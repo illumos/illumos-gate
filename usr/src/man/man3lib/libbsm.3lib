@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libbsm 3LIB "24 Mar 2004" "SunOS 5.11" "Interface Libraries"
+.TH LIBBSM 3LIB "Mar 24, 2004"
 .SH NAME
 libbsm \- basic security library
 .SH SYNOPSIS
@@ -27,68 +27,62 @@ interfaces.
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBau_close\fR\fBau_open\fR
-\fBau_preselect\fR\fBau_to_arg\fR
-\fBau_to_arg32\fR\fBau_to_arg64\fR
-\fBau_to_attr\fR\fBau_to_cmd\fR
-\fBau_to_data\fR\fBau_to_groups\fR
-\fBau_to_in_addr\fR\fBau_to_ipc\fR
-\fBau_to_iport\fR\fBau_to_me\fR
-\fBau_to_newgroups\fR\fBau_to_opaque\fR
-\fBau_to_path\fR\fBau_to_process\fR
-\fBau_to_process_ex\fR\fBau_to_return\fR
-\fBau_to_return32\fR\fBau_to_return64\fR
-\fBau_to_socket\fR\fBau_to_subject\fR
-\fBau_to_subject_ex\fR\fBau_to_text\fR
-\fBau_user_mask\fR\fBau_write\fR
-\fBaudit\fR\fBauditon\fR
-\fBauditsvc\fR\fBendac\fR
-\fBendauclass\fR\fBendauevent\fR
-\fBendauuser\fR\fBgetacdir\fR
-\fBgetacflg\fR\fBgetacmin\fR
-\fBgetacna\fR\fBgetauclassent\fR
-\fBgetauclassent_r\fR\fBgetauclassnam\fR
-\fBgetauclassnam_r\fR\fBgetaudit\fR
-\fBgetaudit_addr\fR\fBgetauditflagsbin\fR
-\fBgetauditflagschar\fR\fBgetauevent\fR
-\fBgetauevent_r\fR\fBgetauevnam\fR
-\fBgetauevnam_r\fR\fBgetauevnonam\fR
-\fBgetauevnum\fR\fBgetauevnum_r\fR
-\fBgetauid\fR\fBgetauuserent\fR
-\fBgetauuserent_r\fR\fBgetauusernam\fR
-\fBgetauusernam_r\fR\fBgetfauditflags\fR
-\fBsetac\fR\fBsetauclass\fR
-\fBsetauclassfile\fR\fBsetaudit\fR
-\fBsetaudit_addr\fR\fBsetauevent\fR
-\fBsetaueventfile\fR\fBsetauid\fR
-\fBsetauuser\fR\fBsetauuserfile\fR
-\fBtestac\fR
+l l
+l l .
+\fBau_close\fR	\fBau_open\fR
+\fBau_preselect\fR	\fBau_to_arg\fR
+\fBau_to_arg32\fR	\fBau_to_arg64\fR
+\fBau_to_attr\fR	\fBau_to_cmd\fR
+\fBau_to_data\fR	\fBau_to_groups\fR
+\fBau_to_in_addr\fR	\fBau_to_ipc\fR
+\fBau_to_iport\fR	\fBau_to_me\fR
+\fBau_to_newgroups\fR	\fBau_to_opaque\fR
+\fBau_to_path\fR	\fBau_to_process\fR
+\fBau_to_process_ex\fR	\fBau_to_return\fR
+\fBau_to_return32\fR	\fBau_to_return64\fR
+\fBau_to_socket\fR	\fBau_to_subject\fR
+\fBau_to_subject_ex\fR	\fBau_to_text\fR
+\fBau_user_mask\fR	\fBau_write\fR
+\fBaudit\fR	\fBauditon\fR
+\fBauditsvc\fR	\fBendac\fR
+\fBendauclass\fR	\fBendauevent\fR
+\fBendauuser\fR	\fBgetacdir\fR
+\fBgetacflg\fR	\fBgetacmin\fR
+\fBgetacna\fR	\fBgetauclassent\fR
+\fBgetauclassent_r\fR	\fBgetauclassnam\fR
+\fBgetauclassnam_r\fR	\fBgetaudit\fR
+\fBgetaudit_addr\fR	\fBgetauditflagsbin\fR
+\fBgetauditflagschar\fR	\fBgetauevent\fR
+\fBgetauevent_r\fR	\fBgetauevnam\fR
+\fBgetauevnam_r\fR	\fBgetauevnonam\fR
+\fBgetauevnum\fR	\fBgetauevnum_r\fR
+\fBgetauid\fR	\fBgetauuserent\fR
+\fBgetauuserent_r\fR	\fBgetauusernam\fR
+\fBgetauusernam_r\fR	\fBgetfauditflags\fR
+\fBsetac\fR	\fBsetauclass\fR
+\fBsetauclassfile\fR	\fBsetaudit\fR
+\fBsetaudit_addr\fR	\fBsetauevent\fR
+\fBsetaueventfile\fR	\fBsetauid\fR
+\fBsetauuser\fR	\fBsetauuserfile\fR
+\fBtestac\fR	
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/libbsm.so.1\fR\fR
 .ad
 .RS 23n
-.rt  
 shared object
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/64/libbsm.so.1\fR\fR
 .ad
 .RS 23n
-.rt  
 64-bit shared object
 .RE
 
@@ -100,12 +94,11 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
-MT-LevelT{
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+MT-Level	T{
 See individual man page for each function.
 T}
 .TE

@@ -2,14 +2,14 @@
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH open 2 "16 Jun 2008" "SunOS 5.11" "System Calls"
+.TH OPEN 2 "Jun 16, 2008"
 .SH NAME
 open, openat \- open a file
 .SH SYNOPSIS
@@ -68,34 +68,28 @@ exactly one of the first three values (file access modes) below in the value of
 \fIoflag\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_RDONLY\fR\fR
 .ad
 .RS 12n
-.rt  
 Open for reading only.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_WRONLY\fR\fR
 .ad
 .RS 12n
-.rt  
 Open for writing only.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_RDWR\fR\fR
 .ad
 .RS 12n
-.rt  
 Open for reading and writing. The result is undefined if this flag is applied
 to a FIFO.
 .RE
@@ -105,7 +99,6 @@ to a FIFO.
 Any combination of the following may be used:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_APPEND\fR\fR
 .ad
@@ -116,7 +109,6 @@ If set, the file offset is set to the end of the file prior to each write.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_CREAT\fR\fR
 .ad
@@ -149,7 +141,6 @@ both.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_DSYNC\fR\fR
 .ad
@@ -161,7 +152,6 @@ I/O data integrity completion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_EXCL\fR\fR
 .ad
@@ -179,7 +169,6 @@ regardless of the contents of the symbolic link. If \fBO_EXCL\fR is set and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_LARGEFILE\fR\fR
 .ad
@@ -191,7 +180,6 @@ that can be represented correctly in an object of type \fBoff64_t\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_NOCTTY\fR\fR
 .ad
@@ -203,7 +191,6 @@ the terminal device to become the controlling terminal for the process.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_NOFOLLOW\fR\fR
 .ad
@@ -215,7 +202,6 @@ If the path names a symbolic link, \fBopen()\fR fails and sets \fBerrno\fR to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_NOLINKS\fR\fR
 .ad
@@ -227,7 +213,6 @@ sets \fBerrno\fR to \fBEMLINK\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_NONBLOCK\fR or \fBO_NDELAY\fR\fR
 .ad
@@ -285,7 +270,6 @@ Otherwise, the behavior of \fBO_NONBLOCK\fR and \fBO_NDELAY\fR is unspecified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_RSYNC\fR\fR
 .ad
@@ -302,7 +286,6 @@ file integrity completion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_SYNC\fR\fR
 .ad
@@ -314,7 +297,6 @@ I/O file integrity completion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_TRUNC\fR\fR
 .ad
@@ -329,7 +311,6 @@ result of using \fBO_TRUNC\fR with \fBO_RDONLY\fR is undefined.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_XATTR\fR\fR
 .ad
@@ -391,34 +372,28 @@ were called with \fIcmd\fR \fBF_SHARE_NBMAND\fR and the \fBfshare_t\fR values
 set as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBf_access\fR\fR
 .ad
 .RS 12n
-.rt  
 Set to the type of read/write access for which the file is opened.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBf_deny\fR\fR
 .ad
 .RS 12n
-.rt  
 \fBF_NODNY\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBf_id\fR\fR
 .ad
 .RS 12n
-.rt  
 The file descriptor value returned from \fBopen()\fR.
 .RE
 
@@ -447,12 +422,10 @@ and no files are created or modified.
 The \fBopen()\fR and \fBopenat()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 16n
-.rt  
 Search permission is denied on a component of the path prefix.
 .sp
 The file exists and the permissions specified by \fIoflag\fR are denied.
@@ -472,35 +445,29 @@ processes to open files for reading regardless of permission bits.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 16n
-.rt  
 A mandatory share reservation could not be obtained because the desired access
 conflicts with an existing \fBf_deny\fR share reservation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 16n
-.rt  
 The file descriptor provided to \fBopenat()\fR is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEDQUOT\fR\fR
 .ad
 .RS 16n
-.rt  
 The file does not exist, \fBO_CREAT\fR is specified, and either the directory
 where the new file entry is being placed cannot be extended because the user's
 quota of disk blocks on that file system has been exhausted, or the user's
@@ -510,23 +477,19 @@ exhausted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEEXIST\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fBO_CREAT\fR and \fBO_EXCL\fR flags are set and the named file exists.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEILSEQ\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIpath\fR argument includes non-UTF8 characters and the file system
 accepts only file names where all characters are part of the UTF-8 character
 codeset.
@@ -534,34 +497,28 @@ codeset.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 16n
-.rt  
 A signal was caught during \fBopen()\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIpath\fR argument points to an illegal address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 16n
-.rt  
 The system does not support synchronized I/O for this file, or the
 \fBO_XATTR\fR flag was supplied and the underlying file system does not support
 extended file attributes.
@@ -569,36 +526,30 @@ extended file attributes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIpath\fR argument names a \fBSTREAMS\fR file and a hangup or error
 occurred during the \fBopen()\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEISDIR\fR\fR
 .ad
 .RS 16n
-.rt  
 The named file is a directory and \fIoflag\fR includes \fBO_WRONLY\fR or
 \fBO_RDWR\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBELOOP\fR\fR
 .ad
 .RS 16n
-.rt  
 Too many symbolic links were encountered in resolving \fIpath\fR.
 .sp
 A loop exists in symbolic links encountered during resolution of the \fIpath\fR
@@ -610,71 +561,59 @@ link.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEMFILE\fR\fR
 .ad
 .RS 16n
-.rt  
 There are currently {\fBOPEN_MAX\fR} file descriptors open in the calling
 process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEMLINK\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fBO_NOLINKS\fR flag is set and the named file has a link count greater
 than 1.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEMULTIHOP\fR\fR
 .ad
 .RS 16n
-.rt  
 Components of \fIpath\fR require hopping to multiple remote machines and the
 file system does not allow it.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENAMETOOLONG\fR\fR
 .ad
 .RS 16n
-.rt  
 The length of the \fIpath\fR argument exceeds {\fBPATH_MAX\fR} or a pathname
 component is longer than {\fBNAME_MAX\fR}.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENFILE\fR\fR
 .ad
 .RS 16n
-.rt  
 The maximum allowable number of files is currently open in the system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fBO_CREAT\fR flag is not set and the named file does not exist; or the
 \fBO_CREAT\fR flag is set and either the path prefix does not exist or the
 \fIpath\fR argument points to an empty string.
@@ -682,59 +621,49 @@ The \fBO_CREAT\fR flag is not set and the named file does not exist; or the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOLINK\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIpath\fR argument points to a remote machine, and the link to that
 machine is no longer active.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSR\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIpath\fR argument names a STREAMS-based file and the system is unable to
 allocate a STREAM.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSPC\fR\fR
 .ad
 .RS 16n
-.rt  
 The directory or file system that would contain the new file cannot be
 expanded, the file does not exist, and \fBO_CREAT\fR is specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSYS\fR\fR
 .ad
 .RS 16n
-.rt  
 The device specified by \fIpath\fR does not support the open operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTDIR\fR\fR
 .ad
 .RS 16n
-.rt  
 A component of the path prefix is not a directory or a relative path was
 supplied to \fBopenat()\fR, the \fBO_XATTR\fR flag was not supplied, and the
 file descriptor does not refer to a directory.
@@ -742,12 +671,10 @@ file descriptor does not refer to a directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENXIO\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fBO_NONBLOCK\fR flag is set, the named file is a FIFO, the \fBO_WRONLY\fR
 flag is set, and no process has the file open for reading; or the named file is
 a character special or block special file and the device associated with this
@@ -757,23 +684,19 @@ framework .
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOPNOTSUPP\fR\fR
 .ad
 .RS 16n
-.rt  
 An attempt was made to open a path that corresponds to a \fBAF_UNIX\fR socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOVERFLOW\fR\fR
 .ad
 .RS 16n
-.rt  
 The named file is a regular file and either \fBO_LARGEFILE\fR is not set and
 the size of the file cannot be represented correctly in an object of type
 \fBoff_t\fR or \fBO_LARGEFILE\fR is set and the size of the file cannot be
@@ -782,12 +705,10 @@ represented correctly in an object of type \fBoff64_t\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEROFS\fR\fR
 .ad
 .RS 16n
-.rt  
 The named file resides on a read-only file system and either \fBO_WRONLY\fR,
 \fBO_RDWR\fR, \fBO_CREAT\fR (if file does not exist), or \fBO_TRUNC\fR is set
 in the \fIoflag\fR argument.
@@ -798,12 +719,10 @@ in the \fIoflag\fR argument.
 The \fBopenat()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 9n
-.rt  
 The \fIfildes\fR argument is not a valid open file descriptor or is not
 \fBAT_FTCWD\fR.
 .RE
@@ -813,59 +732,49 @@ The \fIfildes\fR argument is not a valid open file descriptor or is not
 The \fBopen()\fR function may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIpath\fR argument names the slave side of a pseudo-terminal device that
 is locked.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 16n
-.rt  
 The value of the \fIoflag\fR argument is not valid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENAMETOOLONG\fR\fR
 .ad
 .RS 16n
-.rt  
 Pathname resolution of a symbolic link produced an intermediate result whose
 length exceeds {\fBPATH_MAX\fR}.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIpath\fR argument names a \fBSTREAMS\fR file and the system is unable to
 allocate resources.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBETXTBSY\fR\fR
 .ad
 .RS 16n
-.rt  
 The file is a pure procedure (shared text) file that is being executed and
 \fIoflag\fR is \fBO_WRONLY\fR or \fBO_RDWR\fR.
 .RE
@@ -914,8 +823,8 @@ file and exits.
 .nf
 #include <fcntl.h>
 #include <stdio.h>
-#include <stdlib.h>                              
-#define LOCKFILE "/etc/ptmp"                     
+#include <stdlib.h>
+#define LOCKFILE "/etc/ptmp"
 \&...
 int pfd; /* Integer for file descriptor returned by open() call. */
 \&...
@@ -971,17 +880,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelAsync-Signal-Safe
+MT-Level	Async-Signal-Safe
 _
-StandardFor \fBopen()\fR, see \fBstandards\fR(5).
+Standard	For \fBopen()\fR, see \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO

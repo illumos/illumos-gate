@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH lpusers 1M "19 Aug 1996" "SunOS 5.11" "System Administration Commands"
+.TH LPUSERS 1M "Aug 19, 1996"
 .SH NAME
 lpusers \- set printing queue priorities
 .SH SYNOPSIS
@@ -52,56 +52,46 @@ can request when submitting a print request. The \fIlogin-ID-list\fR argument
 may include  any or all of the following constructs:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlogin-ID\fR\fR
 .ad
 .RS 24n
-.rt  
 A user on any system
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsystem_name\fR\fB!\fR\fIlogin-ID\fR\fR
 .ad
 .RS 24n
-.rt  
 A user on the system \fIsystem_name\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsystem_name\fR\fB!all\fR\fR
 .ad
 .RS 24n
-.rt  
 All users on system \fIsystem_name\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBall!\fR\fIlogin-ID\fR\fR
 .ad
 .RS 24n
-.rt  
 A user on all systems
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBall\fR\fR
 .ad
 .RS 24n
-.rt  
 All users on all systems
 .RE
 
@@ -131,7 +121,6 @@ and the priority limits assigned to users.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fI priority-level\fR\fR
 .ad
@@ -142,7 +131,6 @@ Set the system-wide priority default to \fIpriority-level\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
@@ -153,7 +141,6 @@ List the default priority level and the priority limits assigned to users.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fI priority-level\fR\fR
 .ad
@@ -164,7 +151,6 @@ Set the default highest priority level for all users not explicitly covered.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fI priority-level\fR \fB-u\fR\fI login-ID-list\fR\fR
 .ad
@@ -176,7 +162,6 @@ Set the default highest \fIpriority-level\fR that the users in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fI login-ID-list\fR\fR
 .ad
@@ -191,23 +176,19 @@ Remove any explicit priority level for the specified users.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnon-zero\fR
 .ad
 .RS 12n
-.rt  
 An error occurred.
 .RE
 

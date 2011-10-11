@@ -2,26 +2,26 @@
 .\" Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH at 1 "13 Apr 2005" "SunOS 5.11" "User Commands"
+.TH AT 1 "Apr 13, 2005"
 .SH NAME
 at, batch \- execute commands at a later time
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/at\fR [\fB-c\fR | \fB-k\fR | \fB-s\fR] [\fB-m\fR] [\fB-f\fR \fIfile\fR] [\fB-p\fR \fIproject\fR] 
+\fB/usr/bin/at\fR [\fB-c\fR | \fB-k\fR | \fB-s\fR] [\fB-m\fR] [\fB-f\fR \fIfile\fR] [\fB-p\fR \fIproject\fR]
      [\fB-q\fR \fIqueuename\fR] \fB-t\fR \fItime\fR
 .fi
 
 .LP
 .nf
-\fB/usr/bin/at\fR [\fB-c\fR | \fB-k\fR | \fB-s\fR] [\fB-m\fR] [\fB-f\fR \fIfile\fR] [\fB-p\fR \fIproject\fR] 
+\fB/usr/bin/at\fR [\fB-c\fR | \fB-k\fR | \fB-s\fR] [\fB-m\fR] [\fB-f\fR \fIfile\fR] [\fB-p\fR \fIproject\fR]
      [\fB-q\fR \fIqueuename\fR] \fItimespec\fR...
 .fi
 
@@ -42,19 +42,19 @@ at, batch \- execute commands at a later time
 
 .LP
 .nf
-\fB/usr/xpg4/bin/at\fR [\fB-c\fR | \fB-k\fR | \fB-s\fR] [\fB-m\fR] [\fB-f\fR \fIfile\fR] [\fB-p\fR \fIproject\fR] 
+\fB/usr/xpg4/bin/at\fR [\fB-c\fR | \fB-k\fR | \fB-s\fR] [\fB-m\fR] [\fB-f\fR \fIfile\fR] [\fB-p\fR \fIproject\fR]
      [\fB-q\fR \fIqueuename\fR] \fB-t\fR \fItime\fR
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/at\fR [\fB-c\fR | \fB-k\fR | \fB-s\fR] [\fB-m\fR] [\fB-f\fR \fIfile\fR] [\fB-p\fR \fIproject\fR] 
+\fB/usr/xpg4/bin/at\fR [\fB-c\fR | \fB-k\fR | \fB-s\fR] [\fB-m\fR] [\fB-f\fR \fIfile\fR] [\fB-p\fR \fIproject\fR]
      [\fB-q\fR \fIqueuename\fR] \fItimespec\fR...
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/at\fR \fB-l\fR [\fB-p\fR \fIproject\fR] [\fB-q\fR \fIqueuename\fR] 
+\fB/usr/xpg4/bin/at\fR \fB-l\fR [\fB-p\fR \fIproject\fR] [\fB-q\fR \fIqueuename\fR]
      [\fIat_job_id.\fR \fI\&..\fR]
 .fi
 
@@ -154,57 +154,47 @@ If \fBSHELL\fR is unset or \fBNULL\fR, \fB/usr/bin/sh\fR is used.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fR
 .ad
 .RS 17n
-.rt  
 C shell. \fBcsh\fR(1) is used to execute the at-job.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR \fR
 .ad
 .RS 17n
-.rt  
 Korn shell. \fBksh\fR(1) is used to execute the at-job.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fR
 .ad
 .RS 17n
-.rt  
 Bourne shell. \fBsh\fR(1) is used to execute the at-job.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIfile\fR \fR
 .ad
 .RS 17n
-.rt  
 Specifies the path of a file to be used as the source of the at-job, instead of
 standard input.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fR
 .ad
 .RS 17n
-.rt  
 (The letter ell.) Reports all jobs scheduled for the invoking user if no
 \fIat_job_id\fR operands are specified. If \fIat_job_id\fRs are specified,
 reports only information for these jobs.
@@ -212,12 +202,10 @@ reports only information for these jobs.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fR
 .ad
 .RS 17n
-.rt  
 Sends mail to the invoking user after the at-job has run, announcing its
 completion. Standard output and standard error produced by the at-job are
 mailed to the user as well, unless redirected elsewhere. Mail is sent even if
@@ -231,12 +219,10 @@ completion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIproject\fR\fR
 .ad
 .RS 17n
-.rt  
 Specifies under which project the \fBat\fR or \fBbatch\fR job is run. When used
 with the \fB-l\fR option, limits the search to that particular project. Values
 for \fIproject\fR is interpreted first as a project name, and then as a
@@ -246,12 +232,10 @@ project is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR \fIqueuename\fR \fR
 .ad
 .RS 17n
-.rt  
 Specifies in which queue to schedule a job for submission. When used with the
 \fB-l\fR option, limits the search to that particular queue. Values for
 \fIqueuename\fR are limited to the lower case letters \fBa\fR through \fBz\fR.
@@ -262,24 +246,20 @@ can not be used with the \fB-q\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIat_job_id\fR \fR
 .ad
 .RS 17n
-.rt  
 Removes the jobs with the specified \fIat_job_id\fR operands that were
 previously scheduled by the \fBat\fR utility.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fItime\fR \fR
 .ad
 .RS 17n
-.rt  
 Submits the job to be run at the time specified by the \fItime\fR
 option-argument, which must have the format as specified by the \fBtouch\fR(1)
 utility.
@@ -291,24 +271,20 @@ utility.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIat_job_id\fR \fR
 .ad
 .RS 14n
-.rt  
 The name reported by a previous invocation of the \fBat\fR utility at the time
 the job was scheduled.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItimespec\fR \fR
 .ad
 .RS 14n
-.rt  
 Submit the job to be run at the date and time specified. All of the
 \fItimespec\fR operands are interpreted as if they were separated by space
 characters and concatenated. The date and time are interpreted as being in the
@@ -320,12 +296,10 @@ specification string. All of the values from the \fBLC_TIME\fR categories in
 the "C" locale are recognized in a case-insensitive manner.
 .sp
 .ne 2
-.mk
 .na
 \fB\fItime\fR \fR
 .ad
 .RS 14n
-.rt  
 The \fItime\fR can be specified as one, two or four digits. One- and two-digit
 numbers are taken to be hours, four-digit numbers to be hours and minutes. The
 time can alternatively be specified as two numbers separated by a colon,
@@ -338,34 +312,28 @@ specified using the \fBTZ\fR environment variable. The \fItime\fR field can
 also be one of the following tokens in the "C" locale:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmidnight\fR \fR
 .ad
 .RS 13n
-.rt  
 Indicates the time 12:00 am (00:00).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoon\fR \fR
 .ad
 .RS 13n
-.rt  
 Indicates the time 12:00 pm.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnow\fR \fR
 .ad
 .RS 13n
-.rt  
 Indicate the current day and time. Invoking \fBat\fR \fBnow\fR submits an
 at-job for potentially immediate execution (that is, subject only to
 unspecified scheduling delays).
@@ -375,12 +343,10 @@ unspecified scheduling delays).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdate\fR \fR
 .ad
 .RS 14n
-.rt  
 An optional \fIdate\fR can be specified as either a month name (one of the
 values from the \fBmon\fR or \fBabmon\fR keywords in the \fBLC_TIME\fR locale
 category) followed by a day number (and possibly year number preceded by a
@@ -389,23 +355,19 @@ comma) or a day of the week (one of the values from the \fBday\fR or
 are recognized in the "C" locale:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtoday\fR \fR
 .ad
 .RS 13n
-.rt  
 Indicates the current day.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtomorrow\fR \fR
 .ad
 .RS 13n
-.rt  
 Indicates the day following the current day.
 .RE
 
@@ -417,12 +379,10 @@ assumed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIincrement\fR \fR
 .ad
 .RS 14n
-.rt  
 The optional \fIincrement\fR is a number preceded by a plus sign (\fB+\fR) and
 suffixed by one of the following: \fBminutes\fR, \fBhours\fR, \fBdays\fR,
 \fBweeks\fR, \fBmonths\fR, or \fByears\fR. (The singular forms are also
@@ -573,12 +533,10 @@ that affect the execution of \fBat\fR and \fBbatch\fR: \fBLANG\fR,
 \fBLC_TIME\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDATEMSK\fR \fR
 .ad
 .RS 12n
-.rt  
 If the environment variable \fBDATEMSK\fR is set, \fBat\fR uses its value as
 the full path name of a template file containing format strings. The strings
 consist of format specifiers and text characters that are used to provide a
@@ -593,12 +551,10 @@ not recognized when \fBDATEMSK\fR is set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSHELL\fR \fR
 .ad
 .RS 12n
-.rt  
 Determine a name of a command interpreter to be used to invoke the at-job. If
 the variable is unset or \fINULL\fR, \fBsh\fR is used. If it is set to a value
 other than \fBsh\fR, the implementation uses that shell; a warning diagnostic
@@ -607,12 +563,10 @@ is printed telling which shell will be used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTZ\fR \fR
 .ad
 .RS 12n
-.rt  
 Determine the timezone. The job is submitted for execution at the time
 specified by \fItimespec\fR or \fB-t\fR \fItime\fR relative to the timezone
 specified by the \fBTZ\fR variable. If \fItimespec\fR specifies a timezone, it
@@ -626,47 +580,39 @@ is unset or \fINULL\fR, an unspecified default timezone is used.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 7n
-.rt  
 The \fBat\fR utility successfully submitted, removed or listed a job or jobs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR \fR
 .ad
 .RS 7n
-.rt  
 An error occurred, and the job will not be scheduled.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/cron/at.allow\fR \fR
 .ad
 .RS 27n
-.rt  
 names of users, one per line, who are authorized access to the \fBat\fR and
 \fBbatch\fR utilities
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/cron/at.deny\fR \fR
 .ad
 .RS 27n
-.rt  
 names of users, one per line, who are denied access to the \fBat\fR and
 \fBbatch\fR utilities
 .RE
@@ -680,15 +626,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSINot enabled
+CSI	Not enabled
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SS "/usr/xpg4/bin/at"
@@ -696,15 +641,14 @@ Interface StabilityStandard
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSINot enabled
+CSI	Not enabled
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SS "/usr/bin/batch"
@@ -712,15 +656,14 @@ Interface StabilityStandard
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SS "/usr/xpg4/bin/batch"
@@ -728,15 +671,14 @@ Interface StabilityStandard
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

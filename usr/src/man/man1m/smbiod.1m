@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH smbiod 1M "7 Jul 2009" "SunOS 5.11" "System Administration Commands"
+.TH SMBIOD 1M "Jul 7, 2009"
 .SH NAME
 smbiod \- SMB client I/O daemon
 .SH SYNOPSIS
@@ -48,57 +48,47 @@ The \fBsmbiod\fR daemon has no external, customer-accessible interfaces.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB0\fR
 .ad
 .RS 13n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB>0\fR
 .ad
 .RS 13n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/smbfs/smbiod\fR\fR
 .ad
 .RS 25n
-.rt  
 SMB I/O daemon.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/tmp/.smbiod-\fIUID\fR\fR\fR
 .ad
 .RS 25n
-.rt  
 File on which to instantiate a door service for user \fIUID\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/run/smbiod-0\fR\fR
 .ad
 .RS 25n
-.rt  
 File on which to instantiate a door service for superuser.
 .RE
 
@@ -111,13 +101,12 @@ attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityUncommitted
+Interface Stability	Uncommitted
 .TE
 
 .SH SEE ALSO

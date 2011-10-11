@@ -2,13 +2,13 @@
 .\" Copyright (c) 1986-2006 AT&T Knowledge Ventures
 .\" To view license terms, see http://www.opensource.org/licenses/cpl1.0.txt
 .\" Portions Copyright (c) 2007, Sun Microsystems, Inc.
-.TH msgcpp 1 "9 Oct 2007" "SunOS 5.11" "User Commands"
+.TH MSGCPP 1 "Oct 9, 2007"
 .SH NAME
 msgcpp \- C language message catalog preprocessor
 .SH SYNOPSIS
 .LP
 .nf
-\fBmsgcpp\fR [\fB-ACEHMPVX\fR] [\fB-D\fR \fIname\fR[\fB=\fR\fIvalue\fR]] [\fB-I\fR \fIdirectory\fR] [\fB-U\fR \fIname\fR] 
+\fBmsgcpp\fR [\fB-ACEHMPVX\fR] [\fB-D\fR \fIname\fR[\fB=\fR\fIvalue\fR]] [\fB-I\fR \fIdirectory\fR] [\fB-U\fR \fIname\fR]
  [\fB-T\fR[\fIlength\fR]] [\fB-Y\fR \fIdirectory\fR] [\fIinput\fR [\fIoutput\fR] ]
 .fi
 
@@ -23,46 +23,38 @@ Candidate message text is determined by arguments to the last \fB<error.h>\fR
 and \fB<option.h>\fR functions. The \fBmsgcpp\fR keyed output lines are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcmd\fR \fIcommand\fR\fR
 .ad
 .RS 19n
-.rt  
 \fIcommand\fR is a candidate for \fB--??keys\fR option string generation. This
 is triggered by \fBb_command(int argc\fR, in the input.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdef\fR \fIname string\fR\fR
 .ad
 .RS 19n
-.rt  
 \fIname\fR is a candidate variable with \fIstring\fR value string.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstr\fR \fIstring\fR\fR
 .ad
 .RS 19n
-.rt  
 \fIstring\fR should be entered into the catalog.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvar\fR \fIname\fR\fR
 .ad
 .RS 19n
-.rt  
 If \fBdef\fR \fIname\fR occurs then its string value should be entered into the
 catalog.
 .RE
@@ -120,7 +112,6 @@ _BLD_msgcat ... #endif\fR.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR\fR
 .ad
@@ -129,13 +120,11 @@ The following options are supported:
 \fB\fB--assert=\fR\fIassertion\fR\fR
 .ad
 .RS 25n
-.rt  
 Enter the assertion using \fB#assert\fR for system V compatibility.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
@@ -144,7 +133,6 @@ Enter the assertion using \fB#assert\fR for system V compatibility.
 \fB\fB--comments\fR\fR
 .ad
 .RS 25n
-.rt  
 Pass comments to the output.
 .sp
 Comments are omitted by default.
@@ -152,7 +140,6 @@ Comments are omitted by default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR\fR
 .ad
@@ -161,7 +148,6 @@ Comments are omitted by default.
 \fB\fB--define=\fR\fIname\fR\fB[=\fR\fIvalue\fR\fB]\fR\fR
 .ad
 .RS 25n
-.rt  
 Define the macro \fIname\fR to have \fIvalue\fR. This is the only portable way
 to pass options through \fBcc\fR to \fBcpp\fR(1).
 .RS +4
@@ -202,7 +188,6 @@ definition.
 .RE
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D-C\fR\fR
 .ad
@@ -217,7 +202,6 @@ Preprocess for K&R C compatibility.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D-D\fR\fIlevel\fR\fR
 .ad
@@ -236,7 +220,6 @@ produce more output. Levels higher than \fB3\fR can only be enabled in the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D-F\fR\fIname\fR\fR
 .ad
@@ -248,7 +231,6 @@ messages and the line sync output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D-H\fR\fR
 .ad
@@ -264,7 +246,6 @@ directory headers are suppressed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D-I\fR\fR
 .ad
@@ -280,7 +261,6 @@ All directories contain C headers. This option is only used only with
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D-K\fR\fR
 .ad
@@ -295,7 +275,6 @@ Enable the non-standard \fIname\fR\fB=\fR\fIvalue\fR macro argument mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D-L\fR\fB[\fR\fIid\fR\fB]\fR\fR
 .ad
@@ -311,7 +290,6 @@ to null.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D-M\fR\fR
 .ad
@@ -326,7 +304,6 @@ Disable multiple include detection.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D-P\fR\fR
 .ad
@@ -342,7 +319,6 @@ non-C input.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D-Q\fR\fR
 .ad
@@ -358,7 +334,6 @@ Dump macro definitions to the output so that the output may be passed through
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D-R\fR\fR
 .ad
@@ -374,7 +349,6 @@ cannot make up their semantics between K&R and ISO C.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D-S\fR\fR
 .ad
@@ -390,7 +364,6 @@ Enable strict preprocessing semantics and warnings. This works with any mode
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D-T\fR\fItest\fR\fR
 .ad
@@ -405,7 +378,6 @@ Enable implementation specific test code according to \fItest\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D-W\fR\fR
 .ad
@@ -420,7 +392,6 @@ Enable pedantic warnings in non-hosted files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D-X\fR\fB[cc]\fR\fR
 .ad
@@ -436,7 +407,6 @@ executable on \fB$PATH\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D-Z\fR\fR
 .ad
@@ -451,7 +421,6 @@ Enable pool mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D-d\fR\fR
 .ad
@@ -463,7 +432,6 @@ output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D-m\fR\fR
 .ad
@@ -475,7 +443,6 @@ disabled.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D-+\fR\fR
 .ad
@@ -492,7 +459,6 @@ Preprocess for the C++ dialect.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-E\fR\fR
 .ad
@@ -501,13 +467,11 @@ Preprocess for the C++ dialect.
 \fB\fB--preprocess\fR\fR
 .ad
 .RS 25n
-.rt  
 Ignored; for compatibility with very old compilers.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-H\fR\fR
 .ad
@@ -516,14 +480,12 @@ Ignored; for compatibility with very old compilers.
 \fB\fB--include-reference\fR\fR
 .ad
 .RS 25n
-.rt  
 Emit \fB#include\fR file paths on the standard error, one per line, indented to
 show nesting.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I\fR\fR
 .ad
@@ -532,7 +494,6 @@ show nesting.
 \fB\fB--include[=\fR\fIdirectory\fR\fB]\fR\fR
 .ad
 .RS 25n
-.rt  
 Append directory to the list of directories searched for \fB#include\fR files.
 .sp
 If directory is \fB-\fR:
@@ -556,7 +517,6 @@ the directory \fB\&.\fR is searched only if it is explicitly specified by an
 .RE
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I-C\fR\fIdirectory\fR\fR
 .ad
@@ -572,7 +532,6 @@ Mark \fIdirectory\fR as a C header directory. This option is used with
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I-D[\fR\fIfile\fR]\fR
 .ad
@@ -584,7 +543,6 @@ definitions if \fIfile\fR is omitted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I-H\fR\fIdirectory\fR\fR
 .ad
@@ -600,7 +558,6 @@ compatibility warnings disabled.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I-I\fR\fIheader\fR\fR
 .ad
@@ -615,7 +572,6 @@ Add \fIheader\fR to the list of ignored headers.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I-M\fR\fIfile\fR\fR
 .ad
@@ -628,7 +584,6 @@ for header. header is ignored \fBif = "map"\fR is omitted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I-R\fR\fIfile\fR\fR
 .ad
@@ -639,7 +594,6 @@ Include \fIfile\fR but do not emit text or line syncs.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I-S\fR\fIdirectory\fR\fR
 .ad
@@ -650,7 +604,6 @@ Add \fIdirectory\fR to the default standard include directory list.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I-T\fR\fIfile\fR\fR
 .ad
@@ -664,7 +617,6 @@ omitted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR\fR
 .ad
@@ -673,7 +625,6 @@ omitted.
 \fB\fB--dependencies\fR\fR
 .ad
 .RS 25n
-.rt  
 Generate \fBmake\fR(1S) dependencies. This option is not needed with
 \fBnmake\fR.
 .sp
@@ -683,35 +634,29 @@ output styles.
 The following optional flags are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBD\fR\fR
 .ad
 .RS 5n
-.rt  
 Generate dependencies in a separate \fB\&.d\fR file. Preprocessed output is
 still written to output, or the standard output if output is omitted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBG\fR\fR
 .ad
 .RS 5n
-.rt  
 Also generate missing dependencies.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM\fR\fR
 .ad
 .RS 5n
-.rt  
 Only generate local header dependencies. Hosted headers are omitted. Hosted
 headers are determined by the \fB-I-H\fR option and the -\fB-pp:hosted\fR and
 \fBpp:hostdir pragmas\fR. No special distinction is made between the \fB""\fR
@@ -722,7 +667,6 @@ and \fB<>\fR include styles.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR\fR
 .ad
@@ -731,7 +675,6 @@ and \fB<>\fR include styles.
 \fB\fB--sync\fR\fR
 .ad
 .RS 25n
-.rt  
 Emit line syncs.
 .sp
 Line sync is turned on by default. \fB-P\fR means \fB--nosync\fR.
@@ -739,19 +682,16 @@ Line sync is turned on by default. \fB-P\fR means \fB--nosync\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR\fB[\fR\fIlength\fR\fB]\fR\fR
 .ad
 .RS 25n
-.rt  
 If not \fBgcc\fR, truncate identifiers to \fIlength\fR characters for
 compatibility with old AT&T compilers.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-U\fR\fR
 .ad
@@ -760,13 +700,11 @@ compatibility with old AT&T compilers.
 \fB\fB--undefine=\fR\fIname\fR\fR
 .ad
 .RS 25n
-.rt  
 Remove the definition for the macro \fIname\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
@@ -775,13 +713,11 @@ Remove the definition for the macro \fIname\fR.
 \fB\fB--version\fR\fR
 .ad
 .RS 25n
-.rt  
 Emit the \fBlibpp\fR version.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-X\fR\fR
 .ad
@@ -790,14 +726,12 @@ Emit the \fBlibpp\fR version.
 \fB\fB--argmode\fR\fR
 .ad
 .RS 25n
-.rt  
 Enable \fIname\fR\fB=\fR\fIvalue\fR macro arguments for \fBeasel\fR
 compatibility.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Y\fR\fR
 .ad
@@ -806,7 +740,6 @@ compatibility.
 \fB\fB--standard=\fR\fIdirectory\fR\fR
 .ad
 .RS 25n
-.rt  
 Add \fIdirectory\fR to the list searched for \fB#include <...>\fR files.
 .RE
 
@@ -816,46 +749,38 @@ Add \fIdirectory\fR to the list searched for \fB#include <...>\fR files.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinput\fR\fR
 .ad
 .RS 10n
-.rt  
 Specifies C source file to preprocess.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoutput\fR\fR
 .ad
 .RS 10n
-.rt  
 Specifies output file.
 .RE
 
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -911,13 +836,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityVolatile 
+Interface Stability	Volatile
 .TE
 
 .SH SEE ALSO

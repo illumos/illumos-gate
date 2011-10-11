@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH stmfSetLuProp 3STMF "17 Jul 2009" "SunOS 5.11" "SCSI Target Mode Framework Library Functions"
+.TH STMFSETLUPROP 3STMF "Jul 17, 2009"
 .SH NAME
 stmfSetLuProp, stmfGetLuProp \- set or get a logical unit property
 .SH SYNOPSIS
@@ -24,46 +24,38 @@ cc [ \fIflag\fR... ] \fIfile\fR... -lstmf [ \fIlibrary\fR... ]
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhdl\fR\fR
 .ad
 .RS 11n
-.rt  
 A logical unit resource previously allocated by
 \fBstmfCreateLuResource\fR(3STMF) or \fBstmfGetLuResource\fR(3STMF).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprop\fR\fR
 .ad
 .RS 11n
-.rt  
 A property type value. See DESCRIPTION for valid values.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpropVal\fR\fR
 .ad
 .RS 11n
-.rt  
 A property value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpropLen\fR\fR
 .ad
 .RS 11n
-.rt  
 The length of the specified property value. If \fIpropLen\fR was of an
 insufficient size to hold the returned property value, \fIpropLen\fR will
 contain the required size of the buffer and \fBSTMF_ERROR_INVALID_ARG\fR will
@@ -81,7 +73,6 @@ contain no leading characters to indicate a base hexadecimal representation
 values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_LU_PROP_ALIAS\fR\fR
 .ad
@@ -94,7 +85,6 @@ Default: Set to file name of backing store.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_LU_PROP_BLOCK_SIZE\fR\fR
 .ad
@@ -107,7 +97,6 @@ Default: 512
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_LU_PROP_COMPANY_ID\fR\fR
 .ad
@@ -122,7 +111,6 @@ Default: 00144F
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_LU_PROP_DATA_FILENAME\fR\fR
 .ad
@@ -135,7 +123,6 @@ Default: None
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_LU_PROP_GUID\fR\fR
 .ad
@@ -150,7 +137,6 @@ Default: Set by framework to a generated value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_LU_PROP_META_FILENAME\fR\fR
 .ad
@@ -165,7 +151,6 @@ Default: None. If this value is not specified, the value specified in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_LU_PROP_MGMT_URL\fR\fR
 .ad
@@ -177,7 +162,6 @@ one URL can be passed using space delimited URLs.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_LU_PROP_PID\fR\fR
 .ad
@@ -191,7 +175,6 @@ Default: sSet to COMSTAR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_LU_PROP_PRODUCT_REV\fR\fR
 .ad
@@ -205,7 +188,6 @@ Default: Set to 1.0.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_LU_PROP_SERIAL_NUM\fR\fR
 .ad
@@ -219,7 +201,6 @@ Default: None
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_LU_PROP_SIZE\fR\fR
 .ad
@@ -233,7 +214,6 @@ property value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_LU_PROP_VID\fR\fR
 .ad
@@ -247,7 +227,6 @@ Default: Set to SUN.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_LU_PROP_WRITE_CACHE_DISABLE\fR\fR
 .ad
@@ -262,7 +241,6 @@ Default: Writeback cache setting of the backing store device specified by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_LU_PROP_WRITE_PROTECT\fR\fR
 .ad
@@ -280,7 +258,6 @@ Default: "false"
 The following values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_STATUS_SUCCESS\fR\fR
 .ad
@@ -291,7 +268,6 @@ The API call was successful.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_ERROR_INVALID_ARG\fR\fR
 .ad
@@ -302,7 +278,6 @@ Either \fIprop\fR or \fIpropVal\fR is unrecognized.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_ERROR_INVALID_PROPSIZE\fR\fR
 .ad
@@ -313,7 +288,6 @@ The size of \fIpropVal\fR is invalid.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_ERROR_NO_PROP\fR\fR
 .ad
@@ -330,15 +304,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

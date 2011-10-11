@@ -1,13 +1,13 @@
 '\" te
 .\"  Copyright 1994, The X/Open Company Ltd.  All Rights Reserved  Portions Copyright 1989 AT&T  Portions Copyright (c) 1998, Sun Microsystems, Inc.  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH t_open 3NSL "7 May 1998" "SunOS 5.11" "Networking Services Library Functions"
+.TH T_OPEN 3NSL "May 7, 1998"
 .SH NAME
 t_open \- establish a transport endpoint
 .SH SYNOPSIS
@@ -78,12 +78,10 @@ t_scalar_t flags;       /* other info about the transport provider  */
 The values of the fields have the following meanings:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaddr\fR\fR
 .ad
 .RS 12n
-.rt  
 A value greater than zero (\fBT_NULL\fR) indicates the maximum size of a
 transport protocol address and a value of -2 (\fBT_INVALID\fR) specifies that
 the transport provider does not provide user access to transport protocol
@@ -92,12 +90,10 @@ addresses.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoptions\fR\fR
 .ad
 .RS 12n
-.rt  
 A value greater than zero (\fBT_NULL\fR) indicates the maximum number of bytes
 of protocol-specific options supported by the provider, and a value of -2
 (\fBT_INVALID\fR) specifies that the transport provider does not support
@@ -106,12 +102,10 @@ user-settable options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItsdu\fR\fR
 .ad
 .RS 12n
-.rt  
 A value greater than zero (\fBT_NULL\fR specifies the maximum size of a
 transport service data unit (TSDU); a value of zero (\fBT_NULL\fR) specifies
 that the transport provider does not support the concept of TSDU, although it
@@ -123,12 +117,10 @@ that the transfer of normal data is not supported by the transport provider.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIetsdu\fR\fR
 .ad
 .RS 12n
-.rt  
 A value greater than zero (\fBT_NULL\fR) specifies the maximum size of an
 expedited transport service data unit (ETSDU); a value of zero (\fBT_NULL\fR)
 specifies that the transport provider does not support the concept of ETSDU,
@@ -142,12 +134,10 @@ expedited data may be quite different for different transport providers.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIconnect\fR\fR
 .ad
 .RS 12n
-.rt  
 A value greater than zero (\fBT_NULL\fR) specifies the maximum amount of data
 that may be associated with connection establishment functions, and a value of
 -2 (\fBT_INVALID\fR) specifies that the transport provider does not allow data
@@ -156,12 +146,10 @@ to be sent with connection establishment functions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdiscon\fR\fR
 .ad
 .RS 12n
-.rt  
 If the  \fBT_ORDRELDATA\fR bit in flags is clear, a value greater than zero
 (\fBT_NULL\fR) specifies the maximum amount of data that may be associated with
 the \fBt_snddis\fR(3NSL) and \fBt_rcvdis\fR(3NSL) functions, and a value of -2
@@ -174,24 +162,20 @@ number of octets that may be associated with the \fBt_sndreldata()\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIservtype\fR\fR
 .ad
 .RS 12n
-.rt  
 This field specifies the service type supported by the transport provider, as
 described below.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 12n
-.rt  
 This is a bit field used to specify other information about the  communications
 provider.  If the  \fBT_ORDRELDATA\fR bit is set, the communications provider
 supports user data to be sent with an orderly release. If the  \fBT_SENDZERO\fR
@@ -212,36 +196,30 @@ The \fIservtype\fR field of \fIinfo\fR specifies one of the following values on
 return:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT_COTS\fR \fR
 .ad
 .RS 15n
-.rt  
 The transport provider supports a connection-mode service but does not support
 the optional orderly release facility.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT_COTS_ORD\fR \fR
 .ad
 .RS 15n
-.rt  
 The transport provider supports a connection-mode service with the optional
 orderly release facility.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT_CLTS\fR \fR
 .ad
 .RS 15n
-.rt  
 The transport provider supports a connectionless-mode service. For this service
 type, \fBt_open()\fR will return -2 (\fBT_INVALID\fR) for \fIetsdu\fR,
 \fIconnect\fR and \fIdiscon\fR.
@@ -270,34 +248,28 @@ value of -1 is returned and \fBt_errno\fR is set to indicate an error.
 On failure, \fBt_errno\fR is set to the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTBADFLAG\fR\fR
 .ad
 .RS 12n
-.rt  
 An invalid flag is specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTBADNAME\fR\fR
 .ad
 .RS 12n
-.rt  
 Invalid transport provider name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTPROTO\fR\fR
 .ad
 .RS 12n
-.rt  
 This error indicates that a communication problem has been detected between XTI
 and the transport provider for which there is no other suitable XTI error
 \fB(t_errno)\fR.
@@ -305,12 +277,10 @@ and the transport provider for which there is no other suitable XTI error
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTSYSERR\fR\fR
 .ad
 .RS 12n
-.rt  
 A system error has occurred during execution of this function.
 .RE
 
@@ -366,13 +336,12 @@ See \fBattributes\fR(5)  for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT LevelSafe
+MT Level	Safe
 .TE
 
 .SH SEE ALSO

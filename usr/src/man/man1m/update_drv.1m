@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH update_drv 1M "10 Feb 2009" "SunOS 5.11" "System Administration Commands"
+.TH UPDATE_DRV 1M "Feb 10, 2009"
 .SH NAME
 update_drv \- modify device driver attributes
 .SH SYNOPSIS
@@ -14,13 +14,13 @@ update_drv \- modify device driver attributes
 
 .LP
 .nf
-\fBupdate_drv\fR [\fB-b\fR \fIbasedir\fR] [\fB-f\fR | \fB-v\fR] [\fB-n\fR] \fB-a\fR [\fB-m\fR '\fIpermission\fR'] 
+\fBupdate_drv\fR [\fB-b\fR \fIbasedir\fR] [\fB-f\fR | \fB-v\fR] [\fB-n\fR] \fB-a\fR [\fB-m\fR '\fIpermission\fR']
      [\fB-i\fR '\fIidentify-name\fR'] [\fB-P\fR '\fIprivilege\fR'] [\fB-p\fR '\fIpolicy\fR'] \fIdriver_module\fR
 .fi
 
 .LP
 .nf
-\fBupdate_drv\fR [\fB-b\fR \fIbasedir\fR] [\fB-f\fR | \fB-v\fR] [\fB-n\fR] \fB-d\fR [\fB-m\fR '\fIpermission\fR'] 
+\fBupdate_drv\fR [\fB-b\fR \fIbasedir\fR] [\fB-f\fR | \fB-v\fR] [\fB-n\fR] \fB-d\fR [\fB-m\fR '\fIpermission\fR']
      [\fB-i\fR '\fIidentify-name\fR'] [\fB-P\fR '\fIprivilege\fR'] [\fB-p\fR '\fIpolicy\fR'] \fIdriver_module\fR
 .fi
 
@@ -49,7 +49,6 @@ do not get modified.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
@@ -70,7 +69,6 @@ The \fB-a\fR and \fB-d\fR options are mutually exclusive.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR \fIbasedir\fR\fR
 .ad
@@ -91,7 +89,6 @@ zone's file system. See \fBzones\fR(5).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
@@ -111,7 +108,6 @@ If the entry doesn't exist \fBupdate_drv\fR returns an error.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
@@ -129,7 +125,6 @@ such devices remain.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR '\fIidentify-name\fR'\fR
 .ad
@@ -143,7 +138,6 @@ recommended.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR '\fIpermission\fR'\fR
 .ad
@@ -156,7 +150,6 @@ then, this option is ignored. The permission string is mandatory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
@@ -168,7 +161,6 @@ configuration files for that driver.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR '\fIpolicy\fR'\fR
 .ad
@@ -183,7 +175,6 @@ is., no wildcard matching is performed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR '\fIprivilege\fR'\fR
 .ad
@@ -197,7 +188,6 @@ file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -302,7 +292,6 @@ example#   update_drv -a -i '"/pci@8,600000/SUNW,qlc@4"' qlt
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -313,7 +302,6 @@ Successful completion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB>\fB0\fR\fR
 .ad

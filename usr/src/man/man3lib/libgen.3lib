@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libgen 3LIB "24 Mar 2004" "SunOS 5.11" "Interface Libraries"
+.TH LIBGEN 3LIB "Mar 24, 2004"
 .SH NAME
 libgen \- string pattern-matching library
 .SH SYNOPSIS
@@ -27,23 +27,21 @@ interfaces.
 
 .sp
 .TS
-tab();
-lw(1.83i) lw(1.83i) lw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-\fB___braelist\fR\fB___braslist\fR\fB___loc1\fR
-\fB___loc2\fR\fB___locs\fR\fB___nbra\fR
-\fB___regerrno\fR\fB___reglength\fR\fBadvance\fR
-\fBbgets\fR\fBbraelist\fR\fBbraslist\fR
-\fBbufsplit\fR\fBcompile\fR\fBcopylist\fR
-\fBeaccess\fR\fBgmatch\fR\fBisencrypt\fR
-\fBloc1\fR\fBloc2\fR\fBlocs\fR
-\fBmkdirp\fR\fBnbra\fR\fBp2close\fR
-\fBp2open\fR\fBpathfind\fR\fBregerrno\fR
-\fBreglength\fR\fBrmdirp\fR\fBstep\fR
-\fBstrcadd\fR\fBstrccpy\fR\fBstreadd\fR
-\fBstrecpy\fR\fBstrfind\fR\fBstrrspn\fR
-\fBstrtrns\fR
+l l l
+l l l .
+\fB___braelist\fR	\fB___braslist\fR	\fB___loc1\fR
+\fB___loc2\fR	\fB___locs\fR	\fB___nbra\fR
+\fB___regerrno\fR	\fB___reglength\fR	\fBadvance\fR
+\fBbgets\fR	\fBbraelist\fR	\fBbraslist\fR
+\fBbufsplit\fR	\fBcompile\fR	\fBcopylist\fR
+\fBeaccess\fR	\fBgmatch\fR	\fBisencrypt\fR
+\fBloc1\fR	\fBloc2\fR	\fBlocs\fR
+\fBmkdirp\fR	\fBnbra\fR	\fBp2close\fR
+\fBp2open\fR	\fBpathfind\fR	\fBregerrno\fR
+\fBreglength\fR	\fBrmdirp\fR	\fBstep\fR
+\fBstrcadd\fR	\fBstrccpy\fR	\fBstreadd\fR
+\fBstrecpy\fR	\fBstrfind\fR	\fBstrrspn\fR
+\fBstrtrns\fR		
 .TE
 
 .sp
@@ -53,32 +51,26 @@ The following interface is unique to the 32-bit version of this library:
 
 .sp
 .TS
-tab();
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-\fBcopylist64\fR
+l l l .
+\fBcopylist64\fR		
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/libgen.so.1\fR\fR
 .ad
 .RS 23n
-.rt  
 shared object
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/64/libgen.so.1\fR\fR
 .ad
 .RS 23n
-.rt  
 64-bit shared object
 .RE
 
@@ -90,13 +82,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

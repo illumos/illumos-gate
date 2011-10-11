@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_dma_segtocookie 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_DMA_SEGTOCOOKIE 9F "Jan 16, 2006"
 .SH NAME
 ddi_dma_segtocookie \- convert a DMA segment to a DMA address cookie
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/ddi.h> 
+#include <sys/ddi.h>
 #include <sys/sunddi.h>
 
 
@@ -26,46 +26,38 @@ instead.
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIseg\fR\fR
 .ad
 .RS 11n
-.rt  
 A \fBDMA\fR segment.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoffp\fR\fR
 .ad
 .RS 11n
-.rt  
 A pointer to an \fBoff_t\fR. Upon a successful return, it is filled in with the
 offset. This segment is addressing within the object.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlenp\fR\fR
 .ad
 .RS 11n
-.rt  
 The byte length. This segment is addressing within the object.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcookiep\fR\fR
 .ad
 .RS 11n
-.rt  
 A pointer to a \fBDMA\fR cookie (see \fBddi_dma_cookie\fR(9S)).
 .RE
 
@@ -83,23 +75,19 @@ specify the range within the object.
 The \fBddi_dma_segtocookie()\fR function returns:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 15n
-.rt  
 Successfully filled in all values.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 15n
-.rt  
 Failed to successfully fill in all values.
 .RE
 
@@ -123,7 +111,7 @@ for (win = NULL; (retw = ddi_dma_nextwin(handle, win, &nwin)) !=
 		    DDI_DMA_DONE; seg = nseg) {
 			if (rets != DDI_SUCCESS) {
 
-				/* do error handling */ 
+				/* do error handling */
 			} else {
 				ddi_dma_segtocookie(nseg, &off, &len, &cookie);
 
@@ -143,13 +131,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Stability LevelObsolete
+Stability Level	Obsolete
 .TE
 
 .SH SEE ALSO

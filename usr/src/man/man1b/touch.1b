@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH touch 1B "26 Oct 1995" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.TH TOUCH 1B "Oct 26, 1995"
 .SH NAME
 touch \- change file access and modification times
 .SH SYNOPSIS
@@ -20,47 +20,39 @@ time. \fBfile\fR is created if it does not already exist.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 6n
-.rt  
 Change the access time of \fBfile\fR. Do not change the modification time
 unless \fB-m\fR is also specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 6n
-.rt  
 Do not create \fBfile\fR if it does not exist.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 Attempt to force the touch in spite of read and write permissions on
 \fBfile\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
 .RS 6n
-.rt  
 Change the modification time of \fBfile\fR. Do not change the access time
 unless \fB-a\fR is also specified.
 .RE
@@ -76,23 +68,19 @@ encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 \fBtouch\fR executed successfully and all requested changes were made.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred. \fBtouch\fR returns the number of files for which the times
 could not be successfully modified.
 .RE

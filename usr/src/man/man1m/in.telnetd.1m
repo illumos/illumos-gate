@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH in.telnetd 1M "10 Nov 2005" "SunOS 5.11" "System Administration Commands"
+.TH IN.TELNETD 1M "Nov 10, 2005"
 .SH NAME
 in.telnetd, telnetd \- DARPA TELNET protocol server
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/in.telnetd\fR [\fB-a\fR \fIauthmode\fR] [\fB-EXUh\fR] [\fB-s\fR \fItos\fR] 
+\fB/usr/sbin/in.telnetd\fR [\fB-a\fR \fIauthmode\fR] [\fB-EXUh\fR] [\fB-s\fR \fItos\fR]
      [\fB-S\fR \fIkeytab\fR] [\fB-M\fR \fIrealm\fR]
 .fi
 
@@ -99,22 +99,18 @@ BANNER=""
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIauthmode\fR\fR
 .ad
 .RS 15n
-.rt  
 This option may be used for specifying what mode should be used for
 authentication. There are several valid values for \fIauthmode\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvalid\fR\fR
 .ad
 .RS 9n
-.rt  
 Only allows connections when the remote user can provide valid authentication
 information to identify the remote user, and is allowed access to the specified
 account without providing a password.
@@ -122,12 +118,10 @@ account without providing a password.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuser\fR\fR
 .ad
 .RS 9n
-.rt  
 Only allows connections when the remote user can provide valid authentication
 information to identify the remote user. The \fBlogin\fR(1) command will
 provide any additional user verification needed if the remote user is not
@@ -136,12 +130,10 @@ allowed automatic access to the specified account.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnone\fR\fR
 .ad
 .RS 9n
-.rt  
 This is the default state. Authentication information is not required. If no or
 insufficient authentication information is provided, then the \fBlogin\fR(1)
 program provides the necessary user verification.
@@ -149,12 +141,10 @@ program provides the necessary user verification.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBoff\fR\fR
 .ad
 .RS 9n
-.rt  
 This disables the authentication code. All user verification happens through
 the \fBlogin\fR(1) program.
 .RE
@@ -163,81 +153,67 @@ the \fBlogin\fR(1) program.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-E\fR\fR
 .ad
 .RS 15n
-.rt  
 Disables encryption support negotiation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 15n
-.rt  
 Disables displaying host specific information before login has been completed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR \fIrealm\fR\fR
 .ad
 .RS 15n
-.rt  
 Uses the indicated Kerberos V5 realm. By default, the daemon will determine its
 realm from the settings in the \fBkrb5.conf\fR(4) file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fItos\fR\fR
 .ad
 .RS 15n
-.rt  
 Sets the \fBIP\fR \fBTOS\fR option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR \fIkeytab\fR\fR
 .ad
 .RS 15n
-.rt  
 Sets the \fBKRB5\fR keytab file to use. The\fB/etc/krb5/krb5.keytab\fR file is
 used by default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-U\fR\fR
 .ad
 .RS 15n
-.rt  
 Refuses connections that cannot be mapped to a name through the
 \fBgetnameinfo\fR(3SOCKET) function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-X\fR\fR
 .ad
 .RS 15n
-.rt  
 Disables Kerberos V5 authentication support negotiation.
 .RE
 
@@ -315,13 +291,11 @@ For a Kerberized telnet service, the correct \fBPAM\fR service name is
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/default/telnetd\fR\fR
 .ad
 .RS 24n
-.rt  
- 
+
 .RE
 
 .SH SEE ALSO

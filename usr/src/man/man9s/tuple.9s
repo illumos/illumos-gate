@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH tuple 9S "20 Dec 1996" "SunOS 5.11" "Data Structures for Drivers"
+.TH TUPLE 9S "Dec 20, 1996"
 .SH NAME
 tuple \- card information structure (CIS) access structure
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/pccard.h> 
+#include <sys/pccard.h>
 .fi
 
 .SH INTERFACE LEVEL
@@ -92,28 +92,23 @@ cisdata_t     TupleLink;       /* tuple link */
 The fields are defined as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSocket\fR \fR
 .ad
 .RS 17n
-.rt  
 Not used in Solaris, but for portability with other card services
 implementations, it should be set to the logical socket number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAttributes\fR \fR
 .ad
 .RS 17n
-.rt  
 This field is bit-mapped. The following bits are defined:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTUPLE_RETURN_LINK\fR \fR
 .ad
@@ -124,7 +119,6 @@ Return link tuples if set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTUPLE_RETURN_IGNORED_TUPLES\fR \fR
 .ad
@@ -137,7 +131,6 @@ the same tuples in a function-specific \fBCIS \fRchain.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTUPLE_RETURN_NAME\fR \fR
 .ad
@@ -150,12 +143,10 @@ Return tuple name string using the \fBcsx_ParseTuple\fR(9F) function if set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDesiredTuple\fR \fR
 .ad
 .RS 17n
-.rt  
 This field is the requested tuple type code to be returned when calling
 \fBcsx_GetFirstTuple\fR(9F) or \fBcsx_GetNextTuple\fR(9F).
 \fBRETURN_FIRST_TUPLE\fR is used to return the first tuple regardless of tuple
@@ -165,12 +156,10 @@ tuple type.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTupleOffset\fR \fR
 .ad
 .RS 17n
-.rt  
 This field allows partial tuple information to be retrieved, starting at the
 specified offset within the tuple. This field must only be set before calling
 \fBcsx_GetTupleData\fR(9F).
@@ -178,12 +167,10 @@ specified offset within the tuple. This field must only be set before calling
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTupleDataMax\fR \fR
 .ad
 .RS 17n
-.rt  
 This field is the size of the tuple data buffer that card services uses to
 return raw tuple data from \fBcsx_GetTupleData\fR(9F). It can be larger than
 the number of bytes in the tuple data body. Card services ignores any value
@@ -192,36 +179,30 @@ placed here by the client.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTupleDataLen\fR \fR
 .ad
 .RS 17n
-.rt  
 This field is the actual size of the tuple data body. It represents the number
 of tuple data body bytes returned by \fBcsx_GetTupleData\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTupleData\fR \fR
 .ad
 .RS 17n
-.rt  
 This field is an array of bytes containing the raw tuple data body contents
 returned by \fBcsx_GetTupleData\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTupleCode\fR \fR
 .ad
 .RS 17n
-.rt  
 This field is the tuple type code and is returned by
 \fBcsx_GetFirstTuple\fR(9F) or \fBcsx_GetNextTuple\fR(9F) when a tuple matching
 the \fBDesiredTuple\fR field is returned.
@@ -229,12 +210,10 @@ the \fBDesiredTuple\fR field is returned.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTupleLink\fR \fR
 .ad
 .RS 17n
-.rt  
 This field is the tuple link, the offset to the next tuple, and is returned by
 \fBcsx_GetFirstTuple\fR(9F) or \fBcsx_GetNextTuple\fR(9F) when a tuple matching
 the \fBDesiredTuple\fR field is returned.

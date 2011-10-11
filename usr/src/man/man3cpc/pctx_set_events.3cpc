@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pctx_set_events 3CPC "13 May 2003" "SunOS 5.11" "CPU Performance Counters Library Functions"
+.TH PCTX_SET_EVENTS 3CPC "May 13, 2003"
 .SH NAME
 pctx_set_events \- associate callbacks with process events
 .SH SYNOPSIS
@@ -95,30 +95,29 @@ and the handlers executed by users of the library.
 
 .sp
 .TS
-tab() box;
-cw(1.02i) |cw(1.14i) |cw(3.34i) 
-cw(1.02i) |cw(1.14i) |cw(3.34i) 
-.
+box;
+c | c | c
+c | c | c .
 System Calls and pctx Handlers
 _
-System callHandlerComments
+System call	Handler	Comments
 _
-\fBexec\fR,\fBexecve\fR\fIfini_lwp\fRT{
+\fBexec\fR,\fBexecve\fR	\fIfini_lwp\fR	T{
 Invoked serially on all lwps in the process.
 T}
-\fIexec\fRT{
+	\fIexec\fR	T{
 Only invoked if the \fBexec()\fR system call succeeded.
 T}
-\fIinit_lwp\fRT{
+	\fIinit_lwp\fR	T{
 If the exec succeeds, only invoked on lwp 1. If the exec fails, invoked serially on all lwps in the process.
 T}
 _
-\fBfork\fR, \fBvfork\fR, \fBfork1\fR\fIfork\fRT{
+\fBfork\fR, \fBvfork\fR, \fBfork1\fR	\fIfork\fR	T{
 Only invoked if the \fBfork()\fR system call succeeded.
 T}
 _
-\fBexit\fR\fIfini_lwp\fRInvoked on all lwps in the process.
-\fIexit\fRInvoked on the exiting lwp.
+\fBexit\fR	\fIfini_lwp\fR	Invoked on all lwps in the process.
+	\fIexit\fR	Invoked on the exiting lwp.
 .TE
 
 .sp
@@ -178,15 +177,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelUnsafe
+MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO

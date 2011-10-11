@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH scsi_hba_tran 9S "30 May 2006" "SunOS 5.11" "Data Structures for Drivers"
+.TH SCSI_HBA_TRAN 9S "May 30, 2006"
 .SH NAME
 scsi_hba_tran \- SCSI Host Bus Adapter (HBA) driver transport vector structure
 .SH SYNOPSIS
@@ -29,79 +29,73 @@ executed.
 dev_info_t          *tran_hba_dip;          /* HBAs dev_info
                                                 pointer */
 void                *tran_hba_private;      /* HBA softstate */
-void                *tran_tgt_private;      /* HBA target private 
+void                *tran_tgt_private;      /* HBA target private
                                                 pointer */
 struct scsi_device  *tran_sd;               /* scsi_device */
 int                 (*tran_tgt_init)( );    /* Transport target */
                                                 Initialization */
-int                 (*tran_tgt_probe)( );   /* Transport target 
+int                 (*tran_tgt_probe)( );   /* Transport target
                                                 probe */
-void                (*tran_tgt_free)( );    /* Transport target 
+void                (*tran_tgt_free)( );    /* Transport target
                                                 free */
 int                 (*tran_start)( );       /* Transport start */
 int                 (*tran_reset)( );       /* Transport reset */
 int                 (*tran_abort)( );       /* Transport abort */
-int                 (*tran_getcap)( );      /* Capability 
+int                 (*tran_getcap)( );      /* Capability
                                                 retrieval */
-int                 (*tran_setcap)( );      /* Capability 
+int                 (*tran_setcap)( );      /* Capability
                                                 establishment */
-struct scsi_pkt     *(*tran_init_pkt)( );   /* Packet and DMA 
+struct scsi_pkt     *(*tran_init_pkt)( );   /* Packet and DMA
                                                 allocation */
 void                (*tran_destroy_pkt)( ); /* Packet and DMA */
                                                 deallocation */
 void                (*tran_dmafree)( );     /* DMA deallocation */
 void                (*tran_sync_pkt)( );    /* Sync DMA */
-void                (*tran_reset_notify)( );/* Bus reset 
+void                (*tran_reset_notify)( );/* Bus reset
                                                 notification */
 int                 (*tran_bus_reset)( );   /* Reset bus only */
 int                 (*tran_quiesce)( );     /* Quiesce a bus */
 int                 (*tran_unquiesce)( );   /* Unquiesce a bus */
-int                 (*tran_setup_pkt)( );   /* Initialization 
+int                 (*tran_setup_pkt)( );   /* Initialization
                                                 for pkt */
 int                 (*tran_teardown_pkt)( );/* Deallocation */
 int                 (*tran_pkt_constructor) ( );
                                                /* Constructor */
 int                 (*tran_pkt_destructor) ( );
                                               /* Destructor */
-int                 tran_hba_len;            /* # bytes for 
+int                 tran_hba_len;            /* # bytes for
                                                  pkt_ha_private */
-int                 tran_interconnect_type;  /* transport 
+int                 tran_interconnect_type;  /* transport
                                                  interconnect */
 .fi
 .in -2
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtran_hba_dip\fR\fR
 .ad
 .RS 26n
-.rt  
 \fBdev_info\fR pointer to the \fBHBA\fR that supplies the \fBscsi_hba_tran\fR
 structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtran_hba_private\fR\fR
 .ad
 .RS 26n
-.rt  
 Private pointer that the \fBHBA\fR driver can use to refer to the device's soft
 state structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtran_tgt_private\fR\fR
 .ad
 .RS 26n
-.rt  
 Private pointer that the \fBHBA\fR can use to refer to per-target specific
 data. This field can only be used when the \fBSCSI_HBA_TRAN_CLONE\fR flag is
 specified in \fBscsi_hba_attach\fR(9F). In this case, the \fBHBA\fR driver must
@@ -110,137 +104,113 @@ initialize this field in its \fBtran_tgt_init\fR(9E) entry point.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtran_sd\fR\fR
 .ad
 .RS 26n
-.rt  
 Pointer to \fBscsi_device\fR(9S) structure if cloning; otherwise \fINULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtran_tgt_init\fR\fR
 .ad
 .RS 26n
-.rt  
 Function entry that allows per-target \fBHBA\fR initialization, if necessary.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtran_tgt_probe\fR\fR
 .ad
 .RS 26n
-.rt  
 Function entry that allows per-target \fBscsi_probe\fR(9F) customization, if
 necessary.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtran_tgt_free\fR\fR
 .ad
 .RS 26n
-.rt  
 Function entry that allows per-target \fBHBA\fR deallocation, if necessary.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtran_start\fR\fR
 .ad
 .RS 26n
-.rt  
 Function entry that starts a \fBSCSI\fR command execution on the \fBHBA\fR
 hardware.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtran_reset\fR\fR
 .ad
 .RS 26n
-.rt  
 Function entry that resets a \fBSCSI\fR bus or target device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtran_abort\fR\fR
 .ad
 .RS 26n
-.rt  
 Function entry that aborts one \fBSCSI\fR command, or all pending \fBSCSI\fR
 commands.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtran_getcap\fR\fR
 .ad
 .RS 26n
-.rt  
 Function entry that retrieves a \fBSCSI\fR capability.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtran_setcap\fR\fR
 .ad
 .RS 26n
-.rt  
 Function entry that sets a \fBSCSI\fR capability.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtran_init_pkt\fR\fR
 .ad
 .RS 26n
-.rt  
 Function entry that allocates a \fBscsi_pkt\fR structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtran_destroy_pkt\fR\fR
 .ad
 .RS 26n
-.rt  
 Function entry that frees a \fBscsi_pkt\fR structure allocated by
 \fBtran_init_pkt\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtran_dmafree\fR\fR
 .ad
 .RS 26n
-.rt  
 Function entry that frees \fBDMA\fR resources that were previously allocated by
 \fBtran_init_pkt\fR. Not called for \fBHBA\fR drivers that provide a
 \fBtran_setup_pkt\fR entry point.
@@ -248,129 +218,107 @@ Function entry that frees \fBDMA\fR resources that were previously allocated by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtran_sync_pkt\fR\fR
 .ad
 .RS 26n
-.rt  
 Synchronizes data in \fIpkt\fR after a data transfer has been completed. Not
 called for \fBHBA\fR drivers that provide a \fBtran_setup_pkt\fR entry point.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtran_reset_notify\fR\fR
 .ad
 .RS 26n
-.rt  
 Function entry that allows a target to register a bus reset notification
 request with the \fBHBA\fR driver.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtran_bus_reset\fR\fR
 .ad
 .RS 26n
-.rt  
 Function entry that resets the \fBSCSI\fR bus without resetting targets.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtran_quiesce\fR\fR
 .ad
 .RS 26n
-.rt  
 Function entry that waits for all outstanding commands to complete and blocks
 (or queues) any \fBI/O\fR requests issued.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtran_unquiesce\fR\fR
 .ad
 .RS 26n
-.rt  
 Function entry that allows \fBI/O\fR activities to resume on the \fBSCSI\fR
 bus.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtran_setup_pkt\fR\fR
 .ad
 .RS 26n
-.rt  
 Optional entry point that initializes a \fBscsi_pkt\fR structure. See
 \fBtran_setup_pkt\fR(9E).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtran_teardown_pkt\fR\fR
 .ad
 .RS 26n
-.rt  
 Entry point that releases resources allocated by \fBtran_setup_pkt\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtran_pkt_constructor\fR\fR
 .ad
 .RS 26n
-.rt  
 Additional optional entry point that performs the actions of a constructor. See
 \fBtran_setup_pkt\fR(9E).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtran_pkt_destructor\fR\fR
 .ad
 .RS 26n
-.rt  
 Additional optional entry point that performs the actions of a destructor. See
 \fBtran_setup_pkt\fR(9E).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtran_hba_len\fR\fR
 .ad
 .RS 26n
-.rt  
 Size of \fBpkt_ha_private\fR. See \fBtran_setup_pkt\fR(9E).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtran_interconnect_type\fR\fR
 .ad
 .RS 26n
-.rt  
 Integer value that denotes the interconnect type of the transport as defined in
 the \fBservices.h\fR header file.
 .RE

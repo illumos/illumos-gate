@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH privileges 5 "29 May 2009" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH PRIVILEGES 5 "May 29, 2009"
 .SH NAME
 privileges \- process privilege model
 .SH DESCRIPTION
@@ -31,7 +31,6 @@ were accustomed to having.
 The defined privileges are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_CONTRACT_EVENT\fR\fR
 .ad
@@ -45,7 +44,6 @@ which could be generated in volume by the user.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_CONTRACT_IDENTITY\fR\fR
 .ad
@@ -56,7 +54,6 @@ Allows a process to set the service FMRI value of a process contract template.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_CONTRACT_OBSERVER\fR\fR
 .ad
@@ -71,7 +68,6 @@ and owned by users other than the process's effective user ID.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_CPC_CPU\fR\fR
 .ad
@@ -82,7 +78,6 @@ Allow a process to access per-CPU hardware performance counters.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_DTRACE_KERNEL\fR\fR
 .ad
@@ -93,7 +88,6 @@ Allow DTrace kernel-level tracing.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_DTRACE_PROC\fR\fR
 .ad
@@ -105,7 +99,6 @@ placed and enabled in processes to which the user has permissions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_DTRACE_USER\fR\fR
 .ad
@@ -117,7 +110,6 @@ providers to examine processes to which the user has permissions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_FILE_CHOWN\fR\fR
 .ad
@@ -130,7 +122,6 @@ the process's supplemental group IDs.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_FILE_CHOWN_SELF\fR\fR
 .ad
@@ -142,7 +133,6 @@ if {\fB_POSIX_CHOWN_RESTRICTED\fR} is not in effect.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_FILE_DAC_EXECUTE\fR\fR
 .ad
@@ -154,7 +144,6 @@ would otherwise disallow the process execute permission.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_FILE_DAC_READ\fR\fR
 .ad
@@ -166,7 +155,6 @@ otherwise disallow the process read permission.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_FILE_DAC_SEARCH\fR\fR
 .ad
@@ -178,7 +166,6 @@ otherwise allow the process search permission.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_FILE_DAC_WRITE\fR\fR
 .ad
@@ -191,7 +178,6 @@ files owned by UID 0 in the absence of an effective UID of 0.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_FILE_DOWNGRADE_SL\fR\fR
 .ad
@@ -206,7 +192,6 @@ Extensions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_FILE_LINK_ANY\fR\fR
 .ad
@@ -218,7 +203,6 @@ process's effective UID.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_FILE_OWNER\fR\fR
 .ad
@@ -236,7 +220,6 @@ modify that file's or directory's permission bits or ACL.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_FILE_SETID\fR\fR
 .ad
@@ -253,7 +236,6 @@ a setuid 0 file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_FILE_UPGRADE_SL\fR\fR
 .ad
@@ -268,7 +250,6 @@ Extensions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_FILE_FLAG_SET\fR\fR
 .ad
@@ -279,7 +260,6 @@ Allows a process to set immutable, nounlink or appendonly file attributes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_GRAPHICS_ACCESS\fR\fR
 .ad
@@ -292,7 +272,6 @@ is also allowed to perform privileged graphics device mappings.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_GRAPHICS_MAP\fR\fR
 .ad
@@ -303,7 +282,6 @@ Allow a process to perform privileged mappings through a graphics device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_IPC_DAC_READ\fR\fR
 .ad
@@ -316,7 +294,6 @@ permission.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_IPC_DAC_WRITE\fR\fR
 .ad
@@ -329,7 +306,6 @@ write permission.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_IPC_OWNER\fR\fR
 .ad
@@ -343,7 +319,6 @@ Segment.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_NET_BINDMLP\fR\fR
 .ad
@@ -360,7 +335,6 @@ Extensions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_NET_ICMPACCESS\fR\fR
 .ad
@@ -371,7 +345,6 @@ Allow a process to send and receive ICMP packets.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_NET_MAC_AWARE\fR\fR
 .ad
@@ -391,7 +364,6 @@ Extensions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_NET_OBSERVABILITY\fR\fR
 .ad
@@ -403,7 +375,6 @@ traffic is disallowed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_NET_PRIVADDR\fR\fR
 .ad
@@ -417,7 +388,6 @@ reserved for use by NFS and SMB.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_NET_RAWACCESS\fR\fR
 .ad
@@ -428,7 +398,6 @@ Allow a process to have direct access to the network layer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_PROC_AUDIT\fR\fR
 .ad
@@ -440,7 +409,6 @@ pre-selection information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_PROC_CHROOT\fR\fR
 .ad
@@ -451,7 +419,6 @@ Allow a process to change its root directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_PROC_CLOCK_HIGHRES\fR\fR
 .ad
@@ -462,7 +429,6 @@ Allow a process to use high resolution timers.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_PROC_EXEC\fR\fR
 .ad
@@ -473,7 +439,6 @@ Allow a process to call \fBexec\fR(2).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_PROC_FORK\fR\fR
 .ad
@@ -484,7 +449,6 @@ Allow a process to call \fBfork\fR(2), \fBfork1\fR(2), or \fBvfork\fR(2).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_PROC_INFO\fR\fR
 .ad
@@ -497,7 +461,6 @@ can send signals. Processes that cannot be examined cannot be seen in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_PROC_LOCK_MEMORY\fR\fR
 .ad
@@ -508,7 +471,6 @@ Allow a process to lock pages in physical memory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_PROC_OWNER\fR\fR
 .ad
@@ -526,7 +488,6 @@ arbitrary processes to CPUs.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_PROC_PRIOCNTL\fR\fR
 .ad
@@ -539,7 +500,6 @@ RT class.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_PROC_SESSION\fR\fR
 .ad
@@ -550,7 +510,6 @@ Allow a process to send signals or trace processes outside its session.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_PROC_SETID\fR\fR
 .ad
@@ -562,7 +521,6 @@ to be asserted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_PROC_TASKID\fR\fR
 .ad
@@ -573,7 +531,6 @@ Allow a process to assign a new task ID to the calling process.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_PROC_ZONE\fR\fR
 .ad
@@ -585,7 +542,6 @@ Allow a process to trace or send signals to processes in other zones. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_SYS_ACCT\fR\fR
 .ad
@@ -597,7 +553,6 @@ Allow a process to enable and disable and manage accounting through
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_SYS_ADMIN\fR\fR
 .ad
@@ -609,7 +564,6 @@ domain name and specifying \fBcoreadm\fR(1M) and \fBnscd\fR(1M) settings
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_SYS_AUDIT\fR\fR
 .ad
@@ -624,7 +578,6 @@ class mappings, and policy options).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_SYS_CONFIG\fR\fR
 .ad
@@ -638,7 +591,6 @@ PCFS bootsector.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_SYS_DEVICES\fR\fR
 .ad
@@ -652,7 +604,6 @@ Allow a process to open devices that have been exclusively opened.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_SYS_DL_CONFIG\fR\fR
 .ad
@@ -663,7 +614,6 @@ Allow a process to configure a system's datalink interfaces.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_SYS_IP_CONFIG\fR\fR
 .ad
@@ -678,7 +628,6 @@ anchored \fBSTREAM\fRs modules with matching \fBzoneid\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_SYS_IPC_CONFIG\fR\fR
 .ad
@@ -689,7 +638,6 @@ Allow a process to increase the size of a System V IPC Message Queue buffer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_SYS_LINKDIR\fR\fR
 .ad
@@ -700,7 +648,6 @@ Allow a process to unlink and link directories.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_SYS_MOUNT\fR\fR
 .ad
@@ -713,7 +660,6 @@ add and remove swap devices.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_SYS_NET_CONFIG\fR\fR
 .ad
@@ -727,7 +673,6 @@ modules on locations other than the top of the module stack.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_SYS_NFS\fR\fR
 .ad
@@ -740,7 +685,6 @@ locking operations, bind to NFS reserved ports: ports 2049 (\fBnfs\fR) and port
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_SYS_PPP_CONFIG\fR\fR
 .ad
@@ -753,7 +697,6 @@ This privilege is granted by default to exclusive IP stack instance zones.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_SYS_RES_CONFIG\fR\fR
 .ad
@@ -768,7 +711,6 @@ pools and bind processes to pools.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_SYS_RESOURCE\fR\fR
 .ad
@@ -780,7 +722,6 @@ Allow a process to exceed the resource limits imposed on it by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_SYS_SMB\fR\fR
 .ad
@@ -793,7 +734,6 @@ bind to NetBIOS or SMB reserved ports: ports 137, 138, 139 (NetBIOS) and 445
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_SYS_SUSER_COMPAT\fR\fR
 .ad
@@ -807,7 +747,6 @@ Solaris proper.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_SYS_TIME\fR\fR
 .ad
@@ -819,7 +758,6 @@ calls: \fBstime\fR(2), \fBadjtime\fR(2), and \fBntp_adjtime\fR(2).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_SYS_TRANS_LABEL\fR\fR
 .ad
@@ -834,7 +772,6 @@ Extensions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_VIRT_MANAGE\fR\fR
 .ad
@@ -845,7 +782,6 @@ Allows a process to manage virtualized environments such as \fBxVM\fR(5).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_WIN_COLORMAP\fR\fR
 .ad
@@ -863,7 +799,6 @@ Extensions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_WIN_CONFIG\fR\fR
 .ad
@@ -887,7 +822,6 @@ Extensions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_WIN_DAC_READ\fR\fR
 .ad
@@ -902,7 +836,6 @@ Extensions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_WIN_DAC_WRITE\fR\fR
 .ad
@@ -918,7 +851,6 @@ Extensions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_WIN_DEVICES\fR\fR
 .ad
@@ -936,7 +868,6 @@ Extensions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_WIN_DGA\fR\fR
 .ad
@@ -953,7 +884,6 @@ Extensions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_WIN_DOWNGRADE_SL\fR\fR
 .ad
@@ -968,7 +898,6 @@ Extensions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_WIN_FONTPATH\fR\fR
 .ad
@@ -982,7 +911,6 @@ Extensions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_WIN_MAC_READ\fR\fR
 .ad
@@ -997,7 +925,6 @@ Extensions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_WIN_MAC_WRITE\fR\fR
 .ad
@@ -1013,7 +940,6 @@ Extensions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_WIN_SELECTION\fR\fR
 .ad
@@ -1028,7 +954,6 @@ Extensions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_WIN_UPGRADE_SL\fR\fR
 .ad
@@ -1043,7 +968,6 @@ Extensions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_XVM_CONTROL\fR\fR
 .ad
@@ -1072,45 +996,37 @@ The privilege implementation in Solaris extends the process credential with
 four privilege sets:
 .sp
 .ne 2
-.mk
 .na
 \fBI, the inheritable set\fR
 .ad
 .RS 26n
-.rt  
 The privileges inherited on \fBexec\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBP, the permitted set\fR
 .ad
 .RS 26n
-.rt  
 The maximum set of privileges for the process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBE, the effective set\fR
 .ad
 .RS 26n
-.rt  
 The privileges currently in effect.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBL, the limit set\fR
 .ad
 .RS 26n
-.rt  
 The upper bound of the privileges a process and its offspring can obtain.
 Changes to L take effect on the next \fBexec\fR.
 .RE

@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH acct 1M "22 Feb 1999" "SunOS 5.11" "System Administration Commands"
+.TH ACCT 1M "Feb 22, 1999"
 .SH NAME
 acct, acctdisk, acctdusg, accton, acctwtmp, closewtmp, utmp2wtmp \- overview of
 accounting and miscellaneous accounting commands
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/lib/acct/acctdisk\fR 
+\fB/usr/lib/acct/acctdisk\fR
 .fi
 
 .LP
@@ -30,12 +30,12 @@ accounting and miscellaneous accounting commands
 
 .LP
 .nf
-\fB/usr/lib/acct/closewtmp\fR 
+\fB/usr/lib/acct/closewtmp\fR
 .fi
 
 .LP
 .nf
-\fB/usr/lib/acct/utmp2wtmp\fR 
+\fB/usr/lib/acct/utmp2wtmp\fR
 .fi
 
 .SH DESCRIPTION
@@ -116,12 +116,10 @@ for connect times of users currently logged in.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fIfilename\fR\fR
 .ad
 .RS 15n
-.rt  
 Places in \fIfilename\fR records consisting of those filenames for which
 \fBacctdusg\fR charges no one (a potential source for finding users trying to
 avoid disk charges).
@@ -129,12 +127,10 @@ avoid disk charges).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIfilename\fR\fR
 .ad
 .RS 15n
-.rt  
 Specifies a password file, \fIfilename\fR. This option is not needed if the
 password file is \fB/etc/passwd\fR.
 .RE
@@ -152,12 +148,10 @@ none of the above variables are set in the environment, the "C" (U.S. style)
 locale determines how \fBacct\fR behaves.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_CTYPE\fR\fR
 .ad
 .RS 12n
-.rt  
 Determines how \fBacct\fR handles characters. When \fBLC_CTYPE\fR is set to a
 valid value, \fBacct\fR can display and handle text and filenames containing
 valid characters for that locale. \fBacct\fR can display and handle Extended
@@ -168,12 +162,10 @@ the "C" locale, only characters from ISO 8859-1 are valid.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_TIME\fR\fR
 .ad
 .RS 12n
-.rt  
 Determines how \fBacct\fR handles date and time formats. In the "C" locale,
 date and time handling follows the U.S. rules.
 .RE
@@ -181,45 +173,37 @@ date and time handling follows the U.S. rules.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/passwd\fR\fR
 .ad
 .RS 18n
-.rt  
 Used for login name to user \fBID\fR conversions.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/acct\fR\fR
 .ad
 .RS 18n
-.rt  
 Holds all accounting commands listed in sub-class 1M of this manual.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/pacct\fR\fR
 .ad
 .RS 18n
-.rt  
 Current process accounting file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/wtmpx\fR\fR
 .ad
 .RS 18n
-.rt  
 History of user access and administration information..
 .RE
 

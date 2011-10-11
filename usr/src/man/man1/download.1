@@ -3,19 +3,19 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH download 1 "9 Sep 1996" "SunOS 5.11" "User Commands"
+.TH DOWNLOAD 1 "Sep 9, 1996"
 .SH NAME
 download \- host resident PostScript font downloader
 .SH SYNOPSIS
 .LP
 .nf
-\fBdownload\fR [\fB-f\fR] [\fB-p\fR \fIprinter\fR] [\fB-m\fR \fIname\fR] [\fB-H\fR \fIdirectory\fR] 
+\fBdownload\fR [\fB-f\fR] [\fB-p\fR \fIprinter\fR] [\fB-m\fR \fIname\fR] [\fB-H\fR \fIdirectory\fR]
      [\fIfile\fR]...
 .fi
 
 .LP
 .nf
-\fB/usr/lib/lp/postscript/download\fR 
+\fB/usr/lib/lp/postscript/download\fR
 .fi
 
 .SH DESCRIPTION
@@ -48,12 +48,10 @@ ignored if the map table can not be read.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 16n
-.rt  
 Force a complete scan of each input \fBfile\fR. In the absence of an explicit
 comment pointing \fBdownload\fR to the end of the file, the default scan stops
 immediately after the PostScript header comments.
@@ -61,24 +59,20 @@ immediately after the PostScript header comments.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fI printer\fR\fR
 .ad
 .RS 16n
-.rt  
 Check the list of printer-resident fonts in
 \fB/etc/lp/printers/\fR\fIprinter\fR\fB/residentfonts\fR before downloading.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fI name\fR\fR
 .ad
 .RS 16n
-.rt  
 Use \fIname\fR as the font map table. A \fIname\fR that begins with \fB/\fR is
 the full pathname of the map table and is used as is. Otherwise  \fIname\fR is
 appended to the pathname of the host font directory.
@@ -86,12 +80,10 @@ appended to the pathname of the host font directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-H\fR\fI directory\fR\fR
 .ad
 .RS 16n
-.rt  
 Use \fIdir\fR as the host font directory. The default is
 \fB/usr/lib/lp/postscript\fR.
 .RE
@@ -139,23 +131,19 @@ map table, you could download fonts  by issuing the following command:
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnon-zero\fR
 .ad
 .RS 12n
-.rt  
 An error occurred.
 .RE
 

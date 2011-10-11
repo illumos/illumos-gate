@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_intr_dup_handler 9F "09 May 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_INTR_DUP_HANDLER 9F "May 09, 2006"
 .SH NAME
 ddi_intr_dup_handler \- reuse interrupt handler and arguments for MSI-X
 interrupts
@@ -15,7 +15,7 @@ interrupts
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 
-\fBint\fR \fBddi_intr_dup_handler\fR(\fBddi_intr_handle_t\fR \fIprimary\fR, \fBint\fR \fIvector\fR, 
+\fBint\fR \fBddi_intr_dup_handler\fR(\fBddi_intr_handle_t\fR \fIprimary\fR, \fBint\fR \fIvector\fR,
      \fBddi_intr_handle_t *\fR\fInew\fR);
 .fi
 
@@ -26,34 +26,28 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprimary\fR\fR
 .ad
 .RS 11n
-.rt  
 Original DDI interrupt handle
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvector\fR\fR
 .ad
 .RS 11n
-.rt  
 Interrupt number to duplicate
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInew\fR\fR
 .ad
 .RS 11n
-.rt  
 Pointer to new DDI interrupt handle
 .RE
 
@@ -113,12 +107,10 @@ See the EXAMPLES section for code that illustrates the use of the
 The \fBddi_intr_dup_handler()\fR function returns:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 15n
-.rt  
 On success.
 .sp
 Note that the interface should be verified to ensure that the return value is
@@ -128,12 +120,10 @@ result in inconsistent behavior among platforms.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_EINVAL\fR\fR
 .ad
 .RS 15n
-.rt  
 On encountering invalid input parameters. \fBDDI_EINVAL\fR is also returned if
 a dup is attempted from a dup-ed interrupt or if the hardware device is found
 not to support MSI-X interrupts.
@@ -141,12 +131,10 @@ not to support MSI-X interrupts.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 15n
-.rt  
 On any implementation specific failure.
 .RE
 
@@ -234,7 +222,7 @@ add_msix_interrupts(intr_state_t *state)
               (void) ddi_intr_disable(state->intr_htable[y]);
               (void) ddi_intr_free(state->intr_htable[y]);
           }
-                
+
           goto error2;
       }
   }
@@ -255,7 +243,7 @@ remove_msix_interrupts(intr_state_t *state)
 {
     int x;
 
-    /* 
+    /*
      * Disable all the handles and free the dup-ed handles
      * before we can remove the main MSI-X interrupt handle.
      */
@@ -290,13 +278,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH toupper 3C "14 Aug 2002" "SunOS 5.11" "Standard C Library Functions"
+.TH TOUPPER 3C "Aug 14, 2002"
 .SH NAME
 toupper \- transliterate lower-case characters to upper-case
 .SH SYNOPSIS
 .LP
 .nf
-#include <ctype.h> 
+#include <ctype.h>
 
 \fBint\fR \fBtoupper\fR(\fBint\fR \fIc\fR);
 .fi
@@ -41,17 +41,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) |lw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

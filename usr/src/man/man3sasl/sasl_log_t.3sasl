@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sasl_log_t 3SASL "27 Oct 2003" "SunOS 5.11" "Simple Authentication Security Layer Library Functions"
+.TH SASL_LOG_T 3SASL "Oct 27, 2003"
 .SH NAME
 sasl_log_t \- the SASL logging callback function
 .SH SYNOPSIS
@@ -26,109 +26,89 @@ specified.
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcontext\fR\fR
 .ad
 .RS 11n
-.rt  
 The logging context from the callback record.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlevel\fR\fR
 .ad
 .RS 11n
-.rt  
 The logging level. Possible values for \fIlevel\fR include:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_LOG_NONE\fR\fR
 .ad
 .RS 18n
-.rt  
 Do not log anything.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_LOG_ERR\fR\fR
 .ad
 .RS 18n
-.rt  
 Log unusual errors. This is the default log level.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_LOG_FAIL\fR\fR
 .ad
 .RS 18n
-.rt  
 Log all authentication failures.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_LOG_WARN\fR\fR
 .ad
 .RS 18n
-.rt  
 Log non-fatal warnings.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_LOG_NOTE\fR\fR
 .ad
 .RS 18n
-.rt  
 Log non-fatal warnings (more verbose than \fBSASL_LOG_WARN\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_LOG_DEBUG\fR\fR
 .ad
 .RS 18n
-.rt  
 Log non-fatal warnings (more verbose than \fBSASL_LOG_NOTE\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_LOG_TRACE\fR\fR
 .ad
 .RS 18n
-.rt  
 Log traces of internal protocols.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_LOG_PASS\fR\fR
 .ad
 .RS 18n
-.rt  
 Log traces of internal protocols, including passwords.
 .RE
 
@@ -136,12 +116,10 @@ Log traces of internal protocols, including passwords.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImessage\fR\fR
 .ad
 .RS 11n
-.rt  
 The message to log
 .RE
 
@@ -154,12 +132,10 @@ SASL error codes.
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_OK\fR\fR
 .ad
 .RS 11n
-.rt  
 The call to \fBsasl_log_t()\fR was successful.
 .RE
 
@@ -174,15 +150,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

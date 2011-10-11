@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH rdc.cf 4 "08 Jun 2007" "SunOS 5.11" "File Formats"
+.TH RDC.CF 4 "Jun 08, 2007"
 .SH NAME
 rdc.cf \- Availability Suite Remote  Mirror  software  configuration file
 .SH DESCRIPTION
@@ -25,7 +25,6 @@ post pdevice pbitmap shost sdevice sbitmap protocol mode options
 The \fBrdc.cf\fR fields are:
 .sp
 .ne 2
-.mk
 .na
 \fBphost (primary host)\fR
 .ad
@@ -36,7 +35,6 @@ Server on which the primary volume resides.
 
 .sp
 .ne 2
-.mk
 .na
 \fBpdevice (primary device)\fR
 .ad
@@ -48,7 +46,6 @@ example, /dev/rdsk/c0t1d0s2).
 
 .sp
 .ne 2
-.mk
 .na
 \fBpbitmap (primary bitmap)\fR
 .ad
@@ -61,7 +58,6 @@ partition is stored. Specify only full path names (for example,
 
 .sp
 .ne 2
-.mk
 .na
 \fBshost (secondary host)\fR
 .ad
@@ -72,7 +68,6 @@ Server on which the secondary volume resides.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsdevice (secondary device)\fR
 .ad
@@ -84,7 +79,6 @@ example,\fB/dev/rdsk/c0t1d0s4\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fBsbitmap (secondary bitmap)\fR
 .ad
@@ -97,7 +91,6 @@ is stored. Specify only full path names (for example,
 
 .sp
 .ne 2
-.mk
 .na
 \fBprotocol\fR
 .ad
@@ -108,7 +101,6 @@ Network transfer protocol. Specify IP.
 
 .sp
 .ne 2
-.mk
 .na
 \fBmode\fR
 .ad
@@ -122,7 +114,6 @@ operation is confirmed as complete  before  updating the remote volume.
 
 .sp
 .ne 2
-.mk
 .na
 \fBoptions\fR
 .ad
@@ -159,15 +150,14 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Architecturex86
+Architecture	x86
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

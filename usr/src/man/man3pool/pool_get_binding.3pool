@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pool_get_binding 3POOL "27 Mar 2007" "SunOS 5.11" "Pool Configuration Manipulation Library Functions"
+.TH POOL_GET_BINDING 3POOL "Mar 27, 2007"
 .SH NAME
 pool_get_binding, pool_set_binding, pool_get_resource_binding \- set and query
 process to resource pool bindings
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpool\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpool\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <pool.h>
 
 \fBchar *\fR\fBpool_get_binding\fR(\fBpid_t\fR \fIpid\fR);
@@ -56,34 +56,28 @@ superuser privilege.
 The \fIidtype\fR parameter can be of the following types:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBP_PID\fR\fR
 .ad
 .RS 12n
-.rt  
 The \fIid\fR parameter is a pid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBP_TASKID\fR\fR
 .ad
 .RS 12n
-.rt  
 The \fIid\fR parameter is a taskid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBP_PROJID\fR\fR
 .ad
 .RS 12n
-.rt  
 The \fIid\fR parameter is a project ID. All currently running processes
 belonging to the given project will be bound to the pool's resources.
 .RE
@@ -119,23 +113,19 @@ value.
 The \fBpool_get_binding()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_INVALID_CONF\fR\fR
 .ad
 .RS 22n
-.rt  
 The configuration is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_INVALID_SEARCH\fR\fR
 .ad
 .RS 22n
-.rt  
 It is not possible to determine the binding for this target due to the
 overlapping nature of the pools configured for this system, or the pool could
 not be located.
@@ -143,12 +133,10 @@ not be located.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_SYSTEM\fR\fR
 .ad
 .RS 22n
-.rt  
 A system error has occurred. Check the system error code for more details.
 .RE
 
@@ -157,34 +145,28 @@ A system error has occurred. Check the system error code for more details.
 The \fBpool_set_binding()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_INVALID_SEARCH\fR\fR
 .ad
 .RS 22n
-.rt  
 The pool could not be found.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_INVALID_CONF\fR\fR
 .ad
 .RS 22n
-.rt  
 The configuration is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_SYSTEM\fR\fR
 .ad
 .RS 22n
-.rt  
 A system error has occurred. Check the system error code for more details.
 .RE
 
@@ -193,34 +175,28 @@ A system error has occurred. Check the system error code for more details.
 The \fBpool_get_resource_binding()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_INVALID_CONF\fR\fR
 .ad
 .RS 22n
-.rt  
 The configuration is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_INVALID_SEARCH\fR\fR
 .ad
 .RS 22n
-.rt  
 The target is not bound to a resource of the specified type.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_SYSTEM\fR\fR
 .ad
 .RS 22n
-.rt  
 A system error has occurred. Check the system error code for more details.
 .RE
 
@@ -233,15 +209,15 @@ A system error has occurred. Check the system error code for more details.
 #include <sys/types.h>
 #include <pool.h>
 #include <unistd.h>
- 
+
 \&...
- 
+
 id_t pid = getpid();
- 
+
 \&...
- 
+
 if (pool_set_binding("target", P_PID, pid) == PO_FAIL) \{
-        (void) fprintf(stderr, "pool binding failed (\%d)\B{}n",
+        (void) fprintf(stderr, "pool binding failed (\\%d)\\B{}n",
                  pool_error());
 \}
 .fi
@@ -255,17 +231,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityUnstable
+Interface Stability	Unstable
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ftpaddhost 1M "1 May 2003" "SunOS 5.11" "System Administration Commands"
+.TH FTPADDHOST 1M "May 1, 2003"
 .SH NAME
 ftpaddhost \- set up a virtual FTP host
 .SH SYNOPSIS
@@ -25,24 +25,20 @@ address or the name of a host.
 The \fBftpaddhost\fR script supports the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
 .RS 14n
-.rt  
 Create a banner for the virtual host. This option is useful to confirm that the
 virtual host is working.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 14n
-.rt  
 Configure complete virtual hosting. This option allows each virtual host to
 have its own version of the \fBftpaccess\fR, \fBftpconversions\fR,
 \fB\fR\fBftpgroups\fR, \fBftphosts\fR, and \fBftpusers\fR files. The master
@@ -55,12 +51,10 @@ file, the master version is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 14n
-.rt  
 Configure limited virtual hosting. This  option allows a small number of
 parameters to be configured differently for a  virtual host. See the
 \fBvirtual\fR keyword on the \fBftpaccess\fR(4) manual page.
@@ -68,12 +62,10 @@ parameters to be configured differently for a  virtual host. See the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR \fIxferlog\fR\fR
 .ad
 .RS 14n
-.rt  
 Create a logfile entry such that the transfer logs for the virtual host are
 written to the specified file. An absolute path must be specified for the
 \fIxferlog\fR file.
@@ -85,23 +77,19 @@ written to the specified file. An absolute path must be specified for the
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhostname\fR\fR
 .ad
 .RS 12n
-.rt  
 The host name or IP address of the virtual server.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIroot_dir\fR\fR
 .ad
 .RS 12n
-.rt  
 The absolute pathname of the directory under which the virtual server is set
 up.
 .RE
@@ -112,41 +100,34 @@ up.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 6n
-.rt  
 Successful completion
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 6n
-.rt  
 Improper usage of the command
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 6n
-.rt  
 Command failed
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ftpd/virtual-ftpd/\fIhostname\fR\fR\fR
 .ad
@@ -163,13 +144,12 @@ See \fBattributes\fR(5)  for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

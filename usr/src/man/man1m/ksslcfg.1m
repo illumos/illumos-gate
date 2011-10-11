@@ -3,33 +3,33 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ksslcfg 1M "27 May 2008" "SunOS 5.11" "System Administration Commands"
+.TH KSSLCFG 1M "May 27, 2008"
 .SH NAME
 ksslcfg \- enable and configure SMF instance of Kernel SSL
 .SH SYNOPSIS
 .LP
 .nf
-\fBksslcfg\fR create \fB-f\fR pkcs11 \fB-T\fR \fItoken_label\fR \fB-C\fR \fIcertificate_label\fR 
-     [\fB-d\fR \fIsofttoken_directory\fR] 
-     [\fB-p\fR \fIpassword_file\fR [\fB-u\fR \fIusername\fR]] 
-     [\fB-h\fR \fIca_certchain_file\fR] [\fB-c\fR \fIciphersuites\fR] 
-     [\fB-t\fR \fIssl_session_cache_timeout\fR] 
+\fBksslcfg\fR create \fB-f\fR pkcs11 \fB-T\fR \fItoken_label\fR \fB-C\fR \fIcertificate_label\fR
+     [\fB-d\fR \fIsofttoken_directory\fR]
+     [\fB-p\fR \fIpassword_file\fR [\fB-u\fR \fIusername\fR]]
+     [\fB-h\fR \fIca_certchain_file\fR] [\fB-c\fR \fIciphersuites\fR]
+     [\fB-t\fR \fIssl_session_cache_timeout\fR]
      [\fB-z\fR \fIssl_session_cache_size\fR] [\fB-v\fR] \fB-x\fR \fIproxy_port\fR [\fIhost\fR] \fIssl_port\fR
 .fi
 
 .LP
 .nf
-\fBksslcfg\fR create \fB-f\fR pkcs12 \fB-i\fR \fIcert_and_key_pk12file\fR 
-     [\fB-p\fR \fIpassword_file\fR [\fB-u\fR \fIusername\fR]] 
-     [\fB-c\fR \fIciphersuites\fR] [\fB-t\fR \fIssl_session_cache_timeout\fR] 
+\fBksslcfg\fR create \fB-f\fR pkcs12 \fB-i\fR \fIcert_and_key_pk12file\fR
+     [\fB-p\fR \fIpassword_file\fR [\fB-u\fR \fIusername\fR]]
+     [\fB-c\fR \fIciphersuites\fR] [\fB-t\fR \fIssl_session_cache_timeout\fR]
      [\fB-z\fR \fIssl_session_cache_size\fR] [\fB-v\fR] \fB-x\fR \fIproxy_port\fR [\fIhost\fR] \fIssl_port\fR
 .fi
 
 .LP
 .nf
-\fBksslcfg\fR create \fB-f\fR pem \fB-i\fR \fIcert_and_key_pemfile\fR 
-     [\fB-p\fR \fIpassword_file\fR [\fB-u\fR \fIusername\fR]] 
-     [\fB-c\fR \fIciphersuites\fR] [\fB-t\fR \fIssl_session_cache_timeout\fR] 
+\fBksslcfg\fR create \fB-f\fR pem \fB-i\fR \fIcert_and_key_pemfile\fR
+     [\fB-p\fR \fIpassword_file\fR [\fB-u\fR \fIusername\fR]]
+     [\fB-c\fR \fIciphersuites\fR] [\fB-t\fR \fIssl_session_cache_timeout\fR]
      [\fB-z\fR \fIssl_session_cache_size\fR] [\fB-v\fR] \fB-x\fR \fIproxy_port\fR [\fIhost\fR] \fIssl_port\fR
 .fi
 
@@ -90,7 +90,6 @@ dependencies of other services.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIciphersuites\fR\fR
 .ad
@@ -115,7 +114,6 @@ rsa_des_cbc_sha
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIkey_format\fR\fR
 .ad
@@ -127,7 +125,6 @@ options are \fBpkcs11\fR, \fBpkcs12\fR, and \fBpem\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIkey_and_certificate_file\fR\fR
 .ad
@@ -144,7 +141,6 @@ and so on.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR \fIcertificate_label\fR\fR
 .ad
@@ -159,7 +155,6 @@ token specified by \fB-T\fR. This option is to be used only with \fB-f\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIsofttoken_directory\fR\fR
 .ad
@@ -173,7 +168,6 @@ default location of the PKCS#11 softtoken directory (\fB$HOME/.sunw\fR). See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fIca_certchain_file\fR\fR
 .ad
@@ -187,7 +181,6 @@ the server certificate (specified with the \fB-C\fR option), from
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIpassword_file\fR\fR
 .ad
@@ -200,7 +193,6 @@ to authenticate the user to the PKCS #11 token.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fIssl_session_cache_timeout\fR\fR
 .ad
@@ -213,7 +205,6 @@ The timeout value, in seconds, for an SSL session. It corresponds to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fItoken_label\fR\fR
 .ad
@@ -226,7 +217,6 @@ tokens available.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fIusername\fR\fR
 .ad
@@ -238,7 +228,6 @@ will try to read the password file as root.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -249,7 +238,6 @@ Verbose mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
@@ -260,7 +248,6 @@ Displays the version.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR \fIproxy_port\fR\fR
 .ad
@@ -273,7 +260,6 @@ external HTTP packets are delivered to this port.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fIssl_session_cache_size\fR\fR
 .ad
@@ -286,7 +272,6 @@ is not specified, the default is 5000 entries.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-?\fR \fI\fR\fR
 .ad
@@ -298,12 +283,10 @@ Displays the usage of the command.
 .SH OPERANDS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fIhost\fR] [\fIssl_port\fR]\fR\fR
 .ad
 .RS 21n
-.rt  
 The address and the port of the web server for which the kernel SSL entry is
 created. If \fIhost\fR is omitted, the entry will be used for all requests that
 arrived at the \fIssl_port\fR, regardless of the destination address. Both a
@@ -384,23 +367,19 @@ The following command disables and deletes an instance.
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -412,13 +391,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

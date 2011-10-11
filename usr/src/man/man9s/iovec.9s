@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH iovec 9S "11 Apr 1991" "SunOS 5.11" "Data Structures for Drivers"
+.TH IOVEC 9S "Apr 11, 1991"
 .SH NAME
 iovec \- data storage structure for I/O using uio
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/uio.h> 
+#include <sys/uio.h>
 .fi
 
 .SH INTERFACE LEVEL
@@ -28,7 +28,7 @@ and length specification.
 .in +2
 .nf
 caddr_t    iov_base;  /* base address of the data storage area */
-                      /* represented by the iovec structure */ 
+                      /* represented by the iovec structure */
 int        iov_len;   /* size of the data storage area in bytes */
 .fi
 .in -2

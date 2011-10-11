@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH kernel 1M "27 Nov 2007" "SunOS 5.11" "System Administration Commands"
+.TH KERNEL 1M "Nov 27, 2007"
 .SH NAME
 kernel \- UNIX system executable file containing basic operating system
 services
@@ -73,7 +73,6 @@ The kernel configuration can be controlled using the \fB/etc/system\fR file
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
@@ -90,7 +89,6 @@ system configuration file. See \fBsystem\fR(4).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIaltinit\fR\fR
 .ad
@@ -103,7 +101,6 @@ must be a valid path to an executable. The default primordial process is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fIsmf_options\fR\fR
 .ad
@@ -120,7 +117,6 @@ boot the system.
 Recovery options
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdebug\fR\fR
 .ad
@@ -131,7 +127,6 @@ Prints standard per-service output and all \fBsvc.startd\fR messages to log.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImilestone=[milestone]\fR\fR
 .ad
@@ -146,7 +141,6 @@ Boot with some SMF services temporarily disabled, as indicated by
 Messages options
 .sp
 .ne 2
-.mk
 .na
 \fB\fIquiet\fR\fR
 .ad
@@ -158,7 +152,6 @@ intervention.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIverbose\fR\fR
 .ad
@@ -171,7 +164,6 @@ Prints standard per-service output with more informational messages.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
@@ -184,7 +176,6 @@ configure the logical namespace in \fB/dev\fR. See \fBadd_drv\fR(1M) and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
@@ -195,7 +186,6 @@ Boots only to init level 's'. See \fBinit\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -208,7 +198,6 @@ are still printed, but the output is directed to the system logfile. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
@@ -225,7 +214,6 @@ See \fBboot\fR(1M) for examples and instructions on how to boot.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel\fR\fR
 .ad
@@ -237,7 +225,6 @@ instruction set that are needed for booting the system. of the core image file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/\fIplatform-name\fR/kernel\fR\fR
 .ad
@@ -248,7 +235,6 @@ The platform-specific kernel components.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/\fIhardware-class-name\fR\fR\fB/kernel\fR\fR
 .ad
@@ -259,7 +245,6 @@ The kernel components specific to this hardware class.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/kernel\fR\fR
 .ad
@@ -275,7 +260,6 @@ The directories in this section can potentially contain the following
 subdirectories:
 .sp
 .ne 2
-.mk
 .na
 \fBdrv\fR
 .ad
@@ -286,7 +270,6 @@ Loadable device drivers
 
 .sp
 .ne 2
-.mk
 .na
 \fBexec\fR
 .ad
@@ -297,7 +280,6 @@ The modules that execute programs stored in various file formats.
 
 .sp
 .ne 2
-.mk
 .na
 \fBfs\fR
 .ad
@@ -308,7 +290,6 @@ File system modules
 
 .sp
 .ne 2
-.mk
 .na
 \fBmisc\fR
 .ad
@@ -319,7 +300,6 @@ Miscellaneous system-related modules
 
 .sp
 .ne 2
-.mk
 .na
 \fBsched\fR
 .ad
@@ -330,7 +310,6 @@ Operating system schedulers
 
 .sp
 .ne 2
-.mk
 .na
 \fBstrmod\fR
 .ad
@@ -341,7 +320,6 @@ System V STREAMS loadable modules
 
 .sp
 .ne 2
-.mk
 .na
 \fBsys\fR
 .ad
@@ -353,7 +331,6 @@ Loadable system calls
 .SS "SPARC"
 .sp
 .ne 2
-.mk
 .na
 \fBcpu\fR
 .ad
@@ -364,7 +341,6 @@ Processor specific modules
 
 .sp
 .ne 2
-.mk
 .na
 \fBtod\fR
 .ad
@@ -380,7 +356,6 @@ contained within \fBsparcv9\fR directories in the directories listed above.
 .SS "x86"
 .sp
 .ne 2
-.mk
 .na
 \fBmach\fR
 .ad

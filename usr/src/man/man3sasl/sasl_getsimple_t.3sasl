@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sasl_getsimple_t 3SASL "27 Oct 2003" "SunOS 5.11" "Simple Authentication Security Layer Library Functions"
+.TH SASL_GETSIMPLE_T 3SASL "Oct 27, 2003"
 .SH NAME
 sasl_getsimple_t \- the SASL callback function for username, authname and realm
 .SH SYNOPSIS
@@ -27,65 +27,53 @@ the realm. The \fIid\fR parameter indicates which value is requested.
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcontext\fR\fR
 .ad
 .RS 11n
-.rt  
 The context from the callback structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIid\fR\fR
 .ad
 .RS 11n
-.rt  
 The callback ID. Possible values for \fIid\fR include:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_CB_USER\fR\fR
 .ad
 .RS 20n
-.rt  
 Client user identity for login.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_CB_AUTHNAME\fR\fR
 .ad
 .RS 20n
-.rt  
 Client authentication name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_CB_LANGUAGE\fR\fR
 .ad
 .RS 20n
-.rt  
 Comma-separated list of languages pursuant to \fIRFC 1766\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_CB_CNONCE\fR\fR
 .ad
 .RS 20n
-.rt  
 The client-nonce. This value is used primarily for testing.
 .RE
 
@@ -93,24 +81,20 @@ The client-nonce. This value is used primarily for testing.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIresult\fR\fR
 .ad
 .RS 11n
-.rt  
 To cancel user, set the value of \fIresult\fR with a null-terminated string. If
 the value of \fIresult\fR is \fINULL\fR, then the user is cancelled.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlen\fR\fR
 .ad
 .RS 11n
-.rt  
 The length of \fIresult\fR.
 .RE
 
@@ -123,12 +107,10 @@ of SASL error codes.
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_OK\fR\fR
 .ad
 .RS 11n
-.rt  
 The call to \fBsasl_getsimple_t()\fR was successful.
 .RE
 
@@ -143,15 +125,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libdevinfo 3LIB "15 May 2008" "SunOS 5.11" "Interface Libraries"
+.TH LIBDEVINFO 3LIB "May 15, 2008"
 .SH NAME
 libdevinfo \- device information library
 .SH SYNOPSIS
@@ -170,55 +170,53 @@ interfaces.
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBdi_binding_name\fR\fBdi_bus_addr\fR
-\fBdi_child_node\fR\fBdi_compatible_names\fR
-\fBdi_devfs_minor_path\fR\fBdi_devfs_path\fR
-\fBdi_devfs_path_free\fR\fBdi_devid\fR
-\fBdi_driver_major\fR\fBdi_driver_name\fR
-\fBdi_driver_ops\fR\fBdi_drv_first_node\fR
-\fBdi_drv_next_node\fR\fBdi_fini\fR
-\fBdi_init\fR\fBdi_instance\fR
-\fBdi_link_next_by_lnode\fR\fBdi_link_next_by_node\fR
-\fBdi_link_private_get\fR\fBdi_link_private_set\fR
-\fBdi_link_spectype\fR\fBdi_link_to_lnode\fR
-\fBdi_lnode_devinfo\fR\fBdi_lnode_devt\fR
-\fBdi_lnode_name\fR\fBdi_lnode_next\fR
-\fBdi_lnode_private_get\fR\fBdi_lnode_private_set\fR
-\fBdi_minor_devt\fR\fBdi_minor_name\fR
-\fBdi_minor_next\fR\fBdi_minor_nodetype\fR
-\fBdi_minor_private_get\fR\fBdi_minor_private_set\fR
-\fBdi_minor_spectype\fR\fBdi_minor_type\fR
-\fBdi_node_name\fR\fBdi_node_private_get\fR
-\fBdi_node_private_set\fR\fBdi_nodeid\fR
-\fBdi_parent_node\fR\fBdi_path_bus_addr\fR
-\fBdi_path_client_devfs_path\fR\fBdi_path_client_next_path\fR
-\fBdi_path_client_node\fR\fBdi_path_devfs_path\fR
-\fBdi_path_instance\fR\fBdi_path_node_name\fR
-\fBdi_path_phci_next_path\fR\fBdi_path_phci_node\fR
-\fBdi_path_prop_bytes\fR\fBdi_path_prop_int64s\fR
-\fBdi_path_prop_ints\fR\fBdi_path_prop_len\fR
-\fBdi_path_prop_lookup_bytes\fR\fBdi_path_prop_lookup_int64s\fR
-\fBdi_path_prop_lookup_ints\fR\fBdi_path_prop_lookup_strings\fR
-\fBdi_path_prop_name\fR\fBdi_path_prop_strings\fR
-\fBdi_path_prop_next\fR\fBdi_path_prop_type\fR
-\fBdi_path_state\fR\fBdi_prom_fini\fR
-\fBdi_prom_init\fR\fBdi_prom_prop_data\fR
-\fBdi_prom_prop_lookup_bytes\fR\fBdi_prom_prop_lookup_ints\fR
-\fBdi_prom_prop_lookup_strings\fR\fBdi_prom_prop_name\fR
-\fBdi_prom_prop_next\fR\fBdi_prop_bytes\fR
-\fBdi_prop_devt\fR\fBdi_prop_int64\fR
-\fBdi_prop_ints\fR\fBdi_prop_lookup_bytes\fR
-\fBdi_prop_lookup_int64\fR\fBdi_prop_lookup_ints\fR
-\fBdi_prop_lookup_strings\fR\fBdi_prop_name\fR
-\fBdi_prop_next\fR\fBdi_prop_strings\fR
-\fBdi_prop_type\fR\fBdi_sibling_node\fR
-\fBdi_state\fR\fBdi_walk_link\fR
-\fBdi_walk_lnode\fR\fBdi_walk_minor\fR
-\fBdi_walk_node\fR
+l l
+l l .
+\fBdi_binding_name\fR	\fBdi_bus_addr\fR
+\fBdi_child_node\fR	\fBdi_compatible_names\fR
+\fBdi_devfs_minor_path\fR	\fBdi_devfs_path\fR
+\fBdi_devfs_path_free\fR	\fBdi_devid\fR
+\fBdi_driver_major\fR	\fBdi_driver_name\fR
+\fBdi_driver_ops\fR	\fBdi_drv_first_node\fR
+\fBdi_drv_next_node\fR	\fBdi_fini\fR
+\fBdi_init\fR	\fBdi_instance\fR
+\fBdi_link_next_by_lnode\fR	\fBdi_link_next_by_node\fR
+\fBdi_link_private_get\fR	\fBdi_link_private_set\fR
+\fBdi_link_spectype\fR	\fBdi_link_to_lnode\fR
+\fBdi_lnode_devinfo\fR	\fBdi_lnode_devt\fR
+\fBdi_lnode_name\fR	\fBdi_lnode_next\fR
+\fBdi_lnode_private_get\fR	\fBdi_lnode_private_set\fR
+\fBdi_minor_devt\fR	\fBdi_minor_name\fR
+\fBdi_minor_next\fR	\fBdi_minor_nodetype\fR
+\fBdi_minor_private_get\fR	\fBdi_minor_private_set\fR
+\fBdi_minor_spectype\fR	\fBdi_minor_type\fR
+\fBdi_node_name\fR	\fBdi_node_private_get\fR
+\fBdi_node_private_set\fR	\fBdi_nodeid\fR
+\fBdi_parent_node\fR	\fBdi_path_bus_addr\fR
+\fBdi_path_client_devfs_path\fR	\fBdi_path_client_next_path\fR
+\fBdi_path_client_node\fR	\fBdi_path_devfs_path\fR
+\fBdi_path_instance\fR	\fBdi_path_node_name\fR
+\fBdi_path_phci_next_path\fR	\fBdi_path_phci_node\fR
+\fBdi_path_prop_bytes\fR	\fBdi_path_prop_int64s\fR
+\fBdi_path_prop_ints\fR	\fBdi_path_prop_len\fR
+\fBdi_path_prop_lookup_bytes\fR	\fBdi_path_prop_lookup_int64s\fR
+\fBdi_path_prop_lookup_ints\fR	\fBdi_path_prop_lookup_strings\fR
+\fBdi_path_prop_name\fR	\fBdi_path_prop_strings\fR
+\fBdi_path_prop_next\fR	\fBdi_path_prop_type\fR
+\fBdi_path_state\fR	\fBdi_prom_fini\fR
+\fBdi_prom_init\fR	\fBdi_prom_prop_data\fR
+\fBdi_prom_prop_lookup_bytes\fR	\fBdi_prom_prop_lookup_ints\fR
+\fBdi_prom_prop_lookup_strings\fR	\fBdi_prom_prop_name\fR
+\fBdi_prom_prop_next\fR	\fBdi_prop_bytes\fR
+\fBdi_prop_devt\fR	\fBdi_prop_int64\fR
+\fBdi_prop_ints\fR	\fBdi_prop_lookup_bytes\fR
+\fBdi_prop_lookup_int64\fR	\fBdi_prop_lookup_ints\fR
+\fBdi_prop_lookup_strings\fR	\fBdi_prop_name\fR
+\fBdi_prop_next\fR	\fBdi_prop_strings\fR
+\fBdi_prop_type\fR	\fBdi_sibling_node\fR
+\fBdi_state\fR	\fBdi_walk_link\fR
+\fBdi_walk_lnode\fR	\fBdi_walk_minor\fR
+\fBdi_walk_node\fR	
 .TE
 
 .SH EXAMPLES
@@ -257,7 +255,6 @@ Minor nodes
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/libdevinfo.so.1\fR\fR
 .ad
@@ -268,7 +265,6 @@ shared object
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/64/libdevinfo.so.1\fR\fR
 .ad
@@ -285,14 +281,13 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
-Interface StabilityCommitted
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

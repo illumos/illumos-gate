@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH vt 7I "22 Sep 2008" "SunOS 5.11" "Ioctl Requests"
+.TH VT 7I "Sep 22, 2008"
 .SH NAME
 vt \- Solaris virtual console interface
 .SH SYNOPSIS
@@ -27,9 +27,9 @@ support and switch between multiple screen faces on a single physical device.
 .LP
 VT's are accessed in the same way as other devices. The \fBopen\fR(2) system
 call is used to open the virtual console and \fBread\fR(2), \fBwrite\fR(2) and
-\fBioctl\fR(2) are used 	in the normal way and support the functionality of the
+\fBioctl\fR(2) are used in the normal way and support the functionality of the
 underlying device.  In addition, some virtual console-specific ioctls are
-provided and described	 below.
+provided and described below.
 .sp
 .LP
 The VT provides a link between different screen faces and the device. The
@@ -95,7 +95,6 @@ controlling tty and privilege check for query/view operations.
 The following ioctls apply to devices that support virtual consoles:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVT_ENABLED\fR\fR
 .ad
@@ -108,7 +107,6 @@ integer is 1, otherwise it is 0.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVT_OPENQRY\fR\fR
 .ad
@@ -122,7 +120,6 @@ VT's, -1 is filled in.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVT_GETMODE\fR\fR
 .ad
@@ -156,7 +153,6 @@ struct vt_mode {
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVT_SETMODE\fR\fR
 .ad
@@ -171,13 +167,12 @@ the signal default is \fBSIGUSR1\fR (for relsig and acqsig).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVT_RELDISP\fR\fR
 .ad
 .sp .6
 .RS 4n
-Tells the VT manager if	the process releases (or refuses to release) the
+Tells the VT manager if the process releases (or refuses to release) the
 display. An argument of 1 indicates the VT is released. An argument of 0
 indicates refusal to release. The \fBVT_ACKACQ\fR argument indicates if
 acquisition of the VT has been completed.
@@ -185,7 +180,6 @@ acquisition of the VT has been completed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVT_ACTIVATE\fR\fR
 .ad
@@ -198,20 +192,18 @@ exist, the call fails and errno is set to \fBENXIO\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVT_WAITACTIVE\fR\fR
 .ad
 .sp .6
 .RS 4n
 If the specified VT is currently active, this call returns immediately.
-Otherwise, it sleeps until the 	specified VT becomes active, at which point it
+Otherwise, it sleeps until the specified VT becomes active, at which point it
 returns.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVT_GETSTATE\fR\fR
 .ad
@@ -239,7 +231,6 @@ VT in v_state. Next, the VT manager transfers the information in structure
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKDGETMODE\fR\fR
 .ad
@@ -258,7 +249,6 @@ Obtains the text/graphics mode associated with the VT.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKDSETMODE\fR\fR
 .ad
@@ -296,12 +286,10 @@ console text mode.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/vt/#\fR \fR
 .ad
 .RS 14n
-.rt  
 VT devices.
 .RE
 

@@ -2,19 +2,19 @@
 .\" To view license terms, attribution, and copyright for IP Filter, the default path is /usr/lib/ipf/IPFILTER.LICENCE. If the Solaris operating environment has been installed anywhere other than the default, modify the given path to access the file at the installed
 .\" location.
 .\" Portions Copyright (c) 2008, Sun Microsystems Inc. All Rights Reserved.
-.TH ippool 1M "3 Apr 2008" "SunOS 5.11" "System Administration Commands"
+.TH IPPOOL 1M "Apr 3, 2008"
 .SH NAME
 ippool \- user interface to the IP Filter pools
 .SH SYNOPSIS
 .LP
 .nf
-\fBippool\fR \fB-a\fR [\fB-dnv\fR] [\fB-m\fR \fIpoolname\fR] [\fB-o\fR \fIrole\fR] \fB-i\fR \fIipaddr\fR 
+\fBippool\fR \fB-a\fR [\fB-dnv\fR] [\fB-m\fR \fIpoolname\fR] [\fB-o\fR \fIrole\fR] \fB-i\fR \fIipaddr\fR
      [/\fInetmask\fR]
 .fi
 
 .LP
 .nf
-\fBippool\fR \fB-A\fR [\fB-dnv\fR] [\fB-m\fR \fIpoolname\fR] [\fB-o\fR \fIrole\fR] [\fB-S\fR \fIseed\fR] 
+\fBippool\fR \fB-A\fR [\fB-dnv\fR] [\fB-m\fR \fIpoolname\fR] [\fB-o\fR \fIrole\fR] [\fB-S\fR \fIseed\fR]
      [\fB-t\fR \fItype\fR]
 .fi
 
@@ -40,7 +40,7 @@ ippool \- user interface to the IP Filter pools
 
 .LP
 .nf
-\fBippool\fR \fB-r\fR [\fB-dnv\fR] [\fB-m\fR \fIpoolname\fR] [\fB-o\fR \fIrole\fR] \fB-i\fR \fIipaddr\fR 
+\fBippool\fR \fB-r\fR [\fB-dnv\fR] [\fB-m\fR \fIpoolname\fR] [\fB-o\fR \fIrole\fR] \fB-i\fR \fIipaddr\fR
      [/\fInetmask\fR]
 .fi
 
@@ -85,35 +85,29 @@ require \fBippool\fR to be run as root for all operations.
 The following global options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 6n
-.rt  
 Toggle debugging of processing the configuration file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 6n
-.rt  
 Prevents \fBippool\fR from doing anything, such as making ioctl calls, that
 would alter the currently running kernel.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 Turn verbose mode on.
 .RE
 
@@ -123,101 +117,83 @@ Turn verbose mode on.
 The following instance-specific options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 11n
-.rt  
 Add a new data node to an existing pool in the kernel.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR\fR
 .ad
 .RS 11n
-.rt  
 Add a new (empty) pool to the kernel.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIfile\fR\fR
 .ad
 .RS 11n
-.rt  
 Read in IP pool configuration information from \fIfile\fR and load it into the
 kernel.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
 .RS 11n
-.rt  
 Flush loaded pools from the kernel.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 11n
-.rt  
 Display a list of pools of the type: hash loaded in the kernel.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 11n
-.rt  
 Display a list of pools of the type: tree loaded in the kernel.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 11n
-.rt  
 Remove an existing data node from a pool in the kernel.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR\fR
 .ad
 .RS 11n
-.rt  
 Remove an existing pool from within the kernel.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 11n
-.rt  
 Display IP pool statistical information.
 .RE
 
@@ -227,12 +203,10 @@ Display IP pool statistical information.
 The following, additional options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIipaddr\fR[/\fInetmask\fR]\fR
 .ad
 .RS 23n
-.rt  
 Sets the IP address for the operation being undertaken with an all-one's mask
 or, optionally, a specific netmask, given in either dotted-quad notation or as
 a single integer.
@@ -240,83 +214,69 @@ a single integer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fIpoolname\fR\fR
 .ad
 .RS 23n
-.rt  
 Sets the pool name for the current operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR \fIcore\fR\fR
 .ad
 .RS 23n
-.rt  
 Specify an alternative path to \fB/dev/kmem\fR from which to retrieve
 statistical information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-N\fR \fInamelist\fR\fR
 .ad
 .RS 23n
-.rt  
 Specify an alternative path to lookup symbol name information when retrieving
 statistical information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIrole\fR\fR
 .ad
 .RS 23n
-.rt  
 Sets the role with which this pool is to be used. Currently only \fBipf\fR,
 \fBauth\fR, and \fBcount\fR are accepted as arguments to this option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR \fIseed\fR\fR
 .ad
 .RS 23n
-.rt  
 Sets the hashing seed to the number specified. For use with hash-type pools
 only.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fItype\fR\fR
 .ad
 .RS 23n
-.rt  
 Sets the type of pool being defined. Must be one of \fBpool\fR, \fBhash\fR, or
 \fBgroup-map\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
 .RS 23n
-.rt  
 When parsing a configuration file, rather than load new pool data into the
 kernel, unload it.
 .RE
@@ -324,34 +284,28 @@ kernel, unload it.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/ippool\fR\fR
 .ad
 .RS 24n
-.rt  
 Link to IP Filter pseudo device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/kmem\fR\fR
 .ad
 .RS 24n
-.rt  
 Special file that provides access to virtual address space.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ipf/ippool.conf\fR\fR
 .ad
 .RS 24n
-.rt  
 Location of \fBippool\fR startup configuration file.
 .RE
 
@@ -363,13 +317,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH audioconvert 1 "16 Feb 2001" "SunOS 5.11" "User Commands"
+.TH AUDIOCONVERT 1 "Feb 16, 2001"
 .SH NAME
 audioconvert \- convert audio file formats
 .SH SYNOPSIS
 .LP
 .nf
-\fBaudioconvert\fR [\fB-pF\fR] [\fB-f\fR \fIoutfmt\fR] [\fB-o\fR \fIoutfile\fR] 
+\fBaudioconvert\fR [\fB-pF\fR] [\fB-f\fR \fIoutfmt\fR] [\fB-o\fR \fIoutfile\fR]
      [ [\fB-i\fR \fIinfmt\fR] [\fIfile\fR]...] ...
 .fi
 
@@ -55,12 +55,10 @@ files.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 14n
-.rt  
 \fIIn Place\fR: The input files are individually converted to the format
 specified by the \fB-f\fR option and rewritten. If a target file is a symbolic
 link, the underlying file will be rewritten. The \fB-o\fR option may not be
@@ -69,12 +67,10 @@ specified with \fB-p\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
 .RS 14n
-.rt  
 \fIForce\fR: This option forces \fBaudioconvert\fR to ignore any file header
 for input files whose format is specified by the \fB-i\fR option. If \fB-F\fR
 is not specified, \fBaudioconvert\fR ignores the \fB-i\fR option for input
@@ -83,12 +79,10 @@ files that contain valid audio file headers.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIoutfmt\fR\fR
 .ad
 .RS 14n
-.rt  
 \fIOutput Format\fR: This option is used to specify the file format and data
 encoding of the output file. Defaults for unspecified fields are derived from
 the input file format. Valid keywords and values are listed in the next
@@ -97,12 +91,10 @@ section.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIoutfile\fR\fR
 .ad
 .RS 14n
-.rt  
 \fIOutput File\fR: All input files are concatenated, converted to the output
 format, and written to the named output file. If \fB-o\fR and \fB-p\fR are not
 specified, the concatenated output is written to the standard output. The
@@ -111,12 +103,10 @@ specified, the concatenated output is written to the standard output. The
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIinfmt\fR\fR
 .ad
 .RS 14n
-.rt  
 \fIInput Format\fR: This option is used to specify the data encoding of raw
 input files. Ordinarily, the input data format is derived from the audio file
 header. This option is required when converting audio data that is not preceded
@@ -131,12 +121,10 @@ files following that specification, until a new input format is specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fR
 .ad
 .RS 14n
-.rt  
 \fIFile Specification\fR: The named audio files are concatenated, converted to
 the output format, and written out. If no file name is present, or if the
 special file name `\(mi' is specified, audio data is read from the standard
@@ -145,12 +133,10 @@ input.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-?\fR\fR
 .ad
 .RS 14n
-.rt  
 \fIHelp\fR: Prints a command line usage message.
 .RE
 
@@ -167,12 +153,10 @@ with no intervening whitespace. Unambiguous values may be used without the
 preceding \fIkeyword\fR=.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrate\fR\fR
 .ad
 .RS 12n
-.rt  
 The audio sampling rate is specified in samples per second. If a number is
 followed by the letter \fBk\fR, it is multiplied by 1000 (for example, 44.1k =
 44100). Standard of the commonly used sample rates are: 8k, 16k, 32k, 44.1k,
@@ -181,12 +165,10 @@ and 48k.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchannels\fR\fR
 .ad
 .RS 12n
-.rt  
 The number of interleaved channels is specified as an integer. The words
 \fBmono\fR and \fBstereo\fR may also be used to specify one and two channel
 data, respectively.
@@ -194,43 +176,36 @@ data, respectively.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBencoding\fR\fR
 .ad
 .RS 12n
-.rt  
 This option specifies the digital audio data representation. Encodings
 determine precision implicitly (\fBulaw\fR implies 8-bit precision) or
 explicitly as part of the name (for example, \fBlinear16\fR). Valid encoding
 values are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBulaw\fR\fR
 .ad
 .RS 13n
-.rt  
 \fBCCITT G.711\fR -law encoding. This is an 8-bit format primarily used for
 telephone quality speech.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBalaw\fR\fR
 .ad
 .RS 13n
-.rt  
 \fBCCITT G.711\fR A-law encoding. This is an 8-bit format primarily used for
 telephone quality speech in Europe.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlinear8\fR,\fR
 .ad
@@ -243,7 +218,6 @@ telephone quality speech in Europe.
 \fB\fBlinear32\fR\fR
 .ad
 .RS 13n
-.rt  
 Linear Pulse Code Modulation (PCM) encoding. The name identifies the number of
 bits of precision. \fBlinear16\fR is typically used for high quality audio
 data.
@@ -251,23 +225,19 @@ data.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpcm\fR\fR
 .ad
 .RS 13n
-.rt  
 Same as \fBlinear16\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBg721\fR\fR
 .ad
 .RS 13n
-.rt  
 \fBCCITT G.721\fR compression format. This encoding uses Adaptive Delta Pulse
 Code Modulation (ADPCM) with 4-bit precision. It is primarily used for
 compressing -law voice data (achieving a 2:1 compression ratio).
@@ -275,12 +245,10 @@ compressing -law voice data (achieving a 2:1 compression ratio).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBg723\fR\fR
 .ad
 .RS 13n
-.rt  
 \fBCCITT G.723\fR compression format. This encoding uses Adaptive Delta Pulse
 Code Modulation (ADPCM) with 3-bit precision. It is primarily used for
 compressing -law voice data (achieving an 8:3 compression ratio). The audio
@@ -292,34 +260,28 @@ The following encoding values are also accepted as shorthand to set the sample
 rate, channels, and encoding:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvoice\fR\fR
 .ad
 .RS 9n
-.rt  
 Equivalent to \fBencoding=ulaw,rate=8k,channels=mono\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcd\fR\fR
 .ad
 .RS 9n
-.rt  
 Equivalent to \fBencoding=linear16,rate=44.1k,channels=stereo\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdat\fR\fR
 .ad
 .RS 9n
-.rt  
 Equivalent to \fBencoding=linear16,rate=48k,channels=stereo\fR.
 .RE
 
@@ -327,32 +289,26 @@ Equivalent to \fBencoding=linear16,rate=48k,channels=stereo\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBformat\fR\fR
 .ad
 .RS 12n
-.rt  
 This option specifies the audio file format. Valid formats are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsun\fR\fR
 .ad
 .RS 7n
-.rt  
 Sun compatible file format (the default).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBraw\fR\fR
 .ad
 .RS 7n
-.rt  
 Use this format when reading or writing raw audio data (with no audio header),
 or in conjunction with an  \fBoffset\fR to import a foreign audio file format.
 .RE
@@ -361,12 +317,10 @@ or in conjunction with an  \fBoffset\fR to import a foreign audio file format.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBoffset\fR\fR
 .ad
 .RS 12n
-.rt  
 (\fB-i\fR \fIonly\fR) Specifies a byte offset to locate the start of the audio
 data. This option may be used to import audio data that contains an
 unrecognized file header.
@@ -431,15 +385,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureSPARC, x86
+Architecture	SPARC, x86
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

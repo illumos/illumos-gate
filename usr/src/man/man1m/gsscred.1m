@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH gsscred 1M "11 Feb 2004" "SunOS 5.11" "System Administration Commands"
+.TH GSSCRED 1M "Feb 11, 2004"
 .SH NAME
 gsscred \- add, remove, and list gsscred table entries
 .SH SYNOPSIS
@@ -61,89 +61,73 @@ are returned.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 14n
-.rt  
 Add a table entry.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIcomment\fR\fR
 .ad
 .RS 14n
-.rt  
 Insert comment about this table entry.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 14n
-.rt  
 Search table for entry.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fImech\fR\fR
 .ad
 .RS 14n
-.rt  
 Specify the mechanism for which this name is to be translated.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fIuser\fR\fR
 .ad
 .RS 14n
-.rt  
 Specify the optional principal name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIoid\fR\fR
 .ad
 .RS 14n
-.rt  
 Specify the OID indicating the name type of the user.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 14n
-.rt  
 Remove the entry from the table.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fIuid\fR\fR
 .ad
 .RS 14n
-.rt  
 Specify the \fIuid\fR for the \fIuser\fR if the \fIuser\fR is not local.
 .RE
 
@@ -218,23 +202,19 @@ example% \fBgsscred -n bsimpson -l\fR
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB>\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -246,13 +226,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

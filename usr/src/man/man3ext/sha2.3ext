@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sha2 3EXT "13 Nov 2007" "SunOS 5.11" "Extended Library Functions"
+.TH SHA2 3EXT "Nov 13, 2007"
 .SH NAME
 sha2, SHA2Init, SHA2Update, SHA2Final, SHA256Init, SHA256Update, SHA256Final,
 SHA384Init, SHA384Update, SHA384Final, SHA512Init, SHA512Update, SHA512Final \-
@@ -88,7 +88,6 @@ are "compressed" in a secure manner before being encrypted with a private
 (secret) key under a public-key cryptosystem such as RSA.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSHA2Init()\fR, \fBSHA2Update()\fR, \fBSHA2Final()\fR\fR
 .ad
@@ -119,7 +118,6 @@ state of the context structure is undefined. It must be reinitialized with
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSHA256Init()\fR, \fBSHA256Update()\fR, \fBSHA256Final()\fR,
 \fBSHA384Init()\fR, \fBSHA384Update()\fR, \fBSHA384Final()\fR,
@@ -155,7 +153,7 @@ contain the result of the \fBSHA2\fR digest.
 #include <sha2.h>
 
 int
-AuthenticateMsg(unsigned char *auth_buffer, struct iovec 
+AuthenticateMsg(unsigned char *auth_buffer, struct iovec
                 *messageIov, unsigned int num_buffers)
 {
     SHA2_CTX sha2_context;
@@ -190,7 +188,7 @@ interfaces.
 .in +2
 .nf
 int
-AuthenticateMsg(unsigned char *auth_buffer, struct iovec 
+AuthenticateMsg(unsigned char *auth_buffer, struct iovec
                 *messageIov, unsigned int num_buffers)
 {
     SHA384_CTX ctx;
@@ -220,15 +218,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

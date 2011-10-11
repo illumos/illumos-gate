@@ -1,13 +1,13 @@
 '\" te
 .\"  Copyright (c) 1992, X/Open Company Limited  All Rights Reserved  Portions Copyright (c) 1995, Sun Microsystems, Inc.  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH expand 1 "1 Feb 1995" "SunOS 5.11" "User Commands"
+.TH EXPAND 1 "Feb 1, 1995"
 .SH NAME
 expand, unexpand \- expand TAB characters to SPACE characters, and vice versa
 .SH SYNOPSIS
@@ -47,12 +47,10 @@ overridden by the \fB-a\fR option (see the OPTIONS section below).
 The following options are supported for \fBexpand\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fItablist\fR \fR
 .ad
 .RS 26n
-.rt  
 Specifies the tab stops. The argument \fItablist\fR must consist of a single
 positive decimal integer or multiple positive decimal integers, separated by
 blank characters or commas, in ascending order. If a single number is given,
@@ -72,24 +70,20 @@ character is replaced by a single space character in the output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-\fR\fItabstop\fR \fR
 .ad
 .RS 26n
-.rt  
 Specifies as a single argument, sets TAB characters \fItabstop\fR SPACE
 characters apart instead of the default \fB8\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-\fR\fItab1\fR\fI,\|tab2,...,tabn\fR \fR
 .ad
 .RS 26n
-.rt  
 Sets TAB characters at the columns specified by
 \fB-\fR\fItab1,tab2,...,\|tabn\fR
 .RE
@@ -99,24 +93,20 @@ Sets TAB characters at the columns specified by
 The following options are supported for \fBunexpand\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fR
 .ad
 .RS 15n
-.rt  
 Inserts TAB characters when replacing a run of two or more SPACE characters
 would produce a smaller output file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fItablist\fR \fR
 .ad
 .RS 15n
-.rt  
 Specifies the tab stops. The option-argument \fItablist\fR must be a single
 argument consisting of a single positive decimal integer or multiple positive
 decimal integers, separated by blank characters or commas, in ascending order.
@@ -144,12 +134,10 @@ characters.
 The following ooperand is supported for \fBexpand\fR and \fBunexpand\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fIfile\fR\fR \fR
 .ad
 .RS 9n
-.rt  
 The path name of a text file to be used as input.
 .RE
 
@@ -165,23 +153,19 @@ that affect the execution of \fBexpand\fR and \fBunexpand\fR: \fBLANG\fR,
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 7n
-.rt  
 Successful completion
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR \fR
 .ad
 .RS 7n
-.rt  
 An error occurred.
 .RE
 
@@ -193,15 +177,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIenabled
+CSI	enabled
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

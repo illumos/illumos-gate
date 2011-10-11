@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH fstyp 1M "19 Dec 2007" "SunOS 5.11" "System Administration Commands"
+.TH FSTYP 1M "Dec 19, 2007"
 .SH NAME
 fstyp \- determine file system type
 .SH SYNOPSIS
@@ -36,12 +36,10 @@ decisions about subsequent use of a storage device or disk partition.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 6n
-.rt  
 Output all available file system attributes. If a file system has been
 successfully identified, and this option is specified, the \fIFSType\fR
 identifier is followed by one or more "name-value" pairs, one per line, in the
@@ -101,12 +99,10 @@ In addition to the \fIFSType\fR-specific attributes, the following generic
 attributes may be present:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIgen_clean\fR\fR
 .ad
 .RS 13n
-.rt  
 Allowable values are "true" or "false". If the value is "false", the file
 system is damaged or was not unmounted cleanly and the \fBfsck\fR(1M) command
 must be run before this file system can be mounted.
@@ -114,34 +110,28 @@ must be run before this file system can be mounted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIgen_guid\fR\fR
 .ad
 .RS 12n
-.rt  
 Globally unique identifier. This string uniquely identifies the file system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIgen_version\fR\fR
 .ad
 .RS 15n
-.rt  
 A string describing the file system version.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIgen_volume_label\fR\fR
 .ad
 .RS 20n
-.rt  
 Volume label, a human-readable string used to either describe or identify the
 file system.
 .RE
@@ -150,12 +140,10 @@ file system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 Produce verbose output. This is usually information about the file systems
 superblock and varies across different \fIFSTypes\fR. See \fBufs\fR(7FS),
 \fBmkfs_ufs\fR(1M), and \fBtunefs\fR(1M) for details.

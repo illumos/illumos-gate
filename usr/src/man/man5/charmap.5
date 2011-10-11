@@ -1,13 +1,13 @@
 '\" te
 .\"  Copyright (c) 1992, X/Open Company Limited  All Rights Reserved  Portions Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH charmap 5 "1 Dec 2003" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH CHARMAP 5 "Dec 1, 2003"
 .SH NAME
 charmap \- character set description file
 .SH DESCRIPTION
@@ -51,16 +51,15 @@ characters in the portable character set table.
 
 .sp
 .TS
-tab() box;
-lw(.92i) lw(.92i) lw(.92i) lw(.92i) lw(.92i) lw(.92i) 
-lw(.92i) lw(.92i) lw(.92i) lw(.92i) lw(.92i) lw(.92i) 
-.
-<ACK><DC2><ENQ><FS><IS4><SOH>
-<BEL><DC3><EOT><GS><LF><STX>
-<BS><DC4><ESC><HT><NAK><SUB>
-<CAN><DEL><ETB><IS1><RS><SYN>
-<CR><DLE><ETX><IS2><SI><US>
-<DC1><EM><FF><IS3><SO><VT>
+box;
+l l l l l l
+l l l l l l .
+<ACK>	<DC2>	<ENQ>	<FS>	<IS4>	<SOH>
+<BEL>	<DC3>	<EOT>	<GS>	<LF>	<STX>
+<BS>	<DC4>	<ESC>	<HT>	<NAK>	<SUB>
+<CAN>	<DEL>	<ETB>	<IS1>	<RS>	<SYN>
+<CR>	<DLE>	<ETX>	<IS2>	<SI>	<US>
+<DC1>	<EM>	<FF>	<IS3>	<SO>	<VT>
 .TE
 
 .SS "Declarations"
@@ -72,48 +71,40 @@ including the surrounding brackets, followed by one or more blank characters,
 followed by the value to be assigned to the symbol.
 .sp
 .ne 2
-.mk
 .na
 \fB<\fIcode_set_name\fR>\fR
 .ad
 .RS 19n
-.rt  
 The name of the coded character set for which the character set description
 file is defined.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB<\fImb_cur_max\fR>\fR
 .ad
 .RS 19n
-.rt  
 The maximum number of bytes in a multi-byte character. This defaults to
 \fB1\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB<\fImb_cur_min\fR>\fR
 .ad
 .RS 19n
-.rt  
 An unsigned positive integer value that defines the minimum number of bytes in
 a character for the encoded character set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB<\fIescape_char\fR>\fR
 .ad
 .RS 19n
-.rt  
 The escape character used to indicate that the characters following will be
 interpreted in a special way, as defined later in this section. This defaults
 to backslash ('\fB\e\fR\&'), which is the character glyph used in all the
@@ -122,12 +113,10 @@ following text and examples, unless otherwise noted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB<\fIcomment_char\fR>\fR
 .ad
 .RS 19n
-.rt  
 The character that when placed in column 1 of a charmap line, is used to
 indicate that the line is to be ignored. The default character is the number
 sign (#).
@@ -271,12 +260,10 @@ in the following list, starting in column 1, followed by the value(s) to be
 associated to the keyword, as defined below.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIDTH\fR\fR
 .ad
 .RS 17n
-.rt  
 A non-negative integer value defining the column width for the printable
 character in the coded character set mapping definitions. Coded character set
 character values are defined using symbolic character names followed by column
@@ -288,12 +275,10 @@ undefined results. The \fBEND WIDTH\fR keyword is used to terminate the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIDTH_DEFAULT\fR\fR
 .ad
 .RS 17n
-.rt  
 A non-negative integer value defining the default column width for any
 printable character not listed by one of the \fBWIDTH\fR keywords. If no
 \fBWIDTH_DEFAULT\fR keyword is included in the charmap, the default character

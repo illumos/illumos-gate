@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH wusb_df 7D "18 Sep 2009" "SunOS 5.11" "Devices"
+.TH WUSB_DF 7D "Sep 18, 2009"
 .SH NAME
 wusb_df, hwa1480_fw \- WUSB firmware download driver and firmware module for
 Intel i1480 chipset
@@ -28,7 +28,6 @@ symbol.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/wusb_df\fR\fR
 .ad
@@ -39,7 +38,6 @@ symbol.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/sparcv9/wusb_df\fR\fR
 .ad
@@ -50,7 +48,6 @@ symbol.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/amd64/wusb_df\fR\fR
 .ad
@@ -61,7 +58,6 @@ symbol.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/misc/hwa_1480\fR\fR
 .ad
@@ -72,7 +68,6 @@ symbol.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/misc/sparcv9/hwa_1480\fR\fR
 .ad
@@ -83,7 +78,6 @@ symbol.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/amd64/hwa_1480\fR\fR
 .ad
@@ -100,13 +94,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) |lw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+l | l
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureSPARC, x86, PCI-based systems
+Architecture	SPARC, x86, PCI-based systems
 .TE
 
 .SH SEE ALSO

@@ -3,17 +3,17 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH csx_Parse_CISTPL_FORMAT 9F "24 Jan 1997" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH CSX_PARSE_CISTPL_FORMAT 9F "Jan 24, 1997"
 .SH NAME
 csx_Parse_CISTPL_FORMAT \- parse the Data Recording Format tuple
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/pccard.h> 
+#include <sys/pccard.h>
 
 
 
-\fBint32_t\fR \fBcsx_Parse_CISTPL_FORMAT\fR(\fBclient_handle_t\fR \fIch\fR, \fBtuple_t *\fR\fItu\fR, 
+\fBint32_t\fR \fBcsx_Parse_CISTPL_FORMAT\fR(\fBclient_handle_t\fR \fIch\fR, \fBtuple_t *\fR\fItu\fR,
      \fBcistpl_format_t *\fR\fIpt\fR);
 .fi
 
@@ -24,35 +24,29 @@ Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIch\fR\fR
 .ad
 .RS 6n
-.rt  
 Client handle returned from \fBcsx_RegisterClient\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItu\fR\fR
 .ad
 .RS 6n
-.rt  
 Pointer to a \fBtuple_t\fR structure (see \fBtuple\fR(9S)) returned by a call
 to \fBcsx_GetFirstTuple\fR(9F) or \fBcsx_GetNextTuple\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpt\fR\fR
 .ad
 .RS 6n
-.rt  
 Pointer to a \fBcistpl_format_t\fR structure which contains the parsed
 \fBCISTPL_FORMAT\fR tuple information upon return from this function.
 .RE
@@ -93,43 +87,35 @@ uint32_t     dev.mem.edcloc;
 The fields are defined as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtype\fR\fR
 .ad
 .RS 20n
-.rt  
 This field indicates the type of device:
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFMTTYPE_DISK\fR
 .ad
 .RS 19n
-.rt  
 disk-like device
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFMTTYPE_MEM\fR
 .ad
 .RS 19n
-.rt  
 memory-like device
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFMTTYPE_VS\fR
 .ad
 .RS 19n
-.rt  
 vendor-specific device
 .RE
 
@@ -137,110 +123,90 @@ vendor-specific device
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBedc_length\fR\fR
 .ad
 .RS 20n
-.rt  
 This field indicates the error detection code length.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBedc_type\fR\fR
 .ad
 .RS 20n
-.rt  
 This field indicates the error detection code type.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBoffset\fR\fR
 .ad
 .RS 20n
-.rt  
 This field indicates the offset of the first byte of data in this partition.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnbytes\fR\fR
 .ad
 .RS 20n
-.rt  
 This field indicates the number of bytes of data in this partition
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdev.disk.bksize\fR\fR
 .ad
 .RS 20n
-.rt  
 This field indicates the block size, for disk devices.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdev.disk.nblocks\fR\fR
 .ad
 .RS 20n
-.rt  
 This field indicates the number of blocks, for disk devices.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdev.disk.edcloc\fR\fR
 .ad
 .RS 20n
-.rt  
 This field indicates the location of the error detection code, for disk
 devices.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdev.mem.flags\fR\fR
 .ad
 .RS 20n
-.rt  
 This field provides flags, for memory devices.  Valid flags are:
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFMTFLAGS_ADDR\fR
 .ad
 .RS 20n
-.rt  
 address is valid
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFMTFLAGS_AUTO\fR
 .ad
 .RS 20n
-.rt  
 automatically map memory region
 .RE
 
@@ -248,34 +214,28 @@ automatically map memory region
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdev.mem.reserved\fR\fR
 .ad
 .RS 20n
-.rt  
 This field is reserved.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdev.mem.address\fR\fR
 .ad
 .RS 20n
-.rt  
 This field indicates the physical address, for memory devices.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdev.mem.edcloc\fR\fR
 .ad
 .RS 20n
-.rt  
 This field indicates the location of the error detection code, for memory
 devices.
 .RE
@@ -283,67 +243,55 @@ devices.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_SUCCESS\fR\fR
 .ad
 .RS 27n
-.rt  
 Successful operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_BAD_HANDLE\fR\fR
 .ad
 .RS 27n
-.rt  
 Client handle is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_UNKNOWN_TUPLE\fR\fR
 .ad
 .RS 27n
-.rt  
 Parser does not know how to parse tuple.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_NO_CARD\fR\fR
 .ad
 .RS 27n
-.rt  
 No \fBPC \fRCard in socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_NO_CIS\fR\fR
 .ad
 .RS 27n
-.rt  
 No Card Information Structure (CIS) on \fBPC \fRCard.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_UNSUPPORTED_FUNCTION\fR\fR
 .ad
 .RS 27n
-.rt  
 No \fBPCMCIA \fRhardware installed.
 .RE
 

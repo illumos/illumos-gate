@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH in.rarpd 1M "20 Aug 2004" "SunOS 5.11" "System Administration Commands"
+.TH IN.RARPD 1M "Aug 20, 2004"
 .SH NAME
 in.rarpd, rarpd \- DARPA Reverse Address Resolution Protocol server
 .SH SYNOPSIS
@@ -43,12 +43,10 @@ message set to communicate directly with the datalink device driver.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 6n
-.rt  
 Get the list of available network interfaces from \fBIP\fR using the
 \fBSIOCGIFADDR\fR ioctl and start a \fBRARP\fR daemon process on each interface
 returned.
@@ -56,12 +54,10 @@ returned.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 6n
-.rt  
 Print assorted debugging messages while executing.
 .RE
 
@@ -101,56 +97,46 @@ example# /usr/sbin/in.rarpd le 0
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ethers\fR\fR
 .ad
 .RS 15n
-.rt  
 File or other source, as specified by \fBnsswitch.conf\fR(4).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/hosts\fR\fR
 .ad
 .RS 15n
-.rt  
 File or other source, as specified by \fBnsswitch.conf\fR(4).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/tftpboot\fR\fR
 .ad
 .RS 15n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/ip\fR\fR
 .ad
 .RS 15n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/arp\fR\fR
 .ad
 .RS 15n
-.rt  
 
 .RE
 

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dhcp_inittab 4 "31 Aug 2009" "SunOS 5.11" "File Formats"
+.TH DHCP_INITTAB 4 "Aug 31, 2009"
 .SH NAME
 dhcp_inittab \- information repository for DHCP options
 .SH DESCRIPTION
@@ -63,12 +63,10 @@ clients and servers. The following categories are defined; the category names
 are not case-sensitive:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTANDARD\fR\fR
 .ad
 .RS 12n
-.rt  
 All client and server \fBDHCP\fR implementations agree on the semantics. These
 are administered by the Internet Assigned Numbers Authority (\fBIANA\fR). These
 options are numbered from \fB1\fR to \fB127\fR for IPv4 DHCP, and \fB1\fR to
@@ -77,12 +75,10 @@ options are numbered from \fB1\fR to \fB127\fR for IPv4 DHCP, and \fB1\fR to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSITE\fR\fR
 .ad
 .RS 12n
-.rt  
 Within a specific site, all client and server implementations agree on the
 semantics. However, at another site the type and meaning of the option may be
 quite different. These options are numbered from \fB128\fR to \fB254\fR for
@@ -91,12 +87,10 @@ IPv4 DHCP. DHCPv6 does not support site options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVENDOR\fR\fR
 .ad
 .RS 12n
-.rt  
 Each vendor may define \fB254\fR options (65536 for DHCPv6) unique to that
 vendor. The vendor is identified within a \fBDHCP\fR packet by the "Vendor
 Class" option, number \fB60\fR (number \fB17\fR for DHCPv6). An option with a
@@ -110,24 +104,20 @@ Define non-Sun vendor options in the \fBdhcptab\fR file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFIELD\fR\fR
 .ad
 .RS 12n
-.rt  
 This category allows the fixed fields within a \fBDHCP\fR packet to be aliased
 to a mnemonic name for use with \fBdhcpinfo\fR(1).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBINTERNAL\fR\fR
 .ad
 .RS 12n
-.rt  
 This category is internal to the Solaris \fBDHCP\fR implementation and will not
 be further defined.
 .RE
@@ -188,23 +178,19 @@ Data Type is one of the following values, which are not case sensitive:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAscii\fR\fR
 .ad
 .RS 13n
-.rt  
 A printable character string
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBBool\fR
 .ad
 .RS 13n
-.rt  
 Has no value. Scope limited to category limited to \fBINTERNAL\fR. Presence of
 an option of this type within a Solaris configuration file represents
 \fBTRUE\fR, absence represents \fBFALSE\fR.
@@ -212,155 +198,127 @@ an option of this type within a Solaris configuration file represents
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOctet\fR\fR
 .ad
 .RS 13n
-.rt  
 An array of bytes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUnumber8\fR\fR
 .ad
 .RS 13n
-.rt  
 An 8-bit unsigned integer
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSnumber8\fR\fR
 .ad
 .RS 13n
-.rt  
 An 8-bit signed integer
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUnumber16\fR\fR
 .ad
 .RS 13n
-.rt  
 A 16-bit unsigned integer
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSnumber16\fR\fR
 .ad
 .RS 13n
-.rt  
 A 16-bit signed integer
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUnumber24\fR\fR
 .ad
 .RS 13n
-.rt  
 A 24-bit unsigned integer
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUnumber32\fR\fR
 .ad
 .RS 13n
-.rt  
 A 32-bit unsigned integer
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSnumber32\fR\fR
 .ad
 .RS 13n
-.rt  
 A 32-bit signed integer
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUnumber64\fR\fR
 .ad
 .RS 13n
-.rt  
 A 64-bit unsigned integer
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSnumber64\fR\fR
 .ad
 .RS 13n
-.rt  
 A 64-bit signed integer
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIp\fR\fR
 .ad
 .RS 13n
-.rt  
 An \fBIPv4\fR address
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIpv6\fR\fR
 .ad
 .RS 13n
-.rt  
 An \fBIPv6\fR address
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDuid\fR\fR
 .ad
 .RS 13n
-.rt  
 An RFC 3315 Unique Identifier
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDomain\fR\fR
 .ad
 .RS 13n
-.rt  
 An RFC 1035-encoded domain name
 .RE
 
@@ -411,127 +369,125 @@ The following table maps the mnemonic identifiers used in Solaris DHCP to
 
 .sp
 .TS
-tab();
-cw(1.4i) cw(1.09i) cw(3.02i) 
-lw(1.4i) lw(1.09i) lw(3.02i) 
-.
-\fISymbol\fR\fICode\fR\fIDescription\fR
+c c c
+l l l .
+\fISymbol\fR	\fICode\fR	\fIDescription\fR
 _
-\fBSubnet\fR\fB1\fRT{
+\fBSubnet\fR	\fB1\fR	T{
 Subnet Mask, dotted Internet address (IP).
 T}
-\fBUTCoffst\fR\fB2\fRT{
+\fBUTCoffst\fR	\fB2\fR	T{
 Coordinated Universal time offset (seconds).
 T}
-\fBRouter\fR\fB3\fRList of Routers, IP.
-\fBTimeserv\fR\fB4\fRList of RFC-868 servers, IP.
-\fBIEN116ns\fR\fB5\fRList of IEN 116 name servers, IP.
-\fBDNSserv\fR\fB6\fRList of DNS name servers, IP.
-\fBLogserv\fR\fB7\fRList of MIT-LCS UDP log servers, IP.
-\fBCookie\fR\fB8\fRList of RFC-865 cookie servers, IP.
-\fBLprserv\fR\fB9\fRT{
+\fBRouter\fR	\fB3\fR	List of Routers, IP.
+\fBTimeserv\fR	\fB4\fR	List of RFC-868 servers, IP.
+\fBIEN116ns\fR	\fB5\fR	List of IEN 116 name servers, IP.
+\fBDNSserv\fR	\fB6\fR	List of DNS name servers, IP.
+\fBLogserv\fR	\fB7\fR	List of MIT-LCS UDP log servers, IP.
+\fBCookie\fR	\fB8\fR	List of RFC-865 cookie servers, IP.
+\fBLprserv\fR	\fB9\fR	T{
 List of RFC-1179 line printer servers, IP.
 T}
-\fBImpress\fR\fB10\fRList of Imagen Impress servers, IP.
-\fBResource\fR\fB11\fRT{
+\fBImpress\fR	\fB10\fR	List of Imagen Impress servers, IP.
+\fBResource\fR	\fB11\fR	T{
 List of RFC-887 resource location servers, IP.
 T}
-\fBHostname\fR\fB12\fRT{
+\fBHostname\fR	\fB12\fR	T{
 Client's hostname, value from hosts database.
 T}
-\fBBootsize\fR\fB13\fRT{
+\fBBootsize\fR	\fB13\fR	T{
 Number of 512 octet blocks in boot image, NUMBER.
 T}
-\fBDumpfile\fR\fB14\fRT{
-Path where core image should be dumped, ASCII. 
+\fBDumpfile\fR	\fB14\fR	T{
+Path where core image should be dumped, ASCII.
 T}
-\fBDNSdmain\fR\fB15\fRDNS domain name, ASCII.
-\fBSwapserv\fR\fB16\fRClient's swap server, IP.
-\fBRootpath\fR\fB17\fRClient's Root path, ASCII.
-\fBExtendP\fR\fB18\fRExtensions path, ASCII.
-\fBIpFwdF\fR\fB19\fRIP Forwarding Enable/Disable, NUMBER.
-\fBNLrouteF\fR\fB20\fRNon-local Source Routing, NUMBER.
-\fBPFilter\fR\fB21\fRPolicy Filter, IP.
-\fBMaxIpSiz\fR\fB22\fRT{
+\fBDNSdmain\fR	\fB15\fR	DNS domain name, ASCII.
+\fBSwapserv\fR	\fB16\fR	Client's swap server, IP.
+\fBRootpath\fR	\fB17\fR	Client's Root path, ASCII.
+\fBExtendP\fR	\fB18\fR	Extensions path, ASCII.
+\fBIpFwdF\fR	\fB19\fR	IP Forwarding Enable/Disable, NUMBER.
+\fBNLrouteF\fR	\fB20\fR	Non-local Source Routing, NUMBER.
+\fBPFilter\fR	\fB21\fR	Policy Filter, IP.
+\fBMaxIpSiz\fR	\fB22\fR	T{
 Maximum datagram Reassembly Size, NUMBER.
 T}
-\fBIpTTL\fR\fB23\fRT{
+\fBIpTTL\fR	\fB23\fR	T{
 Default IP Time to Live, (1=<x<=255), NUMBER.
 T}
-\fBPathTO\fR\fB24\fRRFC-1191 Path MTU Aging Timeout, NUMBER.
-\fBPathTbl\fR\fB25\fRRFC-1191 Path MTU Plateau Table, NUMBER.
-\fBMTU\fR\fB26\fRInterface MTU, x>=68, NUMBER. 
-\fBSameMtuF\fR\fB27\fRAll Subnets are Local, NUMBER.
-\fBBroadcst\fR\fB28\fRBroadcast Address, IP.
-\fBMaskDscF\fR\fB29\fRPerform Mask Discovery, NUMBER.
-\fBMaskSupF\fR\fB30\fRMask Supplier, NUMBER.
-\fBRDiscvyF\fR\fB31\fRPerform Router Discovery, NUMBER.
-\fBRSolictS\fR\fB32\fRRouter Solicitation Address, IP.
-\fBStaticRt\fR\fB33\fRT{
+\fBPathTO\fR	\fB24\fR	RFC-1191 Path MTU Aging Timeout, NUMBER.
+\fBPathTbl\fR	\fB25\fR	RFC-1191 Path MTU Plateau Table, NUMBER.
+\fBMTU\fR	\fB26\fR	Interface MTU, x>=68, NUMBER.
+\fBSameMtuF\fR	\fB27\fR	All Subnets are Local, NUMBER.
+\fBBroadcst\fR	\fB28\fR	Broadcast Address, IP.
+\fBMaskDscF\fR	\fB29\fR	Perform Mask Discovery, NUMBER.
+\fBMaskSupF\fR	\fB30\fR	Mask Supplier, NUMBER.
+\fBRDiscvyF\fR	\fB31\fR	Perform Router Discovery, NUMBER.
+\fBRSolictS\fR	\fB32\fR	Router Solicitation Address, IP.
+\fBStaticRt\fR	\fB33\fR	T{
 Static Route, Double IP (network router).
 T}
-\fBTrailerF\fR\fB34\fRTrailer Encapsulation, NUMBER.
-\fBArpTimeO\fR\fB35\fRARP Cache Time out, NUMBER.
-\fBEthEncap\fR\fB36\fREthernet Encapsulation, NUMBER.
-\fBTcpTTL\fR\fB37\fRTCP Default Time to Live, NUMBER.
-\fBTcpKaInt\fR\fB38\fRTCP Keepalive Interval, NUMBER. 
-\fBTcpKaGbF\fR\fB39\fRTCP Keepalive Garbage, NUMBER.
-\fBNISdmain\fR\fB40\fRNIS Domain name, ASCII.
-\fBNISservs\fR\fB41\fRList of NIS servers, IP.
-\fBNTPservs\fR\fB42\fRList of NTP servers, IP.
-\fBNetBNms\fR\fB44\fRList of NetBIOS Name servers, IP.
-\fBNetBDsts\fR\fB45\fRT{
+\fBTrailerF\fR	\fB34\fR	Trailer Encapsulation, NUMBER.
+\fBArpTimeO\fR	\fB35\fR	ARP Cache Time out, NUMBER.
+\fBEthEncap\fR	\fB36\fR	Ethernet Encapsulation, NUMBER.
+\fBTcpTTL\fR	\fB37\fR	TCP Default Time to Live, NUMBER.
+\fBTcpKaInt\fR	\fB38\fR	TCP Keepalive Interval, NUMBER.
+\fBTcpKaGbF\fR	\fB39\fR	TCP Keepalive Garbage, NUMBER.
+\fBNISdmain\fR	\fB40\fR	NIS Domain name, ASCII.
+\fBNISservs\fR	\fB41\fR	List of NIS servers, IP.
+\fBNTPservs\fR	\fB42\fR	List of NTP servers, IP.
+\fBNetBNms\fR	\fB44\fR	List of NetBIOS Name servers, IP.
+\fBNetBDsts\fR	\fB45\fR	T{
 List of NetBIOS Distribution servers, IP.
 T}
-\fBNetBNdT\fR\fB46\fRT{
+\fBNetBNdT\fR	\fB46\fR	T{
 NetBIOS Node type (1=B-node, 2=P, 4=M, 8=H).
 T}
-\fBNetBScop\fR\fB47\fRNetBIOS scope, ASCII.
-\fBXFontSrv\fR\fB48\fRList of X Window Font servers, IP.
-\fBXDispMgr\fR\fB49\fRList of X Window Display managers, IP.
-\fBLeaseTim\fR\fB51\fRLease Time Policy, (-1 = PERM), NUMBER.
-\fBMessage\fR\fB56\fRT{
-Message to be displayed on client, ASCII. 
+\fBNetBScop\fR	\fB47\fR	NetBIOS scope, ASCII.
+\fBXFontSrv\fR	\fB48\fR	List of X Window Font servers, IP.
+\fBXDispMgr\fR	\fB49\fR	List of X Window Display managers, IP.
+\fBLeaseTim\fR	\fB51\fR	Lease Time Policy, (-1 = PERM), NUMBER.
+\fBMessage\fR	\fB56\fR	T{
+Message to be displayed on client, ASCII.
 T}
-\fBT1Time\fR\fB58\fRRenewal (T1) time, NUMBER.
-\fBT2Time\fR\fB59\fRRebinding (T2) time, NUMBER.
-\fBNW_dmain\fR\fB62\fRNetWare/IP Domain Name, ASCII.
-\fBNWIPOpts\fR\fB63\fRT{
+\fBT1Time\fR	\fB58\fR	Renewal (T1) time, NUMBER.
+\fBT2Time\fR	\fB59\fR	Rebinding (T2) time, NUMBER.
+\fBNW_dmain\fR	\fB62\fR	NetWare/IP Domain Name, ASCII.
+\fBNWIPOpts\fR	\fB63\fR	T{
 NetWare/IP Options, OCTET (unknown type).
 T}
-\fBNIS+dom\fR\fB64\fRNIS+ Domain name, ASCII.
-\fBNIS+serv\fR\fB65\fRNIS+ servers, IP.
-\fBTFTPsrvN\fR\fB66\fRTFTP server hostname, ASCII.
-\fBOptBootF\fR\fB67\fROptional Bootfile path, ASCII.
-\fBMblIPAgt\fR\fB68\fRMobile IP Home Agent, IP.
-\fBSMTPserv\fR\fB69\fRT{
+\fBNIS+dom\fR	\fB64\fR	NIS+ Domain name, ASCII.
+\fBNIS+serv\fR	\fB65\fR	NIS+ servers, IP.
+\fBTFTPsrvN\fR	\fB66\fR	TFTP server hostname, ASCII.
+\fBOptBootF\fR	\fB67\fR	Optional Bootfile path, ASCII.
+\fBMblIPAgt\fR	\fB68\fR	Mobile IP Home Agent, IP.
+\fBSMTPserv\fR	\fB69\fR	T{
 Simple Mail Transport Protocol Server, IP.
 T}
-\fBPOP3serv\fR\fB70\fRPost Office Protocol (POP3) Server, IP.
-\fBNNTPserv\fR\fB71\fRT{
-Network News Transport Proto. (NNTP) Server, IP. 
+\fBPOP3serv\fR	\fB70\fR	Post Office Protocol (POP3) Server, IP.
+\fBNNTPserv\fR	\fB71\fR	T{
+Network News Transport Proto. (NNTP) Server, IP.
 T}
-\fBWWWservs\fR\fB72\fRDefault WorldWideWeb Server, IP.
-\fBFingersv\fR\fB73\fRDefault Finger Server, IP.
-\fBIRCservs\fR\fB74\fRInternet Relay Chat Server, IP.
-\fBSTservs\fR\fB75\fRStreetTalk Server, IP.
-\fBSTDAservs\fR\fB76\fRStreetTalk Directory Assist. Server, IP.
-\fBUserClas\fR\fB77\fRUser class information, ASCII.
-\fBSLP_DA\fR\fB78\fRDirectory agent, OCTET.
-\fBSLP_SS\fR\fB79\fRService scope, OCTET.
-\fBAgentOpt\fR\fB82\fRAgent circuit ID, OCTET.
-\fBFQDN\fR\fB89\fRFully Qualified Domain Name, OCTET.
-\fBPXEarch\fR\fB93\fRClient system architecture, NUMBER.
-\fBBootFile\fR\fBN/A\fRFile to Boot, ASCII.
-\fBBootPath\fR\fBN/A\fRT{
+\fBWWWservs\fR	\fB72\fR	Default WorldWideWeb Server, IP.
+\fBFingersv\fR	\fB73\fR	Default Finger Server, IP.
+\fBIRCservs\fR	\fB74\fR	Internet Relay Chat Server, IP.
+\fBSTservs\fR	\fB75\fR	StreetTalk Server, IP.
+\fBSTDAservs\fR	\fB76\fR	StreetTalk Directory Assist. Server, IP.
+\fBUserClas\fR	\fB77\fR	User class information, ASCII.
+\fBSLP_DA\fR	\fB78\fR	Directory agent, OCTET.
+\fBSLP_SS\fR	\fB79\fR	Service scope, OCTET.
+\fBAgentOpt\fR	\fB82\fR	Agent circuit ID, OCTET.
+\fBFQDN\fR	\fB89\fR	Fully Qualified Domain Name, OCTET.
+\fBPXEarch\fR	\fB93\fR	Client system architecture, NUMBER.
+\fBBootFile\fR	\fBN/A\fR	File to Boot, ASCII.
+\fBBootPath\fR	\fBN/A\fR	T{
 Boot path prefix to apply to client's requested boot file, ASCII.
 T}
-\fBBootSrvA\fR\fBN/A\fRBoot Server, IP.
-\fBBootSrvN\fR\fBN/A\fRBoot Server Hostname, ASCII.
-\fBEchoVC\fR\fBN/A\fRT{
+\fBBootSrvA\fR	\fBN/A\fR	Boot Server, IP.
+\fBBootSrvN\fR	\fBN/A\fR	Boot Server Hostname, ASCII.
+\fBEchoVC\fR	\fBN/A\fR	T{
 Echo Vendor Class Identifier Flag, (Present=\fBTRUE\fR)
 T}
-\fBLeaseNeg\fR\fBN/A\fRLease is Negotiable Flag, (Present=\fBTRUE\fR)
+\fBLeaseNeg\fR	\fBN/A\fR	Lease is Negotiable Flag, (Present=\fBTRUE\fR)
 .TE
 
 .SS "Mnemonic Identifiers for IPv6 Options"
@@ -543,40 +499,38 @@ The following table maps the mnemonic identifiers used in Solaris DHCP to RFC
 
 .sp
 .TS
-tab();
-cw(1.4i) cw(1.09i) cw(3.02i) 
-lw(1.4i) lw(1.09i) lw(3.02i) 
-.
-\fISymbol\fR\fICode\fR\fIDescription\fR
+c c c
+l l l .
+\fISymbol\fR	\fICode\fR	\fIDescription\fR
 _
-\fBClientID\fR\fB1\fRUnique identifier for client, DUID
-\fBServerID\fR\fB2\fRUnique identifier for server, DUID
-\fBPreference\fR\fB7\fRServer preference, NUMBER
-\fBUnicast\fR\fB12\fRUnicast server address, IPV6
-\fBUserClass\fR\fB15\fRUser classes for client, OCTET
-\fBVendorClass\fR\fB16\fRVendor client hardware items, OCTET
-\fBSIPNames\fR\fB21\fRSIP proxy server name list, DOMAIN
-\fBSIPAddresses\fR\fB22\fRT{
+\fBClientID\fR	\fB1\fR	Unique identifier for client, DUID
+\fBServerID\fR	\fB2\fR	Unique identifier for server, DUID
+\fBPreference\fR	\fB7\fR	Server preference, NUMBER
+\fBUnicast\fR	\fB12\fR	Unicast server address, IPV6
+\fBUserClass\fR	\fB15\fR	User classes for client, OCTET
+\fBVendorClass\fR	\fB16\fR	Vendor client hardware items, OCTET
+\fBSIPNames\fR	\fB21\fR	SIP proxy server name list, DOMAIN
+\fBSIPAddresses\fR	\fB22\fR	T{
 SIP proxy server addresses in preference order, IPV6
 T}
-\fBDNSAddresses\fR\fB23\fRT{
+\fBDNSAddresses\fR	\fB23\fR	T{
 DNS server addresses in preference order, IPV6
 T}
-\fBDNSSearch\fR\fB24\fRDNS search list, DOMAIN
-\fBNISServers\fR\fB27\fRT{
+\fBDNSSearch\fR	\fB24\fR	DNS search list, DOMAIN
+\fBNISServers\fR	\fB27\fR	T{
 NIS server addresses in preference order, IPV6
 T}
-\fBNIS+Servers\fR\fB28\fRT{
+\fBNIS+Servers\fR	\fB28\fR	T{
 NIS+ server addresses in preference order, IPV6
 T}
-\fBNISDomain\fR\fB29\fRNIS domain name, DOMAIN
-\fBNIS+Domain\fR\fB30\fRNIS+ domain name, DOMAIN
-\fBSNTPServers\fR\fB31\fRIPV6
-\fBInfoRefresh\fR\fB32\fRUNUMBER32
-\fBBCMCDomain\fR\fB33\fRT{
+\fBNISDomain\fR	\fB29\fR	NIS domain name, DOMAIN
+\fBNIS+Domain\fR	\fB30\fR	NIS+ domain name, DOMAIN
+\fBSNTPServers\fR	\fB31\fR	IPV6
+\fBInfoRefresh\fR	\fB32\fR	UNUMBER32
+\fBBCMCDomain\fR	\fB33\fR	T{
 Broadcast/multicast control server name list, DOMAIN
 T}
-\fBBCMCAddresses\fR\fB34\fRT{
+\fBBCMCAddresses\fR	\fB34\fR	T{
 Broadcast/multicast control server addresses, IPV6
 T}
 .TE
@@ -621,13 +575,12 @@ See \fBattributes\fR(5)  for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

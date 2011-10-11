@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH atomic_ops 3C "12 Aug 2004" "SunOS 5.11" "Standard C Library Functions"
+.TH ATOMIC_OPS 3C "Aug 12, 2004"
 .SH NAME
 atomic_ops \- atomic operations
 .SH SYNOPSIS
@@ -19,45 +19,37 @@ This collection of functions provides atomic memory operations. There are 8
 different classes of atomic operations:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBatomic_add\fR(3C)\fR
 .ad
 .RS 19n
-.rt  
 These functions provide an atomic addition of a signed value to a variable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBatomic_and\fR(3C)\fR
 .ad
 .RS 19n
-.rt  
 These functions provide an atomic logical 'and' of a value to a variable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBatomic_bits\fR(3C)\fR
 .ad
 .RS 19n
-.rt  
 These functions provide atomic bit setting and clearing within a variable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBatomic_cas\fR(3C)\fR
 .ad
 .RS 19n
-.rt  
 These functions provide an atomic comparison of a value with a variable. If the
 comparison is equal, then swap in a new value for the variable, returning the
 old value of the variable in either case.
@@ -65,45 +57,37 @@ old value of the variable in either case.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBatomic_dec\fR(3C)\fR
 .ad
 .RS 19n
-.rt  
 These functions provide an atomic decrement on a variable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBatomic_inc\fR(3C)\fR
 .ad
 .RS 19n
-.rt  
 These functions provide an atomic increment on a variable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBatomic_or\fR(3C)\fR
 .ad
 .RS 19n
-.rt  
 These functions provide an atomic logical 'or' of a value to a variable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBatomic_swap\fR(3C)\fR
 .ad
 .RS 19n
-.rt  
 These functions provide an atomic swap of a value with a variable, returning
 the old value of the variable.
 .RE
@@ -116,15 +100,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStable
+Interface Stability	Stable
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

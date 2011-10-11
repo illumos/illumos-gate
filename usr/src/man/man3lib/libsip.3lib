@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libsip 3LIB "11 Jan 2008" "SunOS 5.11" "Interface Libraries"
+.TH LIBSIP 3LIB "Jan 11, 2008"
 .SH NAME
 libsip \- Session Initiation Protocol (SIP) library
 .SH SYNOPSIS
@@ -30,154 +30,148 @@ interfaces.
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBsip_add_accept\fR\fBsip_add_accept_enc\fR
-\fBsip_add_accept_lang\fR\fBsip_add_alert_info\fR
-\fBsip_add_allow\fR\fBsip_add_allow_events\fR
-\fBsip_add_authen_info\fR\fBsip_add_author\fR
-\fBsip_add_branchid_to_via\fR\fBsip_add_call_info\fR
-\fBsip_add_callid\fR\fBsip_add_contact\fR
-\fBsip_add_content\fR\fBsip_add_content_disp\fR
-\fBsip_add_content_enc\fR\fBsip_add_content_lang\fR
-\fBsip_add_content_type\fR\fBsip_add_cseq\fR
-\fBsip_add_date\fR\fBsip_add_error_info\fR
-\fBsip_add_event\fR\fBsip_add_expires\fR
-\fBsip_add_from\fR\fBsip_add_header\fR
-\fBsip_add_in_reply_to\fR\fBsip_add_maxforward\fR
-\fBsip_add_mime_version\fR\fBsip_add_min_expires\fR
-\fBsip_add_org\fR\fBsip_add_param\fR
-\fBsip_add_passertedid\fR\fBsip_add_ppreferredid\fR
-\fBsip_add_priority\fR\fBsip_add_privacy\fR
-\fBsip_add_proxy_authen\fR\fBsip_add_proxy_author\fR
-\fBsip_add_proxy_require\fR\fBsip_add_rack\fR
-\fBsip_add_record_route\fR\fBsip_add_reply_to\fR
-\fBsip_add_request_line\fR\fBsip_add_require\fR
-\fBsip_add_response_line\fR\fBsip_add_retry_after\fR
-\fBsip_add_route\fR\fBsip_add_rseq\fR
-\fBsip_add_server\fR\fBsip_add_subject\fR
-\fBsip_add_substate\fR\fBsip_add_supported\fR
-\fBsip_add_to\fR\fBsip_add_tstamp\fR
-\fBsip_add_unsupported\fR\fBsip_add_user_agent\fR
-\fBsip_add_via\fR\fBsip_add_warning\fR
-\fBsip_add_www_authen\fR\fBsip_branchid\fR
-\fBsip_clear_stale_data\fR\fBsip_clone_msg\fR
-\fBsip_conn_destroyed\fR\fBsip_copy_all_headers\fR
-\fBsip_copy_header\fR\fBsip_copy_header_by_name\fR
-\fBsip_copy_start_line\fR\fBsip_create_dialog_req\fR
-\fBsip_create_dialog_req_nocontact\fR\fBsip_create_OKack\fR
-\fBsip_create_response\fR\fBsip_delete_dialog\fR
-\fBsip_delete_header\fR\fBsip_delete_header_by_name\fR
-\fBsip_delete_start_line\fR\fBsip_delete_value\fR
-\fBsip_disable_counters\fR\fBsip_disable_dialog_logging\fR
-\fBsip_disable_trans_logging\fR\fBsip_enable_counters\fR
-\fBsip_enable_dialog_logging\fR\fBsip_enable_trans_logging\fR
-\fBsip_free_msg\fR\fBsip_free_parsed_uri\fR
-\fBsip_get_accept_enc\fR\fBsip_get_accept_lang\fR
-\fBsip_get_accept_sub_type\fR\fBsip_get_accept_type\fR
-\fBsip_get_alert_info_uri\fR\fBsip_get_allow_events\fR
-\fBsip_get_allow_method\fR\fBsip_get_authen_info\fR
-\fBsip_get_author_param\fR\fBsip_get_author_scheme\fR
-\fBsip_get_branchid\fR\fBsip_get_call_info_uri\fR
-\fBsip_get_callid\fR\fBsip_get_callseq_method\fR
-\fBsip_get_callseq_num\fR\fBsip_get_contact_display_name\fR
-\fBsip_get_contact_uri_str\fR\fBsip_get_content_disp\fR
-\fBsip_get_content_enc\fR\fBsip_get_content_lang\fR
-\fBsip_get_content_length\fR\fBsip_get_content_sub_type\fR
-\fBsip_get_content_type\fR\fBsip_get_content\fR
-\fBsip_get_counter_value\fR\fBsip_get_cseq\fR
-\fBsip_get_date_day\fR\fBsip_get_date_month\fR
-\fBsip_get_date_time\fR\fBsip_get_date_timezone\fR
-\fBsip_get_date_wkday\fR\fBsip_get_date_year\fR
-\fBsip_get_dialog_callid\fR\fBsip_get_dialog_local_cseq\fR
-\fBsip_get_dialog_local_tag\fR\fBsip_get_dialog_local_uri\fR
-\fBsip_get_dialog_local_contact_uri\fR\fBsip_get_dialog_method\fR
-\fBsip_get_dialog_msgcnt\fR\fBsip_get_dialog_remote_cseq\fR
-\fBsip_get_dialog_remote_tag\fR\fBsip_get_dialog_remote_target_uri\fR
-\fBsip_get_dialog_remote_uri\fR\fBsip_get_dialog_route_set\fR
-\fBsip_get_dialog_state\fR\fBsip_get_dialog_type\fR
-\fBsip_get_error_info_uri\fR\fBsip_get_event\fR
-\fBsip_get_expires\fR\fBsip_get_from_display_name\fR
-\fBsip_get_from_tag\fR\fBsip_get_from_uri_str\fR
-\fBsip_get_header\fR\fBsip_get_header_value\fR
-\fBsip_get_in_reply_to\fR\fBsip_get_maxforward\fR
-\fBsip_get_mime_version\fR\fBsip_get_min_expires\fR
-\fBsip_get_msg_len\fR\fBsip_get_next_value\fR
-\fBsip_get_num_via\fR\fBsip_get_org\fR
-\fBsip_get_param_value\fR\fBsip_get_params\fR
-\fBsip_get_passertedid_display_name\fR\fBsip_get_passertedid_uri_str\fR
-\fBsip_get_ppreferredid_display_name\fR\fBsip_get_ppreferredid_uri_str\fR
-\fBsip_get_priority\fR\fBsip_get_priv_value\fR
-\fBsip_get_proxy_authen_param\fR\fBsip_get_proxy_authen_scheme\fR
-\fBsip_get_proxy_author_param\fR\fBsip_get_proxy_author_scheme\fR
-\fBsip_get_proxy_require\fR\fBsip_get_rack_cseq_num\fR
-\fBsip_get_rack_method\fR\fBsip_get_rack_resp_num\fR
-\fBsip_get_replyto_display_name\fR\fBsip_get_replyto_uri_str\fR
-\fBsip_get_request_method\fR\fBsip_get_request_uri_str\fR
-\fBsip_get_require\fR\fBsip_get_resp_desc\fR
-\fBsip_get_response_code\fR\fBsip_get_response_phrase\fR
-\fBsip_get_retry_after_cmts\fR\fBsip_get_retry_after_time\fR
-\fBsip_get_route_display_name\fR\fBsip_get_route_uri_str\fR
-\fBsip_get_rseq\fR\fBsip_get_rseq_resp_num\fR
-\fBsip_get_server\fR\fBsip_get_sip_version\fR
-\fBsip_get_subject\fR\fBsip_get_substate\fR
-\fBsip_get_supported\fR\fBsip_get_to_display_name\fR
-\fBsip_get_to_tag\fR\fBsip_get_to_uri_str\fR
-\fBsip_get_trans\fR\fBsip_get_trans_branchid\fR
-\fBsip_get_trans_conn_obj\fR\fBsip_get_trans_method\fR
-\fBsip_get_trans_orig_msg\fR\fBsip_get_trans_resp_msg\fR
-\fBsip_get_trans_state\fR\fBsip_get_tstamp_delay\fR
-\fBsip_get_tstamp_value\fR\fBsip_get_unsupported\fR
-\fBsip_get_uri_errflags\fR\fBsip_get_uri_headers\fR
-\fBsip_get_uri_host\fR\fBsip_get_uri_opaque\fR
-\fBsip_get_uri_params\fR\fBsip_get_uri_parsed\fR
-\fBsip_get_uri_password\fR\fBsip_get_uri_path\fR
-\fBsip_get_uri_port\fR\fBsip_get_uri_query\fR
-\fBsip_get_uri_regname\fR\fBsip_get_uri_scheme\fR
-\fBsip_get_uri_user\fR\fBsip_get_user_agent\fR
-\fBsip_get_via_sent_by_host\fR\fBsip_get_via_sent_by_port\fR
-\fBsip_get_via_sent_protocol_name\fR\fBsip_get_via_sent_protocol_version\fR
-\fBsip_get_via_sent_transport\fR\fBsip_get_warning_agent\fR
-\fBsip_get_warning_code\fR\fBsip_get_warning_text\fR
-\fBsip_get_www_authen_param\fR\fBsip_get_www_authen_scheme\fR
-\fBsip_guid\fR\fBsip_hdr_to_str\fR
-\fBsip_hold_dialog\fR\fBsip_hold_msg\fR
-\fBsip_hold_trans\fR\fBsip_init_conn_object\fR
-\fBsip_is_dialog_secure\fR\fBsip_is_param_present\fR
-\fBsip_is_sip_uri\fR\fBsip_is_uri_teluser\fR
-\fBsip_msg_is_request\fR\fBsip_msg_is_response\fR
-\fBsip_msg_to_str\fR\fBsip_new_msg\fR
-\fBsip_parse_uri\fR\fBsip_process_new_packet\fR
-\fBsip_register_sent_by\fR\fBsip_release_dialog\fR
-\fBsip_release_trans\fR\fBsip_reqline_to_str\fR
-\fBsip_respline_to_str\fR\fBsip_sendmsg\fR
-\fBsip_sent_by_to_str\fR\fBsip_stack_init\fR
-\fBsip_unregister_all_sent_by\fR\fBsip_unregister_sent_by\fR
-\fBsip_uri_errflags_to_str\fR
+l l
+l l .
+\fBsip_add_accept\fR	\fBsip_add_accept_enc\fR
+\fBsip_add_accept_lang\fR	\fBsip_add_alert_info\fR
+\fBsip_add_allow\fR	\fBsip_add_allow_events\fR
+\fBsip_add_authen_info\fR	\fBsip_add_author\fR
+\fBsip_add_branchid_to_via\fR	\fBsip_add_call_info\fR
+\fBsip_add_callid\fR	\fBsip_add_contact\fR
+\fBsip_add_content\fR	\fBsip_add_content_disp\fR
+\fBsip_add_content_enc\fR	\fBsip_add_content_lang\fR
+\fBsip_add_content_type\fR	\fBsip_add_cseq\fR
+\fBsip_add_date\fR	\fBsip_add_error_info\fR
+\fBsip_add_event\fR	\fBsip_add_expires\fR
+\fBsip_add_from\fR	\fBsip_add_header\fR
+\fBsip_add_in_reply_to\fR	\fBsip_add_maxforward\fR
+\fBsip_add_mime_version\fR	\fBsip_add_min_expires\fR
+\fBsip_add_org\fR	\fBsip_add_param\fR
+\fBsip_add_passertedid\fR	\fBsip_add_ppreferredid\fR
+\fBsip_add_priority\fR	\fBsip_add_privacy\fR
+\fBsip_add_proxy_authen\fR	\fBsip_add_proxy_author\fR
+\fBsip_add_proxy_require\fR	\fBsip_add_rack\fR
+\fBsip_add_record_route\fR	\fBsip_add_reply_to\fR
+\fBsip_add_request_line\fR	\fBsip_add_require\fR
+\fBsip_add_response_line\fR	\fBsip_add_retry_after\fR
+\fBsip_add_route\fR	\fBsip_add_rseq\fR
+\fBsip_add_server\fR	\fBsip_add_subject\fR
+\fBsip_add_substate\fR	\fBsip_add_supported\fR
+\fBsip_add_to\fR	\fBsip_add_tstamp\fR
+\fBsip_add_unsupported\fR	\fBsip_add_user_agent\fR
+\fBsip_add_via\fR	\fBsip_add_warning\fR
+\fBsip_add_www_authen\fR	\fBsip_branchid\fR
+\fBsip_clear_stale_data\fR	\fBsip_clone_msg\fR
+\fBsip_conn_destroyed\fR	\fBsip_copy_all_headers\fR
+\fBsip_copy_header\fR	\fBsip_copy_header_by_name\fR
+\fBsip_copy_start_line\fR	\fBsip_create_dialog_req\fR
+\fBsip_create_dialog_req_nocontact\fR	\fBsip_create_OKack\fR
+\fBsip_create_response\fR	\fBsip_delete_dialog\fR
+\fBsip_delete_header\fR	\fBsip_delete_header_by_name\fR
+\fBsip_delete_start_line\fR	\fBsip_delete_value\fR
+\fBsip_disable_counters\fR	\fBsip_disable_dialog_logging\fR
+\fBsip_disable_trans_logging\fR	\fBsip_enable_counters\fR
+\fBsip_enable_dialog_logging\fR	\fBsip_enable_trans_logging\fR
+\fBsip_free_msg\fR	\fBsip_free_parsed_uri\fR
+\fBsip_get_accept_enc\fR	\fBsip_get_accept_lang\fR
+\fBsip_get_accept_sub_type\fR	\fBsip_get_accept_type\fR
+\fBsip_get_alert_info_uri\fR	\fBsip_get_allow_events\fR
+\fBsip_get_allow_method\fR	\fBsip_get_authen_info\fR
+\fBsip_get_author_param\fR	\fBsip_get_author_scheme\fR
+\fBsip_get_branchid\fR	\fBsip_get_call_info_uri\fR
+\fBsip_get_callid\fR	\fBsip_get_callseq_method\fR
+\fBsip_get_callseq_num\fR	\fBsip_get_contact_display_name\fR
+\fBsip_get_contact_uri_str\fR	\fBsip_get_content_disp\fR
+\fBsip_get_content_enc\fR	\fBsip_get_content_lang\fR
+\fBsip_get_content_length\fR	\fBsip_get_content_sub_type\fR
+\fBsip_get_content_type\fR	\fBsip_get_content\fR
+\fBsip_get_counter_value\fR	\fBsip_get_cseq\fR
+\fBsip_get_date_day\fR	\fBsip_get_date_month\fR
+\fBsip_get_date_time\fR	\fBsip_get_date_timezone\fR
+\fBsip_get_date_wkday\fR	\fBsip_get_date_year\fR
+\fBsip_get_dialog_callid\fR	\fBsip_get_dialog_local_cseq\fR
+\fBsip_get_dialog_local_tag\fR	\fBsip_get_dialog_local_uri\fR
+\fBsip_get_dialog_local_contact_uri\fR	\fBsip_get_dialog_method\fR
+\fBsip_get_dialog_msgcnt\fR	\fBsip_get_dialog_remote_cseq\fR
+\fBsip_get_dialog_remote_tag\fR	\fBsip_get_dialog_remote_target_uri\fR
+\fBsip_get_dialog_remote_uri\fR	\fBsip_get_dialog_route_set\fR
+\fBsip_get_dialog_state\fR	\fBsip_get_dialog_type\fR
+\fBsip_get_error_info_uri\fR	\fBsip_get_event\fR
+\fBsip_get_expires\fR	\fBsip_get_from_display_name\fR
+\fBsip_get_from_tag\fR	\fBsip_get_from_uri_str\fR
+\fBsip_get_header\fR	\fBsip_get_header_value\fR
+\fBsip_get_in_reply_to\fR	\fBsip_get_maxforward\fR
+\fBsip_get_mime_version\fR	\fBsip_get_min_expires\fR
+\fBsip_get_msg_len\fR	\fBsip_get_next_value\fR
+\fBsip_get_num_via\fR	\fBsip_get_org\fR
+\fBsip_get_param_value\fR	\fBsip_get_params\fR
+\fBsip_get_passertedid_display_name\fR	\fBsip_get_passertedid_uri_str\fR
+\fBsip_get_ppreferredid_display_name\fR	\fBsip_get_ppreferredid_uri_str\fR
+\fBsip_get_priority\fR	\fBsip_get_priv_value\fR
+\fBsip_get_proxy_authen_param\fR	\fBsip_get_proxy_authen_scheme\fR
+\fBsip_get_proxy_author_param\fR	\fBsip_get_proxy_author_scheme\fR
+\fBsip_get_proxy_require\fR	\fBsip_get_rack_cseq_num\fR
+\fBsip_get_rack_method\fR	\fBsip_get_rack_resp_num\fR
+\fBsip_get_replyto_display_name\fR	\fBsip_get_replyto_uri_str\fR
+\fBsip_get_request_method\fR	\fBsip_get_request_uri_str\fR
+\fBsip_get_require\fR	\fBsip_get_resp_desc\fR
+\fBsip_get_response_code\fR	\fBsip_get_response_phrase\fR
+\fBsip_get_retry_after_cmts\fR	\fBsip_get_retry_after_time\fR
+\fBsip_get_route_display_name\fR	\fBsip_get_route_uri_str\fR
+\fBsip_get_rseq\fR	\fBsip_get_rseq_resp_num\fR
+\fBsip_get_server\fR	\fBsip_get_sip_version\fR
+\fBsip_get_subject\fR	\fBsip_get_substate\fR
+\fBsip_get_supported\fR	\fBsip_get_to_display_name\fR
+\fBsip_get_to_tag\fR	\fBsip_get_to_uri_str\fR
+\fBsip_get_trans\fR	\fBsip_get_trans_branchid\fR
+\fBsip_get_trans_conn_obj\fR	\fBsip_get_trans_method\fR
+\fBsip_get_trans_orig_msg\fR	\fBsip_get_trans_resp_msg\fR
+\fBsip_get_trans_state\fR	\fBsip_get_tstamp_delay\fR
+\fBsip_get_tstamp_value\fR	\fBsip_get_unsupported\fR
+\fBsip_get_uri_errflags\fR	\fBsip_get_uri_headers\fR
+\fBsip_get_uri_host\fR	\fBsip_get_uri_opaque\fR
+\fBsip_get_uri_params\fR	\fBsip_get_uri_parsed\fR
+\fBsip_get_uri_password\fR	\fBsip_get_uri_path\fR
+\fBsip_get_uri_port\fR	\fBsip_get_uri_query\fR
+\fBsip_get_uri_regname\fR	\fBsip_get_uri_scheme\fR
+\fBsip_get_uri_user\fR	\fBsip_get_user_agent\fR
+\fBsip_get_via_sent_by_host\fR	\fBsip_get_via_sent_by_port\fR
+\fBsip_get_via_sent_protocol_name\fR	\fBsip_get_via_sent_protocol_version\fR
+\fBsip_get_via_sent_transport\fR	\fBsip_get_warning_agent\fR
+\fBsip_get_warning_code\fR	\fBsip_get_warning_text\fR
+\fBsip_get_www_authen_param\fR	\fBsip_get_www_authen_scheme\fR
+\fBsip_guid\fR	\fBsip_hdr_to_str\fR
+\fBsip_hold_dialog\fR	\fBsip_hold_msg\fR
+\fBsip_hold_trans\fR	\fBsip_init_conn_object\fR
+\fBsip_is_dialog_secure\fR	\fBsip_is_param_present\fR
+\fBsip_is_sip_uri\fR	\fBsip_is_uri_teluser\fR
+\fBsip_msg_is_request\fR	\fBsip_msg_is_response\fR
+\fBsip_msg_to_str\fR	\fBsip_new_msg\fR
+\fBsip_parse_uri\fR	\fBsip_process_new_packet\fR
+\fBsip_register_sent_by\fR	\fBsip_release_dialog\fR
+\fBsip_release_trans\fR	\fBsip_reqline_to_str\fR
+\fBsip_respline_to_str\fR	\fBsip_sendmsg\fR
+\fBsip_sent_by_to_str\fR	\fBsip_stack_init\fR
+\fBsip_unregister_all_sent_by\fR	\fBsip_unregister_sent_by\fR
+\fBsip_uri_errflags_to_str\fR	
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/libsip.so.1\fR\fR
 .ad
 .RS 23n
-.rt  
 shared object
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/64/libsip.so.1\fR\fR
 .ad
 .RS 23n
-.rt  
 64-bit shared object
 .RE
 
@@ -189,15 +183,14 @@ See \fBattributes\fR(5) for description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ts_dptbl 4 "15 Oct 2002" "SunOS 5.11" "File Formats"
+.TH TS_DPTBL 4 "Oct 15, 2002"
 .SH NAME
 ts_dptbl \- time-sharing dispatcher parameter table
 .SH DESCRIPTION
@@ -45,12 +45,10 @@ A parameter structure consists of the following members. These are also
 described in the \fB/usr/include/sys/ts.h\fR header.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBts_globpri\fR\fR
 .ad
 .RS 14n
-.rt  
 The global scheduling priority associated with this priority level. The mapping
 between time-sharing priority levels and global scheduling priorities is
 determined at boot time by the system configuration. \fBts_globpri\fR is the
@@ -60,12 +58,10 @@ only member of the \fBts_dptbl\fR which cannot be changed with
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBts_quantum\fR\fR
 .ad
 .RS 14n
-.rt  
 The length of the time quantum allocated to processes at this level in ticks
 (\fBhz\fR).
 .sp
@@ -76,12 +72,10 @@ absolute time quantums.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBts_tqexp\fR\fR
 .ad
 .RS 14n
-.rt  
 Priority level of the new queue on which to place a process running at the
 current level if it exceeds its time quantum. Normally this field links to a
 lower priority time-sharing level that has a larger quantum.
@@ -89,12 +83,10 @@ lower priority time-sharing level that has a larger quantum.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBts_slpret\fR\fR
 .ad
 .RS 14n
-.rt  
 Priority level of the new queue on which to place a process, that was
 previously in user mode at this level, when it returns to user mode after
 sleeping. Normally this field links to a higher priority level that has a
@@ -103,12 +95,10 @@ smaller quantum.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBts_maxwait\fR\fR
 .ad
 .RS 14n
-.rt  
 A per process counter, \fBts_dispwait\fR is initialized to zero each time a
 time-sharing or inter-active process is placed back on the dispatcher queue
 after its time quantum has expired or when it is awakened (\fBts_dispwait\fR is
@@ -121,12 +111,10 @@ value for its level, the process' priority is changed to that indicated by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBts_lwait\fR\fR
 .ad
 .RS 14n
-.rt  
 Move a process to this new priority level if \fBts_dispwait\fR is greater than
 \fBts_maxwait\fR.
 .RE
@@ -227,7 +215,7 @@ unaffected.
 \&.              .        .          .           .         . .
 \&.              .        .          .           .         . .
 50             48       59         5           59        # 58
-50             49       59         5           59        # 59 
+50             49       59         5           59        # 59
 .fi
 .in -2
 
@@ -350,7 +338,7 @@ pri_t config_ts_kmdpris[] = {
 };
 tsdpent_t	config_ts_dptbl[] = {
 
-/*  glbpri  qntm  tqexp  slprt  mxwt  lwt  */ 
+/*  glbpri  qntm  tqexp  slprt  mxwt  lwt  */
 
     0,      100,  0,     10,    5,    10,
     1,      100,  0,     11,    5,    11,
@@ -419,30 +407,30 @@ short config_ts_maxumdpri = sizeof (config_ts_dptbl)/16 - 1;
  * Return the address of config_ts_dptbl
  */
 tsdpent_t *
-ts_getdptbl() 
+ts_getdptbl()
 {
-      return (config_ts_dptbl); 
+      return (config_ts_dptbl);
 }
 
 /*
  * Return the address of config_ts_kmdpris
  */
  int *
- ts_getkmdpris() 
+ ts_getkmdpris()
 {
-      return (config_ts_kmdpris); 
+      return (config_ts_kmdpris);
 }
 
 /*
- * Return the address of ts_maxumdpri 
+ * Return the address of ts_maxumdpri
  */
 short
-ts_getmaxumdpri() 
+ts_getmaxumdpri()
 {
-       return (config_ts_maxumdpri); 
+       return (config_ts_maxumdpri);
 }
 
-/* END ts_dptbl.c */ 
+/* END ts_dptbl.c */
 .fi
 .in -2
 

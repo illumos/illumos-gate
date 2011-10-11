@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH acctadm 1M "17 Dec 2008" "SunOS 5.11" "System Administration Commands"
+.TH ACCTADM 1M "Dec 17, 2008"
 .SH NAME
 acctadm \- configure extended accounting facility
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/acctadm\fR [\fB-DEsrux\fR] [\fB-d\fR \fIresource_list\fR] 
-     [\fB-e\fR \fIresource_list\fR] [\fB-f\fR \fIfilename\fR] 
+\fB/usr/sbin/acctadm\fR [\fB-DEsrux\fR] [\fB-d\fR \fIresource_list\fR]
+     [\fB-e\fR \fIresource_list\fR] [\fB-f\fR \fIfilename\fR]
      [task | process | flow | net]
 .fi
 
@@ -26,7 +26,6 @@ extended accounting facility.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIresource_list\fR\fR
 .ad
@@ -40,7 +39,6 @@ This option requires an operand. See \fBOPERANDS\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR\fR
 .ad
@@ -54,7 +52,6 @@ option. See \fB-x\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fIresource_list\fR\fR
 .ad
@@ -68,7 +65,6 @@ This option requires an operand. See \fBOPERANDS\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-E\fR\fR
 .ad
@@ -80,7 +76,6 @@ output to a file. This option requires an operand. See \fBOPERANDS\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIfilename\fR\fR
 .ad
@@ -94,7 +89,6 @@ This option requires an operand. See \fBOPERANDS\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
@@ -109,7 +103,6 @@ resource groups for all available accounting types. See OPERANDS.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
@@ -121,7 +114,6 @@ extended accounting configuration at boot.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
@@ -143,7 +135,6 @@ require an operand.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprocess\fR\fR
 .ad
@@ -155,7 +146,6 @@ accounting facility.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtask\fR\fR
 .ad
@@ -167,7 +157,6 @@ facility.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBflow\fR\fR
 .ad
@@ -179,7 +168,6 @@ facility.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnet\fR\fR
 .ad
@@ -254,7 +242,7 @@ The following command displays available resource groups:
 .nf
 $ \fBacctadm -r\fR
   process:
-  extended pid,uid,gid,cpu,time,command,tty,projid, \e 
+  extended pid,uid,gid,cpu,time,command,tty,projid, \e
   taskid,ancpid,wait-status,zone,flag,memory,mstate
   basic    pid,uid,gid,cpu,time,command,tty,flag
   task:
@@ -303,7 +291,6 @@ $ \fBacctadm -r task\fR
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -317,7 +304,6 @@ successfully.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
@@ -331,7 +317,6 @@ configuration.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
@@ -342,7 +327,6 @@ Invalid command line options were specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB95\fR\fR
 .ad
@@ -354,7 +338,6 @@ service instance.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB96\fR\fR
 .ad
@@ -372,13 +355,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

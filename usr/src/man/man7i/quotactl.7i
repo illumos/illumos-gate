@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH quotactl 7I "14 June 2004" "SunOS 5.11" "Ioctl Requests"
+.TH QUOTACTL 7I "Jun 14, 2004"
 .SH NAME
 quotactl \- manipulate disk quotas
 .SH SYNOPSIS
@@ -40,12 +40,10 @@ structure which is copied in or out of the system. The interpretation of
 \fIaddr\fR is given with each value of \fIop\fR below.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBQ_QUOTAON\fR\fR
 .ad
 .RS 14n
-.rt  
 Turn on quotas for a file system. \fIaddr\fR points to the full pathname of the
 \fBquotas\fR file. \fIuid\fR is ignored. It is recommended that \fIuid\fR have
 the value of \fB0\fR. This call is restricted to the super-user.
@@ -53,12 +51,10 @@ the value of \fB0\fR. This call is restricted to the super-user.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBQ_QUOTAOFF\fR\fR
 .ad
 .RS 14n
-.rt  
 Turn off quotas for a file system. \fIaddr\fR and \fIuid\fR are ignored. It is
 recommended that \fIaddr\fR have the value of \fINULL\fR and \fIuid\fR have the
 value of \fB0\fR. This call is restricted to the super-user.
@@ -66,12 +62,10 @@ value of \fB0\fR. This call is restricted to the super-user.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBQ_GETQUOTA\fR\fR
 .ad
 .RS 14n
-.rt  
 Get disk quota limits and current usage for user \fIuid\fR. \fIaddr\fR is a
 pointer to a \fBdqblk\fR structure (defined in \fB<sys/fs/ufs_quota.h>\fR).
 Only the super-user may get the quotas of a user other than himself.
@@ -79,12 +73,10 @@ Only the super-user may get the quotas of a user other than himself.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBQ_SETQUOTA\fR\fR
 .ad
 .RS 14n
-.rt  
 Set disk quota limits and current usage for user \fIuid\fR. \fIaddr\fR is a
 pointer to a \fBdqblk\fR structure (defined in \fBsys/fs/ufs_quota.h\fR). This
 call is restricted to the super-user.
@@ -92,12 +84,10 @@ call is restricted to the super-user.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBQ_SETQLIM\fR\fR
 .ad
 .RS 14n
-.rt  
 Set disk quota limits for user \fIuid\fR. \fIaddr\fR is a pointer to a
 \fBdqblk\fR structure (defined in \fBsys/fs/ufs_quota.h\fR). This call is
 restricted to the super-user.
@@ -105,24 +95,20 @@ restricted to the super-user.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBQ_SYNC\fR\fR
 .ad
 .RS 14n
-.rt  
 Update the on-disk copy of quota usages for this file system. \fIaddr\fR and
 \fIuid\fR are ignored.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBQ_ALLSYNC\fR\fR
 .ad
 .RS 14n
-.rt  
 Update the on-disk copy of quota usages for all file systems with active
 quotas. \fIaddr\fR and \fIuid\fR are ignored.
 .RE
@@ -133,93 +119,77 @@ quotas. \fIaddr\fR and \fIuid\fR are ignored.
 This \fBioctl()\fR returns:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 9n
-.rt  
 on success.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi1\fR\fR
 .ad
 .RS 9n
-.rt  
 on failure and sets \fBerrno\fR to indicate the error.
 .RE
 
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 \fIaddr\fR is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The kernel has not been compiled with the \fBQUOTA\fR option. \fIop\fR is
 invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fBquotas\fR file specified by \fIaddr\fR does not exist.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 10n
-.rt  
 The call is privileged and the calling process did not assert
 {PRIV_SYS_MOUNT} in the effective set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBESRCH\fR\fR
 .ad
 .RS 10n
-.rt  
 No disk quota is found for the indicated user. Quotas have not been turned on
 for this file system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEUSERS\fR\fR
 .ad
 .RS 10n
-.rt  
 The quota table is full.
 .RE
 
@@ -228,12 +198,10 @@ The quota table is full.
 If \fIop\fR is \fBQ_QUOTAON\fR, \fBioctl()\fR may set \fBerrno\fR to:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 10n
-.rt  
 The quota file pointed to by \fIaddr\fR exists but is not a regular file. The
 quota file pointed to by \fIaddr\fR exists but is not on the file system
 pointed to by \fIspecial\fR.
@@ -241,12 +209,10 @@ pointed to by \fIspecial\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 10n
-.rt  
 Internal I/O error while attempting to read the \fBquotas\fR file pointed to by
 \fIaddr\fR.
 .RE
@@ -254,7 +220,6 @@ Internal I/O error while attempting to read the \fBquotas\fR file pointed to by
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/include/sys/fs/ufs_quota.h\fR\fR
 .ad

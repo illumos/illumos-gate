@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH scsi_dmaget 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH SCSI_DMAGET 9F "Jan 16, 2006"
 .SH NAME
 scsi_dmaget, scsi_dmafree \- SCSI dma utility routines
 .SH SYNOPSIS
@@ -13,7 +13,7 @@ scsi_dmaget, scsi_dmafree \- SCSI dma utility routines
 
 
 
-\fBstruct scsi_pkt *\fR\fBscsi_dmaget\fR(\fBstruct scsi_pkt *\fR\fIpkt\fR, 
+\fBstruct scsi_pkt *\fR\fBscsi_dmaget\fR(\fBstruct scsi_pkt *\fR\fIpkt\fR,
      \fBopaque_t\fR \fIdmatoken\fR, \fBint\fR\fB(*\fRcallback\fB)(void)\fR);
 .fi
 
@@ -31,34 +31,28 @@ These interfaces are obsolete. Use \fBscsi_init_pkt\fR(9F) instead of
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpkt\fR\fR
 .ad
 .RS 12n
-.rt  
 A pointer to a \fBscsi_pkt\fR(9S) structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdmatoken\fR\fR
 .ad
 .RS 12n
-.rt  
 Pointer to an implementation dependent object.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcallback\fR\fR
 .ad
 .RS 12n
-.rt  
 Pointer to a callback function, or \fBNULL_FUNC\fR or \fBSLEEP_FUNC.\fR
 .RE
 
@@ -81,34 +75,28 @@ The \fIcallback\fR parameter indicates what \fBscsi_dmaget()\fR should do when
 resources are not available:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNULL_FUNC\fR\fR
 .ad
 .RS 16n
-.rt  
 Do not wait for resources. Return a \fINULL\fR pointer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLEEP_FUNC\fR\fR
 .ad
 .RS 16n
-.rt  
 Wait indefinitely for resources.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBOther Values\fR
 .ad
 .RS 16n
-.rt  
 \fIcallback\fR points to a function which is called when resources may have
 become available. \fIcallback\fR must return either \fB0\fR (indicating that it
 attempted to allocate resources but failed to do so again), in which case it is
@@ -145,13 +133,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Stability LevelObsolete
+Stability Level	Obsolete
 .TE
 
 .SH SEE ALSO

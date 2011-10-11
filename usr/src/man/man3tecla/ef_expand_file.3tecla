@@ -8,7 +8,7 @@
 .\" copyright notice(s) and this permission notice appear in all copies of
 .\" the Software and that both the above copyright notice(s) and this
 .\" permission notice appear in supporting documentation.
-.\" 
+.\"
 .\" THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
 .\" OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
 .\" MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
@@ -18,20 +18,20 @@
 .\" FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
 .\" NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION
 .\" WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-.\" 
+.\"
 .\" Except as contained in this notice, the name of a copyright holder
 .\" shall not be used in advertising or otherwise to promote the sale, use
 .\" or other dealings in this Software without prior written authorization
 .\" of the copyright holder.
 .\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
-.TH ef_expand_file 3TECLA "1 Jun 2004" "SunOS 5.11" "Interactive Command-line Input Library Functions"
+.TH EF_EXPAND_FILE 3TECLA "Jun 1, 2004"
 .SH NAME
 ef_expand_file, del_ExpandFile, ef_last_error, ef_list_expansions,
 new_ExpandFile \- expand filename and wildcard expressions
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ltecla\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ltecla\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <libtecla.h>
 
 \fBExpandFile *\fR\fBef_expand_file\fR(\fBvoid\fR);
@@ -81,34 +81,28 @@ behavior of the UNIX \fBtcsh\fR shell.
 The supported wildcards and their meanings are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB*\fR\fR
 .ad
 .RS 12n
-.rt  
 Match any sequence of zero or more characters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB?\fR\fR
 .ad
 .RS 12n
-.rt  
 Match any single character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB[\fB\fIchars\fR\fR]\fR
 .ad
 .RS 12n
-.rt  
 Match any single character that appears in \fIchars\fR. If \fIchars\fR contains
 an expression of the form a-b, then any character between a and b, including a
 and b, matches. The '-' character loses its special meaning as a range
@@ -121,12 +115,10 @@ be part of the range, the '-' should come first and the ']' second.
 
 .sp
 .ne 2
-.mk
 .na
 \fB[^\fIchars\fR]\fR
 .ad
 .RS 12n
-.rt  
 The same as [\fIchars\fR] except that it matches any single character that does
 not appear in \fIchars\fR.
 .RE
@@ -225,18 +217,18 @@ The following is a complete example of how to use the file expansion function.
 .nf
 #include <stdio.h>
 #include <libtecla.h>
- 
+
 int main(int argc, char *argv[])
 {
     ExpandFile *ef;      /* The expansion resource object */
     char *filename;      /* The filename being expanded */
     FileExpansion *expn; /* The results of the expansion */
     int i;
- 
+
     ef = new_ExpandFile();
     if(!ef)
         return 1;
- 
+
     for(arg = *(argv++); arg; arg = *(argv++)) {
        if((expn = ef_expand_file(ef, arg, -1)) == NULL) {
           fprintf(stderr, "Error expanding %s (%s).\en", arg,
@@ -247,7 +239,7 @@ int main(int argc, char *argv[])
               printf(" %s\en", expn->files[i]);
        }
     }
- 
+
     ef = del_ExpandFile(ef);
     return 0;
 }
@@ -262,15 +254,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_mmap_get_model 9F "8 Feb 2001" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_MMAP_GET_MODEL 9F "Feb 8, 2001"
 .SH NAME
 ddi_mmap_get_model \- return data model type of current thread
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/ddi.h> 
+#include <sys/ddi.h>
 #include <sys/sunddi.h>
 
 
@@ -35,34 +35,28 @@ data model.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_MODEL_ILP32\fR \fR
 .ad
 .RS 20n
-.rt  
 Current thread expects 32-bit \fI(ILP32)\fR semantics.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_MODEL_LP64\fR \fR
 .ad
 .RS 20n
-.rt  
 Current thread expects 64-bit \fI(LP64)\fR semantics.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR \fR
 .ad
 .RS 20n
-.rt  
 The \fBddi_mmap_get_model()\fR function was not called from the \fBmmap\fR(9E)
 entry point.
 .RE
@@ -87,7 +81,7 @@ struct data32 {
         int len;
         caddr32_t addr;
 };
- 
+
 struct data {
         int len;
         caddr_t addr;

@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH unifdef 1 "14 Jan 1992" "SunOS 5.11" "User Commands"
+.TH UNIFDEF 1 "Jan 14, 1992"
 .SH NAME
 unifdef \- resolve and remove ifdef'ed lines from C program source
 .SH SYNOPSIS
 .LP
 .nf
-\fBunifdef\fR [\fB-clt\fR] [\fB-D\fR\fIname\fR] [\fB-U\fR\fIname\fR] [\fB-iD\fR\fIname\fR] [\fB-iU\fR\fIname\fR] ... 
+\fBunifdef\fR [\fB-clt\fR] [\fB-D\fR\fIname\fR] [\fB-U\fR\fIname\fR] [\fB-iD\fR\fIname\fR] [\fB-iU\fR\fIname\fR] ...
      [\fIfilename\fR]
 .fi
 
@@ -45,69 +45,57 @@ from the standard input if no \fIfilename\fR argument is given.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 11n
-.rt  
 Complement the normal operation. Lines that would have been removed or blanked
 are retained, and vice versa.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 11n
-.rt  
 Replace ``lines removed'' lines with blank lines.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 11n
-.rt  
 Plain text option. \fBunifdef\fR refrains from attempting to recognize comments
 and single and double quotes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR\fIname\fR\fR
 .ad
 .RS 11n
-.rt  
 Lines associated with the defined symbol \fIname\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-U\fR\fIname\fR\fR
 .ad
 .RS 11n
-.rt  
 Lines associated with the undefined symbol \fIname\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-iD\fR\fIname\fR\fR
 .ad
 .RS 11n
-.rt  
 Ignore, but print out, lines associated with the defined symbol \fIname\fR. If
 you use \fBifdef\fRs to delimit non-C lines, such as comments or code which is
 under construction, then you must tell \fBunifdef\fR which symbols are used for
@@ -117,12 +105,10 @@ them.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-iU\fR\fIname\fR\fR
 .ad
 .RS 11n
-.rt  
 Ignore, but print out, lines associated with the undefined symbol \fIname\fR.
 .RE
 
@@ -132,23 +118,19 @@ Ignore, but print out, lines associated with the undefined symbol \fIname\fR.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 Operation failed.
 .RE
 
@@ -159,12 +141,10 @@ Operation failed.
 .SH DIAGNOSTICS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPremature\fR \fBEOF\fR\fR
 .ad
 .RS 17n
-.rt  
 Inappropriate \fBelse\fR or \fBendif\fR.
 .RE
 

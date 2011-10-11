@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH devmap_dup 9E "21 Jan 1997" "SunOS 5.11" "Driver Entry Points"
+.TH DEVMAP_DUP 9E "Jan 21, 1997"
 .SH NAME
 devmap_dup \- device mapping duplication entry point
 .SH SYNOPSIS
@@ -14,7 +14,7 @@ devmap_dup \- device mapping duplication entry point
 
 
 
-\fB int prefix\fR\fBdevmap_dup\fR(\fBdevmap_cookie_t\fR \fIdhp\fR, \fBvoid *\fR\fIpvtp\fR, 
+\fB int prefix\fR\fBdevmap_dup\fR(\fBdevmap_cookie_t\fR \fIdhp\fR, \fBvoid *\fR\fIpvtp\fR,
      \fBdevmap_cookie_t\fR \fInew_dhp\fR, \fBvoid **\fR\fInew_pvtp\fR);
 .fi
 
@@ -25,47 +25,39 @@ Solaris DDI specific (Solaris DDI).
 .SH ARGUMENTS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdhp\fR \fR
 .ad
 .RS 13n
-.rt  
 An opaque mapping handle that the system uses to describe the mapping currently
 being duplicated.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpvtp\fR \fR
 .ad
 .RS 13n
-.rt  
 Driver private mapping data for the mapping currently being duplicated.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInew_dhp\fR \fR
 .ad
 .RS 13n
-.rt  
 An opaque data structure that the system uses to describe the duplicated device
 mapping.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInew_pvtp\fR \fR
 .ad
 .RS 13n
-.rt  
 A pointer to be filled in by device drivers with the driver private mapping
 data for the duplicated device mapping.
 .RE
@@ -88,23 +80,19 @@ operation such as \fBfork()\fR to fail.
 \fBdevmap_dup()\fR returns the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 12n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBNon-zero\fR
 .ad
 .RS 12n
-.rt  
 An error occurred.
 .RE
 

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH fopen 3UCB "30 Oct 2007" "SunOS 5.11" "SunOS/BSD Compatibility Library Functions"
+.TH FOPEN 3UCB "Oct 30, 2007"
 .SH NAME
 fopen, freopen \- open a stream
 .SH SYNOPSIS
@@ -34,67 +34,55 @@ file to be opened. The \fImode\fR argument is a character string having one of
 the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBr\fR\fR
 .ad
 .RS 6n
-.rt  
 open for reading
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBw\fR\fR
 .ad
 .RS 6n
-.rt  
 truncate or create for writing
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBa\fR\fR
 .ad
 .RS 6n
-.rt  
 append: open for writing at end of file, or create for writing
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBr+\fR\fR
 .ad
 .RS 6n
-.rt  
 open for update (reading and writing)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBw+\fR\fR
 .ad
 .RS 6n
-.rt  
 truncate or create for update
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBa+\fR\fR
 .ad
 .RS 6n
-.rt  
 append; open or create for update at \fBEOF\fR
 .RE
 

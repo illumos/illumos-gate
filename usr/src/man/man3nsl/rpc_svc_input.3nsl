@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH rpc_svc_input 3NSL "6 Jan 2003" "SunOS 5.11" "Networking Services Library Functions"
+.TH RPC_SVC_INPUT 3NSL "Jan 6, 2003"
 .SH NAME
 rpc_svc_input, svc_add_input, svc_remove_input \- declare or remove a callback
 on a file descriptor
@@ -38,12 +38,10 @@ descriptor.
 See \fBrpc\fR(3NSL) for the definition of the \fBSVCXPRT\fR data structure.
 .sp
 .ne 2
-.mk
 .na
 \fBsvc_add_input\fB()\fR\fR
 .ad
 .RS 22n
-.rt  
 This function is used to register a \fIcallback\fR function on a file
 descriptor, \fIfd\fR. The file descriptor, \fIfd\fR, is the first parameter to
 be passed to \fBsvc_add_input()\fR. This \fIcallback\fR function will be
@@ -73,35 +71,29 @@ registration, that can be used later to remove this callback. Upon failure,
 The \fBsvc_add_input()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIfd\fR or \fIevents\fR parameters are invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEEXIST\fR\fR
 .ad
 .RS 10n
-.rt  
 A callback is already registered to the file descriptor with one of the
 specified events.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 Memory is exhausted.
 .RE
 
@@ -109,12 +101,10 @@ Memory is exhausted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_remove_input()\fR\fR
 .ad
 .RS 22n
-.rt  
 This function is used to unregister a callback function on a file descriptor,
 \fIfd\fR. The \fIid\fR parameter specifies the registration to be removed.
 .sp
@@ -124,12 +114,10 @@ is returned and \fBerrno\fR is set to indicate the error.
 The \fBsvc_remove_input()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fBEINVAL\fR
 .ad
 .RS 10n
-.rt  
 The \fIid\fR parameter is invalid.
 .RE
 
@@ -143,17 +131,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureAll
+Architecture	All
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

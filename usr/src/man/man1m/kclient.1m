@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing. See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH kclient 1M "27 May 2009" "SunOS 5.11" "System Administration Commands"
+.TH KCLIENT 1M "May 27, 2009"
 .SH NAME
 kclient \- set up a machine as a Kerberos client
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/kclient\fR [\fB-n\fR] [\fB-R\fR \fIrealm\fR] [\fB-k\fR \fIkdc\fR] [\fB-a\fR \fIadminuser\fR] 
+\fB/usr/sbin/kclient\fR [\fB-n\fR] [\fB-R\fR \fIrealm\fR] [\fB-k\fR \fIkdc\fR] [\fB-a\fR \fIadminuser\fR]
      [\fB-c\fR \fIfilepath\fR] [\fB-d\fR \fIdnsarg\fR] [\fB-f\fR \fIfqdn_list\fR] [\fB-h\fR \fIlogical_host_name\fR]
      [\fB-k\fR \fIkdc_list\fR] [\fB-m\fR \fImaster_kdc\fR] [\fB-p\fR \fIprofile\fR] [\fB-s\fR \fIpam_service\fR]
      [\fB-T\fR \fIkdc_vendor\fR]
@@ -142,7 +142,6 @@ delivered  in  the  \fBSUNWntpu\fR package (not a SunOS man page).
 The non-interactive mode supports the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
@@ -156,7 +155,6 @@ file if the \fB-K\fR option has not been specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR [ \fIrealm\fR ]\fR
 .ad
@@ -167,7 +165,6 @@ Specifies the Kerberos realm.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR \fIkdc_list\fR\fR
 .ad
@@ -183,7 +180,6 @@ canonicalized by DNS.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR [ \fIadminuser\fR ]\fR
 .ad
@@ -194,7 +190,6 @@ Specifies the Kerberos administrative user.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fIkdc_vendor\fR\fR
 .ad
@@ -204,7 +199,6 @@ Configure the Kerberos client to associate with a third party server. Valid
 \fIkdc_vendor\fR currently supported are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBms_ad\fR\fR
 .ad
@@ -215,7 +209,6 @@ Microsoft Active Directory
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmit\fR\fR
 .ad
@@ -226,7 +219,6 @@ MIT KDC server
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBheimdal\fR\fR
 .ad
@@ -237,7 +229,6 @@ Heimdal KDC server
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshishi\fR\fR
 .ad
@@ -252,7 +243,6 @@ with the server if the \fBms_ad\fR option is specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR [ \fIfilepath\fR ]\fR
 .ad
@@ -265,7 +255,6 @@ remote host and brought over to the local host by means of NFS.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR [ \fIdnsarg\fR ]\fR
 .ad
@@ -285,7 +274,6 @@ be used for any kind of mapping lookup.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR \fIdomain_list\fR\fR
 .ad
@@ -301,7 +289,6 @@ is \fBhost1.eng.example.com\fR, then the domain that is mapped to the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-K\fR\fR
 .ad
@@ -335,7 +322,6 @@ time, these keys will be installed on the machine.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR [ \fIfqdn_list\fR ]\fR
 .ad
@@ -354,7 +340,6 @@ kerberized services, but situated in multiple different DNS domains.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fIlogical_host_name\fR\fR
 .ad
@@ -368,7 +353,6 @@ be manually copied over to the other members of the cluster.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fImaster_kdc\fR\fR
 .ad
@@ -382,7 +366,6 @@ listed with the \fB-k\fR option is the master KDC.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR [ \fIprofile\fR ]\fR
 .ad
@@ -421,7 +404,6 @@ listed in the profile.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIpam_service\fR\fR
 .ad
@@ -539,7 +521,6 @@ the KDC server \fBkdc1.example.com\fR:
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/kadm5.acl\fR\fR
 .ad
@@ -550,7 +531,6 @@ Kerberos access control list (ACL) file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/krb5.conf\fR\fR
 .ad
@@ -561,7 +541,6 @@ Default location for the local host's configuration file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/krb5.keytab\fR\fR
 .ad
@@ -572,7 +551,6 @@ Default location for the local host's \fBkeytab\fR file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/nfssec.conf\fR\fR
 .ad
@@ -583,7 +561,6 @@ File listing NFS security modes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/resolv.conf\fR\fR
 .ad
@@ -600,13 +577,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

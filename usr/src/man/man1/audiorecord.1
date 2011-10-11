@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH audiorecord 1 "5 May 2009" "SunOS 5.11" "User Commands"
+.TH AUDIORECORD 1 "May 5, 2009"
 .SH NAME
 audiorecord \- record an audio file
 .SH SYNOPSIS
@@ -43,35 +43,29 @@ read access, \fBaudiorecord\fR prints an error message and exits immediately.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-\e?\fR\fR
 .ad
 .RS 24n
-.rt  
 \fIHelp\fR: Prints a command line usage message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 24n
-.rt  
 \fIAppend\fR: Appends the data on the end of the named audio file. The audio
 device must support the audio data format of the existing file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIchannels\fR\fR
 .ad
 .RS 24n
-.rt  
 \fIChannels\fR: Specifies the number of audio channels (1 or 2). The value may
 be specified as an integer or as the string \fBmono\fR or \fBstereo\fR. The
 default value is \fBmono\fR.
@@ -79,12 +73,10 @@ default value is \fBmono\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdev\fR\fR
 .ad
 .RS 24n
-.rt  
 \fIDevice\fR: The \fIdev\fR argument specifies an alternate audio device from
 which input should be taken. If the \fB-d\fR option is not specified, the
 \fBAUDIODEV\fR environment variable is consulted (see below). Otherwise,
@@ -93,24 +85,20 @@ which input should be taken. If the \fB-d\fR option is not specified, the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fIencoding\fR\fR
 .ad
 .RS 24n
-.rt  
 \fIEncoding\fR: Specifies the audio data encoding. This value may be one of
 \fBulaw\fR, \fBalaw\fR, or \fBlinear\fR. The default encoding is \fBulaw\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 24n
-.rt  
 \fIForce\fR: When the \fB-a\fR flag is specified, the sample rate of the audio
 device must match the sample rate at which the original file was recorded. If
 the \fB-f\fR flag is also specified, sample rate differences are ignored, with
@@ -119,12 +107,10 @@ a warning message printed on the standard error.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIinfo\fR\fR
 .ad
 .RS 24n
-.rt  
 \fIInformation\fR: The `information' field of the output file header is set to
 the string specified by the \fIinfo\fR argument. This option cannot be
 specified in conjunction with the \fB-a\fR argument.
@@ -132,12 +118,10 @@ specified in conjunction with the \fB-a\fR argument.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIrate\fR\fR
 .ad
 .RS 24n
-.rt  
 \fISample Rate\fR: Specifies the sample rate, in samples per second. If a
 number is followed by the letter \fBk\fR, it is multiplied by 1000 (for
 example, 44.1k = 44100). The default sample rate is 8 kHz.
@@ -145,12 +129,10 @@ example, 44.1k = 44100). The default sample rate is 8 kHz.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fItime\fR\fR
 .ad
 .RS 24n
-.rt  
 \fITime\fR: The \fItime\fR argument specifies the maximum length of time to
 record. Time can be specified as a floating-point value, indicating the number
 of seconds, or in the form: \fIhh:mm:ss.dd\fR, where the hour and minute
@@ -159,12 +141,10 @@ specifications are optional.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fBau\fR | \fBaif\fR[\fBf\fR] | \fBwav\fR\fR
 .ad
 .RS 24n
-.rt  
 Specifies the audio file type to create. If the \fB-a\fR option is used, the
 file type must match the file to which it is being appended. Regardless of the
 file suffix, the type is set as specified in this option. If this option is not
@@ -173,12 +153,10 @@ specified, the file suffix determines the type.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR \fIvol\fR\fR
 .ad
 .RS 24n
-.rt  
 \fIVolume\fR: The recording gain is set to the specified value before recording
 begins, and is reset to its previous level when \fBaudiorecord\fR exits. The
 \fIvol\fR argument is an integer value between 0 and 100, inclusive. If this
@@ -189,7 +167,6 @@ set by any process.
 .SH OPERANDS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR[\fB\&.au\fR|\fB\&.aif\fR[\fBf\fR]]|\fB\&.wav\fR\fR
 .ad
@@ -214,12 +191,10 @@ when encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
 .SH ENVIRONMENT VARIABLES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUDIODEV\fR\fR
 .ad
 .RS 12n
-.rt  
 The full path name of the audio device to record from, if no \fB-d\fR argument
 is supplied. If the \fBAUDIODEV\fR variable is not set, \fB/dev/audio\fR is
 used.
@@ -233,15 +208,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureSPARC, x86
+Architecture	SPARC, x86
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

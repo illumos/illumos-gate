@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dlopen 3C "4 Feb 2005" "SunOS 5.11" "Standard C Library Functions"
+.TH DLOPEN 3C "Feb 4, 2005"
 .SH NAME
 dlopen, dlmopen \- gain access to an executable object file
 .SH SYNOPSIS
@@ -68,12 +68,10 @@ governs when these references take place. The \fImode\fR argument can be one of
 the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTLD_LAZY\fR\fR
 .ad
 .RS 13n
-.rt  
 Only immediate symbol references are relocated when the object is first loaded.
 Lazy references are not relocated until a given function is called for the
 first time. This value for \fImode\fR should improve performance, since a
@@ -84,12 +82,10 @@ initialization. See \fBNOTES\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTLD_NOW\fR\fR
 .ad
 .RS 13n
-.rt  
 All necessary relocations are performed when the object is first loaded. This
 process might waste some processing if relocations are performed for lazy
 references that are never used. However, this mode ensures that when an object
@@ -110,12 +106,10 @@ a \fBdlopen()\fR call, \fImode\fR should be a bitwise-inclusive OR with one of
 the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTLD_GLOBAL\fR\fR
 .ad
 .RS 15n
-.rt  
 The object's global symbols are made available for the relocation processing of
 any other object. In addition, symbol lookup using \fBdlopen(0,\fR
 \fImode\fR\fB)\fR and an associated \fBdlsym()\fR allows objects that are
@@ -124,12 +118,10 @@ loaded with \fBRTLD_GLOBAL\fR to be searched.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTLD_LOCAL\fR\fR
 .ad
 .RS 15n
-.rt  
 The object's globals symbols are only available for the relocation processing
 of other objects that include the same group.
 .RE
@@ -153,12 +145,10 @@ be a bitwise-inclusive \fBOR\fR with one of the following values to affect the
 scope of symbol availability:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTLD_GROUP\fR\fR
 .ad
 .RS 15n
-.rt  
 Only symbols from the associated group are made available for relocation. A
 group is established from the defined object and all the dependencies of that
 object. A group must be completely self-contained. All dependency relationships
@@ -168,12 +158,10 @@ requirements of each object that defines the group.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTLD_PARENT\fR\fR
 .ad
 .RS 15n
-.rt  
 The symbols of the object initiating the \fBdlopen()\fR call are made available
 to the objects obtained by \fBdlopen()\fR. This option is useful when
 hierarchical \fBdlopen()\fR families are created. Although the parent object
@@ -183,12 +171,10 @@ available to \fBdlsym()\fR through the returned \fIhandle\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTLD_WORLD\fR\fR
 .ad
 .RS 15n
-.rt  
 Only symbols from \fBRTLD_GLOBAL\fR objects are made available for relocation.
 .RE
 
@@ -204,24 +190,20 @@ The following modes provide additional capabilities outside of relocation
 processing:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTLD_NODELETE\fR\fR
 .ad
 .RS 17n
-.rt  
 The specified object is tagged to prevent its deletion from the address space
 as part of a \fBdlclose()\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTLD_NOLOAD\fR\fR
 .ad
 .RS 17n
-.rt  
 The specified object is not loaded as part of the \fBdlopen()\fR. However, a
 valid \fIhandle\fR is returned if the object already exists as part of the
 process address space. Additional modes can be specified as a bitwise-inclusive
@@ -238,12 +220,10 @@ loaded from \fBdlopen()\fR. The \fImode\fR parameter can also be a
 bitwise-inclusive OR with the following value to restrict this symbol search:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTLD_FIRST\fR\fR
 .ad
 .RS 14n
-.rt  
 Use of this \fIhandle\fR with \fBdlsym()\fR, restricts the symbol search to the
 first object associated with the \fIhandle\fR.
 .RE
@@ -267,34 +247,28 @@ the object is loaded. This parameter can be any valid \fBLmid_t\fR returned by
 \fBdlinfo()\fR or one of the following special values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLM_ID_BASE\fR\fR
 .ad
 .RS 15n
-.rt  
 Load the object on the applications link-map list.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLM_ID_LDSO\fR\fR
 .ad
 .RS 15n
-.rt  
 Load the object on the dynamic linkers (\fBld.so.1\fR) link-map list.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLM_ID_NEWLM\fR\fR
 .ad
 .RS 15n
-.rt  
 Cause the object to create a new link-map list as part of loading. Objects that
 are opened on a new link-map list must express all of their dependencies.
 .RE
@@ -323,15 +297,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT\(miLevelMT\(miSafe
+MT\(miLevel	MT\(miSafe
 .TE
 
 .SH SEE ALSO

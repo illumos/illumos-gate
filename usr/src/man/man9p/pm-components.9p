@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pm-components 9P "6 Jan 2004" "SunOS 5.11" "Kernel Properties for Drivers"
+.TH PM-COMPONENTS 9P "Jan 6, 2004"
 .SH NAME
 pm-components \- Power Management device property
 .SH DESCRIPTION
@@ -53,7 +53,7 @@ Management is enabled. See \fBpower.conf\fR(4).
 The \fBpm-component\fR property syntax is:
 .LP
 .nf
-pm-components="NAME=component name","numeric power level=power level name",  "numeric power level=power level name"  [, "numeric power level=power level name" ...]  [, "NAME=component name", "numeric power level=power level name",  "numeric power level=power level name" [, "numeric power level=power level name"...]...];        
+pm-components="NAME=component name","numeric power level=power level name",  "numeric power level=power level name"  [, "numeric power level=power level name" ...]  [, "NAME=component name", "numeric power level=power level name",  "numeric power level=power level name" [, "numeric power level=power level name"...]...];
 .fi
 
 .sp
@@ -88,7 +88,7 @@ level, which represent spindle stopped or full speed.
 .sp
 .in +2
 .nf
-pm-components="NAME=Spindle Motor", "0=Stopped", "1=Full Speed"; 
+pm-components="NAME=Spindle Motor", "0=Stopped", "1=Full Speed";
 \&...
 .fi
 .in -2
@@ -129,9 +129,9 @@ monitor.
 .sp
 .in +2
 .nf
-pm-components="NAME=Frame Buffer", "0=Off" 
+pm-components="NAME=Frame Buffer", "0=Off"
  	"1=Suspend", "2=Standby", "3=On",
-		"NAME=Monitor", "0=Off", "1=Suspend", "2=Standby," 
+		"NAME=Monitor", "0=Off", "1=Suspend", "2=Standby,"
 		"3=On;
 .fi
 .in -2
@@ -145,13 +145,12 @@ See attributes(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface stabilityCommitted
+Interface stability	Committed
 .TE
 
 .SH SEE ALSO

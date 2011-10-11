@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_dma_attr 9S "12 Feb 2009" "SunOS 5.11" "Data Structures for Drivers"
+.TH DDI_DMA_ATTR 9S "Feb 12, 2009"
 .SH NAME
 ddi_dma_attr \- DMA attributes structure
 .SH SYNOPSIS
@@ -111,47 +111,39 @@ The \fBdma_attr_sgllen\fR field describes the length of the \fBDMA\fR
 scatter/gather list of a device. Possible values are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB< 0\fR\fR
 .ad
 .RS 7n
-.rt  
 Device \fBDMA\fR engine is not constrained by the size, for example,
 with\fBDMA\fR chaining.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB= 0\fR\fR
 .ad
 .RS 7n
-.rt  
 Reserved.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB= 1\fR\fR
 .ad
 .RS 7n
-.rt  
 Device \fBDMA\fR engine does not support scatter/gather such as third party
 \fBDMA\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB> 1\fR\fR
 .ad
 .RS 7n
-.rt  
 Device \fBDMA\fR engine uses scatter/gather. The \fBdma_attr_sgllen\fR value is
 the maximum number of entries in the list.
 .RE
@@ -172,7 +164,6 @@ granularity of the device transfer size.
 The \fBdma_attr_flags\fR field can be set to a combination of:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_DMA_FORCE_PHYSICAL\fR\fR
 .ad
@@ -193,7 +184,6 @@ the operation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_DMA_FLAGERR\fR\fR
 .ad
@@ -218,7 +208,6 @@ anyway.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_DMA_RELAXED_ORDERING\fR\fR
 .ad
@@ -305,16 +294,16 @@ The corresponding \fBddi_dma_attr_t\fR structure is initialized as follows:
 .nf
 static ddi_dma_attr_t dma_attrs = {
          DMA_ATTR_V0              /* version number */
-         (uint64_t)0x0,           /* low address */  
+         (uint64_t)0x0,           /* low address */
          (uint64_t)0xffffffff,    /* high address */
          (uint64_t)0xffffff,      /* DMA counter max */
-         (uint64_t)0x1            /* alignment */  
+         (uint64_t)0x1            /* alignment */
          0x0c,                    /* burst sizes */
          0x1,                     /* minimum transfer size */
          (uint64_t)0x3ffffff,     /* maximum transfer size */
          (uint64_t)0x7fff,        /* maximum segment size */
          17,                      /* scatter/gather list lgth */
-         512                      /* granularity */  
+         512                      /* granularity */
          0                        /* DMA flags */
 };
 .fi
@@ -328,13 +317,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

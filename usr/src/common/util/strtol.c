@@ -20,6 +20,10 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ */
+
+/*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -96,6 +100,7 @@ strtol(const char *str, char **nptr, int base)
 #if	defined(_KERNEL) && !defined(_BOOT)
 		return (EINVAL);
 #else	/* _KERNEL && !_BOOT */
+		errno = EINVAL;
 		return (0);
 #endif	/* _KERNEL && !_BOOT */
 	}

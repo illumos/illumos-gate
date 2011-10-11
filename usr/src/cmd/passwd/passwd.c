@@ -1066,14 +1066,6 @@ ckarg(int argc, char **argv, attrlist **attributes)
 			if (repository.type == NULL)
 				repository = __REPFILES;
 
-			/*
-			 * Only privileged process can execute this
-			 * for FILES
-			 */
-			if (IS_FILES(repository) && (ckuid() != SUCCESS)) {
-				retval = NOPERM;
-				return (FAIL);
-			}
 			if (flag & (EFLAG|SAFLAG|AGEFLAG)) {
 				retval = BADOPT;
 				return (FAIL);

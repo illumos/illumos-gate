@@ -1,11 +1,11 @@
 '\" te
 .\" Copyright (c) 2007 Sun Microsystems, Inc. - All Rights Reserved.
-.\" Copyright 1989 AT&T 
+.\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1982-2007 AT&T Knowledge Ventures
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH let 1 "2 Nov 2007" "SunOS 5.11" "User Commands"
+.TH LET 1 "Nov 2, 2007"
 .SH NAME
 let \- shell built-in function to evaluate one or more arithmetic expressions
 .SH SYNOPSIS
@@ -42,23 +42,19 @@ command arguments.
 \fBksh\fR returns the following exit values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 The value of the last expression is \fBnon-zero\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 The value of the last expression is zero.
 .RE
 
@@ -68,23 +64,19 @@ The value of the last expression is zero.
 \fBksh93\fR returns the following exit values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 The last \fIexpr\fR evaluates to a \fBnon-zero\fR value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 The last \fIexpr\fR evaluates to \fB0\fR or an error occurred.
 .RE
 

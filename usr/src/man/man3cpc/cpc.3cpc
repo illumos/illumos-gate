@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cpc 3CPC "8 Oct 2008" "SunOS 5.11" "CPU Performance Counters Library Functions"
+.TH CPC 3CPC "Oct 8, 2008"
 .SH NAME
 cpc \- hardware performance counters
 .SH DESCRIPTION
@@ -39,47 +39,39 @@ cannot simultaneously be both shared and private.
 The following configuration interfaces are provided:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcpc_open\fR(3CPC)\fR
 .ad
 .RS 21n
-.rt  
 Check the version the application was compiled with against the version of the
 library.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcpc_cciname\fR(3CPC)\fR
 .ad
 .RS 21n
-.rt  
 Return a printable string to describe the performance counters of the
 processor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcpc_npic\fR(3CPC)\fR
 .ad
 .RS 21n
-.rt  
 Return the number of performance counters on the processor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcpc_cpuref\fR(3CPC)\fR
 .ad
 .RS 21n
-.rt  
 Return a reference to documentation that should be consulted to understand how
 to use and interpret data from the performance counters.
 .RE

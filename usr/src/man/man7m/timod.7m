@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH timod 7M "26 Mar 1993" "SunOS 5.11" "STREAMS Modules"
+.TH TIMOD 7M "Mar 26, 1993"
 .SH NAME
 timod \- Transport Interface cooperating STREAMS module
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/stropts.h> 
+#include <sys/stropts.h>
 .fi
 
 .LP
@@ -66,12 +66,10 @@ types are defined in <\fBsys/tihdr.h\fR>. The possible values for the \fIcmd\fR
 field are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTI_BIND\fR \fR
 .ad
 .RS 15n
-.rt  
 Bind an address to the underlying transport protocol provider. The message
 issued to the  \fBTI_BIND\fR ioctl is equivalent to the \fBTI\fR message type
 \fBT_BIND_REQ\fR and the message returned by the successful completion of the
@@ -80,12 +78,10 @@ issued to the  \fBTI_BIND\fR ioctl is equivalent to the \fBTI\fR message type
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTI_UNBIND\fR \fR
 .ad
 .RS 15n
-.rt  
 Unbind an address from the underlying transport protocol provider. The message
 issued to the  \fBTI_UNBIND\fR ioctl is equivalent to the \fBTI\fR message type
 \fBT_UNBIND_REQ\fR and the message returned by the successful completion of the
@@ -94,12 +90,10 @@ issued to the  \fBTI_UNBIND\fR ioctl is equivalent to the \fBTI\fR message type
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTI_GETINFO\fR \fR
 .ad
 .RS 15n
-.rt  
 Get the \fBTI\fR protocol specific information from the transport protocol
 provider. The message issued to the  \fBTI_GETINFO\fR ioctl is equivalent to
 the \fBTI\fR message type  \fBT_INFO_REQ\fR and the message returned by the
@@ -109,12 +103,10 @@ type \fBT_INFO_ACK.\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTI_OPTMGMT\fR \fR
 .ad
 .RS 15n
-.rt  
 Get, set, or negotiate protocol specific options with the transport protocol
 provider. The message issued to the  \fBTI_OPTMGMT\fR ioctl is equivalent to
 the TI message type  \fBT_OPTMGMT_REQ\fR and the message returned by the
@@ -125,45 +117,37 @@ type \fBT_OPTMGMT_ACK.\fR
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB<\fBsys/timod.h\fR> \fR
 .ad
 .RS 19n
-.rt  
 ioctl definitions
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB<\fBsys/tiuser.h\fR> \fR
 .ad
 .RS 19n
-.rt  
 \fBTLI\fR interface declaration and structure file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB<\fBsys/tihdr.h\fR> \fR
 .ad
 .RS 19n
-.rt  
 \fBTPI\fR declarations and user-level code
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB<\fBsys/errno.h\fR> \fR
 .ad
 .RS 19n
-.rt  
 system error messages file. Please see \fBerrno\fR(3C).
 .RE
 

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH acct 2 "20 Jan 2003" "SunOS 5.11" "System Calls"
+.TH ACCT 2 "Jan 20, 2003"
 .SH NAME
 acct \- enable or disable process accounting
 .SH SYNOPSIS
@@ -43,57 +43,47 @@ returned and \fBerrno\fR is set to indicate the error.
 The \fBacct()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 16n
-.rt  
 The file named by \fIpath\fR is not an ordinary file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBUSY\fR\fR
 .ad
 .RS 16n
-.rt  
 An attempt is being made to enable accounting using the same file that is
 currently being used.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIpath\fR argument points to an illegal address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBELOOP\fR\fR
 .ad
 .RS 16n
-.rt  
 Too many symbolic links were encountered in translating \fIpath\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENAMETOOLONG\fR\fR
 .ad
 .RS 16n
-.rt  
 The length of the  \fIpath\fR argument exceeds {\fBPATH_MAX\fR}, or the length
 of a \fIpath\fR argument exceeds {\fBNAME_MAX\fR} while \fB_POSIX_NO_TRUNC\fR
 is in effect.
@@ -101,46 +91,38 @@ is in effect.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 16n
-.rt  
 One or more components of the accounting file pathname do not exist.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTDIR\fR\fR
 .ad
 .RS 16n
-.rt  
 A component of the path prefix is not a directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 16n
-.rt  
 The {\fBPRIV_SYS_ACCT\fR} privilege is not asserted in the effective set of the
 calling process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEROFS\fR\fR
 .ad
 .RS 16n
-.rt  
 The named file resides on a read-only file system.
 .RE
 

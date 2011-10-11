@@ -2,7 +2,7 @@
 .\" To view license terms, attribution, and copyright for IP Filter, the default path is /usr/lib/ipf/IPFILTER.LICENCE. If the Solaris operating environment has been installed anywhere other than the default, modify the given path to access the file at the installed
 .\" location.
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
-.TH svc.ipfd 1M "13 Jan 2009" "SunOS 5.11" "System Administration Commands"
+.TH SVC.IPFD 1M "Jan 13, 2009"
 .SH NAME
 svc.ipfd \- IP Filter firewall monitoring daemon
 .SH SYNOPSIS
@@ -46,7 +46,6 @@ similar to the \fBinetd\fR property group in \fBinetd\fR managed services. This
 property group supports:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfirewall_context/name\fR\fR
 .ad
@@ -58,7 +57,6 @@ For non-\fBinetd\fR services. The IANA name or RPC name, equivalent to the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfirewall_context/isrpc\fR\fR
 .ad
@@ -77,7 +75,6 @@ their own IPF rules. An optional property \fBipf_method\fR, provides a
 mechanism to allow such custom rule generation:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfirewall_context/ipf_method\fR\fR
 .ad
@@ -119,7 +116,6 @@ store the respective system-wide policies.
 Below are the properties, their possible values, and corresponding semantics:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpolicy\fR\fR
 .ad
@@ -128,7 +124,6 @@ Below are the properties, their possible values, and corresponding semantics:
 The \fBpolicy\fR has the following modes:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnone\fR policy mode\fR
 .ad
@@ -141,7 +136,6 @@ service.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdeny\fR policy mode\fR
 .ad
@@ -153,7 +147,6 @@ sources except those specified in the \fBapply_to\fR property.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBallow\fR policy mode\fR
 .ad
@@ -167,7 +160,6 @@ except those specified in the \fBapply_to\fR property.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBapply_to\fR\fR
 .ad
@@ -192,7 +184,6 @@ interface:      if:\fIinterface_name\fR       "if:e1000g0"
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBexceptions\fR\fR
 .ad
@@ -210,7 +201,6 @@ in the \fBexceptions\fR property. This property has the same value syntax as
 For individual network services only:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfirewall_config/policy\fR\fR
 .ad
@@ -225,7 +215,6 @@ A service's policy can also be set to \fBuse_global\fR. Services with
 For the Global Default only:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfirewall_config_default/policy\fR\fR
 .ad
@@ -244,7 +233,6 @@ firewall policies.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfirewall_config_default/custom_policy_file\fR\fR
 .ad
@@ -301,7 +289,6 @@ Refresh configuration:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfirewall_config_default/open_ports\fR\fR
 .ad
@@ -380,7 +367,6 @@ groups and properties and their appropriate default values.
 Firewall policy configuration:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfirewall_config\fR\fR
 .ad
@@ -407,7 +393,6 @@ See "Firewall Policy Configuration," above, for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfirewall_config/policy\fR\fR
 .ad
@@ -419,7 +404,6 @@ default, inherit the Global Default firewall policy.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfirewall_config/apply_to\fR\fR
 .ad
@@ -430,7 +414,6 @@ An empty property, this property has no initial value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfirewall_config/exceptions\fR\fR
 .ad
@@ -444,7 +427,6 @@ An empty property, this property has no initial value.
 Firewall static definition:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfirewall_context\fR\fR
 .ad
@@ -459,7 +441,6 @@ See "Firewall Static Configuration," above, for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfirewall_context/name\fR\fR
 .ad
@@ -472,7 +453,6 @@ property. For RPC services, the RPC program number is stored in this property.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfirewall_context/isrpc\fR\fR
 .ad
@@ -484,7 +464,6 @@ For RPC services, this property should be created with its value set to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfirewall_context/ipf_method\fR\fR
 .ad
@@ -518,13 +497,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

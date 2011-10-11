@@ -1,13 +1,13 @@
 '\" te
 .\" Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright (c) 1980 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement  specifies the terms and conditions for redistribution.
-.TH vipw 1B "14 Sep 1992" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.TH VIPW 1B "Sep 14, 1992"
 .SH NAME
 vipw \- edit the password file
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/ucb/vipw\fR 
+\fB/usr/ucb/vipw\fR
 .fi
 
 .SH DESCRIPTION
@@ -27,23 +27,19 @@ for root.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ptmp\fR\fR
 .ad
 .RS 15n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/shells\fR\fR
 .ad
 .RS 15n
-.rt  
 
 .RE
 

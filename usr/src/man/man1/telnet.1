@@ -1,15 +1,15 @@
 '\" te
 .\" Copyright 1989 AT&T
-.\" Copyright (C) 2004, Sun Microsystems, Inc. All Rights Reserved 
+.\" Copyright (C) 2004, Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright (c) 1983, 1990, 1993 The Regents of the University of California. All rights reserved.
-.TH telnet 1 "17 Aug 2006" "SunOS 5.11" "User Commands"
+.TH TELNET 1 "Aug 17, 2006"
 .SH NAME
 telnet \- user interface to a remote system using the TELNET protocol
 .SH SYNOPSIS
 .LP
 .nf
-\fBtelnet\fR [\fB-8EFKLacdfrx\fR] [\fB-X\fR \fIatype\fR] [\fB-e\fR \fIescape_char\fR] 
-     [\fB-k\fR \fIrealm\fR] [\fB-l\fR \fIuser\fR] [\fB-n\fR \fIfile\fR] 
+\fBtelnet\fR [\fB-8EFKLacdfrx\fR] [\fB-X\fR \fIatype\fR] [\fB-e\fR \fIescape_char\fR]
+     [\fB-k\fR \fIrealm\fR] [\fB-l\fR \fIuser\fR] [\fB-n\fR \fIfile\fR]
      [ [ [!] @hop1 [@hop2...] @] \fIhost\fR [\fIport\fR]]
 .fi
 
@@ -76,7 +76,6 @@ mode.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-8\fR\fR
 .ad
@@ -88,7 +87,6 @@ attempted for both input and output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
@@ -103,7 +101,6 @@ with the user \fBID\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
@@ -115,7 +112,6 @@ Disables the reading of the user's \fBtelnetrc\fR file. (See the \fBtoggle\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
@@ -126,7 +122,6 @@ Sets the initial value of the \fBdebug\fR toggle to \fBTRUE\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fIescape_char\fR\fR
 .ad
@@ -144,7 +139,6 @@ character, use the \fB-E\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-E\fR\fR
 .ad
@@ -155,7 +149,6 @@ Stops any character from being recognized as an escape character.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
@@ -166,7 +159,6 @@ Forwards a copy of the local credentials to the remote system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
@@ -177,7 +169,6 @@ Forwards a forwardable copy of the local credentials to the remote system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR \fIrealm\fR\fR
 .ad
@@ -190,7 +181,6 @@ realm as determined in\fBkrb5.conf\fR(4).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-K\fR\fR
 .ad
@@ -201,7 +191,6 @@ Specifies no automatic login to the remote system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIuser\fR\fR
 .ad
@@ -214,7 +203,6 @@ then \fIuser\fR will be sent to the remote system as the value for the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
@@ -226,7 +214,6 @@ be negotiated on output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fItracefile\fR\fR
 .ad
@@ -238,7 +225,6 @@ Opens \fItracefile\fR for recording trace information. See the \fBset\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
@@ -257,7 +243,6 @@ future.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
@@ -270,7 +255,6 @@ if encryption cannot be turned on.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-X\fR \fIatype\fR\fR
 .ad
@@ -289,7 +273,6 @@ also true for arguments to the \fBmode\fR, \fBset\fR, \fBtoggle\fR,
 \fBunset\fR, \fBenviron\fR, and \fBdisplay\fR commands.)
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauth\fR \fIargument\fR ...\fR
 .ad
@@ -300,7 +283,6 @@ The \fBauth\fR command manipulates the information sent through the
 command are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisable\fR \fItype\fR\fR
 .ad
@@ -312,7 +294,6 @@ types, use the \fBauth\fR \fBdisable ?\fR command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBenable\fR \fItype\fR\fR
 .ad
@@ -324,7 +305,6 @@ types, use the \fBauth\fR \fBenable ?\fR command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstatus\fR\fR
 .ad
@@ -337,7 +317,6 @@ Lists the current status of the various types of authentication.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBopen\fR [\fB\fR\fB-l\fR \fIuser\fR ] [ [!] @\fIhop1\fR
 [@\fIhop2\fR ...]@\fIhost\fR [ \fIport\fR ]\fR
@@ -360,7 +339,6 @@ variable \fBUSER\fR to the remote system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclose\fR\fR
 .ad
@@ -372,7 +350,6 @@ command mode) will also close a session and exit.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBencrypt\fR\fR
 .ad
@@ -384,7 +361,6 @@ The encrypt command manipulates the information sent through the \fBTELNET\fR
 Valid arguments for the encrypt command are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisable\fR \fItype\fR [\fBinput\fR|\fBoutput\fR]\fR
 .ad
@@ -397,7 +373,6 @@ the \fBencrypt\fR \fBdisable ?\fR command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBenable\fR \fItype\fR [\fBinput\fR|\fBoutput\fR]\fR
 .ad
@@ -410,7 +385,6 @@ input and output are enabled. To obtain a list of available types, use the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinput\fR\fR
 .ad
@@ -421,7 +395,6 @@ This is the same as the \fBencrypt\fR \fBstart input\fR command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-input\fR\fR
 .ad
@@ -432,7 +405,6 @@ This is the same as the \fBencrypt\fR \fBstop input\fR command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBoutput\fR\fR
 .ad
@@ -443,7 +415,6 @@ This is the same as the \fBencrypt\fR \fBstart output\fR command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-output\fR\fR
 .ad
@@ -454,7 +425,6 @@ This is the same as the \fBencrypt\fR \fBstop output\fR command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstart\fR [\fBinput\fR|\fBoutput\fR]\fR
 .ad
@@ -467,7 +437,6 @@ output are enabled. To obtain a list of available types, use the \fBencrypt\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstatus\fR\fR
 .ad
@@ -478,7 +447,6 @@ Lists the current status of encryption.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstop\fR [\fBinput\fR|\fBoutput\fR]\fR
 .ad
@@ -490,7 +458,6 @@ output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtype\fR \fItype\fR\fR
 .ad
@@ -504,7 +471,6 @@ Sets the default type of encryption to be used with later \fBencrypt\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBquit\fR\fR
 .ad
@@ -515,7 +481,6 @@ Same as \fBclose\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBz\fR\fR
 .ad
@@ -527,7 +492,6 @@ that supports job control, such as \fBsh\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmode\fR \fItype\fR\fR
 .ad
@@ -538,7 +502,6 @@ remote host is capable of entering that mode, the requested mode will be
 entered. The argument \fItype\fR is one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcharacter\fR\fR
 .ad
@@ -550,7 +513,6 @@ understand the \fBLINEMODE\fR option, then enter "character at a time" mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBline\fR\fR
 .ad
@@ -563,7 +525,6 @@ mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBisig\fR (\fB-isig\fR)\fR
 .ad
@@ -575,7 +536,6 @@ option. This requires that the \fBLINEMODE\fR option be enabled.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBedit\fR (\fB-edit\fR)\fR
 .ad
@@ -587,7 +547,6 @@ This requires that the \fBLINEMODE\fR option be enabled.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsofttabs\fR (\fB-softtabs\fR)\fR
 .ad
@@ -599,7 +558,6 @@ option. This requires that the \fBLINEMODE\fR option be enabled.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlitecho\fR (\fB-litecho\fR)\fR
 .ad
@@ -611,7 +569,6 @@ option. This requires that the \fBLINEMODE\fR option be enabled.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB?\fR\fR
 .ad
@@ -624,7 +581,6 @@ Prints out help information for the \fBmode\fR command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstatus\fR\fR
 .ad
@@ -636,7 +592,6 @@ connected to, as well as the current mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisplay\fR\fR
 .ad
@@ -648,7 +603,6 @@ connected to, as well as the current mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB?\fR\fR
 .ad
@@ -661,7 +615,6 @@ information for just that command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsend\fR \fIargument\fR\fB\|.\|.\|.\fR\fR
 .ad
@@ -672,7 +625,6 @@ are the arguments that can be specified (more than one argument may be
 specified at a time):
 .sp
 .ne 2
-.mk
 .na
 \fB\fBescape\fR\fR
 .ad
@@ -683,7 +635,6 @@ Send the current \fBtelnet\fR escape character (initially \fB^]\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsynch\fR\fR
 .ad
@@ -697,7 +648,6 @@ system. If it does not work, a lowercase "r" may be echoed on the terminal.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbrk\fR or \fBbreak\fR\fR
 .ad
@@ -709,7 +659,6 @@ remote system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBip\fR\fR
 .ad
@@ -721,7 +670,6 @@ currently running process on the remote system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBabort\fR\fR
 .ad
@@ -732,7 +680,6 @@ Send the \fBTELNET ABORT\fR (Abort Process) sequence.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBao\fR\fR
 .ad
@@ -744,7 +691,6 @@ the remote system to the user's terminal.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBayt\fR\fR
 .ad
@@ -756,7 +702,6 @@ may or may not respond.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBec\fR\fR
 .ad
@@ -768,7 +713,6 @@ character entered.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBel\fR\fR
 .ad
@@ -780,7 +724,6 @@ system to erase the line currently being entered.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBeof\fR\fR
 .ad
@@ -791,7 +734,6 @@ Send the \fBTELNET EOF\fR (End Of File) sequence.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBeor\fR\fR
 .ad
@@ -802,7 +744,6 @@ Send the \fBTELNET EOR\fR (End Of Record) sequence.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBga\fR\fR
 .ad
@@ -814,7 +755,6 @@ significance for the remote system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgetstatus\fR\fR
 .ad
@@ -827,7 +767,6 @@ status.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnop\fR\fR
 .ad
@@ -838,7 +777,6 @@ Send the \fBTELNET NOP\fR (No Operation) sequence.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsusp\fR\fR
 .ad
@@ -849,7 +787,6 @@ Send the \fBTELNET SUSP\fR (Suspend Process) sequence.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdo\fR \fIoption\fR\fR
 .ad
@@ -877,7 +814,6 @@ useful for unusual debugging situations.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB?\fR\fR
 .ad
@@ -890,7 +826,6 @@ Print out help information for the \fBsend\fR command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBset\fR \fIargument\fR [\fIvalue\fR]\fR
 .ad
@@ -908,7 +843,6 @@ The values of variables may be interrogated with the \fBdisplay\fR command. If
 variables that may be specified are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBecho\fR\fR
 .ad
@@ -921,7 +855,6 @@ suppressing echoing of entered characters, for example, entering a password.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBescape\fR\fR
 .ad
@@ -933,7 +866,6 @@ This is the \fBtelnet\fR escape character (initially \fB^]\fR) that enters
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinterrupt\fR\fR
 .ad
@@ -948,7 +880,6 @@ character.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBquit\fR\fR
 .ad
@@ -962,7 +893,6 @@ terminal's \fBquit\fR character.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBflushoutput\fR\fR
 .ad
@@ -976,7 +906,6 @@ terminal's \fBflush\fR character.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBerase\fR\fR
 .ad
@@ -991,7 +920,6 @@ initial value for the \fBerase\fR character is taken to be the terminal's
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkill\fR\fR
 .ad
@@ -1006,7 +934,6 @@ character.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBeof\fR\fR
 .ad
@@ -1020,7 +947,6 @@ character.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBayt\fR\fR
 .ad
@@ -1034,7 +960,6 @@ for \fBayt\fR is the terminal's status character.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBforw1\fR\fR
 .ad
@@ -1052,7 +977,6 @@ from the terminal's \fBeol\fR and \fBeol2\fR characters.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlnext\fR\fR
 .ad
@@ -1066,7 +990,6 @@ terminal's \fBlnext\fR character.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBreprint\fR\fR
 .ad
@@ -1080,7 +1003,6 @@ character. The initial value for \fBreprint\fR is taken to be the terminal's
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrlogin\fR\fR
 .ad
@@ -1096,7 +1018,6 @@ is to disable the \fBrlogin\fR escape character.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstart\fR\fR
 .ad
@@ -1110,7 +1031,6 @@ initial value for the \fBkill\fR character is taken to be the terminal's
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstop\fR\fR
 .ad
@@ -1124,7 +1044,6 @@ initial value for the \fBkill\fR character is taken to be the terminal's
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsusp\fR\fR
 .ad
@@ -1139,7 +1058,6 @@ character.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtracefile\fR\fR
 .ad
@@ -1153,7 +1071,6 @@ default).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBworderase\fR\fR
 .ad
@@ -1167,7 +1084,6 @@ initial value for the \fBworderase\fR character is taken to be the terminal's
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB?\fR\fR
 .ad
@@ -1180,7 +1096,6 @@ Displays the legal \fBset\fR and \fBunset\fR commands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBslc\fR \fIstate\fR\fR
 .ad
@@ -1194,7 +1109,6 @@ sequences (like \fBip\fR or \fBquit\fR) or line editing characters (like
 exported. The following values for \fIstate\fR are valid:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcheck\fR\fR
 .ad
@@ -1208,7 +1122,6 @@ values.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBexport\fR\fR
 .ad
@@ -1221,7 +1134,6 @@ started.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBimport\fR\fR
 .ad
@@ -1234,7 +1146,6 @@ connection was established.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB?\fR\fR
 .ad
@@ -1247,7 +1158,6 @@ Prints out help information for the \fBslc\fR command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtoggle\fR \fIargument\fR...\fR
 .ad
@@ -1259,23 +1169,19 @@ state of these flags may be interrogated with the \fBdisplay\fR command. Valid
 arguments are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauthdebug\fR\fR
 .ad
 .RS 20n
-.rt  
 Turns on debugging information for the authentication code.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBautodecrypt\fR\fR
 .ad
 .RS 20n
-.rt  
 When the \fBTELNET\fR \fBENCRYPT\fR option is negotiated, by default the actual
 encryption (decryption) of the data stream does not start automatically. The
 autoencrypt (autodecrypt) command states that encryption of the output (input)
@@ -1284,12 +1190,10 @@ stream should be enabled as soon as possible.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBautologin\fR\fR
 .ad
 .RS 20n
-.rt  
 If the remote side supports the \fBTELNET\fR \fBAUTHENTICATION\fR option,
 \fBtelnet\fR attempts to use it to perform automatic authentication. If the
 \fBAUTHENTICATION\fR option is not supported, the user's login name is
@@ -1299,12 +1203,10 @@ same as specifying the \fB-a\fR option on the \fBopen\fR command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBautoflush\fR\fR
 .ad
 .RS 20n
-.rt  
 If \fBautoflush\fR and \fBlocalchars\fR are both \fBTRUE,\fR then when the
 \fBao\fR, \fBintr\fR, or \fBquit\fR characters are recognized (and transformed
 into \fBTELNET\fR sequences; see \fBset\fR for details), \fBtelnet\fR refuses
@@ -1317,12 +1219,10 @@ terminal user has not done an "stty noflsh". Otherwise, the value is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBautosynch\fR\fR
 .ad
 .RS 20n
-.rt  
 If \fBautosynch\fR and \fBlocalchars\fR are both \fBTRUE\fR, then when either
 the \fBinterrupt\fR or \fBquit\fR characters are typed (see \fBset\fR for
 descriptions of \fBinterrupt\fR and \fBquit\fR), the resulting \fBTELNET\fR
@@ -1334,45 +1234,37 @@ upon. The initial value of this toggle is \fBFALSE\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbinary\fR\fR
 .ad
 .RS 20n
-.rt  
 Enable or disable the \fBTELNET BINARY\fR option on both input and output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinbinary\fR\fR
 .ad
 .RS 20n
-.rt  
 Enable or disable the \fBTELNET BINARY\fR option on input.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBoutbinary\fR\fR
 .ad
 .RS 20n
-.rt  
 Enable or disable the \fBTELNET BINARY\fR option on output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcrlf\fR\fR
 .ad
 .RS 20n
-.rt  
 Determines how carriage returns are sent. If the value is \fBTRUE\fR, then
 carriage returns will be sent as \fB<CR><LF>\fR\&. If the value is \fBFALSE\fR,
 then carriage returns will be send as \fB<CR><NUL>\fR\&. The initial value for
@@ -1381,12 +1273,10 @@ this toggle is \fBFALSE\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcrmod\fR\fR
 .ad
 .RS 20n
-.rt  
 Toggle RETURN mode. When this mode is enabled, most RETURN characters received
 from the remote host will be mapped into a RETURN followed by a line feed. This
 mode does not affect those characters typed by the user, only those received
@@ -1397,35 +1287,29 @@ RETURN but never send LINEFEED. The initial value for this toggle is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdebug\fR\fR
 .ad
 .RS 20n
-.rt  
 Toggle socket level debugging (only available to the super-user). The initial
 value for this toggle is \fBFALSE\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBencdebug\fR\fR
 .ad
 .RS 20n
-.rt  
 Turns on debugging information for the encryption code.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlocalchars\fR\fR
 .ad
 .RS 20n
-.rt  
 If this toggle is \fBTRUE\fR, then the \fBflush\fR, \fBinterrupt\fR,
 \fBquit\fR, \fBerase\fR, and \fBkill\fR characters (see \fBset\fR) are
 recognized locally, and transformed into appropriate \fBTELNET\fR control
@@ -1440,24 +1324,20 @@ assumed always to be \fBTRUE\fR. If \fBLINEMODE\fR has ever been enabled, then
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnetdata\fR\fR
 .ad
 .RS 20n
-.rt  
 Toggle the display of all network data (in hexadecimal format). The initial
 value for this toggle is \fBFALSE\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBoptions\fR\fR
 .ad
 .RS 20n
-.rt  
 Toggle the display of some internal \fBTELNET\fR protocol processing (having to
 do with \fBtelnet\fR options). The initial value for this toggle is
 \fBFALSE\fR.
@@ -1465,12 +1345,10 @@ do with \fBtelnet\fR options). The initial value for this toggle is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprettydump\fR\fR
 .ad
 .RS 20n
-.rt  
 When the \fBnetdata\fR toggle is enabled, if \fBprettydump\fR is enabled, the
 output from the \fBnetdata\fR command will be formatted in a more user readable
 format. Spaces are put between each character in the output. The beginning of
@@ -1480,12 +1358,10 @@ locating them.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBskiprc\fR\fR
 .ad
 .RS 20n
-.rt  
 When the \fBskiprc\fR toggle is \fBTRUE\fR, \fBTELNET\fR skips the reading of
 the \fB\&.telnetrc\fR file in the user's home directory when connections are
 opened. The initial value for this toggle is \fBFALSE\fR.
@@ -1493,24 +1369,20 @@ opened. The initial value for this toggle is \fBFALSE\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtermdata\fR\fR
 .ad
 .RS 20n
-.rt  
 Toggles the display of all terminal data (in hexadecimal format). The initial
 value for this toggle is \fBFALSE\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBverbose_encrypt\fR\fR
 .ad
 .RS 20n
-.rt  
 When the \fBverbose_encrypt\fR flag is \fBTRUE\fR, \fBTELNET\fR prints out a
 message each time encryption is enabled or disabled. The initial value for this
 toggle is \fBFALSE\fR.
@@ -1518,12 +1390,10 @@ toggle is \fBFALSE\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB?\fR\fR
 .ad
 .RS 20n
-.rt  
 Display the legal \fBtoggle\fR commands.
 .RE
 
@@ -1531,7 +1401,6 @@ Display the legal \fBtoggle\fR commands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBenviron\fR \fIargument\|.\|.\|.\fR\fR
 .ad
@@ -1543,7 +1412,6 @@ from the users environment. Only the \fBDISPLAY\fR and \fBPRINTER\fR variables
 are exported by default. Valid arguments for the \fBenviron\fR command are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdefine\fR \fIvariable value\fR\fR
 .ad
@@ -1556,7 +1424,6 @@ single or double quotes, so that tabs and spaces may be included.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBundefine\fR \fIvariable\fR\fR
 .ad
@@ -1567,7 +1434,6 @@ Remove \fIvariable\fR from the list of environment variables.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBexport\fR \fIvariable\fR\fR
 .ad
@@ -1578,7 +1444,6 @@ Mark the \fIvariable\fR to be exported to the remote side.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunexport\fR \fIvariable\fR\fR
 .ad
@@ -1590,7 +1455,6 @@ remote side.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlist\fR\fR
 .ad
@@ -1603,7 +1467,6 @@ explicitly requested.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB?\fR\fR
 .ad
@@ -1616,7 +1479,6 @@ Prints out help information for the \fBenviron\fR command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlogout\fR\fR
 .ad
@@ -1635,12 +1497,10 @@ immediately.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.telnetrc\fR\fR
 .ad
 .RS 19n
-.rt  
 file that contains commands to be executed before initiating a \fBtelnet\fR
 session
 .RE
@@ -1654,7 +1514,6 @@ session
 .SH DIAGNOSTICS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNO LOGINS: System going down in\fR \fIN\fR \fBminutes\fR\fR
 .ad

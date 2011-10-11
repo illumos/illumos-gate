@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_prop_exists 9F "22 May 1995" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_PROP_EXISTS 9F "May 22, 1995"
 .SH NAME
 ddi_prop_exists \- check for the existence of a property
 .SH SYNOPSIS
@@ -14,7 +14,7 @@ ddi_prop_exists \- check for the existence of a property
 
 
 
-\fBint\fR \fBddi_prop_exists\fR(\fBdev_t\fR \fImatch_dev\fR, \fBdev_info_t *\fR\fIdip\fR, \fBuint_t\fR \fIflags\fR, 
+\fBint\fR \fBddi_prop_exists\fR(\fBdev_t\fR \fImatch_dev\fR, \fBdev_info_t *\fR\fIdip\fR, \fBuint_t\fR \fIflags\fR,
      \fBchar *\fR\fIname\fR);
 .fi
 
@@ -25,56 +25,46 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fImatch_dev\fR \fR
 .ad
 .RS 14n
-.rt  
 Device number associated with property or \fBDDI_DEV_T_ANY.\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR \fR
 .ad
 .RS 14n
-.rt  
 Pointer to the device info node of device whose property list should be
 searched.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR \fR
 .ad
 .RS 14n
-.rt  
 Possible flag values are some combination of:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_DONTPASS\fR \fR
 .ad
 .RS 22n
-.rt  
 Do not pass request to parent device information node if the property  is not
 found.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_NOTPROM\fR \fR
 .ad
 .RS 22n
-.rt  
 Do not look at  \fBPROM \fRproperties (ignored on platforms that do not support
 \fBPROM \fRproperties).
 .RE
@@ -83,12 +73,10 @@ Do not look at  \fBPROM \fRproperties (ignored on platforms that do not support
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR \fR
 .ad
 .RS 14n
-.rt  
 String containing the name of the property.
 .RE
 

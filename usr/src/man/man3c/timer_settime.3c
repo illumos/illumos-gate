@@ -2,14 +2,14 @@
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH timer_settime 3C "5 Feb 2008" "SunOS 5.11" "Standard C Library Functions"
+.TH TIMER_SETTIME 3C "Feb 5, 2008"
 .SH NAME
 timer_settime, timer_gettime, timer_getoverrun \- per-process timers
 .SH SYNOPSIS
@@ -118,24 +118,20 @@ The \fBtimer_settime()\fR, \fBtimer_gettime()\fR and \fBtimer_getoverrun()\fR
 functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR \fR
 .ad
 .RS 11n
-.rt  
 The \fItimerid\fR argument does not correspond to a timer returned by
 \fBtimer_create\fR(3C) but not yet deleted by \fBtimer_delete\fR(3C).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSYS\fR \fR
 .ad
 .RS 11n
-.rt  
 The \fBtimer_settime()\fR, \fBtimer_gettime()\fR, and \fBtimer_getoverrun()\fR
 functions are not supported by the system. The \fBtimer_settime()\fR function
 will fail if:
@@ -143,12 +139,10 @@ will fail if:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 11n
-.rt  
 A \fIvalue\fR structure specified a nanosecond value less than zero or greater
 than or equal to 1000 million.
 .RE
@@ -161,17 +155,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) |lw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+l | l
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelAsync-Signal-Safe
+MT-Level	Async-Signal-Safe
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO

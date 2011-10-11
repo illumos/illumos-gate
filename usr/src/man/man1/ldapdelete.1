@@ -4,17 +4,17 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ldapdelete 1 "15 Jan 2004" "SunOS 5.11" "User Commands"
+.TH LDAPDELETE 1 "Jan 15, 2004"
 .SH NAME
 ldapdelete \- ldap delete entry tool
 .SH SYNOPSIS
 .LP
 .nf
-\fBldapdelete\fR [\fB-n\fR] [\fB-v\fR] [\fB-c\fR] [\fB-d\fR \fIdebuglevel\fR] [\fB-f\fR \fIfile\fR] 
-     [\fB-D\fR \fIbindDN\fR] [\fB-w\fR \fIpasswd\fR | \fB-j\fR \fIfile\fR] [\fB-J\fR [:\fIcriticality\fR]] 
-     [\fB-?\fR] [\fB-H\fR] [\fB-h\fR \fIldaphost\fR] [\fB-V\fR \fIversion\fR] [\fB-i\fR \fIlocale\fR] 
-     [\fB-k\fR \fIpath\fR] [\fB-P\fR \fIpath\fR] [\fB-N\fR \fIcertificate\fR] [\fB-y\fR \fIproxyid\fR] 
-     [\fB-p\fR \fIldapport\fR] [\fB-O\fR \fIhoplimit\fR] [\fB-o\fR \fIattributename\fR=\fIvalue\fR] 
+\fBldapdelete\fR [\fB-n\fR] [\fB-v\fR] [\fB-c\fR] [\fB-d\fR \fIdebuglevel\fR] [\fB-f\fR \fIfile\fR]
+     [\fB-D\fR \fIbindDN\fR] [\fB-w\fR \fIpasswd\fR | \fB-j\fR \fIfile\fR] [\fB-J\fR [:\fIcriticality\fR]]
+     [\fB-?\fR] [\fB-H\fR] [\fB-h\fR \fIldaphost\fR] [\fB-V\fR \fIversion\fR] [\fB-i\fR \fIlocale\fR]
+     [\fB-k\fR \fIpath\fR] [\fB-P\fR \fIpath\fR] [\fB-N\fR \fIcertificate\fR] [\fB-y\fR \fIproxyid\fR]
+     [\fB-p\fR \fIldapport\fR] [\fB-O\fR \fIhoplimit\fR] [\fB-o\fR \fIattributename\fR=\fIvalue\fR]
      [\fB-W\fR \fIpassword\fR] [\fIdn\fR]...
 .fi
 
@@ -32,7 +32,6 @@ arguments are provided, a list of \fBDN\fRs is read from \fIfile\fR, if the
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
@@ -43,7 +42,6 @@ Bypass confirmation question when deleting a branch.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
@@ -55,7 +53,6 @@ continue with deletions. The default is to exit after reporting an error.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdebuglevel\fR \fR
 .ad
@@ -65,56 +62,46 @@ Sets the \fBLDAP\fR debugging level. Useful levels of debugging for
 \fBldapdelete\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 7n
-.rt  
 Trace
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 7n
-.rt  
 Packets
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB4\fR\fR
 .ad
 .RS 7n
-.rt  
 Arguments
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB32\fR\fR
 .ad
 .RS 7n
-.rt  
 Filters
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB128\fR\fR
 .ad
 .RS 7n
-.rt  
 Access control
 .RE
 
@@ -125,7 +112,6 @@ example, to request trace and filter information, specify a \fIdebuglevel\fR of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR \fIbindDN\fR\fR
 .ad
@@ -136,7 +122,6 @@ Uses the distinguished name \fIbindDN\fR to bind to the directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-E\fR\fR
 .ad
@@ -148,7 +133,6 @@ control.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIfile\fR\fR
 .ad
@@ -160,7 +144,6 @@ input.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-?\fR\fR
 .ad
@@ -171,7 +154,6 @@ Display the usage help text that briefly describes all options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-H\fR\fR
 .ad
@@ -182,7 +164,6 @@ Display the usage help text that briefly describes all options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fIldaphost\fR\fR
 .ad
@@ -193,7 +174,6 @@ Specifies an alternate host on which the LDAP server is running.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIlocale\fR\fR
 .ad
@@ -216,7 +196,6 @@ the data in the file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-j\fR \fIfilename\fR\fR
 .ad
@@ -231,7 +210,6 @@ alternative between \fB-j\fR and \fB-w\fR/\fB-W\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-J\fR [:\fIcriticality\fR[:\fIvalue\fR|::\fIb64value\fR|\fIb64value\fR|:\
 fIfileurl\fR]]\fR
@@ -243,7 +221,6 @@ Criticality is a boolean value (default is \fBfalse\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR \fIpath\fR\fR
 .ad
@@ -256,7 +233,6 @@ your directory server. This is for NLS support.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR\fR
 .ad
@@ -269,7 +245,6 @@ the referral.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
@@ -281,7 +256,6 @@ conjunction with options \fB-v\fR and \fB-d\fR for debugging.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-N\fR \fIcertificate\fR\fR
 .ad
@@ -293,7 +267,6 @@ authentication. For example: \fB-N\fR \fB"Directory-Cert"\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIattributename\fR=\fIvalue\fR\fR
 .ad
@@ -305,56 +278,46 @@ operation, authorization ID, authentication ID, and so forth.
 The different attribute names and their values are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsecProp\fR=\fI"number"\fR\fR
 .ad
 .RS 20n
-.rt  
 For defining SASL security properties.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrealm\fR=\fI"value"\fR\fR
 .ad
 .RS 20n
-.rt  
 Specifies SASL realm (default is \fBrealm=none\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauthzid\fR=\fI"value"\fR\fR
 .ad
 .RS 20n
-.rt  
 Specify the authorization ID name for SASL bind.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauthid\fR=\fI"value"\fR\fR
 .ad
 .RS 20n
-.rt  
 Specify the authentication ID for SASL bind.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmech\fR=\fI"value"\fR\fR
 .ad
 .RS 20n
-.rt  
 Specifies the various SASL mechanisms.
 .RE
 
@@ -362,7 +325,6 @@ Specifies the various SASL mechanisms.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-O\fR \fIhopLimit\fR\fR
 .ad
@@ -374,7 +336,6 @@ delete. By default, there is no limit.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIldapport\fR\fR
 .ad
@@ -385,7 +346,6 @@ Specifies an alternate \fBTCP\fR port where the LDAP server is listening.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR \fIpath\fR\fR
 .ad
@@ -414,7 +374,6 @@ Use the \fB-P\fR option alone to specify server authentication only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -425,7 +384,6 @@ Uses verbose mode, with diagnostics written to standard output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR \fIversion\fR\fR
 .ad
@@ -438,7 +396,6 @@ servers that do not support v3.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-W\fR \fIpassword\fR\fR
 .ad
@@ -454,7 +411,6 @@ mutually exclusive of \fB-j\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR \fIpasswd\fR\fR
 .ad
@@ -471,7 +427,6 @@ the password will not be visible to other users.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Y\fR \fIproxyid\fR\fR
 .ad
@@ -483,7 +438,6 @@ operation, usually in double quotes ("") for the shell.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Z\fR\fR
 .ad
@@ -500,12 +454,10 @@ options needed to identify the certificate and the key database.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdn\fR\fR
 .ad
 .RS 6n
-.rt  
 Specifies one or several distinguished names of entries to delete.
 .RE
 
@@ -521,7 +473,7 @@ To delete the entry named with commonName \fBDelete Me\fR directly below the
 .in +2
 .nf
 example% \fBldapdelete -D "cn=Administrator, o=XYZ, c=US" \e
-  "cn=Delete Me, o=XYZ, c=US"\fR 
+  "cn=Delete Me, o=XYZ, c=US"\fR
 .fi
 .in -2
 .sp
@@ -551,12 +503,11 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
-Stability LevelEvolving
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+Stability Level	Evolving
 .TE
 
 .SH EXIT STATUS
@@ -565,23 +516,19 @@ Stability LevelEvolving
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 13n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBNon-zero \fR
 .ad
 .RS 13n
-.rt  
 An error occurred. A diagnostic message is written to standard error.
 .RE
 

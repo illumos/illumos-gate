@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH preap 1 "19 Jun 2006" "SunOS 5.11" "User Commands"
+.TH PREAP 1 "Jun 19, 2006"
 .SH NAME
 preap \- force a defunct process to be reaped by its parent
 .SH SYNOPSIS
@@ -62,12 +62,10 @@ The process has been defunct for less than one minute.
 The following option is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
 .RS 6n
-.rt  
 Forces the parent to reap the child, overriding safety checks.
 .RE
 
@@ -77,12 +75,10 @@ Forces the parent to reap the child, overriding safety checks.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpid\fR\fR
 .ad
 .RS 7n
-.rt  
 Process \fBID\fR list.
 .RE
 
@@ -101,23 +97,19 @@ The following exit values are returned by \fBpreap\fR, which prints the exit
 status of each target process reaped:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 Successfully operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnon-zero\fR
 .ad
 .RS 12n
-.rt  
 Failure, such as no such process, permission denied, or invalid option.
 .RE
 

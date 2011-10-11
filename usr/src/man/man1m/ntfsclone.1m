@@ -7,7 +7,7 @@
 .\" This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation ; either version 2 of the License, or (at your option) any later version.  This program is distributed
 .\" in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.  You should have received a copy of the GNU General Public License along with this program
 .\" (in the main directory of the Linux-NTFS distribution in the file COPYING);  if not, write to the Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 11-1307 USA
-.TH ntfsclone 1M "14 May 2009" "SunOS 5.11" "System Administration Commands"
+.TH NTFSCLONE 1M "May 14, 2009"
 .SH NAME
 ntfsclone \- clone, image, restore, or rescue an NTFS
 .SH SYNOPSIS
@@ -157,7 +157,6 @@ can be combined. For example, \fB-fv\fR is the equivalent of \fB-f\fR \fB-v\fR.
 A full-name option can be abbreviated to a unique prefix of its name.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR, \fB--force\fR\fR
 .ad
@@ -169,7 +168,6 @@ following a consistency check.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR, \fB--help\fR\fR
 .ad
@@ -180,7 +178,6 @@ Show a list of options with a brief description of each one.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR, \fB--ignore-fs-check\fR\fR
 .ad
@@ -193,7 +190,6 @@ inconsistency are saved.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR, \fB--metadata\fR\fR
 .ad
@@ -204,7 +200,6 @@ Clone only metadata. With this option, you must clone only to a file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR, \fB--output\fR \fIfile\fR\fR
 .ad
@@ -216,7 +211,6 @@ clone to the standard output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-O\fR, \fB--overwrite\fR \fIfile\fR\fR
 .ad
@@ -227,7 +221,6 @@ Clone NTFS to \fIfile\fR, overwriting \fIfile\fR if it already exists.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--rescue\fR\fR
 .ad
@@ -243,7 +236,6 @@ string: \fBBadSector\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR, \fB--restore-image\fR \fIsource\fR\fR
 .ad
@@ -255,7 +247,6 @@ Restore from the special image format specified by \fIsource\fR. If
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR, \fB--save-image\fR\fR
 .ad
@@ -446,13 +437,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityUncommitted
+Interface Stability	Uncommitted
 .TE
 
 .SH SEE ALSO

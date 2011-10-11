@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH scsi_extended_sense 9S "30 Aug 1995" "SunOS 5.11" "Data Structures for Drivers"
+.TH SCSI_EXTENDED_SENSE 9S "Aug 30, 1995"
 .SH NAME
 scsi_extended_sense \- SCSI extended sense structure
 .SH SYNOPSIS
@@ -82,7 +82,6 @@ match the logical block length of the data on the medium.
 condition. The following sense keys are defined:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKEY_NO_SENSE\fR \fR
 .ad
@@ -93,7 +92,6 @@ Indicates that there is no specific sense key information to be reported.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKEY_RECOVERABLE_ERROR\fR \fR
 .ad
@@ -105,7 +103,6 @@ action performed by the target.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKEY_NOT_READY\fR \fR
 .ad
@@ -116,7 +113,6 @@ Indicates that the logical unit addressed cannot be accessed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKEY_MEDIUM_ERROR\fR \fR
 .ad
@@ -128,7 +124,6 @@ was probably caused by a flaw on the medium or an error in the recorded data.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKEY_HARDWARE_ERROR\fR \fR
 .ad
@@ -140,7 +135,6 @@ performing the command or during a self test.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKEY_ILLEGAL_REQUEST\fR \fR
 .ad
@@ -152,7 +146,6 @@ additional parameters supplied as data for some commands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKEY_UNIT_ATTENTION\fR \fR
 .ad
@@ -164,7 +157,6 @@ been reset.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKEY_WRITE_PROTECT/KEY_DATA_PROTECT\fR \fR
 .ad
@@ -176,7 +168,6 @@ block that is protected from this operation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKEY_BLANK_CHECK\fR \fR
 .ad
@@ -189,7 +180,6 @@ write-once device encountered a non-blank medium while writing.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKEY_VENDOR_UNIQUE\fR \fR
 .ad
@@ -200,7 +190,6 @@ This sense key is available for reporting vendor-specific conditions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKEY_COPY_ABORTED\fR \fR
 .ad
@@ -212,7 +201,6 @@ was aborted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKEY_ABORTED_COMMAND\fR \fR
 .ad
@@ -223,7 +211,6 @@ Indicates that the target aborted the command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKEY_EQUAL\fR \fR
 .ad
@@ -235,7 +222,6 @@ comparison.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKEY_VOLUME_OVERFLOW\fR \fR
 .ad
@@ -247,7 +233,6 @@ and data might remain in the buffer that has not been written to the medium.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKEY_MISCOMPARE\fR \fR
 .ad
@@ -258,7 +243,6 @@ Indicates that the source data did not match the data read from the medium.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKEY_RESERVE\fR \fR
 .ad

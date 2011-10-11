@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mkmsgs 1 "26 Jul 1994" "SunOS 5.11" "User Commands"
+.TH MKMSGS 1 "Jul 26, 1994"
 .SH NAME
 mkmsgs \- create message files for use by gettxt
 .SH SYNOPSIS
@@ -54,23 +54,19 @@ software compatibility will be broken.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fR
 .ad
 .RS 14n
-.rt  
 Overwrite \fImsgfile\fR, if it exists.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fI locale\fR \fR
 .ad
 .RS 14n
-.rt  
 Install \fImsgfile\fR in the
 \fB/usr/lib/\fIlocale\fR/\fR\fIlocale\fR/\fBLC_MESSAGES\fR  directory. Only
 someone who is super user or a member of group \fBbin\fR can create or
@@ -143,7 +139,6 @@ the beginning of the \fBDESCRIPTION\fR section.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/locale/\fR\fBlocale\fR\fB/\fR\fBLC_MESSAGES\fR\fB/*  \fR\fR
 .ad

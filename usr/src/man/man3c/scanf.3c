@@ -3,14 +3,14 @@
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
 .\" Portions Copyright (c) 1997, The Open Group. All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH scanf 3C "10 Jul 2008" "SunOS 5.11" "Standard C Library Functions"
+.TH SCANF 3C "Jul 10, 2008"
 .SH NAME
 scanf, fscanf, sscanf, vscanf, vfscanf, vsscanf \- convert formatted input
 .SH SYNOPSIS
@@ -222,12 +222,10 @@ represented in the space provided, the behavior is undefined.
 The length modifiers and their meanings are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhh\fR\fR
 .ad
 .RS 16n
-.rt  
 Specifies that a following \fBd\fR, \fBi\fR, \fBo\fR, \fBu\fR, \fBx\fR,
 \fBX\fR, or \fBn\fR conversion specifier applies to an argument with type
 pointer to \fBsigned char\fR or \fBunsigned char\fR.
@@ -235,12 +233,10 @@ pointer to \fBsigned char\fR or \fBunsigned char\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBh\fR\fR
 .ad
 .RS 16n
-.rt  
 Specifies that a following \fBd\fR, \fBi\fR, \fBo\fR, \fBu\fR, \fBx\fR,
 \fBX\fR, or \fBn\fR conversion specifier applies to an argument with type
 pointer to \fBshort\fR or \fBunsigned short\fR.
@@ -248,12 +244,10 @@ pointer to \fBshort\fR or \fBunsigned short\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBl\fR (ell)\fR
 .ad
 .RS 16n
-.rt  
 Specifies that a following \fBd\fR, \fBi\fR, \fBo\fR, \fBu\fR, \fBx\fR,
 \fBX\fR, or \fBn\fR conversion specifier applies to an argument with type
 pointer to \fBlong\fR or \fBunsigned long\fR; that a following \fBa\fR,
@@ -265,12 +259,10 @@ argument with type pointer to \fBwchar_t\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBll\fR (ell-ell)\fR
 .ad
 .RS 16n
-.rt  
 Specifies that a following \fBd\fR, \fBi\fR, \fBo\fR, \fBu\fR, \fBx\fR,
 \fBX\fR, or \fBn\fR conversion specifier applies to an argument with type
 pointer to \fBlong long\fR or \fBunsigned long long\fR.
@@ -278,12 +270,10 @@ pointer to \fBlong long\fR or \fBunsigned long long\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBj\fR\fR
 .ad
 .RS 16n
-.rt  
 Specifies that a following \fBd\fR, \fBi\fR, \fBo\fR, \fBu\fR, \fBx\fR,
 \fBX\fR, or \fBn\fR conversion specifier applies to an argument with type
 pointer to \fBintmax_t\fR or \fBuintmax_t\fR.
@@ -291,12 +281,10 @@ pointer to \fBintmax_t\fR or \fBuintmax_t\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBz\fR\fR
 .ad
 .RS 16n
-.rt  
 Specifies that a following \fBd\fR, \fBi\fR, \fBo\fR, \fBu\fR, \fBx\fR,
 \fBX\fR, or \fBn\fR conversion specifier applies to an argument with type
 pointer to \fBsize_t\fR or the corresponding signed integer type.
@@ -304,12 +292,10 @@ pointer to \fBsize_t\fR or the corresponding signed integer type.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBt\fR\fR
 .ad
 .RS 16n
-.rt  
 Specifies that a following \fBd\fR, \fBi\fR, \fBo\fR, \fBu\fR, \fBx\fR,
 \fBX\fR, or \fBn\fR conversion specifier applies to an argument with type
 pointer to \fBptrdiff_t\fR or the corresponding \fBunsigned\fR type.
@@ -317,12 +303,10 @@ pointer to \fBptrdiff_t\fR or the corresponding \fBunsigned\fR type.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBL\fR\fR
 .ad
 .RS 16n
-.rt  
 Specifies that a following \fBa\fR, \fBA\fR, \fBe\fR, \fBE\fR, \fBf\fR,
 \fBF\fR, \fBg\fR, or \fBG\fR conversion specifier applies to an argument with
 type pointer to \fBlong double\fR.
@@ -338,12 +322,10 @@ specified above, the behavior is undefined.
 The following conversion characters are valid:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd\fR\fR
 .ad
 .RS 11n
-.rt  
 Matches an optionally signed decimal integer, whose format is the same as
 expected for the subject sequence of \fBstrtol\fR(3C) with the value 10 for the
 \fIbase\fR argument. In the absence of a size modifier, the corresponding
@@ -352,12 +334,10 @@ argument must be a pointer to \fBint\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBi\fR\fR
 .ad
 .RS 11n
-.rt  
 Matches an optionally signed integer, whose format is the same as expected for
 the subject sequence of \fBstrtol()\fR with 0 for the \fIbase\fR argument. In
 the absence of a size modifier, the corresponding argument must be a pointer to
@@ -366,12 +346,10 @@ the absence of a size modifier, the corresponding argument must be a pointer to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBo\fR\fR
 .ad
 .RS 11n
-.rt  
 Matches an optionally signed octal integer, whose format is the same as
 expected for the subject sequence of \fBstrtoul\fR(3C) with the value 8 for the
 \fIbase\fR argument. In the absence of a size modifier, the corresponding
@@ -380,12 +358,10 @@ argument must be a pointer to \fBunsigned int\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBu\fR\fR
 .ad
 .RS 11n
-.rt  
 Matches an optionally signed decimal integer, whose format is the same as
 expected for the subject sequence of \fBstrtoul()\fR with the value 10 for the
 \fIbase\fR argument. In the absence of a size modifier, the corresponding
@@ -394,12 +370,10 @@ argument must be a pointer to \fBunsigned int\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBx\fR\fR
 .ad
 .RS 11n
-.rt  
 Matches an optionally signed hexadecimal integer, whose format is the same as
 expected for the subject sequence of \fBstrtoul()\fR with the value 16 for the
 \fIbase\fR argument. In the absence of a size modifier, the corresponding
@@ -408,12 +382,10 @@ argument must be a pointer to \fBunsigned int\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBa\fR,\fBe\fR,\fBf\fR,\fBg\fR\fR
 .ad
 .RS 11n
-.rt  
 Matches an optionally signed floating-point number, infinity, or NaN, whose
 format is the same as expected for the subject sequence of \fBstrtod\fR(3C). In
 the absence of a size modifier, the corresponding argument must be a pointer to
@@ -431,12 +403,10 @@ setting of \fBerrno\fR to \fBERANGE\fR, if applicable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fR
 .ad
 .RS 11n
-.rt  
 Matches a sequence of bytes that are not white-space characters. The
 corresponding argument must be a pointer to the initial byte of an array of
 \fBchar\fR, \fBsigned char\fR, or \fBunsigned char\fR large enough to accept
@@ -454,12 +424,10 @@ the terminating null  wide-character, which will be added automatically.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fR
 .ad
 .RS 11n
-.rt  
 Matches a non-empty sequence of characters from a set of expected characters
 (the \fIscanset\fR). The normal skip over white-space characters is suppressed
 in this case. The corresponding argument must be a pointer to the initial byte
@@ -492,12 +460,10 @@ it indicates a range of characters to be matched.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBc\fR\fR
 .ad
 .RS 11n
-.rt  
 Matches a sequence of characters of the number specified by the field width (1
 if no field width is present in the conversion specification). The
 corresponding argument must be a pointer to the initial byte of an array of
@@ -516,12 +482,10 @@ sequence of wide-characters.  No null wide-character is added.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBp\fR\fR
 .ad
 .RS 11n
-.rt  
 Matches the set of sequences that is the same as the set of sequences that is
 produced by the \fB%p\fR conversion of the corresponding \fBprintf\fR(3C)
 functions. The corresponding argument must be a pointer to a pointer to
@@ -532,12 +496,10 @@ otherwise the behavior of the \fB%p\fR conversion is undefined.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBn\fR\fR
 .ad
 .RS 11n
-.rt  
 No input is consumed. The corresponding argument must be a pointer to the
 integer into which is to be written the number of bytes read from the input so
 far by this call to the \fBscanf()\fR functions. Execution of a \fB%n\fR
@@ -547,34 +509,28 @@ the completion of execution of the function.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBC\fR\fR
 .ad
 .RS 11n
-.rt  
 Same as \fBlc\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS\fR\fR
 .ad
 .RS 11n
-.rt  
 Same as \fBls\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%\fR\fR
 .ad
 .RS 11n
-.rt  
 Matches a single \fB%\fR; no conversion or assignment occurs. The complete
 conversion specification must be \fB%%\fR.
 .RE
@@ -636,23 +592,19 @@ fail, refer to \fBfgetc\fR(3C) or \fBfgetwc\fR(3C).
 In addition, \fBfscanf()\fR may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEILSEQ\fR\fR
 .ad
 .RS 10n
-.rt  
 Input byte sequence does not form a valid character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 There are insufficient arguments.
 .RE
 
@@ -724,19 +676,18 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) |lw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+l | l
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO

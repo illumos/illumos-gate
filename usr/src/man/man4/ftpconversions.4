@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ftpconversions 4 "1 May 2003" "SunOS 5.11" "File Formats"
+.TH FTPCONVERSIONS 4 "May 1, 2003"
 .SH NAME
 ftpconversions \- FTP Server conversions database
 .SH SYNOPSIS
@@ -40,89 +40,73 @@ colons (:).
 The fields are described as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB1\fR
 .ad
 .RS 5n
-.rt  
 \fBStrip prefix\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB2\fR
 .ad
 .RS 5n
-.rt  
 \fBStrip postfix\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB3\fR
 .ad
 .RS 5n
-.rt  
 \fBAddon prefix\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB4\fR
 .ad
 .RS 5n
-.rt  
 \fBAddon postfix\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB5\fR
 .ad
 .RS 5n
-.rt  
 \fBExternal command\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB6\fR
 .ad
 .RS 5n
-.rt  
 \fBTypes\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB7\fR
 .ad
 .RS 5n
-.rt  
 \fBOptions\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB8\fR
 .ad
 .RS 5n
-.rt  
 \fBDescription\fR.
 .RE
 
@@ -150,34 +134,28 @@ in their \fBchroot'd\fR hierarchy along with any necessary dynamic libraries.
 \fBTypes\fR specifies the conversion type. The following values are recognized:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT_ASCII\fR\fR
 .ad
 .RS 11n
-.rt  
 ASCII transfers are allowed of a file produced by the conversion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fBT_DIR\fR\fR
 .ad
 .RS 11n
-.rt  
 Directories can be converted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT_REG\fR\fR
 .ad
 .RS 11n
-.rt  
 Regular files can be converted.
 .RE
 
@@ -189,34 +167,28 @@ that is written to the FTP Server logfile. See \fBxferlog\fR(4). The following
 options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_COMPRESS\fR\fR
 .ad
 .RS 16n
-.rt  
 conversion compresses
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_TAR\fR\fR
 .ad
 .RS 16n
-.rt  
 conversion archives
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_UNCOMPRESS\fR\fR
 .ad
 .RS 16n
-.rt  
 conversion uncompresses
 .RE
 
@@ -268,13 +240,11 @@ ASCII mode.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ftpd/ftpconversions\fR\fR
 .ad
 .RS 28n
-.rt  
- 
+
 .RE
 
 .SH SEE ALSO

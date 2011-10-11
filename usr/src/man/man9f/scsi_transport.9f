@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH scsi_transport 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH SCSI_TRANSPORT 9F "Jan 16, 2006"
 .SH NAME
 scsi_transport \- request by a SCSI target driver to start a command
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/scsi/scsi.h> 
+#include <sys/scsi/scsi.h>
 
 
 
@@ -23,12 +23,10 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpkt\fR\fR
 .ad
 .RS 7n
-.rt  
 Pointer to a \fBscsi_pkt\fR(9S) structure.
 .RE
 
@@ -51,23 +49,19 @@ routine provided by the target driver in the \fBpkt_comp\fR member of the
 The \fBscsi_transport()\fR function returns:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTRAN_ACCEPT\fR\fR
 .ad
 .RS 20n
-.rt  
 The packet was accepted by the transport layer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTRAN_BUSY\fR\fR
 .ad
 .RS 20n
-.rt  
 The packet could not be accepted because there was already a packet in progress
 for this target/lun, the host adapter queue was full, or the target device
 queue was full.
@@ -75,24 +69,20 @@ queue was full.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTRAN_BADPKT\fR\fR
 .ad
 .RS 20n
-.rt  
 The \fBDMA\fR count in the packet exceeded the \fBDMA\fR engine's maximum
 \fBDMA\fR size.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTRAN_FATAL_ERROR\fR\fR
 .ad
 .RS 20n
-.rt  
 A fatal error has occurred in the transport layer.
 .RE
 

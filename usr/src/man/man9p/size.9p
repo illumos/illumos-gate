@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH size 9P "23 Janl2008" "SunOS 5.11" "Kernel Properties for Drivers"
+.TH SIZE 9P "Jan 23, 2008"
 .SH NAME
 size, Nblock, blksize, device-nblocks, device-blksize \- device size properties
 .SH DESCRIPTION
@@ -18,24 +18,20 @@ size associated with a \fBddi_create_minor_node\fR(9F) \fBdev_t\fR (partition).
 device size property names:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdevice-nblocks\fR\fR
 .ad
 .RS 18n
-.rt  
 An \fBint64_t\fR property representing device size in
 \fBdevice-blksize\fRblocks.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdevice-blksize\fR\fR
 .ad
 .RS 18n
-.rt  
 An integer property representing the size in bytes of a block. If defined, the
 value must be a power of two. If not defined, \fBDEV_BSIZE\fR is implied.
 .RE
@@ -45,24 +41,20 @@ value must be a power of two. If not defined, \fBDEV_BSIZE\fR is implied.
 minor size property names:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSize\fR\fR
 .ad
 .RS 11n
-.rt  
 An \fBint64_t\fR property representing the size in bytes of a character minor
 device (\fBS_IFCHR\fR \fBspec_type\fR in ddi_create_minor_node).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNblocks\fR\fR
 .ad
 .RS 11n
-.rt  
 An \fBint64_t\fR property representing the number blocks, in
 \fBdevice-blksize\fR units, of a block minor device (\fBS_IFBLK\fR
 \fBspec_type\fR in ddi_create_minor_node).
@@ -70,12 +62,10 @@ An \fBint64_t\fR property representing the number blocks, in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBblksize\fR\fR
 .ad
 .RS 11n
-.rt  
 An integer property representing the size in bytes of a block. If defined, the
 value must be a power of two. If not defined, \fBDEV_BSIZE\fR is implied.
 .RE
@@ -115,13 +105,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

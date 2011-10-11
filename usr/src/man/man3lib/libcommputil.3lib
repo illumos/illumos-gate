@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libcommputil 3LIB "12 Oct 2007" "SunOS 5.11" "Interface Libraries"
+.TH LIBCOMMPUTIL 3LIB "Oct 12, 2007"
 .SH NAME
 libcommputil \- communication protocol parser utilities library
 .SH SYNOPSIS
@@ -38,45 +38,39 @@ interfaces.
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBsdp_add_attribute\fR\fBsdp_add_bandwidth\fR
-\fBsdp_add_connection\fR\fBsdp_add_email\fR
-\fBsdp_add_information\fR\fBsdp_add_key\fR
-\fBsdp_add_media\fR\fBsdp_add_name\fR
-\fBsdp_add_origin\fR\fBsdp_add_phone\fR
-\fBsdp_add_repeat\fR\fBsdp_add_time\fR
-\fBsdp_add_uri\fR\fBsdp_add_zone\fR
-\fBsdp_clone_session\fR\fBsdp_delete_attribute\fR
-\fBsdp_delete_field\fR\fBsdp_delete_media\fR
-\fBsdp_delete_media_field\fR\fBsdp_find_attribute\fR
-\fBsdp_find_media\fR\fBsdp_find_media_rtpmap\fR
-\fBsdp_free_session\fR\fBsdp_new_session\fR
-\fBsdp_parse\fR\fBsdp_session_to_str\fR
+l l
+l l .
+\fBsdp_add_attribute\fR	\fBsdp_add_bandwidth\fR
+\fBsdp_add_connection\fR	\fBsdp_add_email\fR
+\fBsdp_add_information\fR	\fBsdp_add_key\fR
+\fBsdp_add_media\fR	\fBsdp_add_name\fR
+\fBsdp_add_origin\fR	\fBsdp_add_phone\fR
+\fBsdp_add_repeat\fR	\fBsdp_add_time\fR
+\fBsdp_add_uri\fR	\fBsdp_add_zone\fR
+\fBsdp_clone_session\fR	\fBsdp_delete_attribute\fR
+\fBsdp_delete_field\fR	\fBsdp_delete_media\fR
+\fBsdp_delete_media_field\fR	\fBsdp_find_attribute\fR
+\fBsdp_find_media\fR	\fBsdp_find_media_rtpmap\fR
+\fBsdp_free_session\fR	\fBsdp_new_session\fR
+\fBsdp_parse\fR	\fBsdp_session_to_str\fR
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/libcommputil.so.1\fR\fR
 .ad
 .RS 29n
-.rt  
 shared object.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/64/libcommputil.so.1\fR\fR
 .ad
 .RS 29n
-.rt  
 64-bit shared object.
 .RE
 
@@ -88,15 +82,14 @@ See \fBattributes\fR(5) for description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

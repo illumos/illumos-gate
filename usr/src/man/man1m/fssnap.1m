@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH fssnap 1M "11 Aug 2004" "SunOS 5.11" "System Administration Commands"
+.TH FSSNAP 1M "Aug 11, 2004"
 .SH NAME
 fssnap \- create temporary snapshots of a file system
 .SH SYNOPSIS
@@ -19,7 +19,7 @@ fssnap \- create temporary snapshots of a file system
 
 .LP
 .nf
-\fBfssnap\fR \fB-i\fR [\fB-F\fR \fIFSType\fR] [\fB-V\fR] [\fB-o\fR \fIspecial_options\fR] 
+\fBfssnap\fR \fB-i\fR [\fB-F\fR \fIFSType\fR] [\fB-V\fR] [\fB-o\fR \fIspecial_options\fR]
      [\fI/mount/point\fR | \fIdev\fR]
 .fi
 
@@ -51,23 +51,19 @@ output when a snapshot is created.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 22n
-.rt  
 Deletes the snapshot associated with the given file system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR \fIFSType\fR\fR
 .ad
 .RS 22n
-.rt  
 Specifies the file system type to be used. The \fBFSType\fR should either be
 specified here or be determined by matching the block special device with an
 entry in the \fB/etc/vfstab\fR table, or by consulting \fB/etc/default/fs\fR.
@@ -75,12 +71,10 @@ entry in the \fB/etc/vfstab\fR table, or by consulting \fB/etc/default/fs\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 22n
-.rt  
 Displays the state of any given \fBFSType\fR snapshot. If a mount-point or
 device is not given, a list of all snapshots on the system is displayed. When a
 mount-point or device is specified, detailed information is provided for the
@@ -91,23 +85,19 @@ information is file-system dependent. See the \fBFSType\fR-specific
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIspecial_options\fR\fR
 .ad
 .RS 22n
-.rt  
 See the \fBFSType\fR-specific man page for \fBfssnap\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
 .RS 22n
-.rt  
 Echoes the complete command line, but does not execute the command.
 .RE
 
@@ -117,12 +107,10 @@ Echoes the complete command line, but does not execute the command.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fI/mount/point\fR\fR
 .ad
 .RS 16n
-.rt  
 The directory where the file system resides.
 .RE
 
@@ -136,46 +124,38 @@ See \fBFSType\fR-specific man pages for examples.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB>\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/vfstab\fR\fR
 .ad
 .RS 19n
-.rt  
 Specifies file system type.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/default/fs\fR\fR
 .ad
 .RS 19n
-.rt  
 Specifies the default local file system type.
 .RE
 

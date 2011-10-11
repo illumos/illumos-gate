@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pool_get_property 3POOL "23 Sep 2003" "SunOS 5.11" "Pool Configuration Manipulation Library Functions"
+.TH POOL_GET_PROPERTY 3POOL "Sep 23, 2003"
 .SH NAME
 pool_get_property, pool_put_property, pool_rm_property, pool_walk_properties \-
 resource pool element property manipulation
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpool\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpool\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <pool.h>
 
 \fBpool_value_class_t\fR \fBpool_get_property\fR(\fBpool_conf_t *\fR\fIconf\fR,
@@ -45,56 +45,46 @@ The various pool types are converted to the common pool element type
 opaque type that contains a property value of one of the following types:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOC_UINT\fR\fR
 .ad
 .RS 14n
-.rt  
 unsigned 64-bit integer
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOC_INT\fR\fR
 .ad
 .RS 14n
-.rt  
 signed 64-bit integer
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOC_DOUBLE\fR\fR
 .ad
 .RS 14n
-.rt  
 signed double-precision floating point value
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOC_BOOL\fR\fR
 .ad
 .RS 14n
-.rt  
 boolean value: 0 is false, non-zero is true
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOC_STRING\fR\fR
 .ad
 .RS 14n
-.rt  
 null-terminated string of characters
 .RE
 
@@ -149,12 +139,10 @@ they return \(mi1 and \fBpool_error()\fR returns the pool-specific error value.
 The \fBpool_get_property()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_BADPARAM\fR\fR
 .ad
 .RS 16n
-.rt  
 The supplied configuration's status is not \fBPOF_VALID\fR, the supplied
 \fIconf\fR does not contain the supplied \fIelem\fR, or the property is
 restricted and cannot be accessed by the library.
@@ -162,12 +150,10 @@ restricted and cannot be accessed by the library.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_SYSTEM\fR\fR
 .ad
 .RS 16n
-.rt  
 A system error has occurred. Check the system error code for more details.
 .RE
 
@@ -176,12 +162,10 @@ A system error has occurred. Check the system error code for more details.
 The \fBpool_put_property()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_BADPARAM\fR\fR
 .ad
 .RS 20n
-.rt  
 The supplied configuration's status is not \fBPOF_VALID\fR, the supplied
 \fIconf\fR does not contain the supplied \fIelem\fR, the property name is not
 in the correct format, or the property already exists and the supplied type
@@ -190,34 +174,28 @@ does not match the existing type.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_SYSTEM\fR\fR
 .ad
 .RS 20n
-.rt  
 A system error has occurred. Check the system error code for more details.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_PUTPROP\fR\fR
 .ad
 .RS 20n
-.rt  
 The property name is reserved by \fBlibpool\fR and not available for use.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_INVALID_CONF\fR\fR
 .ad
 .RS 20n
-.rt  
 The configuration is invalid.
 .RE
 
@@ -226,12 +204,10 @@ The configuration is invalid.
 The \fBpool_rm_property()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_BADPARAM\fR\fR
 .ad
 .RS 16n
-.rt  
 The supplied configuration's status is not \fBPOF_VALID\fR, the supplied
 \fIconf\fR does not contain the supplied elem, or the property is reserved by
 libpool and cannot be removed.
@@ -239,23 +215,19 @@ libpool and cannot be removed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_SYSTEM\fR\fR
 .ad
 .RS 16n
-.rt  
 A system error has occurred. Check the system error code for more details.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_PUTPROP\fR\fR
 .ad
 .RS 16n
-.rt  
 The property name is reserved by \fBlibpool\fR and not available for use.
 .RE
 
@@ -264,23 +236,19 @@ The property name is reserved by \fBlibpool\fR and not available for use.
 The \fBpool_walk_properties()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_BADPARAM\fR\fR
 .ad
 .RS 16n
-.rt  
 The supplied configuration's status is not \fBPOF_VALID\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_SYSTEM\fR\fR
 .ad
 .RS 16n
-.rt  
 A system error has occurred. Check the system error code for more details.
 .RE
 
@@ -292,17 +260,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityUnstable
+Interface Stability	Unstable
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

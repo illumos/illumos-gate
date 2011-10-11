@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH zsh 7D "1 Jan 1997" "SunOS 5.11" "Devices"
+.TH ZSH 7D "Jan 1, 1997"
 .SH NAME
 zsh \- On-board serial HDLC/SDLC interface
 .SH SYNOPSIS
@@ -96,12 +96,10 @@ excessive watchdog timeouts caused by a cable break.
 The \fBzsh\fR driver supports several \fBioctl()\fR commands, including:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS_IOCGETMODE\fR\fR
 .ad
 .RS 17n
-.rt  
 Return a \fBstruct scc_mode\fR containing parameters currently in use. These
 include the transmit and receive clock sources, boolean loopback and
 \fBNRZI\fR mode flags and the integer baud rate.
@@ -109,24 +107,20 @@ include the transmit and receive clock sources, boolean loopback and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS_IOCSETMODE\fR\fR
 .ad
 .RS 17n
-.rt  
 The argument is a \fBstruct scc_mode\fR from which the \fBSCC\fR channel will
 be programmed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS_IOCGETSTATS\fR\fR
 .ad
 .RS 17n
-.rt  
 Return a \fBstruct sl_stats\fR containing the current totals of
 hardware-generated events. These include numbers of packets and characters sent
 and received by the driver, aborts and \fBCRC\fR errors detected, transmit
@@ -135,35 +129,29 @@ underruns, and receive overruns.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS_IOCCLRSTATS\fR\fR
 .ad
 .RS 17n
-.rt  
 Clear the hardware statistics for this channel.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS_IOCGETSPEED\fR\fR
 .ad
 .RS 17n
-.rt  
 Returns the currently set baud rate as an integer.  This may not reflect the
 actual data transfer rate if external clocks are used.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS_IOCGETMCTL\fR\fR
 .ad
 .RS 17n
-.rt  
 Returns the current state of the \fBCTS\fR and \fBDCD\fR incoming modem
 interface signals as an integer.
 .RE
@@ -207,23 +195,19 @@ An \fBopen()\fR will fail if a \fBSTREAMS\fR message block cannot be allocated,
 or:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENXIO\fR\fR
 .ad
 .RS 9n
-.rt  
 The unit being opened does not exist.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBUSY\fR\fR
 .ad
 .RS 9n
-.rt  
 The device is in use by another serial protocol.
 .RE
 
@@ -232,23 +216,19 @@ The device is in use by another serial protocol.
 An \fBioctl()\fR will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 An attempt was made to select an invalid clocking source.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The baud rate specified for use with the baud rate generator would translate to
 a null time constant in the \fBSCC\fR's registers.
 .RE
@@ -256,7 +236,6 @@ a null time constant in the \fBSCC\fR's registers.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/zsh[0-1]\fR,\fB/dev/zsh\fR\fR
 .ad
@@ -267,7 +246,6 @@ character-special devices
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/include/sys/ser_sync.h\fR\fR
 .ad
@@ -284,13 +262,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Architecturex86
+Architecture	x86
 .TE
 
 .SH SEE ALSO
@@ -305,7 +282,6 @@ Manual\fR for details of the \fBSCC\fR's operation and capabilities.
 .SH DIAGNOSTICS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBzsh data open failed, no memory, rq=\fR\fInnn\fR\fR
 .ad
@@ -316,7 +292,6 @@ Manual\fR for details of the \fBSCC\fR's operation and capabilities.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBzsh clone open failed, no memory, rq=\fR\fInnn\fR\fR
 .ad
@@ -328,7 +303,6 @@ value of \fInnn\fR is the address of the read queue passed to \fBopen\fR(2).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBzsh_open: can't alloc message block\fR\fR
 .ad
@@ -340,7 +314,6 @@ not be made available for incoming data.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBzsh: clone device \fR\fId\fR\fB must be attached before use!\fR\fR
 .ad
@@ -352,7 +325,6 @@ attached to a particular serial channel.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBzsh\fR\fIn\fR\fB: invalid operation for clone dev.\fR\fR
 .ad
@@ -364,7 +336,6 @@ Only \fBM_IOCTL\fR and \fBM_PROTO\fR message types are permitted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBzsh\fR\fIn\fR\fB: not initialized, can't send message\fR\fR
 .ad
@@ -378,7 +349,6 @@ performs the programming operation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBzsh\fR\fIn\fR\fB: transmit hung\fR\fR
 .ad

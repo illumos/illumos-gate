@@ -1,10 +1,10 @@
 '\" te
-.\"  Copyright 1989 AT&T 
+.\"  Copyright 1989 AT&T
 .\" Copyright (C) 2005, Sun Microsystems, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH rpc_svc_create 3NSL "22 Mar 2005" "SunOS 5.11" "Networking Services Library Functions"
+.TH RPC_SVC_CREATE 3NSL "Mar 22, 2005"
 .SH NAME
 rpc_svc_create, svc_control, svc_create, svc_destroy, svc_dg_create,
 svc_fd_create, svc_raw_create, svc_tli_create, svc_tp_create, svc_vc_create,
@@ -86,23 +86,19 @@ server can be invoked by calling \fBsvc_run()\fR.
 See \fBrpc\fR(3NSL) for the definition of the \fBSVCXPRT\fR data structure.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_control()\fR\fR
 .ad
 .RS 21n
-.rt  
 A function to change or retrieve information about a service object. \fIreq\fR
 indicates the type of operation and \fIinfo\fR is a pointer to the information.
 The supported values of \fIreq\fR,  their argument types, and what they do are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSVCGET_VERSQUIET\fR\fR
 .ad
 .RS 25n
-.rt  
 If a request is received for a program number served by this server but the
 version number is outside the range registered with the server, an
 \fBRPC_PROGVERSMISMATCH\fR error will normally be returned.  \fIinfo\fR should
@@ -115,12 +111,10 @@ behavior, that is, an  \fBRPC_PROGVERSMISMATCH\fR error will be returned.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSVCSET_VERSQUIET\fR\fR
 .ad
 .RS 25n
-.rt  
 If a request is received for a program number served by this server but the
 version number is outside the range registered with the server, an
 \fBRPC_PROGVERSMISMATCH\fR error will normally be returned.  It is sometimes
@@ -132,12 +126,10 @@ the out of range request should be silently ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSVCGET_XID\fR\fR
 .ad
 .RS 25n
-.rt  
 Returns the transaction  \fBID\fR of connection\(mioriented and connectionless
 transport service calls. The transaction  \fBID\fR assists in uniquely
 identifying client requests for a given \fBRPC\fR version, program number,
@@ -154,12 +146,10 @@ of rendezvous or raw type, and the request is of type \fBSVCGET_XID,\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSVCSET_RECVERRHANDLER\fR\fR
 .ad
 .RS 25n
-.rt  
 Attaches or detaches a disconnection handler to the service handle, \fIsvc\fR,
 that will be called when a transport error arrives during the reception of a
 request or when the server is waiting for a request and the connection shuts
@@ -185,12 +175,10 @@ MT-safe way.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSVCGET_RECVERRHANDLER\fR\fR
 .ad
 .RS 25n
-.rt  
 Upon successful completion of the \fBSVCGET_RECVERRHANDLER\fR request,
 \fI*info\fR contains the address of the handler for receiving errors. Upon
 failure, \fI*info\fR contains \fINULL\fR.
@@ -198,12 +186,10 @@ failure, \fI*info\fR contains \fINULL\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSVCSET_CONNMAXREC\fR\fR
 .ad
 .RS 25n
-.rt  
 Set the maximum record size (in bytes) and enable non-blocking mode for this
 service handle. Value can be set and read for both connection and
 non-connection oriented transports, but is silently ignored for the
@@ -213,12 +199,10 @@ non-connection oriented case. The \fIinfo\fR argument should be a pointer to an
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSVCGET_CONNMAXREC\fR\fR
 .ad
 .RS 25n
-.rt  
 Get the maximum record size for this service handle. Zero means no maximum in
 effect and the connection is in blocking mode. The result is not significant
 for non-connection oriented transports. The \fIinfo\fR argument should be a
@@ -231,12 +215,10 @@ returns false.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_create()\fR\fR
 .ad
 .RS 21n
-.rt  
 \fBsvc_create()\fR creates server handles for all the transports belonging to
 the class \fInettype\fR.
 .sp
@@ -255,12 +237,10 @@ created, otherwise it returns \fB0\fR and an error message is logged.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_destroy()\fR\fR
 .ad
 .RS 21n
-.rt  
 A function macro that destroys the \fBRPC\fR service handle \fIxprt\fR.
 Destruction usually involves deallocation of private data structures, including
 \fIxprt\fR itself.  Use of \fIxprt\fR is undefined after calling this routine.
@@ -268,12 +248,10 @@ Destruction usually involves deallocation of private data structures, including
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_dg_create()\fR\fR
 .ad
 .RS 21n
-.rt  
 This routine creates a connectionless \fBRPC\fR service handle, and returns a
 pointer to it. This routine returns \fINULL\fR if it fails, and an error
 message is logged. \fIsendsz\fR and \fIrecvsz\fR are parameters used to specify
@@ -288,12 +266,10 @@ large arguments or return huge results.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_fd_create()\fR\fR
 .ad
 .RS 21n
-.rt  
 This routine creates a service on top of an open and bound file descriptor, and
 returns the handle to it. Typically, this descriptor is a connected file
 descriptor for a connection-oriented transport. \fIsendsz\fR and \fIrecvsz\fR
@@ -304,12 +280,10 @@ and an error message is logged.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_raw_create()\fR\fR
 .ad
 .RS 21n
-.rt  
 This routine creates an \fBRPC\fR service handle and returns a pointer to it.
 The transport is really a buffer within the process's address space, so the
 corresponding \fBRPC\fR client should live in the same address space; (see
@@ -324,12 +298,10 @@ used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_tli_create()\fR\fR
 .ad
 .RS 21n
-.rt  
 This routine creates an \fBRPC\fR server handle, and returns a pointer to it.
 \fIfildes\fR is the file descriptor on which the service is listening.  If
 \fIfildes\fR is \fBRPC_ANYFD\fR, it opens a file descriptor on the transport
@@ -347,12 +319,10 @@ service.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_tp_create()\fR\fR
 .ad
 .RS 21n
-.rt  
 \fBsvc_tp_create()\fR creates a server handle for the network specified by
 \fInetconf\fR, and registers itself with the \fBrpcbind\fR service.
 \fIdispatch\fR is called when there is a remote procedure call for the given
@@ -363,12 +333,10 @@ service.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_vc_create()\fR\fR
 .ad
 .RS 21n
-.rt  
 This routine creates a connection-oriented \fBRPC\fR service and returns a
 pointer to it. This routine returns \fINULL\fR if it fails, and an error
 message is logged. The users may specify the size of the send and receive
@@ -379,12 +347,10 @@ bound. The server is not registered with the \fBrpcbind\fR(1M) service.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_door_create()\fR\fR
 .ad
 .RS 21n
-.rt  
 This routine creates an RPC server handle over doors and returns a pointer to
 it. Doors is a transport mechanism that facilitates fast data transfer between
 processes on the same machine. for the given program The user may set the size
@@ -405,17 +371,16 @@ See \fBattributes\fR(5)  for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureAll
+Architecture	All
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

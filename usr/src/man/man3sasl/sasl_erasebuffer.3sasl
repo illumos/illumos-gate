@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sasl_erasebuffer 3SASL "16 Sep 2003" "SunOS 5.11" "Simple Authentication Security Layer Library Functions"
+.TH SASL_ERASEBUFFER 3SASL "Sep 16, 2003"
 .SH NAME
 sasl_erasebuffer \- erase buffer
 .SH SYNOPSIS
@@ -25,23 +25,19 @@ or password. The implementation may use recovery-resistant erase logic.
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpass\fR\fR
 .ad
 .RS 8n
-.rt  
 A password
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlen\fR\fR
 .ad
 .RS 8n
-.rt  
 The length of the password
 .RE
 
@@ -61,15 +57,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

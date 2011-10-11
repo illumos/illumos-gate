@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libdat 3LIB "16 Jul 2004" "SunOS 5.11" "Interface Libraries"
+.TH LIBDAT 3LIB "Jul 16, 2004"
 .SH NAME
 libdat \- direct access transport library
 .SH SYNOPSIS
@@ -34,41 +34,39 @@ object interfaces.
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBdat_cno_create\fR\fBdat_cno_free\fR
-\fBdat_cno_modify_agent\fR\fBdat_cno_query\fR
-\fBdat_cno_wait\fR\fBdat_cr_accept\fR
-\fBdat_cr_handoff\fR\fBdat_cr_query\fR
-\fBdat_cr_reject\fR\fBdat_ep_connect\fR
-\fBdat_ep_create\fR\fBdat_ep_disconnect\fR
-\fBdat_ep_dup_connect\fR\fBdat_ep_free\fR
-\fBdat_ep_get_status\fR\fBdat_ep_modify\fR
-\fBdat_ep_post_rdma_read\fR\fBdat_ep_post_rdma_write\fR
-\fBdat_ep_post_recv\fR\fBdat_ep_post_send\fR
-\fBdat_ep_query\fR\fBdat_ep_reset\fR
-\fBdat_evd_clear_unwaitable\fR\fBdat_evd_create\fR
-\fBdat_evd_dequeue\fR\fBdat_evd_disable\fR
-\fBdat_evd_enable\fR\fBdat_evd_free\fR
-\fBdat_evd_modify_cno\fR\fBdat_evd_post_se\fR
-\fBdat_evd_query\fR\fBdat_evd_resize\fR
-\fBdat_evd_set_unwaitable\fR\fBdat_evd_wait\fR
-\fBdat_get_consumer_context\fR\fBdat_get_handle_type\fR
-\fBdat_ia_close\fR\fBdat_ia_open\fR
-\fBdat_ia_query\fR\fBdat_lmr_create\fR
-\fBdat_lmr_free\fR\fBdat_lmr_query\fR
-\fBdat_provider_fini\fR\fBdat_provider_init\fR
-\fBdat_psp_create\fR\fBdat_psp_create_any\fR
-\fBdat_psp_free\fR\fBdat_psp_query\fR
-\fBdat_pz_create\fR\fBdat_pz_free\fR
-\fBdat_pz_query\fR\fBdat_registry_list_providers\fR
-\fBdat_rmr_bind\fR\fBdat_rmr_create\fR
-\fBdat_rmr_free\fR\fBdat_rmr_query\fR
-\fBdat_rsp_create\fR\fBdat_rsp_free\fR
-\fBdat_rsp_query\fR\fBdat_set_consumer_context\fR
-\fBdat_strerror\fR
+l l
+l l .
+\fBdat_cno_create\fR	\fBdat_cno_free\fR
+\fBdat_cno_modify_agent\fR	\fBdat_cno_query\fR
+\fBdat_cno_wait\fR	\fBdat_cr_accept\fR
+\fBdat_cr_handoff\fR	\fBdat_cr_query\fR
+\fBdat_cr_reject\fR	\fBdat_ep_connect\fR
+\fBdat_ep_create\fR	\fBdat_ep_disconnect\fR
+\fBdat_ep_dup_connect\fR	\fBdat_ep_free\fR
+\fBdat_ep_get_status\fR	\fBdat_ep_modify\fR
+\fBdat_ep_post_rdma_read\fR	\fBdat_ep_post_rdma_write\fR
+\fBdat_ep_post_recv\fR	\fBdat_ep_post_send\fR
+\fBdat_ep_query\fR	\fBdat_ep_reset\fR
+\fBdat_evd_clear_unwaitable\fR	\fBdat_evd_create\fR
+\fBdat_evd_dequeue\fR	\fBdat_evd_disable\fR
+\fBdat_evd_enable\fR	\fBdat_evd_free\fR
+\fBdat_evd_modify_cno\fR	\fBdat_evd_post_se\fR
+\fBdat_evd_query\fR	\fBdat_evd_resize\fR
+\fBdat_evd_set_unwaitable\fR	\fBdat_evd_wait\fR
+\fBdat_get_consumer_context\fR	\fBdat_get_handle_type\fR
+\fBdat_ia_close\fR	\fBdat_ia_open\fR
+\fBdat_ia_query\fR	\fBdat_lmr_create\fR
+\fBdat_lmr_free\fR	\fBdat_lmr_query\fR
+\fBdat_provider_fini\fR	\fBdat_provider_init\fR
+\fBdat_psp_create\fR	\fBdat_psp_create_any\fR
+\fBdat_psp_free\fR	\fBdat_psp_query\fR
+\fBdat_pz_create\fR	\fBdat_pz_free\fR
+\fBdat_pz_query\fR	\fBdat_registry_list_providers\fR
+\fBdat_rmr_bind\fR	\fBdat_rmr_create\fR
+\fBdat_rmr_free\fR	\fBdat_rmr_query\fR
+\fBdat_rsp_create\fR	\fBdat_rsp_free\fR
+\fBdat_rsp_query\fR	\fBdat_set_consumer_context\fR
+\fBdat_strerror\fR	
 .TE
 
 .SS "uDAPL 1.2"
@@ -76,16 +74,14 @@ lw(2.75i) lw(2.75i)
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBdat_ep_create_with_srq\fR\fBdat_ep_recv_query\fR
-\fBdat_ep_set_watermark\fR\fBdat_lmr_sync_rdma_read\fR
-\fBdat_lmr_sync_rdma_write\fR\fBdat_srq_create\fR
-\fBdat_srq_free\fR\fBdat_srq_post_recv\fR
-\fBdat_srq_query\fR\fBdat_srq_resize\fR
-\fBdat_srq_set_lw\fR
+l l
+l l .
+\fBdat_ep_create_with_srq\fR	\fBdat_ep_recv_query\fR
+\fBdat_ep_set_watermark\fR	\fBdat_lmr_sync_rdma_read\fR
+\fBdat_lmr_sync_rdma_write\fR	\fBdat_srq_create\fR
+\fBdat_srq_free\fR	\fBdat_srq_post_recv\fR
+\fBdat_srq_query\fR	\fBdat_srq_resize\fR
+\fBdat_srq_set_lw\fR	
 .TE
 
 .sp
@@ -96,32 +92,26 @@ below for service providers.
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-.
-dat_registry_add_provider\fBdat_registry_remove_provider\fR
+l l .
+dat_registry_add_provider	\fBdat_registry_remove_provider\fR
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/libdat.so.1\fR\fR
 .ad
 .RS 27n
-.rt  
 shared object
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/64/libdat.so.1\fR\fR
 .ad
 .RS 27n
-.rt  
 64-bit shared object
 .RE
 
@@ -133,15 +123,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard: uDAPL, 1.1, 1.2
+Interface Stability	Standard: uDAPL, 1.1, 1.2
 _
-MT-LevelUnsafe
+MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO
@@ -158,10 +147,8 @@ loadable shared object with two public entry points exported:
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-.
-\fBdat_provider_init\fR\fBdat_provider_fini\fR
+l l .
+\fBdat_provider_init\fR	\fBdat_provider_fini\fR
 .TE
 
 .sp

@@ -1060,11 +1060,12 @@ remove_iiset(int setno, char *shadow, int shd_exp)
 					(void) cfg_load_dsvols(cfg);
 					(void) cfg_load_svols(cfg);
 					if (cfg_vol_disable(cfg, shadow, sn,
-					    "ii") < 0)
+					    "ii") < 0) {
 						dsw_error(gettext(
 						    "SV disable of shadow "
 						    "failed"),
 						    NULL);
+					}
 					cfg_resource(cfg, cfg_cluster_tag);
 			} else {
 				if (cfg_vol_disable(cfg, shadow,
@@ -1364,8 +1365,7 @@ get_bitmap(master_volume, shd_bitmap, copy_bitmap, size)
 {
 	dsw_bitmap_t parms;
 
-	(void) strncpy(parms.shadow_vol, master_volume, DSW_NAMELEN);
-	parms.shadow_vol[DSW_NAMELEN-1] = '\0';
+	(void) strlcpy(parms.shadow_vol, master_volume, DSW_NAMELEN);
 	parms.shd_bitmap = shd_bitmap;
 	parms.shd_size = size;
 	parms.copy_bitmap = copy_bitmap;
@@ -1385,8 +1385,7 @@ allocate_bitmap(char *shadow_volume)
 	dsw_stat_t	args;
 	int		stat_flags;
 
-	(void) strncpy(args.shadow_vol, shadow_volume, DSW_NAMELEN);
-	args.shadow_vol[DSW_NAMELEN-1] = '\0';
+	(void) strlcpy(args.shadow_vol, shadow_volume, DSW_NAMELEN);
 
 	args.status = spcs_s_ucreate();
 	if (do_ioctl(dsw_fd, DSWIOC_STAT, &args) == -1)
@@ -1741,8 +1740,7 @@ child_wait(pid_t child, enum child_event event, char *volume)
 	dsw_stat_t	args;
 	int rc;
 
-	(void) strncpy(args.shadow_vol, volume, DSW_NAMELEN);
-	args.shadow_vol[DSW_NAMELEN-1] = '\0';
+	(void) strlcpy(args.shadow_vol, volume, DSW_NAMELEN);
 
 	for (; dead_child != child; (void) sleep(1)) {
 
@@ -2190,8 +2188,7 @@ reset(char *volume)
 	unlocked = 1;
 
 	spcs_log("ii", NULL, gettext("Start reset %s"), volume);
-	(void) strncpy(prev_stat.shadow_vol, volume, DSW_NAMELEN);
-	prev_stat.shadow_vol[DSW_NAMELEN - 1] = '\0';
+	(void) strlcpy(prev_stat.shadow_vol, volume, DSW_NAMELEN);
 	prev_stat.status = spcs_s_ucreate();
 	if (do_ioctl(dsw_fd, DSWIOC_STAT, &prev_stat) == -1) {
 		/* set is suspended, so we do the enable processing instead */
@@ -2528,9 +2525,8 @@ do_acopy(char **vol_list, enum copy_update update_mode,
 			    "unmount it first"), NULL);
 		}
 
-		(void) strncpy(stat_s.shadow_vol, parms.shadow_vol,
+		(void) strlcpy(stat_s.shadow_vol, parms.shadow_vol,
 		    DSW_NAMELEN);
-		stat_s.shadow_vol[DSW_NAMELEN-1] = '\0';
 		stat_s.status = spcs_s_ucreate();
 		rc = do_ioctl(dsw_fd, DSWIOC_STAT, &stat_s);
 		spcs_s_ufree(&stat_s.status);
@@ -2636,8 +2632,7 @@ do_copy(char **vol_list, enum copy_update update_mode,
 		    "unmount it first"), NULL);
 	}
 
-	(void) strncpy(stat_s.shadow_vol, copy_args.shadow_vol, DSW_NAMELEN);
-	stat_s.shadow_vol[DSW_NAMELEN-1] = '\0';
+	(void) strlcpy(stat_s.shadow_vol, copy_args.shadow_vol, DSW_NAMELEN);
 	stat_s.status = spcs_s_ucreate();
 	rc = do_ioctl(dsw_fd, DSWIOC_STAT, &stat_s);
 	spcs_s_ufree(&stat_s.status);
@@ -2714,8 +2709,7 @@ print_status(dsw_config_t *conf, int in_config)
 	if (need_sep++ > 0)
 		(void) printf("--------------------------------------"
 		    "----------------------------------------\n");
-	(void) strncpy(args.shadow_vol, conf->shadow_vol, DSW_NAMELEN);
-	args.shadow_vol[DSW_NAMELEN-1] = '\0';
+	(void) strlcpy(args.shadow_vol, conf->shadow_vol, DSW_NAMELEN);
 	if (in_config) {
 		(void) printf("%s: %s\n",
 		    conf->master_vol, gettext("(master volume)"));
@@ -3087,8 +3081,7 @@ can_disable(char *vol)
 	dsw_stat_t args;
 
 	if (mounted(vol)) {
-		(void) strncpy(args.shadow_vol, vol, DSW_NAMELEN);
-		args.shadow_vol[DSW_NAMELEN - 1] = '\0';
+		(void) strlcpy(args.shadow_vol, vol, DSW_NAMELEN);
 		args.status = spcs_s_ucreate();
 		if (do_ioctl(dsw_fd, DSWIOC_STAT, &args) != -1 &&
 		    (args.stat & DSW_GOLDEN) == 0) {
@@ -3107,8 +3100,7 @@ clean_up_after_failed_disable(dsw_ioctl_t *parms)
 	dsw_stat_t args;
 
 	for (p = group_volumes; *p; p++) {
-		(void) strncpy(args.shadow_vol, *p, DSW_NAMELEN);
-		args.shadow_vol[DSW_NAMELEN - 1] = '\0';
+		(void) strlcpy(args.shadow_vol, *p, DSW_NAMELEN);
 		args.status = spcs_s_ucreate();
 		if (do_ioctl(dsw_fd, DSWIOC_STAT, &args) == -1) {
 			/* set was successfully disabled */
@@ -3416,8 +3408,7 @@ dsw_display_status(int argc, char *argv[])
 			(void) printf(gettext(
 			    "Volume is not in configuration file\n"), NULL);
 			(void) fflush(stdout);
-			(void) strncpy(parms.shadow_vol, argv[1], DSW_NAMELEN);
-			parms.shadow_vol[DSW_NAMELEN - 1] = '\0';
+			(void) strlcpy(parms.shadow_vol, argv[1], DSW_NAMELEN);
 		}
 		print_status(&parms, in_config);
 	} else if (group_name) {
@@ -3466,8 +3457,7 @@ dsw_display_bitmap(int argc, char *argv[])
 		(void) printf(gettext(
 		    "Volume is not in configuration file\n"), NULL);
 		(void) fflush(stdout);
-		(void) strncpy(parms.master_vol, argv[1], DSW_NAMELEN);
-		parms.master_vol[DSW_NAMELEN - 1] = '\0';
+		(void) strlcpy(parms.master_vol, argv[1], DSW_NAMELEN);
 	}
 
 	bitmap_op(parms.shadow_vol, 1, 0, 0, 0);
@@ -3583,10 +3573,8 @@ import(char *shadow_volume, char *bitmap_volume)
 	reload_vols = LD_DSVOLS | LD_SHADOWS;
 	conform_name(&shadow_volume);
 	(void) strcpy(parms.master_vol, II_IMPORTED_SHADOW);
-	(void) strncpy(parms.shadow_vol, shadow_volume, DSW_NAMELEN);
-	parms.shadow_vol[DSW_NAMELEN-1] = '\0';
-	(void) strncpy(parms.bitmap_vol, bitmap_volume, DSW_NAMELEN);
-	parms.bitmap_vol[DSW_NAMELEN-1] = '\0';
+	(void) strlcpy(parms.shadow_vol, shadow_volume, DSW_NAMELEN);
+	(void) strlcpy(parms.bitmap_vol, bitmap_volume, DSW_NAMELEN);
 	parms.flag = DSW_GOLDEN;
 
 	spcs_log("ii", NULL, gettext("Import %s %s"),
@@ -3693,8 +3681,7 @@ join(char *shadow_volume, char *bitmap_file)
 
 	(void) fclose(bmpfp);
 
-	(void) strncpy(parms.shadow_vol, shadow_volume, DSW_NAMELEN);
-	parms.shadow_vol[DSW_NAMELEN-1] = '\0';
+	(void) strlcpy(parms.shadow_vol, shadow_volume, DSW_NAMELEN);
 	parms.shd_bitmap = shd_bitmap;
 	parms.shd_size = size;
 	parms.copy_bitmap = NULL;
@@ -3730,8 +3717,7 @@ params(char *shadow_volume)
 	int new_delay;
 	int new_unit;
 
-	(void) strncpy(parms.shadow_vol, shadow_volume, DSW_NAMELEN);
-	parms.shadow_vol[DSW_NAMELEN-1] = '\0';
+	(void) strlcpy(parms.shadow_vol, shadow_volume, DSW_NAMELEN);
 	if (delay == NULL || unit == NULL) {
 		get = 1;
 		parms.copy_delay = -1;
@@ -3784,8 +3770,7 @@ do_attach(dsw_config_t *parms)
 			dsw_error(
 			    gettext("Volume is not in a Point-in-Time Copy "
 			    "group"), NULL);
-		(void) strncpy(io.bitmap_vol, parms->bitmap_vol, DSW_NAMELEN);
-		io.bitmap_vol[DSW_NAMELEN-1] = '\0';
+		(void) strlcpy(io.bitmap_vol, parms->bitmap_vol, DSW_NAMELEN);
 		io.status = spcs_s_ucreate();
 		if (do_ioctl(dsw_fd, DSWIOC_OATTACH, &io) == -1) {
 			spcs_log("ii", NULL, gettext("Attach failed %s %s"),
@@ -3843,8 +3828,7 @@ attach(char *shadow_volume)
 		    "group"), NULL);
 
 	/* can only attach an overflow volume to dependent, compact shadow */
-	(void) strncpy(args.shadow_vol, shadow_volume, DSW_NAMELEN);
-	args.shadow_vol[DSW_NAMELEN-1] = '\0';
+	(void) strlcpy(args.shadow_vol, shadow_volume, DSW_NAMELEN);
 
 	args.status = spcs_s_ucreate();
 	if ((do_ioctl(dsw_fd, DSWIOC_STAT, &args) == -1) ||
@@ -3852,8 +3836,7 @@ attach(char *shadow_volume)
 		dsw_error(gettext("Not a compact dependent shadow"), NULL);
 
 	/* bitmap_vol is overloaded */
-	(void) strncpy(parms.bitmap_vol, overflow_file, DSW_NAMELEN);
-	parms.bitmap_vol[DSW_NAMELEN-1] = '\0';
+	(void) strlcpy(parms.bitmap_vol, overflow_file, DSW_NAMELEN);
 
 	do_attach(&parms);
 
@@ -3942,8 +3925,7 @@ dsw_olist(int argc, char *argv[])
 
 			/* make copy of string */
 			vol[ i ] = (char *)malloc(DSW_NAMELEN + 1);
-			(void) strncpy(vol[ i ], sp, DSW_NAMELEN);
-			vol[ i ][ DSW_NAMELEN ] = '\0';
+			(void) strlcpy(vol[ i ], sp, DSW_NAMELEN);
 
 			item.key = vol[ i ];
 			item.data = (char *)0;
@@ -3997,8 +3979,7 @@ dsw_ostat(int argc, char *argv[])
 	if (argc != 2)
 		usage(gettext("Incorrect number of arguments"));
 
-	(void) strncpy(args.overflow_vol, argv[1], DSW_NAMELEN);
-	args.overflow_vol[DSW_NAMELEN-1] = '\0';
+	(void) strlcpy(args.overflow_vol, argv[1], DSW_NAMELEN);
 
 	args.status = spcs_s_ucreate();
 	if (do_ioctl(dsw_fd, DSWIOC_OSTAT2, &args) == -1)
@@ -4279,8 +4260,7 @@ is_exported(char *set)
 	dsw_stat_t args;
 	int rc;
 
-	(void) strncpy(args.shadow_vol, set, DSW_NAMELEN);
-	args.shadow_vol[DSW_NAMELEN-1] = '\0';
+	(void) strlcpy(args.shadow_vol, set, DSW_NAMELEN);
 	args.status = spcs_s_ucreate();
 
 	rc = do_ioctl(dsw_fd, DSWIOC_STAT, &args);

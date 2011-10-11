@@ -7,7 +7,7 @@
 .\" This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation ; either version 2 of the License, or (at your option) any later version.  This program is distributed
 .\" in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.  You should have received a copy of the GNU General Public License along with this program
 .\" (in the main directory of the Linux-NTFS distribution in the file COPYING);  if not, write to the Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 11-1307 USA
-.TH ntfsundelete 1M "22 May 2009" "SunOS 5.11" "System Administration Commands"
+.TH NTFSUNDELETE 1M "May 22, 2009"
 .SH NAME
 ntfsundelete \- recover a deleted file from an NTFS volume
 .SH SYNOPSIS
@@ -23,7 +23,6 @@ The \fBntfsundelete\fR utility can, under the right circumstances, recover a
 deleted file from an NTFS volume. The command has three modes of operation:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBScan\fR\fR
 .ad
@@ -36,7 +35,6 @@ and size of each deleted file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUndelete\fR\fR
 .ad
@@ -49,7 +47,6 @@ much of the data as possible. It saves the result to another location.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCopy\fR\fR
 .ad
@@ -111,7 +108,6 @@ can be combined. For example, \fB-fv\fR is the equivalent of \fB-f\fR \fB-v\fR.
 A full-name option can be abbreviated to a unique prefix of its name.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR, \fB--byte\fR \fInum\fR\fR
 .ad
@@ -123,7 +119,6 @@ Fill in the parts of unrecoverable file clusters with byte represented by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR, \fB--case\fR\fR
 .ad
@@ -135,7 +130,6 @@ case-sensitive. The default filename search is case-insensitive.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR, \fB--copy\fR \fIrange\fR\fR
 .ad
@@ -148,7 +142,6 @@ combined with the \fB--output\fR and \fB--destination\fR options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR, \fB--destination\fR \fIdir\fR\fR
 .ad
@@ -160,7 +153,6 @@ Specify the location of the output file for the \fB--copy\fR and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR, \fB--force\fR\fR
 .ad
@@ -172,7 +164,6 @@ this option with caution.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR, \fB--help\fR\fR
 .ad
@@ -183,7 +174,6 @@ Show a list of options with a brief description of each one.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR, \fB--inodes\fR \fIrange\fR\fR
 .ad
@@ -196,7 +186,6 @@ separated by a dash (\fB-\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR, \fB--match\fR \fIpattern\fR\fR
 .ad
@@ -211,7 +200,6 @@ option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-O\fR, \fB--optimistic\fR\fR
 .ad
@@ -222,7 +210,6 @@ Recover parts of the file even if they are currently marked as in use.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR, \fB--output\fR \fIfile\fR\fR
 .ad
@@ -234,7 +221,6 @@ options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR, \fB--parent\fR\fR
 .ad
@@ -245,7 +231,6 @@ Display the parent directory of a deleted file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR, \fB--percentage\fR \fInum\fR\fR
 .ad
@@ -257,7 +242,6 @@ Filter the output of the \fB--scan\fR option by matching only files with
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR, \fB--quiet\fR\fR
 .ad
@@ -269,7 +253,6 @@ Reduce the amount of output to a minimum. This option is not useful with the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR, \fB--scan\fR\fR
 .ad
@@ -287,7 +270,6 @@ much of a file can potentially be recovered.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR, \fB--size\fR \fIrange\fR\fR
 .ad
@@ -302,7 +284,6 @@ terabytes respectively.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR, \fB--time\fR \fIsince\fR\fR
 .ad
@@ -316,7 +297,6 @@ months, or years.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR, \fB--truncate\fR\fR
 .ad
@@ -330,7 +310,6 @@ the file to exactly that size.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR, \fB--undelete\fR\fR
 .ad
@@ -346,7 +325,6 @@ When the file is recovered it will be given its original name, unless the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR, \fB--verbose\fR \fI\fR\fR
 .ad
@@ -357,7 +335,6 @@ Increase the amount of output that \fBntfsundelete\fR displays.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR, \fB--version\fR \fI\fR\fR
 .ad
@@ -476,13 +453,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityUncommitted
+Interface Stability	Uncommitted
 .TE
 
 .SH SEE ALSO

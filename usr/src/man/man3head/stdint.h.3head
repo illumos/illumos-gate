@@ -1,13 +1,13 @@
 '\" te
 .\" Copyright (c) 2001, The IEEE and The Open Group. All Rights Reserved. Portions Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH stdint.h 3HEAD "10 Sep 2004" "SunOS 5.11" "Headers"
+.TH STDINT.H 3HEAD "Sep 10, 2004"
 .SH NAME
 stdint.h, stdint \- integer types
 .SH SYNOPSIS
@@ -94,7 +94,6 @@ decimal integer with no leading zeros (for example, 8 or 24, but not 04 or
 048).
 .sp
 .ne 2
-.mk
 .na
 \fBExact-width integer types\fR
 .ad
@@ -162,7 +161,6 @@ All other types of this form are optional.
 
 .sp
 .ne 2
-.mk
 .na
 \fBMinimum-width integer types\fR
 .ad
@@ -198,7 +196,6 @@ All other types of this form are optional.
 
 .sp
 .ne 2
-.mk
 .na
 \fBFastest minimum-width integer types\fR
 .ad
@@ -236,7 +233,6 @@ All other types of this form are optional.
 
 .sp
 .ne 2
-.mk
 .na
 \fBInteger types capable of holding object pointers\fR
 .ad
@@ -244,12 +240,10 @@ All other types of this form are optional.
 .RS 4n
 .sp
 .ne 2
-.mk
 .na
 \fB\fBintptr_t\fR\fR
 .ad
 .RS 13n
-.rt  
 Designates a signed integer type with the property that any valid pointer to
 void can be converted to this type, then converted back to a pointer to void,
 and the result will compare equal to the original pointer.
@@ -257,12 +251,10 @@ and the result will compare equal to the original pointer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuintptr_t\fR\fR
 .ad
 .RS 13n
-.rt  
 Designates an unsigned integer type with the property that any valid pointer to
 void can be converted to this type, then converted back to a pointer to void,
 and the result will compare equal to the original pointer.
@@ -274,7 +266,6 @@ are required; otherwise, they are optional.
 
 .sp
 .ne 2
-.mk
 .na
 \fBGreatest-width integer types\fR
 .ad
@@ -282,24 +273,20 @@ are required; otherwise, they are optional.
 .RS 4n
 .sp
 .ne 2
-.mk
 .na
 \fB\fBintmax_t\fR\fR
 .ad
 .RS 13n
-.rt  
 Designates a signed integer type capable of representing any value of any
 signed integer type.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuintmax_t\fR\fR
 .ad
 .RS 13n
-.rt  
 Designates an unsigned integer type capable of representing any value of any
 unsigned integer type.
 .RE
@@ -327,7 +314,6 @@ value  given below, with the same sign, except where stated to be exactly the
 given value.
 .sp
 .ne 2
-.mk
 .na
 \fBLimits of exact-width integer types\fR
 .ad
@@ -342,12 +328,10 @@ Minimum values of exact-width signed integer types:
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fBINTN_MIN\fR}\fR
 .ad
 .RS 14n
-.rt  
 Exactly -(2^N-1)
 .RE
 
@@ -363,12 +347,10 @@ Maximum values of exact-width signed integer types:
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fBINTN_MAX\fR}\fR
 .ad
 .RS 14n
-.rt  
 Exactly 2^N-1 -1
 .RE
 
@@ -384,12 +366,10 @@ Maximum values of exact-width unsigned integer types:
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fBUINTN_MAX\fR}\fR
 .ad
 .RS 15n
-.rt  
 Exactly 2^N -1
 .RE
 
@@ -400,7 +380,6 @@ Exactly 2^N -1
 
 .sp
 .ne 2
-.mk
 .na
 \fBLimits of minimum-width integer types\fR
 .ad
@@ -415,12 +394,10 @@ Minimum values of minimum-width signed integer types:
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fBINT_LEAST\fIN\fR_MIN\fR}\fR
 .ad
 .RS 20n
-.rt  
 -(2^N-1 -1)
 .RE
 
@@ -436,12 +413,10 @@ Maximum values of minimum-width signed integer types:
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fBINT_LEAST\fIN\fR_MAX\fR}\fR
 .ad
 .RS 20n
-.rt  
 2^N-1 -1
 .RE
 
@@ -457,12 +432,10 @@ Maximum values of minimum-width unsigned integer types:
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fBUINT_LEAST\fIN\fR_MAX\fR}\fR
 .ad
 .RS 21n
-.rt  
 2^N -1
 .RE
 
@@ -473,7 +446,6 @@ Maximum values of minimum-width unsigned integer types:
 
 .sp
 .ne 2
-.mk
 .na
 \fBLimits of fastest minimum-width integer types\fR
 .ad
@@ -488,12 +460,10 @@ Minimum values of fastest minimum-width signed integer types:
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fBINT_FAST\fIN\fR_MIN\fR}\fR
 .ad
 .RS 19n
-.rt  
 -(2^N-1 -1)
 .RE
 
@@ -509,12 +479,10 @@ Maximum values of fastest minimum-width signed integer types:
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fBINT_FAST\fIN\fR_MAX\fR}\fR
 .ad
 .RS 19n
-.rt  
 2^N-1 -1
 .RE
 
@@ -530,12 +498,10 @@ Maximum values of fastest minimum-width unsigned integer types:
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fBUINT_FAST\fIN\fR_MAX\fR}\fR
 .ad
 .RS 20n
-.rt  
 2^N-1 -1
 .RE
 
@@ -546,7 +512,6 @@ Maximum values of fastest minimum-width unsigned integer types:
 
 .sp
 .ne 2
-.mk
 .na
 \fBLimits of integer types capable of holding object pointers\fR
 .ad
@@ -561,12 +526,10 @@ Minimum value of pointer-holding signed integer type:
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fBINTPTR_MIN\fR}\fR
 .ad
 .RS 16n
-.rt  
 -(2^15 -1)
 .RE
 
@@ -582,12 +545,10 @@ Maximum value of pointer-holding signed integer type:
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fBINTPTR_MAX\fR}\fR
 .ad
 .RS 16n
-.rt  
 2^15 -1
 .RE
 
@@ -603,12 +564,10 @@ Minimum value of pointer-holding signed integer type:
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fBUINTPTR_MAX\fR}\fR
 .ad
 .RS 17n
-.rt  
 2^16 -1
 .RE
 
@@ -619,7 +578,6 @@ Minimum value of pointer-holding signed integer type:
 
 .sp
 .ne 2
-.mk
 .na
 \fBLimits of greatest-width integer types\fR
 .ad
@@ -634,12 +592,10 @@ Minimum value of greatest-width signed integer type:
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fBINTMAX_MIN\fR}\fR
 .ad
 .RS 16n
-.rt  
 -(2^63 -1)
 .RE
 
@@ -655,12 +611,10 @@ Maximum value of greatest-width signed integer type:
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fBINTMAX_MIN\fR}\fR
 .ad
 .RS 16n
-.rt  
 2^63 -1
 .RE
 
@@ -676,12 +630,10 @@ Maximum value of greatest-width unsigned integer type:
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fBUINTMAX_MIN\fR}\fR
 .ad
 .RS 17n
-.rt  
 2^64 -1
 .RE
 
@@ -690,7 +642,7 @@ Maximum value of greatest-width unsigned integer type:
 .sp
 .in +2
 .nf
-                  
+
 .fi
 .in -2
 
@@ -712,31 +664,25 @@ to or greater in magnitude (absolute value) than the corresponding value given
 below, with the same sign.
 .sp
 .ne 2
-.mk
 .na
 \fBLimits of \fBptrdiff_t\fR:\fR
 .ad
 .RS 27n
-.rt  
 .sp
 .ne 2
-.mk
 .na
 \fB{\fBPTRDIFF_MIN\fR}\fR
 .ad
 .RS 17n
-.rt  
 -65535
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fBPTRDIFF_MAX\fR}\fR
 .ad
 .RS 17n
-.rt  
 +65535
 .RE
 
@@ -744,31 +690,25 @@ below, with the same sign.
 
 .sp
 .ne 2
-.mk
 .na
 \fBLimits of \fBsig_atomic_t\fR:\fR
 .ad
 .RS 27n
-.rt  
 .sp
 .ne 2
-.mk
 .na
 \fB{\fBSIG_ATOMIC_MIN\fR}\fR
 .ad
 .RS 20n
-.rt  
 See below.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fBSIG_ATOMIC_MAX\fR}\fR
 .ad
 .RS 20n
-.rt  
 See below.
 .RE
 
@@ -776,20 +716,16 @@ See below.
 
 .sp
 .ne 2
-.mk
 .na
 \fBLimits of \fBsize_t\fR:\fR
 .ad
 .RS 27n
-.rt  
 .sp
 .ne 2
-.mk
 .na
 \fB{\fBSIZE_MAX\fR}\fR
 .ad
 .RS 14n
-.rt  
 65535
 .RE
 
@@ -797,31 +733,25 @@ See below.
 
 .sp
 .ne 2
-.mk
 .na
 \fBLimits of \fBwchar_t\fR:\fR
 .ad
 .RS 27n
-.rt  
 .sp
 .ne 2
-.mk
 .na
 \fB{\fBWCHAR_MIN\fR}\fR
 .ad
 .RS 15n
-.rt  
 See below.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fBWCHAR_MAX\fR}\fR
 .ad
 .RS 15n
-.rt  
 See below.
 .RE
 
@@ -829,31 +759,25 @@ See below.
 
 .sp
 .ne 2
-.mk
 .na
 \fBLimits of \fBwint_t\fR:\fR
 .ad
 .RS 27n
-.rt  
 .sp
 .ne 2
-.mk
 .na
 \fB{\fBWINT_MIN\fR}\fR
 .ad
 .RS 14n
-.rt  
 See below.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fBWINT_MAX\fR}\fR
 .ad
 .RS 14n
-.rt  
 See below.
 .RE
 
@@ -899,7 +823,6 @@ these macros is a decimal, octal, or hexadecimal constant with a value that
 does not exceed the limits for the corresponding type.
 .sp
 .ne 2
-.mk
 .na
 \fBMacros for minimum-width integer constant expressions\fR
 .ad
@@ -915,7 +838,6 @@ corresponding to the type \fBuint_least\fIN\fR_t\fR. For example, if
 
 .sp
 .ne 2
-.mk
 .na
 \fBMacros for greatest-width integer constant expressions\fR
 .ad
@@ -949,13 +871,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

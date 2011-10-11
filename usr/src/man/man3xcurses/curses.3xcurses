@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH curses 3XCURSES "5 Jun 2002" "SunOS 5.11" "X/Open Curses Library Functions"
+.TH CURSES 3XCURSES "Jun 5, 2002"
 .SH NAME
 curses \- introduction and overview of X/Open Curses
 .SH DESCRIPTION
@@ -115,35 +115,29 @@ normally used for the terminal.
 X/Open Curses defines the following data types:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBattr_t\fR\fR
 .ad
 .RS 12n
-.rt  
 An integral type that holds an OR-ed set of attributes. The attributes
 acceptable are those which begin with the \fBWA_\fR prefix .
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbool\fR\fR
 .ad
 .RS 12n
-.rt  
 Boolean data type.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcchar_t\fR\fR
 .ad
 .RS 12n
-.rt  
 A type that refers to a string consisting of a spacing wide character, up to  5
 non-spacing wide characters, and zero or more attributes of any type. See
 Attributes, Color Pairs, and Renditions. A null \fBcchar_t\fR object terminates
@@ -152,12 +146,10 @@ arrays of \fBcchar_t\fR objects.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchtype\fR\fR
 .ad
 .RS 12n
-.rt  
 An integral type whose values are formed by OR-ing an \fB"unsigned char"\fR
 with a color pair.  and with zero or more attributes. The attributes acceptable
 are those which begin with the \fBA_\fR prefix and \fBCOLOR_PAIR\fR(3XCURSES)
@@ -165,23 +157,19 @@ are those which begin with the \fBA_\fR prefix and \fBCOLOR_PAIR\fR(3XCURSES)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCREEN\fR\fR
 .ad
 .RS 12n
-.rt  
 An opaque data type associated with a terminal's display screen.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTERMINAL\fR\fR
 .ad
 .RS 12n
-.rt  
 An opaque data type associated with a terminal. It contains information about
 the terminal's capabilities (as defined by \fBterminfo\fR), the terminal modes,
 and current state of input/output operations.
@@ -189,23 +177,19 @@ and current state of input/output operations.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwchar_t\fR\fR
 .ad
 .RS 12n
-.rt  
 An integral data type whose values represent wide characters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWINDOW\fR\fR
 .ad
 .RS 12n
-.rt  
 An opaque data type associated with a window.
 .RE
 
@@ -217,24 +201,20 @@ The X/Open Curses manual pages refer at various points to screens, windows
 defines each of these terms.
 .sp
 .ne 2
-.mk
 .na
 \fBScreen\fR
 .ad
 .RS 10n
-.rt  
 A screen is a terminal's physical output device.  The \fBSCREEN\fR data type is
 associated with a terminal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBWindow\fR
 .ad
 .RS 10n
-.rt  
 Window objects are two-dimensional arrays of characters and their renditions.
 X/Open Curses provides \fIstdscr\fR, a default window which is the size of of
 the terminal screen. You can use the \fBnewwin\fR(3XCURSES) function to create
@@ -251,12 +231,10 @@ that let you specify a window.
 There are three sub-types of windows:
 .sp
 .ne 2
-.mk
 .na
 \fBSubwindow\fR
 .ad
 .RS 18n
-.rt  
 A window which has been created within another window (the parent window) and
 whose position has been specified with absolute screen coordinates. The
 \fBderwin\fR(3XCURSES) and \fBsubwin\fR(3XCURSES) functions can be used to
@@ -265,36 +243,30 @@ create  subwindows.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDerived Window\fR
 .ad
 .RS 18n
-.rt  
 A subwindow whose position is defined relative to the parent window's
 coordinates rather than in absolute terms.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBPad\fR
 .ad
 .RS 18n
-.rt  
 A special type of window that can be larger than the screen. For more
 information, see the  \fBnewpad\fR(3XCURSES) man page.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTerminal\fR
 .ad
 .RS 18n
-.rt  
 A terminal is the input and output device which character-based applications
 use to interact with the user. The \fBTERMINAL\fR data type is associated with
 such a device.
@@ -333,26 +305,25 @@ type \fBchtype\fR:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) cw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBConstant\fR\fBDescription\fR
+box;
+c c
+l l .
+\fBConstant\fR	\fBDescription\fR
 _
-\fBA_ALTCHARSET\fRAlternate character set
-\fBA_ATTRIBUTES\fRBit-mask to extract attributes
-\fBA_BLINK\fRBlinking
-\fBA_BOLD\fRBold
-\fBA_CHARTEXT\fRBit-mask to extract a character
-\fBA_COLOR\fRT{
+\fBA_ALTCHARSET\fR	Alternate character set
+\fBA_ATTRIBUTES\fR	Bit-mask to extract attributes
+\fBA_BLINK\fR	Blinking
+\fBA_BOLD\fR	Bold
+\fBA_CHARTEXT\fR	Bit-mask to extract a character
+\fBA_COLOR\fR	T{
 Bit-mask to extract color-pair information
 T}
-\fBA_DIM\fRHalf-bright
-\fBA_INVIS\fRInvisible
-\fBA_PROTECT\fRProtected
-\fBA_REVERSE\fRReverse video
-\fBA_STANDOUT\fRHighlights specific to terminal
-\fBA_UNDERLINE\fRUnderline
+\fBA_DIM\fR	Half-bright
+\fBA_INVIS\fR	Invisible
+\fBA_PROTECT\fR	Protected
+\fBA_REVERSE\fR	Reverse video
+\fBA_STANDOUT\fR	Highlights specific to terminal
+\fBA_UNDERLINE\fR	Underline
 .TE
 
 .SS "WA_ Constant Values for Attributes"
@@ -363,28 +334,27 @@ The following constants modify objects of type \fBattr_t\fR:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) cw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBConstant\fR\fBDescription\fR
+box;
+c c
+l l .
+\fBConstant\fR	\fBDescription\fR
 _
-\fBWA_ALTCHARSET\fRAlternate character set
-\fBWA_ATTRIBUTES\fRAttribute mask
-\fBWA_BLINK\fRBlinking
-\fBWA_BOLD\fRBold
-\fBWA_DIM\fRHalf-bright
-\fBWA_HORIZONTAL\fRHorizontal highlight
-\fBWA_INVIS\fRInvisible
-\fBWA_LEFT\fRLeft highlist
-\fBWA_LOW\fRLow highlist
-\fBWA_PROTECT\fRProtected
-\fBWA_REVERSE\fRReverse video
-\fBWA_RIGHT\fRRight highlight
-\fBWA_STANDOUT\fRHighlights specific to terminal
-\fBWA_TOP\fRTop highlight
-\fBWA_UNDERLINE\fRUnderline
-\fBWA_VERTICAL\fRVertical highlight
+\fBWA_ALTCHARSET\fR	Alternate character set
+\fBWA_ATTRIBUTES\fR	Attribute mask
+\fBWA_BLINK\fR	Blinking
+\fBWA_BOLD\fR	Bold
+\fBWA_DIM\fR	Half-bright
+\fBWA_HORIZONTAL\fR	Horizontal highlight
+\fBWA_INVIS\fR	Invisible
+\fBWA_LEFT\fR	Left highlist
+\fBWA_LOW\fR	Low highlist
+\fBWA_PROTECT\fR	Protected
+\fBWA_REVERSE\fR	Reverse video
+\fBWA_RIGHT\fR	Right highlight
+\fBWA_STANDOUT\fR	Highlights specific to terminal
+\fBWA_TOP\fR	Top highlight
+\fBWA_UNDERLINE\fR	Underline
+\fBWA_VERTICAL\fR	Vertical highlight
 .TE
 
 .SS "Color Macros"
@@ -397,20 +367,19 @@ macros are defined:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) cw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBMacro\fR\fBDescription\fR
+box;
+c c
+l l .
+\fBMacro\fR	\fBDescription\fR
 _
-\fBCOLOR_BLACK\fRBlack
-\fBCOLOR_BLUE\fRBlue
-\fBCOLOR_GREEN\fRGreen
-\fBCOLOR_CYAN\fRCyan
-\fBCOLOR_RED\fRRed
-\fBCOLOR_MAGENTA\fRMagenta
-\fBCOLOR_YELLOW\fRYellow
-\fBCOLOR_WHITE\fRWhite
+\fBCOLOR_BLACK\fR	Black
+\fBCOLOR_BLUE\fR	Blue
+\fBCOLOR_GREEN\fR	Green
+\fBCOLOR_CYAN\fR	Cyan
+\fBCOLOR_RED\fR	Red
+\fBCOLOR_MAGENTA\fR	Magenta
+\fBCOLOR_YELLOW\fR	Yellow
+\fBCOLOR_WHITE\fR	White
 .TE
 
 .sp
@@ -432,14 +401,13 @@ The following functions modify a window's color:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) cw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBFunction\fR\fBDescription\fR
+box;
+c c
+l l .
+\fBFunction\fR	\fBDescription\fR
 _
-\fBattr_set()\fR, wattr_set(\|)Change the window's rendition.
-\fBcolor_set()\fR, wcolor_set(\|)Set the window's color
+\fBattr_set()\fR, wattr_set(\|)	Change the window's rendition.
+\fBcolor_set()\fR, wcolor_set(\|)	Set the window's color
 .TE
 
 .SS "Non-Spacing Characters"
@@ -536,12 +504,10 @@ the \fBoverwrite\fR(3XCURSES), \fBoverlay\fR(3XCURSES),
 Some functions assign special meanings to certain special characters:
 .sp
 .ne 2
-.mk
 .na
 \fBBackspace\fR
 .ad
 .RS 22n
-.rt  
 Moves the cursor one column towards the beginning of the line.   If the cursor
 was already at the beginning of the line, it remains there. All subsequent
 characters are added or inserted at this point.
@@ -549,12 +515,10 @@ characters are added or inserted at this point.
 
 .sp
 .ne 2
-.mk
 .na
 \fBCarriage Return\fR
 .ad
 .RS 22n
-.rt  
 Moves the cursor to the beginning of the current line. If the cursor was
 already at the beginning of the line, it remains there. All subsequent
 characters are added or inserted at this point.
@@ -562,12 +526,10 @@ characters are added or inserted at this point.
 
 .sp
 .ne 2
-.mk
 .na
 \fBNewline\fR
 .ad
 .RS 22n
-.rt  
 When adding characters, X/Open Curses fills the remainder of the line with the
 background character (effectively truncating the newline) and scrolls the
 window as described earlier. All subsequent characters are inserted at the
@@ -581,12 +543,10 @@ subsequent characters are placed at the start of the new line.
 
 .sp
 .ne 2
-.mk
 .na
 \fBTab\fR
 .ad
 .RS 22n
-.rt  
 moves subsequent characters to next horizontal tab strop. Default tab stops are
 set at 0, 8, 16, and so on.
 .sp
@@ -598,12 +558,10 @@ occur as described earlier.
 
 .sp
 .ne 2
-.mk
 .na
 \fBControl Characters\fR
 .ad
 .RS 22n
-.rt  
 When X/Open Curses functions perform special character processing, they convert
 control characters to the \fB^\fR\fIX\fR notation, where \fIX\fR is a
 single-column character (uppercase, if it is a letter) and writes that
@@ -623,12 +581,10 @@ There are four input modes possible with X/Open Curses that affect the behavior
 of input functions like \fBgetch\fR(3XCURSES) and \fBgetnstr\fR(3XCURSES).
 .sp
 .ne 2
-.mk
 .na
 \fBLine Canonical (Cooked)\fR
 .ad
 .RS 27n
-.rt  
 In line input mode, the terminal driver handles the input of line units as well
 as  \fBSIGERASE\fR and \fBSIGKILL\fR character processing.   See
 \fBtermio\fR(7I) for more information.
@@ -650,12 +606,10 @@ terminal.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcbreak\fR Mode\fR
 .ad
 .RS 27n
-.rt  
 Byte/character input provides a finer degree of control.   The terminal driver
 passes each byte read to the application without interpreting erase and kill
 characters.   It is the application's responsibility to handle line editing. It
@@ -667,12 +621,10 @@ call the \fBcbreak()\fR function.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhalfdelay\fR Mode\fR
 .ad
 .RS 27n
-.rt  
 This is the same as the \fBcbreak()\fR mode with a timeout.   The terminal
 driver waits for a byte to be received or for a timer to  expire, in which case
 the \fBgetch()\fR function either returns a byte or  \fBERR\fR respectively.
@@ -682,12 +634,10 @@ This mode overrides timeouts set for an individual window with the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBraw\fR Mode\fR
 .ad
 .RS 27n
-.rt  
 This mode provides byte/character input with the most control for  an
 application. It is similar to \fBcbreak()\fR mode, but also disables signal
 character processing (\fBSIGINTR\fR, \fBSIGSUSP\fR, \fBSIGQUIT\fR) and flow
@@ -840,10 +790,10 @@ window that contains multi-column characters and you do the following:
 .sp
 .in +2
 .nf
-save=dupwin(dialog);     /* create backing store */ 
-overwrite(cursor, save); /* save region to be overlayed */ 
-wrefresh(dialog);        /* display dialog */ 
-wrefresh(save);          /* restore screen image */ 
+save=dupwin(dialog);     /* create backing store */
+overwrite(cursor, save); /* save region to be overlayed */
+wrefresh(dialog);        /* display dialog */
+wrefresh(save);          /* restore screen image */
 delwin(save);            /* release backing store */
 .fi
 .in -2
@@ -912,15 +862,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelUnsafe
+MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO

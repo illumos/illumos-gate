@@ -1,7 +1,7 @@
 '\" te
 .\" Copyright (c) 1983 Regents of the University of California. All rights reserved. The Berkeley software License Agreement specifies the terms and conditions for redistribution.
 .\" Copyright (c) 2006 Sun Microsystems, Inc. All Rights Reserved.
-.TH lpc 1B "2 Jun 2006" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.TH LPC 1B "Jun 2, 2006"
 .SH NAME
 lpc \- line printer control program
 .SH SYNOPSIS
@@ -61,7 +61,6 @@ others are available only to super-users.
 All users can execute the following \fBlpc\fR commands:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB?\fR [\fIcommand\fR \|.\|.\|.] | \fBhelp\fR [\fIcommand\fR \|.\|.\|.]\fR
 .ad
@@ -74,7 +73,6 @@ commands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBexit\fR | \fBquit\fR\fR
 .ad
@@ -85,7 +83,6 @@ Exits from \fBlpc\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstatus\fR [\fBall\fR | \fIprinter\fR\|.\|.\|.]\fR
 .ad
@@ -103,7 +100,6 @@ conventions for atomic names.
 Only a super-user can execute the following \fBlpc\fR commands:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBabort\fR [\fBall\fR | \fIprinter\fR\|.\|.\|.]\fR
 .ad
@@ -119,7 +115,6 @@ regarding naming conventions for atomic names.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclean\fR [\fBall\fR | \fIprinter\fR\|.\|.\|.\|]\fR
 .ad
@@ -135,7 +130,6 @@ names.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisable\fR [\fBall\fR | \fIprinter\fR \|.\|.\|.]\fR
 .ad
@@ -151,7 +145,6 @@ regarding naming conventions for atomic names.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdown\fR [\fBall\fR | \fIprinter\fR \|.\|.\|.\|] [\fImessage\fR]\fR
 .ad
@@ -169,7 +162,6 @@ for information regarding naming conventions for atomic names.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBenable\fR [\fBall\fR | \fIprinter\fR \|.\|.\|.]\fR
 .ad
@@ -184,7 +176,6 @@ conventions for atomic names.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrestart\fR [\fBall\fR | \fIprinter\fR\|.\|.\|.]\fR
 .ad
@@ -200,7 +191,6 @@ information regarding naming conventions for atomic names.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstart\fR [\fBall\fR | \fIprinter\fR\|.\|.\|.]\fR
 .ad
@@ -215,7 +205,6 @@ regarding naming conventions for atomic names.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstop\fR [\fBall\fR | \fIprinter\fR\|.\|.\|.\|]\fR
 .ad
@@ -231,7 +220,6 @@ names.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtopq\fR \fIprinter\fR[\fIrequest-ID\fR\|.\|.\|.] [\fIuser\fR
 \|.\|.\|.]\fR
@@ -246,7 +234,6 @@ information regarding naming conventions for atomic names.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBup\fR [\fBall\fR | \fIprinter\fR \|.\|.\|.]\fR
 .ad
@@ -267,79 +254,65 @@ conventions for atomic names.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnon-zero\fR
 .ad
 .RS 12n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/printers.conf\fR\fR
 .ad
 .RS 24n
-.rt  
  System printer configuration database
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.printers\fR\fR
 .ad
 .RS 24n
-.rt  
 User-configurable printer database
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprinters.conf.byname\fR\fR
 .ad
 .RS 24n
-.rt  
 NIS version of \fB/etc/printers.conf\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprinters.org_dir\fR\fR
 .ad
 .RS 24n
-.rt  
  NIS+ version of \fB/etc/printers.conf\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBou=printers\fR\fR
 .ad
 .RS 24n
-.rt  
 LDAP version of \fB/etc/printers.conf\fR
 .RE
 
@@ -351,13 +324,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

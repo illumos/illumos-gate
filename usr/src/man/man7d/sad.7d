@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sad 7D "16 Apr 1997" "SunOS 5.11" "Devices"
+.TH SAD 7D "Apr 16, 1997"
 .SH NAME
 sad \- STREAMS Administrative Driver
 .SH SYNOPSIS
@@ -57,12 +57,10 @@ of modules to be automatically pushed on a stream when a driver is  first
 opened. Autopush is controlled by the following commands:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSAD_SAP\fR\fR
 .ad
 .RS 11n
-.rt  
 Allows the administrator to configure the given device's autopush information.
 \fIarg\fR points to a  \fBstrapush\fR structure, which contains the following
 members:
@@ -82,45 +80,37 @@ The  \fBsap_cmd\fR field indicates the type of configuration being done. It may
 take on one of the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSAP_ONE\fR\fR
 .ad
 .RS 13n
-.rt  
 Configure one minor device of a driver.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSAP_RANGE\fR\fR
 .ad
 .RS 13n
-.rt  
 Configure a range of minor devices of a driver.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSAP_ALL\fR\fR
 .ad
 .RS 13n
-.rt  
 Configure all minor devices of a driver.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSAP_CLEAR\fR\fR
 .ad
 .RS 13n
-.rt  
 Undo configuration information for a driver.
 .RE
 
@@ -147,57 +137,47 @@ number in the range configured.
 On failure,  \fBerrno\fR is set to the following value:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 \fIarg\fR points outside the allocated address space.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The major device number is invalid, the number of modules is invalid, or the
 list of module names is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSTR\fR\fR
 .ad
 .RS 10n
-.rt  
 The major device number does not represent a  \fBSTREAMS\fR driver.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEEXIST\fR\fR
 .ad
 .RS 10n
-.rt  
 The major-minor device pair is already configured.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBERANGE\fR\fR
 .ad
 .RS 10n
-.rt  
 The command is  \fBSAP_RANGE\fR and  \fBsap_lastminor\fR is not greater than
 \fBsap_minor\fR, or the command is  \fBSAP_CLEAR\fR and  \fBsap_minor\fR is not
 equal to the first minor in the range.
@@ -205,23 +185,19 @@ equal to the first minor in the range.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENODEV\fR\fR
 .ad
 .RS 10n
-.rt  
 The command is  \fBSAP_CLEAR\fR and the device is not configured for autopush.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSR\fR\fR
 .ad
 .RS 10n
-.rt  
 An internal autopush data structure cannot be allocated.
 .RE
 
@@ -229,12 +205,10 @@ An internal autopush data structure cannot be allocated.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSAD_GAP\fR\fR
 .ad
 .RS 11n
-.rt  
 Allows any user to query the  \fBsad\fR driver to get the autopush
 configuration information for a given device. \fIarg\fR points to a
 \fBstrapush\fR structure as described in the previous command.
@@ -248,45 +222,37 @@ entries in the module list will be zero-filled.
 On failure,  \fBerrno\fR is set to one of the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 \fIarg\fR points outside the allocated address space.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The major device number is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSTR\fR\fR
 .ad
 .RS 10n
-.rt  
 The major device number does not represent a  \fBSTREAMS\fR driver.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENODEV\fR\fR
 .ad
 .RS 10n
-.rt  
 The device is not configured for autopush.
 .RE
 
@@ -294,12 +260,10 @@ The device is not configured for autopush.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSAD_VML\fR\fR
 .ad
 .RS 11n
-.rt  
 Allows any user to validate a list of modules (that is, to see if they are
 installed on the system). \fIarg\fR is a pointer to a  \fBstr_list\fR structure
 with the following members:
@@ -326,23 +290,19 @@ or \(mi1 on failure. On failure,  \fBerrno\fR is set to one of the following
 values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 \fIarg\fR points outside the allocated address space.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The  \fBsl_nmods\fR field of the  \fBstr_list\fR structure is less than or
 equal to zero.
 .RE

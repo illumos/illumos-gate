@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH STRUCT_DECL 9F "20 May 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH STRUCT_DECL 9F "May 20, 2006"
 .SH NAME
 STRUCT_DECL, SIZEOF_PTR, SIZEOF_STRUCT, STRUCT_BUF, STRUCT_FADDR, STRUCT_FGET,
 STRUCT_FGETP, STRUCT_FSET, STRUCT_FSETP, STRUCT_HANDLE, STRUCT_INIT,
@@ -89,24 +89,20 @@ Solaris DDI specific (Solaris DDI).
 The macros take the following parameters:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstructname\fR\fR
 .ad
 .RS 14n
-.rt  
 The structure name that appears \fBafter\fR the \fBC\fR keyword struct of the
 native form.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIumodel\fR\fR
 .ad
 .RS 14n
-.rt  
  A bit field that contains either the \fBILP32\fR model bit
 (\fBDATAMODEL_ILP32\fR), or the \fBLP64\fR model bit (\fBDATAMODEL_LP64\fR). In
 an \fBioctl\fR(9E), these bits are present in the flag parameter. In a
@@ -117,24 +113,20 @@ current thread.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhandle\fR\fR
 .ad
 .RS 14n
-.rt  
 The variable name used to refer to a particular instance of a structure which
 is handled by these macros.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfield\fR\fR
 .ad
 .RS 14n
-.rt  
 The field name within the structure that can contain substructures. If the
 structures contain substructures, unions, or arrays, the \fIfield\fR can be
 whatever complex expression would naturally follow the first . or ->.
@@ -172,7 +164,6 @@ block device driver \fBioctl\fR(9E) routine that needs to copy in data from a
 user-mode program.
 .sp
 .ne 2
-.mk
 .na
 \fBSTRUCT_DECL(structname, handle)\fR
 .ad
@@ -186,7 +177,6 @@ variable by this macro.
 
 .sp
 .ne 2
-.mk
 .na
 \fBvoid STRUCT_INIT(handle, model_t umodel)\fR
 .ad
@@ -204,7 +194,6 @@ with \fBSTRUCT_DECL()\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSTRUCT_HANDLE(structname, handle)\fR
 .ad
@@ -216,7 +205,6 @@ does not allocate an instance of "struct".
 
 .sp
 .ne 2
-.mk
 .na
 \fBvoid STRUCT_SET_HANDLE(handle, model_t umodel, void *addr)\fR
 .ad
@@ -236,7 +224,6 @@ When used in an \fBioctl\fR(9E), \fIumodel\fR is the flag parameter. In a
 .SS "Operation Macros"
 .sp
 .ne 2
-.mk
 .na
 \fBsize_t STRUCT_SIZE(handle)\fR
 .ad
@@ -251,7 +238,6 @@ form is returned.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSTRUCT_FGET(handle, field)\fR
 .ad
@@ -263,7 +249,6 @@ according to the data model associated with \fIhandle\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSTRUCT_FGETP(handle, field)\fR
 .ad
@@ -277,7 +262,6 @@ failures.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSTRUCT_FSET(handle, field, val)\fR
 .ad
@@ -290,7 +274,6 @@ statement.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSTRUCT_FSETP(handle, field, val)\fR
 .ad
@@ -303,7 +286,6 @@ expression, but only as a statement.
 
 .sp
 .ne 2
-.mk
 .na
 \fBstruct structname *STRUCT_BUF(handle)\fR
 .ad
@@ -316,7 +298,6 @@ Returns a pointer to the native mode instance of the structure described by
 .SS "Macros Not Using Handles"
 .sp
 .ne 2
-.mk
 .na
 \fBsize_t SIZEOF_STRUCT(structname, umodel)\fR
 .ad
@@ -327,7 +308,6 @@ Returns size of \fIstructname\fR based on \fIumodel\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsize_t SIZEOF_PTR(umodel)\fR
 .ad
@@ -472,13 +452,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

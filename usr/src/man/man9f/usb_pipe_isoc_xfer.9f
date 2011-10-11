@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH usb_pipe_isoc_xfer 9F "5 Jan 2004" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH USB_PIPE_ISOC_XFER 9F "Jan 5, 2004"
 .SH NAME
 usb_pipe_isoc_xfer, usb_pipe_stop_isoc_polling \- USB isochronous transfer and
 polling functions
@@ -35,34 +35,28 @@ Solaris DDI specific (Solaris DDI)
 For \fBusb_pipe_isoc_xfer()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpipe_handle\fR\fR
 .ad
 .RS 15n
-.rt  
 Isochronous pipe handle on which request is made.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrequest\fR\fR
 .ad
 .RS 15n
-.rt  
 Pointer to isochronous transfer request.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 15n
-.rt  
 USB_FLAGS_SLEEP is the only flag recognized. Wait for needed resources if
 unavailable.
 .RE
@@ -72,23 +66,19 @@ unavailable.
 For \fBusb_pipe_stop_isoc_polling()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpipe_handle\fR\fR
 .ad
 .RS 15n
-.rt  
 Isochronous pipe handle on which to stop polling for input.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 15n
-.rt  
 USB_FLAGS_SLEEP is the only flag recognized. Wait for polling to stop.
 .RE
 
@@ -241,45 +231,37 @@ USB_CR_STOPPED_POLLING.
 For \fBusb_pipe_isoc_xfer()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_SUCCESS\fR
 .ad
 .RS 27n
-.rt  
 Transfer was successful.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_ARGS\fR
 .ad
 .RS 27n
-.rt  
 Request is \fBNULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_CONTEXT\fR
 .ad
 .RS 27n
-.rt  
 Called from interrupt context with the USB_FLAGS_SLEEP flag set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_REQUEST\fR
 .ad
 .RS 27n
-.rt  
 The request has been freed or otherwise invalidated.
 .sp
 A set of conflicting  attributes were specified. See
@@ -297,12 +279,10 @@ nonzero isoc_frame_no.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_NO_FRAME_NUMBER\fR
 .ad
 .RS 27n
-.rt  
 An isochronous request was not specified with one and only one   of
 USB_ATTRS_ISOC_START_FRAME or USB_ATTRS_ISOC_XFER_ASAP specified.
 .sp
@@ -312,12 +292,10 @@ zero isoc_frame_no.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_START_FRAME\fR
 .ad
 .RS 27n
-.rt  
 An isochronous request was specified with an invalid starting frame number
 (less than current frame number, or zero) and USB_ATTRS_ISOC_START_FRAME
 specified.
@@ -325,12 +303,10 @@ specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_PIPE\fR
 .ad
 .RS 27n
-.rt  
 Pipe handle is NULL or invalid.
 .sp
  Pipe is closing or closed.
@@ -338,45 +314,37 @@ Pipe handle is NULL or invalid.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_PIPE_ERROR\fR
 .ad
 .RS 27n
-.rt  
 Pipe  handle refers to a pipe which is in the USB_PIPE_STATE_ERROR state.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_NO_RESOURCES\fR
 .ad
 .RS 27n
-.rt  
 Memory, descriptors or other resources unavailable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_HC_HARDWARE_ERROR\fR
 .ad
 .RS 27n
-.rt  
 Host controller is in error state.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_FAILURE\fR
 .ad
 .RS 27n
-.rt  
 An asynchronous transfer failed or an internal error occurred.
 .sp
 .in +2
@@ -457,7 +425,7 @@ USB_FLAGS_SLEEP flag is clear.
 
     usb_pipe_stop_isoc_polling(pipe, USB_FLAGS_SLEEP);
     pm_idle_component(dip, 0);
-                
+
 .fi
 .in -2
 
@@ -469,15 +437,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitecturePCI-based systems
+Architecture	PCI-based systems
 _
-Interface stabilityEvolving
+Interface stability	Evolving
 .TE
 
 .SH SEE ALSO

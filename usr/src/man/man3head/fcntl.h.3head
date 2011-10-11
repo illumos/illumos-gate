@@ -1,20 +1,20 @@
 '\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH fcntl.h 3HEAD "5 Feb 2008" "SunOS 5.11" "Headers"
+.TH FCNTL.H 3HEAD "Feb 5, 2008"
 .SH NAME
 fcntl.h, fcntl \- file control options
 .SH SYNOPSIS
 .LP
 .nf
-#include <fcntl.h> 
+#include <fcntl.h>
 .fi
 
 .SH DESCRIPTION
@@ -27,214 +27,176 @@ by the functions \fBfcntl\fR(2), \fBopen\fR(2), and \fBopenat\fR(2).
 Values for \fIcmd\fR used by \fBfcntl()\fR (the following values are unique):
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_DUPFD\fR\fR
 .ad
 .RS 15n
-.rt  
 Duplicate file descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_DUP2FD\fR\fR
 .ad
 .RS 15n
-.rt  
 Similar to \fBF_DUPFD\fR, but always returns \fIarg\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_GETFD\fR\fR
 .ad
 .RS 15n
-.rt  
 Get file descriptor flags.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_SETFD\fR\fR
 .ad
 .RS 15n
-.rt  
 Set file descriptor flags.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_GETFL\fR\fR
 .ad
 .RS 15n
-.rt  
 Get file status flags.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_SETFL\fR\fR
 .ad
 .RS 15n
-.rt  
 Set file status flags.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_GETOWN\fR\fR
 .ad
 .RS 15n
-.rt  
 Get process or process group \fBID\fR to receive \fBSIGURG\fR signals.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_SETOWN\fR\fR
 .ad
 .RS 15n
-.rt  
 Set process or process group \fBID\fR to receive \fBSIGURG\fR signals.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_FREESP\fR\fR
 .ad
 .RS 15n
-.rt  
 Free storage space associated with a section of the ordinary file \fIfildes\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_ALLOCSP\fR\fR
 .ad
 .RS 15n
-.rt  
 Allocate space for a section of the ordinary file \fIfildes\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_ALLOCSP64\fR\fR
 .ad
 .RS 15n
-.rt  
 Equivalent to \fBF_ALLOCSP\fR, but takes a \fBstruct flock64\fR argument rather
 than a \fBstruct flock\fR argument.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_GETLK\fR\fR
 .ad
 .RS 15n
-.rt  
 Get record locking information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_GETLK64\fR\fR
 .ad
 .RS 15n
-.rt  
 Equivalent to \fBF_GETLK\fR, but takes a \fBstruct flock64\fR argument rather
 than a \fBstruct flock\fR argument.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_SETLK\fR\fR
 .ad
 .RS 15n
-.rt  
 Set record locking information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_SETLK64\fR\fR
 .ad
 .RS 15n
-.rt  
 Equivalent to \fBF_SETLK\fR, but takes a \fBstruct flock64\fR argument rather
 than a \fBstruct flock\fR argument.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_SETLKW\fR\fR
 .ad
 .RS 15n
-.rt  
 Set record locking information; wait if blocked.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_SETLKW64\fR\fR
 .ad
 .RS 15n
-.rt  
 Equivalent to \fBF_SETLKW\fR, but takes a \fBstruct flock64\fR argument rather
 than a \fBstruct flock\fR argument.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_SHARE\fR\fR
 .ad
 .RS 15n
-.rt  
 Set share reservation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_UNSHARE\fR\fR
 .ad
 .RS 15n
-.rt  
 Remove share reservation.
 .RE
 
@@ -243,12 +205,10 @@ Remove share reservation.
 File descriptor flags used for \fBfcntl()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFD_CLOEXEC\fR\fR
 .ad
 .RS 14n
-.rt  
 Close the file descriptor upon execution of an \fBexec\fR function (see
 \fBexec\fR(2)).
 .RE
@@ -259,34 +219,28 @@ Values for \fBl_type\fR used for record locking with \fBfcntl()\fR (the
 following values are unique):
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_RDLCK\fR\fR
 .ad
 .RS 11n
-.rt  
 Shared or read lock.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_UNLCK\fR\fR
 .ad
 .RS 11n
-.rt  
 Unlock.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_WRLCK\fR\fR
 .ad
 .RS 11n
-.rt  
 Exclusive or write lock.
 .RE
 
@@ -296,34 +250,28 @@ Values for \fBf_access\fR used for share reservations with \fBfcntl()\fR (the
 following values are unique):
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_RDACC\fR\fR
 .ad
 .RS 11n
-.rt  
 Read-only share reservation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_WRACC\fR\fR
 .ad
 .RS 11n
-.rt  
 Write-only share reservation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_RWACC\fR\fR
 .ad
 .RS 11n
-.rt  
 Read and write share reservation.
 .RE
 
@@ -333,56 +281,46 @@ Values for \fBf_deny\fR used for share reservations with \fBfcntl()\fR (the
 following values are unique):
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_COMPAT\fR\fR
 .ad
 .RS 12n
-.rt  
 Compatibility mode share reservation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_RDDNY\fR\fR
 .ad
 .RS 12n
-.rt  
 Deny other read access share reservations.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_WRDNY\fR\fR
 .ad
 .RS 12n
-.rt  
 Deny other write access share reservations.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_RWDNY\fR\fR
 .ad
 .RS 12n
-.rt  
 Deny other read or write access share reservations.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_NODNY\fR\fR
 .ad
 .RS 12n
-.rt  
 Do not deny other read or write access share reservations.
 .RE
 
@@ -392,56 +330,46 @@ File creation and assignment flags are used in the \fIoflag\fR argument by
 \fBopen()\fR and \fBopenat()\fR. All of these values are bitwise distinct:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_CREAT\fR\fR
 .ad
 .RS 12n
-.rt  
 Create file if it does not exist.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_EXCL\fR\fR
 .ad
 .RS 12n
-.rt  
 Exclusive use flag.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_NOCTTY\fR\fR
 .ad
 .RS 12n
-.rt  
 Do not assign controlling tty.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_TRUNC\fR\fR
 .ad
 .RS 12n
-.rt  
 Truncate flag.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_XATTR\fR\fR
 .ad
 .RS 12n
-.rt  
 When opening a file, this flag affects the way in which relative paths are
 resolved by \fBopen()\fR and \fBopenat()\fR.  With this flag set, the
 \fIpath\fR argument is resolved as an extended attribute reference on either
@@ -454,57 +382,47 @@ descriptor argument of \fBopenat()\fR.
 File status flags used for \fBfcntl()\fR, \fBopen()\fR, and \fBopen()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_APPEND\fR\fR
 .ad
 .RS 14n
-.rt  
 Set append mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_NDELAY\fR\fR
 .ad
 .RS 14n
-.rt  
 Non-blocking mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_NONBLOCK\fR\fR
 .ad
 .RS 14n
-.rt  
 Non-blocking mode (POSIX; see \fBstandards\fR(5)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_DSYNC\fR\fR
 .ad
 .RS 14n
-.rt  
 Write I/O operations on the file descriptor complete as defined by synchronized
 I/O data integrity completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_RSYNC\fR\fR
 .ad
 .RS 14n
-.rt  
 Read I/O operations on the file descriptor complete at the same level of
 integrity as specified by the \fBO_DSYNC\fR and  \fBO_SYNC\fR flags. If both
 \fBO_DSYNC\fR and \fBO_RSYNC\fR are set in \fIoflag\fR, all I/O operations on
@@ -516,12 +434,10 @@ I/O file integrity completion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_SYNC\fR\fR
 .ad
 .RS 14n
-.rt  
 When opening a regular file, this flag affects subsequent writes. If set, each
 \fBwrite\fR(2) will wait for both the file data and file status to be
 physically updated.  Write I/O operations on the file descriptor complete as
@@ -533,12 +449,10 @@ defined by synchronized I/O file integrity completion.
 Mask for use with file access modes:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_ACCMODE\fR\fR
 .ad
 .RS 13n
-.rt  
 Mask for file access modes.
 .RE
 
@@ -547,34 +461,28 @@ Mask for file access modes.
 File access modes used for \fBfcntl()\fR, \fBopen()\fR, and \fBopenat()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_RDONLY\fR\fR
 .ad
 .RS 12n
-.rt  
 Open for reading only.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_RDWR\fR\fR
 .ad
 .RS 12n
-.rt  
 Open for reading and writing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_WRONLY\fR\fR
 .ad
 .RS 12n
-.rt  
 Open for writing only.
 .RE
 
@@ -584,12 +492,10 @@ The following constants are used by system calls capable of resolving paths
 relative to a provided open file descriptor:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAT_FDCWD\fR\fR
 .ad
 .RS 23n
-.rt  
 Special value to pass in place of a file descriptor to inform the called
 routine that relative path arguments should be resolved from the current
 working directory.
@@ -597,12 +503,10 @@ working directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAT_SYMLINK_NOFOLLOW\fR\fR
 .ad
 .RS 23n
-.rt  
 Flag passed to \fBfstatat\fR(2) and \fBfchownat\fR(2) to change the bahavior of
 these functions when they are given a file as an argument that is a symbolic
 link. In this case the functions operate on the symbolic link file rather than
@@ -611,12 +515,10 @@ the file the link references.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAT_REMOVEDIR\fR\fR
 .ad
 .RS 23n
-.rt  
 Flag passed to \fBunlinkat\fR(2) to tell it to assume that its path argument
 refers to a directory and to attempt to remove this directory.
 .RE
@@ -658,15 +560,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO

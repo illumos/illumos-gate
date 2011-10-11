@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH rtquery 1M "24 Apr 2002" "SunOS 5.11" "System Administration Commands"
+.TH RTQUERY 1M "Apr 24, 2002"
 .SH NAME
 rtquery \- query routing daemons for their routing tables
 .SH SYNOPSIS
@@ -45,7 +45,6 @@ The \fBrtquery\fR command is also used to turn tracing on or off in
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fBpasswd=\fR\fIXXX\fR\fR
 .ad
@@ -54,65 +53,54 @@ The following options are supported:
 \fB\fB-a\fR \fBmd5_passwd=\fR\fIXXX\fR|\fIKeyID\fR\fR
 .ad
 .RS 27n
-.rt  
 Causes the query to be sent with the indicated cleartext or MD5 password.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 27n
-.rt  
 Displays only the numeric network and host addresses instead of both numeric
 and symbolic names.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 27n
-.rt  
 Uses the poll command to request full routing information from \fBGateD\fR.
 This is an undocumented extension RIP protocol supported only by \fBGateD\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIaddr\fR\fR
 .ad
 .RS 27n
-.rt  
 Asks about the route to destination \fIaddr\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fIoperation\fR\fR
 .ad
 .RS 27n
-.rt  
 Changes tracing, where \fIoperation\fR is one of the actions listed below.
 Requests from processes not running with UID 0 or on distant networks are
 generally ignored by the daemon except for a message in the system log.
 \fBGateD\fR is likely to ignore these debugging requests.
 .sp
 .ne 2
-.mk
 .na
 \fBon=\fItracefile\fR\fR
 .ad
 .RS 16n
-.rt  
 Turns tracing on, directing tracing into the specified file. That file must
 have been specified when the daemon was started or have the name,
 \fB/var/log/in.routed.trace\fR.
@@ -120,34 +108,28 @@ have been specified when the daemon was started or have the name,
 
 .sp
 .ne 2
-.mk
 .na
 \fBmore\fR
 .ad
 .RS 16n
-.rt  
 Increases the debugging level.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBoff\fR
 .ad
 .RS 16n
-.rt  
 Turns off tracing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdump\fR
 .ad
 .RS 16n
-.rt  
 Dumps the daemon's routing table to the current trace file.
 .RE
 
@@ -155,24 +137,20 @@ Dumps the daemon's routing table to the current trace file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR \fItimeout\fR\fR
 .ad
 .RS 27n
-.rt  
 Changes the delay for an answer from each host. By default, each host is given
 15 seconds to respond.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-1\fR\fR
 .ad
 .RS 27n
-.rt  
 Queries using RIP version 1 instead of RIP version 2.
 .RE
 
@@ -182,23 +160,19 @@ Queries using RIP version 1 instead of RIP version 2.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB>\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 

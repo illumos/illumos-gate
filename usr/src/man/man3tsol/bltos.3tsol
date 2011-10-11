@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH bltos 3TSOL "20 Jul 2007" "SunOS 5.11" "Trusted Extensions Library Functions"
+.TH BLTOS 3TSOL "Jul 20, 2007"
 .SH NAME
 bltos, bsltos, bcleartos \- translate binary labels to character coded labels
 .SH SYNOPSIS
@@ -87,81 +87,67 @@ pre-allocated memory, then \fIstr_len\fR indicates the size of that memory. If
 The \fIflags\fR argument is \fB0\fR or the logical sum of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLONG_WORDS\fR\fR
 .ad
 .RS 24n
-.rt  
 Translate using long names of words defined in \fIlabel\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSHORT_WORDS\fR\fR
 .ad
 .RS 24n
-.rt  
 Translate using short names of words defined in \fIlabel\fR. If no short name
 is defined in the \fBlabel_encodings\fR file for a word, the long name is used.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLONG_CLASSIFICATION\fR\fR
 .ad
 .RS 24n
-.rt  
 Translate using long name of classification defined in \fIlabel\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSHORT_CLASSIFICATION\fR\fR
 .ad
 .RS 24n
-.rt  
 Translate using short name of classification defined in \fIlabel\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBACCESS_RELATED\fR\fR
 .ad
 .RS 24n
-.rt  
 Translate only \fBaccess-related\fR entries defined in information label
 \fIlabel\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVIEW_EXTERNAL\fR\fR
 .ad
 .RS 24n
-.rt  
 Translate \fBADMIN_LOW\fR and \fBADMIN_HIGH\fR labels to the lowest and highest
 labels defined in the \fBlabel_encodings\fR file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVIEW_INTERNAL\fR\fR
 .ad
 .RS 24n
-.rt  
 Translate \fBADMIN_LOW\fR and \fBADMIN_HIGH\fR labels to the \fBadmin low\fR
 \fBname\fR and \fBadmin high\fR \fBname\fR strings specified in the
 \fBlabel_encodings\fR file. If no strings are specified, the strings
@@ -170,12 +156,10 @@ Translate \fBADMIN_LOW\fR and \fBADMIN_HIGH\fR labels to the \fBadmin low\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNO_CLASSIFICATION\fR\fR
 .ad
 .RS 24n
-.rt  
 Do not translate classification defined in \fIlabel\fR.
 .RE
 
@@ -214,7 +198,6 @@ return string memory is insufficient to hold the string, these functions return
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/security/tsol/label_encodings\fR\fR
 .ad
@@ -232,15 +215,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityObsolete
+Interface Stability	Obsolete
 _
-MT-LevelMT-Safe with exceptions
+MT-Level	MT-Safe with exceptions
 .TE
 
 .sp

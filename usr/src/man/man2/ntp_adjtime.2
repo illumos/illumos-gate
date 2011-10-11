@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ntp_adjtime 2 "21 May 2009" "SunOS 5.11" "System Calls"
+.TH NTP_ADJTIME 2 "May 21, 2009"
 .SH NAME
 ntp_adjtime \- adjust local clock parameters
 .SH SYNOPSIS
@@ -65,35 +65,29 @@ Upon successful completion, \fBntp_adjtime()\fR returns the current clock state
 The \fBntp_adjtime()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 The  \fItptr\fR argument is an invalid pointer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fBconstant\fR member of the structure pointed to by \fItptr\fR is less
 than 0 or greater than 30.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 10n
-.rt  
 The {\fBPRIV_SYS_TIME\fR} privilege is not asserted in the effective set of the
 calling process.
 .RE

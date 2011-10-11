@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH label_to_str 3TSOL "20 Jul 2007" "SunOS 5.11" "Trusted Extensions Library Functions"
+.TH LABEL_TO_STR 3TSOL "Jul 20, 2007"
 .SH NAME
 label_to_str \- convert labels to human readable strings
 .SH SYNOPSIS
@@ -16,7 +16,7 @@ label_to_str \- convert labels to human readable strings
 .nf
 #include <tsol/label.h>
 
-\fBint\fR \fBlabel_to_str\fR(\fBconst m_label_t *\fR\fIlabel\fR, \fBchar **\fR\fIstring\fR, 
+\fBint\fR \fBlabel_to_str\fR(\fBconst m_label_t *\fR\fIlabel\fR, \fBchar **\fR\fIstring\fR,
     \fBconst m_label_str_t\fR \fIconversion_type\fR, \fBuint_t\fR \fIflags\fR);
 .fi
 
@@ -41,23 +41,19 @@ The \fIconversion_type\fR parameter controls the type of label conversion. Not
 all types of conversion are valid for all types of label:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM_LABEL\fR\fR
 .ad
 .RS 22n
-.rt  
 Converts \fIlabel\fR to a human readable string based on its type.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM_INTERNAL\fR\fR
 .ad
 .RS 22n
-.rt  
 Converts \fIlabel\fR to an internal text representation that is safe for
 storing in a public object. Internal conversions can later be parsed to their
 same value.
@@ -65,24 +61,20 @@ same value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM_COLOR\fR\fR
 .ad
 .RS 22n
-.rt  
 Converts \fIlabel\fR to a string that represents the color name that the
 administrator has associated with the label.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRINTER_TOP_BOTTOM\fR\fR
 .ad
 .RS 22n
-.rt  
 Converts \fIlabel\fR to a human readable string that is appropriate for use as
 the top and bottom label of banner and trailer pages in the Defense
 Intelligence Agency (DIA) encodings printed output schema.
@@ -90,36 +82,30 @@ Intelligence Agency (DIA) encodings printed output schema.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRINTER_LABEL\fR\fR
 .ad
 .RS 22n
-.rt  
 Converts \fIlabel\fR to a human readable string that is appropriate for use as
 the banner page downgrade warning in the DIA encodings printed output schema.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRINTER_CAVEATS\fR\fR
 .ad
 .RS 22n
-.rt  
 Converts \fIlabel\fR to a human readable string that is appropriate for use as
 the banner page caveats section in the DIA encodings printed output schema.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRINTER_CHANNELS\fR\fR
 .ad
 .RS 22n
-.rt  
 Converts \fIlabel\fR to a human readable string that is appropriate for use as
 the banner page handling channels in the DIA encodings printed output schema.
 .RE
@@ -129,34 +115,28 @@ the banner page handling channels in the DIA encodings printed output schema.
 The \fIflags\fR parameter provides a hint to the label conversion:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDEF_NAMES\fR\fR
 .ad
 .RS 15n
-.rt  
 The default names are preferred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSHORT_NAMES\fR\fR
 .ad
 .RS 15n
-.rt  
 Short names are preferred where defined.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLONG_NAMES\fR\fR
 .ad
 .RS 15n
-.rt  
 Long names are preferred.
 .RE
 
@@ -172,34 +152,28 @@ string pointer is set to \fINULL\fR.
 The \fBlabel_to_str()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 11n
-.rt  
 Invalid parameter.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSUP\fR\fR
 .ad
 .RS 11n
-.rt  
 The system does not support label translations.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 11n
-.rt  
 The physical limits of the system are exceeded by size bytes of memory which
 cannot be allocated.
 .RE
@@ -212,17 +186,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 _
-StandardSee below.
+Standard	See below.
 .TE
 
 .sp

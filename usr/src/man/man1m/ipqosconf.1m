@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ipqosconf 1M "18 Dec 2008" "SunOS 5.11" "System Administration Commands"
+.TH IPQOSCONF 1M "Dec 18, 2008"
 .SH NAME
 ipqosconf \- configure the IPQoS facility
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/ipqosconf\fR 
+\fB/usr/sbin/ipqosconf\fR
 .fi
 
 .LP
@@ -58,57 +58,47 @@ then read from the \fBsvc:/network/initial:default\fR service.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIconf_file\fR\fR
 .ad
 .RS 16n
-.rt  
 Apply the configuration in \fIconf_file\fR. If the \fIconf_file\fR is
 \fB\(mi\fR, \fBipqosconf\fR reads from standard input.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 16n
-.rt  
 Populate the boot file with the current configuration.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 16n
-.rt  
 Flush the configuration.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 16n
-.rt  
 List the current applied configuration.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
 .RS 16n
-.rt  
 List the current configuration in verbose mode.
 .sp
 In addition to the information that the \fB-l\fR option provides, the \fB-L\fR
@@ -120,23 +110,19 @@ configuration file
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 16n
-.rt  
 Log messages to \fBsyslog\fR during an \fB-a\fR operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 16n
-.rt  
 Toggle verbose mode during an \fB-a\fR operation.
 .sp
 The \fB-v\fR option causes all messages to go to the console in addition to
@@ -186,7 +172,7 @@ action {
       cf_clauses
 }
 
-action_name      ::= string 
+action_name      ::= string
 module_name      ::= ipgpc | dlcosmk | dscpmk | flowacct | tswtclmt |
                      tokenmt
 
@@ -197,7 +183,7 @@ params_clause    ::= params {
 
 parameters       ::= prm_name_value parameters | ""
 
-prm_name_value   ::= \fIparam_name\fR \fIparam_value\fR 
+prm_name_value   ::= \fIparam_name\fR \fIparam_value\fR
 .fi
 .in -2
 .sp
@@ -300,7 +286,7 @@ peak_rate               uint32
 <if present this signifies that this will be a two rate meter, not
    a single rate meter>
 peak_burst              uint32
-<this is the 'peak' burst size for a two rate meter, but 
+<this is the 'peak' burst size for a two rate meter, but
    the 'excess' burst size for a single rate meter>
 color_aware             boolean
 color_map               integer_array
@@ -361,7 +347,7 @@ CLASSIFIER module ipgpc configuration syntax:
 user               user
 projid             int32
 if_name            ifname
-direction          enum { 
+direction          enum {
                    LOCAL_IN,
                    LOCAL_OUT,
                    FWD_IN,
@@ -400,12 +386,10 @@ max_limit        uint32
 .SS "Types"
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaction\fR\fR
 .ad
 .RS 17n
-.rt  
 A string of characters with a matching action definition. The character string
 can be up to twenty three characters in length. To allow for spaces the string
 needs to be enclosed in quotes and cannot span lines. Two special actions are
@@ -417,12 +401,10 @@ is passed to it to be dropped.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaddress\fR\fR
 .ad
 .RS 17n
-.rt  
 A machine name or address recognized by \fBgetipnodebyname\fR(3SOCKET). If a
 machine name is specified, and \fBip_version\fR has been defined, the query is
 done using that address family. If a machine name is not specified and
@@ -436,36 +418,30 @@ names.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIenum\fR\fR
 .ad
 .RS 17n
-.rt  
 Either one of the supported values or comma delimited list of support values,
 enclosed in curly braces.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIifname\fR\fR
 .ad
 .RS 17n
-.rt  
 A non-\fINULL\fR, existing interface name recognized by the \fBSIOGLIFINDEX\fR
 socket ioctl.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinteger_array\fR\fR
 .ad
 .RS 17n
-.rt  
 A comma delimited set of \fIrange\fR/\fIvalue\fR pairs, enclosed in curly
 braces.
 .sp
@@ -478,12 +454,10 @@ in the set of ranges are left at their previous value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImap_index\fR\fR
 .ad
 .RS 17n
-.rt  
 A non-negative integer used as an index into any maps associated with a
 parameter of this type.
 .sp
@@ -493,48 +467,40 @@ associated maps. The index starts at \fB0\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIport\fR\fR
 .ad
 .RS 17n
-.rt  
 Either a service name recognized by \fBgetservbyname\fR(3SOCKET) or an integer
 \fB1\fR-\fB65535\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprotocol\fR\fR
 .ad
 .RS 17n
-.rt  
 Either a protocol name recognized by \fBgetprotobyname\fR(3SOCKET) or an
 integer \fB1\fR-\fB255\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstring\fR\fR
 .ad
 .RS 17n
-.rt  
 A character string. Enclose \fIstring\fR in quotes. \fIstring\fR cannot span
 multiple lines.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIuser\fR\fR
 .ad
 .RS 17n
-.rt  
 Either a valid user ID or username for the system that is being configured.
 .RE
 
@@ -544,24 +510,20 @@ Either a valid user ID or username for the system that is being configured.
 The configuration file can contain the following parameters
 .sp
 .ne 2
-.mk
 .na
 \fBcolor_aware\fR
 .ad
 .RS 23n
-.rt  
 A value of \fBTRUE\fR or \fBFALSE\fR, indicating whether or not the configured
 action takes account of the previous packet coloring when classifying.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBcolor_map\fR
 .ad
 .RS 23n
-.rt  
 An integer array that defines which values of the \fBdscp\fR field correspond
 with which colors for when the \fBcolor_aware\fR parameter is set to
 \fBTRUE\fR.
@@ -569,57 +531,47 @@ with which colors for when the \fBcolor_aware\fR parameter is set to
 
 .sp
 .ne 2
-.mk
 .na
 \fBcommitted_burst\fR
 .ad
 .RS 23n
-.rt  
 The committed burst size in bits.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBcommitted_rate\fR
 .ad
 .RS 23n
-.rt  
 The committed rate in bits per second.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBcos\fR
 .ad
 .RS 23n
-.rt  
 The value used to determine the underlying driver level priority applied to the
 packet which is defined in \fB802.1D\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdaddr\fR
 .ad
 .RS 23n
-.rt  
 The destination address of the datagram.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdirection\fR
 .ad
 .RS 23n
-.rt  
 The value used to build a filter matching only part of the traffic.
 .sp
 This parameter is of type \fBenum\fR with valid values of \fBLOCAL_IN\fR (local
@@ -630,23 +582,19 @@ exiting the system).
 
 .sp
 .ne 2
-.mk
 .na
 \fBdport\fR
 .ad
 .RS 23n
-.rt  
 The destination port of the datagram.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdscp_detailed_stats\fR
 .ad
 .RS 23n
-.rt  
 A value of \fBTRUE\fR or \fBFALSE\fR that determines whether detailed
 statistics are switched on for this \fBdscp\fR action.
 .sp
@@ -655,12 +603,10 @@ Specify \fBTRUE\fR to switch on or \fBFALSE\fR to switch off.
 
 .sp
 .ne 2
-.mk
 .na
 \fBdscp_map\fR
 .ad
 .RS 23n
-.rt  
 The \fIinteger_array\fR that supplies the values that IP packets with a given
 \fBdscp\fR value have their dscp re-marked with.
 .sp
@@ -671,12 +617,10 @@ and valid values are also \fB0\fR-\fB63\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBdsfield\fR
 .ad
 .RS 23n
-.rt  
 The \fBDS\fR field of the \fBIP\fR datagram header. This is an 8-bit value,
 with each bit position corresponding with the same one in the header; this
 enables matches to be done on the CU bits. If you specify this parameter, you
@@ -685,12 +629,10 @@ must also specify the \fBdsfield_mask\fR parameter.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdsfield_mask\fR\fR
 .ad
 .RS 23n
-.rt  
 The mask applied to the \fBdsfield\fR parameter to determine the bits against
 which to match. This is an 8-bit value, with each bit position corresponding
 with the same one in the \fBdsfield\fR parameter.
@@ -698,47 +640,39 @@ with the same one in the \fBdsfield\fR parameter.
 
 .sp
 .ne 2
-.mk
 .na
 \fBglobal_stats\fR
 .ad
 .RS 23n
-.rt  
 A value of \fBTRUE\fR or \fBFALSE\fR to enable or disable the statistic
 collection for this action.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBgreen_action_name\fR
 .ad
 .RS 23n
-.rt  
 The action to be executed for packets that are deemed to be green.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBif_name\fR
 .ad
 .RS 23n
-.rt  
 The name of an interface recognized by the \fBSIOGLIFINDEX\fR ioctl. This
 parameter is of type \fBifname\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBip_version\fR
 .ad
 .RS 23n
-.rt  
 This parameter is of type \fBenum\fR and has valid values of \fBV4\fR and
 \fBV6\fR.
 .sp
@@ -752,24 +686,20 @@ for a specified hostname.
 
 .sp
 .ne 2
-.mk
 .na
 \fBmax_limit\fR
 .ad
 .RS 23n
-.rt  
 The maximum number of flow entries present at one time in the \fBflowacct\fR
 actions in the memory resident table.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnext_action\fR
 .ad
 .RS 23n
-.rt  
 The action to be executed when the current action is complete.
 .sp
 This value can be either the name of an action defined in the configuration
@@ -778,35 +708,29 @@ file, or one of the two special action types: \fBdrop\fR and \fBcontinue\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBpeak_burst\fR
 .ad
 .RS 23n
-.rt  
 The peak burst size, for a two rate meter, or excess burst size, for a single
 rate meter, in bits.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBpeak_rate\fR
 .ad
 .RS 23n
-.rt  
 The peak rate in bits per second.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBprecedence\fR
 .ad
 .RS 23n
-.rt  
 An integer that is used to order filters. If there are two matching filters
 that have the same priority value, the one with the lower precedence value is
 the one matched. This parameter should be used because the order of the filters
@@ -815,12 +739,10 @@ in a configuration file has no influence on their relative precedence.
 
 .sp
 .ne 2
-.mk
 .na
 \fBpriority\fR
 .ad
 .RS 23n
-.rt  
 An integer that represents the relative priority of a filter. If there are two
 matching filters, the one with the higher priority value is the one matched.
 Multiple filters can have the same priority.
@@ -828,114 +750,94 @@ Multiple filters can have the same priority.
 
 .sp
 .ne 2
-.mk
 .na
 \fBprojid\fR
 .ad
 .RS 23n
-.rt  
 The project ID of the process sending the data. This value is always \fB-1\fR
 for received traffic.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBprotocol\fR
 .ad
 .RS 23n
-.rt  
 The Upper Layer Protocol against which this entry is matched.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBred_action_name\fR
 .ad
 .RS 23n
-.rt  
 The action to be executed for packets that are determined to be red.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBsaddr\fR
 .ad
 .RS 23n
-.rt  
 The source address of the datagram.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBsport\fR
 .ad
 .RS 23n
-.rt  
 The source port of the datagram.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBtimeout\fR
 .ad
 .RS 23n
-.rt  
 The timeout in milliseconds after which flows are written to the accounting
 file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBtimer\fR
 .ad
 .RS 23n
-.rt  
 The period in milliseconds at which timed-out flows are checked for.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBuser\fR
 .ad
 .RS 23n
-.rt  
 The user ID or username of the process sending the data. This value is always
 \fB-1\fR for received traffic.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwindow\fR
 .ad
 .RS 23n
-.rt  
 The window size in ms.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fByellow_action_name\fR
 .ad
 .RS 23n
-.rt  
 The action to be executed for packets that are determined to be yellow.
 .RE
 
@@ -1072,7 +974,6 @@ action {
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/inet/ipqosinit.conf\fR\fR
 .ad
@@ -1084,7 +985,6 @@ exists, it is read from the \fBnetwork/initial:default\fR service.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/inet/ipqosconf.1.sample\fR\fR
 .ad
@@ -1095,7 +995,6 @@ Sample configuration file for an application server
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/inet/ipqosconf.2.sample\fR\fR
 .ad
@@ -1106,7 +1005,6 @@ Sample configuration file that meters the traffic for a specified application
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/inet/ipqosconf.3.sample\fR\fR
 .ad
@@ -1124,13 +1022,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

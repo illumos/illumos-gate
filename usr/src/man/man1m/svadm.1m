@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH svadm 1M "2 Oct 2007" "SunOS 5.11" "System Administration Commands"
+.TH SVADM 1M "Oct 2, 2007"
 .SH NAME
 svadm \- command line interface to control Availability Suite Storage Volume
 operations
@@ -57,7 +57,6 @@ list of volumes currently under SV control. \fBsvadm\fR supports the following
 options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR \fItag\fR\fR
 .ad
@@ -72,7 +71,6 @@ to other nodes in the cluster.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
@@ -85,7 +83,6 @@ in this cluster disk group.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
@@ -99,7 +96,6 @@ should be in this cluster disk group.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIconfig_file\fR\fR
 .ad
@@ -113,7 +109,6 @@ lines and lines starting with the comment character (#) are ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
@@ -124,7 +119,6 @@ Displays the \fBsvadm\fR usage summary.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
@@ -135,7 +129,6 @@ Displays extended status for the volumes currently under SV control.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
@@ -151,7 +144,6 @@ to reconfigure the cluster tag associated with the volume. The \fB-e\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -180,13 +172,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH gld 9E "3 Jan 2001" "SunOS 5.11" "Driver Entry Points"
+.TH GLD 9E "Jan 3, 2001"
 .SH NAME
 gld, gldm_reset, gldm_start, gldm_stop, gldm_set_mac_addr, gldm_set_multicast,
 gldm_set_promiscuous, gldm_send, gldm_intr, gldm_get_stats, gldm_ioctl \-
@@ -48,7 +48,7 @@ Generic LAN Driver entry points
 
 .LP
 .nf
-\fBint\fR \fBprefix_send\fR(\fBgld_mac_info_t *\fR\fImacinfo\fR, 
+\fBint\fR \fBprefix_send\fR(\fBgld_mac_info_t *\fR\fImacinfo\fR,
      \fBmblk_t *\fR\fImp\fR);
 .fi
 
@@ -59,13 +59,13 @@ Generic LAN Driver entry points
 
 .LP
 .nf
-\fBint\fR \fBprefix_get_stats\fR(\fBgld_mac_info_t *\fR\fImacinfo\fR, 
+\fBint\fR \fBprefix_get_stats\fR(\fBgld_mac_info_t *\fR\fImacinfo\fR,
      \fBstruct gld_stats *\fR\fIstats\fR);
 .fi
 
 .LP
 .nf
-\fBint\fR \fBprefix_ioctl\fR(\fBgld_mac_info_t *\fR\fImacinfo\fR, 
+\fBint\fR \fBprefix_ioctl\fR(\fBgld_mac_info_t *\fR\fImacinfo\fR,
      \fBqueue_t *\fR\fIq\fR, \fBmblk_t *\fR\fImp\fR);
 .fi
 
@@ -76,23 +76,19 @@ Solaris architecture specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fImacinfo\fR \fR
 .ad
 .RS 18n
-.rt  
 Pointer to a \fBgld_mac_info\fR(9S) structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImacaddr\fR \fR
 .ad
 .RS 18n
-.rt  
 Pointer to the beginning of a character array containing a valid MAC address.
 The array will be of the length specified by the driver in the
 \fBgldm_addrlen\fR element of the \fBgld_mac_info\fR(9S) structure.
@@ -100,12 +96,10 @@ The array will be of the length specified by the driver in the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImulticastaddr\fR \fR
 .ad
 .RS 18n
-.rt  
 Pointer to the beginning of a character array containing a multicast, group, or
 functional address. The array will be of the length specified by the driver in
 the \fBgldm_addrlen\fR element of the \fBgld_mac_info\fR(9S) structure.
@@ -113,12 +107,10 @@ the \fBgldm_addrlen\fR element of the \fBgld_mac_info\fR(9S) structure.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImultiflag\fR \fR
 .ad
 .RS 18n
-.rt  
 A flag indicating whether reception of the multicast address is to be enabled
 or disabled. This argument is specified as \fBGLD_MULTI_ENABLE\fR or
 \fBGLD_MULTI_DISABLE\fR.
@@ -126,12 +118,10 @@ or disabled. This argument is specified as \fBGLD_MULTI_ENABLE\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpromiscflag\fR \fR
 .ad
 .RS 18n
-.rt  
 A flag indicating what type of promiscuous mode, if any, is to be enabled. This
 argument is specified as \fBGLD_MAC_PROMISC_PHYS\fR,
 \fBGLD_MAC_PROMISC_MULTI\fR, or \fBGLD_MAC_PROMISC_NONE\fR.
@@ -139,36 +129,30 @@ argument is specified as \fBGLD_MAC_PROMISC_PHYS\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImp\fR \fR
 .ad
 .RS 18n
-.rt  
 Pointer to a STREAMS message block containing the packet to be transmitted or
 the ioctl to be executed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstats\fR \fR
 .ad
 .RS 18n
-.rt  
 Pointer to a \fBgld_stats\fR(9S) structure to be filled in with the current
 values of statistics counters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIq\fR \fR
 .ad
 .RS 18n
-.rt  
 Pointer to the \fBqueue\fR(9S) structure to be used in the reply to the ioctl.
 .RE
 
@@ -347,23 +331,19 @@ an error of \fBEINVAL\fR.
 \fBgldm_intr\fR(\|) must return:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_INTR_CLAIMED\fR \fR
 .ad
 .RS 23n
-.rt  
 if and only if the device definitely interrupted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_INTR_UNCLAIMED\fR \fR
 .ad
 .RS 23n
-.rt  
 if the device did not interrupt.
 .RE
 
@@ -372,24 +352,20 @@ if the device did not interrupt.
 The other functions must return:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLD_SUCCESS\fR \fR
 .ad
 .RS 21n
-.rt  
 on success. \fBgldm_stop\fR(\|) and \fBgldm_ioctl\fR(\|) should always return
 this value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLD_NORESOURCES\fR \fR
 .ad
 .RS 21n
-.rt  
 if there are insufficient resources to carry out the request at this time. Only
 \fBgldm_set_mac_addr\fR(\|), \fBgldm_set_multicast\fR(\|),
 \fBgldm_set_promiscuous\fR(\|), and \fBgldm_send\fR(\|) may return this value.
@@ -397,24 +373,20 @@ if there are insufficient resources to carry out the request at this time. Only
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLD_NOLINK\fR \fR
 .ad
 .RS 21n
-.rt  
 if \fBgldm_send\fR(\|) is called when there is no physical connection to a
 network or link partner.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLD_NOTSUPPORTED\fR \fR
 .ad
 .RS 21n
-.rt  
 if the requested function is not supported. Only \fBgldm_set_mac_addr\fR(\|),
 \fBgldm_set_multicast\fR(\|), and \fBgldm_set_promiscuous\fR(\|) may return
 this value.
@@ -422,24 +394,20 @@ this value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLD_BADARG\fR \fR
 .ad
 .RS 21n
-.rt  
 if the function detected an unsuitable argument, for example, a bad multicast
 address, a bad MAC address, or a bad packet or packet length.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLD_FAILURE\fR \fR
 .ad
 .RS 21n
-.rt  
 on hardware failure.
 .RE
 

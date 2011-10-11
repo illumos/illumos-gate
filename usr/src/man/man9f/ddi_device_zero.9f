@@ -3,18 +3,18 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_device_zero 9F "25 Sep 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_DEVICE_ZERO 9F "Sep 25, 1996"
 .SH NAME
 ddi_device_zero \- zero fill the device
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/ddi.h> 
+#include <sys/ddi.h>
 #include <sys/sunddi.h>
 
 
 
-\fBint\fR \fBddi_device_zero\fR(\fBddi_acc_handle_t\fR \fIhandle\fR, \fBcaddr_t\fR \fIdev_addr\fR, 
+\fBint\fR \fBddi_device_zero\fR(\fBddi_acc_handle_t\fR \fIhandle\fR, \fBcaddr_t\fR \fIdev_addr\fR,
      \fBsize_t\fR \fIbytecount\fR, \fBssize_t\fR \fIdev_advcnt\fR, \fBuint_t\fR \fIdev_datasz\fR);
 .fi
 
@@ -25,99 +25,81 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhandle\fR \fR
 .ad
 .RS 15n
-.rt  
 The data access handle returned from setup calls, such as
 \fBddi_regs_map_setup\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdev_addr\fR \fR
 .ad
 .RS 15n
-.rt  
 Beginning of the device address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbytecount\fR \fR
 .ad
 .RS 15n
-.rt  
 Number of bytes to zero.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdev_advcnt\fR \fR
 .ad
 .RS 15n
-.rt  
 Number of  \fIdev_datasz\fR units to advance on every access.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdev_datasz\fR \fR
 .ad
 .RS 15n
-.rt  
 The size of each data word. Possible values are defined as:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_DATA_SZ01_ACC\fR \fR
 .ad
 .RS 22n
-.rt  
 1 byte data size
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_DATA_SZ02_ACC\fR \fR
 .ad
 .RS 22n
-.rt  
 2 bytes data size
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_DATA_SZ04_ACC\fR \fR
 .ad
 .RS 22n
-.rt  
 4 bytes data size
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_DATA_SZ08_ACC\fR \fR
 .ad
 .RS 22n
-.rt  
 8 bytes data size
 .RE
 
@@ -145,23 +127,19 @@ The \fIdev_datasz\fR argument determines the size of data word on each access.
 \fBddi_device_zero()\fR returns:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR \fR
 .ad
 .RS 16n
-.rt  
 Successfully zeroed the data.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR \fR
 .ad
 .RS 16n
-.rt  
 The byte count is not a multiple of  \fIdev_datasz\fR.
 .RE
 

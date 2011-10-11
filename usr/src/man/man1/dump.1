@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dump 1 "6 Sep 2002" "SunOS 5.11" "User Commands"
+.TH DUMP 1 "Sep 6, 2002"
 .SH NAME
 dump \- dump selected parts of an object file
 .SH SYNOPSIS
@@ -43,129 +43,106 @@ This utility will accept both object files and archives of object files. It
 processes each file argument according to one or more of the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 20n
-.rt  
 Dumps the archive header of each member of an archive.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 20n
-.rt  
 Dumps the string table(s).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
 .RS 20n
-.rt  
 Dumps decoded C++ symbol table names.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 20n
-.rt  
 Dumps each file header.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR\fR
 .ad
 .RS 20n
-.rt  
 Dumps the global symbols in the symbol table of an archive.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 20n
-.rt  
 Dumps the section headers.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
 .RS 20n
-.rt  
 Dumps dynamic linking information and static shared library information, if
 available.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 20n
-.rt  
 Dumps each program execution header.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 20n
-.rt  
 Dumps relocation information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 20n
-.rt  
 Dumps section contents in hexadecimal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 20n
-.rt  
 Dumps symbol table entries.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fIindex\fR\fR
 .ad
@@ -174,19 +151,16 @@ Dumps symbol table entries.
 \fB\fB-T\fR \fIindex1\fR,\fIindex2\fR\fR
 .ad
 .RS 20n
-.rt  
 Dumps only the indexed symbol table entry defined by \fIindex\fR or a range of
 entries defined by \fIindex1\fR\fB,\fR\fIindex2\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
 .RS 20n
-.rt  
 Prints version information.
 .RE
 
@@ -196,7 +170,6 @@ The following modifiers are used in conjunction with the options listed above
 to modify their capabilities.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fInumber\fR\fR
 .ad
@@ -205,7 +178,6 @@ to modify their capabilities.
 \fB\fB-d\fR \fInumber1\fR,\fInumber2\fR\fR
 .ad
 .RS 22n
-.rt  
 Dumps the section number indicated by \fInumber\fR or the range of sections
 starting at \fInumber1\fR and ending at \fInumber2\fR. This modifier can be
 used with \fB-h\fR, \fB-s\fR, and \fB-r\fR. When \fB-d\fR is used with \fB-h\fR
@@ -223,12 +195,10 @@ output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-n\fR\fB \fR\fIname\fR\fR
 .ad
 .RS 22n
-.rt  
 Dumps information pertaining only to the named entity. This modifier can be
 used with \fB-h\fR, \fB-s\fR, \fB-r\fR, and  \fB-t\fR. When \fB-n\fR is used
 with \fB-h\fR or \fB-s\fR, the argument will be treated as the name of a
@@ -241,110 +211,90 @@ dump the section header information for the \fB\&.text\fR section.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 22n
-.rt  
 Suppresses printing of the headings.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 22n
-.rt  
 Dumps information in symbolic representation rather than numeric. This modifier
 can be used with
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 6n
-.rt  
 (date, user id, group id)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 (class, data, type, machine, version, flags)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 6n
-.rt  
 (type, flags)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
 .RS 6n
-.rt  
 (value)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 6n
-.rt  
 (type, flags)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 6n
-.rt  
 (name, type)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 6n
-.rt  
 (interpret section contents wherever possible)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 6n
-.rt  
 (type, bind)
 .RE
 

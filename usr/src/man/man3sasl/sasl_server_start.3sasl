@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sasl_server_start 3SASL "1 Oct 2003" "SunOS 5.11" "Simple Authentication Security Layer Library Functions"
+.TH SASL_SERVER_START 3SASL "Oct 1, 2003"
 .SH NAME
 sasl_server_start \- create a new server authentication object
 .SH SYNOPSIS
@@ -28,34 +28,28 @@ fails if the mechanism is not supported.
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIconn\fR\fR
 .ad
 .RS 16n
-.rt  
 The SASL context for this connection.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImech\fR\fR
 .ad
 .RS 16n
-.rt  
 The mechanism name that the client requested.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIclientin\fR\fR
 .ad
 .RS 16n
-.rt  
 The initial response from the client. The value of \fIclientin\fR is \fINULL\fR
 if the protocol lacks support for the client-send-first or if the other end did
 not have an initial send. No initial client send is distinct from an initial
@@ -64,23 +58,19 @@ send of a null string. The protocol must account for this difference.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIclientinlen\fR\fR
 .ad
 .RS 16n
-.rt  
 The length of the initial response.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIserverout\fR\fR
 .ad
 .RS 16n
-.rt  
 Created by the plugin library. The value of \fIserverout\fR is the initial
 server response to send to the client. \fIserverout\fR is allocated or freed by
 the library. It is the job of the client to send it over the network to the
@@ -90,12 +80,10 @@ done by the server.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIserveroutlen\fR\fR
 .ad
 .RS 16n
-.rt  
 The length of the initial server challenge.
 .RE
 
@@ -107,23 +95,19 @@ code.
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_OK\fR\fR
 .ad
 .RS 17n
-.rt  
 Authentication completed successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_CONTINUE\fR\fR
 .ad
 .RS 17n
-.rt  
 The call to \fBsasl_server_start()\fR was successful, and more steps are needed
 in the authentication.
 .RE
@@ -141,15 +125,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

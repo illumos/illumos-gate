@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH proc_service 3PROC "12 Oct 2007" "SunOS 5.11" "Process Control Library Functions"
+.TH PROC_SERVICE 3PROC "Oct 12, 2007"
 .SH NAME
 proc_service \- process service interfaces
 .SH SYNOPSIS
 .LP
 .nf
-#include <proc_service.h> 
+#include <proc_service.h>
 
 \fBps_err_e\fR \fBps_pdmodel\fR(\fBstruct ps_prochandle *\fR\fIph\fR,
      \fBint *\fR\fIdata_model\fR);
@@ -175,280 +175,230 @@ a functional specification that clients of \fBlibthread_db\fR and
 .SH FUNCTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBps_pdmodel()\fR\fR
 .ad
 .RS 23n
-.rt  
 Returns the data model of the target process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBps_pglobal_lookup()\fR\fR
 .ad
 .RS 23n
-.rt  
 Looks up the symbol in the symbol table of the load object in the target
 process and returns its address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBps_pglobal_sym()\fR\fR
 .ad
 .RS 23n
-.rt  
 Looks up the symbol in the symbol table of the load object in the target
 process and returns its symbol table entry.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBps_pread()\fR\fR
 .ad
 .RS 23n
-.rt  
 Copies \fIsize\fR bytes from the target process to the controlling process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBps_pwrite()\fR\fR
 .ad
 .RS 23n
-.rt  
 Copies \fIsize\fR bytes from the controlling process to the target process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBps_pdread()\fR\fR
 .ad
 .RS 23n
-.rt  
 Identical to \fBps_pread()\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBps_pdwrite()\fR\fR
 .ad
 .RS 23n
-.rt  
 Identical to \fBps_pwrite()\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBps_ptread()\fR\fR
 .ad
 .RS 23n
-.rt  
 Identical to \fBps_pread()\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBps_ptwrite()\fR\fR
 .ad
 .RS 23n
-.rt  
 Identical to \fBps_pwrite()\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBps_pstop()\fR\fR
 .ad
 .RS 23n
-.rt  
 Stops the target process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBps_pcontinue()\fR\fR
 .ad
 .RS 23n
-.rt  
 Resumes target process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBps_lstop()\fR\fR
 .ad
 .RS 23n
-.rt  
 Stops a single lightweight process ( \fBLWP\fR ) within the target process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBps_lcontinue()\fR\fR
 .ad
 .RS 23n
-.rt  
 Resumes a single \fBLWP\fR within the target process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBps_lgetregs()\fR\fR
 .ad
 .RS 23n
-.rt  
 Gets the general registers of the \fBLWP\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBps_lsetregs()\fR\fR
 .ad
 .RS 23n
-.rt  
 Sets the general registers of the \fBLWP\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBps_lgetfpregs()\fR\fR
 .ad
 .RS 23n
-.rt  
 Gets the \fBLWP`s\fR floating point register set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBps_lsetfpregs()\fR\fR
 .ad
 .RS 23n
-.rt  
 Sets the \fBLWP`s\fR floating point register set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBps_pauxv()\fR\fR
 .ad
 .RS 23n
-.rt  
 Returns a pointer to a read-only copy of the target process's auxiliary vector.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBps_kill()\fR\fR
 .ad
 .RS 23n
-.rt  
 Sends signal to target process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBps_lrolltoaddr()\fR\fR
 .ad
 .RS 23n
-.rt  
 Rolls the \fBLWP\fR out of a critical section when the process is stopped.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBps_plog()\fR\fR
 .ad
 .RS 23n
-.rt  
 Logs a message.
 .RE
 
 .SS "SPARC"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBps_lgetxregsize()\fR\fR
 .ad
 .RS 21n
-.rt  
 Returns the size of the architecture-dependent extra state registers.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBps_lgetxregs()\fR\fR
 .ad
 .RS 21n
-.rt  
 Gets the extra state registers of the \fBLWP\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBps_lsetxregs()\fR\fR
 .ad
 .RS 21n
-.rt  
 Sets the extra state registers of the \fBLWP\fR.
 .RE
 
 .SS "x86"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBps_lgetLDT()\fR\fR
 .ad
 .RS 16n
-.rt  
 Reads the local descriptor table of the \fBLWP\fR.
 .RE
 
@@ -460,13 +410,12 @@ See \fBattributes\fR(5) for description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT LevelSafe
+MT Level	Safe
 .TE
 
 .SH SEE ALSO

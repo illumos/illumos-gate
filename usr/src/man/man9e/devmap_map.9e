@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH devmap_map 9E "7 Jan 1997" "SunOS 5.11" "Driver Entry Points"
+.TH DEVMAP_MAP 9E "Jan 7, 1997"
 .SH NAME
 devmap_map \- device mapping create entry point
 .SH SYNOPSIS
@@ -14,7 +14,7 @@ devmap_map \- device mapping create entry point
 
 
 
-\fBint prefix\fR\fBdevmap_map\fR(\fBdevmap_cookie_t\fR \fIdhp\fR, \fBdev_t\fR \fIdev\fR, 
+\fBint prefix\fR\fBdevmap_map\fR(\fBdevmap_cookie_t\fR \fIdhp\fR, \fBdev_t\fR \fIdev\fR,
      \fBuint_t\fR \fIflags\fR, \fBoffset_t\fR \fIoff\fR, \fBsize_t\fR \fIlen\fR, \fBvoid **\fR\fIpvtp\fR);
 .fi
 
@@ -25,55 +25,45 @@ Solaris DDI specific (Solaris DDI).
 .SH ARGUMENTS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdhp\fR \fR
 .ad
 .RS 10n
-.rt  
 An opaque mapping handle that the system uses to describe the mapping currently
 being created.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdev\fR \fR
 .ad
 .RS 10n
-.rt  
 The device whose memory is to be mapped.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR \fR
 .ad
 .RS 10n
-.rt  
 Flags indicating type of mapping. Possible values are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAP_PRIVATE\fR \fR
 .ad
 .RS 16n
-.rt  
 Changes are private.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAP_SHARED\fR \fR
 .ad
 .RS 16n
-.rt  
 Changes should be shared.
 .RE
 
@@ -81,34 +71,28 @@ Changes should be shared.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoff\fR \fR
 .ad
 .RS 10n
-.rt  
 User offset within the logical device memory at which the mapping begins.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlen\fR \fR
 .ad
 .RS 10n
-.rt  
 Length (in bytes) of the memory to be mapped.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpvtp\fR \fR
 .ad
 .RS 10n
-.rt  
 A pointer to be filled in by device drivers with the driver private mapping
 data.
 .RE
@@ -155,23 +139,19 @@ example, a driver may allocate a memory region to store the device context if
 \fBdevmap_map()\fR returns the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 12n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBNon-zero\fR
 .ad
 .RS 12n
-.rt  
 An error occurred.
 .RE
 

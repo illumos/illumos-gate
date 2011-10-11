@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH usb_completion_reason 9S "5 Jan 2004" "SunOS 5.11" "Data Structures for Drivers"
+.TH USB_COMPLETION_REASON 9S "Jan 5, 2004"
 .SH NAME
 usb_completion_reason \- USB completion reason definitions
 .SH SYNOPSIS
@@ -30,56 +30,46 @@ detected.
 The usb_cr_t enumerated type contains the following definitions:
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_CR_OK\fR
 .ad
 .RS 27n
-.rt  
 The transfer completed without any errors being detected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_CR_CRC\fR
 .ad
 .RS 27n
-.rt  
 CRC error was detected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_CR_BITSTUFFING\fR
 .ad
 .RS 27n
-.rt  
 Bit stuffing violation was detected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_CR_DATA_TOGGLE_MM\fR
 .ad
 .RS 27n
-.rt  
 Data toggle packet identifier did not match expected value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_CR_STALL\fR
 .ad
 .RS 27n
-.rt  
 The device endpoint indicated that it is stalled. If autoclearing is enabled
 for the request (request attributes has USB_ATTRS_AUTOCLEARING set), check the
 callback flags (usb_cb_flags_t) in the callback handler to determine whether
@@ -90,58 +80,48 @@ information on autoclearing.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_CR_DEV_NOT_RESP\fR
 .ad
 .RS 27n
-.rt  
 Host controller timed out while waiting for device to respond.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_CR_PID_CHECKFAILURE\fR
 .ad
 .RS 27n
-.rt  
 Check bits on the packet identifier returned from the device             were
 not as expected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_CR_UNEXP_PID\fR
 .ad
 .RS 27n
-.rt  
 Packet identifier received was not valid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_CR_DATA_OVERRUN\fR
 .ad
 .RS 27n
-.rt  
 Amount of data returned exceeded either the maximum packet size of the endpoint
 or the remaining buffer size.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_CR_DATA_UNDERRUN\fR
 .ad
 .RS 27n
-.rt  
 Amount of data returned was not sufficient to fill the specified buffer and the
 USB_ATTRS_SHORT_XFER_OK attribute was not set. Please see
 \fBusb_request_attributes\fR(9S) for more information on allowance of short
@@ -150,128 +130,106 @@ transfers.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_CR_BUFFER_OVERRUN\fR
 .ad
 .RS 27n
-.rt  
 A device sent data faster than the system could digest it.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_CR_BUFFER_UNDERRUN\fR
 .ad
 .RS 27n
-.rt  
 The host controller could not get data from the system fast enough to keep up
 with the required USB data rate.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_CR_TIMEOUT\fR
 .ad
 .RS 27n
-.rt  
 A timeout specified in a control, bulk, or one-time interrupt request has
 expired.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_CR_NOT_ACCESSED\fR
 .ad
 .RS 27n
-.rt  
 Request was not accessed nor processed by the host controller.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_CR_NO_RESOURCES\fR
 .ad
 .RS 27n
-.rt  
 No resources were available to continue servicing a periodic interrupt or
 isochronous request.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_CR_STOPPED_POLLING\fR
 .ad
 .RS 27n
-.rt  
 Servicing of the current periodic request cannot continue because polling on an
 interrupt-IN or isochronous-IN endpoint has stopped.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_CR_PIPE_CLOSING\fR
 .ad
 .RS 27n
-.rt  
 Request was not started because the pipe to which it was queued was closing or
 closed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_CR_PIPE_RESET\fR
 .ad
 .RS 27n
-.rt  
 Request was not started because the pipe to which it was queued was reset.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_CR_NOT_SUPPORTED\fR
 .ad
 .RS 27n
-.rt  
 Request or command is not supported.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_CR_FLUSHED\fR
 .ad
 .RS 27n
-.rt  
 Request was not completed because the pipe to which it was queued went to an
 error state, became stalled, was reset or was closed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_CR_HC_HARDWARE_ERR\fR
 .ad
 .RS 27n
-.rt  
 Request could not be completed due to a general host             controller
 hardware error.
 .RE
@@ -284,15 +242,14 @@ See attributes(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitecturePCI-based systems
+Architecture	PCI-based systems
 _
-Interface stabilityCommitted
+Interface stability	Committed
 .TE
 
 .SH SEE ALSO

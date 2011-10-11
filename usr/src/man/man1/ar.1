@@ -1,7 +1,7 @@
 '\" te
-.\"  Copyright 1989 AT&T 
+.\"  Copyright 1989 AT&T
 .\"  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
-.\" Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved 
+.\" Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at  http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text
 .\" are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical
@@ -10,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ar 1 "24 Aug 2009" "SunOS 5.11" "User Commands"
+.TH AR 1 "Aug 24, 2009"
 .SH NAME
 ar \- maintain portable archive or library
 .SH SYNOPSIS
@@ -111,48 +111,40 @@ update the contents of such an archive, the symbol table is rebuilt. The
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 6n
-.rt  
 Positions new \fIfile\fRs in \fIarchive\fR after the file named by the
 \fIposname\fR operand.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
 .RS 6n
-.rt  
 Positions new \fIfile\fRs in \fIarchive\fR before the file named by the
 \fIposname\fR operand.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 6n
-.rt  
 Suppresses the diagnostic message that is written to standard error by default
 when \fIarchive\fR is created.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
 .RS 6n
-.rt  
 Prevents extracted files from replacing like-named files in the file system.
 This option is useful when \fB-T\fR is also used to prevent truncated file
 names from replacing files with the same prefix.
@@ -160,35 +152,29 @@ names from replacing files with the same prefix.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 6n
-.rt  
 Deletes one or more \fIfile\fRs from \fIarchive\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 6n
-.rt  
 Positions new \fIfile\fRs in \fIarchive\fR before the file named by the
 \fIposname\fR operand. This option is quivalent to \fB-b\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
 .RS 6n
-.rt  
 Moves \fIfile\fRs. If \fB-a\fR, \fB-b\fR, or \fB-i\fR with the \fIposname\fR
 operand are specified, the \fB-m\fR option moves \fIfile\fRs to the new
 position. Otherwise, \fB-m\fR moves \fIfile\fRs to the end of \fIarchive\fR.
@@ -196,12 +182,10 @@ position. Otherwise, \fB-m\fR moves \fIfile\fRs to the end of \fIarchive\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 6n
-.rt  
 Prints the contents of \fIfile\fRs in \fIarchive\fR to standard output. If no
 \fIfile\fRs are specified, the contents of all files in \fIarchive\fR are
 written in the order of the archive.
@@ -209,12 +193,10 @@ written in the order of the archive.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
 .RS 6n
-.rt  
 Quickly appends \fIfile\fRs to the end of \fIarchive\fR. Positioning options
 \fB-a\fR, \fB-b\fR, and \fB-i\fR are invalid. The command does not check
 whether the added \fIfile\fRs are already in \fIarchive\fR. This option is
@@ -224,12 +206,10 @@ piece-by-piece.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 6n
-.rt  
 Replaces or adds \fIfile\fRs in \fIarchive\fR. If \fIarchive\fR does not exist,
 a new archive file is created and a diagnostic message is written to standard
 error, unless the \fB-c\fR option is specified. If no \fIfile\fRs are specified
@@ -244,12 +224,10 @@ or \fB-i\fR) \fIposname\fR. Otherwise, the new files are placed at the end.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 6n
-.rt  
 Forces the regeneration of the archive symbol table even if \fBar\fR is not
 invoked with an option that will modify the archive contents. This command is
 useful to restore the archive symbol table after the \fBstrip\fR(1) command has
@@ -258,12 +236,10 @@ been used on the archive.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 6n
-.rt  
 Prints a table of contents of \fIarchive\fR. The files specified by the
 \fIfile\fR operands are included in the written list. If no \fIfile\fR operands
 are specified, all files in \fIarchive\fR are included in the order of the
@@ -272,12 +248,10 @@ archive.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR\fR
 .ad
 .RS 6n
-.rt  
 Allows file name truncation of extracted files whose archive names are longer
 than the file system can support. By default, extracting a file with a name
 that is too long is an error. In that case, a diagnostic message is written and
@@ -286,12 +260,10 @@ the file is not extracted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
 .RS 6n
-.rt  
 Updates older files. When used with the \fB-r\fR option, files within
 \fIarchive\fR are replaced only if the corresponding \fIfile\fR has a
 modification time that is at least as new as the modification time of the file
@@ -300,12 +272,10 @@ within \fIarchive\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 Gives verbose output. When used with options \fB-d\fR, \fB-r\fR, or \fB-x\fR,
 the \fB-v\fR option writes a detailed file-by-file description of the archive
 creation and the constituent \fIfile\fRs, and maintenance activity. When used
@@ -319,12 +289,10 @@ standard error.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
 .RS 6n
-.rt  
 Prints its version number on standard error.
 .RE
 
@@ -334,24 +302,20 @@ Prints its version number on standard error.
 The following options are supported for \fB/usr/xpg4/bin/ar\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 Same as the \fB/usr/bin/ar\fR version, except when writing to an archive, no
 message is written to the standard error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 6n
-.rt  
 Extracts the files named by the \fIfile\fR operands from \fIarchive\fR. The
 contents of \fIarchive\fR are not changed. If no \fIfile\fR operands are given,
 all files in \fIarchive\fR are extracted. If the file name of a file extracted
@@ -367,23 +331,19 @@ is being extracted, the results are undefined. The modification time of each
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIarchive\fR\fR
 .ad
 .RS 11n
-.rt  
 A path name of the archive file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fR
 .ad
 .RS 11n
-.rt  
 A path name. Only the last component is used when comparing against the names
 of files in the archive. If two or more \fIfile\fR operands have the same last
 path name component (see \fBbasename\fR(1)), the results are unspecified. The
@@ -393,12 +353,10 @@ added to or replaced in the archive.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIposname\fR\fR
 .ad
 .RS 11n
-.rt  
 The name of a file in the archive file, used for relative positioning. See
 options \fB-m\fR and \fB-r\fR.
 .RE
@@ -411,24 +369,20 @@ that affect the execution of \fBar\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, \fBLC_TIME\fR, and \fBNLSPATH\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTMPDIR\fR\fR
 .ad
 .RS 10n
-.rt  
 Determine the pathname that overrides the default directory for temporary
 files, if any.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTZ\fR\fR
 .ad
 .RS 10n
-.rt  
 Determine the timezone used to calculate date and time strings written by
 \fBar\fR \fB-tv\fR. If \fBTZ\fR is unset or null, an unspecified default
 timezone is used.
@@ -440,23 +394,19 @@ timezone is used.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -469,13 +419,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SS "\fB/usr/xpg4/bin/ar\fR"
@@ -483,15 +432,14 @@ Interface StabilityCommitted
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO

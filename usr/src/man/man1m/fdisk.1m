@@ -3,18 +3,18 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH fdisk 1M "2 Jul 2009" "SunOS 5.11" "System Administration Commands"
+.TH FDISK 1M "Jul 2, 2009"
 .SH NAME
 fdisk \- create or modify fixed disk partition table
 .SH SYNOPSIS
 .LP
 .nf
-\fBfdisk\fR [\fB-o\fR \fIoffset\fR] [\fB-s\fR \fIsize\fR] [\fB-P\fR \fIfill_patt\fR] [\fB-S\fR \fIgeom_file\fR] 
-     [\fB-w\fR | \fB-r\fR | \fB-d\fR | \fB-n\fR | \fB-I\fR | \fB-B\fR | \fB-t\fR | \fB-T\fR | \fB-g\fR | \fB-G\fR | \fB-R\fR | \fB-E\fR] 
-     [-\fB-F\fR \fIfdisk_file\fR] [ [\fB-v\fR] \fB-W\fR {\fIfdisk_file\fR | \(mi}] 
-     [\fB-h\fR] [\fB-b\fR \fImasterboot\fR] 
-     [\fB-A\fR \fIid\fR : \fIact\fR : \fIbhead\fR : \fIbsect\fR : \fIbcyl\fR : \fIehead\fR : \fIesect\fR : 
-         \fIecyl\fR : \fIrsect\fR : \fInumsect\fR] 
+\fBfdisk\fR [\fB-o\fR \fIoffset\fR] [\fB-s\fR \fIsize\fR] [\fB-P\fR \fIfill_patt\fR] [\fB-S\fR \fIgeom_file\fR]
+     [\fB-w\fR | \fB-r\fR | \fB-d\fR | \fB-n\fR | \fB-I\fR | \fB-B\fR | \fB-t\fR | \fB-T\fR | \fB-g\fR | \fB-G\fR | \fB-R\fR | \fB-E\fR]
+     [-\fB-F\fR \fIfdisk_file\fR] [ [\fB-v\fR] \fB-W\fR {\fIfdisk_file\fR | \(mi}]
+     [\fB-h\fR] [\fB-b\fR \fImasterboot\fR]
+     [\fB-A\fR \fIid\fR : \fIact\fR : \fIbhead\fR : \fIbsect\fR : \fIbcyl\fR : \fIehead\fR : \fIesect\fR :
+         \fIecyl\fR : \fIrsect\fR : \fInumsect\fR]
      [\fB-D\fR \fIid\fR : \fIact\fR : \fIbhead:\fR \fIbsect\fR : \fIbcyl\fR : \fIehead:\fR \fIesect\fR :
          \fIecyl\fR : \fIrsect\fR : \fInumsect\fR] \fIrdevice\fR
 .fi
@@ -102,7 +102,6 @@ metadata.
 The menu options for interactive mode given by the \fBfdisk\fR program are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCreate a partition\fR\fR
 .ad
@@ -121,7 +120,6 @@ fit, a message is displayed and the program returns to the original menu.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBChange Active (Boot from) partition\fR\fR
 .ad
@@ -134,7 +132,6 @@ bootstrap will look for the second-stage bootstrap, otherwise known as the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDelete a partition\fR\fR
 .ad
@@ -146,7 +143,6 @@ this will destroy all data in that partition.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBChange between Solaris and Solaris2 Partition IDs\fR\fR
 .ad
@@ -159,7 +155,6 @@ in the disk partition and is provided for compatibility with older software.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEdit/View extended partitions\fR\fR
 .ad
@@ -174,12 +169,10 @@ the list of options that the extended partition submenu supports. Given below
 is the list:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBa\fR\fR
 .ad
 .RS 5n
-.rt  
 Add a logical drive.
 .sp
 Use this submenu option to add a logical drive. There are three pieces of
@@ -191,12 +184,10 @@ list the supported partitions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd\fR\fR
 .ad
 .RS 5n
-.rt  
 Delete a logical drive.
 .sp
 Use this submenu option to delete a logical drive. The only input required is
@@ -205,12 +196,10 @@ the number of the logical drive that is to be deleted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBh\fR\fR
 .ad
 .RS 5n
-.rt  
 Display the help menu.
 .sp
 This submenu option displays the supported operations in the extended partition
@@ -219,12 +208,10 @@ submenu.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBi\fR\fR
 .ad
 .RS 5n
-.rt  
 Change the id of the logical drive.
 .sp
 Use this submenu option to change the system ID of the existing logical drives.
@@ -234,12 +221,10 @@ when in this submenu.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBp\fR\fR
 .ad
 .RS 5n
-.rt  
 Display the logical drive layout.
 .sp
 Displays the logical drive information to stdout. This output reflects any
@@ -250,12 +235,10 @@ not committed to the disk until return to the main menu (using the submenu
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBr\fR\fR
 .ad
 .RS 5n
-.rt  
 Return to the main \fBfdisk\fR menu.
 .sp
 Exit the extended partition submenu and return to the main menu.
@@ -269,24 +252,20 @@ Use the following options to include your modifications to the partition table
 at this time or to cancel the session without modifying the table:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBExit\fR\fR
 .ad
 .RS 10n
-.rt  
 This option writes the new version of the table created during this session
 with \fBfdisk\fR out to the fixed disk, and exits the program.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCancel\fR\fR
 .ad
 .RS 10n
-.rt  
 This option exits without modifying the partition table.
 .RE
 
@@ -296,7 +275,6 @@ This option exits without modifying the partition table.
 The following options apply to \fBfdisk\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR \fIid:act:bhead:bsect:bcyl:ehead:esect:ecyl:rsect:numsect\fR\fR
 .ad
@@ -309,7 +287,6 @@ partition if the \fBfdisk\fR table changes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR \fImaster_boot\fR\fR
 .ad
@@ -321,7 +298,6 @@ master boot program is \fB/usr/lib/fs/ufs/mboot\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-B\fR\fR
 .ad
@@ -334,7 +310,6 @@ partition will be limited to 2 TB.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
@@ -347,7 +322,6 @@ with \fB-F\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR \fIid:act:bhead:bsect:bcyl:ehead:esect:ecyl:rsect:numsect\fR\fR
 .ad
@@ -361,7 +335,6 @@ Solaris partition if the \fBfdisk\fR table changes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-E\fR\fR
 .ad
@@ -372,7 +345,6 @@ Create an \fBEFI\fR partition that uses the entire disk.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR \fIfdisk_file\fR\fR
 .ad
@@ -396,24 +368,20 @@ whitespace or colons, and have the following format:
 \&...where the entries have the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIid\fR\fR
 .ad
 .RS 11n
-.rt  
 This is the type of partition and the correct numeric values may be found in
 \fBfdisk.h\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIact\fR\fR
 .ad
 .RS 11n
-.rt  
 This is the active partition flag; \fB0\fR means not active and \fB128\fR means
 active. For logical drives, this flag will always be set to 0 even if specified
 as 128 by the user.
@@ -421,84 +389,70 @@ as 128 by the user.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbhead\fR\fR
 .ad
 .RS 11n
-.rt  
 This is the head where the partition starts. If this is set to \fB0\fR,
 \fBfdisk\fR will correctly fill this in from other information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbsect\fR\fR
 .ad
 .RS 11n
-.rt  
 This is the sector where the partition starts. If this is set to \fB0\fR,
 \fBfdisk\fR will correctly fill this in from other information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbcyl\fR\fR
 .ad
 .RS 11n
-.rt  
 This is the cylinder where the partition starts. If this is set to \fB0\fR,
 \fBfdisk\fR will correctly fill this in from other information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIehead\fR\fR
 .ad
 .RS 11n
-.rt  
 This is the head where the partition ends. If this is set to \fB0\fR,
 \fBfdisk\fR will correctly fill this in from other information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIesect\fR\fR
 .ad
 .RS 11n
-.rt  
 This is the sector where the partition ends. If this is set to \fB0\fR,
 \fBfdisk\fR will correctly fill this in from other information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIecyl\fR\fR
 .ad
 .RS 11n
-.rt  
 This is the cylinder where the partition ends. If this is set to \fB0\fR,
 \fBfdisk\fR will correctly fill this in from other information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrsect\fR\fR
 .ad
 .RS 11n
-.rt  
 The relative sector from the beginning of the disk where the partition starts.
 This must be specified and can be used by \fBfdisk\fR to fill in other fields.
 For logical drives, you must make sure that there are at least 63 free sectors
@@ -507,12 +461,10 @@ before the \fIrsect\fR specified for a logical drive.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInumsect\fR\fR
 .ad
 .RS 11n
-.rt  
 The size in sectors of this disk partition. This must be specified and can be
 used by \fBfdisk\fR to fill in other fields.
 .RE
@@ -521,7 +473,6 @@ used by \fBfdisk\fR to fill in other fields.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR\fR
 .ad
@@ -533,7 +484,6 @@ for the format).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-G\fR\fR
 .ad
@@ -545,7 +495,6 @@ option for the format).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
@@ -557,7 +506,6 @@ for each.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I\fR\fR
 .ad
@@ -570,7 +518,6 @@ option (see above).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
@@ -584,7 +531,6 @@ mode if the \fB-n\fR option is specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIoffset\fR\fR
 .ad
@@ -596,7 +542,6 @@ and \fB-w\fR. Zero is assumed when this option is not used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR \fIfill_patt\fR\fR
 .ad
@@ -610,7 +555,6 @@ as long words and fills each block (see \fB-o\fR and \fB-s\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
@@ -622,7 +566,6 @@ the starting point and size of the operation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR\fR
 .ad
@@ -633,7 +576,6 @@ Treat disk as read-only. This is for testing purposes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIsize\fR\fR
 .ad
@@ -644,7 +586,6 @@ Number of blocks to perform operation on (see \fB-o\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR \fIgeom_file\fR\fR
 .ad
@@ -667,78 +608,64 @@ format:
 where the entries have the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpcyl\fR\fR
 .ad
 .RS 12n
-.rt  
 This is the number of physical cylinders for the drive.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIncyl\fR\fR
 .ad
 .RS 12n
-.rt  
 This is the number of usable cylinders for the drive.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIacyl\fR\fR
 .ad
 .RS 12n
-.rt  
 This is the number of alt cylinders for the drive.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbcyl\fR\fR
 .ad
 .RS 12n
-.rt  
 This is the number of offset cylinders for the drive (should be zero).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInheads\fR\fR
 .ad
 .RS 12n
-.rt  
 The number of heads for this drive.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInsectors\fR\fR
 .ad
 .RS 12n
-.rt  
 The number of sectors per track.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsectsiz\fR\fR
 .ad
 .RS 12n
-.rt  
 The size in bytes of a sector.
 .RE
 
@@ -746,7 +673,6 @@ The size in bytes of a sector.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
@@ -758,7 +684,6 @@ table boundaries.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR\fR
 .ad
@@ -769,7 +694,6 @@ Remove incorrect slice table entries that span partition table boundaries.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -782,7 +706,6 @@ support virtual geometry. (x86 only)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR\fR
 .ad
@@ -794,7 +717,6 @@ starting point and size of the operation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-W\fR \fB\(mi\fR\fR
 .ad
@@ -805,7 +727,6 @@ Output the disk table to \fBstdout\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-W\fR \fIfdisk_file\fR\fR
 .ad
@@ -818,23 +739,19 @@ with the \fB-F\fR option below.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/rdsk/c0t0d0p0\fR\fR
 .ad
 .RS 25n
-.rt  
 Raw device associated with the fixed disk.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/fs/ufs/mboot\fR\fR
 .ad
 .RS 25n
-.rt  
 Default master boot program.
 .RE
 
@@ -846,13 +763,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Architecturex86 and SPARC
+Architecture	x86 and SPARC
 .TE
 
 .SH SEE ALSO
@@ -867,7 +783,6 @@ Most messages will be self-explanatory. The following may appear immediately
 after starting the program:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFdisk\fR: \fBcannot open\fR <\fBdevice\fR>\fR
 .ad
@@ -878,7 +793,6 @@ This indicates that the device name argument is not valid.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFdisk\fR: \fBunable to get device parameters for device\fR
 <\fBdevice\fR>\fR
@@ -891,7 +805,6 @@ in the fixed disk driver.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFdisk\fR: \fBerror reading partition table\fR\fR
 .ad
@@ -904,7 +817,6 @@ the configuration of the fixed disk.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFdisk\fR: \fBerror writing boot record\fR\fR
 .ad

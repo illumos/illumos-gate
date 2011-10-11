@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cpc_bind_curlwp 3CPC "05 Mar 2007" "SunOS 5.11" "CPU Performance Counters Library Functions"
+.TH CPC_BIND_CURLWP 3CPC "Mar 05, 2007"
 .SH NAME
 cpc_bind_curlwp, cpc_bind_pctx, cpc_bind_cpu, cpc_unbind, cpc_request_preset,
 cpc_set_restart \- bind request sets to hardware counters
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lcpc\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lcpc\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <libcpc.h>
 
 \fBint\fR \fBcpc_bind_curlwp\fR(\fBcpc_t *\fR\fIcpc\fR, \fBcpc_set_t *\fR\fIset\fR, \fBuint_t\fR \fIflags\fR);
@@ -141,12 +141,10 @@ specific error description to \fBstderr\fR.
 These functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 11n
-.rt  
 For \fBcpc_bind_curlwp()\fR, the system has Pentium 4 processors with
 HyperThreading and at least one physical processor has more than one hardware
 thread online. See NOTES.
@@ -160,12 +158,10 @@ access to the requested hypervisor event was denied.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 11n
-.rt  
 For \fBcpc_bind_curlwp()\fR and \fBcpc_bind_pctx()\fR, the performance counters
 are not available for use by the application.
 .sp
@@ -176,12 +172,10 @@ to a CPU at a time.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 11n
-.rt  
 The set does not contain any requests or \fBcpc_set_add_request()\fR was not
 called.
 .sp
@@ -205,23 +199,19 @@ For \fBcpc_request_preset()\fR and \fBcpc_set_restart()\fR, the calling
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSYS\fR\fR
 .ad
 .RS 11n
-.rt  
 For \fBcpc_bind_cpu()\fR, the specified processor is not online.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSUP\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fBcpc_bind_curlwp()\fR function was called with the
 \fBCPC_OVF_NOTIFY_EMT\fR flag, but the underlying processor is not capable of
 detecting counter overflow.
@@ -229,12 +219,10 @@ detecting counter overflow.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBESRCH\fR\fR
 .ad
 .RS 11n
-.rt  
 For \fBcpc_bind_pctx()\fR, the specified \fBLWP\fR in the target process does
 not exist.
 .RE
@@ -314,14 +302,14 @@ for (iter = 1; iter <= 20; iter++) {
              break;
 
          /* ==> Computation to be measured goes here <== */
- 
+
         if (cpc_set_sample(cpc, set, after) == -1)
              break;
- 
+
         cpc_buf_sub(cpc, diff, after, before);
         cpc_buf_get(cpc, diff, ind0, &val0);
         cpc_buf_get(cpc, diff, ind1, &val1);
-        
+
          (void) printf("%3d: %" PRId64 " %" PRId64 "\en", iter,
                 val0, val1);
 }
@@ -367,7 +355,7 @@ emt_handler(int sig, siginfo_t *sip, void *arg)
          psignal(sig, "example");
          psiginfo(sip, "example");
          return;
-     }   
+     }
 
      (void) printf("lwp%d - si_addr %p ucontext: %%pc %p %%sp %p\en",
          _lwp_self(), (void *)sip->si_addr,
@@ -383,14 +371,14 @@ emt_handler(int sig, siginfo_t *sip, void *arg)
      (void) fflush(stdout);
 
      /*
-     * Update a request's preset and restart the counters. Counters which 
-     * have not been preset with cpc_request_preset() will resume counting 
-     * from their current value. 
+     * Update a request's preset and restart the counters. Counters which
+     * have not been preset with cpc_request_preset() will resume counting
+     * from their current value.
      */
-     (cpc_request_preset(cpc, ind1, val1) != 0) 
-        error("cannot set preset for request %d: %s", ind1, 
-             strerror(errno)); 
-        if (cpc_set_restart(cpc, set) != 0)                                   
+     (cpc_request_preset(cpc, ind1, val1) != 0)
+        error("cannot set preset for request %d: %s", ind1,
+             strerror(errno));
+        if (cpc_set_restart(cpc, set) != 0)
              error("cannot restart lwp%d: %s", _lwp_self(), strerror(errno));
 }
 .fi
@@ -405,29 +393,29 @@ library and creates a set:
 .in +2
 .nf
 #define PRESET (UINT64_MAX - 999ull)
- 
+
      struct sigaction act;
-     ... 
+     ...
      act.sa_sigaction = emt_handler;
      bzero(&act.sa_mask, sizeof (act.sa_mask));
      act.sa_flags = SA_RESTART|SA_SIGINFO;
      if (sigaction(SIGEMT, &act, NULL) == -1)
          error("sigaction: %s", strerror(errno));
- 
+
      if ((index = cpc_set_add_request(cpc, set, event, PRESET,
         CPC_COUNT_USER | CPC_OVF_NOTIFY_EMT, 0, NULL)) != 0)
         error("cannot add request to set: %s", strerror(errno));
- 
+
      if ((buf = cpc_buf_create(cpc, set)) == NULL)
         error("cannot create buffer: %s", strerror(errno));
- 
+
      if (cpc_bind_curlwp(cpc, set, 0) == -1)
          error("cannot bind lwp%d: %s", _lwp_self(), strerror(errno));
- 
+
      for (iter = 1; iter <= 20; iter++) {
          /* ==> Computation to be measured goes here <== */
      }
- 
+
      cpc_unbind(cpc, set);      /* done */
 .fi
 .in -2
@@ -440,15 +428,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

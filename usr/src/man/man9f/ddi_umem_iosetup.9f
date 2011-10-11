@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_umem_iosetup 9F "4 Feb 2003" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_UMEM_IOSETUP 9F "Feb 4, 2003"
 .SH NAME
 ddi_umem_iosetup \- Setup I/O requests to application memory
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/ddi.h> 
+#include <sys/ddi.h>
 #include <sys/sunddi.h>
 
 
@@ -26,90 +26,74 @@ Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcookie\fR \fR
 .ad
 .RS 14n
-.rt  
 The kernel memory cookie allocated by \fBddi_umem_lock\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoff\fR \fR
 .ad
 .RS 14n
-.rt  
 Offset from the start of the cookie.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlen\fR \fR
 .ad
 .RS 14n
-.rt  
 Length of the I/O request in bytes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdirection\fR \fR
 .ad
 .RS 14n
-.rt  
 Must be set to \fBB_READ\fR for reads from the device or \fBB_WRITE\fR for
 writes to the device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdev\fR \fR
 .ad
 .RS 14n
-.rt  
 Device number
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIblkno\fR \fR
 .ad
 .RS 14n
-.rt  
 Block number on device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIiodone\fR \fR
 .ad
 .RS 14n
-.rt  
 Specific \fBbiodone\fR(9F) routine.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsleepflag\fR \fR
 .ad
 .RS 14n
-.rt  
 Determines whether caller can sleep for memory. Possible flags are
 \fBDDI_UMEM_SLEEP\fR to allow sleeping until memory is available, or
 \fBDDI_UMEM_NOSLEEP\fR to return \fBNULL\fR immediately if memory is not

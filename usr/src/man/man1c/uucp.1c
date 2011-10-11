@@ -1,19 +1,19 @@
 '\" te
 .\"  Copyright 1989 AT&T Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH uucp 1C "9 Mar 2005" "SunOS 5.11" "Communication Commands"
+.TH UUCP 1C "Mar 9, 2005"
 .SH NAME
 uucp, uulog, uuname \- UNIX-to-UNIX system copy
 .SH SYNOPSIS
 .LP
 .nf
-\fBuucp\fR [\fB-c\fR | \fB-C\fR] [\fB-d\fR | \fB-f\fR] [\fB-g\fR\fIgrade\fR] [\fB-jmr\fR] [\fB-n\fR\fIuser\fR] [\fB-s\fR\fIfile\fR] 
+\fBuucp\fR [\fB-c\fR | \fB-C\fR] [\fB-d\fR | \fB-f\fR] [\fB-g\fR\fIgrade\fR] [\fB-jmr\fR] [\fB-n\fR\fIuser\fR] [\fB-s\fR\fIfile\fR]
      [\fB-x\fR\fIdebug_level\fR] \fIsource-file\fR \fIdestination-file\fR
 .fi
 
@@ -50,57 +50,47 @@ The \fBuuname\fR utility lists the names of systems known to \fBuucp\fR.
 The following options are supported by \fBuucp\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 18n
-.rt  
 Does not copy local file to the spool directory for transfer to the remote
 machine (default).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
 .RS 18n
-.rt  
 Forces the copy of local files to the spool directory for transfer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 18n
-.rt  
 Makes all necessary directories for the file copy (default).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 18n
-.rt  
 Does not make intermediate directories for the file copy.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR \fIgrade\fR\fR
 .ad
 .RS 18n
-.rt  
 \fIgrade\fR can be either a single letter, number, or a string of alphanumeric
 characters defining a service grade. The \fBuuglist\fR command can determine
 whether it is appropriate to use the single letter, number, or a string of
@@ -111,12 +101,10 @@ to use a single letter or number as a grade of service.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-j\fR\fR
 .ad
 .RS 18n
-.rt  
 Prints the \fBuucp\fR job identification string on standard output. This job
 identification can be used by \fBuustat\fR to obtain the status of a \fBuucp\fR
 job or to terminate a \fBuucp\fR job. The \fBuucp\fR job is valid as long as
@@ -125,23 +113,19 @@ the job remains queued on the local system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
 .RS 18n
-.rt  
 Sends mail to the requester when the copy is complete.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fIuser\fR\fR
 .ad
 .RS 18n
-.rt  
 Notifies \fIuser\fR on the remote system that a file was sent.
 .sp
 When multiple \fB-n\fR options are passed in, \fBuucp\fR only retains the value
@@ -150,35 +134,29 @@ specified for the last \fB-n\fR option. This is the only user notified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 18n
-.rt  
 Does not start the file transfer, just queue the job.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIfile\fR\fR
 .ad
 .RS 18n
-.rt  
 Reports status of the transfer to \fIfile\fR. This option is accepted for
 compatibility, but it is ignored because it is insecure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR \fIdebug_level\fR\fR
 .ad
 .RS 18n
-.rt  
 Produce debugging output on standard output. \fIdebug_level\fR is a number
 between 0 and 9. As \fIdebug_level\fR increases to 9, more detailed debugging
 information is given. This option may not be available on all systems.
@@ -190,23 +168,19 @@ information is given. This option may not be available on all systems.
 The following options cause \fBuulog\fR to print logging information:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIsys\fR\fR
 .ad
 .RS 13n
-.rt  
 Prints information about file transfer work involving system \fIsys\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIsystem\fR\fR
 .ad
 .RS 13n
-.rt  
 Executes a \fBtail\fR \fB-f\fR command of the file transfer log for
 \fIsystem\fR. You must press BREAK to exit this function.
 .RE
@@ -216,23 +190,19 @@ Executes a \fBtail\fR \fB-f\fR command of the file transfer log for
 Other options used in conjunction with the above options are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 11n
-.rt  
 Looks in the \fBuuxqt\fR log file for the given system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-\fR\fInumber\fR\fR
 .ad
 .RS 11n
-.rt  
 Executes a \fBtail\fR command of \fInumber\fR lines.
 .RE
 
@@ -242,12 +212,10 @@ Executes a \fBtail\fR command of \fInumber\fR lines.
 The following options are supported by \fBuuname\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 6n
-.rt  
 Displays the names of systems known to \fBcu\fR. The two lists are the same,
 unless your machine is using different \fBSystems\fR files for \fBcu\fR and
 \fBuucp\fR. See the \fBSysfiles\fR file.
@@ -255,12 +223,10 @@ unless your machine is using different \fBSystems\fR files for \fBcu\fR and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 6n
-.rt  
 Displays the local system name.
 .RE
 
@@ -369,68 +335,56 @@ that affect the execution of \fBuucp\fR: \fBLANG\fR, \fBLC_ALL\fR,
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/uucp/*\fR\fR
 .ad
 .RS 27n
-.rt  
 other data files
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/spool/uucp\fR\fR
 .ad
 .RS 27n
-.rt  
 spool directories
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/uucp/*\fR\fR
 .ad
 .RS 27n
-.rt  
 other program files
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/spool/uucppublic/*\fR\fR
 .ad
 .RS 27n
-.rt  
 public directory for receiving and sending
 .RE
 
@@ -442,13 +396,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPE ATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE 	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

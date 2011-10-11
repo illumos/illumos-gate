@@ -4,7 +4,7 @@
 .\" This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 3 of the License, or (at your option) any later version.  This program is distributed
 .\" in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.  You should have received a copy of the GNU General Public License along with this program.
 .\" If not, see: http://www.gnu.org/copyleft/gpl.html
-.TH parted 1M "27 May 2009" "SunOS 5.11" "System Administration Commands"
+.TH PARTED 1M "May 27, 2009"
 .SH NAME
 parted \- partition manipulation program
 .SH SYNOPSIS
@@ -34,12 +34,10 @@ subcommands, most of which have their own options and operands. These
 subcommands are described below. \fBparted\fR has an optional operand:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevice\fR\fR
 .ad
 .RS 10n
-.rt  
 The block device to be used. When none is given, \fBparted\fR uses the first
 block device it finds.
 .RE
@@ -50,7 +48,6 @@ block device it finds.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR, \fB--help\fR\fR
 .ad
@@ -61,7 +58,6 @@ Displays a help message.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR, \fB--interactive\fR\fR
 .ad
@@ -72,7 +68,6 @@ Prompts for user intervention.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR, \fB--list\fR\fR
 .ad
@@ -83,7 +78,6 @@ Lists partition layout on all block devices.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR, \fB--machine\fR\fR
 .ad
@@ -94,7 +88,6 @@ Displays machine-parseable output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR, \fB--script\fR\fR
 .ad
@@ -105,7 +98,6 @@ Never prompts for user intervention.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR, \fB--version\fR\fR
 .ad
@@ -121,7 +113,6 @@ If you omit a subcommand in a \fBparted\fR command line, the utility issues a
 command prompt.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcheck\fR \fIpartition\fR\fR
 .ad
@@ -132,7 +123,6 @@ Do a simple check on \fIpartition\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcp\fR [\fIsource-device\fR] \fIsource\fR \fIdest\fR\fR
 .ad
@@ -145,7 +135,6 @@ current device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhelp\fR \fIcommand\fR\fR
 .ad
@@ -156,7 +145,6 @@ Display general help, or help on a command, if specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmkfs\fR \fIpartition\fR \fIfs-type\fR\fR
 .ad
@@ -168,7 +156,6 @@ Make a filesystem \fIfs-type\fR on partition. \fIfs-type\fR can be one of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmklabel\fR \fIlabel-type\fR\fR
 .ad
@@ -181,7 +168,6 @@ should be one of \fBbsd\fR, \fBdvh\fR, \fBgpt\fR, \fBloop\fR, \fBmac\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmkpart\fR \fIpart-type\fR [\fIfs-type\fR] \fIstart\fR \fIend\fR\fR
 .ad
@@ -196,7 +182,6 @@ should be one of \fBprimary\fR, \fBlogical\fR, or \fBextended\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmkpartfs\fR \fIpart-type\fR \fIfs-type\fR \fIstart\fR \fIend\fR\fR
 .ad
@@ -208,7 +193,6 @@ Make a \fIpart-type\fR partition with file system \fIfs-type\fR, beginning at
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmove\fR \fIpartition\fR \fIstart\fR \fIend\fR\fR
 .ad
@@ -220,7 +204,6 @@ that \fBmove\fR never changes the minor number.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBname\fR \fIpartition\fR \fIname\fR\fR
 .ad
@@ -232,7 +215,6 @@ and GPT disk labels. The name can be placed in quotes, if necessary.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprint\fR\fR
 .ad
@@ -243,7 +225,6 @@ Display the partition table.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBquit\fR\fR
 .ad
@@ -254,7 +235,6 @@ Exit from \fBparted\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrescue\fR \fIstart\fR \fIend\fR\fR
 .ad
@@ -267,7 +247,6 @@ an entry for it in the partition table.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBresize\fR \fIpartition\fR \fIstart\fR \fIend\fR\fR
 .ad
@@ -279,7 +258,6 @@ ends at \fIend\fR (by default, in megabytes).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrm\fR \fIpartition\fR\fR
 .ad
@@ -290,7 +268,6 @@ Delete \fIpartition\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBselect\fR \fIdevice\fR\fR
 .ad
@@ -303,7 +280,6 @@ raid device, or an SVM or LVM logical volume if necessary.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBset\fR \fIpartition\fR \fIflag\fR \fIstate\fR\fR
 .ad
@@ -317,7 +293,6 @@ flags are: \fBboot\fR, \fBroot\fR, \fBswap\fR, \fBhidden\fR, \fBraid\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunit\fR \fIunit\fR\fR
 .ad
@@ -333,7 +308,6 @@ for input, and a human-friendly form for output).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBversion\fR\fR
 .ad
@@ -350,13 +324,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityUncommitted
+Interface Stability	Uncommitted
 .TE
 
 .SH SEE ALSO

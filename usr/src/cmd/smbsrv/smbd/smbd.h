@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -55,8 +56,8 @@ void smbd_set_secmode(int);
 boolean_t smbd_online(void);
 void smbd_online_wait(const char *);
 
-void smbd_spool_init(void);
-void smbd_spool_fini(void);
+void smbd_spool_start(void);
+void smbd_spool_stop(void);
 int smbd_cups_init(void);
 void smbd_cups_fini(void);
 void smbd_load_printers(void);

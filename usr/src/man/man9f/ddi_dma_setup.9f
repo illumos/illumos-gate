@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_dma_setup 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_DMA_SETUP 9F "Jan 16, 2006"
 .SH NAME
 ddi_dma_setup \- setup DMA resources
 .SH SYNOPSIS
@@ -14,7 +14,7 @@ ddi_dma_setup \- setup DMA resources
 
 
 
-\fBint\fR \fBddi_dma_setup\fR(\fBdev_info_t *\fR\fIdip\fR, \fBddi_dma_req_t *\fR\fIdmareqp\fR, 
+\fBint\fR \fBddi_dma_setup\fR(\fBdev_info_t *\fR\fIdip\fR, \fBddi_dma_req_t *\fR\fIdmareqp\fR,
      \fBddi_dma_handle_t *\fR\fIhandlep\fR);
 .fi
 
@@ -28,34 +28,28 @@ used instead.
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 11n
-.rt  
 A pointer to the device's \fBdev_info\fR structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdmareqp\fR\fR
 .ad
 .RS 11n
-.rt  
 A pointer to a \fBDMA\fR request structure (see \fBddi_dma_req\fR(9S)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhandlep\fR\fR
 .ad
 .RS 11n
-.rt  
 A pointer to a \fBDMA\fR handle to be filled in. See below for a discussion of
 a handle. If \fIhandlep\fR is \fINULL\fR, the call to \fBddi_dma_setup()\fR is
 considered an advisory call, in which case no resources are allocated, but a
@@ -97,24 +91,20 @@ When \fBDMA\fR transfer completes, the driver should free up the allocated
 The \fBddi_dma_setup()\fR function returns:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_DMA_MAPPED\fR\fR
 .ad
 .RS 23n
-.rt  
 Successfully allocated resources for the object. In the case of an
 \fBadvisory\fR call, this indicates that the request is legal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_DMA_PARTIAL_MAP\fR\fR
 .ad
 .RS 23n
-.rt  
 Successfully allocated resources for a \fBpart\fR of the object. This is
 acceptable when partial transfers are allowed using a flag setting in the
 \fBddi_dma_req\fR structure (see \fBddi_dma_req\fR(9S) and
@@ -123,34 +113,28 @@ acceptable when partial transfers are allowed using a flag setting in the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_DMA_NORESOURCES\fR\fR
 .ad
 .RS 23n
-.rt  
 When no resources are available.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_DMA_NOMAPPING\fR\fR
 .ad
 .RS 23n
-.rt  
 The object cannot be reached by the device requesting the resources.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_DMA_TOOBIG\fR\fR
 .ad
 .RS 23n
-.rt  
 The object is too big and exceeds the available resources. The maximum size
 varies depending on machine and configuration.
 .RE
@@ -170,13 +154,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Stability LevelObsolete
+Stability Level	Obsolete
 .TE
 
 .SH SEE ALSO

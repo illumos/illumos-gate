@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH stty 1B "14 Feb 2005" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.TH STTY 1B "Feb 14, 2005"
 .SH NAME
 stty \- set the options for a terminal
 .SH SYNOPSIS
@@ -27,35 +27,29 @@ CTRL-h. In this case, recall that CTRL-h is the same as the BACKSPACE key.) The
 sequence \fB^@\fR means that an option has a null value.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 6n
-.rt  
 Reports all of the option settings.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR\fR
 .ad
 .RS 6n
-.rt  
 Reports current settings in a form that can be used as an argument to another
 \fBstty\fR command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 6n
-.rt  
 Reports all the option settings with the control characters in an easy to read
 column format.
 .RE
@@ -69,46 +63,38 @@ by all hardware interfaces. The options are selected from the following:
 .SS "Special Requests"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBall\fR\fR
 .ad
 .RS 14n
-.rt  
 Reports the same option settings as \fBstty\fR without arguments,  but with the
 control characters in column format.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBeverything\fR\fR
 .ad
 .RS 14n
-.rt  
 Everything \fBstty\fR knows about is printed. Same as \fB-h\fR option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBspeed\fR\fR
 .ad
 .RS 14n
-.rt  
 The terminal speed alone is reported on the standard output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsize\fR\fR
 .ad
 .RS 14n
-.rt  
 The terminal (window) sizes are printed on the standard output, first rows and
 then columns. This option is only appropriate if currently running a window
 system.
@@ -120,7 +106,6 @@ always report the settings to the standard output.
 .SS "Control Modes"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBparenb\fR (\fB-parenb\fR)\fR
 .ad
@@ -131,7 +116,6 @@ Enable (disable) parity generation and detection.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBparext\fR (\fB\fR\fB-parext\fR\fB)\fR\fR
 .ad
@@ -143,7 +127,6 @@ parity.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBparodd\fR (\fB-parodd\fR)\fR
 .ad
@@ -154,7 +137,6 @@ Select odd (even) parity, or mark (space) parity if \fBparext\fR is enabled.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcs5 cs6 cs7 cs8\fR\fR
 .ad
@@ -165,7 +147,6 @@ Select character size (see \fBtermio\fR(7I)).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -176,7 +157,6 @@ Hang up line immediately.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB110 300 600 1200 1800 2400 4800 9600 19200 exta 38400 extb\fR\fR
 .ad
@@ -188,7 +168,6 @@ supported by all hardware interfaces.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBispeed 0 110 300 600 1200 1800 2400 4800 9600 19200 exta 38400 extb\fR\fR
 .ad
@@ -201,7 +180,6 @@ the input baud rate is specified by the value of the output baud rate.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBospeed 0 110 300 600 1200 1800 2400 4800 9600 19200 exta 38400 extb\fR\fR
 .ad
@@ -214,7 +192,6 @@ line is hung up immediately.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhupcl\fR (\fB-hupcl\fR)\fR
 .ad
@@ -225,7 +202,6 @@ Hang up (do not hang up) connection on last close.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhup\fR (\fB-hup\fR)\fR
 .ad
@@ -236,7 +212,6 @@ Same as \fBhupcl\fR (\fB-hupcl\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcstopb\fR (\fB-cstopb\fR)\fR
 .ad
@@ -247,7 +222,6 @@ Use two (one) stop bits per character.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcread\fR (\fB-cread\fR)\fR
 .ad
@@ -258,7 +232,6 @@ Enable (disable) the receiver.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclocal\fR (\fB-clocal\fR)\fR
 .ad
@@ -269,7 +242,6 @@ Assume a line without (with) modem control.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcrtscts\fR (\fB-crtscts\fR)\fR
 .ad
@@ -281,7 +253,6 @@ line.  Suspends  output until the  \fBCTS\fR (Clear to Send) line is  raised.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBloblk\fR (\fB-loblk\fR)\fR
 .ad
@@ -293,358 +264,294 @@ Block (do not block) output from a non-current layer.
 .SS "Input Modes"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBignbrk\fR (\fB-ignbrk\fR)\fR
 .ad
 .RS 22n
-.rt  
 Ignore (do not ignore) break on input.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbrkint\fR (\fB-brkint\fR)\fR
 .ad
 .RS 22n
-.rt  
 Signal (do not signal) INTR on break.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBignpar\fR (\fB-ignpar\fR)\fR
 .ad
 .RS 22n
-.rt  
 Ignore (do not ignore) parity errors.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBparmrk\fR (\fB-parmrk\fR)\fR
 .ad
 .RS 22n
-.rt  
 Mark (do not mark) parity errors (see \fBtermio\fR(7I)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinpck\fR (\fB-inpck\fR)\fR
 .ad
 .RS 22n
-.rt  
 Enable (disable) input parity checking.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBistrip\fR (\fB-istrip\fR)\fR
 .ad
 .RS 22n
-.rt  
 Strip (do not strip) input characters to seven bits.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinlcr\fR (\fB-inlcr\fR)\fR
 .ad
 .RS 22n
-.rt  
 Map (do not map) NL to CR on input.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBigncr\fR (\fB-igncr\fR)\fR
 .ad
 .RS 22n
-.rt  
 Ignore (do not ignore) CR on input.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBicrnl\fR (\fB-icrnl\fR)\fR
 .ad
 .RS 22n
-.rt  
 Map (do not map) CR to NL on input.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBiuclc\fR (\fB-iuclc\fR)\fR
 .ad
 .RS 22n
-.rt  
 Map (do not map) upper-case alphabetics to lower case on input.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBixon\fR (\fB-ixon\fR)\fR
 .ad
 .RS 22n
-.rt  
 Enable (disable) START/STOP output control.  Output is stopped by sending an
 STOP and started by sending an START.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBixany\fR (\fB-ixany\fR)\fR
 .ad
 .RS 22n
-.rt  
 Allow any character (only START) to restart output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdecctlq\fR (\fB-decctlq\fR)\fR
 .ad
 .RS 22n
-.rt  
 Same as \fB-ixany\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBixoff\fR (\fB-ixoff\fR)\fR
 .ad
 .RS 22n
-.rt  
 Request that the system send (not send) START/STOP characters when the input
 queue is nearly empty/full.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtandem\fR (\fB\fR\fB-tandem\fR\fB)\fR\fR
 .ad
 .RS 22n
-.rt  
 Same as \fBixoff\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBimaxbel\fR (\fB\fR\fB-imaxbel\fR\fB)\fR\fR
 .ad
 .RS 22n
-.rt  
 Echo (do not echo)  \fBBEL\fR when the input line is too long.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBiexten\fR (\fB\fR\fB-iexten\fR\fB)\fR\fR
 .ad
 .RS 22n
-.rt  
 Enable (disable) extended (implementation-defined) functions for input data.
 .RE
 
 .SS "Output Modes"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBopost\fR (\fB-opost\fR)\fR
 .ad
 .RS 23n
-.rt  
 Post-process output (do not post-process output; ignore all other output
 modes).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBolcuc\fR (\fB-olcuc\fR)\fR
 .ad
 .RS 23n
-.rt  
 Map (do not map) lower-case alphabetics to upper case on output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBonlcr\fR (\fB-onlcr\fR)\fR
 .ad
 .RS 23n
-.rt  
 Map (do not map) NL to CR-NL on output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBocrnl\fR (\fB-ocrnl\fR)\fR
 .ad
 .RS 23n
-.rt  
 Map (do not map) CR to NL on output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBonocr\fR (\fB-onocr\fR)\fR
 .ad
 .RS 23n
-.rt  
 Do not (do) output CRs at column zero.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBonlret\fR (\fB-onlret\fR)\fR
 .ad
 .RS 23n
-.rt  
 On the terminal NL performs (does not perform) the CR function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBofill\fR (\fB-ofill\fR)\fR
 .ad
 .RS 23n
-.rt  
 Use fill characters (use timing) for delays.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBofdel\fR (\fB-ofdel\fR)\fR
 .ad
 .RS 23n
-.rt  
 Fill characters are DELs (NULs).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcr0 cr1 cr2 cr3\fR\fR
 .ad
 .RS 23n
-.rt  
 Select style of delay for carriage returns (see \fBtermio\fR(7I)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnl0 nl1\fR\fR
 .ad
 .RS 23n
-.rt  
 Select style of delay for line-feeds (see \fBtermio\fR(7I)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtab0 tab1 tab2 tab3\fR\fR
 .ad
 .RS 23n
-.rt  
 Select style of delay for horizontal tabs (see \fBtermio\fR(7I)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbs0 bs1\fR\fR
 .ad
 .RS 23n
-.rt  
 Select style of delay for backspaces (see \fBtermio\fR(7I)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBff0 ff1\fR\fR
 .ad
 .RS 23n
-.rt  
 Select style of delay for form-feeds (see \fBtermio\fR(7I)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvt0 vt1\fR\fR
 .ad
 .RS 23n
-.rt  
 Select style of delay for vertical tabs (see \fBtermio\fR(7I)).
 .RE
 
 .SS "Local Modes"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBisig\fR (\fB-isig\fR)\fR
 .ad
 .RS 24n
-.rt  
 Enable (disable) the checking of characters against the special control
 characters INTR, QUIT, and SWTCH. For information on \fBSWTCH\fR, see
 \fBNOTES\fR.
@@ -652,57 +559,47 @@ characters INTR, QUIT, and SWTCH. For information on \fBSWTCH\fR, see
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBicanon\fR (\fB-icanon\fR)\fR
 .ad
 .RS 24n
-.rt  
 Enable (disable) canonical input (ERASE and KILL processing). Does not set MIN
 or TIME.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcbreak\fR (\fB-cbreak\fR)\fR
 .ad
 .RS 24n
-.rt  
 Equivalent to \fB-icanon min 1 time 0\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxcase\fR (\fB-xcase\fR)\fR
 .ad
 .RS 24n
-.rt  
 Canonical (unprocessed) upper/lower-case presentation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBecho\fR (\fB-echo\fR)\fR
 .ad
 .RS 24n
-.rt  
 Echo back (do not echo back) every character typed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBechoe\fR (\fB-echoe\fR)\fR
 .ad
 .RS 24n
-.rt  
 Echo (do not echo) ERASE character as a backspace-space-backspace string.
 Note:  This mode erases the ERASEed character on many CRT terminals; however,
 it does \fInot\fR keep track of column position and, as a result, can be
@@ -711,191 +608,157 @@ confusing on escaped characters, tabs, and backspaces.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcrterase\fR (\fB-crterase\fR)\fR
 .ad
 .RS 24n
-.rt  
 Same as \fBechoe\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBechok\fR (\fB-echok\fR)\fR
 .ad
 .RS 24n
-.rt  
 Echo (do not echo) NL after KILL character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlfkc\fR (\fB-lfkc\fR)\fR
 .ad
 .RS 24n
-.rt  
 The same as \fBechok\fR (\fB-echok\fR); obsolete.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBechonl\fR (\fB-echonl\fR)\fR
 .ad
 .RS 24n
-.rt  
 Echo (do not echo) NL.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoflsh\fR (\fB-noflsh\fR)\fR
 .ad
 .RS 24n
-.rt  
 Disable (enable) flush after INTR, QUIT, or SWTCH. For information on
 \fBSWTCH\fR, see \fBNOTES\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstwrap\fR (\fB-stwrap\fR)\fR
 .ad
 .RS 24n
-.rt  
 Disable (enable) truncation of lines longer than 79 characters on a synchronous
 line.  (Does not apply to the 3B2.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtostop\fR (\fB-tostop\fR)\fR
 .ad
 .RS 24n
-.rt  
 Send (do not send)  \fBSIGTTOU\fR for background processes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBechoctl\fR (\fB\fR\fB-echoctl\fR\fB)\fR\fR
 .ad
 .RS 24n
-.rt  
 Echo (do not echo) control characters as ^\fIchar\fR, delete as ^?
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBctlecho\fR (\fB\fR\fB-ctlecho\fR\fB)\fR\fR
 .ad
 .RS 24n
-.rt  
 Same as \fBechoctl\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBechoprt\fR (\fB\fR\fB-echoprt\fR\fB)\fR\fR
 .ad
 .RS 24n
-.rt  
 Echo (do not echo) erase character as character is ``erased''.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprterase\fR (\fB-prterase\fR)\fR
 .ad
 .RS 24n
-.rt  
 Same as \fBechoprt\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBechoke\fR (\fB\fR\fB-echoke\fR\fB)\fR\fR
 .ad
 .RS 24n
-.rt  
 BS-SP-BS erase (do not BS-SP-BS erase) entire line on line kill.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcrtkill\fR (\fB-crtkill\fR)\fR
 .ad
 .RS 24n
-.rt  
 Same as \fBechoke\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBflusho\fR (\fB\fR\fB-flusho\fR\fB)\fR\fR
 .ad
 .RS 24n
-.rt  
 Output is (is not) being flushed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpendin\fR (\fB\fR\fB-pendin\fR\fB)\fR\fR
 .ad
 .RS 24n
-.rt  
 Retype (do not retype) pending input at next read or input character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstflush\fR (\fB-stflush\fR)\fR
 .ad
 .RS 24n
-.rt  
 Enable (disable) flush on a synchronous line after every \fBwrite\fR(2). (Does
 not apply to the 3B2.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstappl\fR (\fB-stappl\fR)\fR
 .ad
 .RS 24n
-.rt  
 Use application mode (use line mode) on a synchronous line. (Does not apply to
 the 3B2.)
 .RE
@@ -903,196 +766,162 @@ the 3B2.)
 .SS "Hardware Flow Control Modes"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrtsxoff\fR (\fB-rtsxoff\fR)\fR
 .ad
 .RS 24n
-.rt  
 Enable (disable) RTS hardware flow control on input.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBctsxon\fR (\fB-ctsxon\fR)\fR
 .ad
 .RS 24n
-.rt  
 Enable (disable) CTS hardware flow control on output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdterxoff\fR (\fB-dterxoff\fR)\fR
 .ad
 .RS 24n
-.rt  
 Enable (disable) DTER hardware flow control on input.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrlsdxon\fR (\fB-rlsdxon\fR)\fR
 .ad
 .RS 24n
-.rt  
 Enable (disable) RLSD hardware flow control on output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBisxoff\fR (\fB-isxoff\fR)\fR
 .ad
 .RS 24n
-.rt  
 Enable (disable) isochronous hardware flow control on input.
 .RE
 
 .SS "Clock Modes"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxcibrg\fR\fR
 .ad
 .RS 12n
-.rt  
 Get transmit clock from internal baud rate generator.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxctset\fR\fR
 .ad
 .RS 12n
-.rt  
 Get the transmit clock from transmitter signal element timing (DCE source)
 lead, CCITT V.24 circuit 114, EIA-232-D pin 15.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxcrset\fR\fR
 .ad
 .RS 12n
-.rt  
 Get transmit clock from receiver signal element timing (DCE source) lead, CCITT
 V.24 circuit 115, EIA-232-D pin 17.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrcibrg\fR\fR
 .ad
 .RS 12n
-.rt  
 Get receive clock from internal baud rate generator.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrctset\fR\fR
 .ad
 .RS 12n
-.rt  
 Get receive clock from transmitter signal element timing (DCE source) lead,
 CCITT V.24 circuit 114, EIA-232-D pin 15.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrcrset\fR\fR
 .ad
 .RS 12n
-.rt  
 Get receive clock from receiver signal element timing (DCE source) lead, CCITT
 V.24 circuit 115, EIA-232-D pin 17.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtsetcoff\fR\fR
 .ad
 .RS 12n
-.rt  
 Transmitter signal element timing clock not provided.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtsetcrc\fR\fR
 .ad
 .RS 12n
-.rt  
 Output receive clock on transmitter signal element timing (DTE source) lead,
 CCITT V.24 circuit 113, EIA-232-D pin 24, clock source.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtsetcxc\fR\fR
 .ad
 .RS 12n
-.rt  
 Output transmit clock on transmitter signal element timing (DTE source) lead,
 CCITT V.24 circuit 113, EIA-232-D pin 24, clock source.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrsetcoff\fR\fR
 .ad
 .RS 12n
-.rt  
 Receiver signal element timing clock not provided.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrsetcrc\fR\fR
 .ad
 .RS 12n
-.rt  
 Output receive clock on receiver signal element timing (DTE source) lead, CCITT
 V.24 circuit 128, no EIA-232-D pin, clock source.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrsetcxc\fR\fR
 .ad
 .RS 12n
-.rt  
 Output transmit clock on receiver signal element timing (DTE source) lead,
 CCITT V.24 circuit 128, no EIA-232-D pin, clock source.
 .RE
@@ -1100,12 +929,10 @@ CCITT V.24 circuit 128, no EIA-232-D pin, clock source.
 .SS "Control Assignments"
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcontrol-character c\fR\fR
 .ad
 .RS 23n
-.rt  
 Set \fIcontrol-character\fR to \fIc\fR, where \fIcontrol-character\fR is
 \fBintr\fR, \fBquit\fR, \fBerase\fR, \fBkill\fR, \fBeof\fR, \fBeol\fR,
 \fBeol2\fR, \fBswtch\fR, \fBstart\fR, \fBstop\fR, \fBsusp\fR, \fBdsusp\fR,
@@ -1120,213 +947,175 @@ information on \fBSWTCH\fR, see \fBNOTES\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBline\fR\fI i\fR\fR
 .ad
 .RS 23n
-.rt  
 Set line discipline to \fIi\fR (0 < \fIi\fR < 127 ).
 .RE
 
 .SS "Combination Modes"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBevenp\fR or \fBparity\fR\fR
 .ad
 .RS 24n
-.rt  
 Enable \fBparenb\fR and \fBcs7\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-evenp\fR, or \fB-parity\fR\fR
 .ad
 .RS 24n
-.rt  
 Disable \fBparenb\fR, and set \fBcs8\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBeven\fR (\fB-even\fR)\fR
 .ad
 .RS 24n
-.rt  
 Same as \fBevenp\fR (\fB-evenp\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBoddp\fR\fR
 .ad
 .RS 24n
-.rt  
 Enable \fBparenb\fR, \fBcs7\fR, and \fBparodd\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-oddp\fR\fR
 .ad
 .RS 24n
-.rt  
 Disable \fBparenb\fR and \fBparodd\fR, and set \fBcs8\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBodd\fR (\fB-odd\fR)\fR
 .ad
 .RS 24n
-.rt  
 Same as  \fBoddp\fR (\fB-oddp\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBspacep\fR\fR
 .ad
 .RS 24n
-.rt  
 Enable \fBparenb\fR, \fBcs7\fR, and \fBparext\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-spacep\fR\fR
 .ad
 .RS 24n
-.rt  
 Disable \fBparenb\fR and \fBparext\fR, and set \fBcs8\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmarkp\fR\fR
 .ad
 .RS 24n
-.rt  
 Enable \fBparenb\fR, \fBcs7\fR, \fBparodd\fR, and \fBparext\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-markp\fR\fR
 .ad
 .RS 24n
-.rt  
 Disable \fBparenb\fR, \fBparodd\fR, and \fBparext\fR, and set \fBcs8\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBraw\fR (\fB-raw\fR or \fBcooked\fR)\fR
 .ad
 .RS 24n
-.rt  
 Enable (disable) raw input and output (no ERASE, KILL, INTR, QUIT, SWTCH, EOT,
 or output post processing). For information on \fBSWTCH\fR, see \fBNOTES\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnl\fR (\fB-nl\fR)\fR
 .ad
 .RS 24n
-.rt  
 Unset (set) \fBicrnl\fR, \fBonlcr\fR. In addition \fB-nl\fR unsets \fBinlcr\fR,
 \fBigncr\fR,  \fBocrnl\fR, and \fBonlret\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlcase\fR (\fB-lcase\fR)\fR
 .ad
 .RS 24n
-.rt  
 Set (unset) \fBxcase\fR, \fBiuclc\fR, and \fBolcuc\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLCASE\fR (\fB-LCASE\fR)\fR
 .ad
 .RS 24n
-.rt  
 Same as \fBlcase\fR (\fB-lcase\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtabs\fR (\fB-tabs\fR or \fBtab3\fR)\fR
 .ad
 .RS 24n
-.rt  
 Preserve (expand to spaces) tabs when printing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBek\fR\fR
 .ad
 .RS 24n
-.rt  
 Reset ERASE and KILL characters back to normal DEL and CTRL-u, respectively.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsane\fR\fR
 .ad
 .RS 24n
-.rt  
 Reset all modes to some reasonable values.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBterm\fR\fR
 .ad
 .RS 24n
-.rt  
 Set all modes suitable for the terminal type \fIterm\fR, where \fIterm\fR is
 one of \fBtty33\fR, \fBtty37\fR, \fBvt05\fR,  \fBtn300\fR, \fBti700\fR, or
 \fBtek\fR.
@@ -1334,59 +1123,49 @@ one of \fBtty33\fR, \fBtty37\fR, \fBvt05\fR,  \fBtn300\fR, \fBti700\fR, or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBasync\fR\fR
 .ad
 .RS 24n
-.rt  
 Set normal asynchronous communications where clock settings are \fBxcibrg\fR,
 \fBrcibrg\fR,  \fBtsetcoff\fR and \fBrsetcoff\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlitout (\fR\fB-litout\fR\fB)\fR\fR
 .ad
 .RS 24n
-.rt  
 Disable (enable) \fBparenb\fR, \fBistrip\fR, and \fBopost\fR, and set \fBcs8\fR
 (\fBcs7\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpass8 (\fR\fB-pass8\fR\fB)\fR\fR
 .ad
 .RS 24n
-.rt  
 Disable (enable) \fBparenb\fR and \fBistrip\fR, and set \fBcs8 \fR (\fBcs7\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcrt\fR\fR
 .ad
 .RS 24n
-.rt  
 Set options for a \fBCRT\fR (\fBechoe\fR, \fBechoctl\fR, and, if >= 1200 baud,
 \fBechoke\fR.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdec\fR\fR
 .ad
 .RS 24n
-.rt  
 Set all modes suitable for Digital Equipment Corp. operating systems users
 ERASE, KILL, and INTR characters to \fB^?\fR, \fB^U\fR, and \fB^C\fR,
 \fBdecctlq\fR, and \fBcrt\fR.)
@@ -1395,56 +1174,46 @@ ERASE, KILL, and INTR characters to \fB^?\fR, \fB^U\fR, and \fB^C\fR,
 .SS "Window Size"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrows\fR\fIn\fR\fR
 .ad
 .RS 12n
-.rt  
 Set window size to \fIn\fR \fIrows\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcolumns\fR\fIn\fR\fR
 .ad
 .RS 12n
-.rt  
 Set window size to \fIn\fR \fIcolumns\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcols\fR\fIn\fR\fR
 .ad
 .RS 12n
-.rt  
 An alias for \fBcolumns\fR\fI n\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBypixels\fR\fIn\fR\fR
 .ad
 .RS 12n
-.rt  
 Set vertical window size to \fIn\fR \fIpixels\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxpixels\fR\fIn\fR\fR
 .ad
 .RS 12n
-.rt  
 Set horizontal window size to \fIn\fR \fIpixels\fR.
 .RE
 

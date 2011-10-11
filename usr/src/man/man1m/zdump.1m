@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH zdump 1M "3 Jan 2006" "SunOS 5.11" "System Administration Commands"
+.TH ZDUMP 1M "Jan 3, 2006"
 .SH NAME
 zdump \- time zone dumper
 .SH SYNOPSIS
@@ -31,23 +31,19 @@ time routines in \fBlibc\fR. See \fBctime\fR(3C) and \fBmktime\fR(3C).
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--\fR\fIversion\fR\fR
 .ad
 .RS 22n
-.rt  
 Outputs version information and exits.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 22n
-.rt  
 Displays the entire contents of the time zone database file for \fIzonename\fR.
 Prints the time at the lowest possible time value; the time one day after the
 lowest possible time value; the times both one second before and exactly at
@@ -61,12 +57,10 @@ otherwise.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR [\fIloyear\fR],\fIhiyear\fR\fR
 .ad
 .RS 22n
-.rt  
 Cuts off the verbose output near the start of the given year(s) . By default,
 the program cuts off verbose output near the start of the years -500 and 2500.
 .RE
@@ -77,35 +71,29 @@ the program cuts off verbose output near the start of the years -500 and 2500.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/zoneinfo\fR\fR
 .ad
 .RS 27n
-.rt  
 Standard zone information directory
 .RE
 
@@ -117,13 +105,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStable
+Interface Stability	Stable
 .TE
 
 .SH SEE ALSO

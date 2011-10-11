@@ -1,9 +1,9 @@
 '\" te
-.\" Copyright (C) 2008, Sun Microsystems, Inc. All Rights Reserved 
+.\" Copyright (C) 2008, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mconnect 1 "28 Jan 2008" "SunOS 5.11" "User Commands"
+.TH MCONNECT 1 "Jan 28, 2008"
 .SH NAME
 mconnect \- connect to SMTP mail server socket
 .SH SYNOPSIS
@@ -27,24 +27,20 @@ server. An interrupt closes the connection immediately and exits.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fIport\fR\fR
 .ad
 .RS 10n
-.rt  
 Specify the port number instead of the default \fBSMTP\fR port (number 25) as
 the next argument.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 10n
-.rt  
 \fBRaw\fR mode: disable the default line buffering and input handling. This
 produces an effect similar to  \fBtelnet\fR(1) to port number 25.
 .RE
@@ -55,12 +51,10 @@ produces an effect similar to  \fBtelnet\fR(1) to port number 25.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhostname\fR\fR
 .ad
 .RS 12n
-.rt  
 The name of a given host.
 .RE
 
@@ -71,12 +65,10 @@ The \fBmconnect\fR command is IPv6-enabled. See \fBip6\fR(7P).
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/mail/sendmail.hf\fR\fR
 .ad
 .RS 25n
-.rt  
 Help file for \fBSMTP\fR commands
 .RE
 

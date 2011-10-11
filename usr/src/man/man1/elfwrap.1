@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH elfwrap 1 "17 March 2008" "SunOS 5.11" "User Commands"
+.TH ELFWRAP 1 "Mar 17, 2008"
 .SH NAME
 elfwrap \- wrap data in an \fBELF\fR file
 .SH SYNOPSIS
@@ -48,7 +48,6 @@ The \fBbasename\fR(1) of each data file is used to create various pieces of
 relocatable object.
 .sp
 .ne 2
-.mk
 .na
 \fBAn \fBELF\fR section named \fB\&.isv-data\fR\fR
 .ad
@@ -59,7 +58,6 @@ This section contains the entire contents of the input data file.
 
 .sp
 .ne 2
-.mk
 .na
 \fBAn \fBELF\fR symbol named \fBisv-data_start\fR\fR
 .ad
@@ -70,7 +68,6 @@ This symbol reflects the starting address of the \fB\&.isv-data\fR section.
 
 .sp
 .ne 2
-.mk
 .na
 \fBAn \fBELF\fR symbol named \fBisv-data_end\fR\fR
 .ad
@@ -86,7 +83,6 @@ This symbol reflects the address of the first location after the
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-64\fR\fR
 .ad
@@ -97,7 +93,6 @@ Create a 64-bit \fBELF\fR relocatable object.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIrelobj-file\fR\fR
 .ad
@@ -108,7 +103,6 @@ Produce a relocatable object that is named \fIrelobj-file\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR target=\fBsparc\fR | \fBx86\fR\fR
 .ad
@@ -132,8 +126,8 @@ The following example encapsulates the system \fBpasswd\fR file and the system
 .nf
 example% \fBelfwrap -o passgroup.o /etc/passwd /etc/group\fR
 example% \fBelfdump -s passgroup.o | egrep "passwd|group"\fR
-  [2]  0x00000000 0x00000000  SECT LOCL  D  0 .passwd        
-  [3]  0x00000000 0x00000000  SECT LOCL  D  0 .group         
+  [2]  0x00000000 0x00000000  SECT LOCL  D  0 .passwd
+  [3]  0x00000000 0x00000000  SECT LOCL  D  0 .group
   [7]  0x00000000 0x000002f0  OBJT GLOB  D  0 .passwd  passwd_start
   [8]  0x000002f0 0x00000000  OBJT GLOB  D  0 .passwd  passwd_end
   [9]  0x00000000 0x00000121  OBJT GLOB  D  0 .group   group_start
@@ -181,12 +175,10 @@ nobody4:x:65534:65534:SunOS 4.x NFS Anonymous Access User:/:
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBa.wrap.o\fR\fR
 .ad
 .RS 12n
-.rt  
 The default relocatable object file created.
 .RE
 
@@ -198,13 +190,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

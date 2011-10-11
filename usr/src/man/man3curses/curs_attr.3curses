@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH curs_attr 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.TH CURS_ATTR 3CURSES "Dec 31, 1996"
 .SH NAME
 curs_attr, attroff, wattroff, attron, wattron, attrset, wattrset, standend,
 wstandend, standout, wstandout \- curses character and window attribute control
@@ -89,100 +89,82 @@ the routines \fBattron()\fR, \fBattroff()\fR, and \fBattrset()\fR, or OR-ed
 with the characters passed to \fBaddch()\fR.
 .sp
 .ne 2
-.mk
 .na
 \fBA_STANDOUT\fR
 .ad
 .RS 17n
-.rt  
 Best highlighting mode of the terminal
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBA_UNDERLINE\fR
 .ad
 .RS 17n
-.rt  
 Underlining
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBA_REVERSE\fR
 .ad
 .RS 17n
-.rt  
 Reverse video
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBA_BLINK\fR
 .ad
 .RS 17n
-.rt  
 Blinking
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBA_DIM\fR
 .ad
 .RS 17n
-.rt  
 Half bright
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBA_BOLD\fR
 .ad
 .RS 17n
-.rt  
 Extra bright or bold
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBA_ALTCHARSET\fR
 .ad
 .RS 17n
-.rt  
 Alternate character set
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBA_CHARTEXT\fR
 .ad
 .RS 17n
-.rt  
 Bit-mask to extract a character
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBCOLOR_PAIR(\fIn\fR)\fR
 .ad
 .RS 17n
-.rt  
 Color-pair number \fIn\fR
 .RE
 
@@ -191,12 +173,10 @@ Color-pair number \fIn\fR
 The following macro is the reverse of \fBCOLOR_PAIR(\fR\fIn\fR\fB):\fR
 .sp
 .ne 2
-.mk
 .na
 \fBPAIR_NUMBER(\fIattrs\fR)\fR
 .ad
 .RS 22n
-.rt  
 Returns the pair number associated with the \fBCOLOR_PAIR(\fR\fIn\fR) attribute
 .RE
 
@@ -212,13 +192,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelUnsafe
+MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO

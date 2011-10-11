@@ -1,11 +1,11 @@
 '\" te
-.\" Copyright 1989 AT&T 
+.\" Copyright 1989 AT&T
 .\" Copyright (C) 2004, Sun Microsystems, Inc.
 .\" All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH su 1M "26 Feb 2004" "SunOS 5.11" "System Administration Commands"
+.TH SU 1M "Feb 26, 2004"
 .SH NAME
 su \- become superuser or another user
 .SH SYNOPSIS
@@ -148,12 +148,10 @@ none of the above variables are set in the environment, the "C" (U.S. style)
 locale determines how \fBsu\fR behaves.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_CTYPE\fR\fR
 .ad
 .RS 15n
-.rt  
 Determines how \fBsu\fR handles characters. When \fBLC_CTYPE\fR is set to a
 valid value, \fBsu\fR can display and handle text and filenames containing
 valid characters for that locale. \fBsu\fR can display and handle Extended Unix
@@ -165,12 +163,10 @@ from ISO 8859-1 are valid.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_MESSAGES\fR\fR
 .ad
 .RS 15n
-.rt  
 Determines how diagnostic and informative messages are presented. This includes
 the language and style of the messages, and the correct form of affirmative and
 negative responses. In the "C" locale, the messages are presented in the
@@ -180,111 +176,91 @@ default form found in the program itself (in most cases, U.S. English).
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$\fR\fBHOME\fR\fB/.profile\fR\fR
 .ad
 .RS 22n
-.rt  
 user's login commands for \fBsh\fR and \fBksh\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/passwd\fR\fR
 .ad
 .RS 22n
-.rt  
 system's password file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/profile\fR\fR
 .ad
 .RS 22n
-.rt  
 system-wide \fBsh\fR and \fBksh\fR login commands
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/sulog\fR\fR
 .ad
 .RS 22n
-.rt  
 log file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/default/su\fR\fR
 .ad
 .RS 22n
-.rt  
 the default parameters in this file are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSULOG\fR\fR
 .ad
 .RS 11n
-.rt  
 If defined, all attempts to \fBsu\fR to another user are logged in the
 indicated file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCONSOLE\fR\fR
 .ad
 .RS 11n
-.rt  
 If defined, all attempts to \fBsu\fR to \fBroot\fR are logged on the console.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPATH\fR\fR
 .ad
 .RS 11n
-.rt  
 Default path. (\fB/usr/bin:\fR)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSU\fR\fBPATH\fR\fR
 .ad
 .RS 11n
-.rt  
 Default path for a user invoking \fBsu\fR to \fBroot\fR.
 (\fB/usr/sbin:/usr/bin\fR)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSYSLOG\fR\fR
 .ad
 .RS 11n
-.rt  
 Determines whether the \fBsyslog\fR(3C) \fBLOG_AUTH\fR facility should be used
 to log all \fBsu\fR attempts. \fBLOG_NOTICE\fR messages are generated for
 \fBsu\fR's to root, \fBLOG_INFO\fR messages are generated for \fBsu\fR's to
@@ -296,21 +272,17 @@ attempts.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/default/login\fR\fR
 .ad
 .RS 22n
-.rt  
 the default parameters in this file are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIMEZONE\fR\fR
 .ad
 .RS 12n
-.rt  
 Sets the TZ environment variable of the shell.
 .RE
 

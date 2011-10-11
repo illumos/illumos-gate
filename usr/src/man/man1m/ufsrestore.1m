@@ -4,14 +4,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ufsrestore 1M "24 Sep 2002" "SunOS 5.11" "System Administration Commands"
+.TH UFSRESTORE 1M "Sep 24, 2002"
 .SH NAME
 ufsrestore \- incremental file system restore
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/ufsrestore\fR i | r | R | t | x [abcdfhlmostvyLT] 
-     [\fIarchive_file\fR] [\fIfactor\fR] [\fIdumpfile\fR] [\fIn\fR] [\fIlabel\fR] 
+\fB/usr/sbin/ufsrestore\fR i | r | R | t | x [abcdfhlmostvyLT]
+     [\fIarchive_file\fR] [\fIfactor\fR] [\fIdumpfile\fR] [\fIn\fR] [\fIlabel\fR]
      [\fItimeout\fR] [\fIfilename\fR]...
 .fi
 
@@ -49,12 +49,10 @@ directory. The \fBR\fR function is intended for restoring into a populated
 directory.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBi\fR\fR
 .ad
 .RS 5n
-.rt  
 Interactive. After reading in the directory information from the media,
 \fBufsrestore\fR invokes a shell-like interface that allows you to browse
 through the dump file's directory hierarchy and select individual files to be
@@ -64,12 +62,10 @@ extracted. Restoration has the same semantics as \fBx\fR (see below). See
 
 .sp
 .ne 2
-.mk
 .na
 \fBr\fR
 .ad
 .RS 5n
-.rt  
 Recursive. Starting with an empty directory and a level 0 dump, the \fBr\fR
 function recreates the filesystem relative to the current working directory,
 exactly as it appeared when the dump was made. Information used to restore
@@ -86,12 +82,10 @@ they are preserved.
 
 .sp
 .ne 2
-.mk
 .na
 \fBR\fR
 .ad
 .RS 5n
-.rt  
 Resume restoring. If an \fBr\fR-mode \fBufsrestore\fR was interrupted, this
 function prompts for the volume from which to resume restoring and continues
 the restoration from where it was left off.  Otherwise identical to \fBr\fR.
@@ -99,12 +93,10 @@ the restoration from where it was left off.  Otherwise identical to \fBr\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBt\fR
 .ad
 .RS 5n
-.rt  
 Table of contents. List each \fIfilename\fR that appears on the media. If no
 \fIfilename\fR argument is given, the root directory is listed. This results in
 a list of all files on the media, unless the \fBh\fR function modifier is in
@@ -115,12 +107,10 @@ modifier is mutually exclusive with the \fBx\fR and \fBr\fR function letters.
 
 .sp
 .ne 2
-.mk
 .na
 \fBx\fR
 .ad
 .RS 5n
-.rt  
 Extract the named files from the media. Files are restored to the same relative
 locations that they had in the original file system.
 .sp
@@ -144,12 +134,10 @@ definition) not entire file systems.
 .SS "Function Modifiers"
 .sp
 .ne 2
-.mk
 .na
 \fBa \fIarchive_file\fR\fR
 .ad
 .RS 19n
-.rt  
 Read the table of contents from \fIarchive_file\fR instead of the media. This
 function modifier can be used in combination with the \fBt\fR, \fBi\fR, or
 \fBx\fR function letters, making it possible to check whether files are on the
@@ -160,12 +148,10 @@ the file(s) before extracting them.
 
 .sp
 .ne 2
-.mk
 .na
 \fBb \fIfactor\fR\fR
 .ad
 .RS 19n
-.rt  
 Blocking factor. Specify the blocking factor for tape reads. For variable
 length \fBSCSI\fR tape devices, unless the data was written with the default
 blocking factor, a blocking factor at least as great as that used to write the
@@ -176,35 +162,29 @@ maximum blocking factor.
 
 .sp
 .ne 2
-.mk
 .na
 \fBc\fR
 .ad
 .RS 19n
-.rt  
 Convert the contents of the media in 4.1BSD format to the new \fBufs\fR file
 system format.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBd\fR
 .ad
 .RS 19n
-.rt  
 Debug. Turn on debugging output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBf \fIdump_file\fR\fR
 .ad
 .RS 19n
-.rt  
 Use \fIdump_file\fR instead of \fB/dev/rmt/0\fR as the file to restore from.
 Typically \fIdump_file\fR specifies a tape or diskette drive. If
 \fIdump_file\fR is specified as `\fB\(mi\fR\&', \fBufsrestore\fR reads from the
@@ -232,24 +212,20 @@ access the remote machine.
 
 .sp
 .ne 2
-.mk
 .na
 \fBh\fR
 .ad
 .RS 19n
-.rt  
 Extract or list the actual directory, rather than the files that it references.
 This prevents hierarchical restoration of complete subtrees from the tape.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBl\fR
 .ad
 .RS 19n
-.rt  
 Autoload. When the end-of-tape is reached before the restore is complete, take
 the drive off-line and wait up to two minutes (the default, see the \fBT\fR
 function modifier) for the tape drive to be ready again. This gives autoloading
@@ -259,12 +235,10 @@ within two minutes, continue. If it is not, prompt for another tape and wait.
 
 .sp
 .ne 2
-.mk
 .na
 \fBL \fIlabel\fR\fR
 .ad
 .RS 19n
-.rt  
 The label that should appear in the header of the dump file. If the labels do
 not match, \fBufsrestore\fR issues a diagnostic and exits. The tape label is
 specific to the \fBufsdump\fR tape format, and bears no resemblance to
@@ -273,12 +247,10 @@ specific to the \fBufsdump\fR tape format, and bears no resemblance to
 
 .sp
 .ne 2
-.mk
 .na
 \fBm\fR
 .ad
 .RS 19n
-.rt  
 Extract by inode numbers rather than by filename to avoid regenerating complete
 pathnames. Regardless of where the files are located in the dump hierarchy,
 they are restored into the current directory and renamed with their inode
@@ -287,12 +259,10 @@ number. This is useful if only a few files are being extracted.
 
 .sp
 .ne 2
-.mk
 .na
 \fBo\fR
 .ad
 .RS 19n
-.rt  
 Offline. Take the drive off-line when the restore is complete or the
 end-of-media is reached and rewind the tape, or eject the diskette. In the case
 of some autoloading 8mm drives, the tape is removed from the drive
@@ -301,12 +271,10 @@ automatically.
 
 .sp
 .ne 2
-.mk
 .na
 \fBs \fIn\fR\fR
 .ad
 .RS 19n
-.rt  
 Skip to the \fIn\fRth file when there are multiple dump files on the same tape.
 For example, the command:
 .sp
@@ -331,12 +299,10 @@ because on some devices absolute positioning is very time consuming.
 
 .sp
 .ne 2
-.mk
 .na
 \fBT timeout [hms]\fR
 .ad
 .RS 19n
-.rt  
 Sets the amount of time to wait for an autoload command to complete. This
 function modifier is ignored unless the \fBl\fR function modifier has also been
 specified. The default timeout period is two minutes. The time units may be
@@ -346,24 +312,20 @@ specified as a trailing \fBh\fR (hours), \fBm\fR (minutes), or \fBs\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fBv\fR
 .ad
 .RS 19n
-.rt  
 Verbose. \fBufsrestore\fR displays the name and inode number of each file it
 restores, preceded by its file type.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBy\fR
 .ad
 .RS 19n
-.rt  
 Do not ask whether to abort the restore in the event of tape errors.
 \fBufsrestore\fR tries to skip over the bad tape block(s) and continue as best
 it can.
@@ -378,12 +340,10 @@ that accept an argument, the default is the current directory. The interactive
 options are:
 .sp
 .ne 2
-.mk
 .na
 \fBadd [\fIfilename\fR]\fR
 .ad
 .RS 22n
-.rt  
 Add the named file or directory to the list of files to extract. If a directory
 is specified, add that directory and its files (recursively) to the extraction
 list (unless the \fBh\fR modifier is in effect).
@@ -391,23 +351,19 @@ list (unless the \fBh\fR modifier is in effect).
 
 .sp
 .ne 2
-.mk
 .na
 \fBcd \fIdirectory\fR\fR
 .ad
 .RS 22n
-.rt  
 Change to \fIdirectory\fR (within the dump file).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdelete [\fIfilename\fR]\fR
 .ad
 .RS 22n
-.rt  
 Delete the current directory, or the named file or directory from the list of
 files to extract. If a directory is specified, delete that directory and all
 its descendents from the extraction list (unless the \fBh\fR modifier is in
@@ -418,12 +374,10 @@ to omit.
 
 .sp
 .ne 2
-.mk
 .na
 \fBextract\fR
 .ad
 .RS 22n
-.rt  
 Extract all files on the extraction list from the dump media. \fBufsrestore\fR
 asks which volume the user wishes to mount. The fastest way to extract a small
 number of files is to start with the last volume and work toward the first. If
@@ -433,23 +387,19 @@ positioned to file \fIn\fR when it is read.
 
 .sp
 .ne 2
-.mk
 .na
 \fBhelp\fR
 .ad
 .RS 22n
-.rt  
 Display a summary of the available commands.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBls [\fIdirectory\fR]\fR
 .ad
 .RS 22n
-.rt  
 List files in \fIdirectory\fR or the current directory, represented by a
 `\fB\&.\fR' (period). Directories are appended with a `\fB/\fR' (slash).
 Entries marked for extraction are prefixed with a `\fB*\fR' (asterisk). If the
@@ -458,23 +408,19 @@ verbose option is in effect, inode numbers are also listed.
 
 .sp
 .ne 2
-.mk
 .na
 \fBmarked [\fIdirectory\fR]\fR
 .ad
 .RS 22n
-.rt  
 Like \fBls\fR, except only files marked for extraction are listed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBpager\fR
 .ad
 .RS 22n
-.rt  
 Toggle the pagination of the output from the \fBls\fR and \fBmarked\fR
 commands. The pager used is that defined by the \fBPAGER\fR environment
 variable, or more(1) if that envar is not defined. The \fBPAGER\fR envar may
@@ -483,34 +429,28 @@ include white-space-separated arguments for the pagination program.
 
 .sp
 .ne 2
-.mk
 .na
 \fBpwd\fR
 .ad
 .RS 22n
-.rt  
 Print the full pathname of the current working directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBquit\fR
 .ad
 .RS 22n
-.rt  
 \fBufsrestore\fR exits immediately, even if the extraction list is not empty.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBsetmodes\fR
 .ad
 .RS 22n
-.rt  
 Prompts: \fBset owner/mode for\fR `\fB\&.\fR' (period). Type \fBy\fR for yes to
 set the mode (permissions, owner, times) of the current directory `\fB\&.\fR'
 (period) into which files are being restored equal to the mode of the root
@@ -524,12 +464,10 @@ the files were dumped.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsetpager \fIcommand\fR\fR
 .ad
 .RS 22n
-.rt  
 Sets the command to use for paginating output instead of the default or that
 inherited from the environment. The \fIcommand\fR string may include arguments
 in addition to the command itself.
@@ -537,12 +475,10 @@ in addition to the command itself.
 
 .sp
 .ne 2
-.mk
 .na
 \fBverbose\fR
 .ad
 .RS 22n
-.rt  
 Toggle the status of the \fBv\fR modifier. While \fBv\fR is in effect, the
 \fBls\fR command lists the inode numbers of all entries, and \fBufsrestore\fR
 displays information about each file as it is extracted.
@@ -550,12 +486,10 @@ displays information about each file as it is extracted.
 
 .sp
 .ne 2
-.mk
 .na
 \fBwhat\fR
 .ad
 .RS 22n
-.rt  
 Display the dump header on the media.
 .RE
 
@@ -565,12 +499,10 @@ Display the dump header on the media.
 The following operands are supported.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfilename\fR\fR
 .ad
 .RS 12n
-.rt  
 Specifies the pathname of files (or directories) to be restored to disk. Unless
 the \fBh\fR function modifier is also used, a directory name refers to the
 files it contains, and (recursively) its subdirectories and the files they
@@ -589,47 +521,39 @@ when encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 An error occurred. Verbose messages are displayed.
 .RE
 
 .SH ENVIRONMENT VARIABLES
 .sp
 .ne 2
-.mk
 .na
 \fBPAGER\fR
 .ad
 .RS 10n
-.rt  
 The command to use as a filter for paginating output. This can also be used to
 specify the options to be used. Default is \fBmore\fR(1).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTMPDIR\fR
 .ad
 .RS 10n
-.rt  
 Selects the directory for temporary files. Defaults to \fB/tmp\fR if not
 defined in the environment.
 .RE
@@ -637,45 +561,37 @@ defined in the environment.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/rmt/0\fR\fR
 .ad
 .RS 23n
-.rt  
 the default tape drive
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$TMPDIR/rstdir*\fR\fR
 .ad
 .RS 23n
-.rt  
 file containing directories on the tape
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$TMPDIR/rstmode*\fR\fR
 .ad
 .RS 23n
-.rt  
 owner, mode, and timestamps for directories
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&./restoresymtable\fR\fR
 .ad
 .RS 23n
-.rt  
 information passed between incremental restores
 .RE
 
@@ -706,7 +622,6 @@ Most checks are self-explanatory or can "never happen". Common errors are given
 below.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBConverting to new file system format\fR\fR
 .ad
@@ -718,7 +633,6 @@ automatically converted to the new file system format.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfilename\fR\fB: not found on tape\fR\fR
 .ad
@@ -732,7 +646,6 @@ the \fBr\fR function.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBexpected next file\fR \fIinumber\fR\fB, got\fR \fIinumber\fR\fR
 .ad
@@ -744,7 +657,6 @@ using a dump tape created on an active file system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIncremental tape too low\fR\fR
 .ad
@@ -756,7 +668,6 @@ incremental tape, or that has too low an incremental level has been loaded.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIncremental tape too high\fR\fR
 .ad
@@ -769,7 +680,6 @@ level has been loaded.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmedia\fR \fBread\fR \fBerror:\fR \fBinvalid\fR \fBargument\fR\fR
 .ad
@@ -781,7 +691,6 @@ write data.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTape read error while restoring\fR\fR
 .ad
@@ -806,7 +715,6 @@ extracted files have been corrupted, though files may not be found on the tape.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBresync ufsrestore, skipped\fR \fInum\fR\fR
 .ad
@@ -818,7 +726,6 @@ This message lists the number of blocks that were skipped over.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIncorrect tape label. Expected `foo', got `bar'.\fR\fR
 .ad

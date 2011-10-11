@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH usb_pipe_get_state 9F "5 Jan 2004" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH USB_PIPE_GET_STATE 9F "Jan 5, 2004"
 .SH NAME
 usb_pipe_get_state \- Return USB pipe state
 .SH SYNOPSIS
@@ -13,7 +13,7 @@ usb_pipe_get_state \- Return USB pipe state
 
 
 
-\fBint\fR \fBusb_pipe_get_state\fR(\fBusb_pipe_handle_t\fR \fIpipe_handle\fR, 
+\fBint\fR \fBusb_pipe_get_state\fR(\fBusb_pipe_handle_t\fR \fIpipe_handle\fR,
      \fBusb_pipe_state_t *\fR\fIpipe_state\fR, \fBusb_flags_t\fR \fIusb_flags\fR);
 .fi
 
@@ -24,34 +24,28 @@ Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpipe_handle\fR\fR
 .ad
 .RS 15n
-.rt  
 Handle of the pipe to retrieve the state.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpipe_state\fR\fR
 .ad
 .RS 15n
-.rt  
 Pointer to where pipe state is returned.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIusb_flags\fR\fR
 .ad
 .RS 15n
-.rt  
 No flags are recognized. Reserved for future expansion.
 .RE
 
@@ -66,46 +60,38 @@ referred to by \fIpipe_handle\fR into the location pointed to by
 Possible pipe states are:
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_PIPE_STATE_CLOSED\fR
 .ad
 .RS 26n
-.rt  
 Pipe is closed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_PIPE_STATE_ACTIVE\fR
 .ad
 .RS 26n
-.rt  
 Pipe is active and can send/receive data. Polling is active for isochronous and
 interrupt pipes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_PIPE_STATE_IDLE\fR
 .ad
 .RS 26n
-.rt  
 Polling is stopped for isochronous and interrupt-IN pipes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_PIPE_STATE_ERROR\fR
 .ad
 .RS 26n
-.rt  
 An error occurred. Client must call \fBusb_pipe_reset()\fR. Note that this
 status is not seen by a client driver if USB_ATTRS_AUTOCLEARING is set in the
 request attributes.
@@ -113,12 +99,10 @@ request attributes.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_PIPE_STATE_CLOSING\fR
 .ad
 .RS 26n
-.rt  
 Pipe is being closed. Requests are being drained from the pipe and other
 cleanup is in progress.
 .RE
@@ -126,34 +110,28 @@ cleanup is in progress.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_SUCCESS\fR
 .ad
 .RS 20n
-.rt  
 Pipe state returned in second argument.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_ARGS\fR
 .ad
 .RS 20n
-.rt  
 Pipe_state argument is \fBNULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_PIPE\fR
 .ad
 .RS 20n
-.rt  
 Pipe_handle argument is \fBNULL\fR.
 .RE
 
@@ -175,7 +153,7 @@ May be called from user, kernel or interrupt context.
                 ddi_driver_name(dip), ddi_get_instance(dip));
             do_recovery();
     }
-            
+
 .fi
 .in -2
 
@@ -187,15 +165,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitecturePCI-based systems
+Architecture	PCI-based systems
 _
-Interface stabilityCommitted
+Interface stability	Committed
 .TE
 
 .SH SEE ALSO

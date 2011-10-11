@@ -24,8 +24,36 @@
  */
 
 /*
- * IntelVersion: 1.439 v3-1-10-1_2009-9-18_Release14-6
+ * Copyright (c) 2001-2010, Intel Corporation
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ *  1. Redistributions of source code must retain the above copyright notice,
+ *     this list of conditions and the following disclaimer.
+ *
+ *  2. Redistributions in binary form must reproduce the above copyright
+ *     notice, this list of conditions and the following disclaimer in the
+ *     documentation and/or other materials provided with the distribution.
+ *
+ *  3. Neither the name of the Intel Corporation nor the names of its
+ *     contributors may be used to endorse or promote products derived from
+ *     this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  */
+
 #ifndef _E1000_HW_H_
 #define	_E1000_HW_H_
 
@@ -124,6 +152,8 @@ struct e1000_hw;
 #define	E1000_DEV_ID_PCH_M_HV_LC		0x10EB
 #define	E1000_DEV_ID_PCH_D_HV_DM		0x10EF
 #define	E1000_DEV_ID_PCH_D_HV_DC		0x10F0
+#define	E1000_DEV_ID_PCH2_LV_LM			0x1502
+#define	E1000_DEV_ID_PCH2_LV_V			0x1503
 
 #define	E1000_REVISION_0	0
 #define	E1000_REVISION_1	1
@@ -164,6 +194,7 @@ enum e1000_mac_type {
 	e1000_ich9lan,
 	e1000_ich10lan,
 	e1000_pchlan,
+	e1000_pch2lan,
 	e1000_num_macs	/* List is 1-based, so subtract 1 for true count. */
 };
 
@@ -204,6 +235,7 @@ enum e1000_phy_type {
 	e1000_phy_bm,
 	e1000_phy_82578,
 	e1000_phy_82577,
+	e1000_phy_82579
 };
 
 enum e1000_bus_type {
@@ -653,6 +685,7 @@ struct e1000_mac_info {
 	u8 forced_speed_duplex;
 
 	bool adaptive_ifs;
+	bool has_fwsm;
 	bool arc_subsystem_valid;
 	bool asf_firmware_present;
 	bool autoneg;
@@ -727,6 +760,7 @@ struct e1000_fc_info {
 	u32 high_water;		/* Flow control high-water mark */
 	u32 low_water;		/* Flow control low-water mark */
 	u16 pause_time;		/* Flow control pause timer */
+	u16 refresh_time;	/* Flow control refresh timer */
 	bool send_xon;		/* Flow control send XON */
 	bool strict_ieee;	/* Strict IEEE mode */
 	enum e1000_fc_mode current_mode; /* FC mode in effect */
@@ -777,7 +811,7 @@ struct e1000_dev_spec_ich8lan {
 	E1000_MUTEX nvm_mutex;
 	E1000_MUTEX swflag_mutex;
 	bool nvm_k1_enabled;
-	bool nvm_lcd_config_enabled;
+	bool eee_disable;
 };
 
 struct e1000_hw {

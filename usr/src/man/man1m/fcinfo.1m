@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH fcinfo 1M "26 Jul 2009" "SunOS 5.11" "System Administration Commands"
+.TH FCINFO 1M "Jul 26, 2009"
 .SH NAME
 fcinfo, fcadm \- Fibre Channel HBA Port Command Line Interface
 .SH SYNOPSIS
@@ -19,13 +19,13 @@ fcinfo, fcadm \- Fibre Channel HBA Port Command Line Interface
 
 .LP
 .nf
-\fBfcinfo\fR remote-port [\fB-ls\fR] [\fB-p\fR \fIHBA_port_WWN\fR] 
+\fBfcinfo\fR remote-port [\fB-ls\fR] [\fB-p\fR \fIHBA_port_WWN\fR]
      [\fIREMOTE_port_WWN\fR]...
 .fi
 
 .LP
 .nf
-\fBfcadm\fR remote-port [\fB-ls\fR] [\fB-p\fR \fIHBA_port_WWN\fR] 
+\fBfcadm\fR remote-port [\fB-ls\fR] [\fB-p\fR \fIHBA_port_WWN\fR]
      [\fIREMOTE_port_WWN\fR]...
 .fi
 
@@ -41,19 +41,19 @@ fcinfo, fcadm \- Fibre Channel HBA Port Command Line Interface
 
 .LP
 .nf
-\fBfcadm\fR create-npiv-port \fB-p\fR \fIVirtual_Port_WWN\fR [\fB-n\fR \fIVirtual_Node_WWN\fR] 
+\fBfcadm\fR create-npiv-port \fB-p\fR \fIVirtual_Port_WWN\fR [\fB-n\fR \fIVirtual_Node_WWN\fR]
      \fIPhysicalPort_port_WWN\fR
 .fi
 
 .LP
 .nf
-\fBfcadm\fR delete-npiv-port \fB-p\fR \fIVirtual_Port_WWN\fR [\fB-n\fR \fIVirtual_Node_WWN\fR] 
+\fBfcadm\fR delete-npiv-port \fB-p\fR \fIVirtual_Port_WWN\fR [\fB-n\fR \fIVirtual_Node_WWN\fR]
      \fIPhysicalPort_port_WWN\fR
 .fi
 
 .LP
 .nf
-\fBfcadm\fR create-fcoe-port [\fB-tf\fR] \fB-p\fR \fIPort_WWN\fR [\fB-n\fR \fINode_WWN\fR] 
+\fBfcadm\fR create-fcoe-port [\fB-tf\fR] \fB-p\fR \fIPort_WWN\fR [\fB-n\fR \fINode_WWN\fR]
      \fIMAC_Interface\fR
 .fi
 
@@ -111,12 +111,10 @@ not apply for the target mode port.
 The following subcommands are supported by both \fBfcinfo\fR and \fBfcadm\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhba-port\fR\fR
 .ad
 .RS 21n
-.rt  
 Lists information for the \fBHBA\fR port referenced by the specified
 \fIHBA_port_WWN\fR. If \fIHBA_port_WWN\fR is not specified, all initiator mode
 and target mode fibre channel \fBHBA\fR ports on the host will be listed.
@@ -124,12 +122,10 @@ and target mode fibre channel \fBHBA\fR ports on the host will be listed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBremote-port\fR\fR
 .ad
 .RS 21n
-.rt  
 Lists the \fIremote-port\fR information for those remote ports that are
 specified. If no \fIREMOTE_port_WWN\fR is specified, all remote ports that are
 visible through \fIHBA_port_WWN\fR are listed.
@@ -137,12 +133,10 @@ visible through \fIHBA_port_WWN\fR are listed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlogical-unit\fR | \fBlu\fR\fR
 .ad
 .RS 21n
-.rt  
 Lists the logical unit referenced by the specified \fIdevice_path\fR. If
 \fIdevice_path\fR is not specified, all fibre channel logical units will be
 listed. This subcommand applies only to the initiator mode.
@@ -154,7 +148,6 @@ The following subcommands, which administer N_Port ID Virtualization (NPIV) HBA
 ports, are supported only by \fBfcadm\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcreate-npiv-port\fR\fR
 .ad
@@ -165,7 +158,6 @@ Create an NPIV virtual port on the specified adapter.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdelete-npiv-port\fR\fR
 .ad
@@ -180,7 +172,6 @@ The following subcommands, which administer Fibre Channel over Ethernet (FCoE)
 ports, are supported only by \fBfcadm\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcreate-fcoe-port\fR\fR
 .ad
@@ -197,7 +188,6 @@ enable FCoE.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdelete-fcoe-port\fR\fR
 .ad
@@ -208,7 +198,6 @@ Deletes the FCoE port associated with the specified MAC interface.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlist-fcoe-ports\fR\fR
 .ad
@@ -219,7 +208,6 @@ List information of FCoE ports.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBforce-lip\fR\fR
 .ad
@@ -241,7 +229,6 @@ any data loss.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR, \fB--fcoe\fR\fR
 .ad
@@ -252,7 +239,6 @@ Lists the information for all FCoE ports.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR, \fB--fcoe-promiscuous\fR\fR
 .ad
@@ -265,7 +251,6 @@ Promiscuous mode will be enabled for the specified MAC interface.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR, \fB--linkstat\fR\fR
 .ad
@@ -277,7 +262,6 @@ specified \fIHBA_port_WWN\fR or \fIREMOTE_port_WWN\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fIHBA_node_WWN\fR, \fB--node\fR \fIHBA_node_WWN\fR\fR
 .ad
@@ -294,7 +278,6 @@ the MAC address of the specified MAC interface.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIHBA_port_WWN\fR, \fB--port\fR \fIHBA_port_WWN\fR\fR
 .ad
@@ -315,7 +298,6 @@ the MAC address of the specified MAC interface.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR, \fB--scsi-target\fR\fR
 .ad
@@ -332,7 +314,6 @@ mode port.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR [\fIHBA_node_WWN\fR], \fB-target\fR [\fIHBA_node_WWN\fR]\fR
 .ad
@@ -346,7 +327,6 @@ When used with \fBcreate-fcoe-port\fR, create a FCoE target mode port.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR, \fB--verbose\fR\fR
 .ad
@@ -360,7 +340,6 @@ for the local and remote fibre channel ports to which this device is attached.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR, \fB--version\fR\fR
 .ad
@@ -371,7 +350,6 @@ Displays the version information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-?\fR, \fB--help\fR\fR
 .ad
@@ -456,7 +434,7 @@ HBA Port WWN: 210100e08b272ab5
         State: online
         Supported Speeds: 1Gb 2Gb
         Current Speed: 2Gb
-        Node WWN: 200100e08b272ab5    
+        Node WWN: 200100e08b272ab5
 .fi
 .in -2
 .sp
@@ -913,7 +891,7 @@ information:
 .in +2
 .nf
 # \fBfcinfo remote-port  -s -p 210100e08b272ab5\fR
- 
+
 Remote Port WWN: 210100e08b296a60
         Active FC4 Types: SCSI,IP
         SCSI Target: no
@@ -1035,10 +1013,10 @@ The following command lists the logical unit:
 .in +2
 .nf
 # \fBfcinfo logical-unit\fR
- 
+
 /dev/rdsk/c0t600C0FF0000000000036223AE73EB705d0s2
 /dev/rdsk/c0t600C0FF00000000000362272539E5B03d0s2
-/dev/rmt/0n             
+/dev/rmt/0n
 .fi
 .in -2
 .sp
@@ -1054,7 +1032,7 @@ using the \fB-v\fR option for device \fB/dev/rmt/On\fR:
 .in +2
 .nf
 # \fBfcinfo lu -v /dev/rmt/On\fR
- 
+
  OS Device Name: /dev/rmt/0n
         HBA Port WWN: 210000e07c030b91
         	      Remote Port WWN: 21010003b7830a6
@@ -1077,7 +1055,7 @@ using the \fB-v\fR option for device
 .nf
 # \fBfcinfo logical-unit -v \e\fR
      \fB/dev/rdsk/c0t600C0FF0000000000036223AE73EB705d0s2\fR
- 
+
  OS Device Name: /dev/rdsk/c0t600C0FF0000000000036223AE73EB705d0s2
         HBA Port WWN: 210100e08b27a8a1
                 Remote Port WWN: 256000c0ffc03622
@@ -1243,13 +1221,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

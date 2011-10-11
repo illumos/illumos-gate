@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH bsdmalloc 3MALLOC "21 Mar 2005" "SunOS 5.11" "Memory Allocation Library Functions"
+.TH BSDMALLOC 3MALLOC "Mar 21, 2005"
 .SH NAME
 bsdmalloc \- memory allocator
 .SH SYNOPSIS
@@ -69,24 +69,20 @@ If \fBmalloc()\fR or \fBrealloc()\fR returns  unsuccessfully, \fBerrno\fR will
 be set to indicate the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 \fIsize\fR bytes of memory cannot be allocated because it exceeds the physical
 limits of the system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 10n
-.rt  
 There is not enough memory available at this point in time to allocate
 \fIsize\fR bytes of memory; but the application could try again later.
 .RE

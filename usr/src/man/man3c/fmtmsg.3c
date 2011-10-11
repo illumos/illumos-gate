@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH fmtmsg 3C "24 Jul 2002" "SunOS 5.11" "Standard C Library Functions"
+.TH FMTMSG 3C "Jul 24, 2002"
 .SH NAME
 fmtmsg \- display a message on stderr or system console
 .SH SYNOPSIS
@@ -32,12 +32,10 @@ displayed to the user, but rather defines the source of the message and directs
 the display of the formatted message.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIclassification\fR\fR
 .ad
 .RS 18n
-.rt  
 Contains identifiers from the following groups of major classifications and
 subclassifications. Any one identifier from a subclass may be used in
 combination by ORing the values together with a single identifier from a
@@ -89,12 +87,10 @@ component is supplied for the message.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlabel\fR\fR
 .ad
 .RS 18n
-.rt  
 Identifies the source of the message. The format of this component is two
 fields separated by a colon. The first field is up to 10 characters long; the
 second is up to 14 characters. Suggested usage is that \fIlabel\fR identifies
@@ -105,12 +101,10 @@ application name. For example, the \fIlabel\fR \fBUX:cat\fR indicates the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIseverity\fR\fR
 .ad
 .RS 18n
-.rt  
 Indicates the seriousness of the condition. Identifiers for the standard levels
 of \fIseverity\fR are:
 .RS +4
@@ -152,24 +146,20 @@ Other severity levels may be added by using the \fBaddseverity()\fR routine.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItext\fR\fR
 .ad
 .RS 18n
-.rt  
 Describes the condition that produced the message. The \fItext\fR string is not
 limited to a specific size.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaction\fR\fR
 .ad
 .RS 18n
-.rt  
 Describes the first step to be taken in the error recovery process.
 \fBfmtmsg()\fR precedes each action string with the prefix: \fBTO\fRFIX\fB:.\fR
 The \fIaction\fR string is not limited to a specific size.
@@ -177,12 +167,10 @@ The \fIaction\fR string is not limited to a specific size.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItag\fR\fR
 .ad
 .RS 18n
-.rt  
 An identifier which references on-line documentation for the message. Suggested
 usage is that \fItag\fR includes the \fIlabel\fR and a unique identifying
 number. A sample \fItag\fR is \fBUX:cat:146\fR.
@@ -195,12 +183,10 @@ The \fBMSGVERB\fR and \fBSEV_LEVEL\fR environment variables control the
 behavior of \fBfmtmsg()\fR as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMSGVERB\fR\fR
 .ad
 .RS 13n
-.rt  
 This variable determines which message components \fBfmtmsg()\fR selects when
 writing messages to \fBstderr\fR. Its value is a colon-separated list of
 optional keywords and can be set as follows:
@@ -235,12 +221,10 @@ included in console messages.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSEV_LEVEL\fR\fR
 .ad
 .RS 13n
-.rt  
 This variable defines severity levels and associates print strings with them
 for use by \fBfmtmsg()\fR. The standard severity levels listed below cannot be
 modified. Additional severity levels can also be defined, redefined, and
@@ -249,56 +233,46 @@ severity level is defined by both \fBSEV_LEVEL\fR and \fBaddseverity()\fR, the
 definition by \fBaddseverity()\fR takes precedence.
 .sp
 .ne 2
-.mk
 .na
 \fB0\fR
 .ad
 .RS 5n
-.rt  
 (no severity is used)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB1\fR
 .ad
 .RS 5n
-.rt  
 \fBHALT\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB2\fR
 .ad
 .RS 5n
-.rt  
 \fBERROR\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB3\fR
 .ad
 .RS 5n
-.rt  
 \fBWARNING\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB4\fR
 .ad
 .RS 5n
-.rt  
 \fBINFO\fR
 .RE
 
@@ -353,17 +327,16 @@ arguments.
 
 .sp
 .TS
-tab() box;
-lw(1.38i) lw(1.38i) lw(1.38i) lw(1.38i) 
-lw(1.38i) lw(1.38i) lw(1.38i) lw(1.38i) 
-.
-ArgumentTypeNull-ValueIdentifier
-\fIlabel\fR\fBchar*\fR\fB(char*) NULL\fR\fBMM_NULLLBL\fR
-\fIseverity\fR\fBint\fR\fB0\fR\fBMM_NULLSEV\fR
-\fIclass\fR\fBlong\fR\fB0L\fR\fBMM_NULLMC\fR
-\fItext\fR\fBchar*\fR\fB(char*) NULL\fR\fBMM_NULLTXT\fR
-\fIaction\fR\fBchar*\fR\fB(char*) NULL\fR\fBMM_NULLACT\fR
-\fItag\fR\fBchar*\fR\fB(char*) NULL\fR\fBMM_NULLTAG\fR
+box;
+l l l l
+l l l l .
+Argument	Type	Null-Value	Identifier
+\fIlabel\fR	\fBchar*\fR	\fB(char*) NULL\fR	\fBMM_NULLLBL\fR
+\fIseverity\fR	\fBint\fR	\fB0\fR	\fBMM_NULLSEV\fR
+\fIclass\fR	\fBlong\fR	\fB0L\fR	\fBMM_NULLMC\fR
+\fItext\fR	\fBchar*\fR	\fB(char*) NULL\fR	\fBMM_NULLTXT\fR
+\fIaction\fR	\fBchar*\fR	\fB(char*) NULL\fR	\fBMM_NULLACT\fR
+\fItag\fR	\fBchar*\fR	\fB(char*) NULL\fR	\fBMM_NULLTAG\fR
 .TE
 
 .sp
@@ -377,46 +350,38 @@ the \fBEnvironment Variables\fR section above).
 The \fBfmtmsg()\fR returns the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_OK\fR\fR
 .ad
 .RS 12n
-.rt  
 The function succeeded.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_NOTOK\fR\fR
 .ad
 .RS 12n
-.rt  
 The function failed completely.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_NOMSG\fR\fR
 .ad
 .RS 12n
-.rt  
 The function was unable to generate a message on the standard error stream, but
 otherwise succeeded.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_NOCON\fR\fR
 .ad
 .RS 12n
-.rt  
 The function was unable to generate a console message, but otherwise succeeded.
 .RE
 
@@ -506,15 +471,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

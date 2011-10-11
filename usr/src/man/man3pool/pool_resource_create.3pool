@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pool_resource_create 3POOL "23 Sep 2003" "SunOS 5.11" "Pool Configuration Manipulation Library Functions"
+.TH POOL_RESOURCE_CREATE 3POOL "Sep 23, 2003"
 .SH NAME
 pool_resource_create, pool_resource_destroy, pool_resource_info,
 pool_query_resource_components, pool_resource_transfer, pool_resource_xtransfer
@@ -11,7 +11,7 @@ pool_query_resource_components, pool_resource_transfer, pool_resource_xtransfer
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpool\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpool\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <pool.h>
 
 \fBpool_resource_t *\fR\fBpool_resource_create\fR(\fBpool_conf_t *\fR\fIconf\fR,
@@ -126,47 +126,39 @@ pool-specific error value.
 The \fBpool_resource_create()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_BADPARAM\fR\fR
 .ad
 .RS 20n
-.rt  
 The supplied configuration's status is not \fBPOF_VALID\fR or \fIname\fR is in
 use for this resource type.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_INVALID_CONF\fR\fR
 .ad
 .RS 20n
-.rt  
 The resource element could not be created because the configuration would be
 invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_PUTPROP\fR\fR
 .ad
 .RS 20n
-.rt  
 One of the supplied properties could not be set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_SYSTEM\fR\fR
 .ad
 .RS 20n
-.rt  
  A system error has occurred. Check the system error code for more details.
 .RE
 
@@ -175,12 +167,10 @@ One of the supplied properties could not be set.
 The \fBpool_resource_destroy()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_BADPARAM\fR\fR
 .ad
 .RS 16n
-.rt  
 The supplied configuration's status is not \fBPOF_VALID\fR.
 .RE
 
@@ -189,35 +179,29 @@ The supplied configuration's status is not \fBPOF_VALID\fR.
 The \fBpool_resource_info()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_BADPARAM\fR\fR
 .ad
 .RS 20n
-.rt  
 The supplied configuration's status is not \fBPOF_VALID\fR or the \fIflags\fR
 paramter is neither 0 nor 1.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_INVALID_CONF\fR\fR
 .ad
 .RS 20n
-.rt  
 The configuration is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_SYSTEM\fR\fR
 .ad
 .RS 20n
-.rt  
 A system error has occurred. Check the system error code for more details.
 .RE
 
@@ -226,34 +210,28 @@ A system error has occurred. Check the system error code for more details.
 The \fBpool_query_resource_components()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_BADPARAM\fR\fR
 .ad
 .RS 20n
-.rt  
 The supplied configuration's status is not \fBPOF_VALID\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_INVALID_CONF\fR\fR
 .ad
 .RS 20n
-.rt  
 The configuration is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_SYSTEM\fR\fR
 .ad
 .RS 20n
-.rt  
 A system error has occurred. Check the system error code for more details.
 .RE
 
@@ -262,12 +240,10 @@ A system error has occurred. Check the system error code for more details.
 The \fBpool_resource_transfer()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_BADPARAM\fR\fR
 .ad
 .RS 16n
-.rt  
 The supplied configuration's status is not \fBPOF_VALID\fR, the two resources
 are not of the same type, or the transfer would cause either of the resources
 to exceed their \fBmin\fR and \fBmax\fR properties.
@@ -275,12 +251,10 @@ to exceed their \fBmin\fR and \fBmax\fR properties.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_SYSTEM\fR\fR
 .ad
 .RS 16n
-.rt  
 A system error has occurred. Check the system error code for more details.
 .RE
 
@@ -289,12 +263,10 @@ A system error has occurred. Check the system error code for more details.
 The \fBpool_resource_xtransfer()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_BADPARAM\fR\fR
 .ad
 .RS 20n
-.rt  
 The supplied configuration's status is not \fBPOF_VALID\fR, the two resources
 are not of the same type, or the supplied resources do not belong to the
 source.
@@ -302,23 +274,19 @@ source.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_INVALID_CONF\fR\fR
 .ad
 .RS 20n
-.rt  
 The transfer operation failed and the configuration may be invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_SYSTEM\fR\fR
 .ad
 .RS 20n
-.rt  
 A system error has occurred. Check the system error code for more details.
 .RE
 
@@ -330,16 +298,16 @@ A system error has occurred. Check the system error code for more details.
 .nf
 #include <pool.h>
 #include <stdio.h>
- 
+
 \&...
- 
+
 pool_conf_t *conf;
 pool_resource_t *resource;
 \&...
- 
+
 if ((resource = pool_resource_create(conf, "pset",
     "foo")) == NULL) {
-    (void) fprintf(stderr, "Cannot create resource\B{}n");
+    (void) fprintf(stderr, "Cannot create resource\\B{}n");
     ...
 }
 .fi
@@ -353,17 +321,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityUnstable
+Interface Stability	Unstable
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

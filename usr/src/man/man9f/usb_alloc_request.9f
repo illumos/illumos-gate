@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH usb_alloc_request 9F "25 July 2004" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH USB_ALLOC_REQUEST 9F "Jul 25, 2004"
 .SH NAME
 usb_alloc_request, usb_alloc_ctrl_req, usb_free_ctrl_req, usb_alloc_bulk_req,
 usb_free_bulk_req, usb_alloc_intr_req, usb_free_intr_req, usb_alloc_isoc_req,
@@ -13,7 +13,7 @@ usb_free_isoc_req \- Allocate and free USB transfer requests
 .nf
 #include <sys/usb/usba.h>
 
-\fBusb_ctrl_req_t *\fR\fBusb_alloc_ctrl_req\fR(\fBdev_info_t *\fR\fIdip\fR, \fBsize_t\fR \fIlen\fR, 
+\fBusb_ctrl_req_t *\fR\fBusb_alloc_ctrl_req\fR(\fBdev_info_t *\fR\fIdip\fR, \fBsize_t\fR \fIlen\fR,
      \fBusb_flags_t\fR \fIflags\fR);
 .fi
 
@@ -24,7 +24,7 @@ usb_free_isoc_req \- Allocate and free USB transfer requests
 
 .LP
 .nf
-\fBusb_bulk_req_t *\fR\fBusb_alloc_bulk_req\fR(\fBdev_info_t\fR \fIdip\fR, \fBsize_t\fR \fIlen\fR, 
+\fBusb_bulk_req_t *\fR\fBusb_alloc_bulk_req\fR(\fBdev_info_t\fR \fIdip\fR, \fBsize_t\fR \fIlen\fR,
      \fBusb_flags_t\fR \fIflags\fR);
 .fi
 
@@ -35,7 +35,7 @@ usb_free_isoc_req \- Allocate and free USB transfer requests
 
 .LP
 .nf
-\fBusb_intr_req_t *\fR\fBusb_alloc_intr_req\fR(\fBdev_info_t *\fR\fIdip\fR, \fBsize_t\fR \fIlen\fR, 
+\fBusb_intr_req_t *\fR\fBusb_alloc_intr_req\fR(\fBdev_info_t *\fR\fIdip\fR, \fBsize_t\fR \fIlen\fR,
      \fBusb_flags_t\fR \fIflags\fR);
 .fi
 
@@ -46,7 +46,7 @@ usb_free_isoc_req \- Allocate and free USB transfer requests
 
 .LP
 .nf
-\fBusb_isoc_req_t *\fR\fBusb_alloc_isoc_req\fR(\fBdev_info_t *\fR\fIdip\fR, 
+\fBusb_isoc_req_t *\fR\fBusb_alloc_isoc_req\fR(\fBdev_info_t *\fR\fIdip\fR,
      \fBuint_t\fR \fIisoc_pkts_count\fR, \fBsize_t\fR \fIlen\fR, \fBusb_flags_t\fR \fIflags\fR);
 .fi
 
@@ -66,34 +66,28 @@ For \fBusb_alloc_ctrl_req()\fR, \fBusb_alloc_bulk_req()\fR and
 \fBusb_alloc_intr_req()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 9n
-.rt  
 Pointer to the device's dev_info structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlen\fR\fR
 .ad
 .RS 9n
-.rt  
 Length of \fIdata\fR for this request.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 9n
-.rt  
 Only USB_FLAGS_SLEEP is recognized. Wait for resources if not immediately
 available.
 .RE
@@ -103,46 +97,38 @@ available.
 For \fBusb_alloc_isoc_req()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 19n
-.rt  
 Pointer to the device's dev_info structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIisoc_pkts_count\fR\fR
 .ad
 .RS 19n
-.rt  
 Number of isochronous packet descriptors to associate with this request. Must
 be greater than zero.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlen\fR\fR
 .ad
 .RS 19n
-.rt  
 Length of \fIdata\fR for this isochronous request.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 19n
-.rt  
 Only USB_FLAGS_SLEEP is recognized. Wait for resources if not immediately
 available.
 .RE
@@ -153,12 +139,10 @@ For \fBusb_free_ctrl_req()\fR, \fBusb_free_bulk_req()\fR,
 \fBusb_free_intr_req()\fR and \fBusb_free_isoc_req()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrequest\fR\fR
 .ad
 .RS 11n
-.rt  
 Pointer to the request structure to be freed. Can be \fBNULL\fR.
 .RE
 
@@ -217,13 +201,13 @@ The free routines may be called from kernel, user, and interrupt context.
 .sp
 .in +2
 .nf
-    /* This allocates and initializes an asynchronous control 
-     * request which will pass no data.  Asynchronous requests 
+    /* This allocates and initializes an asynchronous control
+     * request which will pass no data.  Asynchronous requests
      * are used when they cannot block the calling thread.
      */
 
     usb_ctrl_req_t *ctrl_req;
- 
+
     if ((ctrl_req = usb_alloc_ctrl_req(dip, 0, 0)) == NULL) {
             return (FAILURE);
     }
@@ -239,7 +223,7 @@ The free routines may be called from kernel, user, and interrupt context.
     ctrl_req->ctrl_exc_callback = exception_callback;
     ...
     ...
-            
+
 .fi
 .in -2
 
@@ -251,15 +235,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitecturePCI-based systems
+Architecture	PCI-based systems
 _
-Interface stabilityCommitted
+Interface stability	Committed
 .TE
 
 .SH SEE ALSO

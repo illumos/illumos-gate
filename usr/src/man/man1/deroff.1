@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH deroff 1 "14 Sep 1992" "SunOS 5.11" "User Commands"
+.TH DEROFF 1 "Sep 14, 1992"
 .SH NAME
 deroff \- remove nroff/troff, tbl, and eqn constructs
 .SH SYNOPSIS
@@ -29,12 +29,10 @@ standard input.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
 .RS 6n
-.rt  
 The \fB-m\fR option may be followed by an \fBm\fR, \fBs\fR, or \fBl\fR. The
 \fB-mm\fR option causes the macros to be interpreted so that only running text
 is output (that is, no text from macro lines.)  The \fB-ml\fR option forces the
@@ -44,12 +42,10 @@ macros.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR\fR
 .ad
 .RS 6n
-.rt  
 If the \fB-w\fR option is given, the output is a word list, one ``word'' per
 line, with all other characters deleted. Otherwise, the output follows the
 original, with the deletions mentioned above. In text, a ``word'' is any string
@@ -63,12 +59,10 @@ ampersands are removed from ``words.''
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 6n
-.rt  
 The  \fB-i\fR option causes  \fBderoff\fR to ignore  \fB\&.so\fR and
 \fB\&.nx\fR commands.
 .RE

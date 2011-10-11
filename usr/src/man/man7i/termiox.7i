@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH termiox 7I "3 Jul 1990" "SunOS 5.11" "Ioctl Requests"
+.TH TERMIOX 7I "Jul 3, 1990"
 .SH NAME
 termiox \- extended general terminal interface
 .SH DESCRIPTION
@@ -95,23 +95,21 @@ The \fBx_hflag\fR field describes hardware flow control modes:
 
 .sp
 .TS
-tab();
-lw(1.28i) lw(1.06i) lw(3.17i) 
-lw(1.28i) lw(1.06i) lw(3.17i) 
-.
-RTSXOFF 0000001T{
+l l l
+l l l .
+RTSXOFF 	0000001	T{
 Enable RTS hardware flow control on input.
 T}
-CTSXON  0000002T{
+CTSXON  	0000002	T{
 Enable CTS hardware flow control on output.
 T}
-DTRXOFF 0000004T{
+DTRXOFF 	0000004	T{
 Enable DTR hardware flow control on input.
 T}
-CDXON   0000010T{
+CDXON   	0000010	T{
 Enable CD hardware flow control on output.
 T}
-ISXOFF  0000020T{
+ISXOFF  	0000020	T{
 Enable isochronous hardware flow control on input
 T}
 .TE
@@ -187,60 +185,58 @@ The \fBx_cflag\fR field specifies the system treatment of clock modes.
 
 .sp
 .TS
-tab();
-lw(1.5i) lw(.94i) lw(3.06i) 
-lw(1.5i) lw(.94i) lw(3.06i) 
-.
-\fBXMTCLK\fR0000007Transmit clock source:
-\fBXCIBRG\fR0000000  T{
+l l l
+l l l .
+\fBXMTCLK\fR	0000007	Transmit clock source:
+\fBXCIBRG\fR	0000000  	T{
 Get transmit clock from internal baud rate generator.
 T}
-\fBXCTSET\fR0000001  T{
+\fBXCTSET\fR	0000001  	T{
 Get transmit clock from transmitter signal element timing (DCE source) lead, CCITT V.24 circuit 114, EIA-232-D pin 15.
 T}
-\fBXCRSET\fR0000002  T{
+\fBXCRSET\fR	0000002  	T{
 Get transmit clock from receiver signal element timing (DCE source) lead, CCITT V.24 circuit 115, EIA-232-D pin 17.
 T}
-\fBRCVCLK\fR0000070  Receive clock source:
-\fBRCIBRG\fR0000000  T{
+\fBRCVCLK\fR	0000070  	Receive clock source:
+\fBRCIBRG\fR	0000000  	T{
 Get receive clock from internal baud rate generator.
 T}
-\fBRCTSET\fR0000010  T{
+\fBRCTSET\fR	0000010  	T{
 Get receive clock from transmitter signal element timing (DCE source) lead, CCITT V.24 circuit 114, EIA-232-D pin 15.
 T}
-\fBRCRSET\fR0000020  T{
+\fBRCRSET\fR	0000020  	T{
 Get receive clock from receiver signal element timing (DCE source) lead, CCITT V.24 circuit 115, EIA-232-D pin 17.
 T}
-\fBTSETCLK\fR0000700  T{
+\fBTSETCLK\fR	0000700  	T{
 Transmitter signal element timing (DTE source) lead, CCITT V.24 circuit 113, EIA-232-D pin 24, clock source:
 T}
-\fBTSETCOFF\fR0000000  TSET clock not provided.
-\fBTSETCRBRG\fR0000100  T{
+\fBTSETCOFF\fR	0000000  	TSET clock not provided.
+\fBTSETCRBRG\fR	0000100  	T{
 Output receive baud rate generator on circuit 113.
 T}
-\fBTSETCTBRG\fR0000200  T{
+\fBTSETCTBRG\fR	0000200  	T{
 Output transmit baud rate generator on circuit 113
 T}
-\fBTSETCTSET\fR0000300  T{
+\fBTSETCTSET\fR	0000300  	T{
 Output transmitter signal element timing (DCE source) on circuit 113.
 T}
-\fBTSETCRSET\fR0000400  T{
+\fBTSETCRSET\fR	0000400  	T{
 Output receiver signal element timing (DCE source) on circuit 113.
 T}
-\fBRSETCLK\fR0007000  T{
+\fBRSETCLK\fR	0007000  	T{
 Receiver signal element timing (DTE source) lead, CCITT V.24 circuit 128, no EIA-232-D pin, clock source:
 T}
-\fBRSETCOFF\fR0000000  RSET clock not provided.
-\fBRSETCRBRG\fR0001000  T{
+\fBRSETCOFF\fR	0000000  	RSET clock not provided.
+\fBRSETCRBRG\fR	0001000  	T{
 Output receive baud rate generator on circuit 128.
 T}
-\fBRSETCTBRG\fR0002000  T{
+\fBRSETCTBRG\fR	0002000  	T{
 Output transmit baud rate generator on circuit 128.
 T}
-\fBRSETCTSET\fR0003000  T{
+\fBRSETCTSET\fR	0003000  	T{
 Output transmitter signal element timing (DCE source) on circuit 128.
 T}
-\fBRSETCRSET\fR0004000  T{
+\fBRSETCRSET\fR	0004000  	T{
 Output receiver signal element timing (DCE) on circuit 128.
 T}
 .TE
@@ -298,7 +294,7 @@ The  \fBioctl\fR(2) system calls have the form:
 .sp
 .in +2
 .nf
-\fBioctl\fR (\fIfildes, command, arg\fR) \fBstruct termiox *\fR \fIarg\fR; 
+\fBioctl\fR (\fIfildes, command, arg\fR) \fBstruct termiox *\fR \fIarg\fR;
 .fi
 .in -2
 
@@ -307,24 +303,20 @@ The  \fBioctl\fR(2) system calls have the form:
 The commands using this form are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTCGETX\fR\fR
 .ad
 .RS 11n
-.rt  
 The argument is a pointer to a \fBtermiox\fR structure. The current terminal
 parameters are fetched and stored into that structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTCSETX\fR\fR
 .ad
 .RS 11n
-.rt  
 The argument is a pointer to a \fBtermiox\fR structure.  The current terminal
 parameters are set from the values stored in that structure.  The change is
 immediate.
@@ -332,12 +324,10 @@ immediate.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTCSETXW\fR\fR
 .ad
 .RS 11n
-.rt  
 The argument is a pointer to a \fBtermiox\fR structure.  The current terminal
 parameters are set from the values stored in that structure.  The change occurs
 after all characters queued for output have been transmitted. This form should
@@ -346,12 +336,10 @@ be used when changing parameters that will affect output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTCSETXF\fR\fR
 .ad
 .RS 11n
-.rt  
 The argument is a pointer to a \fBtermiox\fR structure.  The current terminal
 parameters are set from the values stored in that structure.  The change occurs
 after all characters queued for output have been transmitted; all characters

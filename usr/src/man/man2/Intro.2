@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH Intro 2 "17 Nov 2008" "SunOS 5.11" "System Calls"
+.TH INTRO 2 "Nov 17, 2008"
 .SH NAME
 Intro, intro \- introduction to system calls and error numbers
 .SH SYNOPSIS
@@ -55,12 +55,10 @@ following is a complete list of the error numbers and their names as defined in
 <\fBerrno.h\fR>.
 .sp
 .ne 2
-.mk
 .na
 \fB1 EPERM\fR
 .ad
 .RS 23n
-.rt  
 Lacking appropriate privileges
 .sp
 Typically this error indicates an attempt to modify a file in some way
@@ -74,12 +72,10 @@ to override the restriction.
 
 .sp
 .ne 2
-.mk
 .na
 \fB2 ENOENT\fR
 .ad
 .RS 23n
-.rt  
 No such file or directory
 .sp
 A file name is specified and the file should exist but doesn't, or one of the
@@ -88,12 +84,10 @@ directories in a path name does not exist.
 
 .sp
 .ne 2
-.mk
 .na
 \fB3 ESRCH\fR
 .ad
 .RS 23n
-.rt  
 No such process, LWP, or thread
 .sp
 No process can be found in the system that corresponds to the specified
@@ -102,12 +96,10 @@ No process can be found in the system that corresponds to the specified
 
 .sp
 .ne 2
-.mk
 .na
 \fB4 EINTR\fR
 .ad
 .RS 23n
-.rt  
 Interrupted system call
 .sp
 An asynchronous signal (such as interrupt or quit), which the user has elected
@@ -121,12 +113,10 @@ thread or \fBLWP\fR calls \fBfork\fR(2).
 
 .sp
 .ne 2
-.mk
 .na
 \fB5 EIO\fR
 .ad
 .RS 23n
-.rt  
 I/O error
 .sp
 Some physical I/O error has occurred. This error may in some cases occur on a
@@ -135,12 +125,10 @@ call following the one to which it actually applies.
 
 .sp
 .ne 2
-.mk
 .na
 \fB6 ENXIO\fR
 .ad
 .RS 23n
-.rt  
 No such device or address
 .sp
 I/O on a special file refers to a subdevice which does not exist, or exists
@@ -150,12 +138,10 @@ drive is not on-line or no disk pack is loaded on a drive.
 
 .sp
 .ne 2
-.mk
 .na
 \fB7 E2BIG\fR
 .ad
 .RS 23n
-.rt  
 Arg list too long
 .sp
 An argument list longer than  \fBARG_MAX\fR bytes is presented to a member of
@@ -166,12 +152,10 @@ exported shell variables.
 
 .sp
 .ne 2
-.mk
 .na
 \fB8 ENOEXEC\fR
 .ad
 .RS 23n
-.rt  
 Exec format error
 .sp
 A request is made to execute a file which, although it has the appropriate
@@ -180,12 +164,10 @@ permissions, does not start with a valid format (see \fBa.out\fR(4)).
 
 .sp
 .ne 2
-.mk
 .na
 \fB9 EBADF\fR
 .ad
 .RS 23n
-.rt  
 Bad file number
 .sp
 Either a file descriptor refers to no open file, or a \fBread\fR(2)
@@ -195,12 +177,10 @@ writing (respectively, reading).
 
 .sp
 .ne 2
-.mk
 .na
 \fB10 ECHILD\fR
 .ad
 .RS 23n
-.rt  
 No child processes
 .sp
 A \fBwait\fR(3C) function call was executed by a process that had no existing
@@ -209,12 +189,10 @@ or unwaited-for child processes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB11 EAGAIN\fR
 .ad
 .RS 23n
-.rt  
 No more processes, or no more LWPs
 .sp
 For example, the \fBfork\fR(2) function failed because the system's process
@@ -224,12 +202,10 @@ call failed because of insufficient memory or swap space.
 
 .sp
 .ne 2
-.mk
 .na
 \fB12 ENOMEM\fR
 .ad
 .RS 23n
-.rt  
 Not enough space
 .sp
 During execution of \fBbrk()\fR or \fBsbrk()\fR (see \fBbrk\fR(2)), or one of
@@ -243,12 +219,10 @@ function.
 
 .sp
 .ne 2
-.mk
 .na
 \fB13 EACCES\fR
 .ad
 .RS 23n
-.rt  
 Permission denied
 .sp
 An attempt was made to access a file in a way forbidden by the protection
@@ -260,12 +234,10 @@ to override the protection system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB14 EFAULT\fR
 .ad
 .RS 23n
-.rt  
 Bad address
 .sp
 The system encountered a hardware fault in attempting to use an argument of a
@@ -278,12 +250,10 @@ address to a routine will result in undefined behavior.
 
 .sp
 .ne 2
-.mk
 .na
 \fB15 ENOTBLK\fR
 .ad
 .RS 23n
-.rt  
 Block device required
 .sp
 A non-block device or file was mentioned where a block device was required (for
@@ -292,12 +262,10 @@ example, in a call to the \fBmount\fR(2) function).
 
 .sp
 .ne 2
-.mk
 .na
 \fB16 EBUSY\fR
 .ad
 .RS 23n
-.rt  
 Device busy
 .sp
 An attempt was made to mount a device that was already mounted or an attempt
@@ -311,12 +279,10 @@ held,  and by the processor control function  \fBP_ONLINE\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB17 EEXIST\fR
 .ad
 .RS 23n
-.rt  
 File exists
 .sp
 An existing file was mentioned in an inappropriate context (for example, call
@@ -325,12 +291,10 @@ to the \fBlink\fR(2) function).
 
 .sp
 .ne 2
-.mk
 .na
 \fB18 EXDEV\fR
 .ad
 .RS 23n
-.rt  
 Cross-device link
 .sp
 A hard link to a file on another device was attempted.
@@ -338,12 +302,10 @@ A hard link to a file on another device was attempted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB19 ENODEV\fR
 .ad
 .RS 23n
-.rt  
 No such device
 .sp
 An attempt was made to apply an inappropriate operation to a device (for
@@ -352,12 +314,10 @@ example, read a write-only device).
 
 .sp
 .ne 2
-.mk
 .na
 \fB20 ENOTDIR\fR
 .ad
 .RS 23n
-.rt  
 Not a directory
 .sp
 A non-directory was specified where a directory is required (for example, in a
@@ -366,12 +326,10 @@ path prefix or as an argument to the \fBchdir\fR(2) function).
 
 .sp
 .ne 2
-.mk
 .na
 \fB21 EISDIR\fR
 .ad
 .RS 23n
-.rt  
 Is a directory
 .sp
 An attempt was made to write on a directory.
@@ -379,12 +337,10 @@ An attempt was made to write on a directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB22 EINVAL\fR
 .ad
 .RS 23n
-.rt  
 Invalid argument
 .sp
 An invalid argument was specified (for example, unmounting a non-mounted
@@ -395,12 +351,10 @@ attributes was attempted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB23 ENFILE\fR
 .ad
 .RS 23n
-.rt  
 File table overflow
 .sp
 The system file table is full (that is,  \fBSYS_OPEN\fR files are open, and
@@ -409,12 +363,10 @@ temporarily no more files can be opened).
 
 .sp
 .ne 2
-.mk
 .na
 \fB24 EMFILE\fR
 .ad
 .RS 23n
-.rt  
 Too many open files
 .sp
 No process may have more than  \fBOPEN_MAX\fR file descriptors open at a time.
@@ -422,12 +374,10 @@ No process may have more than  \fBOPEN_MAX\fR file descriptors open at a time.
 
 .sp
 .ne 2
-.mk
 .na
 \fB25 ENOTTY\fR
 .ad
 .RS 23n
-.rt  
 Inappropriate ioctl for device
 .sp
 A call was made to the \fBioctl\fR(2) function specifying a file that is not a
@@ -436,12 +386,10 @@ special character device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB26 ETXTBSY\fR
 .ad
 .RS 23n
-.rt  
 Text file busy (obsolete)
 .sp
 An attempt was made to execute a pure-procedure program that is currently open
@@ -451,12 +399,10 @@ program that is being executed. \fB(This message is obsolete.)\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB27 EFBIG\fR
 .ad
 .RS 23n
-.rt  
 File too large
 .sp
 The size of the file exceeded the limit specified by resource
@@ -468,12 +414,10 @@ below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB28 ENOSPC\fR
 .ad
 .RS 23n
-.rt  
 No space left on device
 .sp
 While writing an ordinary file or creating a directory entry, there is no free
@@ -484,12 +428,10 @@ more record entries left on the system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB29 ESPIPE\fR
 .ad
 .RS 23n
-.rt  
 Illegal seek
 .sp
 A call to the  \fBlseek\fR(2) function was issued to a pipe.
@@ -497,12 +439,10 @@ A call to the  \fBlseek\fR(2) function was issued to a pipe.
 
 .sp
 .ne 2
-.mk
 .na
 \fB30 EROFS\fR
 .ad
 .RS 23n
-.rt  
 Read-only file system
 .sp
 An attempt to modify a file or directory was made on a device mounted
@@ -511,12 +451,10 @@ read-only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB31 EMLINK\fR
 .ad
 .RS 23n
-.rt  
 Too many links
 .sp
 An attempt to make more than the maximum number of links,  \fBLINK_MAX\fR, to a
@@ -525,12 +463,10 @@ file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB32 EPIPE\fR
 .ad
 .RS 23n
-.rt  
 Broken pipe
 .sp
 A write on a pipe for which there is no process to read the data. This
@@ -540,12 +476,10 @@ ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB33 EDOM\fR
 .ad
 .RS 23n
-.rt  
 Math argument out of domain of function
 .sp
 The argument of a function in the math package (3M) is out of the domain of the
@@ -554,12 +488,10 @@ function.
 
 .sp
 .ne 2
-.mk
 .na
 \fB34 ERANGE\fR
 .ad
 .RS 23n
-.rt  
 Math result not representable
 .sp
 The value of a function in the math package (3M) is not representable within
@@ -568,12 +500,10 @@ machine precision.
 
 .sp
 .ne 2
-.mk
 .na
 \fB35 ENOMSG\fR
 .ad
 .RS 23n
-.rt  
 No message of desired type
 .sp
 An attempt was made to receive a message of a type that does not exist on the
@@ -582,12 +512,10 @@ specified message queue (see \fBmsgrcv\fR(2)).
 
 .sp
 .ne 2
-.mk
 .na
 \fB36 EIDRM\fR
 .ad
 .RS 23n
-.rt  
 Identifier removed
 .sp
 This error is returned to processes that resume execution due to the removal of
@@ -597,100 +525,82 @@ an identifier from the file system's name space (see \fBmsgctl\fR(2),
 
 .sp
 .ne 2
-.mk
 .na
 \fB37 ECHRNG\fR
 .ad
 .RS 23n
-.rt  
 Channel number out of range
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB38 EL2NSYNC\fR
 .ad
 .RS 23n
-.rt  
 Level 2 not synchronized
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB39 EL3HLT\fR
 .ad
 .RS 23n
-.rt  
 Level 3 halted
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB40 EL3RST\fR
 .ad
 .RS 23n
-.rt  
 Level 3 reset
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB41 ELNRNG\fR
 .ad
 .RS 23n
-.rt  
 Link number out of range
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB42 EUNATCH\fR
 .ad
 .RS 23n
-.rt  
 Protocol driver not attached
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB43 ENOCSI\fR
 .ad
 .RS 23n
-.rt  
 No CSI structure available
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB44 EL2HLT\fR
 .ad
 .RS 23n
-.rt  
 Level 2 halted
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB45 EDEADLK\fR
 .ad
 .RS 23n
-.rt  
 Deadlock condition
 .sp
 A deadlock situation was detected and avoided. This error pertains to file and
@@ -700,12 +610,10 @@ and r/w locks.
 
 .sp
 .ne 2
-.mk
 .na
 \fB46 ENOLCK\fR
 .ad
 .RS 23n
-.rt  
 No record locks available
 .sp
 There are no more locks available. The system lock table is full (see
@@ -714,12 +622,10 @@ There are no more locks available. The system lock table is full (see
 
 .sp
 .ne 2
-.mk
 .na
 \fB47 ECANCELED\fR
 .ad
 .RS 23n
-.rt  
 Operation canceled
 .sp
 The associated asynchronous operation was canceled before completion.
@@ -727,12 +633,10 @@ The associated asynchronous operation was canceled before completion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB48 ENOTSUP\fR
 .ad
 .RS 23n
-.rt  
 Not supported
 .sp
 This version of the system does not support this feature. Future versions of
@@ -741,12 +645,10 @@ the system may provide support.
 
 .sp
 .ne 2
-.mk
 .na
 \fB49 EDQUOT\fR
 .ad
 .RS 23n
-.rt  
 Disc quota exceeded
 .sp
 A \fBwrite\fR(2) to an ordinary file, the creation of a directory or symbolic
@@ -757,23 +659,19 @@ file failed because the user's quota of inodes was exhausted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB58-59\fR
 .ad
 .RS 23n
-.rt  
 Reserved
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB60 ENOSTR\fR
 .ad
 .RS 23n
-.rt  
 Device not a stream
 .sp
 A \fBputmsg\fR(2) or \fBgetmsg\fR(2) call was attempted on a file descriptor
@@ -782,23 +680,19 @@ that is not a STREAMS device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB61 ENODATA\fR
 .ad
 .RS 23n
-.rt  
 No data available
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB62 ETIME\fR
 .ad
 .RS 23n
-.rt  
 Timer expired
 .sp
 The timer set for a STREAMS \fBioctl\fR(2) call has expired. The cause of this
@@ -811,12 +705,10 @@ also returned in the case of \fB_lwp_cond_timedwait\fR(2) or
 
 .sp
 .ne 2
-.mk
 .na
 \fB63 ENOSR\fR
 .ad
 .RS 23n
-.rt  
 Out of stream resources
 .sp
 During a  \fBSTREAMS\fR \fBopen\fR(2) call, either no  \fBSTREAMS\fR queues or
@@ -826,12 +718,10 @@ condition; one may recover from it if other processes release resources.
 
 .sp
 .ne 2
-.mk
 .na
 \fB65 ENOPKG\fR
 .ad
 .RS 23n
-.rt  
 Package not installed
 .sp
 This error occurs when users attempt to use a call from a package which has not
@@ -840,12 +730,10 @@ been installed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB71 EPROTO\fR
 .ad
 .RS 23n
-.rt  
 Protocol error
 .sp
 Some protocol error occurred.  This error is device-specific, but is generally
@@ -854,12 +742,10 @@ not related to a hardware failure.
 
 .sp
 .ne 2
-.mk
 .na
 \fB77 EBADMSG\fR
 .ad
 .RS 23n
-.rt  
 Not a data message
 .sp
 During a \fBread\fR(2), \fBgetmsg\fR(2), or \fBioctl\fR(2) \fBI_RECVFD\fR call
@@ -867,34 +753,28 @@ to a STREAMS device, something has come to the head of the queue that can not
 be processed.  That something depends on the call:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBread()\fR:\fR
 .ad
 .RS 13n
-.rt  
 control information or passed file descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgetmsg()\fR:\fR
 .ad
 .RS 13n
-.rt  
 passed file descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBioctl()\fR:\fR
 .ad
 .RS 13n
-.rt  
 control or data information.
 .RE
 
@@ -902,12 +782,10 @@ control or data information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB78 ENAMETOOLONG\fR
 .ad
 .RS 23n
-.rt  
 File name too long
 .sp
 The length of the path argument exceeds  \fIPATH_MAX\fR, or the length of a
@@ -917,23 +795,19 @@ see \fBlimits.h\fR(3HEAD).
 
 .sp
 .ne 2
-.mk
 .na
 \fB79 EOVERFLOW\fR
 .ad
 .RS 23n
-.rt  
 Value too large for defined data type.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB80 ENOTUNIQ\fR
 .ad
 .RS 23n
-.rt  
 Name not unique on network
 .sp
 Given log name not unique.
@@ -941,12 +815,10 @@ Given log name not unique.
 
 .sp
 .ne 2
-.mk
 .na
 \fB81 EBADFD\fR
 .ad
 .RS 23n
-.rt  
 File descriptor in bad state
 .sp
 Either a file descriptor refers to no open file or a read request was made to a
@@ -955,23 +827,19 @@ file that is open only for writing.
 
 .sp
 .ne 2
-.mk
 .na
 \fB82 EREMCHG\fR
 .ad
 .RS 23n
-.rt  
 Remote address changed
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB83 ELIBACC\fR
 .ad
 .RS 23n
-.rt  
 Cannot access a needed share library
 .sp
 Trying to \fBexec\fR an \fBa.out\fR that requires a static shared library and
@@ -981,12 +849,10 @@ to use it.
 
 .sp
 .ne 2
-.mk
 .na
 \fB84 ELIBBAD\fR
 .ad
 .RS 23n
-.rt  
 Accessing a corrupted shared library
 .sp
 Trying to \fBexec\fR an \fBa.out\fR that requires a static shared library (to
@@ -996,12 +862,10 @@ static shared library is probably corrupted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB85 ELIBSCN\fR
 .ad
 .RS 23n
-.rt  
 \fB\&.lib\fR section in \fBa.out\fR corrupted
 .sp
 Trying to \fBexec\fR an \fBa.out\fR that requires a static shared library (to
@@ -1012,12 +876,10 @@ libraries are needed. The \fBa.out\fR is probably corrupted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB86 ELIBMAX\fR
 .ad
 .RS 23n
-.rt  
 Attempting to link in more shared libraries than system limit
 .sp
 Trying to \fBexec\fR an \fBa.out\fR that requires more static shared libraries
@@ -1027,12 +889,10 @@ Administration Guide: IP Services\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB87 ELIBEXEC\fR
 .ad
 .RS 23n
-.rt  
 Cannot \fBexec\fR a shared library directly
 .sp
 Attempting to \fBexec\fR a shared library directly.
@@ -1040,12 +900,10 @@ Attempting to \fBexec\fR a shared library directly.
 
 .sp
 .ne 2
-.mk
 .na
 \fB88 EILSEQ\fR
 .ad
 .RS 23n
-.rt  
 Error 88
 .sp
 Illegal byte sequence. Handle multiple characters as a single character.
@@ -1053,35 +911,29 @@ Illegal byte sequence. Handle multiple characters as a single character.
 
 .sp
 .ne 2
-.mk
 .na
 \fB89 ENOSYS\fR
 .ad
 .RS 23n
-.rt  
 Operation not applicable
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB90 ELOOP\fR
 .ad
 .RS 23n
-.rt  
 Number of symbolic links encountered during path name traversal exceeds
 \fBMAXSYMLINKS\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB91 ESTART\fR
 .ad
 .RS 23n
-.rt  
 Restartable system call
 .sp
 Interrupted system call should be restarted.
@@ -1089,12 +941,10 @@ Interrupted system call should be restarted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB92 ESTRPIPE\fR
 .ad
 .RS 23n
-.rt  
 If pipe/FIFO, don't sleep in stream head
 .sp
 Streams pipe error (not externally visible).
@@ -1102,45 +952,37 @@ Streams pipe error (not externally visible).
 
 .sp
 .ne 2
-.mk
 .na
 \fB93 ENOTEMPTY\fR
 .ad
 .RS 23n
-.rt  
 Directory not empty
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB94 EUSERS\fR
 .ad
 .RS 23n
-.rt  
 Too many users
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB95 ENOTSOCK\fR
 .ad
 .RS 23n
-.rt  
 Socket operation on non-socket
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB96 EDESTADDRREQ\fR
 .ad
 .RS 23n
-.rt  
 Destination address required
 .sp
 A required address was omitted from an operation on a transport endpoint.
@@ -1149,12 +991,10 @@ Destination address required.
 
 .sp
 .ne 2
-.mk
 .na
 \fB97 EMGSIZE\fR
 .ad
 .RS 23n
-.rt  
 Message too long
 .sp
 A message sent on a transport provider was larger than the internal message
@@ -1163,12 +1003,10 @@ buffer or some other network limit.
 
 .sp
 .ne 2
-.mk
 .na
 \fB98 EPROTOTYPE\fR
 .ad
 .RS 23n
-.rt  
 Protocol wrong type for socket
 .sp
 A protocol was specified that does not support the semantics of the socket type
@@ -1177,12 +1015,10 @@ requested.
 
 .sp
 .ne 2
-.mk
 .na
 \fB99 ENOPROTOOPT\fR
 .ad
 .RS 23n
-.rt  
 Protocol not available
 .sp
 A bad option or level was specified when getting or setting options for a
@@ -1191,12 +1027,10 @@ protocol.
 
 .sp
 .ne 2
-.mk
 .na
 \fB120 EPROTONOSUPPORT\fR
 .ad
 .RS 23n
-.rt  
 Protocol not supported
 .sp
 The protocol has not been configured into the system or no implementation for
@@ -1205,12 +1039,10 @@ it exists.
 
 .sp
 .ne 2
-.mk
 .na
 \fB121 ESOCKTNOSUPPORT\fR
 .ad
 .RS 23n
-.rt  
 Socket type not supported
 .sp
 The support for the socket type has not been configured into the system or no
@@ -1219,12 +1051,10 @@ implementation for it exists.
 
 .sp
 .ne 2
-.mk
 .na
 \fB122 EOPNOTSUPP\fR
 .ad
 .RS 23n
-.rt  
 Operation not supported on transport endpoint
 .sp
 For example, trying to accept a connection on a datagram transport endpoint.
@@ -1232,12 +1062,10 @@ For example, trying to accept a connection on a datagram transport endpoint.
 
 .sp
 .ne 2
-.mk
 .na
 \fB123 EPFNOSUPPORT\fR
 .ad
 .RS 23n
-.rt  
 Protocol family not supported
 .sp
 The protocol family has not been configured into the system or no
@@ -1246,12 +1074,10 @@ implementation for it exists. Used for the Internet protocols.
 
 .sp
 .ne 2
-.mk
 .na
 \fB124 EAFNOSUPPORT\fR
 .ad
 .RS 23n
-.rt  
 Address family not supported by protocol family
 .sp
 An address incompatible with the requested protocol was used.
@@ -1259,12 +1085,10 @@ An address incompatible with the requested protocol was used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB125 EADDRINUSE\fR
 .ad
 .RS 23n
-.rt  
 Address already in use
 .sp
 User attempted to use an address already in use, and the protocol does not
@@ -1273,12 +1097,10 @@ allow this.
 
 .sp
 .ne 2
-.mk
 .na
 \fB126 EADDRNOTAVAIL\fR
 .ad
 .RS 23n
-.rt  
 Cannot assign requested address
 .sp
 Results from an attempt to create a transport endpoint with an address not on
@@ -1287,12 +1109,10 @@ the current machine.
 
 .sp
 .ne 2
-.mk
 .na
 \fB127 ENETDOWN\fR
 .ad
 .RS 23n
-.rt  
 Network is down
 .sp
 Operation encountered a dead network.
@@ -1300,12 +1120,10 @@ Operation encountered a dead network.
 
 .sp
 .ne 2
-.mk
 .na
 \fB128 ENETUNREACH\fR
 .ad
 .RS 23n
-.rt  
 Network is unreachable
 .sp
 Operation was attempted to an unreachable network.
@@ -1313,12 +1131,10 @@ Operation was attempted to an unreachable network.
 
 .sp
 .ne 2
-.mk
 .na
 \fB129 ENETRESET\fR
 .ad
 .RS 23n
-.rt  
 Network dropped connection because of reset
 .sp
 The host you were connected to crashed and rebooted.
@@ -1326,12 +1142,10 @@ The host you were connected to crashed and rebooted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB130 ECONNABORTED\fR
 .ad
 .RS 23n
-.rt  
 Software caused connection abort
 .sp
 A connection abort was caused internal to your host machine.
@@ -1339,12 +1153,10 @@ A connection abort was caused internal to your host machine.
 
 .sp
 .ne 2
-.mk
 .na
 \fB131 ECONNRESET\fR
 .ad
 .RS 23n
-.rt  
 Connection reset by peer
 .sp
 A connection was forcibly closed by a peer. This normally results from a loss
@@ -1353,12 +1165,10 @@ of the connection on the remote host due to a timeout or a reboot.
 
 .sp
 .ne 2
-.mk
 .na
 \fB132 ENOBUFS\fR
 .ad
 .RS 23n
-.rt  
 No buffer space available
 .sp
 An operation on a transport endpoint or pipe was not performed because the
@@ -1367,12 +1177,10 @@ system lacked sufficient buffer space or because a queue was full.
 
 .sp
 .ne 2
-.mk
 .na
 \fB133 EISCONN\fR
 .ad
 .RS 23n
-.rt  
 Transport endpoint is already connected
 .sp
 A connect request was made on an already connected transport endpoint; or, a
@@ -1382,12 +1190,10 @@ transport endpoint specified a destination when already connected.
 
 .sp
 .ne 2
-.mk
 .na
 \fB134 ENOTCONN\fR
 .ad
 .RS 23n
-.rt  
 Transport endpoint is not connected
 .sp
 A request to send or receive data was disallowed because the transport endpoint
@@ -1396,12 +1202,10 @@ is not connected and (when sending a datagram) no address was supplied.
 
 .sp
 .ne 2
-.mk
 .na
 \fB143 ESHUTDOWN\fR
 .ad
 .RS 23n
-.rt  
 Cannot send after transport endpoint shutdown
 .sp
 A request to send data was disallowed because the transport endpoint has
@@ -1410,23 +1214,19 @@ already been shut down.
 
 .sp
 .ne 2
-.mk
 .na
 \fB144 ETOOMANYREFS\fR
 .ad
 .RS 23n
-.rt  
 Too many references: cannot splice
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB145 ETIMEDOUT\fR
 .ad
 .RS 23n
-.rt  
 Connection timed out
 .sp
 A  \fBconnect\fR(3SOCKET) or  \fBsend\fR(3SOCKET) request failed because the
@@ -1437,12 +1237,10 @@ connected party did not properly respond after a period of time; or a
 
 .sp
 .ne 2
-.mk
 .na
 \fB146 ECONNREFUSED\fR
 .ad
 .RS 23n
-.rt  
 Connection refused
 .sp
 No connection could be made because the target machine actively refused it.
@@ -1452,12 +1250,10 @@ the remote host.
 
 .sp
 .ne 2
-.mk
 .na
 \fB147 EHOSTDOWN\fR
 .ad
 .RS 23n
-.rt  
 Host is down
 .sp
 A transport provider operation failed because the destination host was down.
@@ -1465,12 +1261,10 @@ A transport provider operation failed because the destination host was down.
 
 .sp
 .ne 2
-.mk
 .na
 \fB148 EHOSTUNREACH\fR
 .ad
 .RS 23n
-.rt  
 No route to host
 .sp
 A transport provider operation was attempted to an unreachable host.
@@ -1478,12 +1272,10 @@ A transport provider operation was attempted to an unreachable host.
 
 .sp
 .ne 2
-.mk
 .na
 \fB149 EALREADY\fR
 .ad
 .RS 23n
-.rt  
 Operation already in progress
 .sp
 An operation was attempted on a non-blocking object that already had an
@@ -1492,12 +1284,10 @@ operation in progress.
 
 .sp
 .ne 2
-.mk
 .na
 \fB150 EINPROGRESS\fR
 .ad
 .RS 23n
-.rt  
 Operation now in progress
 .sp
 An operation that takes a long time to complete (such as a \fBconnect()\fR) was
@@ -1506,12 +1296,10 @@ attempted on a non-blocking object.
 
 .sp
 .ne 2
-.mk
 .na
 \fB151 ESTALE\fR
 .ad
 .RS 23n
-.rt  
 Stale NFS file handle
 .RE
 

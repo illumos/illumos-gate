@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH menus 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.TH MENUS 3CURSES "Dec 31, 1996"
 .SH NAME
 menus \- character based menus package
 .SH SYNOPSIS
@@ -47,71 +47,69 @@ which it is described.
 
 .sp
 .TS
-tab();
-cw(2.75i) cw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBMenus Routine Name\fR\fBManual Page Name\fR
-\fBcurrent_item\fR\fBmenu_item_current(3X)\fR
-\fBfree_item\fR\fBmenu_item_new(3X)\fR
-\fBfree_menu\fR\fBmenu_new(3X)\fR
-\fBitem_count\fR\fBmenu_items(3X)\fR
-\fBitem_description\fR\fBmenu_item_name(3X)\fR
-\fBitem_index\fR\fBmenu_item_current(3X)\fR
-\fBitem_init\fR\fBmenu_hook(3X)\fR
-\fBitem_name\fR\fBmenu_item_name(3X)\fR
-\fBitem_opts\fR\fBmenu_item_opts(3X)\fR
-\fBitem_opts_off\fR\fBmenu_item_opts(3X)\fR
-\fBitem_opts_on\fR\fBmenu_item_opts(3X)\fR
-\fBitem_term\fR\fBmenu_hook(3X)\fR
-\fBitem_userptr\fR\fBmenu_item_userptr(3X)\fR
-\fBitem_value\fR\fBmenu_item_value(3X)\fR
-\fBitem_visible\fR\fBmenu_item_visible(3X)\fR
-\fBmenu_back\fR\fBmenu_attributes(3X)\fR
-\fBmenu_driver\fR\fBmenu_driver(3X)\fR
-\fBmenu_fore\fR\fBmenu_attributes(3X)\fR
-\fBmenu_format\fR\fBmenu_format(3X)\fR
-\fBmenu_grey\fR\fBmenu_attributes(3X)\fR
-\fBmenu_init\fR\fBmenu_hook(3X)\fR
-\fBmenu_items\fR\fBmenu_items(3X)\fR
-\fBmenu_mark\fR\fBmenu_mark(3X)\fR
-\fBmenu_opts\fR\fBmenu_opts(3X)\fR
-\fBmenu_opts_off\fR\fBmenu_opts(3X)\fR
-\fBmenu_opts_on\fR\fBmenu_opts(3X)\fR
-\fBmenu_pad\fR\fBmenu_attributes(3X)\fR
-\fBmenu_pattern\fR\fBmenu_pattern(3X)\fR
-\fBmenu_sub\fR\fBmenu_win(3X)\fR
-\fBmenu_term\fR\fBmenu_hook(3X)\fR
-\fBmenu_userptr\fR\fBmenu_userptr(3X)\fR
-\fBmenu_win\fR\fBmenu_win(3X)\fR
-\fBnew_item\fR\fBmenu_item_new(3X)\fR
-\fBnew_menu\fR\fBmenu_new(3X)\fR
-\fBpos_menu_cursor\fR\fBmenu_cursor(3X)\fR
-\fBpost_menu\fR\fBmenu_post(3X)\fR
-\fBscale_menu\fR\fBmenu_win(3X)\fR
-\fBset_current_item\fR\fBmenu_item_current(3X)\fR
-\fBset_item_init\fR\fBmenu_hook(3X)\fR
-\fBset_item_opts\fR\fBmenu_item_opts(3X)\fR
-\fBset_item_term\fR\fBmenu_hook(3X)\fR
-\fBset_item_userptr\fR\fBmenu_item_userptr(3X)\fR
-\fBset_item_value\fR\fBmenu_item_value(3X)\fR
-\fBset_menu_back\fR\fBmenu_attributes(3X)\fR
-\fBset_menu_fore\fR\fBmenu_attributes(3X)\fR
-\fBset_menu_format\fR\fBmenu_format(3X)\fR
-\fBset_menu_grey\fR\fBmenu_attributes(3X)\fR
-\fBset_menu_init\fR\fBmenu_hook(3X)\fR
-\fBset_menu_items\fR\fBmenu_items(3X)\fR
-\fBset_menu_mark\fR\fBmenu_mark(3X)\fR
-\fBset_menu_opts\fR\fBmenu_opts(3X)\fR
-\fBset_menu_pad\fR\fBmenu_attributes(3X)\fR
-\fBset_menu_pattern\fR\fBmenu_pattern(3X)\fR
-\fBset_menu_sub\fR\fBmenu_win(3X)\fR
-\fBset_menu_term\fR\fBmenu_hook(3X)\fR
-\fBset_menu_userptr\fR\fBmenu_userptr(3X)\fR
-\fBset_menu_win\fR\fBmenu_win(3X)\fR
-\fBset_top_row\fR\fBmenu_item_current(3X)\fR
-\fBtop_row\fR\fBmenu_item_current(3X)\fR
-\fBunpost_menu\fR\fBmenu_post(3X)\fR
+c c
+l l .
+\fBMenus Routine Name\fR	\fBManual Page Name\fR
+\fBcurrent_item\fR	\fBmenu_item_current(3X)\fR
+\fBfree_item\fR	\fBmenu_item_new(3X)\fR
+\fBfree_menu\fR	\fBmenu_new(3X)\fR
+\fBitem_count\fR	\fBmenu_items(3X)\fR
+\fBitem_description\fR	\fBmenu_item_name(3X)\fR
+\fBitem_index\fR	\fBmenu_item_current(3X)\fR
+\fBitem_init\fR	\fBmenu_hook(3X)\fR
+\fBitem_name\fR	\fBmenu_item_name(3X)\fR
+\fBitem_opts\fR	\fBmenu_item_opts(3X)\fR
+\fBitem_opts_off\fR	\fBmenu_item_opts(3X)\fR
+\fBitem_opts_on\fR	\fBmenu_item_opts(3X)\fR
+\fBitem_term\fR	\fBmenu_hook(3X)\fR
+\fBitem_userptr\fR	\fBmenu_item_userptr(3X)\fR
+\fBitem_value\fR	\fBmenu_item_value(3X)\fR
+\fBitem_visible\fR	\fBmenu_item_visible(3X)\fR
+\fBmenu_back\fR	\fBmenu_attributes(3X)\fR
+\fBmenu_driver\fR	\fBmenu_driver(3X)\fR
+\fBmenu_fore\fR	\fBmenu_attributes(3X)\fR
+\fBmenu_format\fR	\fBmenu_format(3X)\fR
+\fBmenu_grey\fR	\fBmenu_attributes(3X)\fR
+\fBmenu_init\fR	\fBmenu_hook(3X)\fR
+\fBmenu_items\fR	\fBmenu_items(3X)\fR
+\fBmenu_mark\fR	\fBmenu_mark(3X)\fR
+\fBmenu_opts\fR	\fBmenu_opts(3X)\fR
+\fBmenu_opts_off\fR	\fBmenu_opts(3X)\fR
+\fBmenu_opts_on\fR	\fBmenu_opts(3X)\fR
+\fBmenu_pad\fR	\fBmenu_attributes(3X)\fR
+\fBmenu_pattern\fR	\fBmenu_pattern(3X)\fR
+\fBmenu_sub\fR	\fBmenu_win(3X)\fR
+\fBmenu_term\fR	\fBmenu_hook(3X)\fR
+\fBmenu_userptr\fR	\fBmenu_userptr(3X)\fR
+\fBmenu_win\fR	\fBmenu_win(3X)\fR
+\fBnew_item\fR	\fBmenu_item_new(3X)\fR
+\fBnew_menu\fR	\fBmenu_new(3X)\fR
+\fBpos_menu_cursor\fR	\fBmenu_cursor(3X)\fR
+\fBpost_menu\fR	\fBmenu_post(3X)\fR
+\fBscale_menu\fR	\fBmenu_win(3X)\fR
+\fBset_current_item\fR	\fBmenu_item_current(3X)\fR
+\fBset_item_init\fR	\fBmenu_hook(3X)\fR
+\fBset_item_opts\fR	\fBmenu_item_opts(3X)\fR
+\fBset_item_term\fR	\fBmenu_hook(3X)\fR
+\fBset_item_userptr\fR	\fBmenu_item_userptr(3X)\fR
+\fBset_item_value\fR	\fBmenu_item_value(3X)\fR
+\fBset_menu_back\fR	\fBmenu_attributes(3X)\fR
+\fBset_menu_fore\fR	\fBmenu_attributes(3X)\fR
+\fBset_menu_format\fR	\fBmenu_format(3X)\fR
+\fBset_menu_grey\fR	\fBmenu_attributes(3X)\fR
+\fBset_menu_init\fR	\fBmenu_hook(3X)\fR
+\fBset_menu_items\fR	\fBmenu_items(3X)\fR
+\fBset_menu_mark\fR	\fBmenu_mark(3X)\fR
+\fBset_menu_opts\fR	\fBmenu_opts(3X)\fR
+\fBset_menu_pad\fR	\fBmenu_attributes(3X)\fR
+\fBset_menu_pattern\fR	\fBmenu_pattern(3X)\fR
+\fBset_menu_sub\fR	\fBmenu_win(3X)\fR
+\fBset_menu_term\fR	\fBmenu_hook(3X)\fR
+\fBset_menu_userptr\fR	\fBmenu_userptr(3X)\fR
+\fBset_menu_win\fR	\fBmenu_win(3X)\fR
+\fBset_top_row\fR	\fBmenu_item_current(3X)\fR
+\fBtop_row\fR	\fBmenu_item_current(3X)\fR
+\fBunpost_menu\fR	\fBmenu_post(3X)\fR
 .TE
 
 .SH RETURN VALUES
@@ -121,144 +119,118 @@ Routines that return pointers always return \fINULL\fR on error. Routines that
 return an integer return one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE_OK\fR\fR
 .ad
 .RS 21n
-.rt  
 The routine returned successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE_SYSTEM_ERROR\fR\fR
 .ad
 .RS 21n
-.rt  
 System error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE_BAD_ARGUMENT\fR\fR
 .ad
 .RS 21n
-.rt  
 An incorrect argument was passed to the routine.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE_POSTED\fR\fR
 .ad
 .RS 21n
-.rt  
 The menu is already posted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE_CONNECTED\fR\fR
 .ad
 .RS 21n
-.rt  
 One or more items are already connected to another menu.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE_BAD_STATE\fR\fR
 .ad
 .RS 21n
-.rt  
 The routine was called from an initialization or termination function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE_NO_ROOM\fR\fR
 .ad
 .RS 21n
-.rt  
 The menu does not fit within its subwindow.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE_NOT_POSTED\fR\fR
 .ad
 .RS 21n
-.rt  
 The menu has not been posted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE_UNKNOWN_COMMAND\fR\fR
 .ad
 .RS 21n
-.rt  
 An unknown request was passed to the menu driver.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE_NO_MATCH\fR\fR
 .ad
 .RS 21n
-.rt  
 The character failed to match.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE_NOT_SELECTABLE\fR\fR
 .ad
 .RS 21n
-.rt  
 The item cannot be selected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE_NOT_CONNECTED\fR\fR
 .ad
 .RS 21n
-.rt  
 No items are connected to the menu.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE_REQUEST_DENIED\fR\fR
 .ad
 .RS 21n
-.rt  
 The menu driver could not process the request.
 .RE
 
@@ -270,13 +242,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelUnsafe
+MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO

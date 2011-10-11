@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libthread 3LIB "24 Mar 2004" "SunOS 5.11" "Interface Libraries"
+.TH LIBTHREAD 3LIB "Mar 24, 2004"
 .SH NAME
 libthread \- threads library
 .SH SYNOPSIS
@@ -32,54 +32,48 @@ interfaces.
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBcond_broadcast\fR\fBcond_destroy\fR
-\fBcond_init\fR\fBcond_reltimedwait\fR
-\fBcond_signal\fR\fBcond_timedwait\fR
-\fBcond_wait\fR\fBmutex_destroy\fR
-\fBmutex_init\fR\fBmutex_lock\fR
-\fBmutex_trylock\fR\fBmutex_unlock\fR
-\fBrw_rdlock\fR\fBrw_tryrdlock\fR
-\fBrw_trywrlock\fR\fBrw_unlock\fR
-\fBrw_wrlock\fR\fBrwlock_destroy\fR
-\fBrwlock_init\fR\fBsema_destroy\fR
-\fBsema_init\fR\fBsema_post\fR
-\fBsema_trywait\fR\fBsema_wait\fR
-\fBthr_continue\fR\fBthr_create\fR
-\fBthr_exit\fR\fBthr_getconcurrency\fR
-\fBthr_getprio\fR\fBthr_getspecific\fR
-\fBthr_join\fR\fBthr_keycreate\fR
-\fBthr_kill\fR\fBthr_main\fR
-\fBthr_min_stack\fR\fBthr_self\fR
-\fBthr_setconcurrency\fR\fBthr_setprio\fR
-\fBthr_setspecific\fR\fBthr_sigsetmask\fR
-\fBthr_stksegment\fR\fBthr_suspend\fR
-\fBthr_yield\fR
+l l
+l l .
+\fBcond_broadcast\fR	\fBcond_destroy\fR
+\fBcond_init\fR	\fBcond_reltimedwait\fR
+\fBcond_signal\fR	\fBcond_timedwait\fR
+\fBcond_wait\fR	\fBmutex_destroy\fR
+\fBmutex_init\fR	\fBmutex_lock\fR
+\fBmutex_trylock\fR	\fBmutex_unlock\fR
+\fBrw_rdlock\fR	\fBrw_tryrdlock\fR
+\fBrw_trywrlock\fR	\fBrw_unlock\fR
+\fBrw_wrlock\fR	\fBrwlock_destroy\fR
+\fBrwlock_init\fR	\fBsema_destroy\fR
+\fBsema_init\fR	\fBsema_post\fR
+\fBsema_trywait\fR	\fBsema_wait\fR
+\fBthr_continue\fR	\fBthr_create\fR
+\fBthr_exit\fR	\fBthr_getconcurrency\fR
+\fBthr_getprio\fR	\fBthr_getspecific\fR
+\fBthr_join\fR	\fBthr_keycreate\fR
+\fBthr_kill\fR	\fBthr_main\fR
+\fBthr_min_stack\fR	\fBthr_self\fR
+\fBthr_setconcurrency\fR	\fBthr_setprio\fR
+\fBthr_setspecific\fR	\fBthr_sigsetmask\fR
+\fBthr_stksegment\fR	\fBthr_suspend\fR
+\fBthr_yield\fR	
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/libthread.so.1\fR\fR
 .ad
 .RS 26n
-.rt  
 a filter on \fBlibc.so.1\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/64/libthread.so.1\fR\fR
 .ad
 .RS 26n
-.rt  
 a filter on \fB64/libc.so.1\fR
 .RE
 
@@ -91,13 +85,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

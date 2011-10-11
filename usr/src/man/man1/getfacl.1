@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH getfacl 1 "5 Nov 1994" "SunOS 5.11" "User Commands"
+.TH GETFACL 1 "Nov 5, 1994"
 .SH NAME
 getfacl \- display discretionary file information
 .SH SYNOPSIS
@@ -35,24 +35,20 @@ exists.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 6n
-.rt  
 Displays the filename, the file owner, the file group owner, and the \fBACL\fR
 of the file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 6n
-.rt  
 Displays the filename, the file owner, the file group owner, and the default
 \fBACL\fR of the file, if it exists.
 .RE
@@ -63,12 +59,10 @@ Displays the filename, the file owner, the file group owner, and the default
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fR
 .ad
 .RS 8n
-.rt  
 The path name of a regular file, special file, or named pipe.
 .RE
 
@@ -181,14 +175,14 @@ would print:
 .sp
 .in +2
 .nf
-# file: foo 
-# owner: shea 
-# group: staff 
-user::rwx 
-user:spy:\|\(mi\|\(mi\|\(mi 
-user:mookie:r\|\(mi\|\(mi 
-group::r\|\(mi\|\(mi 
-mask::rw\|\(mi 
+# file: foo
+# owner: shea
+# group: staff
+user::rwx
+user:spy:\|\(mi\|\(mi\|\(mi
+user:mookie:r\|\(mi\|\(mi
+group::r\|\(mi\|\(mi
+mask::rw\|\(mi
 other::\|\(mi\|\(mi\|\(mi
 .fi
 .in -2
@@ -221,7 +215,7 @@ would print:
 user::rwx
 user:spy:\|\(mi\|\(mi\|\(mi
 user:mookie:r\|\(mi\|\(mi     #effective:\|\(mi\|\(mi\|\(mi
-group::\|\(mi\|\(mi\|\(mi          
+group::\|\(mi\|\(mi\|\(mi
 mask::\|\(mi\|\(mi\|\(mi
 other::\|\(mi\|\(mi\|\(mi
 .fi
@@ -266,23 +260,19 @@ default:other::\|\(mi\|\(mi\|\(mi
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/passwd\fR\fR
 .ad
 .RS 15n
-.rt  
 system password file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/group\fR\fR
 .ad
 .RS 15n
-.rt  
 group file
 .RE
 
@@ -294,13 +284,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

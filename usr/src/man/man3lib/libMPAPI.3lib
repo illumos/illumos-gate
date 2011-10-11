@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libMPAPI 3LIB "12 Dec 2006" "SunOS 5.11" "Interface Libraries"
+.TH LIBMPAPI 3LIB "Dec 12, 2006"
 .SH NAME
 libMPAPI, libmpapi \- Common Mulitipath Management library
 .SH SYNOPSIS
@@ -476,7 +476,6 @@ Errors are generally returned from the underlying VSL and can include any of
 the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMP_STATUS_SUCCESS\fR\fR
 .ad
@@ -488,7 +487,6 @@ carried out.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMP_STATUS_INVALID_PARAMETER\fR\fR
 .ad
@@ -502,7 +500,6 @@ this specification, but is not         appropriate for this API
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMP_STATUS_UNKNOWN_FN\fR\fR
 .ad
@@ -514,7 +511,6 @@ a previously registered or known function.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMP_STATUS_FAILED\fR\fR
 .ad
@@ -526,7 +522,6 @@ out.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMP_STATUS_INSUFFICIENT_MEMORY\fR\fR
 .ad
@@ -538,7 +533,6 @@ required to complete the requested operation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMP_STATUS_INVALID_OBJECT_TYPE\fR\fR
 .ad
@@ -550,7 +544,6 @@ is not defined in this specification.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMP_STATUS_OBJECT_NOT_FOUND\fR\fR
 .ad
@@ -564,7 +557,6 @@ limited to an invalid object owner identifier or sequence number.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMP_STATUS_UNSUPPORTED\fR\fR
 .ad
@@ -576,7 +568,6 @@ requested function.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMP_STATUS_FN_REPLACED\fR\fR
 .ad
@@ -588,7 +579,6 @@ replaces a previously registered function.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMP_STATUS_ACCESS_STATE_INVALID\fR\fR
 .ad
@@ -601,7 +591,6 @@ illegal combination of access states.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMP_STATUS_PATH_NONOPERATIONAL\fR\fR
 .ad
@@ -613,7 +602,6 @@ selected by the caller.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMP_STATUS_TRY_AGAIN\fR\fR
 .ad
@@ -625,7 +613,6 @@ request, but might be able to complete it later.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMP_STATUS_NOT_PERMITTED\fR\fR
 .ad
@@ -638,23 +625,19 @@ permitted in other configurations.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/libMPAPI.so\fR\fR
 .ad
 .RS 27n
-.rt  
 shared object
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/64/libMPAPI.so\fR\fR
 .ad
 .RS 27n
-.rt  
 64-bit shared object
 .RE
 
@@ -666,16 +649,15 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted 
-MT-LevelSafe
+Interface Stability	Committed
+MT-Level	Safe
 _
-StandardT{
+Standard	T{
 ANSI INCITS 412 Multipath Management API (except for \fBSun_MP_SendScsiCmd\fR)
 T}
 .TE

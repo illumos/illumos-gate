@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sdp_add_origin 3COMMPUTIL "12 Oct 2007" "SunOS 5.11" "Communication Protocol Parser Utilities Library Functions"
+.TH SDP_ADD_ORIGIN 3COMMPUTIL "Oct 12, 2007"
 .SH NAME
 sdp_add_origin, sdp_add_name, sdp_add_information, sdp_add_uri, sdp_add_email,
 sdp_add_phone, sdp_add_connection, sdp_add_bandwidth, sdp_add_repeat,
@@ -206,23 +206,19 @@ error.
 These functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 Mandatory parameters are not provided (they are null).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 The allocation of memory failed.
 .RE
 
@@ -285,13 +281,13 @@ int main ()
     my_sess->version = 0;
     if (sdp_add_name(my_sess, "-") != 0)
         goto err_ret;
-    if (sdp_add_origin(my_sess, "Alice", 2890844526ULL, 2890842807ULL, 
+    if (sdp_add_origin(my_sess, "Alice", 2890844526ULL, 2890842807ULL,
          "IN", "IP4", "10.47.16.5") != 0)
         goto err_ret;
     if (sdp_add_information(&my_sess->s_info, "A Seminar on the session"
                 "description protocol") != 0)
         goto err_ret;
-    if (sdp_add_uri (my_sess, "http://www.example.com/seminars/sdp.pdf") 
+    if (sdp_add_uri (my_sess, "http://www.example.com/seminars/sdp.pdf")
                 != 0)
         goto err_ret;
     if (sdp_add_email(my_sess, "alice@example.com (Alice smith)") != 0)
@@ -328,10 +324,10 @@ int main ()
         goto err_ret;
     if (sdp_add_information(&my_media->m_info, "video media") != 0)
         goto err_ret;
-    if (sdp_add_attribute(&my_media->m_attr, "rtpmap", 
+    if (sdp_add_attribute(&my_media->m_attr, "rtpmap",
               "99 h232-199/90000") != 0)
         goto err_ret;
-    if (sdp_add_attribute(&my_media->m_attr, "rtpmap", 
+    if (sdp_add_attribute(&my_media->m_attr, "rtpmap",
               "90 h263-1998/90000") != 0)
         goto err_ret;
     b_sdp = sdp_session_to_str(my_sess, &error);
@@ -346,7 +342,7 @@ int main ()
 err_ret:
     free(b_sdp);
     sdp_free_session(my_sess);
-    return (1);        
+    return (1);
 }
 .fi
 .in -2
@@ -359,15 +355,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

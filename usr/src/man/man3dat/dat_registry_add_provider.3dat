@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dat_registry_add_provider 3DAT "16 Jul 2004" "SunOS 5.11" "Direct Access Transport Library Functions"
+.TH DAT_REGISTRY_ADD_PROVIDER 3DAT "Jul 16, 2004"
 .SH NAME
 dat_registry_add_provider \- declare the Provider with the Dynamic Registry
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ldat\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ldat\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <\fBdat/udat.h\fR>
 
 DAT_RETURN
@@ -23,23 +23,19 @@ DAT_RETURN
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprovider\fR\fR
 .ad
 .RS 17n
-.rt  
 Self-description of a Provider.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprovider_info\fR\fR
 .ad
 .RS 17n
-.rt  
 Attributes of the Provider.
 .RE
 
@@ -63,7 +59,6 @@ defined by the header files with which the Consumer compiled.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_SUCCESS\fR\fR
 .ad
@@ -74,7 +69,6 @@ The operation was successful.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_INSUFFICIENT_RESOURCES\fR\fR
 .ad
@@ -85,7 +79,6 @@ The maximum number of Providers was already registered.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_INVALID_PARAMETER\fR\fR
 .ad
@@ -96,7 +89,6 @@ Invalid parameter.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_PROVIDER_ALREADY_REGISTERED\fR\fR
 .ad
@@ -113,15 +105,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard: uDAPL, 1.1, 1.2
+Interface Stability	Standard: uDAPL, 1.1, 1.2
 _
-MT-Level
+MT-Level	
 .TE
 
 .SH SEE ALSO

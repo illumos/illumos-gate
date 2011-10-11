@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH readdir 3UCB "30 Oct 2007" "SunOS 5.11" "SunOS/BSD Compatibility Library Functions"
+.TH READDIR 3UCB "Oct 30, 2007"
 .SH NAME
 readdir \- read a directory entry
 .SH SYNOPSIS
@@ -46,127 +46,105 @@ The \fBreaddir()\fR function will fail if one or more of the following are
 true:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 13n
-.rt  
 Mandatory file/record locking was set, \fBO_NDELAY\fR or \fBO_NONBLOCK\fR was
 set, and there was a blocking record lock.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 13n
-.rt  
 Total amount of system memory available when reading using raw I/O is
 temporarily insufficient.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 13n
-.rt  
 No data is waiting to be read on a file associated with a tty device and
 \fBO_NONBLOCK\fR was set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 13n
-.rt  
 No message is waiting to be read on a stream and  \fBO_NDELAY\fR or
 \fBO_NONBLOCK\fR was set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 13n
-.rt  
 The file descriptor determined by the \fBDIR\fR stream is no longer valid. This
 results if the \fBDIR\fR stream has been closed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADMSG\fR\fR
 .ad
 .RS 13n
-.rt  
 Message waiting to be read on a stream is not a data message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEDEADLK\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fBread()\fR was going to go to sleep and cause a deadlock to occur.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 13n
-.rt  
 \fIbuf\fR points to an illegal address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 13n
-.rt  
 A signal was caught during the \fBread()\fR or \fBreadv()\fR function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 13n
-.rt  
 Attempted to read from a stream linked to a multiplexor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 13n
-.rt  
 A physical I/O error has occurred, or the process is in a background process
 group and is attempting to read from its controlling terminal, and either the
 process is ignoring or blocking the \fBSIGTTIN\fR signal or the process group
@@ -175,59 +153,49 @@ of the process is orphaned.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 13n
-.rt  
 The current file pointer for the directory is not located at a valid entry.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOLCK\fR\fR
 .ad
 .RS 13n
-.rt  
 The system record lock table was full, so the \fBread()\fR or \fBreadv()\fR
 could not go to sleep until the blocking record lock was removed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOLINK\fR\fR
 .ad
 .RS 13n
-.rt  
 \fIfildes\fR is on a remote machine and the link to that machine is no longer
 active.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENXIO\fR\fR
 .ad
 .RS 13n
-.rt  
 The device associated with  \fIfildes\fR is a block special or character
 special file and the value of the file pointer is out of range.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOVERFLOW\fR\fR
 .ad
 .RS 13n
-.rt  
 The value of the \fBdirect\fR structure member \fBd_ino\fR cannot be
 represented in an \fBino_t\fR.
 .RE

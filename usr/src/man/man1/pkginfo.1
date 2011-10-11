@@ -3,19 +3,19 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pkginfo 1 "30 Oct 2007" "SunOS 5.11" "User Commands"
+.TH PKGINFO 1 "Oct 30, 2007"
 .SH NAME
 pkginfo \- display software package information
 .SH SYNOPSIS
 .LP
 .nf
-\fBpkginfo\fR [\fB-q\fR | \fB-x\fR | \fB-l\fR] [\fB-p\fR | \fB-i\fR] [\fB-r\fR] [\fB-a\fR \fIarch\fR] 
+\fBpkginfo\fR [\fB-q\fR | \fB-x\fR | \fB-l\fR] [\fB-p\fR | \fB-i\fR] [\fB-r\fR] [\fB-a\fR \fIarch\fR]
      [\fB-v\fR \fIversion\fR] [\fB-c\fR \fIcategory\fR]... [\fIpkginst\fR]...
 .fi
 
 .LP
 .nf
-\fBpkginfo\fR [\fB-d\fR \fIdevice\fR] [\fB-R\fR \fIroot_path\fR] [\fB-q\fR | \fB-x\fR | \fB-l\fR] [\fB-a\fR \fIarch\fR] 
+\fBpkginfo\fR [\fB-d\fR \fIdevice\fR] [\fB-R\fR \fIroot_path\fR] [\fB-q\fR | \fB-x\fR | \fB-l\fR] [\fB-a\fR \fIarch\fR]
      [\fB-v\fR \fIversion\fR] [\fB-c\fR \fIcategory\fR]... [\fIpkginst\fR]...
 .fi
 
@@ -40,7 +40,6 @@ the \fB-d\fR option.
 The options \fB-q\fR, \fB-x\fR, and \fB-l\fR are mutually exclusive.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIarch\fR\fR
 .ad
@@ -51,7 +50,6 @@ Specify the architecture of the package as \fBarch\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIcategory\fR\fR
 .ad
@@ -65,7 +63,6 @@ list. The match is not case specific.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdevice\fR\fR
 .ad
@@ -79,7 +76,6 @@ indicate the default installation spool directory (\fB/var/spool/pkg\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
@@ -90,7 +86,6 @@ Display information for fully installed packages only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
@@ -102,7 +97,6 @@ designated package(s).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
@@ -113,7 +107,6 @@ Display information for partially installed packages only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
@@ -125,7 +118,6 @@ package has been installed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
@@ -136,7 +128,6 @@ List the installation base for relocatable packages.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIroot_path\fR\fR
 .ad
@@ -149,7 +140,6 @@ tree starting in the specified \fIroot_path\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR \fIversion\fR\fR
 .ad
@@ -164,7 +154,6 @@ during version comparison.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
@@ -178,7 +167,6 @@ package version (if available).
 .SH OPERANDS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpkginst\fR\fR
 .ad
@@ -195,7 +183,6 @@ to be escaped. In the C-Shell, "\fB*\fR" must be surrounded by single quotes
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -206,7 +193,6 @@ Successful completion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
@@ -218,7 +204,6 @@ An error occurred.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/spool/pkg\fR\fR
 .ad

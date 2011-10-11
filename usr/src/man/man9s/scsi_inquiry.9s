@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH scsi_inquiry 9S "5 Nov 2008" "SunOS 5.11" "Data Structures for Drivers"
+.TH SCSI_INQUIRY 9S "Nov 5, 2008"
 .SH NAME
 scsi_inquiry \- SCSI inquiry structure
 .SH SYNOPSIS
@@ -28,7 +28,7 @@ returned, are reserved for future standardization. This structure is part of
 .sp
 .in +2
 .nf
-Lines that start with an 'X' will be deleted before submission; 
+Lines that start with an 'X' will be deleted before submission;
 they are being classified as unstable at this time.
 
 uchar_t  inq_dtype;         /* Periph. qualifier, dev. type */
@@ -75,199 +75,163 @@ Peripheral Device Type and bits 5 - 7 represent the Peripheral Qualifier. The
 following values are appropriate for Peripheral Device Type field:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDTYPE_DIRECT\fR\fR
 .ad
 .RS 20n
-.rt  
 Direct-access device (for example, magnetic disk).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDTYPE_SEQUENTIAL\fR\fR
 .ad
 .RS 20n
-.rt  
 Sequential-access device (for example, magnetic tape).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDTYPE_PRINTER\fR\fR
 .ad
 .RS 20n
-.rt  
 Printer device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDTYPE_PROCESSOR\fR\fR
 .ad
 .RS 20n
-.rt  
 Processor device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDTYPE_WORM\fR\fR
 .ad
 .RS 20n
-.rt  
 Write-once device (for example, some optical disks).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDTYPE_RODIRECT\fR\fR
 .ad
 .RS 20n
-.rt  
 CD-ROM device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDTYPE_SCANNER\fR\fR
 .ad
 .RS 20n
-.rt  
 Scanner device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDTYPE_OPTICAL\fR\fR
 .ad
 .RS 20n
-.rt  
 Optical memory device (for example, some optical disks).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDTYPE_CHANGER\fR\fR
 .ad
 .RS 20n
-.rt  
 Medium Changer device (for example, jukeboxes).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDTYPE_COMM\fR\fR
 .ad
 .RS 20n
-.rt  
 Communications device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDTYPE_ARRAY_CTRL\fR\fR
 .ad
 .RS 20n
-.rt  
 Array controller device (for example, \fBRAID\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDTYPE_ESI\fR\fR
 .ad
 .RS 20n
-.rt  
 Enclosure services device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDTYPE_RBC\fR\fR
 .ad
 .RS 20n
-.rt  
 Simplified direct-access device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDTYPE_OCRW\fR\fR
 .ad
 .RS 20n
-.rt  
 Optical card reader/writer device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDTYPE_BRIDGE\fR\fR
 .ad
 .RS 20n
-.rt  
 Bridge.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDTYPE_OSD\fR\fR
 .ad
 .RS 20n
-.rt  
 Object-based storage device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDTYPE_UNKNOWN\fR\fR
 .ad
 .RS 20n
-.rt  
 Unknown or no device type.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDTYPE_MASK\fR\fR
 .ad
 .RS 20n
-.rt  
 Mask to isolate Peripheral Device Type field.
 .RE
 
@@ -276,12 +240,10 @@ Mask to isolate Peripheral Device Type field.
 The following values are appropriate for the Peripheral Qualifier field:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDPQ_POSSIBLE\fR\fR
 .ad
 .RS 17n
-.rt  
 The specified peripheral device type is currently connected to this logical
 unit. If the target cannot determine whether or not a physical device is
 currently connected, it uses this peripheral qualifier when returning the
@@ -291,12 +253,10 @@ ready for access by the initiator.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDPQ_SUPPORTED\fR\fR
 .ad
 .RS 17n
-.rt  
 The target is capable of supporting the specified peripheral device type on
 this logical unit. However, the physical device is not currently connected to
 this logical unit.
@@ -304,12 +264,10 @@ this logical unit.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDPQ_NEVER\fR\fR
 .ad
 .RS 17n
-.rt  
 The target is not capable of supporting a physical device on this logical unit.
 For this peripheral qualifier, the peripheral device type shall be set to
 \fBDTYPE_UNKNOWN\fR to provide compatibility with previous versions of
@@ -319,23 +277,19 @@ qualifier is reserved.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDPQ_VUNIQ\fR\fR
 .ad
 .RS 17n
-.rt  
 This is a vendor-unique qualifier.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDPQ_MASK\fR\fR
 .ad
 .RS 17n
-.rt  
 Mask to isolate Peripheral Qualifier field.
 .RE
 

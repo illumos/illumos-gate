@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH modlmisc 9S "6 Nov 2007" "SunOS 5.11" "Data Structures for Drivers"
+.TH MODLMISC 9S "Nov 6, 2007"
 .SH NAME
 modlmisc \- linkage structure for loadable miscellaneous modules
 .SH SYNOPSIS
@@ -25,31 +25,27 @@ specific information to the kernel.
 .sp
 .in +2
 .nf
-struct mod_ops      *misc_modops;        
-char                *misc_linkinfo;     
+struct mod_ops      *misc_modops;
+char                *misc_linkinfo;
 .fi
 .in -2
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmisc_modops\fR\fR
 .ad
 .RS 17n
-.rt  
 Must always be initialized to the address of \fBmod_miscops\fR. This member
 identifies the module as a loadable miscellaneous module.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmisc_linkinfo\fR\fR
 .ad
 .RS 17n
-.rt  
 Can be any string up to \fBMODMAXNAMELEN\fR characters (including the
 terminating \fBNULL\fR characters), and is used to describe the module, but can
 also contain other information (such as a version number).

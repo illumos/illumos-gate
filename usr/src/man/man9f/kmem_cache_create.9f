@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH kmem_cache_create 9F "24 Jun 2008" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH KMEM_CACHE_CREATE 9F "Jun 24, 2008"
 .SH NAME
 kmem_cache_create, kmem_cache_alloc, kmem_cache_free, kmem_cache_destroy,
 kmem_cache_set_move \- kernel memory cache allocator operations
@@ -13,9 +13,9 @@ kmem_cache_set_move \- kernel memory cache allocator operations
 #include <sys/types.h>
 #include <sys/kmem.h>
 
-\fBkmem_cache_t *\fR\fBkmem_cache_create\fR(\fBchar *\fR\fIname\fR, \fBsize_t\fR \fIbufsize\fR, 
-     \fBsize_t\fR \fIalign\fR, \fBint\fR (*\fIconstructor\fR)(void *, void *, int), 
-     \fBvoid\fR (*\fIdestructor\fR)(void *, void *), \fBvoid\fR (*\fIreclaim\fR)(void *), 
+\fBkmem_cache_t *\fR\fBkmem_cache_create\fR(\fBchar *\fR\fIname\fR, \fBsize_t\fR \fIbufsize\fR,
+     \fBsize_t\fR \fIalign\fR, \fBint\fR (*\fIconstructor\fR)(void *, void *, int),
+     \fBvoid\fR (*\fIdestructor\fR)(void *, void *), \fBvoid\fR (*\fIreclaim\fR)(void *),
      \fBvoid\fR *\fIprivate\fR, \fBvoid\fR *\fIvmp\fR, \fBint\fR \fIcflags\fR);
 .fi
 
@@ -36,7 +36,7 @@ kmem_cache_set_move \- kernel memory cache allocator operations
 
 .LP
 .nf
-\fBvoid\fR \fBkmem_cache_set_move\fR(\fBkmem_cache_t\fR *\fIcp\fR, \fBkmem_cbrc_t\fR (*\fImove\fR)(\fBvoid\fR *, 
+\fBvoid\fR \fBkmem_cache_set_move\fR(\fBkmem_cache_t\fR *\fIcp\fR, \fBkmem_cbrc_t\fR (*\fImove\fR)(\fBvoid\fR *,
      \fBvoid\fR *, \fBsize_t\fR *, \fBvoid\fR *));
 .fi
 
@@ -71,143 +71,117 @@ Solaris DDI specific (Solaris DDI)
 The parameters for the \fBkmem_cache_*\fR functions are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR\fR
 .ad
 .RS 15n
-.rt  
 Descriptive name of a \fBkstat\fR(9S) structure of class \fBkmem_cache\fR.
 Names longer than 31 characters are truncated.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbufsize\fR\fR
 .ad
 .RS 15n
-.rt  
 Size of the objects it manages.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIalign\fR\fR
 .ad
 .RS 15n
-.rt  
 Required object alignment.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIconstructor\fR\fR
 .ad
 .RS 15n
-.rt  
 Pointer to an object constructor function. Parameters are defined below.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdestructor\fR\fR
 .ad
 .RS 15n
-.rt  
 Pointer to an object destructor function. Parameters are defined below.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIreclaim\fR\fR
 .ad
 .RS 15n
-.rt  
 Drivers should pass \fBNULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprivate\fR\fR
 .ad
 .RS 15n
-.rt  
 Pass-through argument for constructor/destructor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvmp\fR\fR
 .ad
 .RS 15n
-.rt  
 Drivers should pass \fBNULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcflags\fR\fR
 .ad
 .RS 15n
-.rt  
 Drivers must pass 0.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIkmflag\fR\fR
 .ad
 .RS 15n
-.rt  
 Possible flags are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKM_SLEEP\fR\fR
 .ad
 .RS 15n
-.rt  
 Allow sleeping (blocking) until memory is available.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKM_NOSLEEP\fR\fR
 .ad
 .RS 15n
-.rt  
 Return NULL immediately if memory is not available.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKM_PUSHPAGE\fR\fR
 .ad
 .RS 15n
-.rt  
 Allow the allocation to use reserved memory.
 .RE
 
@@ -215,23 +189,19 @@ Allow the allocation to use reserved memory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIobj\fR\fR
 .ad
 .RS 15n
-.rt  
 Pointer to the object allocated by \fBkmem_cache_alloc()\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImove\fR\fR
 .ad
 .RS 15n
-.rt  
 Pointer to an object relocation function. Parameters are defined below.
 .RE
 
@@ -240,35 +210,29 @@ Pointer to an object relocation function. Parameters are defined below.
 The parameters for the callback constructor function are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvoid *\fIbuf\fR\fR\fR
 .ad
 .RS 18n
-.rt  
 Pointer to the object to be constructed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvoid *\fIuser_arg\fR\fR\fR
 .ad
 .RS 18n
-.rt  
 The \fIprivate\fR parameter from the call to \fBkmem_cache_create()\fR; it is
 typically a pointer to the soft-state structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBint \fIkmflags\fR\fR\fR
 .ad
 .RS 18n
-.rt  
 Propagated \fIkmflag\fR values.
 .RE
 
@@ -277,23 +241,19 @@ Propagated \fIkmflag\fR values.
 The parameters for the callback destructor function are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvoid *\fIbuf\fR\fR\fR
 .ad
 .RS 18n
-.rt  
 Pointer to the object to be deconstructed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvoid *\fIuser_arg\fR\fR\fR
 .ad
 .RS 18n
-.rt  
 The \fIprivate\fR parameter from the call to \fBkmem_cache_create()\fR; it is
 typically a pointer to the soft-state structure.
 .RE
@@ -303,46 +263,38 @@ typically a pointer to the soft-state structure.
 The parameters for the callback \fBmove()\fR function are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvoid *\fIold\fR\fR\fR
 .ad
 .RS 18n
-.rt  
 Pointer to the object to be moved.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvoid *\fInew\fR\fR\fR
 .ad
 .RS 18n
-.rt  
 Pointer to the object that serves as the copy destination for the contents of
 the old parameter.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsize_t \fIbufsize\fR\fR\fR
 .ad
 .RS 18n
-.rt  
 Size of the object to be moved.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvoid *\fIuser_arg\fR\fR\fR
 .ad
 .RS 18n
-.rt  
 The private parameter from the call to \fBkmem_cache_create()\fR; it is
 typically a pointer to the \fBsoft-state\fR structure.
 .RE
@@ -478,35 +430,29 @@ slab layer (bypassing the per-CPU magazine layer). The response tells the
 allocator which of the two object parameters to free:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKMEM_CBRC_YES\fR\fR
 .ad
 .RS 23n
-.rt  
 The client moved the object; the allocator frees the old parameter.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKMEM_CBRC_NO\fR\fR
 .ad
 .RS 23n
-.rt  
 The client refused to move the object; the allocator frees the new parameter
 (the unused copy destination).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKMEM_CBRC_LATER\fR\fR
 .ad
 .RS 23n
-.rt  
 The client is using the object and cannot move it now; the allocator frees the
 new parameter (the unused copy destination). The client should use
 \fBKMEM_CBRC_LATER\fR instead of \fBKMEM_CBRC_NO\fR if the object is likely to
@@ -515,12 +461,10 @@ become movable soon.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKMEM_CBRC_DONT_NEED\fR\fR
 .ad
 .RS 23n
-.rt  
 The client no longer needs the object; the allocator frees both the old and new
 parameters. This response is the client's opportunity to be a model citizen and
 give back as much as it can.
@@ -528,45 +472,37 @@ give back as much as it can.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKMEM_CBRC_DONT_KNOW\fR\fR
 .ad
 .RS 23n
-.rt  
 The client does not know about the object because:
 .sp
 .ne 2
-.mk
 .na
 \fBa)\fR
 .ad
 .RS 6n
-.rt  
 the client has just allocated the object and has not yet put it wherever it
 expects to find known objects
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBb)\fR
 .ad
 .RS 6n
-.rt  
 the client has removed the object from wherever it expects to find known
 objects and is about to free the object
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBc)\fR
 .ad
 .RS 6n
-.rt  
 the client has freed the object
 .RE
 
@@ -610,23 +546,19 @@ less likely to call back again for that object.
 The parameters for the \fBnotification\fR function are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcp\fR\fR
 .ad
 .RS 7n
-.rt  
 Pointer to the object cache.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIobj\fR\fR
 .ad
 .RS 7n
-.rt  
 Pointer to the object that has become movable since an earlier refusal to move
 it.
 .RE
@@ -807,13 +739,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

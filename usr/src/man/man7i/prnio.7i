@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH prnio 7I "2 Jan 2002" "SunOS 5.11" "Ioctl Requests"
+.TH PRNIO 7I "Jan 2, 2002"
 .SH NAME
 prnio \- generic printer interface
 .SH SYNOPSIS
@@ -86,12 +86,10 @@ during the Abort phase as described in \fBPRNIOC_GET_IFCAP\fR section.
 .SH IOCTLS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRNIOC_GET_IFCAP\fR\fR
 .ad
 .RS 21n
-.rt  
 Application can retrieve printer interface capabilities using this command. The
 \fBioctl\fR(2) argument is a pointer to \fBuint_t\fR, a bit field representing
 a set of properties and services provided by a printer driver. Set bit means
@@ -138,12 +136,10 @@ data. Only STREAMS drivers can support this capability.
 
 .sp
 .ne 2
-.mk
 .na
 \fBPRNIOC_SET_IFCAP\fR
 .ad
 .RS 21n
-.rt  
 This ioctl can be used to change interface capabilities. The argument is a
 pointer to \fBuint_t\fR bit field that is described in detail in the
 \fBPRNIOC_GET_IFCAP\fR section. Capabilities should be set one at a time;
@@ -162,12 +158,10 @@ followed by \fBPRNIOC_GET_IFCAP\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBPRNIOC_GET_IFINFO\fR
 .ad
 .RS 21n
-.rt  
 This command can be used to retrieve printer interface info string, which is an
 arbitrary format string usually describing the bus type. The argument is a
 pointer to \fBstruct prn_interface_info\fR as described below.\f(CW\fR
@@ -214,17 +208,15 @@ macros:
 .in -2
 .br
 .in +2
-Printer interface info string is for information only: no 	implications should
+Printer interface info string is for information only: no implications should
 be made from its value.
 .in -2
 .sp
 .ne 2
-.mk
 .na
 \fBPRNIOC_RESET\fR
 .ad
 .RS 25n
-.rt  
 Some applications may want to reset the printer state during Setup and/or
 Cleanup phase using \fBPRNIOC_RESET\fR command. Reset semantics are
 device-specific, and in general, applications using this command should be
@@ -238,13 +230,11 @@ corresponding man page and printer manual.
 
 .sp
 .ne 2
-.mk
 .na
 \fBPRNIOC_GET_1284_DEVID\fR
 .ad
 .RS 25n
-.rt  
-This command can be used to retrieve printer device ID as 	defined by \fIIEEE
+This command can be used to retrieve printer device ID as defined by \fIIEEE
 1284-1994\fR.The \fBioctl\fR(2) argument is a pointer to \fBstruct
 prn_1284_device_id\fR as described below.
 .RE
@@ -263,7 +253,7 @@ struct prn_1284_device_id {
 .sp
 .LP
 For convenience, the two-byte length field is not considered part of device ID
-string and is not returned 	in the user buffer. Instead, \fBid_rlen\fR  value
+string and is not returned in the user buffer. Instead, \fBid_rlen\fR  value
 shall be set to (length - 2) by the driver, where length is the ID length field
 value. If buffer length is less than \fBid_rlen\fR, the driver returns the
 first \fBid_len\fR bytes of the ID.
@@ -272,12 +262,10 @@ first \fBid_len\fR bytes of the ID.
 The printer driver must return the most up-to-date value of the device ID.
 .sp
 .ne 2
-.mk
 .na
 \fBPRNIOC_GET_STATUS\fR
 .ad
 .RS 21n
-.rt  
 This command can be used by applications to retrieve current device status. The
 argument is a pointer to \fBuint_t\fR, where the status word is returned.
 Status is a combination of the following bits:
@@ -296,12 +284,10 @@ data. Applications may use this bit for an outbound flow control
 .in -2
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRNIOC_GET_1284_STATUS\fR\fR
 .ad
 .RS 26n
-.rt  
 Devices that support \fBPRN_1284_STATUS\fR capability accept this ioctl to
 retrieve the device status lines defined in \fIIEEE 1284\fR for use in
 Compatibility mode. The following bits may be set by the driver:
@@ -325,12 +311,10 @@ Compatibility mode. The following bits may be set by the driver:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRNIOC_GET_TIMEOUTS\fR\fR
 .ad
 .RS 26n
-.rt  
 This command  retrieves current transfer timeout values for  the driver. The
 argument is  a pointer to \fBstruct prn_timeouts\fR as described below.
 .RE
@@ -352,12 +336,10 @@ timeouts in seconds. This command is only valid for drivers that support
 \fBPRN_TIMEOUTS\fR capability.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRNIOC_SET_TIMEOUTS\fR\fR
 .ad
 .RS 23n
-.rt  
 This command sets current transfer  timeout values for the driver. The
 argument is  a pointer to \fBstruct prn_timeouts\fR. See
 \fBPRNIOC_GET_TIMEOUTS\fR for description of  this structure. This  command is
@@ -372,15 +354,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Architecture SPARC, IA
+Architecture	 SPARC, IA
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH usb_pipe_open 9F "5 Jan 2004" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH USB_PIPE_OPEN 9F "Jan 5, 2004"
 .SH NAME
 usb_pipe_open \- Open a USB pipe to a device
 .SH SYNOPSIS
@@ -25,57 +25,47 @@ Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 15n
-.rt  
 Pointer to the device's \fBdev_info\fR structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIendpoint\fR\fR
 .ad
 .RS 15n
-.rt  
 Pointer to endpoint descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpipe_policy\fR\fR
 .ad
 .RS 15n
-.rt  
 Pointer to \fIpipe_policy\fR. \fIpipe_policy\fR provides hints on pipe usage.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 15n
-.rt  
 USB_FLAGS_SLEEP is only flag that is recognized. Wait for memory resources if
 not immediately available.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpipe_handle\fR\fR
 .ad
 .RS 15n
-.rt  
 Address to where new pipe handle is returned. (The handle is opaque.)
 .RE
 
@@ -92,12 +82,10 @@ corresponding type of pipe. Each of the four types of pipes uses its physical
 connection resource differently. They are:
 .sp
 .ne 2
-.mk
 .na
 \fBControl pipe\fR
 .ad
 .RS 20n
-.rt  
 Used for bursty, non-periodic, reliable, host-initiated request/response
 communication, such as for command/status operations. These are guaranteed to
 get approximately 10% of frame time and will get more if needed and if
@@ -106,12 +94,10 @@ available, but there is no guarantee on transfer promptness. Bidirectional.
 
 .sp
 .ne 2
-.mk
 .na
 \fBBulk pipe\fR
 .ad
 .RS 20n
-.rt  
 Used for large, reliable, non-time-critical data transfers. These get the bus
 on a bandwidth-available basis. Unidirectional. Sample uses include printer
 data.
@@ -119,24 +105,20 @@ data.
 
 .sp
 .ne 2
-.mk
 .na
 \fBInterrupt pipe\fR
 .ad
 .RS 20n
-.rt  
 Used for sending or receiving small amounts of reliable data infrequently but
 with bounded service periods, as for interrupt handling. Unidirectional.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBIsochronous pipe\fR
 .ad
 .RS 20n
-.rt  
 Used for large, unreliable, time-critical data transfers. Boasts a guaranteed
 constant data rate as long as there is data, but there are no retries of failed
 transfers. Interrupt and isochronous data are together guaranteed 90% of frame
@@ -236,102 +218,84 @@ pipe. On failure, it is set to NULL.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_SUCCESS\fR
 .ad
 .RS 25n
-.rt  
 Open succeeded.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_NO_RESOURCES\fR
 .ad
 .RS 25n
-.rt  
 Insufficient resources were available.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_NO_BANDWIDTH\fR
 .ad
 .RS 25n
-.rt  
 Insufficient bandwidth available. (isochronous and interrupt pipes).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_CONTEXT\fR
 .ad
 .RS 25n
-.rt  
 Called from interrupt handler with USB_FLAGS_SLEEP set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_ARGS\fR
 .ad
 .RS 25n
-.rt  
 dip and/or pipe_handle is NULL. Pipe_policy is NULL.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_PERM\fR
 .ad
 .RS 25n
-.rt  
 Endpoint is NULL, signifying the default control pipe. A client driver cannot
 open the default control pipe.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_NOT_SUPPORTED\fR
 .ad
 .RS 25n
-.rt  
 Isochronous or interrupt endpoint with maximum packet size of zero is not
 supported.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_HC_HARDWARE_ERROR\fR
 .ad
 .RS 25n
-.rt  
 Host controller is in an error state.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_FAILURE\fR
 .ad
 .RS 25n
-.rt  
 Pipe is already open. Host controller not in an operational state. Polling
 interval (\fBep_descr bInterval\fR field) is out of range (intr or isoc pipes).
 .RE
@@ -366,7 +330,7 @@ called from interrupt context if the \fIUSB_FLAGS_SLEEP\fR option is not set.
 
     /* Get first interrupt-IN endpoint. */
     ep_data = usb_lookup_ep_data(dip, reg_data, interface, alternate,
-        first_ep_number, USB_EP_ATTR_INTR, USB_EP_DIR_IN); 
+        first_ep_number, USB_EP_ATTR_INTR, USB_EP_DIR_IN);
     if (ep_data == NULL) {
         ...
     }
@@ -387,15 +351,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitecturePCI-based systems
+Architecture	PCI-based systems
 _
-Interface stabilityCommitted
+Interface stability	Committed
 .TE
 
 .SH SEE ALSO

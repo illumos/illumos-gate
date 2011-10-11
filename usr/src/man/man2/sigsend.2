@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sigsend 2 "19 Jul 2004" "SunOS 5.11" "System Calls"
+.TH SIGSEND 2 "Jul 19, 2004"
 .SH NAME
 sigsend, sigsendset \- send a signal to a process or a group of processes
 .SH SYNOPSIS
@@ -114,45 +114,37 @@ set of processes the function is to apply to. The valid values for \fBp_op\fR
 and the processes they specify are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOP_DIFF\fR\fR
 .ad
 .RS 12n
-.rt  
 Set difference: processes in left set and not in right set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOP_AND\fR\fR
 .ad
 .RS 12n
-.rt  
 Set intersection: processes in both left and right sets.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOP_OR\fR\fR
 .ad
 .RS 12n
-.rt  
 Set union: processes in either left or right set or both.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOP_XOR\fR\fR
 .ad
 .RS 12n
-.rt  
 Set exclusive-or: processes in left or right set but not in both.
 .RE
 
@@ -167,36 +159,30 @@ returned and \fBerrno\fR is set to indicate the error.
 The \fBsigsend()\fR and \fBsigsendset()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIsig\fR argument is not a valid signal number, or the \fIidtype\fR
 argument is not a valid idtype field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIsig\fR argument is  \fBSIGKILL,\fR \fIidtype\fR is  \fBP_PID\fR and
 \fIid\fR is  \fB1\fR (proc1).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 10n
-.rt  
 The effective user of the calling process does not match the real or saved user
 ID of the receiving process, the calling process does not have the
 {\fBPRIV_PROC_OWNER\fR} privilege asserted in the effective set, and the
@@ -211,12 +197,10 @@ receiving process.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBESRCH\fR\fR
 .ad
 .RS 10n
-.rt  
 No process can be found corresponding to that specified by \fIid\fR and
 \fIidtype\fR.
 .RE
@@ -226,12 +210,10 @@ No process can be found corresponding to that specified by \fIid\fR and
 The  \fBsigsendset()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIpsp\fR argument points to an illegal address.
 .RE
 

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dlsym 3C "26 Sep 2005" "SunOS 5.11" "Standard C Library Functions"
+.TH DLSYM 3C "Sep 26, 2005"
 .SH NAME
 dlsym \- get the address of a symbol in a shared object or executable
 .SH SYNOPSIS
@@ -37,12 +37,10 @@ automatically as a result of loading the object referenced by \fIhandle\fR. See
 The following special handles are supported.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTLD_DEFAULT\fR\fR
 .ad
 .RS 16n
-.rt  
 Instructs \fBdlsym()\fR to search for the named symbol starting with the first
 object loaded, typically the dynamic executable. The search continues through
 the list of initial dependencies that are loaded with the process, followed by
@@ -58,12 +56,10 @@ However, this compensation can undermine the advantages of lazy loading.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTLD_PROBE\fR\fR
 .ad
 .RS 16n
-.rt  
 Instructs \fBdlsym()\fR to search for the named symbol in the same manner as
 occurs with a \fIhandle\fR of \fBRTLD_DEFAULT\fR. However, this model only
 searches for symbols in the presently loaded objects, together with any lazy
@@ -75,24 +71,20 @@ optimal search than would occur using \fBRTLD_DEFAULT\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTLD_NEXT\fR\fR
 .ad
 .RS 16n
-.rt  
 Instructs \fBdlsym()\fR to search for the named symbol in the objects that were
 loaded following the object from which the \fBdlsym()\fR call is being made.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTLD_SELF\fR\fR
 .ad
 .RS 16n
-.rt  
 Instructs \fBdlsym()\fR to search for the named symbol in the objects that were
 loaded starting with the object from which the \fBdlsym()\fR call is being
 made.
@@ -188,15 +180,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

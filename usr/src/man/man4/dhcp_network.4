@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dhcp_network 4 "5 Mar 2004" "SunOS 5.11" "File Formats"
+.TH DHCP_NETWORK 4 "Mar 5, 2004"
 .SH NAME
 dhcp_network \- DHCP network tables
 .SH DESCRIPTION
@@ -41,12 +41,10 @@ store used to maintain the table. However, an entry in a \fBDHCP\fR network
 table must contain the following fields:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBClient_ID\fR \fR
 .ad
 .RS 14n
-.rt  
 The client identifier field, \fBClient_ID\fR, is an \fBASCII\fR hexadecimal
 representation of the unique octet string value of the \fBDHCP\fR Client
 Identifier Option (code 61) which identifies a \fBDHCP\fR client. In the
@@ -65,22 +63,18 @@ hardware address of \fB8:0:20:11:12:b7\fR, so its client identifier would be:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFlags\fR \fR
 .ad
 .RS 14n
-.rt  
 The \fBFlags\fR field is a decimal value, the bit fields of which can have a
 combination of the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1 (PERMANENT)\fR \fR
 .ad
 .RS 18n
-.rt  
 Evaluation of the \fBLease\fR field is turned off (lease is permanent). If this
 bit is not set, Evaluation of the \fBLease\fR field is enabled and the
 \fBLease\fR is \fBDYNAMIC.\fR
@@ -88,24 +82,20 @@ bit is not set, Evaluation of the \fBLease\fR field is enabled and the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2 (MANUAL)\fR \fR
 .ad
 .RS 18n
-.rt  
 This entry has a manual client \fBID\fR binding (cannot be reclaimed by
 \fBDHCP\fR server). Client will not be allocated another address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB4 (UNUSABLE)\fR \fR
 .ad
 .RS 18n
-.rt  
 When set, this value means that either through \fBICMP\fR echo or client
 \fBDECLINE,\fR this address has been found to be unusable. Can also be used by
 the network administrator to \fIprevent\fR a certain client from booting, if
@@ -114,12 +104,10 @@ used in conjunction with the \fBMANUAL\fR flag.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB8 (BOOTP)\fR \fR
 .ad
 .RS 18n
-.rt  
 This entry is reserved for allocation to \fBBOOTP\fR clients only.
 .RE
 
@@ -127,24 +115,20 @@ This entry is reserved for allocation to \fBBOOTP\fR clients only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBClient_IP\fR \fR
 .ad
 .RS 14n
-.rt  
 The \fBClient_IP\fR field holds the \fBIP\fR address for this entry. This value
 must be unique in the database.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBServer_IP\fR \fR
 .ad
 .RS 14n
-.rt  
 This field holds the \fBIP\fR address of the \fBDHCP\fR server which \fIowns\fR
 this client \fBIP\fR address, and thus is responsible for initial allocation to
 a requesting client. On a multi-homed DHCP server, this IP address must be the
@@ -153,12 +137,10 @@ first address returned by \fBgethostbyname\fR(3NSL).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLease\fR \fR
 .ad
 .RS 14n
-.rt  
 This numeric field holds the entry's absolute lease expiration time, and is in
 seconds since \fBJanuary 1, 1970\fR. It can be decimal, or hexadecimal (if
 \fB0x\fR prefixes number). The special value \fB-1\fR is used to denote a
@@ -167,24 +149,20 @@ permanent lease.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMacro\fR \fR
 .ad
 .RS 14n
-.rt  
 This \fBASCII\fR text field contains the \fBdhcptab\fR macro name used to look
 up this entry's configuration parameters in the \fBdhcptab\fR(4) database.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBComment\fR \fR
 .ad
 .RS 14n
-.rt  
 This \fBASCII\fR text field contains an optional comment.
 .RE
 
@@ -231,13 +209,12 @@ See \fBattributes\fR(5) for a description of the following attribute:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

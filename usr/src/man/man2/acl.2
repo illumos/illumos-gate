@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH acl 2 "10 Jan 2007" "SunOS 5.11" "System Calls"
+.TH ACL 2 "Jan 10, 2007"
 .SH NAME
 acl, facl \- get or set a file's Access Control List (ACL)
 .SH SYNOPSIS
@@ -32,23 +32,19 @@ fit into buffer \fIaclbufp\fR. The \fBacl()\fR function is used to manipulate
 The following types are supported for \fIaclbufp\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBaclent_t\fR\fR
 .ad
 .RS 12n
-.rt  
 Used by the UFS file system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBace_t\fR\fR
 .ad
 .RS 12n
-.rt  
 Used by the ZFS and NFSv4 file systems.
 .RE
 
@@ -57,12 +53,10 @@ Used by the ZFS and NFSv4 file systems.
 The following values for \fIcmd\fR are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSETACL\fR\fR
 .ad
 .RS 17n
-.rt  
 \fInentries\fR \fBaclent_t\fR \fBACL\fR entries, specified in buffer
 \fIaclbufp\fR, are stored in the file's  \fBACL\fR. All directories in the path
 name must be searchable.
@@ -70,12 +64,10 @@ name must be searchable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGETACL\fR\fR
 .ad
 .RS 17n
-.rt  
 Buffer \fIaclbufp\fR is filled with the file's  \fBaclent_t\fR \fBACL\fR
 entries. Read access to the file is not required, but all directories in the
 path name must be searchable.
@@ -83,12 +75,10 @@ path name must be searchable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGETACLCNT\fR\fR
 .ad
 .RS 17n
-.rt  
 The number of entries in the file's \fBaclent_t\fR \fBACL\fR is returned. Read
 access to the file is not required, but all directories in the path name must
 be searchable.
@@ -96,12 +86,10 @@ be searchable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBACE_SETACL\fR\fR
 .ad
 .RS 17n
-.rt  
 \fInentries\fR \fBace_t\fR ACL entries, specified in buffer \fIaclbufp\fR, are
 stored in the file's ACL. All directories in the path name must be searchable.
 Write ACL access is required to change the file's ACL.
@@ -109,12 +97,10 @@ Write ACL access is required to change the file's ACL.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBACE_GETACL\fR\fR
 .ad
 .RS 17n
-.rt  
 Buffer \fIaclbufp\fR is filled with the file's \fBace_t\fR ACL entries. Read
 access to the file is required and all directories in the path name must be
 searchable.
@@ -122,12 +108,10 @@ searchable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBACE_GETACLCNT\fR\fR
 .ad
 .RS 17n
-.rt  
 The number of entries in the file's \fBace_t\fR ACL is  returned. Read access
 to the file is required and all directories in the path name must be
 searchable.
@@ -147,34 +131,28 @@ Upon successful completion, \fBacl()\fR and \fBfacl()\fR return \fB0\fR if
 The \fBacl()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 11n
-.rt  
 The caller does not have access to a component of the pathname.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fIpathp\fR or \fIaclbufp\fR argument points to an illegal address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fIcmd\fR argument is not  \fBGETACL\fR, \fBSETACL\fR, \fBACE_GETACL\fR,
 \fBGETACLCNT\fR, or \fBACE_GETACLCNT\fR; the \fIcmd\fR argument is
 \fBSETACL\fR and  \fInentries\fR is less than 3; or the \fIcmd\fR argument is
@@ -184,34 +162,28 @@ is not valid.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 11n
-.rt  
 A disk  I/O  error has occurred while storing or retrieving the  \fBACL.\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 11n
-.rt  
 A component of the path does not exist.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSPC\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fIcmd\fR argument is  \fBGETACL\fR and \fInentries\fR is less than the
 number of entries in the file's  \fBACL\fR, or the \fIcmd\fR argument is
 \fBSETACL\fR and there is insufficient space in the file system to store the
@@ -220,12 +192,10 @@ number of entries in the file's  \fBACL\fR, or the \fIcmd\fR argument is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSYS\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fIcmd\fR argument is  \fBSETACL\fR or \fBACE_SETACL\fR and the file
 specified by \fIpathp\fR resides on a file system that does not support
 \fBACLs\fR, or the \fBacl()\fR function is not supported by this
@@ -234,12 +204,10 @@ implementation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTDIR\fR\fR
 .ad
 .RS 11n
-.rt  
 A component of the path specified by \fIpathp\fR is not a directory, or the
 \fIcmd\fR argument is  \fBSETACL\fR or \fBACE_SETACL\fR and an attempt is made
 to set a default \fBACL\fR on a file type other than a directory.
@@ -247,12 +215,10 @@ to set a default \fBACL\fR on a file type other than a directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSUP\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fIcmd\fR argument is \fBGETACL\fR, but the ACL is composed of \fBace_t\fR
 entries, and the ACL cannot be translated into \fBaclent_t\fR form.
 .sp
@@ -263,24 +229,20 @@ translated into \fBaclent_t\fR form.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 11n
-.rt  
 The effective user \fBID\fR does not match the owner of the file and the
 process does not have appropriate privilege.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEROFS\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fIcmd\fR argument is  \fBSETACL\fR or \fBACE_SETACL\fR and the file
 specified by \fIpathp\fR resides on a file system that is mounted read-only.
 .RE
@@ -293,13 +255,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE  TYPEATTRIBUTE  VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE  TYPE	ATTRIBUTE  VALUE
 _
-Interface  StabilityEvolving
+Interface  Stability	Evolving
 .TE
 
 .SH SEE ALSO

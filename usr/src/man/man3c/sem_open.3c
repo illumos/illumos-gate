@@ -10,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sem_open 3C "9 Jul 2009" "SunOS 5.11" "Standard C Library Functions"
+.TH SEM_OPEN 3C "Jul 9, 2009"
 .SH NAME
 sem_open \- initialize/open a named semaphore
 .SH SYNOPSIS
@@ -41,12 +41,10 @@ accessed by the call to \fBsem_open()\fR. The following flag bits may be set in
 \fIoflag\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_CREAT\fR\fR
 .ad
 .RS 11n
-.rt  
 This flag is used to create a semaphore if it does not already exist. If
 \fBO_CREAT\fR is set and the semaphore already exists, then \fBO_CREAT\fR has
 no effect, except as noted under \fB\fR\fBO_EXCL.\fR Otherwise,
@@ -71,12 +69,10 @@ the \fBO_CREAT\fR flag, other processes can connect to the semaphore by calling
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_EXCL\fR\fR
 .ad
 .RS 11n
-.rt  
 If \fBO_EXCL\fR and \fBO_CREAT\fR are set, \fBsem_open()\fR fails if the
 semaphore \fIname\fR exists. The check for the existence of the semaphore and
 the creation of the semaphore if it does not exist are atomic with respect to
@@ -125,12 +121,10 @@ If any of the following conditions occur, the \fBsem_open()\fR function will
 return \fBSEM_FAILED\fR and set \fBerrno\fR to the corresponding value:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 16n
-.rt  
 The named semaphore exists and the \fBO_RDWR\fR permissions are denied, or the
 named semaphore does not exist and permission to create the named semaphore is
 denied.
@@ -138,34 +132,28 @@ denied.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEEXIST\fR\fR
 .ad
 .RS 16n
-.rt  
 \fBO_CREAT\fR and  \fBO_EXCL\fR are set and the named semaphore already exists.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fBsem_open()\fR function was interrupted by a signal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fBsem_open()\fR operation is not supported for the given name, or
 \fBO_CREAT\fR was set in \fIoflag\fR and \fIvalue\fR is greater than
 \fBSEM_VALUE_MAX\fR.
@@ -173,12 +161,10 @@ The \fBsem_open()\fR operation is not supported for the given name, or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEMFILE\fR\fR
 .ad
 .RS 16n
-.rt  
 The number of open semaphore descriptors in this process exceeds
 \fBSEM_NSEMS_MAX\fR, or the number of open file descriptors in this process
 exceeds  \fBOPEN_MAX\fR.
@@ -186,57 +172,47 @@ exceeds  \fBOPEN_MAX\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENAMETOOLONG\fR\fR
 .ad
 .RS 16n
-.rt  
 The length of \fIname\fR string exceeds \fIPATH_MAX\fR, or a pathname component
 is longer than \fINAME_MAX\fR while \fB_POSIX_NO_TRUNC\fR is in effect.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENFILE\fR\fR
 .ad
 .RS 16n
-.rt  
 Too many semaphores are currently open in the system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 16n
-.rt  
 \fBO_CREAT\fR is not set and the named semaphore does not exist.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSPC\fR\fR
 .ad
 .RS 16n
-.rt  
 There is insufficient space for the creation of the new named semaphore.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSYS\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fBsem_open()\fR function is not supported by the system.
 .RE
 
@@ -248,17 +224,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) |lw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO

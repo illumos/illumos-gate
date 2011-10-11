@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_create_minor_node 9F "14 Dec 2004" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_CREATE_MINOR_NODE 9F "Dec 14, 2004"
 .SH NAME
 ddi_create_minor_node \- Create a minor node for this device
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/stat.h> 
-#include <sys/sunddi.h> 
+#include <sys/stat.h>
+#include <sys/sunddi.h>
 
 
 
@@ -25,199 +25,163 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR \fR
 .ad
 .RS 14n
-.rt  
 A pointer to the device's \fBdev_info\fR structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR \fR
 .ad
 .RS 14n
-.rt  
 The name of this particular minor device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIspec_type\fR \fR
 .ad
 .RS 14n
-.rt  
 \fBS_IFCHR\fR or \fBS_IFBLK\fR for character or block minor devices
 respectively.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIminor_num\fR \fR
 .ad
 .RS 14n
-.rt  
 The minor number for this particular minor device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInode_type\fR \fR
 .ad
 .RS 14n
-.rt  
 Any string literal that uniquely identifies the type of  node. The following
 predefined node types are provided with this release:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_NT_SERIAL\fR \fR
 .ad
 .RS 24n
-.rt  
 For serial ports
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_NT_SERIAL_MB\fR \fR
 .ad
 .RS 24n
-.rt  
 For on board serial ports
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_NT_SERIAL_DO\fR \fR
 .ad
 .RS 24n
-.rt  
 For dial out ports
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_NT_SERIAL_MB_DO\fR \fR
 .ad
 .RS 24n
-.rt  
 For on board dial out ports
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_NT_BLOCK\fR \fR
 .ad
 .RS 24n
-.rt  
 For hard disks
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_NT_BLOCK_CHAN\fR \fR
 .ad
 .RS 24n
-.rt  
 For hard disks with channel or target numbers
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_NT_CD\fR \fR
 .ad
 .RS 24n
-.rt  
 For CDROM drives
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_NT_CD_CHAN\fR \fR
 .ad
 .RS 24n
-.rt  
 For CDROM drives with channel or target numbers
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_NT_FD\fR \fR
 .ad
 .RS 24n
-.rt  
 For floppy disks
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_NT_TAPE\fR \fR
 .ad
 .RS 24n
-.rt  
 For tape drives
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_NT_NET\fR \fR
 .ad
 .RS 24n
-.rt  
 For DLPI style 1 or style 2 network devices
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_NT_DISPLAY\fR \fR
 .ad
 .RS 24n
-.rt  
 For display devices
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PSEUDO\fR \fR
 .ad
 .RS 24n
-.rt  
 For pseudo devices
 .RE
 
@@ -225,12 +189,10 @@ For pseudo devices
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflag\fR \fR
 .ad
 .RS 14n
-.rt  
 If the device is a clone device then this flag is set to \fBCLONE_DEV\fR else
 it is set to \fB0\fR.
 .RE
@@ -255,24 +217,20 @@ belongs to.
 \fBddi_create_minor_node()\fR returns:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR \fR
 .ad
 .RS 16n
-.rt  
 Was able to allocate memory, create the minor data structure, and place it into
 the linked list of minor devices for this driver.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR \fR
 .ad
 .RS 16n
-.rt  
 Minor node creation failed.
 .RE
 

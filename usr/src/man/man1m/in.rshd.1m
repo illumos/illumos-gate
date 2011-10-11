@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH in.rshd 1M "10 Nov 2005" "SunOS 5.11" "System Administration Commands"
+.TH IN.RSHD 1M "Nov 10, 2005"
 .SH NAME
 in.rshd, rshd \- remote shell server
 .SH SYNOPSIS
 .LP
 .nf
-\fBin.rshd\fR [\fB-k5eciU\fR] [\fB-s\fR \fItos\fR] [\fB-S\fR \fIkeytab\fR] [\fB-M\fR \fIrealm\fR] 
+\fBin.rshd\fR [\fB-k5eciU\fR] [\fB-s\fR \fItos\fR] [\fB-S\fR \fIkeytab\fR] [\fB-M\fR \fIrealm\fR]
      [\fB-L\fR \fIenv_var\fR] \fIhost.port\fR
 .fi
 
@@ -140,23 +140,19 @@ passed to the normal login shell of the user. The \fBPATH\fR variable is set to
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-5\fR\fR
 .ad
 .RS 14n
-.rt  
 Same as \fB-k\fR, for backwards compatibility
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 14n
-.rt  
 Requires Kerberos V5 clients to present a cryptographic checksum of initial
 connection information like the name of the user that the client is trying to
 access in the initial authenticator. This checksum provides additionl security
@@ -166,23 +162,19 @@ This option is mutually exclusive with the \fB-i\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 14n
-.rt  
 Requires the client to encrypt the connection.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 14n
-.rt  
 Ignores authenticator checksums if provided. This option ignores authenticator
 checksums presented by current Kerberos clients to protect initial connection
 information. Option \fB-i\fR is the opposite of option \fB-c\fR.
@@ -190,12 +182,10 @@ information. Option \fB-i\fR is the opposite of option \fB-c\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR\fR
 .ad
 .RS 14n
-.rt  
 Allows Kerberos V5 authentication with the \fB\&.k5login\fR access control file
 to be trusted. If this authentication system is used by the client and the
 authorization check is passed, then the user is allowed to log in.
@@ -203,58 +193,48 @@ authorization check is passed, then the user is allowed to log in.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR \fIenv_var\fR\fR
 .ad
 .RS 14n
-.rt  
 List of environment variables that need to be saved and passed along.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR \fIrealm\fR\fR
 .ad
 .RS 14n
-.rt  
 Uses the indicated Kerberos V5 realm. By default, the daemon will determine its
 realm from the settings in the \fBkrb5.conf\fR(4) file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fItos\fR\fR
 .ad
 .RS 14n
-.rt  
 Sets the \fBIP\fR \fBTOS\fR option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR \fIkeytab\fR\fR
 .ad
 .RS 14n
-.rt  
 Sets the \fBKRB5\fR keytab file to use. The\fB/etc/krb5/krb5.keytab\fR file is
 used by default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-U\fR\fR
 .ad
 .RS 14n
-.rt  
 Refuses connections that cannot be mapped to a name through the
 \fBgetnameinfo\fR(3SOCKET) function.
 .RE
@@ -289,17 +269,15 @@ module.
 
 .sp
 .TS
-tab();
-lw(.79i) lw(.79i) lw(.79i) lw(3.14i) 
-lw(.79i) lw(.79i) lw(.79i) lw(3.14i) 
-.
-rshauthrequiredpam_rhosts_auth.so.1
-
-rshaccountrequiredpam_unix_roles.so.1
-rshsessionrequiredpam_unix_projects.so.1
-rshsessionrequiredpam_unix_account.so.1
-
-rshsessionrequiredpam_unix_session.so.1
+l l l l
+l l l l .
+rsh	auth	required	pam_rhosts_auth.so.1
+			
+rsh	account	required	pam_unix_roles.so.1
+rsh	session	required	pam_unix_projects.so.1
+rsh	session	required	pam_unix_account.so.1
+			
+rsh	session	required	pam_unix_session.so.1
 .TE
 
 .sp
@@ -319,23 +297,19 @@ service name is \fBkrsh\fR.
 \fB/etc/hosts.equiv\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.k5login\fR\fR
 .ad
 .RS 23n
-.rt  
 File containing Kerberos principals that are allowed access.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/krb5.conf\fR\fR
 .ad
 .RS 23n
-.rt  
 Kerberos configuration file.
 .RE
 
@@ -363,7 +337,6 @@ returned above upon successful completion of all the steps prior to the command
 execution).
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlocuser too long\fR\fR
 .ad
@@ -374,7 +347,6 @@ The name of the user on the client's machine is longer than 16 characters.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBremuser too long\fR\fR
 .ad
@@ -385,7 +357,6 @@ The name of the user on the remote machine is longer than 16 characters.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcommand too long\fR\fR
 .ad
@@ -397,7 +368,6 @@ into the system).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHostname for your address unknown.\fR\fR
 .ad
@@ -408,7 +378,6 @@ No entry in the host name database existed for the client's machine.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLogin incorrect.\fR\fR
 .ad
@@ -419,7 +388,6 @@ No password file entry for the user name existed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPermission denied.\fR\fR
 .ad
@@ -430,7 +398,6 @@ The authentication procedure described above failed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCan't make pipe.\fR\fR
 .ad
@@ -441,7 +408,6 @@ The pipe needed for the \fBstderr\fR was not created.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTry again.\fR\fR
 .ad

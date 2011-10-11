@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH if_nametoindex 3XNET "14 Dec 2003" "SunOS 5.11" "X/Open Networking Services Library Functions"
+.TH IF_NAMETOINDEX 3XNET "Dec 14, 2003"
 .SH NAME
 if_nametoindex, if_indextoname, if_nameindex, if_freenameindex \- functions to
 map Internet Protocol network interface names and interface indexes
@@ -38,34 +38,28 @@ map Internet Protocol network interface names and interface indexes
 These functions support the following parameters:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIifname\fR\fR
 .ad
 .RS 11n
-.rt  
 interface name
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIifindex\fR\fR
 .ad
 .RS 11n
-.rt  
 interface index
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIptr\fR\fR
 .ad
 .RS 11n
-.rt  
 pointer returned by \fBif_nameindex()\fR
 .RE
 
@@ -86,12 +80,10 @@ the specified index is returned. \fBIF_NAMESIZE\fR is defined in
 the interface name.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBif_nametoindex()\fR\fR
 .ad
 .RS 22n
-.rt  
 The \fBif_nametoindex()\fR function returns the interface index corresponding
 to the interface name pointed to by the \fIifname\fR pointer. If the specified
 interface name does not exist, the return value is \fB0\fR, and \fIerrno\fR is
@@ -102,12 +94,10 @@ example, \fBENOMEM\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBif_indextoname()\fR\fR
 .ad
 .RS 22n
-.rt  
 The \fBif_indextoname()\fR function maps an interface index into its
 corresponding name. This pointer is also the return value of the function. If
 there is no interface corresponding to the specified index, \fBNULL\fR is
@@ -118,12 +108,10 @@ such as running out of memory, \fBif_indextoname()\fR returns \fBNULL\fR and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB*if_nameindex()\fR\fR
 .ad
 .RS 22n
-.rt  
 The \fBif_nameindex()\fR function returns an array of \fBif_nameindex\fR
 structures, one structure per interface. The \fBif_nameindex\fR structure holds
 the information about a single interface and is defined when the
@@ -131,10 +119,10 @@ the information about a single interface and is defined when the
 .sp
 .in +2
 .nf
-struct if_nameindex {         
-    unsigned int   if_index;  /* 1, 2, ... */         
+struct if_nameindex {
+    unsigned int   if_index;  /* 1, 2, ... */
     char           *if_name;   /* null terminated name: "eri0", ... */
-};     
+};
 .fi
 .in -2
 
@@ -148,12 +136,10 @@ by the \fBif_freenameindex()\fR function.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBif_freenameindex()\fR\fR
 .ad
 .RS 22n
-.rt  
 The \fBif_freenameindex()\fR function frees the dynamic memory that was
 allocated by \fBif_nameindex()\fR. The argument to this function must be a
 pointer that was returned by \fBif_nameindex()\fR.
@@ -167,15 +153,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

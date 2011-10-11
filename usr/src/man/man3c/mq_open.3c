@@ -2,14 +2,14 @@
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mq_open 3C "5 Feb 2008" "SunOS 5.11" "Standard C Library Functions"
+.TH MQ_OPEN 3C "Feb 5, 2008"
 .SH NAME
 mq_open \- open a message queue
 .SH SYNOPSIS
@@ -52,12 +52,10 @@ following list. Applications must specify exactly one of the first three values
 (access modes) below in the value of \fIoflag\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_RDONLY\fR \fR
 .ad
 .RS 13n
-.rt  
 Open the message queue for receiving messages. The process can use the returned
 message queue descriptor with \fBmq_receive\fR(3C), but not \fBmq_send\fR(3C).
 A message queue may be open multiple times in the same or different processes
@@ -66,12 +64,10 @@ for receiving messages.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_WRONLY\fR \fR
 .ad
 .RS 13n
-.rt  
 Open the queue for sending messages. The process can use the returned message
 queue descriptor with \fBmq_send\fR(3C) but not \fBmq_receive\fR(3C). A message
 queue may be open multiple times in the same or different processes for sending
@@ -80,12 +76,10 @@ messages.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_RDWR\fR \fR
 .ad
 .RS 13n
-.rt  
 Open the queue for both receiving and sending messages. The process can use any
 of the functions allowed for \fBO_RDONLY\fR and \fBO_WRONLY\fR. A message queue
 may be open multiple times in the same or different processes for sending
@@ -98,12 +92,10 @@ Any combination of the remaining flags may additionally be specified in the
 value of \fIoflag\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_CREAT\fR \fR
 .ad
 .RS 15n
-.rt  
 This option is used to create a message queue, and it requires two additional
 arguments: \fImode\fR, which is of type \fBmode_t\fR, and  \fIattr\fR, which is
 pointer to a \fBmq_attr\fR structure. If the pathname, \fIname\fR, has already
@@ -128,12 +120,10 @@ creating the message queue.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_EXCL\fR \fR
 .ad
 .RS 15n
-.rt  
 If both \fBO_EXCL\fR and \fBO_CREAT\fR are set, \fBmq_open()\fR will fail if
 the message queue \fIname\fR exists. The check for the existence of the message
 queue and the creation of the message queue if it does not exist are atomic
@@ -144,12 +134,10 @@ with respect to other processes executing \fBmq_open()\fR naming the same
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_NONBLOCK\fR \fR
 .ad
 .RS 15n
-.rt  
 The setting of this flag is associated with the open message queue description
 and determines whether a \fBmq_send\fR(3C) or \fBmq_receive\fR(3C) waits for
 resources or messages that are not currently available, or fails with
@@ -169,12 +157,10 @@ indicate the error condition.
 The  \fBmq_open()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR \fR
 .ad
 .RS 17n
-.rt  
 The message queue exists and the permissions specified by \fIoflag\fR are
 denied, or the message queue does not exist and permission to create the
 message queue is denied.
@@ -182,35 +168,29 @@ message queue is denied.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEEXIST\fR \fR
 .ad
 .RS 17n
-.rt  
 \fBO_CREAT\fR and \fBO_EXCL\fR are set and the named message queue already
 exists.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR \fR
 .ad
 .RS 17n
-.rt  
 The \fBmq_open()\fR operation was interrupted by a signal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR \fR
 .ad
 .RS 17n
-.rt  
 The \fBmq_open()\fR operation is not supported for the given name, or
 \fBO_CREAT\fR was specified in \fIoflag\fR, the value of \fIattr\fR is not
 \fINULL,\fR and either \fBmq_maxmsg\fR or \fBmq_msgsize\fR was less than or
@@ -219,12 +199,10 @@ equal to zero.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEMFILE\fR \fR
 .ad
 .RS 17n
-.rt  
 The number of open message queue descriptors in this process exceeds
 \fBMQ_OPEN_MAX,\fR of the number of open file descriptors in this process
 exceeds \fBOPEN_MAX.\fR
@@ -232,12 +210,10 @@ exceeds \fBOPEN_MAX.\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENAMETOOLONG\fR \fR
 .ad
 .RS 17n
-.rt  
 The length of the \fIname\fR string exceeds \fBPATH_MAX,\fR or a pathname
 component is longer than \fINAME_MAX\fR while \fB_POSIX_NO_TRUNC\fR is in
 effect.
@@ -245,45 +221,37 @@ effect.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENFILE\fR \fR
 .ad
 .RS 17n
-.rt  
 Too many message queues are currently open in the system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR \fR
 .ad
 .RS 17n
-.rt  
 \fBO_CREAT\fR is not set and the named message queue does not exist.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSPC\fR \fR
 .ad
 .RS 17n
-.rt  
 There is insufficient space for the creation of the new message queue.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSYS\fR \fR
 .ad
 .RS 17n
-.rt  
 The \fBmq_open()\fR function is not supported by the system.
 .RE
 
@@ -295,17 +263,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) |lw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO

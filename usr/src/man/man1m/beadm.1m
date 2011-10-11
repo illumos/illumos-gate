@@ -1,6 +1,6 @@
 '\" te
 .\" Copyright 2011 Nexenta Systems, Inc. All rights reserved.
-.TH beadm 1M "26 Feb 2011" "SunOS 5.11" "System Administration Commands"
+.TH BEADM 1M "Feb 26, 2011"
 .SH NAME
 beadm \- utility for managing zfs boot environments
 .SH SYNOPSIS
@@ -40,7 +40,7 @@ beadm \- utility for managing zfs boot environments
 .nf
 \fBbeadm\fR \fBrename\fR \fIbeName\fR \fInewBeName\fR
 .fi
- 
+
 .LP
 .nf
 \fBbeadm\fR \fBactivate\fR \fIbeName\fR
@@ -141,7 +141,6 @@ Roll back a BE to an existing snapshot of a BE.
 .el -
 Display information about your snapshots and datasets.
 .RE
-.RE
 
 .SH SUBCOMMANDS
 The \fBbeadm\fR command has the subcommands and options listed
@@ -149,7 +148,6 @@ below. Also see
 EXAMPLES below.
 .sp
 .ne 2
-.mk
 .na
 \fBbeadm\fR
 .ad
@@ -160,7 +158,6 @@ Displays command usage.
 
 .sp
 .ne 2
-.mk
 .na
 \fBbeadm\fR \fBcreate\fR [\fB-a\fR] [\fB-d\fR \fIdescription\fR]
 [\fB-e\fR \fInon-activeBeName\fR | \fIbeName@snapshot\fR]
@@ -183,7 +180,6 @@ not provided, \fIbeName\fR
 will be used as the title.
 .sp
 .ne 2
-.mk
 .na
 \fB-a\fR
 .ad
@@ -194,7 +190,6 @@ the newly created BE.
 .RE
 .sp
 .ne 2
-.mk
 .na
 \fB-d\fR \fIdescription\fR
 .ad
@@ -204,7 +199,6 @@ Create a new BE with a description associated with it.
 .RE
 .sp
 .ne 2
-.mk
 .na
 \fB-e\fR \fInon-activeBeName\fR
 .ad
@@ -214,7 +208,6 @@ Create a new BE from an existing inactive BE.
 .RE
 .sp
 .ne 2
-.mk
 .na
 \fB-e\fR \fIbeName@snapshot\fR
 .ad
@@ -224,7 +217,6 @@ Create a new BE from an existing snapshot of the BE named beName.
 .RE
 .sp
 .ne 2
-.mk
 .na
 \fB-o\fR \fIproperty=value\fR
 .ad
@@ -238,7 +230,6 @@ the
 .RE
 .sp
 .ne 2
-.mk
 .na
 \fB-p\fR \fIzpool\fR
 .ad
@@ -252,7 +243,6 @@ behavior is to create the new BE in the same pool as as the origin BE.
 
 .sp
 .ne 2
-.mk
 .na
 \fBbeadm\fR \fBcreate\fR \fIbeName@snapshot\fR
 .ad
@@ -263,7 +253,6 @@ Creates a snapshot of the existing BE named beName.
 
 .sp
 .ne 2
-.mk
 .na
 \fBbeadm\fR \fBdestroy\fR [\fB-fF\fR] \fIbeName\fR | \fIbeName@snapshot\fR
 .ad
@@ -278,7 +267,6 @@ this command
 with caution.
 .sp
 .ne 2
-.mk
 .na
 \fB-f\fR
 .ad
@@ -288,7 +276,6 @@ Forcefully unmount the boot environment if it is currently mounted.
 .RE
 .sp
 .ne 2
-.mk
 .na
 \fB-F\fR
 .ad
@@ -301,7 +288,6 @@ environment.
 
 .sp
 .ne 2
-.mk
 .na
 \fBbeadm\fR \fBlist\fR [\fB-a\fR | \fB-ds\fR] [\fB-H\fR] [\fIbeName\fR]
 .ad
@@ -325,7 +311,6 @@ blank if
 the boot environment does not have a uuid.  See the EXAMPLES section.
 .sp
 .ne 2
-.mk
 .na
 \fB-a\fR
 .ad
@@ -336,7 +321,6 @@ subordinate file systems and snapshots.
 .RE
 .sp
 .ne 2
-.mk
 .na
 \fB-d\fR
 .ad
@@ -347,7 +331,6 @@ environment.
 .RE
 .sp
 .ne 2
-.mk
 .na
 \fB-s\fR
 .ad
@@ -357,7 +340,6 @@ Lists information about the snapshots of the boot environment.
 .RE
 .sp
 .ne 2
-.mk
 .na
 \fB-H\fR
 .ad
@@ -370,7 +352,6 @@ separated by a semicolon.
 
 .sp
 .ne 2
-.mk
 .na
 \fBbeadm\fR \fBmount\fR \fIbeName\fR \fImountpoint\fR
 .ad
@@ -382,7 +363,6 @@ already existing empty directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fBbeadm\fR \fBunmount\fR [\fB-f\fR] \fIbeName\fR
 .ad
@@ -391,7 +371,6 @@ already existing empty directory.
 Unmounts the boot environment named beName.
 .sp
 .ne 2
-.mk
 .na
 \fB-f\fR
 .ad
@@ -403,7 +382,6 @@ Forcefully unmount the boot environment even if its currently busy.
 
 .sp
 .ne 2
-.mk
 .na
 \fBbeadm\fR \fBrename\fR \fIbeName\fR \fInewBeName\fR
 .ad
@@ -414,7 +392,6 @@ Renames the boot environment named \fIbeName\fR to \fInewBeName\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBbeadm\fR \fBrollback\fR \fIbeName\fR \fIsnapshot\fR | \fIbeName@snapshot\fR
 .ad
@@ -426,7 +403,6 @@ of the boot environment named \fIbeName@snapshot\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBbeadm\fR \fBactivate\fR \fIbeName\fR
 .ad
@@ -440,10 +416,9 @@ Makes beName the active BE on next reboot.
 The alternate BE location outside rpool/ROOT can be configured
 by modifying the BENAME_STARTS_WITH parameter in /etc/default/be.
 For example: BENAME_STARTS_WITH=rootfs
-.RE
 
 .SH EXAMPLES
-.LP     
+.LP
 \fBExample 1\fR: Create a new BE named BE1, by cloning the current live BE.
 .sp
 .in +2
@@ -508,7 +483,7 @@ on.
 .fi
 .in -2
 .sp
-    
+
 .LP
 \fBExample 7\fR: Create a new BE named BE6 based on the currently running BE
 and provide a description for it.
@@ -647,8 +622,8 @@ BE5
 .nf
 \fB# beadm list -a BE5\fR
 
-BE/Dataset/Snapshot   Active Mountpoint Space   Policy Created          
--------------------   ------ ---------- -----   ------ -------          
+BE/Dataset/Snapshot   Active Mountpoint Space   Policy Created
+-------------------   ------ ---------- -----   ------ -------
 BE5
    p/ROOT/BE5         NR     /          6.10G   static 2008-09-09 16:53
    p/ROOT/BE5/opt     -      /opt       24.55M  static 2008-09-09 16:53
@@ -683,7 +658,6 @@ BE5;215b8387-4968-627c-d2d0-f4a011414bab;NR;/;7786206208;static;1221004384
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB0\fR
 .ad
@@ -694,7 +668,6 @@ Successful completion
 
 .sp
 .ne 2
-.mk
 .na
 \fB>0\fR
 .ad
@@ -706,18 +679,16 @@ Failure
 
 .SH FILES
 .sp
-.LP     
+.LP
 .sp
 .ne 2
-.mk
 .na
 \fB/var/log/beadm/<beName>/create.log.<yyyymmdd_hhmmss>\fR
 .ad
 .sp .6
-.RS 4n    
+.RS 4n
 Log used for capturing beadm create output
 .sp
-.in+2
 .nf
 \fIyyyymmdd_hhmmss\fR - 20071130_140558
 \fIyy\fR - year; 2007
@@ -730,20 +701,17 @@ Log used for capturing beadm create output
 .in -2
 .sp
 .RE
-.RE
 .sp
-.LP     
+.LP
 .sp
 .ne 2
-.mk
 .na
 \fB/etc/default/be\fR
 .ad
 .sp .6
-.RS 4n    
+.RS 4n
 Contains default value for BENAME_STARTS_WITH parameter
 .sp
-.RE
 .RE
 
 .SH ATTRIBUTES
@@ -754,13 +722,12 @@ See \fBattributes\fR(5) for descriptions of the  following  attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityUncommitted
+Interface Stability	Uncommitted
 .TE
 
 

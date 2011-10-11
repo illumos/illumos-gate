@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH consadm 1m "27 Oct 2004" "SunOS 5.11" "System Administration Commands"
+.TH CONSADM 1M "Oct 27, 2004"
 .SH NAME
 consadm \- select or display devices used as auxiliary console devices
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/consadm\fR 
+\fB/usr/sbin/consadm\fR
 .fi
 
 .LP
@@ -69,12 +69,10 @@ as the system console.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIdevice\fR\fR
 .ad
 .RS 13n
-.rt  
 Adds \fIdevice\fR to the list of auxiliary console devices. Specify
 \fIdevice\fR as the path name to the device or devices to be added to the
 auxiliary console device list.
@@ -82,12 +80,10 @@ auxiliary console device list.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdevice\fR\fR
 .ad
 .RS 13n
-.rt  
 Removes \fIdevice\fR from the list of auxiliary console devices. Specify
 \fIdevice\fR as the path name to the device or devices to be removed from the
 auxiliary console device list.
@@ -95,12 +91,10 @@ auxiliary console device list.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 13n
-.rt  
 Prints the list of auxiliary consoles that will be auxiliary across reboots.
 .sp
 When invoked with the \fB-a\fR or \fB-d\fR options , tells the application to
@@ -168,23 +162,19 @@ and \fBNLSPATH\fR.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB>\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -196,13 +186,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Stability LevelEvolving
+Stability Level	Evolving
 .TE
 
 .SH SEE ALSO

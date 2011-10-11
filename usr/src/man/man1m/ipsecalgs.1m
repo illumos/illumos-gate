@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ipsecalgs 1M "5 Jul 2007" "SunOS 5.11" "System Administration Commands"
+.TH IPSECALGS 1M "Jul 5, 2007"
 .SH NAME
 ipsecalgs \- configure the IPsec protocols and algorithms table
 .SH SYNOPSIS
 .LP
 .nf
-\fBipsecalgs\fR 
+\fBipsecalgs\fR
 .fi
 
 .LP
@@ -24,14 +24,14 @@ ipsecalgs \- configure the IPsec protocols and algorithms table
 
 .LP
 .nf
-\fBipsecalgs\fR \fB-a\fR [\fB-P\fR \fIprotocol-number\fR | \fB-p\fR \fIprotocol-name\fR] \fB-k\fR \fIkeylen-list\fR 
+\fBipsecalgs\fR \fB-a\fR [\fB-P\fR \fIprotocol-number\fR | \fB-p\fR \fIprotocol-name\fR] \fB-k\fR \fIkeylen-list\fR
      [\fB-i\fR \fIinc\fR] [\fB-K\fR \fIdefault-keylen\fR] \fB-b\fR \fIblocklen-list\fR \fB-n\fR \fIalg-names\fR
      \fB-N\fR \fIalg-number\fR \fB-m\fR \fImech-name\fR [\fB-f\fR] [\fB-s\fR]
 .fi
 
 .LP
 .nf
-\fBipsecalgs\fR \fB-P\fR \fIprotocol-number\fR \fB-p\fR \fIprotocol-name\fR 
+\fBipsecalgs\fR \fB-P\fR \fIprotocol-number\fR \fB-p\fR \fIprotocol-name\fR
      [\fB-e\fR \fIexec-mode\fR] [\fB-f\fR] [\fB-s\fR]
 .fi
 
@@ -109,24 +109,20 @@ algorithms that can be applied to IPsec traffic.
 The following protocols are predefined:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIPSEC_PROTO_ESP\fR\fR
 .ad
 .RS 19n
-.rt  
 Defines the encryption algorithms (transforms) that can be used by IPsec to
 provide data confidentiality.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIPSEC_PROTO_AH\fR\fR
 .ad
 .RS 19n
-.rt  
 Defines the authentication algorithms (transforms) that can be used by IPsec to
 provide authentication.
 .RE
@@ -162,12 +158,10 @@ option.
 \fBipsecalgs\fR supports the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 6n
-.rt  
 Adds an algorithm of the protocol specified by the \fB-P\fR option. The
 algorithm name(s) are specified with the \fB-n\fR option. The supported key
 lengths and block sizes are specified with the \fB-k\fR, \fB-i\fR, and \fB-b\fR
@@ -176,35 +170,29 @@ options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
 .RS 6n
-.rt  
 Specifies the block or MAC lengths of an algorithm, in bytes. Set more than one
 block length by separating the values with commas.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 6n
-.rt  
 Designates the execution mode of cryptographic requests for the specified
 protocol in the absence of cryptographic hardware provider. See
 \fBcryptoadm\fR(1M). \fIexec-mode\fR can be one of the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsync\fR\fR
 .ad
 .RS 9n
-.rt  
 Cryptographic requests are processed synchronously in the absence of a
 cryptographic hardware provider. This execution mode leads to better latency
 when no cryptographic hardware providers are available
@@ -212,12 +200,10 @@ when no cryptographic hardware providers are available
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBasync\fR\fR
 .ad
 .RS 9n
-.rt  
 Cryptographic requests are always processed asynchronously in the absence of
 cryptographic hardware provider. This execution can improve the resource
 utilization on a multi-CPU system, but can lead to higher latency when no
@@ -231,24 +217,20 @@ mode is used in the absence of a cryptographic hardware provider.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 Used with the \fB-a\fR option to force the addition of an algorithm or protocol
 if an entry with the same name or number already exists.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 6n
-.rt  
 Specifies the valid key length increments in bits. This option must be used
 when the valid key lengths for an algorithm are specified by a range with the
 \fB-k\fR option.
@@ -256,12 +238,10 @@ when the valid key lengths for an algorithm are specified by a range with the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-K\fR\fR
 .ad
 .RS 6n
-.rt  
 Specifies the default key lengths for an algorithm, in bits. If the \fB-K\fR
 option is not specified, the minimum key length will be determined as follows:
 .RS +4
@@ -282,12 +262,10 @@ length will be the first listed key length.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR\fR
 .ad
 .RS 6n
-.rt  
 Specifies the supported key lengths for an algorithm, in bits. You can
 designate the supported key lengths by enumeration or by range.
 .sp
@@ -321,23 +299,19 @@ dash ('\fB-\fR') character, for example:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 6n
-.rt  
 Displays the kernel algorithm tables.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
 .RS 6n
-.rt  
 Specifies the name of the cryptographic framework mechanism name corresponding
 to the algorithm. Cryptographic framework mechanisms are described in the
 \fBcryptoadm\fR(1M) man page.
@@ -345,24 +319,20 @@ to the algorithm. Cryptographic framework mechanisms are described in the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-N\fR\fR
 .ad
 .RS 6n
-.rt  
 Specifies an algorithm number. The algorithm number for a protocol must be
 unique. IANA manages the algorithm numbers. See \fIRFC 2407\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 6n
-.rt  
 Specifies one or more names for an algorithm. When adding an algorithm with the
 \fB-a\fR option, \fIalg-names\fR contains a string or a comma-separated list of
 strings, for example:
@@ -380,12 +350,10 @@ contains one of the valid algorithm names.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR\fR
 .ad
 .RS 6n
-.rt  
 Adds a protocol of the number specified by \fIprotocol-number\fR with the name
 specified by the \fB-p\fR option. This option is also used to specify an IPsec
 protocol when used with the \fB-a\fR and the \fB-R\fR options. Protocol numbers
@@ -394,23 +362,19 @@ are managed by the IANA. See \fIRFC 2407\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 6n
-.rt  
 Specifies the name of the IPsec protocol.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR\fR
 .ad
 .RS 6n
-.rt  
 Removes and IPsec protocol from the algorithm table. The protocol can be
 specified by number by using the \fB-P\fR option or by name by using the
 \fB-p\fR option. The algorithms associated with the protocol are removed as
@@ -419,12 +383,10 @@ well.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 6n
-.rt  
 Removes the mapping for an algorithm The algorithm can be specified by
 algorithm number using the \fB-N\fR option or by algorithm name using the
 \fB-A\fR option.
@@ -432,12 +394,10 @@ algorithm number using the \fB-N\fR option or by algorithm name using the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 6n
-.rt  
 Synchronizes the kernel with the contents of \fB/etc/inet/ipsecalgs\fR. The
 contents of \fB/etc/inet/ipsecalgs\fR are always updated, but new information
 is not passed on to the kernel unless the \fB-s\fR is used. See \fBNOTES\fR for
@@ -493,7 +453,6 @@ example# \fBsvcadm refresh ipsecalgs\fR
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/inet/ipsecalgs\fR\fR
 .ad
@@ -511,13 +470,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH resource_controls 5 "2 Jul 2007" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH RESOURCE_CONTROLS 5 "Jul 2, 2007"
 .SH NAME
 resource_controls \- resource controls available through project database
 .SH DESCRIPTION
@@ -50,7 +50,6 @@ library.
 The following are the resource controls are available:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprocess.max-address-space\fR\fR
 .ad
@@ -62,7 +61,6 @@ available to this process, expressed as a number of bytes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprocess.max-core-size\fR\fR
 .ad
@@ -74,7 +72,6 @@ bytes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprocess.max-cpu-time\fR\fR
 .ad
@@ -86,7 +83,6 @@ seconds.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprocess.max-data-size\fR\fR
 .ad
@@ -97,7 +93,6 @@ Maximum heap memory available to this process, expressed as a number of bytes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprocess.max-file-descriptor\fR\fR
 .ad
@@ -109,7 +104,6 @@ integer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprocess.max-file-size\fR\fR
 .ad
@@ -121,7 +115,6 @@ number of bytes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprocess.max-msg-messages\fR\fR
 .ad
@@ -133,7 +126,6 @@ control at \fBmsgget()\fR time), expressed as an integer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprocess.max-msg-qbytes\fR\fR
 .ad
@@ -145,7 +137,6 @@ resource control at \fBmsgget()\fR time), expressed as a number of bytes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprocess.max-port-events\fR\fR
 .ad
@@ -156,7 +147,6 @@ Maximum allowable number of events per event port, expressed as an integer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprocess.max-sem-nsems\fR\fR
 .ad
@@ -168,7 +158,6 @@ integer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprocess.max-sem-ops\fR\fR
 .ad
@@ -181,7 +170,6 @@ integer, specifying the number of operations.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprocess.max-stack-size\fR\fR
 .ad
@@ -193,7 +181,6 @@ of bytes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBproject.cpu-caps\fR\fR
 .ad
@@ -208,7 +195,6 @@ action.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBproject.cpu-shares\fR\fR
 .ad
@@ -221,7 +207,6 @@ resource control does not support the \fBsyslog\fR action.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBproject.max-contracts\fR\fR
 .ad
@@ -232,7 +217,6 @@ Maximum number of contracts allowed in a project, expressed as an integer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBproject.max-crypto-memory\fR\fR
 .ad
@@ -245,7 +229,6 @@ charged against this resource control.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBproject.max-locked-memory\fR\fR
 .ad
@@ -257,7 +240,6 @@ Total amount of physical memory locked by device drivers and user processes
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBproject.max-lwps\fR\fR
 .ad
@@ -269,7 +251,6 @@ integer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBproject.max-msg-ids\fR\fR
 .ad
@@ -281,7 +262,6 @@ integer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBproject.max-port-ids\fR\fR
 .ad
@@ -292,7 +272,6 @@ Maximum allowable number of event ports, expressed as an integer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBproject.max-sem-ids\fR\fR
 .ad
@@ -303,7 +282,6 @@ Maximum number of semaphore IDs allowed for a project, expressed as an integer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBproject.max-shm-ids\fR\fR
 .ad
@@ -315,7 +293,6 @@ integer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBproject.max-shm-memory\fR\fR
 .ad
@@ -327,7 +304,6 @@ bytes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBproject.max-tasks\fR\fR
 .ad
@@ -338,7 +314,6 @@ Maximum number of tasks allowable in a project, expressed as an integer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBproject.pool\fR\fR
 .ad
@@ -349,7 +324,6 @@ Binds a specified resource pool with a project.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrcap.max-rss\fR\fR
 .ad
@@ -361,7 +335,6 @@ in a project.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtask.max-cpu-time\fR\fR
 .ad
@@ -373,7 +346,6 @@ number of seconds.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtask.max-lwps\fR\fR
 .ad
@@ -388,7 +360,6 @@ expressed as an integer.
 The following zone-wide resource controls are available:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBzone.cpu-cap\fR\fR
 .ad
@@ -403,7 +374,6 @@ not support the \fBsyslog\fR action.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBzone.cpu-shares\fR\fR
 .ad
@@ -418,7 +388,6 @@ Expressed as an integer. This resource control does not support the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBzone.max-locked-memory\fR\fR
 .ad
@@ -429,7 +398,6 @@ Total amount of physical locked memory available to a zone.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBzone.max-lwps\fR\fR
 .ad
@@ -443,7 +411,6 @@ entries. Expressed as an integer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBzone.max-msg-ids\fR\fR
 .ad
@@ -455,7 +422,6 @@ integer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBzone.max-sem-ids\fR\fR
 .ad
@@ -466,7 +432,6 @@ Maximum number of semaphore IDs allowed for a zone, expressed as an integer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBzone.max-shm-ids\fR\fR
 .ad
@@ -478,7 +443,6 @@ integer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBzone.max-shm-memory\fR\fR
 .ad
@@ -490,7 +454,6 @@ bytes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBzone.max-swap\fR\fR
 .ad
@@ -600,7 +563,6 @@ Each threshold value on a resource control must be associated with a privilege
 level. The privilege level must be one of the following three types:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbasic\fR\fR
 .ad
@@ -611,7 +573,6 @@ Can be modified by the owner of the calling process.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprivileged\fR\fR
 .ad
@@ -623,7 +584,6 @@ or by \fBprctl\fR(1) (requiring \fBproc_owner\fR privilege).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsystem\fR\fR
 .ad
@@ -748,7 +708,6 @@ associate one or more actions. There are three types of local actions:
 follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnone\fR\fR
 .ad
@@ -763,7 +722,6 @@ the process exceeding the threshhold is not affected.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdeny\fR\fR
 .ad
@@ -777,7 +735,6 @@ control value. See the \fBfork\fR(2).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsignal=\fR\fR
 .ad
@@ -807,7 +764,6 @@ following list. For additional information about signals, see
 The following are the signals available to resource control values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGABRT\fR\fR
 .ad
@@ -818,7 +774,6 @@ Terminate the process.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGHUP\fR\fR
 .ad
@@ -830,7 +785,6 @@ the process group that controls the terminal.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGTERM\fR\fR
 .ad
@@ -841,7 +795,6 @@ Terminate the process. Termination signal sent by software.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGKILL\fR\fR
 .ad
@@ -852,7 +805,6 @@ Terminate the process and kill the program.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGSTOP\fR\fR
 .ad
@@ -863,7 +815,6 @@ Stop the process. Job control signal.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGXRES\fR\fR
 .ad
@@ -874,7 +825,6 @@ Resource control limit exceeded. Generated by resource control facility.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGXFSZ\fR\fR
 .ad
@@ -887,7 +837,6 @@ controls with the \fBRCTL_GLOBAL_FILE_SIZE\fR property
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGXCPU\fR\fR
 .ad
@@ -939,7 +888,6 @@ process.max-cpu-time  syslog=off [ lowerable no-deny cpu-time inf seconds ]
 The global flags indicate the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlowerable\fR\fR
 .ad
@@ -951,7 +899,6 @@ control.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBno-deny\fR\fR
 .ad
@@ -963,7 +910,6 @@ denied.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcpu-time\fR\fR
 .ad
@@ -975,7 +921,6 @@ are reached.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBseconds\fR\fR
 .ad
@@ -1024,13 +969,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

@@ -49,7 +49,6 @@
 #include <libgen.h>
 #include <pwd.h>
 #include <grp.h>
-#include <cups/cups.h>
 
 #include <smbsrv/smb_door.h>
 #include <smbsrv/smb_ioctl.h>
@@ -535,6 +534,7 @@ smbd_service_init(void)
 	if (smbd.s_door_lmshr < 0)
 		smbd_report("share initialization failed");
 
+	/* This reloads the kernel config info. */
 	if (smbd_kernel_bind() != 0) {
 		(void) mutex_unlock(&smbd_service_mutex);
 		return (-1);
@@ -542,6 +542,7 @@ smbd_service_init(void)
 
 	smbd_load_shares();
 	smbd_load_printers();
+	smbd_spool_start();
 
 	smbd.s_initialized = B_TRUE;
 	smbd_report("service initialized");
@@ -582,6 +583,7 @@ smbd_service_fini(void)
 	smb_lgrp_stop();
 	smbd_opipe_stop();
 	smbd_door_stop();
+	smbd_spool_stop();
 	smbd_refresh_fini();
 	smbd_kernel_unbind();
 	smbd_share_stop();
@@ -677,6 +679,7 @@ smbd_refresh_monitor(void *arg)
 
 		(void) mutex_lock(&smbd_service_mutex);
 
+		smbd_spool_stop();
 		smbd_dc_monitor_refresh();
 		smb_ccache_remove(SMB_CCACHE_PATH);
 
@@ -695,6 +698,7 @@ smbd_refresh_monitor(void *arg)
 		(void) smbd_kernel_bind();
 		smbd_load_shares();
 		smbd_load_printers();
+		smbd_spool_start();
 
 		(void) mutex_unlock(&smbd_service_mutex);
 	}
@@ -833,7 +837,6 @@ smbd_kernel_start(void)
 	if (rc != 0)
 		return (rc);
 
-	smbd_spool_init();
 	return (0);
 }
 
@@ -843,7 +846,6 @@ smbd_kernel_start(void)
 static void
 smbd_kernel_unbind(void)
 {
-	smbd_spool_fini();
 	smb_kmod_unbind();
 	smbd.s_kbound = B_FALSE;
 }

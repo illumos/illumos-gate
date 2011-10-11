@@ -3,19 +3,19 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH scsi_hba_pkt_alloc 9F "11 Dec 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH SCSI_HBA_PKT_ALLOC 9F "Dec 11, 2006"
 .SH NAME
 scsi_hba_pkt_alloc, scsi_hba_pkt_free \- allocate and free a scsi_pkt structure
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/scsi/scsi.h> 
+#include <sys/scsi/scsi.h>
 
 
 
-\fBstruct scsi_pkt *\fR\fBscsi_hba_pkt_alloc\fR(\fBdev_info_t *\fR\fIdip\fR, 
-     \fBstruct scsi_address *\fR\fIap\fR, \fBint\fR \fIcmdlen\fR, \fBint\fR \fIstatuslen\fR, 
-     \fBint\fR \fItgtlen\fR, \fBint\fR \fIhbalen\fR, 
+\fBstruct scsi_pkt *\fR\fBscsi_hba_pkt_alloc\fR(\fBdev_info_t *\fR\fIdip\fR,
+     \fBstruct scsi_address *\fR\fIap\fR, \fBint\fR \fIcmdlen\fR, \fBint\fR \fIstatuslen\fR,
+     \fBint\fR \fItgtlen\fR, \fBint\fR \fIhbalen\fR,
      \fBint\fR (*\fIcallback\fR)(\fBcaddr_t\fR \fIarg\fR), \fBcaddr_t\fR \fIarg\fR);
 .fi
 
@@ -31,104 +31,86 @@ Solaris architecture specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 13n
-.rt  
 Pointer to a \fBdev_info_t\fR structure, defining the \fBHBA\fR driver
 instance.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIap\fR\fR
 .ad
 .RS 13n
-.rt  
 Pointer to a \fBscsi_address\fR(9S) structure, defining the target instance.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcmdlen\fR\fR
 .ad
 .RS 13n
-.rt  
 Length in bytes to be allocated for the \fBSCSI\fR command descriptor block
 (\fBCDB\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstatuslen\fR\fR
 .ad
 .RS 13n
-.rt  
 Length in bytes to be allocated for the \fBSCSI\fR status completion block
 (\fBSCB\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItgtlen\fR\fR
 .ad
 .RS 13n
-.rt  
 Length in bytes to be allocated for a private data area for the target driver's
 exclusive use.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhbalen\fR\fR
 .ad
 .RS 13n
-.rt  
 Length in bytes to be allocated for a private data area for the \fBHBA\fR
 driver's exclusive use.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcallback\fR\fR
 .ad
 .RS 13n
-.rt  
 Indicates what \fBscsi_hba_pkt_alloc()\fR should do when resources are not
 available:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNULL_FUNC\fR\fR
 .ad
 .RS 14n
-.rt  
 Do not wait for resources.  Return a \fINULL\fR pointer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLEEP_FUNC\fR\fR
 .ad
 .RS 14n
-.rt  
 Wait indefinitely for resources.
 .RE
 
@@ -136,23 +118,19 @@ Wait indefinitely for resources.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIarg\fR\fR
 .ad
 .RS 13n
-.rt  
 Must be \fINULL.\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpkt\fR\fR
 .ad
 .RS 13n
-.rt  
 A pointer to a \fBscsi_pkt\fR(9S) structure.
 .RE
 
@@ -182,45 +160,37 @@ The \fBscsi_hba_pkt_alloc()\fR function also allocates memory for these
 memory:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkt_ha_private\fR\fR
 .ad
 .RS 18n
-.rt  
 \fBHBA\fR private data area.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkt_private\fR\fR
 .ad
 .RS 18n
-.rt  
 Target driver private data area.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkt_scbp\fR\fR
 .ad
 .RS 18n
-.rt  
 \fBSCSI\fR status completion block.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkt_cdbp\fR\fR
 .ad
 .RS 18n
-.rt  
 \fBSCSI\fR command descriptor block.
 .RE
 

@@ -10,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH getconf 1 "1 Sep 2009" "SunOS 5.11" "User Commands"
+.TH GETCONF 1 "Sep 1, 2009"
 .SH NAME
 getconf \- get configuration values
 .SH SYNOPSIS
@@ -127,24 +127,20 @@ The following options are supported by \fB/usr/bin/getconf\fR,
 \fB/usr/xpg4/bin/getconf\fR, and \fB/usr/xpg6/bin/getconf\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 19n
-.rt  
 Writes the names of the current system configuration variables to the standard
 output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fIspecification\fR\fR
 .ad
 .RS 19n
-.rt  
 Gives the specification which governs the selection of values for configuration
 variables.
 .RE
@@ -156,7 +152,6 @@ The following options are supported by the \fBgetconf\fR built-in command in
 \fBksh93\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
@@ -165,13 +160,11 @@ The following options are supported by the \fBgetconf\fR built-in command in
 \fB\fB--all\fR\fR
 .ad
 .RS 24n
-.rt  
 Call the native \fBgetconf -a\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
@@ -180,13 +173,11 @@ Call the native \fBgetconf -a\fR.
 \fB\fB--base\fR\fR
 .ad
 .RS 24n
-.rt  
 List base variable name without \fBcall\fR and standard prefixes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
@@ -195,7 +186,6 @@ List base variable name without \fBcall\fR and standard prefixes.
 \fB\fB--call=\fR\fIRE\fR\fR
 .ad
 .RS 24n
-.rt  
 Display variables with \fBcall\fR prefix that matches \fIRE\fR. The \fBcall\fR
 prefixes are:
 .RS +4
@@ -242,7 +232,6 @@ Constant value
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
@@ -251,13 +240,11 @@ Constant value
 \fB\fB--defined\fR\fR
 .ad
 .RS 24n
-.rt  
 Only display defined values when no operands are specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
@@ -266,13 +253,11 @@ Only display defined values when no operands are specified.
 \fB\fB--lowercase\fR\fR
 .ad
 .RS 24n
-.rt  
 List variable names in lower case.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
@@ -281,13 +266,11 @@ List variable names in lower case.
 \fB\fB--name=\fR\fIRE\fR\fR
 .ad
 .RS 24n
-.rt  
 Display variables with names that match \fIRE\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
@@ -296,7 +279,6 @@ Display variables with names that match \fIRE\fR.
 \fB\fB--portable\fR\fR
 .ad
 .RS 24n
-.rt  
 Display the named writable variables and values in a form that can be directly
 executed by \fBksh93\fR(1) to set the values. If \fIname\fR is omitted, lists
 all writable variables.
@@ -304,7 +286,6 @@ all writable variables.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
@@ -313,13 +294,11 @@ all writable variables.
 \fB\fB--quote\fR\fR
 .ad
 .RS 24n
-.rt  
 Quote values (\fB"..."\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
@@ -328,14 +307,12 @@ Quote values (\fB"..."\fR).
 \fB\fB--readonly\fR\fR
 .ad
 .RS 24n
-.rt  
 Display the named \fBreadonly\fR variables in \fIname\fR\fB=\fR\fIvalue\fR
 form. If \fIname\fR is omitted, lists all \fBreadonly\fR variables.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
@@ -344,7 +321,6 @@ form. If \fIname\fR is omitted, lists all \fBreadonly\fR variables.
 \fB\fB--standard=\fR\fIRE\fR\fR
 .ad
 .RS 24n
-.rt  
 Display variables with standard prefix that matches \fIRE\fR. Use the
 \fB--table\fR option to view all standard prefixes, including local additions.
 .sp
@@ -352,7 +328,7 @@ The standard prefixes available on all systems are:
 .sp
 .in +2
 .nf
- 
+
 AES
 AST
 C
@@ -370,7 +346,6 @@ XPG
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
@@ -379,14 +354,12 @@ XPG
 \fB\fB--table\fR\fR
 .ad
 .RS 24n
-.rt  
 Display the internal table that contains the name, standard, standard section,
 and system call symbol prefix for each variable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR\fR
 .ad
@@ -395,14 +368,12 @@ and system call symbol prefix for each variable.
 \fB\fB--writable\fR\fR
 .ad
 .RS 24n
-.rt  
 Display the named writable variables in \fIname\fR\fB=\fR\fIvalue\fR form. If
 \fIname\fR is omitted, lists all writable variables.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -411,7 +382,6 @@ Display the named writable variables in \fIname\fR\fB=\fR\fIvalue\fR form. If
 \fB\fB--specification=name\fR\fR
 .ad
 .RS 24n
-.rt  
 Call the native \fBgetconf -v\fR \fIname\fR.
 .RE
 
@@ -423,12 +393,10 @@ The following operands are supported by \fB/usr/bin/getconf\fR,
 \fB/usr/xpg4/bin/getconf\fR, and \fB/usr/xpg6/bin/getconf\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpath_var\fR\fR
 .ad
 .RS 12n
-.rt  
 A name of a configuration variable whose value is available from the
 \fBpathconf\fR(2) function. All of the values in the following table are
 supported:
@@ -438,35 +406,29 @@ supported:
 
 .sp
 .TS
-tab();
-lw(1.83i) lw(1.83i) lw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-LINK_MAXNAME_MAX_POSIX_CHOWN_RESTRICTED
-MAX_CANONPATH_MAX_POSIX_NO_TRUNC
-MAX_INPUTPIPE_BUF_POSIX_VDISABLE
+l l l
+l l l .
+LINK_MAX	NAME_MAX	_POSIX_CHOWN_RESTRICTED
+MAX_CANON	PATH_MAX	_POSIX_NO_TRUNC
+MAX_INPUT	PIPE_BUF	_POSIX_VDISABLE
 .TE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpathname\fR\fR
 .ad
 .RS 14n
-.rt  
 A path name for which the variable specified by \fIpath_var\fR is to be
 determined.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsystem_var\fR\fR
 .ad
 .RS 14n
-.rt  
 A name of a configuration variable whose value is available from
 \fBconfstr\fR(3C) or \fBsysconf\fR(3C). All of the values in the following
 table are supported:
@@ -476,128 +438,126 @@ table are supported:
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-ARG_MAXBC_BASE_MAX
-BC_DIM_MAXBC_SCALE_MAX
-BC_STRING_MAXCHAR_BIT
-CHARCLASS_NAME_MAXCHAR_MAX
-CHAR_MINCHILD_MAX
-CLK_TCKCOLL_WEIGHTS_MAX
-CS_PATHEXPR_NEST_MAX
-HOST_NAME_MAXINT_MAX
-INT_MINLFS64_CFLAGS
-LFS64_LDFLAGSLFS64_LIBS
-LFS64_LINTFLAGSLFS_CFLAGS
-LFS_LDFLAGSLFS_LIBS
-LFS_LINTFLAGSLINE_MAX
-LONG_BITLONG_MAX
-LONG_MINMB_LEN_MAX
-NGROUPS_MAXNL_ARGMAX
-NL_LANGMAXNL_MSGMAX
-NL_NMAXNL_SETMAX
-NL_TEXTMAXNZERO
-OPEN_MAXPOSIX2_BC_BASE_MAX
-POSIX2_BC_DIM_MAXPOSIX2_BC_SCALE_MAX
-POSIX2_BC_STRING_MAXPOSIX2_C_BIND
-POSIX2_C_DEVPOSIX2_CHAR_TERM
-POSIX2_COLL_WEIGHTS_MAXPOSIX2_C_VERSION
-POSIX2_EXPR_NEST_MAXPOSIX2_FORT_DEV
-POSIX2_FORT_RUNPOSIX2_LINE_MAX
-POSIX2_LOCALEDEFPOSIX2_RE_DUP_MAX
-POSIX2_SW_DEVPOSIX2_SYMLINKS
-POSIX2_UPEPOSIX2_VERSION
-POSIX_ALLOC_SIZE_MINPOSIX_REC_INCR_XFER_SIZE
-POSIX_REC_MAX_XFER_SIZEPOSIX_REC_MIN_XFER_SIZE
-POSIX_REC_XFER_ALIGNPOSIX_V6_ILP32_OFF32
-POSIX_V6_ILP32_OFF32_CFLAGSPOSIX_V6_ILP32_OFF32_LDFLAGS
-POSIX_V6_ILP32_OFF32_LIBSPOSIX_V6_ILP32_OFFBIG
-POSIX_V6_ILP32_OFFBIG_CFLAGSPOSIX_V6_ILP32_OFFBIG_LDFLAGS
-POSIX_V6_ILP32_OFFBIG_LIBSPOSIX_V6_LP64_OFF64
-POSIX_V6_LP64_OFF64_CFLAGSPOSIX_V6_LP64_OFF64_LDFLAGS
-POSIX_V6_LP64_OFF64_LIBSPOSIX_V6_LPBIG_OFFBIG
-POSIX_V6_LPBIG_OFFBIG_CFLAGSPOSIX_V6_LPBIG_OFFBIG_LDFLAGS
-POSIX_V6_LPBIG_OFFBIG_LIBSPOSIX_V6_WIDTH_RESTRICTED_ENVS
-SYMLINK_MAXSYMLOOP_MAX
-_POSIX2_BC_BASE_MAX_POSIX2_BC_DIM_MAX
-_POSIX2_BC_SCALE_MAX_POSIX2_BC_STRING_MAX
-_POSIX2_CHARCLASS_NAME_MAX_POSIX2_CHAR_TERM
-_POSIX2_COLL_WEIGHTS_MAX_POSIX2_C_BIND
-_POSIX2_C_DEV_POSIX2_C_VERSION
-_POSIX2_EXPR_NEST_MAX_POSIX2_FORT_DEV
-_POSIX2_FORT_RUN_POSIX2_LINE_MAX
-_POSIX2_LOCALEDEF_POSIX2_PBS
-_POSIX2_PBS_ACCOUNTING_POSIX2_PBS_CHECKPOINT
-_POSIX2_PBS_LOCATE_POSIX2_PBS_MESSAGE
-_POSIX2_PBS_TRACK_POSIX2_RE_DUP_MAX
-_POSIX2_SW_DEV_POSIX2_UPE
-_POSIX2_VERSION_POSIX_ADVISORY_INFO
-_POSIX_AIO_LISTIO_MAX_POSIX_AIO_MAX
-_POSIX_ARG_MAX_POSIX_ASYNC_IO
-_POSIX_BARRIERS_POSIX_CHILD_MAX
-_POSIX_CLOCKRES_MIN_POSIX_CLOCK_SELECTION
-_POSIX_CPUTIME_POSIX_DELAYTIMER_MAX
-_POSIX_HOST_NAME_MAX_POSIX_IPV6
-_POSIX_JOB_CONTROL_POSIX_LINK_MAX
-_POSIX_LOGIN_NAME_MAX_POSIX_MAX_CANON
-_POSIX_MAX_INPUT_POSIX_MONOTONIC_CLOCK
-_POSIX_MQ_OPEN_MAX_POSIX_MQ_PRIO_MAX
-_POSIX_NAME_MAX_POSIX_NGROUPS_MAX
-_POSIX_OPEN_MAX_POSIX_PATH_MAX
-_POSIX_PIPE_BUF_POSIX_PRIO_IO
-_POSIX_RAW_SOCKETS_POSIX_READER_WRITER_LOCKS
-_POSIX_REGEXP_POSIX_RE_DUP_MAX
-_POSIX_RTSIG_MAX_POSIX_SAVED_IDS
-_POSIX_SEM_NSEMS_MAX_POSIX_SEM_VALUE_MAX
-_POSIX_SHELL_POSIX_SIGQUEUE_MAX
-_POSIX_SPAWN_POSIX_SPIN_LOCKS
-_POSIX_SPORADIC_SERVER_POSIX_SSIZE_MAX
-_POSIX_SS_REPL_MAX_POSIX_STREAM_MAX
-_POSIX_SYMLINK_MAX_POSIX_SYMLOOP_MAX
-_POSIX_SYNC_IO_POSIX_THREAD_ATTR_STACKADDR
-_POSIX_THREAD_ATTR_STACKSIZE_POSIX_THREAD_CPUTIME
-_POSIX_THREAD_DESTRUCTOR_ITERATIONS_POSIX_THREAD_KEYS_MAX
-_POSIX_THREAD_PRIORITY_SCHEDULING_POSIX_THREAD_PRIO_INHERIT
-_POSIX_THREAD_PRIO_PROTECT_POSIX_THREAD_PROCESS_SHARED
-_POSIX_THREAD_SAFE_FUNCTIONS_POSIX_THREAD_SPORADIC_SERVER
-_POSIX_THREAD_THREADS_MAX_POSIX_TIMEOUTS
-_POSIX_TIMER_MAX_POSIX_TRA_POSIX_TIMER_MAXCE
-_POSIX_TIMESTAMP_RESOLUTION
-_POSIX_TRACE_EVENT_FILTER_POSIX_TRACE_EVENT_NAME_MAX
-_POSIX_TRACE_INHERIT_POSIX_TRACE_LOG
-_POSIX_TRACE_NAME_MAX_POSIX_TRACE_SYS_MAX
-_POSIX_TRACE_USER_EVENT_MAX_POSIX_TTY_NAME_MAX
-_POSIX_TYPED_MEMORY_OBJECTS_POSIX_TZNAME_MAX
-_POSIX_VERSION_POSIX_V6_ILP32_OFF32
-_POSIX_V6_ILP32_OFFBIG_POSIX_V6_LP64_OFF64
-_POSIX_V6_LPBIG_OFFBIG_V6_ILP32_OFF32
-_V6_ILP32_OFFBIG_V6_LP64_OFF64
-_V6_LPBIG_OFFBIGRE_DUP_MAX
-SCHAR_MAXSCHAR_MIN
-SHRT_MAXSHRT_MIN
-SSIZE_MAXSTREAM_MAX
-TMP_MAXTZNAME_MAX
-UCHAR_MAXUINT_MAX
-ULONG_MAXUSHRT_MAX
-WORD_BITXBS5_ILP32_OFF32
-XBS5_ILP32_OFF32_CFLAGSXBS5_ILP32_OFF32_LDFLAGS
-XBS5_ILP32_OFF32_LIBSXBS5_ILP32_OFF32_LINTFLAGS
-XBS5_ILP32_OFFBIGXBS5_ILP32_OFFBIG_CFLAGS
-XBS5_ILP32_OFFBIG_LDFLAGSXBS5_ILP32_OFFBIG_LIBS
-XBS5_ILP32_OFFBIG_LINTFLAGSXBS5_LP64_OFF64
-XBS5_LP64_OFF64_CFLAGSXBS5_LP64_OFF64_LDFLAGS
-XBS5_LP64_OFF64_LIBSXBS5_LP64_OFF64_LINTFLAGS
-XBS5_LPBIG_OFFBIGXBS5_LPBIG_OFFBIG_CFLAGS
-XBS5_LPBIG_OFFBIG_LDFLAGSXBS5_LPBIG_OFFBIG_LIBS
-XBS5_LPBIG_OFFBIG_LINTFLAGS_XOPEN_CRYPT
-_XOPEN_ENH_I18N_XOPEN_IOV_MAX
-_XOPEN_LEGACY_XOPEN_NAME_MAX
-_XOPEN_PATH_MAX_XOPEN_SHM
-_XOPEN_STREAMS_XOPEN_VERSION
-_XOPEN_XCU_VERSION_XOPEN_XPG2
-_XOPEN_XPG3_XOPEN_XPG4
+l l
+l l .
+ARG_MAX	BC_BASE_MAX
+BC_DIM_MAX	BC_SCALE_MAX
+BC_STRING_MAX	CHAR_BIT
+CHARCLASS_NAME_MAX	CHAR_MAX
+CHAR_MIN	CHILD_MAX
+CLK_TCK	COLL_WEIGHTS_MAX
+CS_PATH	EXPR_NEST_MAX
+HOST_NAME_MAX	INT_MAX
+INT_MIN	LFS64_CFLAGS
+LFS64_LDFLAGS	LFS64_LIBS
+LFS64_LINTFLAGS	LFS_CFLAGS
+LFS_LDFLAGS	LFS_LIBS
+LFS_LINTFLAGS	LINE_MAX
+LONG_BIT	LONG_MAX
+LONG_MIN	MB_LEN_MAX
+NGROUPS_MAX	NL_ARGMAX
+NL_LANGMAX	NL_MSGMAX
+NL_NMAX	NL_SETMAX
+NL_TEXTMAX	NZERO
+OPEN_MAX	POSIX2_BC_BASE_MAX
+POSIX2_BC_DIM_MAX	POSIX2_BC_SCALE_MAX
+POSIX2_BC_STRING_MAX	POSIX2_C_BIND
+POSIX2_C_DEV	POSIX2_CHAR_TERM
+POSIX2_COLL_WEIGHTS_MAX	POSIX2_C_VERSION
+POSIX2_EXPR_NEST_MAX	POSIX2_FORT_DEV
+POSIX2_FORT_RUN	POSIX2_LINE_MAX
+POSIX2_LOCALEDEF	POSIX2_RE_DUP_MAX
+POSIX2_SW_DEV	POSIX2_SYMLINKS
+POSIX2_UPE	POSIX2_VERSION
+POSIX_ALLOC_SIZE_MIN	POSIX_REC_INCR_XFER_SIZE
+POSIX_REC_MAX_XFER_SIZE	POSIX_REC_MIN_XFER_SIZE
+POSIX_REC_XFER_ALIGN	POSIX_V6_ILP32_OFF32
+POSIX_V6_ILP32_OFF32_CFLAGS	POSIX_V6_ILP32_OFF32_LDFLAGS
+POSIX_V6_ILP32_OFF32_LIBS	POSIX_V6_ILP32_OFFBIG
+POSIX_V6_ILP32_OFFBIG_CFLAGS	POSIX_V6_ILP32_OFFBIG_LDFLAGS
+POSIX_V6_ILP32_OFFBIG_LIBS	POSIX_V6_LP64_OFF64
+POSIX_V6_LP64_OFF64_CFLAGS	POSIX_V6_LP64_OFF64_LDFLAGS
+POSIX_V6_LP64_OFF64_LIBS	POSIX_V6_LPBIG_OFFBIG
+POSIX_V6_LPBIG_OFFBIG_CFLAGS	POSIX_V6_LPBIG_OFFBIG_LDFLAGS
+POSIX_V6_LPBIG_OFFBIG_LIBS	POSIX_V6_WIDTH_RESTRICTED_ENVS
+SYMLINK_MAX	SYMLOOP_MAX
+_POSIX2_BC_BASE_MAX	_POSIX2_BC_DIM_MAX
+_POSIX2_BC_SCALE_MAX	_POSIX2_BC_STRING_MAX
+_POSIX2_CHARCLASS_NAME_MAX	_POSIX2_CHAR_TERM
+_POSIX2_COLL_WEIGHTS_MAX	_POSIX2_C_BIND
+_POSIX2_C_DEV	_POSIX2_C_VERSION
+_POSIX2_EXPR_NEST_MAX	_POSIX2_FORT_DEV
+_POSIX2_FORT_RUN	_POSIX2_LINE_MAX
+_POSIX2_LOCALEDEF	_POSIX2_PBS
+_POSIX2_PBS_ACCOUNTING	_POSIX2_PBS_CHECKPOINT
+_POSIX2_PBS_LOCATE	_POSIX2_PBS_MESSAGE
+_POSIX2_PBS_TRACK	_POSIX2_RE_DUP_MAX
+_POSIX2_SW_DEV	_POSIX2_UPE
+_POSIX2_VERSION	_POSIX_ADVISORY_INFO
+_POSIX_AIO_LISTIO_MAX	_POSIX_AIO_MAX
+_POSIX_ARG_MAX	_POSIX_ASYNC_IO
+_POSIX_BARRIERS	_POSIX_CHILD_MAX
+_POSIX_CLOCKRES_MIN	_POSIX_CLOCK_SELECTION
+_POSIX_CPUTIME	_POSIX_DELAYTIMER_MAX
+_POSIX_HOST_NAME_MAX	_POSIX_IPV6
+_POSIX_JOB_CONTROL	_POSIX_LINK_MAX
+_POSIX_LOGIN_NAME_MAX	_POSIX_MAX_CANON
+_POSIX_MAX_INPUT	_POSIX_MONOTONIC_CLOCK
+_POSIX_MQ_OPEN_MAX	_POSIX_MQ_PRIO_MAX
+_POSIX_NAME_MAX	_POSIX_NGROUPS_MAX
+_POSIX_OPEN_MAX	_POSIX_PATH_MAX
+_POSIX_PIPE_BUF	_POSIX_PRIO_IO
+_POSIX_RAW_SOCKETS	_POSIX_READER_WRITER_LOCKS
+_POSIX_REGEXP	_POSIX_RE_DUP_MAX
+_POSIX_RTSIG_MAX	_POSIX_SAVED_IDS
+_POSIX_SEM_NSEMS_MAX	_POSIX_SEM_VALUE_MAX
+_POSIX_SHELL	_POSIX_SIGQUEUE_MAX
+_POSIX_SPAWN	_POSIX_SPIN_LOCKS
+_POSIX_SPORADIC_SERVER	_POSIX_SSIZE_MAX
+_POSIX_SS_REPL_MAX	_POSIX_STREAM_MAX
+_POSIX_SYMLINK_MAX	_POSIX_SYMLOOP_MAX
+_POSIX_SYNC_IO	_POSIX_THREAD_ATTR_STACKADDR
+_POSIX_THREAD_ATTR_STACKSIZE	_POSIX_THREAD_CPUTIME
+_POSIX_THREAD_DESTRUCTOR_ITERATIONS	_POSIX_THREAD_KEYS_MAX
+_POSIX_THREAD_PRIORITY_SCHEDULING	_POSIX_THREAD_PRIO_INHERIT
+_POSIX_THREAD_PRIO_PROTECT	_POSIX_THREAD_PROCESS_SHARED
+_POSIX_THREAD_SAFE_FUNCTIONS	_POSIX_THREAD_SPORADIC_SERVER
+_POSIX_THREAD_THREADS_MAX	_POSIX_TIMEOUTS
+_POSIX_TIMER_MAX	_POSIX_TRA_POSIX_TIMER_MAXCE
+_POSIX_TIMESTAMP_RESOLUTION	
+_POSIX_TRACE_EVENT_FILTER	_POSIX_TRACE_EVENT_NAME_MAX
+_POSIX_TRACE_INHERIT	_POSIX_TRACE_LOG
+_POSIX_TRACE_NAME_MAX	_POSIX_TRACE_SYS_MAX
+_POSIX_TRACE_USER_EVENT_MAX	_POSIX_TTY_NAME_MAX
+_POSIX_TYPED_MEMORY_OBJECTS	_POSIX_TZNAME_MAX
+_POSIX_VERSION	_POSIX_V6_ILP32_OFF32
+_POSIX_V6_ILP32_OFFBIG	_POSIX_V6_LP64_OFF64
+_POSIX_V6_LPBIG_OFFBIG	_V6_ILP32_OFF32
+_V6_ILP32_OFFBIG	_V6_LP64_OFF64
+_V6_LPBIG_OFFBIG	RE_DUP_MAX
+SCHAR_MAX	SCHAR_MIN
+SHRT_MAX	SHRT_MIN
+SSIZE_MAX	STREAM_MAX
+TMP_MAX	TZNAME_MAX
+UCHAR_MAX	UINT_MAX
+ULONG_MAX	USHRT_MAX
+WORD_BIT	XBS5_ILP32_OFF32
+XBS5_ILP32_OFF32_CFLAGS	XBS5_ILP32_OFF32_LDFLAGS
+XBS5_ILP32_OFF32_LIBS	XBS5_ILP32_OFF32_LINTFLAGS
+XBS5_ILP32_OFFBIG	XBS5_ILP32_OFFBIG_CFLAGS
+XBS5_ILP32_OFFBIG_LDFLAGS	XBS5_ILP32_OFFBIG_LIBS
+XBS5_ILP32_OFFBIG_LINTFLAGS	XBS5_LP64_OFF64
+XBS5_LP64_OFF64_CFLAGS	XBS5_LP64_OFF64_LDFLAGS
+XBS5_LP64_OFF64_LIBS	XBS5_LP64_OFF64_LINTFLAGS
+XBS5_LPBIG_OFFBIG	XBS5_LPBIG_OFFBIG_CFLAGS
+XBS5_LPBIG_OFFBIG_LDFLAGS	XBS5_LPBIG_OFFBIG_LIBS
+XBS5_LPBIG_OFFBIG_LINTFLAGS	_XOPEN_CRYPT
+_XOPEN_ENH_I18N	_XOPEN_IOV_MAX
+_XOPEN_LEGACY	_XOPEN_NAME_MAX
+_XOPEN_PATH_MAX	_XOPEN_SHM
+_XOPEN_STREAMS	_XOPEN_VERSION
+_XOPEN_XCU_VERSION	_XOPEN_XPG2
+_XOPEN_XPG3	_XOPEN_XPG4
 .TE
 
 .sp
@@ -703,12 +663,10 @@ The following environment variable is supported by the \fBksh93\fR built-in
 \fBgetconf\fR command:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_AST_FEATURES\fR\fR
 .ad
 .RS 17n
-.rt  
 Local writable values that are different from the default are stored in the
 \fB_AST_FEATURES\fR environment variable. The \fB_AST_FEATURES\fR value is a
 space-separated list of \fIname path value\fR 3-tuples, where \fIname\fR is the
@@ -722,24 +680,20 @@ path is applicable, and \fIvalue\fR is the system configuration value.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 The specified variable is valid and information about its current state was
 written successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -752,15 +706,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SS "ksh93"
@@ -768,13 +721,12 @@ StandardSee \fBstandards\fR(5).
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

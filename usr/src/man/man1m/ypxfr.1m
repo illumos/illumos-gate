@@ -4,14 +4,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ypxfr 1M "11 Mar 1998" "SunOS 5.11" "System Administration Commands"
+.TH YPXFR 1M "Mar 11, 1998"
 .SH NAME
 ypxfr, ypxfr_1perday, ypxfr_1perhour, ypxfr_2perday \- transfer NIS map from a
 NIS server to host
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/lib/netsvc/yp/ypxfr\fR [\fB-c\fR] [\fB-f\fR] [\fB-C\fR \fItid\fR \fIprog\fR \fIserver\fR] 
+\fB/usr/lib/netsvc/yp/ypxfr\fR [\fB-c\fR] [\fB-f\fR] [\fB-C\fR \fItid\fR \fIprog\fR \fIserver\fR]
      [\fB-d\fR \fIypdomain\fR] [\fB-h\fR \fIhost\fR] [\fB-s\fR \fIypdomain\fR] \fImapname\fR
 .fi
 
@@ -51,12 +51,10 @@ Refer to \fBypfiles\fR(4) for an overview of the NIS name service.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 22n
-.rt  
 Do not send a "Clear current map" request to the local \fBypserv\fR process.
 Use this flag if \fBypserv\fR is not running locally at the time you are
 running \fBypxfr\fR. Otherwise, \fBypxfr\fR complains that it cannot
@@ -65,24 +63,20 @@ communicate with the local \fBypserv\fR, and the transfer fails.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 22n
-.rt  
 Force the transfer to occur even if the version at the master is not more
 recent than the local version.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fI tid prog server\fR\fR
 .ad
 .RS 22n
-.rt  
 This option is for use \fIonly\fR by \fBypserv\fR. When \fBypserv\fR starts
 \fBypxfr\fR, it specifies that \fBypxfr\fR should call back a \fByppush\fR
 process at the host \fIserver\fR, registered as program number \fIprog\fR, and
@@ -91,23 +85,19 @@ waiting for a response to transaction \fItid\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fI ypdomain\fR\fR
 .ad
 .RS 22n
-.rt  
 Specify a domain other than the default domain.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fIhost\fR\fR
 .ad
 .RS 22n
-.rt  
 Get the map from \fIhost\fR, regardless of the master. If \fIhost\fR is not
 specified, \fBypxfr\fR asks the \fBNIS\fR service for the name of the master,
 and tries to get the map from there. \fIhost\fR must be a valid host name.
@@ -115,12 +105,10 @@ and tries to get the map from there. \fIhost\fR must be a valid host name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fI ypdomain\fR\fR
 .ad
 .RS 22n
-.rt  
 Specify a source domain from which to transfer a map that should be the same
 across domains.
 .RE
@@ -128,7 +116,6 @@ across domains.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/yp/ypxfr.log\fR\fR
 .ad
@@ -139,7 +126,6 @@ Log file
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/netsvc/yp/ypxfr_1perday\fR\fR
 .ad
@@ -150,7 +136,6 @@ Script to run one transfer per day, for use with \fBcron\fR(1M)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/netsvc/yp/ypxfr_2perday\fR\fR
 .ad
@@ -161,7 +146,6 @@ Script to run two transfer per day, for use with \fBcron\fR(1M)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/netsvc/yp/ypxfr_1perhour\fR\fR
 .ad
@@ -172,7 +156,6 @@ Script for hourly transfers of volatile maps
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/yp/\fR\fIypdomain\fR\fR
 .ad
@@ -183,7 +166,6 @@ Script for hourly transfers of volatile maps
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/spool/cron/crontabs/root\fR\fR
 .ad

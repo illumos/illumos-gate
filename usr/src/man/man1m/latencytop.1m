@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH latencytop 1M "29 Sep 2009" "SunOS 5.11" "System Administration Commands"
+.TH LATENCYTOP 1M "Sep 29, 2009"
 .SH NAME
 latencytop \- report latency-related statistics in system and in applications
 .SH SYNOPSIS
@@ -50,7 +50,6 @@ or R key. The interval time is restored to the default or to a specified value
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR, \fB--feature\fR [no]\fIfeature1\fR,[no]\fIfeature2\fR,...\fR
 .ad
@@ -60,7 +59,6 @@ Enables/disables features in LatencyTOP. Features can be only one of the
 following:
 .sp
 .ne 2
-.mk
 .na
 \fB[\fBno\fR]\fBfilter\fR\fR
 .ad
@@ -72,7 +70,6 @@ Filter large interruptible latencies, for example, sleep. The default is
 
 .sp
 .ne 2
-.mk
 .na
 \fB[\fBno\fR]\fBsched\fR\fR
 .ad
@@ -83,7 +80,6 @@ Monitors \fBsched\fR (PID=0). The default is \fBoff\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB[\fBno\fR]\fBsobj\fR\fR
 .ad
@@ -94,7 +90,6 @@ Monitors synchronize objects. The default is \fBon\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB[\fBno\fR]\fBlow\fR\fR
 .ad
@@ -109,7 +104,6 @@ workloads such as a very busy web server. The default is \fBoff\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
@@ -120,7 +114,6 @@ Displays the command's usage.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR \fIlog_level\fR\fR
 .ad
@@ -129,34 +122,28 @@ Displays the command's usage.
 Specifies the level of logging in the log file. Valid values are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 \fBnone\fR (default)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 \fBunknown\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 \fBall\fR
 .RE
 
@@ -164,7 +151,6 @@ Specifies the level of logging in the log file. Valid values are:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR [\fIlog_interval\fR]\fR
 .ad
@@ -176,7 +162,6 @@ Writes data to the log file every \fIlog_interval\fR seconds;
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIlog_file\fR\fR
 .ad
@@ -188,7 +173,6 @@ Specifies the log file where output will be written. The default log file is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fIinterval\fR\fR
 .ad
@@ -273,7 +257,6 @@ synchronization objects.
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -284,7 +267,6 @@ Successful operation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
@@ -301,15 +283,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Architecturex86, SPARC
+Architecture	x86, SPARC
 _
-Interface StabilityVolatile
+Interface Stability	Volatile
 .TE
 
 .SH SEE ALSO

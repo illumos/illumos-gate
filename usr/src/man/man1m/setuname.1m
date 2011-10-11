@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH setuname 1M "9 Jul 2003" "SunOS 5.11" "System Administration Commands"
+.TH SETUNAME 1M "Jul 9, 2003"
 .SH NAME
 setuname \- change machine information
 .SH SYNOPSIS
@@ -33,12 +33,10 @@ message if the name entered is incompatible with the system requirements.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fI node\fR\fR
 .ad
 .RS 11n
-.rt  
 Changes the node name. \fInode\fR specifies the new network node name and can
 consist of alphanumeric characters and the special characters dash, underbar,
 and dollar sign.
@@ -46,12 +44,10 @@ and dollar sign.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fI name\fR\fR
 .ad
 .RS 11n
-.rt  
 Changes the system name. \fIname\fR specifies new system name and can consist
 of alphanumeric characters and the special characters dash, underbar, and
 dollar sign.
@@ -59,12 +55,10 @@ dollar sign.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 11n
-.rt  
 Temporary change. No attempt will be made to create a permanent change.
 .RE
 

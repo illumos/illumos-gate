@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH rpcgen 1 "24 Aug 2009" "SunOS 5.11" "User Commands"
+.TH RPCGEN 1 "Aug 24, 2009"
 .SH NAME
 rpcgen \- an RPC protocol compiler
 .SH SYNOPSIS
@@ -15,14 +15,14 @@ rpcgen \- an RPC protocol compiler
 
 .LP
 .nf
-\fBrpcgen\fR [\fB-a\fR] [\fB-A\fR] [\fB-b\fR] [\fB-C\fR] [\fB-D\fR \fIname\fR [= \fIvalue\fR]] [\fB-i\fR \fIsize\fR] 
-     [\fB-I\fR [\fB-K\fR \fIseconds\fR]] [\fB-L\fR] [\fB-M\fR] [\fB-N\fR] [\fB- T\fR] [\fB-v\fR] 
+\fBrpcgen\fR [\fB-a\fR] [\fB-A\fR] [\fB-b\fR] [\fB-C\fR] [\fB-D\fR \fIname\fR [= \fIvalue\fR]] [\fB-i\fR \fIsize\fR]
+     [\fB-I\fR [\fB-K\fR \fIseconds\fR]] [\fB-L\fR] [\fB-M\fR] [\fB-N\fR] [\fB- T\fR] [\fB-v\fR]
      [\fB-Y\fR \fIpathname\fR] \fIinfile\fR
 .fi
 
 .LP
 .nf
-\fBrpcgen\fR [\fB-c\fR | \fB-h\fR | \fB-l\fR | \fB-m\fR | \fB-t\fR | \fB-Sc\fR | \fB-Ss\fR | \fB-Sm\fR] 
+\fBrpcgen\fR [\fB-c\fR | \fB-h\fR | \fB-l\fR | \fB-m\fR | \fB-t\fR | \fB-Sc\fR | \fB-Ss\fR | \fB-Sm\fR]
      [\fB-o\fR \fIoutfile\fR] [\fIinfile\fR]
 .fi
 
@@ -124,56 +124,46 @@ actually interpreted by \fBrpcgen\fR. For each type of output file,
 programmer:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRPC_HDR\fR\fR
 .ad
 .RS 12n
-.rt  
 defined when compiling into headers
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRPC_XDR\fR\fR
 .ad
 .RS 12n
-.rt  
 defined when compiling into \fBXDR\fR routines
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRPC_SVC\fR\fR
 .ad
 .RS 12n
-.rt  
 defined when compiling into server-side stubs
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRPC_CLNT\fR\fR
 .ad
 .RS 12n
-.rt  
 defined when compiling into client-side stubs
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRPC_TBL\fR\fR
 .ad
 .RS 12n
-.rt  
 defined when compiling into \fBRPC\fR dispatch tables
 .RE
 
@@ -214,23 +204,19 @@ extern void RPC_MSGOUT(const char *fmt, ...);
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 18n
-.rt  
 Generates all files, including sample files.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR\fR
 .ad
 .RS 18n
-.rt  
 Enables the Automatic \fBMT\fR mode in the server main program. In this mode,
 the \fBRPC\fR library automatically creates threads to service client requests.
 This option generates multithread-safe stubs by implicitly turning on the
@@ -241,47 +227,39 @@ the default values for the Automatic \fBMT\fR mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
 .RS 18n
-.rt  
 Backward compatibility mode. Generates transport-specific \fBRPC\fR code for
 older versions of the operating system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 18n
-.rt  
 Compiles into \fBXDR\fR routines.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
 .RS 18n
-.rt  
 Generates header and stub files which can be used with ANSI C compilers.
 Headers generated with this flag can also be used with C++ programs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR\fIname\fR\fB[=\fR\fIvalue\fR\fB]\fR\fR
 .ad
 .RS 18n
-.rt  
 Defines a symbol \fIname\fR. Equivalent to the \fB#define\fR directive in the
 source. If no \fIvalue\fR is given, \fIvalue\fR is defined as \fB1\fR. This
 option can be specified more than once.
@@ -289,12 +267,10 @@ option can be specified more than once.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 18n
-.rt  
 Compiles into \fBC\fR data-definitions (a header). The \fB-T\fR option can be
 used in conjunction to produce a header which supports \fBRPC\fR dispatch
 tables.
@@ -302,24 +278,20 @@ tables.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIsize\fR\fR
 .ad
 .RS 18n
-.rt  
 Size at which to start generating inline code. This option is useful for
 optimization. The default \fIsize\fR is 5.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I\fR\fR
 .ad
 .RS 18n
-.rt  
 Compiles support for \fBinetd\fR(1M) in the server side stubs. Such servers can
 be self-started or can be started by \fBinetd\fR. When the server is
 self-started, it backgrounds itself by default. A special define symbol
@@ -339,12 +311,10 @@ compatibility code. By default (that is, when \fB-b\fR is not specified),
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-K\fR \fIseconds\fR\fR
 .ad
 .RS 18n
-.rt  
 By default, services created using \fBrpcgen\fR and invoked through port
 monitors wait 120 seconds after servicing a request before exiting. That
 interval can be changed using the \fB-K\fR flag. To create a server that exits
@@ -360,35 +330,29 @@ immediately on completion. For such servers, \fBrpcgen\fR should be used with
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 18n
-.rt  
 Compiles into client-side stubs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
 .RS 18n
-.rt  
 When the servers are started in foreground, uses \fBsyslog\fR(3C) to log the
 server errors instead of printing them on the standard error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
 .RS 18n
-.rt  
 Compiles into server-side stubs, but do not generate a "main" routine. This
 option is useful for doing callback-routines and for users who need to write
 their own "main" routine to do initialization.
@@ -396,12 +360,10 @@ their own "main" routine to do initialization.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR\fR
 .ad
 .RS 18n
-.rt  
 Generates multithread-safe stubs for passing arguments and results between
 \fBrpcgen\fR-generated code and user written code. This option is useful for
 users who want to use threads in their code.
@@ -409,12 +371,10 @@ users who want to use threads in their code.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-N\fR\fR
 .ad
 .RS 18n
-.rt  
 This option allows procedures to have multiple arguments. It also uses the
 style of parameter passing that closely resembles C. So, when passing an
 argument to a remote procedure, you do not have to pass a pointer to the
@@ -425,12 +385,10 @@ this option is not the default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fInetid\fR\fR
 .ad
 .RS 18n
-.rt  
 Compiles into server-side stubs for the transport specified by \fInetid\fR.
 There should be an entry for \fInetid\fR in the \fBnetconfig\fR database. This
 option can be specified more than once, so as to compile a server that serves
@@ -439,12 +397,10 @@ multiple transports.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIoutfile\fR\fR
 .ad
 .RS 18n
-.rt  
 Specifies the name of the output file. If none is specified, standard output is
 used (\fB-c\fR, \fB-h\fR, \fB-l\fR, \fB-m\fR, \fB-n\fR, \fB-s\fR, \fB-Sc\fR,
 \fB-Sm\fR, \fB-Ss\fR, and \fB-t\fR modes only).
@@ -452,12 +408,10 @@ used (\fB-c\fR, \fB-h\fR, \fB-l\fR, \fB-m\fR, \fB-n\fR, \fB-s\fR, \fB-Sc\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fInettype\fR\fR
 .ad
 .RS 18n
-.rt  
 Compiles into server-side stubs for all the transports belonging to the class
 \fInettype\fR. The supported classes are \fBnetpath\fR, \fBvisible\fR,
 \fBcircuit_n\fR, \fBcircuit_v\fR, \fBdatagram_n\fR, \fBdatagram_v\fR,
@@ -468,56 +422,46 @@ transports are chosen at run time and not at compile time.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Sc\fR\fR
 .ad
 .RS 18n
-.rt  
 Generates sample client code that uses remote procedure calls.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Sm\fR\fR
 .ad
 .RS 18n
-.rt  
 Generates a sample Makefile which can be used for compiling the application.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Ss\fR\fR
 .ad
 .RS 18n
-.rt  
 Generates sample server code that uses remote procedure calls.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 18n
-.rt  
 Compiles into \fBRPC\fR dispatch table.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR\fR
 .ad
 .RS 18n
-.rt  
 Generates the code to support \fBRPC\fR dispatch tables.
 .sp
 The options \fB-c\fR, \fB-h\fR, \fB-l\fR, \fB-m\fR, \fB-s\fR, \fB-Sc\fR,
@@ -528,23 +472,19 @@ can be used with the other options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 18n
-.rt  
 Displays the version number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Y\fR \fIpathname\fR\fR
 .ad
 .RS 18n
-.rt  
 Gives the name of the directory where \fBrpcgen\fR starts looking for the C
 preprocessor.
 .RE
@@ -555,12 +495,10 @@ preprocessor.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinfile\fR\fR
 .ad
 .RS 10n
-.rt  
 input file
 .RE
 
@@ -632,23 +570,19 @@ example% \fBrpcgen -n tcp -o prot_svc.c prot.x\fR
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH smtnzonecfg 1M "31 Oct 2007" "SunOS 5.11" "System Administration Commands"
+.TH SMTNZONECFG 1M "Oct 31, 2007"
 .SH NAME
 smtnzonecfg \- manage entries in the zone configuration database for Trusted
 Extensions networking
@@ -23,12 +23,10 @@ The \fBsmtnzonecfg\fR command adds, modifies, deletes, and lists entries in the
 \fBsmtnzonecfg\fR \fIsubcommand\fRs are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadd\fR\fR
 .ad
 .RS 10n
-.rt  
 Adds a new entry to the \fBtnzonecfg\fR database. To add an entry, the
 administrator must have the \fBsolaris.network.host.write\fR and
 \fBsolaris.network.security.write\fR authorizations.
@@ -36,12 +34,10 @@ administrator must have the \fBsolaris.network.host.write\fR and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmodify\fR\fR
 .ad
 .RS 10n
-.rt  
 Modifies an entry in the \fBtnzonecfg\fR database. To modify an entry, the
 administrator must have the \fBsolaris.network.host.write\fR and
 \fBsolaris.network.security.write\fR authorizations.
@@ -49,12 +45,10 @@ administrator must have the \fBsolaris.network.host.write\fR and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdelete\fR\fR
 .ad
 .RS 10n
-.rt  
 Deletes an entry from the \fBtnzonecfg\fR database. To delete an entry, the
 administrator must have the \fBsolaris.network.host.write\fR and
 \fBsolaris.network.security.write\fR authorizations.
@@ -62,12 +56,10 @@ administrator must have the \fBsolaris.network.host.write\fR and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlist\fR\fR
 .ad
 .RS 10n
-.rt  
 Lists entries in the \fBtnzonecfg\fR database. To list an entry, the
 administrator must have the \fBsolaris.network.host.read\fR and
 \fBsolaris.network.security.read\fR authorizations.
@@ -97,7 +89,6 @@ options can also be specified by their equivalent option words preceded by a
 double dash. For example, you can use either \fB-D\fR or \fB--domain\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR | \fB--domain\fR \fIdomain\fR\fR
 .ad
@@ -116,7 +107,6 @@ tool-by-tool basis. This option specifies the domain for all other tools.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-H\fR | \fB--hostname\fR \fIhost_name:port\fR\fR
 .ad
@@ -130,7 +120,6 @@ Console connects to the local host on port \fB898\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR | \fB--rolepassword\fR \fIrole_password\fR\fR
 .ad
@@ -145,7 +134,6 @@ insecure.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR | \fB--password\fR \fIpassword\fR\fR
 .ad
@@ -159,7 +147,6 @@ insecure.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR | \fB--rolename\fR \fIrole_name\fR\fR
 .ad
@@ -171,7 +158,6 @@ role is assumed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR | \fB--username\fR \fIuser_name\fR\fR
 .ad
@@ -183,7 +169,6 @@ the user identity running the console process is assumed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--\fR\fR
 .ad
@@ -200,7 +185,6 @@ Descriptions and other argument options that contain white spaces must be
 enclosed in double quotes.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
@@ -211,7 +195,6 @@ Displays the command's usage statement.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fIzonename\fR\fR
 .ad
@@ -234,7 +217,6 @@ configured zones:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIlabel\fR\fR
 .ad
@@ -246,7 +228,6 @@ zone is booted. Each zone must have a unique label.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x policymatch\fR=\fB0\fR|\fB1\fR\fR
 .ad
@@ -268,7 +249,6 @@ value of 0.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x mlpzone\fR=""|\fIport/protocol\fR\fR
 .ad
@@ -295,7 +275,6 @@ the \fBpublic\fR zone has a label range from \fBPUBLIC\fR to \fBINTERNAL\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x mlpshared\fR=""|\fIport/protocol\fR\fR
 .ad
@@ -324,7 +303,7 @@ One of the following sets of arguments must be specified for subcommand
 .nf
 \fB-n\fR \fIzonename\fR \fB-l\fR \fIlabel\fR [\fB-x\fR policymatch=\fIpolicy-match-level\fR \e
 \fB-x\fR mlpzone=\fIport/protocol\fR;.... | \e
-\fB-x\fR mlpshared=\fIport/protocol\fR;.... ] 
+\fB-x\fR mlpshared=\fIport/protocol\fR;.... ]
 \fB-h\fR
 .fi
 .in -2
@@ -342,7 +321,7 @@ One of the following sets of arguments must be specified for subcommand
 .nf
 \fB-n\fR \fIzonename\fR [\fB-l\fR \fIlabel\fR] [\fB-x\fR policymatch=\fIpolicy-match-level\fR \e
 \fB-x\fR mlpzone=\fIport/protocol\fR;.... |\e
-\fB-x\fR mlpshared=\fIport/protocol\fR;.... ] 
+\fB-x\fR mlpshared=\fIport/protocol\fR;.... ]
 \fB-h\fR
 .fi
 .in -2
@@ -433,34 +412,28 @@ $ \fB/usr/sadm/bin/smtnzonecfg list --\fR
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 Invalid command syntax. A usage message displays.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 An error occurred while executing the command. An error message displays.
 .RE
 
@@ -470,7 +443,6 @@ An error occurred while executing the command. An error message displays.
 The following files are used by the \fBsmtnzonecfg\fR command:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/security/tsol/tnzonecfg\fR\fR
 .ad
@@ -487,13 +459,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

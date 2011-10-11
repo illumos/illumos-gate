@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH elf_update 3ELF "11 Jul 2001" "SunOS 5.11" "ELF Library Functions"
+.TH ELF_UPDATE 3ELF "Jul 11, 2001"
 .SH NAME
 elf_update \- update an ELF descriptor
 .SH SYNOPSIS
@@ -26,12 +26,10 @@ structural data needed to generate the file's image.
 The \fIcmd\fR argument can have the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBELF_C_NULL\fR\fR
 .ad
 .RS 15n
-.rt  
 This value tells \fBelf_update()\fR to recalculate various values, updating
 only the \fBELF\fR descriptor's memory structures. Any modified structures are
 flagged with the \fBELF_F_DIRTY\fR bit. A program thus can update the
@@ -43,12 +41,10 @@ writing (see  \fBelf_begin\fR(3ELF)).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBELF_C_WRITE\fR\fR
 .ad
 .RS 15n
-.rt  
 If \fIcmd\fR has this value, \fBelf_update()\fR duplicates its \fBELF_C_NULL\fR
 actions and also writes any ``dirty'' information associated with the \fBELF\fR
 descriptor to the file. That is, when a program has used
@@ -82,21 +78,19 @@ The following table shows ELF Header members:
 
 .sp
 .TS
-tab();
-lw(1.65i) lw(3.85i) 
-lw(1.65i) lw(3.85i) 
-.
-MemberNotes
-
-e_ident[EI_DATA]Library controls other \fBe_ident\fR values
-e_type
-e_machine
-e_version
-e_entry
-e_phoffOnly when \fBELF_F_LAYOUT\fR asserted
-e_shoffOnly when \fBELF_F_LAYOUT\fR asserted 
-e_flags
-e_shstrndx
+l l
+l l .
+Member	Notes
+	
+e_ident[EI_DATA]	Library controls other \fBe_ident\fR values
+e_type	
+e_machine	
+e_version	
+e_entry	
+e_phoff	Only when \fBELF_F_LAYOUT\fR asserted
+e_shoff	Only when \fBELF_F_LAYOUT\fR asserted
+e_flags	
+e_shstrndx	
 .TE
 
 .sp
@@ -106,20 +100,18 @@ The following table shows the Program Header members:
 
 .sp
 .TS
-tab();
-lw(1.65i) lw(3.85i) 
-lw(1.65i) lw(3.85i) 
-.
-MemberNotes
-
-p_typeThe application controls all
-p_offsetprogram header entries
-p_vaddr
-p_paddr
-p_filesz
-p_memsz
-p_flags
-p_align
+l l
+l l .
+Member	Notes
+	
+p_type	The application controls all
+p_offset	program header entries
+p_vaddr	
+p_paddr	
+p_filesz	
+p_memsz	
+p_flags	
+p_align	
 .TE
 
 .sp
@@ -129,22 +121,20 @@ The following table shows the Section Header members:
 
 .sp
 .TS
-tab();
-lw(1.65i) lw(3.85i) 
-lw(1.65i) lw(3.85i) 
-.
-MemberNotes
-
-sh_name
-sh_type
-sh_flags
-sh_addr
-sh_offsetOnly when \fBELF_F_LAYOUT\fR asserted
-sh_sizeOnly when \fBELF_F_LAYOUT\fR asserted
-sh_link
-sh_info
-sh_addralignOnly when \fBELF_F_LAYOUT\fR asserted
-sh_entsize
+l l
+l l .
+Member	Notes
+	
+sh_name	
+sh_type	
+sh_flags	
+sh_addr	
+sh_offset	Only when \fBELF_F_LAYOUT\fR asserted
+sh_size	Only when \fBELF_F_LAYOUT\fR asserted
+sh_link	
+sh_info	
+sh_addralign	Only when \fBELF_F_LAYOUT\fR asserted
+sh_entsize	
 .TE
 
 .sp
@@ -154,18 +144,16 @@ The following table shows the Data Descriptor members:
 
 .sp
 .TS
-tab();
-lw(1.65i) lw(3.85i) 
-lw(1.65i) lw(3.85i) 
-.
-MemberNotes
-
-d_buf
-d_type
-d_size
-d_offOnly when \fBELF_F_LAYOUT\fR asserted
-d_align
-d_version
+l l
+l l .
+Member	Notes
+	
+d_buf	
+d_type	
+d_size	
+d_off	Only when \fBELF_F_LAYOUT\fR asserted
+d_align	
+d_version	
 .TE
 
 .sp
@@ -201,15 +189,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStable
+Interface Stability	Stable
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

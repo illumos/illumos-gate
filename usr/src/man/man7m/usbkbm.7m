@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH usbkbm 7M "27 June 2005" "SunOS 5.11" "STREAMS Modules"
+.TH USBKBM 7M "Jun 27, 2005"
 .SH NAME
 usbkbm \- keyboard STREAMS module for Sun USB Keyboard
 .SH SYNOPSIS
@@ -39,12 +39,10 @@ the supported  \fBioctl\fR(2) requests.
 ioctls than \fBkb\fR(7M):
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKIOCTYPE\fR \fR
 .ad
 .RS 13n
-.rt  
 This  \fBioctl()\fR returns a new keyboard type defined for the  \fBUSB\fR
 keyboard. All types are listed below:
 .RE
@@ -66,12 +64,10 @@ The  \fBUSB\fR keyboard type is \fBKB_USB\fR; \fBusbkbm\fR will return
 \fBKB_USB\fR in response to the  \fBKIOCTYPE\fR ioctl.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKIOCLAYOUT\fR \fR
 .ad
 .RS 15n
-.rt  
 The argument is a pointer to an  \fBint\fR. The layout code specified by the
 \fBbCountryCode\fR value returned in the \fBHID\fR descriptor is returned in
 the int pointed to by the argument. The \fBcountrycodes\fR are defined in 6.2.1
@@ -80,15 +76,12 @@ of the  \fBHID\fR 1.0 specifications.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKIOCCMD\fR \fR
 .ad
 .RS 15n
-.rt  
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKBD_CMD_CLICK/KBD_CMD_NOCLICK\fR \fR
 .ad
@@ -101,7 +94,6 @@ are ignored. Because clicking is not supported on the \fBUSB\fR keyboard,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKBD_CMD_SETLED\fR \fR
 .ad
@@ -112,7 +104,6 @@ Set keyboard LEDs. Same as  \fBkb\fR(7M).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKBD_CMD_GETLAYOUT\fR \fR
 .ad
@@ -124,7 +115,6 @@ returned.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKBD_CMD_BELL/KBD_CMD_NOBELL\fR \fR
 .ad
@@ -136,7 +126,6 @@ buzzer.  The request for the bell is rerouted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKBD_CMD_RESET\fR \fR
 .ad
@@ -151,7 +140,6 @@ keyboard. \fBusbkbm\fR ignores this command and  does not return an error.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB/kernel/strmod/usbkbm\fR
 .ad
@@ -162,7 +150,6 @@ keyboard. \fBusbkbm\fR ignores this command and  does not return an error.
 
 .sp
 .ne 2
-.mk
 .na
 \fB/kernel/strmod/sparcv9/usbkbm\fR
 .ad
@@ -179,13 +166,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitecturePCI-based  systems
+Architecture	PCI-based  systems
 .TE
 
 .SH SEE ALSO

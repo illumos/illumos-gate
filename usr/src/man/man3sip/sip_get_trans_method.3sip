@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sip_get_trans_method 3SIP "10 Feb 2007" "SunOS 5.11" "Session Initiation Protocol Library Functions"
+.TH SIP_GET_TRANS_METHOD 3SIP "Feb 10, 2007"
 .SH NAME
 sip_get_trans_method, sip_get_trans_state, sip_get_trans_orig_msg,
 sip_get_trans_conn_obj, sip_get_trans_resp_msg, sip_get_trans_branchid \- get
@@ -173,23 +173,19 @@ error.
 If the error is non-null, one of the following values is set:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The input transaction \fIsip_trans\fR is \fINULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 For \fBsip_get_trans_branchid()\fR there is an  error allocating memory for the
 branch ID string.
 .RE
@@ -206,15 +202,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

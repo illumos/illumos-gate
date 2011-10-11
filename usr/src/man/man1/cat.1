@@ -3,14 +3,14 @@
 .\" 2008, Sun Microsystems, Inc. All Rights Reserved
 .\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
 .\" Portions Copyright (c) 1982-2007 AT&T Knowledge Ventures
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cat 1 "8 Apr 2008" "SunOS 5.11" "User Commands"
+.TH CAT 1 "Apr 8, 2008"
 .SH NAME
 cat \- concatenate and display files
 .SH SYNOPSIS
@@ -72,45 +72,37 @@ copies from standard input starting at the current location.
 The following options are supported by \fB/usr/bin/cat\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
 .RS 6n
-.rt  
 Number the lines, as \fB-n\fR, but omit the line numbers from blank lines.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 6n
-.rt  
 Precede each line output with its line number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 6n
-.rt  
 \fBcat\fR is silent about non-existent files.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
 .RS 6n
-.rt  
 The output is not buffered.
 .sp
 Buffered output is the default.
@@ -118,12 +110,10 @@ Buffered output is the default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 Non-printing characters, with the exception of tabs, NEWLINEs and form feeds,
 are printed visibly. ASCII control characters (octal \fB000\fR \(mi \fB037\fR)
 are printed as \fB^\fR\fIn,\fR where \fIn\fR is the corresponding ASCII
@@ -138,23 +128,19 @@ the ASCII character specified by the low-order seven bits.
 When used with the \fB-v\fR option, the following options can be used:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 6n
-.rt  
 A \fB$\fR character is printed at the end of each line, prior to the NEWLINE.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 6n
-.rt  
 Tabs are printed as \fB^I\fRs and form feeds to be printed as \fB^L\fRs.
 .RE
 
@@ -168,90 +154,74 @@ specified.
 \fBksh93\fR \fBcat\fR supports the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR \fB--number-nonblank\fR\fR
 .ad
 .RS 25n
-.rt  
 Number lines as with \fB-n\fR but omit line numbers from blank lines.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fB--dos-input\fR\fR
 .ad
 .RS 25n
-.rt  
 Open input files in text mode. Removes RETURNs in front of NEWLINEs on some
 systems.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 25n
-.rt  
 Equivalent to \fB-vE\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fB--number\fR\fR
 .ad
 .RS 25n
-.rt  
 Insert a line number at the beginning of each line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 25n
-.rt  
 Equivalent to \fB-S\fR for \fBatt universe\fR and \fB-B\fR otherwise.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 25n
-.rt  
 Equivalent to \fB-vT\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fB--unbuffer\fR\fR
 .ad
 .RS 25n
-.rt  
 Do not delay the output by buffering.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR \fB--show-nonprinting\fR\fR
 .ad
 .RS 25n
-.rt  
 Cause non-printing characters (with the exception of TABs, NEWLINEs, and form
 feeds) to be output as printable character sequences. \fBASCII\fR control
 characters are printed as \fB^n\fR, where \fIn\fR is the corresponding
@@ -264,68 +234,56 @@ treated as printable characters.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR \fB--show-all\fR\fR
 .ad
 .RS 25n
-.rt  
 Equivalent to \fB-vET\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-B\fR \fB--squeeze-blank\fR\fR
 .ad
 .RS 25n
-.rt  
 Replace multiple adjacent NEWLINE characters with one NEWLINE.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR \fB--dos-output\fR\fR
 .ad
 .RS 25n
-.rt  
 Open output files in text mode. Insert RETURNs in front of NEWLINEs on some
 systems.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-E\fR \fB--show-ends\fR\fR
 .ad
 .RS 25n
-.rt  
 Insert a \fB$\fR before each NEWLINE.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR \fB--silent\fR\fR
 .ad
 .RS 25n
-.rt  
 \fBcat\fR is silent about non-existent files.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fB--show-blank\fR\fR
 .ad
 .RS 25n
-.rt  
 Copies TABs as \fB^I\fR and form feeds as \fB^L\fR.
 .RE
 
@@ -335,12 +293,10 @@ Copies TABs as \fB^I\fR and form feeds as \fB^L\fR.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fR
 .ad
 .RS 8n
-.rt  
 A path name of an input file. If no \fIfile\fR is specified, the standard input
 is used. If \fIfile\fR is \fB\|\(mi\|\fR, \fBcat\fR reads from the standard
 input at that point in the sequence. \fBcat\fR does not close and reopen
@@ -448,23 +404,19 @@ that affect the execution of \fBcat\fR: \fBLANG\fR, \fBLC_ALL\fR,
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 All input files were output successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -477,17 +429,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SS "\fBksh93\fR"
@@ -495,13 +446,12 @@ StandardSee \fBstandards\fR(5).
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

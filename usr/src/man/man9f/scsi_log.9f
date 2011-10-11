@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH scsi_log 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH SCSI_LOG 9F "Jan 16, 2006"
 .SH NAME
 scsi_log \- display a SCSI-device-related message
 .SH SYNOPSIS
@@ -14,7 +14,7 @@ scsi_log \- display a SCSI-device-related message
 
 
 
-\fBvoid\fR \fBscsi_log\fR(\fBdev_info_t *\fR\fIdip\fR, \fBchar *\fR\fIdrv_name\fR, \fBuint_t\fR \fIlevel\fR, 
+\fBvoid\fR \fBscsi_log\fR(\fBdev_info_t *\fR\fIdip\fR, \fBchar *\fR\fIdrv_name\fR, \fBuint_t\fR \fIlevel\fR,
      \fBconst char *\fR\fIfmt\fR\fB, ...\fR);
 .fi
 
@@ -25,45 +25,37 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 12n
-.rt  
 Pointer to the \fBdev_info\fR structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdrv_name\fR\fR
 .ad
 .RS 12n
-.rt  
 String naming the device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlevel\fR\fR
 .ad
 .RS 12n
-.rt  
 Error level.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfmt\fR\fR
 .ad
 .RS 12n
-.rt  
 Display format.
 .RE
 

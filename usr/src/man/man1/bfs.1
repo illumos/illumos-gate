@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH bfs 1 "20 May 1996" "SunOS 5.11" "User Commands"
+.TH BFS 1 "May 20, 1996"
 .SH NAME
 bfs \- big file scanner
 .SH SYNOPSIS
@@ -37,23 +37,19 @@ regular expressions may be surrounded with two symbols besides \fB/\fR and
 \fB?\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>\fR\fR
 .ad
 .RS 5n
-.rt  
 indicates downward search without wrap-around, and
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB<\fR\fR
 .ad
 .RS 5n
-.rt  
 indicates upward search without wrap-around.
 .RE
 
@@ -75,7 +71,6 @@ xt\fR, and\fB xc\fR commands, below). The following additional commands are
 available:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxf\fR\fI file\fR\fR
 .ad
@@ -89,7 +84,6 @@ depth of 10.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxn\fR\fR
 .ad
@@ -100,7 +94,6 @@ List the marks currently in use (marks are set by the \fBk\fR command).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxo\fR\fI [\|file\|]\fR\fR
 .ad
@@ -115,7 +108,6 @@ Note that each diversion causes truncation or creation of the file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB:\fR\fI label\fR\fR
 .ad
@@ -129,7 +121,6 @@ a command file, since labels need not be referenced.
 
 .sp
 .ne 2
-.mk
 .na
 \fB( \fB\&. \fR, \fB\&. \fR)\fBxb\fR/\fIregular expression\fR/\fIlabel\fR\fR
 .ad
@@ -165,7 +156,6 @@ terminal. If it is read from a pipe, only a downward jump is possible.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxt\fR\fI number\fR\fR
 .ad
@@ -177,7 +167,6 @@ Output from the \fBp\fR and null commands is truncated to, at most,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxv\fR[\fIdigit\fR]\|[\fIspaces\fR]\|[\fIvalue\fR]\fR
 .ad
@@ -237,7 +226,6 @@ stores the value \fB!date\fR into variable \fB7\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxbz\fR\fI label\fR\fR
 .ad
@@ -253,12 +241,10 @@ value, respectively, to the specified label. The two examples below both
 search for the next five lines containing the string \fBsize\fR:
 .sp
 .ne 2
-.mk
 .na
 \fBExample 1:\fR
 .ad
 .RS 14n
-.rt  
 .sp
 .in +2
 .nf
@@ -276,12 +262,10 @@ xbn l\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fBExample 2:\fR
 .ad
 .RS 14n
-.rt  
 .sp
 .in +2
 .nf
@@ -301,7 +285,6 @@ xbz l\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxc\fR [\fBswitch\fR]\fR
 .ad
@@ -320,12 +303,10 @@ lines suppressed.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfilename\fR\fR
 .ad
 .RS 12n
-.rt  
 Any file up to 1024K bytes and 32K lines, with up to 512 characters, including
 new-line, per line (255 for 16-bit machines). \fIfilename\fR can be a section
 of a larger file which has been divided into more manageable sections for
@@ -338,23 +319,19 @@ editing by the use of \fBcsplit\fR(1).
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion without any file or command errors.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 

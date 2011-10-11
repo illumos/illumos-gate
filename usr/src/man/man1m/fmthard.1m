@@ -3,21 +3,21 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH fmthard 1M "25 Sep 2008" "SunOS 5.11" "System Administration Commands"
+.TH FMTHARD 1M "Sep 25, 2008"
 .SH NAME
 fmthard \- populate label on hard disks
 .SH SYNOPSIS
 .SS "SPARC"
 .LP
 .nf
-\fBfmthard\fR \fB-d\fR \fIdata\fR | \fB-n\fR \fIvolume_name\fR | \fB-s\fR \fIdatafile\fR [\fB-i\fR] /dev/rdsk/c? 
+\fBfmthard\fR \fB-d\fR \fIdata\fR | \fB-n\fR \fIvolume_name\fR | \fB-s\fR \fIdatafile\fR [\fB-i\fR] /dev/rdsk/c?
      [t?] d?s2
 .fi
 
 .SS "x86"
 .LP
 .nf
-\fBfmthard\fR \fB-d\fR \fIdata\fR | \fB-n\fR \fIvolume_name\fR | \fB-s\fR \fIdatafile\fR [\fB-i\fR] /dev/rdsk/c? 
+\fBfmthard\fR \fB-d\fR \fIdata\fR | \fB-n\fR \fIvolume_name\fR | \fB-s\fR \fIdatafile\fR [\fB-i\fR] /dev/rdsk/c?
      [t?] d?s2
 .fi
 
@@ -45,7 +45,6 @@ by \fBfdisk\fR.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdata\fR\fR
 .ad
@@ -62,7 +61,6 @@ of the \fIdatafile\fR below for more information on these fields.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
@@ -75,7 +73,6 @@ on the disk.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fIvolume_name\fR\fR
 .ad
@@ -87,7 +84,6 @@ long.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIdatafile\fR\fR
 .ad
@@ -116,7 +112,6 @@ separated by white space and having the following format:
 where the entries have the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpartition\fR\fR
 .ad
@@ -131,7 +126,6 @@ slices \fB0\fR\(mi\fB15\fR. Each Solaris \fBfdisk\fR partition can have up to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItag\fR\fR
 .ad
@@ -145,7 +139,6 @@ The partition tag: a decimal number. The following are reserved codes: \fB0\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflag\fR\fR
 .ad
@@ -158,7 +151,6 @@ partitions use \fB0x00\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstarting_sector\fR\fR
 .ad
@@ -169,7 +161,6 @@ The sector number (decimal) on which the partition starts.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsize_in_sectors\fR\fR
 .ad

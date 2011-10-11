@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH scsi_sense_key 9F "28 Jun 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH SCSI_SENSE_KEY 9F "Jun 28, 2006"
 .SH NAME
 scsi_sense_key, scsi_sense_asc, scsi_sense_ascq \- retrieve fields from SCSI
 sense data
@@ -34,12 +34,10 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsense_buffer\fR\fR
 .ad
 .RS 16n
-.rt  
 Pointer to a buffer containing \fBSCSI\fR sense data. The sense data is
 expected in wire format starting at the response code. It can be in either
 fixed or descriptor format.

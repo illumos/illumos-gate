@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ucred_get 3C "4 Apr 2008" "SunOS 5.11" "Standard C Library Functions"
+.TH UCRED_GET 3C "Apr 4, 2008"
 .SH NAME
 ucred_get, ucred_free, ucred_geteuid, ucred_getruid, ucred_getsuid,
 ucred_getegid, ucred_getrgid, ucred_getsgid, ucred_getgroups, ucred_getprivset,
@@ -178,30 +178,25 @@ See DESCRIPTION.
 The \fBucred_get()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 10n
-.rt  
 There is not enough memory available to allocate sufficient memory to hold a
 user credential. The application can try again later.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 10n
-.rt  
 The caller does not have sufficient privileges to examine the target process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEMFILE\fR\fR
 .ad
@@ -210,30 +205,25 @@ The caller does not have sufficient privileges to examine the target process.
 \fB\fBENFILE\fR\fR
 .ad
 .RS 10n
-.rt  
 The calling process cannot open any more files.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 The physical limits of the system are exceeded by the memory allocation needed
 to hold a user credential.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBESRCH\fR\fR
 .ad
 .RS 10n
-.rt  
 The target process does not exist.
 .RE
 
@@ -242,12 +232,10 @@ The target process does not exist.
 The \fBucred_getprivset()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The privilege set argument is invalid.
 .RE
 
@@ -256,12 +244,10 @@ The privilege set argument is invalid.
 The \fBucred_getlabel()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The label is not present.
 .RE
 
@@ -274,12 +260,10 @@ The \fBucred_geteuid()\fR, \fBucred_getruid()\fR, \fBucred_getsuid()\fR,
 functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The requested user credential attribute is not available in the specified user
 credential.
 .RE
@@ -292,15 +276,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

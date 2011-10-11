@@ -1,15 +1,15 @@
 '\" te
-.\" Copyright 1989 AT&T 
+.\" Copyright 1989 AT&T
 .\" Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved
 .\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pack 1 "13 Mar 2008" "SunOS 5.11" "User Commands"
+.TH PACK 1 "Mar 13, 2008"
 .SH NAME
 pack, pcat, unpack \- compress and expand files
 .SH SYNOPSIS
@@ -176,12 +176,10 @@ the unpacked file cannot be created.
 The following options are supported by \fBpack\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 Forces packing of \fBfile\fR. This is useful for causing an entire directory to
 be packed even if some of the files do not benefit. Packed files can be
 restored to their original form using \fBunpack\fR or \fBpcat\fR.
@@ -192,12 +190,10 @@ restored to their original form using \fBunpack\fR or \fBpcat\fR.
 The following options are supported by \fBpack\fR and \fBunpack\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-/\fR\fR
 .ad
 .RS 6n
-.rt  
 When packing or unpacking, copies any ACL and extended system attributes
 associated with the source file to the target file. If an ACL or extended
 system attributes cannot be copied, the original file is retained, a diagnostic
@@ -211,24 +207,20 @@ message is written to \fBstderr\fR, and the final exit status is
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfile\fR\fR
 .ad
 .RS 8n
-.rt  
 A path name of a file to be packed, unpacked, or pcated; \fBfile\fR can include
 or omit the \fB\&.z\fR suffix.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi\fR\fR
 .ad
 .RS 8n
-.rt  
 \fBpack\fR uses Huffman (minimum redundancy) codes on a byte-by-byte basis. If
 the \fB\(mi\fR argument is used, an internal flag is set that causes the number
 of times each byte is used, its relative frequency, and the code for the byte
@@ -284,23 +276,19 @@ that affect the execution of \fBpack\fR, \fBpcat\fR, and \fBunpack\fR:
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred. The number of files the command failed to pack/unpack is
 returned. If the number of failures exceeds \fB255\fR, then \fB255\fR is
 returned.
@@ -314,13 +302,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) |lw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 .TE
 
 .SH SEE ALSO

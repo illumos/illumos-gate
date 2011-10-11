@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_intr_get_nintrs 9F "13 November 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_INTR_GET_NINTRS 9F "Nov 13, 2006"
 .SH NAME
 ddi_intr_get_nintrs, ddi_intr_get_navail \- return number of interrupts
 supported or available for a given interrupt type
@@ -33,34 +33,28 @@ Solaris DDI specific (Solaris DDI).
 \fBddi_intr_get_nintrs()\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 11n
-.rt  
 Pointer to \fBdev_info\fR structure
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItype\fR\fR
 .ad
 .RS 11n
-.rt  
 Interrupt type
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInintrsp\fR\fR
 .ad
 .RS 11n
-.rt  
 Pointer to number of interrupts of the given type that are supported by the
 system
 .RE
@@ -70,34 +64,28 @@ system
 \fBddi_intr_get_navail()\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 11n
-.rt  
 Pointer to \fBdev_info\fR structure
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItype\fR\fR
 .ad
 .RS 11n
-.rt  
 Interrupt type
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInavailp\fR\fR
 .ad
 .RS 11n
-.rt  
 Pointer to number of interrupts of the given type that are currently available
 from the system
 .RE
@@ -139,45 +127,37 @@ The \fBddi_intr_get_nintrs()\fR and \fBddi_intr_get_navail()\fR functions
 return:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 21n
-.rt  
 On success.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_EINVAL\fR\fR
 .ad
 .RS 21n
-.rt  
 On encountering invalid input parameters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_INTR_NOTFOUND\fR\fR
 .ad
 .RS 21n
-.rt  
 On not finding any interrupts for the given interrupt type.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 21n
-.rt  
 On any implementation specific failure.
 .RE
 
@@ -194,13 +174,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

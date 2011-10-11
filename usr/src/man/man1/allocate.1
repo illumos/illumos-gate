@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH allocate 1 "30 Apr 2008" "SunOS 5.11" "User Commands"
+.TH ALLOCATE 1 "Apr 30, 2008"
 .SH NAME
 allocate \- device allocation
 .SH SYNOPSIS
@@ -48,12 +48,10 @@ device. For devices with removable media that have a mountable file system,
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR \fIdevice\fR\fR
 .ad
 .RS 18n
-.rt  
 Force allocates either free or pre-allocated devices. This option is often used
 with the \fB-U\fR option to allocate/reallocate devices to a specific user.
 Only those users that have \fBsolaris.device.revoke\fR authorization are
@@ -62,35 +60,29 @@ allowed to use this option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR \fIdev\(mitype\fR\fR
 .ad
 .RS 18n
-.rt  
 Allocates devices with a device\(mitype matching \fIdev\(mitype\fR. The
 \fIdev\(mitype\fR argument specifies the device type to be operated on.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 18n
-.rt  
 Silent. Suppresses any diagnostic output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-U\fR \fIuname\fR\fR
 .ad
 .RS 18n
-.rt  
 Uses the user ID \fIuname\fR instead of the user ID of the current process when
 performing the allocate operation. Only a user with the
 \fBsolaris.device.revoke\fR authorization is permitted to use this option.
@@ -101,12 +93,10 @@ performing the allocate operation. Only a user with the
 The following options are supported with Trusted Extensions:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR\fR
 .ad
 .RS 15n
-.rt  
 Runs the device cleaning program in a windowing environment. If a windowing
 version of the program exists, it is used. Otherwise, the standard version is
 run in a terminal window.
@@ -114,12 +104,10 @@ run in a terminal window.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fIzonename\fR\fR
 .ad
 .RS 15n
-.rt  
 Allocates device to the zone specified by \fIzonename\fR.
 .RE
 
@@ -129,12 +117,10 @@ Allocates device to the zone specified by \fIzonename\fR.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevice\fR\fR
 .ad
 .RS 10n
-.rt  
 Specifies the name of the device to be allocated.
 .RE
 
@@ -144,34 +130,28 @@ Specifies the name of the device to be allocated.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 15n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB20\fR\fR
 .ad
 .RS 15n
-.rt  
 No entry for the specified device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIother value\fR\fR
 .ad
 .RS 15n
-.rt  
 An error occurred.
 .RE
 
@@ -196,13 +176,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

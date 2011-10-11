@@ -24,8 +24,36 @@
  */
 
 /*
- * IntelVersion: 1.74 v3-1-10-1_2009-9-18_Release14-6
+ * Copyright (c) 2001-2010, Intel Corporation
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ *  1. Redistributions of source code must retain the above copyright notice,
+ *     this list of conditions and the following disclaimer.
+ *
+ *  2. Redistributions in binary form must reproduce the above copyright
+ *     notice, this list of conditions and the following disclaimer in the
+ *     documentation and/or other materials provided with the distribution.
+ *
+ *  3. Neither the name of the Intel Corporation nor the names of its
+ *     contributors may be used to endorse or promote products derived from
+ *     this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  */
+
 #ifndef _E1000_PHY_H_
 #define	_E1000_PHY_H_
 
@@ -91,7 +119,6 @@ s32 e1000_read_phy_reg_hv(struct e1000_hw *hw, u32 offset, u16 *data);
 s32 e1000_read_phy_reg_hv_locked(struct e1000_hw *hw, u32 offset, u16 *data);
 s32 e1000_write_phy_reg_hv(struct e1000_hw *hw, u32 offset, u16 data);
 s32 e1000_write_phy_reg_hv_locked(struct e1000_hw *hw, u32 offset, u16 data);
-s32 e1000_set_mdio_slow_mode_hv(struct e1000_hw *hw, bool slow);
 s32 e1000_link_stall_workaround_hv(struct e1000_hw *hw);
 s32 e1000_copper_link_setup_82577(struct e1000_hw *hw);
 s32 e1000_check_polarity_82577(struct e1000_hw *hw);
@@ -227,12 +254,15 @@ s32 e1000_get_cable_length_82577(struct e1000_hw *hw);
 #define	E1000_KMRNCTRLSTA_OFFSET	0x001F0000
 #define	E1000_KMRNCTRLSTA_OFFSET_SHIFT	16
 #define	E1000_KMRNCTRLSTA_REN		0x00200000
+#define	E1000_KMRNCTRLSTA_CTRL_OFFSET	0x1	/* Kumeran Control */
 #define	E1000_KMRNCTRLSTA_DIAG_OFFSET	0x3	/* Kumeran Diagnostic */
 #define	E1000_KMRNCTRLSTA_TIMEOUTS	0x4	/* Kumeran Timeouts */
 #define	E1000_KMRNCTRLSTA_INBAND_PARAM	0x9	/* Kumeran InBand Parameters */
+#define	E1000_KMRNCTRLSTA_IBIST_DISABLE	0x0200	/* Kumeran IBIST Disable */
 #define	E1000_KMRNCTRLSTA_DIAG_NELPBK	0x1000	/* Nearend Loopback mode */
 #define	E1000_KMRNCTRLSTA_K1_CONFIG	0x7
 #define	E1000_KMRNCTRLSTA_K1_ENABLE	0x0002
+#define	E1000_KMRNCTRLSTA_HD_CTRL	0x10	/* Kumeran HD Control */
 
 #define	IFE_PHY_EXTENDED_STATUS_CONTROL	0x10
 #define	IFE_PHY_SPECIAL_CONTROL		0x11 /* 100BaseTx PHY Special Control */

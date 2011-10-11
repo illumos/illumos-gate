@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH gss_acquire_cred 3GSS "14 Jan 2003" "SunOS 5.11" "Generic Security Services API Library Functions"
+.TH GSS_ACQUIRE_CRED 3GSS "Jan 14, 2003"
 .SH NAME
 gss_acquire_cred \- acquire a handle for a pre-existing credential by name
 .SH SYNOPSIS
 .LP
 .nf
-\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lgss\fR  [ \fIlibrary\fR... ] 
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lgss\fR  [ \fIlibrary\fR... ]
 #include <gssapi/gssapi.h>
 
 \fBOM_uint32\fR \fBgss_acquire_cred\fR(\fBOM_uint32 *\fR\fIminor_status\fR,
@@ -68,23 +68,19 @@ overhead of a deferred credential acquisition.
 The parameter descriptions for \fBgss_acquire_cred()\fR follow:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdesired_name\fR\fR
 .ad
 .RS 22n
-.rt  
 The name of the principal for which a credential should be acquired.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItime_req\fR\fR
 .ad
 .RS 22n
-.rt  
 The number of seconds that credentials remain valid. Specify
 \fBGSS_C_INDEFINITE\fR  to request that the credentials have the maximum
 permitted lifetime
@@ -92,24 +88,20 @@ permitted lifetime
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdesired_mechs\fR\fR
 .ad
 .RS 22n
-.rt  
 The set of underlying security mechanisms that may be used.
 \fBGSS_C_NO_OID_SET\fR may be used to obtain a default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcred_usage\fR\fR
 .ad
 .RS 22n
-.rt  
 A flag that indicates how this credential should be used. If the flag is
 \fBGSS_C_ACCEPT\fR, then credentials will be used only to accept security
 credentials. \fBGSS_C_INITIATE\fR indicates that credentials will be used only
@@ -119,12 +111,10 @@ credentials may be used either to initiate or accept security contexts.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoutput_cred_handle\fR\fR
 .ad
 .RS 22n
-.rt  
 The returned credential handle.  Resources associated with this credential
 handle must be released by the application after use with a call to
 \fBgss_release_cred\fR(3GSS)
@@ -132,12 +122,10 @@ handle must be released by the application after use with a call to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIactual_mechs\fR\fR
 .ad
 .RS 22n
-.rt  
 The set of mechanisms for which the credential is valid.  Storage associated
 with the returned \fBOID\fR-set must be released by the application after use
 with a call to  \fBgss_release_oid_set\fR(3GSS).  Specify \fBNULL\fR if not
@@ -146,24 +134,20 @@ required.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItime_rec\fR\fR
 .ad
 .RS 22n
-.rt  
 Actual number of seconds for which the returned credentials will remain valid.
 Specify \fBNULL\fR if not required.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIminor_status\fR\fR
 .ad
 .RS 22n
-.rt  
 Mechanism specific status code.
 .RE
 
@@ -173,78 +157,64 @@ Mechanism specific status code.
 \fBgss_acquire_cred()\fR may return the following status code:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_COMPLETE\fR\fR
 .ad
 .RS 29n
-.rt  
  Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_BAD_MECH\fR\fR
 .ad
 .RS 29n
-.rt  
 An unavailable mechanism has been requested.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_BAD_NAMETYPE\fR\fR
 .ad
 .RS 29n
-.rt  
 The type contained within the \fIdesired_name\fR parameter is not supported.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_BAD_NAME\fR\fR
 .ad
 .RS 29n
-.rt  
 The value supplied for \fIdesired_name\fR parameter is ill formed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_CREDENTIALS_EXPIRED\fR\fR
 .ad
 .RS 29n
-.rt  
 The credentials could not be acquired because they have expired.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_NO_CRED\fR\fR
 .ad
 .RS 29n
-.rt  
 No credentials were found for the specified name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_FAILURE\fR\fR
 .ad
 .RS 29n
-.rt  
 The underlying mechanism detected an error for which no specific \fBGSS\fR
 status code is defined.  The mechanism-specific status code reported by means
 of the \fIminor_status\fR parameter details the error condition.
@@ -258,13 +228,12 @@ See \fBattributes\fR(5)  for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

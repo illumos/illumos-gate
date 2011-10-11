@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sip_stack_init 3SIP "23 Jan 2007" "SunOS 5.11" "Session Initiation Protocol Library Functions"
+.TH SIP_STACK_INIT 3SIP "Jan 23, 2007"
 .SH NAME
 sip_stack_init \- initializes SIP stack
 .SH SYNOPSIS
@@ -40,23 +40,19 @@ typedef struct sip_stack_init_s {
 
 .sp
 .ne 2
-.mk
 .na
 \fBsip_version\fR
 .ad
 .RS 19n
-.rt  
 This must be set to \fBSIP_STACK_VERSION\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBsip_stack_flags\fR
 .ad
 .RS 19n
-.rt  
 If the application wants the \fBSIP\fR stack to maintain dialogs, this flag
 must be set to \fBSIP_STACK_DIALOGS\fR. Otherwise, it must be set to \fB0\fR.
 If \fBSIP_STACK_DIALOGS\fR is not set, the stack does not deal with dialogs at
@@ -84,7 +80,7 @@ The registration structure is supplied by:
 typedef struct sip_ulp_pointers_s {
      void      (*sip_ulp_recv)(const sip_conn_object_t,
                      sip_msg_t, const sip_dialog_t);
-     uint_t    (*sip_ulp_timeout)(void *, 
+     uint_t    (*sip_ulp_timeout)(void *,
                      void (*func)(void *),
                      struct timeval *);
      boolean_t (*sip_ulp_untimeout)(uint_t);
@@ -103,12 +99,10 @@ typedef struct sip_ulp_pointers_s {
 
 .sp
 .ne 2
-.mk
 .na
 \fBsip_ulp_recv\fR
 .ad
 .RS 26n
-.rt  
 This is a mandatory routine that the application registers for the stack to
 deliver an inbound \fBSIP\fR message. The \fBSIP\fR stack invokes the function
 with the connection object on which the message arrived, the \fBSIP\fR message,
@@ -123,7 +117,6 @@ cache the dialog, it must hold a reference on the dialog using
 
 .sp
 .ne 2
-.mk
 .na
 \fBsip_ulp_timeout\fR
 .ad
@@ -132,7 +125,6 @@ cache the dialog, it must hold a reference on the dialog using
 \fBsip_ulp_untimeout\fR
 .ad
 .RS 26n
-.rt  
 An application can register these two routines to implement its own routines
 for the stack timers. Typically, an application should allow the stack to use
 its own built-in timer routines. The built-in timer routines are used only by
@@ -146,12 +138,10 @@ callback function.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsip_ulp_trans_error\fR
 .ad
 .RS 26n
-.rt  
 The application can register this routine to be notified of a transaction
 error. An error can occur when the transaction layer tries to send a message
 using a cached connection object which results in a failure. If this routine is
@@ -161,12 +151,10 @@ argument is for future use. It is always set to \fBNULL\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsip_ulp_dlg_del\fR
 .ad
 .RS 26n
-.rt  
 An application can register this routine to be notified when a dialog is
 deleted. The dialog to be deleted is passed along with the \fBSIP\fR message
 which caused the dialog to be deleted. The final argument is for future use. It
@@ -175,7 +163,6 @@ is always set to \fBNULL\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsip_ulp_trans_state_cb\fR
 .ad
@@ -184,7 +171,6 @@ is always set to \fBNULL\fR.
 \fBsip_ulp_dlg_state_cb\fR
 .ad
 .RS 26n
-.rt  
 If these callback routines are registered, the stack invokes
 \fBsip_ulp_trans_state_cb\fR when a transaction changes states and
 \fBsip_ulp_dlg_state_cb\fR when a dialog changes states.
@@ -227,12 +213,10 @@ typedef struct sip_io_pointers_s {
 
 .sp
 .ne 2
-.mk
 .na
 \fBsip_conn_send\fR
 .ad
 .RS 27n
-.rt  
 This function is invoked by the stack after processing an outbound \fBSIP\fR
 message. This function is responsible for sending the \fBSIP\fR message to the
 peer. A return of \fB0\fR indicates success. The \fBSIP\fR message is passed to
@@ -242,7 +226,6 @@ connection object.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsip_hold_conn_object\fR
 .ad
@@ -251,7 +234,6 @@ connection object.
 \fBsip_rel_conn_object\fR
 .ad
 .RS 27n
-.rt  
 The application provides a mechanism for the stack to indicate that a
 connection object is in use by the stack and must not be freed. The stack uses
 \fBsip_hold_conn_object\fR to indicate that the connection object is in use and
@@ -262,12 +244,10 @@ application will not free the connection object if it is in use by the stack.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsip_conn_is_stream\fR
 .ad
 .RS 27n
-.rt  
 The stack uses this to determine whether the connection object, passed as the
 argument, is byte-stream oriented. Byte-stream protocols include \fBTCP\fR
 while message-based protocols include \fBSCTP\fR and \fBUDP\fR.
@@ -275,12 +255,10 @@ while message-based protocols include \fBSCTP\fR and \fBUDP\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsip_conn_is_reliable\fR
 .ad
 .RS 27n
-.rt  
 The stack uses this to determine whether the connection object, passed as the
 argument, is reliable. Reliable protocols include \fBTCP\fR and \fBSCTP\fR.
 Unreliable protocols include \fBUDP\fR.
@@ -288,7 +266,6 @@ Unreliable protocols include \fBUDP\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsip_conn_local_address\fR
 .ad
@@ -297,7 +274,6 @@ Unreliable protocols include \fBUDP\fR.
 \fBsip_conn_remote_address\fR
 .ad
 .RS 27n
-.rt  
 These two interfaces are used by the stack to obtain endpoint information for a
 connection object. The \fBsip_conn_local_address\fR provides the local
 address/port information. The \fBsip_conn_remote_address\fR provides the
@@ -308,12 +284,10 @@ reflect the actual length.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsip_conn_transport\fR
 .ad
 .RS 27n
-.rt  
 The stack uses this to determine the transport used by the connection object,
 passed as the argument. The transport could be \fBTCP\fR, \fBUDP\fR,
 \fBSCTP\fR.
@@ -321,7 +295,6 @@ passed as the argument. The transport could be \fBTCP\fR, \fBUDP\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fBsip_conn_timer1\fR
 .ad
@@ -338,7 +311,6 @@ passed as the argument. The transport could be \fBTCP\fR, \fBUDP\fR,
 \fBsip_conn_timerd\fR
 .ad
 .RS 27n
-.rt  
 These four interfaces may be registered by an application to provide connection
 object specific timer information. If these are not registered the stack uses
 default values.
@@ -382,12 +354,10 @@ typedef struct header_function_table {
 
 .sp
 .ne 2
-.mk
 .na
 \fBheader_name\fR
 .ad
 .RS 27n
-.rt  
 The full name of the header. The application must ensure that he name does not
 conflict with existing headers. If it does, the one registered by the
 application takes precedence.
@@ -395,46 +365,38 @@ application takes precedence.
 
 .sp
 .ne 2
-.mk
 .na
 \fBheader_short_name\fR
 .ad
 .RS 27n
-.rt  
 Compact name, if any, for the header.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBheader_parse_func\fR
 .ad
 .RS 27n
-.rt  
 The parsing function for the header. The parser will set the second argument to
 the resulting parsed structure. A return value of \fB0\fR indicates success.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBheader_free\fR
 .ad
 .RS 27n
-.rt  
 The function that frees the parsed header
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBheader_check_compliance\fR
 .ad
 .RS 27n
-.rt  
 An application can optionally provide this function that will check if the
 header is compliant or not. The compliance for a custom header will be defined
 by the application.
@@ -442,12 +404,10 @@ by the application.
 
 .sp
 .ne 2
-.mk
 .na
 \fBheader_is_equal\fR
 .ad
 .RS 27n
-.rt  
 An application can optionally provide this function to determine whether two
 input headers are equivalent. The equivalence criteria is defined by the
 application.
@@ -469,12 +429,10 @@ On failure, the \fBsip_stack_init()\fR function returns the following error
 value:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 If the stack version is incorrect, or if any of the mandatory functions is
 missing.
 .RE
@@ -487,15 +445,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

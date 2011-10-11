@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sysevent_get_attr_list 3SYSEVENT "24 Jul 2009" "SunOS 5.11" "System Event Library Functions"
+.TH SYSEVENT_GET_ATTR_LIST 3SYSEVENT "Jul 24, 2009"
 .SH NAME
 sysevent_get_attr_list \- get attribute list pointer
 .SH SYNOPSIS
 .LP
 .nf
-\fBcc\fR [\fIflag \&.\|.\|.\fR]  \fIfile\fR\&.\|.\|. \fB-lsysevent\fR \fB -lnvpair \fR [\fIlibrary \&.\|.\|.\fR] 
+\fBcc\fR [\fIflag \&.\|.\|.\fR]  \fIfile\fR\&.\|.\|. \fB-lsysevent\fR \fB -lnvpair \fR [\fIlibrary \&.\|.\|.\fR]
 #include <libsysevent.h>
 #include <libnvpair.h>
 
@@ -19,23 +19,19 @@ sysevent_get_attr_list \- get attribute list pointer
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIev\fR\fR
 .ad
 .RS 13n
-.rt  
 handle to a system event
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIattr_list\fR\fR
 .ad
 .RS 13n
-.rt  
 address of a pointer to attribute list (\fBnvlist_t\fR)
 .RE
 
@@ -59,23 +55,19 @@ sets \fBerrno\fR to indicate the error.
 The \fBsysevent_get_attr_list()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 Insufficient memory available to allocate an \fBnvlist\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 Invalid \fBsysevent\fR event attribute list.
 .RE
 
@@ -87,15 +79,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

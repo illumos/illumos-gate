@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mod_ipp 4 "26 Nov 2003" "SunOS 5.11" "File Formats"
+.TH MOD_IPP 4 "Nov 26, 2003"
 .SH NAME
 mod_ipp \- Embedded Internet Print Protocol (IPP) listener for the Apache HTTP
 server
@@ -55,12 +55,10 @@ will disable support for the named operation.
 The following is a list of IPP handling service operations:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprint-job\fR\fR
 .ad
 .RS 26n
-.rt  
 This operation is a required IPP operation that allows client systems to submit
 a print job with a single document embedded in the data stream. This operation
 is primarily used from the IPP support Microsoft has provided for its Windows
@@ -69,12 +67,10 @@ is primarily used from the IPP support Microsoft has provided for its Windows
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprint-uri\fR\fR
 .ad
 .RS 26n
-.rt  
 This is an optional IPP operation that allows client systems to submit a print
 job with a reference (URL) for a single document. This operation is currently
 not supported by the \fBmod_ipp\fR Apache Module.
@@ -82,12 +78,10 @@ not supported by the \fBmod_ipp\fR Apache Module.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvalidate-job\fR\fR
 .ad
 .RS 26n
-.rt  
 This is a required IPP operation that allows client systems to simulate the
 submission of a print job to verify that the server is capable of handling the
 job. This operation is supported by \fBmod_ipp\fR.
@@ -95,12 +89,10 @@ job. This operation is supported by \fBmod_ipp\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcreate-job\fR\fR
 .ad
 .RS 26n
-.rt  
 This is an optional IPP operation that allows client systems to submit a print
 job. The operation is used with the \fBsend-document\fR and \fBsend-uri\fR
 operations.
@@ -108,84 +100,70 @@ operations.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBget-jobs\fR\fR
 .ad
 .RS 26n
-.rt  
 This is a required IPP operation that allows client systems to retrieve a list
 of print jobs from the print service.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBget-printer-attributes\fR\fR
 .ad
 .RS 26n
-.rt  
 This is a required IPP operation that allows client systems to retrieve
 attributes from the print service that describes the named printer object.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpause-printer\fR\fR
 .ad
 .RS 26n
-.rt  
 This an optional IPP operation that allows client systems to stop job
 processing on the named print queue.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBresume-printer\fR\fR
 .ad
 .RS 26n
-.rt  
 This is an optional IPP operation that allows client systems to resume job
 processing on the named print queue.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpurge-jobs\fR\fR
 .ad
 .RS 26n
-.rt  
 This is an optional IPP operation that allows client systems to cancel all
 print jobs on the named print queue.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsend-document\fR\fR
 .ad
 .RS 26n
-.rt  
 This is a required IPP operation that allows client systems to add documents to
 print jobs created with the \fBcreate-job\fR operation, but not yet submitted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsend-uri\fR\fR
 .ad
 .RS 26n
-.rt  
 This is an optional IPP operation that allows a client system to add a document
 reference (URI) to a print job created with the \fBcreate-job\fR operation, but
 not yet submitted. This operation is currently not supported by the
@@ -194,84 +172,70 @@ not yet submitted. This operation is currently not supported by the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcancel-job\fR\fR
 .ad
 .RS 26n
-.rt  
 This is a required IPP operation that allows client systems to cancel print
 jobs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBget-job-attributes\fR\fR
 .ad
 .RS 26n
-.rt  
 This is a required IPP operation that allows client systems to retrieve
 attributes that describe a print job from the print service.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhold-job\fR\fR
 .ad
 .RS 26n
-.rt  
 This is an optional IPP operation that allows client systems to hold print
 jobs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrelease-job\fR\fR
 .ad
 .RS 26n
-.rt  
 This is an optional IPP operation that allows client systems to release print
 jobs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrestart-job\fR\fR
 .ad
 .RS 26n
-.rt  
 This is an optional IPP operation that allows client systems to restart print
 jobs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBall\fR\fR
 .ad
 .RS 26n
-.rt  
 This is a place holder for enabling or disabling support for all IPP operations
 implemented by the \fBmod_ipp\fR Apache module.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrequired\fR\fR
 .ad
 .RS 26n
-.rt  
 This is a place holder for enabling or disabling support for the required IPP
 operations implemented by the \fBmod_ipp\fR Apache module.
 .RE
@@ -349,13 +313,12 @@ See \fBattributes\fR(5) or descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityExternal
+Interface Stability	External
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pmconfig 1M "12 Aug 2004" "SunOS 5.11" "System Administration Commands"
+.TH PMCONFIG 1M "Aug 12, 2004"
 .SH NAME
 pmconfig \- Configure the Power Management system
 .SH SYNOPSIS
@@ -44,12 +44,10 @@ configuration is \fBdtpower\fR(1M).
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 6n
-.rt  
  Reset  Power Management and suspend-resume  state to default and exit. User
 must have both  Power Management and suspend-resume  configuration permission
 for this option.
@@ -61,46 +59,38 @@ for this option.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Upon successful completion
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/power.conf\fR\fR
 .ad
 .RS 22n
-.rt  
 System  Power Management configuration file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/default/power\fR\fR
 .ad
 .RS 22n
-.rt  
 File that controls permissions for system's  Power Management and
 suspend-resume  features. The \fBPMCHANGEPERM\fR keyboard controls the Power
 Management configuration permissions, while the \fBCPRCHANGEPERM \fRkeyword
@@ -112,34 +102,28 @@ controls the  suspend-resume  configuration permissions.
 Allowed values are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBall\fR\fR
 .ad
 .RS 22n
-.rt  
 Any user can change the configuration.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-\fR\fR
 .ad
 .RS 22n
-.rt  
 No one except super-user can change the configuration.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB<user1, user2,...>\fR\fR
 .ad
 .RS 22n
-.rt  
 A  user in this user list or a super-user can change the configuration. The
 user list is a space and/or comma (,) separated list. You must enclose the list
 in < and > characters.
@@ -147,12 +131,10 @@ in < and > characters.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBconsole-owner\fR\fR
 .ad
 .RS 22n
-.rt  
 A  user who owns the system console device node or a super-user can change the
 configuration.
 .RE
@@ -169,13 +151,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface stability Unstable 
+Interface stability 	Unstable
 .TE
 
 .SH SEE ALSO

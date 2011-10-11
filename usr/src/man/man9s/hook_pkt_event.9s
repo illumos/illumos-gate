@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH hook_pkt_event 9S "1 May 2008" "SunOS 5.11" "Data Structures for Drivers"
+.TH HOOK_PKT_EVENT 9S "May 1, 2008"
 .SH NAME
 hook_pkt_event \- packet event structure passed through to hooks
 .SH SYNOPSIS
@@ -51,7 +51,7 @@ NH_LOOPBACK_OUT                 yes         yes         yes       yes
 .sp
 .in +2
 .nf
-net_data_t           hne_family;      
+net_data_t           hne_family;
 phy_if_t             hpe_ifp;
 phy_if_t             hpe_ofp;
 void                 *hpe_hdr;
@@ -59,7 +59,7 @@ mblk_t               *hpe_mp;
 mblk_t               *hpe_mb;
 uint32_t             hpe_flags;
 
- 
+
 .fi
 .in -2
 
@@ -68,91 +68,75 @@ uint32_t             hpe_flags;
 The following fields are set for each event:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhne_family\fR\fR
 .ad
 .RS 14n
-.rt  
 The protocol family for this packet. This value matches the corresponding value
 returned from a call to \fBnet_protocol_lookup\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhpe_ifp\fR\fR
 .ad
 .RS 14n
-.rt  
 The inbound interface for a packet.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhpe_ofp\fR\fR
 .ad
 .RS 14n
-.rt  
 The outbound interface for a packet.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhpe_hdr\fR\fR
 .ad
 .RS 14n
-.rt  
 Pointer to the start of the network protocol header within an \fBmblk_t\fR
 structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhpe_mp\fR\fR
 .ad
 .RS 14n
-.rt  
 Pointer to the \fBmblk_t\fR pointer that points to the first \fBmblk_t\fR
 structure in this packet.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhpe_mb\fR\fR
 .ad
 .RS 14n
-.rt  
 Pointer to the \fBmblk_t\fR structure that contains \fBhpe_hdr\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhpe_flags\fR\fR
 .ad
 .RS 13n
-.rt  
 This field is used to carry additional properties of packets. The current
 collection of defined bits available is:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHPE_BROADCAST\fR\fR
 .ad
 .RS 17n
-.rt  
 This bit is set if the packet was recognized as a broadcast packet from the
 link layer. The bit cannot be set if \fBHPE_MULTICAST\fR is set, currently only
 possible with physical in packet events.
@@ -160,12 +144,10 @@ possible with physical in packet events.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHPE_MULTICAST\fR\fR
 .ad
 .RS 17n
-.rt  
 This set if the packet was recognized as a multicast packet from the link
 layer. This bit cannot be set if \fBHPE_BROADCAST\fR is set, currently only
 possible with physical in packet events.
@@ -181,13 +163,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

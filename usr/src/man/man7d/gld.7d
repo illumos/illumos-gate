@@ -3,28 +3,28 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH gld 7D "10 Nov 2005" "SunOS 5.11" "Devices"
+.TH GLD 7D "Nov 10, 2005"
 .SH NAME
 gld \- Generic \fBLAN\fR Driver
 .SH SYNOPSIS
 .LP
 .nf
-\fB#include\fR \fB<sys/stropts.h>\fR 
+\fB#include\fR \fB<sys/stropts.h>\fR
 .fi
 
 .LP
 .nf
-\fB#include\fR \fB<sys/stream.h>\fR 
+\fB#include\fR \fB<sys/stream.h>\fR
 .fi
 
 .LP
 .nf
-\fB#include\fR \fB<sys/dlpi.h>\fR 
+\fB#include\fR \fB<sys/dlpi.h>\fR
 .fi
 
 .LP
 .nf
-\fB#include\fR \fB<sys/gld.h>\fR 
+\fB#include\fR \fB<sys/gld.h>\fR
 .fi
 
 .SH INTERFACE LEVEL
@@ -331,45 +331,37 @@ The read-side \fBqinit\fR(9S) structure should specify the following elements
 as shown below:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBqi_putp\fR \fR
 .ad
 .RS 14n
-.rt  
 \fINULL\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBqi_srvp\fR \fR
 .ad
 .RS 14n
-.rt  
 \fBgld_rsrv\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBqi_qopen\fR \fR
 .ad
 .RS 14n
-.rt  
 \fBgld_open\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBqi_qclose\fR \fR
 .ad
 .RS 14n
-.rt  
 \fBgld_close\fR
 .RE
 
@@ -379,45 +371,37 @@ The write-side \fBqinit\fR(9S) structure should specify the following elements
 as shown below:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBqi_putp\fR \fR
 .ad
 .RS 14n
-.rt  
 \fBgld_wput\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBqi_srvp\fR \fR
 .ad
 .RS 14n
-.rt  
 \fBgld_wsrv\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBqi_qopen\fR \fR
 .ad
 .RS 14n
-.rt  
 \fINULL\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBqi_qclose\fR \fR
 .ad
 .RS 14n
-.rt  
 \fINULL\fR
 .RE
 
@@ -493,193 +477,159 @@ noted.
 GLD maintains and reports the following statistics.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrbytes64\fR \fR
 .ad
 .RS 15n
-.rt  
 Total bytes successfully received on the interface (64 bits).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrbytes\fR \fR
 .ad
 .RS 15n
-.rt  
 Total bytes successfully received on the interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBobytes64\fR \fR
 .ad
 .RS 15n
-.rt  
 Total bytes requested to be transmitted on the interface (64 bits).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBobytes\fR \fR
 .ad
 .RS 15n
-.rt  
 Total bytes requested to be transmitted on the interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBipackets64\fR \fR
 .ad
 .RS 15n
-.rt  
 Total packets successfully received on the interface (64 bits).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBipackets\fR \fR
 .ad
 .RS 15n
-.rt  
 Total packets successfully received on the interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBopackets64\fR \fR
 .ad
 .RS 15n
-.rt  
 Total packets requested to be transmitted on the interface (64 bits).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBopackets\fR \fR
 .ad
 .RS 15n
-.rt  
 Total packets requested to be transmitted on the interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmultircv\fR \fR
 .ad
 .RS 15n
-.rt  
 Multicast packets successfully received, including group and functional
 addresses (long).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmultixmt\fR \fR
 .ad
 .RS 15n
-.rt  
 Multicast packets requested to be transmitted, including group and functional
 addresses (long).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbrdcstrcv\fR \fR
 .ad
 .RS 15n
-.rt  
 Broadcast packets successfully received (long).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbrdcstxmt\fR \fR
 .ad
 .RS 15n
-.rt  
 Broadcast packets requested to be transmitted (long).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunknowns\fR \fR
 .ad
 .RS 15n
-.rt  
 Valid received packets not accepted by any stream (long).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoxmtbuf\fR \fR
 .ad
 .RS 15n
-.rt  
 Packets discarded on output because transmit buffer was busy, or no buffer
 could be allocated for transmit (long).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBblocked\fR \fR
 .ad
 .RS 15n
-.rt  
 Times a received packet could not be put up a stream because the queue was flow
 controlled (long).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxmtretry\fR \fR
 .ad
 .RS 15n
-.rt  
 Times transmit was retried after having been delayed due to lack of resources
 (long).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpromisc\fR \fR
 .ad
 .RS 15n
-.rt  
 Current ``promiscuous'' state of the interface (string).
 .RE
 
@@ -693,102 +643,84 @@ described in \fBgld\fR(9E), to update the device-specific statistics in the
 the named statistics variables below.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBifspeed\fR \fR
 .ad
 .RS 13n
-.rt  
 Current estimated bandwidth of the interface in bits per second (64 bits).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmedia\fR \fR
 .ad
 .RS 13n
-.rt  
 Current media type in use by the device (string).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBintr\fR \fR
 .ad
 .RS 13n
-.rt  
 Times interrupt handler was called and claimed the interrupt (long).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnorcvbuf\fR \fR
 .ad
 .RS 13n
-.rt  
 Times a valid incoming packet was known to have been discarded because no
 buffer could be allocated for receive (long).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBierrors\fR \fR
 .ad
 .RS 13n
-.rt  
 Total packets received that couldn't be processed because they contained errors
 (long).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBoerrors\fR \fR
 .ad
 .RS 13n
-.rt  
 Total packets that weren't successfully transmitted because of errors (long).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmissed\fR \fR
 .ad
 .RS 13n
-.rt  
 Packets known to have been dropped by the hardware on receive (long).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuflo\fR \fR
 .ad
 .RS 13n
-.rt  
 Times FIFO underflowed on transmit (long).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBoflo\fR \fR
 .ad
 .RS 13n
-.rt  
 Times receiver overflowed during receive (long).
 .RE
 
@@ -798,169 +730,139 @@ The following group of statistics applies to networks of type \fBDL_ETHER\fR;
 these are maintained by device-specific drivers of that type, as above.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBalign_errors\fR \fR
 .ad
 .RS 23n
-.rt  
 Packets received with framing errors (not an integral number of octets) (long).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfcs_errors\fR \fR
 .ad
 .RS 23n
-.rt  
 Packets received with CRC errors (long).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBduplex\fR \fR
 .ad
 .RS 23n
-.rt  
 Current duplex mode of the interface (string).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcarrier_errors\fR \fR
 .ad
 .RS 23n
-.rt  
 Times carrier was lost or never detected on a transmission attempt (long).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcollisions\fR \fR
 .ad
 .RS 23n
-.rt  
 Ethernet collisions during transmit (long).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBex_collisions\fR \fR
 .ad
 .RS 23n
-.rt  
 Frames where excess collisions occurred on transmit, causing transmit failure
 (long).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtx_late_collisions\fR \fR
 .ad
 .RS 23n
-.rt  
 Times a transmit collision occurred late (after 512 bit times) (long).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdefer_xmts\fR \fR
 .ad
 .RS 23n
-.rt  
 Packets without collisions where first transmit attempt was delayed because the
 medium was busy (long).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfirst_collisions\fR \fR
 .ad
 .RS 23n
-.rt  
 Packets successfully transmitted with exactly one collision.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmulti_collisions\fR \fR
 .ad
 .RS 23n
-.rt  
 Packets successfully transmitted with multiple collisions.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsqe_errors\fR \fR
 .ad
 .RS 23n
-.rt  
 Times SQE test error was reported.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmacxmt_errors\fR \fR
 .ad
 .RS 23n
-.rt  
 Packets encountering transmit MAC failures, except carrier and collision
 failures.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmacrcv_errors\fR \fR
 .ad
 .RS 23n
-.rt  
 Packets received with MAC errors, except align, fcs, and toolong errors.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtoolong_errors\fR \fR
 .ad
 .RS 23n
-.rt  
 Packets received larger than the maximum permitted length.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrunt_errors\fR \fR
 .ad
 .RS 23n
-.rt  
 Packets received smaller than the minimum permitted length (long).
 .RE
 
@@ -970,103 +872,85 @@ The following group of statistics applies to networks of type \fBDL_TPR\fR;
 these are maintained by device-specific drivers of that type, as above.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBline_errors\fR \fR
 .ad
 .RS 24n
-.rt  
 Packets received with non-data bits or FCS errors.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBburst_errors\fR \fR
 .ad
 .RS 24n
-.rt  
 Times an absence of transitions for five half-bit timers was detected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsignal_losses\fR \fR
 .ad
 .RS 24n
-.rt  
 Times loss of signal condition on the ring was detected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBace_errors\fR \fR
 .ad
 .RS 24n
-.rt  
 Times an AMP or SMP frame in which A is equal to C is equal to 0, was followed
 by another such SMP frame without an intervening AMP frame.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinternal_errors\fR \fR
 .ad
 .RS 24n
-.rt  
 Times the station recognized an internal error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlost_frame_errors\fR \fR
 .ad
 .RS 24n
-.rt  
 Times the TRR timer expired during transmit.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBframe_copied_errors\fR \fR
 .ad
 .RS 24n
-.rt  
 Times a frame addressed to this station was received with the FS field A bit
 set to 1.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtoken_errors\fR \fR
 .ad
 .RS 24n
-.rt  
 Times the station acting as the active monitor recognized an error condition
 that needed a token transmitted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfreq_errors\fR \fR
 .ad
 .RS 24n
-.rt  
 Times the frequency of the incoming signal differed from the expected
 frequency.
 .RE
@@ -1077,68 +961,56 @@ The following group of statistics applies to networks of type \fBDL_FDDI\fR;
 these are maintained by device-specific drivers of that type, as above.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmac_errors\fR \fR
 .ad
 .RS 20n
-.rt  
 Frames detected in error by this MAC that had not been detected in error by
 another MAC.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmac_lost_errors\fR \fR
 .ad
 .RS 20n
-.rt  
 Frames received with format errors such that the frame was stripped.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmac_tokens\fR \fR
 .ad
 .RS 20n
-.rt  
 Number of tokens received (total of non-restricted and restricted).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmac_tvx_expired\fR \fR
 .ad
 .RS 20n
-.rt  
 Number of times that TVX has expired.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmac_late\fR \fR
 .ad
 .RS 20n
-.rt  
 Number of TRT expirations since this MAC was reset or a token was received.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmac_ring_ops\fR \fR
 .ad
 .RS 20n
-.rt  
 Number of times the ring has entered the ``Ring_Operational'' state from the
 ``Ring Not Operational'' state.
 .RE
@@ -1146,12 +1018,10 @@ Number of times the ring has entered the ``Ring_Operational'' state from the
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/misc/gld\fR \fR
 .ad
 .RS 21n
-.rt  
 loadable kernel module
 .RE
 

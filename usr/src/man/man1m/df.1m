@@ -1,5 +1,5 @@
 '\" te
-.\" Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved. 
+.\" Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved Portions
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at  http://www.opengroup.org/bookstore/.
@@ -10,21 +10,21 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH df 1M "26 Jul 2009" "SunOS 5.11" "System Administration Commands"
+.TH DF 1M "Jul 26, 2009"
 .SH NAME
 df \- displays number of free disk blocks and free files
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/df\fR [\fB-F\fR \fIFSType\fR] [\fB-abeghklntVvZ\fR] 
-     [\fB-o\fR \fIFSType-specific_options\fR] 
+\fB/usr/bin/df\fR [\fB-F\fR \fIFSType\fR] [\fB-abeghklntVvZ\fR]
+     [\fB-o\fR \fIFSType-specific_options\fR]
      [\fIblock_device\fR | \fIdirectory\fR | \fIfile\fR | \fIresource\fR ...]
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/df\fR [\fB-F\fR \fIFSType\fR] [\fB-abeghklnPtVZ\fR] 
-     [\fB-o\fR \fIFSType-specific_options\fR] 
+\fB/usr/xpg4/bin/df\fR [\fB-F\fR \fIFSType\fR] [\fB-abeghklnPtVZ\fR]
+     [\fB-o\fR \fIFSType-specific_options\fR]
      [\fIblock_device\fR | \fIdirectory\fR | \fIfile\fR | \fIresource\fR ...]
 .fi
 
@@ -53,7 +53,6 @@ The following options are supported for both \fB/usr/bin/df\fR and
 \fB/usr/xpg4/bin/df\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
@@ -65,7 +64,6 @@ Reports on all file systems including ones whose entries in \fB/etc/mnttab\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
@@ -76,7 +74,6 @@ Prints the total number of kilobytes free.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
@@ -87,7 +84,6 @@ Prints only the number of files free.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR \fIFSType\fR\fR
 .ad
@@ -102,7 +98,6 @@ table, or by consulting \fB/etc/default/fs\fR. See \fBdefault_fs\fR(4).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR\fR
 .ad
@@ -116,7 +111,6 @@ options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
@@ -139,7 +133,6 @@ and can not be used together with \fB-o\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR\fR
 .ad
@@ -156,7 +149,6 @@ overrides the \fB-b\fR, \fB-e\fR, \fB-n\fR, and \fB-t\fR options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
@@ -168,7 +160,6 @@ systems. It can not be used with the \fB-o\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
@@ -181,7 +172,6 @@ systems. It can not be used with the \fB-o\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIFSType-specific_options\fR\fR
 .ad
@@ -194,7 +184,6 @@ command for details.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
@@ -206,7 +195,6 @@ and \fB-n\fR options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
@@ -221,7 +209,6 @@ be used to verify and validate the command line.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Z\fR\fR
 .ad
@@ -238,7 +225,6 @@ zone.
 The following option is supported for \fB/usr/bin/df\fR only:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -294,7 +280,6 @@ the percentage of blocks in use by files
 The following option is supported for \fB/usr/xpg4/bin/df\fR only:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR\fR
 .ad
@@ -311,7 +296,6 @@ The \fBdf\fR utility interprets operands according to the following precedence:
 supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIblock_device\fR\fR
 .ad
@@ -322,7 +306,6 @@ Represents a block special device (for example, \fB/dev/dsk/c1d0s7\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdirectory\fR\fR
 .ad
@@ -334,7 +317,6 @@ contains \fIdirectory\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fR
 .ad
@@ -346,7 +328,6 @@ Represents a valid file name. \fBdf\fR reports on the file system that contains
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIresource\fR\fR
 .ad
@@ -444,7 +425,6 @@ example%\fB/usr/bin/df -F ufs -o i\fR
 .SH ENVIRONMENT VARIABLES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSYSV3\fR\fR
 .ad
@@ -468,7 +448,6 @@ that affect the execution of \fBdf\fR: \fBLANG\fR, \fBLC_ALL\fR,
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -479,7 +458,6 @@ Successful completion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
@@ -491,7 +469,6 @@ An error occurred.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/dsk/*\fR\fR
 .ad
@@ -502,7 +479,6 @@ Disk devices
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/default/fs\fR\fR
 .ad
@@ -515,7 +491,6 @@ is the default partition for a command if no FSType is specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/mnttab\fR\fR
 .ad
@@ -526,7 +501,6 @@ Mount table
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/vfstab\fR\fR
 .ad
@@ -544,13 +518,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

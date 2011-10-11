@@ -2,11 +2,11 @@
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright (c) 1980 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement specifies the terms and conditions for redistribution.
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
-.TH getpriority 3C "1 Apr 2008" "SunOS 5.11" "Standard C Library Functions"
+.TH GETPRIORITY 3C "Apr 1, 2008"
 .SH NAME
 getpriority, setpriority \- get and set the nice value
 .SH SYNOPSIS
@@ -98,24 +98,20 @@ Upon successful completion, \fBsetpriority()\fR returns \fB0\fR. Otherwise,
 The \fBgetpriority()\fR and \fBsetpriority()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBESRCH\fR\fR
 .ad
 .RS 10n
-.rt  
 No process or thread could be located using the \fIwhich\fR and \fIwho\fR
 argument values specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The value of the \fIwhich\fR argument was not recognized, or the value of the
 \fIwho\fR argument is not a valid process ID, process group ID, user ID, group
 ID, session ID, thread (lwp) ID, task ID, project ID, or zone ID.
@@ -126,12 +122,10 @@ ID, session ID, thread (lwp) ID, task ID, project ID, or zone ID.
 In addition, \fBsetpriority()\fR may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 10n
-.rt  
 A process was located, but neither the real nor effective user ID of the
 executing process match the effective user ID of the process whose nice value
 is being changed.
@@ -139,12 +133,10 @@ is being changed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 10n
-.rt  
 A request was made to change the nice value to a lower numeric value and the
 current process does not have appropriate privileges.
 .RE
@@ -165,7 +157,7 @@ ID returned by the call to \fBgetpid\fR(2).
 int which = PRIO_PROCESS;
 id_t pid;
 int ret;
- 
+
 pid = getpid();
 ret = getpriority(which, pid);
 .fi
@@ -186,7 +178,7 @@ int which = PRIO_PROCESS;
 id_t pid;
 int value = -20;
 int ret;
- 
+
 pid = getpid();
 ret = setpriority(which, pid, value);
 .fi
@@ -208,15 +200,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO

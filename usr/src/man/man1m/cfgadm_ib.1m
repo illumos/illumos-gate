@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cfgadm_ib 1M "2 Jul 2008" "SunOS 5.11" "System Administration Commands"
+.TH CFGADM_IB 1M "Jul 2, 2008"
 .SH NAME
 cfgadm_ib \- InfiniBand hardware specific commands for cfgadm
 .SH SYNOPSIS
@@ -105,7 +105,6 @@ of Port, VPPA and HCA_SVC device contains  its Partition Key (\fIP_Key\fR),
 of ap_id is as below:
 .sp
 .ne 2
-.mk
 .na
 \fBPort device\fR
 .ad
@@ -116,7 +115,6 @@ of ap_id is as below:
 
 .sp
 .ne 2
-.mk
 .na
 \fBVPPA device\fR
 .ad
@@ -127,7 +125,6 @@ of ap_id is as below:
 
 .sp
 .ne 2
-.mk
 .na
 \fBHCA_SVC device\fR
 .ad
@@ -160,7 +157,7 @@ one HCA_SVC) and one HCA:
 .sp
 .in +2
 .nf
-example# cfgadm -al 
+example# cfgadm -al
 Ap_Id                    Type       Receptacle   Occupant      Condition
 hca:21346543210a987      IB-HCA     connected    configured    ok
 ib                       IB-FABRIC  connected    configured    ok
@@ -197,7 +194,6 @@ listing attachment points.
 The receptacle state for attachment points have the following meanings:
 .sp
 .ne 2
-.mk
 .na
 \fBconnected\fR
 .ad
@@ -218,7 +214,6 @@ All IB ap_ids are always shown as connected.
 The occupant state for attachment points have the following meanings:
 .sp
 .ne 2
-.mk
 .na
 \fBconfigured\fR
 .ad
@@ -229,7 +224,6 @@ The IB device, and the HCA ap_id, are configured and usable by Solaris.
 
 .sp
 .ne 2
-.mk
 .na
 \fBunconfigured\fR
 .ad
@@ -250,7 +244,6 @@ hardware.
 The attachment point conditions are:
 .sp
 .ne 2
-.mk
 .na
 \fBfailed\fR
 .ad
@@ -261,7 +254,6 @@ Not used.
 
 .sp
 .ne 2
-.mk
 .na
 \fBfailing\fR
 .ad
@@ -272,7 +264,6 @@ Not used.
 
 .sp
 .ne 2
-.mk
 .na
 \fBok\fR
 .ad
@@ -283,7 +274,6 @@ Normal state. Ready for use.
 
 .sp
 .ne 2
-.mk
 .na
 \fBunknown\fR
 .ad
@@ -297,7 +287,6 @@ This condition does not apply to a HCA attachment point.
 
 .sp
 .ne 2
-.mk
 .na
 \fBunusable\fR
 .ad
@@ -312,7 +301,6 @@ Not used.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIfunction\fR\fR
 .ad
@@ -325,7 +313,6 @@ points (that is, the HCA ap_ids and the IB static \fBib\fR ap_id).
 The following generic commands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fBconfigure\fR
 .ad
@@ -336,7 +323,6 @@ Configure the IB device to be used by Solaris.
 
 .sp
 .ne 2
-.mk
 .na
 \fBunconfigure\fR
 .ad
@@ -350,7 +336,6 @@ Unconfigure the IB device. If successful, \fBcfgadm\fR reports the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
@@ -361,7 +346,6 @@ Not supported.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fIap_id\fR\fR
 .ad
@@ -372,7 +356,6 @@ Obtain IB specific help for an IB attachment point.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
@@ -412,7 +395,6 @@ of its ports. See \fBEXAMPLES\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIhardware_option\fR\fR
 .ad
@@ -423,7 +405,6 @@ This option is not currently defined.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIlisting_option\fR\fR
 .ad
@@ -435,7 +416,6 @@ Refer to the \fBcfgadm\fR(1M) man page for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR \fIhardware_function\fR\fR
 .ad
@@ -447,7 +427,6 @@ than 4 characters long.
 The following hardware specific functions are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadd_service\fR
 \fB-ocomm\fR\fB=[port|vppa|hca_svc],service=\fR\fIname\fR\fR
@@ -466,7 +445,6 @@ the \fBname\fR service to either \fBport-svc-list\fR or to the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdelete_service\fR
 \fB-ocomm\fR\fB=[port|vppa|hca_svc],service=\fR\fIname\fR\fR
@@ -484,7 +462,6 @@ service from the \fBport-svc-list\fR, \fBvppa-svc-list\fR, or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlist_clients\fR\fR
 .ad
@@ -503,7 +480,6 @@ displayed in that column.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlist_services\fR\fR
 .ad
@@ -516,7 +492,6 @@ point only. It lists all the Port and VPPA services as read from the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunconfig_clients\fR\fR
 .ad
@@ -530,7 +505,6 @@ Only IB kernel clients that do not have an alternate HCA are unconfigured. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBupdate_ioc_config\fR\fR
 .ad
@@ -548,7 +522,6 @@ See \fBib\fR(7D).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBupdate_pkey_tbls\fR\fR
 .ad
@@ -610,7 +583,7 @@ The following command lists the verbose status of a IB VPPA device:
 .sp
 .in +2
 .nf
-example# cfgadm -alv ib::80245678,ffff,ipib      
+example# cfgadm -alv ib::80245678,ffff,ipib
 Ap_Id                   Receptacle Occupant   Condition Information
 When         Type     Busy  Phys_Id
 ib::80245678,ffff,ipib    connected    configured   ok        ipib
@@ -686,7 +659,7 @@ The following command displays only IB ap_ids. The output only includes the
 .sp
 .in +2
 .nf
- 
+
 # cfgadm -al -s "cols=ap_id:info"  ib::80245678,ffff,ipib
 Ap_Id                                Information
 ib::80245678,ffff,ipib               ipib
@@ -705,7 +678,7 @@ The following command unconfigures the IB IOC attached to
 .in +2
 .nf
 # cfgadm -c unconfigure ib::80020123456789a
-Unconfigure the device: /devices/ib:fabric::80020123456789a 
+Unconfigure the device: /devices/ib:fabric::80020123456789a
 This operation will suspend activity on the IB device
 Continue (yes/no)?
 .fi
@@ -719,7 +692,7 @@ Enter: \fBy\fR
 .sp
 .in +2
 .nf
-IB device unconfigured successfully. 
+IB device unconfigured successfully.
 # cfgadm -al ib::80020123456789a
 Ap_Id                  Type      Receptacle  Occupant     Condition
 ib::80020123456789     IB-IOC    connected   unconfigured unknown
@@ -746,7 +719,7 @@ The following series of commands configures an IB device attached to
 # cfgadm -yc configure ib::80020123456789a
 # cfgadm -al ib::80020123456789a
 Ap_Id                  Type        Receptacle   Occupant     Condition
-ib::80020123456789a    IB-IOC      connected    configured   ok       
+ib::80020123456789a    IB-IOC      connected    configured   ok
 .fi
 .in -2
 .sp
@@ -864,7 +837,6 @@ The following command unconfigures all kernel clients of a HCA
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/cfgadm/ib.so.1\fR\fR
 .ad

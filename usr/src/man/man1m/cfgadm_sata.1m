@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cfgadm_sata 1M "27 Aug 2007" "SunOS 5.11" "System Administration Commands"
+.TH CFGADM_SATA 1M "Aug 27, 2007"
 .SH NAME
 cfgadm_sata \- SATA hardware-specific commands for cfgadm
 .SH SYNOPSIS
@@ -21,7 +21,7 @@ cfgadm_sata \- SATA hardware-specific commands for cfgadm
 
 .LP
 .nf
-\fB/usr/sbin/cfgadm\fR [\fB-v\fR] [\fB-a\fR] [\fB-s\fR \fIlisting_options\fR] 
+\fB/usr/sbin/cfgadm\fR [\fB-v\fR] [\fB-a\fR] [\fB-s\fR \fIlisting_options\fR]
      [\fB-o\fR \fIhardware_options\fR] [\fB-l\fR [\fIap_id\fR | \fIap_type\fR]...]
 .fi
 
@@ -66,34 +66,28 @@ sataX/P[.M][::dsk/cXtYd0]
 where
 .sp
 .ne 2
-.mk
 .na
 \fBX\fR
 .ad
 .RS 14n
-.rt  
 is the \fBSATA\fR controller number
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBP\fR
 .ad
 .RS 14n
-.rt  
 is the \fBSATA\fR controller's device port number (0 to 31)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBM\fR
 .ad
 .RS 14n
-.rt  
 is the port multiplier's device port number (0 to 14) the port multiplier host
 port number (15). It is used only when the port multiplier is attached to the
 \fBSATA\fR controller's device port.
@@ -101,23 +95,19 @@ port number (15). It is used only when the port multiplier is attached to the
 
 .sp
 .ne 2
-.mk
 .na
 \fBdev/cXtYd0\fR
 .ad
 .RS 14n
-.rt  
 identifies the attached \fBSATA\fR device
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBY\fR
 .ad
 .RS 14n
-.rt  
 is a target number
 .RE
 
@@ -191,24 +181,20 @@ The receptacle state for attachment point at the \fBSATA\fR port have the
 following meanings:
 .sp
 .ne 2
-.mk
 .na
 \fBempty\fR
 .ad
 .RS 16n
-.rt  
 The \fBSATA\fR port is powered-on and enabled. No device presence was detected
 on this port.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdisconnected\fR
 .ad
 .RS 16n
-.rt  
 The \fBSATA\fR port is not enabled or the \fBSATA\fR device presence was
 detected but no communication with the device was established, or the port has
 failed.
@@ -216,12 +202,10 @@ failed.
 
 .sp
 .ne 2
-.mk
 .na
 \fBconnected\fR
 .ad
 .RS 16n
-.rt  
 The \fBSATA\fR device is detected on the port the communication with the device
 is established.
 .RE
@@ -232,24 +216,20 @@ The occupant (device attached to the \fBSATA\fR port) state have the following
 meanings:
 .sp
 .ne 2
-.mk
 .na
 \fBconfigured\fR
 .ad
 .RS 16n
-.rt  
 The attached \fBSATA\fR device is configured and ready to use by the operating
 system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBunconfigured\fR
 .ad
 .RS 16n
-.rt  
 No device is attached, or the \fBSATA\fR device attached to the \fBSATA\fR port
 was not yet configured. To configure it, run the command "\fBcfgadm -c
 configure ap_id\fR".
@@ -260,23 +240,19 @@ configure ap_id\fR".
 The attachment point (\fBSATA\fR port) condition have the following meanings:
 .sp
 .ne 2
-.mk
 .na
 \fBok\fR
 .ad
 .RS 11n
-.rt  
 The \fBSATA\fR port is powered-on and enabled, and is ready for use.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBfailed\fR
 .ad
 .RS 11n
-.rt  
 The \fBSATA\fR port failed. It may be disabled and/or powered-off by the
 system. It is unusable and its condition is unknown. It may be due to the
 device plugged-in.
@@ -284,12 +260,10 @@ device plugged-in.
 
 .sp
 .ne 2
-.mk
 .na
 \fBunknown\fR
 .ad
 .RS 11n
-.rt  
 The \fBSATA\fR port is disabled and its condition is unknown.
 .RE
 
@@ -300,7 +274,6 @@ occupant state, and an attachment point (\fBSATA\fR port) condition. The valid
 states are:
 .sp
 .ne 2
-.mk
 .na
 \fBempty/unconfigured/ok\fR
 .ad
@@ -311,7 +284,6 @@ The \fBSATA\fR port is enabled and active. No device presence was detected.
 
 .sp
 .ne 2
-.mk
 .na
 \fBdisconnected/unconfigured/ok\fR
 .ad
@@ -323,7 +295,6 @@ communications with the device was established.
 
 .sp
 .ne 2
-.mk
 .na
 \fBdisconnected/unconfigured/unknown\fR
 .ad
@@ -334,7 +305,6 @@ The \fBSATA\fR Port is disabled and its condition is unknown.
 
 .sp
 .ne 2
-.mk
 .na
 \fBdisconnected/unconfigured/failed\fR
 .ad
@@ -346,7 +316,6 @@ system due to a system-detected failure.
 
 .sp
 .ne 2
-.mk
 .na
 \fBconnected/unconfigured/ok\fR
 .ad
@@ -359,7 +328,6 @@ to be used by the \fBOS\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBconnected/configured/ok\fR
 .ad
@@ -377,7 +345,6 @@ changes, (\fB-c\fR), invoking hardware specific functions (\fB-x\fR), and
 obtaining configuration administration help messages (\fB-h\fR).
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIfunction\fR\fR
 .ad
@@ -388,7 +355,6 @@ specific library. For \fBSATA\fR port attachment point, the following
 configuration state change operations are supported:
 .sp
 .ne 2
-.mk
 .na
 \fBconnect\fR
 .ad
@@ -400,7 +366,6 @@ attached device. This operation implies powering-on the port if necessary.
 
 .sp
 .ne 2
-.mk
 .na
 \fBdisconnect\fR
 .ad
@@ -416,24 +381,20 @@ For a \fBSATA\fR device attached to the \fBSATA\fR port following state change
 operations are supported:
 .sp
 .ne 2
-.mk
 .na
 \fBconfigure\fR
 .ad
 .RS 15n
-.rt  
 Configure new device for use by the operating system if it is not already
 configured. This command also implies connect operation, if necessary.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBunconfigure\fR
 .ad
 .RS 15n
-.rt  
 Unconfigure the device connected to the \fBSATA\fR port if it is not already
 unconfigured.
 .RE
@@ -447,7 +408,6 @@ multiplier's device ports.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
@@ -458,7 +418,6 @@ Not supported.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fIap_id\fR\fR
 .ad
@@ -470,7 +429,6 @@ Not supported.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR [\fB-v\fR]\fR
 .ad
@@ -501,7 +459,6 @@ No: product Serial Number
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIhardware_options\fR\fR
 .ad
@@ -512,7 +469,6 @@ No hardware specific options are currently defined.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIlisting_options\fR\fR
 .ad
@@ -524,7 +480,6 @@ suboption. See \fBcfgadm\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fIap_id\fR\fR
 .ad
@@ -537,7 +492,6 @@ controller, an error message is issued.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR \fIhardware_function\fR\fR
 .ad
@@ -554,7 +508,6 @@ message is issued and the operation is not performed. An error message will be
 also issued if the \fBSATA\fR controller does not support specified operation.
 .sp
 .ne 2
-.mk
 .na
 \fBsata_reset_device ap_id\fR
 .ad
@@ -566,7 +519,6 @@ Reset the \fBSATA\fR device attached to \fBap_id\fR \fBSATA\fR port. The
 
 .sp
 .ne 2
-.mk
 .na
 \fBsata_reset_port ap_id\fR
 .ad
@@ -581,7 +533,6 @@ the port multiplier may not be reset
 
 .sp
 .ne 2
-.mk
 .na
 \fBsata_reset_all ap_id\fR
 .ad
@@ -598,7 +549,6 @@ operation. Any newly enumerated devices will be left unconfigured.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsata_port_deactivate ap_id\fR
 .ad
@@ -610,7 +560,6 @@ emergency step; use with caution.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsata_port_activate ap_id\fR
 .ad
@@ -622,7 +571,6 @@ port which was deactivated to recover from errors.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsata_port_self_test ap_id\fR
 .ad
@@ -636,7 +584,6 @@ implies unconfiguring all devices and resetting the \fBSATA\fR controller.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -686,19 +633,19 @@ unconfigured/ok   -c disconnect   error message, no state change
 
 disconnected/
 unconfigured/
-unknown 
+unknown
 (no disk plugged) -c configure    error message, state change to
                                   empty/unconfigured/ok, or
                                   disconnected/unconfigured/failed
-       
+
 disconnected/
 unconfigured/
-unknown           -c configure    state change to 
+unknown           -c configure    state change to
 (disk plugged)                    connected/configured/ok or,
                                   connected/unconfigured/ok, or
                                   disconnected/unconfigured/failed and
                                   possible error message
-       
+
 disconnected/
 unconfigured/
 unknown           -c connect      empty/unconfigured/ok, or
@@ -733,7 +680,7 @@ unconfigured/ok   -c unconfigure  error message, no state change
 
 connected/
 unconfigured/ok   -c connect      error message, no state change
-       
+
 connected/
 unconfigured/ok   -c disconnect   disconnected/unconfigured/unknown, or
                                   disconnected/unconfigured/failed
@@ -842,12 +789,10 @@ cfgadm: Component system is busy, try again: failed to offline:
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB/usr/lib/cfgadm/sata.so.1\fR
 .ad
 .RS 29n
-.rt  
 Hardware specific library for generic \fBSATA\fR hot plugging.
 .RE
 

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH policy.conf 4 "25 Feb 2008" "SunOS 5.11" "File Formats"
+.TH POLICY.CONF 4 "Feb 25, 2008"
 .SH NAME
 policy.conf \- configuration file for security policy
 .SH SYNOPSIS
@@ -25,7 +25,6 @@ key=value
 The following keys are defined:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUTHS_GRANTED\fR\fR
 .ad
@@ -38,7 +37,6 @@ comma-separated authorizations defined in \fBauth_attr\fR(4).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROFS_GRANTED\fR\fR
 .ad
@@ -51,7 +49,6 @@ value is zero or more comma-separated profiles defined in \fBprof_attr\fR(4).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCONSOLE_USER\fR\fR
 .ad
@@ -65,7 +62,6 @@ defined in \fBprof_attr\fR(4).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_DEFAULT\fR and \fBPRIV_LIMIT\fR\fR
 .ad
@@ -94,7 +90,6 @@ privilege set can cause unexpected failure modes in applications.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLOCK_AFTER_RETRIES=YES|NO\fR\fR
 .ad
@@ -108,7 +103,6 @@ for a user equals or exceeds the allowed number of retries as defined by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCRYPT_ALGORITHMS_ALLOW\fR\fR
 .ad
@@ -120,7 +114,6 @@ in \fBcrypt_gensalt\fR(3C).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCRYPT_ALGORITHMS_DEPRECATE\fR\fR
 .ad
@@ -134,7 +127,6 @@ another algorithm, such as \fBCRYPT_DEFAULT=1\fR for BSD and Linux MD5.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCRYPT_DEFAULT\fR\fR
 .ad
@@ -196,45 +188,37 @@ occur.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/user_attr\fR\fR
 .ad
 .RS 29n
-.rt  
 Defines extended user attributes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/security/auth_attr\fR\fR
 .ad
 .RS 29n
-.rt  
 Defines authorizations.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/security/prof_attr\fR\fR
 .ad
 .RS 29n
-.rt  
 Defines profiles.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/security/policy.conf\fR\fR
 .ad
 .RS 29n
-.rt  
 Defines policy for the system.
 .RE
 
@@ -246,13 +230,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

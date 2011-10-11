@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libpicl 3PICL "28 Mar 2000" "SunOS 5.11" "PICL Library Functions"
+.TH LIBPICL 3PICL "Mar 28, 2000"
 .SH NAME
 libpicl \- PICL interface library
 .SH SYNOPSIS
 .LP
 .nf
-\fBcc\fR [ \fIflag\fR \|.\|.\|. ] \fIfile\fR \|.\|.\|. \fB-lpicl\fR [ \fIlibrary\fR \|.\|.\|. ] 
+\fBcc\fR [ \fIflag\fR \|.\|.\|. ] \fIfile\fR \|.\|.\|. \fB-lpicl\fR [ \fIlibrary\fR \|.\|.\|. ]
 #include <picl.h>
 .fi
 
@@ -33,21 +33,20 @@ the property set of a \fBpicl\fR class node.
 
 .sp
 .TS
-tab() box;
-cw(2.72i) |cw(2.78i) 
-lw(2.72i) |lw(2.78i) 
-.
-Property NameProperty Value
+box;
+c | c
+l | l .
+Property Name	Property Value
 _
-\fBname\fRThe name of the node
+\fBname\fR	The name of the node
 _
-\fB_class\fRThe PICL class name of the node
+\fB_class\fR	The PICL class name of the node
 _
-\fB_parent\fRNode handle of the parent node
+\fB_parent\fR	Node handle of the parent node
 _
-\fB_child\fRNode handle of the first child node
+\fB_child\fR	Node handle of the first child node
 _
-\fB_peer\fRNode handle of the next peer node
+\fB_peer\fR	Node handle of the next peer node
 .TE
 
 .sp
@@ -80,21 +79,20 @@ The following table lists the different PICL property types enumerated in
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-Property TypeProperty Value
+box;
+c | c
+l | l .
+Property Type	Property Value
 _
-\fBPICL_PTYPE_VOID\fRNone
+\fBPICL_PTYPE_VOID\fR	None
 _
-\fBPICL_PTYPE_INT\fRIs an integer
+\fBPICL_PTYPE_INT\fR	Is an integer
 _
-\fBPICL_PTYPE_UNSIGNED_INT\fRIs an unsigned integer
+\fBPICL_PTYPE_UNSIGNED_INT\fR	Is an unsigned integer
 _
-\fBPICL_PTYPE_FLOAT\fRIs a floating-point number
+\fBPICL_PTYPE_FLOAT\fR	Is a floating-point number
 _
-\fBPICL_PTYPE_REFERENCE\fRIs a PICL node handle
+\fBPICL_PTYPE_REFERENCE\fR	Is a PICL node handle
 .TE
 
 .SS "Reference Property Naming Convention"
@@ -119,7 +117,7 @@ defined by the \fBpicl_propinfo_t\fR structure.
 typedef struct {
     picl_prop_type_t  type;           /* property type */
     unsigned int      accessmode;     /* read, write */
-    size_t            size;           /* item size or 
+    size_t            size;           /* item size or
                                          string size */
     char              name[PICL_PROPNAMELEN_MAX];
 } picl_propinfo_t;
@@ -166,13 +164,12 @@ See \fBattributes\fR(5)  for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

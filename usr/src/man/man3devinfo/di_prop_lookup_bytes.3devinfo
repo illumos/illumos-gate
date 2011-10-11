@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH di_prop_lookup_bytes 3DEVINFO "26 Mar 2001" "SunOS 5.11" "Device Information Library Functions"
+.TH DI_PROP_LOOKUP_BYTES 3DEVINFO "Mar 26, 2001"
 .SH NAME
 di_prop_lookup_bytes, di_prop_lookup_ints, di_prop_lookup_int64,
 di_prop_lookup_strings \- search for a property
@@ -38,12 +38,10 @@ di_prop_lookup_strings \- search for a property
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdev\fR\fR
 .ad
 .RS 13n
-.rt  
 \fBdev_t\fR of minor node with which the property is associated.
 \fBDDI_DEV_T_ANY\fR is a wild card that matches all \fBdev_t\fR's, including
 \fBDDI_DEV_T_NONE\fR.
@@ -51,23 +49,19 @@ di_prop_lookup_strings \- search for a property
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInode\fR\fR
 .ad
 .RS 13n
-.rt  
 Handle to the device node with which the property is associated.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprop_data\fR\fR
 .ad
 .RS 13n
-.rt  
 For \fBdi_prop_lookup_bytes()\fR, the address to a pointer to an array of
 unsigned characters containing the property data.
 .sp
@@ -84,12 +78,10 @@ data.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprop_name\fR\fR
 .ad
 .RS 13n
-.rt  
 Name of the property for which to search.
 .RE
 
@@ -112,34 +104,28 @@ is set to indicate the error.
 These functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 11n
-.rt  
 Invalid argument.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSUP\fR\fR
 .ad
 .RS 11n
-.rt  
 The snapshot contains no property information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENXIO\fR\fR
 .ad
 .RS 11n
-.rt  
 The property does not exist; try \fBdi_prom_prop_lookup_*()\fR.
 .RE
 
@@ -151,15 +137,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

@@ -1,9 +1,9 @@
 '\" te
-.\" Copyright 2007, Sun Microsystems, Inc.  All Rights Reserved 
+.\" Copyright 2007, Sun Microsystems, Inc.  All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mac 1 "21 Mar 2007" "SunOS 5.11" "User Commands"
+.TH MAC 1 "Mar 21, 2007"
 .SH NAME
 mac \- calculate message authentication codes of the input
 .SH SYNOPSIS
@@ -33,12 +33,10 @@ single file.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIalgorithm\fR\fR
 .ad
 .RS 17n
-.rt  
 Specifies the name of the algorithm to use during the encryption or decryption
 process. See USAGE, \fBAlgorithms\fR for details. \fBNote:\fR Algorithms for
 producing general length \fBMAC\fRs are not supported.
@@ -46,12 +44,10 @@ producing general length \fBMAC\fRs are not supported.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR \fIkeyfile\fR\fR
 .ad
 .RS 17n
-.rt  
 Specifies the file containing the key value for the encryption algorithm. Each
 algorithm has specific key material requirements, as stated in the PKCS#11
 specification. If \fB-k\fR is not specified, \fBmac\fR prompts for  key
@@ -63,23 +59,19 @@ the \fISystem Administration Guide: Security Services\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-K\fR \fIkey_label\fR\fR
 .ad
 .RS 17n
-.rt  
 Specify the label of a symmetric token key in a PKCS#11 token.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 17n
-.rt  
 Displays the list of algorithms available on the system. This list can change
 depending on the configuration of the cryptographic framework. The keysizes are
 displayed in bits.
@@ -87,12 +79,10 @@ displayed in bits.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fItoken_spec\fR\fR
 .ad
 .RS 17n
-.rt  
 Specify a PKCS#11 token other than the default soft token object store when the
 \fB-K\fR is specified.
 .sp
@@ -117,12 +107,10 @@ token label and the manufacturer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 17n
-.rt  
 Provides verbose information.
 .RE
 
@@ -207,23 +195,19 @@ Enter pin for Sun Software PKCS#11 softtoken:
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -235,13 +219,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

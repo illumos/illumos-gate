@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libsasl 3LIB "27 Oct 2003" "SunOS 5.11" "Interface Libraries"
+.TH LIBSASL 3LIB "Oct 27, 2003"
 .SH NAME
 libsasl \- simple authentication and security layer library
 .SH SYNOPSIS
@@ -48,54 +48,50 @@ See \fBIntro\fR(3) for additional information on shared object interfaces.
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBprop_clear\fR\fBprop_dispose\fR
-\fBprop_dup\fR\fBprop_erase\fR
-\fBprop_format\fR\fBprop_get\fR
-\fBprop_getnames\fR\fBprop_new\fR
-\fBprop_request\fR\fBprop_set\fR
-\fBprop_setvals\fR\fBsasl_authorize_t\fR
-\fBsasl_auxprop\fR\fBsasl_auxprop_add_plugin\fR
-\fBsasl_auxprop_getctx\fR\fBsasl_auxprop_request\fR
-\fBsasl_canon_user_t\fR\fBsasl_canonuser_add_plugin\fR
-\fBsasl_chalprompt_t\fR\fBsasl_checkapop\fR
-\fBsasl_checkpass\fR\fBsasl_client_add_plugin\fR
-\fBsasl_client_init\fR\fBsasl_client_new\fR
-\fBsasl_client_plug_init_t\fR\fBsasl_client_start\fR
-\fBsasl_client_step\fR\fBsasl_decode\fR
-\fBsasl_decode64\fR\fBsasl_dispose\fR
-\fBsasl_done\fR\fBsasl_encode\fR
-\fBsasl_encode64\fR\fBsasl_encodev\fR
-\fBsasl_erasebuffer\fR\fBsasl_errdetail\fR
-\fBsasl_errors\fR\fBsasl_errstring\fR
-\fBsasl_getcallback_t\fR\fBsasl_getopt_t\fR
-\fBsasl_getpath_t\fR\fBsasl_getprop\fR
-\fBsasl_getrealm_t\fR\fBsasl_getsecret_t\fR
-\fBsasl_getsimple_t\fR\fBsasl_global_listmech\fR
-\fBsasl_idle\fR\fBsasl_listmech\fR
-\fBsasl_log_t\fR\fBsasl_server_add_plugin\fR
-\fBsasl_server_init\fR\fBsasl_server_new\fR
-\fBsasl_server_plug_init_t\fR\fBsasl_server_start\fR
-\fBsasl_server_step\fR\fBsasl_server_userdb_checkpass_t\fR
-\fBsasl_server_userdb_setpass_t\fR\fBsasl_set_alloc\fR
-\fBsasl_set_mutex\fR\fBsasl_seterror\fR
-\fBsasl_setpass\fR\fBsasl_setprop\fR
-\fBsasl_utf8verify\fR\fBsasl_verifyfile_t\fR
-\fBsasl_version\fR
+l l
+l l .
+\fBprop_clear\fR	\fBprop_dispose\fR
+\fBprop_dup\fR	\fBprop_erase\fR
+\fBprop_format\fR	\fBprop_get\fR
+\fBprop_getnames\fR	\fBprop_new\fR
+\fBprop_request\fR	\fBprop_set\fR
+\fBprop_setvals\fR	\fBsasl_authorize_t\fR
+\fBsasl_auxprop\fR	\fBsasl_auxprop_add_plugin\fR
+\fBsasl_auxprop_getctx\fR	\fBsasl_auxprop_request\fR
+\fBsasl_canon_user_t\fR	\fBsasl_canonuser_add_plugin\fR
+\fBsasl_chalprompt_t\fR	\fBsasl_checkapop\fR
+\fBsasl_checkpass\fR	\fBsasl_client_add_plugin\fR
+\fBsasl_client_init\fR	\fBsasl_client_new\fR
+\fBsasl_client_plug_init_t\fR	\fBsasl_client_start\fR
+\fBsasl_client_step\fR	\fBsasl_decode\fR
+\fBsasl_decode64\fR	\fBsasl_dispose\fR
+\fBsasl_done\fR	\fBsasl_encode\fR
+\fBsasl_encode64\fR	\fBsasl_encodev\fR
+\fBsasl_erasebuffer\fR	\fBsasl_errdetail\fR
+\fBsasl_errors\fR	\fBsasl_errstring\fR
+\fBsasl_getcallback_t\fR	\fBsasl_getopt_t\fR
+\fBsasl_getpath_t\fR	\fBsasl_getprop\fR
+\fBsasl_getrealm_t\fR	\fBsasl_getsecret_t\fR
+\fBsasl_getsimple_t\fR	\fBsasl_global_listmech\fR
+\fBsasl_idle\fR	\fBsasl_listmech\fR
+\fBsasl_log_t\fR	\fBsasl_server_add_plugin\fR
+\fBsasl_server_init\fR	\fBsasl_server_new\fR
+\fBsasl_server_plug_init_t\fR	\fBsasl_server_start\fR
+\fBsasl_server_step\fR	\fBsasl_server_userdb_checkpass_t\fR
+\fBsasl_server_userdb_setpass_t\fR	\fBsasl_set_alloc\fR
+\fBsasl_set_mutex\fR	\fBsasl_seterror\fR
+\fBsasl_setpass\fR	\fBsasl_setprop\fR
+\fBsasl_utf8verify\fR	\fBsasl_verifyfile_t\fR
+\fBsasl_version\fR	
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/libsasl.so.1\fR\fR
 .ad
 .RS 25n
-.rt  
 shared object
 .RE
 
@@ -107,13 +103,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

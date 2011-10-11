@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH strace 1M "4 Oct 1994" "SunOS 5.11" "System Administration Commands"
+.TH STRACE 1M "Oct 4, 1994"
 .SH NAME
 strace \- print STREAMS trace messages
 .SH SYNOPSIS
@@ -34,90 +34,74 @@ The format of each trace message output is:
 <\fIsid\fR> <\fItext\fR>
 .sp
 .ne 2
-.mk
 .na
 \fB<\fIseq\fR>\fR
 .ad
 .RS 11n
-.rt  
 trace sequence number
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB<\fBtime\fR>\fR
 .ad
 .RS 11n
-.rt  
 time of message in \fIhh:mm:ss\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB<\fIticks\fR>\fR
 .ad
 .RS 11n
-.rt  
 time of message in machine ticks since boot
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB<\fIlevel\fR>\fR
 .ad
 .RS 11n
-.rt  
 tracing priority level
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB<\fIflags\fR>\fR
 .ad
 .RS 11n
-.rt  
 E : message is also in the error log F : indicates a fatal error N : mail was
 sent to the system administrator (hardcoded as root)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB<\fImid\fR>\fR
 .ad
 .RS 11n
-.rt  
 module  \fBID\fR number of source
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB<\fIsid\fR>\fR
 .ad
 .RS 11n
-.rt  
 sub-ID number of source
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB<\fItext\fR>\fR
 .ad
 .RS 11n
-.rt  
 formatted text of the trace message
 .RE
 

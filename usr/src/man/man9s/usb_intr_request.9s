@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH usb_intr_request 9S "5 Jan 2004" "SunOS 5.11" "Data Structures for Drivers"
+.TH USB_INTR_REQUEST 9S "Jan 5, 2004"
 .SH NAME
 usb_intr_request \- USB interrupt request structure
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/usb/usba.h> 
+#include <sys/usb/usba.h>
 .fi
 
 .SH INTERFACE LEVEL
@@ -67,46 +67,38 @@ Request attributes define special handling for transfers. The following
 attributes are valid for interrupt requests:
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_ATTRS_SHORT_XFER_OK\fR
 .ad
 .RS 27n
-.rt  
 Accept transfers where less data is received than expected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_ATTRS_AUTOCLEARING\fR
 .ad
 .RS 27n
-.rt  
 Have USB framework reset pipe and clear functional stalls automatically on
 exception.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_ATTRS_PIPE_RESET\fR
 .ad
 .RS 27n
-.rt  
 Have USB framework reset pipe automatically on exception.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_ATTRS_ONE_XFER\fR
 .ad
 .RS 27n
-.rt  
 Perform a single IN transfer.  Do not start periodic transfers with this
 request.
 .RE
@@ -117,14 +109,14 @@ Please see \fBusb_request_attributes\fR(9S) for more information.
 .sp
 .in +2
 .nf
-Interrupt transfers/requests are subject to the following 
+Interrupt transfers/requests are subject to the following
 constraints and caveats:
 
-1) The following table indicates combinations of 
-   usb_pipe_intr_xfer() flags argument and fields 
+1) The following table indicates combinations of
+   usb_pipe_intr_xfer() flags argument and fields
    of the usb_intr_req_t request argument (X = don't care):
 
-     "none" as attributes in the table below indicates 
+     "none" as attributes in the table below indicates
      neither ONE_XFER nor SHORT_XFER_OK
 
      flags     Type  attributes      data    timeout semantics
@@ -146,7 +138,7 @@ constraints and caveats:
      X         OUT   X               NULL    X       illegal
 
      X         OUT   ONE_XFER        X       X       illegal
-        
+
      X         OUT   SHORT_XFER_OK   X       X       illegal
 
      no sleep  OUT   none            !=NULL  0       See table note (F)
@@ -160,112 +152,112 @@ constraints and caveats:
      Table notes:
 
        A) Continuous polling, new data is returned in cloned request
-          structures via continous callbacks, original request is 
+          structures via continous callbacks, original request is
           returned on stop polling.
 
-       B) One time poll, no timeout, callback when data is 
+       B) One time poll, no timeout, callback when data is
           received.
 
-       C) One time poll, with timeout, callback when data 
+       C) One time poll, with timeout, callback when data
           is received.
 
-       D) One time poll, no timeout, one callback, unblock 
+       D) One time poll, no timeout, one callback, unblock
           when transfer completes.
 
-       E) One time poll, timeout, one callback, unblock when 
+       E) One time poll, timeout, one callback, unblock when
           transfer completes or timeout occurs.
 
-       F) Transfer until data exhausted, no timeout, callback 
+       F) Transfer until data exhausted, no timeout, callback
           when done.
 
-       G) Transfer until data exhausted, timeout, callback 
+       G) Transfer until data exhausted, timeout, callback
           when done.
 
-       H) Transfer until data exhausted, no timeout, unblock 
+       H) Transfer until data exhausted, no timeout, unblock
           when data is received.
 
-       I) Transfer until data exhausted, timeout, unblock 
+       I) Transfer until data exhausted, timeout, unblock
           when data is received.
 
 
-   2) USB_FLAGS_SLEEP indicates here just to wait for 
-      resources, except when ONE_XFER is set, in which case it 
+   2) USB_FLAGS_SLEEP indicates here just to wait for
+      resources, except when ONE_XFER is set, in which case it
       also waits for completion before returning.
 
    3) Reads (IN):
 
-       a) The client driver does *not* provide a data buffer.  
-          By default, a READ request would mean continuous 
-          polling for data IN.  The USBA framework allocates a 
-          new data buffer for each poll.  intr_len specifies 
+       a) The client driver does *not* provide a data buffer.
+          By default, a READ request would mean continuous
+          polling for data IN.  The USBA framework allocates a
+          new data buffer for each poll.  intr_len specifies
          the amount of 'periodic data' for each poll.
 
-       b) The USBA framework issues a callback to the client 
-          at the end of a polling interval when there is data to 
-          return.  Each callback returns its data in a new request 
-          cloned from the original.  Note that the amount of data 
+       b) The USBA framework issues a callback to the client
+          at the end of a polling interval when there is data to
+          return.  Each callback returns its data in a new request
+          cloned from the original.  Note that the amount of data
           read IN is either intr_len or "wMaxPacketSize" in length.
 
-       c) Normally, the HCD keeps polling the interrupt endpoint 
-          forever even if there is no data to be read IN.  A 
-          client driver may stop this polling by calling 
+       c) Normally, the HCD keeps polling the interrupt endpoint
+          forever even if there is no data to be read IN.  A
+          client driver may stop this polling by calling
           usb_pipe_stop_intr_polling(9F).
-        
-       d) If a client driver chooses to pass USB_ATTRS_ONE_XFER 
-          as 'xfer_attributes' the HCD polls for data until 
-          some data is received.  The USBA framework reads in 
-          the data, does a callback, and stops polling for any 
+
+       d) If a client driver chooses to pass USB_ATTRS_ONE_XFER
+          as 'xfer_attributes' the HCD polls for data until
+          some data is received.  The USBA framework reads in
+          the data, does a callback, and stops polling for any
           more data.  In this case, the client
-          driver need not explicitly call 
+          driver need not explicitly call
           usb_pipe_stop_intr_polling().
 
-       e) All requests with USB_ATTRS_ONE_XFER require callbacks 
-          to be specified. 
-        
-       f) When continuous polling is stopped, the original 
+       e) All requests with USB_ATTRS_ONE_XFER require callbacks
+          to be specified.
+
+       f) When continuous polling is stopped, the original
           request is returned with USB_CR_STOPPED_POLLING.
-      
-       g) If the USB_ATTRS_SHORT_XFER_OK attribute is not set 
-          and a short transfer is received while polling, 
-          an error is assumed and polling is stopped.  In this 
-          case or the case of other errors, the error must be cleared 
-          and polling restarted by the client driver. Setting the 
+
+       g) If the USB_ATTRS_SHORT_XFER_OK attribute is not set
+          and a short transfer is received while polling,
+          an error is assumed and polling is stopped.  In this
+          case or the case of other errors, the error must be cleared
+          and polling restarted by the client driver. Setting the
           USB_ATTRS_AUTOCLEARING attribute will clear the error
-          but not restart polling.  (NOTE: Polling can be 
-          restarted from an exception callback corresponding to 
-          an original request.  Please see usb_pipe_intr_xfer(9F) 
+          but not restart polling.  (NOTE: Polling can be
+          restarted from an exception callback corresponding to
+          an original request.  Please see usb_pipe_intr_xfer(9F)
           for more information.
 
    4) Writes (OUT):
-        
-       a) A client driver provides the data buffer, and 
+
+       a) A client driver provides the data buffer, and
           data, needed for intr write.
 
-       b) Unlike read (see previous section), there  
+       b) Unlike read (see previous section), there
          is no continuous write mode.
 
-       c) The USB_ATTRS_ONE_XFER attribute is illegal.  
-          By default USBA keeps writing intr data until 
+       c) The USB_ATTRS_ONE_XFER attribute is illegal.
+          By default USBA keeps writing intr data until
           the provided data buffer has been
-          written out. The USBA framework does ONE 
+          written out. The USBA framework does ONE
           callback to the client driver.
 
        d) Queueing is supported.
 
-    The intr_completion_reason indicates the status 
-    of the transfer.  See usb_completion_reason(9S) for 
+    The intr_completion_reason indicates the status
+    of the transfer.  See usb_completion_reason(9S) for
     usb_cr_t definitions.
 
-    The intr_cb_flags are set prior to calling the 
-    exception callback handler, to summarize recovery actions 
+    The intr_cb_flags are set prior to calling the
+    exception callback handler, to summarize recovery actions
     taken and errors encountered during
-    recovery.  See usb_callback_flags(9S) for 
+    recovery.  See usb_callback_flags(9S) for
     usb_cb_flags_t definitions.
 
     --- Callback handling ---
 
-    All usb request types share the same callback 
-    handling. Please see usb_callback_flags(9S) for a 
+    All usb request types share the same callback
+    handling. Please see usb_callback_flags(9S) for a
    description of use and operation.
 .fi
 .in -2
@@ -278,15 +270,14 @@ See attributes(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitecturePCI-based systems
+Architecture	PCI-based systems
 _
-Interface stabilityCommitted
+Interface stability	Committed
 .TE
 
 .SH SEE ALSO

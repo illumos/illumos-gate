@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH rusage 1B "14 Sep 1992" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.TH RUSAGE 1B "Sep 14, 1992"
 .SH NAME
 rusage \- print resource usage for a command
 .SH SYNOPSIS
@@ -50,24 +50,22 @@ structure, as described in \fBgetrusage\fR(3C), as follows:
 
 .sp
 .TS
-tab();
-lw(.69i) lw(1.38i) lw(3.44i) 
-lw(.69i) lw(1.38i) lw(3.44i) 
-.
-\fBreal\fR\fBelapsed real time\fR
-\fBuser\fR\fBru_utime\fR\fBuser time used\fR
-\fBsys\fR\fBru_stime\fR\fBsystem time used\fR
-\fBpf\fR\fBru_majflt\fR\fBpage faults requiring physical I/O\fR
-\fBpr\fR\fBru_minflt\fR\fBpage faults not requiring physical I/O\fR
-\fBsw\fR\fBru_nswap\fR\fBswaps\fR
-\fBrb\fR\fBru_inblock\fR\fBblock input operations\fR
-\fBwb\fR\fBru_oublock\fR\fBblock output operations\fR
-\fBvcx\fR\fBru_nvcsw\fR\fBvoluntary context switches\fR
-\fBicx\fR\fBru_nivcsw\fR\fBinvoluntary context switches\fR
-\fBmx\fR\fBru_maxrss\fR\fBmaximum resident set size\fR
-\fBix\fR\fBru_ixrss\fR\fBcurrently 0\fR
-\fBid\fR\fBru_idrss\fR\fBintegral resident set size\fR
-\fBis\fR\fBru_isrss\fR\fBcurrently 0\fR
+l l l
+l l l .
+\fBreal\fR		\fBelapsed real time\fR
+\fBuser\fR	\fBru_utime\fR	\fBuser time used\fR
+\fBsys\fR	\fBru_stime\fR	\fBsystem time used\fR
+\fBpf\fR	\fBru_majflt\fR	\fBpage faults requiring physical I/O\fR
+\fBpr\fR	\fBru_minflt\fR	\fBpage faults not requiring physical I/O\fR
+\fBsw\fR	\fBru_nswap\fR	\fBswaps\fR
+\fBrb\fR	\fBru_inblock\fR	\fBblock input operations\fR
+\fBwb\fR	\fBru_oublock\fR	\fBblock output operations\fR
+\fBvcx\fR	\fBru_nvcsw\fR	\fBvoluntary context switches\fR
+\fBicx\fR	\fBru_nivcsw\fR	\fBinvoluntary context switches\fR
+\fBmx\fR	\fBru_maxrss\fR	\fBmaximum resident set size\fR
+\fBix\fR	\fBru_ixrss\fR	\fBcurrently 0\fR
+\fBid\fR	\fBru_idrss\fR	\fBintegral resident set size\fR
+\fBis\fR	\fBru_isrss\fR	\fBcurrently 0\fR
 .TE
 
 .SH SEE ALSO

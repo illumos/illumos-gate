@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH rt_dptbl 4 "15 Oct 2002" "SunOS 5.11" "File Formats"
+.TH RT_DPTBL 4 "Oct 15, 2002"
 .SH NAME
 rt_dptbl \- real-time dispatcher parameter table
 .SH DESCRIPTION
@@ -39,24 +39,20 @@ A parameter structure consists of the following members. These are also
 described in the \fB/usr/include/sys/rt.h\fR header file.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrt_globpri\fR\fR
 .ad
 .RS 14n
-.rt  
 The global scheduling priority associated with this priority level. The
 \fBrt_globpri\fR values cannot be changed with \fBdispadmin\fR(1M).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrt_quantum\fR\fR
 .ad
 .RS 14n
-.rt  
 The length of the time quantum allocated to processes at this level in ticks
 (\fBhz\fR). The time quantum value is only a default or starting value for
 processes at a particular level as the time quantum of a real-time process can

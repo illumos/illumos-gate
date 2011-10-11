@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH Intro 9F "11 Mar 2008" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH INTRO 9F "Mar 11, 2008"
 .SH NAME
 Intro, intro \- introduction to DDI/DKI functions
 .SH DESCRIPTION
@@ -130,97 +130,95 @@ The following table summarizes the STREAMS functions described in this section.
 
 .sp
 .TS
-tab();
-cw(2.75i) cw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-RoutineType
+c c
+l l .
+Routine	Type
 _
-\fBadjmsg\fRDDI/DKI
-\fBallocb\fRDDI/DKI
-\fBallocb_tmpl\fRSolaris DDI
-\fBbackq\fRDDI/DKI
-\fBbcanput\fRDDI/DKI
-\fBbcanputnext\fRDDI/DKI
-\fBbufcall\fRDDI/DKI
-\fBcanput\fRDDI/DKI
-\fBcanputnext\fRDDI/DKI
-\fBclrbuf\fRDDI/DKI
-\fBcopyb\fRDDI/DKI
-\fBcopymsg\fRDDI/DKI
-\fBDB_BASE\fRSolaris DDI
-\fBDB_LIM\fRSolaris DDI
-\fBDB_REF\fRSolaris DDI
-\fBDB_TYPE\fRSolaris DDI
-\fBdatamsg\fRDDI/DKI
-\fBdupb\fRDDI/DKI
-\fBdupmsg\fRDDI/DKI
-\fBenableok\fRDDI/DKI
-\fBesballoc\fRDDI/DKI
-\fBesbbcall\fRDDI/DKI
-\fBflushband\fRDDI/DKI
-\fBflushq\fRDDI/DKI
-\fBfreeb\fRDDI/DKI
-\fBfreemsg\fRDDI/DKI
-\fBfreezestr\fRDDI/DKI
-\fBgetq\fRDDI/DKI
-\fBIOC_CONVER_FROM\fRSolaris DDI
-\fBinsq\fRDDI/DKI
-\fBlinkb\fRDDI/DKI
-\fBMBLKHEAD\fRSolaris DDI
-\fBMBLKIN\fRSolaris DDI
-\fBMBLKL\fRSolaris DDI
-\fBMBLKSIZE\fRSolaris DDI
-\fBMBLKTAIL\fRSolaris DDI
-\fBmcopyin\fRSolaris DDI
-\fBmcopymsg\fRSolaris DDI
-\fBmcopyout\fRSolaris DDI
-\fBmerror\fRSolaris DDI
-\fBmexchange\fRSolaris DDI
-\fBmioc2ack\fRSolaris DDI
-\fBmiocack\fRSolaris DDI
-\fBmexchange\fRSolaris DDI
-\fBmiocpullup\fRSolaris DDI
-\fBmkiocb\fRSolaris DDI
-\fBmsgdsize\fRDDI/DKI
-\fBmsgpullup\fRDDI/DKI
-\fBmsgsize\fRSolaris DDI
-\fBmt-streams\fRSolaris DDI
-\fBnoenable\fRDDI/DKI
-\fBOTHERQ\fRDDI/DKI
-\fBpullupmsg\fRDDI/DKI
-\fBput\fRDDI/DKI
-\fBputbq\fRDDI/DKI
-\fBputctl\fRDDI/DKI
-\fBputctl1\fRDDI/DKI
-\fBputnext\fRDDI/DKI
-\fBputnextctl\fRDDI/DKI
-\fBputq\fRDDI/DKI
-\fBqassociate\fRSolaris DDI
-\fBqbufcall\fRSolaris DDI
-\fBqenable\fRDDI/DKI
-\fBqprocson\fRDDI/DKI
-\fBqprocsoff\fRDDI/DKI
-\fBqreply\fRDDI/DKI
-\fBqsize\fRDDI/DKI
-\fBqtimeout\fRSolaris DDI
-\fBqunbufcall\fRSolaris DDI
-\fBquntimeout\fRSolaris DDI
-\fBqwait\fRSolaris DDI
-\fBqwait_sig\fRSolaris DDI
-\fBqwriter\fRSolaris DDI
-\fBRD\fRDDI/DKI
-\fBrmvb\fRDDI/DKI
-\fBrmvq\fRDDI/DKI
-\fBSAMESTR\fRDDI/DKI
-\fBstrlog\fRDDI/DKI
-\fBstrqget\fRDDI/DKI
-\fBstrqset\fRDDI/DKI
-\fBtestb\fRDDI/DKI
-\fBunbufcall\fRDDI/DKI
-\fBunfreezestr\fRDDI/DKI
-\fBunlinkb\fRDDI/DKI
-\fBWR\fRDDI/DKI
+\fBadjmsg\fR	DDI/DKI
+\fBallocb\fR	DDI/DKI
+\fBallocb_tmpl\fR	Solaris DDI
+\fBbackq\fR	DDI/DKI
+\fBbcanput\fR	DDI/DKI
+\fBbcanputnext\fR	DDI/DKI
+\fBbufcall\fR	DDI/DKI
+\fBcanput\fR	DDI/DKI
+\fBcanputnext\fR	DDI/DKI
+\fBclrbuf\fR	DDI/DKI
+\fBcopyb\fR	DDI/DKI
+\fBcopymsg\fR	DDI/DKI
+\fBDB_BASE\fR	Solaris DDI
+\fBDB_LIM\fR	Solaris DDI
+\fBDB_REF\fR	Solaris DDI
+\fBDB_TYPE\fR	Solaris DDI
+\fBdatamsg\fR	DDI/DKI
+\fBdupb\fR	DDI/DKI
+\fBdupmsg\fR	DDI/DKI
+\fBenableok\fR	DDI/DKI
+\fBesballoc\fR	DDI/DKI
+\fBesbbcall\fR	DDI/DKI
+\fBflushband\fR	DDI/DKI
+\fBflushq\fR	DDI/DKI
+\fBfreeb\fR	DDI/DKI
+\fBfreemsg\fR	DDI/DKI
+\fBfreezestr\fR	DDI/DKI
+\fBgetq\fR	DDI/DKI
+\fBIOC_CONVER_FROM\fR	Solaris DDI
+\fBinsq\fR	DDI/DKI
+\fBlinkb\fR	DDI/DKI
+\fBMBLKHEAD\fR	Solaris DDI
+\fBMBLKIN\fR	Solaris DDI
+\fBMBLKL\fR	Solaris DDI
+\fBMBLKSIZE\fR	Solaris DDI
+\fBMBLKTAIL\fR	Solaris DDI
+\fBmcopyin\fR	Solaris DDI
+\fBmcopymsg\fR	Solaris DDI
+\fBmcopyout\fR	Solaris DDI
+\fBmerror\fR	Solaris DDI
+\fBmexchange\fR	Solaris DDI
+\fBmioc2ack\fR	Solaris DDI
+\fBmiocack\fR	Solaris DDI
+\fBmexchange\fR	Solaris DDI
+\fBmiocpullup\fR	Solaris DDI
+\fBmkiocb\fR	Solaris DDI
+\fBmsgdsize\fR	DDI/DKI
+\fBmsgpullup\fR	DDI/DKI
+\fBmsgsize\fR	Solaris DDI
+\fBmt-streams\fR	Solaris DDI
+\fBnoenable\fR	DDI/DKI
+\fBOTHERQ\fR	DDI/DKI
+\fBpullupmsg\fR	DDI/DKI
+\fBput\fR	DDI/DKI
+\fBputbq\fR	DDI/DKI
+\fBputctl\fR	DDI/DKI
+\fBputctl1\fR	DDI/DKI
+\fBputnext\fR	DDI/DKI
+\fBputnextctl\fR	DDI/DKI
+\fBputq\fR	DDI/DKI
+\fBqassociate\fR	Solaris DDI
+\fBqbufcall\fR	Solaris DDI
+\fBqenable\fR	DDI/DKI
+\fBqprocson\fR	DDI/DKI
+\fBqprocsoff\fR	DDI/DKI
+\fBqreply\fR	DDI/DKI
+\fBqsize\fR	DDI/DKI
+\fBqtimeout\fR	Solaris DDI
+\fBqunbufcall\fR	Solaris DDI
+\fBquntimeout\fR	Solaris DDI
+\fBqwait\fR	Solaris DDI
+\fBqwait_sig\fR	Solaris DDI
+\fBqwriter\fR	Solaris DDI
+\fBRD\fR	DDI/DKI
+\fBrmvb\fR	DDI/DKI
+\fBrmvq\fR	DDI/DKI
+\fBSAMESTR\fR	DDI/DKI
+\fBstrlog\fR	DDI/DKI
+\fBstrqget\fR	DDI/DKI
+\fBstrqset\fR	DDI/DKI
+\fBtestb\fR	DDI/DKI
+\fBunbufcall\fR	DDI/DKI
+\fBunfreezestr\fR	DDI/DKI
+\fBunlinkb\fR	DDI/DKI
+\fBWR\fR	DDI/DKI
 .TE
 
 .sp
@@ -230,656 +228,654 @@ The following table summarizes the functions not specific to STREAMS.
 
 .sp
 .TS
-tab();
-cw(2.75i) cw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-RoutineType
+c c
+l l .
+Routine	Type
 _
-\fBASSERT\fRDDI/DKI
-\fBanocancel\fRSolaris DDI
-\fBaphysio\fRSolaris DDI
-\fBatomic_add\fRDDI/DKI
-\fBatomic_and\fRDDI/DKI
-\fBatomic_bits\fRDDI/DKI
-\fBatomic_cas\fRDDI/DKI
-\fBatomic_dec\fRDDI/DKI
-\fBatomic_inc\fRDDI/DKI
-\fBatomic_ops\fRDDI/DKI
-\fBatomic_or\fRDDI/DKI
-\fBatomic_swap\fRDDI/DKI
-\fBbcmp\fRDDI/DKI
-\fBbcopy\fRDDI/DKI
-\fBbioclone\fRSolaris DDI
-\fBbiodone\fRDDI/DKI
-\fBbiofini\fRSolaris DDI
-\fBbioinit\fRSolaris DDI
-\fBbiomodified\fRSolaris DDI
-\fBbiosize\fRSolaris DDI
-\fBbioerror\fRSolaris DDI
-\fBbioreset\fRSolaris DDI
-\fBbiowait\fRDDI/DKI
-\fBbp_copyin\fRDDI/DKI
-\fBbp_copyout\fRDDI/DKI
-\fBbp_mapin\fRDDI/DKI
-\fBbp_mapout\fRDDI/DKI
-\fBbtop\fRDDI/DKI
-\fBbtopr\fRDDI/DKI
-\fBbzero\fRDDI/DKI
-\fBcmn_err\fRDDI/DKI
-\fBcondvar\fRSolaris DDI
-\fBcopyin\fRDDI/DKI
-\fBcopyout\fRDDI/DKI
-\fBcsx_AccessConfigurationRegister\fRSolaris DDI
-\fBcsx_ConvertSize\fRSolaris DDI
-\fBcsx_ConvertSpeed\fRSolaris DDI
-\fBcsx_CS_DDI_Info\fRSolaris DDI
-\fBcsx_DeregisterClient\fRSolaris DDI
-\fBcsx_DupHandle\fRSolaris DDI
-\fBcsx_Error2Text\fRSolaris DDI
-\fBcsx_Event2Text\fRSolaris DDI
-\fBcsx_FreeHandle\fRSolaris DDI
-\fBcsx_Get8\fRSolaris DDI
-\fBcsx_GetFirstClient\fRSolaris DDI
-\fBcsx_GetFirstTuple\fRSolaris DDI
-\fBcsx_GetHandleOffset\fRSolaris DDI
-\fBcsx_GetMappedAddr\fRSolaris DDI
-\fBcsx_GetStatus\fRSolaris DDI
-\fBcsx_GetTupleData\fRSolaris DDI
-\fBcsx_MakeDeviceNode\fRSolaris DDI
-\fBcsx_MapLogSocket\fRSolaris DDI
-\fBcsx_MapMemPage\fRSolaris DDI
-\fBcsx_ModifyConfiguration\fRSolaris DDI
-\fBcsx_ModifyWindow\fRSolaris DDI
-\fBcsx_Parse_CISTPL_BATTERY\fRSolaris DDI
-\fBcsx_Parse_CISTPL_BYTEORDER\fRSolaris DDI
-\fBcsx_Parse_CISTPL_CFTABLE_ENTRY\fRSolaris DDI
-\fBcsx_Parse_CISTPL_CONFIG\fRSolaris DDI
-\fBcsx_Parse_CISTPL_DATE\fRSolaris DDI
-\fBcsx_Parse_CISTPL_DEVICE\fRSolaris DDI
-\fBcsx_Parse_CISTPL_DEVICEGEO\fRSolaris DDI
-\fBcsx_Parse_CISTPL_DEVICEGEO_A\fRSolaris DDI
-\fBcsx_Parse_CISTPL_FORMAT\fRSolaris DDI
-\fBcsx_Parse_CISTPL_FUNCE\fRSolaris DDI
-\fBcsx_Parse_CISTPL_FUNCID\fRSolaris DDI
-\fBcsx_Parse_CISTPL_GEOMETRY\fRSolaris DDI
-\fBcsx_Parse_CISTPL_JEDEC_C\fRSolaris DDI
-\fBcsx_Parse_CISTPL_LINKTARGET\fRSolaris DDI
-\fBcsx_Parse_CISTPL_LONGLINK_A\fRSolaris DDI
-\fBcsx_Parse_CISTPL_LONGLINK_MFC\fRSolaris DDI
-\fBcsx_Parse_CISTPL_MANFID\fRSolaris DDI
-\fBcsx_Parse_CISTPL_ORG\fRSolaris DDI
-\fBcsx_Parse_CISTPL_SPCL\fRSolaris DDI
-\fBcsx_Parse_CISTPL_SWIL\fRSolaris DDI
-\fBcsx_Parse_CISTPL_VERS_1\fRSolaris DDI
-\fBcsx_Parse_CISTPL_VERS_2\fRSolaris DDI
-\fBcsx_ParseTuple\fRSolaris DDI
-\fBcsx_Put8\fRSolaris DDI
-\fBcsx_RegisterClient\fRSolaris DDI
-\fBcsx_ReleaseConfiguration\fRSolaris DDI
-\fBcsx_RepGet8\fRSolaris DDI
-\fBcsx_RepPut8\fRSolaris DDI
-\fBcsx_RequestConfiguration\fRSolaris DDI
-\fBcsx_RequestIO\fRSolaris DDI
-\fBcsx_RequestIRQ\fRSolaris DDI
-\fBcsx_RequestSocketMask\fRSolaris DDI
-\fBcsx_RequestWindow\fRSolaris DDI
-\fBcsx_ResetFunction\fRSolaris DDI
-\fBcsx_SetEventMask\fRSolaris DDI
-\fBcsx_SetHandleOffset\fRSolaris DDI
-\fBcsx_ValidateCIS\fRSolaris DDI
-\fBcv_broadcast\fRSolaris DDI
-\fBcv_destroy\fRSolaris DDI
-\fBcv_init\fRSolaris DDI
-\fBcv_signal\fRSolaris DDI
-\fBcv_timedwait\fRSolaris DDI
-\fBcv_wait\fRSolaris DDI
-\fBcv_wait_sig\fRSolaris DDI
-\fBddi_add_event_handler\fRSolaris DDI
-\fBddi_add_intr\fRSolaris DDI
-\fBddi_add_softintr\fRSolaris DDI
-\fBddi_binding_name\fRSolaris DDI
-\fBddi_btop\fRSolaris DDI
-\fBddi_btopr\fRSolaris DDI
-\fBddi_can_receive_sig\fRSolaris DDI
-\fBddi_check_acc_handle\fRSolaris DDI
-\fBddi_copyin\fRSolaris DDI
-\fBddi_copyout\fRSolaris DDI
-\fBddi_create_minor_node\fRSolaris DDI
-\fBddi_cred\fRSolaris DDI
-\fBddi_dev_is_sid\fRSolaris DDI
-\fBddi_dev_nintrs\fRSolaris DDI
-\fBddi_dev_nregs\fRSolaris DDI
-\fBddi_dev_regsize\fRSolaris DDI
-\fBddi_device_copy\fRSolaris DDI
-\fBddi_device_zero\fRSolaris DDI
-\fBddi_devmap_segmap\fRSolaris DDI
-\fBddi_dma_addr_bind_handle\fRSolaris DDI
-\fBddi_dma_addr_setup\fRSolaris DDI
-\fBddi_dma_alloc_handle\fRSolaris DDI
-\fBddi_dma_buf_bind_handle\fRSolaris DDI
-\fBddi_dma_buf_setup\fRSolaris DDI
-\fBddi_dma_burstsizes\fRSolaris DDI
-\fBddi_dma_coff\fRSolaris SPARC DDI
-\fBddi_dma_curwin\fRSolaris SPARC DDI
-\fBddi_dma_devalign\fRSolaris DDI
-\fBddi_dma_free\fRSolaris DDI
-\fBddi_dma_free_handle\fRSolaris DDI
-\fBddi_dma_getwin\fRSolaris DDI
-\fBddi_dma_get_attr\fRSolaris DDI
-\fBddi_dma_htoc\fRSolaris SPARC DDI
-\fBddi_dma_mem_alloc\fRSolaris DDI
-\fBddi_dma_mem_free\fRSolaris DDI
-\fBddi_dma_movwin\fRSolaris SPARC DDI
-\fBddi_dma_nextcookie\fRSolaris DDI
-\fBddi_dma_nextseg\fRSolaris DDI
-\fBddi_dma_nextwin\fRSolaris DDI
-\fBddi_dma_numwin\fRSolaris DDI
-\fBddi_dma_segtocookie\fRSolaris DDI
-\fBddi_dma_set_sbus64\fRSolaris DDI
-\fBddi_dma_setup\fRSolaris DDI
-\fBddi_dma_sync\fRSolaris DDI
-\fBddi_dma_unbind_handle\fRSolaris DDI
-\fBddi_dmae\fRSolaris x86 DDI
-\fBddi_dmae_1stparty\fRSolaris x86 DDI
-\fBddi_dmae_alloc\fRSolaris x86 DDI
-\fBddi_dmae_disable\fRSolaris x86 DDI
-\fBddi_dmae_enable\fRSolaris x86 DDI
-\fBddi_dmae_getattr\fRSolaris x86 DDI
-\fBddi_dmae_getcnt\fRSolaris x86 DDI
-\fBddi_dmae_getlim\fRSolaris x86 DDI
-\fBddi_dmae_prog\fRSolaris x86 DDI
-\fBddi_dmae_release\fRSolaris x86 DDI
-\fBddi_dmae_stop\fRSolaris x86 DDI
-\fBddi_driver_major\fRSolaris DDI
-\fBddi_driver_name\fRSolaris DDI
-\fBddi_enter_critical\fRSolaris DDI
-\fBddi_exit_critical\fRSolaris DDI
-\fBddi_ffs\fRSolaris DDI
-\fBddi_fls\fRSolaris DDI
-\fBddi_fm_acc_err_clear\fRSolaris DDI
-\fBddi_fm_acc_err_get\fRSolaris DDI
-\fBddi_fm_ereport_post\fRSolaris DDI
-\fBddi_fm_handler_register\fRSolaris DDI
-\fBddi_fm_init\fRSolaris DDI
-\fBddi_fm_service_impact\fRSolaris DDI
-\fBddi_get16\fRSolaris DDI
-\fBddi_get32\fRSolaris DDI
-\fBddi_get64\fRSolaris DDI
-\fBddi_get8\fRSolaris DDI
-\fBddi_get_cred\fRSolaris DDI
-\fBddi_get_devstate\fRSolaris DDI
-\fBddi_get_driver_private\fRSolaris DDI
-\fBddi_get_eventcookie\fRSolaris DDI
-\fBddi_get_iblock_cookie\fRSolaris DDI
-\fBddi_get_iminor\fRSolaris DDI
-\fBddi_get_instance\fRSolaris DDI
-\fBddi_get_kt_did\fRSolaris DDI
-\fBddi_get_lbolt\fRSolaris DDI
-\fBddi_get_name\fRSolaris DDI
-\fBddi_get_parent\fRSolaris DDI
-\fBddi_get_pid\fRSolaris DDI
-\fBddi_get_soft_iblock_cookie\fRSolaris DDI
-\fBddi_get_soft_state\fRSolaris DDI
-\fBddi_getb\fRSolaris DDI
-\fBddi_getl\fRSolaris DDI
-\fBddi_getll\fRSolaris DDI
-\fBddi_getlongprop\fRSolaris DDI
-\fBddi_getlongprop_buf\fRSolaris DDI
-\fBddi_getprop\fRSolaris DDI
-\fBddi_getproplen\fRSolaris DDI
-\fBddi_getw\fRSolaris DDI
-\fBddi_intr_add_handler\fRSolaris DDI
-\fBddi_intr_add_softint\fRSolaris DDI
-\fBddi_intr_alloc\fRSolaris DDI
-\fBddi_intr_block_disable\fRSolaris DDI
-\fBddi_intr_block_enable\fRSolaris DDI
-\fBddi_intr_clr_mask\fRSolaris DDI
-\fBddi_intr_dup_handler\fRSolaris DDI
-\fBddi_intr_disable\fRSolaris DDI
-\fBddi_intr_enable\fRSolaris DDI
-\fBddi_intr_free\fRSolaris DDI
-\fBddi_intr_get_cap\fRSolaris DDI
-\fBddi_intr_get_hilevel_pri\fRSolaris DDI
-\fBddi_intr_get_navail\fRSolaris DDI
-\fBddi_intr_get_nintrs\fRSolaris DDI
-\fBddi_intr_get_pending\fRSolaris DDI
-\fBddi_intr_get_pri\fRSolaris DDI
-\fBddi_intr_get_softint_pri\fRSolaris DDI
-\fBddi_intr_get_supported_types\fRSolaris DDI
-\fBddi_intr_remove_handler\fRSolaris DDI
-\fBddi_intr_remove_softint\fRSolaris DDI
-\fBddi_intr_set_cap\fRSolaris DDI
-\fBddi_intr_set_mask\fRSolaris DDI
-\fBddi_intr_set_pri\fRSolaris DDI
-\fBddi_intr_set_softint_pri\fRSolaris DDI
-\fBddi_intr_trigger_softint\fRSolaris DDI
-\fBddi_io_get16\fRSolaris DDI
-\fBddi_io_get32\fRSolaris DDI
-\fBddi_io_get8\fRSolaris DDI
-\fBddi_io_getb\fRSolaris DDI
-\fBddi_io_getl\fRSolaris DDI
-\fBddi_io_getw\fRSolaris DDI
-\fBddi_io_put16\fRSolaris DDI
-\fBddi_io_put32\fRSolaris DDI
-\fBddi_io_put8\fRSolaris DDI
-\fBddi_io_putb\fRSolaris DDI
-\fBddi_io_putl\fRSolaris DDI
-\fBddi_io_putw\fRSolaris DDI
-\fBddi_io_rep_get16\fRSolaris DDI
-\fBddi_io_rep_get32\fRSolaris DDI
-\fBddi_io_rep_get8\fRSolaris DDI
-\fBddi_io_rep_getb\fRSolaris DDI
-\fBddi_io_rep_getl\fRSolaris DDI
-\fBddi_io_rep_getw\fRSolaris DDI
-\fBddi_io_rep_put16\fRSolaris DDI
-\fBddi_io_rep_put32\fRSolaris DDI
-\fBddi_io_rep_put8\fRSolaris DDI
-\fBddi_io_rep_putb\fRSolaris DDI
-\fBddi_io_rep_putl\fRSolaris DDI
-\fBddi_io_rep_putw\fRSolaris DDI
-\fBddi_iomin\fRSolaris DDI
-\fBddi_iopb_alloc\fRSolaris DDI
-\fBddi_iopb_free\fRSolaris DDI
-\fBddi_log_sysevent\fRSolaris DDI
-\fBddi_map_regs\fRSolaris DDI
-\fBddi_mapdev\fRSolaris DDI
-\fBddi_mapdev_intercept\fRSolaris DDI
-\fBddi_mapdev_nointercept\fRSolaris DDI
-\fBddi_mapdev_set_device_acc_attr\fRSolaris DDI
-\fBddi_mem_alloc\fRSolaris DDI
-\fBddi_mem_free\fRSolaris DDI
-\fBddi_mem_get16\fRSolaris DDI
-\fBddi_mem_get32\fRSolaris DDI
-\fBddi_mem_get64\fRSolaris DDI
-\fBddi_mem_get8\fRSolaris DDI
-\fBddi_mem_getb\fRSolaris DDI
-\fBddi_mem_getl\fRSolaris DDI
-\fBddi_mem_getll\fRSolaris DDI
-\fBddi_mem_getw\fRSolaris DDI
-\fBddi_mem_put16\fRSolaris DDI
-\fBddi_mem_put32\fRSolaris DDI
-\fBddi_mem_put64\fRSolaris DDI
-\fBddi_mem_put8\fRSolaris DDI
-\fBddi_mem_putb\fRSolaris DDI
-\fBddi_mem_putl\fRSolaris DDI
-\fBddi_mem_putll\fRSolaris DDI
-\fBddi_mem_putw\fRSolaris DDI
-\fBddi_mem_rep_get16\fRSolaris DDI
-\fBddi_mem_rep_get32\fRSolaris DDI
-\fBddi_mem_rep_get64\fRSolaris DDI
-\fBddi_mem_rep_get8\fRSolaris DDI
-\fBddi_mem_rep_getb\fRSolaris DDI
-\fBddi_mem_rep_getl\fRSolaris DDI
-\fBddi_mem_rep_getll\fRSolaris DDI
-\fBddi_mem_rep_getw\fRSolaris DDI
-\fBddi_mem_rep_put16\fRSolaris DDI
-\fBddi_mem_rep_put32\fRSolaris DDI
-\fBddi_mem_rep_put64\fRSolaris DDI
-\fBddi_mem_rep_put8\fRSolaris DDI
-\fBddi_mem_rep_putb\fRSolaris DDI
-\fBddi_mem_rep_putl\fRSolaris DDI
-\fBddi_mem_rep_putll\fRSolaris DDI
-\fBddi_mem_rep_putw\fRSolaris DDI
-\fBddi_mmap_get_model\fRSolaris DDI
-\fBddi_model_convert_from\fRSolaris DDI
-\fBddi_modopen\fRSolaris DDI
-\fBddi_no_info\fRSolaris DDI
-\fBddi_node_name\fRSolaris DDI
-\fBddi_peek16\fRSolaris DDI
-\fBddi_peek32\fRSolaris DDI
-\fBddi_peek64\fRSolaris DDI
-\fBddi_peek8\fRSolaris DDI
-\fBddi_peekc\fRSolaris DDI
-\fBddi_peekd\fRSolaris DDI
-\fBddi_peekl\fRSolaris DDI
-\fBddi_peeks\fRSolaris DDI
-\fBddi_periodic_add\fRSolaris DDI
-\fBddi_periodic_delete\fRSolaris DDI
-\fBddi_poke16\fRSolaris DDI
-\fBddi_poke32\fRSolaris DDI
-\fBddi_poke64\fRSolaris DDI
-\fBddi_poke8\fRSolaris DDI
-\fBddi_pokec\fRSolaris DDI
-\fBddi_poked\fRSolaris DDI
-\fBddi_pokel\fRSolaris DDI
-\fBddi_pokes\fRSolaris DDI
-\fBddi_prop_create\fRSolaris DDI
-\fBddi_prop_exists\fRSolaris DDI
-\fBddi_prop_free\fRSolaris DDI
-\fBddi_prop_get_int\fRSolaris DDI
-\fBddi_prop_lookup\fRSolaris DDI
-\fBddi_prop_lookup_byte_array\fRSolaris DDI
-\fBddi_prop_lookup_int_array\fRSolaris DDI
-\fBddi_prop_lookup_string\fRSolaris DDI
-\fBddi_prop_lookup_string_array\fRSolaris DDI
-\fBddi_prop_modify\fRSolaris DDI
-\fBddi_prop_op\fRSolaris DDI
-\fBddi_prop_remove\fRSolaris DDI
-\fBddi_prop_remove_all\fRSolaris DDI
-\fBddi_prop_undefine\fRSolaris DDI
-\fBddi_prop_update\fRSolaris DDI
-\fBddi_prop_update_byte_array\fRSolaris DDI
-\fBddi_prop_update_int\fRSolaris DDI
-\fBddi_prop_update_int_array\fRSolaris DDI
-\fBddi_prop_update_string\fRSolaris DDI
-\fBddi_prop_update_string_array\fRSolaris DDI
-\fBddi_ptob\fRSolaris DDI
-\fBddi_put16\fRSolaris DDI
-\fBddi_put32\fRSolaris DDI
-\fBddi_put64\fRSolaris DDI
-\fBddi_put8\fRSolaris DDI
-\fBddi_putb\fRSolaris DDI
-\fBddi_putl\fRSolaris DDI
-\fBddi_putll\fRSolaris DDI
-\fBddi_putw\fRSolaris DDI
-\fBddi_regs_map_free\fRSolaris DDI
-\fBddi_regs_map_setup\fRSolaris DDI
-\fBddi_remove_event_handler\fRSolaris DDI
-\fBddi_remove_intr\fRSolaris DDI
-\fBddi_remove_minor_node\fRSolaris DDI
-\fBddi_remove_softintr\fRSolaris DDI
-\fBddi_removing_power\fRSolaris DDI
-\fBddi_rep_get16\fRSolaris DDI
-\fBddi_rep_get32\fRSolaris DDI
-\fBddi_rep_get64\fRSolaris DDI
-\fBddi_rep_get8\fRSolaris DDI
-\fBddi_rep_getb\fRSolaris DDI
-\fBddi_rep_getl\fRSolaris DDI
-\fBddi_rep_getll\fRSolaris DDI
-\fBddi_rep_getw\fRSolaris DDI
-\fBddi_rep_put16\fRSolaris DDI
-\fBddi_rep_put32\fRSolaris DDI
-\fBddi_rep_put64\fRSolaris DDI
-\fBddi_rep_put8\fRSolaris DDI
-\fBddi_rep_putb\fRSolaris DDI
-\fBddi_rep_putl\fRSolaris DDI
-\fBddi_rep_putll\fRSolaris DDI
-\fBddi_rep_putw\fRSolaris DDI
-\fBddi_report_dev\fRSolaris DDI
-\fBddi_root_node\fRSolaris DDI
-\fBddi_segmap\fRSolaris DDI
-\fBddi_segmap_setup\fRSolaris DDI
-\fBddi_set_driver_private\fRSolaris DDI
-\fBddi_slaveonly\fRSolaris DDI
-\fBddi_soft_state\fRSolaris DDI
-\fBddi_soft_state_fini\fRSolaris DDI
-\fBddi_soft_state_free\fRSolaris DDI
-\fBddi_soft_state_init\fRSolaris DDI
-\fBddi_soft_state_zalloc\fRSolaris DDI
-\fBddi_strlol\fRSolaris DDI
-\fBddi_strloul\fRSolaris DDI
-\fBddi_trigger_softintr\fRSolaris DDI
-\fBddi_umem_alloc\fRSolaris DDI
-\fBddi_umem_free\fRSolaris DDI
-\fBddi_umem_iosetup\fRSolaris DDI
-\fBddi_umem_lock\fRSolaris DDI
-\fBddi_unmap_regs\fRSolaris DDI
-\fBdelay\fRDDI/DKI
-\fBdevmap_default_access\fRSolaris DDI
-\fBdevmap_devmem_setup\fRSolaris DDI
-\fBdevmap_do_ctxmgt\fRSolaris DDI
-\fBdevmap_load\fRSolaris DDI
-\fBdevmap_set_ctx_timeout\fRSolaris DDI
-\fBdevmap_setup\fRSolaris DDI
-\fBdevmap_umem_setup\fRSolaris DDI
-\fBdevmap_unload\fRSolaris DDI
-\fBdisksort\fRSolaris DDI
-\fBdlbindack\fRSolaris DDI
-\fBdrv_getparm\fRDDI/DKI
-\fBdrv_hztousec\fRDDI/DKI
-\fBdrv_priv\fRDDI/DKI
-\fBdrv_usectohz\fRDDI/DKI
-\fBdrv_usecwait\fRDDI/DKI
-\fBfree_pktiopb\fRSolaris DDI
-\fBfreerbuf\fRDDI/DKI
-\fBget_pktiopb\fRSolaris DDI
-\fBgeterror\fRDDI/DKI
-\fBgethrtime\fRDDI/DKI
-\fBgetmajor\fRDDI/DKI
-\fBgetminor\fRDDI/DKI
-\fBgetrbuf\fRDDI/DKI
-\fBgld\fRSolaris DDI
-\fBhat_getkpfnum\fRDKI only
-\fBid32_alloc\fRSolaris DDI
-\fBinb\fRSolaris x86 DDI
-\fBinl\fRSolaris x86 DDI
-\fBinw\fRSolaris x86 DDI
-\fBkiconv\fRSolaris DDI
-\fBkiconv_close\fRSolaris DDI
-\fBkiconv_open\fRSolaris DDI
-\fBkiconvstr\fRSolaris DDI
-\fBkmem_alloc\fRDDI/DKI
-\fBkmem_cache_create\fRSolaris DDI
-\fBkmem_free\fRDDI/DKI
-\fBkmem_zalloc\fRDDI/DKI
-\fBkstat_create\fRSolaris DDI
-\fBkstat_delete\fRSolaris DDI
-\fBkstat_install\fRSolaris DDI
-\fBkstat_named_init\fRSolaris DDI
-\fBkstat_queue\fRSolaris DDI
-\fBkstat_runq_back_to_waitq\fRSolaris DDI
-\fBkstat_runq_enter\fRSolaris DDI
-\fBkstat_runq_exit\fRSolaris DDI
-\fBkstat_waitq_enter\fRSolaris DDI
-\fBkstat_waitq_exit\fRSolaris DDI
-\fBkstat_waitq_to_runq\fRSolaris DDI
-\fBldi_add_event_handler\fRSolaris DDI
-\fBldi_aread\fRSolaris DDI
-\fBldi_devmap\fRSolaris DDI
-\fBldi_dump\fRSolaris DDI
-\fBldi_ev_finalize\fRSolaris DDI
-\fBldi_ev_get_cookie\fRSolaris DDI
-\fBldi_ev_get_type\fRSolaris DDI
-\fBldi_ev_notify\fRSolaris DDI
-\fBldi_ev_register_callbacks\fRSolaris DDI
-\fBldi_ev_remove_callbacks\fRSolaris DDI
-\fBldi_get_dev\fRSolaris DDI
-\fBldi_get_eventcookie\fRSolaris DDI
-\fBldi_get_size\fRSolaris DDI
-\fBldi_ident_from_dev\fRSolaris DDI
-\fBldi_ioctl\fRSolaris DDI
-\fBldi_open_by_dev\fRSolaris DDI
-\fBldi_poll\fRSolaris DDI
-\fBldi_prop_exists\fRSolaris DDI
-\fBldi_prop_get_int\fRSolaris DDI
-\fBldi_prop_get_lookup_int_array\fRSolaris DDI
-\fBldi_putmsg\fRSolaris DDI
-\fBldi_read\fRSolaris DDI
-\fBldi_remove_event_handler\fRSolaris DDI
-\fBldi_strategy\fRSolaris DDI
-\fBmakecom_g0\fRSolaris DDI
-\fBmakecom_g0_s\fRSolaris DDI
-\fBmakecom_g1\fRSolaris DDI
-\fBmakecom_g5\fRSolaris DDI
-\fBmakedevice\fRDDI/DKI
-\fBmax\fRDDI/DKI
-\fBmax\fRDDI/DKI
-\fBmembar_ops\fRSolaris DDI
-\fBmemchr\fRSolaris DDI
-\fBminphys\fRSolaris DDI
-\fBmod_info\fRSolaris DDI
-\fBmod_install\fRSolaris DDI
-\fBmod_remove\fRSolaris DDI
-\fBmutex_destroy\fRSolaris DDI
-\fBmutex_enter\fRSolaris DDI
-\fBmutex_exit\fRSolaris DDI
-\fBmutex_init\fRSolaris DDI
-\fBmutex_owned\fRSolaris DDI
-\fBmutex_tryenter\fRSolaris DDI
-\fBnochpoll\fRSolaris DDI
-\fBnodev\fRDDI/DKI
-\fBnulldev\fRDDI/DKI
-\fBnumtos\fRSolaris DDI
-\fBnvlist_add_boolean\fRSolaris DDI
-\fBnvlist_alloc\fRSolaris DDI
-\fBnvlist_lookup_boolean\fRSolaris DDI
-\fBnvlist_lookup_nvpair\fRSolaris DDI
-\fBnvlist_next_nvpair\fRSolaris DDI
-\fBnvlist_remove\fRSolaris DDI
-\fBnvlist_value_byte\fRSolaris DDI
-\fBoutb\fRSolaris x86 DDI
-\fBoutl\fRSolaris x86 DDI
-\fBoutw\fRSolaris x86 DDI
-\fBpci_config_get16\fRSolaris DDI
-\fBpci_config_get32\fRSolaris DDI
-\fBpci_config_get64\fRSolaris DDI
-\fBpci_config_get8\fRSolaris DDI
-\fBpci_config_getb\fRSolaris DDI
-\fBpci_config_getl\fRSolaris DDI
-\fBpci_config_getw\fRSolaris DDI
-\fBpci_config_put16\fRSolaris DDI
-\fBpci_config_put32\fRSolaris DDI
-\fBpci_config_put64\fRSolaris DDI
-\fBpci_config_put8\fRSolaris DDI
-\fBpci_config_putb\fRSolaris DDI
-\fBpci_config_putl\fRSolaris DDI
-\fBpci_config_putw\fRSolaris DDI
-\fBpci_config_setup\fRSolaris DDI
-\fBpci_config_teardown\fRSolaris DDI
-\fBpci_ereport_setup\fRSolaris DDI
-\fBpci_report_pmcap\fRSolaris DDI
-\fBpci_save_config_regs\fRSolaris DDI
-\fBphysio\fRSolaris DDI
-\fBpm_busy_component\fRSolaris DDI
-\fBpm_power_has_changed\fRSolaris DDI
-\fBpm_raise_power\fRSolaris DDI
-\fBpm_trans_check\fRSolaris DDI
-\fBpollwakeup\fRDDI/DKI
-\fBpci_config_teardown\fRSolaris DDI
-\fBpci_config_teardown\fRSolaris DDI
-\fBpriv_getbyname\fRSolaris DDI
-\fBpriv_policy\fRSolaris DDI
-\fBproc_signal\fRSolaris DDI
-\fBproc_unref\fRSolaris DDI
-\fBptob\fRDDI/DKI
-\fBrepinsb\fRSolaris x86 DDI
-\fBrepinsd\fRSolaris x86 DDI
-\fBrepinsw\fRSolaris x86 DDI
-\fBrepoutsb\fRSolaris x86 DDI
-\fBrepoutsd\fRSolaris x86 DDI
-\fBrepoutsw\fRSolaris x86 DDI
-\fBrmalloc\fRDDI/DKI
-\fBrmalloc_wait\fRDDI/DKI
-\fBrmallocmap\fRDDI/DKI
-\fBrmallocmap_wait\fRDDI/DKI
-\fBrmfree\fRDDI/DKI
-\fBrmfreemap\fRDDI/DKI
-\fBrw_destroy\fRSolaris DDI
-\fBrw_downgrade\fRSolaris DDI
-\fBrw_enter\fRSolaris DDI
-\fBrw_exit\fRSolaris DDI
-\fBrw_init\fRSolaris DDI
-\fBrw_read_locked\fRSolaris DDI
-\fBrw_tryenter\fRSolaris DDI
-\fBrw_tryupgrade\fRSolaris DDI
-\fBscsi_abort\fRSolaris DDI
-\fBscsi_alloc_consistent_buf\fRSolaris DDI
-\fBscsi_cname\fRSolaris DDI
-\fBscsi_destroy_pkt\fRSolaris DDI
-\fBscsi_dmafree\fRSolaris DDI
-\fBscsi_dmaget\fRSolaris DDI
-\fBscsi_dname\fRSolaris DDI
-\fBscsi_errmsg\fRSolaris DDI
-\fBscsi_ext_sense_fields\fRSolaris DDI
-\fBscsi_find_sense_descr\fRSolaris DDI
-\fBscsi_free_consistent_buf\fRSolaris DDI
-\fBscsi_get_device_type_scsi_options\fRSolaris DDI
-\fBscsi_get_device_type_string\fRSolaris DDI
-\fBscsi_hba_attach\fRSolaris DDI
-\fBscsi_hba_attach_setup\fRSolaris DDI
-\fBscsi_hba_detach\fRSolaris DDI
-\fBscsi_hba_fini\fRSolaris DDI
-\fBscsi_hba_init\fRSolaris DDI
-\fBscsi_hba_lookup_capstr\fRSolaris DDI
-\fBscsi_hba_pkt_alloc\fRSolaris DDI
-\fBscsi_hba_pkt_free\fRSolaris DDI
-\fBscsi_hba_probe\fRSolaris DDI
-\fBscsi_hba_tran_alloc\fRSolaris DDI
-\fBscsi_hba_tran_free\fRSolaris DDI
-\fBscsi_ifgetcap\fRSolaris DDI
-\fBscsi_ifsetcap\fRSolaris DDI
-\fBscsi_init_pkt\fRSolaris DDI
-\fBscsi_log\fRSolaris DDI
-\fBscsi_mname\fRSolaris DDI
-\fBscsi_pktalloc\fRSolaris DDI
-\fBscsi_pktfree\fRSolaris DDI
-\fBscsi_poll\fRSolaris DDI
-\fBscsi_probe\fRSolaris DDI
-\fBscsi_resalloc\fRSolaris DDI
-\fBscsi_reset\fRSolaris DDI
-\fBscsi_reset_notify\fRSolaris DDI
-\fBscsi_resfree\fRSolaris DDI
-\fBscsi_rname\fRSolaris DDI
-\fBscsi_sense_key\fRSolaris DDI
-\fBscsi_setup_cdb\fRSolaris DDI
-\fBscsi_slave\fRSolaris DDI
-\fBscsi_sname\fRSolaris DDI
-\fBscsi_sync_pkt\fRSolaris DDI
-\fBscsi_transport\fRSolaris DDI
-\fBscsi_unprobe\fRSolaris DDI
-\fBscsi_unslave\fRSolaris DDI
-\fBscsi_validate_sense\fRSolaris DDI
-\fBscsi_vu_errmsg\fRSolaris DDI
-\fBsema_destroy\fRSolaris DDI
-\fBsema_init\fRSolaris DDI
-\fBsema_p\fRSolaris DDI
-\fBsema_p_sig\fRSolaris DDI
-\fBsema_tryp\fRSolaris DDI
-\fBsema_v\fRSolaris DDI
-\fBsprintf\fRSolaris DDI
-\fBstoi\fRSolaris DDI
-\fBstrchr\fRSolaris DDI
-\fBstrcmp\fRSolaris DDI
-\fBstrcpy\fRSolaris DDI
-\fBstrlen\fRSolaris DDI
-\fBstrncmp\fRSolaris DDI
-\fBstrncpy\fRSolaris DDI
-\fBSTRUCT_DECL\fRSolaris DDI
-\fBswab\fRDDI/DKI
-\fBtaskq\fRSolaris DDI
-\fBtimeout\fRDDI/DKI
-\fBu8_strcmp\fRSolaris DDI
-\fBu8_textprep_str\fRSolaris DDI
-\fBu8_validate\fRSolaris DDI
-\fBuconv_u16tou32\fRSolaris DDI
-\fBuiomove\fRDDI/DKI
-\fBuntimeout\fRDDI/DKI
-\fBureadc\fRDDI/DKI
-\fBusb_alloc_request\fRSolaris DDI
-\fBusb_client_attach\fRSolaris DDI
-\fBusb_clr_feature\fRSolaris DDI
-\fBusb_create_pm_components\fRSolaris DDI
-\fBusb_get_addr\fRSolaris DDI
-\fBusb_get_alt_if\fRSolaris DDI
-\fBusb_get_cfg\fRSolaris DDI
-\fBusb_get_current_frame_number\fRSolaris DDI
-\fBusb_get_dev_data\fRSolaris DDI
-\fBusb_get_max_pkts_per_ioc_request\fRSolaris DDI
-\fBusb_get_status\fRSolaris DDI
-\fBusb_get_string_desc\fRSolaris DDI
-\fBusb_handle_remote_wakeup\fRSolaris DDI
-\fBusb_lookup_ep_data\fRSolaris DDI
-\fBusb_parse_data\fRSolaris DDI
-\fBusb_pipe_bulk_xfer\fRSolaris DDI
-\fBusb_pipe_close\fRSolaris DDI
-\fBusb_pipe_ctrl_xfer\fRSolaris DDI
-\fBusb_pipe_drain_reqs\fRSolaris DDI
-\fBusb_pipe_get_max_bulk_transfer_size\fRSolaris DDI
-\fBusb_pipe_get_state\fRSolaris DDI
-\fBusb_pipe_intr_xfer\fRSolaris DDI
-\fBusb_pipe_isoc_xfer\fRSolaris DDI
-\fBusb_pipe_open\fRSolaris DDI
-\fBusb_pipe_reset\fRSolaris DDI
-\fBusb_pipe_set_private\fRSolaris DDI
-\fBusb_register_hotplug_cbs\fRSolaris DDI
-\fBusb_reset_device\fRSolaris DDI
-\fBuwritec\fRDDI/DKI
-\fBva_arg\fRSolaris DDI
-\fBva_end\fRSolaris DDI
-\fBva_start\fRSolaris DDI
-\fBvcmn_err\fRDDI/DKI
-\fBvsprintf\fRSolaris DDI
+\fBASSERT\fR	DDI/DKI
+\fBanocancel\fR	Solaris DDI
+\fBaphysio\fR	Solaris DDI
+\fBatomic_add\fR	DDI/DKI
+\fBatomic_and\fR	DDI/DKI
+\fBatomic_bits\fR	DDI/DKI
+\fBatomic_cas\fR	DDI/DKI
+\fBatomic_dec\fR	DDI/DKI
+\fBatomic_inc\fR	DDI/DKI
+\fBatomic_ops\fR	DDI/DKI
+\fBatomic_or\fR	DDI/DKI
+\fBatomic_swap\fR	DDI/DKI
+\fBbcmp\fR	DDI/DKI
+\fBbcopy\fR	DDI/DKI
+\fBbioclone\fR	Solaris DDI
+\fBbiodone\fR	DDI/DKI
+\fBbiofini\fR	Solaris DDI
+\fBbioinit\fR	Solaris DDI
+\fBbiomodified\fR	Solaris DDI
+\fBbiosize\fR	Solaris DDI
+\fBbioerror\fR	Solaris DDI
+\fBbioreset\fR	Solaris DDI
+\fBbiowait\fR	DDI/DKI
+\fBbp_copyin\fR	DDI/DKI
+\fBbp_copyout\fR	DDI/DKI
+\fBbp_mapin\fR	DDI/DKI
+\fBbp_mapout\fR	DDI/DKI
+\fBbtop\fR	DDI/DKI
+\fBbtopr\fR	DDI/DKI
+\fBbzero\fR	DDI/DKI
+\fBcmn_err\fR	DDI/DKI
+\fBcondvar\fR	Solaris DDI
+\fBcopyin\fR	DDI/DKI
+\fBcopyout\fR	DDI/DKI
+\fBcsx_AccessConfigurationRegister\fR	Solaris DDI
+\fBcsx_ConvertSize\fR	Solaris DDI
+\fBcsx_ConvertSpeed\fR	Solaris DDI
+\fBcsx_CS_DDI_Info\fR	Solaris DDI
+\fBcsx_DeregisterClient\fR	Solaris DDI
+\fBcsx_DupHandle\fR	Solaris DDI
+\fBcsx_Error2Text\fR	Solaris DDI
+\fBcsx_Event2Text\fR	Solaris DDI
+\fBcsx_FreeHandle\fR	Solaris DDI
+\fBcsx_Get8\fR	Solaris DDI
+\fBcsx_GetFirstClient\fR	Solaris DDI
+\fBcsx_GetFirstTuple\fR	Solaris DDI
+\fBcsx_GetHandleOffset\fR	Solaris DDI
+\fBcsx_GetMappedAddr\fR	Solaris DDI
+\fBcsx_GetStatus\fR	Solaris DDI
+\fBcsx_GetTupleData\fR	Solaris DDI
+\fBcsx_MakeDeviceNode\fR	Solaris DDI
+\fBcsx_MapLogSocket\fR	Solaris DDI
+\fBcsx_MapMemPage\fR	Solaris DDI
+\fBcsx_ModifyConfiguration\fR	Solaris DDI
+\fBcsx_ModifyWindow\fR	Solaris DDI
+\fBcsx_Parse_CISTPL_BATTERY\fR	Solaris DDI
+\fBcsx_Parse_CISTPL_BYTEORDER\fR	Solaris DDI
+\fBcsx_Parse_CISTPL_CFTABLE_ENTRY\fR	Solaris DDI
+\fBcsx_Parse_CISTPL_CONFIG\fR	Solaris DDI
+\fBcsx_Parse_CISTPL_DATE\fR	Solaris DDI
+\fBcsx_Parse_CISTPL_DEVICE\fR	Solaris DDI
+\fBcsx_Parse_CISTPL_DEVICEGEO\fR	Solaris DDI
+\fBcsx_Parse_CISTPL_DEVICEGEO_A\fR	Solaris DDI
+\fBcsx_Parse_CISTPL_FORMAT\fR	Solaris DDI
+\fBcsx_Parse_CISTPL_FUNCE\fR	Solaris DDI
+\fBcsx_Parse_CISTPL_FUNCID\fR	Solaris DDI
+\fBcsx_Parse_CISTPL_GEOMETRY\fR	Solaris DDI
+\fBcsx_Parse_CISTPL_JEDEC_C\fR	Solaris DDI
+\fBcsx_Parse_CISTPL_LINKTARGET\fR	Solaris DDI
+\fBcsx_Parse_CISTPL_LONGLINK_A\fR	Solaris DDI
+\fBcsx_Parse_CISTPL_LONGLINK_MFC\fR	Solaris DDI
+\fBcsx_Parse_CISTPL_MANFID\fR	Solaris DDI
+\fBcsx_Parse_CISTPL_ORG\fR	Solaris DDI
+\fBcsx_Parse_CISTPL_SPCL\fR	Solaris DDI
+\fBcsx_Parse_CISTPL_SWIL\fR	Solaris DDI
+\fBcsx_Parse_CISTPL_VERS_1\fR	Solaris DDI
+\fBcsx_Parse_CISTPL_VERS_2\fR	Solaris DDI
+\fBcsx_ParseTuple\fR	Solaris DDI
+\fBcsx_Put8\fR	Solaris DDI
+\fBcsx_RegisterClient\fR	Solaris DDI
+\fBcsx_ReleaseConfiguration\fR	Solaris DDI
+\fBcsx_RepGet8\fR	Solaris DDI
+\fBcsx_RepPut8\fR	Solaris DDI
+\fBcsx_RequestConfiguration\fR	Solaris DDI
+\fBcsx_RequestIO\fR	Solaris DDI
+\fBcsx_RequestIRQ\fR	Solaris DDI
+\fBcsx_RequestSocketMask\fR	Solaris DDI
+\fBcsx_RequestWindow\fR	Solaris DDI
+\fBcsx_ResetFunction\fR	Solaris DDI
+\fBcsx_SetEventMask\fR	Solaris DDI
+\fBcsx_SetHandleOffset\fR	Solaris DDI
+\fBcsx_ValidateCIS\fR	Solaris DDI
+\fBcv_broadcast\fR	Solaris DDI
+\fBcv_destroy\fR	Solaris DDI
+\fBcv_init\fR	Solaris DDI
+\fBcv_signal\fR	Solaris DDI
+\fBcv_timedwait\fR	Solaris DDI
+\fBcv_wait\fR	Solaris DDI
+\fBcv_wait_sig\fR	Solaris DDI
+\fBddi_add_event_handler\fR	Solaris DDI
+\fBddi_add_intr\fR	Solaris DDI
+\fBddi_add_softintr\fR	Solaris DDI
+\fBddi_binding_name\fR	Solaris DDI
+\fBddi_btop\fR	Solaris DDI
+\fBddi_btopr\fR	Solaris DDI
+\fBddi_can_receive_sig\fR	Solaris DDI
+\fBddi_check_acc_handle\fR	Solaris DDI
+\fBddi_copyin\fR	Solaris DDI
+\fBddi_copyout\fR	Solaris DDI
+\fBddi_create_minor_node\fR	Solaris DDI
+\fBddi_cred\fR	Solaris DDI
+\fBddi_dev_is_sid\fR	Solaris DDI
+\fBddi_dev_nintrs\fR	Solaris DDI
+\fBddi_dev_nregs\fR	Solaris DDI
+\fBddi_dev_regsize\fR	Solaris DDI
+\fBddi_device_copy\fR	Solaris DDI
+\fBddi_device_zero\fR	Solaris DDI
+\fBddi_devmap_segmap\fR	Solaris DDI
+\fBddi_dma_addr_bind_handle\fR	Solaris DDI
+\fBddi_dma_addr_setup\fR	Solaris DDI
+\fBddi_dma_alloc_handle\fR	Solaris DDI
+\fBddi_dma_buf_bind_handle\fR	Solaris DDI
+\fBddi_dma_buf_setup\fR	Solaris DDI
+\fBddi_dma_burstsizes\fR	Solaris DDI
+\fBddi_dma_coff\fR	Solaris SPARC DDI
+\fBddi_dma_curwin\fR	Solaris SPARC DDI
+\fBddi_dma_devalign\fR	Solaris DDI
+\fBddi_dma_free\fR	Solaris DDI
+\fBddi_dma_free_handle\fR	Solaris DDI
+\fBddi_dma_getwin\fR	Solaris DDI
+\fBddi_dma_get_attr\fR	Solaris DDI
+\fBddi_dma_htoc\fR	Solaris SPARC DDI
+\fBddi_dma_mem_alloc\fR	Solaris DDI
+\fBddi_dma_mem_free\fR	Solaris DDI
+\fBddi_dma_movwin\fR	Solaris SPARC DDI
+\fBddi_dma_nextcookie\fR	Solaris DDI
+\fBddi_dma_nextseg\fR	Solaris DDI
+\fBddi_dma_nextwin\fR	Solaris DDI
+\fBddi_dma_numwin\fR	Solaris DDI
+\fBddi_dma_segtocookie\fR	Solaris DDI
+\fBddi_dma_set_sbus64\fR	Solaris DDI
+\fBddi_dma_setup\fR	Solaris DDI
+\fBddi_dma_sync\fR	Solaris DDI
+\fBddi_dma_unbind_handle\fR	Solaris DDI
+\fBddi_dmae\fR	Solaris x86 DDI
+\fBddi_dmae_1stparty\fR	Solaris x86 DDI
+\fBddi_dmae_alloc\fR	Solaris x86 DDI
+\fBddi_dmae_disable\fR	Solaris x86 DDI
+\fBddi_dmae_enable\fR	Solaris x86 DDI
+\fBddi_dmae_getattr\fR	Solaris x86 DDI
+\fBddi_dmae_getcnt\fR	Solaris x86 DDI
+\fBddi_dmae_getlim\fR	Solaris x86 DDI
+\fBddi_dmae_prog\fR	Solaris x86 DDI
+\fBddi_dmae_release\fR	Solaris x86 DDI
+\fBddi_dmae_stop\fR	Solaris x86 DDI
+\fBddi_driver_major\fR	Solaris DDI
+\fBddi_driver_name\fR	Solaris DDI
+\fBddi_enter_critical\fR	Solaris DDI
+\fBddi_exit_critical\fR	Solaris DDI
+\fBddi_ffs\fR	Solaris DDI
+\fBddi_fls\fR	Solaris DDI
+\fBddi_fm_acc_err_clear\fR	Solaris DDI
+\fBddi_fm_acc_err_get\fR	Solaris DDI
+\fBddi_fm_ereport_post\fR	Solaris DDI
+\fBddi_fm_handler_register\fR	Solaris DDI
+\fBddi_fm_init\fR	Solaris DDI
+\fBddi_fm_service_impact\fR	Solaris DDI
+\fBddi_get16\fR	Solaris DDI
+\fBddi_get32\fR	Solaris DDI
+\fBddi_get64\fR	Solaris DDI
+\fBddi_get8\fR	Solaris DDI
+\fBddi_get_cred\fR	Solaris DDI
+\fBddi_get_devstate\fR	Solaris DDI
+\fBddi_get_driver_private\fR	Solaris DDI
+\fBddi_get_eventcookie\fR	Solaris DDI
+\fBddi_get_iblock_cookie\fR	Solaris DDI
+\fBddi_get_iminor\fR	Solaris DDI
+\fBddi_get_instance\fR	Solaris DDI
+\fBddi_get_kt_did\fR	Solaris DDI
+\fBddi_get_lbolt\fR	Solaris DDI
+\fBddi_get_name\fR	Solaris DDI
+\fBddi_get_parent\fR	Solaris DDI
+\fBddi_get_pid\fR	Solaris DDI
+\fBddi_get_soft_iblock_cookie\fR	Solaris DDI
+\fBddi_get_soft_state\fR	Solaris DDI
+\fBddi_getb\fR	Solaris DDI
+\fBddi_getl\fR	Solaris DDI
+\fBddi_getll\fR	Solaris DDI
+\fBddi_getlongprop\fR	Solaris DDI
+\fBddi_getlongprop_buf\fR	Solaris DDI
+\fBddi_getprop\fR	Solaris DDI
+\fBddi_getproplen\fR	Solaris DDI
+\fBddi_getw\fR	Solaris DDI
+\fBddi_intr_add_handler\fR	Solaris DDI
+\fBddi_intr_add_softint\fR	Solaris DDI
+\fBddi_intr_alloc\fR	Solaris DDI
+\fBddi_intr_block_disable\fR	Solaris DDI
+\fBddi_intr_block_enable\fR	Solaris DDI
+\fBddi_intr_clr_mask\fR	Solaris DDI
+\fBddi_intr_dup_handler\fR	Solaris DDI
+\fBddi_intr_disable\fR	Solaris DDI
+\fBddi_intr_enable\fR	Solaris DDI
+\fBddi_intr_free\fR	Solaris DDI
+\fBddi_intr_get_cap\fR	Solaris DDI
+\fBddi_intr_get_hilevel_pri\fR	Solaris DDI
+\fBddi_intr_get_navail\fR	Solaris DDI
+\fBddi_intr_get_nintrs\fR	Solaris DDI
+\fBddi_intr_get_pending\fR	Solaris DDI
+\fBddi_intr_get_pri\fR	Solaris DDI
+\fBddi_intr_get_softint_pri\fR	Solaris DDI
+\fBddi_intr_get_supported_types\fR	Solaris DDI
+\fBddi_intr_remove_handler\fR	Solaris DDI
+\fBddi_intr_remove_softint\fR	Solaris DDI
+\fBddi_intr_set_cap\fR	Solaris DDI
+\fBddi_intr_set_mask\fR	Solaris DDI
+\fBddi_intr_set_pri\fR	Solaris DDI
+\fBddi_intr_set_softint_pri\fR	Solaris DDI
+\fBddi_intr_trigger_softint\fR	Solaris DDI
+\fBddi_io_get16\fR	Solaris DDI
+\fBddi_io_get32\fR	Solaris DDI
+\fBddi_io_get8\fR	Solaris DDI
+\fBddi_io_getb\fR	Solaris DDI
+\fBddi_io_getl\fR	Solaris DDI
+\fBddi_io_getw\fR	Solaris DDI
+\fBddi_io_put16\fR	Solaris DDI
+\fBddi_io_put32\fR	Solaris DDI
+\fBddi_io_put8\fR	Solaris DDI
+\fBddi_io_putb\fR	Solaris DDI
+\fBddi_io_putl\fR	Solaris DDI
+\fBddi_io_putw\fR	Solaris DDI
+\fBddi_io_rep_get16\fR	Solaris DDI
+\fBddi_io_rep_get32\fR	Solaris DDI
+\fBddi_io_rep_get8\fR	Solaris DDI
+\fBddi_io_rep_getb\fR	Solaris DDI
+\fBddi_io_rep_getl\fR	Solaris DDI
+\fBddi_io_rep_getw\fR	Solaris DDI
+\fBddi_io_rep_put16\fR	Solaris DDI
+\fBddi_io_rep_put32\fR	Solaris DDI
+\fBddi_io_rep_put8\fR	Solaris DDI
+\fBddi_io_rep_putb\fR	Solaris DDI
+\fBddi_io_rep_putl\fR	Solaris DDI
+\fBddi_io_rep_putw\fR	Solaris DDI
+\fBddi_iomin\fR	Solaris DDI
+\fBddi_iopb_alloc\fR	Solaris DDI
+\fBddi_iopb_free\fR	Solaris DDI
+\fBddi_log_sysevent\fR	Solaris DDI
+\fBddi_map_regs\fR	Solaris DDI
+\fBddi_mapdev\fR	Solaris DDI
+\fBddi_mapdev_intercept\fR	Solaris DDI
+\fBddi_mapdev_nointercept\fR	Solaris DDI
+\fBddi_mapdev_set_device_acc_attr\fR	Solaris DDI
+\fBddi_mem_alloc\fR	Solaris DDI
+\fBddi_mem_free\fR	Solaris DDI
+\fBddi_mem_get16\fR	Solaris DDI
+\fBddi_mem_get32\fR	Solaris DDI
+\fBddi_mem_get64\fR	Solaris DDI
+\fBddi_mem_get8\fR	Solaris DDI
+\fBddi_mem_getb\fR	Solaris DDI
+\fBddi_mem_getl\fR	Solaris DDI
+\fBddi_mem_getll\fR	Solaris DDI
+\fBddi_mem_getw\fR	Solaris DDI
+\fBddi_mem_put16\fR	Solaris DDI
+\fBddi_mem_put32\fR	Solaris DDI
+\fBddi_mem_put64\fR	Solaris DDI
+\fBddi_mem_put8\fR	Solaris DDI
+\fBddi_mem_putb\fR	Solaris DDI
+\fBddi_mem_putl\fR	Solaris DDI
+\fBddi_mem_putll\fR	Solaris DDI
+\fBddi_mem_putw\fR	Solaris DDI
+\fBddi_mem_rep_get16\fR	Solaris DDI
+\fBddi_mem_rep_get32\fR	Solaris DDI
+\fBddi_mem_rep_get64\fR	Solaris DDI
+\fBddi_mem_rep_get8\fR	Solaris DDI
+\fBddi_mem_rep_getb\fR	Solaris DDI
+\fBddi_mem_rep_getl\fR	Solaris DDI
+\fBddi_mem_rep_getll\fR	Solaris DDI
+\fBddi_mem_rep_getw\fR	Solaris DDI
+\fBddi_mem_rep_put16\fR	Solaris DDI
+\fBddi_mem_rep_put32\fR	Solaris DDI
+\fBddi_mem_rep_put64\fR	Solaris DDI
+\fBddi_mem_rep_put8\fR	Solaris DDI
+\fBddi_mem_rep_putb\fR	Solaris DDI
+\fBddi_mem_rep_putl\fR	Solaris DDI
+\fBddi_mem_rep_putll\fR	Solaris DDI
+\fBddi_mem_rep_putw\fR	Solaris DDI
+\fBddi_mmap_get_model\fR	Solaris DDI
+\fBddi_model_convert_from\fR	Solaris DDI
+\fBddi_modopen\fR	Solaris DDI
+\fBddi_no_info\fR	Solaris DDI
+\fBddi_node_name\fR	Solaris DDI
+\fBddi_peek16\fR	Solaris DDI
+\fBddi_peek32\fR	Solaris DDI
+\fBddi_peek64\fR	Solaris DDI
+\fBddi_peek8\fR	Solaris DDI
+\fBddi_peekc\fR	Solaris DDI
+\fBddi_peekd\fR	Solaris DDI
+\fBddi_peekl\fR	Solaris DDI
+\fBddi_peeks\fR	Solaris DDI
+\fBddi_periodic_add\fR	Solaris DDI
+\fBddi_periodic_delete\fR	Solaris DDI
+\fBddi_poke16\fR	Solaris DDI
+\fBddi_poke32\fR	Solaris DDI
+\fBddi_poke64\fR	Solaris DDI
+\fBddi_poke8\fR	Solaris DDI
+\fBddi_pokec\fR	Solaris DDI
+\fBddi_poked\fR	Solaris DDI
+\fBddi_pokel\fR	Solaris DDI
+\fBddi_pokes\fR	Solaris DDI
+\fBddi_prop_create\fR	Solaris DDI
+\fBddi_prop_exists\fR	Solaris DDI
+\fBddi_prop_free\fR	Solaris DDI
+\fBddi_prop_get_int\fR	Solaris DDI
+\fBddi_prop_lookup\fR	Solaris DDI
+\fBddi_prop_lookup_byte_array\fR	Solaris DDI
+\fBddi_prop_lookup_int_array\fR	Solaris DDI
+\fBddi_prop_lookup_string\fR	Solaris DDI
+\fBddi_prop_lookup_string_array\fR	Solaris DDI
+\fBddi_prop_modify\fR	Solaris DDI
+\fBddi_prop_op\fR	Solaris DDI
+\fBddi_prop_remove\fR	Solaris DDI
+\fBddi_prop_remove_all\fR	Solaris DDI
+\fBddi_prop_undefine\fR	Solaris DDI
+\fBddi_prop_update\fR	Solaris DDI
+\fBddi_prop_update_byte_array\fR	Solaris DDI
+\fBddi_prop_update_int\fR	Solaris DDI
+\fBddi_prop_update_int_array\fR	Solaris DDI
+\fBddi_prop_update_string\fR	Solaris DDI
+\fBddi_prop_update_string_array\fR	Solaris DDI
+\fBddi_ptob\fR	Solaris DDI
+\fBddi_put16\fR	Solaris DDI
+\fBddi_put32\fR	Solaris DDI
+\fBddi_put64\fR	Solaris DDI
+\fBddi_put8\fR	Solaris DDI
+\fBddi_putb\fR	Solaris DDI
+\fBddi_putl\fR	Solaris DDI
+\fBddi_putll\fR	Solaris DDI
+\fBddi_putw\fR	Solaris DDI
+\fBddi_regs_map_free\fR	Solaris DDI
+\fBddi_regs_map_setup\fR	Solaris DDI
+\fBddi_remove_event_handler\fR	Solaris DDI
+\fBddi_remove_intr\fR	Solaris DDI
+\fBddi_remove_minor_node\fR	Solaris DDI
+\fBddi_remove_softintr\fR	Solaris DDI
+\fBddi_removing_power\fR	Solaris DDI
+\fBddi_rep_get16\fR	Solaris DDI
+\fBddi_rep_get32\fR	Solaris DDI
+\fBddi_rep_get64\fR	Solaris DDI
+\fBddi_rep_get8\fR	Solaris DDI
+\fBddi_rep_getb\fR	Solaris DDI
+\fBddi_rep_getl\fR	Solaris DDI
+\fBddi_rep_getll\fR	Solaris DDI
+\fBddi_rep_getw\fR	Solaris DDI
+\fBddi_rep_put16\fR	Solaris DDI
+\fBddi_rep_put32\fR	Solaris DDI
+\fBddi_rep_put64\fR	Solaris DDI
+\fBddi_rep_put8\fR	Solaris DDI
+\fBddi_rep_putb\fR	Solaris DDI
+\fBddi_rep_putl\fR	Solaris DDI
+\fBddi_rep_putll\fR	Solaris DDI
+\fBddi_rep_putw\fR	Solaris DDI
+\fBddi_report_dev\fR	Solaris DDI
+\fBddi_root_node\fR	Solaris DDI
+\fBddi_segmap\fR	Solaris DDI
+\fBddi_segmap_setup\fR	Solaris DDI
+\fBddi_set_driver_private\fR	Solaris DDI
+\fBddi_slaveonly\fR	Solaris DDI
+\fBddi_soft_state\fR	Solaris DDI
+\fBddi_soft_state_fini\fR	Solaris DDI
+\fBddi_soft_state_free\fR	Solaris DDI
+\fBddi_soft_state_init\fR	Solaris DDI
+\fBddi_soft_state_zalloc\fR	Solaris DDI
+\fBddi_strlol\fR	Solaris DDI
+\fBddi_strloul\fR	Solaris DDI
+\fBddi_trigger_softintr\fR	Solaris DDI
+\fBddi_umem_alloc\fR	Solaris DDI
+\fBddi_umem_free\fR	Solaris DDI
+\fBddi_umem_iosetup\fR	Solaris DDI
+\fBddi_umem_lock\fR	Solaris DDI
+\fBddi_unmap_regs\fR	Solaris DDI
+\fBdelay\fR	DDI/DKI
+\fBdevmap_default_access\fR	Solaris DDI
+\fBdevmap_devmem_setup\fR	Solaris DDI
+\fBdevmap_do_ctxmgt\fR	Solaris DDI
+\fBdevmap_load\fR	Solaris DDI
+\fBdevmap_set_ctx_timeout\fR	Solaris DDI
+\fBdevmap_setup\fR	Solaris DDI
+\fBdevmap_umem_setup\fR	Solaris DDI
+\fBdevmap_unload\fR	Solaris DDI
+\fBdisksort\fR	Solaris DDI
+\fBdlbindack\fR	Solaris DDI
+\fBdrv_getparm\fR	DDI/DKI
+\fBdrv_hztousec\fR	DDI/DKI
+\fBdrv_priv\fR	DDI/DKI
+\fBdrv_usectohz\fR	DDI/DKI
+\fBdrv_usecwait\fR	DDI/DKI
+\fBfree_pktiopb\fR	Solaris DDI
+\fBfreerbuf\fR	DDI/DKI
+\fBget_pktiopb\fR	Solaris DDI
+\fBgeterror\fR	DDI/DKI
+\fBgethrtime\fR	DDI/DKI
+\fBgetmajor\fR	DDI/DKI
+\fBgetminor\fR	DDI/DKI
+\fBgetrbuf\fR	DDI/DKI
+\fBgld\fR	Solaris DDI
+\fBhat_getkpfnum\fR	DKI only
+\fBid32_alloc\fR	Solaris DDI
+\fBinb\fR	Solaris x86 DDI
+\fBinl\fR	Solaris x86 DDI
+\fBinw\fR	Solaris x86 DDI
+\fBkiconv\fR	Solaris DDI
+\fBkiconv_close\fR	Solaris DDI
+\fBkiconv_open\fR	Solaris DDI
+\fBkiconvstr\fR	Solaris DDI
+\fBkmem_alloc\fR	DDI/DKI
+\fBkmem_cache_create\fR	Solaris DDI
+\fBkmem_free\fR	DDI/DKI
+\fBkmem_zalloc\fR	DDI/DKI
+\fBkstat_create\fR	Solaris DDI
+\fBkstat_delete\fR	Solaris DDI
+\fBkstat_install\fR	Solaris DDI
+\fBkstat_named_init\fR	Solaris DDI
+\fBkstat_queue\fR	Solaris DDI
+\fBkstat_runq_back_to_waitq\fR	Solaris DDI
+\fBkstat_runq_enter\fR	Solaris DDI
+\fBkstat_runq_exit\fR	Solaris DDI
+\fBkstat_waitq_enter\fR	Solaris DDI
+\fBkstat_waitq_exit\fR	Solaris DDI
+\fBkstat_waitq_to_runq\fR	Solaris DDI
+\fBldi_add_event_handler\fR	Solaris DDI
+\fBldi_aread\fR	Solaris DDI
+\fBldi_devmap\fR	Solaris DDI
+\fBldi_dump\fR	Solaris DDI
+\fBldi_ev_finalize\fR	Solaris DDI
+\fBldi_ev_get_cookie\fR	Solaris DDI
+\fBldi_ev_get_type\fR	Solaris DDI
+\fBldi_ev_notify\fR	Solaris DDI
+\fBldi_ev_register_callbacks\fR	Solaris DDI
+\fBldi_ev_remove_callbacks\fR	Solaris DDI
+\fBldi_get_dev\fR	Solaris DDI
+\fBldi_get_eventcookie\fR	Solaris DDI
+\fBldi_get_size\fR	Solaris DDI
+\fBldi_ident_from_dev\fR	Solaris DDI
+\fBldi_ioctl\fR	Solaris DDI
+\fBldi_open_by_dev\fR	Solaris DDI
+\fBldi_poll\fR	Solaris DDI
+\fBldi_prop_exists\fR	Solaris DDI
+\fBldi_prop_get_int\fR	Solaris DDI
+\fBldi_prop_get_lookup_int_array\fR	Solaris DDI
+\fBldi_putmsg\fR	Solaris DDI
+\fBldi_read\fR	Solaris DDI
+\fBldi_remove_event_handler\fR	Solaris DDI
+\fBldi_strategy\fR	Solaris DDI
+\fBmakecom_g0\fR	Solaris DDI
+\fBmakecom_g0_s\fR	Solaris DDI
+\fBmakecom_g1\fR	Solaris DDI
+\fBmakecom_g5\fR	Solaris DDI
+\fBmakedevice\fR	DDI/DKI
+\fBmax\fR	DDI/DKI
+\fBmax\fR	DDI/DKI
+\fBmembar_ops\fR	Solaris DDI
+\fBmemchr\fR	Solaris DDI
+\fBminphys\fR	Solaris DDI
+\fBmod_info\fR	Solaris DDI
+\fBmod_install\fR	Solaris DDI
+\fBmod_remove\fR	Solaris DDI
+\fBmutex_destroy\fR	Solaris DDI
+\fBmutex_enter\fR	Solaris DDI
+\fBmutex_exit\fR	Solaris DDI
+\fBmutex_init\fR	Solaris DDI
+\fBmutex_owned\fR	Solaris DDI
+\fBmutex_tryenter\fR	Solaris DDI
+\fBnochpoll\fR	Solaris DDI
+\fBnodev\fR	DDI/DKI
+\fBnulldev\fR	DDI/DKI
+\fBnumtos\fR	Solaris DDI
+\fBnvlist_add_boolean\fR	Solaris DDI
+\fBnvlist_alloc\fR	Solaris DDI
+\fBnvlist_lookup_boolean\fR	Solaris DDI
+\fBnvlist_lookup_nvpair\fR	Solaris DDI
+\fBnvlist_next_nvpair\fR	Solaris DDI
+\fBnvlist_remove\fR	Solaris DDI
+\fBnvlist_value_byte\fR	Solaris DDI
+\fBoutb\fR	Solaris x86 DDI
+\fBoutl\fR	Solaris x86 DDI
+\fBoutw\fR	Solaris x86 DDI
+\fBpci_config_get16\fR	Solaris DDI
+\fBpci_config_get32\fR	Solaris DDI
+\fBpci_config_get64\fR	Solaris DDI
+\fBpci_config_get8\fR	Solaris DDI
+\fBpci_config_getb\fR	Solaris DDI
+\fBpci_config_getl\fR	Solaris DDI
+\fBpci_config_getw\fR	Solaris DDI
+\fBpci_config_put16\fR	Solaris DDI
+\fBpci_config_put32\fR	Solaris DDI
+\fBpci_config_put64\fR	Solaris DDI
+\fBpci_config_put8\fR	Solaris DDI
+\fBpci_config_putb\fR	Solaris DDI
+\fBpci_config_putl\fR	Solaris DDI
+\fBpci_config_putw\fR	Solaris DDI
+\fBpci_config_setup\fR	Solaris DDI
+\fBpci_config_teardown\fR	Solaris DDI
+\fBpci_ereport_setup\fR	Solaris DDI
+\fBpci_report_pmcap\fR	Solaris DDI
+\fBpci_save_config_regs\fR	Solaris DDI
+\fBphysio\fR	Solaris DDI
+\fBpm_busy_component\fR	Solaris DDI
+\fBpm_power_has_changed\fR	Solaris DDI
+\fBpm_raise_power\fR	Solaris DDI
+\fBpm_trans_check\fR	Solaris DDI
+\fBpollwakeup\fR	DDI/DKI
+\fBpci_config_teardown\fR	Solaris DDI
+\fBpci_config_teardown\fR	Solaris DDI
+\fBpriv_getbyname\fR	Solaris DDI
+\fBpriv_policy\fR	Solaris DDI
+\fBproc_signal\fR	Solaris DDI
+\fBproc_unref\fR	Solaris DDI
+\fBptob\fR	DDI/DKI
+\fBrepinsb\fR	Solaris x86 DDI
+\fBrepinsd\fR	Solaris x86 DDI
+\fBrepinsw\fR	Solaris x86 DDI
+\fBrepoutsb\fR	Solaris x86 DDI
+\fBrepoutsd\fR	Solaris x86 DDI
+\fBrepoutsw\fR	Solaris x86 DDI
+\fBrmalloc\fR	DDI/DKI
+\fBrmalloc_wait\fR	DDI/DKI
+\fBrmallocmap\fR	DDI/DKI
+\fBrmallocmap_wait\fR	DDI/DKI
+\fBrmfree\fR	DDI/DKI
+\fBrmfreemap\fR	DDI/DKI
+\fBrw_destroy\fR	Solaris DDI
+\fBrw_downgrade\fR	Solaris DDI
+\fBrw_enter\fR	Solaris DDI
+\fBrw_exit\fR	Solaris DDI
+\fBrw_init\fR	Solaris DDI
+\fBrw_read_locked\fR	Solaris DDI
+\fBrw_tryenter\fR	Solaris DDI
+\fBrw_tryupgrade\fR	Solaris DDI
+\fBscsi_abort\fR	Solaris DDI
+\fBscsi_alloc_consistent_buf\fR	Solaris DDI
+\fBscsi_cname\fR	Solaris DDI
+\fBscsi_destroy_pkt\fR	Solaris DDI
+\fBscsi_dmafree\fR	Solaris DDI
+\fBscsi_dmaget\fR	Solaris DDI
+\fBscsi_dname\fR	Solaris DDI
+\fBscsi_errmsg\fR	Solaris DDI
+\fBscsi_ext_sense_fields\fR	Solaris DDI
+\fBscsi_find_sense_descr\fR	Solaris DDI
+\fBscsi_free_consistent_buf\fR	Solaris DDI
+\fBscsi_get_device_type_scsi_options\fR	Solaris DDI
+\fBscsi_get_device_type_string\fR	Solaris DDI
+\fBscsi_hba_attach\fR	Solaris DDI
+\fBscsi_hba_attach_setup\fR	Solaris DDI
+\fBscsi_hba_detach\fR	Solaris DDI
+\fBscsi_hba_fini\fR	Solaris DDI
+\fBscsi_hba_init\fR	Solaris DDI
+\fBscsi_hba_lookup_capstr\fR	Solaris DDI
+\fBscsi_hba_pkt_alloc\fR	Solaris DDI
+\fBscsi_hba_pkt_free\fR	Solaris DDI
+\fBscsi_hba_probe\fR	Solaris DDI
+\fBscsi_hba_tran_alloc\fR	Solaris DDI
+\fBscsi_hba_tran_free\fR	Solaris DDI
+\fBscsi_ifgetcap\fR	Solaris DDI
+\fBscsi_ifsetcap\fR	Solaris DDI
+\fBscsi_init_pkt\fR	Solaris DDI
+\fBscsi_log\fR	Solaris DDI
+\fBscsi_mname\fR	Solaris DDI
+\fBscsi_pktalloc\fR	Solaris DDI
+\fBscsi_pktfree\fR	Solaris DDI
+\fBscsi_poll\fR	Solaris DDI
+\fBscsi_probe\fR	Solaris DDI
+\fBscsi_resalloc\fR	Solaris DDI
+\fBscsi_reset\fR	Solaris DDI
+\fBscsi_reset_notify\fR	Solaris DDI
+\fBscsi_resfree\fR	Solaris DDI
+\fBscsi_rname\fR	Solaris DDI
+\fBscsi_sense_key\fR	Solaris DDI
+\fBscsi_setup_cdb\fR	Solaris DDI
+\fBscsi_slave\fR	Solaris DDI
+\fBscsi_sname\fR	Solaris DDI
+\fBscsi_sync_pkt\fR	Solaris DDI
+\fBscsi_transport\fR	Solaris DDI
+\fBscsi_unprobe\fR	Solaris DDI
+\fBscsi_unslave\fR	Solaris DDI
+\fBscsi_validate_sense\fR	Solaris DDI
+\fBscsi_vu_errmsg\fR	Solaris DDI
+\fBsema_destroy\fR	Solaris DDI
+\fBsema_init\fR	Solaris DDI
+\fBsema_p\fR	Solaris DDI
+\fBsema_p_sig\fR	Solaris DDI
+\fBsema_tryp\fR	Solaris DDI
+\fBsema_v\fR	Solaris DDI
+\fBsprintf\fR	Solaris DDI
+\fBstoi\fR	Solaris DDI
+\fBstrchr\fR	Solaris DDI
+\fBstrcmp\fR	Solaris DDI
+\fBstrcpy\fR	Solaris DDI
+\fBstrlen\fR	Solaris DDI
+\fBstrncmp\fR	Solaris DDI
+\fBstrncpy\fR	Solaris DDI
+\fBSTRUCT_DECL\fR	Solaris DDI
+\fBswab\fR	DDI/DKI
+\fBtaskq\fR	Solaris DDI
+\fBtimeout\fR	DDI/DKI
+\fBu8_strcmp\fR	Solaris DDI
+\fBu8_textprep_str\fR	Solaris DDI
+\fBu8_validate\fR	Solaris DDI
+\fBuconv_u16tou32\fR	Solaris DDI
+\fBuiomove\fR	DDI/DKI
+\fBuntimeout\fR	DDI/DKI
+\fBureadc\fR	DDI/DKI
+\fBusb_alloc_request\fR	Solaris DDI
+\fBusb_client_attach\fR	Solaris DDI
+\fBusb_clr_feature\fR	Solaris DDI
+\fBusb_create_pm_components\fR	Solaris DDI
+\fBusb_get_addr\fR	Solaris DDI
+\fBusb_get_alt_if\fR	Solaris DDI
+\fBusb_get_cfg\fR	Solaris DDI
+\fBusb_get_current_frame_number\fR	Solaris DDI
+\fBusb_get_dev_data\fR	Solaris DDI
+\fBusb_get_max_pkts_per_ioc_request\fR	Solaris DDI
+\fBusb_get_status\fR	Solaris DDI
+\fBusb_get_string_desc\fR	Solaris DDI
+\fBusb_handle_remote_wakeup\fR	Solaris DDI
+\fBusb_lookup_ep_data\fR	Solaris DDI
+\fBusb_parse_data\fR	Solaris DDI
+\fBusb_pipe_bulk_xfer\fR	Solaris DDI
+\fBusb_pipe_close\fR	Solaris DDI
+\fBusb_pipe_ctrl_xfer\fR	Solaris DDI
+\fBusb_pipe_drain_reqs\fR	Solaris DDI
+\fBusb_pipe_get_max_bulk_transfer_size\fR	Solaris DDI
+\fBusb_pipe_get_state\fR	Solaris DDI
+\fBusb_pipe_intr_xfer\fR	Solaris DDI
+\fBusb_pipe_isoc_xfer\fR	Solaris DDI
+\fBusb_pipe_open\fR	Solaris DDI
+\fBusb_pipe_reset\fR	Solaris DDI
+\fBusb_pipe_set_private\fR	Solaris DDI
+\fBusb_register_hotplug_cbs\fR	Solaris DDI
+\fBusb_reset_device\fR	Solaris DDI
+\fBuwritec\fR	DDI/DKI
+\fBva_arg\fR	Solaris DDI
+\fBva_end\fR	Solaris DDI
+\fBva_start\fR	Solaris DDI
+\fBvcmn_err\fR	DDI/DKI
+\fBvsprintf\fR	Solaris DDI
 .TE
 
 .SH SEE ALSO

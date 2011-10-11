@@ -3,19 +3,19 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_dma_getwin 9F "15 Nov 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_DMA_GETWIN 9F "Nov 15, 1996"
 .SH NAME
 ddi_dma_getwin \- activate a new DMA window
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/ddi.h> 
-#include <sys/sunddi.h> 
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
 
 
 
-\fBint\fR \fBddi_dma_getwin\fR(\fBddi_dma_handle_t\fR \fIhandle\fR, \fBuint_t\fR \fIwin\fR, 
-     \fBoff_t *\fR\fIoffp\fR, \fBsize_t *\fR\fIlenp\fR, \fBddi_dma_cookie_t\fR \fI*cookiep\fR, 
+\fBint\fR \fBddi_dma_getwin\fR(\fBddi_dma_handle_t\fR \fIhandle\fR, \fBuint_t\fR \fIwin\fR,
+     \fBoff_t *\fR\fIoffp\fR, \fBsize_t *\fR\fIlenp\fR, \fBddi_dma_cookie_t\fR \fI*cookiep\fR,
      \fBuint_t *\fR\fIccountp\fR);
 .fi
 
@@ -26,70 +26,58 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhandle\fR \fR
 .ad
 .RS 12n
-.rt  
 The  \fBDMA\fR handle previously allocated by a call to
 \fBddi_dma_alloc_handle\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIwin\fR \fR
 .ad
 .RS 12n
-.rt  
 Number of the window to activate.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoffp\fR \fR
 .ad
 .RS 12n
-.rt  
 Pointer to an offset.  Upon a successful return,  \fIoffp\fR will contain the
 new offset indicating the  beginning of the window within the object.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlenp\fR \fR
 .ad
 .RS 12n
-.rt  
 Upon a successful return,  \fIlenp\fR will contain the size, in bytes, of the
 current window.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcookiep\fR \fR
 .ad
 .RS 12n
-.rt  
 A pointer to the first  \fBddi_dma_cookie\fR(9S) structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIccountp\fR \fR
 .ad
 .RS 12n
-.rt  
 Upon a successful return,  \fIccountp\fR will contain the number of cookies for
 this  \fBDMA\fR window.
 .RE
@@ -135,23 +123,19 @@ start another \fBDMA\fR transfer.
 \fBddi_dma_getwin()\fR returns:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR \fR
 .ad
 .RS 16n
-.rt  
 Resources for the specified \fBDMA\fR window are allocated.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR \fR
 .ad
 .RS 16n
-.rt  
 \fIwin\fR is not a valid window index.
 .RE
 

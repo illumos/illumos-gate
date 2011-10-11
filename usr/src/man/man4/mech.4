@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mech 4 "6 Sep 2006" "SunOS 5.11" "File Formats"
+.TH MECH 4 "Sep 6, 2006"
 .SH NAME
 mech, qop \- mechanism and QOP files
 .SH SYNOPSIS
@@ -32,7 +32,6 @@ should be from the most preferred to the least preferred mechanisms.
 The \fB/etc/gss/mech\fR file contains five fields:
 .sp
 .ne 2
-.mk
 .na
 \fB\fImechanism name\fR\fR
 .ad
@@ -43,7 +42,6 @@ The \fB/etc/gss/mech\fR file contains five fields:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIobject identifier\fR\fR
 .ad
@@ -54,7 +52,6 @@ The \fB/etc/gss/mech\fR file contains five fields:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIshared library\fR\fR
 .ad
@@ -65,7 +62,6 @@ Shared library which implements the services provided by this mechanism.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIkernel module\fR\fR
 .ad
@@ -76,7 +72,6 @@ Kernel module which implements the services provided by this mechanism.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlibrary options\fR (optional field)\fR
 .ad
@@ -95,34 +90,28 @@ module entries.
 The \fB/etc/gss/qop\fR file contains three fields:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIQOP string\fR\fR
 .ad
 .RS 19n
-.rt  
 Name, in \fBASCII\fR, of this Quality of Protection.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIQOP value\fR\fR
 .ad
 .RS 19n
-.rt  
 Numeric value by which \fBRPC\fR identifies this \fBQOP\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImechanism name\fR \fR
 .ad
 .RS 19n
-.rt  
 \fBASCII\fR string representing the mechanism with which this \fBQOP\fR is
 associated.
 .RE

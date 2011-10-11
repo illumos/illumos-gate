@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ipmpstat 1M "10 Feb 2009" "SunOS 5.11" "System Administration Commands"
+.TH IPMPSTAT 1M "Feb 10, 2009"
 .SH NAME
 ipmpstat \- display IPMP subsystem status
 .SH SYNOPSIS
@@ -30,7 +30,6 @@ privileges.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
@@ -41,7 +40,6 @@ Display IPMP data address information ("address" output mode).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR\fR
 .ad
@@ -52,7 +50,6 @@ Display IPMP group information ("group" output mode).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
@@ -63,7 +60,6 @@ Display IP interface information ("interface" output mode).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
@@ -75,7 +71,6 @@ hostnames. This option may be used in any output mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIfield\fR[,...]\fR
 .ad
@@ -89,7 +84,6 @@ may be used to display all fields for a given output mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
@@ -100,7 +94,6 @@ Display IPMP probe information ("probe" output mode).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
@@ -111,7 +104,6 @@ Display IPMP target information ("target" output mode).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR\fR
 .ad
@@ -129,7 +121,6 @@ The \fBipmpstat\fR utility supports the output modes listed below. Note that
 these modes map to some of the options described above.
 .sp
 .ne 2
-.mk
 .na
 \fBAddress Mode\fR
 .ad
@@ -139,7 +130,6 @@ Address mode displays the state of all IPMP data addresses on the system. The
 following output fields are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBADDRESS\fR\fR
 .ad
@@ -154,7 +144,6 @@ take precedence.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTATE\fR\fR
 .ad
@@ -166,7 +155,6 @@ The state of the address. Either \fBup\fR if the address is \fBIFF_UP\fR (see
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGROUP\fR\fR
 .ad
@@ -177,7 +165,6 @@ The IPMP IP interface hosting the address.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBINBOUND\fR\fR
 .ad
@@ -192,7 +179,6 @@ interfaces left in the IPMP group).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOUTBOUND\fR\fR
 .ad
@@ -210,7 +196,6 @@ If \fB-o\fR is not specified, all output fields are displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fBGroup Mode\fR
 .ad
@@ -220,7 +205,6 @@ Group mode displays the state of all IPMP groups on the system. The following
 output fields are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGROUP\fR\fR
 .ad
@@ -232,7 +216,6 @@ group (see \fBin.mpathd\fR(1M)), this field will be empty.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGROUPNAME\fR\fR
 .ad
@@ -243,7 +226,6 @@ The IPMP group name. For the anonymous group, this field will be empty.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTATE\fR\fR
 .ad
@@ -252,34 +234,28 @@ The IPMP group name. For the anonymous group, this field will be empty.
 The state of the group:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBok\fR\fR
 .ad
 .RS 12n
-.rt  
 All interfaces in the group are usable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdegraded\fR\fR
 .ad
 .RS 12n
-.rt  
 Some (but not all) interfaces in the group are usable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfailed\fR\fR
 .ad
 .RS 12n
-.rt  
 No interfaces in the group are usable.
 .RE
 
@@ -287,7 +263,6 @@ No interfaces in the group are usable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFDT\fR\fR
 .ad
@@ -299,7 +274,6 @@ disabled, this field will be empty.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBINTERFACES\fR\fR
 .ad
@@ -335,7 +309,6 @@ If \fB-o\fR is not specified, all output fields are displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fBInterface Mode\fR
 .ad
@@ -345,7 +318,6 @@ Interface mode displays the state of all IP interfaces that are tracked by
 \fBin.mpathd\fR on the system. The following output fields are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBINTERFACE\fR\fR
 .ad
@@ -356,7 +328,6 @@ The IP interface name associated with the information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBACTIVE\fR\fR
 .ad
@@ -368,7 +339,6 @@ used by the system for IP data traffic.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGROUP\fR\fR
 .ad
@@ -380,7 +350,6 @@ the anonymous group (see \fBin.mpathd\fR(1M)), this field will be empty.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFLAGS\fR\fR
 .ad
@@ -389,78 +358,64 @@ the anonymous group (see \fBin.mpathd\fR(1M)), this field will be empty.
 Assorted information about the IP interface:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBi\fR\fR
 .ad
 .RS 5n
-.rt  
 Unusable due to being \fBINACTIVE\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fR
 .ad
 .RS 5n
-.rt  
 Marked \fBSTANDBY\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBm\fR\fR
 .ad
 .RS 5n
-.rt  
 Nominated to send/receive IPv4 multicast for its IPMP group.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBb\fR\fR
 .ad
 .RS 5n
-.rt  
 Nominated to send/receive IPv4 broadcast for its IPMP group.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM\fR\fR
 .ad
 .RS 5n
-.rt  
 Nominated to send/receive IPv6 multicast for its IPMP group.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd\fR\fR
 .ad
 .RS 5n
-.rt  
 Unusable due to being \fBdown\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBh\fR\fR
 .ad
 .RS 5n
-.rt  
 Unusable due to being brought \fBOFFLINE\fR by \fBin.mpathd\fR because of a
 duplicate hardware address.
 .RE
@@ -469,7 +424,6 @@ duplicate hardware address.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLINK\fR\fR
 .ad
@@ -478,7 +432,6 @@ duplicate hardware address.
 The state of link-based failure detection:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBup\fR\fR
 .ad
@@ -489,7 +442,6 @@ The link is up.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdown\fR\fR
 .ad
@@ -500,7 +452,6 @@ The link is down.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunknown\fR\fR
 .ad
@@ -513,7 +464,6 @@ The network driver does not report link state changes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROBE\fR\fR
 .ad
@@ -522,7 +472,6 @@ The network driver does not report link state changes.
 The state of probe-based failure detection:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBok\fR\fR
 .ad
@@ -533,7 +482,6 @@ Probes detect no problems.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfailed\fR\fR
 .ad
@@ -544,7 +492,6 @@ Probes detect failure.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunknown\fR\fR
 .ad
@@ -555,7 +502,6 @@ Probes cannot be sent since no suitable probe targets are known.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisabled\fR\fR
 .ad
@@ -569,7 +515,6 @@ configured.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTATE\fR\fR
 .ad
@@ -578,7 +523,6 @@ configured.
 The overall state of the interface:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBok\fR\fR
 .ad
@@ -590,7 +534,6 @@ failure detection methods.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfailed\fR\fR
 .ad
@@ -602,7 +545,6 @@ The interface is online but has a link state of \fBdown\fR or a probe state of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBoffline\fR\fR
 .ad
@@ -613,7 +555,6 @@ The interface is offline.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunknown\fR\fR
 .ad
@@ -630,7 +571,6 @@ If \fB-o\fR is not specified, all output fields are displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fBProbe Mode\fR
 .ad
@@ -641,7 +581,6 @@ Unlike other output modes, this mode runs until explicitly terminated using
 \fBCtrl-C\fR. The following output fields are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIME\fR\fR
 .ad
@@ -653,7 +592,6 @@ the probe was sent prior to starting \fBipmpstat\fR, the time will be negative.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROBE\fR\fR
 .ad
@@ -667,7 +605,6 @@ this identifier matches the \fBicmp_seq\fR field of the ICMP probe packet.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBINTERFACE\fR\fR
 .ad
@@ -678,7 +615,6 @@ The IP interface the probe was sent on.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTARGET\fR\fR
 .ad
@@ -689,7 +625,6 @@ The hostname (or IP address) of the target the probe was sent to.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNETRTT\fR\fR
 .ad
@@ -703,7 +638,6 @@ empty.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTT\fR\fR
 .ad
@@ -719,7 +653,6 @@ local system itself is overloaded.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTTAVG\fR\fR
 .ad
@@ -732,7 +665,6 @@ average, this field will be empty.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTTDEV\fR\fR
 .ad
@@ -750,7 +682,6 @@ If \fB-o\fR is not specified, all fields except for \fBRTTAVG\fR and
 
 .sp
 .ne 2
-.mk
 .na
 \fBTarget Mode\fR
 .ad
@@ -760,7 +691,6 @@ Target mode displays IPMP probe target information. The following output fields
 are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBINTERFACE\fR\fR
 .ad
@@ -771,7 +701,6 @@ The IP interface name associated with the information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMODE\fR\fR
 .ad
@@ -780,34 +709,28 @@ The IP interface name associated with the information.
 The probe target discovery mode:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBroutes\fR\fR
 .ad
 .RS 13n
-.rt  
 Probe targets found by means of the routing table.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmulticast\fR\fR
 .ad
 .RS 13n
-.rt  
 Probe targets found by means of multicast ICMP probes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisabled\fR\fR
 .ad
 .RS 13n
-.rt  
 Probe-based failure detection is disabled.
 .RE
 
@@ -815,7 +738,6 @@ Probe-based failure detection is disabled.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTESTADDR\fR\fR
 .ad
@@ -830,7 +752,6 @@ address.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTARGETS\fR\fR
 .ad
@@ -919,17 +840,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-Machine-Parseable FormatCommitted
+Machine-Parseable Format	Committed
 _
-Human-Friendly FormatNot-an-Interface
+Human-Friendly Format	Not-an-Interface
 .TE
 
 .sp

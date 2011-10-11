@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ufs 7FS "18 Jun 2009" "SunOS 5.11" "File Systems"
+.TH UFS 7FS "Jun 18, 2009"
 .SH NAME
 ufs \- UFS file system
 .SH SYNOPSIS
@@ -48,23 +48,19 @@ when the last system write occurred. \fBfs_state\fR is updated whenever
 \fBfs_clean\fR changes. Some \fBfs_clean\fR values are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFSCLEAN\fR\fR
 .ad
 .RS 12n
-.rt  
 Indicates an undamaged, cleanly unmounted file system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFSACTIVE\fR\fR
 .ad
 .RS 12n
-.rt  
 Indicates a mounted file system that has modified data in memory. A mounted
 file system with this state flag indicates that user data or metadata would be
 lost if power to the system is interrupted.
@@ -72,12 +68,10 @@ lost if power to the system is interrupted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFSSTABLE\fR\fR
 .ad
 .RS 12n
-.rt  
 Indicates an idle mounted file system. A mounted file system with this state
 flag indicates that neither user data nor metadata would be lost if power to
 the system is interrupted.
@@ -85,23 +79,19 @@ the system is interrupted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFSBAD\fR\fR
 .ad
 .RS 12n
-.rt  
 Indicates that this file system contains inconsistent file system data.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBFSLOG\fR
 .ad
 .RS 12n
-.rt  
 Indicates that the file system has logging enabled. A file system with this
 flag set is either mounted or unmounted. If a file system has logging enabled,
 the only flags that it can have are \fBFSLOG\fR or \fBFSBAD\fR. A non-logging
@@ -203,7 +193,7 @@ Use \fBmount\fR from the command line:
 .sp
 .in +2
 .nf
-# mount -F ufs /dev/dsk/c0t0d0s7 /export/home 
+# mount -F ufs /dev/dsk/c0t0d0s7 /export/home
 .fi
 .in -2
 .sp
@@ -234,13 +224,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityUncommitted
+Interface Stability	Uncommitted
 .TE
 
 .SH SEE ALSO

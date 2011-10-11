@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ar.h 3HEAD "1 Jul 1998" "SunOS 5.11" "Headers"
+.TH AR.H 3HEAD "Jul 1, 1998"
 .SH NAME
 ar.h, ar \- archive file format
 .SH SYNOPSIS
@@ -24,7 +24,7 @@ Each archive begins with the archive magic string.
 .sp
 .in +2
 .nf
-#define  ARMAG   "!<arch>\en"    /* magic string */ 
+#define  ARMAG   "!<arch>\en"    /* magic string */
 #define  SARMAG   8             /* length of magic string */
 .fi
 .in -2
@@ -95,7 +95,7 @@ machine's ``natural'' byte order is different.
 .in +2
 .nf
                  0       1       2       3
-0x01020304       01      02      03      04       
+0x01020304       01      02      03      04
 .fi
 .in -2
 
@@ -136,12 +136,12 @@ Offset     +0   +1   +2   +3
  4       |       114         | name
          |___________________|
  8       |       122         | object
-         |___________________| 
+         |___________________|
 12       |       426         | function
          |___________________|
 16       |       434         | name2
-         |___________________| 
-20       |  n | a  | m  | e  | 
+         |___________________|
+20       |  n | a  | m  | e  |
          |____|____|____|____|
 24       | \e0 | o  | b  | j  |
          |____|____|____|____|
@@ -199,11 +199,11 @@ Offset   +0   +1   +2   +3   +4   +5   +6   +7   +8   +9
    Member Name                            ar_name
 _______________________________________________________________
 short-name           | short-name/  | Not in string table
-                     |              |                         
+                     |              |
 file_name_sample     | /0           | Offset 0 in string table
-                     |              |                         
+                     |              |
 longerfilenamexample | /18          | Offset 18 in string table
-_____________________|______________|___________________________            
+_____________________|______________|___________________________
 .fi
 .in -2
 

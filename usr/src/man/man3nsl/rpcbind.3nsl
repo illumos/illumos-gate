@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH rpcbind 3NSL "20 Feb 1998" "SunOS 5.11" "Networking Services Library Functions"
+.TH RPCBIND 3NSL "Feb 20, 1998"
 .SH NAME
 rpcbind, rpcb_getmaps, rpcb_getaddr, rpcb_gettime, rpcb_rmtcall, rpcb_set,
 rpcb_unset \- library routines for RPC bind service
@@ -61,12 +61,10 @@ their universal addresses. See \fBrpcbind\fR(1M).
 .SS "Routines"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrpcb_getmaps()\fR\fR
 .ad
 .RS 18n
-.rt  
 An interface to the \fBrpcbind\fR service, which returns a list of the current
 \fBRPC\fR program-to-address mappings on  \fIhost\fR. It uses the transport
 specified through \fInetconf\fR to contact the remote \fBrpcbind\fR service on
@@ -76,12 +74,10 @@ could not be contacted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrpcb_getaddr()\fR\fR
 .ad
 .RS 18n
-.rt  
 An interface to the \fBrpcbind\fR service, which finds the address of the
 service on \fIhost\fR that is registered with program number \fIprognum\fR,
 version \fIversnum\fR, and speaks the transport protocol associated with
@@ -95,12 +91,10 @@ status. See \fBrpc_clnt_create\fR(3NSL).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrpcb_gettime()\fR\fR
 .ad
 .RS 18n
-.rt  
 This routine returns the time on \fIhost\fR in \fItimep\fR. If \fIhost\fR is
 \fINULL\fR, \fBrpcb_gettime()\fR returns the time on its own machine. This
 routine returns \fBTRUE\fR if it succeeds, \fBFALSE\fR if it fails.
@@ -110,12 +104,10 @@ the remote server.   This routine is particularly useful for secure RPC.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrpcb_rmtcall()\fR\fR
 .ad
 .RS 18n
-.rt  
 An interface to the \fBrpcbind\fR service, which instructs \fBrpcbind\fR on
 \fIhost\fR to make an \fBRPC\fR call on your behalf to a procedure on that
 host. The  \fBnetconfig\fR structure should correspond to a connectionless
@@ -134,12 +126,10 @@ Note: \fBrpcb_rmtcall()\fR is only available for connectionless transports.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrpcb_set()\fR\fR
 .ad
 .RS 18n
-.rt  
 An interface to the \fBrpcbind\fR service, which establishes a mapping between
 the triple [\fIprognum\fR, \fIversnum\fR, \fInetconf\fR->\fInc_netid]\fR and
 \fIsvcaddr\fR on the machine's \fBrpcbind\fR service. The value of
@@ -151,12 +141,10 @@ already exists such an entry with \fBrpcbind\fR, \fBrpcb_set()\fR will fail.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrpcb_unset()\fR\fR
 .ad
 .RS 18n
-.rt  
 An interface to the \fBrpcbind\fR service, which destroys the mapping between
 the triple [\fIprognum\fR, \fIversnum\fR, \fInetconf\fR->\fInc_netid]\fR and
 the address on the machine's \fBrpcbind\fR service. If  \fInetconf\fR is
@@ -176,13 +164,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

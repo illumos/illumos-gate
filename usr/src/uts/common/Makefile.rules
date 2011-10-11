@@ -975,6 +975,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/pcan/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/pcn/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/pcwl/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -2243,6 +2247,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/pcmcia/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/pcan/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/pcn/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/pcwl/%.c

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_dma_buf_setup 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_DMA_BUF_SETUP 9F "Jan 16, 2006"
 .SH NAME
 ddi_dma_buf_setup \- easier DMA setup for use with buffer structures
 .SH SYNOPSIS
@@ -15,7 +15,7 @@ ddi_dma_buf_setup \- easier DMA setup for use with buffer structures
 
 
 \fBint\fR \fBddi_dma_buf_setup\fR(\fBdev_info_t *\fR\fIdip\fR, \fBstruct buf *\fR\fIbp\fR, \fBuint_t\fR \fIflags\fR,
-     \fBint (*\fR\fIwaitfp\fR) (caddr_t),, \fBcaddr_t\fR \fIarg\fR, \fBddi_dma_lim_t *\fR\fIlim\fR, 
+     \fBint (*\fR\fIwaitfp\fR) (caddr_t),, \fBcaddr_t\fR \fIarg\fR, \fBddi_dma_lim_t *\fR\fIlim\fR,
      \fBddi_dma_handle_t *\fR\fIhandlep\fR);
 .fi
 
@@ -27,45 +27,37 @@ instead.
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 11n
-.rt  
 A pointer to the device's \fBdev_info\fR structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbp\fR\fR
 .ad
 .RS 11n
-.rt  
 A pointer to a system buffer structure (see \fBbuf\fR(9S)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 11n
-.rt  
 Flags that go into a \fBddi_dma_req\fR structure (see \fBddi_dma_req\fR(9S)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIwaitfp\fR\fR
 .ad
 .RS 11n
-.rt  
 The address of a function to call back later if resources aren't available now.
 The special function addresses \fBDDI_DMA_SLEEP\fR and \fBDDI_DMA_DONTWAIT\fR
 (see \fBddi_dma_req\fR(9S)) are taken to mean, respectively, wait until
@@ -74,23 +66,19 @@ resources are available, or do not wait at all and do not schedule a callback.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIarg\fR\fR
 .ad
 .RS 11n
-.rt  
 Argument to be passed to a callback function, if such a function is specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlim\fR\fR
 .ad
 .RS 11n
-.rt  
 A pointer to a \fBDMA\fR limits structure for this device (see
 \fBddi_dma_lim_sparc\fR(9S) or \fBddi_dma_lim_x86\fR(9S)). If this pointer is
 \fINULL\fR, a default set of \fBDMA\fR limits is assumed.
@@ -98,12 +86,10 @@ A pointer to a \fBDMA\fR limits structure for this device (see
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhandlep\fR\fR
 .ad
 .RS 11n
-.rt  
 Pointer to a \fBDMA\fR handle. See \fBddi_dma_setup\fR(9F) for a discussion of
 handle.
 .RE
@@ -132,13 +118,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Stability LevelObsolete
+Stability Level	Obsolete
 .TE
 
 .SH SEE ALSO

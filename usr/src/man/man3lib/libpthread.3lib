@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libpthread 3LIB "24 Mar 2004" "SunOS 5.11" "Interface Libraries"
+.TH LIBPTHREAD 3LIB "Mar 24, 2004"
 .SH NAME
 libpthread \- POSIX threads library
 .SH SYNOPSIS
@@ -34,74 +34,68 @@ interfaces.
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fB__pthread_cleanup_pop\fR\fB__pthread_cleanup_push\fR
-\fBpthread_attr_destroy\fR\fBpthread_attr_getdetachstate\fR
-\fBpthread_attr_getguardsize\fR\fBpthread_attr_getinheritsched\fR
-\fBpthread_attr_getschedparam\fR\fBpthread_attr_getschedpolicy\fR
-\fBpthread_attr_getscope\fR\fBpthread_attr_getstackaddr\fR
-\fBpthread_attr_getstacksize\fR\fBpthread_attr_init\fR
-\fBpthread_attr_setdetachstate\fR\fBpthread_attr_setguardsize\fR
-\fBpthread_attr_setinheritsched\fR\fBpthread_attr_setschedparam\fR
-\fBpthread_attr_setschedpolicy\fR\fBpthread_attr_setscope\fR
-\fBpthread_attr_setstackaddr\fR\fBpthread_attr_setstacksize\fR
-\fBpthread_cancel\fR\fBpthread_cond_broadcast\fR
-\fBpthread_cond_destroy\fR\fBpthread_cond_init\fR
-\fBpthread_cond_reltimedwait_np\fR\fBpthread_cond_signal\fR
-\fBpthread_cond_timedwait\fR\fBpthread_cond_wait\fR
-\fBpthread_condattr_destroy\fR\fBpthread_condattr_getpshared\fR
-\fBpthread_condattr_init\fR\fBpthread_condattr_setpshared\fR
-\fBpthread_create\fR\fBpthread_detach\fR
-\fBpthread_equal\fR\fBpthread_exit\fR
-\fBpthread_getconcurrency\fR\fBpthread_getschedparam\fR
-\fBpthread_getspecific\fR\fBpthread_join\fR
-\fBpthread_key_create\fR\fBpthread_key_delete\fR
-\fBpthread_kill\fR\fBpthread_mutex_consistent_np\fR
-\fBpthread_mutex_destroy\fR\fBpthread_mutex_getprioceiling\fR
-\fBpthread_mutex_init\fR\fBpthread_mutex_lock\fR
-\fBpthread_mutex_setprioceiling\fR\fBpthread_mutex_trylock\fR
-\fBpthread_mutex_unlock\fR\fBpthread_mutexattr_destroy\fR
-\fBpthread_mutexattr_getprioceiling\fR\fBpthread_mutexattr_getprotocol\fR
-\fBpthread_mutexattr_getpshared\fR\fBpthread_mutexattr_getrobust_np\fR
-\fBpthread_mutexattr_gettype\fR\fBpthread_mutexattr_init\fR
-\fBpthread_mutexattr_setprioceiling\fR\fBpthread_mutexattr_setprotocol\fR
-\fBpthread_mutexattr_setpshared\fR\fBpthread_mutexattr_setrobust_np\fR
-\fBpthread_mutexattr_settype\fR\fBpthread_once\fR
-\fBpthread_rwlock_destroy\fR\fBpthread_rwlock_init\fR
-\fBpthread_rwlock_rdlock\fR\fBpthread_rwlock_tryrdlock\fR
-\fBpthread_rwlock_trywrlock\fR\fBpthread_rwlock_unlock\fR
-\fBpthread_rwlock_wrlock\fR\fBpthread_rwlockattr_destroy\fR
-\fBpthread_rwlockattr_getpshared\fR\fBpthread_rwlockattr_init\fR
-\fBpthread_rwlockattr_setpshared\fR\fBpthread_self\fR
-\fBpthread_setcancelstate\fR\fBpthread_setcanceltype\fR
-\fBpthread_setconcurrency\fR\fBpthread_setschedparam\fR
-\fBpthread_setspecific\fR\fBpthread_sigmask\fR
-\fBpthread_testcancel\fR
+l l
+l l .
+\fB__pthread_cleanup_pop\fR	\fB__pthread_cleanup_push\fR
+\fBpthread_attr_destroy\fR	\fBpthread_attr_getdetachstate\fR
+\fBpthread_attr_getguardsize\fR	\fBpthread_attr_getinheritsched\fR
+\fBpthread_attr_getschedparam\fR	\fBpthread_attr_getschedpolicy\fR
+\fBpthread_attr_getscope\fR	\fBpthread_attr_getstackaddr\fR
+\fBpthread_attr_getstacksize\fR	\fBpthread_attr_init\fR
+\fBpthread_attr_setdetachstate\fR	\fBpthread_attr_setguardsize\fR
+\fBpthread_attr_setinheritsched\fR	\fBpthread_attr_setschedparam\fR
+\fBpthread_attr_setschedpolicy\fR	\fBpthread_attr_setscope\fR
+\fBpthread_attr_setstackaddr\fR	\fBpthread_attr_setstacksize\fR
+\fBpthread_cancel\fR	\fBpthread_cond_broadcast\fR
+\fBpthread_cond_destroy\fR	\fBpthread_cond_init\fR
+\fBpthread_cond_reltimedwait_np\fR	\fBpthread_cond_signal\fR
+\fBpthread_cond_timedwait\fR	\fBpthread_cond_wait\fR
+\fBpthread_condattr_destroy\fR	\fBpthread_condattr_getpshared\fR
+\fBpthread_condattr_init\fR	\fBpthread_condattr_setpshared\fR
+\fBpthread_create\fR	\fBpthread_detach\fR
+\fBpthread_equal\fR	\fBpthread_exit\fR
+\fBpthread_getconcurrency\fR	\fBpthread_getschedparam\fR
+\fBpthread_getspecific\fR	\fBpthread_join\fR
+\fBpthread_key_create\fR	\fBpthread_key_delete\fR
+\fBpthread_kill\fR	\fBpthread_mutex_consistent_np\fR
+\fBpthread_mutex_destroy\fR	\fBpthread_mutex_getprioceiling\fR
+\fBpthread_mutex_init\fR	\fBpthread_mutex_lock\fR
+\fBpthread_mutex_setprioceiling\fR	\fBpthread_mutex_trylock\fR
+\fBpthread_mutex_unlock\fR	\fBpthread_mutexattr_destroy\fR
+\fBpthread_mutexattr_getprioceiling\fR	\fBpthread_mutexattr_getprotocol\fR
+\fBpthread_mutexattr_getpshared\fR	\fBpthread_mutexattr_getrobust_np\fR
+\fBpthread_mutexattr_gettype\fR	\fBpthread_mutexattr_init\fR
+\fBpthread_mutexattr_setprioceiling\fR	\fBpthread_mutexattr_setprotocol\fR
+\fBpthread_mutexattr_setpshared\fR	\fBpthread_mutexattr_setrobust_np\fR
+\fBpthread_mutexattr_settype\fR	\fBpthread_once\fR
+\fBpthread_rwlock_destroy\fR	\fBpthread_rwlock_init\fR
+\fBpthread_rwlock_rdlock\fR	\fBpthread_rwlock_tryrdlock\fR
+\fBpthread_rwlock_trywrlock\fR	\fBpthread_rwlock_unlock\fR
+\fBpthread_rwlock_wrlock\fR	\fBpthread_rwlockattr_destroy\fR
+\fBpthread_rwlockattr_getpshared\fR	\fBpthread_rwlockattr_init\fR
+\fBpthread_rwlockattr_setpshared\fR	\fBpthread_self\fR
+\fBpthread_setcancelstate\fR	\fBpthread_setcanceltype\fR
+\fBpthread_setconcurrency\fR	\fBpthread_setschedparam\fR
+\fBpthread_setspecific\fR	\fBpthread_sigmask\fR
+\fBpthread_testcancel\fR	
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/libpthread.so.1\fR\fR
 .ad
 .RS 27n
-.rt  
 a filter on \fB/lib/libc.so.1\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/64/libpthread.so.1\fR\fR
 .ad
 .RS 27n
-.rt  
 a filter on \fB/lib/64/libc.so.1\fR
 .RE
 
@@ -113,13 +107,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

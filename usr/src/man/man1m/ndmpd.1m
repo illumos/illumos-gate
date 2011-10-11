@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing. See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ndmpd 1M "27 Apr 2009" "SunOS 5.11" "System Administration Commands"
+.TH NDMPD 1M "Apr 27, 2009"
 .SH NAME
 ndmpd \- Network Data Management Protocol daemon
 .SH SYNOPSIS
@@ -30,7 +30,6 @@ By default, \fBndmpd\fR is disabled.
 The following option is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
@@ -42,42 +41,35 @@ Debugging mode; log file will be created.
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 An error occurred that prevented the \fBndmpd\fR daemon from initializing, such
 as failure to fork a process, mutex initialization.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Invalid command-line options were specified.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/ndmp/ndmpd\fR\fR
 .ad
@@ -88,7 +80,6 @@ Network data management protocol server binary.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/ndmp/ndmp.log\fR\fR
 .ad
@@ -100,7 +91,6 @@ reboot.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/ndmp/dumpdates\fR\fR
 .ad
@@ -118,13 +108,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

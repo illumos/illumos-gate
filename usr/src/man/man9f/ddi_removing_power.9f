@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_removing_power 9F "14 March 2001" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_REMOVING_POWER 9F "Mar 14, 2001"
 .SH NAME
 ddi_removing_power \- check whether \fBDDI_SUSPEND\fR might result in power
 being removed from a device
@@ -38,12 +38,10 @@ the device due to a failure to suspend and power off the system.
 The \fBddi_removing_power()\fR function supports the following parameter:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 7n
-.rt  
 pointer to the device's \fBdev_info\fR structure
 .RE
 
@@ -53,24 +51,20 @@ pointer to the device's \fBdev_info\fR structure
 The \fBddi_removing_power()\fR function returns:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 Power might be removed by the framework as a result of the pending
 \fBDDI_SUSPEND\fR call.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Power will not be removed by the framework as a result of the pending
 \fBDDI_SUSPEND\fR call.
 .RE
@@ -95,7 +89,7 @@ int
           /*
            * We do not allow DDI_SUSPEND if power will be removed and
            * we have a device that damages tape when power is removed
-           * We do support DDI_SUSPEND for Device Reconfiguration, 
+           * We do support DDI_SUSPEND for Device Reconfiguration,
            * however.
            */
              if (ddi_removing_power(dip) && xxdamages_tape(dip))
@@ -112,13 +106,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ptm 7D "5 Feb 1997" "SunOS 5.11" "Devices"
+.TH PTM 7D "Feb 5, 1997"
 .SH NAME
 ptm \- STREAMS pseudo-tty master driver
 .SH DESCRIPTION
@@ -66,23 +66,19 @@ not open.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/ptmx\fR\fR
 .ad
 .RS 14n
-.rt  
 master clone device
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/pts/M\fR\fR
 .ad
 .RS 14n
-.rt  
 slave devices (M = 0 -> N-1)
 .RE
 

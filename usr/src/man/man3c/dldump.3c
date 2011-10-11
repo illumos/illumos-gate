@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dldump 3C "1 Mar 2004" "SunOS 5.11" "Standard C Library Functions"
+.TH DLDUMP 3C "Mar 1, 2004"
 .SH NAME
 dldump \- create a new file from a dynamic object component of the calling
 process
@@ -71,12 +71,10 @@ affect the relocations that are applied to the new object. \fINon-symbolic\fR
 relocations can be applied using the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTLD_REL_RELATIVE\fR\fR
 .ad
 .RS 21n
-.rt  
 Relocation records from the object \fIipath\fR, that define \fIrelative\fR
 relocations, are applied to the object \fIopath\fR.
 .RE
@@ -87,12 +85,10 @@ A variety of \fIsymbolic\fR relocations can be applied using the following
 flags (each of these flags also implies  \fBRTLD_REL_RELATIVE\fR is in effect):
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTLD_REL_EXEC\fR\fR
 .ad
 .RS 20n
-.rt  
 Symbolic relocations that result in binding \fIipath\fR to the dynamic object
 that started the process, commonly a dynamic executable, are applied to the
 object \fIopath\fR.
@@ -100,24 +96,20 @@ object \fIopath\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTLD_REL_DEPENDS\fR\fR
 .ad
 .RS 20n
-.rt  
 Symbolic relocations that result in binding \fIipath\fR to any of the dynamic
 dependencies of the process are applied to the object \fIopath\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTLD_REL_PRELOAD\fR\fR
 .ad
 .RS 20n
-.rt  
 Symbolic relocations that result in binding \fIipath\fR to any objects
 preloaded with the process are applied to the object \fIopath\fR. See
 \fBLD_PRELOAD\fR in \fBld.so.1\fR(1).
@@ -125,36 +117,30 @@ preloaded with the process are applied to the object \fIopath\fR. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTLD_REL_SELF\fR\fR
 .ad
 .RS 20n
-.rt  
 Symbolic relocations that result in binding \fIipath\fR to itself, are applied
 to the object \fIopath\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTLD_REL_WEAK\fR\fR
 .ad
 .RS 20n
-.rt  
 Weak relocations that remain unresolved are applied to the object \fIopath\fR
 as \fB0\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTLD_REL_ALL\fR\fR
 .ad
 .RS 20n
-.rt  
 \fIAll\fR relocation records defined in the object \fIipath\fR are applied to
 the new object \fIopath\fR. This is basically a concatenation of all the above
 relocation flags.
@@ -182,12 +168,10 @@ The following additional attributes for creating the new dynamic object
 \fIopath\fR can be specified using the \fIflags\fR parameter:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTLD_MEMORY\fR\fR
 .ad
 .RS 15n
-.rt  
 The new object \fIopath\fR is constructed from the current memory contents of
 the \fIipath\fR image as it exists in the calling process. This option allows
 data modified by the calling process to be captured in the new object. Note
@@ -206,12 +190,10 @@ returned to the value as it existed in the \fIipath\fR disc file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTLD_STRIP\fR\fR
 .ad
 .RS 15n
-.rt  
 Only collect allocatable sections within the object \fIopath\fR. Sections that
 are not part of the dynamic objects' memory image are removed. \fBRTLD_STRIP\fR
 reduces the size of the \fIopath\fR disc file and is comparable to having run
@@ -220,12 +202,10 @@ the new object through \fBstrip\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTLD_NOHEAP\fR\fR
 .ad
 .RS 15n
-.rt  
 Do not save any heap to the new object. This option is only meaningful when
 processing a dynamic executable with the \fBRTLD_MEMORY\fR attribute and allows
 for reducing the size of the \fIopath\fR disc file. The executable must confine
@@ -428,13 +408,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH scsi_status 9S "30 Aug 1995" "SunOS 5.11" "Data Structures for Drivers"
+.TH SCSI_STATUS 9S "Aug 30, 1995"
 .SH NAME
 scsi_status \- SCSI status structure
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/scsi/scsi.h> 
+#include <sys/scsi/scsi.h>
 .fi
 
 .SH INTERFACE LEVEL
@@ -66,7 +66,6 @@ command queue in the target is full.
 For accessing the status as a byte, the following values are appropriate:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTATUS_GOOD\fR \fR
 .ad
@@ -77,7 +76,6 @@ This status indicates that the target has successfully completed the command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTATUS_CHECK\fR \fR
 .ad
@@ -88,7 +86,6 @@ This status indicates that a contingent allegiance condition has occurred.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTATUS_MET\fR \fR
 .ad
@@ -99,7 +96,6 @@ This status is returned when the requested operations are satisfied.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTATUS_BUSY\fR \fR
 .ad
@@ -110,7 +106,6 @@ This status indicates that the target is busy.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTATUS_INTERMEDIATE\fR \fR
 .ad
@@ -122,7 +117,6 @@ linked commands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTATUS_SCSI2\fR \fR
 .ad
@@ -133,7 +127,6 @@ This is the \fBSCSI-2 \fRmodifier bit.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTATUS_INTERMEDIATE_MET\fR \fR
 .ad
@@ -144,7 +137,6 @@ This status is a combination of \fBSTATUS_MET\fR and \fBSTATUS_INTERMEDIATE\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTATUS_RESERVATION_CONFLICT\fR \fR
 .ad
@@ -157,7 +149,6 @@ a logical unit or an extent within a logical unit is reserved.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTATUS_TERMINATED\fR \fR
 .ad
@@ -170,7 +161,6 @@ after receiving a terminate \fBI/O\fR process message.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTATUS_QFULL\fR \fR
 .ad

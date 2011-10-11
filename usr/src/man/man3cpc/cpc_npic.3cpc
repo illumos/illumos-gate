@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cpc_npic 3CPC "8 Oct 2008" "SunOS 5.11" "CPU Performance Counters Library Functions"
+.TH CPC_NPIC 3CPC "Oct 8, 2008"
 .SH NAME
 cpc_npic, cpc_caps, cpc_cciname, cpc_cpuref, cpc_walk_events_all,
 cpc_walk_generic_events_all, cpc_walk_events_pic, cpc_walk_generic_events_pic,
@@ -11,7 +11,7 @@ cpc_walk_attrs \- determine CPU performance counter configuration
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lcpc\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lcpc\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <libcpc.h>
 
 \fBuint_t\fR \fBcpc_npic\fR(\fBcpc_t *\fR\fIcpc\fR);
@@ -52,7 +52,7 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lcpc\fR [ \fIlibrary\fR\&.\|.
 
 .LP
 .nf
-\fBvoid\fR \fBcpc_walk_generic_events_pic\fR(\fBcpc_t *\fR\fIcpc\fR, \fBuint_t\fR \fIpicno\fR, 
+\fBvoid\fR \fBcpc_walk_generic_events_pic\fR(\fBcpc_t *\fR\fIcpc\fR, \fBuint_t\fR \fIpicno\fR,
      \fBvoid *\fR\fIarg\fR, \fBvoid\fR (*\fIaction\fR)(\fBvoid *\fR\fIarg\fR, \fBuint_t\fR \fIpicno\fR,
      \fBconst char *\fR\fIevent\fR));
 .fi
@@ -172,12 +172,10 @@ The \fBcpc_walk_events_all()\fR, \fBcpc_walk_events_pic()\fR,
 \fBcpc_walk_generic_events_pic()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 There is not enough memory available.
 .RE
 
@@ -189,15 +187,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

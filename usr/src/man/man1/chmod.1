@@ -10,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH chmod 1 "11 Dec 2008" "SunOS 5.11" "User Commands"
+.TH CHMOD 1 "Dec 11, 2008"
 .SH NAME
 chmod \- change the permissions mode of a file
 .SH SYNOPSIS
@@ -56,33 +56,27 @@ where \fIabsolute-mode\fR is specified using octal numbers \fInnnn\fR defined
 as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIn\fR\fR
 .ad
 .RS 5n
-.rt  
 a number from \fB0\fR to \fB7\fR. An absolute mode is constructed from the OR
 of any of the following modes:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB4000\fR\fR
 .ad
 .RS 12n
-.rt  
 Set user \fBID\fR on execution.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB20\fR\fI\|#\|\fR\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 Set group \fBID\fR on execution if \fI#\fR is \fB7\fR, \fB5\fR, \fB3\fR, or
 \fB1\fR.
 .sp
@@ -96,144 +90,118 @@ directories, the set-gid bit can only be set or cleared by using symbolic mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1000\fR\fR
 .ad
 .RS 12n
-.rt  
 Turn on sticky bit. See \fBchmod\fR(2).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0400\fR\fR
 .ad
 .RS 12n
-.rt  
 Allow read by owner.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0200\fR\fR
 .ad
 .RS 12n
-.rt  
 Allow write by owner.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0100\fR\fR
 .ad
 .RS 12n
-.rt  
 Allow execute (search in directory) by owner.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0700\fR\fR
 .ad
 .RS 12n
-.rt  
 Allow read, write, and execute (search) by owner.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0040\fR\fR
 .ad
 .RS 12n
-.rt  
 Allow read by group.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0020\fR\fR
 .ad
 .RS 12n
-.rt  
 Allow write by group.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0010\fR\fR
 .ad
 .RS 12n
-.rt  
 Allow execute (search in directory) by group.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0070\fR\fR
 .ad
 .RS 12n
-.rt  
 Allow read, write, and execute (search) by group.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0004\fR\fR
 .ad
 .RS 12n
-.rt  
 Allow read by others.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0002\fR\fR
 .ad
 .RS 12n
-.rt  
 Allow write by others.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0001\fR\fR
 .ad
 .RS 12n
-.rt  
 Allow execute (search in directory) by others.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0007\fR\fR
 .ad
 .RS 12n
-.rt  
 Allow read, write, and execute (search) by others.
 .RE
 
@@ -265,55 +233,45 @@ following a single operator cause the corresponding operations to be performed
 simultaneously.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwho\fR\fR
 .ad
 .RS 14n
-.rt  
 zero or more of the characters \fBu\fR, \fBg\fR, \fBo\fR, and \fBa\fR
 specifying whose permissions are to be changed or assigned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBu\fR\fR
 .ad
 .RS 5n
-.rt  
 user's permissions
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBg\fR\fR
 .ad
 .RS 5n
-.rt  
 group's permissions
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBo\fR\fR
 .ad
 .RS 5n
-.rt  
 others' permissions
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBa\fR\fR
 .ad
 .RS 5n
-.rt  
 all permissions (user, group, and other)
 .RE
 
@@ -325,22 +283,18 @@ not override the restrictions of your user mask.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoperator\fR\fR
 .ad
 .RS 14n
-.rt  
 either \fB+\fR, \fB\(mi\fR, or \fB=\fR, signifying how permissions are to be
 changed:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+\fR\fR
 .ad
 .RS 8n
-.rt  
 Add permissions.
 .sp
 If \fIpermissions\fR are omitted, nothing is added.
@@ -355,12 +309,10 @@ If \fBwho\fR is present, add the file mode bits represented by the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi\fR\fR
 .ad
 .RS 8n
-.rt  
 Take away permissions.
 .sp
 If \fIpermissions\fR are omitted, do nothing.
@@ -375,12 +327,10 @@ If \fBwho\fR is present, clear the file mode bits represented by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB=\fR\fR
 .ad
 .RS 8n
-.rt  
 Assign permissions absolutely.
 .sp
 If \fBwho\fR is omitted, clear all file mode bits; if \fBwho\fR is present,
@@ -403,99 +353,81 @@ useful only with \fB=\fR to take away all permissions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpermission\fR\fR
 .ad
 .RS 14n
-.rt  
 any compatible combination of the following letters:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBl\fR\fR
 .ad
 .RS 9n
-.rt  
 mandatory locking
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBr\fR\fR
 .ad
 .RS 9n
-.rt  
 read permission
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fR
 .ad
 .RS 9n
-.rt  
 user or group set-ID
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBt\fR\fR
 .ad
 .RS 9n
-.rt  
 sticky bit
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBw\fR\fR
 .ad
 .RS 9n
-.rt  
 write permission
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBx\fR\fR
 .ad
 .RS 9n
-.rt  
 execute permission
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBX\fR\fR
 .ad
 .RS 9n
-.rt  
 execute permission if the file is a directory or if there is execute permission
 for one of the other user classes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBu\fR,\fBg\fR,\fBo\fR\fR
 .ad
 .RS 9n
-.rt  
 indicate that \fIpermission\fR is to be taken from the current user, group or
 other mode respectively.
 .RE
@@ -507,12 +439,10 @@ sequences each having three characters:
 
 .sp
 .TS
-tab();
-lw(1.83i) lw(1.83i) lw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-UserGroupOther
-rwxrwxrwx
+l l l
+l l l .
+User	Group	Other
+rwx	rwx	rwx
 .TE
 
 This example (user, group, and others all have permission to read, write, and
@@ -572,12 +502,10 @@ Where \fIacl_specification\fR is a comma-separated list (with no intervening
 white space) of an ACL specification of the form:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA[\fIindex\fR]+\fIacl_specification\fR\fR\fR
 .ad
 .RS 30n
-.rt  
 Prepends the access control entries (ACE) specified in \fIacl_specification\fR
 to the beginning of the file's ACL. Depending on the file system, the ACL can
 be reordered when applied to the file. If "optional" number is specified then
@@ -586,30 +514,25 @@ new ACEs are inserted before specified number.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA-\fR\fR
 .ad
 .RS 30n
-.rt  
 Removes all ACEs for current ACL on file and replaces current ACL with new ACL
 that represents only the current mode of the file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA\fIindex\fR\fR-\fR
 .ad
 .RS 30n
-.rt  
 Removes ACE specified by \fIindex\fR number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA-\fIacl_specification\fR\fR\fR
 .ad
@@ -618,30 +541,25 @@ Removes ACE specified by \fIindex\fR number.
 \fB\fR
 .ad
 .RS 30n
-.rt  
 Removes ACEs specified by \fIacl_specification\fR, if they exist in current
 file's ACL.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA=\fIacl_specification\fR\fR\fR
 .ad
 .RS 30n
-.rt  
 Replaces a files entire ACL with \fIacl_specification\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA[\fIindex\fR]=\fIacl_specification\fR\fR\fR
 .ad
 .RS 30n
-.rt  
 Replaces ACEs starting at a specific index number in the current ACL on the
 file. If multiple ACEs are specified, then each subsequent ACE in
 \fIacl_specification\fR replaces the corresponding ACE in the current ACL.
@@ -656,7 +574,6 @@ POSIX-draft ACLs (as supported by UFS) are specified as colon (\fB:\fR)
 separated fields of the following.
 .sp
 .ne 2
-.mk
 .na
 \fBuser::perms\fR
 .ad
@@ -667,7 +584,6 @@ File owner permissions.
 
 .sp
 .ne 2
-.mk
 .na
 \fBuser:\fIusername\fR:perms\fR
 .ad
@@ -678,7 +594,6 @@ Permissions for a specific user.
 
 .sp
 .ne 2
-.mk
 .na
 \fBgroup::perms\fR
 .ad
@@ -689,7 +604,6 @@ File group owner permissions.
 
 .sp
 .ne 2
-.mk
 .na
 \fBgroup:\fIgroupname:\fRperms\fR
 .ad
@@ -700,7 +614,6 @@ Permissions for a specific group.
 
 .sp
 .ne 2
-.mk
 .na
 \fBother::perms\fR
 .ad
@@ -711,7 +624,6 @@ Permissions for user other than the file owner or members of file group owner.
 
 .sp
 .ne 2
-.mk
 .na
 \fBmask:perms\fR
 .ad
@@ -723,7 +635,6 @@ The ACL mask. The mask entry specifies the maximum permissions allowed for user
 
 .sp
 .ne 2
-.mk
 .na
 \fBdefault:user::perms\fR
 .ad
@@ -734,7 +645,6 @@ Default file owner permissions.
 
 .sp
 .ne 2
-.mk
 .na
 \fBdefault:user:\fIusername\fR:perms\fR
 .ad
@@ -745,7 +655,6 @@ Default permissions for a specific user.
 
 .sp
 .ne 2
-.mk
 .na
 \fBdefault:group::perms\fR
 .ad
@@ -756,7 +665,6 @@ Default file group owner permissions.
 
 .sp
 .ne 2
-.mk
 .na
 \fBdefault:group:\fIgroupname\fR:perms\fR
 .ad
@@ -767,7 +675,6 @@ Default permissions for a specific group.
 
 .sp
 .ne 2
-.mk
 .na
 \fBdefault:other:perms\fR
 .ad
@@ -779,7 +686,6 @@ group owner.
 
 .sp
 .ne 2
-.mk
 .na
 \fBdefault:mask:perms\fR
 .ad
@@ -811,7 +717,6 @@ entries, finer grained permissions, and enhanced inheritance control.
 NFSv4 ACLs are specified as colon (\fB:\fR) separated fields of the following.
 .sp
 .ne 2
-.mk
 .na
 \fBowner@:<perms>[:inheritance flags]:<allow|deny>\fR
 .ad
@@ -822,7 +727,6 @@ Permissions for file owner.
 
 .sp
 .ne 2
-.mk
 .na
 \fBgroup@:<perms>[:inheritance flags]:<allow|deny>\fR
 .ad
@@ -833,7 +737,6 @@ Permissions for file group owner.
 
 .sp
 .ne 2
-.mk
 .na
 \fBeveryone@:<perms>[:inheritance flags]:<allow|deny>\fR
 .ad
@@ -844,7 +747,6 @@ Permissions for everyone, including file owner and group owner.
 
 .sp
 .ne 2
-.mk
 .na
 \fBuser:<username>:<perms>[:inheritance flags]:<allow|deny>\fR
 .ad
@@ -855,7 +757,6 @@ Permissions for a specific user.
 
 .sp
 .ne 2
-.mk
 .na
 \fBusersid:<sid string>:<perms>[:inheritance flags]:<allow|deny>\fR
 .ad
@@ -866,7 +767,6 @@ Permissions for a specific user, but user is specified by SID.
 
 .sp
 .ne 2
-.mk
 .na
 \fBgroup:<groupname>:<perms>[:inheritance flags]:<allow|deny>\fR
 .ad
@@ -877,7 +777,6 @@ Permissions for a specific group.
 
 .sp
 .ne 2
-.mk
 .na
 \fBgroupsid:<sid string>:<perms>[:inheritance flags]:<allow|deny>\fR
 .ad
@@ -888,7 +787,6 @@ Permissions for a specific group, but group is specified by SID.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsid:<sid string>:<perms>[:inheritance flags]:<allow|deny>\fR
 .ad
@@ -911,56 +809,46 @@ The permissions for verbose mode and their abbreviated form in parentheses for
 compact and positional mode are described as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBread_data (\fBr\fR)\fR
 .ad
 .RS 24n
-.rt  
 Permission to read the data of a file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBlist_directory (\fBr\fR)\fR
 .ad
 .RS 24n
-.rt  
 Permission to list the contents of a directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwrite_data (\fBw\fR)\fR
 .ad
 .RS 24n
-.rt  
 Permission to modify a file's data. anywhere in the file's offset range.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBadd_file (\fBw\fR)\fR
 .ad
 .RS 24n
-.rt  
 Permission to add a new file to a directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBappend_data (\fBp\fR)\fR
 .ad
 .RS 24n
-.rt  
 The ability to modify a file's data, but only starting at EOF.
 .sp
 Currently, this permission is not supported.
@@ -968,135 +856,111 @@ Currently, this permission is not supported.
 
 .sp
 .ne 2
-.mk
 .na
 \fBadd_subdirectory (\fBp\fR)\fR
 .ad
 .RS 24n
-.rt  
 Permission to create a subdirectory to a directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBread_xattr (\fBR\fR)\fR
 .ad
 .RS 24n
-.rt  
 Ability to read the extended attributes of a file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwrite_xattr (\fBW\fR)\fR
 .ad
 .RS 24n
-.rt  
 Ability to create extended attributes or write to the extended attribute
 directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBexecute (\fBx\fR)\fR
 .ad
 .RS 24n
-.rt  
 Permission to execute a file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBread_attributes (\fBa\fR)\fR
 .ad
 .RS 24n
-.rt  
 The ability to read basic attributes (non-ACLs) of a file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwrite_attributes (\fBA\fR)\fR
 .ad
 .RS 24n
-.rt  
 Permission to change the times associated with a file or directory to an
 arbitrary value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdelete (\fBd\fR)\fR
 .ad
 .RS 24n
-.rt  
 Permission to delete a file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdelete_child (\fBD\fR)\fR
 .ad
 .RS 24n
-.rt  
 Permission to delete a file within a directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBread_acl (\fBc\fR)\fR
 .ad
 .RS 24n
-.rt  
 Permission to read the ACL of a file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwrite_acl (\fBC\fR)\fR
 .ad
 .RS 24n
-.rt  
 Permission to write the ACL of a file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwrite_owner (\fBo\fR)\fR
 .ad
 .RS 24n
-.rt  
 Permission to change the owner of a file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBsynchronize (\fBs\fR)\fR
 .ad
 .RS 24n
-.rt  
 Permission to access file locally at server with synchronize reads and writes.
 .sp
 Currently, this permission is not supported.
@@ -1144,45 +1008,37 @@ Several special permission sets or aliases are also supported. The following
 permission sets are used the same way that verbose permissions are specified.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfull_set\fR\fR
 .ad
 .RS 14n
-.rt  
 All permissions.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmodify_set\fR\fR
 .ad
 .RS 14n
-.rt  
 All permissions except \fBwrite_acl\fR and \fBwrite_owner\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBread_set\fR\fR
 .ad
 .RS 14n
-.rt  
 \fBread_data, read_acl, read_attributes,\fR and \fBread_xattr\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwrite_set\fR\fR
 .ad
 .RS 14n
-.rt  
 \fBwrite_data, append_data, write_attributes\fR, and \fBwrite_xattr\fR
 .RE
 
@@ -1193,34 +1049,28 @@ format uses words to indicate the various inheritance flags separated with a
 forward slash (\fB/\fR) character.
 .sp
 .ne 2
-.mk
 .na
 \fBfile_inherit (\fBf\fR)\fR
 .ad
 .RS 20n
-.rt  
 Inherit to all newly created files.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdir_inherit (\fBd\fR)\fR
 .ad
 .RS 20n
-.rt  
 Inherit to all newly created directories.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBinherit_only (\fBi\fR)\fR
 .ad
 .RS 20n
-.rt  
 When placed on a directory, do not apply to the directory, only to newly
 created files and directories. This flag requires that either
 \fBfile_inherit\fR and or \fBdir_inherit\fR is also specified.
@@ -1228,12 +1078,10 @@ created files and directories. This flag requires that either
 
 .sp
 .ne 2
-.mk
 .na
 \fBno_propagate (\fBn\fR)\fR
 .ad
 .RS 20n
-.rt  
 Indicates that ACL entries should be inherited to objects in a directory, but
 inheritance should stop after descending one level. This flag is dependent upon
 either \fBfile_inherit\fR and or \fBdir_inherit\fR also being specified.
@@ -1316,24 +1164,20 @@ comma-separated list of one or more \fIattribute_specifications\fR. Each
 An \fIoperator\fR is one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+\fR\fR
 .ad
 .RS 5n
-.rt  
 Each attribute specified by the associated \fIattribute_specifier\fR is
 adjusted to match the value specified by the \fIattribute_specifier\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-\fR\fR
 .ad
 .RS 5n
-.rt  
 Each attribute specified by the associated \fIattribute_specifier\fR is
 adjusted to match the inverse of the value specified by the
 \fIattribute_specifier\fR.
@@ -1341,12 +1185,10 @@ adjusted to match the inverse of the value specified by the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB=\fR\fR
 .ad
 .RS 5n
-.rt  
 Each attribute specified by the associated \fIattribute_specifier\fR is
 adjusted to match the value specified by the \fIattribute_specifier\fR. Any
 boolean read-write extended system attributes associated with the current file
@@ -1362,7 +1204,6 @@ If an \fIoperator\fR is not specified in an \fIattribute_specification\fR,
 An \fIattribute_specifier\fR takes one of the following forms:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBa\fR\fR
 .ad
@@ -1374,7 +1215,6 @@ current file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBc[\fIcompact_attribute_list\fR]\fR\fR
 .ad
@@ -1390,7 +1230,6 @@ Set each boolean read-write extended system attribute identified by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBv[\fIverbose_attribute_setting\fR]\fR\fR
 .ad
@@ -1432,122 +1271,100 @@ specified operation is applied.
 The following is a list of \fBAttribute Names and Abbreviation Characters\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAttribute Name\fR\fR
 .ad
 .RS 18n
-.rt  
 \fBAbbreviation Character\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhidden\fR\fR
 .ad
 .RS 18n
-.rt  
 \fBH\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsystem\fR\fR
 .ad
 .RS 18n
-.rt  
 \fBS\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBreadonly\fR\fR
 .ad
 .RS 18n
-.rt  
 \fBR\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBarchive\fR\fR
 .ad
 .RS 18n
-.rt  
 \fBA\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnounlink\fR\fR
 .ad
 .RS 18n
-.rt  
 \fBu\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBimmutable\fR\fR
 .ad
 .RS 18n
-.rt  
 \fBi\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBappendonly\fR\fR
 .ad
 .RS 18n
-.rt  
 \fBa\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnodump\fR\fR
 .ad
 .RS 18n
-.rt  
 \fBd\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBav_quarantined\fR\fR
 .ad
 .RS 18n
-.rt  
 \fBq\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBav_modified\fR\fR
 .ad
 .RS 18n
-.rt  
 \fBm\fR
 .RE
 
@@ -1557,23 +1374,19 @@ The following is a list of \fBAttribute Names and Abbreviation Characters\fR:
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 22n
-.rt  
 Force. \fBchmod\fR does not complain if it fails to change the mode of a file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR\fR
 .ad
 .RS 22n
-.rt  
 Recursively descend through directory arguments, setting the mode for each
 file. When symbolic links are encountered, the mode of the target file is
 changed, but no recursion takes place.
@@ -1581,12 +1394,10 @@ changed, but no recursion takes place.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-@\fR \fInamed_attribute\fR\fR
 .ad
 .RS 22n
-.rt  
 Perform the attribute operation on the named extended attribute file of each
 file operand instead of the file operand itself. If multiple \fB-@\fR
 operations are supplied, the attribute specification mode is applied to each of
@@ -1608,7 +1419,6 @@ attribute file of the file operand and the file operand itself.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIabsolute-mode\fR\fR
 .ad
@@ -1625,7 +1435,6 @@ in the \fBDESCRIPTION\fR section of this manual page for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIacl_operation\fR\fR
 .ad
@@ -1640,7 +1449,7 @@ Operation\fR in the \fBDESCRIPTION\fR section for more information.
 .nf
 \fBA[\fR\fInumber\fR\fB] -\fR
 \fBA-\fR\fIacl_specification\fR
-\fBA[\fR\fIindex\fR\fB]{+|=}\fR\fBacl_specification\fR 
+\fBA[\fR\fIindex\fR\fB]{+|=}\fR\fBacl_specification\fR
 .fi
 .in -2
 .sp
@@ -1649,7 +1458,6 @@ Operation\fR in the \fBDESCRIPTION\fR section for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIattribute_specification_list\fR\fR
 .ad
@@ -1662,7 +1470,6 @@ more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fR
 .ad
@@ -1716,7 +1523,7 @@ others:
 .in +2
 .nf
 % chmod go+rw \fIfile\fR
-% chmod 066 \fIfile\fR 
+% chmod 066 \fIfile\fR
 .fi
 .in -2
 .sp
@@ -2272,7 +2079,7 @@ Now, change the allow access to a deny for user marks:
 $ chmod A0=user:marks:read_data:deny file.5
 $ ls -v file.5
 -rw-r--r--+  1 marks   staff          0 Aug 23 09:11 file.5
-0:user:marks:read_data:deny 
+0:user:marks:read_data:deny
 1:owner@:read_data/write_data/append_data/write_xattr/write_attributes
      /write_acl/write_owner:allow
 2:group@:write_data/append_data/execute:deny
@@ -2345,12 +2152,12 @@ $ chmod A+user:lp:read_data:file_inherit:allow test.dir
 $ ls -dv test.dir
 drwxr-xr-x+  2 marks   staff          2 Aug 23 09:08 test.dir/
 0:user:lp:read_data:file_inherit:allow
-1:owner@::deny 
+1:owner@::deny
 2:owner@:list_directory/read_data/add_file/write_data/add_subdirectory
      /append_data/write_xattr/execute/write_attributes/write_acl
      /write_owner:allow
 3:group@:add_file/write_data/add_subdirectory/append_data:deny
-4:group@:list_directory/read_data/execute:allow 
+4:group@:list_directory/read_data/execute:allow
 5:everyone@:add_file/write_data/add_subdirectory/append_data/write_xattr
      /write_attributes/write_acl/write_owner:deny
 6:everyone@:list_directory/read_data/read_xattr/execute/read_attributes
@@ -2754,23 +2561,19 @@ that affect the execution of \fBchmod\fR: \fBLANG\fR, \fBLC_ALL\fR,
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -2782,15 +2585,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

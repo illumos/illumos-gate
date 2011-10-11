@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH strchg 1 "24 Mar 2005" "SunOS 5.11" "User Commands"
+.TH STRCHG 1 "Mar 24, 2005"
 .SH NAME
 strchg, strconf \- change or query stream configuration
 .SH SYNOPSIS
@@ -48,7 +48,6 @@ The following options apply to \fBstrchg\fR and, \fB\fR\fB-h\fR\fB,\fR
 \fB\fR\fB-f\fR\fB,\fR and \fB-p\fR are mutually exclusive.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
@@ -60,7 +59,6 @@ requires the \fB-p\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fI filename\fR \fR
 .ad
@@ -76,7 +74,6 @@ necessary modules in order to end up with the desired configuration.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fI module1\fR [\|,\|\fImodule2\fR.\|.\|.\|]\fR
 .ad
@@ -90,7 +87,6 @@ etc.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fR
 .ad
@@ -102,7 +98,6 @@ alone, \fBstrchg\fR pops the topmost module from the stream.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fI module\fR \fR
 .ad
@@ -118,12 +113,10 @@ The following options apply to \fBstrconf\fR and, \fB-m\fR and \fB-t\fR are
 mutually exclusive.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fI module\fR \fR
 .ad
 .RS 14n
-.rt  
 Determine if the named \fImodule\fR is present on a stream. If it is,
 \fBstrconf\fR prints the message \fByes\fR and returns zero. If not,
 \fBstrconf\fR prints the message \fBno\fR and returns a non-zero value. The
@@ -132,12 +125,10 @@ Determine if the named \fImodule\fR is present on a stream. If it is,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fI module\fR \fR
 .ad
 .RS 14n
-.rt  
 Print only the topmost module (if one exists). The \fB-t\fR and \fB-m\fR
 options are mutually exclusive.
 .RE

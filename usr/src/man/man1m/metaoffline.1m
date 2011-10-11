@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH metaoffline 1M "26 Mar 2006" "SunOS 5.11" "System Administration Commands"
+.TH METAOFFLINE 1M "Mar 26, 2006"
 .SH NAME
 metaoffline, metaonline \- place submirrors offline and online
 .SH SYNOPSIS
@@ -67,34 +67,28 @@ only be mounted as read-only.
 Root privileges are required for all of the following options except \fB-h\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 14n
-.rt  
 Forces offlining of submirrors that have slices requiring maintenance.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 14n
-.rt  
 Displays usage message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fB\fIsetname\fR\fR\fR
 .ad
 .RS 14n
-.rt  
 Specifies the name of the diskset on which \fBmetaoffline\fR and
 \fBmetaonline\fR will work. Using the \fB-s\fR option will cause the command to
 perform its administrative function within the specified diskset. Without this
@@ -103,24 +97,20 @@ option, the command will perform its function on local metadevices.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImirror\fR\fR
 .ad
 .RS 14n
-.rt  
 Specifies the metadevice name of the mirror from which the submirror will be
 either taken offline or put online.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsubmirror\fR\fR
 .ad
 .RS 14n
-.rt  
 Specifies the metadevice name of the submirror to be either taken offline or
 put online.
 .RE
@@ -147,23 +137,19 @@ This example takes one submirror, \fBmymirror_sub1\fR, offline from mirror
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -175,13 +161,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStable
+Interface Stability	Stable
 .TE
 
 .SH SEE ALSO

@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_cb_register 9F "30 Jan 2009" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_CB_REGISTER 9F "Jan 30, 2009"
 .SH NAME
 ddi_cb_register, ddi_cb_unregister \- register and unregister a device driver
 callback handler
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/sunddi.h> 
+#include <sys/sunddi.h>
 
 \fBint\fR \fBddi_cb_register\fR(\fBdev_info_t *\fR\fIdip\fR, \fBddi_cb_flags_t\fR \fIflags\fR,
       \fBddi_cb_func_t\fR \fIcbfunc\fR, \fBvoid *\fR\fIarg1\fR, \fBvoid *\fR\fIarg2\fR,
@@ -32,67 +32,55 @@ Solaris DDI specific (Solaris DDI).
 \fBddi_cb_register()\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 12n
-.rt  
 Pointer to the \fBdev_info\fR structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 12n
-.rt  
 Flags to determine which callback events can be handled.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcbfunc\fR\fR
 .ad
 .RS 12n
-.rt  
 Callback handler function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIarg1\fR\fR
 .ad
 .RS 12n
-.rt  
 First argument to the callback handler.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIarg2\fR\fR
 .ad
 .RS 12n
-.rt  
 Second (optional) argument to the callback handler.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIret_hdlp\fR\fR
 .ad
 .RS 12n
-.rt  
 Pointer to return a handle to the registered callback.
 .RE
 
@@ -101,12 +89,10 @@ Pointer to return a handle to the registered callback.
 \fBddi_cb_unregister()\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhdl\fR\fR
 .ad
 .RS 7n
-.rt  
 Handle to the registered callback handler that is to be unregistered.
 .RE
 
@@ -128,12 +114,10 @@ handler and prevents future processing of actions.
 The \fIflags\fR parameter consists of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_CB_FLAG_INTR\fR\fR
 .ad
 .RS 20n
-.rt  
 The device driver participates in interrupt resource management. The device
 driver may receive additional interrupt resources from the system, but only
 because it can accept callback notices informing it when it has more or less
@@ -148,8 +132,8 @@ The cdfunc is a callback handler with the following prototype:
 .sp
 .in +2
 .nf
-typedef int (*ddi_cb_func_t)(dev_info_t *dip, 
-              ddi_cb_action_t action, void *cbarg, 
+typedef int (*ddi_cb_func_t)(dev_info_t *dip,
+              ddi_cb_action_t action, void *cbarg,
               void *arg1, void *arg2);
 .fi
 .in -2
@@ -168,12 +152,10 @@ if it received a callback action that it did not know how to process, or
 The \fIaction\fR parameter can be one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIDDI_CB_INTR_ADD\fR\fR
 .ad
 .RS 22n
-.rt  
 For interrupt resource management, the driver has more available interrupts.
 The driver can allocate more interrupt vectors and then set up more interrupt
 handling functions by using \fBddi_intr_alloc\fR(9F).
@@ -181,12 +163,10 @@ handling functions by using \fBddi_intr_alloc\fR(9F).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIDDI_CB_INTR_REMOVE\fR\fR
 .ad
 .RS 22n
-.rt  
 For interrupt resource management, the driver has fewer available interrupts.
 The driver must release any previously allocated interrupts in excess of what
 is now available by using \fBddi_intr_free\fR(9F).
@@ -220,35 +200,29 @@ allocations so that it never uses more interrupts than are currently available.
 The \fBddi_cb_register()\fR and \fBddi_cb_unregister()\fR functions return:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 16n
-.rt  
 on success
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_EINVAL\fR\fR
 .ad
 .RS 16n
-.rt  
 An invalid parameter was given when registering a callback handler, or an
 invalid handle was given when unregistering.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_EALREADY\fR\fR
 .ad
 .RS 16n
-.rt  
 An attempt was made to register a callback handler while a previous
 registration still exists.
 .RE
@@ -258,34 +232,28 @@ registration still exists.
 The \fIcbfunc\fR routine must return:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 15n
-.rt  
 on success
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_ENOTSUP\fR\fR
 .ad
 .RS 15n
-.rt  
 The device does not support the operation
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 15n
-.rt  
 Implementation specific failure
 .RE
 
@@ -549,15 +517,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityPrivate
+Interface Stability	Private
 _
-MT-LevelUnsafe
+MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO

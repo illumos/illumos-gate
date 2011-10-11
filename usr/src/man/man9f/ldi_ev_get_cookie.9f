@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ldi_ev_get_cookie 9F "21 Aug 2007" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH LDI_EV_GET_COOKIE 9F "Aug 21, 2007"
 .SH NAME
 ldi_ev_get_cookie \- get an LDI event cookie for a specified event
 .SH SYNOPSIS
@@ -11,7 +11,7 @@ ldi_ev_get_cookie \- get an LDI event cookie for a specified event
 .nf
 #include <sys/sunldi.h>
 
-\fBint\fR \fBldi_ev_get_cookie\fR(\fIldi_handle_t lh\fR, \fIchar *evname\fR, 
+\fBint\fR \fBldi_ev_get_cookie\fR(\fIldi_handle_t lh\fR, \fIchar *evname\fR,
      \fIldi_ev_cookie_t *cookiep\fR);
 .fi
 
@@ -22,7 +22,6 @@ Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIldi_handle_t lh\fR\fR
 .ad
@@ -34,7 +33,6 @@ requested.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIchar *evname\fR\fR
 .ad
@@ -45,7 +43,6 @@ The string name of the event.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIldi_ev_cookie_t *cookiep\fR\fR
 .ad
@@ -70,7 +67,6 @@ registering callbacks on events.
 The following two LDI events are currently defined:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDI_EV_OFFLINE\fR\fR
 .ad
@@ -81,7 +77,6 @@ The device is moving to the offline state.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDI_EV_DEGRADE\fR\fR
 .ad
@@ -101,7 +96,6 @@ for NDI event services. For such events, \fBldi_ev_get_cookie()\fR replaces
 The return values for this function are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDI_EV_SUCCESS\fR\fR
 .ad
@@ -112,7 +106,6 @@ The event cookie was created successfully.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDI_EV_FAILURE\fR\fR
 .ad

@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -64,6 +65,13 @@ struct zone;		/* forward reference */
 struct ts_label_s;	/* forward reference */
 struct credklpd;	/* forward reference */
 
+/* Supplemental groups list. */
+typedef struct credgrp {
+	uint_t		crg_ref;
+	uint_t		crg_ngroups;
+	gid_t		crg_groups[1];
+} credgrp_t;
+
 struct cred {
 	uint_t		cr_ref;		/* reference count */
 	uid_t		cr_uid;		/* effective user id */
@@ -78,7 +86,7 @@ struct cred {
 	struct ts_label_s *cr_label;	/* pointer to the effective label */
 	struct credklpd *cr_klpd;	/* pointer to the cred's klpd */
 	credsid_t	*cr_ksid;	/* pointer to SIDs */
-	struct credgrp	*cr_grps;	/* supplemental groups */
+	credgrp_t	*cr_grps;	/* supplemental groups */
 					/* audit info is defined dynamically */
 					/* and valid only when audit enabled */
 	/* auditinfo_addr_t	cr_auinfo;	audit info */

@@ -1,13 +1,13 @@
 '\" te
 .\"  Copyright 1989 AT&T  Copyright (c) 1992, X/Open Company Limited  All Rights Reserved  Portions Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH tail 1 "13 Jul 2005" "SunOS 5.11" "User Commands"
+.TH TAIL 1 "Jul 13, 2005"
 .SH NAME
 tail \- deliver the last part of a file
 .SH SYNOPSIS
@@ -70,34 +70,28 @@ exclusive. If both are specified on the command line, the \fB-f\fR option is
 ignored.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR \fR
 .ad
 .RS 7n
-.rt  
 Units of blocks.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fR
 .ad
 .RS 7n
-.rt  
 Units of bytes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fR
 .ad
 .RS 7n
-.rt  
 Follow. If the input-file is not a pipe, the program does not terminate after
 the line of the input-file has been copied, but enters an endless loop, wherein
 it sleeps for a second and then attempts to read and copy further records from
@@ -107,23 +101,19 @@ being written by some other process.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fR
 .ad
 .RS 7n
-.rt  
 Units of lines.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fR
 .ad
 .RS 7n
-.rt  
 Reverse. Copies lines from the specified starting point in the file in reverse
 order. The default for \fBr\fR is to print the entire file in reverse order.
 .RE
@@ -134,44 +124,36 @@ order. The default for \fBr\fR is to print the entire file in reverse order.
 The following options are supported for \fB/usr/xpg4/bin/tail\fR only:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fInumber\fR \fR
 .ad
 .RS 14n
-.rt  
 The \fInumber\fR option-argument must be a decimal integer whose sign affects
 the location in the file, measured in bytes, to begin the copying:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+\fR \fR
 .ad
 .RS 9n
-.rt  
 Copying starts relative to the beginning of the file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi\fR \fR
 .ad
 .RS 9n
-.rt  
 Copying starts relative to the end of the file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnone\fR
 .ad
 .RS 9n
-.rt  
 Copying starts relative to the end of the file.
 .RE
 
@@ -181,12 +163,10 @@ first byte of the file, \fB\fR\fB-c\fR\fB\(mi1\fR the last.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fInumber\fR \fR
 .ad
 .RS 14n
-.rt  
 Equivalent to \fB-c\fR\fInumber,\fR except the starting location in the file is
 measured in lines instead of bytes. The origin for counting is \fB1\fR. That
 is, \fB-n\fR\fB+1\fR represents the first line of the file, \fB-n\fR\fB\(mi1\fR
@@ -199,12 +179,10 @@ the last.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR \fR
 .ad
 .RS 9n
-.rt  
 A path name of an input file. If no \fIfile\fR operands are specified, the
 standard input is used.
 .RE
@@ -257,23 +235,19 @@ that affect the execution of \fBtail\fR: \fBLANG\fR, \fBLC_ALL\fR,
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 7n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR \fR
 .ad
 .RS 7n
-.rt  
 An error occurred.
 .RE
 
@@ -286,13 +260,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 .TE
 
 .SS "/usr/xpg4/bin/tail"
@@ -300,15 +273,14 @@ CSIEnabled
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

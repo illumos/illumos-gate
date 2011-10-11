@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pooladm 1M "1 Dec 2005" "SunOS 5.11" "System Administration Commands"
+.TH POOLADM 1M "Dec 1, 2005"
 .SH NAME
 pooladm \- activate and deactivate the resource pools facility
 .SH SYNOPSIS
@@ -37,46 +37,38 @@ configuration.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 6n
-.rt  
 Instantiate the configuration at the given location. If a filename is not
 specified, it defaults to \fB/etc/pooladm.conf\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 6n
-.rt  
 Disable the pools facility so that pools can no longer be manipulated.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 6n
-.rt  
 Enable the pools facility so that pools can be manipulated.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 6n
-.rt  
 Validate the configuration without actually updating the current active
 configuration. Checks that there are no syntactic errors and that the
 configuration can be instantiated on the current system. No validation of
@@ -85,12 +77,10 @@ application specific properties is performed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 6n
-.rt  
 Update the specified location with the details of the current dynamic
 configuration.
 .sp
@@ -101,12 +91,10 @@ configuration is updated before the static location.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 6n
-.rt  
 Remove the currently active pool configuration. Destroy all defined resources,
 and return all formerly partitioned components to their default resources.
 .RE
@@ -117,12 +105,10 @@ and return all formerly partitioned components to their default resources.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfilename\fR\fR
 .ad
 .RS 12n
-.rt  
 Use the configuration contained within this file.
 .RE
 
@@ -219,12 +205,10 @@ example# \fB/usr/sbin/pooladm -s /tmp/state.backup\fR
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/pooladm.conf\fR\fR
 .ad
 .RS 21n
-.rt  
 Configuration file for \fBpooladm\fR.
 .RE
 
@@ -236,13 +220,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

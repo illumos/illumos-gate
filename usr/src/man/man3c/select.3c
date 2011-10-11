@@ -1,13 +1,13 @@
 '\" te
 .\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.  Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH select 3C "1 Nov 2004" "SunOS 5.11" "Standard C Library Functions"
+.TH SELECT 3C "Nov 1, 2004"
 .SH NAME
 select, pselect, FD_SET, FD_CLR, FD_ISSET, FD_ZERO \- synchronous I/O
 multiplexing
@@ -242,48 +242,40 @@ the macros \fBFD_CLR()\fR, \fBFD_ISSET()\fR, \fBFD_SET()\fR, and
 \fBFD_ZERO()\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFD_CLR\fR(\fIfd\fR, &\fIfdset\fR)\fR
 .ad
 .RS 24n
-.rt  
 Clears the bit for the file descriptor \fIfd\fR in the file descriptor set
 \fIfdset\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFD_ISSET\fR(\fIfd\fR, &\fIfdset\fR)\fR
 .ad
 .RS 24n
-.rt  
 Returns a non-zero value if the bit for the file descriptor \fIfd\fR is set in
 the file descriptor set pointed to by \fIfdset\fR, and 0 otherwise.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFD_SET\fR(\fIfd\fR, &\fIfdset\fR)\fR
 .ad
 .RS 24n
-.rt  
 Sets the bit for the file descriptor \fIfd\fR in the file descriptor set
 \fIfdset\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFD_ZERO\fR(&\fIfdset\fR)\fR
 .ad
 .RS 24n
-.rt  
 Initializes the file descriptor set \fIfdset\fR to have zero bits for all file
 descriptors.
 .RE
@@ -311,24 +303,20 @@ descriptor \fIfd\fR is set in the file descriptor set pointed to by
 The \fBselect()\fR and \fBpselect()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 10n
-.rt  
 One or more of the file descriptor sets specified a file descriptor that is not
 a valid open file descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 10n
-.rt  
 The function was interrupted before any of the selected events occurred and
 before the timeout interval expired.
 .sp
@@ -339,46 +327,38 @@ implementation-dependent whether \fBselect()\fR restarts or returns with
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 An invalid timeout interval was specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fInfds\fR argument is less than 0 or greater than \fBFD_SETSIZE\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 One of the specified file descriptors refers to a STREAM or multiplexer that is
 linked (directly or indirectly) downstream from a multiplexer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 A component of the pointed-to time limit is outside the acceptable range:
 \fBt_sec\fR must be between \fB0\fR and 10^8, inclusive.   \fBt_usec\fR must be
 greater than or equal to \fB0\fR, and less than 10^6.
@@ -405,15 +385,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

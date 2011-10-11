@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH string_to_decimal 3C "1 Oct 2003" "SunOS 5.11" "Standard C Library Functions"
+.TH STRING_TO_DECIMAL 3C "Oct 1, 2003"
 .SH NAME
 string_to_decimal, file_to_decimal, func_to_decimal \- parse characters into
 decimal record
@@ -12,14 +12,14 @@ decimal record
 .nf
 #include <floatingpoint.h>
 
-\fBvoid\fR \fBstring_to_decimal\fR(\fBchar **\fR\fIpc\fR, \fBint\fR \fInmax\fR, 
+\fBvoid\fR \fBstring_to_decimal\fR(\fBchar **\fR\fIpc\fR, \fBint\fR \fInmax\fR,
      \fBint\fR \fIfortran_conventions\fR, \fBdecimal_record *\fR\fIpd\fR,
      \fBenum decimal_string_form *\fR\fIpform\fR, \fBchar **\fR\fIpechar\fR);
 .fi
 
 .LP
 .nf
-\fBvoid\fR \fBfunc_to_decimal\fR(\fBchar **\fR\fIpc\fR, \fBint\fR \fInmax\fR, 
+\fBvoid\fR \fBfunc_to_decimal\fR(\fBchar **\fR\fIpc\fR, \fBint\fR \fInmax\fR,
      \fBint\fR \fIfortran_conventions\fR, \fBdecimal_record *\fR\fIpd\fR,
      \fBenum decimal_string_form *\fR\fIpform\fR, \fBchar **\fR\fIpechar\fR,
      \fBint (*\fR\fIpget\fR)(void), \fBint *\fR\fIpnread\fR, \fBint (*\fR\fIpunget\fR)(int \fIc\fR));
@@ -77,45 +77,37 @@ The \fIfortran_conventions\fR argument provides additional control over the set
 of accepted forms. It must be one of the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB0\fR
 .ad
 .RS 5n
-.rt  
 no Fortran conventions
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB1\fR
 .ad
 .RS 5n
-.rt  
 Fortran list-directed input conventions
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB2\fR
 .ad
 .RS 5n
-.rt  
 Fortran formatted input conventions, blanks are ignored
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB3\fR
 .ad
 .RS 5n
-.rt  
 Fortran formatted input conventions, blanks are interpreted as zeroes
 .RE
 
@@ -150,26 +142,24 @@ defined above.  Numbers in brackets refer to the notes following the table.
 
 .sp
 .TS
-tab();
-cw(1.63i) cw(2.02i) cw(1.85i) 
-lw(1.63i) lw(2.02i) lw(1.85i) 
-.
-form*\fIpform\fRpd->\fBfpclass\fR
+c c c
+l l l .
+form	*\fIpform\fR	pd->\fBfpclass\fR
 _
-all white space [1]\fBwhitespace_form\fR\fBfp_zero\fR
-\fIdigits\fR\fBfixed_int_form\fR\fBfp_normal\fR [2]
-\fIdigits\fR.\fBfixed_intdot_form\fR\fBfp_normal\fR [2]
-\&.\fIdigits\fR\fBfixed_dotfrac_form\fR\fBfp_normal\fR [2]
-\fIdigits\fR.\fIdigits\fR\fBfixed_intdotfrac_form\fR\fBfp_normal\fR [2]
-\fIdigits\fR \fIexponent\fR\fBfloating_int_form\fR\fBfp_normal\fR [2]
-\fIdigits\fR. \fIexponent\fR\fBfloating_intdot_form\fR\fBfp_normal\fR [2]
-\&.digits \fIexponent\fR\fBfloating_dotfrac_form\fR\fBfp_normal\fR [2]
-\fIdigits\fR.\fIdigits\fR \fIexponent\fR\fBfloating_intdotfrac_form\fR\fBfp_normal\fR [2]
-INF\fBinf_form\fR\fBfp_infinity\fR
-INFINITY\fBinfinity_form\fR\fBfp_infinity\fR
-NAN\fBnan_form\fR\fBfp_quiet\fR
-NAN(\fIstring\fR)\fBnanstring_form\fR\fBfp_quiet\fR
-none of the above\fBinvalid_form\fR\fBfp_signaling\fR
+all white space [1]	\fBwhitespace_form\fR	\fBfp_zero\fR
+\fIdigits\fR	\fBfixed_int_form\fR	\fBfp_normal\fR [2]
+\fIdigits\fR.	\fBfixed_intdot_form\fR	\fBfp_normal\fR [2]
+\&.\fIdigits\fR	\fBfixed_dotfrac_form\fR	\fBfp_normal\fR [2]
+\fIdigits\fR.\fIdigits\fR	\fBfixed_intdotfrac_form\fR	\fBfp_normal\fR [2]
+\fIdigits\fR \fIexponent\fR	\fBfloating_int_form\fR	\fBfp_normal\fR [2]
+\fIdigits\fR. \fIexponent\fR	\fBfloating_intdot_form\fR	\fBfp_normal\fR [2]
+\&.digits \fIexponent\fR	\fBfloating_dotfrac_form\fR	\fBfp_normal\fR [2]
+\fIdigits\fR.\fIdigits\fR \fIexponent\fR	\fBfloating_intdotfrac_form\fR	\fBfp_normal\fR [2]
+INF	\fBinf_form\fR	\fBfp_infinity\fR
+INFINITY	\fBinfinity_form\fR	\fBfp_infinity\fR
+NAN	\fBnan_form\fR	\fBfp_quiet\fR
+NAN(\fIstring\fR)	\fBnanstring_form\fR	\fBfp_quiet\fR
+none of the above	\fBinvalid_form\fR	\fBfp_signaling\fR
 .TE
 
 .sp
@@ -274,13 +264,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelMT-Safe with exceptions
+MT-Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO

@@ -4,14 +4,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH gld 9F "28 Aug 2003" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH GLD 9F "Aug 28, 2003"
 .SH NAME
 gld, gld_mac_alloc, gld_mac_free, gld_register, gld_unregister, gld_recv,
 gld_sched, gld_intr \- Generic LAN Driver service routines
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/gld.h> 
+#include <sys/gld.h>
 
 \fBgld_mac_info_t *\fR\fBgld_mac_alloc\fR(\fBdev_info_t *\fR\fIdip\fR);
 .fi
@@ -58,56 +58,46 @@ Solaris architecture specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fImacinfo\fR \fR
 .ad
 .RS 13n
-.rt  
 Pointer to a \fBgld_mac_info\fR(9S) structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR \fR
 .ad
 .RS 13n
-.rt  
 Pointer to \fBdev_info\fR structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR \fR
 .ad
 .RS 13n
-.rt  
 Device interface name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImp\fR \fR
 .ad
 .RS 13n
-.rt  
 Pointer to a message block containing a received packet.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInewstate\fR \fR
 .ad
 .RS 13n
-.rt  
 Media link state.
 .RE
 
@@ -246,34 +236,28 @@ in the media link state. The newstate argument should be set to one of the
 following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLD_LINKSTATE_DOWN\fR \fR
 .ad
 .RS 26n
-.rt  
 The media link is unavailable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLD_LINKSTATE_UP\fR \fR
 .ad
 .RS 26n
-.rt  
 The media link is unavailable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLD_LINKSTATE_UNKNOWN\fR \fR
 .ad
 .RS 26n
-.rt  
 The status of the media link is unknown.
 .RE
 
@@ -291,23 +275,19 @@ structure.
 \fBgld_register\fR(\|) and \fBgld_unregister\fR(\|) return:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR \fR
 .ad
 .RS 16n
-.rt  
 on success.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR \fR
 .ad
 .RS 16n
-.rt  
 on failure.
 .RE
 

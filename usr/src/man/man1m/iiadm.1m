@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH iiadm 1M "2 Oct 2007" "SunOS 5.11" "System Administration Commands"
+.TH IIADM 1M "Oct 2, 2007"
 .SH NAME
 iiadm \- command-line interface to control Sun StorageTek Availability Suite
 Point-in-Time Copy operations
@@ -211,23 +211,19 @@ The \fBii_bitmap\fR variable in the \fB/usr/kernel/drv/ii.conf\fR configuration
 file determines the bitmap volume operational semantics as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 13n
-.rt  
 Indicates that the bitmap is maintained in memory only or resume operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 13n
-.rt  
 Indicates that the bitmap is maintained in memory and on disk. This is the
 default value.
 .RE
@@ -247,34 +243,28 @@ file determines the amount of information logging that is output to the system
 console \fB/dev/console\fR during Point-in-Time Copy processing.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 13n
-.rt  
 Indicates that no logging is sent to the system console.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 13n
-.rt  
 Indicates that informational logging is sent to the system console.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 13n
-.rt  
 Indicates that developmental logging is sent to the system console.
 .RE
 
@@ -284,7 +274,6 @@ Indicates that developmental logging is sent to the system console.
 The \fBiiadm\fR utility supports the following options.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fB{ind|dep}\fR \fImaster_vol shadow_vol bitmap_vol\fR\fR
 .ad
@@ -324,7 +313,6 @@ known by for all \fBiiadm\fR options requiring specification of a
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIvolume_set\fR\fR
 .ad
@@ -355,7 +343,6 @@ copy to complete:
 
 .sp
 .ne 2
-.mk
 .na
 \fB[\fB-p\fR] \fB-u\fR \fBs\fR \fIvolume_set\fR\fR
 .ad
@@ -386,7 +373,6 @@ prior point-in-time data.
 
 .sp
 .ne 2
-.mk
 .na
 \fB[\fB-p\fR] [\fB-n\fR] \fB-u\fR \fBm\fR \fIvolume_set\fR\fR
 .ad
@@ -419,7 +405,6 @@ prior point-in-time data.
 
 .sp
 .ne 2
-.mk
 .na
 \fB[\fB-p\fR] \fB-c\fR s \fIvolume_set\fR\fR
 .ad
@@ -453,7 +438,6 @@ prior point-in-time data.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fBm\fR \fIvolume_set\fR\fR
 .ad
@@ -491,7 +475,6 @@ prior point-in-time data.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIvolume_set\fR\fR
 .ad
@@ -507,7 +490,6 @@ or copy command option to resynchronize the volumes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fB-p\fR\fB] [\fR\fB-n\fR\fB] \fR\fB-w\fR \fIvolume_set\fR\fR
 .ad
@@ -531,7 +513,6 @@ this option unlocks the data.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIvolume_set\fR\fR
 .ad
@@ -545,7 +526,6 @@ displayed for all Point-in-Time Copy volume sets that are configured.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
@@ -556,7 +536,6 @@ List all currently configured Point-in-Time Copy volumes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-O\fR \fIoverflow_vol\fR\fR
 .ad
@@ -583,7 +562,6 @@ especially when using the \fB-n\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR \fIoverflow_vol\fR \fIvolume_set\fR\fR
 .ad
@@ -614,7 +592,6 @@ especially when using the \fB-n\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR \fIvolume_set\fR\fR
 .ad
@@ -628,7 +605,6 @@ described below on the \fIvolume_set\fR. These operations momentarily clear out
 all overflow writes that are associated with this volume set.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBabort\fR(\fB-a\fR)\fR
 .ad
@@ -639,7 +615,6 @@ Abort copy operation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisable\fR(\fB-d\fR)\fR
 .ad
@@ -650,7 +625,6 @@ Dissolve the volume set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBupdate\fR(\fB-u\fR)\fR
 .ad
@@ -663,7 +637,6 @@ Update the volume set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
@@ -675,7 +648,6 @@ volume sets.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Q\fR \fIoverflow_vol\fR\fR
 .ad
@@ -686,7 +658,6 @@ This option displays the current status of the \fIoverflow_vol\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-E\fR \fIvolume_set\fR\fR
 .ad
@@ -705,7 +676,6 @@ export command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I\fR \fIvolume_set\fR \fIbitmap_vol\fR\fR
 .ad
@@ -735,7 +705,6 @@ operation. For example,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-J\fR \fIvolume_set\fR \fIbitmap_vol\fR\fR
 .ad
@@ -753,7 +722,6 @@ once again imported.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR \fIgroup_name\fR \fB-m\fR \fIvolume_set [volume_set2 ...]\fR\fR
 .ad
@@ -781,7 +749,6 @@ iiadm -g \fIgroup_name\fR [\fIoptions\fR]
 The \fIoptions\fR are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
@@ -792,7 +759,6 @@ Abort copy operation on all sets within \fIgroup_name\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR\fR
 .ad
@@ -803,7 +769,6 @@ Attach \fIoverflow_vol\fR to all sets within \fIgroup_name\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fB{s | m}\fR\fR
 .ad
@@ -814,7 +779,6 @@ Copy shadow/master for all sets within \fIgroup_name\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR\fR
 .ad
@@ -825,7 +789,6 @@ Detach \fIoverflow_vol\fR from all sets within \fIgroup_name\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
@@ -836,7 +799,6 @@ Disable all sets within \fIgroup_name\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-E\fR\fR
 .ad
@@ -847,7 +809,6 @@ Export all volume sets within \fIgroup_name\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
@@ -858,7 +819,6 @@ Status of all volume sets within \fIgroup_name\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
@@ -869,7 +829,6 @@ List all volume sets within \fIgroup_name\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
@@ -880,7 +839,6 @@ List all groups.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
@@ -891,7 +849,6 @@ Do not ask if an update of the master volume is what the user really intended.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR\fR
 .ad
@@ -902,7 +859,6 @@ Set parameters on all volume sets within \fIgroup_name\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR\fR
 .ad
@@ -913,7 +869,6 @@ Reset all volume sets within \fIgroup_name\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fB{s | m}\fR\fR
 .ad
@@ -924,7 +879,6 @@ Update shadow/master for all sets within \fIgroup_name\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR\fR
 .ad
@@ -937,7 +891,6 @@ Wait for all volume sets within \fIgroup_name\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR \fB-" "\fR \fB-m\fR \fIvolume_set\fR [\fIvolume_set2 ...\fR]\fR
 .ad
@@ -953,7 +906,6 @@ documented \fBiiadm\fR group commands to be performed against the blank (\fB"
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR \fIcluster_tag\fR\fR
 .ad
@@ -981,7 +933,6 @@ package has not been installed or configured.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
@@ -992,7 +943,6 @@ Prints the \fBiiadm\fR usage summary.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -1007,7 +957,6 @@ Contact Sun Enterprise Services for assistance in using the remaining commands
 in this section.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR \fIdelay\fR \fIunit\fR \fIvolume_set\fR\fR
 .ad
@@ -1020,7 +969,6 @@ from 2 to 10000 inclusive; unit ranges from 100 to 60000 inclusive.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIvolume\fR\fR
 .ad
@@ -1036,23 +984,19 @@ point-in-time volume updates.
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 13n
-.rt  
 Command completed successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 13n
-.rt  
 An error occurred.
 .RE
 
@@ -1064,13 +1008,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

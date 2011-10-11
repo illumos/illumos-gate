@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH metastat 1M "26 Mar 2006" "SunOS 5.11" "System Administration Commands"
+.TH METASTAT 1M "Mar 26, 2006"
 .SH NAME
 metastat \- display status for metadevice or hot spare pool
 .SH SYNOPSIS
@@ -14,13 +14,13 @@ metastat \- display status for metadevice or hot spare pool
 
 .LP
 .nf
-\fB/usr/sbin/metastat\fR [\fB-a\fR] [\fB-B\fR] [\fB-D\fR] [\fB-c\fR] [\fB-i\fR] [\fB-p\fR] [\fB-q\fR] 
+\fB/usr/sbin/metastat\fR [\fB-a\fR] [\fB-B\fR] [\fB-D\fR] [\fB-c\fR] [\fB-i\fR] [\fB-p\fR] [\fB-q\fR]
      [\fB-s\fR \fIsetname\fR] [\fB-t\fR] [\fImetadevice...\fR] [\fIhot_spare_pool\fR...]
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/metastat\fR [\fB-a\fR] [\fB-B\fR] [\fB-D\fR] [\fB-c\fR] [\fB-i\fR] [\fB-p\fR] [\fB-q\fR] 
+\fB/usr/sbin/metastat\fR [\fB-a\fR] [\fB-B\fR] [\fB-D\fR] [\fB-c\fR] [\fB-i\fR] [\fB-p\fR] [\fB-q\fR]
      [\fB-s\fR \fIsetname\fR] \fIcomponent\fR...
 .fi
 
@@ -41,23 +41,19 @@ command to view the status of the metadevice.
 on the system. The possible states include:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOkay\fR\fR
 .ad
 .RS 21n
-.rt  
 The device reports no errors.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNeeds maintenance\fR\fR
 .ad
 .RS 21n
-.rt  
 A problem has been detected. This requires that the system administrator
 replace the failed physical device. Volumes displaying \fBNeeds maintenance\fR
 have incurred no data loss, although additional failures could risk data loss.
@@ -66,12 +62,10 @@ Take action as quickly as possible.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLast erred\fR\fR
 .ad
 .RS 21n
-.rt  
 A problem has been detected. Data loss is a possibility. This might occur if a
 component of a submirror fails and is not replaced by a hot spare, therefore
 going into \fBNeeds maintenance\fR state. If the corresponding component also
@@ -81,12 +75,10 @@ valid data source, data loss could be a possibility.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUnavailable\fR\fR
 .ad
 .RS 21n
-.rt  
 A device cannot be accessed, but has not incurred errors. This might occur if a
 physical device has been removed with Solaris Dynamic Reconfiguration (DR)
 features, thus leaving the Solaris Volume Manager volume unavailable. It could
@@ -108,35 +100,29 @@ Needs maintenance or Last erred states.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 14n
-.rt  
 Display all disk sets. Only metadevices in disk sets that are owned by the
 current host are displayed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-B\fR\fR
 .ad
 .RS 14n
-.rt  
 Display the current status of all of the 64-bit metadevices and hot spares.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 14n
-.rt  
 Display concise output.
 .sp
 There is one line of output for each metadevice. The output shows the basic
@@ -149,35 +135,29 @@ human-readable output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR\fR
 .ad
 .RS 14n
-.rt  
 Display the current status of all of the descriptive name metadevices and
 hotspares.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 14n
-.rt  
 Display usage message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 14n
-.rt  
 Check the status of RAID-1 (mirror) volumes, RAID-5 volumes, and hot spares.
 The inquiry checks each metadevice for accessibility, starting at the top level
 metadevice. When problems are discovered, the metadevice state databases are
@@ -186,12 +166,10 @@ updated as if an error had occurred.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 14n
-.rt  
 Display the list of active metadevices and hot spare pools in the same format
 as \fBmd.tab\fR. See \fBmd.tab\fR(4).
 .sp
@@ -201,23 +179,19 @@ recovery or setup.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
 .RS 14n
-.rt  
 Display the status for metadevices without the device relocation information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fB\fIsetname\fR\fR\fR
 .ad
 .RS 14n
-.rt  
 Specify the name of the disk set on which \fBmetastat\fR works. Using the
 \fB-s\fR option causes the command to perform its administrative function
 within the specified disk set. Without this option, the command performs its
@@ -226,12 +200,10 @@ function on metadevices and hot spare pools in the local disk set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 14n
-.rt  
 Display the current status and timestamp for the specified metadevices and hot
 spare pools. The timestamp provides the date and time of the last state change.
 .RE
@@ -242,35 +214,29 @@ spare pools. The timestamp provides the date and time of the last state change.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcomponent\fR\fR
 .ad
 .RS 18n
-.rt  
 Display the status of the component hosting a soft partition, including
 extents, starting blocks, and block count.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhot_spare_pool\fR\fR
 .ad
 .RS 18n
-.rt  
 Display the status of the specified hot spare pool(s).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImetadevice\fR\fR
 .ad
 .RS 18n
-.rt  
 Display the status of the specified metadevice(s). If a trans metadevice is
 specified, the status of the master and log devices is also displayed. Trans
 metadevices have been replaced by UFS logging. See \fBNOTES\fR.
@@ -289,7 +255,7 @@ after creating a mirror, \fBopt_mirror\fR, consisting of two submirrors,
 .in +2
 .nf
 # metastat opt_mirror
-opt_mirror: Mirror 
+opt_mirror: Mirror
     Submirror 0: opt_sub1
       State: Okay
     Submirror 1: opt_sub2
@@ -395,7 +361,7 @@ oban/d100: Mirror
     Pass: 1
     Read option: roundrobin (default)
     Write option: parallel (default)
-    Resync option: application based 
+    Resync option: application based
     Owner: None
     Size: 1027216 blocks (501 MB)
 
@@ -410,7 +376,7 @@ oban/d11: Submirror of oban/d100
     State: Okay
     Size: 1027216 blocks (501 MB)
     Stripe 0:
-        Device     Start Block  Dbase     State Reloc Hot Spare 
+        Device     Start Block  Dbase     State Reloc Hot Spare
         c1t4d0s0          0     No         Okay
 .fi
 .in -2
@@ -448,23 +414,19 @@ A slice may go into an error state after \fBmetastat\fR \fB-p\fR is issued.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -476,13 +438,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStable
+Interface Stability	Stable
 .TE
 
 .SH SEE ALSO

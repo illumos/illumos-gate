@@ -3,7 +3,7 @@
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
-.TH atu 7D "26 Mar 2009" "SunOS 5.11" "Devices"
+.TH ATU 7D "Mar 26, 2009"
 .SH NAME
 atu \- Atmel AT76C50x USB IEEE 802.11b Wireless Device Driver
 .SH DESCRIPTION
@@ -28,34 +28,28 @@ supported. Encryption types WEP40 and WEP104 are supported.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/atu*\fR\fR
 .ad
 .RS 25n
-.rt  
 Special character device
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/atu\fR\fR
 .ad
 .RS 25n
-.rt  
 32-bit ELF kernel module (x86)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/amd64/atu\fR\fR
 .ad
 .RS 25n
-.rt  
 64-bit ELF kernel module (x86)
 .RE
 
@@ -67,15 +61,14 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) |lw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+l | l
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Architecturex86
+Architecture	x86
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

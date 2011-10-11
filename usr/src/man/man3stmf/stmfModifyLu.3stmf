@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH stmfModifyLu 3STMF "8 May 2009" "SunOS 5.11" "SCSI Target Mode Framework Library Functions"
+.TH STMFMODIFYLU 3STMF "May 8, 2009"
 .SH NAME
 stmfModifyLu, stmfModifyLuByFname \- modify a logical uni
 .SH SYNOPSIS
@@ -24,56 +24,46 @@ cc [ \fIflag\fR... ] \fIfile\fR... -lstmf [ \fIlibrary\fR... ]
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIluGuid\fR\fR
 .ad
 .RS 11n
-.rt  
 The guid of logical unit to modify.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfname\fR\fR
 .ad
 .RS 11n
-.rt  
 The filename of logical unit to modify.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdType\fR\fR
 .ad
 .RS 11n
-.rt  
 Type of logical unit. See \fBstmfCreateLuResource\fR(3STMF).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprop\fR\fR
 .ad
 .RS 11n
-.rt  
 A property type value. See DESCRIPTION for valid values.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpropVal\fR\fR
 .ad
 .RS 11n
-.rt  
 A property value.
 .RE
 
@@ -87,7 +77,6 @@ properties of a logical unit device.
 Valid properties for modify \fBSTMF_DISK\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_LU_PROP_ALIAS\fR\fR
 .ad
@@ -100,7 +89,6 @@ Default: Set to file name of backing store.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_LU_PROP_SIZE\fR\fR
 .ad
@@ -115,7 +103,6 @@ property value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_LU_PROP_WRITE_CACHE_DISABLE\fR\fR
 .ad
@@ -130,7 +117,6 @@ Default: Writeback cache setting of the backing store device specified by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_LU_PROP_WRITE_PROTECT\fR\fR
 .ad
@@ -148,7 +134,6 @@ Default: "false"
 The following values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_STATUS_SUCCESS\fR\fR
 .ad
@@ -159,7 +144,6 @@ The API call was successful.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_ERROR_INVALID_ARG\fR\fR
 .ad
@@ -170,7 +154,6 @@ Either \fIprop\fR or \fIpropVal\fR is unrecognized.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_ERROR_INVALID_PROPSIZE\fR\fR
 .ad
@@ -181,7 +164,6 @@ The size of \fIpropVal\fR is invalid.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_ERROR_NO_PROP\fR\fR
 .ad
@@ -198,15 +180,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

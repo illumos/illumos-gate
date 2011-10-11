@@ -1,16 +1,16 @@
 '\" te
-.\" Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved 
+.\" Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ssh-socks5-proxy-connect 1 "30 Oct 2002" "SunOS 5.11" "User Commands"
+.TH SSH-SOCKS5-PROXY-CONNECT 1 "Oct 30, 2002"
 .SH NAME
 ssh-socks5-proxy-connect \- Secure Shell proxy for SOCKS5
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/lib/ssh/ssh-socks5-proxy-connect\fR 
-     [\fB-h\fR \fIsocks5_proxy_host\fR] 
+\fB/usr/lib/ssh/ssh-socks5-proxy-connect\fR
+     [\fB-h\fR \fIsocks5_proxy_host\fR]
      [\fB-p\fR \fIsocks5_proxy_port\fR] \fIconnect_host\fR \fIconnect_port\fR
 .fi
 
@@ -30,24 +30,20 @@ defined in RFC 1928. Only anonymous connections are possible.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fIsocks5_proxy_host\fR\fR
 .ad
 .RS 24n
-.rt  
 Specifies the proxy web server through which to connect. Overrides the
 \fBSOCKS5_SERVER\fR environment variable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIsocks5_proxy_port\fR\fR
 .ad
 .RS 24n
-.rt  
 Specifies the port on which the proxy web server runs. If not specified, port
 80 is assumed. Overrides the \fBSOCKS5_PORT\fR environment variable.
 .RE
@@ -58,45 +54,37 @@ Specifies the port on which the proxy web server runs. If not specified, port
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsocks5_proxy_host\fR\fR
 .ad
 .RS 21n
-.rt  
 The host name or IP address (IPv4 or IPv6) of the proxy.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsocks5_proxy_port\fR\fR
 .ad
 .RS 21n
-.rt  
 The numeric port number to connect to on \fIsocks5_proxy_host\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIconnect_host\fR\fR
 .ad
 .RS 21n
-.rt  
 The name of the remote host to which the socks gateway is to connect you.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIconnect_port\fR\fR
 .ad
 .RS 21n
-.rt  
 The numeric port number of the socks gateway to connect you to on
 \fIconnect_host\fR.
 .RE
@@ -161,23 +149,19 @@ example$ \fBssh -o'ProxyCommand=/usr/lib/ssh/ssh-socks5-proxy-connect \e
 .SH ENVIRONMENT VARIABLES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSOCKS5_SERVER\fR\fR
 .ad
 .RS 17n
-.rt  
 Takes \fIsocks5_proxy_host\fR operand to specify the default proxy host.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSOCKS5_PORT\fR\fR
 .ad
 .RS 17n
-.rt  
 Takes \fIsocks5_proxy_port \fR operand to specify the default proxy port.
 .RE
 
@@ -187,23 +171,19 @@ Takes \fIsocks5_proxy_port \fR operand to specify the default proxy port.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR \fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -215,13 +195,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStable
+Interface Stability	Stable
 .TE
 
 .SH SEE ALSO

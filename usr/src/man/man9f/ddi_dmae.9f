@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_dmae 9F "04 Apr 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_DMAE 9F "Apr 04, 2006"
 .SH NAME
 ddi_dmae, ddi_dmae_alloc, ddi_dmae_release, ddi_dmae_prog, ddi_dmae_disable,
 ddi_dmae_enable, ddi_dmae_stop, ddi_dmae_getcnt, ddi_dmae_1stparty,
@@ -70,56 +70,46 @@ below, to replace it.
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 12n
-.rt  
 A \fBdev_info\fR pointer that identifies the device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIchnl\fR\fR
 .ad
 .RS 12n
-.rt  
 A \fBDMA\fR channel number. On \fBISA\fR buses this number must be \fB0\fR,
 \fB1\fR, \fB2\fR, \fB3\fR, \fB5\fR, \fB6\fR, or \fB7\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcallback\fR\fR
 .ad
 .RS 12n
-.rt  
 The address of a function to call back later if resources are not currently
 available. The following special function addresses may also be used:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_DMA_SLEEP\fR\fR
 .ad
 .RS 20n
-.rt  
 Wait until resources are available.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_DMA_DONTWAIT\fR\fR
 .ad
 .RS 20n
-.rt  
 Do not wait until resources are available and do not schedule a callback.
 .RE
 
@@ -127,69 +117,57 @@ Do not wait until resources are available and do not schedule a callback.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIarg\fR\fR
 .ad
 .RS 12n
-.rt  
 Argument to be passed to the callback function, if specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdmaereqp\fR\fR
 .ad
 .RS 12n
-.rt  
 A pointer to a \fBDMA\fR engine request structure. See \fBddi_dmae_req\fR(9S).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcookiep\fR\fR
 .ad
 .RS 12n
-.rt  
 A pointer to a \fBddi_dma_cookie\fR(9S) object, obtained from
 \fBddi_dma_segtocookie\fR(9F), which contains the address and count.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcountp\fR\fR
 .ad
 .RS 12n
-.rt  
 A pointer to an integer that will receive the count of the number of bytes not
 yet transferred upon completion of a \fBDMA\fR operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlimitsp\fR\fR
 .ad
 .RS 12n
-.rt  
 A pointer to a \fBDMA\fR limit structure. See \fBddi_dma_lim_x86\fR(9S).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIattrp\fR\fR
 .ad
 .RS 12n
-.rt  
 A pointer to a \fBDMA \fR attribute structure. See \fBddi_dma_attr\fR(9S).
 .RE
 
@@ -200,12 +178,10 @@ There are three possible ways that a device can perform \fBDMA\fR engine
 functions:
 .sp
 .ne 2
-.mk
 .na
 \fBBus master DMA\fR
 .ad
 .RS 19n
-.rt  
 If the device is capable of acting as a true bus master, then the driver should
 program the device's \fBDMA\fR registers directly and not make use of the
 \fBDMA\fR engine functions described here. The driver should obtain the
@@ -215,12 +191,10 @@ program the device's \fBDMA\fR registers directly and not make use of the
 
 .sp
 .ne 2
-.mk
 .na
 \fBThird-party \fBDMA\fR\fR
 .ad
 .RS 19n
-.rt  
 This method uses the system \fBDMA\fR engine that is resident on the main
 system board. In this model, the device cooperates with the system's \fBDMA\fR
 engine to effect the data transfers between the device and memory. The driver
@@ -232,12 +206,10 @@ to initiate the transfer in cooperation with that engine.
 
 .sp
 .ne 2
-.mk
 .na
 \fBFirst-party DMA\fR
 .ad
 .RS 19n
-.rt  
 Using this method, the device uses its own \fBDMA\fR bus cycles, but requires a
 channel from the system's \fBDMA\fR engine. After allocating the \fBDMA\fR
 channel, the \fBddi_dmae_1stparty()\fR function may be used to perform whatever
@@ -367,34 +339,28 @@ allocation functions to provide the information necessary to break the
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 23n
-.rt  
 Upon success, for all of these routines.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 23n
-.rt  
 May be returned due to invalid arguments.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_DMA_NORESOURCES\fR\fR
 .ad
 .RS 23n
-.rt  
 May be returned by \fBddi_dmae_alloc()\fR if the requested resources are not
 available and the value of \fIdmae_waitfp\fR is not \fBDDI_DMA_SLEEP\fR.
 .RE
@@ -414,13 +380,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Architecturex86
+Architecture	x86
 .TE
 
 .SH SEE ALSO

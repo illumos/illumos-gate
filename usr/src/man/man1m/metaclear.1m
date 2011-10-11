@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH metaclear 1M "26 Mar 2006" "SunOS 5.11" "System Administration Commands"
+.TH METACLEAR 1M "Mar 26, 2006"
 .SH NAME
 metaclear \- delete active metadevices and hot spare pools
 .SH SYNOPSIS
@@ -58,70 +58,58 @@ Any metadevice currently in use (open) cannot be deleted.
 Root privileges are required for all of the following options except \fB-h\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 14n
-.rt  
 Deletes all metadevices and configured hot spare pools in the set named by
 \fB-s\fR, or the local set by default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 14n
-.rt  
 Deletes (forcibly) a metadevice that contains a subcomponent in an error state.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 14n
-.rt  
 Displays usage message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 14n
-.rt  
 Deletes (purges) all soft partitions from the specified metadevice or
 component.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 14n
-.rt  
 Recursively deletes specified metadevices and hot spare pools, but does not
 delete metadevices on which others depend.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fB\fIsetname\fR\fR\fR
 .ad
 .RS 14n
-.rt  
 Specifies the name of the diskset on which \fBmetaclear\fR will work. Using the
 \fB-s\fR option causes the command to perform its administrative function
 within the specified diskset. Without this option, the command performs its
@@ -131,35 +119,29 @@ function on local metadevices and/or hot spare pools.
 .SH OPERANDS
 .sp
 .ne 2
-.mk
 .na
 \fB\fImetadevice\fR \fI\&...\fR\fR
 .ad
 .RS 24n
-.rt  
 Specifies the name(s) of the metadevice(s) to be deleted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcomponent\fR\fR
 .ad
 .RS 24n
-.rt  
 Specifies the \fBc*d*t*s*\fR name(s) of the components containing soft
 partitions to be deleted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhot_spare_pool\fR \fI\&...\fR\fR
 .ad
 .RS 24n
-.rt  
 Specifies the name(s) of the hot spare pools to be deleted. Names for hot spare
 pools can be any legal file name that is composed of alphanumeric characters, a
 dash ("-"), an underscore ("_"), or a period ("."). Names must begin with a
@@ -265,23 +247,19 @@ d5: Soft Partition is cleared
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -293,13 +271,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStable
+Interface Stability	Stable
 .TE
 
 .SH SEE ALSO

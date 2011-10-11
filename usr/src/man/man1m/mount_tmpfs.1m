@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mount_tmpfs 1M "24 Nov 2003" "SunOS 5.11" "System Administration Commands"
+.TH MOUNT_TMPFS 1M "Nov 24, 2003"
 .SH NAME
 mount_tmpfs \- mount tmpfs file systems
 .SH SYNOPSIS
@@ -34,24 +34,20 @@ disregarded and assumed to be the virtual memory resources within the system.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIspecific_options\fR\fR
 .ad
 .RS 23n
-.rt  
 Specify \fBtmpfs\fR file system specific options in a comma-separated list with
 no intervening spaces. If invalid options are specified, a warning  message is
 printed and the invalid options are ignored. The following options are
 available:
 .sp
 .ne 2
-.mk
 .na
 \fBsize=\fIsz\fR\fR
 .ad
 .RS 19n
-.rt  
 The \fIsz\fR argument controls the size of this particular \fBtmpfs\fR file
 system. If the argument is has a `k' suffix, the number will be interpreted as
 a number of kilobytes. An `m' suffix will be interpreted as a number of
@@ -62,12 +58,10 @@ pagesize of the system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxattr\fR | \fBnoxattr\fR\fR
 .ad
 .RS 19n
-.rt  
 Allow or disallow the creation and manipulation of extended attributes. The
 default is \fBxattr\fR. See \fBfsattr\fR(5) for a description of extended
 attributes.
@@ -77,12 +71,10 @@ attributes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-O\fR\fR
 .ad
 .RS 23n
-.rt  
 Overlay  mount. Allow the file system to be mounted over an existing mount
 point, making the underlying file system inaccessible. If a mount is attempted
 on a pre-existing mount point without setting this flag, the mount will fail,
@@ -92,12 +84,10 @@ producing the error\f(CWdevice busy\fR.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/mnttab\fR\fR
 .ad
 .RS 15n
-.rt  
 Table of mounted file systems
 .RE
 

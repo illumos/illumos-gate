@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH xdr_simple 3NSL "27 Aug 2001" "SunOS 5.11" "Networking Services Library Functions"
+.TH XDR_SIMPLE 3NSL "Aug 27, 2001"
 .SH NAME
 xdr_simple, xdr_bool, xdr_char, xdr_double, xdr_enum, xdr_float, xdr_free,
 xdr_hyper, xdr_int, xdr_long, xdr_longlong_t, xdr_quadruple, xdr_short,
@@ -129,12 +129,10 @@ is suggested that \fBmalloc\fR(3C) be used to allocate these buffers or that
 the programmer insure  that the buffer address is divisible evenly by four.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_bool()\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_bool()\fR translates between booleans (C integers) and their external
 representations. When encoding data, this filter produces values of either
 \fB1\fR or \fB0\fR. This routine returns \fBTRUE\fR if it succeeds, \fBFALSE\fR
@@ -143,12 +141,10 @@ otherwise.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_char()\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_char()\fR translates between C characters and their external
 representations. This routine returns \fBTRUE\fR if it succeeds, \fBFALSE\fR
 otherwise. Note: encoded characters are not packed, and occupy 4 bytes each.
@@ -158,12 +154,10 @@ For arrays of characters, it is worthwhile to consider \fBxdr_bytes()\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_double()\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_double()\fR translates between C \fBdouble\fR precision numbers and
 their external representations. This routine returns \fBTRUE\fR if it succeeds,
 \fBFALSE\fR otherwise.
@@ -171,12 +165,10 @@ their external representations. This routine returns \fBTRUE\fR if it succeeds,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_enum()\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_enum()\fR translates between C \fBenum\fRs (actually integers) and their
 external representations. This routine returns \fBTRUE\fR if it succeeds,
 \fBFALSE\fR otherwise.
@@ -184,12 +176,10 @@ external representations. This routine returns \fBTRUE\fR if it succeeds,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_float()\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_float()\fR translates between C \fBfloat\fRs and their external
 representations. This routine returns \fBTRUE\fR if it succeeds, \fBFALSE\fR
 otherwise.
@@ -197,12 +187,10 @@ otherwise.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_free()\fR\fR
 .ad
 .RS 22n
-.rt  
 Generic freeing routine. The first argument is the \fBXDR\fR routine for the
 object being freed. The second argument is a pointer to the object itself.
 Note: the pointer passed to this routine is not freed, but what it points to is
@@ -211,12 +199,10 @@ freed (recursively, depending on the XDR routine).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_hyper()\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_hyper()\fR translates between ANSI C  \fBlong\fR \fBlong\fR integers and
 their external representations. This routine returns \fBTRUE\fR if it succeeds,
 \fBFALSE\fR otherwise.
@@ -224,12 +210,10 @@ their external representations. This routine returns \fBTRUE\fR if it succeeds,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_int()\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_int()\fR translates between C integers and their external
 representations. This routine returns \fBTRUE\fR if it succeeds, \fBFALSE\fR
 otherwise.
@@ -237,12 +221,10 @@ otherwise.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_long()\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_long()\fR translates between C \fBlong\fR integers and their external
 representations. This routine returns \fBTRUE\fR if it succeeds, \fBFALSE\fR
 otherwise.
@@ -254,12 +236,10 @@ is recommended in place of this routine.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_longlong_t()\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_longlong_t()\fR translates between ANSI C  \fBlong\fR \fBlong\fR
 integers and their external representations. This routine returns \fBTRUE\fR if
 it succeeds, \fBFALSE\fR otherwise. This routine is identical to
@@ -268,12 +248,10 @@ it succeeds, \fBFALSE\fR otherwise. This routine is identical to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_quadruple()\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_quadruple()\fR translates between IEEE quadruple precision floating
 point numbers and their external representations. This routine returns
 \fBTRUE\fR if it succeeds, \fBFALSE\fR otherwise.
@@ -281,12 +259,10 @@ point numbers and their external representations. This routine returns
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_short()\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_short()\fR translates between C \fBshort\fR integers and their external
 representations. This routine returns \fBTRUE\fR if it succeeds, \fBFALSE\fR
 otherwise.
@@ -294,12 +270,10 @@ otherwise.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_u_char()\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_u_char()\fR translates between \fBunsigned\fR C characters and their
 external representations. This routine returns \fBTRUE\fR if it succeeds,
 \fBFALSE\fR otherwise.
@@ -307,12 +281,10 @@ external representations. This routine returns \fBTRUE\fR if it succeeds,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_u_hyper()\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_u_hyper()\fR translates between unsigned ANSI C  \fBlong\fR \fBlong\fR
 integers and their external representations. This routine returns \fBTRUE\fR if
 it succeeds, \fBFALSE\fR otherwise.
@@ -320,12 +292,10 @@ it succeeds, \fBFALSE\fR otherwise.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_u_int()\fR\fR
 .ad
 .RS 22n
-.rt  
 A filter primitive that translates between a C \fBunsigned\fR integer and its
 external representation. This routine returns \fBTRUE\fR if it succeeds,
 \fBFALSE\fR otherwise.
@@ -333,12 +303,10 @@ external representation. This routine returns \fBTRUE\fR if it succeeds,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_u_long()\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_u_long()\fR translates between C \fBunsigned long\fR integers and their
 external representations. This routine returns \fBTRUE\fR if it succeeds,
 \fBFALSE\fR otherwise.
@@ -350,12 +318,10 @@ routine is recommended in place of this routine.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_u_longlong_t()\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_u_longlong_t()\fR translates between unsigned ANSI C  \fBlong\fR
 \fBlong\fR integers and their external representations. This routine returns
 \fBTRUE\fR if it succeeds, \fBFALSE\fR otherwise. This routine is identical to
@@ -364,12 +330,10 @@ routine is recommended in place of this routine.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_u_short()\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_u_short()\fR translates between C \fBunsigned short\fR integers and
 their external representations. This routine returns \fBTRUE\fR if it succeeds,
 \fBFALSE\fR otherwise.
@@ -377,12 +341,10 @@ their external representations. This routine returns \fBTRUE\fR if it succeeds,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_void()\fR\fR
 .ad
 .RS 22n
-.rt  
 This routine always returns \fBTRUE\fR. It may be passed to \fBRPC\fR routines
 that require a function parameter, where nothing is to be done.
 .RE
@@ -395,12 +357,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) cw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
-MT-LevelSafe
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

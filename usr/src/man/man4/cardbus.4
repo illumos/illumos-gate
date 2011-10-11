@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cardbus 4 "11 July 2006" "SunOS 5.11" "File Formats"
+.TH CARDBUS 4 "Jul 11, 2006"
 .SH NAME
 cardbus \- configuration files for cardbus device drivers
 .SH DESCRIPTION
@@ -32,12 +32,10 @@ instance of a driver.
 The CardBus nexus driver recognizes the following properties:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBreg\fR\fR
 .ad
 .RS 14n
-.rt  
 An arbitrary length array where each element of the array consists of a 5-tuple
 of 32-bit values. Each array element describes a logically contiguous mappable
 resource on the \fBPCI\fR bus.
@@ -48,18 +46,16 @@ mappable resource. The first tuple contains the following information:
 
 .sp
 .TS
-tab();
-lw(1.83i) lw(1.83i) lw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-Bits 0 - 78-bit register number
-Bits 8 - 103-bit function number
-Bits 11 - 155-bit device number
-Bits 16 - 23 8-bit bus number
-Bits 24 - 252-bit address space type identifier
-Bits 31 - 28T{
+l l l
+l l l .
+Bits 0 - 7	8-bit register number	
+Bits 8 - 10	3-bit function number	
+Bits 11 - 15	5-bit device number	
+Bits 16 - 23 	8-bit bus number	
+Bits 24 - 25	2-bit address space type identifier	
+Bits 31 - 28	T{
 Register number extended bits 8:11 for extended config space. Zero for conventional configuration space.
-T}
+T}	
 .TE
 
 The address space type identifier can be interpreted as follows:
@@ -67,13 +63,11 @@ The address space type identifier can be interpreted as follows:
 
 .sp
 .TS
-tab();
-lw(1.83i) lw(1.83i) lw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-0x0configuration space
-0x1I/O space
-0x232-bit memory space address
+l l l
+l l l .
+0x0	configuration space	
+0x1	I/O space	
+0x2	32-bit memory space address	
 .TE
 
 The bus number is a unique identifying number assigned to each bus within the
@@ -115,12 +109,10 @@ level.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinterrupts\fR\fR
 .ad
 .RS 14n
-.rt  
 This property consists of a single-integer element array. Valid interrupt
 property values are \fB1\fR, \fB2\fR, \fB3\fR, and \fB4\fR. This value is
 derived directly from the contents of the device's configuration-interrupt-pin
@@ -224,13 +216,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureSPARC, x86
+Architecture	SPARC, x86
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH rsm_get_controller 3RSM "8 Jun 2001" "SunOS 5.11" "Remote Shared Memory Library Functions"
+.TH RSM_GET_CONTROLLER 3RSM "Jun 8, 2001"
 .SH NAME
 rsm_get_controller, rsm_get_controller_attr, rsm_release_controller \- get or
 release a controller handle
@@ -11,7 +11,7 @@ release a controller handle
 .LP
 .nf
 cc [ \fIflag\fR... ] \fIfile\fR... -lrsm [ \fIlibrary\fR... ]
-#include <rsmapi.h> 
+#include <rsmapi.h>
 
 \fBint\fR \fBrsm_get_controller\fR(\fBchar *\fR\fIname\fR,
      \fBrsmapi_controller_handle_t *\fR\fIcontroller\fR);
@@ -66,12 +66,10 @@ The \fBrsm_get_controller()\fR, \fBrsm_get_controller_attr()\fR, and
 \fBrsm_release_controller()\fR functions can return the following errors:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSMERR_BAD_CTLR_HNDL\fR \fR
 .ad
 .RS 25n
-.rt  
 Invalid controller handle.
 .RE
 
@@ -81,12 +79,10 @@ The \fBrsm_get_controller()\fR and  \fBrsm_get_controller_attr()\fR functions
 can return the following errors:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSMERR_BAD_ADDR\fR \fR
 .ad
 .RS 20n
-.rt  
 Bad address.
 .RE
 
@@ -95,7 +91,6 @@ Bad address.
 The  \fBrsm_get_controller()\fR function can return the following errors:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSMERR_CTLR_NOT_PRESENT\fR \fR
 .ad
@@ -106,7 +101,6 @@ Controller not present.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSMERR_INSUFFICIENT_MEM\fR \fR
 .ad
@@ -117,7 +111,6 @@ Insufficient memory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSMERR_BAD_LIBRARY_VERSION\fR \fR
 .ad
@@ -134,15 +127,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) |lw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE \fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

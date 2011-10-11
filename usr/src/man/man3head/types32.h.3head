@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH types32.h 3HEAD "30 Oct 1997" "SunOS 5.11" "Headers"
+.TH TYPES32.H 3HEAD "Oct 30, 1997"
 .SH NAME
 types32.h, types32 \- fixed-width data types
 .SH SYNOPSIS
@@ -23,30 +23,28 @@ used for compatibility and interoperability purposes in either the 32-bit or
 
 .sp
 .TS
-tab();
-lw(1.83i) lw(1.83i) lw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-\fBtypedef\fR\fBint32_t\fR\fBblkcnt32_t\fR
-\fBtypedef\fR\fBuint32_t\fR\fBcaddr32_t\fR
-\fBtypedef\fR\fBint32_t\fR\fBclock32_t\fR
-\fBtypedef\fR\fBint32_t\fR\fBdaddr32_t\fR
-\fBtypedef\fR\fBuint32_t\fR\fBdev32_t\fR
-\fBtypedef\fR\fBuint32_t\fR\fBfsblkcnt32_t\fR
-\fBtypedef\fR\fBuint32_t\fR\fBfsfilcnt32_t\fR
-\fBtypedef\fR\fBint32_t\fR\fBgid32_t\fR
-\fBtypedef\fR\fBint32_t\fR\fBid32_t\fR
-\fBtypedef\fR\fBuint32_t\fR\fBino32_t\fR
-\fBtypedef\fR\fBint32_t\fR\fBkey32_t\fR
-\fBtypedef\fR\fBuint32_t\fR\fBmajor32_t\fR
-\fBtypedef\fR\fBuint32_t\fR\fBminor32_t\fR
-\fBtypedef\fR\fBuint32_t\fR\fBmode32_t\fR
-\fBtypedef\fR\fBuint32_t\fR\fBnlink32_t\fR
-\fBtypedef\fR\fBint32_t\fR\fBpid32_t\fR
-\fBtypedef\fR\fBuint32_t\fR\fBrlim32_t\fR
-\fBtypedef\fR\fBuint32_t\fR\fBsize32_t\fR
-\fBtypedef\fR\fBint32_t\fR\fBssize32_t\fR
-\fBtypedef\fR\fBtime32_t\fR\fBint32_t\fR
-\fBtypedef\fR\fBuid32_t\fR\fBint32_t\fR
+l l l
+l l l .
+\fBtypedef\fR	\fBint32_t\fR	\fBblkcnt32_t\fR
+\fBtypedef\fR	\fBuint32_t\fR	\fBcaddr32_t\fR
+\fBtypedef\fR	\fBint32_t\fR	\fBclock32_t\fR
+\fBtypedef\fR	\fBint32_t\fR	\fBdaddr32_t\fR
+\fBtypedef\fR	\fBuint32_t\fR	\fBdev32_t\fR
+\fBtypedef\fR	\fBuint32_t\fR	\fBfsblkcnt32_t\fR
+\fBtypedef\fR	\fBuint32_t\fR	\fBfsfilcnt32_t\fR
+\fBtypedef\fR	\fBint32_t\fR	\fBgid32_t\fR
+\fBtypedef\fR	\fBint32_t\fR	\fBid32_t\fR
+\fBtypedef\fR	\fBuint32_t\fR	\fBino32_t\fR
+\fBtypedef\fR	\fBint32_t\fR	\fBkey32_t\fR
+\fBtypedef\fR	\fBuint32_t\fR	\fBmajor32_t\fR
+\fBtypedef\fR	\fBuint32_t\fR	\fBminor32_t\fR
+\fBtypedef\fR	\fBuint32_t\fR	\fBmode32_t\fR
+\fBtypedef\fR	\fBuint32_t\fR	\fBnlink32_t\fR
+\fBtypedef\fR	\fBint32_t\fR	\fBpid32_t\fR
+\fBtypedef\fR	\fBuint32_t\fR	\fBrlim32_t\fR
+\fBtypedef\fR	\fBuint32_t\fR	\fBsize32_t\fR
+\fBtypedef\fR	\fBint32_t\fR	\fBssize32_t\fR
+\fBtypedef\fR	\fBtime32_t\fR	\fBint32_t\fR
+\fBtypedef\fR	\fBuid32_t\fR	\fBint32_t\fR
 .TE
 

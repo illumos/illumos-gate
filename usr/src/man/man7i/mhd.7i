@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mhd 7i "18 Mar 2011" "SunOS 5.11" "Ioctl Requests"
+.TH MHD 7I "Mar 18, 2011"
 .SH NAME
 mhd \- multihost disk control operations
 .SH SYNOPSIS
 .LP
 .nf
-\fB#include\fR \fB<sys/mhd.h>\fR 
+\fB#include\fR \fB<sys/mhd.h>\fR
 .fi
 
 .SH DESCRIPTION
@@ -93,12 +93,10 @@ ioctl(fd, MHIOCQRESERVE);
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMHIOCTKOWN\fR \fR
 .ad
 .RS 18n
-.rt  
 Forcefully acquires exclusive access rights to the multihost disk for the local
 host. Revokes all access rights to the multihost disk from remote hosts.
 Causes the disk to enter the exclusive access state.
@@ -110,24 +108,20 @@ the automatic probe function described below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMHIOCRELEASE\fR \fR
 .ad
 .RS 18n
-.rt  
 Relinquishes exclusive access rights to the multihost disk for the local host.
 On success, causes the disk to enter the  non- exclusive access state.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMHIOCSTATUS\fR \fR
 .ad
 .RS 18n
-.rt  
 Probes a multihost disk to determine whether the local host has access rights
 to the disk. Returns  \fB0\fR if the local host has access to the disk,
 \fB1\fR if it doesn't, and \fB-1\fR with errno set to  \fBEIO\fR if the probe
@@ -136,12 +130,10 @@ failed for some other reason.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMHIOCQRESERVE\fR \fR
 .ad
 .RS 18n
-.rt  
 Issues, simply and only, a SCSI-2 Reserve command. If the attempt to reserve
 fails due to the SCSI error Reservation Conflict (which implies that some other
 host has the device reserved), then the ioctl will return  \fB-1\fR with errno
@@ -170,7 +162,6 @@ The function prototypes and descriptions for the shared multihost ioctls are as
 follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBioctl\fR(\fBfd\fR, \fBMHIOCGRP_INKEYS\fR, (\fBmhioc_inkeys_t\fR)
 \fI*k\fR\fB);\fR\fR
@@ -194,7 +185,6 @@ then this ioctl returns \fB-1\fR with \fBerrno\fR set to  \fBENOTSUP\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBioctl\fR(\fBfd\fR, \fBMHIOCGRP_INRESV\fR, (\fBmhioc_inresvs_t\fR)
 \fI*r\fR\fB);\fR\fR
@@ -209,7 +199,6 @@ then this ioctl returns \fB-1\fR with \fBerrno\fR set to \fBENOTSUP\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBioctl\fR(\fBfd\fR, \fBMHIOCGRP_REGISTER\fR, (\fBmhioc_register_t\fR)
 \fI*r\fR\fB);\fR\fR
@@ -234,7 +223,6 @@ Reservation Conflict, this ioctl returns \fB-1\fR with \fBerrno\fR set to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBioctl\fR(\fBfd\fR, \fBMHIOCGRP_RESERVE\fR, (\fBmhioc_resv_desc_t\fR)
 \fI*r\fR\fB);\fR\fR
@@ -249,7 +237,6 @@ returns \fB-1\fR with \fBerrno\fR set to \fBEACCES.\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBioctl\fR(\fBfd\fR, \fBMHIOCGRP_PREEMPTANDABORT\fR,
 (\fBmhioc_preemptandabort_t\fR) \fI*r\fR\fB);\fR\fR
@@ -268,7 +255,6 @@ Reservation Conflict, this ioctl returns \fB-1\fR with \fBerrno\fR set to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBioctl\fR(\fBfd\fR, \fBMHIOCGRP_PREEMPT\fR,
 (\fBmhioc_preemptandabort_t\fR) \fI*r\fR\fB);\fR\fR
@@ -282,7 +268,6 @@ implemented).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBioctl\fR(\fBfd\fR, \fBMHIOCGRP_CLEAR\fR, (\fBmhioc_resv_key_t\fR)
 \fI*r\fR\fB);\fR\fR
@@ -312,7 +297,6 @@ The \fBMHIOCENFAILFAST\fR ioctl is applicable for both non-shared and shared
 disks, and may be used with either the non-shared or shared ioctls.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBioctl\fR(\fBfd\fR, \fBMHIOENFAILFAST\fR, (unsigned int \fI*\fR)
 \fImillisecs\fR\fB);\fR\fR
@@ -361,46 +345,38 @@ Each request returns \fB-1\fR on failure and sets \fBerrno\fR to indicate the
 error.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR \fR
 .ad
 .RS 14n
-.rt  
 Caller is not root.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR \fR
 .ad
 .RS 14n
-.rt  
 Access rights were denied.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 14n
-.rt  
 The multihost disk or controller was unable to successfully complete the
 requested operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOPNOTSUP\fR \fR
 .ad
 .RS 14n
-.rt  
 The multihost disk does not support the operation. For example, it does not
 support the SCSI-2 Reserve/Release command set, or the SCSI-3 Persistent
 Reservation command set.
@@ -414,12 +390,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
-StabilityEvolving
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Stability	Evolving
 .TE
 
 .SH SEE ALSO

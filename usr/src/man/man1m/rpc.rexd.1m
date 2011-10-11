@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH rpc.rexd 1M "5 Nov 2004" "SunOS 5.11" "System Administration Commands"
+.TH RPC.REXD 1M "Nov 5, 2004"
 .SH NAME
 rpc.rexd, rexd \- RPC-based remote execution server
 .SH SYNOPSIS
@@ -35,12 +35,10 @@ the sending to the receiving system.
 The following option is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 6n
-.rt  
 Secure. When specified, requests must have valid \fBDES\fR credentials. If the
 request does not have a \fBDES\fR credential it is rejected. The default
 publickey credential is rejected. Only newer \fBon\fR(1) commands send
@@ -80,34 +78,28 @@ determine whether the given user is a legal user.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/pts\fIn\fR\fR\fR
 .ad
 .RS 23n
-.rt  
 Pseudo-terminals used for interactive mode
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/passwd\fR\fR
 .ad
 .RS 23n
-.rt  
 Authorized users
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/tmp_rex/rexd??????\fR\fR
 .ad
 .RS 23n
-.rt  
 Temporary mount points for remote file systems
 .RE
 

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mt 1 "21 Jun 2007" "SunOS 5.11" "User Commands"
+.TH MT 1 "Jun 21, 2007"
 .SH NAME
 mt \- magnetic tape control
 .SH SYNOPSIS
@@ -24,12 +24,10 @@ If \fBTAPE\fR does not exist, \fBmt\fR uses the device \fB/dev/rmt/0n\fR.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fItapename\fR\fR
 .ad
 .RS 15n
-.rt  
 Specifies the raw tape device.
 .RE
 
@@ -39,12 +37,10 @@ Specifies the raw tape device.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcount\fR\fR
 .ad
 .RS 11n
-.rt  
 The number of times that the requested operation is to be performed. By
 default, \fBmt\fR performs \fIcommand\fR once. Multiple operations of
 \fIcommand\fR can be performed by specifying \fIcount\fR.
@@ -52,58 +48,48 @@ default, \fBmt\fR performs \fIcommand\fR once. Multiple operations of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcommand\fR\fR
 .ad
 .RS 11n
-.rt  
 The following available commands that can be sent to a magnetic tape drive are
 supported. Only as many characters as are required to uniquely identify a
 \fIcommand\fR need be specified.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBasf\fR\fR
 .ad
 .RS 10n
-.rt  
 Specifies absolute space to \fIcount\fR file number. This is equivalent to a
 \fBrewind\fR followed by a \fBfsf\fR \fIcount\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbsf\fR\fR
 .ad
 .RS 10n
-.rt  
 Back spaces over \fIcount\fR EOF marks. The tape is positioned on the
 beginning-of-tape side of the EOF mark.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbsr\fR\fR
 .ad
 .RS 10n
-.rt  
 Back spaces \fIcount\fR records.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbssf\fR\fR
 .ad
 .RS 10n
-.rt  
 Back spaces over the requested number of sequential file marks. Sequential file
 marks are where the file marks are one right after the other with no other
 blocks of any kind between the file marks. The number argument specifies how
@@ -116,7 +102,6 @@ This command is not supported by all drives.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBeof\fR\fR
 .ad
@@ -125,41 +110,34 @@ This command is not supported by all drives.
 \fB\fBweof\fR\fR
 .ad
 .RS 10n
-.rt  
 Writes \fIcount\fR EOF marks at the current position on the tape.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfsf\fR\fR
 .ad
 .RS 10n
-.rt  
 Forward spaces over \fIcount\fR EOF marks. The tape is positioned on the first
 block of the file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfsr\fR\fR
 .ad
 .RS 10n
-.rt  
 Forward spaces \fIcount\fR records.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfssf\fR\fR
 .ad
 .RS 10n
-.rt  
 Forward spaces the over requested number of sequential file marks. Sequential
 file marks are where the file marks are one right after the other with no other
 blocks of any kind between the file marks. The number argument specifies how
@@ -172,68 +150,56 @@ This command is not supported by all drives.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBload\fR\fR
 .ad
 .RS 10n
-.rt  
 Requests drive load and thread current media. Not supported by all drives.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlock\fR\fR
 .ad
 .RS 10n
-.rt  
 Prevents media removal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnbsf\fR\fR
 .ad
 .RS 10n
-.rt  
 Back spaces \fIcount\fR files. The tape is positioned on the first block of the
 file. This is equivalent to \fIcount+1\fR \fBbsf\fRs ollowed by one \fBfsf\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBseek\fR\fR
 .ad
 .RS 10n
-.rt  
 Positions to requested logical tape position.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtell\fR\fR
 .ad
 .RS 10n
-.rt  
 Gets and prints current logical tape position.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunlock\fR\fR
 .ad
 .RS 10n
-.rt  
 Allows media removal.
 .RE
 
@@ -241,12 +207,10 @@ If \fIcount\fR is specified with any of the following commands, the \fIcount\fR
 is ignored and the command is performed only once.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBconfig\fR\fR
 .ad
 .RS 16n
-.rt  
 Reads the drives current configuration from the driver and displays it in
 \fBst.conf\fR format. See \fBst\fR(7D) for definition of fields and there
 meanings.
@@ -254,24 +218,20 @@ meanings.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBeom\fR\fR
 .ad
 .RS 16n
-.rt  
 Spaces to the end of recorded media on the tape. This is useful for appending
 files onto previously written tapes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBerase\fR\fR
 .ad
 .RS 16n
-.rt  
 Erases the entire tape.
 .sp
 Some tape drives have option settings where only portions of the tape can be
@@ -282,12 +242,10 @@ device specific manual for time details.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBforcereserve\fR\fR
 .ad
 .RS 16n
-.rt  
 Attempts to break a SCSI II reserve issued by another initiator. When this
 command completes, the drive is not reserved for the current initiator, but is
 available for use. This command can be only be executed by those with
@@ -296,7 +254,6 @@ super-user privileges.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBoffline\fR\fR
 .ad
@@ -305,65 +262,54 @@ super-user privileges.
 \fB\fBrewoffl\fR\fR
 .ad
 .RS 16n
-.rt  
 Rewinds the tape and, if appropriate, takes the drive unit off-line by
 unloading the tape.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrelease\fR\fR
 .ad
 .RS 16n
-.rt  
 Re-establishes the default behavior of releasing at close.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBreserve\fR\fR
 .ad
 .RS 16n
-.rt  
 Allows the tape drive to remain reserved after closing the device. The drive
 must then be explicitly released.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBretension\fR\fR
 .ad
 .RS 16n
-.rt  
 Rewinds the cartridge tape completely, then winds it forward to the end of the
 reel and back to beginning-of-tape to smooth out tape tension.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrewind\fR\fR
 .ad
 .RS 16n
-.rt  
 Rewinds the tape.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstatus\fR\fR
 .ad
 .RS 16n
-.rt  
 Prints status information about the tape unit.
 .sp
 Status information can include the sense key reported by the drive, the
@@ -377,66 +323,41 @@ might also report that WORM media is loaded in that drive.
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 All operations were successful.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 Command was unrecognized or \fBmt\fR was unable to open the specified tape
 drive.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 An operation failed.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/rmt/*\fR\fR
 .ad
 .RS 14n
-.rt  
 magnetic tape interface
 .RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
-_
-\fBAvailability\fR\fBSUNWcsu\fR
-.TE
 
 .SH SEE ALSO
 .sp

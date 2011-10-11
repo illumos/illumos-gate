@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH audio 7I "6 May 2009" "SunOS 5.11" "Ioctl Requests"
+.TH AUDIO 7I "May 6, 2009"
 .SH NAME
 audio \- generic audio device interface
 .SH SYNOPSIS
 .LP
 .nf
-\fB#include\fR \fB<sys/audio.h>\fR 
+\fB#include\fR \fB<sys/audio.h>\fR
 .fi
 
 .SH OVERVIEW
@@ -595,12 +595,10 @@ notification of audio status changes, as described above.
 The audio device additionally supports the following \fBioctl\fR commands:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUDIO_DRAIN\fR\fR
 .ad
 .RS 17n
-.rt  
 The argument is ignored. This command suspends the calling process until the
 output STREAMS queue is empty and all queued samples have been played, or until
 a signal is delivered to the calling process. It may not be issued for the
@@ -610,12 +608,10 @@ final \fBclose()\fR of \fB/dev/audio\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUDIO_GETDEV\fR\fR
 .ad
 .RS 17n
-.rt  
 The argument is a pointer to an \fBaudio_device_t\fR structure. This command
 may be issued for either \fB/dev/audio\fR or \fB/dev/audioctl\fR. The returned
 value in the name field will be a string that will identify the current
@@ -628,12 +624,10 @@ pages to determine the actual strings returned by the device driver.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUDIO_GETINFO\fR\fR
 .ad
 .RS 17n
-.rt  
 The argument is a pointer to an \fBaudio_info_t\fR structure. This command may
 be issued for either \fB/dev/audio\fR or \fB/dev/audioctl\fR. The current state
 of the \fB/dev/audio\fR device is returned in the structure.
@@ -644,12 +638,10 @@ the process, and do not necessarily reflect the actual hardware device itself.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUDIO_SETINFO\fR\fR
 .ad
 .RS 17n
-.rt  
 The argument is a pointer to an \fBaudio_info_t\fR structure. This command may
 be issued for either the \fB/dev/audio\fR or the \fB/dev/audioctl\fR device
 with some restrictions. This command configures the audio device according to
@@ -711,24 +703,20 @@ This technique eliminates problems associated with using a sequence of
 An \fBopen()\fR will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBUSY\fR\fR
 .ad
 .RS 9n
-.rt  
 The requested play or record access is busy and either the \fBO_NDELAY\fR or
 \fBO_NONBLOCK\fR flag was set in the \fBopen()\fR request.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 9n
-.rt  
 The requested play or record access is busy and a signal interrupted the
 \fBopen()\fR request.
 .RE
@@ -738,12 +726,10 @@ The requested play or record access is busy and a signal interrupted the
 An \fBioctl()\fR will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The parameter changes requested in the \fBAUDIO_SETINFO()\fR ioctl are invalid
 or are not supported by the device.
 .RE
@@ -755,56 +741,46 @@ The physical audio device names are system dependent and are rarely used by
 programmers. Programmers should use the following generic device names:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/audio\fR\fR
 .ad
 .RS 28n
-.rt  
 Symbolic link to the system's primary audio device
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/audioctl\fR\fR
 .ad
 .RS 28n
-.rt  
 Symbolic link to the control device for \fB/dev/audio\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/sound/0\fR\fR
 .ad
 .RS 28n
-.rt  
 First audio device in the system
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/sound/0ctl\fR\fR
 .ad
 .RS 28n
-.rt  
 Audio control device for \fB/dev/sound/0\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/audio/samples\fR\fR
 .ad
 .RS 28n
-.rt  
 Audio files
 .RE
 
@@ -816,15 +792,14 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(1.82i) |cw(3.68i) 
-lw(1.82i) |lw(3.68i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureSPARC, x86
+Architecture	SPARC, x86
 _
-Stability LevelObsolete Uncommitted
+Stability Level	Obsolete Uncommitted
 .TE
 
 .SH SEE ALSO

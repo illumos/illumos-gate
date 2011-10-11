@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH lofiadm 1M "31 Aug 2009" "SunOS 5.11" "System Administration Commands"
+.TH LOFIADM 1M "Aug 31, 2009"
 .SH NAME
 lofiadm \- administer files available as block devices through lofi
 .SH SYNOPSIS
@@ -85,7 +85,6 @@ The \fBlofi\fR driver is not available and will not work inside a zone.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIfile\fR [\fIdevice\fR]\fR
 .ad
@@ -103,7 +102,6 @@ reestablish a particular set of associations.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR {\fIgzip\fR | \fIgzip-N\fR | \fIlzma\fR}\fR
 .ad
@@ -125,7 +123,6 @@ file read/write.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIfile\fR | \fIdevice\fR\fR
 .ad
@@ -137,7 +134,6 @@ block device is not busy, and deallocates the block device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIsegment_size\fR\fR
 .ad
@@ -149,7 +145,6 @@ can be an integer multiple of 512.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-U\fR \fIfile\fR\fR
 .ad
@@ -163,7 +158,6 @@ Uncompress a compressed file.
 The following options are used when the file is encrypted:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIcrypto_algorithm\fR\fR
 .ad
@@ -179,7 +173,6 @@ The passphrase is used to derive a symmetric encryption key using PKCS#5 PBKD2.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR \fIraw_key_file\fR | \fIwrapped_key_file\fR\fR
 .ad
@@ -192,7 +185,6 @@ given with the \fB-T\fR option, then the key is wrapped by that object. If
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fItoken_key\fR\fR
 .ad
@@ -207,7 +199,6 @@ must be an RSA private key.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
@@ -222,7 +213,6 @@ Generate an ephemeral symmetric encryption key.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcrypto_algorithm\fR\fR
 .ad
@@ -234,7 +224,6 @@ One of: \fBaes-128-cbc\fR, \fBaes-192-cbc\fR, \fBaes-256-cbc\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevice\fR\fR
 .ad
@@ -254,7 +243,6 @@ only opened read-only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fR
 .ad
@@ -265,7 +253,6 @@ Display the block device associated with \fIfile\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIraw_key_file\fR\fR
 .ad
@@ -277,7 +264,6 @@ encryption key.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItoken_key\fR\fR
 .ad
@@ -306,7 +292,6 @@ token object with only its key label \fBMylofiKey\fR, use:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIwrapped_key_file\fR\fR
 .ad
@@ -393,13 +378,13 @@ Check to ensure that Solaris understands the image:
 .nf
 # \fBdf -k /mnt\fR
 Filesystem            kbytes    used   avail capacity  Mounted on
-/dev/lofi/1           512418  512418       0   100%    /mnt 
+/dev/lofi/1           512418  512418       0   100%    /mnt
 # \fBls /mnt\fR
-\&./            RedHat/       doc/          ls-lR         rr_moved/ 
-\&../           TRANS.TBL     dosutils/     ls-lR.gz      sbin@ 
-\&.buildlog     bin@          etc@          misc/         tmp/ 
-COPYING       boot/         images/       mnt/          usr@ 
-README        boot.cat*     kernels/      modules/ 
+\&./            RedHat/       doc/          ls-lR         rr_moved/
+\&../           TRANS.TBL     dosutils/     ls-lR.gz      sbin@
+\&.buildlog     bin@          etc@          misc/         tmp/
+COPYING       boot/         images/       mnt/          usr@
+README        boot.cat*     kernels/      modules/
 RPM-PGP-KEY   dev@          lib@          proc/
 .fi
 .in -2
@@ -729,7 +714,6 @@ and \fBNLSPATH\fR.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -740,7 +724,6 @@ Successful completion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad

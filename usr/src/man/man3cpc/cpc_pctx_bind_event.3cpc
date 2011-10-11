@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cpc_pctx_bind_event 3CPC "05 Mar 2007" "SunOS 5.11" "CPU Performance Counters Library Functions"
+.TH CPC_PCTX_BIND_EVENT 3CPC "Mar 05, 2007"
 .SH NAME
 cpc_pctx_bind_event, cpc_pctx_take_sample, cpc_pctx_rele, cpc_pctx_invalidate
 \- access CPU performance counters in other processes
@@ -68,24 +68,20 @@ analogous functions described on the \fBcpc_bind_event\fR(3CPC) manual page. In
 addition, these function may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 10n
-.rt  
 For \fBcpc_pctx_bind_event()\fR, access to the requested hypervisor event was
 denied.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBESRCH\fR\fR
 .ad
 .RS 10n
-.rt  
 The value of the \fIlwpid\fR argument is invalid in the context of the
 controlled process.
 .RE
@@ -98,15 +94,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelUnsafe
+MT-Level	Unsafe
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

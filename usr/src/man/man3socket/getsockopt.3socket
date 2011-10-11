@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH getsockopt 3SOCKET "27 Jan 2009" "SunOS 5.11" "Sockets Library Functions"
+.TH GETSOCKOPT 3SOCKET "Jan 27, 2009"
 .SH NAME
 getsockopt, setsockopt \- get and set options on sockets
 .SH SYNOPSIS
@@ -67,23 +67,19 @@ and the linger interval. \fBstruct linger\fR is defined in
 <\fBsys/socket.h\fR>. \fBstruct\fR \fBlinger\fR contains the following members:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBl_onoff\fR\fR
 .ad
 .RS 12n
-.rt  
 on = 1/off = 0
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBl_linger\fR\fR
 .ad
 .RS 12n
-.rt  
 linger time, in seconds
 .RE
 
@@ -93,200 +89,164 @@ The following options are recognized at the socket level. Except as noted, each
 may be examined with \fBgetsockopt()\fR and set with \fBsetsockopt()\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_DEBUG\fR\fR
 .ad
 .RS 19n
-.rt  
 enable/disable recording of debugging information
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_REUSEADDR\fR\fR
 .ad
 .RS 19n
-.rt  
 enable/disable local address reuse
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_KEEPALIVE\fR\fR
 .ad
 .RS 19n
-.rt  
 enable/disable keep connections alive
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_DONTROUTE\fR\fR
 .ad
 .RS 19n
-.rt  
 enable/disable routing bypass for outgoing messages
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_LINGER\fR\fR
 .ad
 .RS 19n
-.rt  
 linger on close if data is present
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_BROADCAST\fR\fR
 .ad
 .RS 19n
-.rt  
 enable/disable permission to transmit broadcast messages
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_OOBINLINE\fR\fR
 .ad
 .RS 19n
-.rt  
 enable/disable reception of out-of-band data in band
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_SNDBUF\fR\fR
 .ad
 .RS 19n
-.rt  
 set buffer size for output
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_RCVBUF\fR\fR
 .ad
 .RS 19n
-.rt  
 set buffer size for input
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_DGRAM_ERRIND\fR\fR
 .ad
 .RS 19n
-.rt  
 application wants delayed error
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_TIMESTAMP\fR\fR
 .ad
 .RS 19n
-.rt  
 enable/disable reception of timestamp with datagrams
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_EXCLBIND\fR\fR
 .ad
 .RS 19n
-.rt  
 enable/disable exclusive binding of the socket
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_TYPE\fR\fR
 .ad
 .RS 19n
-.rt  
 get the type of the socket (get only)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_ERROR\fR\fR
 .ad
 .RS 19n
-.rt  
 get and clear error on the socket (get only)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_MAC_EXEMPT\fR\fR
 .ad
 .RS 19n
-.rt  
 get or set mandatory access control on the socket. This option is available
 only when the system is configured with Trusted Extensions.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_ALLZONES\fR\fR
 .ad
 .RS 19n
-.rt  
 bypass zone boundaries (privileged).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_DOMAIN\fR\fR
 .ad
 .RS 19n
-.rt  
 get the domain used in the socket (get only)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_PROTOTYPE\fR\fR
 .ad
 .RS 19n
-.rt  
 for socket in domains \fBPF_INET\fR and \fBPF_INET6\fR, get the underlying
 protocol number used in the socket. For socket in domain \fBPF_ROUTE\fR, get
 the address family used in the socket.
@@ -406,168 +366,138 @@ error.
 The \fBgetsockopt()\fR and \fBsetsockopt()\fR calls succeed unless:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 17n
-.rt  
 The argument \fIs\fR is not a valid file descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 17n
-.rt  
 There was insufficient memory available for the operation to complete.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOPROTOOPT\fR\fR
 .ad
 .RS 17n
-.rt  
 The option is unknown at the level indicated.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSR\fR\fR
 .ad
 .RS 17n
-.rt  
 There were insufficient STREAMS resources available for the operation to
 complete.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSOCK\fR\fR
 .ad
 .RS 17n
-.rt  
 The argument \fIs\fR is not a socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOBUFS\fR\fR
 .ad
 .RS 17n
-.rt  
 \fBSO_SNDBUF\fR or \fBSO_RCVBUF\fR exceeds a system limit.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 17n
-.rt  
 Invalid length for \fBIP_OPTIONS\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEHOSTUNREACH\fR\fR
 .ad
 .RS 17n
-.rt  
 Invalid address for \fBIP_MULTICAST_IF\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 17n
-.rt  
 Not a multicast address for \fBIP_ADD_MEMBERSHIP\fR and
 \fBIP_DROP_MEMBERSHIP\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEADDRNOTAVAIL\fR\fR
 .ad
 .RS 17n
-.rt  
 Bad interface address for \fBIP_ADD_MEMBERSHIP\fR and \fBIP_DROP_MEMBERSHIP\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEADDRINUSE\fR\fR
 .ad
 .RS 17n
-.rt  
 Address already joined for \fBIP_ADD_MEMBERSHIP\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 17n
-.rt  
 Address not joined for \fBIP_DROP_MEMBERSHIP\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 17n
-.rt  
 No permissions.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 17n
-.rt  
 Permission denied.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 17n
-.rt  
 The specified option is invalid at the specified socket level, or the socket
 has been shut down.
 .RE
@@ -580,13 +510,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

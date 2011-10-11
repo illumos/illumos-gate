@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH llseek 2 "1 Apr 2005" "SunOS 5.11" "System Calls"
+.TH LLSEEK 2 "Apr 1, 2005"
 .SH NAME
 llseek \- move extended read/write file pointer
 .SH SYNOPSIS
@@ -94,23 +94,19 @@ set to indicate the error.
 The \fBllseek()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIfildes\fR argument is not an open file descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIwhence\fR argument is not \fBSEEK_SET\fR, \fBSEEK_CUR\fR, or
 \fBSEEK_END\fR; the \fIoffset\fR argument is not a valid offset for this file
 system type; or the \fIfildes\fR argument is not a remote file descriptor and
@@ -119,24 +115,20 @@ the resulting file pointer would be negative.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENXIO\fR\fR
 .ad
 .RS 10n
-.rt  
 For \fBSEEK_DATA\fR, there are no more data regions past the supplied offset.
 For \fBSEEK_HOLE\fR, there are no more holes past the supplied offset.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBESPIPE\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIfildes\fR argument is associated with a pipe or FIFO.
 .RE
 

@@ -75,13 +75,6 @@ typedef struct ephemeral_zsd {
 	cred_t		*eph_nobody;
 } ephemeral_zsd_t;
 
-/* Supplemental groups list. */
-typedef struct credgrp {
-	uint_t		crg_ref;
-	uint_t		crg_ngroups;
-	gid_t		crg_groups[1];
-} credgrp_t;
-
 static void crgrphold(credgrp_t *);
 
 #define	CREDGRPSZ(ngrp)	(sizeof (credgrp_t) + ((ngrp - 1) * sizeof (gid_t)))

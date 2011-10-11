@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH semop 2 "12 May 2006" "SunOS 5.11" "System Calls"
+.TH SEMOP 2 "May 12, 2006"
 .SH NAME
 semop, semtimedop \- semaphore operations
 .SH SYNOPSIS
@@ -225,91 +225,75 @@ returned and \fBerrno\fR is set to indicate the error.
 The \fBsemop()\fR and \fBsemtimedop()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE2BIG\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fInsops\fR argument is greater than the system-imposed maximum. See NOTES.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 10n
-.rt  
 Operation permission is denied to the calling process (see \fBIntro\fR(2)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 10n
-.rt  
 The operation would result in suspension of the calling process but
 (\fIsem_flg\fR\fB&IPC_NOWAIT\fR) is true.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIsops\fR argument points to an illegal address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFBIG\fR\fR
 .ad
 .RS 10n
-.rt  
 The value of \fBsem_num\fR is less than 0 or greater than or equal to the
 number of semaphores in the set associated with \fIsemid\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIDRM\fR\fR
 .ad
 .RS 10n
-.rt  
 A \fIsemid\fR was removed from the system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 10n
-.rt  
 A signal was received.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIsemid\fR argument is not a valid semaphore identifier, or the number of
 individual semaphores for which the calling process requests a \fBSEM_UNDO\fR
 operation would exceed the system-imposed limit. Solaris does not impose a
@@ -319,12 +303,10 @@ requests a \fBSEM_UNDO\fR operation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSPC\fR\fR
 .ad
 .RS 10n
-.rt  
 The limit on the number of individual processes requesting a \fBSEM_UNDO\fR
 operation would be exceeded. Solaris does not impose a limit on the number of
 individual processes requesting an \fBSEM_UNDO\fR operation.
@@ -332,12 +314,10 @@ individual processes requesting an \fBSEM_UNDO\fR operation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBERANGE\fR\fR
 .ad
 .RS 10n
-.rt  
 An operation would cause a \fBsemval\fR or a \fBsemadj\fR value to overflow the
 system-imposed limit.
 .RE
@@ -347,12 +327,10 @@ system-imposed limit.
 The \fBsemtimedop()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 10n
-.rt  
 The timeout expired before the requested operation could be completed.
 .RE
 
@@ -361,23 +339,19 @@ The timeout expired before the requested operation could be completed.
 The \fBsemtimedop()\fR function will fail if one of the following is detected:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fItimeout\fR argument points to an illegal address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fItimeout\fR argument specified a \fBtv_sec\fR or \fBtv_nsec\fR value less
 than 0, or a \fBtv_nsec\fR value greater than or equal to 1000 million.
 .RE
@@ -390,13 +364,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface Stability\fBsemop()\fR is Standard.
+Interface Stability	\fBsemop()\fR is Standard.
 .TE
 
 .SH SEE ALSO

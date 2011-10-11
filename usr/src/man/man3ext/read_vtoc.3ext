@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH read_vtoc 3EXT "7 Oct 2008" "SunOS 5.11" "Extended Library Functions"
+.TH READ_VTOC 3EXT "Oct 7, 2008"
 .SH NAME
 read_vtoc, write_vtoc \- read and write a disk's VTOC
 .SH SYNOPSIS
@@ -54,45 +54,37 @@ descriptor. Otherwise, they return a negative integer indicating one of the
 following errors:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVT_EIO\fR\fR
 .ad
 .RS 15n
-.rt  
 An I/O error occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVT_ENOTSUP\fR\fR
 .ad
 .RS 15n
-.rt  
 This operation is not supported on this disk.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVT_ERROR\fR\fR
 .ad
 .RS 15n
-.rt  
 An unknown error occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVT_OVERFLOW\fR\fR
 .ad
 .RS 15n
-.rt  
 The caller attempted an operation that is illegal on the disk and may overflow
 the fields in the data structure.
 .RE
@@ -104,56 +96,46 @@ Upon successful completion, \fBwrite_vtoc()\fR and \fBwrite_extvtoc()\fR return
 errors:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVT_EINVAL\fR\fR
 .ad
 .RS 15n
-.rt  
 The VTOC contains an incorrect field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVT_EIO\fR\fR
 .ad
 .RS 15n
-.rt  
 An I/O error occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVT_ENOTSUP\fR\fR
 .ad
 .RS 15n
-.rt  
 This operation is not supported on this disk.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVT_ERROR\fR\fR
 .ad
 .RS 15n
-.rt  
 An unknown error occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVT_OVERFLOW\fR\fR
 .ad
 .RS 15n
-.rt  
 The caller attempted an operation that is illegal on the disk and may overflow
 the fields in the data structure.
 .RE
@@ -166,13 +148,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelUnsafe
+MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO

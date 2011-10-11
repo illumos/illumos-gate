@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ruptime 1 "6 Nov 2000" "SunOS 5.11" "User Commands"
+.TH RUPTIME 1 "Nov 6, 2000"
 .SH NAME
 ruptime \- show host status of local machines
 .SH SYNOPSIS
@@ -35,66 +35,54 @@ specifying one of the options listed below.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 16n
-.rt  
 Counts even those users who have been idle for an hour or more.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 16n
-.rt  
 Reverses the sorting order.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR | \fB-t\fR | \fB-u\fR\fR
 .ad
 .RS 16n
-.rt  
 These options are mutually exclusive. The use of one overrides the previous
 one(s).
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 6n
-.rt  
 Sorts the display by load average.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 6n
-.rt  
 Sorts the display by up time.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
 .RS 6n
-.rt  
 Sorts the display by number of users.
 .RE
 
@@ -103,12 +91,10 @@ Sorts the display by number of users.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/spool/rwho/whod.*\fR\fR
 .ad
 .RS 26n
-.rt  
 data files
 .RE
 

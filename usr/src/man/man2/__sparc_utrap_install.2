@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH __sparc_utrap_install 2 "11 Nov 1997" "SunOS 5.11" "System Calls"
+.TH __SPARC_UTRAP_INSTALL 2 "Nov 11, 1997"
 .SH NAME
 __sparc_utrap_install \- install a SPARC V9 user trap handler
 .SH SYNOPSIS
@@ -52,47 +52,46 @@ asterisk (\fB*\fR) are implemented as precise traps only.
 
 .sp
 .TS
-tab() box;
-cw(2.74i) |cw(2.76i) 
-lw(2.74i) |lw(2.76i) 
-.
-\fBTrap Name\fR\fBUser Trap Type (utrap_entry_t)\fR
+box;
+c | c
+l | l .
+\fBTrap Name\fR	\fBUser Trap Type (utrap_entry_t)\fR
 _
-\fBillegal_instruction\fRT{
+\fBillegal_instruction\fR	T{
 \fBUT_ILLTRAP_INSTRUCTION\fR +*\fB or UT_ILLEGAL_INSTRUCTION\fR
 T}
 _
-\fBfp_disabled\fR\fBUT_FP_DISABLED\fR +*
+\fBfp_disabled\fR	\fBUT_FP_DISABLED\fR +*
 _
-\fBfp_exception_ieee_754\fR\fBUT_FP_EXCEPTION_IEEE_754\fR +
+\fBfp_exception_ieee_754\fR	\fBUT_FP_EXCEPTION_IEEE_754\fR +
 _
-\fBfp_exception_other\fR\fBUT_FP_EXCEPTION_OTHER\fR
+\fBfp_exception_other\fR	\fBUT_FP_EXCEPTION_OTHER\fR
 _
-\fBtag_overflow\fR\fBUT_TAG_OVERFLOW\fR +*
+\fBtag_overflow\fR	\fBUT_TAG_OVERFLOW\fR +*
 _
-\fBdivision_by_zero\fR\fBUT_DIVISION_BY_ZERO\fR +
+\fBdivision_by_zero\fR	\fBUT_DIVISION_BY_ZERO\fR +
 _
-\fBmem_address_not_aligned\fR\fBUT_MEM_ADDRESS_NOT_ALIGNED\fR +
+\fBmem_address_not_aligned\fR	\fBUT_MEM_ADDRESS_NOT_ALIGNED\fR +
 _
-\fBprivileged_action\fR\fBUT_PRIVILEGED_ACTION\fR +
+\fBprivileged_action\fR	\fBUT_PRIVILEGED_ACTION\fR +
 _
-\fBprivileged_opcode\fR\fBUT_PRIVILEGED_OPCODE\fR
+\fBprivileged_opcode\fR	\fBUT_PRIVILEGED_OPCODE\fR
 _
-\fBasync_data_error\fR\fBUT_ASYNC_DATA_ERROR\fR
+\fBasync_data_error\fR	\fBUT_ASYNC_DATA_ERROR\fR
 _
-\fBtrap_instruction\fRT{
+\fBtrap_instruction\fR	T{
 \fBUT_TRAP_INSTRUCTION_16 \fRthrough \fBUT_TRAP_INSTRUCTION_31\fR +*
 T}
 _
 T{
 \fBinstruction_access_exception\fR \fBinstruction_access_MMU_miss\fR \fBinstruction_access_error\fR
-T}T{
+T}	T{
 \fBUT_INSTRUCTION_EXCEPTION \fRor \fBUT_INSTRUCTION_PROTECTION \fRor \fBUT_INSTRUCTION_ERROR \fR
 T}
 _
 T{
 \fBdata_access_exception\fR \fBdata_access_MMU_miss\fR \fBdata_access_error\fR \fBdata_access_protection\fR
-T}T{
+T}	T{
 \fBUT_DATA_EXCEPTION \fRor \fBUT_DATA_PROTECTION \fRor \fBUT_DATA_ERROR\fR
 T}
 .TE
@@ -103,7 +102,6 @@ The following explanations are provided for those user trap types that are not
 self-explanatory.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUT_ILLTRAP_INSTRUCTION\fR\fR
 .ad
@@ -115,7 +113,6 @@ It is always precise.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUT_ILLEGAL_INSTRUCTION\fR\fR
 .ad
@@ -128,7 +125,6 @@ specifies the interface. The trap may be precise or deferred.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUT_PRIVILEGED_OPCODE\fR\fR
 .ad
@@ -141,7 +137,6 @@ only specifies the interface.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUT_DATA_EXCEPTION,\fR \fBUT_INSTRUCTION_EXCEPTION\fR\fR
 .ad
@@ -153,7 +148,6 @@ access, respectively.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUT_DATA_PROTECTION,\fR \fBUT_INSTRUCTION_PROTECTION\fR\fR
 .ad
@@ -166,7 +160,6 @@ respectively.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUT_DATA_ERROR,\fR \fBUT_INSTRUCTION_ERROR\fR\fR
 .ad
@@ -180,7 +173,6 @@ data or instruction access, respectively. \fB%l1\fR will contain either
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUT_FP_DISABLED\fR\fR
 .ad
@@ -247,33 +239,32 @@ indicated in the following table.
 
 .sp
 .TS
-tab() box;
-lw(1.76i) |lw(3.74i) 
-lw(1.76i) |lw(3.74i) 
-.
-\fBInstructions\fR\fBAdditional Information\fR
+box;
+l | l
+l | l .
+\fBInstructions\fR	\fBAdditional Information\fR
 _
-LD-type (LDSTUB)T{
+LD-type (LDSTUB)	T{
 \fB%o2\fR contains the effective address (\fIrs1\fR + \fIrs2\fR | \fIsimm13\fR).
 T}
 _
-ST-type (CAS, SWAP)T{
+ST-type (CAS, SWAP)	T{
 \fB%o2\fR contains the effective address (\fI rs1\fR + \fIrs2\fR |\fIsimm13\fR).
 T}
 _
-Integer arithmeticT{
+Integer arithmetic	T{
 \fB%o2\fR contains the \fIrs1\fR value. \fB%o3\fR contains the \fIrs2\fR | \fIsimm13\fR value. \fB%o4\fR contains the contents of the \fB%y\fR register.
 T}
 _
-Floating-point arithmeticT{
+Floating-point arithmetic	T{
 \fB%o2\fR contains the address of \fIrs1\fR value. \fB%o3\fR contains the address of \fIrs2\fR value.
 T}
 _
-Control-transferT{
+Control-transfer	T{
 \fB%o2\fR contains the target address (\fIrs1\fR + \fIrs2\fR | \fIsimm13\fR).
 T}
 _
-Asynchronous data errorsT{
+Asynchronous data errors	T{
 \fB%o2\fR contains the address that caused the error. \fB%o3\fR contains the effective ASI, if available, else \(mi1.
 T}
 .TE
@@ -328,12 +319,10 @@ returned and \fBerrno\fR is set to indicate the error.
 The \fB__sparc_utrap_install()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fItype\fR argument is not a supported user trap type; the new user trap
 handler address is not word aligned; the old user trap handler address cannot
 be returned; or the user program is not a 64-bit executable.
@@ -387,13 +376,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH devlinks 1M "15 Jul 2002" "SunOS 5.11" "System Administration Commands"
+.TH DEVLINKS 1M "Jul 15, 2002"
 .SH NAME
 devlinks \- adds /dev entries for miscellaneous devices and pseudo-devices
 .SH SYNOPSIS
@@ -39,12 +39,10 @@ TAB characters.
 The fields are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevfs-spec\fR\fR
 .ad
 .RS 18n
-.rt  
 Specification of devinfo nodes that will have links created for them. This
 specification consists of one or more keyword-value pairs, where the keyword is
 separated from the value by an equal-sign (`\fB=\fR'), and keyword-value pairs
@@ -53,36 +51,30 @@ are separated from one another by semicolons.
 The possible keywords are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fItype\fR\fR
 .ad
 .RS 12n
-.rt  
 The devinfo device type. Possible values are specified in
 \fBddi_create_minor_node\fR(9F)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR\fR
 .ad
 .RS 12n
-.rt  
 The name of the node. This is the portion of the \fB/devices\fR tree entry name
 that occurs before the first `\fB@\fR' or `\fB:\fR' character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaddr\fR[\fIn\fR]\fR
 .ad
 .RS 12n
-.rt  
 The address portion of a node name. This is the portion of a node name that
 occurs between the `\fB@\fR' and the `\fB:\fR' characters. It is possible that
 a node may have a name without an address part, which is the case for many of
@@ -94,12 +86,10 @@ on. \fIaddr0\fR is the same as \fIaddr\fR and matches the whole field.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIminor\fR[\fIn\fR]\fR
 .ad
 .RS 12n
-.rt  
 The minor portion of a node name \(mi the portion of the name after the
 `\fB:\fR'. As with \fIaddr\fR above, a number after the \fIminor\fR keyword
 specifies a subfield to match.
@@ -111,12 +101,10 @@ present.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR\fR
 .ad
 .RS 18n
-.rt  
 Specification of the \fB/dev\fR links that correspond to the devinfo nodes.
 This field allows \fBdevlinks\fR to determine matching \fB/dev\fR names for the
 \fB/devices\fR nodes it has found. The specification of this field uses
@@ -132,24 +120,20 @@ point to the same directory, \fBname\fR and \fBaddress\fR under the
 The possible escape-sequences are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\eD\fR\fR
 .ad
 .RS 8n
-.rt  
 Substitute the \fBdevice-name\fR (name) portion of the corresponding devinfo
 node-name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\eA\fR\fIn\fR\fR
 .ad
 .RS 8n
-.rt  
 Substitute the \fIn\fRth component of the \fBaddress\fR component of the
 corresponding devinfo node name. Sub-components are separated by commas, and
 sub-component \fB0\fR is the whole \fBaddress\fR component.
@@ -157,12 +141,10 @@ sub-component \fB0\fR is the whole \fBaddress\fR component.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\eM\fR\fIn\fR\fR
 .ad
 .RS 8n
-.rt  
 Substitute the \fIn\fRth sub-component of the \fBminor\fR component of the
 corresponding devinfo node name. Sub-components are separated by commas, and
 sub-component \fB0\fR is the whole \fBminor\fR component.
@@ -170,12 +152,10 @@ sub-component \fB0\fR is the whole \fBminor\fR component.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\eN\fR\fIn\fR\fR
 .ad
 .RS 8n
-.rt  
 Substitute the value of a 'counter' starting at \fIn\fR. There can be only one
 counter for each dev-spec, and counter-values will be selected so they are as
 low as possible while not colliding with already-existing link names.
@@ -191,12 +171,10 @@ the already-existing \fB/dev\fR-name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIextra-dev-link\fR\fR
 .ad
 .RS 18n
-.rt  
 Optional specification of an extra \fB/dev\fR link that points to the initial
 \fB/dev\fR link (specified in field 2). This field may contain a \fBcounter\fR
 escape-sequence (as described for the \fIdev-spec\fR field) but may not contain
@@ -210,24 +188,20 @@ particular \fB/dev\fR name.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 17n
-.rt  
 Debugging mode \(mi print out all \fBdevinfo\fR nodes found, and indicate what
 links would be created, but do not do anything.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIrootdir\fR\fR
 .ad
 .RS 17n
-.rt  
 Use \fIrootdir\fR as the root of the \fB/dev\fR and \fB/devices\fR directories
 under which the device nodes and links are created. Changing the root directory
 does not change the location of the \fB/etc/devlink.tab\fR default table, nor
@@ -236,12 +210,10 @@ is the root directory applied to the filename supplied to the \fB-t\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fItable-file\fR\fR
 .ad
 .RS 17n
-.rt  
 Set the table file used by \fBdevlinks\fR to specify the links that must be
 created. If this option is not given, \fB/etc/devlink.tab\fR is used. This
 option gives a way to instruct \fBdevlinks\fR just to perform a particular
@@ -297,34 +269,28 @@ under \fB/dev/framebuffer\fR. This entry will use a counter to end the name.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev\fR\fR
 .ad
 .RS 20n
-.rt  
 entries for the miscellaneous devices for general use
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/devices\fR\fR
 .ad
 .RS 20n
-.rt  
 device nodes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/devlink.tab\fR\fR
 .ad
 .RS 20n
-.rt  
 the default rule-file
 .RE
 

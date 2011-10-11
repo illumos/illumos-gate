@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH usbsprl 7D "23 Nov 2006" "SunOS 5.11" "Devices"
+.TH USBSPRL 7D "Nov 23, 2006"
 .SH NAME
 usbsprl \- Prolific PL2303 USB to serial converter driver
 .SH SYNOPSIS
@@ -91,23 +91,19 @@ speed.
 An \fBopen()\fR fails under the following conditions:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENXIO\fR\fR
 .ad
 .RS 9n
-.rt  
 The  unit being opened does not exist.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBUSY\fR\fR
 .ad
 .RS 9n
-.rt  
 The \fB/dev/cua\fR (dial-out) device is being opened while  the \fB/dev/term\fR
 (dial-in device) is open, or the dial-in device is being opened with a no-delay
 open while the dial-out device is open.
@@ -115,31 +111,26 @@ open while the dial-out device is open.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBUSY\fR\fR
 .ad
 .RS 9n
-.rt  
 The  unit has been marked as exclusive-use by another  process with a TIOCEXCL
 ioctl() call.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 9n
-.rt  
 USB device I/O error.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/usbsprl\fR\fR
 .ad
@@ -150,7 +141,6 @@ USB device I/O error.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/amd64/usbsprl\fR\fR
 .ad
@@ -161,7 +151,6 @@ USB device I/O error.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/sparcv9/usbsprl\fR\fR
 .ad
@@ -172,7 +161,6 @@ USB device I/O error.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/cua/[0-9]*\fR\fR
 .ad
@@ -183,7 +171,6 @@ dial-out tty lines.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/term/[0-9]*\fR\fR
 .ad
@@ -200,13 +187,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureSPARC, x86, PCI-based systems
+Architecture	SPARC, x86, PCI-based systems
 .TE
 
 .SH SEE ALSO
@@ -230,7 +216,6 @@ Warning: <device path> (usbsprl<instance num>): Error Message...
 
 .sp
 .ne 2
-.mk
 .na
 \fBDevice was disconnected while open. Data may have been lost.\fR
 .ad
@@ -242,7 +227,6 @@ data transfer was in progress. The job may be aborted.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDevice is not identical to the previous one on this port. Please disconnect
 and reconnect.\fR
@@ -256,7 +240,6 @@ reconnect the original device to the same port.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDevice has been reconnected, but data may have been lost.\fR
 .ad
@@ -269,7 +252,6 @@ be lost.
 
 .sp
 .ne 2
-.mk
 .na
 \fBCannot access <\fIdevice\fR>. Please reconnect.\fR
 .ad
@@ -294,7 +276,6 @@ the following manner:
 
 .sp
 .ne 2
-.mk
 .na
 \fBInput overrun.\fR
 .ad

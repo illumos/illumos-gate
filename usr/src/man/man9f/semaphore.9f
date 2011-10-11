@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH semaphore 9F "7 May 1997" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH SEMAPHORE 9F "May 7, 1997"
 .SH NAME
 semaphore, sema_init, sema_destroy, sema_p, sema_p_sig, sema_v, sema_tryp \-
 semaphore functions
@@ -50,57 +50,47 @@ Solaris \fBDDI\fR specific (Solaris \fBDDI\fR).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsp\fR\fR
 .ad
 .RS 8n
-.rt  
 A pointer to a semaphore, type \fBksema_t\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIval\fR\fR
 .ad
 .RS 8n
-.rt  
 Initial value for semaphore.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR\fR
 .ad
 .RS 8n
-.rt  
 Descriptive string. This is obsolete and should be \fINULL\fR. (Non-\fINULL\fR
 strings are legal, but they are a waste of kernel memory.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItype\fR\fR
 .ad
 .RS 8n
-.rt  
 Variant type of the semaphore. Currently, only \fBSEMA_DRIVER\fR is supported.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIarg\fR\fR
 .ad
 .RS 8n
-.rt  
 Type-specific argument; should be \fINULL\fR.
 .RE
 
@@ -133,23 +123,19 @@ greater than zero, and will not block.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 \fBsema_tryp()\fR could not decrement the semaphore value because it was zero.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 \fBsema_p_sig()\fR was not able to decrement the semaphore value and detected a
 pending signal.
 .RE

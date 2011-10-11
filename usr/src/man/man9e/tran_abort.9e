@@ -3,17 +3,17 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH tran_abort 9E "17 Aug 2005" "SunOS 5.11" "Driver Entry Points"
+.TH TRAN_ABORT 9E "Aug 17, 2005"
 .SH NAME
 tran_abort \- abort a SCSI command
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/scsi/scsi.h> 
+#include <sys/scsi/scsi.h>
 
 
 
-\fB int prefix\fR\fBtran_abort\fR(\fBstruct scsi_address *\fR\fIap\fR, 
+\fB int prefix\fR\fBtran_abort\fR(\fBstruct scsi_address *\fR\fIap\fR,
      \fBstruct scsi_pkt *\fR\fIpkt\fR);
 .fi
 
@@ -24,23 +24,19 @@ Solaris architecture specific (Solaris DDI).
 .SH ARGUMENTS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIap\fR \fR
 .ad
 .RS 8n
-.rt  
 Pointer to a \fBscsi_address\fR(9S) structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpkt\fR \fR
 .ad
 .RS 8n
-.rt  
 Pointer to a \fBscsi_pkt\fR(9S) structure.
 .RE
 
@@ -75,23 +71,19 @@ For each packet successfully aborted, \fBtran_abort()\fR must set the
 \fBtran_abort()\fR must return:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR \fR
 .ad
 .RS 6n
-.rt  
 upon success or partial success.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 6n
-.rt  
 upon failure.
 .RE
 

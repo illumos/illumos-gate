@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH qassociate 9F "01 Feb 2007" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH QASSOCIATE 9F "Feb 01, 2007"
 .SH NAME
 qassociate \- associate STREAMS queue with driver instance
 .SH SYNOPSIS
@@ -25,24 +25,20 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fBqueue_t *\fIq\fR\fR
 .ad
 .RS 16n
-.rt  
 Pointer to a \fBqueue\fR(9S) structure. Either the read or write queue can be
 used.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBint \fIinstance\fR\fR
 .ad
 .RS 16n
-.rt  
 Driver instance number or -1.
 .RE
 
@@ -86,23 +82,19 @@ entry point.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Success.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-1\fR\fR
 .ad
 .RS 6n
-.rt  
 Failure.
 .RE
 

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libform 3LIB "22 May 2003" "SunOS 5.11" "Interface Libraries"
+.TH LIBFORM 3LIB "May 22, 2003"
 .SH NAME
 libform \- forms library
 .SH SYNOPSIS
@@ -26,68 +26,62 @@ interfaces.
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBcurrent_field\fR\fBdata_ahead\fR
-\fBdata_behind\fR\fBdup_field\fR
-\fBdynamic_field_info\fR\fBfield_arg\fR
-\fBfield_back\fR\fBfield_buffer\fR
-\fBfield_count\fR\fBfield_fore\fR
-\fBfield_index\fR\fBfield_info\fR
-\fBfield_init\fR\fBfield_just\fR
-\fBfield_opts\fR\fBfield_opts_off\fR
-\fBfield_opts_on\fR\fBfield_pad\fR
-\fBfield_status\fR\fBfield_term\fR
-\fBfield_type\fR\fBfield_userptr\fR
-\fBform_driver\fR\fBform_fields\fR
-\fBform_init\fR\fBform_opts\fR
-\fBform_opts_off\fR\fBform_opts_on\fR
-\fBform_page\fR\fBform_sub\fR
-\fBform_term\fR\fBform_userptr\fR
-\fBform_win\fR\fBfree_field\fR
-\fBfree_fieldtype\fR\fBfree_form\fR
-\fBlink_field\fR\fBlink_fieldtype\fR
-\fBmove_field\fR\fBnew_field\fR
-\fBnew_fieldtype\fR\fBnew_form\fR
-\fBnew_page\fR\fBpos_form_cursor\fR
-\fBpost_form\fR\fBscale_form\fR
-\fBset_current_field\fR\fBset_field_back\fR
-\fBset_field_buffer\fR\fBset_field_fore\fR
-\fBset_field_init\fR\fBset_field_just\fR
-\fBset_field_opts\fR\fBset_field_pad\fR
-\fBset_field_status\fR\fBset_field_term\fR
-\fBset_field_type\fR\fBset_field_userptr\fR
-\fBset_fieldtype_arg\fR\fBset_fieldtype_choice\fR
-\fBset_form_fields\fR\fBset_form_init\fR
-\fBset_form_opts\fR\fBset_form_page\fR
-\fBset_form_sub\fR\fBset_form_term\fR
-\fBset_form_userptr\fR\fBset_form_win\fR
-\fBset_max_field\fR\fBset_new_page\fR
-\fBunpost_form\fR
+l l
+l l .
+\fBcurrent_field\fR	\fBdata_ahead\fR
+\fBdata_behind\fR	\fBdup_field\fR
+\fBdynamic_field_info\fR	\fBfield_arg\fR
+\fBfield_back\fR	\fBfield_buffer\fR
+\fBfield_count\fR	\fBfield_fore\fR
+\fBfield_index\fR	\fBfield_info\fR
+\fBfield_init\fR	\fBfield_just\fR
+\fBfield_opts\fR	\fBfield_opts_off\fR
+\fBfield_opts_on\fR	\fBfield_pad\fR
+\fBfield_status\fR	\fBfield_term\fR
+\fBfield_type\fR	\fBfield_userptr\fR
+\fBform_driver\fR	\fBform_fields\fR
+\fBform_init\fR	\fBform_opts\fR
+\fBform_opts_off\fR	\fBform_opts_on\fR
+\fBform_page\fR	\fBform_sub\fR
+\fBform_term\fR	\fBform_userptr\fR
+\fBform_win\fR	\fBfree_field\fR
+\fBfree_fieldtype\fR	\fBfree_form\fR
+\fBlink_field\fR	\fBlink_fieldtype\fR
+\fBmove_field\fR	\fBnew_field\fR
+\fBnew_fieldtype\fR	\fBnew_form\fR
+\fBnew_page\fR	\fBpos_form_cursor\fR
+\fBpost_form\fR	\fBscale_form\fR
+\fBset_current_field\fR	\fBset_field_back\fR
+\fBset_field_buffer\fR	\fBset_field_fore\fR
+\fBset_field_init\fR	\fBset_field_just\fR
+\fBset_field_opts\fR	\fBset_field_pad\fR
+\fBset_field_status\fR	\fBset_field_term\fR
+\fBset_field_type\fR	\fBset_field_userptr\fR
+\fBset_fieldtype_arg\fR	\fBset_fieldtype_choice\fR
+\fBset_form_fields\fR	\fBset_form_init\fR
+\fBset_form_opts\fR	\fBset_form_page\fR
+\fBset_form_sub\fR	\fBset_form_term\fR
+\fBset_form_userptr\fR	\fBset_form_win\fR
+\fBset_max_field\fR	\fBset_new_page\fR
+\fBunpost_form\fR	
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/libform.so.1\fR\fR
 .ad
 .RS 28n
-.rt  
 shared object
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/64/libform.so.1\fR\fR
 .ad
 .RS 28n
-.rt  
 64-bit shared object
 .RE
 
@@ -99,13 +93,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelUnsafe
+MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO

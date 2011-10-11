@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MP_SetProprietaryProperties 3MPAPI "15 Feb 2006" "SunOS 5.11" "Common Multipath Management Library Functions"
+.TH MP_SETPROPRIETARYPROPERTIES 3MPAPI "Feb 15, 2006"
 .SH NAME
 MP_SetProprietaryProperties \- set proprietary properties
 .SH SYNOPSIS
@@ -20,12 +20,10 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lMPAPI\fR [ \fIlibrary\fR\&.\
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoid\fR\fR
 .ad
 .RS 17n
-.rt  
 The object ID representing an object ID that has type
 \fBMP_LOAD_BALANCE_PROPIETARY_TYPE\fR, or \fBMP_PLUGIN_PROPERTIES\fR, or
 \fBMP_MULTIPATH_LOGICAL_UNIT_PROPERTIES\fR instance.
@@ -33,23 +31,19 @@ The object ID representing an object ID that has type
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcount\fR\fR
 .ad
 .RS 17n
-.rt  
 The number of valid items in \fIpPropertyList\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpPropertyList\fR\fR
 .ad
 .RS 17n
-.rt  
 A pointer to an array of property name/value pairs. This array must contain the
 same number of elements as does \fIcount\fR.
 .RE
@@ -68,7 +62,6 @@ proprietary property names listed in the referenced object ID.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMP_STATUS_INVALID_OBJECT_TYPE\fR\fR
 .ad
@@ -80,7 +73,6 @@ happen if an uninitialized object ID is passed to the API.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMP_STATUS_OBJECT_NOT_FOUND\fR\fR
 .ad
@@ -91,7 +83,6 @@ The \fIoid\fR owner ID or object sequence number is invalid.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMP_STATUS_INVALID_PARAMETER\fR\fR
 .ad
@@ -105,7 +96,6 @@ type subfield  other than\fBMP_OBJECT_TYPE_PROPRIETARY_LOAD_BALANCE\fR, or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMP_STATUS_SUCCESS\fR\fR
 .ad
@@ -116,7 +106,6 @@ The operation is successful.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMP_STATUS_UNSUPPORTED\fR\fR
 .ad
@@ -133,17 +122,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityT{
+Interface Stability	T{
 Standard: ANSI INCITS 412 Multipath Management API
 T}
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

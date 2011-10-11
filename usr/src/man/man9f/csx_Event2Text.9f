@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH csx_Event2Text 9F "19 Jul 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH CSX_EVENT2TEXT 9F "Jul 19, 1996"
 .SH NAME
 csx_Event2Text \- convert events to text strings
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/pccard.h> 
+#include <sys/pccard.h>
 
 
 
@@ -23,12 +23,10 @@ Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIev\fR\fR
 .ad
 .RS 6n
-.rt  
 Pointer to an \fBevent2text_t\fR structure.
 .RE
 
@@ -46,7 +44,7 @@ The structure members of \fBevent2text_t\fR are:
 .nf
 event_t     event;                        /*the event code*/
 char        text[CS_EVENT_MAX_BUFSIZE]    /*the event code*/
-    
+
 .fi
 .in -2
 
@@ -55,47 +53,39 @@ char        text[CS_EVENT_MAX_BUFSIZE]    /*the event code*/
 The fields are defined as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBevent\fR\fR
 .ad
 .RS 9n
-.rt  
 The text for the event code in the \fBevent\fR field is returned in the
 \fBtext\fR field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtext\fR\fR
 .ad
 .RS 9n
-.rt  
 The text string describing the name of the event.
 .RE
 
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_SUCCESS\fR\fR
 .ad
 .RS 27n
-.rt  
 Successful operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_UNSUPPORTED_FUNCTION\fR\fR
 .ad
 .RS 27n
-.rt  
 No \fBPCMCIA \fRhardware installed.
 .RE
 
@@ -109,13 +99,13 @@ This function may be called from user or kernel context.
 .sp
 .in +2
 .nf
-xx_event(event_t event, int priority, event_callback_args_t *eca) 
+xx_event(event_t event, int priority, event_callback_args_t *eca)
 { 	
 	  event2text_t    event2text; 	
 
-	  event2text.event = event; 
-	  csx_Event2Text(&event2text); 
-	  cmn_err(CE_CONT, "event %s (0x%x)", event2text.text, (int)event); 
+	  event2text.event = event;
+	  csx_Event2Text(&event2text);
+	  cmn_err(CE_CONT, "event %s (0x%x)", event2text.text, (int)event);
 }
 .fi
 .in -2

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH wpad 1M "11 Mar 2008" "SunOS 5.11" "System Administration Commands"
+.TH WPAD 1M "Mar 11, 2008"
 .SH NAME
 wpad \- WPA and WPA2 protocol daemon
 .SH SYNOPSIS
@@ -67,7 +67,6 @@ Stop and start the \fBwpad\fR daemon using \fBdladm\fR(1M). Use:
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIinterface\fR\fR
 .ad
@@ -78,7 +77,6 @@ Specify a WiFi Link interface to start the \fBwpad\fR daemon.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR \fIpre_shared_key_name\fR\fR
 .ad
@@ -137,13 +135,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityUncommitted
+Interface Stability	Uncommitted
 .TE
 
 .SH SEE ALSO

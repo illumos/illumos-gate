@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sppptun 1M "27 May 2009" "SunOS 5.11" "System Administration Commands"
+.TH SPPPTUN 1M "May 27, 2009"
 .SH NAME
 sppptun \- PPP tunneling driver utility
 .SH SYNOPSIS
 .LP
 .nf
-\fBsppptun plumb\fR 
+\fBsppptun plumb\fR
 .fi
 
 .LP
@@ -24,7 +24,7 @@ sppptun \- PPP tunneling driver utility
 
 .LP
 .nf
-\fBsppptun query\fR 
+\fBsppptun query\fR
 .fi
 
 .SH DESCRIPTION
@@ -64,7 +64,6 @@ not need to set these values. See the examples for one possible use.
 .SH USAGE
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsppptun plumb\fR\fR
 .ad
@@ -77,7 +76,6 @@ used as the \fIprotocol\fR argument below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsppptun plumb [\fB-s\fR \fIsap\fR] \fIprotocol\fR \fIdevice\fR\fR\fR
 .ad
@@ -99,7 +97,6 @@ in RFC 2516. The defaults are 8864 for \fBpppoe\fR and 8863 for \fBpppoed\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsppptun unplumb \fIinterface\fR\fR\fR
 .ad
@@ -112,7 +109,6 @@ name of the interface as reported when the interface was plumbed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsppptun query\fR\fR
 .ad
@@ -186,57 +182,47 @@ nge0        phys     1500   up       --
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 One or more errors occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ppp/pppoe.if\fR\fR
 .ad
 .RS 21n
-.rt  
 list of Ethernet interfaces to be plumbed at boot time
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/sbin/sppptun\fR\fR
 .ad
 .RS 21n
-.rt  
 executable command
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/sppptun\fR\fR
 .ad
 .RS 21n
-.rt  
 Solaris PPP tunneling device driver
 .RE
 

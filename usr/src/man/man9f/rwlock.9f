@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH rwlock 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH RWLOCK 9F "Jan 16, 2006"
 .SH NAME
 rwlock, rw_init, rw_destroy, rw_enter, rw_exit, rw_tryenter, rw_downgrade,
 rw_tryupgrade, rw_read_locked \- readers/writer lock functions
@@ -59,57 +59,47 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrwlp\fR\fR
 .ad
 .RS 14n
-.rt  
 Pointer to a \fBkrwlock_t\fR readers/writer lock.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR\fR
 .ad
 .RS 14n
-.rt  
 Descriptive string. This is obsolete and should be \fBNULL\fR. (Non-null
 strings are legal, but they're a waste of kernel memory.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItype\fR\fR
 .ad
 .RS 14n
-.rt  
 Type of readers/writer lock.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIarg\fR\fR
 .ad
 .RS 14n
-.rt  
 Type-specific argument for initialization function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIenter_type\fR\fR
 .ad
 .RS 14n
-.rt  
 One of the values \fBRW_READER\fR or \fBRW_WRITER\fR, indicating whether the
 lock is to be acquired non-exclusively (\fBRW_READER\fR) or exclusively
 (\fBRW_WRITER\fR).
@@ -187,58 +177,48 @@ called for a lock that isn't held by the caller.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 \fBrw_tryenter()\fR could not obtain the lock without blocking.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 \fBrw_tryupgrade()\fR was unable to perform the upgrade because of other
 threads holding or waiting to hold the lock.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 \fBrw_read_locked()\fR returns \fB0\fR if the lock is held by the caller for
 write.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnon-zero\fR\fR
 .ad
 .RS 12n
-.rt  
 from \fBrw_read_locked()\fR if the lock is held by the caller for read.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnon-zero\fR\fR
 .ad
 .RS 12n
-.rt  
 successful return from \fBrw_tryenter()\fR or \fBrw_tryupgrade()\fR.
 .RE
 

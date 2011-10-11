@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH poold 1M "1 Dec 2005" "SunOS 5.11" "System Administration Commands"
+.TH POOLD 1M "Dec 1, 2005"
 .SH NAME
 poold \- automated resource pools partitioning daemon
 .SH SYNOPSIS
@@ -67,12 +67,10 @@ objectives.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIlevel\fR\fR
 .ad
 .RS 12n
-.rt  
 Specify the vebosity level for logging information.
 .sp
 Specify \fIlevel\fR as \fBALERT\fR, \fBCRIT\fR, \fBERR\fR, \fBWARNING\fR,
@@ -80,80 +78,66 @@ Specify \fIlevel\fR as \fBALERT\fR, \fBCRIT\fR, \fBERR\fR, \fBWARNING\fR,
 the default logging level is \fBINFO\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBALERT\fR\fR
 .ad
 .RS 11n
-.rt  
  A condition that should be corrected immediately, such as a corrupted system
 database.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCRIT\fR\fR
 .ad
 .RS 11n
-.rt  
 Critical conditions, such as hard device errors.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBERR\fR\fR
 .ad
 .RS 11n
-.rt  
 Errors.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWARNING\fR\fR
 .ad
 .RS 11n
-.rt  
 Warning messages.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNOTICE\fR\fR
 .ad
 .RS 11n
-.rt  
  Conditions that are not error conditions, but that may require special
 handling.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBINFO\fR\fR
 .ad
 .RS 11n
-.rt  
 Informational messages.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDEBUG\fR\fR
 .ad
 .RS 11n
-.rt  
 Messages that contain information normally of use only when debugging a
 program.
 .RE
@@ -201,13 +185,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

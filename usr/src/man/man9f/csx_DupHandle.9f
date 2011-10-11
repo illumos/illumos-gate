@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH csx_DupHandle 9F "19 Jul 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH CSX_DUPHANDLE 9F "Jul 19, 1996"
 .SH NAME
 csx_DupHandle \- duplicate access handle
 .SH SYNOPSIS
@@ -24,35 +24,29 @@ Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhandle1\fR \fR
 .ad
 .RS 12n
-.rt  
 The access handle returned from \fBcsx_RequestIO\fR(9F) or
 \fBcsx_RequestWindow\fR(9F) that is to be duplicated.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhandle2\fR \fR
 .ad
 .RS 12n
-.rt  
 A pointer to the newly-created duplicated data access handle.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR \fR
 .ad
 .RS 12n
-.rt  
 The access attributes that will be applied to the new handle.
 .RE
 
@@ -100,24 +94,20 @@ data access functions. The ability to specify the order in which the \fBCPU
 of the following bits may be specified:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIN_ACC_STRICT_ORDER\fR \fR
 .ad
 .RS 28n
-.rt  
 The data references must be issued by a \fBCPU \fRin program order. Strict
 ordering is the default behavior.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIN_ACC_UNORDERED_OK\fR \fR
 .ad
 .RS 28n
-.rt  
 The \fBCPU \fRmay re-order the data  references. This includes all kinds of
 re-ordering (that is, a load followed by a store may be replaced by a store
 followed by a load).
@@ -125,12 +115,10 @@ followed by a load).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIN_ACC_MERGING_OK\fR \fR
 .ad
 .RS 28n
-.rt  
 The \fBCPU \fRmay merge individual stores to consecutive locations. For
 example, the \fBCPU \fRmay turn two consecutive byte stores into one halfword
 store. It may also batch individual loads. For example, the \fBCPU \fRmay turn
@@ -140,12 +128,10 @@ implies re-ordering.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIN_ACC_LOADCACHING_OK\fR \fR
 .ad
 .RS 28n
-.rt  
 The \fBCPU \fRmay cache the data it fetches and reuse it until another store
 occurs. The default behavior is to fetch new data on every load. Setting this
 bit also implies merging and re-ordering.
@@ -153,12 +139,10 @@ bit also implies merging and re-ordering.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIN_ACC_STORECACHING_OK\fR \fR
 .ad
 .RS 28n
-.rt  
 The \fBCPU \fRmay keep the data in the cache and push it to the device (perhaps
 with other data) at a later time. The  default behavior is to push the data
 right away. Setting this bit also implies load caching, merging, and
@@ -173,35 +157,29 @@ and cached together.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_SUCCESS\fR \fR
 .ad
 .RS 28n
-.rt  
 Successful operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_FAILURE\fR \fR
 .ad
 .RS 28n
-.rt  
 Error in \fIflags\fR argument or handle could not be duplicated for some
 reason.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_UNSUPPORTED_FUNCTION\fR \fR
 .ad
 .RS 28n
-.rt  
 No \fBPCMCIA \fRhardware installed.
 .RE
 

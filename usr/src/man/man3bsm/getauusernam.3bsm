@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH getauusernam 3BSM "31 Mar 2005" "SunOS 5.11" "Security and Auditing Library Functions"
+.TH GETAUUSERNAM 3BSM "Mar 31, 2005"
 .SH NAME
 getauusernam, getauuserent, setauuser, endauuser, getauusernam_r,
 getauuserent_r \- get audit_user entry
@@ -108,23 +108,19 @@ Solaris Auditing has been enabled.  See \fBbsmconv\fR(1M) for more information.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/security/audit_user\fR\fR
 .ad
 .RS 28n
-.rt  
 file that stores per-user audit event mask
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/passwd\fR\fR
 .ad
 .RS 28n
-.rt  
 file that stores user ID to username mappings
 .RE
 
@@ -136,13 +132,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelMT-Safe with exceptions
+MT-Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO

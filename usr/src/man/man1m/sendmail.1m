@@ -6,19 +6,19 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sendmail 1M "25 Feb 2009" "SunOS 5.11" "System Administration Commands"
+.TH SENDMAIL 1M "Feb 25, 2009"
 .SH NAME
 sendmail \- send mail over the internet
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/lib/sendmail\fR [\fB-Ac\fR] [\fB-Am\fR] [\fB-ba\fR] [\fB-bD\fR] [\fB-bd\fR] [\fB-bi\fR] [\fB-bl\fR] 
+\fB/usr/lib/sendmail\fR [\fB-Ac\fR] [\fB-Am\fR] [\fB-ba\fR] [\fB-bD\fR] [\fB-bd\fR] [\fB-bi\fR] [\fB-bl\fR]
      [\fB-bm\fR] [\fB-bp\fR] [\fB-bP\fR] [\fB-bs\fR] [\fB-bt\fR] [\fB-bv\fR] [\fB-B\fR \fItype\fR] [\fB-C\fR \fIfile\fR]
-     [\fB-D\fR \fIlogfile\fR] [\fB-d\fR \fIX\fR] [\fB-F\fR \fIfullname\fR] [\fB-f\fR \fIname\fR] [\fB-G\fR] 
-     [\fB-h\fR \fIN\fR] [\fB-L \fItag\fR\fR] [\fB-M\fR x\fIvalue\fR] [\fB-N\fR \fInotifications\fR] [\fB-n\fR] 
-     [\fB-O\fR\fIoption\fR =\fIvalue\fR] [\fB-o\fR x\fIvalue\fR] [\fB-p\fR \fIprotocol\fR] 
-     [\fB-Q\fR [\fIreason\fR]] [\fB-q\fR [\fItime\fR]] [\fB-q\fR \fIXstring\fR] [\fB-R\fR \fIret\fR] 
-     [\fB-r\fR \fIname\fR] [\fB-t\fR] [\fB-V\fR \fIenvid\fR] [\fB-v\fR] [\fB-X\fR \fIlogfile\fR] 
+     [\fB-D\fR \fIlogfile\fR] [\fB-d\fR \fIX\fR] [\fB-F\fR \fIfullname\fR] [\fB-f\fR \fIname\fR] [\fB-G\fR]
+     [\fB-h\fR \fIN\fR] [\fB-L \fItag\fR\fR] [\fB-M\fR x\fIvalue\fR] [\fB-N\fR \fInotifications\fR] [\fB-n\fR]
+     [\fB-O\fR\fIoption\fR =\fIvalue\fR] [\fB-o\fR x\fIvalue\fR] [\fB-p\fR \fIprotocol\fR]
+     [\fB-Q\fR [\fIreason\fR]] [\fB-q\fR [\fItime\fR]] [\fB-q\fR \fIXstring\fR] [\fB-R\fR \fIret\fR]
+     [\fB-r\fR \fIname\fR] [\fB-t\fR] [\fB-V\fR \fIenvid\fR] [\fB-v\fR] [\fB-X\fR \fIlogfile\fR]
      [\fIaddress\fR]...
 .fi
 
@@ -69,7 +69,7 @@ The \fBsendmail\fR service is managed by the service management facility,
 .nf
 svc:/network/smtp:sendmail
 svc:/network/sendmail-client:default
- 
+
 .fi
 .in -2
 .sp
@@ -179,7 +179,6 @@ You can use the following variables in the \fB/etc/default/sendmail\fR startup
 file:
 .sp
 .ne 2
-.mk
 .na
 \fBCLIENTOPTIONS=\fIstring\fR\fR
 .ad
@@ -193,7 +192,6 @@ this variable.
 
 .sp
 .ne 2
-.mk
 .na
 \fBCLIENTQUEUEINTERVAL=\fI#\fR\fR
 .ad
@@ -211,7 +209,6 @@ client-only queue, then acts as a client queue processor.
 
 .sp
 .ne 2
-.mk
 .na
 \fBETRN_HOSTS=\fIstring\fR\fR
 .ad
@@ -225,7 +222,6 @@ information, refer to the \fBetrn\fR(1M) man page.
 
 .sp
 .ne 2
-.mk
 .na
 \fBMODE=-bd\fR
 .ad
@@ -237,7 +233,6 @@ leave it undefined.
 
 .sp
 .ne 2
-.mk
 .na
 \fBOPTIONS=\fIstring\fR\fR
 .ad
@@ -249,7 +244,6 @@ checking is done, so be careful when making changes to this variable.
 
 .sp
 .ne 2
-.mk
 .na
 \fBQUEUEINTERVAL=\fI#\fR\fR
 .ad
@@ -265,7 +259,6 @@ the entry does not end with an appropriate letter, the interval is ignored and
 
 .sp
 .ne 2
-.mk
 .na
 \fBQUEUEOPTIONS=p\fR
 .ad
@@ -288,7 +281,6 @@ information, see \fB/usr/include/libmilter/README\fR and http://www.milter.org
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Ac\fR\fR
 .ad
@@ -300,7 +292,6 @@ mail submission.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Am\fR\fR
 .ad
@@ -312,7 +303,6 @@ submission.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-ba\fR\fR
 .ad
@@ -325,7 +315,6 @@ and all messages are generated with a RETURN-LINEFEED at the end. Also, the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-bd\fR\fR
 .ad
@@ -336,7 +325,6 @@ Runs as a daemon in the background, waiting for incoming SMTP connections.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-bD\fR\fR
 .ad
@@ -347,7 +335,6 @@ Runs as a daemon in the foreground, waiting for incoming SMTP connections.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-bi\fR\fR
 .ad
@@ -360,7 +347,6 @@ use of this option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-bl\fR\fR
 .ad
@@ -371,7 +357,6 @@ Runs as a daemon (like \fB-bd\fR) but accepts only loopback SMTP connections.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-bm\fR\fR
 .ad
@@ -382,7 +367,6 @@ Delivers mail in the usual way (default).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-bp\fR\fR
 .ad
@@ -393,7 +377,6 @@ Prints a summary of the mail queues.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-bP\fR\fR
 .ad
@@ -405,7 +388,6 @@ shared memory support.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-bs\fR\fR
 .ad
@@ -417,7 +399,6 @@ operations of the \fB-ba\fR flag that are compatible with \fBSMTP\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-bt\fR\fR
 .ad
@@ -429,7 +410,6 @@ parsing; it is used for debugging configuration tables.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-bv\fR\fR
 .ad
@@ -441,7 +421,6 @@ is normally used for validating users or mailing lists.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-B\fR \fItype\fR\fR
 .ad
@@ -452,7 +431,6 @@ Indicates body \fItype\fR (\fB7BIT\fR or \fB8BITMIME\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR \fIfile\fR\fR
 .ad
@@ -463,7 +441,6 @@ Uses alternate configuration file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR \fIlogfile\fR\fR
 .ad
@@ -474,7 +451,6 @@ Send debugging output to the indicated log file instead of \fBstdout\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIX\fR\fR
 .ad
@@ -485,7 +461,6 @@ Sets debugging value to \fIX\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIname\fR\fR
 .ad
@@ -496,7 +471,6 @@ Sets the name of the "from" person (that is, the sender of the mail).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR \fIfullname\fR\fR
 .ad
@@ -507,7 +481,6 @@ Sets the full name of the sender.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-G\fR\fR
 .ad
@@ -522,7 +495,6 @@ in this mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fIN\fR\fR
 .ad
@@ -535,7 +507,6 @@ message, the victim of an aliasing loop.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR \fItag\fR\fR
 .ad
@@ -546,7 +517,6 @@ Sets the identifier used in \fBsyslog\fR messages to the supplied \fItag\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR\fIxvalue\fR\fR
 .ad
@@ -557,7 +527,6 @@ Sets macro \fIx\fR to the specified \fIvalue\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
@@ -568,7 +537,6 @@ Does not do aliasing.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-N\fR \fInotifications\fR\fR
 .ad
@@ -582,7 +550,6 @@ stuck in a queue somwhere. The default is "FAILURE,DELAY".
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fIxvalue\fR\fR
 .ad
@@ -594,7 +561,6 @@ Sets option \fIx\fR to the specified \fIvalue\fR. \fBProcessing\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-O\fR\fIoption=value\fR\fR
 .ad
@@ -606,7 +572,6 @@ Sets \fIoption\fR to the specified \fIvalue\fR (for long from names).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIprotocol\fR\fR
 .ad
@@ -622,7 +587,6 @@ to \fBUUCP\fR and the sending host to \fBuunet\fR. Some existing programs use
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR[\fItime\fR]\fR
 .ad
@@ -640,7 +604,6 @@ with \fB-bd\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-qp[\fR\fItime\fR\fB-]\fR\fR
 .ad
@@ -656,7 +619,6 @@ the previous queue run.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-qf\fR\fR
 .ad
@@ -668,7 +630,6 @@ in the foreground.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-qG\fR \fIname\fR\fR
 .ad
@@ -679,7 +640,6 @@ Processes jobs in queue group called \fIname\fR only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q[!]I\fR \fIsubstr\fR\fR
 .ad
@@ -691,7 +651,6 @@ queue \fBID\fR or not when \fB!\fR is specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q[!]Q\fR \fIsubstr\fR\fR
 .ad
@@ -703,7 +662,6 @@ substring of the quarantine \fIreason\fR or not when \fB!\fR is specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q[!]R\fR \fIsubstr\fR\fR
 .ad
@@ -715,7 +673,6 @@ the recipients or not when \fB!\fR is specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q[!]S\fR \fIsubstr\fR\fR
 .ad
@@ -727,7 +684,6 @@ sender or not when \fB!\fR is specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Q\fR[\fIreason\fR]\fR
 .ad
@@ -740,7 +696,6 @@ some sort of item matching as described above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIname\fR\fR
 .ad
@@ -751,7 +706,6 @@ An alternate and obsolete form of the \fB-f\fR flag.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIret\fR\fR
 .ad
@@ -763,7 +717,6 @@ can be \fBHDRS\fR for headers only or \fBFULL\fR for headers plus body.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
@@ -778,7 +731,6 @@ when no legal recipients are included in the message.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -789,7 +741,6 @@ Goes into verbose mode. Alias expansions are announced, and so forth.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR \fIenvid\fR\fR
 .ad
@@ -801,7 +752,6 @@ returned if the message bounces.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-X\fR \fIlogfile\fR\fR
 .ad
@@ -854,7 +804,6 @@ the list below, the multiple character name is presented first followed by the
 single character syntax enclosed in parentheses.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAliasFile (A\fR\fIfile\fR\fB)\fR\fR
 .ad
@@ -865,7 +814,6 @@ Specifies possible alias files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAliasWait (a\fR \fIN\fR\fB)\fR\fR
 .ad
@@ -878,7 +826,6 @@ minutes, issues a warning. Defaults to 10 minutes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAllowBogusHELO\fR\fR
 .ad
@@ -890,7 +837,6 @@ this option is disabled.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBBadRcptThrottle=\fR\fIN\fR\fR
 .ad
@@ -902,7 +848,6 @@ envelope are rejected, sleeps for one second after each rejected RCPT command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBBlankSub (B\fR\fIc\fR\fB)\fR\fR
 .ad
@@ -914,7 +859,6 @@ are replaced by this character. Defaults to SPACE (that is, no change is made).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCACertFile\fR\fR
 .ad
@@ -925,7 +869,6 @@ File containing one CA cert.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCACertPath\fR\fR
 .ad
@@ -936,7 +879,6 @@ Path to directory with certs of CAs.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCheckAliases (n)\fR\fR
 .ad
@@ -947,7 +889,6 @@ Validates the RHS of aliases when rebuilding the \fBaliases\fR(4) database.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCheckpointInterval (C\fR\fIN\fR\fB)\fR\fR
 .ad
@@ -960,7 +901,6 @@ any but the last \fIN\fR recipients.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBClassFactor (z\fR\fIfact\fR\fB)\fR\fR
 .ad
@@ -974,7 +914,6 @@ higher \fBPriority:\fR are favored. Defaults to \fB1800\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBClientCertFile\fR\fR
 .ad
@@ -986,7 +925,6 @@ File containing the cert of the client, that is, this cert is used when
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBClientKeyFile\fR\fR
 .ad
@@ -997,7 +935,6 @@ File containing the private key belonging to the client cert.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBClientPortOptions\fR\fR
 .ad
@@ -1007,7 +944,6 @@ Sets client \fBSMTP\fR options. The options are key=value pairs. Known keys
 are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAddr\fR \fIAddress Mask\fR\fR
 .ad
@@ -1019,7 +955,6 @@ numeric address in dot notation or a network name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFamily\fR\fR
 .ad
@@ -1030,7 +965,6 @@ Address family (defaults to INET).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBListen\fR\fR
 .ad
@@ -1041,7 +975,6 @@ Size of listen queue (defaults to 10).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPort\fR\fR
 .ad
@@ -1052,7 +985,6 @@ Name/number of listening port (defaults to \fBsmtp\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRcvBufSize\fR\fR
 .ad
@@ -1063,7 +995,6 @@ The size of the TCP/IP receive buffer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSndBufSize\fR\fR
 .ad
@@ -1074,7 +1005,6 @@ The size of the TCP/IP send buffer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBModifier\fR\fR
 .ad
@@ -1083,7 +1013,6 @@ The size of the TCP/IP send buffer.
 Options (flags) for the daemon. Can be:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBh\fR\fR
 .ad
@@ -1101,7 +1030,6 @@ used for the \fBHELO\fR/\fBEHLO\fR command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBColonOkInAddr\fR\fR
 .ad
@@ -1114,7 +1042,6 @@ is on for version 5 and lower configuration files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBConnectionCacheSize (k\fR\fIN\fR\fB)\fR\fR
 .ad
@@ -1129,7 +1056,6 @@ connections are closed immediately.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBConnectionCacheTimeout (K\fR\fItimeout\fR\fB)\fR\fR
 .ad
@@ -1147,7 +1073,6 @@ excessive resources on the other end. The default is five minutes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBConnectionRateThrottle\fR\fR
 .ad
@@ -1160,7 +1085,6 @@ there is no limit.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBConnectionRateWindowSize\fR\fR
 .ad
@@ -1172,7 +1096,6 @@ is maintained. The default is 60 seconds.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBControlSocketName\fR\fR
 .ad
@@ -1191,7 +1114,6 @@ for the socket name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCRLFile\fR\fR
 .ad
@@ -1203,7 +1125,6 @@ authentication.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDaemonPortOptions (O\fR\fIoptions\fR\fB)\fR\fR
 .ad
@@ -1213,7 +1134,6 @@ Sets server SMTP options. The options are \fIkey=value\fR pairs. Known keys
 are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBName\fR\fR
 .ad
@@ -1225,7 +1145,6 @@ error messages and logging.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAddr\fR\fR
 .ad
@@ -1238,7 +1157,6 @@ The address mask may be a numeric address in dot notation or a network name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFamily\fR\fR
 .ad
@@ -1249,7 +1167,6 @@ Address family (defaults to \fBINET).\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBInputMailFilters\fR\fR
 .ad
@@ -1260,7 +1177,6 @@ List of input mail filters for the daemon.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBListen\fR\fR
 .ad
@@ -1271,7 +1187,6 @@ Size of listen queue (defaults to \fB10\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBModifier\fR\fR
 .ad
@@ -1280,7 +1195,6 @@ Size of listen queue (defaults to \fB10\fR).
 Options (flags) for the daemon; can be a sequence (without any delimiters) of:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBa\fR\fR
 .ad
@@ -1291,7 +1205,6 @@ Requires authentication.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBb\fR\fR
 .ad
@@ -1302,7 +1215,6 @@ Binds to interface through which mail has been received.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBc\fR\fR
 .ad
@@ -1313,7 +1225,6 @@ Performs hostname canonification (\fB\&.cf\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBf\fR\fR
 .ad
@@ -1324,7 +1235,6 @@ Requires fully qualified hostname (\fB\&.cf\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBh\fR\fR
 .ad
@@ -1335,7 +1245,6 @@ Uses name of interface for \fBHELO\fR command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBu\fR\fR
 .ad
@@ -1346,7 +1255,6 @@ Allows unqualified addresses (\fB\&.cf\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBC\fR\fR
 .ad
@@ -1357,7 +1265,6 @@ Does not perform hostname canonification.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE\fR\fR
 .ad
@@ -1370,7 +1277,6 @@ Disallows \fBETRN\fR (see \fBRFC\fR 2476).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBName\fR\fR
 .ad
@@ -1382,7 +1288,6 @@ messages and logging.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPort\fR\fR
 .ad
@@ -1393,7 +1298,6 @@ Name/number of listening port (defaults to \fBsmtp\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBReceiveSize\fR\fR
 .ad
@@ -1404,7 +1308,6 @@ The size of the TCP/IP receive buffer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSendSize\fR\fR
 .ad
@@ -1415,7 +1318,6 @@ The size of the TCP/IP send buffer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchildren\fR\fR
 .ad
@@ -1426,7 +1328,6 @@ Maximum number of children per daemon. See \fBMaxDaemonChildren\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDeliveryMode\fR\fR
 .ad
@@ -1437,7 +1338,6 @@ Delivery mode per daemon. See \fBDeliveryMode\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrefuseLA\fR\fR
 .ad
@@ -1448,7 +1348,6 @@ Delivery mode per daemon. See \fBDeliveryMode\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdelayLA\fR\fR
 .ad
@@ -1459,7 +1358,6 @@ Delivery mode per daemon. See \fBDeliveryMode\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBqueueLA\fR\fR
 .ad
@@ -1474,7 +1372,6 @@ Delivery mode per daemon. See \fBDeliveryMode\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDataFileBufferSize\fR\fR
 .ad
@@ -1486,7 +1383,6 @@ disk-based. The default is 4096 bytes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDeadLetterDrop\fR\fR
 .ad
@@ -1502,7 +1398,6 @@ could not be opened.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDefaultCharSet\fR\fR
 .ad
@@ -1514,7 +1409,6 @@ MIME.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDefaultUser (g\fR\fIgid\fR\fB) or (u\fR\fIuid\fR\fB)\fR\fR
 .ad
@@ -1527,7 +1421,6 @@ given as a symbolic group or user name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDelayLA=\fR\fILA\fR\fR
 .ad
@@ -1539,7 +1432,6 @@ second on most SMTP commands and before accepting connections.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDeliverByMin=\fR\fItime\fR\fR
 .ad
@@ -1553,7 +1445,6 @@ keyword \fBDELIVERBY\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDeliveryMode (d\fR\fIx\fR\fB)\fR\fR
 .ad
@@ -1562,7 +1453,6 @@ keyword \fBDELIVERBY\fR.
 Delivers in mode \fIx\fR. Legal modes are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBi\fR\fR
 .ad
@@ -1573,7 +1463,6 @@ Delivers interactively (synchronously).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBb\fR\fR
 .ad
@@ -1584,7 +1473,6 @@ Delivers in background (asynchronously).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd\fR\fR
 .ad
@@ -1595,7 +1483,6 @@ Deferred mode. Database lookups are deferred until the actual queue run.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBq\fR\fR
 .ad
@@ -1610,7 +1497,6 @@ given no argument (that is, \fBOd\fR is equivalent to \fBOdi\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDHParameters\fR\fR
 .ad
@@ -1621,7 +1507,6 @@ File containing the DH parameters.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDialDelay\fR\fR
 .ad
@@ -1633,7 +1518,6 @@ not retry".
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDontBlameSendmail\fR\fR
 .ad
@@ -1646,7 +1530,6 @@ more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDontExpandCnames\fR\fR
 .ad
@@ -1658,7 +1541,6 @@ records.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDontInitGroups\fR\fR
 .ad
@@ -1671,7 +1553,6 @@ permissions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDontProbeInterfaces\fR\fR
 .ad
@@ -1685,7 +1566,6 @@ configuration error.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDontPruneRoutes (R)\fR\fR
 .ad
@@ -1696,7 +1576,6 @@ If set, does not prune route-addr syntax addresses to the minimum possible.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDoubleBounceAddress\fR\fR
 .ad
@@ -1708,7 +1587,6 @@ error message to this address.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEightBitMode (8)\fR\fR
 .ad
@@ -1719,7 +1597,6 @@ key can selected by using just the first character, but using the full word is
 better for clarity.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmimify\fR\fR
 .ad
@@ -1730,7 +1607,6 @@ Does any necessary conversion of \fB8BITMIME\fR to 7-bit.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpass\fR\fR
 .ad
@@ -1741,7 +1617,6 @@ Passes unlabeled 8-bit input through as is.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstrict\fR\fR
 .ad
@@ -1754,7 +1629,6 @@ Rejects unlabeled 8-bit input.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBErrorHeader (E\fR\fIfile/message\fR\fB)\fR\fR
 .ad
@@ -1771,7 +1645,6 @@ is printed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBErrorMode (e\fR\fIx\fR\fB)\fR\fR
 .ad
@@ -1780,7 +1653,6 @@ is printed.
 Disposes of errors using mode \fIx\fR. The values for \fIx\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBe\fR\fR
 .ad
@@ -1791,7 +1663,6 @@ Mails back errors and gives \fB0\fR exit status always.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBm\fR\fR
 .ad
@@ -1802,7 +1673,6 @@ Mails back errors.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBp\fR\fR
 .ad
@@ -1813,7 +1683,6 @@ Prints error messages (default).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBq\fR\fR
 .ad
@@ -1824,7 +1693,6 @@ No messages, just gives exit status.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBw\fR\fR
 .ad
@@ -1837,7 +1705,6 @@ Writes back errors (mail if user not logged in).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFallbackMXhost (V\fR\fIfallbackhost\fR\fB)\fR\fR
 .ad
@@ -1849,7 +1716,6 @@ host. This is intended to be used by sites with poor network connectivity.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFallBackSmartHost\fR\fR
 .ad
@@ -1863,7 +1729,6 @@ domain but not outside.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFastSplit\fR\fR
 .ad
@@ -1884,7 +1749,6 @@ the number of processes to deliver the envelopes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBForkEachJob (Y)\fR\fR
 .ad
@@ -1897,7 +1761,6 @@ considerable amounts of memory while the queue is being processed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBForwardPath (J\fR\fIpath\fR\fB)\fR\fR
 .ad
@@ -1916,7 +1779,6 @@ exist). Refer to the NOTES section for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHeloName=\fIname\fR\fR\fR
 .ad
@@ -1927,7 +1789,6 @@ Sets the name to be used for \fBHELO\fR/\fBEHLO\fR (instead of \fB$j\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHelpFile (H\fR\fIfile\fR\fB)\fR\fR
 .ad
@@ -1938,7 +1799,6 @@ Specifies the help file for SMTP.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHoldExpensive (c)\fR\fR
 .ad
@@ -1950,7 +1810,6 @@ immediately.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHostsFile\fR\fR
 .ad
@@ -1961,7 +1820,6 @@ Sets the file to use when doing "file" type access of host names.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHostStatusDirectory\fR\fR
 .ad
@@ -1974,7 +1832,6 @@ relative to the queue directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIgnoreDots (i)\fR\fR
 .ad
@@ -1986,7 +1843,6 @@ always accepted) when reading \fBSMTP\fR mail.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLogLevel (L\fR\fIn\fR\fB)\fR\fR
 .ad
@@ -1997,7 +1853,6 @@ Sets the default log level to \fIn\fR. Defaults to \fB9\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB(M\fR\fIx\|value\fR\fB)\fR\fR
 .ad
@@ -2009,7 +1864,6 @@ command line.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMailboxDatabase\fR\fR
 .ad
@@ -2022,7 +1876,6 @@ the source code, see \fBlibsm/mbdb.c\fR for details.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMatchGECOS (G)\fR\fR
 .ad
@@ -2035,7 +1888,6 @@ well as the login name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMaxDaemonChildren\fR\fR
 .ad
@@ -2047,7 +1899,6 @@ connections are rejected. If not set or <=0, there is no limit.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMaxHopCount (h\fR\fIN\fR\fB)\fR\fR
 .ad
@@ -2059,7 +1910,6 @@ times are assumed to be in a loop and are rejected. Defaults to \fB25\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMaxMessageSize\fR\fR
 .ad
@@ -2070,7 +1920,6 @@ The maximum size of messages that are accepted (in bytes).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMaxMimeHeaderLength=\fR\fIM\fR\fB[/\fR\fIN\fR\fB]\fR\fR
 .ad
@@ -2085,7 +1934,6 @@ meaning no checks are done.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMaxNOOPCommands=\fR\fIN\fR\fR
 .ad
@@ -2096,7 +1944,6 @@ Overrides the default of 20 for the number of useless commands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMaxQueueChildren=\fR\fIN\fR\fR
 .ad
@@ -2114,7 +1961,6 @@ run later (in round robin order). See \fBMaxRunnersPerQueue\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMaxQueueRunSize\fR\fR
 .ad
@@ -2127,7 +1973,6 @@ reached; job priority is not used. If not set, there is no limit.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMaxRunnersPerQueue=\fR\fIN\fR\fR
 .ad
@@ -2144,7 +1989,6 @@ default is \fB1\fR when not set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMeToo (M)\fR\fR
 .ad
@@ -2155,7 +1999,6 @@ Sends to me too, even if I am in an alias expansion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMaxRecipientsPerMessage\fR\fR
 .ad
@@ -2168,7 +2011,6 @@ next delivery attempt.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMinFreeBlocks (b\fR\fIN/M\fR\fB)\fR\fR
 .ad
@@ -2184,7 +2026,6 @@ otherwise unused.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMinQueueAge\fR\fR
 .ad
@@ -2197,7 +2038,6 @@ without trying all jobs in each run. The default value is 0.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMustQuoteChars\fR\fR
 .ad
@@ -2209,7 +2049,6 @@ are quoted automatically.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNiceQueueRun\fR\fR
 .ad
@@ -2220,7 +2059,6 @@ Specifies the priority of queue runners. See \fBnice\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNoRecipientAction\fR\fR
 .ad
@@ -2230,7 +2068,6 @@ Sets action if there are no legal recipient files in the message. The legal
 values are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadd-apparently-to\fR\fR
 .ad
@@ -2242,7 +2079,6 @@ expose blind recipients).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadd-bcc\fR\fR
 .ad
@@ -2253,7 +2089,6 @@ Adds an empty \fBBcc:\fR header.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadd-to\fR\fR
 .ad
@@ -2265,7 +2100,6 @@ recipients).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadd-to-undisclosed\fR\fR
 .ad
@@ -2276,7 +2110,6 @@ Adds a \fBTo: undisclosed-recipients:\fR header.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnone\fR\fR
 .ad
@@ -2289,7 +2122,6 @@ Does nothing, that is, leaves the message as it is.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOldStyleHeaders (o)\fR\fR
 .ad
@@ -2304,7 +2136,6 @@ output with commas between the names.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOperatorChars or $o\fR\fR
 .ad
@@ -2316,7 +2147,6 @@ an address into tokens.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPidFile\fR\fR
 .ad
@@ -2329,7 +2159,6 @@ opened, and unlinked when \fBsendmail\fR exits.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPostmasterCopy (P\fR\fIpostmaster\fR\fB)\fR\fR
 .ad
@@ -2344,7 +2173,6 @@ systems vendors.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPrivacyOptions (p\fR\fIopt,opt,...\fR\fB)\fR\fR
 .ad
@@ -2370,7 +2198,6 @@ system, such as using an non-standard queue directory.
 The options can be selected from:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauthwarnings\fR\fR
 .ad
@@ -2381,7 +2208,6 @@ Puts \fBX-Authentication-Warning:\fR headers in messages.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgoaway\fR\fR
 .ad
@@ -2392,7 +2218,6 @@ Disallows essentially all SMTP status queries.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBneedexpnhelo\fR\fR
 .ad
@@ -2403,7 +2228,6 @@ Insists on \fBHELO\fR or \fBEHLO\fR command before \fBEXPN\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBneedmailhelo\fR\fR
 .ad
@@ -2414,7 +2238,6 @@ Insists on \fBHELO\fR or \fBEHLO\fR command before \fBMAIL\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBneedvrfyhelo\fR\fR
 .ad
@@ -2425,7 +2248,6 @@ Insists on \fBHELO\fR or \fBEHLO\fR command before \fBVRFY\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoactualrecipient\fR\fR
 .ad
@@ -2437,7 +2259,6 @@ to which an address is mapped.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoetrn\fR\fR
 .ad
@@ -2448,7 +2269,6 @@ Disallows \fBETRN\fR entirely.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoexpn\fR\fR
 .ad
@@ -2459,7 +2279,6 @@ Disallows \fBEXPN\fR entirely.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoreceipts\fR\fR
 .ad
@@ -2470,7 +2289,6 @@ Prevents return receipts.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnobodyreturn\fR\fR
 .ad
@@ -2481,7 +2299,6 @@ Does not return the body of a message with DSNs.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnovrfy\fR\fR
 .ad
@@ -2492,7 +2309,6 @@ Disallows \fBVRFY\fR entirely.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpublic\fR\fR
 .ad
@@ -2503,7 +2319,6 @@ Allows open access.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBre\fR\fB\fR\fBstrictexpand\fR\fR
 .ad
@@ -2514,7 +2329,6 @@ Restricts \fB-bv\fR and \fB-v\fR command line flags.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrestrictmailq\fR\fR
 .ad
@@ -2525,7 +2339,6 @@ Restricts \fBmailq\fR command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrestrictqrun\fR\fR
 .ad
@@ -2538,7 +2351,6 @@ Restricts \fB-q\fR command line flag.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBProcessTitlePrefix \fIstring\fR\fR\fR
 .ad
@@ -2550,7 +2362,6 @@ Prefixes the process title shown on "\fB/usr/ucb/ps auxww\fR" listings with
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBQueueDirectory (Q\fR\fIdir\fR\fB)\fR\fR
 .ad
@@ -2561,7 +2372,6 @@ Uses the named \fIdir\fR as the queue directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBQueueFactor (q\fR\fIfactor\fR\fB)\fR\fR
 .ad
@@ -2575,7 +2385,6 @@ determine the maximum message priority to be sent. Defaults to \fB600000\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBQueueFileMode=\fR\fImode\fR\fR
 .ad
@@ -2588,7 +2397,6 @@ it uses \fB0644\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBQueueLA (x\fR\fILA\fR\fB)\fR\fR
 .ad
@@ -2601,7 +2409,6 @@ online when \fBsendmail\fR starts.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBQueueSortOrder=\fR\fIalgorithm\fR\fR
 .ad
@@ -2628,7 +2435,6 @@ parts of the queue at the same time. Priority ordering is the default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBQueueTimeout (T\fR\fIrtime\fR\fB/\fR\fIwtime\fR\fB)\fR\fR
 .ad
@@ -2642,7 +2448,6 @@ is sent. If it is missing or \fB0\fR, then no warning messages are sent.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRandFile\fR\fR
 .ad
@@ -2655,7 +2460,6 @@ socket if EGD is used (use prefix \fBegd:\fR). Note that Solaris supports
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRecipientFactor (y\fR\fIfact\fR\fB)\fR\fR
 .ad
@@ -2668,7 +2472,6 @@ with large numbers of recipients. Defaults to \fB30000\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRefuseLA (X\fR\fILA\fR\fB)\fR\fR
 .ad
@@ -2681,7 +2484,6 @@ connections. Defaults to 12 times the number of processors online when
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRejectLogInterval\fR\fR
 .ad
@@ -2692,7 +2494,6 @@ Log interval when refusing connections for this long (default: 3h).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBResolverOptions (I)\fR\fR
 .ad
@@ -2703,7 +2504,6 @@ Tunes DNS lookups.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRetryFactor (Z\fR\fIfact\fR\fB)\fR\fR
 .ad
@@ -2717,7 +2517,6 @@ are down are all too often down for a long time. Defaults to \fB90000\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRrtImpliesDsn\fR\fR
 .ad
@@ -2730,7 +2529,6 @@ to the address given in the header.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRunAsUser\fR\fR
 .ad
@@ -2742,7 +2540,6 @@ firewalls where users do not have accounts.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSafeFileEnvironment\fR\fR
 .ad
@@ -2754,7 +2551,6 @@ files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSaveFromLine (f)\fR\fR
 .ad
@@ -2766,7 +2562,6 @@ assumed redundant and discarded.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSendMimeErrors (j)\fR\fR
 .ad
@@ -2780,7 +2575,6 @@ processing as described in RFC 1891.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBServerCertFile\fR\fR
 .ad
@@ -2792,7 +2586,6 @@ File containing the cert of the server, that is, this cert is used when
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBServerKeyFile\fR\fR
 .ad
@@ -2803,7 +2596,6 @@ File containing the private key belonging to the server cert.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBServiceSwitchFile\fR\fR
 .ad
@@ -2815,7 +2607,6 @@ defined in the Solaris operating environment this option is ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSevenBitInput (7)\fR\fR
 .ad
@@ -2827,7 +2618,6 @@ be necessary.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSharedMemoryKey\fR\fR
 .ad
@@ -2843,7 +2633,6 @@ instead of each individual process gathering the data each time it is required.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSharedMemoryKeyFile=\fR\fIfile\fR\fR
 .ad
@@ -2855,7 +2644,6 @@ shared memory key will be stored in the specified file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSingleLineFromHeader\fR\fR
 .ad
@@ -2867,7 +2655,6 @@ line.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSingleThreadDelivery\fR\fR
 .ad
@@ -2879,7 +2666,6 @@ single thread deliveries to other hosts.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSmtpGreetingMessage or $e\fR\fR
 .ad
@@ -2890,7 +2676,6 @@ Specifies the initial SMTP greeting message.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSoftBounce\fR\fR
 .ad
@@ -2903,7 +2688,6 @@ erroneous bouncing of mail.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBStatusFile (S\fR\fIfile\fR\fB)\fR\fR
 .ad
@@ -2916,7 +2700,6 @@ enable \fBmailstats\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSuperSafe (s)\fR\fR
 .ad
@@ -2938,7 +2721,6 @@ SMTP server; in all other situations it acts the same as True.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTempFileMode (F\fR\fImode\fR\fB)\fR\fR
 .ad
@@ -2949,7 +2731,6 @@ Specifies the file mode for queue files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTimeout (r\fR\fItimeouts\fR\fB)\fR\fR
 .ad
@@ -2962,7 +2743,6 @@ the longer values. The recognized timeouts and their default values, and their
 minimum values specified in RFC 1123 section 5.3.2 are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBaconnect\fR\fR
 .ad
@@ -2973,7 +2753,6 @@ all connections for a single delivery attempt [0, unspecified]
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcommand\fR\fR
 .ad
@@ -2984,7 +2763,6 @@ command read [1h, 5m]
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBconnect\fR\fR
 .ad
@@ -2995,7 +2773,6 @@ initial connect [0, unspecified]
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcontrol\fR\fR
 .ad
@@ -3006,7 +2783,6 @@ complete control socket transaction [2m, none]
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdatablock\fR\fR
 .ad
@@ -3017,7 +2793,6 @@ data block read [1h, 3m]
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdatafinal\fR\fR
 .ad
@@ -3028,7 +2803,6 @@ reply to final \fB\&.\fR in data [1h, 10m]
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdatainit\fR\fR
 .ad
@@ -3039,7 +2813,6 @@ reply to \fBDATA\fR command [5m, 2m]
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfileopen\fR\fR
 .ad
@@ -3050,7 +2823,6 @@ file open [60sec, none]
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhelo\fR\fR
 .ad
@@ -3061,7 +2833,6 @@ reply to \fBHELO\fR or \fBEHLO\fR command [5m, none]
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhoststatus\fR\fR
 .ad
@@ -3072,7 +2843,6 @@ host retry [30m, unspecified]
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBiconnect\fR\fR
 .ad
@@ -3083,7 +2853,6 @@ first attempt to connect to a host [0, unspecified]
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBident\fR\fR
 .ad
@@ -3094,7 +2863,6 @@ first attempt to connect to a host [0, unspecified]
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinitial\fR\fR
 .ad
@@ -3105,7 +2873,6 @@ wait for initial greeting message [5m, 5m]
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlhlo\fR\fR
 .ad
@@ -3116,7 +2883,6 @@ wait for reply to an LMTP LHLO command [2m, unspecified]
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmail\fR\fR
 .ad
@@ -3127,7 +2893,6 @@ reply to \fBMAIL\fR command [10m, 5m]
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmisc\fR\fR
 .ad
@@ -3138,7 +2903,6 @@ reply to \fBNOOP\fR and \fBVERB\fR commands [2m, none]
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBqueuereturn\fR\fR
 .ad
@@ -3149,7 +2913,6 @@ undeliverable message returned [5d]
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBqueuewarn\fR\fR
 .ad
@@ -3160,7 +2923,6 @@ deferred warning [4h]
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBquit\fR\fR
 .ad
@@ -3171,7 +2933,6 @@ reply to \fBQUIT\fR command [2m, none]
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrcpt\fR\fR
 .ad
@@ -3182,7 +2943,6 @@ reply to \fBRCPT\fR command [1h, 5m]
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBresolver.retrans\fR\fR
 .ad
@@ -3194,7 +2954,6 @@ Resolver's retransmission time interval (in seconds) [varies]. Sets both
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBresolver.retrans.first\fR\fR
 .ad
@@ -3206,7 +2965,6 @@ deliver a message [varies].
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBresolver.retrans.normal\fR\fR
 .ad
@@ -3218,7 +2976,6 @@ the first delivery attempt [varies].
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBresolver.retry\fR\fR
 .ad
@@ -3230,7 +2987,6 @@ Number of times to retransmit a resolver query [varies]. Sets both
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBresolver.retry.first\fR\fR
 .ad
@@ -3242,7 +2998,6 @@ a message [varies].
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBresolver.retry.normal\fR\fR
 .ad
@@ -3254,7 +3009,6 @@ first delivery attempt [varies].
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrset\fR\fR
 .ad
@@ -3265,7 +3019,6 @@ reply to \fBRSET\fR command [5m, none]
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstarttls\fR\fR
 .ad
@@ -3278,7 +3031,6 @@ response to an \fBSMTP STARTTLS\fR command [1h]
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTimeZoneSpec (t\fR\fItzinfo\fR\fB)\fR\fR
 .ad
@@ -3292,7 +3044,6 @@ used, and if set and non-null, the \fBTZ\fR variable is set to this value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTLSSrvOptions\fR\fR
 .ad
@@ -3304,7 +3055,6 @@ the server does not ask for a certificate.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTrustedUser\fR\fR
 .ad
@@ -3318,7 +3068,6 @@ automatically owned by this user.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTryNullMXList (w)\fR\fR
 .ad
@@ -3337,7 +3086,6 @@ deprecated.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUnixFromLine or $l\fR\fR
 .ad
@@ -3348,7 +3096,6 @@ The "From " line used when sending to files or programs.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUnsafeGroupWrites\fR\fR
 .ad
@@ -3360,7 +3107,6 @@ that is, programs and files cannot be directly referenced from such files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUseErrorsTo (l)\fR\fR
 .ad
@@ -3374,7 +3120,6 @@ and deprecated.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUseMSP\fR\fR
 .ad
@@ -3386,7 +3131,6 @@ the group is the same as that of a set-group-id \fBsendmail\fR binary.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUserDatabaseSpec (U)\fR\fR
 .ad
@@ -3397,7 +3141,6 @@ Defines the name and location of the file containing User Database information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVerbose (v)\fR\fR
 .ad
@@ -3412,7 +3155,6 @@ configuration file; it is intended for command line use only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBXscriptFileBufferSize\fR\fR
 .ad
@@ -3437,7 +3179,6 @@ the contents of the mail queue.
 .SH OPERANDS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaddress\fR\fR
 .ad
@@ -3458,7 +3199,6 @@ when encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
 defined in \fB/usr/include/sysexits.h\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEX_OK\fR\fR
 .ad
@@ -3469,7 +3209,6 @@ Successful completion on all addresses.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEX_NOUSER\fR\fR
 .ad
@@ -3480,7 +3219,6 @@ User name not recognized.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEX_UNAVAILABLE\fR\fR
 .ad
@@ -3491,7 +3229,6 @@ Catchall. Necessary resources were not available.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEX_SYNTAX\fR\fR
 .ad
@@ -3502,7 +3239,6 @@ Syntax error in address.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEX_SOFTWARE\fR\fR
 .ad
@@ -3513,7 +3249,6 @@ Internal software error, including bad arguments.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEX_OSERR\fR\fR
 .ad
@@ -3524,7 +3259,6 @@ Temporary operating system error, such as "cannot fork".
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEX_NOHOST\fR\fR
 .ad
@@ -3535,7 +3269,6 @@ Host name not recognized.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEX_TEMPFAIL\fR\fR
 .ad
@@ -3579,7 +3312,6 @@ on the host \fIserver\fR.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdead.letter\fR\fR
 .ad
@@ -3590,7 +3322,6 @@ Unmailable text
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/default/sendmail\fR\fR
 .ad
@@ -3602,7 +3333,6 @@ line options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/mail/aliases\fR\fR
 .ad
@@ -3613,7 +3343,6 @@ Mail aliases file (ASCII)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/mail/aliases.db\fR\fR
 .ad
@@ -3624,7 +3353,6 @@ Database of mail aliases (binary)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/mail/aliases.dir\fR\fR
 .ad
@@ -3635,7 +3363,6 @@ Database of mail aliases (binary)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/mail/aliases.pag\fR\fR
 .ad
@@ -3646,7 +3373,6 @@ Database of mail aliases (binary)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/mail/sendmail.cf\fR\fR
 .ad
@@ -3657,7 +3383,6 @@ Defines environment for \fBsendmail\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/mail/submit.cf\fR\fR
 .ad
@@ -3668,7 +3393,6 @@ Defines environment for MSP
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/mail/trusted-users\fR\fR
 .ad
@@ -3684,7 +3408,6 @@ is commented out. See \fBsendmail\fR(4) for instructions on making changes to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/spool/clientmqueue/*\fR\fR
 .ad
@@ -3695,7 +3418,6 @@ Temporary files and queued mail
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/spool/mqueue/*\fR\fR
 .ad
@@ -3706,7 +3428,6 @@ Temporary files and queued mail
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~/.forward\fR\fR
 .ad
@@ -3717,7 +3438,6 @@ List of recipients for forwarding messages
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/include/libmilter/README\fR\fR
 .ad

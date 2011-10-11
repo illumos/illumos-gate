@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH isainfo 1 "8 Feb 2007" "SunOS 5.11" "User Commands"
+.TH ISAINFO 1 "Feb 8, 2007"
 .SH NAME
 isainfo \- describe instruction set architectures
 .SH SYNOPSIS
@@ -32,59 +32,49 @@ currently running system.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
 .RS 6n
-.rt  
 Prints the number of bits in the address space of the native instruction set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR\fR
 .ad
 .RS 6n
-.rt  
 Prints the name of the instruction set(s) used by the operating system kernel
 components such as device drivers and \fBSTREAMS\fR modules.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 6n
-.rt  
 Prints the name of the native instruction set used by portable applications
 supported by the current version of the operating system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 When used with the \fB-b\fR, \fB-k\fR or \fB-n\fR options, prints more detailed
 information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 6n
-.rt  
 Prints instruction extensions to the native ABI which are supported by the
 platform.
 .RE
@@ -151,12 +141,10 @@ i386: fpu tsc cx8 sep cmov mmx ammx a3dnow a3dnowx fxsr sse sse2 pause
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fBNon-zero\fR
 .ad
 .RS 12n
-.rt  
 Options are not specified correctly, or the command is unable to recognize
 attributes of the system on which it is running. An error message is printed to
 \fBstderr\fR.

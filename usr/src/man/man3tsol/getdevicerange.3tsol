@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH getdevicerange 3TSOL "20 Jul 2007" "SunOS 5.11" "Trusted Extensions Library Functions"
+.TH GETDEVICERANGE 3TSOL "Jul 20, 2007"
 .SH NAME
 getdevicerange \- get the label range of a device
 .SH SYNOPSIS
@@ -57,36 +57,30 @@ blrange_t *range;
 The \fBgetdevicerange()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 11n
-.rt  
 There is not enough memory available to allocate the required bytes. The
 application could try later.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 11n
-.rt  
 The physical limits of the system are exceeded by size bytes of memory which
 cannot be allocated.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSUP\fR\fR
 .ad
 .RS 11n
-.rt  
 Invalid upper or lower bound for device.
 .RE
 
@@ -98,15 +92,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.16i) |cw(3.34i) 
-lw(2.16i) |lw(3.34i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

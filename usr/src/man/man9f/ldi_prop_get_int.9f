@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ldi_prop_get_int 9F "3 June 2003" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH LDI_PROP_GET_INT 9F "Jun 3, 2003"
 .SH NAME
 ldi_prop_get_int, ldi_prop_get_int64 \- Lookup integer property
 .SH SYNOPSIS
@@ -11,7 +11,7 @@ ldi_prop_get_int, ldi_prop_get_int64 \- Lookup integer property
 .nf
 #include <sys/sunldi.h>
 
-\fBint\fR \fBldi_prop_get_int\fR(\fBldi_handle_t\fR \fIlh\fR, \fBuint_t\fR \fIflags\fR, \fBchar *\fR\fIname\fR, 
+\fBint\fR \fBldi_prop_get_int\fR(\fBldi_handle_t\fR \fIlh\fR, \fBuint_t\fR \fIflags\fR, \fBchar *\fR\fIname\fR,
      \fBint\fR \fIdefvalue\fR);
 .fi
 
@@ -24,32 +24,26 @@ ldi_prop_get_int, ldi_prop_get_int64 \- Lookup integer property
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlh\fR \fR
 .ad
 .RS 10n
-.rt  
 Layered handle.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR \fR
 .ad
 .RS 10n
-.rt  
 Possible flag values are some combination of:
 .sp
 .ne 2
-.mk
 .na
 \fBLDI_DEV_T_ANY\fR
 .ad
 .RS 21n
-.rt  
 Match the lookup request independent of the actual dev_t value that was used
 when the property was created. Indicates any dev_t value (including
 DDI_DEV_T_NONE) associated with a possible property match satisfies the
@@ -58,23 +52,19 @@ matching criteria.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDDI_PROP_DONTPASS\fR
 .ad
 .RS 21n
-.rt  
 Do not pass request to parent device information node if property not found.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDDI_PROP_NOTPROM\fR
 .ad
 .RS 21n
-.rt  
 Do not look at PROM properties (ignored on platforms that do not support PROM
 properties).
 .RE
@@ -83,23 +73,19 @@ properties).
 
 .sp
 .ne 2
-.mk
 .na
 \fBname\fR
 .ad
 .RS 12n
-.rt  
 String containing the property name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdefvalue\fR
 .ad
 .RS 12n
-.rt  
 Integer value that is returned if the property is not found.
 .RE
 
@@ -196,15 +182,15 @@ Using\fB ldi_prop_get_int64()\fR.
 .in +2
 .nf
 The following example demonstrates the use of ldi_prop_get_int64().
- 
+
        /*
         * Get the value of the integer "timeout" property, using
         * our own default if no such property exists
         */
 
        int64_t timeout, defval;
- 
-       timeout = ldi_prop_get_int64(lh, LDI_DEV_T_ANY|DDI_PROP_DONTPASS, 
+
+       timeout = ldi_prop_get_int64(lh, LDI_DEV_T_ANY|DDI_PROP_DONTPASS,
            propname, defval);
 .fi
 .in -2

@@ -1,9 +1,9 @@
 '\" te
-.\" Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved 
+.\" Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ieee1394 7D "3 Apr 2009" "SunOS 5.11" "Devices"
+.TH IEEE1394 7D "Apr 3, 2009"
 .SH NAME
 ieee1394, firewire, 1394 \- Solaris IEEE-1394 Architecture
 .SH DESCRIPTION
@@ -44,47 +44,44 @@ are 64 bit drivers.
 
 .sp
 .TS
-tab() box;
-cw(5.5i) |cw(0i) 
-lw(5.5i) |lw(0i) 
-.
-SUPPORT MODULE(S)FUNCTION
+box;
+c | c
+l | l .
+SUPPORT MODULE(S)	FUNCTION
 _
-/kernel/misc/[sparcv9|amd64/]s1394IEEE-1394 framework
+/kernel/misc/[sparcv9|amd64/]s1394	IEEE-1394 framework
 _
-/kernel/misc/[sparcv9|amd64/]sbp2 Serial Bus Protocol-2 (SBP-2)
+/kernel/misc/[sparcv9|amd64/]sbp2 	Serial Bus Protocol-2 (SBP-2)
 .TE
 
 .sp
 
 .sp
 .TS
-tab() box;
-cw(5.5i) |cw(0i) 
-lw(5.5i) |lw(0i) 
-.
-TARGET DRIVERDEVICE CLASS
+box;
+c | c
+l | l .
+TARGET DRIVER	DEVICE CLASS
 _
-/kernel/drv/[sparcv9|amd64/]s1394IEEE-1394 framework
+/kernel/drv/[sparcv9|amd64/]s1394	IEEE-1394 framework
 _
-/kernel/drv/[sparcv9|amd64/]scsa1394 mass storage class
+/kernel/drv/[sparcv9|amd64/]scsa1394 	mass storage class
 _
-/kernel/drv/[sparcv9|amd64/]av1394camcorder (AV/C) class
+/kernel/drv/[sparcv9|amd64/]av1394	camcorder (AV/C) class
 _
-/kernel/drv/[sparcv9|amd64/]dcam1394digital camera (IIDC) class
+/kernel/drv/[sparcv9|amd64/]dcam1394	digital camera (IIDC) class
 .TE
 
 .sp
 
 .sp
 .TS
-tab() box;
-cw(5.5i) |cw(0i) 
-lw(5.5i) |lw(0i) 
-.
-HOST CONTROLLER INTERFACE DRIVER(S)DEVICE 
+box;
+c | c
+l | l .
+HOST CONTROLLER INTERFACE DRIVER(S)	DEVICE
 _
-/kernel/drv/[sparcv9|amd64/]hci1394Open HCI
+/kernel/drv/[sparcv9|amd64/]hci1394	Open HCI
 .TE
 
 .SH ATTRIBUTES
@@ -95,13 +92,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitecturePCI-based systems
+Architecture	PCI-based systems
 .TE
 
 .SH SEE ALSO

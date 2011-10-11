@@ -1,14 +1,14 @@
 '\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH aio_write 3C "5 Feb 2008" "SunOS 5.11" "Standard C Library Functions"
+.TH AIO_WRITE 3C "Feb 5, 2008"
 .SH NAME
 aio_write \- asynchronous write to a file
 .SH SYNOPSIS
@@ -89,12 +89,10 @@ I/O operation is successfully queued; otherwise, the function returns
 The  \fBaio_write()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 10n
-.rt  
 The requested asynchronous I/O operation was not queued due to system resource
 limitations.
 .RE
@@ -110,24 +108,20 @@ asynchronous operation is set to \fB\(mi1\fR, and the error status of the
 asynchronous operation will be set to the corresponding value.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIaiocbp\fR\(->\fBaio_fildes\fR argument is not a valid file descriptor
 open for writing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The file offset value implied by \fIaiocbp\fR->\fBaio_offset\fR would be
 invalid, \fIaiocbp->\fR\fBaio_reqprio\fR is not a valid value, or
 \fIaiocbp\fR\(->\fBaio_nbytes\fR is an invalid value.
@@ -143,36 +137,30 @@ error status for the asynchronous operation contains one of the values normally
 set by the \fBwrite()\fR function call, or one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fIaiocbp\fR\(->\fBaio_fildes\fR argument is not a valid file descriptor
 open for writing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 13n
-.rt  
 The file offset value implied by \fIaiocbp\fR->\fBaio_offset\fR would be
 invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBECANCELED\fR\fR
 .ad
 .RS 13n
-.rt  
 The requested I/O was canceled before the I/O completed due to an explicit
 \fBaio_cancel\fR(3C) request.
 .RE
@@ -182,12 +170,10 @@ The requested I/O was canceled before the I/O completed due to an explicit
 The following condition may be detected synchronously or asynchronously:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFBIG\fR\fR
 .ad
 .RS 9n
-.rt  
 The file is a regular file, \fIaiobcp\fR\(->\fBaio_nbytes\fR is greater than 0
 and the starting offset in \fIaiobcp\fR\(->\fBaio_offset\fR is at or beyond the
 offset maximum in the open file description associated with
@@ -207,17 +193,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO

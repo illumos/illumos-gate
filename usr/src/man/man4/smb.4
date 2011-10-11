@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH smb 4 "25 Sep 2009" "SunOS 5.11" "File Formats"
+.TH SMB 4 "Sep 25, 2009"
 .SH NAME
 smb \- configuration properties for Solaris CIFS server
 .SH DESCRIPTION
@@ -20,7 +20,6 @@ for these properties in SMF.
 The following list describes the properties:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBads_site\fR\fR
 .ad
@@ -36,7 +35,6 @@ By default, no value is set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBautohome_map\fR\fR
 .ad
@@ -48,7 +46,6 @@ default path is \fB/etc\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisposition\fR\fR
 .ad
@@ -67,7 +64,6 @@ disposition = [ continue | terminate ]
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcontinue\fR\fR
 .ad
@@ -79,7 +75,6 @@ the event that disposition is not specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBterminate\fR\fR
 .ad
@@ -92,7 +87,6 @@ Disconnect the share if the map command fails.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBddns_enable\fR\fR
 .ad
@@ -105,7 +99,6 @@ value is \fBfalse\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBipv6_enabled\fR\fR
 .ad
@@ -117,7 +110,6 @@ are \fBtrue\fR and \fBfalse\fR. The default value is \fBfalse\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkeep_alive\fR\fR
 .ad
@@ -130,7 +122,6 @@ values are 0 and from 20 seconds and above. The default value is 5400 seconds.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlmauth_level\fR\fR
 .ad
@@ -143,12 +134,10 @@ mode. The default value is 3.
 The following describes the behavior at each level.
 .sp
 .ne 2
-.mk
 .na
 \fB2\fR
 .ad
 .RS 13n
-.rt  
 In Windows workgroup mode, the Solaris CIFS server accepts LM, NTLM, LMv2, and
 NTLMv2 requests. In domain mode, the SMB redirector on the Solaris CIFS server
 sends NTLM requests.
@@ -156,12 +145,10 @@ sends NTLM requests.
 
 .sp
 .ne 2
-.mk
 .na
 \fB3\fR
 .ad
 .RS 13n
-.rt  
 In Windows workgroup mode, the Solaris CIFS server accepts LM, NTLM, LMv2, and
 NTLMv2 requests. In domain mode, the SMB redirector on the Solaris CIFS server
 sends LMv2 and NTLMv2 requests.
@@ -169,12 +156,10 @@ sends LMv2 and NTLMv2 requests.
 
 .sp
 .ne 2
-.mk
 .na
 \fB4\fR
 .ad
 .RS 13n
-.rt  
 In Windows workgroup mode, the Solaris CIFS server accepts NTLM, LMv2, and
 NTLMv2 requests. In domain mode, the SMB redirector on the Solaris CIFS server
 sends LMv2 and NTLMv2 requests.
@@ -182,12 +167,10 @@ sends LMv2 and NTLMv2 requests.
 
 .sp
 .ne 2
-.mk
 .na
 \fB5\fR
 .ad
 .RS 13n
-.rt  
 In Windows workgroup mode, the Solaris CIFS server accepts LMv2 and NTLMv2
 requests. In domain mode, the SMB redirector on the Solaris CIFS server sends
 LMv2 and NTLMv2 requests.
@@ -197,7 +180,6 @@ LMv2 and NTLMv2 requests.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmap\fR\fR
 .ad
@@ -208,7 +190,6 @@ can take the following arguments, which will be substituted when the command is
 exec'd as described below:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%U\fR\fR
 .ad
@@ -219,7 +200,6 @@ Windows username.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%D\fR\fR
 .ad
@@ -230,7 +210,6 @@ Name of the domain or workgroup of \fB%U\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%h\fR\fR
 .ad
@@ -241,7 +220,6 @@ The server hostname.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%M\fR\fR
 .ad
@@ -252,7 +230,6 @@ The client hostname, or \fB""\fR if not available.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%L\fR\fR
 .ad
@@ -263,7 +240,6 @@ The server NetBIOS name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%m\fR\fR
 .ad
@@ -275,7 +251,6 @@ valid for NetBIOS connections (port 139).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%I\fR\fR
 .ad
@@ -286,7 +261,6 @@ The IP address of the client machine.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%i\fR\fR
 .ad
@@ -297,7 +271,6 @@ The local IP address to which the client is connected.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%S\fR\fR
 .ad
@@ -308,7 +281,6 @@ The name of the share.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%P\fR\fR
 .ad
@@ -319,7 +291,6 @@ The root directory of the share.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%u\fR\fR
 .ad
@@ -332,7 +303,6 @@ The UID of the Unix user.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmax_workers\fR\fR
 .ad
@@ -350,7 +320,6 @@ which appears in \fBsharectl\fR(1M) as \fB1024\fR, is \fB1088\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnetbios_scope\fR\fR
 .ad
@@ -365,7 +334,6 @@ string that represents a domain name. By default, no value is set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpdc\fR\fR
 .ad
@@ -379,7 +347,6 @@ the other domain controllers are also available. By default, no value is set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrestrict_anonymous\fR\fR
 .ad
@@ -393,7 +360,6 @@ enables anonymous access.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsigning_enabled\fR\fR
 .ad
@@ -408,7 +374,6 @@ Valid values are \fBtrue\fR and \fBfalse\fR. The default value is \fBfalse\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsigning_required\fR\fR
 .ad
@@ -423,7 +388,6 @@ the server. The \fBsigning_required\fR setting is only taken into account when
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsystem_comment\fR\fR
 .ad
@@ -436,7 +400,6 @@ Network Places on Windows clients. By default, no value is set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunmap\fR\fR
 .ad
@@ -448,7 +411,6 @@ can take the same substitutions listed on the \fBmap\fR property.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwins_exclude\fR\fR
 .ad
@@ -461,7 +423,6 @@ interfaces.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwins_server_1\fR\fR
 .ad
@@ -473,7 +434,6 @@ set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwins_server_2\fR\fR
 .ad
@@ -492,13 +452,12 @@ attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityUncommitted
+Interface Stability	Uncommitted
 .TE
 
 .SH SEE ALSO

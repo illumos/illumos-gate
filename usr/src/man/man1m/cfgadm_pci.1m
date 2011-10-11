@@ -3,27 +3,27 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cfgadm_pci 1M "13 Jun 2008" "SunOS 5.11" "System Administration Commands"
+.TH CFGADM_PCI 1M "Jun 13, 2008"
 .SH NAME
 cfgadm_pci \- PCI, CompactPCI, and PCI Express Hotplug hardware specific
 commands for cfgadm
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/cfgadm\fR [\fB-f\fR] [\fB-y\fR | \fB-n\fR] [\fB-v\fR] 
+\fB/usr/sbin/cfgadm\fR [\fB-f\fR] [\fB-y\fR | \fB-n\fR] [\fB-v\fR]
      [\fB-o\fR \fIhardware_options\fR] \fB-c\fR \fIfunction\fR \fIap_id\fR [\fIap_id\fR]
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/cfgadm\fR [\fB-f\fR] [\fB-y\fR | \fB-n\fR] [\fB-v\fR] 
-     [\fB-o\fR \fIhardware_options\fR] \fB-x\fR \fIhardware_function\fR \fIap_id\fR 
+\fB/usr/sbin/cfgadm\fR [\fB-f\fR] [\fB-y\fR | \fB-n\fR] [\fB-v\fR]
+     [\fB-o\fR \fIhardware_options\fR] \fB-x\fR \fIhardware_function\fR \fIap_id\fR
      [\fIap_id\fR]
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/cfgadm\fR [\fB-v\fR] [\fB-s\fR \fIlisting_options\fR] 
+\fB/usr/sbin/cfgadm\fR [\fB-v\fR] [\fB-s\fR \fIlisting_options\fR]
      [\fB-o\fR \fIhardware_options\fR] [\fB-l\fR [\fIap_id\fR | \fIap_type\fR]]
 .fi
 
@@ -34,7 +34,7 @@ commands for cfgadm
 
 .LP
 .nf
-\fB/usr/sbin/cfgadm\fR [\fB-v\fR] [\fB-o\fR \fIhardware_function\fR] \fB-h\fR 
+\fB/usr/sbin/cfgadm\fR [\fB-v\fR] [\fB-o\fR \fIhardware_function\fR] \fB-h\fR
      [\fIap_id\fR| \fIap_type\fR]
 .fi
 
@@ -90,17 +90,17 @@ Grammar:
    absolute-slot-path : \fIslot-path\fR[\fI:slot-path\fR[\fI:slotpath\fR ...]]
 
    slot-path : [\fIfru-id\fR.]\fIslot-id\fR
-           where \fIfru-id\fR indicates the chassis FRU, if any, 
+           where \fIfru-id\fR indicates the chassis FRU, if any,
            containing the \fIslot-id\fR
 
    fru-id : \fIfru-type\fR[\fIserialid#\fR]
-           where \fIfru-type\fR is "iob" for PCI Express expansion 
+           where \fIfru-type\fR is "iob" for PCI Express expansion
            chassis, followed by its serial number \fIserialid#\fR,
            if available
 
     slot-id: \fIslot-name\fR | \fIdevice-type\fR \fIphysical-slot#\fR |\e
             \fInexus-driver-name\fR \fInexus-driver-instance\fR.\e
-            \fIdevice-type\fR \fIpci-device-number\fR         
+            \fIdevice-type\fR \fIpci-device-number\fR
 .fi
 .in -2
 .sp
@@ -137,7 +137,6 @@ branded expansion chassis.
 Each \fIslot-id\fR consists of one of three possible forms:
 .sp
 .ne 2
-.mk
 .na
 \fBslot-id form (1)\fR
 .ad
@@ -148,7 +147,6 @@ Each \fIslot-id\fR consists of one of three possible forms:
 
 .sp
 .ne 2
-.mk
 .na
 \fBslot-id form (2)\fR
 .ad
@@ -159,7 +157,6 @@ Each \fIslot-id\fR consists of one of three possible forms:
 
 .sp
 .ne 2
-.mk
 .na
 \fBslot-id form (3)\fR
 .ad
@@ -217,7 +214,6 @@ Lastly, the final form of the actual \fIap_id\fR name used in \fBcfgadm\fR is
 decided as follows, specified in order of precedence:
 .sp
 .ne 2
-.mk
 .na
 \fBap_id form (1)\fR
 .ad
@@ -229,7 +225,6 @@ if the \fIabsolute-slot-path\fR can fit within the fixed length limit of
 
 .sp
 .ne 2
-.mk
 .na
 \fBap_id form (2)\fR
 .ad
@@ -244,7 +239,6 @@ unique \fIap_id\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBap_id form (3)\fR
 .ad
@@ -274,7 +268,6 @@ See the EXAMPLES section for a list of hotpluggable examples.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIfunction\fR\fR
 .ad
@@ -283,7 +276,6 @@ The following options are supported:
 The following \fIfunction\fRs are supported for PCI hot pluggable slots:
 .sp
 .ne 2
-.mk
 .na
 \fBconfigure\fR
 .ad
@@ -294,7 +286,6 @@ Configure the PCI device in the slot to be used by Solaris.
 
 .sp
 .ne 2
-.mk
 .na
 \fBconnect\fR
 .ad
@@ -305,7 +296,6 @@ Connect the slot to PCI bus.
 
 .sp
 .ne 2
-.mk
 .na
 \fBdisconnect\fR
 .ad
@@ -316,7 +306,6 @@ Disconnect the slot from the PCI bus.
 
 .sp
 .ne 2
-.mk
 .na
 \fBinsert\fR
 .ad
@@ -327,7 +316,6 @@ Not supported.
 
 .sp
 .ne 2
-.mk
 .na
 \fBremove\fR
 .ad
@@ -338,7 +326,6 @@ Not supported.
 
 .sp
 .ne 2
-.mk
 .na
 \fBunconfigure\fR
 .ad
@@ -351,7 +338,6 @@ Logically remove the PCI device's resources from the system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
@@ -362,7 +348,6 @@ Not supported.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fIap_id\fR | \fIap_type\fR\fR
 .ad
@@ -373,7 +358,6 @@ Print out PCI hot plug specific help message.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIlist\fR\fR
 .ad
@@ -384,7 +368,6 @@ List the values of PCI Hot Plug slots.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIhardware_options\fR\fR
 .ad
@@ -395,7 +378,6 @@ No hardware specific options are currently defined.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIlisting_options\fR\fR
 .ad
@@ -406,7 +388,6 @@ Same as the generic \fBcfgadm\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fIap_id\fR\fR
 .ad
@@ -418,7 +399,6 @@ the slot.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -440,7 +420,6 @@ field is printed with or without the \fB-v\fR option. The occupant \fBType\fR
 field will describe the contents of the slot. There are 2 possible values:
 .sp
 .ne 2
-.mk
 .na
 \fBunknown\fR
 .ad
@@ -452,7 +431,6 @@ there is no driver for the device on the card.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsubclass\fR/\fIboard\fR\fR
 .ad
@@ -480,7 +458,6 @@ semi-transparent PCI bridge.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR \fIhardware_function\fR\fR
 .ad
@@ -492,7 +469,6 @@ not normally change the state of a receptacle or occupant.
 The following \fIhardware_functions\fR are supported:
 .sp
 .ne 2
-.mk
 .na
 \fBenable_slot | disable_slot\fR
 .ad
@@ -511,7 +487,6 @@ unusable.
 
 .sp
 .ne 2
-.mk
 .na
 \fBenable_autoconfig | disable_autoconfig\fR
 .ad
@@ -532,7 +507,6 @@ cannot be used to configure the occupant of the slot.
 
 .sp
 .ne 2
-.mk
 .na
 \fBled=[\fIled_sub_arg\fR],mode=[\fImode_sub_arg\fR]\fR
 .ad
@@ -553,7 +527,7 @@ Changing the state of the LED does not change the state of the receptacle or
 occupant. Normally, the LEDs are controlled by the hot plug controller, no user
 intervention is necessary. Use this command for testing purposes.
 .sp
-\fBCaution:\fR Changing the state of the LED can misrepresent	 the state of
+\fBCaution:\fR Changing the state of the LED can misrepresent the state of
 occupant or receptacle.
 .sp
 The following command prints the values of LEDs:
@@ -671,7 +645,7 @@ The change can be verified by entering the following command:
 .sp
 .in +2
 .nf
-example# \fBcfgadm cpci_slot4\fR 
+example# \fBcfgadm cpci_slot4\fR
 
 
 Ap_Id                   Type         Receptacle   Occupant     Condition
@@ -700,7 +674,7 @@ The change can be verifed by entering the following command:
 .sp
 .in +2
 .nf
-example# \fBcfgadm cpci_slot4\fR 
+example# \fBcfgadm cpci_slot4\fR
 
 
 Ap_Id                   Type         Receptacle   Occupant     Condition
@@ -751,7 +725,6 @@ derived from the platform through the "slot-names" property.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSlot iou#0-pci#0\fR
 .ad
@@ -762,7 +735,6 @@ this slot is empty or its occupant is unconfigured
 
 .sp
 .ne 2
-.mk
 .na
 \fBSlot iou#0-pci#1\fR
 .ad
@@ -776,7 +748,6 @@ expansion chassis in this case does not have or exports a \fIserial-id\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSlot iou#0-pci#2\fR
 .ad
@@ -791,7 +762,6 @@ the platform, hardware or firmware.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSlot iou#0-pci#3\fR
 .ad
@@ -842,7 +812,7 @@ that are lacking in certain device properties:
 .in +2
 .nf
 example# \fBcfgadm -s cols=ap_id:info\fR
-  
+
 Ap_Id                          Information
 px_pci7.pcie0                  Location: px_pci7.pcie0
 px_pci11.pcie0                 Location: px_pci11.pcie0
@@ -883,16 +853,16 @@ paths exceeding the \fIApId\fR field length limit:
 .in +2
 .nf
 example# \fBcfgadm -s cols=ap_id:info\fR
- 
+
 Ap_Id                          Information
 pcie4                          Location: pcie4
 pcie4:iobSUNW.pcie1            Location: pcie4/iobSUNW.pcie1
 pcie4:iobSUNW.pcie2            Location: pcie4/iobSUNW.pcie2
-iob8879c3f3.pci1               
+iob8879c3f3.pci1
                    Location: pcie4/iobSUNW.pcie2/iob8879c3f3.pci1
-iob8879c3f3.pci2               
+iob8879c3f3.pci2
                    Location: pcie4/iobSUNW.pcie2/iob8879c3f3.pci2
-iob8879c3f3.pci3               
+iob8879c3f3.pci3
                    Location: pcie4/iobSUNW.pcie2/iob8879c3f3.pci3
 .fi
 .in -2
@@ -930,9 +900,9 @@ example# \fBcfgadm -s cols=ap_id:info\fR
 Ap_Id                          Information
 pcie4                          Location: pcie4
 pcie4:iob4567812345678.pcie3   Location: pcie4/iob4567812345678.pcie3
-px_pci20.pcie0                 
+px_pci20.pcie0
                    Location: pcie4/iob4567812345678.pcie3/iob.pcie1
-px_pci21.pcie0                       
+px_pci21.pcie0
                    Location: pcie4/iob4567812345678.pcie3/iob.pcie2
 .fi
 .in -2
@@ -967,7 +937,6 @@ bound to driver instance 21 of "px_pci"
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB/usr/lib/cfgadm/pci.so.1\fR
 .ad

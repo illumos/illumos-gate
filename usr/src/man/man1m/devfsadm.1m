@@ -3,19 +3,19 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH devfsadm 1M "23 Jun 2008" "SunOS 5.11" "System Administration Commands"
+.TH DEVFSADM 1M "Jun 23, 2008"
 .SH NAME
 devfsadm, devfsadmd \- administration command for /dev
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/devfsadm\fR [\fB-C\fR] [\fB-c\fR \fIdevice_class\fR] [\fB-i\fR \fIdriver_name\fR] 
+\fB/usr/sbin/devfsadm\fR [\fB-C\fR] [\fB-c\fR \fIdevice_class\fR] [\fB-i\fR \fIdriver_name\fR]
      [ \fB-n\fR] [\fB-r\fR \fIroot_dir\fR] [\fB-s\fR] [\fB-t\fR \fItable_file\fR] [\fB-v\fR]
 .fi
 
 .LP
 .nf
-\fB/usr/lib/devfsadm/devfsadmd\fR 
+\fB/usr/lib/devfsadm/devfsadmd\fR
 .fi
 
 .SH DESCRIPTION
@@ -52,12 +52,10 @@ In addition to managing \fB/dev\fR, \fBdevfsadm\fR also maintains the
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
 .RS 19n
-.rt  
 Cleanup mode. Prompt \fBdevfsadm\fR to cleanup dangling \fB/dev\fR links that
 are not normally removed. If the \fB-c\fR option is also used, \fBdevfsadm\fR
 only cleans up for the listed devices' classes.
@@ -65,12 +63,10 @@ only cleans up for the listed devices' classes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIdevice_class\fR\fR
 .ad
 .RS 19n
-.rt  
 Restrict operations to devices of class \fIdevice_class\fR. Solaris defines the
 following values for \fIdevice_class\fR: \fBdisk\fR, \fBtape\fR, \fBport\fR,
 \fBaudio\fR, and \fBpseudo\fR. This option might be specified more than once to
@@ -79,58 +75,48 @@ specify multiple device classes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIdriver_name\fR\fR
 .ad
 .RS 19n
-.rt  
 Configure only the devices for the named driver, \fIdriver_name\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 19n
-.rt  
 Do not attempt to load drivers or add new nodes to the kernel device tree.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 19n
-.rt  
 Suppress any changes to \fB/dev\fR. This is useful with the \fB-v\fR option for
 debugging.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fItable_file\fR\fR
 .ad
 .RS 19n
-.rt  
 Read an alternate \fBdevlink.tab\fR file. \fBdevfsadm\fR normally reads
 \fB/etc/devlink.tab\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIroot_dir\fR\fR
 .ad
 .RS 19n
-.rt  
 Presume that the \fB/dev\fR directory trees are found under \fIroot_dir\fR, not
 directly under \fBroot\fR (\fB/\fR). No other use or assumptions are made about
 \fIroot_dir\fR.
@@ -138,12 +124,10 @@ directly under \fBroot\fR (\fB/\fR). No other use or assumptions are made about
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 19n
-.rt  
 Print changes to \fB/dev\fR in verbose mode.
 .RE
 
@@ -153,30 +137,25 @@ Print changes to \fB/dev\fR in verbose mode.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/devices\fR\fR
 .ad
@@ -187,7 +166,6 @@ device nodes directory
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev\fR\fR
 .ad
@@ -198,7 +176,6 @@ logical symbolic links to /devices
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/devfsadm/devfsadmd\fR\fR
 .ad
@@ -209,7 +186,6 @@ devfsadm daemon
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/.devfsadm_dev.lock\fR\fR
 .ad
@@ -220,7 +196,6 @@ update lock file
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/.devfsadm_daemon.lock\fR\fR
 .ad
@@ -231,7 +206,6 @@ daemon lock file
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/security/device_policy\fR\fR
 .ad
@@ -242,7 +216,6 @@ device policy file
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/security/extra_privs\fR\fR
 .ad

@@ -4,13 +4,13 @@
 .\"  specifies the terms and conditions for redistribution.
 .\" Copyright (c) 2000, Sun Microsystems, Inc.
 .\"  All Rights Reserved
-.TH vgrind 1 "3 Mar 2000" "SunOS 5.11" "User Commands"
+.TH VGRIND 1 "Mar 3, 2000"
 .SH NAME
 vgrind \- grind nice program listings
 .SH SYNOPSIS
 .LP
 .nf
-\fBvgrind\fR [\fB-2fntwx\fR] [\fB-d\fR \fIdefs-file\fR] [\fB-h\fR \fIheader\fR] [\fB-l\fR \fIlanguage\fR] 
+\fBvgrind\fR [\fB-2fntwx\fR] [\fB-d\fR \fIdefs-file\fR] [\fB-h\fR \fIheader\fR] [\fB-l\fR \fIlanguage\fR]
      [\fB-s\fR \fIn\fR] [\fB-o\fR \fIpagelist\fR] [\fB-P\fR \fIprinter\fR] [\fB-T\fR \fIoutput-device\fR] \fIfilename\fR...
 .fi
 
@@ -29,23 +29,19 @@ standard input is passed directly to the standard output except for lines
 bracketed by the \fBtroff\fR-like macros:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&.vS\fR\fR
 .ad
 .RS 9n
-.rt  
 starts processing
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&.vE\fR\fR
 .ad
 .RS 9n
-.rt  
 ends processing
 .RE
 
@@ -105,12 +101,10 @@ without conversion.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-2\fR\fR
 .ad
 .RS 16n
-.rt  
 Produces two-column output. Specifying this option changes the default point
 size to 8 (as if the \fB-s8\fR option were supplied). It also arranges for
 output to appear in landscape mode.
@@ -118,46 +112,38 @@ output to appear in landscape mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 16n
-.rt  
 Forces filter mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 16n
-.rt  
 Does not make keywords boldface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR\fR
 .ad
 .RS 16n
-.rt  
 Considers TAB characters to be spaced four columns apart instead of the usual
 eight.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 16n
-.rt  
 Outputs the index file in a "pretty" format. The index file itself is produced
 whenever \fBvgrind\fR is run with a file called \fBindex\fR that is present in
 the current directory. The index of function definitions can then be run off by
@@ -166,36 +152,30 @@ giving \fBvgrind\fR the \fB-x\fR option and the file \fBindex\fR as argument.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdefs-file\fR\fR
 .ad
 .RS 16n
-.rt  
 Specifies an alternate language definitions file (default is
 \fB/usr/lib/vgrindefs\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fIheader\fR\fR
 .ad
 .RS 16n
-.rt  
 Specifies a header to appear in the center of every output page. Use quotes to
 specify headers with embedded spaces.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIlanguage\fR\fR
 .ad
 .RS 16n
-.rt  
 Specifies the language to use. Among the \fIlanguage\fRs currently known are:
 Bourne shell (\fB-lsh\fR), C (\fB-lc\fR, the default), C++ (\fB-lc++\fR), C
 shell (\fB-lcsh\fR), emacs MLisp (\fB-lml\fR), FORTRAN (\fB-lf\fR), Icon
@@ -205,23 +185,19 @@ shell (\fB-lcsh\fR), emacs MLisp (\fB-lml\fR), FORTRAN (\fB-lf\fR), Icon
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR \fIprinter\fR\fR
 .ad
 .RS 16n
-.rt  
 Sends output to the named \fIprinter\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIn\fR\fR
 .ad
 .RS 16n
-.rt  
 Specifies a point size to use on output (exactly the same as the argument of a
 \fBtroff\fR \fB\&.ps\fR point size request).
 .RE
@@ -232,24 +208,20 @@ Specifies a point size to use on output (exactly the same as the argument of a
 \fBTROFF\fR environment variable. See ENVIRONMENT VARIABLES.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 20n
-.rt  
 Similar to the same option in \fBtroff\fR; that is, formatted text goes to the
 standard output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIpagelist\fR\fR
 .ad
 .RS 20n
-.rt  
 Prints only those pages whose page numbers appear in the comma-separated
 \fIpagelist\fR of numbers and ranges. A range \fIN\(miM\fR means pages \fIN\fR
 through \fIM\fR; an initial \fB-N\fR means from the beginning to page \fIN\fR;
@@ -258,12 +230,10 @@ and a final \fIN\fR\(mi means from \fIN\fR to the end.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fIoutput-device\fR\fR
 .ad
 .RS 20n
-.rt  
 Formats output for the specified \fIoutput-device\fR.
 .RE
 
@@ -273,12 +243,10 @@ Formats output for the specified \fIoutput-device\fR.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfilename\fR\fR
 .ad
 .RS 12n
-.rt  
 Name of the program source to be processed by \fBvgrind\fR. Use `\fB\(mi\fR\&'
 to specify the standard input.
 .RE
@@ -293,7 +261,6 @@ mechanism allows for local variations in \fBtroff\fR's name.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBindex\fR\fR
 .ad
@@ -304,7 +271,6 @@ file where source for index is created
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/vgrindefs\fR\fR
 .ad
@@ -315,7 +281,6 @@ language descriptions
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/vfontedpr\fR\fR
 .ad
@@ -326,7 +291,6 @@ preprocessor
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/tmac/tmac.vgrind\fR\fR
 .ad
@@ -346,59 +310,49 @@ macro package
 \fBvgrind\fR assumes that a certain programming style is followed:
 .sp
 .ne 2
-.mk
 .na
 \fBC\fR
 .ad
 .RS 11n
-.rt  
 Function names can be preceded on a line only by SPACE, TAB, or an asterisk
 (\fB*\fR). The parenthesized arguments must also be on the same line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBFORTRAN\fR
 .ad
 .RS 11n
-.rt  
 Function names need to appear on the same line as the keywords \fBfunction\fR
 or \fBsubroutine\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBMLisp\fR
 .ad
 .RS 11n
-.rt  
 Function names should not appear on the same line as the preceding \fBdefun\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBModel\fR
 .ad
 .RS 11n
-.rt  
 Function names need to appear on the same line as the keywords \fBis
 beginproc\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBPascal\fR
 .ad
 .RS 11n
-.rt  
 Function names need to appear on the same line as the keywords \fBfunction\fR
 or \fBprocedure\fR.
 .RE

@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH in.rexecd 1M "4 Nov 2004" "SunOS 5.11" "System Administration Commands"
+.TH IN.REXECD 1M "Nov 4, 2004"
 .SH NAME
 in.rexecd, rexecd \- remote execution server
 .SH SYNOPSIS
 .LP
 .nf
-\fBin.rexecd\fR 
+\fBin.rexecd\fR
 .fi
 
 .SH DESCRIPTION
@@ -85,90 +85,74 @@ indicated by a leading byte with a value of 1 (0 is returned in step 7 above
 upon successful completion of all the steps prior to the command execution).
 .sp
 .ne 2
-.mk
 .na
 \fB\fBusername too long\fR\fR
 .ad
 .RS 24n
-.rt  
 The name is longer than 16 characters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpassword too long\fR\fR
 .ad
 .RS 24n
-.rt  
 The password is longer than 16 characters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcommand too long\fR\fR
 .ad
 .RS 24n
-.rt  
 The command line passed exceeds the size of the argument list (as configured
 into the system).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLogin incorrect.\fR\fR
 .ad
 .RS 24n
-.rt  
 No password file entry for the user name existed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPassword incorrect.\fR\fR
 .ad
 .RS 24n
-.rt  
 The wrong password was supplied.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNo remote directory.\fR\fR
 .ad
 .RS 24n
-.rt  
 The \fBchdir\fR command to the home directory failed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTry again.\fR\fR
 .ad
 .RS 24n
-.rt  
 A \fBfork\fR by the server failed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/bin/sh: ...\fR\fR
 .ad
 .RS 24n
-.rt  
 The user's login shell could not be started.
 .RE
 

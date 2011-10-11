@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH link 2 "18 May 2007" "SunOS 5.11" "System Calls"
+.TH LINK 2 "May 18, 2007"
 .SH NAME
 link \- link to a file
 .SH SYNOPSIS
@@ -44,24 +44,20 @@ returned, no link is created, and \fBerrno\fR is set to indicate the error.
 The \fBlink()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 16n
-.rt  
 A component of either path prefix denies search permission, or the requested
 link requires writing in a directory with a mode that denies write permission.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEDQUOT\fR\fR
 .ad
 .RS 16n
-.rt  
 The directory where the entry for the new link is being placed cannot be
 extended because the user's quota of disk blocks on that file system has been
 exhausted.
@@ -69,79 +65,65 @@ exhausted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEEXIST\fR\fR
 .ad
 .RS 16n
-.rt  
 The link named by \fInew\fR exists.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIexisting\fR or \fInew\fR argument points to an illegal address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEILSEQ\fR\fR
 .ad
 .RS 16n
-.rt  
 The path argument includes non-UTF8 characters and the file system accepts only
 file names where all characters are part of the UTF-8 character codeset.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 16n
-.rt  
 A signal was caught during the execution of the \fBlink()\fR function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBELOOP\fR\fR
 .ad
 .RS 16n
-.rt  
 Too many symbolic links were encountered in translating \fIpath\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEMLINK\fR\fR
 .ad
 .RS 16n
-.rt  
 The maximum number of links to a file would be exceeded.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENAMETOOLONG\fR\fR
 .ad
 .RS 16n
-.rt  
 The length of the \fIexisting\fR or \fInew\fR argument exceeds \fBPATH_MAX\fR,
 or the length of a \fIexisting\fR or \fInew\fR component exceeds \fBNAME_MAX\fR
 while \fB_POSIX_NO_TRUNC\fR is in effect.
@@ -149,12 +131,10 @@ while \fB_POSIX_NO_TRUNC\fR is in effect.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIexisting\fR or \fInew\fR argument is a null pathname; a component of
 either path prefix does not exist; or the file named by \fIexisting\fR does not
 exist.
@@ -162,46 +142,38 @@ exist.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOLINK\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIexisting\fR or \fInew\fR argument points to a remote machine and the
 link to that machine is no longer active.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSPC\fR\fR
 .ad
 .RS 16n
-.rt  
 The directory that would contain the link cannot be extended.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTDIR\fR\fR
 .ad
 .RS 16n
-.rt  
 A component of either path prefix is not a directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 16n
-.rt  
 The file named by \fIexisting\fR is a directory and the
 {\fBPRIV_SYS_LINKDIR\fR} privilege is not asserted in the effective set of the
 calling process.
@@ -213,23 +185,19 @@ the calling process.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEROFS\fR\fR
 .ad
 .RS 16n
-.rt  
 The requested link requires writing in a directory on a read-only file system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEXDEV\fR\fR
 .ad
 .RS 16n
-.rt  
 The link named by \fInew\fR and the file named by \fIexisting\fR are on
 different logical devices (file systems).
 .RE
@@ -242,15 +210,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelAsync-Signal-Safe
+MT-Level	Async-Signal-Safe
 .TE
 
 .SH SEE ALSO

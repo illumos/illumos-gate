@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH chown 2 "9 Oct 2008" "SunOS 5.11" "System Calls"
+.TH CHOWN 2 "Oct 9, 2008"
 .SH NAME
 chown, lchown, fchown, fchownat \- change owner and group of a file
 .SH SYNOPSIS
@@ -28,7 +28,7 @@ chown, lchown, fchown, fchownat \- change owner and group of a file
 
 .LP
 .nf
-\fBint\fR \fBfchownat\fR(\fBint\fR \fIfildes\fR, \fBconst char *\fR\fIpath\fR, \fBuid_t\fR \fIowner\fR, 
+\fBint\fR \fBfchownat\fR(\fBint\fR \fIfildes\fR, \fBconst char *\fR\fIpath\fR, \fBuid_t\fR \fIowner\fR,
      \fBgid_t\fR \fIgroup\fR, \fBint\fR \fIflag\fR);
 .fi
 
@@ -116,12 +116,10 @@ returned, the owner and group of the named file remain unchanged, and
 All of these functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 9n
-.rt  
 The effective user ID does not match the owner of the file and the
 {\fBPRIV_FILE_CHOWN\fR} privilege is not asserted in the effective set of the
 calling process, or the {\fBPRIV_FILE_CHOWN_SELF\fR} privilege is not asserted
@@ -133,80 +131,66 @@ in the effective set of the calling process.
 The \fBchown()\fR, \fBlchown()\fR, and \fBfchownat()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 16n
-.rt  
 Search permission is denied on a component of the path prefix of \fIpath\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIpath\fR argument points to an illegal address and for \fBfchownat()\fR,
 the file descriptor has the value \fBAT_FDCWD\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 16n
-.rt  
 A signal was caught during the execution of the \fBchown()\fR or \fBlchown()\fR
 function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIgroup\fR or \fIowner\fR argument is out of range.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 16n
-.rt  
 An I/O error occurred while reading from or writing to the file system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBELOOP\fR\fR
 .ad
 .RS 16n
-.rt  
 Too many symbolic links were encountered in translating \fIpath\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENAMETOOLONG\fR\fR
 .ad
 .RS 16n
-.rt  
 The length of the \fIpath\fR argument exceeds {\fIPATH_MAX\fR}, or the length
 of a \fIpath\fR component exceeds {\fINAME_MAX\fR} while
 {\fB_POSIX_NO_TRUNC\fR} is in effect.
@@ -214,36 +198,30 @@ of a \fIpath\fR component exceeds {\fINAME_MAX\fR} while
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOLINK\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIpath\fR argument points to a remote machine and the link to that machine
 is no longer active.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 16n
-.rt  
 Either a component of the path prefix or the file referred to by \fIpath\fR
 does not exist or is a null pathname.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTDIR\fR\fR
 .ad
 .RS 16n
-.rt  
 A component of the path prefix of \fIpath\fR is not a directory, or the path
 supplied to \fBfchownat()\fR is relative and the file descriptor provided does
 not refer to a valid directory.
@@ -251,12 +229,10 @@ not refer to a valid directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEROFS\fR\fR
 .ad
 .RS 16n
-.rt  
 The named file  resides on a read-only file system.
 .RE
 
@@ -265,12 +241,10 @@ The named file  resides on a read-only file system.
 The \fBfchown()\fR and \fBfchownat()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 11n
-.rt  
 For \fBfchown()\fR the \fIfildes\fR argument is not an open file descriptor
 and.
 .sp
@@ -280,57 +254,47 @@ For \fBfchownat()\fR, the \fIpath\fR argument is not absolute and the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 11n
-.rt  
 An I/O error occurred while reading from or writing to the file system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 11n
-.rt  
 A signal was caught during execution of the function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOLINK\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fIfildes\fR argument points to a remote machine and the link to that
 machine is no longer active.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fIgroup\fR or \fIowner\fR argument is out of range.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEROFS\fR\fR
 .ad
 .RS 11n
-.rt  
 The named file referred to by \fIfildes\fR resides on a read-only file system.
 .RE
 
@@ -342,15 +306,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 _
-MT-LevelSee below.
+MT-Level	See below.
 .TE
 
 .sp

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dfshares_nfs 1M "6 Nov 2000" "SunOS 5.11" "System Administration Commands"
+.TH DFSHARES_NFS 1M "Nov 6, 2000"
 .SH NAME
 dfshares_nfs \- list available NFS resources from remote systems
 .SH SYNOPSIS
@@ -48,34 +48,28 @@ whitespace-separated fields.  For each resource, the fields are:
 where
 .sp
 .ne 2
-.mk
 .na
 \fB\fIresource\fR\fR
 .ad
 .RS 13n
-.rt  
 Specifies the resource name that must be given to the \fBmount\fR(1M) command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIserver\fR\fR
 .ad
 .RS 13n
-.rt  
 Specifies the system that is making the resource available.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaccess\fR\fR
 .ad
 .RS 13n
-.rt  
 Specifies the access permissions granted to the client systems;  however,
 \fBdfshares\fR cannot determine this information for an  \fBNFS\fR resource and
 populates the field with a hyphen (-).
@@ -83,12 +77,10 @@ populates the field with a hyphen (-).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItransport\fR\fR
 .ad
 .RS 13n
-.rt  
 Specifies the transport provider over which the \fIresource\fR  is shared;
 however, \fBdfshares\fR cannot determine this information for an  \fBNFS\fR
 resource and populates the field with a hyphen (-).
@@ -102,35 +94,29 @@ may be omitted.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR \fBnfs\fR\fR
 .ad
 .RS 10n
-.rt  
 Specify the  \fBNFS\fR file system type
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 10n
-.rt  
 Suppress header line in output.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/dfs/fstypes\fR\fR
 .ad
 .RS 20n
-.rt  
 
 .RE
 

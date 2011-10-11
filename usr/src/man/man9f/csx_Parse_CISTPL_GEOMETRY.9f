@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH csx_Parse_CISTPL_GEOMETRY 9F "24 Jan 1997" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH CSX_PARSE_CISTPL_GEOMETRY 9F "Jan 24, 1997"
 .SH NAME
 csx_Parse_CISTPL_GEOMETRY \- parse the Geometry tuple
 .SH SYNOPSIS
@@ -24,35 +24,29 @@ Solaris \fBDDI\fR Specific (Solaris \fBDDI\fR)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIch\fR\fR
 .ad
 .RS 6n
-.rt  
 Client handle returned from \fBcsx_RegisterClient\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItu\fR\fR
 .ad
 .RS 6n
-.rt  
 Pointer to a \fBtuple_t\fR structure (see \fBtuple\fR(9S)) returned by a call
 to \fBcsx_GetFirstTuple\fR(9F) or \fBcsx_GetNextTuple\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpt\fR\fR
 .ad
 .RS 6n
-.rt  
 Pointer to a \fBcistpl_geometry_t\fR structure which contains the parsed
 \fBCISTPL_GEOMETRY\fR tuple information upon return from this function.
 .RE
@@ -83,101 +77,83 @@ The structure members of \fBcistpl_geometry_t\fR are:
 The fields are defined as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBspt\fR\fR
 .ad
 .RS 8n
-.rt  
 This field indicates the number of sectors per track.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtpc\fR\fR
 .ad
 .RS 8n
-.rt  
 This field indicates the number of tracks per cylinder.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBncyl\fR\fR
 .ad
 .RS 8n
-.rt  
 This field indicates the number of cylinders.
 .RE
 
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_SUCCESS\fR\fR
 .ad
 .RS 27n
-.rt  
 Successful operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_BAD_HANDLE\fR\fR
 .ad
 .RS 27n
-.rt  
 Client handle is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_UNKNOWN_TUPLE\fR\fR
 .ad
 .RS 27n
-.rt  
 Parser does not know how to parse tuple.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_NO_CARD\fR\fR
 .ad
 .RS 27n
-.rt  
 No \fBPC\fR Card in socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_NO_CIS\fR\fR
 .ad
 .RS 27n
-.rt  
 No Card Information Structure (\fBCIS\fR) on \fBPC\fR Card.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_UNSUPPORTED_FUNCTION\fR\fR
 .ad
 .RS 27n
-.rt  
 No \fBPCMCIA\fR hardware installed.
 .RE
 

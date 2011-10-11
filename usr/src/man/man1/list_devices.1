@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH list_devices 1 "30 Apr 2008" "SunOS 5.11" "User Commands"
+.TH LIST_DEVICES 1 "Apr 30, 2008"
 .SH NAME
 list_devices \- list allocatable devices
 .SH SYNOPSIS
 .LP
 .nf
-\fBlist_devices\fR [\fB-s\fR] [\fB-U\fR \fIuid\fR] [\fB-z\fR \fIzonename\fR] [\fB-a\fR [\fB-w\fR]] 
+\fBlist_devices\fR [\fB-s\fR] [\fB-U\fR \fIuid\fR] [\fB-z\fR \fIzonename\fR] [\fB-a\fR [\fB-w\fR]]
      \fB-l\fR | \fB-n\fR | \fB-u\fR [\fIdevice\fR] | [\fB-l\fR | \fB-n\fR | \fB-u\fR] \fB-c\fR \fIdev-class\fR
 .fi
 
@@ -35,12 +35,10 @@ specified \fIdev-class\fR are listed. There is no default \fIdev-class\fR.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR [\fB-c\fR \fIdev-class\fR | \fIdevice\fR]\fR
 .ad
 .RS 30n
-.rt  
 Lists the pathnames of the device special files associated with the
 \fIdevice\fR that are allocatable to the current process.
 .sp
@@ -53,12 +51,10 @@ specified device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR [\fB-c\fR \fIdev-class\fR | \fIdevice\fR]\fR
 .ad
 .RS 30n
-.rt  
 Lists the pathnames of the device special files associated with the device that
 are allocatable to the current process but are not currently allocated.
 .sp
@@ -71,23 +67,19 @@ specified device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 30n
-.rt  
 Silent. Suppresses any diagnostic output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR [\fB-c\fR \fIdev-class\fR | \fIdevice\fR]\fR
 .ad
 .RS 30n
-.rt  
 Lists the pathnames of device special files associated with the device that are
 allocated to the owner of the current process.
 .sp
@@ -100,12 +92,10 @@ specified device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-U\fR \fIuid\fR\fR
 .ad
 .RS 30n
-.rt  
 Uses the user \fBID\fR \fIuid\fR instead of the real user \fBID\fR of the
 current process when performing the \fBlist_devices\fR operation. Only a user
 with the \fBsolaris.device.revoke\fR authorization can use this option.
@@ -117,12 +107,10 @@ The following options are supported when the system is configured with Trusted
 Extensions:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 15n
-.rt  
 Lists attributes like authorizations, cleaning programs and labels associated
 with a device.
 .sp
@@ -148,60 +136,50 @@ format.
 The \fB-a\fR output has the following keys:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauths\fR\fR
 .ad
 .RS 10n
-.rt  
 Specifies the list of authorizations. The value is \fBauths\fR is described in
 \fBdevice_allocate\fR(4).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclean\fR\fR
 .ad
 .RS 10n
-.rt  
 Specifies the device cleaning script. The value is \fBdevice-exec\fR as
 described in \fBdevice_allocate\fR(4).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdevice\fR\fR
 .ad
 .RS 10n
-.rt  
 Specifies the device name. The value is \fBdevice-name\fR as described in
 \fBdevice_allocate\fR(4).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfiles\fR\fR
 .ad
 .RS 10n
-.rt  
 Specifies the device file paths. The value is \fBdevice-list\fR as described in
 \fBdevice_maps\fR(4).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtype\fR\fR
 .ad
 .RS 10n
-.rt  
 Specifies the device type. The value is \fBdevice-type\fR as described in
 \fBdevice_allocate\fR(4).
 .RE
@@ -210,12 +188,10 @@ Specifies the device type. The value is \fBdevice-type\fR as described in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 15n
-.rt  
 Displays the system-supplied default attributes for the device types managed by
 device allocation. If \fIdev-type\fR is specified, it lists the default
 attributes for only that device type.
@@ -223,12 +199,10 @@ attributes for only that device type.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR\fR
 .ad
 .RS 15n
-.rt  
 This option can be used with \fB-a\fR to list the current owner of the device
 as the key value pair \fIowner\fR\fB=\fR\fIvalue\fR. \fIvalue\fR is the
 \fBuid\fR of the current owner of the device. If the device is unallocated,
@@ -238,12 +212,10 @@ This option also suppresses any diagnostic output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fIzonename\fR\fR
 .ad
 .RS 15n
-.rt  
 When specified with the \fB-l\fR option, lists only those non-allocated devices
 whose label range includes the label of the zonename, and of the allocated
 devices, only those that are allocated at the same label as that of
@@ -319,34 +291,28 @@ files=/dev/audio2 /dev/audio2ctl /dev/sound/2 /dev/sound/2ctl
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 15n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB20\fR\fR
 .ad
 .RS 15n
-.rt  
 No entry for the specified device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIother value\fR\fR
 .ad
 .RS 15n
-.rt  
 An error occurred.
 .RE
 
@@ -371,13 +337,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

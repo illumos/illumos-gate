@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NISLDAPmapping 4 "29 Mar 2006" "SunOS 5.11" "File Formats"
+.TH NISLDAPMAPPING 4 "Mar 29, 2006"
 .SH NAME
 NISLDAPmapping \- mapping file used by the NIS server components
 .SH SYNOPSIS
@@ -58,12 +58,10 @@ Repeated fields, with separator characters, are described by the following
 syntax:
 .sp
 .ne 2
-.mk
 .na
 \fBOne or more entries\fR
 .ad
 .RS 24n
-.rt  
 entry:entry:entry
 .sp
 .in +2
@@ -76,12 +74,10 @@ entry[":"...]
 
 .sp
 .ne 2
-.mk
 .na
 \fBZero or more entries\fR
 .ad
 .RS 24n
-.rt  
 .sp
 .in +2
 .nf
@@ -123,7 +119,6 @@ part of syntactic elements.
 The following attributes are recognized.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnisLDAPdomainContext\fR\fR
 .ad
@@ -153,7 +148,6 @@ attribute makes use of the \fBNISDomainName\fR specified for that domain.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnisLDAPyppasswddDomains\fR\fR
 .ad
@@ -178,7 +172,6 @@ entries withone domainname per entry.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnisLDAPdatabaseIdMapping\fR\fR
 .ad
@@ -202,7 +195,7 @@ databaseId      = Label identifying a (subset of a) NIS
                   object for mapping purposes.
 indexlist       = fieldspec[","...]
 fieldspec       = fieldname "=" fieldvalue
-fieldname       = The name of a entry field as defined in 
+fieldname       = The name of a entry field as defined in
                   nisLDAPnameFields.
 fieldvalue      = fieldvaluestring | \e" fieldvaluestring \e"
 .fi
@@ -242,7 +235,6 @@ unpredictable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnisLDAPentryTtl\fR\fR
 .ad
@@ -254,7 +246,7 @@ The syntax for the \fBnisLDAPentryTtl\fR attribute is:
 .sp
 .in +2
 .nf
-mapName[" "...]":" 
+mapName[" "...]":"
         initialTTLlo ":" initialTTLhi ":" runningTTL
 .fi
 .in -2
@@ -262,12 +254,10 @@ mapName[" "...]":"
 where
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinitialTTLlo\fR\fR
 .ad
 .RS 16n
-.rt  
 The lower limit for the initial \fBTTL\fR (in seconds) for data read from LDAP
 when the \fBypserv\fR starts. If the \fBinitialTTLhi\fR also is specified, the
 actual \fBinitialTTL\fR will be randomly selected from the interval
@@ -277,23 +267,19 @@ yields the default value of 1800 seconds.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinitialTTLhi\fR\fR
 .ad
 .RS 16n
-.rt  
 The upper limit for the initial TTL. If left empty, defaults to 5400.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrunningTTL\fR\fR
 .ad
 .RS 16n
-.rt  
 The TTL (in seconds) for data retrieved from LDAP while the ypserv is running.
 Leave the field empty to obtain the default value of 3600 seconds.
 .RE
@@ -323,7 +309,6 @@ hosts.byname hosts.byaddr:7200:10800:14400
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnisLDAPobjectDN\fR\fR
 .ad
@@ -435,7 +420,6 @@ passwd:ou=People,?one?\e
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnisLDAPnameFields\fR\fR
 .ad
@@ -472,70 +456,58 @@ characters. The whitespace and tab characters are ignored.
 Regardless of the content of this entry some \fBfieldNames\fR are reserved:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrf_key\fR\fR
 .ad
 .RS 18n
-.rt  
 The DBM key value
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrf_ipkey\fR\fR
 .ad
 .RS 18n
-.rt  
 The DBM key value handled as an IP address. See the discussion of \fB%a\fR
 fields.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrf_comment\fR\fR
 .ad
 .RS 18n
-.rt  
 Everything following the first occurance of a symbol. \fBrf_comment\fR is
 defined by \fBnisLDAPcommentChar\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrf_domain\fR\fR
 .ad
 .RS 18n
-.rt  
 The name of the domain in which the current NIS operation is being carried out.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrf_searchipkey\fR\fR
 .ad
 .RS 18n
-.rt  
 The \fBrf_searchkey\fR value handled as an IP address. See the discussion of
 \fB%a\fR fields above.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrf_searchkey\fR\fR
 .ad
 .RS 18n
-.rt  
 See the description under \fBnisLDAPattributeFromField\fR below.
 .RE
 
@@ -561,7 +533,6 @@ nisLDAPnameFields rpc.bynumber : \e
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnisLDAPsplitFields\fR\fR
 .ad
@@ -611,7 +582,6 @@ into further subfields.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnisLDAPrepeatedFieldSeparators\fR\fR
 .ad
@@ -645,7 +615,6 @@ nisLDAPrepeatedFieldSeparators netIdEntry: ""
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnisLDAPcommentChar\fR\fR
 .ad
@@ -676,7 +645,6 @@ nisLDAPcommentChar mapname : ''
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnisLDAPmapFlags\fR\fR
 .ad
@@ -701,7 +669,6 @@ By default neither entry is created.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnisLDAPfieldFromAttribute\fR\fR
 .ad
@@ -736,7 +703,6 @@ below, including examples of complex attribute to field conversions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnisLDAPattributeFromField\fR\fR
 .ad
@@ -798,12 +764,10 @@ The \fBlval\fR and \fBrval\fR syntax are defined below at Values. The format of
 a \fBnamespec\fR is:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnamespec\fR\fR
 .ad
 .RS 16n
-.rt  
 .sp
 .in +2
 .nf
@@ -816,12 +780,10 @@ a \fBnamespec\fR is:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfieldname\fR\fR
 .ad
 .RS 16n
-.rt  
 .sp
 .in +2
 .nf
@@ -833,12 +795,10 @@ field | "(" field ")"
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBattrspec\fR\fR
 .ad
 .RS 16n
-.rt  
 .sp
 .in +2
 .nf
@@ -850,12 +810,10 @@ attribute | "(" attribute ")"
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsearchTriple\fR\fR
 .ad
 .RS 16n
-.rt  
 .sp
 .in +2
 .nf
@@ -867,34 +825,28 @@ attribute | "(" attribute ")"
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbaseDN\fR\fR
 .ad
 .RS 16n
-.rt  
 Base DN for search
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfilter\fR\fR
 .ad
 .RS 16n
-.rt  
 LDAP search filter
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmapspec\fR\fR
 .ad
 .RS 16n
-.rt  
 Map name
 .RE
 
@@ -910,23 +862,19 @@ For assignments to a field:
 
 .sp
 .ne 2
-.mk
 .na
 \fBon the \fBLHS\fR\fR
 .ad
 .RS 14n
-.rt  
 yp
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBon the \fBRHS\fR\fR
 .ad
 .RS 14n
-.rt  
 ldap
 .RE
 
@@ -944,23 +892,19 @@ For assignments to an attribute:
 
 .sp
 .ne 2
-.mk
 .na
 \fBon the \fBLHS\fR\fR
 .ad
 .RS 14n
-.rt  
 ldap
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBon the \fBRHS\fR\fR
 .ad
 .RS 14n
-.rt  
 yp
 .RE
 
@@ -986,12 +930,10 @@ The \fBsearchTriple\fR can be used to specify an attribute from a location
 other than the read or write target. The defaultvalues are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbaseDN\fR\fR
 .ad
 .RS 10n
-.rt  
 If \fBbaseDN\fR is omitted, the default is the current \fBobjectDN\fR. If the
 \fBbaseDN\fR ends in a comma, the context of the domain is appended from
 \fBnisLDAPdomainContext\fR .
@@ -999,23 +941,19 @@ If \fBbaseDN\fR is omitted, the default is the current \fBobjectDN\fR. If the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBscope\fR\fR
 .ad
 .RS 10n
-.rt  
 one
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfilter\fR\fR
 .ad
 .RS 10n
-.rt  
 Empty
 .RE
 
@@ -1082,34 +1020,28 @@ retrieval or assignment of entry or field values, the extent to which the other
 Where wildcard support is available, it is of the following limited form:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB*\fR\fR
 .ad
 .RS 9n
-.rt  
 Matches any number of characters
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[x]\fR\fR
 .ad
 .RS 9n
-.rt  
 Matches the character x
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[x-y]\fR\fR
 .ad
 .RS 9n
-.rt  
 Matches any character in the range x to y, inclusive
 .RE
 
@@ -1183,7 +1115,7 @@ way to specify that special case is:
 lval            = "(" formatspec "," namespec *("," namespec) ")"
 rval            = "(" formatspec ["," namelist ["," elide] ] ")"
 
-namelist        = name_or_sse *( "," name_or_sse)        
+namelist        = name_or_sse *( "," name_or_sse)
 name_or_sse     = namespec | removespec | substringextract
 removespec      = list_or_name "-" namespec
 list_or_name    = "(" namespec ")" | namespec
@@ -1249,7 +1181,7 @@ results in:
 .sp
 .in +2
 .nf
-(assuming host="xyzzy", user="-", domain="x.y.z") 
+(assuming host="xyzzy", user="-", domain="x.y.z")
 "(xyzzy,-,x.y.z)"
 .fi
 .in -2
@@ -1403,45 +1335,37 @@ following combinations of lists are allowed, but they are not particularly
 useful:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB(attrname)=(fieldname)\fR\fR
 .ad
 .RS 26n
-.rt  
 Equivalent to \fBattrname=fieldname\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBattrname=(fieldname)\fR\fR
 .ad
 .RS 26n
-.rt  
 Equivalent to \fBattrname=fieldname\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB(fieldname)=attrname\fR\fR
 .ad
 .RS 26n
-.rt  
 Equivalent to \fBfieldname=attrname\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfieldname=(attrname)\fR\fR
 .ad
 .RS 26n
-.rt  
 Equivalent to \fBfieldname=attrname\fR
 .RE
 
@@ -1555,12 +1479,10 @@ instance of \fBmgrprfc822mailmember\fR:
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/yp/NISLDAPmapping\fR\fR
 .ad
 .RS 26n
-.rt  
 Mapping file used by the NIS server components
 .RE
 
@@ -1572,13 +1494,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface Stability Obsolete
+Interface Stability 	Obsolete
 .TE
 
 .SH SEE ALSO

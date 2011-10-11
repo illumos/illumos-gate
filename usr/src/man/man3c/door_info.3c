@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH door_info 3C "22 Mar 2005" "SunOS 5.11" "Standard C Library Functions"
+.TH DOOR_INFO 3C "Mar 22, 2005"
 .SH NAME
 door_info \- return information associated with a door descriptor
 .SH SYNOPSIS
@@ -46,93 +46,77 @@ The \fBdi_target\fR member is the process \fBID\fR of the door server, or
 The values for  \fBdi_attributes\fR may be composed of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDOOR_LOCAL\fR\fR
 .ad
 .RS 20n
-.rt  
 The door descriptor refers to a service procedure in this process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDOOR_UNREF\fR\fR
 .ad
 .RS 20n
-.rt  
 The door has requested notification when all but the last reference has gone
 away.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDOOR_UNREF_MULTI\fR\fR
 .ad
 .RS 20n
-.rt  
 Similar to \fBDOOR_UNREF\fR, except multiple unreferenced notifications may be
 delivered for this door.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDOOR_IS_UNREF\fR\fR
 .ad
 .RS 20n
-.rt  
 There is currently only one descriptor referring to the door.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDOOR_REFUSE_DESC\fR\fR
 .ad
 .RS 20n
-.rt  
 The door refuses any attempt to \fBdoor_call\fR(3C) it with argument
 descriptors.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDOOR_NO_CANCEL\fR\fR
 .ad
 .RS 20n
-.rt  
 Clients who abort a \fBdoor_call\fR(3C) call on this door will not cause the
 \fBcancellation\fR(5) of the server thread handling the request.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDOOR_REVOKED\fR\fR
 .ad
 .RS 20n
-.rt  
 The door descriptor refers to a door that has been revoked.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDOOR_PRIVATE\fR\fR
 .ad
 .RS 20n
-.rt  
 The door has a separate pool of server threads associated with it.
 .RE
 
@@ -155,23 +139,19 @@ returned and  \fBerrno\fR is set to indicate the error.
 The  \fBdoor_info()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 The address of argument \fIinfo\fR is an invalid address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 10n
-.rt  
 \fId\fR is not a door descriptor.
 .RE
 
@@ -183,17 +163,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Architectureall
+Architecture	all
 _
-Interface StabilityStable
+Interface Stability	Stable
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

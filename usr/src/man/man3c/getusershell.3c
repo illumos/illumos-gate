@@ -2,7 +2,7 @@
 .\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright (c) 1985 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement specifies the terms and conditions for redistribution.
 .\" Portions Copyright (c) 1982-2007 AT&T Knowledge Ventures
-.TH getusershell 3C "1 Nov 2007" "SunOS 5.11" "Standard C Library Functions"
+.TH GETUSERSHELL 3C "Nov 1, 2007"
 .SH NAME
 getusershell, setusershell, endusershell \- get legal user shells
 .SH SYNOPSIS

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pm_power_has_changed 9F "22 July 2004" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH PM_POWER_HAS_CHANGED 9F "Jul 22, 2004"
 .SH NAME
 pm_power_has_changed \- Notify Power Management framework of autonomous power
 level change
@@ -23,34 +23,28 @@ Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 7n
-.rt  
 Pointer to the device \fBdev_info\fR structure
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcomponent\fR\fR
 .ad
 .RS 13n
-.rt  
 Number of the component that has changed power level
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlevel\fR\fR
 .ad
 .RS 9n
-.rt  
 Power level to which the indicated component has changed
 .RE
 
@@ -95,23 +89,19 @@ function must be called from the same thread which entered \fBattach\fR(9E),
 The \fBpm_power_has_changed()\fR function returns:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 15n
-.rt  
 The power level of component was successfully updated to \fIlevel\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 15n
-.rt  
 Invalid component \fIcomponent\fR or power level \fIlevel\fR.
 .RE
 
@@ -166,7 +156,7 @@ xxdisk_power(dev_info *dip, int comp, int level)
 	mutex_enter( xsp->lock);
 
 	...
- 
+
 	...
 
 }
@@ -181,13 +171,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

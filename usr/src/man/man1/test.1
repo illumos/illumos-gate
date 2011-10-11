@@ -11,7 +11,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH test 1 "11 Aug 2009" "SunOS 5.11" "User Commands"
+.TH TEST 1 "Aug 11, 2009"
 .SH NAME
 test \- evaluate condition(s)
 .SH SYNOPSIS
@@ -171,67 +171,55 @@ primaries.
 The following primaries can be used to construct \fIcondition\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIfile\fR\fR
 .ad
 .RS 28n
-.rt  
 True if \fIfile\fR exists. (Not available in \fBsh\fR.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR \fIfile\fR\fR
 .ad
 .RS 28n
-.rt  
 True if \fIfile\fR exists and is a block special file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIfile\fR\fR
 .ad
 .RS 28n
-.rt  
 True if \fIfile\fR exists and is a character special file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIfile\fR\fR
 .ad
 .RS 28n
-.rt  
 True if \fIfile\fR exists and is a directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fIfile\fR\fR
 .ad
 .RS 28n
-.rt  
 True if \fIfile\fR exists. (Not available in \fBsh\fR.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIfile\fR\fR
 .ad
 .RS 28n
-.rt  
 True if \fIfile\fR exists and is a regular file. Alternatively, if
 \fB/usr/bin/sh\fR users specify \fB/usr/ucb\fR before \fB/usr/bin\fR in their
 \fBPATH\fR environment variable, then \fBtest\fR returns true if \fIfile\fR
@@ -241,148 +229,122 @@ exists and is (\fBnot\(mia\(midirectory\fR). The \fBcsh\fR \fBtest\fR and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR \fIfile\fR\fR
 .ad
 .RS 28n
-.rt  
 True if \fIfile\fR exists and its set group \fBID\fR flag is set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-G\fR \fIfile\fR\fR
 .ad
 .RS 28n
-.rt  
 True if \fIfile\fR exists and its group matches the effective group \fBID\fR of
 this process. (Not available in \fBsh\fR.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fIfile\fR\fR
 .ad
 .RS 28n
-.rt  
 True if \fIfile\fR exists and is a symbolic link.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR \fIfile\fR\fR
 .ad
 .RS 28n
-.rt  
 True if \fIfile\fR exists and has its sticky bit set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR \fIfile\fR\fR
 .ad
 .RS 28n
-.rt  
 True if \fIfile\fR exists and is a symbolic link.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fIstring\fR\fR
 .ad
 .RS 28n
-.rt  
 True if the length of \fIstring\fR is non-zero.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIoption\fR\fR
 .ad
 .RS 28n
-.rt  
 True if option named \fIoption\fR is on. This option is not available in
 \fBcsh\fR or \fBsh\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-O\fR \fIfile\fR\fR
 .ad
 .RS 28n
-.rt  
 True if \fIfile\fR exists and is owned by the effective user \fBID\fR of this
 process. This option is not available in \fBsh\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIfile\fR\fR
 .ad
 .RS 28n
-.rt  
 True if \fIfile\fR is a named pipe (\fBFIFO\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIfile\fR\fR
 .ad
 .RS 28n
-.rt  
 True if \fIfile\fR exists and is readable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIfile\fR\fR
 .ad
 .RS 28n
-.rt  
 True if \fIfile\fR exists and has a size greater than zero.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR \fIfile\fR\fR
 .ad
 .RS 28n
-.rt  
 True if \fIfile\fR exists and is a socket. This option is not available in
 \fBsh\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR [\fIfile_descriptor\fR]\fR
 .ad
 .RS 28n
-.rt  
 True if the file whose file descriptor number is \fIfile_descriptor\fR is open
 and is associated with a terminal. If \fIfile_descriptor\fR is not specified,
 \fB1\fR is used as a default value.
@@ -390,23 +352,19 @@ and is associated with a terminal. If \fIfile_descriptor\fR is not specified,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fIfile\fR\fR
 .ad
 .RS 28n
-.rt  
 True if \fIfile\fR exists and its set-user-ID flag is set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR \fIfile\fR\fR
 .ad
 .RS 28n
-.rt  
 True if \fIfile\fR exists and is writable. True indicates only that the write
 flag is on. The \fIfile\fR is not writable on a read-only file system even if
 this test indicates true.
@@ -414,12 +372,10 @@ this test indicates true.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR \fIfile\fR\fR
 .ad
 .RS 28n
-.rt  
 True if \fIfile\fR exists and is executable. True indicates only that the
 execute flag is on. If \fIfile\fR is a directory, true indicates that
 \fIfile\fR can be searched.
@@ -427,92 +383,76 @@ execute flag is on. If \fIfile\fR is a directory, true indicates that
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fIstring\fR\fR
 .ad
 .RS 28n
-.rt  
 True if the length of string \fIstring\fR is zero.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile1\fR \fB-nt\fR \fIfile2\fR\fR
 .ad
 .RS 28n
-.rt  
 True if \fIfile1\fR exists and is newer than \fIfile2\fR. This option is not
 available in \fBsh\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile1\fR \fB-ot\fR \fIfile2\fR\fR
 .ad
 .RS 28n
-.rt  
 True if \fIfile1\fR exists and is older than \fIfile2\fR. This option is not
 available in \fBsh\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile1\fR \fB-ef\fR \fIfile2\fR\fR
 .ad
 .RS 28n
-.rt  
 True if \fIfile1\fR and \fIfile2\fR exist and refer to the same file. This
 option is not available in \fBsh\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstring\fR\fR
 .ad
 .RS 28n
-.rt  
 True if the string \fIstring\fR is not the null string.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstring1\fR \fB=\fR \fIstring2\fR\fR
 .ad
 .RS 28n
-.rt  
 True if the strings \fIstring1\fR and \fIstring2\fR are identical.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstring1\fR \fB!=\fR \fIstring2\fR\fR
 .ad
 .RS 28n
-.rt  
 True if the strings \fIstring1\fR and \fIstring2\fR are not identical.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIn1\fR \fB-eq\fR \fIn2\fR\fR
 .ad
 .RS 28n
-.rt  
 True if the numbers \fIn1\fR and \fIn2\fR are algebraically equal. A number may
 be integer, floating point or floating-point constant (such as [+/-]Inf,
 [+/-]NaN) in any format specified by C99/XPG6/SUS.
@@ -520,12 +460,10 @@ be integer, floating point or floating-point constant (such as [+/-]Inf,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIn1\fR \fB-ne\fR \fIn2\fR\fR
 .ad
 .RS 28n
-.rt  
 True if the numbers \fIn1\fR and \fIn2\fR are not algebraically equal. A number
 may be integer, floating point or floating-point constant (such as [+/-]Inf,
 [+/-]NaN) in any format specified by C99/XPG6/SUS.
@@ -533,12 +471,10 @@ may be integer, floating point or floating-point constant (such as [+/-]Inf,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIn1\fR \fB-gt\fR \fIn2\fR\fR
 .ad
 .RS 28n
-.rt  
 True if the number \fIn1\fR is algebraically greater than the number \fIn2\fR.
 A number may be integer, floating point or floating-point constant (such as
 [+/-]Inf, [+/-]NaN) in any format specified by C99/XPG6/SUS.
@@ -546,12 +482,10 @@ A number may be integer, floating point or floating-point constant (such as
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIn1\fR \fB-ge\fR \fIn2\fR\fR
 .ad
 .RS 28n
-.rt  
 True if the number \fIn1\fR is algebraically greater than or equal to the
 number \fIn2\fR. A number may be integer, floating point or floating-point
 constant (such as [+/-]Inf, [+/-]NaN) in any format specified by C99/XPG6/SUS.
@@ -559,12 +493,10 @@ constant (such as [+/-]Inf, [+/-]NaN) in any format specified by C99/XPG6/SUS.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIn1\fR \fB-lt\fR \fIn2\fR\fR
 .ad
 .RS 28n
-.rt  
 True if the number \fIn1\fR is algebraically less than the number \fIn2\fR. A
 number may be integer, floating point or floating-point constant (such as
 [+/-]Inf, [+/-]NaN) in any format specified by C99/XPG6/SUS.
@@ -572,12 +504,10 @@ number may be integer, floating point or floating-point constant (such as
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIn1\fR \fB-le\fR \fIn2\fR\fR
 .ad
 .RS 28n
-.rt  
 True if the number \fIn1\fR is algebraically less than or equal to the number
 \fIn2\fR. A number may be integer, floating point or floating-point constant
 (such as [+/-]Inf, [+/-]NaN) in any format specified by C99/XPG6/SUS.
@@ -585,12 +515,10 @@ True if the number \fIn1\fR is algebraically less than or equal to the number
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcondition1\fR \fB-a\fR \fIcondition2\fR\fR
 .ad
 .RS 28n
-.rt  
 True if both \fIcondition1\fR and \fIcondition2\fR are true. The \fB-a\fR
 binary primary is left associative and has higher precedence than the \fB-o\fR
 binary primary.
@@ -598,12 +526,10 @@ binary primary.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcondition1\fR \fB-o\fR \fIcondition2\fR\fR
 .ad
 .RS 28n
-.rt  
 True if either \fIcondition1\fR or \fIcondition2\fR is true. The \fB-o\fR
 binary primary is left associative.
 .RE
@@ -613,23 +539,19 @@ binary primary is left associative.
 These primaries can be combined with the following operators:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!\fR \fIcondition\fR\fR
 .ad
 .RS 17n
-.rt  
 True if \fIcondition\fR is false.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB( \fIcondition\fR )\fR
 .ad
 .RS 17n
-.rt  
 True if condition is true. The parentheses ( ) can be used to alter the normal
 precedence and associativity. The parentheses are meaningful to the shell and,
 therefore, must be quoted.
@@ -648,34 +570,28 @@ arguments presented to \fBtest\fR as a \fIcondition\fR, \fIcondition1\fR, or
 \fIcondition2\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fI0 arguments:\fR\fR
 .ad
 .RS 16n
-.rt  
 Exit false (1).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fI1 argument:\fR\fR
 .ad
 .RS 16n
-.rt  
 Exit true (0) if \fB$1\fR is not null. Otherwise, exit false.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fI2 arguments:\fR\fR
 .ad
 .RS 16n
-.rt  
 .RS +4
 .TP
 .ie t \(bu
@@ -700,12 +616,10 @@ Otherwise, produce unspecified results.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fI3 arguments:\fR\fR
 .ad
 .RS 16n
-.rt  
 .RS +4
 .TP
 .ie t \(bu
@@ -729,12 +643,10 @@ Otherwise, produce unspecified results.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fI4 arguments:\fR\fR
 .ad
 .RS 16n
-.rt  
 .RS +4
 .TP
 .ie t \(bu
@@ -1004,7 +916,7 @@ then
 
 else
 
-    echo "At least one of the three test conditions is false"        
+    echo "At least one of the three test conditions is false"
 fi
 .fi
 .in -2
@@ -1018,7 +930,7 @@ Examples of the \fBtest\fR built-in:
 .sp
 .in +2
 .nf
-test \(gagrep $ROOT /etc/passwd >&1 /dev/null\(ga   \fI# discard output\fR 
+test \(gagrep $ROOT /etc/passwd >&1 /dev/null\(ga   \fI# discard output\fR
 
 echo $?    \fI# test for success\fR
 [ \(gagrep nosuchname /etc/passwd >&1 /dev/null\(ga ]
@@ -1034,8 +946,8 @@ echo $?    \fI# test for failure\fR
 .in +2
 .nf
 @ ZERO = 0; @ ONE = 1; @ TWO = 2;  set ROOT = root
-grep $ROOT  /etc/passwd >&1 /dev/null  \fI# discard output\fR         
-    \fI# $status must be tested for immediately following grep\fR 
+grep $ROOT  /etc/passwd >&1 /dev/null  \fI# discard output\fR
+    \fI# $status must be tested for immediately following grep\fR
 if ( "$status" == "0" && $ONE > $ZERO && $TWO == 2 ) then
        echo "$ONE is greater than 0, $TWO equals 2, and $ROOT is" \e
              "a user-name in the password file"
@@ -1049,11 +961,11 @@ if ( "$status" == "0" && $ONE > $ZERO && $TWO == 2 ) then
 .sp
 .in +2
 .nf
-ZERO=0 ONE=1 TWO=$((ONE+ONE)) ROOT=root         
+ZERO=0 ONE=1 TWO=$((ONE+ONE)) ROOT=root
 if  ((ONE > ZERO))            \fI#  arithmetical comparison\fR
  [[ $TWO = 2 ]]                \fI#  string comparison\fR
- [ \(gagrep $ROOT  /etc/passwd >&1 /dev/null\(ga ] \fI# discard output\fR        
-then 
+ [ \(gagrep $ROOT  /etc/passwd >&1 /dev/null\(ga ] \fI# discard output\fR
+then
      echo "$ONE is greater than 0, $TWO equals 2, and $ROOT is" \e
              "a user-name in the password file"
 
@@ -1075,34 +987,28 @@ that affect the execution of \fBtest\fR: \fBLANG\fR, \fBLC_ALL\fR,
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 \fIcondition\fR evaluated to true.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 6n
-.rt  
 \fIcondition\fR evaluated to false or \fIcondition\fR was missing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>1\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -1115,15 +1021,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SS "ksh93"
@@ -1131,13 +1036,12 @@ StandardSee \fBstandards\fR(5).
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityUncommitted
+Interface Stability	Uncommitted
 .TE
 
 .SH SEE ALSO

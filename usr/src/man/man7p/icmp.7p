@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH icmp 7P "3 Jul 1990" "SunOS 5.11" "Protocols"
+.TH ICMP 7P "Jul 3, 1990"
 .SH NAME
 icmp, ICMP \- Internet Control Message Protocol
 .SH SYNOPSIS
@@ -64,12 +64,10 @@ International, Menlo Park, Calif., September 1981.
 A socket operation may fail with one of the following errors returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEISCONN\fR\fR
 .ad
 .RS 17n
-.rt  
 An attempt was made to establish a connection on a socket which already has
 one, or when trying to send a datagram with the destination address specified
 and the socket is already connected.
@@ -77,35 +75,29 @@ and the socket is already connected.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTCONN\fR\fR
 .ad
 .RS 17n
-.rt  
 An attempt was made to send a datagram, but no destination address is
 specified, and the socket has not been connected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOBUFS\fR\fR
 .ad
 .RS 17n
-.rt  
 The system ran out of memory for an internal data structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEADDRNOTAVAIL\fR\fR
 .ad
 .RS 17n
-.rt  
 An attempt was made to create a socket with a network address for which no
 network interface exists.
 .RE

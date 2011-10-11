@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH priocntl 1 "1 Apr 2008" "SunOS 5.11" "User Commands"
+.TH PRIOCNTL 1 "Apr 1, 2008"
 .SH NAME
 priocntl \- display or set scheduling parameters of specified process(es)
 .SH SYNOPSIS
@@ -20,13 +20,13 @@ priocntl \- display or set scheduling parameters of specified process(es)
 
 .LP
 .nf
-\fBpriocntl\fR \fB-s\fR [\fB-c\fR \fIclass\fR] [\fIclass-specific\fR \fIoptions\fR] 
+\fBpriocntl\fR \fB-s\fR [\fB-c\fR \fIclass\fR] [\fIclass-specific\fR \fIoptions\fR]
      [\fB-i\fR \fIidtype\fR] [\fIidlist\fR]
 .fi
 
 .LP
 .nf
-\fBpriocntl\fR \fB-e\fR [\fB-c\fR \fIclass\fR] [\fIclass-specific\fR \fIoptions\fR] \fIcommand\fR 
+\fBpriocntl\fR \fB-e\fR [\fB-c\fR \fIclass\fR] [\fIclass-specific\fR \fIoptions\fR] \fIcommand\fR
      [\fIargument(s)\fR]
 .fi
 
@@ -176,12 +176,10 @@ the user's current class.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIclass\fR\fR
 .ad
 .RS 13n
-.rt  
 Specifies the \fIclass\fR to be set. (The valid \fIclass\fR arguments are
 \fBRT\fR for real-time, \fBTS\fR for time-sharing, \fBIA\fR for inter-active,
 \fBFSS\fR for fair-share, or \fBFX\fR for fixed-priority.) If the specified
@@ -190,35 +188,29 @@ class is not already configured, it is automatically configured.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 13n
-.rt  
 Displays the scheduling parameters associated with a set of processes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 13n
-.rt  
 Executes a specified command with the class and scheduling parameters
 associated with a set of processes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIidtype\fR\fR
 .ad
 .RS 13n
-.rt  
 This option, together with the \fIidlist\fR arguments (if any), specifies one
 or more processes to which the \fBpriocntl\fR command is to apply. The
 interpretation of \fIidlist\fR depends on the value of \fIidtype\fR. If the
@@ -229,12 +221,10 @@ The valid \fIidtype\fR arguments and corresponding interpretations of
 \fIidlist\fR are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fBall\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fBpriocntl\fR command applies to all existing processes. No \fIidlist\fR
 should be specified (if one is specified, it is ignored). The permission
 restrictions described below still apply.
@@ -242,24 +232,20 @@ restrictions described below still apply.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fBctid\fR\fR
 .ad
 .RS 13n
-.rt  
 idlist is a list of process contract IDs. The \fBpriocntl\fR command applies to
 all processes with a process contract ID equal to an ID from the list.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fBclass\fR\fR
 .ad
 .RS 13n
-.rt  
 \fIidlist\fR consists of a single class name (\fBRT\fR for real-time, \fBTS\fR
 for time-sharing, \fBIA\fR for inter-active, \fBFSS\fR for fair-share, or
 \fBFX\fR for fixed-priority). The \fBpriocntl\fR command applies to all
@@ -268,12 +254,10 @@ processes in the specified class.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fBgid\fR\fR
 .ad
 .RS 13n
-.rt  
 \fIidlist\fR is a list of group \fBID\fRs. The \fBpriocntl\fR command applies
 to all processes with an effective group \fBID\fR equal to an \fBID\fR from the
 list.
@@ -281,48 +265,40 @@ list.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fBpgid\fR\fR
 .ad
 .RS 13n
-.rt  
 \fIidlist\fR is a list of process group \fBID\fRs. The \fBpriocntl\fR command
 applies to all processes in the specified process groups.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fBpid\fR\fR
 .ad
 .RS 13n
-.rt  
 \fIidlist\fR is a list of process \fBID\fRs. The \fBpriocntl\fR command applies
 to the specified processes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fBppid\fR\fR
 .ad
 .RS 13n
-.rt  
 \fIidlist\fR is a list of parent process \fBID\fRs. The \fBpriocntl\fR command
 applies to all processes whose parent process \fBID\fR is in the list.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fBprojid\fR\fR
 .ad
 .RS 13n
-.rt  
 \fIidlist\fR is a list of project \fBID\fRs. The \fBpriocntl\fR command applies
 to all processes with an effective project \fBID\fR equal to an \fBID\fR from
 the list.
@@ -330,36 +306,30 @@ the list.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fBsid\fR\fR
 .ad
 .RS 13n
-.rt  
 \fIidlist\fR is a list of session \fBID\fRs. The \fBpriocntl\fR command applies
 to all processes in the specified sessions.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fBtaskid\fR\fR
 .ad
 .RS 13n
-.rt  
 \fIidlist\fR is a list of task \fBID\fRs. The \fBpriocntl\fR command applies to
 all processes in the specified tasks.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fBuid\fR\fR
 .ad
 .RS 13n
-.rt  
 \fIidlist\fR is a list of user \fBID\fRs. The \fBpriocntl\fR command applies to
 all processes with an effective user \fBID\fR equal to an \fBID\fR from the
 list.
@@ -367,12 +337,10 @@ list.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fBzoneid\fR\fR
 .ad
 .RS 13n
-.rt  
 \fIidlist\fR is a list of zone \fBID\fRs. The \fBpriocntl\fR command applies to
 all processes with an effective zone \fBID\fR equal to an \fBID\fR from the
 list.
@@ -382,12 +350,10 @@ list.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 13n
-.rt  
 Displays a list of the classes currently configured in the system along with
 class-specific information about each class. The format of the class-specific
 information displayed is described under USAGE.
@@ -395,12 +361,10 @@ information displayed is described under USAGE.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 13n
-.rt  
 Sets the scheduling parameters associated with a set of processes.
 .RE
 
@@ -409,35 +373,29 @@ Sets the scheduling parameters associated with a set of processes.
 The valid class-specific options for setting real-time parameters are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIrtpri\fR\fR
 .ad
 .RS 21n
-.rt  
 Sets the real-time priority of the specified process(es) to \fIrtpri\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fItqntm\fR [\fB-r\fR \fIres\fR]\fR
 .ad
 .RS 21n
-.rt  
 Sets the time quantum of the specified process(es) to \fItqntm\fR. You can
 optionally specify a resolution as explained below.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR \fItqsig\fR\fR
 .ad
 .RS 21n
-.rt  
 Sets the real-time time quantum signal of the specified process(es) to
 \fItqsig\fR.
 .RE
@@ -447,23 +405,19 @@ Sets the real-time time quantum signal of the specified process(es) to
 The valid class-specific options for setting time-sharing parameters are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fItsuprilim\fR\fR
 .ad
 .RS 16n
-.rt  
 Sets the user priority limit of the specified process(es) to \fItsuprilim\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fItsupri\fR\fR
 .ad
 .RS 16n
-.rt  
 Sets the user priority of the specified process(es) to \fItsupri\fR.
 .RE
 
@@ -472,23 +426,19 @@ Sets the user priority of the specified process(es) to \fItsupri\fR.
 The valid class-specific options for setting inter-active parameters are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fIiauprilim\fR\fR
 .ad
 .RS 16n
-.rt  
 Sets the user priority limit of the specified process(es) to \fIiauprilim\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIiaupri\fR\fR
 .ad
 .RS 16n
-.rt  
 Sets the user priority of the specified process(es) to \fIiaupri\fR.
 .RE
 
@@ -497,23 +447,19 @@ Sets the user priority of the specified process(es) to \fIiaupri\fR.
 The valid class-specific options for setting fair-share parameters are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fIfssuprilim\fR\fR
 .ad
 .RS 17n
-.rt  
 Sets the user priority limit of the specified process(es) to \fIfssuprilim\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIfssupri\fR\fR
 .ad
 .RS 17n
-.rt  
 Sets the user priority of the specified process(es) to \fIfssupri\fR.
 .RE
 
@@ -522,34 +468,28 @@ Sets the user priority of the specified process(es) to \fIfssupri\fR.
 The valid class-specific options for setting fixed-priority parameters are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fIfxuprilim\fR\fR
 .ad
 .RS 16n
-.rt  
 Sets the user priority limit of the specified process(es) to \fIfxuprilim\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIfxupri\fR\fR
 .ad
 .RS 16n
-.rt  
 Sets the user priority of the specified process(es) to \fIfxupri\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fItqntm\fR\fR
 .ad
 .RS 16n
-.rt  
 [\fB-r\fR \fIres\fR] Sets the time quantum of the specified process(es) to
 \fItqntm\fR. You can optionally specify a resolution as explained below.
 .RE
@@ -1007,23 +947,19 @@ The following exit values are returned:
 For options \fB-d\fR, \fB-l\fR, and \fB-s\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 Error condition.
 .RE
 
@@ -1036,12 +972,10 @@ Return of the Exit Status of the executed command denotes successful operation.
 Otherwise,
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 Command could not be executed at the specified priority.
 .RE
 
@@ -1053,13 +987,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 .TE
 
 .SH SEE ALSO
@@ -1077,7 +1010,6 @@ CSIEnabled
 \fBpriocntl\fR prints the following error messages:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBProcess(es) not found\fR\fR
 .ad
@@ -1088,7 +1020,6 @@ None of the specified processes exists.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSpecified processes from different classes\fR\fR
 .ad
@@ -1100,7 +1031,6 @@ option is not present, and processes from more than one class are specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBInvalid option or argument\fR\fR
 .ad

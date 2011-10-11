@@ -3,18 +3,18 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH devmap_unload 9F "22 Jan 1997" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DEVMAP_UNLOAD 9F "Jan 22, 1997"
 .SH NAME
 devmap_unload, devmap_load \- control validation of memory address translations
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/ddi.h> 
+#include <sys/ddi.h>
 #include <sys/sunddi.h>
 
 
 
-\fBint\fR \fBdevmap_load\fR(\fBdevmap_cookie_t\fR \fIdhp\fR, \fBoffset_t\fR \fIoff\fR, \fBsize_t\fR \fIlen\fR, 
+\fBint\fR \fBdevmap_load\fR(\fBdevmap_cookie_t\fR \fIdhp\fR, \fBoffset_t\fR \fIoff\fR, \fBsize_t\fR \fIlen\fR,
      \fBuint_t\fR \fItype\fR, \fBuint_t\fR \fIrw\fR);
 .fi
 
@@ -30,58 +30,48 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdhp\fR \fR
 .ad
 .RS 8n
-.rt  
 An opaque mapping handle that the system uses to describe the mapping.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoff\fR \fR
 .ad
 .RS 8n
-.rt  
 User offset within the logical device memory at which the loading or unloading
 of the address translations begins.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlen\fR \fR
 .ad
 .RS 8n
-.rt  
 Length (in bytes) of the range being affected.
 .RE
 
 .SS "devmap_load() only"
 .sp
 .ne 2
-.mk
 .na
 \fB\fItype\fR \fR
 .ad
 .RS 9n
-.rt  
 Type of access operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrw\fR \fR
 .ad
 .RS 9n
-.rt  
 Direction of access.
 .RE
 
@@ -128,23 +118,19 @@ process.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 12n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNon-zero\fR\fR
 .ad
 .RS 12n
-.rt  
 An error occurred.
 .RE
 
@@ -177,7 +163,7 @@ xxdevmap_contextmgt(devmap_cookie_t dhp, void *pvtp, offset_t off,
     if (cur_ctx != NULL && cur_ctx != pvp->ctx) {
         p = cur_ctx->pvt;
         /*
-         * unload the region from off to the end of the mapping. 
+         * unload the region from off to the end of the mapping.
          */
         cur_dhp = p->dhp;
         if ((err = devmap_unload(cur_dhp, off, len)) != 0)

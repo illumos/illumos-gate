@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cachefslog 1M "7 Feb 1997" "SunOS 5.11" "System Administration Commands"
+.TH CACHEFSLOG 1M "Feb 7, 1997"
 .SH NAME
 cachefslog \- Cache File System logging
 .SH SYNOPSIS
@@ -28,35 +28,29 @@ The following options are supported. You must be super-user to use the \fB-f\fR
 and \fB-h\fR options.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIlogfile\fR\fR
 .ad
 .RS 14n
-.rt  
 Specify the log file to be used.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 14n
-.rt  
 Halt logging.
 .RE
 
 .SH OPERANDS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcachefs_mount_point\fR\fR
 .ad
 .RS 23n
-.rt  
 A mount point of a cache file system.
 .RE
 
@@ -133,23 +127,19 @@ not logged: /home/sam\fI\fR
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 success
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnon-zero\fR
 .ad
 .RS 12n
-.rt  
 an error has occurred.
 .RE
 
@@ -161,12 +151,10 @@ an error has occurred.
 .SH DIAGNOSTICS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBInvalid path\fR\fR
 .ad
 .RS 16n
-.rt  
 It is illegal to specify a path within a cache file system.
 .RE
 

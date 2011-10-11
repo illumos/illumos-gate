@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ldi_ev_register_callbacks 9F "21 Aug 2007" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH LDI_EV_REGISTER_CALLBACKS 9F "Aug 21, 2007"
 .SH NAME
 ldi_ev_register_callbacks \- add a notify and/or finalize callback
 .SH SYNOPSIS
@@ -11,7 +11,7 @@ ldi_ev_register_callbacks \- add a notify and/or finalize callback
 .nf
 #include <sys/sunldi.h>
 
-\fBint\fR \fBldi_ev_get_cookie\fR(\fIldi_handle_t lh\fR, \fIldi_ev_cookie_t *cookie\fR, 
+\fBint\fR \fBldi_ev_get_cookie\fR(\fIldi_handle_t lh\fR, \fIldi_ev_cookie_t *cookie\fR,
       \fIldi_ev_callback_t *callb\fR, \fBvoid\fR \fI*arg\fR, \fIldi_ev_callback_id_t *id\fR);
 .fi
 
@@ -22,7 +22,6 @@ Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIldi_handle_t lh\fR\fR
 .ad
@@ -34,7 +33,6 @@ requested.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIldi_ev_cookie_t *cookie\fR\fR
 .ad
@@ -46,7 +44,6 @@ An opaque event cookie for the event type returned by a previous call to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIldi_ev_callback_t *callb\fR\fR
 .ad
@@ -73,18 +70,15 @@ struct ldi_ev_callback {
 where
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcb_vers\fR\fR
 .ad
 .RS 11n
-.rt  
 Version of callback vector. Must be set to \fBLDI_EV_CB_VERS\fR by the caller.
 .sp
 The arguments passed into the callbacks when they are invoked, include:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBint ldi_result\fR\fR
 .ad
@@ -97,7 +91,6 @@ callback: \fBLDI_EV_SUCCESS\fR: The state change succeeded
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvoid *ev_data\fR\fR
 .ad
@@ -112,7 +105,6 @@ Event specific data.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvoid *arg\fR\fR
 .ad
@@ -123,7 +115,6 @@ A pointer to opaque caller private data.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldi_ev_callback_id_t *id\fR\fR
 .ad
@@ -339,7 +330,6 @@ unregister the callback(s) later.
 The return values for this function are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDI_EV_SUCCESS\fR\fR
 .ad
@@ -350,7 +340,6 @@ Callback(s) added successfully.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDI_EV_FAILURE\fR\fR
 .ad
@@ -431,7 +420,7 @@ off_notify(ldi_handle_t lh, ldi_ev_cookie_t off_cookie, void *arg,
 
         /*
          * We cannot permit the offline. The first layer that detects
-         * failure i.e. us, must generate finalize events for our 
+         * failure i.e. us, must generate finalize events for our
            consumers
          */
         ldi_ev_finalize(dip, minor, spec_type, LDI_EV_FAILURE, off_cookie,
@@ -446,7 +435,7 @@ off_notify(ldi_handle_t lh, ldi_ev_cookie_t off_cookie, void *arg,
  * in our notify callback. ldi_result passed in may be SUCCESS or FAILURE
  */
 static void
-off_finalize(ldi_handle_t NULL_lh, ldi_ev_cookie_t off_cookie, 
+off_finalize(ldi_handle_t NULL_lh, ldi_ev_cookie_t off_cookie,
     int ldi_result, void *arg, void *ev_data)
 {
         ldi_handle_t lh;
@@ -496,7 +485,7 @@ event_register(void)
 
         /* no notify callbacks allowed for degrade events */
         callb.cb_vers = LDI_EV_CB_VERS;
-        callb.cb_notify = NULL; /* NULL, notify cannot be used for 
+        callb.cb_notify = NULL; /* NULL, notify cannot be used for
                                    DEGRADE */
         callb.cb_finalize = dgrd_finalize;
 
@@ -515,7 +504,7 @@ event_unregister(ldi_ev_callback_id_t id)
  * For degrade events. ldi_result will always be LDI_EV_SUCCESS
  */
 static void
-dgrd_finalize(ldi_handle_t lh, ldi_ev_cookie_t off_cookie, 
+dgrd_finalize(ldi_handle_t lh, ldi_ev_cookie_t off_cookie,
     int ldi_result, void *arg, void *ev_data)
 {
         ASSERT(ldi_result == LDI_EV_SUCCESS);

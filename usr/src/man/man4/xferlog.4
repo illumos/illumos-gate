@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH xferlog 4 "25 Apr 2003" "SunOS 5.11" "File Formats"
+.TH XFERLOG 4 "Apr 25, 2003"
 .SH NAME
 xferlog \- FTP Server transfer log file
 .SH SYNOPSIS
@@ -26,7 +26,7 @@ form. All fields are separated by spaces.
 .in +2
 .nf
 \fIcurrent-time\fR  \fItransfer-time \fR   \fIremote-host\fR  \fIbytes-transferred\fR  \e
-        \fIfilename\fR  
+        \fIfilename\fR
 \fItransfer-type\fR  \fIspecial-action-flag\fR  \fIdirection\fR \fIaccess-mode\fR  \fIusername\fR
 \fIservice-name\fR  \fIauthentication-method\fR  \fIauthenticated-user-id\fR \e
          \fIcompletion-status\fR
@@ -44,87 +44,71 @@ file format used. In addition to those in the default format, it also supports
 The fields are defined as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcurrent-time\fR\fR
 .ad
 .RS 25n
-.rt  
 The current local time in the form \fBDDD MMM dd hh:mm:ss YYYY\fR, where:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDD\fR\fR
 .ad
 .RS 8n
-.rt  
 Is the day of the week
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMMM\fR\fR
 .ad
 .RS 8n
-.rt  
 Is the month
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdd\fR\fR
 .ad
 .RS 8n
-.rt  
 Is the day of the month
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhh\fR\fR
 .ad
 .RS 8n
-.rt  
 Is the hour
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmm\fR\fR
 .ad
 .RS 8n
-.rt  
 Is the minutes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBss\fR\fR
 .ad
 .RS 8n
-.rt  
 Is the seconds
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBYYYY\fR\fR
 .ad
 .RS 8n
-.rt  
 Is the year
 .RE
 
@@ -132,76 +116,62 @@ Is the year
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItransfer-time \fR\fR
 .ad
 .RS 25n
-.rt  
 The total time in seconds for the transfer
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIremote-host\fR\fR
 .ad
 .RS 25n
-.rt  
 The remote host name
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbytes-transferred\fR\fR
 .ad
 .RS 25n
-.rt  
 The number of bytes transferred
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfilename\fR\fR
 .ad
 .RS 25n
-.rt  
 The absolute pathname of the transferred file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItransfer-type\fR\fR
 .ad
 .RS 25n
-.rt  
 A single character indicating the type of transfer:
 .sp
 .ne 2
-.mk
 .na
 \fBa\fR
 .ad
 .RS 5n
-.rt  
 Indicates an ascii transfer
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBb\fR
 .ad
 .RS 5n
-.rt  
 Indicates a binary transfer
 .RE
 
@@ -209,55 +179,45 @@ Indicates a binary transfer
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIspecial-action-flag\fR\fR
 .ad
 .RS 25n
-.rt  
 One or more single character flags that indicate any special action taken. The
 \fIspecial-action-flag\fR can have one of more of the following values:
 .sp
 .ne 2
-.mk
 .na
 \fBC\fR
 .ad
 .RS 16n
-.rt  
 File was compressed
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBU\fR
 .ad
 .RS 16n
-.rt  
 File was uncompressed
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBT\fR
 .ad
 .RS 16n
-.rt  
 File was archived, for example, by using \fBtar\fR(1)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB_ (underbar)\fR
 .ad
 .RS 16n
-.rt  
 No action was taken.
 .RE
 
@@ -265,33 +225,27 @@ No action was taken.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdirection\fR\fR
 .ad
 .RS 25n
-.rt  
 The direction of the transfer. \fIdirection\fR can have one of the following
 values:
 .sp
 .ne 2
-.mk
 .na
 \fBo\fR
 .ad
 .RS 5n
-.rt  
 Outgoing
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBi\fR
 .ad
 .RS 5n
-.rt  
 Incoming
 .RE
 
@@ -299,45 +253,37 @@ Incoming
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaccess-mode\fR\fR
 .ad
 .RS 25n
-.rt  
 The method by which the user is logged in. \fIaccess-mode\fR can have one of
 the following values:
 .sp
 .ne 2
-.mk
 .na
 \fBa\fR
 .ad
 .RS 5n
-.rt  
 For an anonymous user.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBg\fR
 .ad
 .RS 5n
-.rt  
 For a passworded guest user. See the description of the \fBguestgroup\fR
 capability in \fBftpaccess\fR(4).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBr\fR
 .ad
 .RS 5n
-.rt  
 For a real, locally authenticated user
 .RE
 
@@ -345,55 +291,45 @@ For a real, locally authenticated user
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIusername\fR\fR
 .ad
 .RS 25n
-.rt  
 The local username, or if anonymous, the ID string given
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIservice-name\fR\fR
 .ad
 .RS 25n
-.rt  
 The name of the service invoked, usually \fBftp\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIauthentication-method\fR\fR
 .ad
 .RS 25n
-.rt  
 The method of authentication used. \fIauthentication-method\fR can have one of
 the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB0\fR
 .ad
 .RS 5n
-.rt  
 None
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB1\fR
 .ad
 .RS 5n
-.rt  
 \fIRFC 931\fR authentication
 .RE
 
@@ -401,45 +337,37 @@ None
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIauthenticated-user-id\fR\fR
 .ad
 .RS 25n
-.rt  
 The user ID returned by the authentication method. A \fB*\fR is used if an
 authenticated user ID is not available.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcompletion-status\fR\fR
 .ad
 .RS 25n
-.rt  
 A single character indicating the status of the transfer.
 \fIcompletion-status\fR can have one of the following values:
 .sp
 .ne 2
-.mk
 .na
 \fBc\fR
 .ad
 .RS 5n
-.rt  
 Indicates complete transfer
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBi\fR
 .ad
 .RS 5n
-.rt  
 Indicates incomplete transfer
 .RE
 
@@ -447,35 +375,29 @@ Indicates incomplete transfer
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIchroot-filename\fR\fR
 .ad
 .RS 25n
-.rt  
 The pathname of the transferred file relative to the \fBchroot\fR point. This
 will differ from the \fIfilename\fR field for anonymous and guest users.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile-size\fR\fR
 .ad
 .RS 25n
-.rt  
 The size, in bytes, of the file on the server.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrestart-offset\fR\fR
 .ad
 .RS 25n
-.rt  
 The offset, in bytes, at which the file transfer was restarted (0 when no
 restart offset was specified).
 .RE
@@ -492,13 +414,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityExternal
+Interface Stability	External
 .TE
 
 .SH SEE ALSO

@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH stat.h 3HEAD "1 Sep 2009" "SunOS 5.11" "Headers"
+.TH STAT.H 3HEAD "Sep 1, 2009"
 .SH NAME
 stat.h, stat \- data returned by stat system call
 .SH SYNOPSIS
@@ -26,42 +26,40 @@ The constants used in the \fBst_mode\fR field are also defined in this file:
 
 .sp
 .TS
-tab();
-lw(.81i) lw(1.38i) lw(3.32i) 
-lw(.81i) lw(1.38i) lw(3.32i) 
-.
-#defineS_IFMT/* type of file */
-#defineS_IAMB/* access mode bits */
-#defineS_IFIFO/* fifo */
-#defineS_IFCHR/* character special */
-#defineS_IFDIR/* directory */
-#defineS_IFNAM/* \fBXENIX\fR special named file */ 
-#defineS_INSEM/* \fBXENIX\fR semaphore subtype of \fBIFNAM\fR */
-#defineS_INSHD/* \fBXENIX\fR shared data subtype of \fBIFNAM\fR */
-#defineS_IFBLK/* block special */
-#defineS_IFREG/* regular */
-#defineS_IFLNK/* symbolic link */
-#defineS_IFSOCK/* socket */
-#defineS_IFDOOR/* door */
-#defineS_ISUID/* set user id on execution */
-#defineS_ISGID/* set group id on execution */
-#defineS_ISVTX/* save swapped text even after use */
-#defineS_IREAD/* read permission, owner */
-#defineS_IWRITE/* write permission, owner */
-#defineS_IEXEC/* execute/search permission, owner */
-#defineS_ENFMT/* record locking enforcement flag */
-#defineS_IRWXU/* read, write, execute: owner */
-#defineS_IRUSR/* read permission: owner */
-#defineS_IWUSR/* write permission: owner */
-#defineS_IXUSR/* execute permission: owner */
-#defineS_IRWXG/* read, write, execute: group */
-#defineS_IRGRP/* read permission: group */
-#defineS_IWGRP/* write permission: group */
-#defineS_IXGRP/* execute permission: group */
-#defineS_IRWXO/* read, write, execute: other */
-#defineS_IROTH/* read permission: other */
-#defineS_IWOTH/* write permission: other */
-#defineS_IXOTH/* execute permission: other */
+l l l
+l l l .
+#define	S_IFMT	/* type of file */
+#define	S_IAMB	/* access mode bits */
+#define	S_IFIFO	/* fifo */
+#define	S_IFCHR	/* character special */
+#define	S_IFDIR	/* directory */
+#define	S_IFNAM	/* \fBXENIX\fR special named file */
+#define	S_INSEM	/* \fBXENIX\fR semaphore subtype of \fBIFNAM\fR */
+#define	S_INSHD	/* \fBXENIX\fR shared data subtype of \fBIFNAM\fR */
+#define	S_IFBLK	/* block special */
+#define	S_IFREG	/* regular */
+#define	S_IFLNK	/* symbolic link */
+#define	S_IFSOCK	/* socket */
+#define	S_IFDOOR	/* door */
+#define	S_ISUID	/* set user id on execution */
+#define	S_ISGID	/* set group id on execution */
+#define	S_ISVTX	/* save swapped text even after use */
+#define	S_IREAD	/* read permission, owner */
+#define	S_IWRITE	/* write permission, owner */
+#define	S_IEXEC	/* execute/search permission, owner */
+#define	S_ENFMT	/* record locking enforcement flag */
+#define	S_IRWXU	/* read, write, execute: owner */
+#define	S_IRUSR	/* read permission: owner */
+#define	S_IWUSR	/* write permission: owner */
+#define	S_IXUSR	/* execute permission: owner */
+#define	S_IRWXG	/* read, write, execute: group */
+#define	S_IRGRP	/* read permission: group */
+#define	S_IWGRP	/* write permission: group */
+#define	S_IXGRP	/* execute permission: group */
+#define	S_IRWXO	/* read, write, execute: other */
+#define	S_IROTH	/* read permission: other */
+#define	S_IWOTH	/* write permission: other */
+#define	S_IXOTH	/* execute permission: other */
 .TE
 
 .sp
@@ -71,16 +69,14 @@ The following macros are for POSIX conformance (see \fBstandards\fR(5)):
 
 .sp
 .TS
-tab();
-lw(.78i) lw(1.43i) lw(3.29i) 
-lw(.78i) lw(1.43i) lw(3.29i) 
-.
-#defineS_ISBLK(mode)block special file
-#defineS_ISCHR(mode)character special file
-#defineS_ISDIR(mode)directory file
-#defineS_ISFIFO(mode)pipe or fifo file
-#defineS_ISREG(mode)regular file
-#defineS_ISSOCK(mode)socket file
+l l l
+l l l .
+#define	S_ISBLK(mode)	block special file
+#define	S_ISCHR(mode)	character special file
+#define	S_ISDIR(mode)	directory file
+#define	S_ISFIFO(mode)	pipe or fifo file
+#define	S_ISREG(mode)	regular file
+#define	S_ISSOCK(mode)	socket file
 .TE
 
 .sp
@@ -104,15 +100,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO

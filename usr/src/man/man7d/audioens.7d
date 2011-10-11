@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH audioens 7D "15 May 2009" "SunOS 5.11" "Devices"
+.TH AUDIOENS 7D "May 15, 2009"
 .SH NAME
 audioens \- Ensoniq ESS 1371 and ESS 1373 audio driver
 .SH DESCRIPTION
@@ -15,7 +15,6 @@ different names, including the Sound Blaster PCI128 and AudioPCI '97.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/audioens\fR\fR
 .ad
@@ -26,7 +25,6 @@ different names, including the Sound Blaster PCI128 and AudioPCI '97.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/amd64/audioens\fR\fR
 .ad
@@ -37,7 +35,6 @@ different names, including the Sound Blaster PCI128 and AudioPCI '97.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/sparcv9/audioens\fR\fR
 .ad
@@ -54,15 +51,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(0i) |cw(5.5i) 
-lw(0i) |lw(5.5i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureSPARC, x86
+Architecture	SPARC, x86
 _
-Interface StabilityUncommitted
+Interface Stability	Uncommitted
 .TE
 
 .SH SEE ALSO

@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dnet 7D "20 OCT 2000" "SunOS 5.11" "Devices"
+.TH DNET 7D "Oct 20, 2000"
 .SH NAME
 dnet \- Ethernet driver for DEC 21040, 21041, 21140 Ethernet cards
 .SH SYNOPSIS
 .LP
 .nf
-\fB/kernel/drv/dnet\fR 
+\fB/kernel/drv/dnet\fR
 .fi
 
 .SH DESCRIPTION
@@ -124,12 +124,10 @@ Version 4 SROM formats are not supported.
 The \fB/kernel/drv/dnet.conf\fR file supports the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfull-duplex\fR\fR
 .ad
 .RS 15n
-.rt  
 For full duplex operation use \fBfull-duplex=1\fR, for half duplex use
 \fBfull-duplex=0\fR. Half-duplex operation gives better results on older 10mbit
 networks.
@@ -137,12 +135,10 @@ networks.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBspeed\fR\fR
 .ad
 .RS 15n
-.rt  
 For 10mbit operation use \fBspeed=10\fR, for 100mbit operation use
 \fBspeed=100\fR. Certain 21140 based cards will operate at either speed. Use
 the speed property to override the 100mbit default in this case.
@@ -151,23 +147,19 @@ the speed property to override the 100mbit default in this case.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/dnet\fR\fR
 .ad
 .RS 25n
-.rt  
 character special device
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/dnet.conf\fR\fR
 .ad
 .RS 25n
-.rt  
 \fBdnet\fR configuration file
 .RE
 
@@ -179,13 +171,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Architecturex86
+Architecture	x86
 .TE
 
 .SH SEE ALSO

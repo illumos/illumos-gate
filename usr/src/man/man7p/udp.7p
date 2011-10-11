@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH udp 7P "4 July 2006" "SunOS 5.11" "Protocols"
+.TH UDP 7P "Jul 4, 2006"
 .SH NAME
 udp, UDP \- Internet User Datagram Protocol
 .SH SYNOPSIS
@@ -103,7 +103,6 @@ Options at the \fBIP\fR level may be used with \fBUDP\fR. See \fBip\fR(7P) or
 Key Management applications (see \fBipsec\fR(7P)and \fBpf_key\fR(7P)):
 .sp
 .ne 2
-.mk
 .na
 \fBUDP_NAT_T_ENDPOINT\fR
 .ad
@@ -167,12 +166,10 @@ UDP Encapsulation of IPsec ESP Packets\fR, The Internet Society, 2005.
 A socket operation may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEISCONN\fR\fR
 .ad
 .RS 17n
-.rt  
 A \fBconnect()\fR operation was attempted on a socket on which a
 \fBconnect()\fR operation had already been performed, and the socket could not
 be successfully disconnected before making the new connection.
@@ -180,12 +177,10 @@ be successfully disconnected before making the new connection.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEISCONN\fR\fR
 .ad
 .RS 17n
-.rt  
 A \fBsendto()\fR or \fBsendmsg()\fR operation specifying an address to which
 the message should be sent was attempted on a socket on which a \fBconnect()\fR
 operation had already been performed.
@@ -193,12 +188,10 @@ operation had already been performed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTCONN\fR\fR
 .ad
 .RS 17n
-.rt  
 A \fBsend()\fR or \fBwrite()\fR operation, or a \fBsendto()\fR or
 \fBsendmsg()\fR operation not specifying an address to which the message should
 be sent, was attempted on a socket on which a \fBconnect()\fR operation had not
@@ -207,59 +200,49 @@ already been performed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEADDRINUSE\fR\fR
 .ad
 .RS 17n
-.rt  
 A \fBbind()\fR operation was attempted on a socket with a network address/port
 pair that has already been bound to another socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEADDRNOTAVAIL\fR\fR
 .ad
 .RS 17n
-.rt  
 A \fBbind()\fR operation was attempted on a socket with a network address for
 which no network interface exists.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 17n
-.rt  
 A \fBsendmsg()\fR operation with a non-NULL \fBmsg_accrights\fR was attempted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 17n
-.rt  
 A \fBbind()\fR operation was attempted with a "reserved" port number and the
 effective user \fBID\fR of the process was not the privileged user.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOBUFS\fR\fR
 .ad
 .RS 17n
-.rt  
 The system ran out of memory for internal data structures.
 .RE
 

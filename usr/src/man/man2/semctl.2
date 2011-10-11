@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH semctl 2 "1 Feb 2003" "SunOS 5.11" "System Calls"
+.TH SEMCTL 2 "Feb 1, 2003"
 .SH NAME
 semctl \- semaphore control operations
 .SH SYNOPSIS
@@ -59,23 +59,19 @@ semaphore operations as specified by \fIcmd\fR are executed with respect to the
 semaphore specified by \fIsemid\fR and \fIsemnum\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGETVAL\fR\fR
 .ad
 .RS 11n
-.rt  
 Return the value of  semval (see \fBIntro\fR(2)). {READ}
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSETVAL\fR\fR
 .ad
 .RS 11n
-.rt  
 Set the value of  \fBsemval\fR to \fIarg.\fR\fIval\fR. {ALTER} When this
 command is successfully executed, the \fBsemadj\fR value corresponding to the
 specified semaphore in all processes is cleared.
@@ -83,34 +79,28 @@ specified semaphore in all processes is cleared.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGETPID\fR\fR
 .ad
 .RS 11n
-.rt  
 Return the value of \fB(int) sempid\fR. {READ}
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGETNCNT\fR\fR
 .ad
 .RS 11n
-.rt  
 Return the value of \fBsemncnt\fR. {READ}
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGETZCNT\fR\fR
 .ad
 .RS 11n
-.rt  
 Return the value of \fBsemzcnt\fR. {READ}
 .RE
 
@@ -120,23 +110,19 @@ The following operations return and set, respectively, every \fBsemval\fR in
 the set of semaphores.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGETALL\fR\fR
 .ad
 .RS 10n
-.rt  
 Place \fBsemval\fRs into array pointed to by \fIarg.\fR\fBarray\fR. {READ}
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSETALL\fR\fR
 .ad
 .RS 10n
-.rt  
 Set \fBsemval\fRs according to the array pointed to by \fIarg.\fR\fBarray\fR.
 {ALTER}. When this cmd is successfully executed, the \fBsemadj\fR values
 corresponding to each specified semaphore in all processes are cleared.
@@ -147,12 +133,10 @@ corresponding to each specified semaphore in all processes are cleared.
 The following operations are also available.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIPC_STAT\fR\fR
 .ad
 .RS 12n
-.rt  
 Place the current value of each member of the data structure associated with
 \fIsemid\fR into the structure pointed to by \fIarg.\fR\fBbuf\fR. The contents
 of this structure are defined in \fBIntro\fR(2). {READ}
@@ -160,12 +144,10 @@ of this structure are defined in \fBIntro\fR(2). {READ}
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIPC_SET\fR\fR
 .ad
 .RS 12n
-.rt  
 Set the value of the following members of the data structure associated with
 \fIsemid\fR to the corresponding value found in the structure pointed to by
 \fIarg\fR.\fBbuf\fR:
@@ -187,12 +169,10 @@ associated with \fImsqid\fR. Only a process with the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIPC_RMID\fR\fR
 .ad
 .RS 12n
-.rt  
 Remove the semaphore identifier specified by \fIsemid\fR from the system and
 destroy the set of semaphores and data structure associated with it. This
 command can be executed only by a process that has the {\fBPRIV_IPC_OWNER\fR}
@@ -207,45 +187,37 @@ privilege or an effective user \fBID\fR equal to the value of
 Upon successful completion, the value returned depends on \fIcmd\fR as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGETVAL\fR\fR
 .ad
 .RS 11n
-.rt  
 the value of \fBsemval\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGETPID\fR\fR
 .ad
 .RS 11n
-.rt  
 the value of \fB(int) sempid\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGETNCNT\fR\fR
 .ad
 .RS 11n
-.rt  
 the value of \fBsemncnt\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGETZCNT\fR\fR
 .ad
 .RS 11n
-.rt  
 the value of \fBsemzcnt\fR
 .RE
 
@@ -259,34 +231,28 @@ returned and \fBerrno\fR is set to indicate the error.
 The \fBsemctl()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 13n
-.rt  
 Operation permission is denied to the calling process (see \fBIntro\fR(2)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 13n
-.rt  
 The source or target is not a valid address in the user process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fIsemid\fR argument is not a valid semaphore identifier; the \fIsemnum\fR
 argument is less than 0 or greater than \fBsem_nsems\fR \(mi1; or the \fIcmd\fR
 argument is not a valid command or is \fBIPC_SET\fR and \fBsem_perm.uid\fR or
@@ -295,12 +261,10 @@ argument is not a valid command or is \fBIPC_SET\fR and \fBsem_perm.uid\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fIcmd\fR argument is equal to \fBIPC_RMID\fR or \fBIPC_SET\fR, the
 effective user ID of the calling process is not equal to the value of
 \fBsem_perm.cuid\fR or \fBsem_perm.uid\fR in the data structure associated with
@@ -310,24 +274,20 @@ the calling process.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOVERFLOW\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fIcmd\fR argument is \fBIPC_STAT\fR and \fIuid\fR or \fIgid\fR is too
 large to be stored in the structure pointed to by \fIarg.buf\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBERANGE\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fIcmd\fR argument is \fBSETVAL\fR or \fBSETALL\fR and the value to which
 \fBsemval\fR is to be set is greater than the system imposed maximum.
 .RE
@@ -340,13 +300,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

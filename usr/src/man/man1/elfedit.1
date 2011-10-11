@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH elfedit 1 "28 Jan 2008" "SunOS 5.11" "User Commands"
+.TH ELFEDIT 1 "Jan 28, 2008"
 .SH NAME
 elfedit \- examine or edit ELF files
 .SH SYNOPSIS
@@ -69,12 +69,10 @@ The interpretation of the characters in an \fBelfedit\fR token depends on the
 style of quoting used:
 .sp
 .ne 2
-.mk
 .na
 \fBUnquoted\fR
 .ad
 .RS 17n
-.rt  
 Outside of single (') or double (") quotes, backslash (\) acts as an escape
 character. When a backslash character is seen, \fBelfedit\fR ignores it, and
 treats the character following it literally (even if the following character is
@@ -86,12 +84,10 @@ literal character.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSingle Quotes\fR
 .ad
 .RS 17n
-.rt  
 Within single quotes ('), white space characters do not delimit tokens, and are
 interpreted as literal characters within the token. Double quote (") and
 backslash (\) characters are interpreted as literal characters, and have no
@@ -100,134 +96,110 @@ special meaning.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDouble Quotes\fR
 .ad
 .RS 17n
-.rt  
 Within double quotes ("), white space characters do not delimit tokens. Single
 quote characters are interpreted literally and do not have a quoting function.
 Backslash (\) is an escape character which operates similarly to the way it is
 used in the C programming language within a string literal:
 .sp
 .ne 2
-.mk
 .na
 \fB\a\fR
 .ad
 .RS 8n
-.rt  
 alert (bell)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
-\fB\b\fR
+\fB\\b\fR
 .ad
 .RS 8n
-.rt  
 backspace
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\f\fR
 .ad
 .RS 8n
-.rt  
 form feed
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\n\fR
 .ad
 .RS 8n
-.rt  
 newline
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\r\fR
 .ad
 .RS 8n
-.rt  
 return
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\t\fR
 .ad
 .RS 8n
-.rt  
 horizontal tab
 .RE
 
 .sp
 .ne 2
-.mk
 .na
-\fB\v\fR
+\fB\\v\fR
 .ad
 .RS 8n
-.rt  
 vertical tab
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\\\fR
 .ad
 .RS 8n
-.rt  
 backslash
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\'\fR
 .ad
 .RS 8n
-.rt  
 single quote
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\"\fR
 .ad
 .RS 8n
-.rt  
 double quote
 .RE
 
 .sp
 .ne 2
-.mk
 .na
-\fB\ooo\fR
+\fB\\ooo\fR
 .ad
 .RS 8n
-.rt  
 An octal constant, where ooo is one to three octal digits (0...7)
 .RE
 
@@ -250,100 +222,82 @@ form.
 \fBelfedit\fR is delivered with the following standard modules:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcap\fR\fR
 .ad
 .RS 11n
-.rt  
 Capabilities Section
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdyn\fR\fR
 .ad
 .RS 11n
-.rt  
 Dynamic Section
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBehdr\fR\fR
 .ad
 .RS 11n
-.rt  
 ELF Header
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBphdr\fR\fR
 .ad
 .RS 11n
-.rt  
 Program Header Array
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshdr\fR\fR
 .ad
 .RS 11n
-.rt  
 Section Header Array
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstr\fR\fR
 .ad
 .RS 11n
-.rt  
 String Table Section
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsym\fR\fR
 .ad
 .RS 11n
-.rt  
 Symbol Table Section
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsyminfo\fR\fR
 .ad
 .RS 11n
-.rt  
 \fBSyminfo\fR Section
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsys\fR\fR
 .ad
 .RS 11n
-.rt  
 Core built in \fBelfedit\fR commands
 .RE
 
@@ -455,48 +409,40 @@ addition to normal characters, the path can also contain any of the following
 tokens:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%i\fR\fR
 .ad
 .RS 6n
-.rt  
 Expands to the current instruction set architecture (ISA) name (\fBsparc\fR,
 \fBsparcv9\fR, \fBi386\fR, \fBamd64\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%I\fR\fR
 .ad
 .RS 6n
-.rt  
 Expands to the 64-bit ISA. This is the same thing as \fB%i\fR for 64-bit
 versions of \fBelfedit\fR, but expands to the empty string for 32-bit versions.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%o\fR\fR
 .ad
 .RS 6n
-.rt  
 Expands to the old value of the path being modified. This is useful for
 appending or prepending directories to the default path.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%r\fR\fR
 .ad
 .RS 6n
-.rt  
 Root of file system tree holding the \fBelfedit\fR program, assuming that
 \fBelfedit\fR is installed as \fBusr/bin/elfedi\fRt within the tree. On a
 standard system, this is simply the standard system root directory (\fB/\fR).
@@ -507,12 +453,10 @@ modules are used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%%\fR\fR
 .ad
 .RS 6n
-.rt  
 Expands to a single \fB%\fR character
 .RE
 
@@ -532,34 +476,28 @@ The default module search path for \fBelfedit\fR is:
 Expanding the tokens, this is:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/elfedit\fR\fR
 .ad
 .RS 28n
-.rt  
 32-bit \fBelfedit\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/elfedit/sparcv9\fR\fR
 .ad
 .RS 28n
-.rt  
 64-bit \fBelfedit\fR (\fBsparc\fR)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/elfedit/amd64\fR\fR
 .ad
 .RS 28n
-.rt  
 64-bit \fBelfedit\fR (\fBx86\fR)
 .RE
 
@@ -574,12 +512,10 @@ specify both, the \fB-L\fR option supersedes the environment variable.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 29n
-.rt  
 Enable \fBautoprint\fR mode. When \fBautoprint\fR is enabled, \fBelfedit\fR
 prints the modified values that result when the ELF file is modified. This
 output is shown in the current output style, which can be changed using the
@@ -601,12 +537,10 @@ interactive session, use the \fBelfedit\fR command:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 29n
-.rt  
 If set, this option causes \fBelfedit\fR to issue informational messages
 describing its internal operations and details of the ELF object being
 processed. This can be useful when a deep understanding of the operation being
@@ -615,12 +549,10 @@ carried out is desired.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fIcmd\fR\fR
 .ad
 .RS 29n
-.rt  
 Specifies an edit command. Multiple \fB-e\fR options can be specified. If edit
 commands are present on the command line, \fBelfedit\fR operates in batch mode.
 After opening the file, \fBelfedit\fR executes each command in the order given,
@@ -630,60 +562,50 @@ useful for performing simple operations from shell scripts and makefiles.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR \fIpath\fR\fR
 .ad
 .RS 29n
-.rt  
 Sets default path for locating \fBelfedit\fR modules. Modules are described in
 \fBModule Search Path\fR section of this manual page..
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fBdefault\fR | \fBsimple\fR | \fBnum\fR\fR
 .ad
 .RS 29n
-.rt  
 The style used to display ELF data. This option establishes the current style
 for the session. It can be changed from within the \fBelfedit\fR session by
 using the set (\fBsys:set\fR) command, or by providing \fB-o\fR options to the
 individual commands executed within the session.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdefault\fR\fR
 .ad
 .RS 11n
-.rt  
 The default style is to display output in a format intended for human viewing.
 This style is similar to that used by the \fBelfdump\fR utility.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnum\fR\fR
 .ad
 .RS 11n
-.rt  
 Integer values are always shown in integer form. Strings are shown as the
 integer offset into the containing string table.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsimple\fR\fR
 .ad
 .RS 11n
-.rt  
 When displaying strings from within the ELF file, only the string is displayed.
 Integer values are displayed as symbolic constants if possible, and in integer
 form otherwise. No titles, headers, or other supplemental output is shown.
@@ -693,12 +615,10 @@ form otherwise. No titles, headers, or other supplemental output is shown.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 29n
-.rt  
 Read-only mode. The input file is opened for read-only access, and the results
 of the edit session are not saved. \fBelfedit\fR does not allow the
 \fIoutfile\fR argument when \fB-r\fR is specified. Read-only mode is highly
@@ -713,12 +633,10 @@ examination of files for which the user does not have write permission.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinfile\fR\fR
 .ad
 .RS 11n
-.rt  
 Input file containing an ELF object to process.
 .sp
 This can be an executable (\fBET_EXEC\fR), shared object (\fBET_DYN\fR), or
@@ -744,12 +662,10 @@ can be useful for examining an existing file that you do not wish to modify.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoutfile\fR\fR
 .ad
 .RS 11n
-.rt  
 Output file. If both \fIinfile\fR and \fIoutfile\fR are present, \fIinfile\fR
 is opened for read-only access, and the modified object contents are written to
 \fIoutfile\fR.
@@ -791,34 +707,28 @@ their work and exit when running in this mode.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 A fatal error occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Invalid command line options were specified.
 .RE
 
@@ -958,36 +868,30 @@ STT_FUNC
 .SH ENVIRONMENT VARIABLES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBELFEDIT_PATH\fR\fR
 .ad
 .RS 16n
-.rt  
 Alters the default module search path. Module search paths are discussed in the
 \fBModule Search Path\fR section of this manual page.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLD_NOEXEC_64\fR\fR
 .ad
 .RS 16n
-.rt  
 Suppresses the automatic execution of the 64-bit \fBelfedit\fR. By default, the
 64-bit version of \fBelfedit\fR runs if the system is 64-bit capable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAGER\fR\fR
 .ad
 .RS 16n
-.rt  
 Interactively delivers output from \fBelfedit\fR to the screen. If not set,
 \fBmore\fR is used. See \fBmore\fR(1).
 .RE
@@ -995,24 +899,20 @@ Interactively delivers output from \fBelfedit\fR to the screen. If not set,
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/elfedit\fR\fR
 .ad
 .RS 20n
-.rt  
 Default directory for \fBelfedit\fR modules that are loaded on demand to supply
 editing commands.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~/.teclarc\fR\fR
 .ad
 .RS 20n
-.rt  
 Personal \fBtecla\fR customization file for command line editing. See
 \fBtecla\fR(5).
 .RE
@@ -1025,13 +925,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

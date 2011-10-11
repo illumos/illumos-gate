@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH regcmp 1 "Dec 20 1996" "SunOS 5.11" "User Commands"
+.TH REGCMP 1 "Dec 20, 1996"
 .SH NAME
 regcmp \- regular expression compile
 .SH SYNOPSIS
@@ -23,12 +23,10 @@ places the output in \fIfilename\fR\fB\&.i\fR.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi\fR \fR
 .ad
 .RS 9n
-.rt  
 If the \fB\(mi\fR option is used, the output is placed in
 \fIfilename\fR\fB\&.c\fR. The format of entries in \fIfilename\fR is a name (C
 variable) followed by one or more blanks followed by one or more regular
@@ -46,23 +44,19 @@ self-explanatory.
 \fBExample 1 \fRExamples of the \fBregcmp\fR command.
 .sp
 .ne 2
-.mk
 .na
 \fBname \fR
 .ad
 .RS 9n
-.rt  
 \fB"([A\(miZa\(miz][A\(miZa\(miz0\(mi9_]*)$0"\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBtelno\fR
 .ad
 .RS 9n
-.rt  
 \fB"\|\e({0,1}([2\(mi9][01][1\(mi9])$0\e){0,1} *"\fR
 .sp
 \fB"([2\(mi9][0\(mi9]{2})$1[ \(mi]{0,1}"\fR
@@ -97,12 +91,10 @@ A general description of the usage of the \fBLC_*\fR environmental variables
 can be found in \fBenviron\fR(5).
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_CTYPE\fR \fR
 .ad
 .RS 16n
-.rt  
 Determines how \fBregcmp\fR handles characters. When \fBLC_CTYPE\fR is set to a
 valid value, \fBregcmp\fR can display and handle text and filenames containing
 valid characters for that locale.
@@ -110,12 +102,10 @@ valid characters for that locale.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_MESSAGES\fR \fR
 .ad
 .RS 16n
-.rt  
 Determines how diagnostic and informative messages are presented. This includes
 the language and style of the messages, and the correct form of affirmative and
 negative responses.  In the "C" locale, the messages are presented in the
@@ -130,12 +120,11 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
-CSIEnabled
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+CSI	Enabled
 .TE
 
 .SH SEE ALSO

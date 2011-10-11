@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH proc 4 "29 Nov 2006" "SunOS 5.11" "File Formats"
+.TH PROC 4 "Nov 29, 2006"
 .SH NAME
 proc \- /proc, the process file system
 .SH DESCRIPTION
@@ -281,78 +281,64 @@ convenience, it also contains the lwp flags for the representative lwp,
 described later.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_ISSYS\fR\fR
 .ad
 .RS 13n
-.rt  
 process is a system process (see \fBPCSTOP\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_VFORKP\fR\fR
 .ad
 .RS 13n
-.rt  
 process is the parent of a vforked child (see \fBPCWATCH\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_FORK\fR\fR
 .ad
 .RS 13n
-.rt  
 process has its inherit-on-fork mode set (see \fBPCSET\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_RLC\fR\fR
 .ad
 .RS 13n
-.rt  
 process has its run-on-last-close mode set (see \fBPCSET\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_KLC\fR\fR
 .ad
 .RS 13n
-.rt  
 process has its kill-on-last-close mode set (see \fBPCSET\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_ASYNC\fR\fR
 .ad
 .RS 13n
-.rt  
 process has its asynchronous-stop mode set (see \fBPCSET\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_MSACCT\fR\fR
 .ad
 .RS 13n
-.rt  
 Set by default in all processes to indicate that microstate accounting is
 enabled. However, this flag has been deprecated and no longer has any effect.
 Microstate accounting may not be disabled; however, it is still possible to
@@ -361,12 +347,10 @@ toggle the flag.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_MSFORK\fR\fR
 .ad
 .RS 13n
-.rt  
 Set by default in all processes to indicate that microstate accounting will be
 enabled for processes that this parent forks(). However, this flag has been
 deprecated and no longer has any effect. It is possible to toggle this flag;
@@ -375,23 +359,19 @@ however, it is not possible to disable microstate accounting.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_BPTADJ\fR\fR
 .ad
 .RS 13n
-.rt  
 process has its breakpoint adjustment mode set (see \fBPCSET\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_PTRACE\fR\fR
 .ad
 .RS 13n
-.rt  
 process has its ptrace-compatibility mode set (see \fBPCSET\fR).
 .RE
 
@@ -447,34 +427,28 @@ system calls being traced on entry and exit (see \fBPCSENTRY\fR and
 \fBpr_dmodel\fR indicates the data model of the process. Possible values are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_MODEL_ILP32\fR\fR
 .ad
 .RS 19n
-.rt  
 process data model is ILP32.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_MODEL_LP64\fR\fR
 .ad
 .RS 19n
-.rt  
 process data model is LP64.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_MODEL_NATIVE\fR\fR
 .ad
 .RS 19n
-.rt  
 process data model is native.
 .RE
 
@@ -531,112 +505,92 @@ typedef struct lwpstatus {
 it also contains the process flags, described previously.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_STOPPED\fR\fR
 .ad
 .RS 14n
-.rt  
 The lwp is stopped.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_ISTOP\fR\fR
 .ad
 .RS 14n
-.rt  
 The lwp is stopped on an event of interest (see \fBPCSTOP\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_DSTOP\fR\fR
 .ad
 .RS 14n
-.rt  
 The lwp has a stop directive in effect (see \fBPCSTOP\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_STEP\fR\fR
 .ad
 .RS 14n
-.rt  
 The lwp has a single-step directive in effect (see \fBPCRUN\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_ASLEEP\fR\fR
 .ad
 .RS 14n
-.rt  
 The lwp is in an interruptible sleep within a system call.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_PCINVAL\fR\fR
 .ad
 .RS 14n
-.rt  
 The lwp's current instruction (\fBpr_instr\fR) is undefined.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_DETACH\fR\fR
 .ad
 .RS 14n
-.rt  
 This is a detached lwp (see \fBpthread_create\fR(3C) and
 \fBpthread_join\fR(3C)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_DAEMON\fR\fR
 .ad
 .RS 14n
-.rt  
 This is a daemon lwp (see \fBpthread_create\fR(3C)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_ASLWP\fR\fR
 .ad
 .RS 14n
-.rt  
 This flag is obsolete and is never set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_AGENT\fR\fR
 .ad
 .RS 14n
-.rt  
 This is the \fB/proc\fR agent lwp for the process.
 .RE
 
@@ -650,12 +604,10 @@ for the stop. Possible values of \fBpr_why\fR and the associated \fBpr_what\fR
 are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_REQUESTED\fR\fR
 .ad
 .RS 17n
-.rt  
 indicates that the stop occurred in response to a stop directive, normally
 because \fBPCSTOP\fR was applied or because another lwp stopped on an event of
 interest and the asynchronous-stop flag (see \fBPCSET\fR) was not set for the
@@ -664,12 +616,10 @@ process. \fBpr_what\fR is unused in this case.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_SIGNALLED\fR\fR
 .ad
 .RS 17n
-.rt  
 indicates that the lwp stopped on receipt of a signal (see \fBPCSTRACE\fR);
 \fBpr_what\fR holds the signal number that caused the stop (for a newly-stopped
 lwp, the same value is in \fBpr_cursig\fR).
@@ -677,19 +627,16 @@ lwp, the same value is in \fBpr_cursig\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_FAULTED\fR\fR
 .ad
 .RS 17n
-.rt  
 indicates that the lwp stopped on incurring a hardware fault (see
 \fBPCSFAULT\fR); \fBpr_what\fR holds the fault number that caused the stop.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_SYSENTRY\fR\fR
 .ad
@@ -698,19 +645,16 @@ indicates that the lwp stopped on incurring a hardware fault (see
 \fB\fBPR_SYSEXIT\fR\fR
 .ad
 .RS 17n
-.rt  
 indicate a stop on entry to or exit from a system call (see \fBPCSENTRY\fR and
 \fBPCSEXIT\fR); \fBpr_what\fR holds the system call number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_JOBCONTROL\fR\fR
 .ad
 .RS 17n
-.rt  
 indicates that the lwp stopped due to the default action of a job control stop
 signal (see \fBsigaction\fR(2)); \fBpr_what\fR holds the stopping signal
 number.
@@ -718,12 +662,10 @@ number.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_SUSPENDED\fR\fR
 .ad
 .RS 17n
-.rt  
 indicates that the lwp stopped due to internal synchronization of lwps within
 the process. \fBpr_what\fR is unused in this case.
 .RE
@@ -799,12 +741,10 @@ to an invalid virtual address.
 registers.
 .sp
 .ne 2
-.mk
 .na
 \fBSPARC\fR
 .ad
 .RS 21n
-.rt  
 On SPARC-based machines, the predefined constants \fBR_G0\fR ... \fBR_G7\fR,
 \fBR_O0\fR ... \fBR_O7\fR, \fBR_L0\fR ... \fBR_L7\fR, \fBR_I0\fR ...
 \fBR_I7\fR, \fBR_PC\fR, \fBR_nPC\fR, and \fBR_Y\fR can be used as indices to
@@ -815,12 +755,10 @@ file in the \fB/proc/\fR\fIpid\fR\fB/lwp/\fR\fIlwpid\fR subdirectory).
 
 .sp
 .ne 2
-.mk
 .na
 \fBSPARC V8 (32-bit)\fR
 .ad
 .RS 21n
-.rt  
 For SPARC V8 (32-bit) controlling processes, the predefined constants
 \fBR_PSR\fR, \fBR_WIM\fR, and \fBR_TBR\fR can be used as indices to refer to
 the corresponding special registers. For SPARC V9 (64-bit) controlling
@@ -830,12 +768,10 @@ can be used as indices to refer to the corresponding special registers.
 
 .sp
 .ne 2
-.mk
 .na
 \fBx86 (32-bit)\fR
 .ad
 .RS 21n
-.rt  
 For 32-bit x86 processes, the predefined constants listed belowcan be used as
 indices to refer to the corresponding registers.
 .sp
@@ -870,12 +806,10 @@ listed above.
 
 .sp
 .ne 2
-.mk
 .na
 \fBx86 (64-bit)\fR
 .ad
 .RS 21n
-.rt  
 To read the registers of a 32- \fBor\fR a 64-bit process, a 64-bit x86 process
 should use the predefined constants listed below.
 .sp
@@ -1081,7 +1015,7 @@ Contains a description of the privileges associated with the process:
 .sp
 .in +2
 .nf
-typedef struct prpriv {  
+typedef struct prpriv {
      uint32_t        pr_nsets;      /* number of privilege set */
      uint32_t        pr_setsize;    /* size of privilege set */
      uint32_t        pr_infosize;   /* size of supplementary data */
@@ -1192,78 +1126,64 @@ mapped.
 \fBpr_mflags\fR is a bit-mask of protection and attribute flags:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMA_READ\fR\fR
 .ad
 .RS 17n
-.rt  
 mapping is readable by the traced process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMA_WRITE\fR\fR
 .ad
 .RS 17n
-.rt  
 mapping is writable by the traced process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMA_EXEC\fR\fR
 .ad
 .RS 17n
-.rt  
 mapping is executable by the traced process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMA_SHARED\fR\fR
 .ad
 .RS 17n
-.rt  
 mapping changes are shared by the mapped object.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMA_ISM\fR\fR
 .ad
 .RS 17n
-.rt  
 mapping is intimate shared memory (shared MMU resources)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAP_NORESERVE\fR\fR
 .ad
 .RS 17n
-.rt  
 mapping does not have swap space reserved (mapped with MAP_NORESERVE)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMA_SHM\fR\fR
 .ad
 .RS 17n
-.rt  
 mapping System V shared memory
 .RE
 
@@ -1429,23 +1349,19 @@ structure begins on an eight-byte aligned boundary. Each data byte may contain
 these flags:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPG_REFERENCED\fR\fR
 .ad
 .RS 17n
-.rt  
 page has been referenced.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPG_MODIFIED\fR\fR
 .ad
 .RS 17n
-.rt  
 page has been modified.
 .RE
 
@@ -1706,34 +1622,28 @@ Make an lwp runnable again after a stop. This operation takes a \fBlong\fR
 operand containing zero or more of the following flags:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRCSIG\fR\fR
 .ad
 .RS 12n
-.rt  
 clears the current signal, if any (see \fBPCCSIG\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRCFAULT\fR\fR
 .ad
 .RS 12n
-.rt  
 clears the current fault, if any (see \fBPCCFAULT\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRSTEP\fR\fR
 .ad
 .RS 12n
-.rt  
 directs the lwp to execute a single machine instruction. On completion of the
 instruction, a trace trap occurs. If \fBFLTTRACE\fR is being traced, the lwp
 stops; otherwise, it is sent \fBSIGTRAP\fR. If \fBSIGTRAP\fR is being traced
@@ -1746,12 +1656,10 @@ SPARC and x86-based machines.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRSABORT\fR\fR
 .ad
 .RS 12n
-.rt  
 is meaningful only if the lwp is in a \fBPR_SYSENTRY\fR stop or is marked
 \fBPR_ASLEEP\fR; it instructs the lwp to abort execution of the system call
 (see \fBPCSENTRY\fR and \fBPCSEXIT\fR).
@@ -1759,12 +1667,10 @@ is meaningful only if the lwp is in a \fBPR_SYSENTRY\fR stop or is marked
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRSTOP\fR\fR
 .ad
 .RS 12n
-.rt  
 directs the lwp to stop again as soon as possible after resuming execution (see
 \fBPCDSTOP\fR). In particular, if the lwp is stopped on \fBPR_SIGNALLED\fR or
 \fBPR_FAULTED\fR, the next stop will show \fBPR_REQUESTED\fR, no other stop
@@ -1853,133 +1759,109 @@ include the following. Some of these may not occur on all processors; there may
 be processor-specific faults in addition to these.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFLTILL\fR\fR
 .ad
 .RS 13n
-.rt  
 illegal instruction
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFLTPRIV\fR\fR
 .ad
 .RS 13n
-.rt  
 privileged instruction
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFLTBPT\fR\fR
 .ad
 .RS 13n
-.rt  
 breakpoint trap
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFLTTRACE\fR\fR
 .ad
 .RS 13n
-.rt  
 trace trap (single-step)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFLTWATCH\fR\fR
 .ad
 .RS 13n
-.rt  
 watchpoint trap
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFLTACCESS\fR\fR
 .ad
 .RS 13n
-.rt  
 memory access fault (bus error)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFLTBOUNDS\fR\fR
 .ad
 .RS 13n
-.rt  
 memory bounds violation
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFLTIOVF\fR\fR
 .ad
 .RS 13n
-.rt  
 integer overflow
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFLTIZDIV\fR\fR
 .ad
 .RS 13n
-.rt  
 integer zero divide
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFLTFPE\fR\fR
 .ad
 .RS 13n
-.rt  
 floating-point exception
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFLTSTACK\fR\fR
 .ad
 .RS 13n
-.rt  
 unrecoverable stack fault
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFLTPAGE\fR\fR
 .ad
 .RS 13n
-.rt  
 recoverable page fault
 .RE
 
@@ -2042,45 +1924,37 @@ bytes. \fBpr_wflags\fR specifies the type of memory access to be monitored as a
 bit-mask of the following flags:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWA_READ\fR\fR
 .ad
 .RS 16n
-.rt  
 read access
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWA_WRITE\fR\fR
 .ad
 .RS 16n
-.rt  
 write access
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWA_EXEC\fR\fR
 .ad
 .RS 16n
-.rt  
 execution access
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWA_TRAPAFTER\fR\fR
 .ad
 .RS 16n
-.rt  
 trap after the instruction completes
 .RE
 
@@ -2183,12 +2057,10 @@ All watched areas are cancelled when the traced process performs a successful
 flags in an operand \fBlong\fR in the control message:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_FORK\fR\fR
 .ad
 .RS 13n
-.rt  
 (inherit-on-fork): When set, the process's tracing flags and its
 inherit-on-fork mode are inherited by the child of a \fBfork\fR(2),
 \fBfork1\fR(2), or \fBvfork\fR(2). When unset, child processes start with all
@@ -2197,12 +2069,10 @@ tracing flags cleared.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_RLC\fR\fR
 .ad
 .RS 13n
-.rt  
 (run-on-last-close): When set and the last writable \fB/proc\fR file descriptor
 referring to the traced process or any of its lwps is closed, all of the
 process's tracing flags and watched areas are cleared, any outstanding stop
@@ -2214,12 +2084,10 @@ not set running on last close.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_KLC\fR\fR
 .ad
 .RS 13n
-.rt  
 (kill-on-last-close): When set and the last writable \fB/proc\fR file
 descriptor referring to the traced process or any of its lwps is closed, the
 process is terminated with \fBSIGKILL\fR.
@@ -2227,12 +2095,10 @@ process is terminated with \fBSIGKILL\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_ASYNC\fR\fR
 .ad
 .RS 13n
-.rt  
 (asynchronous-stop): When set, a stop on an event of interest by one lwp does
 not directly affect any other lwp in the process. When unset and an lwp stops
 on an event of interest other than \fBPR_REQUESTED\fR, all other lwps in the
@@ -2241,12 +2107,10 @@ process are directed to stop.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_MSACCT\fR\fR
 .ad
 .RS 13n
-.rt  
 (microstate accounting): Microstate accounting is now continuously enabled.
 This flag is deprecated and no longer has any effect upon microstate
 accounting. Applications may toggle this flag; however, microstate accounting
@@ -2255,12 +2119,10 @@ will remain enabled regardless.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_MSFORK\fR\fR
 .ad
 .RS 13n
-.rt  
 (inherit microstate accounting): All processes now inherit microstate
 accounting, as it is continuously enabled. This flag has been deprecated and
 its use no longer has any effect upon the behavior of microstate accounting.
@@ -2268,12 +2130,10 @@ its use no longer has any effect upon the behavior of microstate accounting.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_BPTADJ\fR\fR
 .ad
 .RS 13n
-.rt  
 (breakpoint trap pc adjustment): On x86-based machines, a breakpoint trap
 leaves the program counter (the \fBEIP\fR) referring to the breakpointed
 instruction plus one byte. When \fBPR_BPTADJ\fR is set, the system will adjust
@@ -2285,12 +2145,10 @@ instruction.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPR_PTRACE\fR\fR
 .ad
 .RS 13n
-.rt  
 (ptrace-compatibility): When set, a stop on an event of interest by the traced
 process is reported to the parent of the traced process by \fBwait\fR(3C),
 \fBSIGTRAP\fR is sent to the traced process when it executes a successful
@@ -2543,7 +2401,6 @@ wait simply for termination.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc\fR\fR
 .ad
@@ -2554,7 +2411,6 @@ directory (list of processes)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR\fR\fR
 .ad
@@ -2565,7 +2421,6 @@ specific process directory
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/self\fR\fR
 .ad
@@ -2576,7 +2431,6 @@ alias for a process's own directory
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/as\fR\fR
 .ad
@@ -2587,7 +2441,6 @@ address space file
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/ctl\fR\fR
 .ad
@@ -2598,7 +2451,6 @@ process control file
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/status\fR\fR
 .ad
@@ -2609,7 +2461,6 @@ process status
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/lstatus\fR\fR
 .ad
@@ -2620,7 +2471,6 @@ array of lwp status structs
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/psinfo\fR\fR
 .ad
@@ -2631,7 +2481,6 @@ process \fBps\fR(1) info
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/lpsinfo\fR\fR
 .ad
@@ -2642,7 +2491,6 @@ array of lwp \fBps\fR(1) info structs
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/map\fR\fR
 .ad
@@ -2653,7 +2501,6 @@ address space map
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/xmap\fR\fR
 .ad
@@ -2664,7 +2511,6 @@ extended address space map
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/rmap\fR\fR
 .ad
@@ -2675,7 +2521,6 @@ reserved address map
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/cred\fR\fR
 .ad
@@ -2686,7 +2531,6 @@ process credentials
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/priv\fR\fR
 .ad
@@ -2697,7 +2541,6 @@ process privileges
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/sigact\fR\fR
 .ad
@@ -2708,7 +2551,6 @@ process signal actions
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/auxv\fR\fR
 .ad
@@ -2719,7 +2561,6 @@ process aux vector
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/ldt\fR\fR
 .ad
@@ -2730,7 +2571,6 @@ process \fBLDT\fR (x86 only)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/usage\fR\fR
 .ad
@@ -2741,7 +2581,6 @@ process usage
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/lusage\fR\fR
 .ad
@@ -2752,7 +2591,6 @@ array of lwp usage structs
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/path\fR\fR
 .ad
@@ -2763,7 +2601,6 @@ symbolic links to process open files
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/pagedata\fR\fR
 .ad
@@ -2774,7 +2611,6 @@ process page data
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/watch\fR\fR
 .ad
@@ -2785,7 +2621,6 @@ active watchpoints
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/cwd\fR\fR
 .ad
@@ -2796,7 +2631,6 @@ alias for the current working directory
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/root\fR\fR
 .ad
@@ -2807,7 +2641,6 @@ alias for the root directory
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/fd\fR\fR
 .ad
@@ -2818,7 +2651,6 @@ directory (list of open files)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/fd/*\fR\fR
 .ad
@@ -2829,7 +2661,6 @@ aliases for process's open files
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/object\fR\fR
 .ad
@@ -2840,7 +2671,6 @@ directory (list of mapped files)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/object/a.out\fR\fR
 .ad
@@ -2851,7 +2681,6 @@ alias for process's executable file
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/object/*\fR\fR
 .ad
@@ -2862,7 +2691,6 @@ aliases for other mapped files
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/lwp\fR\fR
 .ad
@@ -2873,7 +2701,6 @@ directory (list of lwps)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/lwp/\fIlwpid\fR\fR\fR
 .ad
@@ -2884,7 +2711,6 @@ specific lwp directory
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/lwp/agent\fR\fR
 .ad
@@ -2895,7 +2721,6 @@ alias for the agent lwp directory
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/lwp/\fIlwpid\fR/lwpctl\fR\fR
 .ad
@@ -2906,7 +2731,6 @@ lwp control file
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/lwp/\fIlwpid\fR/lwpstatus\fR\fR
 .ad
@@ -2917,7 +2741,6 @@ lwp status
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/lwp/\fIlwpid\fR/lwpsinfo\fR\fR
 .ad
@@ -2928,7 +2751,6 @@ lwp \fBps\fR(1) info
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/lwp/\fIlwpid\fR/lwpusage\fR\fR
 .ad
@@ -2939,7 +2761,6 @@ lwp usage
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/lwp/\fIlwpid\fR/gwindows\fR\fR
 .ad
@@ -2950,7 +2771,6 @@ register windows (SPARC only)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/lwp/\fIlwpid\fR/xregs\fR\fR
 .ad
@@ -2961,7 +2781,6 @@ extra state registers
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/lwp/\fIlwpid\fR/asrs\fR\fR
 .ad
@@ -2993,24 +2812,20 @@ Errors that can occur in addition to the errors normally associated with file
 system access:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE2BIG\fR\fR
 .ad
 .RS 13n
-.rt  
 Data to be returned in a \fBread\fR(2) of the page data file exceeds the size
 of the read buffer provided by the caller.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 13n
-.rt  
 An attempt was made to examine a process that ran under a different uid than
 the controlling process and {\fBPRIV_PROC_OWNER\fR} was not asserted in the
 effective set.
@@ -3018,12 +2833,10 @@ effective set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 13n
-.rt  
 The traced process has performed an \fBexec\fR(2) of a setuid/setgid object
 file or of an object file that it cannot read; all further operations on the
 process or lwp file descriptor (except \fBclose\fR(2)) elicit this error.
@@ -3031,12 +2844,10 @@ process or lwp file descriptor (except \fBclose\fR(2)) elicit this error.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBUSY\fR\fR
 .ad
 .RS 13n
-.rt  
 \fBPCSTOP\fR, \fBPCDSTOP\fR, \fBPCWSTOP\fR, or \fBPCTWSTOP\fR was applied to a
 system process; an exclusive \fBopen\fR(2) was attempted on a \fB/proc\fR file
 for a process already open for writing; \fBPCRUN\fR, \fBPCSREG\fR,
@@ -3048,12 +2859,10 @@ that was not fully stopped or that already had an agent lwp.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 13n
-.rt  
 In general, this means that some invalid argument was supplied to a system
 call. A non-exhaustive list of conditions eliciting this error includes: a
 control message operation code is undefined; an out-of-range signal number was
@@ -3065,35 +2874,29 @@ that does not support extra state registers.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 13n
-.rt  
 A signal was received by the controlling process while waiting for the traced
 process or lwp to stop via \fBPCSTOP\fR, \fBPCWSTOP\fR, or \fBPCTWSTOP\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 13n
-.rt  
 A \fBwrite\fR(2) was attempted at an illegal address in the traced process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 13n
-.rt  
 The traced process or lwp has terminated after being opened. The basic
 privilege {\fBPRIV_PROC_INFO\fR} is not asserted in the effective set of the
 calling process and the calling process cannot send a signal to the target
@@ -3102,12 +2905,10 @@ process.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 13n
-.rt  
 The system-imposed limit on the number of page data file descriptors was
 reached on an open of \fB/proc/\fR\fIpid\fR\fB/pagedata\fR; an attempt was made
 with \fBPCWATCH\fR to establish more watched areas than the system can support;
@@ -3117,24 +2918,20 @@ creating lwps.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSYS\fR\fR
 .ad
 .RS 13n
-.rt  
 An attempt was made to perform an unsupported operation (such as
 \fBcreat\fR(2), \fBlink\fR(2), or \fBunlink\fR(2)) on an entry in \fB/proc\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOVERFLOW\fR\fR
 .ad
 .RS 13n
-.rt  
 A 32-bit controlling process attempted to read or write the \fBas\fR file or
 attempted to read the \fBmap\fR, \fBrmap\fR, or \fBpagedata\fR file of a 64-bit
 target process. A 32-bit controlling process attempted to apply one of the
@@ -3144,12 +2941,10 @@ control operations \fBPCSREG\fR, \fBPCSXREG\fR, \fBPCSVADDR\fR, \fBPCWATCH\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 13n
-.rt  
 The process that issued the \fBPCSCRED\fR or \fBPCSCREDX\fR operation did not
 have the {\fBPRIV_PROC_SETID\fR} privilege asserted in its effective set, or
 the process that issued the \fBPCNICE\fR operation did not have the

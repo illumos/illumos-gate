@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing. See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH growfs 1M "20 Apr 2009" "SunOS 5.11" "System Administration Commands"
+.TH GROWFS 1M "Apr 20, 2009"
 .SH NAME
 growfs \- non-destructively expand a UFS file system
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/growfs\fR [\fB-M\fR \fImount-point\fR] [\fInewfs-options\fR] 
+\fB/usr/sbin/growfs\fR [\fB-M\fR \fImount-point\fR] [\fInewfs-options\fR]
      [\fIraw-device\fR]
 .fi
 
@@ -56,35 +56,29 @@ circumstance, you would have to restore the file system from backups.
 Root privileges are required for all of the following options.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR \fImount-point\fR\fR
 .ad
 .RS 18n
-.rt  
 The file system to be expanded is mounted on \fImount-point\fR. File system
 locking (\fBlockfs\fR) will be used.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInewfs-options\fR\fR
 .ad
 .RS 18n
-.rt  
 The options are documented in the \fBnewfs\fR man page.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIraw-device\fR\fR
 .ad
 .RS 18n
-.rt  
 Specifies the name of a raw metadevice or raw special device, residing in
 \fB/dev/md/rdsk\fR, or \fB/dev/rdsk\fR, respectively, including the disk slice,
 where you want the file system to be grown.
@@ -206,23 +200,19 @@ access times are not kept when the lock is in effect.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 

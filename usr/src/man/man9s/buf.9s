@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH buf 9S "19 Sep 2002" "SunOS 5.11" "Data Structures for Drivers"
+.TH BUF 9S "Sep 19, 2002"
 .SH NAME
 buf \- block I/O data transfer structure
 .SH SYNOPSIS
@@ -46,16 +46,16 @@ device is maximized. The \fBav_forw\fR and the \fBav_back\fR members of the
 .sp
 .in +2
 .nf
-int           b_flags;           /* Buffer status */ 
+int           b_flags;           /* Buffer status */
 struct buf    *av_forw;          /* Driver work list link */
 struct buf    *av_back;          /* Driver work list link */
-size_t        b_bcount;          /* # of bytes to transfer */ 
+size_t        b_bcount;          /* # of bytes to transfer */
 union {
-     caddr_t  b_addr;            /* Buffer's virtual address */ 
+     caddr_t  b_addr;            /* Buffer's virtual address */
 } b_un;
-daddr_t       b_blkno;           /* Block number on device */ 
-diskaddr_t    b_lblkno;          /* Expanded block number on dev. */ 
-size_t        b_resid;           /* # of bytes not xferred */ 
+daddr_t       b_blkno;           /* Block number on device */
+diskaddr_t    b_lblkno;          /* Expanded block number on dev. */
+size_t        b_resid;           /* # of bytes not xferred */
 size_t        b_bufsize;         /* size of alloc. buffer */
 int           (*b_iodone)(struct buf *); /* function called */
 	                                        /* by biodone */
@@ -85,12 +85,10 @@ kernel and may not be used.
 Valid flags are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBB_BUSY\fR \fR
 .ad
 .RS 13n
-.rt  
 Indicates the buffer is in use. The driver must not change this flag unless it
 allocated the buffer with \fBgetrbuf\fR(9F) and no \fBI/O\fR operation is in
 progress.
@@ -98,23 +96,19 @@ progress.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBB_DONE\fR \fR
 .ad
 .RS 13n
-.rt  
 Indicates the data transfer has completed. This flag is read-only.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBB_ERROR\fR \fR
 .ad
 .RS 13n
-.rt  
 Indicates an \fBI/O\fR transfer error. It is set in conjunction with the
 \fBb_error\fR field. \fBbioerror\fR(9F) should be used in preference to setting
 the \fBB_ERROR\fR bit.
@@ -122,12 +116,10 @@ the \fBB_ERROR\fR bit.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBB_PAGEIO\fR \fR
 .ad
 .RS 13n
-.rt  
 Indicates the buffer is being used in a paged \fBI/O\fR request. See the
 description of the \fBb_un.b_addr\fR field for more information. This flag is
 read-only.
@@ -135,12 +127,10 @@ read-only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBB_PHYS\fR \fR
 .ad
 .RS 13n
-.rt  
 indicates the buffer header is being used for physical (direct) \fBI/O\fR to a
 user data area. See the description of the \fBb_un.b_addr\fR field for more
 information. This flag is read-only.
@@ -148,23 +138,19 @@ information. This flag is read-only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBB_READ\fR \fR
 .ad
 .RS 13n
-.rt  
 Indicates that data is to be read from the peripheral device into main memory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBB_WRITE\fR \fR
 .ad
 .RS 13n
-.rt  
 Indicates that the data is to be transferred from main memory to the peripheral
 device. \fBB_WRITE\fR is a pseudo flag and cannot be directly tested; it is
 only detected as the NOT form of \fBB_READ\fR.

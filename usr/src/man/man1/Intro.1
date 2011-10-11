@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH Intro 1 "18 Nov 2008" "SunOS 5.11" "User Commands"
+.TH INTRO 1 "Nov 18, 2008"
 .SH NAME
 Intro, intro \- introduction to commands and application programs
 .SH DESCRIPTION
@@ -17,45 +17,37 @@ operating system.
 Pages of special interest are categorized as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB1B\fR
 .ad
 .RS 6n
-.rt  
 Commands found only in the \fISunOS/BSD Compatibility Package\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB1C\fR
 .ad
 .RS 6n
-.rt  
 Commands for communicating with other systems.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB1F\fR
 .ad
 .RS 6n
-.rt  
 Commands associated with \fIForm and Menu Language Interpreter\fR (FMLI).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB1S\fR
 .ad
 .RS 6n
-.rt  
 Commands specific to SunOS.
 .RE
 
@@ -97,69 +89,57 @@ should be interpreted as explained below.
 \fIname\fR [\fB-\fR\fIoption\fR...] [\fIcmdarg\fR...] where:
 .sp
 .ne 2
-.mk
 .na
 \fB[ ]\fR
 .ad
 .RS 15n
-.rt  
 Surround an \fIoption\fR or \fIcmdarg\fR that is not required.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fI\&...\fR\fR
 .ad
 .RS 15n
-.rt  
 Indicates multiple occurrences of the \fIoption\fR or \fIcmdarg\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR\fR
 .ad
 .RS 15n
-.rt  
 The name of an executable file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB{ }\fR
 .ad
 .RS 15n
-.rt  
 The options and/or arguments enclosed within braces are interdependent, such
 that everything enclosed must be treated as a unit.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoption\fR\fR
 .ad
 .RS 15n
-.rt  
 (Always preceded by a "\(mi".) \fInoargletter\fR... or, \fIargletter\fR
 \fIoptarg\fR[\fB,\fR...]
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInoargletter\fR\fR
 .ad
 .RS 15n
-.rt  
 A single letter representing an option without an option-argument. Notice that
 more than one \fInoargletter\fR option can be grouped after one "\(mi"
 (Guideline 5, below).
@@ -167,23 +147,19 @@ more than one \fInoargletter\fR option can be grouped after one "\(mi"
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIargletter\fR\fR
 .ad
 .RS 15n
-.rt  
 A single letter representing an option requiring an option-argument.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoptarg\fR\fR
 .ad
 .RS 15n
-.rt  
 An option-argument (character string) satisfying a preceding \fIargletter\fR.
 Notice that groups of \fIoptargs\fR following an \fIargletter\fR must be
 separated by commas, or separated by a tab or space character and quoted
@@ -192,12 +168,10 @@ separated by commas, or separated by a tab or space character and quoted
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcmdarg\fR\fR
 .ad
 .RS 15n
-.rt  
 Path name (or other command argument) \fInot\fR beginning with "\(mi", or
 "\(mi" by itself indicating the standard input.
 .RE
@@ -401,12 +375,10 @@ option_argument\fR in the example).
 CLIP expands the guidelines discussed with the following additional guidelines:
 .sp
 .ne 2
-.mk
 .na
 \fB14.\fR
 .ad
 .RS 7n
-.rt  
 The form \fBcommand subcommand [options] [operands]\fR is appropriate for
 grouping similar operations. Subcommand names should follow the same
 conventions as command names as specified in guidelines 1 and 2.
@@ -414,12 +386,10 @@ conventions as command names as specified in guidelines 1 and 2.
 
 .sp
 .ne 2
-.mk
 .na
 \fB15.\fR
 .ad
 .RS 7n
-.rt  
 Long-options should be preceded by \fB--\fR and should include only
 alphanumeric characters and hyphens from the portable character set. Option
 names are typically one to three words long, with hyphens to separate words.
@@ -427,24 +397,20 @@ names are typically one to three words long, with hyphens to separate words.
 
 .sp
 .ne 2
-.mk
 .na
 \fB16.\fR
 .ad
 .RS 7n
-.rt  
 \fB--name=argument\fR should be used to specify an option-argument for a
 long-option. The form \fB--name argument\fR is also accepted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB17.\fR
 .ad
 .RS 7n
-.rt  
 All utilities should support two standard long-options: \fB--version\fR (with
 the short-option synonym \fB-V\fR ) and \fB--help\fR (with the short-option
 synonym \fB-?\fR ). The short option synonyms for \fB--\fRversion can vary if
@@ -455,12 +421,10 @@ after displaying the appropriate output, the utility successfully exits.
 
 .sp
 .ne 2
-.mk
 .na
 \fB18.\fR
 .ad
 .RS 7n
-.rt  
 Every short-option should have exactly one corresponding long-option and every
 long-option should have exactly one corresponding short-option. Synonymous
 options can be allowed in the interest of compatibility with historical
@@ -469,12 +433,10 @@ practice or community versions of equivalent utilities.
 
 .sp
 .ne 2
-.mk
 .na
 \fB19.\fR
 .ad
 .RS 7n
-.rt  
 The short-option name should get its name from the long-option name according
 to these rules:
 .RS +4
@@ -504,12 +466,10 @@ arbitrary character.
 
 .sp
 .ne 2
-.mk
 .na
 \fB20.\fR
 .ad
 .RS 7n
-.rt  
 If a long-option name consists of a single character, it must use the same
 character as the short-option name. Single character long-options should be
 avoided. They are only allowed for the exceptionally rare case that a single
@@ -518,12 +478,10 @@ character is the most  descriptive name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB21.\fR
 .ad
 .RS 7n
-.rt  
 The subcommand in the form described in guideline 1 of the additional CLIP
 guidelines is generally required. In the case where it is omitted, the command
 shall take no operands and only options which are defined to stop further

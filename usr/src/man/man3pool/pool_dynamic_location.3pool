@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pool_dynamic_location 3POOL "23 Sep 2003" "SunOS 5.11" "Pool Configuration Manipulation Library Functions"
+.TH POOL_DYNAMIC_LOCATION 3POOL "Sep 23, 2003"
 .SH NAME
 pool_dynamic_location, pool_static_location, pool_version, pool_get_status,
 pool_set_status, pool_resource_type_list \- resource pool framework functions
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpool\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpool\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <pool.h>
 
 \fBconst char *\fR\fBpool_dynamic_location\fR(\fBvoid\fR);
@@ -109,12 +109,10 @@ No errors are defined for \fBpool_dynamic_location()\fR,
 The \fBpool_get_status()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_SYSTEM\fR\fR
 .ad
 .RS 14n
-.rt  
 A system error occurred when accessing the kernel pool state.
 .RE
 
@@ -123,12 +121,10 @@ A system error occurred when accessing the kernel pool state.
 The \fBpool_set_status()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_SYSTEM\fR\fR
 .ad
 .RS 14n
-.rt  
 A system error occurred when modifying the kernel pool state.
 .RE
 
@@ -137,12 +133,10 @@ A system error occurred when modifying the kernel pool state.
 The \fBpool_resource_type_list()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_BADPARAM\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fInumres\fR parameter was \fINULL\fR.
 .RE
 
@@ -155,15 +149,15 @@ The \fInumres\fR parameter was \fINULL\fR.
 #include sys/types.h>
 #include <unistd.h>
 #include <pool.h>
- 
+
 \&...
- 
+
 const char *location = pool_dynamic_location();
- 
+
 \&...
- 
-    (void) fprintf(stderr, "pool dynamic location is %s\en", 
-           location);           
+
+    (void) fprintf(stderr, "pool dynamic location is %s\en",
+           location);
 .fi
 .in -2
 
@@ -174,9 +168,9 @@ const char *location = pool_dynamic_location();
 .nf
 #include <stdio.h>
 #include <pool.h>
- 
+
 \&...
- 
+
    if (pool_set_status(POOL_ENABLED) != 0) {
       (void) fprintf(stderr, "pools could not be enabled %s\en",
              pool_strerror(pool_error()));
@@ -194,17 +188,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityUnstable
+Interface Stability	Unstable
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

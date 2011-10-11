@@ -1,19 +1,19 @@
 '\" te
 .\" Copyright (c) 2001, The IEEE and The Open Group. All Rights Reserved. Portions Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH glob.h 3HEAD "10 Sep 2004" "SunOS 5.11" "Headers"
+.TH GLOB.H 3HEAD "Sep 10, 2004"
 .SH NAME
 glob.h, glob \- pathname pattern-matching types
 .SH SYNOPSIS
 .LP
 .nf
-#include <\fBglob.h\fR> 
+#include <\fBglob.h\fR>
 .fi
 
 .SH DESCRIPTION
@@ -28,9 +28,9 @@ The structure type \fBglob_t\fR contains the following members:
 .in +2
 .nf
 size_t gl_pathc       /* count of paths matched by pattern */
-char   **gl_pathv     /* pointer to a list of matched 
+char   **gl_pathv     /* pointer to a list of matched
                          pathnames */
-size_t gl_offs        /* lots to reserve at the beginning 
+size_t gl_offs        /* lots to reserve at the beginning
                          of gl_pathv */
 .fi
 .in -2
@@ -40,79 +40,65 @@ size_t gl_offs        /* lots to reserve at the beginning
 The following constants are provided as values for the \fBflags\fR argument:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLOB_APPEND\fR\fR
 .ad
 .RS 17n
-.rt  
 Append generated pathnames to those previously obtained.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLOB_DOOFFS\fR\fR
 .ad
 .RS 17n
-.rt  
 Specify how many null pointers to add to the beginning of \fBgl_pathv\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLOB_ERR\fR\fR
 .ad
 .RS 17n
-.rt  
 Cause \fBglob()\fR to return on error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLOB_MARK\fR\fR
 .ad
 .RS 17n
-.rt  
 Each pathname that is a directory that matches pattern has a slash appended.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLOB_NOCHECK\fR\fR
 .ad
 .RS 17n
-.rt  
 If pattern does not match any  pathname, then return a list consisting of only
 pattern.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLOB_NOESCAPE\fR\fR
 .ad
 .RS 17n
-.rt  
 Disable backslash escaping.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLOB_NOSORT\fR\fR
 .ad
 .RS 17n
-.rt  
 Do not sort the pathnames returned.
 .RE
 
@@ -121,47 +107,39 @@ Do not sort the pathnames returned.
 The following constants are defined as error return values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLOB_ABORTED\fR\fR
 .ad
 .RS 16n
-.rt  
 The scan was stopped because \fBGLOB_ERR\fR was set or \fB(*errfunc)()\fR
 returned non-zero.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLOB_NOMATCH\fR\fR
 .ad
 .RS 16n
-.rt  
 The pattern does not match any existing pathname, and \fBGLOB_NOCHECK\fR was
 not set in flags.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLOB_NOSPACE\fR\fR
 .ad
 .RS 16n
-.rt  
 An attempt to allocate memory failed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLOB_NOSYS\fR\fR
 .ad
 .RS 16n
-.rt  
 Reserved.
 .RE
 
@@ -173,13 +151,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

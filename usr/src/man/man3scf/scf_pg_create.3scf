@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH scf_pg_create 3SCF "29 Jun 2009" "SunOS 5.11" "Service Configuration Facility Library Functions"
+.TH SCF_PG_CREATE 3SCF "Jun 29, 2009"
 .SH NAME
 scf_pg_create, scf_pg_handle, scf_pg_destroy, scf_pg_get_parent_service,
 scf_pg_get_parent_instance, scf_pg_get_parent_snaplevel, scf_pg_get_name,
@@ -15,7 +15,7 @@ property groups in the Service Configuration Facility
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <libscf.h>
 
 \fBscf_propertygroup_t *\fR\fBscf_pg_create\fR(\fBscf_handle_t *\fR\fIhandle\fR);
@@ -247,7 +247,6 @@ Upon successful completion, \fBscf_pg_get_parent_service()\fR,
 The \fBscf_pg_create()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
 .ad
@@ -258,7 +257,6 @@ The \fIhandle\fR argument is \fINULL\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NO_MEMORY\fR\fR
 .ad
@@ -269,7 +267,6 @@ There is not enough memory to allocate an \fBscf_propertygroup_t\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NO_RESOURCES\fR\fR
 .ad
@@ -283,7 +280,6 @@ The server does not have adequate resources for a new property group handle.
 The \fBscf_pg_handle()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_HANDLE_DESTROYED\fR\fR
 .ad
@@ -297,7 +293,6 @@ The handle associated with \fIpg\fR has been destroyed.
 The \fBscf_pg_update()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_CONNECTION_BROKEN\fR\fR
 .ad
@@ -308,7 +303,6 @@ The connection to the repository was lost.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_DELETED\fR\fR
 .ad
@@ -319,7 +313,6 @@ An ancestor of the property group specified by \fIpg\fR has been deleted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_INTERNAL\fR\fR
 .ad
@@ -330,7 +323,6 @@ An internal error occurred. This can happen if \fIpg\fR has been corrupted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
 .ad
@@ -341,7 +333,6 @@ The \fIpg\fR argument refers to an invalid \fBscf_propertygroup_t\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_BOUND\fR\fR
 .ad
@@ -352,7 +343,6 @@ The handle is not bound.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_SET\fR\fR
 .ad
@@ -368,7 +358,6 @@ The \fBscf_service_get_pg()\fR, \fBscf_instance_get_pg()\fR,
 \fBscf_pg_get_underlying_pg()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_BACKEND_ACCESS\fR\fR
 .ad
@@ -380,7 +369,6 @@ chose for the operation denied access.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_INTERNAL\fR\fR
 .ad
@@ -391,7 +379,6 @@ An internal error occurred.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NO_RESOURCES\fR\fR
 .ad
@@ -407,7 +394,6 @@ The \fBscf_pg_get_name()\fR, \fBscf_pg_get_type()\fR, \fBscf_pg_get_flags()\fR,
 \fBscf_pg_get_parent_instance()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_DELETED\fR\fR
 .ad
@@ -418,7 +404,6 @@ The property group specified by \fIpg\fR has been deleted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_SET\fR\fR
 .ad
@@ -429,7 +414,6 @@ The property group specified by \fIpg\fR is not set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_BOUND\fR\fR
 .ad
@@ -440,7 +424,6 @@ The handle is not bound.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_CONNECTION_BROKEN\fR\fR
 .ad
@@ -455,7 +438,6 @@ The \fBscf_pg_get_parent_service()\fR, \fBscf_pg_get_parent_snaplevel()\fR, and
 \fBscf_pg_get_parent_instance()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_CONSTRAINT_VIOLATED\fR\fR
 .ad
@@ -467,7 +449,6 @@ property group specified by \fIpg\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_HANDLE_MISMATCH\fR\fR
 .ad
@@ -484,7 +465,6 @@ The \fBscf_instance_get_pg()\fR, \fBscf_instance_get_pg_composed()\fR,
 \fBscf_snaplevel_get_pg()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_FOUND\fR\fR
 .ad
@@ -501,7 +481,6 @@ The \fBscf_service_add_pg()\fR, \fBscf_service_get_pg()\fR,
 functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_DELETED\fR\fR
 .ad
@@ -512,7 +491,6 @@ The service or instance has been deleted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_SET\fR\fR
 .ad
@@ -523,7 +501,6 @@ The instance is not set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
 .ad
@@ -534,7 +511,6 @@ The value of the \fIname\fR argument is not a valid property group name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_HANDLE_MISMATCH\fR\fR
 .ad
@@ -546,7 +522,6 @@ derived from the same handle.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_BOUND\fR\fR
 .ad
@@ -557,7 +532,6 @@ The handle is not bound.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_CONNECTION_BROKEN\fR\fR
 .ad
@@ -572,7 +546,6 @@ The \fBscf_service_add_pg()\fR and \fBscf_instance_add_pg()\fR functions will
 fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_PERMISSION_DENIED\fR\fR
 .ad
@@ -583,7 +556,6 @@ The caller does not have permission to create the requested property group.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_BACKEND_READONLY\fR\fR
 .ad
@@ -594,7 +566,6 @@ The repository backend is read-only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_BACKEND_ACCESS\fR\fR
 .ad
@@ -605,7 +576,6 @@ The repository backend refused the modification.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_EXISTS\fR\fR
 .ad
@@ -616,7 +586,6 @@ A {service,instance,property group} named \fIname\fR already exists.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NO_RESOURCES\fR\fR
 .ad
@@ -630,7 +599,6 @@ The server does not have the resources to complete the request.
 The \fBscf_pg_delete()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_BACKEND_ACCESS\fR\fR
 .ad
@@ -641,7 +609,6 @@ The repository backend refused the modification.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_BACKEND_READONLY\fR\fR
 .ad
@@ -652,7 +619,6 @@ The repository backend is read-only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_CONNECTION_BROKEN\fR\fR
 .ad
@@ -663,7 +629,6 @@ The connection to the repository was lost.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_DELETED\fR\fR
 .ad
@@ -674,7 +639,6 @@ The property group has been deleted by someone else.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NO_RESOURCES\fR\fR
 .ad
@@ -685,7 +649,6 @@ The server does not have adequate resources for a new property group handle.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_SET\fR\fR
 .ad
@@ -696,7 +659,6 @@ The property group has not been set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_PERMISSION_DENIED\fR\fR
 .ad
@@ -710,7 +672,6 @@ The caller does not have permission to delete this property group.
 The \fBscf_pg_get_underlying_pg()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_CONNECTION_BROKEN\fR\fR
 .ad
@@ -721,7 +682,6 @@ The connection to the repository was lost.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_CONSTRAINT_VIOLATED\fR\fR
 .ad
@@ -732,7 +692,6 @@ A required constraint was not met.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_DELETED\fR\fR
 .ad
@@ -743,7 +702,6 @@ The property group has been deleted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_HANDLE_MISMATCH\fR\fR
 .ad
@@ -754,7 +712,6 @@ The property group and \fIout\fR are not derived from the same handle.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
 .ad
@@ -765,7 +722,6 @@ An argument is invalid.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_BOUND\fR\fR
 .ad
@@ -776,7 +732,6 @@ The handle is not bound.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_SET\fR\fR
 .ad
@@ -834,15 +789,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

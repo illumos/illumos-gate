@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sip_get_msg_len 3SIP "09 Feb 2007" "SunOS 5.11" "Session Initiation Protocol Library Functions"
+.TH SIP_GET_MSG_LEN 3SIP "Feb 09, 2007"
 .SH NAME
 sip_get_msg_len \- returns the length of the SIP message
 .SH SYNOPSIS
@@ -12,7 +12,7 @@ sip_get_msg_len \- returns the length of the SIP message
 \fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lsip\fR [ \fIlibrary\fR ... ]
 #include <sip.h>
 
-\fBint\fR \fIsip_get_msg_len\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBint\fR \fIsip_get_msg_len\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
@@ -37,36 +37,30 @@ This function takes a pointer to an integer \fIerror\fR as an argument. If the
 error is non-null, one of the following values is set:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The input \fBSIP\fR message \fIsip_msg\fR or the header value is null; or the
 specified header/header value is deleted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPROTO\fR\fR
 .ad
 .RS 10n
-.rt  
 The header value is not present or invalid. The parser could not parse it
 correctly.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 There is an error allocating memory for the return value.
 .RE
 
@@ -82,15 +76,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

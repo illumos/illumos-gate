@@ -1,13 +1,13 @@
 '\" te
 .\"  Copyright (c) 1992, X/Open Company Limited  All Rights Reserved  Portions Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH lex 1 "22 Aug 1997" "SunOS 5.11" "User Commands"
+.TH LEX 1 "Aug 22, 1997"
 .SH NAME
 lex \- generate programs for lexical tasks
 .SH SYNOPSIS
@@ -32,35 +32,29 @@ description of the \fBlex\fR input language.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fR
 .ad
 .RS 12n
-.rt  
 Indicates C-language action (default option).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fR
 .ad
 .RS 12n
-.rt  
 Generates a program that can handle \fBEUC\fR characters (cannot be used with
 the \fB-w\fR option). \fByytext[\|]\fR is of type \fBunsigned char[\|]\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fR
 .ad
 .RS 12n
-.rt  
 Suppresses the summary of statistics usually written with the \fB-v\fR option.
 If no table sizes are specified in the \fBlex\fR source code and the \fB-v\fR
 option is not specified, then \fB-n\fR is implied.
@@ -68,23 +62,19 @@ option is not specified, then \fB-n\fR is implied.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fR
 .ad
 .RS 12n
-.rt  
 Writes the resulting program to standard output instead of \fBlex.yy.c\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR \fR
 .ad
 .RS 12n
-.rt  
 Writes a summary of \fBlex\fR statistics to the standard error. (See the
 discussion of \fBlex\fR table sizes under the heading \fBDefinitions in
 lex\fR.) If table sizes are specified in the \fBlex\fR source code, and if the
@@ -93,12 +83,10 @@ lex\fR.) If table sizes are specified in the \fBlex\fR source code, and if the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR \fR
 .ad
 .RS 12n
-.rt  
 Generates a program that can handle \fBEUC\fR characters (cannot be used with
 the \fB-e\fR option). Unlike the \fB-e\fR option, \fByytext[\|]\fR is of type
 \fBwchar_t[\|]\fR.
@@ -106,23 +94,19 @@ the \fB-e\fR option). Unlike the \fB-e\fR option, \fByytext[\|]\fR is of type
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR \fR
 .ad
 .RS 12n
-.rt  
 Prints out version information on standard error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-Q\fR\fB[y|n]\fR \fR
 .ad
 .RS 12n
-.rt  
 Prints out version information to output file \fBlex.yy.c\fR by using
 \fB-Qy\fR. The \fB-Qn\fR option does not print out version information and is
 the default.
@@ -134,12 +118,10 @@ the default.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR \fR
 .ad
 .RS 9n
-.rt  
 A pathname of an input file. If more than one such \fIfile\fR is specified, all
 files will be concatenated to produce a single \fBlex\fR program. If no
 \fIfile\fR operands are specified, or if a \fIfile\fR operand is \fB\(mi\fR,
@@ -312,23 +294,19 @@ Implementations accept either of the following two mutually exclusive
 declarations in the \fBDefinitions\fR \fBin\fR \fBlex\fR section:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%array\fR \fR
 .ad
 .RS 13n
-.rt  
 Declare the type of \fIyytext\fR to be a null-terminated character array.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%pointer\fR \fR
 .ad
 .RS 13n
-.rt  
 Declare the type of \fIyytext\fR to be a pointer to a null-terminated character
 string.
 .RE
@@ -364,18 +342,17 @@ following table.
 
 .sp
 .TS
-tab() box;
-cw(1.28i) cw(2.94i) cw(1.28i) 
-lw(1.28i) lw(2.94i) lw(1.28i) 
-.
-\fBDeclaration\fR\fBDescription\fR\fBDefault\fR
+box;
+c c c
+l l l .
+\fBDeclaration\fR	\fBDescription\fR	\fBDefault\fR
 _
-\fB%p\fR\fIn\fRNumber of positions2500
-\fB%n\fR\fIn\fRNumber of states500
-\fB%a\fR\fI n\fRNumber of transitions2000
-\fB%e\fR\fIn\fRNumber of parse tree nodes1000
-\fB%k\fR\fIn\fRNumber of packed character classes10000
-\fB%o\fR\fIn\fRSize of the output array3000
+\fB%p\fR\fIn\fR	Number of positions	2500
+\fB%n\fR\fIn\fR	Number of states	500
+\fB%a\fR\fI n\fR	Number of transitions	2000
+\fB%e\fR\fIn\fR	Number of parse tree nodes	1000
+\fB%k\fR\fIn\fR	Number of packed character classes	10000
+\fB%o\fR\fIn\fR	Size of the output array	3000
 .TE
 
 .sp
@@ -455,12 +432,10 @@ described on \fBregex\fR(5) with the following additions and exceptions to the
 syntax:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\|.\|.\|.\fR \fR
 .ad
 .RS 14n
-.rt  
 Any string enclosed in double-quotes will represent the characters within the
 double-quotes as themselves, except that backslash escapes (which appear in the
 following table) are recognized. Any backslash-escape sequence is terminated by
@@ -473,7 +448,6 @@ octal value 1 followed by the character 1.
 \fI<\fR\fIstate\fR\fI>\fR\fIr\fR
 .sp
 .ne 2
-.mk
 .na
 \fB<\fIstate1\fR, \fIstate2\fR, \|.\|.\|.\|>\fIr\fR\fR
 .ad
@@ -490,7 +464,6 @@ at the beginning of a regular expression.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIr\fR/\fIx\fR \fR
 .ad
@@ -511,7 +484,6 @@ grouped within parentheses.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB{\fR\fIname\fR\fB}\fR \fR
 .ad
@@ -543,29 +515,28 @@ character cannot be matched by a period operator.
 
 .sp
 .TS
-tab() box;
-cw(1.22i) cw(2.92i) cw(1.36i) 
-cw(1.22i) cw(2.92i) cw(1.36i) 
-.
+box;
+c c c
+c c c .
 Escape Sequences in lex
 _
-Escape SequenceDescription Meaning
+Escape Sequence	Description 	Meaning
 _
-\e\fIdigits\fRT{
+\e\fIdigits\fR	T{
 A backslash character followed by the longest sequence of one, two or three octal-digit characters (01234567). Ifall of the digits are 0, (that is, representation of the NUL character), the behavior is undefined.
-T}T{
+T}	T{
 The character whose encoding is represented by the one-, two- or three-digit octal integer. Multi-byte characters require multiple, concatenated escape sequences of this type, including the leading \e for each byte.
 T}
 _
-\e\fBx\fR\fIdigits\fRT{
+\e\fBx\fR\fIdigits\fR	T{
 A backslash character followed by the longest sequence of hexadecimal-digit characters (01234567abcdefABCDEF). If all of the digits are 0, (that is, representation of the NUL character), the behavior is undefined.
-T}T{
+T}	T{
 The character whose encoding is represented by the hexadecimal integer.
 T}
 _
-\e\fIc\fRT{
+\e\fIc\fR	T{
 A backslash character followed by any character not described in this table.  (\e\e, \ea, \eb, \ef, \een, \er, \et, \ev).
-T}The character c, unchanged.
+T}	The character c, unchanged.
 .TE
 
 .sp
@@ -574,12 +545,10 @@ The order of precedence given to extended regular expressions for \fBlex\fR is
 as shown in the following table, from high to low.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNote\fR: \fR
 .ad
 .RS 10n
-.rt  
 The escaped characters entry is not meant to imply that these are operators,
 but they are included in the table to show their relationships to the true
 operators. The start condition, trailing context and anchoring notations have
@@ -591,22 +560,21 @@ this section; they can only appear at the beginning or ending of an \fBERE.\fR
 
 .sp
 .TS
-tab() box;
-cw(2.75i) cw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
+box;
+c c
+l l .
 ERE Precedence in lex
 _
-\fIcollation-related bracket symbols\fR\fB[= =]  [: :]  [. .]\fR
-\fIescaped characters\fR\fB\e<\fR\fIspecial character\fR>
-\fIbracket expression\fR\fB[ ]\fR
-\fIquoting\fR\fB".\|.\|."\fR
-\fIgrouping\fR\fB()\fR
-\fIdefinition\fR\fB{\fR\fIname\fR}
-\fIsingle-character RE duplication\fR\fB* + ?\fR
-\fIconcatenation\fR
-\fIinterval expression\fR\fB{\fR\fIm\fR,\fIn\fR}
-\fIalternation\fR\fB|\fR
+\fIcollation-related bracket symbols\fR	\fB[= =]  [: :]  [. .]\fR
+\fIescaped characters\fR	\fB\e<\fR\fIspecial character\fR>
+\fIbracket expression\fR	\fB[ ]\fR
+\fIquoting\fR	\fB".\|.\|."\fR
+\fIgrouping\fR	\fB()\fR
+\fIdefinition\fR	\fB{\fR\fIname\fR}
+\fIsingle-character RE duplication\fR	\fB* + ?\fR
+\fIconcatenation\fR	
+\fIinterval expression\fR	\fB{\fR\fIm\fR,\fIn\fR}
+\fIalternation\fR	\fB|\fR
 .TE
 
 .sp
@@ -711,12 +679,10 @@ Four special actions are available:
 
 .sp
 .ne 2
-.mk
 .na
 \fB|\fR
 .ad
 .RS 12n
-.rt  
 The action | means that the action for the next rule is the action for this
 rule. Unlike the other three actions, | cannot be enclosed in braces or be
 semicolon-terminated. It must be specified alone, with no other actions.
@@ -724,23 +690,19 @@ semicolon-terminated. It must be specified alone, with no other actions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBECHO;\fR \fR
 .ad
 .RS 12n
-.rt  
 Writes the contents of the string \fIyytext\fR on the output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBREJECT;\fR \fR
 .ad
 .RS 12n
-.rt  
 Usually only a single expression is matched by a given string in the input.
 \fBREJECT\fR means "continue to the next expression that matches the current
 input," and causes whatever rule was the second choice after the current rule
@@ -758,12 +720,10 @@ scanners.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBBEGIN\fR \fR
 .ad
 .RS 12n
-.rt  
 The action:
 .sp
 \fBBEGIN\fR \fInewstate\fR\fB;\fR
@@ -782,12 +742,10 @@ of \fBlex\fR, or are accessible only through the \fB\fR\fB-l\fR\fB l\fR operand
 to \fBc89\fR or \fBcc\fR (the \fBlex\fR library).
 .sp
 .ne 2
-.mk
 .na
 \fB\fBint\fR \fByylex(void)\fR \fR
 .ad
 .RS 21n
-.rt  
 Performs lexical analysis on the input; this is the primary function generated
 by the \fBlex\fR utility. The function returns zero when the end of input is
 reached; otherwise it returns non-zero values (tokens) determined by the
@@ -796,12 +754,10 @@ actions that are selected.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBint\fR \fByymore(void)\fR \fR
 .ad
 .RS 21n
-.rt  
 When called, indicates that when the next input string is recognized, it is to
 be appended to the current value of \fIyytext\fR rather than replacing it; the
 value in \fIyyleng\fR is adjusted accordingly.
@@ -809,12 +765,10 @@ value in \fIyyleng\fR is adjusted accordingly.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBint\fR\fIyyless(int\fR\fB n\fR\fI)\fR \fR
 .ad
 .RS 21n
-.rt  
 Retains \fIn\fR initial characters in \fIyytext\fR, NUL-terminated, and treats
 the remaining characters as if they had not been read; the value in
 \fIyyleng\fR is adjusted accordingly.
@@ -822,12 +776,10 @@ the remaining characters as if they had not been read; the value in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBint\fR \fBinput(void)\fR \fR
 .ad
 .RS 21n
-.rt  
 Returns the next character from the input, or zero on end-of-file. It obtains
 input from the stream pointer \fIyyin\fR, although possibly via an intermediate
 buffer. Thus, once scanning has begun, the effect of altering the value of
@@ -837,12 +789,10 @@ the scanner without any processing by the scanner.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBint\fR \fBunput(int\fR \fB\fIc\fR\fR\fB)\fR \fR
 .ad
 .RS 21n
-.rt  
 Returns the character \fIc\fR to the input; \fIyytext\fR and \fIyyleng\fR are
 undefined until the next expression is matched. The result of using \fIunput\fR
 for more characters than have been input is unspecified.
@@ -855,7 +805,6 @@ the \fB\fR\fB-l\fR\fB l\fR operand; they can therefore be redefined by a
 portable application:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBint\fR \fByywrap(void)\fR \fR
 .ad
@@ -870,7 +819,6 @@ another source of input, then the application can include a function
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBint\fR \fBmain(int\fR \fB\fIargc\fR,\fR \fBchar\fR \fB*\fIargv\fR[\|])\fR
 \fR
@@ -987,23 +935,19 @@ that affect the execution of \fBlex\fR: \fBLANG\fR, \fBLC_ALL\fR,
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 7n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR \fR
 .ad
 .RS 7n
-.rt  
 An error occurred.
 .RE
 
@@ -1015,13 +959,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
@@ -1032,7 +975,7 @@ Interface StabilityStandard
 .SH NOTES
 .sp
 .LP
-If routines such as \fByyback()\fR, \fByywrap()\fR, and \fByylock()\fR 
+If routines such as \fByyback()\fR, \fByywrap()\fR, and \fByylock()\fR
 in \fB\|.l\fR (ell) files are to be external C functions, the command line to
 compile a C++ program must define the \fB__EXTERN_C__\fR macro. For example:
 .sp

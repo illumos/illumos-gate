@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH in.uucpd 1M "12 Aug 2004" "SunOS 5.11" "System Administration Commands"
+.TH IN.UUCPD 1M "Aug 12, 2004"
 .SH NAME
 in.uucpd, uucpd \- UUCP server
 .SH SYNOPSIS
@@ -79,34 +79,28 @@ then the peer may be prompted for multiple passwords.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/utmpx\fR\fR
 .ad
 .RS 20n
-.rt  
 accounting
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/wtmpx\fR\fR
 .ad
 .RS 20n
-.rt  
 accounting
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/lastlog\fR\fR
 .ad
 .RS 20n
-.rt  
 time of last login
 .RE
 
@@ -126,34 +120,28 @@ All diagnostic messages are returned on the connection, after which the
 connection is closed.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuser read\fR\fR
 .ad
 .RS 20n
-.rt  
 An error occurred while reading the username.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpasswd read\fR\fR
 .ad
 .RS 20n
-.rt  
 An error occurred while reading the password.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLogin incorrect.\fR\fR
 .ad
 .RS 20n
-.rt  
 The username is invalid or refers to an account with a login shell other than
 \fB/usr/lib/uucp/uucico\fR, or the password is not the correct password for the
 account.

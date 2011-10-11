@@ -1,10 +1,10 @@
 '\" te
-.\" Copyright 1989 AT&T 
+.\" Copyright 1989 AT&T
 .\" Copyright (C) 2002, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sac 1M "21 Apr 2009" "SunOS 5.11" "System Administration Commands"
+.TH SAC 1M "Apr 21, 2009"
 .SH NAME
 sac \- service access controller
 .SH SYNOPSIS
@@ -15,7 +15,7 @@ sac \- service access controller
 
 .LP
 .nf
-\fB/usr/lib/saf/sac\fR 
+\fB/usr/lib/saf/sac\fR
 .fi
 
 .SH DESCRIPTION
@@ -66,59 +66,49 @@ Access Controller returns the status  of the port monitors specified, which
 states:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENABLED\fR\fR
 .ad
 .RS 14n
-.rt  
 The port monitor is currently running and is accepting connections. See
 \fBsacadm\fR(1M) with the \fB-e\fR option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDISABLED\fR\fR
 .ad
 .RS 14n
-.rt  
 The port monitor is currently running and is not accepting connections. See
 \fBsacadm\fR with the \fB-d\fR option, and see \fBNOTRUNNING\fR, below.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTARTING\fR\fR
 .ad
 .RS 14n
-.rt  
 The port monitor is in the process of starting up. \fBSTARTING\fR is an
 intermediate state  on the way to \fBENABLED\fR or \fBDISABLED\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFAILED\fR\fR
 .ad
 .RS 14n
-.rt  
 The port monitor was unable to start and remain running.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTOPPING\fR\fR
 .ad
 .RS 14n
-.rt  
 The port monitor has been manually terminated but has not completed its
 shutdown procedure. \fBSTOPPING\fR is an intermediate state on the way to
 \fBNOTRUNNING\fR.
@@ -126,12 +116,10 @@ shutdown procedure. \fBSTOPPING\fR is an intermediate state on the way to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNOTRUNNING\fR\fR
 .ad
 .RS 14n
-.rt  
 The port monitor is not currently running. (See \fBsacadm\fR with \fB-k\fR.)
 This is the normal "not running" state. When a port monitor is killed, all
 ports it was monitoring are inaccessible.  It is not possible for an external
@@ -191,12 +179,10 @@ If there are no entries for the \fBsac\fR service, then the entries for the
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fIsanity_interval\fR\fR
 .ad
 .RS 22n
-.rt  
 Sets the frequency (\fIsanity_interval\fR) with which \fBsac\fR polls the port
 monitors on the system.
 .RE

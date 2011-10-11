@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH qwait 9F "15 Dec 2003" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH QWAIT 9F "Dec 15, 2003"
 .SH NAME
 qwait, qwait_sig \- STREAMS wait routines
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/stream.h> 
-#include <sys/ddi.h> 
+#include <sys/stream.h>
+#include <sys/ddi.h>
 
 
 
@@ -29,12 +29,10 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIqp\fR\fR
 .ad
 .RS 6n
-.rt  
 Pointer to the queue that is being opened or closed.
 .RE
 
@@ -85,12 +83,10 @@ perimeter. See \fBcondvar\fR(9F).
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 For \fBqwait_sig()\fR, indicates that the condition was not necessarily
 signaled, and the function returned because a signal was pending.
 .RE

@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH appcert 1 "29 Jan 2007" "SunOS 5.11" "User Commands"
+.TH APPCERT 1 "Jan 29, 2007"
 .SH NAME
 appcert \- examine application-level products for unstable use of Solaris
 interfaces
 .SH SYNOPSIS
 .LP
 .nf
-\fBappcert\fR [\fB-h\fR] [\fB-n\fR] [\fB-f\fR \fIinfile\fR] [\fB-w\fR \fIworking_dir\fR] [\fB-B\fR] [\fB-L\fR] 
+\fBappcert\fR [\fB-h\fR] [\fB-n\fR] [\fB-f\fR \fIinfile\fR] [\fB-w\fR \fIworking_dir\fR] [\fB-B\fR] [\fB-L\fR]
      [\fB-S\fR] {\fIobj\fR | \fIdir\fR}...
 .fi
 
@@ -95,12 +95,10 @@ application being checked runs. See NOTES.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-B\fR\fR
 .ad
 .RS 18n
-.rt  
 If \fBappcert\fR is run in batch mode, the output report will contain one line
 per binary, beginning with \fBPASS\fR if no problems were detected for the
 binary, \fBFAIL\fR if any problems were found, or \fBINC\fR if the binary could
@@ -112,12 +110,10 @@ triggered. These strings are flush left and so can be selected via \fBgrep\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIinfile\fR\fR
 .ad
 .RS 18n
-.rt  
 Specifies the file \fIinfile\fR that contains a list of files (one per line) to
 check. This list is appended to the list determined from the command line
 operands (see OPERANDS below).
@@ -125,23 +121,19 @@ operands (see OPERANDS below).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 18n
-.rt  
 Prints out the usage information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
 .RS 18n
-.rt  
 \fBappcert\fR examines your product for the presence of shared objects. If it
 finds some, it appends the directories they reside in to \fBLD_LIBRARY_PATH\fR.
 Use this flag to prevent \fBappcert\fR from doing this.
@@ -149,36 +141,30 @@ Use this flag to prevent \fBappcert\fR from doing this.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 18n
-.rt  
 When searching directories for binaries to check, this option does not follow
 symbolic links. See \fBfind\fR(1).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR\fR
 .ad
 .RS 18n
-.rt  
 Appends Solaris library directories (that is,
 \fB/usr/openwin/lib:/usr/dt/lib\fR) to \fBLD_LIBRARY_PATH\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR \fIworking_dir\fR\fR
 .ad
 .RS 18n
-.rt  
 Identifies the directory in which to run the library components and create
 temporary files (default is \fB/tmp\fR).
 .RE
@@ -189,12 +175,10 @@ temporary files (default is \fB/tmp\fR).
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB{\fIobj\fR | \fIdir\fR}  ...\fR
 .ad
 .RS 20n
-.rt  
 A complete list of objects and/or directories that contain the objects
 constituting the product to be checked. \fBappcert\fR recursively searches
 directories looking for object files; non-object files are ignored.
@@ -206,46 +190,38 @@ directories looking for object files; non-object files are ignored.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 \fBappcert\fR ran successfully and found no potential binary stability
 problems.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 \fBappcert\fR failed to run successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Some of the objects checked have potential binary stability problems.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 5n
-.rt  
 No binary objects were located that could be checked.
 .RE
 
@@ -322,36 +298,30 @@ in C.
 directory (\fB/tmp/appcert.\fI?????\fR\fR by default):
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIndex\fR\fR
 .ad
 .RS 11n
-.rt  
 A mapping between checked binaries and the subdirectory in the working
 directory in which the output specific to that binary can be found.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBReport\fR\fR
 .ad
 .RS 11n
-.rt  
 A copy of the rollup report that was displayed on stdout when \fBappcert\fR was
 run.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSkipped\fR\fR
 .ad
 .RS 11n
-.rt  
 A list of binaries that \fBappcert\fR was asked to check but had to skip, along
 with a brief reason why each was skipped.
 .RE
@@ -362,45 +332,37 @@ In addition, there is per-object information in the subdirectories under
 \fBappcert.\fI?????\fR/objects/\fR, in the following files:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcheck.demoted_symbols\fR\fR
 .ad
 .RS 25n
-.rt  
 A list of symbols suspected to be demoted Solaris symbols.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcheck.dynamic.private\fR\fR
 .ad
 .RS 25n
-.rt  
 A list of private Solaris symbols to which the object makes direct bindings.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcheck.dynamic.public\fR\fR
 .ad
 .RS 25n
-.rt  
 A list of public Solaris symbols to which the object makes direct bindings.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcheck.dynamic.unbound\fR\fR
 .ad
 .RS 25n
-.rt  
 A list of symbols not bound by the dynamic linker when \fBldd\fR \fB-r\fR was
 run. For convenience, \fBldd\fR output lines containing \fBfile not found\fR
 are also included.
@@ -408,12 +370,10 @@ are also included.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsummary.dynamic\fR\fR
 .ad
 .RS 25n
-.rt  
 A pretty-printed summary of dynamic bindings for the objects examined,
 including tables of Public and Private symbols used from each Solaris library.
 .RE
@@ -707,13 +667,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface stabilityStable
+Interface stability	Stable
 .TE
 
 .SH SEE ALSO

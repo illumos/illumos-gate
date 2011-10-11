@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pset_setattr 2 "28 Jun 2004" "SunOS 5.11" "System Calls"
+.TH PSET_SETATTR 2 "Jun 28, 2004"
 .SH NAME
 pset_setattr, pset_getattr \- set or get processor set attributes
 .SH SYNOPSIS
@@ -36,12 +36,10 @@ The value of the \fIattr\fR argument is the bitwise inclusive-OR of these
 attributes, defined in <\fBsys/pset.h\fR>:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPSET_NOESCAPE\fR\fR
 .ad
 .RS 17n
-.rt  
 Unbinding of LWPs from the processor set with this attribute requires the
 {\fBPRIV_SYS_RES_CONFIG\fR} privilege to be asserted in the effective set of
 the calling process.
@@ -67,23 +65,19 @@ and \fBerrno\fR is set to indicate the error.
 These function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 11n
-.rt  
 The location pointed to by \fIattr\fR was not writable by the user.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 11n
-.rt  
 An invalid processor set ID was specified.
 .sp
 The caller is in a non-global zone, the pools facility is active, and the
@@ -92,12 +86,10 @@ processor is not a member of the zone's pool's processor set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSUP\fR\fR
 .ad
 .RS 11n
-.rt  
 The pools facility is active. See \fBpooladm\fR(1M) and
 \fBpool_set_status\fR(3POOL) for information about enabling and disabling the
 pools facility.
@@ -111,15 +103,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStable
+Interface Stability	Stable
 _
-MT-LevelAsync-Signal-Safe
+MT-Level	Async-Signal-Safe
 .TE
 
 .SH SEE ALSO

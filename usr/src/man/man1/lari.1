@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH lari 1 "28 Nov 2007" "SunOS 5.11" "User Commands"
+.TH LARI 1 "Nov 28, 2007"
 .SH NAME
 lari \- link analysis of runtime interfaces
 .SH SYNOPSIS
@@ -64,7 +64,7 @@ directly to the runtime linker, \fBld.so.1\fR(1):
 .sp
 .in +2
 .nf
-\fBLD_DEBUG=files,bindings,detail LD_DEBUG_OUTPUT=lari.dbg \ 
+\fBLD_DEBUG=files,bindings,detail LD_DEBUG_OUTPUT=lari.dbg \
 LD_BIND_NOW=yes\fR
 .fi
 .in -2
@@ -104,12 +104,10 @@ of these \fImapfiles\fR can be created by \fBlari\fR.
 The following options are supported.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 13n
-.rt  
 Displays all interface information for the objects analyzed. \fBNote:\fR The
 output from this option can be substantial, but is often useful for piping to
 other analysis tools.
@@ -117,12 +115,10 @@ other analysis tools.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
 .RS 13n
-.rt  
 Limits the interface information to those symbols that have been explicitly
 bound to. \fBNote:\fR Symbols defined as protected might have been bound to
 from within the defining object. This binding is satisfied at link-edit time
@@ -132,12 +128,10 @@ displayed with this option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
 .RS 13n
-.rt  
 Demangles C++ symbol names. This option is useful for augmenting runtime
 interface information. When generating interface definitions, demangled names
 are added to the \fImapfiles\fR as comments.
@@ -145,36 +139,30 @@ are added to the \fImapfiles\fR as comments.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fImapdir\fR\fR
 .ad
 .RS 13n
-.rt  
 Defines the directory, \fImapdir\fR, in which \fImapfiles\fR are created. By
 default, the current working directory is used.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR\fR
 .ad
 .RS 13n
-.rt  
 Interprets any input \fIfiles\fR as debugging information rather than as
 dynamic objects.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 13n
-.rt  
 Displays interesting interface binding information. This mode is the default if
 no other output controlling option is supplied. See \fBInteresting
 Information\fR under EXTENDED DESCRIPTION.
@@ -182,12 +170,10 @@ Information\fR under EXTENDED DESCRIPTION.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
 .RS 13n
-.rt  
 Creates \fImapfiles\fR for each dynamic object that is processed. These
 \fImapfiles\fR reflect the interface requirements of each object as required by
 the input file being processed.
@@ -195,12 +181,10 @@ the input file being processed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 13n
-.rt  
 Limits the interface information to those symbols that are deemed an overhead.
 When creating \fImapfiles\fR, any overhead symbols are itemized as local
 symbols. See \fBOverhead Information\fR under EXTENDED DESCRIPTION.
@@ -208,36 +192,30 @@ symbols. See \fBOverhead Information\fR under EXTENDED DESCRIPTION.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 13n
-.rt  
 Saves the bindings information produced from \fBldd\fR(1) for further analysis.
 See FILES.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
 .RS 13n
-.rt  
 Appends interesting symbol visibilities. Symbols that are defined as
 \fBsingleton\fR or are defined \fBprotected\fR are identified with this option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 13n
-.rt  
 Ignores any objects that are already versioned. Versioned objects have had
 their interfaces defined, but can contribute to the interface information
 displayed. For example, a versioned shared object might reveal overhead symbols
@@ -271,12 +249,10 @@ information field provides one or more of the following tokens that describe
 the symbol's use:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcnt\fR:\fIbnd\fR\fR
 .ad
 .RS 11n
-.rt  
 Two decimal values indicate the symbol count, \fBcnt\fR, and the number of
 bindings to this object, \fBbnd\fR. The symbol count is the number of
 occurrences of this symbol definition that have been found in the objects that
@@ -287,45 +263,37 @@ that have been bound to this symbol definition by the runtime linker.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE\fR\fR
 .ad
 .RS 11n
-.rt  
 This symbol definition has been bound to from an external object.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS\fR\fR
 .ad
 .RS 11n
-.rt  
 This symbol definition has been bound to from the same object.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBD\fR\fR
 .ad
 .RS 11n
-.rt  
 This symbol definition has been directly bound to.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBI\fR\fR
 .ad
 .RS 11n
-.rt  
 This symbol definition provides for an interposer.  An object that explicitly
 identifies itself as an interposor defines all global symbols as interposers.
 See the \fB-z\fR \fBinterpose\fR option of \fBld\fR(1), and the
@@ -336,34 +304,28 @@ dynamic executable can be defined as interposers by using the \fBINTERPOSE\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBC\fR\fR
 .ad
 .RS 11n
-.rt  
 This symbol definition is the reference data of a copy-relocation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF\fR\fR
 .ad
 .RS 11n
-.rt  
 This symbol definition resides in a filtee.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBP\fR\fR
 .ad
 .RS 11n
-.rt  
 This symbol is defined as protected. This symbol might have an internal binding
 from the object in which the symbol is declared. Any internal bindings with
 this attribute can not be interposed upon by another symbol definition.
@@ -371,48 +333,40 @@ this attribute can not be interposed upon by another symbol definition.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA\fR\fR
 .ad
 .RS 11n
-.rt  
 This symbol definition is the address of a procedure linkage table entry within
 a dynamic executable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBU\fR\fR
 .ad
 .RS 11n
-.rt  
 This symbol lookup originated from a user request, for example,
 \fBdlsym\fR(3C).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBR\fR\fR
 .ad
 .RS 11n
-.rt  
 This symbol definition is acting as a filter, and provides for redirection to a
 filtee.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBr\fR\fR
 .ad
 .RS 11n
-.rt  
 A binding to this symbol was rejected at some point during a symbol search. A
 rejection can occur when a direct binding request finds a symbol that has been
 tagged to prevent direct binding. In this scenario, the symbol search is
@@ -424,12 +378,10 @@ is repeated using a default search model.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBN\fR\fR
 .ad
 .RS 11n
-.rt  
 This symbol definition explicitly prohibits directly binding to the definition.
 .RE
 
@@ -699,12 +651,10 @@ foo.so {
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$TMPDIR/lari.dbg.\fIfile\fR\fR\fR
 .ad
 .RS 25n
-.rt  
 Binding output produced by \fBldd\fR(1).
 .RE
 
@@ -716,13 +666,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

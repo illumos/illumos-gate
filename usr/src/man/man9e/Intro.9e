@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH Intro 9E "15 May 2001" "SunOS 5.11" "Driver Entry Points"
+.TH INTRO 9E "May 15, 2001"
 .SH NAME
 Intro, intro \- overview of device driver interfaces and introduction to driver
 entry points
@@ -205,46 +205,38 @@ Association (PCMCIA) and the Japan Electronic Industry Development Association
 Section 9 is divided into the following subsections:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB9E\fR \fR
 .ad
 .RS 7n
-.rt  
 Driver Entry Points - contains reference pages for all driver entry point
 routines.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB9F\fR \fR
 .ad
 .RS 7n
-.rt  
 Kernel Functions - contains reference pages for all driver support routines.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB9P\fR \fR
 .ad
 .RS 7n
-.rt  
 Driver Properties - contains reference pages for driver properties.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB9S\fR \fR
 .ad
 .RS 7n
-.rt  
 Data Structures - contains reference pages for driver-related structures.
 .RE
 
@@ -339,14 +331,12 @@ this section.
 
 .sp
 .TS
-tab();
-cw(2.75i) cw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBRoutine\fR\fBType\fR
+c c
+l l .
+\fBRoutine\fR	\fBType\fR
 _
-\fBput\fRDDI/DKI
-\fBsrv\fRDDI/DKI
+\fBput\fR	DDI/DKI
+\fBsrv\fR	DDI/DKI
 .TE
 
 .sp
@@ -357,58 +347,56 @@ section.
 
 .sp
 .TS
-tab();
-cw(2.18i) cw(3.32i) 
-lw(2.18i) lw(3.32i) 
-.
-\fBRoutine\fR\fBType \fR
+c c
+l l .
+\fBRoutine\fR	\fBType \fR
 _
-\fB_fini\fRSolaris DDI
-\fB_info\fRSolaris DDI
-\fB_init\fRSolaris DDI
-\fBaread\fRSolaris DDI
-\fBattach\fRSolaris DDI
-\fBawrite\fRSolaris DDI
-\fBchpoll\fRDDI/DKI
-\fBclose\fRDDI/DKI
-\fBdetach\fRSolaris DDI
-\fBdevmap\fRSolaris DDI
-\fBdevmap_access\fRSolaris DDI
-\fBdevmap_contextmgt\fRSolaris DDI
-\fBdevmap_dup\fRSolaris DDI
-\fBdevmap_map\fRSolaris DDI
-\fBdevmap_unmap\fRSolaris DDI
-\fBdump\fRSolaris DDI
-\fBgetinfo\fRSolaris DDI
-\fBidentify\fRSolaris DDI
-\fBioctl\fRDDI/DKI
-\fBks_update\fRSolaris DDI
-\fBmapdev_access\fRSolaris DDI
-\fBmapdev_dup\fRSolaris DDI
-\fBmapdev_free\fRSolaris DDI
-\fBmmap\fRDKI only
-\fBopen\fRDDI/DKI
-\fBpower\fRSolaris DDI
-\fBprint\fRDDI/DKI
-\fBprobe\fRSolaris DDI
-\fBprop_op\fRSolaris DDI
-\fBread\fRDDI/DKI
-\fBsegmap\fRDKI only
-\fBstrategy\fRDDI/DKI
-\fBtran_abort\fRSolaris DDI
-\fBtran_destroy_pkt\fRSolaris DDI
-\fBtran_dmafree\fRSolaris DDI
-\fBtran_getcap\fRSolaris DDI
-\fBtran_init_pkt\fRSolaris DDI
-\fBtran_reset\fRSolaris DDI
-\fBtran_reset_notify\fRSolaris DDI
-\fBtran_setcap\fRSolaris DDI
-\fBtran_start\fRSolaris DDI
-\fBtran_sync_pkt\fRSolaris DDI
-\fBtran_tgt_free\fRSolaris DDI
-\fBtran_tgt_init\fRSolaris DDI
-\fBtran_tgt_probe\fRSolaris DDI
-\fBwrite\fRDDI/DKI
+\fB_fini\fR	Solaris DDI
+\fB_info\fR	Solaris DDI
+\fB_init\fR	Solaris DDI
+\fBaread\fR	Solaris DDI
+\fBattach\fR	Solaris DDI
+\fBawrite\fR	Solaris DDI
+\fBchpoll\fR	DDI/DKI
+\fBclose\fR	DDI/DKI
+\fBdetach\fR	Solaris DDI
+\fBdevmap\fR	Solaris DDI
+\fBdevmap_access\fR	Solaris DDI
+\fBdevmap_contextmgt\fR	Solaris DDI
+\fBdevmap_dup\fR	Solaris DDI
+\fBdevmap_map\fR	Solaris DDI
+\fBdevmap_unmap\fR	Solaris DDI
+\fBdump\fR	Solaris DDI
+\fBgetinfo\fR	Solaris DDI
+\fBidentify\fR	Solaris DDI
+\fBioctl\fR	DDI/DKI
+\fBks_update\fR	Solaris DDI
+\fBmapdev_access\fR	Solaris DDI
+\fBmapdev_dup\fR	Solaris DDI
+\fBmapdev_free\fR	Solaris DDI
+\fBmmap\fR	DKI only
+\fBopen\fR	DDI/DKI
+\fBpower\fR	Solaris DDI
+\fBprint\fR	DDI/DKI
+\fBprobe\fR	Solaris DDI
+\fBprop_op\fR	Solaris DDI
+\fBread\fR	DDI/DKI
+\fBsegmap\fR	DKI only
+\fBstrategy\fR	DDI/DKI
+\fBtran_abort\fR	Solaris DDI
+\fBtran_destroy_pkt\fR	Solaris DDI
+\fBtran_dmafree\fR	Solaris DDI
+\fBtran_getcap\fR	Solaris DDI
+\fBtran_init_pkt\fR	Solaris DDI
+\fBtran_reset\fR	Solaris DDI
+\fBtran_reset_notify\fR	Solaris DDI
+\fBtran_setcap\fR	Solaris DDI
+\fBtran_start\fR	Solaris DDI
+\fBtran_sync_pkt\fR	Solaris DDI
+\fBtran_tgt_free\fR	Solaris DDI
+\fBtran_tgt_init\fR	Solaris DDI
+\fBtran_tgt_probe\fR	Solaris DDI
+\fBwrite\fR	DDI/DKI
 .TE
 
 .sp
@@ -430,41 +418,39 @@ declared as \fBvoid\fR (no error is returned).
 
 .sp
 .TS
-tab();
-cw(1.69i) cw(3.81i) 
-lw(1.69i) lw(3.81i) 
-.
-Error ValueError Description
+c c
+l l .
+Error Value	Error Description
 _
-EAGAINT{
+EAGAIN	T{
 Kernel resources, such as the buf structure or cache memory, are not available at this time (device may be busy, or the system resource is not available). This is used in open, ioctl, read, write, and strategy.
 T}
 _
-EFAULTT{
+EFAULT	T{
 An invalid address has been passed as an argument; memory addressing error. This is used in open, close, ioctl, read, write, and strategy.
 T}
 _
-EINTRT{
+EINTR	T{
 Sleep interrupted by signal. This is used in open, close, ioctl, read, write, and strategy.
 T}
 _
-EINVALT{
+EINVAL	T{
 An invalid argument was passed to the routine. This is used in open, ioctl, read, write, and strategy.
 T}
 _
-EIOT{
+EIO	T{
 A device error occurred; an error condition was detected in a device status register (the I/O request was valid, but an error occurred on the device). This is used in open, close, ioctl, read, write, and strategy.
 T}
 _
-ENXIOT{
+ENXIO	T{
 An attempt was made to access a device or subdevice that does not exist (one that is not configured); an attempt was made to perform an invalid I/O operation; an incorrect minor number was specified. This is used in open, close, ioctl, read, write, and strategy.
 T}
 _
-EPERMT{
+EPERM	T{
 A process attempting an operation did not have required permission. This is used in open, ioctl, read, write, and strategy.
 T}
 _
-EROFST{
+EROFS	T{
 An attempt was made to open for writing a read-only device. This is used in open.
 T}
 .TE
@@ -477,20 +463,19 @@ the error values can be returned.
 
 .sp
 .TS
-tab() box;
-cw(1.08i) |cw(1.11i) |cw(1.12i) |cw(2.18i) 
-lw(1.08i) |lw(1.11i) |lw(1.12i) |lw(2.18i) 
-.
-opencloseioctlread, write and strategy
+box;
+c | c | c | c
+l | l | l | l .
+open	close	ioctl	read, write and strategy
 _
-EAGAINEFAULTEAGAINEAGAIN
-EFAULTEINTREFAULTEFAULT
-EINTREIOEINTREINTR
-EINVALENXIOEINVALEINVAL
-EIOEIOEIO
-ENXIOENXIOENXIO
-EPERMEPERM
-EROFS
+EAGAIN	EFAULT	EAGAIN	EAGAIN
+EFAULT	EINTR	EFAULT	EFAULT
+EINTR	EIO	EINTR	EINTR
+EINVAL	ENXIO	EINVAL	EINVAL
+EIO		EIO	EIO
+ENXIO		ENXIO	ENXIO
+EPERM		EPERM	
+EROFS			
 .TE
 
 .SH SEE ALSO

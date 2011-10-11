@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH plimit 1 "8 Jun 1998" "SunOS 5.11" "User Commands"
+.TH PLIMIT 1 "Jun 8, 1998"
 .SH NAME
 plimit \- get or set the resource limits of running processes
 .SH SYNOPSIS
@@ -36,24 +36,20 @@ limit.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR\fR
 .ad
 .RS 6n
-.rt  
 On output, show file sizes in kilobytes (1024 bytes) rather than in 512-byte
 blocks.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
 .RS 6n
-.rt  
 On output, show file and memory sizes in megabytes (1024*1024 bytes).
 .RE
 
@@ -73,45 +69,37 @@ limit is either the literal string \fBunlimited\fR, or a number, with an
 optional scaling factor, as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIn\fR\fBk\fR\fR
 .ad
 .RS 9n
-.rt  
 \fIn\fR kilobytes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIn\fR\fBm\fR\fR
 .ad
 .RS 9n
-.rt  
 \fIn\fR megabytes (minutes for CPU time)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIn\fR\fBh\fR\fR
 .ad
 .RS 9n
-.rt  
 \fIn\fR hours (for CPU time only)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImm\fR\fB:\fR\fIss\fR\fR
 .ad
 .RS 9n
-.rt  
 minutes and seconds (for CPU time only)
 .RE
 
@@ -120,78 +108,64 @@ minutes and seconds (for CPU time only)
 The soft limit cannot exceed the hard limit.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fI soft,hard\fR\fR
 .ad
 .RS 16n
-.rt  
 Set core file size limits (default unit is 512-byte blocks).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fI soft,hard\fR\fR
 .ad
 .RS 16n
-.rt  
 Set data segment (heap) size limits (default unit is kilobytes).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fI soft,hard\fR\fR
 .ad
 .RS 16n
-.rt  
 Set file size limits (default unit is 512-byte blocks).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fI soft,hard\fR\fR
 .ad
 .RS 16n
-.rt  
 Set file descriptor limits (no default unit).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fI soft,hard\fR\fR
 .ad
 .RS 16n
-.rt  
 Set stack segment size limits (default unit is kilobytes).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fI soft,hard\fR\fR
 .ad
 .RS 16n
-.rt  
 Set CPU time limits (default unit is seconds).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fI soft,hard\fR\fR
 .ad
 .RS 16n
-.rt  
 Set virtual memory size limits (default unit is kilobytes).
 .RE
 
@@ -201,12 +175,10 @@ Set virtual memory size limits (default unit is kilobytes).
 The following operands are supported.
 .sp
 .ne 2
-.mk
 .na
 \fBpid\fR
 .ad
 .RS 7n
-.rt  
 Process ID list.
 .RE
 
@@ -218,12 +190,10 @@ as no such process, permission denied, or invalid option).
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fR\fIpid\fR\fB/*\fR\fR
 .ad
 .RS 15n
-.rt  
 process information and control files
 .RE
 

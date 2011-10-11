@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH zlogin 1 "18 Dec 2006" "SunOS 5.11" "User Commands"
+.TH ZLOGIN 1 "Dec 18, 2006"
 .SH NAME
 zlogin \- enter a zone
 .SH SYNOPSIS
@@ -14,7 +14,7 @@ zlogin \- enter a zone
 
 .LP
 .nf
-\fBzlogin\fR [\fB-ES\fR] [\fB-e\fR \fIc\fR] [\fB-l\fR \fIusername\fR] \fIzonename\fR \fIutility\fR 
+\fBzlogin\fR [\fB-ES\fR] [\fB-e\fR \fIc\fR] [\fB-l\fR \fIusername\fR] \fIzonename\fR \fIutility\fR
      [\fIargument\fR]...
 .fi
 
@@ -29,12 +29,10 @@ utility.
 \fBzlogin\fR operates in one of three modes:
 .sp
 .ne 2
-.mk
 .na
 \fBInteractive Mode\fR
 .ad
 .RS 24n
-.rt  
 If no utility argument is given and the stdin file descriptor for the
 \fBzlogin\fR process is a tty device, \fBzlogin\fR operates in \fBinteractive
 mode\fR. In this mode, \fBzlogin\fR creates a new pseudo terminal for use
@@ -45,12 +43,10 @@ within the login session. Programs requiring a tty device, for example,
 
 .sp
 .ne 2
-.mk
 .na
 \fBNon-Interactive Mode\fR
 .ad
 .RS 24n
-.rt  
 If a utility is specified, \fBzlogin\fR operates in \fBnon-interactive mode\fR.
 This mode can be useful for script authors since stdin, stdout, and stderr are
 preserved and the exit status of \fIutility\fR is returned upon termination. In
@@ -63,12 +59,10 @@ in the non-global zone. See \fBrsh\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fBConsole Mode\fR
 .ad
 .RS 24n
-.rt  
 If the \fB-C\fR option is specified, the user is connected to the zone console
 device and \fBzlogin\fR operates in \fBconsole mode\fR. The zone console is
 available once the zone is in the installed  state. Connections to the console
@@ -81,23 +75,19 @@ are persistent across reboot of the zone.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
 .RS 15n
-.rt  
 Connects to the zone console.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fIc\fR\fR
 .ad
 .RS 15n
-.rt  
 Specifies a different escape character, \fIc\fR, for the key sequence used to
 access extended functions and to disconnect from the login. The default escape
 character is the tilde (\fB~\fR).
@@ -105,24 +95,20 @@ character is the tilde (\fB~\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-E\fR\fR
 .ad
 .RS 15n
-.rt  
 Disables the ability to access extended functions or to disconnect from the
 login by using the escape sequence character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIusername\fR\fR
 .ad
 .RS 15n
-.rt  
 Specifies a different \fIusername\fR for the zone login. If you do not use this
 option, the zone username used is "root". This option is invalid if the
 \fB-C\fR option is specified.
@@ -130,12 +116,10 @@ option, the zone username used is "root". This option is invalid if the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR\fR
 .ad
 .RS 15n
-.rt  
 "Safe" login mode. \fBzlogin\fR does minimal processing and does not invoke
 \fBlogin\fR(1) or \fBsu\fR(1M). The \fB-S\fR option can not be used if a
 username is specified through the \fB-l\fR option, and cannot be used with
@@ -150,12 +134,10 @@ Lines that you type that start with the tilde character (\fB~\fR) are "escape
 sequences". The escape character can be changed using the \fB-e\fR option.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~.\fR\fR
 .ad
 .RS 6n
-.rt  
 Disconnects from the zone. This is not the same as a logout, because the local
 host breaks the connection with no warning to the zone's end.
 .RE
@@ -171,34 +153,28 @@ process cannot change zone again, nor can any of its children.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIzonename\fR\fR
 .ad
 .RS 15n
-.rt  
 The name of the zone to be entered.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIutility\fR\fR
 .ad
 .RS 15n
-.rt  
 The utility to be run in the specified zone.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIargument...\fR\fR
 .ad
 .RS 15n
-.rt  
 Arguments passed to the utility.
 .RE
 
@@ -221,34 +197,28 @@ to perform the requested operation, \fBzlogin\fR exits with status \fB1\fR.
 To summarize, the following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 7n
-.rt  
 Successful entry.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 7n
-.rt  
 Permission denied, or failure to enter the zone.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBAny\fR
 .ad
 .RS 7n
-.rt  
 Return code from utility, or from \fBsu\fR(1M) if operating in non-interactive
 mode.
 .RE
@@ -261,13 +231,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

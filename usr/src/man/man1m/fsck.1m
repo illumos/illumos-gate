@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH fsck 1M "7 May 2008" "SunOS 5.11" "System Administration Commands"
+.TH FSCK 1M "May 7, 2008"
 .SH NAME
 fsck \- check and repair file systems
 .SH SYNOPSIS
@@ -15,7 +15,7 @@ fsck \- check and repair file systems
 
 .LP
 .nf
-\fBfsck\fR [\fB-F\fR \fIFSType\fR] [\fB-n\fR | N | y | Y] [\fB-V\fR] [\fB-v\fR] 
+\fBfsck\fR [\fB-F\fR \fIFSType\fR] [\fB-n\fR | N | y | Y] [\fB-V\fR] [\fB-v\fR]
      [\fB-o\fR \fIFSType-specific-options\fR] [\fIspecial\fR]...
 .fi
 
@@ -65,7 +65,6 @@ information.
 The following generic options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR \fIFSType\fR\fR
 .ad
@@ -76,7 +75,6 @@ Specify the file system type on which to operate.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
@@ -97,7 +95,6 @@ ufs fsck: sanity check: /dev/rdsk/c0t3d0s1 okay
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR | \fB-N\fR\fR
 .ad
@@ -109,7 +106,6 @@ the file system for writing.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
@@ -121,7 +117,6 @@ be used to verify and to validate the command line.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -133,7 +128,6 @@ Enables verbose output. Might not be supported by all filesystem-specific
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-y\fR | \fBY\fR\fR
 .ad
@@ -144,7 +138,6 @@ Assume a \fByes\fR response to all questions asked by \fBfsck\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIspecific-options\fR\fR
 .ad
@@ -154,7 +147,6 @@ These \fIspecific-options\fR can be any combination of the following separated
 by commas (with no intervening spaces).
 .sp
 .ne 2
-.mk
 .na
 \fB\fBb=\fR\fIn\fR\fR
 .ad
@@ -167,7 +159,6 @@ by running \fBnewfs\fR(1M) with the \fB-Nv\fR options specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBc\fR\fR
 .ad
@@ -190,7 +181,6 @@ future releases.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBf\fR\fR
 .ad
@@ -202,7 +192,6 @@ clean flag.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBp\fR\fR
 .ad
@@ -215,7 +204,6 @@ parallel file system checking.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBw\fR\fR
 .ad
@@ -229,7 +217,6 @@ Check writable file systems only.
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -240,7 +227,6 @@ file system is unmounted and OK
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
@@ -251,7 +237,6 @@ erroneous parameters are specified
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB32\fR\fR
 .ad
@@ -262,7 +247,6 @@ file system is unmounted and needs checking (\fBfsck\fR \fB-m\fR only)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB33\fR\fR
 .ad
@@ -273,7 +257,6 @@ file system is already mounted
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB34\fR\fR
 .ad
@@ -284,7 +267,6 @@ cannot stat device
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB35\fR\fR
 .ad
@@ -295,7 +277,6 @@ a filesystem that is mounted read/write was modified - reboot
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB36\fR\fR
 .ad
@@ -306,7 +287,6 @@ uncorrectable errors detected - terminate normally
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB37\fR\fR
 .ad
@@ -317,7 +297,6 @@ a signal was caught during processing
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB39\fR\fR
 .ad
@@ -328,7 +307,6 @@ uncorrectable errors detected - terminate immediately
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB40\fR\fR
 .ad
@@ -345,7 +323,6 @@ The \fBfsck\fR command is \fBlarge file aware\fR for UFS file systems, per the
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/default/fs\fR\fR
 .ad
@@ -355,7 +332,6 @@ default local file system type. Default values can be set for the following
 flags in \fB/etc/default/fs\fR. For example: \fBLOCAL=ufs.\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLOCAL\fR\fR
 .ad
@@ -368,7 +344,6 @@ The default partition for a command if no FSType is specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/vfstab\fR\fR
 .ad
@@ -385,13 +360,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

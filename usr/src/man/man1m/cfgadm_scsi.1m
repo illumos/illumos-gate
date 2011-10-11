@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cfgadm_scsi 1M "6 Jun 2006" "SunOS 5.11" "System Administration Commands"
+.TH CFGADM_SCSI 1M "Jun 6, 2006"
 .SH NAME
 cfgadm_scsi \- SCSI hardware specific commands for cfgadm
 .SH SYNOPSIS
@@ -123,56 +123,46 @@ points. The receptacle and occupant state for attachment points at the
 \fBSCSI\fR controller have the following meanings:
 .sp
 .ne 2
-.mk
 .na
 \fBempty\fR
 .ad
 .RS 16n
-.rt  
 not applicable
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdisconnected\fR
 .ad
 .RS 16n
-.rt  
 bus quiesced (\fBI/O\fR activity on bus is suspended)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBconnected\fR
 .ad
 .RS 16n
-.rt  
 bus active
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBconfigured\fR
 .ad
 .RS 16n
-.rt  
 one or more devices on the bus is configured
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBunconfigured\fR
 .ad
 .RS 16n
-.rt  
 no device on the bus is configured
 .RE
 
@@ -181,56 +171,46 @@ no device on the bus is configured
 The corresponding states for individual \fBSCSI\fR devices are:
 .sp
 .ne 2
-.mk
 .na
 \fBempty\fR
 .ad
 .RS 16n
-.rt  
 not applicable
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdisconnected\fR
 .ad
 .RS 16n
-.rt  
 bus to which the device is attached is quiesced
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBconnected\fR
 .ad
 .RS 16n
-.rt  
 bus to which device is attached is active
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBconfigured\fR
 .ad
 .RS 16n
-.rt  
 device is configured
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBunconfigured\fR
 .ad
 .RS 16n
-.rt  
 device is not configured
 .RE
 
@@ -243,12 +223,10 @@ state changes, (\fB-c\fR), invoking hardware specific functions (\fB-x\fR), and
 obtaining configuration administration help messages (\fB-h\fR).
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIfunction\fR\fR
 .ad
 .RS 24n
-.rt  
 The following generic commands are defined for the \fBSCSI \fRhardware specific
 library:
 .sp
@@ -256,23 +234,19 @@ For \fBSCSI\fR controller attachment points, the following configuration state
 change operations are supported:
 .sp
 .ne 2
-.mk
 .na
 \fBconnect\fR
 .ad
 .RS 15n
-.rt  
 Unquiesce the \fBSCSI\fR bus.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdisconnect\fR
 .ad
 .RS 15n
-.rt  
 Quiesce the bus (suspend \fBI/O\fR activity on bus).
 .sp
 Incorrect use of this command can cause the system to hang. See \fBNOTES\fR.
@@ -280,46 +254,38 @@ Incorrect use of this command can cause the system to hang. See \fBNOTES\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBconfigure\fR
 .ad
 .RS 15n
-.rt  
 Configure new devices on \fBSCSI\fR bus.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBunconfigure\fR
 .ad
 .RS 15n
-.rt  
 Unconfigure all devices connected to bus.
 .RE
 
 The following generic commands are defined for \fBSCSI\fR devices:
 .sp
 .ne 2
-.mk
 .na
 \fBconfigure\fR
 .ad
 .RS 15n
-.rt  
 configure a specific device
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBunconfigure\fR
 .ad
 .RS 15n
-.rt  
 unconfigure a specific device
 .RE
 
@@ -327,12 +293,10 @@ unconfigure a specific device
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 24n
-.rt  
 When used with the \fBdisconnect\fR command, forces a quiesce of the \fBSCSI\fR
 bus, if supported by hardware.
 .sp
@@ -341,58 +305,48 @@ Incorrect use of this command can cause the system to hang. See \fBNOTES\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fIap_id\fR\fR
 .ad
 .RS 24n
-.rt  
 SCSI specific help can be obtained by using the help option with any SCSI
 attachment point.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIhardware_option\fR\fR
 .ad
 .RS 24n
-.rt  
 No hardware specific options are currently defined.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIlisting_option\fR\fR
 .ad
 .RS 24n
-.rt  
 Attachment points of class \fBscsi\fR can be listed by using the \fBselect\fR
 sub-option. Refer to the \fBcfgadm\fR(1M) man page for additional information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fIap_id\fR\fR
 .ad
 .RS 24n
-.rt  
 No test commands are available at present.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR \fIhardware_function\fR\fR
 .ad
 .RS 24n
-.rt  
 Some of the following commands can only be used with SCSI controllers and some
 only with SCSI devices.
 .sp
@@ -403,7 +357,6 @@ for a \fBSCSI\fR device, for example: \fBc0::dsk/c0dt3d0\fR.
 The following hardware specific functions are defined:
 .sp
 .ne 2
-.mk
 .na
 \fBinsert_device \fIcontroller_ap_id\fR\fR
 .ad
@@ -416,7 +369,6 @@ This command is intended for interactive use only.
 
 .sp
 .ne 2
-.mk
 .na
 \fBremove_device \fIdevice_ap_id\fR\fR
 .ad
@@ -429,7 +381,6 @@ This command is intended for interactive use only.
 
 .sp
 .ne 2
-.mk
 .na
 \fBreplace_device \fIdevice_ap_id\fR\fR
 .ad
@@ -443,7 +394,6 @@ This command is intended for interactive use only.
 
 .sp
 .ne 2
-.mk
 .na
 \fBreset_device \fIdevice_ap_id\fR\fR
 .ad
@@ -454,7 +404,6 @@ Reset \fIdevice_ap_id\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBreset_bus \fIcontroller_ap_id\fR\fR
 .ad
@@ -466,7 +415,6 @@ bus.
 
 .sp
 .ne 2
-.mk
 .na
 \fBreset_all \fIcontroller_ap_id\fR\fR
 .ad
@@ -477,7 +425,6 @@ Reset bus \fIcontroller_ap_id\fR and all devices on the bus.
 
 .sp
 .ne 2
-.mk
 .na
 \fBlocator [=on|off] \fIdevice_ap_id\fR\fR
 .ad
@@ -490,7 +437,6 @@ locator is printed.
 
 .sp
 .ne 2
-.mk
 .na
 \fBled[=LED,mode=on|off|blink] \fIdevice_ap_id\fR\fR
 .ad
@@ -555,7 +501,7 @@ The system responds with the following:
 .nf
 Adding device to SCSI HBA: /devices/sbus@1f,0/SUNW,fas@e,8800000
 This operation will suspend activity on SCSI bus c0
-Continue (yes/no)? 
+Continue (yes/no)?
 .fi
 .in -2
 .sp
@@ -579,7 +525,7 @@ The system responds with the following:
 .sp
 .in +2
 .nf
-SCSI bus quiesced successfully. 
+SCSI bus quiesced successfully.
 It is now safe to proceed with hotplug operation.
 Enter y if operation is complete or n to abort (yes/no)?
 .fi
@@ -645,7 +591,7 @@ The system responds with the following:
 .sp
 .in +2
 .nf
-SCSI bus quiesced successfully. 
+SCSI bus quiesced successfully.
 It is now safe to proceed with hotplug operation.
 Enter y if operation is complete or n to abort (yes/no)?
 .fi
@@ -745,7 +691,6 @@ The system does not print anything in response.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/cfgadm/scsi.so.1\fR\fR
 .ad
@@ -756,7 +701,6 @@ hardware-specific library for generic \fBSCSI\fR hot-plugging
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/platform/SPARC-Enterprise/lib/cfgadm/scsi.so.1\fR\fR
 .ad

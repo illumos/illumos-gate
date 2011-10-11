@@ -4,14 +4,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH klist 1 "16 Nov 2006" "SunOS 5.11" "User Commands"
+.TH KLIST 1 "Nov 16, 2006"
 .SH NAME
 klist \- list currently held Kerberos tickets
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/klist\fR [\fB-e\fR] 
-     [ [\fB-c\fR] [\fB-f\fR] [\fB-s\fR] [\fB-a\fR [\fB-n\fR]] [\fIcache_name\fR]] 
+\fB/usr/bin/klist\fR [\fB-e\fR]
+     [ [\fB-c\fR] [\fB-f\fR] [\fB-s\fR] [\fB-a\fR [\fB-n\fR]] [\fIcache_name\fR]]
      [\fB-k\fR [\fB-t\fR] [\fB-K\fR] [\fIkeytab_file\fR]]
 .fi
 
@@ -38,200 +38,164 @@ user.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 20n
-.rt  
 Displays list of addresses in credentials. Uses the configured nameservice to
 translate numeric network addresses to the associated hostname if possible.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR [\fIcache_name\fR]\fR
 .ad
 .RS 20n
-.rt  
 Lists tickets held in a credentials cache. This is the default if neither
 \fB-c\fR nor \fB-k\fR is specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 20n
-.rt  
 Displays the encryption types of the session key and the ticket for each
 credential in the credential cache, or each key in the keytab file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 20n
-.rt  
 Shows the flags present in the credentials, using the following abbreviations:
 .sp
 .ne 2
-.mk
 .na
 \fBa\fR
 .ad
 .RS 5n
-.rt  
 Anonymous
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBA\fR
 .ad
 .RS 5n
-.rt  
 Pre-authenticated
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBd\fR
 .ad
 .RS 5n
-.rt  
 Post-dated
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBD\fR
 .ad
 .RS 5n
-.rt  
 Post-dateable
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBf\fR
 .ad
 .RS 5n
-.rt  
 Forwarded
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBF\fR
 .ad
 .RS 5n
-.rt  
 Forwardable
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBH\fR
 .ad
 .RS 5n
-.rt  
 Hardware authenticated
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBi\fR
 .ad
 .RS 5n
-.rt  
 Invalid
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBI\fR
 .ad
 .RS 5n
-.rt  
 Initial
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBO\fR
 .ad
 .RS 5n
-.rt  
 Okay as delegate
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBp\fR
 .ad
 .RS 5n
-.rt  
 Proxy
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBP\fR
 .ad
 .RS 5n
-.rt  
 Proxiable
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBR\fR
 .ad
 .RS 5n
-.rt  
 Renewable
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBT\fR
 .ad
 .RS 5n
-.rt  
 Transit policy checked
 .RE
 
@@ -239,47 +203,39 @@ Transit policy checked
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR [\fIkeytab_file\fR]\fR
 .ad
 .RS 20n
-.rt  
 List keys held in a \fBkeytab\fR file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-K\fR\fR
 .ad
 .RS 20n
-.rt  
 Displays the value of the encryption key in each keytab entry in the keytab
 file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 20n
-.rt  
 Shows numeric \fBIP\fR addresses instead of reverse-resolving addresses. Only
 valid with \fB-a\fR option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 20n
-.rt  
 Causes \fBklist\fR to run silently (produce no output), but to still set the
 exit status according to whether it finds the credentials cache. The exit
 status is \fB0\fR if \fBklist\fR finds a credentials cache, and `\fB1\fRif it
@@ -288,12 +244,10 @@ does not, or if the local-realm TGT has expired.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 20n
-.rt  
 Displays the time entry timestamps for each keytab entry in the keytab file.
 .RE
 
@@ -303,12 +257,10 @@ Displays the time entry timestamps for each keytab entry in the keytab file.
 \fBklist\fR uses the following environment variable:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKRB5CCNAME\fR\fR
 .ad
 .RS 14n
-.rt  
 Location of the credentials (ticket) cache. See \fBkrb5envvar\fR(5) for syntax
 and details.
 .RE
@@ -316,34 +268,28 @@ and details.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/tmp/krb5cc_\fIuid\fR\fR\fR
 .ad
 .RS 25n
-.rt  
 Default credentials cache (\fIuid\fR is the decimal \fBUID\fR of the user).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/krb5.keytab\fR\fR
 .ad
 .RS 25n
-.rt  
 Default location for the local host's \fBkeytab\fR file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/krb5.conf\fR\fR
 .ad
 .RS 25n
-.rt  
 Default location for the local host's configuration file. See
 \fBkrb5.conf\fR(4).
 .RE
@@ -356,13 +302,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

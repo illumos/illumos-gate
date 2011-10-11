@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH scsi 4 "30 May 2008" "SunOS 5.11" "File Formats"
+.TH SCSI 4 "May 30, 2008"
 .SH NAME
 scsi \- configuration files for SCSI target drivers
 .SH DESCRIPTION
@@ -92,7 +92,7 @@ scsiclass,DDEE                                      (10 *1)
 scsiclass,DDFFF                                     (11 *2)
 scsiclass,DD                                        (12)
 scsiclass                                           (13)
-   *1 only produced on a secondary function node        
+   *1 only produced on a secondary function node
    *2 only produced on a node with flags
 .fi
 .in -2
@@ -102,81 +102,67 @@ scsiclass                                           (13)
 where:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBv\fR\fR
 .ad
 .RS 20n
-.rt  
 Is the letter \fBv\fR. Denotes the beginning of \fBVVVVVVVV\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVVVVVVVV\fR\fR
 .ad
 .RS 20n
-.rt  
 Translated scsi_vendor: SCSI standard INQUIRY data "Vendor identification"
 SCSI_ASCII field (bytes 8-15).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBp\fR\fR
 .ad
 .RS 20n
-.rt  
 Is the letter \fBp\fR. Denotes the beginning of \fBPPPPPPPPPPPPPPPP\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPPPPPPPPPPPPPPPP\fR\fR
 .ad
 .RS 20n
-.rt  
 Translated scsi_product: SCSI standard INQUIRY data "Product identification"
 SCSI_ASCII field (bytes 16-31).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBr\fR\fR
 .ad
 .RS 20n
-.rt  
 Is the letter \fBr\fR. Denotes the beginning of \fBRRRR\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRRRR\fR\fR
 .ad
 .RS 20n
-.rt  
 Translated scsi_revision: SCSI standard INQUIRY data "Product revision level"
 SCSI_ASCII field (bytes 32-35).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDD\fR\fR
 .ad
 .RS 20n
-.rt  
 Is a two digit ASCII hexadecimal number. The value of the two digits is based
 one the SCSI "Peripheral device type" command set associated with the node. On
 a primary node this is the scsi_dtype of the primary command set; on a
@@ -186,34 +172,28 @@ function command set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEE\fR\fR
 .ad
 .RS 20n
-.rt  
 Same encoding used for \fBDD\fR. This form is only generated on secondary
 function nodes. The \fBDD\fR function is embedded in an \fBEE\fR device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFFF\fR\fR
 .ad
 .RS 20n
-.rt  
 Concatenation, in alphabetical order, of the flag characters below. The
 following flag characters are defined:
 .sp
 .ne 2
-.mk
 .na
 \fBR\fR
 .ad
 .RS 5n
-.rt  
 Removable media: Used when \fBscsi_rmb\fR is set
 .RE
 
@@ -238,23 +218,19 @@ All host adapter drivers of class \fBscsi\fR recognize the following
 properties:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtarget\fR\fR
 .ad
 .RS 10n
-.rt  
 Integer-valued \fBSCSI\fR target identifier that this driver claims.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlun\fR\fR
 .ad
 .RS 10n
-.rt  
 Integer-valued \fBSCSI\fR logical unit number ( \fBLUN)\fR that this driver
 claims.
 .RE
@@ -341,13 +317,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

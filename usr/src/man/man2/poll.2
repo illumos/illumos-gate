@@ -1,13 +1,13 @@
 '\" te
 .\"  Copyright 1989 AT&T  Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH poll 2 "23 Aug 2001" "SunOS 5.11" "System Calls"
+.TH POLL 2 "Aug 23, 2001"
 .SH NAME
 poll \- input/output multiplexing
 .SH SYNOPSIS
@@ -50,106 +50,88 @@ The \fBfd\fR member specifies an open file descriptor and the \fBevents\fR and
 of any combination of the following event flags:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOLLIN\fR\fR
 .ad
 .RS 14n
-.rt  
 Data other than high priority data may be read without blocking. For streams,
 this flag is set in \fBrevents\fR even if the message is of zero length.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOLLRDNORM\fR\fR
 .ad
 .RS 14n
-.rt  
 Normal data (priority band equals 0) may be read without blocking. For streams,
 this flag is set in \fBrevents\fR even if the message is of zero length.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOLLRDBAND\fR\fR
 .ad
 .RS 14n
-.rt  
 Data from a non-zero priority band may be read without blocking. For streams,
 this flag is set in \fBrevents\fR even if the message is of zero length.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOLLPRI\fR\fR
 .ad
 .RS 14n
-.rt  
 High priority data may be received without blocking. For streams, this flag is
 set in \fBrevents\fR even if the message is of zero length.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOLLOUT\fR\fR
 .ad
 .RS 14n
-.rt  
 Normal data (priority band equals 0) may be written without blocking.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOLLWRNORM\fR\fR
 .ad
 .RS 14n
-.rt  
 The same as  \fBPOLLOUT\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOLLWRBAND\fR\fR
 .ad
 .RS 14n
-.rt  
 Priority data (priority band > 0) may be written.  This event only examines
 bands that have been written to at least once.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOLLERR\fR\fR
 .ad
 .RS 14n
-.rt  
 An error has occurred on the device or stream.  This flag is only valid in the
 \fBrevents\fR bitmask; it is not used in the \fBevents\fR member.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOLLHUP\fR\fR
 .ad
 .RS 14n
-.rt  
 A hangup has occurred on the stream. This event and  \fBPOLLOUT\fR are mutually
 exclusive; a stream can never be writable if a hangup has occurred. However,
 this event and  \fBPOLLIN\fR, \fBPOLLRDNORM\fR, \fBPOLLRDBAND\fR, or
@@ -159,12 +141,10 @@ this event and  \fBPOLLIN\fR, \fBPOLLRDNORM\fR, \fBPOLLRDBAND\fR, or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOLLNVAL\fR\fR
 .ad
 .RS 14n
-.rt  
 The specified \fBfd\fR value does not belong to an open file. This flag is only
 valid in the \fBrevents\fR member; it is not used in the \fBevents\fR member.
 .RE
@@ -225,46 +205,38 @@ indicate the error.
 The \fBpoll()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 10n
-.rt  
 Allocation of internal data structures failed, but the request may be attempted
 again.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 Some argument points to an illegal address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 10n
-.rt  
 A signal was caught during the \fBpoll()\fR function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The argument \fInfds\fR is greater than \fB{OPEN_MAX}\fR, or one of the
 \fBfd\fR members refers to a stream or multiplexer that is linked (directly or
 indirectly) downstream from a multiplexer.
@@ -278,13 +250,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

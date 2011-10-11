@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_prop_get_int 9F "25 Aug 2001" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_PROP_GET_INT 9F "Aug 25, 2001"
 .SH NAME
 ddi_prop_get_int, ddi_prop_get_int64 \- lookup integer property
 .SH SYNOPSIS
@@ -14,7 +14,7 @@ ddi_prop_get_int, ddi_prop_get_int64 \- lookup integer property
 
 
 
-\fBint\fR \fBddi_prop_get_int\fR(\fBdev_t\fR \fImatch_dev\fR, \fBdev_info_t *\fR\fIdip\fR, \fBuint_t\fR \fIflags\fR, 
+\fBint\fR \fBddi_prop_get_int\fR(\fBdev_t\fR \fImatch_dev\fR, \fBdev_info_t *\fR\fIdip\fR, \fBuint_t\fR \fIflags\fR,
      \fBchar *\fR\fIname\fR, \fBint\fR \fIdefvalue\fR);
 .fi
 
@@ -27,55 +27,45 @@ ddi_prop_get_int, ddi_prop_get_int64 \- lookup integer property
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fImatch_dev\fR\fR
 .ad
 .RS 13n
-.rt  
 Device number associated with property or \fBDDI_DEV_T_ANY.\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 13n
-.rt  
 Pointer to the device info node of device whose property list should be
 searched.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 13n
-.rt  
 Possible flag values are some combination of:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_DONTPASS\fR\fR
 .ad
 .RS 21n
-.rt  
 Do not pass request to parent device information node if property not found.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_NOTPROM\fR\fR
 .ad
 .RS 21n
-.rt  
 Do not look at \fBPROM \fRproperties (ignored on platforms that do not support
 \fBPROM \fRproperties).
 .RE
@@ -84,23 +74,19 @@ Do not look at \fBPROM \fRproperties (ignored on platforms that do not support
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR\fR
 .ad
 .RS 13n
-.rt  
 String containing the name of the property.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdefvalue\fR\fR
 .ad
 .RS 13n
-.rt  
 An integer value that is returned if the property cannot be found.
 .RE
 
@@ -200,7 +186,7 @@ The following example demonstrates the use of \fBddi_prop_get_int()\fR.
 	* Get the value of the integer "width" property, using
 	* our own default if no such property exists
 	*/
-	width = ddi_prop_get_int(xx_dev, xx_dip, 0, "width", 
+	width = ddi_prop_get_int(xx_dev, xx_dip, 0, "width",
 	           XX_DEFAULT_WIDTH);\fR
 .fi
 .in -2

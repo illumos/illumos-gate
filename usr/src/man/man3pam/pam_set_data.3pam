@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pam_set_data 3PAM "13 Oct 1998" "SunOS 5.11" "PAM Library Functions"
+.TH PAM_SET_DATA 3PAM "Oct 13, 1998"
 .SH NAME
 pam_set_data, pam_get_data \- PAM routines to maintain module specific state
 .SH SYNOPSIS
@@ -14,7 +14,7 @@ pam_set_data, pam_get_data \- PAM routines to maintain module specific state
 
 
 
-\fBint\fR \fBpam_set_data\fR(\fBpam_handle_t *\fR\fIpamh\fR, 
+\fBint\fR \fBpam_set_data\fR(\fBpam_handle_t *\fR\fIpamh\fR,
      \fBconst char *\fR\fImodule_data_name\fR, \fBvoid *\fR\fIdata\fR,
      \fBvoid  (*\fR\fIcleanup\fR) (pam_handle_t *\fIpamh\fR, \fBvoid *\fR\fIdata\fR,
      \fBint\fR \fIpam_end_status\fR));
@@ -66,12 +66,10 @@ In addition to the return values listed in \fBpam\fR(3PAM), the following value
 may also be returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_NO_MODULE_DATA\fR\fR
 .ad
 .RS 22n
-.rt  
 No module specific data is present.
 .RE
 
@@ -83,15 +81,14 @@ See \fBattributes\fR(5) for description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface Stability Stable
+Interface Stability	 Stable
 _
-MT-LevelMT-Safe with exceptions
+MT-Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH putdgrp 1M "5 Jul 1990" "SunOS 5.11" "System Administration Commands"
+.TH PUTDGRP 1M "Jul 5, 1990"
 .SH NAME
 putdgrp \- edits device group table
 .SH SYNOPSIS
@@ -42,12 +42,10 @@ adds the specified devices to that new group.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 6n
-.rt  
 Delete the group or, if used with \fIdevice\fR, delete the device  from a group
 definition.
 .RE
@@ -58,23 +56,19 @@ definition.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdgroup\fR\fR
 .ad
 .RS 10n
-.rt  
 Specify a device group name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevice\fR\fR
 .ad
 .RS 10n
-.rt  
 Specify the pathname or alias of the device that is to be added to, or deleted
 from, the device group.
 .RE
@@ -85,47 +79,39 @@ from, the device group.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 Command syntax was incorrect, an invalid option was used,  or an internal error
 occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Device group table could not be opened for reading or a new device group table
 could not be created.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 5n
-.rt  
 If executed with the  \fB-d\fR option, indicates that an entry in the device
 group table for the device group  \fIdgroup\fR does not exist and so cannot be
 deleted. Otherwise, indicates that the  device group \fIdgroup\fR already
@@ -134,12 +120,10 @@ exists and cannot be added.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB4\fR\fR
 .ad
 .RS 5n
-.rt  
 If executed with the  \fB-d\fR option, indicates that the device group
 \fIdgroup\fR does not have as members one or more of the specified devices.
 Otherwise, indicates that the device group  \fIdgroup\fR already has one or
@@ -206,12 +190,10 @@ example#  \fBputdgrp \fR\fB-d\fR\fB floppies diskette2\fR
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/dgroup.tab\fR\fR
 .ad
 .RS 19n
-.rt  
 
 .RE
 

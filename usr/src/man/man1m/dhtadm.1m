@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dhtadm 1M "28 Aug 2004" "SunOS 5.11" "System Administration Commands"
+.TH DHTADM 1M "Aug 28, 2004"
 .SH NAME
 dhtadm \- DHCP configuration table management utility
 .SH SYNOPSIS
@@ -14,55 +14,55 @@ dhtadm \- DHCP configuration table management utility
 
 .LP
 .nf
-\fBdhtadm\fR \fB-A\fR \fB-s\fR \fIsymbol_name\fR \fB-d\fR \fIdefinition\fR [\fB-r\fR \fIresource\fR] 
+\fBdhtadm\fR \fB-A\fR \fB-s\fR \fIsymbol_name\fR \fB-d\fR \fIdefinition\fR [\fB-r\fR \fIresource\fR]
      [\fB-p\fR \fIpath\fR] [\fB-u\fR \fIuninterpreted\fR] [\fB-g\fR]
 .fi
 
 .LP
 .nf
-\fBdhtadm\fR \fB-A\fR \fB-m\fR \fImacro_name\fR \fB-d\fR \fIdefinition\fR [\fB-r\fR \fIresource\fR] 
+\fBdhtadm\fR \fB-A\fR \fB-m\fR \fImacro_name\fR \fB-d\fR \fIdefinition\fR [\fB-r\fR \fIresource\fR]
      [\fB-p\fR \fIpath\fR] [\fB-u\fR \fIuninterpreted\fR] [\fB-g\fR]
 .fi
 
 .LP
 .nf
-\fBdhtadm\fR \fB-M\fR \fB-s\fR \fIsymbol_name\fR \fB-d\fR \fIdefinition\fR [\fB-r\fR \fIresource\fR] 
+\fBdhtadm\fR \fB-M\fR \fB-s\fR \fIsymbol_name\fR \fB-d\fR \fIdefinition\fR [\fB-r\fR \fIresource\fR]
      [\fB-p\fR \fIpath\fR] [\fB-u\fR \fIuninterpreted\fR] [\fB-g\fR]
 .fi
 
 .LP
 .nf
-\fBdhtadm\fR \fB-M\fR \fB-s\fR \fIsymbol_name\fR \fB-n\fR \fInew_name\fR [\fB-r\fR \fIresource\fR] 
+\fBdhtadm\fR \fB-M\fR \fB-s\fR \fIsymbol_name\fR \fB-n\fR \fInew_name\fR [\fB-r\fR \fIresource\fR]
      [\fB-p\fR \fIpath\fR] [\fB-u\fR \fIuninterpreted\fR] [\fB-g\fR]
 .fi
 
 .LP
 .nf
-\fBdhtadm\fR \fB-M\fR \fB-m\fR \fImacro_name\fR \fB-n\fR \fInew_name\fR [\fB-r\fR \fIresource\fR] [\fB-p\fR \fIpath\fR] 
+\fBdhtadm\fR \fB-M\fR \fB-m\fR \fImacro_name\fR \fB-n\fR \fInew_name\fR [\fB-r\fR \fIresource\fR] [\fB-p\fR \fIpath\fR]
      [\fB-u\fR \fIuninterpreted\fR] [\fB-g\fR]
 .fi
 
 .LP
 .nf
-\fBdhtadm\fR \fB-M\fR \fB-m\fR \fImacro_name\fR \fB-d\fR \fIdefinition\fR [\fB-r\fR \fIresource\fR] 
+\fBdhtadm\fR \fB-M\fR \fB-m\fR \fImacro_name\fR \fB-d\fR \fIdefinition\fR [\fB-r\fR \fIresource\fR]
      [\fB-p\fR \fIpath\fR] [\fB-u\fR \fIuninterpreted\fR] [\fB-g\fR]
 .fi
 
 .LP
 .nf
-\fBdhtadm\fR \fB-M\fR \fB-m\fR \fImacro_name\fR \fB-e\fR \fIsymbol=value\fR [\fB-r\fR \fIresource\fR] 
+\fBdhtadm\fR \fB-M\fR \fB-m\fR \fImacro_name\fR \fB-e\fR \fIsymbol=value\fR [\fB-r\fR \fIresource\fR]
      [\fB-p\fR \fIpath\fR] [\fB-u\fR \fIuninterpreted\fR] [\fB-g\fR]
 .fi
 
 .LP
 .nf
-\fBdhtadm\fR \fB-D\fR \fB-s\fR \fIsymbol_name\fR [\fB-r\fR \fIresource\fR] [\fB-p\fR \fIpath\fR] 
+\fBdhtadm\fR \fB-D\fR \fB-s\fR \fIsymbol_name\fR [\fB-r\fR \fIresource\fR] [\fB-p\fR \fIpath\fR]
      [\fB-u\fR \fIuninterpreted\fR] [\fB-g\fR]
 .fi
 
 .LP
 .nf
-\fBdhtadm\fR \fB-D\fR \fB-m\fR \fImacro_name\fR [\fB-r\fR \fIresource\fR] [\fB-p\fR \fIpath\fR] 
+\fBdhtadm\fR \fB-D\fR \fB-m\fR \fImacro_name\fR [\fB-r\fR \fIresource\fR] [\fB-p\fR \fIpath\fR]
      [\fB-u\fR \fIuninterpreted\fR] [\fB-g\fR]
 .fi
 
@@ -108,23 +108,19 @@ command: \fB-A\fR, \fB-B\fR, \fB-C\fR, \fB-D\fR, \fB-M\fR, \fB-P\fR or
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR \fR
 .ad
 .RS 27n
-.rt  
 Add a symbol or macro definition to the \fBdhcptab\fR table.
 .sp
 The following sub-options are required:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdefinition\fR\fR
 .ad
 .RS 18n
-.rt  
 Specify a macro or symbol definition.
 .sp
 \fIdefinition\fR must be enclosed in single quotation marks. For macros, use
@@ -139,12 +135,10 @@ See \fBdhcptab\fR(4) for information about these fields.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fImacro_name\fR\fR
 .ad
 .RS 18n
-.rt  
 Specify the name of the macro to be added.
 .sp
 The \fB-d\fR option must be used with the \fB-m\fR option. The \fB-s\fR option
@@ -153,12 +147,10 @@ cannot be used with the \fB-m\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIsymbol_name\fR\fR
 .ad
 .RS 18n
-.rt  
 Specify the name of the symbol to be added.
 .sp
 The \fB-d\fR option must be used with the \fB-s\fR option. The \fB-m\fR option
@@ -169,12 +161,10 @@ cannot be used with the \fB-s\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-B\fR\fR
 .ad
 .RS 27n
-.rt  
 Batch process \fBdhtadm\fR commands. \fBdhtadm\fR reads from the specified file
 or from standard input a series of \fBdhtadm\fR commands and execute them
 within the same process. Processing many \fBdhtadm\fR commands using this
@@ -184,12 +174,10 @@ is recommended for using \fBdhtadm\fR in scripts.
 The following sub-option is optional:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 Display commands to standard output as they are processed.
 .RE
 
@@ -197,45 +185,37 @@ Display commands to standard output as they are processed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR \fR
 .ad
 .RS 27n
-.rt  
 Create the \fBDHCP\fR service configuration table, \fBdhcptab\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR \fR
 .ad
 .RS 27n
-.rt  
 Delete a symbol or macro definition.
 .sp
 The following sub-options are required:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fImacro_name\fR\fR
 .ad
 .RS 18n
-.rt  
 Delete the specified macro.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIsymbol_name\fR\fR
 .ad
 .RS 18n
-.rt  
 Delete the specified symbol.
 .RE
 
@@ -243,35 +223,29 @@ Delete the specified symbol.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR \fR
 .ad
 .RS 27n
-.rt  
 Signal the DHCP daemon to reload the \fBdhcptab\fR after successful completion
 of the operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR \fR
 .ad
 .RS 27n
-.rt  
 Modify an existing symbol or macro definition.
 .sp
 The following sub-options are required:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdefinition\fR\fR
 .ad
 .RS 17n
-.rt  
 Specify a macro or symbol definition to modify.
 .sp
 The definition must be enclosed in single quotation marks. For macros, use the
@@ -285,12 +259,10 @@ See \fBdhcptab\fR(4) for information about these fields.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 17n
-.rt  
 This sub-option uses the \fIsymbol\fR \fB=\fR\fIvalue\fR argument. Use it to
 edit a \fIsymbol\fR/\fIvalue\fR pair within a macro. To add a symbol which does
 not have an associate value, enter:
@@ -315,24 +287,20 @@ To delete a symbol definition from a macro, enter:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
 .RS 17n
-.rt  
 This sub-option uses the \fImacro_name\fR argument. The \fB-n\fR, \fB-d\fR, or
 \fB-e\fR sub-options are legal companions for this sub-option..
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 17n
-.rt  
 This sub-option uses the \fInew_name\fR argument and modifies the name of the
 object specified by the \fB-m\fR or \fB-s\fR sub-option. It is not limited to
 macros. . Use it to specify a new macro name or symbol name.
@@ -340,12 +308,10 @@ macros. . Use it to specify a new macro name or symbol name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 17n
-.rt  
 This sub-option uses the \fIsymbol_name\fR argument. Use it to specify a
 symbol. The \fB-d\fR sub-option is a legal companion.
 .RE
@@ -354,12 +320,10 @@ symbol. The \fB-d\fR sub-option is a legal companion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fI path\fR \fR
 .ad
 .RS 27n
-.rt  
 Override the \fBdhcpsvc.conf\fR(4) configuration value for \fBPATH=\fR with
 \fIpath\fR. See \fBdhcpsvc.conf\fR(4) for more details regarding \fIpath\fR.
 See \fBdhcp_modules\fR(5) for information regarding data storage modules for
@@ -368,23 +332,19 @@ the \fBDHCP\fR service.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR \fR
 .ad
 .RS 27n
-.rt  
 Print (display) the \fBdhcptab\fR table.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fI data_store_resource\fR \fR
 .ad
 .RS 27n
-.rt  
 Override the \fBdhcpsvc.conf\fR(4) configuration value for \fBRESOURCE=\fR with
 the \fIdata_store_resource\fR specified. See \fBdhcpsvc.conf\fR(4) for more
 details on resource type. See\fI\fR for more information about adding support
@@ -394,23 +354,19 @@ storage modules for the \fBDHCP\fR service.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fR
 .ad
 .RS 27n
-.rt  
 Remove the \fBdhcptab\fR table.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fI uninterpreted\fR\fR
 .ad
 .RS 27n
-.rt  
 Data which is ignored by \fBdhtadm\fR, but passed to currently configured
 public module, to be interpreted by the data store. The private layer provides
 for module-specific configuration information through the use of the
@@ -447,7 +403,7 @@ resource in the \fB/var/mydhcp\fR directory:
 .sp
 .in +2
 .nf
-# dhtadm \fB-A\fR \fB-s\fR MySym 
+# dhtadm \fB-A\fR \fB-s\fR MySym
    \fB-d\fR 'Vendor=SUNW.PCW.LAN,20,IP,1,0'
    \fB-r\fR SUNWfiles \fB-p\fR /var/mydhcp
 .fi
@@ -578,7 +534,7 @@ The following command prints to standard output the contents of the
 .sp
 .in +2
 .nf
-# dhtadm \fB-P\fR 
+# dhtadm \fB-P\fR
 .fi
 .in -2
 .sp
@@ -602,69 +558,57 @@ have been executed: :
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR \fR
 .ad
 .RS 6n
-.rt  
 Object already exists.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR \fR
 .ad
 .RS 6n
-.rt  
 Object does not exist.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR \fR
 .ad
 .RS 6n
-.rt  
 Non-critical error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB4\fR \fR
 .ad
 .RS 6n
-.rt  
 Critical error.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/inet/dhcpsvc.conf\fR \fR
 .ad
 .RS 27n
-.rt  
- 
+
 .RE
 
 .SH ATTRIBUTES
@@ -675,13 +619,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

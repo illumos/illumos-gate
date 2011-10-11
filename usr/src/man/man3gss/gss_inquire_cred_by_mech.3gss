@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH gss_inquire_cred_by_mech 3GSS "15 Aug 2007" "SunOS 5.11" "Generic Security Services API Library Functions"
+.TH GSS_INQUIRE_CRED_BY_MECH 3GSS "Aug 15, 2007"
 .SH NAME
 gss_inquire_cred_by_mech \- obtain per-mechanism information about a credential
 .SH SYNOPSIS
 .LP
 .nf
-\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lgss\fR  [ \fIlibrary\fR... ] 
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lgss\fR  [ \fIlibrary\fR... ]
 #include <gssapi/gssapi.h>
 
 \fBOM_uint32\fR \fBgss_inquire_cred_by_mech\fR(\fBOM_uint32 *\fR\fIminor_status\fR,
@@ -21,12 +21,10 @@ gss_inquire_cred_by_mech \- obtain per-mechanism information about a credential
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIacceptor_lifetime\fR\fR
 .ad
 .RS 22n
-.rt  
 The number of seconds that the credential is capable of accepting security
 contexts under the specified mechanism. If the credential can no longer be used
 to accept contexts, or if the credential usage for this mechanism is
@@ -36,24 +34,20 @@ if this parameter is not required.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcred_handle\fR\fR
 .ad
 .RS 22n
-.rt  
 A handle that refers to the target credential. Specify
 \fBGSS_C_NO_CREDENTIAL\fR to inquire about the default initiator principal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcred_usage\fR\fR
 .ad
 .RS 22n
-.rt  
 How the credential may be used with the specified mechanism. The
 \fIcred_usage\fR parameter may contain one of the following values:
 \fBGSS_C_INITIATE\fR, \fBGSS_C_ACCEPT\fR, or \fBGSS_C_BOTH\fR. Specify
@@ -62,12 +56,10 @@ How the credential may be used with the specified mechanism. The
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinitiator_lifetime\fR\fR
 .ad
 .RS 22n
-.rt  
 The number of seconds that the credential is capable of initiating security
 contexts under the specified mechanism. If the credential can no longer be used
 to initiate contexts, or if the credential usage for this mechanism is
@@ -77,34 +69,28 @@ if this parameter is not required.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImech_type\fR\fR
 .ad
 .RS 22n
-.rt  
 The mechanism for which the information should be returned.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIminor_status\fR\fR
 .ad
 .RS 22n
-.rt  
 A mechanism specific status code.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR\fR
 .ad
 .RS 22n
-.rt  
 The name whose identity the credential asserts. Any storage associated with
 this \fIname\fR must be freed by the application after use by a call to
 \fBgss_release_name\fR(3GSS).
@@ -122,45 +108,37 @@ The \fBgss_inquire_cred_by_mech()\fR function can return the following status
 codes:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_COMPLETE\fR\fR
 .ad
 .RS 30n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_CREDENTIALS_EXPIRED\fR\fR
 .ad
 .RS 30n
-.rt  
 The credentials cannot be added because they have expired.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_DEFECTIVE_CREDENTIAL\fR\fR
 .ad
 .RS 30n
-.rt  
 The referenced credentials are invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_FAILURE\fR\fR
 .ad
 .RS 30n
-.rt  
 The underlying mechanism detected an error for which no specific \fBGSS\fR
 status code is defined.  The mechanism-specific status code reported by means
 of the \fIminor_status\fR parameter details the error condition.
@@ -168,23 +146,19 @@ of the \fIminor_status\fR parameter details the error condition.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_NO_CRED\fR\fR
 .ad
 .RS 30n
-.rt  
 The referenced credentials cannot be accessed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_UNAVAILABLE\fR\fR
 .ad
 .RS 30n
-.rt  
 The \fBgss_inquire_cred_by_mech()\fR function is not available for the
 specified mechanism type.
 .RE
@@ -197,13 +171,12 @@ See \fBattributes\fR(5)  for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

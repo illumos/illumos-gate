@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH Kstat 3PERL "21 Jul 2005" "SunOS 5.11" "Perl Library Functions"
+.TH KSTAT 3PERL "Jul 21, 2005"
 .SH NAME
 Kstat \- Perl tied hash interface to the kstat facility
 .SH SYNOPSIS
@@ -49,24 +49,20 @@ fields.
 .SS "Methods"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnew()\fR\fR
 .ad
 .RS 12n
-.rt  
 Create a new kstat statistics hierarchy and return a reference to the top-level
 hash. Use it like any normal hash to access the statistics.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBupdate()\fR\fR
 .ad
 .RS 12n
-.rt  
 Update all the statistics that have been accessed so far.  In scalar context,
 \fBupdate()\fR returns 1 if the \fBkstat\fR structure has changed, and 0
 otherwise. In list context, \fBupdate()\fR returns references to two arrays:
@@ -85,7 +81,7 @@ use Sun::Solaris::Kstat;
 
 my $kstat = Sun::Solaris::Kstat->new();
 my ($usr1, $sys1, $wio1, $idle1) =
-   @{$kstat->{cpu_stat}{0}{cpu_stat0}}{qw(user kernel 
+   @{$kstat->{cpu_stat}{0}{cpu_stat0}}{qw(user kernel
         wait idle)};
 print("usr sys wio idle\en");
 while (1) {
@@ -94,7 +90,7 @@ while (1) {
            print("Configuration changed\en");
    }
    my ($usr2, $sys2, $wio2, $idle2) =
-       @{$kstat->{cpu_stat}{0}{cpu_stat0}}{qw(user kernel 
+       @{$kstat->{cpu_stat}{0}{cpu_stat0}}{qw(user kernel
             wait idle)};
    printf(" %.2d  %.2d  %.2d  %.2d\en",
         ($usr2 - $usr1) / 5, ($sys2 - $sys1) / 5,
@@ -139,12 +135,10 @@ so these values are approximated in this module. There are two classes of
 64-bit value to be dealt with:
 .sp
 .ne 2
-.mk
 .na
 \fB64-bit intervals and times\fR
 .ad
 .RS 30n
-.rt  
 These are the \fBcrtime\fR and \fBsnaptime\fR fields of all the statistics
 hashes, and the \fBwtime\fR, \fBwlentime\fR, \fBwlastupdate\fR, \fBrtime\fR,
 \fBrlentime\fR and \fBrlastupdate\fR fields of the \fBkstat\fR I/O statistics
@@ -158,12 +152,10 @@ kstats are being rounded to approximately microsecond resolution.
 
 .sp
 .ne 2
-.mk
 .na
 \fB64-bit counters\fR
 .ad
 .RS 30n
-.rt  
 It is not useful to store these values as 32-bit values. As noted above,
 floating-point values offer 53 bits of precision. Accordingly, all 64-bit
 counters are stored as floating-point values.

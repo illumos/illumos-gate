@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH warn.conf 4 "30 Mar 2005" "SunOS 5.11" "File Formats"
+.TH WARN.CONF 4 "Mar 30, 2005"
 .SH NAME
 warn.conf \- Kerberos warning configuration file
 .SH SYNOPSIS
 .LP
 .nf
-/etc/krb5/warn.conf 
+/etc/krb5/warn.conf
 .fi
 
 .SH DESCRIPTION
@@ -45,48 +45,40 @@ or:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprincipal\fR\fR
 .ad
 .RS 17n
-.rt  
 Specifies the principal name to be warned. The asterisk (\fB*\fR) wildcard can
 be used to specify groups of principals.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrenew\fR\fR
 .ad
 .RS 17n
-.rt  
 Automatically renew the credentials (TGT) until renewable lifetime expires.
 This is equivalent to the user running \fBkinit\fR \fB-R\fR.
 .sp
 The renew options include:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlog-success\fR\fR
 .ad
 .RS 15n
-.rt  
 Log the result of the renew attempt on success using the specified method
 (\fBsyslog\fR|\fBterminal\fR|\fBmail\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlog-failure\fR\fR
 .ad
 .RS 15n
-.rt  
 Log the result of the renew attempt on failure using the specified method
 (\fBsyslog\fR|\fBterminal\fR|\fBmail\fR). Some renew failure conditions are:
 TGT renewable lifetime has expired, the KDCs are unavailable, or the cred cache
@@ -95,12 +87,10 @@ file has been removed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlog\fR\fR
 .ad
 .RS 15n
-.rt  
 Same as specifing both \fBlog-success\fR and \fBlog-failure\fR.
 .RE
 
@@ -114,12 +104,10 @@ If no log options are given, no logging is done.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsyslog\fR\fR
 .ad
 .RS 17n
-.rt  
 Sends the warnings to the system's syslog. Depending on the
 \fB/etc/syslog.conf\fR file, syslog entries are written to the
 \fB/var/adm/messages\fR file and/or displayed on the terminal.
@@ -127,34 +115,28 @@ Sends the warnings to the system's syslog. Depending on the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBterminal\fR\fR
 .ad
 .RS 17n
-.rt  
 Sends the warnings to display on the terminal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmail\fR\fR
 .ad
 .RS 17n
-.rt  
 Sends the warnings as email to the address specified by \fIemail_address\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItime\fR\fR
 .ad
 .RS 17n
-.rt  
 Specifies how much time before the \fBTGT\fR expires when a warning should be
 sent. The default time value is seconds, but you can specify \fBh\fR (hours)
 and \fBm\fR (minutes) after the number to specify other time values.
@@ -162,12 +144,10 @@ and \fBm\fR (minutes) after the number to specify other time values.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIemail_address\fR\fR
 .ad
 .RS 17n
-.rt  
 Specifies the email address at which to send the warnings. This field must be
 specified only with the \fBmail\fR field.
 .RE
@@ -182,7 +162,7 @@ The following \fBwarn.conf\fR entry
 .sp
 .in +2
 .nf
-\fB* syslog 5m\fR 
+\fB* syslog 5m\fR
 .fi
 .in -2
 .sp
@@ -229,12 +209,10 @@ myname@ACME.COM: your kerberos credentials have been renewed
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/krb5/ktkt_warnd\fR\fR
 .ad
 .RS 28n
-.rt  
 Kerberos warning daemon
 .RE
 
@@ -246,13 +224,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

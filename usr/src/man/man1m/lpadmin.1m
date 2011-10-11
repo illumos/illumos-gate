@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH lpadmin 1M "24 May 2006" "SunOS 5.11" "System Administration Commands"
+.TH LPADMIN 1M "May 24, 2006"
 .SH NAME
 lpadmin \- configure the LP print service
 .SH SYNOPSIS
@@ -24,7 +24,7 @@ lpadmin \- configure the LP print service
 
 .LP
 .nf
-\fBlpadmin\fR \fB-S\fR \fIprint-wheel\fR \fB-T\fR [\fB-A\fR \fIalert-type\fR] [\fB-W\fR \fIminutes\fR] 
+\fBlpadmin\fR \fB-S\fR \fIprint-wheel\fR \fB-T\fR [\fB-A\fR \fIalert-type\fR] [\fB-W\fR \fIminutes\fR]
      [\fB-Q\fR \fIrequests\fR]
 .fi
 
@@ -105,7 +105,6 @@ characters and must consist entirely of the characters \fBA\fR-\fBZ\fR,
 The following options can appear in any order.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR \fIalert-type\fR [\fB-W\fR \fIminutes\fR]\fR
 .ad
@@ -116,35 +115,29 @@ when a printer fault is detected, and periodically thereafter, until the
 printer fault is cleared by the administrator. The \fIalert-types\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmail\fR\fR
 .ad
 .RS 17n
-.rt  
 Send the alert message using mail (see \fBmail\fR(1)) to the administrator.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwrite\fR\fR
 .ad
 .RS 17n
-.rt  
 Write the message to the terminal on which the administrator is logged in. If
 the administrator is logged in on several terminals, one is chosen arbitrarily.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBquiet\fR\fR
 .ad
 .RS 17n
-.rt  
 Do not send messages for the current condition. An administrator can use this
 option to temporarily stop receiving further messages about a known problem.
 Once the fault has been cleared and printing resumes, messages are sent again
@@ -153,12 +146,10 @@ when another fault occurs with the printer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshowfault\fR\fR
 .ad
 .RS 17n
-.rt  
 Attempt to execute a fault handler on each system that has a print job in the
 queue. The fault handler is \fB/etc/lp/alerts/printer\fR. It is invoked with
 three parameters: \fIprinter_name\fR, \fBdate\fR, \fIfile_name\fR. The
@@ -167,12 +158,10 @@ three parameters: \fIprinter_name\fR, \fBdate\fR, \fIfile_name\fR. The
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnone\fR\fR
 .ad
 .RS 17n
-.rt  
 Do not send messages; any existing alert definition for the printer is removed.
 No alert is sent when the printer faults until a different alert-type (except
 \fBquiet\fR) is used.
@@ -180,12 +169,10 @@ No alert is sent when the printer faults until a different alert-type (except
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIshell-command\fR\fR
 .ad
 .RS 17n
-.rt  
 Run the \fIshell-command\fR each time the alert needs to be sent. The shell
 command should expect the message in standard input. If there are blank spaces
 embedded in the command, enclose the command in quotes. Notice that the
@@ -199,12 +186,10 @@ used to change the user ID, then the \fIuser-name\fR for the new ID is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlist\fR\fR
 .ad
 .RS 17n
-.rt  
 Display the type of the alert for the printer fault. No change is made to the
 alert.
 .RE
@@ -245,7 +230,6 @@ is sent at intervals specified by \fIminutes\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIclass\fR\fR
 .ad
@@ -258,7 +242,6 @@ it does not already exist. This option requires the \fB-U\fR \fIdial-info\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR \fIcomment\fR\fR
 .ad
@@ -271,7 +254,6 @@ this comment.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fIprinter\fR\fR
 .ad
@@ -284,7 +266,6 @@ with this option.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fBallow\fR:\fIform-list\fR\fR
 .ad
@@ -335,7 +316,6 @@ printer type before the \fB-f\fR option can be used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR \fIfault-recovery\fR\fR
 .ad
@@ -346,35 +326,29 @@ stopped because of a printer fault, according to the value of
 \fIfault-recovery\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcontinue\fR\fR
 .ad
 .RS 13n
-.rt  
 Continue printing on the top of the page where printing stopped. This requires
 a filter to wait for the fault to clear before automatically continuing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbeginning\fR\fR
 .ad
 .RS 13n
-.rt  
 Start printing the request again from the beginning.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwait\fR\fR
 .ad
 .RS 13n
-.rt  
 Disable printing on \fIprinter\fR and wait for the administrator or a user to
 enable printing again.
 .sp
@@ -390,7 +364,6 @@ beginning.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
@@ -403,7 +376,6 @@ of the mutually exclusive options, \fB-h\fR and \fB-l\fR, is specified,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIinterface\fR\fR
 .ad
@@ -416,7 +388,6 @@ specified with this option.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I\fR \fIcontent-type-list\fR\fR
 .ad
@@ -432,20 +403,18 @@ printable \fBASCII\fR characters and the following control characters:
 
 .sp
 .TS
-tab();
-cw(1.83i) cw(1.83i) cw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-Control CharOctal ValueMeaning
-BACKSPACE10Move back one char, except
- at beginning of line
-TAB11Move to next tab stop
-LINEFEED12Move to beginning of
- (newline) next line
-FORMFEED14Move to beginning of
- next page
-RETURN15Move to beginning of
- current line
+c c c
+l l l .
+Control Char	Octal Value	Meaning
+BACKSPACE	10	Move back one char, except
+		 at beginning of line
+TAB	11	Move to next tab stop
+LINEFEED	12	Move to beginning of
+ (newline)		 next line
+FORMFEED	14	Move to beginning of
+		 next page
+RETURN	15	Move to beginning of
+		 current line
 .TE
 
 To prevent the print service from considering \fBsimple\fR a valid type for the
@@ -470,7 +439,6 @@ valid content type.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
@@ -484,7 +452,6 @@ option.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fImodel\fR\fR
 .ad
@@ -497,7 +464,6 @@ option.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR \fB-f\fR \fIform-name\fR [\fB-a\fR [\fB-o\fR \fBfilebreak\fR]]
 [\fB-t\fR \fItray-number\fR]]\fR
@@ -543,7 +509,6 @@ Notice the other use of \fB-f\fR without the \fB-M\fR option above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR \fB-S\fR \fIprint-wheel\fR\fR
 .ad
@@ -570,7 +535,6 @@ described below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fIppdfilename\fR\fR
 .ad
@@ -583,7 +547,6 @@ conjunction with the \fB-p\fR, \fB-d\fR, \fB-x\fR, or \fB-S\fR options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIoption\fR\fR
 .ad
@@ -601,7 +564,6 @@ Used with the \fB-o\fR Option", below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR \fIpaper-name\fR\fR
 .ad
@@ -612,7 +574,6 @@ Specify a paper type list that the printer supports.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIclass\fR\fR
 .ad
@@ -624,7 +585,6 @@ last member of \fIclass\fR, then \fIclass\fR is removed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR \fIlist\fR\fR
 .ad
@@ -658,7 +618,6 @@ printer type before the \fB-S\fR option can be used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIsystem-name\fR\fR
 .ad
@@ -668,7 +627,6 @@ The \fB-s\fR option can be used for both remote or local printers. For remote
 printers:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIsystem-name\fR[\fB!\fR\fIprinter-name\fR] (UUCP format)\fR
 .ad
@@ -704,7 +662,6 @@ your system:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIscheme\fR\fB://\fR\fIend-point\fR (URI format)\fR
 .ad
@@ -751,12 +708,10 @@ For example:
 For local printers:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR "\fBlocalhost\fR"\fR
 .ad
 .RS 18n
-.rt  
 Use \fBlocalhost\fR for the \fIsystem-name\fR to be used by the print service.
 In an environment where the nodename is variable, print queues are invalidated
 when the nodename changes. Using \fBlocalhost\fR as the \fIsystem-name\fR
@@ -775,7 +730,6 @@ This option should never be used when creating name service maps.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fIprinter-type-list\fR\fR
 .ad
@@ -800,7 +754,6 @@ If the \fIprinter-type-list\fR contains more than one type, then the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-t\fR\fInumber-of-trays\fR\fR
 .ad
@@ -811,7 +764,6 @@ Specify the number of trays when creating the printer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fBallow:\fR\fIlogin-ID-list\fR\fR
 .ad
@@ -826,56 +778,46 @@ default all users are allowed on a new printer. The \fIlogin-ID-list\fR
 argument can include any or all of the following constructs:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlogin-ID\fR\fR
 .ad
 .RS 24n
-.rt  
 a user on any system
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsystem-name\fR\fB!\fR\fIlogin-ID\fR\fR
 .ad
 .RS 24n
-.rt  
 a user on system \fIsystem-name\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsystem-name\fR\fB!all\fR\fR
 .ad
 .RS 24n
-.rt  
 all users on system \fIsystem-name\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBall!\fR\fIlogin-ID\fR\fR
 .ad
 .RS 24n
-.rt  
 a user on all systems
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBall\fR\fR
 .ad
 .RS 24n
-.rt  
 all users on all systems
 .RE
 
@@ -896,7 +838,6 @@ allow:all\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fR
 .ad
@@ -918,7 +859,6 @@ default, \fB\fR\fB-U\fR\fB direct\fR is assumed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-v\fR \fIdevice\fR\fR
 .ad
@@ -931,7 +871,6 @@ associated with more than one printer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR \fIscheme\fR\fB://\fR\fIend-point\fR\fR
 .ad
@@ -977,7 +916,6 @@ there is no system default destination. No other \fIoptions\fR are allowed with
 .SS "Setting an Alert for a Print Wheel"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR \fIprint-wheel\fR [\fB-A\fR \fIalert-type\fR] [\fB-W\fR
 \fIminutes\fR] [\fB-Q\fR \fIrequests\fR] \fB-T\fR\fR
@@ -993,23 +931,19 @@ print wheel, no alert is sent for the print wheel. Notice the other use of
 The \fIalert-types\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmail\fR\fR
 .ad
 .RS 17n
-.rt  
 Send the alert message using the \fBmail\fR command to the administrator.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwrite\fR\fR
 .ad
 .RS 17n
-.rt  
 Write the message, using the \fBwrite\fR command, to the terminal on which the
 administrator is logged in. If the administrator is logged in on several
 terminals, one is arbitrarily chosen.
@@ -1017,12 +951,10 @@ terminals, one is arbitrarily chosen.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBquiet\fR\fR
 .ad
 .RS 17n
-.rt  
 Do not send messages for the current condition. An administrator can use this
 option to temporarily stop receiving further messages about a known problem.
 Once the \fIprint-wheel\fR has been mounted and subsequently unmounted,
@@ -1032,24 +964,20 @@ specified by the \fB-Q\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnone\fR\fR
 .ad
 .RS 17n
-.rt  
 Do not send messages until the \fB-A\fR option is given again with a different
 \fIalert-type\fR (other than \fBquiet\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIshell-command\fR\fR
 .ad
 .RS 17n
-.rt  
 Run the \fIshell-command\fR each time the alert needs to be sent. The shell
 command should expect the message in standard input. If there are blanks
 embedded in the command, enclose the command in quotes. Notice that the
@@ -1063,12 +991,10 @@ used to change the user ID, then the \fIuser-name\fR for the new ID is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlist\fR\fR
 .ad
 .RS 17n
-.rt  
 Display the type of the alert for the print wheel on standard output. No change
 is made to the alert.
 .RE
@@ -1190,7 +1116,7 @@ The default for \fBstty\fR is:
 .in +2
 .nf
 stty="'9600 cs8 -cstopb -parenb ixon
-     -ixany opost -olcuc onlcr 
+     -ixany opost -olcuc onlcr
      -ocrnl -onocr
      -onlret -ofill nl0 cr0 tab0 bs0 vt0 ff0'"
 .fi
@@ -1291,7 +1217,6 @@ The \fB-o\fR option supports the use of arbitrary, user-defined options with
 the following format:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIkey\fR\fB=\fR\fIvalue\fR\fR
 .ad
@@ -1315,7 +1240,6 @@ lpadmin -p \fIprintername\fR -o \fIkey\fR=
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlpadmin\fR \fB-p\fR \fIprinter\fR \fB-o\fR \fBfoo | nofoo\fR\fR
 .ad
@@ -1372,68 +1296,56 @@ example# \fBaccept \fIprtr\fR\fR
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnon-zero\fR
 .ad
 .RS 12n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/spool/lp/*\fR\fR
 .ad
 .RS 26n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/lp\fR\fR
 .ad
 .RS 26n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/lp/alerts/printer\fR\fR
 .ad
 .RS 26n
-.rt  
 Fault handler for \fBlpadmin\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/printers.conf\fR\fR
 .ad
 .RS 26n
-.rt  
 System printer configuration database
 .RE
 
@@ -1445,13 +1357,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityObsolete
+Interface Stability	Obsolete
 .TE
 
 .SH SEE ALSO

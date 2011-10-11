@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mpapi.conf 4 "15 Mar 2006" "SunOS 5.11" "File Formats"
+.TH MPAPI.CONF 4 "Mar 15, 2006"
 .SH NAME
 mpapi.conf \- configuration file for libMPAPI
 .SH SYNOPSIS
@@ -39,12 +39,10 @@ Each plugin library entry is a single line of the form:
 where
 .sp
 .ne 2
-.mk
 .na
 \fB\fBid\fR\fR
 .ad
 .RS 21n
-.rt  
 The identification of library.  It is the resersed domain name of the vendor
 followed by \fB\&.\fR followed by the vendor specific name of the plugin that
 uniquiely identifies the plugin library.
@@ -52,12 +50,10 @@ uniquiely identifies the plugin library.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlibrary file name\fR\fR
 .ad
 .RS 21n
-.rt  
 The  shared  object library file in the absolute path format.
 .RE
 
@@ -88,13 +84,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityT{
+Interface Stability	T{
 Standard: ANSI INCITS 412 Multipath Management API
 T}
 .TE

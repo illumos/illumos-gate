@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH syncinit 1M "9 Mar 1993" "SunOS 5.11" "System Administration Commands"
+.TH SYNCINIT 1M "Mar 9, 1993"
 .SH NAME
 syncinit \- set serial line interface operating parameters
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/syncinit\fR \fIdevice\fR 
+\fB/usr/sbin/syncinit\fR \fIdevice\fR
      [ [\fIbaud_rate\fR] | [\fIkeyword\fR=\fIvalue\fR,]... | [\fIsingle-word\fR \fIoption\fR]]
 .fi
 
@@ -40,52 +40,50 @@ The following options are supported:
 
 .sp
 .TS
-tab();
-lw(.87i) lw(.87i) lw(3.76i) 
-lw(.87i) lw(.87i) lw(3.76i) 
-.
-\fBKeyword\fR\fBValue\fR\fBEffect\fR
-\fBloop\fRyesT{
+l l l
+l l l .
+\fBKeyword\fR	\fBValue\fR	\fBEffect\fR
+\fBloop\fR	yes	T{
 Set the port to operate in \fBinternal loopback\fR mode. The receiver is electrically disconnected from the DCE receive data input and tied to the outgoing transmit data line. Transmit data is available to the DCE. The Digital Phase-Locked Loop (DPLL) may not be used as a clock source in this mode. If no other clocking options have been specified, perform the equivalent of \fBtxc=baud\fR and \fBrxc=baud\fR.
 T}
-noT{
+	no	T{
 Disable internal loopback mode.  If no other clocking options have been specified, perform the equivalent of \fBtxc=txc\fR and \fBrxc=rxc\fR.
 T}
-\fBecho\fRyesT{
+\fBecho\fR	yes	T{
 Set the port to operate in \fBauto-echo\fR mode.  The transmit data output is electrically disconnected from the transmitter and tied to the receive data input. Incoming receive data is still visible.  Use of this mode in combination with local loopback mode has no value, and should be rejected by the device driver. The \fBauto-echo\fR mode is useful to make a system become the endpoint of a remote loopback test.
 T}
-noDisable \fBauto-echo\fR mode.
-\fBnrzi\fRyesT{
-Set the port to operate with \fBNRZI\fR data encoding.  
+	no	Disable \fBauto-echo\fR mode.
+\fBnrzi\fR	yes	T{
+Set the port to operate with \fBNRZI\fR data encoding.
 T}
-noT{
-Set the port to operate with \fBNRZ\fR data encoding.  
+	no	T{
+Set the port to operate with \fBNRZ\fR data encoding.
 T}
-\fBtxc\fR\fBtxc\fRT{
+\fBtxc\fR	\fBtxc\fR	T{
 Transmit clock source will be the \fBTxC\fR signal (pin 15).
 T}
-\fBrxc\fRT{
+	\fBrxc\fR	T{
 Transmit clock source will be the \fBRxC\fR signal (pin 17).
 T}
-\fBbaud \fRT{
+	\fBbaud \fR	T{
 Transmit clock source will be the internal \fBbaud rate generator\fR.
 T}
-\fBpll\fRT{
+	\fBpll\fR	T{
 Transmit clock source will be the output of the \fBDPLL\fR circuit.
 T}
-\fBrxc\fR\fBrxc\fRT{
+\fBrxc\fR	\fBrxc\fR	T{
 Receive clock source will be the \fBRxC\fR signal (pin 17).
 T}
-\fBtxc\fRT{
+	\fBtxc\fR	T{
 Receive clock source will be the \fBTxC\fR signal (pin 15).
 T}
-\fBbaud\fRT{
+	\fBbaud\fR	T{
 Receive clock source will be the internal \fBbaud rate generator\fR.
 T}
-\fBpll\fRT{
+	\fBpll\fR	T{
 Receive clock source will be the output of the \fBDPLL\fR circuit.
 T}
-\fBspeed\fR\fIinteger\fRT{
+\fBspeed\fR	\fIinteger\fR	T{
 Set the baud rate to \fIinteger\fR bits per second.
 T}
 .TE
@@ -98,15 +96,13 @@ time:
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBKeyword\fR\fBEquivalent to Options:\fR
-\fBexternal\fR\fBtxc=txc rxc=rxc loop=no\fR
-\fBsender\fR\fBtxc=baud rxc=rxc loop=no\fR
-\fBinternal\fR\fBtxc=pll rxc=pll loop=no\fR
-\fBstop\fR\fBspeed=0\fR
+l l
+l l .
+\fBKeyword\fR	\fBEquivalent to Options:\fR
+\fBexternal\fR	\fBtxc=txc rxc=rxc loop=no\fR
+\fBsender\fR	\fBtxc=baud rxc=rxc loop=no\fR
+\fBinternal\fR	\fBtxc=pll rxc=pll loop=no\fR
+\fBstop\fR	\fBspeed=0\fR
 .TE
 
 .SH EXAMPLES
@@ -150,7 +146,6 @@ speed=0, loopback=no, echo=no, nrzi=no, txc=txc, rxc=rxc
 .SH DIAGNOSTICS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevice\fR\fB missing minor device number\fR\fR
 .ad
@@ -162,7 +157,6 @@ minor device number.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbad speed: \fR\fIarg\fR\fR
 .ad
@@ -174,7 +168,6 @@ interpreted as a decimal integer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBBad arg: \fR\fIarg\fR\fR
 .ad
@@ -185,7 +178,6 @@ The string  \fIarg\fR did not make sense as an option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBioctl failure code = \fR\fIerrno\fR\fR
 .ad

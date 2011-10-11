@@ -2,7 +2,7 @@
 .\" To view license terms, attribution, and copyright for OpenSSH, the default path is /var/sadm/pkg/SUNWsshdr/install/copyright. If the Solaris operating environment has been installed anywhere other than the default, modify the specified path to access the file at
 .\" the installed location.
 .\" Portions Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
-.TH ssh 1 "20 May 2009" "SunOS 5.11" "User Commands"
+.TH SSH 1 "May 20, 2009"
 .SH NAME
 ssh \- secure shell client (remote login program)
 .SH SYNOPSIS
@@ -13,9 +13,9 @@ ssh \- secure shell client (remote login program)
 
 .LP
 .nf
-\fBssh\fR [\fB-afgknqstvxACNTX1246\fR] [\fB-b\fR \fIbind_address\fR] [\fB-m\fR \fImac_spec\fR] 
-     [\fB-c\fR \fIcipher_spec\fR] [\fB-e\fR \fIescape_char\fR] [\fB-i\fR \fIidentity_file\fR] 
-     [\fB-l\fR \fIlogin_name\fR] [\fB-F\fR \fIconfigfile\fR] [\fB-o\fR \fIoption\fR] [\fB-p\fR \fIport\fR] 
+\fBssh\fR [\fB-afgknqstvxACNTX1246\fR] [\fB-b\fR \fIbind_address\fR] [\fB-m\fR \fImac_spec\fR]
+     [\fB-c\fR \fIcipher_spec\fR] [\fB-e\fR \fIescape_char\fR] [\fB-i\fR \fIidentity_file\fR]
+     [\fB-l\fR \fIlogin_name\fR] [\fB-F\fR \fIconfigfile\fR] [\fB-o\fR \fIoption\fR] [\fB-p\fR \fIport\fR]
      [\fB-L\fR [\fIbind_address\fR\fB:\fR]\fIport\fR\fB:\fR\fIhost\fR\fB:\fR\fIhostport\fR]
      [\fB-R\fR [\fIbind_address\fR\fB:\fR]\fIport\fR\fB:\fR\fIhost\fR\fB:\fR\fIhostport\fR]
      [\fB-D\fR [\fIbind_address\fR\fB:\fR]\fIport\fR] \fIhostname\fR | \fIuser\fR\fB@\fR\fIhostname\fR [\fIcommand\fR]
@@ -193,92 +193,76 @@ directive or on the command line by the \fB-e\fR option.
 The supported escapes, assuming the default \fB~\fR, are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~.\fR\fR
 .ad
 .RS 7n
-.rt  
 Disconnect.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~^Z\fR\fR
 .ad
 .RS 7n
-.rt  
 Background \fBssh\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~#\fR\fR
 .ad
 .RS 7n
-.rt  
 List forwarded connections.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~&\fR\fR
 .ad
 .RS 7n
-.rt  
 Background \fBssh\fR at logout when waiting for forwarded connection / X11
 sessions to terminate.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~?\fR\fR
 .ad
 .RS 7n
-.rt  
 Display a list of escape characters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~B\fR\fR
 .ad
 .RS 7n
-.rt  
 Send a break to the remote system. Only useful for SSH protocol version 2 and
 if the peer supports it.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~C\fR\fR
 .ad
 .RS 7n
-.rt  
 Open command line. Only useful for adding port forwardings using the \fB-L\fR
 and \fB-R\fR options).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~R\fR\fR
 .ad
 .RS 7n
-.rt  
 Request rekeying of the connection. Only useful for SSH protocol version 2 and
 if the peer supports it.
 .RE
@@ -383,7 +367,6 @@ Rekeying can be used to redelegate credentials when \fBGssKeyEx\fR is
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-1\fR\fR
 .ad
@@ -394,7 +377,6 @@ Forces \fBssh\fR to try protocol version 1 only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-2\fR\fR
 .ad
@@ -405,7 +387,6 @@ Forces \fBssh\fR to try protocol version 2 only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-4\fR\fR
 .ad
@@ -416,7 +397,6 @@ Forces \fBssh\fR to use IPv4 addresses only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-6\fR\fR
 .ad
@@ -427,7 +407,6 @@ Forces \fBssh\fR to use IPv6 addresses only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
@@ -438,7 +417,6 @@ Disables forwarding of the authentication agent connection.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR\fR
 .ad
@@ -457,7 +435,6 @@ identities loaded into the agent.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR \fIbind_address\fR\fR
 .ad
@@ -469,7 +446,6 @@ or aliased addresses.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIcipher_spec\fR\fR
 .ad
@@ -487,7 +463,6 @@ listed in order of preference. See the \fICiphers\fR option in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
@@ -505,7 +480,6 @@ configuration files. See the \fBCompression\fR option in \fBssh_config\fR(4).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR [\fIbind_address\fR\fB:\fR]\fIport\fR\fR
 .ad
@@ -533,7 +507,6 @@ from all interfaces.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fIch\fR | ^\fIch\fR | none\fR
 .ad
@@ -549,7 +522,6 @@ disables any escapes and makes the session fully transparent.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
@@ -564,7 +536,6 @@ way to start X11 programs at a remote site is with something like \fBssh\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR \fIconfigfile\fR\fR
 .ad
@@ -578,7 +549,6 @@ file is \fB$HOME/.ssh/config\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR\fR
 .ad
@@ -589,7 +559,6 @@ Allows remote hosts to connect to local forwarded ports.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIidentity_file\fR\fR
 .ad
@@ -605,7 +574,6 @@ multiple identities specified in configuration files).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIlogin_name\fR\fR
 .ad
@@ -617,7 +585,6 @@ specified on a per-host basis in the configuration file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR [\fIbind_address:\fR]\fIport\fR:\fIhost\fR:\fIhostport\fR\fR
 .ad
@@ -644,7 +611,6 @@ interfaces.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fImac_spec\fR\fR
 .ad
@@ -657,7 +623,6 @@ preference. See the MACs keyword for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
@@ -683,7 +648,6 @@ or passphrase. See also the \fB-f\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-N\fR\fR
 .ad
@@ -695,7 +659,6 @@ ports (protocol version 2 only).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIoption\fR\fR
 .ad
@@ -708,7 +671,6 @@ flag. The option has the same format as a line in the configuration file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIport\fR\fR
 .ad
@@ -720,7 +682,6 @@ per-host basis in the configuration file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR\fR
 .ad
@@ -731,7 +692,6 @@ Obsoleted option. SSHv1 connections from privileged ports are not supported.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
@@ -743,7 +703,6 @@ fatal errors are displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR [\fIbind_address\fR:]\fIport\fR:\fIhost\fR:\fIhostport\fR\fR
 .ad
@@ -772,7 +731,6 @@ only succeeds if the server's \fBGatewayPorts\fR option is enabled. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
@@ -786,7 +744,6 @@ subsystem is specified as the remote command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
@@ -800,7 +757,6 @@ allocation, even if \fBssh\fR has no local \fBtty\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR\fR
 .ad
@@ -811,7 +767,6 @@ Disables pseudo-tty allocation (protocol version 2 only).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -824,7 +779,6 @@ problems. Multiple \fB-v\fR options increase the verbosity. Maximum is 3.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
@@ -835,7 +789,6 @@ Disables X11 forwarding.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-X\fR\fR
 .ad
@@ -863,7 +816,6 @@ means that they have full access to the original X11 display.
 \fBssh\fR normally sets the following environment variables:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDISPLAY\fR\fR
 .ad
@@ -874,7 +826,6 @@ The \fBDISPLAY\fR variable must be set for X11 display forwarding to work.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSSH_ASKPASS\fR\fR
 .ad
@@ -892,7 +843,6 @@ from \fB/dev/null\fR to make this work. The system is shipped with
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSSH_AUTH_SOCK\fR\fR
 .ad
@@ -903,7 +853,6 @@ Indicates the path of a unix-domain socket used to communicate with the agent.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSSH_LANGS\fR\fR
 .ad
@@ -916,7 +865,6 @@ on the server.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLANG\fR, \fBLC_ALL\fR, \fBLC_COLLATE\fR, \fBLC_CTYPE\fR,\fR
 .ad
@@ -946,19 +894,16 @@ connection, including the initial key exchange.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.ssh/known_hosts\fR\fR
 .ad
 .RS 26n
-.rt  
 Records host keys for all hosts the user has logged into that are not in
 \fB/etc/ssh/ssh_known_hosts\fR. See \fBsshd\fR(1M).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.ssh/identity\fR\fR
 .ad
@@ -971,7 +916,6 @@ Records host keys for all hosts the user has logged into that are not in
 \fB\fB$HOME/.ssh/id_ssa\fR\fR
 .ad
 .RS 26n
-.rt  
 Contains the authentication identity of the user. These files are for protocol
 1 \fBRSA\fR, protocol 2 \fBDSA\fR, and protocol 2 \fBRSA\fR, respectively.
 These files contain sensitive data and should be readable by the user but not
@@ -983,12 +927,10 @@ this file using \fB3DES\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ssh/sshrc\fR\fR
 .ad
 .RS 26n
-.rt  
 Commands in this file are executed by \fBssh\fR when the user logs in just
 before the user's shell or command is started. See \fBsshd\fR(1M) for more
 information.
@@ -996,12 +938,10 @@ information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.ssh/rc\fR\fR
 .ad
 .RS 26n
-.rt  
 Commands in this file are executed by \fBssh\fR when the user logs in just
 before the user's shell or command is started. See \fBsshd\fR(1M) for more
 information.
@@ -1009,12 +949,10 @@ information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.ssh/environment\fR\fR
 .ad
 .RS 26n
-.rt  
 Contains additional definitions for environment variables. See ENVIRONMENT
 VARIABLES.
 .RE
@@ -1027,13 +965,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

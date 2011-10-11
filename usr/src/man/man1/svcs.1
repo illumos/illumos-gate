@@ -3,19 +3,19 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH svcs 1 "17 Apr 2011" "SunOS 5.11" "User Commands"
+.TH SVCS 1 "Apr 17, 2011"
 .SH NAME
 svcs \- report service status
 .SH SYNOPSIS
 .LP
 .nf
-\fBsvcs\fR [\fB-aHpv?\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] [\fB-o\fR \fIcol\fR[,\fIcol\fR]]... [\fB-R\fR \fIFMRI-instance\fR]... 
+\fBsvcs\fR [\fB-aHpv?\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] [\fB-o\fR \fIcol\fR[,\fIcol\fR]]... [\fB-R\fR \fIFMRI-instance\fR]...
      [\fB-sS\fR \fIcol\fR]... [\fIFMRI\fR | \fIpattern\fR]...
 .fi
 
 .LP
 .nf
-\fBsvcs\fR {\fB-d\fR | \fB-D\fR} [\fB-Hpv?\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] [\fB-o\fR \fIcol\fR[,\fIcol\fR]]... [\fB-sS\fR \fIcol\fR]... 
+\fBsvcs\fR {\fB-d\fR | \fB-D\fR} [\fB-Hpv?\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] [\fB-o\fR \fIcol\fR[,\fIcol\fR]]... [\fB-sS\fR \fIcol\fR]...
      [\fIFMRI\fR | \fIpattern\fR] ...
 .fi
 
@@ -67,70 +67,58 @@ The output of this command can be used appropriately as input to the
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-?\fR\fR
 .ad
 .RS 20n
-.rt  
 Displays an extended usage message, including column specifiers.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 20n
-.rt  
 Show all services, even disabled ones. This option has no effect if services
 are selected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 20n
-.rt  
 Lists the services or service instances upon which the given service instances
 depend.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR\fR
 .ad
 .RS 20n
-.rt  
 Lists the service instances that depend on the given services or service
 instances.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-H\fR\fR
 .ad
 .RS 20n
-.rt  
 Omits the column headers.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 20n
-.rt  
 (The letter ell.) Displays all available information about the selected
 services and service instances, with one service attribute displayed for each
 line. Information for different instances are separated by blank lines.
@@ -138,12 +126,10 @@ line. Information for different instances are separated by blank lines.
 The following specific attributes require further explanation:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdependency\fR\fR
 .ad
 .RS 14n
-.rt  
 Information about a dependency. The grouping and \fBrestart_on\fR properties
 are displayed first and are separated by a forward slash (\fB/\fR). Next, each
 entity and its state is listed. See \fBsmf\fR(5) for information about states.
@@ -151,57 +137,47 @@ In addition to the standard states, each service dependency can have the
 following state descriptions:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBabsent\fR\fR
 .ad
 .RS 12n
-.rt  
 No such service is defined on the system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinvalid\fR\fR
 .ad
 .RS 12n
-.rt  
 The fault management resource identifier (FMRI) is invalid (see \fBsmf\fR(5)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmultiple\fR\fR
 .ad
 .RS 12n
-.rt  
 The entity is a service with multiple instances.
 .RE
 
 File dependencies can only have one of the following state descriptions:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBabsent\fR\fR
 .ad
 .RS 11n
-.rt  
 No such file on the system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBonline\fR\fR
 .ad
 .RS 11n
-.rt  
 The file exists.
 .sp
 If the file did not exist the last time that \fBsvc.startd\fR evaluated the
@@ -211,12 +187,10 @@ service's dependencies, it can consider the dependency to be unsatisfied.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunknown\fR\fR
 .ad
 .RS 11n
-.rt  
 \fBstat\fR(2) failed for a reason other than \fBENOENT\fR.
 .RE
 
@@ -226,12 +200,10 @@ See \fBsmf\fR(5) for additional details about dependencies, grouping, and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBenabled\fR\fR
 .ad
 .RS 14n
-.rt  
 Whether the service is enabled or not, and whether it is enabled or disabled
 temporarily (until the next system reboot). The former is specified as either
 \fBtrue\fR or \fBfalse\fR, and the latter is designated by the presence of
@@ -246,36 +218,30 @@ specific milestone. See \fBsvcadm\fR(1M) for details.
 
 .sp
 .ne 2
-.mk
 .na
 \fB-L\fR
 .ad
 .RS 20n
-.rt
 Display the log file of the selected services and service instances, one
 per-line.
-.RE 
+.RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIcol\fR[,\fIcol\fR]...\fR
 .ad
 .RS 20n
-.rt  
 Prints the specified columns. Each \fIcol\fR should be a column name. See
 \fBCOLUMNS\fR below for available columns.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 20n
-.rt  
 Lists processes associated with each service instance. A service instance can
 have no associated processes. The process ID, start time, and command name
 (\fBPID\fR, \fBSTIME\fR, and \fBCMD\fR fields from \fBps\fR(1)) are displayed
@@ -284,47 +250,39 @@ for each process.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIFMRI-instance\fR\fR
 .ad
 .RS 20n
-.rt  
 Selects service instances that have the given service instance as their
 restarter.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIcol\fR\fR
 .ad
 .RS 20n
-.rt  
 Sorts output by column. \fIcol\fR should be a column name. See \fBCOLUMNS\fR
 below for available columns. Multiple \fB-s\fR options behave additively.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR \fIcol\fR\fR
 .ad
 .RS 20n
-.rt  
 Sorts by \fIcol\fR in the opposite order as option \fB-s\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 20n
-.rt  
 Without \fB-x\fR or \fB-l\fR, displays verbose columns: \fBSTATE\fR,
 \fBNSTATE\fR, \fBSTIME\fR, \fBCTID\fR, and \fBFMRI\fR.
 .sp
@@ -336,12 +294,10 @@ With \fB-l\fR, displays user-visible properties in property groups of type
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 20n
-.rt  
 Displays explanations for service states.
 .sp
 Without arguments, the \fB-x\fR option explains the states of services which:
@@ -361,24 +317,20 @@ are preventing another enabled service from running.
 
 .sp
 .ne 2
-.mk
 .na
 \fB-z \fIzone\fR
 .ad
 .RS 20n
-.rt
 Display only the services in the \fIzone\fR.  This option is only applicable
 in the global zone, see \fBzones\fR(5).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB-Z\fR
 .ad
 .RS 20n
-.rt
 Display services from all zones, with an additional column indicating in which
 zone the service is running.  This option is only applicable in the global
 zone, see \fBzones\fR(5).
@@ -390,12 +342,10 @@ zone, see \fBzones\fR(5).
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIFMRI\fR\fR
 .ad
 .RS 17n
-.rt  
 A fault management resource identifier (FMRI) that specifies one or more
 instances (see \fBsmf\fR(5)). FMRIs can be abbreviated by specifying the
 instance name, or the trailing portion of the service name. For example, given
@@ -441,12 +391,10 @@ other permanent tools.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpattern\fR\fR
 .ad
 .RS 17n
-.rt  
 A pattern that is matched against the \fIFMRI\fRs of service instances
 according to the "globbing" rules described by \fBfnmatch\fR(5). If the pattern
 does not begin with \fBsvc:\fR, then \fBsvc:/\fR is prepended. The following is
@@ -465,12 +413,10 @@ disabled       Aug_02    svc:/network/rpc/keyserv:default
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIFMRI-instance\fR\fR
 .ad
 .RS 17n
-.rt  
 An FMRI that specifies an instance.
 .RE
 
@@ -482,24 +428,20 @@ Column names are case insensitive. The default output format is equivalent to
 \fBSTIME\fR, \fBFMRI\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCTID\fR\fR
 .ad
 .RS 10n
-.rt  
 The primary contract ID for the service instance. Not all instances have valid
 primary contract IDs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDESC\fR\fR
 .ad
 .RS 10n
-.rt  
 A brief description of the service, from its template element. A service might
 not have a description available, in which case a hyphen (\fB\(hy\fR) is used
 to denote an empty value.
@@ -507,34 +449,28 @@ to denote an empty value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFMRI\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIFMRI\fR of the service instance.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBINST\fR\fR
 .ad
 .RS 10n
-.rt  
 The instance name of the service instance.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNSTA\fR\fR
 .ad
 .RS 10n
-.rt  
 The abbreviated next state of the service instance, as given in the \fBSTA\fR
 column description. A hyphen denotes that the instance is not transitioning.
 Same as \fBSTA\fR otherwise.
@@ -542,121 +478,99 @@ Same as \fBSTA\fR otherwise.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNSTATE\fR\fR
 .ad
 .RS 10n
-.rt  
 The next state of the service. A hyphen is used to denote that the instance is
 not transitioning. Same as \fBSTATE\fR otherwise.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCOPE\fR\fR
 .ad
 .RS 10n
-.rt  
 The scope name of the service instance.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSVC\fR\fR
 .ad
 .RS 10n
-.rt  
 The service name of the service instance.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTA\fR\fR
 .ad
 .RS 10n
-.rt  
 The abbreviated state of the service instance (see \fBsmf\fR(5)):
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDGD\fR\fR
 .ad
 .RS 7n
-.rt  
 degraded
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDIS\fR\fR
 .ad
 .RS 7n
-.rt  
 disabled
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLRC\fR\fR
 .ad
 .RS 7n
-.rt  
 legacy \fBrc*.d\fR script-initiated instance
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMNT\fR\fR
 .ad
 .RS 7n
-.rt  
 maintenance
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOFF\fR\fR
 .ad
 .RS 7n
-.rt  
 offline
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBON\fR\fR
 .ad
 .RS 7n
-.rt  
 online
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUN\fR\fR
 .ad
 .RS 7n
-.rt  
 uninitialized
 .RE
 
@@ -669,12 +583,10 @@ See \fBsmf\fR(5) for an explanation of service states.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTATE\fR\fR
 .ad
 .RS 10n
-.rt  
 The state of the service instance. An asterisk is appended for instances in
 transition, unless the \fBNSTA\fR or \fBNSTATE\fR column is also being
 displayed.
@@ -684,12 +596,10 @@ See \fBsmf\fR(5) for an explanation of service states.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTIME\fR\fR
 .ad
 .RS 10n
-.rt  
 If the service instance entered the current state within the last 24 hours,
 this column indicates the time that it did so. Otherwise, this column indicates
 the date on which it did so, printed with underscores (\fB_\fR) in place of
@@ -787,7 +697,7 @@ example% svcs -p sendmail
 STATE          STIME    FMRI
 online         13:25:13 svc:/network/smtp:sendmail
                13:25:15   100939 sendmail
-13:25:15   100940 sendmail  
+13:25:15   100940 sendmail
 .fi
 .in -2
 .sp
@@ -862,34 +772,28 @@ Impact: This service is not running.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful command invocation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 Fatal error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Invalid command line options were specified.
 .RE
 
@@ -901,13 +805,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

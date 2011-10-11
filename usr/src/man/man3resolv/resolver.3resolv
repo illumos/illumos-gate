@@ -1,7 +1,7 @@
 '\" te
-.\"  Portions Copyright 1989 AT&T Portions Copyright (c) 1985, 1995 Regents of the University of California. 
+.\"  Portions Copyright 1989 AT&T Portions Copyright (c) 1985, 1995 Regents of the University of California.
 .\" Copyright (C) 2006, Sun Microsystems, Inc. All Rights Reserved
-.TH resolver 3RESOLV "26 Dec 2006" "SunOS 5.11" "Resolver Library Functions"
+.TH RESOLVER 3RESOLV "Dec 26, 2006"
 .SH NAME
 resolver, res_ninit, fp_resstat, res_hostalias, res_nquery, res_nsearch,
 res_nquerydomain, res_nmkquery, res_nsend, res_nclose, res_nsendsigned,
@@ -192,35 +192,29 @@ defined in <\fBresolv.h\fR>. They are stored as a simple bit mask containing
 the bitwise \fBOR\fR of the options enabled.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRES_INIT\fR\fR
 .ad
 .RS 17n
-.rt  
 True if the initial name server address and default domain name are
 initialized, that is, \fBres_init()\fR or \fBres_ninit()\fR has been called.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRES_DEBUG\fR\fR
 .ad
 .RS 17n
-.rt  
 Print debugging messages.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRES_AAONLY\fR\fR
 .ad
 .RS 17n
-.rt  
 Accept authoritative answers only. With this option, \fBres_send()\fR will
 continue until it finds an authoritative answer or finds an error. Currently
 this option is not implemented.
@@ -228,23 +222,19 @@ this option is not implemented.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRES_USEVC\fR\fR
 .ad
 .RS 17n
-.rt  
 Use \fBTCP\fR connections for queries instead of \fBUDP\fR datagrams.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRES_STAYOPEN\fR\fR
 .ad
 .RS 17n
-.rt  
 Use with \fBRES_USEVC\fR to keep the \fBTCP\fR connection open between queries.
 This is a useful option for programs that regularly do many queries. The normal
 mode used should be \fBUDP\fR.
@@ -252,23 +242,19 @@ mode used should be \fBUDP\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRES_IGNTC\fR\fR
 .ad
 .RS 17n
-.rt  
 Ignore truncation errors; that is, do not retry with \fBTCP\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRES_RECURSE\fR\fR
 .ad
 .RS 17n
-.rt  
 Set the recursion-desired bit in queries. This is the default. \fBres_send()\fR
 and \fBres_nsend()\fR do not do iterative queries and expect the name server to
 handle recursion.
@@ -276,12 +262,10 @@ handle recursion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRES_DEFNAMES\fR\fR
 .ad
 .RS 17n
-.rt  
 If set, \fBres_search()\fR and \fBres_nsearch()\fR append the default domain
 name to single-component names, that is, names that do not contain a dot. This
 option is enabled by default.
@@ -289,12 +273,10 @@ option is enabled by default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRES_DNSRCH\fR\fR
 .ad
 .RS 17n
-.rt  
 If this option is set, \fBres_search()\fR and \fBres_nsearch()\fR search for
 host names in the current domain and in parent domains. See \fBhostname\fR(1).
 This option is used by the standard host lookup routine
@@ -303,24 +285,20 @@ This option is used by the standard host lookup routine
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRES_NOALIASES\fR\fR
 .ad
 .RS 17n
-.rt  
 This option turns off the user level aliasing feature controlled by the
 \fBHOSTALIASES\fR environment variable. Network daemons should set this option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRES_BLAST\fR\fR
 .ad
 .RS 17n
-.rt  
 If the \fBRES_BLAST\fR option is defined, \fBresolver()\fR queries will be sent
 to all servers. If the \fBRES_BLAST\fR option is not defined, but
 \fBRES_ROTATE\fR is , the list of nameservers are rotated according to a
@@ -329,24 +307,20 @@ round-robin scheme. \fBRES_BLAST\fR overrides \fBRES_ROTATE\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRES_ROTATE\fR\fR
 .ad
 .RS 17n
-.rt  
 This option causes \fBres_nsend()\fR and \fBres_send()\fR to rotate the list of
 nameservers in \fBstatp->nsaddr_list\fR or \fB_res.nsaddr_list\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRES_KEEPTSIG\fR\fR
 .ad
 .RS 17n
-.rt  
 This option causes \fBres_nsendsigned()\fR to leave the message unchanged after
 \fBTSIG\fR verification. Otherwise the \fBTSIG\fR record would be removed and
 the header would be updated.
@@ -506,12 +480,12 @@ operation. The following definitions are given in <\fBnetdb.h\fR>:
 .sp
 .in +2
 .nf
-#define NETDB_INTERNAL -1 /* see errno */  
-#define NETDB_SUCCESS  0  /* no problem */ 
-#define HOST_NOT_FOUND 1  /* Authoritative Answer Host not found */  
-#define TRY_AGAIN      2  /* Non-Authoritative not found, or SERVFAIL */ 
-#define NO_RECOVERY    3  /* Non-Recoverable: FORMERR, REFUSED, NOTIMP*/ 
-#define NO_DATA        4  /* Valid name, no data for requested type */      
+#define NETDB_INTERNAL -1 /* see errno */
+#define NETDB_SUCCESS  0  /* no problem */
+#define HOST_NOT_FOUND 1  /* Authoritative Answer Host not found */
+#define TRY_AGAIN      2  /* Non-Authoritative not found, or SERVFAIL */
+#define NO_RECOVERY    3  /* Non-Recoverable: FORMERR, REFUSED, NOTIMP*/
+#define NO_DATA        4  /* Valid name, no data for requested type */
 .fi
 .in -2
 .sp
@@ -533,12 +507,10 @@ and set the list of servers to be queried.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/resolv.conf\fR\fR
 .ad
 .RS 20n
-.rt  
 resolver configuration file
 .RE
 
@@ -550,14 +522,13 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
-Interface StabilityCommitted
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+Interface Stability	Committed
 _
-MT-LevelT{
+MT-Level	T{
 Unsafe for deprecated interfaces; MT-Safe for all others.
 T}
 .TE

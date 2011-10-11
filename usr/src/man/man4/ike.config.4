@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ike.config 4 "27 Apr 2009" "SunOS 5.11" "File Formats"
+.TH IKE.CONFIG 4 "Apr 27, 2009"
 .SH NAME
 ike.config \- configuration file for IKE policy
 .SH SYNOPSIS
@@ -34,7 +34,6 @@ sequence introduces a comment. The remainder of that line is ignored.
 There are several types of lexical tokens in the \fBike.config\fR file:
 .sp
 .ne 2
-.mk
 .na
 \fB\fInum\fR\fR
 .ad
@@ -45,7 +44,6 @@ A decimal, hex, or octal number representation is as in 'C'.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIIPaddr\fR/\fIprefix\fR/\fIrange\fR\fR
 .ad
@@ -63,7 +61,6 @@ by an arbitrary amount of white space.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBXXX\fR | \fBYYY\fR | \fBZZZ\fR\fR
 .ad
@@ -74,7 +71,6 @@ Either the words \fBXX\fRX, \fBYYY\fR, or \fBZZZ\fR, for example, {yes,no}.
 
 .sp
 .ne 2
-.mk
 .na
 \fBp1-id-type\fR
 .ad
@@ -137,7 +133,6 @@ An IKE phase 1 identity type. IKE phase 1 identity types include:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB"\fR\fIstring\fR\fB"\fR\fR
 .ad
@@ -154,7 +149,6 @@ backslash, two must be specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcert-sel\fR\fR
 .ad
@@ -170,8 +164,8 @@ alternative names, the filename or \fBslot\fR of a certificate in
 .sp
 .in +2
 .nf
-"SLOT=0" 
-"EMAIL=postmaster@domain.org" 
+"SLOT=0"
+"EMAIL=postmaster@domain.org"
 "webmaster@domain.org" # Some just work w/o TYPE=
 "IP=10.0.0.1"
 "10.21.11.11"          # Some just work w/o TYPE=
@@ -189,7 +183,6 @@ used in \fBikecert\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIldap-list\fR\fR
 .ad
@@ -205,7 +198,6 @@ The default port for LDAP is \fB389\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIparameter-list\fR\fR
 .ad
@@ -247,7 +239,6 @@ IKE rules
 The global parameter entries are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBcert_root \fIcert-sel\fR\fR
 .ad
@@ -261,7 +252,6 @@ directory. It must have a CRL in \fB/etc/inet/ike/crl\fRs. Multiple
 
 .sp
 .ne 2
-.mk
 .na
 \fBcert_trust \fIcert-sel\fR\fR
 .ad
@@ -275,7 +265,6 @@ be encoded in a file in \fB/etc/inet/ike/publickeys\fR. Multiple
 
 .sp
 .ne 2
-.mk
 .na
 \fBexpire_timer \fIinteger\fR\fR
 .ad
@@ -287,7 +276,6 @@ negotiation linger before deleting it. Default value: 300 seconds.
 
 .sp
 .ne 2
-.mk
 .na
 \fBignore_crls\fR
 .ad
@@ -299,7 +287,6 @@ Revocation Lists (\fBCRL\fRs) for root \fBCA\fRs (as given in \fBcert_root\fR)
 
 .sp
 .ne 2
-.mk
 .na
 \fBldap_server \fIldap-list\fR\fR
 .ad
@@ -310,7 +297,6 @@ A list of LDAP servers to query for certificates. The list can be additive.
 
 .sp
 .ne 2
-.mk
 .na
 \fBpkcs11_path \fIstring\fR\fR
 .ad
@@ -335,7 +321,6 @@ This option is now deprecated, and may be removed in a future release.
 
 .sp
 .ne 2
-.mk
 .na
 \fBretry_limit \fIinteger\fR\fR
 .ad
@@ -347,7 +332,6 @@ The number of retransmits before any IKE negotiation is aborted. Default value:
 
 .sp
 .ne 2
-.mk
 .na
 \fBretry_timer_init \fIinteger\fR or \fIfloat\fR\fR
 .ad
@@ -360,7 +344,6 @@ until the \fBretry_timer_max\fR value (see below) is reached. Default value:
 
 .sp
 .ne 2
-.mk
 .na
 \fBretry_timer_max \fIinteger\fR or \fIfloat\fR\fR
 .ad
@@ -379,7 +362,6 @@ interval is 8 (0.5 * 2 ^ (5 - 1)) seconds.
 
 .sp
 .ne 2
-.mk
 .na
 \fBproxy \fIstring\fR\fR
 .ad
@@ -391,7 +373,6 @@ The string following this keyword must be a URL for an HTTP proxy, for example,
 
 .sp
 .ne 2
-.mk
 .na
 \fBsocks \fIstring\fR\fR
 .ad
@@ -403,7 +384,6 @@ The string following this keyword must be a URL for a SOCKS proxy, for example,
 
 .sp
 .ne 2
-.mk
 .na
 \fBuse_http\fR
 .ad
@@ -423,7 +403,6 @@ defaults.
 The IKE phase 1 transform defaults are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBp1_lifetime_secs \fInum\fR\fR
 .ad
@@ -435,7 +414,6 @@ association (\fBSA\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fBp1_nonce_len \fInum\fR\fR
 .ad
@@ -452,7 +430,6 @@ Values specified within any given rule override these defaults, unless a rule
 cannot.
 .sp
 .ne 2
-.mk
 .na
 \fBp2_lifetime_secs \fInum\fR\fR
 .ad
@@ -464,7 +441,6 @@ association (SA). This value is optional. If omitted, a default value is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fBp2_softlife_secs \fInum\fR\fR
 .ad
@@ -485,7 +461,6 @@ disables soft expires.
 
 .sp
 .ne 2
-.mk
 .na
 \fBp2_idletime_secs \fInum\fR\fR
 .ad
@@ -498,7 +473,6 @@ before the SA is revalidated.
 
 .sp
 .ne 2
-.mk
 .na
 \fBp2_lifetime_kb \fInum\fR\fR
 .ad
@@ -512,7 +486,6 @@ passed.
 
 .sp
 .ne 2
-.mk
 .na
 \fBp2_softlife_kb \fInum\fR\fR
 .ad
@@ -528,7 +501,6 @@ lifetime specified by \fBp2_lifetime_kb\fR. The value specified by
 
 .sp
 .ne 2
-.mk
 .na
 \fBp2_nonce_len \fInum\fR\fR
 .ad
@@ -540,7 +512,6 @@ specified on a per-rule basis.
 
 .sp
 .ne 2
-.mk
 .na
 \fBlocal_id_type \fIp1-id-type\fR\fR
 .ad
@@ -577,7 +548,6 @@ CN=Sun Test cert\fR)
 
 .sp
 .ne 2
-.mk
 .na
 \fBp1_xform '{' parameter-list '}\fR
 .ad
@@ -594,7 +564,6 @@ optional, elements in the parameter-list must occur exactly once within a given
 transform's parameter-list:
 .sp
 .ne 2
-.mk
 .na
 \fBoakley_group \fInumber\fR\fR
 .ad
@@ -631,7 +600,6 @@ are currently:
 
 .sp
 .ne 2
-.mk
 .na
 \fBencr_alg {3des, 3des-cbc, blowfish, blowfish-cdc, des, des-cbc, aes,
 aes-cbc}\fR
@@ -647,7 +615,6 @@ AES key sizes are allowed.
 
 .sp
 .ne 2
-.mk
 .na
 \fBauth_alg {md5, sha, sha1, sha256, sha384, sha512}\fR
 .ad
@@ -663,7 +630,6 @@ diplays a list of installed providers and their mechanisms. See
 
 .sp
 .ne 2
-.mk
 .na
 \fBauth_method {preshared, rsa_sig, rsa_encrypt, dss_sig}\fR
 .ad
@@ -674,7 +640,6 @@ The authentication method used for IKE phase 1.
 
 .sp
 .ne 2
-.mk
 .na
 \fBp1_lifetime_secs \fInum\fR\fR
 .ad
@@ -687,7 +652,6 @@ Optional. The lifetime for a phase 1 SA.
 
 .sp
 .ne 2
-.mk
 .na
 \fBp2_lifetime_secs \fInum\fR\fR
 .ad
@@ -700,7 +664,6 @@ in seconds.
 
 .sp
 .ne 2
-.mk
 .na
 \fBp2_pfs \fInum\fR\fR
 .ad
@@ -744,7 +707,6 @@ An IKE rule starts with a right-curly-brace (\fB{\fR), ends with a
 left-curly-brace (\fB}\fR), and has the following parameters in between:
 .sp
 .ne 2
-.mk
 .na
 \fBlabel \fIstring\fR\fR
 .ad
@@ -760,7 +722,6 @@ allowed per rule.
 
 .sp
 .ne 2
-.mk
 .na
 \fBlocal_addr <\fIIPaddr\fR/\fIprefix\fR/\fIrange\fR>\fR
 .ad
@@ -773,7 +734,6 @@ given rule.
 
 .sp
 .ne 2
-.mk
 .na
 \fBremote_addr <\fIIPaddr\fR/\fIprefix\fR/\fIrang\fRe>\fR
 .ad
@@ -786,7 +746,6 @@ given rule.
 
 .sp
 .ne 2
-.mk
 .na
 \fBlocal_id_type \fIp1-id-type\fR\fR
 .ad
@@ -803,7 +762,6 @@ required. Multiple 'local_id_type' parameters within a rule are not allowed.
 
 .sp
 .ne 2
-.mk
 .na
 \fBlocal_id \fIcert-sel\fR\fR
 .ad
@@ -816,7 +774,6 @@ selector. Only one local identity per rule is used, the first one stated.
 
 .sp
 .ne 2
-.mk
 .na
 \fBremote_id \fIcert-sel\fR\fR
 .ad
@@ -833,7 +790,6 @@ prevent a breakdown in security if this value for \fBremote_id\fR is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fBp2_lifetime_secs \fInum\fR\fR
 .ad
@@ -846,7 +802,6 @@ in seconds.
 
 .sp
 .ne 2
-.mk
 .na
 \fBp2_pfs \fInum\fR\fR
 .ad
@@ -886,7 +841,6 @@ group specified is used for phase 2 PFS. Acceptable values are:
 
 .sp
 .ne 2
-.mk
 .na
 \fBp1_xform \fB{\fR \fIparameter-list\fR \fB}\fR\fR
 .ad
@@ -903,7 +857,6 @@ parameter-list; unless specified as optional, must occur exactly once within a
 given transform's parameter-list:
 .sp
 .ne 2
-.mk
 .na
 \fBoakley_group \fInumber\fR\fR
 .ad
@@ -939,7 +892,6 @@ Acceptable values are currently:
 
 .sp
 .ne 2
-.mk
 .na
 \fBencr_alg {3des, 3des-cbc, blowfish, blowfish-cdc, des, des-cbc, aes,
 aes-cbc}\fR
@@ -955,7 +907,6 @@ AES key sizes are allowed.
 
 .sp
 .ne 2
-.mk
 .na
 \fBauth_alg {md5, sha, sha1}\fR
 .ad
@@ -966,7 +917,6 @@ An authentication algorithm, as specified in \fBipseckey\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fBauth_method {preshared, rsa_sig, rsa_encrypt, dss_sig}\fR
 .ad
@@ -977,7 +927,6 @@ The authentication method used for IKE phase 1.
 
 .sp
 .ne 2
-.mk
 .na
 \fBp1_lifetime_secs \fInum\fR\fR
 .ad
@@ -998,7 +947,7 @@ The following is an example of an \fBike.config\fR file:
 .sp
 .in +2
 .nf
- 
+
 ### BEGINNING OF FILE
 
 ### First some global parameters...
@@ -1009,8 +958,8 @@ The following is an example of an \fBike.config\fR file:
 # I must have this certificate in my local filesystem, see ikecert(1m).
 cert_root    "C=US, O=Sun Microsystems\\, Inc., CN=Sun CA"
 
-# Explicitly trusted certs that need no signatures, or perhaps 
-# self-signed ones. Like root certificates, use full DNs for them 
+# Explicitly trusted certs that need no signatures, or perhaps
+# self-signed ones. Like root certificates, use full DNs for them
 # for now.
 cert_trust    "EMAIL=root@domain.org"
 
@@ -1046,7 +995,7 @@ p2_pfs 2
 }
 
 {
-   # an index-only rule.  If I'm a receiver, and all I 
+   # an index-only rule.  If I'm a receiver, and all I
    # have are index-only rules, what do I do about inbound IKE requests?
    # Answer:  Take them all!
 
@@ -1064,8 +1013,8 @@ p2_pfs 2
    {auth_method preshared  oakley_group 5  auth_alg md5  encr_alg \e
     blowfish }   p1_xform
    {auth_method preshared  oakley_group 5  auth_alg md5  encr_alg 3des }
-   
-   # After said list, another keyword (or a '}') stops xform 
+
+   # After said list, another keyword (or a '}') stops xform
    # parsing.
 }
 
@@ -1081,12 +1030,12 @@ p2_pfs 2
    local_addr 10.1.86.51
    remote_addr 10.1.80.0/24
 
-   p1_xform 
+   p1_xform
    { auth_method rsa_sig  oakley_group 5  auth_alg md5  encr_alg 3des }
    p1_xform
    { auth_method rsa_sig  oakley_group 5  auth_alg md5  encr_alg \e
      blowfish }
-   p1_xform 
+   p1_xform
    { auth_method rsa_sig  oakley_group 5  auth_alg sha1  encr_alg 3des }
    p1_xform
    { auth_method rsa_sig  oakley_group 5  auth_alg sha1  encr_alg \e
@@ -1117,7 +1066,7 @@ p2_pfs 2
     { auth_method rsa_sig  oakley_group 5  auth_alg sha1  encr_alg \e
       blowfish }
 }
-     
+
 {
     # How 'bout something with a different cert type and name?
 
@@ -1153,7 +1102,7 @@ p2_pfs 2
    p1_xform
    { auth_method preshared oakley_group 5 auth_alg md5 encr_alg \e
      blowfish}
-   
+
 }
 .fi
 .in -2
@@ -1166,13 +1115,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

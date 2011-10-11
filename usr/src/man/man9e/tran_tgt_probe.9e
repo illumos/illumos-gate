@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH tran_tgt_probe 9E "1 Nov 1993" "SunOS 5.11" "Driver Entry Points"
+.TH TRAN_TGT_PROBE 9E "Nov 1, 1993"
 .SH NAME
 tran_tgt_probe \- request to probe SCSI bus for a particular target
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/scsi/scsi.h> 
+#include <sys/scsi/scsi.h>
 
 
 
@@ -24,23 +24,19 @@ Solaris architecture specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsd\fR \fR
 .ad
 .RS 13n
-.rt  
 Pointer to a  \fBscsi_device\fR(9S) structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIwaitfunc\fR \fR
 .ad
 .RS 13n
-.rt  
 Pointer to either  \fBNULL_FUNC\fR or \fBSLEEP_FUNC\fR.
 .RE
 
@@ -79,24 +75,20 @@ are preserved.
 are not available:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNULL_FUNC\fR \fR
 .ad
 .RS 15n
-.rt  
 Do not wait for resources.  See  \fBscsi_probe\fR(9F) for defined return values
 if no resources are available.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLEEP_FUNC\fR \fR
 .ad
 .RS 15n
-.rt  
 Wait indefinitely for resources.
 .RE
 

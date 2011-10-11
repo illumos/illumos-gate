@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_modopen 9F "17 March 2008" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_MODOPEN 9F "Mar 17, 2008"
 .SH NAME
 ddi_modopen, ddi_modsym, ddi_modclose \- dynamically-loaded kernel module
 functions
@@ -34,12 +34,10 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fImodname\fR\fR
 .ad
 .RS 11n
-.rt  
 The name of the dynamically-loaded kernel module (file) to be opened. The
 \fImodname\fR string is of the form:
 .sp
@@ -59,47 +57,39 @@ provided.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImode\fR\fR
 .ad
 .RS 11n
-.rt  
 Currently, \fBKRTLD_MODE_FIRST\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIerrnop\fR\fR
 .ad
 .RS 11n
-.rt  
 Pointer to \fBerrno\fR returned on error, if \fBNULL\fR then no additional
 error information is available.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhandle\fR\fR
 .ad
 .RS 11n
-.rt  
 Opaque handle returned from \fBddi_modopen()\fR, invalidated by
 \fBddi_modclose()\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsymname\fR\fR
 .ad
 .RS 11n
-.rt  
 Symbol's name as a character string.
 .RE
 

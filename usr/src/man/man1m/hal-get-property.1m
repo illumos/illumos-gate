@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH hal-get-property 1M "18 Aug 2006" "SunOS 5.11" "System Administration Commands"
+.TH HAL-GET-PROPERTY 1M "Aug 18, 2006"
 .SH NAME
 hal-get-property, hal-set-property \- get and set HAL device properties
 .SH SYNOPSIS
@@ -42,7 +42,6 @@ and set properties of hardware that conforms to HAL specifications.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--udi\fR \fIudi\fR\fR
 .ad
@@ -53,7 +52,6 @@ Unique device ID.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--key\fR \fIkey\fR\fR
 .ad
@@ -64,7 +62,6 @@ Key of the property to set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--int\fR\fR
 .ad
@@ -76,7 +73,6 @@ Set value to an integer. Accepts decimal or hexadecimal value prefixed with
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--uint64\fR\fR
 .ad
@@ -88,7 +84,6 @@ Set value to an integer. Accepts decimal or hexadecimal value prefixed with
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--string\fR \fIvalue\fR\fR
 .ad
@@ -99,7 +94,6 @@ Set value to a string.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--double\fR \fIvalue\fR\fR
 .ad
@@ -110,7 +104,6 @@ Set value to a floating point number.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--boolean\fR \fIvalue\fR\fR
 .ad
@@ -121,7 +114,6 @@ Set value to a boolean, that is, true or false
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--strlist-pre\fR \fIvalue\fR\fR
 .ad
@@ -132,7 +124,6 @@ Prepend a string to a list.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--strlist-post\fR \fIvalue\fR\fR
 .ad
@@ -143,7 +134,6 @@ Append a string to a list.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--strlist-rem\fR \fIvalue\fR\fR
 .ad
@@ -154,7 +144,6 @@ Remove a string from a list.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--remove\fR \fIvalue\fR\fR
 .ad
@@ -165,7 +154,6 @@ Indicates that the property should be removed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--version\fR\fR
 .ad
@@ -176,7 +164,6 @@ Display version and exit.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--help\fR\fR
 .ad
@@ -193,13 +180,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityVolatile
+Interface Stability	Volatile
 .TE
 
 .SH SEE ALSO

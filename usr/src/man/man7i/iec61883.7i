@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH iec61883 7I "27 Mar 2009" "SunOS 5.11" "Ioctl Requests"
+.TH IEC61883 7I "Mar 27, 2009"
 .SH NAME
 iec61883 \- IEC 61883 interfaces
 .SH SYNOPSIS
@@ -121,7 +121,6 @@ typedef struct iec61883_arq {
 \fBarq_type\fR contains \fBARQ\fR type:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIEC61883_ARQ_FCP_CMD\fR\fR
 .ad
@@ -139,7 +138,6 @@ See \fIIEC 61883-1\fR for the FCP frame structure definition.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIEC61883_ARQ_BUS_RESET\fR\fR
 .ad
@@ -197,7 +195,6 @@ any active transfers that were in progress.
 The following commands only apply to isochronous nodes:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIEC61883_ISOCH_INIT\fR\fR
 .ad
@@ -242,7 +239,6 @@ compatible with \fBii_bus_speed\fR.
 \fBii_direction\fR can take one of the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIEC61883_DIR_RECV\fR\fR
 .ad
@@ -253,7 +249,6 @@ Receiving isochronous data.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIEC61883_DIR_XMIT\fR\fR
 .ad
@@ -285,7 +280,6 @@ set by \fBii_rate_n\fR and \fBii_rate_d\fR respectively. Any integer numbers
 can be used, or the following predefined constants:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIEC61883_RATE_N_DV_NTSC IEC61883_RATE_D_DV_NTSC\fR\fR
 .ad
@@ -296,7 +290,6 @@ Data rate expected by \fBDV-NTSC\fR devices.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIEC61883_RATE_N_DV_PAL IEC61883_RATE_D_DV_PAL\fR\fR
 .ad
@@ -309,7 +302,6 @@ During data transmission, a timestamp based on the current value of the cycle
 timer is usually required. \fBii_ts_mode\fR defines timestamp mode to be used:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIEC61883_TS_SYT\fR\fR
 .ad
@@ -320,7 +312,6 @@ Driver puts a timestamp in the SYT field of the first CIP header of each frame.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIEC61883_TS_NONE\fR\fR
 .ad
@@ -355,7 +346,6 @@ In case of command success, \fBii_error\fR is set to 0; otherwise one of the
 following values can be returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIEC61883_ERR_NOMEM\fR\fR
 .ad
@@ -366,7 +356,6 @@ Not enough memory for the data buffer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIEC61883_ERR_NOCHANNEL\fR\fR
 .ad
@@ -377,7 +366,6 @@ Cannot allocate isochronous channel.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIEC61883_ERR_PKT_SIZE\fR\fR
 .ad
@@ -388,7 +376,6 @@ Packet size is not allowed at this bus speed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIEC61883_ERR_VERSION\fR\fR
 .ad
@@ -399,7 +386,6 @@ Interface version is not supported.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIEC61883_ERR_INVAL\fR\fR
 .ad
@@ -410,7 +396,6 @@ One or more the parameters are invalid
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIEC61883_ERR_OTHER\fR\fR
 .ad
@@ -423,7 +408,6 @@ Unspecified error type.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIEC61883_ISOCH_FINI\fR\fR
 .ad
@@ -436,7 +420,6 @@ and the data buffer must be unmapped; otherwise the command fails.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIEC61883_START\fR\fR
 .ad
@@ -448,7 +431,6 @@ by \fBIEC61883_ISOCH_INIT\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIEC61883_STOP\fR\fR
 .ad
@@ -460,7 +442,6 @@ by \fBIEC61883_ISOCH_INIT\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIEC61883_RECV\fR\fR
 .ad
@@ -510,7 +491,6 @@ continuity counters (DBC field of the CIP header).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIEC61883_XMIT\fR\fR
 .ad
@@ -550,7 +530,6 @@ frame buffer to be the first packet of an AV frame.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIEC61883_PLUG_INIT\fR\fR
 .ad
@@ -579,7 +558,6 @@ typedef struct iec61883_plug_init {
 \fBpi_loc\fR specifies plug location:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIEC61883_LOC_LOCAL\fR\fR
 .ad
@@ -591,7 +569,6 @@ Command fails if the plug already exists
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIEC61883_LOC_REMOTE\fR\fR
 .ad
@@ -604,7 +581,6 @@ otherwise the command fails.
 \fBpi_type\fR specifies isochronous plug type:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIEC61883_PLUG_IN IEC61883_PLUG_OUT\fR\fR
 .ad
@@ -615,7 +591,6 @@ Input or output plugs.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIEC61883_PLUG_MASTER_IN IEC61883_PLUG_MASTER_OUT\fR\fR
 .ad
@@ -637,7 +612,6 @@ with other plug commands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIEC61883_PLUG_FINI\fR\fR
 .ad
@@ -649,7 +623,6 @@ any resources associated with this handle, including the PCR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIEC61883_PLUG_REG_READ\fR\fR
 .ad
@@ -673,7 +646,6 @@ value is returned in \fBpr_val\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIEC61883_PLUG_REG_CAS\fR\fR
 .ad
@@ -706,7 +678,6 @@ pl_old.
 The following commands only apply to asynchronous nodes:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIEC61883_ARQ_GET_IBUF_SIZE\fR\fR
 .ad
@@ -718,7 +689,6 @@ pointer to \fBint\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIEC61883_ARQ_SET_IBUF_SIZE\fR\fR
 .ad
@@ -731,35 +701,29 @@ size in bytes.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/av/N/async\fR\fR
 .ad
 .RS 19n
-.rt  
 Device node for asynchronous data
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/av/N/isoch\fR\fR
 .ad
 .RS 19n
-.rt  
 Device has been disconnected
 .RE
 
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 10n
-.rt  
 Bus operation failed.
 .sp
 DMA failure.
@@ -767,34 +731,28 @@ DMA failure.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 \fBioctl\fR(2) argument points to an illegal address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 Invalid argument or argument combination.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENODEV\fR\fR
 .ad
 .RS 10n
-.rt  
 Device has been disconnected.
 .RE
 
@@ -806,15 +764,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(1.83i) |cw(3.67i) 
-lw(1.83i) |lw(3.67i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureAll
+Architecture	All
 _
-Stability levelCommitted
+Stability level	Committed
 .TE
 
 .SH SEE ALSO

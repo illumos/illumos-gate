@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cfgadm_sdcard 1M "28 Feb 2008" "SunOS 5.11" "System Administration Commands"
+.TH CFGADM_SDCARD 1M "Feb 28, 2008"
 .SH NAME
 cfgadm_sdcard \- SD/MMC hardware-specific commands for cfgadm
 .SH SYNOPSIS
@@ -112,7 +112,6 @@ The receptacle state for an attachment point at the  SD/MMC slot has the
 following  meanings:
 .sp
 .ne 2
-.mk
 .na
 \fBempty\fR
 .ad
@@ -124,7 +123,6 @@ this slot.
 
 .sp
 .ne 2
-.mk
 .na
 \fBdisconnected\fR
 .ad
@@ -136,7 +134,6 @@ no communication with the device was established,  or the slot has failed.
 
 .sp
 .ne 2
-.mk
 .na
 \fBconnected\fR
 .ad
@@ -152,7 +149,6 @@ The occupant (device inserted in the SD/MMC slot) state has the following
 meanings:
 .sp
 .ne 2
-.mk
 .na
 \fBconfigured\fR
 .ad
@@ -164,7 +160,6 @@ system.
 
 .sp
 .ne 2
-.mk
 .na
 \fBunconfigured\fR
 .ad
@@ -180,7 +175,6 @@ yet configured.                      To configure, run  the command \fBcfgadm
 The attachment point (SD/MMC slot) condition has the following meanings:
 .sp
 .ne 2
-.mk
 .na
 \fBok\fR
 .ad
@@ -191,7 +185,6 @@ The SD/MMC slot is powered-on, enabled and  ready for use.
 
 .sp
 .ne 2
-.mk
 .na
 \fBfailed\fR
 .ad
@@ -204,7 +197,6 @@ due to the device inserted in the slot.
 
 .sp
 .ne 2
-.mk
 .na
 \fBunknown\fR
 .ad
@@ -226,7 +218,6 @@ configuration administration help messages (\fB-h\fR).
 change operations are supported:
 .sp
 .ne 2
-.mk
 .na
 \fBconnect\fR
 .ad
@@ -238,7 +229,6 @@ attached device. This operation implies powering-on the slot if necessary.
 
 .sp
 .ne 2
-.mk
 .na
 \fBdisconnect\fR
 .ad
@@ -255,7 +245,6 @@ The following state change operations are supported for an SD/MMC card inserted
 in to the SD/MMC slot:
 .sp
 .ne 2
-.mk
 .na
 \fBconfigure\fR
 .ad
@@ -267,7 +256,6 @@ configured.  This command  also  implies connect operation, if necessary.
 
 .sp
 .ne 2
-.mk
 .na
 \fBunconfigure\fR
 .ad
@@ -365,7 +353,7 @@ unconfiguring a disk:
 .nf
        # cfgadm -c unconfigure sdcard1/5::dsk/c01t35d0
 
- 
+
 .fi
 .in -2
 
@@ -386,7 +374,6 @@ The system responds with the following:
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB/usr/lib/cfgadm/sdcard.so.1\fR
 .ad

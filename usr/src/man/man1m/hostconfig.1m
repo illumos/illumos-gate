@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH hostconfig 1M "6 Nov 2000" "SunOS 5.11" "System Administration Commands"
+.TH HOSTCONFIG 1M "Nov 6, 2000"
 .SH NAME
 hostconfig \- configure a system's host parameters
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/hostconfig\fR \fB-p\fR \fIprotocol\fR [\fB-d\fR] [ \fB-h\fR] [\fB-n\fR] [\fB-v\fR] 
+\fB/usr/sbin/hostconfig\fR \fB-p\fR \fIprotocol\fR [\fB-d\fR] [ \fB-h\fR] [\fB-n\fR] [\fB-v\fR]
      [\fB-i\fR \fIinterface\fR] [\fB-f\fR \fIhostname\fR]
 .fi
 
@@ -29,69 +29,57 @@ Currently, only one protocol (\fBbootparams\fR) is defined.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 16n
-.rt  
 Enable \fBdebug\fR output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fI hostname\fR\fR
 .ad
 .RS 16n
-.rt  
 Run the protocol as if this machine were named \fBhostname\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 16n
-.rt  
 Echo the received \fBhostname\fR to \fBstdout\fR, rather than setting
 \fBhostname\fR using the system name directly.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fI interface\fR\fR
 .ad
 .RS 16n
-.rt  
 Use only the named network interface to run the protocol.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 16n
-.rt  
 Run the network protocol, but do not set the acquired parameters into the
 system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIprotocol\fR\fR
 .ad
 .RS 16n
-.rt  
 Run \fBhostconfig\fR using \fIprotocol\fR. Currently, only one protocol
 (\fBbootparams\fR) is available. This option is required.
 .sp
@@ -102,12 +90,10 @@ the RPC \fBbootparams\fR protocol. This sets the system's  \fBhostname\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 16n
-.rt  
 Enable verbose output.
 .RE
 

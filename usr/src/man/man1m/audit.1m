@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH audit 1M "16 Apr 2008" "SunOS 5.11" "System Administration Commands"
+.TH AUDIT 1M "Apr 16, 2008"
 .SH NAME
 audit \- control the behavior of the audit daemon
 .SH SYNOPSIS
@@ -27,24 +27,20 @@ trail and disable auditing.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 11n
-.rt  
 Notify the audit daemon to close the current audit file and open a new audit
 file in the current audit directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 11n
-.rt  
 Notify the audit daemon to read the audit control file. The audit daemon stores
 the information internally. If the audit daemon is not running but audit has
 been enabled by means of \fBbsmconv\fR(1M), the audit daemon is started.
@@ -52,24 +48,20 @@ been enabled by means of \fBbsmconv\fR(1M), the audit daemon is started.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 11n
-.rt  
 Direct the audit daemon to close the current audit trail file, disable
 auditing, and die. Use \fB-s\fR to restart auditing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR \fIpath\fR\fR
 .ad
 .RS 11n
-.rt  
 Verify the syntax for the audit control file stored in \fIpath\fR. The
 \fBaudit\fR command displays an approval message or outputs specific error
 messages for each error found.
@@ -101,13 +93,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-StabilityEvolving
+Stability	Evolving
 .TE
 
 .SH SEE ALSO

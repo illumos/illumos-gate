@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH priv_getbyname 9F "11 Mar 2004" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH PRIV_GETBYNAME 9F "Mar 11, 2004"
 .SH NAME
 priv_getbyname \- map a privilege name to a number
 .SH SYNOPSIS
@@ -23,23 +23,19 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpriv\fR\fR
 .ad
 .RS 9n
-.rt  
 name of the privilege
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 9n
-.rt  
 flags, must be zero or \fBPRIV_ALLOC\fR
 .RE
 
@@ -72,12 +68,10 @@ This function returns the privilege number, which is greater than or equal to
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 16n
-.rt  
 This might be caused by any of the following
 .RS +4
 .TP
@@ -101,23 +95,19 @@ The \fIpriv\fR parameter contains invalid characters.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 16n
-.rt  
 There is no room to allocate another privilege.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENAMETOOLONG\fR\fR
 .ad
 .RS 16n
-.rt  
 An attempt was made to allocate a privilege that was longer than
 \fB{PRIVNAME_MAX}\fR characters.
 .RE
@@ -134,15 +124,14 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureAll
+Architecture	All
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

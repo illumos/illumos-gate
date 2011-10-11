@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH physio 9F "2 Apr 1993" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH PHYSIO 9F "Apr 2, 1993"
 .SH NAME
 physio, minphys \- perform physical I/O
 .SH SYNOPSIS
@@ -16,7 +16,7 @@ physio, minphys \- perform physical I/O
 
 
 
-\fBint\fR \fBphysio\fR(\fBint\fR(\fI*strat\fR)(\fIstruct buf *\fR), \fBstruct buf\fR \fI*bp\fR, \fBdev_t\fR \fIdev\fR, 
+\fBint\fR \fBphysio\fR(\fBint\fR(\fI*strat\fR)(\fIstruct buf *\fR), \fBstruct buf\fR \fI*bp\fR, \fBdev_t\fR \fIdev\fR,
      \fBint\fR \fIrw\fR, \fBvoid\fR (\fI*mincnt\fR)(\fIstruct buf *\fR), \fBstruct uio\fR \fI*uio\fR);
 .fi
 
@@ -33,23 +33,19 @@ Solaris DDI specific (Solaris DDI).
 .SS "\fBphysio()\fR"
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstrat\fR \fR
 .ad
 .RS 11n
-.rt  
 Pointer to device strategy routine.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbp\fR \fR
 .ad
 .RS 11n
-.rt  
 Pointer to a \fBbuf\fR(9S) structure describing the transfer. If \fIbp\fR is
 set to \fINULL\fR then \fBphysio()\fR allocates one which is automatically
 released upon completion.
@@ -57,58 +53,48 @@ released upon completion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdev\fR \fR
 .ad
 .RS 11n
-.rt  
 The device number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrw\fR \fR
 .ad
 .RS 11n
-.rt  
 Read/write flag. This is either \fBB_READ\fR when reading from the device, or
 \fBB_WRITE\fR when writing to the device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImincnt\fR \fR
 .ad
 .RS 11n
-.rt  
 Routine which bounds the maximum transfer unit size.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIuio\fR \fR
 .ad
 .RS 11n
-.rt  
 Pointer to the \fBuio\fR structure which describes the user \fBI/O\fR request.
 .RE
 
 .SS "\fBminphys()\fR"
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbp\fR \fR
 .ad
 .RS 7n
-.rt  
 Pointer to a \fBbuf\fR structure.
 .RE
 
@@ -146,23 +132,19 @@ not exceed the system limit.
 \fBphysio()\fR returns:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 12n
-.rt  
 Upon success.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnon-zero\fR\fR
 .ad
 .RS 12n
-.rt  
 Upon failure.
 .RE
 

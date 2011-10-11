@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH timeout 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH TIMEOUT 9F "Jan 16, 2006"
 .SH NAME
 timeout \- execute a function after a specified length of time
 .SH SYNOPSIS
@@ -15,7 +15,7 @@ timeout \- execute a function after a specified length of time
 
 
 
-\fBtimeout_id_t\fR \fBtimeout\fR(\fBvoid (\fR\fI* func\fR)(void \fI*\fR), \fBvoid\fR \fI*arg\fR, 
+\fBtimeout_id_t\fR \fBtimeout\fR(\fBvoid (\fR\fI* func\fR)(void \fI*\fR), \fBvoid\fR \fI*arg\fR,
      \fBclock_t\fR  \fIticks\fR);
 .fi
 
@@ -26,34 +26,28 @@ Architecture independent level 1 (DDI/DKI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfunc\fR\fR
 .ad
 .RS 9n
-.rt  
 Kernel function to invoke when the time increment expires.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIarg\fR\fR
 .ad
 .RS 9n
-.rt  
 Argument to the function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIticks\fR\fR
 .ad
 .RS 9n
-.rt  
 Number of clock ticks to wait before the function is called. Use
 \fBdrv_usectohz\fR(9F) to convert microseconds to clock ticks.
 .RE
@@ -144,7 +138,7 @@ xxcheckcond(struct xxstate *xsp)
          .
          .
          .
-}   
+}
 .fi
 .in -2
 

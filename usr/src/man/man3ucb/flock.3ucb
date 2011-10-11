@@ -1,7 +1,7 @@
 '\" te
 .\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright (c) 1983 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement specifies the terms and conditions for redistribution.
-.TH flock 3UCB "30 Oct 2007" "SunOS 5.11" "SunOS/BSD Compatibility Library Functions"
+.TH FLOCK 3UCB "Oct 30, 2007"
 .SH NAME
 flock \- apply or remove an advisory lock on an open file
 .SH SYNOPSIS
@@ -58,68 +58,56 @@ the error \fBEWOULDBLOCK\fR will be returned.
 \fBflock()\fR returns:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 9n
-.rt  
 on success.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi1\fR\fR
 .ad
 .RS 9n
-.rt  
 on failure and sets \fBerrno\fR to indicate the error.
 .RE
 
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 15n
-.rt  
 The argument \fIfd\fR is an invalid descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 15n
-.rt  
 \fIoperation\fR is not a valid argument.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOPNOTSUPP\fR\fR
 .ad
 .RS 15n
-.rt  
 The argument \fIfd\fR refers to an object other than a file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEWOULDBLOCK\fR\fR
 .ad
 .RS 15n
-.rt  
 The file is locked and the  \fBLOCK_NB\fR option was specified.
 .RE
 

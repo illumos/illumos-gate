@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ct_pr_event_get_pid 3CONTRACT "19 Jul 2004" "SunOS 5.11" "Contract Management Library Functions"
+.TH CT_PR_EVENT_GET_PID 3CONTRACT "Jul 19, 2004"
 .SH NAME
 ct_pr_event_get_pid, ct_pr_event_get_ppid, ct_pr_event_get_signal,
 ct_pr_event_get_sender, ct_pr_event_get_senderct, ct_pr_event_get_exitstatus,
@@ -132,12 +132,10 @@ The \fBct_pr_event_get_pid()\fR, \fBct_pr_event_get_ppid()\fR,
 \fBct_pr_event_get_zcorefile()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIevthdl\fR argument is not a process contract event object.
 .RE
 
@@ -150,12 +148,10 @@ The \fBct_pr_event_get_ppid()\fR, \fBct_pr_event_get_signal()\fR,
 functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The requested data do not match the event type.
 .RE
 
@@ -164,12 +160,10 @@ The requested data do not match the event type.
 The \fBct_pr_event_get_sender()\fRa functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 10n
-.rt  
 The process ID of the sender was not available, or the event object was read by
 a process running in a non-global zone and the sender was in a different zone.
 .RE
@@ -180,12 +174,10 @@ The \fBct_pr_event_get_pcorefile()\fR, \fBct_pr_event_get_gcorefile()\fR, and
 \fBct_pr_event_get_zcorefile()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 10n
-.rt  
 The requested core file was not created.
 .RE
 
@@ -194,12 +186,10 @@ The requested core file was not created.
 The \fBct_pr_event_get_zcorefile()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 10n
-.rt  
 The event object was read by a process running in a non-global zone.
 .RE
 
@@ -219,7 +209,7 @@ encountered.
 #include <fcntl.h>
 #include <stdio.h>
 #include <libcontract.h>
- 
+
 \&...
 int fd;
 ct_evthdl_t event;
@@ -253,15 +243,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

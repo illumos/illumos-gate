@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH svccfg 1M "29 Jun 2009" "SunOS 5.11" "System Administration Commands"
+.TH SVCCFG 1M "Jun 29, 2009"
 .SH NAME
 svccfg \- import, export, and modify service configurations
 .SH SYNOPSIS
@@ -41,7 +41,6 @@ details.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIcommand-file\fR\fR
 .ad
@@ -52,7 +51,6 @@ Reads and executes \fBsvccfg\fR subcommands from \fIcommand-file\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIFMRI\fR\fR
 .ad
@@ -64,7 +62,6 @@ identifier) before executing any subcommands. See \fBsmf\fR(5).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -98,10 +95,10 @@ All the following are valid abbreviations:
 .sp
 .in +2
 .nf
-sendmail 
-:sendmail 
-smtp 
-smtp:sendmail 
+sendmail
+:sendmail
+smtp
+smtp:sendmail
 network/smtp
 .fi
 .in -2
@@ -128,7 +125,6 @@ or service, an error message is printed and no action is taken.
 .SS "General Subcommands"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBend\fR\fR
 .ad
@@ -147,7 +143,6 @@ Exits immediately.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrepository\fR \fIrepfile\fR\fR
 .ad
@@ -163,7 +158,6 @@ system repository, \fB/etc/svc/repository.db\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBset\fR [\fB-v\fR|\fB-V\fR]\fR
 .ad
@@ -173,7 +167,6 @@ Sets optional behavior. If no options are specified, set displays the options
 currently in effect.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -184,7 +177,6 @@ Turns on verbose mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
@@ -198,7 +190,6 @@ Turns off verbose mode.
 .SS "Service Profile Subcommands"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBapply\fR [\fB-n\fR] \fIfile\fR\fR
 .ad
@@ -222,7 +213,6 @@ fails.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBextract\fR [\fI> file\fR]\fR
 .ad
@@ -236,7 +226,6 @@ a file.
 .SS "Service Manifest Subcommands"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBarchive\fR [\fB-a\fR]\fR
 .ad
@@ -256,7 +245,6 @@ there are insufficient privileges to read these values.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBexport\fR [\fB-a\fR] \fIservice_FMRI\fR [\fI>file\fR]\fR
 .ad
@@ -280,7 +268,6 @@ specifies an instance), the command fails.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBimport\fR [\fB-V\fR] \fIfile\fR\fR
 .ad
@@ -309,7 +296,6 @@ they represent administrator preference.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinventory\fR \fIfile\fR\fR
 .ad
@@ -323,7 +309,6 @@ of the service.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrestore\fR\fR
 .ad
@@ -345,7 +330,6 @@ the archive was made.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvalidate\fR [\fIfile\fR | \fIfmri\fR]\fR
 .ad
@@ -378,7 +362,6 @@ See \fBsmf_template\fR(5) for a description of templates.
 An "entity" refers to a scope, service, or service instance.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadd\fR \fIname\fR\fR
 .ad
@@ -391,7 +374,6 @@ entities.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdelete\fR [\fB-f\fR] \fB{\fIname\fR | \fIfmri\fR}\fR\fR
 .ad
@@ -410,7 +392,6 @@ to delete service configurations.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlist\fR [\fIpattern\fR]\fR
 .ad
@@ -423,7 +404,6 @@ listed for property-bearing entities, namely services and service instances.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBselect\fR {\fIname\fR | \fIfmri\fR}\fR
 .ad
@@ -436,7 +416,6 @@ entity that the argument specifies becomes the current selection.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunselect\fR\fR
 .ad
@@ -448,7 +427,6 @@ The parent of the current selection becomes the current selection.
 .SS "Property Inspection and Modification Subcommands"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBaddpg\fR \fIname\fR \fItype\fR [\fIflags\fR]\fR
 .ad
@@ -463,7 +441,6 @@ with which to create the property group. 'P' represents
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBaddpropvalue\fR \fIpg\fR\fI/name\fR [\fItype:\fR] \fIvalue\fR\fR
 .ad
@@ -483,7 +460,6 @@ values associated with the property.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdelpg\fR \fIname\fR\fR
 .ad
@@ -495,7 +471,6 @@ Deletes the property group \fIname\fR of the current selection. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdelprop\fR \fIpg\fR[\fI/name\fR]\fR
 .ad
@@ -507,7 +482,6 @@ Deletes the named property group or property of the current selection. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdelpropvalue\fR \fIpg/name\fR \fIglobpattern\fR\fR
 .ad
@@ -520,7 +494,6 @@ required to modify properties.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdescribe\fR [\fB-v\fR] [\fB-t\fR] [\fIpropertygroup\fR/\fIproperty\fR]\fR
 .ad
@@ -544,7 +517,6 @@ groups and properties.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBeditprop\fR\fR
 .ad
@@ -560,7 +532,6 @@ delete properties.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlistpg\fR [\fIpattern\fR]\fR
 .ad
@@ -575,7 +546,6 @@ In interactive mode, a basic description of the property groups is also given.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlistprop\fR [\fIpattern\fR]\fR
 .ad
@@ -591,7 +561,6 @@ properties with names which match the argument are listed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsetenv\fR [\fB-i\fR | \fB-s\fR] [\fB-m\fR \fImethod_name\fR] \fIenvvar
 value\fR\fR
@@ -599,7 +568,7 @@ value\fR\fR
 .sp .6
 .RS 4n
 Sets a method environment variable for a service or instance by changing the
-"environment" property in the \fImethod_name\fR property 	group, if that
+"environment" property in the \fImethod_name\fR property group, if that
 property group has type "method". If \fImethod_name\fR is not specified and the
 \fB-i\fR option is used, the "method_context" property group is used, if an
 instance is currently selected. If the \fB-s\fR option is used and a service is
@@ -618,7 +587,6 @@ by a "=" are removed, and the value "\fIenvvar\fR=\fIvalue\fR" is added. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsetprop\fR \fIpg/name\fR = [\fItype:\fR] \fIvalue\fR\fR
 .ad
@@ -643,7 +611,6 @@ order in which they are specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunsetenv\fR [\fB-i\fR | \fB-s\fR] [\fB-m\fR \fImethod_name\fR] \fIenvvar
 value\fR\fR
@@ -651,7 +618,7 @@ value\fR\fR
 .sp .6
 .RS 4n
 Removes a method environment variable for a service or instance by changing the
-"environment" property in the \fImethod_name\fR property 	group, if that
+"environment" property in the \fImethod_name\fR property group, if that
 property group has type "method". If \fImethod_name\fR is not specified and the
 \fB-i\fR option is used, the "method_context" property group is used, if an
 instance is currently selected. If the \fB-s\fR option is used and a service is
@@ -671,7 +638,6 @@ modify properties.
 .SS "Snapshot Navigation and Selection Subcommands"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlistsnap\fR\fR
 .ad
@@ -682,7 +648,6 @@ Displays snapshots available for the currently selected instance.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrevert\fR [\fIsnapshot\fR]\fR
 .ad
@@ -697,7 +662,6 @@ See \fBsmf_security\fR(5) for the privileges required to change properties.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBselectsnap\fR [\fIname\fR]\fR
 .ad
@@ -711,7 +675,6 @@ read-only.
 .SS "Instance Subcommands"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrefresh\fR\fR
 .ad
@@ -833,7 +796,6 @@ ttymon/label                astring  console
 .SH ENVIRONMENTAL VARIABLES
 .sp
 .ne 2
-.mk
 .na
 \fBEDITOR\fR
 .ad
@@ -849,7 +811,6 @@ editor is \fBvi\fR(1).
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -860,7 +821,6 @@ Successful execution.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
@@ -872,7 +832,6 @@ standard error stream.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
@@ -889,13 +848,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

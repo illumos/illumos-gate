@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ufsdump 1M "17 Mar 2008" "SunOS 5.11" "System Administration Commands"
+.TH UFSDUMP 1M "Mar 17, 2008"
 .SH NAME
 ufsdump \- incremental file system dump
 .SH SYNOPSIS
@@ -57,7 +57,6 @@ older version of the \fBrestore\fR command.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\(mi9\fR\fR
 .ad
@@ -74,7 +73,6 @@ files modified or added since the "level \fB2\fR" (Monday) backup. A "level
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBa\fR \fIarchive_file\fR\fR
 .ad
@@ -87,7 +85,6 @@ file is in the dump file that is being restored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBb\fR \fIfactor\fR\fR
 .ad
@@ -104,7 +101,6 @@ with \fBtar\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBc\fR\fR
 .ad
@@ -121,7 +117,6 @@ with this option, their values will override the defaults set by this option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd\fR \fIbpi\fR\fR
 .ad
@@ -134,7 +129,6 @@ cartridge tape, in which case it is assumed to be 1000BPI per track. Typical
 values for tape devices are:
 .sp
 .ne 2
-.mk
 .na
 \fB1/2 inch tape\fR
 .ad
@@ -145,7 +139,6 @@ values for tape devices are:
 
 .sp
 .ne 2
-.mk
 .na
 \fB1/4 inch cartridge\fR
 .ad
@@ -159,7 +152,6 @@ values for tape devices are:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBD\fR\fR
 .ad
@@ -170,7 +162,6 @@ Diskette. Dump to diskette.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBf\fR \fIdump_file\fR\fR
 .ad
@@ -193,7 +184,6 @@ remote machine.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBl\fR\fR
 .ad
@@ -208,7 +198,6 @@ another tape and wait.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBL\fR \fIstring\fR\fR
 .ad
@@ -223,7 +212,6 @@ is specific to the \fBufsdump\fR tape format, and bears no resemblance to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBn\fR\fR
 .ad
@@ -238,7 +226,6 @@ logged in.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBN\fR \fIdevice_name\fR\fR
 .ad
@@ -252,7 +239,6 @@ contain no white space as defined in \fBscanf\fR(3C) and is case-sensitive.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBo\fR\fR
 .ad
@@ -267,7 +253,6 @@ overwriting the media.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR \fIsize\fR\fR
 .ad
@@ -283,7 +268,6 @@ cartridge). Typical values for tape devices depend on the \fBc\fR option, for
 cartridge devices, and the \fBD\fR option for diskettes:
 .sp
 .ne 2
-.mk
 .na
 \fB1/2 inch tape\fR
 .ad
@@ -294,7 +278,6 @@ cartridge devices, and the \fBD\fR option for diskettes:
 
 .sp
 .ne 2
-.mk
 .na
 \fB60-Mbyte 1/4 inch cartridge\fR
 .ad
@@ -305,7 +288,6 @@ cartridge devices, and the \fBD\fR option for diskettes:
 
 .sp
 .ne 2
-.mk
 .na
 \fB150-Mbyte 1/4 inch cartridge\fR
 .ad
@@ -316,7 +298,6 @@ cartridge devices, and the \fBD\fR option for diskettes:
 
 .sp
 .ne 2
-.mk
 .na
 \fBdiskette\fR
 .ad
@@ -330,7 +311,6 @@ for bad block information.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS\fR\fR
 .ad
@@ -344,7 +324,6 @@ media will be needed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBt\fR \fItracks\fR\fR
 .ad
@@ -356,7 +335,6 @@ option is not compatible with the \fBD\fR option. Values for Sun-supported tape
 devices are:
 .sp
 .ne 2
-.mk
 .na
 \fB60-Mbyte 1/4 inch cartridge\fR
 .ad
@@ -367,7 +345,6 @@ devices are:
 
 .sp
 .ne 2
-.mk
 .na
 \fB150-Mbyte 1/4 inch cartridge\fR
 .ad
@@ -380,7 +357,6 @@ devices are:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT\fR \fItime_wait\fR\fB[hms]\fR\fR
 .ad
@@ -395,7 +371,6 @@ default unit is minutes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBu\fR\fR
 .ad
@@ -408,7 +383,6 @@ file system successfully dumped that includes the file system name (or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBv\fR\fR
 .ad
@@ -423,7 +397,6 @@ standard output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBw\fR\fR
 .ad
@@ -437,7 +410,6 @@ ignored. After reporting, \fBufsdump\fR exits immediately.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBW\fR\fR
 .ad
@@ -455,7 +427,6 @@ that have not been backed up within a day are highlighted.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfiles_to_dump\fR\fR
 .ad
@@ -523,7 +494,6 @@ While running, \fBufsdump\fR emits many verbose messages. \fBufsdump\fR returns
 the following exit values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -534,7 +504,6 @@ Normal exit.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
@@ -545,7 +514,6 @@ Startup errors encountered.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
@@ -557,7 +525,6 @@ Abort \(mi no checkpoint attempted.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/rmt/0\fR\fR
 .ad
@@ -568,7 +535,6 @@ default unit to dump to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/dumpdates\fR\fR
 .ad
@@ -579,7 +545,6 @@ dump date record
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/group\fR\fR
 .ad
@@ -590,7 +555,6 @@ to find group \fBsys\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/hosts\fR\fR
 .ad
@@ -601,7 +565,6 @@ to gain access to remote system with drive
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/vfstab\fR\fR
 .ad

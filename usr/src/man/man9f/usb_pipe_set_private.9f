@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH usb_pipe_set_private 9F "5 Jan 2004" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH USB_PIPE_SET_PRIVATE 9F "Jan 5, 2004"
 .SH NAME
 usb_pipe_set_private, usb_pipe_get_private \- USB user-defined pipe data-field
 facility
@@ -30,23 +30,19 @@ Solaris DDI specific (Solaris DDI)
 For \fBusb_pipe_set_private()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpipe_handle\fR\fR
 .ad
 .RS 15n
-.rt  
 Pipe handle into which user-defined data is placed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdata\fR\fR
 .ad
 .RS 15n
-.rt  
 Data to store in the pipe handle.
 .RE
 
@@ -55,12 +51,10 @@ Data to store in the pipe handle.
 For \fBusb_pipe_get_private()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpipe_handle\fR\fR
 .ad
 .RS 15n
-.rt  
 Pipe handle from which user-defined data is retrieved.
 .RE
 
@@ -83,23 +77,19 @@ stored via \fBusb_set_driver_private()\fR, from the pipe referred to by
 For \fBusb_pipe_set_private()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_SUCCESS\fR
 .ad
 .RS 20n
-.rt  
 Private data has been successfully stored in pipe handle.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_PIPE\fR
 .ad
 .RS 20n
-.rt  
 \fIpipe_handle\fR argument is \fBNULL\fR or invalid.
 .sp
 Pipe is closing or closed.
@@ -107,12 +97,10 @@ Pipe is closing or closed.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_PERM\fR
 .ad
 .RS 20n
-.rt  
 The \fIpipe_handle\fR argument refers to the default control pipe.
 .RE
 
@@ -144,7 +132,7 @@ May be called from user, kernel or interrupt context.
     ----
 
     xxx_data_t *xxx_data_ptr = (xxx_data_t *)usb_pipe_get_private(pipe);
-            
+
 .fi
 .in -2
 
@@ -156,15 +144,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitecturePCI-based systems
+Architecture	PCI-based systems
 _
-Interface stabilityCommitted
+Interface stability	Committed
 .TE
 
 .SH SEE ALSO

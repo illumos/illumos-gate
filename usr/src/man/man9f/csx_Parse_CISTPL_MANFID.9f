@@ -3,17 +3,17 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH csx_Parse_CISTPL_MANFID 9F "20 Dec 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH CSX_PARSE_CISTPL_MANFID 9F "Dec 20, 1996"
 .SH NAME
 csx_Parse_CISTPL_MANFID \- parse Manufacturer Identification tuple
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/pccard.h> 
+#include <sys/pccard.h>
 
 
 
-\fBint32_t\fR \fBcsx_Parse_CISTPL_MANFID\fR(\fBclient_handle_t\fR \fIch\fR, \fBtuple_t *\fR\fItu\fR, 
+\fBint32_t\fR \fBcsx_Parse_CISTPL_MANFID\fR(\fBclient_handle_t\fR \fIch\fR, \fBtuple_t *\fR\fItu\fR,
      \fBcistpl_manfid_t *\fR\fIcm\fR);
 .fi
 
@@ -24,35 +24,29 @@ Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIch\fR\fR
 .ad
 .RS 6n
-.rt  
 Client handle returned from \fBcsx_RegisterClient\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItu\fR\fR
 .ad
 .RS 6n
-.rt  
 Pointer to a \fBtuple_t\fR structure (see \fBtuple\fR(9S)) returned by a call
 to \fBcsx_GetFirstTuple\fR(9F) or \fBcsx_GetNextTuple\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcm\fR\fR
 .ad
 .RS 6n
-.rt  
 Pointer to a \fBcistpl_manfid_t\fR structure which contains the parsed
 \fBCISTPL_MANFID\fR tuple information upon return from this function.
 .RE
@@ -75,7 +69,7 @@ The structure members of \fBcistpl_manfid_t\fR are:
 .in +2
 .nf
 uint32_t   manf;   /* PCMCIA assigned manufacturer code */
-uint32_t   card;   /* manufacturer information 
+uint32_t   card;   /* manufacturer information
                     (part number and/or revision) */
 .fi
 .in -2
@@ -83,67 +77,55 @@ uint32_t   card;   /* manufacturer information
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_SUCCESS\fR\fR
 .ad
 .RS 27n
-.rt  
 Successful operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_BAD_HANDLE\fR\fR
 .ad
 .RS 27n
-.rt  
 Client handle is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_UNKNOWN_TUPLE\fR\fR
 .ad
 .RS 27n
-.rt  
 Parser does not know how to parse tuple.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_NO_CARD\fR\fR
 .ad
 .RS 27n
-.rt  
 No \fBPC \fRCard in socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_NO_CIS\fR\fR
 .ad
 .RS 27n
-.rt  
 No Card Information Structure (CIS) on \fBPC \fRcard.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_UNSUPPORTED_FUNCTION\fR\fR
 .ad
 .RS 27n
-.rt  
 No \fBPCMCIA \fRhardware installed.
 .RE
 

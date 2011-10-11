@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH rpc_soc 3NSL "7 Jun 2001" "SunOS 5.11" "Networking Services Library Functions"
+.TH RPC_SOC 3NSL "Jun 7, 2001"
 .SH NAME
 rpc_soc, authdes_create, authunix_create, authunix_create_default, callrpc,
 clnt_broadcast, clntraw_create, clnttcp_create, clntudp_bufcreate,
@@ -219,12 +219,10 @@ The symbol \fBPORTMAP\fR should be defined so that the appropriate function
 declarations for the old interfaces are included through the header files.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauthdes_create()\fR\fR
 .ad
 .RS 30n
-.rt  
 \fBauthdes_create()\fR is the first of two routines which interface to the
 \fBRPC\fR secure authentication system, known as \fBDES\fR authentication. The
 second is \fBauthdes_getucred()\fR, below.  Note: the keyserver daemon
@@ -256,12 +254,10 @@ This routine exists for backward compatibility only, and it is made obsolete by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauthunix_create()\fR\fR
 .ad
 .RS 30n
-.rt  
 Create and return an \fBRPC\fR authentication handle that contains .UX
 authentication information. The parameter \fIhost\fR is the name of the machine
 on which the information was created; \fIuid\fR is the user's user \fBID;\fR
@@ -276,12 +272,10 @@ This routine exists for backward compatibility only, and it is made obsolete by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauthunix_create_default()\fR\fR
 .ad
 .RS 30n
-.rt  
 Call \fBauthunix_create()\fR with the appropriate parameters.
 .sp
 This routine exists for backward compatibility only, and it is made obsolete by
@@ -290,12 +284,10 @@ This routine exists for backward compatibility only, and it is made obsolete by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcallrpc()\fR\fR
 .ad
 .RS 30n
-.rt  
 Call the remote procedure associated with \fIprognum\fR, \fIversnum\fR, and
 \fIprocnum\fR on the machine, \fIhost\fR. The parameter \fIinproc\fR is used to
 encode the procedure's parameters, and \fIoutproc\fR is used to decode the
@@ -312,12 +304,10 @@ routine exists for backward compatibility only, and is made obsolete by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_stat_clnt_broadcast()\fR\fR
 .ad
 .RS 30n
-.rt  
 Like \fBcallrpc()\fR, except the call message is broadcast to all locally
 connected broadcast nets. Each time the caller receives a response, this
 routine calls \fBeachresult()\fR, whose form is:
@@ -346,12 +336,10 @@ backward compatibility only, and is made obsolete by \fBrpc_broadcast()\fR. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclntraw_create()\fR\fR
 .ad
 .RS 30n
-.rt  
 This routine creates an internal, memory-based \fBRPC\fR client for the remote
 program \fIprognum\fR, version \fIversnum\fR. The transport used to pass
 messages to the service is actually a buffer within the process's address
@@ -367,12 +355,10 @@ which obsoletes it.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnttcp_create()\fR\fR
 .ad
 .RS 30n
-.rt  
 This routine creates an \fBRPC\fR client for the remote program \fIprognum\fR,
 version \fIversnum\fR; the client uses \fBTCP/IP\fR as a transport. The remote
 program is located at Internet address \fIaddr\fR. If
@@ -393,12 +379,10 @@ This routine exists for backward compatibility only. \fBclnt_create()\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclntudp_bufcreate()\fR\fR
 .ad
 .RS 30n
-.rt  
 Create a client handle for the remote program \fIprognum\fR, on \fIversnum\fR;
 the client uses  \fBUDP/IP\fR as the transport. The remote program is located
 at the Internet address \fIaddr\fR. If \fIaddr\fR->\fIsin_port\fR is  \fB0\fR,
@@ -429,12 +413,10 @@ This routine exists for backward compatibility only. \fBclnt_tli_create()\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclntudp_create()\fR\fR
 .ad
 .RS 30n
-.rt  
 This routine creates an \fBRPC\fR client handle for the remote program
 \fIprognum\fR, version \fIversnum\fR; the client uses \fBUDP/IP\fR as a
 transport. The remote program is located at Internet address \fIaddr\fR. If
@@ -461,12 +443,10 @@ This routine exists for backward compatibility only. \fBclnt_create()\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBget_myaddress()\fR\fR
 .ad
 .RS 30n
-.rt  
 Places the local system's \fBIP\fR address into \fI*addr\fR, without consulting
 the library routines that deal with \fB/etc/hosts\fR. The port number is always
 set to \fBhtons(PMAPPORT)\fR.
@@ -486,12 +466,10 @@ retrieve the local system's network address as a \fInetbuf\fR structure. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgetrpcport()\fR\fR
 .ad
 .RS 30n
-.rt  
 \fBgetrpcport()\fR returns the port number for the version \fIversnum\fR of the
 \fBRPC\fR program \fIprognum\fR running on \fIhost\fR and using protocol
 \fIproto\fR. \fBgetrpcport()\fR returns  \fB0\fR if the  \fBRPC\fR system
@@ -505,12 +483,10 @@ provided by \fBrpcb_getaddr()\fR. See  \fBrpcbind\fR(3NSL).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpmaplist()\fR\fR
 .ad
 .RS 30n
-.rt  
 A user interface to the \fBportmap\fR service,  which returns a list of the
 current \fBRPC\fR program-to-port mappings on the host located at \fBIP\fR
 address \fIaddr\fR. This routine can return \fBNULL .\fR The command
@@ -522,12 +498,10 @@ provided by \fBrpcb_getmaps()\fR. See \fBrpcbind\fR(3NSL).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpmap_getport()\fR\fR
 .ad
 .RS 30n
-.rt  
 A user interface to the \fBportmap\fR service,  which returns the port number
 on which waits a service that supports program  \fIprognum\fR, version
 \fIversnum\fR, and speaks the transport protocol associated with
@@ -543,12 +517,10 @@ provided by \fBrpcb_getaddr()\fR. See \fBrpcbind\fR(3NSL).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpmap_rmtcall()\fR\fR
 .ad
 .RS 30n
-.rt  
 Request that the \fBportmap\fR on the host at \fBIP\fR address \fI*addr\fR make
 an \fBRPC\fR on the behalf of the caller to a procedure on that host.
 \fI*portp\fR is modified to the program's port number if the procedure
@@ -567,12 +539,10 @@ provided by \fBrpcb_rmtcall()\fR. See \fBrpcbind\fR(3NSL).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpmap_set()\fR\fR
 .ad
 .RS 30n
-.rt  
 A user interface to the \fBportmap\fR service,  that establishes a mapping
 between the triple [\fIprognum\fR, \fIversnum\fR, \fIprotocol\fR] and
 \fIport\fR on the machine's \fBportmap\fR service.  The value of \fIprotocol\fR
@@ -588,12 +558,10 @@ provided by \fBrpcb_set()\fR. See \fBrpcbind\fR(3NSL).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpmap_unset()\fR\fR
 .ad
 .RS 30n
-.rt  
 A user interface to the \fBportmap\fR service,  which destroys all mapping
 between the triple [\fIprognum\fR, \fIversnum\fR, \fIall-protocols\fR] and
 \fIport\fR on the machine's \fBportmap\fR service.  This routine returns one if
@@ -605,12 +573,10 @@ provided by \fBrpcb_unset()\fR. See \fBrpcbind\fR(3NSL).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_fds()\fR\fR
 .ad
 .RS 30n
-.rt  
 A global variable reflecting the \fBRPC\fR service side's read file descriptor
 bit mask; it is suitable as a parameter to the \fBselect()\fR call. This is
 only of interest if a service implementor does not call \fBsvc_run()\fR, but
@@ -625,12 +591,10 @@ This interface is made obsolete by \fBsvc_fdset\fR. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_getcaller()\fR\fR
 .ad
 .RS 30n
-.rt  
 This routine returns the network address, represented as a \fBstruct
 sockaddr_in\fR, of the caller of a procedure associated with the \fBRPC\fR
 service transport handle, \fIxprt\fR.
@@ -642,12 +606,10 @@ which returns the address as a \fBstruct netbuf\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_getreq()\fR\fR
 .ad
 .RS 30n
-.rt  
 This routine is only of interest if a service implementor does not call
 \fBsvc_run()\fR, but instead implements custom asynchronous event processing.
 It is called when the \fBselect()\fR call has determined that an \fBRPC\fR
@@ -661,12 +623,10 @@ This interface is made obsolete by \fBsvc_getreqset()\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fBsvcfd_create\fB()\fR\fR
 .ad
 .RS 30n
-.rt  
 Create a service on top of any open and bound descriptor. Typically, this
 descriptor is a connected file descriptor for a stream protocol. Refer to the
 \fBFile Descriptor\fR section for more information. \fIsendsz\fR and
@@ -679,12 +639,10 @@ This interface is made obsolete by \fBsvc_fd_create()\fR (see
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvcraw_create()\fR\fR
 .ad
 .RS 30n
-.rt  
 This routine creates an internal, memory-based \fBRPC\fR service transport, to
 which it returns a pointer. The transport is really a buffer within the
 process's address space, so the corresponding \fBRPC\fR client should live in
@@ -700,12 +658,10 @@ obsoletes it.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvctcp_create()\fR\fR
 .ad
 .RS 30n
-.rt  
 This routine creates a \fBTCP/IP-based\fR \fBRPC\fR service transport, to which
 it returns a pointer. The transport is associated with the file descriptor
 \fIfd\fR, which may be \fBRPC_ANYSOCK\fR, in which case a new file descriptor
@@ -724,12 +680,10 @@ This routine exists for backward compatibility only. \fBsvc_create()\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvcudp_bufcreate()\fR\fR
 .ad
 .RS 30n
-.rt  
 This routine creates a \fBUDP/IP-based\fR \fBRPC\fR service transport, to which
 it returns a pointer. The transport is associated with the file descriptor
 \fIfd\fR. If \fIfd\fR is \fBRPC_ANYSOCK\fR then a new file descriptor is
@@ -749,12 +703,10 @@ This routine exists for backward compatibility only. \fBsvc_tli_create()\fR, or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvcudp_create()\fR\fR
 .ad
 .RS 30n
-.rt  
 This routine creates a \fBUDP/IP-based\fR \fBRPC\fR service transport, to which
 it returns a pointer. The transport is associated with the file descriptor
 \fIfd\fR, which may be \fBRPC_ANYSOCK\fR, in which case a new file descriptor
@@ -775,12 +727,10 @@ This routine exists for backward compatibility only. \fBsvc_create()\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBregisterrpc()\fR\fR
 .ad
 .RS 30n
-.rt  
 Register program \fIprognum\fR, procedure \fIprocname\fR, and version
 \fIversnum\fR with the \fBRPC\fR service package. If a request arrives for
 program \fIprognum\fR, version \fIversnum\fR, and procedure \fIprocnum\fR,
@@ -797,12 +747,10 @@ This routine exists for backward compatibility only, and it is made obsolete by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_register()\fR\fR
 .ad
 .RS 30n
-.rt  
 Associates \fIprognum\fR and \fIversnum\fR with the service dispatch procedure,
 \fIdispatch\fR. If \fIprotocol\fR is  \fB0\fR, the service is not registered
 with the \fBportmap\fR service. If \fIprotocol\fR is non-zero,  then a mapping
@@ -826,12 +774,10 @@ provided by \fBsvc_reg()\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_unregister()\fR\fR
 .ad
 .RS 30n
-.rt  
 Remove all mapping of the double [\fIprognum\fR, \fIversnum\fR] to dispatch
 routines, and of the triple [\fIprognum\fR, \fIversnum\fR, \fIall-protocols\fR]
 to port number from \fBportmap\fR.
@@ -842,12 +788,10 @@ provided by \fBsvc_unreg()\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_authunix_parms()\fR\fR
 .ad
 .RS 30n
-.rt  
 Used for describing \fBUNIX\fR credentials. This routine is useful for users
 who wish to generate these credentials without using the \fBRPC\fR
 authentication package.
@@ -864,13 +808,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelUnsafe
+MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO

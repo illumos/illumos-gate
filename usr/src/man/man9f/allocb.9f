@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH allocb 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH ALLOCB 9F "Jan 16, 2006"
 .SH NAME
 allocb \- allocate a message block
 .SH SYNOPSIS
@@ -43,45 +43,37 @@ buffer is at least double-word aligned, so it can hold any C data structure.
 The fields in the \fBmblk_t\fR structure are initialized as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBb_cont\fR\fR
 .ad
 .RS 11n
-.rt  
 set to  \fINULL\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBb_rptr\fR\fR
 .ad
 .RS 11n
-.rt  
 points to the beginning of the data buffer
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBb_wptr\fR\fR
 .ad
 .RS 11n
-.rt  
 points to the beginning of the data buffer
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBb_datap\fR\fR
 .ad
 .RS 11n
-.rt  
 points to the \fBdblk_t\fR structure
 .RE
 
@@ -90,34 +82,28 @@ points to the \fBdblk_t\fR structure
 The fields in the \fBdblk_t\fR structure are initialized as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdb_base\fR\fR
 .ad
 .RS 11n
-.rt  
 points to the first byte of the data buffer
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdb_lim\fR\fR
 .ad
 .RS 11n
-.rt  
 points to the last byte + 1 of the buffer
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdb_type\fR\fR
 .ad
 .RS 11n
-.rt  
 set to \fBM_DATA\fR
 .RE
 
@@ -131,23 +117,19 @@ members that are affected when a message block is allocated
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsize\fR\fR
 .ad
 .RS 8n
-.rt  
 The number of bytes in the message block.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpri\fR\fR
 .ad
 .RS 8n
-.rt  
 Priority of the request (no longer used).
 .RE
 
@@ -195,13 +177,13 @@ the \fBputnext\fR(9F) function is used to send the message upstream, returning
 3    unsigned char err;
 4  {
 5    mblk_t *bp;
-6  
+6
 7    if ((bp = allocb(1, BPRI_HI)) == NULL) /* allocate msg. block */
 8         return(0);
 9
 10    bp->b_datap->db_type = M_ERROR;    /* set msg type to M_ERROR */
 11    *bp->b_wptr++ = err;               /* increment write pointer */
-12  
+12
 13    if (!(q->q_flag & QREADR))         /* if not read queue     */
 14         q = RD(q);                    /*    get read queue     */
 15    putnext(q,bp);                     /* send message upstream */

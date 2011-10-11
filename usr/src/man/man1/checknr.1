@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH checknr 1 "14 Sep 1992" "SunOS 5.11" "User Commands"
+.TH CHECKNR 1 "Sep 14, 1992"
 .SH NAME
 checknr \- check nroff and troff input files; report possible errors
 .SH SYNOPSIS
 .LP
 .nf
-\fBchecknr\fR [\fB-fs\fR] [\fB-a\fR . \fIx1\fR . \fIy1\fR . \fIx2\fR . \fIy2\fR ... .\fIxn\fR .\fIyn\fR] 
+\fBchecknr\fR [\fB-fs\fR] [\fB-a\fR . \fIx1\fR . \fIy1\fR . \fIx2\fR . \fIy2\fR ... .\fIxn\fR .\fIyn\fR]
      [\fB-c\fR . \fIx1\fR . \fIx2\fR . \fIx3\fR ... .\fIxn\fR] [\fIfilename\fR]...
 .fi
 
@@ -37,7 +37,6 @@ Size changes using \fB\es\fR\fIx \fR.\|.\|. \fB\es0\fR\&.
 .ie t \(bu
 .el o
 Macros that come in open .\|.\|. close forms, for example, the \fB\&.TS\fR and
-\fB\&.TE\fR macros which must always come in pairs.
 .RE
 .sp
 .LP
@@ -56,34 +55,28 @@ you should think of this as a contribution to your document preparation style.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fR
 .ad
 .RS 24n
-.rt  
 Ignore \fB\ef\fR font changes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fR
 .ad
 .RS 24n
-.rt  
 Ignore \fB\es\fR size changes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-a\fR\fB .\fR\fIx1 \fR\fB\&.\fR\fIy1.\|.\|.\fR \fR
 .ad
 .RS 24n
-.rt  
 Add pairs of macros to the list. The pairs of macros are assumed to be those
 (such as \fB\&.DS\fR and \fB\&.DE\fR) that should be checked for balance.  The
 \fB-a\fR option must be followed by groups of six characters, each group
@@ -94,12 +87,10 @@ name, another period, and the second macro name. For example, to define a pair
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-c\fR\fB .\fR\fIx1\|.\|.\|.\fR \fR
 .ad
 .RS 24n
-.rt  
 Define commands which \fBchecknr\fR would otherwise complain about as
 undefined.
 .RE

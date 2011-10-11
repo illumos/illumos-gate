@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cmdk 7D "4 Nov 2008" "SunOS 5.11" "Devices"
+.TH CMDK 7D "Nov 4, 2008"
 .SH NAME
 cmdk \- common disk driver
 .SH SYNOPSIS
@@ -47,67 +47,55 @@ The fdisk partition 0 is to access the entire disk and is generally used by the
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/dsk/c\fR\fIn\fR\fBd\fR\fIn\fR[\fBs\fR|\fBp\fR]\fIn\fR\fR
 .ad
 .RS 26n
-.rt  
 block device (IDE)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/rdsk/c\fR\fIn\fR\fBd\fR\fIn\fR[\fBs\fR|\fBp\fR]\fIn\fR\fR
 .ad
 .RS 26n
-.rt  
 raw device (IDE)
 .sp
 where:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBc\fR\fIn\fR\fR
 .ad
 .RS 6n
-.rt  
 controller \fIn\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd\fR\fIn\fR\fR
 .ad
 .RS 6n
-.rt  
 lun \fIn (0-1)\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fIn\fR\fR
 .ad
 .RS 6n
-.rt  
 UNIX system slice \fIn (0-15).\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBp\fR\fIn\fR\fR
 .ad
 .RS 6n
-.rt  
 fdisk partition (0-36).
 .RE
 
@@ -115,23 +103,19 @@ fdisk partition (0-36).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/cmdk\fR\fR
 .ad
 .RS 26n
-.rt  
 32-bit kernel module.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/amd64/cmdk\fR\fR
 .ad
 .RS 26n
-.rt  
 64-bit kernel module.
 .RE
 
@@ -143,13 +127,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Architecturex86
+Architecture	x86
 .TE
 
 .SH SEE ALSO

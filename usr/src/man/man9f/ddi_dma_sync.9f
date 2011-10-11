@@ -3,16 +3,16 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_dma_sync 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_DMA_SYNC 9F "Jan 16, 2006"
 .SH NAME
 ddi_dma_sync \- synchronize CPU and I/O views of memory
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/ddi.h> 
+#include <sys/ddi.h>
 #include <sys/sunddi.h>
 
-\fBint\fR \fBddi_dma_sync\fR(\fBddi_dma_handle_t\fR \fIhandle\fR, \fBoff_t\fR \fIoffset\fR, 
+\fBint\fR \fBddi_dma_sync\fR(\fBddi_dma_handle_t\fR \fIhandle\fR, \fBoff_t\fR \fIoffset\fR,
      \fBsize_t\fR \fIlength\fR, \fBuint_t\fR \fItype\fR);
 .fi
 
@@ -23,34 +23,28 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhandle\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIhandle\fR filled in by a call to \fBddi_dma_alloc_handle\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoffset\fR\fR
 .ad
 .RS 10n
-.rt  
 The offset into the object described by the \fIhandle\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlength\fR\fR
 .ad
 .RS 10n
-.rt  
 The length, in bytes, of the area to synchronize. When \fIlength\fR is zero,
 the entire range starting from \fIoffset\fR to the end of the object has the
 requested operation applied to it.
@@ -58,12 +52,10 @@ requested operation applied to it.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItype\fR\fR
 .ad
 .RS 10n
-.rt  
 Indicates the caller's desire about what view of the memory object to
 synchronize. The possible values are \fBDDI_DMA_SYNC_FORDEV\fR,
 \fBDDI_DMA_SYNC_FORCPU\fR and \fBDDI_DMA_SYNC_FORKERNEL\fR.
@@ -120,23 +112,19 @@ otherwise, synchronize for \fBCPU\fR.
 The \fBddi_dma_sync()\fR function returns:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 15n
-.rt  
 Caches are successfully flushed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 15n
-.rt  
 The address range to be flushed is out of the address range established by
 \fBddi_dma_addr_bind_handle\fR(9F) or \fBddi_dma_buf_bind_handle\fR(9F).
 .RE

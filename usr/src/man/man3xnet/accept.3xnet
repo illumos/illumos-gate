@@ -1,13 +1,13 @@
 '\" te
 .\" Copyright (c) 1992, X/Open Company Limited  All Rights Reserved  Portions Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH accept 3XNET "1 Nov 2003" "SunOS 5.11" "X/Open Networking Services Library Functions"
+.TH ACCEPT 3XNET "Nov 1, 2003"
 .SH NAME
 accept \- accept a new connection on a socket
 .SH SYNOPSIS
@@ -15,7 +15,7 @@ accept \- accept a new connection on a socket
 .nf
 \fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lxnet\fR [ \fIlibrary\fR ... ]
 #include <sys/socket.h>
- 
+
 
 \fBint\fR \fBaccept\fR(\fBint\fR \fIsocket\fR, \fBstruct sockaddr *restrict\fR \fIaddress\fR,
      \fBsocklen_t *restrict\fR \fIaddress_len\fR);
@@ -33,12 +33,10 @@ for that socket.
 The function takes the following arguments:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsocket\fR\fR
 .ad
 .RS 15n
-.rt  
 Specifies a socket that was created with \fBsocket\fR(3XNET), has been bound to
 an address with \fBbind\fR(3XNET), and has issued a successful call to
 \fBlisten\fR(3XNET).
@@ -46,24 +44,20 @@ an address with \fBbind\fR(3XNET), and has issued a successful call to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaddress\fR\fR
 .ad
 .RS 15n
-.rt  
 Either a null pointer, or a pointer to a \fBsockaddr\fR structure where the
 address of the connecting socket will be returned.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaddress_len\fR\fR
 .ad
 .RS 15n
-.rt  
 Points to a \fBsocklen_t\fR which on input specifies the length of the supplied
 \fBsockaddr\fR structure, and on output specifies the length of the stored
 address.
@@ -113,7 +107,6 @@ descriptor of the accepted socket.  Otherwise, \(mi1 is returned and
 The \fBaccept()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
@@ -122,109 +115,90 @@ The \fBaccept()\fR function will fail if:
 \fB\fBEWOULDBLOCK\fR\fR
 .ad
 .RS 16n
-.rt  
 O_NONBLOCK is set for the socket file descriptor and no connections are present
 to be accepted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIsocket\fR argument is not a valid file descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBECONNABORTED\fR\fR
 .ad
 .RS 16n
-.rt  
 A connection has been aborted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 16n
-.rt  
 The  \fIaddress\fR or  \fIaddress_len\fR parameter can not be accessed or
 written.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fBaccept()\fR function was interrupted by a signal that was caught before
 a valid connection arrived.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIsocket\fR is not accepting connections.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEMFILE\fR\fR
 .ad
 .RS 16n
-.rt  
 \fBOPEN_MAX\fR file descriptors are currently open in the calling process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENFILE\fR\fR
 .ad
 .RS 16n
-.rt  
 The maximum number of file descriptors in the system are already open.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSOCK\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIsocket\fR argument does not refer to a socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOPNOTSUPP\fR\fR
 .ad
 .RS 16n
-.rt  
 The socket type of the specified socket does not support accepting connections.
 .RE
 
@@ -233,45 +207,37 @@ The socket type of the specified socket does not support accepting connections.
 The \fBaccept()\fR function may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOBUFS\fR\fR
 .ad
 .RS 11n
-.rt  
 No buffer space is available.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 11n
-.rt  
 There was insufficient memory available to complete the operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSR\fR\fR
 .ad
 .RS 11n
-.rt  
 There was insufficient STREAMS resources available to complete the operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPROTO\fR\fR
 .ad
 .RS 11n
-.rt  
 A protocol error has occurred; for example, the STREAMS protocol stack has not
 been initialized.
 .RE
@@ -284,15 +250,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

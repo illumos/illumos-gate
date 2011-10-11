@@ -4,14 +4,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pkgmk 1 "30 Oct 2007" "SunOS 5.11" "User Commands"
+.TH PKGMK 1 "Oct 30, 2007"
 .SH NAME
 pkgmk \- produce an installable package
 .SH SYNOPSIS
 .LP
 .nf
-\fBpkgmk\fR [\fB-o\fR] [\fB-a\fR \fIarch\fR] [\fB-b\fR \fIbase_src_dir\fR] [\fB-d\fR \fIdevice\fR] 
-     [\fB-f\fR \fIprototype\fR] [\fB-l\fR \fIlimit\fR] [\fB-p\fR \fIpstamp\fR] [\fB-r\fR \fIroot_path\fR] 
+\fBpkgmk\fR [\fB-o\fR] [\fB-a\fR \fIarch\fR] [\fB-b\fR \fIbase_src_dir\fR] [\fB-d\fR \fIdevice\fR]
+     [\fB-f\fR \fIprototype\fR] [\fB-l\fR \fIlimit\fR] [\fB-p\fR \fIpstamp\fR] [\fB-r\fR \fIroot_path\fR]
      [\fB-v\fR \fIversion\fR] [\fIvariable=value\fR]... [\fIpkginst\fR]
 .fi
 
@@ -85,24 +85,20 @@ package commands can process a datastream of  up to 4 GB.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIarch\fR\fR
 .ad
 .RS 19n
-.rt  
 Overrides the architecture information provided in the \fBpkginfo\fR(4) file
 with \fIarch\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR \fIbase_src_dir\fR\fR
 .ad
 .RS 19n
-.rt  
 Prepends the indicated \fIbase_src_dir\fR to locate relocatable objects on the
 source machine. Use this option to search for all objects in the prototype
 file. \fBpkgmk\fR expects to find the objects in /\fIbase_src_dir\fR or to
@@ -111,12 +107,10 @@ locate the objects by use of the \fB-b\fR and \fB-r\fR options, respectively.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdevice\fR\fR
 .ad
 .RS 19n
-.rt  
 Creates the package on \fIdevice\fR. \fIdevice\fR can be an absolute directory
 pathname or the identifiers for a floppy disk or removable disk (for example,
 \fB/dev/diskette\fR). The default device is the installation spool directory
@@ -125,24 +119,20 @@ pathname or the identifiers for a floppy disk or removable disk (for example,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIprototype\fR\fR
 .ad
 .RS 19n
-.rt  
 Uses the file \fIprototype\fR as input to the command. The default
 \fIprototype\fR filename is [\fBPp\fR]\fBrototype\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIlimit\fR\fR
 .ad
 .RS 19n
-.rt  
 Specifies the maximum size in 512 byte blocks of the output device as
 \fBlimit\fR. By default, if the output file is a directory or a mountable
 device, \fBpkgmk\fR employs the \fBdf\fR(1M) command to dynamically calculate
@@ -153,36 +143,30 @@ format.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 19n
-.rt  
 Overwrites the same instance; package instance is overwritten if it already
 exists.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIpstamp\fR\fR
 .ad
 .RS 19n
-.rt  
 Overrides the production stamp definition in the \fBpkginfo\fR(4) file with
 \fIpstamp\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIroot_path\fR\fR
 .ad
 .RS 19n
-.rt  
 Uses the indicated \fIroot_path\fR with the source pathname appended to locate
 objects on the source machine, using a comma (\fB,\fR) as the separator for the
 path elements. If this option is specified, look for the full destination path
@@ -192,24 +176,20 @@ specified, look for the leaf filename in the current directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR \fIversion\fR\fR
 .ad
 .RS 19n
-.rt  
 Overrides the version information provided in the \fBpkginfo\fR(4) file with
 \fIversion\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvariable=value\fR\fR
 .ad
 .RS 19n
-.rt  
 Places the indicated variable in the packaging environment. (See
 \fBprototype\fR(4) for definitions of variable specifications.)
 .RE
@@ -220,12 +200,10 @@ Places the indicated variable in the packaging environment. (See
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpkginst\fR\fR
 .ad
 .RS 11n
-.rt  
 A package designation by its instance. An instance can be the package
 abbreviation or a specific instance (for example, \fBinst.1\fR or
 \fBinst.2\fR). All instances of a package can be requested by \fBinst.*\fR. The
@@ -240,23 +218,19 @@ need to be escaped. In the C-Shell, \fB*\fR must be surrounded by single quotes
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 

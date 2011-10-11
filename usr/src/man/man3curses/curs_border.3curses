@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH curs_border 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.TH CURS_BORDER 3CURSES "Dec 31, 1996"
 .SH NAME
 curs_border, border, wborder, box, whline, wvline \- create curses borders,
 horizontal and vertical lines
@@ -58,18 +58,16 @@ is drawn around the edges of the window. The arguments and attributes are:
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBls\fRleft side of the border
-\fBrs\fRright side of the border
-\fBts\fRtop side of the border
-\fBbs\fRbottom side of the border
-\fBtl\fRtop left-hand corner
-\fBtr\fRtop right-hand corner
-\fBbl\fRbottom left-hand corner 
-\fBbr\fRbottom right-hand corner
+l l
+l l .
+\fBls\fR	left side of the border
+\fBrs\fR	right side of the border
+\fBts\fR	top side of the border
+\fBbs\fR	bottom side of the border
+\fBtl\fR	top left-hand corner
+\fBtr\fR	top right-hand corner
+\fBbl\fR	bottom left-hand corner
+\fBbr\fR	bottom right-hand corner
 .TE
 
 .sp
@@ -111,13 +109,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelUnsafe
+MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO

@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH fdformat 1 "28 Feb 2007" "SunOS 5.11" "User Commands"
+.TH FDFORMAT 1 "Feb 28, 2007"
 .SH NAME
 fdformat \- format floppy diskette or PCMCIA memory card
 .SH SYNOPSIS
 .LP
 .nf
-\fBfdformat\fR [\fB-dDeEfHlLmMUqvx\fR] [\fB-b\fR \fIlabel\fR] [\fB-B\fR \fIfilename\fR] 
+\fBfdformat\fR [\fB-dDeEfHlLmMUqvx\fR] [\fB-b\fR \fIlabel\fR] [\fB-B\fR \fIfilename\fR]
      [\fB-t\fR \fIdostype\fR] [\fIdevname\fR]
 .fi
 
@@ -80,24 +80,20 @@ block \fB0\fR.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR \fIlabel\fR\fR
 .ad
 .RS 15n
-.rt  
 Labels the media with volume label. A SunOS volume label is restricted to 8
 characters. A \fBDOS\fR volume label is restricted to 11 upper-case characters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-B\fR \fIfilename\fR\fR
 .ad
 .RS 15n
-.rt  
 Installs special boot loader in filename on an \fBMS-DOS\fR diskette. This
 option is only meaningful when the \fB-d\fR option (or \fB-t\fR \fBdos\fR) is
 also specified.
@@ -105,12 +101,10 @@ also specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR\fR
 .ad
 .RS 15n
-.rt  
 Formats a \fB720KB\fR (3.5 inch) or \fB360KB\fR (5.25 inch) double-density
 diskette (same as the \fB-l\fR or \fB-L\fR options). This is the default for
 double-density type drives. It is needed if the drive is a high- or
@@ -119,47 +113,39 @@ extended-density type.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 15n
-.rt  
 Ejects the diskette when done. This feature is not available on all systems.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-E\fR\fR
 .ad
 .RS 15n
-.rt  
 Formats a \fB2.88MB\fR (3.5 inch) extended-density diskette. This is the
 default for extended-density type drives.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 15n
-.rt  
 Forces formatting, that is, this option does not ask for confirmation before
 starting format.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-H\fR\fR
 .ad
 .RS 15n
-.rt  
 Formats a \fB1.44MB\fR (3.5 inch) or \fB1.2MB\fR (5.25 inch) high-density
 diskette. This is the default for high-density type drives; it is needed if the
 drive is the extended-density type.
@@ -167,12 +153,10 @@ drive is the extended-density type.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR\fR
 .ad
 .RS 15n
-.rt  
 Writes a \fB1.2MB\fR (3.5 inch) medium-density format on a high-density
 diskette (use only with the -t nec option). This is the same as using \fB-m\fR.
 .sp
@@ -181,35 +165,29 @@ This feature is not available on all systems.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
 .RS 15n
-.rt  
 Quiet; does not print status messages.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fBdos\fR\fR
 .ad
 .RS 15n
-.rt  
 Installs an \fBMS-DOS\fR file system and boot sector formatting. This is
 equivalent to the \fBDOS\fR format command or the \fB-d\fR option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fBnec\fR\fR
 .ad
 .RS 15n
-.rt  
 Installs an \fBNEC-DOS\fR file system and boot sector on the disk after
 formatting. This should be used only with the \fB-M\fR option. This feature is
 not available on all systems.
@@ -217,35 +195,29 @@ not available on all systems.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-U\fR\fR
 .ad
 .RS 15n
-.rt  
 Performs \fBumount\fR on any file systems and then formats. See
 \fBmount\fR(1M).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 15n
-.rt  
 Verifies each block of the diskette after the format.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 15n
-.rt  
 Skips the format and only writes a SunOS label or an \fBMS-DOS\fR file system.
 .RE
 
@@ -255,12 +227,10 @@ Skips the format and only writes a SunOS label or an \fBMS-DOS\fR file system.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevname\fR\fR
 .ad
 .RS 11n
-.rt  
 Replaces \fIdevname\fR with \fBrdiskette0\fR (systems without volume
 management) or \fBfloppy0\fR (systems with volume management) to use the first
 drive or rdiskette1 (systems without volume management) or \fBfloppy1\fR
@@ -275,28 +245,24 @@ If devname is omitted, the default diskette drive, if one exists, will be used.
 \fIN\fR represents a decimal number and can be specified as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBc\fIN\fR\fR
 .ad
 .RS 6n
-.rt  
 Controller \fIN\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBt\fIN\fR\fR
 .ad
 .RS 6n
-.rt  
 Technology type \fIN\fR:
 .sp
 .in +2
 .nf
- 
+
 0x1       ROM
 0x2       OTPROM
 0x3       EPROM
@@ -312,23 +278,19 @@ Technology type \fIN\fR:
 
 .sp
 .ne 2
-.mk
 .na
 \fBd\fIN\fR\fR
 .ad
 .RS 6n
-.rt  
 Technology region in type \fIN\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBs\fIN\fR\fR
 .ad
 .RS 6n
-.rt  
 Slice \fIN\fR.
 .RE
 
@@ -336,24 +298,20 @@ The following options are provided for compatibility with previous versions of
 \fBfdformat\fR. Their use is discouraged.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 6n
-.rt  
 Formats an \fBMS-DOS\fR floppy diskette or \fBPCMCIA\fR memory card (same as
 \fB-t\fR \fBdos\fR). This is equivalent to the \fBMS-DOS FORMAT\fR command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 6n
-.rt  
 Formats a \fB720KB\fR (3.5 inch) or \fB360KB\fR (5.25 inch) double-density
 diskette (same as \fB-D\fR or \fB-L\fR). This is the default for double-density
 type drives; it is needed if the drive is the high- or extended-density type.
@@ -361,12 +319,10 @@ type drives; it is needed if the drive is the high- or extended-density type.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
 .RS 6n
-.rt  
 Formats a \fB720KB\fR (3.5 inch) or \fB360KB\fR (5.25 inch) double-density
 diskette (same as \fB-l\fR or \fB-D\fR). This is the default for double-density
 type drives.
@@ -374,12 +330,10 @@ type drives.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
 .RS 6n
-.rt  
 Writes a \fB1.2 MB\fR (3.5 inch) medium- density format on a high-density
 diskette (use only with the \fB-t\fR \fBnec\fR option). This is the same as
 using \fB-M\fR. This feature is not available on all systems.
@@ -390,106 +344,88 @@ using \fB-M\fR. This feature is not available on all systems.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB/dev/diskette0\fR
 .ad
 .RS 24n
-.rt  
 Directory providing block device access for the media in floppy drive \fB0\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB/dev/diskette0\fR
 .ad
 .RS 24n
-.rt  
 Directory providing character device access for the media in floppy drive
 \fB0\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB/dev/aliases/floppy0\fR
 .ad
 .RS 24n
-.rt  
 Symbolic link to the character device for the media in floppy drive \fB0\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB/dev/rdiskette\fR
 .ad
 .RS 24n
-.rt  
 Directory providing character device access for the media in the primary floppy
 drive, usually drive \fB0\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB/dev/dsk/c\fIN\fRt\fIN\fRd\fIN\fRs\fIN\fR\fR
 .ad
 .RS 24n
-.rt  
 Directory providing block device access for the \fBPCMCIA\fR memory card. See
 OPERANDS for a description of \fIN\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB/dev/rdsk/c\fIN\fRt\fIN\fRd\fIN\fRs\fIN\fR\fR
 .ad
 .RS 24n
-.rt  
 Directory providing character device access for the \fBPCMCIA\fR memory card.
 See OPERANDS for a description of \fIN\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB/dev/aliases/pcmem\fIS\fR\fR
 .ad
 .RS 24n
-.rt  
 Symbolic link to the character device for the \fBPCMCIA\fR memory card in
 socket \fIS\fR where \fIS\fR represents a \fBPCMCIA\fR socket number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB/dev/rdsk/c\fIN\fRt\fIN\fRd\fIN\fRs\fIN\fR\fR
 .ad
 .RS 24n
-.rt  
 Directory providing character device access for the \fBPCMCIA\fR memory card.
 See OPERANDS for a description of \fIN\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB/dev/dsk/c\fIN\fRt\fIN\fRd\fIN\fRs\fIN\fR\fR
 .ad
 .RS 24n
-.rt  
 Directory providing block device access for the \fBPCMCIA\fR memory card. See
 OPERANDS for a description of \fIN\fR.
 .RE
@@ -520,8 +456,8 @@ following message:
 .sp
 .in +2
 .nf
-Non-System disk or disk error. 
-Replace and strike any key when ready 
+Non-System disk or disk error.
+Replace and strike any key when ready
 .fi
 .in -2
 .sp

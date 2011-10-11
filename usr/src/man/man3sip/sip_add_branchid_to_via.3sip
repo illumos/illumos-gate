@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sip_add_branchid_to_via 3SIP "25 Jan 2007" "SunOS 5.11" "Session Initiation Protocol Library Functions"
+.TH SIP_ADD_BRANCHID_TO_VIA 3SIP "Jan 25, 2007"
 .SH NAME
 sip_add_branchid_to_via \- add a branch parameter to the topmost VIA header in
 the SIP message
@@ -36,12 +36,10 @@ On failure, functions that return an error value may return one of the
 following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 Mandatory parameters are not provided or are NULL.
 .sp
 For \fBsip_add_branchid_to_via()\fR, the topmost \fBVIA\fR header already has a
@@ -50,23 +48,19 @@ branch \fIparam\fR or the \fBSIP\fR message does not have a \fBVIA\fR header.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 10n
-.rt  
 The message cannot be modified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 There is an error allocating memory for creating headers/parameters.
 .RE
 
@@ -78,15 +72,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

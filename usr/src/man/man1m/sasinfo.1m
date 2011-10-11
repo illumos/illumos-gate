@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sasinfo 1M "10 Jul 2009" "SunOS 5.11" "System Administration Commands"
+.TH SASINFO 1M "Jul 10, 2009"
 .SH NAME
 sasinfo \- Serial Attached SCSI HBA port command line interface
 .SH SYNOPSIS
@@ -59,7 +59,6 @@ that might be connected to those HBA ports.
 The following subcommands are supported by \fBsasinfo\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhba\fR\fR
 .ad
@@ -71,7 +70,6 @@ Lists information for the HBA referenced by the specified \fIHBA_name\fR.  If
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhba-port\fR\fR
 .ad
@@ -87,7 +85,6 @@ device, no HBA port is configured.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBexpander\fR\fR
 .ad
@@ -100,7 +97,6 @@ visible across all HBA ports on the host will be listed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtarget-port\fR\fR
 .ad
@@ -113,7 +109,6 @@ ports that are visible on the host will be listed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlogical-unit\fR | \fBlu\fR\fR
 .ad
@@ -130,7 +125,6 @@ including the SAS Management Protocol (SMP) target port.
 The following options are supported.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-?\fR, \fB--help\fR\fR
 .ad
@@ -141,7 +135,6 @@ Displays usage information
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR, \fB--hba\fR \fIHBA_Name\fR\fR
 .ad
@@ -153,7 +146,6 @@ The \fB-a\fR option can only be used with the \fBhba-port\fR subcommand.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR, \fB--phy-linkstat\fR\fR
 .ad
@@ -166,7 +158,6 @@ is specified. This option is used only with the \fBhba-port\fR subcommand.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIHBA_port_SAS_Addr\fR, \fB--port\fR \fIHBA_port_SAS_Addr\fR\fR
 .ad
@@ -179,7 +170,6 @@ HBA port on the host. The \fB-p\fR option can be used only with the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR, \fB--scsi\fR\fR
 .ad
@@ -191,7 +181,6 @@ option is only used for the \fBtarget-port\fR subcommand.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR, \fB--verbose\fR\fR
 .ad
@@ -203,7 +192,6 @@ and so forth, based on which subcommand is invoked.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR, \fB--version\fR\fR
 .ad
@@ -214,7 +202,6 @@ Displays the version information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-y\fR, \fB--phy\fR\fR
 .ad
@@ -737,13 +724,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

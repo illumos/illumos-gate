@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH proc 1 "10 Dec 2008" "SunOS 5.11" "User Commands"
+.TH PROC 1 "Dec 10, 2008"
 .SH NAME
 proc, pflags, pcred, pldd, psig, pstack, pfiles, pwdx, pstop, prun, pwait,
 ptime \- proc tools
@@ -104,12 +104,10 @@ delimiters. For example \fB/1,2,7-9\fR examines threads \fB1\fR, \fB2\fR,
 See \fBWARNINGS\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpflags\fR\fR
 .ad
 .RS 10n
-.rt  
 Print the \fB/proc\fR tracing flags, the pending and held signals, and other
 \fB/proc\fR status information for each process or specified lwps in each
 process.
@@ -117,60 +115,50 @@ process.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpcred\fR\fR
 .ad
 .RS 10n
-.rt  
 Print or set the credentials (effective, real, saved \fBUID\fRs and \fBGID\fRs)
 of each process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpldd\fR\fR
 .ad
 .RS 10n
-.rt  
 List the dynamic libraries linked into each process, including shared objects
 explicitly attached using \fBdlopen\fR(3C). See also \fBldd\fR(1).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpsig\fR\fR
 .ad
 .RS 10n
-.rt  
 List the signal actions and handlers of each process. See
 \fBsignal.h\fR(3HEAD).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpstack\fR\fR
 .ad
 .RS 10n
-.rt  
 Print a hex+symbolic stack trace for each process or specified lwps in each
 process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpfiles\fR\fR
 .ad
 .RS 10n
-.rt  
 Report \fBfstat\fR(2) and \fBfcntl\fR(2) information for all open files in each
 process. For network endpoints, the local (and peer if connected) address
 information is also provided. For sockets, the socket type, socket options and
@@ -182,56 +170,46 @@ for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpwdx\fR\fR
 .ad
 .RS 10n
-.rt  
 Print the current working directory of each process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpstop\fR\fR
 .ad
 .RS 10n
-.rt  
 Stop each process or the specified lwps (\fBPR_REQUESTED\fR stop).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprun\fR\fR
 .ad
 .RS 10n
-.rt  
 Set running each process or the specified lwps (the inverse of \fBpstop\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpwait\fR\fR
 .ad
 .RS 10n
-.rt  
 Wait for all of the specified processes to terminate.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBptime\fR\fR
 .ad
 .RS 10n
-.rt  
 Time the \fIcommand\fR, like \fBtime\fR(1), but using microstate accounting for
 reproducible precision. Unlike \fBtime\fR(1), children of the command are not
 timed.
@@ -246,23 +224,19 @@ statistics for the specified \fIpid\fR.
 The following general options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
 .RS 6n
-.rt  
 Force. Grabs the target process even if another process has control.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 6n
-.rt  
 (\fBpsig\fR and \fBpfiles\fR only) Sets non-verbose mode. \fBpsig\fR displays
 signal handler addresses rather than names. \fBpfiles\fR does not display
 verbose information for each file descriptor. Instead, \fBpfiles\fR limits its
@@ -272,23 +246,19 @@ output to the information that would be retrieved if the process applied
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 6n
-.rt  
 (\fBpflags\fR only) If the process is stopped, displays its machine registers.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 (\fBpwait\fR only) Verbose. Reports terminations to standard output.
 .RE
 
@@ -297,24 +267,20 @@ output to the information that would be retrieved if the process applied
 In addition to the general options, \fBpcred\fR supports the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR \fIgroup/gid\fR\fR
 .ad
 .RS 16n
-.rt  
 Sets the real, effective, and saved group ids (\fBGID\fRs) of the target
 processes to the specified value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-G\fR \fIgrouplist\fR\fR
 .ad
 .RS 16n
-.rt  
 Sets the supplementary \fBGID\fRs of the target process to the specified list
 of groups. The supplementary groups should be specified as a comma-separated
 list of group names ids. An empty list clears the supplementary group list of
@@ -323,12 +289,10 @@ the target processes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIlogin\fR\fR
 .ad
 .RS 16n
-.rt  
 Sets the real, effective, and saved \fBUID\fRs of the target processes to the
 \fBUID\fR of the specified login. Sets the real, effective, and saved
 \fBGID\fRs of the target processes to the \fBGID\fR of the specified login.
@@ -338,12 +302,10 @@ specified login.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fIuser/uid\fR\fR
 .ad
 .RS 16n
-.rt  
 Sets the real, effective, and saved user ids (\fBUID\fRs) of the target
 processes to the specified value.
 .RE
@@ -353,12 +315,10 @@ processes to the specified value.
 In addition to the general options, \fBpldd\fR supports the following option:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 6n
-.rt  
 Shows unresolved dynamic linker map names.
 .RE
 
@@ -367,133 +327,109 @@ Shows unresolved dynamic linker map names.
 In addition to the general options, \fBptime\fR supports the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
 .RS 10n
-.rt  
 Display the full set of microstate accounting statistics.
 .sp
 The displayed fields are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBreal\fR\fR
 .ad
 .RS 8n
-.rt  
 Wall clock time.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuser\fR\fR
 .ad
 .RS 8n
-.rt  
 User level CPU time.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsys\fR\fR
 .ad
 .RS 8n
-.rt  
 System call CPU time.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtrap\fR\fR
 .ad
 .RS 8n
-.rt  
 Other system trap CPU time.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtflt\fR\fR
 .ad
 .RS 8n
-.rt  
 Text page fault sleep time.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdflt\fR\fR
 .ad
 .RS 8n
-.rt  
 Data page fault sleep time.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkflt\fR\fR
 .ad
 .RS 8n
-.rt  
 Kernel page fault sleep time.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlock\fR\fR
 .ad
 .RS 8n
-.rt  
 User lock wait sleep time.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBslp\fR\fR
 .ad
 .RS 8n
-.rt  
 All other sleep time.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlat\fR\fR
 .ad
 .RS 8n
-.rt  
 CPU latency (wait) time.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstop\fR\fR
 .ad
 .RS 8n
-.rt  
 Stopped time.
 .RE
 
@@ -501,12 +437,10 @@ Stopped time.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIpid\fR\fR
 .ad
 .RS 10n
-.rt  
 Displays a snapshot of timing statistics for the specified \fIpid\fR.
 .RE
 
@@ -558,35 +492,29 @@ not available.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 Successful operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnon-zero\fR
 .ad
 .RS 12n
-.rt  
 An error has occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/*\fR\fR
 .ad
 .RS 11n
-.rt  
 process files
 .RE
 
@@ -598,13 +526,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

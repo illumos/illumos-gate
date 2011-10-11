@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH volrmmount 1 "28 Feb 2007" "SunOS 5.11" "User Commands"
+.TH VOLRMMOUNT 1 "Feb 28, 2007"
 .SH NAME
 volrmmount \- call rmmount to mount or unmount media
 .SH SYNOPSIS
@@ -40,34 +40,28 @@ This command allows you to override volume management's usual handling of media
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 6n
-.rt  
 Simulates an insertion of the specified media by calling \fBrmmount\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 6n
-.rt  
 Simulates an ejection of the specified media by calling \fBrmmount\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 6n
-.rt  
 Displays the name of the default device for \fBvolrmmount\fR to handle. This
 device is used if no \fIname\fR or \fInickname\fR is supplied.
 .RE
@@ -78,23 +72,19 @@ device is used if no \fIname\fR or \fInickname\fR is supplied.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR\fR
 .ad
 .RS 12n
-.rt  
 The name that volume management recognizes as the device's name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInickname\fR\fR
 .ad
 .RS 12n
-.rt  
 A shortened version of the device's name. Following is the list of recognized
 nicknames:
 .RE
@@ -103,43 +93,42 @@ nicknames:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-NicknamePath
+box;
+c | c
+l | l .
+Nickname	Path
 _
-fd/dev/rdiskette
+fd	/dev/rdiskette
 _
-fd0/dev/rdiskette
+fd0	/dev/rdiskette
 _
-fd1/dev/rdiskette1
+fd1	/dev/rdiskette1
 _
-diskette/dev/rdiskette
+diskette	/dev/rdiskette
 _
-diskette0/dev/rdiskette0
+diskette0	/dev/rdiskette0
 _
-diskette1/dev/rdiskette1
+diskette1	/dev/rdiskette1
 _
-rdiskette/dev/rdiskette
+rdiskette	/dev/rdiskette
 _
-rdiskette0/dev/rdiskette0
+rdiskette0	/dev/rdiskette0
 _
-rdiskette1/dev/rdiskette1
+rdiskette1	/dev/rdiskette1
 _
-floppy/dev/rdiskette
+floppy	/dev/rdiskette
 _
-floppy0/dev/rdiskette0
+floppy0	/dev/rdiskette0
 _
-floppy1/dev/rdiskette1
+floppy1	/dev/rdiskette1
 _
-cdrom0/dev/rdsk/cXtYdZ/\fIlabel\fR
+cdrom0	/dev/rdsk/cXtYdZ/\fIlabel\fR
 _
-zip0/dev/rdsk/cXtYdZ/\fIlabel\fR
+zip0	/dev/rdsk/cXtYdZ/\fIlabel\fR
 _
-jaz0/dev/rdsk/cXtYdZ/\fIlabel\fR
+jaz0	/dev/rdsk/cXtYdZ/\fIlabel\fR
 _
-rmdisk0/dev/rdsk/cXtYdZ/\fIlabel\fR
+rmdisk0	/dev/rdsk/cXtYdZ/\fIlabel\fR
 .TE
 
 .SH EXAMPLES
@@ -180,12 +169,10 @@ Notice that if you are using a named floppy, you can use its name in place of
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/volctl\fR\fR
 .ad
 .RS 15n
-.rt  
 volume management control port
 .RE
 

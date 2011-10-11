@@ -1,19 +1,19 @@
 '\" te
 .\"  Copyright 1994, The X/Open Company Ltd.  All Rights Reserved  Portions Copyright 1989 AT&T  Portions Copyright (c) 1998, Sun Microsystems, Inc.  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH t_optmgmt 3NSL "7 May 1998" "SunOS 5.11" "Networking Services Library Functions"
+.TH T_OPTMGMT 3NSL "May 7, 1998"
 .SH NAME
 t_optmgmt \- manage options for a transport endpoint
 .SH SYNOPSIS
 .LP
 .nf
-#include <xti.h> 
+#include <xti.h>
 
 
 
@@ -88,24 +88,20 @@ the architecture\(hyspecific alignment rules. The macros
 \fBT_OPT_DATA\fR(tohp) are provided for that purpose.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT_OPT_DATA(nhp)\fR \fR
 .ad
 .RS 29n
-.rt  
 If argument is a pointer to a \fBt_opthdr\fR structure, this macro returns an
 unsigned character pointer to the data associated with the \fBt_opthdr\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT_OPT_NEXTHDR(nbp,\fR \fBtohp)\fR \fR
 .ad
 .RS 29n
-.rt  
 If the first argument is a pointer to a netbuf structure associated with an
 option buffer and second argument is a pointer to a \fBt_opthdr\fR structure
 within that option buffer, this macro returns a pointer to the next
@@ -115,12 +111,10 @@ within that option buffer, this macro returns a pointer to the next
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT_OPT_FIRSTHDR(tohp)\fR \fR
 .ad
 .RS 29n
-.rt  
 If the argument is a pointer to a \fBnetbuf\fR structure associated with an
 option buffer, this macro returns the pointer to the first \fBt_opthdr\fR
 structure in the associated option buffer, or a null pointer if there is no
@@ -150,12 +144,10 @@ The \fIflags\fR field of \fIreq\fR must specify one of the following actions:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT_NEGOTIATE\fR \fR
 .ad
 .RS 29n
-.rt  
 This action enables the transport user to negotiate option values.
 .sp
 The user specifies the options of interest and their values in the buffer
@@ -188,12 +180,10 @@ endpoint, not all requests to negotiate the default value may be successful.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT_CHECK\fR \fR
 .ad
 .RS 29n
-.rt  
 This action enables the user to verify whether the options specified in
 \fIreq\fR are supported by the transport provider.If an option is specified
 with no option value (it consists only of a \fBt_opthdr\fR structure), the
@@ -218,12 +208,10 @@ remain unchanged.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT_DEFAULT\fR \fR
 .ad
 .RS 29n
-.rt  
 This action enables the transport user to retrieve the default option values.
 The user specifies the options of interest in \fIreq\(->opt.buf\fR. The option
 values are irrelevant and will be ignored; it is sufficient to specify the
@@ -246,12 +234,10 @@ this case, \fIret\(->opt.maxlen\fR must be given at least the value
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT_CURRENT\fR\fR
 .ad
 .RS 29n
-.rt  
 This action enables the transport user to retrieve the currently effective
 option values. The user specifies the options of interest in
 \fIreq\(->opt.buf\fR. The option values are irrelevant and will be ignored; it
@@ -310,46 +296,38 @@ ALL - apart from \fBT_UNINIT\fR.
 On failure, \fBt_errno\fR is set to one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTBADF\fR\fR
 .ad
 .RS 15n
-.rt  
 The specified file descriptor does not refer to a transport endpoint.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTBADFLAG\fR\fR
 .ad
 .RS 15n
-.rt  
 An invalid flag was specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTBADOPT\fR\fR
 .ad
 .RS 15n
-.rt  
 The specified options were in an incorrect format or contained illegal
 information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTBUFOVFLW\fR\fR
 .ad
 .RS 15n
-.rt  
 The number of bytes allowed for an incoming argument \fI(maxlen)\fR is greater
 than  \fB0\fR but not sufficient to store the value of that argument. The
 information to be returned in \fIret\fR will be discarded.
@@ -357,35 +335,29 @@ information to be returned in \fIret\fR will be discarded.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNOTSUPPORT\fR\fR
 .ad
 .RS 15n
-.rt  
 This action is not supported by the transport provider.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTOUTSTATE\fR\fR
 .ad
 .RS 15n
-.rt  
 The communications endpoint referenced by  \fIfd\fR is not in one of the states
 in which a call to this function is valid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTPROTO\fR\fR
 .ad
 .RS 15n
-.rt  
 This error indicates that a communication problem has been detected between XTI
 and the transport provider for which there is no other suitable XTI error
 \fB(t_errno)\fR.
@@ -393,12 +365,10 @@ and the transport provider for which there is no other suitable XTI error
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTSYSERR\fR\fR
 .ad
 .RS 15n
-.rt  
 A system error has occurred during execution of this function.
 .RE
 
@@ -432,24 +402,20 @@ circumstances than its \fBXTI\fR counterpart are \fBTACCES\fR and
 \fBTBUFOVFLW\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTACCES\fR \fR
 .ad
 .RS 14n
-.rt  
 can be returned to indicate that the user does not have permission to negotiate
 the specified options.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTBUFOVFLW\fR \fR
 .ad
 .RS 14n
-.rt  
 can be returned even when the \fBmaxlen\fR field of the corresponding buffer
 has been set to zero.
 .RE
@@ -470,12 +436,10 @@ The semantic meaning of various action values for the \fBflags\fR field of
 interface users should heed the following descriptions of the actions:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT_NEGOTIATE\fR \fR
 .ad
 .RS 16n
-.rt  
 This action enables the user to negotiate the values of the options specified
 in \fIreq\fR with the transport provider. The provider will evaluate the
 requested options and negotiate the values, returning the negotiated values
@@ -484,12 +448,10 @@ through \fIret\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT_CHECK\fR \fR
 .ad
 .RS 16n
-.rt  
 This action enables the user to verify whether the options specified in
 \fIreq\fR are supported by the transport provider. On return, the \fBflags\fR
 field of \fIret\fR will have either \fBT_SUCCESS\fR or \fBT_FAILURE\fR set to
@@ -499,12 +461,10 @@ meaningful for the \fBT_CHECK\fR request.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT_DEFAULT\fR \fR
 .ad
 .RS 16n
-.rt  
 This action enables a user to retrieve the default options supported by the
 transport provider into the \fBopt\fR field of \fIret\fR. In \fIreq\fR, the
 \fBlen\fR field of \fBopt\fR must be zero and the \fBbuf\fR field may be
@@ -525,13 +485,12 @@ See \fBattributes\fR(5)  for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT LevelSafe
+MT Level	Safe
 .TE
 
 .SH SEE ALSO

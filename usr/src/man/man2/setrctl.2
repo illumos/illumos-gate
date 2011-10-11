@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH setrctl 2 "31 Jan 2007" "SunOS 5.11" "System Calls"
+.TH SETRCTL 2 "Jan 31, 2007"
 .SH NAME
 setrctl, getrctl \- set or get resource control values
 .SH SYNOPSIS
@@ -109,24 +109,20 @@ error.
 The \fBsetrctl()\fR and \fBgetrctl()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 12n
-.rt  
 The \fIcontrolname\fR, \fIold_blk\fR, or \fInew_blk\fR argument points to an
 illegal address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 12n
-.rt  
 No resource control with the given name is known to the system, or the resource
 control block contains properties that are not valid for the resource control
 specified.
@@ -138,12 +134,10 @@ calling process.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 12n
-.rt  
 No value beyond the given resource control block exists.
 .sp
 \fBRCTL_USE_RECIPIENT_PID\fR was used and the process ID set by
@@ -153,24 +147,20 @@ zone, depending on the resource control name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBESRCH\fR\fR
 .ad
 .RS 12n
-.rt  
 No value matching the given resource control block was found for any of
 \fBRCTL_NEXT\fR, \fBRCTL_DELETE\fR, or \fBRCTL_REPLACE\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSUPP\fR\fR
 .ad
 .RS 12n
-.rt  
 The resource control requested by \fBRCTL_USAGE\fR does not support the usage
 operation.
 .RE
@@ -180,12 +170,10 @@ operation.
 The \fBsetrctl()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 10n
-.rt  
 The rctl value specified cannot be changed by the current process, including
 the case where the recipient process ID does not match the calling process and
 the calling process is unprivileged.
@@ -193,12 +181,10 @@ the calling process is unprivileged.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 10n
-.rt  
 An attempt to set a system limit was attempted.
 .RE
 
@@ -285,13 +271,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelAsync-Signal-Safe
+MT-Level	Async-Signal-Safe
 .TE
 
 .SH SEE ALSO
