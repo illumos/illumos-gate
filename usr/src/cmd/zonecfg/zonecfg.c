@@ -1188,10 +1188,10 @@ usage(boolean_t verbose, uint_t flags)
 	if (flags & HELP_USAGE) {
 		(void) fprintf(fp, "%s:\t%s %s\n", gettext("usage"),
 		    execname, cmd_to_str(CMD_HELP));
-		(void) fprintf(fp, "\t%s -z <zone>\t\t\t(%s)\n",
+		(void) fprintf(fp, "\t%s {-z <zone>|-u <uuid>}\t\t\t(%s)\n",
 		    execname, gettext("interactive"));
-		(void) fprintf(fp, "\t%s -z <zone> <command>\n", execname);
-		(void) fprintf(fp, "\t%s -z <zone> -f <command-file>\n",
+		(void) fprintf(fp, "\t%s {-z <zone>|-u <uuid>} <command>\n", execname);
+		(void) fprintf(fp, "\t%s {-z <zone>|-u <uuid>} -f <command-file>\n",
 		    execname);
 	}
 	if (flags & HELP_SUBCMDS) {
@@ -7404,8 +7404,10 @@ get_execbasename(char *execfullname)
 int
 main(int argc, char *argv[])
 {
-	int err, arg;
+	int err, arg, uflag = 0, zflag = 0;
 	struct stat st;
+	uuid_t uuidin;
+	char zonename[ZONENAME_MAX + 1];
 
 	/* This must be before anything goes to stdout. */
 	setbuf(stdout, NULL);
@@ -7432,7 +7434,7 @@ main(int argc, char *argv[])
 		exit(Z_OK);
 	}
 
-	while ((arg = getopt(argc, argv, "?f:R:z:")) != EOF) {
+	while ((arg = getopt(argc, argv, "?f:R:z:u:")) != EOF) {
 		switch (arg) {
 		case '?':
 			if (optopt == '?')
@@ -7459,6 +7461,21 @@ main(int argc, char *argv[])
 			}
 			zonecfg_set_root(optarg);
 			break;
+		case 'u':
+			if (uuid_parse((char *)optarg, uuidin) == -1)
+				return (Z_INVALID_PROPERTY);
+
+			if (zonecfg_get_name_by_uuid(uuidin, zonename, ZONENAME_MAX) !=
+			    Z_OK) {
+				zone_perror(optarg, Z_BOGUS_ZONE_NAME, B_TRUE);
+				usage(B_FALSE, HELP_SYNTAX);
+				exit(Z_USAGE);
+			}
+
+			(void) strlcpy(zone, zonename, sizeof (zone));
+			(void) strlcpy(revert_zone, zonename, sizeof (zone));
+			uflag = 1;
+			break;
 		case 'z':
 			if (strcmp(optarg, GLOBAL_ZONENAME) == 0) {
 				global_zone = B_TRUE;
@@ -7469,6 +7486,7 @@ main(int argc, char *argv[])
 			}
 			(void) strlcpy(zone, optarg, sizeof (zone));
 			(void) strlcpy(revert_zone, optarg, sizeof (zone));
+			zflag = 1;
 			break;
 		default:
 			usage(B_FALSE, HELP_USAGE);
@@ -7476,7 +7494,7 @@ main(int argc, char *argv[])
 		}
 	}
 
-	if (optind > argc || strcmp(zone, "") == 0) {
+	if (optind > argc || strcmp(zone, "") == 0 || (uflag && zflag)) {
 		usage(B_FALSE, HELP_USAGE);
 		exit(Z_USAGE);
 	}
