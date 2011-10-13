@@ -36,7 +36,7 @@ MAPOPTS =	$(MAPFILES:%=-M%)
 
 LFLAGS =	-t
 YFLAGS =	-d -b zonecfg_grammar
-LDLIBS +=	-lzonecfg -ll -lnsl -ltecla -lzfs -lbrand -ldladm -linetutil
+LDLIBS +=	-lzonecfg -ll -lnsl -ltecla -lzfs -lbrand -ldladm -linetutil -luuid
 CPPFLAGS +=	-I.
 LDFLAGS +=	$(MAPOPTS)
 CLEANFILES +=	zonecfg_lex.c zonecfg_grammar.tab.c zonecfg_grammar.tab.h

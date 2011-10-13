@@ -10,17 +10,17 @@ zonecfg \- set up zone configuration
 .SH SYNOPSIS
 .LP
 .nf
-\fBzonecfg\fR \fB-z\fR \fIzonename\fR
+\fBzonecfg\fR {\fB-z\fR \fIzonename\fR | \fB-u\fR \fIuuid\fR}
 .fi
 
 .LP
 .nf
-\fBzonecfg\fR \fB-z\fR \fIzonename\fR \fIsubcommand\fR
+\fBzonecfg\fR {\fB-z\fR \fIzonename\fR | \fB-u\fR \fIuuid\fR} \fIsubcommand\fR
 .fi
 
 .LP
 .nf
-\fBzonecfg\fR \fB-z\fR \fIzonename\fR \fB-f\fR \fIcommand_file\fR
+\fBzonecfg\fR {\fB-z\fR \fIzonename\fR | \fB-u\fR \fIuuid\fR} \fB-f\fR \fIcommand_file\fR
 .fi
 
 .LP
@@ -43,7 +43,8 @@ The following synopsis of the \fBzonecfg\fR command is for interactive usage:
 .sp
 .in +2
 .nf
-zonecfg \fB-z\fR \fIzonename subcommand\fR
+{\fB-z\fR \fIzonename\fR | \fB-u\fR \fIuuid\fR}
+zonecfg {\fB-z\fR \fIzonename | \fB-u\fR \fIuuid} subcommand\fR
 .fi
 .in -2
 .sp
@@ -1181,6 +1182,17 @@ begin with an alphanumeric character and can contain alphanumeric characters,
 the underscore (\fB_\fR) the hyphen (\fB-\fR), and the dot (\fB\&.\fR). The
 name \fBglobal\fR and all names beginning with \fBSUNW\fR are reserved and
 cannot be used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-u\fR \fIuuid\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify the uuid of a zone instead of the Zone name.
 .RE
 
 .SH SUBCOMMANDS
