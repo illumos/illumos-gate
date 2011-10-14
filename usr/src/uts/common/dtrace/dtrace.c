@@ -745,7 +745,7 @@ static int
 dtrace_vcanload(void *src, dtrace_diftype_t *type, dtrace_mstate_t *mstate,
     dtrace_vstate_t *vstate)
 {
-	size_t sz;
+	size_t sz, strsize;
 	ASSERT(type->dtdt_flags & DIF_TF_BYREF);
 
 	/*
@@ -755,11 +755,24 @@ dtrace_vcanload(void *src, dtrace_diftype_t *type, dtrace_mstate_t *mstate,
 	if ((mstate->dtms_access & DTRACE_ACCESS_KERNEL) != 0)
 		return (1);
 
-	if (type->dtdt_kind == DIF_TYPE_STRING)
-		sz = dtrace_strlen(src,
-		    vstate->dtvs_state->dts_options[DTRACEOPT_STRSIZE]) + 1;
-	else
+	if (type->dtdt_kind == DIF_TYPE_STRING) {
+		dtrace_state_t *state = vstate->dtvs_state;
+
+		if (state != NULL) {
+			strsize = state->dts_options[DTRACEOPT_STRSIZE];
+		} else {
+			/*
+			 * In helper context, we have a NULL state; fall back
+			 * to using the system-wide default for the string size
+			 * in this case.
+			 */
+			strsize = dtrace_strsize_default;
+		}
+
+		sz = dtrace_strlen(src, strsize) + 1;
+	} else {
 		sz = type->dtdt_size;
+	}
 
 	return (dtrace_canload((uintptr_t)src, sz, mstate, vstate));
 }
