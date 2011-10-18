@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2011 by Delphix. All rights reserved.
+ */
+
 #include "lint.h"
 #include "thr_uberdata.h"
 #include <sys/libc_kernel.h>
@@ -76,6 +80,8 @@ typedef struct file_attr {
 #else
 extern int getdents64(int, dirent64_t *, size_t);
 #endif
+
+extern const char **_environ;
 
 /*
  * Support function:
@@ -877,5 +883,69 @@ posix_spawnattr_getsigmask(
 		return (EINVAL);
 
 	*sigmask = sap->sa_sigmask;
+	return (0);
+}
+
+/*
+ * Spawn a process to run "sh -c <cmd>".  Return the child's pid (in
+ * *pidp), and a file descriptor (in *fdp) for reading or writing to the
+ * child process, depending on the 'write' argument.
+ * Return 0 on success; otherwise return an error code.
+ */
+int
+posix_spawn_pipe_np(pid_t *pidp, int *fdp,
+    const char *cmd, boolean_t write,
+    posix_spawn_file_actions_t *fact, posix_spawnattr_t *attr)
+{
+	int	p[2];
+	int	myside, yourside, stdio;
+	const char *shpath = _PATH_BSHELL;
+	const char *argvec[4] = { "sh", "-c", cmd, NULL };
+	int	error;
+
+	if (pipe(p) < 0)
+		return (errno);
+
+	if (access(shpath, X_OK))	/* XPG4 Requirement: */
+		shpath = "";		/* force child to fail immediately */
+
+	if (write) {
+		/*
+		 * Data is read from p[0] and written to p[1].
+		 * 'stdio' is the fd in the child process that should be
+		 * connected to the pipe.
+		 */
+		myside = p[1];
+		yourside = p[0];
+		stdio = STDIN_FILENO;
+	} else {
+		myside = p[0];
+		yourside = p[1];
+		stdio = STDOUT_FILENO;
+	}
+
+	error = posix_spawn_file_actions_addclose(fact, myside);
+	if (yourside != stdio) {
+		if (error == 0) {
+			error = posix_spawn_file_actions_adddup2(fact,
+			    yourside, stdio);
+		}
+		if (error == 0) {
+			error = posix_spawn_file_actions_addclose(fact,
+			    yourside);
+		}
+	}
+
+	if (error)
+		return (error);
+	error = posix_spawn(pidp, shpath, fact, attr,
+	    (char *const *)argvec, (char *const *)_environ);
+	(void) close(yourside);
+	if (error) {
+		(void) close(myside);
+		return (error);
+	}
+
+	*fdp = myside;
 	return (0);
 }

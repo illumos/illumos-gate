@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2011 by Delphix. All rights reserved.
+ */
+
 #ifndef _SPAWN_H
 #define	_SPAWN_H
 
@@ -154,6 +158,14 @@ extern int posix_spawnattr_getsigdefault(
  */
 #if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
 
+extern int posix_spawn_pipe_np(
+	pid_t *_RESTRICT_KYWD pidp,
+	int *_RESTRICT_KYWD fdp,
+	const char *_RESTRICT_KYWD cmd,
+	boolean_t write,
+	posix_spawn_file_actions_t *_RESTRICT_KYWD fact,
+	posix_spawnattr_t *_RESTRICT_KYWD attr);
+
 extern int posix_spawn_file_actions_addclosefrom_np(
 	posix_spawn_file_actions_t *file_actions,
 	int lowfiledes);
@@ -198,6 +210,7 @@ extern int posix_spawnattr_getschedpolicy();
 extern int posix_spawnattr_setsigdefault();
 extern int posix_spawnattr_getsigdefault();
 #if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
+extern int posix_spawn_pipe_np();
 extern int posix_spawn_file_actions_addclosefrom_np();
 extern int posix_spawnattr_setsigignore_np();
 extern int posix_spawnattr_getsigignore_np();
