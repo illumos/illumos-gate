@@ -23,6 +23,10 @@
  * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 #include "bge_impl.h"
 
 #define	PIO_ADDR(bgep, offset)	((void *)((caddr_t)(bgep)->io_regs+(offset)))
@@ -3306,9 +3310,6 @@ bge_poll_firmware(bge_t *bgep)
 		for (i = 0; i < 1000; ++i) {
 			drv_usecwait(1000);
 			gen = bge_nic_get64(bgep, NIC_MEM_GENCOMM) >> 32;
-			if (i == 0 && DEVICE_5704_SERIES_CHIPSETS(bgep))
-				drv_usecwait(100000);
-			mac = bge_reg_get64(bgep, MAC_ADDRESS_REG(0));
 #ifdef BGE_IPMI_ASF
 			if (!bgep->asf_enabled) {
 #endif
@@ -3317,6 +3318,7 @@ bge_poll_firmware(bge_t *bgep)
 #ifdef BGE_IPMI_ASF
 			}
 #endif
+			mac = bge_reg_get64(bgep, MAC_ADDRESS_REG(0));
 			if (mac != 0ULL)
 				break;
 			if (bgep->bge_chip_state != BGE_CHIP_INITIAL)
