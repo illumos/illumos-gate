@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2011 by Delphix. All rights reserved.
  */
 
 #include <fcntl.h>
@@ -860,7 +861,6 @@ add_ptr2array(void *p, void ***parray)
 static void
 remove_controller(controller_t *cp, controller_t *currp)
 {
-	disk_t *dp;
 	int	i;
 
 	if (cp == currp) {
@@ -884,20 +884,28 @@ remove_controller(controller_t *cp, controller_t *currp)
 		 * is a 'path' so any disk that has a reference to it
 		 * as a controller needs to have this reference removed.
 		 */
-		dp = cp->disks[0];
-		while (dp != NULL) {
-			for (i = 0; dp->controllers[i]; i++) {
-				if (libdiskmgt_str_eq(dp->controllers[i]->name,
-				    cp->name)) {
-					int j;
+		for (i = 0; cp->disks[i]; i++) {
+			disk_t *dp = cp->disks[i];
+			int j;
 
-					for (j = i; dp->controllers[j]; j++) {
-						dp->controllers[j] =
-						    dp->controllers[j + 1];
+			for (j = 0; dp->controllers[j]; j++) {
+				int k;
+
+				if (libdiskmgt_str_eq(dp->controllers[j]->name,
+				    cp->name)) {
+
+					if (dm_debug) {
+						(void) fprintf(stderr,
+						    "INFO: REMOVING disk %s on "
+						    "controller %s\n",
+						    dp->kernel_name, cp->name);
+					}
+					for (k = j; dp->controllers[k]; k++) {
+						dp->controllers[k] =
+						    dp->controllers[k + 1];
 					}
 				}
 			}
-			dp = dp->next;
 		}
 	}
 	/*
