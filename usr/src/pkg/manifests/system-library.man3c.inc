@@ -618,6 +618,7 @@ file path=usr/share/man/man3c/posix_spawn_file_actions_adddup2.3c
 file path=usr/share/man/man3c/posix_spawn_file_actions_addopen.3c
 file path=usr/share/man/man3c/posix_spawn_file_actions_destroy.3c
 file path=usr/share/man/man3c/posix_spawn_file_actions_init.3c
+file path=usr/share/man/man3c/posix_spawn_pipe_np.3c
 file path=usr/share/man/man3c/posix_spawnattr_destroy.3c
 file path=usr/share/man/man3c/posix_spawnattr_getflags.3c
 file path=usr/share/man/man3c/posix_spawnattr_getpgroup.3c
