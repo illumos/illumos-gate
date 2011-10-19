@@ -1308,8 +1308,6 @@ zvol_read(dev_t dev, uio_t *uio, cred_t *cr)
 	rl_t *rl;
 	int error = 0;
 
-	DTRACE_PROBE3(zvol__uio__start, dev_t, dev, uio_t *, uio, int, 0);
-
 	zv = zfsdev_get_soft_state(minor, ZSST_ZVOL);
 	if (zv == NULL)
 		return (ENXIO);
@@ -1324,6 +1322,8 @@ zvol_read(dev_t dev, uio_t *uio, cred_t *cr)
 		    zvol_minphys, uio);
 		return (error);
 	}
+
+	DTRACE_PROBE3(zvol__uio__start, dev_t, dev, uio_t *, uio, int, 0);
 
 	rl = zfs_range_lock(&zv->zv_znode, uio->uio_loffset, uio->uio_resid,
 	    RL_READER);
@@ -1361,8 +1361,6 @@ zvol_write(dev_t dev, uio_t *uio, cred_t *cr)
 	int error = 0;
 	boolean_t sync;
 
-	DTRACE_PROBE3(zvol__uio__start, dev_t, dev, uio_t *, uio, int, 1);
-
 	zv = zfsdev_get_soft_state(minor, ZSST_ZVOL);
 	if (zv == NULL)
 		return (ENXIO);
@@ -1377,6 +1375,8 @@ zvol_write(dev_t dev, uio_t *uio, cred_t *cr)
 		    zvol_minphys, uio);
 		return (error);
 	}
+
+	DTRACE_PROBE3(zvol__uio__start, dev_t, dev, uio_t *, uio, int, 1);
 
 	sync = !(zv->zv_flags & ZVOL_WCE) ||
 	    (zv->zv_objset->os_sync == ZFS_SYNC_ALWAYS);
