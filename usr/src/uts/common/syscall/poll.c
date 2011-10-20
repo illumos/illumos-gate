@@ -24,6 +24,7 @@
  * Use is subject to license terms.
  */
 
+/* Copyright (c) 2011 by Delphix. All rights reserved. */
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -286,11 +287,10 @@ poll_common(pollfd_t *fds, nfds_t nfds, timespec_t *tsp, k_sigset_t *ksetp)
 	klwp_t *lwp = ttolwp(t);
 	proc_t *p = ttoproc(t);
 	int fdcnt = 0;
-	int rval;
 	int i;
-	timespec_t *rqtp = NULL;
-	int timecheck = 0;
 	int imm_timeout = 0;
+	clock_t *deltap = NULL;
+	clock_t delta;
 	pollfd_t *pollfdp;
 	pollstate_t *ps;
 	pollcache_t *pcp;
@@ -302,14 +302,22 @@ poll_common(pollfd_t *fds, nfds_t nfds, timespec_t *tsp, k_sigset_t *ksetp)
 	 * Determine the precise future time of the requested timeout, if any.
 	 */
 	if (tsp != NULL) {
-		if (tsp->tv_sec == 0 && tsp->tv_nsec == 0)
+		if (tsp->tv_sec == 0 && tsp->tv_nsec == 0) {
 			imm_timeout = 1;
-		else {
-			timespec_t now;
-			timecheck = timechanged;
-			gethrestime(&now);
-			rqtp = tsp;
-			timespecadd(rqtp, &now);
+		} else {
+			/*
+			 * cv_relwaituntil_sig operates at
+			 * the tick granularity, which by default is 10 ms.
+			 * Convert the specified timespec to ticks, rounding
+			 * up to at least 1 tick to avoid flooding the
+			 * system with small high resolution timers.
+			 */
+			delta = SEC_TO_TICK(tsp->tv_sec) +
+			    NSEC_TO_TICK(tsp->tv_nsec);
+			if (delta < 1) {
+				delta = 1;
+			}
+			deltap = &delta;
 		}
 	}
 
@@ -347,11 +355,11 @@ poll_common(pollfd_t *fds, nfds_t nfds, timespec_t *tsp, k_sigset_t *ksetp)
 		 */
 		if (!imm_timeout) {
 			mutex_enter(&t->t_delay_lock);
-			while ((rval = cv_waituntil_sig(&t->t_delay_cv,
-			    &t->t_delay_lock, rqtp, timecheck)) > 0)
+			while ((delta = cv_relwaituntil_sig(&t->t_delay_cv,
+			    &t->t_delay_lock, deltap, TR_MILLISEC)) > 0)
 				continue;
 			mutex_exit(&t->t_delay_lock);
-			if (rval == 0)
+			if (delta == 0)
 				error = EINTR;
 		}
 		goto pollout;
@@ -542,18 +550,19 @@ poll_common(pollfd_t *fds, nfds_t nfds, timespec_t *tsp, k_sigset_t *ksetp)
 		 * Do not check for signals if we have a zero timeout.
 		 */
 		mutex_exit(&ps->ps_lock);
-		if (imm_timeout)
-			rval = -1;
-		else
-			rval = cv_waituntil_sig(&pcp->pc_cv, &pcp->pc_lock,
-			    rqtp, timecheck);
+		if (imm_timeout) {
+			delta = -1;
+		} else {
+			delta = cv_relwaituntil_sig(&pcp->pc_cv, &pcp->pc_lock,
+			    deltap, TR_MILLISEC);
+		}
 		mutex_exit(&pcp->pc_lock);
 		/*
 		 * If we have received a signal or timed out
 		 * then break out and return.
 		 */
-		if (rval <= 0) {
-			if (rval == 0)
+		if (delta <= 0) {
+			if (delta == 0)
 				error = EINTR;
 			break;
 		}
