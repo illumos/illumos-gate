@@ -3,6 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.\" Copyright 2011 by Delphix.  All rights reserved.
 .TH LIBC 3LIB "Sep 15, 2009"
 .SH NAME
 libc \- C library
@@ -425,8 +426,11 @@ l l .
 \fBposix_memalign\fR	\fBposix_openpt\fR
 \fBposix_spawn\fR	\fBposix_spawn_file_actions_addclose\fR
 \fBposix_spawn_file_actions_addclosefrom_np\fR	\fBposix_spawn_file_actions_adddup2\fR
-\fBposix_spawn_file_actions_addopen\fR	\fBposix_spawn_file_actions_destroy\fR
-\fBposix_spawn_file_actions_init\fR	\fBposix_spawnattr_destroy\fR
+\fBposix_spawn_file_actions_addopen\fR	
+\fBposix_spawn_file_actions_destroy\fR
+\fBposix_spawn_file_actions_init\fR
+\fBposix_spawn_pipe_np\fR
+\fBposix_spawnattr_destroy\fR
 \fBposix_spawnattr_getflags\fR	\fBposix_spawnattr_getpgroup\fR
 \fBposix_spawnattr_getschedparam\fR	\fBposix_spawnattr_getschedpolicy\fR
 \fBposix_spawnattr_getsigdefault\fR	\fBposix_spawnattr_getsigignore_np\fR
