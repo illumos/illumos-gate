@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  */
 
 /* This file contains all TCP input processing functions. */
@@ -2231,6 +2232,114 @@ tcp_ack_mp(tcp_t *tcp)
 }
 
 /*
+ * Dummy socket upcalls for if/when the conn_t gets detached from a
+ * direct-callback sonode via a user-driven close().  Easy to catch with
+ * DTrace FBT, and should be mostly harmless.
+ */
+
+/* ARGSUSED */
+static sock_upper_handle_t
+tcp_dummy_newconn(sock_upper_handle_t x, sock_lower_handle_t y,
+    sock_downcalls_t *z, cred_t *cr, pid_t pid, sock_upcalls_t **ignored)
+{
+	ASSERT(0);	/* Panic in debug, otherwise ignore. */
+	return (NULL);
+}
+
+/* ARGSUSED */
+static void
+tcp_dummy_connected(sock_upper_handle_t x, sock_connid_t y, cred_t *cr,
+    pid_t pid)
+{
+	ASSERT(x == NULL);
+	/* Normally we'd crhold(cr) and attach it to socket state. */
+	/* LINTED */
+}
+
+/* ARGSUSED */
+static int
+tcp_dummy_disconnected(sock_upper_handle_t x, sock_connid_t y, int blah)
+{
+	ASSERT(0);	/* Panic in debug, otherwise ignore. */
+	return (-1);
+}
+
+/* ARGSUSED */
+static void
+tcp_dummy_opctl(sock_upper_handle_t x, sock_opctl_action_t y, uintptr_t blah)
+{
+	ASSERT(x == NULL);
+	/* We really want this one to be a harmless NOP for now. */
+	/* LINTED */
+}
+
+/* ARGSUSED */
+static ssize_t
+tcp_dummy_recv(sock_upper_handle_t x, mblk_t *mp, size_t len, int flags,
+    int *error, boolean_t *push)
+{
+	ASSERT(x == NULL);
+
+	/*
+	 * Consume the message, set ESHUTDOWN, and return an error.
+	 * Nobody's home!
+	 */
+	freemsg(mp);
+	*error = ESHUTDOWN;
+	return (-1);
+}
+
+/* ARGSUSED */
+static void
+tcp_dummy_set_proto_props(sock_upper_handle_t x, struct sock_proto_props *y)
+{
+	ASSERT(0);	/* Panic in debug, otherwise ignore. */
+}
+
+/* ARGSUSED */
+static void
+tcp_dummy_txq_full(sock_upper_handle_t x, boolean_t y)
+{
+	ASSERT(0);	/* Panic in debug, otherwise ignore. */
+}
+
+/* ARGSUSED */
+static void
+tcp_dummy_signal_oob(sock_upper_handle_t x, ssize_t len)
+{
+	ASSERT(x == NULL);
+	/* Otherwise, this would signal socket state about OOB data. */
+}
+
+/* ARGSUSED */
+static void
+tcp_dummy_set_error(sock_upper_handle_t x, int err)
+{
+	ASSERT(0);	/* Panic in debug, otherwise ignore. */
+}
+
+/* ARGSUSED */
+static void
+tcp_dummy_onearg(sock_upper_handle_t x)
+{
+	ASSERT(0);	/* Panic in debug, otherwise ignore. */
+}
+
+static sock_upcalls_t tcp_dummy_upcalls = {
+	tcp_dummy_newconn,
+	tcp_dummy_connected,
+	tcp_dummy_disconnected,
+	tcp_dummy_opctl,
+	tcp_dummy_recv,
+	tcp_dummy_set_proto_props,
+	tcp_dummy_txq_full,
+	tcp_dummy_signal_oob,
+	tcp_dummy_onearg,
+	tcp_dummy_set_error,
+	tcp_dummy_onearg
+};
+
+/*
  * Handle M_DATA messages from IP. Its called directly from IP via
  * squeue for received IP packets.
  *
@@ -2272,6 +2381,7 @@ tcp_input_data(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 	squeue_t	*sqp = (squeue_t *)arg2;
 	tcp_t		*tcp = connp->conn_tcp;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	sock_upcalls_t	*sockupcalls;
 
 	/*
 	 * RST from fused tcp loopback peer should trigger an unfuse.
@@ -2396,6 +2506,11 @@ tcp_input_data(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 			seg_len = 0;
 		}
 	}
+
+	sockupcalls = connp->conn_upcalls;
+	/* A conn_t may have belonged to a now-closed socket.  Be careful. */
+	if (sockupcalls == NULL)
+		sockupcalls = &tcp_dummy_upcalls;
 
 	switch (tcp->tcp_state) {
 	case TCPS_SYN_SENT:
@@ -2608,8 +2723,7 @@ tcp_input_data(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 						}
 						putnext(connp->conn_rq, mp1);
 					} else {
-						(*connp->conn_upcalls->
-						    su_connected)
+						(*sockupcalls->su_connected)
 						    (connp->conn_upper_handle,
 						    tcp->tcp_connid,
 						    ira->ira_cred,
@@ -2636,7 +2750,7 @@ tcp_input_data(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 					}
 					putnext(connp->conn_rq, mp1);
 				} else {
-					(*connp->conn_upcalls->su_connected)
+					(*sockupcalls->su_connected)
 					    (connp->conn_upper_handle,
 					    tcp->tcp_connid, ira->ira_cred,
 					    ira->ira_cpid);
@@ -3010,8 +3124,7 @@ try_again:;
 			    tcp->tcp_urp_last))) {
 				if (IPCL_IS_NONSTR(connp)) {
 					if (!TCP_IS_DETACHED(tcp)) {
-						(*connp->conn_upcalls->
-						    su_signal_oob)
+						(*sockupcalls->su_signal_oob)
 						    (connp->conn_upper_handle,
 						    urp);
 					}
@@ -3289,7 +3402,7 @@ ok:;
 			 */
 			if (IPCL_IS_NONSTR(connp)) {
 				if (!TCP_IS_DETACHED(tcp)) {
-					(*connp->conn_upcalls->su_signal_oob)
+					(*sockupcalls->su_signal_oob)
 					    (connp->conn_upper_handle, urp);
 				}
 			} else {
@@ -3448,7 +3561,7 @@ ok:;
 			if (IPCL_IS_NONSTR(connp)) {
 				int error;
 
-				(*connp->conn_upcalls->su_recv)
+				(*sockupcalls->su_recv)
 				    (connp->conn_upper_handle, mp, seg_len,
 				    MSG_OOB, &error, NULL);
 				/*
@@ -4627,8 +4740,7 @@ update_ack:
 		boolean_t push = flags & (TH_PUSH|TH_FIN);
 		int error;
 
-		if ((*connp->conn_upcalls->su_recv)(
-		    connp->conn_upper_handle,
+		if ((*sockupcalls->su_recv)(connp->conn_upper_handle,
 		    mp, seg_len, 0, &error, &push) <= 0) {
 			/*
 			 * We should never be in middle of a
@@ -4870,8 +4982,8 @@ ack_check:
 		if (IPCL_IS_NONSTR(connp)) {
 			ASSERT(tcp->tcp_ordrel_mp == NULL);
 			tcp->tcp_ordrel_done = B_TRUE;
-			(*connp->conn_upcalls->su_opctl)
-			    (connp->conn_upper_handle, SOCK_OPCTL_SHUT_RECV, 0);
+			(*sockupcalls->su_opctl)(connp->conn_upper_handle,
+			    SOCK_OPCTL_SHUT_RECV, 0);
 			goto done;
 		}
 

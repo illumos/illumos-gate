@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2011 Nexenta Systems, Inc. All rights reserved
 #
 
 arp_m_tbl
@@ -250,6 +251,7 @@ tcp_conn_cache
 tcp_conn_hash_size
 tcp_do_reclaim
 tcp_drop_ack_unsent_cnt
+tcp_dummy_upcalls
 tcp_early_abort
 tcp_fallback_sock_winit
 tcp_free_list_max_cnt
