@@ -13657,6 +13657,14 @@ h usr/ucb/ps=usr/lib/isaexec
 f usr/ucb/shutdown 0755 root bin
 f usr/ucb/touch 0755 root bin
 s usr/ucb/uptime=../bin/uptime
+d usr/ucblib 0755 root bin
+s usr/ucblib/32=.
+s usr/ucblib/64=amd64
+d usr/ucblib/amd64 0755 root bin
+s usr/ucblib/amd64/libucb.so=libucb.so.1
+f usr/ucblib/amd64/libucb.so.1 0755 root bin
+s usr/ucblib/libucb.so=libucb.so.1
+f usr/ucblib/libucb.so.1 0755 root bin
 d usr/xpg4 0755 root bin
 d usr/xpg4/bin 0755 root bin
 s usr/xpg4/bin/alias=../../bin/alias
