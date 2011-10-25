@@ -75,6 +75,7 @@
  * Local routines
  */
 static int preload_module(struct sysparam *, void *);
+static struct vfssw *getfstype(char *, char *, size_t);
 static int getphysdev(char *, char *, size_t);
 static int load_bootpath_drivers(char *bootpath);
 static int load_boot_driver(char *drv);
@@ -82,8 +83,6 @@ static int load_boot_platform_modules(char *drv);
 static dev_info_t *path_to_devinfo(char *path);
 static boolean_t netboot_over_ib(char *bootpath);
 static boolean_t netboot_over_iscsi(void);
-
-struct vfssw *getfstype(char *, char *, size_t);
 
 /*
  * Module linkage information for the kernel.
@@ -648,7 +647,7 @@ get_fstype_prop(char *fstype)
  * implicitly it won't run the filesystems vsw_init() entry either).
  * We do that explicitly in rootconf().
  */
-struct vfssw *
+static struct vfssw *
 getfstype(char *askfor, char *fsname, size_t fsnamelen)
 {
 	struct vfssw *vsw;
