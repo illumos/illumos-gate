@@ -13657,6 +13657,30 @@ h usr/ucb/ps=usr/lib/isaexec
 f usr/ucb/shutdown 0755 root bin
 f usr/ucb/touch 0755 root bin
 s usr/ucb/uptime=../bin/uptime
+d usr/ucbinclude 0755 root bin
+f usr/ucbinclude/curses.h 0755 root bin
+f usr/ucbinclude/dbm.h 0755 root bin
+s usr/ucbinclude/fcntl.h=sys/fcntl.h
+f usr/ucbinclude/setjmp.h 0755 root bin
+f usr/ucbinclude/sgtty.h 0755 root bin
+f usr/ucbinclude/signal.h 0755 root bin
+f usr/ucbinclude/stdio.h 0755 root bin
+f usr/ucbinclude/strings.h 0755 root bin
+d usr/ucbinclude/sys 0755 root bin
+f usr/ucbinclude/sys/dir.h 0755 root bin
+f usr/ucbinclude/sys/fcntl.h 0755 root bin
+f usr/ucbinclude/sys/file.h 0755 root bin
+f usr/ucbinclude/sys/ioctl.h 0755 root bin
+f usr/ucbinclude/sys/param.h 0755 root bin
+f usr/ucbinclude/sys/resource.h 0755 root bin
+f usr/ucbinclude/sys/rusage.h 0755 root bin
+f usr/ucbinclude/sys/signal.h 0755 root bin
+f usr/ucbinclude/sys/sysmacros.h 0755 root bin
+f usr/ucbinclude/sys/ttychars.h 0755 root bin
+f usr/ucbinclude/sys/types.h 0755 root bin
+f usr/ucbinclude/sys/vfs.h 0755 root bin
+f usr/ucbinclude/sys/wait.h 0755 root bin
+f usr/ucbinclude/unistd.h 0755 root bin
 d usr/ucblib 0755 root bin
 s usr/ucblib/32=.
 s usr/ucblib/64=amd64
