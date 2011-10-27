@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
  */
 
 /* This file contains all TCP input processing functions. */
@@ -5422,6 +5423,16 @@ tcp_icmp_input(void *arg1, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 	/* Assume IP provides aligned packets */
 	ASSERT(OK_32PTR(mp->b_rptr));
 	ASSERT((MBLKL(mp) >= sizeof (ipha_t)));
+
+	/*
+	 * It's possible that we've gotten here, but the TCP state is closed and
+	 * we no longer have a conn_t. In that case, we should just drop the
+	 * icmp packet
+	 */
+	if (tcp->tcp_state == TCPS_CLOSED) {
+		freemsg(mp);
+		return;
+	}
 
 	/*
 	 * Verify IP version. Anything other than IPv4 or IPv6 packet is sent
