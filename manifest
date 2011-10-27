@@ -2286,6 +2286,7 @@ s usr/bin/tar=../sbin/tar
 f usr/bin/tbl 0555 root bin
 f usr/bin/tcopy 0555 root bin
 h usr/bin/tee=usr/bin/alias
+f usr/bin/telnet 0555 root bin
 h usr/bin/test=usr/bin/alias
 f usr/bin/tic 0555 root bin
 f usr/bin/time 0555 root bin
