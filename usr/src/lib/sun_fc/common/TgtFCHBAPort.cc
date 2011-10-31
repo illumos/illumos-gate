@@ -48,7 +48,7 @@
 #include <sys/scsi/generic/inquiry.h>
 #include <sys/scsi/generic/status.h>
 #include <errno.h>
-#include <stdlib.h>
+#include <cstdlib>
 
 
 using namespace std;

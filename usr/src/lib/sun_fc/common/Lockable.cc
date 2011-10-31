@@ -29,7 +29,7 @@
 #include <cstdio>
 #include <cerrno>
 #include <unistd.h>
-#include <string.h>
+#include <cstring>
 
 using namespace std;
 

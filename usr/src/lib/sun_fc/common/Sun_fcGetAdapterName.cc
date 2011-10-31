@@ -28,7 +28,7 @@
 #include "HBAList.h"
 #include "Trace.h"
 #include "Exceptions.h"
-#include <string.h>
+#include <cstring>
 
 #ifdef	__cplusplus
 extern "C" {

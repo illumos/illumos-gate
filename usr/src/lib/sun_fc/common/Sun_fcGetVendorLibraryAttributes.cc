@@ -29,7 +29,7 @@
 #include "Exceptions.h"
 #include "sun_fc_version.h"
 #include "HBAList.h"
-#include <string.h>
+#include <cstring>
 
 #ifdef	__cplusplus
 extern "C" {
