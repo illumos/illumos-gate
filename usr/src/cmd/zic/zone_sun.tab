@@ -1,7 +1,5 @@
-# Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
-#
 # <pre>
-# @(#)zone.tab	8.38
+# @(#)zone.tab	8.50
 # This file is in the public domain, so clarified as of
 # 2009-05-17 by Arthur David Olson.
 #
@@ -34,7 +32,6 @@ AG	+1703-06148	America/Antigua	-
 AI	+1812-06304	America/Anguilla	-
 AL	+4120+01950	Europe/Tirane	-
 AM	+4011+04430	Asia/Yerevan	-
-AN	+1211-06900	America/Curacao	-
 AO	-0848+01314	Africa/Luanda	-
 AQ	-7750+16636	Antarctica/McMurdo	-	McMurdo Station, Ross Island
 AQ	-9000+00000	Antarctica/South_Pole	-	Amundsen-Scott Station, South Pole
@@ -89,6 +86,7 @@ BL	+1753-06251	America/St_Barthelemy	-
 BM	+3217-06446	Atlantic/Bermuda	-
 BN	+0456+11455	Asia/Brunei	-
 BO	-1630-06809	America/La_Paz	-
+BQ	+120903-0681636	America/Kralendijk	-
 BR	-0351-03225	America/Noronha	Brazil/DeNoronha	Atlantic islands
 BR	-0127-04829	America/Belem	-	Amapa, E Para
 BR	-0343-03830	America/Fortaleza	-	NE Brazil (MA, PI, CE, RN, PB)
@@ -122,7 +120,7 @@ CA	+4901-08816	America/Nipigon	-	Eastern Time - Ontario & Quebec - places that d
 CA	+4823-08915	America/Thunder_Bay	-	Eastern Time - Thunder Bay, Ontario
 CA	+6344-06828	America/Iqaluit	-	Eastern Time - east Nunavut - most locations
 CA	+6608-06544	America/Pangnirtung	-	Eastern Time - Pangnirtung, Nunavut
-CA	+744144-0944945	America/Resolute	-	Eastern Standard Time - Resolute, Nunavut
+CA	+744144-0944945	America/Resolute	-	Central Standard Time - Resolute, Nunavut
 CA	+484531-0913718	America/Atikokan	-	Eastern Standard Time - Atikokan, Ontario and Southampton I, Nunavut
 CA	+624900-0920459	America/Rankin_Inlet	-	Central Time - central Nunavut
 CA	+4953-09709	America/Winnipeg	Canada/Central	Central Time - Manitoba & west Ontario
@@ -148,11 +146,16 @@ CK	-2114-15946	Pacific/Rarotonga	-
 CL	-3327-07040	America/Santiago	Chile/Continental	most locations
 CL	-2709-10926	Pacific/Easter	Chile/EasterIsland	Easter Island & Sala y Gomez
 CM	+0403+00942	Africa/Douala	-
-CN	+3114+12128	Asia/Shanghai	PRC
+CN	+3114+12128	Asia/Shanghai	PRC	east China - Beijing, Guangdong, Shanghai, etc.
+CN	+4545+12641	Asia/Harbin	-	Heilongjiang (except Mohe), Jilin
+CN	+2934+10635	Asia/Chongqing	-	central China - Sichuan, Yunnan, Guangxi, Shaanxi, Guizhou, etc.
+CN	+4348+08735	Asia/Urumqi	-	most of Tibet & Xinjiang
+CN	+3929+07559	Asia/Kashgar	-	west Tibet & Xinjiang
 CO	+0436-07405	America/Bogota	-
 CR	+0956-08405	America/Costa_Rica	-
 CU	+2308-08222	America/Havana	-
 CV	+1455-02331	Atlantic/Cape_Verde	-
+CW	+1211-06900	America/Curacao	-
 CX	-1025+10543	Indian/Christmas	-
 CY	+3510+03322	Asia/Nicosia	-
 CZ	+5005+01426	Europe/Prague	-
@@ -209,8 +212,8 @@ HT	+1832-07220	America/Port-au-Prince	-
 HU	+4730+01905	Europe/Budapest	-
 ID	-0610+10648	Asia/Jakarta	-	Java & Sumatra
 ID	-0002+10920	Asia/Pontianak	-	west & central Borneo
-ID	-0507+11924	Asia/Makassar	-	east & south Borneo, Celebes, Bali, Nusa Tengarra, west Timor
-ID	-0232+14042	Asia/Jayapura	-	Irian Jaya & the Moluccas
+ID	-0507+11924	Asia/Makassar	-	east & south Borneo, Sulawesi (Celebes), Bali, Nusa Tengarra, west Timor
+ID	-0232+14042	Asia/Jayapura	-	west New Guinea (Irian Jaya) & Malukus (Moluccas)
 IE	+5320-00615	Europe/Dublin	Eire
 IL	+3146+03514	Asia/Jerusalem	Israel
 IM	+5409-00428	Europe/Isle_of_Man	-
@@ -255,6 +258,7 @@ LY	+3254+01311	Africa/Tripoli	Libya
 MA	+3339-00735	Africa/Casablanca	-
 MC	+4342+00723	Europe/Monaco	-
 MD	+4700+02850	Europe/Chisinau	-
+MD	+4651+02938	Europe/Tiraspol	-	Pridnestrovie
 ME	+4226+01916	Europe/Podgorica	-
 MF	+1804-06305	America/Marigot	-
 MG	-1855+04731	Indian/Antananarivo	-
@@ -316,7 +320,8 @@ PL	+5215+02100	Europe/Warsaw	Poland
 PM	+4703-05620	America/Miquelon	-
 PN	-2504-13005	Pacific/Pitcairn	-
 PR	+182806-0660622	America/Puerto_Rico	-
-PS	+3130+03428	Asia/Gaza	-
+PS	+3130+03428	Asia/Gaza	-	Gaza Strip
+PS	+313200+0350542	Asia/Hebron	-	West Bank
 PT	+3843-00908	Europe/Lisbon	-	mainland
 PT	+3238-01654	Atlantic/Madeira	-	Madeira Islands
 PT	+3744-02540	Atlantic/Azores	-	Azores
@@ -358,8 +363,10 @@ SM	+4355+01228	Europe/San_Marino	-
 SN	+1440-01726	Africa/Dakar	-
 SO	+0204+04522	Africa/Mogadishu	-
 SR	+0550-05510	America/Paramaribo	-
+SS	+0451+03136	Africa/Juba	-
 ST	+0020+00644	Africa/Sao_Tome	-
 SV	+1342-08912	America/El_Salvador	-
+SX	+180305-0630250	America/Lower_Princes	-
 SY	+3330+03618	Asia/Damascus	-
 SZ	-2618+03106	Africa/Mbabane	-
 TC	+2128-07108	America/Grand_Turk	-
@@ -402,6 +409,7 @@ US	+411745-0863730	America/Indiana/Knox	-	Central Time - Indiana - Starke County
 US	+450628-0873651	America/Menominee	-	Central Time - Michigan - Dickinson, Gogebic, Iron & Menominee Counties
 US	+470659-1011757	America/North_Dakota/Center	-	Central Time - North Dakota - Oliver County
 US	+465042-1012439	America/North_Dakota/New_Salem	-	Central Time - North Dakota - Morton County (except Mandan area)
+US	+471551-1014640	America/North_Dakota/Beulah	-	Central Time - North Dakota - Mercer County
 US	+394421-1045903	America/Denver	US/Mountain	Mountain Time
 US	+433649-1161209	America/Boise	-	Mountain Time - south Idaho & east Oregon
 US	+364708-1084111	America/Shiprock	-	Mountain Time - Navajo
@@ -409,9 +417,11 @@ US	+332654-1120424	America/Phoenix	US/Arizona	Mountain Standard Time - Arizona
 US	+340308-1181434	America/Los_Angeles	US/Pacific	Pacific Time
 US	+611305-1495401	America/Anchorage	US/Alaska	Alaska Time
 US	+581807-1342511	America/Juneau	-	Alaska Time - Alaska panhandle
+US	+571035-1351807	America/Sitka	-	Alaska Time - southeast Alaska panhandle
 US	+593249-1394338	America/Yakutat	-	Alaska Time - Alaska panhandle neck
 US	+643004-1652423	America/Nome	-	Alaska Time - west Alaska
 US	+515248-1763929	America/Adak	US/Aleutian	Aleutian Islands
+US	+550737-1313435	America/Metlakatla	-	Metlakatla Time - Annette Island
 US	+211825-1575130	Pacific/Honolulu	US/Hawaii	Hawaii
 UY	-3453-05611	America/Montevideo	-
 UZ	+3940+06648	Asia/Samarkand	-	west Uzbekistan
@@ -430,12 +440,3 @@ YT	-1247+04514	Indian/Mayotte	-
 ZA	-2615+02800	Africa/Johannesburg	-
 ZM	-1525+02817	Africa/Lusaka	-
 ZW	-1750+03103	Africa/Harare	-
-#
-# These entries support timezones associated with a region
-# (group of countries).
-#
-#country-
-#group	Coordinates	Continent	Timezone	Comments
-ee	+0000+00000	Europe/	EET
-me	+0000+00000	Europe/	MET
-we	+0000+00000	Europe/	WET
