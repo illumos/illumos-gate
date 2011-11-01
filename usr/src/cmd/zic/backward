@@ -1,7 +1,5 @@
-# Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
-
 # <pre>
-# @(#)backward	8.9
+# @(#)backward	8.10
 # This file is in the public domain, so clarified as of
 # 2009-05-17 by Arthur David Olson.
 
@@ -69,7 +67,6 @@ Link	America/Havana		Cuba
 Link	Africa/Cairo		Egypt
 Link	Europe/Dublin		Eire
 Link	Europe/London		Europe/Belfast
-Link	Europe/Chisinau		Europe/Tiraspol
 Link	Europe/London		GB
 Link	Europe/London		GB-Eire
 Link	Etc/GMT			GMT+0
@@ -97,6 +94,7 @@ Link	Pacific/Chuuk		Pacific/Truk
 Link	Pacific/Pohnpei		Pacific/Ponape
 Link	Europe/Warsaw		Poland
 Link	Europe/Lisbon		Portugal
+Link	Asia/Taipei		ROC
 Link	Asia/Seoul		ROK
 Link	Asia/Singapore		Singapore
 Link	Europe/Istanbul		Turkey
