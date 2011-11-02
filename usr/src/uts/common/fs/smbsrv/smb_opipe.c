@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -118,6 +119,13 @@ smb_opipe_open(smb_request_t *sr)
 	char *pipe_name;
 
 	if ((pipe_name = smb_opipe_lookup(op->fqi.fq_path.pn_path)) == NULL)
+		return (NT_STATUS_OBJECT_NAME_NOT_FOUND);
+
+	/*
+	 * If printing is disabled, pretend spoolss does not exist.
+	 */
+	if (sr->sr_server->sv_cfg.skc_print_enable == 0 &&
+	    strcmp(pipe_name, "SPOOLSS") == 0)
 		return (NT_STATUS_OBJECT_NAME_NOT_FOUND);
 
 	op->create_options = 0;

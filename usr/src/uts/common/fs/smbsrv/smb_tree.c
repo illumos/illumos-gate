@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -759,6 +760,12 @@ smb_tree_connect_printq(smb_request_t *sr, const char *sharename)
 
 	ASSERT(user);
 	ASSERT(user->u_cred);
+
+	if (sr->sr_server->sv_cfg.skc_print_enable == 0) {
+		smb_tree_log(sr, sharename, "printing disabled");
+		smbsr_error(sr, 0, ERRSRV, ERRinvnetname);
+		return (NULL);
+	}
 
 	if ((strcmp(service, any) != 0) &&
 	    (strcasecmp(service, "LPT1:") != 0)) {

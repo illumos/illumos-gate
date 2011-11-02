@@ -1879,6 +1879,7 @@ again:
 
 			if (act == DTRACEACT_TRACEMEM_DYNSIZE &&
 			    rec->dtrd_size == sizeof (uint64_t)) {
+				/* LINTED - alignment */
 				tracememsize = *((unsigned long long *)addr);
 				continue;
 			}

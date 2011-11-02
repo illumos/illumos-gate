@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011 by Delphix. All rights reserved.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -762,6 +763,9 @@ extern int opteron_workaround_6323525;
 extern void patch_workaround_6323525(void);
 #endif
 
+#if !defined(__xpv)
+extern void determine_platform(void);
+#endif
 extern int get_hwenv(void);
 extern int is_controldom(void);
 

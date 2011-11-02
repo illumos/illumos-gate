@@ -801,7 +801,7 @@ find_next_cf_line(char *volume, int next)
 	dsw_config_t cf_line;
 
 	for (setnumber = next; get_dsw_config(setnumber, &cf_line) == 0;
-								setnumber++) {
+	    setnumber++) {
 		if (strncmp(volume, cf_line.master_vol, DSW_NAMELEN) == 0 ||
 		    strncmp(volume, cf_line.shadow_vol, DSW_NAMELEN) == 0 ||
 		    strncmp(volume, cf_line.bitmap_vol, DSW_NAMELEN) == 0)
@@ -858,7 +858,7 @@ get_overflow_list()
 	rc = do_ioctl(dsw_fd, DSWIOC_OLIST, acopy_args);
 	if (rc == -1)
 		dsw_error(gettext("Overflow list access failure"),
-			&acopy_args->status);
+		    &acopy_args->status);
 	else
 		acopy_args->shadow_vol[DSW_NAMELEN*acopy_args->count] = NULL;
 
@@ -879,8 +879,7 @@ find_group_members(char *group)
 	group_volumes = NULL;
 	for (setnumber = 1; /*CSTYLED*/; setnumber++) {
 		(void) snprintf(key, sizeof (key), "ii.set%d.group", setnumber);
-		if (cfg_get_cstring(cfg, key, buf,
-					sizeof (buf)) < 0)
+		if (cfg_get_cstring(cfg, key, buf, sizeof (buf)) < 0)
 			break;
 
 		if (strcmp(group, buf))
@@ -888,14 +887,13 @@ find_group_members(char *group)
 
 		(void) snprintf(key, sizeof (key), "ii.set%d.shadow",
 		    setnumber);
-		if (cfg_get_cstring(cfg, key, buf,
-					sizeof (buf)) < 0)
+		if (cfg_get_cstring(cfg, key, buf, sizeof (buf)) < 0)
 			break;
 
 		if (nmembers >= vector_len) {
 			vector_len += 10;
 			group_volumes = realloc(group_volumes, (1+vector_len) *
-					sizeof (char *));
+			    sizeof (char *));
 		}
 		group_volumes[nmembers] = strdup(buf);
 		nmembers++;
@@ -919,8 +917,7 @@ find_next_matching_cf_line(
 		conf = &config;
 	(void) get_dsw_config(setnumber, conf);
 	if (io) {
-		(void) strncpy(io->shadow_vol, conf->shadow_vol, DSW_NAMELEN);
-		io->shadow_vol[DSW_NAMELEN] = '\0';
+		(void) strlcpy(io->shadow_vol, conf->shadow_vol, DSW_NAMELEN);
 	}
 	return (1);
 }
@@ -967,9 +964,8 @@ find_shadow_config(char *volume, dsw_config_t *conf, dsw_ioctl_t *io)
 			}
 
 			if (io) {
-				(void) strncpy(io->shadow_vol, c->shadow_vol,
+				(void) strlcpy(io->shadow_vol, c->shadow_vol,
 				    DSW_NAMELEN);
-				io->shadow_vol[DSW_NAMELEN] = '\0';
 			}
 			return (1);
 		}
@@ -992,7 +988,7 @@ add_cfg_entry(dsw_config_t *parms)
 				(void) sprintf(buf, "ii.set%d.group",
 				    setnumber);
 				if (cfg_put_cstring(cfg, buf,
-					group_name, strlen(group_name)) < 0)
+				    group_name, strlen(group_name)) < 0)
 					perror("cfg_put_cstring");
 			}
 			else
@@ -1033,13 +1029,14 @@ remove_iiset(int setno, char *shadow, int shd_exp)
 				 * Handle multiple-shadows of single master
 				 */
 				mdata = (mstcount_t *)
-					nsc_lookup(volhash, sdata->master);
+				    nsc_lookup(volhash, sdata->master);
 				if ((mdata) && (mdata->count == 1)) {
-				    if (cfg_vol_disable(cfg, sdata->master,
-					cfg_cluster_tag, "ii") < 0)
-					    dsw_error(gettext(
-						"SV disable of master failed"),
-						NULL);
+					if (cfg_vol_disable(cfg, sdata->master,
+					    cfg_cluster_tag, "ii") < 0)
+						dsw_error(gettext(
+						    "SV disable of master "
+						    "failed"),
+						    NULL);
 				}
 			}
 
@@ -1052,10 +1049,10 @@ remove_iiset(int setno, char *shadow, int shd_exp)
 				 */
 				/*EMPTY*/;
 			} else if (cfg_cluster_tag &&
-				    strcmp(cfg_cluster_tag, "") &&
-				    cfg_dgname(shadow, sn, sizeof (sn)) &&
-				    strlen(sn) &&
-				    strcmp(sn, cfg_cluster_tag)) {
+			    strcmp(cfg_cluster_tag, "") &&
+			    cfg_dgname(shadow, sn, sizeof (sn)) &&
+			    strlen(sn) &&
+			    strcmp(sn, cfg_cluster_tag)) {
 					/* reload disk group volumes */
 					cfg_resource(cfg, sn);
 					cfg_unload_dsvols();
@@ -1063,10 +1060,12 @@ remove_iiset(int setno, char *shadow, int shd_exp)
 					(void) cfg_load_dsvols(cfg);
 					(void) cfg_load_svols(cfg);
 					if (cfg_vol_disable(cfg, shadow, sn,
-					    "ii") < 0)
-					    dsw_error(gettext(
-						"SV disable of shadow failed"),
-						NULL);
+					    "ii") < 0) {
+						dsw_error(gettext(
+						    "SV disable of shadow "
+						    "failed"),
+						    NULL);
+					}
 					cfg_resource(cfg, cfg_cluster_tag);
 			} else {
 				if (cfg_vol_disable(cfg, shadow,
@@ -1174,26 +1173,27 @@ check_resource_group(char *volume)
 				cfg_resource(cfg, cfg_cluster_tag);
 				return (1);
 			} else {
-			/*
-			 * Check dgname and cluster tag from -C are the same.
-			 */
-			if (strcmp(diskgroup, cfg_cluster_tag) != 0) {
-			    char error_buffer[128];
-			    (void) snprintf(error_buffer, sizeof (error_buffer),
-				gettext(
-				    "-C (%s) does not match disk group "
-				    "name (%s) for %s"), cfg_cluster_tag,
-				    diskgroup, volume);
-				spcs_log("ii", NULL, error_buffer);
-				dsw_error(error_buffer, NULL);
-			    }
+				/*
+				 * Check dgname and cluster tag from -C are
+				 * the same.
+				 */
+				if (strcmp(diskgroup, cfg_cluster_tag) != 0) {
+					char error_buffer[128];
+					(void) snprintf(error_buffer,
+					    sizeof (error_buffer),
+					    gettext("-C (%s) does not match "
+					    "disk group name (%s) for %s"),
+					    cfg_cluster_tag, diskgroup, volume);
+					spcs_log("ii", NULL, error_buffer);
+					dsw_error(error_buffer, NULL);
+				}
 			}
 		} else if (cfg_cluster_tag == NULL)
 			dsw_error(gettext(
-				"Point-in-Time Copy volumes, that are not "
-				"in a device group which has been "
-				"registered with SunCluster, "
-				"require usage of \"-C\""), NULL);
+			    "Point-in-Time Copy volumes, that are not "
+			    "in a device group which has been "
+			    "registered with SunCluster, "
+			    "require usage of \"-C\""), NULL);
 	}
 	return (0);
 }
@@ -1365,8 +1365,7 @@ get_bitmap(master_volume, shd_bitmap, copy_bitmap, size)
 {
 	dsw_bitmap_t parms;
 
-	(void) strncpy(parms.shadow_vol, master_volume, DSW_NAMELEN);
-	parms.shadow_vol[DSW_NAMELEN-1] = '\0';
+	(void) strlcpy(parms.shadow_vol, master_volume, DSW_NAMELEN);
 	parms.shd_bitmap = shd_bitmap;
 	parms.shd_size = size;
 	parms.copy_bitmap = copy_bitmap;
@@ -1386,8 +1385,7 @@ allocate_bitmap(char *shadow_volume)
 	dsw_stat_t	args;
 	int		stat_flags;
 
-	(void) strncpy(args.shadow_vol, shadow_volume, DSW_NAMELEN);
-	args.shadow_vol[DSW_NAMELEN-1] = '\0';
+	(void) strlcpy(args.shadow_vol, shadow_volume, DSW_NAMELEN);
 
 	args.status = spcs_s_ucreate();
 	if (do_ioctl(dsw_fd, DSWIOC_STAT, &args) == -1)
@@ -1489,9 +1487,9 @@ usage(char *why)
 		    gettext("\t-e dep m s b\tenable dependent master shadow "
 		    "bitmap"));
 		if (check_cluster() == II_CLUSTER)
-		    (void) fprintf(stdout, "%s\n",
-			gettext("\t-ne ind m s b\tenable exportable master "
-			"shadow bitmap"));
+			(void) fprintf(stdout, "%s\n",
+			    gettext("\t-ne ind m s b\tenable exportable master "
+			    "shadow bitmap"));
 		(void) fprintf(stdout, "%s\n",
 		    gettext("\t-d v\t\tdisable volume"));
 		(void) fprintf(stdout, "%s\n",
@@ -1548,7 +1546,7 @@ usage(char *why)
 		    gettext("\t-n\t\tperform action without question"));
 		(void) fprintf(stdout, "%s\n",
 		    gettext("\t-p [-c|-u] {m|s}"
-			"enable PID locking on copy or update"));
+		    "enable PID locking on copy or update"));
 		(void) fprintf(stdout, "%s\n",
 		    gettext("\t-p -w v\t\tdisable PID locking"));
 		(void) fprintf(stdout, "%s\n",
@@ -1742,8 +1740,7 @@ child_wait(pid_t child, enum child_event event, char *volume)
 	dsw_stat_t	args;
 	int rc;
 
-	(void) strncpy(args.shadow_vol, volume, DSW_NAMELEN);
-	args.shadow_vol[DSW_NAMELEN-1] = '\0';
+	(void) strlcpy(args.shadow_vol, volume, DSW_NAMELEN);
 
 	for (; dead_child != child; (void) sleep(1)) {
 
@@ -1802,7 +1799,7 @@ mounted(char *t)
 
 	if ((mntfp = fopen("/etc/mnttab", "r")) == NULL) {
 		dsw_error(gettext("Can not check volume against mount table"),
-					NULL);
+		    NULL);
 	}
 	if (getmntany(mntfp, &mntent, &mntref) != -1) {
 		/* found something before EOF */
@@ -1834,10 +1831,10 @@ enable(char *master_volume, char *shadow_volume,
 	bzero(&parms, sizeof (dsw_config_t));
 
 	if (strcmp(copy_type, "independent") == 0 ||
-			strcmp(copy_type, gettext("independent")) == 0)
+	    strcmp(copy_type, gettext("independent")) == 0)
 		parms.flag = DSW_GOLDEN;
 	else if (strcmp(copy_type, "dependent") == 0 ||
-			strcmp(copy_type, gettext("dependent")) == 0)
+	    strcmp(copy_type, gettext("dependent")) == 0)
 		parms.flag = 0;
 	else
 		dsw_error(gettext("don't understand shadow type"), NULL);
@@ -1878,8 +1875,8 @@ enable(char *master_volume, char *shadow_volume,
 		if (check_diskgroup(bitmap_volume, bmp_dg)) rc++;
 		if ((rc != 0) && (rc != 3))
 			dsw_error(gettext(
-				"Not all Point-in-Time Copy volumes are "
-				"in a disk group"), NULL);
+			    "Not all Point-in-Time Copy volumes are "
+			    "in a disk group"), NULL);
 
 		/*
 		 * If volumes are not in a disk group, but are in a
@@ -1887,10 +1884,10 @@ enable(char *master_volume, char *shadow_volume,
 		 */
 		if (rc == 0 && cfg_cluster_tag == NULL)
 			dsw_error(gettext(
-				"Point-in-Time Copy volumes, that are not "
-				"in a device group which has been "
-				"registered with SunCluster, "
-				"require usage of \"-C\""), NULL);
+			    "Point-in-Time Copy volumes, that are not "
+			    "in a device group which has been "
+			    "registered with SunCluster, "
+			    "require usage of \"-C\""), NULL);
 
 		/*
 		 * the same disk group
@@ -1898,8 +1895,8 @@ enable(char *master_volume, char *shadow_volume,
 		 */
 		if ((strcmp(mst_dg, bmp_dg)) ||
 		    (strcmp(mst_dg, shd_dg) && (!nflg)))
-			    dsw_error(gettext(
-				"Volumes are not in same disk group"), NULL);
+			dsw_error(gettext(
+			    "Volumes are not in same disk group"), NULL);
 
 		/*
 		 * Can never enable the same shadow twice, regardless of
@@ -1907,7 +1904,7 @@ enable(char *master_volume, char *shadow_volume,
 		 */
 		if (find_shadow_line(shadow_volume))
 			dsw_error(gettext(
-				"Shadow volume is already configured"), NULL);
+			    "Shadow volume is already configured"), NULL);
 
 		/*
 		 * Groups cannot span multiple clusters
@@ -1980,22 +1977,22 @@ enable(char *master_volume, char *shadow_volume,
 	 */
 	if (stat(master_volume, &mstat) != 0)
 		dsw_error(gettext(
-			"Unable to access master volume"), NULL);
+		    "Unable to access master volume"), NULL);
 	if (!S_ISCHR(mstat.st_mode))
 		dsw_error(gettext(
-			"Master volume is not a character device"), NULL);
+		    "Master volume is not a character device"), NULL);
 	/* check the shadow_vol hasn't be used as SNDR secondary vol */
 	check_iishadow(shadow_volume);
 	if (stat(shadow_volume, &sstat) != 0)
 		dsw_error(gettext(
-			"Unable to access shadow volume"), NULL);
+		    "Unable to access shadow volume"), NULL);
 	if (!S_ISCHR(sstat.st_mode))
 		dsw_error(gettext(
-			"Shadow volume is not a character device"), NULL);
+		    "Shadow volume is not a character device"), NULL);
 	if (mounted(shadow_volume)) {
 		errno = EBUSY;
 		dsw_error(gettext(
-			"Shadow volume is mounted, unmount it first"), NULL);
+		    "Shadow volume is mounted, unmount it first"), NULL);
 	}
 	if (mstat.st_rdev == sstat.st_rdev) {
 		errno = EINVAL;
@@ -2007,7 +2004,7 @@ enable(char *master_volume, char *shadow_volume,
 	}
 	if (!S_ISCHR(bstat.st_mode))
 		dsw_error(gettext(
-			"Bitmap volume is not a character device"), NULL);
+		    "Bitmap volume is not a character device"), NULL);
 	if (S_ISCHR(bstat.st_mode)) {
 		if (mstat.st_rdev == bstat.st_rdev) {
 			errno = EINVAL;
@@ -2040,16 +2037,16 @@ enable(char *master_volume, char *shadow_volume,
 	for (p = get_overflow_list(); *p != NULL; p += DSW_NAMELEN) {
 		if (strncmp(master_volume, p, DSW_NAMELEN) == 0)
 			dsw_error(gettext(
-				"Master volume is already an overflow volume"),
-				NULL);
+			    "Master volume is already an overflow volume"),
+			    NULL);
 		else if (strncmp(shadow_volume, p, DSW_NAMELEN) == 0)
 			dsw_error(gettext(
-				"Shadow volume is already an overflow volume"),
-				NULL);
+			    "Shadow volume is already an overflow volume"),
+			    NULL);
 		else if (strncmp(bitmap_volume, p, DSW_NAMELEN) == 0)
 			dsw_error(gettext(
-				"Bitmap volume is already an overflow volume"),
-				NULL);
+			    "Bitmap volume is already an overflow volume"),
+			    NULL);
 	}
 
 	/*
@@ -2057,7 +2054,7 @@ enable(char *master_volume, char *shadow_volume,
 	 */
 	if (find_shadow_config(shadow_volume, NULL, &temp))
 		dsw_error(gettext(
-			"Shadow volume is already configured"), NULL);
+		    "Shadow volume is already configured"), NULL);
 	if (perform_autosv()) {
 		/*
 		 * parse the dsvol entries to see if we need to place
@@ -2078,20 +2075,21 @@ enable(char *master_volume, char *shadow_volume,
 			if (nflg) {
 				cfg_resource(cfg, shd_dg);
 				rc = cfg_vol_enable(cfg, shadow_volume,
-					shd_dg, "ii");
+				    shd_dg, "ii");
 				cfg_resource(cfg, cfg_cluster_tag);
 			} else {
 				rc = cfg_vol_enable(cfg, shadow_volume,
-					cfg_cluster_tag, "ii");
+				    cfg_cluster_tag, "ii");
 			}
 			if (rc < 0) {
 				if (mvol_enabled) {
 					if (cfg_vol_disable(cfg,
 					    master_volume, cfg_cluster_tag,
 					    "ii") < 0)
-					    dsw_error(gettext(
-						"SV disable of master failed"),
-						NULL);
+						dsw_error(gettext(
+						    "SV disable of master "
+						    "failed"),
+						    NULL);
 				}
 				dsw_error(
 				    gettext("Cannot enable shadow volume"),
@@ -2132,8 +2130,8 @@ enable(char *master_volume, char *shadow_volume,
 			if (!ii_lock(cfg, CFG_WRLOCK) ||
 			    !find_shadow_config(shadow_volume, NULL, &temp)) {
 				dsw_error(gettext(
-					"Enable failed, can't tidy up cfg"),
-					&parms.status);
+				    "Enable failed, can't tidy up cfg"),
+				    &parms.status);
 			}
 			config_locked = 1;
 			remove_iiset(setnumber, shadow_volume, 0);
@@ -2145,8 +2143,8 @@ enable(char *master_volume, char *shadow_volume,
 		else
 			sp_info = NULL;
 		spcs_log("ii", sp_info, gettext("Enabled %s %s %s (%s)"),
-			master_volume, shadow_volume, bitmap_volume,
-			parms.flag & DSW_GOLDEN ? "independent" : "dependent");
+		    master_volume, shadow_volume, bitmap_volume,
+		    parms.flag & DSW_GOLDEN ? "independent" : "dependent");
 		spcs_s_ufree(&parms.status);
 		break;
 
@@ -2190,8 +2188,7 @@ reset(char *volume)
 	unlocked = 1;
 
 	spcs_log("ii", NULL, gettext("Start reset %s"), volume);
-	(void) strncpy(prev_stat.shadow_vol, volume, DSW_NAMELEN);
-	prev_stat.shadow_vol[DSW_NAMELEN - 1] = '\0';
+	(void) strlcpy(prev_stat.shadow_vol, volume, DSW_NAMELEN);
 	prev_stat.status = spcs_s_ucreate();
 	if (do_ioctl(dsw_fd, DSWIOC_STAT, &prev_stat) == -1) {
 		/* set is suspended, so we do the enable processing instead */
@@ -2309,13 +2306,13 @@ overflow(char *volume)
 	check_action(gettext("Initialize this overflow volume?"));
 	if (find_matching_cf_line(volume, NULL, &args))
 		dsw_error(gettext("Volume is part of a Point-in-Time Copy "
-					    "group"), NULL);
+		    "group"), NULL);
 	args.status = spcs_s_ucreate();
 	(void) strncpy(args.shadow_vol, volume, DSW_NAMELEN);
 	rc = do_ioctl(dsw_fd, DSWIOC_OCREAT, &args);
 	if (rc == -1) {
 		spcs_log("ii", &args.status,
-			gettext("Create overflow failed %s"), volume);
+		    gettext("Create overflow failed %s"), volume);
 		dsw_error(gettext("Create overflow failed"), &args.status);
 	}
 	if (rc == -1)
@@ -2525,12 +2522,11 @@ do_acopy(char **vol_list, enum copy_update update_mode,
 		if (mounted(t)) {
 			errno = EBUSY;
 			dsw_error(gettext("Target of copy/update is mounted, "
-						"unmount it first"), NULL);
+			    "unmount it first"), NULL);
 		}
 
-		(void) strncpy(stat_s.shadow_vol, parms.shadow_vol,
+		(void) strlcpy(stat_s.shadow_vol, parms.shadow_vol,
 		    DSW_NAMELEN);
-		stat_s.shadow_vol[DSW_NAMELEN-1] = '\0';
 		stat_s.status = spcs_s_ucreate();
 		rc = do_ioctl(dsw_fd, DSWIOC_STAT, &stat_s);
 		spcs_s_ufree(&stat_s.status);
@@ -2550,11 +2546,10 @@ do_acopy(char **vol_list, enum copy_update update_mode,
 	acopy_args->status = spcs_s_ucreate();
 	for (i = 0; i < n_vols; i++) {
 		spcs_log("ii", NULL, gettext("Atomic %s %s %s"),
-			update_mode == Update ?
-				gettext("update") : gettext("copy"),
-			vol_list[i],
-			direction == ToMaster ?  gettext("from shadow") :
-			gettext("to shadow"));
+		    update_mode == Update ? gettext("update") : gettext("copy"),
+		    vol_list[i],
+		    direction == ToMaster ?  gettext("from shadow") :
+		    gettext("to shadow"));
 	}
 	if (group_name == NULL || *group_name == NULL) {
 		sp = acopy_args->shadow_vol;
@@ -2572,8 +2567,8 @@ do_acopy(char **vol_list, enum copy_update update_mode,
 			(void) sprintf(buf, gettext("Update failed"));
 		} else {
 			spcs_log("ii", NULL,
-				gettext("Atomic update of %s failed"),
-				vol_list[acopy_args->count]);
+			    gettext("Atomic update of %s failed"),
+			    vol_list[acopy_args->count]);
 			(void) sprintf(buf, gettext("Update of %s failed"),
 			    vol_list[acopy_args->count]);
 		}
@@ -2602,7 +2597,7 @@ do_copy(char **vol_list, enum copy_update update_mode,
 	volume = vol_list[0];
 	if (!find_shadow_config(volume, &parms, &copy_args))
 		dsw_error(gettext("Volume is not in a Point-in-Time Copy "
-					    "group"), NULL);
+		    "group"), NULL);
 
 	cfg_unlock(cfg);
 	config_locked = 0;
@@ -2634,11 +2629,10 @@ do_copy(char **vol_list, enum copy_update update_mode,
 	if (mounted(t)) {
 		errno = EBUSY;
 		dsw_error(gettext("Target of copy/update is mounted, "
-					"unmount it first"), NULL);
+		    "unmount it first"), NULL);
 	}
 
-	(void) strncpy(stat_s.shadow_vol, copy_args.shadow_vol, DSW_NAMELEN);
-	stat_s.shadow_vol[DSW_NAMELEN-1] = '\0';
+	(void) strlcpy(stat_s.shadow_vol, copy_args.shadow_vol, DSW_NAMELEN);
 	stat_s.status = spcs_s_ucreate();
 	rc = do_ioctl(dsw_fd, DSWIOC_STAT, &stat_s);
 	spcs_s_ufree(&stat_s.status);
@@ -2653,11 +2647,10 @@ do_copy(char **vol_list, enum copy_update update_mode,
 
 	copy_args.status = spcs_s_ucreate();
 	spcs_log("ii", NULL, gettext("Start %s %s %s"),
-			update_mode == Update ?
-				gettext("update") : gettext("copy"),
-			volume,
-			direction == ToMaster ?  gettext("from shadow") :
-			gettext("to shadow"));
+	    update_mode == Update ? gettext("update") : gettext("copy"),
+	    volume,
+	    direction == ToMaster ?  gettext("from shadow") :
+	    gettext("to shadow"));
 
 	if (wait_action == WaitForStart)
 		(void) sigset(SIGCHLD, sigchild);
@@ -2665,7 +2658,7 @@ do_copy(char **vol_list, enum copy_update update_mode,
 
 	case (pid_t)-1:
 		dsw_error(gettext("Unable to fork"),
-					NULL);
+		    NULL);
 		break;
 
 	case 0:
@@ -2674,19 +2667,18 @@ do_copy(char **vol_list, enum copy_update update_mode,
 			spcs_log("ii", &copy_args.status,
 			    gettext("Fail %s %s %s"),
 			    update_mode == Update ?
-					gettext("update") : gettext("copy"),
+			    gettext("update") : gettext("copy"),
 			    volume,
-			    direction == ToMaster ?  gettext("from shadow")
-					: gettext("to shadow"));
+			    direction == ToMaster ?
+			    gettext("from shadow") : gettext("to shadow"));
 			dsw_error(gettext("Copy failed"), &copy_args.status);
 		}
 		spcs_s_ufree(&copy_args.status);
 		spcs_log("ii", NULL, gettext("Finish %s %s %s"),
-		    update_mode == Update ?
-				gettext("update") : gettext("copy"),
+		    update_mode == Update ? gettext("update") : gettext("copy"),
 		    volume,
 		    direction == ToMaster ?  gettext("from shadow") :
-				gettext("to shadow"));
+		    gettext("to shadow"));
 
 		exit(0);
 		break;
@@ -2717,8 +2709,7 @@ print_status(dsw_config_t *conf, int in_config)
 	if (need_sep++ > 0)
 		(void) printf("--------------------------------------"
 		    "----------------------------------------\n");
-	(void) strncpy(args.shadow_vol, conf->shadow_vol, DSW_NAMELEN);
-	args.shadow_vol[DSW_NAMELEN-1] = '\0';
+	(void) strlcpy(args.shadow_vol, conf->shadow_vol, DSW_NAMELEN);
 	if (in_config) {
 		(void) printf("%s: %s\n",
 		    conf->master_vol, gettext("(master volume)"));
@@ -2732,23 +2723,26 @@ print_status(dsw_config_t *conf, int in_config)
 	 * Do special checking on the status of this volume in a Sun Cluster
 	 */
 	if (check_cluster() == II_CLUSTER) {
-	    char dgname[CFG_MAX_BUF], *other_node;
+		char dgname[CFG_MAX_BUF], *other_node;
 
-	    if (cfg_dgname(conf->bitmap_vol, dgname, sizeof (dgname))) {
-		if (strlen(dgname)) {
-		    int rc = cfg_dgname_islocal(dgname, &other_node);
-		    if (rc < 0) {
-			(void) printf(gettext(
-			    "Suspended on this node, not active elsewhere\n"));
-			return;
-		    } else if (rc == 0) {
-			(void) printf(gettext(
-				"Suspended on this node, active on %s\n"),
-				other_node);
-			return;
-		    }
+		if (cfg_dgname(conf->bitmap_vol, dgname, sizeof (dgname))) {
+			if (strlen(dgname)) {
+				int rc = cfg_dgname_islocal(dgname,
+				    &other_node);
+
+				if (rc < 0) {
+					(void) printf(gettext(
+					    "Suspended on this node, "
+					    "not active elsewhere\n"));
+					return;
+				} else if (rc == 0) {
+					(void) printf(gettext(
+					    "Suspended on this node, "
+					    "active on %s\n"), other_node);
+					return;
+				}
+			}
 		}
-	    }
 	}
 
 	args.status = spcs_s_ucreate();
@@ -2769,11 +2763,11 @@ print_status(dsw_config_t *conf, int in_config)
 
 	if (conf->group_name[0] != '\0')
 		(void) printf(gettext("Group name: %s\n"),
-			    conf->group_name);
+		    conf->group_name);
 
 	if (conf->cluster_tag[0] != '\0')
 		(void) printf(gettext("Cluster tag: %s\n"),
-			    conf->cluster_tag);
+		    conf->cluster_tag);
 
 	stat_flags = args.stat;
 	spcs_s_ufree(&args.status);
@@ -2827,15 +2821,15 @@ print_status(dsw_config_t *conf, int in_config)
 	tmp_time = args.mtime;
 	if (tmp_time != 0)
 		(void) printf("%s %s", gettext("Latest modified time:"),
-			ctime(&tmp_time));
+		    ctime(&tmp_time));
 	else
 		(void) printf("%s\n", gettext("Latest modified time: unknown"));
 
 	(void) printf("%s %8llu\n", gettext("Volume size:"), args.size);
 	if (args.shdsize != 0) {
 		(void) printf("%s %lld %s %lld\n",
-			gettext("Shadow chunks total:"), args.shdsize,
-			gettext("Shadow chunks used:"), args.shdused);
+		    gettext("Shadow chunks total:"), args.shdsize,
+		    gettext("Shadow chunks used:"), args.shdused);
 	}
 	bitmap_op(args.shadow_vol, 0, 1, 0, 0);
 }
@@ -2847,7 +2841,7 @@ abort_copy(char *volume)
 
 	if (!find_shadow_config(volume, NULL, &args))
 		dsw_error(gettext("Volume is not in a Point-in-Time Copy "
-						"group"), NULL);
+		    "group"), NULL);
 	args.status = spcs_s_ucreate();
 	if (do_ioctl(dsw_fd, DSWIOC_ABORT, &args)  == -1)
 		dsw_error(gettext("Abort failed"), &args.status);
@@ -2935,7 +2929,7 @@ list_volumes()
 				/* LINTED alignment of cast ok */
 				lp = (dsw_config_t *)ip->data;
 				if (strcmp(parms.master_vol,
-					II_IMPORTED_SHADOW))
+				    II_IMPORTED_SHADOW))
 					found = !(lp->flag & DSW_SHDIMPORT);
 				else
 					found = (lp->flag & DSW_SHDIMPORT);
@@ -2947,7 +2941,7 @@ list_volumes()
 			found = FALSE;
 
 		if ((cfg_cluster_tag) &&
-			strcmp(cfg_cluster_tag, parms.cluster_tag))
+		    strcmp(cfg_cluster_tag, parms.cluster_tag))
 			continue;
 
 		if ((group_name) && strcmp(group_name, parms.group_name))
@@ -2979,7 +2973,7 @@ wait_for_copy(char *volume)
 	config_locked = 1;
 	if (!find_shadow_config(volume, NULL, &parms))
 		dsw_error(gettext("Volume is not in a Point-in-Time Copy "
-						"group"), NULL);
+		    "group"), NULL);
 	cfg_unlock(cfg);
 	config_locked = 0;
 	unlocked = 1;
@@ -3017,7 +3011,7 @@ export(char *volume)
 
 	if (!find_shadow_config(volume, &conf, &parms))
 		dsw_error(gettext("Volume is not in a Point-in-Time Copy "
-				"group"), NULL);
+		    "group"), NULL);
 	if (mounted(volume))
 		dsw_error(gettext("Can't export a mounted volume"), NULL);
 
@@ -3062,7 +3056,7 @@ detach(char *volume)
 
 	if (!find_shadow_config(volume, NULL, &parms))
 		dsw_error(gettext("Volume is not in a Point-in-Time Copy "
-						"group"), NULL);
+		    "group"), NULL);
 	parms.status = spcs_s_ucreate();
 	rc = do_ioctl(dsw_fd, DSWIOC_ODETACH, &parms);
 	if (rc == 0) {
@@ -3074,9 +3068,9 @@ detach(char *volume)
 		(void) cfg_commit(cfg);
 	} else {
 		spcs_log("ii", NULL, gettext("Detach of overflow %s failed"),
-				parms.shadow_vol);
+		    parms.shadow_vol);
 		dsw_error(gettext("Failed to detach overflow volume"),
-				&parms.status);
+		    &parms.status);
 	}
 	return (rc);
 }
@@ -3087,8 +3081,7 @@ can_disable(char *vol)
 	dsw_stat_t args;
 
 	if (mounted(vol)) {
-		(void) strncpy(args.shadow_vol, vol, DSW_NAMELEN);
-		args.shadow_vol[DSW_NAMELEN - 1] = '\0';
+		(void) strlcpy(args.shadow_vol, vol, DSW_NAMELEN);
 		args.status = spcs_s_ucreate();
 		if (do_ioctl(dsw_fd, DSWIOC_STAT, &args) != -1 &&
 		    (args.stat & DSW_GOLDEN) == 0) {
@@ -3107,8 +3100,7 @@ clean_up_after_failed_disable(dsw_ioctl_t *parms)
 	dsw_stat_t args;
 
 	for (p = group_volumes; *p; p++) {
-		(void) strncpy(args.shadow_vol, *p, DSW_NAMELEN);
-		args.shadow_vol[DSW_NAMELEN - 1] = '\0';
+		(void) strlcpy(args.shadow_vol, *p, DSW_NAMELEN);
 		args.status = spcs_s_ucreate();
 		if (do_ioctl(dsw_fd, DSWIOC_STAT, &args) == -1) {
 			/* set was successfully disabled */
@@ -3238,8 +3230,7 @@ dsw_group_or_single_op(int argc, char *argv[], int (*op)(char *))
 	if (group_name) {
 		if (find_group_members(group_name) < 1)
 			dsw_error(gettext("Group does not exist or "
-				"has no members"),
-						NULL);
+			    "has no members"), NULL);
 		for (; *group_volumes; group_volumes++)
 			rc |= (*op)(*group_volumes);
 	} else {
@@ -3320,8 +3311,7 @@ dsw_copy_to_shadow(int argc, char *argv[])
 	else {
 		if (find_group_members(group_name) < 1)
 			dsw_error(gettext("Group does not exist or "
-				"has no members"),
-						NULL);
+			    "has no members"), NULL);
 		volume_list = group_volumes;
 	}
 
@@ -3341,8 +3331,7 @@ dsw_update_shadow(int argc, char *argv[])
 	else {
 		if (find_group_members(group_name) < 1)
 			dsw_error(gettext("Group does not exist or "
-				"has no members"),
-						NULL);
+			    "has no members"), NULL);
 		volume_list = group_volumes;
 	}
 
@@ -3362,11 +3351,10 @@ dsw_copy_to_master(int argc, char *argv[])
 		check_action(gettext("Overwrite master with shadow volume?"));
 	} else {
 		check_action(gettext("Overwrite every"
-			" master in this group with its shadow volume?"));
+		    " master in this group with its shadow volume?"));
 		if (find_group_members(group_name) < 1)
 			dsw_error(gettext("Group does not exist or "
-				"has no members"),
-						NULL);
+			    "has no members"), NULL);
 		volume_list = group_volumes;
 	}
 
@@ -3386,11 +3374,10 @@ dsw_update_master(int argc, char *argv[])
 		check_action(gettext("Overwrite master with shadow volume?"));
 	} else {
 		check_action(gettext("Overwrite every"
-			" master in this group with its shadow volume?"));
+		    " master in this group with its shadow volume?"));
 		if (find_group_members(group_name) < 1)
 			dsw_error(gettext("Group does not exist or "
-				"has no members"),
-						NULL);
+			    "has no members"), NULL);
 		volume_list = group_volumes;
 	}
 
@@ -3421,35 +3408,34 @@ dsw_display_status(int argc, char *argv[])
 			(void) printf(gettext(
 			    "Volume is not in configuration file\n"), NULL);
 			(void) fflush(stdout);
-			(void) strncpy(parms.shadow_vol, argv[1], DSW_NAMELEN);
-			parms.shadow_vol[DSW_NAMELEN] = '\0';
+			(void) strlcpy(parms.shadow_vol, argv[1], DSW_NAMELEN);
 		}
 		print_status(&parms, in_config);
 	} else if (group_name) {
 		if (find_group_members(group_name) < 1)
 			dsw_error(gettext("Group does not exist or "
-				"has no members"),
-						NULL);
+			    "has no members"), NULL);
 		for (; *group_volumes; group_volumes++) {
 			in_config = find_shadow_config(*group_volumes,
-						&parms, NULL);
+			    &parms, NULL);
 			if (in_config)
 				print_status(&parms, in_config);
 		}
 	} else {
 		/* perform action for each line of the stored config file */
 		for (setnumber = 1;
-			!get_dsw_config(setnumber, &parms); setnumber++) {
+		    !get_dsw_config(setnumber, &parms); setnumber++) {
 			switch (check_cluster()) {
 			case II_CLUSTER:
-			    if ((cfg_cluster_tag) &&
-				(strcmp(cfg_cluster_tag, parms.cluster_tag)))
-				    continue;
-			    break;
+				if ((cfg_cluster_tag) &&
+				    (strcmp(cfg_cluster_tag,
+				    parms.cluster_tag)))
+					continue;
+				break;
 			case II_CLUSTER_LCL:
-			    if (strlen(parms.cluster_tag))
-				    continue;
-			    break;
+				if (strlen(parms.cluster_tag))
+					continue;
+				break;
 			}
 			print_status(&parms, 1);
 		}
@@ -3471,8 +3457,7 @@ dsw_display_bitmap(int argc, char *argv[])
 		(void) printf(gettext(
 		    "Volume is not in configuration file\n"), NULL);
 		(void) fflush(stdout);
-		(void) strncpy(parms.master_vol, argv[1], DSW_NAMELEN);
-		parms.master_vol[DSW_NAMELEN] = '\0';
+		(void) strlcpy(parms.master_vol, argv[1], DSW_NAMELEN);
 	}
 
 	bitmap_op(parms.shadow_vol, 1, 0, 0, 0);
@@ -3588,10 +3573,8 @@ import(char *shadow_volume, char *bitmap_volume)
 	reload_vols = LD_DSVOLS | LD_SHADOWS;
 	conform_name(&shadow_volume);
 	(void) strcpy(parms.master_vol, II_IMPORTED_SHADOW);
-	(void) strncpy(parms.shadow_vol, shadow_volume, DSW_NAMELEN);
-	parms.shadow_vol[DSW_NAMELEN-1] = '\0';
-	(void) strncpy(parms.bitmap_vol, bitmap_volume, DSW_NAMELEN);
-	parms.bitmap_vol[DSW_NAMELEN-1] = '\0';
+	(void) strlcpy(parms.shadow_vol, shadow_volume, DSW_NAMELEN);
+	(void) strlcpy(parms.bitmap_vol, bitmap_volume, DSW_NAMELEN);
 	parms.flag = DSW_GOLDEN;
 
 	spcs_log("ii", NULL, gettext("Import %s %s"),
@@ -3639,7 +3622,7 @@ join(char *shadow_volume, char *bitmap_file)
 
 	if (!find_shadow_config(shadow_volume, &conf, &shd))
 		dsw_error(gettext("Volume is not in a Point-in-Time Copy "
-				"group"), NULL);
+		    "group"), NULL);
 
 	/* If this is an exportable shadow in the cluster, change ctag */
 	if (strlen(conf.cluster_tag) &&
@@ -3698,8 +3681,7 @@ join(char *shadow_volume, char *bitmap_file)
 
 	(void) fclose(bmpfp);
 
-	(void) strncpy(parms.shadow_vol, shadow_volume, DSW_NAMELEN);
-	parms.shadow_vol[DSW_NAMELEN-1] = '\0';
+	(void) strlcpy(parms.shadow_vol, shadow_volume, DSW_NAMELEN);
 	parms.shd_bitmap = shd_bitmap;
 	parms.shd_size = size;
 	parms.copy_bitmap = NULL;
@@ -3735,8 +3717,7 @@ params(char *shadow_volume)
 	int new_delay;
 	int new_unit;
 
-	(void) strncpy(parms.shadow_vol, shadow_volume, DSW_NAMELEN);
-	parms.shadow_vol[DSW_NAMELEN-1] = '\0';
+	(void) strlcpy(parms.shadow_vol, shadow_volume, DSW_NAMELEN);
 	if (delay == NULL || unit == NULL) {
 		get = 1;
 		parms.copy_delay = -1;
@@ -3775,7 +3756,7 @@ do_attach(dsw_config_t *parms)
 	int check = 0;
 
 	spcs_log("ii", NULL, gettext("Attach %s %s"),
-		parms->shadow_vol, parms->bitmap_vol);
+	    parms->shadow_vol, parms->bitmap_vol);
 	parms->status = spcs_s_ucreate();
 	rc = do_ioctl(dsw_fd, DSWIOC_OATTACH, parms);
 	if (rc == -1) {
@@ -3789,8 +3770,7 @@ do_attach(dsw_config_t *parms)
 			dsw_error(
 			    gettext("Volume is not in a Point-in-Time Copy "
 			    "group"), NULL);
-		(void) strncpy(io.bitmap_vol, parms->bitmap_vol, DSW_NAMELEN);
-		io.bitmap_vol[DSW_NAMELEN-1] = '\0';
+		(void) strlcpy(io.bitmap_vol, parms->bitmap_vol, DSW_NAMELEN);
 		io.status = spcs_s_ucreate();
 		if (do_ioctl(dsw_fd, DSWIOC_OATTACH, &io) == -1) {
 			spcs_log("ii", NULL, gettext("Attach failed %s %s"),
@@ -3839,17 +3819,16 @@ attach(char *shadow_volume)
 	/* assure that the overflow_file is not an II volume */
 	if (find_any_cf_line(overflow_file))
 		dsw_error(gettext(
-			"Overflow volume is already in a Point-in-Time Copy "
-			"group"), NULL);
+		    "Overflow volume is already in a Point-in-Time Copy "
+		    "group"), NULL);
 
 	/* use find_shadow_config() to find setnumber */
 	if (!find_shadow_config(shadow_volume, &parms, NULL))
 		dsw_error(gettext("Volume is not in a Point-in-Time Copy "
-			"group"), NULL);
+		    "group"), NULL);
 
 	/* can only attach an overflow volume to dependent, compact shadow */
-	(void) strncpy(args.shadow_vol, shadow_volume, DSW_NAMELEN);
-	args.shadow_vol[DSW_NAMELEN-1] = '\0';
+	(void) strlcpy(args.shadow_vol, shadow_volume, DSW_NAMELEN);
 
 	args.status = spcs_s_ucreate();
 	if ((do_ioctl(dsw_fd, DSWIOC_STAT, &args) == -1) ||
@@ -3857,15 +3836,14 @@ attach(char *shadow_volume)
 		dsw_error(gettext("Not a compact dependent shadow"), NULL);
 
 	/* bitmap_vol is overloaded */
-	(void) strncpy(parms.bitmap_vol, overflow_file, DSW_NAMELEN);
-	parms.bitmap_vol[DSW_NAMELEN-1] = '\0';
+	(void) strlcpy(parms.bitmap_vol, overflow_file, DSW_NAMELEN);
 
 	do_attach(&parms);
 
 	/* add overflow to cfg line */
 	(void) sprintf(key, "ii.set%d.overflow", setnumber);
 	if (cfg_put_cstring(cfg, key, overflow_file,
-		    strlen(overflow_file)) < 0) {
+	    strlen(overflow_file)) < 0) {
 		perror("cfg_put_cstring");
 	}
 	(void) cfg_commit(cfg);
@@ -3947,8 +3925,7 @@ dsw_olist(int argc, char *argv[])
 
 			/* make copy of string */
 			vol[ i ] = (char *)malloc(DSW_NAMELEN + 1);
-			(void) strncpy(vol[ i ], sp, DSW_NAMELEN);
-			vol[ i ][ DSW_NAMELEN ] = '\0';
+			(void) strlcpy(vol[ i ], sp, DSW_NAMELEN);
 
 			item.key = vol[ i ];
 			item.data = (char *)0;
@@ -4002,8 +3979,7 @@ dsw_ostat(int argc, char *argv[])
 	if (argc != 2)
 		usage(gettext("Incorrect number of arguments"));
 
-	(void) strncpy(args.overflow_vol, argv[1], DSW_NAMELEN);
-	args.overflow_vol[DSW_NAMELEN-1] = '\0';
+	(void) strlcpy(args.overflow_vol, argv[1], DSW_NAMELEN);
 
 	args.status = spcs_s_ucreate();
 	if (do_ioctl(dsw_fd, DSWIOC_OSTAT2, &args) == -1)
@@ -4027,7 +4003,7 @@ dsw_ostat(int argc, char *argv[])
 	(void) printf(gettext("Number of chunks ever allocated: %lld\n"),
 	    args.used);
 	(void) printf(gettext("Number of used chunks: %lld\n"),
-		(args.nchunks - args.unused));
+	    (args.nchunks - args.unused));
 	(void) printf(gettext("Number of unused chunks: %lld\n"), args.unused);
 	exit(0);
 }
@@ -4057,7 +4033,7 @@ dsw_move_2_group(int argc, char *argv[])
 	for (++argv; *argv; argv++) {
 		if (!find_shadow_config(*argv, &parms, NULL))
 			dsw_error(gettext("Volume is not in a Point-in-Time "
-					"Copy group"), NULL);
+			    "Copy group"), NULL);
 
 		/* ensure the ctag matches the group */
 		if (gdata && *gdata->ctag) {
@@ -4122,7 +4098,7 @@ dsw_list_group_volumes()
 
 	if (find_group_members(group_name) < 1)
 		dsw_error(gettext("Group does not exist or has no members"),
-			NULL);
+		    NULL);
 
 	if ((pfp = popen("/usr/bin/sort -u", "w")) == NULL) {
 		dsw_error(gettext("Can't open sort program"), NULL);
@@ -4284,8 +4260,7 @@ is_exported(char *set)
 	dsw_stat_t args;
 	int rc;
 
-	(void) strncpy(args.shadow_vol, set, DSW_NAMELEN);
-	args.shadow_vol[DSW_NAMELEN-1] = '\0';
+	(void) strlcpy(args.shadow_vol, set, DSW_NAMELEN);
 	args.status = spcs_s_ucreate();
 
 	rc = do_ioctl(dsw_fd, DSWIOC_STAT, &args);

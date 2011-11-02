@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  */
 
 /* LINTLIBRARY */
@@ -45,6 +46,7 @@
 #include <fmtmsg.h>
 #include <fnmatch.h>
 #include <ftw.h>
+#include <glob.h>
 #include <getwidth.h>
 #include <grp.h>
 #include <iconv.h>
@@ -1140,6 +1142,11 @@ int vsprintf(char *_RESTRICT_KYWD string, const char *_RESTRICT_KYWD format,
 /*
  * /usr/src/lib/libc/port/regex routines
  */
+
+/* glob.c */
+extern int glob(const char *restrict pattern, int flags,
+    int(*errfunc)(const char *epath, int eerrno), glob_t *restrict pglob);
+extern void globfree(glob_t *pglob);
 
 /* regex.c */
 char *regex(const char *regexp, const char *stringp, ...);

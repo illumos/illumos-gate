@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -30,6 +31,7 @@
 #include <sys/sysmacros.h>
 #include <sys/filio.h>		/* FIO* ioctls */
 #include <sys/sockio.h>		/* SIOC* ioctls */
+#include <sys/poll_impl.h>
 #include <sys/cmn_err.h>
 #include <sys/ksocket.h>
 #include <io/ksocket/ksocket_impl.h>
@@ -54,7 +56,7 @@ ksocket_socket(ksocket_t *ksp, int domain, int type, int protocol, int flags,
 	/* All Solaris components should pass a cred for this operation. */
 	ASSERT(cr != NULL);
 
-	if (domain == AF_NCA || domain == AF_UNIX)
+	if (domain == AF_NCA)
 		return (EAFNOSUPPORT);
 
 	ASSERT(flags == KSOCKET_SLEEP || flags == KSOCKET_NOSLEEP);
@@ -715,6 +717,144 @@ ksocket_ioctl(ksocket_t ks, int cmd, intptr_t arg, int *rvalp, struct cred *cr)
 	}
 
 	return (rval);
+}
+
+/*
+ * Wait for an input event, similar to t_kspoll().
+ * Ideas and code borrowed from ../devpoll.c
+ * Basically, setup just enough poll data structures so
+ * we can block on a CV until timeout or pollwakeup().
+ */
+int
+ksocket_spoll(ksocket_t ks, int timo, short events, short *revents,
+    struct cred *cr)
+{
+	struct		sonode *so;
+	pollhead_t	*php, *php2;
+	polldat_t	*pdp;
+	pollcache_t	*pcp;
+	int		error;
+	clock_t		expires = 0;
+	clock_t		rval;
+
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
+	ASSERT(curthread->t_pollcache == NULL);
+
+	if (revents == NULL)
+		return (EINVAL);
+	if (!KSOCKET_VALID(ks))
+		return (ENOTSOCK);
+	so = KSTOSO(ks);
+
+	/*
+	 * Check if there are any events already pending.
+	 * If we're not willing to block, (timo == 0) then
+	 * pass "anyyet">0 to socket_poll so it can skip
+	 * some work.  Othewise pass "anyyet"=0 and if
+	 * there are no events pending, it will fill in
+	 * the pollhead pointer we need for pollwakeup().
+	 *
+	 * XXX - pollrelock() logic needs to know which
+	 * which pollcache lock to grab. It'd be a
+	 * cleaner solution if we could pass pcp as
+	 * an arguement in VOP_POLL interface instead
+	 * of implicitly passing it using thread_t
+	 * struct. On the other hand, changing VOP_POLL
+	 * interface will require all driver/file system
+	 * poll routine to change. May want to revisit
+	 * the tradeoff later.
+	 */
+	php = NULL;
+	*revents = 0;
+	pcp = pcache_alloc();
+	pcache_create(pcp, 1);
+
+	mutex_enter(&pcp->pc_lock);
+	curthread->t_pollcache = pcp;
+	error = socket_poll(so, (short)events, (timo == 0),
+	    revents, &php);
+	curthread->t_pollcache = NULL;
+	mutex_exit(&pcp->pc_lock);
+
+	if (error != 0 || *revents != 0 || timo == 0)
+		goto out;
+
+	/*
+	 * Need to block.  Did not get *revents, so the
+	 * php should be non-NULL, but let's verify.
+	 * Also compute when our sleep expires.
+	 */
+	if (php == NULL) {
+		error = EIO;
+		goto out;
+	}
+	if (timo > 0)
+		expires = ddi_get_lbolt() +
+		    MSEC_TO_TICK_ROUNDUP(timo);
+
+	/*
+	 * Setup: pollhead -> polldat -> pollcache
+	 * needed for pollwakeup()
+	 * pdp should be freed by pcache_destroy
+	 */
+	pdp = kmem_zalloc(sizeof (*pdp), KM_SLEEP);
+	pdp->pd_fd = 0;
+	pdp->pd_events = events;
+	pdp->pd_pcache = pcp;
+	pcache_insert_fd(pcp, pdp, 1);
+	pollhead_insert(php, pdp);
+	pdp->pd_php = php;
+
+	mutex_enter(&pcp->pc_lock);
+	while (!(so->so_state & SS_CLOSING)) {
+		pcp->pc_flag = 0;
+
+		/* Ditto pcp comment above. */
+		curthread->t_pollcache = pcp;
+		error = socket_poll(so, (short)events, 0,
+		    revents, &php2);
+		curthread->t_pollcache = NULL;
+		ASSERT(php2 == php);
+
+		if (error != 0 || *revents != 0)
+			break;
+
+		if (pcp->pc_flag & T_POLLWAKE)
+			continue;
+
+		if (timo == -1) {
+			rval = cv_wait_sig(&pcp->pc_cv, &pcp->pc_lock);
+		} else {
+			rval = cv_timedwait_sig(&pcp->pc_cv, &pcp->pc_lock,
+			    expires);
+		}
+		if (rval <= 0) {
+			if (rval == 0)
+				error = EINTR;
+			break;
+		}
+	}
+	mutex_exit(&pcp->pc_lock);
+
+	if (pdp->pd_php != NULL) {
+		pollhead_delete(pdp->pd_php, pdp);
+		pdp->pd_php = NULL;
+		pdp->pd_fd = NULL;
+	}
+
+	/*
+	 * pollwakeup() may still interact with this pollcache. Wait until
+	 * it is done.
+	 */
+	mutex_enter(&pcp->pc_no_exit);
+	ASSERT(pcp->pc_busy >= 0);
+	while (pcp->pc_busy > 0)
+		cv_wait(&pcp->pc_busy_cv, &pcp->pc_no_exit);
+	mutex_exit(&pcp->pc_no_exit);
+out:
+	pcache_destroy(pcp);
+	return (error);
 }
 
 int

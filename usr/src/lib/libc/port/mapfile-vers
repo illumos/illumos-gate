@@ -24,6 +24,8 @@
 # Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2011 by Delphix. All rights reserved.
+#
 
 #
 # MAPFILE HEADER START
@@ -87,6 +89,11 @@ $endif
 $if _x86 && _ELF64
 $add amd64
 $endif
+
+SYMBOL_VERSION ILLUMOS_0.2 {	# Illumos additions
+    protected:
+        posix_spawn_pipe_np;
+} ILLUMOS_0.1;
 
 SYMBOL_VERSION ILLUMOS_0.1 {	# Illumos additions
     protected:

@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2011 by Delphix. All rights reserved.
+ */
+
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -49,13 +53,6 @@
 #include "stdiom.h"
 #include "mse.h"
 #include "libc.h"
-
-#define	tst(a, b) (*mode == 'r'? (b) : (a))
-#define	RDR	0
-#define	WTR	1
-
-extern	int __xpg4;	/* defined in _xpg4.c; 0 if not xpg4-compiled program */
-extern const char **_environ;
 
 static mutex_t popen_lock = DEFAULTMUTEX;
 
@@ -91,22 +88,15 @@ cleanup(void *arg)
 FILE *
 popen(const char *cmd, const char *mode)
 {
-	int	p[2];
 	pid_t	pid;
-	int	myside;
-	int	yourside;
-	int	fd;
+	int	myfd, fd;
 	const char *shpath = _PATH_BSHELL;
 	FILE	*iop;
-	int	stdio;
 	node_t	*curr;
-	char	*argvec[4];
 	node_t	*node;
-	posix_spawnattr_t attr;
 	posix_spawn_file_actions_t fact;
+	posix_spawnattr_t attr;
 	int	error;
-	static const char *shell = "sh";
-	static const char *sh_flg = "-c";
 
 	if ((node = lmalloc(sizeof (node_t))) == NULL)
 		return (NULL);
@@ -121,7 +111,19 @@ popen(const char *cmd, const char *mode)
 		errno = error;
 		return (NULL);
 	}
-	if (pipe(p) < 0) {
+
+	if (access(shpath, X_OK))	/* XPG4 Requirement: */
+		shpath = "";		/* force child to fail immediately */
+
+
+	/*
+	 * fdopen() can fail (if the fd is too high or we are out of memory),
+	 * but we don't want to have any way to fail after creating the child
+	 * process.  So we fdopen() a dummy fd (myfd), and once we get the real
+	 * fd from posix_spawn_pipe_np(), we dup2() the real fd onto the dummy.
+	 */
+	myfd = open("/dev/null", O_RDWR);
+	if (myfd == -1) {
 		error = errno;
 		lfree(node, sizeof (node_t));
 		(void) posix_spawnattr_destroy(&attr);
@@ -129,23 +131,13 @@ popen(const char *cmd, const char *mode)
 		errno = error;
 		return (NULL);
 	}
-
-	if (access(shpath, X_OK))	/* XPG4 Requirement: */
-		shpath = "";		/* force child to fail immediately */
-
-	myside = tst(p[WTR], p[RDR]);
-	yourside = tst(p[RDR], p[WTR]);
-	/* myside and yourside reverse roles in child */
-	stdio = tst(0, 1);
-
-	/* This will fail more quickly if we run out of fds */
-	if ((iop = fdopen(myside, mode)) == NULL) {
+	iop = fdopen(myfd, mode);
+	if (iop == NULL) {
 		error = errno;
 		lfree(node, sizeof (node_t));
 		(void) posix_spawnattr_destroy(&attr);
 		(void) posix_spawn_file_actions_destroy(&fact);
-		(void) close(yourside);
-		(void) close(myside);
+		(void) close(myfd);
 		errno = error;
 		return (NULL);
 	}
@@ -155,63 +147,56 @@ popen(const char *cmd, const char *mode)
 	/* in the child, close all pipes from other popen's */
 	for (curr = head; curr != NULL && error == 0; curr = curr->next) {
 		/*
-		 * These conditions may apply if a previous iob returned
+		 * The fd may no longer be open if an iob previously returned
 		 * by popen() was closed with fclose() rather than pclose(),
-		 * or if close(fileno(iob)) was called.  Don't let these
-		 * programming errors cause us to malfunction here.
+		 * or if close(fileno(iob)) was called.  Use fcntl() to check
+		 * if the fd is still open, so that these programming errors
+		 * won't cause us to malfunction here.
 		 */
-		if ((fd = curr->fd) != myside && fd != yourside &&
-		    fcntl(fd, F_GETFD) >= 0)
-			error = posix_spawn_file_actions_addclose(&fact, fd);
-	}
-	if (error == 0)
-		error =  posix_spawn_file_actions_addclose(&fact, myside);
-	if (yourside != stdio) {
-		if (error == 0)
-			error = posix_spawn_file_actions_adddup2(&fact,
-			    yourside, stdio);
-		if (error == 0)
+		if (fcntl(curr->fd, F_GETFD) >= 0) {
 			error = posix_spawn_file_actions_addclose(&fact,
-			    yourside);
+			    curr->fd);
+		}
 	}
 	/*
 	 * See the comments in port/stdio/system.c for why these
 	 * non-portable posix_spawn() attributes are being used.
 	 */
-	if (error == 0)
+	if (error == 0) {
 		error = posix_spawnattr_setflags(&attr,
 		    POSIX_SPAWN_NOSIGCHLD_NP |
 		    POSIX_SPAWN_WAITPID_NP |
 		    POSIX_SPAWN_NOEXECERR_NP);
-	if (error) {
+	}
+	if (error != 0) {
 		lmutex_unlock(&popen_lock);
 		lfree(node, sizeof (node_t));
 		(void) posix_spawnattr_destroy(&attr);
 		(void) posix_spawn_file_actions_destroy(&fact);
 		(void) fclose(iop);
-		(void) close(yourside);
 		errno = error;
 		return (NULL);
 	}
-	argvec[0] = (char *)shell;
-	argvec[1] = (char *)sh_flg;
-	argvec[2] = (char *)cmd;
-	argvec[3] = NULL;
-	error = posix_spawn(&pid, shpath, &fact, &attr,
-	    (char *const *)argvec, (char *const *)_environ);
+	error = posix_spawn_pipe_np(&pid, &fd, cmd, *mode != 'r', &fact, &attr);
 	(void) posix_spawnattr_destroy(&attr);
 	(void) posix_spawn_file_actions_destroy(&fact);
-	(void) close(yourside);
-	if (error) {
+	if (error != 0) {
 		lmutex_unlock(&popen_lock);
 		lfree(node, sizeof (node_t));
 		(void) fclose(iop);
 		errno = error;
 		return (NULL);
 	}
-	_insert_nolock(pid, myside, node);
+	_insert_nolock(pid, myfd, node);
 
 	lmutex_unlock(&popen_lock);
+
+	/*
+	 * myfd is the one that we fdopen()'ed; make it refer to the
+	 * pipe to the child.
+	 */
+	(void) dup2(fd, myfd);
+	(void) close(fd);
 
 	_SET_ORIENTATION_BYTE(iop);
 
