@@ -44,8 +44,6 @@
 #ifndef _STDIO_H
 #define	_STDIO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/feature_tests.h>
 #include <sys/va_list.h>
 #include <stdio_tag.h>
@@ -85,16 +83,7 @@ typedef long	fpos_t;
 
 #if defined(__STDC__)
 
-#if #machine(pdp11)
-#define	BUFSIZ		512
-#define	_STDIO_REVERSE
-#elif #machine(u370)
-#define	BUFSIZ		4096
-#define	_STDIO_REVERSE
-#define	_STDIO_ALLOCATE
-#else
 #define	BUFSIZ		1024
-#endif
 
 #else	/* !defined(__STDC__) */
 

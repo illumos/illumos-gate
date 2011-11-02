@@ -27,6 +27,7 @@
 #ifndef _ASM_CPU_H
 #define	_ASM_CPU_H
 
+#include <sys/ccompile.h>
 #include <sys/types.h>
 
 #ifdef	__cplusplus
@@ -35,7 +36,7 @@ extern "C" {
 
 #if !defined(__lint) && defined(__GNUC__)
 
-extern __inline__ void
+extern __GNU_INLINE void
 prefetch_read_many(void *addr)
 {
 #if defined(__sparcv9)
@@ -48,7 +49,7 @@ prefetch_read_many(void *addr)
 #endif
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 prefetch_read_once(void *addr)
 {
 #if defined(__sparcv9)
@@ -61,7 +62,7 @@ prefetch_read_once(void *addr)
 #endif
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 prefetch_write_many(void *addr)
 {
 #if defined(__sparcv9)
@@ -74,7 +75,7 @@ prefetch_write_many(void *addr)
 #endif
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 prefetch_write_once(void *addr)
 {
 #if defined(__sparcv9)

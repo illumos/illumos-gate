@@ -296,7 +296,7 @@ lm75_set16(intptr_t arg, int reg, struct lm75_unit *unitp, int mode) {
 	i2c_tran_pointer->i2c_flags = I2C_WR;
 	i2c_tran_pointer->i2c_wbuf[0] = (uchar_t)reg;
 	i2c_tran_pointer->i2c_wbuf[1] = (temp16 >> 1);
-	i2c_tran_pointer->i2c_wbuf[2] =	((temp16 & 0xFE) << 7);
+	i2c_tran_pointer->i2c_wbuf[2] =	((temp16 & 0xFF) << 7);
 
 	err = i2c_transfer(unitp->lm75_hdl, i2c_tran_pointer);
 	i2c_transfer_free(unitp->lm75_hdl, i2c_tran_pointer);

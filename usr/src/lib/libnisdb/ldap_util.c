@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>
@@ -49,7 +47,7 @@ static pthread_key_t		tsdKey;
  * Log a message to the appropriate place.
  */
 void
-logmsg(int msgtype, int priority, char *fmt, ...) {
+logmsg(int msgtype, int priority, const char *fmt, ...) {
 	va_list		ap;
 	struct timeval	tp;
 
@@ -199,7 +197,7 @@ logError(int priority) {
  * zero bytes is legal, and returns a NULL pointer.
  */
 void *
-am(char *msg, int size) {
+am(const char *msg, int size) {
 	void	*p;
 
 	if (size > 0) {
@@ -227,7 +225,7 @@ am(char *msg, int size) {
  * on a NULL pointer.
  */
 int
-slen(char *str) {
+slen(const char *str) {
 	return ((str != 0) ? strlen(str) : 0);
 }
 
@@ -236,7 +234,7 @@ slen(char *str) {
  * like strdup(), but don't die if 'str' is a NULL pointer.
  */
 char *
-sdup(char *msg, int allocate, char *str) {
+sdup(const char *msg, int allocate, char *str) {
 	char	*s;
 
 	if (!allocate)
@@ -259,7 +257,7 @@ sdup(char *msg, int allocate, char *str) {
  * NULL pointer or two. If deallocate!=0, free() the input strings.
  */
 char *
-scat(char *msg, int deallocate, char *s1, char *s2) {
+scat(const char *msg, int deallocate, char *s1, char *s2) {
 	char	*n;
 	int	l1 = 0, l2 = 0;
 
@@ -437,7 +435,7 @@ scasecmp(char *s, __nis_single_value_t *v) {
  * result to '*buf'.
  */
 int
-vp2buf(char *msg, char **buf, int buflen, char *fmt, va_list ap) {
+vp2buf(const char *msg, char **buf, int buflen, const char *fmt, va_list ap) {
 	char		*newbuf = am(msg, STDBUFSIZE);
 	int		size = 0;
 
@@ -482,7 +480,7 @@ p2buf(char *msg, char *fmt, ...) {
 
 /* sprintf to the specified __nis_buffer_t */
 void
-bp2buf(char *msg, __nis_buffer_t *b, char *fmt, ...) {
+bp2buf(const char *msg, __nis_buffer_t *b, const char *fmt, ...) {
 	va_list	ap;
 
 	va_start(ap, fmt);
@@ -492,7 +490,7 @@ bp2buf(char *msg, __nis_buffer_t *b, char *fmt, ...) {
 
 /* Copy 'buf' to the specified __nis_buffer_t */
 void
-bc2buf(char *msg, void *buf, int len, __nis_buffer_t *b) {
+bc2buf(const char *msg, void *buf, int len, __nis_buffer_t *b) {
 	void	*new;
 
 	/*
@@ -517,7 +515,7 @@ bc2buf(char *msg, void *buf, int len, __nis_buffer_t *b) {
 
 /* Like bc2buf(), but remove any trailing NUL bytes */
 void
-sbc2buf(char *msg, void *buf, int len, __nis_buffer_t *b) {
+sbc2buf(const char *msg, void *buf, int len, __nis_buffer_t *b) {
 	if (buf == 0 || len <= 0 || b == 0)
 		return;
 	/* Snip off trailing NULs */

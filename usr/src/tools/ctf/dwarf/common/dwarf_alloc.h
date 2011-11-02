@@ -1,6 +1,7 @@
 /*
 
-  Copyright (C) 2000 Silicon Graphics, Inc.  All Rights Reserved.
+  Copyright (C) 2000,2005 Silicon Graphics, Inc.  All Rights Reserved.
+  Portions Copyright (C) 2008-2010  David Anderson. All Rights Reserved.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms of version 2.1 of the GNU Lesser General Public License 
@@ -17,12 +18,12 @@
   any, provided herein do not apply to combinations of this program with 
   other software, or any other product whatsoever.  
 
-  You should have received a copy of the GNU Lesser General Public 
-  License along with this program; if not, write the Free Software 
-  Foundation, Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, 
+  You should have received a copy of the GNU Lesser General Public
+  License along with this program; if not, write the Free Software
+  Foundation, Inc., 51 Franklin Street - Fifth Floor, Boston MA 02110-1301,
   USA.
 
-  Contact information:  Silicon Graphics, Inc., 1600 Amphitheatre Pky,
+  Contact information:  Silicon Graphics, Inc., 1500 Crittenden Lane,
   Mountain View, CA 94043, or:
 
   http://www.sgi.com
@@ -33,7 +34,7 @@
 
 */
 
-
+/* #define DWARF_SIMPLE_MALLOC 1  */
 
 Dwarf_Ptr _dwarf_get_alloc(Dwarf_Debug, Dwarf_Small, Dwarf_Unsigned);
 Dwarf_Debug _dwarf_get_debug(void);
@@ -43,8 +44,17 @@ int _dwarf_free_all_of_one_debug(Dwarf_Debug);
 typedef struct Dwarf_Alloc_Area_s *Dwarf_Alloc_Area;
 typedef struct Dwarf_Free_List_s *Dwarf_Free_List;
 
-#define ALLOC_AREA_INDEX_TABLE_MAX 42
-#define ALLOC_AREA_REAL_TABLE_MAX 31
+/* ALLOC_AREA_INDEX_TABLE_MAX is the size of the
+   struct ial_s index_into_allocated array in dwarf_alloc.c
+*/
+#define ALLOC_AREA_INDEX_TABLE_MAX 45
+/* ALLOC_AREA_REAL_TABLE_MAX is the size of the array needed
+   to hold pointers to dwarf alloc chunk areas.
+   It's smaller as some of the index_into_allocated 
+   entries (they look like {0,1,1,0,0} )
+   are treated specially and don't use 'chunks'.
+*/
+#define ALLOC_AREA_REAL_TABLE_MAX 32
 
 /* 
     This struct is used to chain all the deallocated

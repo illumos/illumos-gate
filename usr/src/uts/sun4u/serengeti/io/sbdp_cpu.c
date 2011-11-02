@@ -648,7 +648,8 @@ sbdp_cpu_stop_self(uint64_t pa)
 	extern void	sbdp_shutdown_asm(sbdp_shutdown_t *);
 	extern void	sbdp_shutdown_asm_end(void);
 
-	funclen = (uint_t)sbdp_shutdown_asm_end - (uint_t)sbdp_shutdown_asm;
+	funclen = (uintptr_t)sbdp_shutdown_asm_end -
+	    (uintptr_t)sbdp_shutdown_asm;
 	ASSERT(funclen <= MMU_PAGESIZE);
 	ASSERT(bbsram_pa != 0);
 	ASSERT((bbsram_pa & MMU_PAGEOFFSET) == 0);

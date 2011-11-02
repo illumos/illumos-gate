@@ -62,6 +62,15 @@
 #define	SYSCONFIG (*(funcs[SYSCONFIG_F]))
 
 /*
+ * GCC will not emit unused static functions unless specifically told it must
+ */
+#ifdef __GNUC__
+#define	__USED	__attribute__((used))
+#else
+#define	__USED
+#endif
+
+/*
  * Alias ld.so entry point -- receives a bootstrap structure and a vector
  * of strings.  The vector is "well-known" to us, and consists of pointers
  * to string constants.  This aliasing bootstrap requires no relocation in
@@ -70,7 +79,7 @@
  * order to maintain the "no bootstrapping" requirement -- it calls only
  * local functions, uses no intrinsics, etc.
  */
-static void *
+static void * __USED
 __rtld(Elf32_Boot *ebp, const char *strings[], int (*funcs[])())
 {
 	int i, p;			/* working */

@@ -28,9 +28,6 @@
 /*	Copyright (c) 1988 AT&T */
 /*	  All Rights Reserved	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 /* ------------------------------------------------------------------------ */
 /* include headers */
 /* ------------------------------------------------------------------------ */
@@ -124,7 +121,7 @@ store_binding(binding_bucket * bind)
 			if (!bkts[i].sym)
 				break;
 		}
-		if ((!bkts[i].sym) && (table_full != TRUE)) {
+		if ((i < DEFBKTS) && (!bkts[i].sym) && (table_full != TRUE)) {
 			bkts[i].sym = bind->sym;
 			bkts[i].obj = bind->obj;
 			bkts[i].ref_lib = bind->ref_lib;
@@ -1023,8 +1020,7 @@ scan_symbols(obj_list * c,
 		binding_bucket *binding;
 		/* look only at .text section symbols */
 		if (!is_text_section(symtab_entry->st_shndx,
-				    c->obj->elf,
-				    c->obj->ehdr))
+		    c->obj->elf, c->obj->ehdr))
 			continue;
 
 		/* look only at weak and global symbols */
@@ -1049,7 +1045,7 @@ scan_symbols(obj_list * c,
 		}
 		sym_name = buf + symtab_entry->st_name;
 		binding = (struct binding_bucket *)
-			    malloc(sizeof (binding_bucket));
+		    malloc(sizeof (binding_bucket));
 		binding->sym = sym_name;
 		binding->obj = c->obj->ename;
 		binding->section = "TEXT";
@@ -1206,7 +1202,7 @@ print_symtab(obj_list * com,
 	c = (obj_list *) malloc(sizeof (obj_list));
 	c->obj = (obj_com *) malloc(sizeof (obj_com));
 	fullname = (char *)malloc(strlen(com->obj->ename)
-			+ strlen(filename) + 2);
+	    + strlen(filename) + 2);
 	(void *) strcpy(fullname, com->obj->ename);
 	(void *) strcat(fullname, "(");
 	(void *) strcat(fullname, filename);
@@ -1470,7 +1466,7 @@ find_dtneeded(obj_list * c)
 		if (dcurrent->d_tag == DT_NEEDED) {
 			tmp_lib = (dt_list *) malloc(sizeof (dt_list));
 			tmp_lib->libname = c->obj->dynnames +
-					    dcurrent->d_un.d_val;
+			    dcurrent->d_un.d_val;
 			tmp_lib->d_tag = dcurrent->d_tag;
 			tmp_lib->next = NULL;
 			dt_needed = add_dtneeded(dt_needed, tmp_lib);
@@ -1683,8 +1679,7 @@ analyze_args(obj_list * c,
 	if (c->obj->numfiles > 0) {
 		i = 0;
 		c->obj->filenames = (char **)
-				    malloc(sizeof (char *) *
-				    (c->obj->numfiles + 1));
+		    malloc(sizeof (char *) * (c->obj->numfiles + 1));
 		for (; optind < argc; i++, optind++)
 			c->obj->filenames[i] = argv[optind];
 	}

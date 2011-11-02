@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Just in case we're not in a build environment, make sure that
  * TEXT_DOMAIN gets set to something.
@@ -242,20 +240,19 @@ get_db_rec(
 	reqp->ur_type2 = type2;
 
 	switch (cmd) {
-	    case MD_UR_GET_NEXT:
-		    reqp->ur_cmd = MD_DB_GETNEXTREC;
-		    reqp->ur_recid = *idp;
-		    if (metaioctl(ureq, reqp, &reqp->ur_mde, NULL)
-			!= 0) {
-			    (void) mdstealerror(ep, &reqp->ur_mde);
-			    Free(reqp);
-			    return (NULL);
-		    }
-		    *idp = reqp->ur_recid;
-		    break;
-	    case MD_UR_GET_WKEY:
-		    reqp->ur_recid = *idp;
-		    break;
+	case MD_UR_GET_NEXT:
+		reqp->ur_cmd = MD_DB_GETNEXTREC;
+		reqp->ur_recid = *idp;
+		if (metaioctl(ureq, reqp, &reqp->ur_mde, NULL) != 0) {
+			(void) mdstealerror(ep, &reqp->ur_mde);
+			Free(reqp);
+			return (NULL);
+		}
+		*idp = reqp->ur_recid;
+		break;
+	case MD_UR_GET_WKEY:
+		reqp->ur_recid = *idp;
+		break;
 	}
 
 	if (*idp <= 0) {
@@ -283,17 +280,17 @@ get_db_rec(
 	}
 
 	switch (reqp->ur_type) {
-	    case MDDB_USER:
-		    switch (reqp->ur_type2) {
-			case MDDB_UR_SR:
-				if (ckncvt_set_record(reqp, ep)) {
-					Free((void *)(uintptr_t)reqp->ur_data);
-					Free(reqp);
-					return (NULL);
-				}
-				break;
-		    }
-		    break;
+	case MDDB_USER:
+		switch (reqp->ur_type2) {
+		case MDDB_UR_SR:
+			if (ckncvt_set_record(reqp, ep)) {
+				Free((void *)(uintptr_t)reqp->ur_data);
+				Free(reqp);
+				return (NULL);
+			}
+			break;
+		}
+		break;
 	}
 
 	return (reqp);
@@ -337,9 +334,9 @@ get_ur_rec(
 static int
 sr_hosts(md_set_record *sr)
 {
-	int		i,
-			nid = 0,
-			self_in_set = FALSE;
+	int		i;
+	int		nid = 0;
+	int		self_in_set = FALSE;
 	md_error_t	xep = mdnullerror;
 	md_mnnode_record	*nr;
 	md_mnset_record		*mnsr;
@@ -483,7 +480,7 @@ sr_drvs(md_set_record *sr)
 				nm.setno = MD_LOCAL_SET;
 				nm.side = nr->nr_nodeid;
 				nm.key = dr->dr_key;
-				nm.devname = (uint64_t)device_name;
+				nm.devname = (uintptr_t)device_name;
 
 				if (metaioctl(MD_IOCGET_NM, &nm, &nm.mde,
 				    NULL) != 0) {
@@ -530,7 +527,7 @@ sr_drvs(md_set_record *sr)
 				nm.setno = MD_LOCAL_SET;
 				nm.side = i + SKEW;
 				nm.key = dr->dr_key;
-				nm.devname = (uint64_t)device_name;
+				nm.devname = (uintptr_t)device_name;
 
 				if (metaioctl(MD_IOCGET_NM, &nm, &nm.mde,
 				    NULL) != 0) {
@@ -690,7 +687,7 @@ sr_sidenms(void)
 						continue;
 
 					add_key_to_lst(&use, i + SKEW,
-						dr->dr_key);
+					    dr->dr_key);
 				}
 			}
 		}
@@ -915,7 +912,7 @@ set_snarf(md_error_t *ep)
 	/* Go get the set records */
 	id = 0;
 	while ((sr = get_ur_rec(MD_LOCAL_SET, MD_UR_GET_NEXT, MDDB_UR_SR,
-							&id, ep)) != NULL) {
+	    &id, ep)) != NULL) {
 		sr->sr_next = NULL;
 		sr->sr_drivechain = NULL;
 
@@ -967,7 +964,7 @@ set_snarf(md_error_t *ep)
 			mnsr->sr_nodechain = NULL;
 			p = &mnsr->sr_noderec;
 			while ((nr = get_ur_rec(MD_LOCAL_SET, MD_UR_GET_WKEY,
-					MDDB_UR_NR, p, ep)) != NULL) {
+			    MDDB_UR_NR, p, ep)) != NULL) {
 				nr->nr_next = NULL;
 
 				if (md_in_daemon)
@@ -1049,7 +1046,7 @@ set_snarf(md_error_t *ep)
 					p = NULL;
 
 				mnnr_cache_add((struct md_mnset_record *)sr,
-					nr);
+				    nr);
 
 				if ((md_in_daemon) &&
 				    (strcmp(nr->nr_nodename, mynode()) == 0)) {
@@ -1059,7 +1056,7 @@ set_snarf(md_error_t *ep)
 					if (metaioctl(MD_MN_SET_NODEID, &snp,
 					    &snp.sn_mde, NULL) != 0) {
 						(void) mdstealerror(ep,
-							&snp.sn_mde);
+						    &snp.sn_mde);
 					}
 				}
 
@@ -1079,7 +1076,7 @@ set_snarf(md_error_t *ep)
 		/* Go get the drive records */
 		p = &sr->sr_driverec;
 		while ((dr = get_ur_rec(MD_LOCAL_SET, MD_UR_GET_WKEY,
-				MDDB_UR_DR, p, ep)) != NULL) {
+		    MDDB_UR_DR, p, ep)) != NULL) {
 			dr->dr_next = NULL;
 
 			if (md_in_daemon)
@@ -1360,19 +1357,19 @@ metad_isautotakebyname(char *setname)
 	md_error_t	error = mdnullerror;
 	md_set_record	*sr;
 
-	if (md_in_daemon)
-	    assert(setsnarfdone != 0);
-	else if (set_snarf(&error)) {
-	    mdclrerror(&error);
-	    return (0);
+	if (md_in_daemon) {
+		assert(setsnarfdone != 0);
+	} else if (set_snarf(&error)) {
+		mdclrerror(&error);
+		return (0);
 	}
 
 	for (sr = setrecords; sr != NULL; sr = sr->sr_next) {
-	    if (strcmp(setname, sr->sr_setname) == 0) {
-		if (sr->sr_flags & MD_SR_AUTO_TAKE)
-		    return (1);
-		return (0);
-	    }
+		if (strcmp(setname, sr->sr_setname) == 0) {
+			if (sr->sr_flags & MD_SR_AUTO_TAKE)
+				return (1);
+			return (0);
+		}
 	}
 
 	return (0);
@@ -1384,19 +1381,19 @@ metad_isautotakebynum(set_t setno)
 	md_error_t	error = mdnullerror;
 	md_set_record	*sr;
 
-	if (md_in_daemon)
-	    assert(setsnarfdone != 0);
-	else if (set_snarf(&error)) {
-	    mdclrerror(&error);
-	    return (0);
+	if (md_in_daemon) {
+		assert(setsnarfdone != 0);
+	} else if (set_snarf(&error)) {
+		mdclrerror(&error);
+		return (0);
 	}
 
 	for (sr = setrecords; sr != NULL; sr = sr->sr_next) {
-	    if (setno == sr->sr_setno) {
-		if (sr->sr_flags & MD_SR_AUTO_TAKE)
-		    return (1);
-		return (0);
-	    }
+		if (setno == sr->sr_setno) {
+			if (sr->sr_flags & MD_SR_AUTO_TAKE)
+				return (1);
+			return (0);
+		}
 	}
 
 	return (0);

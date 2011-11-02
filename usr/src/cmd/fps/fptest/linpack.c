@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -372,7 +370,6 @@ MATGEN(REAL a[], int lda, int n, REAL b[], REAL *norma)
 	int		i;
 	int		init[4];
 	int		j;
-	REAL	value;
 
 	init[0] = 1;
 	init[1] = 2;
@@ -381,21 +378,22 @@ MATGEN(REAL a[], int lda, int n, REAL b[], REAL *norma)
 	*norma = LP_ZERO;
 	for (j = 0; j < n; j++) {
 		for (i = 0; i < n; i++) {
-#ifdef FPS_LAPA_UNK
-			a[lda*j+i] =
-			    (i < j) ? (double)(i+1) : (double)(j+ALPHA);
-			if (fabs(a[lda*j+i]) > *norma)
-				*norma = fabs(a[lda*j+i]);
-			} /* i */
-#else
+#ifndef FPS_LAPA_UNK
+			REAL	value;
+
 			value = (REAL) dran(init) - 0.5;
 			a[lda * j + i] = value;
 			value = fabs(value);
 			if (value > *norma) {
 				*norma = value;
 			}
-		} /* i */
+#else
+			a[lda*j+i] =
+			    (i < j) ? (double)(i+1) : (double)(j+ALPHA);
+			if (fabs(a[lda*j+i]) > *norma)
+				*norma = fabs(a[lda*j+i]);
 #endif /* FPS_LAPA_UNK */
+		} /* i */
 	} /* j */
 
 

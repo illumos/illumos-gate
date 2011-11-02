@@ -43,6 +43,7 @@
 #include <TgtFCHBAPort.h>
 #include <HBAList.h>
 #include <sun_fc.h>
+#include <cstdlib>
 
 using namespace std;
 const string TgtFCHBA::FCT_DRIVER_PATH = "/devices/pseudo/fct@0:admin";

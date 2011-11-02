@@ -237,7 +237,7 @@ sort_physinstall(void)
 		memlists[i].next = 0;
 		memlists[i - 1].next = (native_ptr_t)(uintptr_t)(memlists + i);
 	}
-	bi->bi_phys_install = (native_ptr_t)memlists;
+	bi->bi_phys_install = (native_ptr_t)(uintptr_t)memlists;
 	DBG(bi->bi_phys_install);
 }
 
@@ -258,7 +258,7 @@ build_rsvdmemlists(void)
 		rsvdmemlists[i - 1].next =
 		    (native_ptr_t)(uintptr_t)(rsvdmemlists + i);
 	}
-	bi->bi_rsvdmem = (native_ptr_t)rsvdmemlists;
+	bi->bi_rsvdmem = (native_ptr_t)(uintptr_t)rsvdmemlists;
 	DBG(bi->bi_rsvdmem);
 }
 
@@ -668,7 +668,7 @@ build_pcimemlists(mmap_t *mem, int num)
 		pcimemlists[i - 1].next =
 		    (native_ptr_t)(uintptr_t)(pcimemlists + i);
 	}
-	bi->bi_pcimem = (native_ptr_t)pcimemlists;
+	bi->bi_pcimem = (native_ptr_t)(uintptr_t)pcimemlists;
 	DBG(bi->bi_pcimem);
 }
 
@@ -808,7 +808,7 @@ init_mem_alloc(void)
 	 * we'll build the module list while we're walking through here
 	 */
 	DBG_MSG("\nFinding Modules\n");
-	check_higher((paddr_t)&_end);
+	check_higher((paddr_t)(uintptr_t)&_end);
 	for (mod = (mb_module_t *)(mb_info->mods_addr), i = 0;
 	    i < mb_info->mods_count;
 	    ++mod, ++i) {
@@ -826,7 +826,7 @@ init_mem_alloc(void)
 
 		check_higher(mod->mod_end);
 	}
-	bi->bi_modules = (native_ptr_t)modules;
+	bi->bi_modules = (native_ptr_t)(uintptr_t)modules;
 	DBG(bi->bi_modules);
 	bi->bi_module_cnt = mb_info->mods_count;
 	DBG(bi->bi_module_cnt);
@@ -911,7 +911,7 @@ init_mem_alloc(void)
 		pcimemlists[0].size = pci_hi_limit - pcimemlists[0].addr;
 		pcimemlists[0].next = 0;
 		pcimemlists[0].prev = 0;
-		bi->bi_pcimem = (native_ptr_t)pcimemlists;
+		bi->bi_pcimem = (native_ptr_t)(uintptr_t)pcimemlists;
 		DBG(bi->bi_pcimem);
 	} else {
 		dboot_panic("No memory info from boot loader!!!");

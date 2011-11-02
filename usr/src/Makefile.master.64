@@ -54,9 +54,10 @@ LDLIBS.cmd =	$(LDLIBS64)
 LDLIBS.lib =	$(LDLIBS64)
 
 #
-# Override Makefile.master's settings of SFWLIBDIR
+# Override Makefile.master's settings of SFWLIBDIR and GCCLIBDIR
 #
 SFWLIBDIR=	$(SFWLIBDIR64)
+GCCLIBDIR=	$(GCCLIBDIR64)
 
 #
 # Override Makefile.master's settings of CC, CCC, AS and LINT
@@ -80,8 +81,9 @@ BUILD.SO=	$(CC) $(CFLAGS) -o $@ $(GSHARED) $(DYNFLAGS) \
 MAPFILECLASS=	-64
 
 CCNEEDED =		-lCrun
-$(__GNUC64)CCNEEDED =	-L$(SFWLIBDIR) -R$(SFWLIBDIR) -lstdc++	\
-			-lgcc_s_$(MACH64)
+$(__GNUC64)CCNEEDED =	-L$(GCCLIBDIR) -R$(GCCLIBDIR) -lstdc++
+$(__GNUC64)$(__GNUC3)CCNEEDED +=	-lgcc_s_$(MACH64)
+$(__GNUC64)$(__GNUC4)CCNEEDED +=	-lgcc_s
 
 BUILDCCC.SO=    $(CCC) $(CCFLAGS) -o $@ $(GSHARED) $(DYNFLAGS) \
 		$(PICS) $(EXTPICS) $(LDLIBS) $(CCNEEDED)

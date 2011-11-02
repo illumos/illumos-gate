@@ -24,23 +24,21 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
-
 #include	<errno.h>
 #include	<string.h>
 #include	<sys/utsname.h>
 #include	<sys/syscall.h>
 
-/* 
+/*
  * utsname structure has a different format in SVr4/SunOS 5.0.
  * The data needs to be mapped before returning to the user.
  */
 
-/* 
+/*
  * The following values and structure are from the SVR4 utsname.h.
  */
 #define		NEW_SYS_NMLN	257
-#define 	SYS_NMLN	9
+#define		SYS_NMLN	9
 #define		SYS_NDLN	65
 
 struct n_utsname {
@@ -51,14 +49,14 @@ struct n_utsname {
 	char machine[NEW_SYS_NMLN];
 };
 
-int uname( uts )
-register struct utsname *uts;		/* where to put results */
+int
+uname(struct utsname *uts)
 {
-	return(bc_uname(uts));
+	return (bc_uname(uts));
 }
 
-int bc_uname( uts )
-struct utsname *uts;
+int
+bc_uname(struct utsname *uts)
 {
 	struct n_utsname n_uts;
 	int    ret;
@@ -67,9 +65,13 @@ struct utsname *uts;
 		memcpy(uts->sysname, n_uts.sysname, SYS_NMLN);
 		if (strlen(n_uts.sysname) > SYS_NMLN)
 			uts->sysname[SYS_NMLN-1] = '\0';
-		memcpy(uts->nodename, n_uts.nodename, SYS_NDLN);
-		if (strlen(n_uts.nodename) > SYS_NDLN)
-			uts->nodename[SYS_NDLN-1] = '\0';
+
+		memcpy(uts->nodename, n_uts.nodename, SYS_NMLN);
+		memcpy(uts->nodeext, n_uts.nodename + SYS_NMLN,
+		    SYS_NDLN - SYS_NMLN);
+		if (strlen(n_uts.nodename + SYS_NMLN) > SYS_NDLN - SYS_NMLN)
+			uts->nodeext[SYS_NDLN - SYS_NMLN - 1] = '\0';
+
 		memcpy(uts->release, n_uts.release, SYS_NMLN);
 		if (strlen(n_uts.release) > SYS_NMLN)
 			uts->release[SYS_NMLN-1] = '\0';
@@ -81,5 +83,5 @@ struct utsname *uts;
 			uts->machine[SYS_NMLN-1] = '\0';
 	}
 
-	return(ret);
+	return (ret);
 }

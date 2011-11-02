@@ -26,8 +26,6 @@
 #ifndef	_SYS_PATHCONF_H
 #define	_SYS_PATHCONF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	pathconf.h 1.9 89/06/26 SMI	*/
 
 #include <sys/unistd.h>
@@ -118,7 +116,7 @@ struct	pathcnf32 {
  * The size of the non-kernel part of the struct.
  */
 #ifdef	_KERNEL
-#define	PCSIZ		(int)(&(((struct pathcnf *)0)->pc_refcnt))
+#define	PCSIZ		((size_t)(&(((struct pathcnf *)0)->pc_refcnt)))
 #define	PCCMP(p1, p2)	bcmp((char *)p1, (char *)p2, PCSIZ)
 #endif
 

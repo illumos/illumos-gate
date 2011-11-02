@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdarg.h>
 #include <syslog.h>
 
@@ -83,26 +81,27 @@ typedef struct {
 extern unsigned long	numMisaligned;
 
 /* Exported functions */
-void	logmsg(int msgtype, int priority, char *fmt, ...);
+void	logmsg(int msgtype, int priority, const char *fmt, ...);
 void	reportError(int error, char *fmt, ...);
 int	getError(char **message);
 void	clearError(void);
 void	logError(int priority);
-void	*am(char *msg, int size);
-int	slen(char *str);
-char	*sdup(char *msg, int allocate, char *str);
-char	*scat(char *msg, int deallocate, char *s1, char *s2);
+void	*am(const char *msg, int size);
+int	slen(const char *str);
+char	*sdup(const char *msg, int allocate, char *str);
+char	*scat(const char *msg, int deallocate, char *s1, char *s2);
 void	sfree(void *ptr);
 char	lastChar(__nis_single_value_t *v);
 void	*appendString2SingleVal(char *str, __nis_single_value_t *v,
 		int *newLen);
 int	scmp(char *s, __nis_single_value_t *v);
 int	scasecmp(char *s, __nis_single_value_t *v);
-int	vp2buf(char *msg, char **buf, int buflen, char *fmt, va_list ap);
+int	vp2buf(const char *msg, char **buf, int buflen, const char *fmt,
+    va_list ap);
 void	p2buf(char *msg, char *fmt, ...);
-void	bp2buf(char *msg, __nis_buffer_t *b, char *fmt, ...);
-void	bc2buf(char *msg, void *buf, int len, __nis_buffer_t *b);
-void	sbc2buf(char *msg, void *buf, int len, __nis_buffer_t *b);
+void	bp2buf(const char *msg, __nis_buffer_t *b, const char *fmt, ...);
+void	bc2buf(const char *msg, void *buf, int len, __nis_buffer_t *b);
+void	sbc2buf(const char *msg, void *buf, int len, __nis_buffer_t *b);
 void	c2buf(char *msg, void *buf, int len);
 void	sc2buf(char *msg, void *buf, int len);
 void	printbuf(void);

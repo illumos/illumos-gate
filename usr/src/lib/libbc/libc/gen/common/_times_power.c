@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "base_conversion.h"
 #include <malloc.h>
 
@@ -411,8 +409,8 @@ _big_float_times_power(_big_float *pbf, int mult, int n, int precision,
 
 					if ((int)trailing_zeros_to_delete > deletelimit) {
 #ifdef DEBUG
-	printf("\n __x_power trailing zeros delete count lowered from %d to
-	%d \n", trailing_zeros_to_delete,deletelimit);
+	printf("\n __x_power trailing zeros delete count lowered from %d to "
+	"%d \n", trailing_zeros_to_delete,deletelimit);
 #endif
 
 						trailing_zeros_to_delete = deletelimit;

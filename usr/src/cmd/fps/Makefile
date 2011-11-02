@@ -56,7 +56,7 @@ $(SUBDIRS): FRC
 			cd $@; pwd; VERSION='$(VERSION)' $(MAKE) $(TARGET);\
 			;;						\
 		*)							\
-			if [ $@ != fptest ];				\
+			if [ $@ != fptest -a $@ != compilercheck ];	\
 			then						\
 				cd $@; pwd; VERSION='$(VERSION)'	\
 				$(MAKE) $(TARGET);			\

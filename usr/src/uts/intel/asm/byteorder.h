@@ -26,6 +26,7 @@
 #ifndef _ASM_BYTEORDER_H
 #define	_ASM_BYTEORDER_H
 
+#include <sys/ccompile.h>
 #include <sys/types.h>
 
 #ifdef	__cplusplus
@@ -44,7 +45,8 @@ extern "C" {
 
 #if defined(__i386) || defined(__amd64)
 
-extern __inline__ uint16_t htons(uint16_t value)
+extern __GNU_INLINE uint16_t
+htons(uint16_t value)
 {
 #if defined(__amd64)
 	__asm__("xchgb %h0, %b0" : "+Q" (value));
@@ -54,7 +56,8 @@ extern __inline__ uint16_t htons(uint16_t value)
 	return (value);
 }
 
-extern __inline__ uint16_t ntohs(uint16_t value)
+extern __GNU_INLINE uint16_t
+ntohs(uint16_t value)
 {
 #if defined(__amd64)
 	__asm__("xchgb %h0, %b0" : "+Q" (value));
@@ -64,26 +67,30 @@ extern __inline__ uint16_t ntohs(uint16_t value)
 	return (value);
 }
 
-extern __inline__ uint32_t htonl(uint32_t value)
+extern __GNU_INLINE uint32_t
+htonl(uint32_t value)
 {
 	__asm__("bswap %0" : "+r" (value));
 	return (value);
 }
 
-extern __inline__ uint32_t ntohl(uint32_t value)
+extern __GNU_INLINE uint32_t
+ntohl(uint32_t value)
 {
 	__asm__("bswap %0" : "+r" (value));
 	return (value);
 }
 
 #if defined(__amd64)
-extern __inline__ uint64_t htonll(uint64_t value)
+extern __GNU_INLINE uint64_t
+htonll(uint64_t value)
 {
 	__asm__("bswapq %0" : "+r" (value));
 	return (value);
 }
 
-extern __inline__ uint64_t ntohll(uint64_t value)
+extern __GNU_INLINE uint64_t
+ntohll(uint64_t value)
 {
 	__asm__("bswapq %0" : "+r" (value));
 	return (value);
@@ -91,12 +98,14 @@ extern __inline__ uint64_t ntohll(uint64_t value)
 
 #elif defined(__i386)
 /* Use the htonl() and ntohl() inline functions defined above */
-extern __inline__ uint64_t htonll(uint64_t value)
+extern __GNU_INLINE uint64_t
+htonll(uint64_t value)
 {
 	return (htonl(value >> 32) | ((uint64_t)htonl(value) << 32));
 }
 
-extern __inline__ uint64_t ntohll(uint64_t value)
+extern __GNU_INLINE uint64_t
+ntohll(uint64_t value)
 {
 	return (ntohl(value >> 32) | (uint64_t)ntohl(value) << 32);
 }

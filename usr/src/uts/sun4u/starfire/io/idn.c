@@ -620,7 +620,7 @@ idnattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 #ifndef	lint
 	ASSERT(sizeof (idnsb_t) == IDNSB_SIZE);
-	ASSERT((uint_t)&((struct idnsb *)0)->id_hwchkpt[0] == 0x40);
+	ASSERT(offsetof(struct idnsb, id_hwchkpt[0]) == 0x40);
 #endif	/* lint */
 
 	switch (cmd) {
@@ -4745,7 +4745,8 @@ static char	_bd2hexascii[] = {
 		mutex_enter(&snoop_mutex); \
 		if (snoop_data == NULL) { \
 			snoop_data = (struct snoop_buffer *) \
-				(((uint_t)snoop_buffer + 0xf) & ~0xf); \
+				(((uint_t)(uintptr_t)snoop_buffer + 0xf) & \
+				    ~0xf);				\
 		} \
 		snoop_data[snoop_index].io = ((in) == 0) ? 'o' : 'i'; \
 		snoop_data[snoop_index].board = \
