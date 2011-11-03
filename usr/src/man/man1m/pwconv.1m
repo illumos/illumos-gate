@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pwconv 1M "9 Mar 1993" "SunOS 5.11" "System Administration Commands"
+.TH PWCONV 1M "Mar 9, 1993"
 .SH NAME
 pwconv \- installs and updates /etc/shadow with information from /etc/passwd
 .SH SYNOPSIS
 .LP
 .nf
-\fBpwconv\fR 
+\fBpwconv\fR
 .fi
 
 .SH DESCRIPTION
@@ -37,7 +37,6 @@ If the  \fB/etc/shadow\fR file does exist, the following tasks will be
 performed:
 .sp
 .ne 2
-.mk
 .na
 \fB\fR
 .ad
@@ -49,7 +48,6 @@ Entries that are in the  \fB/etc/passwd\fR file and not in the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fR
 .ad
@@ -61,7 +59,6 @@ Entries that are in the  \fB/etc/shadow\fR file and not in the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fR
 .ad
@@ -78,45 +75,37 @@ The \fBpwconv\fR command can only be used by the super-user.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/opasswd\fR\fR
 .ad
 .RS 16n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/oshadow\fR\fR
 .ad
 .RS 16n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/passwd\fR\fR
 .ad
 .RS 16n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/shadow\fR\fR
 .ad
 .RS 16n
-.rt  
 
 .RE
 
@@ -131,78 +120,64 @@ The \fBpwconv\fR command can only be used by the super-user.
 \fBpwconv\fR exits with one of the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 \fBSUCCESS.\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 Permission denied.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Invalid command syntax.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 5n
-.rt  
 Unexpected failure.  Conversion not done.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB4\fR\fR
 .ad
 .RS 5n
-.rt  
 Unexpected failure.  Password file(s) missing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB5\fR\fR
 .ad
 .RS 5n
-.rt  
 Password file(s) busy.  Try again later.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB6\fR\fR
 .ad
 .RS 5n
-.rt  
 Bad entry in \fB/etc/shadow\fR file.
 .RE
 

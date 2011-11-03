@@ -3,18 +3,18 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_dma_alloc_handle 9F "22 Sep 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_DMA_ALLOC_HANDLE 9F "Sep 22, 1996"
 .SH NAME
 ddi_dma_alloc_handle \- allocate DMA handle
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/ddi.h> 
-#include <sys/sunddi.h> 
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
 
 
 
-\fBint\fR \fBddi_dma_alloc_handle\fR(\fBdev_info_t *\fR\fIdip\fR, \fBddi_dma_attr_t *\fR\fIattr\fR, 
+\fBint\fR \fBddi_dma_alloc_handle\fR(\fBdev_info_t *\fR\fIdip\fR, \fBddi_dma_attr_t *\fR\fIattr\fR,
      \fBint  (*\fR\fIcallback\fR) (caddr_t), \fBcaddr_t\fR \fIarg\fR, \fBddi_dma_handle_t *\fR\fIhandlep\fR);
 .fi
 
@@ -25,56 +25,46 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 12n
-.rt  
 Pointer to the device's  \fBdev_info\fR structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIattr\fR\fR
 .ad
 .RS 12n
-.rt  
 Pointer to a  \fBDMA\fR attribute structure for this device (see
 \fBddi_dma_attr\fR(9S)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcallback\fR\fR
 .ad
 .RS 12n
-.rt  
 The address of a function to call back later if resources aren't available now.
 The following special function addresses may also be used.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_DMA_SLEEP\fR\fR
 .ad
 .RS 20n
-.rt  
 Wait until resources are available.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_DMA_DONTWAIT\fR\fR
 .ad
 .RS 20n
-.rt  
 Do not wait until resources are available and do not schedule a callback.
 .RE
 
@@ -82,23 +72,19 @@ Do not wait until resources are available and do not schedule a callback.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIarg\fR\fR
 .ad
 .RS 12n
-.rt  
 Argument to be passed to a callback function, if such a function is specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhandlep\fR\fR
 .ad
 .RS 12n
-.rt  
 Pointer to the  \fBDMA\fR handle to be initialized.
 .RE
 
@@ -146,35 +132,29 @@ must be called to free the handle.
 \fBddi_dma_alloc_handle()\fR returns:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 23n
-.rt  
 Successfully allocated a new \fBDMA\fR handle.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_DMA_BADATTR\fR\fR
 .ad
 .RS 23n
-.rt  
 The attributes specified in the \fBddi_dma_attr\fR(9S) structure make it
 impossible for the system to allocate potential  \fBDMA\fR resources.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_DMA_NORESOURCES\fR\fR
 .ad
 .RS 23n
-.rt  
 No resources are available.
 .RE
 

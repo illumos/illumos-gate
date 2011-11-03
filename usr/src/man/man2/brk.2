@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH brk 2 "14 Jan 1997" "SunOS 5.11" "System Calls"
+.TH BRK 2 "Jan 14, 1997"
 .SH NAME
 brk, sbrk \- change the amount of space allocated for the calling process's
 data segment
@@ -67,12 +67,10 @@ The \fBbrk()\fR and \fBsbrk()\fR functions will fail and no additional memory
 will be allocated if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 The data segment size limit as set by \fBsetrlimit()\fR (see
 \fBgetrlimit\fR(2)) would be exceeded; the maximum possible size of a data
 segment (compiled into the system) would be exceeded; insufficient space exists
@@ -83,12 +81,10 @@ mapping (see \fBmmap\fR(2)).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 10n
-.rt  
 Total amount of system memory available for private pages is temporarily
 insufficient. This may occur even though the space requested was less than the
 maximum data segment size (see  \fBulimit\fR(2)).
@@ -116,13 +112,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

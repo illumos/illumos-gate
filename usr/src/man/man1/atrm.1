@@ -2,7 +2,7 @@
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 1985 Regents of the University of California. All rights reserved. The Berkeley software License Agreement specifies the terms and conditions for redistribution.
 .\" Copyright (c) 2007 Sun Microsystems, Inc., All Rights Reserved.
-.TH atrm 1 "16 Jul 2007" "SunOS 5.11" "User Commands"
+.TH ATRM 1 "Jul 16, 2007"
 .SH NAME
 atrm \- remove jobs spooled by at or batch
 .SH SYNOPSIS
@@ -31,36 +31,30 @@ You can only remove jobs belonging to other users if you have
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 6n
-.rt  
 All. Removes all unexecuted jobs that were created by the current user. If
 invoked by the privileged user, the entire queue is flushed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 Force. All information regarding the removal of the specified jobs is
 suppressed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 6n
-.rt  
 Interactive. \fBatrm\fR asks if a job should be removed. If the response is
 affirmative, the job is removed.
 .RE
@@ -68,12 +62,10 @@ affirmative, the job is removed.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/spool/cron/atjobs\fR\fR
 .ad
 .RS 26n
-.rt  
 Spool area for \fBat\fR jobs
 .RE
 

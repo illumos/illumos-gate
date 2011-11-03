@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_prop_create 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_PROP_CREATE 9F "Jan 16, 2006"
 .SH NAME
 ddi_prop_create, ddi_prop_modify, ddi_prop_remove, ddi_prop_remove_all,
 ddi_prop_undefine \- create, remove, or modify properties for leaf device
@@ -15,19 +15,19 @@ drivers
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 
-\fBint\fR \fBddi_prop_create\fR(\fBdev_t\fR \fIdev\fR, \fBdev_info_t *\fR\fIdip\fR, \fBint\fR \fIflags\fR, 
+\fBint\fR \fBddi_prop_create\fR(\fBdev_t\fR \fIdev\fR, \fBdev_info_t *\fR\fIdip\fR, \fBint\fR \fIflags\fR,
      \fBchar *\fR\fIname\fR, \fBcaddr_t\fR \fIvaluep\fR, \fBint\fR \fIlength\fR);
 .fi
 
 .LP
 .nf
-\fBint\fR \fBddi_prop_undefine\fR(\fBdev_t\fR \fIdev\fR, \fBdev_info_t *\fR\fIdip\fR, \fBint\fR \fIflags\fR, 
+\fBint\fR \fBddi_prop_undefine\fR(\fBdev_t\fR \fIdev\fR, \fBdev_info_t *\fR\fIdip\fR, \fBint\fR \fIflags\fR,
      \fBchar *\fR\fIname\fR);
 .fi
 
 .LP
 .nf
-\fBint\fR \fBddi_prop_modify\fR(\fBdev_t\fR \fIdev\fR, \fBdev_info_t *\fR\fIdip\fR, \fBint\fR \fIflags\fR, 
+\fBint\fR \fBddi_prop_modify\fR(\fBdev_t\fR \fIdev\fR, \fBdev_info_t *\fR\fIdip\fR, \fBint\fR \fIflags\fR,
      \fBchar *\fR\fIname\fR, \fBcaddr_t\fR \fIvaluep\fR, \fBint\fR \fIlength\fR);
 .fi
 
@@ -53,68 +53,56 @@ instead of these functions.
 \fBddi_prop_create()\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdev\fR\fR
 .ad
 .RS 10n
-.rt  
 \fBdev_t\fR of the device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 10n
-.rt  
 \fBdev_info_t\fR pointer of the device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 10n
-.rt  
 \fIflag\fR modifiers. The only possible flag value is \fBDDI_PROP_CANSLEEP\fR:
 Memory allocation may sleep.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR\fR
 .ad
 .RS 10n
-.rt  
 name of property.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvaluep\fR\fR
 .ad
 .RS 10n
-.rt  
 pointer to property value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlength\fR\fR
 .ad
 .RS 10n
-.rt  
 property length.
 .RE
 
@@ -123,46 +111,38 @@ property length.
 \fBddi_prop_undefine()\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdev\fR\fR
 .ad
 .RS 9n
-.rt  
 \fBdev_t\fR of the device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 9n
-.rt  
 \fBdev_info_t\fR pointer of the device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 9n
-.rt  
 flag modifiers. The only possible flag value is \fBDDI_PROP_CANSLEEP\fR: Memory
 allocation may sleep.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR\fR
 .ad
 .RS 9n
-.rt  
 name of property.
 .RE
 
@@ -171,68 +151,56 @@ name of property.
 \fBddi_prop_modify()\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdev\fR\fR
 .ad
 .RS 10n
-.rt  
 \fBdev_t\fR of the device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 10n
-.rt  
 \fBdev_info_t\fR pointer of the device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 10n
-.rt  
 flag modifiers. The only possible flag value is \fBDDI_PROP_CANSLEEP\fR: Memory
 allocation may sleep.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR\fR
 .ad
 .RS 10n
-.rt  
 name of property.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvaluep\fR\fR
 .ad
 .RS 10n
-.rt  
 pointer to property value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlength\fR\fR
 .ad
 .RS 10n
-.rt  
 property length.
 .RE
 
@@ -241,34 +209,28 @@ property length.
 \fBddi_prop_remove()\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdev\fR\fR
 .ad
 .RS 8n
-.rt  
 \fBdev_t\fR of the device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 8n
-.rt  
 \fBdev_info_t\fR pointer of the device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR\fR
 .ad
 .RS 8n
-.rt  
 name of property.
 .RE
 
@@ -277,12 +239,10 @@ name of property.
 \fBddi_prop_remove_all()\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 7n
-.rt  
 \fBdev_info_t\fR pointer of the device.
 .RE
 
@@ -308,12 +268,10 @@ caller.
 The individual functions are described as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBddi_prop_create()\fR\fR
 .ad
 .RS 25n
-.rt  
 \fBddi_prop_create()\fR adds a property to the device's property list. If the
 property is not associated with any particular \fIdev\fR but is associated with
 the physical device itself, then the argument \fIdev\fR should be the special
@@ -336,12 +294,10 @@ sleep until memory becomes available.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBddi_prop_undefine()\fR\fR
 .ad
 .RS 25n
-.rt  
 \fBddi_prop_undefine()\fR is a special case of property creation where the
 value of the property is set to undefined. This property has the effect of
 terminating a property search at the current devinfo node, rather than allowing
@@ -357,12 +313,10 @@ is subject to the same memory allocation constraints as
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBddi_prop_modify()\fR\fR
 .ad
 .RS 25n
-.rt  
 \fBddi_prop_modify()\fR modifies the length and the value of a property. If
 \fBddi_prop_modify()\fR finds the property in the driver's property list,
 allocates memory for the property value and returns \fBDDI_PROP_SUCCESS\fR. If
@@ -375,12 +329,10 @@ is subject to the same memory allocation constraints as
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBddi_prop_remove()\fR\fR
 .ad
 .RS 25n
-.rt  
 \fBddi_prop_remove()\fR unlinks a property from the device's property list. If
 \fBddi_prop_remove()\fR finds the property (an exact match of both
 \fIname\fRand \fIdev\fR), it unlinks the property, frees its memory, and
@@ -389,12 +341,10 @@ returns \fBDDI_PROP_SUCCESS,\fR otherwise, it returns \fBDDI_PROP_NOT_FOUND\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBddi_prop_remove_all()\fR\fR
 .ad
 .RS 25n
-.rt  
 \fBddi_prop_remove_all()\fR removes the properties of all the \fBdev_t\fR's
 associated with the \fIdip\fR. It is called before unloading a driver.
 .RE
@@ -405,34 +355,28 @@ associated with the \fIdip\fR. It is called before unloading a driver.
 The \fBddi_prop_create()\fR function returns the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_SUCCESS\fR\fR
 .ad
 .RS 22n
-.rt  
 On success.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_NO_MEMORY\fR\fR
 .ad
 .RS 22n
-.rt  
 On memory allocation failure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_INVAL_ARG\fR\fR
 .ad
 .RS 22n
-.rt  
 If an attempt is made to create a property with \fIdev\fR equal to
 \fBDDI_DEV_T_ANY\fR or if \fIname\fR is \fINULL\fR or \fIname\fR is the
 \fINULL\fR string.
@@ -443,34 +387,28 @@ If an attempt is made to create a property with \fIdev\fR equal to
 The \fBddi_prop_ undefine()\fR function returns the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_SUCCESS\fR\fR
 .ad
 .RS 22n
-.rt  
 On success.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_NO_MEMORY\fR\fR
 .ad
 .RS 22n
-.rt  
 On memory allocation failure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_INVAL_ARG\fR\fR
 .ad
 .RS 22n
-.rt  
 If an attempt is made to create a property with \fIdev\fR \fBDDI_DEV_T_ANY\fR
 or if \fIname\fR is \fINULL\fR or \fIname\fR is the \fINULL\fR string.
 .RE
@@ -480,34 +418,28 @@ or if \fIname\fR is \fINULL\fR or \fIname\fR is the \fINULL\fR string.
 The \fBddi_prop_modify()\fR function returns the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_SUCCESS\fR\fR
 .ad
 .RS 22n
-.rt  
 On success.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_NO_MEMORY\fR\fR
 .ad
 .RS 22n
-.rt  
 On memory allocation failure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_INVAL_ARG\fR\fR
 .ad
 .RS 22n
-.rt  
 If an attempt is made to create a property with \fIdev\fR equal to
 \fBDDI_DEV_T_ANY\fR or if \fIname\fR is \fINULL\fR or \fIname\fR is the
 \fINULL\fR string.
@@ -515,12 +447,10 @@ If an attempt is made to create a property with \fIdev\fR equal to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_NOT_FOUND\fR\fR
 .ad
 .RS 22n
-.rt  
 On property search failure.
 .RE
 
@@ -529,23 +459,19 @@ On property search failure.
 The \fBddi_prop_remove()\fR function returns the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_SUCCESS\fR\fR
 .ad
 .RS 22n
-.rt  
 On success.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_INVAL_ARG\fR\fR
 .ad
 .RS 22n
-.rt  
 If an attempt is made to create a property with \fIdev\fR equal to
 \fBDDI_DEV_T_ANY\fR or if \fIname\fR is \fINULL\fR or \fIname\fR is the
 \fINULL\fR string.
@@ -553,12 +479,10 @@ If an attempt is made to create a property with \fIdev\fR equal to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_NOT_FOUND\fR\fR
 .ad
 .RS 22n
-.rt  
 On property search failure.
 .RE
 
@@ -582,8 +506,8 @@ partition on a disk.
 int propval = 8192;
 
 for (minor = 0; minor < 8; minor ++) {
-	   (void) ddi_prop_create(makedevice(DDI_MAJOR_T_UNKNOWN, minor), 
-	       dev, DDI_PROP_CANSLEEP, "nblocks", (caddr_t) &propval, 
+	   (void) ddi_prop_create(makedevice(DDI_MAJOR_T_UNKNOWN, minor),
+	       dev, DDI_PROP_CANSLEEP, "nblocks", (caddr_t) &propval,
             sizeof (int));
 	       \&.\|.\|.
 }
@@ -598,13 +522,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.66i) |cw(2.84i) 
-lw(2.66i) |lw(2.84i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Stability LevelT{
+Stability Level	T{
 \fBddi_prop_create()\fR and \fBddi_prop_modify()\fR are Obsolete
 T}
 .TE

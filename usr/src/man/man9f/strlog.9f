@@ -5,19 +5,19 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH strlog 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH STRLOG 9F "Jan 16, 2006"
 .SH NAME
 strlog \- submit messages to the log driver
 .SH SYNOPSIS
 .LP
 .nf
 #include <sys/stream.h>
-#include <sys/strlog.h> 
+#include <sys/strlog.h>
 #include <sys/log.h>
 
 
 
-\fBint\fR \fBstrlog\fR(\fBshort\fR \fImid\fR, \fBshort\fR \fIsid\fR, \fBchar\fR \fIlevel\fR, 
+\fBint\fR \fBstrlog\fR(\fBshort\fR \fImid\fR, \fBshort\fR \fIsid\fR, \fBchar\fR \fIlevel\fR,
      \fBunsigned short\fR \fIflags\fR, \fBchar *\fR\fIfmt\fR, ...);
 .fi
 
@@ -28,122 +28,100 @@ Architecture independent level 1 (DDI/DKI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fImid\fR\fR
 .ad
 .RS 9n
-.rt  
 Identification number of the module or driver submitting the message (in the
 case of a module, its \fBmi_idnum\fR value from \fBmodule_info\fR(9S)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsid\fR\fR
 .ad
 .RS 9n
-.rt  
 Identification number for a particular minor device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlevel\fR\fR
 .ad
 .RS 9n
-.rt  
 Tracing level for selective screening of low priority messages. Larger values
 imply less important information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 9n
-.rt  
 Valid flag values are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSL_ERROR\fR\fR
 .ad
 .RS 14n
-.rt  
 Message is for error logger.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSL_TRACE\fR\fR
 .ad
 .RS 14n
-.rt  
 Message is for trace.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSL_NOTIFY\fR\fR
 .ad
 .RS 14n
-.rt  
 Mail copy of message to system administrator.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSL_CONSOLE\fR\fR
 .ad
 .RS 14n
-.rt  
 Log message to console.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSL_FATAL\fR\fR
 .ad
 .RS 14n
-.rt  
 Error is fatal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSL_WARN\fR\fR
 .ad
 .RS 14n
-.rt  
 Error is a warning.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSL_NOTE\fR\fR
 .ad
 .RS 14n
-.rt  
 Error is a notice.
 .RE
 
@@ -151,12 +129,10 @@ Error is a notice.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfmt\fR\fR
 .ad
 .RS 9n
-.rt  
 \fBprintf\fR(3C) style format string. \fB%e\fR, \fB%g\fR, and \fB%G\fR formats
 are not allowed but \fB%s\fR is supported.
 .RE
@@ -192,7 +168,6 @@ context.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/streams/error.\fR\fImm-dd\fR\fR
 .ad

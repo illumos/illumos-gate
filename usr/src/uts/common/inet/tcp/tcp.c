@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011, Joyent Inc. All rights reserved.
+ * Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -2227,6 +2228,10 @@ tcp_reinit_values(tcp)
 	    tcp->tcp_eager_prev_drop_q0 == NULL) ||
 	    tcp->tcp_eager_next_drop_q0 == tcp->tcp_eager_prev_drop_q0);
 
+	DONTCARE(tcp->tcp_ka_rinterval);	/* Init in tcp_init_values */
+	DONTCARE(tcp->tcp_ka_abort_thres);	/* Init in tcp_init_values */
+	DONTCARE(tcp->tcp_ka_cnt);		/* Init in tcp_init_values */
+
 	tcp->tcp_client_errno = 0;
 
 	DONTCARE(connp->conn_sum);		/* Init in tcp_init_values */
@@ -2354,6 +2359,8 @@ tcp_init_values(tcp_t *tcp, tcp_t *parent)
 
 		tcp->tcp_ka_interval = tcps->tcps_keepalive_interval;
 		tcp->tcp_ka_abort_thres = tcps->tcps_keepalive_abort_interval;
+		tcp->tcp_ka_cnt = 0;
+		tcp->tcp_ka_rinterval = 0;
 
 		/*
 		 * Default value of tcp_init_cwnd is 0, so no need to set here
@@ -2381,6 +2388,8 @@ tcp_init_values(tcp_t *tcp, tcp_t *parent)
 
 		tcp->tcp_ka_interval = parent->tcp_ka_interval;
 		tcp->tcp_ka_abort_thres = parent->tcp_ka_abort_thres;
+		tcp->tcp_ka_cnt = parent->tcp_ka_cnt;
+		tcp->tcp_ka_rinterval = parent->tcp_ka_rinterval;
 
 		tcp->tcp_init_cwnd = parent->tcp_init_cwnd;
 	}
@@ -3918,7 +3927,7 @@ tcp_iss_init(tcp_t *tcp)
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 	conn_t		*connp = tcp->tcp_connp;
 
-	tcps->tcps_iss_incr_extra += (ISS_INCR >> 1);
+	tcps->tcps_iss_incr_extra += (tcps->tcps_iss_incr >> 1);
 	tcp->tcp_iss = tcps->tcps_iss_incr_extra;
 	switch (tcps->tcps_strong_iss) {
 	case 2:
@@ -3941,7 +3950,8 @@ tcp_iss_init(tcp_t *tcp)
 		tcp->tcp_iss += (gethrtime() >> ISS_NSEC_SHT) + tcp_random();
 		break;
 	default:
-		tcp->tcp_iss += (uint32_t)gethrestime_sec() * ISS_INCR;
+		tcp->tcp_iss += (uint32_t)gethrestime_sec() *
+		    tcps->tcps_iss_incr;
 		break;
 	}
 	tcp->tcp_valid_bits = TCP_ISS_VALID;

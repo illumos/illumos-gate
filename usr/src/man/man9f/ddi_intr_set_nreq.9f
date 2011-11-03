@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_intr_set_nreq 9F "5 Jan 2009" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_INTR_SET_NREQ 9F "Jan 5, 2009"
 .SH NAME
 ddi_intr_set_nreq \- set the number of interrupts requested for a device driver
 instance
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/ddi_intr.h> 
+#include <sys/ddi_intr.h>
 
 
 
@@ -24,23 +24,19 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 8n
-.rt  
 Pointer to the \fBdev_info\fR structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInreq\fR\fR
 .ad
 .RS 8n
-.rt  
 Number of interrupts requested.
 .RE
 
@@ -77,46 +73,38 @@ functionality.
 The \fBddi_intr_set_nreq()\fR function returns:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 15n
-.rt  
 on success
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_EINVAL\fR\fR
 .ad
 .RS 15n
-.rt  
 The operation is invalid because the \fInreq\fR parameter is not a legal value
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_ENOTSUP\fR\fR
 .ad
 .RS 15n
-.rt  
 The operation is not supported. The driver must have a registered callback, and
 the system must have interrupt pools implemented.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 15n
-.rt  
 Implementation specific failure
 .RE
 
@@ -132,15 +120,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityPrivate
+Interface Stability	Private
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

@@ -3,18 +3,18 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH csx_AccessConfigurationRegister 9F "19 Jul 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH CSX_ACCESSCONFIGURATIONREGISTER 9F "Jul 19, 1996"
 .SH NAME
 csx_AccessConfigurationRegister \- read or write a PC Card Configuration
 Register
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/pccard.h> 
+#include <sys/pccard.h>
 
 
 
-\fBint32_t\fR \fBcsx_AccessConfigurationRegister\fR(\fBclient_handle_t\fR \fIch\fR, 
+\fBint32_t\fR \fBcsx_AccessConfigurationRegister\fR(\fBclient_handle_t\fR \fIch\fR,
      \fBaccess_config_reg_t *\fR\fIacr\fR);
 .fi
 
@@ -25,23 +25,19 @@ Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIch\fR\fR
 .ad
 .RS 7n
-.rt  
 Client handle returned from \fBcsx_RegisterClient\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIacr\fR\fR
 .ad
 .RS 7n
-.rt  
 Pointer to an \fBaccess_config_reg_t\fR structure.
 .RE
 
@@ -69,24 +65,20 @@ uint32_t     Value;      /* value read or written*/
 The fields are defined as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSocket\fR\fR
 .ad
 .RS 10n
-.rt  
 Not used in Solaris, but for portability with other Card Services
 implementations, it should be set to the logical socket number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAction\fR\fR
 .ad
 .RS 10n
-.rt  
 May be set to \fBCONFIG_REG_READ\fR or \fBCONFIG_REG_WRITE\fR. All other values
 in the \fBAction\fR field are reserved for future use. If the \fBAction\fR
 field is set to \fBCONFIG_REG_WRITE,\fR the \fBValue\fR field is written to the
@@ -97,12 +89,10 @@ only updated by a \fBCONFIG_REG_READ\fR request.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOffset\fR\fR
 .ad
 .RS 10n
-.rt  
 Specifies the byte offset for the desired configuration register from the \fBPC
 \fRCard configuration register base specified in
 \fBcsx_RequestConfiguration\fR(9F).
@@ -110,12 +100,10 @@ Specifies the byte offset for the desired configuration register from the \fBPC
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBValue\fR\fR
 .ad
 .RS 10n
-.rt  
 Contains the value read from the \fBPC \fRCard Configuration Register for a
 read operation. For a write operation, the \fBValue\fR field contains the value
 to write to the configuration register. As noted above, on return from a write
@@ -142,69 +130,57 @@ appropriate card state after the reset operation is complete.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_SUCCESS\fR\fR
 .ad
 .RS 27n
-.rt  
 Successful operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_BAD_ARGS\fR\fR
 .ad
 .RS 27n
-.rt  
 Specified arguments are invalid. Client specifies an \fBOffset\fR that is out
 of range or neither \fBCONFIG_REG_READ\fR or \fBCONFIG_REG_WRITE\fR is set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_UNSUPPORTED_MODE\fR\fR
 .ad
 .RS 27n
-.rt  
 Client has not called \fBcsx_RequestConfiguration\fR(9F) before calling this
 function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_BAD_HANDLE\fR\fR
 .ad
 .RS 27n
-.rt  
 Client handle is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_NO_CARD\fR\fR
 .ad
 .RS 27n
-.rt  
 No \fBPC \fRcard in socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_UNSUPPORTED_FUNCTION\fR\fR
 .ad
 .RS 27n
-.rt  
 No \fBPCMCIA \fRhardware installed.
 .RE
 

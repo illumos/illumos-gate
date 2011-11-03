@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH trap 1 "20 Nov 2007" "SunOS 5.11" "User Commands"
+.TH TRAP 1 "Nov 20, 2007"
 .SH NAME
 trap, onintr \- shell built-in functions to respond to (hardware) signals
 .SH SYNOPSIS
@@ -124,12 +124,10 @@ altered by the trap execution.
 \fIcondition\fR can be the name or number of a signal, or one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEXIT\fR\fR
 .ad
 .RS 9n
-.rt  
 Execute this trap when the shell exits. If defined within a function with the
 \fBfunction\fR reserved word, executes the trap in the caller's environment
 when the function returns. The trap action is restored to the value it had when
@@ -138,46 +136,38 @@ it called the function.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 9n
-.rt  
 Same as \fBEXIT\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDEBUG\fR\fR
 .ad
 .RS 9n
-.rt  
 Execute before each simple command is executed but after the arguments are
 expanded.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBERR\fR\fR
 .ad
 .RS 9n
-.rt  
 Execute whenever \fBset -e\fR would cause the shell to exit.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKEYBD\fR\fR
 .ad
 .RS 9n
-.rt  
 Execute when a key is entered from a terminal device.
 .RE
 
@@ -202,12 +192,10 @@ The following options are supported by the \fBtrap\fR built-in command in
 \fBksh93\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 6n
-.rt  
 Causes the current traps to be output in a format that can be processed as
 input to the shell to recreate the current traps.
 .RE
@@ -217,23 +205,19 @@ input to the shell to recreate the current traps.
 The trap built-in in \fBksh93\fR exits with one of the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH gettxt 1 "20 Dec 1996" "SunOS 5.11" "User Commands"
+.TH GETTXT 1 "Dec 20, 1996"
 .SH NAME
 gettxt \- retrieve a text string from a message database
 .SH SYNOPSIS
@@ -21,12 +21,10 @@ directory name \fIlocale\fR corresponds to the language in which the text
 strings are written; see \fBsetlocale\fR(3C).
 .sp
 .ne 2
-.mk
 .na
 \fB\fImsgfile\fR \fR
 .ad
 .RS 13n
-.rt  
 Name of the file in the directory
 \fB/usr/lib/locale/\fR\fIlocale\fR\fB/\fR\fBLC_MESSAGES\fR\fB \fR to retrieve
 \fImsgnum\fR from. The name of \fImsgfile\fR can be up to 14 characters in
@@ -36,12 +34,10 @@ length, but may not contain either \e0 (null) or the \fBASCII\fR code for
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImsgnum\fR \fR
 .ad
 .RS 13n
-.rt  
 Sequence number of the string to retrieve from \fImsgfile\fR. The strings in
 \fImsgfile\fR are numbered sequentially from \fI1\fR to \fIn\fR, where \fIn\fR
 is the number of strings in the file.
@@ -49,12 +45,10 @@ is the number of strings in the file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdflt_msg\fR \fR
 .ad
 .RS 13n
-.rt  
 Default string to be displayed if \fBgettxt\fR fails to retrieve \fImsgnum\fR
 from \fImsgfile\fR. Nongraphic characters must be represented as alphabetic
 escape sequences.
@@ -108,12 +102,10 @@ that affect the execution of \fBgettxt\fR: \fBLC_CTYPE\fR and
 \fB\fR\fBLC_MESSAGES\fR\fB\&.   \fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_CTYPE\fR \fR
 .ad
 .RS 16n
-.rt  
 Determines how \fBgettxt\fR handles characters. When \fBLC_CTYPE\fR is set to a
 valid value, \fBgettxt\fR can display and handle text and filenames containing
 valid characters for that locale. \fBgettxt\fR can display and handle Extended
@@ -124,12 +116,10 @@ column widths. In the "C" locale, only characters from ISO 8859-1 are valid.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_MESSAGES\fR \fR
 .ad
 .RS 16n
-.rt  
 Determines how diagnostic and informative messages are presented. This includes
 the language and style of the messages, and the correct form of affirmative and
 negative responses.  In the "C" locale, the messages are presented in the
@@ -139,7 +129,6 @@ default form found in the program itself (in most cases, U.S. English).
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/locale/C/\fR\fBLC_MESSAGES\fR\fB/*   \fR\fR
 .ad
@@ -150,7 +139,6 @@ default message files created by \fBmkmsgs\fR(1)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/locale/\fR\fIlocale\fR\fB/\fR\fBLC_MESSAGES\fR\fB/*   \fR\fR
 .ad
@@ -167,12 +155,11 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
-CSIEnabled
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+CSI	Enabled
 .TE
 
 .SH SEE ALSO

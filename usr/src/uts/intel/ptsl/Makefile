@@ -23,8 +23,7 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 #
 #	This makefile drives the production of the ptsl driver
 #
@@ -64,6 +63,11 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
+
+#
+# Depends on ptc
+#
+LDFLAGS += -dy -N drv/ptc
 
 #
 #	Default build targets.

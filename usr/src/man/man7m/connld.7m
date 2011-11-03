@@ -4,18 +4,18 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH connld 7M "3 May 2004" "SunOS 5.11" "STREAMS Modules"
+.TH CONNLD 7M "May 3, 2004"
 .SH NAME
 connld \- line discipline for unique stream connections
 .SH SYNOPSIS
 .LP
 .nf
-\fB#include </sys/steam.h>\fR 
+\fB#include </sys/steam.h>\fR
 .fi
 
 .LP
 .nf
-\fBint ioctl(\fIfd\fR,I_PUSH,"connld");\fR 
+\fBint ioctl(\fIfd\fR,I_PUSH,"connld");\fR
 .fi
 
 .SH DESCRIPTION
@@ -57,82 +57,68 @@ On success, an open of \fBconnld\fR returns 0. On failure, \fBerrno\fR is set
 to the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR \fR
 .ad
 .RS 11n
-.rt  
 A stream onto which \fBconnld\fR is being pushed is not a pipe or the pipe does
 not have a write queue pointer pointing to a stream head read queue.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR \fR
 .ad
 .RS 11n
-.rt  
 The other end of the pipe onto which \fBconnld\fR is being pushed is linked
 under a multiplexor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPIPE\fR \fR
 .ad
 .RS 11n
-.rt  
 \fBconnld\fR is being pushed onto a pipe end whose other end is no longer
 there.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR \fR
 .ad
 .RS 11n
-.rt  
 An internal pipe could not be created.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENXIO\fR \fR
 .ad
 .RS 11n
-.rt  
 An  \fBM_HANGUP\fR message is at the stream head of the pipe onto which
 \fBconnld\fR is being pushed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR \fR
 .ad
 .RS 11n
-.rt  
 Internal data structures could not be allocated.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENFILE\fR \fR
 .ad
 .RS 11n
-.rt  
 A file table entry could not be allocated.
 .RE
 

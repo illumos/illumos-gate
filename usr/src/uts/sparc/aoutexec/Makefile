@@ -23,8 +23,7 @@
 # uts/sparc/aoutexec/Makefile
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 #
 #	This makefile drives the production of the aoutexec exec kernel
 #	module (binary compatibility).
@@ -61,6 +60,11 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 # lint pass one enforcement
 #
 CFLAGS += $(CCVERBOSE)
+
+#
+# Define dependency on elfexec
+#
+LDFLAGS += -dy -N exec/elfexec
 
 #
 #	Default build targets.

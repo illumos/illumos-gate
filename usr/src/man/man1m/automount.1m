@@ -1,10 +1,10 @@
 '\" te
-.\" Copyright 1989 AT&T 
+.\" Copyright 1989 AT&T
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH automount 1M "28 Mar 2008" "SunOS 5.11" "System Administration Commands"
+.TH AUTOMOUNT 1M "Mar 28, 2008"
 .SH NAME
 automount \- install automatic mount points
 .SH SYNOPSIS
@@ -104,24 +104,20 @@ directory is automatically created on behalf of the user.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fIduration\fR\fR
 .ad
 .RS 15n
-.rt  
 Specifies a \fIduration\fR, in seconds, that a file system is to remain mounted
 when not in use. The default is \fB10\fR minutes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 15n
-.rt  
 Verbose mode. Notifies of \fBautofs\fR mounts, unmounts, or other non-essential
 information.
 .RE
@@ -234,7 +230,7 @@ still be applied. For example:
 .sp
 .in +2
 .nf
-man -ro alpha:/usr/man  bravo,charlie(1):/usr/share/man  
+man -ro alpha:/usr/man  bravo,charlie(1):/usr/share/man
      delta(3):/export/man
 .fi
 .in -2
@@ -302,35 +298,33 @@ to its current value for the client's host name. Supported variables are:
 
 .sp
 .TS
-tab();
-lw(1.07i) lw(2.6i) lw(1.83i) 
-lw(1.07i) lw(2.6i) lw(1.83i) 
-.
-\fBARCH\fRThe output of \fBarch\fRT{
+l l l
+l l l .
+\fBARCH\fR	The output of \fBarch\fR	T{
 The architecture name. For example, \fBsun4\fR on a sun4u machine.
 T}
-\fBCPU\fRThe output of \fBuname\fR \fB-p\fRThe processor type.
-For example, "sparc"
-\fBHOST\fRThe output of \fBuname\fR \fB-n\fRThe host name.
-For example, \fBmyhost\fR.
-\fBKARCH\fRThe output of \fBarch -k\fR or \fBuname -m\fRT{
+\fBCPU\fR	The output of \fBuname\fR \fB-p\fR	The processor type.
+		For example, "sparc"
+\fBHOST\fR	The output of \fBuname\fR \fB-n\fR	The host name.
+		For example, \fBmyhost\fR.
+\fBKARCH\fR	The output of \fBarch -k\fR or \fBuname -m\fR	T{
 The kernel architecture name or machine hardware name. For example, \fBsun4u\fR.
 T}
-
-\fBOSNAME\fRThe output of \fBuname\fR \fB-s\fRThe OS name.
-For example, "SunOS"
-\fBOSREL\fRThe output of \fBuname\fR \fB-r\fRThe OS release name. 
-For example "5.3"
-\fBOSVERS\fRThe output of \fBuname\fR \fB-v\fRThe OS version.
-For example, "beta1.0"
-\fBNATISA\fRThe output of \fBisainfo\fR \fB-n\fRT{
+		
+\fBOSNAME\fR	The output of \fBuname\fR \fB-s\fR	The OS name.
+		For example, "SunOS"
+\fBOSREL\fR	The output of \fBuname\fR \fB-r\fR	The OS release name.
+		For example "5.3"
+\fBOSVERS\fR	The output of \fBuname\fR \fB-v\fR	The OS version.
+		For example, "beta1.0"
+\fBNATISA\fR	The output of \fBisainfo\fR \fB-n\fR	T{
 The native instruction set architecture for the system.
 T}
-For example, "sparcv9"
-\fBPLATFORM\fRThe output of \fBuname -i\fRT{
+		For example, "sparcv9"
+\fBPLATFORM\fR	The output of \fBuname -i\fR	T{
 The platform name. For example,  \fBSUNW,Sun-Fire-V240\fR.
 T}
-
+		
 .TE
 
 .sp
@@ -579,69 +573,57 @@ available in their zone.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/auto_master\fR\fR
 .ad
 .RS 23n
-.rt  
 Master automount map.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/auto_home\fR\fR
 .ad
 .RS 23n
-.rt  
 Map to support automounted home directories.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/default/autofs\fR\fR
 .ad
 .RS 23n
-.rt  
 Supplies default values for parameters for \fBautomount\fR and
 \fBautomountd\fR. See \fBautofs\fR(4).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/nsswitch.conf\fR\fR
 .ad
 .RS 23n
-.rt  
 Name service switch configuration file. See \fBnsswitch.conf\fR(4).
 .RE
 

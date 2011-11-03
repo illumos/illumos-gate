@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <locale.h>
 #include "stdio.h"
 #include "errno.h"
@@ -152,6 +150,7 @@ main(int argc, char *argv[])
 	char *			u		= 0;
 	char *			cp;
 	char *			rest;
+	char			stroptsw[]	= "-X";
 
 	Action			action		= 0;
 
@@ -203,13 +202,13 @@ main(int argc, char *argv[])
 		case 'A':
 		case 'u':
 			if (!*optarg) {
-				(cp = "-X")[1] = c;
-				LP_ERRMSG1 (ERROR, E_LP_NULLARG, cp);
+				stroptsw[1] = c;
+				LP_ERRMSG1 (ERROR, E_LP_NULLARG, stroptsw);
 				exit (1);
 			}
 			if (*optarg == '-') {
-				(cp = "-X")[1] = c;
-				LP_ERRMSG1 (ERROR, E_LP_OPTARG, cp);
+				stroptsw[1] = c;
+				LP_ERRMSG1 (ERROR, E_LP_OPTARG, stroptsw);
 				exit (1);
 			}
 			break;
@@ -332,11 +331,11 @@ main(int argc, char *argv[])
 				usage ();
 				exit (0);
 			}
-			(cp = "-X")[1] = optopt;
+			stroptsw[1] = optopt;
 			if (strchr(OPT_LIST, optopt))
-				LP_ERRMSG1 (ERROR, E_LP_OPTARG, cp);
+				LP_ERRMSG1 (ERROR, E_LP_OPTARG, stroptsw);
 			else
-				LP_ERRMSG1 (ERROR, E_LP_OPTION, cp);
+				LP_ERRMSG1 (ERROR, E_LP_OPTION, stroptsw);
 			exit (1);
 
 		}

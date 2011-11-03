@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -753,6 +754,20 @@ usr/include/smbsrv
 #
 usr/lib/smbsrv/dtrace
 #
+# Private/Internal (lint) libraries of smbsrv. Do not ship.
+#
+usr/lib/reparse/llib-lreparse_smb
+usr/lib/reparse/llib-lreparse_smb.ln
+usr/lib/smbsrv/llib-lmlrpc
+usr/lib/smbsrv/llib-lmlrpc.ln
+usr/lib/smbsrv/llib-lmlsvc
+usr/lib/smbsrv/llib-lmlsvc.ln
+usr/lib/smbsrv/llib-lsmb
+usr/lib/smbsrv/llib-lsmb.ln
+usr/lib/smbsrv/llib-lsmbns
+usr/lib/smbsrv/llib-lsmbns.ln
+#
+#
 # Private/Internal 64-bit libraries of smbsrv. Do not ship.
 #
 usr/lib/smbsrv/amd64				i386
@@ -804,6 +819,7 @@ usr/lib/sparcv9/llib-lsmbfs.ln		sparc
 #
 usr/lib/fs/smbfs/chacl
 usr/lib/fs/smbfs/lsacl
+usr/lib/fs/smbfs/testnp
 #
 # FC related files
 kernel/kmdb/fcip		i386
@@ -922,6 +938,13 @@ usr/lib/sparcv9/llib-lvrrpadm.ln	sparc
 #
 opt/onbld/bin/i386/elfsign	i386
 opt/onbld/bin/sparc/elfsign	sparc
+
+#
+# Private libdwarf
+#
+opt/onbld/lib/i386/libdwarf.so	i386
+opt/onbld/lib/sparc/libdwarf.so	sparc
+
 #
 # Private socket filter API
 #

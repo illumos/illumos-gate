@@ -23,8 +23,7 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 #
 #	This makefile drives the production of the kernel rpcsec module.
 #
@@ -54,6 +53,11 @@ include $(UTSBASE)/intel/Makefile.intel
 ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
+
+#
+# Define dependency on rpcmod and kgssapi
+#
+LDFLAGS += -dy -N strmod/rpcmod -N misc/kgssapi
 
 #
 # For now, disable these lint checks; maintainers should endeavor

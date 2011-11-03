@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cvcd 1M "9 Mar 2006" "SunOS 5.11" "System Administration Commands"
+.TH CVCD 1M "Mar 9, 2006"
 .SH NAME
 cvcd \- virtual console daemon
 .SH SYNOPSIS
 .LP
 .nf
-\fB/platform\fI\fR/\fIplatform_name\fR/cvcd\fR [\fB-a\fR \fIauth\fR] [\fB-e\fR \fIencr\fR] 
+\fB/platform\fI\fR/\fIplatform_name\fR/cvcd\fR [\fB-a\fR \fIauth\fR] [\fB-e\fR \fIencr\fR]
      [\fB-u\fR \fIesp_auth\fR]
 .fi
 
@@ -49,36 +49,30 @@ through the options described below. See \fBipsec\fR(7P).
 The \fBcvcd\fR daemon supports the options listed below.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIauth\fR\fR
 .ad
 .RS 15n
-.rt  
 Controls the IPsec Authentication Header (AH) algorithm. \fIauth\fR can be one
 of \fBnone\fR, \fBmd5\fR, or \fBsha1\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fIencr\fR\fR
 .ad
 .RS 15n
-.rt  
 Controls the IPsec Encapsulating Security Payload (ESP) encryption algorithm.
 \fIencr\fR can be one of \fBnone\fR, \fBdes\fR, or \fB3des\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fIesp_auth\fR\fR
 .ad
 .RS 15n
-.rt  
 Controls the IPsec Encapsulating Security Payload (ESP) authentication
 algorithm. \fIesp_auth\fR can be one of \fBnone\fR, \fBmd5\fR, or \fBsha1\fR.
 .RE
@@ -89,12 +83,10 @@ algorithm. \fIesp_auth\fR can be one of \fBnone\fR, \fBmd5\fR, or \fBsha1\fR.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIplatform_name\fR\fR
 .ad
 .RS 17n
-.rt  
 The official Sun platform name used in packaging and code. For example, for Sun
 Fire 15K servers, the \fIplatform_name\fR would be \fBSUNW,Sun-Fire-15000\fR.
 .RE
@@ -127,13 +119,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureT{
+Architecture	T{
 Sun Enterprise 10000 servers, Sun Fire High-End Systems
 T}
 .TE

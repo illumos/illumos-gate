@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH luxadm 1M "24 Sep 2003" "SunOS 5.11" "System Administration Commands"
+.TH LUXADM 1M "Sep 24, 2003"
 .SH NAME
 luxadm \- administer Sun Fire 880 storage subsystem and FC_AL devices
 .SH SYNOPSIS
 .LP
 .nf
-\fBluxadm\fR [\fIoptions\fR]... \fIsubcommand\fR [\fIoptions\fR]... \fIenclosure\fR 
+\fBluxadm\fR [\fIoptions\fR]... \fIsubcommand\fR [\fIoptions\fR]... \fIenclosure\fR
      [,\fIdev\fR] | \fIpathname\fR...
 .fi
 
@@ -177,23 +177,19 @@ logical names for disks and subsystems.
 The following options are supported by all subcommands:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 6n
-.rt  
 Expert mode. This option is not recommended for the novice user.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 Verbose mode.
 .RE
 
@@ -207,7 +203,6 @@ subcommand in the \fBUSAGE\fR section.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIenclosure\fR\fR
 .ad
@@ -219,7 +214,6 @@ subsystem.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfibre_channel_HBA_port\fR\fR
 .ad
@@ -238,7 +232,6 @@ The path to the host controller port. A typical path is:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpathname\fR\fR
 .ad
@@ -253,7 +246,6 @@ subsystem, or disk device. \fIpathname\fR can also be the \fBWWN\fR of a
 .SS "Subcommands"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisplay\fR \fIenclosure\fR[,\fIdev\fR]\|.\|.\|.\||
 \fIpathname\fR\|.\|.\|.\fR
@@ -282,12 +274,10 @@ for all subsystem devices, including disks.
 Disk data consists of inquiry, capacity, and configuration information.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 6n
-.rt  
 Displays performance information for the device or subsystem specified by
 \fIpathname\fR. This option only applies to subsystems that accumulate
 performance information.
@@ -295,12 +285,10 @@ performance information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 6n
-.rt  
 Displays error information for the \fBFC_AL\fR device specified by the
 pathname, or, if the path is a \fBSENA,\fR for all devices on the loop. The
 \fB-r\fR option only applies to \fBSENA\fR subsystems and individual
@@ -309,12 +297,10 @@ pathname, or, if the path is a \fBSENA,\fR for all devices on the loop. The
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 Displays in verbose mode, including mode sense data.
 .RE
 
@@ -322,7 +308,6 @@ Displays in verbose mode, including mode sense data.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdownload\fR [ \fB-s\fR ] [ \fB-f\fR \fIfilename_path\fR ]
 \fIenclosure\fR.\|.\|.\fR
@@ -344,12 +329,10 @@ image for the Sun Fire 880 internal storage subsystem is in:
 \fB/usr/platform/SUNW,Sun-Fire-880/lib/images/int_fcbpl_fw\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 6n
-.rt  
 Save. The \fB-s\fR option is used to save the downloaded firmware in the
 FEPROM. If \fB-s\fR is not specified, the downloaded firmware will not be saved
 across power cycles.
@@ -365,7 +348,6 @@ When using the \fB-s\fR option, the \fBdownload\fR subcommand modifies the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBenclosure_name\fR \fInew_name\fR \fIenclosure\fR | \fIpathname\fR\fR
 .ad
@@ -380,7 +362,6 @@ subsystem.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfailover primary\fR | \fBsecondary\fR \fIpathname\fR\fR
 .ad
@@ -395,7 +376,6 @@ logical volume is accessed through the secondary controller specified by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfcal_s_download\fR [ \fB-f\fR \fIfcode-file\fR ]\fR
 .ad
@@ -411,12 +391,10 @@ activity through that adapter \fIwill\fR cause the adapter to reset. Newly
 updated FCode will not be executed or visible until a system reboot.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIfcode-file\fR\fR
 .ad
 .RS 17n
-.rt  
 When invoked without the \fB-f\fR option, the current version of the fcode in
 each \fBFC100/S\fR Sbus card is printed.
 .RE
@@ -425,7 +403,6 @@ each \fBFC100/S\fR Sbus card is printed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfcode_download\fR \fB-p\fR\fR
 .ad
@@ -447,24 +424,20 @@ through that adapter causes the adapter to reset. Newly updated FCode will not
 be executed or visible until a system reboot.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdir-name\fR\fR
 .ad
 .RS 15n
-.rt  
 Download the FCode files contained in the directory \fIdir-name\fR to the
 appropriate adapter cards.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 15n
-.rt  
 Prints the current version of FCode loaded on each card. No download is
 performed.
 .RE
@@ -473,7 +446,6 @@ performed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinquiry\fR \fIenclosure\fR[,\fIdev\fR ]\|.\|.\|.\| |
 \fIpathname\fR\|.\|.\|.\fR
@@ -486,7 +458,6 @@ enclosure or pathname.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinsert_device\fR [ \fIenclosure\fR,\fIdev\fR\|.\|.\|. ]\fR
 .ad
@@ -509,7 +480,6 @@ creates and displays the logical pathnames for the devices.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBled\fR \fIenclosure\fR,\fIdev\fR\|.\|.\|.\|| \fIpathname\fR.\|.\|.\fR
 .ad
@@ -522,7 +492,6 @@ support this functionality.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBled_blink\fR \fIenclosure\fR,\fIdev\fR\|.\|.\|.\||
 \fIpathname\fR\|.\|.\|.\fR
@@ -536,7 +505,6 @@ subsystems that support this functionality.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBled_off\fR \fIenclosure\fR,\fIdev\fR\|.\|.\|.\||
 \fIpathname\fR\|.\|.\|.\fR
@@ -553,7 +521,6 @@ subsystems that support this functionality.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBled_on\fR \fIpathname\fR\|.\|.\|.\fR
 .ad
@@ -566,7 +533,6 @@ support this functionality.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpower_off\fR [ \fB-F\fR ] \fIenclosure\fR[,\fIdev\fR]\|.\|.\|. |
 \fIpathname\fR \|.\|.\|.\fR
@@ -581,12 +547,10 @@ spun down (stopped) and in bypass mode. This command does not apply to the Sun
 Fire 880 internal storage subsystem.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
 .RS 6n
-.rt  
 The force option only applies to the \fBSENA.\fR Instructs \fBluxadm\fR to
 attempt to power off one or more devices even if those devices are being used
 by this host (and are, therefore, busy).
@@ -601,7 +565,6 @@ sure of the consequences of overriding normal checks.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpower_on\fR \fIenclosure\fR[\fB,\fR\fIdev\fR]\|.\|.\|\fR
 .ad
@@ -615,7 +578,6 @@ apply to the Sun Fire 880 internal storage subsystem.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprobe\fR [ \fB-p\fR ]\fR
 .ad
@@ -628,12 +590,10 @@ subcommand warns the user if it finds different \fBSENAs\fR with the same
 enclosure names.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 6n
-.rt  
 Includes the physical pathname in the display.
 .RE
 
@@ -641,7 +601,6 @@ Includes the physical pathname in the display.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBqlgc_s_download\fR [ \fB-f\fR \fIfcode-file\fR ]\fR
 .ad
@@ -656,12 +615,10 @@ activity through that adapter will cause the adapter to reset. Newly updated
 FCode will not be executed or visible until a system reboot.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIfcode-file\fR\fR
 .ad
 .RS 17n
-.rt  
 When invoked without the \fB-f\fR option, the current version of the FCode in
 each \fBFC100/P\fR,\fB FC100/2P PCI\fR card is printed.
 .RE
@@ -670,7 +627,6 @@ each \fBFC100/P\fR,\fB FC100/2P PCI\fR card is printed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrelease\fR \fIpathname\fR\fR
 .ad
@@ -684,7 +640,6 @@ This subcommand is included for historical and diagnostic purposes only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBremove_device\fR [ \fB-F\fR ] \fIenclosure\fR[,\fIdev\fR]\|.\|.\|.\||
 \fIpathname\fR\|.\|.\|.\fR
@@ -732,12 +687,10 @@ Complete the \fBluxadm\fR \fBremove_device\fR command on the additional hosts.
 .RE
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
 .RS 6n
-.rt  
 Instructs \fBluxadm\fR to attempt to hot plug one or more devices even if those
 devices are being used by this host (and are, therefore, \fBbusy\fR or
 \fBreserved\fR), to \fBforce\fR the hotplugging operation.
@@ -752,7 +705,6 @@ consequences of overriding normal hotplugging checks.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBreserve\fR \fIpathname\fR\fR
 .ad
@@ -766,7 +718,6 @@ This subcommand is included for historical and diagnostic purposes only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBset_boot_dev\fR [ \fB-y\fR ] \fIpathname\fR\fR
 .ad
@@ -782,7 +733,6 @@ non-interactively, in which case no confirmation is requested or required.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstart\fR \fIpathname\fR\fR
 .ad
@@ -793,7 +743,6 @@ Spin up the specified disk(s) in a SENA.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstop\fR \fIpathname\fR...\fR
 .ad
@@ -815,7 +764,6 @@ If you specify a disk to an expert subcommand that operates on a bus, the
 subcommand operates on the bus to which the specified disk is attached.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fBbypass\fR \fB[\fR\fB-ab\fR\fB]\fR \fIenclosure\fR,\fIdev\fR\fR
 .ad
@@ -831,23 +779,19 @@ Circuit) to the bypassed state for the port and device specified.
 This subcommand supports the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 6n
-.rt  
 Bypass port \fBa\fR of the device specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
 .RS 6n
-.rt  
 Bypass port \fBb\fR of the device specified.
 .RE
 
@@ -855,7 +799,6 @@ Bypass port \fBb\fR of the device specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fBdump_map\fR \fIfibre_channel_HBA_port\fR\fR
 .ad
@@ -868,7 +811,6 @@ returned.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fBenable\fR \fB[\fR\fB-ab\fR\fB]\fR \fIenclosure\fR,\fIdev\fR\fR
 .ad
@@ -884,23 +826,19 @@ Circuit) to the enabled state for the port and device specified.
 This subcommand supports the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 6n
-.rt  
 Enable port \fBa\fR of the device specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
 .RS 6n
-.rt  
 Enable port \fBb\fR of the device specified.
 .RE
 
@@ -908,7 +846,6 @@ Enable port \fBb\fR of the device specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-e\fR \fBforcelip\fR \fIenclosure\fR[\fB,\fR\fIdev\fR] \|.\|.\|. |
 \fIpathname\fR\|.\|.\|.\fR
@@ -926,7 +863,6 @@ all ports on the loop.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-e\fR \fBrdls\fR \fIenclosure\fR[\fB,\fR\fIdev\fR] \|.\|.\|. |
 \fIpathname\fR\|.\|.\|.\fR
@@ -947,100 +883,82 @@ by users that are knowledgeable about the systems they are managing.
 These commands do not apply to the Sun Fire 880 internal storage subsystem.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-e\fR \fBbus_getstate\fR \fIpathname\fR\fR
 .ad
 .RS 29n
-.rt  
 Get and display the state of the specified bus.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-e\fR \fBbus_quiesce\fR \fIpathname\fR\fR
 .ad
 .RS 29n
-.rt  
 Quiesce the specified bus.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-e\fR \fBbus_reset\fR \fIpathname\fR\fR
 .ad
 .RS 29n
-.rt  
 Reset the specified bus only.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-e\fR \fBbus_resetall\fR \fIpathname\fR\fR
 .ad
 .RS 29n
-.rt  
 Reset the specified bus and all devices.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-e\fR \fBbus_unquiesce\fR \fIpathname\fR\fR
 .ad
 .RS 29n
-.rt  
 Unquiesce the specified bus. the specified device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-e\fR \fBdev_getstate\fR \fIpathname\fR\fR
 .ad
 .RS 29n
-.rt  
 Get and display the state of the specified device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-e\fR \fBdev_reset\fR \fIpathname\fR\fR
 .ad
 .RS 29n
-.rt  
 Reset the specified device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-e\fR \fBoffline\fR \fIpathname\fR\fR
 .ad
 .RS 29n
-.rt  
 Take the specified device offline.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-e\fR \fBonline\fR \fIpathname\fR\fR
 .ad
 .RS 29n
-.rt  
 Put the specified device online.
 .RE
 
@@ -1118,7 +1036,7 @@ case, use \fIs\fR to specify the slot:
 .sp
 .in +2
 .nf
-example% \fBluxadm display BOB,s0\fR 
+example% \fBluxadm display BOB,s0\fR
 .fi
 .in -2
 .sp
@@ -1307,30 +1225,25 @@ that affects the execution of \fBluxadm\fR.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 9n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi1\fR\fR
 .ad
 .RS 9n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBusr/lib/firmware/fc_s/fc_s_fcode\fR\fR
 .ad
@@ -1341,7 +1254,6 @@ An error occurred.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBusr/lib/locale/C/LC_MESSAGES/ibfirmware\fR\fR
 .ad

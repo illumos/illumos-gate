@@ -23,8 +23,7 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 #
 #	This makefile drives the production of the spppasyn STREAMS 
 #	kernel module.
@@ -74,6 +73,11 @@ INC_PATH	+= -I$(UTSBASE)/common/io/ppp/common
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
+
+#
+# Depends on sppp
+#
+LDFLAGS         += -dy -N drv/sppp
 
 #
 #	Default build targets.

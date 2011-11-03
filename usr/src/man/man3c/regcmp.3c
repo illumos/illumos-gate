@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH regcmp 3C "14 Nov 2002" "SunOS 5.11" "Standard C Library Functions"
+.TH REGCMP 3C "Nov 14, 2002"
 .SH NAME
 regcmp, regex \- compile and execute regular expression
 .SH SYNOPSIS
@@ -47,35 +47,29 @@ have been changed slightly. The following are the valid symbols and associated
 meanings.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\|]\|*\|.^\fR\fR
 .ad
 .RS 18n
-.rt  
 This group of symbols retains its meaning as described on the \fBregexp\fR(5)
 manual page.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$\fR\fR
 .ad
 .RS 18n
-.rt  
 Matches the end of the string; \fB\en\fR matches a newline.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi\fR\fR
 .ad
 .RS 18n
-.rt  
 Within brackets the minus means \fIthrough\fR. For example, \fB[a\(miz]\fR is
 equivalent to \fB[abcd\|.\|.\|.xyz]\fR. The \fB\(mi\fR can appear as itself
 only if used as the first or last character. For example, the character class
@@ -84,24 +78,20 @@ expression \fB[]\(mi]\fR matches the characters \fB]\fR and \fB\(mi\fR\&.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+\fR\fR
 .ad
 .RS 18n
-.rt  
 A regular expression followed by \fB+\fR means \fIone or more times\fR. For
 example, \fB[0\(mi9]+\fR is equivalent to \fB[0\(mi9][0\(mi9]*.\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB{\fR\fIm\fR} {\fIm,\fR} {\fIm,u\fR}\fR
 .ad
 .RS 18n
-.rt  
 Integer values enclosed in \fB{\|}\fR indicate the number of times the
 preceding regular expression is to be applied. The value \fIm\fR is the minimum
 number and \fIu\fR is a number, less than 256, which is the maximum. If only
@@ -114,12 +104,10 @@ number of times the regular expression is to be applied. The value
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB( ... )$\fR\fIn\fR\fR
 .ad
 .RS 18n
-.rt  
 The value of the enclosed regular expression is to be returned. The value will
 be stored in the (\fIn\fR+1)th argument following the subject argument. At
 most, ten enclosed regular expressions are allowed. The \fBregex()\fR function
@@ -128,12 +116,10 @@ makes its assignments unconditionally.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB( ... )\fR\fR
 .ad
 .RS 18n
-.rt  
 Parentheses are used for grouping. An operator, for example, \fB*\fR, \fB+\fR,
 \fB{\|}\fR, can work on a single character or a regular expression enclosed in
 parentheses. For example, \fB(a*(cb+)*)$0\fR. By necessity, all the above
@@ -199,13 +185,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

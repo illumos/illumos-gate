@@ -10,14 +10,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH thr_create 3C "16 Mar 2009" "SunOS 5.11" "Standard C Library Functions"
+.TH THR_CREATE 3C "Mar 16, 2009"
 .SH NAME
 thr_create \- create a thread
 .SH SYNOPSIS
 .LP
 .nf
 cc -mt [ \fIflag\fR... ] \fIfile\fR...[ \fIlibrary\fR... ]
-#include <thread.h> 
+#include <thread.h>
 
 \fBint\fR \fBthr_create\fR(\fBvoid *\fR\fIstack_base\fR, \fBsize_t\fR \fIstack_size\fR,
      \fBvoid *(*\fR\fIstart_func\fR) (void*), \fBvoid *\fR\fIarg\fR, \fBlong\fR \fIflags\fR,
@@ -94,23 +94,19 @@ created thread. The value in \fIflags\fR is determined by the bitwise
 inclusive-OR of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTHR_BOUND\fR \fR
 .ad
 .RS 18n
-.rt  
 This flag is obsolete and is maintained for compatibility.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTHR_DETACHED\fR \fR
 .ad
 .RS 18n
-.rt  
 This flag affects the detachstate attribute of the thread. The new thread is
 created detached. The exit status of a detached thread is not accessible to
 other threads. Its thread ID and other resources may be re-used as soon as the
@@ -119,23 +115,19 @@ thread terminates. \fBthr_join\fR(3C) will not wait for a detached thread.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTHR_NEW_LWP\fR \fR
 .ad
 .RS 18n
-.rt  
 This flag is obsolete and is maintained for compatibility.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTHR_SUSPENDED\fR \fR
 .ad
 .RS 18n
-.rt  
 This flag affects the suspended attribute of the thread. The new thread is
 created suspended and will not execute \fIstart_func\fR until it is started by
 \fBthr_continue()\fR.
@@ -143,12 +135,10 @@ created suspended and will not execute \fIstart_func\fR until it is started by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTHR_DAEMON\fR \fR
 .ad
 .RS 18n
-.rt  
 This flag affects the daemon attribute of the thread. In addition to being
 created detached (\fBTHR_DAEMON\fR implies \fBTHR_DETACHED\fR), the thread is
 marked as a daemon. Daemon threads do not interfere with the exit conditions
@@ -178,7 +168,7 @@ Create a detached thread whose thread ID we do not care about:
 .sp
 .in +2
 .nf
-thr_create(NULL, 0, start_func, arg, THR_DETACHED, NULL); 
+thr_create(NULL, 0, start_func, arg, THR_DETACHED, NULL);
 .fi
 .in -2
 
@@ -204,24 +194,20 @@ error value is returned to indicate the error.
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR \fR
 .ad
 .RS 11n
-.rt  
 A resource control limit on the total number of threads in a process, task,
 project, or zone has been exceeded or some system resource has been exceeded.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR \fR
 .ad
 .RS 11n
-.rt  
 The \fIstack_base\fR argument is not \fINULL\fR and \fIstack_size\fR is less
 than \fBTHR_MIN_STACK\fR, or the \fIstack_base\fR argument is \fINULL\fR and
 \fIstack_size\fR is not \fB0\fR and is less than \fBTHR_MIN_STACK\fR.
@@ -229,12 +215,10 @@ than \fBTHR_MIN_STACK\fR, or the \fIstack_base\fR argument is \fINULL\fR and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 11n
-.rt  
 The system cannot allocate stack for the thread.
 .RE
 
@@ -380,13 +364,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

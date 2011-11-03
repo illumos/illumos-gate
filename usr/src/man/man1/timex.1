@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH timex 1 "14 Sep 1992" "SunOS 5.11" "User Commands"
+.TH TIMEX 1 "Sep 14, 1992"
 .SH NAME
 timex \- time a command; report process data and system activity
 .SH SYNOPSIS
@@ -28,12 +28,10 @@ The output of \fBtimex\fR is written on standard error.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 6n
-.rt  
 Report the total number of blocks read or written and total characters
 transferred by  \fBcommand\fR and all its children. This option works only if
 the process accounting software is installed.
@@ -41,36 +39,30 @@ the process accounting software is installed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 6n
-.rt  
 List process accounting records for \fBcommand\fR and all its children. This
 option works only if the process accounting software is installed. Suboptions
 \fBf\fR, \fBh\fR, \fBk\fR, \fBm\fR, \fBr\fR, and \fBt\fR modify the data items
 reported. The options are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 Print the \fBfork\fR(2)/ \fBexec\fR(2) flag and system exit status columns in
 the output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 6n
-.rt  
 Instead of mean memory size, show the fraction of total available CPU time
 consumed by the process during its execution. This ``hog factor'' is computed
 as (total CPU time)/(elapsed time).
@@ -78,45 +70,37 @@ as (total CPU time)/(elapsed time).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR\fR
 .ad
 .RS 6n
-.rt  
 Instead of memory size, show total kcore-minutes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
 .RS 6n
-.rt  
 Show mean core size (the default).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 6n
-.rt  
 Show CPU factor (user time/(system-time + user-time)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 6n
-.rt  
 Show separate system and user CPU times. The number of blocks read or written
 and the number of characters transferred are always reported.
 .RE
@@ -125,12 +109,10 @@ and the number of characters transferred are always reported.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 6n
-.rt  
 Report total system activity (not just that due to  \fBcommand\fR) that
 occurred during the execution interval of \fBcommand\fR. All the data items
 listed in  \fBsar\fR(1) are reported.

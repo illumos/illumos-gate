@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH resolvepath 2 "12 May 1997" "SunOS 5.11" "System Calls"
+.TH RESOLVEPATH 2 "May 12, 1997"
 .SH NAME
 resolvepath \- resolve all symbolic links of a path name
 .SH SYNOPSIS
@@ -39,46 +39,38 @@ unchanged, and sets \fBerrno\fR to indicate the error.
 The \fBresolvepath()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 16n
-.rt  
 Search permission is denied for a component of the path prefix of \fIpath\fR or
 for a path prefix component resulting from the resolution of a symbolic link.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIpath\fR or \fIbuf\fR argument points to an illegal address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 16n
-.rt  
 An I/O error occurred while reading from the file system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIpath\fR argument is an empty string or a component of \fIpath\fR or a
 path name component produced by resolving a symbolic link does not name an
 existing file.
@@ -86,23 +78,19 @@ existing file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBELOOP\fR\fR
 .ad
 .RS 16n
-.rt  
 Too many symbolic links were encountered in resolving \fIpath\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENAMETOOLONG\fR\fR
 .ad
 .RS 16n
-.rt  
 The length of \fIpath\fR exceeds \fIPATH_MAX\fR, or a path name component is
 longer than \fINAME_MAX\fR. Path name resolution of a symbolic link produced an
 intermediate result whose length exceeds \fIPATH_MAX\fR or a component whose
@@ -111,12 +99,10 @@ length exceeds \fINAME_MAX\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTDIR\fR\fR
 .ad
 .RS 16n
-.rt  
 A component of the path prefix of \fIpath\fR or of a path prefix component
 resulting from the resolution of a symbolic link is not a directory.
 .RE

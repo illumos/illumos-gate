@@ -1,117 +1,385 @@
 /*
- * CDDL HEADER START
+ * Copyright (c) 1980, 1993
+ *	The Regents of the University of California.  All rights reserved.
  *
- * The contents of this file are subject to the terms of the
- * Common Development and Distribution License (the "License").
- * You may not use this file except in compliance with the License.
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
- * See the License for the specific language governing permissions
- * and limitations under the License.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 4. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
  *
- * When distributing Covered Code, include this CDDL HEADER in each
- * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
- * If applicable, add the following below this CDDL HEADER, with the
- * fields enclosed by brackets "[]" replaced with your own identifying
- * information: Portions Copyright [yyyy] [name of copyright owner]
- *
- * CDDL HEADER END
- */
-/*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-/*
- * University Copyright- Copyright (c) 1982, 1986, 1988
- * The Regents of the University of California
- * All Rights Reserved
- *
- * University Acknowledgment- Portions of this document are derived from
- * software developed by the University of California, Berkeley, and its
- * contributors.
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
  */
 
 #include <sys/types.h>
 #include <sys/socket.h>
 
 #include <netinet/in.h>
-
-#include <stdio.h>
+#include <arpa/inet.h>
+#include <ctype.h>
+#include <err.h>
+#include <limits.h>
 #include <netdb.h>
-#include <string.h>
+#include <stdarg.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sysexits.h>
 #include <unistd.h>
 
-#define	NICHOST	"whois.internic.net"
+#define	ABUSEHOST	"whois.abuse.net"
+#define	NICHOST		"whois.crsnic.net"
+#define	INICHOST	"whois.networksolutions.com"
+#define	GNICHOST	"whois.nic.gov"
+#define	ANICHOST	"whois.arin.net"
+#define	LNICHOST	"whois.lacnic.net"
+#define	KNICHOST	"whois.krnic.net"
+#define	RNICHOST	"whois.ripe.net"
+#define	PNICHOST	"whois.apnic.net"
+#define	MNICHOST	"whois.ra.net"
+#define	QNICHOST_TAIL	".whois-servers.net"
+#define	BNICHOST	"whois.registro.br"
+#define	NORIDHOST	"whois.norid.no"
+#define	IANAHOST	"whois.iana.org"
+#define	GERMNICHOST	"de.whois-servers.net"
+#define	FNICHOST	"whois.afrinic.net"
+#define	DEFAULT_PORT	"whois"
+#define	WHOIS_SERVER_ID	"Whois Server: "
+#define	WHOIS_ORG_SERVER_ID	"Registrant Street1:Whois Server:"
+
+#define	WHOIS_RECURSE		0x01
+#define	WHOIS_QUICK		0x02
+
+#define	ishost(h) (isalnum((unsigned char)h) || h == '.' || h == '-')
+
+const char *ip_whois[] = { LNICHOST, RNICHOST, PNICHOST, BNICHOST,
+    FNICHOST, NULL };
+const char *port = DEFAULT_PORT;
+
+static char *choose_server(char *);
+static struct addrinfo *gethostinfo(char const *host, int exit_on_error);
+static void s_asprintf(char **ret, const char *format, ...);
+static void usage(void);
+static void whois(const char *, const char *, int);
+static char *getln(FILE *in, size_t *lenp);
 
 int
 main(int argc, char *argv[])
 {
-	int s, rv;
-	register FILE *sfi, *sfo;
-	register int c;
-	char *host = NICHOST;
-	struct addrinfo *ai_head, *ai;
-	struct addrinfo hints;
+	const char *country, *host;
+	char *qnichost;
+	int ch, flags, use_qnichost;
 
-	argc--, argv++;
-	if (argc > 2 && strcmp(*argv, "-h") == 0) {
-		argv++, argc--;
-		host = *argv++;
-		argc--;
-	}
-	if (argc != 1) {
-		(void) fprintf(stderr, "usage: whois [ -h host ] name\n");
-		exit(1);
-	}
-
-	memset(&hints, 0, sizeof (hints));
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_protocol = IPPROTO_TCP;
-	hints.ai_flags = AI_ADDRCONFIG;
-	rv = getaddrinfo(host, "whois", &hints, &ai_head);
-	if (rv != 0) {
-		(void) fprintf(stderr, "whois: %s: %s\n", host,
-		    gai_strerror(rv));
-		exit(1);
-	}
-
-	for (ai = ai_head; ai != NULL; ai = ai->ai_next) {
-		s = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
-		if (s >= 0) {
-			rv = connect(s, ai->ai_addr, ai->ai_addrlen);
-			if (rv < 0)
-				(void) close(s);
-			else
-				break;
+	country = host = qnichost = NULL;
+	flags = use_qnichost = 0;
+	while ((ch = getopt(argc, argv, "aAbc:fgh:iIklmp:Qr")) != -1) {
+		switch (ch) {
+		case 'a':
+			host = ANICHOST;
+			break;
+		case 'A':
+			host = PNICHOST;
+			break;
+		case 'b':
+			host = ABUSEHOST;
+			break;
+		case 'c':
+			country = optarg;
+			break;
+		case 'f':
+			host = FNICHOST;
+			break;
+		case 'g':
+			host = GNICHOST;
+			break;
+		case 'h':
+			host = optarg;
+			break;
+		case 'i':
+			host = INICHOST;
+			break;
+		case 'I':
+			host = IANAHOST;
+			break;
+		case 'k':
+			host = KNICHOST;
+			break;
+		case 'l':
+			host = LNICHOST;
+			break;
+		case 'm':
+			host = MNICHOST;
+			break;
+		case 'p':
+			port = optarg;
+			break;
+		case 'Q':
+			flags |= WHOIS_QUICK;
+			break;
+		case 'r':
+			host = RNICHOST;
+			break;
+		case '?':
+		default:
+			usage();
+			/* NOTREACHED */
 		}
 	}
-	if (ai_head != NULL)
-		freeaddrinfo(ai_head);
+	argc -= optind;
+	argv += optind;
 
-	if (s < 0) {
-		perror("whois: socket");
-		exit(2);
-	} else if (rv < 0) {
-		perror("whois: connect");
-		exit(5);
+	if (!argc || (country != NULL && host != NULL))
+		usage();
+
+	/*
+	 * If no host or country is specified determine the top level domain
+	 * from the query.  If the TLD is a number, query ARIN.  Otherwise, use
+	 * TLD.whois-server.net.  If the domain does not contain '.', fall
+	 * back to NICHOST.
+	 */
+	if (host == NULL && country == NULL) {
+		use_qnichost = 1;
+		host = NICHOST;
+		if (!(flags & WHOIS_QUICK))
+			flags |= WHOIS_RECURSE;
 	}
+	while (argc-- > 0) {
+		if (country != NULL) {
+			s_asprintf(&qnichost, "%s%s", country, QNICHOST_TAIL);
+			whois(*argv, qnichost, flags);
+		} else if (use_qnichost)
+			if ((qnichost = choose_server(*argv)) != NULL)
+				whois(*argv, qnichost, flags);
+		if (qnichost == NULL)
+			whois(*argv, host, flags);
+		free(qnichost);
+		qnichost = NULL;
+		argv++;
+	}
+
+	return (0);
+}
+
+/*
+ * This function will remove any trailing periods from domain, after which it
+ * returns a pointer to newly allocated memory containing the whois server to
+ * be queried, or a NULL if the correct server couldn't be determined.  The
+ * caller must remember to free(3) the allocated memory.
+ */
+static char *
+choose_server(char *domain)
+{
+	char *pos, *retval;
+
+	if (strchr(domain, ':')) {
+		s_asprintf(&retval, "%s", ANICHOST);
+		return (retval);
+	}
+	for (pos = strchr(domain, '\0'); pos > domain && *--pos == '.'; )
+		*pos = '\0';
+	if (*domain == '\0')
+		errx(EX_USAGE, "can't search for a null string");
+	if (strlen(domain) > sizeof ("-NORID")-1 &&
+	    strcasecmp(domain + strlen(domain) - sizeof ("-NORID") + 1,
+	    "-NORID") == 0) {
+		s_asprintf(&retval, "%s", NORIDHOST);
+		return (retval);
+	}
+	while (pos > domain && *pos != '.')
+		--pos;
+	if (pos <= domain)
+		return (NULL);
+	if (isdigit((unsigned char)*++pos))
+		s_asprintf(&retval, "%s", ANICHOST);
+	else
+		s_asprintf(&retval, "%s%s", pos, QNICHOST_TAIL);
+	return (retval);
+}
+
+static struct addrinfo *
+gethostinfo(char const *host, int exit_on_error)
+{
+	struct addrinfo hints, *res;
+	int error;
+
+	(void) memset(&hints, 0, sizeof (hints));
+	hints.ai_flags = 0;
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	error = getaddrinfo(host, port, &hints, &res);
+	if (error) {
+		warnx("%s: %s", host, gai_strerror(error));
+		if (exit_on_error)
+			exit(EX_NOHOST);
+		return (NULL);
+	}
+	return (res);
+}
+
+/*
+ * Wrapper for asprintf(3) that exits on error.
+ */
+/* PRINTFLIKE2 */
+static void
+s_asprintf(char **ret, const char *format, ...)
+{
+	va_list ap;
+
+	va_start(ap, format);
+	if (vasprintf(ret, format, ap) == -1) {
+		va_end(ap);
+		err(EX_OSERR, "vasprintf()");
+	}
+	va_end(ap);
+}
+
+static void
+whois(const char *query, const char *hostname, int flags)
+{
+	FILE *sfi, *sfo;
+	struct addrinfo *hostres, *res;
+	char *buf, *host, *nhost, *p;
+	int i, s;
+	size_t c, len;
+
+	s = -1;
+	hostres = gethostinfo(hostname, 1);
+	for (res = hostres; res; res = res->ai_next) {
+		s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+		if (s < 0)
+			continue;
+		if (connect(s, res->ai_addr, res->ai_addrlen) == 0)
+			break;
+		(void) close(s);
+	}
+	freeaddrinfo(hostres);
+	if (res == NULL)
+		err(EX_OSERR, "connect()");
 
 	sfi = fdopen(s, "r");
 	sfo = fdopen(s, "w");
-	if (sfi == NULL || sfo == NULL) {
-		perror("fdopen");
-		(void) close(s);
-		exit(1);
+	if (sfi == NULL || sfo == NULL)
+		err(EX_OSERR, "fdopen()");
+	if (strcmp(hostname, GERMNICHOST) == 0) {
+		(void) fprintf(sfo, "-T dn,ace -C US-ASCII %s\r\n", query);
+	} else if (strcmp(hostname, "dk" QNICHOST_TAIL) == 0) {
+		(void) fprintf(sfo, "--show-handles %s\r\n", query);
+	} else {
+		(void) fprintf(sfo, "%s\r\n", query);
 	}
-	(void) fprintf(sfo, "%s\r\n", *argv);
 	(void) fflush(sfo);
-	while ((c = getc(sfi)) != EOF)
-		(void) putchar(c);
-	return (0);
+	nhost = NULL;
+	while ((buf = getln(sfi, &len)) != NULL) {
+		while (len > 0 && isspace((unsigned char)buf[len - 1]))
+			buf[--len] = '\0';
+		(void) printf("%.*s\n", (int)len, buf);
+
+		if ((flags & WHOIS_RECURSE) && nhost == NULL) {
+			host = strnstr(buf, WHOIS_SERVER_ID, len);
+			if (host != NULL) {
+				host += sizeof (WHOIS_SERVER_ID) - 1;
+				for (p = host; p < buf + len; p++) {
+					if (!ishost(*p)) {
+						*p = '\0';
+						break;
+					}
+				}
+				s_asprintf(&nhost, "%.*s",
+				    (int)(buf + len - host), host);
+			} else if ((host =
+			    strnstr(buf, WHOIS_ORG_SERVER_ID, len)) != NULL) {
+				host += sizeof (WHOIS_ORG_SERVER_ID) - 1;
+				for (p = host; p < buf + len; p++) {
+					if (!ishost(*p)) {
+						*p = '\0';
+						break;
+					}
+				}
+				s_asprintf(&nhost, "%.*s",
+				    (int)(buf + len - host), host);
+			} else if (strcmp(hostname, ANICHOST) == 0) {
+				for (c = 0; c <= len; c++)
+					buf[c] = tolower((unsigned char)buf[c]);
+				for (i = 0; ip_whois[i] != NULL; i++) {
+					if (strnstr(buf, ip_whois[i], len) !=
+					    NULL) {
+						s_asprintf(&nhost, "%s",
+						    ip_whois[i]);
+						break;
+					}
+				}
+			}
+		}
+	}
+	if (nhost != NULL) {
+		whois(query, nhost, 0);
+		free(nhost);
+	}
+}
+
+static void
+usage(void)
+{
+	(void) fprintf(stderr,
+	    "usage: whois [-aAbfgiIklmQr] [-c country-code | -h hostname] "
+	    "[-p port] name ...\n");
+	exit(EX_USAGE);
+}
+
+static char *
+getln(FILE *in, size_t *lenp)
+{
+	static char	*buffer = NULL;
+	static size_t	sz = 0;
+
+	size_t		len = 0;
+
+	for (;;) {
+		if (sz <= (len + 1)) {
+			char *nb;
+			if ((nb = realloc(buffer, sz + LINE_MAX)) == NULL) {
+				err(1, "realloc");
+			}
+			buffer = nb;
+			sz += LINE_MAX;
+		}
+
+		buffer[len] = 0;
+
+		if (fgets(buffer + len, sz - len, in) == NULL) {
+			/* END OF FILE */
+			*lenp = len;
+			if (len == 0)
+				return (NULL);
+			break;
+		}
+
+		len += strlen(buffer + len);
+
+		if (buffer[len - 1] == '\n') {
+			/* got the new line */
+			*lenp = len;
+			break;
+		}
+	}
+
+	return (buffer);
 }

@@ -19,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -31,7 +31,6 @@
 #include <strings.h>
 #include <smbsrv/wintypes.h>
 #include <smbsrv/libsmb.h>
-#include <smbsrv/libsmbrdr.h>
 #include <smbsrv/ndl/dssetup.ndl>
 #include <smbsrv/libmlsvc.h>
 
@@ -82,20 +81,20 @@ dssetup_get_domain_info(ds_primary_domain_info_t *ds_info)
 
 /*
  * Check whether our connection to the DC is working.
- * Note: Do NOT want to block opening a connection,
- * as that would interfere with smbd_dc_monitor
- * getting to smbd_dc_update, smb_locate_dc.
  */
 int
 dssetup_check_service(void)
 {
-	char	cur_dc[MAXHOSTNAMELEN];
+	ds_primary_domain_info_t	ds_info;
+	int				rc;
 
-	bzero(cur_dc, sizeof (cur_dc));
-	smb_domain_current_dc(cur_dc, sizeof (cur_dc));
+	bzero(&ds_info, sizeof (ds_info));
 
-	if (smbrdr_echo(cur_dc) < 0)
-		return (-1);
+	if ((rc = dssetup_get_domain_info(&ds_info)) == 0) {
+		free(ds_info.nt_domain);
+		free(ds_info.dns_domain);
+		free(ds_info.forest);
+	}
 
-	return (0);
+	return (rc);
 }

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_remove_event_handler 9F "2 May 2003" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_REMOVE_EVENT_HANDLER 9F "May 2, 2003"
 .SH NAME
 ddi_remove_event_handler \- remove an NDI event service callback handler
 .SH SYNOPSIS
@@ -22,12 +22,10 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBddi_registration_id_t \fR\fIid\fR\fR
 .ad
 .RS 28n
-.rt  
 Unique system wide registration ID return by \fBddi_add_event_handler\fR(9F)
 upon successful registration.
 .RE
@@ -42,23 +40,19 @@ not be invoked in the face of the event.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 15n
-.rt  
 Callback handler removed successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 15n
-.rt  
 Failed to remove callback handler.
 .RE
 
@@ -75,13 +69,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Stability LevelCommitted
+Stability Level	Committed
 .TE
 
 .SH SEE ALSO

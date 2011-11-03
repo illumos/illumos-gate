@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SLPFindSrvTypes 3SLP "16 Jan 2003" "SunOS 5.11" "Service Location Protocol Library Functions"
+.TH SLPFINDSRVTYPES 3SLP "Jan 16, 2003"
 .SH NAME
 SLPFindSrvTypes \- find service types
 .SH SYNOPSIS
@@ -54,23 +54,19 @@ is returned.
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhSLP\fR\fR
 .ad
 .RS 21n
-.rt  
 The \fBSLPHandle\fR on which to  search for types. It cannot  be \fINULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpcNamingAuthority\fR\fR
 .ad
 .RS 21n
-.rt  
 The naming authority to search. Use "\fB*\fR"to search all naming authorties;
 use the empty string \fB""\fR to search the default naming authority. It cannot
 be \fINULL\fR.
@@ -78,36 +74,30 @@ be \fINULL\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpcScopeList\fR\fR
 .ad
 .RS 21n
-.rt  
 A pointer to a \fBchar\fR containing a comma-separated  list  of scope names to
 search for service types. It cannot be \fINULL\fR or an empty string, \fB""\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcallback\fR\fR
 .ad
 .RS 21n
-.rt  
 A callback through which the results of the operation are reported. It cannot
 be \fINULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpvCookie\fR\fR
 .ad
 .RS 21n
-.rt  
 Memory passed to the callback code from the client. It can be \fINULL\fR.
 .RE
 
@@ -138,12 +128,10 @@ err = SLPFindSrvTypes(hSLP, "", "default", findsrvtypes, NULL);
 .SH ENVIRONMENT VARIABLES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLP_CONF_FILE\fR\fR
 .ad
 .RS 17n
-.rt  
 When set, use this file for configuration.
 .RE
 

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libdbm 3LIBUCB "14 Nov 2002" "SunOS 5.11" "SunOS/BSD Compatibility Interface Libraries"
+.TH LIBDBM 3LIBUCB "Nov 14, 2002"
 .SH NAME
 libdbm \- database subroutines library
 .SH SYNOPSIS
@@ -29,24 +29,21 @@ interfaces.
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBbitno\fR\fBblkno\fR
-\fBdbmclose\fR\fBdbminit\fR
-\fBdbrdonly\fR\fBdelete\fR
-\fBdirbuf\fR\fBdirf\fR
-\fBfetch\fR\fBfirstkey\fR
-\fBhmask\fR\fBmaxbno\fR
-\fBnextkey\fR\fBpagbuf\fR
-\fBpagf\fR\fBstore\fR
+l l
+l l .
+\fBbitno\fR	\fBblkno\fR
+\fBdbmclose\fR	\fBdbminit\fR
+\fBdbrdonly\fR	\fBdelete\fR
+\fBdirbuf\fR	\fBdirf\fR
+\fBfetch\fR	\fBfirstkey\fR
+\fBhmask\fR	\fBmaxbno\fR
+\fBnextkey\fR	\fBpagbuf\fR
+\fBpagf\fR	\fBstore\fR
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/libucb/libdbm.so.1\fR \fR
 .ad
@@ -57,7 +54,6 @@ shared object
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/libucb/64/libdbm.so.1\fR \fR
 .ad
@@ -74,12 +70,11 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
-MT-LevelUnsafe
+box;
+l l
+l l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO

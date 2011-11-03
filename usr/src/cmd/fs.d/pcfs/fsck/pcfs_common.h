@@ -20,14 +20,14 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2011 Gary Mills
+ *
  * Copyright (c) 1999 by Sun Microsystems, Inc.
  * All rights reserved.
  */
 
 #ifndef _PCFS_COMMON_H
 #define	_PCFS_COMMON_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Common routines for the pcfs user-level utilities
@@ -40,7 +40,10 @@ extern "C" {
 #include <sys/isa_defs.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/sysmacros.h>
 #include "pcfs_bpb.h"
+
+#define	IN_RANGE(n, x, y) (((n) >= (x)) && ((n) <= (y)))
 
 /*
  *  A macro implementing a ceiling function for integer divides.
@@ -78,7 +81,6 @@ extern void missing_arg(char *option);
 extern void dump_bytes(uchar_t *b, int n);
 extern void bad_arg(char *option);
 extern void usage(void);
-extern int  is_z_a_power_of_x_le_y(int x, int y, int z);
 extern int  yes(void);
 
 /*

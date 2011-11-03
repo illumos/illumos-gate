@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH prop_op 9E "8 Jul 1996" "SunOS 5.11" "Driver Entry Points"
+.TH PROP_OP 9E "Jul 8, 1996"
 .SH NAME
 prop_op \- report driver property information
 .SH SYNOPSIS
@@ -15,8 +15,8 @@ prop_op \- report driver property information
 
 
 
-\fBint prefix\fR\fBprop_op\fR(\fBdev_t\fR \fIdev\fR, \fBdev_info_t *\fR\fIdip\fR, 
-     \fBddi_prop_op_t\fR \fIprop_op\fR, \fBint\fR \fIflags\fR, \fBchar *\fR\fIname\fR, \fBcaddr_t\fR \fIvaluep\fR, 
+\fBint prefix\fR\fBprop_op\fR(\fBdev_t\fR \fIdev\fR, \fBdev_info_t *\fR\fIdip\fR,
+     \fBddi_prop_op_t\fR \fIprop_op\fR, \fBint\fR \fIflags\fR, \fBchar *\fR\fIname\fR, \fBcaddr_t\fR \fIvaluep\fR,
      \fBint *\fR\fIlengthp\fR);
 .fi
 
@@ -28,65 +28,53 @@ Solaris DDI specific (Solaris DDI). This entry point is required, but it can be
 .SH ARGUMENTS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdev\fR\fR
 .ad
 .RS 12n
-.rt  
 Device number associated with this device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 12n
-.rt  
 A pointer to the  device information structure for this device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprop_op\fR\fR
 .ad
 .RS 12n
-.rt  
 Property operator. Valid operators are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROP_LEN\fR \fR
 .ad
 .RS 26n
-.rt  
 Get property length only. (\fIvaluep\fR unaffected).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROP_LEN_AND_VAL_BUF\fR\fR
 .ad
 .RS 26n
-.rt  
 Get length and value into caller's buffer. (\fIvaluep\fR used as input).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROP_LEN_AND_VAL_ALLOC\fR\fR
 .ad
 .RS 26n
-.rt  
 Get length and value into allocated buffer. (\fIvaluep\fR returned as pointer
 to pointer to allocated buffer).
 .RE
@@ -95,21 +83,17 @@ to pointer to allocated buffer).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 12n
-.rt  
 The only possible flag value is:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_DONTPASS\fR\fR
 .ad
 .RS 21n
-.rt  
 Do not pass request to parent if property not found.
 .RE
 
@@ -117,23 +101,19 @@ Do not pass request to parent if property not found.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR\fR
 .ad
 .RS 12n
-.rt  
 Pointer to name of property to be interrogated.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvaluep\fR \fR
 .ad
 .RS 12n
-.rt  
 If  \fIprop_op\fR is  \fBPROP_LEN_AND_VAL_BUF\fR, this should be a pointer to
 the user's buffer.  If \fIprop_op\fR is \fBPROP_LEN_AND_VAL_ALLOC\fR, this
 should be the \fIaddress\fR of a pointer.
@@ -141,12 +121,10 @@ should be the \fIaddress\fR of a pointer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlengthp\fR \fR
 .ad
 .RS 12n
-.rt  
 On exit,  *\fIlengthp\fR will contain the property length.  If \fIprop_op\fR is
 \fBPROP_LEN_AND_VAL_BUF\fR then \fIlengthp\fR should point to an \fBint\fR that
 contains the length of caller's buffer,  before calling \fBprop_op()\fR.
@@ -167,57 +145,47 @@ properties for its device.
 \fBprop_op()\fR should return:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_SUCCESS\fR \fR
 .ad
 .RS 27n
-.rt  
 Property found and returned.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_NOT_FOUND\fR \fR
 .ad
 .RS 27n
-.rt  
 Property not found.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_UNDEFINED\fR \fR
 .ad
 .RS 27n
-.rt  
 Prop explicitly undefined.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_NO_MEMORY\fR \fR
 .ad
 .RS 27n
-.rt  
 Property found, but unable to allocate memory. \fIlengthp\fR has the correct
 property length.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_BUF_TOO_SMALL\fR \fR
 .ad
 .RS 27n
-.rt  
 Property found, but the supplied buffer is too small. \fIlengthp\fR has the
 correct property length.
 .RE
@@ -262,7 +230,7 @@ xxprop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
      }
 		       /*	other cases...	*/
      skip:
-     return (ddi_prop_op(dev, dip, prop_op, flags,\e 
+     return (ddi_prop_op(dev, dip, prop_op, flags,\e
              name, valuep, lengthp));
 }
 .fi

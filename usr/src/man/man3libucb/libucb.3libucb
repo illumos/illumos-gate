@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libucb 3LIBUCB "14 Dec 2004" "SunOS 5.11" "SunOS/BSD Compatibility Interface Libraries"
+.TH LIBUCB 3LIBUCB "Dec 14, 2004"
 .SH NAME
 libucb \- UCB source compatibility library
 .SH SYNOPSIS
@@ -27,31 +27,29 @@ interfaces.
 
 .sp
 .TS
-tab();
-lw(1.83i) lw(1.83i) lw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-\fBalphasort\fR\fBbcmp\fR\fBbcopy\fR
-\fBbzero\fR\fBflock\fR\fBfopen\fR
-\fBfprintf\fR\fBfreopen\fR\fBfstatfs\fR
-\fBftime\fR\fBgetdtablesize\fR\fBgethostid\fR
-\fBgethostname\fR\fBgetpagesize\fR\fBgetrusage\fR
-\fBgettimeofday\fR\fBgetwd\fR\fBindex\fR
-\fBkillpg\fR\fBlongjmp\fR\fBmctl\fR
-\fBnice\fR\fBnlist\fR\fBprintf\fR
-\fBpsignal\fR\fBrand\fR\fBre_comp\fR
-\fBre_exec\fR\fBreaddir\fR\fBreboot\fR
-\fBrindex\fR\fBscandir\fR\fBsetbuffer\fR
-\fBsethostname\fR\fBsetjmp\fR\fBsetlinebuf\fR
-\fBsetpgrp\fR\fBsettimeofday\fR\fBsigblock\fR
-\fBsiginterrupt\fR\fBsignal\fR\fBsigpause\fR
-\fBsigsetmask\fR\fBsigstack\fR\fBsigvec\fR
-\fBsigvechandler\fR\fBsleep\fR\fBsprintf\fR
-\fBsrand\fR\fBstatfs\fR\fBsys_siglist\fR
-\fBtimes\fR\fBualarm\fR\fBusignal\fR
-\fBusigpause\fR\fBusleep\fR\fBvfprintf\fR
-\fBvprintf\fR\fBvsprintf\fR\fBwait3\fR
-\fBwait4\fR
+l l l
+l l l .
+\fBalphasort\fR	\fBbcmp\fR	\fBbcopy\fR
+\fBbzero\fR	\fBflock\fR	\fBfopen\fR
+\fBfprintf\fR	\fBfreopen\fR	\fBfstatfs\fR
+\fBftime\fR	\fBgetdtablesize\fR	\fBgethostid\fR
+\fBgethostname\fR	\fBgetpagesize\fR	\fBgetrusage\fR
+\fBgettimeofday\fR	\fBgetwd\fR	\fBindex\fR
+\fBkillpg\fR	\fBlongjmp\fR	\fBmctl\fR
+\fBnice\fR	\fBnlist\fR	\fBprintf\fR
+\fBpsignal\fR	\fBrand\fR	\fBre_comp\fR
+\fBre_exec\fR	\fBreaddir\fR	\fBreboot\fR
+\fBrindex\fR	\fBscandir\fR	\fBsetbuffer\fR
+\fBsethostname\fR	\fBsetjmp\fR	\fBsetlinebuf\fR
+\fBsetpgrp\fR	\fBsettimeofday\fR	\fBsigblock\fR
+\fBsiginterrupt\fR	\fBsignal\fR	\fBsigpause\fR
+\fBsigsetmask\fR	\fBsigstack\fR	\fBsigvec\fR
+\fBsigvechandler\fR	\fBsleep\fR	\fBsprintf\fR
+\fBsrand\fR	\fBstatfs\fR	\fBsys_siglist\fR
+\fBtimes\fR	\fBualarm\fR	\fBusignal\fR
+\fBusigpause\fR	\fBusleep\fR	\fBvfprintf\fR
+\fBvprintf\fR	\fBvsprintf\fR	\fBwait3\fR
+\fBwait4\fR		
 .TE
 
 .sp
@@ -61,34 +59,28 @@ The following interfaces are unique to the 32-bit version of this library:
 
 .sp
 .TS
-tab();
-lw(1.83i) lw(1.83i) lw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-\fBalphasort64\fR\fBfopen64\fR\fBfreopen64\fR
-\fBreaddir64\fR\fBscandir64\fR
+l l l
+l l l .
+\fBalphasort64\fR	\fBfopen64\fR	\fBfreopen64\fR
+\fBreaddir64\fR	\fBscandir64\fR	
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/ucblib/libucb.so.1\fR\fR
 .ad
 .RS 30n
-.rt  
 shared object
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/ucblib/64/libucb.so.1\fR\fR
 .ad
 .RS 30n
-.rt  
 64-bit shared object
 .RE
 
@@ -100,13 +92,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSafe with exceptions
+MT-Level	Safe with exceptions
 .TE
 
 .SH SEE ALSO

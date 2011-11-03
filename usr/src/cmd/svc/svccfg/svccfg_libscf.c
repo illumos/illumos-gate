@@ -13070,7 +13070,7 @@ listtmpl(const char *pattern, int templates)
 		abort();
 
 	/* If pattern is specified, we want to list only those items. */
-	while (scf_tmpl_iter_pgs(pgt, fmribuf, snapbuf, NULL, NULL) == 1) {
+	while (scf_tmpl_iter_pgs(pgt, fmribuf, snapbuf, NULL, 0) == 1) {
 		listed = 0;
 		if (pattern == NULL || (scf_tmpl_pg_name(pgt, &pg_name) > 0 &&
 		    fnmatch(pattern, pg_name, 0) == 0)) {
@@ -13080,7 +13080,7 @@ listtmpl(const char *pattern, int templates)
 
 		scf_tmpl_prop_reset(prt);
 
-		while (scf_tmpl_iter_props(pgt, prt, NULL) == 0) {
+		while (scf_tmpl_iter_props(pgt, prt, 0) == 0) {
 			search_name = NULL;
 			prop_name_size = scf_tmpl_prop_name(prt, &prop_name);
 			if ((prop_name_size > 0) && (pg_name != NULL)) {
@@ -13192,7 +13192,7 @@ listprop(const char *pattern, int only_pgs, int templates)
 			scfdie();
 		assert(szret <= pgnlen);
 
-		if (scf_tmpl_get_by_pg(pg, pgt, NULL) == -1) {
+		if (scf_tmpl_get_by_pg(pg, pgt, 0) == -1) {
 			if (scf_error() != SCF_ERROR_NOT_FOUND)
 				scfdie();
 			pgtp = NULL;
@@ -13284,7 +13284,7 @@ listprop(const char *pattern, int only_pgs, int templates)
 
 				if (pgtp != NULL) {
 					if (scf_tmpl_get_by_prop(pgt, prnbuf,
-					    prt, NULL) < 0) {
+					    prt, 0) < 0) {
 						if (scf_error() !=
 						    SCF_ERROR_NOT_FOUND)
 							scfdie();
@@ -13633,9 +13633,9 @@ lscf_setprop(const char *pgname, const char *type, const char *value,
 
 				/* Then check for a type set in a template. */
 				} else if (scf_tmpl_get_by_pg(pg, pgt,
-				    NULL) == 0 &&
+				    0) == 0 &&
 				    scf_tmpl_get_by_prop(pgt, propname, prt,
-				    NULL) == 0 &&
+				    0) == 0 &&
 				    scf_tmpl_prop_type(prt, &current_ty) == 0) {
 					ty = current_ty;
 
@@ -15522,7 +15522,7 @@ lscf_delnotify(const char *set, int global)
 		}
 
 		for (p = pgs; *p; ++p) {
-			if (smf_notify_del_params(de_tag(*p), NULL, NULL) !=
+			if (smf_notify_del_params(de_tag(*p), NULL, 0) !=
 			    SCF_SUCCESS) {
 				uu_warn(gettext("Failed for \"%s\": %s\n"), *p,
 				    scf_strerror(scf_error()));

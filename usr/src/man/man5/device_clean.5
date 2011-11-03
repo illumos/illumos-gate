@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH device_clean 5 "14 Jun 2007" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH DEVICE_CLEAN 5 "Jun 14, 2007"
 .SH NAME
 device_clean \- device clean programs
 .SH DESCRIPTION
@@ -28,45 +28,37 @@ appropriate media for the caller.
 The following device clean programs reside in \fB/etc/security/lib\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBaudio_clean\fR\fR
 .ad
 .RS 15n
-.rt  
 audio devices
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfd_clean\fR\fR
 .ad
 .RS 15n
-.rt  
 floppy devices
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBst_clean\fR\fR
 .ad
 .RS 15n
-.rt  
 tape devices
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsr_clean\fR\fR
 .ad
 .RS 15n
-.rt  
 CD-ROM devices
 .RE
 
@@ -76,46 +68,38 @@ On a system configured with Trusted Extensions, the following additional
 cleaning programs and wrappers are available.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisk_clean\fR\fR
 .ad
 .RS 23n
-.rt  
 floppy, CD-ROM, and other removable media devices. This program mounts the
 device during the execution of \fBallocate\fR, if required.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBaudio_clean_wrapper\fR\fR
 .ad
 .RS 23n
-.rt  
 wrapper to make audio_clean work with CDE
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwdwwrapper\fR\fR
 .ad
 .RS 23n
-.rt  
 wrapper to make other cleaning programs work with CDE
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwdwmsg\fR\fR
 .ad
 .RS 23n
-.rt  
 CDE dialog boxes for cleaning programs
 .RE
 
@@ -137,57 +121,47 @@ must adhere to the syntax described below.
 where:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevice-name\fR\fR
 .ad
 .RS 15n
-.rt  
 The name of the device that is to be cleaned. Use \fBlist_devices\fR to obtain
 the list of allocatable devices.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 15n
-.rt  
 Invoke boot-time initialization.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 15n
-.rt  
 Force cleanup by the administrator.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 15n
-.rt  
 Invoke standard cleanup by the user.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I\fR\fR
 .ad
 .RS 15n
-.rt  
 Same as \fB-i\fR, with no error or warning.
 .RE
 
@@ -197,48 +171,40 @@ The following options are supported only when the system is configured with
 Trusted Extensions.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fImode\fR\fR
 .ad
 .RS 16n
-.rt  
 Specify the mode in which the clean program is invoked. Valid values are allo-
 cate and deallocate. The default mode is allocate.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fIuser-name\fR\fR
 .ad
 .RS 16n
-.rt  
 Specify the name of user who executes the device clean program. The default
 user is the caller.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fIzone-name\fR\fR
 .ad
 .RS 16n
-.rt  
 Specify the name of the zone in which the device is to be allocated or
 deallocated. The default zone is the global zone.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIzone-path\fR\fR
 .ad
 .RS 16n
-.rt  
 Establish the root path of the zone that is specified by \fIzone-name\fR.
 Default is "/".
 .RE
@@ -249,7 +215,6 @@ Default is "/".
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -260,7 +225,6 @@ Successful completion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
@@ -271,7 +235,6 @@ An error. Caller can place device in error state.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
@@ -286,7 +249,6 @@ On a system configured with Trusted Extensions, the following additional exit
 values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
@@ -297,7 +259,6 @@ Mounting of device failed. Caller shall not place device in error state.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB4\fR\fR
 .ad
@@ -309,12 +270,10 @@ Mounting of device succeeded.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/security/lib/*\fR\fR
 .ad
 .RS 23n
-.rt  
 device clean programs
 .RE
 
@@ -326,13 +285,12 @@ See \fBattributes\fR(5)  for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

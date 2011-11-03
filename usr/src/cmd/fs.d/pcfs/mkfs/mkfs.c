@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2011 Gary Mills
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -51,6 +53,7 @@
  *
  *	XXX -- floppy opens need O_NDELAY?
  */
+#define	IN_RANGE(n, x, y) (((n) >= (x)) && ((n) <= (y)))
 #define	DEFAULT_LABEL "NONAME"
 
 static char	*BootBlkFn = NULL;
@@ -165,7 +168,6 @@ static int verify_bootblkfile(char *fn, boot_sector_t *bs,
 static int open_and_examine(char *dn, bpb_t *wbpb);
 static int verify_firstfile(char *fn, ulong_t *filesize);
 static int lookup_FAT_size(uchar_t partid);
-static int powerofx_le_y(int x, int y, int value);
 static int open_and_seek(char *dn, bpb_t *wbpb, off64_t *seekto);
 static int warn_mismatch(char *desc, char *src, int expect, int assigned);
 static int copy_bootblk(char *fn, boot_sector_t *bootsect,
@@ -229,33 +231,6 @@ yes(void)
 		a++;
 	}
 	return (*a);
-}
-
-/*
- * powerofx_le_y
- *	args of x,y, and value to be checked
- *	returns 1 if x**n == value and n >= 0 and value <= y
- *	returns 0 otherwise
- */
-static
-int
-powerofx_le_y(int x, int y, int value)
-{
-	int ispower = 0;
-	int pow = 1;
-
-	if (value < 1 || value > y)
-		return (ispower);
-
-	do {
-		if (pow == value) {
-			ispower = 1;
-			break;
-		}
-		pow *= x;
-	} while (pow <= y);
-
-	return (ispower);
 }
 
 static
@@ -1878,7 +1853,8 @@ read_existing_bpb(int fd, bpb_t *wbpb)
 	if (wbpb->bpb.bytes_sector != BPSEC) {
 		(void) fprintf(stderr,
 		    gettext("Bogus bytes per sector value.\n"));
-		if (!powerofx_le_y(2, BPSEC * 8, wbpb->bpb.bytes_sector)) {
+		if (!(ISP2(wbpb->bpb.bytes_sector) &&
+		    IN_RANGE(wbpb->bpb.bytes_sector, 1, BPSEC * 8))) {
 			(void) fprintf(stderr,
 			    gettext("The device name may be missing a "
 			    "logical drive specifier.\n"));
@@ -1895,7 +1871,8 @@ read_existing_bpb(int fd, bpb_t *wbpb)
 			exit(6);
 		}
 	}
-	if (!(powerofx_le_y(2, 128, wbpb->bpb.sectors_per_cluster))) {
+	if (!(ISP2(wbpb->bpb.sectors_per_cluster) &&
+	    IN_RANGE(wbpb->bpb.sectors_per_cluster, 1, 128))) {
 		(void) fprintf(stderr,
 		    gettext("Bogus sectors per cluster value.\n"));
 		(void) fprintf(stderr,
@@ -3435,7 +3412,8 @@ sanity_check_options(int argc, int optind)
 		(void) fprintf(stderr, gettext("Invalid Bits/Fat value."
 		    " Must be 12, 16 or 32.\n"));
 		exit(2);
-	} else if (!GetSPC && !powerofx_le_y(2, 128, SecPerClust)) {
+	} else if (!GetSPC && !(ISP2(SecPerClust) &&
+	    IN_RANGE(SecPerClust, 1, 128))) {
 		(void) fprintf(stderr,
 		    gettext("Invalid Sectors/Cluster value.  Must be a "
 		    "power of 2 between 1 and 128.\n"));

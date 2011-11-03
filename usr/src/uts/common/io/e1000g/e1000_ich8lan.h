@@ -24,8 +24,36 @@
  */
 
 /*
- * IntelVersion: 1.41 v3-1-10-1_2009-9-18_Release14-6
+ * Copyright (c) 2001-2010, Intel Corporation
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ *  1. Redistributions of source code must retain the above copyright notice,
+ *     this list of conditions and the following disclaimer.
+ *
+ *  2. Redistributions in binary form must reproduce the above copyright
+ *     notice, this list of conditions and the following disclaimer in the
+ *     documentation and/or other materials provided with the distribution.
+ *
+ *  3. Neither the name of the Intel Corporation nor the names of its
+ *     contributors may be used to endorse or promote products derived from
+ *     this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  */
+
 #ifndef _E1000_ICH8LAN_H_
 #define	_E1000_ICH8LAN_H_
 
@@ -83,9 +111,14 @@ extern "C" {
 #define	E1000_FEXTNVM_SW_CONFIG		1
 #define	E1000_FEXTNVM_SW_CONFIG_ICH8M	(1 << 27) /* Bit redefined for ICH8M */
 
+#define	E1000_FEXTNVM4_BEACON_DURATION_MASK	0x7
+#define	E1000_FEXTNVM4_BEACON_DURATION_8USEC	0x7
+#define	E1000_FEXTNVM4_BEACON_DURATION_16USEC	0x3
+
 #define	PCIE_ICH8_SNOOP_ALL	PCIE_NO_SNOOP_ALL
 
 #define	E1000_ICH_RAR_ENTRIES		7
+#define	E1000_PCH2_RAR_ENTRIES		5 /* RAR[0], SHRA[0-3] */
 
 #define	PHY_PAGE_SHIFT	5
 #define	PHY_REG(page, reg)	(((page) << PHY_PAGE_SHIFT) | \
@@ -146,6 +179,7 @@ extern "C" {
 
 /* SMBus Address Phy Register */
 #define	HV_SMB_ADDR	PHY_REG(768, 26)
+#define	HV_SMB_ADDR_MASK	0x007F
 #define	HV_SMB_ADDR_PEC_EN	0x0200
 #define	HV_SMB_ADDR_VALID	0x0080
 
@@ -162,8 +196,38 @@ extern "C" {
 /* Phy address bit from LCD Config word */
 #define	LCD_CFG_PHY_ADDR_BIT	0x0020
 
+/* KMRN Mode Control */
+#define	HV_KMRN_MODE_CTRL	PHY_REG(769, 16)
+#define	HV_KMRN_MDIO_SLOW	0x0400
+
+/* KMRN FIFO Control and Status */
+#define	HV_KMRN_FIFO_CTRLSTA			PHY_REG(770, 16)
+#define	HV_KMRN_FIFO_CTRLSTA_PREAMBLE_MASK	0x7000
+#define	HV_KMRN_FIFO_CTRLSTA_PREAMBLE_SHIFT	12
+
+/* PHY Power Management Control */
+#define	HV_PM_CTRL		PHY_REG(770, 17)
+
 /* SW Semaphore flag timeout in milliseconds */
 #define	SW_FLAG_TIMEOUT		400
+
+/* PHY Low Power Idle Control */
+#define	I82579_LPI_CTRL		PHY_REG(772, 20)
+#define	I82579_LPI_CTRL_ENABLE_MASK	0x6000
+
+/* EMI Registers */
+#define	I82579_EMI_ADDR		0x10
+#define	I82579_EMI_DATA		0x11
+#define	I82579_LPI_UPDATE_TIMER	0x4805 /* in 40ns units + 40 ns base value */
+
+/* PHY Low Power Idle Control */
+#define	I82579_LPI_CTRL			PHY_REG(772, 20)
+#define	I82579_LPI_CTRL_ENABLE_MASK	0x6000
+
+/* EMI Registers */
+#define	I82579_EMI_ADDR		0x10
+#define	I82579_EMI_DATA		0x11
+#define	I82579_LPI_UPDATE_TIMER	0x4805 /* in 40ns units + 40 ns base value */
 
 /*
  * Additional interrupts need to be handled for ICH family:
@@ -188,6 +252,8 @@ extern "C" {
 #define	E1000_RXDEXT_LINKSEC_ERROR_REPLAY_ERROR	0x40000000
 #define	E1000_RXDEXT_LINKSEC_ERROR_BAD_SIG	0x60000000
 
+/* Receive Address Initial CRC Calculation */
+#define	E1000_PCH_RAICC(_n)	(0x05F50 + ((_n) * 4))
 
 void e1000_set_kmrn_lock_loss_workaround_ich8lan(struct e1000_hw *hw,
     bool state);
@@ -196,6 +262,7 @@ void e1000_gig_downshift_workaround_ich8lan(struct e1000_hw *hw);
 void e1000_disable_gig_wol_ich8lan(struct e1000_hw *hw);
 s32 e1000_configure_k1_ich8lan(struct e1000_hw *hw, bool k1_enable);
 s32 e1000_oem_bits_config_ich8lan(struct e1000_hw *hw, bool d0_config);
+s32 e1000_lv_jumbo_workaround_ich8lan(struct e1000_hw *hw, bool enable);
 
 #ifdef __cplusplus
 }

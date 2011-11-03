@@ -2,30 +2,30 @@
 .\" Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1995, Sun Microsystems, Inc.  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pr 1 "18 Mar 1997" "SunOS 5.11" "User Commands"
+.TH PR 1 "Mar 18, 1997"
 .SH NAME
 pr \- print files
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/pr\fR [+ \fIpage\fR] [\fB-column\fR] [\fB-adFmrt\fR] [\fB-e\fR [\fIchar\fR] [\fIgap\fR]] 
-     [\fB-h\fR \fIheader\fR] [\fB-i\fR [\fIchar\fR] [\fIgap\fR]] [\fB-l\fR \fIlines\fR] 
-     [\fB-n\fR [\fIchar\fR] [\fIwidth\fR]] [\fB-o\fR \fIoffset\fR] [\fB-s\fR [\fIchar\fR]] 
+\fB/usr/bin/pr\fR [+ \fIpage\fR] [\fB-column\fR] [\fB-adFmrt\fR] [\fB-e\fR [\fIchar\fR] [\fIgap\fR]]
+     [\fB-h\fR \fIheader\fR] [\fB-i\fR [\fIchar\fR] [\fIgap\fR]] [\fB-l\fR \fIlines\fR]
+     [\fB-n\fR [\fIchar\fR] [\fIwidth\fR]] [\fB-o\fR \fIoffset\fR] [\fB-s\fR [\fIchar\fR]]
      [\fB-w\fR \fIwidth\fR] [\fB-fp\fR] [\fIfile\fR]...
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/pr\fR [+ \fIpage\fR] [\fB-column\fR | \fB-c\fR \fIcolumn\fR] [\fB-adFmrt\fR] 
-     [\fB-e\fR [\fIchar\fR] [\fIgap\fR]] [\fB-h\fR \fIheader\fR] [\fB-i\fR [\fIchar\fR] [\fIgap\fR]] 
-     [\fB-l\fR \fIlines\fR] [\fB-n\fR [\fIchar\fR] [\fIwidth\fR]] [\fB-o\fR \fIoffset\fR] 
+\fB/usr/xpg4/bin/pr\fR [+ \fIpage\fR] [\fB-column\fR | \fB-c\fR \fIcolumn\fR] [\fB-adFmrt\fR]
+     [\fB-e\fR [\fIchar\fR] [\fIgap\fR]] [\fB-h\fR \fIheader\fR] [\fB-i\fR [\fIchar\fR] [\fIgap\fR]]
+     [\fB-l\fR \fIlines\fR] [\fB-n\fR [\fIchar\fR] [\fIwidth\fR]] [\fB-o\fR \fIoffset\fR]
      [\fB-s\fR [\fIchar\fR]] [\fB-w\fR \fIwidth\fR] [\fB-fp\fR] [\fIfile\fR]...
 .fi
 
@@ -76,23 +76,19 @@ The following options are supported for both \fB/usr/bin/pr\fR and
 \fB/usr/xpg4/bin/pr\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+\fR\fIpage\fR\fR
 .ad
 .RS 29n
-.rt  
 Begins output at page number \fIpage\fR of the formatted input.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-\fR\fIcolumn\fR\fR
 .ad
 .RS 29n
-.rt  
 Produces multi-column output that is arranged in \fIcolumn\fR columns (default
 is \fB1\fR) and is written down each column in the order in which the text is
 received from the input file. This option should not be used with \fB-m\fR. The
@@ -105,12 +101,10 @@ to write the output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 29n
-.rt  
 Modifies the effect of the \fB-\fR\fIcolumn\fR option so that the columns are
 filled across the page in a round-robin order (for example, when \fIcolumn\fR
 is 2, the first input line heads column 1, the second heads column 2, the third
@@ -119,24 +113,20 @@ is the second line in column 1, and so forth).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 29n
-.rt  
 Produces output that is double-spaced; append an extra \fBNEWLINE\fR character
 following every \fBNEWLINE\fR character found in the input.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-e\fR\fB\|[\|\fR\fIchar\fR\fB\|][\|\fR\fIgap\fR\fB\|]\fR\fR
 .ad
 .RS 29n
-.rt  
 Expands each input \fBTAB\fR character to the next greater column position
 specified by the formula \fIn\fR \fI*gap+1\fR, where \fIn\fR is an integer
 \fB>0\fR. If \fIgap\fR is \fB0\fR or is omitted, it defaults to \fB8\fR. All
@@ -147,12 +137,10 @@ specified, it will be used as the input tab character.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 29n
-.rt  
 Uses a \fBFORMFEED\fR character for new pages, instead of the default behavior
 that uses a sequence of \fBNEWLINE\fR characters. Pauses before beginning the
 first page if the standard output is associated with a terminal.
@@ -160,24 +148,20 @@ first page if the standard output is associated with a terminal.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fIheader\fR\fR
 .ad
 .RS 29n
-.rt  
 Uses the string \fIheader\fR to replace the contents of the \fIfile\fR operand
 in the page header.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIlines\fR\fR
 .ad
 .RS 29n
-.rt  
 Overrides the 66-line default and reset the page length to \fIlines\fR. If
 \fIlines\fR is not greater than the sum of both the header and trailer depths
 (in lines), \fBpr\fR will suppress both the header and trailer, as if the
@@ -186,12 +170,10 @@ Overrides the 66-line default and reset the page length to \fIlines\fR. If
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
 .RS 29n
-.rt  
 Merges files. Standard output will be formatted so \fBpr\fR writes one line
 from each file specified by \fIfile\fR, side by side into text columns of equal
 fixed widths, in terms of the number of column positions. Implementations
@@ -200,12 +182,10 @@ support merging of at least nine \fIfile\fRs.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\|[\|\fR\fIchar\fR\fB\|][\|\fR\fIwidth\fR\fB\|]\fR\fR
 .ad
 .RS 29n
-.rt  
 Provides \fIwidth\fR-digit line numbering (default for \fIwidth\fR is \fB5\fR).
 The number will occupy the first \fIwidth\fR column positions of each text
 column of default output or each line of \fB-m\fR output. If \fIchar\fR (any
@@ -216,12 +196,10 @@ character).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIoffset\fR\fR
 .ad
 .RS 29n
-.rt  
 Each line of output will be preceded by offset <space>s. If the \fB-o\fR option
 is not specified, the default offset is \fB0\fR. The space taken will be in
 addition to the output line width (see \fB-w\fR option below).
@@ -229,12 +207,10 @@ addition to the output line width (see \fB-w\fR option below).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 29n
-.rt  
 Pauses before beginning each page if the standard output is directed to a
 terminal (\fBpr\fR will write an \fBALERT\fR character to standard error and
 wait for a carriage-return character to be read on \fB/dev/tty\fR).
@@ -242,23 +218,19 @@ wait for a carriage-return character to be read on \fB/dev/tty\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 29n
-.rt  
 Writes no diagnostic reports on failure to open files.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fB[\fR\fIchar\fR\fB]\fR\fR
 .ad
 .RS 29n
-.rt  
 Separates text columns by the single character \fIchar\fR instead of by the
 appropriate number of \fBSPACE\fR characters (default for \fIchar\fR is the
 \fBTAB\fR character).
@@ -266,12 +238,10 @@ appropriate number of \fBSPACE\fR characters (default for \fIchar\fR is the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 29n
-.rt  
 Writes neither the five-line identifying header nor the five-line trailer
 usually supplied for each page. Quits writing after the last line of each file
 without spacing to the end of the page.
@@ -279,12 +249,10 @@ without spacing to the end of the page.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR \fIwidth\fR\fR
 .ad
 .RS 29n
-.rt  
 Sets the width of the line to \fIwidth\fR column positions for multiple
 text-column output only. If the \fB-w\fR option is not specified and the
 \fB-s\fR option is not specified, the default width is \fB72\fR. If the
@@ -300,12 +268,10 @@ For single column output, input lines will not be truncated.
 The following options are supported for \fB/usr/bin/pr\fR only:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
 .RS 27n
-.rt  
 Folds the lines of the input file. When used in multi-column mode (with the
 \fB-a\fR or \fB-m\fR options), lines will be folded to fit the current column's
 width. Otherwise, they will be folded to fit the current line width (80
@@ -314,12 +280,10 @@ columns).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-i\fR\fB\|[\|\fR\fIchar\fR\fB\|][\|\fR\fIgap\fR\fB\|]\fR\fR
 .ad
 .RS 27n
-.rt  
 In output, replaces \fBSPACE\fR characters with \fBTAB\fR characters wherever
 one or more adjacent \fBSPACE\fR characters reach column positions \fIgap+1\fR,
 \fI2*gap+1\fR, \fI3*gap+1\fR, and so forth. If \fIgap\fR is \fB0\fR or is
@@ -334,24 +298,20 @@ as the output \fBTAB\fR character.
 The following options are supported for \fB/usr/xpg4/bin/pr\fR only:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
 .RS 27n
-.rt  
 Uses a \fBFORMFEED\fR character for new pages, instead of the default behavior
 that uses a sequence of \fBNEWLINE\fR characters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-i\fR\fB\|[\|\fR\fIchar\fR\fB\|][\|\fR\fIgap\fR\fB\|]\fR\fR
 .ad
 .RS 27n
-.rt  
 In output, replaces multiple \fBSPACE\fR characters with \fBTAB\fR characters
 wherever two or more adjacent \fBSPACE\fR characters reach column positions
 \fIgap+1\fR, \fI2*gap+1\fR, \fI3*gap+1\fR, and so forth. If \fIgap\fR is
@@ -366,12 +326,10 @@ will be used as the output \fBTAB\fR character.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fR
 .ad
 .RS 8n
-.rt  
 A path name of a file to be written. If no \fIfile\fR operands are specified,
 or if a \fIfile\fR operand is \fB\(mi\fR, the standard input will be used.
 .RE
@@ -429,23 +387,19 @@ that affect the execution of \fBpr\fR: \fBLANG\fR, \fBLC_ALL\fR,
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -458,13 +412,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 .TE
 
 .SS "/usr/xpg4/bin/pr"
@@ -472,17 +425,16 @@ CSIEnabled
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO

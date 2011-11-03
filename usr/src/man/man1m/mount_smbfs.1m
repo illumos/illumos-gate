@@ -6,7 +6,7 @@
 .\" BY THE AUTHOR AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
 .\" SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
 .\" OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.TH mount_smbfs 1M "31 Mar 2009" "SunOS 5.11" "System Administration Commands"
+.TH MOUNT_SMBFS 1M "Mar 31, 2009"
 .SH NAME
 mount_smbfs, umount_smbfs \- mount and unmount a shared resource from a CIFS
 file server
@@ -23,7 +23,7 @@ file server
 
 .LP
 .nf
-\fB/sbin/mount\fR [\fB-F smbfs\fR] [\fIgeneric-options\fR] [\fB-o\fR \fIname\fR\fB=\fR\fIvalue\fR] 
+\fB/sbin/mount\fR [\fB-F smbfs\fR] [\fIgeneric-options\fR] [\fB-o\fR \fIname\fR\fB=\fR\fIvalue\fR]
      [\fB-O\fR] \fIresource\fR \fImount-point\fR
 .fi
 
@@ -82,7 +82,6 @@ To enable the service, enter the following \fBsvcadm\fR(1M) command:
 The \fBmount\fR command supports the following operands:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIresource\fR
 //[\fIworkgroup\fR;][\fIuser\fR[:\fIpassword\fR]@]\fIserver\fR/\fIshare\fR\fR
@@ -137,7 +136,6 @@ quotes: \fBmount -F smbfs "//SALES;george@RSERVER" /mnt\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImount-point\fR\fR
 .ad
@@ -155,7 +153,6 @@ See the \fBmount\fR(1M) man page for the list of supported
 \fIgeneric-options\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIname\fR\fB=\fR\fIvalue\fR or\fR
 .ad
@@ -170,7 +167,6 @@ name-value pair as a list of comma-separated pairs. No spaces are permitted in
 the list. The properties are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdirperms=\fR\fIoctaltriplet\fR\fR
 .ad
@@ -187,7 +183,6 @@ server.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfileperms=\fR\fIoctaltriplet\fR\fR
 .ad
@@ -202,7 +197,6 @@ server.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgid=\fR\fIgroupid\fR\fR
 .ad
@@ -214,7 +208,6 @@ the directory where the volume is mounted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBintr\fR|\fBnointr\fR\fR
 .ad
@@ -228,7 +221,6 @@ cancellation is normally allowed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoprompt\fR\fR
 .ad
@@ -244,7 +236,6 @@ property is set, and no password is stored by the \fBsmbutil login\fR command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBretry_count=\fR\fInumber\fR\fR
 .ad
@@ -259,7 +250,6 @@ the global value set in SMF or the value set in your \fB\&.nsmbrc\fR file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtimeout=\fR\fIseconds\fR\fR
 .ad
@@ -273,7 +263,6 @@ global value set in SMF or the value set in your \fB\&.nsmbrc\fR file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuid=\fR\fIuserid\fR\fR
 .ad
@@ -285,7 +274,6 @@ directory where the volume is mounted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxattr\fR|\fBnoxattr\fR\fR
 .ad
@@ -302,7 +290,6 @@ use Solaris Extended attributes fail with EINVAL.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-O\fR\fR
 .ad
@@ -433,7 +420,6 @@ point. The following command line unmounts the share from the mount point.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/mnttab\fR\fR
 .ad
@@ -444,7 +430,6 @@ Table of mounted file systems.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/dfs/fstypes\fR\fR
 .ad
@@ -455,7 +440,6 @@ Default distributed file system type.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/vfstab\fR\fR
 .ad
@@ -466,7 +450,6 @@ Table of automatically mounted resources.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.nsmbrc\fR\fR
 .ad
@@ -485,13 +468,12 @@ attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

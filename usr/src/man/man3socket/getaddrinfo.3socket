@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH getaddrinfo 3SOCKET "8 May 2009" "SunOS 5.11" "Sockets Library Functions"
+.TH GETADDRINFO 3SOCKET "May 8, 2009"
 .SH NAME
 getaddrinfo, getnameinfo, freeaddrinfo, gai_strerror \- translate between node
 name and address
 .SH SYNOPSIS
 .LP
 .nf
-\fBcc\fR [ \fIflag\fR\&.\|.\|. ] \fIfile\fR \&.\|.\|. \fB-lsocket\fR \fB -lnsl \fR [ \fIlibrary\fR \&.\|.\|. ] 
+\fBcc\fR [ \fIflag\fR\&.\|.\|. ] \fIfile\fR \&.\|.\|. \fB-lsocket\fR \fB -lnsl \fR [ \fIlibrary\fR \&.\|.\|. ]
 #include <sys/socket.h>
 #include <netdb.h>
 
@@ -83,7 +83,7 @@ The \fBaddrinfo\fR structure is defined as:
 struct addrinfo {
 int              ai_flags;      /* AI_PASSIVE, AI_CANONNAME,
                                    AI_NUMERICHOST, AI_NUMERICSERV
-                                   AI_V4MAPPED, AI_ALL, 
+                                   AI_V4MAPPED, AI_ALL,
                                    AI_ADDRCONFIG */
 int              ai_family;     /* PF_xxx */
 int              ai_socktype;   /* SOCK_xxx */
@@ -324,49 +324,48 @@ address ordering list of pair-wise comparison rules follow below:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) |lw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-Avoid unusable destinations.T{
+box;
+l | l
+l | l .
+Avoid unusable destinations.	T{
 Prefer a destination that is reachable through the IP routing table.
 T}
 _
-Prefer matching scope.T{
+Prefer matching scope.	T{
 Prefer a destination whose scope is equal to the scope of its source address. See \fBinet6\fR(7P) for the definition of scope used by this rule.
 T}
 _
-Avoid link-local source.T{
+Avoid link-local source.	T{
 Avoid selecting a link-local source address when the destination address is not a link-local address.
 T}
 _
-Avoid deprecated addresses.T{
+Avoid deprecated addresses.	T{
 Prefer a destination that is not deprecated (\fBIFF_DEPRECATED\fR).
 T}
 _
 T{
 Prefer matching label. This rule uses labels that are obtained through the IPv6 default address selection policy table. See \fBipaddrsel\fR(1M) for a description of the default contents of the table and how the table is configured.
-T}T{
+T}	T{
 Prefer a destination whose label is equal to the label of its source address.
 T}
 _
 T{
 Prefer higher precedence. This rule uses precedence values that are obtained through the IPv6 default address selection policy table. See \fBipaddrsel\fR(1M) for a description of the default contents of the table and how the table is configured.
-T}T{
+T}	T{
 Prefer the destination whose precedence is higher than the other destination.
 T}
 _
-Prefer native transport.T{
+Prefer native transport.	T{
 Prefer a destination if the interface that is used for sending packets to that destination is not an IP over IP tunnel.
 T}
 _
 T{
 Prefer smaller scope. See \fBinet6\fR(7P) for the definition of this rule.
-T}T{
+T}	T{
 Prefer the destination whose scope is smaller than the other destination.
 T}
 _
-Use longest matching prefix.T{
+Use longest matching prefix.	T{
 When the two destinations belong to the same address family, prefer the destination that has the longer matching prefix with its source address.
 T}
 .TE
@@ -378,167 +377,137 @@ The following names are the error values returned by \fBgetaddrinfo()\fR and
 are defined in <\fBnetdb.h\fR>:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAI_ADDRFAMILY\fR\fR
 .ad
 .RS 18n
-.rt  
 Address family for nodename is not supported.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAI_AGAIN\fR\fR
 .ad
 .RS 18n
-.rt  
 Temporary failure in name resolution has occurred .
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAI_BADFLAGS\fR\fR
 .ad
 .RS 18n
-.rt  
 Invalid value specified for \fBai_flags\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAI_FAIL\fR\fR
 .ad
 .RS 18n
-.rt  
 Non-recoverable failure in name resolution has occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAI_FAMILY\fR\fR
 .ad
 .RS 18n
-.rt  
 The \fBai_family\fR is not supported.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAI_MEMORY\fR\fR
 .ad
 .RS 18n
-.rt  
 Memory allocation failure has occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAI_NODATA\fR\fR
 .ad
 .RS 18n
-.rt  
 No address is associated with \fInodename\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAI_NONAME\fR\fR
 .ad
 .RS 18n
-.rt  
 Neither \fInodename\fR nor \fIservname\fR is provided or known.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAI_SERVICE\fR\fR
 .ad
 .RS 18n
-.rt  
 The \fIservname\fR is not supported for \fBai_socktype\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAI_SOCKTYPE\fR\fR
 .ad
 .RS 18n
-.rt  
 The \fBai_socktype\fR is not supported.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAI_OVERFLOW\fR\fR
 .ad
 .RS 18n
-.rt  
 Argument buffer has overflowed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAI_SYSTEM\fR\fR
 .ad
 .RS 18n
-.rt  
 System error was returned in \fIerrno\fR.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/inet/hosts\fR\fR
 .ad
 .RS 22n
-.rt  
 local database that associates names of nodes with IP addresses
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/netconfig\fR\fR
 .ad
 .RS 22n
-.rt  
 network configuration database
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/nsswitch.conf\fR\fR
 .ad
 .RS 22n
-.rt  
 configuration file for the name service switch
 .RE
 
@@ -550,17 +519,16 @@ See \fBattributes\fR(5) for description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH labelbuilder 3TSOL "20 Jul 2007" "SunOS 5.11" "Trusted Extensions Library Functions"
+.TH LABELBUILDER 3TSOL "Jul 20, 2007"
 .SH NAME
 labelbuilder, tsol_lbuild_create, tsol_lbuild_get, tsol_lbuild_set,
 tsol_lbuild_destroy \- create a Motif-based user interface for interactively
@@ -81,56 +81,46 @@ The widget information is accessed directly by referencing the following fields
 of the \fBModLabelData\fR structure.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlbuild_dialog\fR\fR
 .ad
 .RS 17n
-.rt  
 The label builder dialog box.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBok\fR\fR
 .ad
 .RS 17n
-.rt  
 The OK pushbutton.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcancel\fR\fR
 .ad
 .RS 17n
-.rt  
 The Cancel pushbutton.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBreset\fR\fR
 .ad
 .RS 17n
-.rt  
 The Reset pushbutton.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhelp\fR\fR
 .ad
 .RS 17n
-.rt  
 The Help pushbutton.
 .RE
 
@@ -139,36 +129,30 @@ The Help pushbutton.
 The \fBtsol_lbuild_create()\fR parameter list takes the following values:
 .sp
 .ne 2
-.mk
 .na
 \fBwidget\fR
 .ad
 .RS 15n
-.rt  
 The widget from which the dialog box is created. Any Motif widget can be
 passed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBok_callback\fR
 .ad
 .RS 15n
-.rt  
 A callback function that implements the behavior of the OK pushbutton on the
 dialog box.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&..., NULL\fR\fR
 .ad
 .RS 15n
-.rt  
 A \fINULL\fR terminated list of extended operations and value pairs that define
 the characteristics and behavior of the label builder dialog box.
 .RE
@@ -194,33 +178,27 @@ set from input supplied by the end user. These exceptions are noted in the
 descriptions.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLBUILD_MODE\fR\fR
 .ad
 .RS 22n
-.rt  
 Create a user interface to build a sensitivity label or a clearance. Value is
 \fBLBUILD_MODE_SL\fR by default.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLBUILD_MODE_SL\fR\fR
 .ad
 .RS 19n
-.rt  
 Build a sensitivity label.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLBUILD_MODE_CLR\fR\fR
 .ad
 .RS 19n
-.rt  
 Build a clearance.
 .RE
 
@@ -228,68 +206,56 @@ Build a clearance.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLBUILD_VALUE_SL\fR\fR
 .ad
 .RS 22n
-.rt  
 The starting sensitivity label. This value is \fBADMIN_LOW\fR by default and is
 used when the mode is \fBLBUILD_MODE_SL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLBUILD_VALUE_CLR\fR\fR
 .ad
 .RS 22n
-.rt  
 The starting clearance. This value is \fBADMIN_LOW\fR by default and is used
 when the mode is \fBLBUILD_MODE_CLR\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLBUILD_USERFIELD\fR\fR
 .ad
 .RS 22n
-.rt  
 A character string prompt that displays at the top of the label builder dialog
 box. Value is \fINULL\fR by default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLBUILD_SHOW\fR\fR
 .ad
 .RS 22n
-.rt  
 Show or hide the label builder dialog box. Value is \fBFALSE\fR by default.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTRUE\fR\fR
 .ad
 .RS 9n
-.rt  
 Show the label builder dialog box.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFALSE\fR\fR
 .ad
 .RS 9n
-.rt  
 Hide the label builder dialog box.
 .RE
 
@@ -297,24 +263,20 @@ Hide the label builder dialog box.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLBUILD_TITLE\fR\fR
 .ad
 .RS 22n
-.rt  
 A character string title that appears at the top of the label builder dialog
 box. Value is \fINULL\fR by default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLBUILD_WORK_SL\fR\fR
 .ad
 .RS 22n
-.rt  
 Not valid for \fBtsol_lbuild_set()\fR or \fBtsol_lbuild_create()\fR. The
 sensitivity label the end user is building. Value is updated to the end user's
 input when the end user selects the Update pushbutton or interactively chooses
@@ -323,12 +285,10 @@ an option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLBUILD_WORK_CLR\fR\fR
 .ad
 .RS 22n
-.rt  
 Not valid for \fBtsol_lbuild_set()\fR or \fBtsol_lbuild_create()\fR. The
 clearance the end user is building. Value is updated to the end user's input
 when the end user selects the Update pushbutton or interactively chooses an
@@ -337,12 +297,10 @@ option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLBUILD_X\fR\fR
 .ad
 .RS 22n
-.rt  
 The X position in pixels of the top-left corner of the label builder dialog box
 in relation to the top-left corner of the screen. By default the label builder
 dialog box is positioned in the middle of the screen.
@@ -350,12 +308,10 @@ dialog box is positioned in the middle of the screen.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLBUILD_Y\fR\fR
 .ad
 .RS 22n
-.rt  
 The Y position in pixels of the top-left corner of the label builder dialog box
 in relation to the top-left corner of the screen. By default the label builder
 dialog box is positioned in the middle of the screen.
@@ -363,12 +319,10 @@ dialog box is positioned in the middle of the screen.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLBUILD_LOWER_BOUND\fR\fR
 .ad
 .RS 22n
-.rt  
 The lowest classification (and related compartments and markings) available to
 the user as radio buttons for interactively building a label or clearance. This
 value is the user's minimum label.
@@ -376,12 +330,10 @@ value is the user's minimum label.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLBUILD_UPPER_BOUND\fR\fR
 .ad
 .RS 22n
-.rt  
 The highest classification (and related compartments and markings) available to
 the user as radio buttons for interactively building a label or clearance. A
 supplied value should be within the user's accreditation range.  If no value is
@@ -392,12 +344,10 @@ user's clearance.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLBUILD_CHECK_AR\fR\fR
 .ad
 .RS 22n
-.rt  
 Check that the user-built label entered in the Update With field is within the
 user's accreditation range. A value of 1 means check, and a value of 0 means do
 not check. If checking is on and the label is out of range, an error message is
@@ -406,17 +356,14 @@ raised to the end user.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLBUILD_VIEW\fR\fR
 .ad
 .RS 22n
-.rt  
 Use the internal or external label representation. Value is
 \fBLBUILD_VIEW_EXTERNAL\fR by default.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLBUILD_VIEW_INTERNAL\fR\fR
 .ad
@@ -428,7 +375,6 @@ Use the internal names for the highest and lowest labels in the system:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLBUILD_VIEW_EXTERNAL\fR\fR
 .ad
@@ -460,7 +406,7 @@ create the user interface.
 .nf
 (ModLabelData *)lbldata = tsol_lbuild_create(widget0, callback_function,
      LBUILD_MODE, LBUILD_MODE_SL,
-     LBUILD_TITLE, "Setting Sensitivity Label", 
+     LBUILD_TITLE, "Setting Sensitivity Label",
      LBUILD_VIEW, LBUILD_VIEW_INTERNAL,
      LBUILD_X, 200,
      LBUILD_Y, 200,
@@ -507,7 +453,6 @@ tsol_lbuild_destroy(lbldata);
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/dt/include/Dt/ModLabel.h\fR\fR
 .ad
@@ -518,7 +463,6 @@ Header file for label builder functions
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/security/tsol/label_encodings\fR\fR
 .ad
@@ -536,15 +480,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

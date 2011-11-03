@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -65,6 +66,7 @@
 #include "combined.h"
 #include "contract.h"
 #include "cpupart_mdb.h"
+#include "cred.h"
 #include "ctxop.h"
 #include "cyclic.h"
 #include "damap.h"
@@ -3892,6 +3894,12 @@ static const mdb_dcmd_t dcmds[] = {
 
 	/* from cpupart.c */
 	{ "cpupart", "?[-v]", "print cpu partition info", cpupart },
+
+	/* from cred.c */
+	{ "cred", ":[-v]", "display a credential", cmd_cred },
+	{ "credgrp", ":[-v]", "display cred_t groups", cmd_credgrp },
+	{ "credsid", ":[-v]", "display a credsid_t", cmd_credsid },
+	{ "ksidlist", ":[-v]", "display a ksidlist_t", cmd_ksidlist },
 
 	/* from cyclic.c */
 	{ "cyccover", NULL, "dump cyclic coverage information", cyccover },

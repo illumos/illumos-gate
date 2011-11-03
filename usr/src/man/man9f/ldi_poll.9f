@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ldi_poll 9F "3 June 2003" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH LDI_POLL 9F "Jun 3, 2003"
 .SH NAME
 ldi_poll \- Poll a device
 .SH SYNOPSIS
@@ -20,120 +20,98 @@ ldi_poll \- Poll a device
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlh\fR \fR
 .ad
 .RS 13n
-.rt  
 Layered handle.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIevents\fR \fR
 .ad
 .RS 13n
-.rt  
 Potential events. Valid events are:
 .sp
 .ne 2
-.mk
 .na
 \fBPOLLIN\fR
 .ad
 .RS 14n
-.rt  
 Data other than high priority data may be read without blocking.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBPOLLOUT\fR
 .ad
 .RS 14n
-.rt  
 Normal data may be written without blocking.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBPOLLPRI\fR
 .ad
 .RS 14n
-.rt  
 High priority data may be received without blocking.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBPOLLHUP\fR
 .ad
 .RS 14n
-.rt  
 Device hangup has occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBPOLLERR\fR
 .ad
 .RS 14n
-.rt  
 An error has occurred on the device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBPOLLRDNORM\fR
 .ad
 .RS 14n
-.rt  
 Normal data (priority band = 0) may be read without blocking.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBPOLLRDBAND\fR
 .ad
 .RS 14n
-.rt  
 Data from a non-zero priority band may be read without blocking.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBPOLLWRNORM\fR
 .ad
 .RS 14n
-.rt  
 Data other than high priority data may be read without blocking.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBPOLLWRBAND\fR
 .ad
 .RS 14n
-.rt  
 Priority data (priority band > 0) may be written.
 .RE
 
@@ -141,12 +119,10 @@ Priority data (priority band > 0) may be written.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIanyyet\fR\fR
 .ad
 .RS 13n
-.rt  
 A flag that is non-zero if any other file descriptors                 in the
 pollfd array have events pending. The \fBpoll\fR(2) system call takes a pointer
 to an array of pollfd                 structures as one of its arguments. See
@@ -155,23 +131,19 @@ to an array of pollfd                 structures as one of its arguments. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIreventsp\fR \fR
 .ad
 .RS 13n
-.rt  
 Pointer to a bitmask of the returned events satisfied.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIphpp\fR \fR
 .ad
 .RS 13n
-.rt  
 Pointer to a pointer to a pollhead structure.
 .RE
 
@@ -188,23 +160,19 @@ The \fBldi_poll()\fR function returns \fB0\fR upon success. If a failure occurs
 before the request is passed on to the device, possible return values are:
 .sp
 .ne 2
-.mk
 .na
 \fBEINVAL\fR
 .ad
 .RS 11n
-.rt  
 Invalid input parameters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBENOTSUP\fR
 .ad
 .RS 11n
-.rt  
 Operation is not supported for this device.
 .RE
 

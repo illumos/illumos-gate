@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH id32_alloc 9F "12 Dec 2001" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH ID32_ALLOC 9F "Dec 12, 2001"
 .SH NAME
 id32_alloc, id32_free, id32_lookup \- 32-bit driver ID management routines
 .SH SYNOPSIS
@@ -34,23 +34,19 @@ Solaris architecture specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIptr\fR\fR
 .ad
 .RS 9n
-.rt  
 any valid 32- or 64-bit pointer
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflag\fR \fR
 .ad
 .RS 9n
-.rt  
 determines whether caller can sleep for memory (see \fBkmem_alloc\fR(9F) for a
 description)
 .RE

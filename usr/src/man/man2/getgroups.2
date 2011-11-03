@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH getgroups 2 "8 Sep 2006" "SunOS 5.11" "System Calls"
+.TH GETGROUPS 2 "Sep 8, 2006"
 .SH NAME
 getgroups, setgroups \- get or set supplementary group access list IDs
 .SH SYNOPSIS
@@ -49,12 +49,10 @@ indicate the error.
 The \fBgetgroups()\fR and \fBsetgroups()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 A referenced part of the array pointed to by \fIgrouplist\fR is an illegal
 address.
 .RE
@@ -64,12 +62,10 @@ address.
 The \fBgetgroups()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The value of \fIgidsetsize\fR is non-zero and less than the number of
 supplementary group IDs set for the calling process.
 .RE
@@ -79,23 +75,19 @@ supplementary group IDs set for the calling process.
 The \fBsetgroups()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The value of \fIngroups\fR is greater than {\fBNGROUPS_MAX\fR}.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 10n
-.rt  
 The {\fBPRIV_PROC_SETID\fR} privilege is not asserted in the effective set of
 the calling process.
 .RE
@@ -113,15 +105,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface Stability\fBgetgroups()\fR is Standard.
+Interface Stability	\fBgetgroups()\fR is Standard.
 _
-MT-LevelAsync-Signal-Safe
+MT-Level	Async-Signal-Safe
 .TE
 
 .SH SEE ALSO

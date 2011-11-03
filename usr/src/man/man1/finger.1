@@ -2,7 +2,7 @@
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 1980 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement specifies the terms and conditions for redistribution.
 .\"   Copyright (c) 2000, Sun Microsystems, Inc.  All Rights Reserved.
-.TH finger 1 "6 Nov 2000" "SunOS 5.11" "User Commands"
+.TH FINGER 1 "Nov 6, 2000"
 .SH NAME
 finger \- display information about local and remote users
 .SH SYNOPSIS
@@ -13,7 +13,7 @@ finger \- display information about local and remote users
 
 .LP
 .nf
-\fBfinger\fR [\fB-l\fR] 
+\fBfinger\fR [\fB-l\fR]
      [\fIusername@hostname\fR 1 [\fI@hostname\fR 2 \fI\&..\fR \fI\&.@hostname\fR n]...]
 .fi
 
@@ -141,182 +141,150 @@ The following options are supported, except that the  \fIusername@hostname\fR
 form supports only the \fB-l\fR option:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR \fR
 .ad
 .RS 7n
-.rt  
 Suppresses printing the user's home directory and shell in a long format
 printout.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fR
 .ad
 .RS 7n
-.rt  
 Suppresses printing the header that is normally printed in a non-long format
 printout.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fR
 .ad
 .RS 7n
-.rt  
 Suppresses printing of the \fB\&.project\fR file in a long format printout.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fR
 .ad
 .RS 7n
-.rt  
 Forces "idle" output format, which is similar to short format except that only
 the login name, terminal, login time, and idle time are printed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fR
 .ad
 .RS 7n
-.rt  
 Forces long output format.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fR
 .ad
 .RS 7n
-.rt  
 Matches arguments only on user name (not first or last name).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fR
 .ad
 .RS 7n
-.rt  
 Suppresses printing of the \fB\&.plan\fR file in a long format printout.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR \fR
 .ad
 .RS 7n
-.rt  
 Forces quick output format, which is similar to short format except that only
 the login name, terminal, and login time are printed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fR
 .ad
 .RS 7n
-.rt  
 Forces short output format.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR \fR
 .ad
 .RS 7n
-.rt  
 Suppresses printing the full name in a short format printout.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.plan    \fR \fR
 .ad
 .RS 24n
-.rt  
 user's plan
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.project\fR \fR
 .ad
 .RS 24n
-.rt  
 user's projects
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/default/finger\fR \fR
 .ad
 .RS 24n
-.rt  
 \fBfinger\fR options file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/passwd\fR\fR
 .ad
 .RS 24n
-.rt  
 password file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/lastlog\fR \fR
 .ad
 .RS 24n
-.rt  
 time of last login
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/utmpx\fR \fR
 .ad
 .RS 24n
-.rt  
 accounting
 .RE
 

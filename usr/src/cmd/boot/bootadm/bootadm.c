@@ -23,6 +23,10 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ */
+
+/*
  * bootadm(1M) is a new utility for managing bootability of
  * Solaris *Newboot* environments. It has two primary tasks:
  * 	- Allow end users to manage bootability of Newboot Solaris instances
@@ -62,6 +66,7 @@
 #include <zlib.h>
 #include <sys/lockfs.h>
 #include <sys/filio.h>
+#include <libbe.h>
 #ifdef i386
 #include <libfdisk.h>
 #endif
@@ -2920,6 +2925,57 @@ check_archive(char *dest)
 	return (BAM_SUCCESS);
 }
 
+static boolean_t
+is_be(char *root)
+{
+	zfs_handle_t	*zhp;
+	libzfs_handle_t	*hdl;
+	be_node_list_t	*be_nodes = NULL;
+	be_node_list_t	*cur_be;
+	boolean_t	be_exist = B_FALSE;
+	char		ds_path[ZFS_MAXNAMELEN];
+
+	if (!is_zfs(root))
+		return (B_FALSE);
+	/*
+	 * Get dataset for mountpoint
+	 */
+	if ((hdl = libzfs_init()) == NULL)
+		return (B_FALSE);
+
+	if ((zhp = zfs_path_to_zhandle(hdl, root,
+	    ZFS_TYPE_FILESYSTEM)) == NULL) {
+		libzfs_fini(hdl);
+		return (B_FALSE);
+	}
+
+	(void) strlcpy(ds_path, zfs_get_name(zhp), sizeof (ds_path));
+
+	/*
+	 * Check if the current dataset is BE
+	 */
+	if (be_list(NULL, &be_nodes) == BE_SUCCESS) {
+		for (cur_be = be_nodes; cur_be != NULL;
+		    cur_be = cur_be->be_next_node) {
+
+			/*
+			 * Because we guarantee that cur_be->be_root_ds
+			 * is null-terminated by internal data structure,
+			 * we can safely use strcmp()
+			 */
+			if (strcmp(ds_path, cur_be->be_root_ds) == 0) {
+				be_exist = B_TRUE;
+				break;
+			}
+		}
+		be_free_list(be_nodes);
+	}
+	zfs_close(zhp);
+	libzfs_fini(hdl);
+
+	return (be_exist);
+}
+
 /*
  * Returns 1 if mkiso is in the expected PATH, 0 otherwise
  */
@@ -3587,6 +3643,11 @@ update_archive(char *root, char *opt)
 	init_walk_args();
 	(void) umask(022);
 
+	/*
+	 * Never update non-BE root in update_all
+	 */
+	if (!is_be(root) && bam_update_all)
+		return (BAM_SUCCESS);
 	/*
 	 * root must belong to a boot archive based OS,
 	 */

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH usbms 7M "1 Dec 2005" "SunOS 5.11" "STREAMS Modules"
+.TH USBMS 7M "Dec 1, 2005"
 .SH NAME
 usbms \- USB mouse STREAMS module
 .SH SYNOPSIS
@@ -52,12 +52,10 @@ is the absolute mouse.
 .SH IOCTLS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVUIDGFORMAT\fR \fR
 .ad
 .RS 16n
-.rt  
 This option returns the current state of the  \fBSTREAMS\fR module. The state
 of the \fBusbms\fR \fBSTREAMS\fR module may be either \fBVUID_NATIVE\fR (no
 message processing) or \fBVUID_FIRM_EVENT\fR (convert to Firm events).
@@ -65,12 +63,10 @@ message processing) or \fBVUID_FIRM_EVENT\fR (convert to Firm events).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVUIDSFORMAT\fR \fR
 .ad
 .RS 16n
-.rt  
 The argument is a pointer to an \fBint\fR. Set the state of the  \fBSTREAMS\fR
 module to the \fBint\fR pointed to by the argument.
 .RE
@@ -90,12 +86,10 @@ typedef struct  vuid_addr_probe {
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVUIDSADDR\fR \fR
 .ad
 .RS 14n
-.rt  
 The argument is a pointer to a \fBVuid_addr_probe\fR structure.
 \fBVUIDSADDR\fR sets the virtual input device segment address indicated by base
 to next.
@@ -106,12 +100,10 @@ to next.
 If base does not equal \fBVKEY_FIRST\fR,  \fBENODEV\fR is returned.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVUIDGADDR\fR \fR
 .ad
 .RS 14n
-.rt  
 The argument is a pointer to a \fBVuid_addr_probe\fR structure. Return the
 address of the virtual input device segment indicated by base to current.
 .RE
@@ -121,7 +113,6 @@ address of the virtual input device segment indicated by base to current.
 If base does not equal \fBVKEY_FIRST\fR, \fBENODEV\fR is returned.
 .sp
 .ne 2
-.mk
 .na
 \fBVUIDGWHEELCOUNT\fR
 .ad
@@ -134,7 +125,6 @@ if wheel(s) are present and zero if no wheels are present.
 
 .sp
 .ne 2
-.mk
 .na
 \fBVUIDGWHEELINFO\fR
 .ad
@@ -150,7 +140,7 @@ VUID_WHEEL_FORMAT_UNKNOWN.
 .in +2
 .nf
    typedef struct {
-           int     vers;   
+           int     vers;
            int     id;
            int     format;
    } wheel_info;
@@ -164,7 +154,6 @@ wheel for which the information is desired.
 
 .sp
 .ne 2
-.mk
 .na
 \fBVUIDSWHEELSTATE/VUIDGWHEELSTATE\fR
 .ad
@@ -188,7 +177,7 @@ stateflags and then change only the bit they want.
 .in +2
 .nf
    typedef struct {
-           int            vers;   
+           int            vers;
            int            id;
            uint32_t       stateflags;
    } wheel_state;
@@ -208,9 +197,9 @@ for 'VUIDGWHEEL INFO' ioctl.
 .in +2
 .nf
    typedef struct {
-        int     jitter_thresh;     
-        int     speed_law;  
-        int     speed_limit;          
+        int     jitter_thresh;
+        int     speed_law;
+        int     speed_limit;
    } Ms_parms;
 .fi
 .in -2
@@ -227,36 +216,30 @@ it is \fB1,\fR a "speed limit" is applied to mouse motions.  Motions along
 either axis of more than \fBspeed_limit\fR units are discarded.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMSIOGETPARMS\fR \fR
 .ad
 .RS 19n
-.rt  
 The argument is a pointer to a \fBMs_params\fR structure. The \fBusbms\fR
 module parameters are returned in the structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMSIOSETPARMS\fR\fR
 .ad
 .RS 19n
-.rt  
 The argument is a pointer to a \fBMs_params\fR structure. The \fBusbms\fR
 module parameters are set according to the values in the structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMSIOSRESOLUTION\fR\fR
 .ad
 .RS 19n
-.rt  
 Used by the absolute mouse to get the  current screen resolution. The parameter
 is a pointer to the \fBMs_screen_resolution\fR structure:
 .sp
@@ -275,7 +258,6 @@ structure and used to calculate the correct coordinates.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB/kernel/strmod/usbms\fR
 .ad
@@ -286,7 +268,6 @@ structure and used to calculate the correct coordinates.
 
 .sp
 .ne 2
-.mk
 .na
 \fB/kernel/strmod/sparcv9/usbms\fR
 .ad
@@ -303,13 +284,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitecturePCI-based  systems
+Architecture	PCI-based  systems
 .TE
 
 .SH SEE ALSO
@@ -338,7 +318,6 @@ the following manner:
 
 .sp
 .ne 2
-.mk
 .na
 \fBInvalid Hid descriptor tree. Set to default value (3 buttons).\fR
 .ad
@@ -349,7 +328,6 @@ The mouse supplied incorrect information in its HID report.
 
 .sp
 .ne 2
-.mk
 .na
 \fBMouse buffer flushed when overrun.\fR
 .ad

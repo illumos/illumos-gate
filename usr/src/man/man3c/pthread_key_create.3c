@@ -2,14 +2,14 @@
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
 .\" Copyright 1991, 1992, 1994, The X/Open Company Ltd.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pthread_key_create 3C "2 Nov 2007" "SunOS 5.11" "Standard C Library Functions"
+.TH PTHREAD_KEY_CREATE 3C "Nov 2, 2007"
 .SH NAME
 pthread_key_create, pthread_key_create_once_np \- create thread-specific data
 key
@@ -87,12 +87,10 @@ The  \fBpthread_key_create()\fR and \fBpthread_key_create_once_np()\fR
 functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 10n
-.rt  
 The system lacked the necessary resources to create another thread-specific
 data key, or the system-imposed limit on the total number of keys per process
 \fBPTHREAD_KEYS_MAX\fR has been exceeded.
@@ -100,12 +98,10 @@ data key, or the system-imposed limit on the total number of keys per process
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 Insufficient memory exists to create the key.
 .RE
 
@@ -175,7 +171,7 @@ static void
 show_tsd()
 {
      void *tsd = pthread_getspecific(tsd_key);
- 
+
      printf("tsd for %d = %s\en", pthread_self(), (char *)tsd);
 }
 
@@ -197,17 +193,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted.
+Interface Stability	Committed.
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 _
-StandardSee below.
+Standard	See below.
 .TE
 
 .sp

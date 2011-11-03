@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH fsck_udfs 1M "5 September 2000" "SunOS 5.11" "System Administration Commands"
+.TH FSCK_UDFS 1M "Sep 5, 2000"
 .SH NAME
 fsck_udfs \- file system consistency check and interactive repair
 .SH SYNOPSIS
@@ -14,7 +14,7 @@ fsck_udfs \- file system consistency check and interactive repair
 
 .LP
 .nf
-\fBfsck\fR \fB-F\fR udfs [\fIgeneric_options\fR] [\fB-o\fR \fIspecific_options\fR] 
+\fBfsck\fR \fB-F\fR udfs [\fIgeneric_options\fR] [\fB-o\fR \fIspecific_options\fR]
      [\fIspecial \|.\|.\|.\fR]
 .fi
 
@@ -126,21 +126,17 @@ Total free block count incorrect
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIgeneric_options\fR\fR
 .ad
 .RS 23n
-.rt  
 The following \fIgeneric_options\fR are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
 .RS 11n
-.rt  
 Check but do not repair. This option checks to be sure that the file system is
 suitable for mounting, and returns the appropriate exit status. If the file
 system is ready for mounting, \fBfsck \fRdisplays a message such as:
@@ -156,36 +152,30 @@ udfs fsck: sanity check: /dev/rdsk/c0t2d0s0 okay
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR | \fB-N\fR\fR
 .ad
 .RS 11n
-.rt  
 Assume a \fBno\fR response to all questions asked by \fBfsck\fR; do not open
 the file system for writing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
 .RS 11n
-.rt  
 Echo the expanded command line, but do not execute the command. This option can
 be used to verify and to validate the command line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-y\fR | \fB-Y\fR\fR
 .ad
 .RS 11n
-.rt  
 Assume a \fByes\fR response to all questions asked by \fBfsck\fR.
 .RE
 
@@ -193,34 +183,28 @@ Assume a \fByes\fR response to all questions asked by \fBfsck\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIspecific_options\fR\fR
 .ad
 .RS 23n
-.rt  
 Specify \fBudfs\fR file system specific options in a comma-separated list with
 no intervening spaces. The following \fIspecific_options\fR are available:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBf\fR\fR
 .ad
 .RS 5n
-.rt  
 Force checking of file systems regardless of the state of their logical volume
 integrity state.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBp\fR\fR
 .ad
 .RS 5n
-.rt  
 Check and fix the file system non-interactively (\fBpreen\fR). Exit immediately
 if there is a problem that requires intervention. This option is required to
 enable parallel file system checking.
@@ -228,12 +212,10 @@ enable parallel file system checking.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBw\fR\fR
 .ad
 .RS 5n
-.rt  
 Check writable file systems only.
 .RE
 
@@ -242,12 +224,10 @@ Check writable file systems only.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/vtstab\fR\fR
 .ad
 .RS 15n
-.rt  
 List of default parameters for each file system.
 .RE
 
@@ -275,7 +255,6 @@ to be completed before the next mount operation.
 .SH DIAGNOSTICS
 .sp
 .ne 2
-.mk
 .na
 \fBnot writable\fR
 .ad
@@ -286,7 +265,6 @@ You cannot write to the device.
 
 .sp
 .ne 2
-.mk
 .na
 \fBCurrently Mounted on\fR
 .ad
@@ -297,7 +275,6 @@ The device is already mounted and cannot run \fBfsck\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBFILE SYSTEM WAS MODIFIED\fR
 .ad
@@ -308,7 +285,6 @@ File system has been modified to bring it to a consistent state.
 
 .sp
 .ne 2
-.mk
 .na
 \fBCan't read allocation extent\fR
 .ad
@@ -319,7 +295,6 @@ Cannot read the block containing allocation extent.
 
 .sp
 .ne 2
-.mk
 .na
 \fBBad tag on alloc extent\fR
 .ad
@@ -330,7 +305,6 @@ Invalid tag detected when expecting an allocation extent.
 
 .sp
 .ne 2
-.mk
 .na
 \fBVolume sequence tag error\fR
 .ad
@@ -341,7 +315,6 @@ Invalid tag detected in the volume sequence.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSpace bitmap tag error\fR
 .ad
@@ -352,7 +325,6 @@ Invalid tag detected in the space bitmap.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUNEXPECTED INCONSISTENCY; RUN fsck MANUALLY\fR
 .ad

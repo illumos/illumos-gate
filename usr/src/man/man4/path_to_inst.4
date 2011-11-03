@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH path_to_inst 4 "18 May 2007" "SunOS 5.11" "File Formats"
+.TH PATH_TO_INST 4 "May 18, 2007"
 .SH NAME
 path_to_inst \- device instance number file
 .SH SYNOPSIS
@@ -55,35 +55,29 @@ Each instance entry is a single line of the form:
 where
 .sp
 .ne 2
-.mk
 .na
 \fB\fIphysical\fR \fIname\fR\fR
 .ad
 .RS 23n
-.rt  
 is the absolute physical pathname of a device. This pathname must be enclosed
 in double quotes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinstance number\fR\fR
 .ad
 .RS 23n
-.rt  
 is a decimal or hexadecimal number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdriver binding name\fR\fR
 .ad
 .RS 23n
-.rt  
 is the name used to determine the driver for the device. This name may be a
 driver alias or a driver name. The driver binding name must be enclosed in
 double quotes.
@@ -113,12 +107,10 @@ Here are some sample \fBpath_to_inst\fR entries:
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/path_to_inst\fR\fR
 .ad
 .RS 21n
-.rt  
 Mapping of physical device names to instance numbers.
 .RE
 

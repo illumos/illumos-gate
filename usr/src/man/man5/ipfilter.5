@@ -2,7 +2,7 @@
 .\" To view license terms, attribution, and copyright for IP Filter, the default path is /usr/lib/ipf/IPFILTER.LICENCE. If the Solaris operating environment has been installed anywhere other than the default, modify the given path to access the file at the installed
 .\" location.
 .\" Portions Copyright (c) 2009, Sun Microsystems Inc. All Rights Reserved.
-.TH ipfilter 5 "20 May 2009" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH IPFILTER 5 "May 20, 2009"
 .SH NAME
 ipfilter \- IP packet filtering software
 .SH DESCRIPTION
@@ -44,7 +44,6 @@ A three-layer approach with different precedence levels helps the user achieve
 the desired behaviors.
 .sp
 .ne 2
-.mk
 .na
 \fBGlobal Default\fR
 .ad
@@ -57,7 +56,6 @@ policy.
 
 .sp
 .ne 2
-.mk
 .na
 \fBNetwork Services\fR
 .ad
@@ -69,7 +67,6 @@ traffic to its specific ports, regardless of Global Default policy.
 
 .sp
 .ne 2
-.mk
 .na
 \fBGlobal Override\fR
 .ad
@@ -101,7 +98,6 @@ interfaces, from all of which a system can receive incoming traffic. The basic
 set of firewall modes are:
 .sp
 .ne 2
-.mk
 .na
 \fBNone\fR
 .ad
@@ -112,7 +108,6 @@ No firewall, allow all incoming traffic.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDeny\fR
 .ad
@@ -123,7 +118,6 @@ Allow all incoming traffic but deny from specified source(s).
 
 .sp
 .ne 2
-.mk
 .na
 \fBAllow\fR
 .ad
@@ -222,13 +216,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

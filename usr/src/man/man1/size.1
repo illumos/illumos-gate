@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH size 1 "24 Aug 2009" "SunOS 5.11" "User Commands"
+.TH SIZE 1 "Aug 24, 2009"
 .SH NAME
 size \- print section sizes in bytes of object files
 .SH SYNOPSIS
@@ -48,12 +48,10 @@ prints an error message and stops processing the file.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 Prints out the size of each allocatable section, the name of the section, and
 the total of the section sizes. If there is no section data, \fBsize\fR prints
 out an error message and stops processing the file.
@@ -61,12 +59,10 @@ out an error message and stops processing the file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
 .RS 6n
-.rt  
 Prints out the size of each loadable segment, the permission  flags of the
 segment, then the total of the loadable segment sizes. If there is no segment
 data, \fBsize\fR prints an error message and stops processing the file.
@@ -74,12 +70,10 @@ data, \fBsize\fR prints an error message and stops processing the file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 6n
-.rt  
 Prints out non-loadable segment or non-allocatable section sizes. If segment
 data exists, \fBsize\fR prints out the memory size of each loadable segment or
 file size of each non-loadable segment, the permission flags, and the total
@@ -91,35 +85,29 @@ data, \fBsize\fR prints an error message and stops processing.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 6n
-.rt  
 Prints numbers in octal, not decimal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
 .RS 6n
-.rt  
 Prints the version information for the \fBsize\fR command on the standard error
 output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 6n
-.rt  
 Prints numbers in hexadecimal, not decimal.
 .RE
 
@@ -133,7 +121,7 @@ The examples below are typical \fBsize\fR output.
 .in +2
 .nf
 example% \fBsize \fIfilename\fR\fR
-2724 + 88 + 0 = 2812 
+2724 + 88 + 0 = 2812
 .fi
 .in -2
 .sp
@@ -144,7 +132,7 @@ example% \fBsize \fIfilename\fR\fR
 .in +2
 .nf
 example% \fBsize -f \fIfilename\fR\fR
-26(.text) + 5(.init) + 5(.fini) = 36 
+26(.text) + 5(.init) + 5(.fini) = 36
 .fi
 .in -2
 .sp

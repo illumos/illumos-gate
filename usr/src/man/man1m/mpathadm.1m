@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing. See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mpathadm 1M "4 May 2009" "SunOS 5.11" "System Administration Commands"
+.TH MPATHADM 1M "May 4, 2009"
 .SH NAME
 mpathadm \- multipath discovery and administration
 .SH SYNOPSIS
@@ -29,78 +29,64 @@ The \fBmpathadm\fR command supports the following subcommands, which are
 described in detail in subsections that follow.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlist\fR\fR
 .ad
 .RS 12n
-.rt  
 Display a list of discovered instances for a given object.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshow\fR\fR
 .ad
 .RS 12n
-.rt  
 Display information about a given object instance.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmodify\fR\fR
 .ad
 .RS 12n
-.rt  
 Modify properties of an object.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBenable\fR\fR
 .ad
 .RS 12n
-.rt  
 Enable an object.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisable\fR\fR
 .ad
 .RS 12n
-.rt  
 Disable an object.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfailover\fR\fR
 .ad
 .RS 12n
-.rt  
 Cause target port group failover for a logical-unit.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBoverride\fR\fR
 .ad
 .RS 12n
-.rt  
 Set a path to be used over other paths on a logical-unit.
 .RE
 
@@ -124,7 +110,6 @@ The syntax for the \fBlist\fR subcommand is:
 The \fBlist\fR subcommand displays data for following direct-objects:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmpath-support\fR [\fImpath-support-name\fR, ...]\fR
 .ad
@@ -138,7 +123,6 @@ registered multipathing support libraries will be displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinitiator-port\fR [\fIinitiator-port-name\fR, ...]\fR
 .ad
@@ -151,7 +135,6 @@ displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fBlogical-unit\fR | \fBlu\fR} [\fIoptions\fR]
 [\fIlogical-unit-name\fR, ...]\fR
@@ -164,7 +147,6 @@ is specified, all discovered logical-units will be displayed.
 Options for \fBlist logical-unit\fR are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR, \fB-\fR\fB-name\fR \fIname\fR\fR
 .ad
@@ -177,7 +159,6 @@ command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR, \fB-\fR\fB-target-port\fR \fItarget-port-name\fR\fR
 .ad
@@ -206,7 +187,6 @@ The \fBshow\fR subcommand displays detailed information for following the
 direct-objects:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmpath-support\fR [\fImpath-support-name\fR, ...]\fR
 .ad
@@ -220,7 +200,6 @@ output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinitiator-port\fR
 \fIinitiator-port-name\fR[,\fIinitiator-port-name\fR, ...]\fR
@@ -232,7 +211,6 @@ Show the detailed information for the given \fIinitiator-port-name\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fBlogical-unit\fR | \fBlu\fR} [\fIlogical-unit-name\fR, ...]\fR
 .ad
@@ -263,7 +241,6 @@ The \fBmodify\fR subcommand modifies characteristics of the following
 direct-objects:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmpath-support\fR [\fIoptions\fR] \fImpath-support-name\fR, ...\fR
 .ad
@@ -273,7 +250,6 @@ Configuration management of an \fImpath-support\fR. Options to modify
 mpath-support are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR, \fB-\fR\fB-autofailback\fR on | off\fR
 .ad
@@ -285,7 +261,6 @@ failback support.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR, \fB-\fR\fB-autoprobe\fR on | off\fR
 .ad
@@ -297,7 +272,6 @@ support.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR, \fB-\fR\fB-loadbalance\fR loadbalance-type\fR
 .ad
@@ -311,7 +285,6 @@ supported types listed in the \fBshow mpath-support\fR output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fBlogical-unit\fR | \fBlu\fR} [\fIoptions\fR]
 \fIlogical-unit-name\fR, ...\fR
@@ -322,7 +295,6 @@ Configuration management of a logical unit. Options to modify
 \fBlogical-unit\fR are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR, \fB-\fR\fB-autofailback\fR on | off\fR
 .ad
@@ -334,7 +306,6 @@ failback support
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR, \fB-\fR\fB-autoprobe\fR on | off\fR
 .ad
@@ -346,7 +317,6 @@ probing support.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR, \fB-\fR\fB-loadbalance\fR loadbalance-type\fR
 .ad
@@ -375,7 +345,6 @@ The \fBenable\fR subcommand supports the following direct-objects to be
 enabled:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpath\fR \fB-i\fR \fIinitiator-port-name\fR \fB-t\fR
 \fItarget-port-name\fR\fR
@@ -407,7 +376,6 @@ The \fBdisable\fR subcommand supports the following direct-objects to be
 disabled:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpath\fR \fB-i\fR \fIinitiator-port-name\fR \fB-t\fR
 \fItarget-port-name\fR\fR
@@ -439,7 +407,6 @@ The \fBfailover\fR subcommand supports failover for the following
 direct-objects:
 .sp
 .ne 2
-.mk
 .na
 \fB{\fBlogical-unit\fR | \fBlu\fR} \fIlogical-unit-name\fR\fR
 .ad
@@ -468,7 +435,6 @@ The \fBoverride\fR subcommand controls whether or not the following
 direct-objects override another:
 .sp
 .ne 2
-.mk
 .na
 \fBpath {\fB-i\fR \fIinitiator-port-name\fR \fB-t\fR \fItarget-port-name\fR |
 \fB-c\fR}\fR
@@ -489,7 +455,6 @@ disabled.
 Options for override path are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR, \fB-\fR\fB-initiator-port\fR \fIinitiator-port-name\fR\fR
 .ad
@@ -501,7 +466,6 @@ must also be included.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR, \fB-\fR\fB-target-port\fR \fItarget-port-name\fR\fR
 .ad
@@ -513,7 +477,6 @@ also be included.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR, \fB-\fR\fB-logical-unit\fR \fIlogical-unit\fR\fR
 .ad
@@ -525,7 +488,6 @@ must also be included.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR, \fB-\fR\fB-cancel\fR\fR
 .ad
@@ -543,23 +505,19 @@ also be included.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR, \fB-\fR\fB-version\fR\fR
 .ad
 .RS 17n
-.rt  
 Display the version information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-?\fR, \fB-\fR\fB-help\fR\fR
 .ad
 .RS 17n
-.rt  
 Display context help. Can be used following an \fBmpathadm\fR command with no
 arguments, following a subcommand, or following a subcommand direct-object
 combination. Responds with help information appropriate for your entry. For
@@ -762,13 +720,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

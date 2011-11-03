@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH tran_quiesce 9E "31 Jan 1999" "SunOS 5.11" "Driver Entry Points"
+.TH TRAN_QUIESCE 9E "Jan 31, 1999"
 .SH NAME
 tran_quiesce, tran_unquiesce \- quiesce and unquiesce a SCSI bus
 .SH SYNOPSIS
@@ -26,12 +26,10 @@ Solaris DDI
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhba_dip\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fBdev_info_t\fR pointer associated with the SCSI HBA.
 .RE
 
@@ -56,23 +54,19 @@ Implementation is hardware specific.
 \fBtran_quiesce()\fR and \fBtran_unquiesce()\fR should return:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNon-zero\fR\fR
 .ad
 .RS 12n
-.rt  
 An error occurred.
 .RE
 
@@ -84,13 +78,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

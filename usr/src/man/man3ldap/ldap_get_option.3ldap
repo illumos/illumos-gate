@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ldap_get_option 3LDAP "15 Jan 2004" "SunOS 5.11" "LDAP Library Functions"
+.TH LDAP_GET_OPTION 3LDAP "Jan 15, 2004"
 .SH NAME
 ldap_get_option, ldap_set_option \- get or set session preferences in the
 \fBldap\fR structure.
@@ -43,7 +43,6 @@ of the option that you set or get.
 The following values can be specified for the \fIoption\fR parameter:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_OPT_API_INFO\fR\fR
 .ad
@@ -56,7 +55,6 @@ execution time. The data type for the \fIoptdata\fR parameter is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_OPT_DEREF\fR\fR
 .ad
@@ -67,47 +65,39 @@ Determines how aliases are handled during a search. The data type for the
 for the \fIoptdata\fR parameter:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_DEREF_NEVER\fR\fR
 .ad
 .RS 24n
-.rt  
 Specifies that aliases are never dereferenced.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_DEREF_SEARCHING\fR\fR
 .ad
 .RS 24n
-.rt  
 Specifies that aliases are dereferenced when searching under the base object,
 but not when finding the base object.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_DEREF_FINDING\fR\fR
 .ad
 .RS 24n
-.rt  
 Specifies that aliases are dereferenced when finding the base object, but not
 when searching under the base object.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_DEREF_ALWAYS\fR\fR
 .ad
 .RS 24n
-.rt  
 Specifies that aliases are always dereferenced when finding the base object and
 searching under the base object.
 .RE
@@ -116,7 +106,6 @@ searching under the base object.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_OPT_SIZELIMIT\fR\fR
 .ad
@@ -130,7 +119,6 @@ limit enforced by the client.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_OPT_TIMELIMIT\fR\fR
 .ad
@@ -144,7 +132,6 @@ limit enforced by the client.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_OPT_REFERRALS\fR\fR
 .ad
@@ -155,23 +142,19 @@ Determines whether the client should follow referrals. The data type for the
 for the \fIoptdata\fR parameter:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_OPT_ON\fR\fR
 .ad
 .RS 16n
-.rt  
 Specifies that the client should follow referrals.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_OPT_OFF\fR\fR
 .ad
 .RS 16n
-.rt  
 Specifies that the client should not follow referrals.
 .RE
 
@@ -180,7 +163,6 @@ By default, the client follows referrals.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_OPT_RESTART\fR\fR
 .ad
@@ -193,7 +175,6 @@ aborted prematurely. It can be set to one of the constants \fBLDAP_OPT_ON\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_OPT_PROTOCOL_VERSION\fR\fR
 .ad
@@ -208,7 +189,6 @@ features, set the protocol version to \fBLDAP_VERSION3\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_OPT_SERVER_CONTROLS\fR\fR
 .ad
@@ -223,7 +203,6 @@ type for the \fIoptdata\fR parameter for \fBldap_set_option()\fR is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_OPT_CLIENT_CONTROLS\fR\fR
 .ad
@@ -238,7 +217,6 @@ type for the \fIoptdata\fR parameter for \fBldap_set_option()\fR is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_OPT_API_FEATURE_INFO\fR\fR
 .ad
@@ -251,7 +229,6 @@ Retrieves version information at execution time about extended features of the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_OPT_HOST_NAME\fR\fR
 .ad
@@ -264,7 +241,6 @@ data type for the \fIoptdata\fR parameter for \fBldap_set_option()\fR is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_OPT_ERROR_NUMBER\fR\fR
 .ad
@@ -276,7 +252,6 @@ session. The data type for the \fIoptdata\fR parameter is \fB(int *)\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_OPT_ERROR_STRING\fR\fR
 .ad
@@ -290,7 +265,6 @@ occurred for this session. The data type for the \fIoptdata\fR parameter for
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_OPT_MATCHED_DN\fR\fR
 .ad
@@ -304,7 +278,6 @@ parameter for \fBldap_set_option()\fR is \fB(char *)\fR and for
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_OPT_REBIND_ARG\fR\fR
 .ad
@@ -318,7 +291,6 @@ parameter is \fB(void * )\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_OPT_REBIND_FN\fR\fR
 .ad
@@ -333,7 +305,6 @@ parameter is \fB(\fR\fBLDAP_REBINDPROC_CALLBACK\fR\fB *)\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_OPT_X_SASL_MECH\fR\fR
 .ad
@@ -345,7 +316,6 @@ data type for the \fIoptdata\fR parameter is \fB(char * )\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_OPT_X_SASL_REALM\fR\fR
 .ad
@@ -359,7 +329,6 @@ using the \fBldap_interactive_bind_s()\fR function. The data type for the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_OPT_X_SASL_AUTHCID\fR\fR
 .ad
@@ -373,7 +342,6 @@ parameter is \fB(char * )\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_OPT_X_SASL_AUTHZID\fR\fR
 .ad
@@ -387,7 +355,6 @@ parameter is \fB(char * )\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_OPT_X_SASL_SSF\fR\fR
 .ad
@@ -401,7 +368,6 @@ for the \fIoptdata\fR parameter is \fB(sasl_ssf_t * )\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_OPT_X_SASL_SSF_EXTERNAL\fR\fR
 .ad
@@ -415,7 +381,6 @@ type for the \fIoptdata\fR parameter is \fB(sasl_ssf_t * )\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_OPT_X_SASL_SECPROPS\fR\fR
 .ad
@@ -429,89 +394,73 @@ parameter is \fB(char * )\fR, a comma delimited string containing text values
 for any of the \fBSASL_SEC_PROPS\fR that should be set. The text values are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoanonymous\fR\fR
 .ad
 .RS 16n
-.rt  
 Sets the \fBSASL_SEC_NOANONYMOUS\fR flag
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnodict\fR\fR
 .ad
 .RS 16n
-.rt  
 Sets the \fBSASL_SEC_NODICTIONARY\fR flag
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoplain\fR\fR
 .ad
 .RS 16n
-.rt  
 Sets the \fBSASL_SEC_NOPLAINTEXT\fR flag
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBforwardsec\fR\fR
 .ad
 .RS 16n
-.rt  
 Sets the \fBSASL_SEC_FORWARD_SECRECY\fR flag
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpasscred\fR\fR
 .ad
 .RS 16n
-.rt  
 Sets the \fBSASL_SEC_PASS_CREDENTIALS\fR flag
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBminssf=N\fR\fR
 .ad
 .RS 16n
-.rt  
 Sets \fBminssf\fR to the integer value \fBN\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmaxssf=N\fR\fR
 .ad
 .RS 16n
-.rt  
 Sets \fBmaxssf\fR to the integer value \fBN\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmaxbufsize=N\fR\fR
 .ad
 .RS 16n
-.rt  
 Sets \fBmaxbufsize\fR to the integer value \fBN\fR
 .RE
 
@@ -519,7 +468,6 @@ Sets \fBmaxbufsize\fR to the integer value \fBN\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_OPT_X_SASL_SSF_MIN\fR\fR
 .ad
@@ -532,7 +480,6 @@ parameter is \fB(char * )\fR numeric string.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_OPT_X_SASL_SSF_MAX\fR\fR
 .ad
@@ -545,7 +492,6 @@ parameter is \fB(char * )\fR numeric string.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_OPT_X_SASL_MAXBUFSIZE\fR\fR
 .ad
@@ -562,23 +508,19 @@ parameter is \fB(char * )\fR numeric string.
 The \fBldap_set_option()\fR and \fBldap_get_option()\fR functions return:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_SUCCESS\fR\fR
 .ad
 .RS 16n
-.rt  
 If successful
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-1\fR\fR
 .ad
 .RS 16n
-.rt  
 If unsuccessful
 .RE
 
@@ -590,15 +532,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

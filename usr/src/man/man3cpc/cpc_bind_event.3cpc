@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cpc_bind_event 3CPC "02 Mar 2007" "SunOS 5.11" "CPU Performance Counters Library Functions"
+.TH CPC_BIND_EVENT 3CPC "Mar 02, 2007"
 .SH NAME
 cpc_bind_event, cpc_take_sample, cpc_rele \- use CPU performance counters on
 lwps
@@ -71,24 +71,20 @@ return \fB0\fR. Otherwise, these functions return \fB\(mi1\fR, and set
 The \fBcpc_bind_event()\fR and \fBcpc_take_sample()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 11n
-.rt  
 For \fBcpc_bind_event()\fR, access to the requested hypervisor event was
 denied.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 11n
-.rt  
 Another process may be sampling system-wide CPU statistics. For
 \fBcpc_bind_event()\fR, this implies that no new contexts can be created. For
 \fBcpc_take_sample()\fR, this implies that the performance counter context has
@@ -100,24 +96,20 @@ attempting to bind and sample the event once more.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fBcpc_take_sample()\fR function has been invoked before the context is
 bound.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSUP\fR\fR
 .ad
 .RS 11n
-.rt  
 The caller has attempted an operation that is illegal or not supported on the
 current platform, such as attempting to specify signal delivery on counter
 overflow on a CPU that doesn't generate an interrupt on counter overflow.
@@ -198,7 +190,7 @@ for (iter = 1; iter <= 20; iter++) {
 }
 
 if (iter != 20)
-    error("can't sample '%s': %s", setting,    strerror(errno)); 
+    error("can't sample '%s': %s", setting,    strerror(errno));
 
 free(setting);
 return (0);
@@ -301,15 +293,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 _
-Interface StabilityObsolete
+Interface Stability	Obsolete
 .TE
 
 .SH SEE ALSO

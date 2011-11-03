@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sockio 7I "8 Nov 1996" "SunOS 5.11" "Ioctl Requests"
+.TH SOCKIO 7I "Nov 8, 1996"
 .SH NAME
 sockio \- ioctls that operate directly on sockets
 .SH SYNOPSIS
@@ -23,12 +23,10 @@ specific network interface or protocol are documented in the manual page for
 that interface or protocol.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCSPGRP\fR\fR
 .ad
 .RS 15n
-.rt  
 The argument is a pointer to an \fBint\fR. Set the process-group \fBID\fR that
 will subsequently receive \fBSIGIO\fR or \fBSIGURG\fR signals for the socket
 referred to by the descriptor passed to \fBioctl\fR to the value of that
@@ -38,12 +36,10 @@ process \fBID)\fR or negative (in which case it must be a process group).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCGPGRP\fR\fR
 .ad
 .RS 15n
-.rt  
 The argument is a pointer to an \fBint\fR. Set the value of that \fBint\fR to
 the process-group \fBID\fR that is receiving \fBSIGIO\fR or \fBSIGURG\fR
 signals for the socket referred to by the descriptor passed to \fBioctl\fR.
@@ -51,12 +47,10 @@ signals for the socket referred to by the descriptor passed to \fBioctl\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCCATMARK\fR\fR
 .ad
 .RS 15n
-.rt  
 The argument is a pointer to an \fBint\fR. Set the value of that \fBint\fR to
 \fB1\fR if the read pointer for the socket referred to by the descriptor passed
 to \fBioctl\fR points to a mark in the data stream for an out-of-band message.

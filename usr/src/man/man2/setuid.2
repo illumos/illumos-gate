@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH setuid 2 "20 Jan 2003" "SunOS 5.11" "System Calls"
+.TH SETUID 2 "Jan 20, 2003"
 .SH NAME
 setuid, setegid, seteuid, setgid \- set user and group IDs
 .SH SYNOPSIS
@@ -89,23 +89,19 @@ returned and \fBerrno\fR is set to indicate the error.
 The \fBsetuid()\fR and \fBsetgid()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The value of \fIuid\fR or \fIgid\fR is out of range.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 10n
-.rt  
 For \fBsetuid()\fR and \fBseteuid()\fR, the {\fBPRIV_PROC_SETID\fR} privilege
 is not asserted in the effective set of the calling process and the \fIuid\fR
 argument does not match either the real or saved user IDs, or an attempt is
@@ -125,15 +121,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelAsync-Signal-Safe
+MT-Level	Async-Signal-Safe
 .TE
 
 .SH SEE ALSO

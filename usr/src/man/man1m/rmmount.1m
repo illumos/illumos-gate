@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH rmmount 1M "1 Mar 2007" "SunOS 5.11" "System Administration Commands"
+.TH RMMOUNT 1M "Mar 1, 2007"
 .SH NAME
 rmmount \- removable media mounter for CD-ROM, floppy, Jaz drive, and others
 .SH SYNOPSIS
@@ -30,34 +30,28 @@ one of the locations listed below.
 For a diskette (floppy):
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/floppy/floppy0\fR\fR
 .ad
 .RS 26n
-.rt  
 symbolic link to mounted floppy in local floppy drive
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/floppy/floppy_name\fR\fR
 .ad
 .RS 26n
-.rt  
 mounted named floppy
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/floppy/unnamed_floppy\fR\fR
 .ad
 .RS 26n
-.rt  
 mounted unnamed floppy
 .RE
 
@@ -66,7 +60,6 @@ mounted unnamed floppy
 For a CD-ROM or a DVD-ROM:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/cdrom/cdrom0\fR\fR
 .ad
@@ -77,7 +70,6 @@ symbolic link to mounted \fBCD-ROM\fR in local \fBCD-ROM\fR drive
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/cdrom/CD-ROM_name\fR\fR
 .ad
@@ -88,7 +80,6 @@ mounted named \fBCD-ROM\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/cdrom/CD-ROM_name/partition\fR\fR
 .ad
@@ -99,7 +90,6 @@ mounted named \fBCD-ROM\fR with partitioned file system
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/cdrom/unnamed_cdrom\fR\fR
 .ad
@@ -113,45 +103,37 @@ mounted unnamed \fBCD-ROM\fR
 For a Zip drive:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/rmdisk/zip0\fR\fR
 .ad
 .RS 30n
-.rt  
 symbolic link to mounted Zip medium in local Zip drive
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/rmdisk/\fIZip_name\fR\fR\fR
 .ad
 .RS 30n
-.rt  
 mounted named Zip medium
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/rmdisk/\fIZip_name\fR/partition\fR\fR
 .ad
 .RS 30n
-.rt  
 mounted named Zip medium with partitioned file system
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/rmdisk/unnamed_zip\fR\fR
 .ad
 .RS 30n
-.rt  
 mounted unnamed Zip medium
 .RE
 
@@ -160,45 +142,37 @@ mounted unnamed Zip medium
 For a Jaz drive:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/rmdisk/jaz0\fR\fR
 .ad
 .RS 30n
-.rt  
 symbolic link to mounted Jaz medium in local Jaz drive
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/rmdisk/\fIJaz_name\fR\fR\fR
 .ad
 .RS 30n
-.rt  
 mounted named Jaz medium
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/rmdisk/\fIJaz_name\fR/partition\fR\fR
 .ad
 .RS 30n
-.rt  
 mounted named Jaz medium with partitioned file system
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/rmdisk/unnamed_Jaz\fR\fR
 .ad
 .RS 30n
-.rt  
 mounted unnamed Jaz medium
 .RE
 
@@ -207,7 +181,6 @@ mounted unnamed Jaz medium
 For a generic "rmdisk" drive:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/rmdisk/rmdisk0\fR\fR
 .ad
@@ -218,7 +191,6 @@ symbolic link to mounted removable medium in local removable medium drive
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/rmdisk/\fIrmdisk_name\fR\fR\fR
 .ad
@@ -229,7 +201,6 @@ mounted named removable medium
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/rmdisk/\fIrmdisk_name\fR/partition\fR\fR
 .ad
@@ -240,7 +211,6 @@ mounted named removable medium with partitioned file system
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/rmdisk/unnamed_rmdisk\fR\fR
 .ad
@@ -291,24 +261,20 @@ process), the ejection will fail.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR\fR
 .ad
 .RS 6n
-.rt  
 Turn on the debugging output from the \fBrmmount\fR \fBdprintf\fR calls.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/rmmount/*.so.1\fR\fR
 .ad
 .RS 27n
-.rt  
 shared objects used by \fBrmmount\fR.
 .RE
 

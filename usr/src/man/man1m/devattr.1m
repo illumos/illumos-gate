@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH devattr 1M "5 Jul 1990" "SunOS 5.11" "System Administration Commands"
+.TH DEVATTR 1M "Jul 5, 1990"
 .SH NAME
 devattr \- display device attributes
 .SH SYNOPSIS
@@ -28,12 +28,10 @@ line, only those attributes  are shown, displayed in command line order.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 Specifies verbose format. Attribute values are displayed in an
 \fIattribute\fR\fB=\fR\fIvalue\fR format.
 .RE
@@ -44,12 +42,10 @@ Specifies verbose format. Attribute values are displayed in an
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIattribute\fR\fR
 .ad
 .RS 13n
-.rt  
 Defines which attribute, or attributes, should be shown. Default is to show all
 attributes for a device. See the \fBputdev\fR(1M) manual page for a complete
 listing and description of available attributes.
@@ -57,12 +53,10 @@ listing and description of available attributes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevice\fR\fR
 .ad
 .RS 13n
-.rt  
 Defines the device whose attributes should be displayed. Can be the pathname of
 the device or the device alias.
 .RE
@@ -73,57 +67,47 @@ the device or the device alias.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 Command syntax was incorrect, invalid option was used, or an internal error
 occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Device table could not be opened for reading.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 5n
-.rt  
 Requested device could not be found in the device table.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB4\fR\fR
 .ad
 .RS 5n
-.rt  
 Requested attribute was not defined for the specified device.
 .RE
 

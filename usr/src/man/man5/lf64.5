@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH lf64 5 "14 Jul 2008" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH LF64 5 "Jul 14, 2008"
 .SH NAME
 lf64 \- transitional interfaces for 64-bit file offsets
 .SH DESCRIPTION
@@ -30,12 +30,10 @@ file offset definition.
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-struct \fBaiocb\fRstruct \fBaiocb64\fR
-   \fBoff_t\fR aio_offset;   \fBoff64_t\fR aio_offset;
+l l
+l l .
+struct \fBaiocb\fR	struct \fBaiocb64\fR
+   \fBoff_t\fR aio_offset;	   \fBoff64_t\fR aio_offset;
 .TE
 
 .SS "<\fBsys/dirent.h\fR>"
@@ -43,13 +41,11 @@ struct \fBaiocb\fRstruct \fBaiocb64\fR
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-struct \fBdirent\fRstruct \fBdirent64\fR
-   \fBino_t\fR d_ino;   \fBino64_t\fR d_ino;
-   \fBoff_t\fR d_off;   \fBoff64_t\fR d_off;
+l l
+l l .
+struct \fBdirent\fR	struct \fBdirent64\fR
+   \fBino_t\fR d_ino;	   \fBino64_t\fR d_ino;
+   \fBoff_t\fR d_off;	   \fBoff64_t\fR d_off;
 .TE
 
 .SS "<\fBsys/fcntl.h\fR>"
@@ -57,19 +53,17 @@ struct \fBdirent\fRstruct \fBdirent64\fR
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-struct \fBflock\fRstruct \fBflock64\fR
-   \fBoff_t\fR l_start;   \fBoff64_t\fR l_start;
-   \fBoff_t\fR l_len;   \fBoff64_t\fR l_len;
-\fBF_SETLK\fR\fBF_SETLK64\fR
-\fBF_SETLKW\fR\fBF_SETLKW64\fR
-\fBF_GETLK\fR\fBF_GETLK64\fR
-\fBF_FREESP\fR\fBF_FREESP64\fR
-\fBF_ALLOCSP\fR\fBF_ALLOCSP64\fR
-\fBO_LARGEFILE\fR
+l l
+l l .
+struct \fBflock\fR	struct \fBflock64\fR
+   \fBoff_t\fR l_start;	   \fBoff64_t\fR l_start;
+   \fBoff_t\fR l_len;	   \fBoff64_t\fR l_len;
+\fBF_SETLK\fR	\fBF_SETLK64\fR
+\fBF_SETLKW\fR	\fBF_SETLKW64\fR
+\fBF_GETLK\fR	\fBF_GETLK64\fR
+\fBF_FREESP\fR	\fBF_FREESP64\fR
+\fBF_ALLOCSP\fR	\fBF_ALLOCSP64\fR
+	\fBO_LARGEFILE\fR
 .TE
 
 .SS "<\fBsys/stdio.h\fR>"
@@ -77,10 +71,8 @@ struct \fBflock\fRstruct \fBflock64\fR
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-.
-\fBfpos_t\fR\fBfpos64_t\fR
+l l .
+\fBfpos_t\fR	\fBfpos64_t\fR
 .TE
 
 .SS "<\fBsys/resource.h\fR>"
@@ -88,17 +80,15 @@ lw(2.75i) lw(2.75i)
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBrlim_t\fR\fBrlim64_t\fR
-struct \fBrlimit\fRstruct \fBrlimit64\fR
-   \fBrlim_t\fR rlim_cur;   \fBrlim64_t\fR rlim_cur;
-   \fBrlim_t\fR rlim_max;   \fBrlim64_t\fR rlim_max;
-\fBRLIM_INFINITY\fR\fBRLIM64_INFINITY\fR
-\fBRLIM_SAVED_MAX\fR\fBRLIM64_SAVED_MAX\fR
-\fBRLIM_SAVED_CUR\fR\fBRLIM64_SAVED_CUR\fR
+l l
+l l .
+\fBrlim_t\fR	\fBrlim64_t\fR
+struct \fBrlimit\fR	struct \fBrlimit64\fR
+   \fBrlim_t\fR rlim_cur;	   \fBrlim64_t\fR rlim_cur;
+   \fBrlim_t\fR rlim_max;	   \fBrlim64_t\fR rlim_max;
+\fBRLIM_INFINITY\fR	\fBRLIM64_INFINITY\fR
+\fBRLIM_SAVED_MAX\fR	\fBRLIM64_SAVED_MAX\fR
+\fBRLIM_SAVED_CUR\fR	\fBRLIM64_SAVED_CUR\fR
 .TE
 
 .SS "<\fBsys/stat.h\fR>"
@@ -106,14 +96,12 @@ struct \fBrlimit\fRstruct \fBrlimit64\fR
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-struct \fBstat\fRstruct \fBstat64\fR
-   \fBino_t\fR st_ino;   \fBino64_t\fR st_ino;
-   \fBoff_t\fR st_size;   \fBoff64_t\fR st_size;
-   \fBblkcnt_t\fR st_blocks;   \fBblkcnt64_t\fR st_blocks;
+l l
+l l .
+struct \fBstat\fR	struct \fBstat64\fR
+   \fBino_t\fR st_ino;	   \fBino64_t\fR st_ino;
+   \fBoff_t\fR st_size;	   \fBoff64_t\fR st_size;
+   \fBblkcnt_t\fR st_blocks;	   \fBblkcnt64_t\fR st_blocks;
 .TE
 
 .SS "<\fBsys/statvfs.h\fR>"
@@ -121,17 +109,15 @@ struct \fBstat\fRstruct \fBstat64\fR
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-struct \fBstatvfs\fRstruct \fBstatvfs64\fR
-   \fBfsblkcnt_t\fR f_blocks;   \fBfsblkcnt64_t\fR f_blocks;
-   \fBfsblkcnt_t\fR f_bfree;   \fBfsblkcnt64_t\fR f_bfree;
-   \fBfsblkcnt_t\fR f_bavial;   \fBfsblkcnt64_t\fR f_bavial;
-   \fBfsfilcnt_t\fR  f_files;   \fBfsfilcnt64_t\fR  f_files;
-   \fBfsfilcnt_t\fR  f_ffree;   \fBfsfilcnt64_t\fR  f_ffree;
-   \fBfsfilcnt_t\fR  f_favail;   \fBfsfilcnt64_t\fR  f_favail;
+l l
+l l .
+struct \fBstatvfs\fR	struct \fBstatvfs64\fR
+   \fBfsblkcnt_t\fR f_blocks;	   \fBfsblkcnt64_t\fR f_blocks;
+   \fBfsblkcnt_t\fR f_bfree;	   \fBfsblkcnt64_t\fR f_bfree;
+   \fBfsblkcnt_t\fR f_bavial;	   \fBfsblkcnt64_t\fR f_bavial;
+   \fBfsfilcnt_t\fR  f_files;	   \fBfsfilcnt64_t\fR  f_files;
+   \fBfsfilcnt_t\fR  f_ffree;	   \fBfsfilcnt64_t\fR  f_ffree;
+   \fBfsfilcnt_t\fR  f_favail;	   \fBfsfilcnt64_t\fR  f_favail;
 .TE
 
 .SS "<\fBsys/types.h\fR>"
@@ -139,15 +125,13 @@ struct \fBstatvfs\fRstruct \fBstatvfs64\fR
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBoff_t\fR;\fBoff64_t\fR;
-\fBino_t\fR;\fBino64_t\fR;  
-\fBblkcnt_t\fR;\fBblkcnt64_t\fR;
-\fBfsblkcnt_t\fR;\fBfsblkcnt64_t\fR;
-\fBfsfilcnt_t\fR;\fBfsfilcnt64_t\fR;
+l l
+l l .
+\fBoff_t\fR;	\fBoff64_t\fR;
+\fBino_t\fR;	\fBino64_t\fR;
+\fBblkcnt_t\fR;	\fBblkcnt64_t\fR;
+\fBfsblkcnt_t\fR;	\fBfsblkcnt64_t\fR;
+\fBfsfilcnt_t\fR;	\fBfsfilcnt64_t\fR;
 .TE
 
 .SS "<\fBunistd.h\fR>"
@@ -155,12 +139,10 @@ lw(2.75i) lw(2.75i)
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fB_LFS64_LARGEFILE\fR
-\fB_LFS64_STDIO\fR
+l l
+l l .
+	\fB_LFS64_LARGEFILE\fR
+	\fB_LFS64_STDIO\fR
 .TE
 
 .SS "<\fBsys/unistd.h\fR>"
@@ -168,14 +150,12 @@ lw(2.75i) lw(2.75i)
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fB_CS_LFS64_CFLAGS\fR
-\fB_CS_LFS64_LDFLAGS\fR
-\fB_CS_LFS64_LIBS\fR
-\fB_CS_LFS64_LINTFLAGS\fR
+l l
+l l .
+	\fB_CS_LFS64_CFLAGS\fR
+	\fB_CS_LFS64_LDFLAGS\fR
+	\fB_CS_LFS64_LIBS\fR
+	\fB_CS_LFS64_LINTFLAGS\fR
 .TE
 
 .SS "System Interfaces"
@@ -190,25 +170,23 @@ font.
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-int \fBaio_cancel\fR(..., int \fBaio_cancel64\fR(..., 
-   struct \fBaiocb\fR *);   struct \fBaiocb64\fR *);
-int \fBaio_error\fR(int \fBaio_error64\fR(
-   const struct \fBaiocb\fR *);   const struct \fBaiocb64\fR *);
-int \fBaio_fsync\fR(..., int \fBaio_fsync64\fR(..., 
-   struct \fBaiocb\fR *);   struct \fBaiocb64\fR *);
-int \fBaio_read\fR(struct \fBaiocb\fR *);int \fBaio_read64\fR(struct \fBaiocb64\fR *);
-int \fBaio_return\fR(struct \fBaiocb\fR *);int \fBaio_return64\fR(struct \fBaiocb64\fR *);
-int \fBaio_suspend\fR(int \fBaio_suspend64\fR(
-   const struct \fBaiocb\fR *, ...);   const struct \fBaiocb64\fR *, ...);
-int \fBaio_waitn\fR(aiocb_t *[],int \fBaio_waitn64\fR(aiocb64_t *[],
-   ...);   ...);
-int \fBaio_write\fR(struct \fBaiocb\fR *);int \fBaio_write64\fR(struct \fBaiocb64\fR *);
-int \fBlio_listio\fR(..., int \fBlio_listio64\fR(..., 
-   const struct \fBaiocb\fR *, ...);   const struct \fBaiocb64\fR *, ...);
+l l
+l l .
+int \fBaio_cancel\fR(..., 	int \fBaio_cancel64\fR(...,
+   struct \fBaiocb\fR *);	   struct \fBaiocb64\fR *);
+int \fBaio_error\fR(	int \fBaio_error64\fR(
+   const struct \fBaiocb\fR *);	   const struct \fBaiocb64\fR *);
+int \fBaio_fsync\fR(..., 	int \fBaio_fsync64\fR(...,
+   struct \fBaiocb\fR *);	   struct \fBaiocb64\fR *);
+int \fBaio_read\fR(struct \fBaiocb\fR *);	int \fBaio_read64\fR(struct \fBaiocb64\fR *);
+int \fBaio_return\fR(struct \fBaiocb\fR *);	int \fBaio_return64\fR(struct \fBaiocb64\fR *);
+int \fBaio_suspend\fR(	int \fBaio_suspend64\fR(
+   const struct \fBaiocb\fR *, ...);	   const struct \fBaiocb64\fR *, ...);
+int \fBaio_waitn\fR(aiocb_t *[],	int \fBaio_waitn64\fR(aiocb64_t *[],
+   ...);	   ...);
+int \fBaio_write\fR(struct \fBaiocb\fR *);	int \fBaio_write64\fR(struct \fBaiocb64\fR *);
+int \fBlio_listio\fR(..., 	int \fBlio_listio64\fR(...,
+   const struct \fBaiocb\fR *, ...);	   const struct \fBaiocb64\fR *, ...);
 .TE
 
 .SS "<\fBdirent.h\fR>"
@@ -216,20 +194,18 @@ int \fBlio_listio\fR(..., int \fBlio_listio64\fR(...,
 
 .sp
 .TS
-tab();
-lw(2.74i) lw(2.76i) 
-lw(2.74i) lw(2.76i) 
-.
-int \fBalphasort\fR(int \fBalphasort64\fR(
-   const struct dirent **,    const struct dirent64 **, 
-   const struct dirent **)   const struct dirent64 **)
-struct \fBdirent *\fR\fBreaddir()\fR;struct \fBdirent64 *\fR\fBreaddir64()\fR;
-struct \fBdirent *\fR\fBreaddir_r()\fR;struct \fBdirent64 *\fR\fBreaddir64_r()\fR;
-int \fBscandir\fR(..., int \fBscandir64\fR(..., 
-   struct dirent *(*[]),    struct dirent64 *(*[]), 
-   int (*)(const struct dirent *),   int (*)(const struct dirent64 *),
-   int (*)(const struct dirent **,   int (*)(const struct dirent64 **,
-      const struct dirent **))      const struct dirent64 **))
+l l
+l l .
+int \fBalphasort\fR(	int \fBalphasort64\fR(
+   const struct dirent **, 	   const struct dirent64 **,
+   const struct dirent **)	   const struct dirent64 **)
+struct \fBdirent *\fR\fBreaddir()\fR;	struct \fBdirent64 *\fR\fBreaddir64()\fR;
+struct \fBdirent *\fR\fBreaddir_r()\fR;	struct \fBdirent64 *\fR\fBreaddir64_r()\fR;
+int \fBscandir\fR(..., 	int \fBscandir64\fR(...,
+   struct dirent *(*[]), 	   struct dirent64 *(*[]),
+   int (*)(const struct dirent *),	   int (*)(const struct dirent64 *),
+   int (*)(const struct dirent **,	   int (*)(const struct dirent64 **,
+      const struct dirent **))	      const struct dirent64 **))
 .TE
 
 .SS "<\fBfcntl.h\fR>"
@@ -237,16 +213,14 @@ int \fBscandir\fR(..., int \fBscandir64\fR(...,
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-int \fBattropen()\fR;int \fBattropen64()\fR;
-int \fBcreat()\fR;int \fBcreat64()\fR;
-int \fBopen()\fR;int \fBopen64()\fR;
-int \fBopenat()\fR;int \fBopenat64()\fR;
-int \fBposix_fadvise()\fRint \fBposix_fadvise64()\fR
-int \fBposix_fallocate()\fRint \fBposix_fallocate64()\fR
+l l
+l l .
+int \fBattropen()\fR;	int \fBattropen64()\fR;
+int \fBcreat()\fR;	int \fBcreat64()\fR;
+int \fBopen()\fR;	int \fBopen64()\fR;
+int \fBopenat()\fR;	int \fBopenat64()\fR;
+int \fBposix_fadvise()\fR	int \fBposix_fadvise64()\fR
+int \fBposix_fallocate()\fR	int \fBposix_fallocate64()\fR
 .TE
 
 .SS "<\fBftw.h\fR>"
@@ -254,16 +228,14 @@ int \fBposix_fallocate()\fRint \fBposix_fallocate64()\fR
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-int \fBftw\fR(...,int \fBftw64\fR(...,
-   const struct \fBstat\fR *, ...);   const struct \fBstat64\fR *, ...);
-
-int \fBnftw\fR(..int \fBnftw64\fR(...,
-   const struct \fBstat\fR *, ...);   const struct \fBstat64\fR *,  ...);
-
+l l
+l l .
+int \fBftw\fR(...,	int \fBftw64\fR(...,
+   const struct \fBstat\fR *, ...);	   const struct \fBstat64\fR *, ...);
+	
+int \fBnftw\fR(..	int \fBnftw64\fR(...,
+   const struct \fBstat\fR *, ...);	   const struct \fBstat64\fR *,  ...);
+	
 .TE
 
 .SS "<\fBlibgen.h\fR>"
@@ -271,10 +243,8 @@ int \fBnftw\fR(..int \fBnftw64\fR(...,
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-.
-char *\fBcopylist\fR(..., \fBoff_t\fR);char *\fBcopylist64\fR(..., \fBoff64_t\fR);
+l l .
+char *\fBcopylist\fR(..., \fBoff_t\fR);	char *\fBcopylist64\fR(..., \fBoff64_t\fR);
 .TE
 
 .SS "<\fBstdio.h\fR>"
@@ -282,18 +252,16 @@ char *\fBcopylist\fR(..., \fBoff_t\fR);char *\fBcopylist64\fR(..., \fBoff64_t\f
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-int \fBfgetpos()\fR;int \fBfgetpos64()\fR;
-FILE *\fBfopen()\fR;FILE *\fBfopen64()\fR;
-FILE *\fBfreopen()\fR;FILE *\fBfreopen64()\fR;
-int \fBfseeko\fR(..., \fBoff_t\fR, ...);int \fBfseeko64\fR(..., \fBoff64_t\fR, ...);
-int \fBfsetpos\fR(...,int \fBfsetpos64\fR(...,
-   const \fBfpos_t\fR *);  const \fBfpos64_t\fR *);
-off_t \fBftello()\fR;off64_t \fBftello64()\fR();
-FILE *\fBtmpfile()\fR;FILE *\fBtmpfile64()\fR;
+l l
+l l .
+int \fBfgetpos()\fR;	int \fBfgetpos64()\fR;
+FILE *\fBfopen()\fR;	FILE *\fBfopen64()\fR;
+FILE *\fBfreopen()\fR;	FILE *\fBfreopen64()\fR;
+int \fBfseeko\fR(..., \fBoff_t\fR, ...);	int \fBfseeko64\fR(..., \fBoff64_t\fR, ...);
+int \fBfsetpos\fR(...,	int \fBfsetpos64\fR(...,
+   const \fBfpos_t\fR *);	  const \fBfpos64_t\fR *);
+off_t \fBftello()\fR;	off64_t \fBftello64()\fR();
+FILE *\fBtmpfile()\fR;	FILE *\fBtmpfile64()\fR;
 .TE
 
 .SS "<\fBstdlib.h\fR>"
@@ -301,10 +269,8 @@ FILE *\fBtmpfile()\fR;FILE *\fBtmpfile64()\fR;
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-.
-int \fBmkstemp()\fR;int \fBmkstemp64()\fR;
+l l .
+int \fBmkstemp()\fR;	int \fBmkstemp64()\fR;
 .TE
 
 .SS "<\fBsys/async.h\fR>"
@@ -312,12 +278,10 @@ int \fBmkstemp()\fR;int \fBmkstemp64()\fR;
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-int \fBaioread\fR(..., \fBoff_t\fR, ...);int \fBaioread64\fR(..., \fBoff64_t\fR, ...);
-int \fBaiowrite\fR(..., \fBoff_t\fR, ...);int \fBaiowrite64\fR(..., \fBoff64_t\fR, ...);
+l l
+l l .
+int \fBaioread\fR(..., \fBoff_t\fR, ...);	int \fBaioread64\fR(..., \fBoff64_t\fR, ...);
+int \fBaiowrite\fR(..., \fBoff_t\fR, ...);	int \fBaiowrite64\fR(..., \fBoff64_t\fR, ...);
 .TE
 
 .SS "<\fBsys/dirent.h\fR>"
@@ -325,12 +289,10 @@ int \fBaiowrite\fR(..., \fBoff_t\fR, ...);int \fBaiowrite64\fR(..., \fBoff64_t\
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-int \fBgetdents\fR(..., \fBdirent\fR);int \fBgetdents64\fR(..., \fBdirent64\fR);
-
+l l
+l l .
+int \fBgetdents\fR(..., \fBdirent\fR);	int \fBgetdents64\fR(..., \fBdirent64\fR);
+	
 .TE
 
 .SS "<\fBsys/mman.h\fR>"
@@ -338,10 +300,8 @@ int \fBgetdents\fR(..., \fBdirent\fR);int \fBgetdents64\fR(..., \fBdirent64\fR)
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-.
-void \fBmmap\fR(..., \fBoff_t\fR);void \fBmmap64\fR(..., \fBoff64_t\fR);
+l l .
+void \fBmmap\fR(..., \fBoff_t\fR);	void \fBmmap64\fR(..., \fBoff64_t\fR);
 .TE
 
 .SS "<\fBsys/resource.h\fR>"
@@ -349,14 +309,12 @@ void \fBmmap\fR(..., \fBoff_t\fR);void \fBmmap64\fR(..., \fBoff64_t\fR);
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-int \fBgetrlimit\fR(...,int \fBgetrlimit64\fR(...,
-   struct \fBrlimit\fR *);   struct \fBrlimit64\fR *);
-int \fBsetrlimit\fR(...,int \fBsetrlimit64\fR(...,
-   const struct \fBrlimit\fR *);   const struct \fBrlimit64\fR *);
+l l
+l l .
+int \fBgetrlimit\fR(...,	int \fBgetrlimit64\fR(...,
+   struct \fBrlimit\fR *);	   struct \fBrlimit64\fR *);
+int \fBsetrlimit\fR(...,	int \fBsetrlimit64\fR(...,
+   const struct \fBrlimit\fR *);	   const struct \fBrlimit64\fR *);
 .TE
 
 .SS "<\fBsys/sendfile.h\fR>"
@@ -364,15 +322,13 @@ int \fBsetrlimit\fR(...,int \fBsetrlimit64\fR(...,
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-ssize_t \fBsendfile\fR(..., ssize_t \fBsendfile64\fR(...,
-   \fBoff_t\fR *, ...);   \fBoff64_t\fR *, ...);
-ssize_t \fBsendfilev\fR(..., const ssize_t \fBsendfilev64\fR(..., const
-   struct \fBsendfilevec\fR *,  ...);  struct \fBsendfilevec64\fR *, ...); 
-
+l l
+l l .
+ssize_t \fBsendfile\fR(..., 	ssize_t \fBsendfile64\fR(...,
+   \fBoff_t\fR *, ...);	   \fBoff64_t\fR *, ...);
+ssize_t \fBsendfilev\fR(..., const 	ssize_t \fBsendfilev64\fR(..., const
+   struct \fBsendfilevec\fR *,  ...);	  struct \fBsendfilevec64\fR *, ...);
+	
 .TE
 
 .SS "<\fBsys/stat.h\fR>"
@@ -380,15 +336,13 @@ ssize_t \fBsendfilev\fR(..., const ssize_t \fBsendfilev64\fR(..., const
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-int \fBfstat\fR(..., struct \fBstat\fR *);int \fBfstat64\fR(...,  struct \fBstat64\fR *);
-int \fBfstatat\fR(..., int \fBfstatat64\fR(..., 
-   struct \fBstat\fR *, int);   struct \fBstat64\fR *, int);
-int \fBlstat\fR(..., struct \fBstat\fR *);int \fBlstat64\fR(..., struct \fBstat64\fR *);
-int \fBstat\fR(..., struct \fBstat\fR *);int \fBstat64\fR(..., struct \fBstat64\fR *);
+l l
+l l .
+int \fBfstat\fR(..., struct \fBstat\fR *);	int \fBfstat64\fR(...,  struct \fBstat64\fR *);
+int \fBfstatat\fR(..., 	int \fBfstatat64\fR(...,
+   struct \fBstat\fR *, int);	   struct \fBstat64\fR *, int);
+int \fBlstat\fR(..., struct \fBstat\fR *);	int \fBlstat64\fR(..., struct \fBstat64\fR *);
+int \fBstat\fR(..., struct \fBstat\fR *);	int \fBstat64\fR(..., struct \fBstat64\fR *);
 .TE
 
 .SS "<\fBsys/statvfs.h\fR>"
@@ -396,14 +350,12 @@ int \fBstat\fR(..., struct \fBstat\fR *);int \fBstat64\fR(..., struct \fBstat64
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-int \fBstatvfs\fR(...,int \fBstatvfs64\fR(...,
-   struct \fBstatvfs\fR *);   struct \fBstatvfs64\fR *);
-int \fBfstatvfs\fR(..., int \fBfstatvfs64\fR(..., 
-   struct \fBstatvfs\fR *);  struct \fBstatvfs64\fR *); 
+l l
+l l .
+int \fBstatvfs\fR(...,	int \fBstatvfs64\fR(...,
+   struct \fBstatvfs\fR *);	   struct \fBstatvfs64\fR *);
+int \fBfstatvfs\fR(..., 	int \fBfstatvfs64\fR(...,
+   struct \fBstatvfs\fR *);	  struct \fBstatvfs64\fR *);
 .TE
 
 .SS "<\fBucbinclude/stdio.h\fR>"
@@ -411,12 +363,10 @@ int \fBfstatvfs\fR(..., int \fBfstatvfs64\fR(...,
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-FILE *\fBfopen()\fRFILE *\fBfopen64()\fR
-FILE *\fBfreopen()\fRFILE *\fBfreopen64()\fR
+l l
+l l .
+FILE *\fBfopen()\fR	FILE *\fBfopen64()\fR
+FILE *\fBfreopen()\fR	FILE *\fBfreopen64()\fR
 .TE
 
 .SS "<\fBucbinclude/sys/dir.h\fR>"
@@ -424,17 +374,15 @@ FILE *\fBfreopen()\fRFILE *\fBfreopen64()\fR
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-int \fBalphasort\fR(int \fBalphasort64\fR(
-   struct \fBdirect\fR **,   struct \fBdirect64\fR **,
-   struct \fBdirect\fR **);   struct \fBdirect64\fR **);
-struct \fBdirect *\fR\fBreaddir()\fR;struct \fBdirect64 *\fR\fBreaddir64()\fR;
-int \fBscandir\fR(...,int \fBscandir64\fR(...,
-   struct \fBdirect\fR *(*[]);,  ...);   struct \fBdirect64\fR *(*[]);,  ...);
-
+l l
+l l .
+int \fBalphasort\fR(	int \fBalphasort64\fR(
+   struct \fBdirect\fR **,	   struct \fBdirect64\fR **,
+   struct \fBdirect\fR **);	   struct \fBdirect64\fR **);
+struct \fBdirect *\fR\fBreaddir()\fR;	struct \fBdirect64 *\fR\fBreaddir64()\fR;
+int \fBscandir\fR(...,	int \fBscandir64\fR(...,
+   struct \fBdirect\fR *(*[]);,  ...);	   struct \fBdirect64\fR *(*[]);,  ...);
+	
 .TE
 
 .SS "<\fBunistd.h\fR>"
@@ -442,16 +390,14 @@ int \fBscandir\fR(...,int \fBscandir64\fR(...,
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-int \fBlockf\fR(..., \fBoff_t\fR);int \fBlockf64\fR(..., \fBoff64_t\fR);
-\fBoff_t lseek\fR(..., \fBoff_t\fR, ...);\fBoff64_t lseek64\fR(..., \fBoff64_t\fR, ...);
-int \fBftruncate\fR(..., \fBoff_t\fR);int \fBftruncate64\fR..., \fBoff64_t\fR);
-ssize_t \fBpread\fR(..., \fBoff_t\fR);ssize_t \fBpread64\fR..., \fBoff64_t\fR);
-ssize_t \fBpwrite\fR(..., \fBoff_t\fR);ssize_t \fBpwrite64\fR(..., \fBoff64_t\fR);
-int \fBtruncate\fR(..., \fBoff_t\fR);int \fBtruncate64\fR(..., \fBoff64_t\fR);
+l l
+l l .
+int \fBlockf\fR(..., \fBoff_t\fR);	int \fBlockf64\fR(..., \fBoff64_t\fR);
+\fBoff_t lseek\fR(..., \fBoff_t\fR, ...);	\fBoff64_t lseek64\fR(..., \fBoff64_t\fR, ...);
+int \fBftruncate\fR(..., \fBoff_t\fR);	int \fBftruncate64\fR..., \fBoff64_t\fR);
+ssize_t \fBpread\fR(..., \fBoff_t\fR);	ssize_t \fBpread64\fR..., \fBoff64_t\fR);
+ssize_t \fBpwrite\fR(..., \fBoff_t\fR);	ssize_t \fBpwrite64\fR(..., \fBoff64_t\fR);
+int \fBtruncate\fR(..., \fBoff_t\fR);	int \fBtruncate64\fR(..., \fBoff64_t\fR);
 .TE
 
 .SH SEE ALSO

@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mmapobj 2 "1 Dec 2008" "SunOS 5.11" "System Calls"
+.TH MMAPOBJ 2 "Dec 1, 2008"
 .SH NAME
 mmapobj \- map a file object in the appropriate manner
 .SH SYNOPSIS
@@ -19,28 +19,23 @@ mmapobj \- map a file object in the appropriate manner
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfd\fR\fR
 .ad
 .RS 12n
-.rt  
 The open file descriptor for the file to be mapped.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 12n
-.rt  
 Indicates that the default behavior of \fBmmapobj()\fR should be modified
 accordingly. Available flags are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMMOBJ_INTERPRET\fR\fR
 .ad
@@ -52,7 +47,6 @@ single image. This flag can be used only with \fBELF\fR and \fBAOUT\fR files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMMOBJ_PADDING\fR\fR
 .ad
@@ -70,24 +64,20 @@ changed. This padding request will be ignored for the \fBAOUT\fR format.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstorage\fR\fR
 .ad
 .RS 12n
-.rt  
 A pointer to the \fBmmapobj_result_t\fR array where the mapping data will be
 copied out after a successful mapping of \fIfd\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIelements\fR\fR
 .ad
 .RS 12n
-.rt  
 A pointer to the number of \fBmmapobj_result_t\fR elements pointed to by
 \fIstorage\fR.  On return, \fIelements\fR contains the number of mappings
 required to fully map the requested object.  If the original value of
@@ -97,12 +87,10 @@ modified to contain the number of mappings necessary.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIarg\fR\fR
 .ad
 .RS 12n
-.rt  
 A pointer to additional information that might be associated with the specific
 request. Only the \fBMMOBJ_PADDING\fR request uses this argument. If
 \fBMMOBJ_PADDING\fR is not specified, \fIarg\fR must be \fINULL\fR.
@@ -119,7 +107,6 @@ the rules for that file format.  The following \fBELF\fR and \fBAOUT\fR formats
 are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBET_EXEC\fR and \fBAOUT\fR executables\fR
 .ad
@@ -132,7 +119,6 @@ address of each mapping is explicitly defined by the file's program headers.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBET_DYN\fR and \fBAOUT\fR shared objects\fR
 .ad
@@ -147,7 +133,6 @@ program headers.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBET_REL\fR and \fBET_CORE\fR\fR
 .ad
@@ -238,12 +223,10 @@ data is copied to storage.
 The \fBmmapobj()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE2BIG\fR\fR
 .ad
 .RS 14n
-.rt  
 The \fIelements\fR argument was not large enough to hold the number of loadable
 segments in \fIfd\fR. The \fIelements\fR argument will be modified to contain
 the number of segments required.
@@ -251,35 +234,29 @@ the number of segments required.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 14n
-.rt  
 The file system containing the \fIfd\fR to be mapped does not allow execute
 access, or the file descriptor pointed to by \fIfd\fR is not open for reading.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEADDRINUSE\fR\fR
 .ad
 .RS 14n
-.rt  
 The mapping requirements overlap an object that is already used by the process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 14n
-.rt  
 There is insufficient room to reserve swap space for the mapping.
 .sp
 The file to be mapped is already locked using advisory or mandatory record
@@ -288,35 +265,29 @@ locking. See \fBfcntl\fR(2).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 14n
-.rt  
 The \fIfd\fR argument is not a valid open file descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 14n
-.rt  
 The \fIstorage\fR, \fIarg\fR, or \fIelements\fR argument points to an invalid
 address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 14n
-.rt  
 The \fIflags\fR argument contains an invalid flag.
 .sp
 \fBMMOBJ_PADDING\fR was not specified in \fIflags\fRand \fIarg\fR was non-null.
@@ -324,24 +295,20 @@ The \fIflags\fR argument contains an invalid flag.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENODEV\fR\fR
 .ad
 .RS 14n
-.rt  
 The \fIfd\fR argument refers to an object for which \fBmmapobj()\fR is
 meaningless, such as a terminal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 14n
-.rt  
 Insufficient memory is available to hold the program headers.
 .sp
 Insufficient memory is available in the address space to create the mapping.
@@ -349,12 +316,10 @@ Insufficient memory is available in the address space to create the mapping.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSUP\fR\fR
 .ad
 .RS 14n
-.rt  
 The current user data model does not match the \fIfd\fR to be interpreted;
 thus, a 32-bit process that tried to use \fBmmapobj()\fR to interpret a 64-bit
 object would return \fBENOTSUP\fR.
@@ -367,12 +332,10 @@ The \fBELF\fR header contains an unaligned \fIe_phentsize\fR value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSYS\fR\fR
 .ad
 .RS 14n
-.rt  
 An unsupported filesystem operation was attempted while trying to map in the
 object.
 .RE
@@ -385,15 +348,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityPrivate
+Interface Stability	Private
 _
-MT-LevelAsync-Signal-Safe
+MT-Level	Async-Signal-Safe
 .TE
 
 .SH SEE ALSO

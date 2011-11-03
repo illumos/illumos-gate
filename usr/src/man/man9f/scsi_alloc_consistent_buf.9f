@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH scsi_alloc_consistent_buf 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH SCSI_ALLOC_CONSISTENT_BUF 9F "Jan 16, 2006"
 .SH NAME
 scsi_alloc_consistent_buf \- allocate an I/O buffer for SCSI DMA
 .SH SYNOPSIS
@@ -13,8 +13,8 @@ scsi_alloc_consistent_buf \- allocate an I/O buffer for SCSI DMA
 
 
 
-\fBstruct buf *\fR\fBscsi_alloc_consistent_buf\fR(\fBstructscsi_address*\fR\fIap\fR, 
-     \fBstruct buf *\fR\fIbp\fR, \fBsize_t\fR \fIdatalen\fR, \fBuint_t\fR \fIbflags\fR, 
+\fBstruct buf *\fR\fBscsi_alloc_consistent_buf\fR(\fBstructscsi_address*\fR\fIap\fR,
+     \fBstruct buf *\fR\fIbp\fR, \fBsize_t\fR \fIdatalen\fR, \fBuint_t\fR \fIbflags\fR,
      \fBint (*\fR\fIcallback\fR)(caddr_t), \fBcaddr_t\fR \fIarg\fR);
 .fi
 
@@ -25,68 +25,56 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIap\fR\fR
 .ad
 .RS 12n
-.rt  
 Pointer to the \fBscsi_address\fR(9S) structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbp\fR\fR
 .ad
 .RS 12n
-.rt  
 Pointer to the \fBbuf\fR(9S) structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdatalen\fR\fR
 .ad
 .RS 12n
-.rt  
 Number of bytes for the data buffer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbflags\fR\fR
 .ad
 .RS 12n
-.rt  
 Flags setting for the allocated buffer header. This should either be
 \fBB_READ\fR or \fBB_WRITE\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcallback\fR\fR
 .ad
 .RS 12n
-.rt  
 A pointer to a callback function, \fBNULL_FUNC\fR or \fBSLEEP_FUNC\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIarg\fR\fR
 .ad
 .RS 12n
-.rt  
 The callback function argument.
 .RE
 
@@ -115,34 +103,28 @@ be allocated using \fBddi_dma_mem_alloc\fR(9F).
 memory access \fB(DMA)\fR resources are not available; the valid values are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNULL_FUNC\fR\fR
 .ad
 .RS 16n
-.rt  
 Do not wait for resources. Return a \fINULL\fR pointer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLEEP_FUNC\fR\fR
 .ad
 .RS 16n
-.rt  
 Wait indefinitely for resources.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBOther Values\fR
 .ad
 .RS 16n
-.rt  
 \fIcallback\fR points to a function that is called when resources may become
 available. \fIcallback\fR must return either \fB0\fR (indicating that it
 attempted to allocate resources but failed to do so), in which case it is put
@@ -190,7 +172,7 @@ attached.
          SUN_INQSIZE, B_READ, canwait, NULL);
     if (bp) {
     	pkt = scsi_init_pkt(&devp->sd_address, NULL, bp,
-        	CDB_GROUP0, 1, PP_LEN, PKT_CONSISTENT, 
+        	CDB_GROUP0, 1, PP_LEN, PKT_CONSISTENT,
 		canwait, NULL);
     }
 .fi

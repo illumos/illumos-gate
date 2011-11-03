@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sendmail 4 "8 May 2008" "SunOS 5.11" "File Formats"
+.TH SENDMAIL 4 "May 8, 2008"
 .SH NAME
 sendmail, sendmail.cf, submit.cf \- sendmail configuration files
 .SH SYNOPSIS
@@ -27,24 +27,20 @@ are used for submission and transmission of mail, instead of only
 \fBsendmail.cf\fR, as before. These are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsendmail.cf\fR\fR
 .ad
 .RS 15n
-.rt  
 Remains the principal \fBsendmail\fR configuration file. Used for the Mail
 Transmission Agent (MTA).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsubmit.cf\fR\fR
 .ad
 .RS 15n
-.rt  
 Used for the Mail Submission Program (MSP). The MSP is used to submit mail
 messages. Unlike the MTA, it does not run as an SMTP daemon.
 .RE
@@ -271,12 +267,10 @@ upgrade from clobbering your \fB\&.cf\fR file, or renaming it to
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/mail/cf/README\fR\fR
 .ad
 .RS 23n
-.rt  
 Describes \fBsendmail\fR configuration files.
 .RE
 
@@ -288,13 +282,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

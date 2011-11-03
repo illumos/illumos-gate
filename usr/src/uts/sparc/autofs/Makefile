@@ -22,8 +22,7 @@
 # uts/sparc/autofs/Makefile
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 #
 #	This makefile drives the production of the
 #	autofs file system kernel module.
@@ -61,6 +60,11 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK)
 #	Overrides.
 #
 CFLAGS		+= $(CCVERBOSE)
+
+#
+# Define dependencies on rpmod, rpcsec, and mntfs
+#
+LDFLAGS         += -dy -N strmod/rpcmod -N misc/rpcsec -N fs/mntfs
 
 #
 # For now, disable these lint checks; maintainers should endeavor

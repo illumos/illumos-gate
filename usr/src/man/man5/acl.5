@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH acl 5 "29 Sep 2008" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH ACL 5 "Sep 29, 2008"
 .SH NAME
 acl \- Access Control Lists
 .SH DESCRIPTION
@@ -59,45 +59,37 @@ Each \fIacl_entry\fR contains one ACL entry. An ACL entry is represented by two
 or three colon-separated(\fB:\fR) fields.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIuser\fR:[\fIuid\fR]:\fIperms\fR\fR
 .ad
 .RS 21n
-.rt  
 If \fIuid\fR blank, it represents the file owner.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIgroup\fR:[\fIgid\fR]:\fIperms\fR\fR
 .ad
 .RS 21n
-.rt  
 If \fIgid\fR is blank, it represents the owning group.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIother\fR:\fIperms\fR\fR
 .ad
 .RS 21n
-.rt  
 Represents the file other class.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImask\fR:\fIperms\fR\fR
 .ad
 .RS 21n
-.rt  
 Defines the \fBMAX\fR permission to hand out.
 .RE
 
@@ -188,115 +180,95 @@ The permissions for verbose mode and their abbreviated form in parentheses for
 compact and positional mode are described as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBread_data (\fBr\fR)\fR
 .ad
 .RS 24n
-.rt  
 Permission to read the data of the file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBlist_directory (\fBr\fR)\fR
 .ad
 .RS 24n
-.rt  
 Permission to list the contents of a directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwrite_data (\fBw\fR)\fR
 .ad
 .RS 24n
-.rt  
 Permission to modify a file's data anywhere in the file's offset range. This
 includes the ability to grow the file or write to any arbitrary offset.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBadd_file (\fBw\fR)\fR
 .ad
 .RS 24n
-.rt  
 Permission to add a new file to a directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBappend_data (\fBp\fR)\fR
 .ad
 .RS 24n
-.rt  
 The ability to modify the file's data, but only starting at EOF. Currently,
 this permission is not supported.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBadd_subdirectory (\fBp\fR)\fR
 .ad
 .RS 24n
-.rt  
 Permission to create a subdirectory to a directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBread_xattr (\fBR\fR)\fR
 .ad
 .RS 24n
-.rt  
 The ability to read the extended attributes of a file or do a lookup in the
 extended attributes directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwrite_xattr (\fBW\fR)\fR
 .ad
 .RS 24n
-.rt  
 The ability to create extended attributes or write to the extended attributes
 directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBexecute (\fBx\fR)\fR
 .ad
 .RS 24n
-.rt  
 Permission to execute a file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBread_attributes (\fBa\fR)\fR
 .ad
 .RS 24n
-.rt  
 The ability to read basic attributes (non-ACLs) of a file. Basic attributes are
 considered to be the stat level attributes. Allowing this access mask bit means
 that the entity can execute \fBls\fR(1) and \fBstat\fR(2).
@@ -304,81 +276,67 @@ that the entity can execute \fBls\fR(1) and \fBstat\fR(2).
 
 .sp
 .ne 2
-.mk
 .na
 \fBwrite_attributes (\fBA\fR)\fR
 .ad
 .RS 24n
-.rt  
 Permission to change the times associated with a file or directory to an
 arbitrary value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdelete (\fBd\fR)\fR
 .ad
 .RS 24n
-.rt  
 Permission to delete the file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdelete_child (\fBD\fR)\fR
 .ad
 .RS 24n
-.rt  
 Permission to delete a file within a directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBread_acl (\fBc\fR)\fR
 .ad
 .RS 24n
-.rt  
 Permission to read the ACL.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwrite_acl (\fBC\fR)\fR
 .ad
 .RS 24n
-.rt  
 Permission to write the ACL or the ability to execute \fBchmod\fR(1) or
 \fBsetfacl\fR(1).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwrite_owner (\fBo\fR)\fR
 .ad
 .RS 24n
-.rt  
 Permission to change the owner or the ability to execute \fBchown\fR(1) or
 \fBchgrp\fR(1).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBsynchronize (\fBs\fR)\fR
 .ad
 .RS 24n
-.rt  
 Permission to access a file locally at the server with synchronous reads and
 writes. Currently, this permission is not supported.
 .RE
@@ -388,34 +346,28 @@ writes. Currently, this permission is not supported.
 The following inheritance flags are supported by NFSv4:
 .sp
 .ne 2
-.mk
 .na
 \fBfile_inherit (\fBf\fR)\fR
 .ad
 .RS 26n
-.rt  
 Inherit to all newly created files in a directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdir_inherit (\fBd\fR)\fR
 .ad
 .RS 26n
-.rt  
 Inherit to all newly created directories in a directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBinherit_only (\fBi\fR)\fR
 .ad
 .RS 26n
-.rt  
 Placed on a directory, but does not apply to the directory itself, only to
 newly created created files and directories. This flag requires file_inherit
 and or dir_inherit to indicate what to inherit.
@@ -423,12 +375,10 @@ and or dir_inherit to indicate what to inherit.
 
 .sp
 .ne 2
-.mk
 .na
 \fBno_propagate (\fBn\fR)\fR
 .ad
 .RS 26n
-.rt  
 Placed on directories and indicates that ACL entries should only be inherited
 one level of the tree. This flag requires file_inherit and or dir_inherit to
 indicate what to inherit.
@@ -436,47 +386,39 @@ indicate what to inherit.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsuccessful_access (\fBS)\fR)\fR
 .ad
 .RS 26n
-.rt  
 Indicates if an alarm or audit record should be initiated upon successful
 accesses. Used with audit/alarm ACE types.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBfailed_access (\fBF\fR)\fR
 .ad
 .RS 26n
-.rt  
 Indicates if an alarm or audit record should be initiated when access fails.
 Used with audit/alarm ACE types.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBinherited (\fBI\fR)\fR
 .ad
 .RS 26n
-.rt  
 ACE was inherited.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-\fR\fR
 .ad
 .RS 26n
-.rt  
 No permission granted.
 .RE
 
@@ -498,45 +440,37 @@ An NFSv4 ACL is expressed using the following syntax:
 
 .sp
 .ne 2
-.mk
 .na
 \fBowner@\fR
 .ad
 .RS 10n
-.rt  
 File owner
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBgroup@\fR
 .ad
 .RS 10n
-.rt  
 Group owner
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBuser\fR
 .ad
 .RS 10n
-.rt  
 Permissions for a specific user
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBgroup\fR
 .ad
 .RS 10n
-.rt  
 Permissions for a specific group
 .RE
 
@@ -549,7 +483,7 @@ ACL specification examples:
 .sp
 .in +2
 .nf
-user:fred:read_data/write_data/read_attributes:file_inherit:allow 
+user:fred:read_data/write_data/read_attributes:file_inherit:allow
 owner@:read_data:allow,group@:read_data:allow,user:tom:read_data:deny
 .fi
 .in -2
@@ -612,12 +546,10 @@ The Solaris command interface supports the manipulation of ACLs. The following
 Solaris utilities accommodate both ACL models:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchmod\fR\fR
 .ad
 .RS 12n
-.rt  
 The \fBchmod\fR utility has been enhanced to allow for the setting and deleting
 of ACLs. This is achieved by extending the symbolic-mode argument to support
 ACL manipulation. See \fBchmod\fR(1) for details.
@@ -625,24 +557,20 @@ ACL manipulation. See \fBchmod\fR(1) for details.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcompress\fR\fR
 .ad
 .RS 12n
-.rt  
 When a file is compressed any ACL associated with the original file is
 preserved with the compressed file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcp\fR\fR
 .ad
 .RS 12n
-.rt  
 By default, \fBcp\fR ignores ACLs, unless the \fB-p\fR option is specified.
 When \fB-p\fR is specified the owner and group id, permission modes,
 modification and access times, ACLs, and extended attributes if applicable are
@@ -651,46 +579,38 @@ preserved.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcpio\fR\fR
 .ad
 .RS 12n
-.rt  
 ACLs are preserved when the \fB-P\fR option is specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfind\fR\fR
 .ad
 .RS 12n
-.rt  
 Find locates files with ACLs when the \fB-acl\fR flag is specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBls\fR\fR
 .ad
 .RS 12n
-.rt  
 By default \fBls\fR does not display ACL information. When the \fB-v\fR option
 is specified, a file's ACL is displayed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmv\fR\fR
 .ad
 .RS 12n
-.rt  
 When a file is moved, all attributes are carried along with the renamed file.
 When a file is moved across a file system boundary, the ACLs are replicated. If
 the ACL information cannot be replicated, the move fails and the source file is
@@ -699,47 +619,39 @@ not removed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpack\fR\fR
 .ad
 .RS 12n
-.rt  
 When a file is packed, any ACL associated with the original file is preserved
 with the packed file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrcp\fR\fR
 .ad
 .RS 12n
-.rt  
 \fBrcp\fR has been enhanced to support copying. A file's ACL is only preserved
 when the remote host supports ACLs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtar\fR\fR
 .ad
 .RS 12n
-.rt  
 ACLs are preserved when the \fB-p\fR option is specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunpack\fR\fR
 .ad
 .RS 12n
-.rt  
 When a file with an ACL is unpacked, the unpacked file retains the ACL
 information.
 .RE

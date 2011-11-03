@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_dma_get_attr 9F "12 Oct 2005" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_DMA_GET_ATTR 9F "Oct 12, 2005"
 .SH NAME
 ddi_dma_get_attr \- get the device DMA attribute structure from a DMA handle
 .SH SYNOPSIS
@@ -24,23 +24,19 @@ Solaris DDI specific (Solaris DDI). This interface is obsolete.
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhandle\fR\fR
 .ad
 .RS 10n
-.rt  
 The handle filled in by a call to \fBddi_dma_alloc_handle\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIattrp\fR\fR
 .ad
 .RS 10n
-.rt  
 Pointer to a buffer suitable for holding a DMA attribute structure. See
 \fBddi_dma_attr\fR(9S).
 .RE
@@ -54,24 +50,20 @@ memory object bound to the given handle will be subject.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 19n
-.rt  
 Successfully passed back attribute structure in buffer pointed to by
 \fIattrp\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_DMA_BADATTR\fR\fR
 .ad
 .RS 19n
-.rt  
 A valid attribute structure could not be passed back.
 .RE
 
@@ -87,13 +79,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityObsolete
+Interface Stability	Obsolete
 .TE
 
 .SH SEE ALSO

@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libpool 3LIB "14 Dec 2006" "SunOS 5.11" "Interface Libraries"
+.TH LIBPOOL 3LIB "Dec 14, 2006"
 .SH NAME
 libpool \- pool configuration manipulation library
 .SH SYNOPSIS
 .LP
 .nf
-\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... [ \fIlibrary\fR... ] 
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... [ \fIlibrary\fR... ]
 #include <\fBpool.h\fR>
 .fi
 
@@ -42,17 +42,15 @@ functions is modified.
 
 .sp
 .TS
-tab();
-cw(3.38i) cw(2.12i) 
-lw(3.38i) lw(2.12i) 
-.
-System CallError Value
+c c
+l l .
+System Call	Error Value
 _
-\fBpset_assign\fR(pset !=\fBPS_QUERY\fR)\fBENOTSUP\fR
-\fBpset_bind\fR(pset !=\fBPS_QUERY\fR)\fBENOTSUP\fR
-\fBpset_create()\fR\fBENOTSUP\fR
-\fBpset_destroy()\fR\fBENOTSUP\fR
-\fBpset_setattr()\fR\fBENOTSUP\fR
+\fBpset_assign\fR(pset !=\fBPS_QUERY\fR)	\fBENOTSUP\fR
+\fBpset_bind\fR(pset !=\fBPS_QUERY\fR)	\fBENOTSUP\fR
+\fBpset_create()\fR	\fBENOTSUP\fR
+\fBpset_destroy()\fR	\fBENOTSUP\fR
+\fBpset_setattr()\fR	\fBENOTSUP\fR
 .TE
 
 .sp
@@ -76,27 +74,25 @@ the \fBsystem.comment\fR property for that configuration.
 
 .sp
 .TS
-tab();
-cw(2.41i) cw(.73i) cw(2.36i) 
-lw(2.41i) lw(.73i) lw(2.36i) 
-.
-Property nameTypeDescription
-\fBsystem.allocate-method\fR\fBstring\fRT{
+c c c
+l l l .
+Property name	Type	Description
+\fBsystem.allocate-method\fR	\fBstring\fR	T{
 Allocation method to use when this configuration is instantiated
 T}
-\fBsystem.bind-default\fR\fBbool\fRT{
+\fBsystem.bind-default\fR	\fBbool\fR	T{
 If specified pool not found, bind to pool with 'pool.default' property set to true
 T}
-\fBsystem.comment\fR\fBstring\fRUser description of system
-\fBsystem.name\fR\fBstring\fRUser name for the configuration
-\fBsystem.version\fR\fBint64\fRT{
+\fBsystem.comment\fR	\fBstring\fR	User description of system
+\fBsystem.name\fR	\fBstring\fR	User name for the configuration
+\fBsystem.version\fR	\fBint64\fR	T{
 \fBlibpool\fR version required to manipulate this configuration
 T}
-\fBsystem.poold.log-level\fR\fBstring\fR\fBpoold\fR logging level
-\fBsystem.poold.log-location\fR\fBstring\fR\fBpoold\fR logging location
-\fBsystem.poold.history-file\fR\fBstring\fR\fBpoold\fR decision history location
-\fBsystem.poold.monitor-interval\fR\fBuint64\fR\fBpoold\fR monitoring sample interval
-\fBsystem.poold.objectives\fR\fBstring\fR\fBpoold\fR objectives for a system.
+\fBsystem.poold.log-level\fR	\fBstring\fR	\fBpoold\fR logging level
+\fBsystem.poold.log-location\fR	\fBstring\fR	\fBpoold\fR logging location
+\fBsystem.poold.history-file\fR	\fBstring\fR	\fBpoold\fR decision history location
+\fBsystem.poold.monitor-interval\fR	\fBuint64\fR	\fBpoold\fR monitoring sample interval
+\fBsystem.poold.objectives\fR	\fBstring\fR	\fBpoold\fR objectives for a system.
 .TE
 
 .sp
@@ -203,27 +199,25 @@ resources freely within those constraints.
 
 .sp
 .TS
-tab();
-cw(1.85i) cw(.84i) cw(2.81i) 
-lw(1.85i) lw(.84i) lw(2.81i) 
-.
-Property nameTypeDescription
-\fBpool.active\fR\fBbool\fRMark this pool as active, if true.
-\fBpool.comment\fR\fBstring\fRUser description of pool.
-\fBpool.default\fR\fBbool\fRT{
+c c c
+l l l .
+Property name	Type	Description
+\fBpool.active\fR	\fBbool\fR	Mark this pool as active, if true.
+\fBpool.comment\fR	\fBstring\fR	User description of pool.
+\fBpool.default\fR	\fBbool\fR	T{
 Mark this pool as the default pool, if true; see system.bind-default property.
 T}
-\fBpool.importance\fR\fBint64\fRT{
+\fBpool.importance\fR	\fBint64\fR	T{
 Relative importance of this pool; for possible resource dispute resolution.
 T}
-\fBpool.name\fR\fBstring\fRT{
+\fBpool.name\fR	\fBstring\fR	T{
 User name for pool; used by \fBsetproject\fR(3PROJECT) as value for 'project.pool' project attribute in \fBproject\fR(4) database.
 T}
-\fBpool.scheduler\fR\fBstring\fRT{
+\fBpool.scheduler\fR	\fBstring\fR	T{
 Scheduler class to which consumers of this pool will be bound. This property is optional and if not specified, the scheduler bindings for consumers of this pool are not affected.
 T}
-\fBpool.sys_id\fR\fBint64\fRSystem-assigned pool ID.
-\fBpool.temporary\fR\fBbool\fRT{
+\fBpool.sys_id\fR	\fBint64\fR	System-assigned pool ID.
+\fBpool.temporary\fR	\fBbool\fR	T{
 Mark this pool as a temporary resource; if true, this pool can exist only in the dynamic configuration and cannot be committed to a configuration file.
 T}
 .TE
@@ -242,35 +236,33 @@ for a list of valid class names.
 
 .sp
 .TS
-tab();
-cw(1.85i) cw(.84i) cw(2.81i) 
-lw(1.85i) lw(.84i) lw(2.81i) 
-.
-Property nameTypeDescription
-\fBpset.comment\fR\fBstring\fRUser description of resource.
-\fBpset.default\fR\fBbool\fRMarks default processor set.
-\fBpset.load\fR\fBuint64\fRThe load for this processor set.
-\fBpset.max\fR\fBuint64\fRT{
+c c c
+l l l .
+Property name	Type	Description
+\fBpset.comment\fR	\fBstring\fR	User description of resource.
+\fBpset.default\fR	\fBbool\fR	Marks default processor set.
+\fBpset.load\fR	\fBuint64\fR	The load for this processor set.
+\fBpset.max\fR	\fBuint64\fR	T{
 Maximum number of CPUs permitted in this processor set.
 T}
-\fBpset.min\fR\fBuint64\fRT{
+\fBpset.min\fR	\fBuint64\fR	T{
 Minimum number of CPUs permitted in this processor set.
 T}
-\fBpset.name\fR\fBstring\fRUser name for resource.
-\fBpset.size\fR\fBuint64\fRT{
+\fBpset.name\fR	\fBstring\fR	User name for resource.
+\fBpset.size\fR	\fBuint64\fR	T{
 Current number of CPUs in this processor set.
 T}
-\fBpset.sys_id\fR\fBint64\fRSystem-assigned processor set ID.
-\fBpset.temporary\fR\fBbool\fRT{
+\fBpset.sys_id\fR	\fBint64\fR	System-assigned processor set ID.
+\fBpset.temporary\fR	\fBbool\fR	T{
 Mark this processor set as a temporary resource; if true, this processor set can exist only in the dynamic configuration and cannot be committed to a configuration file.
 T}
-\fBpset.type\fR\fBstring\fRT{
+\fBpset.type\fR	\fBstring\fR	T{
 Names resource type; value for all processor sets is \fBpset\fR.
 T}
-\fBpset.units\fR\fBstring\fRT{
+\fBpset.units\fR	\fBstring\fR	T{
 Identifies meaning of size-related properties; value for all processor sets is \fBpopulation\fR.
 T}
-\fBpset.poold.objectives\fR\fBstring\fRT{
+\fBpset.poold.objectives\fR	\fBstring\fR	T{
 Specifies the poold objectives for a pset.
 T}
 .TE
@@ -297,44 +289,36 @@ entry for the specification of this property's syntax.
 There are two types of objectives that can be set on a \fBpset\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlocality\fR\fR
 .ad
 .RS 15n
-.rt  
 This objective influences the impact that locality, as measured by lgroup data,
 has upon the chosen configuration. This objective can take one of three values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtight\fR\fR
 .ad
 .RS 9n
-.rt  
 If set, configurations that maximize resource locality are favored.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBloose\fR\fR
 .ad
 .RS 9n
-.rt  
 If set, configurations that minimize resource locality are favored.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnone\fR\fR
 .ad
 .RS 9n
-.rt  
 This is the default value for this objective. If set, configuration
 favorability is uninfluenced by resource locality.
 .RE
@@ -343,12 +327,10 @@ favorability is uninfluenced by resource locality.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fButilization\fR\fR
 .ad
 .RS 15n
-.rt  
 This objective favors configurations that allocate resources to partitions that
 are failing to preserve the specified utilization objective.
 .RE
@@ -359,36 +341,30 @@ These objectives are specified in terms of an operator and a value. The
 operators are
 .sp
 .ne 2
-.mk
 .na
 \fB\fB<\fR\fR
 .ad
 .RS 5n
-.rt  
 The ``less than'' operator is used to indicate that the specified value should
 be treated as a maximum target value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>\fR\fR
 .ad
 .RS 5n
-.rt  
 The ``greater than'' operator is used to indicate that the specified value
 should be treated as a minimum target value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~\fR\fR
 .ad
 .RS 5n
-.rt  
 The ``about'' operator is used to indicate that the specified value should be
 treated as a target value about which some fluctuation is acceptable.
 .RE
@@ -404,18 +380,16 @@ validated to ensure that they do not overlap.
 
 .sp
 .TS
-tab();
-cw(1.85i) cw(1.07i) cw(2.58i) 
-lw(1.85i) lw(1.07i) lw(2.58i) 
-.
-Property nameTypeDescription
+c c c
+l l l .
+Property name	Type	Description
 _
-\fBcpu.comment\fR\fBstring\fRUser description of CPU.
-\fBcpu.pinned\fR\fBbool\fRCPU pinned to this processor set.
-\fBcpu.status\fR\fBint64\fRT{
+\fBcpu.comment\fR	\fBstring\fR	User description of CPU.
+\fBcpu.pinned\fR	\fBbool\fR	CPU pinned to this processor set.
+\fBcpu.status\fR	\fBint64\fR	T{
 Processor status, on-line, offline or interrupts disabled.
 T}
-\fBcpu.sys_id\fR\fBint64\fRSystem-assigned processor ID.
+\fBcpu.sys_id\fR	\fBint64\fR	System-assigned processor ID.
 .TE
 
 .sp
@@ -427,34 +401,28 @@ writeable.
 The \fBcpu.status\fR property can be set only to the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBoff-line\fR\fR
 .ad
 .RS 12n
-.rt  
 Set the CPU offline.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBon-line\fR\fR
 .ad
 .RS 12n
-.rt  
 Set the CPU online.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBno-intr\fR\fR
 .ad
 .RS 12n
-.rt  
 Disable interrupt processing on the CPU.
 .RE
 
@@ -472,67 +440,61 @@ interfaces.
 
 .sp
 .TS
-tab();
-lw(2.72i) lw(2.78i) 
-lw(2.72i) lw(2.78i) 
-.
-\fBpool_associate\fR\fBpool_component_info\fR
-\fBpool_component_to_elem\fR\fBpool_conf_alloc\fR
-\fBpool_conf_close\fR\fBpool_conf_commit\fR
-\fBpool_conf_export\fR\fBpool_conf_free\fR
-\fBpool_conf_info\fR\fBpool_conf_location\fR
-\fBpool_conf_open\fR\fBpool_conf_remove\fR
-\fBpool_conf_rollback\fR\fBpool_conf_status\fR
-\fBpool_conf_to_elem\fR\fBpool_conf_update\fR
-\fBpool_conf_validate\fR\fBpool_create\fR
-\fBpool_destroy\fR\fBpool_dissociate\fR
-\fBpool_dynamic_location\fR\fBpool_error\fR
-\fBpool_get_binding\fR\fBpool_get_owning_resource\fR
-\fBpool_get_pool\fR\fBpool_get_property\fR
-\fBpool_get_resource\fR\fBpool_get_resource_binding\fR
-\fBpool_get_status\fR\fBpool_info\fR
-\fBpool_put_property\fR\fBpool_query_components\fR
-\fBpool_query_pool_resources\fR\fBpool_query_pools\fR
-\fBpool_query_resource_components\fR\fBpool_query_resources\fR
-\fBpool_resource_create\fR\fBpool_resource_destroy\fR
-\fBpool_resource_info\fR\fBpool_resource_to_elem\fR
-\fBpool_resource_transfer\fR\fBpool_resource_type_list\fR
-\fBpool_resource_xtransfer\fR\fBpool_rm_property\fR
-\fBpool_set_binding\fR\fBpool_set_status\fR
-\fBpool_static_location\fR\fBpool_strerror\fR
-\fBpool_to_elem\fR\fBpool_value_alloc\fR
-\fBpool_value_free\fR\fBpool_value_get_bool\fR
-\fBpool_value_get_double\fR\fBpool_value_get_int64\fR
-\fBpool_value_get_name\fR\fBpool_value_get_string\fR
-\fBpool_value_get_type\fR\fBpool_value_get_uint64\fR
-\fBpool_value_set_bool\fR\fBpool_value_set_double\fR
-\fBpool_value_set_int64\fR\fBpool_value_set_name\fR
-\fBpool_value_set_string\fR\fBpool_value_set_uint64\fR
-\fBpool_version\fR\fBpool_walk_components\fR
-\fBpool_walk_pools\fR\fBpool_walk_properties\fR
-\fBpool_walk_resources\fR
+l l
+l l .
+\fBpool_associate\fR	\fBpool_component_info\fR
+\fBpool_component_to_elem\fR	\fBpool_conf_alloc\fR
+\fBpool_conf_close\fR	\fBpool_conf_commit\fR
+\fBpool_conf_export\fR	\fBpool_conf_free\fR
+\fBpool_conf_info\fR	\fBpool_conf_location\fR
+\fBpool_conf_open\fR	\fBpool_conf_remove\fR
+\fBpool_conf_rollback\fR	\fBpool_conf_status\fR
+\fBpool_conf_to_elem\fR	\fBpool_conf_update\fR
+\fBpool_conf_validate\fR	\fBpool_create\fR
+\fBpool_destroy\fR	\fBpool_dissociate\fR
+\fBpool_dynamic_location\fR	\fBpool_error\fR
+\fBpool_get_binding\fR	\fBpool_get_owning_resource\fR
+\fBpool_get_pool\fR	\fBpool_get_property\fR
+\fBpool_get_resource\fR	\fBpool_get_resource_binding\fR
+\fBpool_get_status\fR	\fBpool_info\fR
+\fBpool_put_property\fR	\fBpool_query_components\fR
+\fBpool_query_pool_resources\fR	\fBpool_query_pools\fR
+\fBpool_query_resource_components\fR	\fBpool_query_resources\fR
+\fBpool_resource_create\fR	\fBpool_resource_destroy\fR
+\fBpool_resource_info\fR	\fBpool_resource_to_elem\fR
+\fBpool_resource_transfer\fR	\fBpool_resource_type_list\fR
+\fBpool_resource_xtransfer\fR	\fBpool_rm_property\fR
+\fBpool_set_binding\fR	\fBpool_set_status\fR
+\fBpool_static_location\fR	\fBpool_strerror\fR
+\fBpool_to_elem\fR	\fBpool_value_alloc\fR
+\fBpool_value_free\fR	\fBpool_value_get_bool\fR
+\fBpool_value_get_double\fR	\fBpool_value_get_int64\fR
+\fBpool_value_get_name\fR	\fBpool_value_get_string\fR
+\fBpool_value_get_type\fR	\fBpool_value_get_uint64\fR
+\fBpool_value_set_bool\fR	\fBpool_value_set_double\fR
+\fBpool_value_set_int64\fR	\fBpool_value_set_name\fR
+\fBpool_value_set_string\fR	\fBpool_value_set_uint64\fR
+\fBpool_version\fR	\fBpool_walk_components\fR
+\fBpool_walk_pools\fR	\fBpool_walk_properties\fR
+\fBpool_walk_resources\fR	
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/libpool.so.1\fR\fR
 .ad
 .RS 28n
-.rt  
 shared object
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/64/libpool.so.1\fR\fR
 .ad
 .RS 28n
-.rt  
 64-bit shared object
 .RE
 
@@ -544,17 +506,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityUnstable
+Interface Stability	Unstable
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

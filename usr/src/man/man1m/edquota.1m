@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH edquota 1M "14 Feb 2003" "SunOS 5.11" "System Administration Commands"
+.TH EDQUOTA 1M "Feb 14, 2003"
 .SH NAME
 edquota \- edit user quotas for ufs file system
 .SH SYNOPSIS
@@ -65,12 +65,10 @@ The  \fInumber\fR fields may be modified to reflect desired values.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 6n
-.rt  
 Duplicate the quotas of the \fIproto_user\fR specified for each \fIusername\fR
 specified. This is the normal mechanism used to initialize quotas for groups of
 users.
@@ -78,12 +76,10 @@ users.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 6n
-.rt  
 Edit the soft time limits for each file system. If the time limits are zero,
 the default time limits in \fB/usr/include/sys/fs/ufs_quota.h\fR are used. The
 temporary file created will have one or more lines of the form
@@ -109,23 +105,19 @@ when encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBquotas\fR\fR
 .ad
 .RS 15n
-.rt  
 quota file at the file system root
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/mnttab\fR\fR
 .ad
 .RS 15n
-.rt  
 table of mounted file systems
 .RE
 

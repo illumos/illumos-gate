@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sip_get_contact_display_name 3SIP "10 Feb 2007" "SunOS 5.11" "Session Initiation Protocol Library Functions"
+.TH SIP_GET_CONTACT_DISPLAY_NAME 3SIP "Feb 10, 2007"
 .SH NAME
 sip_get_contact_display_name, sip_get_from_display_name,
 sip_get_to_display_name, sip_get_from_tag, sip_get_to_tag, sip_get_callid,
@@ -38,73 +38,73 @@ sip_get_from_uri_str, sip_get_to_uri_str \- obtain header specific attributes
 \fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lsip\fR [ \fIlibrary\fR ... ]
 #include <sip.h>
 
-\fBconst sip_str_t *\fR\fIsip_get_contact_display_name\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_contact_display_name\fR(\fBsip_header_value_t\fR \fIvalue\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_from_display_name\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_from_display_name\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_to_display_name\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_to_display_name\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_contact_uri_str\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_contact_uri_str\fR(\fBsip_header_value_t\fR \fIvalue\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_from_uri_str\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_from_uri_str\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_to_uri_str\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_to_uri_str\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_from_tag\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_from_tag\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_to_tag\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_to_tag\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_callid\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_callid\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBint\fR \fIsip_get_callseq_num\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBint\fR \fIsip_get_callseq_num\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBsip_method_t\fR \fIsip_get_callseq_method\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBsip_method_t\fR \fIsip_get_callseq_method\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_via_sent_by_host\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_via_sent_by_host\fR(\fBsip_header_value_t\fR \fIvalue\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
@@ -122,253 +122,253 @@ sip_get_from_uri_str, sip_get_to_uri_str \- obtain header specific attributes
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_via_sent_transport\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_via_sent_transport\fR(\fBsip_header_value_t\fR \fIvalue\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBint\fR \fIsip_get_maxforward\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBint\fR \fIsip_get_maxforward\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBint\fR \fIsip_get_content_length\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBint\fR \fIsip_get_content_length\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_content_type\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_content_type\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_content_sub_type\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_content_sub_type\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBchar *\fR\fIsip_get_content\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBchar *\fR\fIsip_get_content\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_accept_type\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_accept_type\fR(\fBsip_header_value_t\fR \fIvalue\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_accept_sub_type\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_accept_sub_type\fR(\fBsip_header_value_t\fR \fIvalue\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_accept_enc\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_accept_enc\fR(\fBsip_header_value_t\fR \fIvalue\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_accept_lang\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_accept_lang\fR(\fBsip_header_value_t\fR \fIvalue\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_alert_info_uri\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_alert_info_uri\fR(\fBsip_header_value_t\fR \fIvalue\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBsip_method_t\fR \fIsip_get_allow_method\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+\fBsip_method_t\fR \fIsip_get_allow_method\fR(\fBsip_header_value_t\fR \fIvalue\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBint\fR \fIsip_get_min_expire\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBint\fR \fIsip_get_min_expire\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_mime_version\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_mime_version\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_org\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_org\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_priority\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_priority\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_replyto_display_name\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_replyto_display_name\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_replyto_uri_str\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_replyto_uri_str\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_date_time\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_date_time\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBint\fR \fIsip_get_date_day\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBint\fR \fIsip_get_date_day\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_date_month\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_date_month\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBint\fR \fIsip_get_date_year\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBint\fR \fIsip_get_date_year\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_date_wkday\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_date_wkday\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_date_timezone\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_date_timezone\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_content_disp\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_content_disp\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_content_enc\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_content_enc\fR(\fBsip_header_value_t\fR \fIvalue\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_error_info_uri\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_error_info_uri\fR(\fBsip_header_value_t\fR \fIvalue\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBint\fR \fIsip_get_expires\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBint\fR \fIsip_get_expires\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_require\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_require\fR(\fBsip_header_value_t\fR \fIvalue\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_subject\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_subject\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_supported\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_supported\fR(\fBsip_header_value_t\fR \fIvalue\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_tstamp_delay\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_tstamp_delay\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_unsupported\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_unsupported\fR(\fBsip_header_value_t\fR \fIvalue\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_server\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_server\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_user_agent\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_user_agent\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBint\fR \fIsip_get_warning_code\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+\fBint\fR \fIsip_get_warning_code\fR(\fBsip_header_value_t\fR \fIvalue\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_warning_agent\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_warning_agent\fR(\fBsip_header_value_t\fR \fIvalue\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_warning_text\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_warning_text\fR(\fBsip_header_value_t\fR \fIvalue\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_call_info_uri\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_call_info_uri\fR(\fBsip_header_value_t\fR \fIvalue\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_in_reply_to\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_in_reply_to\fR(\fBsip_header_value_t\fR \fIvalue\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBint\fR \fIsip_get_retry_after_time\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBint\fR \fIsip_get_retry_after_time\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_retry_after_cmts\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_retry_after_cmts\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
@@ -386,7 +386,7 @@ sip_get_from_uri_str, sip_get_to_uri_str \- obtain header specific attributes
 
 .LP
 .nf
-\fBint\fR \fIsip_get_rack_resp_num\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBint\fR \fIsip_get_rack_resp_num\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
@@ -402,25 +402,25 @@ sip_method_t\fB\fR \fIsip_get_rack_method\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBi
 
 .LP
 .nf
-\fBint\fR \fIsip_get_rseq_resp_num\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBint\fR \fIsip_get_rseq_resp_num\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_priv_value\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_priv_value\fR(\fBsip_header_value_t\fR \fIvalue\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_author_scheme\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_author_scheme\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_author_param\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_author_param\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBchar *\fR\fIname\fR, \fBint *\fR\fIerror\fR);
 .fi
 
@@ -438,13 +438,13 @@ sip_method_t\fB\fR \fIsip_get_rack_method\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_proxy_authen_param\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_proxy_authen_param\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBchar *\fR\fIname\fR, \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_proxy_author_scheme\fR(\fBsip_msg_t\fR \fImsg\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_proxy_author_scheme\fR(\fBsip_msg_t\fR \fImsg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
@@ -456,13 +456,13 @@ sip_method_t\fB\fR \fIsip_get_rack_method\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_proxy_require\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_proxy_require\fR(\fBsip_header_value_t\fR \fIvalue\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_www_authen_scheme\fR(\fBsip_msg_t\fR \fImsg\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_www_authen_scheme\fR(\fBsip_msg_t\fR \fImsg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
@@ -480,31 +480,31 @@ sip_method_t\fB\fR \fIsip_get_rack_method\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_event\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_event\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_substate\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_substate\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_content_lang\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_content_lang\fR(\fBsip_header_value_t\fR \fIvalue\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_tstamp_value\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_tstamp_value\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
 .LP
 .nf
-\fBconst sip_str_t *\fR\fIsip_get_route_uri_str\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+\fBconst sip_str_t *\fR\fIsip_get_route_uri_str\fR(\fBsip_header_value_t\fR \fIvalue\fR,
      \fBint *\fR\fIerror\fR);
 .fi
 
@@ -1049,36 +1049,30 @@ These functions take a pointer to an integer \fIerror\fR as an argument. If the
 error is non-null, one of the following values is set:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The input \fBSIP\fR message \fIsip_msg\fR or the header value is null; or the
 specified header/header value is deleted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPROTO\fR\fR
 .ad
 .RS 10n
-.rt  
 The header value is not present or invalid. The parser could not parse it
 correctly.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 There is an error allocating memory for the return value.
 .RE
 
@@ -1094,15 +1088,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

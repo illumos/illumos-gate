@@ -1,13 +1,13 @@
 '\" te
 .\"  Copyright 1989 AT&T  Copyright (c) 1995, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH col 1 "1 Feb 1995" "SunOS 5.11" "User Commands"
+.TH COL 1 "Feb 1, 1995"
 .SH NAME
 col \- reverse line-feeds filter
 .SH SYNOPSIS
@@ -52,27 +52,23 @@ means a sequence of two characters, \fBESC\fR followed by the character
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-reverse line-feedESC\(mi7
-reverse half-line-feedESC\(mi8
-forward half-line-feedESC\(mi9
-vertical-tab (VT)013
-start-of-text (SO)016
-end-of-text (SI)017
+l l
+l l .
+reverse line-feed	ESC\(mi7
+reverse half-line-feed	ESC\(mi8
+forward half-line-feed	ESC\(mi9
+vertical-tab (VT)	013
+start-of-text (SO)	016
+end-of-text (SI)	017
 .TE
 
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
 .RS 7n
-.rt  
 Assume that the output device in use is not capable of backspacing. In this
 case, if two or more characters are to appear in the same place, only the last
 one read will be output.
@@ -80,12 +76,10 @@ one read will be output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fR
 .ad
 .RS 7n
-.rt  
 Although \fBcol\fR accepts half-line motions in its input, it normally does not
 emit them on output. Instead, text that would appear between lines is moved to
 the next lower full-line boundary. This treatment can be suppressed by the
@@ -96,12 +90,10 @@ reverse line motion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fR
 .ad
 .RS 7n
-.rt  
 Normally, \fBcol\fR will ignore any escape sequences unknown to it that are
 found in its input; the \fB-p\fR option may be used to cause \fBcol\fR to
 output these sequences as regular characters, subject to overprinting from
@@ -111,12 +103,10 @@ user is fully aware of the textual position of the escape sequences.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR \fR
 .ad
 .RS 7n
-.rt  
 Prevent \fBcol\fR from converting blank characters to tab characters on output
 wherever possible. Tab stops are considered to be at each column position
 \fIn\fR such that \fIn\fR modulo 8 equals 1.
@@ -134,23 +124,19 @@ that affect the execution of \fBcol\fR: \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and
 The following error values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 7n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR \fR
 .ad
 .RS 7n
-.rt  
 An error occurred.
 .RE
 
@@ -162,12 +148,11 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
-CSIenabled
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+CSI	enabled
 .TE
 
 .SH SEE ALSO

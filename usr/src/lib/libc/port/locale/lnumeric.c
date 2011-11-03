@@ -51,13 +51,17 @@ static char	*_numeric_locale_buf;
 int
 __numeric_load_locale(const char *name)
 {
+	const struct lc_numeric_T *leg = &_C_numeric_locale;
+
 	int ret;
 
 	ret = __part_load_locale(name, &_numeric_using_locale,
 	    &_numeric_locale_buf, "LC_NUMERIC", LCNUMERIC_SIZE, LCNUMERIC_SIZE,
 	    (const char **)&_numeric_locale);
-	if (ret != _LDP_ERROR)
-		__nlocale_changed = 1;
+	if (ret == _LDP_ERROR)
+		return (_LDP_ERROR);
+
+	__nlocale_changed = 1;
 	if (ret == _LDP_LOADED) {
 		/* Can't be empty according to C99 */
 		if (*_numeric_locale.decimal_point == '\0')
@@ -65,11 +69,11 @@ __numeric_load_locale(const char *name)
 			    _C_numeric_locale.decimal_point;
 		_numeric_locale.grouping =
 		    __fix_locale_grouping_str(_numeric_locale.grouping);
-
-		/* This is Solaris legacy, required for _doprnt */
-		_numeric[0] = *_numeric_locale.decimal_point;
-		_numeric[1] = *_numeric_locale.grouping;
+		leg = (const struct lc_numeric_T *)&_numeric_locale;
 	}
+	/* This is Solaris legacy, required for ABI compatability */
+	_numeric[0] = *leg->decimal_point;
+	_numeric[1] = *leg->grouping;
 	return (ret);
 }
 

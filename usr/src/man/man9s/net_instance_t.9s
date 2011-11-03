@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH net_instance_t 9S "1 May 2008" "SunOS 5.11" "Data Structures for Drivers"
+.TH NET_INSTANCE_T 9S "May 1, 2008"
 .SH NAME
 net_instance_t \- packet event structure passed through to hooks
 .SH SYNOPSIS
@@ -38,45 +38,37 @@ identify each instance of \fBIP\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnin_name\fR\fR
 .ad
 .RS 16n
-.rt  
 Name of the owner of the instance.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnin_create\fR\fR
 .ad
 .RS 16n
-.rt  
 Function to be called when a new instance of \fBIP\fR is created.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnin_destroy\fR\fR
 .ad
 .RS 16n
-.rt  
 Function to be called when an instance of \fBIP\fR is being destroyed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnin_shutdown\fR\fR
 .ad
 .RS 16n
-.rt  
 Function to be called when an instance of \fBIP\fR is being shutdown.
 \fBnin_shutdown()\fR is called before \fBnin_destroy()\fR is called.
 .RE
@@ -89,13 +81,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

@@ -2,7 +2,7 @@
 .\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 1983 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement  specifies the terms and conditions for redistribution.
-.TH resolv.conf 4 "15 Dec 2004" "SunOS 5.11" "File Formats"
+.TH RESOLV.CONF 4 "Dec 15, 2004"
 .SH NAME
 resolv.conf \- resolver configuration file
 .SH SYNOPSIS
@@ -25,12 +25,10 @@ that provide various types of \fBresolver\fR information.
 The \fBresolv.conf\fR file contains the following configuration directives:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnameserver\fR\fR
 .ad
 .RS 23n
-.rt  
 Specifies the IPv4 or IPv6 Internet address of a name server that the resolver
 is to query. Up to \fIMAXNS\fR name servers may be listed, one per keyword. See
 <\fBresolv.h\fR>. If there are multiple servers, the resolver library queries
@@ -43,12 +41,10 @@ the name servers until a maximum number of retries are made.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdomain\fR\fR
 .ad
 .RS 23n
-.rt  
 Specifies the local domain name. Most queries for names within this domain can
 use short names relative to the local domain. If no domain entry is present,
 the domain is determined from \fBsysinfo\fR(2) or from \fBgethostname\fR(3C).
@@ -59,12 +55,10 @@ the \fBLOCALDOMAIN\fR environment variable to override the domain name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsearch\fR\fR
 .ad
 .RS 23n
-.rt  
 The search list for host name lookup. The search list is normally determined
 from the local domain name. By default, it contains only the local domain name.
 You can change the default behavior by listing the desired domain search path
@@ -80,12 +74,10 @@ characters.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsortlist\fR\fIaddresslist\fR\fR
 .ad
 .RS 23n
-.rt  
 Allows addresses returned by the libresolv-internal \fBgethostbyname()\fR to be
 sorted. A \fBsortlist\fR is specified by IP address netmask pairs. The netmask
 is optional and defaults to the natural netmask of the net. The IP address and
@@ -103,17 +95,15 @@ sortlist 130.155.160.0/255.255.240.0 130.155.0.0
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBoptions\fR\fR
 .ad
 .RS 23n
-.rt  
 Allows certain internal resolver variables to be modified. The syntax is
 .sp
 .in +2
 .nf
-options option ... 
+options option ...
 .fi
 .in -2
 .sp
@@ -121,23 +111,19 @@ options option ...
 where option is one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdebug\fR\fR
 .ad
 .RS 18n
-.rt  
 Sets \fBRES_DEBUG\fR in the \fB_res.options\fR field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBndots:\fR\fIn\fR\fR
 .ad
 .RS 18n
-.rt  
 Sets a threshold floor for the number of dots which must appear in a name given
 to \fBres_query()\fR before an initial absolute (as-is) query is performed. See
 \fBresolver\fR(3RESOLV). The default value for \fIn\fR is 1, which means that
@@ -147,7 +133,6 @@ before any search list elements are appended to it.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtimeout:\fR\fIn\fR\fR
 .ad
@@ -156,7 +141,6 @@ before any search list elements are appended to it.
 \fB\fBretrans:\fR\fIn\fR\fR
 .ad
 .RS 18n
-.rt  
 Sets the amount of time the resolver will wait for a response from a remote
 name server before retrying the query by means of a different name server.
 Measured in seconds, the default is \fBRES_TIMEOUT\fR. See <\fBresolv.h\fR>.
@@ -167,7 +151,6 @@ retransmit attempt.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBattempts:\fR\fIn\fR\fR
 .ad
@@ -176,7 +159,6 @@ retransmit attempt.
 \fB\fBretry:\fR\fIn\fR\fR
 .ad
 .RS 18n
-.rt  
 Sets the number of times the resolver will send a query to its name servers
 before giving up and returning an error to the calling application. The default
 is \fBRES_DFLRETRY\fR. See <\fBresolv.h\fR>.
@@ -184,12 +166,10 @@ is \fBRES_DFLRETRY\fR. See <\fBresolv.h\fR>.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrotate\fR\fR
 .ad
 .RS 18n
-.rt  
 Sets \fBRES_ROTATE\fR in \fB_res.options\fR. The name servers are queried
 round-robin from among those listed. The query load is spread among all listed
 servers, rather than having all clients try the first listed server first every
@@ -198,12 +178,10 @@ time.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBno-check-names\fR\fR
 .ad
 .RS 18n
-.rt  
 Sets \fBRES_NOCHECKNAME\fR in \fB_res.options\fR. This disables the modern BIND
 checking of incoming host names and mail names for invalid characters such as
 underscore (\fB_\fR), non-ASCII, or control characters.
@@ -211,12 +189,10 @@ underscore (\fB_\fR), non-ASCII, or control characters.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinet6\fR\fR
 .ad
 .RS 18n
-.rt  
 Sets \fBRES_USE_INET6\fR in \fB_res.options\fR. In the Solaris BIND port, this
 has no effect on \fBgethostbyname\fR(3NSL). To retrieve IPv6 addresses or IPv4
 addresses, use \fBgetaddrinfo\fR(3SOCKET) instead of setting \fBinet6\fR.
@@ -246,13 +222,11 @@ white space.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/resolv.conf\fR\fR
 .ad
 .RS 20n
-.rt  
- 
+
 .RE
 
 .SH ATTRIBUTES
@@ -263,13 +237,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard BIND 8.3.3
+Interface Stability	Standard BIND 8.3.3
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_dmae_req 9S "18 Nov 2004" "SunOS 5.11" "Data Structures for Drivers"
+.TH DDI_DMAE_REQ 9S "Nov 18, 2004"
 .SH NAME
 ddi_dmae_req \- DMA engine request structure
 .SH SYNOPSIS
@@ -47,12 +47,10 @@ void*procparms;              /* parameter for nextcookie call */
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBder_command\fR\fR
 .ad
 .RS 18n
-.rt  
 Specifies what \fBDMA\fR operation is to be performed. The value
 \fBDMAE_CMD_WRITE\fR signifies that data is to be transferred from memory to
 the \fBI/O \fRdevice. The value \fBDMAE_CMD_READ\fR signifies that data is to
@@ -62,12 +60,10 @@ the driver before calling \fBddi_dmae_prog()\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBder_bufprocess\fR\fR
 .ad
 .RS 18n
-.rt  
 On some bus types, a driver can set \fBder_bufprocess\fR to the value
 \fBDMAE_BUF_CHAIN\fR to specify that multiple \fBDMA\fR cookies will be given
 to the \fBDMA\fR engine for a single \fBI/O\fR transfer. This action causes a
@@ -171,12 +167,10 @@ segment to be a multiple of the device-granularity size.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBder_path\fR\fR
 .ad
 .RS 18n
-.rt  
 Specifies the \fBDMA\fR transfer size. The default of zero
 (\fBDMAE_PATH_DEF\fR) specifies \fBISA\fR compatibility mode. In that mode,
 channels 0, 1, 2, and 3 are programmed in 8-bit mode (\fBDMAE_PATH_8\fR), and
@@ -186,12 +180,10 @@ channels 5, 6, and 7 are programmed in 16-bit, count-by-word mode
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBder_cycles\fR\fR
 .ad
 .RS 18n
-.rt  
 Specifies the timing mode to be used during \fBDMA\fR data transfers. The
 default of zero (\fBDMAE_CYCLES_1\fR) specifies \fBISA\fR compatible timing.
 Drivers using this mode must also specify \fBDMAE_TRANS_SNGL\fR in the
@@ -200,12 +192,10 @@ Drivers using this mode must also specify \fBDMAE_TRANS_SNGL\fR in the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBder_trans\fR\fR
 .ad
 .RS 18n
-.rt  
 Specifies the bus transfer mode that the \fBDMA\fR engine should expect from
 the device. The default value of zero (\fBDMAE_TRANS_SNGL\fR) specifies that
 the device performs one transfer for each bus arbitration cycle. Devices that
@@ -222,13 +212,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Architecturex86
+Architecture	x86
 .TE
 
 .SH SEE ALSO

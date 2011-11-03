@@ -2,14 +2,14 @@
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH timer_create 3C "5 Feb 2008" "SunOS 5.11" "Standard C Library Functions"
+.TH TIMER_CREATE 3C "Feb 5, 2008"
 .SH NAME
 timer_create \- create a timer
 .SH SYNOPSIS
@@ -49,45 +49,37 @@ The system defines a set of clocks that can be used as timing bases for
 per-process timers. The following values for \fIclock_id\fR are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCLOCK_REALTIME\fR\fR
 .ad
 .RS 18n
-.rt  
 wall clock
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCLOCK_VIRTUAL\fR\fR
 .ad
 .RS 18n
-.rt  
 user CPU usage clock
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCLOCK_PROF\fR\fR
 .ad
 .RS 18n
-.rt  
 user and system CPU usage clock
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCLOCK_HIGHRES\fR\fR
 .ad
 .RS 18n
-.rt  
 non-adjustable, high-resolution clock
 .RE
 
@@ -121,12 +113,10 @@ passed to the per-process timer calls. If an error occurs, the function returns
 The \fBtimer_create()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 10n
-.rt  
 The system lacks sufficient signal queuing resources to honor the request, or
 the calling process has already created all of the timers it is allowed by the
 system.
@@ -134,23 +124,19 @@ system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The specified clock \fBID\fR, \fIclock_id\fR, is not defined.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 10n
-.rt  
 The specified clock \fBID\fR, \fIclock_id\fR, is \fBCLOCK_HIGHRES\fR and the
 {\fBPRIV_PROC_CLOCK_HIGHRES\fR} is not asserted in the effective set of the
 calling process.
@@ -164,17 +150,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) |lw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+l | l
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe with exceptions
+MT-Level	MT-Safe with exceptions
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO

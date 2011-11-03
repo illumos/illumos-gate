@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dlinfo 3C "4 Feb 2009" "SunOS 5.11" "Standard C Library Functions"
+.TH DLINFO 3C "Feb 4, 2009"
 .SH NAME
 dlinfo \- dynamic load information
 .SH SYNOPSIS
@@ -42,7 +42,6 @@ to the caller.
 The \fIrequest\fR argument can take the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTLD_DI_ARGSINFO\fR\fR
 .ad
@@ -53,34 +52,28 @@ Obtain process argument information. The \fIp\fR argument is a pointer
 initialized:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdla_argc\fR\fR
 .ad
 .RS 12n
-.rt  
 The number of arguments passed to the process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdla_argv\fR\fR
 .ad
 .RS 12n
-.rt  
 The argument array passed to the process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdla_envp\fR\fR
 .ad
 .RS 12n
-.rt  
 The active environment variable array that is available to the process. This
 element initially points to the environment variable array that is made
 available to \fBexec\fR(2). This element can be updated should an alternative
@@ -89,12 +82,10 @@ environment be established by the process. See \fBputenv\fR(3C).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdla_auxv\fR\fR
 .ad
 .RS 12n
-.rt  
 The auxiliary vector array passed to the process.
 .RE
 
@@ -106,7 +97,6 @@ of how the runtime linker has been invoked.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTLD_DI_CONFIGADDR\fR\fR
 .ad
@@ -117,23 +107,19 @@ Obtain the configuration file information. The \fIp\fR argument is a
 this structure are initialized:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdli_fname\fR\fR
 .ad
 .RS 13n
-.rt  
 The full name of the configuration file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdli_fbase\fR\fR
 .ad
 .RS 13n
-.rt  
 The base address of the configuration file loaded into memory.
 .RE
 
@@ -141,7 +127,6 @@ The base address of the configuration file loaded into memory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTLD_DI_LINKMAP\fR\fR
 .ad
@@ -166,46 +151,38 @@ The \fBLink_map\fR structure includes the following members:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBl_addr\fR\fR
 .ad
 .RS 13n
-.rt  
 The base address of the object loaded into memory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBl_name\fR\fR
 .ad
 .RS 13n
-.rt  
 The full name of the loaded object. This full name is the filename of the
 object as referenced by \fBld.so.1\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBl_ld\fR\fR
 .ad
 .RS 13n
-.rt  
 Points to the \fBSHT_DYNAMIC\fR structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBl_next\fR\fR
 .ad
 .RS 13n
-.rt  
 The next \fBLink_map\fR on the link-map list. Other objects on the same
 link-map list as the current object can be examined by following the
 \fBl_next\fR and \fBl_prev\fR members.
@@ -213,23 +190,19 @@ link-map list as the current object can be examined by following the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBl_prev\fR\fR
 .ad
 .RS 13n
-.rt  
 The previous \fBLink_map\fR on the link-map list.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBl_refname\fR\fR
 .ad
 .RS 13n
-.rt  
 If the object that is referenced is a \fIfilter\fR, this member points to the
 name of the object being filtered. If the object is not a \fIfilter\fR, this
 member is \fB0\fR. See the \fILinker and Libraries Guide\fR.
@@ -239,7 +212,6 @@ member is \fB0\fR. See the \fILinker and Libraries Guide\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTLD_DI_LMID\fR\fR
 .ad
@@ -251,7 +223,6 @@ loaded. The \fIp\fR argument is a \fBLmid_t\fR pointer (\fBLmid_t *\fR\fIp\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTLD_DI_MMAPCNT\fR\fR
 .ad
@@ -274,7 +245,6 @@ This initialized structure is then passed to a \fBRTLD_DI_MMAPS\fR request. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTLD_DI_MMAPS\fR\fR
 .ad
@@ -298,7 +268,6 @@ request, where the segment mapping information is copied to the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTLD_DI_SERINFO\fR\fR
 .ad
@@ -318,7 +287,6 @@ defined in <\fBlink.h\fR>.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTLD_DI_SERINFOSIZE\fR\fR
 .ad
@@ -341,7 +309,6 @@ then passed to a \fBRTLD_DI_SERINFO\fR request. See \fBEXAMPLES\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTLD_DI_ORIGIN\fR\fR
 .ad
@@ -356,7 +323,6 @@ the pointer \fIp\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTLD_DI_GETSIGNAL\fR\fR
 .ad
@@ -375,7 +341,6 @@ variable \fBLD_SIGNAL\fR. See \fBld.so.1\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTLD_DI_SETSIGNAL\fR\fR
 .ad
@@ -479,15 +444,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStable
+Interface Stability	Stable
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

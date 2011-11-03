@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH kstat_intr 9S "4 Apr 1994" "SunOS 5.11" "Data Structures for Drivers"
+.TH KSTAT_INTR 9S "Apr 4, 1994"
 .SH NAME
 kstat_intr \- structure for interrupt kstats
 .SH SYNOPSIS
@@ -69,56 +69,46 @@ based on the type of interrupt condition.
 The following indexes are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKSTAT_INTR_HARD\fR \fR
 .ad
 .RS 24n
-.rt  
 Hard interrupt
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKSTAT_INTR_SOFT\fR \fR
 .ad
 .RS 24n
-.rt  
 Soft interrupt
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKSTAT_INTR_WATCHDOG\fR \fR
 .ad
 .RS 24n
-.rt  
 Watchdog interrupt
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKSTAT_INTR_SPURIOUS\fR \fR
 .ad
 .RS 24n
-.rt  
 Spurious interrupt
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKSTAT_INTR_MULTSVC\fR \fR
 .ad
 .RS 24n
-.rt  
 Multiple service interrupt
 .RE
 

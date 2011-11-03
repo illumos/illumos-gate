@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH lpsched 1M "3 Sep 2004" "SunOS 5.11" "System Administration Commands"
+.TH LPSCHED 1M "Sep 3, 2004"
 .SH NAME
 lpsched \- start the LP print service
 .SH SYNOPSIS
 .LP
 .nf
-\fBlpsched\fR [\fB-f\fR \fInum_filters\fR] [\fB-n\fR \fInum_notifiers\fR] [\fB-p\fR \fIfd_limit\fR] 
+\fBlpsched\fR [\fB-f\fR \fInum_filters\fR] [\fB-n\fR \fInum_notifiers\fR] [\fB-p\fR \fIfd_limit\fR]
      [\fB-r\fR \fIreserved_fds\fR]
 .fi
 
@@ -32,12 +32,10 @@ It is recommended that you start  and stop the LP print service using
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fI num_filters\fR\fR
 .ad
 .RS 20n
-.rt  
 Specifies the number of concurrent slow filters that may be run on a print
 server. A default value of \fB1\fR is used if none is specified. Depending on
 server configuration, a value of  \fB1\fR may cause printers to remain idle
@@ -46,24 +44,20 @@ while there are jobs queued to them.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fI num_notifiers\fR\fR
 .ad
 .RS 20n
-.rt  
 Specifies the number of concurrent notification processes that can run on a
 print server. A default value of  \fB1\fR is used when none is specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fI fd_limit\fR\fR
 .ad
 .RS 20n
-.rt  
 Specifies the file descriptor resource limit for the  \fBlpsched\fR process. A
 default value of  \fB4096\fR is used if none is specified. On extremely large
 and active print servers, it may be necessary to increase this value.
@@ -71,12 +65,10 @@ and active print servers, it may be necessary to increase this value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fI reserved_fds\fR\fR
 .ad
 .RS 20n
-.rt  
 Specifies the number of file descriptors that the scheduler reserves for
 internal communications under heavy load. A default value of  \fB2\fR is used
 when none is specified. It should not be necessary to modify this value unless
@@ -89,35 +81,29 @@ instructed to do so when troubleshooting problems under high load.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnon-zero\fR
 .ad
 .RS 12n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/spool/lp/*\fR\fR
 .ad
 .RS 19n
-.rt  
 \fBLP\fR print queue.
 .RE
 

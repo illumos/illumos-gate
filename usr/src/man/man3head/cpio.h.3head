@@ -1,19 +1,19 @@
 '\" te
 .\"  Copyright (c) 2001, The IEEE and The Open Group. All Rights Reserved. Portions Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cpio.h 3HEAD "10 Sep 2004" "SunOS 5.11" "Headers"
+.TH CPIO.H 3HEAD "Sep 10, 2004"
 .SH NAME
 cpio.h, cpio \- cpio archive values
 .SH SYNOPSIS
 .LP
 .nf
-#include <\fBcpio.h\fR> 
+#include <\fBcpio.h\fR>
 .fi
 
 .SH DESCRIPTION
@@ -25,32 +25,30 @@ described as follows:
 
 .sp
 .TS
-tab();
-cw(1.52i) cw(3.98i) 
-lw(1.52i) lw(3.98i) 
-.
-NameDescription
+c c
+l l .
+Name	Description
 _
-C_IRUSRRead by owner
-C_IWUSRWrite by owner
-C_IXUSRExecute by owner
-C_IRGRPRead by group
-C_IWGRPWrite by group
-C_IXGRPExecute by group
-C_IROTHRead by others
-C_IWOTHWrite by others
-C_IXOTHExecute by others
-C_ISUIDSet user ID
-C_ISGIDSet group ID
-C_ISVTXOn directories, restricted deletion flag
-C_ISDIRDirectory
-C_ISFIFOFIFO
-C_ISREGRegular file
-C_ISBLKBlock special
-C_ISCHRCharacter special
-C_ISCTGReserved
-C_ISLNKSymbolic link
-C_ISSOCKSocket
+C_IRUSR	Read by owner
+C_IWUSR	Write by owner
+C_IXUSR	Execute by owner
+C_IRGRP	Read by group
+C_IWGRP	Write by group
+C_IXGRP	Execute by group
+C_IROTH	Read by others
+C_IWOTH	Write by others
+C_IXOTH	Execute by others
+C_ISUID	Set user ID
+C_ISGID	Set group ID
+C_ISVTX	On directories, restricted deletion flag
+C_ISDIR	Directory
+C_ISFIFO	FIFO
+C_ISREG	Regular file
+C_ISBLK	Block special
+C_ISCHR	Character special
+C_ISCTG	Reserved
+C_ISLNK	Symbolic link
+C_ISSOCK	Socket
 .TE
 
 .sp
@@ -59,7 +57,7 @@ The header defines the symbolic constant:
 .sp
 .in +2
 .nf
-MAGIC         "070707" 
+MAGIC         "070707"
 .fi
 .in -2
 
@@ -71,13 +69,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

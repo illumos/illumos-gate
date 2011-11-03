@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dat_cno_create 3DAT "16 Jul 2004" "SunOS 5.11" "Direct Access Transport Library Functions"
+.TH DAT_CNO_CREATE 3DAT "Jul 16, 2004"
 .SH NAME
 dat_cno_create \- create a CNO instance
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ldat\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ldat\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <\fBdat/udat.h\fR>
 
 DAT_RETURN
@@ -24,35 +24,29 @@ DAT_RETURN
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIia_handle\fR\fR
 .ad
 .RS 14n
-.rt  
 Handle for an instance of DAT IA.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIagent\fR\fR
 .ad
 .RS 14n
-.rt  
 An optional OS Wait Proxy Agent that is to be invoked whenever CNO is invoked.
 \fBDAT_OS_WAIT_PROXY_AGENT_NULL\fR indicates that there is no proxy agent
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcno_handle\fR\fR
 .ad
 .RS 14n
-.rt  
 Handle for the created instance of CNO.
 .RE
 
@@ -74,45 +68,37 @@ at most, one OS Wait Proxy Agent.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_SUCCESS\fR\fR
 .ad
 .RS 30n
-.rt  
 The operation was successful.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_INSUFFICIENT_RESOURCES\fR\fR
 .ad
 .RS 30n
-.rt  
 The operation failed due to resource limitations.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_INVALID_HANDLE\fR\fR
 .ad
 .RS 30n
-.rt  
 The \fIia_handle\fR parameter is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_INVALID_PARAMETER\fR\fR
 .ad
 .RS 30n
-.rt  
 One of the parameters was invalid, out of range, or a combination of parameters
 was invalid, or the \fIagent\fR parameter is invalid.
 .RE
@@ -125,15 +111,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard: uDAPL, 1.1, 1.2
+Interface Stability	Standard: uDAPL, 1.1, 1.2
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

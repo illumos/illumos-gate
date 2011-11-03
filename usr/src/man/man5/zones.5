@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH zones 5 "29 Jan 2009" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH ZONES 5 "Jan 29, 2009"
 .SH NAME
 zones \- Solaris application containers
 .SH DESCRIPTION
@@ -52,48 +52,40 @@ report the names and IDs of configured zones.
 A zone can be in one of several states:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCONFIGURED\fR\fR
 .ad
 .RS 17n
-.rt  
 Indicates that the configuration for the zone has been completely specified and
 committed to stable storage.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBINCOMPLETE\fR\fR
 .ad
 .RS 17n
-.rt  
 Indicates that the zone is in the midst of being installed or uninstalled, or
 was interrupted in the midst of such a transition.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBINSTALLED\fR\fR
 .ad
 .RS 17n
-.rt  
 Indicates that the zone's configuration has been instantiated on the system:
 packages have been installed under the zone's root path.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBREADY\fR\fR
 .ad
 .RS 17n
-.rt  
 Indicates that the "virtual platform" for the zone has been established. For
 instance, file systems have been mounted, devices have been configured, but no
 processes associated with the zone have been started.
@@ -101,19 +93,16 @@ processes associated with the zone have been started.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRUNNING\fR\fR
 .ad
 .RS 17n
-.rt  
 Indicates that user processes associated with the zone application environment
 are running.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSHUTTING_DOWN\fR\fR
 .ad
@@ -122,7 +111,6 @@ are running.
 \fB\fBDOWN\fR\fR
 .ad
 .RS 17n
-.rt  
 Indicates that the zone is being halted. The zone can become stuck in one of
 these states if it is unable to tear down the application environment state
 (such as mounted file systems) or if some portion of the virtual platform

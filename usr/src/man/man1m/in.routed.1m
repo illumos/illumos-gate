@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH in.routed 1M "24 Jul 2008" "SunOS 5.11" "System Administration Commands"
+.TH IN.ROUTED 1M "Jul 24, 2008"
 .SH NAME
 in.routed, routed \- network routing daemon
 .SH SYNOPSIS
@@ -205,7 +205,6 @@ described, and can be set by means of a command of the form:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR\fR
 .ad
@@ -221,7 +220,6 @@ property value to false.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
@@ -233,7 +231,6 @@ not usable under the SMF.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR \fBnet[/\fImask\fR][,\fImetric\fR]\fR\fR
 .ad
@@ -253,7 +250,6 @@ Use of this option is equivalent to setting the \fBminimize_routes\fR property.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR\fR
 .ad
@@ -274,7 +270,6 @@ the \fBoffer_default_route\fR property to true.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
@@ -289,7 +284,6 @@ equivalent to setting the \fBadvertise_host_routes\fR property to false.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
@@ -307,7 +301,6 @@ setting the \fBadvertise_host_routes_primary\fR property to true.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
@@ -320,7 +313,6 @@ property to false.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR \fIparams\fR\fR
 .ad
@@ -332,7 +324,6 @@ file. Can also be set by means of the \fBparameters\fR property.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
@@ -346,7 +337,6 @@ option is equivalent to setting the \fBquiet_mode\fR property to true.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
@@ -361,7 +351,6 @@ the \fBsupply_routes\fR property to true.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR\fR
 .ad
@@ -378,7 +367,6 @@ discouraged. Use of this option is equivalent to setting the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
@@ -391,7 +379,6 @@ Solaris and has no SMF equivalent.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fItracefile\fR\fR
 .ad
@@ -405,7 +392,6 @@ is equivalent to setting the \fBlog_file\fR property to \fBtrace file path\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -419,7 +405,6 @@ requires the \fB-T\fR option. Use of this option is equivalent to setting the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
@@ -430,7 +415,6 @@ Displays the version of the daemon.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR\fR
 .ad
@@ -445,24 +429,20 @@ the \fBrtquery\fR(1M) command.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/defaultrouter\fR\fR
 .ad
 .RS 22n
-.rt  
 If this file is present and contains the address of a default router, the
 system startup script does not run \fBin.routed\fR. See \fBdefaultrouter\fR(4).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/gateways\fR\fR
 .ad
 .RS 22n
-.rt  
 List of distant gateways and general configuration options for \fBin.routed\fR.
 See \fBgateways\fR(4).
 .RE

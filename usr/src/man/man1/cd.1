@@ -3,14 +3,14 @@
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
 .\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
 .\" Portions Copyright (c) 1982-2007 AT&T Knowledge Ventures
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cd 1 "8 Apr 2008" "SunOS 5.11" "User Commands"
+.TH CD 1 "Apr 8, 2008"
 .SH NAME
 cd, chdir, pushd, popd, dirs \- change working directory
 .SH SYNOPSIS
@@ -124,23 +124,19 @@ by that value.
 exchange the top two elements.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+\fR\fIn\fR\fR
 .ad
 .RS 7n
-.rt  
 Rotate the \fIn\fR'th entry to the top of the stack and \fBcd\fR to it.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdir\fR\fR
 .ad
 .RS 7n
-.rt  
 Push the current working directory onto the stack and change to \fIdir\fR.
 .RE
 
@@ -150,12 +146,10 @@ Push the current working directory onto the stack and change to \fIdir\fR.
 elements of the directory stack are numbered from 0 starting at the top.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+\fR\fIn\fR\fR
 .ad
 .RS 6n
-.rt  
 Discard the \fIn\fR'th entry in the stack.
 .RE
 
@@ -187,24 +181,20 @@ pathname formed by the concatenation of the value of PWD, a slash character,
 and arg.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
 .RS 6n
-.rt  
 Handles the operation dot-dot (\fB\&..\fR) logically. Symbolic link components
 are \fBnot\fR resolved before dot-dot components are processed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR\fR
 .ad
 .RS 6n
-.rt  
 Handles the operand dot-dot physically. Symbolic link components \fBare\fR
 resolved before dot-dot components are processed.
 .RE
@@ -231,12 +221,10 @@ the Korn shell. (See \fBpwd\fR(1), \fBsh\fR(1), and \fBchdir\fR(2)).
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdirectory\fR\fR
 .ad
 .RS 13n
-.rt  
 An absolute or relative pathname of the directory that becomes the new working
 directory. The interpretation of a relative pathname by \fBcd\fR depends on the
 \fBCDPATH\fR environment variable.
@@ -261,12 +249,10 @@ that affect the execution of \fBcd\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDPATH\fR\fR
 .ad
 .RS 10n
-.rt  
 A colon-separated list of pathnames that refer to directories. If the
 \fIdirectory\fR operand does not begin with a slash \fB(\fR \fB/\fR \fB)\fR
 character, and the first component is not dot or dot-dot, \fBcd\fR searches for
@@ -279,35 +265,29 @@ an empty string.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHOME\fR\fR
 .ad
 .RS 10n
-.rt  
 The name of the home directory, used when no \fIdirectory\fR operand is
 specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOLDPWD\fR\fR
 .ad
 .RS 10n
-.rt  
 A pathname of the previous working directory, used by \fBcd-\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPWD\fR\fR
 .ad
 .RS 10n
-.rt  
 A pathname of the current working directory, set by \fBcd\fR after it has
 changed to that directory.
 .RE
@@ -318,23 +298,19 @@ changed to that directory.
 The following exit values are returned by \fBcd\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 The directory was successfully changed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -347,15 +323,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SS "ksh93"
@@ -363,13 +338,12 @@ StandardSee \fBstandards\fR(5).
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityUncommitted
+Interface Stability	Uncommitted
 .TE
 
 .SH SEE ALSO

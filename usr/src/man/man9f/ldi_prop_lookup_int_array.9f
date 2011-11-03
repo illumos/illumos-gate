@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ldi_prop_lookup_int_array 9F "3 June 2003" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH LDI_PROP_LOOKUP_INT_ARRAY 9F "Jun 3, 2003"
 .SH NAME
 ldi_prop_lookup_int_array, ldi_prop_lookup_int64_array,
 ldi_prop_lookup_string_array, ldi_prop_lookup_string,
@@ -25,7 +25,7 @@ ldi_prop_lookup_byte_array \- Lookup property information
 
 .LP
 .nf
-\fBint\fR \fBldi_prop_lookup_string_array\fR(\fBldi_handle_t\fR \fIlh\fR, \fBuint_t\fR  \fIflags\fR, 
+\fBint\fR \fBldi_prop_lookup_string_array\fR(\fBldi_handle_t\fR \fIlh\fR, \fBuint_t\fR  \fIflags\fR,
      \fBchar *\fR\fIname\fR, \fBchar ***\fR\fIdatap\fR, \fBuint_t *\fR\fInelementsp\fR);
 .fi
 
@@ -44,32 +44,26 @@ ldi_prop_lookup_byte_array \- Lookup property information
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlh\fR\fR
 .ad
 .RS 9n
-.rt  
 Layered handle.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 9n
-.rt  
 Possible flag values are some combination of:
 .sp
 .ne 2
-.mk
 .na
 \fBLDI_DEV_T_ANY\fR
 .ad
 .RS 21n
-.rt  
 Match the lookup request independent of the actual \fBdev_t\fR value that was
 used when the property was created. The flag indicates any \fBdev_t\fR value
 (including DDI_DEV_T_NONE) associated with a possible property match will
@@ -78,24 +72,20 @@ satisfy the matching criteria.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDDI_PROP_DONTPASS\fR
 .ad
 .RS 21n
-.rt  
 Do not pass request to parent device information node if the property is not
 found.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDDI_PROP_NOTPROM\fR
 .ad
 .RS 21n
-.rt  
 Do not look at PROM properties (ignored on platforms that do not support PROM
 properties).
 .RE
@@ -104,23 +94,19 @@ properties).
 
 .sp
 .ne 2
-.mk
 .na
 \fBname\fR
 .ad
 .RS 13n
-.rt  
 String containing the property name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnelements\fR
 .ad
 .RS 13n
-.rt  
 The address of an unsigned integer which, upon successful return, contains the
 number of elements accounted for in the memory pointed at by datap. Depending
 on the interface you use, the elements are either integers, strings or bytes.
@@ -131,7 +117,6 @@ on the interface you use, the elements are either integers, strings or bytes.
 datap
 .sp
 .ne 2
-.mk
 .na
 \fBldi_prop_lookup_int_array()\fR
 .ad
@@ -143,7 +128,6 @@ memory containing the integer array property value.
 
 .sp
 .ne 2
-.mk
 .na
 \fBldi_prop_lookup_int64_array()\fR
 .ad
@@ -155,7 +139,6 @@ point to memory containing the integer array property value.
 
 .sp
 .ne 2
-.mk
 .na
 \fBldi_prop_lookup_string_array()\fR
 .ad
@@ -169,7 +152,6 @@ array of pointers to NULL terminated strings, much like the argv argument to
 
 .sp
 .ne 2
-.mk
 .na
 \fBldi_prop_lookup_string()\fR
 .ad
@@ -181,7 +163,6 @@ containing the NULL terminated string value of the property.
 
 .sp
 .ne 2
-.mk
 .na
 \fBldi_prop_lookup_byte_array()\fR
 .ad
@@ -282,7 +263,6 @@ free call is ddi_prop_free(my-int-ptr).
 Property look up functions are described below:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldi_prop_lookup_int_array()\fR\fR
 .ad
@@ -297,7 +277,6 @@ integer array value of the property.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldi_prop_lookup_int64_array()\fR\fR
 .ad
@@ -313,7 +292,6 @@ integer array value of the property This function does not search the PROM for
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldi_prop_lookup_string_array()\fR\fR
 .ad
@@ -328,7 +306,6 @@ strings, much like the argv argument to \fBexecve\fR(2).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldi_prop_lookup_string()\fR\fR
 .ad
@@ -342,7 +319,6 @@ property.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldi_prop_lookup_byte_array()\fR\fR
 .ad
@@ -356,7 +332,6 @@ the property.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBddi_prop_free()\fR\fR
 .ad
@@ -377,57 +352,47 @@ The functions \fBldi_prop_lookup_int_array()\fR,
 the following values:
 .sp
 .ne 2
-.mk
 .na
 \fBDDI_PROP_SUCCESS\fR
 .ad
 .RS 26n
-.rt  
 Property found and returned.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDDI_PROP_INVAL_ARG\fR
 .ad
 .RS 26n
-.rt  
 If an attempt is made to look up a property with a NULL ldi handle, name is
 NULL or name is a the null string.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDDI_PROP_NOT_FOUND\fR
 .ad
 .RS 26n
-.rt  
 Property not found.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDDI_PROP_UNDEFINED\fR
 .ad
 .RS 26n
-.rt  
 Prop explicitly undefined (see \fBddi_prop_undefine(9F\fR)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDDI_PROP_CANNOT_DECODE\fR
 .ad
 .RS 26n
-.rt  
 Property value cannot be decoded.
 .RE
 
@@ -440,19 +405,19 @@ These functions may be called from user or kernel context.
 .in +2
 .nf
 Using ldi_prop_lookup_int64_array().
- 
-       The following example demonstrates the use of 
+
+       The following example demonstrates the use of
        ldi_prop_lookup_int64_array().
 
- 
+
        int64_t *options;
        uint_t  noptions;
- 
-       /* 
+
+       /*
         * Get the data associated with the integer "options" property
         * array, along with the number of option integers
         */
- 
+
        if  (ldi_prop_lookup_int64_array(lh,
            LDI_DEV_T_ANY|DDI_PROP_NOTPROM, "options",
            &options, &noptions) == DDI_PROP_SUCCESS) {
@@ -461,7 +426,7 @@ Using ldi_prop_lookup_int64_array().
                 * we just received. Let's do "our thing" with data.
                 */
                xx_process_options(options, noptions);
-       
+
                /*
                 * Free the memory allocated for the property data
                 */

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_dma_htoc 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_DMA_HTOC 9F "Jan 16, 2006"
 .SH NAME
 ddi_dma_htoc \- convert a DMA handle to a DMA address cookie
 .SH SYNOPSIS
@@ -15,7 +15,7 @@ ddi_dma_htoc \- convert a DMA handle to a DMA address cookie
 
 
 
-\fBint\fR \fBddi_dma_htoc\fR(\fBddi_dma_handle_t\fR \fIhandle\fR, \fBoff_t\fR \fIoff\fR, 
+\fBint\fR \fBddi_dma_htoc\fR(\fBddi_dma_handle_t\fR \fIhandle\fR, \fBoff_t\fR \fIoff\fR,
      \fBddi_dma_cookie_t *\fR\fIcookiep\fR);
 .fi
 
@@ -27,34 +27,28 @@ This interface is obsolete. \fBddi_dma_addr_bind_handle\fR(9F) or
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhandle\fR\fR
 .ad
 .RS 11n
-.rt  
 The handle filled in by a call to \fBddi_dma_setup\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoff\fR\fR
 .ad
 .RS 11n
-.rt  
 An offset into the object that \fIhandle\fR maps.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcookiep\fR\fR
 .ad
 .RS 11n
-.rt  
 A pointer to a \fBddi_dma_cookie\fR(9S) structure.
 .RE
 
@@ -71,23 +65,19 @@ with the appropriate address, length, and bus type to be used to program the
 The \fBddi_dma_htoc()\fR function returns:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 15n
-.rt  
 Successfully filled in the cookie pointed to by \fIcookiep\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 15n
-.rt  
 Failed to successfully fill in the cookie.
 .RE
 
@@ -104,13 +94,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Stability LevelObsolete
+Stability Level	Obsolete
 .TE
 
 .SH SEE ALSO

@@ -1,10 +1,10 @@
 '\" te
-.\"  Copyright 1989 AT&T  
+.\"  Copyright 1989 AT&T
 .\" Copyright (c) 1995, Sun Microsystems, Inc.  All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH segmap 9E "14 Jan 1997" "SunOS 5.11" "Driver Entry Points"
+.TH SEGMAP 9E "Jan 14, 1997"
 .SH NAME
 segmap \- map device memory into user space
 .SH SYNOPSIS
@@ -31,122 +31,100 @@ Architecture independent level 2 (DKI only).
 .SH ARGUMENTS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdev\fR \fR
 .ad
 .RS 12n
-.rt  
 Device whose memory is to be mapped.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoff\fR \fR
 .ad
 .RS 12n
-.rt  
 Offset within device memory at which mapping begins.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIasp\fR \fR
 .ad
 .RS 12n
-.rt  
 Pointer to the address space into which the device memory should be mapped.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaddrp\fR \fR
 .ad
 .RS 12n
-.rt  
 Pointer to the address in the address space to which the device memory should
 be mapped.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlen\fR \fR
 .ad
 .RS 12n
-.rt  
 Length (in bytes) of the memory to be mapped.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprot\fR \fR
 .ad
 .RS 12n
-.rt  
 A bit field that specifies the protections. Possible settings are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_READ\fR \fR
 .ad
 .RS 15n
-.rt  
 Read access is desired.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_WRITE\fR \fR
 .ad
 .RS 15n
-.rt  
 Write access is desired.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_EXEC\fR \fR
 .ad
 .RS 15n
-.rt  
 Execute access is desired.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_USER\fR \fR
 .ad
 .RS 15n
-.rt  
 User-level access is desired (the mapping is  being done as a result of a
 \fBmmap\fR(2) system call).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_ALL\fR \fR
 .ad
 .RS 15n
-.rt  
 All access is desired.
 .RE
 
@@ -154,44 +132,36 @@ All access is desired.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImaxprot\fR \fR
 .ad
 .RS 12n
-.rt  
 Maximum protection flag possible for attempted mapping; the \fBPROT_WRITE\fR
 bit may be masked out if the user opened the special file read-only.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR \fR
 .ad
 .RS 12n
-.rt  
 Flags indicating type of mapping. Possible values are (other bits may be set):
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAP_SHARED\fR \fR
 .ad
 .RS 16n
-.rt  
 Changes should be shared.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAP_PRIVATE\fR \fR
 .ad
 .RS 16n
-.rt  
 Changes are private.
 .RE
 
@@ -199,12 +169,10 @@ Changes are private.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcred_p\fR \fR
 .ad
 .RS 12n
-.rt  
 Pointer to the  user credentials structure.
 .RE
 

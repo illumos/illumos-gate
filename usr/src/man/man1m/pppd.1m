@@ -3,7 +3,7 @@
 .\" Redistribution and use in source and binary forms are permitted provided that the above copyright notice and this paragraph are duplicated in all such forms and that any documentation, advertising materials, and other materials related to such distribution and use acknowledge that the software was developed by Carnegie Mellon University.  The name of the University may not be used to endorse or promote products derived from this software without specific prior written permission.  THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
 .\" WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
 .\" Portions Copyright (c) 2008, Sun Microsystems, Inc. All Right Reserved.
-.TH pppd 1M "21 Nov 2001" "SunOS 5.11" "System Administration Commands"
+.TH PPPD 1M "Nov 21, 2001"
 .SH NAME
 pppd \- point to point protocol daemon
 .SH SYNOPSIS
@@ -53,12 +53,10 @@ file.
 .SS "Frequently Used Options"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB<tty_name>\fR \fR
 .ad
 .RS 23n
-.rt  
 Communicate over the named device. The string \fB/dev/\fR is prepended if
 necessary. If no device name is given, or if the name of the terminal connected
 to the standard input is given, \fBpppd\fR uses that terminal and does not fork
@@ -68,24 +66,20 @@ source cannot be overridden by a non-privileged user.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB<speed>\fR \fR
 .ad
 .RS 23n
-.rt  
 Set the baud rate to <\fBspeed\fR> (a decimal number). The default is to leave
 the baud rate unchanged. This option is normally needed for dial-out only.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBasyncmap\fR \fB\fI<map>\fR\fR \fR
 .ad
 .RS 23n
-.rt  
 Set the \fBasync\fR character map to \fI<map>\fR\&. The map describes which
 control characters cannot be successfully received over the serial line.
 \fBpppd\fR asks the peer to send these characters as a 2-byte escape sequence.
@@ -101,12 +95,10 @@ characters.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauth\fR \fR
 .ad
 .RS 23n
-.rt  
 Require the peer to authenticate itself before allowing network packets to be
 sent or received. This option is the default if the system has a default route.
 If the \fBauth\fR or the \fBnoauth\fR option is not specified, \fBpppd\fR
@@ -116,12 +108,10 @@ already have a route.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcall\fR \fB\fIname\fR\fR \fR
 .ad
 .RS 23n
-.rt  
 Read options from the file \fB/etc/ppp/peers/\fR\fIname\fR. This file may
 contain privileged options, including \fBnoauth\fR, even if \fBpppd\fR is not
 being run by root. The \fIname\fR string may not begin with a slash ("/") or
@@ -130,23 +120,19 @@ include consecutive periods \fB("..")\fR as a pathname component.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcallback\fR \fB\fInumber\fR\fR \fR
 .ad
 .RS 23n
-.rt  
 Request a callback to the given telephone number using Microsoft CBCP.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBconnect\fR \fB\fIscript\fR\fR \fR
 .ad
 .RS 23n
-.rt  
 Use the executable or shell command specified by \fIscript\fR to set up the
 serial line. This script would typically use the \fBchat\fR(1M) program to dial
 the modem and start the remote \fBPPP\fR session. A value for this option
@@ -156,12 +142,10 @@ user.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcrtscts\fR \fR
 .ad
 .RS 23n
-.rt  
 Use hardware flow control, that is, RTS/CTS, to control the flow of data on the
 serial port. If the \fBcrtscts\fR, \fBnocrtscts\fR, \fBcdtrcts\fR or
 \fBnocdtrcts\fR option is not provided, the hardware flow control setting for
@@ -174,12 +158,10 @@ DTR as a modem control line.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdefaultroute\fR \fR
 .ad
 .RS 23n
-.rt  
 Add a default route to the system routing tables when IPCP negotiation
 successfully completes, using the peer as the gateway. This entry is removed
 when the \fBPPP\fR connection is broken. This option is privileged if the
@@ -188,12 +170,10 @@ when the \fBPPP\fR connection is broken. This option is privileged if the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisconnect\fR \fB \fIscript\fR\fR \fR
 .ad
 .RS 23n
-.rt  
 Run the executable or shell command specified by \fIscript\fR after \fBpppd\fR
 terminates the link. Typically, this script is used to command the modem to
 hang up if hardware modem control signals are not available. \fBdisconnect\fR
@@ -204,12 +184,10 @@ user.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBescape\fR \fB\fIxx,yy,...\fR\fR \fR
 .ad
 .RS 23n
-.rt  
 Specifies that certain characters be escaped on transmission regardless of
 whether the peer requests them to be escaped with its \fBasync\fR control
 character map. The characters to be escaped are specified as a list of hex
@@ -221,12 +199,10 @@ containing hex values 0x20 through 0x3f and 0x5e.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfile\fR \fB\fIname\fR\fR \fR
 .ad
 .RS 23n
-.rt  
 Read options from file \fIname\fR. If this option is used on the command line
 or in \fB$HOME/.ppprc\fR, the file must be readable by the user invoking
 \fBpppd\fR. See  for a list of files that \fBpppd\fR always reads, regardless
@@ -235,12 +211,10 @@ of the use of this option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinit\fR \fB \fIscript\fR \fR \fR
 .ad
 .RS 23n
-.rt  
 Run the executable or shell command specified by \fIscript\fR to initialize the
 serial line. This script would typically use the \fBchat\fR(1M) program to
 configure the modem to enable auto-answer. A value for this option from a
@@ -249,24 +223,20 @@ privileged source cannot be overridden by a non-privileged user.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlock\fR \fR
 .ad
 .RS 23n
-.rt  
 Directs \fBpppd\fR to create a UUCP-style lock file for the serial device to
 ensure exclusive access to the device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmru\fR \fB\fIn\fR\fR \fR
 .ad
 .RS 23n
-.rt  
 Set the Maximum Receive Unit (MRU) value to \fIn\fR. \fBpppd\fR asks the peer
 to send packets of no more than \fIn\fR bytes. Minimum MRU value is 128.
 Default MRU value is 1500. A value of 296 is recommended for slow links (40
@@ -276,12 +246,10 @@ bytes for TCP/IP header + 256 bytes of data). For IPv6, MRU must be at least
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmtu\fR \fB\fIn\fR\fR \fR
 .ad
 .RS 23n
-.rt  
 Set the Maximum Transmit Unit (MTU) value to \fIn\fR. Unless the peer requests
 a smaller value via MRU negotiation, \fBpppd\fR requests the kernel networking
 code to send data packets of no more than \fIn\fR bytes through the PPP network
@@ -290,12 +258,10 @@ interface. For IPv6, MTU must be at least 1280.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpassive\fR \fR
 .ad
 .RS 23n
-.rt  
 Enables the "passive" option in the LCP. With this option, \fBpppd\fR attempts
 to initiate a connection; if no reply is received from the peer, \fBpppd\fR
 waits passively for a valid LCP packet instead of exiting, as it would without
@@ -305,7 +271,6 @@ this option.
 .SS "Options"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB<local_IP_address>:<remote_IP_address>\fR \fR
 .ad
@@ -325,7 +290,6 @@ respectively.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBallow-fcs\fR \fB\fIfcs-type\fR\fR \fR
 .ad
@@ -339,7 +303,6 @@ type not listed, a LCP Configure-Nak is sent to request only the listed types.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBallow-ip\fR \fB\fIaddress(es)\fR\fR \fR
 .ad
@@ -353,7 +316,6 @@ more more details.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbsdcomp\fR \fB\fInr,nt\fR\fR \fR
 .ad
@@ -374,7 +336,6 @@ from the privileged source.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcdtrcts\fR \fR
 .ad
@@ -391,7 +352,6 @@ control line.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchap-interval\fR \fB\fIn\fR\fR\fR
 .ad
@@ -403,7 +363,6 @@ seconds.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchap-max-challenge\fR \fB\fIn\fR\fR \fR
 .ad
@@ -414,7 +373,6 @@ Set the maximum number of CHAP challenge transmissions to \fIn\fR (default 10).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchap-restart\fR \fB\fIn\fR\fR \fR
 .ad
@@ -426,7 +384,6 @@ Set the CHAP restart interval (retransmission timeout for challenges) to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBconnect-delay\fR \fB\fIn\fR\fR \fR
 .ad
@@ -441,7 +398,6 @@ applies only if the \fBconnect\fR or \fBpty\fR option is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdatarate\fR \fB\fIn\fR\fR \fR
 .ad
@@ -453,7 +409,6 @@ Set maximum data rate to \fIn\fR (in bytes per second) when using the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdebug\fR \fR
 .ad
@@ -468,7 +423,6 @@ The packets are logged through syslog with facility \fBdaemon\fR and level
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdefault-asyncmap\fR \fR
 .ad
@@ -480,7 +434,6 @@ escaped for both the transmit and the receive direction.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdefault-fcs\fR \fR
 .ad
@@ -493,7 +446,6 @@ specified by the peer, then LCP Configure-Reject is sent.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdefault-mru\fR \fR
 .ad
@@ -506,7 +458,6 @@ directions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdeflate\fR \fB\fInr,nt,e\fR\fR \fR
 .ad
@@ -530,7 +481,6 @@ code size larger than the value from the privileged source.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdemand\fR \fR
 .ad
@@ -550,7 +500,6 @@ in conjunction with the \fBdemand\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdomain\fR \fB\fId\fR\fR \fR
 .ad
@@ -566,7 +515,6 @@ the default name when authenticating to the peer. This option is privileged.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBendpoint\fR \fB\fIendpoint-value\fR\fR \fR
 .ad
@@ -586,7 +534,6 @@ implementation does not support multilink.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfcs\fR \fB\fIfcs-type\fR\fR \fR
 .ad
@@ -603,7 +550,6 @@ to the default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhide-password\fR \fR
 .ad
@@ -615,7 +561,6 @@ exclude the password string from the log. This is the default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBholdoff\fR \fB\fIn\fR\fR \fR
 .ad
@@ -629,7 +574,6 @@ because it was idle.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBident\fR \fB\fIstring\fR\fR \fR
 .ad
@@ -641,7 +585,6 @@ similar to that displayed by the \fB--version\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBidle\fR \fB\fIn\fR\fR \fR
 .ad
@@ -655,7 +598,6 @@ the \fBdemand\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBipcp-accept-local\fR \fR
 .ad
@@ -667,7 +609,6 @@ even if the local IP address is specified in an option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBipcp-accept-remote\fR \fR
 .ad
@@ -679,7 +620,6 @@ even if the remote IP address is specified in an option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBipcp-max-configure\fR \fB\fIn\fR\fR \fR
 .ad
@@ -691,7 +631,6 @@ Set the maximum number of IPCP Configure-Request transmissions to \fIn\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBipcp-max-failure\fR \fB\fIn\fR\fR \fR
 .ad
@@ -703,7 +642,6 @@ Configure-Rejects instead to \fIn\fR (default 10).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBipcp-max-terminate\fR \fB\fIn\fR\fR \fR
 .ad
@@ -715,7 +653,6 @@ Set the maximum number of IPCP terminate-request transmissions to \fIn\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBipcp-restart\fR \fB\fIn\fR\fR \fR
 .ad
@@ -727,7 +664,6 @@ Set the IPCP restart interval (retransmission timeout) to \fIn\fR seconds
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBipparam\fR \fB\fIstring\fR\fR \fR
 .ad
@@ -740,7 +676,6 @@ scripts. See the  section.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBipv6\fR
 \fB\fI<local_interface_identifier>\fR,\fI<remote_interface_identifier>\fR\fR
@@ -758,7 +693,6 @@ can be used instead of the \fBipv6 <local>,<remote>\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBipv6cp-accept-local\fR \fR
 .ad
@@ -769,7 +703,6 @@ Accept peer's interface identifier for the local link identifier.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBipv6cp-max-configure\fR \fB\fIn\fR\fR \fR
 .ad
@@ -781,7 +714,6 @@ Set the maximum number of IPv6CP Configure-Request transmissions to \fIn\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBipv6cp-max-failure\fR \fB\fIn\fR\fR \fR
 .ad
@@ -793,7 +725,6 @@ Configure-Rejects instead to \fIn\fR (default 10).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBipv6cp-max-terminate\fR \fB\fIn\fR\fR \fR
 .ad
@@ -805,7 +736,6 @@ Set the maximum number of IPv6CP terminate-request transmissions to \fIn\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBipv6cp-restart\fR \fB\fIn\fR\fR \fR
 .ad
@@ -817,7 +747,6 @@ Set the IPv6CP restart interval (retransmission timeout) to \fIn\fR seconds
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBipv6cp-use-ipaddr\fR \fR
 .ad
@@ -832,7 +761,6 @@ with \fBipcp-accept-remote\fR if the remote IPv6 identifier is unspecified.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBipv6cp-use-persistent\fR \fR
 .ad
@@ -843,7 +771,6 @@ Use uniquely-available persistent value for link local address.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkdebug\fR \fB\fIn\fR\fR \fR
 .ad
@@ -860,7 +787,6 @@ Use the \fBdebug\fR option instead.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlcp-echo-failure\fR \fB\fIn\fR\fR \fR
 .ad
@@ -876,7 +802,6 @@ has hung up) in situations where no hardware modem control lines are available.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlcp-echo-interval\fR \fB\fIn\fR\fR \fR
 .ad
@@ -890,7 +815,6 @@ option to detect that the peer is no longer connected.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlcp-max-configure\fR \fB\fIn\fR\fR \fR
 .ad
@@ -902,7 +826,6 @@ Set the maximum number of LCP Configure-Request transmissions to \fIn\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlcp-max-failure\fR \fB\fIn\fR\fR \fR
 .ad
@@ -914,7 +837,6 @@ Configure-Rejects instead to \fIn\fR (default 10).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlcp-max-terminate\fR \fB\fIn\fR\fR \fR
 .ad
@@ -926,7 +848,6 @@ Set the maximum number of LCP Terminate-Request transmissions to \fIn\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlcp-restart\fR \fB\fIn\fR\fR \fR
 .ad
@@ -938,7 +859,6 @@ Set the LCP restart interval (retransmission timeout) to \fIn\fR seconds
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlinkname\fR \fB\fIname\fR\fR \fR
 .ad
@@ -952,7 +872,6 @@ for the link to a given peer system. This is a privileged option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlocal\fR \fR
 .ad
@@ -965,7 +884,6 @@ of the DTR (Data Terminal Ready) signal.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlogfd\fR \fB\fIn\fR\fR \fR
 .ad
@@ -980,7 +898,6 @@ unless the serial port is open on stdout.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlogfile\fR \fB\fIfilename\fR\fR \fR
 .ad
@@ -993,7 +910,6 @@ invoked \fBpppd\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlogin\fR \fR
 .ad
@@ -1007,7 +923,6 @@ to be allowed access.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmaxconnect\fR \fB\fIn\fR\fR \fR
 .ad
@@ -1021,7 +936,6 @@ starts, and again when 5, 2, and 0.5 minutes are remaining.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmaxfail\fR \fB\fIn\fR\fR \fR
 .ad
@@ -1033,7 +947,6 @@ means no limit. The default value is 10.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmodem\fR \fR
 .ad
@@ -1048,7 +961,6 @@ terminated and before executing the connect script.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBms-dns\fR \fB\fI<addr>\fR\fR \fR
 .ad
@@ -1065,7 +977,6 @@ versions of \fBpppd\fR under the name \fBdns-addr\fR.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBms-lanman\fR \fR
 .ad
@@ -1078,7 +989,6 @@ Microsoft NT.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBms-wins\fR \fB\fI<addr>\fR\fR \fR
 .ad
@@ -1095,7 +1005,6 @@ and secondary.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBname\fR \fB\fIname\fR\fR \fR
 .ad
@@ -1112,7 +1021,6 @@ domain name to \fIname\fR.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBno-accm-test\fR \fR
 .ad
@@ -1127,7 +1035,6 @@ operation with random failures. This option disables that feature.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoaccomp\fR \fR
 .ad
@@ -1138,7 +1045,6 @@ Disable HDLC Address/Control compression in both directions (send and receive).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoauth\fR \fR
 .ad
@@ -1149,7 +1055,6 @@ Do not require the peer to authenticate itself. This option is privileged.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnobsdcomp\fR \fR
 .ad
@@ -1162,7 +1067,6 @@ compress packets using the BSD-Compress scheme. This option is not necessary if
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoccp\fR \fR
 .ad
@@ -1176,7 +1080,6 @@ compression do not need to be separately disabled.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnocrtscts\fR \fR
 .ad
@@ -1190,7 +1093,6 @@ unchanged.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnocdtrcts\fR \fR
 .ad
@@ -1202,7 +1104,6 @@ forms of hardware flow control.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnodefaultroute\fR \fR
 .ad
@@ -1215,7 +1116,6 @@ creating default routes with \fBpppd\fR by placing this option in the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnodeflate\fR \fR
 .ad
@@ -1228,7 +1128,6 @@ is specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnodeflatedraft\fR \fR
 .ad
@@ -1240,7 +1139,6 @@ compression. This option is not necessary if \fBnoccp\fR is specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnodetach\fR \fR
 .ad
@@ -1253,7 +1151,6 @@ on the standard input is specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoendpoint\fR \fR
 .ad
@@ -1264,7 +1161,6 @@ Do not send or accept the Multilink Endpoint Discriminator option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoident\fR \fR
 .ad
@@ -1278,7 +1174,6 @@ Code-Reject in response to received LCP Identification messages.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoip\fR \fR
 .ad
@@ -1290,7 +1185,6 @@ has bugs or becomes confused by requests from \fBpppd\fR for IPCP negotiation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoipv6\fR \fR
 .ad
@@ -1302,7 +1196,6 @@ default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoipdefault\fR \fR
 .ad
@@ -1316,7 +1209,6 @@ option, the peer must supply the local IP address during IPCP negotiation
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnolog\fR \fR
 .ad
@@ -1329,7 +1221,6 @@ option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnomagic\fR \fR
 .ad
@@ -1342,7 +1233,6 @@ option to work around the "Serial line is looped back" error message.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnopam\fR \fR
 .ad
@@ -1355,7 +1245,6 @@ mechanisms. The default is not to use PAM.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnopcomp\fR \fR
 .ad
@@ -1367,7 +1256,6 @@ direction.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnopersist\fR \fR
 .ad
@@ -1379,7 +1267,6 @@ the \fBpersist\fR or \fBdemand\fR option is specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoplink\fR \fR
 .ad
@@ -1394,7 +1281,6 @@ modinsert, modremove or unplumb support is needed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnopredictor1\fR \fR
 .ad
@@ -1406,7 +1292,6 @@ compatibility. The implementation does not support Predictor-1 compression.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoproxyarp\fR \fR
 .ad
@@ -1419,7 +1304,6 @@ proxy ARP entries with \fBpppd\fR, place this option in the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnotty\fR \fR
 .ad
@@ -1439,7 +1323,6 @@ given if this option is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnovj\fR \fR
 .ad
@@ -1451,7 +1334,6 @@ the receive direction.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnovjccomp\fR \fR
 .ad
@@ -1465,7 +1347,6 @@ the peer to do so. This option is unnecessary if \fBnovj\fR is specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpam\fR \fR
 .ad
@@ -1479,7 +1360,6 @@ is not to use PAM.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpapcrypt\fR \fR
 .ad
@@ -1493,7 +1373,6 @@ file. Use this option if the secrets in the \fBpap-secrets\fR file are in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpap-max-authreq\fR \fB\fIn\fR\fR \fR
 .ad
@@ -1505,7 +1384,6 @@ Set the maximum number of PAP authenticate-request transmissions to \fIn\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpap-restart\fR \fB\fIn\fR\fR \fR
 .ad
@@ -1517,7 +1395,6 @@ Set the PAP restart interval (retransmission timeout) to \fIn\fR seconds
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpap-timeout\fR \fB\fIn\fR\fR \fR
 .ad
@@ -1529,7 +1406,6 @@ with PAP to \fIn\fR seconds (0= no limit). The default is 30 seconds.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpassword\fR \fB\fIstring\fR\fR \fR
 .ad
@@ -1540,7 +1416,6 @@ Password string for authentication to the peer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpersist\fR \fR
 .ad
@@ -1552,7 +1427,6 @@ connection.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBplink\fR \fR
 .ad
@@ -1568,7 +1442,6 @@ option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBplugin\fR \fB\fIfilename\fR\fR \fR
 .ad
@@ -1582,7 +1455,6 @@ object to load in that order.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBplumbed\fR \fR
 .ad
@@ -1598,7 +1470,6 @@ may be helpful when \fBpppd\fR is used with external applications that use
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpppmux\fR \fB\fItimer\fR\fR \fR
 .ad
@@ -1610,7 +1481,6 @@ timeout to \fItimer\fR microseconds.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprivgroup\fR \fB\fIgroup-name\fR\fR \fR
 .ad
@@ -1625,7 +1495,6 @@ careful using this option. Consider it equivalent to putting the members of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBproxyarp\fR \fR
 .ad
@@ -1640,7 +1509,6 @@ Ethernet interface.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpty\fR \fB \fIscript\fR\fR \fR
 .ad
@@ -1657,7 +1525,6 @@ process will have pipes on its standard input and output.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBreceive-all\fR \fR
 .ad
@@ -1672,7 +1539,6 @@ dial-back implementations.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrecord\fR \fB\fIfilename\fR\fR \fR
 .ad
@@ -1692,7 +1558,6 @@ the \fBdebug\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBremotename\fR \fB\fIname\fR\fR \fR
 .ad
@@ -1705,7 +1570,6 @@ Challenge messages, and this option is often used to work around this problem.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrefuse-chap\fR \fR
 .ad
@@ -1718,7 +1582,6 @@ not affected.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrefuse-mschap\fR \fR
 .ad
@@ -1731,7 +1594,6 @@ with LCP Configure-Nak. That option does not disable any other form of CHAP.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrefuse-mschapv2\fR \fR
 .ad
@@ -1744,7 +1606,6 @@ Configure-Nak. That option does not disable any other form of CHAP.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrefuse-pap\fR \fR
 .ad
@@ -1756,7 +1617,6 @@ using Password Authentication Protocol (PAP).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrequire-chap\fR \fR
 .ad
@@ -1768,7 +1628,6 @@ MS-CHAP is not affected.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrequire-mschap\fR \fR
 .ad
@@ -1779,7 +1638,6 @@ Require the peer to authenticate itself using MS-CHAPv1 authentication.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrequire-mschapv2\fR \fR
 .ad
@@ -1790,7 +1648,6 @@ Require the peer to authenticate itself using MS-CHAPv2 authentication.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrequire-pap\fR \fR
 .ad
@@ -1801,7 +1658,6 @@ Require the peer to authenticate itself using PAP authentication.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshow-password\fR \fR
 .ad
@@ -1813,7 +1669,6 @@ password string in the log message.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsilent\fR \fR
 .ad
@@ -1827,7 +1682,6 @@ compatibility, but the current \fBpassive\fR option is preferred.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsmall-accm-test\fR \fR
 .ad
@@ -1841,7 +1695,6 @@ tested. This option is useful on very slow links.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsocket\fR \fB\fIhost\fR:\fIport\fR\fR \fR
 .ad
@@ -1852,7 +1705,6 @@ Connect to given host and port using TCP and run PPP over this connection.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsync\fR \fR
 .ad
@@ -1865,7 +1717,6 @@ by \fBpppd\fR with this option must have sync support. Currently supports
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunit\fR \fB\fIn\fR\fR \fR
 .ad
@@ -1876,7 +1727,6 @@ Set PPP interface unit number to \fIn\fR, if possible.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBupdetach\fR \fR
 .ad
@@ -1890,7 +1740,6 @@ messages from the debug option are directed to \fBpppd\fR's standard output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBusehostname\fR \fR
 .ad
@@ -1904,7 +1753,6 @@ normally not needed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBusepeerdns\fR \fR
 .ad
@@ -1919,7 +1767,6 @@ address(es) supplied by the peer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuser\fR \fB\fIname\fR\fR \fR
 .ad
@@ -1931,7 +1778,6 @@ Sets the name used for authenticating the local system to the peer to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvj-max-slots\fR \fB\fIn\fR\fR \fR
 .ad
@@ -1944,7 +1790,6 @@ and 16 (inclusive).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwelcome\fR \fB\fIscript\fR\fR \fR
 .ad
@@ -1958,7 +1803,6 @@ user.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxonxoff\fR \fR
 .ad
@@ -1974,12 +1818,10 @@ the serial port.
 The following options are obsolete:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+ua\fR \fB\fIname\fR\fR\fR
 .ad
 .RS 14n
-.rt  
 Read a PAP user name and password from the file \fIname\fR. This file must have
 two lines for name and password. Name and password are sent to the peer when
 the peer requests PAP authentication.
@@ -1987,34 +1829,28 @@ the peer requests PAP authentication.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+ipv6\fR \fR
 .ad
 .RS 14n
-.rt  
 Enable IPv6 and IPv6CP without specifying interface identifiers.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--version\fR \fR
 .ad
 .RS 14n
-.rt  
 Show version number and exit.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--help\fR \fR
 .ad
 .RS 14n
-.rt  
 Show brief help message and exit.
 .RE
 
@@ -2063,7 +1899,7 @@ that is, \fB/etc/ppp/options\fR or an options file read using the \fBcall\fR
 option, \fBpppd\fR uses full root privileges when opening the device. Thus, by
 creating an appropriate file under \fB/etc/ppp/peers\fR, the system
 administrator can allow users to establish a PPP connection via a device that
-they 	would not normally have access to. Otherwise \fBpppd\fR uses the invoking
+they would not normally have access to. Otherwise \fBpppd\fR uses the invoking
 user's real UID when opening the device.
 .SS "Authentication"
 .sp
@@ -2152,7 +1988,7 @@ that name will be used as the peer's name. If that fails, \fBpppd\fR uses the
 null string as the peer's name.
 .sp
 .LP
-When authenticating the peer with PAP, the supplied password	is compared with
+When authenticating the peer with PAP, the supplied password is compared with
 data in the secrets file. If the password and secret do not match, the password
 is encrypted using \fBcrypt()\fR and checked against the secret again. If the
 \fBpapcrypt\fR option is given, the first unencrypted comparison is omitted for
@@ -2176,7 +2012,7 @@ address for the remote host, IPCP is closed. IP packets are sent or received
 only when IPCP is open.
 .sp
 .LP
-To allow hosts that cannot authenticate themselves to connect 	and use one of a
+To allow hosts that cannot authenticate themselves to connect and use one of a
 restricted set of IP addresses, add a line to the \fBpap-secrets\fR file
 specifying the empty string for the client name and secret.
 .sp
@@ -2238,90 +2074,74 @@ except for some environment variables that give information about the link. The
 \fBpppd\fR environment variables are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDEVICE\fR \fR
 .ad
 .RS 15n
-.rt  
 Name of the serial tty device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIFNAME\fR \fR
 .ad
 .RS 15n
-.rt  
 Name of the network interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIPLOCAL\fR \fR
 .ad
 .RS 15n
-.rt  
 IP address for the link's local end. This is set only when IPCP has started.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIPREMOTE\fR \fR
 .ad
 .RS 15n
-.rt  
 IP address for the link's remote end. This is set only when IPCP has started.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPEERNAME\fR \fR
 .ad
 .RS 15n
-.rt  
 Authenticated name of the peer. This is set only if the peer authenticates
 itself.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSPEED\fR \fR
 .ad
 .RS 15n
-.rt  
 Baud rate of the tty device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBORIG_UID\fR \fR
 .ad
 .RS 15n
-.rt  
 Real user-id of user who invoked \fBpppd\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPPPLOGNAME\fR \fR
 .ad
 .RS 15n
-.rt  
 Username of the real user-id who invoked \fBpppd\fR. This is always set.
 .RE
 
@@ -2331,46 +2151,38 @@ Username of the real user-id who invoked \fBpppd\fR. This is always set.
 scripts:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCONNECT_TIME\fR \fR
 .ad
 .RS 17n
-.rt  
 Number of seconds between the start of PPP negotiation and connection
 termination.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBBYTES_SENT\fR \fR
 .ad
 .RS 17n
-.rt  
 Number of bytes sent at the level of the serial port during the connection.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBBYTES_RCVD\fR \fR
 .ad
 .RS 17n
-.rt  
 Number of bytes received at the level of the serial port during the connection.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLINKNAME\fR \fR
 .ad
 .RS 17n
-.rt  
 Logical name of the link, set with the \fBlinkname\fR option.
 .RE
 
@@ -2380,12 +2192,10 @@ If they exist, \fBpppd\fR invokes the following scripts. It is not an error if
 they do not exist.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ppp/auth-up\fR \fR
 .ad
 .RS 23n
-.rt  
 Program or script executed after the remote system successfully authenticates
 itself. It is executed with five command-line arguments: \fBinterface-name
 peer-name user-name tty-device speed\fR. Note that this script is not executed
@@ -2395,12 +2205,10 @@ option is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ppp/auth-down\fR \fR
 .ad
 .RS 23n
-.rt  
 Program or script executed when the link goes down if \fB/etc/ppp/auth-up\fR
 was previously executed. It is executed in the same manner with the same
 parameters as \fB/etc/ppp/auth-up\fR.
@@ -2408,12 +2216,10 @@ parameters as \fB/etc/ppp/auth-up\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ppp/ip-up\fR \fR
 .ad
 .RS 21n
-.rt  
 A program or script that is executed when the link is available for sending and
 receiving IP packets (that is, IPCP has come up). It is executed with six
 command-line arguments: \fBinterface-name tty-device speed local-IP-address
@@ -2422,12 +2228,10 @@ remote-IP-address ipparam\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ppp/ip-down\fR \fR
 .ad
 .RS 21n
-.rt  
 A program or script which is executed when the link is no longer available for
 sending and receiving IP packets. This script can be used for undoing the
 effects of the \fB/etc/ppp/ip-up\fR script. It is invoked in the same manner
@@ -2436,12 +2240,10 @@ and with the same parameters as the \fBip-up\fR script.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ppp/ipv6-up\fR \fR
 .ad
 .RS 21n
-.rt  
 Similar to \fB/etc/ppp/ip-up\fR, except that it is executed when the link is
 available for sending and receiving IPv6 packets. Executed with six
 command-line arguments: \fBinterface-name tty-device speed
@@ -2450,12 +2252,10 @@ local-link-local-address remote-link-local-address ipparam\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ppp/ipv6-down\fR \fR
 .ad
 .RS 23n
-.rt  
 Similar to \fB/etc/ppp/ip-down\fR, but executed when IPv6 packets can no longer
 be transmitted on the link. Executed with the same parameters as the ipv6-up
 script.
@@ -2491,18 +2291,18 @@ any login sequence required. The \fB/etc/ppp/chat-isp\fR file is used by
 .sp
 .in +2
 .nf
-ABORT "NO CARRIER" 
-ABORT "NO DIALTONE" 
-ABORT "ERROR" 
-ABORT "NO ANSWER" 
-ABORT "BUSY" 
-ABORT "Username/Password Incorrect" 
-"" "at" 
-OK "at&f&d2&c1" 
-OK "atdt2468135" 
-"name:" "^Umyuserid" 
-"word:" "\qmypassword" 
-"ispts" "\q^Uppp" 
+ABORT "NO CARRIER"
+ABORT "NO DIALTONE"
+ABORT "ERROR"
+ABORT "NO ANSWER"
+ABORT "BUSY"
+ABORT "Username/Password Incorrect"
+"" "at"
+OK "at&f&d2&c1"
+OK "atdt2468135"
+"name:" "^Umyuserid"
+"word:" "\qmypassword"
+"ispts" "\q^Uppp"
 "~-^Uppp-~"
 .fi
 .in -2
@@ -2542,7 +2342,7 @@ entry to the \fB/etc/ppp/pap-secrets\fR or \fB/etc/ppp/chap-secrets\fR files:
 .sp
 .in +2
 .nf
-\fBjoespc	server	"joe's secret"	joespc.my.net\fR 
+\fBjoespc	server	"joe's secret"	joespc.my.net\fR
 .fi
 .in -2
 .sp
@@ -2569,36 +2369,30 @@ The \fBpppd\fR exit status indicates errors or specifies why a link was
 terminated. Exit status values are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 7n
-.rt  
 \fBpppd\fR has detached or the connection was successfully established and
 terminated at the peer's request.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR \fR
 .ad
 .RS 7n
-.rt  
 An immediately fatal error occurred. For example, an essential system call
 failed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR \fR
 .ad
 .RS 7n
-.rt  
 An error was detected in the options given. For example, two mutually exclusive
 options were used, or \fB/etc/ppp/options\fR is missing and the user is not
 root.
@@ -2606,225 +2400,185 @@ root.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR \fR
 .ad
 .RS 7n
-.rt  
 \fBpppd\fR is not \fBsetuid-root\fR and the invoking user is not root.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB4\fR \fR
 .ad
 .RS 7n
-.rt  
 The kernel does not support PPP. For example, the PPP kernel driver is not
 included or cannot be loaded.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB5\fR \fR
 .ad
 .RS 7n
-.rt  
 \fBpppd\fR terminated because it was sent a SIGINT, SIGTERM or SIGHUP signal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB6\fR \fR
 .ad
 .RS 7n
-.rt  
 The serial port could not be locked.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB7\fR \fR
 .ad
 .RS 7n
-.rt  
 The serial port could not be opened.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB8\fR \fR
 .ad
 .RS 7n
-.rt  
 The connect script failed and returned a non-zero exit status.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB9\fR \fR
 .ad
 .RS 7n
-.rt  
 The command specified as the argument to the \fBpty\fR option could not be run.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB10\fR \fR
 .ad
 .RS 7n
-.rt  
 The PPP negotiation failed because no network protocols were able to run.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB11\fR \fR
 .ad
 .RS 7n
-.rt  
 The peer system failed or refused to authenticate itself.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB12\fR \fR
 .ad
 .RS 7n
-.rt  
 The link was established successfully, but terminated because it was idle.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB13\fR \fR
 .ad
 .RS 7n
-.rt  
 The link was established successfully, but terminated because the connect time
 limit was reached.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB14\fR \fR
 .ad
 .RS 7n
-.rt  
 Callback was negotiated and an incoming call should arrive shortly.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB15\fR \fR
 .ad
 .RS 7n
-.rt  
 The link was terminated because the peer is not responding to echo requests.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB16\fR \fR
 .ad
 .RS 7n
-.rt  
 The link was terminated by the modem hanging up.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB17\fR \fR
 .ad
 .RS 7n
-.rt  
 The PPP negotiation failed because serial loopback was detected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB18\fR \fR
 .ad
 .RS 7n
-.rt  
 The init script failed because a non-zero exit status was returned.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB19\fR \fR
 .ad
 .RS 7n
-.rt  
 Authentication to the peer failed.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/run/sppp\fIn\fR\fR\fB\&.pid\fR \fR
 .ad
 .RS 29n
-.rt  
 Process-ID for \fBpppd\fR process on PPP interface unit \fIn\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/run/ppp-\fIname\fR\fR\fB\&.pid\fR \fR
 .ad
 .RS 29n
-.rt  
 Process-ID for \fBpppd\fR process for logical link name (see the \fBlinkname\fR
 option).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ppp/pap-secrets\fR \fR
 .ad
 .RS 29n
-.rt  
 Usernames, passwords and IP addresses for PAP authentication. This file should
 be owned by root and not readable or writable by any other user, otherwise
 \fBpppd\fR will log a warning.
@@ -2832,12 +2586,10 @@ be owned by root and not readable or writable by any other user, otherwise
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ppp/chap-secrets\fR \fR
 .ad
 .RS 29n
-.rt  
 Names, secrets and IP addresses for all forms of CHAP authentication. The
 \fB/etc/ppp/pap-secrets\fR file should be owned by \fBroot\fR should not
 readable or writable by any other user, otherwise, \fBpppd\fR will log a
@@ -2846,35 +2598,29 @@ warning.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ppp/options\fR \fR
 .ad
 .RS 29n
-.rt  
 System default options for \fBpppd\fR, read before user default options or
 command-line options.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.ppprc\fR \fR
 .ad
 .RS 29n
-.rt  
 User default options, read before \fB/etc/ppp/options.\fIttyname\fR\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ppp/options.\fIttyname\fR\fR \fR
 .ad
 .RS 29n
-.rt  
 System default options for the serial port in use; read after
 \fB$HOME/.ppprc\fR. The \fIttyname\fR component of this filename is formed when
 the initial \fB/dev/\fR is stripped from the port name (if present), and
@@ -2883,12 +2629,10 @@ slashes (if any) are converted to dots.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ppp/peers\fR \fR
 .ad
 .RS 29n
-.rt  
 Directory with options files that may contain privileged options, even if
 \fBpppd\fR was invoked by a user other than \fBroot\fR. The system
 administrator can create options files in this directory to permit
@@ -2904,13 +2648,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
@@ -2952,23 +2695,19 @@ Simpson, W. \fIRFC 1662, HDLC-like Framing \fR. Network Working Group. July
 These signals affect \fBpppd\fR behavior:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGINT, SIGTERM\fR \fR
 .ad
 .RS 20n
-.rt  
 Terminate the link, restore the serial device settings and exit.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGHUP\fR \fR
 .ad
 .RS 20n
-.rt  
 Terminate the link, restore the serial device settings and close the serial
 device. If the \fBpersist\fR or \fBdemand\fR option is specified, \fBpppd\fR
 attempts to reopen the serial device and start another connection after the
@@ -2978,24 +2717,20 @@ period, \fBSIGHUP\fR causes \fBpppd\fR to end the holdoff period immediately.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGUSR1\fR \fR
 .ad
 .RS 20n
-.rt  
 Toggles the state of the \fBdebug\fR option and prints link status information
 to the log.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGUSR2\fR \fR
 .ad
 .RS 20n
-.rt  
 Causes \fBpppd\fR to renegotiate compression. This is useful to re-enable
 compression after it has been disabled as a result of a fatal decompression
 error. (Fatal decompression errors generally indicate a bug in an

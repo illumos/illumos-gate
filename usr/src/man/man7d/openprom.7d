@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH openprom 7D "13 Jan 1997" "SunOS 5.11" "Devices"
+.TH OPENPROM 7D "Jan 13, 1997"
 .SH NAME
 openprom \- PROM monitor configuration interface
 .SH SYNOPSIS
@@ -70,12 +70,10 @@ changed.
 .SH IOCTLS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOPROMGETOPT\fR\fR
 .ad
 .RS 19n
-.rt  
 This ioctl takes the null-terminated name of a property in the
 \fIoprom_array\fR and returns its null-terminated value (overlaying its name).
 \fIoprom_size\fR should be set to the size of \fIoprom_array\fR; on return it
@@ -86,24 +84,20 @@ will be set to zero. See \fBBUGS\fR below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOPROMSETOPT\fR\fR
 .ad
 .RS 19n
-.rt  
 This ioctl takes two adjacent strings in \fIoprom_array\fR; the null-terminated
 property name followed by the null-terminated value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOPROMSETOPT2\fR\fR
 .ad
 .RS 19n
-.rt  
 This ioctl is similar to  \fBOPROMSETOPT,\fR except that it uses the difference
 between the actual user array size and the length of the property name plus its
 null terminator.
@@ -111,12 +105,10 @@ null terminator.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOPROMNXTOPT\fR\fR
 .ad
 .RS 19n
-.rt  
 This ioctl is used to retrieve properties sequentially. The null-terminated
 name of a property is placed into \fIoprom_array\fR and on return it is
 replaced with the null-terminated name of the next property in the sequence,
@@ -127,7 +119,6 @@ there are no more properties.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOPROMNXT\fR\fR
 .ad
@@ -144,7 +135,6 @@ there are no more properties.
 \fB\fBOPROMNXTPROP\fR\fR
 .ad
 .RS 19n
-.rt  
 These ioctls provide an interface to the raw \fIconfig_ops\fR operations in the
 \fBPROM\fR monitor. One can use them to traverse the system device tree; see
 \fBprtconf\fR(1M).
@@ -152,12 +142,10 @@ These ioctls provide an interface to the raw \fIconfig_ops\fR operations in the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOPROMGETPROPLEN\fR\fR
 .ad
 .RS 19n
-.rt  
 This ioctl provides an interface to the \fIproperty length\fR raw config op. It
 takes the name of a property in the buffer, and returns an integer in the
 buffer. It returns the integer \fB-1\fR if the property does not exist; \fB0\fR
@@ -168,12 +156,10 @@ monitor. See \fBBUGS\fR below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOPROMGETVERSION\fR\fR
 .ad
 .RS 19n
-.rt  
 This ioctl returns an arbitrary and platform-dependent NULL-terminated string
 in \fIoprom_array\fR, representing the underlying version of the firmware.
 .RE
@@ -181,34 +167,28 @@ in \fIoprom_array\fR, representing the underlying version of the firmware.
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 10n
-.rt  
 There are too many opens of the \fB/dev/openprom\fR device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 A bad address has been passed to an \fBioctl\fR(2) routine.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The size value was invalid, or (for \fBOPROMSETOPT\fR) the       property does
 not exist, or an invalid ioctl is being issued, or the ioctl is not supported
 by the firmware, or the nodeid specified does not exist in the firmware device
@@ -217,35 +197,29 @@ tree.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 The kernel could not allocate space to copy the user's structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 10n
-.rt  
 Attempts have been made to write to a read-only entity, or read from a write
 only entity.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENXIO\fR\fR
 .ad
 .RS 10n
-.rt  
 Attempting to open a non-existent device.
 .RE
 
@@ -398,12 +372,10 @@ main(void)
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/openprom\fR\fR
 .ad
 .RS 17n
-.rt  
 PROM monitor configuration interface
 .RE
 

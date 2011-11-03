@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH admin 4 "20 Dec 2004" "SunOS 5.11" "File Formats"
+.TH ADMIN 4 "Dec 20, 2004"
 .SH NAME
 admin \- installation defaults file
 .SH DESCRIPTION
@@ -43,12 +43,10 @@ sequence, the installer is notified and asked to supply instructions (see
 \fBNOTES\fR).
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbasedir\fR\fR
 .ad
 .RS 30n
-.rt  
 Indicates the base directory where relocatable packages are to be installed. If
 there is no \fBbasedir\fR entry in the file, the installer will be prompted for
 a path name, as if the file contained the entry \fBbasedir=ask\fR. This
@@ -59,12 +57,10 @@ the \fBBASEDIR\fR parameter in the \fBpkginfo\fR(4) file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmail\fR\fR
 .ad
 .RS 30n
-.rt  
 Defines a list of users to whom mail should be sent following installation of a
 package. If the list is empty, no mail is sent. If the parameter is not present
 in the \fBadmin\fR file, the default value of \fBroot\fR is used. The \fBask\fR
@@ -73,33 +69,27 @@ value cannot be used with this parameter.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrunlevel\fR\fR
 .ad
 .RS 30n
-.rt  
 Indicates resolution if the run level is not correct for the installation or
 removal of a package. Options are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnocheck\fR\fR
 .ad
 .RS 11n
-.rt  
 Do not check for run level.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBquit\fR\fR
 .ad
 .RS 11n
-.rt  
 Abort installation if run level is not met.
 .RE
 
@@ -107,44 +97,36 @@ Abort installation if run level is not met.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBconflict\fR\fR
 .ad
 .RS 30n
-.rt  
 Specifies what to do if an installation expects to overwrite a previously
 installed file, thus creating a conflict between packages. Options are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnocheck\fR\fR
 .ad
 .RS 12n
-.rt  
 Do not check for conflict; files in conflict will be overwritten.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBquit\fR\fR
 .ad
 .RS 12n
-.rt  
 Abort installation if conflict is detected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnochange\fR\fR
 .ad
 .RS 12n
-.rt  
 Override installation of conflicting files; they will not be installed.
 .RE
 
@@ -152,44 +134,36 @@ Override installation of conflicting files; they will not be installed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsetuid\fR\fR
 .ad
 .RS 30n
-.rt  
 Checks for executables which will have setuid or setgid bits enabled after
 installation. Options are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnocheck\fR\fR
 .ad
 .RS 12n
-.rt  
 Do not check for setuid executables.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBquit\fR\fR
 .ad
 .RS 12n
-.rt  
 Abort installation if setuid processes are detected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnochange\fR\fR
 .ad
 .RS 12n
-.rt  
 Override installation of setuid processes; processes will be installed without
 setuid bits enabled.
 .RE
@@ -198,33 +172,27 @@ setuid bits enabled.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBaction\fR\fR
 .ad
 .RS 30n
-.rt  
 Determines if action scripts provided by package developers contain possible
 security impact. Options are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnocheck\fR\fR
 .ad
 .RS 11n
-.rt  
 Ignore security impact of action scripts.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBquit\fR\fR
 .ad
 .RS 11n
-.rt  
 Abort installation if action scripts may have a negative security impact.
 .RE
 
@@ -232,33 +200,27 @@ Abort installation if action scripts may have a negative security impact.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpartial\fR\fR
 .ad
 .RS 30n
-.rt  
 Checks to see if a version of the package is already partially installed on the
 system. Options are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnocheck\fR\fR
 .ad
 .RS 11n
-.rt  
 Do not check for a partially installed package.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBquit\fR\fR
 .ad
 .RS 11n
-.rt  
 Abort installation if a partially installed package exists.
 .RE
 
@@ -266,34 +228,28 @@ Abort installation if a partially installed package exists.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinstance\fR\fR
 .ad
 .RS 30n
-.rt  
 Determines how to handle installation if a previous version of the package
 (including a partially installed instance) already exists. Options are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBquit\fR\fR
 .ad
 .RS 13n
-.rt  
 Exit without installing if an instance of the package already exists (does not
 overwrite existing packages).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBoverwrite\fR\fR
 .ad
 .RS 13n
-.rt  
 Overwrite an existing package if only one instance exists. If there is more
 than one instance, but only one has the same architecture, it overwrites that
 instance. Otherwise, the installer is prompted with existing instances and
@@ -302,12 +258,10 @@ asked which to overwrite.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunique\fR\fR
 .ad
 .RS 13n
-.rt  
 Do not overwrite an existing instance of a package. Instead, a new instance of
 the package is created. The new instance will be assigned the next available
 instance identifier.
@@ -317,33 +271,27 @@ instance identifier.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBidepend\fR\fR
 .ad
 .RS 30n
-.rt  
 Controls resolution if the package to be installed depends on other packages
 and if other packages depend on the one to be installed. Options are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnocheck\fR\fR
 .ad
 .RS 11n
-.rt  
 Do not check package dependencies.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBquit\fR\fR
 .ad
 .RS 11n
-.rt  
 Abort installation if package dependencies are not met.
 .RE
 
@@ -351,35 +299,29 @@ Abort installation if package dependencies are not met.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrdepend\fR\fR
 .ad
 .RS 30n
-.rt  
 Controls resolution if other packages depend on the package to be removed. Also
 determines behavior if registered products components to be removed. See
 \fBlibwsreg\fR(3LIB) and \fBprodreg\fR(1M) for a definition of product
 components. Options are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnocheck\fR\fR
 .ad
 .RS 11n
-.rt  
 Do not check package or product dependencies.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBquit\fR\fR
 .ad
 .RS 11n
-.rt  
 Abort removal if package or product dependencies are not met.
 .RE
 
@@ -387,33 +329,27 @@ Abort removal if package or product dependencies are not met.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBspace\fR\fR
 .ad
 .RS 30n
-.rt  
 Controls resolution if disk space requirements for package are not met. Options
 are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnocheck\fR\fR
 .ad
 .RS 11n
-.rt  
 Do not check space requirements (installation fails if it runs out of space).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBquit\fR\fR
 .ad
 .RS 11n
-.rt  
 Abort installation if space requirements are not met.
 .RE
 
@@ -421,22 +357,18 @@ Abort installation if space requirements are not met.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauthentication\fR\fR
 .ad
 .RS 30n
-.rt  
 Controls resolution when a datastream package with signature is to be
 installed. Options are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnocheck\fR\fR
 .ad
 .RS 11n
-.rt  
 Do not verify package signature. This also disables the use of the Online
 Certificate Status Protocol (OCSP) to validate the package's signing
 certificate.
@@ -444,12 +376,10 @@ certificate.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBquit\fR\fR
 .ad
 .RS 11n
-.rt  
 Abort installation if package signature cannot be verified.
 .RE
 
@@ -457,12 +387,10 @@ Abort installation if package signature cannot be verified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnetworktimeout\fR\fR
 .ad
 .RS 30n
-.rt  
 Number of seconds to wait before giving up a network connection when
 downloading a package. This entry must be a positive integer. If not present,
 the default value of 60 is used.
@@ -470,12 +398,10 @@ the default value of 60 is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnetworkretries\fR\fR
 .ad
 .RS 30n
-.rt  
 Number of times to retry a failed network connection when downloading a
 package. This entry must be a positive integer. If not present, the default
 value of 5 is used.
@@ -483,12 +409,10 @@ value of 5 is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkeystore\fR\fR
 .ad
 .RS 30n
-.rt  
 Location of trusted certificates used when downloading packages over SSL and
 when verifying signatures on packages. This is the base directory of the
 certificate location for trusted certificates used when validating digital
@@ -502,12 +426,10 @@ See \fBKEYSTORE LOCATIONS\fR and \fBKEYSTORE AND CERTIFICATE FORMATS\fR in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBproxy\fR\fR
 .ad
 .RS 30n
-.rt  
 The default proxy to use when installing packages from the network. Currently,
 only HTTP or HTTPS proxies are supported. If this field is blank or
 nonexistent, then no proxy will be used.
@@ -515,23 +437,19 @@ nonexistent, then no proxy will be used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrscriptalt=root | noaccess\fR\fR
 .ad
 .RS 30n
-.rt  
 Determines the user that will run request scripts. This parameter can have
 either of the values described below. See \fBpkgadd\fR(1M) for details on the
 conditions under which this parameter is useful.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBroot\fR\fR
 .ad
 .RS 12n
-.rt  
 Run request script as user \fBinstall\fR, if such a user exists, with the
 privileges of that user. Otherwise, run script as user \fBroot\fR, with UID
 equal to 0 and with all/zone privileges. (See \fBzones\fR(5).)
@@ -539,12 +457,10 @@ equal to 0 and with all/zone privileges. (See \fBzones\fR(5).)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoaccess\fR\fR
 .ad
 .RS 12n
-.rt  
 Run request script as user \fBinstall\fR, if such a user exists, with the
 privileges of that user. Otherwise, run script as user \fBnoaccess\fR, with the
 basic privileges of the unprivileged user \fBnoaccess\fR.
@@ -570,8 +486,8 @@ group-, and world-read privileges (444). Its contents are as follows:
 .in +2
 .nf
 mail=
-instance=unique                                                   
-partial=ask                                                        
+instance=unique
+partial=ask
 runlevel=ask
 idepend=ask
 rdepend=ask
@@ -624,7 +540,6 @@ The default \fBadmin\fR file is consulted during package installation when no
 other \fBadmin\fR file is specified.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/sadm/install/admin/default\fR\fR
 .ad
@@ -641,13 +556,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

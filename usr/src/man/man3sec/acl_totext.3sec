@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH acl_totext 3SEC "16 Jun 2008" "SunOS 5.11" "File Access Control Library Functions"
+.TH ACL_TOTEXT 3SEC "Jun 16, 2008"
 .SH NAME
 acl_totext, acl_fromtext \- convert internal representation  to or from
 external representation
@@ -35,24 +35,20 @@ Values for \fIflags\fR are constructed by a bitwise-inclusive-OR of \fIflags\fR
 from the following list, defined in <\fBsys/acl.h\fR>.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBACL_COMPACT_FMT\fR\fR
 .ad
 .RS 19n
-.rt  
 For NFSv4 ACLs, the ACL entries will be formatted using the compact ACL format
 detailed in \fBls\fR(1) for the \fB-V\fR option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBACL_APPEND_ID\fR\fR
 .ad
 .RS 19n
-.rt  
 Append the \fBuid\fR or \fBgid\fR for additional user or group entries.  This
 flag is used to construt ACL entries in a manner that is suitable for archive
 utilities such as \fBtar\fR(1). When the ACL is translated from the external
@@ -64,12 +60,10 @@ be ignored when the user or group name does exist on the system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBACL_SID_FMT\fR\fR
 .ad
 .RS 19n
-.rt  
 For NFSv4 ACLs, the ACL entries for user or group entries will use the
 \fBusersid\fR or \fBgroupsid\fR format when the "id" field in the ACL entry is
 an ephemeral \fBuid\fR or \fBgid\fR.  The raw \fBsid\fR format will only be
@@ -93,96 +87,80 @@ ACL entry contains three, four or five colon separated fields. The first field
 contains the ACL entry type. The entry type keywords are defined as:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBeveryone@\fR\fR
 .ad
 .RS 13n
-.rt  
 This ACL entry specifies the access granted to any user or group that does not
 match any previous ACL entry.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgroup\fR\fR
 .ad
 .RS 13n
-.rt  
 This ACL entry with a GID specifies the access granted to a additional group of
 the object.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgroup@\fR\fR
 .ad
 .RS 13n
-.rt  
 This ACL entry with no GID specified in the ACL entry field specifies the
 access granted to the owning group of the object.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgroupsid\fR\fR
 .ad
 .RS 13n
-.rt  
 This ACL entry with a SID or Windows name specifies the access granted to a
 Windows group. This type of entry is for a CIFS server created file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBowner@\fR\fR
 .ad
 .RS 13n
-.rt  
 This ACL entry with no UID specified in the ACL entry field specifies the
 access granted to the owner of the object.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsid\fR\fR
 .ad
 .RS 13n
-.rt  
 This ACL entry with a SID or Windows name when the entry could be either a
 group or a user.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuser\fR\fR
 .ad
 .RS 13n
-.rt  
 This ACL entry with a UID specifies the access granted to a additional user of
 the object.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBusersid\fR\fR
 .ad
 .RS 13n
-.rt  
 This ACL entry with a SID or Windows name specifies the access granted to a
 Windows user. This type of entry is for a CIFS server created file.
 .RE
@@ -194,24 +172,20 @@ ACL entries. This field is not used for \fBowner@\fR, \fBgroup@\fR, or
 \fBeveryone@\fR entries.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuid\fR\fR
 .ad
 .RS 7n
-.rt  
 This field contains a user-name or user-ID. If the user-name cannot be resolved
 to a UID, then the entry is assumed to be a numeric UID.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgid\fR\fR
 .ad
 .RS 7n
-.rt  
 This field contains a group-name or group-ID. If the group-name can't be
 resolved to a GID, then the entry is assumed to be a numeric GID.
 .RE
@@ -224,188 +198,154 @@ the permissions depends on whether \fBACL_COMPACT_FMT\fR is specified. When the
 is used with a forward slash (/) separating the permissions.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadd_file\fR\fR
 .ad
 .RS 20n
-.rt  
 Add a file to a directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadd_subdirectory\fR\fR
 .ad
 .RS 20n
-.rt  
 Add a subdirectory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBappend\fR\fR
 .ad
 .RS 20n
-.rt  
 Append data.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdelete\fR\fR
 .ad
 .RS 20n
-.rt  
 Delete.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdelete_child\fR\fR
 .ad
 .RS 20n
-.rt  
 Delete child.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBexecute\fR\fR
 .ad
 .RS 20n
-.rt  
 Execute permission.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlist_directory\fR\fR
 .ad
 .RS 20n
-.rt  
 List a directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBread_acl\fR\fR
 .ad
 .RS 20n
-.rt  
 Read ACL.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBread_data\fR\fR
 .ad
 .RS 20n
-.rt  
 Read permission.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBread_attributes\fR\fR
 .ad
 .RS 20n
-.rt  
 Read attributes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBread_xattr\fR\fR
 .ad
 .RS 20n
-.rt  
 Read named attributes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsynchronize\fR\fR
 .ad
 .RS 20n
-.rt  
 Synchronize.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwrite_acl\fR\fR
 .ad
 .RS 20n
-.rt  
 Write ACL.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwrite_attributes\fR\fR
 .ad
 .RS 20n
-.rt  
 Write attributes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwrite_data\fR\fR
 .ad
 .RS 20n
-.rt  
 Write permission.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwrite_owner\fR\fR
 .ad
 .RS 20n
-.rt  
 Write owner.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwrite_xattr\fR\fR
 .ad
 .RS 20n
-.rt  
 Write named attributes.
 .RE
 
@@ -420,155 +360,127 @@ letters.  A hyphen (-) character is used to indicate that the permission at
 that position is not specified.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBa\fR\fR
 .ad
 .RS 5n
-.rt  
 read attributes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA\fR\fR
 .ad
 .RS 5n
-.rt  
 write attributes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBc\fR\fR
 .ad
 .RS 5n
-.rt  
 read ACL
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBC\fR\fR
 .ad
 .RS 5n
-.rt  
 write ACL
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd\fR\fR
 .ad
 .RS 5n
-.rt  
 delete
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBD\fR\fR
 .ad
 .RS 5n
-.rt  
 delete child
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBo\fR\fR
 .ad
 .RS 5n
-.rt  
 write owner
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBp\fR\fR
 .ad
 .RS 5n
-.rt  
 append
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBr\fR\fR
 .ad
 .RS 5n
-.rt  
 read_data
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBR\fR\fR
 .ad
 .RS 5n
-.rt  
 read named attributes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fR
 .ad
 .RS 5n
-.rt  
 synchronize
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBw\fR\fR
 .ad
 .RS 5n
-.rt  
 write_data
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBW\fR\fR
 .ad
 .RS 5n
-.rt  
 write named attributes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBx\fR\fR
 .ad
 .RS 5n
-.rt  
 execute
 .RE
 
@@ -584,45 +496,37 @@ flags set. The following is the list of inheritance flags separated by a slash
 (/) character.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdir_inherit\fR\fR
 .ad
 .RS 16n
-.rt  
 \fBACE_DIRECTORY_INHERIT_ACE\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfile_inherit\fR\fR
 .ad
 .RS 16n
-.rt  
 \fBACE_FILE_INHERIT_ACE\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinherit_only\fR\fR
 .ad
 .RS 16n
-.rt  
 \fBACE_INHERIT_ONLY_ACE\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBno_propagate\fR\fR
 .ad
 .RS 16n
-.rt  
 \fBACE_NO_PROPAGATE_INHERIT_ACE\fR
 .RE
 
@@ -633,67 +537,55 @@ and is represented as positional arguments. A hyphen (-) character is used to
 indicate that the inheritance flag at that position is not specified.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd\fR\fR
 .ad
 .RS 5n
-.rt  
 \fBdir_inherit\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBf\fR\fR
 .ad
 .RS 5n
-.rt  
 \fBfile_inherit\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF\fR\fR
 .ad
 .RS 5n
-.rt  
 failed access (not currently supported)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBi\fR\fR
 .ad
 .RS 5n
-.rt  
 \fBinherit_only\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBn\fR\fR
 .ad
 .RS 5n
-.rt  
 \fBno_propagate\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS\fR\fR
 .ad
 .RS 5n
-.rt  
 successful access (not currently supported)
 .RE
 
@@ -702,23 +594,19 @@ successful access (not currently supported)
 The fifth field contains the type of the ACE (\fBallow\fR or \fBdeny\fR):
 .sp
 .ne 2
-.mk
 .na
 \fB\fBallow\fR\fR
 .ad
 .RS 9n
-.rt  
 The mask specified in field three should be allowed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdeny\fR\fR
 .ad
 .RS 9n
-.rt  
 The mask specified in field three should be denied.
 .RE
 
@@ -733,100 +621,82 @@ Upon successful completion, the \fBacl_fromtext()\fR function returns 0.
 Otherwise, the return value is set to one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACL_FIELD_NOT_BLANK\fR\fR
 .ad
 .RS 28n
-.rt  
 A field that should be blank is not blank.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACL_FLAGS_ERROR\fR\fR
 .ad
 .RS 28n
-.rt  
 An invalid ACL flag was specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACL_INHERIT_ERROR\fR\fR
 .ad
 .RS 28n
-.rt  
 An invalid inheritance field was specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACL_INVALID_ACCESS_TYPE\fR\fR
 .ad
 .RS 28n
-.rt  
 An invalid access type was specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACL_INVALID_STR\fR\fR
 .ad
 .RS 28n
-.rt  
 The string is \fINULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACL_INVALID_USER_GROUP\fR\fR
 .ad
 .RS 28n
-.rt  
 The required user or group name not found.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACL_MISSING_FIELDS\fR\fR
 .ad
 .RS 28n
-.rt  
 The ACL needs more fields to be specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACL_PERM_MASK_ERROR\fR\fR
 .ad
 .RS 28n
-.rt  
 The permission mask is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACL_UNKNOWN_DATA\fR\fR
 .ad
 .RS 28n
-.rt  
 Unknown data was found in the ACL.
 .RE
 
@@ -877,15 +747,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

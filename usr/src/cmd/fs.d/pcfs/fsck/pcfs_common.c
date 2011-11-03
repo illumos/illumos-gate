@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2011 Gary Mills
+ *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -62,23 +64,6 @@ void swap_pack_grabbpb(bpb_t *wbpb, struct _boot_sector *bsp);
  */
 extern int AlwaysYes;
 extern int AlwaysNo;
-
-int
-is_z_a_power_of_x_le_y(int x, int y, int z)
-{
-	int ispower = 0;
-	int pow = 1;
-
-	do {
-		if (pow == z) {
-			ispower = 1;
-			break;
-		}
-		pow *= x;
-	} while (pow <= y);
-
-	return (ispower);
-}
 
 /*
  * store_16_bits

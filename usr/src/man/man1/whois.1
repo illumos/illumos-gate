@@ -1,90 +1,191 @@
-'\" te
-.\"  Copyright 1989 AT&T  Copyright (c) 1992, Sun Microsystems, Inc.  All Rights Reserved
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH whois 1 "6 Nov 2000" "SunOS 5.11" "User Commands"
+.TH WHOIS 1 "Oct 2, 2009"
 .SH NAME
-whois \- Internet user name directory service
+\fBwhois\fP
+\- Internet domain name and network number directory service
 .SH SYNOPSIS
-.LP
-.nf
-\fBwhois\fR [\fB-h\fR \fIhost\fR] \fIidentifier\fR
-.fi
-
+.br
+\fBwhois\fP
+[\fB\-aAbfgiIklmQr\fP]
+[\fB\-c\fP \fIcountry-code\fP | \fIFl\fP h \fIhost\fP]
+[\fB\-p\fP \fIport\fP]
+\fIname\fP...
 .SH DESCRIPTION
-.sp
-.LP
-\fBwhois\fR searches for an \fBInternet\fR directory entry for an
-\fIidentifier\fR which is either a name (such as ``Smith'') or a handle (such
-as ``SRI-NIC''). To force a name-only search, precede the name with a period;
-to force a handle-only search, precede the handle with an exclamation point.
-.sp
-.LP
-To search for a group or organization entry, precede the argument with \fB*\fR
-(an asterisk). The entire membership list of the group will be displayed with
-the record.
-.sp
-.LP
-You may of course use an exclamation point and asterisk, or a period and
-asterisk together.
+The
+\fBwhois\fP
+utility looks up records in the databases maintained by several
+Network Information Centers (NICs).
+
+The options are as follows:
+.TP
+\fB\-a\fP
+Use the American Registry for Internet Numbers (ARIN) database.
+It contains network numbers used in those parts of the world covered neither by
+APNIC, AfriNIC, LACNIC, nor by RIPE.
+
+(Hint: All point of contact handles in the ARIN whois database end with -ARIN.)
+
+.TP
+\fB\-A\fP
+Use the Asia/Pacific Network Information Center (APNIC) database.
+It contains network numbers used in East Asia, Australia,
+New Zealand, and the Pacific islands.
+.TP
+\fB\-b\fP
+Use the Network Abuse Clearinghouse database.
+It contains addresses to which network abuse should be reported,
+indexed by domain name.
+.TP
+\fB\-c\fP \fIcountry-code\fP
+This is the equivalent of using the
+\fB\-h\fP
+option with an argument of \fIcountry-code\fP.whois-servers.net.
+.TP
+\fB\-f\fP
+Use the African Network Information Centre (AfriNIC) database.
+It contains network numbers used in Africa and the islands of the
+western Indian Ocean.
+.TP
+\fB\-g\fP
+Use the US non-military federal government database, which contains points of
+contact for subdomains of
+\fI\&.GOV\fP.
+.TP
+\fB\-h\fP \fIhost\fP
+Use the specified host instead of the default variant.
+Either a host name or an IP address may be specified.
+
+By default
+\fBwhois\fP
+constructs the name of a whois server to use from the top-level domain (TLD)
+of the supplied (single) argument, and appending .whois-servers.net .
+This effectively allows a suitable whois server to be selected
+automatically for a large number of TLDs.
+
+In the event that an IP
+address is specified, the whois server will default to the American
+Registry for Internet Numbers (ARIN).
+If a query to ARIN references APNIC, AfriNIC, LACNIC, or RIPE,
+that server will be queried also, provided that the
+\fB\-Q\fP
+option is not specified.
+
+If the query is not a domain name or IP address,
+\fBwhois\fP
+will fall back to
+\fIwhois.crsnic.net\fP.
+.TP
+\fB\-i\fP
+Use the Network Solutions Registry for Internet Numbers
+(\fIwhois.networksolutions.com\fP)
+database.
+It contains network numbers and domain contact information for most of
+\fI\&.COM\fP,.NET,.ORG
+and
+\fI\&.EDU\fP
+domains.
+
+.B NOTE !
+The registration of these domains is now done by a number of
+independent and competing registrars and this database holds no information
+on the domains registered by organizations other than Network Solutions, Inc.
+Also, note that the InterNIC database
+(\fIwhois.internic.net\fP)
+is no longer handled by Network Solutions, Inc.
+For details, see
+\fIhttp://www.internic.net/\fP.
+
+(Hint: Contact information, identified by the term
+.IR handle ,
+can be looked up by prefixing "handle" to the NIC
+handle in the query.)
+.TP
+\fB\-I\fP
+Use the Internet Assigned Numbers Authority (IANA) database.
+It contains network information for top-level domains.
+.TP
+\fB\-k\fP
+Use the National Internet Development Agency of Korea's (KRNIC)
+database.
+It contains network numbers and domain contact information
+for Korea.
+.TP
+\fB\-l\fP
+Use the Latin American and Caribbean IP address Regional Registry
+(Tn LACNIC)
+database.
+It contains network numbers used in much of Latin America and the
+Caribbean.
+.TP
+\fB\-m\fP
+Use the Route Arbiter Database (RADB) database.
+It contains route policy specifications for a large
+number of operators' networks.
+.TP
+\fB\-p\fP \fIport\fP
+Connect to the whois server on
+\fIport\fP.
+If this option is not specified,
+\fBwhois\fP
+defaults to port 43.
+.TP
+\fB\-Q\fP
+Do a quick lookup.
+This means that
+\fBwhois\fP
+will not attempt to lookup the name in the authoritative whois
+server (if one is listed).
+This option has no effect when combined with any other options.
+.TP
+\fB\-r\fP
+Use the R\(aaeseaux IP Europ\(aaeens (RIPE) database.
+It contains network numbers and domain contact information
+for Europe.
+
+The operands specified to
+\fBwhois\fP
+are treated independently and may be used
+as queries on different whois servers.
+.SH EXIT STATUS
+The \fBwhois\fP utility exits 0 on success, and >0 if an error occurs.
 .SH EXAMPLES
-.LP
-\fBExample 1 \fRUsing The \fBwhois\fR Command
-.sp
-.LP
-The command:
+Most types of data, such as domain names and IP addresses, can be used as
+arguments to
+\fBwhois\fP
+without any options, and
+\fBwhois\fP
+will choose the correct whois server to query.
+Some exceptions, where
+\fBwhois\fP
+will not be able to handle data correctly, are detailed below.
 
-.sp
-.in +2
-.nf
-example% whois Smith
-.fi
-.in -2
-.sp
+To obtain contact information about an
+administrator located in the Russian TLD domain RU,
+use the
+\fB\-c\fP
+option as shown in the following example, where
+\fICONTACT-ID\fP
+is substituted with the actual contact identifier.
 
-.sp
-.LP
-looks for the name or handle SMITH.
+whois -c RU CONTACT-ID
 
-.sp
-.LP
-The command:
+(Note: This example is specific to the TLD RU,
+but other TLDs can be queried by using a similar syntax.)
 
-.sp
-.in +2
-.nf
-example% whois !SRI-NIC
-.fi
-.in -2
-.sp
+The following example demonstrates how to query
+a whois server using a non-standard port, where
+``query-data''
+is the query to be sent to
+``whois.example.com''
+on port
+``rwhois''
+(written numerically as 4321).
 
-.sp
-.LP
-looks for the handle SRI-NIC only.
-
-.sp
-.LP
-The command:
-
-.sp
-.in +2
-.nf
-example% whois .Smith, John
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-looks for the name \fBJOHN SMITH\fR only.
-
-.sp
-.LP
-Adding \fB\&.\|.\|.\fR to the name or handle argument will match anything from
-that point; that is, \fBZU .\|.\|.\fR will match ZUL, ZUM, and so on.
-
+whois -h whois.example.com -p rwhois query-data
 .SH SEE ALSO
-.sp
-.LP
-\fBattributes\fR(5)
+
+Vic White and Ken Harrenstien, \fINICNAME/WHOIS\fP, 1 March 1982, RFC 812.
+.SH HISTORY
+The
+\fBwhois\fP
+command appeared in
+4.3BSD.

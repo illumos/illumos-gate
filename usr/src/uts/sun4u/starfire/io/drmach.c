@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
 
 #include <sys/debug.h>
@@ -211,11 +212,21 @@ struct drmach_shutdown_mbox {
 	uint64_t	physaddr;
 };
 struct drmach_shutdown_mbox	*drmach_shutdown_asm_mbox;
+
+static int		drmach_fini(void);
 static sbd_error_t	*drmach_device_new(drmach_node_t *,
 				drmach_board_t *, drmach_device_t **);
 static sbd_error_t	*drmach_cpu_new(drmach_device_t *);
 static sbd_error_t	*drmach_mem_new(drmach_device_t *);
 static sbd_error_t	*drmach_io_new(drmach_device_t *);
+static sbd_error_t	*drmach_board_release(drmachid_t);
+static sbd_error_t	*drmach_board_status(drmachid_t, drmach_status_t *);
+static sbd_error_t	*drmach_cpu_release(drmachid_t);
+static sbd_error_t	*drmach_cpu_status(drmachid_t, drmach_status_t *);
+static sbd_error_t	*drmach_io_release(drmachid_t);
+static sbd_error_t	*drmach_io_status(drmachid_t, drmach_status_t *);
+static sbd_error_t	*drmach_mem_release(drmachid_t);
+static sbd_error_t	*drmach_mem_status(drmachid_t, drmach_status_t *);
 
 extern struct cpu	*SIGBCPU;
 
@@ -285,14 +296,6 @@ static struct {
 #define	MBYTE	(1048576ull)
 
 /*
- * This is necessary because the CPU support needs
- * to call cvc_assign_iocpu.
- */
-#ifndef lint
-char _depends_on[] = "drv/cvc";
-#endif  /* lint */
-
-/*
  * drmach autoconfiguration data structures and interfaces
  */
 
@@ -347,8 +350,6 @@ _init(void)
 int
 _fini(void)
 {
-	static int drmach_fini(void);
-
 	if (drmach_fini())
 		return (DDI_FAILURE);
 	else
@@ -787,9 +788,6 @@ drmach_device_get_proplen(drmach_device_t *dp, char *name, int *len)
 static drmach_board_t *
 drmach_board_new(int bnum)
 {
-	static sbd_error_t *drmach_board_release(drmachid_t);
-	static sbd_error_t *drmach_board_status(drmachid_t, drmach_status_t *);
-
 	drmach_board_t	*bp;
 
 	bp = kmem_zalloc(sizeof (drmach_board_t), KM_SLEEP);
@@ -1730,9 +1728,6 @@ drmach_copy_rename_fini(drmachid_t id)
 static sbd_error_t *
 drmach_io_new(drmach_device_t *dp)
 {
-	static sbd_error_t *drmach_io_release(drmachid_t);
-	static sbd_error_t *drmach_io_status(drmachid_t, drmach_status_t *);
-
 	sbd_error_t	*err;
 	int		 portid;
 
@@ -2350,9 +2345,6 @@ drmach_board_unassign(drmachid_t id)
 static sbd_error_t *
 drmach_cpu_new(drmach_device_t *dp)
 {
-	static sbd_error_t *drmach_cpu_release(drmachid_t);
-	static sbd_error_t *drmach_cpu_status(drmachid_t, drmach_status_t *);
-
 	sbd_error_t	*err;
 	int		 portid;
 
@@ -2930,9 +2922,6 @@ drmach_io_status(drmachid_t id, drmach_status_t *stat)
 static sbd_error_t *
 drmach_mem_new(drmach_device_t *dp)
 {
-	static sbd_error_t *drmach_mem_release(drmachid_t);
-	static sbd_error_t *drmach_mem_status(drmachid_t, drmach_status_t *);
-
 	dp->unum = 0;
 	dp->cm.isa = (void *)drmach_mem_new;
 	dp->cm.release = drmach_mem_release;

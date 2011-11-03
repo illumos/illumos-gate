@@ -1,13 +1,13 @@
 '\" te
 .\"  Copyright 1989 AT&T.  Copyright (c) 2004 Sun Microsystems, Inc.  All Rights Reserved.  Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mknod 2 "19 Feb 2004" "SunOS 5.11" "System Calls"
+.TH MKNOD 2 "Feb 19, 2004"
 .SH NAME
 mknod \- make a directory, a special file, or a regular file
 .SH SYNOPSIS
@@ -30,56 +30,46 @@ The file type is specified in \fImode\fR by the \fBS_IFMT\fR bits, which must
 be set to one of the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS_IFIFO\fR\fR
 .ad
 .RS 11n
-.rt  
 fifo special
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS_IFCHR\fR\fR
 .ad
 .RS 11n
-.rt  
 character special
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS_IFDIR\fR\fR
 .ad
 .RS 11n
-.rt  
 directory
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS_IFBLK\fR\fR
 .ad
 .RS 11n
-.rt  
 block special
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS_IFREG\fR\fR
 .ad
 .RS 11n
-.rt  
 ordinary file
 .RE
 
@@ -91,31 +81,29 @@ and may be constructed by a bitwise \fBOR\fR operation of the following values:
 
 .sp
 .TS
-tab();
-lw(1.08i) lw(.89i) lw(3.53i) 
-lw(1.08i) lw(.89i) lw(3.53i) 
-.
-\fBS_ISUID\fR04000Set user ID on execution.
-\fBS_ISGID\fR020#0T{
+l l l
+l l l .
+\fBS_ISUID\fR	04000	Set user ID on execution.
+\fBS_ISGID\fR	020#0	T{
 Set group ID on execution if # is \fB7\fR, \fB5\fR, \fB3\fR, or \fB1\fR. Enable mandatory file/record locking if # is \fB6\fR, \fB4\fR, \fB2\fR, or \fB0\fR
 T}
-\fBS_ISVTX\fR01000T{
+\fBS_ISVTX\fR	01000	T{
 On directories, restricted deletion flag; on regular files on a UFS file system, do not cache flag.
 T}
-\fBS_IRWXU\fR00700Read, write, execute by owner.
-\fBS_IRUSR\fR00400Read by owner.
-\fBS_IWUSR\fR00200Write by owner.
-\fBS_IXUSR\fR00100T{
+\fBS_IRWXU\fR	00700	Read, write, execute by owner.
+\fBS_IRUSR\fR	00400	Read by owner.
+\fBS_IWUSR\fR	00200	Write by owner.
+\fBS_IXUSR\fR	00100	T{
 Execute (search if a directory) by owner.
 T}
-\fBS_IRWXG\fR00070Read, write, execute by group.
-\fBS_IRGRP\fR00040Read by group.
-\fBS_IWGRP\fR00020Write by group.
-\fBS_IXGRP\fR00010Execute by group.
-\fBS_IRWXO\fR00007Read, write, execute (search) by others.
-\fBS_IROTH\fR00004Read by others.
-\fBS_IWOTH\fR00002Write by others
-\fBS_IXOTH\fR00001Execute by others.
+\fBS_IRWXG\fR	00070	Read, write, execute by group.
+\fBS_IRGRP\fR	00040	Read by group.
+\fBS_IWGRP\fR	00020	Write by group.
+\fBS_IXGRP\fR	00010	Execute by group.
+\fBS_IRWXO\fR	00007	Read, write, execute (search) by others.
+\fBS_IROTH\fR	00004	Read by others.
+\fBS_IWOTH\fR	00002	Write by others
+\fBS_IXOTH\fR	00001	Execute by others.
 .TE
 
 .sp
@@ -150,24 +138,20 @@ indicate the error.
 The \fBmknod()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 16n
-.rt  
 A component of the path prefix denies search permission, or write permission is
 denied on the parent directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEDQUOT\fR\fR
 .ad
 .RS 16n
-.rt  
 The directory where the new file entry is being placed cannot be extended
 because the user's quota of disk blocks on that file system has been exhausted,
 or the user's quota of inodes on the file system where the file is being
@@ -176,78 +160,64 @@ created has been exhausted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEEXIST\fR\fR
 .ad
 .RS 16n
-.rt  
 The named file exists.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIpath\fR argument points to an illegal address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 16n
-.rt  
 A signal was caught during the execution of the \fBmknod()\fR function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 16n
-.rt  
 An invalid argument exists.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 16n
-.rt  
 An I/O error occurred while accessing the file system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBELOOP\fR\fR
 .ad
 .RS 16n
-.rt  
 Too many symbolic links were encountered in translating \fIpath\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENAMETOOLONG\fR\fR
 .ad
 .RS 16n
-.rt  
 The length of the \fIpath\fR argument exceeds {\fB\fR\fBPATH_MAX\fR}, or the
 length of a \fIpath\fR component exceeds {\fB\fR\fBNAME_MAX\fR} while
 \fB\fR\fB_POSIX_NO_TRUNC\fR is in effect.
@@ -255,70 +225,58 @@ length of a \fIpath\fR component exceeds {\fB\fR\fBNAME_MAX\fR} while
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 16n
-.rt  
 A component of the path prefix specified by \fIpath\fR does not name an
 existing directory or \fIpath\fR is an empty string.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOLINK\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIpath\fR argument points to a remote machine and the link to that machine
 is no longer active.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSPC\fR\fR
 .ad
 .RS 16n
-.rt  
 The directory that would contain the new file cannot be extended or the file
 system is out of file allocation resources.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTDIR\fR\fR
 .ad
 .RS 16n
-.rt  
 A component of the path prefix is not a directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 16n
-.rt  
 Not all privileges are asserted in the effective set of the calling process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEROFS\fR\fR
 .ad
 .RS 16n
-.rt  
 The directory in which the file is to be created is located on a read-only file
 system.
 .RE
@@ -328,12 +286,10 @@ system.
 The \fBmknod()\fR function may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENAMETOOLONG\fR\fR
 .ad
 .RS 16n
-.rt  
 Pathname resolution of a symbolic link produced an intermediate result whose
 length exceeds {\fBPATH_MAX\fR}.
 .RE
@@ -361,15 +317,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelAsync-Signal-Safe
+MT-Level	Async-Signal-Safe
 .TE
 
 .SH SEE ALSO

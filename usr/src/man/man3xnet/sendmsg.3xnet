@@ -1,13 +1,13 @@
 '\" te
 .\" Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.  Portions Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sendmsg 3XNET "1 Nov 2003" "SunOS 5.11" "X/Open Networking Services Library Functions"
+.TH SENDMSG 3XNET "Nov 1, 2003"
 .SH NAME
 sendmsg \- send a message on a socket using a message structure
 .SH SYNOPSIS
@@ -25,23 +25,19 @@ sendmsg \- send a message on a socket using a message structure
 The function takes the following arguments:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsocket\fR\fR
 .ad
 .RS 11n
-.rt  
 Specifies the socket file descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImessage\fR\fR
 .ad
 .RS 11n
-.rt  
 Points to a \fBmsghdr\fR structure, containing both the destination address and
 the buffers for the outgoing message. The length and format of the address
 depend on the address family of the socket.  The \fBmsg_flags\fR member is
@@ -50,33 +46,27 @@ ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 11n
-.rt  
 Specifies the type of message transmission. The application may specify 0 or
 the following flag:
 .sp
 .ne 2
-.mk
 .na
 \fBMSG_EOR\fR
 .ad
 .RS 11n
-.rt  
 Terminates a record (if supported by the protocol)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBMSG_OOB\fR
 .ad
 .RS 11n
-.rt  
 Sends out-of-band data on sockets that support out-of-bound data. The
 significance and semantics of out-of-band data are protocol-specific.
 .RE
@@ -137,7 +127,6 @@ the error.
 The \fBsendmsg()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR \fR
 .ad
@@ -146,52 +135,43 @@ The \fBsendmsg()\fR function will fail if:
 \fB\fBEWOULDBLOCK\fR\fR
 .ad
 .RS 16n
-.rt  
 The socket's file descriptor is marked O_NONBLOCK and the requested operation
 would block.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAFNOSUPPORT\fR\fR
 .ad
 .RS 16n
-.rt  
 Addresses in the specified address family cannot be used with this socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIsocket\fR argument is not a valid file descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBECONNRESET\fR\fR
 .ad
 .RS 16n
-.rt  
 A connection was forcibly closed by a peer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 16n
-.rt  
 The  \fImessage\fR parameter, or storage pointed to by the  \fImsg_name\fR,
 \fImsg_control\fR or  \fImsg_iov\fR fields of the  \fImessage\fR parameter, or
 storage pointed to by the \fBiovec\fR structures pointed to by the
@@ -200,34 +180,28 @@ storage pointed to by the \fBiovec\fR structures pointed to by the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 16n
-.rt  
 A signal interrupted \fBsendmsg()\fR before any data was transmitted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 16n
-.rt  
 The sum of the \fBiov_len\fR values overflows an \fBssize_t\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEMSGSIZE\fR\fR
 .ad
 .RS 16n
-.rt  
 The message is to large to be sent all at once (as the socket requires), or the
 \fBmsg_iovlen\fR member of the \fBmsghdr\fR structure pointed to by
 \fImessage\fR is less than or equal to 0 or is greater than \fBIOV_MAX\fR.
@@ -235,46 +209,38 @@ The message is to large to be sent all at once (as the socket requires), or the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTCONN\fR\fR
 .ad
 .RS 16n
-.rt  
 The socket is connection-mode but is not connected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSOCK\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIsocket\fR argument does not refer a socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOPNOTSUPP\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIsocket\fR argument is associated with a socket that does not support one
 or more of the values set in \fIflags\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPIPE\fR\fR
 .ad
 .RS 16n
-.rt  
 The socket is shut down for writing, or the socket is connection-mode and is no
 longer connected. In the latter case, and if the socket is of type SOCK_STREAM,
 the \fBSIGPIPE\fR signal is generated to the calling thread.
@@ -286,59 +252,49 @@ If the address family of the socket is \fBAF_UNIX\fR, then \fBsendmsg()\fR will
 fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 16n
-.rt  
 An I/O error occurred while reading from or writing to the file system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBELOOP\fR\fR
 .ad
 .RS 16n
-.rt  
 Too many symbolic links were encountered in translating the pathname in the
 socket address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENAMETOOLONG\fR\fR
 .ad
 .RS 16n
-.rt  
 A component of a pathname exceeded \fINAME_MAX\fR characters, or an entire
 pathname exceeded \fIPATH_MAX\fR characters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 16n
-.rt  
 A component of the pathname does not name an existing file or the pathname is
 an empty string.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTDIR\fR\fR
 .ad
 .RS 16n
-.rt  
 A component of the path prefix of the pathname in the socket address is not a
 directory.
 .RE
@@ -348,114 +304,94 @@ directory.
 The \fBsendmsg()\fR function may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 16n
-.rt  
 Search permission is denied for a component of the path prefix; or write access
 to the named socket is denied.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEDESTADDRREQ\fR\fR
 .ad
 .RS 16n
-.rt  
 The socket is not connection-mode and does not have its peer address set, and
 no destination address was specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEHOSTUNREACH\fR\fR
 .ad
 .RS 16n
-.rt  
 The destination host cannot be reached (probably because the host is down or a
 remote router cannot reach it).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 16n
-.rt  
 An I/O error occurred while reading from or writing to the file system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEISCONN\fR\fR
 .ad
 .RS 16n
-.rt  
 A destination address was specified and the socket is already connected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENETDOWN\fR\fR
 .ad
 .RS 16n
-.rt  
 The local interface used to reach the destination is down.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENETUNREACH\fR\fR
 .ad
 .RS 16n
-.rt  
 No route to the network is present.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOBUFS\fR\fR
 .ad
 .RS 16n
-.rt  
 Insufficient resources were available in the system to perform the operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 16n
-.rt  
 Insufficient memory was available to fulfill the request.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSR\fR\fR
 .ad
 .RS 16n
-.rt  
 There were insufficient STREAMS resources available for the operation to
 complete.
 .RE
@@ -466,12 +402,10 @@ If the address family of the socket is \fBAF_UNIX\fR, then \fBsendmsg()\fR may
 fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENAMETOOLONG\fR\fR
 .ad
 .RS 16n
-.rt  
 Pathname resolution of a symbolic link produced an intermediate result whose
 length exceeds \fIPATH_MAX\fR.
 .RE
@@ -484,15 +418,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

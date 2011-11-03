@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH lpq 1B "2 Jun 2006" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.TH LPQ 1B "Jun 2, 2006"
 .SH NAME
 lpq \- display the content of a print queue
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/ucb/lpq\fR [\fB-P\fR \fIdestination\fR] [\fB-l\fR] [+ [\fIinterval\fR]] 
+\fB/usr/ucb/lpq\fR [\fB-P\fR \fIdestination\fR] [\fB-l\fR] [+ [\fIinterval\fR]]
      [\fIrequest-ID\fR...] [\fIuser\fR]...
 .fi
 
@@ -69,24 +69,20 @@ The print client commands locate destination information using the
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 18n
-.rt  
 Displays information in long format. Long format includes the name of the host
 from which a print request originated in the display.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR \fIdestination\fR\fR
 .ad
 .RS 18n
-.rt  
 Displays information about printer or class of printers (see \fBlpadmin\fR(1M))
 \fI\&.\fR Specify \fIdestination\fR using atomic, URI-style
 (\fIscheme\fR\fB://\fR\fBendpoint\fR), or POSIX-style
@@ -96,12 +92,10 @@ information regarding destination names.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+\fR [\fIinterval\fR]\fR
 .ad
 .RS 18n
-.rt  
 Displays information at specific time intervals. Stops displaying information
 when the print queue is empty. Clears the screen before reporting displaying
 the print queue. Specify \fIinterval\fR as the number of seconds between
@@ -114,23 +108,19 @@ displays. If  \fIinterval\fR is not specified only executes once.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrequest-ID\fR\fR
 .ad
 .RS 14n
-.rt  
 The job number associated with a print request.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIuser\fR\fR
 .ad
 .RS 14n
-.rt  
 The name of the user about whose jobs  \fBlpq\fR reports information. Specify
 \fIuser\fR as a valid username.
 .RE
@@ -141,79 +131,65 @@ The name of the user about whose jobs  \fBlpq\fR reports information. Specify
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnon-zero\fR
 .ad
 .RS 12n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.printers\fR\fR
 .ad
 .RS 24n
-.rt  
 User-configurable printer database
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/printers.conf\fR\fR
 .ad
 .RS 24n
-.rt  
 System printer configuration database
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprinters.conf.byname\fR\fR
 .ad
 .RS 24n
-.rt  
 NIS version of \fB/etc/printers.conf\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprinters.org_dir\fR\fR
 .ad
 .RS 24n
-.rt  
 NIS+ version of \fB/etc/printers.conf\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBou=printers\fR\fR
 .ad
 .RS 24n
-.rt  
 LDAP version of \fB/etc/printers.conf\fR
 .RE
 
@@ -225,13 +201,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

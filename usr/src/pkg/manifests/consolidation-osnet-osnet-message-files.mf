@@ -46,8 +46,8 @@ dir path=usr/lib/locale
 dir path=usr/lib/locale/C
 dir path=usr/lib/locale/C/LC_MESSAGES
 dir path=usr/lib/locale/C/LC_TIME
-dir path=usr/share group=sys
-dir path=usr/share/lib group=sys
+dir path=usr/share
+dir path=usr/share/lib
 dir path=usr/share/lib/locale
 dir path=usr/share/lib/locale/com
 dir path=usr/share/lib/locale/com/sun

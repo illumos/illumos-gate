@@ -21,6 +21,7 @@
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2011, Richard Lowe
+# Copyright 2011 Nexenta Systems, Inc. All rights reserved.
 #
 
 #
@@ -400,7 +401,6 @@ DIRS= \
 	/usr/share/man/man3xcurses \
 	/usr/share/man/man3xnet \
 	/usr/share/man/man4 \
-	/usr/share/man/man4b \
 	/usr/share/man/man5 \
 	/usr/share/man/man7 \
 	/usr/share/man/man7d \
@@ -754,9 +754,9 @@ $(ROOT)/usr/ccs/lib/llib-lpanel.ln:= 	REALPATH=../../lib/llib-lpanel.ln
 $(ROOT)/usr/ccs/lib/libtermlib.so:=	REALPATH=../../../lib/libcurses.so.1
 $(ROOT)/usr/ccs/lib/llib-ltermlib:= 	REALPATH=../../../lib/llib-lcurses
 $(ROOT)/usr/ccs/lib/llib-ltermlib.ln:= 	REALPATH=../../../lib/llib-lcurses.ln
-$(ROOT)/usr/ccs/lib/libtermcap.so:=	REALPATH=../../../lib/libcurses.so.1
-$(ROOT)/usr/ccs/lib/llib-ltermcap:= 	REALPATH=../../../lib/llib-lcurses
-$(ROOT)/usr/ccs/lib/llib-ltermcap.ln:= 	REALPATH=../../../lib/llib-lcurses.ln
+$(ROOT)/usr/ccs/lib/libtermcap.so:=	REALPATH=../../../lib/libtermcap.so.1
+$(ROOT)/usr/ccs/lib/llib-ltermcap:= 	REALPATH=../../../lib/llib-ltermcap
+$(ROOT)/usr/ccs/lib/llib-ltermcap.ln:= 	REALPATH=../../../lib/llib-ltermcap.ln
 $(ROOT)/usr/ccs/lib/values-Xa.o:=	REALPATH=../../lib/values-Xa.o
 $(ROOT)/usr/ccs/lib/values-Xc.o:=	REALPATH=../../lib/values-Xc.o
 $(ROOT)/usr/ccs/lib/values-Xs.o:=	REALPATH=../../lib/values-Xs.o
@@ -799,9 +799,9 @@ $(ROOT)/usr/ccs/lib/$(MACH64)/libtermlib.so:= \
 $(ROOT)/usr/ccs/lib/$(MACH64)/llib-ltermlib.ln:= \
 	REALPATH=../../../../lib/$(MACH64)/llib-lcurses.ln
 $(ROOT)/usr/ccs/lib/$(MACH64)/libtermcap.so:= \
-	REALPATH=../../../../lib/$(MACH64)/libcurses.so.1
+	REALPATH=../../../../lib/$(MACH64)/libtermcap.so.1
 $(ROOT)/usr/ccs/lib/$(MACH64)/llib-ltermcap.ln:= \
-	REALPATH=../../../../lib/$(MACH64)/llib-lcurses.ln
+	REALPATH=../../../../lib/$(MACH64)/llib-ltermcap.ln
 $(ROOT)/usr/ccs/lib/$(MACH64)/values-Xa.o:= \
 	REALPATH=../../../lib/$(MACH64)/values-Xa.o
 $(ROOT)/usr/ccs/lib/$(MACH64)/values-Xc.o:= \
@@ -1009,8 +1009,8 @@ $(ROOT)/usr/lib/libsocket.so.1:=	REALPATH=../../lib/libsocket.so.1
 $(ROOT)/usr/lib/libsocket.so:=		REALPATH=../../lib/libsocket.so.1
 $(ROOT)/usr/lib/libsysevent.so.1:=	REALPATH=../../lib/libsysevent.so.1
 $(ROOT)/usr/lib/libsysevent.so:=	REALPATH=../../lib/libsysevent.so.1
-$(ROOT)/usr/lib/libtermcap.so.1:=	REALPATH=../../lib/libcurses.so.1
-$(ROOT)/usr/lib/libtermcap.so:=		REALPATH=../../lib/libcurses.so.1
+$(ROOT)/usr/lib/libtermcap.so.1:=	REALPATH=../../lib/libtermcap.so.1
+$(ROOT)/usr/lib/libtermcap.so:=		REALPATH=../../lib/libtermcap.so.1
 $(ROOT)/usr/lib/libtermlib.so.1:=	REALPATH=../../lib/libcurses.so.1
 $(ROOT)/usr/lib/libtermlib.so:=		REALPATH=../../lib/libcurses.so.1
 $(ROOT)/usr/lib/libthread.so.1:=	REALPATH=../../lib/libthread.so.1
@@ -1113,8 +1113,8 @@ $(ROOT)/usr/lib/llib-lsocket.ln:=	REALPATH=../../lib/llib-lsocket.ln
 $(ROOT)/usr/lib/llib-lsocket:=		REALPATH=../../lib/llib-lsocket
 $(ROOT)/usr/lib/llib-lsysevent.ln:=	REALPATH=../../lib/llib-lsysevent.ln
 $(ROOT)/usr/lib/llib-lsysevent:=	REALPATH=../../lib/llib-lsysevent
-$(ROOT)/usr/lib/llib-ltermcap.ln:=	REALPATH=../../lib/llib-lcurses.ln
-$(ROOT)/usr/lib/llib-ltermcap:=		REALPATH=../../lib/llib-lcurses
+$(ROOT)/usr/lib/llib-ltermcap.ln:=	REALPATH=../../lib/llib-ltermcap.ln
+$(ROOT)/usr/lib/llib-ltermcap:=		REALPATH=../../lib/llib-ltermcap
 $(ROOT)/usr/lib/llib-ltermlib.ln:=	REALPATH=../../lib/llib-lcurses.ln
 $(ROOT)/usr/lib/llib-ltermlib:=		REALPATH=../../lib/llib-lcurses
 $(ROOT)/usr/lib/llib-lthread.ln:=	REALPATH=../../lib/llib-lthread.ln
@@ -1332,9 +1332,9 @@ $(ROOT)/usr/lib/$(MACH64)/libsysevent.so.1:= \
 $(ROOT)/usr/lib/$(MACH64)/libsysevent.so:= \
 	REALPATH=../../../lib/$(MACH64)/libsysevent.so.1
 $(ROOT)/usr/lib/$(MACH64)/libtermcap.so.1:= \
-	REALPATH=../../../lib/$(MACH64)/libcurses.so.1
+	REALPATH=../../../lib/$(MACH64)/libtermcap.so.1
 $(ROOT)/usr/lib/$(MACH64)/libtermcap.so:= \
-	REALPATH=../../../lib/$(MACH64)/libcurses.so.1
+	REALPATH=../../../lib/$(MACH64)/libtermcap.so.1
 $(ROOT)/usr/lib/$(MACH64)/libtermlib.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/libcurses.so.1
 $(ROOT)/usr/lib/$(MACH64)/libtermlib.so:= \
@@ -1401,8 +1401,6 @@ $(ROOT)/usr/lib/$(MACH64)/llib-lctf.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-lctf.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-lcurses.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-lcurses.ln
-$(ROOT)/usr/lib/$(MACH64)/llib-lcurses:= \
-	REALPATH=../../../lib/$(MACH64)/llib-lcurses
 $(ROOT)/usr/lib/$(MACH64)/llib-ldevice.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-ldevice.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-ldevid.ln:= \
@@ -1458,13 +1456,9 @@ $(ROOT)/usr/lib/$(MACH64)/llib-lsocket.ln:= \
 $(ROOT)/usr/lib/$(MACH64)/llib-lsysevent.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-lsysevent.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-ltermcap.ln:= \
-	REALPATH=../../../lib/$(MACH64)/llib-lcurses.ln
-$(ROOT)/usr/lib/$(MACH64)/llib-ltermcap:= \
-	REALPATH=../../../lib/$(MACH64)/llib-lcurses
+	REALPATH=../../../lib/$(MACH64)/llib-ltermcap.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-ltermlib.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-lcurses.ln
-$(ROOT)/usr/lib/$(MACH64)/llib-ltermlib:= \
-	REALPATH=../../../lib/$(MACH64)/llib-lcurses
 $(ROOT)/usr/lib/$(MACH64)/llib-lthread.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-lthread.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-lthread_db.ln:= \
@@ -1879,7 +1873,6 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/llib-lcmdutils.ln \
 	/usr/lib/$(MACH64)/llib-lcontract.ln \
 	/usr/lib/$(MACH64)/llib-lctf.ln \
-	/usr/lib/$(MACH64)/llib-lcurses \
 	/usr/lib/$(MACH64)/llib-lcurses.ln \
 	/usr/lib/$(MACH64)/llib-ldevice.ln \
 	/usr/lib/$(MACH64)/llib-ldevid.ln \
@@ -1908,9 +1901,7 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/llib-lsendfile.ln \
 	/usr/lib/$(MACH64)/llib-lsocket.ln \
 	/usr/lib/$(MACH64)/llib-lsysevent.ln \
-	/usr/lib/$(MACH64)/llib-ltermcap \
 	/usr/lib/$(MACH64)/llib-ltermcap.ln \
-	/usr/lib/$(MACH64)/llib-ltermlib \
 	/usr/lib/$(MACH64)/llib-ltermlib.ln \
 	/usr/lib/$(MACH64)/llib-lthread.ln \
 	/usr/lib/$(MACH64)/llib-lthread_db.ln \

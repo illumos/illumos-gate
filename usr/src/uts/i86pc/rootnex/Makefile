@@ -21,6 +21,7 @@
 #
 # uts/i86pc/rootnex/Makefile
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 # Use is subject to license terms.
 #
 #	This makefile drives the production of the rootnex driver
@@ -55,9 +56,9 @@ LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 #
-#	Overrides.
+# Define dependencies on iommulib and acpica
 #
-LDFLAGS		+= -dy
+LDFLAGS		+= -dy -N misc/iommulib -N misc/acpica
 
 #
 # For now, disable these lint checks; maintainers should endeavor

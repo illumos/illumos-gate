@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH termio 7I "14 Sep 2005" "SunOS 5.11" "Ioctl Requests"
+.TH TERMIO 7I "Sep 14, 2005"
 .SH NAME
 termio \- general terminal interface
 .SH SYNOPSIS
@@ -158,12 +158,10 @@ bursty and short-term data transmissions. The four possible values for
 \fBMIN\fR and \fBTIME\fR and their interactions are described below.
 .sp
 .ne 2
-.mk
 .na
 \fBCase A: MIN > 0, TIME > 0\fR
 .ad
 .RS 29n
-.rt  
 In this case, \fBTIME\fR serves as an intercharacter timer and is activated
 after the first character is received.  Since it is an intercharacter timer, it
 is reset after a character is received. The interaction between \fBMIN\fR and
@@ -183,12 +181,10 @@ immediately.
 
 .sp
 .ne 2
-.mk
 .na
 \fBCase B: MIN > 0, TIME = 0\fR
 .ad
 .RS 29n
-.rt  
 In this case, since the value of \fBTIME\fR is zero, the timer plays no role
 and only \fBMIN\fR is significant.  A pending read is not satisfied until
 \fBMIN\fR characters are received (the pending read sleeps until  \fBMIN\fR
@@ -198,12 +194,10 @@ terminal \fBI/O\fR may block indefinitely in the read operation.
 
 .sp
 .ne 2
-.mk
 .na
 \fBCase C: MIN = 0, TIME > 0\fR
 .ad
 .RS 29n
-.rt  
 In this case, since \fBMIN\fR = 0,  \fBTIME\fR no longer represents an
 intercharacter timer: it now serves as a read timer that is activated as soon
 as a \fBread\fR is done.  A read is satisfied as soon as a single character is
@@ -217,12 +211,10 @@ returns with zero characters.
 
 .sp
 .ne 2
-.mk
 .na
 \fBCase D: MIN = 0, TIME = 0\fR
 .ad
 .RS 29n
-.rt  
 In this case, return is immediate. The minimum of either the number of
 characters requested or the number of characters currently available is
 returned without waiting for more characters to be input.
@@ -285,12 +277,10 @@ Certain characters have special functions on input. These functions and their
 default character values are summarized as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBINTR\fR\fR
 .ad
 .RS 11n
-.rt  
 (Control-c or \fBASCII ETX\fR) generates a \fBSIGINT\fR signal. \fBSIGINT\fR is
 sent to all foreground processes associated with the controlling terminal.
 Normally, each such process is forced to terminate, but arrangements may be
@@ -300,12 +290,10 @@ location. (See  \fBsignal.h\fR(3HEAD)).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBQUIT\fR\fR
 .ad
 .RS 11n
-.rt  
 (Control-| or \fBASCII FS\fR) generates a \fBSIGQUIT\fR signal.  Its treatment
 is identical to the interrupt signal except that, unless a receiving process
 has made other arrangements, it will not only be terminated but a core image
@@ -314,12 +302,10 @@ file (called  \fBcore\fR) will be created in the current working directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBERASE\fR\fR
 .ad
 .RS 11n
-.rt  
 (DEL) erases the preceding character. It does not erase beyond the start of a
 line, as delimited by a \fBNL\fR, \fBEOF\fR, \fBEOL\fR, or \fBEOL2\fR
 character.
@@ -327,12 +313,10 @@ character.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWERASE\fR\fR
 .ad
 .RS 11n
-.rt  
 (Control-w or \fBASCII ETX\fR) erases the preceding "word". It does not erase
 beyond the start of a line, as delimited by a \fBNL\fR, \fBEOF\fR, \fBEOL\fR,
 or \fBEOL2\fR character.
@@ -340,36 +324,30 @@ or \fBEOL2\fR character.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKILL\fR\fR
 .ad
 .RS 11n
-.rt  
 (Control-u or \fBASCII NAK\fR) deletes the entire line, as delimited by a
 \fBNL\fR, \fBEOF\fR, \fBEOL\fR, or \fBEOL2\fR character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBREPRINT\fR\fR
 .ad
 .RS 11n
-.rt  
 (Control-r or \fBASCII DC2\fR) reprints all characters, preceded by a newline,
 that have not been read.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOF\fR\fR
 .ad
 .RS 11n
-.rt  
 (Control-d or \fBASCII EOT\fR) may be used to generate an end-of-file  from a
 terminal. When received, all the characters waiting to be read are immediately
 passed to the program, without waiting for a newline, and the \fBEOF\fR is
@@ -382,46 +360,38 @@ terminals that respond to \fBEOT\fR from hanging up.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNL\fR\fR
 .ad
 .RS 11n
-.rt  
 (ASCII LF) is the normal line delimiter. It cannot be changed or escaped.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOL\fR\fR
 .ad
 .RS 11n
-.rt  
 (ASCII NULL) is an additional line delimiter, like \fBNL\fR . It is not
 normally used.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOL2\fR\fR
 .ad
 .RS 11n
-.rt  
 is another additional line delimiter.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSWTCH\fR\fR
 .ad
 .RS 11n
-.rt  
 (Control-z or \fBASCII EM\fR) Header file symbols related to this special
 character are present for compatibility purposes only and the kernel takes no
 special action on matching SWTCH (except to discard the character).
@@ -429,24 +399,20 @@ special action on matching SWTCH (except to discard the character).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSUSP\fR\fR
 .ad
 .RS 11n
-.rt  
 (Control-z or \fBASCII SUB\fR) generates a  \fBSIGTSTP\fR signal. \fBSIGTSTP\fR
 stops all processes in the foreground process group for that terminal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDSUSP\fR\fR
 .ad
 .RS 11n
-.rt  
 (Control-y or \fBASCII EM\fR). It generates a \fBSIGTSTP\fR signal as
 \fBSUSP\fR does, but the signal is sent when a process in the foreground
 process group attempts to read the \fBDSUSP\fR character, rather than when it
@@ -455,12 +421,10 @@ is typed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTOP\fR\fR
 .ad
 .RS 11n
-.rt  
 (Control-s or \fBASCII DC3\fR) can be used to suspend output temporarily. It is
 useful with \fBCRT\fR terminals to prevent output from disappearing before it
 can be read. While output is suspended, \fBSTOP\fR characters are ignored and
@@ -469,12 +433,10 @@ not read.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTART\fR\fR
 .ad
 .RS 11n
-.rt  
 (Control-q or \fBASCII DC1\fR) is used to resume output. Output has been
 suspended by a \fBSTOP\fR character.  While output is not suspended,
 \fBSTART\fR characters are ignored and not read.
@@ -482,12 +444,10 @@ suspended by a \fBSTOP\fR character.  While output is not suspended,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDISCARD\fR\fR
 .ad
 .RS 11n
-.rt  
 (Control-o or \fBASCII SI\fR) causes subsequent output to be discarded. Output
 is discarded until another \fBDISCARD\fR character is typed, more input
 arrives, or the condition is cleared by a program.
@@ -495,12 +455,10 @@ arrives, or the condition is cleared by a program.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLNEXT\fR\fR
 .ad
 .RS 11n
-.rt  
 (Control-v or \fBASCII SYN\fR) causes the special meaning of the next character
 to be ignored.  This works for all the special characters mentioned above. It
 allows characters to be input that would otherwise be interpreted by the system
@@ -570,45 +528,44 @@ typical default values  for each function are as follows:
 
 .sp
 .TS
-tab() box;
-cw(1.83i) |cw(1.83i) |cw(1.83i) 
-lw(1.83i) |lw(1.83i) |lw(1.83i) 
-.
-Relative PositionSubscript NameTypical Default Value
+box;
+c | c | c
+l | l | l .
+Relative Position	Subscript Name	Typical Default Value
 _
-0VINTRETX
+0	VINTR	ETX
 _
-1 VQUITFS
+1 	VQUIT	FS
 _
-2VERASEDEL
+2	VERASE	DEL
 _
-3VKILLNAK
+3	VKILL	NAK
 _
-4VEOFEOT
+4	VEOF	EOT
 _
-5VEOLNUL
+5	VEOL	NUL
 _
-6VEOL2NUL
+6	VEOL2	NUL
 _
-7VWSTCHNUL
+7	VWSTCH	NUL
 _
-8VSTARTNUL
+8	VSTART	NUL
 _
-9VSTOPDC3
+9	VSTOP	DC3
 _
-10VSUSPSUB
+10	VSUSP	SUB
 _
-11VDSUSPEM
+11	VDSUSP	EM
 _
-12VREPRINTDC2
+12	VREPRINT	DC2
 _
-13VDISCARDSI
+13	VDISCARD	SI
 _
-14VWERASEETB
+14	VWERASE	ETB
 _
-15VLNEXTSYN
+15	VLNEXT	SYN
 _
-16-19Reserved
+16-19	Reserved	
 .TE
 
 .SS "Input Modes"
@@ -617,155 +574,127 @@ _
 The \fBc_iflag\fR field describes the basic terminal input control:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIGNBRK\fR\fR
 .ad
 .RS 11n
-.rt  
  Ignore break condition.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBBRKINT\fR\fR
 .ad
 .RS 11n
-.rt  
 Signal interrupt on break.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIGNPAR\fR\fR
 .ad
 .RS 11n
-.rt  
 Ignore characters with parity errors.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPARMRK\fR\fR
 .ad
 .RS 11n
-.rt  
 Mark parity errors.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBINPCK\fR\fR
 .ad
 .RS 11n
-.rt  
 Enable input parity check.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBISTRIP\fR\fR
 .ad
 .RS 11n
-.rt  
 Strip character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBINLCR\fR\fR
 .ad
 .RS 11n
-.rt  
 Map NL to CR on input.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIGNCR\fR\fR
 .ad
 .RS 11n
-.rt  
 Ignore CR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBICRNL\fR\fR
 .ad
 .RS 11n
-.rt  
 Map CR to NL on input.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIUCLC\fR\fR
 .ad
 .RS 11n
-.rt  
 Map upper-case to lower-case on input.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIXON\fR\fR
 .ad
 .RS 11n
-.rt  
 Enable start/stop output control.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIXANY\fR\fR
 .ad
 .RS 11n
-.rt  
 Enable any character to restart output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIXOFF\fR\fR
 .ad
 .RS 11n
-.rt  
 Enable start/stop input control.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIMAXBEL\fR\fR
 .ad
 .RS 11n
-.rt  
 Echo  \fBBEL\fR on input line too long.
 .RE
 
@@ -846,100 +775,82 @@ the input stream overflows.
 The  \fBc_oflag\fR field specifies the  system treatment of output:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOPOST\fR\fR
 .ad
 .RS 10n
-.rt  
 Post-process output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOLCUC\fR\fR
 .ad
 .RS 10n
-.rt  
 Map lower case to upper on output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBONLCR\fR\fR
 .ad
 .RS 10n
-.rt  
 Map NL to CR-NL on output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOCRNL\fR\fR
 .ad
 .RS 10n
-.rt  
 Map CR to NL on output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBONOCR\fR\fR
 .ad
 .RS 10n
-.rt  
 No \fBCR\fR output at column 0.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBONLRET\fR\fR
 .ad
 .RS 10n
-.rt  
 \fBNL\fR performs \fBCR\fR function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOFILL\fR\fR
 .ad
 .RS 10n
-.rt  
 Use fill characters for delay.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOFDEL\fR\fR
 .ad
 .RS 10n
-.rt  
 Fill is \fBDEL\fR, else \fINULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNLDLY\fR\fR
 .ad
 .RS 10n
-.rt  
 Select newline delays:
 .br
 .in +2
@@ -953,12 +864,10 @@ Select newline delays:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCRDLY\fR\fR
 .ad
 .RS 10n
-.rt  
 Select carriage-return delays:
 .br
 .in +2
@@ -980,65 +889,53 @@ Select carriage-return delays:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTABDLY\fR\fR
 .ad
 .RS 10n
-.rt  
 Select horizontal tab delays or tab expansion:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTAB0\fR\fR
 .ad
 .RS 9n
-.rt  
- 
+
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTAB1\fR\fR
 .ad
 .RS 9n
-.rt  
- 
+
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTAB2\fR\fR
 .ad
 .RS 9n
-.rt  
- 
+
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTAB3\fR\fR
 .ad
 .RS 9n
-.rt  
 Expand tabs to spaces
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBXTABS\fR\fR
 .ad
 .RS 9n
-.rt  
 Expand tabs to spaces
 .RE
 
@@ -1046,12 +943,10 @@ Expand tabs to spaces
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBBSDLY\fR\fR
 .ad
 .RS 10n
-.rt  
 Select backspace delays:
 .br
 .in +2
@@ -1065,12 +960,10 @@ Select backspace delays:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVTDLY\fR\fR
 .ad
 .RS 10n
-.rt  
 Select vertical tab delays:
 .br
 .in +2
@@ -1084,12 +977,10 @@ Select vertical tab delays:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFFDLY\fR\fR
 .ad
 .RS 10n
-.rt  
 Select form feed delays:
 .br
 .in +2
@@ -1163,474 +1054,388 @@ The actual delays depend on line speed and system load.
 The \fBc_cflag\fR field describes the hardware control of the terminal:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCBAUD\fR\fR
 .ad
 .RS 13n
-.rt  
 Baud rate:
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBB0\fR\fR
 .ad
 .RS 13n
-.rt  
 Hang up
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBB50\fR\fR
 .ad
 .RS 13n
-.rt  
 50 baud
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBB75\fR\fR
 .ad
 .RS 13n
-.rt  
 75 baud
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBB110\fR\fR
 .ad
 .RS 13n
-.rt  
 110 baud
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBB134\fR\fR
 .ad
 .RS 13n
-.rt  
 134 baud
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBB150\fR\fR
 .ad
 .RS 13n
-.rt  
 150 baud
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBB200\fR\fR
 .ad
 .RS 13n
-.rt  
 200 baud
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBB300\fR\fR
 .ad
 .RS 13n
-.rt  
 300 baud
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBB600\fR\fR
 .ad
 .RS 13n
-.rt  
 600 baud
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBB1200\fR\fR
 .ad
 .RS 13n
-.rt  
 1200 baud
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBB1800\fR\fR
 .ad
 .RS 13n
-.rt  
 1800 baud
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBB2400\fR\fR
 .ad
 .RS 13n
-.rt  
 2400 baud
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBB4800\fR\fR
 .ad
 .RS 13n
-.rt  
 4800 baud
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBB9600\fR\fR
 .ad
 .RS 13n
-.rt  
 9600 baud
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBB19200\fR\fR
 .ad
 .RS 13n
-.rt  
 19200 baud
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEXTA\fR\fR
 .ad
 .RS 13n
-.rt  
 External A
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBB38400\fR\fR
 .ad
 .RS 13n
-.rt  
 38400 baud
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEXTB\fR\fR
 .ad
 .RS 13n
-.rt  
 External B
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBB57600\fR\fR
 .ad
 .RS 13n
-.rt  
 57600 baud
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBB76800\fR\fR
 .ad
 .RS 13n
-.rt  
 76800 baud
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBB115200\fR\fR
 .ad
 .RS 13n
-.rt  
 115200 baud
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBB153600\fR\fR
 .ad
 .RS 13n
-.rt  
 153600 baud
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBB230400\fR\fR
 .ad
 .RS 13n
-.rt  
 230400 baud
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBB307200\fR\fR
 .ad
 .RS 13n
-.rt  
 307200 baud
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBB460800\fR\fR
 .ad
 .RS 13n
-.rt  
 460800 baud
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCSIZE\fR\fR
 .ad
 .RS 13n
-.rt  
 Character size:
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS5\fR\fR
 .ad
 .RS 13n
-.rt  
 5 bits
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS6\fR\fR
 .ad
 .RS 13n
-.rt  
 6 bits
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS7\fR\fR
 .ad
 .RS 13n
-.rt  
 7 bits
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS8\fR\fR
 .ad
 .RS 13n
-.rt  
 8 bits
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCSTOPB\fR\fR
 .ad
 .RS 13n
-.rt  
 Send two stop bits, else one
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCREAD\fR\fR
 .ad
 .RS 13n
-.rt  
 Enable receiver
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPARENB\fR\fR
 .ad
 .RS 13n
-.rt  
 Parity enable
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPARODD\fR\fR
 .ad
 .RS 13n
-.rt  
 Odd parity, else even
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHUPCL\fR\fR
 .ad
 .RS 13n
-.rt  
 Hang up on last close
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCLOCAL\fR\fR
 .ad
 .RS 13n
-.rt  
 Local line, else dial-up
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCIBAUD\fR\fR
 .ad
 .RS 13n
-.rt  
 Input baud rate, if different from output rate
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAREXT\fR\fR
 .ad
 .RS 13n
-.rt  
 Extended parity for mark and space parity
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCRTSXOFF\fR\fR
 .ad
 .RS 13n
-.rt  
 Enable inbound hardware flow control
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCRTSCTS\fR\fR
 .ad
 .RS 13n
-.rt  
 Enable outbound hardware flow control
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCBAUDEXT\fR\fR
 .ad
 .RS 13n
-.rt  
 Bit to indicate output speed > B38400
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCIBAUDEXT\fR\fR
 .ad
 .RS 13n
-.rt  
 Bit to indicate input speed > B38400
 .RE
 
@@ -1755,24 +1560,20 @@ The four possible combinations for the state of \fBCRTSCTS\fR and
 \fBCRTSXOFF\fR bits and their interactions are described below.
 .sp
 .ne 2
-.mk
 .na
 \fBCase A:\fR
 .ad
 .RS 11n
-.rt  
 \fBCRTSCTS\fR off, \fBCRTSXOFF\fR off. In this case the hardware flow control
 is disabled.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBCase B:\fR
 .ad
 .RS 11n
-.rt  
 \fBCRTSCTS\fR on, \fBCRTSXOFF\fR off. In this case only outbound hardware flow
 control is enabled. The state of CTS signal is used to do outbound flow
 control. It is expected that output will be suspended if CTS is low and resumed
@@ -1781,12 +1582,10 @@ when CTS is high.
 
 .sp
 .ne 2
-.mk
 .na
 \fBCase C:\fR
 .ad
 .RS 11n
-.rt  
 \fBCRTSCTS\fR off, \fBCRTSXOFF\fR on. In this case only inbound hardware flow
 control is enabled. The state of RTS signal is used to do inbound flow control.
 It is expected that input will be suspended if RTS is low and resumed when RTS
@@ -1795,12 +1594,10 @@ is high.
 
 .sp
 .ne 2
-.mk
 .na
 \fBCase D:\fR
 .ad
 .RS 11n
-.rt  
 \fBCRTSCTS\fR on, \fBCRTSXOFF\fR on. In this case both inbound and outbound
 hardware flow control are enabled. Uses the state of CTS signal to do outbound
 flow control and RTS signal to do inbound flow control.
@@ -1814,166 +1611,136 @@ discipline to control terminal functions. The basic line discipline provides
 the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBISIG\fR\fR
 .ad
 .RS 11n
-.rt  
  Enable signals.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBICANON\fR\fR
 .ad
 .RS 11n
-.rt  
 Canonical input (erase and kill processing).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBXCASE\fR\fR
 .ad
 .RS 11n
-.rt  
 Canonical upper/lower presentation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBECHO\fR\fR
 .ad
 .RS 11n
-.rt  
 Enable echo.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBECHOE\fR\fR
 .ad
 .RS 11n
-.rt  
 Echo erase character as \fBBS-SP-BS\fR &.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBECHOK\fR\fR
 .ad
 .RS 11n
-.rt  
 Echo  \fBNL\fR after kill character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBECHONL\fR\fR
 .ad
 .RS 11n
-.rt  
 Echo  \fBNL\fR .
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNOFLSH\fR\fR
 .ad
 .RS 11n
-.rt  
 Disable flush after interrupt or quit.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTOSTOP\fR\fR
 .ad
 .RS 11n
-.rt  
 Send  \fBSIGTTOU\fR for background output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBECHOCTL\fR\fR
 .ad
 .RS 11n
-.rt  
 Echo control characters as  \fIchar,\fR delete as ^?.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBECHOPRT\fR\fR
 .ad
 .RS 11n
-.rt  
 Echo erase character as character erased.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBECHOKE\fR\fR
 .ad
 .RS 11n
-.rt  
 \fBBS-SP-BS\fR erase entire line on line kill.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFLUSHO\fR\fR
 .ad
 .RS 11n
-.rt  
 Output is being flushed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPENDIN\fR\fR
 .ad
 .RS 11n
-.rt  
 Retype pending input at next read or  input character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIEXTEN\fR\fR
 .ad
 .RS 11n
-.rt  
 Enable extended (implementation-defined) functions.
 .RE
 
@@ -2006,23 +1773,22 @@ following escape sequences are generated on output and accepted on input:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-FOR:USE:
+box;
+c | c
+l | l .
+FOR:	USE:
 _
-`\e'
+`	\e'
 _
-|\e!
+|	\e!
 _
-\(ap\e^
+\(ap	\e^
 _
-{\e(
+{	\e(
 _
-}\e)
+}	\e)
 _
-\e\e\e
+\e	\e\e
 .TE
 
 .sp
@@ -2167,27 +1933,26 @@ default values  for each function are as follows:
 
 .sp
 .TS
-tab() box;
-cw(1.83i) |cw(1.83i) |cw(1.83i) 
-lw(1.83i) |lw(1.83i) |lw(1.83i) 
-.
-Relative PositionsSubscript NamesTypical Default Values
+box;
+c | c | c
+l | l | l .
+Relative Positions	Subscript Names	Typical Default Values
 _
-0VINTREXT
+0	VINTR	EXT
 _
-1VQUITFS
+1	VQUIT	FS
 _
-2VERASEDEL
+2	VERASE	DEL
 _
-3VKILLNAK
+3	VKILL	NAK
 _
-4VEOFEOT
+4	VEOF	EOT
 _
-5VEOLNUL
+5	VEOL	NUL
 _
-6VEOL2NUL
+6	VEOL2	NUL
 _
-7Reserved
+7	Reserved	
 .TE
 
 .sp
@@ -2211,100 +1976,82 @@ Status lines are read-only. The following modem control and status lines may be
 supported by a device; they are defined by \fBsys/termios.h\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCM_LE\fR\fR
 .ad
 .RS 13n
-.rt  
  line enable
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCM_DTR\fR\fR
 .ad
 .RS 13n
-.rt  
 data terminal ready
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCM_RTS\fR\fR
 .ad
 .RS 13n
-.rt  
 request to send
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCM_ST\fR\fR
 .ad
 .RS 13n
-.rt  
 secondary transmit
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCM_SR\fR\fR
 .ad
 .RS 13n
-.rt  
 secondary receive
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCM_CTS\fR\fR
 .ad
 .RS 13n
-.rt  
 clear to send
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCM_CAR\fR\fR
 .ad
 .RS 13n
-.rt  
 carrier detect
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCM_RNG\fR\fR
 .ad
 .RS 13n
-.rt  
 ring
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCM_DSR\fR\fR
 .ad
 .RS 13n
-.rt  
 data set ready
 .RE
 
@@ -2358,24 +2105,20 @@ available through the preferred function call interface specified on
 \fBtermios\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTCGETS\fR\fR
 .ad
 .RS 16n
-.rt  
 The argument is a pointer to a \fBtermios\fR structure. The current terminal
 parameters are fetched and stored into that structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTCSETS\fR\fR
 .ad
 .RS 16n
-.rt  
 The argument is a pointer to a \fBtermios\fR structure. The current terminal
 parameters are set from the values stored in that structure. The change is
 immediate.
@@ -2383,12 +2126,10 @@ immediate.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTCSETSW\fR\fR
 .ad
 .RS 16n
-.rt  
 The argument is a pointer to a \fBtermios\fR structure. The current terminal
 parameters are set from the values stored in that structure. The change occurs
 after all characters queued for output have been transmitted. This form should
@@ -2397,12 +2138,10 @@ be used when changing parameters that affect output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTCSETSF\fR\fR
 .ad
 .RS 16n
-.rt  
 The argument is a pointer to a \fBtermios\fR structure. The current terminal
 parameters are set from the values stored in that structure. The change occurs
 after all characters queued for output have been transmitted; all characters
@@ -2411,12 +2150,10 @@ queued for input are discarded and then the change occurs.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTCGETA\fR\fR
 .ad
 .RS 16n
-.rt  
 The argument is a pointer to a \fBtermio\fR structure. The current terminal
 parameters are fetched, and those parameters that can be stored in a
 \fBtermio\fR structure are stored into that structure.
@@ -2424,12 +2161,10 @@ parameters are fetched, and those parameters that can be stored in a
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTCSETA\fR\fR
 .ad
 .RS 16n
-.rt  
 The argument is a pointer to a  \fBtermio\fR structure. Those terminal
 parameters that can be stored in a \fBtermio\fR structure are set from the
 values stored in that structure. The change is immediate.
@@ -2437,12 +2172,10 @@ values stored in that structure. The change is immediate.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTCSETAW\fR\fR
 .ad
 .RS 16n
-.rt  
 The argument is a pointer to a \fBtermio\fR structure. Those terminal
 parameters that can be stored in a \fBtermio\fR structure are set from the
 values stored in that structure. The change occurs after all characters queued
@@ -2452,12 +2185,10 @@ parameters that affect output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTCSETAF\fR\fR
 .ad
 .RS 16n
-.rt  
 The argument is a pointer to a \fBtermio\fR structure.  Those terminal
 parameters that can be stored in a \fBtermio\fR structure are set from the
 values stored in that structure. The change occurs after all characters queued
@@ -2467,24 +2198,20 @@ and then the change occurs.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTCSBRK\fR\fR
 .ad
 .RS 16n
-.rt  
 The argument is an \fBint\fR value. Wait for the output to drain. If the
 argument is \fB0\fR, then send a break (zero valued bits for 0.25 seconds).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTCXONC\fR\fR
 .ad
 .RS 16n
-.rt  
 Start/stop control. The argument is an \fBint\fR value. If the argument is
 \fB0\fR, suspend output; if \fB1\fR, restart suspended output; if \fB2\fR,
 suspend input; if \fB3\fR, restart suspended input.
@@ -2492,12 +2219,10 @@ suspend input; if \fB3\fR, restart suspended input.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTCFLSH\fR\fR
 .ad
 .RS 16n
-.rt  
 The argument is an \fBint\fR value. If the argument is \fB0\fR, flush the input
 queue; if \fB1\fR, flush the output queue; if \fB2\fR, flush both the input and
 output queues.
@@ -2505,12 +2230,10 @@ output queues.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCGPGRP\fR\fR
 .ad
 .RS 16n
-.rt  
 The argument is a pointer to a \fBpid_t\fR. Set the value of that  \fBpid_t\fR
 to the process group \fBID\fR of the foreground process group associated with
 the terminal. See  \fBtermios\fR(3C) for a description of  \fBTCGETPGRP\fR.
@@ -2518,12 +2241,10 @@ the terminal. See  \fBtermios\fR(3C) for a description of  \fBTCGETPGRP\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCSPGRP\fR\fR
 .ad
 .RS 16n
-.rt  
 The argument is a pointer to a \fBpid_t\fR. Associate the process group whose
 process group \fBID\fR is specified by the value of that  \fBpid_t\fR with the
 terminal. The new process group value must be in the range of valid process
@@ -2532,36 +2253,30 @@ group \fBID\fR values.  Otherwise, the error  \fBEPERM\fR is returned.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCGSID\fR\fR
 .ad
 .RS 16n
-.rt  
 The argument is a pointer to a \fBpid_t\fR. The session ID of the terminal is
 fetched  and stored in the  \fBpid_t\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCGWINSZ\fR\fR
 .ad
 .RS 16n
-.rt  
 The argument is a pointer to a \fBwinsize\fR structure. The terminal driver's
 notion of the terminal size is stored into that structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCSWINSZ\fR\fR
 .ad
 .RS 16n
-.rt  
 The argument is a pointer to a \fBwinsize\fR structure. The terminal driver's
 notion of the terminal size is set from the values specified in that structure.
 If the new sizes are different from the old sizes, a \fBSIGWINCH\fR signal is
@@ -2570,12 +2285,10 @@ set to the process group of the terminal.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCMBIS\fR\fR
 .ad
 .RS 16n
-.rt  
 The argument is a pointer to an \fBint\fR whose value is a mask containing
 modem control lines to be turned on. The control lines whose bits are set in
 the argument are turned on; no other control lines are affected.
@@ -2583,12 +2296,10 @@ the argument are turned on; no other control lines are affected.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCMBIC\fR\fR
 .ad
 .RS 16n
-.rt  
 The argument is a pointer to an \fBint\fR whose value is a mask containing
 modem control lines to be turned off. The control lines whose bits are set in
 the argument are turned off; no other control lines are affected.
@@ -2596,12 +2307,10 @@ the argument are turned off; no other control lines are affected.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCMGET\fR\fR
 .ad
 .RS 16n
-.rt  
 The argument is a pointer to an  \fBint\fR. The current state of the modem
 status lines is fetched and stored in the  \fBint\fR pointed to by the
 argument.
@@ -2609,12 +2318,10 @@ argument.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCMSET\fR\fR
 .ad
 .RS 16n
-.rt  
 The argument is a pointer to an  \fBint\fR containing a new set of modem
 control lines. The modem control lines are turned on or off, depending on
 whether the bit for that mode is set or clear.
@@ -2622,12 +2329,10 @@ whether the bit for that mode is set or clear.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCSPPS\fR\fR
 .ad
 .RS 16n
-.rt  
 The argument is a pointer to an \fBint\fR that determines whether
 pulse-per-second event handling is to be enabled (non-zero) or disabled (zero).
 If a one-pulse-per-second reference clock is attached to the serial line's data
@@ -2638,12 +2343,10 @@ is ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCGPPS\fR\fR
 .ad
 .RS 16n
-.rt  
 The argument is a pointer to an \fBint\fR, in which the state of the even
 handling is returned. The \fBint\fR is set to a non-zero value if
 pulse-per-second (PPS) handling has been enabled. Otherwise, it is set to zero.
@@ -2651,24 +2354,20 @@ pulse-per-second (PPS) handling has been enabled. Otherwise, it is set to zero.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCGSOFTCAR\fR\fR
 .ad
 .RS 16n
-.rt  
 The argument is a pointer to an \fBint\fR whose value is \fB1\fR or \fB0\fR,
 depending on whether the software carrier detect is turned on or off.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCSSOFTCAR\fR\fR
 .ad
 .RS 16n
-.rt  
 The argument is a pointer to an \fBint\fR whose value is \fB1\fR or \fB0\fR.
 The value of the integer should be \fB0\fR to turn off software carrier, or
 \fB1\fR to turn it on.
@@ -2676,12 +2375,10 @@ The value of the integer should be \fB0\fR to turn off software carrier, or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCGPPSEV\fR\fR
 .ad
 .RS 16n
-.rt  
 The argument is a pointer to a \fBstruct\fR \fBppsclockev\fR. This structure
 contains the following members:
 .sp

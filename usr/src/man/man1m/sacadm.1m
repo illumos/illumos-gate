@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sacadm 1M "14 Sep 1992" "SunOS 5.11" "System Administration Commands"
+.TH SACADM 1M "Sep 14, 1992"
 .SH NAME
 sacadm \- service access controller administration
 .SH SYNOPSIS
 .LP
 .nf
-\fBsacadm\fR \fB-a\fR \fB-p\fR \fIpmtag\fR \fB-t\fR \fItype\fR \fB-c\fR \fIcmd\fR \fB-v\fR \fIver\fR [\fB-f\fR dx] [\fB-n\fR \fIcount\fR] 
+\fBsacadm\fR \fB-a\fR \fB-p\fR \fIpmtag\fR \fB-t\fR \fItype\fR \fB-c\fR \fIcmd\fR \fB-v\fR \fIver\fR [\fB-f\fR dx] [\fB-n\fR \fIcount\fR]
      [\fB-y\fR \fIcomment\fR] [\fB-z\fR \fIscript\fR]
 .fi
 
@@ -115,12 +115,10 @@ system. Other \fBsacadm\fR commands may be executed only by the super-user.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 14n
-.rt  
 Add a port monitor. When adding a port monitor, \fBsacadm\fR creates the
 supporting directory structure in \fB/etc/saf\fR and \fB/var/saf\fR and adds an
 entry for the new port monitor to \fB/etc/saf/_sactab\fR. The file
@@ -135,46 +133,38 @@ the menu system to add port monitors.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIcmd\fR\fR
 .ad
 .RS 14n
-.rt  
 Execute the command string \fIcmd\fR to start a port monitor. The \fB-c\fR
 option may be used only with a \fB-a\fR. A \fB-a\fR option requires a \fB-c\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 14n
-.rt  
 Disable the port monitor \fIpmtag\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 14n
-.rt  
 Enable the port monitor \fIpmtag\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fBdx\fR\fR
 .ad
 .RS 14n
-.rt  
 The \fB-f\fR option  specifies one or both of the following two flags which are
 then included in the flags field of the \fB_sactab\fR entry for the new port
 monitor. If the \fB-f\fR option is not included on the command line, no flags
@@ -182,23 +172,19 @@ are set and the default conditions prevail. By default, a port monitor is
 started. A \fB-f\fR option with no following argument is illegal.
 .sp
 .ne 2
-.mk
 .na
 \fBd\fR
 .ad
 .RS 5n
-.rt  
 Do not enable the new port monitor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBx\fR
 .ad
 .RS 5n
-.rt  
 Do not start the new port monitor.
 .RE
 
@@ -206,12 +192,10 @@ Do not start the new port monitor.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR\fR
 .ad
 .RS 14n
-.rt  
 The \fB-g\fR option is used to request output or to install or replace the
 per-port monitor configuration script \fB/etc/saf/\fR\fIpmtag\fR\fB/_config\fR.
 \fB-g\fR requires a \fB-p\fR option. The \fB-g\fR option with only a \fB-p\fR
@@ -224,12 +208,10 @@ invalid.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-G\fR\fR
 .ad
 .RS 14n
-.rt  
 The \fB-G\fR option is used to request output or to install or replace the
 per-system configuration script \fB/etc/saf/_sysconfig\fR. The \fB-G\fR option
 by itself prints the per-system configuration script. The \fB-G\fR option in
@@ -240,23 +222,19 @@ option are invalid.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR\fR
 .ad
 .RS 14n
-.rt  
 Stop port monitor \fIpmtag\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 14n
-.rt  
 The \fB-l\fR option is used to request port monitor information. The \fB-l\fR
 by itself lists all port monitors on the system. The \fB-l\fR option in
 combination with the \fB-p\fR option lists only the port monitor specified by
@@ -267,24 +245,20 @@ option is invalid.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
 .RS 14n
-.rt  
 The \fB-L\fR option is identical to the \fB-l\fR option except that the output
 appears in a condensed format.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fIcount\fR\fR
 .ad
 .RS 14n
-.rt  
 Set the restart count to \fIcount\fR. If a restart count is not specified,
 count is set to \fB0\fR. A count of \fB0\fR indicates that the port monitor is
 not to be restarted if it fails.
@@ -292,23 +266,19 @@ not to be restarted if it fails.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIpmtag\fR\fR
 .ad
 .RS 14n
-.rt  
 Specifies the tag associated with a port monitor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 14n
-.rt  
 Remove port monitor \fIpmtag\fR. \fBsacadm\fR removes the port monitor entry
 from \fB/etc/saf/_sactab\fR. If the removed port monitor is not running, then
 no further action is taken. If the removed port monitor is running, the Service
@@ -318,34 +288,28 @@ down. Note that the port monitor's directory structure remains intact.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 14n
-.rt  
 Start a port monitor. The SAC starts the port monitor \fIpmtag\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fBtype\fR\fR
 .ad
 .RS 14n
-.rt  
 Specifies the port monitor type.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR \fBver\fR\fR
 .ad
 .RS 14n
-.rt  
 Specifies the version number of the port monitor. This version number may be
 given as
 .sp
@@ -365,12 +329,10 @@ option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 14n
-.rt  
 The \fB-x\fR option by itself  tells the SAC to read its database file
 (\fB_sactab\fR). The \fB-x\fR option with the \fB-p\fR option tells port
 monitor \fIpmtag\fR to read its administrative file.
@@ -378,23 +340,19 @@ monitor \fIpmtag\fR to read its administrative file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-y\fR \fIcomment\fR\fR
 .ad
 .RS 14n
-.rt  
 Include \fIcomment\fR in the \fB_sactab\fR entry for port monitor \fIpmtag\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBscript\fR\fR
 .ad
 .RS 14n
-.rt  
 Used with the \fB-g\fR and \fB-G\fR options to specify the name of a file that
 contains a configuration script. With the \fB-g\fR option, \fBscript\fR is a
 per-port monitor configuration script; with \fB-G\fR it is a per-system
@@ -560,34 +518,28 @@ monitor whose tag is \fBpmtag\fR with the contents of the file
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/saf/_sactab\fR\fR
 .ad
 .RS 26n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/saf/_sysconfig\fR\fR
 .ad
 .RS 26n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/saf/\fIpmtag\fR\fR\fB/_config\fR\fR
 .ad
 .RS 26n
-.rt  
 
 .RE
 

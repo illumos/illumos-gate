@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH csx_RequestSocketMask 9F "19 Jul 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH CSX_REQUESTSOCKETMASK 9F "Jul 19, 1996"
 .SH NAME
 csx_RequestSocketMask, csx_ReleaseSocketMask \- set or clear the client's
 client event mask
@@ -14,13 +14,13 @@ client event mask
 
 
 
-\fBint32_t\fR \fBcsx_RequestSocketMask\fR(\fBclient_handle_t\fR \fIch\fR, 
+\fBint32_t\fR \fBcsx_RequestSocketMask\fR(\fBclient_handle_t\fR \fIch\fR,
      \fBrequest_socket_mask_t *\fR\fIsm\fR);
 .fi
 
 .LP
 .nf
-\fBint32_t\fR \fBcsx_ReleaseSocketMask\fR(\fBclient_handle_t\fR \fIch\fR, 
+\fBint32_t\fR \fBcsx_ReleaseSocketMask\fR(\fBclient_handle_t\fR \fIch\fR,
      \fBrelease_socket_mask_t *\fR\fIrm\fR);
 .fi
 
@@ -31,34 +31,28 @@ Solaris \fBDDI\fR Specific (Solaris \fBDDI\fR)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIch\fR\fR
 .ad
 .RS 6n
-.rt  
 Client handle returned from \fBcsx_RegisterClient\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsm\fR\fR
 .ad
 .RS 6n
-.rt  
 Pointer to a \fBrequest_socket_mask_t\fR structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrm\fR\fR
 .ad
 .RS 6n
-.rt  
 Pointer to a \fBrelease_socket_mask_t\fR structure.
 .RE
 
@@ -108,24 +102,20 @@ The structure members of \fBrelease_socket_mask_t\fR are:
 The fields are defined as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSocket\fR\fR
 .ad
 .RS 13n
-.rt  
 Not used in Solaris, but for portability with other Card Services
 implementations, it should be set to the logical socket number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEventMask\fR\fR
 .ad
 .RS 13n
-.rt  
 This field is bit-mapped. Card Services performs event notification based on
 this field. See \fBcsx_event_handler\fR(9E) for valid event definitions and for
 additional information about handling events.
@@ -134,56 +124,46 @@ additional information about handling events.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_SUCCESS\fR\fR
 .ad
 .RS 27n
-.rt  
 Successful operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_BAD_HANDLE\fR\fR
 .ad
 .RS 27n
-.rt  
 Client handle is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_IN_USE\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBcsx_ReleaseSocketMask()\fR has not been done.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_BAD_SOCKET\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBcsx_RequestSocketMask()\fR has not been done.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_UNSUPPORTED_FUNCTION\fR\fR
 .ad
 .RS 27n
-.rt  
 No \fBPCMCIA\fR hardware installed.
 .RE
 

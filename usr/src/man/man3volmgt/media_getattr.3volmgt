@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH media_getattr 3VOLMGT "8 Mar 2007" "SunOS 5.11" "Volume Management Library Functions"
+.TH MEDIA_GETATTR 3VOLMGT "Mar 8, 2007"
 .SH NAME
 media_getattr, media_setattr \- get and set media attributes
 .SH SYNOPSIS
 .LP
 .nf
 \fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lvolmgt\fR [ \fIlibrary\fR ... ]
-#include <volmgt.h> 
+#include <volmgt.h>
 
 
 
@@ -44,23 +44,21 @@ specified, and some system properties are read only:
 
 .sp
 .TS
-tab();
-cw(.91i) cw(.83i) cw(1.2i) cw(2.56i) 
-lw(.91i) lw(.83i) lw(1.2i) lw(2.56i) 
-.
-\fBAttribute\fR\fBWritable\fR\fBValue\fR\fBDescription\fR
+c c c c
+l l l l .
+\fBAttribute\fR	\fBWritable\fR	\fBValue\fR	\fBDescription\fR
 _
-\fBs-access\fRRO"seq", "rand"sequential or random access
-\fBs-density\fRRO"low", "medium", "high"media density
-\fBs-parts\fRROcomma separated list of slice numbers list of partitions on this volume
-\fBs-location\fRRO\fIpathname\fRvolume management pathname to media
-\fBs-mejectable\fRRO"true", "false"T{
+\fBs-access\fR	RO	"seq", "rand"	sequential or random access
+\fBs-density\fR	RO	"low", "medium", "high"	media density
+\fBs-parts\fR	RO	comma separated list of slice numbers	 list of partitions on this volume
+\fBs-location\fR	RO	\fIpathname\fR	volume management pathname to media
+\fBs-mejectable\fR	RO	"true", "false"	T{
 whether or not media is manually ejectable
 T}
-\fBs-rmoneject\fRR/W"true", "false"T{
+\fBs-rmoneject\fR	R/W	"true", "false"	T{
 should media access points be removed from database upon ejection
 T}
-\fBs-enxio\fRR/W"true", "false"T{
+\fBs-enxio\fR	R/W	"true", "false"	T{
 if set return \fBENXIO\fR when media access attempted
 T}
 .TE
@@ -130,15 +128,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 _
-Interface StabilityObsolete
+Interface Stability	Obsolete
 .TE
 
 .SH SEE ALSO

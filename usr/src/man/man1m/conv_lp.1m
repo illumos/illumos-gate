@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH conv_lp 1M "9 Sep 1996" "SunOS 5.11" "System Administration Commands"
+.TH CONV_LP 1M "Sep 9, 1996"
 .SH NAME
 conv_lp \- convert LP configuration
 .SH SYNOPSIS
@@ -23,24 +23,20 @@ directory and converts it to an output file for use with print client software.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fI dir\fR\fR
 .ad
 .RS 11n
-.rt  
 The root (`\fB / \fR') directory from which  \fBLP\fR configuration information
 is read.   The default is root (`\fB / \fR').
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fI file\fR\fR
 .ad
 .RS 11n
-.rt  
 The output file to which  \fBconv_lp\fR writes the converted  \fBLP\fR
 configuration information.  The default is \fB/etc/printers.conf\fR.
 .RE
@@ -74,7 +70,7 @@ directory \fB/export/root/client\fR to file
 .sp
 .in +2
 .nf
-% \fBconv_lp -d /export/root/client -f\e 
+% \fBconv_lp -d /export/root/client -f\e
    /export/root/client/etc/printers.conf\fR
 .fi
 .in -2
@@ -86,35 +82,29 @@ directory \fB/export/root/client\fR to file
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnon-zero\fR
 .ad
 .RS 12n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/printers.conf\fR\fR
 .ad
 .RS 22n
-.rt  
 System printer configuration database.
 .RE
 

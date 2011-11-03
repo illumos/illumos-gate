@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH in.ndpd 1M "10 Jan 2007" "SunOS 5.11" "System Administration Commands"
+.TH IN.NDPD 1M "Jan 10, 2007"
 .SH NAME
 in.ndpd \- daemon for IPv6 autoconfiguration
 .SH SYNOPSIS
@@ -165,7 +165,6 @@ service properties are set using a command of the form:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
@@ -189,7 +188,6 @@ property to false.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
@@ -202,7 +200,6 @@ Use of this option is equivalent to setting the \fBdebug\fR property to true.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \ \fIconfig_file\fR\fR
 .ad
@@ -215,7 +212,6 @@ Use \fIconfig_file\fR for configuration information instead of the default
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
@@ -229,12 +225,10 @@ controlling terminal. As such, this option cannot be run under the SMF.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/inet/ndpd.conf\fR\fR
 .ad
 .RS 23n
-.rt  
 Configuration file. This file is not necessary on a host, but it is required on
 a router to enable \fBin.ndpd\fR to advertise autoconfiguration information to
 the hosts.

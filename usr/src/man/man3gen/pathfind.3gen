@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pathfind 3GEN "10 Mar 1999" "SunOS 5.11" "String Pattern-Matching Library Functions"
+.TH PATHFIND 3GEN "Mar 10, 1999"
 .SH NAME
 pathfind \- search for named file in named directories
 .SH SYNOPSIS
@@ -26,35 +26,34 @@ the set \fB[rwxfbcdpugks]:\fR
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-LetterMeaning
+box;
+c | c
+l | l .
+Letter	Meaning
 _
-\fBr\fRreadable
+\fBr\fR	readable
 _
-\fBw\fRwritable
+\fBw\fR	writable
 _
-\fBx\fRexecutable
+\fBx\fR	executable
 _
-\fBf\fRnormal file
+\fBf\fR	normal file
 _
-\fBb\fRblock special
+\fBb\fR	block special
 _
-\fBc\fRcharacter special
+\fBc\fR	character special
 _
-\fBd\fRdirectory
+\fBd\fR	directory
 _
-\fBp\fRFIFO (pipe)
+\fBp\fR	FIFO (pipe)
 _
-\fBu\fRset user ID bit
+\fBu\fR	set user ID bit
 _
-\fBg\fRset group ID bit
+\fBg\fR	set group ID bit
 _
-\fBk\fRsticky bit
+\fBk\fR	sticky bit
 _
-\fBs\fRsize non-zero
+\fBs\fR	size non-zero
 .TE
 
 .sp
@@ -106,13 +105,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

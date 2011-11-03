@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH keytables 4 "18 Feb 2003" "SunOS 5.11" "File Formats"
+.TH KEYTABLES 4 "Feb 18, 2003"
 .SH NAME
 keytables \- keyboard table descriptions for loadkeys and dumpkeys
 .SH DESCRIPTION
@@ -79,78 +79,64 @@ where \fItablename\fR is the name of a particular translation table, or
 \fBall\fR. The translation tables are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbase\fR\fR
 .ad
 .RS 9n
-.rt  
 entry when no shifts are active
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshift\fR\fR
 .ad
 .RS 9n
-.rt  
 entry when "Shift" key is down
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcaps\fR\fR
 .ad
 .RS 9n
-.rt  
 entry when "Caps Lock" is in effect
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBctrl\fR\fR
 .ad
 .RS 9n
-.rt  
 entry when "Control" is down
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBaltg\fR\fR
 .ad
 .RS 9n
-.rt  
 entry when "Alt Graph" is down
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnuml\fR\fR
 .ad
 .RS 9n
-.rt  
 entry when "Num Lock" is in effect
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBup\fR\fR
 .ad
 .RS 9n
-.rt  
 entry when a key goes up
 .RE
 
@@ -200,7 +186,6 @@ One of the following expressions:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshiftkeys+leftshift\fR\fR
 .ad
@@ -211,7 +196,6 @@ the key is to be the left-hand "Shift" key
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshiftkeys+rightshift\fR\fR
 .ad
@@ -222,7 +206,6 @@ the key is to be the right-hand "Shift" key
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshiftkeys+leftctrl\fR\fR
 .ad
@@ -233,7 +216,6 @@ the key is to be the left-hand "Control" key
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshiftkeys+rightctrl\fR\fR
 .ad
@@ -244,7 +226,6 @@ the key is to be the right-hand "Control" key
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshiftkeys+alt\fR\fR
 .ad
@@ -255,7 +236,6 @@ the key is to be the "Alt" shift key
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshiftkeys+altgraph\fR\fR
 .ad
@@ -266,7 +246,6 @@ the key is to be the "Alt Graph" shift key
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshiftkeys+capslock\fR\fR
 .ad
@@ -277,7 +256,6 @@ the key is to be the "Caps Lock" key
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshiftkeys+shiftlock\fR\fR
 .ad
@@ -288,7 +266,6 @@ the key is to be the "Shift Lock" key
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshiftkeys+numlock\fR\fR
 .ad
@@ -299,7 +276,6 @@ the key is to be the "Num Lock" key
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbuckybits+systembit\fR\fR
 .ad
@@ -311,7 +287,6 @@ SETUP key on the VT100 keyboard
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbuckybits+metabit\fR\fR
 .ad
@@ -323,7 +298,6 @@ or Sun-3 keyboard or the "diamond" key on a Sun-4 keyboard
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcompose\fR\fR
 .ad
@@ -334,7 +308,6 @@ the key is to be the "Compose" key
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBctrlq\fR\fR
 .ad
@@ -346,7 +319,6 @@ would be the entry for the "Q" key in the \fBctrl\fR table)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBctrls\fR\fR
 .ad
@@ -358,7 +330,6 @@ would be the entry for the "S" key in the \fBctrl\fR table)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoscroll\fR\fR
 .ad
@@ -369,7 +340,6 @@ on the "VT100" keyboard, the key is to be the "No Scroll" key
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstring+uparrow\fR\fR
 .ad
@@ -380,7 +350,6 @@ the key is to be the "up arrow" key
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstring+downarrow\fR\fR
 .ad
@@ -391,7 +360,6 @@ the key is to be the "down arrow" key
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstring+leftarrow\fR\fR
 .ad
@@ -402,7 +370,6 @@ the key is to be the "left arrow" key
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstring+rightarrow\fR\fR
 .ad
@@ -413,7 +380,6 @@ the key is to be the "right arrow" key
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstring+homearrow\fR\fR
 .ad
@@ -424,7 +390,6 @@ the key is to be the "home" key
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfa_acute\fR\fR
 .ad
@@ -435,7 +400,6 @@ the key is to be the acute accent "floating accent" key
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfa_cedilla\fR\fR
 .ad
@@ -446,7 +410,6 @@ the key is to be the cedilla "floating accent" key
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfa_cflex\fR\fR
 .ad
@@ -457,7 +420,6 @@ the key is to be the circumflex "floating accent" key
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfa_grave\fR\fR
 .ad
@@ -468,7 +430,6 @@ the key is to be the grave accent "floating accent" key
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfa_tilde\fR\fR
 .ad
@@ -479,7 +440,6 @@ the key is to be the tilde "floating accent" key
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfa_umlaut\fR\fR
 .ad
@@ -490,7 +450,6 @@ the key is to be the umlaut "floating accent" key
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnonl\fR\fR
 .ad
@@ -502,7 +461,6 @@ state of Num Lock
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpad0\fR\fR
 .ad
@@ -513,7 +471,6 @@ the key is to be the "0" key on the numeric keypad
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpad1\fR\fR
 .ad
@@ -524,7 +481,6 @@ the key is to be the "1" key on the numeric keypad
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpad2\fR\fR
 .ad
@@ -535,7 +491,6 @@ the key is to be the "2" key on the numeric keypad
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpad3\fR\fR
 .ad
@@ -546,7 +501,6 @@ the key is to be the "3" key on the numeric keypad
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpad4\fR\fR
 .ad
@@ -557,7 +511,6 @@ the key is to be the "4" key on the numeric keypad
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpad5\fR\fR
 .ad
@@ -568,7 +521,6 @@ the key is to be the "5" key on the numeric keypad
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpad6\fR\fR
 .ad
@@ -579,7 +531,6 @@ the key is to be the "6" key on the numeric keypad
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpad7\fR\fR
 .ad
@@ -590,7 +541,6 @@ the key is to be the "7" key on the numeric keypad
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpad8\fR\fR
 .ad
@@ -601,7 +551,6 @@ the key is to be the "8" key on the numeric keypad
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpad9\fR\fR
 .ad
@@ -612,7 +561,6 @@ the key is to be the "9" key on the numeric keypad
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpaddot\fR\fR
 .ad
@@ -623,7 +571,6 @@ the key is to be the "." key on the numeric keypad
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpadenter\fR\fR
 .ad
@@ -634,7 +581,6 @@ the key is to be the "Enter" key on the numeric keypad
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpadplus\fR\fR
 .ad
@@ -645,7 +591,6 @@ the key is to be the "+" key on the numeric keypad
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpadminus\fR\fR
 .ad
@@ -656,7 +601,6 @@ the key is to be the "\(mi" key on the numeric keypad
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpadstar\fR\fR
 .ad
@@ -667,7 +611,6 @@ the key is to be the "*" key on the numeric keypad
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpadslash\fR\fR
 .ad
@@ -678,7 +621,6 @@ the key is to be the "/" key on the numeric keypad
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpadequal\fR\fR
 .ad
@@ -689,7 +631,6 @@ the key is to be the "=" key on the numeric keypad
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpadsep\fR\fR
 .ad
@@ -700,7 +641,6 @@ the key is to be the "," (separator) key on the numeric keypad
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlf(\fIn\fR)\fR\fR
 .ad
@@ -711,7 +651,6 @@ the key is to be the left-hand function key \fIn\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrf(\fIn\fR)\fR\fR
 .ad
@@ -722,7 +661,6 @@ the key is to be the right-hand function key \fIn\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtf(\fIn\fR)\fR\fR
 .ad
@@ -733,7 +671,6 @@ the key is to be the top function key \fIn\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbf(\fIn\fR)\fR\fR
 .ad
@@ -744,7 +681,6 @@ the key is to be the "bottom" function key \fIn\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnop\fR\fR
 .ad
@@ -755,7 +691,6 @@ the key is to do nothing
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBerror\fR\fR
 .ad
@@ -767,7 +702,6 @@ must be used there
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBidle\fR\fR
 .ad
@@ -780,7 +714,6 @@ entries for keystation 127, and must be used there
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBoops\fR\fR
 .ad
@@ -792,7 +725,6 @@ this key exists, but its action is not defined; it has the same effect as
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBreset\fR\fR
 .ad
@@ -804,7 +736,6 @@ the \fBup\fR table entry for keystation 127, and must be used there.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBswap\fR \fInumber1\fR with \fInumber2\fR\fR
 .ad
@@ -815,7 +746,6 @@ exchanges the entries for keystations \fInumber1\fR and \fInumber2\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkey \fInumber1\fR\fR same as \fInumber2\fR\fR
 .ad

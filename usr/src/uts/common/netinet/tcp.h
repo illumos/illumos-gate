@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -125,6 +126,9 @@ struct tcphdr {
 /* gap for expansion of ``standard'' options */
 #define	TCP_ANONPRIVBIND		0x20	/* for internal use only  */
 #define	TCP_EXCLBIND			0x21	/* for internal use only  */
+#define	TCP_KEEPIDLE			0x22
+#define	TCP_KEEPCNT			0x23
+#define	TCP_KEEPINTVL			0x24
 
 #ifdef	__cplusplus
 }

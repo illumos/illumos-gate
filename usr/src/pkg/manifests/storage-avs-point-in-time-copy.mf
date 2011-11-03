@@ -100,4 +100,3 @@ link path=usr/sbin/iiadm target=../bin/iiadm
 link path=usr/sbin/iiboot target=../bin/iiboot
 link path=usr/sbin/iicpbmp target=../bin/iicpbmp
 link path=usr/sbin/iicpshd target=../bin/iicpshd
-depend fmri=driver/storage/sv type=require

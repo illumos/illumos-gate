@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -108,7 +109,8 @@ smb_com_open_print_file(smb_request_t *sr)
 	smb_kshare_t 	*si;
 	struct open_param *op = &sr->arg.open;
 
-	if (!STYPE_ISPRN(sr->tid_tree->t_res_type)) {
+	if (sr->sr_server->sv_cfg.skc_print_enable == 0 ||
+	    !STYPE_ISPRN(sr->tid_tree->t_res_type)) {
 		cmn_err(CE_WARN, "smb_com_open_print_file: bad device");
 		smbsr_error(sr, NT_STATUS_BAD_DEVICE_TYPE,
 		    ERRDOS, ERROR_BAD_DEV_TYPE);
@@ -127,7 +129,7 @@ smb_com_open_print_file(smb_request_t *sr)
 		sp = kmem_zalloc(sizeof (smb_kspooldoc_t), KM_SLEEP);
 		(void) snprintf(sp->sd_path, MAXPATHLEN, "%s/%s", si->shr_path,
 		    op->fqi.fq_path.pn_path);
-		sp->sd_spool_num = sr->sr_server->sp_info.sp_cnt;
+		/* sp->sd_spool_num set by smb_spool_add_doc() */
 		sp->sd_ipaddr = sr->session->ipaddr;
 		(void) strlcpy(sp->sd_username, sr->uid_user->u_name,
 		    MAXNAMELEN);
@@ -181,7 +183,8 @@ smb_com_close_print_file(smb_request_t *sr)
 {
 	smb_sdrc_t rc;
 
-	if (!STYPE_ISPRN(sr->tid_tree->t_res_type)) {
+	if (sr->sr_server->sv_cfg.skc_print_enable == 0 ||
+	    !STYPE_ISPRN(sr->tid_tree->t_res_type)) {
 		smbsr_error(sr, NT_STATUS_BAD_DEVICE_TYPE,
 		    ERRDOS, ERROR_BAD_DEV_TYPE);
 		cmn_err(CE_WARN, "smb_com_close_print_file: SDRC_ERROR");
@@ -268,7 +271,8 @@ smb_com_write_print_file(smb_request_t *sr)
 	smb_attr_t	attr;
 	int		rc;
 
-	if (!STYPE_ISPRN(sr->tid_tree->t_res_type)) {
+	if (sr->sr_server->sv_cfg.skc_print_enable == 0 ||
+	    !STYPE_ISPRN(sr->tid_tree->t_res_type)) {
 		smbsr_error(sr, NT_STATUS_BAD_DEVICE_TYPE,
 		    ERRDOS, ERROR_BAD_DEV_TYPE);
 		return (SDRC_ERROR);

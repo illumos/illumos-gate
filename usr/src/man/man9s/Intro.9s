@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH Intro 9S "15 May 2001" "SunOS 5.11" "Data Structures for Drivers"
+.TH INTRO 9S "May 15, 2001"
 .SH NAME
 Intro, intro \- introduction to kernel data structures and properties
 .SH DESCRIPTION
@@ -69,41 +69,40 @@ The following table summarizes the STREAMS structures described in Section 9S.
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-StructureType
+box;
+c | c
+l | l .
+Structure	Type
 _
-\fBcopyreq\fRDDI/DKI
+\fBcopyreq\fR	DDI/DKI
 _
-\fBcopyresp\fRDDI/DKI
+\fBcopyresp\fR	DDI/DKI
 _
-\fBdatab\fRDDI/DKI
+\fBdatab\fR	DDI/DKI
 _
-\fBfmodsw\fRSolaris DDI 
+\fBfmodsw\fR	Solaris DDI
 _
-\fBfree_rtn\fRDDI/DKI
+\fBfree_rtn\fR	DDI/DKI
 _
-\fBiocblk\fRDDI/DKI
+\fBiocblk\fR	DDI/DKI
 _
-\fBlinkblk\fRDDI/DKI 
+\fBlinkblk\fR	DDI/DKI
 _
-\fBmodule_info\fRDDI/DKI 
+\fBmodule_info\fR	DDI/DKI
 _
-\fBmsgb\fRDDI/DKI 
+\fBmsgb\fR	DDI/DKI
 _
-\fBqband\fRDDI/DKI 
+\fBqband\fR	DDI/DKI
 _
-\fBqinit\fRDDI/DKI 
+\fBqinit\fR	DDI/DKI
 _
-\fBqueclass\fRSolaris DDI
+\fBqueclass\fR	Solaris DDI
 _
-\fBqueue\fRDDI/DKI
+\fBqueue\fR	DDI/DKI
 _
-\fBstreamtab\fRDDI/DKI
+\fBstreamtab\fR	DDI/DKI
 _
-\fBstroptions\fRDDI/DKI
+\fBstroptions\fR	DDI/DKI
 .TE
 
 .sp
@@ -113,75 +112,74 @@ The following table summarizes structures that are not specific to STREAMS I/O.
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-StructureType
+box;
+c | c
+l | l .
+Structure	Type
 _
-\fBaio_req\fRSolaris DDI
+\fBaio_req\fR	Solaris DDI
 _
-\fBbuf\fRDDI/DKI
+\fBbuf\fR	DDI/DKI
 _
-\fBcb_ops\fRSolaris DDI
+\fBcb_ops\fR	Solaris DDI
 _
-\fBddi_device_acc_attr\fRSolaris DDI
+\fBddi_device_acc_attr\fR	Solaris DDI
 _
-\fBddi_dma_attr\fRSolaris DDI 
+\fBddi_dma_attr\fR	Solaris DDI
 _
-\fBddi_dma_cookie\fRSolaris DDI
+\fBddi_dma_cookie\fR	Solaris DDI
 _
-\fBddi_dma_lim_sparc\fRSolaris SPARC DDI
+\fBddi_dma_lim_sparc\fR	Solaris SPARC DDI
 _
-\fBddi_dma_lim_x86\fRSolaris x86 DDI
+\fBddi_dma_lim_x86\fR	Solaris x86 DDI
 _
-\fBddi_dma_req\fRSolaris DDI
+\fBddi_dma_req\fR	Solaris DDI
 _
-\fBddi_dmae_req\fRSolaris x86 DDI
+\fBddi_dmae_req\fR	Solaris x86 DDI
 _
-\fBddi_idevice_cookie\fRSolaris DDI
+\fBddi_idevice_cookie\fR	Solaris DDI
 _
-\fBddi_mapdev_ctl\fRSolaris DDI
+\fBddi_mapdev_ctl\fR	Solaris DDI
 _
-\fBdevmap_callback_ctl\fRSolaris DDI
+\fBdevmap_callback_ctl\fR	Solaris DDI
 _
-\fBdev_ops\fRSolaris DDI 
+\fBdev_ops\fR	Solaris DDI
 _
-\fBiovec\fRDDI/DKI
+\fBiovec\fR	DDI/DKI
 _
-\fBkstat\fRSolaris DDI
+\fBkstat\fR	Solaris DDI
 _
-\fBkstat_intr\fRSolaris DDI
+\fBkstat_intr\fR	Solaris DDI
 _
-\fBkstat_io\fRSolaris DDI
+\fBkstat_io\fR	Solaris DDI
 _
-\fBkstat_named\fRSolaris DDI 
+\fBkstat_named\fR	Solaris DDI
 _
-\fBmap\fRDDI/DKI
+\fBmap\fR	DDI/DKI
 _
-\fBmodldrv\fRSolaris DDI
+\fBmodldrv\fR	Solaris DDI
 _
-\fBmodlinkage\fRSolaris DDI
+\fBmodlinkage\fR	Solaris DDI
 _
-\fBmodlstrmod\fRSolaris DDI
+\fBmodlstrmod\fR	Solaris DDI
 _
-\fBscsi_address\fRSolaris DDI 
+\fBscsi_address\fR	Solaris DDI
 _
-\fBscsi_arq_status\fRSolaris DDI
+\fBscsi_arq_status\fR	Solaris DDI
 _
-\fBscsi_device\fRSolaris DDI 
+\fBscsi_device\fR	Solaris DDI
 _
-\fBscsi_extended_sense\fRSolaris DDI
+\fBscsi_extended_sense\fR	Solaris DDI
 _
-\fBscsi_hba_tran\fRSolaris DDI
+\fBscsi_hba_tran\fR	Solaris DDI
 _
-\fBscsi_inquiry\fRSolaris DDI
+\fBscsi_inquiry\fR	Solaris DDI
 _
-\fBscsi_pkt\fRSolaris DDI
+\fBscsi_pkt\fR	Solaris DDI
 _
-\fBscsi_status\fRSolaris DDI
+\fBscsi_status\fR	Solaris DDI
 _
-\fBuio\fRDDI/DKI
+\fBuio\fR	DDI/DKI
 .TE
 
 .SH SEE ALSO

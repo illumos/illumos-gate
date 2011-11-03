@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH tran_tgt_init 9E "1 Nov 1993" "SunOS 5.11" "Driver Entry Points"
+.TH TRAN_TGT_INIT 9E "Nov 1, 1993"
 .SH NAME
 tran_tgt_init \- request to initialize HBA resources on behalf of a particular
 target
@@ -25,48 +25,40 @@ Solaris architecture specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhba_dip\fR \fR
 .ad
 .RS 13n
-.rt  
 Pointer to a  \fBdev_info_t\fR structure, referring to the \fBHBA\fR device
 instance.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItgt_dip\fR \fR
 .ad
 .RS 13n
-.rt  
 Pointer to a \fBdev_info_t\fR structure, referring to the target device
 instance.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhba_tran\fR \fR
 .ad
 .RS 13n
-.rt  
 Pointer to a  \fBscsi_hba_tran\fR(9S) structure, consisting of the \fBHBA\fR's
 transport vectors.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsd\fR \fR
 .ad
 .RS 13n
-.rt  
 Pointer to a  \fBscsi_device\fR(9S) structure, describing the target.
 .RE
 
@@ -97,24 +89,20 @@ instance.
 \fBtran_tgt_init()\fR must return:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR \fR
 .ad
 .RS 16n
-.rt  
 the \fBHBA\fR driver can support the addressed target, and was able to
 initialize per-target resources.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR \fR
 .ad
 .RS 16n
-.rt  
 the \fBHBA\fR driver cannot support the addressed target, or was unable to
 initialize per-target resources. In this event, the initialization of this
 instance of the target device will not be continued, the target driver's

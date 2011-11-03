@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH boot 1M "2 Mar 2009" "SunOS 5.11" "System Administration Commands"
+.TH BOOT 1M "Mar 2, 2009"
 .SH NAME
 boot \- start the system kernel or a standalone program
 .SH SYNOPSIS
@@ -193,7 +193,6 @@ boot ... -o \fIopt1\fR[,\fIopt2\fR[,...]]
 where each option may be an action:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdhcp\fR\fR
 .ad
@@ -204,7 +203,6 @@ Require \fBwanboot\fR to obtain configuration parameters by means of DHCP.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprompt\fR\fR
 .ad
@@ -215,7 +213,6 @@ Cause \fBwanboot\fR to enter its command interpreter.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fI<cmd>\fR\fR
 .ad
@@ -238,7 +235,6 @@ single commands or assignments, or a comma-separated list of commands or
 assignments. The configuration parameters are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhost-ip\fR\fR
 .ad
@@ -249,7 +245,6 @@ IP address of the client (in dotted-decimal notation)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrouter-ip\fR\fR
 .ad
@@ -260,7 +255,6 @@ IP address of the default router (in dotted-decimal notation)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsubnet-mask\fR\fR
 .ad
@@ -271,7 +265,6 @@ subnet mask (in dotted-decimal notation)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclient-id\fR\fR
 .ad
@@ -282,7 +275,6 @@ DHCP client identifier (a quoted ASCII string or hex ASCII)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhostname\fR\fR
 .ad
@@ -293,7 +285,6 @@ hostname to request in DHCP transactions (ASCII)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhttp-proxy\fR\fR
 .ad
@@ -307,7 +298,6 @@ HTTP proxy server specification (IPADDR[:PORT])
 The key names are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3des\fR\fR
 .ad
@@ -318,7 +308,6 @@ the triple DES encryption key (48 hex ASCII characters)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBaes\fR\fR
 .ad
@@ -329,7 +318,6 @@ the AES encryption key (32 hex ASCII characters)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsha1\fR\fR
 .ad
@@ -343,7 +331,6 @@ the HMAC SHA-1 signature key (40 hex ASCII characters)
 Finally, the URL or the WAN boot CGI is referred to by means of:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbootserver\fR\fR
 .ad
@@ -357,7 +344,6 @@ URL of WAN boot's CGI (the equivalent of OBP's \fBfile\fR parameter)
 The interpreter accepts the following commands:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhelp\fR\fR
 .ad
@@ -368,7 +354,6 @@ Print a brief description of the available commands
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fIvar\fR=\fIval\fR\fR\fR
 .ad
@@ -380,7 +365,6 @@ parameter names, the key names, or \fBbootserver\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fIvar\fR=\fR\fR
 .ad
@@ -391,7 +375,6 @@ Unset parameter \fIvar\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlist\fR\fR
 .ad
@@ -403,7 +386,6 @@ never shown).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprompt\fR\fR
 .ad
@@ -416,7 +398,6 @@ Return) or enter a new value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgo\fR\fR
 .ad
@@ -428,7 +409,6 @@ interpreter and continue booting.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBexit\fR\fR
 .ad
@@ -655,7 +635,6 @@ Configuration parameters, listed below, are specified as \fIkey\fR=\fIvalue\fR
 attribute pairs.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtftp-server\fR\fR
 .ad
@@ -666,7 +645,6 @@ IP address of the TFTP server
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfile\fR\fR
 .ad
@@ -677,7 +655,6 @@ file to download using TFTP or URL for WAN boot
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhost-ip\fR\fR
 .ad
@@ -688,7 +665,6 @@ IP address of the client (in dotted-decimal notation)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrouter-ip\fR\fR
 .ad
@@ -699,7 +675,6 @@ IP address of the default router
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsubnet-mask\fR\fR
 .ad
@@ -710,7 +685,6 @@ subnet mask (in dotted-decimal notation)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclient-id\fR\fR
 .ad
@@ -721,7 +695,6 @@ DHCP client identifier
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhostname\fR\fR
 .ad
@@ -732,7 +705,6 @@ hostname to use in DHCP transactions
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhttp-proxy\fR\fR
 .ad
@@ -743,7 +715,6 @@ HTTP proxy server specification (IPADDR[:PORT])
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtftp-retries\fR\fR
 .ad
@@ -754,7 +725,6 @@ maximum number of TFTP retries
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdhcp-retries\fR\fR
 .ad
@@ -1124,7 +1094,6 @@ GRUB menu.
 The following SPARC options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
@@ -1137,7 +1106,6 @@ passed to the standalone program.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR \fIdefault-file\fR\fR
 .ad
@@ -1152,7 +1120,6 @@ exported by the \fBboot\fR program.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR \fIobject\fR\fR
 .ad
@@ -1165,7 +1132,6 @@ failsafe or \fBwanboot\fR boot archive.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
@@ -1180,7 +1146,6 @@ storage pool.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
@@ -1191,7 +1156,6 @@ Display verbose debugging information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIboot-flags\fR\fR
 .ad
@@ -1205,7 +1169,6 @@ program.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIclient-program-args\fR\fR
 .ad
@@ -1217,7 +1180,6 @@ are not interpreted by \fBboot\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fR
 .ad
@@ -1230,7 +1192,6 @@ NVRAM variable, \fBboot\fR chooses an appropriate default filename.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIOBP\fR \fInames\fR\fR
 .ad
@@ -1244,7 +1205,6 @@ adapter plugged into slot 0.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Z\fR \fIdataset\fR\fR
 .ad
@@ -1259,7 +1219,6 @@ Boot from the root file system in the specified ZFS dataset.
 The following x86 options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-B\fR \fIprop\fR=\fIval\fR...\fR
 .ad
@@ -1284,7 +1243,6 @@ menu entry needs the following option added:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIboot-args\fR\fR
 .ad
@@ -1297,7 +1255,6 @@ information about the options available with the kernel.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/i86pc/kernel/$ISADIR/unix\fR\fR
 .ad
@@ -1531,7 +1488,6 @@ to \fB/boot/grub/menu.lst\fR, and use the \fBset-menu\fR subcommand of
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/\fR\fIplatform-name\fR\fB/ufsboot\fR\fR
 .ad
@@ -1542,7 +1498,6 @@ Second-level program to boot from a disk, DVD, or CD
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/inittab\fR\fR
 .ad
@@ -1553,7 +1508,6 @@ Table in which the \fBinitdefault\fR state is specified
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/sbin/init\fR\fR
 .ad
@@ -1565,7 +1519,6 @@ Program that brings the system to the \fBinitdefault\fR state
 .SS "64-bit SPARC Only"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/\fR\fIplatform-name\fR\fB/kernel/sparcv9/unix\fR\fR
 .ad
@@ -1577,7 +1530,6 @@ Default program to boot system.
 .SS "x86 Only"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/boot\fR\fR
 .ad
@@ -1588,7 +1540,6 @@ Directory containing boot-related files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/boot/grub/menu.lst\fR\fR
 .ad
@@ -1599,7 +1550,6 @@ Menu of bootable operating systems displayed by GRUB.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/i86pc/kernel/unix\fR\fR
 .ad
@@ -1611,7 +1561,6 @@ Menu of bootable operating systems displayed by GRUB.
 .SS "64-bit x86 Only"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/i86pc/kernel/amd64/unix\fR\fR
 .ad

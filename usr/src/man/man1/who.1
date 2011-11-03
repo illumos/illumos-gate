@@ -2,14 +2,14 @@
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2000, Sun Microsystems, Inc.  All Rights Reserved
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH who 1 "3 Nov 2000" "SunOS 5.11" "User Commands"
+.TH WHO 1 "Nov 3, 2000"
 .SH NAME
 who \- who is on the system
 .SH SYNOPSIS
@@ -84,89 +84,73 @@ The general format for output is:
 where:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR \fR
 .ad
 .RS 12n
-.rt  
 User's login name
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstate\fR \fR
 .ad
 .RS 12n
-.rt  
 Capability of writing to the terminal
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIline\fR \fR
 .ad
 .RS 12n
-.rt  
 Name of the line found in \fB/dev\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItime\fR \fR
 .ad
 .RS 12n
-.rt  
 Time since user's login
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIidle\fR \fR
 .ad
 .RS 12n
-.rt  
 Time elapsed since the user's last activity
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpid\fR \fR
 .ad
 .RS 12n
-.rt  
 User's process id
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcomment\fR \fR
 .ad
 .RS 12n
-.rt  
 Comment line in \fBinittab\fR(4)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIexit\fR \fR
 .ad
 .RS 12n
-.rt  
 Exit status for dead processes
 .RE
 
@@ -176,12 +160,10 @@ Exit status for dead processes
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fR
 .ad
 .RS 9n
-.rt  
 Processes \fB/var/adm/utmpx\fR or the named \fIfile\fR with \fB-b\fR, \fB-d\fR,
 \fB-l\fR, \fB-p\fR, \fB-r\fR, \fB-t\fR, \fB-T\fR, and \fB-u\fR options turned
 on.
@@ -189,23 +171,19 @@ on.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR \fR
 .ad
 .RS 9n
-.rt  
 Indicates the time and date of the last reboot.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fR
 .ad
 .RS 9n
-.rt  
 Displays all processes that have expired and not been respawned by \fBinit\fR.
 The \fBexit\fR field appears for dead processes and contains the termination
 and exit values (as returned by \fBwait\fR(3UCB)), of the dead process. This
@@ -214,23 +192,19 @@ can be useful in determining why a process terminated.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-H\fR \fR
 .ad
 .RS 9n
-.rt  
 Outputs column headings above the regular output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fR
 .ad
 .RS 9n
-.rt  
 Lists only those lines on which the system is waiting for someone to login. The
 \fIname\fR field is \fBLOGIN\fR in such cases. Other fields are the same as for
 user entries except that the \fIstate\fR field does not exist.
@@ -238,23 +212,19 @@ user entries except that the \fIstate\fR field does not exist.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fR
 .ad
 .RS 9n
-.rt  
 Outputs only information about the current terminal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fIx\fR \fR
 .ad
 .RS 9n
-.rt  
 Takes a numeric argument, \fIx\fR, which specifies the number of users to
 display per line. \fIx\fR must be at least \fB1\fR. The \fB-n\fR option can
 only be used with \fB-q\fR.
@@ -262,12 +232,10 @@ only be used with \fB-q\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fR
 .ad
 .RS 9n
-.rt  
 Lists any other process that is currently active and has been previously
 spawned by \fBinit\fR. The \fIname\fR field is the name of the program executed
 by \fBinit\fR as found in \fB/sbin/inittab\fR. The \fIstate\fR, \fIline\fR, and
@@ -278,80 +246,66 @@ field of the line from \fB/sbin/inittab\fR that spawned this process. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR \fR
 .ad
 .RS 9n
-.rt  
 (Quick \fBwho\fR) Displays only the names and the number of users currently
 logged on. When this option is used, all other options are ignored.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fR
 .ad
 .RS 9n
-.rt  
 Indicates the current \fIrun-level\fR of the \fBinit\fR process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fR
 .ad
 .RS 9n
-.rt  
 (Default) Lists only the \fIname\fR, \fIline\fR, and \fItime\fR fields.
 .RE
 
 .SS "/usr/bin/who"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fR
 .ad
 .RS 7n
-.rt  
 Same as the \fB-s\fR option, except that the \fIstate\fR \fIidle\fR, \fIpid\fR,
 and \fIcomment\fR, fields are also written. \fIstate\fR is one of the following
 characters:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+\fR \fR
 .ad
 .RS 9n
-.rt  
 The terminal allows write access to other users.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi\fR \fR
 .ad
 .RS 9n
-.rt  
 The terminal denies write access to other users.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB?\fR \fR
 .ad
 .RS 9n
-.rt  
 The terminal write-access state cannot be determined.
 .RE
 
@@ -360,12 +314,10 @@ The terminal write-access state cannot be determined.
 .SS "/usr/xpg4/bin/who"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fR
 .ad
 .RS 7n
-.rt  
 Same as the \fB-s\fR option, except that the \fIstate\fR field is also written.
 \fIstate\fR is one of the characters listed under the \fB/usr/bin/who\fR
 version of this option. If the \fB-u\fR option is used with \fB-T\fR, the idle
@@ -374,24 +326,20 @@ time is added to the end of the previous format.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fR
 .ad
 .RS 7n
-.rt  
 Indicates the last change to the system clock (using the \fBdate\fR utility) by
 \fBroot\fR. See \fBsu\fR(1M) and \fBdate\fR(1).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fR
 .ad
 .RS 7n
-.rt  
 Lists only those users who are currently logged in. The \fIname\fR is the
 user's login name. The \fIline\fR is the name of the line as found in the
 directory \fB/dev\fR. The \fItime\fR is the time that the user logged in. The
@@ -414,7 +362,6 @@ and so forth.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBam\fR \fBi\fR \fR
 .ad
@@ -423,7 +370,6 @@ The following operands are supported:
 \fB\fBam\fR \fBI\fR \fR
 .ad
 .RS 9n
-.rt  
 In the "C" locale, limits the output to describing the invoking user,
 equivalent to the \fB-m\fR option. The \fBam\fR and \fBi\fR or \fBI\fR must be
 separate arguments.
@@ -431,12 +377,10 @@ separate arguments.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR \fR
 .ad
 .RS 9n
-.rt  
 Specifies a path name of a file to substitute for the database of logged-on
 users that \fBwho\fR uses by default.
 .RE
@@ -453,57 +397,47 @@ that affect the execution of \fBwho\fR: \fBLANG\fR, \fBLC_ALL\fR,
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 7n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR \fR
 .ad
 .RS 7n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/sbin/inittab\fR \fR
 .ad
 .RS 19n
-.rt  
 Script for \fBinit\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/utmpx\fR \fR
 .ad
 .RS 19n
-.rt  
 Current user and accounting information
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/wtmpx\fR \fR
 .ad
 .RS 19n
-.rt  
 Historic user and accounting information
 .RE
 
@@ -516,13 +450,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

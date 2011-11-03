@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH elf_getdata 3ELF "11 Jul 2001" "SunOS 5.11" "ELF Library Functions"
+.TH ELF_GETDATA 3ELF "Jul 11, 2001"
 .SH NAME
 elf_getdata, elf_newdata, elf_rawdata \- get section data
 .SH SYNOPSIS
@@ -97,24 +97,20 @@ These members are available for direct manipulation by the program.
 Descriptions appear below.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd_buf\fR\fR
 .ad
 .RS 13n
-.rt  
 A pointer to the data buffer resides here. A data element with no data has a
 null pointer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd_type\fR\fR
 .ad
 .RS 13n
-.rt  
 This member's value specifies the type of the data to which \fBd_buf\fR points.
 A section's type determines how to interpret the section contents, as
 summarized below.
@@ -122,12 +118,10 @@ summarized below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd_size\fR\fR
 .ad
 .RS 13n
-.rt  
 This member holds the total size, in bytes, of the memory occupied by the data.
 This may differ from the size as represented in the file. The size will be zero
 if no data exist. (See the discussion of \fBSHT_NOBITS\fR below for more
@@ -136,24 +130,20 @@ information.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd_off\fR\fR
 .ad
 .RS 13n
-.rt  
 This member gives the offset, within the section, at which the buffer resides.
 This offset is relative to the file's section, not the memory object's.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd_align\fR\fR
 .ad
 .RS 13n
-.rt  
 This member holds the buffer's required alignment, from the beginning of the
 section. That is, \fBd_off\fR will be a multiple of this member's value. For
 example, if this member's value is \fB4\fR, the beginning of the buffer will be
@@ -164,12 +154,10 @@ for a buffer within the section and within the file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd_version\fR\fR
 .ad
 .RS 13n
-.rt  
 This member holds the version number of the objects in the buffer. When the
 library originally read the data from the object file, it used the working
 version to control the translation to memory objects.
@@ -209,34 +197,32 @@ control translation by \fBelf32_xlatetof\fR(3ELF)
 
 .sp
 .TS
-tab();
-cw(1.83i) cw(1.83i) cw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-Section TypeElf_Type32-bit Type
-\fBSHT_DYNAMIC\fR\fBELF_T_DYN\fR\fBElf32_Dyn\fR
-\fBSHT_DYNSYM\fR\fBELF_T_SYM\fR\fBElf32_Sym\fR
-\fBSHT_FINI_ARRAY\fR\fBELF_T_ADDR\fR\fBElf32_Addr\fR
-\fBSHT_GROUP\fR\fBELF_T_WORD\fR\fBElf32_Word\fR
-\fBSHT_HASH\fR\fBELF_T_WORD\fR\fBElf32_Word\fR
-\fBSHT_INIT_ARRAY\fR\fBELF_T_ADDR\fR\fBElf32_Addr\fR
-\fBSHT_NOBITS\fR\fBELF_T_BYTE\fR\fBunsigned char\fR
-\fBSHT_NOTE\fR\fBELF_T_NOTE\fR\fBunsigned char\fR
-\fBSHT_NULL\fR\fInone\fR\fInone\fR
-\fBSHT_PREINIT_ARRAY\fR\fBELF_T_ADDR\fR\fBElf32_Addr\fR
-\fBSHT_PROGBITS\fR\fBELF_T_BYTE\fR\fBunsigned char\fR
-\fBSHT_REL\fR\fBELF_T_REL\fR\fBElf32_Rel\fR
-\fBSHT_RELA\fR\fBELF_T_RELA\fR\fBElf32_Rela\fR
-\fBSHT_STRTAB\fR\fBELF_T_BYTE\fR\fBunsigned char\fR
-\fBSHT_SYMTAB\fR\fBELF_T_SYM\fR\fBElf32_Sym\fR
-\fBSHT_SUNW_comdat\fR\fBELF_T_BYTE\fR\fBunsigned char\fR
-\fBSHT_SUNW_move\fR\fBELF_T_MOVE\fR\fBElf32_Move\fR (sparc)
-\fBSHT_SUNW_move\fR\fBELF_T_MOVEP\fR\fBElf32_Move\fR (ia32)
-\fBSHT_SUNW_syminfo\fR\fBELF_T_SYMINFO\fR\fBElf32_Syminfo\fR
-\fBSHT_SUNW_verdef\fR\fBELF_T_VDEF\fR\fBElf32_Verdef\fR
-\fBSHT_SUNW_verneed\fR\fBELF_T_VNEED\fR\fBElf32_Verneed\fR
-\fBSHT_SUNW_versym\fR\fBELF_T_HALF\fR\fBElf32_Versym\fR
-\fIother\fR\fBELF_T_BYTE\fR\fBunsigned char\fR
+c c c
+l l l .
+Section Type	Elf_Type	32-bit Type
+\fBSHT_DYNAMIC\fR	\fBELF_T_DYN\fR	\fBElf32_Dyn\fR
+\fBSHT_DYNSYM\fR	\fBELF_T_SYM\fR	\fBElf32_Sym\fR
+\fBSHT_FINI_ARRAY\fR	\fBELF_T_ADDR\fR	\fBElf32_Addr\fR
+\fBSHT_GROUP\fR	\fBELF_T_WORD\fR	\fBElf32_Word\fR
+\fBSHT_HASH\fR	\fBELF_T_WORD\fR	\fBElf32_Word\fR
+\fBSHT_INIT_ARRAY\fR	\fBELF_T_ADDR\fR	\fBElf32_Addr\fR
+\fBSHT_NOBITS\fR	\fBELF_T_BYTE\fR	\fBunsigned char\fR
+\fBSHT_NOTE\fR	\fBELF_T_NOTE\fR	\fBunsigned char\fR
+\fBSHT_NULL\fR	\fInone\fR	\fInone\fR
+\fBSHT_PREINIT_ARRAY\fR	\fBELF_T_ADDR\fR	\fBElf32_Addr\fR
+\fBSHT_PROGBITS\fR	\fBELF_T_BYTE\fR	\fBunsigned char\fR
+\fBSHT_REL\fR	\fBELF_T_REL\fR	\fBElf32_Rel\fR
+\fBSHT_RELA\fR	\fBELF_T_RELA\fR	\fBElf32_Rela\fR
+\fBSHT_STRTAB\fR	\fBELF_T_BYTE\fR	\fBunsigned char\fR
+\fBSHT_SYMTAB\fR	\fBELF_T_SYM\fR	\fBElf32_Sym\fR
+\fBSHT_SUNW_comdat\fR	\fBELF_T_BYTE\fR	\fBunsigned char\fR
+\fBSHT_SUNW_move\fR	\fBELF_T_MOVE\fR	\fBElf32_Move\fR (sparc)
+\fBSHT_SUNW_move\fR	\fBELF_T_MOVEP\fR	\fBElf32_Move\fR (ia32)
+\fBSHT_SUNW_syminfo\fR	\fBELF_T_SYMINFO\fR	\fBElf32_Syminfo\fR
+\fBSHT_SUNW_verdef\fR	\fBELF_T_VDEF\fR	\fBElf32_Verdef\fR
+\fBSHT_SUNW_verneed\fR	\fBELF_T_VNEED\fR	\fBElf32_Verneed\fR
+\fBSHT_SUNW_versym\fR	\fBELF_T_HALF\fR	\fBElf32_Versym\fR
+\fIother\fR	\fBELF_T_BYTE\fR	\fBunsigned char\fR
 .TE
 
 .sp
@@ -305,15 +291,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStable
+Interface Stability	Stable
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

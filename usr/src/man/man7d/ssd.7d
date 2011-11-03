@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ssd 7D "9 Aug 2008" "SunOS 5.11" "Devices"
+.TH SSD 7D "Aug 9, 2008"
 .SH NAME
 ssd \- Fibre Channel Arbitrated Loop disk device driver
 .SH SYNOPSIS
@@ -70,90 +70,74 @@ Refer to  \fBdkio\fR(7I).
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 10n
-.rt  
 Permission denied.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBUSY\fR\fR
 .ad
 .RS 10n
-.rt  
 The partition was opened exclusively by another thread.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 The argument was a bad address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 Invalid argument.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 10n
-.rt  
 An I/O error occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTTY\fR\fR
 .ad
 .RS 10n
-.rt  
 The device does not support the requested ioctl function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENXIO\fR\fR
 .ad
 .RS 10n
-.rt  
 When returned during  \fBopen\fR(2), this error indicates the device does not
 exist.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEROFS\fR\fR
 .ad
 .RS 10n
-.rt  
 The device is a read-only device.
 .RE
 
@@ -164,12 +148,10 @@ You configure the \fBssd\fR driver by defining  properties in the
 \fBssd.conf\fR file. The \fBssd\fR driver supports the following properties:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBenable-partition-kstats\fR\fR
 .ad
 .RS 27n
-.rt  
 The default value is 1, which causes partition IO statistics to be maintained.
 Set this value to zero to prevent the driver from recording partition
 statistics. This slightly reduces the CPU overhead for IO, mimimizes the amount
@@ -189,11 +171,11 @@ value of this property is a list of duplets. The formal syntax is:
 .nf
 ssd-config-list = 	<duplet> [, <duplet> ]* ;
 
-where 
+where
 
 <duplet>:=        "<vid+pid>" , "<tunable-list>"
 
-and 
+and
 
 <tunable-list>:=   <tunable>  [, <tunable> ]*;
 <tunable> =        <name> : <value>
@@ -206,9 +188,9 @@ all target devices with the specified <vid+pid>.
 
 Each <tunable> is a <name> : <value> pair. Supported
 tunable names are:
-  
+
    delay-busy:	when busy, nsecs of delay before retry.
-   
+
    retries-timeout:	retries to perform on an IO timeout.
 .fi
 .in -2
@@ -218,7 +200,7 @@ tunable names are:
 .in +2
 .nf
 The following is an example of a global ssd-config-list property:
-  
+
    ssd-config-list =
       "SUN     T4", "delay-busy:600, retries-timeout:6",
       "SUN     StorEdge_3510", "retries-timeout:3";
@@ -228,78 +210,64 @@ The following is an example of a global ssd-config-list property:
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fBssd.conf\fR
 .ad
 .RS 22n
-.rt  
 Driver configuration file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB/dev/dsk/c\fIn\fR\fBt\fR\fIn\fR\fBd\fR\fIn\fR\fBs\fR\fIn\fR\fR
 .ad
 .RS 22n
-.rt  
 block files
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB/dev/rdsk/c\fIn\fR\fBt\fR\fIn\fR\fBd\fR\fIn\fR\fBs\fR\fIn\fR\fR
 .ad
 .RS 22n
-.rt  
 raw files
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBc\fIn\fR\fR
 .ad
 .RS 22n
-.rt  
 is the controller number on the system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBt\fIn\fR\fR
 .ad
 .RS 22n
-.rt  
 7-bit disk loop identifier, such as switch setting
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBd\fIn\fR\fR
 .ad
 .RS 22n
-.rt  
 SCSI lun  \fIn\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fIn\fR\fR
 .ad
 .RS 22n
-.rt  
 partition \fIn\fR (0-7)
 .RE
 
@@ -322,8 +290,8 @@ partition \fIn\fR (0-7)
 .sp
 .in +2
 .nf
-Error for command '<command name>' Error Level: Fatal Requested Block <n>, 
-Error  Block: <m>, Sense Key: <sense key name>, Vendor '<vendor name>': 
+Error for command '<command name>' Error Level: Fatal Requested Block <n>,
+Error  Block: <m>, Sense Key: <sense key name>, Vendor '<vendor name>':
 ASC = 0x<a> (<ASC name>), ASCQ = 0x<b>, FRU = 0x<c>
 .fi
 .in -2
@@ -395,7 +363,7 @@ The drive was reserved by another initiator.
 .sp
 .in +2
 .nf
-SCSI transport failed: reason 'xxxx' : {retrying|giving up} 
+SCSI transport failed: reason 'xxxx' : {retrying|giving up}
 .fi
 .in -2
 .sp

@@ -1,13 +1,13 @@
 '\" te
 .\" Copyright 1989 AT&T. Copyright (c) 2001, The IEEE and The Open Group. All Rights Reserved. Portions Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH wait.h 3HEAD "10 Sep 2004" "SunOS 5.11" "Headers"
+.TH WAIT.H 3HEAD "Sep 10, 2004"
 .SH NAME
 wait.h, wait \- wait status
 .SH SYNOPSIS
@@ -26,12 +26,10 @@ macros evaluate to integral expressions. The \fIstat\fR argument to these
 macros is the integer value returned from \fBwait()\fR or \fBwaitpid()\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWCOREDUMP\fR(\fIstat\fR)\fR
 .ad
 .RS 22n
-.rt  
 If the value of \fBWIFSIGNALED\fR (\fIstat\fR) is non-zero, this macro
 evaluates to a non-zero value if a core image of the terminated child was
 created.
@@ -39,12 +37,10 @@ created.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWEXITSTATUS\fR(\fIstat\fR)\fR
 .ad
 .RS 22n
-.rt  
 If the value of  \fBWIFEXITED(\fR\fIstat\fR\fB)\fR is non-zero, this macro
 evaluates to the exit code that the child process passed to  \fB_exit()\fR (see
 \fBexit\fR(2)) or \fBexit\fR(3C), or the value that the child process returned
@@ -53,72 +49,60 @@ from \fBmain\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIFCONTINUED\fR(\fIstat\fR)\fR
 .ad
 .RS 22n
-.rt  
 Evaluates to a non-zero value if status was returned for a child process that
 has continued.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIFEXITED\fR(\fIstat\fR)\fR
 .ad
 .RS 22n
-.rt  
 Evaluates to a non-zero value if status was returned for a child process that
 terminated normally.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIFSIGNALED\fR(\fIstat\fR)\fR
 .ad
 .RS 22n
-.rt  
 Evaluates to a non-zero value if status was returned for a child process that
 terminated due to the receipt of a signal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIFSTOPPED\fR(\fIstat\fR)\fR
 .ad
 .RS 22n
-.rt  
 Evaluates to a non-zero value if status was returned for a child process that
 is currently stopped.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWSTOPSIG\fR(\fIstat\fR)\fR
 .ad
 .RS 22n
-.rt  
 If the value of \fBWIFSTOPPED(\fR\fIstat\fR\fB)\fR is non-zero, this macro
 evaluates to the number of the signal that caused the child process to stop.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWTERMSIG\fR(\fIstat\fR)\fR
 .ad
 .RS 22n
-.rt  
 If the value of  \fBWIFSIGNALED\fR(\fIstat\fR) is non-zero, this macro
 evaluates to the number of the signal that caused the termination of the child
 process.
@@ -130,23 +114,19 @@ The <\fBsys/wait.h\fR> header defines the symbolic constants listed below for
 use with \fBwaitpid\fR(3C).
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWNOHANG\fR\fR
 .ad
 .RS 13n
-.rt  
 Do not hang if no status is available; return immediately.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWUNTRACED\fR\fR
 .ad
 .RS 13n
-.rt  
 Report status of stopped child process.
 .RE
 
@@ -156,56 +136,46 @@ The symbolic constants listed below are defined as possible values for the
 \fIoptions\fR argument to \fBwaitid\fR(2).
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWEXITED\fR\fR
 .ad
 .RS 14n
-.rt  
 Wait for processes that have exited.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWSTOPPED\fR\fR
 .ad
 .RS 14n
-.rt  
 Status is returned for any child that has stopped upon receipt of a signal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWCONTINUED\fR\fR
 .ad
 .RS 14n
-.rt  
 Status is returned for any child that was stopped and has been continued.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWNOHANG\fR\fR
 .ad
 .RS 14n
-.rt  
 Return immediately if there are no children to wait for.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWNOWAIT\fR\fR
 .ad
 .RS 14n
-.rt  
 Keep the process whose status is returned in \fBinfop\fR in a waitable state.
 .RE
 
@@ -244,13 +214,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

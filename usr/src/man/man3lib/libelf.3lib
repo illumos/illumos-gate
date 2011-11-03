@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libelf 3LIB "18 June 2009" "SunOS 5.11" "Interface Libraries"
+.TH LIBELF 3LIB "Jun 18, 2009"
 .SH NAME
 libelf \- ELF access library
 .SH SYNOPSIS
@@ -29,75 +29,69 @@ interfaces.
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBelf32_checksum\fR\fBelf32_fsize\fR
-\fBelf32_getehdr\fR\fBelf32_getphdr\fR
-\fBelf32_getshdr\fR\fBelf32_newehdr\fR
-\fBelf32_newphdr\fR\fBelf32_xlatetof\fR
-\fBelf32_xlatetom\fR\fBelf64_checksum\fR
-\fBelf64_fsize\fR\fBelf64_getehdr\fR
-\fBelf64_getphdr\fR\fBelf64_getshdr\fR
-\fBelf64_newehdr\fR\fBelf64_newphdr\fR
-\fBelf64_xlatetof\fR\fBelf64_xlatetom\fR
-\fBelf_begin\fR\fBelf_cntl\fR
-\fBelf_end\fR\fBelf_errmsg\fR
-\fBelf_errno\fR\fBelf_fill\fR
-\fBelf_flagdata\fR\fBelf_flagehdr\fR
-\fBelf_flagelf\fR\fBelf_flagphdr\fR
-\fBelf_flagscn\fR\fBelf_flagshdr\fR
-\fBelf_getarhdr\fR\fBelf_getarsym\fR
-\fBelf_getbase\fR\fBelf_getdata\fR
-\fBelf_getident\fR\fBelf_getphdrnum\fR
-\fBelf_getphnum\fR\fBelf_getscn\fR
-\fBelf_getshdrnum\fR\fBelf_getshdrstrndx\fR
-\fBelf_getshnum\fR\fBelf_getshstrndx\fR
-\fBelf_hash\fR\fBelf_kind\fR
-\fBelf_memory\fR\fBelf_ndxscn\fR
-\fBelf_newdata\fR\fBelf_newscn\fR
-\fBelf_next\fR\fBelf_nextscn\fR
-\fBelf_rand\fR\fBelf_rawdata\fR
-\fBelf_rawfile\fR\fBelf_strptr\fR
-\fBelf_update\fR\fBelf_version\fR
-\fBgelf_checksum\fR\fBgelf_fsize\fR
-\fBgelf_getcap\fR\fBgelf_getclass\fR
-\fBgelf_getdyn\fR\fBgelf_getehdr\fR
-\fBgelf_getmove\fR\fBgelf_getphdr\fR
-\fBgelf_getrel\fR\fBgelf_getrela\fR
-\fBgelf_getshdr\fR\fBgelf_getsym\fR
-\fBgelf_getsyminfo\fR\fBgelf_getsymshndx\fR
-\fBgelf_newehdr\fR\fBgelf_newphdr\fR
-\fBgelf_update_cap\fR\fBgelf_update_dyn\fR
-\fBgelf_update_ehdr\fR\fBgelf_update_move\fR
-\fBgelf_update_phdr\fR\fBgelf_update_rel\fR
-\fBgelf_update_rela\fR\fBgelf_update_shdr\fR
-\fBgelf_update_sym\fR\fBgelf_update_symshndx\fR
-\fBgelf_update_syminfo\fR\fBgelf_xlatetof\fR
-\fBgelf_xlatetom\fR\fBnlist\fR
+l l
+l l .
+\fBelf32_checksum\fR	\fBelf32_fsize\fR
+\fBelf32_getehdr\fR	\fBelf32_getphdr\fR
+\fBelf32_getshdr\fR	\fBelf32_newehdr\fR
+\fBelf32_newphdr\fR	\fBelf32_xlatetof\fR
+\fBelf32_xlatetom\fR	\fBelf64_checksum\fR
+\fBelf64_fsize\fR	\fBelf64_getehdr\fR
+\fBelf64_getphdr\fR	\fBelf64_getshdr\fR
+\fBelf64_newehdr\fR	\fBelf64_newphdr\fR
+\fBelf64_xlatetof\fR	\fBelf64_xlatetom\fR
+\fBelf_begin\fR	\fBelf_cntl\fR
+\fBelf_end\fR	\fBelf_errmsg\fR
+\fBelf_errno\fR	\fBelf_fill\fR
+\fBelf_flagdata\fR	\fBelf_flagehdr\fR
+\fBelf_flagelf\fR	\fBelf_flagphdr\fR
+\fBelf_flagscn\fR	\fBelf_flagshdr\fR
+\fBelf_getarhdr\fR	\fBelf_getarsym\fR
+\fBelf_getbase\fR	\fBelf_getdata\fR
+\fBelf_getident\fR	\fBelf_getphdrnum\fR
+\fBelf_getphnum\fR	\fBelf_getscn\fR
+\fBelf_getshdrnum\fR	\fBelf_getshdrstrndx\fR
+\fBelf_getshnum\fR	\fBelf_getshstrndx\fR
+\fBelf_hash\fR	\fBelf_kind\fR
+\fBelf_memory\fR	\fBelf_ndxscn\fR
+\fBelf_newdata\fR	\fBelf_newscn\fR
+\fBelf_next\fR	\fBelf_nextscn\fR
+\fBelf_rand\fR	\fBelf_rawdata\fR
+\fBelf_rawfile\fR	\fBelf_strptr\fR
+\fBelf_update\fR	\fBelf_version\fR
+\fBgelf_checksum\fR	\fBgelf_fsize\fR
+\fBgelf_getcap\fR	\fBgelf_getclass\fR
+\fBgelf_getdyn\fR	\fBgelf_getehdr\fR
+\fBgelf_getmove\fR	\fBgelf_getphdr\fR
+\fBgelf_getrel\fR	\fBgelf_getrela\fR
+\fBgelf_getshdr\fR	\fBgelf_getsym\fR
+\fBgelf_getsyminfo\fR	\fBgelf_getsymshndx\fR
+\fBgelf_newehdr\fR	\fBgelf_newphdr\fR
+\fBgelf_update_cap\fR	\fBgelf_update_dyn\fR
+\fBgelf_update_ehdr\fR	\fBgelf_update_move\fR
+\fBgelf_update_phdr\fR	\fBgelf_update_rel\fR
+\fBgelf_update_rela\fR	\fBgelf_update_shdr\fR
+\fBgelf_update_sym\fR	\fBgelf_update_symshndx\fR
+\fBgelf_update_syminfo\fR	\fBgelf_xlatetof\fR
+\fBgelf_xlatetom\fR	\fBnlist\fR
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/libelf.so.1\fR\fR
 .ad
 .RS 23n
-.rt  
 shared object
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/64/libelf.so.1\fR\fR
 .ad
 .RS 23n
-.rt  
 64-bit shared object
 .RE
 
@@ -109,13 +103,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

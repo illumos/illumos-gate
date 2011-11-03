@@ -3,15 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH gprof 1 "8 Feb 2007" "SunOS 5.11" "User Commands"
+.TH GPROF 1 "Feb 8, 2007"
 .SH NAME
 gprof \- display call-graph profile data
 .SH SYNOPSIS
 .LP
 .nf
-\fBgprof\fR [\fB-abcCDlsz\fR] [\fB-e\fR \fIfunction-name\fR] [\fB-E\fR \fIfunction-name\fR] 
-     [\fB-f\fR \fIfunction-name\fR] [\fB-F\fR \fIfunction-name\fR] 
-     [\fIimage-file\fR [\fIprofile-file\fR...]] 
+\fBgprof\fR [\fB-abcCDlsz\fR] [\fB-e\fR \fIfunction-name\fR] [\fB-E\fR \fIfunction-name\fR]
+     [\fB-f\fR \fIfunction-name\fR] [\fB-F\fR \fIfunction-name\fR]
+     [\fIimage-file\fR [\fIprofile-file\fR...]]
      [\fB-n\fR \fInumber of functions\fR]
 .fi
 
@@ -72,12 +72,10 @@ profiling information to be saved in the \fBgmon.out\fR file.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 19n
-.rt  
 Suppress printing statically declared functions.  If this option is given, all
 relevant information about the static function (for instance, time samples,
 calls to other functions, calls from other functions) belongs to the function
@@ -86,23 +84,19 @@ loaded just before the static function in the \fBa.out\fR file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
 .RS 19n
-.rt  
 Brief.  Suppress descriptions of each field in the profile.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 19n
-.rt  
 Discover the static call-graph of the program by a heuristic which examines the
 text space of the object file.  Static-only parents or children are indicated
 with call counts of 0. Note that for dynamically linked executables, the linked
@@ -111,23 +105,19 @@ shared objects' text segments are not examined.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
 .RS 19n
-.rt  
 Demangle C++ symbol names before printing them out.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR\fR
 .ad
 .RS 19n
-.rt  
 Produce a profile file \fBgmon.sum\fR that represents the difference of the
 profile information in all specified profile files.  This summary profile file
 may be given to subsequent executions of  \fBgprof\fR (also with \fB-D\fR) to
@@ -142,12 +132,10 @@ from A to B as \fBn-m\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fIfunction-name\fR\fR
 .ad
 .RS 19n
-.rt  
 Suppress printing the graph profile entry for routine \fIfunction-name\fR and
 all its descendants (unless they have other ancestors that are not suppressed).
 More than one \fB-e\fR option may be given.  Only one \fIfunction-name\fR may
@@ -156,12 +144,10 @@ be given with each \fB-e\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-E\fR\fIfunction-name\fR\fR
 .ad
 .RS 19n
-.rt  
 Suppress printing the graph profile entry for routine \fIfunction-name\fR (and
 its descendants) as \fB-e\fR, below, and also exclude the time spent in
 \fIfunction-name\fR (and its descendants) from the total and percentage time
@@ -174,12 +160,10 @@ is the default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fIfunction-name\fR\fR
 .ad
 .RS 19n
-.rt  
 Print the graph profile entry only for routine \fIfunction-name\fR and its
 descendants.  More than one \fB-f\fR option may be given.  Only one
 \fIfunction-name\fR may be given with each \fB-f\fR option.
@@ -187,12 +171,10 @@ descendants.  More than one \fB-f\fR option may be given.  Only one
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fIfunction-name\fR\fR
 .ad
 .RS 19n
-.rt  
 Print the graph profile entry only for routine \fIfunction-name\fR and its
 descendants (as \fB-f\fR, below) and also use only the times of the printed
 routines in total time and percentage computations.  More than one \fB-F\fR
@@ -202,12 +184,10 @@ option may be given.  Only one \fIfunction-name\fR may be given with each
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 19n
-.rt  
 Suppress the reporting of graph profile entries for all local symbols.  This
 option would be the equivalent of placing all of the local symbols for the
 specified executable image on the \fB-E\fR exclusion list.
@@ -215,24 +195,20 @@ specified executable image on the \fB-E\fR exclusion list.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 19n
-.rt  
 Limits the size of flat and graph profile listings to the top \fBn\fR offending
 functions.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 19n
-.rt  
 Produce a profile file \fBgmon.sum\fR which represents the sum of the profile
 information in all of the specified profile files.  This summary profile file
 may be given to subsequent executions of \fBgprof\fR (also with  \fB-s\fR) to
@@ -242,12 +218,10 @@ the \fB-D\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR\fR
 .ad
 .RS 19n
-.rt  
 Display routines which have zero usage (as indicated by call counts and
 accumulated time). This is useful in conjunction with the \fB-c\fR option for
 discovering which routines were never called. Note that this has restricted use
@@ -258,12 +232,10 @@ examined by the \fB-c\fR option.
 .SH ENVIRONMENT VARIABLES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROFDIR\fR\fR
 .ad
 .RS 11n
-.rt  
 If this environment variable contains a value, place profiling output within
 that directory, in a file named \fIpid\fR\fB\&.\fR\fIprogramname\fR. \fIpid\fR
 is the process \fBID\fR and \fIprogramname\fR is the name of the program being
@@ -276,45 +248,37 @@ file \fBgmon.out\fR.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBa.out\fR\fR
 .ad
 .RS 30n
-.rt  
 executable file containing namelist
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgmon.out\fR\fR
 .ad
 .RS 30n
-.rt  
 dynamic call-graph and profile
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgmon.sum\fR\fR
 .ad
 .RS 30n
-.rt  
 summarized dynamic call-graph and profile
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$PROFDIR/\fR\fIpid\fR\fB\&.\fR\fIprogramname\fR\fR
 .ad
 .RS 30n
-.rt  
 
 .RE
 

@@ -3,14 +3,14 @@
 .\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
 .\" Portions Copyright (c) 1982-2007 AT&T Knowledge Ventures
 .\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH history 1 "2 Nov 2007" "SunOS 5.11" "User Commands"
+.TH HISTORY 1 "Nov 2, 2007"
 .SH NAME
 history, fc, hist \- process command history list
 .SH SYNOPSIS
@@ -105,23 +105,19 @@ Display the history list. If \fIn\fR is given, display only the \fIn\fR most
 recent events.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 6n
-.rt  
 Reverse the order of printout to be most recent first rather than oldest first.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 6n
-.rt  
 Display the history list without leading numbers. This is used to produce files
 suitable for sourcing using the \fB-h\fR option to the \fBcsh\fR built-in
 command, \fBsource\fR(1).
@@ -164,7 +160,6 @@ gets executed.
 An event designator is a reference to a command line entry in the history list.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!\fR\fR
 .ad
@@ -176,7 +171,6 @@ newline, \fB=\fR or \fB(\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!!\fR\fR
 .ad
@@ -188,7 +182,6 @@ previous command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!\fR\fIn\fR\fR
 .ad
@@ -199,7 +192,6 @@ Refer to command line \fIn\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!\fR\fB-n\fR\fR
 .ad
@@ -210,7 +202,6 @@ Refer to the current command line minus \fIn\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!\fR\fIstr\fR\fR
 .ad
@@ -221,7 +212,6 @@ Refer to the most recent command starting with \fIstr\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!?\fR\fIstr\fR\fB?\fR\fR
 .ad
@@ -232,7 +222,6 @@ Refer to the most recent command containing \fIstr\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!?\fR\fIstr\fR\fB?\fR \fIadditional\fR\fR
 .ad
@@ -244,7 +233,6 @@ Refer to the most recent command containing \fIstr\fR and append
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!{\fR\fBcommand\fR\fB}\fR \fIadditional\fR\fR
 .ad
@@ -256,7 +244,6 @@ Refer to the most recent command beginning with \fBcommand\fR and append
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^\fR\fIprevious_word\fR\fB^\fR\fIreplacement\fR\fB^\fR\fR
 .ad
@@ -297,111 +284,91 @@ word of the previous command, while \fB!!$\fR and \fB!$\fR both refer to the
 last word in the previous command. Word designators include:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB#\fR\fR
 .ad
 .RS 10n
-.rt  
 The entire command line typed so far.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 10n
-.rt  
 The first input word (command).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIn\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIn\fR'th argument.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^\fR\fR
 .ad
 .RS 10n
-.rt  
 The first argument, that is, \fB1\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$\fR\fR
 .ad
 .RS 10n
-.rt  
 The last argument.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%\fR\fR
 .ad
 .RS 10n
-.rt  
 The word matched by (the most recent) \fB?\fR\fIs\fR search.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIx\fR\fB\(mi\fR\fIy\fR\fR
 .ad
 .RS 10n
-.rt  
 A range of words; \fB\(mi\fR\fIy\fR abbreviates \fB0\(mi\fR\fIy\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB*\fR\fR
 .ad
 .RS 10n
-.rt  
 All the arguments, or a null value if there is just one word in the event.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIx\fR\fB*\fR\fR
 .ad
 .RS 10n
-.rt  
 Abbreviates \fIx\fR\fB\(mi$\fR\fI\&.\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIx\fR\fB\(mi\fR\fR
 .ad
 .RS 10n
-.rt  
 Like \fIx\fR\fB*\fR but omitting word \fB$\fR.
 .RE
 
@@ -412,46 +379,38 @@ After the optional word designator, you can add a sequence of one or more of
 the following modifiers, each preceded by a \fB:\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBh\fR\fR
 .ad
 .RS 28n
-.rt  
 Remove a trailing pathname component, leaving the head.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBr\fR\fR
 .ad
 .RS 28n
-.rt  
 Remove a trailing suffix of the form `\fB\&.\fR\fIxxx\fR', leaving the
 basename.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBe\fR\fR
 .ad
 .RS 28n
-.rt  
 Remove all but the suffix, leaving the extension.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs/\fR\fIoldchars\fR\fB/\fR\fIreplacements\fR\fB/\fR\fR
 .ad
 .RS 28n
-.rt  
 Substitute \fIreplacements\fR for \fIoldchars\fR. \fIoldchars\fR is a string
 that can contain embedded blank spaces, whereas \fIprevious_word\fR in the
 event designator can not.
@@ -466,68 +425,56 @@ event designator can not.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBt\fR\fR
 .ad
 .RS 28n
-.rt  
 Remove all leading pathname components, leaving the tail.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB&\fR\fR
 .ad
 .RS 28n
-.rt  
 Repeat the previous substitution.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBg\fR\fR
 .ad
 .RS 28n
-.rt  
 Apply the change to the first occurrence of a match in each word, by prefixing
 the above (for example, \fBg&\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBp\fR\fR
 .ad
 .RS 28n
-.rt  
 Print the new command but do not execute it.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBq\fR\fR
 .ad
 .RS 28n
-.rt  
 Quote the substituted words, escaping further substitutions.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBx\fR\fR
 .ad
 .RS 28n
-.rt  
 Like \fBq\fR, but break into words at each space character, tab or newline.
 .RE
 
@@ -609,24 +556,20 @@ listing. The flag \fB-r\fR reverses the order of the commands and the flag
 about command line editing.)
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHISTFILE\fR\fR
 .ad
 .RS 12n
-.rt  
 If this variable is set when the shell is invoked, then the value is the
 pathname of the file that is used to store the command history.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHISTSIZE\fR\fR
 .ad
 .RS 12n
-.rt  
 If this variable is set when the shell is invoked, then the number of
 previously entered commands that are accessible by this shell is greater than
 or equal to this number. The default is \fB128\fR.
@@ -684,36 +627,30 @@ the \fBhist\fR command and the commands that are re-executed.
 and \fIlast\fR as one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fInumber\fR\fR
 .ad
 .RS 11n
-.rt  
 A positive number representing a command number. A \fB+\fR sign can precede
 \fInumber\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-\fR\fInumber\fR\fR
 .ad
 .RS 11n
-.rt  
 A negative number representing a command that was executed \fInumber\fR
 commands previously. For example, \fB-1\fR is the previous command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstring\fR\fR
 .ad
 .RS 11n
-.rt  
 \fIstring\fR indicates the most recently entered command that begins with
 \fIstring\fR. \fIstring\fR should not contain an \fB=\fR.
 .RE
@@ -739,12 +676,10 @@ otherwise, \fBed\fR is used.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-e\fR \fIeditor\fR\fR
 .ad
 .RS 13n
-.rt  
 Uses the editor named by \fIeditor\fR to edit the commands. The \fIeditor\fR
 string is a utility name, subject to search via the \fBPATH\fR variable. The
 value in the \fBFCEDIT\fR variable is used as a default when \fB-e\fR is not
@@ -753,12 +688,10 @@ specified. If \fBFCEDIT\fR is null or unset, \fBed\fR is used as the editor.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 13n
-.rt  
 (The letter ell.) Lists the commands rather than invoking an editor on them.
 The commands is written in the sequence indicated by the \fIfirst\fR and
 \fIlast\fR operands, as affected by \fB-r\fR, with each command preceded by the
@@ -767,35 +700,29 @@ command number.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 13n
-.rt  
 Suppresses command numbers when listing with \fB-l\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 13n
-.rt  
 Reverses the order of the commands listed (with \fB-l\fR \fB)\fR or edited
 (with neither \fB-l\fR nor \fB-s\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 13n
-.rt  
 Re-executes the command without invoking an editor.
 .RE
 
@@ -805,80 +732,66 @@ Re-executes the command without invoking an editor.
 \fBksh93\fR supports the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fIeditor\fR\fR
 .ad
 .RS 13n
-.rt  
 Specify the editor to use to edit the history command. A value of \fB-\fR for
 \fIeditor\fR is equivalent to specifying the \fB-s\fR option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 13n
-.rt  
 List the commands rather than editing and re-executing them.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-N\fR \fInum\fR\fR
 .ad
 .RS 13n
-.rt  
 Start at \fInum\fR commands back.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 13n
-.rt  
 Suppress the command numbers when the commands are listed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 13n
-.rt  
 Write the result of history expansion for each operand to standard output. All
 other options are ignored.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 13n
-.rt  
 Reverse the order of the commands.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 13n
-.rt  
 Re-execute the command without invoking an editor. In this case an operand of
 the form \fIold=new\fR can be specified to change the first occurrence of the
 string \fIold\fR in the command to \fInew\fR before re-executing the command.
@@ -890,7 +803,6 @@ string \fIold\fR in the command to \fInew\fR before re-executing the command.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfirst\fR\fR
 .ad
@@ -899,30 +811,25 @@ The following operands are supported:
 \fB\fIlast\fR\fR
 .ad
 .RS 9n
-.rt  
 Selects the commands to list or edit. The number of previous commands that can
 be accessed is determined by the value of the \fBHISTSIZE\fR variable. The
 value of \fIfirst\fR or \fIlast\fR or both is one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB[\fB+\fR]\fInumber\fR\fR
 .ad
 .RS 14n
-.rt  
 A positive number representing a command number. Command numbers can be
 displayed with the \fB-l\fR option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi\fR\fInumber\fR\fR
 .ad
 .RS 14n
-.rt  
 A negative decimal number representing the command that was executed
 \fInumber\fR of commands previously. For example, \fB\(mi1\fR is the
 immediately previous command.
@@ -930,12 +837,10 @@ immediately previous command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstring\fR\fR
 .ad
 .RS 14n
-.rt  
 A string indicating the most recently entered command that begins with that
 string. If the \fIold=new\fR operand is not also specified with \fB-s\fR, the
 string form of the \fIfirst\fR operand cannot contain an embedded equal sign.
@@ -973,7 +878,7 @@ commands on the second:
 .sp
 .in +2
 .nf
-fc -r 10 20     fc    30 40 
+fc -r 10 20     fc    30 40
 fc   20 10      fc -r 40 30
 .fi
 .in -2
@@ -991,7 +896,7 @@ For example, if there are only ten commands in the history list, numbered 1 to
 .sp
 .in +2
 .nf
-fc -l 
+fc -l
 fc 1 99
 .fi
 .in -2
@@ -1002,12 +907,10 @@ lists and edits, respectively, all ten commands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIold=new\fR\fR
 .ad
 .RS 14n
-.rt  
 Replace the first occurrence of string \fIold\fR in the commands to be
 reexecuted by the string \fInew\fR.
 .RE
@@ -1089,12 +992,10 @@ that affect the execution of \fBfc\fR: \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and
 \fBNLSPATH\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFCEDIT\fR\fR
 .ad
 .RS 12n
-.rt  
 This variable, when expanded by the shell, determines the default value for the
 \fB-e\fR \fIeditor\fR option's \fIeditor\fR option-argument. If \fBFCEDIT\fR is
 null or unset, \fBed\fR(1) is used as the editor.
@@ -1102,12 +1003,10 @@ null or unset, \fBed\fR(1) is used as the editor.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHISTFILE\fR\fR
 .ad
 .RS 12n
-.rt  
 Determine a pathname naming a command history file. If the \fBHISTFILE\fR
 variable is not set, the shell can attempt to access or create a file
 \fB\&.sh_history\fR in the user's home directory. If the shell cannot obtain
@@ -1133,12 +1032,10 @@ take effect until another shell is invoked.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHISTSIZE\fR\fR
 .ad
 .RS 12n
-.rt  
 Determine a decimal number representing the limit to the number of previous
 commands that are accessible. If this variable is unset, an unspecified default
 greater than or equal to 128 are used. The variable \fBHISTSIZE\fR is accessed
@@ -1152,23 +1049,19 @@ take effect until another shell is invoked.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion of the listing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 

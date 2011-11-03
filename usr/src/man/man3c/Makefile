@@ -256,6 +256,7 @@ MANFILES = 	__fbufsize.3c					\
 	 	posix_spawn_file_actions_addclosefrom_np.3c	\
 	 	posix_spawn_file_actions_adddup2.3c		\
 	 	posix_spawn_file_actions_destroy.3c		\
+	 	posix_spawn_pipe_np.3c				\
 	 	posix_spawnattr_destroy.3c			\
 	 	posix_spawnattr_getflags.3c			\
 	 	posix_spawnattr_getpgroup.3c			\
@@ -1043,6 +1044,9 @@ MANSOFILES =	FD_CLR.3c				\
 	 	srand48.3c				\
 	 	srandom.3c				\
 	 	sscanf.3c				\
+		stderr.3c				\
+		stdin.3c				\
+		stdout.3c				\
 	 	strcasecmp.3c				\
 	 	strcat.3c				\
 	 	strchr.3c				\
@@ -1914,6 +1918,10 @@ sigismember.3c				:= SOSRC = man3c/sigsetops.3c
 sigtimedwait.3c				:= SOSRC = man3c/sigwaitinfo.3c
 
 gsignal.3c				:= SOSRC = man3c/ssignal.3c
+
+stderr.3c				:= SOSRC = man3c/stdio.3c
+stdin.3c				:= SOSRC = man3c/stdio.3c
+stdout.3c				:= SOSRC = man3c/stdio.3c
 
 sig2str.3c				:= SOSRC = man3c/str2sig.3c
 

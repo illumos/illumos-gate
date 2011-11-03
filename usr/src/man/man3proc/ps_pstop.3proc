@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ps_pstop 3PROC "22 Mar 2001" "SunOS 5.11" "Process Control Library Functions"
+.TH PS_PSTOP 3PROC "Mar 22, 2001"
 .SH NAME
 ps_pstop, ps_pcontinue, ps_lstop, ps_lcontinue, ps_lrolltoaddr, ps_kill \-
 process and LWP control in libthread_db
 .SH SYNOPSIS
 .LP
 .nf
-#include <proc_service.h> 
+#include <proc_service.h>
 
 \fBps_err_e\fR \fBps_pstop\fR(\fBstruct ps_prochandle *\fR\fIph\fR);
 .fi
@@ -85,36 +85,30 @@ process for which the handle is \fIph\fR. It has the same semantics as
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPS_OK\fR \fR
 .ad
 .RS 14n
-.rt  
 The call completed successfully. In the case of \fBps_pstop()\fR, the target
 process is stopped.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPS_BADLID\fR \fR
 .ad
 .RS 14n
-.rt  
 For \fBps_lstop()\fR, \fBps_lcontinue()\fR and \fBps_lrolltoaddr()\fR; there is
 no \fBLWP\fR with id \fIlwipd\fR in the target process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPS_ERR\fR \fR
 .ad
 .RS 14n
-.rt  
 The function did not return successfully.
 .RE
 
@@ -126,13 +120,12 @@ See \fBattributes\fR(5) for description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT LevelSafe
+MT Level	Safe
 .TE
 
 .SH SEE ALSO

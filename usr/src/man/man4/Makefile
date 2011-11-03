@@ -9,7 +9,10 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+#
 
 include ../../Makefile.master
 
@@ -63,7 +66,6 @@ COMMON_MANFILES = 	Intro.4				\
 		 	ds.log.4			\
 		 	ethers.4			\
 		 	exec_attr.4			\
-		 	fd.4				\
 		 	fdi.4				\
 		 	format.dat.4			\
 		 	fspec.4				\
@@ -83,6 +85,8 @@ COMMON_MANFILES = 	Intro.4				\
 		 	holidays.4			\
 		 	hosts.4				\
 		 	hosts.equiv.4			\
+			hosts_access.4			\
+			hosts_options.4			\
 		 	ib.4				\
 		 	ike.config.4			\
 		 	ike.preshared.4			\
@@ -226,6 +230,8 @@ MANSOFILES =	addresses.4			\
 		fbtab.4				\
 		forward.4			\
 		fs.4				\
+		hosts.allow.4			\
+		hosts.deny.4			\
 		intro.4				\
 		md.cf.4				\
 		mdi_ib_cache.4			\
@@ -262,6 +268,9 @@ dir.4				:= SOSRC = man4/dir_ufs.4
 
 rhosts.4			:= SOSRC = man4/hosts.equiv.4
 
+hosts.allow.4			:= SOSRC = man4/hosts_access.4
+hosts.deny.4			:= SOSRC = man4/hosts_access.4
+
 fbtab.4				:= SOSRC = man4/logindevperm.4
 
 md.cf.4				:= SOSRC = man4/md.tab.4
@@ -288,5 +297,3 @@ volume-defaults.4		:= SOSRC = man4/volume-request.4
 include ../Makefile.man
 
 install: $(ROOTMANFILES)
-
-

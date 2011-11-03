@@ -712,9 +712,9 @@ ld_create_outfile(Ofl_desc *ofl)
 					break;
 
 				d = elf_getdata(osp->os_scn, NULL);
-				assert(d != NULL);
 
-				d->d_align = pad_align;
+				if (d != NULL)
+					d->d_align = pad_align;
 			}
 		}
 	}

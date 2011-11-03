@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_fm_ereport_post 9F "14 May 2007" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_FM_EREPORT_POST 9F "May 14, 2007"
 .SH NAME
 ddi_fm_ereport_post \- post an FMA Protocol Error Report Event
 .SH SYNOPSIS
@@ -22,45 +22,37 @@ Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 17n
-.rt  
 Pointer to the \fBdev_info\fR structure
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIereport_class\fR\fR
 .ad
 .RS 17n
-.rt  
 \fBFMA\fR Event Protocol error class
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIena\fR\fR
 .ad
 .RS 17n
-.rt  
 Error Numeric Association
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsflag\fR\fR
 .ad
 .RS 17n
-.rt  
 Determines whether caller can sleep for memory or other event resources.
 .RE
 
@@ -78,12 +70,10 @@ The following \fIereport_class\fR strings are available for use by any leaf
 device driver:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdevice.inval_state\fR\fR
 .ad
 .RS 24n
-.rt  
 A leaf driver discovers that the device is in an invalid or inconsistent state.
 For example, the driver might detect that receive or send ring descriptor
 indices are corrupted. It might also find an invalid value in a register or a
@@ -92,12 +82,10 @@ driver-to-device protocol violation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdevice.no_response\fR\fR
 .ad
 .RS 24n
-.rt  
 A leaf driver times out waiting for a response from the device. For example,
 timeouts can occur when no confirmation is seen after resetting, enabling, or
 disabling part of the device.
@@ -105,47 +93,39 @@ disabling part of the device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdevice.badint_limit\fR\fR
 .ad
 .RS 24n
-.rt  
 A leaf device sends too many consecutive interrupts with no work to do.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdevice.intern_corr\fR\fR
 .ad
 .RS 24n
-.rt  
 A leaf device reports to the driver that it has itself detected an internal
 correctable error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdevice.intern_uncorr\fR\fR
 .ad
 .RS 24n
-.rt  
 A leaf device reports to the driver that it has itself detected an internal
 uncorrectable error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdevice.stall\fR\fR
 .ad
 .RS 24n
-.rt  
 A leaf driver determines that data transmission has stalled indefinitely.
 .RE
 
@@ -200,13 +180,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

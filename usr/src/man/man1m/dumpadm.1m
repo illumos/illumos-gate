@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dumpadm 1M "10 Apr 2008" "SunOS 5.11" "System Administration Commands"
+.TH DUMPADM 1M "Apr 10, 2008"
 .SH NAME
 dumpadm \- configure operating system crash dump
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/dumpadm\fR [\fB-nuy\fR] [\fB-c\fR \fIcontent-type\fR] [\fB-d\fR \fIdump-device\fR] 
-     [\fB-m\fR \fImin\fRk | \fImin\fRm | \fImin\fR%] [\fB-s\fR \fIsavecore-dir\fR] 
+\fB/usr/sbin/dumpadm\fR [\fB-nuy\fR] [\fB-c\fR \fIcontent-type\fR] [\fB-d\fR \fIdump-device\fR]
+     [\fB-m\fR \fImin\fRk | \fImin\fRm | \fImin\fR%] [\fB-s\fR \fIsavecore-dir\fR]
      [\fB-r\fR \fIroot-dir\fR]
 .fi
 
@@ -82,7 +82,6 @@ dump parameters.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIcontent-type\fR\fR
 .ad
@@ -92,7 +91,6 @@ Modify the dump configuration so that the crash dump consists of the specified
 dump content. The content should be one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkernel\fR\fR
 .ad
@@ -103,7 +101,6 @@ Kernel memory pages only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBall\fR\fR
 .ad
@@ -114,7 +111,6 @@ All memory pages.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcurproc\fR\fR
 .ad
@@ -130,7 +126,6 @@ process, only kernel pages will be dumped.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdump-device\fR\fR
 .ad
@@ -140,7 +135,6 @@ Modify the dump configuration to use the specified dump device. The dump device
 may one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdump-device\fR\fR
 .ad
@@ -154,7 +148,6 @@ the system is running a ZFS root file system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBswap\fR\fR
 .ad
@@ -174,7 +167,6 @@ device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fImin\fR\fBk\fR | \fImin\fR\fBm\fR | \fImin\fR\fB%\fR\fR
 .ad
@@ -186,7 +178,6 @@ the file system where the savecore directory is located. The \fBmin\fR argument
 can be one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBk\fR\fR
 .ad
@@ -197,7 +188,6 @@ A positive integer suffixed with the unit \fBk\fR specifying kilobytes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBm\fR\fR
 .ad
@@ -208,7 +198,6 @@ A positive integer suffixed with the unit \fBm\fR specifying megabytes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%\fR\fR
 .ad
@@ -230,7 +219,6 @@ alternate directory on the \fBsavecore\fR command-line.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
@@ -245,7 +233,6 @@ retrieval may not be possible.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIroot-dir\fR\fR
 .ad
@@ -258,7 +245,6 @@ create files. If no \fB-r\fR argument is specified, the default root directory
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIsavecore-dir\fR\fR
 .ad
@@ -276,7 +262,6 @@ command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
@@ -294,7 +279,6 @@ with the kernel dump configuration.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-y\fR\fR
 .ad
@@ -330,7 +314,6 @@ example# dumpadm -d /dev/dsk/c0t2d0s2
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -342,7 +325,6 @@ successfully.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
@@ -353,7 +335,6 @@ A fatal error occurred in either obtaining or modifying the dump configuration.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
@@ -365,7 +346,6 @@ Invalid command line options were specified.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/dump\fR\fR
 .ad
@@ -376,7 +356,6 @@ Dump device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/dumpadm.conf\fR\fR
 .ad
@@ -388,7 +367,6 @@ that command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsavecore-directory\fR\fB/minfree\fR\fR
 .ad

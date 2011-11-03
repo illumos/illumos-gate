@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ftpshut 1M "1 May 2003" "SunOS 5.11" "System Administration Commands"
+.TH FTPSHUT 1M "May 1, 2003"
 .SH NAME
 ftpshut \- close down the FTP Servers at a given time
 .SH SYNOPSIS
 .LP
 .nf
-\fBftpshut\fR [\fB-V\fR] [\fB-v\fR] [\fB-l\fR \fImin\fR] [\fB-d\fR \fImin\fR] \fItime\fR 
+\fBftpshut\fR [\fB-V\fR] [\fB-v\fR] [\fB-l\fR \fImin\fR] [\fB-d\fR \fImin\fR] \fItime\fR
      [\fIwarning-message\fR]...
 .fi
 
@@ -45,133 +45,109 @@ shutdown message file is specified by the \fBshutdown\fR capability in the
 The following magic cookies are available:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%s\fR\fR
 .ad
 .RS 6n
-.rt  
 The time system is going to shut down.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%r\fR\fR
 .ad
 .RS 6n
-.rt  
 The time new connections will be denied.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%d\fR\fR
 .ad
 .RS 6n
-.rt  
 The time current connections will be dropped.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%C\fR\fR
 .ad
 .RS 6n
-.rt  
 The current working directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%E\fR\fR
 .ad
 .RS 6n
-.rt  
 The maintainer's email address as defined in the \fBftpaccess\fR file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%F\fR\fR
 .ad
 .RS 6n
-.rt  
 The free space in the partition of \fBCWD\fR, in kilobytes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%L\fR\fR
 .ad
 .RS 6n
-.rt  
 The local host name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%M\fR\fR
 .ad
 .RS 6n
-.rt  
 The maximum allowed number of users in this class.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%N\fR\fR
 .ad
 .RS 6n
-.rt  
 The current number of users in this class.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%R\fR\fR
 .ad
 .RS 6n
-.rt  
 The remote host name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%T\fR\fR
 .ad
 .RS 6n
-.rt  
 The local time (form Thu Nov 15 17:12:42 1990).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%U\fR\fR
 .ad
 .RS 6n
-.rt  
 The username given at login time.
 .RE
 
@@ -181,46 +157,38 @@ The username given at login time.
 The \fBftpshut\fR command supports the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
 .RS 10n
-.rt  
 Display program copyright and version information, then terminate.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fImin\fR\fR
 .ad
 .RS 10n
-.rt  
 The time ahead of shutdown, in minutes, that existing connections will be
 disconnected upon completion of their current or next (if idle) FTP request.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fImin\fR\fR
 .ad
 .RS 10n
-.rt  
 The time ahead of shutdown, in minutes, that new connections will be refused.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 10n
-.rt  
 Verbose. Output the pathname of the shutdown message files created.
 .RE
 
@@ -230,12 +198,10 @@ Verbose. Output the pathname of the shutdown message files created.
 The \fBftpshut\fR command supports the following operands:
 .sp
 .ne 2
-.mk
 .na
 \fB\fItime\fR\fR
 .ad
 .RS 19n
-.rt  
 The \fItime\fR at which \fBftpshut\fR will bring the FTP Servers down.
 \fItime\fR can have a value of \fBnow\fR, which indicates an immediate
 shutdown. Alternatively, \fItime\fR can specify a future time in one of two
@@ -247,12 +213,10 @@ absolute time format, you can only specify times between now and 23:59.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIwarning-message\fR\fR
 .ad
 .RS 19n
-.rt  
 The message to display that warns of the imminent shutdown. The
 \fIwarning-message\fR will be formatted at 70 characters wide. \fBftpshut\fR
 knows the actual string length of the magic cookies. If no warning-message is
@@ -265,47 +229,39 @@ supplied, the default message "\fBSystem shutdown at %s\fR" is used.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB>\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ftpd/ftpaccess\fR\fR
 .ad
 .RS 24n
-.rt  
- 
+
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ftpd/ftpservers\fR\fR
 .ad
 .RS 24n
-.rt  
- 
+
 .RE
 
 .SH ATTRIBUTES
@@ -316,13 +272,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityExternal
+Interface Stability	External
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH slp_api 3SLP "16 Jan 2003" "SunOS 5.11" "Service Location Protocol Library Functions"
+.TH SLP_API 3SLP "Jan 16, 2003"
 .SH NAME
 slp_api \- Service Location Protocol Application Programming Interface
 .SH SYNOPSIS
@@ -133,48 +133,40 @@ code passed to the callback has value \fBSLP_LAST_CALL\fR. There are four
 reasons why the call can terminate:
 .sp
 .ne 2
-.mk
 .na
 \fBDA reply received\fR
 .ad
 .RS 26n
-.rt  
 A reply from a \fBDA\fR has been received and therefore nothing more is
 expected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBMulticast terminated\fR
 .ad
 .RS 26n
-.rt  
 The multicast convergence time has elapsed and the \fBAPI\fR library multicast
 code is giving up.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBMulticast null results\fR
 .ad
 .RS 26n
-.rt  
 Nothing new has been received during multicast for awhile and the \fBAPI\fR
 library multicast code is giving up on that (as an optimization).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBMaximum results\fR
 .ad
 .RS 26n
-.rt  
 The user has set the \fBnet.slp.maxResults\fR property and that number of
 replies has been collected and returned.
 .RE
@@ -246,47 +238,39 @@ function with information parsed from a character buffer containing a service
 follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs_pcSrvType\fR\fR
 .ad
 .RS 17n
-.rt  
 A pointer to a character string containing the service type name, including
 naming authority.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs_pcHost\fR\fR
 .ad
 .RS 17n
-.rt  
 A pointer to a character string containing the host identification information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs_iPort\fR\fR
 .ad
 .RS 17n
-.rt  
 The port number, or zero, if none. The port is only available if the transport
 is \fBIP\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs_pcNetFamily\fR\fR
 .ad
 .RS 17n
-.rt  
 A pointer to a character string containing the network address family
 identifier. Possible values are "\fBipx\fR" for the \fBIPX\fR family,
 "\fBat\fR" for the Appletalk family, and \fB""\fR, the empty string, for the
@@ -295,12 +279,10 @@ identifier. Possible values are "\fBipx\fR" for the \fBIPX\fR family,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs_pcSrvPart\fR\fR
 .ad
 .RS 17n
-.rt  
 The remainder of the \fBURL\fR, after the host identification.
 .sp
 The host and port should be sufficient to open a socket to the machine hosting
@@ -348,8 +330,8 @@ operations ignore the return since the operation is already complete.
 .sp
 .in +2
 .nf
-typedef void SLPRegReport(SLPHandle hSLP, 
-     SLPError errCode, 
+typedef void SLPRegReport(SLPHandle hSLP,
+     SLPError errCode,
      void *pvCookie);
 .fi
 .in -2
@@ -361,34 +343,28 @@ typedef void SLPRegReport(SLPHandle hSLP,
 callback has the following parameters:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhSLP\fR\fR
 .ad
 .RS 12n
-.rt  
 The\fBSLPHandle()\fR used to initiate the operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIerrCode\fR\fR
 .ad
 .RS 12n
-.rt  
 An error code indicating if an error occurred during the operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpvCookie\fR\fR
 .ad
 .RS 12n
-.rt  
 Memory passed down from the client code that called the original \fBAPI\fR
 function, starting the operation. It may be \fINULL\fR.
 .RE
@@ -397,9 +373,9 @@ function, starting the operation. It may be \fINULL\fR.
 .sp
 .in +2
 .nf
-typedef SLPBoolean SLPSrvTypeCallback(SLPHandle hSLP, 
-     const char* pcSrvTypes, 
-     SLPError errCode, 
+typedef SLPBoolean SLPSrvTypeCallback(SLPHandle hSLP,
+     const char* pcSrvTypes,
+     SLPError errCode,
      void *pvCookie);
 .fi
 .in -2
@@ -412,35 +388,29 @@ when the \fIhSLP\fR handle is opened either synchronously or asynchronously.
 The \fBSLPSrvTypeCallback()\fR callback has the following parameters:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhSLP\fR\fR
 .ad
 .RS 14n
-.rt  
 The \fBSLPHandle\fR used to initiate the operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpcSrvTypes\fR\fR
 .ad
 .RS 14n
-.rt  
 A character buffer containing a comma-separated, null-terminated list of
 service types.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIerrCode\fR\fR
 .ad
 .RS 14n
-.rt  
 An error code indicating if an error occurred during the operation. The
 callback should check this error code before processing the parameters. If the
 error code is other than \fBSLP_OK\fR, then the \fBAPI\fR library may choose to
@@ -449,12 +419,10 @@ terminate the outstanding operation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpvCookie\fR\fR
 .ad
 .RS 14n
-.rt  
 emory passed down from the client code that called the original \fBAPI\fR
 function, starting the operation. It can be \fINULL\fR.
 .RE
@@ -463,11 +431,11 @@ function, starting the operation. It can be \fINULL\fR.
 .sp
 .in +2
 .nf
-typedef SLPBoolean SLPSrvURLCallback(SLPHandle hSLP,   
-     const char* pcSrvURL, 
-     unsigned short usLifetime, 
-     SLPError errCode, 
-     void *pvCookie);  
+typedef SLPBoolean SLPSrvURLCallback(SLPHandle hSLP,
+     const char* pcSrvURL,
+     unsigned short usLifetime,
+     SLPError errCode,
+     void *pvCookie);
 .fi
 .in -2
 
@@ -479,46 +447,38 @@ regardless of whether the \fIhSLP\fR was opened collated or uncollated. The
 \fBSLPSrvURLCallback()\fR callback has the following parameters:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhSLP\fR\fR
 .ad
 .RS 14n
-.rt  
 The \fBSLPHandle\fR used to initiate the operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpcSrvURL\fR\fR
 .ad
 .RS 14n
-.rt  
 A character buffer containing the returned service \fBURL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIusLifetime\fR\fR
 .ad
 .RS 14n
-.rt  
 An unsigned short giving the life time of the service advertisement. The value
 must be an unsigned integer less than or equal to \fBSLP_LIFETIME_MAXIMUM\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIerrCode\fR\fR
 .ad
 .RS 14n
-.rt  
 An error code indicating if an error occurred during the operation. The
 callback should check this error code before processing the parameters. If the
 error code is other than \fBSLP_OK\fR, then the \fBAPI\fR library may choose to
@@ -527,12 +487,10 @@ terminate the outstanding operation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpvCookie\fR\fR
 .ad
 .RS 14n
-.rt  
 Memory passed down from the client code that called the original \fBAPI\fR
 function, starting the operation. It can be \fINULL\fR.
 .RE
@@ -541,9 +499,9 @@ function, starting the operation. It can be \fINULL\fR.
 .sp
 .in +2
 .nf
-typedef SLPBoolean SLPAttrCallback(SLPHandle hSLP, 
-     const char* pcAttrList, 
-     SLPError errCode, 
+typedef SLPBoolean SLPAttrCallback(SLPHandle hSLP,
+     const char* pcAttrList,
+     SLPError errCode,
      void *pvCookie);
 .fi
 .in -2
@@ -577,35 +535,29 @@ once, and the \fIpcAttrList\fR parameter is set to the collated result.
 \fBSLPAttrCallback()\fR callback has the following parameters:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhSLP\fR\fR
 .ad
 .RS 14n
-.rt  
 The \fBSLPHandle\fR used to initiate the operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpcAttrList\fR\fR
 .ad
 .RS 14n
-.rt  
 A character buffer containing a comma-separated and null-terminated list of
 attribute id/value assignments, in \fBSLP\fR wire format.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIerrCode\fR\fR
 .ad
 .RS 14n
-.rt  
 An error code indicating if an error occurred during the operation. The
 callback should check this error code before processing the parameters. If the
 error code is other than \fBSLP_OK\fR, then the \fBAPI\fR library may choose to
@@ -614,12 +566,10 @@ terminate the outstanding operation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpvCookie\fR\fR
 .ad
 .RS 14n
-.rt  
 Memory passed down from the client code that called the original \fBAPI\fR
 function, starting the operation. It can be \fINULL\fR.
 .RE
@@ -631,12 +581,10 @@ An interface that is part of the \fBSLP\fR \fBAPI\fR may return one of the
 following values.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLP_LAST_CALL\fR\fR
 .ad
 .RS 30n
-.rt  
 The \fBSLP_LAST_CALL\fR code is passed to callback functions when the \fBAPI\fR
 library has no more data for them and therefore no further calls will be made
 to the callback on the currently outstanding operation. The callback uses this
@@ -651,24 +599,20 @@ error parameter set to \fBSLP_LAST_CALL\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLP_OK\fR\fR
 .ad
 .RS 30n
-.rt  
 The \fBSLP_OK\fR code indicates that the no error occurred during the
 operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLP_LANGUAGE_NOT_SUPPORTED\fR\fR
 .ad
 .RS 30n
-.rt  
 No \fBDA\fR or \fBSA\fR has service advertisement information in the language
 requested, but at least one \fBDA\fR or \fBSA\fR might have information for
 that service in another language.
@@ -676,12 +620,10 @@ that service in another language.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLP_PARSE_ERROR\fR\fR
 .ad
 .RS 30n
-.rt  
 The \fBSLP\fR message was rejected by a remote \fBSLP\fR agent. The \fBAPI\fR
 returns this error only when no information was retrieved, and at least one
 \fBSA\fR or \fBDA\fR indicated a protocol error. The data supplied through the
@@ -690,12 +632,10 @@ returns this error only when no information was retrieved, and at least one
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLP_INVALID_REGISTRATION\fR\fR
 .ad
 .RS 30n
-.rt  
 The \fBAPI\fR may return this error if an attempt to register a service was
 rejected by all \fBDA\fRs because of a malformed \fBURL\fR or
 attributes.\fBSLP\fR does not return the error if at least one \fBDA\fR accepts
@@ -704,12 +644,10 @@ the registration.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLP_SCOPE_NOT_SUPPORTED\fR\fR
 .ad
 .RS 30n
-.rt  
 The \fBAPI\fR returns this error if the \fBUA\fR or \fBSA\fR has been
 configured with the \fBnet.slp.useScopes\fR list of scopes and the \fBSA\fR
 request did not specify one or more of these allowable scopes, and no others.
@@ -719,48 +657,40 @@ supported by a \fBDA\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLP_AUTHENTICATION_ABSENT\fR\fR
 .ad
 .RS 30n
-.rt  
 This error arises when the \fBUA\fR or \fBSA \fRfailed to send an authenticator
 for requests or registrations when security is enabled and thus required.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLP_AUTHENTICATION_FAILED\fR\fR
 .ad
 .RS 30n
-.rt  
 This error arises when a authentication on an \fBSLP\fR message received from a
 remote \fBSLP\fR agent failed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLP_INVALID_UPDATE\fR\fR
 .ad
 .RS 30n
-.rt  
 An update for a nonexisting registration was issued, or the update includes a
 service type or scope different than that in the initial registration.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLP_REFRESH_REJECTED\fR\fR
 .ad
 .RS 30n
-.rt  
 The \fBSA\fR attempted to refresh a registration more frequently than the
 minimum refresh interval. The \fBSA\fR should call the appropriate \fBAPI\fR
 function to obtain the minimum refresh interval to use.
@@ -768,106 +698,88 @@ function to obtain the minimum refresh interval to use.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLP_NOT_IMPLEMENTED\fR\fR
 .ad
 .RS 30n
-.rt  
 An outgoing request overflowed the maximum network \fBMTU\fR size. The request
 should be reduced in size or broken into pieces and tried again.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLP_BUFFER_OVERFLOW\fR\fR
 .ad
 .RS 30n
-.rt  
 An outgoing request overflowed the maximum network \fBMTU\fR size. The request
 should be reduced in size or broken into pieces and tried again.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLP_NETWORK_TIMED_OUT\fR\fR
 .ad
 .RS 30n
-.rt  
 When no reply can be obtained in the time specified by the configured timeout
 interval, this error is returned.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLP_NETWORK_INIT_FAILED\fR\fR
 .ad
 .RS 30n
-.rt  
 If the network cannot initialize properly, this error is returned.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLP_MEMORY_ALLOC_FAILED\fR\fR
 .ad
 .RS 30n
-.rt  
 If the \fBAPI\fR fails to allocate memory, the operationis aborted and returns
 this.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLP_PARAMETER_BAD\fR\fR
 .ad
 .RS 30n
-.rt  
 If a parameter passed into an interface is bad, this  error is returned.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLP_NETWORK_ERROR\fR\fR
 .ad
 .RS 30n
-.rt  
 The failure of networking during normal operations causes this error to be
 returned.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLP_INTERNAL_SYSTEM_ERROR\fR\fR
 .ad
 .RS 30n
-.rt  
 A basic failure of the \fBAPI\fR causes this error to be returned. This occurs
 when a system call or library fails. The operation could not recover.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLP_HANDLE_IN_USE\fR\fR
 .ad
 .RS 30n
-.rt  
 In the C \fBAPI\fR, callback functions are not permitted to recursively call
 into the \fBAPI\fR on the same \fBSLPHandle\fR, either directly or indirectly.
 If an attempt is made to do so, this error is returned from the called
@@ -877,188 +789,154 @@ If an attempt is made to do so, this error is returned from the called
 .SH LIST OF ROUTINES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLPOpen()\fR\fR
 .ad
 .RS 27n
-.rt  
 open an \fBSLP\fR handle
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLPClose()\fR\fR
 .ad
 .RS 27n
-.rt  
 close an open \fBSLP\fR handle
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLPReg()\fR\fR
 .ad
 .RS 27n
-.rt  
 register a service advertisement
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLPDereg()\fR\fR
 .ad
 .RS 27n
-.rt  
 deregister a service advertisement
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLPDelAttrs()\fR\fR
 .ad
 .RS 27n
-.rt  
 delete attributes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLPFindSrvTypes()\fR\fR
 .ad
 .RS 27n
-.rt  
 return service types
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLPFindSrvs()\fR\fR
 .ad
 .RS 27n
-.rt  
 return service URLs
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLPFindAttrs()\fR\fR
 .ad
 .RS 27n
-.rt  
 return service attributes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLPGetRefreshInterval()\fR\fR
 .ad
 .RS 27n
-.rt  
 return the maximum allowed refresh interval for \fBSA\fRs
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLPFindScopes()\fR\fR
 .ad
 .RS 27n
-.rt  
 return list of configured and discovered scopes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLPParseSrvURL()\fR\fR
 .ad
 .RS 27n
-.rt  
 parse service \fBURL\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLPEscape()\fR\fR
 .ad
 .RS 27n
-.rt  
 escape special characters
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLPUnescape()\fR\fR
 .ad
 .RS 27n
-.rt  
 translate escaped characters into \fBUTF-8\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLPGetProperty()\fR\fR
 .ad
 .RS 27n
-.rt  
 return \fBSLP\fR configuration property
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLPSetProperty()\fR\fR
 .ad
 .RS 27n
-.rt  
 set an \fBSLP\fR configuration property
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBslp_strerror()\fR\fR
 .ad
 .RS 27n
-.rt  
 map \fBSLP\fR error code to message
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLPFree()\fR\fR
 .ad
 .RS 27n
-.rt  
 free memory
 .RE
 
@@ -1074,15 +952,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSICSI-enabled
+CSI	CSI-enabled
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

@@ -1,13 +1,13 @@
 '\" te
 .\"  Copyright (c) 1992, X/Open Company Limited  All Rights Reserved  Portions Copyright (c) 1995, Sun Microsystems, Inc.  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH time 1 "1 Feb 1995" "SunOS 5.11" "User Commands"
+.TH TIME 1 "Feb 1, 1995"
 .SH NAME
 time \- time a simple command
 .SH SYNOPSIS
@@ -65,12 +65,10 @@ a | b | time c		a | b | (time c)
 The following option is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fR
 .ad
 .RS 7n
-.rt  
 Writes the timing output to standard error in the following format:
 .sp
 .in +2
@@ -89,23 +87,19 @@ real %f\enuser %f\ensys %f\en < \fIreal seconds\fR>, <\fIuser seconds\fR>,
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIutility\fR \fR
 .ad
 .RS 13n
-.rt  
 The name of the utility that is to be invoked.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIargument\fR \fR
 .ad
 .RS 13n
-.rt  
 Any string to be supplied as an argument when invoking \fIutility\fR.
 .RE
 
@@ -191,34 +185,28 @@ status of \fIutility\fR. Otherwise, the \fBtime\fR utility will exit with one
 of the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\(mi125\fR \fR
 .ad
 .RS 13n
-.rt  
 An error occurred in the \fBtime\fR utility.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB126\fR \fR
 .ad
 .RS 13n
-.rt  
 \fIutility\fR was found but could not be invoked.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB127\fR \fR
 .ad
 .RS 13n
-.rt  
 \fIutility\fR could not be found.
 .RE
 
@@ -230,13 +218,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

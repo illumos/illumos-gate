@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH stmfSetPersistMethod 3STMF "8 May 2009" "SunOS 5.11" "SCSI Target Mode Framework Library Functions"
+.TH STMFSETPERSISTMETHOD 3STMF "May 8, 2009"
 .SH NAME
 stmfSetPersistMethod \- set persistence method for the stmf service
 .SH SYNOPSIS
@@ -18,24 +18,20 @@ cc [ \fIflag\fR... ] \fIfile\fR... -lstmf [ \fIlibrary\fR... ]
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpersistType\fR\fR
 .ad
 .RS 15n
-.rt  
 The requested persistence setting. Can be either \fBSTMF_PERSIST_SMF\fR or
 \fBSTMF_PERSIST_NONE\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIserviceSet\fR\fR
 .ad
 .RS 15n
-.rt  
 Set to indicate whether the setting should persist on the stmf service. When
 set to \fBB_FALSE\fR, this setting is only applicable for the duration of the
 current library open or until a subsequent call is made to change the setting.
@@ -51,23 +47,19 @@ The \fBstmfSetPersistMethod()\fR function sets the persistence method for stmf.
 The following values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_STATUS_SUCCESS\fR\fR
 .ad
 .RS 27n
-.rt  
 The API call was successful.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_ERROR_PERSIST_TYPE\fR\fR
 .ad
 .RS 27n
-.rt  
 The \fIpersistType\fR argument is invalid.
 .RE
 
@@ -79,15 +71,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

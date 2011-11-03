@@ -1,22 +1,22 @@
 '\" te
-.\" Copyright 1989 AT&T  
+.\" Copyright 1989 AT&T
 .\" Copyright (C) 2004, Sun Microsystems, Inc.
 .\" All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ttymon 1M "22 Feb 2005" "SunOS 5.11" "System Administration Commands"
+.TH TTYMON 1M "Feb 22, 2005"
 .SH NAME
 ttymon \- port monitor for terminal ports
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/lib/saf/ttymon\fR 
+\fB/usr/lib/saf/ttymon\fR
 .fi
 
 .LP
 .nf
-\fB/usr/lib/saf/ttymon\fR \fB-g\fR [\fB-d\fR \fIdevice\fR] [\fB-h\fR] [\fB-t\fR \fItimeout\fR] 
+\fB/usr/lib/saf/ttymon\fR \fB-g\fR [\fB-d\fR \fIdevice\fR] [\fB-h\fR] [\fB-t\fR \fItimeout\fR]
      [\fB-l\fR \fIttylabel\fR] [\fB-p\fR \fIprompt\fR] [\fB-m\fR \fImodules\fR] [\fB-T\fR \fItermtype\fR]
 .fi
 
@@ -157,12 +157,10 @@ If there are no entries for the \fBttymon\fR service, then the entries for the
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR\fR
 .ad
 .RS 14n
-.rt  
 A special invocation of \fBttymon\fR is provided with the \fB-g\fR option. This
 form of the command should only be called by applications that need to set the
 correct baud rate and terminal settings on a port and then connect to
@@ -172,12 +170,10 @@ following combinations of options can be used with \fB-g\fR:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fIdevice\fR\fR
 .ad
 .RS 14n
-.rt  
 \fIdevice\fR is the full path name of the port to which \fBttymon\fR is to
 attach. If this option is not specified, file descriptor \fB0\fR must be set up
 by the invoking process to a TTY port.
@@ -185,12 +181,10 @@ by the invoking process to a TTY port.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 14n
-.rt  
 If the -h flag is not set, \fBttymon\fR will force a hangup on the line by
 setting the speed to zero before setting the speed to the default or specified
 speed.
@@ -198,12 +192,10 @@ speed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fIttylabel\fR\fR
 .ad
 .RS 14n
-.rt  
 \fIttylabel\fR is a link to a speed and TTY definition in the \fBttydefs\fR
 file. This definition tells \fBttymon\fR at what speed to run initially, what
 the initial TTY settings are, and what speed to try next if the user indicates
@@ -213,12 +205,10 @@ that the speed is inappropriate by pressing the BREAK key. The default speed is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fImodules\fR\fR
 .ad
 .RS 14n
-.rt  
 When initializing the port, \fBttymon\fR will pop all modules on the port, and
 then push \fImodules\fR in the order specified. \fImodules\fR is a
 comma-separated list of pushable modules. Default modules on the ports are
@@ -227,35 +217,29 @@ usually set up by the Autopush Facility.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fIprompt\fR\fR
 .ad
 .RS 14n
-.rt  
 Allows the user to specify a prompt string. The default prompt is \fBLogin:\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fItimeout\fR\fR
 .ad
 .RS 14n
-.rt  
 Specifies that \fBttymon\fR should exit if no one types anything in
 \fItimeout\fR seconds after the prompt is sent.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR\fItermtype\fR\fR
 .ad
 .RS 14n
-.rt  
 Sets the \fBTERM\fR environment variable to \fItermtype\fR.
 .RE
 
@@ -290,12 +274,10 @@ none of the above variables is set in the environment, the "C" (U.S. style)
 locale determines how \fBttymon\fR behaves.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_CTYPE\fR\fR
 .ad
 .RS 12n
-.rt  
 Determines how \fBttymon\fR handles characters. When \fBLC_CTYPE\fR is set to a
 valid value, \fBttymon\fR can display and handle text and filenames containing
 valid characters for that locale. \fBttymon\fR can display and handle Extended
@@ -307,13 +289,11 @@ widths. In the "C" locale, only characters from ISO 8859-1 are valid.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/logindevperm\fR\fR
 .ad
 .RS 21n
-.rt  
- 
+
 .RE
 
 .sp

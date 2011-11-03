@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sasl_client_plug_init_t 3SASL "27 Oct 2003" "SunOS 5.11" "Simple Authentication Security Layer Library Functions"
+.TH SASL_CLIENT_PLUG_INIT_T 3SASL "Oct 27, 2003"
 .SH NAME
 sasl_client_plug_init_t \- client plug-in entry point
 .SH SYNOPSIS
@@ -26,56 +26,46 @@ entry point.
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIutils\fR\fR
 .ad
 .RS 15n
-.rt  
 The utility callback functions.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImax_version\fR\fR
 .ad
 .RS 15n
-.rt  
 The highest client plug-in version supported.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIout_version\fR\fR
 .ad
 .RS 15n
-.rt  
 The client plug-in version of the result..
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpluglist\fR\fR
 .ad
 .RS 15n
-.rt  
 The list of client mechanism plug-ins.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIplugcount\fR\fR
 .ad
 .RS 15n
-.rt  
 The number of client mechanism plug-ins.
 .RE
 
@@ -88,12 +78,10 @@ complete list of SASL error codes.
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_OK\fR\fR
 .ad
 .RS 11n
-.rt  
 The call to \fBsasl_client_plug_init_t()\fR was successful.
 .RE
 
@@ -108,15 +96,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

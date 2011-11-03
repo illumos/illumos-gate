@@ -1,4 +1,6 @@
 /*
+ * Copyright (c) 2011 Gary Mills
+ *
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -56,6 +58,14 @@
 #define	GAVSIZ		(1024 * 8)
 #define	isdir(d)	((d.st_mode & S_IFMT) == S_IFDIR)
 
+#define	GLOB_LIMIT_MALLOC	65536
+#define	GLOB_LIMIT_STAT		128
+#define	GLOB_LIMIT_READDIR	16384
+
+#define	GLOB_INDEX_MALLOC	0
+#define	GLOB_INDEX_STAT		1
+#define	GLOB_INDEX_READDIR	2
+
 static char **gargv;		/* Pointer to the (stack) arglist */
 static char **agargv;
 static size_t agargv_size;
@@ -63,6 +73,9 @@ static int gargc;		/* Number args in gargv */
 static size_t gnleft;
 static short gflag;
 static int tglob(register char);
+
+/* 0 = malloc(), 1 = stat(), 2 = readdir() */
+static size_t limits[] = { 0, 0, 0 };
 
 /* Prototypes */
 
@@ -112,7 +125,10 @@ char **ftpglob(register char *v, boolean_t check_ncargs)
     char *vv[2];
 
     if (agargv == NULL) {
-	agargv = (char **) malloc(GAVSIZ * sizeof (char *));
+	size_t inc = GAVSIZ * sizeof (char *);
+
+	agargv = (char **) malloc(inc);
+	limits[GLOB_INDEX_MALLOC] += inc;
 	if (agargv == NULL) {
 	    fatal("Out of memory");
 	}
@@ -235,6 +251,8 @@ static void expand(char *as, boolean_t check_ncargs)
 		Gcat(gpath, "", check_ncargs);
 		globcnt++;
 	    }
+	    if (limits[GLOB_INDEX_STAT]++ >= GLOB_LIMIT_STAT)
+	      globerr = "Arguments too long";
 	    goto endit;
 	}
 	addpath(*cs++);
@@ -279,6 +297,10 @@ static void matchdir(char *pattern, boolean_t check_ncargs)
     if (fstat(dirp->dd_fd, &stb) < 0)
 #endif /* HAVE_DIRFD */
 	goto patherr1;
+    if (limits[GLOB_INDEX_STAT]++ >= GLOB_LIMIT_STAT) {
+      globerr = "Arguments too long";
+      return;
+    }
     if (!isdir(stb)) {
 	errno = ENOTDIR;
 	goto patherr1;
@@ -286,7 +308,9 @@ static void matchdir(char *pattern, boolean_t check_ncargs)
     while (!globerr && ((dp = readdir(dirp)) != NULL)) {
 	if (dp->d_ino == 0)
 	    continue;
-	if (match(dp->d_name, pattern, check_ncargs)) {
+	if (limits[GLOB_INDEX_READDIR]++ >= GLOB_LIMIT_READDIR)
+	  globerr = "Arguments too long";
+	else if (match(dp->d_name, pattern, check_ncargs)) {
 	    Gcat(gpath, dp->d_name, check_ncargs);
 	    globcnt++;
 	}
@@ -491,6 +515,8 @@ static int amatch(char *s, char *p, boolean_t check_ncargs)
 		}
 		else
 		    expand(p, check_ncargs);
+	    if (limits[GLOB_INDEX_STAT]++ >= GLOB_LIMIT_STAT)
+	      globerr = "Arguments too long";
 	    gpathp = sgpathp;
 	    *gpathp = 0;
 	    return (0);
@@ -514,10 +540,13 @@ static void Gcat(register char *s1, register char *s2, boolean_t check_ncargs)
     }
     if (gargc >= agargv_size - 1) {
 	char **tmp;
+	size_t inc = GAVSIZ * sizeof (char *);
 
 	tmp = (char **)realloc(agargv,
-		(agargv_size + GAVSIZ) * sizeof (char *));
-	if (tmp == NULL) {
+			       inc + (agargv_size * sizeof (char *)));
+	limits[GLOB_INDEX_MALLOC] += inc;
+	if ((tmp == NULL) ||
+	    (limits[GLOB_INDEX_MALLOC] >= GLOB_LIMIT_MALLOC)) {
 	    fatal("Out of memory");
 	} else {
 	    agargv = tmp;
@@ -616,7 +645,8 @@ char *strspl(register char *cp, register char *dp)
     int bufsize = strlen(cp) + strlen(dp) + 1;
     char *ep = malloc(bufsize);
 
-    if (ep == NULL)
+    limits[GLOB_INDEX_MALLOC] += bufsize;
+    if ((ep == NULL) || (limits[GLOB_INDEX_MALLOC] >= GLOB_LIMIT_MALLOC))
 	fatal("Out of memory");
     (void) strlcpy(ep, cp, bufsize);
     (void) strlcat(ep, dp, bufsize);
@@ -625,9 +655,11 @@ char *strspl(register char *cp, register char *dp)
 
 char **copyblk(register char **v)
 {
-    register char **nv = (char **) malloc((unsigned) ((blklen(v) + 1) *
-						      sizeof(char **)));
-    if (nv == (char **) 0)
+    size_t inc = (unsigned) ((blklen(v) + 1) * sizeof(char **));
+    char **nv = (char **) malloc(inc);
+
+    limits[GLOB_INDEX_MALLOC] += inc;
+    if ((nv == NULL) || (limits[GLOB_INDEX_MALLOC] >= GLOB_LIMIT_MALLOC))
 	fatal("Out of memory");
 
     return (blkcpy(nv, v));

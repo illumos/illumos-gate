@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pntadm 1M "9 Jan 2004" "SunOS 5.11" "System Administration Commands"
+.TH PNTADM 1M "Jan 9, 2004"
 .SH NAME
 pntadm \- DHCP network table management utility
 .SH SYNOPSIS
@@ -14,30 +14,30 @@ pntadm \- DHCP network table management utility
 
 .LP
 .nf
-\fBpntadm\fR \fB-A\fR \fIname_IP_address\fR [\fB-c\fR \fIcomment\fR] [\fB-e\fR \fImm/dd/yyyy\fR] 
-     [\fB-f\fR \fInum\fR | \fIkeywords\fR] [\fB-h\fR \fIclient_hostname\fR] 
-     [\fB-i\fR [\fB-a\fR] \fIclient_ID\fR] [\fB-m\fR [\fB-y\fR] \fImacro\fR] [\fB-s\fR \fIserver\fR] 
+\fBpntadm\fR \fB-A\fR \fIname_IP_address\fR [\fB-c\fR \fIcomment\fR] [\fB-e\fR \fImm/dd/yyyy\fR]
+     [\fB-f\fR \fInum\fR | \fIkeywords\fR] [\fB-h\fR \fIclient_hostname\fR]
+     [\fB-i\fR [\fB-a\fR] \fIclient_ID\fR] [\fB-m\fR [\fB-y\fR] \fImacro\fR] [\fB-s\fR \fIserver\fR]
      [\fB-r\fR \fIresource\fR] [\fB-p\fR \fIpath\fR] [\fB-u\fR \fIuninterpreted\fR] \fInetwork\fR
 .fi
 
 .LP
 .nf
-\fBpntadm\fR \fB-M\fR \fIname_IP_address\fR [\fB-c\fR \fIcomment\fR] [\fB-e\fR \fImm/dd/yyyy\fR] 
-     [\fB-f\fR \fInum\fR | \fIkeywords\fR] [\fB-h\fR \fIclient_hostname\fR] 
-     [\fB-i\fR [\fB-a\fR] \fIclient\fR \fI ID\fR] [\fB-m\fR [\fB-y\fR] \fImacro\fR] 
-     [\fB-n\fR \fInew_client_IP_address\fR] [\fB-s\fR \fIserver\fR] [\fB-r\fR \fIresource\fR] 
+\fBpntadm\fR \fB-M\fR \fIname_IP_address\fR [\fB-c\fR \fIcomment\fR] [\fB-e\fR \fImm/dd/yyyy\fR]
+     [\fB-f\fR \fInum\fR | \fIkeywords\fR] [\fB-h\fR \fIclient_hostname\fR]
+     [\fB-i\fR [\fB-a\fR] \fIclient\fR \fI ID\fR] [\fB-m\fR [\fB-y\fR] \fImacro\fR]
+     [\fB-n\fR \fInew_client_IP_address\fR] [\fB-s\fR \fIserver\fR] [\fB-r\fR \fIresource\fR]
      [\fB-p\fR \fIpath\fR] [\fB-u\fR uninterpreted] \fInetwork\fR
 .fi
 
 .LP
 .nf
-\fBpntadm\fR \fB-D\fR \fIname_IP_address\fR [\fB-y\fR] [\fB-r\fR \fIresource\fR] [\fB-p\fR \fIpath\fR] 
+\fBpntadm\fR \fB-D\fR \fIname_IP_address\fR [\fB-y\fR] [\fB-r\fR \fIresource\fR] [\fB-p\fR \fIpath\fR]
      [\fB-u\fR uninterpreted] \fInetwork\fR
 .fi
 
 .LP
 .nf
-\fBpntadm\fR \fB-P\fR [\fB-v\fR] [\fB-x\fR] [\fB-r\fR \fIresource\fR] [\fB-p\fR \fIpath\fR] 
+\fBpntadm\fR \fB-P\fR [\fB-v\fR] [\fB-x\fR] [\fB-r\fR \fIresource\fR] [\fB-p\fR \fIpath\fR]
      [\fB-u\fR uninterpreted] \fInetwork\fR
 .fi
 
@@ -83,46 +83,38 @@ One of the following options (function flags) must be specified with the
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR\fI name_IP_address\fR\fR
 .ad
 .RS 26n
-.rt  
 Add a client entry with hostname or client IP address, \fIname_IP_address\fR,
 to the named \fBDHCP\fR network table.
 .sp
 The following sub-options are optional:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIcomment\fR\fR
 .ad
 .RS 22n
-.rt  
 Comment text. The default is \fINULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fImm/dd/yyyy\fR\fR
 .ad
 .RS 22n
-.rt  
 Absolute lease. The default is \fB0\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fInum\fR | \fIkeywords\fR\fR
 .ad
 .RS 22n
-.rt  
 Flag value. The default is \fB00\fR.
 .sp
 The flag (\fB-f\fR) option can be specified either as a single number denoting
@@ -130,56 +122,46 @@ the intended flag value, or as a series of the following keywords, combined
 using the plus (\fB+\fR) symbol:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDYNAMIC\fR or \fB00\fR\fR
 .ad
 .RS 19n
-.rt  
 Server manager's assignment.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPERMANENT\fR or \fB01\fR\fR
 .ad
 .RS 19n
-.rt  
 Lease on entry is permanent.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMANUAL\fR or \fB02\fR\fR
 .ad
 .RS 19n
-.rt  
 Administrator managed assignment.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUNUSABLE\fR or \fB04\fR\fR
 .ad
 .RS 19n
-.rt  
 Entry is not valid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBBOOTP\fR or \fB08\fR\fR
 .ad
 .RS 19n
-.rt  
 Entry reserved for \fBBOOTP\fR clients.
 .RE
 
@@ -188,12 +170,10 @@ For a more detailed description of the flag values, see \fBdhcp_network\fR(4).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fIclient_hostname\fR\fR
 .ad
 .RS 22n
-.rt  
 Client hostname. The default is NULL.
 .sp
 When the \fB-h\fR option is used in this mode, the \fIclient_hostname\fR is
@@ -204,12 +184,10 @@ already present in the hosts table.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIclient_ID\fR [\fB-a\fR]\fR
 .ad
 .RS 22n
-.rt  
 Client identifier [\fB-a\fR]. The default is \fB00\fR.
 .sp
 The \fB-i\fR option modified with \fB-a\fR specifies that the client identifier
@@ -219,12 +197,10 @@ before insertion into the table.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fImacro\fR [\fB-y\fR]\fR
 .ad
 .RS 22n
-.rt  
 Macro name. Default is UNKNOWN.
 .sp
 The \fB-m\fR option modified with \fB-y\fR verifies the existence of the named
@@ -233,12 +209,10 @@ macro in the \fBdhcptab\fR table before adding the entry.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIserver\fR\fR
 .ad
 .RS 22n
-.rt  
 Server IP or name. Default is system name (\fBuname\fR \fB-n\fR).
 .RE
 
@@ -246,12 +220,10 @@ Server IP or name. Default is system name (\fBuname\fR \fB-n\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-B\fR\fR
 .ad
 .RS 26n
-.rt  
 Activate batch mode. \fBpntadm\fR will read from the specified file or from
 standard input a series of \fBpntadm\fR commands and execute them within the
 same process. Processing many \fBpntadm\fR commands using this method is much
@@ -261,12 +233,10 @@ for using \fBpntadm\fR in scripts.
 The following sub-option is optional:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 Display commands to standard output as they are processed.
 .RE
 
@@ -274,24 +244,20 @@ Display commands to standard output as they are processed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
 .RS 26n
-.rt  
 Create the \fBDHCP\fR network table for the network specified by \fInetwork\fR.
 See . For details, see \fBdhcp_network\fR(4) and \fBnetworks\fR(4).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR \fI name_IP_address\fR\fR
 .ad
 .RS 26n
-.rt  
 Delete the specified client entry with hostname or client IP address,
 \fIname_IP_address\fR, in the named \fBDHCP\fR network table. (See
 \fBdhcp_network\fR(4).)
@@ -299,12 +265,10 @@ Delete the specified client entry with hostname or client IP address,
 The following sub-option is optional:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-y\fR\fR
 .ad
 .RS 6n
-.rt  
 Remove associated host table entry. The \fB-y\fR option requests that all
 hostnames associated with the \fBIP\fR address in the hosts table in the
 resource be removed.
@@ -314,12 +278,10 @@ resource be removed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
 .RS 26n
-.rt  
 List the \fBDHCP\fR network tables presently configured, one per line, on
 standard output. If none are found, no output is printed and an exit status of
 \fB0\fR is returned.
@@ -327,12 +289,10 @@ standard output. If none are found, no output is printed and an exit status of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR \fI name_IP_address\fR\fR
 .ad
 .RS 26n
-.rt  
 Modify the specified client entry with hostname or client IP address,
 \fIname_IP_address\fR, in the named \fBDHCP\fR network table. See
 \fBdhcp_network\fR(4). The default for the sub-options is what they currently
@@ -341,47 +301,39 @@ are set to.
 The following sub-options are optional.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIcomment\fR\fR
 .ad
 .RS 29n
-.rt  
 New comment text.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fImm/dd/yy\fR\fR
 .ad
 .RS 29n
-.rt  
 New absolute lease expiration date. Time defaults to 12:00 AM of the day
 specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fInum\fR | \fIkeyboard\fR\fR
 .ad
 .RS 29n
-.rt  
 New flag value, see explanation following the description of the \fB-A\fR
 option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fIhost_name\fR\fR
 .ad
 .RS 29n
-.rt  
 New client hostname.
 .sp
 The \fB-h\fR option allows you to change the current \fIhostname\fR associated
@@ -391,45 +343,37 @@ an entry associated with this \fBIP\fR address does not exist.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIclient_ID\fR\fR
 .ad
 .RS 29n
-.rt  
 New client identifier [\fB-a\fR].
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fImacro\fR [\fB-y\fR]\fR
 .ad
 .RS 29n
-.rt  
 Macro name defined in \fBdhcptab\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n \fR \fInew_client_IP_address\fR\fR
 .ad
 .RS 29n
-.rt  
 New \fBIP\fR address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIserver\fR\fR
 .ad
 .RS 29n
-.rt  
 New server \fBIP\fR or name.
 .RE
 
@@ -439,35 +383,29 @@ New server \fBIP\fR or name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR\fR
 .ad
 .RS 26n
-.rt  
 Display the named \fBDHCP\fR network table.
 .sp
 The following sub-options are optional:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 Display lease time in full verbose format and resolve IP addresses for the
 clients and server to hostnames.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 6n
-.rt  
 Display lease time in raw format.
 .RE
 
@@ -476,16 +414,14 @@ These flag codes are used with the \fB-P\fR sub-options:
 
 .sp
 .TS
-tab();
-lw(1.83i) lw(1.83i) lw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-\fB-v\fR\fB-x\fRDescription
-D00DYNAMIC
-P01PERMANENT
-M02MANUAL
-U04UNUSABLE
-B08BOOTP
+l l l
+l l l .
+\fB-v\fR	\fB-x\fR	Description
+D	00	DYNAMIC
+P	01	PERMANENT
+M	02	MANUAL
+U	04	UNUSABLE
+B	08	BOOTP
 .TE
 
 See \fBdhcp_network\fR(4) for information on these sub-options and associated
@@ -494,35 +430,29 @@ flag codes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fI path\fR\fR
 .ad
 .RS 26n
-.rt  
 Override the \fBdhcpsvc.conf\fR(4) configuration value for data store resource
 path, \fIpath\fR See \fBdhcpsvc.conf\fR(4)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR\fR
 .ad
 .RS 26n
-.rt  
 Remove the named DHCP network table. See \fBdhcp_network\fR(4).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIdata_store_resource\fR\fR
 .ad
 .RS 26n
-.rt  
 Override the \fB/etc/inet/dhcpsvc.conf\fR configuration value for
 \fBRESOURCE=\fR with the \fIdata_store_resource\fR specified. See the
 \fBdhcpsvc.conf\fR(4) man page for more details on resource type, and the
@@ -531,12 +461,10 @@ Override the \fB/etc/inet/dhcpsvc.conf\fR configuration value for
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR uninterpreted\fR
 .ad
 .RS 26n
-.rt  
 Data which will be ignored by \fBpntadm\fR, but passed to the currently
 configured public module to be interpreted by the data store. This might be
 used for a database account name or other authentication or authorization
@@ -549,12 +477,10 @@ parameters required by a particular data store.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fInetwork\fR\fR
 .ad
 .RS 11n
-.rt  
 The network address or network name which corresponds to the \fBdhcp network\fR
 table. See \fBdhcp_network\fR(4).
 .RE
@@ -702,80 +628,66 @@ example# \fBpntadm -B addclients\fR
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 Object already exists.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Object does not exist.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 5n
-.rt  
 Non-critical error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB4\fR\fR
 .ad
 .RS 5n
-.rt  
 Critical error.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/inet/dhcpsvc.conf\fR\fR
 .ad
 .RS 26n
-.rt  
- 
+
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/inet/hosts\fR\fR
 .ad
 .RS 26n
-.rt  
- 
+
 .RE
 
 .SH ATTRIBUTES
@@ -786,13 +698,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

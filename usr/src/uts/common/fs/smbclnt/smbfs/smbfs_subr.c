@@ -33,6 +33,7 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -66,19 +67,15 @@
  */
 int
 smbfs_fullpath(struct mbchain *mbp, struct smb_vc *vcp, struct smbnode *dnp,
-	const char *name, int *lenp, u_int8_t sep)
+	const char *name, int nmlen, u_int8_t sep)
 {
 	int caseopt = SMB_CS_NONE;
-	int error, len = 0;
 	int unicode = (SMB_UNICODE_STRINGS(vcp)) ? 1 : 0;
+	int error;
 
 	if (SMB_DIALECT(vcp) < SMB_DIALECT_LANMAN1_0)
 		caseopt |= SMB_CS_UPPER;
 
-	if (lenp) {
-		len = *lenp;
-		*lenp = 0;
-	}
 	if (unicode) {
 		error = mb_put_padbyte(mbp);
 		if (error)
@@ -87,7 +84,7 @@ smbfs_fullpath(struct mbchain *mbp, struct smb_vc *vcp, struct smbnode *dnp,
 
 	error = smb_put_dmem(mbp, vcp,
 	    dnp->n_rpath, dnp->n_rplen,
-	    caseopt, lenp);
+	    caseopt, NULL);
 	if (name) {
 		/*
 		 * Special case at share root:
@@ -116,14 +113,12 @@ smbfs_fullpath(struct mbchain *mbp, struct smb_vc *vcp, struct smbnode *dnp,
 				error = mb_put_uint16le(mbp, sep);
 			else
 				error = mb_put_uint8(mbp, sep);
-			if (!error && lenp)
-				*lenp += (unicode + 1);
 			if (error)
 				return (error);
 		}
 		/* Put the name */
 		error = smb_put_dmem(mbp, vcp,
-		    name, len, caseopt, lenp);
+		    name, nmlen, caseopt, NULL);
 		if (error)
 			return (error);
 	}
@@ -132,8 +127,6 @@ smbfs_fullpath(struct mbchain *mbp, struct smb_vc *vcp, struct smbnode *dnp,
 		error = mb_put_uint16le(mbp, 0);
 	else
 		error = mb_put_uint8(mbp, 0);
-	if (!error && lenp)
-		*lenp += (unicode + 1);
 
 	return (error);
 }

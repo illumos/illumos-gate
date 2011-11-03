@@ -4,22 +4,22 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pkgadd 1M "30 Oct 2007" "SunOS 5.11" "System Administration Commands"
+.TH PKGADD 1M "Oct 30, 2007"
 .SH NAME
 pkgadd \- transfer software packages to the system
 .SH SYNOPSIS
 .LP
 .nf
-\fBpkgadd\fR [\fB-nv\fR] [\fB-a\fR \fIadmin\fR] [\fB-G\fR] [\fB-x\fR \fIproxy\fR] 
-     [ [\fB-M\fR] \fB-R\fR \fIroot_path\fR] [\fB-r\fR \fIresponse\fR] [\fB-k\fR \fIkeystore\fR] 
-     [\fB-P\fR \fIpasswd\fR] [\fB-V\fR \fIfs_file\fR] 
-     [\fB-d\fR \fIdevice\fR | \fB-d\fR \fIdatastream\fR \fIpkginst\fR | all] 
+\fBpkgadd\fR [\fB-nv\fR] [\fB-a\fR \fIadmin\fR] [\fB-G\fR] [\fB-x\fR \fIproxy\fR]
+     [ [\fB-M\fR] \fB-R\fR \fIroot_path\fR] [\fB-r\fR \fIresponse\fR] [\fB-k\fR \fIkeystore\fR]
+     [\fB-P\fR \fIpasswd\fR] [\fB-V\fR \fIfs_file\fR]
+     [\fB-d\fR \fIdevice\fR | \fB-d\fR \fIdatastream\fR \fIpkginst\fR | all]
      [\fIpkginst\fR | \fB-Y\fR \fIcategory\fR [\fI, category\fR]...]
 .fi
 
 .LP
 .nf
-\fBpkgadd\fR \fB-s\fR [\fB-d\fR \fIdevice\fR | \fB-d\fR \fIdatastream\fR \fIpkginst\fR | all] 
+\fBpkgadd\fR \fB-s\fR [\fB-d\fR \fIdevice\fR | \fB-d\fR \fIdatastream\fR \fIpkginst\fR | all]
      [\fIpkginst\fR | \fB-Y\fR \fIcategory\fR [\fI, category\fR]...]
 .fi
 
@@ -89,7 +89,6 @@ The supported options are described as follows. The \fB-d\fR \fIdevice\fR
 source specifier is described under OPERANDS, below.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-a\fR \fIadmin\fR\fR
 .ad
@@ -106,7 +105,6 @@ current working directory, \fBpkgadd\fR looks in the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-G\fR\fR
 .ad
@@ -123,7 +121,6 @@ for a package, \fBSUNW_PKG_ALLZONES\fR is set to true. See \fBpkginfo\fR(4).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR \fIkeystore\fR\fR
 .ad
@@ -137,7 +134,6 @@ valid trusted certificates. See \fBKEYSTORE LOCATIONS\fR for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR\fR
 .ad
@@ -151,7 +147,6 @@ and earlier releases.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
@@ -163,7 +158,6 @@ installed files. The default mode is interactive.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR \fIpasswd\fR\fR
 .ad
@@ -176,7 +170,6 @@ option's argument.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-r\fR \fIresponse\fR\fR
 .ad
@@ -190,7 +183,6 @@ full pathname.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIroot_path\fR\fR
 .ad
@@ -214,7 +206,6 @@ zone's file system. See \fBzones\fR(5).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-s\fR \fIspool\fR\fR
 .ad
@@ -225,7 +216,6 @@ Write the package into the directory \fIspool\fR instead of installing it.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -238,7 +228,6 @@ procedural and non-procedural scripts.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR \fIfs_file\fR\fR
 .ad
@@ -251,7 +240,6 @@ file is non-existent or unreliable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR \fIproxy\fR\fR
 .ad
@@ -280,7 +268,6 @@ for instances of a package to install or spool. Optionally, the source for the
 package instances to be installed or spooled can be specified using:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdevice\fR\fR
 .ad
@@ -333,7 +320,6 @@ the source are to be installed. As an alternative, the package instances to be
 installed can be specified using:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpkginst\fR\fR
 .ad
@@ -350,7 +336,6 @@ quotes (\fB\&'\fR) or preceded by a backslash (\fB\e\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Y\fR \fIcategory\fR[,\fIcategory\fR...]\fR
 .ad
@@ -449,7 +434,6 @@ then the user is prompted to enter one: this will typically be read from the
 current terminal with echoing turned off.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpass:\fIpassword\fR\fR\fR
 .ad
@@ -462,7 +446,6 @@ important.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBenv:\fIvar\fR\fR\fR
 .ad
@@ -475,7 +458,6 @@ should be used with caution.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfile:\fIpathname\fR\fR\fR
 .ad
@@ -489,7 +471,6 @@ named pipe. For example, to read the password from standard input, use
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBconsole\fR\fR
 .ad
@@ -525,7 +506,7 @@ datastream must have been created with the \fBpkgtrans\fR(1) command.
 .sp
 .in +2
 .nf
-example# \fBpkgadd -d /var/tmp/datastream all\fR 
+example# \fBpkgadd -d /var/tmp/datastream all\fR
 .fi
 .in -2
 .sp
@@ -538,7 +519,6 @@ designated datastream will be installed.
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -549,7 +529,6 @@ Successful completion
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
@@ -560,7 +539,6 @@ Fatal error.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
@@ -571,7 +549,6 @@ Warning.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
@@ -582,7 +559,6 @@ Interruption.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB4\fR\fR
 .ad
@@ -593,7 +569,6 @@ Administration.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB5\fR\fR
 .ad
@@ -604,7 +579,6 @@ Administration. Interaction is required. Do not use \fBpkgadd\fR \fB-n\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB10\fR\fR
 .ad
@@ -615,7 +589,6 @@ Reboot after installation of all packages.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB20\fR\fR
 .ad
@@ -627,7 +600,6 @@ Reboot after installation of this package.
 .SH ENVIRONMENT VARIABLES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHTTPPROXY\fR\fR
 .ad
@@ -639,7 +611,6 @@ Specifies an HTTP proxy host. Overrides administration file setting, and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHTTPPROXYPORT\fR\fR
 .ad
@@ -651,7 +622,6 @@ Specifies the port to use when contacting the host specified by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhttp_proxy\fR\fR
 .ad
@@ -664,7 +634,6 @@ setting.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/sadm/install/logs/\fR\fR
 .ad
@@ -681,13 +650,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

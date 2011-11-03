@@ -1,0 +1,45 @@
+'\" te
+.\" Copyright (c) 1993, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH FD 7FS "Jul 3, 1990"
+.SH NAME
+fd, stdin, stdout, stderr \- file descriptor files
+.SH DESCRIPTION
+.sp
+.LP
+These files, conventionally called  \fB/dev/fd/0\fR, \fB/dev/fd/1\fR,
+\fB/dev/fd/2\fR, and so on, refer to files accessible through file descriptors.
+If file descriptor  \fIn\fR is open, these two system calls have the same
+effect:
+.sp
+.in +2
+.nf
+\fBfd = open("/dev/fd/\fR\fIn\fR",mode);
+fd = dup(\fIn\fR);
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+On these files  \fBcreat\fR(2) is equivalent to \fBopen\fR, and \fBmode\fR is
+ignored. As with  \fBdup\fR, subsequent reads or writes on  \fBfd\fR fail
+unless the original file descriptor allows the operations.
+.sp
+.LP
+For convenience in referring to standard input, standard output, and standard
+error, an additional set of names is provided:  \fB/dev/stdin\fR is a synonym
+for  \fB/dev/fd/0\fR, \fB/dev/stdout\fR for \fB/dev/fd/1\fR, and
+\fB/dev/stderr\fR for  \fB/dev/fd/2\fR.
+.SH SEE ALSO
+.sp
+.LP
+\fBcreat\fR(2), \fBdup\fR(2), \fBopen\fR(2)
+.SH DIAGNOSTICS
+.sp
+.LP
+\fBopen\fR(2) returns \fB\(mi1\fR and  \fBEBADF\fR if the associated file
+descriptor is not open.

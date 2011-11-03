@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH add_drv 1M "1 Dec 2005" "SunOS 5.11" "System Administration Commands"
+.TH ADD_DRV 1M "Dec 1, 2005"
 .SH NAME
 add_drv \- add a new device driver to the system
 .SH SYNOPSIS
 .LP
 .nf
-\fBadd_drv\fR [\fB-b\fR \fIbasedir\fR] [\fB-c\fR \fIclass_name\fR] 
-     [\fB-i\fR '\fIidentify_name\fR...'] [\fB-m\fR '\fIpermission\fR','...'] 
+\fBadd_drv\fR [\fB-b\fR \fIbasedir\fR] [\fB-c\fR \fIclass_name\fR]
+     [\fB-i\fR '\fIidentify_name\fR...'] [\fB-m\fR '\fIpermission\fR','...']
      [\fB-p\fR '\fIpolicy\fR'] [\fB-P\fR \fIprivilege\fR] [\fB-n\fR] [\fB-f\fR] [\fB-v\fR] \fIdevice_driver\fR
 .fi
 
@@ -48,7 +48,7 @@ Aliases might require quoting (with double-quotes) if they contain numbers. See
 obtain permission information. The permission specified is applied to matching
 minor nodes created when a device bound to the driver is attached. A minor
 node's permission may be manually changed by \fBchmod\fR(1). For such nodes,
-the specified permissions apply, overriding the default 	permissions specified
+the specified permissions apply, overriding the default permissions specified
 via \fBadd_drv\fR or \fBupdate_drv\fR(1M).
 .sp
 .LP
@@ -139,12 +139,10 @@ The \fB-b\fR option is described below.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR \fIbasedir\fR\fR
 .ad
 .RS 26n
-.rt  
 Installs the driver on the system with a root directory of \fIbasedir\fR rather
 than installing on the system executing \fBadd_drv\fR. This option is typically
 used in package post-installation scripts when the package is not being
@@ -164,23 +162,19 @@ zone's file system. See \fBzones\fR(5).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIclass_name\fR\fR
 .ad
 .RS 26n
-.rt  
 The driver being added to the system exports the class \fIclass_name\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 26n
-.rt  
 Normally if a reconfiguration boot is required to complete the configuration of
 the driver into the system, \fBadd_drv\fR will not add the driver. The force
 flag forces \fBadd_drv\fR to add the driver even if a reconfiguration boot is
@@ -189,47 +183,39 @@ required. See the \fB-v\fR flag.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fB\&'\fR\fIidentify_name\fR\fB\&'\fR\fR
 .ad
 .RS 26n
-.rt  
 A white-space separated list of aliases for the driver \fIdevice_driver\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fB\&'\fR\fIpermission\fR\fB\&'\fR\fR
 .ad
 .RS 26n
-.rt  
 Specify the file system permissions for device nodes created by the system on
 behalf of \fIdevice_driver\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 26n
-.rt  
 Do not try to load and attach \fIdevice_driver\fR, just modify the system
 configuration files for the \fIdevice_driver\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR '\fIpolicy\fR\fB\&'\fR\fR
 .ad
 .RS 26n
-.rt  
 Specify an additional device security policy.
 .sp
 The device security policy constists of several whitespace separated tokens:
@@ -269,24 +255,20 @@ A missing minor spec is interpreted as a \fB*\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR '\fIprivilege\fR\fB\&'\fR\fI\fR\fR
 .ad
 .RS 26n
-.rt  
 Specify additional, comma separated, privileges used by the driver. You can
 also use specific privileges in the device's policy.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 26n
-.rt  
 The verbose flag causes \fBadd_drv\fR to provide additional information
 regarding the success or failure of a driver's configuration into the system.
 See the \fBEXAMPLES\fR section.
@@ -454,7 +436,6 @@ example# add_drv -i '"pci10c5,25"' smc
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv\fR\fR
 .ad
@@ -465,7 +446,6 @@ example# add_drv -i '"pci10c5,25"' smc
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/sparcv9\fR\fR
 .ad
@@ -476,7 +456,6 @@ example# add_drv -i '"pci10c5,25"' smc
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/amd64\fR\fR
 .ad
@@ -487,7 +466,6 @@ example# add_drv -i '"pci10c5,25"' smc
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/kernel/drv\fR\fR
 .ad
@@ -498,7 +476,6 @@ other 32-bit drivers that could potentially be shared between platforms
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/kernel/drv/sparcv9\fR\fR
 .ad
@@ -509,7 +486,6 @@ other 64-bit SPARC drivers that could potentially be shared between platforms
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/kernel/drv/amd64\fR\fR
 .ad
@@ -520,7 +496,6 @@ other 64-bit x86 drivers that could potentially be shared between platforms
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/`uname\fR \fB-i`/kernel/drv\fR\fR
 .ad
@@ -531,7 +506,6 @@ other 64-bit x86 drivers that could potentially be shared between platforms
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/`uname\fR \fB-i`/kernel/drv/sparcv9\fR\fR
 .ad
@@ -542,7 +516,6 @@ other 64-bit x86 drivers that could potentially be shared between platforms
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/`uname\fR \fB-i`/kernel/drv/amd64\fR\fR
 .ad
@@ -553,7 +526,6 @@ other 64-bit x86 drivers that could potentially be shared between platforms
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/driver_aliases\fR\fR
 .ad
@@ -564,7 +536,6 @@ driver aliases file
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/driver_classes\fR\fR
 .ad
@@ -575,7 +546,6 @@ driver classes file
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/minor_perm\fR\fR
 .ad
@@ -586,7 +556,6 @@ minor node permissions
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/name_to_major\fR\fR
 .ad
@@ -597,7 +566,6 @@ major number binding
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/security/device_policy\fR\fR
 .ad
@@ -608,7 +576,6 @@ device policy
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/security/extra_privs\fR\fR
 .ad

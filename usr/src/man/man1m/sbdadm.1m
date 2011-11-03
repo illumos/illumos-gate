@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing. See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sbdadm 1M "20 Aug 2009" "SunOS 5.11" "System Administration Commands"
+.TH SBDADM 1M "Aug 20, 2009"
 .SH NAME
 sbdadm \- SCSI Block Disk command line interface
 .SH SYNOPSIS
@@ -45,7 +45,6 @@ you enter a question mark as an argument to the command (\fBsbdadm ?\fR),
 \fBsbdadm\fR responds with a help display.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcreate-lu\fR [\fB-s\fR, \fB--size\fR \fIsize\fR] \fIfilename\fR\fR
 .ad
@@ -56,67 +55,55 @@ option, \fIsize\fR is an integer followed by one of the following letters, to
 indicate a unit of size:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBk\fR\fR
 .ad
 .RS 5n
-.rt  
 kilobyte
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBm\fR\fR
 .ad
 .RS 5n
-.rt  
 megabyte
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBg\fR\fR
 .ad
 .RS 5n
-.rt  
 gigabyte
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBt\fR\fR
 .ad
 .RS 5n
-.rt  
 terabyte
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBp\fR\fR
 .ad
 .RS 5n
-.rt  
 petabyte
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBe\fR\fR
 .ad
 .RS 5n
-.rt  
 exabyte
 .RE
 
@@ -128,7 +115,6 @@ The size specified can exceed the size of the file or device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdelete-lu\fR \fIlu_name\fR\fR
 .ad
@@ -141,7 +127,6 @@ data on the logical unit remains intact.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBimport-lu\fR \fIlu_name\fR\fR
 .ad
@@ -156,7 +141,6 @@ command for this logical unit.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlist-lu\fR\fR
 .ad
@@ -168,7 +152,6 @@ command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmodify-lu\fR [\fB-s\fR, \fB--size\fR \fIsize\fR] \fIlu_name\fR |
 \fIfilename\fR\fR
@@ -191,7 +174,6 @@ The size specified can exceed the size of the file or device represented by
 \fBsbdadm\fR use the following operands:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfilename\fR\fR
 .ad
@@ -202,7 +184,6 @@ Name of an existing file or a fully qualified path to a raw block device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlu_name\fR\fR
 .ad
@@ -238,10 +219,10 @@ The following command lists all logical units.
 .in +2
 .nf
 # \fBsbdadm list-lu\fR
-Found 2 LU(s) 
+Found 2 LU(s)
 
-              	GUID           	   DATA SIZE    SOURCE 
---------------------------------  -----------  ------ 
+              	GUID           	   DATA SIZE    SOURCE
+--------------------------------  -----------  ------
 6000ae4000144f21d92c47b0dd650002  10737352704  /export/lun/0
 6000ae4000144f21d92c47b0de300032  134283264    /dev/rdsk/c1t1d0s0
 .fi
@@ -251,7 +232,6 @@ Found 2 LU(s)
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -262,7 +242,6 @@ Successful completion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnon-zero\fR\fR
 .ad
@@ -279,13 +258,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityObsolete Committed
+Interface Stability	Obsolete Committed
 .TE
 
 .SH SEE ALSO

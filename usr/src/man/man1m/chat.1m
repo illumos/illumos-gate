@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH chat 1M "4 May 2001" "SunOS 5.11" "System Administration Commands"
+.TH CHAT 1M "May 4, 2001"
 .SH NAME
 chat \- automated conversational exchange tool
 .SH SYNOPSIS
@@ -26,12 +26,10 @@ Point-To-Point Protocol daemon (\fBpppd\fR) and the remote \fBpppd\fR process.
 The  \fBchat\fR command supports the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fI<chat file>\fR\fR
 .ad
 .RS 23n
-.rt  
 Read the \fBchat\fR script from the  \fBchat\fR file. This option is mutually
 exclusive with the  \fBchat\fR script parameters. You must have \fBread\fR
 access to use the file. Multiple lines are permitted in the file. Use the space
@@ -40,12 +38,10 @@ or horizontal tab characters to separate the strings.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fB\fI<timeout>\fR\fR \fR
 .ad
 .RS 23n
-.rt  
 Set the timeout for the expected string to be received. If the string is not
 received within the time limit, the reply string is not sent. If specified,
 a 'subexpect' (alternate reply) string can be sent. Otherwise, if no alternate
@@ -55,12 +51,10 @@ the  \fBchat\fR program to terminate with a non-zero error code.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fB\fI<report file> \fR\fR \fR
 .ad
 .RS 23n
-.rt  
 Set the file for output of the report strings. If you use the keyword
 \fBREPORT\fR, the resulting strings are written to this file. If  the \fB-r\fR
 option is not used and you use the \fBREPORT\fR keyword, the  \fBstderr\fR file
@@ -69,12 +63,10 @@ is used for the report strings.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fR
 .ad
 .RS 23n
-.rt  
 Start with the echo option turned on. You turn echo on or off at specific
 points in the \fBchat\fR script using the \fBECHO\fR keyword. When echoing is
 enabled, all output from the modem is echoed to \fBstderr\fR.
@@ -82,24 +74,20 @@ enabled, all output from the modem is echoed to \fBstderr\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-E\fR \fR
 .ad
 .RS 23n
-.rt  
 Enables environment variable substitution within \fBchat\fR scripts using the
 standard \fI$xxx\fR syntax.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR \fR
 .ad
 .RS 23n
-.rt  
 Request that the \fBchat\fR script execute in a verbose mode. The  \fBchat\fR
 program logs the execution state of the \fBchat\fR script as well as all text
 received from the modem and output strings sent to the modem. The default is to
@@ -109,12 +97,10 @@ alterable using the \fB-S\fR and \fB-s\fR options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR \fR
 .ad
 .RS 23n
-.rt  
 Request that the  \fBchat\fR script be executed in a \fBstderr\fR verbose mode.
 The \fBchat\fR program logs all text received from the modem and output strings
 sent to the modem to \fBstderr\fR. \fBstderr\fR is usually the local console at
@@ -123,24 +109,20 @@ the station running the  \fBchat\fR or \fBpppd\fR program.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 23n
-.rt  
 Use \fBstderr\fR.  Log messages from \fB-v\fR and error messages are sent to
 \fBstderr\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR\fR
 .ad
 .RS 23n
-.rt  
 Do not use syslog.  By default, error messages are set to syslog. This option
 prevents log messages from \fB-v\fR and error messages from being sent to
 syslog.
@@ -148,24 +130,20 @@ syslog.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fB\fI<phone number>\fR\fR\fR
 .ad
 .RS 23n
-.rt  
 Pass in an arbitrary string (usually a telephone number) that will be
 substituted for the \fB\eT\fR substitution metacharacter in a send string.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-U\fR \fB\fI<phone number 2>\fR\fR\fR
 .ad
 .RS 23n
-.rt  
 Pass in a second string (usually a telephone number) that will be substituted
 for the \fB\eU\fR substitution metacharacter in a send string. This is useful
 when dialing an ISDN terminal adapter that requires two numbers.
@@ -173,12 +151,10 @@ when dialing an ISDN terminal adapter that requires two numbers.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBscript\fR \fR
 .ad
 .RS 23n
-.rt  
 If the script is not specified in a file with the \fB-f\fR option, the script
 is included as parameters to the \fBchat\fR program.
 .RE
@@ -267,7 +243,7 @@ with a \fB#\fR character, write something like this:
 .sp
 .in +2
 .nf
-# Now wait for the prompt and send logout string 
+# Now wait for the prompt and send logout string
 \&'# ' logout
 .fi
 .in -2
@@ -329,16 +305,16 @@ example, add a line similar to the following to the script:
 .sp
 .in +2
 .nf
-ABORT BUSY  
-ECHO OFF  
-SAY "Dialing your ISP...\en"  
-\&'' ATDT5551212  
-TIMEOUT 120 
-SAY "Waiting up to 2 minutes for connection ..." 
-CONNECT ''  
-SAY "Connected, now logging in ...\en" 
-ogin: account 
-ssword: pass 
+ABORT BUSY
+ECHO OFF
+SAY "Dialing your ISP...\en"
+\&'' ATDT5551212
+TIMEOUT 120
+SAY "Waiting up to 2 minutes for connection ..."
+CONNECT ''
+SAY "Connected, now logging in ...\en"
+ogin: account
+ssword: pass
 $ \ec
 SAY "Logged in OK ... \en"
 .fi
@@ -351,7 +327,7 @@ In this case, you will see:
 .sp
 .in +2
 .nf
-Dialing your ISP... 
+Dialing your ISP...
 Waiting up to 2 minutes for connection...Connected, now logging in...
 Logged in OK ...
 .fi
@@ -408,7 +384,7 @@ following script:
 .sp
 .in +2
 .nf
-ABORT   'BUSY' 
+ABORT   'BUSY'
 ABORT   'NO CARRIER'
 ""    AT&F
 OK\er\en  ATD1234567
@@ -498,7 +474,7 @@ send string using the sequence ^D.
 The BREAK special reply string sends a break condition. The break is a special
 transmitter signal. Many UNIX systems handle break by cycling through available
 bit rates, and sending break is often needed when the remote system does not
-support autobaud.  BREAK is equivalent to 	using \eK\ec as the reply string.
+support autobaud. BREAK is equivalent to using \eK\ec as the reply string.
 You embed the break sequence into the send string using the \eK sequence.
 .SS "Escape Sequences"
 .sp
@@ -509,13 +485,11 @@ sequences is presented below. Sequences that are not accepted by expect strings
 are indicated.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&''\fR \fR
 .ad
 .RS 10n
-.rt  
-Expects or sends a null string. If you send a null string, \fBchat\fR 	sends
+Expects or sends a null string. If you send a null string, \fBchat\fR sends
 the return character.  If you expect a null string, \fBchat\fR proceeds to the
 reply string without waiting.  This sequence can be a pair of apostrophes or
 quote mark characters.
@@ -523,23 +497,19 @@ quote mark characters.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\eb\fR \fR
 .ad
 .RS 10n
-.rt  
 Represents a backspace character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\ec\fR \fR
 .ad
 .RS 10n
-.rt  
 Suppresses the newline at the end of the reply string. This is the only method
 to send a string without a trailing return character. This sequence must be at
 the end of the send string. For example, the sequence hello\ec will simply send
@@ -548,92 +518,76 @@ the characters h, e, l, l, o. (Not valid  in expect.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\ed\fR \fR
 .ad
 .RS 10n
-.rt  
 Delay for one second. The program uses \fBsleep\fR(1) which delays to a maximum
 of one second.  (Not valid  in expect.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\eK\fR \fR
 .ad
 .RS 10n
-.rt  
 Insert a BREAK.  (Not valid  in expect.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\en\fR \fR
 .ad
 .RS 10n
-.rt  
 Send a newline or linefeed character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\eN\fR \fR
 .ad
 .RS 10n
-.rt  
 Send a null character. The same sequence may be represented by \e0.  (Not valid
 in expect.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\ep\fR \fR
 .ad
 .RS 10n
-.rt  
 Pause for 1/10th of a second.  (Not valid  in expect.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\eq\fR \fR
 .ad
 .RS 10n
-.rt  
 Suppress writing the string to syslog.  The string ?????? is written to the log
 in its place. (Not valid  in expect.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\er\fR \fR
 .ad
 .RS 10n
-.rt  
 Send or expect a carriage return.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\es\fR \fR
 .ad
 .RS 10n
-.rt  
 Represents a space character in the string. Can be used when it is not
 desirable to quote the strings which contains spaces. The sequence 'HI\ TIM'
 and HI\esTIM are the same.
@@ -641,70 +595,58 @@ and HI\esTIM are the same.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\et\fR \fR
 .ad
 .RS 10n
-.rt  
 Send or expect a tab character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\eT\fR \fR
 .ad
 .RS 10n
-.rt  
 Send the phone number string as specified with the \fB-T\fR option.  (Not valid
 in expect.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\eU\fR \fR
 .ad
 .RS 10n
-.rt  
 Send the phone number 2 string as specified with the \fB-U\fR option. (Not
 valid  in expect.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\e\e\fR \fR
 .ad
 .RS 10n
-.rt  
 Send or expect a backslash character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\eddd\fR \fR
 .ad
 .RS 10n
-.rt  
 Collapse the octal digits (ddd) into a single ASCII character and send that
 character. (\e000 is not valid in an expect string.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^C\fR \fR
 .ad
 .RS 10n
-.rt  
 Substitute the sequence with the control character represented by C. For
 example, the character DC1 (17) is shown as ^Q. (Some characters are not valid
 in expect.)
@@ -724,36 +666,30 @@ the variable.
 The \fBchat\fR program terminates with the following completion codes:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 10n
-.rt  
 Normal program termination. Indicates that the script was executed without
 error to normal conclusion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR \fR
 .ad
 .RS 10n
-.rt  
 One or more of the parameters are invalid or an expect string was too large for
 the internal buffers. Indicates that the program was not properly executed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR \fR
 .ad
 .RS 10n
-.rt  
 An error occurred during the execution of the program. This may be due to a
 read or write operation failing or \fBchat\fR receiving a signal such as
 SIGINT.
@@ -761,12 +697,10 @@ SIGINT.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR \fR
 .ad
 .RS 10n
-.rt  
 A timeout event occurred when there was an expect string without having a
 "-subsend" string. This indicates that you may not have programmed the script
 correctly for the condition or that an unexpected event occurred and the
@@ -775,56 +709,46 @@ expected string could not be found.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB4\fR \fR
 .ad
 .RS 10n
-.rt  
 The first string marked as an ABORT condition occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB5\fR \fR
 .ad
 .RS 10n
-.rt  
 The second string marked as an ABORT condition occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB6\fR \fR
 .ad
 .RS 10n
-.rt  
 The third string marked as an ABORT  condition occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB7\fR \fR
 .ad
 .RS 10n
-.rt  
 The fourth string marked as an ABORT condition occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&...\fR \fR
 .ad
 .RS 10n
-.rt  
 The other termination codes are also strings marked as an ABORT condition.
 .RE
 
@@ -842,13 +766,12 @@ See \fBattributes\fR(5)  for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

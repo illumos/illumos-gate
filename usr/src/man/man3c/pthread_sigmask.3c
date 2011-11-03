@@ -2,21 +2,21 @@
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
 .\" Portions Copyright (c) 1995 IEEE.  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pthread_sigmask 3C "23 Mar 2005" "SunOS 5.11" "Standard C Library Functions"
+.TH PTHREAD_SIGMASK 3C "Mar 23, 2005"
 .SH NAME
 pthread_sigmask \- change or examine calling thread's signal mask
 .SH SYNOPSIS
 .LP
 .nf
 cc -mt [ \fIflag\fR... ] \fIfile\fR... -lpthread [ \fIlibrary\fR... ]
-#include <pthread.h> 
+#include <pthread.h>
 #include <signal.h>
 
 \fBint\fR \fBpthread_sigmask\fR(\fBint\fR \fIhow\fR, \fBconst sigset_t *\fR\fIset\fR, \fBsigset_t *\fR\fIoset\fR);
@@ -42,36 +42,30 @@ The value of the argument \fIhow\fR specifies the method in which the set is
 changed and  takes one of the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIG_BLOCK\fR\fR
 .ad
 .RS 15n
-.rt  
 \fIset\fR corresponds to a set of signals to block. They are added to the
 current signal mask.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIG_UNBLOCK\fR\fR
 .ad
 .RS 15n
-.rt  
 \fIset\fR corresponds to a set of signals to unblock. These signals are deleted
 from the current signal mask.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIG_SETMASK\fR\fR
 .ad
 .RS 15n
-.rt  
 \fIset\fR corresponds to the new signal mask. The current signal mask is
 replaced by \fBset\fR.
 .RE
@@ -91,12 +85,10 @@ Upon successful completion, the \fBpthread_sigmask()\fR function returns
 The \fBpthread_sigmask()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The value of \fIhow\fR is not defined and \fIoset\fR is \fINULL\fR.
 .RE
 
@@ -234,7 +226,7 @@ handler(char *argv1)
 			thr_sigsetmask(SIG_UNBLOCK, &new, NULL);
 			break;
 	}
-	printf("\en Press CTRL-C to deliver SIGINT signal to the 
+	printf("\en Press CTRL-C to deliver SIGINT signal to the
      process\en");
 	sleep(8);  /* give user time to hit CTRL-C */
  return (NULL)
@@ -248,7 +240,7 @@ interrupt(int sig)
 
 void test_argv(char argv1[\|])    {
 	if(argv1 == NULL)  {
-		printf("use 0 as arg1 to use thr_create(\|);\en \e 
+		printf("use 0 as arg1 to use thr_create(\|);\en \e
 		or use 1 as arg1 to use pthread_create(\|)\en");
 		exit(NULL);
 	}
@@ -309,15 +301,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelMT-Safe and Async-Signal-Safe
+MT-Level	MT-Safe and Async-Signal-Safe
 .TE
 
 .SH SEE ALSO

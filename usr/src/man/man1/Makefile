@@ -384,7 +384,6 @@ MANFILES=	acctcom.1			\
 	 	tnfdump.1			\
 	 	tnfxtract.1			\
 	 	touch.1				\
-	 	tplot.1				\
 	 	tput.1				\
 	 	tr.1				\
 	 	trap.1				\
@@ -529,11 +528,6 @@ MANSOFILES =	batch.1		\
 		strconf.1	\
 		sun.1		\
 		switch.1	\
-		t300.1		\
-		t300s.1		\
-		t4014.1		\
-		t450.1		\
-		tek.1		\
 		u370.1		\
 		u3b.1		\
 		u3b15.1		\
@@ -560,7 +554,6 @@ MANSOFILES =	batch.1		\
 		valyorn.1	\
 		vax.1		\
 		vedit.1		\
-		ver.1		\
 		whence.1	\
 		while.1		\
 		zcat.1
@@ -738,13 +731,6 @@ spellin.1	:= SOSRC = man1/spell.1
 strconf.1	:= SOSRC = man1/strchg.1
 
 settime.1	:= SOSRC = man1/touch.1
-
-t300.1		:= SOSRC = man1/tplot.1
-t300s.1		:= SOSRC = man1/tplot.1
-t4014.1		:= SOSRC = man1/tplot.1
-t450.1		:= SOSRC = man1/tplot.1
-tek.1		:= SOSRC = man1/tplot.1
-ver.1		:= SOSRC = man1/tplot.1
 
 onintr.1	:= SOSRC = man1/trap.1
 

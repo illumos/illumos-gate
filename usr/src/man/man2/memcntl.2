@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH memcntl 2 "10 Apr 2007" "SunOS 5.11" "System Calls"
+.TH MEMCNTL 2 "Apr 10, 2007"
 .SH NAME
 memcntl \- memory management control
 .SH SYNOPSIS
@@ -13,7 +13,7 @@ memcntl \- memory management control
 #include <sys/types.h>
 #include <sys/mman.h>
 
-\fBint\fR \fBmemcntl\fR(\fBcaddr_t\fR \fIaddr\fR, \fBsize_t\fR \fIlen\fR, \fBint\fR \fIcmd\fR, \fBcaddr_t\fR \fIarg\fR, 
+\fBint\fR \fBmemcntl\fR(\fBcaddr_t\fR \fIaddr\fR, \fBsize_t\fR \fIlen\fR, \fBint\fR \fIcmd\fR, \fBcaddr_t\fR \fIarg\fR,
      \fBint\fR \fIattr\fR, \fBint\fR \fImask\fR);
 .fi
 
@@ -34,23 +34,19 @@ bit pattern contained in \fIattr\fR.
 The following attributes specify page mapping selection criteria:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSHARED\fR\fR
 .ad
 .RS 11n
-.rt  
 Page is mapped shared.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIVATE\fR\fR
 .ad
 .RS 11n
-.rt  
 Page is mapped private.
 .RE
 
@@ -61,34 +57,28 @@ selection criteria are constructed by a bitwise OR operation on the attribute
 bits and must match exactly.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_READ\fR\fR
 .ad
 .RS 14n
-.rt  
 Page can be read.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_WRITE\fR\fR
 .ad
 .RS 14n
-.rt  
 Page can be written.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_EXEC\fR\fR
 .ad
 .RS 14n
-.rt  
 Page can be executed.
 .RE
 
@@ -97,23 +87,19 @@ Page can be executed.
 The following criteria may also be specified:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROC_TEXT\fR\fR
 .ad
 .RS 13n
-.rt  
 Process text.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROC_DATA\fR\fR
 .ad
 .RS 13n
-.rt  
 Process data.
 .RE
 
@@ -133,7 +119,6 @@ The operation to be performed is identified by the argument \fIcmd\fR. The
 symbolic names for the operations are defined in <\fBsys/mman.h\fR> as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMC_LOCK\fR\fR
 .ad
@@ -157,7 +142,6 @@ potential future enhancements.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMC_LOCKAS\fR\fR
 .ad
@@ -170,23 +154,19 @@ future enhancements.  The \fIarg\fR argument is a bit pattern built from the
 flags:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMCL_CURRENT\fR\fR
 .ad
 .RS 15n
-.rt  
 Lock current mappings.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMCL_FUTURE\fR\fR
 .ad
 .RS 15n
-.rt  
 Lock future mappings.
 .RE
 
@@ -198,7 +178,6 @@ to the address space will be locked, provided sufficient memory is available.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMC_SYNC\fR\fR
 .ad
@@ -212,34 +191,28 @@ backing storage for a modified \fBMAP_PRIVATE\fR mapping is its swap area. The
 behavior of the operation:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMS_ASYNC\fR\fR
 .ad
 .RS 17n
-.rt  
 Perform asynchronous writes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMS_SYNC\fR\fR
 .ad
 .RS 17n
-.rt  
 Perform synchronous writes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMS_INVALIDATE\fR\fR
 .ad
 .RS 17n
-.rt  
 Invalidate mappings.
 .RE
 
@@ -255,7 +228,6 @@ require a memory object to be in a known state.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMC_UNLOCK\fR\fR
 .ad
@@ -268,7 +240,6 @@ potential future enhancements.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMC_UNLOCKAS\fR\fR
 .ad
@@ -282,7 +253,6 @@ compatibility with potential future enhancements.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMC_HAT_ADVISE\fR\fR
 .ad
@@ -374,12 +344,10 @@ returns \fB\(mi1\fR and sets \fBerrno\fR to indicate an error.
 The \fBmemcntl()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 10n
-.rt  
 When the selection criteria match, some or all of the memory identified by the
 operation could not be locked when \fBMC_LOCK\fR or \fBMC_LOCKAS\fR was
 specified, some or all mappings in the address range [\fIaddr\fR, \fIaddr\fR +
@@ -393,12 +361,10 @@ memory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBUSY\fR\fR
 .ad
 .RS 10n
-.rt  
 When the selection criteria match, some or all of the addresses in the range
 [\fIaddr, addr + len\fR) are locked and \fBMC_SYNC\fR with the
 \fBMS_INVALIDATE\fR option was specified.
@@ -406,12 +372,10 @@ When the selection criteria match, some or all of the addresses in the range
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIaddr\fR argument specifies invalid selection criteria or is not a
 multiple of the page size as returned by  \fBsysconf\fR(3C); the \fIaddr\fR
 and/or \fIlen\fR argument does not have the value \fB0\fR when \fBMC_LOCKAS\fR
@@ -423,12 +387,10 @@ the same access permissions within the given size boundaries.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 When the selection criteria match, some or all of the addresses in the range
 [\fIaddr\fR, \fIaddr\fR + \fIlen\fR) are invalid for the address space of a
 process or specify one or more pages which are not mapped.
@@ -436,12 +398,10 @@ process or specify one or more pages which are not mapped.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 10n
-.rt  
 The {\fBPRIV_PROC_LOCK_MEMORY\fR} privilege is not asserted in the effective
 set of the calling process and \fBMC_LOCK\fR, \fBMC_LOCKAS\fR, \fBMC_UNLOCK\fR,
 or \fBMC_UNLOCKAS\fR was specified.
@@ -455,13 +415,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

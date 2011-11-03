@@ -20,6 +20,7 @@
 #
 
 #
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
@@ -32,7 +33,7 @@ include $(SRC)/Makefile.master
 
 SUBDIRS_CATALOG=	smbutil mount umount share
 SUBDIRS=		$(SUBDIRS_CATALOG) chacl lsacl \
-			smbiod smbiod-svc svc
+			smbiod smbiod-svc svc test
 
 # for messaging catalog files
 #

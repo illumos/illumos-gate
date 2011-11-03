@@ -3,41 +3,37 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_dma_nextcookie 9F "26 Sep 1994" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_DMA_NEXTCOOKIE 9F "Sep 26, 1994"
 .SH NAME
 ddi_dma_nextcookie \- retrieve subsequent DMA cookie
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/ddi.h> 
+#include <sys/ddi.h>
 #include <sys/sunddi.h>
 
 
 
-\fBvoid\fR \fBddi_dma_nextcookie\fR(\fBddi_dma_handle_t\fR \fIhandle\fR, 
+\fBvoid\fR \fBddi_dma_nextcookie\fR(\fBddi_dma_handle_t\fR \fIhandle\fR,
      \fBddi_dma_cookie_t *\fR\fIcookiep\fR);
 .fi
 
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhandle\fR\fR
 .ad
 .RS 11n
-.rt  
 The handle previously allocated by a call to  \fBddi_dma_alloc_handle\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcookiep\fR\fR
 .ad
 .RS 11n
-.rt  
 A pointer to a  \fBddi_dma_cookie\fR(9S) structure.
 .RE
 
@@ -83,17 +79,17 @@ uint_t            ccount;
 
 status = ddi_dma_buf_bind_handle(handle, bp, DDI_DMA_READ,
 	NULL, NULL, &dmacookie, &ccount);
- 
+
 if (status == DDI_DMA_MAPPED) {
 
 	/* program DMA engine with first cookie */
- 
+
 	while (--ccount > 0) {
 		ddi_dma_nextcookie(handle, &dmacookie);
 		/* program DMA engine with next cookie */
 	}
 }
-\&...  
+\&...
 .fi
 .in -2
 

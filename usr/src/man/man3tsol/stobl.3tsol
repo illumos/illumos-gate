@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH stobl 3TSOL "20 Jul 2007" "SunOS 5.11" "Trusted Extensions Library Functions"
+.TH STOBL 3TSOL "Jul 20, 2007"
 .SH NAME
 stobl, stobsl, stobclear \- translate character-coded labels to binary labels
 .SH SYNOPSIS
@@ -71,12 +71,10 @@ is specified in \fIflags\fR.
 The \fIflags\fR argument can take the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNEW_LABEL\fR\fR
 .ad
 .RS 17n
-.rt  
 \fIlabel\fR contents is not used, is formatted as a label of the relevant type,
 and is assumed to be \fBADMIN_LOW\fR for modification changes. If
 \fBNEW_LABEL\fR is not present, \fIlabel\fR is validated as a defined label of
@@ -85,12 +83,10 @@ the correct type dominated by the process's sensitivity label.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNO_CORRECTION\fR\fR
 .ad
 .RS 17n
-.rt  
 No corrections are made if there are errors in the character-coded label
 \fIstring\fR. \fIstring\fR must be complete and contain all the label
 components that are required by the \fBlabel_encodings\fR file. The
@@ -99,12 +95,10 @@ components that are required by the \fBlabel_encodings\fR file. The
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0 (zero)\fR\fR
 .ad
 .RS 17n
-.rt  
 The default action is taken.
 .RE
 
@@ -154,23 +148,19 @@ When these functions return zero, \fIerror\fR contains one of the following
 values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi1\fR\fR
 .ad
 .RS 9n
-.rt  
 Unable to access the \fBlabel_encodings\fR file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 9n
-.rt  
 The label \fIlabel\fR is not valid for this translation and the \fBNEW_LABEL\fR
 or \fBNO_CORRECTION\fR flag was not specified, or the label \fIlabel\fR is not
 dominated by the process's \fIsensitivity label\fR and the process does not
@@ -179,12 +169,10 @@ have \fBPRIV_SYS_TRANS_LABEL\fR in its set of effective privileges.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 9n
-.rt  
 The character-coded label \fIstring\fR is in error. \fIerror\fR is a one-based
 index into \fIstring\fR indicating where the translation error occurred.
 .RE
@@ -192,7 +180,6 @@ index into \fIstring\fR indicating where the translation error occurred.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/security/tsol/label_encodings\fR\fR
 .ad
@@ -210,15 +197,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityObsolete
+Interface Stability	Obsolete
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .sp

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH u8_textprep_str 9F "18 Sep 2007" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH U8_TEXTPREP_STR 9F "Sep 18, 2007"
 .SH NAME
 u8_textprep_str \- string-based UTF-8 text preparation function
 .SH SYNOPSIS
@@ -25,47 +25,39 @@ Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinarray\fR\fR
 .ad
 .RS 20n
-.rt  
 A pointer to a byte array containing a sequence of UTF-8 character bytes to be
 prepared.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinlen\fR\fR
 .ad
 .RS 20n
-.rt  
 As input argument, the number of bytes to be prepared in \fIinarray\fR. As
 output argument, the number of bytes in \fIinarray\fR still not consumed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoutarray\fR\fR
 .ad
 .RS 20n
-.rt  
 A pointer to a byte array where prepared UTF-8 character bytes can be saved.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoutlen\fR\fR
 .ad
 .RS 20n
-.rt  
 As input argument, the number of available bytes at \fIoutarray\fR where
 prepared character bytes can be saved.  As output argument, after the
 conversion, the number of bytes still available at \fIoutarray\fR.
@@ -73,17 +65,14 @@ conversion, the number of bytes still available at \fIoutarray\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflag\fR\fR
 .ad
 .RS 20n
-.rt  
 The possible preparation options constructed by a bitwise-inclusive-OR of the
 following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBU8_TEXTPREP_IGNORE_NULL\fR\fR
 .ad
@@ -99,7 +88,6 @@ consumed for preparation or an error happened.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBU8_TEXTPREP_IGNORE_INVALID\fR\fR
 .ad
@@ -114,7 +102,6 @@ and instead treats such characters as no need to do any preparation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBU8_TEXTPREP_TOUPPER\fR\fR
 .ad
@@ -125,7 +112,6 @@ Map lowercase characters to uppercase characters if applicable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBU8_TEXTPREP_TOLOWER\fR\fR
 .ad
@@ -136,7 +122,6 @@ Map uppercase characters to lowercase characters if applicable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBU8_TEXTPREP_NFD\fR\fR
 .ad
@@ -147,7 +132,6 @@ Apply Unicode Normalization Form D.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBU8_TEXTPREP_NFC\fR\fR
 .ad
@@ -158,7 +142,6 @@ Apply Unicode Normalization Form C.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBU8_TEXTPREP_NFKD\fR\fR
 .ad
@@ -169,7 +152,6 @@ Apply Unicode Normalization Form KD.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBU8_TEXTPREP_NFKC\fR\fR
 .ad
@@ -191,17 +173,14 @@ bytes from input to output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIunicode_version\fR\fR
 .ad
 .RS 20n
-.rt  
 The version of Unicode data that should be used during UTF-8 text preparation.
 The following values are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBU8_UNICODE_320\fR\fR
 .ad
@@ -212,7 +191,6 @@ Use Unicode 3.2.0 data during comparison.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBU8_UNICODE_500\fR\fR
 .ad
@@ -223,7 +201,6 @@ Use Unicode 5.0.0 data during comparison.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBU8_UNICODE_LATEST\fR\fR
 .ad
@@ -236,67 +213,55 @@ Use the latest Unicode version data available which is Unicode 5.0.0 currently.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIerrno\fR\fR
 .ad
 .RS 20n
-.rt  
 The error value when preparation is not completed or fails. The following
 values are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE2BIG\fR\fR
 .ad
 .RS 10n
-.rt  
 Text preparation stopped due to lack of space in the output array.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 10n
-.rt  
 Specified option values are conflicting and cannot be supported.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEILSEQ\fR\fR
 .ad
 .RS 10n
-.rt  
 Text preparation stopped due to an input byte that does not belong to UTF-8.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 Text preparation stopped due to an incomplete UTF-8 character at the end of the
 input array.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBERANGE\fR\fR
 .ad
 .RS 10n
-.rt  
 The specified Unicode version value is not a supported version.
 .RE
 
@@ -406,13 +371,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

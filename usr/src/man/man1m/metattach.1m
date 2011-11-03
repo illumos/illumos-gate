@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH metattach 1M "20 Jun 2006" "SunOS 5.11" "System Administration Commands"
+.TH METATTACH 1M "Jun 20, 2006"
 .SH NAME
 metattach, metadetach \- attach or detach a metadevice
 .SH SYNOPSIS
@@ -105,12 +105,10 @@ Root privileges are required for all of the following options except \fB-h\fR.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR \fIalignment\fR\fR
 .ad
 .RS 16n
-.rt  
 Set the value of the soft partition extent alignment. Use this option when it
 is important specify a starting offset for the soft partition. It preserves the
 data alignment between the metadevice address space and the address space of
@@ -126,12 +124,10 @@ and affecting performance.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 16n
-.rt  
 Force the detaching of metadevices that have components that need maintenance
 or are busy. You can use this option only when a mirror is in a maintenance
 state that can be fixed with \fBmetareplace\fR(1M). If the mirror is in a
@@ -142,23 +138,19 @@ because the mirrors must be resynchronized before one of them can be detached.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 16n
-.rt  
 Display a usage message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIinterlace\fR\fR
 .ad
 .RS 16n
-.rt  
 Specify the interlace value for stripes, where \fBsize\fR is a specified value
 followed by either \fBk\fR for kilobytes, \fBm\fR for megabytes, or \fBb\fR for
 blocks. The units can be either uppercase or lowercase. If \fIsize\fR is not
@@ -169,12 +161,10 @@ forward on all stripes that follow.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIsetname\fR\fR
 .ad
 .RS 16n
-.rt  
 Specify the name of the diskset on which the \fBmetattach\fR command or the
 \fBmetadetach\fR command works.. Using the \fB-s\fR option causes the command
 to perform its administrative function within the specified diskset. Without
@@ -187,12 +177,10 @@ this option, the command performs its function on local metadevices.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcomponent\fR\fR
 .ad
 .RS 17n
-.rt  
 The logical name for the physical slice (partition) on a disk drive, such as
 \fB/dev/dsk/c0t0d0s2\fR, being added to the concatenation, stripe,
 concatenation of stripes, or RAID5 metadevice.
@@ -200,69 +188,57 @@ concatenation of stripes, or RAID5 metadevice.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIconcat/stripe\fR\fR
 .ad
 .RS 17n
-.rt  
 The metadevice name of the concatenation, stripe, or concatenation of stripes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlog\fR\fR
 .ad
 .RS 17n
-.rt  
 The metadevice name of the logging device to be attached to the trans
 metadevice.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImetadevice\fR\fR
 .ad
 .RS 17n
-.rt  
 The metadevice name to be attached to the mirror as a submirror. This
 metadevice must have been previously created by the \fBmetainit\fR command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImirror\fR\fR
 .ad
 .RS 17n
-.rt  
 The name of the mirror.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIRAID\fR\fR
 .ad
 .RS 17n
-.rt  
 The metadevice name of the RAID5 metadevice.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsize\fR | \fIall\fR\fR
 .ad
 .RS 17n
-.rt  
 The amount of space to add to the soft partition in \fBK\fR or \fBk\fR for
 kilobytes, \fBM\fR or \fBm\fR for megabytes, \fBG\fR or \fBg\fR for gigabytes,
 \fBT\fR or \fBt\fR for terabytes, and \fBB\fR or \fBb\fR for blocks (sectors).
@@ -274,34 +250,28 @@ underlying volume.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsoftpart\fR\fR
 .ad
 .RS 17n
-.rt  
 The metadevice name of the existing soft partition.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsubmirror\fR\fR
 .ad
 .RS 17n
-.rt  
 The metadevice name of the submirror to be detached from the mirror.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItrans\fR\fR
 .ad
 .RS 17n
-.rt  
 The metadevice name of the trans metadevice (not the master or logging device).
 .RE
 
@@ -473,23 +443,19 @@ the soft partition is expanded.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -501,13 +467,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStable
+Interface Stability	Stable
 .TE
 
 .SH SEE ALSO

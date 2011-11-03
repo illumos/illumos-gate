@@ -3,18 +3,18 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH get_pktiopb 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH GET_PKTIOPB 9F "Jan 16, 2006"
 .SH NAME
 get_pktiopb, free_pktiopb \- allocate/free a SCSI packet in the iopb map
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/scsi/scsi.h> 
+#include <sys/scsi/scsi.h>
 
 
 
 \fBstruct scsi_pkt *\fR\fBget_pktiopb\fR(\fBstruct scsi_address *\fR\fIap\fR,
-     \fBcaddr_t *\fR\fIdatap\fR, \fBint\fR \fIcdblen\fR, \fBint\fR \fIstatuslen\fR, \fBint\fR \fIdatalen\fR, 
+     \fBcaddr_t *\fR\fIdatap\fR, \fBint\fR \fIcdblen\fR, \fBint\fR \fIstatuslen\fR, \fBint\fR \fIdatalen\fR,
      \fBint\fR \fIreadflag\fR, \fBint (*\fR\fIcallback\fR);
 .fi
 
@@ -32,89 +32,73 @@ of \fBget_pktiopb()\fR. Use \fBscsi_free_consistent_buf\fR(9F) instead of
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIap\fR\fR
 .ad
 .RS 13n
-.rt  
 Pointer to the target's \fBscsi_address\fR structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdatap\fR\fR
 .ad
 .RS 13n
-.rt  
 Pointer to the address of the packet, set by this function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcdblen\fR\fR
 .ad
 .RS 13n
-.rt  
 Number of bytes required for the \fBSCSI \fRcommand descriptor block (CDB).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstatuslen\fR\fR
 .ad
 .RS 13n
-.rt  
 Number of bytes required for the \fBSCSI \fRstatus area.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdatalen\fR\fR
 .ad
 .RS 13n
-.rt  
 Number of bytes required for the data area of the \fBSCSI \fRcommand.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIreadflag\fR\fR
 .ad
 .RS 13n
-.rt  
 If non-zero, data will be transferred from the \fBSCSI \fRtarget.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcallback\fR\fR
 .ad
 .RS 13n
-.rt  
 Pointer to a callback function, or \fBNULL_FUNC\fR or \fBSLEEP_FUNC\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpkt\fR\fR
 .ad
 .RS 13n
-.rt  
 Pointer to a \fBscsi_pkt\fR(9S) structure.
 .RE
 
@@ -133,34 +117,28 @@ and \fBDMA\fR resources.
 not available:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNULL_FUNC\fR\fR
 .ad
 .RS 16n
-.rt  
 Do not wait for resources. Return a \fINULL\fR pointer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLEEP_FUNC\fR\fR
 .ad
 .RS 16n
-.rt  
 Wait indefinitely for resources.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBOther Values\fR
 .ad
 .RS 16n
-.rt  
 \fIcallback\fR points to a function which is called when resources may have
 become available. \fIcallback\fR \fBmust\fR return either \fB0\fR (indicating
 that it attempted to allocate resources but failed to do so again), in which
@@ -197,13 +175,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Stability LevelObsolete
+Stability Level	Obsolete
 .TE
 
 .SH SEE ALSO

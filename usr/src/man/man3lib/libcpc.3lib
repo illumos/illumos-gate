@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libcpc 3LIB "8 Oct 2008" "SunOS 5.11" "Interface Libraries"
+.TH LIBCPC 3LIB "Oct 8, 2008"
 .SH NAME
 libcpc \- CPU performance counter library
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR... ] \fIfile\fR... \fB-lcpc\fR [ \fIlibrary\fR... ] 
+cc [ \fIflag\fR... ] \fIfile\fR... \fB-lcpc\fR [ \fIlibrary\fR... ]
 .fi
 
 .SH DESCRIPTION
@@ -27,63 +27,57 @@ interfaces.
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBcpc_access\fR\fBcpc_bind_cpu\fR
-\fBcpc_bind_curlwp\fR\fBcpc_bind_event\fR
-\fBcpc_bind_pctx\fR\fBcpc_buf_add\fR
-\fBcpc_buf_copy\fR\fBcpc_buf_create\fR
-\fBcpc_buf_destroy\fR\fBcpc_buf_get\fR
-\fBcpc_buf_hrtime\fR\fBcpc_buf_set\fR
-\fBcpc_buf_sub\fR\fBcpc_buf_tick\fR
-\fBcpc_buf_zero\fR\fBcpc_caps\fR
-\fBcpc_cciname\fR\fBcpc_close\fR
-\fBcpc_cpuref\fR\fBcpc_count_sys_events\fR
-\fBcpc_count_usr_events\fR\fBcpc_disable\fR
-\fBcpc_enable\fR\fBcpc_event_accum\fR
-\fBcpc_event_diff\fR\fBcpc_eventtostr\fR
-\fBcpc_getcciname\fR\fBcpc_getcpuref\fR
-\fBcpc_getcpuver\fR\fBcpc_getnpic\fR
-\fBcpc_getusage\fR\fBcpc_npic\fR
-\fBcpc_open\fR\fBcpc_pctx_bind_event\fR
-\fBcpc_pctx_invalidate\fR\fBcpc_pctx_rele\fR
-\fBcpc_pctx_take_sample\fR\fBcpc_rele\fR
-\fBcpc_request_preset\fR\fBcpc_set_add_request\fR
-\fBcpc_set_create\fR\fBcpc_set_destroy\fR
-\fBcpc_set_restart\fR\fBcpc_set_sample\fR
-\fBcpc_seterrfn\fR\fBcpc_seterrhndlr\fR
-\fBcpc_shared_bind_event\fR\fBcpc_shared_close\fR
-\fBcpc_shared_open\fR\fBcpc_shared_rele\fR
-\fBcpc_shared_take_sample\fR\fBcpc_strtoevent\fR
-\fBcpc_take_sample\fR\fBcpc_unbind\fR
-\fBcpc_version\fR\fBcpc_walk_attrs\fR
-\fBcpc_walk_events_all\fR\fBcpc_walk_events_pic\fR
-\fBcpc_walk_generic_events_all\fR\fBcpc_walk_generic_events_pic\fR
-\fBcpc_walk_names\fR\fBcpc_walk_requests\fR
+l l
+l l .
+\fBcpc_access\fR	\fBcpc_bind_cpu\fR
+\fBcpc_bind_curlwp\fR	\fBcpc_bind_event\fR
+\fBcpc_bind_pctx\fR	\fBcpc_buf_add\fR
+\fBcpc_buf_copy\fR	\fBcpc_buf_create\fR
+\fBcpc_buf_destroy\fR	\fBcpc_buf_get\fR
+\fBcpc_buf_hrtime\fR	\fBcpc_buf_set\fR
+\fBcpc_buf_sub\fR	\fBcpc_buf_tick\fR
+\fBcpc_buf_zero\fR	\fBcpc_caps\fR
+\fBcpc_cciname\fR	\fBcpc_close\fR
+\fBcpc_cpuref\fR	\fBcpc_count_sys_events\fR
+\fBcpc_count_usr_events\fR	\fBcpc_disable\fR
+\fBcpc_enable\fR	\fBcpc_event_accum\fR
+\fBcpc_event_diff\fR	\fBcpc_eventtostr\fR
+\fBcpc_getcciname\fR	\fBcpc_getcpuref\fR
+\fBcpc_getcpuver\fR	\fBcpc_getnpic\fR
+\fBcpc_getusage\fR	\fBcpc_npic\fR
+\fBcpc_open\fR	\fBcpc_pctx_bind_event\fR
+\fBcpc_pctx_invalidate\fR	\fBcpc_pctx_rele\fR
+\fBcpc_pctx_take_sample\fR	\fBcpc_rele\fR
+\fBcpc_request_preset\fR	\fBcpc_set_add_request\fR
+\fBcpc_set_create\fR	\fBcpc_set_destroy\fR
+\fBcpc_set_restart\fR	\fBcpc_set_sample\fR
+\fBcpc_seterrfn\fR	\fBcpc_seterrhndlr\fR
+\fBcpc_shared_bind_event\fR	\fBcpc_shared_close\fR
+\fBcpc_shared_open\fR	\fBcpc_shared_rele\fR
+\fBcpc_shared_take_sample\fR	\fBcpc_strtoevent\fR
+\fBcpc_take_sample\fR	\fBcpc_unbind\fR
+\fBcpc_version\fR	\fBcpc_walk_attrs\fR
+\fBcpc_walk_events_all\fR	\fBcpc_walk_events_pic\fR
+\fBcpc_walk_generic_events_all\fR	\fBcpc_walk_generic_events_pic\fR
+\fBcpc_walk_names\fR	\fBcpc_walk_requests\fR
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/libcpc.so.1\fR\fR
 .ad
 .RS 27n
-.rt  
 shared object
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/64/libcpc.so.1\fR\fR
 .ad
 .RS 27n
-.rt  
 64-bit shared object
 .RE
 
@@ -95,12 +89,11 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
-MT-LevelSafe
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

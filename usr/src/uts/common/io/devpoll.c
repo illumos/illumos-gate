@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  */
 
+/* Copyright (c) 2011 by Delphix. All rights reserved. */
 
 #include <sys/types.h>
 #include <sys/devops.h>
@@ -46,7 +47,7 @@
 #define	RESERVED	1
 
 /* local data struct */
-static	dp_entry_t	**devpolltbl; 	/* dev poll entries */
+static	dp_entry_t	**devpolltbl;	/* dev poll entries */
 static	size_t		dptblsize;
 
 static	kmutex_t	devpoll_lock;	/* lock protecting dev tbl */
@@ -238,7 +239,7 @@ dp_pcache_poll(pollfd_t *pfdp, pollcache_t *pcp, nfds_t nfds, int *fdcntp)
 {
 	int		start, ostart, end;
 	int		fdcnt, fd;
-	boolean_t 	done;
+	boolean_t	done;
 	file_t		*fp;
 	short		revent;
 	boolean_t	no_wrap;
@@ -492,7 +493,7 @@ dpopen(dev_t *devp, int flag, int otyp, cred_t *credp)
 static int
 dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 {
-	minor_t 	minor;
+	minor_t		minor;
 	dp_entry_t	*dpep;
 	pollcache_t	*pcp;
 	pollfd_t	*pollfdp, *pfdp;
@@ -691,21 +692,12 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 static int
 dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 {
-	timestruc_t	now;
-	timestruc_t	rqtime;
-	timestruc_t	*rqtp = NULL;
-	int		timecheck = 0;
-	minor_t 	minor;
+	minor_t		minor;
 	dp_entry_t	*dpep;
 	pollcache_t	*pcp;
-	int 		error = 0;
+	int		error = 0;
 	STRUCT_DECL(dvpoll, dvpoll);
 
-	if (cmd == DP_POLL) {
-		/* do this now, before we sleep on DP_WRITER_PRESENT below */
-		timecheck = timechanged;
-		gethrestime(&now);
-	}
 	minor = getminor(dev);
 	mutex_enter(&devpoll_lock);
 	ASSERT(minor < dptblsize);
@@ -730,11 +722,12 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 	switch (cmd) {
 	case	DP_POLL:
 	{
-		pollstate_t *ps;
-		nfds_t	nfds;
-		int	fdcnt = 0;
-		int	time_out;
-		int	rval;
+		pollstate_t	*ps;
+		nfds_t		nfds;
+		int		fdcnt = 0;
+		int		time_out;
+		clock_t		*deltap = NULL;
+		clock_t		delta;
 
 		STRUCT_INIT(dvpoll, mode);
 		error = copyin((caddr_t)arg, STRUCT_BUF(dvpoll),
@@ -747,12 +740,15 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 		time_out = STRUCT_FGET(dvpoll, dp_timeout);
 		if (time_out > 0) {
 			/*
-			 * Determine the future time of the requested timeout.
+			 * cv_relwaituntil_sig operates at the tick
+			 * granularity, which by default is 10 ms.
+			 * This results in rounding user specified
+			 * timeouts up but prevents the system
+			 * from being flooded with small high
+			 * resolution timers.
 			 */
-			rqtp = &rqtime;
-			rqtp->tv_sec = time_out / MILLISEC;
-			rqtp->tv_nsec = (time_out % MILLISEC) * MICROSEC;
-			timespecadd(rqtp, &now);
+			delta = MSEC_TO_TICK_ROUNDUP(time_out);
+			deltap = &delta;
 		}
 
 		if ((nfds = STRUCT_FGET(dvpoll, dp_nfds)) == 0) {
@@ -765,17 +761,19 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 			if (time_out == 0)
 				return (0);
 			mutex_enter(&curthread->t_delay_lock);
-			while ((rval = cv_waituntil_sig(&curthread->t_delay_cv,
-			    &curthread->t_delay_lock, rqtp, timecheck)) > 0)
+			while ((delta = cv_relwaituntil_sig(
+			    &curthread->t_delay_cv, &curthread->t_delay_lock,
+			    deltap, TR_MILLISEC)) > 0) {
 				continue;
+			}
 			mutex_exit(&curthread->t_delay_lock);
-			return ((rval == 0)? EINTR : 0);
+			return (delta == 0 ? EINTR : 0);
 		}
 
 		/*
-		 * XXX It'd be nice not to have to alloc each time.
-		 * But it requires another per thread structure hook.
-		 * Do it later if there is data suggest that.
+		 * XXX It would be nice not to have to alloc each time, but it
+		 * requires another per thread structure hook. This can be
+		 * implemented later if data suggests that it's necessary.
 		 */
 		if ((ps = curthread->t_pollstate) == NULL) {
 			curthread->t_pollstate = pollstate_create();
@@ -820,14 +818,15 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 			 */
 			if (time_out == 0)	/* immediate timeout */
 				break;
-			rval = cv_waituntil_sig(&pcp->pc_cv, &pcp->pc_lock,
-			    rqtp, timecheck);
+
+			delta = cv_relwaituntil_sig(&pcp->pc_cv, &pcp->pc_lock,
+			    deltap, TR_MILLISEC);
 			/*
 			 * If we were awakened by a signal or timeout
 			 * then break the loop, else poll again.
 			 */
-			if (rval <= 0) {
-				if (rval == 0)	/* signal */
+			if (delta <= 0) {
+				if (delta == 0)	/* signal */
 					error = EINTR;
 				break;
 			}
@@ -915,7 +914,7 @@ dppoll(dev_t dev, short events, int anyyet, short *reventsp,
 static int
 dpclose(dev_t dev, int flag, int otyp, cred_t *credp)
 {
-	minor_t 	minor;
+	minor_t		minor;
 	dp_entry_t	*dpep;
 	pollcache_t	*pcp;
 	int		i;

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_dma_coff 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_DMA_COFF 9F "Jan 16, 2006"
 .SH NAME
 ddi_dma_coff \- convert a DMA cookie to an offset within a DMA handle.
 .SH SYNOPSIS
@@ -26,23 +26,19 @@ Solaris SPARC DDI (Solaris SPARC DDI). This interface is obsolete.
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhandle\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fIhandle\fR filled in by a call to \fBddi_dma_setup\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcookiep\fR\fR
 .ad
 .RS 11n
-.rt  
 A pointer to a \fBDMA\fR cookie (see \fBddi_dma_cookie\fR(9S)) that contains
 the appropriate address, length and bus type to be used in programming the
 \fBDMA\fR engine.
@@ -50,12 +46,10 @@ the appropriate address, length and bus type to be used in programming the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoffp\fR\fR
 .ad
 .RS 11n
-.rt  
 A pointer to an offset to be filled in.
 .RE
 
@@ -77,23 +71,19 @@ for \fBDMA\fR.
 The \fBddi_dma_coff()\fR function returns:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 15n
-.rt  
 Successfully filled in \fIoffp\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 15n
-.rt  
 Failed to successfully fill in \fIoffp\fR.
 .RE
 
@@ -110,13 +100,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityObsolete
+Interface Stability	Obsolete
 .TE
 
 .SH SEE ALSO

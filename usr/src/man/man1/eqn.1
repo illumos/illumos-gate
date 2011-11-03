@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH eqn 1 "12 Jul 2002" "SunOS 5.11" "User Commands"
+.TH EQN 1 "Jul 12, 2002"
 .SH NAME
 eqn, neqn, checkeq \- typeset mathematics test
 .SH SYNOPSIS
@@ -58,12 +58,10 @@ treated as \fBeqn\fR input.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fIxy\fR \fR
 .ad
 .RS 9n
-.rt  
 Sets equation delimiters set to characters \fIx\fR and \fIy\fR with the
 command-line argument. The more common way to do this is with \fBdelim\fR\fI
 xy\fR between \fB\&.EQ\fR and \fB\&.EN\fR. The left and right delimiters may be
@@ -74,12 +72,10 @@ text. All text that is neither between delimiters nor between \fB\&.EQ\fR and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fIn\fR \fR
 .ad
 .RS 9n
-.rt  
 Changes font to \fIn\fR globally in the document. The font can also be changed
 globally in the body of the document by using the \fBgfont\fR\fI n\fR
 directive, where \fIn\fR is the font specification.
@@ -87,12 +83,10 @@ directive, where \fIn\fR is the font specification.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fIn\fR \fR
 .ad
 .RS 9n
-.rt  
 Reduces subscripts and superscripts by \fIn\fR point sizes from the previous
 size.  In the absence of the \fB-p\fR option, subscripts and superscripts are
 reduced by 3 point sizes from the previous size.
@@ -100,12 +94,10 @@ reduced by 3 point sizes from the previous size.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fIn\fR \fR
 .ad
 .RS 9n
-.rt  
 Changes point size to \fIn\fR globally in the document. The point size can also
 be changed globally in the body of the document by using the \fBgsize\fR\fI
 n\fR directive, where  \fIn\fR is the point size.
@@ -117,12 +109,10 @@ n\fR directive, where  \fIn\fR is the point size.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR \fR
 .ad
 .RS 9n
-.rt  
 The nroff or troff file processed by \fBeqn\fR or \fBneqn\fR.
 .RE
 
@@ -142,7 +132,6 @@ tilde (\fB~\fR) represents a full SPACE in the output; a circumflex (\fB^\fR)
 half as much.
 .sp
 .ne 2
-.mk
 .na
 \fBSubscripts and superscripts:\fR
 .ad
@@ -151,12 +140,10 @@ half as much.
 These are produced with the keywords \fBsub\fR and \fBsup\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBx sub i\fR\fR
 .ad
 .RS 29n
-.rt  
 makes
 .EQ
 delim $$
@@ -167,12 +154,10 @@ $x sub i$
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBa sub i sup 2\fR  \fR
 .ad
 .RS 29n
-.rt  
 produces
 .EQ
 delim $$
@@ -183,12 +168,10 @@ $a sub i sup 2$
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBe sup {x sup 2 + y sup 2}\fR\fR
 .ad
 .RS 29n
-.rt  
 gives e^(x^2+y^2)
 .sp
 .RE
@@ -197,7 +180,6 @@ gives e^(x^2+y^2)
 
 .sp
 .ne 2
-.mk
 .na
 \fBFractions:\fR
 .ad
@@ -206,12 +188,10 @@ gives e^(x^2+y^2)
 Fractions are made with \fBover\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBa over b\fR \fR
 .ad
 .RS 13n
-.rt  
 yields
 .EQ
 delim $$
@@ -224,7 +204,6 @@ $a over b$
 
 .sp
 .ne 2
-.mk
 .na
 \fBSquare Roots:\fR
 .ad
@@ -233,7 +212,6 @@ $a over b$
 These are made with \fBsqrt\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1 over sqrt {ax sup 2 +bx+c}\fR  \fR
 .ad
@@ -251,7 +229,6 @@ $1 over sqrt {ax sup 2 +bx+c}$
 
 .sp
 .ne 2
-.mk
 .na
 \fBLimits:\fR
 .ad
@@ -261,7 +238,6 @@ The keywords \fBfrom\fR and \fBto\fR introduce lower and upper limits on
 arbitrary things:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlim from {n\(-> inf } sum from 0 to n x sub i\fR\fR
 .ad
@@ -279,7 +255,6 @@ $lim from {n\(-> inf } sum from 0 to n x sub i$
 
 .sp
 .ne 2
-.mk
 .na
 \fBBrackets and Braces:\fR
 .ad
@@ -289,7 +264,6 @@ Left and right brackets, braces, and the like, of the right height are made
 with \fBleft\fR and \fBright\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBleft [ x sup 2 + y sup 2 over alpha right ] ~=~1\fR  \fR
 .ad
@@ -311,7 +285,6 @@ floor, and \fB""\fR for nothing at all (useful for a right-side-only bracket).
 
 .sp
 .ne 2
-.mk
 .na
 \fBVertical piles:\fR
 .ad
@@ -321,12 +294,10 @@ Vertical piles of things are made with  \fBpile\fR, \fBlpile\fR, \fBcpile\fR,
 and \fBrpile\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpile {a above b above c}\fR\fR
 .ad
 .RS 28n
-.rt  
  produces
 .EQ
 delim $$
@@ -343,7 +314,6 @@ spacing, and \fBrpile\fR right justifies.
 
 .sp
 .ne 2
-.mk
 .na
 \fBMatrices:\fR
 .ad
@@ -352,7 +322,6 @@ spacing, and \fBrpile\fR right justifies.
 Matrices are made with \fBmatrix\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmatrix { lcol { x sub i above y sub 2 } ccol { 1 above 2 } }\fR \fR
 .ad
@@ -372,7 +341,6 @@ In addition, there is \fBrcol\fR for a right-justified column.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDiacritical marks:\fR
 .ad
@@ -382,12 +350,10 @@ Diacritical marks are made with \fBdot\fR, \fBdotdot\fR, \fBhat\fR,
 \fBtilde\fR, \fBbar\fR, \fBvec\fR, \fBdyad\fR, and \fBunder\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBx dot = f(t) bar\fR\fR
 .ad
 .RS 28n
-.rt  
  is
 .EQ
 delim $$
@@ -398,12 +364,10 @@ $x dot = f(t) bar$
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBy dotdot bar ~=~ n under\fR\fR
 .ad
 .RS 28n
-.rt  
  is
 .EQ
 delim $$
@@ -414,12 +378,10 @@ $y dotdot bar ~=~ n under$
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBx vec ~=~ y dyad\fR \fR
 .ad
 .RS 28n
-.rt  
 is
 .EQ
 delim $$
@@ -432,7 +394,6 @@ $x vec ~=~ y dyad$
 
 .sp
 .ne 2
-.mk
 .na
 \fBSizes and Fonts:\fR
 .ad
@@ -447,7 +408,6 @@ Sizes and font can be changed with \fBsize\fR \fIn\fR or \fBsize\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fBSuccessive display arguments:\fR
 .ad
@@ -460,7 +420,6 @@ that is to line up vertically in subsequent equations.
 
 .sp
 .ne 2
-.mk
 .na
 \fBShorthands:\fR
 .ad
@@ -470,7 +429,6 @@ Shorthands may be defined or existing keywords redefined with
 \fBdefine\fR\fI:\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdefine\fR\fI thing \fR\fB%\fR\fI replacement \fR\fB%\fR \fR
 .ad
@@ -485,7 +443,6 @@ character that does not occur in \fIreplacement\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBKeywords and Shorthands:\fR
 .ad
@@ -497,7 +454,6 @@ Keywords like \fBsum\fR \fBint\fR \fBinf\fR and shorthands like \fB>=\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fBGreek letters:\fR
 .ad
@@ -509,7 +465,6 @@ Greek letters are spelled out in the desired case, as in \fBalpha\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fBMathematical words:\fR
 .ad

@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH getty 1M "14 Sep 1992" "SunOS 5.11" "System Administration Commands"
+.TH GETTY 1M "Sep 14, 1992"
 .SH NAME
 getty \- set terminal type, modes, speed, and line discipline
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/lib/saf/ttymon\fR [\fB-h\fR] [\fB-t\fR \fItimeout\fR] \fIline\fR 
+\fB/usr/lib/saf/ttymon\fR [\fB-h\fR] [\fB-t\fR \fItimeout\fR] \fIline\fR
      [\fIspeed\fR [\fItype\fR [\fIlinedisc\fR]]]
 .fi
 
@@ -49,36 +49,30 @@ determined by what it finds in \fB/etc/ttydefs \fR.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 14n
-.rt  
 If the \fB-h\fR flag is not set, a hangup will be forced by setting the speed
 to zero before setting the speed to the default or a specified speed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fI timeout\fR\fR
 .ad
 .RS 14n
-.rt  
 Specifies that \fBgetty\fR should exit if the open on the line succeeds and no
 one types anything in  \fItimeout\fR seconds.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fI file\fR\fR
 .ad
 .RS 14n
-.rt  
 The \fB-c\fR option is no longer supported. Instead use
 \fB/usr/sbin/sttydefs\fR \fB-l\fR to list the contents of the
 \fB/etc/ttydefs\fR file and perform a validity check on the file.
@@ -90,12 +84,10 @@ The \fB-c\fR option is no longer supported. Instead use
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIline\fR\fR
 .ad
 .RS 21n
-.rt  
 The name of a  \fBTTY\fR line in  \fB/dev\fR to which \fBgetty\fR is to attach
 itself. \fBgetty\fR uses this string as the name of a file in the \fB/dev\fR
 directory to open for reading and writing.
@@ -103,12 +95,10 @@ directory to open for reading and writing.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIspeed\fR\fR
 .ad
 .RS 21n
-.rt  
 The  \fIspeed\fR argument is a label to a speed and  \fBTTY\fR definition in
 the file \fB/etc/ttydefs\fR. This definition tells \fBgetty\fR at what speed to
 run initially,  what the initial \fBTTY\fR settings are, and what speed to try
@@ -118,25 +108,21 @@ inappropriate). The default \fIspeed\fR is 300 baud.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItype\fR and \fIlinedisc\fR\fR
 .ad
 .RS 21n
-.rt  
 These options are obsolete and will be ignored.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ttydefs\fR\fR
 .ad
 .RS 16n
-.rt  
- 
+
 .RE
 
 .SH SEE ALSO

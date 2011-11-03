@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH port_send 3C "24 Oct 2007" "SunOS 5.11" "Standard C Library Functions"
+.TH PORT_SEND 3C "Oct 24, 2007"
 .SH NAME
 port_send, port_sendn \- send a user-defined event to a port or list of ports
 .SH SYNOPSIS
@@ -65,12 +65,10 @@ successfully sent.  If an error occurs, the \fBport_sendn()\fR function returns
 The \fBport_send()\fR and \fBport_sendn()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 10n
-.rt  
 The maximum number of events per port is exceeded.  The maximum allowable
 number of events per port is the minimum value of the
 \fBprocess.max-port-events\fR resource control at the time
@@ -79,34 +77,28 @@ number of events per port is the minimum value of the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 10n
-.rt  
 The port file descriptor is not valid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADFD\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIport\fR argument is not an event port file descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 There is not enough memory available to satisfy the request.
 .RE
 
@@ -115,23 +107,19 @@ There is not enough memory available to satisfy the request.
 The \fBport_sendn()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIports\fR[] pointer or \fIerrors\fR[] pointer is not reasonable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The value of the \fInent\fR argument is 0.
 .RE
 
@@ -151,7 +139,7 @@ structure are the same as the corresponding user and events arguments of the
 .in +2
 .nf
 #include <port.h>
- 
+
 int             myport;
 port_event_t    pe;
 struct timespec timeout;
@@ -217,17 +205,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Architectureall
+Architecture	all
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelAsync-Signal-Safe
+MT-Level	Async-Signal-Safe
 .TE
 
 .SH SEE ALSO

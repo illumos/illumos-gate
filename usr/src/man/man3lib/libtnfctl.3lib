@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libtnfctl 3LIB "22 May 2003" "SunOS 5.11" "Interface Libraries"
+.TH LIBTNFCTL 3LIB "May 22, 2003"
 .SH NAME
 libtnfctl \- TNF probe control library
 .SH SYNOPSIS
@@ -28,46 +28,40 @@ interfaces.
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBtnfctl_buffer_alloc\fR\fBtnfctl_buffer_dealloc\fR
-\fBtnfctl_check_libs\fR\fBtnfctl_close\fR
-\fBtnfctl_continue\fR\fBtnfctl_exec_open\fR
-\fBtnfctl_filter_list_add\fR\fBtnfctl_filter_list_delete\fR
-\fBtnfctl_filter_list_get\fR\fBtnfctl_filter_state_set\fR
-\fBtnfctl_indirect_open\fR\fBtnfctl_internal_open\fR
-\fBtnfctl_kernel_open\fR\fBtnfctl_pid_open\fR
-\fBtnfctl_probe_apply\fR\fBtnfctl_probe_apply_ids\fR
-\fBtnfctl_probe_connect\fR\fBtnfctl_probe_disable\fR
-\fBtnfctl_probe_disconnect_all\fR\fBtnfctl_probe_enable\fR
-\fBtnfctl_probe_state_get\fR\fBtnfctl_probe_trace\fR
-\fBtnfctl_probe_untrace\fR\fBtnfctl_register_funcs\fR
-\fBtnfctl_strerror\fR\fBtnfctl_trace_attrs_get\fR
-\fBtnfctl_trace_state_set\fR
+l l
+l l .
+\fBtnfctl_buffer_alloc\fR	\fBtnfctl_buffer_dealloc\fR
+\fBtnfctl_check_libs\fR	\fBtnfctl_close\fR
+\fBtnfctl_continue\fR	\fBtnfctl_exec_open\fR
+\fBtnfctl_filter_list_add\fR	\fBtnfctl_filter_list_delete\fR
+\fBtnfctl_filter_list_get\fR	\fBtnfctl_filter_state_set\fR
+\fBtnfctl_indirect_open\fR	\fBtnfctl_internal_open\fR
+\fBtnfctl_kernel_open\fR	\fBtnfctl_pid_open\fR
+\fBtnfctl_probe_apply\fR	\fBtnfctl_probe_apply_ids\fR
+\fBtnfctl_probe_connect\fR	\fBtnfctl_probe_disable\fR
+\fBtnfctl_probe_disconnect_all\fR	\fBtnfctl_probe_enable\fR
+\fBtnfctl_probe_state_get\fR	\fBtnfctl_probe_trace\fR
+\fBtnfctl_probe_untrace\fR	\fBtnfctl_register_funcs\fR
+\fBtnfctl_strerror\fR	\fBtnfctl_trace_attrs_get\fR
+\fBtnfctl_trace_state_set\fR	
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/libtnfctl.so.1\fR\fR
 .ad
 .RS 30n
-.rt  
 shared object
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/64/libtnfctl.so.1\fR\fR
 .ad
 .RS 30n
-.rt  
 64-bit shared object
 .RE
 
@@ -79,13 +73,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelMT-Safe with exceptions
+MT-Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO

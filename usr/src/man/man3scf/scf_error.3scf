@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH scf_error 3SCF "20 Aug 2007" "SunOS 5.11" "Service Configuration Facility Library Functions"
+.TH SCF_ERROR 3SCF "Aug 20, 2007"
 .SH NAME
 scf_error, scf_strerror \- error interface to Service Configuration Facility
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <libscf.h>
 
 \fBscf_error_t\fR \fBscf_error\fR(\fBvoid\fR);
@@ -37,7 +37,6 @@ error.
 The error values are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_BACKEND_ACCESS\fR\fR
 .ad
@@ -49,7 +48,6 @@ for the operation denied access.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_BACKEND_READONLY\fR\fR
 .ad
@@ -63,7 +61,6 @@ filesystem that contains it is mounted read-only. See \fBmount\fR(1M)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_CONNECTION_BROKEN\fR\fR
 .ad
@@ -74,7 +71,6 @@ The connection to repository is broken.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_CONSTRAINT_VIOLATED\fR\fR
 .ad
@@ -85,7 +81,6 @@ A required constraint was not met.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_DELETED\fR\fR
 .ad
@@ -96,7 +91,6 @@ Object was deleted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_EXISTS\fR\fR
 .ad
@@ -107,7 +101,6 @@ The object already exists.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_HANDLE_DESTROYED\fR\fR
 .ad
@@ -118,7 +111,6 @@ An object was bound to a destroyed handle.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_HANDLE_MISMATCH\fR\fR
 .ad
@@ -129,7 +121,6 @@ Objects from different SCF handles were used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_IN_USE\fR\fR
 .ad
@@ -140,7 +131,6 @@ The object is currently in use.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_INTERNAL\fR\fR
 .ad
@@ -151,7 +141,6 @@ An internal error occurred.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
 .ad
@@ -162,7 +151,6 @@ An argument is invalid.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NO_MEMORY\fR\fR
 .ad
@@ -173,7 +161,6 @@ No memory is available.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NO_RESOURCES\fR\fR
 .ad
@@ -184,7 +171,6 @@ The repository server is out of resources.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NO_SERVER\fR\fR
 .ad
@@ -195,7 +181,6 @@ The repository server is unavailable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NONE\fR\fR
 .ad
@@ -206,7 +191,6 @@ No error occurred.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_BOUND\fR\fR
 .ad
@@ -217,7 +201,6 @@ The handle is not bound.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_FOUND\fR\fR
 .ad
@@ -228,7 +211,6 @@ Nothing of that name was found.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_SET\fR\fR
 .ad
@@ -239,7 +221,6 @@ Cannot use unset value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_PERMISSION_DENIED\fR\fR
 .ad
@@ -251,7 +232,6 @@ The user lacks sufficient authority to conduct the requested operation. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_TYPE_MISMATCH\fR\fR
 .ad
@@ -262,7 +242,6 @@ The type does not match value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_VERSION_MISMATCH\fR\fR
 .ad
@@ -286,15 +265,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

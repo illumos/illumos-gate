@@ -4,18 +4,18 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ldterm 7M "7 Jun1999" "SunOS 5.11" "STREAMS Modules"
+.TH LDTERM 7M "Jun 7, 1999"
 .SH NAME
 ldterm \- standard STREAMS terminal line discipline module
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/stream.h> 
+#include <sys/stream.h>
 .fi
 
 .LP
 .nf
-#include <sys/termios.h> 
+#include <sys/termios.h>
 .fi
 
 .LP
@@ -52,12 +52,10 @@ messages on the read- and write-side.
 Various types of STREAMS messages are processed as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM_BREAK\fR \fR
 .ad
 .RS 12n
-.rt  
 Depending on the state of the \fBBRKINT\fR flag, either an interrupt signal is
 generated or the message is treated as if it were an \fBM_DATA\fR message
 containing a single \fBASCII NUL\fR character when this message is received.
@@ -65,12 +63,10 @@ containing a single \fBASCII NUL\fR character when this message is received.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM_DATA\fR \fR
 .ad
 .RS 12n
-.rt  
 This message is normally processed using the standard \fBtermio\fR input
 processing. If the \fBICANON\fR flag is set, a single input record (``line'')
 is accumulated in an internal buffer and sent upstream when a line-terminating
@@ -100,24 +96,20 @@ All other messages are passed upstream unchanged.
 Various types of \fBSTREAMS\fR messages are processed as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM_FLUSH\fR \fR
 .ad
 .RS 13n
-.rt  
 The write queue of the module is flushed of all its data messages and the
 message is passed downstream.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM_IOCTL\fR \fR
 .ad
 .RS 13n
-.rt  
 The function of this \fBioctl\fR is performed and the message is passed
 downstream in most cases.  The \fBTCFLSH\fR and \fBTCXONC\fR \fBioctls\fR can
 be performed entirely in the  \fBldterm\fR module, so the reply is sent
@@ -126,12 +118,10 @@ upstream and the message is not passed downstream.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM_DATA\fR \fR
 .ad
 .RS 13n
-.rt  
 If the \fBOPOST\fR flag is set, or both the \fBXCASE\fR and \fBICANON\fR flags
 are set, output processing is performed and the processed message is passed
 downstream along with any \fBM_DELAY\fR messages generated.  Otherwise, the
@@ -140,12 +130,10 @@ message is passed downstream without change.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM_CTL\fR \fR
 .ad
 .RS 13n
-.rt  
 If the size of the data buffer associated with the message is the size of
 \fBstruct iocblk\fR, \fBldterm\fR will perform functional negotiation to
 determine where the \fBtermio\fR(7I) processing is to be done. If the command
@@ -167,12 +155,10 @@ is passed upstream.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM_FLUSH\fR \fR
 .ad
 .RS 13n
-.rt  
 The read queue of the module is flushed of all its data messages and all data
 in the record being accumulated are also flushed.  The message is passed
 upstream.
@@ -180,12 +166,10 @@ upstream.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM_IOCACK\fR \fR
 .ad
 .RS 13n
-.rt  
 The data contained within the message, which is to be returned to the process,
 are augmented if necessary, and the message is passed upstream.
 .RE
@@ -200,7 +184,6 @@ All other messages are passed downstream unchanged.
 ioctls. All others are passed downstream.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTCGETS/TCGETA\fR \fR
 .ad
@@ -213,7 +196,6 @@ acknowledgement is passed upstream.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTCSETS/TCSETSW/TCSETSF/TCSETA/TCSETAW/TCSETAF\fR \fR
 .ad
@@ -231,7 +213,6 @@ additional processing.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTCFLSH\fR \fR
 .ad
@@ -248,7 +229,6 @@ placed on the read queue.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTCXONC\fR \fR
 .ad
@@ -264,7 +244,6 @@ downstream.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTCSBRK\fR \fR
 .ad
@@ -276,7 +255,6 @@ and then send an \fBM_IOCACK\fR message upstream.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEUC_WSET\fR \fR
 .ad
@@ -293,7 +271,6 @@ the line discipline changes into \fBEUC \fRhandling mode once the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEUC_WGET\fR \fR
 .ad

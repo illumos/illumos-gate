@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH inetconv 1M "21 Oct 2004" "SunOS 5.11" "System Administration Commands"
+.TH INETCONV 1M "Oct 21, 2004"
 .SH NAME
 inetconv \- convert \fBinetd.conf\fR entries into smf service manifests, import
 them into smf repository
@@ -67,34 +67,28 @@ The input file is left untouched by the conversion process.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-?\fR\fR
 .ad
 .RS 14n
-.rt  
 Display a usage message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 14n
-.rt  
 Enable \fBsmf\fR services which are listed in the input file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 14n
-.rt  
 If a service manifest of the same name as the one to be generated is found in
 the destination directory, \fBinetconv\fR will overwrite that manifest if this
 option is specified. Otherwise, an error message is generated and the
@@ -103,24 +97,20 @@ conversion of that service is not performed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIsrcfile\fR\fR
 .ad
 .RS 14n
-.rt  
 Permits the specification of an alternate input file \fIsrcfile\fR. If this
 option is not specified, then the \fBinetd.conf\fR(4) file is used as input.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 14n
-.rt  
 Turns off the auto-import of the manifests generated during the conversion
 process. Later, if you want to import a generated manifest into the
 \fBsmf\fR(5) repository, you can do so through the use of the \fBsvccfg\fR(1M)
@@ -132,12 +122,10 @@ If the \fB-e\fR option is specified, the \fB-n\fR option only displays the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 14n
-.rt  
 Permits the specification of an alternate destination directory \fIdestdir\fR
 for the generated manifests. If this option is not specified, then the
 manifests are placed in \fB/var/svc/manifest/network/rpc\fR, if the service is
@@ -186,64 +174,53 @@ telnet -> /var/tmp/telnet-tcp6.xml
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Operation completed successfully (no errors).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 Invalid options specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 One or more service lines are malformed, and thus no manifest(s) were generated
 for them.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 5n
-.rt  
 An error occurred importing one or more of the generated manifests.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB4\fR\fR
 .ad
 .RS 5n
-.rt  
 A system error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/svc/manifest/network/{rpc}/\fI<svcname>\fR-\fI<proto>\fR\&.xml\fR\fR
 .ad
@@ -260,13 +237,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

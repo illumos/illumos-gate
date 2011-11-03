@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sasl_client_step 3SASL "28 Aug 2003" "SunOS 5.11" "Simple Authentication Security Layer Library Functions"
+.TH SASL_CLIENT_STEP 3SASL "Aug 28, 2003"
 .SH NAME
 sasl_client_step \- acquire an auxiliary property context
 .SH SYNOPSIS
@@ -42,41 +42,34 @@ as before, but it will have been filled in by the application.
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIconn\fR\fR
 .ad
 .RS 16n
-.rt  
 The SASL connection context.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIserverin\fR\fR
 .ad
 .RS 16n
-.rt  
 The data given by the server. The data is decoded if the protocol encodes
 requests sent over the wire.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIserverinlen\fR\fR
 .ad
 .RS 16n
-.rt  
 The length of the \fIserverin\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIclientout\fR\fR
 .ad
@@ -85,7 +78,6 @@ The length of the \fIserverin\fR.
 \fB\fIclientoutlen\fR\fR
 .ad
 .RS 16n
-.rt  
 \fIclientout\fR and \fIclientoutlen\fR are created. They contain the initial
 client response to send to the server. It is the job of the client to send them
 over the network to the server. Any protocol specific encodingthat is
@@ -94,12 +86,10 @@ necessary, for example \fBbase64\fR encoding, must be done by the client.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprompt_need\fR\fR
 .ad
 .RS 16n
-.rt  
 A list of prompts that are needed to continue, if necessary.
 .RE
 
@@ -111,36 +101,30 @@ code.
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_OK\fR\fR
 .ad
 .RS 17n
-.rt  
 The call to \fBsasl_client_start()\fR was successful. Authentication is
 complete.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_CONTINUE\fR\fR
 .ad
 .RS 17n
-.rt  
 The call to \fBsasl_client_start()\fR was successful, but at least one more
 step is required for authentication.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_INTERACT\fR\fR
 .ad
 .RS 17n
-.rt  
 The library requires some values before \fBsasl_client_step()\fR can proceed.
 .RE
 
@@ -157,15 +141,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

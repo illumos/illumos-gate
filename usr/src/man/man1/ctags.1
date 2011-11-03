@@ -1,13 +1,13 @@
 '\" te
 .\"  Copyright 1989 AT&T Copyright (c) 1980 Regents of the University of California.  Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ctags 1 "18 Mar 1997" "SunOS 5.11" "User Commands"
+.TH CTAGS 1 "Mar 18, 1997"
 .SH NAME
 ctags \- create a tags file for use with ex and vi
 .SH SYNOPSIS
@@ -61,69 +61,57 @@ The precedence of the options that pertain to printing is \fB-x\fR, \fB-v\fR,
 then the remaining options. The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 15n
-.rt  
 Appends output to an existing \fBtags\fR file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-B\fR\fR
 .ad
 .RS 15n
-.rt  
 Uses backward searching patterns (\fB?\fR.\|.\|.\|\fB?\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fItagsfile\fR\fR
 .ad
 .RS 15n
-.rt  
 Places the tag descriptions in a file called \fItagsfile\fR instead of
 \fBtags\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
 .RS 15n
-.rt  
 Uses forward searching patterns (\fB/\fR.\|.\|.\|\fB/\fR) (default).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 15n
-.rt  
 Creates tags for typedefs. \fB/usr/xpg4/bin/ctags\fR creates tags for typedefs
 by default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
 .RS 15n
-.rt  
 Updates the specified files in tags, that is, all references to them are
 deleted, and the new values are appended to the file. Beware: this option is
 implemented in a way that is rather slow; it is usually faster to simply
@@ -132,12 +120,10 @@ rebuild the \fBtags\fR file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 15n
-.rt  
 Produces on the standard output an index listing the function name, file name,
 and page number (assuming 64 line pages). Since the output will be sorted into
 lexicographic order, it may be desired to run the output through \fBsort\fR
@@ -146,23 +132,19 @@ lexicographic order, it may be desired to run the output through \fBsort\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR\fR
 .ad
 .RS 15n
-.rt  
 Suppresses warning diagnostics.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 15n
-.rt  
 Produces a list of object names, the line number and file name on which each is
 defined, as well as the text of that line and prints this on the standard
 output. This is a simple index which can be printed out as an off-line readable
@@ -175,36 +157,30 @@ function index.
 The following \fIfile\fR operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fB\&.c\fR\fR
 .ad
 .RS 12n
-.rt  
 Files with basenames ending with the \fB\&.c\fR suffix are treated as
 C-language source code.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fB\&.h\fR\fR
 .ad
 .RS 12n
-.rt  
 Files with basenames ending with the \fB\&.h\fR suffix are treated as
 C-language source code.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fB\&.f\fR\fR
 .ad
 .RS 12n
-.rt  
 Files with basenames ending with the \fB\&.f\fR suffix are treated as
 FORTRAN-language source code.
 .RE
@@ -265,53 +241,45 @@ that affect the execution of \fBctags\fR: \fBLANG\fR, \fBLC_ALL\fR,
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtags\fR\fR
 .ad
 .RS 8n
-.rt  
 output tags file
 .RE
 
 .SH ATTRIBUTES
 .sp
-.LP
 .SS "/usr/xpg4/bin/ctags"
 .sp
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

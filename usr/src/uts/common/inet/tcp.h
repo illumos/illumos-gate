@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -334,11 +335,26 @@ typedef struct tcp_s {
 	} tcp_conn;
 	uint32_t tcp_syn_rcvd_timeout;	/* How many SYN_RCVD timeout in q0 */
 
-	/* TCP Keepalive Timer members */
+	/*
+	 * TCP Keepalive Timer members.
+	 * All keepalive timer intervals are in milliseconds.
+	 */
 	int32_t	tcp_ka_last_intrvl;	/* Last probe interval */
 	timeout_id_t tcp_ka_tid;	/* Keepalive timer ID */
 	uint32_t tcp_ka_interval;	/* Keepalive interval */
+
+	/*
+	 * TCP connection is terminated if we don't hear back from the peer
+	 * for tcp_ka_abort_thres milliseconds after the first keepalive probe.
+	 * tcp_ka_rinterval is the interval in milliseconds between successive
+	 * keepalive probes. tcp_ka_cnt is the number of keepalive probes to
+	 * be sent before terminating the connection, if we don't hear back from
+	 * peer.
+	 * tcp_ka_abort_thres = tcp_ka_rinterval * tcp_ka_cnt
+	 */
+	uint32_t tcp_ka_rinterval;	/* keepalive retransmit interval */
 	uint32_t tcp_ka_abort_thres;	/* Keepalive abort threshold */
+	uint32_t tcp_ka_cnt;		/* count of keepalive probes */
 
 	int32_t	tcp_client_errno;	/* How the client screwed up */
 

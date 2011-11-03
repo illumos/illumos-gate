@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH net_hook_register 9F "1 May 2008" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH NET_HOOK_REGISTER 9F "May 1, 2008"
 .SH NAME
 net_hook_register \- add a hook to be called in event processing
 .SH SYNOPSIS
@@ -21,23 +21,19 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fInet\fR\fR
 .ad
 .RS 8n
-.rt  
 value returned from a successful call to \fBnet_protocol_register()\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhook\fR\fR
 .ad
 .RS 8n
-.rt  
 pointer to a \fBhook_t\fR structure.
 .RE
 
@@ -59,58 +55,48 @@ The \fBhook_t\fR structure passed in with this function is described by
 \fBhook_t\fR(9S). The following describes how this structure is used.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBh_func\fR\fR
 .ad
 .RS 23n
-.rt  
 Must be non-NULL and represent a function that fits the specified interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBh_name\fR\fR
 .ad
 .RS 23n
-.rt  
 Gives the hook a name that represents its owner. No duplication of \fBh_name\fR
 among the hooks present for an event is allowed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBh_flags\fR\fR
 .ad
 .RS 23n
-.rt  
 Currently unused and must be set to 0.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBh_hint, h_hintvalue\fR\fR
 .ad
 .RS 23n
-.rt  
 Specify a hint to \fBnet_hook_register()\fR on how to insert this hook. If the
 hint cannot be specified, then an error is returned.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBh_arg;\fR\fR
 .ad
 .RS 23n
-.rt  
 May take any value that the consumer wishes to have passed back when the hook
 is activated.
 .RE
@@ -122,56 +108,46 @@ If the \fBnet_hook_register()\fR function succeeds, 0 is returned. Otherwise,
 one of the following errors is returned:
 .sp
 .ne 2
-.mk
 .na
 \fBENOMEM\fR
 .ad
 .RS 10n
-.rt  
 The system cannot allocate any more memory to support registering this hook.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBENXIO\fR
 .ad
 .RS 10n
-.rt  
 A hook cannot be found among the given family of events.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBEEXIST\fR
 .ad
 .RS 10n
-.rt  
 A hook with the given \fBh_name\fR already exists on that event.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBESRCH\fR
 .ad
 .RS 10n
-.rt  
 A before or after dependency cannot be satisfied due to the hook with
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBEBUSY\fR
 .ad
 .RS 10n
-.rt  
 The \fBh_hint\fR field specifies a hint that cannot currently be satisfied
 because it conflicts with another hook. An example of this might be specifying
 \fBHH_FIRST\fR or \fBHH_LAST\fR when another hook has already been registered
@@ -191,13 +167,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

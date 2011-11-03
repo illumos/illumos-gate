@@ -21,6 +21,7 @@
 
 /*
  *  Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+ *  Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
 
 /*
@@ -686,7 +687,6 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(st_drivetype scsi_address))
 /*
  * autoconfiguration routines.
  */
-char _depends_on[] = "misc/scsi";
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* Type of module. This one is a driver */

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH getacct 2 "20 Jan 2003" "SunOS 5.11" "System Calls"
+.TH GETACCT 2 "Jan 20, 2003"
 .SH NAME
 getacct, putacct, wracct \- get, put, or write extended accounting data
 .SH SYNOPSIS
@@ -83,23 +83,19 @@ The \fBgetacct()\fR, \fBputacct()\fR, and \fBwracct()\fR functions will fail
 if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 14n
-.rt  
 The \fIidtype\fR argument was not \fBP_TASKID\fR or \fBP_PID\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSPC\fR\fR
 .ad
 .RS 14n
-.rt  
 The file system containing the extended accounting file is full.  The
 \fBwracct()\fR or \fBputacct()\fR function will fail if the record size would
 exceed the amount of space remaining on the file system.
@@ -107,12 +103,10 @@ exceed the amount of space remaining on the file system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTACTIVE\fR\fR
 .ad
 .RS 14n
-.rt  
 The extended accounting facility for the requested \fBidtype_t\fR is not
 active.  Either \fBputacct()\fR attempted to write a task record when the task
 accounting file was unset, or \fBgetacct()\fR attempted to retrieve accounting
@@ -121,24 +115,20 @@ data for a process when extended process accounting was inactive.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 14n
-.rt  
 The {\fBPRIV_SYS_ACCT\fR} privilege is not asserted in the effective set of the
 calling process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBERSCH\fR\fR
 .ad
 .RS 14n
-.rt  
 The \fIid\fR argument does not refer to a presently active system task \fBID\fR
 or process \fBID\fR.
 .RE
@@ -148,12 +138,10 @@ or process \fBID\fR.
 The \fBputacct()\fR and \fBwracct()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIflags\fR argument is neither \fBEW_PARTIAL\fR nor \fBEW_INTERVAL\fR.
 .RE
 
@@ -165,13 +153,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) |lw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE  TYPEATTRIBUTE	VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelAsync-Signal-Safe
+MT-Level	Async-Signal-Safe
 .TE
 
 .SH SEE ALSO

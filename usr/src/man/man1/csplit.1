@@ -2,14 +2,14 @@
 .\"  Copyright 1989 AT&T
 .\" Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
 .\" Portions Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH csplit 1 "4 Dec 2003" "SunOS 5.11" "User Commands"
+.TH CSPLIT 1 "Dec 4, 2003"
 .SH NAME
 csplit \- split  files based on context
 .SH SYNOPSIS
@@ -30,12 +30,10 @@ operands, and writes the sizes of the files.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fI prefix\fR\fR
 .ad
 .RS 13n
-.rt  
 Names the created files \fIprefix\fR\fB00\fR, \fIprefix\fR\fB01\fR, ...,
 \fIprefix\fR\fIn\fR. The default is \fBxx00\fR ... \fBxx\fR\fIn\fR. If the
 \fIprefix\fR argument would create a file name exceeding \fB14\fR bytes, an
@@ -45,36 +43,30 @@ no files are created.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR\fR
 .ad
 .RS 13n
-.rt  
 Leaves previously created files intact. By default, \fBcsplit\fR removes
 created files if an error occurs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fI number\fR\fR
 .ad
 .RS 13n
-.rt  
 Uses \fInumber\fR decimal digits to form filenames for the file pieces. The
 default is \fB2\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 13n
-.rt  
 Suppresses the output of file size messages.
 .RE
 
@@ -84,12 +76,10 @@ Suppresses the output of file size messages.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fR
 .ad
 .RS 8n
-.rt  
 The path name of a text file to be split. If \fIfile\fR is \fB-\fR, the
 standard input will be used.
 .RE
@@ -99,12 +89,10 @@ standard input will be used.
 The operands \fIarg1\fR ... \fIargn\fR can be a combination of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB/\fIrexp\fR/[\fIoffset\fR]\fR
 .ad
 .RS 18n
-.rt  
 Create a file using the content of the lines from the current line up to, but
 not including, the line that results from the evaluation of the regular
 expression with \fIoffset\fR, if any, applied. The regular expression
@@ -123,24 +111,20 @@ of \fIrexp\fR always is applied from the current line to the end of the file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB%\fIrexp\fR%[\fIoffset\fR]\fR
 .ad
 .RS 18n
-.rt  
 This operand is the same as /\fIrexp\fR/[\fIoffset\fR], except that no file
 will be created for the selected section of the input file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIline_no\fR\fR
 .ad
 .RS 18n
-.rt  
 Create a file from the current line up to (but not including) the line number
 \fIline_no\fR. Lines in the file will be numbered starting at one. The current
 line becomes \fIline_no\fR.
@@ -148,12 +132,10 @@ line becomes \fIline_no\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fInum\fR}\fR
 .ad
 .RS 18n
-.rt  
 Repeat operand. This operand can follow any of the operands described
 previously. If it follows a \fIrexp\fR type operand, that operand will be
 applied \fInum\fR more times. If it follows a \fIline_no\fR operand, the file
@@ -245,23 +227,19 @@ that affect the execution of \fBcsplit\fR: \fBLANG\fR, \fBLC_ALL\fR,
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -273,15 +251,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
@@ -295,12 +272,10 @@ Interface StabilityStandard
 The diagnostic messages are self-explanatory, except for the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIarg\fR \(mi out of range\fR
 .ad
 .RS 25n
-.rt  
 The given argument did not reference a line between the current position and
 the end of the file.
 .RE

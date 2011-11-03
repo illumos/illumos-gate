@@ -2,14 +2,14 @@
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 1999, Sun Microsystems, Inc.  All Rights Reserved
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cut 1 "29 Apr 1999" "SunOS 5.11" "User Commands"
+.TH CUT 1 "Apr 29, 1999"
 .SH NAME
 cut \- cut out selected fields of each line of a file
 .SH SYNOPSIS
@@ -51,12 +51,10 @@ reorder columns in a table, use \fBcut\fR and \fBpaste\fR.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlist\fR \fR
 .ad
 .RS 13n
-.rt  
 A comma-separated or blank-character-separated list of integer field numbers
 (in increasing order), with optional \fB\(mi\fR to indicate ranges (for
 instance, \fB1,4,7\fR; \fB1\(mi3,8\fR; \fB\(mi5,10\fR (short for
@@ -65,12 +63,10 @@ instance, \fB1,4,7\fR; \fB1\(mi3,8\fR; \fB\(mi5,10\fR (short for
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-b\fR \fIlist\fR \fR
 .ad
 .RS 13n
-.rt  
 The \fIlist\fR following \fB-b\fR specifies byte positions (for instance,
 \fB-b1\fR\fB-72\fR would pass the first 72 bytes of each line). When \fB-b\fR
 and \fB-n\fR are used together, \fIlist\fR is adjusted so that no multi-byte
@@ -79,24 +75,20 @@ character is split.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-c\fR \fIlist\fR \fR
 .ad
 .RS 13n
-.rt  
 The \fIlist\fR following \fB-c\fR specifies character positions (for instance,
 \fB-c1\fR\fB-72\fR would pass the first 72 characters of each line).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-d\fR \fIdelim\fR \fR
 .ad
 .RS 13n
-.rt  
 The character following \fB-d\fR is the field delimiter (\fB-f\fR option only).
 Default is \fItab\fR. Space or other characters with special meaning to the
 shell must be quoted. \fIdelim\fR can be a multi-byte character.
@@ -104,12 +96,10 @@ shell must be quoted. \fIdelim\fR can be a multi-byte character.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-f\fR \fIlist\fR \fR
 .ad
 .RS 13n
-.rt  
 The \fIlist\fR following \fB-f\fR is a list of fields assumed to be separated
 in the file by a delimiter character (see \fB-d\fR ); for instance,
 \fB-f1\fR\fB,7\fR copies the first and seventh field only. Lines with no field
@@ -119,24 +109,20 @@ delimiters will be passed through intact (useful for table subheadings), unless
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fR
 .ad
 .RS 13n
-.rt  
 Do not split characters. When \fB-b\fR \fIlist\fR and \fB-n\fR are used
 together, \fIlist\fR is adjusted so that no multi-byte character is split.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fR
 .ad
 .RS 13n
-.rt  
 Suppresses lines with no delimiter characters in case of \fB-f\fR option.
 Unless specified, lines with no delimiters will be passed through untouched.
 .RE
@@ -147,12 +133,10 @@ Unless specified, lines with no delimiters will be passed through untouched.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR \fR
 .ad
 .RS 9n
-.rt  
 A path name of an input file. If no \fIfile\fR operands are specified, or if a
 \fIfile\fR operand is \fB\(mi\fR, the standard input will be used.
 .RE
@@ -203,23 +187,19 @@ that affect the execution of \fBcut\fR: \fBLANG\fR, \fBLC_ALL\fR,
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 7n
-.rt  
 All input files were output successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR \fR
 .ad
 .RS 7n
-.rt  
 An error occurred.
 .RE
 
@@ -231,15 +211,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
@@ -250,7 +229,6 @@ Interface StabilityStandard
 .SH DIAGNOSTICS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcut: \fR\fB-n\fR\fB may only be used with \fR\fB-b\fR \fR
 .ad
@@ -261,7 +239,6 @@ Interface StabilityStandard
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcut: \fR\fB-d\fR\fB may only be used with \fR\fB-f\fR \fR
 .ad
@@ -272,7 +249,6 @@ Interface StabilityStandard
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcut: \fR\fB-s\fR\fB may only be used with \fR\fB-f\fR \fR
 .ad
@@ -283,7 +259,6 @@ Interface StabilityStandard
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcut: cannot open \fR\fI<file>\fR \fR
 .ad
@@ -295,7 +270,6 @@ present, processing continues.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcut: no delimiter specified\fR \fR
 .ad
@@ -306,7 +280,6 @@ Missing \fIdelim\fR on \fB-d\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcut: invalid delimiter\fR \fR
 .ad
@@ -317,7 +290,6 @@ Missing \fIdelim\fR on \fB-d\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcut: no \fIlist\fR\fR\fB specified\fR \fR
 .ad
@@ -328,7 +300,6 @@ Missing \fIlist\fR on \fB-b\fR, \fB-c\fR, or \fB-f\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcut: invalid range specifier\fR \fR
 .ad
@@ -339,7 +310,6 @@ Missing \fIlist\fR on \fB-b\fR, \fB-c\fR, or \fB-f\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcut: too many ranges specified\fR \fR
 .ad
@@ -350,7 +320,6 @@ Missing \fIlist\fR on \fB-b\fR, \fB-c\fR, or \fB-f\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcut: range must be increasing\fR \fR
 .ad
@@ -361,7 +330,6 @@ Missing \fIlist\fR on \fB-b\fR, \fB-c\fR, or \fB-f\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcut: invalid character in range\fR \fR
 .ad
@@ -372,7 +340,6 @@ Missing \fIlist\fR on \fB-b\fR, \fB-c\fR, or \fB-f\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcut: internal error processing input\fR \fR
 .ad
@@ -383,7 +350,6 @@ Missing \fIlist\fR on \fB-b\fR, \fB-c\fR, or \fB-f\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcut: invalid multibyte character\fR \fR
 .ad
@@ -394,7 +360,6 @@ Missing \fIlist\fR on \fB-b\fR, \fB-c\fR, or \fB-f\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcut: unable to allocate enough memory\fR \fR
 .ad

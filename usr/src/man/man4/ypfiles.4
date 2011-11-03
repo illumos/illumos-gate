@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ypfiles 4 "24 Nov 2003" "SunOS 5.11" "File Formats"
+.TH YPFILES 4 "Nov 24, 2003"
 .SH NAME
 ypfiles \- Network Information Service Version 2, formerly knows as YP
 .SH DESCRIPTION
@@ -68,7 +68,6 @@ mode.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/yp\fR\fR
 .ad
@@ -79,7 +78,6 @@ Directory containing NIS configuration files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/yp/binding\fR\fR
 .ad
@@ -90,7 +88,6 @@ Stores the information required to bind the NIS client to the NIS server.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/yp/binding/\fIypdomain\fR/ypservers\fR\fR
 .ad
@@ -101,7 +98,6 @@ Contains the servers to which the NIS client is allowed to bind.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/yp/Makefile\fR\fR
 .ad
@@ -112,7 +108,6 @@ Builds the NIS \fBndbm\fR databases.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/yp/nicknames\fR\fR
 .ad
@@ -123,7 +118,6 @@ Nicknames file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/yp/securenets\fR\fR
 .ad
@@ -136,7 +130,6 @@ served domain. This file is read at startup time by \fBypserv\fR and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/yp/\fIypdomain\fR\fR\fR
 .ad
@@ -147,7 +140,6 @@ Directory containing \fBndbm\fR databases.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/yp/NISLDAPmapping\fR\fR
 .ad
@@ -158,7 +150,6 @@ NIS to LDAP configuration file
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/yp/*/LDAP_*\fR\fR
 .ad
@@ -189,287 +180,235 @@ information has "read" access for an unauthenticated client, that is, one with
 \fBnobody\fR NIS+ credentials.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNIS maps\fR\fR
 .ad
 .RS 26n
-.rt  
  \fBNIS+ tables\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpasswd.byname\fR\fR
 .ad
 .RS 26n
-.rt  
 \fBpasswd.org_dir\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpasswd.byuid\fR\fR
 .ad
 .RS 26n
-.rt  
 \fBpasswd.org_dir\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgroup.byname\fR\fR
 .ad
 .RS 26n
-.rt  
 \fBgroup.org_dir\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgroup.bygid\fR\fR
 .ad
 .RS 26n
-.rt  
 \fBgroup.org_dir\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpublickey.byname\fR\fR
 .ad
 .RS 26n
-.rt  
 \fBcred.org_dir\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhosts.byaddr\fR\fR
 .ad
 .RS 26n
-.rt  
 \fBhosts.org_dir\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhosts.byname\fR\fR
 .ad
 .RS 26n
-.rt  
 \fBhosts.org_dir\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmail.byaddr\fR\fR
 .ad
 .RS 26n
-.rt  
 \fBmail_aliases.org_dir\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmail.aliases\fR\fR
 .ad
 .RS 26n
-.rt  
 \fBmail_aliases.org_dir\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBservices.byname\fR\fR
 .ad
 .RS 26n
-.rt  
 \fBservices.org_dir\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBservices.byservicename\fR\fR
 .ad
 .RS 26n
-.rt  
 \fBservices.org_dir\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrpc.bynumber\fR\fR
 .ad
 .RS 26n
-.rt  
 \fBrpc.org_dir\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrpc.byname\fR\fR
 .ad
 .RS 26n
-.rt  
 \fBrpc.org_dir\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprotocols.bynumber\fR\fR
 .ad
 .RS 26n
-.rt  
 \fBprotocols.org_dir\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprotocols.byname\fR\fR
 .ad
 .RS 26n
-.rt  
 \fBprotocols.org_dir\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnetworks.byaddr\fR\fR
 .ad
 .RS 26n
-.rt  
 \fBnetworks.org_dir\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnetworks.byname\fR\fR
 .ad
 .RS 26n
-.rt  
 \fBnetworks.org_dir\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnetmasks.byaddr\fR\fR
 .ad
 .RS 26n
-.rt  
 \fBnetmasks.org_dir\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBethers.byname\fR\fR
 .ad
 .RS 26n
-.rt  
 \fBethers.org_dir\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBethers.byaddr\fR\fR
 .ad
 .RS 26n
-.rt  
 \fBethers.byname\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbootparams\fR\fR
 .ad
 .RS 26n
-.rt  
 \fBbootparams\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauto.master\fR\fR
 .ad
 .RS 26n
-.rt  
 \fBauto_master.org_dir\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauto.home\fR\fR
 .ad
 .RS 26n
-.rt  
 \fBauto_home.org_dir\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauto.direct\fR\fR
 .ad
 .RS 26n
-.rt  
 \fBauto_direct.org_dir\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauto.src\fR\fR
 .ad
 .RS 26n
-.rt  
 \fBauto_src.org_dir\fR
 .RE
 

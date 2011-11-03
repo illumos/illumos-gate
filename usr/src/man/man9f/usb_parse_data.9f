@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH usb_parse_data 9F "5 Jan 2004" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH USB_PARSE_DATA 9F "Jan 5, 2004"
 .SH NAME
 usb_parse_data \- Tokenize and align the bytes of raw variable-format data
 .SH SYNOPSIS
@@ -13,7 +13,7 @@ usb_parse_data \- Tokenize and align the bytes of raw variable-format data
 
 
 
-\fBsize_t\fR \fBusb_parse_data\fR(\fBchar *\fR\fIformat\fR, \fBuchar_t *\fR\fIdata\fR, 
+\fBsize_t\fR \fBusb_parse_data\fR(\fBchar *\fR\fIformat\fR, \fBuchar_t *\fR\fIdata\fR,
      \fBsize_t\fR \fIdatalen\fR, \fBvoid *\fR\fIstructure\fR, \fBsize_t\fR \fIstructlen\fR);
 .fi
 
@@ -24,12 +24,10 @@ Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIformat\fR\fR
 .ad
 .RS 13n
-.rt  
 Null terminated string describing the format of the data structure for
 general-purpose byte swapping. The letters "c," "s," "l," and "L" represent 1,
 2, 4 and 8 byte quantities, respectively. A descriptor that consists of a short
@@ -39,45 +37,37 @@ as a multiplier of that letter. A format equivalent to "scc" is "s2c."
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdata\fR\fR
 .ad
 .RS 13n
-.rt  
 Raw descriptor data to parse.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdatalen\fR\fR
 .ad
 .RS 13n
-.rt  
 Length, in bytes, of the raw descriptor data buffer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstructure\fR\fR
 .ad
 .RS 13n
-.rt  
 Destination data buffer where parsed data is returned.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstructlen\fR\fR
 .ad
 .RS 13n
-.rt  
 Length, in bytes, of the destination data buffer. Parsed result length will not
 exceed this value.
 .RE
@@ -120,10 +110,10 @@ May be called from user, kernel or interrupt context.
 .nf
   /*
    * Parse raw descriptor data in buf, putting result into ret_descr.
-   * ret_buf_len holds the size of ret_descr buf;  routine returns 
+   * ret_buf_len holds the size of ret_descr buf;  routine returns
    * number of resulting bytes.
    *
-   * Descriptor being parsed has 2 chars, followed by one short, 
+   * Descriptor being parsed has 2 chars, followed by one short,
    * 3 chars and one more short.
    */
   size_t size_of_returned_descr;
@@ -135,7 +125,7 @@ May be called from user, kernel or interrupt context.
            /* Data truncated. */
   }
 
-  or: 
+  or:
 
   size_of_returned_descr = usb_parse_data("2cs3cs",
       buf, sizeof(buf), (void *)ret_descr, (sizeof)xxx_descr_t));
@@ -153,15 +143,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitecturePCI-based systems
+Architecture	PCI-based systems
 _
-Interface stabilityCommitted
+Interface stability	Committed
 .TE
 
 .SH SEE ALSO

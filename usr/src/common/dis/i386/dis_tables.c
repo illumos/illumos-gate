@@ -21,6 +21,7 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -101,6 +102,7 @@ enum {
 	Mv,
 	Mw,
 	M,		/* register or memory */
+	MG9,		/* register or memory in group 9 (prefix optional) */
 	Mb,		/* register or memory, always byte sized */
 	MO,		/* memory only (no registers) */
 	PREF,
@@ -111,6 +113,7 @@ enum {
 	SEG,
 	MR,
 	RM,
+	RM_66r,		/* RM, but with a required 0x66 prefix */ 
 	IA,
 	MA,
 	SD,
@@ -225,7 +228,10 @@ enum {
 	VEX_RRi,        /* VEX  mod_rm, imm8                   -> mod_reg */
 	VEX_RM,         /* VEX  mod_reg                        -> mod_rm */
 	VEX_RRM,        /* VEX  VEX.vvvv, mod_reg              -> mod_rm */
-	VEX_RMX         /* VEX  VEX.vvvv, mod_rm               -> mod_reg */
+	VEX_RMX,        /* VEX  VEX.vvvv, mod_rm               -> mod_reg */
+	VMx,		/* vmcall/vmlaunch/vmresume/vmxoff */
+	VMxo,		/* VMx instruction with optional prefix */
+	SVM		/* AMD SVM instructions */
 };
 
 /*
@@ -493,7 +499,7 @@ const instable_t dis_op0F00[8] = {
  */
 const instable_t dis_op0F01[8] = {
 
-/*  [0]  */	TNSZ("sgdt",MO,6),	TNSZ("sidt",MONITOR_MWAIT,6), TNSZ("lgdt",XGETBV_XSETBV,6),	TNSZ("lidt",MO,6),
+/*  [0]  */	TNSZ("sgdt",VMx,6),	TNSZ("sidt",MONITOR_MWAIT,6),	TNSZ("lgdt",XGETBV_XSETBV,6),	TNSZ("lidt",SVM,6),
 /*  [4]  */	TNSZ("smsw",M,2),	INVALID, 		TNSZ("lmsw",M,2),	TNS("invlpg",SWAPGS),
 };
 
@@ -525,15 +531,34 @@ const instable_t dis_op0FBA[8] = {
 };
 
 /*
- * 	Decode table for 0x0FC7 opcode
+ * 	Decode table for 0x0FC7 opcode (group 9)
  */
 
 const instable_t dis_op0FC7[8] = {
 
 /*  [0]  */	INVALID,		TNS("cmpxchg8b",M),	INVALID,		INVALID,
-/*  [4]  */	INVALID,		INVALID,	INVALID,		 INVALID,
+/*  [4]  */	INVALID,		INVALID,		TNS("vmptrld",MG9),	TNS("vmptrst",MG9),
 };
 
+/*
+ * 	Decode table for 0x0FC7 opcode with 0x66 prefix
+ */
+
+const instable_t dis_op660FC7[8] = {
+
+/*  [0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [4]  */	INVALID,		INVALID,		TNS("vmclear",M),	INVALID,
+};
+
+/*
+ * 	Decode table for 0x0FC7 opcode with 0xF3 prefix
+ */
+
+const instable_t dis_opF30FC7[8] = {
+
+/*  [0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [4]  */	INVALID,		INVALID,		TNS("vmxon",M),		INVALID,
+};
 
 /*
  *	Decode table for 0x0FC8 opcode -- 486 bswap instruction
@@ -1144,7 +1169,7 @@ const instable_t dis_op0F38[256] = {
 /*  [78]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [7C]  */	INVALID,		INVALID,		INVALID,		INVALID,
 
-/*  [80]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [80]  */	TNSy("invept", RM_66r),	TNSy("invvpid", RM_66r),INVALID,		INVALID,
 /*  [84]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [88]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [8C]  */	INVALID,		INVALID,		INVALID,		INVALID,
@@ -1443,7 +1468,7 @@ const instable_t dis_op0F[16][16] = {
 /*  [10]  */	TNSZ("movups",XMMO,16),	TNSZ("movups",XMMOS,16),TNSZ("movlps",XMMO,8),	TNSZ("movlps",XMMOS,8),
 /*  [14]  */	TNSZ("unpcklps",XMMO,16),TNSZ("unpckhps",XMMO,16),TNSZ("movhps",XMMOM,8),TNSZ("movhps",XMMOMS,8),
 /*  [18]  */	IND(dis_op0F18),	INVALID,		INVALID,		INVALID,
-/*  [1C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [1C]  */	INVALID,		INVALID,		INVALID,		TS("nop",Mw),
 }, {
 /*  [20]  */	TSy("mov",SREG),	TSy("mov",SREG),	TSy("mov",SREG),	TSy("mov",SREG),
 /*  [24]  */	TSx("mov",SREG),	INVALID,		TSx("mov",SREG),	INVALID,
@@ -1472,7 +1497,7 @@ const instable_t dis_op0F[16][16] = {
 }, {
 /*  [70]  */	TNSZ("pshufw",MMOPM,8),	TNS("psrXXX",MR),	TNS("psrXXX",MR),	TNS("psrXXX",MR),
 /*  [74]  */	TNSZ("pcmpeqb",MMO,8),	TNSZ("pcmpeqw",MMO,8),	TNSZ("pcmpeqd",MMO,8),	TNS("emms",NORM),
-/*  [78]  */	TNS("INVALID",XMMO),	TNS("INVALID",XMMO),	INVALID,		INVALID,
+/*  [78]  */	TNSy("vmread",RM),	TNSy("vmwrite",MR),	INVALID,		INVALID,
 /*  [7C]  */	INVALID,		INVALID,		TNSZ("movd",MMOS,4),	TNSZ("movq",MMOS,8),
 }, {
 /*  [80]  */	TNS("jo",D),		TNS("jno",D),		TNS("jb",D),		TNS("jae",D),
@@ -1858,7 +1883,7 @@ const instable_t dis_distable[16][16] = {
 /* [2,0] */	TNS("andb",RMw),	TS("and",RMw),		TNS("andb",MRw),	TS("and",MRw),
 /* [2,4] */	TNS("andb",IA),		TS("and",IA),		TNSx("%es:",OVERRIDE),	TNSx("daa",NORM),
 /* [2,8] */	TNS("subb",RMw),	TS("sub",RMw),		TNS("subb",MRw),	TS("sub",MRw),
-/* [2,C] */	TNS("subb",IA),		TS("sub",IA),		TNSx("%cs:",OVERRIDE),	TNSx("das",NORM),
+/* [2,C] */	TNS("subb",IA),		TS("sub",IA),		TNS("%cs:",OVERRIDE),	TNSx("das",NORM),
 }, {
 /* [3,0] */	TNS("xorb",RMw),	TS("xor",RMw),		TNS("xorb",MRw),	TS("xor",MRw),
 /* [3,4] */	TNS("xorb",IA),		TS("xor",IA),		TNSx("%ss:",OVERRIDE),	TNSx("aaa",NORM),
@@ -2902,6 +2927,7 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 				goto error;
 #endif
 			switch (dp->it_adrmode) {
+				case RM_66r:
 				case XMM_66r:
 				case XMMM_66r:
 					if (opnd_size_prefix == 0) {
@@ -3050,6 +3076,42 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 				opnd_size = SIZE32;
 		}
 		break;
+
+	case MG9:
+		/*
+		 * More horribleness: the group 9 (0xF0 0xC7) instructions are
+		 * allowed an optional prefix of 0x66 or 0xF3.  This is similar
+		 * to the SIMD business described above, but with a different
+		 * addressing mode (and an indirect table), so we deal with it
+		 * separately (if similarly).
+		 */
+
+		/*
+		 * Calculate our offset in dis_op0FC7 (the group 9 table)
+		 */
+		if ((uintptr_t)dp - (uintptr_t)dis_op0FC7 > sizeof (dis_op0FC7))
+			goto error;
+
+		off = ((uintptr_t)dp - (uintptr_t)dis_op0FC7) /
+		    sizeof (instable_t);
+
+		/*
+		 * Rewrite if this instruction used one of the magic prefixes.
+		 */
+		if (rep_prefix) {
+			if (rep_prefix == 0xf3)
+				dp = (instable_t *)&dis_opF30FC7[off];
+			else
+				goto error;
+			rep_prefix = 0;
+		} else if (opnd_size_prefix) {
+			dp = (instable_t *)&dis_op660FC7[off];
+			opnd_size_prefix = 0;
+			if (opnd_size == SIZE16)
+				opnd_size = SIZE32;
+		}
+		break;
+
 
 	case MMOSH:
 		/*
@@ -3448,6 +3510,7 @@ just_mem:
 
 	/* single memory or register operand */
 	case M:
+	case MG9:
 		wbit = LONG_OPND;
 		goto just_mem;
 
@@ -3456,6 +3519,76 @@ just_mem:
 		wbit = BYTE_OPND;
 		goto just_mem;
 
+	case VMx:
+		if (mode == 3) {
+#ifdef DIS_TEXT
+			char *vminstr;
+
+			switch (r_m) {
+			case 1:
+				vminstr = "vmcall";
+				break;
+			case 2:
+				vminstr = "vmlaunch";
+				break;
+			case 3:
+				vminstr = "vmresume";
+				break;
+			case 4:
+				vminstr = "vmxoff";
+				break;
+			default:
+				goto error;
+			}
+
+			(void) strncpy(x->d86_mnem, vminstr, OPLEN);
+#else
+			if (r_m < 1 || r_m > 4)
+				goto error;
+#endif
+
+			NOMEM;
+			break;
+		}
+		/*FALLTHROUGH*/
+	case SVM:
+		if (mode == 3) {
+#if DIS_TEXT
+			char *vinstr;
+
+			switch (r_m) {
+			case 0:
+				vinstr = "vmrun";
+				break;
+			case 1:
+				vinstr = "vmmcall";
+				break;
+			case 2:
+				vinstr = "vmload";
+				break;
+			case 3:
+				vinstr = "vmsave";
+				break;
+			case 4:
+				vinstr = "stgi";
+				break;
+			case 5:
+				vinstr = "clgi";
+				break;
+			case 6:
+				vinstr = "skinit";
+				break;
+			case 7:
+				vinstr = "invlpga";
+				break;
+			}
+
+			(void) strncpy(x->d86_mnem, vinstr, OPLEN);
+#endif
+			NOMEM;
+			break;
+		}
+		/*FALLTHROUGH*/
 	case MONITOR_MWAIT:
 		if (mode == 3) {
 			if (r_m == 0) {
@@ -3594,6 +3727,7 @@ just_mem:
 		break;
 
 	case RM:
+	case RM_66r:
 		wbit = LONG_OPND;
 		STANDARD_MODRM(x, mode, reg, r_m, rex_prefix, wbit, 1);
 		break;

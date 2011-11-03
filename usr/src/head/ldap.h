@@ -1,4 +1,5 @@
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2001-2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -27,8 +28,6 @@
 
 #ifndef	_LDAP_H
 #define	_LDAP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -654,6 +653,11 @@ LDAP_API(void) LDAP_CALL ldap_controls_free(LDAPControl **ctrls);
 #ifdef  _SOLARIS_SDK
 char ** ldap_get_reference_urls(LDAP *ld, LDAPMessage *res);
 #endif
+
+LDAP_API(void) LDAP_CALL ldap_add_result_entry(
+	LDAPMessage **list, LDAPMessage *e);
+LDAP_API(LDAPMessage *) LDAP_CALL ldap_delete_result_entry(
+	LDAPMessage **list, LDAPMessage *e);
 
 
 /* End of core standard C LDAP API definitions */

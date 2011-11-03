@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY=	libcurses.a
@@ -145,12 +144,6 @@ $(LINTLIB):= SRCS=../screen/llib-lcurses
 LINTOUT=	lint.out
 LINTSRC=	$(LINTLIB:%.ln=%)
 
-ROOTLINTDIR=	$(ROOTLIBDIR)
-ROOTLINT=	$(LINTSRC:%=$(ROOTLINTDIR)/%)
-ROOTLINTDIR64=	$(ROOTLIBDIR64)
-ROOTLINT64=	$(LINTSRC:%=$(ROOTLINTDIR64)/%)
-ROOTLINKS64=	$(ROOTLIBDIR64)/$(LIBLINKS)
-
 CLEANFILES +=	$(LINTOUT) $(LINTLIB)
 
 CFLAGS	+=	$(CCVERBOSE)
@@ -168,52 +161,53 @@ RM = rm -f
 #
 CLOBBERFILES=	libcurses.so libcurses.so$(VERS)
 
-.KEEP_STATE:
-
 all: $(LIBS)
 
 lint: lintcheck
 
-# install rule for 32-bit libcurses.a
-$(ROOTLIBDIR)/%.a: %.a
-	$(INS.file)
-		cd $(ROOTLIBDIR); \
-		$(RM) libtermlib.a libtermcap.a; \
-		ln libcurses.a libtermlib.a; \
-		ln libcurses.a libtermcap.a;
-
-# install rules for 32-bit libcurses.so in /usr/lib
-$(ROOTLINKS) := INS.liblink= \
+#
+# Install rules for libtermlib.so links.
+# Augments the rule in Makefile.targ
+#
+$(ROOTLIBDIR)/$(LIBLINKS) := INS.liblink= \
 	$(RM) $@; $(SYMLINK) $(LIBLINKPATH)$(LIBLINKS)$(VERS) $@; \
-		cd $(ROOTLIBDIR); \
-		$(RM) libtermlib.so$(VERS) libtermcap.so$(VERS); \
-		$(RM) libtermlib.so libtermcap.so; \
+	cd $(ROOTLIBDIR); \
+		$(RM) libtermlib.so libtermlib.so$(VERS); \
 		$(SYMLINK) libcurses.so$(VERS) libtermlib.so$(VERS); \
-		$(SYMLINK) libcurses.so$(VERS) libtermcap.so$(VERS); \
-		$(SYMLINK) libtermlib.so$(VERS) libtermlib.so; \
-		$(SYMLINK) libtermcap.so$(VERS) libtermcap.so;
+		$(SYMLINK) libtermlib.so$(VERS) libtermlib.so;
 
-# install rule for lint library target
+$(ROOTLIBDIR64)/$(LIBLINKS) := INS.liblink64= \
+	$(RM) $@; $(SYMLINK) $(LIBLINKPATH)$(LIBLINKS)$(VERS) $@; \
+	cd $(ROOTLIBDIR64); \
+		$(RM) libtermlib.so libtermlib.so$(VERS);\
+		$(SYMLINK) libcurses.so$(VERS) libtermlib.so$(VERS); \
+		$(SYMLINK) libtermlib.so$(VERS) libtermlib.so;
+
+#
+# Install rules for libtermlib.ln links.
+# Augments a pattern rule in Makefile.targ
+#
+$(ROOTLIBDIR)/$(LINTLIB) := INS.file= \
+	-$(RM) $@; $(INS) -s -m $(FILEMODE) -f $(@D) $(LINTLIB); \
+	cd $(ROOTLIBDIR); \
+		$(RM) llib-ltermlib.ln ; \
+		$(SYMLINK) ./llib-lcurses.ln llib-ltermlib.ln;
+
+$(ROOTLIBDIR64)/$(LINTLIB) := INS.file= \
+	-$(RM) $@; $(INS) -s -m $(FILEMODE) -f $(@D) $(LINTLIB); \
+	cd $(ROOTLIBDIR64); \
+		$(RM) llib-ltermlib.ln ; \
+		$(SYMLINK) ./llib-lcurses.ln llib-ltermlib.ln;
+
+#
+# Install rule for the lint source, which is installed only in
+# the default library dir, not MACH64 etc.
+#
 $(ROOTLINTDIR)/%: ../screen/%
 	$(INS.file)
 	cd $(ROOTLINTDIR); \
-		$(RM) llib-ltermcap llib-ltermlib ; \
-		$(SYMLINK) ./llib-lcurses llib-ltermcap; \
-		$(SYMLINK) ./llib-lcurses llib-ltermlib; \
-		$(RM) llib-ltermcap.ln llib-ltermlib.ln ; \
-		$(SYMLINK) ./llib-lcurses.ln llib-ltermcap.ln; \
-		$(SYMLINK) ./llib-lcurses.ln llib-ltermlib.ln;
-
-# install rule for 64 bit lint library target
-$(ROOTLINTDIR64)/%: ../screen/%
-	$(INS.file)
-	cd $(ROOTLINTDIR64); \
-		$(RM) llib-ltermcap llib-ltermlib ; \
-		$(SYMLINK) ./llib-lcurses llib-ltermcap; \
-		$(SYMLINK) ./llib-lcurses llib-ltermlib; \
-		$(RM) llib-ltermcap.ln llib-ltermlib.ln ; \
-		$(SYMLINK) ./llib-lcurses.ln llib-ltermcap.ln; \
-		$(SYMLINK) ./llib-lcurses.ln llib-ltermlib.ln;
+		$(RM) llib-ltermlib ; \
+		$(SYMLINK) ./llib-lcurses llib-ltermlib;
 
 #
 # Include library targets

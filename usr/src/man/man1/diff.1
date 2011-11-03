@@ -1,13 +1,13 @@
 '\" te
 .\"  Copyright 1989 AT&T  Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH diff 1 "22 Sep 2004" "SunOS 5.11" "User Commands"
+.TH DIFF 1 "Sep 22, 2004"
 .SH NAME
 diff \- compare two files
 .SH SYNOPSIS
@@ -28,7 +28,7 @@ diff \- compare two files
 
 .LP
 .nf
-\fBdiff\fR [\fB-bitw\fR] [\fB-c\fR | \fB-e\fR | \fB-f\fR | \fB-h\fR | \fB-n\fR | \fB-u\fR] [\fB-l\fR] [\fB-r\fR] [\fB-s\fR] 
+\fBdiff\fR [\fB-bitw\fR] [\fB-c\fR | \fB-e\fR | \fB-f\fR | \fB-h\fR | \fB-n\fR | \fB-u\fR] [\fB-l\fR] [\fB-r\fR] [\fB-s\fR]
      [\fB-S\fR \fIname\fR] \fIdirectory1\fR \fIdirectory2\fR
 .fi
 
@@ -72,36 +72,30 @@ second file flagged by `\|\fB>\fR\|'.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR \fR
 .ad
 .RS 7n
-.rt  
 Ignores trailing blanks (spaces and tabs) and treats other strings of blanks as
 equivalent.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fR
 .ad
 .RS 7n
-.rt  
 Ignores the case of letters. For example, `\fBA\fR' will compare equal to
 `\fBa\fR'.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fR
 .ad
 .RS 7n
-.rt  
 Expands TAB characters in output lines. Normal or \fB-c\fR output adds
 character(s) to the front of each line that may adversely affect the
 indentation of the original source lines and make the output lines difficult to
@@ -110,12 +104,10 @@ interpret. This option will preserve the original source's indentation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR \fR
 .ad
 .RS 7n
-.rt  
 Ignores all blanks (SPACE and TAB characters) and treats all other strings of
 blanks as equivalent. For example, `\fBif ( a =\|= b )\fR' will compare equal
 to `\fBif(a=\|=b)\fR'.
@@ -126,12 +118,10 @@ to `\fBif(a=\|=b)\fR'.
 The following options are mutually exclusive:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fR
 .ad
 .RS 14n
-.rt  
 Produces a listing of differences with three lines of context. With this
 option, output format is modified slightly. That is, output begins with
 identification of the files involved and their creation dates, then each change
@@ -143,24 +133,20 @@ files with '\|!\|'.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR \fInumber\fR \fR
 .ad
 .RS 14n
-.rt  
 Produces a listing of differences identical to that produced by \fB-c\fR with
 \fInumber\fR lines of context.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR \fIstring\fR \fR
 .ad
 .RS 14n
-.rt  
 Creates a merged version of \fIfile1\fR and \fIfile2\fR with C preprocessor
 controls included so that a compilation of the result without defining
 \fIstring\fR is equivalent to compiling \fIfile1\fR, while defining
@@ -169,12 +155,10 @@ controls included so that a compilation of the result without defining
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fR
 .ad
 .RS 14n
-.rt  
 Produces a script of only \fBa\fR, \fBc\fR, and \fBd\fR commands for the editor
 \fBed\fR, which will recreate \fIfile2\fR from \fIfile1\fR. In connection with
 the \fB-e\fR option, the following shell program may help maintain multiple
@@ -193,23 +177,19 @@ hand. A ``latest version'' appears on the standard output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fR
 .ad
 .RS 13n
-.rt  
 Produces a similar script, not useful with \fBed\fR, in the opposite order.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fR
 .ad
 .RS 13n
-.rt  
 Does a fast, half-hearted job. It works only when changed stretches are short
 and well separated, but does work on files of unlimited length. Options
 \fB-c\fR, \fB-C\fR, \fB-D\fR, \fB-e\fR, \fB-f\fR, and \fB-n\fR are unavailable
@@ -218,24 +198,20 @@ with \fB-h\fR. \fBdiff\fR does not descend into directories with this option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fR
 .ad
 .RS 13n
-.rt  
 Produces a script similar to \fB-e\fR, but in the opposite order and with a
 count of changed lines on each insert or delete command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
 .RS 13n
-.rt  
 Produces a listing of differences with three lines of context. The output is
 similar to that of the \fB-c\fR option, except that the context is "unified".
 Removed and changed lines in \fIfile1\fR are marked by a '\fB-\fR' while lines
@@ -257,12 +233,10 @@ Each change is separated by a line of the form
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-U\fR \fInumber\fR\fR
 .ad
 .RS 13n
-.rt  
 Produces a listing of differences identical to that produced by \fB-u\fR with
 \fInumber\fR lines of context.
 .RE
@@ -272,12 +246,10 @@ Produces a listing of differences identical to that produced by \fB-u\fR with
 The following options are used for comparing directories:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fR
 .ad
 .RS 12n
-.rt  
 Produces output in long format. Before the \fBdiff\fR, each text file is piped
 through \fBpr\fR(1) to paginate it. Other differences are remembered and
 summarized after all text file differences are reported.
@@ -285,35 +257,29 @@ summarized after all text file differences are reported.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fR
 .ad
 .RS 12n
-.rt  
 Applies \fBdiff\fR recursively to common subdirectories encountered.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fR
 .ad
 .RS 12n
-.rt  
 Reports files that are identical. These identical files would not otherwise be
 mentioned.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR \fIname\fR \fR
 .ad
 .RS 12n
-.rt  
 Starts a directory \fBdiff\fR in the middle, beginning with the file
 \fIname\fR.
 .RE
@@ -324,7 +290,6 @@ Starts a directory \fBdiff\fR in the middle, beginning with the file
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile1\fR \fR
 .ad
@@ -333,14 +298,12 @@ The following operands are supported:
 \fB\fIfile2\fR\fR
 .ad
 .RS 15n
-.rt  
 A path name of a file or directory to be compared. If either \fIfile1\fR or
 \fIfile2\fR is \fB\(mi\fR, the standard input will be used in its place.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdirectory1\fR \fR
 .ad
@@ -349,7 +312,6 @@ A path name of a file or directory to be compared. If either \fIfile1\fR or
 \fB\fIdirectory2\fR\fR
 .ad
 .RS 15n
-.rt  
 A path name of a directory to be compared.
 .RE
 
@@ -403,12 +365,10 @@ that affect the execution of \fBdiff\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, \fBLC_TIME\fR, and \fBNLSPATH\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTZ\fR \fR
 .ad
 .RS 7n
-.rt  
 Determines the locale for affecting the timezone used for calculating file
 timestamps written with the \fB-C\fR and \fB-c\fR options.
 .RE
@@ -419,57 +379,47 @@ timestamps written with the \fB-C\fR and \fB-c\fR options.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 7n
-.rt  
 No differences were found.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR \fR
 .ad
 .RS 7n
-.rt  
 Differences were found.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>1\fR \fR
 .ad
 .RS 7n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/tmp/d?????\fR \fR
 .ad
 .RS 19n
-.rt  
 temporary file used for comparison
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/diffh\fR \fR
 .ad
 .RS 19n
-.rt  
 executable file for \fB-h\fR option
 .RE
 
@@ -481,15 +431,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pam_set_item 3PAM "31 Oct 2006" "SunOS 5.11" "PAM Library Functions"
+.TH PAM_SET_ITEM 3PAM "Oct 31, 2006"
 .SH NAME
 pam_set_item, pam_get_item \- authentication information routines for PAM
 .SH SYNOPSIS
@@ -31,12 +31,10 @@ needed.  The information is specified by \fIitem_type\fR, and can be one of the
 following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_AUSER\fR\fR
 .ad
 .RS 19n
-.rt  
 The authenticated user name.  Applications that are trusted to correctly
 identify the authenticated user should set this item to the authenticated user
 name. See NOTES and \fBpam_unix_cred\fR(5).
@@ -44,45 +42,37 @@ name. See NOTES and \fBpam_unix_cred\fR(5).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_AUTHTOK\fR\fR
 .ad
 .RS 19n
-.rt  
 The user authentication token.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_CONV\fR\fR
 .ad
 .RS 19n
-.rt  
 The  \fBpam_conv\fR structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_OLDAUTHTOK\fR\fR
 .ad
 .RS 19n
-.rt  
 The old user authentication token.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_RESOURCE\fR\fR
 .ad
 .RS 19n
-.rt  
 A semicolon-separated list of \fIkey\fR=\fIvalue\fR pairs that represent the
 set of resource controls for application by \fBpam_setcred\fR(3PAM) or
 \fBpam_open_session\fR(3PAM). See the individual service module definitions,
@@ -91,78 +81,64 @@ such as \fBpam_unix_cred\fR(5), for interpretations of the keys and values.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_RHOST\fR\fR
 .ad
 .RS 19n
-.rt  
 The remote host name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_RUSER\fR\fR
 .ad
 .RS 19n
-.rt  
 The \fBrlogin\fR/\fBrsh\fR untrusted remote user name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_SERVICE\fR\fR
 .ad
 .RS 19n
-.rt  
 The service name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_TTY\fR\fR
 .ad
 .RS 19n
-.rt  
 The tty name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_USER\fR\fR
 .ad
 .RS 19n
-.rt  
 The user name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_USER_PROMPT\fR\fR
 .ad
 .RS 19n
-.rt  
 The default prompt used by  \fBpam_get_user()\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBPAM_REPOSITORY\fR
 .ad
 .RS 19n
-.rt  
 The repository that contains the authentication token information.
 .RE
 
@@ -173,7 +149,7 @@ The pam_repository structure is defined as:
 .in +2
 .nf
 struct pam_repository {
-    char   *type;       /* Repository type, e.g., files, */ 
+    char   *type;       /* Repository type, e.g., files, */
                         /* nis, ldap */
     void   *scope;      /* Optional scope information */
     size_t  scope_len;  /* length of scope information */
@@ -227,15 +203,14 @@ See \fBattributes\fR(5) for description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface Stability Stable
+Interface Stability	 Stable
 _
-MT-LevelMT-Safe with exceptions
+MT-Level	MT-Safe with exceptions
 .TE
 
 .sp

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH bart_manifest 4 "9 Sep 2003" "SunOS 5.11" "File Formats"
+.TH BART_MANIFEST 4 "Sep 9, 2003"
 .SH NAME
 bart_manifest \- system audit manifest file
 .SH DESCRIPTION
@@ -40,7 +40,7 @@ depending on the file type:
 .sp
 .in +2
 .nf
-\fIfname\fR D \fIsize mode acl dirmtime uid gid\fR 
+\fIfname\fR D \fIsize mode acl dirmtime uid gid\fR
 \fIfname\fR P \fIsize mode acl mtime uid gid\fR
 \fIfname\fR S \fIsize mode acl mtime uid gid\fR
 \fIfname\fR F \fIsize mode acl mtime uid gid contents\fR
@@ -55,12 +55,10 @@ depending on the file type:
 The fields of the manifest file entries are described as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfname\fR\fR
 .ad
 .RS 12n
-.rt  
 Name of the file. To prevent parsing problems that are caused by special
 characters embedded in file names, file names are encoded as described in
 Quoting Syntax.
@@ -68,89 +66,73 @@ Quoting Syntax.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItype\fR\fR
 .ad
 .RS 12n
-.rt  
 Type of file.
 .sp
 Possible values for \fItype\fR are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBB\fR
 .ad
 .RS 5n
-.rt  
 Block device node
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBC\fR
 .ad
 .RS 5n
-.rt  
 Character device node
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBD\fR
 .ad
 .RS 5n
-.rt  
 Directory
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBF\fR
 .ad
 .RS 5n
-.rt  
 File
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBL\fR
 .ad
 .RS 5n
-.rt  
 Symbolic link
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBP\fR
 .ad
 .RS 5n
-.rt  
 Pipe
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBS\fR
 .ad
 .RS 5n
-.rt  
 Socket
 .RE
 
@@ -158,102 +140,84 @@ Socket
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsize\fR\fR
 .ad
 .RS 12n
-.rt  
 File size in bytes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImode\fR\fR
 .ad
 .RS 12n
-.rt  
 Octal number that represents the permissions of the file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIacl\fR\fR
 .ad
 .RS 12n
-.rt  
 ACL attributes for the file. For a file with ACL attributes, this field
 contains the output from \fBacltotext()\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIuid\fR\fR
 .ad
 .RS 12n
-.rt  
 Numerical user ID of the owner of this entry.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIgid\fR\fR
 .ad
 .RS 12n
-.rt  
 Numerical group ID of the owner of this entry.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdirmtime\fR\fR
 .ad
 .RS 12n
-.rt  
 Modification time in seconds since 00:00:00 UTC, January 1, 1970 for
 directories.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlnmtime\fR\fR
 .ad
 .RS 12n
-.rt  
 Creation time for links.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImtime\fR\fR
 .ad
 .RS 12n
-.rt  
 Modification time in seconds since 00:00:00 UTC, January 1, 1970 for files.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcontents\fR\fR
 .ad
 .RS 12n
-.rt  
 Checksum value of the file. This attribute is only specified for regular files.
 If you turn off context checking or if checksums cannot be computed, the value
 of this field is \fB-\fR.
@@ -261,23 +225,19 @@ of this field is \fB-\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdest\fR\fR
 .ad
 .RS 12n
-.rt  
 Destination of a symbolic link.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevnode\fR\fR
 .ad
 .RS 12n
-.rt  
 Value of the device node. This attribute is for character device files and
 block device files only.
 .RE
@@ -295,23 +255,22 @@ characters, the special characters are encoded in their octal forms.
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-Input CharacterQuoted Character
+box;
+c | c
+l | l .
+Input Character	Quoted Character
 _
-SPACE\eSPACE
+SPACE	\eSPACE
 _
-TAB\eTAB
+TAB	\eTAB
 _
-NEWLINE\eNEWLINE
+NEWLINE	\eNEWLINE
 _
-?\e?
+?	\e?
 _
-[\e[
+[	\e[
 _
-*\e*
+*	\e*
 .TE
 
 .SH EXAMPLES
@@ -337,16 +296,16 @@ the encoded versions of the file names to correctly handle special characters.
 # fname C size mode acl mtime uid gid devnode
 /etc D 3584 40755 user::rwx,group::r-x,mask::r-x,other::r-x,
      3c6803d7 0 3
-/etc/.login F 524 100644 user::rw-,group::r--,mask::r--,other::r--, 
+/etc/.login F 524 100644 user::rw-,group::r--,mask::r--,other::r--,
      3c165878 0 3 27b53d5c3e844af3306f1f12b330b318
-/etc/.pwd.lock F 0 100600 user::rw-,group::---,mask::---,other::---, 
+/etc/.pwd.lock F 0 100600 user::rw-,group::---,mask::---,other::---,
      3c166121 0 0 d41d8cd98f00b204e9800998ecf8427e
 /etc/.syslog_door L 20 120777 user::rw-,group::r--,mask::
      rwx,other::r--,3c6803d5 0 0 /var/run/syslog_door
-/etc/autopush L 16 120777 user::r-x,group::r-x,mask::r-x,other::r-x, 
+/etc/autopush L 16 120777 user::r-x,group::r-x,mask::r-x,other::r-x,
      3c165863 0 0 ../sbin/autopush
-/etc/cron.d/FIFO P 0 10600 user::rw-,group::---,mask::---,other::---, 
-     3c6803d5 0 0 
+/etc/cron.d/FIFO P 0 10600 user::rw-,group::---,mask::---,other::---,
+     3c6803d5 0 0
 .fi
 .in -2
 

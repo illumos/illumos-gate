@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH format.dat 4 "19 Apr 2001" "SunOS 5.11" "File Formats"
+.TH FORMAT.DAT 4 "Apr 19, 2001"
 .SH NAME
 format.dat \- disk drive configuration for the format command
 .SH DESCRIPTION
@@ -83,12 +83,10 @@ when it starts up. Each definition starts with one of the following keywords:
 \fBsearch_path\fR, \fBdisk_type\fR, and \fBpartition\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsearch_path\fR\fR
 .ad
 .RS 15n
-.rt  
 4.x: Tells \fBformat\fR which disks it should search for when it starts up. The
 list in the default data file contains all the disks in the GENERIC
 configuration file. If your system has disks that are not in the GENERIC
@@ -103,12 +101,10 @@ defined on a 5.x system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisk_type\fR\fR
 .ad
 .RS 15n
-.rt  
 Defines the controller and disk model. Each \fBdisk_type\fR definition contains
 information concerning the physical geometry of the disk. The default data file
 contains definitions for the controllers and disks that the Solaris operating
@@ -119,45 +115,37 @@ file as you want.
 The following controller types are supported by \fBformat\fR(1M):
 .sp
 .ne 2
-.mk
 .na
 \fBXY450\fR
 .ad
 .RS 10n
-.rt  
 Xylogics 450 controller (SMD)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBXD7053\fR
 .ad
 .RS 10n
-.rt  
 Xylogics 7053 controller (SMD)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBSCSI\fR
 .ad
 .RS 10n
-.rt  
 True SCSI (CCS or SCSI-2)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBISP-80\fR
 .ad
 .RS 10n
-.rt  
 IPI panther controller
 .RE
 
@@ -174,222 +162,182 @@ The following identifiers are assigned values in all \fBdisk_type\fR
 definitions:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBacyl*\fR\fR
 .ad
 .RS 12n
-.rt  
 alternate cylinders
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBasect\fR\fR
 .ad
 .RS 12n
-.rt  
 alternate sectors per track
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBatrks\fR\fR
 .ad
 .RS 12n
-.rt  
 alternate tracks
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfmt_time\fR\fR
 .ad
 .RS 12n
-.rt  
 formatting time per cylinder
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBncyl*\fR\fR
 .ad
 .RS 12n
-.rt  
 number of logical cylinders
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnhead*\fR\fR
 .ad
 .RS 12n
-.rt  
 number of logical heads
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnsect*\fR\fR
 .ad
 .RS 12n
-.rt  
 number of logical sectors per track
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpcyl*\fR\fR
 .ad
 .RS 12n
-.rt  
 number of physical cylinders
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBphead\fR\fR
 .ad
 .RS 12n
-.rt  
 number of physical heads
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpsect\fR\fR
 .ad
 .RS 12n
-.rt  
 number of physical sectors per track
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrpm*\fR\fR
 .ad
 .RS 12n
-.rt  
 drive RPM
 .RE
 
 These identifiers are for SCSI and MD-21 Controllers
 .sp
 .ne 2
-.mk
 .na
 \fB\fBread_retries\fR\fR
 .ad
 .RS 17n
-.rt  
 page 1 byte 3 (read retries)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwrite_retries\fR\fR
 .ad
 .RS 17n
-.rt  
 page 1 byte 8 (write retries)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcyl_skew\fR\fR
 .ad
 .RS 17n
-.rt  
 page 3 bytes 18-19 (cylinder skew)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtrk_skew\fR\fR
 .ad
 .RS 17n
-.rt  
 page 3 bytes 16-17 (track skew)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtrks_zone\fR\fR
 .ad
 .RS 17n
-.rt  
 page 3 bytes 2-3 (tracks per zone)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcache\fR\fR
 .ad
 .RS 17n
-.rt  
 page 38 byte 2 (cache parameter)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprefetch\fR\fR
 .ad
 .RS 17n
-.rt  
 page 38 byte 3 (prefetch parameter)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmax_prefetch\fR\fR
 .ad
 .RS 17n
-.rt  
 page 38 byte 4 (minimum prefetch)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmin_prefetch\fR\fR
 .ad
 .RS 17n
-.rt  
 page 38 byte 6 (maximum prefetch)
 .RE
 
@@ -400,68 +348,56 @@ For SCSI disks, the following geometry specifiers may cause a mode select on
 the byte(s) indicated:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBasect\fR\fR
 .ad
 .RS 9n
-.rt  
 page 3 bytes 4-5 (alternate sectors per zone)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBatrks\fR\fR
 .ad
 .RS 9n
-.rt  
 page 3 bytes 8-9 (alt. tracks per logical unit)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBphead\fR\fR
 .ad
 .RS 9n
-.rt  
 page 4 byte 5 (number of heads)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpsect\fR\fR
 .ad
 .RS 9n
-.rt  
 page 3 bytes 10-11 (sectors per track)
 .RE
 
 And these identifiers are for SMD Controllers Only
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbps*\fR\fR
 .ad
 .RS 8n
-.rt  
 bytes per sector (SMD)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbpt*\fR\fR
 .ad
 .RS 8n
-.rt  
 bytes per track (SMD)
 .RE
 
@@ -471,12 +407,10 @@ was required for all disk types, even though it was only used for SMD disks.
 And this identifier is for XY450 SMD Controllers Only
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdrive_type*\fR\fR
 .ad
 .RS 15n
-.rt  
 drive type (SMD) (just call this "xy450 drive type")
 .RE
 
@@ -484,12 +418,10 @@ drive type (SMD) (just call this "xy450 drive type")
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpartition\fR\fR
 .ad
 .RS 15n
-.rt  
 Defines a partition table for a specific disk type. The partition table
 contains the partitioning information, plus a name that lets you refer to it in
 \fBformat\fR(1M). The default data file contains default partition definitions
@@ -531,12 +463,10 @@ partition = "SUN0535" \e
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/format.dat\fR\fR
 .ad
 .RS 19n
-.rt  
 default data file if \fBformat\fR \fB-x\fR is not specified, nor is there a
 \fBformat.dat\fR file in the current directory.
 .RE

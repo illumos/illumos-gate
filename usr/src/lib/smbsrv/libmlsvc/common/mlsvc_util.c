@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -39,8 +40,8 @@
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libsmbns.h>
 #include <smbsrv/libmlsvc.h>
-#include <smbsrv/libsmbrdr.h>
 #include <smbsrv/smbinfo.h>
+#include <libsmbrdr.h>
 #include <lsalib.h>
 #include <samlib.h>
 #include <smbsrv/netrauth.h>

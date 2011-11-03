@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH port_associate 3C "9 Nov 2007" "SunOS 5.11" "Standard C Library Functions"
+.TH PORT_ASSOCIATE 3C "Nov 9, 2007"
 .SH NAME
 port_associate, port_dissociate \- associate or dissociate the object with the
 port
@@ -159,35 +159,29 @@ Upon succesful completion, 0 is returned. Otherwise, \(mi1 is returned and
 The \fBport_associate()\fR and \fBport_dissociate()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIport\fR identifier is not valid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADFD\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIsource\fR argument is of type \fBPORT_SOURCE_FD\fR and the object
 argument is not a valid file descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIsource\fR argument is not valid.
 .RE
 
@@ -196,12 +190,10 @@ The \fIsource\fR argument is not valid.
 The \fBport_associate()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 11n
-.rt  
 The source argument is \fBPORT_SOURCE_FILE\fR and, Search permission is denied
 on a component of path prefix or the file exists and the permissions,
 corresponding to the events argument, are denied.
@@ -209,12 +201,10 @@ corresponding to the events argument, are denied.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 11n
-.rt  
 The maximum number of objects associated with the port was exceeded. The
 maximum allowable number of events or association of objects per port is the
 minimum value of the \fBprocess.max-port-events\fR resource control at the time
@@ -228,35 +218,29 @@ resource types. Some of the source types do not explicitly use the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 11n
-.rt  
 The source argument is \fBPORT_SOURCE_FILE\fR and the file does not exist or
 the path prefix does not exist or the path points to an empty string.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 11n
-.rt  
 The physical memory limits of the system have been exceeded.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSUP\fR\fR
 .ad
 .RS 11n
-.rt  
 The source argument is \fBPORT_SOURCE_FILE\fR and the file system on which the
 specified file resides, does not support watching for file events
 notifications.
@@ -267,23 +251,19 @@ notifications.
 The \fBport_dissociate()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 10n
-.rt  
 The process is not the owner of the association.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 10n
-.rt  
 The specified object is not associated with the port.
 .RE
 
@@ -431,17 +411,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Architectureall
+Architecture	all
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

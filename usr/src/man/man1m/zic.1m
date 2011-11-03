@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH zic 1M "3 Jan 2006" "SunOS 5.11" "System Administration Commands"
+.TH ZIC 1M "Jan 3, 2006"
 .SH NAME
 zic \- time zone compiler
 .SH SYNOPSIS
 .LP
 .nf
-\fBzic\fR [\fB--\fR\fIversion\fR] [\fB-s\fR] [\fB-v\fR] [\fB-l\fR \fIlocaltime\fR] [\fB-p\fR \fIposixrules\fR] 
+\fBzic\fR [\fB--\fR\fIversion\fR] [\fB-s\fR] [\fB-v\fR] [\fB-l\fR \fIlocaltime\fR] [\fB-p\fR \fIposixrules\fR]
      [\fB-d\fR \fIdirectory\fR] [\fB-y\fR \fIyearistype\fR] [\fIfilename\fR]...
 .fi
 
@@ -57,23 +57,19 @@ Rule   USA   1969  1973   -  Apr lastSun 2:00  1:00   D
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNAME\fR\fR
 .ad
 .RS 12n
-.rt  
 Gives the (arbitrary) name of the set of rules this rule is part of.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFROM\fR\fR
 .ad
 .RS 12n
-.rt  
 Gives the first year in which the rule applies. The word \fBminimum\fR (or an
 abbreviation) means the minimum year with a representable time value. The word
 \fBmaximum\fR (or an abbreviation) means the maximum year with a representable
@@ -82,12 +78,10 @@ time value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTO\fR\fR
 .ad
 .RS 12n
-.rt  
 Gives the final year in which the rule applies. In addition to \fBminimum\fR
 and \fBmaximum\fR (as above), the word \fBonly\fR (or an abbreviation) can be
 used to repeat the value of the \fBFROM\fR field.
@@ -95,65 +89,53 @@ used to repeat the value of the \fBFROM\fR field.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTYPE\fR\fR
 .ad
 .RS 12n
-.rt  
 Gives the type of year in which the rule applies. If \fBTYPE\fR is:
 .sp
 .ne 2
-.mk
 .na
 \fB\&'\fB\(mi\fR\&'\fR
 .ad
 .RS 14n
-.rt  
 The rule applies in all years between \fBFROM\fR and \fBTO\fR, inclusive.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuspres\fR\fR
 .ad
 .RS 14n
-.rt  
 The rule applies in U.S. Presidential election years.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnonpres\fR\fR
 .ad
 .RS 14n
-.rt  
 The rule applies in years other than U.S. Presidential election years.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBeven\fR\fR
 .ad
 .RS 14n
-.rt  
 The rule applies to even-numbered years.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBodd\fR\fR
 .ad
 .RS 14n
-.rt  
 The rule applies to odd-numbered years.
 .RE
 
@@ -175,76 +157,62 @@ Solaris environment.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIN\fR\fR
 .ad
 .RS 12n
-.rt  
 Names the month in which the rule takes effect. Month names can be abbreviated.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBON\fR\fR
 .ad
 .RS 12n
-.rt  
 Gives the day on which the rule takes effect. Recognized forms include:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB5\fR\fR
 .ad
 .RS 11n
-.rt  
 the fifth day of the month
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlastSun\fR\fR
 .ad
 .RS 11n
-.rt  
 The last Sunday in the month
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlastMon\fR\fR
 .ad
 .RS 11n
-.rt  
 The last Monday in the month
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSun>=8\fR\fR
 .ad
 .RS 11n
-.rt  
 First Sunday on or after the eighth
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSun<=25\fR\fR
 .ad
 .RS 11n
-.rt  
 Last Sunday on or before the 25th
 .RE
 
@@ -254,54 +222,44 @@ There cannot be spaces within the \fBON\fR field.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAT\fR\fR
 .ad
 .RS 12n
-.rt  
 Gives the time of day at which the rule takes effect. Recognized forms include:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 11n
-.rt  
 Time in hours
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2:00\fR\fR
 .ad
 .RS 11n
-.rt  
 Time in hours and minutes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB15:00\fR\fR
 .ad
 .RS 11n
-.rt  
 24-hour format time (for times after noon)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1:28:14\fR\fR
 .ad
 .RS 11n
-.rt  
 Time in hours, minutes, and seconds, where hour 0 is midnight at the start of
 the day and hour 24 is midnight at the end of the day.
 .RE
@@ -314,12 +272,10 @@ absence of an indicator, wall clock time is assumed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSAVE\fR\fR
 .ad
 .RS 12n
-.rt  
 Gives the amount of time to be added to local standard time when the rule is in
 effect. This field has the same format as the \fBAT\fR field (without the
 \fBw\fR and \fBs\fR suffixes).
@@ -327,12 +283,10 @@ effect. This field has the same format as the \fBAT\fR field (without the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLETTER/S\fR\fR
 .ad
 .RS 12n
-.rt  
 Gives the "variable part" (for example, the "S" or "D" in "EST" or "EDT" of
 time zone abbreviations to be used when this rule is in effect. If this field
 is '\fB\(mi\fR\&', the variable part is null.
@@ -357,7 +311,7 @@ For example:
 .in +2
 .nf
 Zone Australia/SouthWest   9:30        -         CST    1992 Mar 15 12:00
-                           8:30      Aus         CST                  
+                           8:30      Aus         CST
 .fi
 .in -2
 .sp
@@ -367,24 +321,20 @@ Zone Australia/SouthWest   9:30        -         CST    1992 Mar 15 12:00
 The fields that make up a zone line are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNAME\fR\fR
 .ad
 .RS 14n
-.rt  
 The name of the time zone. This is the name used in creating the time
 conversion information file for the zone.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGMTOFF\fR\fR
 .ad
 .RS 14n
-.rt  
 The amount of time to add to \fBUTC\fR to get standard time in this zone. This
 field has the same format as the \fBAT\fR and \fBSAVE\fR fields of rule lines;
 begin the field with a minus sign to subtract time from \fBUTC\fR.
@@ -392,12 +342,10 @@ begin the field with a minus sign to subtract time from \fBUTC\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRULES/SAVE\fR\fR
 .ad
 .RS 14n
-.rt  
 The name of the rule(s) that apply in the time zone or, alternately, an amount
 of time to add to local standard time. If this field is `\fB\(mi\fR\&', then
 standard time always applies in the time zone.
@@ -405,12 +353,10 @@ standard time always applies in the time zone.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFORMAT\fR\fR
 .ad
 .RS 14n
-.rt  
 The format for time zone abbreviations in this time zone. The pair of
 characters \fB%s\fR is used to show where the "variable part" of the time zone
 abbreviation goes. Alternately, a slash (/) separates standard and daylight
@@ -419,12 +365,10 @@ abbreviations.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUNTIL\fR\fR
 .ad
 .RS 14n
-.rt  
 The time at which the \fBUTC\fR offset or the rule(s) change for a location. It
 is specified as a year, a month, a day, and a time of day. The time of day has
 the same format as the \fBAT\fR field of rule lines. If this is specified, the
@@ -476,35 +420,29 @@ Except for continuation lines, lines can appear in any order in the input.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--\fR\fIversion\fR\fR
 .ad
 .RS 17n
-.rt  
 Outputs version information and exits.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdirectory\fR\fR
 .ad
 .RS 17n
-.rt  
 Creates time conversion information files in the directory \fIdirectory\fR
 rather than in the standard directory \fB/usr/share/lib/zoneinfo\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIlocaltime\fR\fR
 .ad
 .RS 17n
-.rt  
 Uses the given time zone as local time \fIlocaltime\fR. \fBzic\fR acts as if
 the file contained a link line of the form:
 .sp
@@ -519,12 +457,10 @@ Link \fIlocaltime\fR localtime
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIposixrules\fR\fR
 .ad
 .RS 17n
-.rt  
 Uses the rules of the given time zone \fIposixrules\fR when handling
 POSIX-format time zone environment variables. \fBzic\fR acts as if the input
 contained a link line of the form:
@@ -542,12 +478,10 @@ environment.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 17n
-.rt  
 Limits time values stored in output files to values that are the same whether
 they are taken to be signed or unsigned. You can use this option to generate
 SVVS-compatible files.
@@ -557,12 +491,10 @@ This option is obsolete and may be removed in a future release.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 17n
-.rt  
 Complains if a year that appears in a data file is outside the range of years
 representable by system time values (\fB0:00:00 a.m.\fR \fBUTC,\fR \fBJanuary
 1\fR, \fB1970\fR, to \fB3:14:07 a.m.\fR \fBUTC,\fR \fBJanuary 19\fR,
@@ -572,12 +504,10 @@ handled by pre-1998  versions  of \fBzic\fR)  appears in  the input.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-y\fR \fIyearistype\fR\fR
 .ad
 .RS 17n
-.rt  
 Uses the given command \fIyearistype\fR rather than \fByearistype\fR when
 checking year types (see \fBRules\fR under \fBDESCRIPTION\fR).
 .RE
@@ -585,12 +515,10 @@ checking year types (see \fBRules\fR under \fBDESCRIPTION\fR).
 .SH OPERANDS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfilename\fR\fR
 .ad
 .RS 12n
-.rt  
 A file containing input lines that specify the time conversion information
 files to be created. If a \fIfilename\fR is '\fB\(mi\fR\&', the standard input
 is read.
@@ -599,7 +527,6 @@ is read.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/zoneinfo\fR\fR
 .ad
@@ -610,7 +537,6 @@ Standard directory used for created files
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/zoneinfo/src\fR\fR
 .ad
@@ -627,13 +553,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted*
+Interface Stability	Committed*
 .TE
 
 .sp

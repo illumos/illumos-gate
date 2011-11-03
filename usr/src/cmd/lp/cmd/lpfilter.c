@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
@@ -145,6 +142,7 @@ int			main (argc, argv)
 
 	char			*filter,
 				*p;
+	char			stroptsw[] = "-X";
 
 
 	(void) setlocale (LC_ALL, "");
@@ -220,11 +218,11 @@ Check:		if (action && newaction != action) {
 			usage ();
 			exit (0);
 		}
-		(p = "-X")[1] = optopt;
+		stroptsw[1] = optopt;
 		if (strchr(OPT_LIST, optopt))
-			LP_ERRMSG1 (ERROR, E_LP_OPTARG, p);
+			LP_ERRMSG1 (ERROR, E_LP_OPTARG, stroptsw);
 		else
-			LP_ERRMSG1 (ERROR, E_LP_OPTION, p);
+			LP_ERRMSG1 (ERROR, E_LP_OPTION, stroptsw);
 		exit (1);
 
 	}

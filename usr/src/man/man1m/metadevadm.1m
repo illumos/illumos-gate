@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH metadevadm 1M "26 Mar 2006" "SunOS 5.11" "System Administration Commands"
+.TH METADEVADM 1M "Mar 26, 2006"
 .SH NAME
 metadevadm \- update metadevice information
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/metadevadm\fR [\fB-h\fR] [\fB-n\fR] [ [\fB-l\fR]\fB-r\fR] [\fB-s\fR \fIsetname\fR] 
+\fB/usr/sbin/metadevadm\fR [\fB-h\fR] [\fB-n\fR] [ [\fB-l\fR]\fB-r\fR] [\fB-s\fR \fIsetname\fR]
      [\fB-u\fR \fIdisk_specifier\fR] [\fB-v\fR]
 .fi
 
@@ -29,23 +29,19 @@ This command requires root privileges.
 The following options are supported.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 21n
-.rt  
 Provide a help display.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 21n
-.rt  
 Specify that \fBmetadevadm\fR log to \fBsyslog\fR(3C). \fBmetadevadm\fR logs to
 the \fBDAEMON\fR facility at the \fBERR\fR level by default. See
 \fBsyslog.conf\fR(4) for additional information on changing logging levels.
@@ -56,23 +52,19 @@ interactively.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 21n
-.rt  
 Emulate the effect of a command, without making any changes to the system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 21n
-.rt  
 Recompute the pathname and disk specifier (including slice) associated with all
 devices in the metadevice state database if the device supports device IDs. If
 a device does not support device IDs or the device is not available, then no
@@ -86,12 +78,10 @@ update the state database.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIsetname\fR\fR
 .ad
 .RS 21n
-.rt  
 Specify the name of the disk set on which \fBmetadevadm\fR works. This option
 causes the command to perform its administrative function within the specified
 disk set. Without this option, the command performs its function on devices in
@@ -100,12 +90,10 @@ the local disk set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fB\fIdisk_specifier\fR\fR\fR
 .ad
 .RS 21n
-.rt  
 Obtain the device ID associated with the \fIdisk_specifier\fR (for example,
 \fBc1t2d0\fR) of a device and update the metadevice state database. If the
 device ID has not changed this option does nothing. Use this option when a disk
@@ -115,12 +103,10 @@ changing the controller of a storage subsystem.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 21n
-.rt  
 Execute in verbose mode. This option has no effect when used with \fB-u\fR.
 Verbose is the default.
 .RE
@@ -225,34 +211,28 @@ c3t0d0
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Command was successful.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 \fBmetadevadm\fR encountered an error condition.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 An invalid device ID was detected when using the \fB-r\fR option. This is for
 use in the \fBrc2.d\fR script. See \fBinit.d\fR(4).
 .RE
@@ -265,13 +245,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStable
+Interface Stability	Stable
 .TE
 
 .SH SEE ALSO

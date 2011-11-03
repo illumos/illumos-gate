@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -224,6 +225,7 @@ SYMBOL_VERSION SUNW_5.1 {
 
 SYMBOL_VERSION SUNWprivate_1.1 {
     global:
+	ldap_add_result_entry;
 	ldap_charray_add;
 	ldap_charray_dup;
 	ldap_charray_inlist;
@@ -233,6 +235,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	ldap_create_persistentsearch_control;
 	ldap_create_proxiedauth_control;
 	ldap_create_proxyauth_control;
+	ldap_delete_result_entry;
 	ldap_get_lderrno;
 	ldap_get_reference_urls;
 	ldaplogconfigf;

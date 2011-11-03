@@ -1,13 +1,13 @@
 '\" te
 .\"  Copyright 1994, The X/Open Company Ltd.  All Rights Reserved  Portions Copyright 1989 AT&T  Portions Copyright (c) 1998, Sun Microsystems, Inc.  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH t_sync 3NSL "7 May 1998" "SunOS 5.11" "Networking Services Library Functions"
+.TH T_SYNC 3NSL "May 7, 1998"
 .SH NAME
 t_sync \- synchronize transport library
 .SH SYNOPSIS
@@ -69,78 +69,64 @@ Otherwise, a value of  -1 is returned and \fBt_errno\fR is set to indicate an
 error. The state returned is one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT_UNBND\fR \fR
 .ad
 .RS 15n
-.rt  
 Unbound.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT_IDLE\fR \fR
 .ad
 .RS 15n
-.rt  
 Idle.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT_OUTCON\fR \fR
 .ad
 .RS 15n
-.rt  
 Outgoing connection pending.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT_INCON\fR \fR
 .ad
 .RS 15n
-.rt  
 Incoming connection pending.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT_DATAXFER\fR \fR
 .ad
 .RS 15n
-.rt  
 Data transfer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT_OUTREL\fR \fR
 .ad
 .RS 15n
-.rt  
 Outgoing orderly release (waiting for an orderly release indication).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT_INREL\fR \fR
 .ad
 .RS 15n
-.rt  
 Incoming orderly release (waiting for an orderly release request).
 .RE
 
@@ -150,12 +136,10 @@ Incoming orderly release (waiting for an orderly release request).
 On failure, \fBt_errno\fR is set to one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTBADF\fR\fR
 .ad
 .RS 14n
-.rt  
 The specified file descriptor does not refer to a transport endpoint. This
 error may be returned when the \fIfd\fR has been previously closed or an
 erroneous number may have been passed to the call.
@@ -163,12 +147,10 @@ erroneous number may have been passed to the call.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTPROTO\fR\fR
 .ad
 .RS 14n
-.rt  
 This error indicates that a communication problem has been detected between XTI
 and the transport provider for which there is no other suitable XTI error
 \fB(t_errno)\fR.
@@ -176,23 +158,19 @@ and the transport provider for which there is no other suitable XTI error
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTSTATECHNG\fR\fR
 .ad
 .RS 14n
-.rt  
 The transport endpoint is undergoing a state change.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTSYSERR\fR\fR
 .ad
 .RS 14n
-.rt  
 A system error has occurred during execution of this function.
 .RE
 
@@ -228,13 +206,12 @@ See \fBattributes\fR(5)  for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT LevelSafe
+MT Level	Safe
 .TE
 
 .SH SEE ALSO

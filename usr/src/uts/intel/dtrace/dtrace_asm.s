@@ -22,8 +22,9 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2011 Joyent, Inc.  All rights reserved.
+ */
 
 #include <sys/asm_linkage.h>
 #include <sys/regset.h>
@@ -55,6 +56,44 @@ dtrace_getfp(void)
 	movl	%ebp, %eax
 	ret
 	SET_SIZE(dtrace_getfp)
+
+#endif	/* __i386 */
+#endif	/* lint */
+
+
+#if defined(lint) || defined(__lint)
+
+/*ARGSUSED*/
+uint64_t
+dtrace_getvmreg(uint32_t reg, volatile uint16_t *flags)
+{ return (0); }
+
+#else	/* lint */
+
+#if defined(__amd64)
+
+	ENTRY_NP(dtrace_getvmreg)
+
+	movq	%rdi, %rdx
+	vmread	%rdx, %rax
+	ret
+
+	SET_SIZE(dtrace_getvmreg)
+
+#elif defined(__i386)
+
+	ENTRY_NP(dtrace_getvmreg)
+	pushl	%ebp			/ Setup stack frame
+	movl	%esp, %ebp
+
+	movl	12(%ebp), %eax		/ Load flag pointer
+	movw	(%eax), %cx		/ Load flags
+	orw	$CPU_DTRACE_ILLOP, %cx	/ Set ILLOP
+	movw	%cx, (%eax)		/ Store flags
+
+	leave
+	ret
+	SET_SIZE(dtrace_getvmreg)
 
 #endif	/* __i386 */
 #endif	/* lint */

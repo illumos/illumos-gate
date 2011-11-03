@@ -10,31 +10,31 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ls 1 "3 Jun 2009" "SunOS 5.11" "User Commands"
+.TH LS 1 "Jun 3, 2009"
 .SH NAME
 ls \- list contents of directory
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/ls\fR [\fB-aAbcCdeEfFghHiklLmnopqrRsStuUwvVx1@\fR] 
+\fB/usr/bin/ls\fR [\fB-aAbcCdeEfFghHiklLmnopqrRsStuUwvVx1@\fR]
      [\fB-/ c\fR | \fBv\fR] [\fB-% atime | crtime | ctime | mtime | all\fR]
-     [--block-size size] [--color[=\fIwhen\fR]] [--file-type] 
+     [--block-size size] [--color[=\fIwhen\fR]] [--file-type]
      [--si] [--time-style \fIstyle\fR] [\fIfile\fR]...
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/ls\fR [\fB-aAbcCdeEfFghHiklLmnopqrRsStuUwvVx1@\fR] 
+\fB/usr/xpg4/bin/ls\fR [\fB-aAbcCdeEfFghHiklLmnopqrRsStuUwvVx1@\fR]
      [\fB-/ c\fR | \fBv\fR] [\fB-% atime | crtime | ctime | mtime | all\fR]
-     [--block-size size] [--color[=\fIwhen\fR]] [--file-type] 
+     [--block-size size] [--color[=\fIwhen\fR]] [--file-type]
      [--si] [--time-style \fIstyle\fR] [\fIfile\fR]...
 .fi
 
 .LP
 .nf
-\fB/usr/xpg6/bin/ls\fR [\fB-aAbcCdeEfFghHiklLmnopqrRsStuUwvVx1@\fR] 
+\fB/usr/xpg6/bin/ls\fR [\fB-aAbcCdeEfFghHiklLmnopqrRsStuUwvVx1@\fR]
      [\fB-/ c\fR | \fBv\fR] [\fB-% atime | crtime | ctime | mtime | all\fR]
-     [--block-size size] [--color[=\fIwhen\fR]] [--file-type] 
+     [--block-size size] [--color[=\fIwhen\fR]] [--file-type]
      [--si] [--time-style \fIstyle\fR] [\fIfile\fR]...
 .fi
 
@@ -66,7 +66,6 @@ The mode printed when the \fB-e\fR, \fB-E\fR, \fB-g\fR, \fB-l\fR, \fB-n\fR,
 eleven characters. The first character can be one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd\fR\fR
 .ad
@@ -77,7 +76,6 @@ The entry is a directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBD\fR\fR
 .ad
@@ -88,7 +86,6 @@ The entry is a door.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBl\fR\fR
 .ad
@@ -99,7 +96,6 @@ The entry is a symbolic link.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBb\fR\fR
 .ad
@@ -110,7 +106,6 @@ The entry is a block special file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBc\fR\fR
 .ad
@@ -121,7 +116,6 @@ The entry is a character special file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBp\fR\fR
 .ad
@@ -132,7 +126,6 @@ The entry is a \fBFIFO\fR (or "named pipe") special file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBP\fR\fR
 .ad
@@ -143,7 +136,6 @@ The entry is an event port.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fR
 .ad
@@ -154,7 +146,6 @@ The entry is an \fBAF_UNIX\fR address family socket.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi\fR\fR
 .ad
@@ -184,7 +175,7 @@ looks as follows:
 .sp
 .in +2
 .nf
-$ls -/ c  file   
+$ls -/ c  file
 -rw-r--r--   1 root     root           0 May 10 14:17 file
                 {AHRSadim-u}
 
@@ -243,7 +234,6 @@ execution permissions.
 The permissions are indicated as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBr\fR\fR
 .ad
@@ -254,7 +244,6 @@ The file is readable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBw\fR\fR
 .ad
@@ -265,7 +254,6 @@ The file is writable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBx\fR\fR
 .ad
@@ -276,7 +264,6 @@ The file is executable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi\fR\fR
 .ad
@@ -287,7 +274,6 @@ The indicated permission is \fInot\fR granted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fR
 .ad
@@ -299,7 +285,6 @@ user or group execution bit is also on.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS\fR\fR
 .ad
@@ -312,7 +297,6 @@ non-regular files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBt\fR\fR
 .ad
@@ -324,7 +308,6 @@ is on.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT\fR\fR
 .ad
@@ -336,7 +319,6 @@ The 1000 bit is turned on, and execution is off (undefined bit-state).
 .SS "/usr/bin/ls"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBl\fR\fR
 .ad
@@ -349,7 +331,6 @@ is on and the group execution bit is off).
 .SS "/usr/xpg4/bin/ls and /usr/xpg6/bin/ls"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBL\fR\fR
 .ad
@@ -399,7 +380,6 @@ specification is of the format
 or \fB*.Z\fR, or one of the following file types:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBno\fR\fR
 .ad
@@ -410,7 +390,6 @@ Normal file
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfi\fR\fR
 .ad
@@ -421,7 +400,6 @@ Regular file
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdi\fR\fR
 .ad
@@ -432,7 +410,6 @@ Directory
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBln\fR\fR
 .ad
@@ -443,7 +420,6 @@ Symbolic link
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpi\fR\fR
 .ad
@@ -454,7 +430,6 @@ FIFO or named pipe
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBso\fR\fR
 .ad
@@ -465,7 +440,6 @@ Socket
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdo\fR\fR
 .ad
@@ -476,7 +450,6 @@ Door file
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbd\fR\fR
 .ad
@@ -487,7 +460,6 @@ Block device
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcd\fR\fR
 .ad
@@ -498,7 +470,6 @@ Character device
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBex\fR\fR
 .ad
@@ -509,7 +480,6 @@ Execute bit (either \fBuser\fR, \fBgroup\fR, or \fBother\fR) set
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpo\fR\fR
 .ad
@@ -520,7 +490,6 @@ Event port
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBst\fR\fR
 .ad
@@ -531,7 +500,6 @@ Sticky bit set
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBor\fR\fR
 .ad
@@ -542,7 +510,6 @@ Orphaned symlink
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsg\fR\fR
 .ad
@@ -553,7 +520,6 @@ Orphaned symlink
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsu\fR\fR
 .ad
@@ -564,7 +530,6 @@ Orphaned symlink
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBow\fR\fR
 .ad
@@ -575,7 +540,6 @@ Orphaned symlink
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtw\fR\fR
 .ad
@@ -591,7 +555,6 @@ are combined to determine the final output color. Any combination of \fIattr\fR
 values can be specified. Possible \fIattr\fR values are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB00\fR\fR
 .ad
@@ -602,7 +565,6 @@ All attributes off (default terminal color)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB01\fR\fR
 .ad
@@ -613,7 +575,6 @@ Display text in bold
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB04\fR\fR
 .ad
@@ -624,7 +585,6 @@ Display text with an underscore
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB05\fR\fR
 .ad
@@ -635,7 +595,6 @@ Display text in bold
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB07\fR\fR
 .ad
@@ -646,7 +605,6 @@ Display text with foreground and background colors reversed
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB08\fR\fR
 .ad
@@ -661,7 +619,6 @@ One of the following values can be chosen. If multiple values are specified,
 the last specified value is used.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB30\fR\fR
 .ad
@@ -672,7 +629,6 @@ Set foreground to \fBblack\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB31\fR\fR
 .ad
@@ -683,7 +639,6 @@ Set foreground to \fBred\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB32\fR\fR
 .ad
@@ -694,7 +649,6 @@ Set foreground to \fBgreen\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB33\fR\fR
 .ad
@@ -705,7 +659,6 @@ Set foreground to \fByellow\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB34\fR\fR
 .ad
@@ -716,7 +669,6 @@ Set foreground to \fBblue\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB35\fR\fR
 .ad
@@ -729,7 +681,6 @@ Set foreground to \fB\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB36\fR\fR
 .ad
@@ -740,7 +691,6 @@ Set foreground to \fBcyan\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB37\fR\fR
 .ad
@@ -751,7 +701,6 @@ Set foreground to \fBwhite\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB39\fR\fR
 .ad
@@ -766,7 +715,6 @@ One of the following can be specified. If multiple values are specified, the
 last value specified is used.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB40\fR\fR
 .ad
@@ -777,7 +725,6 @@ Set foreground to \fBblack\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB41\fR\fR
 .ad
@@ -788,7 +735,6 @@ Set foreground to \fBred\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB42\fR\fR
 .ad
@@ -799,7 +745,6 @@ Set foreground to \fBgreen\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB43\fR\fR
 .ad
@@ -810,7 +755,6 @@ Set foreground to \fByellow\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB44\fR\fR
 .ad
@@ -821,7 +765,6 @@ Set foreground to \fBblue\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB45\fR\fR
 .ad
@@ -832,7 +775,6 @@ Set foreground to \fBmagenta\fR (\fBpurple\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB46\fR\fR
 .ad
@@ -843,7 +785,6 @@ Set foreground to \fBcyan\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB47\fR\fR
 .ad
@@ -854,7 +795,6 @@ Set foreground to \fBwhite\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB49\fR\fR
 .ad
@@ -886,7 +826,6 @@ The following options are supported:
 The following options are supported for all three versions:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
@@ -902,7 +841,6 @@ normally not listed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR\fR
 .ad
@@ -919,7 +857,6 @@ exception of the working directory (\fB\&.\fR) and the parent directory
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
@@ -935,7 +872,6 @@ Forces printing of non-printable characters to be in the octal
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-B\fR\fR
 .ad
@@ -950,7 +886,6 @@ Do not display any files ending with a tilde (\fB~\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
@@ -962,7 +897,6 @@ so forth) for sorting (\fB-t\fR) or printing (\fB-l\fR or \fB-n\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
@@ -974,7 +908,6 @@ output format.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
@@ -986,7 +919,6 @@ used with \fB-l\fR to get the status of a directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
@@ -998,7 +930,6 @@ for all files regardless of age: \fImmm dd hh:mm:ss yyyy\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-E\fR\fR
 .ad
@@ -1017,7 +948,6 @@ timezone.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
@@ -1031,7 +961,6 @@ in the directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
@@ -1045,7 +974,6 @@ Append a symbol after certain types of files to indicate the file type. The
 following symbols are used:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/\fR\fR
 .ad
@@ -1056,7 +984,6 @@ Directory
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>\fR\fR
 .ad
@@ -1067,7 +994,6 @@ Door file
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB|\fR\fR
 .ad
@@ -1078,7 +1004,6 @@ Named pipe (\fBFIFO\fR)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB@\fR\fR
 .ad
@@ -1089,7 +1014,6 @@ Symbolic link
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB=\fR\fR
 .ad
@@ -1100,7 +1024,6 @@ Socket
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB*\fR\fR
 .ad
@@ -1113,7 +1036,6 @@ Executable
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR\fR
 .ad
@@ -1124,7 +1046,6 @@ The same as \fB-l\fR, except that the owner is not printed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
@@ -1141,7 +1062,6 @@ by \fB1024\fR. The last --si or -h option determines the divisor used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-H\fR\fR
 .ad
@@ -1159,7 +1079,6 @@ is displayed, rather than the referenced directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
@@ -1174,7 +1093,6 @@ For each file, prints the i-node number in the first column of the report.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR\fR
 .ad
@@ -1185,7 +1103,6 @@ All sizes are printed in kbytes. Equivalent to --block-size=1024.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
@@ -1204,7 +1121,6 @@ printed followed by "\fB\(->\fR" and the path name of the referenced file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
@@ -1222,7 +1138,6 @@ than the referenced file or directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
@@ -1233,7 +1148,6 @@ Streams output format. Files are listed across the page, separated by commas.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
@@ -1249,7 +1163,6 @@ numbers are printed, rather than the associated character strings.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
@@ -1264,7 +1177,6 @@ The same as \fB-l\fR, except that the group is not printed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
@@ -1275,7 +1187,6 @@ Puts a slash (\fB/\fR) after each filename if the file is a directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
@@ -1291,7 +1202,6 @@ question mark (\fB?\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
@@ -1307,7 +1217,6 @@ file size first as appropriate.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR\fR
 .ad
@@ -1322,7 +1231,6 @@ Recursively lists subdirectories encountered.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
@@ -1338,7 +1246,6 @@ displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR\fR
 .ad
@@ -1350,7 +1257,6 @@ file name (in increasing alphabetic order) instead of just by name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
@@ -1362,7 +1268,6 @@ modification time. See \fB-c\fR, \fB-u\fR and \fB-%\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
@@ -1374,7 +1279,6 @@ Uses time of last access instead of last modification for sorting (with the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-U\fR\fR
 .ad
@@ -1385,7 +1289,6 @@ Output is unsorted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -1398,7 +1301,6 @@ directory doesn't have an ACL.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
@@ -1422,7 +1324,6 @@ The format of the displayed ACL is as follows:
 \fIentry_type\fR is displayed as one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fBuser:\fIusername\fR\fR
 .ad
@@ -1433,7 +1334,6 @@ Additional user access for \fIusername\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBgroup:\fIgroupname\fR\fR
 .ad
@@ -1444,7 +1344,6 @@ Additional group access for group \fIgroupname\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBowner@\fR
 .ad
@@ -1455,7 +1354,6 @@ File owner.
 
 .sp
 .ne 2
-.mk
 .na
 \fBgroup@\fR
 .ad
@@ -1466,7 +1364,6 @@ File group owner.
 
 .sp
 .ne 2
-.mk
 .na
 \fBeveryone@\fR
 .ad
@@ -1480,7 +1377,6 @@ The following permissions, supported by the NFSv4 ACL model, are displayed by
 using the \fB-v\fR or \fB-V\fR options:
 .sp
 .ne 2
-.mk
 .na
 \fBread_data (\fBr\fR)\fR
 .ad
@@ -1491,7 +1387,6 @@ Permission to read the data of a file.
 
 .sp
 .ne 2
-.mk
 .na
 \fBlist_directory (\fBr\fR)\fR
 .ad
@@ -1502,7 +1397,6 @@ Permission to list the contents of a directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fBwrite_data (\fBw\fR)\fR
 .ad
@@ -1513,7 +1407,6 @@ Permission to modify a file's data. anywhere in the file's offset range.
 
 .sp
 .ne 2
-.mk
 .na
 \fBadd_file (\fBw\fR)\fR
 .ad
@@ -1524,7 +1417,6 @@ Permission to add a new file to a directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fBappend_data (\fBp\fR)\fR
 .ad
@@ -1535,7 +1427,6 @@ The ability to modify a file's data, but only starting at EOF.
 
 .sp
 .ne 2
-.mk
 .na
 \fBadd_subdirectory (\fBp\fR)\fR
 .ad
@@ -1546,7 +1437,6 @@ Permission to create a subdirectory to a directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fBread_xattr (\fBR\fR)\fR
 .ad
@@ -1557,7 +1447,6 @@ Ability to read the extended attributes of a file.
 
 .sp
 .ne 2
-.mk
 .na
 \fBwrite_xattr (\fBW\fR)\fR
 .ad
@@ -1569,7 +1458,6 @@ directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fBexecute (\fBx\fR)\fR
 .ad
@@ -1580,7 +1468,6 @@ Permission to execute a file.
 
 .sp
 .ne 2
-.mk
 .na
 \fBread_attributes (\fBa\fR)\fR
 .ad
@@ -1591,7 +1478,6 @@ The ability to read basic attributes (non-ACLs) of a file.
 
 .sp
 .ne 2
-.mk
 .na
 \fBwrite_attributes (\fBA\fR)\fR
 .ad
@@ -1603,7 +1489,6 @@ arbitrary value.
 
 .sp
 .ne 2
-.mk
 .na
 \fBdelete (\fBd\fR)\fR
 .ad
@@ -1614,7 +1499,6 @@ Permission to delete a file.
 
 .sp
 .ne 2
-.mk
 .na
 \fBdelete_child (\fBD\fR)\fR
 .ad
@@ -1625,7 +1509,6 @@ Permission to delete a file within a directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fBread_acl (\fBc\fR)\fR
 .ad
@@ -1636,7 +1519,6 @@ Permission to read the ACL of a file.
 
 .sp
 .ne 2
-.mk
 .na
 \fBwrite_acl (\fBC\fR)\fR
 .ad
@@ -1647,7 +1529,6 @@ Permission to write the ACL of a file.
 
 .sp
 .ne 2
-.mk
 .na
 \fBwrite_owner (\fBo\fR)\fR
 .ad
@@ -1658,7 +1539,6 @@ Permission to change the owner of a file.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsynchronize (\fBs\fR)\fR
 .ad
@@ -1669,7 +1549,6 @@ Permission to access file locally at server with synchronize reads and writes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-\fR\fR
 .ad
@@ -1682,7 +1561,6 @@ The following inheritance flags, supported by the NFSv4 ACL model, are
 displayed by using the \fB-v\fR or \fB-V\fR options:
 .sp
 .ne 2
-.mk
 .na
 \fBfile_inherit (\fBf\fR)\fR
 .ad
@@ -1693,7 +1571,6 @@ Inherit to all newly created files.
 
 .sp
 .ne 2
-.mk
 .na
 \fBdir_inherit (\fBd\fR)\fR
 .ad
@@ -1704,7 +1581,6 @@ Inherit to all newly created directories.
 
 .sp
 .ne 2
-.mk
 .na
 \fBinherit_only (\fBi\fR)\fR
 .ad
@@ -1717,7 +1593,6 @@ created files and directories. This flag requires that either
 
 .sp
 .ne 2
-.mk
 .na
 \fBno_propagate (\fBn\fR)\fR
 .ad
@@ -1730,7 +1605,6 @@ either \fBfile_inherit\fR and or \fBdir_inherit\fR also being specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsuccessful_access (\fBS\fR)\fR
 .ad
@@ -1742,7 +1616,6 @@ accesses. Used with audit/alarm ACE types.
 
 .sp
 .ne 2
-.mk
 .na
 \fBfailed_access (\fBF\fR)\fR
 .ad
@@ -1754,7 +1627,6 @@ Used with audit/alarm ACE types.
 
 .sp
 .ne 2
-.mk
 .na
 \fBinherited (\fBI\fR)\fR
 .ad
@@ -1765,7 +1637,6 @@ ACE was inherited.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-\fR\fR
 .ad
@@ -1777,45 +1648,37 @@ No permission granted.
 \fIaccess_type\fR is displayed as one of the following types:
 .sp
 .ne 2
-.mk
 .na
 \fBalarm\fR
 .ad
 .RS 9n
-.rt  
 Permission field that specifies permissions that should trigger an alarm.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBallow\fR
 .ad
 .RS 9n
-.rt  
 Permission field that specifies allow permissions.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBaudit\fR
 .ad
 .RS 9n
-.rt  
 Permission field that specifies permissions that should be audited.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdeny\fR
 .ad
 .RS 9n
-.rt  
 Permission field that specifies deny permissions.
 .RE
 
@@ -1832,7 +1695,7 @@ $ ls -dV /sandbox/dir.1
                       group@:r-x-----------:-------:allow
                    everyone@:-w-p---A-W-Co-:-------:deny
                    everyone@:r-x---a-R-c--s:-------:allow
-$ 
+$
                            ||||||||||||||||:||||||+ inherited access
                              ||||||||||||||:||||||+ failed access
                              ||||||||||||||:|||||+--success access
@@ -1863,7 +1726,6 @@ $
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR \fIcols\fR\fR
 .ad
@@ -1878,7 +1740,6 @@ Multi-column output where the column width is forced to \fIcols\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
@@ -1889,7 +1750,6 @@ Multi-column output with entries sorted across rather than down the page.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-1\fR\fR
 .ad
@@ -1900,7 +1760,6 @@ Prints one entry per line of output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-@\fR\fR
 .ad
@@ -1913,7 +1772,6 @@ for files that have extended attributes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR | \fB-v\fR\fR
 .ad
@@ -1925,7 +1783,6 @@ the underlying file system. The option \fB-/\fR supports two option arguments
 \fBc\fR (compact mode) and \fBv\fR (verbose mode).
 .sp
 .ne 2
-.mk
 .na
 \fB\fBappendonly\fR\fR
 .ad
@@ -1937,7 +1794,6 @@ file at a location other than \fBEOF\fR fails with \fBEPERM\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBarchive\fR\fR
 .ad
@@ -1950,7 +1806,6 @@ attribute is set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBav_modified\fR\fR
 .ad
@@ -1962,7 +1817,6 @@ changes or when the file is renamed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBav_quarantined\fR\fR
 .ad
@@ -1973,7 +1827,6 @@ Anti-virus software sets to mark a file as quarantined.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcrtime\fR\fR
 .ad
@@ -1984,7 +1837,6 @@ Timestamp when a file is created.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhidden\fR\fR
 .ad
@@ -1995,7 +1847,6 @@ Marks a file as hidden.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBimmutable\fR\fR
 .ad
@@ -2012,7 +1863,6 @@ fails with \fBEPERM\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnodump\fR\fR
 .ad
@@ -2023,7 +1873,6 @@ Solaris systems have no special semantics for this attribute.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnounlink\fR\fR
 .ad
@@ -2038,7 +1887,6 @@ when attempting to unlink or rename files and directories that are marked as
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBreadonly\fR\fR
 .ad
@@ -2051,7 +1899,6 @@ still be modified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsystem\fR\fR
 .ad
@@ -2112,7 +1959,7 @@ The display positions are as follows:
  |||+------- S (system)
  ||+-------- R (readonly)
  |+--------- H (hidden)
- +---------- A (archive) 
+ +---------- A (archive)
 .fi
 .in -2
 .sp
@@ -2120,14 +1967,13 @@ The display positions are as follows:
 .sp
 .in +2
 .nf
--% atime | crtime | ctime | mtime | all 
+-% atime | crtime | ctime | mtime | all
 .fi
 .in -2
 .sp
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBatime\fR\fR
 .ad
@@ -2138,7 +1984,6 @@ Equivalent to \fB-u\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcrtime\fR\fR
 .ad
@@ -2149,7 +1994,6 @@ Uses the creation time of the file for sorting or printing.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBctime\fR\fR
 .ad
@@ -2160,7 +2004,6 @@ Equivalent to \fB-c\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmtime\fR\fR
 .ad
@@ -2183,7 +2026,6 @@ The option \fB-% all\fR does not effect which timestamp is displayed in long
 format and does not affect sorting.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--block-size\fR \fIsize\fR\fR
 .ad
@@ -2198,7 +2040,6 @@ indicate powers of 10 instead of 2. For example, . \fB10mB\fR means blocks of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--color\fR \fB[=\fR\fIwhen\fR\fB]\fR\fR
 .ad
@@ -2214,7 +2055,6 @@ optional argument that determines when to display color output.
 Possible values for \fIwhen\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBalways\fR\fR
 .ad
@@ -2233,7 +2073,6 @@ Always use color.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauto\fR\fR
 .ad
@@ -2252,7 +2091,6 @@ Use color if a terminal is present.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBno\fR\fR
 .ad
@@ -2274,7 +2112,6 @@ See \fBCOLOR OUTPUT\fR for information on how to control the output colors.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--file-type\fR\fR
 .ad
@@ -2286,7 +2123,6 @@ option, except \fB*\fR is not appended to executable files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-si\fR\fR
 .ad
@@ -2303,7 +2139,6 @@ repeatedly divided by 1000 instead of 1024. The last option \fB--si\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--time-style\fR style\fR
 .ad
@@ -2315,7 +2150,6 @@ displayed for extended attributes (\fB-%\fR).
 Possible values for \fIstyle\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfull-iso\fR\fR
 .ad
@@ -2326,7 +2160,6 @@ Equivalent to \fB-E\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlong-iso\fR\fR
 .ad
@@ -2337,7 +2170,6 @@ Display in \fIYYYY-MM-DD HH:MM\fR for all files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBiso\fR\fR
 .ad
@@ -2349,7 +2181,6 @@ HH:MM\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlocale\fR\fR
 .ad
@@ -2360,7 +2191,6 @@ Use the default locale format for old and new files. This is the default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+FORMAT\fR\fR
 .ad
@@ -2377,7 +2207,6 @@ all files.
 .SS "/usr/bin/ls"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
@@ -2393,7 +2222,6 @@ operands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--file-type\fR\fR
 .ad
@@ -2421,7 +2249,6 @@ option \fB-t\fR, \fB-S\fR, or \fB-U\fR determines the sorting behavior.
 .SS "/usr/xpg4/bin/ls"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
@@ -2436,7 +2263,6 @@ with a trailing equals sign (\fB=\fR). Follows symlinks named as operands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--file-type\fR\fR
 .ad
@@ -2460,7 +2286,6 @@ used for sorting or in long format listings. The last \fB-t\fR, \fB-S\fR, or
 .SS "/usr/xpg6/bin/ls"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
@@ -2476,7 +2301,6 @@ operands unless the \fB-H\fR or \fB-L\fR option is specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--file-type\fR\fR
 .ad
@@ -2504,7 +2328,6 @@ for sorting or in long format listings. The last \fB-t\fR, \fB-S\fR, or
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fR
 .ad
@@ -2530,7 +2353,7 @@ The following example shows how to display detailed information about a file.
 .in +2
 .nf
 % ls -l file.1
--rw-r--r--   1 gozer    staff     206663 Mar 14 10:15 file.1 
+-rw-r--r--   1 gozer    staff     206663 Mar 14 10:15 file.1
 .fi
 .in -2
 .sp
@@ -2550,7 +2373,7 @@ directory.
 .in +2
 .nf
 % ls -ld test.dir
-drwxr-xr-x   2 gozer    staff          2 Mar 14 10:17 test.dir    
+drwxr-xr-x   2 gozer    staff          2 Mar 14 10:17 test.dir
 .fi
 .in -2
 .sp
@@ -2693,7 +2516,7 @@ including indirect blocks, is printed.
 .in +2
 .nf
 example% ls -/ c file    (extended system attribute in compact mode)
--rw-r--r--   1 root     root           0 May 10 14:17 file    
+-rw-r--r--   1 root     root           0 May 10 14:17 file
                          {AHRSadim-u}
 .fi
 .in -2
@@ -2715,7 +2538,7 @@ example% ls -/ v file     (no extended system attribute)
 -rw-r--r--  1 root    staff        0 May 16 14:48 file
                {}
 
-example% ls -/ c file        (extended system attribute 
+example% ls -/ c file        (extended system attribute
                               supported file system)
 
 -rw-r--r--  1 root staff        3 Jun  4 22:04 file
@@ -2773,7 +2596,6 @@ that affect the execution of \fBls\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBNLSPATH\fR, and \fBTZ\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCOLUMNS\fR\fR
 .ad
@@ -2790,7 +2612,6 @@ the multiple text-column output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLS_COLORS\fR\fR
 .ad
@@ -2803,7 +2624,6 @@ color output is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTERM\fR\fR
 .ad
@@ -2816,30 +2636,25 @@ is generated regardless of the value of the --color option.
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 All information was written successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/group\fR\fR
 .ad
@@ -2850,7 +2665,6 @@ group IDs for \fBls\fR \fB-l\fR and \fBls\fR \fB-g\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/passwd\fR\fR
 .ad
@@ -2861,7 +2675,6 @@ user IDs for \fBls\fR \fB-l\fR and \fBls\fR \fB-o\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/terminfo/?/*\fR\fR
 .ad
@@ -2879,17 +2692,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-StandardSee below.
+Standard	See below.
 .TE
 
 .sp
@@ -2907,17 +2719,16 @@ For all options except \fB-A\fR, \fB-b\fR, \fB-e\fR, \fB-E,\fR \fB-h\fR,
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-StandardSee below.
+Standard	See below.
 .TE
 
 .sp
@@ -2935,17 +2746,16 @@ For all options except \fB-A\fR, \fB-b\fR, \fB-e\fR, \fB-E,\fR \fB-h\fR,
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-StandardSee below.
+Standard	See below.
 .TE
 
 .sp

@@ -10,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sem_init 3C "9 Jul 2009" "SunOS 5.11" "Standard C Library Functions"
+.TH SEM_INIT 3C "Jul 9, 2009"
 .SH NAME
 sem_init \- initialize an unnamed semaphore
 .SH SYNOPSIS
@@ -69,46 +69,38 @@ the error.
 The \fBsem_init()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR \fR
 .ad
 .RS 11n
-.rt  
 The \fIvalue\fR argument exceeds  \fBSEM_VALUE_MAX\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSPC\fR \fR
 .ad
 .RS 11n
-.rt  
 A resource required to initialize the semaphore has been exhausted, or the
 resources have reached the limit on semaphores (\fBSEM_NSEMS_MAX\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSYS\fR \fR
 .ad
 .RS 11n
-.rt  
 The \fBsem_init()\fR function is not supported by the system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR \fR
 .ad
 .RS 11n
-.rt  
 The process lacks the appropriate privileges to initialize the semaphore.
 .RE
 
@@ -120,17 +112,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) |lw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO

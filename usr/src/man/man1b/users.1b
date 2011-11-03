@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH users 1B "16 Nov 1998" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.TH USERS 1B "Nov 16, 1998"
 .SH NAME
 users \- display a compact list of users logged in
 .SH SYNOPSIS
@@ -39,12 +39,10 @@ paul george ringo\fRexample%
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/utmpx\fR\fR
 .ad
 .RS 18n
-.rt  
 
 .RE
 

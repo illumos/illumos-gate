@@ -2,14 +2,14 @@
 .\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
 .\" Portions Copyright (c) 1982-2007 AT&T Knowledge Ventures
 .\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH limit 1 "2 Nov 2007" "SunOS 5.11" "User Commands"
+.TH LIMIT 1 "Nov 2, 2007"
 .SH NAME
 limit, ulimit, unlimit \- set or get limitations on the system resources
 available to the current shell and its descendents
@@ -88,78 +88,64 @@ The following options specify the resource whose limits are to be printed or
 set. If no option is specified, the file size limit is printed or set.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 6n
-.rt  
 Maximum core file size (in 512-byte blocks)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 6n
-.rt  
 Maximum size of data segment or heap (in Kbytes)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 Maximum file size (in 512-byte blocks)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 6n
-.rt  
 Maximum file descriptor plus 1
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 6n
-.rt  
 Maximum size of stack segment (in Kbytes)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 6n
-.rt  
 Maximum CPU time (in seconds)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 Maximum size of virtual memory (in Kbytes)
 .RE
 
@@ -173,12 +159,10 @@ limit, if any, be removed. If \fIlimit\fR is omitted, prints the current limit.
 If \fIresource\fR is omitted, displays all limits.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 6n
-.rt  
 Use hard limits instead of the current limits. Hard limits impose a ceiling on
 the values of the current limits. Only the privileged user can raise the hard
 limits.
@@ -189,69 +173,57 @@ limits.
 \fIresource\fR is one of:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcputime\fR\fR
 .ad
 .RS 16n
-.rt  
 Maximum \fBCPU\fR seconds per process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfilesize\fR\fR
 .ad
 .RS 16n
-.rt  
 Largest single file allowed. Limited to the size of the filesystem (see
 \fBdf\fR(1M)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdatasize\fR\fR
 .ad
 .RS 16n
-.rt  
 The maximum size of a process's heap in kilobytes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstacksize\fR\fR
 .ad
 .RS 16n
-.rt  
 Maximum stack size for the process. The default stack size is 2^64.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcoredumpsize\fR\fR
 .ad
 .RS 16n
-.rt  
 Maximum size of a core dump (file). This is limited to the size of the
 filesystem.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdescriptors\fR\fR
 .ad
 .RS 16n
-.rt  
 Maximum number of file descriptors. Run the \fBsysdef\fR(1M) command to obtain
 the maximum possible limits for your system. The values reported are in
 hexadecimal, but can be translated into decimal numbers using the \fBbc\fR(1)
@@ -260,12 +232,10 @@ command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmemorysize\fR\fR
 .ad
 .RS 16n
-.rt  
 Maximum size of virtual memory.
 .RE
 
@@ -274,45 +244,37 @@ Maximum size of virtual memory.
 \fIlimit\fR is a number, with an optional scaling factor, as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIn\fR\fBh\fR\fR
 .ad
 .RS 9n
-.rt  
 Hours (for \fBcputime\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIn\fR\fBk\fR\fR
 .ad
 .RS 9n
-.rt  
 \fIn\fR kilobytes. This is the default for all but \fBcputime\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIn\fR\fBm\fR\fR
 .ad
 .RS 9n
-.rt  
 \fIn\fR megabytes or minutes (for \fBcputime\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImm\fR\fB:\fR\fIss\fR\fR
 .ad
 .RS 9n
-.rt  
 Minutes and seconds (for \fBcputime\fR).
 .RE
 
@@ -323,12 +285,10 @@ specified, then all resource limitations are removed. See the description of
 the \fBlimit\fR command for the list of resource names.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 6n
-.rt  
 Remove corresponding hard limits. Only the privileged user can do this.
 .RE
 
@@ -351,90 +311,74 @@ than one resource is specified, then the limit name and unit is printed before
 the value.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 6n
-.rt  
 Lists all of the current resource limits.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 6n
-.rt  
 The number of 512-byte blocks on the size of core dumps.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 6n
-.rt  
 The number of K-bytes on the size of the data area.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 The number of 512-byte blocks on files written by child processes (files of any
 size can be read).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 6n
-.rt  
 The number of file descriptors plus 1.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 6n
-.rt  
 The number of K-bytes on the size of the stack area.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 6n
-.rt  
 The number of seconds (CPU time) to be used by each process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 The number of K-bytes for virtual memory.
 .RE
 
@@ -481,18 +425,15 @@ If you do not specify any resource, the default is \fB-f.\fR
 The following options are available for \fBulimit\fR in \fBksh93\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 13n
-.rt  
 Displays all current resource limits.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
@@ -501,13 +442,11 @@ Displays all current resource limits.
 \fB\fB--sbsize\fR\fR
 .ad
 .RS 13n
-.rt  
 Specifies the socket buffer size in bytes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
@@ -516,13 +455,11 @@ Specifies the socket buffer size in bytes.
 \fB\fB--core\fR\fR
 .ad
 .RS 13n
-.rt  
 Specifies the core file size in blocks.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
@@ -531,13 +468,11 @@ Specifies the core file size in blocks.
 \fB\fB--data\fR\fR
 .ad
 .RS 13n
-.rt  
 Specifies the data size in kbytes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
@@ -546,24 +481,20 @@ Specifies the data size in kbytes.
 \fB\fB--fsize\fR\fR
 .ad
 .RS 13n
-.rt  
 Specifies the file size in blocks.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-H\fR\fR
 .ad
 .RS 13n
-.rt  
 Displays or sets a hard limit.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
@@ -572,13 +503,11 @@ Displays or sets a hard limit.
 \fB\fB--locks\fR\fR
 .ad
 .RS 13n
-.rt  
 Specifies the number of file locks.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
@@ -587,13 +516,11 @@ Specifies the number of file locks.
 \fB\fB--memlock\fR\fR
 .ad
 .RS 13n
-.rt  
 Specifies the locked address space in Kbytes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR\fR
 .ad
@@ -602,13 +529,11 @@ Specifies the locked address space in Kbytes.
 \fB\fB--as\fR\fR
 .ad
 .RS 13n
-.rt  
 Specifies the address space limit in Kbytes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
@@ -617,13 +542,11 @@ Specifies the address space limit in Kbytes.
 \fB\fB--nofile\fR\fR
 .ad
 .RS 13n
-.rt  
 Specifies the number of open files.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
@@ -632,13 +555,11 @@ Specifies the number of open files.
 \fB\fB--pipe\fR\fR
 .ad
 .RS 13n
-.rt  
 Specifies the pipe buffer size in bytes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
@@ -647,24 +568,20 @@ Specifies the pipe buffer size in bytes.
 \fB\fB--rss\fR\fR
 .ad
 .RS 13n
-.rt  
 Specifies the resident set size in Kbytes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR\fR
 .ad
 .RS 13n
-.rt  
 Displays or sets a soft limit.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
@@ -673,13 +590,11 @@ Displays or sets a soft limit.
 \fB\fB--stack\fR\fR
 .ad
 .RS 13n
-.rt  
 Specifies the stack size in Kbytes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR\fR
 .ad
@@ -688,13 +603,11 @@ Specifies the stack size in Kbytes.
 \fB\fB--threads\fR\fR
 .ad
 .RS 13n
-.rt  
 Specifies the number of threads.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
@@ -703,13 +616,11 @@ Specifies the number of threads.
 \fB\fB--cpu\fR\fR
 .ad
 .RS 13n
-.rt  
 Specifies the CPU time in seconds.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
@@ -718,13 +629,11 @@ Specifies the CPU time in seconds.
 \fB\fB--nproc\fR\fR
 .ad
 .RS 13n
-.rt  
 Specifies the number of processes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -733,7 +642,6 @@ Specifies the number of processes.
 \fB\fB--vmem\fR\fR
 .ad
 .RS 13n
-.rt  
 Specifies the process size in Kbytes.
 .RE
 
@@ -743,12 +651,10 @@ Specifies the process size in Kbytes.
 The following option is supported by \fB/usr/bin/ulimit\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 Sets (or reports, if no \fIblocks\fR operand is present), the file size limit
 in blocks. The \fB-f\fR option is also the default case.
 .RE
@@ -759,12 +665,10 @@ in blocks. The \fB-f\fR option is also the default case.
 The following operand is supported by \fB/usr/bin/ulimit\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIblocks\fR\fR
 .ad
 .RS 10n
-.rt  
 The number of 512-byte blocks to use as the new file size limit.
 .RE
 
@@ -872,23 +776,19 @@ that affect the execution of \fBulimit\fR: \fBLANG\fR, \fBLC_ALL\fR,
 The following exit values are returned by \fBulimit\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 A request for a higher limit was rejected or an error occurred.
 .RE
 
@@ -901,15 +801,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SS "ksh93"
@@ -917,13 +816,12 @@ StandardSee \fBstandards\fR(5).
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityUncommitted
+Interface Stability	Uncommitted
 .TE
 
 .SH SEE ALSO

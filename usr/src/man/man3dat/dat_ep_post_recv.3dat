@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dat_ep_post_recv 3DAT "16 Jul 2004" "SunOS 5.11" "Direct Access Transport Library Functions"
+.TH DAT_EP_POST_RECV 3DAT "Jul 16, 2004"
 .SH NAME
 dat_ep_post_recv \- receive data over the connection of the Endpoint
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ldat\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ldat\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <\fBdat/udat.h\fR>
 
 DAT_RETURN
@@ -26,78 +26,64 @@ DAT_RETURN
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIep_handle\fR\fR
 .ad
 .RS 20n
-.rt  
 Handle for an instance of the Endpoint.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInum_segments\fR\fR
 .ad
 .RS 20n
-.rt  
 Number of \fIlmr_triplets\fR in \fIlocal_iov\fR. Can be 0 for receiving a 0
 size message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlocal_iov\fR\fR
 .ad
 .RS 20n
-.rt  
 I/O Vector that specifies the local buffer to be filled. Can be \fINULL\fR for
 receiving a 0 size message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIuser_cookie:\fR\fR
 .ad
 .RS 20n
-.rt  
 User-provided cookie that is returned to the Consumer at the completion of the
 Receive DTO. Can be \fINULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcompletion_flags\fR\fR
 .ad
 .RS 20n
-.rt  
 Flags for posted Receive. The default \fBDAT_COMPLETION_DEFAULT_FLAG\fR is
 0x00. Other values are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBNotification of Completion\fR
 .ad
 .RS 30n
-.rt  
 \fBDAT_COMPLETION_UNSIGNALLED_FLAG\fR
 .sp
 .ne 2
-.mk
 .na
 \fB0x04\fR
 .ad
 .RS 8n
-.rt  
 Non-notification completion. Local Endpoint must be configured for Unsignaled
 CompletionNotification Suppression.
 .RE
@@ -171,57 +157,47 @@ flushed to \fIrecv_evd_handle\fR.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_SUCCESS\fR\fR
 .ad
 .RS 30n
-.rt  
 The operation was successful.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_INSUFFICIENT_RESOURCES\fR\fR
 .ad
 .RS 30n
-.rt  
 The operation failed due to resource limitations.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_INVALID_PARAMETER\fR\fR
 .ad
 .RS 30n
-.rt  
 Invalid parameter. For example, one of the IOV segments pointed to a memory
 outside its LMR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_INVALID_HANDLE\fR\fR
 .ad
 .RS 30n
-.rt  
 The \fIep_handle\fR parameter is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_PROTECTION_VIOLATION\fR\fR
 .ad
 .RS 30n
-.rt  
 Protection violation for local or remote memory access. Protection Zone
 mismatch between an LMR of one of the \fIlocal_iov\fR segments and the local
 Endpoint.
@@ -229,12 +205,10 @@ Endpoint.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_PRIVILEGES_VIOLATION\fR\fR
 .ad
 .RS 30n
-.rt  
 Privileges violation for local or remote memory access. One of the LMRs used in
 \fIlocal_iov\fR was either invalid or did not have the local read privileges.
 .RE
@@ -254,15 +228,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard: uDAPL, 1.1, 1.2
+Interface Stability	Standard: uDAPL, 1.1, 1.2
 _
-MT-LevelUnsafe
+MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO

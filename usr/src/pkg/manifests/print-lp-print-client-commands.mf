@@ -36,7 +36,7 @@ dir path=usr/lib
 dir path=usr/lib/lp group=lp
 dir path=usr/lib/lp/bin group=lp
 dir path=usr/sbin
-dir path=usr/share group=sys
+dir path=usr/share
 dir path=usr/share/applications group=other
 dir path=usr/share/gnome group=other
 dir path=usr/share/gnome/autostart

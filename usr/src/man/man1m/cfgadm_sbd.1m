@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cfgadm_sbd 1M "13 Oct 2003" "SunOS 5.11" "System Administration Commands"
+.TH CFGADM_SBD 1M "Oct 13, 2003"
 .SH NAME
 cfgadm_sbd \- \fBcfgadm\fR commands for system board administration
 .SH SYNOPSIS
@@ -14,7 +14,7 @@ cfgadm_sbd \- \fBcfgadm\fR commands for system board administration
 
 .LP
 .nf
-\fBcfgadm \fR \fB-c \fR \fIfunction\fR [\fB-f\fR] [\fB-y\fR | \fB-n\fR] 
+\fBcfgadm \fR \fB-c \fR \fIfunction\fR [\fB-f\fR] [\fB-y\fR | \fB-n\fR]
      [\fB-o\fR unassign | nopoweroff] [\fB-v\fR] \fI ap_id\fR...
 .fi
 
@@ -56,34 +56,28 @@ platform. See the \fBPlatform Notes\fR section for more information.
 The following are the names and descriptions of the component conditions:
 .sp
 .ne 2
-.mk
 .na
 \fBfailed\fR
 .ad
 .RS 11n
-.rt  
 The component failed testing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBok\fR
 .ad
 .RS 11n
-.rt  
 The component is operational.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBunknown\fR
 .ad
 .RS 11n
-.rt  
 The component has not been tested.
 .RE
 
@@ -94,12 +88,10 @@ The following is the name and description of the receptacle state for
 components:
 .sp
 .ne 2
-.mk
 .na
 \fBconnected\fR
 .ad
 .RS 13n
-.rt  
 The component is connected to the board slot.
 .RE
 
@@ -109,23 +101,19 @@ The following are the names and descriptions of the occupant states for
 components:
 .sp
 .ne 2
-.mk
 .na
 \fBconfigured\fR
 .ad
 .RS 16n
-.rt  
 The component is available for use by the Solaris operating environment.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBunconfigured\fR
 .ad
 .RS 16n
-.rt  
 The component is not available for use by the Solaris operating environment.
 .RE
 
@@ -135,45 +123,37 @@ The component is not available for use by the Solaris operating environment.
 The following are the names and descriptions of the board conditions.
 .sp
 .ne 2
-.mk
 .na
 \fBfailed\fR
 .ad
 .RS 12n
-.rt  
 The board failed testing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBok\fR
 .ad
 .RS 12n
-.rt  
 The board is operational.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBunknown\fR
 .ad
 .RS 12n
-.rt  
 The board has not been tested.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBunusable\fR
 .ad
 .RS 12n
-.rt  
 The board slot is unusable.
 .RE
 
@@ -193,24 +173,20 @@ The following are the names and descriptions of the receptacle states for
 boards:
 .sp
 .ne 2
-.mk
 .na
 \fBconnected\fR
 .ad
 .RS 16n
-.rt  
 The board is powered on and connected to the system bus. You can view the
 components on a board only after it is in the connected state.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdisconnected\fR
 .ad
 .RS 16n
-.rt  
 The board is disconnected from the system bus. A board can be in the
 disconnected state without being powered off. However, a board must be powered
 off and in the disconnected state before you remove it from the slot.
@@ -218,12 +194,10 @@ off and in the disconnected state before you remove it from the slot.
 
 .sp
 .ne 2
-.mk
 .na
 \fBempty\fR
 .ad
 .RS 16n
-.rt  
 A board is not present.
 .RE
 
@@ -234,23 +208,19 @@ following table contains the names and descriptions of the occupant states for
 boards:
 .sp
 .ne 2
-.mk
 .na
 \fBconfigured\fR
 .ad
 .RS 16n
-.rt  
 At least one component on the board is configured.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBunconfigured\fR
 .ad
 .RS 16n
-.rt  
 All of the components on the board are unconfigured.
 .RE
 
@@ -412,7 +382,7 @@ SB0           CPU       connected      configured     y
 SB0::memory   memory    connected      configured     y
 SB1           CPU       connected      configured     y
 SB1::memory   memory    connected      configured     y
- 
+
 .fi
 .in -2
 .sp
@@ -426,11 +396,11 @@ following example.
 .in +2
 .nf
 Ap_Id         Type      Receptacle     Occupant       Busy
-SB0           CPU       connected      configured     y 
-SB0::memory   memory    connected      configured     y 
-SB1           CPU       connected      configured     y 
-SB1::memory   memory    connected      unconfigured   n 
-  
+SB0           CPU       connected      configured     y
+SB0::memory   memory    connected      configured     y
+SB1           CPU       connected      configured     y
+SB1::memory   memory    connected      unconfigured   n
+
 .fi
 .in -2
 .sp
@@ -445,11 +415,11 @@ the process, only board 0 remains busy, as in the following example.
 .in +2
 .nf
 Ap_Id         Type      Receptacle     Occupant       Busy
-SB0           CPU       connected      configured     y 
-SB0::memory   memory    connected      unconfigured   n 
-SB1           CPU       connected      configured     n 
-SB1::memory   memory    connected      configured     n 
-  
+SB0           CPU       connected      configured     y
+SB0::memory   memory    connected      unconfigured   n
+SB1           CPU       connected      configured     n
+SB1::memory   memory    connected      configured     n
+
 .fi
 .in -2
 .sp
@@ -463,11 +433,11 @@ example.
 .in +2
 .nf
 Ap_Id         Type      Receptacle     Occupant       Busy
-SB0           CPU       connected      configured     n 
-SB0::memory   memory    connected      unconfigured   n 
-SB1           CPU       connected      configured     n 
-SB1::memory   memory    connected      configured     n 
-  
+SB0           CPU       connected      configured     n
+SB0::memory   memory    connected      unconfigured   n
+SB1           CPU       connected      configured     n
+SB1::memory   memory    connected      configured     n
+
 .fi
 .in -2
 .sp
@@ -496,21 +466,17 @@ those options. The following options are supported by the \fBcfgadm_sbd\fR
 plugin:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c \fR\fIfunction\fR\fR
 .ad
 .RS 15n
-.rt  
 Performs a state change function. You can use the following functions:
 .sp
 .ne 2
-.mk
 .na
 \fBunconfigure\fR
 .ad
 .RS 15n
-.rt  
 Changes the occupant state to unconfigured. This function applies to system
 board slots and to all of the components on the system board.
 .sp
@@ -542,12 +508,10 @@ deleted memory is returned to the system memory pool.
 
 .sp
 .ne 2
-.mk
 .na
 \fBdisconnect\fR
 .ad
 .RS 15n
-.rt  
 Changes the receptacle state to disconnected. This function applies only to
 system board slots.
 .sp
@@ -569,12 +533,10 @@ from which is was unassigned.
 
 .sp
 .ne 2
-.mk
 .na
 \fBconfigure\fR
 .ad
 .RS 15n
-.rt  
 Changes the occupant state to configured. This function applies to system board
 slots and to any components on the system board.
 .sp
@@ -596,12 +558,10 @@ before the devices can be used. See \fBifconfig\fR(1M) and \fBmount\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fBconnect\fR
 .ad
 .RS 15n
-.rt  
 Changes the receptacle state to connected. This function applies only to system
 board slots.
 .sp
@@ -622,12 +582,10 @@ domains.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 15n
-.rt  
 Overrides software state changing constraints.
 .sp
 The \fB-f\fR option never overrides fundamental safety and availability
@@ -636,12 +594,10 @@ constraints of the hardware and operating system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 15n
-.rt  
 Lists the state and condition of attachment points specified in the format
 controlled by the \fB-s\fR, \fB-v\fR, and \fB-a\fR options as specified in
 \fBcfgadm\fR(1M). The \fBcfgadm_sbd\fR plugin provides specific information in
@@ -651,21 +607,17 @@ altered by the \fB\fR\fB-o\fR\fB parsable\fR option.
 The parsable \fBinfo\fR field is composed of the following:
 .sp
 .ne 2
-.mk
 .na
 \fBcpu\fR
 .ad
 .RS 10n
-.rt  
 The \fBcpu\fR type displays the following information:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcpuid=\fR\fI#\fR\fB[,\fR\fI#\fR\fB\&.\|.\|.]\fR\fR
 .ad
 .RS 24n
-.rt  
 Where \fI#\fR is a number, and represents the \fBID\fR of the \fBCPU\fR. If
 more than one \fI#\fR is present, this \fBCPU\fR has multiple active virtual
 processors.
@@ -673,24 +625,20 @@ processors.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBspeed=\fR\fI#\fR\fR
 .ad
 .RS 24n
-.rt  
 Where \fI#\fR is a number and represents the speed of the \fBCPU\fR in
 \fBMHz\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBecache=\fR\fI#\fR\fR
 .ad
 .RS 24n
-.rt  
 Where \fI#\fR is a number and represents the size of the ecache in MBytes. If
 the \fBCPU\fR has multiple active virtual processors, the ecache could either
 be shared among the virtual processors, or divided between them.
@@ -700,111 +648,91 @@ be shared among the virtual processors, or divided between them.
 
 .sp
 .ne 2
-.mk
 .na
 \fBmemory\fR
 .ad
 .RS 10n
-.rt  
 The \fBmemory\fR type displays the following information, as appropriate:
 .sp
 .ne 2
-.mk
 .na
 \fBaddress=\fI#\fR\fR
 .ad
 .RS 26n
-.rt  
 Where \fI#\fR is a number, representing the base physical address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBsize=\fI#\fR\fR
 .ad
 .RS 26n
-.rt  
 Where \fI#\fR is a number, representing the size of the memory in \fBKBytes\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBpermanent=\fI#\fR\fR
 .ad
 .RS 26n
-.rt  
 Where \fI#\fR is a number, representing the size of permanent memory in
 \fBKBytes\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBunconfigurable\fR
 .ad
 .RS 26n
-.rt  
 An operating system setting that prevents the memory from being unconfigured.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBinter-board-interleave\fR
 .ad
 .RS 26n
-.rt  
 The board is participating in interleaving with other boards.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBsource=\fIap_id\fR\fR
 .ad
 .RS 26n
-.rt  
 Represents the source attachment point.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBtarget=\fIap_id\fR\fR
 .ad
 .RS 26n
-.rt  
 Represents the target attachment point.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdeleted=\fI#\fR\fR
 .ad
 .RS 26n
-.rt  
 Where \fI#\fR is a number, representing the amount of memory that has already
 been deleted in \fBKBytes\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBremaining=\fI#\fR\fR
 .ad
 .RS 26n
-.rt  
 Where \fI#\fR is a number, representing the amount of memory to be deleted in
 \fBKBytes\fR.
 .RE
@@ -813,32 +741,26 @@ Where \fI#\fR is a number, representing the amount of memory to be deleted in
 
 .sp
 .ne 2
-.mk
 .na
 \fBio\fR
 .ad
 .RS 10n
-.rt  
 The \fBio\fR type displays the following information:
 .sp
 .ne 2
-.mk
 .na
 \fBdevice=\fIpath\fR\fR
 .ad
 .RS 15n
-.rt  
 Represents the physical path to the I/O component.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBreferenced\fR
 .ad
 .RS 15n
-.rt  
 The I/O component is referenced.
 .RE
 
@@ -846,33 +768,27 @@ The I/O component is referenced.
 
 .sp
 .ne 2
-.mk
 .na
 \fBboard\fR
 .ad
 .RS 10n
-.rt  
 The \fBboard\fR type displays the following boolean names. If they are not
 present, then the opposite applies.
 .sp
 .ne 2
-.mk
 .na
 \fBassigned\fR
 .ad
 .RS 14n
-.rt  
 The board is assigned to the domain.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBpowered-on\fR
 .ad
 .RS 14n
-.rt  
 The board is powered on.
 .RE
 
@@ -884,12 +800,10 @@ The same items appear in the \fBinfo\fR field in a more readable format if the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR parsable\fR
 .ad
 .RS 15n
-.rt  
 Returns the information in the \fBinfo\fR field as a boolean \fIname\fR or a
 set of \fBname=value\fR pairs, separated by a space character.
 .sp
@@ -900,12 +814,10 @@ option. See the \fBcfgadm\fR(1M) man page for more information about the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 15n
-.rt  
 Tests the board.
 .sp
 Before a board can be connected, it must pass the appropriate level of testing.
@@ -920,21 +832,17 @@ board be tested.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fI function\fR\fR
 .ad
 .RS 15n
-.rt  
 Performs an sbd-class function. You can use the following functions:
 .sp
 .ne 2
-.mk
 .na
 \fBassign\fR
 .ad
 .RS 12n
-.rt  
 Assigns a board to a domain.
 .sp
 The receptacle state must be disconnected or empty. The board must also be
@@ -943,12 +851,10 @@ listed in the domain available component list. See Dynamic System Domains.
 
 .sp
 .ne 2
-.mk
 .na
 \fBunassign\fR
 .ad
 .RS 12n
-.rt  
 Unassigns a board from a domain.
 .sp
 The receptacle state must be disconnected or empty. The board must also be
@@ -957,12 +863,10 @@ listed in the domain available component list. See Dynamic System Domains.
 
 .sp
 .ne 2
-.mk
 .na
 \fBpoweron\fR
 .ad
 .RS 12n
-.rt  
 Powers the system board on.
 .sp
 The receptacle state must be disconnected.
@@ -970,12 +874,10 @@ The receptacle state must be disconnected.
 
 .sp
 .ne 2
-.mk
 .na
 \fBpoweroff\fR
 .ad
 .RS 12n
-.rt  
 Powers the system board off.
 .sp
 The receptacle state must be disconnected.
@@ -989,12 +891,10 @@ The receptacle state must be disconnected.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fBReceptacle \fIap_id\fR\fR
 .ad
 .RS 20n
-.rt  
 For the Sun Fire high-end systems such as the Sun Fire 15K , the receptacle
 attachment point \fBID\fR takes the form \fBSB\fIX\fR\fR or \fBIO\fIX\fR\fR,
 where \fIX\fR equals the slot number.
@@ -1006,12 +906,10 @@ physical labelling on the machine. See the platform specific information in the
 
 .sp
 .ne 2
-.mk
 .na
 \fBComponent \fIap_id\fR\fR
 .ad
 .RS 20n
-.rt  
 The component attachment point \fBID\fR takes the form \fIcomponent_typeX\fR,
 where \fIcomponent_type\fR equals one of the component types described in
 "Component Types" and \fIX\fR equals the component number. The component number
@@ -1132,7 +1030,7 @@ In the following example, the memory sizes are displayed in Kbytes.
 # \fBcfgadm -c unconfigure -y SB0::memory &\fR
 # \fBcfgadm -l -s noheadings,cols=info -o parsable SB0::memory SB1::memory\fR
 
-address=0x0 size=2097152 permanent=752592 target=SB1::memory 
+address=0x0 size=2097152 permanent=752592 target=SB1::memory
      deleted=1273680 remaining=823472
 address=0x1000000 size=2097152 source=SB0::memory
 .fi
@@ -1167,13 +1065,12 @@ See \fBattributes\fR(5) for a description of the following attribute:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-StabilitySee below.
+Stability	See below.
 .TE
 
 .sp
@@ -1299,12 +1196,10 @@ The \fB-t\fR and \fB-x\fR options behave differently on the Sun Fire high-end
 system platforms. The following list describes their behavior:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 24n
-.rt  
 The system controller uses a CPU to test system boards by running \fBLPOST\fR,
 sequenced by the \fBhpost\fR command. To test I/O boards, the driver starts the
 testing in response to the \fB-t\fR option, and the test runs automatically
@@ -1317,12 +1212,10 @@ system boards (not MCPU boards) to test I/O boards.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR \fBassign | unassign\fR\fR
 .ad
 .RS 24n
-.rt  
 In the Sun Fire high-end system  administration model, the platform
 administrator controls the platform hardware through the use of an available
 component list for each domain. This information is maintained on the system
@@ -1341,34 +1234,28 @@ is not in the available component list for a domain.
 The following are the names and descriptions of the component types:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcpu\fR\fR
 .ad
 .RS 10n
-.rt  
 \fBCPU\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBio\fR\fR
 .ad
 .RS 10n
-.rt  
 \fBI/O\fR device
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmemory\fR\fR
 .ad
 .RS 10n
-.rt  
 Memory
 .RE
 
@@ -1406,34 +1293,28 @@ through \fBSB5\fR, and I/O boards can range from \fBIB6\fR through \fBIB9\fR.
 The following are the names and descriptions of the component types:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcpu\fR\fR
 .ad
 .RS 10n
-.rt  
 \fBCPU\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpci\fR\fR
 .ad
 .RS 10n
-.rt  
 \fBI/O\fR device
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmemory\fR\fR
 .ad
 .RS 10n
-.rt  
 Memory
 .RE
 

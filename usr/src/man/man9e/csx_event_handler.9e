@@ -3,17 +3,17 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH csx_event_handler 9E "22 Nov 1996" "SunOS 5.11" "Driver Entry Points"
+.TH CSX_EVENT_HANDLER 9E "Nov 22, 1996"
 .SH NAME
 csx_event_handler \- PC Card driver event handler
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/pccard.h> 
+#include <sys/pccard.h>
 
 
 
-\fBint32_t prefix\fR\fBevent_handler\fR(\fBevent_t\fR \fIevent\fR, \fBint32_t\fR \fIpriority\fR, 
+\fBint32_t prefix\fR\fBevent_handler\fR(\fBevent_t\fR \fIevent\fR, \fBint32_t\fR \fIpriority\fR,
      \fBevent_callback_args_t *\fR\fIargs\fR);
 .fi
 
@@ -24,34 +24,28 @@ Solaris architecture specific (Solaris \fBDDI) \fR
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIevent\fR\fR
 .ad
 .RS 12n
-.rt  
 The event.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpriority\fR\fR
 .ad
 .RS 12n
-.rt  
 The priority of the event.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIargs\fR\fR
 .ad
 .RS 12n
-.rt  
 A pointer to the \fBevent_callback_t\fR structure.
 .RE
 
@@ -93,7 +87,6 @@ The events and their indications are listed below; they are always delivered as
 low priority unless otherwise noted:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_EVENT_REGISTRATION_COMPLETE\fR\fR
 .ad
@@ -104,7 +97,6 @@ A registration request processed in the background has been completed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_EVENT_CARD_INSERTION\fR\fR
 .ad
@@ -115,7 +107,6 @@ A \fBPC \fRCard has been inserted in a socket.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_EVENT_CARD_READY\fR\fR
 .ad
@@ -127,7 +118,6 @@ state.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_EVENT_CARD_REMOVAL\fR\fR
 .ad
@@ -144,7 +134,6 @@ other \fBPC \fRCards.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_EVENT_BATTERY_LOW\fR\fR
 .ad
@@ -155,7 +144,6 @@ The battery on a \fBPC \fRCard is weak and is in need of replacement.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_EVENT_BATTERY_DEAD\fR\fR
 .ad
@@ -166,7 +154,6 @@ The battery on a \fBPC \fRCard is no longer providing operational voltage.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_EVENT_PM_RESUME\fR\fR
 .ad
@@ -178,7 +165,6 @@ Management software.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_EVENT_PM_SUSPEND\fR\fR
 .ad
@@ -190,7 +176,6 @@ Management software.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_EVENT_CARD_LOCK\fR\fR
 .ad
@@ -202,7 +187,6 @@ A mechanical latch has been manipulated preventing the removal of the \fBPC
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_EVENT_CARD_UNLOCK\fR\fR
 .ad
@@ -214,7 +198,6 @@ A mechanical latch has been manipulated allowing the removal of the \fBPC
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_EVENT_EJECTION_REQUEST\fR\fR
 .ad
@@ -226,7 +209,6 @@ mechanism.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_EVENT_EJECTION_COMPLETE\fR\fR
 .ad
@@ -237,7 +219,6 @@ A motor has completed ejecting a \fBPC \fRCard from a socket.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_EVENT_ERASE_COMPLETE\fR\fR
 .ad
@@ -248,7 +229,6 @@ A queued erase request that is processed in the background has been completed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_EVENT_INSERTION_REQUEST\fR\fR
 .ad
@@ -260,7 +240,6 @@ mechanism.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_EVENT_INSERTION_COMPLETE\fR\fR
 .ad
@@ -271,7 +250,6 @@ A motor has completed inserting a \fBPC \fRCard in a socket.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_EVENT_CARD_RESET\fR\fR
 .ad
@@ -282,7 +260,6 @@ A hardware reset has occurred.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_EVENT_RESET_REQUEST\fR\fR
 .ad
@@ -293,7 +270,6 @@ A request for a physical reset by a client.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_EVENT_RESET_COMPLETE\fR\fR
 .ad
@@ -304,7 +280,6 @@ A reset request that is processed in the background has been completed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_EVENT_RESET_PHYSICAL\fR\fR
 .ad
@@ -315,7 +290,6 @@ A reset is about to occur.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_EVENT_CLIENT_INFO\fR\fR
 .ad
@@ -328,7 +302,6 @@ the \fBclient_info\fR structure as described below, and return
 \fBCS_SUCCESS\fR. Otherwise, it should return \fBCS_UNSUPPORTED_EVENT.\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fBargs->client_data.Attributes\fR\fR
 .ad
@@ -339,7 +312,6 @@ Must be \fBOR\fR'ed with \fBCS_CLIENT_INFO_VALID\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBargs->client_data.Revision\fR\fR
 .ad
@@ -350,7 +322,6 @@ Must be set to a driver-private version number.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBargs->client_data.CSLevel\fR\fR
 .ad
@@ -361,7 +332,6 @@ Must be set to \fBCS_VERSION\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBargs->client_data.RevDate\fR\fR
 .ad
@@ -377,7 +347,6 @@ field could be set to a revision date of July 4 1997 with
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBargs->client_data.ClientName\fR\fR
 .ad
@@ -388,7 +357,6 @@ A string describing the \fBPC \fRCard driver should be copied into this space.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBargs->client_data.VendorName\fR\fR
 .ad
@@ -400,7 +368,6 @@ into this space.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBargs->client_data.DriverName\fR\fR
 .ad
@@ -415,7 +382,6 @@ processed this event; the driver does not need to initialize this field.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_EVENT_WRITE_PROTECT\fR\fR
 .ad
@@ -426,7 +392,6 @@ changed. The current write protect state of the \fBPC \fRCard is in the
 \fBargs->info\fR field:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_EVENT_WRITE_PROTECT_WPOFF\fR\fR
 .ad
@@ -437,7 +402,6 @@ Card is not write protected.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_EVENT_WRITE_PROTECT_WPON\fR\fR
 .ad
@@ -483,34 +447,28 @@ char               DriverName[MODMAXNAMELEN];
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_SUCCESS\fR\fR
 .ad
 .RS 24n
-.rt  
 The event was handled successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_UNSUPPORTED_EVENT\fR\fR
 .ad
 .RS 24n
-.rt  
 Driver does not support this event.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_FAILURE\fR\fR
 .ad
 .RS 24n
-.rt  
 Error occurred while handling this event.
 .RE
 
@@ -523,37 +481,37 @@ priority events, and from kernel context in the case of low priority events.
 .sp
 .in +2
 .nf
-static int 
-xx_event(event_t event, int priority, event_callback_args_t *args) 
-{         
-     int	rval; 
-     struct xxx	*xxx = args->client_data;        
-     client_info_t	*info = &args->client_info;        
-     
-     switch (event) {   
-     case CS_EVENT_REGISTRATION_COMPLETE: 
-          ASSERT(priority & CS_EVENT_PRI_LOW);  
-          mutex_enter(&xxx->event_mutex); 
-          xxx->card_state |= XX_REGISTRATION_COMPLETE;               
-          mutex_exit(&xxx->event_mutex);
-          rval = CS_SUCCESS; 
-          break;  
+static int
+xx_event(event_t event, int priority, event_callback_args_t *args)
+{
+     int	rval;
+     struct xxx	*xxx = args->client_data;
+     client_info_t	*info = &args->client_info;
 
-     case CS_EVENT_CARD_READY: 
+     switch (event) {
+     case CS_EVENT_REGISTRATION_COMPLETE:
           ASSERT(priority & CS_EVENT_PRI_LOW);
-          rval = xx_card_ready(xxx);  
-          mutex_exit(&xxx->event_mutex); 
-          break;   
-
-     case CS_EVENT_CARD_INSERTION:  
-          ASSERT(priority & CS_EVENT_PRI_LOW);  
           mutex_enter(&xxx->event_mutex);
-          rval = xx_card_insertion(xxx);  
-          mutex_exit(&xxx->event_mutex); 
+          xxx->card_state |= XX_REGISTRATION_COMPLETE;
+          mutex_exit(&xxx->event_mutex);
+          rval = CS_SUCCESS;
           break;
 
-     case CS_EVENT_CARD_REMOVAL:  
-          if (priority & CS_EVENT_PRI_HIGH) { 
+     case CS_EVENT_CARD_READY:
+          ASSERT(priority & CS_EVENT_PRI_LOW);
+          rval = xx_card_ready(xxx);
+          mutex_exit(&xxx->event_mutex);
+          break;
+
+     case CS_EVENT_CARD_INSERTION:
+          ASSERT(priority & CS_EVENT_PRI_LOW);
+          mutex_enter(&xxx->event_mutex);
+          rval = xx_card_insertion(xxx);
+          mutex_exit(&xxx->event_mutex);
+          break;
+
+     case CS_EVENT_CARD_REMOVAL:
+          if (priority & CS_EVENT_PRI_HIGH) {
               mutex_enter(&xxx->hi_event_mutex);
               xxx->card_state &= ~XX_CARD_PRESENT;
               mutex_exit(&xxx->hi_event_mutex);
@@ -562,29 +520,29 @@ xx_event(event_t event, int priority, event_callback_args_t *args)
               rval = xx_card_removal(xxx);
               mutex_exit(&xxx->event_mutex);
           }
-          break;        
+          break;
 
      case CS_EVENT_CLIENT_INFO:
           ASSERT(priority & CS_EVENT_PRI_LOW);
-          if (GET_CLIENT_INFO_SUBSVC_CS(info->Attributes) == 
+          if (GET_CLIENT_INFO_SUBSVC_CS(info->Attributes) ==
               CS_CLIENT_INFO_SUBSVC_CS) {
-                info->Attributes |= CS_CLIENT_INFO_VALID; 
+                info->Attributes |= CS_CLIENT_INFO_VALID;
                 info->Revision = 4;
                 info->CSLevel = CS_VERSION;
                 info->RevDate = CS_CLIENT_INFO_MAKE_DATE(4, 7, 17);
                 (void)strncpy(info->ClientName,
                      "WhizBang Ultra Zowie PC card driver",
-                         CS_CLIENT_INFO_MAX_NAME_LEN)  
-      
-                "ACME PC card drivers, Inc.",       
-                         CS_CLIENT_INFO_MAX_NAME_LEN); 
-                rval = CS_SUCCESS;                 
-          } else { 
+                         CS_CLIENT_INFO_MAX_NAME_LEN)
+
+                "ACME PC card drivers, Inc.",
+                         CS_CLIENT_INFO_MAX_NAME_LEN);
+                rval = CS_SUCCESS;
+          } else {
                 rval = CS_UNSUPPORTED_EVENT;
           }
-          break; 
+          break;
 
-          
+
      case CS_EVENT_WRITE_PROTECT:
            ASSERT(priority & CS_EVENT_PRI_LOW);
            mutex_enter(&xxx->event_mutex);
@@ -593,16 +551,16 @@ xx_event(event_t event, int priority, event_callback_args_t *args)
            } else {
                xxx->card_state |= XX_WRITE_PROTECTED;
            }
-           mutex_exit(&xxx->event_mutex); 
+           mutex_exit(&xxx->event_mutex);
            rval = CS_SUCCESS;
-           break; 
-
-     default: 
-           rval = CS_UNSUPPORTED_EVENT; 
            break;
-     }           
 
-     return (rval); 
+     default:
+           rval = CS_UNSUPPORTED_EVENT;
+           break;
+     }
+
+     return (rval);
 }
 .fi
 .in -2

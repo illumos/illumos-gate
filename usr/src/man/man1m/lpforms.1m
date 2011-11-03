@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH lpforms 1M "3 Apr 1997" "SunOS 5.11" "System Administration Commands"
+.TH LPFORMS 1M "Apr 3, 1997"
 .SH NAME
 lpforms \- administer forms used with the LP print service
 .SH SYNOPSIS
@@ -14,7 +14,7 @@ lpforms \- administer forms used with the LP print service
 
 .LP
 .nf
-\fBlpforms\fR \fB-f\fR \fIform-name\fR \fB-A\fR \fIalert-type\fR [\fB-P\fR \fIpaper-name\fR [\fB-d\fR]] 
+\fBlpforms\fR \fB-f\fR \fIform-name\fR \fB-A\fR \fIalert-type\fR [\fB-P\fR \fIpaper-name\fR [\fB-d\fR]]
      [\fB-Q\fR \fIrequests\fR] [\fB-W\fR \fIminutes\fR]
 .fi
 
@@ -36,12 +36,10 @@ is alerted that the form \fIform-name\fR must be mounted on a printer.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIform-name\fR\fR
 .ad
 .RS 16n
-.rt  
 Specify a form.
 .RE
 
@@ -51,47 +49,39 @@ The first form of \fBlpforms\fR  requires that one of the following
 \fIoption\fRs  (\fB\(mi\fR, \fB-l\fR, \fB-F\fR, \fB-x\fR) must be used:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR \fIpathname\fR\fR
 .ad
 .RS 15n
-.rt  
 To add or change form \fIform-name\fR, as specified by the information in
 \fIpathname\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi\fR\fR
 .ad
 .RS 15n
-.rt  
 To add or change form \fIform-name\fR, as specified by the information from
 standard input.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 15n
-.rt  
 To list the attributes of form \fIform-name\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 15n
-.rt  
 To delete form \fIform-name\fR (this option must be used separately; it may not
 be used with any other option).
 .RE
@@ -102,47 +92,39 @@ The second form of the \fBlpforms\fR command requires the  \fB-A\fR
 \fIalert-type\fR option. The other options are optional.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR \fIalert-type\fR\fR
 .ad
 .RS 24n
-.rt  
 Defines an alert to mount the form when there are queued jobs which need it.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR \fIpaper-name\fR [ \fB-d\fR ]\fR
 .ad
 .RS 24n
-.rt  
 Specify the paper name when creating the form. If \fB-d\fR is specified, this
 paper is the default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Q\fR \fIrequests\fR\fR
 .ad
 .RS 24n
-.rt  
 An alert will be sent when a certain number of print requests that need the
 form are waiting.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-W\fR \fIminutes\fR\fR
 .ad
 .RS 24n
-.rt  
 An alert will be sent at intervals specified by minutes.
 .RE
 
@@ -209,7 +191,6 @@ printers only.
 A description of each form attribute is below:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPage length\fR and \fBPage Width\fR\fR
 .ad
@@ -225,7 +206,6 @@ if possible, to each filter used in a request needing this form.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNumber of pages\fR\fR
 .ad
@@ -238,7 +218,6 @@ filter the page subset of 1-\fIinteger\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLine pitch\fR and \fBCharacter pitch\fR\fR
 .ad
@@ -259,7 +238,6 @@ characters-per-inch), \fBpica\fR (10 characters-per-inch), or \fBcompressed\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCharacter set choice\fR\fR
 .ad
@@ -278,7 +256,6 @@ only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRibbon color\fR\fR
 .ad
@@ -290,7 +267,6 @@ also mention that the color of the ribbon should be \fIribbon-color\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBComment\fR\fR
 .ad
@@ -302,7 +278,6 @@ about this form  (see \fBlpstat\fR(1)).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAlignment pattern\fR\fR
 .ad
@@ -363,56 +338,46 @@ The \fIlogin-ID-list\fR argument may include any or all of the following
 constructs:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlogin-ID\fR\fR
 .ad
 .RS 24n
-.rt  
 A user on any system
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsystem_name\fR\fB!\fR\fIlogin-ID\fR\fR
 .ad
 .RS 24n
-.rt  
 A user on system \fIsystem_name\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsystem_name\fR\fB!all\fR\fR
 .ad
 .RS 24n
-.rt  
 All users on system \fIsystem_name\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBall!\fR\fIlogin-ID\fR\fR
 .ad
 .RS 24n
-.rt  
 A user on all systems
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBall\fR\fR
 .ad
 .RS 24n
-.rt  
 All users on all systems
 .RE
 
@@ -447,23 +412,19 @@ The method by which the alert is sent depends on the value of  the
 \fIalert-types\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmail\fR\fR
 .ad
 .RS 17n
-.rt  
 Send the alert message using the \fBmail\fR command to the administrator.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwrite\fR\fR
 .ad
 .RS 17n
-.rt  
 Write the message, using the \fBwrite\fR command, to the terminal on which the
 administrator is logged in. If the administrator is logged in on several
 terminals, one is arbitrarily chosen.
@@ -471,12 +432,10 @@ terminals, one is arbitrarily chosen.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBquiet\fR\fR
 .ad
 .RS 17n
-.rt  
 Do not send messages for the current condition. An administrator can use this
 option to temporarily stop receiving further messages about a known problem.
 Once the form \fIform-name\fR has been mounted and subsequently unmounted,
@@ -486,12 +445,10 @@ threshold specified by the \fB-Q\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshowfault\fR\fR
 .ad
 .RS 17n
-.rt  
 Attempt to execute a form alert handler on each system that has a print job for
 that form in the queue.  The fault handler is  \fB/etc/lp/alerts/form\fR. It is
 invoked with three parameters:  \fIform_name\fR, \fBdate\fR, \fIfile_name\fR.
@@ -500,24 +457,20 @@ invoked with three parameters:  \fIform_name\fR, \fBdate\fR, \fIfile_name\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnone\fR\fR
 .ad
 .RS 17n
-.rt  
 Do not send messages until the \fB-A\fR option is given again with a different
 \fIalert-type\fR (other than \fBquiet\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIshell-command\fR\fR
 .ad
 .RS 17n
-.rt  
 Run the \fIshell-command\fR each time the alert needs to be sent. The shell
 command should expect the message in standard input. If there are blank spaces
 embedded in the command, enclose the command in quotes. Note that the
@@ -532,12 +485,10 @@ used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlist\fR\fR
 .ad
 .RS 17n
-.rt  
 Display the type of the alert for the form on standard output. No change is
 made to the alert.
 .RE
@@ -614,48 +565,40 @@ lines is sent to the standard output, depending on the type of alert for the
 form.
 .sp
 .ne 2
-.mk
 .na
 \fB\(mi\fR
 .ad
 .RS 8n
-.rt  
 \fBWhen\fR \fIrequests\fR \fBrequests are queued:\fR \fBalert
 with\fR\fIshell-command\fR \fBevery\fR \fIminutes\fR \fBminutes\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\(mi\fR
 .ad
 .RS 8n
-.rt  
 \fBWhen\fR  \fIrequests\fR \fBrequests are queued:\fR \fBwrite to\fR
 \fIuser-name\fR \fBevery\fR \fIminutes\fR \fBminutes\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\(mi\fR
 .ad
 .RS 8n
-.rt  
 \fBWhen\fR \fIrequests\fR \fBrequests are queued:\fR \fBmail to\fR
 \fIuser-name\fR \fBevery\fR \fIminutes\fR \fBminutes\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\(mi\fR
 .ad
 .RS 8n
-.rt  
 \fBNo alert\fR
 .RE
 
@@ -689,35 +632,29 @@ when encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnon-zero\fR
 .ad
 .RS 12n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/lp/alerts/form\fR\fR
 .ad
 .RS 23n
-.rt  
 Fault handler for \fBlpform\fR.
 .RE
 

@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH visual_io 7I "14 Oct 2005" "SunOS 5.11" "Ioctl Requests"
+.TH VISUAL_IO 7I "Oct 14, 2005"
 .SH NAME
 visual_io \- Solaris VISUAL I/O control operations
 .SH SYNOPSIS
 .LP
 .nf
-\fB#include <sys/visual_io.h>\fR  
+\fB#include <sys/visual_io.h>\fR
 .fi
 
 .SH DESCRIPTION
@@ -43,12 +43,10 @@ restrictions, described below.
 .SH IOCTLS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVIS_GETIDENTIFIER\fR\fR
 .ad
 .RS 21n
-.rt  
 This \fBioctl()\fR returns an identifier string to uniquely identify a device
 used in the Solaris VISUAL environment.  This is a mandatory ioctl and must
 return a unique string. We suggest that the name be formed as
@@ -71,7 +69,6 @@ struct vis_identifier {
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVIS_GETCURSOR\fR\fR
 .ad
@@ -80,7 +77,6 @@ struct vis_identifier {
 \fB\fBVIS_SETCURSOR\fR\fR
 .ad
 .RS 21n
-.rt  
 These ioctls fetch and set various cursor attributes, using the
 \fBvis_cursor\fR structure.
 .sp
@@ -130,7 +126,6 @@ The \fBvis_cursorcmap\fR structure should contain pointers to two elements,
 specifying the red, green, and blue values for foreground and background.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVIS_SETCURSORPOS\fR\fR
 .ad
@@ -139,7 +134,6 @@ specifying the red, green, and blue values for foreground and background.
 \fB\fBVIS_MOVECURSOR\fR\fR
 .ad
 .RS 20n
-.rt  
 These ioctls fetch and move the current cursor position, using the
 \fBvis_cursorpos\fR structure.
 .RE
@@ -159,7 +153,6 @@ corner of the device, with rows increasing toward the bottom of the device and
 columns increasing from left to right.
 .sp
 .ne 2
-.mk
 .na
 \fBVIS_PUTCMAP\fR
 .ad
@@ -168,7 +161,6 @@ columns increasing from left to right.
 \fB\fBVIS_GETCMAP\fR\fR
 .ad
 .RS 15n
-.rt  
 Set or get color map entries.
 .RE
 
@@ -204,12 +196,10 @@ arrays which contain the color map info to set or where the color map info is
 placed on a get.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVIS_DEVINIT\fR\fR
 .ad
 .RS 15n
-.rt  
 Initializes the graphics driver as a console device.
 .RE
 
@@ -287,12 +277,10 @@ to the \fBmodechg_cb\fR function when the driver notifies the terminal emulator
 of a video mode change.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVIS_DEVFINI\fR\fR
 .ad
 .RS 18n
-.rt  
 Tells the graphics driver that it is no longer the system console device. There
 is no argument to this ioctl. The driver is expected to free any locally kept
 state information related to the console.
@@ -300,12 +288,10 @@ state information related to the console.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVIS_CONSCURSOR\fR\fR
 .ad
 .RS 18n
-.rt  
 Describes the size and placement of the cursor on the screen. The graphics
 driver is expected to display or hide the cursor at the indicated position.
 .RE
@@ -353,12 +339,10 @@ indexes to use when  the \fBaction\fR (see below) is set to
 either \fBVIS_HIDE_CURSOR\fR or \fBVIS_DISPLAY_CURSOR\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVIS_CONSDISPLAY\fR\fR
 .ad
 .RS 19n
-.rt  
 Display data on the graphics device. The graphics driver is expected to display
 the data contained in the  \fBvis_display\fR structure at the specified
 position on the console.
@@ -418,12 +402,10 @@ background color map indexes to use when displaying the data. \fBfb_color\fR is
 used for "on" pixels and \fBbg_color\fR is used for "off" pixels.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVIS_CONSCOPY\fR\fR
 .ad
 .RS 16n
-.rt  
 Copy data from one location on the device to another.  The driver is expected
 to copy the specified data.  The source data should not be modified. Any
 modifications to the source data should be as a side effect of the copy
@@ -493,8 +475,8 @@ console extension is implemented.
 struct vis_polledio {
     struct vis_polledio_arg *arg;
     void    (*display)(vis_polledio_arg *, struct vis_consdisplay *);
-    void    (*copy)(vis_polledio_arg *, struct vis_conscopy *);      
-    void    (*cursor)(vis_polledio_arg *, struct vis_conscursor *);  
+    void    (*copy)(vis_polledio_arg *, struct vis_conscopy *);
+    void    (*cursor)(vis_polledio_arg *, struct vis_conscursor *);
 };
 .fi
 .in -2
@@ -570,12 +552,10 @@ that the driver supports the kernel terminal emulator. By exporting
 driver.
 .sp
 .ne 2
-.mk
 .na
 \fBtem-support\fR
 .ad
 .RS 15n
-.rt  
 This DDI property, set to 1, means driver is compatible with the console
 kernel framebuffer interface.
 .RE

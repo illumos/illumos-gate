@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH iconv_unicode 5 "18 Apr 1997" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH ICONV_UNICODE 5 "Apr 18, 1997"
 .SH NAME
 iconv_unicode \- code set conversion tables for Unicode
 .SH DESCRIPTION
@@ -19,7 +19,7 @@ The following code set conversions are supported:
       Code              FROM          Target Code            TO
                         Filename                             Filename
                         Element                              Element
-     
+
 ISO 8859-1 (Latin 1)    8859-1            UTF-8               UTF-8
 ISO 8859-2 (Latin 2)    8859-2            UTF-8               UTF-8
 ISO 8859-3 (Latin 3)    8859-3            UTF-8               UTF-8
@@ -42,7 +42,7 @@ Korean Johap
 (KS C 5601-1992)        ko_KR-johap92     Korean UTF-8        ko_KR-UTF-8
 Korean UTF-8            ko_KR-UTF-8       Korean EUC          ko_KR-euc
 Korean UTF-8            ko_KR-UTF-8       Korean Johap        ko_KR-johap
-                                          (KS C 5601-1987)        
+                                          (KS C 5601-1987)
 Korean UTF-8            ko_KR-UTF-8       Korean Johap        ko_KR-johap92
                                           (KS C 5601-1992)
 KOI8-R (Cyrillic)       KOI8-R            UCS-2               UCS-2
@@ -64,7 +64,7 @@ UCS-2                   UCS-2             UCS-4               UCS-4
       Code              FROM          Target Code            TO
                         Filename                             Filename
                         Element                              Element
-    
+
 UCS-2              UCS-2           UTF-7                   UTF-7
 UCS-2              UCS-2           UTF-8                   UTF-8
 UCS-4              UCS-4           UCS-2                   UCS-2
@@ -112,7 +112,7 @@ UTF-8              UTF-8           Chinese/PRC EUC         zh_CN.euc
       Code              FROM          Target Code            TO
                         Filename                             Filename
                         Element                              Element
-    
+
 UTF-8                 UTF-8             ISO 2022-CN           zh_CN.iso2022-7
 UTF-8                 UTF-8             Chinese/Taiwan Big5   zh_TW-big5
 UTF-8                 UTF-8             Chinese/Taiwan  EUC   zh_TW-euc
@@ -158,12 +158,10 @@ For example, the library module filename to convert from the \fIKorean\fR
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/iconv/*.so\fR\fR
 .ad
 .RS 23n
-.rt  
 conversion modules
 .RE
 
@@ -243,98 +241,82 @@ ISO 8859 character sets using Latin alphabetic characters are distinguished as
 follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBISO\fR \fB8859-1\fR \fB(Latin\fR \fB1)\fR\fR
 .ad
 .RS 25n
-.rt  
 For most West European languages, including:
 .sp
 
 .sp
 .TS
-tab();
-lw(1.83i) lw(1.83i) lw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-AlbanianFinnishItalian
-CatalanFrenchNorwegian
-DanishGermanPortuguese
-DutchGalicianSpanish
-EnglishIrishSwedish
-FaeroeseIcelandic
+l l l
+l l l .
+Albanian	Finnish	Italian
+Catalan	French	Norwegian
+Danish	German	Portuguese
+Dutch	Galician	Spanish
+English	Irish	Swedish
+Faeroese	Icelandic	
 .TE
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBISO\fR \fB8859-2\fR \fB(Latin\fR \fB2)\fR\fR
 .ad
 .RS 25n
-.rt  
 For most Latin-written Slavic and Central European languages:
 .sp
 
 .sp
 .TS
-tab();
-lw(1.83i) lw(1.83i) lw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-CzechPolishSlovak
-GermanRumanianSlovene
-HungarianCroatian
+l l l
+l l l .
+Czech	Polish	Slovak
+German	Rumanian	Slovene
+Hungarian	Croatian	
 .TE
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBISO\fR \fB8859-3\fR \fB(Latin\fR \fB3)\fR\fR
 .ad
 .RS 25n
-.rt  
 Popularly used for Esperanto, Galician, Maltese, and Turkish.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBISO\fR \fB8859-4\fR \fB(Latin\fR \fB4)\fR\fR
 .ad
 .RS 25n
-.rt  
 Introduces letters for Estonian, Latvian, and Lithuanian. It is an incomplete
 predecessor of ISO 8859-10 (Latin 6).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBISO\fR \fB8859-9\fR \fB(Latin\fR \fB5)\fR\fR
 .ad
 .RS 25n
-.rt  
 Replaces the rarely needed Icelandic letters in ISO 8859-1 (Latin 1) with the
 Turkish ones.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBISO\fR \fB8859-10\fR \fB(Latin\fR \fB6)\fR\fR
 .ad
 .RS 25n
-.rt  
 Adds the last Inuit (Greenlandic) and Sami (Lappish) letters that were not
 included in ISO 8859-4 (Latin 4) to complete coverage of the Nordic area.
 .RE

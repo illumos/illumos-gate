@@ -2,14 +2,14 @@
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mail 1 "24 Jul 2008" "SunOS 5.11" "User Commands"
+.TH MAIL 1 "Jul 24, 2008"
 .SH NAME
 mail, rmail \- read mail or send mail to users
 .SH SYNOPSIS
@@ -89,36 +89,30 @@ continued on the following line if that line starts with white space.
 The following command-line arguments affect sending mail:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fImessage_type\fR\fR
 .ad
 .RS 19n
-.rt  
 A \fBMessage-Type:\fR line is added to the message header with the value of
 \fImessage_type\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 19n
-.rt  
 A \fBTo:\fR line is added to the message header for each of the intended
 \fIrecipient\fRs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR\fR
 .ad
 .RS 19n
-.rt  
 A letter is sent to a remote recipient without waiting for the completion of
 the remote transfer program.
 .RE
@@ -148,12 +142,10 @@ to the local system. The two most prevalent addressing schemes are Domain-style
 and UUCP-style.
 .sp
 .ne 2
-.mk
 .na
 \fBDomain-style addressing\fR
 .ad
 .RS 27n
-.rt  
 Remote recipients are specified by appending an `\fB@\fR' and domain (and
 possibly sub-domain) information to the recipient name (such as
 \fBuser@sf.att.com\fR). (The local system administrator should be consulted for
@@ -162,12 +154,10 @@ details on which addressing conventions are available on the local system.)
 
 .sp
 .ne 2
-.mk
 .na
 \fBUUCP-style addressing\fR
 .ad
 .RS 27n
-.rt  
 Remote recipients are specified by prefixing the recipient name with the remote
 system name and an exclamation point, such as \fBsysa!user.\fR If \fBcsh\fR(1)
 is the default shell, \fBsysa\e!user\fR should be used. A series of system
@@ -182,12 +172,10 @@ extended network (such as \fBsysa!sysb!sysc!user\fR or
 The following command-line arguments affect reading mail:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 11n
-.rt  
 Test for the presence of mail. \fBmail\fR prints nothing.
 .sp
 An exit status of \fB0\fR is returned if the user has mail. Otherwise, an exit
@@ -196,12 +184,10 @@ status of \fB1\fR is returned.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-E\fR\fR
 .ad
 .RS 11n
-.rt  
 Similar to \fB-e\fR, but tests only for the presence of \fBnew\fR mail.
 .sp
 An  exit  status  of \fB0\fR is returned if the user has new            mail
@@ -212,70 +198,58 @@ which has already been read.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 11n
-.rt  
 A window of headers are initially displayed rather than the latest message. The
 display is followed by the \fB?\fR prompt.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 11n
-.rt  
 All messages are printed without prompting for disposition.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR\fR
 .ad
 .RS 11n
-.rt  
 All messages are printed with \fIall\fR header lines displayed, rather than the
 default selective header line display.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
 .RS 11n
-.rt  
 \fBmail\fR terminates after interrupts. Normally an interrupt causes only the
 termination of the message being printed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 11n
-.rt  
 Messages are printed in first-in, first-out order.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIfile\fR\fR
 .ad
 .RS 11n
-.rt  
 \fBmail\fR uses \fIfile\fR (such as \fBmbox\fR) instead of the default
 \fImailfile\fR.
 .RE
@@ -300,269 +274,221 @@ the standard input. The following commands are available to determine the
 disposition of the message:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB#\fR\fR
 .ad
 .RS 22n
-.rt  
 Print the number of the current message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi\fR\fR
 .ad
 .RS 22n
-.rt  
 Print previous message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB<new-line>,\fB+\fR, or \fBn\fR\fR
 .ad
 .RS 22n
-.rt  
 Print the next message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!\fR\fIcommand\fR\fR
 .ad
 .RS 22n
-.rt  
 Escape to the shell to do \fIcommand\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBa\fR\fR
 .ad
 .RS 22n
-.rt  
 Print message that arrived during the \fBmail\fR session.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd\fR, or \fBdp\fR\fR
 .ad
 .RS 22n
-.rt  
 Delete the current message and print the next message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd\fR \fIn\fR\fR
 .ad
 .RS 22n
-.rt  
 Delete message number \fIn\fR. Do not go on to next message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdq\fR\fR
 .ad
 .RS 22n
-.rt  
 Delete message and quit \fBmail\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBh\fR\fR
 .ad
 .RS 22n
-.rt  
 Display a window of headers around current message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBh\fR\fIn\fR\fR
 .ad
 .RS 22n
-.rt  
 Display a window of headers around message number \fIn\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBh a\fR\fR
 .ad
 .RS 22n
-.rt  
 Display headers of all messages in the user's \fImailfile\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBh d\fR\fR
 .ad
 .RS 22n
-.rt  
 Display headers of messages scheduled for deletion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBm\fR [ \fIpersons\fR ]\fR
 .ad
 .RS 22n
-.rt  
 Mail (and delete) the current message to the named \fIpersons\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIn\fR\fR
 .ad
 .RS 22n
-.rt  
 Print message number \fIn\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBp\fR\fR
 .ad
 .RS 22n
-.rt  
 Print current message again, overriding any indications of binary (that is,
 unprintable) content.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBP\fR\fR
 .ad
 .RS 22n
-.rt  
 Override default brief mode and print current message again, displaying all
 header lines.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBq\fR, or Control-d\fR
 .ad
 .RS 22n
-.rt  
 Put undeleted mail back in the \fImailfile\fR and quit \fBmail\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBr\fR [ \fIusers\fR ]\fR
 .ad
 .RS 22n
-.rt  
 Reply to the sender, and other \fIusers\fR, then delete the message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR [ \fIfiles\fR ]\fR
 .ad
 .RS 22n
-.rt  
 Save message in the named \fIfiles\fR (\fBmbox\fR is default) and delete the
 message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBu\fR [ \fIn\fR ]\fR
 .ad
 .RS 22n
-.rt  
 Undelete message number \fIn\fR (default is last read).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBw\fR [ \fIfiles\fR ]\fR
 .ad
 .RS 22n
-.rt  
 Save message contents, without any header lines, in the named \fIfiles\fR
 (\fBmbox\fR is default) and delete the message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBx\fR\fR
 .ad
 .RS 22n
-.rt  
 Put all mail back in the \fImailfile\fR unchanged and exit \fBmail\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBy\fR [ \fIfiles\fR ]\fR
 .ad
 .RS 22n
-.rt  
 Same as \fB-w\fR option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB?\fR\fR
 .ad
 .RS 22n
-.rt  
 Print a command summary.
 .RE
 
@@ -590,12 +516,10 @@ The following command-line arguments cause \fBmail\fR to provide debugging
 information:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR \fIdebug_level\fR\fR
 .ad
 .RS 18n
-.rt  
 \fBmail\fR creates a trace file containing debugging information.
 .RE
 
@@ -631,58 +555,48 @@ following lines in the message header.
 Where the "/\fIoptions\fR" can be one or more of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/delivery\fR\fR
 .ad
 .RS 15n
-.rt  
 Inform the sender that the message was successfully delivered to the
 \fIrecipient\fR's mailbox.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/nodelivery\fR\fR
 .ad
 .RS 15n
-.rt  
 Do not inform the sender of successful deliveries.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/ignore\fR\fR
 .ad
 .RS 15n
-.rt  
 Do not inform the sender of failed deliveries.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/return\fR\fR
 .ad
 .RS 15n
-.rt  
 Inform the sender if mail delivery fails. Return the failed message to the
 sender.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/report\fR\fR
 .ad
 .RS 15n
-.rt  
 Same as \fB/return\fR except that the original message is not returned.
 .RE
 
@@ -696,12 +610,10 @@ first is recognized and later, conflicting, terms are ignored.
 The following operand is supported for sending mail:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrecipient\fR\fR
 .ad
 .RS 13n
-.rt  
 A domain style address ("\fIuser\fR@\fImachine\fR") or user login name
 recognized by \fBlogin\fR(1).
 .RE
@@ -720,12 +632,10 @@ that affect the execution of \fBmail\fR: \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and
 \fBNLSPATH\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTZ\fR\fR
 .ad
 .RS 6n
-.rt  
 Determine the timezone used with date and time strings.
 .RE
 
@@ -735,135 +645,111 @@ Determine the timezone used with date and time strings.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion when the user had mail.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 6n
-.rt  
 The user had no mail or an initialization error occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>1\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred after initialization.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdead.letter\fR\fR
 .ad
 .RS 20n
-.rt  
 unmailable text
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/passwd\fR\fR
 .ad
 .RS 20n
-.rt  
 to identify sender and locate \fIrecipient\fRs
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/mbox\fR\fR
 .ad
 .RS 20n
-.rt  
 saved mail
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$MAIL\fR\fR
 .ad
 .RS 20n
-.rt  
 variable containing path name of \fImailfile\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/tmp/MLDBG\fR*\fR
 .ad
 .RS 20n
-.rt  
 debug trace file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/mail/*.lock\fR\fR
 .ad
 .RS 20n
-.rt  
 lock for mail directory
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/mail/:saved\fR\fR
 .ad
 .RS 20n
-.rt  
 directory for holding temp files to prevent loss of data in the event of a
 system crash
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/mail/\fIuser\fR\fR\fR
 .ad
 .RS 20n
-.rt  
 incoming mail for \fIuser\fR; that is, the \fImailfile\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvar/tmp/ma\fR*\fR
 .ad
 .RS 20n
-.rt  
 temporary file
 .RE
 

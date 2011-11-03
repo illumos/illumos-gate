@@ -3,27 +3,27 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH devmap_setup 9F "22 Jan 1997" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DEVMAP_SETUP 9F "Jan 22, 1997"
 .SH NAME
 devmap_setup, ddi_devmap_segmap \- set up a user mapping to device memory using
 the devmap framework
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/ddi.h> 
-#include <sys/sunddi.h> 
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
 
 
 
-\fBint\fR \fBdevmap_setup\fR(\fBdev_t\fR \fIdev\fR, \fBoffset_t\fR \fIoff\fR, \fBddi_as_handle_t\fR \fIas\fR, 
-     \fBcaddr_t *\fR\fIaddrp\fR, \fBsize_t\fR\fIlen\fR, \fBuint_t\fR \fIprot\fR, \fBuint_t\fR \fImaxprot\fR, 
+\fBint\fR \fBdevmap_setup\fR(\fBdev_t\fR \fIdev\fR, \fBoffset_t\fR \fIoff\fR, \fBddi_as_handle_t\fR \fIas\fR,
+     \fBcaddr_t *\fR\fIaddrp\fR, \fBsize_t\fR\fIlen\fR, \fBuint_t\fR \fIprot\fR, \fBuint_t\fR \fImaxprot\fR,
      \fBuint_t\fR \fIflags\fR, \fBcred_t *\fR\fIcred\fR);
 .fi
 
 .LP
 .nf
-\fBint\fR \fBddi_devmap_segmap\fR(\fBdev_t\fR \fIdev\fR, \fBoff_t\fR \fIoff\fR, \fBddi_as_handle_t\fR \fIas\fR, 
-     \fBcaddr_t *\fR\fIaddrp\fR, \fBoff_t\fR\fIlen\fR, \fBuint_t\fR \fIprot\fR, \fBuint_t\fR \fImaxprot\fR, 
+\fBint\fR \fBddi_devmap_segmap\fR(\fBdev_t\fR \fIdev\fR, \fBoff_t\fR \fIoff\fR, \fBddi_as_handle_t\fR \fIas\fR,
+     \fBcaddr_t *\fR\fIaddrp\fR, \fBoff_t\fR\fIlen\fR, \fBuint_t\fR \fIprot\fR, \fBuint_t\fR \fImaxprot\fR,
      \fBuint_t\fR \fIflags\fR, \fBcred_t *\fR\fIcred\fR);
 .fi
 
@@ -34,124 +34,102 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdev\fR \fR
 .ad
 .RS 12n
-.rt  
 Device whose memory is to be mapped.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoff\fR \fR
 .ad
 .RS 12n
-.rt  
 User offset within the logical device memory at which the mapping begins.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIas\fR \fR
 .ad
 .RS 12n
-.rt  
 An opaque data structure that describes the address space into which the device
 memory should be mapped.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaddrp\fR \fR
 .ad
 .RS 12n
-.rt  
 Pointer to the starting address in the address space into which the device
 memory should be mapped.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlen\fR \fR
 .ad
 .RS 12n
-.rt  
 Length (in bytes) of the memory to be mapped.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprot\fR \fR
 .ad
 .RS 12n
-.rt  
 A bit field that specifies the protections. Some possible settings combinations
 are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_READ\fR \fR
 .ad
 .RS 15n
-.rt  
 Read access is desired.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_WRITE\fR \fR
 .ad
 .RS 15n
-.rt  
 Write access is desired.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_EXEC\fR \fR
 .ad
 .RS 15n
-.rt  
 Execute access is desired.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_USER\fR \fR
 .ad
 .RS 15n
-.rt  
 User-level access is desired (the mapping is being done as a result of a
 \fBmmap\fR(2) system call).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_ALL\fR \fR
 .ad
 .RS 15n
-.rt  
 All access is desired.
 .RE
 
@@ -159,55 +137,45 @@ All access is desired.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImaxprot\fR \fR
 .ad
 .RS 12n
-.rt  
 Maximum protection flag possible for attempted mapping; the \fBPROT_WRITE\fR
 bit may be masked out if the user opened the special file read-only.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR \fR
 .ad
 .RS 12n
-.rt  
 Flags indicating type of mapping. The following flags can be specified:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAP_PRIVATE\fR \fR
 .ad
 .RS 16n
-.rt  
 Changes are private.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAP_SHARED\fR \fR
 .ad
 .RS 16n
-.rt  
 Changes should be shared.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAP_FIXED\fR \fR
 .ad
 .RS 16n
-.rt  
 The user specified an address in  \fI*addrp\fR rather than letting the system
 choose an address.
 .RE
@@ -216,12 +184,10 @@ choose an address.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcred\fR \fR
 .ad
 .RS 12n
-.rt  
 Pointer to the user credential structure.
 .RE
 
@@ -295,23 +261,19 @@ offset within the device address space. If the driver does not provide its own
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 12n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNon-zero\fR\fR
 .ad
 .RS 12n
-.rt  
 An error occurred.  The return value of \fBdevmap_setup()\fR and
 \fBddi_devmap_segmap()\fR should be used directly in the  \fBsegmap\fR(9E)
 entry point.

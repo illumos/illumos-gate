@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ecb_crypt 3EXT "3 Mar 2008" "SunOS 5.11" "Extended Library Functions"
+.TH ECB_CRYPT 3EXT "Mar 3, 2008"
 .SH NAME
 ecb_crypt, cbc_crypt, des_setparity, DES_FAILED \- fast DES encryption
 .SH SYNOPSIS
@@ -67,45 +67,37 @@ Given a result status \fIstat\fR, the macro \fBDES_FAILED\fR is false only for
 the first two statuses.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDESERR_NONE\fR\fR
 .ad
 .RS 21n
-.rt  
 No error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDESERR_NOHWDEVICE\fR\fR
 .ad
 .RS 21n
-.rt  
 Encryption succeeded, but done in software instead of the requested hardware.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDESERR_HWERROR\fR\fR
 .ad
 .RS 21n
-.rt  
 An error occurred in the hardware or driver.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDESERR_BADPARAM\fR\fR
 .ad
 .RS 21n
-.rt  
 Bad parameter to routine.
 .RE
 
@@ -117,13 +109,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

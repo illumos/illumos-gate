@@ -23,6 +23,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2011 Joyent, Inc.  All rights reserved.
+ */
 
 #include <sys/dtrace_impl.h>
 #include <sys/atomic.h>
@@ -935,4 +938,13 @@ got_fp:
 	}
 
 	return (value);
+}
+
+/*ARGSUSED*/
+uint64_t
+dtrace_getvmreg(uint_t ndx, volatile uint16_t *flags)
+{
+	*flags |= CPU_DTRACE_ILLOP;
+
+	return (0);
 }

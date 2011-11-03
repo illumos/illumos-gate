@@ -30,7 +30,6 @@ set name=pkg.summary value="Email Notification Daemon for System Events"
 set name=info.classification \
     value="org.opensolaris.category.2008:System/Administration and Configuration"
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=lib/svc/manifest/system group=sys
 dir path=lib/svc/manifest/system/fm group=sys
 dir path=usr/lib
@@ -41,12 +40,3 @@ file path=usr/lib/fm/notify/process_msg_template.sh mode=0555
 file path=usr/lib/fm/notify/smtp-notify mode=0555
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-#
-# snmp-notify depends on libraries delivered in this package
-#
-depend fmri=service/fault-management type=require
-#
-# snmp-notify requires the sendmail-client service in order to be able to send
-# email notifications.
-#
-depend fmri=service/network/smtp/sendmail type=require

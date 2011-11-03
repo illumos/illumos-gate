@@ -2,7 +2,7 @@
 .\" To view license terms, attribution, and copyright for IP Filter, the default path is /usr/lib/ipf/IPFILTER.LICENCE. If the Solaris operating environment has been installed anywhere other than the default, modify the given path to access the file at the installed
 .\" location.
 .\" Portions Copyright (c) 2008, Sun Microsystems Inc. All Rights Reserved.
-.TH ipfstat 1M "3 Apr 2008" "SunOS 5.11" "System Administration Commands"
+.TH IPFSTAT 1M "Apr 3, 2008"
 .SH NAME
 ipfstat \- reports on packet filter statistics and filter list
 .SH SYNOPSIS
@@ -13,7 +13,7 @@ ipfstat \- reports on packet filter statistics and filter list
 
 .LP
 .nf
-\fBipfstat\fR [\fB-C\fR] [\fB-D\fR \fIaddrport\fR] [\fB-P\fR \fIprotocol\fR] [\fB-S\fR \fIaddrport\fR] 
+\fBipfstat\fR [\fB-C\fR] [\fB-D\fR \fIaddrport\fR] [\fB-P\fR \fIprotocol\fR] [\fB-S\fR \fIaddrport\fR]
      [\fB-T\fR \fIrefreshtime\fR]
 .fi
 
@@ -68,56 +68,46 @@ In state top mode, use the following keys to influence the displayed
 information:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd\fR\fR
 .ad
 .RS 5n
-.rt  
 Select information to display.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBl\fR\fR
 .ad
 .RS 5n
-.rt  
 Redraw the screen.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBq\fR\fR
 .ad
 .RS 5n
-.rt  
 Quit the program.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fR
 .ad
 .RS 5n
-.rt  
 Switch between different sorting criteria.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBr\fR\fR
 .ad
 .RS 5n
-.rt  
 Reverse the sorting criteria.
 .RE
 
@@ -147,46 +137,38 @@ to see additional entries.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-6\fR\fR
 .ad
 .RS 18n
-.rt  
 Display filter lists and states for IPv6, if available. This option might
 change in the future.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 18n
-.rt  
 Display the accounting filter list and show bytes counted against each rule.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR\fR
 .ad
 .RS 18n
-.rt  
 Display packet authentication statistics.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
 .RS 18n
-.rt  
 Valid only in combination with \fB-t\fR. Display "closed" states as well in the
 top. Normally, a TCP connection is not displayed when it reaches the
 \fBCLOSE_WAIT\fR protocol state. With this option enabled, all state entries
@@ -195,23 +177,19 @@ are displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 18n
-.rt  
 Produce debugging output when displaying data.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR \fIaddrport\fR\fR
 .ad
 .RS 18n
-.rt  
 Valid only in combination with \fB-t\fR. Limit the state top display to show
 only state entries whose destination IP address and port match the
 \fIaddrport\fR argument. The \fIaddrport\fR specification is of the form
@@ -223,103 +201,85 @@ port, in that order). If the \fB-D\fR option is not specified, it defaults to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 18n
-.rt  
 Show fragment state information (statistics) and held state information (in the
 kernel) if any is present.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR\fR
 .ad
 .RS 18n
-.rt  
 Show groups currently configured (both active and inactive).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 18n
-.rt  
 Show per-rule the number of times each one scores a "hit". For use in
 combination with \fB-i\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 18n
-.rt  
 Display the filter list used for the input side of the kernel IP processing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I\fR\fR
 .ad
 .RS 18n
-.rt  
 Swap between retrieving \fBinactive\fR/\fBactive\fR filter list details. For
 use in combination with \fB-i\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 18n
-.rt  
 When used with \fB-s\fR, show a list of active state entries (no statistics).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 18n
-.rt  
 Show the rule number for each rule as it is printed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 18n
-.rt  
 Display the filter list used for the output side of the kernel IP processing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR \fIprotocol\fR\fR
 .ad
 .RS 18n
-.rt  
 Valid only in combination with \fB-t\fR. Limit the state top display to show
 only state entries that match a specific protocol. The argument can be a
 protocol name (as defined in \fB/etc/protocols\fR) or a protocol number. If
@@ -328,24 +288,20 @@ this option is not specified, state entries for any protocol are specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR\fR
 .ad
 .RS 18n
-.rt  
 Disable both IP address-to-hostname resolution and port number-to-service name
 resolution.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR \fIaddrport\fR\fR
 .ad
 .RS 18n
-.rt  
 Valid only in combination with \fB-t\fR. Limit the state top display to show
 only state entries whose source IP address and port match the \fIaddrport\fR
 argument. The \fIaddrport\fR specification is of the form
@@ -357,23 +313,19 @@ port, in that order). If the \fB-S\fR option is not specified, it defaults to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 18n
-.rt  
 Show packet/flow state information (statistics only).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fIrefreshtime\fR\fR
 .ad
 .RS 18n
-.rt  
 Valid only in combination with \fB-t\fR. Specifies how often the state
 \fBtop\fR display should be updated. The refresh time is the number of seconds
 between an update. Any positive integer can be used. The default (and minimal
@@ -382,24 +334,20 @@ update time) is 1.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 18n
-.rt  
 Show the state table in a way similar to the way the Unix utility, \fBtop\fR,
 shows the process table. States can be sorted in a number of different ways.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 18n
-.rt  
 Turn verbose mode on. Displays additional debugging information.
 .RE
 
@@ -436,13 +384,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

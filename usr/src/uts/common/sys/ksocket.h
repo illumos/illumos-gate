@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -113,6 +114,7 @@ extern int 	ksocket_getpeername(ksocket_t, struct sockaddr *, socklen_t *,
 extern int 	ksocket_getsockname(ksocket_t, struct sockaddr *, socklen_t *,
 		    struct cred *);
 extern int	ksocket_ioctl(ksocket_t, int, intptr_t, int *, struct cred *);
+extern int	ksocket_spoll(ksocket_t, int, short, short *, struct cred *);
 extern int	ksocket_setcallbacks(ksocket_t, ksocket_callbacks_t *, void *,
 		    struct cred *);
 extern int 	ksocket_close(ksocket_t, struct cred *);

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH vuidmice 7M "21 June 2005" "SunOS 5.11" "STREAMS Modules"
+.TH VUIDMICE 7M "Jun 21, 2005"
 .SH NAME
 vuidmice, vuidm3p, vuidm4p, vuidm5p, vuid2ps2, vuid3ps2 \- converts mouse
 protocol to Firm Events
@@ -84,7 +84,7 @@ if ( format == VUID_NATIVE );
 	 */
 if ( format == VUID_FIRM_EVENT );
 	/* Message processing is enabled.
-	 * Mouse protocol conversion to Firm events 
+	 * Mouse protocol conversion to Firm events
 	 * are performed.
 .fi
 .in -2
@@ -96,23 +96,19 @@ the read- and write-side.
 .SS "Read Side Behavior"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM_DATA\fR \fR
 .ad
 .RS 12n
-.rt  
 Incoming messages are queued and converted to Firm events.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM_FLUSH\fR \fR
 .ad
 .RS 12n
-.rt  
 The read queue of the module is flushed of all its data messages and all data
 in the record being accumulated are also flushed. The message is passed
 upstream.
@@ -121,12 +117,10 @@ upstream.
 .SS "Write Side Behavior"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM_IOCTL\fR \fR
 .ad
 .RS 16n
-.rt  
 Messages sent downstream as a result of an \fBioctl\fR(2) system call.  The two
 valid \fBioctl\fR options processed by the \fBvuidmice\fR modules are
 \fBVUIDGFORMAT\fR and \fBVUIDSFORMAT\fR.
@@ -134,24 +128,20 @@ valid \fBioctl\fR options processed by the \fBvuidmice\fR modules are
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM_FLUSH\fR \fR
 .ad
 .RS 16n
-.rt  
 The write queue of the module is flushed of all its data messages and the
 message is passed downstream.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVUIDGFORMAT\fR \fR
 .ad
 .RS 16n
-.rt  
 This option returns the current state of the  STREAMS module. The state of the
 \fBvuidmice\fR STREAMS module may either be \fBVUID_NATIVE\fR (no message
 processing) or \fBVUID_FIRM_EVENT\fR (convert to Firm events).
@@ -159,12 +149,10 @@ processing) or \fBVUID_FIRM_EVENT\fR (convert to Firm events).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVUIDSFORMAT\fR \fR
 .ad
 .RS 16n
-.rt  
 This option sets the state of the  STREAMS module to \fBVUID_FIRM_EVENT.\fR If
 the state of the STREAMS module is already in \fBVUID_FIRM_EVENT\fR, this
 option is non-operational. It is not possible  to set the state back to
@@ -178,24 +166,20 @@ vuid*)\fR.
 The following wheel support ioctls are defined for PS/2 mouse only:
 .sp
 .ne 2
-.mk
 .na
 \fBVUIDGWHEELCOUNT\fR
 .ad
 .RS 19n
-.rt  
 This ioctl takes a pointer to an integer as argument and sets the value of the
 integer to the number of wheels available on this device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBVUIDGWHEELINFO\fR
 .ad
 .RS 19n
-.rt  
 This command returns static information   about  the  wheel that does not
 change while a  device is in use. Currently the  only information defined  is
 the  wheel orientation                                 which is either
@@ -218,7 +202,6 @@ wheel for which the information is desired.
 
 .sp
 .ne 2
-.mk
 .na
 \fBVUIDSWHEELSTATE\fR
 .ad
@@ -227,7 +210,6 @@ wheel for which the information is desired.
 \fBVUIDGWHEELSTATE\fR
 .ad
 .RS 19n
-.rt  
 VUIDSWHEELSTATE sets the state of the wheel to that specified in the
 stateflags. VUIDGWHEELSTATE returns the current state settings in the
 stateflags field.
@@ -246,7 +228,7 @@ and then change only the bit they want.
 .in +2
 .nf
    typedef struct {
-           int             vers;   
+           int             vers;
            int            id;
            uint32_t       stateflags;
     } wheel_state;
@@ -263,31 +245,30 @@ for 'VUIDGWHEELINFO' ioctl.
 
 .sp
 .TS
-tab() box;
-cw(1.19i) |cw(2.47i) |cw(1.83i) 
-lw(1.19i) |lw(2.47i) |lw(1.83i) 
-.
-ModuleProtocol TypeDevice
+box;
+c | c | c
+l | l | l .
+Module	Protocol Type	Device
 _
-vuidm3pT{
+vuidm3p	T{
 3-Byte Protocol Microsoft 2 Button Serial Mouse
-T}/dev/tty*
+T}	/dev/tty*
 _
-vuidm4pT{
+vuidm4p	T{
 4-Byte Protocol Logitech 3 Button Mouseman
-T}/dev/tty*
+T}	/dev/tty*
 _
-vuidm5pT{
+vuidm5p	T{
 Logitech 3 Button Bus Mouse Microsoft Bus Mouse
-T}/dev/logi/ dev/msm
+T}	/dev/logi/ dev/msm
 _
-vuid2ps2T{
+vuid2ps2	T{
 PS/2 Protocol 2 Button PS/2 Compatible Mouse
-T}/dev/kdmouse
+T}	/dev/kdmouse
 _
-vuid3ps2T{
+vuid3ps2	T{
 PS/2 Protocol 3 Button PS/2 Compatible Mouse
-T}/dev/kdmouse
+T}	/dev/kdmouse
 .TE
 
 .SH ATTRIBUTES
@@ -298,13 +279,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) |lw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Architecturex86
+Architecture	x86
 .TE
 
 .SH SEE ALSO

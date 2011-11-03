@@ -1,19 +1,19 @@
 '\" te
 .\"  Copyright (c) 2001, The IEEE and The Open Group. All Rights Reserved. Portions Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH resource.h 3HEAD "10 Sep 2004" "SunOS 5.11" "Headers"
+.TH RESOURCE.H 3HEAD "Sep 10, 2004"
 .SH NAME
 resource.h, resource \- definitions for resource operations
 .SH SYNOPSIS
 .LP
 .nf
-#include <\fBsys/resource.h\fR> 
+#include <\fBsys/resource.h\fR>
 .fi
 
 .SH DESCRIPTION
@@ -24,34 +24,28 @@ as possible values of the \fIwhich\fR argument of \fBgetpriority()\fR and
 \fBsetpriority()\fR. See \fBgetpriority\fR(3C).
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIO_PROCESS\fR\fR
 .ad
 .RS 16n
-.rt  
 identifies the \fIwho\fR argument as a process ID
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIO_PGRP\fR\fR
 .ad
 .RS 16n
-.rt  
 identifies the \fIwho\fR argument as a process group ID
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIO_USER\fR\fR
 .ad
 .RS 16n
-.rt  
 identifies the \fIwho\fR argument as a user  ID
 .RE
 
@@ -60,12 +54,10 @@ identifies the \fIwho\fR argument as a user  ID
 The following type is defined through \fBtypedef\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrlim_t\fR\fR
 .ad
 .RS 10n
-.rt  
 unsigned integer type used for limit values
 .RE
 
@@ -74,34 +66,28 @@ unsigned integer type used for limit values
 The following symbolic constants are defined:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRLIM_INFINITY\fR\fR
 .ad
 .RS 18n
-.rt  
 a value of \fBrlim_t\fR indicating no limit
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRLIM_SAVED_MAX\fR\fR
 .ad
 .RS 18n
-.rt  
 a value of type \fBrlim_t\fR indicating an unrepresentable saved hard limit
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRLIM_SAVED_CUR\fR\fR
 .ad
 .RS 18n
-.rt  
 a value of type \fBrlim_t\fR indicating an unrepresentable saved soft limit
 .RE
 
@@ -111,23 +97,19 @@ The symbolic constants listed below are defined as possible values of the
 \fIwho\fR parameter of \fBgetrusage()\fR. See \fBgetrusage\fR(3C).
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRUSAGE_SELF\fR\fR
 .ad
 .RS 19n
-.rt  
 returns information about the current process
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRUSAGE_CHILDREN\fR\fR
 .ad
 .RS 19n
-.rt  
 returns information about children of the current process
 .RE
 
@@ -165,78 +147,64 @@ The symbolic constants listed below are defined as possible values for the
 \fBgetrlimit\fR(2).
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRLIMIT_CORE\fR\fR
 .ad
 .RS 17n
-.rt  
 limit on size of core dump file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRLIMIT_CPU\fR\fR
 .ad
 .RS 17n
-.rt  
 limit on CPU time per process
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRLIMIT_DATA\fR\fR
 .ad
 .RS 17n
-.rt  
 limit on data segment size
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRLIMIT_FSIZE\fR\fR
 .ad
 .RS 17n
-.rt  
 limit on file size
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRLIMIT_NOFILE\fR\fR
 .ad
 .RS 17n
-.rt  
 limit on number of open files
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRLIMIT_STACK\fR\fR
 .ad
 .RS 17n
-.rt  
 limit on stack size
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRLIMIT_AS\fR\fR
 .ad
 .RS 17n
-.rt  
 limit on address space size
 .RE
 
@@ -256,13 +224,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

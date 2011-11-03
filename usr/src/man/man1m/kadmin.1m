@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH kadmin 1M "29 Feb 2008" "SunOS 5.11" "System Administration Commands"
+.TH KADMIN 1M "Feb 29, 2008"
 .SH NAME
 kadmin, kadmin.local \- Kerberos database administration program
 .SH SYNOPSIS
@@ -67,7 +67,6 @@ than prompting for a password. The \fB-m\fR option will bypass the
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIcredentials_cache\fR\fR
 .ad
@@ -81,7 +80,6 @@ ticket from the KDC, and stores it in its own temporary credentials cache.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdbname\fR\fR
 .ad
@@ -92,7 +90,6 @@ Specify a non-standard database name. [Local only]
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR\fR
 .ad
@@ -103,7 +100,6 @@ Turn on debug mode. [Local only]
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fI"enc:salt ..."\fR\fR
 .ad
@@ -114,7 +110,6 @@ Specify a different encryption type and/or key salt. [Local only]
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR [\fB-t\fR \fIkeytab\fR]\fR
 .ad
@@ -128,7 +123,6 @@ for keytab maintenance.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
@@ -140,7 +134,6 @@ Accept the database master password from the keyboard rather than using the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIprincipal\fR\fR
 .ad
@@ -154,7 +147,6 @@ the username as obtained with \fBgetpwuid\fR, in that order of preference.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR \fIquery\fR\fR
 .ad
@@ -166,7 +158,6 @@ then exit. This can be useful for writing scripts.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIrealm\fR\fR
 .ad
@@ -177,7 +168,6 @@ Use \fIrealm\fR as the default database realm.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIadmin_server\fR[\fI:port\fR]\fR
 .ad
@@ -190,7 +180,6 @@ client.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR \fIpassword\fR\fR
 .ad
@@ -204,7 +193,6 @@ arguments of this command through \fBps\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR \fIdb_args\fR\fR
 .ad
@@ -214,7 +202,6 @@ Pass database-specific arguments to \fBkadmin\fR. Supported arguments are for
 LDAP and the \fBBerkeley-db2\fR plug-in. These arguments are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbinddn\fR=\fIbinddn\fR\fR
 .ad
@@ -226,7 +213,6 @@ LDAP simple bind DN for authorization on the directory server. Overrides the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbindpwd\fR=\fIbindpwd\fR\fR
 .ad
@@ -237,7 +223,6 @@ Bind password.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdbname\fR=\fIname\fR\fR
 .ad
@@ -248,7 +233,6 @@ For the \fBBerkeley-db2\fR plug-in, specifies a name for the Kerberos database.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnconns\fR=\fInum\fR\fR
 .ad
@@ -259,7 +243,6 @@ Maximum number of server connections.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBport\fR=\fInum\fR\fR
 .ad
@@ -273,7 +256,6 @@ Directory server connection port.
 .SH COMMANDS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlist_requests\fR\fR
 .ad
@@ -285,7 +267,6 @@ Lists all the commands available for \fBkadmin\fR. Aliased by \fBlr\fR and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBget_privs\fR\fR
 .ad
@@ -298,7 +279,6 @@ that is currently running \fBkadmin\fR. The privileges are based on the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fBadd_principal\fR \fB[\fIoptions\fR]\fR \fB\fInewprinc\fR\fR\fR
 .ad
@@ -314,7 +294,6 @@ can be suppressed with the \fB-clearpolicy\fR option. This command requires the
 \fBadd\fR privilege. Aliased by \fBaddprinc\fR and \fBank\fR. The options are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-expire\fR \fIexpdate\fR\fR
 .ad
@@ -326,7 +305,6 @@ the valid absolute time formats that you can specify for \fIexpdate\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-pwexpire\fR \fIpwexpdate\fR\fR
 .ad
@@ -338,7 +316,6 @@ valid absolute time formats that you can specify for \fIpwexpdate\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-maxlife\fR \fImaxlife\fR\fR
 .ad
@@ -350,7 +327,6 @@ for the valid time duration formats that you can specify for \fImaxlife\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-maxrenewlife\fR \fImaxrenewlife\fR\fR
 .ad
@@ -363,7 +339,6 @@ for \fImaxrenewlife\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-kvno\fR \fIkvno\fR\fR
 .ad
@@ -374,7 +349,6 @@ Explicitly set the key version number.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-policy\fR \fIpolicy\fR\fR
 .ad
@@ -389,7 +363,6 @@ policy or the \fBdefault\fR policy.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-clearpolicy\fR\fR
 .ad
@@ -402,7 +375,6 @@ policy does not exist.
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fB-\fR|\fB+\fR}\fBallow_postdated\fR\fR
 .ad
@@ -415,7 +387,6 @@ tickets. (Sets the \fBKRB5_KDB_DISALLOW_POSTDATED\fR flag.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fB-\fR|\fB+\fR}\fBallow_forwardable\fR\fR
 .ad
@@ -428,7 +399,6 @@ tickets. (Sets the \fBKRB5_KDB_DISALLOW_FORWARDABLE\fR flag.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fB-\fR|\fB+\fR}\fBallow_renewable\fR\fR
 .ad
@@ -441,7 +411,6 @@ tickets. (Sets the \fBKRB5_KDB_DISALLOW_RENEWABLE\fR flag.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fB-\fR|\fB+\fR}\fBallow_proxiable\fR\fR
 .ad
@@ -454,7 +423,6 @@ tickets. (Sets the \fBKRB5_KDB_DISALLOW_PROXIABLE\fR flag.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fB-\fR|\fB+\fR}\fBallow_dup_skey\fR\fR
 .ad
@@ -468,7 +436,6 @@ flag.
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fB-\fR|\fB+\fR}\fBrequires_preauth\fR\fR
 .ad
@@ -481,7 +448,6 @@ allowed to \fBkinit\fR. (Sets the \fBKRB5_KDB_REQUIRES_PRE_AUTH\fR flag.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fB-\fR|\fB+\fR}\fBrequires_hwauth\fR\fR
 .ad
@@ -494,7 +460,6 @@ hardware device before being allowed to kinit. (Sets the
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fB-\fR|\fB+\fR}\fBallow_svr\fR\fR
 .ad
@@ -506,7 +471,6 @@ hardware device before being allowed to kinit. (Sets the
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fB-\fR|\fB+\fR}\fBallow_tgs_req\fR\fR
 .ad
@@ -521,7 +485,6 @@ most things. \fB+allow_tgs_req\fR clears this flag. The default is
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fB-\fR|\fB+\fR}\fBallow_tix\fR\fR
 .ad
@@ -535,7 +498,6 @@ in the database.
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fB-\fR|\fB+\fR}\fBneedchange\fR\fR
 .ad
@@ -549,7 +511,6 @@ principal in the database.
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fB-\fR|\fB+\fR}\fBpassword_changing_service\fR\fR
 .ad
@@ -565,7 +526,6 @@ on the principal in the database.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-randkey\fR\fR
 .ad
@@ -576,7 +536,6 @@ Sets the key of the principal to a random value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-pw\fR \fB\fIpassword\fR\fR\fR
 .ad
@@ -589,7 +548,6 @@ unauthorized users gain read access to the script.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR "enc:salt ..."\fR
 .ad
@@ -606,7 +564,6 @@ des-cbc-crc:normal.
 
 .sp
 .ne 2
-.mk
 .na
 \fBExample:\fR
 .ad
@@ -616,11 +573,11 @@ des-cbc-crc:normal.
 .in +2
 .nf
 kadmin: \fBaddprinc tlyu/admin\fR
-WARNING: no policy specified for "tlyu/admin@ACME.COM"; 
+WARNING: no policy specified for "tlyu/admin@ACME.COM";
 defaulting to no policy.
 Enter password for principal tlyu/admin@ACME.COM:
 Re-enter password for principal tlyu/admin@ACME.COM:
-Principal "tlyu/admin@ACME.COM" created. 
+Principal "tlyu/admin@ACME.COM" created.
 kadmin:
 .fi
 .in -2
@@ -630,7 +587,6 @@ kadmin:
 
 .sp
 .ne 2
-.mk
 .na
 \fBErrors:\fR
 .ad
@@ -651,7 +607,6 @@ kadmin:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdelete_principal\fR [\fB-force\fR] \fIprincipal\fR\fR
 .ad
@@ -662,7 +617,6 @@ deletion, unless the \fB-force\fR option is given. This command requires the
 \fBdelete\fR privilege. Aliased by \fBdelprinc\fR.
 .sp
 .ne 2
-.mk
 .na
 \fBExample:\fR
 .ad
@@ -673,7 +627,7 @@ deletion, unless the \fB-force\fR option is given. This command requires the
 .nf
 kadmin: \fBdelprinc mwm_user\fR
 Are you sure you want to delete the principal
-"mwm_user@ACME.COM"? (yes/no): \fByes\fR 
+"mwm_user@ACME.COM"? (yes/no): \fByes\fR
 Principal "mwm_user@ACME.COM" deleted.
 Make sure that you have removed this principal from
 all kadmind ACLs before reusing.
@@ -686,7 +640,6 @@ kadmin:
 
 .sp
 .ne 2
-.mk
 .na
 \fBErrors:\fR
 .ad
@@ -701,7 +654,6 @@ kadmin:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmodify_principal\fR [\fIoptions\fR] \fIprincipal\fR\fR
 .ad
@@ -714,7 +666,6 @@ clear the current policy of a principal. This command requires the \fBmodify\fR
 privilege. Aliased by \fBmodprinc\fR.
 .sp
 .ne 2
-.mk
 .na
 \fBErrors:\fR
 .ad
@@ -733,7 +684,6 @@ privilege. Aliased by \fBmodprinc\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchange_password\fR [\fIoptions\fR] \fIprincipal\fR\fR
 .ad
@@ -745,7 +695,6 @@ privilege, or that the principal that is running the program to be the same as
 the one changed. Aliased by \fBcpw\fR. The following options are available:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-randkey\fR\fR
 .ad
@@ -756,7 +705,6 @@ Sets the key of the principal to a random value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-pw\fR \fIpassword\fR\fR
 .ad
@@ -767,7 +715,6 @@ Sets the password to the specified string. Not recommended.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR "enc:salt ..."\fR
 .ad
@@ -781,7 +728,6 @@ enctype and same salttype in the list will be used to set the new key(s).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-keepold\fR\fR
 .ad
@@ -794,7 +740,6 @@ will allow existing valid TGTs to continue to work.
 
 .sp
 .ne 2
-.mk
 .na
 \fBExample:\fR
 .ad
@@ -816,7 +761,6 @@ kadmin:
 
 .sp
 .ne 2
-.mk
 .na
 \fBErrors:\fR
 .ad
@@ -837,7 +781,6 @@ kadmin:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBget_principal\fR [\fB-terse\fR] \fIprincipal\fR\fR
 .ad
@@ -849,7 +792,6 @@ being listed. With the \fB-terse\fR option, outputs fields as quoted
 tab-separated strings. Aliased by \fBgetprinc\fR.
 .sp
 .ne 2
-.mk
 .na
 \fBExamples:\fR
 .ad
@@ -877,8 +819,8 @@ Key: vno 2, ArcFour with HMAC/md5, no salt
 Key: vno 2, DES cbc mode with RSA-MD5, no salt
 Attributes: REQUIRES_PRE_AUTH
 Policy: [none]
-kadmin: \fBgetprinc -terse tlyu/admin\fR 
-"tlyu/admin@ACME.COM"   0       1199359066      0       2147483647      
+kadmin: \fBgetprinc -terse tlyu/admin\fR
+"tlyu/admin@ACME.COM"   0       1199359066      0       2147483647
 "root/admin@ACME.COM"   1199359066      128     2       0       "[none]"       21474836
 47      0       0       0       5       1       2       18      0       1      2
 17      0       1       2       16      0       1       2       23      0      12
@@ -892,7 +834,6 @@ kadmin:
 
 .sp
 .ne 2
-.mk
 .na
 \fBErrors:\fR
 .ad
@@ -907,7 +848,6 @@ kadmin:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlist_principals\fR [\fIexpression\fR]\fR
 .ad
@@ -922,7 +862,6 @@ the expression. Requires the \fBlist\fR privilege. Aliased by \fBlistprincs\fR,
 \fBget_principals\fR, and \fBgetprincs\fR.
 .sp
 .ne 2
-.mk
 .na
 \fBExamples:\fR
 .ad
@@ -947,7 +886,6 @@ kadmin:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadd_policy\fR [\fIoptions\fR] \fIpolicy\fR\fR
 .ad
@@ -957,7 +895,6 @@ Adds the named policy to the policy database. Requires the \fBadd\fR privilege.
 Aliased by \fBaddpol\fR. The following options are available:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-maxlife\fR \fImaxlife\fR\fR
 .ad
@@ -970,7 +907,6 @@ section for the valid time duration formats that you can specify for
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-minlife\fR \fIminlife\fR\fR
 .ad
@@ -983,7 +919,6 @@ section for the valid time duration formats that you can specify for
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-minlength\fR \fIlength\fR\fR
 .ad
@@ -994,7 +929,6 @@ sets the minimum length of a password.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-minclasses\fR \fInumber\fR\fR
 .ad
@@ -1006,7 +940,6 @@ values are:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
@@ -1017,7 +950,6 @@ only letters (himom)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
@@ -1028,7 +960,6 @@ both letters and numbers (hi2mom)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
@@ -1039,7 +970,6 @@ letters, numbers, and punctuation (hi2mom!)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-history\fR \fInumber\fR\fR
 .ad
@@ -1050,7 +980,6 @@ sets the number of past keys kept for a principal.
 
 .sp
 .ne 2
-.mk
 .na
 \fBErrors:\fR
 .ad
@@ -1065,7 +994,6 @@ sets the number of past keys kept for a principal.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdelete_policy\fR \fB[-force]\fR \fIpolicy\fR\fR
 .ad
@@ -1077,7 +1005,6 @@ by any principals. Requires the \fBdelete\fR privilege. Aliased by
 \fBdelpol\fR.
 .sp
 .ne 2
-.mk
 .na
 \fBExample:\fR
 .ad
@@ -1086,8 +1013,8 @@ by any principals. Requires the \fBdelete\fR privilege. Aliased by
 .sp
 .in +2
 .nf
-kadmin: \fBdel_policy guests\fR 
-Are you sure you want to delete the 
+kadmin: \fBdel_policy guests\fR
+Are you sure you want to delete the
 policy "guests"? (yes/no): \fByes\fR
 Policy "guests" deleted.
 kadmin:
@@ -1099,7 +1026,6 @@ kadmin:
 
 .sp
 .ne 2
-.mk
 .na
 \fBErrors:\fR
 .ad
@@ -1116,7 +1042,6 @@ kadmin:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fBmodify_policy\fR \fB[\fIoptions\fR]\fR \fB\fIpolicy\fR\fR\fR
 .ad
@@ -1126,7 +1051,6 @@ Modifies the named policy. Options are as above for \fBadd_policy\fR. Requires
 the \fBmodify\fR privilege. Aliased by \fBmodpol\fR.
 .sp
 .ne 2
-.mk
 .na
 \fBErrors:\fR
 .ad
@@ -1141,7 +1065,6 @@ the \fBmodify\fR privilege. Aliased by \fBmodpol\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBget_policy\fR [\fB-terse\fR] \fIpolicy\fR\fR
 .ad
@@ -1152,7 +1075,6 @@ With the \fB-terse\fR flag, outputs the fields as quoted strings separated by
 tabs. Aliased by \fBgetpol\fR.
 .sp
 .ne 2
-.mk
 .na
 \fBExamples:\fR
 .ad
@@ -1180,7 +1102,6 @@ kadmin:
 
 .sp
 .ne 2
-.mk
 .na
 \fBErrors:\fR
 .ad
@@ -1195,7 +1116,6 @@ kadmin:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlist_policies\fR [\fIexpression\fR]\fR
 .ad
@@ -1208,7 +1128,6 @@ existing policy names are printed. Requires the \fBlist\fR privilege. Aliased
 by \fBlistpols\fR, \fBget_policies\fR, and \fBgetpols\fR.
 .sp
 .ne 2
-.mk
 .na
 \fBExamples:\fR
 .ad
@@ -1231,7 +1150,6 @@ test-pol test-pol-nopw kadmin:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBktadd\fR [\fB-k\fR \fIkeytab\fR] [\fB-q\fR] [\fB-e\fR
 \fB\fIenctype\fR:salt\fR]\fR
@@ -1267,7 +1185,6 @@ Also, note that if you use \fB-glob\fR to create a keytab, you need to remove
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprinc-exp\fR\fR
 .ad
@@ -1277,7 +1194,6 @@ Also, note that if you use \fB-glob\fR to create a keytab, you need to remove
 command.
 .sp
 .ne 2
-.mk
 .na
 \fBExample:\fR
 .ad
@@ -1301,7 +1217,6 @@ kadmin:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBktremove\fR [\fB-k\fR \fIkeytab\fR] [\fB-q\fR] \fIprincipal\fR
 [\fIkvno\fR | \fBall\fR | \fBold\fR]\fR
@@ -1319,7 +1234,6 @@ argument is not specified, the default keytab file,
 status information is displayed. Aliased by \fBktrem\fR.
 .sp
 .ne 2
-.mk
 .na
 \fBExample:\fR
 .ad
@@ -1330,7 +1244,7 @@ status information is displayed. Aliased by \fBktrem\fR.
 .nf
 kadmin: \fBktremove -k /tmp/new-keytab nfs/chicago\fR
 Entry for principal nfs/chicago with kvno 2
-removed from keytab 
+removed from keytab
 WRFILE:/tmp/new-keytab.
 kadmin:
 .fi
@@ -1343,7 +1257,6 @@ kadmin:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBquit\fR\fR
 .ad
@@ -1361,7 +1274,6 @@ time durations or absolute times. The \fBkadmin\fR option variables
 whereas \fIexpdate\fR and \fIpwexpdate\fR are absolute times.
 .sp
 .ne 2
-.mk
 .na
 \fBExamples:\fR
 .ad
@@ -1396,98 +1308,91 @@ time and date format examples are based on the date and time of July 2, 1999,
 
 .sp
 .TS
-tab() box;
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBTime Format\fR\fBExamples\fR
-\fIhh\fR[:\fImm\fR][:\fIss\fR][am/pm/a.m./p.m.]1p.m., 1:35, 1:35:30pm
+box;
+l l
+l l .
+\fBTime Format\fR	\fBExamples\fR
+\fIhh\fR[:\fImm\fR][:\fIss\fR][am/pm/a.m./p.m.]	1p.m., 1:35, 1:35:30pm
 .TE
 
 .sp
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBVariable\fR\fBDescription\fR
-\fIhh\fRT{
+l l
+l l .
+\fBVariable\fR	\fBDescription\fR
+\fIhh\fR	T{
 hour (12-hour clock, leading zero permitted but not required)
 T}
-\fImm\fRminutes
-\fIss\fRseconds
+\fImm\fR	minutes
+\fIss\fR	seconds
 .TE
 
 .sp
 
 .sp
 .TS
-tab() box;
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBDate Format\fR\fBExamples\fR
-\fImm\fR/\fBdd\fR[/\fIyy\fR]07/02, 07/02/99
-\fIyyyy\fR-\fImm\fR-\fBdd\fR1999-07-02
-\fBdd\fR-\fImonth\fR-\fIyyyy\fR02-July-1999
-\fImonth\fR [,\fIyyyy\fR]Jul 02, July 02,1999
-\fBdd\fR \fImonth\fR[ \fIyyyy\fR]02 JULY, 02 july 1999
+box;
+l l
+l l .
+\fBDate Format\fR	\fBExamples\fR
+\fImm\fR/\fBdd\fR[/\fIyy\fR]	07/02, 07/02/99
+\fIyyyy\fR-\fImm\fR-\fBdd\fR	1999-07-02
+\fBdd\fR-\fImonth\fR-\fIyyyy\fR	02-July-1999
+\fImonth\fR [,\fIyyyy\fR]	Jul 02, July 02,1999
+\fBdd\fR \fImonth\fR[ \fIyyyy\fR]	02 JULY, 02 july 1999
 .TE
 
 .sp
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBVariable Description\fR
-\fBdd\fRday
-\fImm\fRmonth
-\fIyy\fRT{
+l l
+l l .
+\fBVariable Description\fR	
+\fBdd\fR	day
+\fImm\fR	month
+\fIyy\fR	T{
 year within century (00-38 is 2000 to 2038; 70-99 is 1970 to 1999)
 T}
-\fIyyyy\fRyear including century
-\fImonth\fRlocale's full or abbreviated month name
+\fIyyyy\fR	year including century
+\fImonth\fR	locale's full or abbreviated month name
 .TE
 
 .sp
 
 .sp
 .TS
-tab() box;
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBTime Units\fR\fBExamples\fR
-[+|- \fI#\fR] year"-2 year"
-[+|- \fI#\fR] month"2 months"
-[+|- \fI#\fR] fortnight
-[+|- \fI#\fR] week
-[+|- \fI#\fR] day
-[+|- \fI#\fR] hour
-[+|- \fI#\fR] minute
-[+|- \fI#\fR] min
-[+|- \fI#\fR] second
-[+|- \fI#\fR] sec
-tomorrow
-yesterday
-today 
-now 
-this"this year"
-last"last saturday"
-next"next month"
-sunday
-monday
-tuesday
-wednesday
-thursday
-friday
-saturday
-never
+box;
+l l
+l l .
+\fBTime Units\fR	\fBExamples\fR
+[+|- \fI#\fR] year	"-2 year"
+[+|- \fI#\fR] month	"2 months"
+[+|- \fI#\fR] fortnight	
+[+|- \fI#\fR] week	
+[+|- \fI#\fR] day	
+[+|- \fI#\fR] hour	
+[+|- \fI#\fR] minute	
+[+|- \fI#\fR] min	
+[+|- \fI#\fR] second	
+[+|- \fI#\fR] sec	
+tomorrow	
+yesterday	
+today 	
+now 	
+this	"this year"
+last	"last saturday"
+next	"next month"
+sunday	
+monday	
+tuesday	
+wednesday	
+thursday	
+friday	
+saturday	
+never	
 .TE
 
 .sp
@@ -1503,7 +1408,6 @@ See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBkadmin\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAGER\fR\fR
 .ad
@@ -1516,7 +1420,6 @@ specify options. The default is \fBmore\fR(1).
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/krb5/principal\fR\fR
 .ad
@@ -1527,7 +1430,6 @@ Kerberos principal database.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/krb5/principal.ulog\fR\fR
 .ad
@@ -1538,7 +1440,6 @@ The update log file for incremental propagation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/krb5/principal.kadm5\fR\fR
 .ad
@@ -1549,7 +1450,6 @@ Kerberos administrative database. Contains policy information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/krb5/principal.kadm5.lock\fR\fR
 .ad
@@ -1562,7 +1462,6 @@ this file does \fInot\fR exist).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/krb5/kadm5.dict\fR\fR
 .ad
@@ -1573,7 +1472,6 @@ Dictionary of strings explicitly disallowed as passwords.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/kadm5.acl\fR\fR
 .ad
@@ -1584,7 +1482,6 @@ List of principals and their \fBkadmin\fR administrative privileges.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/kadm5.keytab\fR\fR
 .ad
@@ -1602,13 +1499,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

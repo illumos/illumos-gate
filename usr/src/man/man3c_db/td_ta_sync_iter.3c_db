@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH td_ta_sync_iter 3C_DB "19 Jun 2001" "SunOS 5.11" "Threads Debugging Library Functions"
+.TH TD_TA_SYNC_ITER 3C_DB "Jun 19, 2001"
 .SH NAME
 td_ta_sync_iter, td_ta_thr_iter, td_ta_tsd_iter \- iterator functions on
 process handles from libc_db
@@ -85,7 +85,6 @@ returned.
 The selection parameters and corresponding wild-card values are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstate (TD_THR_ANY_STATE\fR):\fR
 .ad
@@ -97,7 +96,6 @@ Select only threads whose state matches \fBstate\fR. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBti_pri (TD_THR_LOWEST_PRIORITY\fR):\fR
 .ad
@@ -108,7 +106,6 @@ Select only threads for which the priority is at least \fBti_pri\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBti_sigmask_p (TD_SIGNO_MASK\fR):\fR
 .ad
@@ -119,7 +116,6 @@ Select only threads whose signal mask exactly matches *\fIti_sigmask_p\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBti_user_flags (TD_THR_ANY_USER_FLAGS\fR):\fR
 .ad
@@ -137,45 +133,37 @@ key can be obtained by calling \fBtd_thr_tsd\fR(3C_DB).
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_OK\fR\fR
 .ad
 .RS 12n
-.rt  
 The call completed successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_BADTA\fR\fR
 .ad
 .RS 12n
-.rt  
 An invalid process handle was passed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_DBERR\fR\fR
 .ad
 .RS 12n
-.rt  
 A call to one of the imported interface routines failed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_ERR\fR\fR
 .ad
 .RS 12n
-.rt  
 The call did not complete successfully.
 .RE
 
@@ -187,13 +175,12 @@ See \fBattributes\fR(5) for description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

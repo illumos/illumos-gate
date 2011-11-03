@@ -2,7 +2,7 @@
 .\" To view license terms, attribution, and copyright for IP Filter, the default path is /usr/lib/ipf/IPFILTER.LICENCE. If the Solaris operating environment has been installed anywhere other than the default, modify the given path to access the file at the installed
 .\" location.
 .\" Portions Copyright (c) 2008, Sun Microsystems Inc. All Rights Reserved.
-.TH ipfs 1M "3 Apr 2008" "SunOS 5.11" "System Administration Commands"
+.TH IPFS 1M "Apr 3, 2008"
 .SH NAME
 ipfs \- saves and restores information for NAT and state tables
 .SH SYNOPSIS
@@ -55,91 +55,75 @@ state-saving is that connections are not interrupted.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 6n
-.rt  
 Change the default directory used with \fB-R\fR and \fB-W\fR options for saving
 state information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 6n
-.rt  
 Do not take any action that would affect information stored in the kernel or on
 disk.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 Provides a verbose description of \fBipfs\fR activities.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-N\fR\fR
 .ad
 .RS 6n
-.rt  
 Operate on NAT information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR\fR
 .ad
 .RS 6n
-.rt  
 Operate on filtering state information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
 .RS 6n
-.rt  
 Unlock state tables in the kernel.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 6n
-.rt  
 Lock state tables in the kernel.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 6n
-.rt  
 Read information in from the specified file and load it into the kernel. This
 requires the state tables to have already been locked and does not change the
 lock once complete.
@@ -147,12 +131,10 @@ lock once complete.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR\fR
 .ad
 .RS 6n
-.rt  
 Write information out to the specified file and from the kernel. This requires
 the state tables to have already been locked and does not change the lock once
 complete.
@@ -160,12 +142,10 @@ complete.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR\fR
 .ad
 .RS 6n
-.rt  
 Restores all saved state information, if any, from two files, \fBipstate.ipf\fR
 and \fBipnat.ipf\fR, stored in the \fB/var/db/ipf\fR directory. This directory
 can be changed with the \fB-d\fR option. The state tables are locked at the
@@ -174,12 +154,10 @@ beginning of this operation and unlocked once complete.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-W\fR\fR
 .ad
 .RS 6n
-.rt  
 Saves in-kernel state information, if any, out to two files, \fBipstate.ipf\fR
 and \fBipnat.ipf\fR, stored in the \fB/var/db/ipf\fR directory. This directory
 can be changed with the \fB-d\fR option. The state tables are locked at the
@@ -225,13 +203,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

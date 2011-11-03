@@ -31,7 +31,7 @@ set name=pkg.summary \
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=i386
 dir path=usr group=sys
-dir path=usr/share group=sys
+dir path=usr/share
 dir path=usr/share/src group=sys
 dir path=usr/share/src/grub
 dir path=usr/share/src/grub/docs

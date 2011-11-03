@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH nvlist_alloc 3NVPAIR "2 Feb 2004" "SunOS 5.11" "Name-value Pair Library Functions"
+.TH NVLIST_ALLOC 3NVPAIR "Feb 2, 2004"
 .SH NAME
 nvlist_alloc, nvlist_free, nvlist_size, nvlist_pack, nvlist_unpack, nvlist_dup,
 nvlist_merge, nvlist_xalloc, nvlist_xpack, nvlist_xunpack, nvlist_xdup,
@@ -13,7 +13,7 @@ a name-value pair list
 .LP
 .nf
 \fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lnvpair\fR [ \fIlibrary\fR... ]
-#include <libnvpair.h> 
+#include <libnvpair.h>
 
 \fBint\fR \fBnvlist_alloc\fR(\fBnvlist_t **\fR\fInvlp\fR, \fBuint_t\fR \fInvflag\fR, \fBint\fR \fIflag\fR);
 .fi
@@ -98,43 +98,35 @@ a name-value pair list
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fInvlp\fR\fR
 .ad
 .RS 12n
-.rt  
 Address of a pointer to \fBnvlist_t\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInvflag\fR\fR
 .ad
 .RS 12n
-.rt  
 Specify bit fields defining \fBnvlist\fR properties:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNV_UNIQUE_NAME\fR\fR
 .ad
 .RS 23n
-.rt  
 The \fBnvpair\fR names are unique.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNV_UNIQUE_NAME_TYPE\fR\fR
 .ad
 .RS 23n
-.rt  
 Name-data type combination is unique.
 .RE
 
@@ -142,112 +134,92 @@ Name-data type combination is unique.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflag\fR\fR
 .ad
 .RS 12n
-.rt  
 Specify 0. Reserved for future use.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInvl\fR\fR
 .ad
 .RS 12n
-.rt  
 The \fBnvlist_t\fR to be processed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdst\fR\fR
 .ad
 .RS 12n
-.rt  
 The destination \fBnvlist_t\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsize\fR\fR
 .ad
 .RS 12n
-.rt  
 Pointer to buffer to contain the encoded size.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbufp\fR\fR
 .ad
 .RS 12n
-.rt  
 Address of buffer to pack \fBnvlist\fR into. Must be 8-byte aligned. If
 \fINULL\fR, library will allocate memory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbuf\fR\fR
 .ad
 .RS 12n
-.rt  
 Buffer containing packed \fBnvlist\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbuflen\fR\fR
 .ad
 .RS 12n
-.rt  
 Size of buffer \fIbufp\fR or \fIbuf\fR points to.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIencoding\fR\fR
 .ad
 .RS 12n
-.rt  
 Encoding method for packing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInvo\fR\fR
 .ad
 .RS 12n
-.rt  
 Pluggable allocator operations pointer (\fBnv_alloc_ops_t\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInva\fR\fR
 .ad
 .RS 12n
-.rt  
 A pointer to an \fBnv_alloc_t\fR structure to be used for the specified
 \fBnvlist_t\fR.
 .RE
@@ -279,23 +251,19 @@ buffer large enough to pack \fInvl\fR. The \fIencoding\fR parameter specifies
 the method of encoding when packing \fInvl\fR. Supported encoding methods are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNV_ENCODE_NATIVE\fR\fR
 .ad
 .RS 20n
-.rt  
 Straight \fBbcopy()\fR as described in \fBbcopy\fR(3C).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNV_ENCODE_XDR\fR\fR
 .ad
 .RS 20n
-.rt  
 Use XDR encoding, suitable for sending to another host.
 .RE
 
@@ -460,12 +428,10 @@ The \fBnvlist_lookup_nv_alloc()\fR function returns a pointer to an allocator.
 These functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 There is an invalid argument.
 .RE
 
@@ -477,12 +443,10 @@ The \fBnvlist_alloc()\fR, \fBnvlist_dup()\fR, \fBnvlist_pack()\fR,
 will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 There is insufficient memory.
 .RE
 
@@ -492,23 +456,19 @@ The \fBnvlist_pack()\fR, \fBnvlist_unpack()\fR, \fBnvlist_xpack()\fR, and
 \fBnvlist_xunpack()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 11n
-.rt  
 An encode/decode error occurs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSUP\fR\fR
 .ad
 .RS 11n
-.rt  
 An encode/decode method is not supported.
 .RE
 
@@ -621,15 +581,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.69i) |cw(2.81i) 
-lw(2.69i) |lw(2.81i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

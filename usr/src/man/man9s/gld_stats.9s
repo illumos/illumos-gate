@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH gld_stats 9S "7 Jun 2004" "SunOS 5.11" "Data Structures for Drivers"
+.TH GLD_STATS 9S "Jun 7, 2004"
 .SH NAME
 gld_stats \- Generic LAN Driver statistics data structure
 .SH SYNOPSIS
@@ -133,12 +133,10 @@ Most of the above statistics variables are counters denoting the number of
 times the particular event was observed. Exceptions are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBglds_speed\fR \fR
 .ad
 .RS 16n
-.rt  
 An estimate of the interface's current bandwidth in bits per second. For
 interfaces that do not vary in bandwidth or for those where no accurate
 estimation can be made, this object should contain the nominal bandwidth.
@@ -146,12 +144,10 @@ estimation can be made, this object should contain the nominal bandwidth.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBglds_media\fR \fR
 .ad
 .RS 16n
-.rt  
 The type of media (wiring) or connector used by the hardware. Currently
 supported media names include \fBGLDM_AUI\fR, \fBGLDM_BNC\fR, \fBGLDM_TP\fR,
 \fBGLDM_10BT\fR, \fBGLDM_100BT\fR, \fBGLDM_100BTX\fR, \fBGLDM_100BT4\fR,
@@ -161,12 +157,10 @@ supported media names include \fBGLDM_AUI\fR, \fBGLDM_BNC\fR, \fBGLDM_TP\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBglds_duplex\fR \fR
 .ad
 .RS 16n
-.rt  
 Current duplex state of the interface. Supported values are
 \fBGLD_DUPLEX_HALF\fR and \fBGLD_DUPLEX_FULL\fR. \fBGLD_DUPLEX_UNKNOWN\fR can
 also be specified.

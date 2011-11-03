@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dat_rsp_create 3DAT "16 Jul 2004" "SunOS 5.11" "Direct Access Transport Library Functions"
+.TH DAT_RSP_CREATE 3DAT "Jul 16, 2004"
 .SH NAME
 dat_rsp_create \- create a Reserved Service Point
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ldat\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ldat\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <\fBdat/udat.h\fR>
 
 DAT_RETURN
@@ -26,34 +26,28 @@ DAT_RETURN
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIia_handle\fR\fR
 .ad
 .RS 14n
-.rt  
 Handle for an instance of DAT IA.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIconn_qual\fR\fR
 .ad
 .RS 14n
-.rt  
 Connection Qualifier of the IA the Reserved Service Point listens to.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIep_handle\fR\fR
 .ad
 .RS 14n
-.rt  
 Handle for the Endpoint associated with the Reserved Service Point that is the
 only Endpoint that can accept a Connection Request on this Service Point. The
 value \fBDAT_HANDLE_NULL\fR requests the Provider to associate a
@@ -62,24 +56,20 @@ Provider-created Endpoint with this Service Point.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIevd_handle\fR\fR
 .ad
 .RS 14n
-.rt  
 The Event Dispatcher to which an event of Connection Request arrival is
 generated.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrsp_handle\fR\fR
 .ad
 .RS 14n
-.rt  
 Handle to an opaque Reserved Service Point.
 .RE
 
@@ -92,68 +82,56 @@ delivered to the specified Event Dispatcher in a Notification event.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_SUCCESS\fR\fR
 .ad
 .RS 30n
-.rt  
 The operation was successful.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_INSUFFICIENT_RESOURCES\fR\fR
 .ad
 .RS 30n
-.rt  
 The operation failed due to resource limitations.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_INVALID_HANDLE\fR\fR
 .ad
 .RS 30n
-.rt  
 The \fIia_handle\fR, \fIevd_handle\fR, or \fIep_handle\fR parameter is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_INVALID_PARAMETER\fR\fR
 .ad
 .RS 30n
-.rt  
 The \fIconn_qual\fR parameter is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_INVALID_STATE\fR\fR
 .ad
 .RS 30n
-.rt  
 Parameter in an invalid state. For example, an Endpoint was not in the Idle
 state.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_CONN_QUAL_IN_USE\fR\fR
 .ad
 .RS 30n
-.rt  
 Specified Connection Qualifier is in use.
 .RE
 
@@ -243,15 +221,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard: uDAPL, 1.1, 1.2
+Interface Stability	Standard: uDAPL, 1.1, 1.2
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  */
 
 
@@ -56,6 +57,8 @@
 #include <langinfo.h>
 #include <ftw.h>
 #include <libgen.h>
+#include <err.h>
+#include <regex.h>
 #include "getresponse.h"
 
 #define	A_DAY		(long)(60*60*24)	/* a day full of seconds */
@@ -78,10 +81,12 @@
 
 enum Command
 {
-	PRINT, DEPTH, LOCAL, MOUNT, ATIME, MTIME, CTIME, NEWER,
-	NAME, F_USER, F_GROUP, INUM, SIZE, LINKS, PERM, EXEC, OK, CPIO, NCPIO,
-	TYPE, AND, OR, NOT, LPAREN, RPAREN, CSIZE, VARARGS, FOLLOW,
-	PRUNE, NOUSER, NOGRP, FSTYPE, LS, XATTR, ACL, MMIN, AMIN, CMIN
+	PRINT,
+	ACL, AMIN, AND, ATIME, CMIN, CPIO, CSIZE, CTIME, DEPTH, EXEC, F_GROUP,
+	F_GROUPACL, F_USER, F_USERACL, FOLLOW, FSTYPE, INAME, INUM, IREGEX,
+	LINKS, LOCAL, LPAREN, LS, MAXDEPTH, MINDEPTH, MMIN, MOUNT, MTIME, NAME,
+	NCPIO, NEWER, NOGRP, NOT, NOUSER, OK, OR, PERM, PRINT0, PRUNE, REGEX,
+	RPAREN, SIZE, TYPE, VARARGS, XATTR
 };
 
 enum Type
@@ -101,44 +106,53 @@ struct Args
  */
 static struct Args commands[] =
 {
-	"!",		NOT,	Op,
-	"(",		LPAREN,	Unary,
-	")",		RPAREN,	Unary,
-	"-a",		AND,	Op,
-	"-amin",	AMIN,	Num,
-	"-atime",	ATIME,	Num,
-	"-cpio",	CPIO,	Cpio,
-	"-cmin",	CMIN,	Num,
-	"-ctime",	CTIME,	Num,
-	"-depth",	DEPTH,	Unary,
-	"-exec",	EXEC,	Exec,
-	"-follow",	FOLLOW, Unary,
+	"!",		NOT,		Op,
+	"(",		LPAREN,		Unary,
+	")",		RPAREN,		Unary,
+	"-a",		AND,		Op,
+	"-acl",		ACL,		Unary,
+	"-amin",	AMIN,		Num,
+	"-and",		AND,		Op,
+	"-atime",	ATIME,		Num,
+	"-cmin",	CMIN,		Num,
+	"-cpio",	CPIO,		Cpio,
+	"-ctime",	CTIME,		Num,
+	"-depth",	DEPTH,		Unary,
+	"-exec",	EXEC,		Exec,
+	"-follow",	FOLLOW,		Unary,
+	"-fstype",	FSTYPE,		Str,
 	"-group",	F_GROUP,	Num,
-	"-inum",	INUM,	Num,
-	"-links",	LINKS,	Num,
-	"-local",	LOCAL,	Unary,
-	"-mount",	MOUNT,	Unary,
-	"-mmin",	MMIN,	Num,
-	"-mtime",	MTIME,	Num,
-	"-name",	NAME,	Str,
-	"-ncpio",	NCPIO,  Cpio,
-	"-newer",	NEWER,	Str,
-	"-o",		OR,	Op,
-	"-ok",		OK,	Exec,
-	"-perm",	PERM,	Num,
-	"-print",	PRINT,	Unary,
-	"-size",	SIZE,	Num,
-	"-type",	TYPE,	Num,
-	"-xdev",	MOUNT,	Unary,
-	"-user",	F_USER,	Num,
-	"-prune",	PRUNE,	Unary,
-	"-nouser",	NOUSER,	Unary,
-	"-nogroup",	NOGRP,	Unary,
-	"-fstype",	FSTYPE,	Str,
-	"-ls",		LS,	Unary,
-	"-xattr",	XATTR,	Unary,
-	"-acl",		ACL,	Unary,
-	NULL,		0,	0
+	"-groupacl",	F_GROUPACL,	Num,
+	"-iname",	INAME,		Str,
+	"-inum",	INUM,		Num,
+	"-iregex",	IREGEX,		Str,
+	"-ls",		LS,		Unary,
+	"-maxdepth",	MAXDEPTH,	Num,
+	"-mindepth",	MINDEPTH,	Num,
+	"-mmin",	MMIN,		Num,
+	"-mount",	MOUNT,		Unary,
+	"-mtime",	MTIME,		Num,
+	"-name",	NAME,		Str,
+	"-ncpio",	NCPIO,		Cpio,
+	"-newer",	NEWER,		Str,
+	"-nogroup",	NOGRP,		Unary,
+	"-not",		NOT,		Op,
+	"-nouser",	NOUSER,		Unary,
+	"-o",		OR,		Op,
+	"-ok",		OK,		Exec,
+	"-or",		OR,		Op,
+	"-perm",	PERM,		Num,
+	"-print",	PRINT,		Unary,
+	"-print0",	PRINT0,		Unary,
+	"-prune",	PRUNE,		Unary,
+	"-regex",	REGEX,		Str,
+	"-size",	SIZE,		Num,
+	"-type",	TYPE,		Num,
+	"-user",	F_USER,		Num,
+	"-useracl",	F_USERACL,	Num,
+	"-xattr",	XATTR,		Unary,
+	"-xdev",	MOUNT,		Unary,
+	NULL,		0,		0
 };
 
 union Item
@@ -220,10 +234,14 @@ static int		fstype_index = 0;
 static int		action_expression = 0;	/* -print, -exec, or -ok */
 static int		error = 0;
 static int		paren_cnt = 0;	/* keeps track of parentheses */
+static int		Eflag = 0;
 static int		hflag = 0;
 static int		lflag = 0;
 /* set when doexec()-invoked utility returns non-zero */
 static int		exec_exitcode = 0;
+static regex_t		*preg = NULL;
+static int		npreg = 0;
+static int		mindepth = -1, maxdepth = -1;
 extern char		**environ;
 
 int
@@ -246,8 +264,11 @@ main(int argc, char **argv)
 		    cmdname, strerror(errno));
 		exit(1);
 	}
-	while ((c = getopt(argc, argv, "HL")) != -1) {
+	while ((c = getopt(argc, argv, "EHL")) != -1) {
 		switch (c) {
+		case 'E':
+			Eflag = 1;
+			break;
 		case 'H':
 			hflag = 1;
 			lflag = 0;
@@ -431,6 +452,14 @@ int *actionp;
 					exit(1);
 				}
 				if (argp->type == Num) {
+					if (((argp->action == MAXDEPTH) ||
+					    (argp->action == MINDEPTH)) &&
+					    ((int)strtol(b, (char **)NULL,
+					    10) < 0))
+						errx(1,
+					gettext("%s: value must be positive"),
+						    (argp->action == MAXDEPTH) ?
+						    "maxdepth" : "mindepth");
 					if ((argp->action != PERM) ||
 					    (*b != '+')) {
 						if (*b == '+' || *b == '-') {
@@ -528,14 +557,17 @@ int *actionp;
 			break;
 
 		case F_USER:
-		case F_GROUP: {
+		case F_GROUP:
+		case F_USERACL:
+		case F_GROUPACL: {
 			struct	passwd	*pw;
 			struct	group *gr;
 			long value;
 			char *q;
 
 			value = -1;
-			if (argp->action == F_USER) {
+			if (argp->action == F_USER ||
+			    argp->action == F_USERACL) {
 				if ((pw = getpwnam(b)) != 0)
 					value = (long)pw->pw_uid;
 			} else {
@@ -586,8 +618,31 @@ int *actionp;
 			break;
 
 		case NAME:
+		case INAME:
 			np->first.cp = b;
 			break;
+		case REGEX:
+		case IREGEX: {
+			int error;
+			size_t errlen;
+			char *errmsg;
+
+			if ((preg = realloc(preg, (npreg + 1) *
+			    sizeof (regex_t))) == NULL)
+				err(1, "realloc");
+			if ((error = regcomp(&preg[npreg], b,
+			    ((np->action == IREGEX) ? REG_ICASE : 0) |
+			    ((Eflag) ? REG_EXTENDED : 0))) != 0) {
+				errlen = regerror(error, &preg[npreg], NULL, 0);
+				if ((errmsg = malloc(errlen)) == NULL)
+					err(1, "malloc");
+				(void) regerror(error, &preg[npreg], errmsg,
+				    errlen);
+				errx(1, gettext("RE error: %s"), errmsg);
+			}
+			npreg++;
+			break;
+		}
 		case PERM:
 			if (*b == '-')
 				++b;
@@ -651,6 +706,7 @@ int *actionp;
 		}
 			/*FALLTHROUGH*/
 		case PRINT:
+		case PRINT0:
 			(*actionp)++;
 			break;
 
@@ -680,6 +736,12 @@ int *actionp;
 		case XATTR:
 			break;
 		case ACL:
+			break;
+		case MAXDEPTH:
+			maxdepth = (int)strtol(b, (char **)NULL, 10);
+			break;
+		case MINDEPTH:
+			mindepth = (int)strtol(b, (char **)NULL, 10);
 			break;
 		}
 
@@ -718,7 +780,7 @@ static void
 usage(void)
 {
 	(void) fprintf(stderr,
-	    gettext("%s: [-H | -L] path-list predicate-list\n"), cmdname);
+	    gettext("%s: [-E] [-H | -L] path-list predicate-list\n"), cmdname);
 	exit(1);
 }
 
@@ -740,6 +802,7 @@ struct FTW *state;
 	long long ll;
 	int not = 1;
 	char *filename;
+	int cnpreg = 0;
 
 	if (type == FTW_NS) {
 		(void) fprintf(stderr, gettext("%s: stat() error %s: %s\n"),
@@ -761,6 +824,10 @@ struct FTW *state;
 		error = 1;
 		return (0);
 	}
+
+	if ((maxdepth != -1 && state->level > maxdepth) ||
+	    (mindepth != -1 && state->level < mindepth))
+		return (0);
 
 	while (np) {
 		switch (np->action) {
@@ -923,8 +990,11 @@ struct FTW *state;
 			val = 1;
 			break;
 
-		case NAME: {
+		case NAME:
+		case INAME: {
 			char *name1;
+			int fnmflags = (np->action == INAME) ?
+			    FNM_IGNORECASE : 0;
 
 			/*
 			 * basename(3c) may modify name, so
@@ -943,13 +1013,10 @@ struct FTW *state;
 			 * '.' in a filename, unless '.' is explicitly
 			 * specified.
 			 */
-#ifdef XPG4
-			val = !fnmatch(np->first.cp,
-			    basename(name1), 0);
-#else
-			val = !fnmatch(np->first.cp,
-			    basename(name1), FNM_PERIOD);
+#ifndef XPG4
+			fnmflags |= FNM_PERIOD;
 #endif
+			val = !fnmatch(np->first.cp, basename(name1), fnmflags);
 			free(name1);
 			break;
 		}
@@ -974,7 +1041,9 @@ struct FTW *state;
 			val = 1;
 			break;
 		case PRINT:
-			(void) fprintf(stdout, "%s\n", name);
+		case PRINT0:
+			(void) fprintf(stdout, "%s%c", name,
+			    (np->action == PRINT) ? '\n' : '\0');
 			val = 1;
 			break;
 		case LS:
@@ -995,6 +1064,60 @@ struct FTW *state;
 			filename = (walkflags & FTW_CHDIR) ?
 				gettail(name) : name;
 			val = acl_trivial(filename);
+			break;
+		case F_USERACL:
+		case F_GROUPACL: {
+			int i;
+			acl_t *acl;
+			void *acl_entry;
+			aclent_t *p1;
+			ace_t *p2;
+
+			filename = (walkflags & FTW_CHDIR) ?
+			    gettail(name) : name;
+			val = 0;
+			if (acl_get(filename, 0, &acl) != 0)
+				break;
+			for (i = 0, acl_entry = acl->acl_aclp;
+			    i != acl->acl_cnt; i++) {
+				if (acl->acl_type == ACLENT_T) {
+					p1 = (aclent_t *)acl_entry;
+					if (p1->a_id == np->first.l) {
+						val = 1;
+						acl_free(acl);
+						break;
+					}
+				} else {
+					p2 = (ace_t *)acl_entry;
+					if (p2->a_who == np->first.l) {
+						val = 1;
+						acl_free(acl);
+						break;
+					}
+				}
+				acl_entry = ((char *)acl_entry +
+				    acl->acl_entry_size);
+			}
+			acl_free(acl);
+			break;
+		}
+		case IREGEX:
+		case REGEX: {
+			regmatch_t pmatch;
+
+			val = 0;
+			if (regexec(&preg[cnpreg], name, 1, &pmatch, NULL) == 0)
+				val = ((pmatch.rm_so == 0) &&
+				    (pmatch.rm_eo == strlen(name)));
+			cnpreg++;
+			break;
+		}
+		case MAXDEPTH:
+			if (state->level == maxdepth && type == FTW_D)
+				state->quit = FTW_PRUNE;
+			/* FALLTHROUGH */
+		case MINDEPTH:
+			val = 1;
 			break;
 		}
 		/*

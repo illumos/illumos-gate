@@ -31,7 +31,7 @@ LDLIBS 		+= -lavl
 YFLAGS		= -d -b parser
 CLEANFILES	= $(OBJS) parser.tab.c parser.tab.h
 CLEANFILES	+= \
-		UTF-8.cm \
+		UTF-8.cm UTF-8.ct \
 		8859-1.cm 8859-2.cm 8859-3.cm 8859-4.cm \
 		8859-5.cm 8859-5.cm 8859-6.cm 8859-7.cm \
 		8859-8.cm 8859-9.cm 8859-9.cm 8859-10.cm \
@@ -179,6 +179,8 @@ UTF_8_LOCALES		= \
 		vi_VN \
 		zh_CN zh_HK zh_MO zh_SG zh_TW
 
+UTF8SRCS	= $(UTF_8_LOCALES:%=data/%.UTF-8.src)
+
 LOCNAMES	= \
 		$(ISO8859_1_LOCALES:%=%.ISO8859-1) \
 		$(ISO8859_2_LOCALES:%=%.ISO8859-2) \
@@ -251,8 +253,12 @@ locale $(ROOTLOCDIRS) $(ROOTCATDIRS):
 
 include ../Makefile.targ
 
-locale/%.UTF-8/stamp:		data/%.UTF-8.src UTF-8.cm locale $(PROG)
-	./$(PROG) -U -i $< -f UTF-8.cm $(@D)
+# Strip LC_CTYPE contents for UTF-8 locales and replace them
+# with UTF-8.ct we compiled
+locale/%.UTF-8/stamp:		data/%.UTF-8.src UTF-8.cm \
+				UTF-8.ct locale $(PROG)
+	$(SED) '/^LC_CTYPE/,/^END LC_CTYPE/d;$$r UTF-8.ct' $< | \
+		./$(PROG) -U -f UTF-8.cm $(@D)
 	$(TOUCH) $@
 locale/%.ISO8859-1/stamp:	data/%.UTF-8.src 8859-1.cm locale $(PROG)
 	./$(PROG) -U -i $< -f 8859-1.cm $(@D)
@@ -294,6 +300,9 @@ locale/%/$(DTIME):	locale/%/stamp
 
 UTF-8.cm: data/UTF-8.cm
 	$(LN) -sf data/UTF-8.cm  $@
+
+UTF-8.ct: $(UTF8SRCS)
+	$(SH) data/ctype.sh $(UTF8SRCS) > $@
 
 %.cm: data/%.TXT UTF-8.cm
 	$(RM) $@

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH devmap_access 9E "17 Jan 1997" "SunOS 5.11" "Driver Entry Points"
+.TH DEVMAP_ACCESS 9E "Jan 17, 1997"
 .SH NAME
 devmap_access \- device mapping access entry point
 .SH SYNOPSIS
@@ -14,7 +14,7 @@ devmap_access \- device mapping access entry point
 
 
 
-\fBint prefix\fR\fBdevmap_access\fR(\fBdevmap_cookie_t\fR \fIdhp\fR, \fBvoid *\fR\fIpvtp\fR, 
+\fBint prefix\fR\fBdevmap_access\fR(\fBdevmap_cookie_t\fR \fIdhp\fR, \fBvoid *\fR\fIpvtp\fR,
      \fBoffset_t\fR \fIoff\fR, \fBsize_t\fR \fIlen\fR, \fBuint_t\fR \fItype\fR, \fBuint_t\fR \fIrw\fR);
 .fi
 
@@ -25,87 +25,71 @@ Solaris DDI specific (Solaris DDI).
 .SH ARGUMENTS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdhp\fR \fR
 .ad
 .RS 9n
-.rt  
 An opaque mapping handle that the system uses to describe the mapping.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpvtp\fR \fR
 .ad
 .RS 9n
-.rt  
 Driver private mapping data.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoff\fR \fR
 .ad
 .RS 9n
-.rt  
 User offset within the logical device memory at which the access begins.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlen\fR \fR
 .ad
 .RS 9n
-.rt  
 Length (in bytes) of the memory being accessed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItype\fR \fR
 .ad
 .RS 9n
-.rt  
 Type of access operation.  Possible values are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDEVMAP_ACCESS\fR \fR
 .ad
 .RS 18n
-.rt  
 Memory access.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDEVMAP_LOCK\fR \fR
 .ad
 .RS 18n
-.rt  
 Lock the memory being accessed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDEVMAP_UNLOCK\fR \fR
 .ad
 .RS 18n
-.rt  
 Unlock the memory being accessed.
 .RE
 
@@ -113,43 +97,35 @@ Unlock the memory being accessed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrw\fR \fR
 .ad
 .RS 9n
-.rt  
 Direction of access.  Possible values are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDEVMAP_READ\fR \fR
 .ad
 .RS 17n
-.rt  
 Read access attempted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDEVMAP_WRITE\fR \fR
 .ad
 .RS 17n
-.rt  
 Write access attempted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDEVMAP_EXEC\fR \fR
 .ad
 .RS 17n
-.rt  
 Execution access attempted.
 .RE
 
@@ -196,23 +172,19 @@ A non-zero return value from  \fBdevmap_access()\fR may result in a
 \fBdevmap_access()\fR returns the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 12n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBNon-zero\fR
 .ad
 .RS 12n
-.rt  
 An error occurred.  The return value from  \fBdevmap_do_ctxmgt\fR(9F) or
 \fBdevmap_default_access\fR(9F) should be returned.
 .RE

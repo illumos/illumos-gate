@@ -1,9 +1,9 @@
 '\" te
-.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved 
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH zyd 7D "10 Dec 2008" "SunOS 5.11" "Devices"
+.TH ZYD 7D "Dec 10, 2008"
 .SH NAME
 zyd \- ZyDAS ZD1211/ZD1211B USB 802.11b/g Wireless Driver
 .SH DESCRIPTION
@@ -25,34 +25,28 @@ and AES-CCMP.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/zyd*\fR\fR
 .ad
 .RS 25n
-.rt  
 Special character device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/zyd\fR\fR
 .ad
 .RS 25n
-.rt  
 32-bit kernel module (x86).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/amd64/zyd\fR\fR
 .ad
 .RS 25n
-.rt  
 64-bit kernel module (x86).
 .RE
 
@@ -64,15 +58,14 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(0i) |cw(5.5i) 
-lw(0i) |lw(5.5i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Architecturex86
+Architecture	x86
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

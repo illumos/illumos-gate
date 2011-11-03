@@ -33,6 +33,7 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -108,6 +109,7 @@ struct smb_ctx {
 	int		ct_shtype_req;	/* share type wanted */
 	char		*ct_origshare;
 	char		*ct_home;
+	char		*ct_rpath;	/* remote file name */
 
 	/* Connection setup SMB stuff. */
 	/* Strings from the SMB negotiate response. */

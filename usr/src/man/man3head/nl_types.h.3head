@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH nl_types.h 3HEAD "3 Jul 1990" "SunOS 5.11" "Headers"
+.TH NL_TYPES.H 3HEAD "Jul 3, 1990"
 .SH NAME
 nl_types.h, nl_types \- native language data types
 .SH SYNOPSIS
@@ -18,36 +18,30 @@ nl_types.h, nl_types \- native language data types
 This header contains the following definitions:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnl_catd\fR\fR
 .ad
 .RS 15n
-.rt  
 Used by the message catalog functions \fBcatopen\fR, \fBcatgets\fR and
 \fBcatclose\fR to identify a catalog.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnl_item\fR\fR
 .ad
 .RS 15n
-.rt  
 Used by \fBnl_langinfo\fR to identify items of langinfo data. Values for
 objects of type \fBnl_item\fR are defined in \fB<langinfo.h>\fR\&.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNL_SETD\fR \fR
 .ad
 .RS 15n
-.rt  
 Used by \fBgencat\fR when no \fB$set\fR directive is specified in a message
 text source file. This constant can be used in subsequent calls to
 \fBcatgets\fR as the value of the set identifier parameter.
@@ -55,34 +49,28 @@ text source file. This constant can be used in subsequent calls to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNL_MGSMAX\fR \fR
 .ad
 .RS 15n
-.rt  
 Maximum number of messages per set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNL_SETMAX\fR \fR
 .ad
 .RS 15n
-.rt  
 Maximum number of sets per catalog.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNL_TEXTMAX\fR \fR
 .ad
 .RS 15n
-.rt  
 Maximum size of a message.
 .RE
 

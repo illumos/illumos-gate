@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH rmformat 1 "19 Feb 2009" "SunOS 5.11" "User Commands"
+.TH RMFORMAT 1 "Feb 19, 2009"
 .SH NAME
 rmformat \- removable rewritable media format utility
 .SH SYNOPSIS
 .LP
 .nf
-\fBrmformat\fR [\fB-DeHUv\fR] [\fB-b\fR \fIlabel\fR] [\fB-c\fR \fIblockno\fR] 
+\fBrmformat\fR [\fB-DeHUv\fR] [\fB-b\fR \fIlabel\fR] [\fB-c\fR \fIblockno\fR]
      [\fB-F\fRquick | long | force ] [\fB-s\fR \fIfilename\fR] [\fIdevname\fR]
 .fi
 
@@ -46,7 +46,6 @@ information can be changed with the help of other options provided by
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR \fIlabel\fR\fR
 .ad
@@ -59,7 +58,6 @@ writing a \fBDOS\fR Volume label, the user should use \fBmkfs_pcfs\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIblockno\fR\fR
 .ad
@@ -80,7 +78,6 @@ block management.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR\fR
 .ad
@@ -93,7 +90,6 @@ extended-density type.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
@@ -105,7 +101,6 @@ drive does not support motorized eject.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR quick | long | force\fR
 .ad
@@ -130,7 +125,6 @@ memory cards, all options start a long format.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-H\fR\fR
 .ad
@@ -143,7 +137,6 @@ type.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
@@ -157,7 +150,6 @@ shows the device pathname, vendor information, and the device type.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIfilename\fR\fR
 .ad
@@ -170,7 +162,7 @@ format providing byte offset, size required, tags, and flags, as follows:
 .sp
 .in +2
 .nf
-slices: \fIn\fR = \fIoffset\fR, \fIsize\fR [, \fIflags\fR, \fItags\fR] 
+slices: \fIn\fR = \fIoffset\fR, \fIsize\fR [, \fIflags\fR, \fItags\fR]
 .fi
 .in -2
 .sp
@@ -216,8 +208,8 @@ For example:
 .sp
 .in +2
 .nf
-slices: 0 = 0, 30MB, "wm", "home" : 
-        1 = 30MB, 51MB : 
+slices: 0 = 0, 30MB, "wm", "home" :
+        1 = 30MB, 51MB :
         2 = 0, 100MB, "wm", "backup" :
         6 = 81MB, 19MB
 .fi
@@ -240,7 +232,6 @@ cautious in using this option on such devices.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-U\fR\fR
 .ad
@@ -253,7 +244,6 @@ format on the device requested.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR read | write\fR
 .ad
@@ -277,7 +267,6 @@ repairing.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevname\fR\fR
 .ad
@@ -330,7 +319,7 @@ newfs: construct a new file system /dev/rdiskette: (y/n)? \fBy\fR
          1.4MB in 5 cyl groups (16 c/g, 0.28MB/g, 128 i/g)
  super-block backups (for fsck -F ufs -o b=#) at:
   32, 640, 1184, 1792, 2336,
-# 
+#
 .fi
 .in -2
 .sp
@@ -402,7 +391,6 @@ Access permissions: Medium is not write protected.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/diskette0\fR\fR
 .ad
@@ -413,7 +401,6 @@ Directory providing block device access for the media in floppy drive 0.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/rdiskette0\fR\fR
 .ad
@@ -424,7 +411,6 @@ Directory providing character device access for the media in floppy drive 0.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/aliases\fR\fR
 .ad
@@ -436,7 +422,6 @@ media under the control of volume management using appropriate alias.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/aliases/floppy0\fR\fR
 .ad
@@ -447,7 +432,6 @@ Symbolic link to the character device for the media in floppy drive 0.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/rdiskette\fR\fR
 .ad
@@ -459,7 +443,6 @@ floppy drive, usually drive 0.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/dsk\fR\fR
 .ad
@@ -471,7 +454,6 @@ cards and removable media devices.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/rdsk\fR\fR
 .ad
@@ -483,7 +465,6 @@ cards and removable media devices.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/aliases/pcmemS\fR\fR
 .ad
@@ -495,7 +476,6 @@ socket S, where S represents a \fBPCMCIA\fR socket number.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/aliases/rmdisk0\fR\fR
 .ad
@@ -507,7 +487,6 @@ floppy, \fBDVD-ROM\fR, \fBPCMCIA\fR memory card, and so forth.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/rdsk\fR\fR
 .ad
@@ -519,7 +498,6 @@ cards and other removable devices.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/dsk\fR\fR
 .ad

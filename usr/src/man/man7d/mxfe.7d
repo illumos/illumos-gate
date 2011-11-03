@@ -6,7 +6,7 @@
 .\" FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
 .\" OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 .\" Portions Copyright (c) 2007 by Sun Microsystems, Inc.  All Rights Reserved.
-.TH mxfe 7D "31 Aug 2007" "SunOS 5.11" "Devices"
+.TH MXFE 7D "Aug 31, 2007"
 .SH NAME
 mxfe \- MXFE Fast Ethernet device driver
 .SH SYNOPSIS
@@ -85,45 +85,37 @@ inbound  frames with a SAP between zero and 1500 are interpreted as \fIIEEE
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/mxfe*\fR\fR
 .ad
 .RS 28n
-.rt  
 Special character device
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/mxfe\fR\fR
 .ad
 .RS 28n
-.rt  
 32-bit driver binary (x86).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/amd64/mxfe\fR\fR
 .ad
 .RS 28n
-.rt  
 64-bit ELF kernel module (x86).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/sparcv9/mxfe\fR\fR
 .ad
 .RS 28n
-.rt  
 Driver binary (SPARC).
 .RE
 
@@ -135,13 +127,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureSPARC, x86
+Architecture	SPARC, x86
 .TE
 
 .SH SEE ALSO

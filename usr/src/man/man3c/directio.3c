@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH directio 3C "9 Apr 2003" "SunOS 5.11" "Standard C Library Functions"
+.TH DIRECTIO 3C "Apr 9, 2003"
 .SH NAME
 directio \- provide advice to file system
 .SH SYNOPSIS
@@ -34,12 +34,10 @@ sets the \fIadvice\fR for all applications using the file associated with
 Values for \fIadvice\fR are defined in \fB<sys/fcntl.h>\fR\&.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDIRECTIO_OFF\fR\fR
 .ad
 .RS 16n
-.rt  
 Applications get the default system behavior when accessing file data.
 .sp
 When an application reads data from a file, the data is first cached in system
@@ -62,12 +60,10 @@ The system behavior for  \fBDIRECTIO_OFF\fR can change without notice.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDIRECTIO_ON\fR\fR
 .ad
 .RS 16n
-.rt  
 The system behaves as though the application is not going to reuse the file
 data in the near future. In other words, the file data is not cached in the
 system's memory pages.
@@ -97,35 +93,29 @@ returns \fB\(mi1\fR and sets \fBerrno\fR to indicate the error.
 The \fBdirectio()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIfildes\fR argument is not a valid open file descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTTY\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIfildes\fR argument is not associated with a file system that accepts
 advisory functions.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The value in \fIadvice\fR is invalid.
 .RE
 
@@ -150,13 +140,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

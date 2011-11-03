@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ld 1 "18 Sep 2009" "SunOS 5.11" "User Commands"
+.TH LD 1 "Sep 18, 2009"
 .SH NAME
 ld \- link-editor for object files
 .SH SYNOPSIS
@@ -141,7 +141,6 @@ processing of archive libraries, remains unchanged.
 The following options are supported.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-32\fR | \fB-64\fR\fR
 .ad
@@ -168,7 +167,6 @@ link-editor\fR in \fILinker and Libraries Guide\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
@@ -182,7 +180,6 @@ Executables\fR under DESCRIPTION.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
@@ -205,7 +202,6 @@ relocation of 64-bit executables.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-B\fR \fBdirect\fR | \fBnodirect\fR\fR
 .ad
@@ -235,7 +231,6 @@ Libraries Guide\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-B\fR \fBdynamic\fR | \fBstatic\fR\fR
 .ad
@@ -250,7 +245,6 @@ option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-B\fR \fBeliminate\fR\fR
 .ad
@@ -269,7 +263,6 @@ mapfile\fR in \fILinker and Libraries Guide\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-B\fR \fBgroup\fR\fR
 .ad
@@ -287,7 +280,6 @@ also asserts the \fB-z\fR \fBdefs\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-B\fR \fBlocal\fR\fR
 .ad
@@ -306,7 +298,6 @@ objects. See also the \fB-B\fR \fBeliminate\fR option and the \fB-B\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-B\fR \fBreduce\fR\fR
 .ad
@@ -325,7 +316,6 @@ shared object is created.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-B\fR \fBsymbolic\fR\fR
 .ad
@@ -347,7 +337,6 @@ recommended.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIname\fR\fR
 .ad
@@ -360,7 +349,6 @@ together with providing alternative object dependencies. See \fBcrle\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
@@ -371,7 +359,6 @@ Demangles C++ symbol names displayed in diagnostic messages.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fBy\fR | \fBn\fR\fR
 .ad
@@ -385,7 +372,6 @@ linking. When \fB-d\fR \fBn\fR is specified, \fBld\fR uses static linking. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR \fItoken\fR,...\fR
 .ad
@@ -398,7 +384,6 @@ available. See \fIDebugging Aids\fR in \fILinker and Libraries Guide\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fIepsym\fR\fR
 .ad
@@ -413,7 +398,6 @@ Sets the entry point address for the output file to be the symbol \fIepsym\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIname\fR\fR
 .ad
@@ -432,7 +416,6 @@ allowed. This option can not be combined with the \fB-F\fR option. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR \fIname\fR\fR
 .ad
@@ -451,7 +434,6 @@ Filters\fR in \fILinker and Libraries Guide\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-G\fR\fR
 .ad
@@ -467,7 +449,6 @@ See Chapter 4, \fIShared Objects,\fR in \fILinker and Libraries Guide\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fIname\fR\fR
 .ad
@@ -487,7 +468,6 @@ object to search for at runtime. See \fIRecording a Shared Object Name\fR in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
@@ -500,7 +480,6 @@ search, which would interfere with the link-editing being performed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I\fR \fIname\fR\fR
 .ad
@@ -520,7 +499,6 @@ control to the interpreter rather than to the \fBa.out\fR directly.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIx\fR\fR
 .ad
@@ -548,7 +526,6 @@ of \fB-l\fR is significant. See \fILinking With Additional Libraries\fR in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR \fIpath\fR\fR
 .ad
@@ -572,7 +549,6 @@ environment variable is also interpreted by the runtime environment. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
@@ -584,7 +560,6 @@ any non-fatal multiply-defined symbols, on the standard output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR \fImapfile\fR\fR
 .ad
@@ -599,7 +574,6 @@ mapfiles are provided in \fB/usr/lib/ld\fR. See FILES.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-N\fR \fIstring\fR\fR
 .ad
@@ -616,7 +590,6 @@ when combined with the \fB-dy\fR and \fB-r\fR options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIoutfile\fR\fR
 .ad
@@ -632,7 +605,6 @@ default object file is \fBa.out\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIauditlib\fR\fR
 .ad
@@ -648,7 +620,6 @@ Guide\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR \fIauditlib\fR\fR
 .ad
@@ -664,7 +635,6 @@ Guide\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Q\fR \fBy\fR | \fBn\fR\fR
 .ad
@@ -681,7 +651,6 @@ sections can be manipulated by the \fBmcs\fR(1) utility.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
@@ -698,7 +667,6 @@ used with the \fB-a\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIpath\fR\fR
 .ad
@@ -730,7 +698,6 @@ dynamic objects to be relocated to different locations in the file system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
@@ -752,7 +719,6 @@ and \fB-z\fR \fBnoldynsym\fR options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR \fIsupportlib\fR\fR
 .ad
@@ -767,7 +733,6 @@ Libraries Guide\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
@@ -779,7 +744,6 @@ different alignments.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fIsymname\fR\fR
 .ad
@@ -799,7 +763,6 @@ Additional Symbols with the u option\fR in \fILinker and Libraries Guide\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
@@ -814,7 +777,6 @@ Outputs a message giving information about the version of \fBld\fR being used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Y\fR \fBP,\fR\fIdirlist\fR\fR
 .ad
@@ -826,7 +788,6 @@ colon-separated path list.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBabsexec\fR\fR
 .ad
@@ -841,7 +802,6 @@ executable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBallextract\fR | \fBdefaultextract\fR | \fBweakextract\fR\fR
 .ad
@@ -865,7 +825,6 @@ Guide\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBaltexec64\fR\fR
 .ad
@@ -881,7 +840,6 @@ link-editor\fR in \fILinker and Libraries Guide\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBcombreloc\fR | \fBnocombreloc\fR\fR
 .ad
@@ -911,7 +869,6 @@ option is unnecessary, and has no effect.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBdefs\fR | \fBnodefs\fR\fR
 .ad
@@ -937,7 +894,6 @@ unspecified. Use of the \fB-z\fR \fBnodefs\fR option is not recommended.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBdirect\fR | \fBnodirect\fR\fR
 .ad
@@ -954,7 +910,6 @@ enabled.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBendfiltee\fR\fR
 .ad
@@ -967,7 +922,6 @@ further filtee searches by the filter. See \fIReducing Filtee Searches\fR in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBfiniarray=\fR\fIfunction\fR\fR
 .ad
@@ -981,7 +935,6 @@ Termination Sections\fR in \fILinker and Libraries Guide\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBglobalaudit\fR\fR
 .ad
@@ -1002,7 +955,6 @@ the \fBLD_AUDIT\fR environment variable. See \fBld.so.1\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBgroupperm\fR | \fBnogroupperm\fR\fR
 .ad
@@ -1015,7 +967,6 @@ had been built using the \fB-B\fR \fBgroup\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBhelp\fR\fR
 .ad
@@ -1030,7 +981,6 @@ Print a summary of the command line options on the standard output and exit.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBignore\fR | \fBrecord\fR\fR
 .ad
@@ -1050,7 +1000,6 @@ contributes to the link-edit, must reference an eliminated section.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBinitarray=\fR\fIfunction\fR\fR
 .ad
@@ -1064,7 +1013,6 @@ Termination Sections\fR in \fILinker and Libraries Guide\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBinitfirst\fR\fR
 .ad
@@ -1079,7 +1027,6 @@ This option is only meaningful when building a shared object.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBinterpose\fR\fR
 .ad
@@ -1099,7 +1046,6 @@ effect.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBlazyload\fR | \fBnolazyload\fR\fR
 .ad
@@ -1116,7 +1062,6 @@ and Libraries Guide\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBld32\fR=\fIarg1\fR,\fIarg2\fR,...\fR
 .ad
@@ -1150,7 +1095,6 @@ determination is carried out \fBprior\fR to any \fB-z\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBloadfltr\fR\fR
 .ad
@@ -1165,7 +1109,6 @@ in effect. See the \fBld.so.1\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBmuldefs\fR\fR
 .ad
@@ -1183,7 +1126,6 @@ be taken.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBnocompstrtab\fR\fR
 .ad
@@ -1197,7 +1139,6 @@ set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBnodefaultlib\fR\fR
 .ad
@@ -1210,7 +1151,6 @@ dependencies of the object can be satisfied from its runpath.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBnodelete\fR\fR
 .ad
@@ -1223,7 +1163,6 @@ the object to the process by using \fBdlopen\fR(3C) with the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBnodlopen\fR\fR
 .ad
@@ -1237,7 +1176,6 @@ building a shared object.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBnodump\fR\fR
 .ad
@@ -1248,7 +1186,6 @@ Marks the object as not available to \fBdldump\fR(3C).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBnoldynsym\fR\fR
 .ad
@@ -1276,7 +1213,6 @@ See the \fB-s\fR and \fB-z\fR \fBredlocsym\fR options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBnopartial\fR\fR
 .ad
@@ -1288,7 +1224,6 @@ files, are expanded in the output file being generated.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBnoversion\fR\fR
 .ad
@@ -1300,7 +1235,6 @@ Does not record any versioning sections. Any version sections or associated
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBnow\fR\fR
 .ad
@@ -1314,7 +1248,6 @@ environment variable in effect. See \fBld.so.1\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBorigin\fR\fR
 .ad
@@ -1327,7 +1260,6 @@ analysis of objects to provide for \fB$ORIGIN\fR processing is now default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBpreinitarray=\fR\fIfunction\fR\fR
 .ad
@@ -1341,7 +1273,6 @@ and Termination Sections\fR in \fILinker and Libraries Guide\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBredlocsym\fR\fR
 .ad
@@ -1358,7 +1289,6 @@ options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBrelaxreloc\fR\fR
 .ad
@@ -1374,7 +1304,6 @@ authors, and is not intended for general use.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBrescan-now\fR\fR
 .ad
@@ -1410,7 +1339,6 @@ advised.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBrescan-start\fR ... \fB-z\fR \fBrescan-end\fR\fR
 .ad
@@ -1435,7 +1363,6 @@ Archive rescan groups cannot be nested.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBtarget=sparc|x86\fR \fI\fR\fR
 .ad
@@ -1459,7 +1386,6 @@ link-editor\fR in \fILinker and Libraries Guide\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBtext\fR\fR
 .ad
@@ -1476,7 +1402,6 @@ incurs the least relocation overhead when loaded into memory. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBtextoff\fR\fR
 .ad
@@ -1489,7 +1414,6 @@ object.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBtextwarn\fR\fR
 .ad
@@ -1502,7 +1426,6 @@ executable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fBverbose\fR\fR
 .ad
@@ -1517,7 +1440,6 @@ additional diagnostics that are deemed too noisy to be generated by default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR\fBwrap=\fR\fIsymbol\fR\fR
 .ad
@@ -1567,7 +1489,6 @@ occurring.
 .SH ENVIRONMENT VARIABLES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLD_ALTEXEC\fR\fR
 .ad
@@ -1581,7 +1502,6 @@ compiler drivers. See the \fB-z altexec64\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLD_LIBRARY_PATH\fR\fR
 .ad
@@ -1631,7 +1551,6 @@ effect.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLD_NOEXEC_64\fR\fR
 .ad
@@ -1646,7 +1565,6 @@ find the use of the 32-bit link-editor faster.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLD_OPTIONS\fR\fR
 .ad
@@ -1667,7 +1585,6 @@ immediately following the name used to invoke \fBld\fR, as in:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLD_RUN_PATH\fR\fR
 .ad
@@ -1680,7 +1597,6 @@ specified, \fB-R\fR supersedes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSGS_SUPPORT\fR\fR
 .ad
@@ -1702,45 +1618,37 @@ characters '\fBLD_\fR' are reserved for possible future enhancements to \fBld\fR
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlib\fIx\fR.so\fR\fR
 .ad
 .RS 15n
-.rt  
 shared object libraries.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlib\fIx\fR.a\fR\fR
 .ad
 .RS 15n
-.rt  
 archive libraries.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBa.out\fR\fR
 .ad
 .RS 15n
-.rt  
 default output file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fILIBPATH\fR\fR
 .ad
 .RS 15n
-.rt  
 For 32-bit libraries, the default search path is \fB/usr/ccs/lib\fR, followed
 by \fB/lib\fR, and finally \fB/usr/lib\fR. For 64-bit libraries, the default
 search path is \fB/lib/64\fR, followed by \fB/usr/lib/64\fR.
@@ -1748,12 +1656,10 @@ search path is \fB/lib/64\fR, followed by \fB/usr/lib/64\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/ld\fR\fR
 .ad
 .RS 15n
-.rt  
 A directory containing several \fBmapfiles\fR that can be used during
 link-editing. These \fBmapfiles\fR provide various capabilities, such as
 defining memory layouts, aligning bss, and defining non-executable stacks.
@@ -1767,13 +1673,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

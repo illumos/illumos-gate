@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pkgmap 4 "12 Jul 2006" "SunOS 5.11" "File Formats"
+.TH PKGMAP 4 "Jul 12, 2006"
 .SH NAME
 pkgmap \- package contents description file
 .SH DESCRIPTION
@@ -22,12 +22,10 @@ each field separated by a space. The fields are described below and must appear
 in the order shown.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpart\fR\fR
 .ad
 .RS 12n
-.rt  
 An optional field designating the part number in which the object resides. A
 part is a collection of files and is the atomic unit by which a package is
 processed. A developer can choose the criteria for grouping files into a part
@@ -37,12 +35,10 @@ assumed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIftype\fR\fR
 .ad
 .RS 12n
-.rt  
 A one-character field that indicates the file type. Valid values are listed
 below. File types are divided between those that are not to be modified and
 those that are modifiable.
@@ -50,57 +46,47 @@ those that are modifiable.
 Files of the following types must never be modified:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBb\fR\fR
 .ad
 .RS 5n
-.rt  
 block special device
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBc\fR\fR
 .ad
 .RS 5n
-.rt  
 character special device
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd\fR\fR
 .ad
 .RS 5n
-.rt  
 directory
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBf\fR\fR
 .ad
 .RS 5n
-.rt  
 a standard executable file, data file, or other type of file, the contents of
 which must never be modified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBi\fR\fR
 .ad
 .RS 5n
-.rt  
 information file (such as a file containing a copyright, list of dependencies,
 or package information) or installation script (such as checkinstall, class
 action [\fBi.\fR], pre/post install/remove), the contents of which must never
@@ -109,57 +95,47 @@ be modified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBl\fR\fR
 .ad
 .RS 5n
-.rt  
 linked file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBp\fR\fR
 .ad
 .RS 5n
-.rt  
 named pipe
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fR
 .ad
 .RS 5n
-.rt  
 symbolic link
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBx\fR\fR
 .ad
 .RS 5n
-.rt  
 an exclusive directory accessible only by this package
 .RE
 
 Files of the following types can be modified:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBe\fR\fR
 .ad
 .RS 5n
-.rt  
 An editable file, intended to be edited (selectively modified) after
 installation. An editable file is expected to change on installation or
 removal, can be shared by several packages, and must be installed by a class
@@ -168,12 +144,10 @@ action script. Examples are a configuration file or a list of users.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBv\fR\fR
 .ad
 .RS 5n
-.rt  
 A volatile file, intended to be overwritten or appended to after installation.
 A volatile file is not expected to change on installation or removal, is not
 preserved between installations, and can be installed by a class action script.
@@ -187,12 +161,10 @@ be marked as \fBe\fR or \fBv\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIclass\fR\fR
 .ad
 .RS 12n
-.rt  
 The installation class to which the file belongs. This name must contain only
 alphanumeric characters and be no longer than 12 characters. It is not
 specified if the \fIftype\fR is \fBi\fR (information file).
@@ -200,12 +172,10 @@ specified if the \fIftype\fR is \fBi\fR (information file).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpathname\fR\fR
 .ad
 .RS 12n
-.rt  
 \fIpathname\fR may contain variables of the form \fB$\fR\fIvariable\fR that
 support install-time configuration of the file. \fIvariable\fR may be embedded
 in the pathname structure. (See \fBprototype\fR(4) for definitions of variable
@@ -227,36 +197,30 @@ CLIENT_BASEDIR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImajor\fR\fR
 .ad
 .RS 12n
-.rt  
 The major device number. The field is only specified for block or character
 special devices.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIminor\fR\fR
 .ad
 .RS 12n
-.rt  
 The minor device number. The field is only specified for block or character
 special devices.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImode\fR\fR
 .ad
 .RS 12n
-.rt  
 The octal mode of the file (for example, 0664). A question mark (\fB?\fR)
 indicates that the mode will be left unchanged, implying that the file already
 exists on the target machine. This field is not used for linked files,
@@ -268,12 +232,10 @@ definitions of variable specifications.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIowner\fR\fR
 .ad
 .RS 12n
-.rt  
 The owner of the file (for example, \fBbin\fR or \fBroot\fR). The field is
 limited to 14 characters in length. A question mark (\fB?\fR) indicates that
 the owner will be left unchanged or changed to the owner stored in the package
@@ -289,12 +251,10 @@ definitions of variable specifications.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIgroup\fR\fR
 .ad
 .RS 12n
-.rt  
 The group to which the file belongs (for example, \fBbin\fR or \fBsys\fR). The
 field is limited to 14 characters in length. A question mark (\fB?\fR)
 indicates that the group will be left unchanged or changed to the owner stored
@@ -310,36 +270,30 @@ definitions of variable specifications.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsize\fR\fR
 .ad
 .RS 12n
-.rt  
 The actual size of the file in bytes. This field is not specified for named
 pipes, special devices, directories or linked files.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcksum\fR\fR
 .ad
 .RS 12n
-.rt  
 The checksum of the file contents. This field is not specified for named pipes,
 special devices, directories, or linked files.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImodtime\fR\fR
 .ad
 .RS 12n
-.rt  
 The time of last modification, as reported by the \fBstat\fR(2) function call.
 This field is not specified for named pipes, special devices, directories, or
 linked files.

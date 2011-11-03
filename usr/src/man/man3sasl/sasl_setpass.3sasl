@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sasl_setpass 3SASL "15 Oct 2003" "SunOS 5.11" "Simple Authentication Security Layer Library Functions"
+.TH SASL_SETPASS 3SASL "Oct 15, 2003"
 .SH NAME
 sasl_setpass \- set the password for a user
 .SH SYNOPSIS
@@ -30,78 +30,64 @@ currently supply a setpass callback.
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIconn\fR\fR
 .ad
 .RS 14n
-.rt  
 The SASL connection context
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIuser\fR\fR
 .ad
 .RS 14n
-.rt  
 The username for which the password is set
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpass\fR\fR
 .ad
 .RS 14n
-.rt  
 The password to set
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpasslen\fR\fR
 .ad
 .RS 14n
-.rt  
 The length of \fIpass\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoldpass\fR\fR
 .ad
 .RS 14n
-.rt  
 The old password, which is optional
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoldpasslen\fR\fR
 .ad
 .RS 14n
-.rt  
 The length of \fIoldpass\fR, which is optional
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 14n
-.rt  
 Refers to flags, including, \fBSASL_SET_CREATE\fR and \fBSASL_SET_DISABLE\fR.
 Use these flags to create and disable accounts.
 .RE
@@ -113,12 +99,10 @@ Use these flags to create and disable accounts.
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_OK\fR\fR
 .ad
 .RS 11n
-.rt  
 The call to \fBsasl_setpass()\fR was successful.
 .RE
 
@@ -133,15 +117,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

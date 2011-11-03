@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
 
 /*
@@ -92,10 +93,6 @@ static ddi_dma_attr_t fcpci_dma_attr = {
 	1,		/* granularity of device */
 	0		/* DMA transfer flags */
 };
-
-#ifndef	lint
-char _depends_on[] = "misc/fcodem misc/busra";
-#endif
 
 #define	HIADDR(n) ((uint32_t)(((uint64_t)(n) & 0xFFFFFFFF00000000)>> 32))
 #define	LOADDR(n)((uint32_t)((uint64_t)(n) & 0x00000000FFFFFFFF))

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH net_instance_notify_register 9F "30 Oct 2008" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH NET_INSTANCE_NOTIFY_REGISTER 9F "Oct 30, 2008"
 .SH NAME
 net_instance_notify_register, net_instance_notify_unregister \- add/delete a
 function to be called for changes to an instance
@@ -13,14 +13,14 @@ function to be called for changes to an instance
 #include <sys/hook.h>
 #include <sys/neti.h>
 
-\fBint\fR \fBnet_instance_notify_register\fR(\fBnet id_t\fR \fInet_id\fR, 
+\fBint\fR \fBnet_instance_notify_register\fR(\fBnet id_t\fR \fInet_id\fR,
      \fBhook_notify_fn_t\fR *\fIcallback\fR, \fBvoid\fR *\fIarg\fR);
 
-\fBint\fR \fBnet_instance_notify_unregister\fR(\fBnet id_t\fR \fInet_id\fR, 
+\fBint\fR \fBnet_instance_notify_unregister\fR(\fBnet id_t\fR \fInet_id\fR,
      \fBhook_notify_fn_t\fR *\fIcallback\fR);
 
 \fBtypedef int\fR (* \fBhook_notify_fn_t\fR)(\fBhook_notify_cmd_t command,\fR
-     \fBvoid\fR *\fIarg\fR, \fBconst char\fR *\fIname1\fR, \fBconst char\fR *\fIname2\fR, \fBconst char\fR 
+     \fBvoid\fR *\fIarg\fR, \fBconst char\fR *\fIname1\fR, \fBconst char\fR *\fIname2\fR, \fBconst char\fR
      *\fIname3\fR);
 .fi
 
@@ -31,35 +31,29 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fInetid\fR\fR
 .ad
 .RS 12n
-.rt  
 value from either \fIcallback\fR registered with \fBnet_instance_register()\fR
 or \fBnet_zoneidtonetid()\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcallback\fR\fR
 .ad
 .RS 12n
-.rt  
 function to call when a change occurs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIarg\fR\fR
 .ad
 .RS 12n
-.rt  
 pointer to pass into the \fBcallback()\fR function when a change occurs.
 .RE
 
@@ -90,34 +84,28 @@ The arguments passed through to the \fBcallback\fR are as follows (the command
 is either \fBHN_REGISTER\fR or \fBHN_UNREGISTER\fR):
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname1\fR\fR
 .ad
 .RS 9n
-.rt  
 is the \fInetid\fR represented as a string.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname2\fR\fR
 .ad
 .RS 9n
-.rt  
 is \fBNULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname3\fR\fR
 .ad
 .RS 9n
-.rt  
 is the name of the instance being added/removed
 .RE
 
@@ -128,12 +116,10 @@ If these functions succeed, 0 is returned. Otherwise, the following error is
 returned:
 .sp
 .ne 2
-.mk
 .na
 \fBEEXIST\fR
 .ad
 .RS 10n
-.rt  
 the given callback function is already registered.
 .RE
 
@@ -149,13 +135,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

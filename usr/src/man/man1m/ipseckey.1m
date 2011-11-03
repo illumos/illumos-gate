@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ipseckey 1M "25 Sep 2008" "SunOS 5.11" "System Administration Commands"
+.TH IPSECKEY 1M "Sep 25, 2008"
 .SH NAME
 ipseckey \- manually manipulate an IPsec Security Association Database (SADB)
 .SH SYNOPSIS
@@ -83,7 +83,6 @@ the \fBSecurity\fR section for details on how to use this command securely.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR [\fIfilename\fR]\fR
 .ad
@@ -98,7 +97,6 @@ information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR [\fIfilename\fR]\fR
 .ad
@@ -112,7 +110,6 @@ generate files readable by the \fB-f\fR argument.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
@@ -125,7 +122,6 @@ otherwise unreachable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
@@ -137,7 +133,6 @@ of an actual hexadecimal digit, print an \fBX\fR when this flag is turned on.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR [\fIfilename\fR]\fR
 .ad
@@ -153,7 +148,6 @@ addresses.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -166,7 +160,6 @@ raw seconds values for lifetimes.
 .SH COMMANDS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadd\fR\fR
 .ad
@@ -181,7 +174,6 @@ extension-value pairs described below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBupdate\fR\fR
 .ad
@@ -198,7 +190,6 @@ but normally is only used for \fBSA\fR lifetime updates.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBupdate-pair\fR\fR
 .ad
@@ -209,7 +200,6 @@ As update, but apply the update to the SA and its paired SA, if there is one.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdelete\fR\fR
 .ad
@@ -224,7 +214,6 @@ updated to indicate that it is now unpaired.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdelete-pair\fR\fR
 .ad
@@ -237,7 +226,6 @@ delete that SA too. This command requires the \fBspi\fR extension and the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBget\fR\fR
 .ad
@@ -249,7 +237,6 @@ Lookup and display a security association from a specific \fBSADB\fR. Like
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBflush\fR\fR
 .ad
@@ -260,7 +247,6 @@ Remove all \fBSA\fR for a given \fBSA_TYPE\fR, or all \fBSA\fR for all types.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmonitor\fR\fR
 .ad
@@ -273,7 +259,6 @@ socket would not receive to be received. See \fBpf_key\fR(7P).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpassive_monitor\fR\fR
 .ad
@@ -284,7 +269,6 @@ Like monitor, except that it does not use the \fBSADB_X_PROMISC\fR message.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpmonitor\fR\fR
 .ad
@@ -295,7 +279,6 @@ Synonym for \fBpassive_monitor\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdump\fR\fR
 .ad
@@ -309,7 +292,6 @@ or that this command will even complete.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsave\fR\fR
 .ad
@@ -322,7 +304,6 @@ provide a way to snapshot a particular \fBSA\fR type, for example, \fBesp\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhelp\fR\fR
 .ad
@@ -334,7 +315,6 @@ Prints a brief summary of commands.
 .SS "\fBSA_TYPE\fR"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBall\fR\fR
 .ad
@@ -347,7 +327,6 @@ these commands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBah\fR\fR
 .ad
@@ -358,7 +337,6 @@ Specifies the IPsec Authentication Header ("\fBAH\fR") \fBSA\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBesp\fR\fR
 .ad
@@ -381,7 +359,6 @@ hexadecimal number with a bit-length. Extensions are usually paired with
 values; however, some extensions require two values after them.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBspi \fI<number>\fR\fR\fR
 .ad
@@ -393,7 +370,6 @@ required for the \fBadd\fR, \fBdelete\fR, \fBget\fR and \fBupdate\fR commands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpair-spi \fI<number>\fR\fR\fR
 .ad
@@ -414,7 +390,6 @@ failed, the SA to be added will instead be removed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinbound | outbound\fR\fR
 .ad
@@ -434,7 +409,6 @@ hash table in which the kernel should find the SA.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBreplay\fR \fI<number>\fR\fR
 .ad
@@ -448,7 +422,6 @@ commands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBreplay_value\fR \fI<number>\fR\fR
 .ad
@@ -460,7 +433,6 @@ and \fBupdate\fR commands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstate \fI<string>\fR|\fI<number>\fR\fR\fR
 .ad
@@ -474,7 +446,6 @@ specified, the value defaults to \fBmature\fR. This extension is used by the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauth_alg \fI<string>\fR|\fI<number>\fR\fR\fR
 .ad
@@ -489,7 +460,6 @@ value, or by strings indicating an algorithm name. Current authentication
 algorithms include:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHMAC-MD5\fR\fR
 .ad
@@ -500,7 +470,6 @@ algorithms include:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHMAC-SH-1\fR\fR
 .ad
@@ -511,7 +480,6 @@ algorithms include:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHMAC-SHA-256\fR\fR
 .ad
@@ -522,7 +490,6 @@ algorithms include:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHMAC-SHA-384\fR\fR
 .ad
@@ -533,7 +500,6 @@ algorithms include:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHMAC-SHA-512\fR\fR
 .ad
@@ -552,7 +518,6 @@ authentication algorithms.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBencr_alg \fI<string>\fR|\fI<number>\fR\fR\fR
 .ad
@@ -583,7 +548,6 @@ will be downgraded to \fBdying\fR from \fBmature\fR. See \fBpf_key\fR(7P). The
 messages.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBidle_addtime\fR \fI<number>\fR\fR
 .ad
@@ -601,7 +565,6 @@ the \fBadd\fR and \fBupdate\fR commands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsoft_bytes \fI<number>\fR\fR\fR
 .ad
@@ -619,7 +582,6 @@ the \fBadd\fR and \fBupdate\fR commands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsoft_addtime \fI<number>\fR\fR\fR
 .ad
@@ -639,7 +601,6 @@ and \fBupdate\fR commands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsoft_usetime \fI<number>\fR\fR\fR
 .ad
@@ -657,7 +618,6 @@ extension is used by the \fBadd\fR and \fBupdate\fR commands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsaddr \fIaddress\fR | \fIname\fR\fR\fR
 .ad
@@ -694,7 +654,6 @@ commands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdaddr \fI<address>\fR|\fI<name>\fR\fR\fR
 .ad
@@ -737,7 +696,6 @@ identified by a name are used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsport\fR \fI<portnum>\fR\fR
 .ad
@@ -750,7 +708,6 @@ be.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdport\fR \fI<portnum>\fR\fR
 .ad
@@ -763,7 +720,6 @@ be.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBencap\fR \fI<protocol>\fR\fR
 .ad
@@ -776,7 +732,6 @@ for \fI<protocol>\fR currently is \fBudp\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBproto\fR \fI<protocol number>\fR\fR
 .ad
@@ -792,7 +747,6 @@ SA.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnat_loc\fR \fI<address>\fR|\fI<name>\fR\fR
 .ad
@@ -806,7 +760,6 @@ specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnat_rem\fR \fI<address>\fR|\fI<name>\fR\fR
 .ad
@@ -820,7 +773,6 @@ This address can match the SA's local address if there is a \fBnat_rport\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnat_lport\fR \fI<portnum>\fR\fR
 .ad
@@ -831,7 +783,6 @@ Identifies the local UDP port on which encapsulation of ESP occurs.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnat_rport\fR \fI<portnum>\fR\fR
 .ad
@@ -842,7 +793,6 @@ Identifies the remote UDP port on which encapsulation of ESP occurs.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBisrc\fR \fI<address>\fR | \fI<name>\fR[/\fI<prefix>\fR]\fR
 .ad
@@ -882,7 +832,6 @@ deprecated, remains.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBidst\fR \fI<address>\fR | \fI<name>\fR[/\fI<prefix>\fR]\fR
 .ad
@@ -911,7 +860,6 @@ IPv6-specific addresses or prefixes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinnersport\fR \fI<portnum>\fR\fR
 .ad
@@ -928,7 +876,6 @@ tunnel-mode SA. It should be used in combination with an upper-layer protocol
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinnerdport\fR \fI<portnum>\fR\fR
 .ad
@@ -945,7 +892,6 @@ a tunnel-mode SA. It should be used in combination with an upper-layer protocol
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBiproto\fR \fI<protocol number>\fR\fBiulp\fR \fI<protocol number>\fR\fR
 .ad
@@ -957,7 +903,6 @@ inner header of a tunnel-mode SA.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauthkey \fI<hexstring>\fR\fR\fR
 .ad
@@ -974,7 +919,6 @@ commands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBencrkey \fI<hexstring>\fR\fR\fR
 .ad
@@ -996,7 +940,6 @@ added \fBSA\fRs. Unlike other extensions, \fBsrcidtype\fR takes two values, a
 \fItype\fR, and an actual \fIvalue\fR. The type can be one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprefix\fR\fR
 .ad
@@ -1007,7 +950,6 @@ An address prefix.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfqdn\fR\fR
 .ad
@@ -1018,7 +960,6 @@ A fully-qualified domain name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdomain\fR\fR
 .ad
@@ -1029,7 +970,6 @@ Domain name, synonym for \fBfqdn\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuser_fqdn\fR\fR
 .ad
@@ -1040,7 +980,6 @@ User identity of the form \fB\fIuser\fR@\fIfqdn\fR\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmailbox\fR\fR
 .ad
@@ -1055,7 +994,6 @@ The \fIvalue\fR is an arbitrary text string that should identify the
 certificate.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsrcidtype \fI<type, value>\fR\fR\fR
 .ad
@@ -1067,7 +1005,6 @@ used by the \fBadd\fR and \fBupdate\fR commands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdstidtype \fI<type, value>\fR\fR\fR
 .ad
@@ -1454,7 +1391,7 @@ also needs to add both \fBSA\fRs.
 .sp
 .in +2
 .nf
-example# \fBipseckey\fR 
+example# \fBipseckey\fR
 ipseckey> \fBadd ah spi 0x2112 src you.domain.com dst me.domain.com \e
           authalg md5 authkey bde359723576fdea08e56cbe876e24ad \e
           hard_bytes 16000000\fR
@@ -1488,18 +1425,18 @@ example:
 .sp
 .in +2
 .nf
-# This is a sample file for flushing out the ESP table and 
-# adding a pair of SAs. 
+# This is a sample file for flushing out the ESP table and
+# adding a pair of SAs.
 
-flush esp 
+flush esp
 
-### Watch out!  I have keying material in this file.  See the 
-### SECURITY section in this manual page for why this can be 
+### Watch out!  I have keying material in this file.  See the
+### SECURITY section in this manual page for why this can be
 ### dangerous .
 
 add esp spi 0x2112 src me.domain.com dst you.domain.com \e
     authalg md5 authkey bde359723576fdea08e56cbe876e24ad \e
-    encralg des encrkey be02938e7def2839 hard_usetime 28800 
+    encralg des encrkey be02938e7def2839 hard_usetime 28800
 add esp spi 0x5150 src you.domain.com dst me.domain.com \e
     authalg md5 authkey 930987dbe09743ade09d92b4097d9e93 \e
     encralg des encrkey 8bd4a52e10127deb hard_usetime 28800
@@ -1545,7 +1482,6 @@ pair-spi 0x654321\fR
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/inet/secret/ipseckeys\fR\fR
 .ad
@@ -1563,12 +1499,11 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
-Interface StabilityCommitted
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
@@ -1601,7 +1536,6 @@ If there are any errors in the configuration file, ipseckey reports the number
 of valid COMMANDS and the total number of COMMANDS parsed.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBParse error on line \fIN\fR.\fR\fR
 .ad
@@ -1616,7 +1550,6 @@ pinpoint in the configuration file the exact line that caused the error.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUnexpected end of command line.\fR\fR
 .ad
@@ -1627,7 +1560,6 @@ An additional argument was expected on the command line.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUnknown\fR
 .ad
@@ -1638,7 +1570,6 @@ A value for a specific extension was unknown.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAddress type \fIN\fR not supported.\fR\fR
 .ad
@@ -1649,7 +1580,6 @@ A name-to-address lookup returned an unsupported address family.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fIN\fR is not a bit specifier\fR\fR
 .ad
@@ -1668,7 +1598,6 @@ Keying material was not entered appropriately.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCan only specify single\fR\fR
 .ad
@@ -1679,7 +1608,6 @@ A duplicate extension was entered.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDon't use extension for \fI<string>\fR for \fI<command>\fR\&.\fR\fR
 .ad
@@ -1690,7 +1618,6 @@ An extension not used by a command was used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOne of the entered values is incorrect: Diagnostic code \fINN\fR:
 \fI<msg>\fR\fR\fR

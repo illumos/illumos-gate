@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pbind 1M "25 Feb 2008" "SunOS 5.11" "System Administration Commands"
+.TH PBIND 1M "Feb 25, 2008"
 .SH NAME
 pbind \- control and query bindings of processes or LWPs
 .SH SYNOPSIS
@@ -61,7 +61,6 @@ any process that has the same effective user ID as the user.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR \fIprocessor_id\fR\fR
 .ad
@@ -76,7 +75,6 @@ on-line. Use the \fBpsrinfo\fR command to determine whether or not
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
@@ -92,7 +90,6 @@ be displayed. The bindings of a subset of LWPs can be displayed by appending
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Q\fR\fR
 .ad
@@ -105,7 +102,6 @@ individual LWPs will be displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
@@ -117,7 +113,6 @@ allowing them to be executed on any on-line processor.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-U\fR\fR
 .ad
@@ -133,7 +128,6 @@ to any processor if no argument is specified.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpid\fR\fR
 .ad
@@ -144,7 +138,6 @@ The process \fBID\fR of the process to be controlled or queried.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlwpid\fR\fR
 .ad
@@ -165,7 +158,6 @@ syntax for selecting \fBLWP\fR \fBID\fRs is as follows:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprocessor_id\fR\fR
 .ad
@@ -263,7 +255,6 @@ lwp id 149/5: 2
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -274,7 +265,6 @@ Successful completion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
@@ -291,7 +281,6 @@ An error occurred.
 .SH DIAGNOSTICS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpbind: cannot query pid 31: No such process\fR\fR
 .ad
@@ -302,7 +291,6 @@ The process specified did not exist or has exited.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpbind: cannot bind pid 31: Not owner\fR\fR
 .ad
@@ -313,7 +301,6 @@ The user does not have permission to bind the process.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpbind: cannot bind pid 31: Invalid argument\fR\fR
 .ad

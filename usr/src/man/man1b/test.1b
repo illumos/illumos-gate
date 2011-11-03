@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH test 1B "1 Apr 1996" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.TH TEST 1B "Apr 1, 1996"
 .SH NAME
 test \- condition evaluation command
 .SH SYNOPSIS
@@ -37,45 +37,37 @@ normally these items are separated by spaces.
 The following primitives are used to construct \fIexpression\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIfilename\fR\fR
 .ad
 .RS 16n
-.rt  
 True if \fIfilename\fR exists and is readable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR \fIfilename\fR\fR
 .ad
 .RS 16n
-.rt  
 True if \fIfilename\fR exists and is writable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR \fIfilename\fR\fR
 .ad
 .RS 16n
-.rt  
 True if \fIfilename\fR exists and is executable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIfilename\fR\fR
 .ad
 .RS 16n
-.rt  
 True if \fIfilename\fR exists and is a regular file. Alternatively, if
 \fB/usr/bin/sh\fR users specify \fB/usr/ucb\fR before \fB/usr/bin\fR in their
 \fBPATH\fR environment variable, then \fBtest\fR will return true if
@@ -85,167 +77,137 @@ default for \fB/usr/bin/csh\fR users.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIfilename\fR\fR
 .ad
 .RS 16n
-.rt  
 True if \fIfilename\fR exists and is a directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIfilename\fR\fR
 .ad
 .RS 16n
-.rt  
 True if \fIfilename\fR exists and is a character special file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR \fIfilename\fR\fR
 .ad
 .RS 16n
-.rt  
 True if \fIfilename\fR exists and is a block special file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIfilename\fR\fR
 .ad
 .RS 16n
-.rt  
 True if \fIfilename\fR exists and is a named pipe (fifo).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fIfilename\fR\fR
 .ad
 .RS 16n
-.rt  
 True if \fIfilename\fR exists and its set-user- \fBID\fR bit is set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR \fIfilename\fR\fR
 .ad
 .RS 16n
-.rt  
 True if \fIfilename\fR exists and its set-group- \fBID\fR bit is set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR \fIfilename\fR\fR
 .ad
 .RS 16n
-.rt  
 True if \fIfilename\fR exists and its sticky bit is set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIfilename\fR\fR
 .ad
 .RS 16n
-.rt  
 True if \fIfilename\fR exists and has a size greater than zero.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR[ \fIfildes\fR ]\fR
 .ad
 .RS 16n
-.rt  
 True if the open file whose file descriptor number is \fIfildes\fR (1 by
 default) is associated with a terminal device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fIs1\fR\fR
 .ad
 .RS 16n
-.rt  
 True if the length of string \fIs1\fR is zero.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fIs1\fR\fR
 .ad
 .RS 16n
-.rt  
 True if the length of the string \fIs1\fR is non-zero.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIs1\fR\fB = \fR\fIs2\fR\fR
 .ad
 .RS 16n
-.rt  
 True if strings \fIs1\fR and \fIs2\fR are identical.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIs1\fR\fB != \fR\fIs2\fR\fR
 .ad
 .RS 16n
-.rt  
 True if strings \fIs1\fR and \fIs2\fR are \fInot\fR identical.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIs1\fR\fR
 .ad
 .RS 16n
-.rt  
 True if \fIs1\fR is \fInot\fR the null string.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIn1\fR\fB \(mieq \fR\fIn2\fR\fR
 .ad
 .RS 16n
-.rt  
 True if the integers \fIn1\fR and \fIn2\fR are algebraically equal. Any of the
 comparisons \fB\(mine\fR, \fB\(migt\fR, \fB\(mige\fR, \fB\(milt\fR, and
 \fB\(mile\fR may be used in place of \fB\(mieq\fR\&.
@@ -257,45 +219,37 @@ comparisons \fB\(mine\fR, \fB\(migt\fR, \fB\(mige\fR, \fB\(milt\fR, and
 These primaries may be combined with the following operators:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!\fR\fR
 .ad
 .RS 16n
-.rt  
 Unary negation operator.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 16n
-.rt  
 Binary \fIand\fR operator.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 16n
-.rt  
 Binary \fIor\fR operator (\fB-a\fR has higher precedence than \fB-o\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB(\fIexpression\fR)\fR
 .ad
 .RS 16n
-.rt  
 Parentheses for grouping. Notice also that parentheses are meaningful to the
 shell and, therefore, must be quoted.
 .RE

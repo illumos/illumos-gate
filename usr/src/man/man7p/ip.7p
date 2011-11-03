@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ip 7P "3 Dec 2008" "SunOS 5.11" "Protocols"
+.TH IP 7P "Dec 3, 2008"
 .SH NAME
 ip, IP \- Internet Protocol
 .SH SYNOPSIS
@@ -78,12 +78,10 @@ changed, including the application-provided transport header.
 The socket options supported at the IP level are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIP_OPTIONS\fR\fR
 .ad
 .RS 22n
-.rt  
 IP options for outgoing datagrams. This socket option may be used to set IP
 options to be included in each outgoing datagram. IP options to be sent are set
 with \fBsetsockopt()\fR (see \fBgetsockopt\fR(3SOCKET)). The
@@ -100,46 +98,38 @@ Internet family.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIP_SEC_OPT\fR\fR
 .ad
 .RS 22n
-.rt  
 Enable or obtain IPsec security settings for this socket. For more details on
 the protection services of IPsec, see \fBipsec\fR(7P).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIP_ADD_MEMBERSHIP\fR\fR
 .ad
 .RS 22n
-.rt  
 Join a multicast group.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIP_DROP_MEMBERSHIP\fR\fR
 .ad
 .RS 22n
-.rt  
 Leave a multicast group.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIP_BOUND_IF\fR\fR
 .ad
 .RS 22n
-.rt  
 Limit  reception and transmission of packets to this interface. Takes an
 integer as an argument. The integer is the selected interface index.
 .RE
@@ -149,7 +139,6 @@ integer as an argument. The integer is the selected interface index.
 The following options take \fBin_pktinfo_t\fR as the parameter:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIP_PKTINFO\fR\fR
 .ad
@@ -176,7 +165,6 @@ send the packet out.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIP_RECVPKTINFO\fR\fR
 .ad
@@ -197,12 +185,10 @@ address is set to \fBINADDR_ANY\fR which causes the kernel to choose the
 interface on which to join.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIP_BLOCK_SOURCE\fR\fR
 .ad
 .RS 29n
-.rt  
 Block multicast packets whose source address matches the given source address.
 The specified group must be joined previously using IP_ADD_MEMBERSHIP or
 MCAST_JOIN_GROUP.
@@ -210,36 +196,30 @@ MCAST_JOIN_GROUP.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIP_UNBLOCK_SOURCE\fR\fR
 .ad
 .RS 29n
-.rt  
 Unblock (begin receiving) multicast packets which were previously blocked using
 IP_BLOCK_SOURCE.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIP_ADD_SOURCE_MEMBERSHIP\fR\fR
 .ad
 .RS 29n
-.rt  
 Begin receiving packets for the given multicast group whose source address
 matches the specified address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIP_DROP_SOURCE_MEMBERSHIP\fR\fR
 .ad
 .RS 29n
-.rt  
 Stop receiving packets for the given multicast group whose source address
 matches the specified address.
 .RE
@@ -251,23 +231,19 @@ structure contains a multicast address (which must be set to the CLASS-D IP
 multicast address), an interface address, and a source address.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMCAST_JOIN_GROUP\fR\fR
 .ad
 .RS 28n
-.rt  
 Join a multicast group. Functionally equivalent to IP_ADD_MEMBERSHIP.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMCAST_BLOCK_SOURCE\fR\fR
 .ad
 .RS 28n
-.rt  
 Block multicast packets whose source address matches the given source address.
 The specified group must be joined previously using IP_ADD_MEMBERSHIP or
 MCAST_JOIN_GROUP.
@@ -275,47 +251,39 @@ MCAST_JOIN_GROUP.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMCAST_UNBLOCK_SOURCE\fR\fR
 .ad
 .RS 28n
-.rt  
 Unblock (begin receiving) multicast packets which were previously blocked using
 MCAST_BLOCK_SOURCE.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMCAST_LEAVE_GROUP\fR\fR
 .ad
 .RS 28n
-.rt  
 Leave a multicast group. Functionally equivalent to IP_DROP_MEMBERSHIP.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMCAST_JOIN_SOURCE_GROUP\fR\fR
 .ad
 .RS 28n
-.rt  
 Begin receiving packets for the given multicast group whose source address
 matches the specified address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMCAST_LEAVE_SOURCE_GROUP\fR\fR
 .ad
 .RS 28n
-.rt  
 Stop receiving packets for the given multicast group whose source address
 matches the specified address.
 .RE
@@ -330,12 +298,10 @@ those options which include a source address. It contains an interface index,
 multicast address, and source address.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIP_MULTICAST_IF\fR\fR
 .ad
 .RS 21n
-.rt  
 The outgoing interface for multicast packets. This option takes a \fBstruct\fR
 \fBin_addr\fR as an argument, and it selects that interface for outgoing IP
 multicast packets. If the address specified is \fBINADDR_ANY\fR, it uses the
@@ -345,12 +311,10 @@ behavior).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIP_MULTICAST_TTL\fR\fR
 .ad
 .RS 21n
-.rt  
 Time to live for multicast datagrams. This option takes an unsigned character
 as an argument. Its value is the TTL that IP uses on outgoing multicast
 datagrams. The default is \fB1\fR.
@@ -358,12 +322,10 @@ datagrams. The default is \fB1\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIP_MULTICAST_LOOP\fR\fR
 .ad
 .RS 21n
-.rt  
 Loopback for multicast  datagrams. Normally multicast  datagrams are delivered
 to members on the sending host (or sending zone). Setting the unsigned
 character argument to 0 causes the opposite behavior, meaning that when
@@ -373,23 +335,19 @@ sending zone.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIP_RECVIF\fR\fR
 .ad
 .RS 21n
-.rt  
 Receive the inbound interface index.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIP_TOS\fR\fR
 .ad
 .RS 21n
-.rt  
 This option takes an integer argument as its input value. The least significant
 8 bits of the value are used to set the Type Of Service field in the IP header
 of the outgoing packets.
@@ -397,12 +355,10 @@ of the outgoing packets.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIP_NEXTHOP\fR\fR
 .ad
 .RS 21n
-.rt  
 This option specifies the address of the onlink nexthop for traffic originating
 from that socket. It causes the routing table to be bypassed and outgoing
 traffic is sent directly to the specified nexthop. This option takes an
@@ -524,56 +480,46 @@ Through the netinfo framework, this driver provides the following packet
 events:
 .sp
 .ne 2
-.mk
 .na
 \fBPhysical in\fR
 .ad
 .RS 16n
-.rt  
 Packets received on a network  interface from an external source.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBPhysical out\fR
 .ad
 .RS 16n
-.rt  
 Packets to be sent out a network interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBForwarding\fR
 .ad
 .RS 16n
-.rt  
 Packets being forwarded through this host to another network.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBloopback in\fR
 .ad
 .RS 16n
-.rt  
 Packets that have been sent by a local application to another.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBloopback out\fR
 .ad
 .RS 16n
-.rt  
 Packets about  to  be  received by a local application from another.
 .RE
 
@@ -593,58 +539,48 @@ through  to the  callback,  please see \fBhook_pkt_event\fR(9S). For IP
 packets, this structure is filled out as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBhpe_ifp\fR
 .ad
 .RS 11n
-.rt  
 Identifier indicating the inbound interface  for packets received with the
 "physical in" event.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBhpe_ofp\fR
 .ad
 .RS 11n
-.rt  
 Identifier indicating the outbound interface for packets received with the
 "physical out" event.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBhpe_hdr\fR
 .ad
 .RS 11n
-.rt  
 Pointer to the start of the IP header (not the ethernet header).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBhpe_mp\fR
 .ad
 .RS 11n
-.rt  
 Pointer to the start of the mblk_t chain containing the IP packet.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBhpe_mb\fR
 .ad
 .RS 11n
-.rt  
 Pointer to the mblk_t with the IP header in it.
 .RE
 
@@ -657,56 +593,46 @@ These events are all reported back through the same callback. The list of
 events is as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBplumb\fR
 .ad
 .RS 18n
-.rt  
 A new network interface has been instantiated.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBunplumb\fR
 .ad
 .RS 18n
-.rt  
 A network interface is no longer associated with this protocol.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBup\fR
 .ad
 .RS 18n
-.rt  
 At least one logical interface is now ready to receive packets.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdown\fR
 .ad
 .RS 18n
-.rt  
 There are no logical interfaces expecting to receive packets.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBaddress change\fR
 .ad
 .RS 18n
-.rt  
 An address has changed on a logical  interface.
 .RE
 
@@ -735,12 +661,10 @@ California, September 1981.
 A socket operation may fail with one of the following errors returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 17n
-.rt  
 A \fBbind()\fR operation was attempted with a "reserved" port number and the
 effective user ID of the process was not the privileged user.
 .sp
@@ -750,59 +674,49 @@ PRIV_SYS_NET_CONFIG privilege.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEADDRINUSE\fR\fR
 .ad
 .RS 17n
-.rt  
 A \fBbind()\fR operation was attempted on a socket with a network address/port
 pair that has already been bound to another socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEADDRNOTAVAIL\fR\fR
 .ad
 .RS 17n
-.rt  
 A \fBbind()\fR operation was attempted for an address that is not configured on
 this machine.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 17n
-.rt  
 A \fBsendmsg()\fR operation with a non-NULL \fBmsg_accrights\fR was attempted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 17n
-.rt  
 A \fBgetsockopt()\fR or \fBsetsockopt()\fR operation with an unknown socket
 option name was given.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 17n
-.rt  
 A \fBgetsockopt()\fR or \fBsetsockopt()\fR operation was attempted with the
 \fBIP\fR option field improperly formed; an option field was shorter than the
 minimum value or longer than the option buffer provided.
@@ -810,12 +724,10 @@ minimum value or longer than the option buffer provided.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEISCONN\fR\fR
 .ad
 .RS 17n
-.rt  
 A \fBconnect()\fR operation was attempted on a socket on which a
 \fBconnect()\fR operation had already been performed, and the socket could not
 be successfully disconnected before making the new connection.
@@ -823,12 +735,10 @@ be successfully disconnected before making the new connection.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEISCONN\fR\fR
 .ad
 .RS 17n
-.rt  
 A \fBsendto()\fR or \fBsendmsg()\fR operation specifying an address to which
 the message should be sent was attempted on a socket on which a \fBconnect()\fR
 operation had already been performed.
@@ -836,12 +746,10 @@ operation had already been performed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEMSGSIZE\fR\fR
 .ad
 .RS 17n
-.rt  
 A \fBsend()\fR, \fBsendto()\fR, or \fBsendmsg()\fR operation was attempted to
 send a datagram that was too large for an interface, but was not allowed to be
 fragmented (such as broadcasts).
@@ -849,12 +757,10 @@ fragmented (such as broadcasts).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENETUNREACH\fR\fR
 .ad
 .RS 17n
-.rt  
 An attempt was made to establish a connection by means of \fBconnect()\fR, or
 to send a datagram by means of \fBsendto()\fR or \fBsendmsg()\fR, where there
 was no matching entry in the routing table; or if an ICMP "destination
@@ -863,12 +769,10 @@ unreachable" message was received.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTCONN\fR\fR
 .ad
 .RS 17n
-.rt  
 A \fBsend()\fR or \fBwrite()\fR operation, or a \fBsendto()\fR or
 \fBsendmsg()\fR operation not specifying an address to which the message should
 be sent, was attempted on a socket on which a \fBconnect()\fR operation had not
@@ -877,46 +781,38 @@ already been performed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOBUFS\fR\fR
 .ad
 .RS 17n
-.rt  
 The system ran out of memory for fragmentation buffers or other internal data
 structures.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOBUFS\fR\fR
 .ad
 .RS 17n
-.rt  
 \fBSO_SNDBUF\fR or \fBSO_RCVBUF\fR exceeds a system limit.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 17n
-.rt  
 Invalid length for \fBIP_OPTIONS\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEHOSTUNREACH\fR\fR
 .ad
 .RS 17n
-.rt  
 Invalid address for \fBIP_MULTICAST_IF\fR.
 .sp
 Invalid (offlink) nexthop address for IP_NEXTHOP.
@@ -924,68 +820,56 @@ Invalid (offlink) nexthop address for IP_NEXTHOP.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 17n
-.rt  
 Not a multicast address for \fBIP_ADD_MEMBERSHIP\fR and
 \fBIP_DROP_MEMBERSHIP\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEADDRNOTAVAIL\fR\fR
 .ad
 .RS 17n
-.rt  
 Bad interface address for \fBIP_ADD_MEMBERSHIP\fR and \fBIP_DROP_MEMBERSHIP\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEADDRINUSE\fR\fR
 .ad
 .RS 17n
-.rt  
 Address already joined for \fBIP_ADD_MEMBERSHIP\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 17n
-.rt  
 Address not joined for \fBIP_DROP_MEMBERSHIP\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOPROTOOPT\fR\fR
 .ad
 .RS 17n
-.rt  
 Invalid socket type.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 17n
-.rt  
 No permissions.
 .RE
 

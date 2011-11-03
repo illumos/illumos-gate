@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH rsm_memseg_import_put 3RSM "8 Jun 2001" "SunOS 5.11" "Remote Shared Memory Library Functions"
+.TH RSM_MEMSEG_IMPORT_PUT 3RSM "Jun 8, 2001"
 .SH NAME
 rsm_memseg_import_put, rsm_memseg_import_put8, rsm_memseg_import_put16,
 rsm_memseg_import_put32, rsm_memseg_import_put64 \- write to a segment
@@ -11,7 +11,7 @@ rsm_memseg_import_put32, rsm_memseg_import_put64 \- write to a segment
 .LP
 .nf
 cc [ \fIflag\fR... ] \fIfile\fR... -lrsm [ \fIlibrary\fR... ]
-#include <rsmapi.h> 
+#include <rsmapi.h>
 
 \fBint\fR \fBrsm_memseg_import_put\fR(\fBrsm_memseg_import_handle_t\fR \fIim_memseg\fR,
      \fBoff_t\fR \fIoffset\fR, \fBvoid *\fR\fIsrc_addr\fR, \fBsize_t\fR \fIlength\fR);
@@ -105,7 +105,6 @@ is returned to indicate the error.
 These functions can return the following errors:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSMERR_BAD_SEG_HNDL\fR \fR
 .ad
@@ -116,7 +115,6 @@ Invalid segment handle.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSMERR_BAD_ADDR\fR \fR
 .ad
@@ -127,7 +125,6 @@ Bad address.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSMERR_BAD_MEM_ALIGNMENT\fR \fR
 .ad
@@ -138,7 +135,6 @@ Invalid memory alignment for pointer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSMERR_BAD_OFFSET\fR \fR
 .ad
@@ -149,7 +145,6 @@ Invalid offset.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSMERR_BAD_LENGTH\fR \fR
 .ad
@@ -160,7 +155,6 @@ Invalid length.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSMERR_PERM_DENIED\fR \fR
 .ad
@@ -171,7 +165,6 @@ Permission denied.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSMERR_INSUFFICIENT_RESOURCES\fR \fR
 .ad
@@ -182,7 +175,6 @@ Insufficient resources.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSMERR_BARRIER_UNINITIALIZED\fR \fR
 .ad
@@ -193,7 +185,6 @@ Barrier not initialized.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSMERR_BARRIER_FAILURE\fR \fR
 .ad
@@ -204,7 +195,6 @@ I/O completion error.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSMERR_CONN_ABORTED\fR \fR
 .ad
@@ -221,15 +211,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) |lw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE \fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

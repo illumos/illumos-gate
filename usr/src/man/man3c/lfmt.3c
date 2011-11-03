@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH lfmt 3C "29 Dec 1996" "SunOS 5.11" "Standard C Library Functions"
+.TH LFMT 3C "Dec 29, 1996"
 .SH NAME
 lfmt \- display error message in standard format and pass to logging and
 monitoring services
@@ -90,7 +90,6 @@ The \fIflags\fR argument is composed of several groups, and can take the
 following values (one from each group):
 .sp
 .ne 2
-.mk
 .na
 \fB\fIOutput format control\fR\fR
 .ad
@@ -98,12 +97,10 @@ following values (one from each group):
 .RS 4n
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_NOSTD\fR\fR
 .ad
 .RS 12n
-.rt  
 Do not use the standard message format but interpret \fBformat\fR as a
 \fBprintf()\fR \fBformat\fR. Only \fIcatalog access control flags\fR,
 \fIconsole display control\fR and \fIlogging information\fR should be specified
@@ -112,12 +109,10 @@ if  \fBMM_NOSTD\fR is used; all other flags will be ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_STD\fR\fR
 .ad
 .RS 12n
-.rt  
 Output using the standard message format (default value is 0).
 .RE
 
@@ -125,7 +120,6 @@ Output using the standard message format (default value is 0).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fICatalog access control\fR\fR
 .ad
@@ -133,24 +127,20 @@ Output using the standard message format (default value is 0).
 .RS 4n
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_NOGET\fR\fR
 .ad
 .RS 12n
-.rt  
 Do not retrieve a localized version of \fBformat\fR. In this case, only the
 \fI<defmsg>\fR field of \fBformat\fR is specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_GET\fR\fR
 .ad
 .RS 12n
-.rt  
 Retrieve a localized version of \fBformat\fR from \fI<catalog>\fR, using
 \fI<msgid>\fR as the index and \fI<defmsg>\fR as the default message (default
 value is 0).
@@ -160,7 +150,6 @@ value is 0).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fISeverity (standard message format only)\fR\fR
 .ad
@@ -168,45 +157,37 @@ value is 0).
 .RS 4n
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_HALT\fR\fR
 .ad
 .RS 14n
-.rt  
 Generate a localized version of  \fBHALT,\fR but donot halt the machine.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_ERROR\fR\fR
 .ad
 .RS 14n
-.rt  
 Generate a localized version of  \fBERROR\fR (default value is 0).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_WARNING\fR\fR
 .ad
 .RS 14n
-.rt  
 Generate a localized version of  \fBWARNING\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_INFO\fR\fR
 .ad
 .RS 14n
-.rt  
 Generate a localized version of  \fBINFO\fR.
 .RE
 
@@ -226,7 +207,6 @@ display of either a severity string (if defined) or the string
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIAction\fR\fR
 .ad
@@ -234,12 +214,10 @@ display of either a severity string (if defined) or the string
 .RS 4n
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_ACTION\fR\fR
 .ad
 .RS 13n
-.rt  
 Specify an action message. Any severity value is superseded and replaced by a
 localized version of \fBTO FIX\fR.
 .RE
@@ -248,7 +226,6 @@ localized version of \fBTO FIX\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIConsole display control\fR\fR
 .ad
@@ -256,23 +233,19 @@ localized version of \fBTO FIX\fR.
 .RS 4n
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_CONSOLE\fR\fR
 .ad
 .RS 16n
-.rt  
 Display the message to the console in addition to the specified \fIstream\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_NOCONSOLE\fR\fR
 .ad
 .RS 16n
-.rt  
 Do not display the message to the console in addition to the specified
 \fIstream\fR (default value is 0).
 .RE
@@ -281,7 +254,6 @@ Do not display the message to the console in addition to the specified
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fILogging information\fR\fR
 .ad
@@ -289,7 +261,6 @@ Do not display the message to the console in addition to the specified
 .RS 4n
 .sp
 .ne 2
-.mk
 .na
 \fB\fIMajor classification\fR\fR
 .ad
@@ -301,7 +272,6 @@ Identify the source of the condition. Identifiers are: \fBMM_HARD\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIMessage source subclassification\fR\fR
 .ad
@@ -355,23 +325,19 @@ Upon successful completion, \fBlfmt()\fR returns the number of bytes
 transmitted.  Otherwise, it returns a negative value:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi1\fR\fR
 .ad
 .RS 9n
-.rt  
 Write the error to \fIstream\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi2\fR\fR
 .ad
 .RS 9n
-.rt  
 Cannot log and/or display at console.
 .RE
 
@@ -434,13 +400,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

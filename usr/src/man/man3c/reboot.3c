@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH reboot 3C "22 Mar 2004" "SunOS 5.11" "Standard C Library Functions"
+.TH REBOOT 3C "Mar 22, 2004"
 .SH NAME
 reboot \- reboot system or halt processor
 .SH SYNOPSIS
@@ -22,48 +22,40 @@ specifies the behavior of the system while rebooting and is a mask constructed
 by a bitwise-inclusive-OR of flags from the following list:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRB_AUTOBOOT\fR\fR
 .ad
 .RS 15n
-.rt  
 The machine is rebooted from the root filesystem on the default boot device.
 This is the default behavior. See \fBboot\fR(1M) and \fBkernel\fR(1M).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRB_HALT\fR\fR
 .ad
 .RS 15n
-.rt  
 The processor is simply halted; no reboot takes place. This option should be
 used with caution.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRB_ASKNAME\fR\fR
 .ad
 .RS 15n
-.rt  
 Interpreted by the bootstrap program and kernel, causing the user to be asked
 for pathnames during the bootstrap.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRB_DUMP\fR\fR
 .ad
 .RS 15n
-.rt  
 The system is forced to panic immediately without any further processing and a
 crash dump is written to the dump device (see \fBdumpadm\fR(1M)) before
 rebooting.
@@ -86,12 +78,10 @@ Upon successful completion, \fBreboot()\fR never returns.  Otherwise,
 The \fBreboot()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 9n
-.rt  
 The {\fBPRIV_SYS_CONFIG\fR} privilege is not asserted in the effective set of
 the calling process.
 .RE

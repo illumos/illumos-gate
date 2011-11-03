@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH installgrub 1M "2 Jul 2009" "SunOS 5.11" "System Administration Commands"
+.TH INSTALLGRUB 1M "Jul 2, 2009"
 .SH NAME
 installgrub \- install GRUB in a disk partition or a floppy
 .SH SYNOPSIS
@@ -28,23 +28,19 @@ the stage 1 file on the master boot sector of the disk.
 The \fBinstallgrub\fR command accepts the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 Suppresses interaction when overwriting the master boot sector.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
 .RS 6n
-.rt  
 Installs GRUB \fIstage1\fR on the master boot sector interactively. You must
 use this option if Solaris is installed on an extended partition.
 .RE
@@ -55,34 +51,28 @@ use this option if Solaris is installed on an extended partition.
 The \fBinstallgrub\fR command accepts the following operands:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstage1\fR\fR
 .ad
 .RS 14n
-.rt  
 The name of the GRUB stage 1 file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstage2\fR\fR
 .ad
 .RS 14n
-.rt  
 The name of the GRUB stage 2 file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIraw-device\fR\fR
 .ad
 .RS 14n
-.rt  
 The name of the device onto which GRUB code is to be installed. It must be a
 character device that is readable and writable. For disk devices, specify the
 slice where the GRUB menu file is located. (For Solaris it is the root slice.)
@@ -126,12 +116,10 @@ example# mount -F pcfs /dev/diskette /mnt
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/boot/grub\fR\fR
 .ad
 .RS 14n
-.rt  
 Directory where GRUB files reside.
 .RE
 
@@ -143,13 +131,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityUncommitted
+Interface Stability	Uncommitted
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pci_ereport_setup 9F "10 May 2007" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH PCI_EREPORT_SETUP 9F "May 10, 2007"
 .SH NAME
 pci_ereport_setup, pci_ereport_teardown, pci_ereport_post \- post error reports
 for the generic PCI errors logged in the PCI Configuration Status register.
@@ -33,34 +33,28 @@ Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 10n
-.rt  
 Pointer to the \fBdev_info\fR structure of the devices
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdep\fR\fR
 .ad
 .RS 10n
-.rt  
 Pointer to DDI error status
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstatus\fR\fR
 .ad
 .RS 10n
-.rt  
 Pointer to status bit storage location
 .RE
 
@@ -132,45 +126,37 @@ The \fBfme_flag\fR in the \fBerror_status\fR argument to the error handler
 callback function will contain one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FM_ERR_UNEXPECTED()\fR\fR
 .ad
 .RS 27n
-.rt  
 Any errors discovered are unexpected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FM_ERR_EXPECTED()\fR\fR
 .ad
 .RS 25n
-.rt  
 Errors discovered were the result of a \fBDDI_ACC_CAUTIOUS\fR operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FM_ERR_POKE()\fR\fR
 .ad
 .RS 25n
-.rt  
 Errors discovered are the result of a \fBddi_poke\fR(9F) operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FM_ERR_PEEK()\fR\fR
 .ad
 .RS 25n
-.rt  
 Errors discovered are the result of a \fBddi_peek\fR(9F) operation.
 .RE
 
@@ -194,35 +180,29 @@ structure pointed at by \fIdep\fR will have been updated, and the
 \fBfme_status\fR field contains one of the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FM_OK\fR\fR
 .ad
 .RS 19n
-.rt  
 No errors were detected which might affect this device instance.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FM_FATAL\fR\fR
 .ad
 .RS 19n
-.rt  
 An error which is considered fatal to the operational state of the system was
 detected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FM_NONFATAL\fR\fR
 .ad
 .RS 19n
-.rt  
 An error which is not considered fatal to the operational state of the system
 was detected. The \fBfme_acc_handle\fR or \fBfme_dma_handle\fR fields in the
 returned \fBddi_fm_error_t\fR structure will typically reference a handle that
@@ -231,12 +211,10 @@ belongs to the device instance that has been affected.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FM_UNKNOWN\fR\fR
 .ad
 .RS 19n
-.rt  
 An error was detected, but the call was unable to determine the impact of the
 error on the operational state of the system. This is treated the same way as
 \fBDDI_FM_FATAL\fR unless some other device is able to evaluate the fault to be
@@ -294,13 +272,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

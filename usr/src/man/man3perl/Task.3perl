@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH Task 3PERL "1 Dec 2002" "SunOS 5.11" "Perl Library Functions"
+.TH TASK 3PERL "Dec 1, 2002"
 .SH NAME
 Task \- Perl interface to Tasks
 .SH SYNOPSIS
@@ -25,7 +25,6 @@ system calls.
 .SS "Functions"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsettaskid($project, $flags)\fR\fR
 .ad
@@ -39,7 +38,6 @@ new task ID is returned if the call succeeds. On failure \(mi1 is returned.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgettaskid()\fR\fR
 .ad
@@ -64,34 +62,28 @@ By default nothing is exported from this module. The following tags can be used
 to selectively import constants and functions defined in this module:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB:SYSCALLS\fR\fR
 .ad
 .RS 14n
-.rt  
 \fBsettaskid()\fR and \fBgettaskid()\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB:CONSTANTS\fR\fR
 .ad
 .RS 14n
-.rt  
 \fBTASK_NORMAL\fR and \fBTASK_FINAL\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB:ALL\fR\fR
 .ad
 .RS 14n
-.rt  
 \fB:SYSCALLS\fR and \fB:CONSTANTS\fR
 .RE
 
@@ -103,13 +95,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

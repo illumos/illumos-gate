@@ -1,6 +1,6 @@
 '\" te
 .\"  Copyright (c) 1980 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement  specifies the terms and conditions for redistribution.
-.TH shutdown 1B "11 Oct 1994" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.TH SHUTDOWN 1B "Oct 11, 1994"
 .SH NAME
 shutdown \- close down the system at a given time
 .SH SYNOPSIS
@@ -36,69 +36,57 @@ brings the system down to single-user mode.
 As an alternative to the above procedure, these options can be specified:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 Arrange, in the manner of \fBfastboot\fR(1B), that when the system is rebooted,
 the file systems will not be checked.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 6n
-.rt  
 Execute \fBhalt\fR(1M).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR\fR
 .ad
 .RS 6n
-.rt  
 Simulate shutdown of the system. Do not actually shut down the system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 6n
-.rt  
 Prevent the normal \fBsync\fR(2) before stopping.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 6n
-.rt  
 Execute \fBreboot\fR(1M).
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/rmtab\fR\fR
 .ad
 .RS 14n
-.rt  
 remote mounted file system table
 .RE
 

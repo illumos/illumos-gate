@@ -3,16 +3,16 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH prstat 1M "25 Jun 2009" "SunOS 5.11" "System Administration Commands"
+.TH PRSTAT 1M "Jun 25, 2009"
 .SH NAME
 prstat \- report active process statistics
 .SH SYNOPSIS
 .LP
 .nf
-\fBprstat\fR [\fB-acHJLmRrtTv\fR] [\fB-d\fR u | d] [\fB-C\fR \fIpsrsetlist\fR] [\fB-h\fR \fIlgrplist\fR] 
-     [\fB-j\fR \fIprojlist\fR] [\fB-k\fR \fItasklist\fR] [\fB-n\fR \fIntop\fR[,\fInbottom\fR]] 
-     [\fB-p\fR \fIpidlist\fR] [\fB-P\fR \fIcpulist\fR] [\fB-s\fR \fIkey\fR | \fB-S\fR \fIkey\fR ] 
-     [\fB-u\fR \fIeuidlist\fR] [\fB-U\fR \fIuidlist\fR] [\fB-z\fR \fIzoneidlist\fR] [\fB-Z\fR] 
+\fBprstat\fR [\fB-acHJLmRrtTv\fR] [\fB-d\fR u | d] [\fB-C\fR \fIpsrsetlist\fR] [\fB-h\fR \fIlgrplist\fR]
+     [\fB-j\fR \fIprojlist\fR] [\fB-k\fR \fItasklist\fR] [\fB-n\fR \fIntop\fR[,\fInbottom\fR]]
+     [\fB-p\fR \fIpidlist\fR] [\fB-P\fR \fIcpulist\fR] [\fB-s\fR \fIkey\fR | \fB-S\fR \fIkey\fR ]
+     [\fB-u\fR \fIeuidlist\fR] [\fB-U\fR \fIuidlist\fR] [\fB-z\fR \fIzoneidlist\fR] [\fB-Z\fR]
      [\fIinterval\fR [\fIcount\fR]]
 .fi
 
@@ -39,7 +39,6 @@ reports statistics sorted by \fBCPU\fR usage.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
@@ -51,7 +50,6 @@ displays separate reports about processes and users at the same time.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
@@ -62,7 +60,6 @@ Print new reports below previous reports instead of overprinting them.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR \fIpsrsetlist\fR\fR
 .ad
@@ -78,7 +75,6 @@ when the \fB-L\fR option is not used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fBu | d\fR\fR
 .ad
@@ -91,7 +87,6 @@ time. See \fBtime\fR(2). Specify \fBd\fR for standard date format. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fIlgrplist\fR\fR
 .ad
@@ -103,7 +98,6 @@ Report only processes or lwps whose home \fIlgroup\fR is in the given list of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-H\fR\fR
 .ad
@@ -115,7 +109,6 @@ extra column showing process or lwps home \fIlgroup\fR with the header LGRP.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-j\fR \fIprojlist\fR\fR
 .ad
@@ -128,7 +121,6 @@ project \fBID\fR. See \fBproject\fR(4).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-J\fR\fR
 .ad
@@ -140,7 +132,6 @@ displays separate reports about processes and projects at the same time.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR \fItasklist\fR\fR
 .ad
@@ -151,7 +142,6 @@ Report only processes or lwps whose task \fBID\fR is in \fItasklist\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
@@ -163,7 +153,6 @@ Report statistics for each light-weight process (\fBLWP\fR). By default,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
@@ -177,7 +166,6 @@ waiting for user locks and waiting for \fBCPU\fR (latency time).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fIntop\fR[\fI,nbottom\fR]\fR
 .ad
@@ -195,7 +183,6 @@ output to a file, the default values for \fBntop\fR and \fBnbottom\fR are
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIpidlist\fR\fR
 .ad
@@ -206,7 +193,6 @@ Report only processes whose process \fBID\fR is in the given list.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR \fIcpulist\fR\fR
 .ad
@@ -219,7 +205,6 @@ reported by \fBpsrinfo\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR\fR
 .ad
@@ -232,7 +217,6 @@ This option is available only for superuser.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
@@ -244,7 +228,6 @@ apply to lookups for the \fB-j\fR, \fB-u\fR, or \fB-U\fR options.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIkey\fR\fR
 .ad
@@ -256,7 +239,6 @@ descending order. Only one \fIkey\fR can be used as an argument.
 There are five possible key values:
 .sp
 .ne 2
-.mk
 .na
 \fBcpu\fR
 .ad
@@ -267,7 +249,6 @@ Sort by process \fBCPU\fR usage. This is the default.
 
 .sp
 .ne 2
-.mk
 .na
 \fBpri\fR
 .ad
@@ -278,7 +259,6 @@ Sort by process priority.
 
 .sp
 .ne 2
-.mk
 .na
 \fBrss\fR
 .ad
@@ -289,7 +269,6 @@ Sort by resident set size.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsize\fR
 .ad
@@ -300,7 +279,6 @@ Sort by size of process image.
 
 .sp
 .ne 2
-.mk
 .na
 \fBtime\fR
 .ad
@@ -313,7 +291,6 @@ Sort by process execution time.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR \fIkey\fR\fR
 .ad
@@ -325,7 +302,6 @@ are the same as for the \fB-s\fR option. See \fB-s\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
@@ -339,7 +315,6 @@ system memory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR\fR
 .ad
@@ -351,7 +326,6 @@ displays separate reports about processes and tasks at the same time.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fIeuidlist\fR\fR
 .ad
@@ -364,7 +338,6 @@ user \fBID\fR may be specified as either a login name or a numerical user
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-U\fR \fIuidlis\fRt\fR
 .ad
@@ -376,7 +349,6 @@ Report only processes whose real user \fBID\fR is in the given list. Each user
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -391,7 +363,6 @@ with the \fB-\fR sign.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fIzoneidlist\fR\fR
 .ad
@@ -404,7 +375,6 @@ can be specified as either a zone name or a numerical zone ID. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Z\fR\fR
 .ad
@@ -421,7 +391,6 @@ The following list defines the column headings and the meanings of a
 \fBprstat\fR report:
 .sp
 .ne 2
-.mk
 .na
 \fBPID\fR
 .ad
@@ -432,7 +401,6 @@ The process \fBID\fR of the process.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSERNAME\fR
 .ad
@@ -443,7 +411,6 @@ The real user (login) name or real user \fBID\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSWAP\fR
 .ad
@@ -455,7 +422,6 @@ devices, in kilobytes (\fBK\fR), megabytes (\fBM\fR), or gigabytes (\fBG\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fBRSS\fR
 .ad
@@ -470,7 +436,6 @@ planning should use the \fB-x\fR option to \fBpmap\fR(1) instead.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSTATE\fR
 .ad
@@ -479,7 +444,6 @@ planning should use the \fB-x\fR option to \fBpmap\fR(1) instead.
 The state of the process:
 .sp
 .ne 2
-.mk
 .na
 \fBcpu\fIN\fR\fR
 .ad
@@ -490,7 +454,6 @@ Process is running on \fBCPU\fR \fIN\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsleep\fR
 .ad
@@ -501,7 +464,6 @@ Sleeping: process is waiting for an event to complete.
 
 .sp
 .ne 2
-.mk
 .na
 \fBwait\fR
 .ad
@@ -513,7 +475,6 @@ limits. See the description of \fBCPU-caps\fR in \fBresource_controls\fR(5).
 
 .sp
 .ne 2
-.mk
 .na
 \fBrun\fR
 .ad
@@ -524,7 +485,6 @@ Runnable: process in on run queue.
 
 .sp
 .ne 2
-.mk
 .na
 \fBzombie\fR
 .ad
@@ -535,7 +495,6 @@ Zombie state: process terminated and parent not waiting.
 
 .sp
 .ne 2
-.mk
 .na
 \fBstop\fR
 .ad
@@ -548,7 +507,6 @@ Process is stopped.
 
 .sp
 .ne 2
-.mk
 .na
 \fBPRI\fR
 .ad
@@ -559,7 +517,6 @@ The priority of the process. Larger numbers mean higher priority.
 
 .sp
 .ne 2
-.mk
 .na
 \fBNICE\fR
 .ad
@@ -571,7 +528,6 @@ classes have a nice value.
 
 .sp
 .ne 2
-.mk
 .na
 \fBTIME\fR
 .ad
@@ -582,7 +538,6 @@ The cumulative execution time for the process.
 
 .sp
 .ne 2
-.mk
 .na
 \fBCPU\fR
 .ad
@@ -596,7 +551,6 @@ that of the processors in the processor set in use by the pool to which the
 
 .sp
 .ne 2
-.mk
 .na
 \fBPROCESS\fR
 .ad
@@ -607,7 +561,6 @@ The name of the process (name of executed file).
 
 .sp
 .ne 2
-.mk
 .na
 \fBLWPID\fR
 .ad
@@ -618,7 +571,6 @@ The \fBlwp\fR \fBID\fR of the \fBlwp\fR being reported.
 
 .sp
 .ne 2
-.mk
 .na
 \fBNLWP\fR
 .ad
@@ -633,7 +585,6 @@ With the some options, in addition to a number of the column headings shown
 above, there are:
 .sp
 .ne 2
-.mk
 .na
 \fBNPROC\fR
 .ad
@@ -644,7 +595,6 @@ Number of processes in a specified collection.
 
 .sp
 .ne 2
-.mk
 .na
 \fBMEMORY\fR
 .ad
@@ -659,7 +609,6 @@ The following columns are displayed when the \fB-v\fR or \fB-m\fR option is
 specified
 .sp
 .ne 2
-.mk
 .na
 \fBUSR\fR
 .ad
@@ -670,7 +619,6 @@ The percentage of time the process has spent in user mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSYS\fR
 .ad
@@ -681,7 +629,6 @@ The percentage of time the process has spent in system mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fBTRP\fR
 .ad
@@ -692,7 +639,6 @@ The percentage of time the process has spent in processing system traps.
 
 .sp
 .ne 2
-.mk
 .na
 \fBTFL\fR
 .ad
@@ -703,7 +649,6 @@ The percentage of time the process has spent processing text page faults.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDFL\fR
 .ad
@@ -714,7 +659,6 @@ The percentage of time the process has spent processing data page faults.
 
 .sp
 .ne 2
-.mk
 .na
 \fBLCK\fR
 .ad
@@ -725,7 +669,6 @@ The percentage of time the process has spent waiting for user locks.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSLP\fR
 .ad
@@ -736,7 +679,6 @@ The percentage of time the process has spent sleeping.
 
 .sp
 .ne 2
-.mk
 .na
 \fBLAT\fR
 .ad
@@ -747,7 +689,6 @@ The percentage of time the process has spent waiting for CPU.
 
 .sp
 .ne 2
-.mk
 .na
 \fBVCX\fR
 .ad
@@ -758,7 +699,6 @@ The number of voluntary context switches.
 
 .sp
 .ne 2
-.mk
 .na
 \fBICX\fR
 .ad
@@ -769,7 +709,6 @@ The number of involuntary context switches.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSCL\fR
 .ad
@@ -780,7 +719,6 @@ The number of system calls.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSIG\fR
 .ad
@@ -799,7 +737,6 @@ process.
 The following column is displayed when the \fB-H\fR option is specified:
 .sp
 .ne 2
-.mk
 .na
 \fBLGRP\fR
 .ad
@@ -814,7 +751,6 @@ The home \fIlgroup\fR of the process or lwp.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcount\fR\fR
 .ad
@@ -826,7 +762,6 @@ Specifies the number of times that the statistics are repeated. By default,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinterval\fR\fR
 .ad
@@ -880,7 +815,7 @@ example% prstat -S rss -n 5 -vc -u root,john
 1185 john    0.0 0.0  -   -   -   -  100  -    0   0   0   0 csh/1
  240 root     0.0 0.0  -   -   -   -  100  -    0   0   0   0 powerd/4
  TOTAL:       71, load averages:  0.02, 0.04, 0.08
- 
+
 .fi
 .in -2
 .sp
@@ -891,7 +826,6 @@ example% prstat -S rss -n 5 -vc -u root,john
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -902,7 +836,6 @@ Successful completion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad

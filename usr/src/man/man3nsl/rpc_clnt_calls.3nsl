@@ -1,10 +1,10 @@
 '\" te
-.\" Copyright 1989 AT&T  
+.\" Copyright 1989 AT&T
 .\" Copyright (C) 2001, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH rpc_clnt_calls 3NSL "1 Aug 2001" "SunOS 5.11" "Networking Services Library Functions"
+.TH RPC_CLNT_CALLS 3NSL "Aug 1, 2001"
 .SH NAME
 rpc_clnt_calls, clnt_call, clnt_send, clnt_freeres, clnt_geterr, clnt_perrno,
 clnt_perror, clnt_sperrno, clnt_sperror, rpc_broadcast, rpc_broadcast_exp,
@@ -111,12 +111,10 @@ receive its results before the second request is sent.
 See \fBrpc\fR(3NSL) for the definition of the \fBCLIENT\fR data structure.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_call()\fR\fR
 .ad
 .RS 23n
-.rt  
 A function macro that calls the remote procedure \fIprocnum\fR associated with
 the client handle, \fIclnt\fR, which is obtained with an \fBRPC\fR client
 creation routine such as \fBclnt_create()\fR. See \fBrpc_clnt_create\fR(3NSL).
@@ -134,12 +132,10 @@ Otherwise, an appropriate status is returned.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_send()\fR\fR
 .ad
 .RS 23n
-.rt  
 Use the \fBclnt_send()\fR function to call a remote asynchronous function.
 .sp
 The \fBclnt_send()\fR function calls the remote function \fBprocnum()\fR
@@ -168,12 +164,10 @@ messages.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_freeres()\fR\fR
 .ad
 .RS 23n
-.rt  
 A function macro that frees any data allocated by the \fBRPC/XDR\fR system when
 it decoded the results of an  \fBRPC\fR call. The parameter \fIout\fR is the
 address of the results, and \fIoutproc\fR is the \fBXDR\fR routine describing
@@ -183,24 +177,20 @@ freed; otherwise it returns \fB0\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_geterr()\fR\fR
 .ad
 .RS 23n
-.rt  
 A function macro that copies the error structure out of the client handle to
 the structure at address \fIerrp\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_perrno()\fR\fR
 .ad
 .RS 23n
-.rt  
 Prints a message to standard error corresponding to the condition indicated by
 \fIstat\fR. A newline is appended. It is normally used after a procedure call
 fails for a routine for which a client handle is not needed, for instance
@@ -209,12 +199,10 @@ fails for a routine for which a client handle is not needed, for instance
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_perror()\fR\fR
 .ad
 .RS 23n
-.rt  
 Prints a message to the standard error indicating why an \fBRPC\fR call failed;
 \fIclnt\fR is the handle used to do the call. The message is prepended with
 string \fIs\fR and a colon. A newline is appended. This routine is normally
@@ -224,12 +212,10 @@ handle, for instance \fBclnt_call()\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_sperrno()\fR\fR
 .ad
 .RS 23n
-.rt  
 Takes the same arguments as \fBclnt_perrno()\fR, but instead of sending a
 message to the standard error indicating why an \fBRPC\fR call failed, returns
 a pointer to a string that contains the message.
@@ -246,12 +232,10 @@ result is not overwritten on each call. See \fBrpc_clnt_create\fR(3NSL).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_sperror()\fR\fR
 .ad
 .RS 23n
-.rt  
 Similar to \fBclnt_perror()\fR, except that like \fBclnt_sperrno()\fR, it
 returns a string instead of printing to standard error. However,
 \fBclnt_sperror()\fR does not append a newline at the end of the message.
@@ -263,12 +247,10 @@ thread-specific data.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrpc_broadcast()\fR\fR
 .ad
 .RS 23n
-.rt  
 Similar to \fBrpc_call()\fR, except that the call message is broadcast to all
 the connectionless transports specified by \fInettype\fR. If \fInettype\fR is
 \fINULL\fR, it defaults to \fBnetpath\fR. Each time it receives a response,
@@ -276,7 +258,7 @@ this routine calls \fBeachresult()\fR, whose form is:
 .sp
 .in +2
 .nf
-bool_t eachresult(caddr_t out,  const struct netbuf *addr,  
+bool_t eachresult(caddr_t out,  const struct netbuf *addr,
 const struct netconfig *netconf);
 .fi
 .in -2
@@ -296,12 +278,10 @@ of that transport. For Ethernet, this value is 1500 bytes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrpc_broadcast_exp()\fR\fR
 .ad
 .RS 23n
-.rt  
 Similar to \fBrpc_broadcast()\fR, except that the initial timeout,
 \fIinittime\fR and the maximum timeout, \fIwaittime\fR, are specified in
 milliseconds.
@@ -313,12 +293,10 @@ increases exponentially until it exceeds \fIwaittime\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrpc_call()\fR\fR
 .ad
 .RS 23n
-.rt  
 Calls the remote procedure associated with \fIprognum\fR, \fIversnum\fR, and
 \fIprocnum\fR on the machine, \fIhost\fR. The parameter \fIinproc\fR is used to
 encode the procedure's parameters, and \fIoutproc\fR is used to decode the
@@ -341,17 +319,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureAll
+Architecture	All
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

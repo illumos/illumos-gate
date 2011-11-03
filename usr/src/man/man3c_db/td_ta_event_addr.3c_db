@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH td_ta_event_addr 3C_DB "19 Oct 1998" "SunOS 5.11" "Threads Debugging Library Functions"
+.TH TD_TA_EVENT_ADDR 3C_DB "Oct 19, 1998"
 .SH NAME
 td_ta_event_addr, td_thr_event_enable, td_ta_set_event, td_thr_set_event,
 td_ta_clear_event, td_thr_clear_event, td_ta_event_getmsg, td_thr_event_getmsg,
@@ -137,155 +137,127 @@ The event types, and the additional information, if any, reported with each
 event, are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_READY\fR\fR
 .ad
 .RS 18n
-.rt  
 The thread became ready to execute.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_SLEEP\fR\fR
 .ad
 .RS 18n
-.rt  
 The thread has blocked on a synchronization object.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_SWITCHTO\fR\fR
 .ad
 .RS 18n
-.rt  
 A runnable thread is being assigned to  \fBLWP.\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_SWITCHFROM\fR\fR
 .ad
 .RS 18n
-.rt  
 A running thread is being removed from its  \fBLWP.\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_LOCK_TRY\fR\fR
 .ad
 .RS 18n
-.rt  
 A thread is trying to get an unavailable lock.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_CATCHSIG\fR\fR
 .ad
 .RS 18n
-.rt  
 A signal was posted to a thread.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_IDLE\fR\fR
 .ad
 .RS 18n
-.rt  
 An \fBLWP\fR is becoming idle.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_CREATE\fR\fR
 .ad
 .RS 18n
-.rt  
 A thread is being created.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_DEATH\fR\fR
 .ad
 .RS 18n
-.rt  
 A thread has terminated.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_PREEMPT\fR\fR
 .ad
 .RS 18n
-.rt  
 A thread is being preempted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_PRI_INHERIT\fR\fR
 .ad
 .RS 18n
-.rt  
 A thread is inheriting an elevated priority from another thread.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_REAP\fR\fR
 .ad
 .RS 18n
-.rt  
 A thread is being reaped.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_CONCURRENCY\fR\fR
 .ad
 .RS 18n
-.rt  
 The number of \fBLWPs\fR is changing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_TIMEOUT\fR\fR
 .ad
 .RS 18n
-.rt  
 A condition-variable timed wait expired.
 .RE
 
@@ -340,67 +312,55 @@ Several macros are provided for manipulating event sets of type
 \fBtd_thr_events_t\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtd_event_emptyset\fR \fR
 .ad
 .RS 22n
-.rt  
 Sets its argument to the \fINULL\fR event set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtd_event_fillset\fR\fR
 .ad
 .RS 22n
-.rt  
 Sets its argument to the set of all events.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtd_event_addset\fR\fR
 .ad
 .RS 22n
-.rt  
 Adds a specific event type to an event set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtd_event_delset\fR\fR
 .ad
 .RS 22n
-.rt  
 Deletes a specific event type from an event set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtd_eventismember\fR\fR
 .ad
 .RS 22n
-.rt  
 Tests whether a specific event type is a member of an event set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtd_eventisempty\fR\fR
 .ad
 .RS 22n
-.rt  
 Tests whether an event set is the \fINULL\fR set.
 .RE
 
@@ -410,80 +370,66 @@ Tests whether an event set is the \fINULL\fR set.
 The following values may be returned for all thread event routines:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_OK\fR\fR
 .ad
 .RS 12n
-.rt  
 The call returned successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_BADTH\fR\fR
 .ad
 .RS 12n
-.rt  
 An invalid thread handle was passed in.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_BADTA\fR\fR
 .ad
 .RS 12n
-.rt  
 An invalid internal process handle was passed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_BADPH\fR\fR
 .ad
 .RS 12n
-.rt  
 There is a \fINULL\fR external process handle associated with this internal
 process handle.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_DBERR\fR\fR
 .ad
 .RS 12n
-.rt  
 A call to one of the imported interface routines failed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_NOMSG\fR\fR
 .ad
 .RS 12n
-.rt  
 No event message was available to return to \fBtd_thr_event_getmsg()\fR or
 \fBtd_ta_event_getmsg()\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_ERR\fR\fR
 .ad
 .RS 12n
-.rt  
 Some other parameter error occurred, or a  \fBlibc_db()\fR internal error
 occurred.
 .RE
@@ -494,12 +440,10 @@ The following value can be returned for \fBtd_thr_event_enable()\fR,
 \fBtd_thr_set_event()\fR, and \fBtd_thr_clear_event()\fR only:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_NOCAPAB\fR \fR
 .ad
 .RS 15n
-.rt  
 Because the agent thread in the target process has not completed
 initialization, this operation cannot be performed. The operation can be
 performed after the target process has been allowed to make some forward
@@ -514,13 +458,12 @@ See \fBattributes\fR(5) for description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

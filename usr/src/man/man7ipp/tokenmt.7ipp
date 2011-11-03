@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH tokenmt 7ipp "29 Sep 2004" "SunOS 5.11" "IP Quality of Service Modules"
+.TH TOKENMT 7IPP "Sep 29, 2004"
 .SH NAME
 tokenmt \- Single and Two Rate Three Conformance Level Meter
 .SH DESCRIPTION
@@ -64,14 +64,14 @@ packet of size \fI B\fR bits arrive at time \fI t\fR, the following occurs:
 .sp
 .in +2
 .nf
-When operating as a Single Rate meter, the outcome (level) 
+When operating as a Single Rate meter, the outcome (level)
 is decided as follows:
         - Update tokens in C and P
-              o Compute no. of tokens accumulated since the 
+              o Compute no. of tokens accumulated since the
                 last time packet was seen at the committed rate as
                 T(t) = committed rate * (t - t')
                 (where t' is the time the last packet was seen)
-              o Add T tokens to C up to a maximum of committed burst 
+              o Add T tokens to C up to a maximum of committed burst
                 size. Add remaining tokens ((C+T) - Commited Burst),
                 if any, to P, to a maximum of peak burst size.
         - Decide outcome
@@ -82,13 +82,13 @@ is decided as follows:
               o Else,
                       o obtain DSCP from packet
                       o obtain color from color_map, color_map[DSCP]
-                      o if (color is GREEN) and (B <= C), outcome is 
+                      o if (color is GREEN) and (B <= C), outcome is
                         GREEN and C -= B.
                       o Else, if (color is GREEN or YELLOW) and
                         (B <= P), outcome is YELLOW and  P -= B.
                       o Else, outcome is RED.
-     Note that if peak_burst and yellow_next_actions are 
-     not specified (that is, a single rate meter with two 
+     Note that if peak_burst and yellow_next_actions are
+     not specified (that is, a single rate meter with two
      outcomes), the outcome is never YELLOW.
 .fi
 .in -2
@@ -147,7 +147,6 @@ module: tokenmt                          instance: <action id>
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/ipp/sparcv9/tokenmt\fR\fR
 .ad

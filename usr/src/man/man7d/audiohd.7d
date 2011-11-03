@@ -1,9 +1,9 @@
 '\" te
-.\" Copyright (c) 2009, Sun Microsystems, Inc. All rights reserved. 
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH audiohd 7D "12 May 2009" "SunOS 5.11" "Devices"
+.TH AUDIOHD 7D "May 12, 2009"
 .SH NAME
 audiohd \- Intel High Definition Audio Controller support
 .SH DESCRIPTION
@@ -14,34 +14,28 @@ compatible with the Intel High-Definition Audio Controller 1.0 specification.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/audiohd.conf\fR\fR
 .ad
 .RS 29n
-.rt  
 \fBaudiohd\fR driver configuration file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/audiohd\fR\fR
 .ad
 .RS 29n
-.rt  
 32-bit x86 kernel driver module
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/amd64/audiohd\fR\fR
 .ad
 .RS 29n
-.rt  
 64-bit x86 kernel driver module
 .RE
 
@@ -53,15 +47,14 @@ See \fBattributes\fR(5) for a descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(1.83i) |cw(3.67i) 
-lw(1.83i) |lw(3.67i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitecturePC-based system
+Architecture	PC-based system
 _
-Stability levelUncommitted
+Stability level	Uncommitted
 .TE
 
 .SH SEE ALSO
@@ -82,7 +75,6 @@ In addition to being logged, the following messages can appear on the system
 console:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBplay-interrupts too low\fR\fR
 .ad
@@ -91,7 +83,6 @@ console:
 \fB\fBrecord-interrupts too low\fR\fR
 .ad
 .RS 30n
-.rt  
 The interrupt rate in \fBaudiohd.conf\fR is set too low. It has been reset to
 the rate specified in the message. Update \fBaudiohd.conf\fR to a higher
 interrupt rate.
@@ -99,7 +90,6 @@ interrupt rate.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBredcord-interrupts too low\fR\fR
 .ad
@@ -108,7 +98,6 @@ interrupt rate.
 \fB\fBrecord-interrupts too high\fR\fR
 .ad
 .RS 30n
-.rt  
 The interrupt rate in \fBaudiohd.conf\fR is set too low. It has been reset to
 the rate specified in the message. Update \fBaudiohd.conf\fR to a higher
 interrupt rate

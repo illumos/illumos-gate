@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2011 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/print/lp@$(PKGVERS)
@@ -54,14 +55,7 @@ dir path=usr/lib/lp/local group=lp
 dir path=usr/lib/lp/model group=lp
 dir path=usr/lib/print group=lp
 dir path=usr/sbin
-dir path=usr/share group=sys
-dir path=usr/share/lib group=sys
-dir path=usr/share/lib/terminfo
-dir path=usr/share/lib/terminfo/4
-dir path=usr/share/lib/terminfo/5
-dir path=usr/share/lib/terminfo/G
-dir path=usr/share/lib/terminfo/P
-dir path=usr/share/lib/terminfo/a
+dir path=usr/share
 dir path=usr/share/man
 dir path=usr/share/man/man1m
 dir path=usr/share/man/man4
@@ -132,87 +126,6 @@ file path=usr/sbin/lpforms group=lp mode=0555
 file path=usr/sbin/lpshut group=lp mode=0555
 file path=usr/sbin/lpsystem group=lp mode=0555
 file path=usr/sbin/lpusers group=lp mode=0555
-file path=usr/share/lib/terminfo/4/40-132-6
-file path=usr/share/lib/terminfo/4/40-132-8
-file path=usr/share/lib/terminfo/4/40-80-6
-file path=usr/share/lib/terminfo/4/40-80-8
-file path=usr/share/lib/terminfo/4/442
-file path=usr/share/lib/terminfo/4/444
-file path=usr/share/lib/terminfo/4/446
-file path=usr/share/lib/terminfo/4/455
-file path=usr/share/lib/terminfo/4/457
-file path=usr/share/lib/terminfo/4/470
-file path=usr/share/lib/terminfo/4/471
-file path=usr/share/lib/terminfo/4/473
-file path=usr/share/lib/terminfo/4/474
-file path=usr/share/lib/terminfo/4/475
-file path=usr/share/lib/terminfo/4/476
-file path=usr/share/lib/terminfo/4/477
-file path=usr/share/lib/terminfo/4/477-455
-file path=usr/share/lib/terminfo/4/477-470
-file path=usr/share/lib/terminfo/4/477-5x6
-file path=usr/share/lib/terminfo/4/477-hi
-file path=usr/share/lib/terminfo/4/477ibmc
-file path=usr/share/lib/terminfo/4/477ibmg
-file path=usr/share/lib/terminfo/4/478
-file path=usr/share/lib/terminfo/4/479
-file path=usr/share/lib/terminfo/4/495hp
-file path=usr/share/lib/terminfo/4/495ibm
-file path=usr/share/lib/terminfo/4/495qume
-file path=usr/share/lib/terminfo/5/5310
-file path=usr/share/lib/terminfo/5/5320
-file path=usr/share/lib/terminfo/5/53x0+high
-file path=usr/share/lib/terminfo/5/570eps
-file path=usr/share/lib/terminfo/5/570ibm
-file path=usr/share/lib/terminfo/5/571eps
-file path=usr/share/lib/terminfo/5/571ibm
-file path=usr/share/lib/terminfo/5/572
-file path=usr/share/lib/terminfo/5/573
-file path=usr/share/lib/terminfo/5/580eps
-file path=usr/share/lib/terminfo/5/580eps-hi
-file path=usr/share/lib/terminfo/5/580ibm
-file path=usr/share/lib/terminfo/5/581eps
-file path=usr/share/lib/terminfo/5/581eps-hi
-file path=usr/share/lib/terminfo/5/581ibm
-file path=usr/share/lib/terminfo/5/583eps
-file path=usr/share/lib/terminfo/5/583eps-80
-file path=usr/share/lib/terminfo/5/583eps-hi
-file path=usr/share/lib/terminfo/5/583eps-hi-80
-file path=usr/share/lib/terminfo/5/583ibm
-file path=usr/share/lib/terminfo/5/583ibm-80
-file path=usr/share/lib/terminfo/5/593eps
-file path=usr/share/lib/terminfo/5/593hp
-file path=usr/share/lib/terminfo/5/593ibm
-file path=usr/share/lib/terminfo/G/Gcitoh+basic
-file path=usr/share/lib/terminfo/G/Gcitoh+low
-file path=usr/share/lib/terminfo/G/Gdaisy+basic
-file path=usr/share/lib/terminfo/G/Gdaisy+lowres
-file path=usr/share/lib/terminfo/G/Gdec+basic
-file path=usr/share/lib/terminfo/G/Gdec+low
-file path=usr/share/lib/terminfo/G/Gep2500+basic
-file path=usr/share/lib/terminfo/G/Gep2500+color
-file path=usr/share/lib/terminfo/G/Gep2500+high
-file path=usr/share/lib/terminfo/G/Gep2500+low
-file path=usr/share/lib/terminfo/G/Gepson+basic
-file path=usr/share/lib/terminfo/G/Gepson+low
-file path=usr/share/lib/terminfo/G/Ghplaser+II
-file path=usr/share/lib/terminfo/G/Ghplaser+basic
-file path=usr/share/lib/terminfo/G/Ghplaser+high
-file path=usr/share/lib/terminfo/G/Gibmc+basic
-file path=usr/share/lib/terminfo/G/Gibmc+color
-file path=usr/share/lib/terminfo/G/Gibmc+low+1x1
-file path=usr/share/lib/terminfo/G/Gibmc+low+5x6
-file path=usr/share/lib/terminfo/G/Gibmg+basic
-file path=usr/share/lib/terminfo/G/Gibmg+low
-file path=usr/share/lib/terminfo/G/Gibmxl+basic
-file path=usr/share/lib/terminfo/G/Gibmxl+high+1x1
-file path=usr/share/lib/terminfo/G/Gibmxl+low+1x1
-file path=usr/share/lib/terminfo/G/Gibmxl+low+5x6
-file path=usr/share/lib/terminfo/G/Gibmxlagm+basic
-file path=usr/share/lib/terminfo/P/PS
-file path=usr/share/lib/terminfo/a/att477+basic1
-file path=usr/share/lib/terminfo/a/att477+basic2
-file path=usr/share/lib/terminfo/a/att583+basic
 file path=usr/share/man/man1m/conv_lp.1m
 file path=usr/share/man/man1m/conv_lpd.1m
 file path=usr/share/man/man1m/in.lpd.1m
@@ -228,122 +141,6 @@ file path=usr/share/man/man4/printers.4
 file path=usr/share/man/man4/printers.conf.4
 file path=var/spool/cron/crontabs/lp group=root mode=0400 \
     original_name=SUNWps:var/spool/cron/crontabs/lp preserve=true
-hardlink path=usr/share/lib/terminfo/4/458 \
-    target=../../../../../usr/share/lib/terminfo/4/457
-hardlink path=usr/share/lib/terminfo/4/477qume \
-    target=../../../../../usr/share/lib/terminfo/4/477-455
-hardlink path=usr/share/lib/terminfo/P/PS-b \
-    target=../../../../../usr/share/lib/terminfo/P/PS
-hardlink path=usr/share/lib/terminfo/P/PS-br \
-    target=../../../../../usr/share/lib/terminfo/P/PS
-hardlink path=usr/share/lib/terminfo/P/PS-r \
-    target=../../../../../usr/share/lib/terminfo/P/PS
-hardlink path=usr/share/lib/terminfo/P/PSR \
-    target=../../../../../usr/share/lib/terminfo/P/PS
-hardlink path=usr/share/lib/terminfo/a/att40-132-6 \
-    target=../../../../../usr/share/lib/terminfo/4/40-132-6
-hardlink path=usr/share/lib/terminfo/a/att40-132-8 \
-    target=../../../../../usr/share/lib/terminfo/4/40-132-8
-hardlink path=usr/share/lib/terminfo/a/att40-80-6 \
-    target=../../../../../usr/share/lib/terminfo/4/40-80-6
-hardlink path=usr/share/lib/terminfo/a/att40-80-8 \
-    target=../../../../../usr/share/lib/terminfo/4/40-80-8
-hardlink path=usr/share/lib/terminfo/a/att442 \
-    target=../../../../../usr/share/lib/terminfo/4/442
-hardlink path=usr/share/lib/terminfo/a/att444 \
-    target=../../../../../usr/share/lib/terminfo/4/444
-hardlink path=usr/share/lib/terminfo/a/att446 \
-    target=../../../../../usr/share/lib/terminfo/4/446
-hardlink path=usr/share/lib/terminfo/a/att455 \
-    target=../../../../../usr/share/lib/terminfo/4/455
-hardlink path=usr/share/lib/terminfo/a/att457 \
-    target=../../../../../usr/share/lib/terminfo/4/457
-hardlink path=usr/share/lib/terminfo/a/att458 \
-    target=../../../../../usr/share/lib/terminfo/4/457
-hardlink path=usr/share/lib/terminfo/a/att470 \
-    target=../../../../../usr/share/lib/terminfo/4/470
-hardlink path=usr/share/lib/terminfo/a/att471 \
-    target=../../../../../usr/share/lib/terminfo/4/471
-hardlink path=usr/share/lib/terminfo/a/att473 \
-    target=../../../../../usr/share/lib/terminfo/4/473
-hardlink path=usr/share/lib/terminfo/a/att474 \
-    target=../../../../../usr/share/lib/terminfo/4/474
-hardlink path=usr/share/lib/terminfo/a/att475 \
-    target=../../../../../usr/share/lib/terminfo/4/475
-hardlink path=usr/share/lib/terminfo/a/att476 \
-    target=../../../../../usr/share/lib/terminfo/4/476
-hardlink path=usr/share/lib/terminfo/a/att477 \
-    target=../../../../../usr/share/lib/terminfo/4/477
-hardlink path=usr/share/lib/terminfo/a/att477-455 \
-    target=../../../../../usr/share/lib/terminfo/4/477-455
-hardlink path=usr/share/lib/terminfo/a/att477-470 \
-    target=../../../../../usr/share/lib/terminfo/4/477-470
-hardlink path=usr/share/lib/terminfo/a/att477-5x6 \
-    target=../../../../../usr/share/lib/terminfo/4/477-5x6
-hardlink path=usr/share/lib/terminfo/a/att477-hi \
-    target=../../../../../usr/share/lib/terminfo/4/477-hi
-hardlink path=usr/share/lib/terminfo/a/att477ibmc \
-    target=../../../../../usr/share/lib/terminfo/4/477ibmc
-hardlink path=usr/share/lib/terminfo/a/att477ibmg \
-    target=../../../../../usr/share/lib/terminfo/4/477ibmg
-hardlink path=usr/share/lib/terminfo/a/att477qume \
-    target=../../../../../usr/share/lib/terminfo/4/477-455
-hardlink path=usr/share/lib/terminfo/a/att478 \
-    target=../../../../../usr/share/lib/terminfo/4/478
-hardlink path=usr/share/lib/terminfo/a/att479 \
-    target=../../../../../usr/share/lib/terminfo/4/479
-hardlink path=usr/share/lib/terminfo/a/att495hp \
-    target=../../../../../usr/share/lib/terminfo/4/495hp
-hardlink path=usr/share/lib/terminfo/a/att495ibm \
-    target=../../../../../usr/share/lib/terminfo/4/495ibm
-hardlink path=usr/share/lib/terminfo/a/att495qume \
-    target=../../../../../usr/share/lib/terminfo/4/495qume
-hardlink path=usr/share/lib/terminfo/a/att5310 \
-    target=../../../../../usr/share/lib/terminfo/5/5310
-hardlink path=usr/share/lib/terminfo/a/att5320 \
-    target=../../../../../usr/share/lib/terminfo/5/5320
-hardlink path=usr/share/lib/terminfo/a/att570eps \
-    target=../../../../../usr/share/lib/terminfo/5/570eps
-hardlink path=usr/share/lib/terminfo/a/att570ibm \
-    target=../../../../../usr/share/lib/terminfo/5/570ibm
-hardlink path=usr/share/lib/terminfo/a/att571eps \
-    target=../../../../../usr/share/lib/terminfo/5/571eps
-hardlink path=usr/share/lib/terminfo/a/att571ibm \
-    target=../../../../../usr/share/lib/terminfo/5/571ibm
-hardlink path=usr/share/lib/terminfo/a/att572 \
-    target=../../../../../usr/share/lib/terminfo/5/572
-hardlink path=usr/share/lib/terminfo/a/att573 \
-    target=../../../../../usr/share/lib/terminfo/5/573
-hardlink path=usr/share/lib/terminfo/a/att580eps \
-    target=../../../../../usr/share/lib/terminfo/5/580eps
-hardlink path=usr/share/lib/terminfo/a/att580eps-hi \
-    target=../../../../../usr/share/lib/terminfo/5/580eps-hi
-hardlink path=usr/share/lib/terminfo/a/att580ibm \
-    target=../../../../../usr/share/lib/terminfo/5/580ibm
-hardlink path=usr/share/lib/terminfo/a/att581eps \
-    target=../../../../../usr/share/lib/terminfo/5/581eps
-hardlink path=usr/share/lib/terminfo/a/att581eps-hi \
-    target=../../../../../usr/share/lib/terminfo/5/581eps-hi
-hardlink path=usr/share/lib/terminfo/a/att581ibm \
-    target=../../../../../usr/share/lib/terminfo/5/581ibm
-hardlink path=usr/share/lib/terminfo/a/att583eps \
-    target=../../../../../usr/share/lib/terminfo/5/583eps
-hardlink path=usr/share/lib/terminfo/a/att583eps-80 \
-    target=../../../../../usr/share/lib/terminfo/5/583eps-80
-hardlink path=usr/share/lib/terminfo/a/att583eps-hi \
-    target=../../../../../usr/share/lib/terminfo/5/583eps-hi
-hardlink path=usr/share/lib/terminfo/a/att583eps-hi-80 \
-    target=../../../../../usr/share/lib/terminfo/5/583eps-hi-80
-hardlink path=usr/share/lib/terminfo/a/att583ibm \
-    target=../../../../../usr/share/lib/terminfo/5/583ibm
-hardlink path=usr/share/lib/terminfo/a/att583ibm-80 \
-    target=../../../../../usr/share/lib/terminfo/5/583ibm-80
-hardlink path=usr/share/lib/terminfo/a/att593eps \
-    target=../../../../../usr/share/lib/terminfo/5/593eps
-hardlink path=usr/share/lib/terminfo/a/att593hp \
-    target=../../../../../usr/share/lib/terminfo/5/593hp
-hardlink path=usr/share/lib/terminfo/a/att593ibm \
-    target=../../../../../usr/share/lib/terminfo/5/593ibm
 legacy pkg=SUNWpsr \
     desc="configuration and start-up files for the print service" \
     name="Solaris Print - LP Server, (root)" version=13.1,REV=2009.11.11
@@ -368,3 +165,7 @@ link path=var/spool/lp/admins/lp target=../../../../etc/lp
 link path=var/spool/lp/bin target=../../../usr/lib/lp/bin
 link path=var/spool/lp/logs target=../../lp/logs
 link path=var/spool/lp/model target=../../../usr/lib/lp/model
+#
+# Depend on terminfo data.
+#
+depend fmri=system/data/terminfo type=require

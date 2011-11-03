@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH tran_start 9E "17 Aug 2005" "SunOS 5.11" "Driver Entry Points"
+.TH TRAN_START 9E "Aug 17, 2005"
 .SH NAME
 tran_start \- request to transport a SCSI command
 .SH SYNOPSIS
@@ -24,23 +24,19 @@ Solaris architecture specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpkt\fR \fR
 .ad
 .RS 8n
-.rt  
 Pointer to the  \fBscsi_pkt\fR(9S) structure that is about to be transferred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIap\fR \fR
 .ad
 .RS 8n
-.rt  
 Pointer to a \fBscsi_address\fR(9S) structure.
 .RE
 
@@ -149,24 +145,20 @@ values in these members are updated to accurately reflect the states through
 which the command transitioned while in the transport layer.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkt_resid\fR \fR
 .ad
 .RS 19n
-.rt  
 For commands with data transfer, this member must be updated to indicate the
 residual of the data transferred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkt_reason\fR\fR
 .ad
 .RS 19n
-.rt  
 The reason for the command completion. This field should be set to
 \fBCMD_CMPLT\fR at the beginning of \fBtran_start()\fR, then updated if the
 command ever transitions to an abnormal termination state. To avoid losing
@@ -176,23 +168,19 @@ still has its original \fBCMD_CMPLT\fR value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkt_statistics\fR \fR
 .ad
 .RS 19n
-.rt  
 Bit field of transport-related statistics.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkt_state\fR \fR
 .ad
 .RS 19n
-.rt  
 Bit field with the major states through which a \fBSCSI\fR command can
 transition. Note: The members listed above, and \fBpkt_hba_private\fR member,
 are the only fields in the \fBscsi_pkt\fR(9S) structure which may be modified
@@ -205,23 +193,19 @@ by the transport layer.
 \fBtran_start()\fR must return:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTRAN_ACCEPT\fR \fR
 .ad
 .RS 21n
-.rt  
 The packet was accepted by the transport layer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTRAN_BUSY\fR \fR
 .ad
 .RS 21n
-.rt  
 The packet could not be accepted because there was already a packet in progress
 for this target/logical unit, the \fBHBA \fRqueue was full, or the target
 device queue was full.
@@ -229,24 +213,20 @@ device queue was full.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTRAN_BADPKT\fR \fR
 .ad
 .RS 21n
-.rt  
 The \fBDMA \fRcount in the packet exceeded the \fBDMA \fRengine's maximum
 \fBDMA \fRsize, or the packet could not be accepted for other reasons.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTRAN_FATAL_ERROR\fR \fR
 .ad
 .RS 21n
-.rt  
 A fatal error has occurred in the \fBHBA. \fR
 .RE
 

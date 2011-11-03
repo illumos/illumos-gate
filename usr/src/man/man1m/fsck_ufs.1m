@@ -1,10 +1,10 @@
 '\" te
-.\" Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved 
+.\" Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved
 .\" Copyright 1989 AT&T
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH fsck_ufs 1M "2 Aug 2005" "SunOS 5.11" "System Administration Commands"
+.TH FSCK_UFS 1M "Aug 2, 2005"
 .SH NAME
 fsck_ufs \- file system consistency check and interactive repair
 .SH SYNOPSIS
@@ -15,7 +15,7 @@ fsck_ufs \- file system consistency check and interactive repair
 
 .LP
 .nf
-\fBfsck\fR \fB-F\fR ufs [\fIgeneric-options\fR] [\fB-o\fR \fIspecific-options\fR] 
+\fBfsck\fR \fB-F\fR ufs [\fIgeneric-options\fR] [\fB-o\fR \fIspecific-options\fR]
      [\fIspecial\fR]...
 .fi
 
@@ -149,18 +149,15 @@ attempt indicates the presence of at least one large file. See
 The \fIgeneric-options\fR consist of the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
 .RS 12n
-.rt  
 Check but do not repair. This option checks that the file system is suitable
 for mounting, returning the appropriate exit status. If the file system is
 ready for mounting, \fBfsck\fR displays a message such as:
 .sp
 .ne 2
-.mk
 .na
 \fB\fR
 .ad
@@ -173,48 +170,40 @@ ready for mounting, \fBfsck\fR displays a message such as:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\||\|\fBN\fR\fR
 .ad
 .RS 12n
-.rt  
 Assume a \fBno\fR response to all questions asked by \fBfsck\fR; do not open
 the file system for writing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
 .RS 12n
-.rt  
 Echo the expanded command line, but do not execute the command. This option may
 be used to verify and to validate the command line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 12n
-.rt  
 Enables verbose output. Might not be supported by all filesystem-specific
 \fBfsck\fR implementations.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-y\fR\||\|\fBY\fR\fR
 .ad
 .RS 12n
-.rt  
 Assume a \fByes\fR response to all questions asked by \fBfsck\fR.
 .RE
 
@@ -223,22 +212,18 @@ Assume a \fByes\fR response to all questions asked by \fBfsck\fR.
 See generic \fBfsck\fR(1M) for the details for specifying \fIspecial\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIspecific-options\fR\fR
 .ad
 .RS 23n
-.rt  
 Specify \fBufs\fR file system specific options. These options can be any
 combination of the following separated by commas (with no intervening spaces).
 .sp
 .ne 2
-.mk
 .na
 \fB\fBb=\fR\fIn\fR\fR
 .ad
 .RS 7n
-.rt  
 Use block \fIn\fR as the super block for the file system. Block 32 is always
 one of the alternate super blocks. Determine the location of other super blocks
 by running \fBnewfs\fR(1M) with the \fB-Nv\fR options specified.
@@ -246,24 +231,20 @@ by running \fBnewfs\fR(1M) with the \fB-Nv\fR options specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBf\fR\fR
 .ad
 .RS 7n
-.rt  
 Force checking of file systems regardless of the state of their super block
 clean flag.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBp\fR\fR
 .ad
 .RS 7n
-.rt  
 Check and fix the file system non-interactively ("preen"). Exit immediately if
 there is a problem requiring intervention. This option is required to enable
 parallel file system checking.
@@ -271,12 +252,10 @@ parallel file system checking.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBw\fR\fR
 .ad
 .RS 7n
-.rt  
 Check writable file systems only.
 .RE
 
@@ -285,12 +264,10 @@ Check writable file systems only.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/vfstab\fR\fR
 .ad
 .RS 15n
-.rt  
 list of default parameters for each file system
 .RE
 
@@ -322,12 +299,10 @@ Running \fBfsck\fR on file systems larger than 2 Gb fails if the user chooses
 to use the block interface to the device:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfsck\fR \fB/dev/dsk/c?t?d?s?\fR\fR
 .ad
 .RS 26n
-.rt  
 
 .RE
 
@@ -336,12 +311,10 @@ to use the block interface to the device:
 rather than the raw (character special) device:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfsck\fR \fB/dev/rdsk/c?t?d?s?\fR\fR
 .ad
 .RS 27n
-.rt  
 
 .RE
 

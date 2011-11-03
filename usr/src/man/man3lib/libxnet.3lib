@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libxnet 3LIB "24 Mar 2004" "SunOS 5.11" "Interface Libraries"
+.TH LIBXNET 3LIB "Mar 24, 2004"
 .SH NAME
 libxnet \- X/Open Networking library
 .SH SYNOPSIS
@@ -27,87 +27,81 @@ interfaces.
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fB__t_errno\fR\fB__xnet_bind\fR
-\fB__xnet_connect\fR\fB__xnet_getsockopt\fR
-\fB__xnet_listen\fR\fB__xnet_recvmsg\fR
-\fB__xnet_sendmsg\fR\fB__xnet_sendto\fR
-\fB__xnet_socket\fR\fB__xnet_socketpair\fR
-\fB_xti_accept\fR\fB_xti_alloc\fR
-\fB_xti_bind\fR\fB_xti_close\fR
-\fB_xti_connect\fR\fB_xti_error\fR
-\fB_xti_free\fR\fB_xti_getinfo\fR
-\fB_xti_getprotaddr\fR\fB_xti_getstate\fR
-\fB_xti_listen\fR\fB_xti_look\fR
-\fB_xti_open\fR\fB_xti_optmgmt\fR
-\fB_xti_rcv\fR\fB_xti_rcvconnect\fR
-\fB_xti_rcvdis\fR\fB_xti_rcvrel\fR
-\fB_xti_rcvreldata\fR\fB_xti_rcvudata\fR
-\fB_xti_rcvuderr\fR\fB_xti_rcvv\fR
-\fB_xti_rcvvudata\fR\fB_xti_snd\fR
-\fB_xti_snddis\fR\fB_xti_sndrel\fR
-\fB_xti_sndreldata\fR\fB_xti_sndudata\fR
-\fB_xti_sndv\fR\fB_xti_sndvudata\fR
-\fB_xti_strerror\fR\fB_xti_sync\fR
-\fB_xti_sysconf\fR\fB_xti_unbind\fR
-\fB_xti_xns5_accept\fR\fB_xti_xns5_snd\fR
-\fBaccept\fR\fBbind\fR
-\fBconnect\fR\fBendhostent\fR
-\fBendnetent\fR\fBendprotoent\fR
-\fBendservent\fR\fBfreeaddrinfo\fR
-\fBgai_strerror\fR\fBgetaddrinfo\fR
-\fBgethostbyaddr\fR\fBgethostbyname\fR
-\fBgethostent\fR\fBgethostname\fR
-\fBgetnameinfo\fR\fBgetnetbyaddr\fR
-\fBgethostname\fR\fBgetnetbyaddr\fR
-\fBgetnetbyname\fR\fBgetnetent\fR
-\fBgetpeername\fR\fBgetprotobyname\fR
-\fBgetprotobynumber\fR\fBgetprotoent\fR
-\fBgetservbyname\fR\fBgetservbyport\fR
-\fBgetservent\fR\fBgetsockname\fR
-\fBgetsockopt\fR\fBh_errno\fR
-\fBhtonl\fR\fBhtons\fR
-\fBif_freenameindex\fR\fBif_indextoname\fR
-\fBif_nameindex\fR\fBif_nametoindex\fR
-\fBinet_addr\fR\fBinet_lnaof\fR
-\fBinet_makeaddr\fR\fBinet_netof\fR
-\fBinet_network\fR\fBinet_ntoa\fR
-\fBinet_ntop\fR\fBinet_pton\fR
-\fBlisten\fR\fBntohl\fR
-\fBntohs\fR\fBrecv\fR
-\fBrecvfrom\fR\fBrecvmsg\fR
-\fBsend\fR\fBsendmsg\fR
-\fBsendto\fR\fBsethostent\fR
-\fBsetnetent\fR\fBsetprotoent\fR
-\fBsetservent\fR\fBsetsockopt\fR
-\fBshutdown\fR\fBsockatmark\fR
-\fBsocket\fR\fBsocketpair\fR
-\fBt_errno\fR
+l l
+l l .
+\fB__t_errno\fR	\fB__xnet_bind\fR
+\fB__xnet_connect\fR	\fB__xnet_getsockopt\fR
+\fB__xnet_listen\fR	\fB__xnet_recvmsg\fR
+\fB__xnet_sendmsg\fR	\fB__xnet_sendto\fR
+\fB__xnet_socket\fR	\fB__xnet_socketpair\fR
+\fB_xti_accept\fR	\fB_xti_alloc\fR
+\fB_xti_bind\fR	\fB_xti_close\fR
+\fB_xti_connect\fR	\fB_xti_error\fR
+\fB_xti_free\fR	\fB_xti_getinfo\fR
+\fB_xti_getprotaddr\fR	\fB_xti_getstate\fR
+\fB_xti_listen\fR	\fB_xti_look\fR
+\fB_xti_open\fR	\fB_xti_optmgmt\fR
+\fB_xti_rcv\fR	\fB_xti_rcvconnect\fR
+\fB_xti_rcvdis\fR	\fB_xti_rcvrel\fR
+\fB_xti_rcvreldata\fR	\fB_xti_rcvudata\fR
+\fB_xti_rcvuderr\fR	\fB_xti_rcvv\fR
+\fB_xti_rcvvudata\fR	\fB_xti_snd\fR
+\fB_xti_snddis\fR	\fB_xti_sndrel\fR
+\fB_xti_sndreldata\fR	\fB_xti_sndudata\fR
+\fB_xti_sndv\fR	\fB_xti_sndvudata\fR
+\fB_xti_strerror\fR	\fB_xti_sync\fR
+\fB_xti_sysconf\fR	\fB_xti_unbind\fR
+\fB_xti_xns5_accept\fR	\fB_xti_xns5_snd\fR
+\fBaccept\fR	\fBbind\fR
+\fBconnect\fR	\fBendhostent\fR
+\fBendnetent\fR	\fBendprotoent\fR
+\fBendservent\fR	\fBfreeaddrinfo\fR
+\fBgai_strerror\fR	\fBgetaddrinfo\fR
+\fBgethostbyaddr\fR	\fBgethostbyname\fR
+\fBgethostent\fR	\fBgethostname\fR
+\fBgetnameinfo\fR	\fBgetnetbyaddr\fR
+\fBgethostname\fR	\fBgetnetbyaddr\fR
+\fBgetnetbyname\fR	\fBgetnetent\fR
+\fBgetpeername\fR	\fBgetprotobyname\fR
+\fBgetprotobynumber\fR	\fBgetprotoent\fR
+\fBgetservbyname\fR	\fBgetservbyport\fR
+\fBgetservent\fR	\fBgetsockname\fR
+\fBgetsockopt\fR	\fBh_errno\fR
+\fBhtonl\fR	\fBhtons\fR
+\fBif_freenameindex\fR	\fBif_indextoname\fR
+\fBif_nameindex\fR	\fBif_nametoindex\fR
+\fBinet_addr\fR	\fBinet_lnaof\fR
+\fBinet_makeaddr\fR	\fBinet_netof\fR
+\fBinet_network\fR	\fBinet_ntoa\fR
+\fBinet_ntop\fR	\fBinet_pton\fR
+\fBlisten\fR	\fBntohl\fR
+\fBntohs\fR	\fBrecv\fR
+\fBrecvfrom\fR	\fBrecvmsg\fR
+\fBsend\fR	\fBsendmsg\fR
+\fBsendto\fR	\fBsethostent\fR
+\fBsetnetent\fR	\fBsetprotoent\fR
+\fBsetservent\fR	\fBsetsockopt\fR
+\fBshutdown\fR	\fBsockatmark\fR
+\fBsocket\fR	\fBsocketpair\fR
+\fBt_errno\fR	
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/libxnet.so.1\fR\fR
 .ad
 .RS 24n
-.rt  
 shared object
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/64/libxnet.so.1\fR\fR
 .ad
 .RS 24n
-.rt  
 64-bit shared object
 .RE
 
@@ -119,15 +113,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

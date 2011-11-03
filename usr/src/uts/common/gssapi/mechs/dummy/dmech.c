@@ -22,9 +22,8 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * A module that implements a dummy security mechanism.
@@ -32,8 +31,6 @@
  * exchanged during security context establishment can be
  * specified through dummy_mech.conf located in /etc.
  */
-
-char _depends_on[] = "misc/kgssapi";
 
 #include <sys/types.h>
 #include <sys/modctl.h>

@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH nfsd 1M "22 Jul 2008" "SunOS 5.11" "System Administration Commands"
+.TH NFSD 1M "Jul 22, 2008"
 .SH NAME
 nfsd \- NFS daemon
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/lib/nfs/nfsd\fR [\fB-a\fR] [\fB-c\fR \fI#_conn\fR] [\fB-l\fR \fIlisten_backlog\fR] 
+\fB/usr/lib/nfs/nfsd\fR [\fB-a\fR] [\fB-c\fR \fI#_conn\fR] [\fB-l\fR \fIlisten_backlog\fR]
      [\fB-p\fR \fIprotocol\fR] [\fB-t\fR \fIdevice\fR] [\fInservers\fR]
 .fi
 
@@ -43,12 +43,10 @@ To change startup parameters for \fBnfsd\fR, use the \fBsharectl\fR(1M) and
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 15n
-.rt  
 Start a \fBNFS\fR daemon over all available connectionless and
 connection-oriented transports, including UDP and TCP. Equivalent of setting
 the \fBNFSD_PROTOCOL\fR parameter to \fBALL\fR in the \fBnfs\fR file.
@@ -56,12 +54,10 @@ the \fBNFSD_PROTOCOL\fR parameter to \fBALL\fR in the \fBnfs\fR file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fI#_conn\fR\fR
 .ad
 .RS 15n
-.rt  
 This sets the maximum number of connections allowed to the \fBNFS\fR server
 over connection-oriented transports. By default, the number of connections is
 unlimited. Equivalent of the \fBNFSD_MAX_CONNECTIONS\fR parameter in the
@@ -70,12 +66,10 @@ unlimited. Equivalent of the \fBNFSD_MAX_CONNECTIONS\fR parameter in the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 15n
-.rt  
 Set connection queue length for the \fBNFS TCP\fR over a connection-oriented
 transport. The default value is 32 entries. Equivalent of the
 \fBNFSD_LISTEN_BACKLOG\fR parameter in the \fBnfs\fR file.
@@ -83,24 +77,20 @@ transport. The default value is 32 entries. Equivalent of the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIprotocol\fR\fR
 .ad
 .RS 15n
-.rt  
 Start a \fBNFS\fR daemon over the specified protocol. Equivalent of the
 \fBNFSD_PROTOCOL\fR parameter in the \fBnfs\fR file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fIdevice\fR\fR
 .ad
 .RS 15n
-.rt  
 Start a \fBNFS\fR daemon for the transport specified by the given device.
 Equivalent of the \fBNFSD_DEVICE\fR parameter in the \fBnfs\fR file.
 .RE
@@ -111,12 +101,10 @@ Equivalent of the \fBNFSD_DEVICE\fR parameter in the \fBnfs\fR file.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fInservers\fR\fR
 .ad
 .RS 12n
-.rt  
 This sets the maximum number of concurrent \fBNFS\fR requests that the server
 can handle. This concurrency is achieved by up to \fInservers\fR threads
 created as needed in the kernel. \fInservers\fR should be based on the load
@@ -140,63 +128,52 @@ variable, edit the \fB/etc/system\fR file and add this entry:
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Daemon started successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 Daemon failed to start.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&.nfs\fIXXX\fR\fR\fR
 .ad
 .RS 24n
-.rt  
 Client machine pointer to an open-but-unlinked file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/default/nfs\fR\fR
 .ad
 .RS 24n
-.rt  
 Contains startup parameters for \fBnfsd\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/system\fR\fR
 .ad
 .RS 24n
-.rt  
 System configuration information file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/nfs/v4_state\fR\fR
 .ad
@@ -205,7 +182,6 @@ System configuration information file.
 \fB\fB/var/nfs/v4_oldstate\fR\fR
 .ad
 .RS 24n
-.rt  
 Directories used by the server to manage client state information. These
 directories should not be removed.
 .RE

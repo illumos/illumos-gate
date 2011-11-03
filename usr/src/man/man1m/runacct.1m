@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH runacct 1M "11 May 1999" "SunOS 5.11" "System Administration Commands"
+.TH RUNACCT 1M "May 11, 1999"
 .SH NAME
 runacct \- run daily accounting
 .SH SYNOPSIS
@@ -39,125 +39,103 @@ determine what to process next. \fIstates\fR are executed in the following
 order:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSETUP\fR\fR
 .ad
 .RS 14n
-.rt  
 Move active accounting files into working files.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWTMPFIX\fR\fR
 .ad
 .RS 14n
-.rt  
 Verify integrity of \fBwtmpx\fR file, correcting date changes if necessary.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCONNECT\fR\fR
 .ad
 .RS 14n
-.rt  
 Produce connect session records in \fBtacct.h\fR format.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROCESS\fR\fR
 .ad
 .RS 14n
-.rt  
 Convert process accounting records into \fBtacct.h\fR format.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMERGE\fR\fR
 .ad
 .RS 14n
-.rt  
 Merge the connect and process accounting records.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFEES\fR\fR
 .ad
 .RS 14n
-.rt  
 Convert output of \fBchargefee\fR into \fBtacct.h\fR format, merge with
 connect, and process accounting records.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDISK\fR\fR
 .ad
 .RS 14n
-.rt  
 Merge disk accounting records with connect, process, and fee accounting
 records.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMERGETACCT\fR\fR
 .ad
 .RS 14n
-.rt  
 Merge the daily total accounting records in \fBdaytacct\fR with the summary
 total accounting records in \fB/var/adm/acct/sum/tacct\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCMS\fR\fR
 .ad
 .RS 14n
-.rt  
 Produce command summaries.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSEREXIT\fR\fR
 .ad
 .RS 14n
-.rt  
 Any installation dependent accounting programs can be included here.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCLEANUP\fR\fR
 .ad
 .RS 14n
-.rt  
 Clean up temporary files and exit. To restart \fBrunacct\fR after a failure,
 first check the \fBactive\fR file for diagnostics, then fix any corrupted data
 files, such as \fBpacct\fR or \fBwtmpx\fR. The \fBlock\fR, \fBlock1\fR, and
@@ -215,7 +193,6 @@ example% nohup runacct 0601 MERGE 2>> /var/adm/acct/nite/fd2log &
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/wtmpx\fR\fR
 .ad
@@ -226,79 +203,72 @@ History of user access and administration information
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/pacct\fR\fIincr\fR\fR
 .ad
 .sp .6
 .RS 4n
- 
+
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/acct/nite/active\fR\fR
 .ad
 .sp .6
 .RS 4n
- 
+
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/acct/nite/daytacct\fR\fR
 .ad
 .sp .6
 .RS 4n
- 
+
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/acct/nite/lock\fR\fR
 .ad
 .sp .6
 .RS 4n
- 
+
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/acct/nite/lock1\fR\fR
 .ad
 .sp .6
 .RS 4n
- 
+
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/acct/nite/lastdate\fR\fR
 .ad
 .sp .6
 .RS 4n
- 
+
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/acct/nite/statefile\fR\fR
 .ad
 .sp .6
 .RS 4n
- 
+
 .RE
 
 .SH SEE ALSO

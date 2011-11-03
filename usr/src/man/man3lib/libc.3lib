@@ -3,7 +3,8 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libc 3LIB "15 Sep 2009" "SunOS 5.11" "Interface Libraries"
+.\" Copyright 2011 by Delphix.  All rights reserved.
+.TH LIBC 3LIB "Sep 15, 2009"
 .SH NAME
 libc \- C library
 .SH DESCRIPTION
@@ -23,745 +24,746 @@ See \fBIntro\fR(3) for additional information on shared object interfaces.
 
 .sp
 .TS
-tab();
-lw(3.11i) lw(2.39i) 
-lw(3.11i) lw(2.39i) 
-.
-\fB____loc1\fR\fB___errno\fR
-\fB__builtin_alloca\fR\fB__ctype\fR
-\fB__fbufsize\fR\fB__flbf\fR
-\fB__flt_rounds\fR\fB__fpending\fR
-\fB__fpurge\fR\fB__freadable\fR
-\fB__freading\fR\fB__fsetlocking\fR
-\fB__fwritable\fR\fB__fwriting\fR
-\fB__huge_val\fR\fB__iob\fR
-\fB__loc1\fR\fB__major\fR
-\fB__makedev\fR\fB__minor\fR
-\fB__nsw_extended_action\fR\fB__nsw_freeconfig\fR
-\fB__nsw_getconfig\fR\fB__posix_asctime_r\fR
-\fB__posix_ctime_r\fR\fB__posix_getgrgid_r\fR
-\fB__posix_getgrnam_r\fR\fB__posix_getlogin_r\fR
-\fB__posix_getpwnam_r\fR\fB__posix_getpwuid_r\fR
-\fB__posix_sigwait\fR\fB__posix_ttyname_r\fR
-\fB__priocntl\fR\fB__priocntlset\fR
-\fB__pthread_cleanup_pop\fR\fB__pthread_cleanup_push\fR
-\fB__sysconf_xpg5\fR\fB__xpg4\fR
-\fB__xpg4_putmsg\fR\fB__xpg4_putpmsg\fR
-\fB_Exit\fR\fB_altzone\fR
-\fB_assert\fR\fB_cleanup\fR
-\fB_ctype\fR\fB_daylight\fR
-\fB_environ\fR\fB_exit\fR
-\fB_exithandle\fR\fB_filbuf\fR
-\fB_flsbuf\fR\fB_flushlbf\fR
-\fB_getdate_err\fR\fB_getdate_err_addr\fR
-\fB_iob\fR\fB_isnan\fR
-\fB_isnand\fR\fB_lwp_cond_broadcast\fR
-\fB_lwp_cond_reltimedwait\fR\fB_lwp_cond_signal\fR
-\fB_lwp_cond_timedwait\fR\fB_lwp_cond_wait\fR
-\fB_lwp_continue\fR\fB_lwp_info\fR
-\fB_lwp_kill\fR\fB_lwp_mutex_lock\fR
-\fB_lwp_mutex_trylock\fR\fB_lwp_mutex_unlock\fR
-\fB_lwp_self\fR\fB_lwp_sema_init\fR
-\fB_lwp_sema_post\fR\fB_lwp_sema_trywait\fR
-\fB_lwp_sema_wait\fR\fB_lwp_suspend\fR
-\fB_lwp_suspend2\fR\fB_modf\fR
-\fB_nextafter\fR\fB_nsc_trydoorcall\fR
-\fB_nss_XbyY_buf_alloc\fR\fB_nss_XbyY_buf_free\fR
-\fB_nss_netdb_aliases\fR\fB_numeric\fR
-\fB_scalb\fR\fB_sibuf\fR
-\fB_sobuf\fR\fB_stack_grow\fR
-\fB_sys_buslist\fR\fB_sys_cldlist\fR
-\fB_sys_fpelist\fR\fB_sys_illlist\fR
-\fB_sys_segvlist\fR\fB_sys_siginfolistp\fR
-\fB_sys_siglist\fR\fB_sys_siglistn\fR
-\fB_sys_siglistp\fR\fB_sys_traplist\fR
-\fB_timezone\fR\fB_tolower\fR
-\fB_toupper\fR\fB_tzname\fR
-\fB_xftw\fR\fB\fR
-\fBa64l\fR\fBabort\fR
-\fBabs\fR\fBaccess\fR
-\fBacct\fR\fBacl\fR
-\fBaddrtosymstr\fR\fBaddsev\fR
-\fBaddseverity\fR\fBadjtime\fR
-\fBaio_cancel\fR\fBaio_error\fR
-\fBaio_fsync\fR\fBaio_read\fR
-\fBaio_return\fR\fBaio_suspend\fR
-\fBaio_waitn\fR\fBaio_write\fR
-\fBaiocancel\fR\fBaioread\fR
-\fBaiowait\fR\fBaiowrite\fR
-\fBalarm\fR\fBalphasort\fR
-\fBaltzone\fR\fBascftime\fR
-\fBasctime\fR\fBasctime_r\fR
-\fBasprintf\fR
-\fBatexit\fR\fBatof\fR
-\fBatoi\fR\fBatol\fR
-\fBatoll\fR\fBatomic_add_16\fR
-\fBatomic_add_16_nv\fR\fBatomic_add_32\fR
-\fBatomic_add_32_nv\fR\fBatomic_add_64\fR
-\fBatomic_add_64_nv\fR\fBatomic_add_8\fR
-\fBatomic_add_8_nv\fR\fBatomic_add_char\fR
-\fBatomic_add_char_nv\fR\fBatomic_add_int\fR
-\fBatomic_add_int_nv\fR\fBatomic_add_long\fR
-\fBatomic_add_long_nv\fR\fBatomic_add_ptr\fR
-\fBatomic_add_ptr_nv\fR\fBatomic_add_short\fR
-\fBatomic_add_short_nv\fR\fBatomic_and_16\fR
-\fBatomic_and_16_nv\fR\fBatomic_and_32\fR
-\fBatomic_and_32_nv\fR\fBatomic_and_64\fR
-\fBatomic_and_64_nv\fR\fBatomic_and_8\fR
-\fBatomic_and_8_nv\fR\fBatomic_and_uchar\fR
-\fBatomic_and_uchar_nv\fR\fBatomic_and_uint\fR
-\fBatomic_and_uint_nv\fR\fBatomic_and_ulong\fR
-\fBatomic_and_ulong_nv\fR\fBatomic_and_ushort\fR
-\fBatomic_and_ushort_nv\fR\fBatomic_cas_16\fR
-\fBatomic_cas_32\fR\fBatomic_cas_64\fR
-\fBatomic_cas_8\fR\fBatomic_cas_ptr\fR
-\fBatomic_cas_uchar\fR\fBatomic_cas_uint\fR
-\fBatomic_cas_ulong\fR\fBatomic_cas_ushort\fR
-\fBatomic_clear_long_excl\fR\fBatomic_dec_16\fR
-\fBatomic_dec_16_nv\fR\fBatomic_dec_32\fR
-\fBatomic_dec_32_nv\fR\fBatomic_dec_64\fR
-\fBatomic_dec_64_nv\fR\fBatomic_dec_8\fR
-\fBatomic_dec_8_nv\fR\fBatomic_dec_ptr\fR
-\fBatomic_dec_ptr_nv\fR\fBatomic_dec_uchar\fR
-\fBatomic_dec_uchar_nv\fR\fBatomic_dec_uint\fR
-\fBatomic_dec_uint_nv\fR\fBatomic_dec_ulong\fR
-\fBatomic_dec_ulong_nv\fR\fBatomic_dec_ushort\fR
-\fBatomic_dec_ushort_nv\fR\fBatomic_inc_16\fR
-\fBatomic_inc_16_nv\fR\fBatomic_inc_32\fR
-\fBatomic_inc_32_nv\fR\fBatomic_inc_64\fR
-\fBatomic_inc_64_nv\fR\fBatomic_inc_8\fR
-\fBatomic_inc_8_nv\fR\fBatomic_inc_ptr\fR
-\fBatomic_inc_ptr_nv\fR\fBatomic_inc_uchar\fR
-\fBatomic_inc_uchar_nv\fR\fBatomic_inc_uint\fR
-\fBatomic_inc_uint_nv\fR\fBatomic_inc_ulong\fR
-\fBatomic_inc_ulong_nv\fR\fBatomic_inc_ushort\fR
-\fBatomic_inc_ushort_nv\fR\fBatomic_or_16\fR
-\fBatomic_or_16_nv\fR\fBatomic_or_32\fR
-\fBatomic_or_32_nv\fR\fBatomic_or_64\fR
-\fBatomic_or_64_nv\fR\fBatomic_or_8\fR
-\fBatomic_or_8_nv\fR\fBatomic_or_uchar\fR
-\fBatomic_or_uchar_nv\fR\fBatomic_or_uint\fR
-\fBatomic_or_uint_nv\fR\fBatomic_or_ulong\fR
-\fBatomic_or_ulong_nv\fR\fBatomic_or_ushort\fR
-\fBatomic_or_ushort_nv\fR\fBatomic_set_long_excl\fR
-\fBatomic_swap_16\fR\fBatomic_swap_32\fR
-\fBatomic_swap_64\fR\fBatomic_swap_8\fR
-\fBatomic_swap_ptr\fR\fBatomic_swap_uchar\fR
-\fBatomic_swap_uint\fR\fBatomic_swap_ulong\fR
-\fBatomic_swap_ushort\fR\fBattropen\fR
-\fBbacktrace\fR\fBbacktrace_symbols\fR
-\fBbacktrace_symbols_fd\fR\fBbasename\fR
-\fBbcmp\fR\fBbcopy\fR
-\fBbindtextdomain\fR\fBbind_textdomain_codeset\fR
-\fBbrk\fR\fBbsd_signal\fR
-\fBbsearch\fR\fBbtowc\fR
-\fBbzero\fR\fBcalloc\fR
-\fBcatclose\fR\fBcatgets\fR
-\fBcatopen\fR\fBcfgetispeed\fR
-\fBcfgetospeed\fR\fBcfsetispeed\fR
-\fBcfsetospeed\fR\fBcftime\fR
-\fBchdir\fR\fBchmod\fR
-\fBchown\fR\fBchroot\fR
-\fBclearerr\fR\fBclock\fR
-\fBclock_getres\fR\fBclock_gettime\fR
-\fBclock_nanosleep\fR\fBclock_settime\fR
-\fBclose\fR\fBclosedir\fR
-\fBclosefrom\fR\fBcloselog\fR
-\fBcond_broadcast\fR\fBcond_destroy\fR
-\fBcond_init\fR\fBcond_reltimedwait\fR
-\fBcond_signal\fR\fBcond_timedwait\fR
-\fBcond_wait\fR\fBconfstr\fR
-\fBcreat\fR\fBcrypt\fR
-\fBcrypt_genhash_impl\fR\fBcrypt_gensalt\fR
-\fBcrypt_gensalt_impl\fR\fBcsetcol\fR
-\fBcsetlen\fR\fBctermid\fR
-\fBctermid_r\fR\fBctime\fR
-\fBctime_r\fR\fBcuserid\fR
-\fBdaemon\fR
-\fBdaylight\fR\fBdbm_clearerr\fR
-\fBdbm_close\fR\fBdbm_delete\fR
-\fBdbm_error\fR\fBdbm_fetch\fR
-\fBdbm_firstkey\fR\fBdbm_nextkey\fR
-\fBdbm_open\fR\fBdbm_store\fR
-\fBdcgettext\fR\fBdcngettext\fR
-\fBdecimal_to_double\fR\fBdecimal_to_extended\fR
-\fBdecimal_to_quadruple\fR\fBdecimal_to_single\fR
-\fBdgettext\fR\fBdifftime\fR
-\fBdirectio\fR\fBdirfd\fR
-\fBdirname\fR\fBdiv\fR
-\fBdladdr\fR\fBdladdr1\fR
-\fBdlclose\fR\fBdldump\fR
-\fBdlerror\fR\fBdlinfo\fR
-\fBdlmopen\fR\fBdlopen\fR
-\fBdlsym\fR\fBdngettext\fR
-\fBdoor_bind\fR\fBdoor_call\fR
-\fBdoor_create\fR\fBdoor_cred\fR
-\fBdoor_getparam\fR\fBdoor_info\fR
-\fBdoor_return\fR\fBdoor_revoke\fR
-\fBdoor_server_create\fR\fBdoor_setparam\fR
-\fBdoor_ucred\fR\fBdoor_unbind\fR
-\fBdouble_to_decimal\fR\fBdrand48\fR
-\fBdup\fR\fBdup2\fR
-\fBeconvert\fR\fBecvt\fR
-\fBenable_extended_FILE_stdio\fR
-\fBencrypt\fR\fBendgrent\fR
-\fBendnetgrent\fR\fBendpwent\fR
-\fBendspent\fR\fBendusershell\fR
-\fBendutent\fR\fBendutxent\fR
-\fBenviron\fR\fBerand48\fR
-\fBerr\fR\fBerrno\fR
-\fBerrx\fR\fBeuccol\fR
-\fBeuclen\fR\fBeucscol\fR
-\fBexecl\fR\fBexecle\fR
-\fBexeclp\fR\fBexecv\fR
-\fBexecve\fR\fBexecvp\fR
-\fBexit\fR\fBextended_to_decimal\fR
-\fBfaccessat\fR
-\fBfacl\fR\fBfattach\fR
-\fBfchdir\fR\fBfchmod\fR
-\fBfchown\fR\fBfchownat\fR
-\fBfchroot\fR\fBfclose\fR
-\fBfcntl\fR\fBfconvert\fR
-\fBfcvt\fR\fBfdatasync\fR
-\fBfdetach\fR
-\fBfdopen\fR\fBfdopendir\fR
-\fBfdwalk\fR\fBfeof\fR
-\fBferror\fR\fBfflush\fR
-\fBffs\fR\fBfgetattr\fR
-\fBfgetc\fR
-\fBfgetgrent\fR\fBfgetgrent_r\fR
-\fBfgetpos\fR\fBfgetpwent\fR
-\fBfgetpwent_r\fR\fBfgets\fR
-\fBfgetspent\fR\fBfgetspent_r\fR
-\fBfgetwc\fR\fBfgetws\fR
-\fBfile_to_decimal\fR\fBfileno\fR
-\fBfinite\fR\fBflockfile\fR
-\fBfmtmsg\fR\fBfnmatch\fR
-\fBfopen\fR\fBfork\fR
-\fBfork1\fR\fBforkall\fR
-\fBforkallx\fR\fBforkx\fR
-\fBfpathconf\fR\fBfpclass\fR
-\fBfpgetmask\fR\fBfpgetround\fR
-\fBfpgetsticky\fR\fBfprintf\fR
-\fBfpsetmask\fR\fBfpsetround\fR
-\fBfpsetsticky\fR\fBfputc\fR
-\fBfputs\fR\fBfputwc\fR
-\fBfputws\fR\fBfread\fR
-\fBfree\fR\fBfreopen\fR
-\fBfrexp\fR\fBfscanf\fR
-\fBfseek\fR\fBfseeko\fR
-\fBfsetattr\fR
-\fBfsetpos\fR\fBfstat\fR
-\fBfstatat\fR\fBfstatfs\fR
-\fBfstatvfs\fR\fBfsync\fR
-\fBftell\fR\fBftello\fR
-\fBftime\fR\fBftok\fR
-\fBftruncate\fR\fBftrylockfile\fR
-\fBftw\fR\fBfunc_to_decimal\fR
-\fBfunlockfile\fR\fBfutimens\fR
-\fBfutimesat\fR
-\fBfwide\fR\fBfwprintf\fR
-\fBfwrite\fR\fBfwscanf\fR
-\fBgconvert\fR\fBgcvt\fR
-\fBgetacct\fR\fBgetattrat\fR
-\fBgetc\fR
-\fBgetc_unlocked\fR\fBgetchar\fR
-\fBgetchar_unlocked\fR\fBgetcontext\fR
-\fBgetcpuid\fR\fBgetcwd\fR
-\fBgetdate\fR\fBgetdate_err\fR
-\fBgetdents\fR\fBgetdtablesize\fR
-\fBgetegid\fR\fBgetenv\fR
-\fBgeteuid\fR\fBgetexecname\fR
-\fBgetextmntent\fR\fBgetgid\fR
-\fBgetgrent\fR\fBgetgrent_r\fR
-\fBgetgrgid\fR\fBgetgrgid_r\fR
-\fBgetgrnam\fR\fBgetgrnam_r\fR
-\fBgetgroups\fR\fBgethomelgroup\fR
-\fBgethostid\fR\fBgethostname\fR
-\fBgethrtime\fR\fBgethrvtime\fR
-\fBgetisax\fR\fBgetitimer\fR
-\fBgetloadavg\fR\fBgetlogin\fR
-\fBgetlogin_r\fR\fBgetmntany\fR
-\fBgetmntent\fR\fBgetmsg\fR
-\fBgetnetgrent\fR\fBgetnetgrent_r\fR
-\fBgetopt\fR\fBgetopt_clip\fR
-\fBgetopt_long\fR\fBgetopt_long_only\fR
-\fBgetpagesize\fR\fBgetpagesizes\fR
-\fBgetpass\fR\fBgetpassphrase\fR
-\fBgetpeerucred\fR\fBgetpflags\fR
-\fBgetpgid\fR\fBgetpgrp\fR
-\fBgetpid\fR\fBgetpmsg\fR
-\fBgetppid\fR\fBgetppriv\fR
-\fBgetpriority\fR\fBgetprojid\fR
-\fBgetpw\fR\fBgetpwent\fR
-\fBgetpwent_r\fR\fBgetpwnam\fR
-\fBgetpwnam_r\fR\fBgetpwuid\fR
-\fBgetpwuid_r\fR\fBgetrctl\fR
-\fBgetrlimit\fR\fBgetrusage\fR
-\fBgets\fR\fBgetsid\fR
-\fBgetspent\fR\fBgetspent_r\fR
-\fBgetspnam\fR\fBgetspnam_r\fR
-\fBgetsubopt\fR\fBgettaskid\fR
-\fBgettext\fR\fBgettimeofday\fR
-\fBgettxt\fR\fBgetuid\fR
-\fBgetusershell\fR\fBgetustack\fR
-\fBgetutent\fR\fBgetutid\fR
-\fBgetutline\fR\fBgetutmp\fR
-\fBgetutmpx\fR\fBgetutxent\fR
-\fBgetutxid\fR\fBgetutxline\fR
-\fBgetvfsany\fR\fBgetvfsent\fR
-\fBgetvfsfile\fR\fBgetvfsspec\fR
-\fBgetw\fR\fBgetwc\fR
-\fBgetwchar\fR\fBgetwd\fR
-\fBgetwidth\fR\fBgetws\fR
-\fBgetzoneid\fR\fBgetzoneidbyname\fR
-\fBgetzonenamebyid\fR\fBglob\fR
-\fBglobfree\fR\fBgmtime\fR
-\fBgmtime_r\fR\fBgrantpt\fR
-\fBgsignal\fR\fBhasmntopt\fR
-\fBhcreate\fR\fBhdestroy\fR
-\fBhsearch\fR\fBiconv\fR
-\fBiconv_close\fR\fBiconv_open\fR
-\fBimaxabs\fR\fBimaxdiv\fR
-\fBindex\fR\fBinitgroups\fR
-\fBinitstate\fR\fBinnetgr\fR
-\fBinsque\fR\fBioctl\fR
-\fBis_system_labeled\fR
-\fBisaexec\fR\fBisalnum\fR
-\fBisalpha\fR\fBisascii\fR
-\fBisastream\fR\fBisatty\fR
-\fBisblank\fR\fBiscntrl\fR
-\fBisdigit\fR\fBisenglish\fR
-\fBisgraph\fR\fBisideogram\fR
-\fBislower\fR\fBisnan\fR
-\fBisnand\fR\fBisnanf\fR
-\fBisnumber\fR\fBisphonogram\fR
-\fBisprint\fR\fBispunct\fR
-\fBissetugid\fR\fBisspace\fR
-\fBisspecial\fR\fBisupper\fR
-\fBiswalnum\fR\fBiswalpha\fR
-\fBiswblank\fR\fBiswcntrl\fR
-\fBiswctype\fR\fBiswdigit\fR
-\fBiswgraph\fR\fBiswlower\fR
-\fBiswprint\fR\fBiswpunct\fR
-\fBiswspace\fR\fBiswupper\fR
-\fBiswxdigit\fR\fBisxdigit\fR
-\fBjrand48\fR\fBkill\fR
-\fBkillpg\fR\fBl64a\fR
-\fBlabs\fR\fBladd\fR
-\fBlchown\fR\fBlckpwdf\fR
-\fBlcong48\fR\fBldexp\fR
-\fBldivide\fR\fBlexp10\fR
-\fBlfind\fR\fBlfmt\fR
-\fBlink\fR\fBlio_listio\fR
-\fBllabs\fR
-\fBlldiv\fR\fBllog10\fR
-\fBllseek\fR\fBlltostr\fR
-\fBlocaleconv\fR\fBlocaltime\fR
-\fBlocaltime_r\fR\fBlockf\fR
-\fBlogb\fR\fBlone\fR
-\fBlongjmp\fR\fBlrand48\fR
-\fBlsearch\fR\fBlseek\fR
-\fBlshiftl\fR\fBlstat\fR
-\fBlsub\fR\fBlten\fR
-\fBlzero\fR\fBmadvise\fR
-\fBmakecontext\fR\fBmakeutx\fR
-\fBmalloc\fR\fBmblen\fR
-\fBmbrlen\fR\fBmbrtowc\fR
-\fBmbsinit\fR\fBmbsrtowcs\fR
-\fBmbstowcs\fR\fBmbtowc\fR
-\fBmemalign\fR\fBmembar_consumer\fR
-\fBmembar_enter\fR\fBmembar_exit\fR
-\fBmembar_producer\fR\fBmemccpy\fR
-\fBmemchr\fR\fBmemcmp\fR
-\fBmemcntl\fR\fBmemcpy\fR
-\fBmeminfo\fR\fBmemmove\fR
-\fBmemset\fR\fBmincore\fR
-\fBmkdir\fR\fBmkfifo\fR
-\fBmknod\fR\fBmkstemp\fR
-\fBmktemp\fR\fBmktime\fR
-\fBmlock\fR\fBmlockall\fR
-\fBmmap\fR\fBmmapobj\fR
-\fBmodctl\fR
-\fBmodf\fR\fBmodff\fR
-\fBmodutx\fR\fBmonitor\fR
-\fBmount\fR\fBmprotect\fR
-\fBmq_close\fR\fBmq_getattr\fR
-\fBmq_notify\fR\fBmq_open\fR
-\fBmq_receive\fR\fBmq_reltimedreceive_np\fR
-\fBmq_reltimedsend_np\fR\fBmq_send\fR
-\fBmq_setattr\fR\fBmq_timedreceive\fR
-\fBmq_timedsend\fR\fBmq_unlink\fR
-\fBmrand48\fR\fBmsgctl\fR
-\fBmsgget\fR\fBmsgids\fR
-\fBmsgrcv\fR\fBmsgsnap\fR
-\fBmsgsnd\fR\fBmsync\fR
-\fBmunlock\fR\fBmunlockall\fR
-\fBmunmap\fR\fBmutex_consistent\fR
-\fBmutex_destroy\fR\fBmutex_init\fR
-\fBmutex_lock\fR\fBmutex_trylock\fR
-\fBmutex_unlock\fR\fBnanosleep\fR
-\fBnextafter\fR
-\fBnfs_getfh\fR\fBnftw\fR
-\fBngettext\fR\fBnice\fR
-\fBnl_langinfo\fR\fBnrand48\fR
-\fBnss_default_finders\fR\fBnss_delete\fR
-\fBnss_endent\fR\fBnss_getent\fR
-\fBnss_search\fR\fBnss_setent\fR
-\fBntp_adjtime\fR\fBntp_gettime\fR
-\fBopen\fR\fBopenat\fR
-\fBopendir\fR\fBopenlog\fR
-\fBoptarg\fR\fBopterr\fR
-\fBoptind\fR\fBoptopt\fR
-\fBp_online\fR\fBpathconf\fR
-\fBpause\fR\fBpclose\fR
-\fBpcsample\fR\fBperror\fR
-\fBpfmt\fR\fBpipe\fR
-\fBplock\fR\fBpoll\fR
-\fBpopen\fR\fBport_alert\fR
-\fBport_associate\fR\fBport_create\fR
-\fBport_dissociate\fR\fBport_get\fR
-\fBport_getn\fR\fBport_send\fR
-\fBport_sendn\fR\fBposix_fadvise\fR
-\fBposix_fallocate\fR\fBposix_madvise\fR
-\fBposix_memalign\fR\fBposix_openpt\fR
-\fBposix_spawn\fR\fBposix_spawn_file_actions_addclose\fR
-\fBposix_spawn_file_actions_addclosefrom_np\fR\fBposix_spawn_file_actions_adddup2\fR
-\fBposix_spawn_file_actions_addopen\fR\fBposix_spawn_file_actions_destroy\fR
-\fBposix_spawn_file_actions_init\fR\fBposix_spawnattr_destroy\fR
-\fBposix_spawnattr_getflags\fR\fBposix_spawnattr_getpgroup\fR
-\fBposix_spawnattr_getschedparam\fR\fBposix_spawnattr_getschedpolicy\fR
-\fBposix_spawnattr_getsigdefault\fR\fBposix_spawnattr_getsigignore_np\fR
-\fBposix_spawnattr_getsigmask\fR\fBposix_spawnattr_init\fR
-\fBposix_spawnattr_setflags\fR\fBposix_spawnattr_setpgroup\fR
-\fBposix_spawnattr_setschedparam\fR\fBposix_spawnattr_setschedpolicy\fR
-\fBposix_spawnattr_setsigdefault\fR\fBposix_spawnattr_setsigignore_np\fR
-\fBposix_spawnattr_setsigmask\fR\fBposix_spawnp\fR
-\fBpread\fR\fBprintf\fR
-\fBprintstack\fR\fBpriocntl\fR
-\fBpriocntlset\fR\fBpriv_addset\fR
-\fBpriv_allocset\fR\fBpriv_copyset\fR
-\fBpriv_delset\fR\fBpriv_emptyset\fR
-\fBpriv_fillset\fR\fBpriv_freeset\fR
-\fBpriv_getbyname\fR\fBpriv_getbynum\fR
-\fBpriv_getsetbyname\fR\fBpriv_getsetbynum\fR
-\fBpriv_gettext\fR\fBpriv_ineffect\fR
-\fBpriv_intersect\fR\fBpriv_inverse\fR
-\fBpriv_isemptyset\fR\fBpriv_isequalset\fR
-\fBpriv_isfullset\fR\fBpriv_ismember\fR
-\fBpriv_issubset\fR\fBpriv_set\fR
-\fBpriv_set_to_str\fR\fBpriv_str_to_set\fR
-\fBpriv_union\fR\fBprocessor_bind\fR
-\fBprocessor_info\fR\fBprofil\fR
-\fBpselect\fR\fBpset_assign\fR
-\fBpset_bind\fR\fBpset_create\fR
-\fBpset_destroy\fR\fBpset_getattr\fR
-\fBpset_getloadavg\fR\fBpset_info\fR
-\fBpset_list\fR\fBpset_setattr\fR
-\fBpsiginfo\fR\fBpsignal\fR
-\fBpthread_atfork\fR\fBpthread_attr_destroy\fR
-\fBpthread_attr_getdetachstate\fR\fBpthread_attr_getguardsize\fR
-\fBpthread_attr_getinheritsched\fR\fBpthread_attr_getschedparam\fR
-\fBpthread_attr_getschedpolicy\fR\fBpthread_attr_getscope\fR
-\fBpthread_attr_getstack\fR\fBpthread_attr_getstackaddr\fR
-\fBpthread_attr_getstacksize\fR\fBpthread_attr_init\fR
-\fBpthread_attr_setdetachstate\fR\fBpthread_attr_setguardsize\fR
-\fBpthread_attr_setinheritsched\fR\fBpthread_attr_setschedparam\fR
-\fBpthread_attr_setschedpolicy\fR\fBpthread_attr_setscope\fR
-\fBpthread_attr_setstack\fR\fBpthread_attr_setstackaddr\fR
-\fBpthread_attr_setstacksize\fR\fBpthread_barrier_destroy\fR
-\fBpthread_barrier_init\fR\fBpthread_barrier_wait\fR
-\fBpthread_barrierattr_destroy\fR\fBpthread_barrierattr_getpshared\fR
-\fBpthread_barrierattr_init\fR\fBpthread_barrierattr_setpshared\fR
-\fBpthread_cancel\fR\fBpthread_cond_broadcast\fR
-\fBpthread_cond_destroy\fR\fBpthread_cond_init\fR
-\fBpthread_cond_reltimedwait_np\fR\fBpthread_cond_signal\fR
-\fBpthread_cond_timedwait\fR\fBpthread_cond_wait\fR
-\fBpthread_condattr_destroy\fR\fBpthread_condattr_getclock\fR
-\fBpthread_condattr_getpshared\fR\fBpthread_condattr_init\fR
-\fBpthread_condattr_setclock\fR\fBpthread_condattr_setpshared\fR
-\fBpthread_create\fR\fBpthread_detach\fR
-\fBpthread_equal\fR\fBpthread_exit\fR
-\fBpthread_getconcurrency\fR\fBpthread_getschedparam\fR
-\fBpthread_getspecific\fR\fBpthread_join\fR
-\fBpthread_key_create\fR\fBpthread_key_create_once_np\fR
-\fBpthread_key_delete\fR
-\fBpthread_kill\fR\fBpthread_mutex_consistent\fR
-\fBpthread_mutex_destroy\fR\fBpthread_mutex_getprioceiling\fR
-\fBpthread_mutex_init\fR\fBpthread_mutex_lock\fR
-\fBpthread_mutex_reltimedlock_np\fR\fBpthread_mutex_setprioceiling\fR
-\fBpthread_mutex_timedlock\fR\fBpthread_mutex_trylock\fR
-\fBpthread_mutex_unlock\fR\fBpthread_mutexattr_destroy\fR
-\fBpthread_mutexattr_getprioceiling\fR\fBpthread_mutexattr_getprotocol\fR
-\fBpthread_mutexattr_getpshared\fR\fBpthread_mutexattr_getrobust\fR
-\fBpthread_mutexattr_gettype\fR\fBpthread_mutexattr_init\fR
-\fBpthread_mutexattr_setprioceiling\fR\fBpthread_mutexattr_setprotocol\fR
-\fBpthread_mutexattr_setpshared\fR\fBpthread_mutexattr_setrobust\fR
-\fBpthread_mutexattr_settype\fR\fBpthread_once\fR
-\fBpthread_rwlock_destroy\fR\fBpthread_rwlock_init\fR
-\fBpthread_rwlock_rdlock\fR\fBpthread_rwlock_reltimedrdlock_np\fR
-\fBpthread_rwlock_reltimedwrlock_np\fR\fBpthread_rwlock_timedrdlock\fR
-\fBpthread_rwlock_timedwrlock\fR\fBpthread_rwlock_tryrdlock\fR
-\fBpthread_rwlock_trywrlock\fR\fBpthread_rwlock_unlock\fR
-\fBpthread_rwlock_wrlock\fR\fBpthread_rwlockattr_destroy\fR
-\fBpthread_rwlockattr_getpshared\fR\fBpthread_rwlockattr_init\fR
-\fBpthread_rwlockattr_setpshared\fR\fBpthread_self\fR
-\fBpthread_setcancelstate\fR\fBpthread_setcanceltype\fR
-\fBpthread_setconcurrency\fR\fBpthread_setspecific\fR
-\fBpthread_sigmask\fR\fBpthread_setschedparam\fR
-\fBpthread_setschedprio\fR\fBpthread_spin_destroy\fR
-\fBpthread_spin_init\fR\fBpthread_spin_lock\fR
-\fBpthread_spin_trylock\fR\fBpthread_spin_unlock\fR
-\fBpthread_testcancel\fR\fBptsname\fR
-\fBputacct\fR\fBputc\fR
-\fBputc_unlocked\fR\fBputchar\fR
-\fBputchar_unlocked\fR\fBputenv\fR
-\fBputmsg\fR\fBputpmsg\fR
-\fBputpwent\fR\fBputs\fR
-\fBputspent\fR\fBpututline\fR
-\fBpututxline\fR\fBputw\fR
-\fBputwc\fR\fBputwchar\fR
-\fBputws\fR\fBpwrite\fR
-\fBqeconvert\fR\fBqecvt\fR
-\fBqfconvert\fR\fBqfcvt\fR
-\fBqgconvert\fR\fBqgcvt\fR
-\fBqsort\fR\fBquadruple_to_decimal\fR
-\fBraise\fR\fBrand\fR
-\fBrand_r\fR\fBrandom\fR
-\fBrctl_walk\fR\fBrctlblk_get_enforced_value\fR
-\fBrctlblk_get_firing_time\fR\fBrctlblk_get_global_action\fR
-\fBrctlblk_get_global_flags\fR\fBrctlblk_get_local_action\fR
-\fBrctlblk_get_local_flags\fR\fBrctlblk_get_privilege\fR
-\fBrctlblk_get_recipient_pid\fR\fBrctlblk_get_value\fR
-\fBrctlblk_set_local_action\fR\fBrctlblk_set_local_flags\fR
-\fBrctlblk_set_privilege\fR\fBrctlblk_set_recipient_pid\fR
-\fBrctlblk_set_value\fR\fBrctlblk_size\fR
-\fBre_comp\fR\fBre_exec\fR
-\fBread\fR\fBreaddir\fR
-\fBreaddir_r\fR\fBreadlink\fR
-\fBreadv\fR\fBrealloc\fR
-\fBrealpath\fR\fBreboot\fR
-\fBregcmp\fR\fBregcomp\fR
-\fBregerror\fR\fBregex\fR
-\fBregexec\fR\fBregfree\fR
-\fBremove\fR\fBremque\fR
-\fBrename\fR\fBrenameat\fR
-\fBresetmnttab\fR\fBresolvepath\fR
-\fBrewind\fR\fBrewinddir\fR
-\fBrindex\fR\fBrmdir\fR
-\fBrw_rdlock\fR\fBrw_read_held\fR
-\fBrw_tryrdlock\fR\fBrw_trywrlock\fR
-\fBrw_unlock\fR\fBrw_write_held\fR
-\fBrw_wrlock\fR\fBrwlock_destroy\fR
-\fBrwlock_init\fR\fBsbrk\fR
-\fBscalb\fR\fBscandir\fR
-\fBscanf\fR\fBsched_get_priority_max\fR
-\fBsched_get_priority_min\fR\fBsched_getparam\fR
-\fBsched_getscheduler\fR\fBsched_rr_get_interval\fR
-\fBsched_setparam\fR\fBsched_setscheduler\fR
-\fBsched_yield\fR\fBschedctl_exit\fR
-\fBschedctl_init\fR\fBschedctl_lookup\fR
-\fBschedctl_start\fR\fBschedctl_stop\fR
-\fBseconvert\fR\fBseed48\fR
-\fBseekdir\fR\fBselect\fR
-\fBsem_close\fR\fBsem_destroy\fR
-\fBsem_getvalue\fR\fBsem_init\fR
-\fBsem_open\fR\fBsem_post\fR
-\fBsem_reltimedwait_np\fR\fBsem_timedwait\fR
-\fBsem_trywait\fR\fBsem_unlink\fR
-\fBsem_wait\fR
-\fBsema_destroy\fR\fBsema_held\fR
-\fBsema_init\fR\fBsema_post\fR
-\fBsema_trywait\fR\fBsema_wait\fR
-\fBsemctl\fR\fBsemget\fR
-\fBsemids\fR\fBsemop\fR
-\fBsemtimedop\fR\fBsetattrat\fR
-\fBsetbuf\fR
-\fBsetbuffer\fR\fBsetcat\fR
-\fBsetcontext\fR\fBsetegid\fR
-\fBsetenv\fR\fBseteuid\fR
-\fBsetgid\fR\fBsetgrent\fR
-\fBsetgroups\fR\fBsethostname\fR
-\fBsetitimer\fR\fBsetjmp\fR
-\fBsetkey\fR\fBsetlabel\fR
-\fBsetlinebuf\fR\fBsetlocale\fR
-\fBsetlogmask\fR\fBsetnetgrent\fR
-\fBsetpflags\fR\fBsetpgid\fR
-\fBsetpgrp\fR\fBsetppriv\fR
-\fBsetpriority\fR\fBsetpwent\fR
-\fBsetrctl\fR\fBsetregid\fR
-\fBsetreuid\fR\fBsetrlimit\fR
-\fBsetsid\fR\fBsetspent\fR
-\fBsetstate\fR\fBsettaskid\fR
-\fBsettimeofday\fR\fBsetuid\fR
-\fBsetusershell\fR\fBsetustack\fR
-\fBsetutent\fR\fBsetutxent\fR
-\fBsetvbuf\fR\fBsfconvert\fR
-\fBsgconvert\fR\fBshm_open\fR
-\fBshm_unlink\fR\fBshmat\fR
-\fBshmctl\fR\fBshmdt\fR
-\fBshmget\fR\fBshmids\fR
-\fBsig2str\fR\fBsigaction\fR
-\fBsigaddset\fR\fBsigaltstack\fR
-\fBsigdelset\fR\fBsigemptyset\fR
-\fBsigfillset\fR\fBsigfpe\fR
-\fBsighold\fR\fBsigignore\fR
-\fBsiginterrupt\fR\fBsigismember\fR
-\fBsiglongjmp\fR\fBsignal\fR
-\fBsigpause\fR\fBsigpending\fR
-\fBsigprocmask\fR\fBsigqueue\fR
-\fBsigrelse\fR
-\fBsigsend\fR\fBsigsendset\fR
-\fBsigset\fR\fBsigsetjmp\fR
-\fBsigstack\fR\fBsigsuspend\fR
-\fBsigtimedwait\fR\fBsigwait\fR
-\fBsigwaitinfo\fR\fBsingle_to_decimal\fR
-\fBsleep\fR\fBsnprintf\fR
-\fBsprintf\fR\fBsrand\fR
-\fBsrand48\fR\fBsrandom\fR
-\fBsscanf\fR\fBssignal\fR
-\fBstack_getbounds\fR\fBstack_inbounds\fR
-\fBstack_setbounds\fR\fBstack_violation\fR
-\fBstat\fR\fBstatfs\fR
-\fBstatvfs\fR\fBstime\fR
-\fBstr2sig\fR\fBstrcasecmp\fR
-\fBstrcat\fR\fBstrchr\fR
-\fBstrcmp\fR\fBstrcoll\fR
-\fBstrcpy\fR\fBstrcspn\fR
-\fBstrdup\fR\fBstrerror\fR
-\fBstrerror_r\fR\fBstrfmon\fR
-\fBstrftime\fR\fBstring_to_decimal\fR
-\fBstrlcat\fR\fBstrlcpy\fR
-\fBstrlen\fR\fBstrncasecmp\fR
-\fBstrncat\fR\fBstrncmp\fR
-\fBstrncpy\fR\fBstrpbrk\fR
-\fBstrptime\fR\fBstrrchr\fR
-\fBstrsep\fR
-\fBstrsignal\fR\fBstrspn\fR
-\fBstrstr\fR\fBstrtod\fR
-\fBstrtof\fR\fBstrtoimax\fR
-\fBstrtok\fR\fBstrtok_r\fR
-\fBstrtol\fR\fBstrtold\fR
-\fBstrtoll\fR\fBstrtoul\fR
-\fBstrtoull\fR\fBstrtoumax\fR
-\fBstrtows\fR\fBstrxfrm\fR
-\fBswab\fR\fBswapcontext\fR
-\fBswapctl\fR\fBswprintf\fR
-\fBswscanf\fR\fBsymlink\fR
-\fBsync\fR\fBsync_instruction_memory\fR
-\fBsysconf\fR\fBsysfs\fR
-\fBsysinfo\fR\fBsyslog\fR
-\fBsystem\fR\fBtcdrain\fR
-\fBtcflow\fR\fBtcflush\fR
-\fBtcgetattr\fR\fBtcgetpgrp\fR
-\fBtcgetsid\fR\fBtcsendbreak\fR
-\fBtcsetattr\fR\fBtcsetpgrp\fR
-\fBtdelete\fR\fBtell\fR
-\fBtelldir\fR\fBtempnam\fR
-\fBtextdomain\fR\fBtfind\fR
-\fBthr_continue\fR\fBthr_create\fR
-\fBthr_exit\fR\fBthr_getconcurrency\fR
-\fBthr_getprio\fR\fBthr_getspecific\fR
-\fBthr_join\fR\fBthr_keycreate\fR
-\fBthr_keycreate_once\fR
-\fBthr_kill\fR\fBthr_main\fR
-\fBthr_min_stack\fR\fBthr_self\fR
-\fBthr_setconcurrency\fR\fBthr_setprio\fR
-\fBthr_setspecific\fR\fBthr_sigsetmask\fR
-\fBthr_stksegment\fR\fBthr_suspend\fR
-\fBthr_yield\fR\fBtime\fR
-\fBtimer_create\fR\fBtimer_delete\fR
-\fBtimer_getoverrun\fR\fBtimer_gettime\fR
-\fBtimer_settime\fR
-\fBtimes\fR\fBtimezone\fR
-\fBtmpfile\fR\fBtmpnam\fR
-\fBtmpnam_r\fR\fBtoascii\fR
-\fBtolower\fR\fBtoupper\fR
-\fBtowctrans\fR\fBtowlower\fR
-\fBtowupper\fR\fBtruncate\fR
-\fBtsearch\fR\fBttyname\fR
-\fBttyname_r\fR\fBttyslot\fR
-\fBtwalk\fR\fBtzname\fR
-\fBtzset\fR\fBu8_strcmp\fR
-\fBu8_textprep_str\fR\fBu8_validate\fR
-\fBuadmin\fR
-\fBualarm\fR\fBuconv_u16tou32\fR
-\fBuconv_u16tou8\fR\fBuconv_u32tou16\fR
-\fBuconv_u32tou8\fR\fBuconv_u8tou16\fR
-\fBuconv_u8tou32\fR\fBucred_free\fR
-\fBucred_get\fR\fBucred_getegid\fR
-\fBucred_geteuid\fR\fBucred_getgroups\fR
-\fBucred_getpflags\fR\fBucred_getpid\fR
-\fBucred_getprivset\fR\fBucred_getprojid\fR
-\fBucred_getrgid\fR\fBucred_getruid\fR
-\fBucred_getsgid\fR\fBucred_getsuid\fR
-\fBucred_getzoneid\fR\fBucred_size\fR
-\fBulckpwdf\fR\fBulimit\fR
-\fBulltostr\fR\fBumask\fR
-\fBumount\fR\fBumount2\fR
-\fBuname\fR\fBungetc\fR
-\fBungetwc\fR\fBunlink\fR
-\fBunlinkat\fR\fBunlockpt\fR
-\fBunordered\fR\fBunsetenv\fR
-\fBupdwtmp\fR\fBupdwtmpx\fR
-\fBusleep\fR\fBustat\fR
-\fButime\fR\fButimensat\fR
-\fButimes\fR\fButmpname\fR
-\fButmpxname\fR\fBuucopy\fR
-\fBvalloc\fR\fBvasprintf\fR
-\fBverr\fR\fBverrx\fR
-\fBvfork\fR\fBvforkx\fR
-\fBvfprintf\fR\fBvfscanf\fR
-\fBvfwprintf\fR\fBvfwscanf\fR
-\fBvhangup\fR\fBvlfmt\fR
-\fBvpfmt\fR\fBvprintf\fR
-\fBvscanf\fR\fBvsnprintf\fR
-\fBvsprintf\fR\fBvsscanf\fR
-\fBvswprintf\fR\fBvswscanf\fR
-\fBvsyslog\fR\fBvwarn\fR
-\fBvwarnx\fR\fBvwprintf\fR
-\fBvwscanf\fR\fBwait\fR
-\fBwait3\fR\fBwait4\fR
-\fBwaitid\fR\fBwaitpid\fR
-\fBwalkcontext\fR\fBwarn\fR
-\fBwarnx\fR\fBwatoll\fR
-\fBwcrtomb\fR\fBwcscat\fR
-\fBwcschr\fR\fBwcscmp\fR
-\fBwcscoll\fR\fBwcscpy\fR
-\fBwcscspn\fR\fBwcsftime\fR
-\fBwcslen\fR\fBwcsncat\fR
-\fBwcsncmp\fR\fBwcsncpy\fR
-\fBwcspbrk\fR\fBwcsrchr\fR
-\fBwcsrtombs\fR\fBwcsspn\fR
-\fBwcsstr\fR\fBwcstod\fR
-\fBwcstof\fR\fBwcstoimax\fR
-\fBwcstok\fR\fBwcstol\fR
-\fBwcstold\fR\fBwcstoll\fR
-\fBwcstombs\fR\fBwcstoul\fR
-\fBwcstoull\fR\fBwcstoumax\fR
-\fBwcswcs\fR\fBwcswidth\fR
-\fBwcsxfrm\fR\fBwctob\fR
-\fBwctomb\fR\fBwctrans\fR
-\fBwctype\fR\fBwcwidth\fR
-\fBwmemchr\fR\fBwmemcmp\fR
-\fBwmemcpy\fR\fBwmemmove\fR
-\fBwmemset\fR\fBwordexp\fR
-\fBwordfree\fR\fBwprintf\fR
-\fBwracct\fR\fBwrite\fR
-\fBwritev\fR\fBwscanf\fR
-\fBwscasecmp\fR\fBwscat\fR
-\fBwschr\fR\fBwscmp\fR
-\fBwscol\fR\fBwscoll\fR
-\fBwscpy\fR\fBwscspn\fR
-\fBwsdup\fR\fBwslen\fR
-\fBwsncasecmp\fR\fBwsncat\fR
-\fBwsncmp\fR\fBwsncpy\fR
-\fBwspbrk\fR\fBwsprintf\fR
-\fBwsrchr\fR\fBwsscanf\fR
-\fBwsspn\fR\fBwstod\fR
-\fBwstok\fR\fBwstol\fR
-\fBwstoll\fR\fBwstostr\fR
-\fBwsxfrm\fR\fByield\fR
+l l
+l l .
+\fB____loc1\fR	\fB___errno\fR
+\fB__builtin_alloca\fR	\fB__ctype\fR
+\fB__fbufsize\fR	\fB__flbf\fR
+\fB__flt_rounds\fR	\fB__fpending\fR
+\fB__fpurge\fR	\fB__freadable\fR
+\fB__freading\fR	\fB__fsetlocking\fR
+\fB__fwritable\fR	\fB__fwriting\fR
+\fB__huge_val\fR	\fB__iob\fR
+\fB__loc1\fR	\fB__major\fR
+\fB__makedev\fR	\fB__minor\fR
+\fB__nsw_extended_action\fR	\fB__nsw_freeconfig\fR
+\fB__nsw_getconfig\fR	\fB__posix_asctime_r\fR
+\fB__posix_ctime_r\fR	\fB__posix_getgrgid_r\fR
+\fB__posix_getgrnam_r\fR	\fB__posix_getlogin_r\fR
+\fB__posix_getpwnam_r\fR	\fB__posix_getpwuid_r\fR
+\fB__posix_sigwait\fR	\fB__posix_ttyname_r\fR
+\fB__priocntl\fR	\fB__priocntlset\fR
+\fB__pthread_cleanup_pop\fR	\fB__pthread_cleanup_push\fR
+\fB__sysconf_xpg5\fR	\fB__xpg4\fR
+\fB__xpg4_putmsg\fR	\fB__xpg4_putpmsg\fR
+\fB_Exit\fR	\fB_altzone\fR
+\fB_assert\fR	\fB_cleanup\fR
+\fB_ctype\fR	\fB_daylight\fR
+\fB_environ\fR	\fB_exit\fR
+\fB_exithandle\fR	\fB_filbuf\fR
+\fB_flsbuf\fR	\fB_flushlbf\fR
+\fB_getdate_err\fR	\fB_getdate_err_addr\fR
+\fB_iob\fR	\fB_isnan\fR
+\fB_isnand\fR	\fB_lwp_cond_broadcast\fR
+\fB_lwp_cond_reltimedwait\fR	\fB_lwp_cond_signal\fR
+\fB_lwp_cond_timedwait\fR	\fB_lwp_cond_wait\fR
+\fB_lwp_continue\fR	\fB_lwp_info\fR
+\fB_lwp_kill\fR	\fB_lwp_mutex_lock\fR
+\fB_lwp_mutex_trylock\fR	\fB_lwp_mutex_unlock\fR
+\fB_lwp_self\fR	\fB_lwp_sema_init\fR
+\fB_lwp_sema_post\fR	\fB_lwp_sema_trywait\fR
+\fB_lwp_sema_wait\fR	\fB_lwp_suspend\fR
+\fB_lwp_suspend2\fR	\fB_modf\fR
+\fB_nextafter\fR	\fB_nsc_trydoorcall\fR
+\fB_nss_XbyY_buf_alloc\fR	\fB_nss_XbyY_buf_free\fR
+\fB_nss_netdb_aliases\fR	\fB_numeric\fR
+\fB_scalb\fR	\fB_sibuf\fR
+\fB_sobuf\fR	\fB_stack_grow\fR
+\fB_sys_buslist\fR	\fB_sys_cldlist\fR
+\fB_sys_fpelist\fR	\fB_sys_illlist\fR
+\fB_sys_segvlist\fR	\fB_sys_siginfolistp\fR
+\fB_sys_siglist\fR	\fB_sys_siglistn\fR
+\fB_sys_siglistp\fR	\fB_sys_traplist\fR
+\fB_timezone\fR	\fB_tolower\fR
+\fB_toupper\fR	\fB_tzname\fR
+\fB_xftw\fR	\fB\fR
+\fBa64l\fR	\fBabort\fR
+\fBabs\fR	\fBaccess\fR
+\fBacct\fR	\fBacl\fR
+\fBaddrtosymstr\fR	\fBaddsev\fR
+\fBaddseverity\fR	\fBadjtime\fR
+\fBaio_cancel\fR	\fBaio_error\fR
+\fBaio_fsync\fR	\fBaio_read\fR
+\fBaio_return\fR	\fBaio_suspend\fR
+\fBaio_waitn\fR	\fBaio_write\fR
+\fBaiocancel\fR	\fBaioread\fR
+\fBaiowait\fR	\fBaiowrite\fR
+\fBalarm\fR	\fBalphasort\fR
+\fBaltzone\fR	\fBascftime\fR
+\fBasctime\fR	\fBasctime_r\fR
+\fBasprintf\fR	
+\fBatexit\fR	\fBatof\fR
+\fBatoi\fR	\fBatol\fR
+\fBatoll\fR	\fBatomic_add_16\fR
+\fBatomic_add_16_nv\fR	\fBatomic_add_32\fR
+\fBatomic_add_32_nv\fR	\fBatomic_add_64\fR
+\fBatomic_add_64_nv\fR	\fBatomic_add_8\fR
+\fBatomic_add_8_nv\fR	\fBatomic_add_char\fR
+\fBatomic_add_char_nv\fR	\fBatomic_add_int\fR
+\fBatomic_add_int_nv\fR	\fBatomic_add_long\fR
+\fBatomic_add_long_nv\fR	\fBatomic_add_ptr\fR
+\fBatomic_add_ptr_nv\fR	\fBatomic_add_short\fR
+\fBatomic_add_short_nv\fR	\fBatomic_and_16\fR
+\fBatomic_and_16_nv\fR	\fBatomic_and_32\fR
+\fBatomic_and_32_nv\fR	\fBatomic_and_64\fR
+\fBatomic_and_64_nv\fR	\fBatomic_and_8\fR
+\fBatomic_and_8_nv\fR	\fBatomic_and_uchar\fR
+\fBatomic_and_uchar_nv\fR	\fBatomic_and_uint\fR
+\fBatomic_and_uint_nv\fR	\fBatomic_and_ulong\fR
+\fBatomic_and_ulong_nv\fR	\fBatomic_and_ushort\fR
+\fBatomic_and_ushort_nv\fR	\fBatomic_cas_16\fR
+\fBatomic_cas_32\fR	\fBatomic_cas_64\fR
+\fBatomic_cas_8\fR	\fBatomic_cas_ptr\fR
+\fBatomic_cas_uchar\fR	\fBatomic_cas_uint\fR
+\fBatomic_cas_ulong\fR	\fBatomic_cas_ushort\fR
+\fBatomic_clear_long_excl\fR	\fBatomic_dec_16\fR
+\fBatomic_dec_16_nv\fR	\fBatomic_dec_32\fR
+\fBatomic_dec_32_nv\fR	\fBatomic_dec_64\fR
+\fBatomic_dec_64_nv\fR	\fBatomic_dec_8\fR
+\fBatomic_dec_8_nv\fR	\fBatomic_dec_ptr\fR
+\fBatomic_dec_ptr_nv\fR	\fBatomic_dec_uchar\fR
+\fBatomic_dec_uchar_nv\fR	\fBatomic_dec_uint\fR
+\fBatomic_dec_uint_nv\fR	\fBatomic_dec_ulong\fR
+\fBatomic_dec_ulong_nv\fR	\fBatomic_dec_ushort\fR
+\fBatomic_dec_ushort_nv\fR	\fBatomic_inc_16\fR
+\fBatomic_inc_16_nv\fR	\fBatomic_inc_32\fR
+\fBatomic_inc_32_nv\fR	\fBatomic_inc_64\fR
+\fBatomic_inc_64_nv\fR	\fBatomic_inc_8\fR
+\fBatomic_inc_8_nv\fR	\fBatomic_inc_ptr\fR
+\fBatomic_inc_ptr_nv\fR	\fBatomic_inc_uchar\fR
+\fBatomic_inc_uchar_nv\fR	\fBatomic_inc_uint\fR
+\fBatomic_inc_uint_nv\fR	\fBatomic_inc_ulong\fR
+\fBatomic_inc_ulong_nv\fR	\fBatomic_inc_ushort\fR
+\fBatomic_inc_ushort_nv\fR	\fBatomic_or_16\fR
+\fBatomic_or_16_nv\fR	\fBatomic_or_32\fR
+\fBatomic_or_32_nv\fR	\fBatomic_or_64\fR
+\fBatomic_or_64_nv\fR	\fBatomic_or_8\fR
+\fBatomic_or_8_nv\fR	\fBatomic_or_uchar\fR
+\fBatomic_or_uchar_nv\fR	\fBatomic_or_uint\fR
+\fBatomic_or_uint_nv\fR	\fBatomic_or_ulong\fR
+\fBatomic_or_ulong_nv\fR	\fBatomic_or_ushort\fR
+\fBatomic_or_ushort_nv\fR	\fBatomic_set_long_excl\fR
+\fBatomic_swap_16\fR	\fBatomic_swap_32\fR
+\fBatomic_swap_64\fR	\fBatomic_swap_8\fR
+\fBatomic_swap_ptr\fR	\fBatomic_swap_uchar\fR
+\fBatomic_swap_uint\fR	\fBatomic_swap_ulong\fR
+\fBatomic_swap_ushort\fR	\fBattropen\fR
+\fBbacktrace\fR	\fBbacktrace_symbols\fR
+\fBbacktrace_symbols_fd\fR	\fBbasename\fR
+\fBbcmp\fR	\fBbcopy\fR
+\fBbindtextdomain\fR	\fBbind_textdomain_codeset\fR
+\fBbrk\fR	\fBbsd_signal\fR
+\fBbsearch\fR	\fBbtowc\fR
+\fBbzero\fR	\fBcalloc\fR
+\fBcatclose\fR	\fBcatgets\fR
+\fBcatopen\fR	\fBcfgetispeed\fR
+\fBcfgetospeed\fR	\fBcfsetispeed\fR
+\fBcfsetospeed\fR	\fBcftime\fR
+\fBchdir\fR	\fBchmod\fR
+\fBchown\fR	\fBchroot\fR
+\fBclearerr\fR	\fBclock\fR
+\fBclock_getres\fR	\fBclock_gettime\fR
+\fBclock_nanosleep\fR	\fBclock_settime\fR
+\fBclose\fR	\fBclosedir\fR
+\fBclosefrom\fR	\fBcloselog\fR
+\fBcond_broadcast\fR	\fBcond_destroy\fR
+\fBcond_init\fR	\fBcond_reltimedwait\fR
+\fBcond_signal\fR	\fBcond_timedwait\fR
+\fBcond_wait\fR	\fBconfstr\fR
+\fBcreat\fR	\fBcrypt\fR
+\fBcrypt_genhash_impl\fR	\fBcrypt_gensalt\fR
+\fBcrypt_gensalt_impl\fR	\fBcsetcol\fR
+\fBcsetlen\fR	\fBctermid\fR
+\fBctermid_r\fR	\fBctime\fR
+\fBctime_r\fR	\fBcuserid\fR
+\fBdaemon\fR	
+\fBdaylight\fR	\fBdbm_clearerr\fR
+\fBdbm_close\fR	\fBdbm_delete\fR
+\fBdbm_error\fR	\fBdbm_fetch\fR
+\fBdbm_firstkey\fR	\fBdbm_nextkey\fR
+\fBdbm_open\fR	\fBdbm_store\fR
+\fBdcgettext\fR	\fBdcngettext\fR
+\fBdecimal_to_double\fR	\fBdecimal_to_extended\fR
+\fBdecimal_to_quadruple\fR	\fBdecimal_to_single\fR
+\fBdgettext\fR	\fBdifftime\fR
+\fBdirectio\fR	\fBdirfd\fR
+\fBdirname\fR	\fBdiv\fR
+\fBdladdr\fR	\fBdladdr1\fR
+\fBdlclose\fR	\fBdldump\fR
+\fBdlerror\fR	\fBdlinfo\fR
+\fBdlmopen\fR	\fBdlopen\fR
+\fBdlsym\fR	\fBdngettext\fR
+\fBdoor_bind\fR	\fBdoor_call\fR
+\fBdoor_create\fR	\fBdoor_cred\fR
+\fBdoor_getparam\fR	\fBdoor_info\fR
+\fBdoor_return\fR	\fBdoor_revoke\fR
+\fBdoor_server_create\fR	\fBdoor_setparam\fR
+\fBdoor_ucred\fR	\fBdoor_unbind\fR
+\fBdouble_to_decimal\fR	\fBdrand48\fR
+\fBdup\fR	\fBdup2\fR
+\fBeconvert\fR	\fBecvt\fR
+\fBenable_extended_FILE_stdio\fR	
+\fBencrypt\fR	\fBendgrent\fR
+\fBendnetgrent\fR	\fBendpwent\fR
+\fBendspent\fR	\fBendusershell\fR
+\fBendutent\fR	\fBendutxent\fR
+\fBenviron\fR	\fBerand48\fR
+\fBerr\fR	\fBerrno\fR
+\fBerrx\fR	\fBeuccol\fR
+\fBeuclen\fR	\fBeucscol\fR
+\fBexecl\fR	\fBexecle\fR
+\fBexeclp\fR	\fBexecv\fR
+\fBexecve\fR	\fBexecvp\fR
+\fBexit\fR	\fBextended_to_decimal\fR
+\fBfaccessat\fR	
+\fBfacl\fR	\fBfattach\fR
+\fBfchdir\fR	\fBfchmod\fR
+\fBfchown\fR	\fBfchownat\fR
+\fBfchroot\fR	\fBfclose\fR
+\fBfcntl\fR	\fBfconvert\fR
+\fBfcvt\fR	\fBfdatasync\fR
+\fBfdetach\fR	
+\fBfdopen\fR	\fBfdopendir\fR
+\fBfdwalk\fR	\fBfeof\fR
+\fBferror\fR	\fBfflush\fR
+\fBffs\fR	\fBfgetattr\fR
+\fBfgetc\fR	
+\fBfgetgrent\fR	\fBfgetgrent_r\fR
+\fBfgetpos\fR	\fBfgetpwent\fR
+\fBfgetpwent_r\fR	\fBfgets\fR
+\fBfgetspent\fR	\fBfgetspent_r\fR
+\fBfgetwc\fR	\fBfgetws\fR
+\fBfile_to_decimal\fR	\fBfileno\fR
+\fBfinite\fR	\fBflockfile\fR
+\fBfmtmsg\fR	\fBfnmatch\fR
+\fBfopen\fR	\fBfork\fR
+\fBfork1\fR	\fBforkall\fR
+\fBforkallx\fR	\fBforkx\fR
+\fBfpathconf\fR	\fBfpclass\fR
+\fBfpgetmask\fR	\fBfpgetround\fR
+\fBfpgetsticky\fR	\fBfprintf\fR
+\fBfpsetmask\fR	\fBfpsetround\fR
+\fBfpsetsticky\fR	\fBfputc\fR
+\fBfputs\fR	\fBfputwc\fR
+\fBfputws\fR	\fBfread\fR
+\fBfree\fR	\fBfreopen\fR
+\fBfrexp\fR	\fBfscanf\fR
+\fBfseek\fR	\fBfseeko\fR
+\fBfsetattr\fR	
+\fBfsetpos\fR	\fBfstat\fR
+\fBfstatat\fR	\fBfstatfs\fR
+\fBfstatvfs\fR	\fBfsync\fR
+\fBftell\fR	\fBftello\fR
+\fBftime\fR	\fBftok\fR
+\fBftruncate\fR	\fBftrylockfile\fR
+\fBftw\fR	\fBfunc_to_decimal\fR
+\fBfunlockfile\fR	\fBfutimens\fR
+\fBfutimesat\fR	
+\fBfwide\fR	\fBfwprintf\fR
+\fBfwrite\fR	\fBfwscanf\fR
+\fBgconvert\fR	\fBgcvt\fR
+\fBgetacct\fR	\fBgetattrat\fR
+\fBgetc\fR	
+\fBgetc_unlocked\fR	\fBgetchar\fR
+\fBgetchar_unlocked\fR	\fBgetcontext\fR
+\fBgetcpuid\fR	\fBgetcwd\fR
+\fBgetdate\fR	\fBgetdate_err\fR
+\fBgetdents\fR	\fBgetdtablesize\fR
+\fBgetegid\fR	\fBgetenv\fR
+\fBgeteuid\fR	\fBgetexecname\fR
+\fBgetextmntent\fR	\fBgetgid\fR
+\fBgetgrent\fR	\fBgetgrent_r\fR
+\fBgetgrgid\fR	\fBgetgrgid_r\fR
+\fBgetgrnam\fR	\fBgetgrnam_r\fR
+\fBgetgroups\fR	\fBgethomelgroup\fR
+\fBgethostid\fR	\fBgethostname\fR
+\fBgethrtime\fR	\fBgethrvtime\fR
+\fBgetisax\fR	\fBgetitimer\fR
+\fBgetloadavg\fR	\fBgetlogin\fR
+\fBgetlogin_r\fR	\fBgetmntany\fR
+\fBgetmntent\fR	\fBgetmsg\fR
+\fBgetnetgrent\fR	\fBgetnetgrent_r\fR
+\fBgetopt\fR	\fBgetopt_clip\fR
+\fBgetopt_long\fR	\fBgetopt_long_only\fR
+\fBgetpagesize\fR	\fBgetpagesizes\fR
+\fBgetpass\fR	\fBgetpassphrase\fR
+\fBgetpeerucred\fR	\fBgetpflags\fR
+\fBgetpgid\fR	\fBgetpgrp\fR
+\fBgetpid\fR	\fBgetpmsg\fR
+\fBgetppid\fR	\fBgetppriv\fR
+\fBgetpriority\fR	\fBgetprojid\fR
+\fBgetpw\fR	\fBgetpwent\fR
+\fBgetpwent_r\fR	\fBgetpwnam\fR
+\fBgetpwnam_r\fR	\fBgetpwuid\fR
+\fBgetpwuid_r\fR	\fBgetrctl\fR
+\fBgetrlimit\fR	\fBgetrusage\fR
+\fBgets\fR	\fBgetsid\fR
+\fBgetspent\fR	\fBgetspent_r\fR
+\fBgetspnam\fR	\fBgetspnam_r\fR
+\fBgetsubopt\fR	\fBgettaskid\fR
+\fBgettext\fR	\fBgettimeofday\fR
+\fBgettxt\fR	\fBgetuid\fR
+\fBgetusershell\fR	\fBgetustack\fR
+\fBgetutent\fR	\fBgetutid\fR
+\fBgetutline\fR	\fBgetutmp\fR
+\fBgetutmpx\fR	\fBgetutxent\fR
+\fBgetutxid\fR	\fBgetutxline\fR
+\fBgetvfsany\fR	\fBgetvfsent\fR
+\fBgetvfsfile\fR	\fBgetvfsspec\fR
+\fBgetw\fR	\fBgetwc\fR
+\fBgetwchar\fR	\fBgetwd\fR
+\fBgetwidth\fR	\fBgetws\fR
+\fBgetzoneid\fR	\fBgetzoneidbyname\fR
+\fBgetzonenamebyid\fR	\fBglob\fR
+\fBglobfree\fR	\fBgmtime\fR
+\fBgmtime_r\fR	\fBgrantpt\fR
+\fBgsignal\fR	\fBhasmntopt\fR
+\fBhcreate\fR	\fBhdestroy\fR
+\fBhsearch\fR	\fBiconv\fR
+\fBiconv_close\fR	\fBiconv_open\fR
+\fBimaxabs\fR	\fBimaxdiv\fR
+\fBindex\fR	\fBinitgroups\fR
+\fBinitstate\fR	\fBinnetgr\fR
+\fBinsque\fR	\fBioctl\fR
+\fBis_system_labeled\fR	
+\fBisaexec\fR	\fBisalnum\fR
+\fBisalpha\fR	\fBisascii\fR
+\fBisastream\fR	\fBisatty\fR
+\fBisblank\fR	\fBiscntrl\fR
+\fBisdigit\fR	\fBisenglish\fR
+\fBisgraph\fR	\fBisideogram\fR
+\fBislower\fR	\fBisnan\fR
+\fBisnand\fR	\fBisnanf\fR
+\fBisnumber\fR	\fBisphonogram\fR
+\fBisprint\fR	\fBispunct\fR
+\fBissetugid\fR	\fBisspace\fR
+\fBisspecial\fR	\fBisupper\fR
+\fBiswalnum\fR	\fBiswalpha\fR
+\fBiswblank\fR	\fBiswcntrl\fR
+\fBiswctype\fR	\fBiswdigit\fR
+\fBiswgraph\fR	\fBiswlower\fR
+\fBiswprint\fR	\fBiswpunct\fR
+\fBiswspace\fR	\fBiswupper\fR
+\fBiswxdigit\fR	\fBisxdigit\fR
+\fBjrand48\fR	\fBkill\fR
+\fBkillpg\fR	\fBl64a\fR
+\fBlabs\fR	\fBladd\fR
+\fBlchown\fR	\fBlckpwdf\fR
+\fBlcong48\fR	\fBldexp\fR
+\fBldivide\fR	\fBlexp10\fR
+\fBlfind\fR	\fBlfmt\fR
+\fBlink\fR	\fBlio_listio\fR
+\fBllabs\fR	
+\fBlldiv\fR	\fBllog10\fR
+\fBllseek\fR	\fBlltostr\fR
+\fBlocaleconv\fR	\fBlocaltime\fR
+\fBlocaltime_r\fR	\fBlockf\fR
+\fBlogb\fR	\fBlone\fR
+\fBlongjmp\fR	\fBlrand48\fR
+\fBlsearch\fR	\fBlseek\fR
+\fBlshiftl\fR	\fBlstat\fR
+\fBlsub\fR	\fBlten\fR
+\fBlzero\fR	\fBmadvise\fR
+\fBmakecontext\fR	\fBmakeutx\fR
+\fBmalloc\fR	\fBmblen\fR
+\fBmbrlen\fR	\fBmbrtowc\fR
+\fBmbsinit\fR	\fBmbsrtowcs\fR
+\fBmbstowcs\fR	\fBmbtowc\fR
+\fBmemalign\fR	\fBmembar_consumer\fR
+\fBmembar_enter\fR	\fBmembar_exit\fR
+\fBmembar_producer\fR	\fBmemccpy\fR
+\fBmemchr\fR	\fBmemcmp\fR
+\fBmemcntl\fR	\fBmemcpy\fR
+\fBmeminfo\fR	\fBmemmove\fR
+\fBmemset\fR	\fBmincore\fR
+\fBmkdir\fR	\fBmkfifo\fR
+\fBmknod\fR	\fBmkstemp\fR
+\fBmktemp\fR	\fBmktime\fR
+\fBmlock\fR	\fBmlockall\fR
+\fBmmap\fR	\fBmmapobj\fR
+\fBmodctl\fR	
+\fBmodf\fR	\fBmodff\fR
+\fBmodutx\fR	\fBmonitor\fR
+\fBmount\fR	\fBmprotect\fR
+\fBmq_close\fR	\fBmq_getattr\fR
+\fBmq_notify\fR	\fBmq_open\fR
+\fBmq_receive\fR	\fBmq_reltimedreceive_np\fR
+\fBmq_reltimedsend_np\fR	\fBmq_send\fR
+\fBmq_setattr\fR	\fBmq_timedreceive\fR
+\fBmq_timedsend\fR	\fBmq_unlink\fR
+\fBmrand48\fR	\fBmsgctl\fR
+\fBmsgget\fR	\fBmsgids\fR
+\fBmsgrcv\fR	\fBmsgsnap\fR
+\fBmsgsnd\fR	\fBmsync\fR
+\fBmunlock\fR	\fBmunlockall\fR
+\fBmunmap\fR	\fBmutex_consistent\fR
+\fBmutex_destroy\fR	\fBmutex_init\fR
+\fBmutex_lock\fR	\fBmutex_trylock\fR
+\fBmutex_unlock\fR	\fBnanosleep\fR
+\fBnextafter\fR	
+\fBnfs_getfh\fR	\fBnftw\fR
+\fBngettext\fR	\fBnice\fR
+\fBnl_langinfo\fR	\fBnrand48\fR
+\fBnss_default_finders\fR	\fBnss_delete\fR
+\fBnss_endent\fR	\fBnss_getent\fR
+\fBnss_search\fR	\fBnss_setent\fR
+\fBntp_adjtime\fR	\fBntp_gettime\fR
+\fBopen\fR	\fBopenat\fR
+\fBopendir\fR	\fBopenlog\fR
+\fBoptarg\fR	\fBopterr\fR
+\fBoptind\fR	\fBoptopt\fR
+\fBp_online\fR	\fBpathconf\fR
+\fBpause\fR	\fBpclose\fR
+\fBpcsample\fR	\fBperror\fR
+\fBpfmt\fR	\fBpipe\fR
+\fBplock\fR	\fBpoll\fR
+\fBpopen\fR	\fBport_alert\fR
+\fBport_associate\fR	\fBport_create\fR
+\fBport_dissociate\fR	\fBport_get\fR
+\fBport_getn\fR	\fBport_send\fR
+\fBport_sendn\fR	\fBposix_fadvise\fR
+\fBposix_fallocate\fR	\fBposix_madvise\fR
+\fBposix_memalign\fR	\fBposix_openpt\fR
+\fBposix_spawn\fR	\fBposix_spawn_file_actions_addclose\fR
+\fBposix_spawn_file_actions_addclosefrom_np\fR	\fBposix_spawn_file_actions_adddup2\fR
+\fBposix_spawn_file_actions_addopen\fR	
+\fBposix_spawn_file_actions_destroy\fR
+\fBposix_spawn_file_actions_init\fR
+\fBposix_spawn_pipe_np\fR
+\fBposix_spawnattr_destroy\fR
+\fBposix_spawnattr_getflags\fR	\fBposix_spawnattr_getpgroup\fR
+\fBposix_spawnattr_getschedparam\fR	\fBposix_spawnattr_getschedpolicy\fR
+\fBposix_spawnattr_getsigdefault\fR	\fBposix_spawnattr_getsigignore_np\fR
+\fBposix_spawnattr_getsigmask\fR	\fBposix_spawnattr_init\fR
+\fBposix_spawnattr_setflags\fR	\fBposix_spawnattr_setpgroup\fR
+\fBposix_spawnattr_setschedparam\fR	\fBposix_spawnattr_setschedpolicy\fR
+\fBposix_spawnattr_setsigdefault\fR	\fBposix_spawnattr_setsigignore_np\fR
+\fBposix_spawnattr_setsigmask\fR	\fBposix_spawnp\fR
+\fBpread\fR	\fBprintf\fR
+\fBprintstack\fR	\fBpriocntl\fR
+\fBpriocntlset\fR	\fBpriv_addset\fR
+\fBpriv_allocset\fR	\fBpriv_copyset\fR
+\fBpriv_delset\fR	\fBpriv_emptyset\fR
+\fBpriv_fillset\fR	\fBpriv_freeset\fR
+\fBpriv_getbyname\fR	\fBpriv_getbynum\fR
+\fBpriv_getsetbyname\fR	\fBpriv_getsetbynum\fR
+\fBpriv_gettext\fR	\fBpriv_ineffect\fR
+\fBpriv_intersect\fR	\fBpriv_inverse\fR
+\fBpriv_isemptyset\fR	\fBpriv_isequalset\fR
+\fBpriv_isfullset\fR	\fBpriv_ismember\fR
+\fBpriv_issubset\fR	\fBpriv_set\fR
+\fBpriv_set_to_str\fR	\fBpriv_str_to_set\fR
+\fBpriv_union\fR	\fBprocessor_bind\fR
+\fBprocessor_info\fR	\fBprofil\fR
+\fBpselect\fR	\fBpset_assign\fR
+\fBpset_bind\fR	\fBpset_create\fR
+\fBpset_destroy\fR	\fBpset_getattr\fR
+\fBpset_getloadavg\fR	\fBpset_info\fR
+\fBpset_list\fR	\fBpset_setattr\fR
+\fBpsiginfo\fR	\fBpsignal\fR
+\fBpthread_atfork\fR	\fBpthread_attr_destroy\fR
+\fBpthread_attr_getdetachstate\fR	\fBpthread_attr_getguardsize\fR
+\fBpthread_attr_getinheritsched\fR	\fBpthread_attr_getschedparam\fR
+\fBpthread_attr_getschedpolicy\fR	\fBpthread_attr_getscope\fR
+\fBpthread_attr_getstack\fR	\fBpthread_attr_getstackaddr\fR
+\fBpthread_attr_getstacksize\fR	\fBpthread_attr_init\fR
+\fBpthread_attr_setdetachstate\fR	\fBpthread_attr_setguardsize\fR
+\fBpthread_attr_setinheritsched\fR	\fBpthread_attr_setschedparam\fR
+\fBpthread_attr_setschedpolicy\fR	\fBpthread_attr_setscope\fR
+\fBpthread_attr_setstack\fR	\fBpthread_attr_setstackaddr\fR
+\fBpthread_attr_setstacksize\fR	\fBpthread_barrier_destroy\fR
+\fBpthread_barrier_init\fR	\fBpthread_barrier_wait\fR
+\fBpthread_barrierattr_destroy\fR	\fBpthread_barrierattr_getpshared\fR
+\fBpthread_barrierattr_init\fR	\fBpthread_barrierattr_setpshared\fR
+\fBpthread_cancel\fR	\fBpthread_cond_broadcast\fR
+\fBpthread_cond_destroy\fR	\fBpthread_cond_init\fR
+\fBpthread_cond_reltimedwait_np\fR	\fBpthread_cond_signal\fR
+\fBpthread_cond_timedwait\fR	\fBpthread_cond_wait\fR
+\fBpthread_condattr_destroy\fR	\fBpthread_condattr_getclock\fR
+\fBpthread_condattr_getpshared\fR	\fBpthread_condattr_init\fR
+\fBpthread_condattr_setclock\fR	\fBpthread_condattr_setpshared\fR
+\fBpthread_create\fR	\fBpthread_detach\fR
+\fBpthread_equal\fR	\fBpthread_exit\fR
+\fBpthread_getconcurrency\fR	\fBpthread_getschedparam\fR
+\fBpthread_getspecific\fR	\fBpthread_join\fR
+\fBpthread_key_create\fR	\fBpthread_key_create_once_np\fR
+\fBpthread_key_delete\fR	
+\fBpthread_kill\fR	\fBpthread_mutex_consistent\fR
+\fBpthread_mutex_destroy\fR	\fBpthread_mutex_getprioceiling\fR
+\fBpthread_mutex_init\fR	\fBpthread_mutex_lock\fR
+\fBpthread_mutex_reltimedlock_np\fR	\fBpthread_mutex_setprioceiling\fR
+\fBpthread_mutex_timedlock\fR	\fBpthread_mutex_trylock\fR
+\fBpthread_mutex_unlock\fR	\fBpthread_mutexattr_destroy\fR
+\fBpthread_mutexattr_getprioceiling\fR	\fBpthread_mutexattr_getprotocol\fR
+\fBpthread_mutexattr_getpshared\fR	\fBpthread_mutexattr_getrobust\fR
+\fBpthread_mutexattr_gettype\fR	\fBpthread_mutexattr_init\fR
+\fBpthread_mutexattr_setprioceiling\fR	\fBpthread_mutexattr_setprotocol\fR
+\fBpthread_mutexattr_setpshared\fR	\fBpthread_mutexattr_setrobust\fR
+\fBpthread_mutexattr_settype\fR	\fBpthread_once\fR
+\fBpthread_rwlock_destroy\fR	\fBpthread_rwlock_init\fR
+\fBpthread_rwlock_rdlock\fR	\fBpthread_rwlock_reltimedrdlock_np\fR
+\fBpthread_rwlock_reltimedwrlock_np\fR	\fBpthread_rwlock_timedrdlock\fR
+\fBpthread_rwlock_timedwrlock\fR	\fBpthread_rwlock_tryrdlock\fR
+\fBpthread_rwlock_trywrlock\fR	\fBpthread_rwlock_unlock\fR
+\fBpthread_rwlock_wrlock\fR	\fBpthread_rwlockattr_destroy\fR
+\fBpthread_rwlockattr_getpshared\fR	\fBpthread_rwlockattr_init\fR
+\fBpthread_rwlockattr_setpshared\fR	\fBpthread_self\fR
+\fBpthread_setcancelstate\fR	\fBpthread_setcanceltype\fR
+\fBpthread_setconcurrency\fR	\fBpthread_setspecific\fR
+\fBpthread_sigmask\fR	\fBpthread_setschedparam\fR
+\fBpthread_setschedprio\fR	\fBpthread_spin_destroy\fR
+\fBpthread_spin_init\fR	\fBpthread_spin_lock\fR
+\fBpthread_spin_trylock\fR	\fBpthread_spin_unlock\fR
+\fBpthread_testcancel\fR	\fBptsname\fR
+\fBputacct\fR	\fBputc\fR
+\fBputc_unlocked\fR	\fBputchar\fR
+\fBputchar_unlocked\fR	\fBputenv\fR
+\fBputmsg\fR	\fBputpmsg\fR
+\fBputpwent\fR	\fBputs\fR
+\fBputspent\fR	\fBpututline\fR
+\fBpututxline\fR	\fBputw\fR
+\fBputwc\fR	\fBputwchar\fR
+\fBputws\fR	\fBpwrite\fR
+\fBqeconvert\fR	\fBqecvt\fR
+\fBqfconvert\fR	\fBqfcvt\fR
+\fBqgconvert\fR	\fBqgcvt\fR
+\fBqsort\fR	\fBquadruple_to_decimal\fR
+\fBraise\fR	\fBrand\fR
+\fBrand_r\fR	\fBrandom\fR
+\fBrctl_walk\fR	\fBrctlblk_get_enforced_value\fR
+\fBrctlblk_get_firing_time\fR	\fBrctlblk_get_global_action\fR
+\fBrctlblk_get_global_flags\fR	\fBrctlblk_get_local_action\fR
+\fBrctlblk_get_local_flags\fR	\fBrctlblk_get_privilege\fR
+\fBrctlblk_get_recipient_pid\fR	\fBrctlblk_get_value\fR
+\fBrctlblk_set_local_action\fR	\fBrctlblk_set_local_flags\fR
+\fBrctlblk_set_privilege\fR	\fBrctlblk_set_recipient_pid\fR
+\fBrctlblk_set_value\fR	\fBrctlblk_size\fR
+\fBre_comp\fR	\fBre_exec\fR
+\fBread\fR	\fBreaddir\fR
+\fBreaddir_r\fR	\fBreadlink\fR
+\fBreadv\fR	\fBrealloc\fR
+\fBrealpath\fR	\fBreboot\fR
+\fBregcmp\fR	\fBregcomp\fR
+\fBregerror\fR	\fBregex\fR
+\fBregexec\fR	\fBregfree\fR
+\fBremove\fR	\fBremque\fR
+\fBrename\fR	\fBrenameat\fR
+\fBresetmnttab\fR	\fBresolvepath\fR
+\fBrewind\fR	\fBrewinddir\fR
+\fBrindex\fR	\fBrmdir\fR
+\fBrw_rdlock\fR	\fBrw_read_held\fR
+\fBrw_tryrdlock\fR	\fBrw_trywrlock\fR
+\fBrw_unlock\fR	\fBrw_write_held\fR
+\fBrw_wrlock\fR	\fBrwlock_destroy\fR
+\fBrwlock_init\fR	\fBsbrk\fR
+\fBscalb\fR	\fBscandir\fR
+\fBscanf\fR	\fBsched_get_priority_max\fR
+\fBsched_get_priority_min\fR	\fBsched_getparam\fR
+\fBsched_getscheduler\fR	\fBsched_rr_get_interval\fR
+\fBsched_setparam\fR	\fBsched_setscheduler\fR
+\fBsched_yield\fR	\fBschedctl_exit\fR
+\fBschedctl_init\fR	\fBschedctl_lookup\fR
+\fBschedctl_start\fR	\fBschedctl_stop\fR
+\fBseconvert\fR	\fBseed48\fR
+\fBseekdir\fR	\fBselect\fR
+\fBsem_close\fR	\fBsem_destroy\fR
+\fBsem_getvalue\fR	\fBsem_init\fR
+\fBsem_open\fR	\fBsem_post\fR
+\fBsem_reltimedwait_np\fR	\fBsem_timedwait\fR
+\fBsem_trywait\fR	\fBsem_unlink\fR
+\fBsem_wait\fR	
+\fBsema_destroy\fR	\fBsema_held\fR
+\fBsema_init\fR	\fBsema_post\fR
+\fBsema_trywait\fR	\fBsema_wait\fR
+\fBsemctl\fR	\fBsemget\fR
+\fBsemids\fR	\fBsemop\fR
+\fBsemtimedop\fR	\fBsetattrat\fR
+\fBsetbuf\fR	
+\fBsetbuffer\fR	\fBsetcat\fR
+\fBsetcontext\fR	\fBsetegid\fR
+\fBsetenv\fR	\fBseteuid\fR
+\fBsetgid\fR	\fBsetgrent\fR
+\fBsetgroups\fR	\fBsethostname\fR
+\fBsetitimer\fR	\fBsetjmp\fR
+\fBsetkey\fR	\fBsetlabel\fR
+\fBsetlinebuf\fR	\fBsetlocale\fR
+\fBsetlogmask\fR	\fBsetnetgrent\fR
+\fBsetpflags\fR	\fBsetpgid\fR
+\fBsetpgrp\fR	\fBsetppriv\fR
+\fBsetpriority\fR	\fBsetpwent\fR
+\fBsetrctl\fR	\fBsetregid\fR
+\fBsetreuid\fR	\fBsetrlimit\fR
+\fBsetsid\fR	\fBsetspent\fR
+\fBsetstate\fR	\fBsettaskid\fR
+\fBsettimeofday\fR	\fBsetuid\fR
+\fBsetusershell\fR	\fBsetustack\fR
+\fBsetutent\fR	\fBsetutxent\fR
+\fBsetvbuf\fR	\fBsfconvert\fR
+\fBsgconvert\fR	\fBshm_open\fR
+\fBshm_unlink\fR	\fBshmat\fR
+\fBshmctl\fR	\fBshmdt\fR
+\fBshmget\fR	\fBshmids\fR
+\fBsig2str\fR	\fBsigaction\fR
+\fBsigaddset\fR	\fBsigaltstack\fR
+\fBsigdelset\fR	\fBsigemptyset\fR
+\fBsigfillset\fR	\fBsigfpe\fR
+\fBsighold\fR	\fBsigignore\fR
+\fBsiginterrupt\fR	\fBsigismember\fR
+\fBsiglongjmp\fR	\fBsignal\fR
+\fBsigpause\fR	\fBsigpending\fR
+\fBsigprocmask\fR	\fBsigqueue\fR
+\fBsigrelse\fR	
+\fBsigsend\fR	\fBsigsendset\fR
+\fBsigset\fR	\fBsigsetjmp\fR
+\fBsigstack\fR	\fBsigsuspend\fR
+\fBsigtimedwait\fR	\fBsigwait\fR
+\fBsigwaitinfo\fR	\fBsingle_to_decimal\fR
+\fBsleep\fR	\fBsnprintf\fR
+\fBsprintf\fR	\fBsrand\fR
+\fBsrand48\fR	\fBsrandom\fR
+\fBsscanf\fR	\fBssignal\fR
+\fBstack_getbounds\fR	\fBstack_inbounds\fR
+\fBstack_setbounds\fR	\fBstack_violation\fR
+\fBstat\fR	\fBstatfs\fR
+\fBstatvfs\fR	\fBstime\fR
+\fBstr2sig\fR	\fBstrcasecmp\fR
+\fBstrcat\fR	\fBstrchr\fR
+\fBstrcmp\fR	\fBstrcoll\fR
+\fBstrcpy\fR	\fBstrcspn\fR
+\fBstrdup\fR	\fBstrerror\fR
+\fBstrerror_r\fR	\fBstrfmon\fR
+\fBstrftime\fR	\fBstring_to_decimal\fR
+\fBstrlcat\fR	\fBstrlcpy\fR
+\fBstrlen\fR	\fBstrncasecmp\fR
+\fBstrncat\fR	\fBstrncmp\fR
+\fBstrncpy\fR	\fBstrpbrk\fR
+\fBstrptime\fR	\fBstrrchr\fR
+\fBstrsep\fR	
+\fBstrsignal\fR	\fBstrspn\fR
+\fBstrstr\fR	\fBstrtod\fR
+\fBstrtof\fR	\fBstrtoimax\fR
+\fBstrtok\fR	\fBstrtok_r\fR
+\fBstrtol\fR	\fBstrtold\fR
+\fBstrtoll\fR	\fBstrtoul\fR
+\fBstrtoull\fR	\fBstrtoumax\fR
+\fBstrtows\fR	\fBstrxfrm\fR
+\fBswab\fR	\fBswapcontext\fR
+\fBswapctl\fR	\fBswprintf\fR
+\fBswscanf\fR	\fBsymlink\fR
+\fBsync\fR	\fBsync_instruction_memory\fR
+\fBsysconf\fR	\fBsysfs\fR
+\fBsysinfo\fR	\fBsyslog\fR
+\fBsystem\fR	\fBtcdrain\fR
+\fBtcflow\fR	\fBtcflush\fR
+\fBtcgetattr\fR	\fBtcgetpgrp\fR
+\fBtcgetsid\fR	\fBtcsendbreak\fR
+\fBtcsetattr\fR	\fBtcsetpgrp\fR
+\fBtdelete\fR	\fBtell\fR
+\fBtelldir\fR	\fBtempnam\fR
+\fBtextdomain\fR	\fBtfind\fR
+\fBthr_continue\fR	\fBthr_create\fR
+\fBthr_exit\fR	\fBthr_getconcurrency\fR
+\fBthr_getprio\fR	\fBthr_getspecific\fR
+\fBthr_join\fR	\fBthr_keycreate\fR
+\fBthr_keycreate_once\fR	
+\fBthr_kill\fR	\fBthr_main\fR
+\fBthr_min_stack\fR	\fBthr_self\fR
+\fBthr_setconcurrency\fR	\fBthr_setprio\fR
+\fBthr_setspecific\fR	\fBthr_sigsetmask\fR
+\fBthr_stksegment\fR	\fBthr_suspend\fR
+\fBthr_yield\fR	\fBtime\fR
+\fBtimer_create\fR	\fBtimer_delete\fR
+\fBtimer_getoverrun\fR	\fBtimer_gettime\fR
+\fBtimer_settime\fR	
+\fBtimes\fR	\fBtimezone\fR
+\fBtmpfile\fR	\fBtmpnam\fR
+\fBtmpnam_r\fR	\fBtoascii\fR
+\fBtolower\fR	\fBtoupper\fR
+\fBtowctrans\fR	\fBtowlower\fR
+\fBtowupper\fR	\fBtruncate\fR
+\fBtsearch\fR	\fBttyname\fR
+\fBttyname_r\fR	\fBttyslot\fR
+\fBtwalk\fR	\fBtzname\fR
+\fBtzset\fR	\fBu8_strcmp\fR
+\fBu8_textprep_str\fR	\fBu8_validate\fR
+\fBuadmin\fR	
+\fBualarm\fR	\fBuconv_u16tou32\fR
+\fBuconv_u16tou8\fR	\fBuconv_u32tou16\fR
+\fBuconv_u32tou8\fR	\fBuconv_u8tou16\fR
+\fBuconv_u8tou32\fR	\fBucred_free\fR
+\fBucred_get\fR	\fBucred_getegid\fR
+\fBucred_geteuid\fR	\fBucred_getgroups\fR
+\fBucred_getpflags\fR	\fBucred_getpid\fR
+\fBucred_getprivset\fR	\fBucred_getprojid\fR
+\fBucred_getrgid\fR	\fBucred_getruid\fR
+\fBucred_getsgid\fR	\fBucred_getsuid\fR
+\fBucred_getzoneid\fR	\fBucred_size\fR
+\fBulckpwdf\fR	\fBulimit\fR
+\fBulltostr\fR	\fBumask\fR
+\fBumount\fR	\fBumount2\fR
+\fBuname\fR	\fBungetc\fR
+\fBungetwc\fR	\fBunlink\fR
+\fBunlinkat\fR	\fBunlockpt\fR
+\fBunordered\fR	\fBunsetenv\fR
+\fBupdwtmp\fR	\fBupdwtmpx\fR
+\fBusleep\fR	\fBustat\fR
+\fButime\fR	\fButimensat\fR
+\fButimes\fR	\fButmpname\fR
+\fButmpxname\fR	\fBuucopy\fR
+\fBvalloc\fR	\fBvasprintf\fR
+\fBverr\fR	\fBverrx\fR
+\fBvfork\fR	\fBvforkx\fR
+\fBvfprintf\fR	\fBvfscanf\fR
+\fBvfwprintf\fR	\fBvfwscanf\fR
+\fBvhangup\fR	\fBvlfmt\fR
+\fBvpfmt\fR	\fBvprintf\fR
+\fBvscanf\fR	\fBvsnprintf\fR
+\fBvsprintf\fR	\fBvsscanf\fR
+\fBvswprintf\fR	\fBvswscanf\fR
+\fBvsyslog\fR	\fBvwarn\fR
+\fBvwarnx\fR	\fBvwprintf\fR
+\fBvwscanf\fR	\fBwait\fR
+\fBwait3\fR	\fBwait4\fR
+\fBwaitid\fR	\fBwaitpid\fR
+\fBwalkcontext\fR	\fBwarn\fR
+\fBwarnx\fR	\fBwatoll\fR
+\fBwcrtomb\fR	\fBwcscat\fR
+\fBwcschr\fR	\fBwcscmp\fR
+\fBwcscoll\fR	\fBwcscpy\fR
+\fBwcscspn\fR	\fBwcsftime\fR
+\fBwcslen\fR	\fBwcsncat\fR
+\fBwcsncmp\fR	\fBwcsncpy\fR
+\fBwcspbrk\fR	\fBwcsrchr\fR
+\fBwcsrtombs\fR	\fBwcsspn\fR
+\fBwcsstr\fR	\fBwcstod\fR
+\fBwcstof\fR	\fBwcstoimax\fR
+\fBwcstok\fR	\fBwcstol\fR
+\fBwcstold\fR	\fBwcstoll\fR
+\fBwcstombs\fR	\fBwcstoul\fR
+\fBwcstoull\fR	\fBwcstoumax\fR
+\fBwcswcs\fR	\fBwcswidth\fR
+\fBwcsxfrm\fR	\fBwctob\fR
+\fBwctomb\fR	\fBwctrans\fR
+\fBwctype\fR	\fBwcwidth\fR
+\fBwmemchr\fR	\fBwmemcmp\fR
+\fBwmemcpy\fR	\fBwmemmove\fR
+\fBwmemset\fR	\fBwordexp\fR
+\fBwordfree\fR	\fBwprintf\fR
+\fBwracct\fR	\fBwrite\fR
+\fBwritev\fR	\fBwscanf\fR
+\fBwscasecmp\fR	\fBwscat\fR
+\fBwschr\fR	\fBwscmp\fR
+\fBwscol\fR	\fBwscoll\fR
+\fBwscpy\fR	\fBwscspn\fR
+\fBwsdup\fR	\fBwslen\fR
+\fBwsncasecmp\fR	\fBwsncat\fR
+\fBwsncmp\fR	\fBwsncpy\fR
+\fBwspbrk\fR	\fBwsprintf\fR
+\fBwsrchr\fR	\fBwsscanf\fR
+\fBwsspn\fR	\fBwstod\fR
+\fBwstok\fR	\fBwstol\fR
+\fBwstoll\fR	\fBwstostr\fR
+\fBwsxfrm\fR	\fByield\fR
 .TE
 
 .sp
@@ -771,38 +773,36 @@ The following interfaces are unique to the 32-bit version of this library:
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fB__div64\fR\fB__mul64\fR
-\fB__posix_readdir_r\fR\fB__rem64\fR
-\fB__udiv64\fR\fB__urem64\fR
-\fB_bufendtab\fR\fB_lastbuf\fR
-\fB_s_fcntl\fR\fB_sys_nsig\fR
-\fB_xftw64\fR\fBaio_cancel64\fR
-\fBaio_error64\fR\fBaio_fsync64\fR
-\fBaio_read64\fR\fBaio_return64\fR
-\fBaio_suspend64\fR\fBaio_waitn64\fR
-\fBaio_write64\fR\fBcreat64\fR
-\fBfgetpos64\fR\fBfopen64\fR
-\fBfreopen64\fR\fBfseeko64\fR
-\fBfsetpos64\fR\fBfstat64\fR
-\fBfstatvfs64\fR\fBftello64\fR
-\fBftruncate64\fR\fBftw64\fR
-\fBgetdents64\fR\fBgetrlimit64\fR
-\fBlio_listio64\fR\fBlockf64\fR
-\fBlseek64\fR\fBlstat64\fR
-\fBmkstemp64\fR\fBmmap64\fR
-\fBnftw64\fR\fBopen64\fR
-\fBpread64\fR\fBptrace\fR
-\fBpwrite64\fR\fBreaddir64\fR
-\fBreaddir64_r\fR\fBs_fcntl\fR
-\fBs_ioctl\fR\fBselect_large_fdset\fR
-\fBsetrlimit64\fR\fBstat64\fR
-\fBstatvfs64\fR\fBsys_errlist\fR
-\fBsys_nerr\fR\fBtell64\fR
-\fBtmpfile64\fR\fBtruncate64\fR
+l l
+l l .
+\fB__div64\fR	\fB__mul64\fR
+\fB__posix_readdir_r\fR	\fB__rem64\fR
+\fB__udiv64\fR	\fB__urem64\fR
+\fB_bufendtab\fR	\fB_lastbuf\fR
+\fB_s_fcntl\fR	\fB_sys_nsig\fR
+\fB_xftw64\fR	\fBaio_cancel64\fR
+\fBaio_error64\fR	\fBaio_fsync64\fR
+\fBaio_read64\fR	\fBaio_return64\fR
+\fBaio_suspend64\fR	\fBaio_waitn64\fR
+\fBaio_write64\fR	\fBcreat64\fR
+\fBfgetpos64\fR	\fBfopen64\fR
+\fBfreopen64\fR	\fBfseeko64\fR
+\fBfsetpos64\fR	\fBfstat64\fR
+\fBfstatvfs64\fR	\fBftello64\fR
+\fBftruncate64\fR	\fBftw64\fR
+\fBgetdents64\fR	\fBgetrlimit64\fR
+\fBlio_listio64\fR	\fBlockf64\fR
+\fBlseek64\fR	\fBlstat64\fR
+\fBmkstemp64\fR	\fBmmap64\fR
+\fBnftw64\fR	\fBopen64\fR
+\fBpread64\fR	\fBptrace\fR
+\fBpwrite64\fR	\fBreaddir64\fR
+\fBreaddir64_r\fR	\fBs_fcntl\fR
+\fBs_ioctl\fR	\fBselect_large_fdset\fR
+\fBsetrlimit64\fR	\fBstat64\fR
+\fBstatvfs64\fR	\fBsys_errlist\fR
+\fBsys_nerr\fR	\fBtell64\fR
+\fBtmpfile64\fR	\fBtruncate64\fR
 .TE
 
 .sp
@@ -813,32 +813,30 @@ library:
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fB\&.div\fR\fB\&.mul\fR
-\fB\&.rem\fR\fB\&.stret1\fR
-\fB\&.stret2\fR\fB\&.stret4\fR
-\fB\&.stret8\fR\fB\&.udiv\fR
-\fB\&.umul\fR\fB\&.urem\fR
-\fB_Q_add\fR\fB_Q_cmp\fR
-\fB_Q_cmpe\fR\fB_Q_div\fR
-\fB_Q_dtoq\fR\fB_Q_feq\fR
-\fB_Q_fge\fR\fB_Q_fgt\fR
-\fB_Q_fle\fR\fB_Q_flt\fR
-\fB_Q_fne\fR\fB_Q_itoq\fR
-\fB_Q_lltoq\fR\fB_Q_mul\fR
-\fB_Q_neg\fR\fB_Q_qtod\fR
-\fB_Q_qtoi\fR\fB_Q_qtoll\fR
-\fB_Q_qtos\fR\fB_Q_qtou\fR
-\fB_Q_qtoull\fR\fB_Q_sqrt\fR
-\fB_Q_stoq\fR\fB_Q_sub\fR
-\fB_Q_ulltoq\fR\fB_Q_utoq\fR
-\fB__dtoll\fR\fB__dtou\fR
-\fB__dtoull\fR\fB__ftoll\fR
-\fB__ftou\fR\fB__ftoull\fR
-\fB__umul64\fR
+l l
+l l .
+\fB\&.div\fR	\fB\&.mul\fR
+\fB\&.rem\fR	\fB\&.stret1\fR
+\fB\&.stret2\fR	\fB\&.stret4\fR
+\fB\&.stret8\fR	\fB\&.udiv\fR
+\fB\&.umul\fR	\fB\&.urem\fR
+\fB_Q_add\fR	\fB_Q_cmp\fR
+\fB_Q_cmpe\fR	\fB_Q_div\fR
+\fB_Q_dtoq\fR	\fB_Q_feq\fR
+\fB_Q_fge\fR	\fB_Q_fgt\fR
+\fB_Q_fle\fR	\fB_Q_flt\fR
+\fB_Q_fne\fR	\fB_Q_itoq\fR
+\fB_Q_lltoq\fR	\fB_Q_mul\fR
+\fB_Q_neg\fR	\fB_Q_qtod\fR
+\fB_Q_qtoi\fR	\fB_Q_qtoll\fR
+\fB_Q_qtos\fR	\fB_Q_qtou\fR
+\fB_Q_qtoull\fR	\fB_Q_sqrt\fR
+\fB_Q_stoq\fR	\fB_Q_sub\fR
+\fB_Q_ulltoq\fR	\fB_Q_utoq\fR
+\fB__dtoll\fR	\fB__dtou\fR
+\fB__dtoull\fR	\fB__ftoll\fR
+\fB__ftou\fR	\fB__ftoull\fR
+\fB__umul64\fR	
 .TE
 
 .sp
@@ -848,15 +846,13 @@ The following interfaces are unique to the 32-bit x86 version of this library:
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fB__fpstart\fR\fB_fp_hw\fR
-\fB_fpstart\fR\fB_fxstat\fR
-\fB_lxstat\fR\fB_nuname\fR
-\fB_thr_errno_addr\fR\fB_xmknod\fR
-\fB_xstat\fR\fBnuname\fR
+l l
+l l .
+\fB__fpstart\fR	\fB_fp_hw\fR
+\fB_fpstart\fR	\fB_fxstat\fR
+\fB_lxstat\fR	\fB_nuname\fR
+\fB_thr_errno_addr\fR	\fB_xmknod\fR
+\fB_xstat\fR	\fBnuname\fR
 .TE
 
 .sp
@@ -867,72 +863,62 @@ library:
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fB_Qp_add\fR\fB_Qp_cmp\fR
-\fB_Qp_cmpe\fR\fB_Qp_div\fR
-\fB_Qp_dtoq\fR\fB_Qp_feq\fR
-\fB_Qp_fge\fR\fB_Qp_fgt\fR
-\fB_Qp_fle\fR\fB_Qp_flt\fR
-\fB_Qp_fne\fR\fB_Qp_itoq\fR
-\fB_Qp_mul\fR\fB_Qp_neg\fR
-\fB_Qp_qtod\fR\fB_Qp_qtoi\fR
-\fB_Qp_qtos\fR\fB_Qp_qtoui\fR
-\fB_Qp_qtoux\fR\fB_Qp_qtox\fR
-\fB_Qp_sqrt\fR\fB_Qp_stoq\fR
-\fB_Qp_sub\fR\fB_Qp_uitoq\fR
-\fB_Qp_uxtoq\fR\fB_Qp_xtoq\fR
-\fB__align_cpy_1\fR\fB__align_cpy_16\fR
-\fB__align_cpy_2\fR\fB__align_cpy_4\fR
-\fB__align_cpy_8\fR\fB__dtoul\fR
-\fB__ftoul\fR\fB__sparc_utrap_install\fR
+l l
+l l .
+\fB_Qp_add\fR	\fB_Qp_cmp\fR
+\fB_Qp_cmpe\fR	\fB_Qp_div\fR
+\fB_Qp_dtoq\fR	\fB_Qp_feq\fR
+\fB_Qp_fge\fR	\fB_Qp_fgt\fR
+\fB_Qp_fle\fR	\fB_Qp_flt\fR
+\fB_Qp_fne\fR	\fB_Qp_itoq\fR
+\fB_Qp_mul\fR	\fB_Qp_neg\fR
+\fB_Qp_qtod\fR	\fB_Qp_qtoi\fR
+\fB_Qp_qtos\fR	\fB_Qp_qtoui\fR
+\fB_Qp_qtoux\fR	\fB_Qp_qtox\fR
+\fB_Qp_sqrt\fR	\fB_Qp_stoq\fR
+\fB_Qp_sub\fR	\fB_Qp_uitoq\fR
+\fB_Qp_uxtoq\fR	\fB_Qp_xtoq\fR
+\fB__align_cpy_1\fR	\fB__align_cpy_16\fR
+\fB__align_cpy_2\fR	\fB__align_cpy_4\fR
+\fB__align_cpy_8\fR	\fB__dtoul\fR
+\fB__ftoul\fR	\fB__sparc_utrap_install\fR
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/libc.so.1\fR\fR
 .ad
 .RS 27n
-.rt  
 shared object
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/64/libc.so.1\fR\fR
 .ad
 .RS 27n
-.rt  
 64-bit shared object
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/c_synonyms.so.1\fR\fR
 .ad
 .RS 27n
-.rt  
 A compatibility library to provide access to obsolete \fBlibc\fR synonym
 symbols
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/64/c_synonyms.so.1\fR\fR
 .ad
 .RS 27n
-.rt  
 A 64-bit compatibility library to provide access to obsolete \fBlibc\fR synonym
 symbols
 .RE
@@ -945,12 +931,11 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
-MT-LevelSafe
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

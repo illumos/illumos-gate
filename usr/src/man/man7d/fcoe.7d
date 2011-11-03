@@ -3,7 +3,7 @@
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
-.TH fcoe 7D "18 Mar 2009" "SunOS 5.11" "Devices"
+.TH FCOE 7D "Mar 18, 2009"
 .SH NAME
 fcoe \- fibre channel over Ethernet transport driver
 .SH DESCRIPTION
@@ -19,34 +19,28 @@ The \fBfcoe\fR driver interfaces with FCoE target mode device driver,
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/fcoe\fR\fR
 .ad
 .RS 26n
-.rt  
 32-bit ELF kernel module (x86)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/amd64/fcoe\fR\fR
 .ad
 .RS 26n
-.rt  
 64-bit ELF kernel module (x86)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkernel/drv/sparcv\fR\fR
 .ad
 .RS 26n
-.rt  
 64-bit ELF kernel module (SPARC)
 .RE
 
@@ -58,13 +52,12 @@ See \fBattributes\fR(5) for a description of the following attribute:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) |lw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+l | l
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureSPARC, x86
+Architecture	SPARC, x86
 .TE
 
 .SH SEE ALSO

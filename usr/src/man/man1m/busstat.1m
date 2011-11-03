@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH busstat 1M "1 Nov 1999" "SunOS 5.11" "System Administration Commands"
+.TH BUSSTAT 1M "Nov 1, 1999"
 .SH NAME
 busstat \- report bus-related performance statistics
 .SH SYNOPSIS
@@ -14,8 +14,8 @@ busstat \- report bus-related performance statistics
 
 .LP
 .nf
-\fBbusstat\fR [\fB-a\fR] [\fB-n\fR] 
-     [\fB-w \fR \fIdevice-inst\fR [,pic0=\fIevent\fR,pic\fIn\fR=\fIevent\fR ]]... 
+\fBbusstat\fR [\fB-a\fR] [\fB-n\fR]
+     [\fB-w \fR \fIdevice-inst\fR [,pic0=\fIevent\fR,pic\fIn\fR=\fIevent\fR ]]...
      [\fB-r\fR \fIdevice-inst\fR]... [\fIinterval \fR [\fIcount\fR]]
 .fi
 
@@ -55,7 +55,6 @@ reside in.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
@@ -66,13 +65,12 @@ Display absolute counter values. The default is \fBdelta\fR values.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fIdevice-inst\fR\fR
 .ad
 .sp .6
 .RS 4n
-Display the list of events that the specified device supports 	for each pic.
+Display the list of events that the specified device supports for each pic.
 .sp
 Specify \fIdevice-inst\fR as device (\fBname\fR) followed by an optional
 instance number. If an instance number is specified, the events for that
@@ -82,7 +80,6 @@ first instance of the specified device are displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
@@ -93,7 +90,6 @@ Print a usage message.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
@@ -104,7 +100,6 @@ List the devices in the system which support performance counters.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
@@ -115,7 +110,6 @@ Do not display a title in the output. The default is to display titles.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIdevice-inst\fR\fR
 .ad
@@ -132,7 +126,6 @@ be sampled when using the \fB-r\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR \fIdevice-inst\fR [,pic0=\fIevent\fR] [,pic\fIn\fR=\fIevent\fR] \fR
 .ad
@@ -152,7 +145,7 @@ counted for a specified \fBpic\fR by providing a comma separated list of
 The \fB-e\fR option displays all valid event names for each device. Any devices
 that are programmed will be sampled every interval seconds and repeated count
 times. It is recommended that the interval specified is small enough to ensure
-that counter wraparound will be detected. The rate at which 	counters
+that counter wraparound will be detected. The rate at which counters
 wraparound varies from device to device. If a user is programming events using
 the \fB-w\fR option and \fBbusstat\fR detects that another user has changed the
 events that are being counted, the tool will terminate as the programmed
@@ -176,34 +169,28 @@ specified in hexadecimal, decimal, or octal, using the usual conventions of
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB0\fR
 .ad
 .RS 5n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB1\fR
 .ad
 .RS 5n
-.rt  
 An error occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB2\fR
 .ad
 .RS 5n
-.rt  
 Another user is writing to the same devices.
 .RE
 

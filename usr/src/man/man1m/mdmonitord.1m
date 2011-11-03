@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mdmonitord 1M "25 Jul 2004" "SunOS 5.11" "System Administration Commands"
+.TH MDMONITORD 1M "Jul 25, 2004"
 .SH NAME
 mdmonitord \- daemon to monitor metadevices
 .SH SYNOPSIS
@@ -39,12 +39,10 @@ error event which triggers a check of these metadevices.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 6n
-.rt  
 Time interval in seconds.  The default value is 0, which causes probes to occur
 only upon an error. If you want to run \fBmdmonitord\fR at a regular interval,
 a value of 1800 (seconds, every half hour) is recommended as a starting point.
@@ -56,23 +54,19 @@ a value of 1800 (seconds, every half hour) is recommended as a starting point.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB>0\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 

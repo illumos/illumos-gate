@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH device_maps 4 "30 Apr 2008" "SunOS 5.11" "File Formats"
+.TH DEVICE_MAPS 4 "Apr 30, 2008"
 .SH NAME
 device_maps \- device_maps file
 .SH SYNOPSIS
@@ -29,7 +29,6 @@ physical device. Each device is represented by a one line entry of the form:
 where
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevice-name\fR\fR
 .ad
@@ -41,7 +40,6 @@ contains no embedded white space or non-printable characters.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevice-type\fR\fR
 .ad
@@ -54,7 +52,6 @@ no embedded white space or non-printable characters.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevice-list\fR\fR
 .ad
@@ -111,12 +108,10 @@ rmt:\e
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/security/device_maps\fR\fR
 .ad
 .RS 29n
-.rt  
 Contains access control information for devices.
 .RE
 
@@ -128,13 +123,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityUncommitted
+Interface Stability	Uncommitted
 .TE
 
 .SH SEE ALSO

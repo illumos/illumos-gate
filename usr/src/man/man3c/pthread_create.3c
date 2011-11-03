@@ -2,21 +2,21 @@
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
 .\" Copyright 1991, 1992, 1994, The X/Open Company Ltd.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pthread_create 3C "23 Mar 2005" "SunOS 5.11" "Standard C Library Functions"
+.TH PTHREAD_CREATE 3C "Mar 23, 2005"
 .SH NAME
 pthread_create \- create a thread
 .SH SYNOPSIS
 .LP
 .nf
 cc -mt [ \fIflag\fR... ] \fIfile\fR... -lpthread [ \fIlibrary\fR... ]
-#include <pthread.h> 
+#include <pthread.h>
 
 \fBint\fR \fBpthread_create\fR(\fBpthread_t *restrict\fR \fIthread\fR,
      \fBconst pthread_attr_t *restrict\fR \fIattr\fR,
@@ -65,7 +65,7 @@ Default thread creation:
 .nf
 pthread_t tid;
 void *start_func(void *), *arg;
- 
+
 pthread_create(&tid, NULL, start_func, arg);
 .fi
 .in -2
@@ -77,7 +77,7 @@ This would have the same effect as:
 .in +2
 .nf
 \fBpthread_attr_t attr;
- 
+
 pthread_attr_init(&attr); /* initialize attr with default */
                           /* attributes */
 pthread_create(&tid, &attr, start_func, arg);\fR
@@ -93,7 +93,7 @@ system-wide basis, use:
 .nf
 pthread_attr_init(&attr); /* initialize attr with default */
                                        /* attributes */
-pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM); 
+pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
                                        /* system-wide contention */
 pthread_create(&tid, &attr, start_func, arg);
 .fi
@@ -127,12 +127,10 @@ an error number is returned to indicate the error.
 The  \fBpthread_create()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 10n
-.rt  
 The system lacked the necessary resources to create another thread, or the
 system-imposed limit on the total number of threads in a process
 \fBPTHREAD_THREADS_MAX\fR would be exceeded.
@@ -140,23 +138,19 @@ system-imposed limit on the total number of threads in a process
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The value specified by \fIattr\fR is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 10n
-.rt  
 The caller does not have appropriate permission to set the required scheduling
 parameters or scheduling policy.
 .RE
@@ -185,23 +179,19 @@ The command-line to time this process is:
 
 .sp
 .ne 2
-.mk
 .na
 \fBPOSIX threading\fR
 .ad
 .RS 21n
-.rt  
 /usr/bin/time a.out 0
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBSolaris threading\fR
 .ad
 .RS 21n
-.rt  
 /usr/bin/time a.out 1
 .RE
 
@@ -212,14 +202,14 @@ The command-line to time this process is:
 #define _REENTRANT    /* basic 3-lines for threads */
 #include <pthread.h>
 #include <thread.h>
- 
+
 #define NUM_THREADS 5
 #define SLEEP_TIME 10
- 
+
 void *sleeping(void *);   /* thread routine */
 int i;
 thread_t tid[NUM_THREADS];      /* array of thread IDs */
- 
+
 int
 main(int argc, char *argv[])
 {
@@ -228,7 +218,7 @@ main(int argc, char *argv[])
         printf("or use 1 as arg1 to use thr_create(\|)\en");
         return (1);
     }
- 
+
     switch (*argv[1])  {
     case '0':  /* POSIX */
         for ( i = 0; i < NUM_THREADS; i++)
@@ -237,7 +227,7 @@ main(int argc, char *argv[])
         for ( i = 0; i < NUM_THREADS; i++)
             pthread_join(tid[i], NULL);
         break;
- 
+
     case '1':  /* Solaris */
         for ( i = 0; i < NUM_THREADS; i++)
             thr_create(NULL, 0, sleeping, (void *)SLEEP_TIME, 0,
@@ -246,11 +236,11 @@ main(int argc, char *argv[])
             ;
         break;
     }  /* switch */
-    printf("main(\|) reporting that all %d threads have 
+    printf("main(\|) reporting that all %d threads have
         terminated\en", i);
     return (0);
 }  /* main */
- 
+
 void *
 sleeping(void *arg)
 {
@@ -279,15 +269,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

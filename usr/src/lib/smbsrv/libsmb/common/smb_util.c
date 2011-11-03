@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <ctype.h>
@@ -76,11 +77,9 @@ static void smb_log_trace(int, const char *);
 static smb_log_t *smb_log_get(smb_log_hdl_t);
 static void smb_log_dump(smb_log_t *);
 
-static uint_t smb_make_mask(char *, uint_t);
-static boolean_t smb_netmatch(struct netbuf *, char *);
 static boolean_t smb_netgroup_match(struct nd_hostservlist *, char *, int);
 
-extern  int __multi_innetgr();
+extern int __multi_innetgr();
 extern int __netdir_getbyaddr_nosrv(struct netconfig *,
     struct nd_hostservlist **, struct netbuf *);
 
@@ -412,57 +411,80 @@ rand_hash(
 int
 smb_chk_hostaccess(smb_inaddr_t *ipaddr, char *access_list)
 {
-	int nentries;
-	char *gr;
-	char *lasts;
+	char addr[INET_ADDRSTRLEN];
+	char buff[256];
+	char *cstr = access_list, *gr = access_list;
 	char *host;
-	int off;
+	int clres;
 	int i;
-	int netgroup_match;
+	int nentries = 0;
+	int off;
 	int response;
+	int sbr = 0;
 	struct nd_hostservlist *clnames;
 	struct in_addr inaddr;
 	struct sockaddr_in sa;
+	struct sockaddr_in6 sa6;
 	struct netbuf buf;
 	struct netconfig *config;
+	struct netent n, *np;
 
 	if (access_list == NULL)
 		return (0);
 
-	inaddr.s_addr = ipaddr->a_ipv4;
-
-	/*
-	 * If access list is empty or "*" - then it's "all"
-	 */
+	/* If access list is empty or "*" - then it's "all" */
 	if (*access_list == '\0' || strcmp(access_list, "*") == 0)
 		return (-1);
 
-	nentries = 0;
+	switch (ipaddr->a_family) {
+	case AF_INET:
+		inaddr.s_addr = ipaddr->a_ipv4;
+		sa.sin_family = AF_INET;
+		sa.sin_port = 0;
+		sa.sin_addr = inaddr;
+		buf.len = buf.maxlen = sizeof (sa);
+		buf.buf = (char *)&sa;
+		config = getnetconfigent("tcp");
+		break;
+	case AF_INET6:
+		sa6.sin6_family = AF_INET6;
+		sa6.sin6_port = 0;
+		sa6.sin6_addr = ipaddr->a_ipv6;
+		buf.len = buf.maxlen = sizeof (sa6);
+		buf.buf = (char *)&sa6;
+		config = getnetconfigent("tcp6");
+		break;
+	default:
+		return (1);
+	}
 
-	sa.sin_family = AF_INET;
-	sa.sin_port = 0;
-	sa.sin_addr = inaddr;
-
-	buf.len = buf.maxlen = sizeof (sa);
-	buf.buf = (char *)&sa;
-
-	config = getnetconfigent("tcp");
 	if (config == NULL)
 		return (1);
 
-	if (__netdir_getbyaddr_nosrv(config, &clnames, &buf)) {
-		freenetconfigent(config);
-		return (0);
-	}
+	/* Try to lookup client hostname */
+	clres = __netdir_getbyaddr_nosrv(config, &clnames, &buf);
 	freenetconfigent(config);
 
-	for (gr = strtok_r(access_list, ":", &lasts);
-	    gr != NULL; gr = strtok_r(NULL, ":", &lasts)) {
+	for (;;) {
+		if ((cstr = strpbrk(cstr, "[]:")) != NULL) {
+			switch (*cstr) {
+			case '[':
+			case ']':
+				sbr = !sbr;
+				cstr++;
+				continue;
+			case ':':
+				if (sbr) {
+					cstr++;
+					continue;
+				}
+				*cstr = '\0';
+			}
+		}
 
 		/*
-		 * If the list name has a '-' prepended
-		 * then a match of the following name
-		 * implies failure instead of success.
+		 * If the list name has a '-' prepended then a match of
+		 * the following name implies failure instead of success.
 		 */
 		if (*gr == '-') {
 			response = 0;
@@ -472,9 +494,53 @@ smb_chk_hostaccess(smb_inaddr_t *ipaddr, char *access_list)
 		}
 
 		/*
-		 * The following loops through all the
-		 * client's aliases.  Usually it's just one name.
+		 * First check if we have '@' entry, as it doesn't
+		 * require client hostname.
 		 */
+		if (*gr == '@') {
+			gr++;
+
+			if (!isdigit(*gr) && *gr != '[') {
+				/* Netname support */
+				if ((np = getnetbyname_r(gr, &n, buff,
+				    sizeof (buff))) != NULL &&
+				    np->n_net != 0) {
+					while ((np->n_net & 0xFF000000u) == 0)
+						np->n_net <<= 8;
+					np->n_net = htonl(np->n_net);
+					if (inet_ntop(AF_INET, &np->n_net, addr,
+					    INET_ADDRSTRLEN) == NULL)
+						break;
+					if (inet_matchaddr(buf.buf, addr))
+						return (response);
+				}
+			} else {
+				if (inet_matchaddr(buf.buf, gr))
+					return (response);
+			}
+
+			if (cstr == NULL)
+				break;
+
+			gr = ++cstr;
+
+			continue;
+		}
+
+		/*
+		 * No other checks can be performed if client address
+		 * can't be resolved.
+		 */
+		if (clres) {
+			if (cstr == NULL)
+				break;
+
+			gr = ++cstr;
+
+			continue;
+		}
+
+		/* Otherwise loop through all client hostname aliases */
 		for (i = 0; i < clnames->h_cnt; i++) {
 			host = clnames->h_hostservs[i].h_host;
 			/*
@@ -484,7 +550,7 @@ smb_chk_hostaccess(smb_inaddr_t *ipaddr, char *access_list)
 			 * suffix.
 			 */
 			if (*gr == '.') {
-				if (*(gr + 1) == '\0') {  /* single dot */
+				if (*(gr + 1) == '\0') {
 					if (strchr(host, '.') == NULL)
 						return (response);
 				} else {
@@ -495,140 +561,24 @@ smb_chk_hostaccess(smb_inaddr_t *ipaddr, char *access_list)
 					}
 				}
 			} else {
-
-				/*
-				 * If the list name begins with an at
-				 * sign then do a network comparison.
-				 */
-				if (*gr == '@') {
-					if (smb_netmatch(&buf, gr + 1))
-						return (response);
-				} else {
-					/*
-					 * Just do a hostname match
-					 */
-					if (strcasecmp(gr, host) == 0)
-						return (response);
+				/* Just do a hostname match */
+				if (strcasecmp(gr, host) == 0)
+					return (response);
 				}
 			}
-		}
 
 		nentries++;
+
+		if (cstr == NULL)
+			break;
+
+		gr = ++cstr;
 	}
 
-	netgroup_match = smb_netgroup_match(clnames, access_list, nentries);
+	if (clres)
+		return (0);
 
-	return (netgroup_match);
-}
-
-/*
- * smb_make_mask
- *
- * Construct a mask for an IPv4 address using the @<dotted-ip>/<len>
- * syntax or use the default mask for the IP address.
- */
-static uint_t
-smb_make_mask(char *maskstr, uint_t addr)
-{
-	uint_t mask;
-	uint_t bits;
-
-	/*
-	 * If the mask is specified explicitly then
-	 * use that value, e.g.
-	 *
-	 *    @109.104.56/28
-	 *
-	 * otherwise assume a mask from the zero octets
-	 * in the least significant bits of the address, e.g.
-	 *
-	 *   @109.104  or  @109.104.0.0
-	 */
-	if (maskstr) {
-		bits = atoi(maskstr);
-		mask = bits ? ~0 << ((sizeof (struct in_addr) * NBBY) - bits)
-		    : 0;
-		addr &= mask;
-	} else {
-		if ((addr & IN_CLASSA_HOST) == 0)
-			mask = IN_CLASSA_NET;
-		else if ((addr & IN_CLASSB_HOST) == 0)
-			mask = IN_CLASSB_NET;
-		else if ((addr & IN_CLASSC_HOST) == 0)
-			mask = IN_CLASSC_NET;
-		else
-			mask = IN_CLASSE_NET;
-	}
-
-	return (mask);
-}
-
-/*
- * smb_netmatch
- *
- * Check to see if the address in the netbuf matches the "net"
- * specified by name.  The format of "name" can be:
- *	fully qualified domain name
- *	dotted IP address
- *	dotted IP address followed by '/<len>'
- *	See sharen_nfs(1M) for details.
- */
-
-static boolean_t
-smb_netmatch(struct netbuf *nb, char *name)
-{
-	uint_t claddr;
-	struct netent n, *np;
-	char *mp, *p;
-	uint_t addr, mask;
-	int i;
-	char buff[256];
-
-	/*
-	 * Check if it's an IPv4 addr
-	 */
-	if (nb->len != sizeof (struct sockaddr_in))
-		return (B_FALSE);
-
-	(void) memcpy(&claddr,
-	    /* LINTED pointer alignment */
-	    &((struct sockaddr_in *)nb->buf)->sin_addr.s_addr,
-	    sizeof (struct in_addr));
-	claddr = ntohl(claddr);
-
-	mp = strchr(name, '/');
-	if (mp)
-		*mp++ = '\0';
-
-	if (isdigit(*name)) {
-		/*
-		 * Convert a dotted IP address
-		 * to an IP address. The conversion
-		 * is not the same as that in inet_addr().
-		 */
-		p = name;
-		addr = 0;
-		for (i = 0; i < 4; i++) {
-			addr |= atoi(p) << ((3-i) * 8);
-			p = strchr(p, '.');
-			if (p == NULL)
-				break;
-			p++;
-		}
-	} else {
-		/*
-		 * Turn the netname into
-		 * an IP address.
-		 */
-		np = getnetbyname_r(name, &n, buff, sizeof (buff));
-		if (np == NULL) {
-			return (B_FALSE);
-		}
-		addr = np->n_net;
-	}
-
-	mask = smb_make_mask(mp, addr);
-	return ((claddr & mask) == addr);
+	return (smb_netgroup_match(clnames, access_list, nentries));
 }
 
 /*

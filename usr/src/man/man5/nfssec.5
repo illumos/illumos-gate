@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH nfssec 5 "16 Mar 2009" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH NFSSEC 5 "Mar 16, 2009"
 .SH NAME
 nfssec \- overview of NFS security modes
 .SH DESCRIPTION
@@ -44,12 +44,10 @@ and protecting the shared filesystems. Before these can be used, the system
 must be configured to be part of a Kerberos realm. See \fBkerberos\fR(5).
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsys\fR\fR
 .ad
 .RS 9n
-.rt  
 Use \fBAUTH_SYS\fR authentication. The user's UNIX user-id and group-ids are
 passed in the clear on the network, unauthenticated by the \fBNFS\fR server.
 This is the simplest security method and requires no additional administration.
@@ -59,48 +57,40 @@ It is the default used by Solaris \fBNFS\fR Version 2 clients and Solaris
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdh\fR\fR
 .ad
 .RS 9n
-.rt  
 Use a Diffie-Hellman public key system (\fBAUTH_DES\fR, which is referred to as
 \fBAUTH_DH\fR in the forthcoming Internet \fBRFC).\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkrb5\fR\fR
 .ad
 .RS 9n
-.rt  
 Use Kerberos V5 protocol to authenticate users before granting access to the
 shared filesystem.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkrb5i\fR\fR
 .ad
 .RS 9n
-.rt  
 Use Kerberos V5 authentication with integrity checking (checksums) to verify
 that the data has not been tampered with.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkrb5p\fR\fR
 .ad
 .RS 9n
-.rt  
 User Kerberos V5 authentication, integrity checksums, and privacy protection
 (encryption) on the shared filesystem. This provides the most secure filesystem
 sharing, as all traffic is encrypted. It should be noted that performance might
@@ -110,12 +100,10 @@ intensity of the encryption algorithm and the amount of data being transferred.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnone\fR\fR
 .ad
 .RS 9n
-.rt  
 Use null authentication (\fBAUTH_NONE\fR). \fBNFS\fR clients using
 \fBAUTH_NONE\fR have no identity and are mapped to the anonymous user
 \fBnobody\fR by \fBNFS\fR servers. A client using a security mode other than
@@ -129,12 +117,10 @@ anonymous user. The \fBNFS\fR security mode \fBnone\fR is supported by
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/nfssec.conf\fR\fR
 .ad
 .RS 20n
-.rt  
 \fBNFS\fR security service configuration file
 .RE
 

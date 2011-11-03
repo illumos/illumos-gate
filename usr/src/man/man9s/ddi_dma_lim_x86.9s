@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_dma_lim_x86 9S "12 Oct 2005" "SunOS 5.11" "Data Structures for Drivers"
+.TH DDI_DMA_LIM_X86 9S "Oct 12, 2005"
 .SH NAME
 ddi_dma_lim_x86 \- x86 DMA limits structure
 .SH SYNOPSIS
@@ -38,19 +38,19 @@ should \fInot relax\fR any restrictions imposed by \fBddi_dmae_getlim()\fR.
 .sp
 .in +2
 .nf
-uint_t  dlim_addr_lo;  /* low range of 32 bit 
+uint_t  dlim_addr_lo;  /* low range of 32 bit
                                         addressing capability */
-uint_t  dlim_addr_hi;  /* inclusive upper bound of 
+uint_t  dlim_addr_hi;  /* inclusive upper bound of
                           addressing capability */
 uint_t  dlim_minxfer;  /* minimum effective dma transfer size */
 uint_t  dlim_version;  /* version number of structure */
-uint_t  dlim_adreg_max; /* inclusive upper bound of 
+uint_t  dlim_adreg_max; /* inclusive upper bound of
                             incrementing addr reg */
 uint_t  dlim_ctreg_max; /* maximum transfer count minus one */
-uint_t  dlim_granular; /* granularity (and min size) of 
+uint_t  dlim_granular; /* granularity (and min size) of
                           transfer count */
 short  dlim_sgllen;    /* length of DMA scatter/gather list */
-uint_t  dlim_reqsize;  /* maximum transfer size in bytes of 
+uint_t  dlim_reqsize;  /* maximum transfer size in bytes of
                           a single I/O */
 .fi
 .in -2
@@ -131,13 +131,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityObsolete
+Interface Stability	Obsolete
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pam.conf 4 "19 June 2006" "SunOS 5.11" "File Formats"
+.TH PAM.CONF 4 "Jun 19, 2006"
 .SH NAME
 pam.conf \- configuration file for pluggable authentication modules
 .SH SYNOPSIS
@@ -21,7 +21,6 @@ for one or more of four possible services: authentication, account management,
 session management, and password management.
 .sp
 .ne 2
-.mk
 .na
 \fBauthentication service module\fR
 .ad
@@ -32,7 +31,6 @@ Provides functionality to authenticate a user and set up user credentials.
 
 .sp
 .ne 2
-.mk
 .na
 \fBaccount management module\fR
 .ad
@@ -45,7 +43,6 @@ verifying access hour restrictions.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsession management module\fR
 .ad
@@ -56,7 +53,6 @@ Provides functionality to set up and terminate login sessions.
 
 .sp
 .ne 2
-.mk
 .na
 \fBpassword management module\fR
 .ad
@@ -165,12 +161,10 @@ continuation and failure semantics of the modules, and can contain one of the
 following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbinding\fR\fR
 .ad
 .RS 14n
-.rt  
 If the service module returns success and no preceding \fBrequired\fR modules
 returned failures, immediately return success without calling any subsequent
 modules. If a failure is returned, treat the failure as a \fBrequired\fR module
@@ -179,12 +173,10 @@ failure, and continue to process the \fBPAM\fR stack.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinclude\fR\fR
 .ad
 .RS 14n
-.rt  
 Process the  lines from the \fBPAM\fR configuration file that is specified in
 the \fImodule_path\fR at this point in the \fBPAM\fR stack. The ``\fBother\fR''
 keyword is used if the specified service_name is not found. 32 levels of
@@ -193,12 +185,10 @@ included \fBPAM\fR configuration files are supported. Any options are ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBoptional\fR\fR
 .ad
 .RS 14n
-.rt  
 If the service module returns success, record the success, and continue to
 process the \fBPAM\fR stack. If a failure is returned, and it is the first
 \fBoptional\fR module failure, save the failure code as an \fBoptional\fR
@@ -207,12 +197,10 @@ failure. Continue to process the \fBPAM\fR stack.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrequired\fR\fR
 .ad
 .RS 14n
-.rt  
 If the service module returns success, record the success, and continue to
 process the \fBPAM\fR stack. If a failure is returned, and it is the first
 \fBrequired\fR failure, save the failure code as a \fBrequired\fR failure.
@@ -221,12 +209,10 @@ Continue to process the \fBPAM\fR stack.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrequisite\fR\fR
 .ad
 .RS 14n
-.rt  
 If the service module returns success, record the success, and continue to
 process the \fBPAM\fR stack. If a failure is returned, immediately return the
 first non-optional failure value recorded without calling any subsequent
@@ -237,12 +223,10 @@ those values.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsufficient\fR\fR
 .ad
 .RS 14n
-.rt  
 If the service module return success and no preceding required modules returned
 failures, immediately return success without calling any subsequent modules. If
 a failure is returned, treat the failure as an optional module failure, and
@@ -343,12 +327,10 @@ location of the service specific modules. The convention, however, is the
 following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpam_module_name.so.x\fR\fR
 .ad
 .RS 29n
-.rt  
 File that implements various function of specific authentication services. As
 the relative pathname specified, \fB/usr/lib/security/$ISA\fR is prepended to
 it.
@@ -356,23 +338,19 @@ it.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/pam.conf\fR\fR
 .ad
 .RS 29n
-.rt  
 Configuration file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/$ISA/libpam.so.1\fR\fR
 .ad
 .RS 29n
-.rt  
 File that implements the \fBPAM\fR framework library
 .RE
 
@@ -453,13 +431,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee Below.
+Interface Stability	See Below.
 .TE
 
 .sp

@@ -3,17 +3,17 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH usb_reset_device 9F "21 August 2007" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH USB_RESET_DEVICE 9F "Aug 21, 2007"
 .SH NAME
 usb_reset_device \- reset a USB device according to the reset_level.
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/usb/usba.h 
+#include <sys/usb/usba.h
 
 
 
-\fBint\fR \fBusb_reset_device\fR (\fBdev_info_t *\fR\fIdip\fR, 
+\fBint\fR \fBusb_reset_device\fR (\fBdev_info_t *\fR\fIdip\fR,
      \fBusb_dev_reset_lvl_t\fR \fIreset_level\fR);
 .fi
 
@@ -24,7 +24,6 @@ Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
@@ -35,7 +34,6 @@ Pointer to the devices's \fBdev_info\fR structure.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIreset_level\fR\fR
 .ad
@@ -70,7 +68,6 @@ Some \fBUSB\fR devices need the driver to upload firmware into the device's
 The valid values for the \fIreset_level\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSB_RESET_LVL_DEFAULT\fR\fR
 .ad
@@ -85,7 +82,6 @@ the descriptors.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSB_RESET_LVL_REATTACH\fR\fR
 .ad
@@ -113,12 +109,10 @@ depending on where the failure occurred.
 The return values for the \fBusb_reset_device()\fR function are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSB_SUCCESS\fR\fR
 .ad
 .RS 23n
-.rt  
 If \fBUSB_RESET_LVL_DEFAULT\fR is specified, the device was reset successfully.
 If \fBUSB_RESET_LVL_REATTACH\fR is specified, reattaching was started
 successfully or a previous reset is still in progress.
@@ -126,12 +120,10 @@ successfully or a previous reset is still in progress.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSB_FAILURE\fR\fR
 .ad
 .RS 23n
-.rt  
 The state of the device's parent hub is invalid (disconnected or suspended).
 This is called when the driver being detached. If \fBUSB_RESET_LVL_DEFAULT\fR
 is specified, the device failed to be reset. If \fBUSB_RESET_LVL_REATTACH\fR is
@@ -140,46 +132,38 @@ specified, reattaching failed to start.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSB_INVALID_ARGS\fR\fR
 .ad
 .RS 23n
-.rt  
 Invalid arguments.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSB_INVALID_PERM\fR\fR
 .ad
 .RS 23n
-.rt  
 The driver of the dip does not own the entire device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSB_BUSY\fR\fR
 .ad
 .RS 23n
-.rt  
 If \fBUSB_RESET_LVL_DEFAULT\fR is specified, one or more pipes other than the
 default control pipe are open on the device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSB_INVALID_CONTEXT\fR\fR
 .ad
 .RS 23n
-.rt  
 If \fBUSB_RESET_LVL_DEFAULT\fR is specified, called from interrupt context
 .RE
 
@@ -197,7 +181,7 @@ state:
 xxx_configure()
 {
     xxx_set_parameter1();
- 
+
     if (xxx_set_parameter2() == USB_FAILURE) {
 
        /* Close all the opened pipes except the default pipe */
@@ -209,11 +193,11 @@ xxx_configure()
            /* Re-configure the device */
            xxx_set_parameter1();
            xxx_set_parameter2();
- 
+
            /* Open the closed pipes if needed */
            ...
        } else {
-           /* Failed to reset the device, check the return value for 
+           /* Failed to reset the device, check the return value for
               further process */
            ...
        }
@@ -243,7 +227,7 @@ static int xxx_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
             /* The re-enumeration has been started up, just return */
             return (DDI_SUCCESS);
        } else {
-            /* Failed to start the re-enumeration, check the return value 
+            /* Failed to start the re-enumeration, check the return value
                for further process*/
                ...
              return (DDI_FAILURE);
@@ -265,15 +249,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitecturePCI-based systems
+Architecture	PCI-based systems
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
@@ -296,7 +279,6 @@ WARNING: \fIdev_path\fR hubd\fIinstance_num\fR \fIdriver_name\fR Error message .
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdriver_name\fR \fIinstance_num\fR is under bus power management, cannot
 be reset. Please disconnect and reconnect this device.\fR
@@ -310,7 +292,6 @@ reconnect it to system.
 
 .sp
 .ne 2
-.mk
 .na
 \fBTime out when resetting the device \fIdriver_name\fR \fIinstance_num\fR.
 Please disconnect and reconnect it to system.\fR
@@ -324,7 +305,6 @@ while and reconnect it to system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdriver_name\fR \fIinstance_num\fR cannot be reset due to other
 applications are using it, please first close these applications, then

@@ -1,9 +1,9 @@
 '\" te
-.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved 
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH usbvc 7D "18 July 2008" "SunOS 5.11" "Devices"
+.TH USBVC 7D "Jul 18, 2008"
 .SH NAME
 usbvc \- USB video class driver
 .SH SYNOPSIS
@@ -63,7 +63,6 @@ of this manpage. In such cases, you should rely on the information in this
 manpage.
 .sp
 .ne 2
-.mk
 .na
 \fBVIDIOC_QUERYCAP\fR
 .ad
@@ -77,7 +76,6 @@ has no meaning in Solaris and is always set to 1.
 
 .sp
 .ne 2
-.mk
 .na
 \fBVIDIOC_ENUM_FMT\fR
 .ad
@@ -88,7 +86,6 @@ Enumerate the video formats supported by the device.
 
 .sp
 .ne 2
-.mk
 .na
 \fBVIDIOC_S_FMT\fR
 .ad
@@ -99,7 +96,6 @@ Set a video format.
 
 .sp
 .ne 2
-.mk
 .na
 \fBVIDIOC_G_FMT\fR
 .ad
@@ -110,7 +106,6 @@ Get a video format.
 
 .sp
 .ne 2
-.mk
 .na
 \fBVIDIOC_REQBUFS\fR
 .ad
@@ -123,7 +118,6 @@ all allocated buffers. (For \fBmmap\fR(2) only).
 
 .sp
 .ne 2
-.mk
 .na
 \fBVIDIOC_QUERYBUF\fR
 .ad
@@ -134,7 +128,6 @@ Query a given buffer's status. (For \fBmmap\fR(2) only).
 
 .sp
 .ne 2
-.mk
 .na
 \fBVIDIOC_QBUF\fR
 .ad
@@ -146,7 +139,6 @@ only).
 
 .sp
 .ne 2
-.mk
 .na
 \fBVIDIOC_DQBUF\fR
 .ad
@@ -158,7 +150,6 @@ only).
 
 .sp
 .ne 2
-.mk
 .na
 \fBVIDIOC_STREAMON\fR
 .ad
@@ -169,7 +160,6 @@ Start reading video data.
 
 .sp
 .ne 2
-.mk
 .na
 \fBVIDIOC_STREAMOFF\fR
 .ad
@@ -180,7 +170,6 @@ Stop reading video data.
 
 .sp
 .ne 2
-.mk
 .na
 \fBVIDIOC_ENUMINPUT\fR
 .ad
@@ -192,7 +181,6 @@ input only.
 
 .sp
 .ne 2
-.mk
 .na
 \fBVIDIOC_G_INPUT\fR
 .ad
@@ -204,7 +192,6 @@ one input only.
 
 .sp
 .ne 2
-.mk
 .na
 \fBVIDIOC_S_INPUT\fR
 .ad
@@ -216,7 +203,6 @@ one input only.
 
 .sp
 .ne 2
-.mk
 .na
 \fBVIDIOC_QUERYCTRL\fR
 .ad
@@ -229,7 +215,6 @@ gamma video controls.
 
 .sp
 .ne 2
-.mk
 .na
 \fBVIDIOC_G_CTRL\fR
 .ad
@@ -240,7 +225,6 @@ Get the device's current video control.
 
 .sp
 .ne 2
-.mk
 .na
 \fBVIDIOC_S_CTRL\fR
 .ad
@@ -251,7 +235,6 @@ Set the device's current video control.
 
 .sp
 .ne 2
-.mk
 .na
 \fBVIDIOC_G_PARM\fR
 .ad
@@ -263,7 +246,6 @@ used internally by driver in read/write mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fBVIDIOC_S_PARM\fR
 .ad
@@ -276,35 +258,29 @@ used internally by driver in read/write mode.
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBUSY\fR\fR
 .ad
 .RS 10n
-.rt  
 An open was attempted after the device has already been opened.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 An  unsupported ioctl is received or an ioctl is attempted with an out-of-range
 value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 10n
-.rt  
 The driver received an  unrecoverable device error or the device did not
 respond or the device stalled when attempting an access. A \fBread\fR(2) or
 \fBioctl\fR(2) did not complete due to a peripheral access.
@@ -312,31 +288,26 @@ respond or the device stalled when attempting an access. A \fBread\fR(2) or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENXIO\fR\fR
 .ad
 .RS 10n
-.rt  
 The driver received  an \fBopen\fR(2) request for a device for which the attach
 failed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBENODEV\fR
 .ad
 .RS 10n
-.rt  
 The driver received  an \fBopen\fR(2) request for a disconnected device.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/usbvc\fR\fR
 .ad
@@ -347,7 +318,6 @@ The driver received  an \fBopen\fR(2) request for a disconnected device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/amd64/usbvc\fR\fR
 .ad
@@ -358,7 +328,6 @@ The driver received  an \fBopen\fR(2) request for a disconnected device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/sparcv9/usbvc\fR\fR
 .ad
@@ -369,7 +338,6 @@ The driver received  an \fBopen\fR(2) request for a disconnected device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/usb/*/*/*\fR\fR
 .ad
@@ -380,7 +348,6 @@ The driver received  an \fBopen\fR(2) request for a disconnected device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/videoN\fR\fR
 .ad
@@ -397,13 +364,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Architecture SPARC, x86, PCI-based systems
+Architecture	 SPARC, x86, PCI-based systems
 .TE
 
 .SH SEE ALSO
@@ -454,7 +420,6 @@ Warning: <device path> (usbvc<instance num>):Error Message...
 
 .sp
 .ne 2
-.mk
 .na
 \fBDevice was disconnected while open. Data may have been lost.\fR
 .ad
@@ -466,7 +431,6 @@ data transfer was in progress. The job may be aborted.
 
 .sp
 .ne 2
-.mk
 .na
 \fBCannot access <device>. Please reconnect.\fR
 .ad
@@ -479,7 +443,6 @@ of the original device.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDevice is not identical to the previous one on this port. Please disconnect
 and reconnect.\fR

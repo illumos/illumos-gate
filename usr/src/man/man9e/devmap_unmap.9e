@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH devmap_unmap 9E "21 Jan 1997" "SunOS 5.11" "Driver Entry Points"
+.TH DEVMAP_UNMAP 9E "Jan 21, 1997"
 .SH NAME
 devmap_unmap \- device mapping unmap entry point
 .SH SYNOPSIS
@@ -14,8 +14,8 @@ devmap_unmap \- device mapping unmap entry point
 
 
 
-\fBvoid prefix\fR\fBdevmap_unmap\fR(\fBdevmap_cookie_t\fR \fIdhp\fR, \fBvoid *\fR\fIpvtp\fR, 
-     \fBoffset_t\fR \fIoff\fR, \fBsize_t\fR\fIlen\fR, \fBdevmap_cookie_t\fR \fInew_dhp1\fR, 
+\fBvoid prefix\fR\fBdevmap_unmap\fR(\fBdevmap_cookie_t\fR \fIdhp\fR, \fBvoid *\fR\fIpvtp\fR,
+     \fBoffset_t\fR \fIoff\fR, \fBsize_t\fR\fIlen\fR, \fBdevmap_cookie_t\fR \fInew_dhp1\fR,
      \fBvoid **\fR\fInew_pvtp1\fR, \fBdevmap_cookie_t\fR\fInew_dhp2\fR, \fBvoid **\fR\fInew_pvtp2\fR);
 .fi
 
@@ -26,68 +26,56 @@ Solaris DDI specific (Solaris DDI).
 .SH ARGUMENTS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdhp\fR \fR
 .ad
 .RS 14n
-.rt  
 An opaque mapping handle that the system uses to describe the mapping.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpvtp\fR \fR
 .ad
 .RS 14n
-.rt  
 Driver private mapping data.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoff\fR \fR
 .ad
 .RS 14n
-.rt  
 User offset within the logical device memory at which the unmapping begins.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlen\fR \fR
 .ad
 .RS 14n
-.rt  
 Length (in bytes) of the memory being unmapped.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInew_dhp1\fR \fR
 .ad
 .RS 14n
-.rt  
 The opaque mapping handle that the system uses to describe the new region that
 ends at (\fIoff\fR - 1) . \fInew_dhp1\fR may be  \fINULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInew_pvtp1\fR \fR
 .ad
 .RS 14n
-.rt  
 A pointer to be filled in by the driver with the driver  private mapping data
 for the new region that ends at (\fIoff\fR - 1); ignored if \fInew_dhp1\fR is
 \fINULL\fR.
@@ -95,24 +83,20 @@ for the new region that ends at (\fIoff\fR - 1); ignored if \fInew_dhp1\fR is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInew_dhp2\fR \fR
 .ad
 .RS 14n
-.rt  
 The opaque mapping handle that the system uses to describe the new region that
 begins at (\fIoff \fR + \fIlen\fR); \fInew_dhp2\fR may be  \fINULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInew_pvtp2\fR \fR
 .ad
 .RS 14n
-.rt  
 A pointer to be filled in by the driver with the driver private mapping data
 for the new region that begins at (\fIoff\fR + \fIlen\fR);  ignored if
 \fInew_dhp2\fR is  \fINULL\fR.

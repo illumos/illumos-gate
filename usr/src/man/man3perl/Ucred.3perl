@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH Ucred 3PERL "30 Jan 2004" "SunOS 5.11" "Perl Library Functions"
+.TH UCRED 3PERL "Jan 30, 2004"
 .SH NAME
 Ucred \- Perl interface to User Credentials
 .SH SYNOPSIS
@@ -23,7 +23,6 @@ None.
 .SS "Functions"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBucred_get($pid)\fR\fR
 .ad
@@ -36,7 +35,6 @@ credentials of that process.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgetpeerucred($fd)\fR\fR
 .ad
@@ -50,7 +48,6 @@ availble.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBucred_geteuid($ucred)\fR\fR
 .ad
@@ -61,7 +58,6 @@ This function returns the effective uid of a user credential, if available.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBucred_getruid($ucred)\fR\fR
 .ad
@@ -72,7 +68,6 @@ This function returns the real uid of a user credential, if available.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBucred_getsuid($ucred)\fR\fR
 .ad
@@ -83,7 +78,6 @@ This function returns the saved uid of a user credential, if available.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBucred_getegid($ucred)\fR\fR
 .ad
@@ -94,7 +88,6 @@ This function returns the effective group of a user credential, if available.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBucred_getrgid($ucred)\fR\fR
 .ad
@@ -105,7 +98,6 @@ This function returns the real group of a user credential, if available.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBucred_getsgid($ucred)\fR\fR
 .ad
@@ -116,7 +108,6 @@ This function returns the saved group of a user credential, if available.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBucred_getgroups($ucred)\fR\fR
 .ad
@@ -129,7 +120,6 @@ groups is returned in \fBSCALAR\fR context.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBucred_getprivset($ucred, $which)\fR\fR
 .ad
@@ -141,7 +131,6 @@ credential, if available.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBucred_getpflags($ucred, $flags)\fR\fR
 .ad
@@ -153,7 +142,6 @@ credential, if available.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBucred_getpid($ucred)\fR\fR
 .ad
@@ -164,7 +152,6 @@ This function returns the process ID of a user credential, if available.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBucred_getprojid($ucred)\fR\fR
 .ad
@@ -175,7 +162,6 @@ This function returns the project ID of a user credential, if available.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBucred_getzoneid($ucred)\fR\fR
 .ad
@@ -199,23 +185,19 @@ By default nothing is exported from this module. The following tags can be used
 to selectively import constants and functions defined in this module:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB:SYSCALLS\fR\fR
 .ad
 .RS 13n
-.rt  
 \fBucred_get()\fR, \fBgetpeerucred()\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB:LIBCALLS\fR\fR
 .ad
 .RS 13n
-.rt  
 \fBucred_geteuid()\fR, \fBucred_getruid()\fR, \fBucred_getsuid()\fR,
 \fBucred_getegid()\fR, \fBucred_getrgid()\fR, \fBucred_getsgid()\fR,
 \fBucred_getgroups()\fR, \fBucred_getprivset()\fR, \fBucred_getpflags()\fR,
@@ -224,12 +206,10 @@ to selectively import constants and functions defined in this module:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB:ALL\fR\fR
 .ad
 .RS 13n
-.rt  
 \fB:SYSCALLS()\fR, \fB:LIBCALLS()\fR
 .RE
 
@@ -241,13 +221,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH usb_mid 7D "22 Dec 2006" "SunOS 5.11" "Devices"
+.TH USB_MID 7D "Dec 22, 2006"
 .SH NAME
 usb_mid \- USB Multi Interface Driver
 .SH SYNOPSIS
 .LP
 .nf
-\fBdevice@\fR\fIunit-address\fR 
+\fBdevice@\fR\fIunit-address\fR
 .fi
 
 .SH DESCRIPTION
@@ -34,7 +34,6 @@ interface only if none of its children are explicitly bound to the
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/usb_mid\fR \fR
 .ad
@@ -45,7 +44,6 @@ interface only if none of its children are explicitly bound to the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/amd64/usb_mid\fR \fR
 .ad
@@ -56,7 +54,6 @@ interface only if none of its children are explicitly bound to the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/sparcv9/usb_mid\fR \fR
 .ad
@@ -67,7 +64,6 @@ interface only if none of its children are explicitly bound to the
 
 .sp
 .ne 2
-.mk
 .na
 \fB/dev/usb/*/*/* \fR
 .ad
@@ -84,13 +80,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureSPARC & x86, PCI-based systems
+Architecture	SPARC & x86, PCI-based systems
 .TE
 
 .SH SEE ALSO
@@ -128,7 +123,6 @@ Warning: <device path> (usb_mid<instance number>): Error Message...
 
 .sp
 .ne 2
-.mk
 .na
 \fBCannot access <device>. Please reconnect.\fR
 .ad
@@ -141,7 +135,6 @@ of the original device.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDevice not identical to the previous one on this port. Please disconnect and
 reconnect.\fR
@@ -154,7 +147,6 @@ to identify the original device with a name string.
 
 .sp
 .ne 2
-.mk
 .na
 \fBPlease disconnect and reconnect this device.\fR
 .ad
@@ -177,7 +169,6 @@ the following manner:
 
 .sp
 .ne 2
-.mk
 .na
 \fBNo driver found for interface <n> (nodename: <string>) of <device>. \fR
 .ad
@@ -188,7 +179,6 @@ No driver is available for this interface.
 
 .sp
 .ne 2
-.mk
 .na
 \fBNo driver found for device <device>. \fR
 .ad
@@ -199,7 +189,6 @@ No driver is available for this interface.
 
 .sp
 .ne 2
-.mk
 .na
 \fBCan't support ugen for multiple configuration devices that have attached
 child interface drivers.\fR

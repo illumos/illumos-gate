@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH umount 2 "4 Aug 2008" "SunOS 5.11" "System Calls"
+.TH UMOUNT 2 "Aug 4, 2008"
 .SH NAME
 umount, umount2 \- unmount a file system
 .SH SYNOPSIS
@@ -35,12 +35,10 @@ additional capability of unmounting file systems even if there are open files
 active. The \fImflag\fR argument must contain one of the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB0\fR
 .ad
 .RS 12n
-.rt  
 Perform a normal unmount that is equivalent to \fBumount()\fR. The
 \fBumount2()\fR function  returns \fBEBUSY\fR if there are open files active
 within the file system to be unmounted.
@@ -48,12 +46,10 @@ within the file system to be unmounted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMS_FORCE\fR\fR
 .ad
 .RS 12n
-.rt  
 Unmount the file system, even if there are open files active. A forced unmount
 can result in loss of data, so it should be used only when a regular unmount is
 unsuccessful. The \fBumount2()\fR function  returns \fBENOTSUP\fR if the
@@ -72,12 +68,10 @@ returned and \fBerrno\fR is set to indicate the error.
 The \fBumount()\fR and \fBumount2()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 16n
-.rt  
 The permission bits of the mount point do not permit read/write access or
 search permission is denied on a component of the path prefix.
 .sp
@@ -92,57 +86,47 @@ mounts or read-write access in the case of read/write mounts.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBUSY\fR\fR
 .ad
 .RS 16n
-.rt  
 A file on \fIfile\fR is busy.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 16n
-.rt  
 The file pointed to by \fIfile\fR points to an illegal address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 16n
-.rt  
 The file pointed to by \fIfile\fR is not mounted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBELOOP\fR\fR
 .ad
 .RS 16n
-.rt  
 Too many symbolic links were encountered in translating the path pointed to by
 \fIfile\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENAMETOOLONG\fR\fR
 .ad
 .RS 16n
-.rt  
 The length of the \fIfile\fR argument exceeds  \fIPATH_MAX\fR, or the length of
 a  \fIfile\fR component exceeds \fINAME_MAX\fR while \fB_POSIX_NO_TRUNC\fR is
 in effect.
@@ -150,58 +134,48 @@ in effect.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 16n
-.rt  
 The file pointed to by \fIfile\fR does not exist or is not an absolute path.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOLINK\fR\fR
 .ad
 .RS 16n
-.rt  
 The file pointed to by \fIfile\fR is on a remote machine and the link to that
 machine is no longer active.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTBLK\fR\fR
 .ad
 .RS 16n
-.rt  
 The file pointed to by \fIfile\fR is not a block special device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 16n
-.rt  
 The {\fBPRIV_SYS_MOUNT\fR} privilege is not asserted in the effective set of
 the calling process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEREMOTE\fR\fR
 .ad
 .RS 16n
-.rt  
 The file pointed to by \fIfile\fR is remote.
 .RE
 
@@ -210,12 +184,10 @@ The file pointed to by \fIfile\fR is remote.
 The \fBumount2()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSUP\fR\fR
 .ad
 .RS 11n
-.rt  
 The file pointed to by \fIfile\fR does not support this operation.
 .RE
 

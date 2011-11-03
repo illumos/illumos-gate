@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH elf_begin 3ELF "11 Jul 2001" "SunOS 5.11" "ELF Library Functions"
+.TH ELF_BEGIN 3ELF "Jul 11, 2001"
 .SH NAME
 elf_begin, elf_end, elf_memory, elf_next, elf_rand \- process ELF object files
 .SH SYNOPSIS
@@ -53,12 +53,10 @@ offset is undefined.
 The \fIcmd\fR argument can take the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBELF_C_NULL\fR\fR
 .ad
 .RS 15n
-.rt  
 When a program sets \fIcmd\fR to this value, \fBelf_begin()\fR returns a null
 pointer, without opening a new descriptor. \fIref\fR is ignored for this
 command. See the examples below for more information.
@@ -66,12 +64,10 @@ command. See the examples below for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBELF_C_READ\fR\fR
 .ad
 .RS 15n
-.rt  
 When a program wants to examine the contents of an existing file, it should set
 \fIcmd\fR to this value. Depending on the value of \fIref\fR, this command
 examines archive members or entire files. Three cases can occur.
@@ -113,12 +109,10 @@ examples below for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBELF_C_RDWR\fR\fR
 .ad
 .RS 15n
-.rt  
 This command duplicates the actions of \fBELF_C_READ\fR and additionally allows
 the program to update the file image (see \fBelf_update\fR(3ELF)). Using
 \fBELF_C_READ\fR gives a read-only view of the file, while \fBELF_C_RDWR\fR
@@ -129,12 +123,10 @@ the \fBELF_C_RDWR\fR command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBELF_C_WRITE\fR\fR
 .ad
 .RS 15n
-.rt  
 If the program wants to ignore previous file contents, presumably to create a
 new file, it should set \fIcmd\fR to this value. \fIref\fR is ignored for this
 command.
@@ -366,15 +358,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStable
+Interface Stability	Stable
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

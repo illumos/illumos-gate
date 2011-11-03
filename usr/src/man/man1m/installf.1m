@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH installf 1M "30 Oct 2007" "SunOS 5.11" "System Administration Commands"
+.TH INSTALLF 1M "Oct 30, 2007"
 .SH NAME
 installf \- add a file to the software installation database
 .SH SYNOPSIS
 .LP
 .nf
-\fBinstallf\fR [\fB-c\fR \fIclass\fR] [ [\fB-M\fR] \fB-R\fR \fIroot_path\fR] [\fB-V\fR \fIfs_file\fR] \fIpkginst\fR \fIpathname\fR 
+\fBinstallf\fR [\fB-c\fR \fIclass\fR] [ [\fB-M\fR] \fB-R\fR \fIroot_path\fR] [\fB-V\fR \fIfs_file\fR] \fIpkginst\fR \fIpathname\fR
      [\fIftype\fR [\fImajor\fR \fIminor\fR] [\fImode\fR \fIowner\fR \fIgroup\fR]]
 .fi
 
@@ -59,36 +59,30 @@ datastream of  up to 4 GB.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIclass\fR\fR
 .ad
 .RS 16n
-.rt  
 Class to which installed objects should be associated. Default class is
 \fBnone\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 16n
-.rt  
 Indicates that installation is complete. This option is used with the final
 invocation of \fBinstallf\fR (for all files of a given class).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR\fR
 .ad
 .RS 16n
-.rt  
 Instruct \fBinstallf\fR not to use the \fB$\fR\fIroot_path\fR\fB/etc/vfstab\fR
 file for determining the client's mount points. This option assumes the mount
 points are correct on the server and it behaves consistently with Solaris 2.5
@@ -97,12 +91,10 @@ and earlier releases.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-R\fR \fIroot_path\fR\fR
 .ad
 .RS 16n
-.rt  
 Define the full path name of a directory to use as the \fIroot_path\fR. All
 files, including package system information files, are relocated to a directory
 tree starting in the specified \fIroot_path\fR. The \fIroot_path\fR can be
@@ -126,12 +118,10 @@ zone's file system. See \fBzones\fR(5).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR \fIfs_file\fR\fR
 .ad
 .RS 16n
-.rt  
 Specify an alternative \fIfs_file\fR to map the client's file systems. For
 example, used in situations where the \fB$\fR\fIroot_path\fR\fB/etc/vfstab\fR
 file is non-existent or unreliable.
@@ -140,143 +130,117 @@ file is non-existent or unreliable.
 .SH OPERANDS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpkginst\fR\fR
 .ad
 .RS 12n
-.rt  
 Name of package instance with which the pathname should be associated.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpathname\fR\fR
 .ad
 .RS 12n
-.rt  
 Pathname that is being created or modified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIftype\fR\fR
 .ad
 .RS 12n
-.rt  
 A one-character field that indicates the file type. Possible file types
 include:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBb\fR\fR
 .ad
 .RS 5n
-.rt  
 block special device
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBc\fR\fR
 .ad
 .RS 5n
-.rt  
 character special device
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd\fR\fR
 .ad
 .RS 5n
-.rt  
 directory
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBe\fR\fR
 .ad
 .RS 5n
-.rt  
 a file to be edited upon installation or removal
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBf\fR\fR
 .ad
 .RS 5n
-.rt  
 a standard executable or data file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBl\fR\fR
 .ad
 .RS 5n
-.rt  
 linked file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBp\fR\fR
 .ad
 .RS 5n
-.rt  
 named pipe
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fR
 .ad
 .RS 5n
-.rt  
 symbolic link
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBv\fR\fR
 .ad
 .RS 5n
-.rt  
 volatile file (one whose contents are expected to change)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBx\fR\fR
 .ad
 .RS 5n
-.rt  
 an exclusive directory
 .RE
 
@@ -284,36 +248,30 @@ an exclusive directory
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImajor\fR\fR
 .ad
 .RS 12n
-.rt  
 The major device number. The field is only specified for block or character
 special devices.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIminor\fR\fR
 .ad
 .RS 12n
-.rt  
 The minor device number. The field is only specified for block or character
 special devices.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImode\fR\fR
 .ad
 .RS 12n
-.rt  
 The octal mode of the file (for example, 0664). A question mark (\fB?\fR)
 indicates that the mode will be left unchanged, implying that the file already
 exists on the target machine. This field is not used for linked or symbolically
@@ -322,12 +280,10 @@ linked files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIowner\fR\fR
 .ad
 .RS 12n
-.rt  
 The owner of the file (for example, \fBbin\fR or \fBroot\fR). The field is
 limited to 14 characters in length. A question mark (\fB?\fR) indicates that
 the owner will be left unchanged, implying that the file already exists on the
@@ -336,12 +292,10 @@ target machine. This field is not used for linked or symbolically linked files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIgroup\fR\fR
 .ad
 .RS 12n
-.rt  
 The group to which the file belongs (for example, \fBbin\fR or \fBsys\fR). The
 field is limited to 14 characters in length. A question mark (\fB?\fR)
 indicates that the group will be left unchanged, implying that the file already
@@ -393,12 +347,10 @@ variable is set when \fBpkgadd\fR(1M) or \fBpkgrm\fR(1M) is invoked with the
 \fB-R\fR option.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPKG_INSTALL_ROOT\fR\fR
 .ad
 .RS 20n
-.rt  
 If present, defines the full path name of a directory to use as the system's
 \fBPKG_INSTALL_ROOT\fR path. All product and package information files are then
 looked for in the directory tree, starting with the specified
@@ -409,23 +361,19 @@ is used.
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -448,13 +396,12 @@ defined:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fIftype\fRRequired Fields
-\fBp\fR, \fBx\fR, \fBd\fR, \fBf\fR, \fBv\fR, or \fBe\fR\fBmode  owner  group\fR
-\fBc\fR or \fBb\fR\fBmajor  minor mode  owner  group\fR
+box;
+l l
+l l .
+\fIftype\fR	Required Fields
+\fBp\fR, \fBx\fR, \fBd\fR, \fBf\fR, \fBv\fR, or \fBe\fR	\fBmode  owner  group\fR
+\fBc\fR or \fBb\fR	\fBmajor  minor mode  owner  group\fR
 .TE
 
 .sp

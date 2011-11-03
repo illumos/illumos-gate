@@ -1,9 +1,9 @@
 '\" te
-.\"  Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved 
+.\"  Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH random 7D "1 Sep 2008" "SunOS 5.11" "Devices"
+.TH RANDOM 7D "Sep 1, 2008"
 .SH NAME
 random, urandom \- Strong random number generator device
 .SH SYNOPSIS
@@ -68,35 +68,29 @@ which providers will be used with \fB/dev/random\fR.
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 11n
-.rt  
 \fBO_NDELAY\fR or \fBO_NONBLOCK\fR was set and no random bytes are available
 for reading from \fB/dev/random\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 11n
-.rt  
 A signal was caught while reading and no data was             transferred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOXIO \fR\fR
 .ad
 .RS 11n
-.rt  
 \fBopen\fR(2) request failed on \fB/dev/random\fR because no entropy provider
 is available.
 .RE
@@ -104,24 +98,20 @@ is available.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/random\fR\fR
 .ad
 .RS 16n
-.rt  
- 
+
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/urandom\fR\fR
 .ad
 .RS 16n
-.rt  
- 
+
 .RE
 
 .SH ATTRIBUTES
@@ -132,12 +122,11 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
-Interface StabilityEvolving
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

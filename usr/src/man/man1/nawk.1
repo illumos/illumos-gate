@@ -2,26 +2,26 @@
 .\" Copyright 1989 AT&T
 .\" Copyright 1992, X/Open Company Limited  All Rights Reserved
 .\" Portions Copyright (c) 2005, 2006 Sun Microsystems, Inc.  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH nawk 1 "24 May 2006" "SunOS 5.11" "User Commands"
+.TH NAWK 1 "May 24, 2006"
 .SH NAME
 nawk \- pattern scanning and processing language
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/nawk\fR [\fB-F\fR \fIERE\fR] [\fB-v\fR \fIassignment\fR] \fI\&'program'\fR | \fB-f\fR \fIprogfile\fR... 
+\fB/usr/bin/nawk\fR [\fB-F\fR \fIERE\fR] [\fB-v\fR \fIassignment\fR] \fI\&'program'\fR | \fB-f\fR \fIprogfile\fR...
      [\fIargument\fR]...
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/awk\fR [\fB-F\fR \fIERE\fR] [\fB-v\fR \fIassignment\fR]... \fI\&'program'\fR | \fB-f\fR \fIprogfile\fR... 
+\fB/usr/xpg4/bin/awk\fR [\fB-F\fR \fIERE\fR] [\fB-v\fR \fIassignment\fR]... \fI\&'program'\fR | \fB-f\fR \fIprogfile\fR...
      [\fIargument\fR]...
 .fi
 
@@ -59,24 +59,20 @@ values of all fields and the \fBNF\fR built-in variable.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR \fIERE\fR\fR
 .ad
 .RS 17n
-.rt  
 Define the input field separator to be the extended regular expression
 \fIERE\fR, before any input is read (can be a character).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIprogfile\fR\fR
 .ad
 .RS 17n
-.rt  
 Specifies the pathname of the file \fIprogfile\fR containing a \fBnawk\fR
 program. If multiple instances of this option are specified, the concatenation
 of the files specified as \fIprogfile\fR in the order specified is the
@@ -86,12 +82,10 @@ the command line as a single argument.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR \fIassignment\fR\fR
 .ad
 .RS 17n
-.rt  
 The \fIassignment\fR argument must be in the same form as an \fIassignment\fR
 operand. The assignment is of the form \fIvar=value\fR, where \fIvar\fR is the
 name of one of the variables described below. The specified assignment occurs
@@ -106,12 +100,10 @@ specified.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprogram\fR\fR
 .ad
 .RS 12n
-.rt  
 If no \fB-f\fR option is specified, the first operand to \fBnawk\fR is the text
 of the \fBnawk\fR program. The application supplies the \fIprogram\fR operand
 as a single argument to \fBnawk.\fR If the text does not end in a newline
@@ -120,21 +112,17 @@ character, \fBnawk\fR interprets the text as if it did.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIargument\fR\fR
 .ad
 .RS 12n
-.rt  
 Either of the following two types of \fIargument\fR can be intermixed:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fR
 .ad
 .RS 14n
-.rt  
 A pathname of a file that contains the input to be read, which is matched
 against the set of patterns in the program. If no \fIfile\fR operands are
 specified, or if a \fIfile\fR operand is \fB\(mi\fR, the standard input is
@@ -143,12 +131,10 @@ used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIassignment\fR\fR
 .ad
 .RS 14n
-.rt  
 An operand that begins with an underscore or alphabetic character from the
 portable character set, followed by a sequence of underscores, digits and
 alphabetics from the portable character set, followed by the \fB=\fR character
@@ -258,66 +244,64 @@ assignment operator).
 
 .sp
 .TS
-tab();
-cw(1.38i) cw(1.38i) cw(1.35i) cw(1.39i) 
-lw(1.38i) lw(1.38i) lw(1.35i) lw(1.39i) 
-.
-\fBSyntax\fR\fBName\fR\fBType of Result\fR\fBAssociativity\fR
+c c c c
+l l l l .
+\fBSyntax\fR	\fBName\fR	\fBType of Result\fR	\fBAssociativity\fR
 _
-( \fIexpr\fR )Groupingtype of \fIexpr\fRn/a
+( \fIexpr\fR )	Grouping	type of \fIexpr\fR	n/a
 _
-$\fIexpr\fRField referencestringn/a
+$\fIexpr\fR	Field reference	string	n/a
 _
-++ \fIlvalue\fRPre-incrementnumericn/a
- \(mi\(mi\fIlvalue\fRPre-decrementnumericn/a
-\fIlvalue\fR ++Post-incrementnumericn/a
-\fIlvalue\fR \(mi\(miPost-decrement numericn/a
+++ \fIlvalue\fR	Pre-increment	numeric	n/a
+ \(mi\(mi\fIlvalue\fR	Pre-decrement	numeric	n/a
+\fIlvalue\fR ++	Post-increment	numeric	n/a
+\fIlvalue\fR \(mi\(mi	Post-decrement 	numeric	n/a
 _
-\fIexpr\fR ^ \fIexpr\fRExponentiationnumericright
+\fIexpr\fR ^ \fIexpr\fR	Exponentiation	numeric	right
 _
-! \fIexpr\fRLogical notnumericn/a
-+ \fIexpr\fRUnary plusnumericn/a
-\(mi \fIexpr\fRUnary minusnumericn/a
+! \fIexpr\fR	Logical not	numeric	n/a
++ \fIexpr\fR	Unary plus	numeric	n/a
+\(mi \fIexpr\fR	Unary minus	numeric	n/a
 _
-\fIexpr\fR * \fIexpr\fRMultiplicationnumericleft
-\fIexpr\fR / \fIexpr\fRDivisionnumericleft
-\fIexpr\fR % \fIexpr\fRModulusnumericleft
+\fIexpr\fR * \fIexpr\fR	Multiplication	numeric	left
+\fIexpr\fR / \fIexpr\fR	Division	numeric	left
+\fIexpr\fR % \fIexpr\fR	Modulus	numeric	left
 _
-\fIexpr\fR + \fIexpr\fRAdditionnumericleft
-\fIexpr\fR \(mi \fIexpr\fRSubtractionnumeric left
+\fIexpr\fR + \fIexpr\fR	Addition	numeric	left
+\fIexpr\fR \(mi \fIexpr\fR	Subtraction	numeric 	left
 _
-\fIexpr\fR \fIexpr\fRString concatenationstringleft
+\fIexpr\fR \fIexpr\fR	String concatenation	string	left
 _
-\fIexpr\fR < \fIexpr\fRLess thannumericnone
-\fIexpr\fR <= \fIexpr\fRLess than or equal tonumericnone
-\fIexpr\fR != \fIexpr\fRNot equal tonumericnone
-\fIexpr\fR == \fIexpr\fREqual tonumericnone
-\fIexpr\fR > \fIexpr\fRGreater thannumericnone
-\fIexpr\fR >= \fIexpr\fRGreater than or equal tonumericnone
+\fIexpr\fR < \fIexpr\fR	Less than	numeric	none
+\fIexpr\fR <= \fIexpr\fR	Less than or equal to	numeric	none
+\fIexpr\fR != \fIexpr\fR	Not equal to	numeric	none
+\fIexpr\fR == \fIexpr\fR	Equal to	numeric	none
+\fIexpr\fR > \fIexpr\fR	Greater than	numeric	none
+\fIexpr\fR >= \fIexpr\fR	Greater than or equal to	numeric	none
 _
-\fIexpr\fR ~ \fIexpr\fRERE matchnumericnone
-\fIexpr\fR !~ \fIexpr\fRERE non-match numericnone
+\fIexpr\fR ~ \fIexpr\fR	ERE match	numeric	none
+\fIexpr\fR !~ \fIexpr\fR	ERE non-match	 numeric	none
 _
-\fIexpr\fR in arrayArray membershipnumericleft
-( \fIindex\fR ) inMulti-dimension arraynumericleft
-    \fIarray\fR    membership
+\fIexpr\fR in array	Array membership	numeric	left
+( \fIindex\fR ) in	Multi-dimension array	numeric	left
+    \fIarray\fR	    membership		
 _
-\fBexpr\fR && \fIexpr\fRLogical ANDnumericleft
+\fBexpr\fR && \fIexpr\fR	Logical AND	numeric	left
 _
-\fBexpr\fR |\|| \fIexpr\fRLogical ORnumericleft
+\fBexpr\fR |\|| \fIexpr\fR	Logical OR	numeric	left
 _
-\fIexpr1\fR ? \fIexpr2\fRConditional expressiontype of selectedright
-    : \fIexpr3\fR   \fIexpr2\fR or \fIexpr3\fR
+\fIexpr1\fR ? \fIexpr2\fR	Conditional expression	type of selected	right
+    : \fIexpr3\fR		   \fIexpr2\fR or \fIexpr3\fR	
 _
-\fIlvalue\fR ^= \fIexpr\fRExponentiationnumericright 
-assignment
-\fIlvalue\fR %= \fIexpr\fRModulus assignmentnumericright
-\fIlvalue\fR *= \fIexpr\fRMultiplicationnumericright
-assignment
-\fIlvalue\fR /= \fIexpr\fRDivision assignmentnumericright
-\fIlvalue\fR +=  \fIexpr\fRAddition assignmentnumericright
-\fIlvalue\fR \(mi= \fIexpr\fRSubtraction assignmentnumericright
-\fIlvalue\fR = \fIexpr\fRAssignmenttype of \fIexpr\fRright
+\fIlvalue\fR ^= \fIexpr\fR	Exponentiation	numeric	right
+	assignment		
+\fIlvalue\fR %= \fIexpr\fR	Modulus assignment	numeric	right
+\fIlvalue\fR *= \fIexpr\fR	Multiplication	numeric	right
+	assignment		
+\fIlvalue\fR /= \fIexpr\fR	Division assignment	numeric	right
+\fIlvalue\fR +=  \fIexpr\fR	Addition assignment	numeric	right
+\fIlvalue\fR \(mi= \fIexpr\fR	Subtraction assignment	numeric	right
+\fIlvalue\fR = \fIexpr\fR	Assignment	type of \fIexpr\fR	right
 .TE
 
 .sp
@@ -491,23 +475,19 @@ string\fR.
 \fB/usr/bin/nawk\fR and \fB/usr/xpg4/bin/awk\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBARGC\fR\fR
 .ad
 .RS 12n
-.rt  
 The number of elements in the \fBARGV\fR array.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBARGV\fR\fR
 .ad
 .RS 12n
-.rt  
 An array of command line arguments, excluding options and the \fIprogram\fR
 argument, numbered from zero to \fBARGC\fR\(mi1.
 .sp
@@ -523,12 +503,10 @@ argument.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENVIRON\fR\fR
 .ad
 .RS 12n
-.rt  
 The variable \fBENVIRON\fR is an array representing the value of the
 environment. The indices of the array are strings consisting of the names of
 the environment variables, and the value of each array element is a string
@@ -545,12 +523,10 @@ environment used is the environment at the time \fBnawk\fR began executing.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFILENAME\fR\fR
 .ad
 .RS 12n
-.rt  
 A pathname of the current input file. Inside a \fBBEGIN\fR action the value is
 undefined. Inside an \fBEND\fR action the value is the name of the last input
 file processed.
@@ -558,12 +534,10 @@ file processed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFNR\fR\fR
 .ad
 .RS 12n
-.rt  
 The ordinal number of the current record in the current file. Inside a
 \fBBEGIN\fR action the value is zero. Inside an \fBEND\fR action the value is
 the number of the last record processed in the last file processed.
@@ -571,23 +545,19 @@ the number of the last record processed in the last file processed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFS\fR\fR
 .ad
 .RS 12n
-.rt  
 Input field separator regular expression; a space character by default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNF\fR\fR
 .ad
 .RS 12n
-.rt  
 The number of fields in the current record. Inside a \fBBEGIN\fR action, the
 use of \fBNF\fR is undefined unless a \fBgetline\fR function without a
 \fIvar\fR argument is executed previously. Inside an \fBEND\fR action, \fBNF\fR
@@ -598,12 +568,10 @@ prior to entering the \fBEND\fR action.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNR\fR\fR
 .ad
 .RS 12n
-.rt  
 The ordinal number of the current record from the start of input. Inside a
 \fBBEGIN\fR action the value is zero. Inside an \fBEND\fR action the value is
 the number of the last record processed.
@@ -611,12 +579,10 @@ the number of the last record processed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOFMT\fR\fR
 .ad
 .RS 12n
-.rt  
 The \fBprintf\fR format for converting numbers to strings in output statements
 \fB"%.6g"\fR by default. The result of the conversion is unspecified if the
 value of \fBOFMT\fR is not a floating-point format specification.
@@ -624,45 +590,37 @@ value of \fBOFMT\fR is not a floating-point format specification.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOFS\fR\fR
 .ad
 .RS 12n
-.rt  
 The \fBprint\fR statement output field separator; a space character by default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBORS\fR\fR
 .ad
 .RS 12n
-.rt  
 The \fBprint\fR output record separator; a newline character by default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLENGTH\fR\fR
 .ad
 .RS 12n
-.rt  
 The length of the string matched by the \fBmatch\fR function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRS\fR\fR
 .ad
 .RS 12n
-.rt  
 The first character of the string value of \fBRS\fR is the input record
 separator; a newline character by default. If \fBRS\fR contains more than one
 character, the results are unspecified. If \fBRS\fR is null, then records are
@@ -673,12 +631,10 @@ field separator is always newline, no matter what the value of \fBFS\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSTART\fR\fR
 .ad
 .RS 12n
-.rt  
 The starting position of the string matched by the \fBmatch\fR function,
 numbering from 1. This is always equivalent to the return value of the
 \fBmatch\fR function.
@@ -686,12 +642,10 @@ numbering from 1. This is always equivalent to the return value of the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSUBSEP\fR\fR
 .ad
 .RS 12n
-.rt  
 The subscript separator string for multi-dimensional arrays. The default value
 is \fB\e034\fR\&.
 .RE
@@ -702,12 +656,10 @@ is \fB\e034\fR\&.
 The following variable is supported for \fB/usr/xpg4/bin/awk\fR only:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCONVFMT\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fBprintf\fR format for converting numbers to strings (except for output
 statements, where \fBOFMT\fR is used). The default is \fB%.6g\fR.
 .RE
@@ -729,25 +681,23 @@ the table below:
 
 .sp
 .TS
-tab();
-lw(.61i) lw(2.44i) lw(2.44i) 
-lw(.61i) lw(2.44i) lw(2.44i) 
-.
-\fBEscape Sequence\fR\fBDescription\fR\fBMeaning\fR
+l l l
+l l l .
+\fBEscape Sequence\fR	\fBDescription\fR	\fBMeaning\fR
 _
-\fB\e"\fRBackslash quotation-markQuotation-mark character
+\fB\e"\fR	Backslash quotation-mark	Quotation-mark character
 _
-\fB\e/\fRBackslash slashSlash character
+\fB\e/\fR	Backslash slash	Slash character
 _
-\fB\e\fR\fIddd\fRT{
+\fB\e\fR\fIddd\fR	T{
 A backslash character followed by the longest sequence of one, two, or three octal-digit characters (01234567).  If all of the digits are 0, (that is, representation of the NULL character), the behavior is undefined.
-T}T{
+T}	T{
 The character encoded by the one-, two- or three-digit octal integer. Multi-byte characters require multiple, concatenated escape sequences, including the leading \e for each byte.
 T}
 _
-\fB\e\fR\fIc\fRT{
-A backslash character followed by any character not described in this table or special characters (\fB\e\e\fR, \fB\ea\fR, \fB\eb\fR, \fB\ef\fR, \fB\en\fR, \fB\er\fR, \fB\et\fR, \fB\ev\fR). 
-T}Undefined
+\fB\e\fR\fIc\fR	T{
+A backslash character followed by any character not described in this table or special characters (\fB\e\e\fR, \fB\ea\fR, \fB\eb\fR, \fB\ef\fR, \fB\en\fR, \fB\er\fR, \fB\et\fR, \fB\ev\fR).
+T}	Undefined
 .TE
 
 .sp
@@ -886,10 +836,10 @@ An action is a sequence of statements. A statement can be one of the following:
 .in +2
 .nf
 if ( \fIexpression\fR ) \fIstatement\fR [ else \fIstatement\fR ]
-while ( \fIexpression\fR ) \fIstatement\fR 
+while ( \fIexpression\fR ) \fIstatement\fR
 do \fIstatement\fR while ( \fIexpression\fR )
-for ( \fIexpression\fR ; \fIexpression\fR ; \fIexpression\fR ) \fIstatement\fR 
-for ( \fIvar\fR in \fIarray\fR ) \fIstatement\fR 
+for ( \fIexpression\fR ; \fIexpression\fR ; \fIexpression\fR ) \fIstatement\fR
+for ( \fIvar\fR in \fIarray\fR ) \fIstatement\fR
 delete \fIarray\fR[\fIsubscript\fR] #delete an array element
 break
 continue
@@ -1078,100 +1028,82 @@ optional in the following list (by displaying them within the \fB[ ]\fR
 brackets), such use is undefined.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBatan2(\fR\fIy\fR,\fIx\fR\fB)\fR\fR
 .ad
 .RS 17n
-.rt  
 Return arctangent of \fIy\fR/\fIx\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcos\fR(\fIx\fR)\fR
 .ad
 .RS 17n
-.rt  
 Return cosine of \fIx,\fR where \fIx\fR is in radians.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsin\fR(\fIx\fR)\fR
 .ad
 .RS 17n
-.rt  
 Return sine of \fIx,\fR where \fIx\fR is in radians.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBexp\fR(\fIx\fR)\fR
 .ad
 .RS 17n
-.rt  
 Return the exponential function of \fIx\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlog\fR(\fIx\fR)\fR
 .ad
 .RS 17n
-.rt  
 Return the natural logarithm of \fIx\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsqrt\fR(\fIx\fR)\fR
 .ad
 .RS 17n
-.rt  
 Return the square root of \fIx\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBint\fR(\fIx\fR)\fR
 .ad
 .RS 17n
-.rt  
 Truncate its argument to an integer. It is truncated toward 0 when \fIx\fR > 0.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrand()\fR\fR
 .ad
 .RS 17n
-.rt  
 Return a random number \fIn\fR, such that 0 \(<= \fIn\fR < 1.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsrand\fR([\fBexpr\fR])\fR
 .ad
 .RS 17n
-.rt  
 Set the seed value for \fBrand\fR to \fIexpr\fR or use the time of day if
 \fIexpr\fR is omitted. The previous seed value is returned.
 .RE
@@ -1185,7 +1117,6 @@ unless the argument or parentheses are indicated as optional in the following
 list (by displaying them within the \fB[ ]\fR brackets), such use is undefined.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgsub\fR(\fIere\fR,\fIrepl\fR[,\|\fIin\fR])\fR
 .ad
@@ -1198,7 +1129,6 @@ the regular expression (like the \fBed\fR utility global substitute) in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBindex\fR(\fIs\fR,\fIt\fR)\fR
 .ad
@@ -1210,7 +1140,6 @@ string \fIt\fR first occurs, or zero if it does not occur at all.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlength\fR[([\fIs\fR])]\fR
 .ad
@@ -1222,7 +1151,6 @@ whole record, \fB$0\fR, if there is no argument.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmatch\fR(\fIs\fR,\fIere\fR)\fR
 .ad
@@ -1237,7 +1165,6 @@ of the matched string, \(mi1 if no match is found.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsplit\fR(\fIs\fR,\fIa\fR[,\|\fIfs\fR])\fR
 .ad
@@ -1256,7 +1183,6 @@ value of \fIfs\fR is unspecified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsprintf\fR(\fBfmt\fR,\fIexpr\fR,\fIexpr\fR,\fB\&...\fR)\fR
 .ad
@@ -1268,7 +1194,6 @@ and return the resulting string.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsub\fR(\fIere\fR,\fIrepl\fR[,\|\fIin\fR])\fR
 .ad
@@ -1291,7 +1216,6 @@ uses the current record (\fB$0\fR) in its place.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsubstr\fR(\fIs\fR,\fIm\fR[,\|\fIn\fR])\fR
 .ad
@@ -1304,7 +1228,6 @@ substring is limited by the length of the string \fIs\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtolower\fR(\fIs\fR)\fR
 .ad
@@ -1319,7 +1242,6 @@ string by the lower-case letter specified by the mapping. Other characters in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtoupper\fR(\fIs\fR)\fR
 .ad
@@ -1343,12 +1265,10 @@ below.
 The input/output and general functions are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclose(\fR\fIexpression\fR)\fR
 .ad
 .RS 27n
-.rt  
 Close the file or pipe opened by a \fBprint\fR or \fBprintf\fR statement or a
 call to \fBgetline\fR with the same string-valued \fIexpression\fR. If the
 close was successful, the function returns \fB0\fR; otherwise, it returns
@@ -1357,12 +1277,10 @@ non-zero.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIexpression\fR|\fBgetline\fR[\fIvar\fR]\fR
 .ad
 .RS 27n
-.rt  
 Read a record of input from a stream piped from the output of a command. The
 stream is created if no stream is currently open with the value of
 \fIexpression\fR as its command name. The stream created is equivalent to one
@@ -1387,36 +1305,30 @@ parentheses properly.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgetline\fR\fR
 .ad
 .RS 30n
-.rt  
 Set \fB$0\fR to the next input record from the current input file. This form of
 \fBgetline\fR sets the \fBNF\fR, \fBNR\fR, and \fBFNR\fR variables.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgetline\fR \fIvar\fR\fR
 .ad
 .RS 30n
-.rt  
 Set variable \fIvar\fR to the next input record from the current input file.
 This form of \fBgetline\fR sets the \fBFNR\fR and \fBNR\fR variables.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgetline\fR [\fIvar\fR] \fB<\fR \fIexpression\fR\fR
 .ad
 .RS 30n
-.rt  
 Read the next record of input from a named file. The \fIexpression\fR is
 evaluated to produce a string that is used as a full pathname. If the file of
 that name is not currently open, it is opened. As long as the stream remains
@@ -1435,12 +1347,10 @@ portable applications must be put in parentheses properly.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsystem\fR(\fIexpression\fR)\fR
 .ad
 .RS 30n
-.rt  
 Execute the command given by \fIexpression\fR in a manner equivalent to the
 \fBsystem\fR(3C) function and return the exit status of the command.
 .RE
@@ -1758,7 +1668,7 @@ variable, one per line:
        n = split (ENVIRON["PATH"], path, ":")
        for (i = 1; i <= n; ++i)
               print path[i]
-       }\fR 
+       }\fR
 .fi
 .in -2
 .sp
@@ -1812,12 +1722,10 @@ that affect execution: \fBLC_COLLATE\fR, \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and
 \fBNLSPATH\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_NUMERIC\fR\fR
 .ad
 .RS 14n
-.rt  
 Determine the radix character used when interpreting numeric input, performing
 conversions between numeric and string values and formatting numeric output.
 Regardless of locale, the period character (the decimal-point character of the
@@ -1831,23 +1739,19 @@ programs (including assignments in command-line arguments).
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 All input files were processed successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 

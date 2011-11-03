@@ -3,19 +3,19 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_dev_report_fault 9F "13 August 1999" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_DEV_REPORT_FAULT 9F "Aug 13, 1999"
 .SH NAME
 ddi_dev_report_fault \- Report a hardware failure
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/ddi.h> 
+#include <sys/ddi.h>
 #include <sys/sunddi.h>
 
 
 
-\fBvoid\fR  \fBddi_dev_report_fault\fR (\fBdev_info_t   *\fR\fIdip\fR, 
-     \fBddi_fault_impact_t\fR \fIimpact\fR, \fB ddi_fault_location_t\fR \fIlocation\fR, 
+\fBvoid\fR  \fBddi_dev_report_fault\fR (\fBdev_info_t   *\fR\fIdip\fR,
+     \fBddi_fault_impact_t\fR \fIimpact\fR, \fB ddi_fault_location_t\fR \fIlocation\fR,
      \fBconst char   *\fR\fImessage \fR);
 .fi
 
@@ -26,48 +26,40 @@ Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR \fR
 .ad
 .RS 13n
-.rt  
 Pointer to the driver's \fBdev_info\fR structure to which the fault report
 relates. (Normally the caller's own \fBdev_info\fR pointer).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIimpact\fR \fR
 .ad
 .RS 13n
-.rt  
 One of a set of enumerated values indicating the impact of the fault on the
 device's ability to provide normal service.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlocation\fR \fR
 .ad
 .RS 13n
-.rt  
 One of a set of enumerated values indicating the location of the fault,
 relative to the hardware controlled by the driver specified by \fBdip\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImessage\fR \fR
 .ad
 .RS 13n
-.rt  
 Text of the message describing the fault being reported.
 .RE
 
@@ -86,24 +78,20 @@ to provide service by passing one of the following values for the impact
 parameter:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SERVICE_LOST\fR\fR
 .ad
 .RS 26n
-.rt  
 Indicates a total loss of service. The driver is unable to implement the normal
 functions of its hardware.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SERVICE_DEGRADED\fR\fR
 .ad
 .RS 26n
-.rt  
 The driver is unable to provide normal service, but can provide a partial or
 degraded level of service. The driver may have to make repeated attempts to
 perform an operation before it succeeds, or it may be running at less than its
@@ -114,12 +102,10 @@ alternative exists.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SERVICE_UNAFFECTED\fR\fR
 .ad
 .RS 26n
-.rt  
 The service provided by the device is currently unaffected by the reported
 fault. This value may be used to report recovered errors for predictive failure
 analysis.
@@ -127,12 +113,10 @@ analysis.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SERVICE_RESTORED\fR\fR
 .ad
 .RS 26n
-.rt  
 The driver has resumed normal service, following a previous report that service
 was lost or degraded.  This message implies that any previously reported fault
 condition no longer exists.
@@ -143,12 +127,10 @@ condition no longer exists.
 The location parameter should be one of the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_DATAPATH_FAULT\fR\fR
 .ad
 .RS 22n
-.rt  
 The fault lies in the datapath between the driver and the device. The device
 may be unplugged, or a problem may exist in the bus on which the device
 resides.  This value is appropriate if the device is not responding to
@@ -158,12 +140,10 @@ accesses, (for example, the device may not be present) or if a call to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_DEVICE_FAULT\fR\fR
 .ad
 .RS 22n
-.rt  
 The fault lies in the device controlled by the driver. This value is
 appropriate if the device returns an error from a selftest function, or if the
 driver is able to determine that device is present and accessible, but is not
@@ -172,12 +152,10 @@ functioning correctly.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_EXTERNAL_FAULT\fR\fR
 .ad
 .RS 22n
-.rt  
 The fault is external to the device.  For example, an Ethernet driver would use
 this value when reporting a cable fault.
 .sp

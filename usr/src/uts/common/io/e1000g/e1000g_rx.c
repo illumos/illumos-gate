@@ -23,6 +23,10 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ */
+
+/*
  * **********************************************************************
  *									*
  * Module Name:								*
@@ -339,6 +343,16 @@ e1000g_rx_setup(struct e1000g *Adapter)
 			(void) e1000_write_phy_reg(hw, 0x11, 0x0003);
 			(void) e1000_write_phy_reg(hw, 22, phy_data);
 		}
+	}
+
+	/* Workaround errata on 82579 adapters with large frames */
+	if (hw->mac.type == e1000_pch2lan) {
+		boolean_t enable_jumbo = (Adapter->default_mtu > ETHERMTU ?
+		    B_TRUE : B_FALSE);
+
+		if (e1000_lv_jumbo_workaround_ich8lan(hw, enable_jumbo) != 0)
+			E1000G_DEBUGLOG_0(Adapter, E1000G_INFO_LEVEL,
+			    "failed to enable jumbo frame workaround mode\n");
 	}
 
 	reg_val =

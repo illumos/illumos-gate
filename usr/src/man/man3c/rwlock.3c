@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH rwlock 3C "14 May 1998" "SunOS 5.11" "Standard C Library Functions"
+.TH RWLOCK 3C "May 14, 1998"
 .SH NAME
 rwlock, rwlock_init, rwlock_destroy, rw_rdlock, rw_wrlock, rw_tryrdlock,
 rw_trywrlock, rw_unlock \- multiple readers, single writer locks
@@ -12,7 +12,7 @@ rw_trywrlock, rw_unlock \- multiple readers, single writer locks
 .nf
 cc -mt [ \fIflag\fR... ] \fIfile\fR...[ \fIlibrary\fR... ]
 
-#include <synch.h> 
+#include <synch.h>
 
 \fBint\fR \fBrwlock_init\fR(\fBrwlock_t *\fR\fIrwlp\fR, \fBint\fR \fItype\fR, \fBvoid *\fR \fIarg\fR);
 .fi
@@ -73,12 +73,10 @@ by way of  \fIarg\fR.
 The \fItype\fR argument can be one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSYNC_PROCESS\fR \fR
 .ad
 .RS 18n
-.rt  
 The readers/writer lock can synchronize threads in this process and other
 processes. The readers/writer lock should be initialized by only one process.
 \fIarg\fR is ignored. A readers/writer lock initialized with this type, must be
@@ -90,12 +88,10 @@ shared memory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSYNC_THREAD\fR \fR
 .ad
 .RS 18n
-.rt  
 The readers/writer lock can synchronize  threads in this process, only.
 \fIarg\fR is ignored.
 .RE
@@ -114,7 +110,7 @@ The following are default readers/writer lock initialization (intra-process):
 .nf
 rwlock_t rwlp;
 rwlock_init(&rwlp, NULL, NULL);
-   
+
 .fi
 .in -2
 
@@ -197,12 +193,10 @@ returned to indicate the error.
 The \fBrwlock_init()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR \fR
 .ad
 .RS 11n
-.rt  
 \fBtype\fR is invalid.
 .RE
 
@@ -211,12 +205,10 @@ The \fBrwlock_init()\fR function will fail if:
 The  \fBrw_tryrdlock()\fR or \fBrw_trywrlock()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBUSY\fR \fR
 .ad
 .RS 10n
-.rt  
 The reader or writer lock pointed to by \fIrwlp\fR was already locked.
 .RE
 
@@ -225,12 +217,10 @@ The reader or writer lock pointed to by \fIrwlp\fR was already locked.
 These functions may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR \fR
 .ad
 .RS 11n
-.rt  
 \fIrwlp\fR or \fIarg\fR points to an illegal address.
 .RE
 
@@ -242,13 +232,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

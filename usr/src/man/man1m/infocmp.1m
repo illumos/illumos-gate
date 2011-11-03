@@ -4,14 +4,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH infocmp 1M "5 Jul 1990" "SunOS 5.11" "System Administration Commands"
+.TH INFOCMP 1M "Jul 5, 1990"
 .SH NAME
 infocmp \- compare or print out terminfo descriptions
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/infocmp\fR [\fB-d\fR] [\fB-c\fR] [\fB-n\fR] [\fB-I\fR] [\fB-L\fR] [\fB-C\fR] [\fB-r\fR] [\fB-u\fR] 
-     [\fB-s\fR | d | i | l | c] [\fB-v\fR] [\fB-V\fR] [\fB-1\fR] [\fB-w\fR \fIwidth\fR] 
+\fB/usr/bin/infocmp\fR [\fB-d\fR] [\fB-c\fR] [\fB-n\fR] [\fB-I\fR] [\fB-L\fR] [\fB-C\fR] [\fB-r\fR] [\fB-u\fR]
+     [\fB-s\fR | d | i | l | c] [\fB-v\fR] [\fB-V\fR] [\fB-1\fR] [\fB-w\fR \fIwidth\fR]
      [\fB-A\fR \fI directory\fR] [\fB-B\fR \fIdirectory\fR] [\fItermname\fR]...
 .fi
 
@@ -38,12 +38,10 @@ the terminals, the value returned will depend on the type of the capability:
 \fINULL\fR for string variables.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 6n
-.rt  
 Produce a list of each capability that is different between two entries. This
 option is useful to show the difference between two entries, created by
 different people, for the same or similar terminals.
@@ -51,12 +49,10 @@ different people, for the same or similar terminals.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 6n
-.rt  
 Produce a list of each capability that is common between two entries.
 Capabilities that are not set are ignored. This option can be used as a quick
 check to see if the \fB-u\fR option is worth using.
@@ -64,12 +60,10 @@ check to see if the \fB-u\fR option is worth using.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 6n
-.rt  
 Produce a list of each capability that is in neither entry. If no
 \fItermname\fR is given, the environment variable \fBTERM\fR will be used for
 both of the \fItermname\fRs. This can be used as a quick check to see if
@@ -82,34 +76,28 @@ The \fB-I\fR \fB,\fR \fB-L\fR \fB,\fR and \fB-C\fR options will produce a
 source listing for each terminal named.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I\fR\fR
 .ad
 .RS 6n
-.rt  
 Use the \fBterminfo\fR names.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
 .RS 6n
-.rt  
 Use the long C variable name listed in < \fBterm.h\fR >.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
 .RS 6n
-.rt  
 Use the \fBtermcap\fR names. The source produced by the \fB-C\fR option may be
 used directly as a \fBtermcap\fR entry, but not all of the parameterized
 strings may be changed to the \fBtermcap\fR format. \fBinfocmp\fR will attempt
@@ -120,12 +108,10 @@ by hand.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 6n
-.rt  
 When using \fB-C\fR \fB,\fR put out all capabilities in \fBtermcap\fR form.
 .RE
 
@@ -174,12 +160,10 @@ equivalents, and some terminal types which commonly have such sequences, are:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
 .RS 6n
-.rt  
 Produce a \fBterminfo\fR source description of the first terminal
 \fItermname\fR which is relative to the sum of the descriptions given by the
 entries for the other terminals' \fItermname\fRs. It does this by analyzing the
@@ -221,54 +205,44 @@ the compilation time, is specifying superfluous  \fBuse=\fR fields.
 \fBinfocmp\fR will flag any superfluous  \fBuse=\fR fields.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 11n
-.rt  
 Sorts the fields within each type according to the argument below:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd\fR\fR
 .ad
 .RS 5n
-.rt  
 Leave fields in the order that they are stored in the \fBterminfo\fR database.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBi\fR\fR
 .ad
 .RS 5n
-.rt  
 Sort by \fBterminfo\fR name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBl\fR\fR
 .ad
 .RS 5n
-.rt  
 Sort by the long C variable name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBc\fR\fR
 .ad
 .RS 5n
-.rt  
 Sort by the \fBtermcap\fR name.
 .RE
 
@@ -280,46 +254,38 @@ name or the long C variable name, respectively.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 11n
-.rt  
 Print out tracing information on standard error as the program runs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
 .RS 11n
-.rt  
 Print out the version of the program in use on standard error and exit.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi1\fR\fR
 .ad
 .RS 11n
-.rt  
 Print the fields one to a line. Otherwise, the fields are printed several to a
 line to a maximum width of 60 characters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR\fIwidth\fR\fR
 .ad
 .RS 11n
-.rt  
 Changes the output to \fIwidth\fR characters.
 .RE
 
@@ -332,23 +298,19 @@ defined, or the terminal is not found in that location, the system
 options \fB-A\fR and \fB-B\fR may be used to override this location.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR \fIdirectory\fR\fR
 .ad
 .RS 16n
-.rt  
 Set \fB\fR\fBTERM\fR\fBINFO \fR for the first \fItermname\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-B\fR \fIdirectory\fR\fR
 .ad
 .RS 16n
-.rt  
 Set \fB\fR\fBTERM\fR\fBINFO \fR for the other \fItermname\fRs. With this, it is
 possible to compare descriptions for a terminal with the same name located in
 two different databases. This is useful for comparing descriptions for the same
@@ -358,7 +320,6 @@ terminal created by different people.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/terminfo/?/*\fR\fR
 .ad

@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH modlinkage 9S "18 Sep 1992" "SunOS 5.11" "Data Structures for Drivers"
+.TH MODLINKAGE 9S "Sep 18, 1992"
 .SH NAME
 modlinkage \- module linkage structure
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/modctl.h> 
+#include <sys/modctl.h>
 .fi
 
 .SH INTERFACE LEVEL
@@ -33,24 +33,20 @@ void   *ml_linkage[4];
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBml_rev\fR \fR
 .ad
 .RS 15n
-.rt  
 Is the revision of the loadable modules system.  This must have the value
 \fBMODREV_1\fR .
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBml_linkage\fR \fR
 .ad
 .RS 15n
-.rt  
 Is a null-terminated array of pointers to linkage structures. Driver modules
 have only one linkage structure.
 .RE

@@ -23,7 +23,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 include $(SRC)/Makefile.master
 
@@ -32,7 +31,7 @@ include $(SRC)/Makefile.master
 ROOTOPTPKG = $(ROOT)/opt/SUNWdtrt
 ROOTBIN = $(ROOTOPTPKG)/bin
 
-SRCS = dtest itest dstyle
+SRCS = dtest itest dstyle dtfailures
 CMDS = $(SRCS:%=$(ROOTBIN)/%)
 
 $(CMDS) := FILEMODE = 0555

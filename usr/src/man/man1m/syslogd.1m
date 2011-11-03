@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH syslogd 1M "31 Oct 2008" "SunOS 5.11" "System Administration Commands"
+.TH SYSLOGD 1M "Oct 31, 2008"
 .SH NAME
 syslogd \- log system messages
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/syslogd\fR [\fB-d\fR] [\fB-f\fR \fIconfigfile\fR] [\fB-m\fR \fImarkinterval\fR] 
+\fB/usr/sbin/syslogd\fR [\fB-d\fR] [\fB-f\fR \fIconfigfile\fR] [\fB-m\fR \fImarkinterval\fR]
      [\fB-p\fR \fIpath\fR] [\fB-t\fR | \fB-T\fR]
 .fi
 
@@ -87,7 +87,6 @@ and \fBfalse\fR is equivalent to the \fB-T\fR command-line option. The default
 value for \fB-log_from_remote\fR is \fBfalse\fR. See NOTES, below.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLOG_FROM_REMOTE\fR\fR
 .ad
@@ -104,7 +103,6 @@ equivalent to the \fB-t\fR command-line option. The default value for
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
@@ -118,7 +116,6 @@ where \fBsyslogd\fR is started.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIconfigfile\fR\fR
 .ad
@@ -129,7 +126,6 @@ Specify an alternate configuration file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fImarkinterval\fR\fR
 .ad
@@ -140,7 +136,6 @@ Specify an interval, in minutes, between mark messages.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIpath\fR\fR
 .ad
@@ -151,7 +146,6 @@ Specify an alternative log device name. The default is \fB/dev/log\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR\fR
 .ad
@@ -163,7 +157,6 @@ This is the default behavior. See .
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
@@ -200,7 +193,7 @@ log file\fB/var/adm/messages\fR.
 .sp
 .in +2
 .nf
-Sep 29 21:41:18 cathy ufs: [ID 845546 kern.notice] 
+Sep 29 21:41:18 cathy ufs: [ID 845546 kern.notice]
                                     alloc /: file system full
 .fi
 .in -2
@@ -241,7 +234,6 @@ systems.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/syslog.conf\fR\fR
 .ad
@@ -252,7 +244,6 @@ Configuration file
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/run/syslog.pid\fR\fR
 .ad
@@ -263,7 +254,6 @@ Process \fBID\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/default/syslogd\fR\fR
 .ad
@@ -275,7 +265,6 @@ command-line options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/log\fR\fR
 .ad
@@ -286,7 +275,6 @@ command-line options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/netconfig\fR\fR
 .ad
@@ -297,7 +285,6 @@ Transport providers available on the system
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/net/transport/hosts\fR\fR
 .ad
@@ -308,7 +295,6 @@ Network hosts for each transport
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/net/transport/services\fR\fR
 .ad

@@ -1,20 +1,20 @@
 '\" te
 .\"  Copyright 1989 AT&T Copyright (c) 1992, X/Open Company Limited All Rights Reserved Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH xargs 1 "17 Jul 2007" "SunOS 5.11" "User Commands"
+.TH XARGS 1 "Jul 17, 2007"
 .SH NAME
 xargs \- construct argument lists and invoke utility
 .SH SYNOPSIS
 .LP
 .nf
-\fBxargs\fR [\fB-t\fR] [\fB-p\fR] [\fB-e\fR[\fIeofstr\fR]] [\fB-E\fR \fIeofstr\fR] 
-     [\fB-I\fR \fIreplstr\fR] [\fB-i\fR[\fIreplstr\fR]] [\fB-L\fR \fInumber\fR] [\fB-l\fR[\fInumber\fR]] 
+\fBxargs\fR [\fB-t\fR] [\fB-p\fR] [\fB-e\fR[\fIeofstr\fR]] [\fB-E\fR \fIeofstr\fR]
+     [\fB-I\fR \fIreplstr\fR] [\fB-i\fR[\fIreplstr\fR]] [\fB-L\fR \fInumber\fR] [\fB-l\fR[\fInumber\fR]]
      [\fB-n\fR \fInumber\fR [\fB-x\fR]] [\fB-s\fR \fIsize\fR] [\fIutility\fR [\fIargument\fR...]]
 .fi
 
@@ -54,12 +54,10 @@ specified, the default command line length is at least \fB{LINE_MAX}\fR.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-e\fR\fB[\fR\fIeofstr\fR\fB]\fR\fR
 .ad
 .RS 15n
-.rt  
 Uses \fIeofstr\fR as the logical end-of-file string. Underscore (\fB_\fR) is
 assumed for the logical \fBEOF\fR string if neither \fB-e\fR nor \fB-E\fR is
 used. When the \fIeofstr\fR option-argument is omitted, the logical \fBEOF\fR
@@ -70,12 +68,10 @@ logical \fBEOF\fR string is encountered.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-E\fR \fIeofstr\fR\fR
 .ad
 .RS 15n
-.rt  
 Specifies a logical end-of-file string to replace the default underscore.
 \fBxargs\fR reads standard input until either end-of-file or the logical EOF
 string is encountered. When \fIeofstr\fR is a null string, the logical
@@ -85,12 +81,10 @@ literally.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I\fR \fIreplstr\fR\fR
 .ad
 .RS 15n
-.rt  
 Insert mode. \fIutility\fR is executed for each line from standard input,
 taking the entire line as a single argument, inserting it in \fIargument\fR
 \fIs\fR for each occurrence of \fIreplstr\fR. A maximum of five arguments in
@@ -103,24 +97,20 @@ takes effect.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-i\fR\fB[\fR\fIreplstr\fR\fB]\fR\fR
 .ad
 .RS 15n
-.rt  
 This option is equivalent to \fB-I\fR \fIreplstr\fR. The string \fB{\|}\fR is
 assumed for \fIreplstr\fR if the option-argument is omitted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR \fInumber\fR\fR
 .ad
 .RS 15n
-.rt  
 The \fIutility\fR is executed for each non-empty \fInumber\fR lines of
 arguments from standard input. The last invocation of \fIutility\fR is with
 fewer lines of arguments if fewer than \fInumber\fR remain. A line is
@@ -132,24 +122,20 @@ options are mutually exclusive; the last one specified takes effect.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l[\fR\fInumber\fR\fB]\fR\fR
 .ad
 .RS 15n
-.rt  
 (The letter ell.) This option is equivalent to \fB-L\fR \fInumber\fR. If
 \fInumber\fR is omitted, \fB1\fR is assumed. Option \fB-x\fR is forced on.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fInumber\fR\fR
 .ad
 .RS 15n
-.rt  
 Invokes \fIutility\fR using as many standard input arguments as possible, up to
 \fInumber\fR (a positive decimal integer) arguments maximum. Fewer arguments
 are used if:
@@ -171,12 +157,10 @@ remaining.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 15n
-.rt  
 Prompt mode. The user is asked whether to execute \fIutility\fR at each
 invocation. Trace mode (\fB-t\fR) is turned on to write the command instance to
 be executed, followed by a prompt to standard error. An affirmative response
@@ -186,12 +170,10 @@ otherwise, that particular invocation of \fIutility\fR is skipped.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIsize\fR\fR
 .ad
 .RS 15n
-.rt  
 Invokes \fIutility\fR using as many standard input arguments as possible
 yielding a command line length less than \fIsize\fR (a positive decimal
 integer) bytes. Fewer arguments are used if:
@@ -223,24 +205,20 @@ uses the largest value it supports within the constraints.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 6n
-.rt  
 Enables trace mode. Each generated command line is written to standard error
 just prior to invocation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 6n
-.rt  
 Terminates if a command line containing \fInumber\fR arguments (see the
 \fB-n\fR option above) or \fInumber\fR lines (see the \fB-L\fR option above)
 does not fit in the implied or specified size (see the \fB-s\fR option above).
@@ -252,12 +230,10 @@ does not fit in the implied or specified size (see the \fB-s\fR option above).
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIutility\fR\fR
 .ad
 .RS 12n
-.rt  
 The name of the utility to be invoked, found by search path using the
 \fBPATH\fR environment variable. (ee \fBenviron\fR(5).) If \fIutility\fR is
 omitted, the default is the \fBecho\fR(1) utility. If the \fIutility\fR operand
@@ -267,12 +243,10 @@ results are undefined.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIargument\fR\fR
 .ad
 .RS 12n
-.rt  
 An initial option or operand for the invocation of \fIutility\fR.
 .RE
 
@@ -393,12 +367,10 @@ that affect the execution of \fBxargs\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_COLLATE\fR, \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPATH\fR\fR
 .ad
 .RS 8n
-.rt  
 Determine the location of \fIutility\fR.
 .RE
 
@@ -418,23 +390,19 @@ expression defined for the \fByesexpr\fR. See \fBlocale\fR(5).
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 All invocations of \fIutility\fR returned exit status \fB0\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\(mi125\fR\fR
 .ad
 .RS 12n
-.rt  
 A command line meeting the specified requirements could not be assembled, one
 or more of the invocations of \fIutility\fR returned a non-zero exit status, or
 some other error occurred.
@@ -442,23 +410,19 @@ some other error occurred.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB126\fR\fR
 .ad
 .RS 12n
-.rt  
 The utility specified by \fIutility\fR was found but could not be invoked.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB127\fR\fR
 .ad
 .RS 12n
-.rt  
 The utility specified by \fIutility\fR could not be found.
 .RE
 
@@ -477,15 +441,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

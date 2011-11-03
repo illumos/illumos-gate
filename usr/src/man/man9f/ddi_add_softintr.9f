@@ -3,21 +3,21 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_add_softintr 9F "19 Oct 2005" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_ADD_SOFTINTR 9F "Oct 19, 2005"
 .SH NAME
 ddi_add_softintr, ddi_get_soft_iblock_cookie, ddi_remove_softintr,
 ddi_trigger_softintr \- software interrupt handling routines
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/types.h> 
-#include <sys/conf.h> 
-#include <sys/ddi.h> 
-#include <sys/sunddi.h> 
+#include <sys/types.h>
+#include <sys/conf.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
 
 
 
-\fBint\fR \fBddi_get_soft_iblock_cookie\fR(\fBdev_info_t *\fR\fIdip\fR, 
+\fBint\fR \fBddi_get_soft_iblock_cookie\fR(\fBdev_info_t *\fR\fIdip\fR,
 \fBint\fR \fIpreference\fR, \fBddi_iblock_cookie_t *\fR\fIiblock_cookiep\fR);
 .fi
 
@@ -26,7 +26,7 @@ ddi_trigger_softintr \- software interrupt handling routines
 \fBint\fR \fBddi_add_softintr\fR(\fBdev_info_t *\fR\fIdip\fR, \fBint\fR \fIpreference\fR, \fBddi_softintr_t *\fR\fIidp\fR,
      \fBddi_iblock_cookie_t *\fR\fIiblock_cookiep\fR, \fBddi_idevice_cookie_t *\fR
      \fIidevice_cookiep\fR,
-     \fBuint_t(*\fR\fIint_handler\fR) (caddr_t \fIint_handler_arg\fR), \fBcaddr_t\fR 
+     \fBuint_t(*\fR\fIint_handler\fR) (caddr_t \fIint_handler_arg\fR), \fBcaddr_t\fR
      \fIint_handler_arg\fR);
 .fi
 
@@ -52,34 +52,28 @@ Drivers\fR for more information.
 \fBddi_get_soft_iblock_cookie()\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 18n
-.rt  
 Pointer to a \fBdev_info\fR structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpreference\fR\fR
 .ad
 .RS 18n
-.rt  
 The type of soft interrupt to retrieve the cookie for.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIiblock_cookiep\fR\fR
 .ad
 .RS 18n
-.rt  
 Pointer to a location to store the interrupt block cookie.
 .RE
 
@@ -88,81 +82,67 @@ Pointer to a location to store the interrupt block cookie.
 \fBddi_add_softintr()\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 19n
-.rt  
 Pointer to \fBdev_info\fR structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpreference\fR\fR
 .ad
 .RS 19n
-.rt  
 A hint value describing the type of soft interrupt to generate.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIidp\fR\fR
 .ad
 .RS 19n
-.rt  
 Pointer to a soft interrupt identifier where a returned soft interrupt
 identifier is stored.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIiblock_cookiep\fR\fR
 .ad
 .RS 19n
-.rt  
 Optional pointer to an interrupt block cookie where a returned interrupt block
 cookie is stored.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIidevice_cookiep\fR\fR
 .ad
 .RS 19n
-.rt  
 Optional pointer to an interrupt device cookie where a returned interrupt
 device cookie is stored (not used).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIint_handler\fR\fR
 .ad
 .RS 19n
-.rt  
 Pointer to interrupt handler.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIint_handler_arg\fR\fR
 .ad
 .RS 19n
-.rt  
 Argument for interrupt handler.
 .RE
 
@@ -171,12 +151,10 @@ Argument for interrupt handler.
 \fBddi_remove_softintr()\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fIid\fR\fR
 .ad
 .RS 6n
-.rt  
 The identifier specifying which soft interrupt handler to remove.
 .RE
 
@@ -185,12 +163,10 @@ The identifier specifying which soft interrupt handler to remove.
 \fBddi_trigger_softintr()\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fIid\fR\fR
 .ad
 .RS 6n
-.rt  
 The identifier specifying which soft interrupt to trigger and which soft
 interrupt handler will be called.
 .RE
@@ -210,34 +186,28 @@ of soft interrupt to retrieve the cookie for. The possible values for
 \fIpreference\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SOFTINT_LOW\fR\fR
 .ad
 .RS 20n
-.rt  
 Low priority soft interrupt.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SOFTINT_MED\fR\fR
 .ad
 .RS 20n
-.rt  
 Medium priority soft interrupt.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SOFTINT_HIGH\fR\fR
 .ad
 .RS 20n
-.rt  
 High priority soft interrupt.
 .RE
 
@@ -329,23 +299,19 @@ which has been set up using \fBddi_add_softintr()\fR.
 \fBddi_add_softintr()\fR and \fBddi_get_soft_iblock_cookie()\fR return:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 15n
-.rt  
 on success
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 15n
-.rt  
 on failure
 .RE
 
@@ -396,7 +362,7 @@ struct xxstate {
          kmutex_t                      low_mutex;
          int                              softint_running;
       .\|.\|.
-}; 
+};
 struct xxstate *xsp;
 static uint_t xxsoftintr(caddr_t);
 static uint_t xxhighintr(caddr_t);
@@ -422,21 +388,21 @@ xxattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
          struct xxstate *xsp;
          .\|.\|.
       /* get high-level iblock cookie */
-         if (ddi_get_iblock_cookie(dip, \fIinumber\fR, 
+         if (ddi_get_iblock_cookie(dip, \fIinumber\fR,
                 &xsp->high_iblock_cookie) != DDI_SUCCESS)  {
                       /* clean up */
                       return (DDI_FAILURE); /* fail attach */
          }
-    
+
          /* initialize high-level mutex */
          mutex_init(&xsp->high_mutex, "xx high mutex", MUTEX_DRIVER,
                (void *)xsp->high_iblock_cookie);
-    
+
          /* add high-level routine - xxhighintr() */
          if (ddi_add_intr(dip, \fIinumber\fR, NULL, NULL,
                 xxhighintr, (caddr_t) xsp) != DDI_SUCCESS)  {
                       /* cleanup */
-                      return (DDI_FAILURE); /* fail attach */ 
+                      return (DDI_FAILURE); /* fail attach */
          }
 
          /* get soft iblock cookie */
@@ -444,19 +410,19 @@ xxattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
                 &xsp->low_iblock_cookie) != DDI_SUCCESS)  {
                       /* clean up */
                       return (DDI_FAILURE); /* fail attach */
-         }   
+         }
 
-         /* initialize low-level mutex */ 
-         mutex_init(&xsp->low_mutex, "xx low mutex", MUTEX_DRIVER, 
-                (void *)xsp->low_iblock_cookie); 
+         /* initialize low-level mutex */
+         mutex_init(&xsp->low_mutex, "xx low mutex", MUTEX_DRIVER,
+                (void *)xsp->low_iblock_cookie);
 
          /* add low level routine - xxsoftintr() */
-         if ( ddi_add_softintr(dip, DDI_SOFTINT_MED, &xsp->id, 
+         if ( ddi_add_softintr(dip, DDI_SOFTINT_MED, &xsp->id,
                 NULL, NULL, xxsoftintr, (caddr_t) xsp) != DDI_SUCCESS) {
                       /* cleanup */
                       return (DDI_FAILURE);  /* fail attach */
          }
-     
+
          .\|.\|.
 }
 .fi
@@ -483,7 +449,7 @@ xxhighintr(caddr_t arg)
          int need_softint;
          .\|.\|.
          mutex_enter(&xsp->high_mutex);
-         /* 
+         /*
          * Verify this device generated the interrupt
          * and disable the device interrupt.
          * Enqueue data for xxsoftintr() processing.
@@ -526,7 +492,7 @@ xxsoftintr(caddr_t arg)
                 /* de-queue data */
 
                 mutex_exit(&xsp->high_mutex);
-        
+
                 /* Process data on queue */
 
                 mutex_enter(&xsp->high_mutex);
@@ -549,13 +515,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityObsolete
+Interface Stability	Obsolete
 .TE
 
 .SH SEE ALSO

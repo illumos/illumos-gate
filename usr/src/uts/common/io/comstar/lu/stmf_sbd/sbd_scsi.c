@@ -103,7 +103,6 @@ void sbd_handle_identifying_info(scsi_task_t *task, stmf_data_buf_t *dbuf);
 static void sbd_handle_unmap_xfer(scsi_task_t *task, uint8_t *buf,
     uint32_t buflen);
 static void sbd_handle_unmap(scsi_task_t *task, stmf_data_buf_t *dbuf);
-static void sbd_handle_write_same(scsi_task_t *task);
 
 extern void sbd_pgr_initialize_it(scsi_task_t *, sbd_it_data_t *);
 extern int sbd_pgr_reservation_conflict(scsi_task_t *);
@@ -114,6 +113,12 @@ extern void sbd_handle_pgr_out_cmd(scsi_task_t *, stmf_data_buf_t *);
 extern void sbd_handle_pgr_out_data(scsi_task_t *, stmf_data_buf_t *);
 void sbd_do_sgl_write_xfer(struct scsi_task *task, sbd_cmd_t *scmd,
     int first_xfer);
+static void sbd_handle_write_same(scsi_task_t *task,
+    struct stmf_data_buf *initial_dbuf);
+static void sbd_do_write_same_xfer(struct scsi_task *task, sbd_cmd_t *scmd,
+    struct stmf_data_buf *dbuf, uint8_t dbuf_reusable);
+static void sbd_handle_write_same_xfer_completion(struct scsi_task *task,
+    sbd_cmd_t *scmd, struct stmf_data_buf *dbuf, uint8_t dbuf_reusable);
 /*
  * IMPORTANT NOTE:
  * =================
@@ -2230,36 +2235,333 @@ sbd_parse_mgmt_url(char **url_addr) {
 	return (url_length);
 }
 
+/* Try to make this the size of a kmem allocation cache. */
+static uint_t sbd_write_same_optimal_chunk = 128 * 1024;
+
+static sbd_status_t
+sbd_write_same_data(struct scsi_task *task, sbd_cmd_t *scmd)
+{
+	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
+	uint64_t addr, len, sz_done;
+	uint32_t big_buf_size, xfer_size, off;
+	uint8_t *big_buf;
+	sbd_status_t ret;
+
+	if (task->task_cdb[0] == SCMD_WRITE_SAME_G1) {
+		addr = READ_SCSI32(&task->task_cdb[2], uint64_t);
+		len = READ_SCSI16(&task->task_cdb[7], uint64_t);
+	} else {
+		addr = READ_SCSI64(&task->task_cdb[2], uint64_t);
+		len = READ_SCSI32(&task->task_cdb[10], uint64_t);
+	}
+	addr <<= sl->sl_data_blocksize_shift;
+	len <<= sl->sl_data_blocksize_shift;
+
+	/*
+	 * Reminders:
+	 *    "len" is total size of what we wish to "write same".
+	 *
+	 *    xfer_size will be scmd->trans_data_len, which is the length
+	 *    of the pattern we wish to replicate over "len".  We replicate
+	 *    "xfer_size" of pattern over "len".
+	 *
+	 *    big_buf_size is set to an ideal actual-write size for an output
+	 *    operation.  It may be the same as "len".  If it's not, it should
+	 *    be an exact multiple of "xfer_size" so we don't get pattern
+	 *    breakage until the very end of "len".
+	 */
+	big_buf_size = len > sbd_write_same_optimal_chunk ?
+	    sbd_write_same_optimal_chunk : (uint32_t)len;
+	xfer_size = scmd->trans_data_len;
+
+	/*
+	 * All transfers should be an integral multiple of the sector size.
+	 */
+	ASSERT((big_buf_size % xfer_size) == 0);
+
+	/*
+	 * Don't sleep for the allocation, and don't make the system
+	 * reclaim memory.  Trade higher I/Os if in a low-memory situation.
+	 */
+	big_buf = kmem_alloc(big_buf_size, KM_NOSLEEP | KM_NORMALPRI);
+
+	if (big_buf == NULL) {
+		/*
+		 * Just send it in terms of of the transmitted data.  This
+		 * will be very slow.
+		 */
+		DTRACE_PROBE1(write__same__low__memory, uint64_t, big_buf_size);
+		big_buf = scmd->trans_data;
+		big_buf_size = scmd->trans_data_len;
+	} else {
+		/*
+		 * We already ASSERT()ed big_buf_size is an integral multiple
+		 * of xfer_size.
+		 */
+		for (off = 0; off < big_buf_size; off += xfer_size)
+			bcopy(scmd->trans_data, big_buf + off, xfer_size);
+	}
+
+	/* Do the actual I/O.  Recycle xfer_size now to be write size. */
+	DTRACE_PROBE1(write__same__io__begin, uint64_t, len);
+	for (sz_done = 0; sz_done < len; sz_done += (uint64_t)xfer_size) {
+		xfer_size = ((big_buf_size + sz_done) <= len) ? big_buf_size :
+		    len - sz_done;
+		ret = sbd_data_write(sl, task, addr + sz_done,
+		    (uint64_t)xfer_size, big_buf);
+		if (ret != SBD_SUCCESS)
+			break;
+	}
+	DTRACE_PROBE2(write__same__io__end, uint64_t, len, uint64_t, sz_done);
+
+	if (big_buf != scmd->trans_data)
+		kmem_free(big_buf, big_buf_size);
+
+	return (ret);
+}
+
 static void
-sbd_handle_write_same(scsi_task_t *task)
+sbd_handle_write_same_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
+    struct stmf_data_buf *dbuf, uint8_t dbuf_reusable)
+{
+	uint64_t laddr;
+	uint32_t buflen, iolen;
+	int ndx, ret;
+
+	if (dbuf->db_xfer_status != STMF_SUCCESS) {
+		stmf_abort(STMF_QUEUE_TASK_ABORT, task,
+		    dbuf->db_xfer_status, NULL);
+		return;
+	}
+
+	if (scmd->flags & SBD_SCSI_CMD_XFER_FAIL) {
+		goto write_same_xfer_done;
+	}
+
+	if (scmd->len != 0) {
+		/*
+		 * Initiate the next port xfer to occur in parallel
+		 * with writing this buf.
+		 */
+		sbd_do_write_same_xfer(task, scmd, NULL, 0);
+	}
+
+	laddr = dbuf->db_relative_offset;
+
+	for (buflen = 0, ndx = 0; (buflen < dbuf->db_data_size) &&
+	    (ndx < dbuf->db_sglist_length); ndx++) {
+		iolen = min(dbuf->db_data_size - buflen,
+		    dbuf->db_sglist[ndx].seg_length);
+		if (iolen == 0)
+			break;
+		bcopy(dbuf->db_sglist[ndx].seg_addr, &scmd->trans_data[laddr],
+		    iolen);
+		buflen += iolen;
+		laddr += (uint64_t)iolen;
+	}
+	task->task_nbytes_transferred += buflen;
+
+write_same_xfer_done:
+	if (scmd->len == 0 || scmd->flags & SBD_SCSI_CMD_XFER_FAIL) {
+		stmf_free_dbuf(task, dbuf);
+		scmd->flags &= ~SBD_SCSI_CMD_ACTIVE;
+		if (scmd->flags & SBD_SCSI_CMD_XFER_FAIL) {
+			stmf_scsilib_send_status(task, STATUS_CHECK,
+			    STMF_SAA_WRITE_ERROR);
+		} else {
+			ret = sbd_write_same_data(task, scmd);
+			if (ret != SBD_SUCCESS) {
+				stmf_scsilib_send_status(task, STATUS_CHECK,
+				    STMF_SAA_WRITE_ERROR);
+			} else {
+				stmf_scsilib_send_status(task, STATUS_GOOD, 0);
+			}
+		}
+		/*
+		 * Only way we should get here is via handle_write_same(),
+		 * and that should make the following assertion always pass.
+		 */
+		ASSERT((scmd->flags & SBD_SCSI_CMD_TRANS_DATA) &&
+		    scmd->trans_data != NULL);
+		kmem_free(scmd->trans_data, scmd->trans_data_len);
+		scmd->flags &= ~SBD_SCSI_CMD_TRANS_DATA;
+		return;
+	}
+	sbd_do_write_same_xfer(task, scmd, dbuf, dbuf_reusable);
+}
+
+static void
+sbd_do_write_same_xfer(struct scsi_task *task, sbd_cmd_t *scmd,
+    struct stmf_data_buf *dbuf, uint8_t dbuf_reusable)
+{
+	uint32_t len;
+
+	if (scmd->len == 0) {
+		if (dbuf != NULL)
+			stmf_free_dbuf(task, dbuf);
+		return;
+	}
+
+	if ((dbuf != NULL) &&
+	    ((dbuf->db_flags & DB_DONT_REUSE) || (dbuf_reusable == 0))) {
+		/* free current dbuf and allocate a new one */
+		stmf_free_dbuf(task, dbuf);
+		dbuf = NULL;
+	}
+	if (dbuf == NULL) {
+		uint32_t maxsize, minsize, old_minsize;
+
+		maxsize = (scmd->len > (128*1024)) ? 128*1024 :
+		    scmd->len;
+		minsize = maxsize >> 2;
+		do {
+			old_minsize = minsize;
+			dbuf = stmf_alloc_dbuf(task, maxsize, &minsize, 0);
+		} while ((dbuf == NULL) && (old_minsize > minsize) &&
+		    (minsize >= 512));
+		if (dbuf == NULL) {
+			if (scmd->nbufs == 0) {
+				stmf_abort(STMF_QUEUE_TASK_ABORT, task,
+				    STMF_ALLOC_FAILURE, NULL);
+			}
+			return;
+		}
+	}
+
+	len = scmd->len > dbuf->db_buf_size ? dbuf->db_buf_size :
+	    scmd->len;
+
+	dbuf->db_relative_offset = scmd->current_ro;
+	dbuf->db_data_size = len;
+	dbuf->db_flags = DB_DIRECTION_FROM_RPORT;
+	(void) stmf_xfer_data(task, dbuf, 0);
+	scmd->nbufs++; /* outstanding port xfers and bufs used */
+	scmd->len -= len;
+	scmd->current_ro += len;
+}
+
+static void
+sbd_handle_write_same(scsi_task_t *task, struct stmf_data_buf *initial_dbuf)
 {
 	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
 	uint64_t addr, len;
-	uint8_t *p;
+	sbd_cmd_t *scmd;
+	stmf_data_buf_t *dbuf;
+	uint8_t unmap;
+	uint8_t do_immediate_data = 0;
 
 	task->task_cmd_xfer_length = 0;
 	if (task->task_additional_flags &
 	    TASK_AF_NO_EXPECTED_XFER_LENGTH) {
 		task->task_expected_xfer_length = 0;
 	}
+	if (sl->sl_flags & SL_WRITE_PROTECTED) {
+		stmf_scsilib_send_status(task, STATUS_CHECK,
+		    STMF_SAA_WRITE_PROTECTED);
+		return;
+	}
 	if (task->task_cdb[1] & 0xF7) {
 		stmf_scsilib_send_status(task, STATUS_CHECK,
 		    STMF_SAA_INVALID_FIELD_IN_CDB);
 		return;
 	}
-	p = &task->task_cdb[2];
-	addr = READ_SCSI64(p, uint64_t);
+	unmap = task->task_cdb[1] & 0x08;
+	if (unmap && ((sl->sl_flags & SL_UNMAP_ENABLED) == 0)) {
+		stmf_scsilib_send_status(task, STATUS_CHECK,
+		    STMF_SAA_INVALID_FIELD_IN_CDB);
+		return;
+	}
+	if (task->task_cdb[0] == SCMD_WRITE_SAME_G1) {
+		addr = READ_SCSI32(&task->task_cdb[2], uint64_t);
+		len = READ_SCSI16(&task->task_cdb[7], uint64_t);
+	} else {
+		addr = READ_SCSI64(&task->task_cdb[2], uint64_t);
+		len = READ_SCSI32(&task->task_cdb[10], uint64_t);
+	}
+	if (len == 0) {
+		stmf_scsilib_send_status(task, STATUS_CHECK,
+		    STMF_SAA_INVALID_FIELD_IN_CDB);
+		return;
+	}
 	addr <<= sl->sl_data_blocksize_shift;
-	len = READ_SCSI32(p+8, uint64_t);
 	len <<= sl->sl_data_blocksize_shift;
 
-	/* TODO -> full write_same support with data checks... */
-	if (sbd_unmap(sl, addr, len) != 0) {
+	/* Check if the command is for the unmap function */
+	if (unmap) {
+		if (sbd_unmap(sl, addr, len) != 0) {
+			stmf_scsilib_send_status(task, STATUS_CHECK,
+			    STMF_SAA_LBA_OUT_OF_RANGE);
+		} else {
+			stmf_scsilib_send_status(task, STATUS_GOOD, 0);
+		}
+		return;
+	}
+
+	/* Write same function */
+
+	task->task_cmd_xfer_length = 1 << sl->sl_data_blocksize_shift;
+	if (task->task_additional_flags &
+	    TASK_AF_NO_EXPECTED_XFER_LENGTH) {
+		task->task_expected_xfer_length = task->task_cmd_xfer_length;
+	}
+	if ((addr + len) > sl->sl_lu_size) {
 		stmf_scsilib_send_status(task, STATUS_CHECK,
 		    STMF_SAA_LBA_OUT_OF_RANGE);
 		return;
 	}
-	stmf_scsilib_send_status(task, STATUS_GOOD, 0);
+
+	/* For rest of this I/O the transfer length is 1 block */
+	len = ((uint64_t)1) << sl->sl_data_blocksize_shift;
+
+	/* Some basic checks */
+	if ((len == 0) || (len != task->task_expected_xfer_length)) {
+		stmf_scsilib_send_status(task, STATUS_CHECK,
+		    STMF_SAA_INVALID_FIELD_IN_CDB);
+		return;
+	}
+
+
+	if ((initial_dbuf != NULL) && (task->task_flags & TF_INITIAL_BURST)) {
+		if (initial_dbuf->db_data_size > len) {
+			if (initial_dbuf->db_data_size >
+			    task->task_expected_xfer_length) {
+				/* protocol error */
+				stmf_abort(STMF_QUEUE_TASK_ABORT, task,
+				    STMF_INVALID_ARG, NULL);
+				return;
+			}
+			initial_dbuf->db_data_size = (uint32_t)len;
+		}
+		do_immediate_data = 1;
+	}
+	dbuf = initial_dbuf;
+
+	if (task->task_lu_private) {
+		scmd = (sbd_cmd_t *)task->task_lu_private;
+	} else {
+		scmd = (sbd_cmd_t *)kmem_alloc(sizeof (sbd_cmd_t), KM_SLEEP);
+		task->task_lu_private = scmd;
+	}
+	scmd->flags = SBD_SCSI_CMD_ACTIVE | SBD_SCSI_CMD_TRANS_DATA;
+	scmd->cmd_type = SBD_CMD_SCSI_WRITE;
+	scmd->nbufs = 0;
+	scmd->len = (uint32_t)len;
+	scmd->trans_data_len = (uint32_t)len;
+	scmd->trans_data = kmem_alloc((size_t)len, KM_SLEEP);
+	scmd->current_ro = 0;
+
+	if (do_immediate_data) {
+		/*
+		 * Account for data passed in this write command
+		 */
+		(void) stmf_xfer_data(task, dbuf, STMF_IOF_STATS_ONLY);
+		scmd->len -= dbuf->db_data_size;
+		scmd->current_ro += dbuf->db_data_size;
+		dbuf->db_xfer_status = STMF_SUCCESS;
+		sbd_handle_write_same_xfer_completion(task, scmd, dbuf, 0);
+	} else {
+		sbd_do_write_same_xfer(task, scmd, dbuf, 0);
+	}
 }
 
 static void
@@ -3071,8 +3373,8 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		return;
 	}
 
-	if ((cdb0 == SCMD_WRITE_SAME_G4) && (sl->sl_flags & SL_UNMAP_ENABLED)) {
-		sbd_handle_write_same(task);
+	if ((cdb0 == SCMD_WRITE_SAME_G4) || (cdb0 == SCMD_WRITE_SAME_G1)) {
+		sbd_handle_write_same(task, initial_dbuf);
 		return;
 	}
 
@@ -3087,7 +3389,7 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		return;
 	}
 
-	if (cdb0 == SCMD_SVC_ACTION_IN_G4) { 	/* Read Capacity or read long */
+	if (cdb0 == SCMD_SVC_ACTION_IN_G4) { /* Read Capacity or read long */
 		if (cdb1 == SSVC_ACTION_READ_CAPACITY_G4) {
 			sbd_handle_read_capacity(task, initial_dbuf);
 			return;
@@ -3182,7 +3484,13 @@ sbd_dbuf_xfer_done(struct scsi_task *task, struct stmf_data_buf *dbuf)
 		break;
 
 	case (SBD_CMD_SCSI_WRITE):
-		sbd_handle_write_xfer_completion(task, scmd, dbuf, 1);
+		if ((task->task_cdb[0] == SCMD_WRITE_SAME_G1) ||
+		    (task->task_cdb[0] == SCMD_WRITE_SAME_G4)) {
+			sbd_handle_write_same_xfer_completion(task, scmd, dbuf,
+			    1);
+		} else {
+			sbd_handle_write_xfer_completion(task, scmd, dbuf, 1);
+		}
 		break;
 
 	case (SBD_CMD_SMALL_READ):
@@ -3251,6 +3559,11 @@ sbd_abort(struct stmf_lu *lu, int abort_cmd, void *arg, uint32_t flags)
 		sbd_cmd_t *scmd = (sbd_cmd_t *)task->task_lu_private;
 
 		if (scmd->flags & SBD_SCSI_CMD_ACTIVE) {
+			if (scmd->flags & SBD_SCSI_CMD_TRANS_DATA) {
+				kmem_free(scmd->trans_data,
+				    scmd->trans_data_len);
+				scmd->flags &= ~SBD_SCSI_CMD_TRANS_DATA;
+			}
 			scmd->flags &= ~SBD_SCSI_CMD_ACTIVE;
 			return (STMF_ABORT_SUCCESS);
 		}

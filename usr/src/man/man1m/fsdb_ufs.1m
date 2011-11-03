@@ -2,7 +2,7 @@
 .\"  Copyright (c) 1988 Regents of the University
 .\" of California.  All rights reserved.  Copyright (c) 2003 Sun Microsystems,
 .\" Inc.  All Rights Reserved.
-.TH fsdb_ufs 1M "14 Apr 2003" "SunOS 5.11" "System Administration Commands"
+.TH FSDB_UFS 1M "Apr 14, 2003"
 .SH NAME
 fsdb_ufs \- ufs file system debugger
 .SH SYNOPSIS
@@ -42,56 +42,46 @@ Wherever possible, \fBadb-\fRlike syntax was adopted to promote the use of
 The following option is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 6n
-.rt  
 Specify \fBUFS\fR file system specific options. These options can be any
 combination of the following separated by commas (with no intervening spaces).
 The options available are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB?\fR\fR
 .ad
 .RS 14n
-.rt  
 Display usage
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBo\fR\fR
 .ad
 .RS 14n
-.rt  
 Override some error conditions
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBp='string'\fR\fR
 .ad
 .RS 14n
-.rt  
 set prompt to string
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBw\fR\fR
 .ad
 .RS 14n
-.rt  
 open for write
 .RE
 
@@ -216,24 +206,20 @@ is again synonymous.
 The symbols recognized by \fBfsdb\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRETURN\fR\fR
 .ad
 .RS 13n
-.rt  
 update the value of \fBdot\fR by the current value of \fBtype\fR and display
 using the current value of \fBcount\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB#\fR\fR
 .ad
 .RS 13n
-.rt  
 numeric expressions may be composed of +, -, *, and % operators (evaluated left
 to right) and may use parentheses. Once evaluated, the value of \fBdot\fR is
 updated.
@@ -241,12 +227,10 @@ updated.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB,\fR\fI count\fR\fR
 .ad
 .RS 13n
-.rt  
 count indicator. The global value of \fBcount\fR will be updated to
 \fBcount\fR. The value of \fBcount\fR will remain until a new command is run. A
 count specifier of '*' will attempt to show a \fIblocks's\fR worth of
@@ -255,47 +239,39 @@ information. The default for \fBcount\fR is 1.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB?\fR\fI f\fR\fR
 .ad
 .RS 13n
-.rt  
 display in structured style with format specifier \fIf\fR. See
 \fBFormatted\fROutput\fB\&.\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/\fR\fI f\fR\fR
 .ad
 .RS 13n
-.rt  
 display in unstructured style with format specifier \fIf\fR See
 \fBFormatted\fROutput\fB\&.\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&.\fR\fR
 .ad
 .RS 13n
-.rt  
 the value of \fBdot\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+\fR\fIe\fR\fR
 .ad
 .RS 13n
-.rt  
 increment the value of \fBdot\fR by the expression \fIe.\fR The amount actually
 incremented is dependent on the size of \fBtype\fR:
 .sp
@@ -306,23 +282,19 @@ The default for \fIe\fR is \fB1\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-\fR\fIe\fR\fR
 .ad
 .RS 13n
-.rt  
 decrement the value of \fBdot\fR by the expression \fIe\fR. See  \fB+\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB*\fR\fIe\fR\fR
 .ad
 .RS 13n
-.rt  
 multiply the value of \fBdot\fR by the expression \fIe.\fR Multiplication and
 division don't use \fBtype\fR. In the above calculation of \fBdot\fR, consider
 the \fBsizeof(type)\fR to be \fB1\fR.
@@ -330,47 +302,39 @@ the \fBsizeof(type)\fR to be \fB1\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%\fR\fIe\fR\fR
 .ad
 .RS 13n
-.rt  
 divide the value of \fBdot\fR by the expression \fIe\fR. See  \fB*\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB<\fR\fI name\fR\fR
 .ad
 .RS 13n
-.rt  
 restore an address saved in register \fIname\fR. \fIname\fR must be a single
 letter or digit.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>\fR\fI name\fR\fR
 .ad
 .RS 13n
-.rt  
 save an address in register \fIname\fR. \fIname\fR must be a single letter or
 digit.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB=\fR\fI f\fR\fR
 .ad
 .RS 13n
-.rt  
 display indicator. If \fIf\fR is a legitimate format specifier. then the value
 of \fBdot\fR is displayed using the format specifier \fIf\fR. See
 \fBFormatted\fROutput. Otherwise, assignment is assumed See  \fB=\fR.
@@ -378,12 +342,10 @@ of \fBdot\fR is displayed using the format specifier \fIf\fR. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB= [\fR\fIs\fR\fB] [\fR\fIe\fR\fB]\fR\fR
 .ad
 .RS 13n
-.rt  
 assignment indicator. The address pointed to by \fBdot\fR has its contents
 changed to the value of the expression \fIe\fR or to the \fBASCII\fR
 representation of the quoted (") string \fIs\fR. This may be useful for
@@ -392,24 +354,20 @@ changing directory names or \fBASCII\fR file information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB=+\fR\fI e\fR\fR
 .ad
 .RS 13n
-.rt  
 incremental assignment. The address pointed to by \fBdot\fR has its contents
 incremented by expression \fIe\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB=-\fR\fI e\fR\fR
 .ad
 .RS 13n
-.rt  
 decremental assignment. The address pointed to by \fBdot\fR has its contents
 decremented by expression \fIe\fR.
 .RE
@@ -429,7 +387,6 @@ counterparts. See individual commands for details. The '*', '?', and '[-]' wild
 card characters are available.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbase=b\fR\fR
 .ad
@@ -445,7 +402,6 @@ the '0', '0t', or '0x' prefix when changing the \fBbase\fR. The default for
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBblock\fR\fR
 .ad
@@ -456,7 +412,6 @@ convert the value of \fBdot\fR to a block address.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcd \fR\fIdir\fR\fR
 .ad
@@ -469,7 +424,6 @@ change directories to inode \fB2\fR ("/").
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcg\fR\fR
 .ad
@@ -480,7 +434,6 @@ convert the value of \fBdot\fR to a cylinder group.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdirectory\fR\fR
 .ad
@@ -493,7 +446,6 @@ to this entry.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfile\fR\fR
 .ad
@@ -505,7 +457,6 @@ the file. The value of \fBdot\fR is updated to the first byte of this block.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfind\fR \fIdir\fR [ \fB-name\fR \fIn\fR] [\fB-inum\fR \fIi\fR]\fR
 .ad
@@ -519,7 +470,6 @@ may be used at one time. Also, the -print is not needed or accepted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfill\fR\fI=p\fR\fR
 .ad
@@ -531,7 +481,6 @@ fill an area of disk with pattern \fIp\fR. The area of disk is delimited by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfragment\fR\fR
 .ad
@@ -544,7 +493,6 @@ that is able to be displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinode\fR\fR
 .ad
@@ -559,7 +507,6 @@ displayed in inode format.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlog_chk\fR\fR
 .ad
@@ -571,7 +518,6 @@ the layout.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlog_delta\fR\fR
 .ad
@@ -584,7 +530,6 @@ head/tail offsets.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlog_head\fR\fR
 .ad
@@ -596,7 +541,6 @@ block allocation for the log and the data structures on the disk.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlog_otodb\fR\fR
 .ad
@@ -608,7 +552,6 @@ the log.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlog_show\fR\fR
 .ad
@@ -620,7 +563,6 @@ log (EOL).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBls\fR\fR
 .ad
@@ -636,7 +578,6 @@ and the name; use the \fBinode\fR command with '?i' to get more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBoverride\fR\fR
 .ad
@@ -648,7 +589,6 @@ override is toggled on.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprompt\fR\fI p\fR\fR
 .ad
@@ -659,7 +599,6 @@ change the \fBfsdb\fR prompt to \fIp\fR. \fIp\fR must be surrounded by (")s.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpwd\fR\fR
 .ad
@@ -670,7 +609,6 @@ display the current working directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBquit\fR\fR
 .ad
@@ -681,7 +619,6 @@ quit \fBfsdb\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsb\fR\fR
 .ad
@@ -695,7 +632,6 @@ superblock and display it in superblock format.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshadow\fR\fR
 .ad
@@ -707,7 +643,6 @@ the beginning of the shadow inode data.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!\fR\fR
 .ad
@@ -734,45 +669,37 @@ would increment the link count of the current \fBinode\fR and set the value of
 \fIdot\fR to the address of the link count field.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBat\fR\fR
 .ad
 .RS 7n
-.rt  
 access time.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbs\fR\fR
 .ad
 .RS 7n
-.rt  
 block size.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBct\fR\fR
 .ad
 .RS 7n
-.rt  
 creation time.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdb\fR\fR
 .ad
 .RS 7n
-.rt  
 use the current value of \fIdot\fR as a direct block index, where direct blocks
 number from 0 - 11. In order to display the block itself, you need to 'pipe'
 this result into the \fBblock\fR or \fBfragment\fR command. For example,
@@ -791,23 +718,19 @@ block address. 20 longs are then displayed in hexadecimal. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgid\fR\fR
 .ad
 .RS 7n
-.rt  
 group id.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBib\fR\fR
 .ad
 .RS 7n
-.rt  
 use the current value of \fIdot\fR as an indirect block index where indirect
 blocks number from 0 - 2. This will only get the indirect block itself (the
 block containing the pointers to the actual blocks). Use the \fBfile\fR command
@@ -816,67 +739,55 @@ and start at block 12 to get to the actual blocks.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBln\fR\fR
 .ad
 .RS 7n
-.rt  
 link count.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmt\fR\fR
 .ad
 .RS 7n
-.rt  
 modification time.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmd\fR\fR
 .ad
 .RS 7n
-.rt  
 mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmaj\fR\fR
 .ad
 .RS 7n
-.rt  
 major device number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmin\fR\fR
 .ad
 .RS 7n
-.rt  
 minor device number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnm\fR\fR
 .ad
 .RS 7n
-.rt  
 although listed here, this command actually operates on the directory name
 field. Once poised at the desired directory entry (using the \fIdirectory\fR
 command), this command will allow you to change or display the directory name.
@@ -892,34 +803,28 @@ message to this effect is displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsi\fR\fR
 .ad
 .RS 7n
-.rt  
 shadow inode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsz\fR\fR
 .ad
 .RS 7n
-.rt  
 file size.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuid\fR\fR
 .ad
 .RS 7n
-.rt  
 user id.
 .RE
 
@@ -932,64 +837,52 @@ superblocks and the like. Unstructured displays raw data. The following shows
 the different ways of displaying:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB?\fR\fR
 .ad
 .RS 5n
-.rt  
 .sp
 .ne 2
-.mk
 .na
 \fB\fBc\fR\fR
 .ad
 .RS 5n
-.rt  
 display as cylinder groups
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBi\fR\fR
 .ad
 .RS 5n
-.rt  
 display as inodes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd\fR\fR
 .ad
 .RS 5n
-.rt  
 display as directories
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fR
 .ad
 .RS 5n
-.rt  
 display as superblocks
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS\fR\fR
 .ad
 .RS 5n
-.rt  
 display as shadow inode data
 .RE
 
@@ -997,64 +890,52 @@ display as shadow inode data
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/\fR\fR
 .ad
 .RS 5n
-.rt  
 .sp
 .ne 2
-.mk
 .na
 \fB\fBb\fR\fR
 .ad
 .RS 7n
-.rt  
 display as bytes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBc\fR\fR
 .ad
 .RS 7n
-.rt  
 display as characters
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBo O\fR\fR
 .ad
 .RS 7n
-.rt  
 display as octal shorts or longs
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd D\fR\fR
 .ad
 .RS 7n
-.rt  
 display as decimal shorts or longs
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBx X\fR\fR
 .ad
 .RS 7n
-.rt  
 display as hexadecimal shorts or longs
 .RE
 

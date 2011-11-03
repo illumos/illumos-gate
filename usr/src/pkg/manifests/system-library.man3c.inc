@@ -9,7 +9,10 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+#
 
 file path=usr/share/man/man3c/FD_CLR.3c
 file path=usr/share/man/man3c/FD_ISSET.3c
@@ -615,6 +618,7 @@ file path=usr/share/man/man3c/posix_spawn_file_actions_adddup2.3c
 file path=usr/share/man/man3c/posix_spawn_file_actions_addopen.3c
 file path=usr/share/man/man3c/posix_spawn_file_actions_destroy.3c
 file path=usr/share/man/man3c/posix_spawn_file_actions_init.3c
+file path=usr/share/man/man3c/posix_spawn_pipe_np.3c
 file path=usr/share/man/man3c/posix_spawnattr_destroy.3c
 file path=usr/share/man/man3c/posix_spawnattr_getflags.3c
 file path=usr/share/man/man3c/posix_spawnattr_getpgroup.3c
@@ -934,7 +938,10 @@ file path=usr/share/man/man3c/stack_getbounds.3c
 file path=usr/share/man/man3c/stack_inbounds.3c
 file path=usr/share/man/man3c/stack_setbounds.3c
 file path=usr/share/man/man3c/stack_violation.3c
+file path=usr/share/man/man3c/stderr.3c
+file path=usr/share/man/man3c/stdin.3c
 file path=usr/share/man/man3c/stdio.3c
+file path=usr/share/man/man3c/stdout.3c
 file path=usr/share/man/man3c/str2sig.3c
 file path=usr/share/man/man3c/strcasecmp.3c
 file path=usr/share/man/man3c/strcat.3c

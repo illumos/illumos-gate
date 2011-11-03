@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH csx_ModifyWindow 9F "19 Jul 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH CSX_MODIFYWINDOW 9F "Jul 19, 1996"
 .SH NAME
 csx_ModifyWindow \- modify window attributes
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/pccard.h> 
+#include <sys/pccard.h>
 
 
 
@@ -24,23 +24,19 @@ Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIwh\fR \fR
 .ad
 .RS 7n
-.rt  
 Window handle returned from \fBcsx_RequestWindow\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImw\fR \fR
 .ad
 .RS 7n
-.rt  
 Pointer to a \fBmodify_win_t\fR structure.
 .RE
 
@@ -73,56 +69,46 @@ uint32_t       AccessSpeed;         /* window access speed */
 The fields are defined as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAttributes\fR \fR
 .ad
 .RS 15n
-.rt  
 This field is bit-mapped and defined as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBWIN_MEMORY_TYPE_CM\fR
 .ad
 .RS 26n
-.rt  
 Window points to Common Memory area. Set this to map the window to Common
 Memory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBWIN_MEMORY_TYPE_AM\fR
 .ad
 .RS 26n
-.rt  
 Window points to Attribute Memory area. Set this to map the window to Attribute
 Memory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBWIN_ENABLE\fR
 .ad
 .RS 26n
-.rt  
 Enable Window. The client must set this to enable the window.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBWIN_ACCESS_SPEED_VALID\fR
 .ad
 .RS 26n
-.rt  
 \fBAccessSpeed\fR valid. The client must set this when the \fBAccessSpeed\fR
 field has a value that the client wants set for the window.
 .RE
@@ -131,12 +117,10 @@ field has a value that the client wants set for the window.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAccessSpeed\fR\fR
 .ad
 .RS 15n
-.rt  
 The bit definitions for this field use the format of the extended speed byte of
 the Device \fBID \fRtuple. If the mantissa is \fB0\fR (noted as reserved in the
 \fIPC Card 95 Standard\fR), the lower bits are a binary code representing a
@@ -144,67 +128,55 @@ speed from the list below. Numbers in the first column are codes; items in the
 second column are speeds.
 .sp
 .ne 2
-.mk
 .na
 \fB0\fR
 .ad
 .RS 9n
-.rt  
 Reserved: do not use
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB1\fR
 .ad
 .RS 9n
-.rt  
 \fB250 nsec\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB2\fR
 .ad
 .RS 9n
-.rt  
 \fB200 nsec\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB3\fR
 .ad
 .RS 9n
-.rt  
 \fB150 nsec\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB4\fR
 .ad
 .RS 9n
-.rt  
 \fB100 nsec\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB5 - 7\fR
 .ad
 .RS 9n
-.rt  
 Reserved: do not use
 .RE
 
@@ -216,78 +188,64 @@ perturbing the \fBAccessSpeed\fR field.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_SUCCESS\fR \fR
 .ad
 .RS 28n
-.rt  
 Successful operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_BAD_HANDLE\fR \fR
 .ad
 .RS 28n
-.rt  
 Window handle is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_NO_CARD\fR \fR
 .ad
 .RS 28n
-.rt  
 No \fBPC \fRCard in socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_BAD_OFFSET\fR \fR
 .ad
 .RS 28n
-.rt  
 Error getting/setting window hardware parameters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_BAD_WINDOW\fR \fR
 .ad
 .RS 28n
-.rt  
 Error getting/setting window hardware parameters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_BAD_SPEED\fR \fR
 .ad
 .RS 28n
-.rt  
 \fBAccessSpeed\fR is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_UNSUPPORTED_FUNCTION\fR \fR
 .ad
 .RS 28n
-.rt  
 No \fBPCMCIA \fRhardware installed.
 .RE
 

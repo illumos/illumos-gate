@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH exec_attr 4 "30 Mar 2006" "SunOS 5.11" "File Formats"
+.TH EXEC_ATTR 4 "Mar 30, 2006"
 .SH NAME
 exec_attr \- execution profiles database
 .SH SYNOPSIS
 .LP
 .nf
-\fB/etc/security/exec_attr\fR 
+\fB/etc/security/exec_attr\fR
 .fi
 
 .SH DESCRIPTION
@@ -43,23 +43,19 @@ is:
 \fIname\fR:\fIpolicy\fR:\fItype\fR:\fIres1\fR:\fIres2\fR:\fIid\fR:\fIattr\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR\fR
 .ad
 .RS 10n
-.rt  
 The name of the profile. Profile names are case-sensitive.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpolicy\fR\fR
 .ad
 .RS 10n
-.rt  
 The security policy that is associated with the profile entry. The valid
 policies are \fBsuser\fR (standard Solaris superuser) and \fBsolaris\fR. The
 \fBsolaris\fR policy recognizes privileges (see \fBprivileges\fR(5)); the
@@ -77,12 +73,10 @@ release should use \fBsuser\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItype\fR\fR
 .ad
 .RS 10n
-.rt  
 The type of object defined in the profile. There are two valid types: \fBcmd\fR
 and \fBact\fR. The \fBcmd\fR type specifies that the \fBID\fR field is a
 command that would be executed by a shell. The \fBact\fR type is available only
@@ -93,34 +87,28 @@ Extensions \fBCDE\fR action mechanism.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIres1\fR\fR
 .ad
 .RS 10n
-.rt  
 Reserved for future use.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIres2\fR\fR
 .ad
 .RS 10n
-.rt  
 Reserved for future use.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIid\fR\fR
 .ad
 .RS 10n
-.rt  
 A string that uniquely identifies the object described by the profile. For a
 profile of type \fBcmd,\fR the id is either the full path to the command or the
 asterisk (\fB*\fR) symbol, which is used to allow all commands. An asterisk
@@ -150,48 +138,40 @@ semicolon-separated fields. These fields can be empty but the semicolons are
 required. The fields in a \fBCDE\fR action are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIargclass\fR\fR
 .ad
 .RS 12n
-.rt  
 Specifies the argument class (for example, \fBFILE\fR or \fBSESSION\fR.)
 Corresponds to \fBARG_CLASS\fR for \fBCDE\fR actions.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIargtype\fR\fR
 .ad
 .RS 12n
-.rt  
 Specifies the data type for the argument. Corresponds to \fBARG_TYPE\fR for
 \fBCDE\fR actions.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIargmode\fR\fR
 .ad
 .RS 12n
-.rt  
 Specifies the read or write mode for the argument. Corresponds to
 \fBARG_MODE\fR for \fBCDE\fR actions.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIargcount\fR\fR
 .ad
 .RS 12n
-.rt  
 Specifies the number of arguments that the action can accept. Corresponds to
 \fBARG_COUNT\fR for \fBCDE\fR actions.
 .RE
@@ -200,12 +180,10 @@ Specifies the number of arguments that the action can accept. Corresponds to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIattr\fR\fR
 .ad
 .RS 10n
-.rt  
 An optional list of semicolon-separated (\fB;\fR) key-value pairs that describe
 the security attributes to apply to the object upon execution. Zero or more
 keys may be specified. The list of valid key words depends on the policy
@@ -269,15 +247,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-AvailibilitySUNWcsr
+Availibility	SUNWcsr
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

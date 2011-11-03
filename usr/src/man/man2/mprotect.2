@@ -1,13 +1,13 @@
 '\" te
 .\"  Copyright 1989 AT&T  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mprotect 2 "12 Jan 1998" "SunOS 5.11" "System Calls"
+.TH MPROTECT 2 "Jan 12, 1998"
 .SH NAME
 mprotect \- set protection of memory mapping
 .SH SYNOPSIS
@@ -28,45 +28,37 @@ specified by \fIprot\fR. Legitimate values for \fIprot\fR are the same as those
 permitted for \fBmmap\fR(2) and are defined in <\fBsys/mman.h\fR> as:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_READ\fR\fR
 .ad
 .RS 14n
-.rt  
 \fB/* page can be read */\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_WRITE\fR\fR
 .ad
 .RS 14n
-.rt  
 \fB/* page can be written */\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_EXEC\fR\fR
 .ad
 .RS 14n
-.rt  
 \fB/* page can be executed */\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_NONE\fR\fR
 .ad
 .RS 14n
-.rt  
 \fB/* page can not be accessed */\fR
 .RE
 
@@ -88,36 +80,30 @@ returns \fB\(mi1\fR and sets \fBerrno\fR to indicate the error.
 The \fBmprotect()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIprot\fR argument specifies a protection that violates the access
 permission the process has to the underlying memory object.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIlen\fR argument has a value equal to 0, or \fIaddr\fR is not a multiple
 of the page size as returned by \fBsysconf\fR(3C).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 Addresses in the range [\fIaddr, addr + len\fR) are invalid for the address
 space of a process, or specify one or more pages which are not mapped.
 .RE
@@ -127,12 +113,10 @@ space of a process, or specify one or more pages which are not mapped.
 The \fBmprotect()\fR function may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 10n
-.rt  
 The address range [\fIaddr, addr + len\fR) includes one or more pages that have
 been locked in memory and that were mapped \fB\fR\fBMAP_PRIVATE\fR\fB;\fR
 \fIprot\fR includes \fB\fR\fBPROT_WRITE\fR\fB;\fR and the system has
@@ -149,13 +133,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fRATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

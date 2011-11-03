@@ -10,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH access 2 "16 Jun 2009" "SunOS 5.11" "System Calls"
+.TH ACCESS 2 "Jun 16, 2009"
 .SH NAME
 access, faccessat \- determine accessibility of a file
 .SH SYNOPSIS
@@ -46,45 +46,37 @@ test, \fBF_OK\fR.
 These constants are defined in <\fBunistd.h\fR> as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBR_OK\fR\fR
 .ad
 .RS 8n
-.rt  
 Test for read permission.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBW_OK\fR\fR
 .ad
 .RS 8n
-.rt  
 Test for write permission.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBX_OK\fR\fR
 .ad
 .RS 8n
-.rt  
 Test for execute or search permission.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_OK\fR\fR
 .ad
 .RS 8n
-.rt  
 Check existence of file
 .RE
 
@@ -115,12 +107,10 @@ Values for \fIflag\fR are constructed by a bitwise-inclusive OR of flags from
 the following list, defined in \fB<fcntl.h>\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAT_EACCESS\fR\fR
 .ad
 .RS 14n
-.rt  
 The checks for accessibility are performed using the effective user and group
 IDs instead of the real user and group ID as required in a call to
 \fBaccess()\fR.
@@ -138,46 +128,38 @@ and \fBerrno\fR is set to indicate the error.
 The \fBaccess()\fR and \fBfaccessat()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 16n
-.rt  
 Permission bits of the file mode do not permit the requested access, or search
 permission is denied on a component of the path prefix.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIpath\fR argument points to an illegal address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 16n
-.rt  
 A signal was caught during the \fBaccess()\fR function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBELOOP\fR\fR
 .ad
 .RS 16n
-.rt  
 Too many symbolic links were encountered in resolving \fIpath\fR, or loop
 exists in symbolic links encountered during resolution of the \fIpath\fR
 argument.
@@ -185,12 +167,10 @@ argument.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENAMETOOLONG\fR\fR
 .ad
 .RS 16n
-.rt  
 The length of the \fIpath\fR argument exceeds {\fBPATH_MAX\fR}, or a pathname
 component is longer than {\fBNAME_MAX\fR} while \fB_POSIX_NO_TRUNC\fR is in
 effect.
@@ -198,59 +178,49 @@ effect.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 16n
-.rt  
 A component of \fIpath\fR does not name an existing file or \fIpath\fR is an
 empty string.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOLINK\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIpath\fR argument points to a remote machine and the link to that machine
 is no longer active.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTDIR\fR\fR
 .ad
 .RS 16n
-.rt  
 A component of the path prefix is not a directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENXIO\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIpath\fR argument points to a character or block device special file and
 the corresponding device has been retired by the fault management framework.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEROFS\fR\fR
 .ad
 .RS 16n
-.rt  
 Write access is requested for a file on a read-only file system.
 .RE
 
@@ -259,12 +229,10 @@ Write access is requested for a file on a read-only file system.
 The \fBfaccessat()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 9n
-.rt  
 The \fIpath\fR argument does not specify an absolute path and the \fIfd\fR
 argument is neither \fBAT_FDCWD\fR nor a valid file descriptor open for reading
 or searching.
@@ -275,35 +243,29 @@ or searching.
 The \fBaccess()\fR and \fBfaccessat()\fR functions may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 16n
-.rt  
 The value of the \fIamode\fR argument is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENAMETOOLONG\fR\fR
 .ad
 .RS 16n
-.rt  
 Pathname resolution of a symbolic link produced an intermediate result whose
 length exceeds {\fBPATH_MAX\fR}.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBETXTBSY\fR\fR
 .ad
 .RS 16n
-.rt  
 Write access is requested for a pure procedure (shared text) file that is being
 executed.
 .RE
@@ -313,23 +275,19 @@ executed.
 The \fBfaccessat()\fR function may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 11n
-.rt  
 The value of the \fIflag\fR argument is not valid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTDIR\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fIpath\fR argument is not an absolute path and \fIfd\fR is neither
 \fBAT_FDCWD\fR nor a file descriptor associated with a directory.
 .RE
@@ -356,17 +314,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelAsync-Signal-Safe
+MT-Level	Async-Signal-Safe
 _
-StandardSee below.
+Standard	See below.
 .TE
 
 .sp

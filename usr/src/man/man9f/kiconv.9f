@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH kiconv 9F "16 Oct 2007" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH KICONV 9F "Oct 16, 2007"
 .SH NAME
 kiconv \- buffer-based code conversion function
 .SH SYNOPSIS
@@ -15,7 +15,7 @@ kiconv \- buffer-based code conversion function
 
 
 
-\fBsize_t\fR \fBkiconv\fR(\fBkiconv_t\fR \fIcd\fR, \fBchar **\fR\fIinbuf\fR, \fBsize_t *\fR\fIinbytesleft\fR, 
+\fBsize_t\fR \fBkiconv\fR(\fBkiconv_t\fR \fIcd\fR, \fBchar **\fR\fIinbuf\fR, \fBsize_t *\fR\fIinbytesleft\fR,
      \fBchar **\fR\fIoutbuf\fR, \fBsize_t *\fR\fIoutbytesleft\fR, \fBint *\fR\fIerrno\fR);
 .fi
 
@@ -29,23 +29,19 @@ Solaris DDI specific (Solaris DDI).
 The parameters for the \fBkiconv\fR function are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcd\fR\fR
 .ad
 .RS 16n
-.rt  
 Code conversion descriptor indicating the code conversion and conversion state.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinbuf\fR\fR
 .ad
 .RS 16n
-.rt  
 Points to an address of a buffer containing a sequence of character bytes in
 \fBfromcode\fR codeset to be converted. After the conversion, the variable is
 updated to point to the byte following the last byte that was successfully used
@@ -54,12 +50,10 @@ in the conversion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinbytesleft\fR\fR
 .ad
 .RS 16n
-.rt  
 As an input parameter, the number of bytes to be converted in \fIinbuf\fR. As
 an output parameter, the number of bytes in \fIinbuf\fR still not converted
 after the conversion.
@@ -67,12 +61,10 @@ after the conversion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoutbuf\fR\fR
 .ad
 .RS 16n
-.rt  
 Points to an address of a buffer where converted character bytes in
 \fBtocode\fR codeset can be saved. After the conversion, the variable is
 updated to point to the byte following the last byte of converted output data.
@@ -80,12 +72,10 @@ updated to point to the byte following the last byte of converted output data.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoutbytesleft\fR\fR
 .ad
 .RS 16n
-.rt  
 As an input parameter, the number of available bytes at \fIoutbuf\fR where
 converted character bytes can be saved. As an output parameter, the number of
 bytes still available at \fIoutbuf\fR after the conversion.
@@ -93,57 +83,47 @@ bytes still available at \fIoutbuf\fR after the conversion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIerrno\fR\fR
 .ad
 .RS 16n
-.rt  
 Indicates the error when conversion is not completed or failed. The following
 are possible values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEILSEQ\fR\fR
 .ad
 .RS 13n
-.rt  
 The input conversion was stopped due to an input byte that does not belong to
 the input codeset.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE2BIG\fR\fR
 .ad
 .RS 13n
-.rt  
 The input conversion was stopped due to lack of space in the output buffer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 13n
-.rt  
 The input conversion was stopped due to an incomplete character or shift
 sequence at the end of the input buffer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fIcd\fR input parameter is not a valid open code conversion descriptor.
 .RE
 
@@ -292,13 +272,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

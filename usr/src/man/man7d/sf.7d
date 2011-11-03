@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sf 7D "27 Mar 1997" "SunOS 5.11" "Devices"
+.TH SF 7D "Mar 27, 1997"
 .SH NAME
 sf \- SOC+ FC-AL FCP Driver
 .SH SYNOPSIS
 .LP
 .nf
-sf@\fIport\fR,0 
+sf@\fIport\fR,0
 .fi
 
 .SH DESCRIPTION
@@ -38,7 +38,6 @@ be accessible.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB/platform/\fIarchitecture\fR/kernel/drv/sf\fR
 .ad
@@ -49,7 +48,6 @@ ELF kernel module
 
 .sp
 .ne 2
-.mk
 .na
 \fB/platform/\fIarchitecture\fR/kernel/drv/sf.conf\fR
 .ad
@@ -66,13 +64,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureSPARC
+Architecture	SPARC
 .TE
 
 .SH SEE ALSO
@@ -108,7 +105,6 @@ Each message is preceded by  \fBsf\fR\fI%d\fR , where  \fI%d\fR is the instance
 number of the  \fBsf\fR device.
 .sp
 .ne 2
-.mk
 .na
 \fBFailed to alloc soft state\fR
 .ad
@@ -120,7 +116,6 @@ did not attach to device, SCSI devices will be inaccessible.
 
 .sp
 .ne 2
-.mk
 .na
 \fBBad soft state\fR
 .ad
@@ -132,7 +127,6 @@ device, SCSI devices will be inaccessible.
 
 .sp
 .ne 2
-.mk
 .na
 \fBFailed to obtain transport handle\fR
 .ad
@@ -144,7 +138,6 @@ driver. Driver did not attach to device, SCSI devices will be inaccessible
 
 .sp
 .ne 2
-.mk
 .na
 \fBFailed to allocate command/response pool\fR
 .ad
@@ -156,7 +149,6 @@ attach to device, SCSI devices will be inaccessible.
 
 .sp
 .ne 2
-.mk
 .na
 \fBFailed to allocate kmem cache\fR
 .ad
@@ -168,7 +160,6 @@ to device, SCSI devices will be inaccessible.
 
 .sp
 .ne 2
-.mk
 .na
 \fBFailed to allocate dma handle for\fR
 .ad
@@ -180,7 +171,6 @@ attach to device, SCSI devices will be inaccessible.
 
 .sp
 .ne 2
-.mk
 .na
 \fBFailed to allocate lilp map\fR
 .ad
@@ -192,7 +182,6 @@ device, SCSI devices will be inaccessible.
 
 .sp
 .ne 2
-.mk
 .na
 \fBFailed to bind dma handle for\fR
 .ad
@@ -204,7 +193,6 @@ to device, SCSI devices will be inaccessible.
 
 .sp
 .ne 2
-.mk
 .na
 \fBFailed to attach\fR
 .ad
@@ -220,7 +208,6 @@ The next set of messages may display at any time.  The full device pathname,
 followed by the shorter form described above, will precede the message.
 .sp
 .ne 2
-.mk
 .na
 \fBInvalid lilp map\fR
 .ad
@@ -232,7 +219,6 @@ will be inaccessible.
 
 .sp
 .ne 2
-.mk
 .na
 \fBTarget t, AL-PA x and hard\fR
 .ad
@@ -244,7 +230,6 @@ address y. The device will not be accessible.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDuplicate switch settings\fR
 .ad
@@ -256,7 +241,6 @@ be inaccessible.
 
 .sp
 .ne 2
-.mk
 .na
 \fBWWN changed on target t\fR
 .ad
@@ -267,7 +251,6 @@ The World Wide Name (WWN) has changed on the device with switch setting t.
 
 .sp
 .ne 2
-.mk
 .na
 \fBTarget t, unknown device type\fR
 .ad

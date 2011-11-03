@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ea_pack_object 3EXACCT "4 Oct 2007" "SunOS 5.11" "Extended Accounting File Access Library Functions"
+.TH EA_PACK_OBJECT 3EXACCT "Oct 4, 2007"
 .SH NAME
 ea_pack_object, ea_unpack_object, ea_get_creator, ea_get_hostname,
 ea_next_object, ea_previous_object, ea_get_object, ea_write_object,
@@ -12,7 +12,7 @@ write extended accounting records
 .SH SYNOPSIS
 .LP
 .nf
-\fBcc\fR [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lexacct\fR [ \fIlibrary\fR\&.\|.\|. ] 
+\fBcc\fR [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lexacct\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <exacct.h>
 
 \fBsize_t\fR \fBea_pack_object\fR(\fBea_object_t *\fR\fIobj\fR, \fBvoid *\fR\fIbuf\fR,
@@ -219,7 +219,6 @@ The extended account error code can be retrieved using \fBea_error\fR(3EXACCT).
 These functions may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEXR_SYSCALL_FAIL\fR\fR
 .ad
@@ -232,7 +231,6 @@ the error value set by the underlying call. On memory allocation failure,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEXR_CORRUPT_FILE\fR\fR
 .ad
@@ -245,7 +243,6 @@ unparsable, and therefore appears corrupted. This error is also used by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEXR_EOF\fR\fR
 .ad
@@ -325,7 +322,7 @@ ea_set_item(&obj, EXT_UINT32 | EXC_DEFAULT | EXT_PROC_PID, &my_pid, 0);
 (void) ea_write_object(&ef, &obj);
 
 ea_close(&ef);
- 
+
 \&...
 .fi
 .in -2
@@ -338,15 +335,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

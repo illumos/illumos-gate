@@ -3,17 +3,17 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_mem_alloc 9F "04 Apr 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_MEM_ALLOC 9F "Apr 04, 2006"
 .SH NAME
 ddi_mem_alloc, ddi_mem_free \- allocate and free sequentially accessed memory
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/ddi.h> 
+#include <sys/ddi.h>
 #include <sys/sunddi.h>
 
-\fBint\fR \fBddi_mem_alloc\fR(\fBdev_info_t *\fR\fIdip\fR, \fBddi_dma_lim_t *\fR\fIlimits\fR, 
-     \fBuint_t\fR \fIlength\fR, \fBuint_t\fR \fIflags\fR, \fBcaddr_t *\fR\fIkaddrp\fR, 
+\fBint\fR \fBddi_mem_alloc\fR(\fBdev_info_t *\fR\fIdip\fR, \fBddi_dma_lim_t *\fR\fIlimits\fR,
+     \fBuint_t\fR \fIlength\fR, \fBuint_t\fR \fIflags\fR, \fBcaddr_t *\fR\fIkaddrp\fR,
      \fBuint_t *\fR\fIreal_length\fR);
 .fi
 
@@ -31,23 +31,19 @@ These interfaces are obsolete. \fBddi_dma_mem_alloc\fR(9F) and
 .SS "\fBddi_mem_alloc()\fR"
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 15n
-.rt  
 A pointer to the device's \fBdev_info\fR structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlimits\fR\fR
 .ad
 .RS 15n
-.rt  
 A pointer to a \fBDMA\fR limits structure for this device (see
 \fBddi_dma_lim_sparc\fR(9S) or \fBddi_dma_lim_x86\fR(9S)). If this pointer is
 \fINULL\fR, a default set of \fBDMA\fR limits is assumed.
@@ -55,46 +51,38 @@ A pointer to a \fBDMA\fR limits structure for this device (see
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlength\fR\fR
 .ad
 .RS 15n
-.rt  
 The length in bytes of the desired allocation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 15n
-.rt  
 The possible flags \fB1\fR and \fB0\fR are taken to mean, respectively, wait
 until memory is available, or do not wait.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIkaddrp\fR\fR
 .ad
 .RS 15n
-.rt  
 On a successful return, *\fIkaddrp\fR points to the allocated memory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIreal_length\fR\fR
 .ad
 .RS 15n
-.rt  
 The length in bytes that was allocated. Alignment and padding requirements may
 cause \fBddi_mem_alloc()\fR to allocate more memory than requested in
 \fIlength\fR.
@@ -103,12 +91,10 @@ cause \fBddi_mem_alloc()\fR to allocate more memory than requested in
 .SS "\fBddi_mem_free()\fR"
 .sp
 .ne 2
-.mk
 .na
 \fB\fIkaddr\fR\fR
 .ad
 .RS 9n
-.rt  
 The memory returned from a successful call to \fBddi_mem_alloc()\fR.
 .RE
 
@@ -144,23 +130,19 @@ The \fBddi_mem_free()\fR function frees up memory allocated by
 The \fBddi_mem_alloc()\fR function returns:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 15n
-.rt  
 Memory successfully allocated.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 15n
-.rt  
 Allocation failed.
 .RE
 
@@ -178,13 +160,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Stability LevelObsolete
+Stability Level	Obsolete
 .TE
 
 .SH SEE ALSO

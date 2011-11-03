@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH kstat 3KSTAT "29 Jan 2007" "SunOS 5.11" "Kernel Statistics Library Functions"
+.TH KSTAT 3KSTAT "Jan 29, 2007"
 .SH NAME
 kstat \- kernel statistics facility
 .SH DESCRIPTION
@@ -24,7 +24,7 @@ section is defined by the \fBkstat_t\fR structure:
 typedef   int kid_t;    /* unique kstat id */
 
 typedef struct kstat {
-   /*   
+   /*
     * Fields relevant to both kernel and user
     */
    hrtime_t      ks_crtime;               /* creation time */
@@ -45,13 +45,13 @@ typedef struct kstat {
    hrtime_t      ks_snaptime;             /* time of last data
                                              snapshot */
 
-   /* 
+   /*
     * Fields relevant to kernel only
     */
    int(*ks_update)(struct kstat *, int);
-   void  *ks_private; 
+   void  *ks_private;
    int(*ks_snapshot)(struct kstat *, void *, int);
-   void  *ks_lock; 
+   void  *ks_lock;
 } kstat_t;
 .fi
 .in -2
@@ -61,12 +61,10 @@ typedef struct kstat {
 The fields that are of significance to the user are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBks_crtime\fR\fR
 .ad
 .RS 16n
-.rt  
 The time the kstat was created. This allows you to compute the rates of various
 counters since the kstat was created; "rate since boot" is replaced by the more
 general concept of "rate since kstat creation". All times associated with
@@ -79,30 +77,25 @@ about high-resolution timestamps.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBks_next\fR\fR
 .ad
 .RS 16n
-.rt  
 kstats are stored as a linked list, or chain. \fBks_next\fR points to the next
 kstat in the chain.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBks_kid\fR\fR
 .ad
 .RS 16n
-.rt  
 A unique identifier for the kstat.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBks_module\fR,\fR
 .ad
@@ -111,19 +104,16 @@ A unique identifier for the kstat.
 \fB\fBks_instance\fR\fR
 .ad
 .RS 16n
-.rt  
 contain the name and instance of the module that created the kstat. In cases
 where there can only be one instance, \fBks_instance\fR is 0.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBks_name\fR\fR
 .ad
 .RS 16n
-.rt  
 gives a meaningful name to a kstat. The full kstat namespace is
 <\fBks_module\fR,\fBks_instance\fR,\fBks_name\fR>, so the name only need be
 unique within a module.
@@ -131,23 +121,19 @@ unique within a module.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBks_type\fR\fR
 .ad
 .RS 16n
-.rt  
 The type of data in this kstat. kstat data types are discussed below.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBks_class\fR\fR
 .ad
 .RS 16n
-.rt  
 Each kstat can be characterized as belonging to some broad class of statistics,
 such as disk, tape, net, vm, and streams. This field can be used as a filter to
 extract related kstats. The following values are currently in use: \fBdisk\fR,
@@ -158,7 +144,6 @@ extract related kstats. The following values are currently in use: \fBdisk\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBks_data\fR,\fR
 .ad
@@ -171,7 +156,6 @@ extract related kstats. The following values are currently in use: \fBdisk\fR,
 \fB\fBks_data_size\fR\fR
 .ad
 .RS 16n
-.rt  
 \fBks_data\fR is a pointer to the kstat's data section. The type of data stored
 there depends on \fBks_type\fR. \fBks_ndata\fR indicates the number of data
 records. Only some kstat types support multiple data records. Currently,
@@ -183,12 +167,10 @@ the data section, in bytes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBks_snaptime\fR\fR
 .ad
 .RS 16n
-.rt  
 The timestamp for the last data snapshot. This allows you to compute activity
 rates:
 .sp
@@ -221,12 +203,10 @@ see above).
 .SS "Raw kstat"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKSTAT_TYPE_RAW\fR\fR
 .ad
 .RS 18n
-.rt  
 raw data
 .RE
 
@@ -237,12 +217,10 @@ used to export well-known structures, like \fIsysinfo\fR.
 .SS "Name=value kstat"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKSTAT_TYPE_NAMED\fR\fR
 .ad
 .RS 20n
-.rt  
 A list of arbitrary \fIname=value\fR statistics.
 .RE
 
@@ -320,12 +298,10 @@ the string pointed to by \fBKSTAT_NAMED_STR_PTR()\fR; that is,
 .SS "Interrupt kstat"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKSTAT_TYPE_INTR\fR\fR
 .ad
 .RS 19n
-.rt  
 Interrupt statistics.
 .RE
 
@@ -340,15 +316,15 @@ returning from any of the other types).
 .sp
 .in +2
 .nf
-#define KSTAT_INTR_HARD      0 
-#define KSTAT_INTR_SOFT      1 
-#define KSTAT_INTR_WATCHDOG  2 
-#define KSTAT_INTR_SPURIOUS  3 
-#define KSTAT_INTR_MULTSVC   4 
-#define KSTAT_NUM_INTRS      5 
+#define KSTAT_INTR_HARD      0
+#define KSTAT_INTR_SOFT      1
+#define KSTAT_INTR_WATCHDOG  2
+#define KSTAT_INTR_SPURIOUS  3
+#define KSTAT_INTR_MULTSVC   4
+#define KSTAT_NUM_INTRS      5
 
-typedef struct kstat_intr {         
-   uint_t intrs[KSTAT_NUM_INTRS]; /* interrupt counters */ 
+typedef struct kstat_intr {
+   uint_t intrs[KSTAT_NUM_INTRS]; /* interrupt counters */
 } kstat_intr_t;
 .fi
 .in -2
@@ -356,12 +332,10 @@ typedef struct kstat_intr {
 .SS "Event timer kstat"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKSTAT_TYPE_TIMER\fR\fR
 .ad
 .RS 20n
-.rt  
 Event timer statistics.
 .RE
 
@@ -387,12 +361,10 @@ typedef struct kstat_timer {
 .SS "I/O kstat"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKSTAT_TYPE_IO\fR\fR
 .ad
 .RS 17n
-.rt  
 I/O statistics.
 .RE
 
@@ -414,7 +386,7 @@ uint_t           writes;     /* number of write operations */
 * Queue length statistics are kept as a running sum of the
 * product of queue length and elapsed time at that length --
 * that is, a Riemann sum for queue length integrated against time.
-*        
+*
 *               ^
 *               |                       _________
 *               8                       | i4    |
@@ -476,10 +448,10 @@ subsequent libkstat operations:
 .sp
 .in +2
 .nf
-typedef struct kstat_ctl { 
-   kid_t     kc_chain_id;    /* current kstat chain ID */ 
-   kstat_t   *kc_chain;      /* pointer to kstat chain */ 
-   int       kc_kd;          /* /dev/kstat descriptor */ 
+typedef struct kstat_ctl {
+   kid_t     kc_chain_id;    /* current kstat chain ID */
+   kstat_t   *kc_chain;      /* pointer to kstat chain */
+   int       kc_kd;          /* /dev/kstat descriptor */
 } kstat_ctl_t;
 .fi
 .in -2
@@ -522,34 +494,28 @@ the kstat chain. See \fBkstat_chain_update\fR(3KSTAT) for an explanation of
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/kstat\fR\fR
 .ad
 .RS 28n
-.rt  
 kernel statistics driver
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/include/kstat.h\fR\fR
 .ad
 .RS 28n
-.rt  
 header
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/include/sys/kstat.h\fR\fR
 .ad
 .RS 28n
-.rt  
 header
 .RE
 

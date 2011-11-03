@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sasl_server_new 3SASL "14 Oct 2003" "SunOS 5.11" "Simple Authentication Security Layer Library Functions"
+.TH SASL_SERVER_NEW 3SASL "Oct 14, 2003"
 .SH NAME
 sasl_server_new \- create a new server authentication object
 .SH SYNOPSIS
@@ -30,24 +30,20 @@ authentication.
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIservice\fR\fR
 .ad
 .RS 16n
-.rt  
 The registered name of the service that uses SASL. The registered name is
 usually the protocol name, for example, IMAP.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIserverFQDN\fR\fR
 .ad
 .RS 16n
-.rt  
 The fully-qualified server domain name. If the value of \fIserverFQDN\fR is
 \fINULL\fR, use \fBgethostname\fR(3C). The \fIserverFQDN\fR parameter is useful
 for multi-homed servers.
@@ -55,24 +51,20 @@ for multi-homed servers.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIuser_realm\fR\fR
 .ad
 .RS 16n
-.rt  
 The domain of the user agent. The \fIuser_realm\fR is usually not necessary.
 The default value of \fIuser_realm\fR is \fINULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIiplocalport\fR\fR
 .ad
 .RS 16n
-.rt  
 .sp
 .LP
 The IP address and port of the local side of the connection. The value of
@@ -122,47 +114,39 @@ The following older formats are also supported:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIipremoteport\fR\fR
 .ad
 .RS 16n
-.rt  
 The IP address and port of the remote side of the connection. The value of
 \fIipremoteport\fR may be \fINULL\fR. See \fIiplocalport\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcallbacks\fR\fR
 .ad
 .RS 16n
-.rt  
 Callbacks, for example: authorization, lang, and new getopt context.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 16n
-.rt  
 Usage flags. For servers, the flags \fBSASL_NEED_PROXY\fR and
 \fBSASL_SUCCESS_DATA\fR are available.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpconn\fR\fR
 .ad
 .RS 16n
-.rt  
 A pointer to the connection context allocated by the library. This structure
 will be used for all future SASL calls for this connection.
 .RE
@@ -175,12 +159,10 @@ code.
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_OK\fR\fR
 .ad
 .RS 11n
-.rt  
 The call to \fBsasl_server_new()\fR was successful.
 .RE
 
@@ -197,15 +179,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

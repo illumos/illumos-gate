@@ -20,10 +20,9 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 #
 #	This makefile drives the production of the cvcredir driver module.
 #
@@ -60,6 +59,11 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 # lint pass one enforcement
 #
 CFLAGS += $(CCVERBOSE)
+
+#
+# Define dependency on cvc
+#
+LDFLAGS += -dy -N drv/cvc
 
 #
 #	Default build targets.

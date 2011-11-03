@@ -2,13 +2,13 @@
 .\" Copyright (C) 2009, Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 1983 Regents of the University of California. All rights reserved. The Berkeley software License Agreement specifies the terms and conditions for redistribution.
-.TH ifconfig 1M "13 Aug 2009" "SunOS 5.11" "System Administration Commands"
+.TH IFCONFIG 1M "Aug 13, 2009"
 .SH NAME
 ifconfig \- configure network interface parameters
 .SH SYNOPSIS
 .LP
 .nf
-\fBifconfig\fR \fIinterface\fR [\fIaddress_family\fR] [\fIaddress\fR [\fI/prefix_length\fR] 
+\fBifconfig\fR \fIinterface\fR [\fIaddress_family\fR] [\fIaddress\fR [\fI/prefix_length\fR]
  [\fIdest_address\fR]] [\fBaddif\fR \fIaddress\fR [\fI/prefix_length\fR]]
  [\fBremoveif\fR \fIaddress\fR [\fI/prefix_length\fR]] [\fBarp\fR | \fB-arp\fR]
  [\fBauth_algs\fR \fIauthentication algorithm\fR] [\fBencr_algs\fR \fIencryption algorithm\fR]
@@ -20,7 +20,7 @@ ifconfig \- configure network interface parameters
  [modinsert \fImod_name@pos\fR] [modremove \fImod_name@pos\fR]
  [\fBmtu\fR \fIn\fR] [\fBnetmask\fR \fImask\fR] [\fBplumb\fR] [\fBunplumb\fR] [\fBprivate\fR
  | \fB-private\fR] [\fBnud\fR | \fB-nud\fR] [\fBset\fR [\fIaddress\fR] [\fI/netmask\fR]]
- [\fBstandby\fR | \fB-standby\fR] [\fBsubnet\fR \fIsubnet_address\fR] [\fBtdst\fR 
+ [\fBstandby\fR | \fB-standby\fR] [\fBsubnet\fR \fIsubnet_address\fR] [\fBtdst\fR
  \fItunnel_dest_address\fR] [\fBtoken\fR \fIaddress\fR/\fIprefix_length\fR]
  [\fBtsrc\fR \fItunnel_src_address\fR] [\fBtrailers\fR | \fB-trailers\fR]
  [\fBup\fR] [\fBdown\fR] [\fBusesrc\fR [\fIname\fR | none]] [\fBxmit\fR | \fB-xmit\fR]
@@ -66,7 +66,6 @@ control.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBaddif\fR \fIaddress\fR\fR
 .ad
@@ -77,7 +76,6 @@ Create the next unused logical interface on the specified physical interface.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBall-zones\fR\fR
 .ad
@@ -94,7 +92,6 @@ which is part of the \fISolaris Trusted Extensions Reference Manual\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBanycast\fR\fR
 .ad
@@ -106,7 +103,6 @@ flag. See "INTERFACE FLAGS," below, for more information on anycast.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-anycast\fR\fR
 .ad
@@ -118,7 +114,6 @@ Marks the logical interface as not an anycast address by clearing the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBarp\fR\fR
 .ad
@@ -131,7 +126,6 @@ currently implemented for mapping between IPv4 addresses and MAC addresses.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-arp\fR\fR
 .ad
@@ -143,7 +137,6 @@ disabled on an IPMP IP interface.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauth_algs\fR \fIauthentication algorithm\fR\fR
 .ad
@@ -162,7 +155,6 @@ security properties, this keyword will not affect the tunnel.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauto-dhcp\fR\fR
 .ad
@@ -175,7 +167,6 @@ For IPv6, the interface specified must be the zeroth logical interface (the
 physical interface name), which has the link-local address.
 .sp
 .ne 2
-.mk
 .na
 \fBprimary\fR
 .ad
@@ -192,7 +183,6 @@ been configured with data read from the previous primary interface.
 
 .sp
 .ne 2
-.mk
 .na
 \fBwait \fIseconds\fR\fR
 .ad
@@ -207,7 +197,6 @@ The symbolic value \fBforever\fR may be used as well, with obvious meaning.
 
 .sp
 .ne 2
-.mk
 .na
 \fBdrop\fR
 .ad
@@ -221,7 +210,6 @@ plumbed by \fBdhcpagent\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBextend\fR
 .ad
@@ -234,7 +222,6 @@ expires.
 
 .sp
 .ne 2
-.mk
 .na
 \fBinform\fR
 .ad
@@ -247,7 +234,6 @@ address is obtained through mechanisms other than \fBDHCP\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBping\fR
 .ad
@@ -260,7 +246,6 @@ exit status of \fB0\fR means success.
 
 .sp
 .ne 2
-.mk
 .na
 \fBrelease\fR
 .ad
@@ -273,7 +258,6 @@ logical interfaces plumbed by \fBdhcpagent\fR are unplumbed.
 
 .sp
 .ne 2
-.mk
 .na
 \fBstart\fR
 .ad
@@ -284,7 +268,6 @@ Start \fBDHCP\fR on the interface.
 
 .sp
 .ne 2
-.mk
 .na
 \fBstatus\fR
 .ad
@@ -297,7 +280,6 @@ Display the \fBDHCP\fR configuration status of the interface.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauto-revarp\fR\fR
 .ad
@@ -310,7 +292,6 @@ RARP; for example, IPoIB (IP over InfiniBand), and on IPv6 interfaces.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbroadcast\fR \fIaddress\fR\fR
 .ad
@@ -345,7 +326,6 @@ the interfaces.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdeprecated\fR\fR
 .ad
@@ -361,7 +341,6 @@ by \fBifconfig\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-deprecated\fR\fR
 .ad
@@ -373,7 +352,6 @@ interface could be used as a source address for outbound packets.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpreferred\fR\fR
 .ad
@@ -391,7 +369,6 @@ address by using a routing protocol.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-preferred\fR\fR
 .ad
@@ -402,7 +379,6 @@ Marks the logical interface as not preferred.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdestination\fR \fIdest_address\fR\fR
 .ad
@@ -413,7 +389,6 @@ Set the destination address for a point-to point interface.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdhcp\fR\fR
 .ad
@@ -424,7 +399,6 @@ This option is an alias for option \fBauto-dhcp\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdown\fR\fR
 .ad
@@ -453,7 +427,6 @@ because the gateway is unreachable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBencaplimit\fR \fIn\fR\fR
 .ad
@@ -472,7 +445,6 @@ link property.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-encaplimit\fR\fR
 .ad
@@ -489,7 +461,6 @@ link property.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBencr_auth_algs\fR \fIauthentication algorithm\fR\fR
 .ad
@@ -508,7 +479,6 @@ security properties, this keyword will not affect the tunnel.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBencr_algs\fR \fIencryption algorithm\fR\fR
 .ad
@@ -528,7 +498,6 @@ security properties, this keyword will not affect the tunnel.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBether\fR [ \fIaddress\fR ]\fR
 .ad
@@ -553,7 +522,6 @@ addresses; see \fBin.mpathd\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-failover\fR\fR
 .ad
@@ -568,7 +536,6 @@ not permitted on an IPMP IP interface.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfailover\fR\fR
 .ad
@@ -581,7 +548,6 @@ MULTIPATHING GROUPS\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgroup\fR [ \fIname\fR |\fB""\fR]\fR
 .ad
@@ -603,7 +569,6 @@ subcommand, which the system will also use as the IPMP group name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBindex\fR \fIn\fR\fR
 .ad
@@ -617,7 +582,6 @@ network interface on the system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBipmp\fR\fR
 .ad
@@ -631,7 +595,6 @@ IPMP IP interfaces have the \fBIPMP\fR flag set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmetric\fR \fIn\fR\fR
 .ad
@@ -645,7 +608,6 @@ counted as addition hops to the destination network or host.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmodinsert\fR \fImod_name@pos\fR\fR
 .ad
@@ -674,7 +636,7 @@ example% ifconfig eri0 modlist
 0 arp
 1 ip
 2 ipqos
-3 firewall 
+3 firewall
 4 eri
 .fi
 .in -2
@@ -684,7 +646,6 @@ example% ifconfig eri0 modlist
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmodlist\fR\fR
 .ad
@@ -709,7 +670,6 @@ example% ifconfig eri0 modlist
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmodremove\fR \fImod_name@pos\fR\fR
 .ad
@@ -748,7 +708,6 @@ modules, cannot be removed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmtu\fR \fIn\fR\fR
 .ad
@@ -761,7 +720,6 @@ Ethernet. This option sets the \fBFIXEDMTU\fR flag on the affected interface.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnetmask\fR \fImask\fR\fR
 .ad
@@ -818,7 +776,6 @@ For both \fBinet\fR and \fBinet6\fR, the same information conveyed by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnud\fR\fR
 .ad
@@ -830,7 +787,6 @@ physical interface.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-nud\fR\fR
 .ad
@@ -842,7 +798,6 @@ physical interface.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBplumb\fR\fR
 .ad
@@ -863,7 +818,6 @@ instead created with the \fBipmp\fR subcommand.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprivate\fR\fR
 .ad
@@ -875,7 +829,6 @@ should not be advertised.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-private\fR\fR
 .ad
@@ -886,7 +839,6 @@ Specify unadvertised interfaces.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBremoveif\fR \fIaddress\fR\fR
 .ad
@@ -898,7 +850,6 @@ the \fIaddress\fR specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrouter\fR\fR
 .ad
@@ -912,7 +863,6 @@ interfaces in that IPMP group.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-router\fR\fR
 .ad
@@ -925,7 +875,6 @@ disables it on all IP interfaces in that IPMP group.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBset\fR\fR
 .ad
@@ -936,7 +885,6 @@ Set the \fIaddress\fR, \fIprefix_length\fR or both, for a logical interface.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstandby\fR\fR
 .ad
@@ -952,7 +900,6 @@ permitted on an IPMP IP interface.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-standby\fR\fR
 .ad
@@ -963,7 +910,6 @@ Clear \fBSTANDBY\fR on the interface. This is the default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsubnet\fR\fR
 .ad
@@ -974,7 +920,6 @@ Set the subnet \fIaddress\fR for an interface.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtdst\fR \fItunnel_dest_address\fR\fR
 .ad
@@ -990,7 +935,6 @@ and \fBmodify-iptun\fR subcommands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBthoplimit\fR \fIn\fR\fR
 .ad
@@ -1008,7 +952,6 @@ property.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtoken\fR \fIaddress\fR/\fIprefix_length\fR\fR
 .ad
@@ -1027,7 +970,6 @@ example% \fBifconfig eri0 inet6 token ::1/64\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtrailers\fR\fR
 .ad
@@ -1040,7 +982,6 @@ flag. It is provided for compatibility, but is ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-trailers\fR\fR
 .ad
@@ -1051,7 +992,6 @@ Disable the use of a "trailer" link level encapsulation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtsrc\fR \fItunnel_src_address\fR\fR
 .ad
@@ -1067,7 +1007,6 @@ and \fBmodify-iptun\fR subcommands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunplumb\fR\fR
 .ad
@@ -1085,7 +1024,6 @@ interface name will no longer appear in the output of \fBifconfig\fR \fB-a\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBup\fR\fR
 .ad
@@ -1101,7 +1039,6 @@ physical interface to send or receive packets
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBusesrc\fR [ \fIname\fR | \fBnone\fR ]\fR
 .ad
@@ -1155,7 +1092,6 @@ specified by means of \fBusesrc\fR, and vice-versa.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxmit\fR\fR
 .ad
@@ -1167,7 +1103,6 @@ when the logical interface is up.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-xmit\fR\fR
 .ad
@@ -1179,7 +1114,6 @@ receive packets.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBzone\fR \fIzonename\fR\fR
 .ad
@@ -1194,7 +1128,6 @@ exclusive-IP zones.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-zone\fR\fR
 .ad
@@ -1210,7 +1143,6 @@ The \fIinterface\fR operand, as well as address parameters that affect it, are
 described below.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinterface\fR\fR
 .ad
@@ -1243,7 +1175,6 @@ order. If one of these interface names is given, the commands following it are
 applied to all of the interfaces that match.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
@@ -1256,7 +1187,6 @@ address family is supplied, either on the command line or by means of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
@@ -1267,7 +1197,6 @@ Apply the commands to all "down" interfaces in the system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR\fR
 .ad
@@ -1279,7 +1208,6 @@ Configuration Protocol) control.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
@@ -1290,7 +1218,6 @@ Apply the commands to all "up" interfaces in the system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Z\fR\fR
 .ad
@@ -1301,7 +1228,6 @@ Apply the commands to all interfaces in the user's zone.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-4\fR\fR
 .ad
@@ -1312,7 +1238,6 @@ Apply the commands to all IPv4 interfaces.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-6\fR\fR
 .ad
@@ -1325,7 +1250,6 @@ Apply the commands to all IPv6 interfaces.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaddress_family\fR\fR
 .ad
@@ -1345,7 +1269,6 @@ command line, the command line overrides the \fBDEFAULT_IP\fR settings.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaddress\fR\fR
 .ad
@@ -1366,7 +1289,6 @@ in the Internet standard colon-separated hexadecimal format represented as
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprefix_length\fR\fR
 .ad
@@ -1381,7 +1303,6 @@ denotes the number of leading set bits in the netmask.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdest_address\fR\fR
 .ad
@@ -1394,7 +1315,6 @@ other end of a point-to-point link.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItunnel_dest_address\fR\fR
 .ad
@@ -1408,7 +1328,6 @@ being configured.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItunnel_src_address\fR\fR
 .ad
@@ -1427,7 +1346,6 @@ The \fBifconfig\fR command supports the following interface flags. The term
 \fBeri0\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBADDRCONF\fR\fR
 .ad
@@ -1444,7 +1362,6 @@ addresses. This flag is specific to IPv6.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBANYCAST\fR\fR
 .ad
@@ -1459,7 +1376,6 @@ address instead of being delivered to all members of the group.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBBROADCAST\fR\fR
 .ad
@@ -1471,7 +1387,6 @@ mutually exclusive
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCoS\fR\fR
 .ad
@@ -1489,7 +1404,6 @@ links that have their \fBdladm\fR(1M) \fBtagmode\fR link property set to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDEPRECATED\fR\fR
 .ad
@@ -1505,7 +1419,6 @@ on all \fBNOFAILOVER\fR addresses, though this may change in a future release.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDHCPRUNNING\fR\fR
 .ad
@@ -1516,7 +1429,6 @@ The logical interface is managed by \fBdhcpagent\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDUPLICATE\fR\fR
 .ad
@@ -1535,7 +1447,6 @@ Setting the interface to \fBdown\fR terminates recovery and removes the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFAILED\fR\fR
 .ad
@@ -1551,7 +1462,6 @@ can be sent or received over any interfaces in that group.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFIXEDMTU\fR\fR
 .ad
@@ -1564,7 +1474,6 @@ dynamic MTU changes that can occur when drivers notify IP of link MTU changes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBINACTIVE\fR\fR
 .ad
@@ -1579,7 +1488,6 @@ indicate that the IP interface has repaired but is not being used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIPMP\fR\fR
 .ad
@@ -1590,7 +1498,6 @@ Indicates that this is an IPMP IP interface.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLOOPBACK\fR\fR
 .ad
@@ -1601,7 +1508,6 @@ Indicates that this is the loopback interface.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMULTI_BCAST\fR\fR
 .ad
@@ -1612,7 +1518,6 @@ Indicates that the broadcast address is used for multicast on this interface.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMULTICAST\fR\fR
 .ad
@@ -1625,7 +1530,6 @@ multicast.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNOARP\fR\fR
 .ad
@@ -1638,7 +1542,6 @@ flag is specific to IPv4.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNOFAILOVER\fR\fR
 .ad
@@ -1651,7 +1554,6 @@ interface.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNOLOCAL\fR\fR
 .ad
@@ -1662,7 +1564,6 @@ The interface has no address , just an on-link subnet.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNONUD\fR\fR
 .ad
@@ -1676,7 +1577,6 @@ neighbor is detected to be unreachable. This flag is specific to IPv6.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNORTEXCH\fR\fR
 .ad
@@ -1691,7 +1591,6 @@ routers.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNOXMIT\fR\fR
 .ad
@@ -1703,7 +1602,6 @@ advertise this address.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOFFLINE\fR\fR
 .ad
@@ -1716,7 +1614,6 @@ is only set on IP interfaces in an IPMP group. See \fBif_mpadm\fR(1M) and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOINTOPOINT\fR\fR
 .ad
@@ -1728,7 +1625,6 @@ Indicates that the address is a point-to-point link. This flag and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPREFERRED\fR\fR
 .ad
@@ -1742,7 +1638,6 @@ another address on the system is of more appropriate scope. The
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIVATE\fR\fR
 .ad
@@ -1755,7 +1650,6 @@ included in advertisements to other routers.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROMISC\fR\fR
 .ad
@@ -1768,7 +1662,6 @@ response to \fBifconfig\fR \fB-a\fR, for example) the \fBPROMISC\fR flag.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBROUTER\fR\fR
 .ad
@@ -1779,7 +1672,6 @@ Indicates that IP packets can be forwarded to and from the interface.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRUNNING\fR\fR
 .ad
@@ -1792,7 +1684,6 @@ interfaces this also indicates that the link is up. For IPMP IP interfaces,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTANDBY\fR\fR
 .ad
@@ -1805,7 +1696,6 @@ another interface in the IPMP group becomes unusable. The \fBINACTIVE\fR and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTEMPORARY\fR\fR
 .ad
@@ -1816,7 +1706,6 @@ Indicates that this is a temporary IPv6 address as defined in RFC 3041.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUNNUMBERED\fR\fR
 .ad
@@ -1828,7 +1717,6 @@ address of some other link in the system
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUP\fR\fR
 .ad
@@ -1843,7 +1731,6 @@ addresses. Similarly, the IP module will allow packets to be sent with an
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVIRTUAL\fR\fR
 .ad
@@ -1857,7 +1744,6 @@ multiple interfaces. (See also the \fBusesrc\fR option.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBXRESOLV\fR\fR
 .ad
@@ -2041,7 +1927,7 @@ The following example shows that the link-local address has a prefix of
 .nf
 example% \fBifconfig eri0 inet6\fR
 ce0: flags=2000841<UP,RUNNING,MULTICAST,IPv6>
-           mtu 1500 index 2 \ 
+           mtu 1500 index 2 \
         inet6 fe80::a00:20ff:fe8e:f3ad/10
 .fi
 .in -2
@@ -2139,34 +2025,28 @@ names will implicitly result in the creation of tunnel links without invoking
 \fBdladm create-iptun\fR. These tunnel names are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBip.tun\fR\fIN\fR\fR
 .ad
 .RS 15n
-.rt  
 An IPv4 tunnel
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBip6.tun\fR\fIN\fR\fR
 .ad
 .RS 15n
-.rt  
 An IPv6 tunnel
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBip.6to4tun\fR\fIN\fR\fR
 .ad
 .RS 15n
-.rt  
 A 6to4 tunnel
 .RE
 
@@ -2582,7 +2462,6 @@ example% \fBifconfig hme0 dhcp release\fR
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/netmasks\fR\fR
 .ad
@@ -2593,7 +2472,6 @@ Netmask data.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/default/inet_type\fR\fR
 .ad
@@ -2610,17 +2488,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.73i) |cw(2.77i) 
-lw(2.73i) |lw(2.77i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
 T{
 Interface Stability for command-line options
-T}Committed
+T}	Committed
 _
-Interface Stability for command outputUncommitted
+Interface Stability for command output	Uncommitted
 .TE
 
 .SH SEE ALSO

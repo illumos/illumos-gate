@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH labelit_ufs 1M "15 Apr 2003" "SunOS 5.11" "System Administration Commands"
+.TH LABELIT_UFS 1M "Apr 15, 2003"
 .SH NAME
 labelit_ufs \- provide and print labels for ufs file systems
 .SH SYNOPSIS
@@ -25,12 +25,10 @@ programs such as \fBvolcopy\fR(1M).
 The following option is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIgeneric_options\fR\fR
 .ad
 .RS 19n
-.rt  
 options supported by the generic  \fBlabelit\fR command. See
 \fBlabelit\fR(1M).
 .RE
@@ -41,36 +39,30 @@ options supported by the generic  \fBlabelit\fR command. See
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIspecial\fR\fR
 .ad
 .RS 11n
-.rt  
 name should be the physical disk section (for example, \fB/dev/dsk/c0d0s6\fR).
 The device may not be on a remote machine.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfsname\fR\fR
 .ad
 .RS 11n
-.rt  
 represents the mount point (for example, \fBroot\fR, \fBu1\fR, and so on) of
 the file system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvolume\fR\fR
 .ad
 .RS 11n
-.rt  
 may be used to represent the physical volume name.
 .RE
 
@@ -85,23 +77,19 @@ limited to six or fewer characters.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 Write or display of labels was successful.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnon-zero\fR
 .ad
 .RS 12n
-.rt  
 An error occurred.
 .RE
 

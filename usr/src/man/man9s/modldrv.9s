@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH modldrv 9S "5 Mar 2001" "SunOS 5.11" "Data Structures for Drivers"
+.TH MODLDRV 9S "Mar 5, 2001"
 .SH NAME
 modldrv \- linkage structure for loadable drivers
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/modctl.h> 
+#include <sys/modctl.h>
 .fi
 
 .SH INTERFACE LEVEL
@@ -25,32 +25,28 @@ information to the kernel.
 .sp
 .in +2
 .nf
-struct mod_ops    *drv_modops;     
-char              *drv_linkinfo; 
+struct mod_ops    *drv_modops;
+char              *drv_linkinfo;
 struct dev_ops    *drv_dev_ops;
 .fi
 .in -2
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdrv_modops\fR \fR
 .ad
 .RS 17n
-.rt  
 Must always be initialized to the address of \fBmod_driverops\fR. This member
 identifies the module as a loadable driver.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdrv_linkinfo\fR \fR
 .ad
 .RS 17n
-.rt  
 Can be any string up to \fBMODMAXNAMELEN\fR characters (including the
 terminating NULL character), and is used to describe the module and its version
 number. This is usually the name of the driver and module version information,
@@ -59,12 +55,10 @@ but can contain other information as well.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdrv_dev_ops\fR \fR
 .ad
 .RS 17n
-.rt  
 Pointer to the driver's \fBdev_ops\fR(9S) structure.
 .RE
 

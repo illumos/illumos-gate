@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH metainit 1M "27 Mar 2006" "SunOS 5.11" "System Administration Commands"
+.TH METAINIT 1M "Mar 27, 2006"
 .SH NAME
 metainit \- configure metadevices
 .SH SYNOPSIS
@@ -20,27 +20,27 @@ metainit \- configure metadevices
 
 .LP
 .nf
-\fB/sbin/metainit\fR [\fIwidth\fR \fIcomponent...\fR [\fB-i\fR \fIinterlace\fR]] 
+\fB/sbin/metainit\fR [\fIwidth\fR \fIcomponent...\fR [\fB-i\fR \fIinterlace\fR]]
      [\fB-h\fR \fIhot_spare_pool\fR]
 .fi
 
 .LP
 .nf
-\fB/sbin/metainit\fR [\fIgeneric options\fR] \fImirror\fR \fB-m\fR \fIsubmirror\fR 
-     [\fIread_options\fR] [\fIwrite_options\fR] 
+\fB/sbin/metainit\fR [\fIgeneric options\fR] \fImirror\fR \fB-m\fR \fIsubmirror\fR
+     [\fIread_options\fR] [\fIwrite_options\fR]
      [\fIpass_num\fR]
 .fi
 
 .LP
 .nf
-\fB/sbin/metainit\fR [\fIgeneric options\fR] \fIRAID\fR \fB-r\fR \fIcomponent...\fR 
-     [\fB-i\fR \fIinterlace\fR] 
+\fB/sbin/metainit\fR [\fIgeneric options\fR] \fIRAID\fR \fB-r\fR \fIcomponent...\fR
+     [\fB-i\fR \fIinterlace\fR]
      [\fB-h\fR \fIhot_spare_pool\fR] [\fB-k\fR] [\fB-o\fR \fIoriginal_column_count\fR]
 .fi
 
 .LP
 .nf
-\fB/sbin/metainit\fR [\fIgeneric options\fR] \fIhot_spare_pool\fR 
+\fB/sbin/metainit\fR [\fIgeneric options\fR] \fIhot_spare_pool\fR
      [\fIhotspare...\fR]
 .fi
 
@@ -56,7 +56,7 @@ metainit \- configure metadevices
 
 .LP
 .nf
-\fB/sbin/metainit\fR [\fIgeneric options\fR] \fIsoftpart\fR \fB-p\fR [\fB-e\fR] \fIcomponent\fR 
+\fB/sbin/metainit\fR [\fIgeneric options\fR] \fIsoftpart\fR \fB-p\fR [\fB-e\fR] \fIcomponent\fR
      [\fB-A\fR \fIalignment\fR] \fIsize\fR
 .fi
 
@@ -127,7 +127,6 @@ Root privileges are required for all of the following options except \fB-h\fR.
 The following generic options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
@@ -142,7 +141,6 @@ option is required when configuring mirrors on root (\fB/\fR), \fBswap\fR, and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
@@ -153,7 +151,6 @@ Displays usage message.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
@@ -166,7 +163,6 @@ not initialized.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
@@ -180,7 +176,6 @@ previously configured metadevices is stored in the metadevice state database
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fB\fIsetname\fR\fR\fR
 .ad
@@ -197,7 +192,6 @@ and/or hotspares.
 The following concat/stripe options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIconcat/stripe\fR\fR
 .ad
@@ -209,7 +203,6 @@ stripes being defined.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInumstripes\fR\fR
 .ad
@@ -223,7 +216,6 @@ varies according to the number of stripes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIwidth\fR\fR
 .ad
@@ -235,7 +227,6 @@ greater than 1, the slices are striped.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcomponent\fR\fR
 .ad
@@ -248,7 +239,6 @@ slices is necessary to enable striping of the parity information across slices.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fB\fIinterlace\fR\fR\fR
 .ad
@@ -265,7 +255,6 @@ cannot be less than 16 blocks, or greater than 100 megabytes. If
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fB\fIhot_spare_pool\fR\fR\fR
 .ad
@@ -289,7 +278,6 @@ cannot be used.
 The following mirror options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fImirror\fR \fB-m\fR \fI\fR\fIsubmirror\fR\fI\fR\fR
 .ad
@@ -307,7 +295,6 @@ any subsequent submirrors are first created using the \fBmetainit\fR command.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIread_options\fR\fR
 .ad
@@ -316,7 +303,6 @@ any subsequent submirrors are first created using the \fBmetainit\fR command.)
 The following read options for mirrors are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR\fR
 .ad
@@ -328,7 +314,6 @@ sequential reads.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
@@ -346,7 +331,6 @@ balancing across the submirrors.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIwrite_options\fR\fR
 .ad
@@ -355,7 +339,6 @@ balancing across the submirrors.
 The following write options for mirrors are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR\fR
 .ad
@@ -371,7 +354,6 @@ dispatched to all mirrors simultaneously.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpass_num\fR\fR
 .ad
@@ -390,7 +372,6 @@ for mirrors mounted as read-only, or as \fBswap\fR.
 The following RAID level 5 options are available:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIRAID\fR \fB-r\fR\fR
 .ad
@@ -402,7 +383,6 @@ the configuration is RAID level 5.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR\fR
 .ad
@@ -421,7 +401,6 @@ data from tape.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fB\fIoriginal_column_count\fR\fR\fR
 .ad
@@ -445,7 +424,6 @@ data from tape.
 The following soft partition options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsoftpart\fR \fB-p\fR [\fB-e\fR] \fIcomponent\fR [\fB-A\fR
 \fIalignment\fR] \fIsize\fR\fR
@@ -493,7 +471,6 @@ partition should occupy all available space on the device.
 The following hot spare pool options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhot_spare_pool\fR \fI\fR\fB[\fR\fI\fR \fI\fR\fIhotspare...\fR\fI\fR
 \fI\fR\fB]\fR\fI\fR\fR
@@ -515,7 +492,6 @@ used.
 The following \fBmd.tab\fR file options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fImetadevice-name\fR\fR
 .ad
@@ -539,7 +515,6 @@ based on the configuration information found in the \fBmd.tab\fR file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
@@ -604,7 +579,7 @@ concatenation of four slices.
 .sp
 .in +2
 .nf
-# metainit d7 4 1 c0t1d0s0 1 c0t2d0s0 1 c0t3d0s0 1 /dev/dsk/c0t4d0s0 
+# metainit d7 4 1 c0t1d0s0 1 c0t2d0s0 1 c0t3d0s0 1 /dev/dsk/c0t4d0s0
 .fi
 .in -2
 .sp
@@ -864,7 +839,6 @@ with an alignment of \fB1m\fR to define the soft partition extent alignment.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/lvm/md.tab\fR\fR
 .ad
@@ -920,7 +894,7 @@ is displayed:
 .in +2
 .nf
 WARNING: This form of metainit is not recommended.
-The stripe is truncating the size of the underlying device. 
+The stripe is truncating the size of the underlying device.
 Please see ERRORS in metainit(1M) for additional information.
 .fi
 .in -2
@@ -966,7 +940,6 @@ Setting this flag degrades performance.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -977,7 +950,6 @@ Successful completion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
@@ -994,13 +966,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStable
+Interface Stability	Stable
 .TE
 
 .SH SEE ALSO

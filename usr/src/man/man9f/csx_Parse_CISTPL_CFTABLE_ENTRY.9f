@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH csx_Parse_CISTPL_CFTABLE_ENTRY 9F "20 Dec 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH CSX_PARSE_CISTPL_CFTABLE_ENTRY 9F "Dec 20, 1996"
 .SH NAME
 csx_Parse_CISTPL_CFTABLE_ENTRY \- parse 16-bit Card Configuration Table Entry
 tuple
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/pccard.h> 
+#include <sys/pccard.h>
 
 
 
@@ -25,35 +25,29 @@ Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIch\fR\fR
 .ad
 .RS 7n
-.rt  
 Client handle returned from \fBcsx_RegisterClient\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItu\fR\fR
 .ad
 .RS 7n
-.rt  
 Pointer to a \fBtuple_t\fR structure (see \fBtuple\fR(9S)) returned  by  a call
 to \fBcsx_GetFirstTuple\fR(9F) or \fBcsx_GetNextTuple\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcft\fR\fR
 .ad
 .RS 7n
-.rt  
 Pointer to a \fBcistpl_cftable_entry_t\fR structure which contains the parsed
 \fBCISTPL_CFTABLE_ENTRY\fR tuple information upon return from this function.
 .RE
@@ -87,7 +81,7 @@ cistpl_cftable_entry_speed_t  speed;     /* device speed description */
 cistpl_cftable_entry_io_t     io;        /* device I/O map */
 cistpl_cftable_entry_irq_t    irq;       /* device IRQ utilization */
 cistpl_cftable_entry_mem_t    mem;       /* device memory space */
-cistpl_cftable_entry_misc_t   misc;      /* miscellaneous 
+cistpl_cftable_entry_misc_t   misc;      /* miscellaneous
                                          /* device features */
 .fi
 .in -2
@@ -97,7 +91,6 @@ cistpl_cftable_entry_misc_t   misc;      /* miscellaneous
 The \fBflags\fR field is defined and bit-mapped as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_DEFAULT\fR
 .ad
@@ -108,7 +101,6 @@ This is a default configuration
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_IF\fR
 .ad
@@ -119,7 +111,6 @@ If configuration byte exists
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_FS_PWR\fR
 .ad
@@ -130,7 +121,6 @@ Power information exists
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_FS_TD\fR
 .ad
@@ -141,7 +131,6 @@ Timing information exists
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_FS_IO\fR
 .ad
@@ -152,7 +141,6 @@ I/O information exists
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_FS_IRQ\fR
 .ad
@@ -163,7 +151,6 @@ IRQ information exists
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_FS_MEM\fR
 .ad
@@ -174,7 +161,6 @@ MEM space information exists
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_FS_MISC\fR
 .ad
@@ -185,7 +171,6 @@ MISC information exists
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_FS_STCE_EV\fR
 .ad
@@ -196,7 +181,6 @@ STCE_EV exists
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_FS_STCE_PD\fR
 .ad
@@ -211,7 +195,6 @@ If the \fBCISTPL_CFTABLE_TPCE_IF\fR flag is set,  the \fBifc\fR field is
 bit-mapped and defined as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_IF_MEMORY\fR
 .ad
@@ -222,7 +205,6 @@ Memory interface
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_IF_IO_MEM\fR
 .ad
@@ -233,7 +215,6 @@ IO and memory
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_IF_CUSTOM_0\fR
 .ad
@@ -244,7 +225,6 @@ Custom interface 0
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_IF_CUSTOM_1\fR
 .ad
@@ -255,7 +235,6 @@ Custom interface 1
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_IF_CUSTOM_2\fR
 .ad
@@ -266,7 +245,6 @@ Custom interface 2
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_IF_CUSTOM_3\fR
 .ad
@@ -277,7 +255,6 @@ Custom interface 3
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_IF_MASK\fR
 .ad
@@ -288,7 +265,6 @@ Interface type mask
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_IF_BVD\fR
 .ad
@@ -299,7 +275,6 @@ BVD active in PRR
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_IF_WP\fR
 .ad
@@ -310,7 +285,6 @@ WP active in PRR
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_IF_RDY\fR
 .ad
@@ -321,7 +295,6 @@ RDY active in PRR
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_IF_MWAIT\fR
 .ad
@@ -354,7 +327,6 @@ cistpl_cftable_entry_pwr_t  pd_vpp2;   /* Vpp2 power description */
 This \fBflags\fR field is bit-mapped and defined as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_FS_PWR_VCC\fR
 .ad
@@ -365,7 +337,6 @@ Vcc description valid
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_FS_PWR_VPP1\fR
 .ad
@@ -376,7 +347,6 @@ Vpp1 description valid
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_FS_PWR_VPP2\fR
 .ad
@@ -414,78 +384,64 @@ uint32_t     pdownI_flags;
 \fBpeakI_flag\fR, and \fBpdownI\fR are defined and bit-mapped as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_PD_NOMV\fR
 .ad
 .RS 29n
-.rt  
 Nominal supply voltage
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_PD_MINV\fR
 .ad
 .RS 29n
-.rt  
 Minimum supply voltage
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_PD_MAXV\fR
 .ad
 .RS 29n
-.rt  
 Maximum supply voltage
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_PD_STATICI\fR
 .ad
 .RS 29n
-.rt  
 Continuous supply current
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_PD_AVGI\fR
 .ad
 .RS 29n
-.rt  
 Maximum current required averaged       over 1 second
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_PD_PEAKI\fR
 .ad
 .RS 29n
-.rt  
 Maximum current required averaged       over 10mS
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_PD_PDOWNI\fR
 .ad
 .RS 29n
-.rt  
 Power down supply current required
 .RE
 
@@ -496,56 +452,46 @@ Power down supply current required
 bit-mapped as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_PD_EXISTS\fR
 .ad
 .RS 30n
-.rt  
 This parameter exists
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_PD_MUL10\fR
 .ad
 .RS 30n
-.rt  
 Multiply return value by 10
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_PD_NC_SLEEP\fR
 .ad
 .RS 30n
-.rt  
 No connection on sleep/power down
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_PD_ZERO\fR
 .ad
 .RS 30n
-.rt  
 Zero value required
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_PD_NC\fR
 .ad
 .RS 30n
-.rt  
 No connection ever
 .RE
 
@@ -570,7 +516,6 @@ uint32_t    nS_rsvd;     /* max RSVD time in nS */
 The \fBflags\fR field is bit-mapped and defined as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_FS_TD_WAIT\fR
 .ad
@@ -581,7 +526,6 @@ WAIT timing exists
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_FS_TD_RDY\fR
 .ad
@@ -592,7 +536,6 @@ RDY/BSY timing exists
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_FS_TD_RSVD\fR
 .ad
@@ -620,7 +563,6 @@ cistpl_cftable_entry_io_range_t
 The \fBflags\fR field is defined and bit-mapped as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_FS_IO_BUS\fR
 .ad
@@ -631,7 +573,6 @@ Bus width mask
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_FS_IO_BUS8\fR
 .ad
@@ -642,7 +583,6 @@ Bus width mask
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_FS_IO_BUS16\fR
 .ad
@@ -653,7 +593,6 @@ Bus width mask
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_FS_IO_RANGE\fR
 .ad
@@ -702,7 +641,6 @@ cistpl_cftable_entry_mem_window_t
 The \fBflags\fR field is defined and bit-mapped as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_FS_MEM3\fR
 .ad
@@ -713,7 +651,6 @@ Space descriptors
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_FS_MEM2\fR
 .ad
@@ -724,7 +661,6 @@ Space descriptors
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_FS_MEM1\fR
 .ad
@@ -735,7 +671,6 @@ Card address=0 any host address
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_FS_MEM_HOST\fR
 .ad
@@ -771,7 +706,6 @@ uint32_t     flags;      /* miscellaneous features flags */
 The \fBflags\fR field is defined and bit-mapped as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_MI_MTC_MASK\fR
 .ad
@@ -782,7 +716,6 @@ Max twin cards mask
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_MI_AUDIO\fR
 .ad
@@ -793,7 +726,6 @@ Audio on BVD2
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_MI_READONLY\fR
 .ad
@@ -804,7 +736,6 @@ R/O storage
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_MI_PWRDOWN\fR
 .ad
@@ -815,7 +746,6 @@ Powerdown capable
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_MI_DRQ_MASK\fR
 .ad
@@ -826,7 +756,6 @@ DMAREQ mask
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_MI_DRQ_SPK\fR
 .ad
@@ -837,7 +766,6 @@ DMAREQ on SPKR
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_MI_DRQ_IOIS\fR
 .ad
@@ -848,7 +776,6 @@ DMAREQ on IOIS16
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_MI_DRQ_INP\fR
 .ad
@@ -859,7 +786,6 @@ DMAREQ on INPACK
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_MI_DMA_8\fR
 .ad
@@ -870,7 +796,6 @@ DMA width 8 bits
 
 .sp
 .ne 2
-.mk
 .na
 \fBCISTPL_CFTABLE_TPCE_MI_DMA_16\fR
 .ad
@@ -882,67 +807,55 @@ DMA width 16 bits
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_SUCCESS\fR\fR
 .ad
 .RS 27n
-.rt  
 Successful operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_BAD_HANDLE\fR\fR
 .ad
 .RS 27n
-.rt  
 Client handle is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_UNKNOWN_TUPLE\fR\fR
 .ad
 .RS 27n
-.rt  
 Parser does not know how to parse tuple.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_NO_CARD\fR\fR
 .ad
 .RS 27n
-.rt  
 No \fBPC \fRCard in socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_NO_CIS\fR\fR
 .ad
 .RS 27n
-.rt  
 No Card Information Structure (CIS) on \fBPC \fRCard.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_UNSUPPORTED_FUNCTION\fR\fR
 .ad
 .RS 27n
-.rt  
 No \fBPCMCIA \fRhardware installed.
 .RE
 

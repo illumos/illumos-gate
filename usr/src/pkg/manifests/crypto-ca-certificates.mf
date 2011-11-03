@@ -31,7 +31,6 @@ set name=pkg.summary \
 set name=info.classification \
     value=org.opensolaris.category.2008:System/Security
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=etc group=sys
 dir path=etc/certs group=sys
 dir path=etc/certs/CA group=sys
@@ -70,7 +69,6 @@ file path=etc/certs/CA/Deutsche_Telekom_Root_CA_2.pem group=sys
 file path=etc/certs/CA/DigiCert_Assured_ID_Root_CA.pem group=sys
 file path=etc/certs/CA/DigiCert_Global_Root_CA.pem group=sys
 file path=etc/certs/CA/DigiCert_High_Assurance_EV_Root_CA.pem group=sys
-file path=etc/certs/CA/DigiNotar_Root_CA.pem group=sys
 file path=etc/certs/CA/Digital_Signature_Trust_Co._Global_CA_1.pem group=sys
 file path=etc/certs/CA/Digital_Signature_Trust_Co._Global_CA_2.pem group=sys
 file path=etc/certs/CA/Digital_Signature_Trust_Co._Global_CA_3.pem group=sys
@@ -420,8 +418,6 @@ link path=etc/openssl/certs/bf64f35b.0 \
     target=../../certs/CA/Entrust_Root_Certification_Authority.pem
 link path=etc/openssl/certs/bf87590f.0 \
     target=../../certs/CA/beTRUSTed_Root_CA_-_RSA_Implementation.pem
-link path=etc/openssl/certs/c0cafbd2.0 \
-    target=../../certs/CA/DigiNotar_Root_CA.pem
 link path=etc/openssl/certs/c19d42c7.0 \
     target=../../certs/CA/Verisign_Class_1_Public_Primary_Certification_Authority_-_G2.pem
 link path=etc/openssl/certs/c215bc69.0 \

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pmadvise 1 "25 Sep 2008" "SunOS 5.11" "User Commands"
+.TH PMADVISE 1 "Sep 25, 2008"
 .SH NAME
 pmadvise \- applies advice about memory to a process
 .SH SYNOPSIS
@@ -29,12 +29,10 @@ program to all segments of a specified type.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
 .RS 6n
-.rt  
 Force by grabbing the target process even if another process has control.
 .sp
 You should exercise caution when using the \fB-F\fR option. See \fBproc\fR(1).
@@ -42,23 +40,19 @@ You should exercise caution when using the \fB-F\fR option. See \fBproc\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 6n
-.rt  
 Show unresolved dynamic linker map names.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 6n
-.rt  
 Specify advice to apply in the following form:
 .sp
 .in +2
@@ -102,12 +96,10 @@ unit of measure.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 Print verbose output. Display output as \fBpmap\fR(1) does, showing what advice
 is being applied where. This can be useful when the advice is being applied to
 a named region (for example, private, shared, and so forth) to get feedback on
@@ -147,12 +139,10 @@ MADV_ACCESS_DEFAULT, MADV_ACCESS_LWP, MADV_ACCESS_MANY
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpid\fR\fR
 .ad
 .RS 7n
-.rt  
 Process ID.
 .RE
 
@@ -205,7 +195,7 @@ The following example displays verbose output from \fBpmadvise\fR:
 .sp
 .in +2
 .nf
- 
+
 % pmadvise -o heap=access_lwp,stack=access_default -v $$
 1720:   -sh
 00010000      88K r-x--  /sbin/sh
@@ -233,46 +223,38 @@ FFBFE000       8K rw---    [ stack ]          <= access_default
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnon-zero\fR\fR
 .ad
 .RS 12n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/*\fR\fR
 .ad
 .RS 19n
-.rt  
 Process files
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/prob/lib/*\fR\fR
 .ad
 .RS 19n
-.rt  
 \fBproc\fR tools support files
 .RE
 
@@ -284,13 +266,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH rmalloc 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH RMALLOC 9F "Jan 16, 2006"
 .SH NAME
 rmalloc \- allocate space from a resource map
 .SH SYNOPSIS
@@ -24,23 +24,19 @@ Architecture independent level 1 (\fBDDI/DKI\fR).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fImp\fR\fR
 .ad
 .RS 8n
-.rt  
 Resource map from where the resource is drawn.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsize\fR\fR
 .ad
 .RS 8n
-.rt  
 Number of units of the resource.
 .RE
 
@@ -53,45 +49,37 @@ calling the function \fBrmallocmap\fR(9F). \fBrmalloc()\fR is one of five
 functions used for resource map management. The other functions include:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrmalloc_wait\fR(9F)\fR
 .ad
 .RS 20n
-.rt  
 Allocate space from a resource map, wait if necessary.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrmfree\fR(9F)\fR
 .ad
 .RS 20n
-.rt  
 Return previously allocated space to a map.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrmallocmap\fR(9F)\fR
 .ad
 .RS 20n
-.rt  
 Allocate a resource map and initialize it.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrmfreemap\fR(9F)\fR
 .ad
 .RS 20n
-.rt  
 Deallocate a resource map.
 .RE
 
@@ -150,26 +138,26 @@ and \fBrmfree\fR(9F) to initialize the total resource area.
     .\|.\|.
 4   xxstart(\|)
 5        /*
-6         *  Allocate private buffer.  If insufficient memory, 
+6         *  Allocate private buffer.  If insufficient memory,
 7         *  display message and halt system.
 8         */
 9   {
 10    register caddr_t bp;
     .\|.\|.
-11    if ((bp = kmem_alloc(XX_BUFSIZE, KM_NOSLEEP) == 0)  { 
-12  
+11    if ((bp = kmem_alloc(XX_BUFSIZE, KM_NOSLEEP) == 0)  {
+12
 13        cmn_err(CE_PANIC, "xxstart: kmem_alloc failed before %d buffer"
 14                  "allocation", XX_BUFSIZE);
 15    }
 16
-17    /*  
-18     * Initialize the resource map with number 
+17    /*
+18     * Initialize the resource map with number
 19     * of slots in map.
 20     */
 21    xx_mp = rmallocmap(XX_MAPSIZE);
 22
 24    /*
-25     * Initialize space management map with total 
+25     * Initialize space management map with total
 26     * buffer area it is to manage.
 27     */
 28    rmfree(xx_mp, XX_BUFSIZE, bp);
@@ -230,7 +218,7 @@ returned.
     ...
 5   xxread(dev_t dev, uio_t *uiop, cred_t *credp)
 6   {
-7 
+7
 8   register caddr_t addr;
 9   register int     size;
 10      size = min(COUNT, XX_MAXSIZE);  /* Break large I/O  */

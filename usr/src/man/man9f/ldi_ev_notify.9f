@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ldi_ev_notify 9F "21 Aug 2007" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH LDI_EV_NOTIFY 9F "Aug 21, 2007"
 .SH NAME
 ldi_ev_notify \- propagate notification of a state change event
 .SH SYNOPSIS
@@ -11,7 +11,7 @@ ldi_ev_notify \- propagate notification of a state change event
 .nf
 #include <sys/sunldi.h>
 
-\fBint\fR \fBldi_ev_notify\fR(\fIdev_info_t *dip\fR, \fIminor_t minor\fR, \fIint spec_type\fR, 
+\fBint\fR \fBldi_ev_notify\fR(\fIdev_info_t *dip\fR, \fIminor_t minor\fR, \fIint spec_type\fR,
      \fIldi_ev_cookie_t cookie\fR, \fIvoid *ev_data\fR);
 .fi
 
@@ -22,7 +22,6 @@ Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdev_info_t *dip\fR\fR
 .ad
@@ -33,7 +32,6 @@ The \fBdevinfo\fR node of the layered consumer exporting the minor device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIminor_t minor\fR\fR
 .ad
@@ -44,7 +42,6 @@ The minor number of the exported minor device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIint spec_type\fR\fR
 .ad
@@ -55,7 +52,6 @@ The type of minor device (\fBS_IFCHR\fR or \fBS_IFBLK\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIldi_ev_cookie_t cookie\fR\fR
 .ad
@@ -67,7 +63,6 @@ An opaque event cookie for the event type returned by a previous call to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvoid *ev_data\fR\fR
 .ad
@@ -162,7 +157,6 @@ static int
 The return values for this function are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDI_EV_SUCCESS\fR\fR
 .ad
@@ -173,7 +167,6 @@ Consumers up the software stack permit state change.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDI_EV_FAILURE\fR\fR
 .ad

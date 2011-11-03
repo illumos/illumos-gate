@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH auth_attr 4 "9 Jan 2002" "SunOS 5.11" "File Formats"
+.TH AUTH_ATTR 4 "Jan 9, 2002"
 .SH NAME
 auth_attr \- authorization description database
 .SH SYNOPSIS
 .LP
 .nf
-\fB/etc/security/auth_attr\fR 
+\fB/etc/security/auth_attr\fR
 .fi
 
 .SH DESCRIPTION
@@ -41,24 +41,20 @@ entry is:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR\fR
 .ad
 .RS 14n
-.rt  
 The name of the authorization. Authorization names are unique strings.
 Construct authorization names using the following convention:
 .sp
 \fIprefix.\fR or \fIprefix.suffix\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprefix\fR\fR
 .ad
 .RS 10n
-.rt  
 Everything in the name field up to the final dot (\fB\&.\fR). Authorizations
 from Sun Microsystems, Inc. use \fBsolaris\fR as a prefix. To avoid name
 conflicts, all other authorizations should use a prefix that begins with the
@@ -70,12 +66,10 @@ separated by dots.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsuffix\fR\fR
 .ad
 .RS 10n
-.rt  
 The final component in the name field. Specifies what is being authorized.
 .sp
 When there is no suffix, the name is defined as a heading. Headings are not
@@ -92,34 +86,28 @@ have both the authorization itself and the appropriate grant authorization.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIres1\fR\fR
 .ad
 .RS 14n
-.rt  
 Reserved for future use.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIres2\fR\fR
 .ad
 .RS 14n
-.rt  
 Reserved for future use.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIshort_desc\fR\fR
 .ad
 .RS 14n
-.rt  
 A short description or terse name for the authorization. This name should be
 suitable for displaying in user interfaces, such as in a scrolling list in a
 \fBGUI\fR.
@@ -127,12 +115,10 @@ suitable for displaying in user interfaces, such as in a scrolling list in a
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlong_desc\fR\fR
 .ad
 .RS 14n
-.rt  
 A long description. This field can explain the precise purpose of the
 authorization, the applications in which it is used, and the type of user that
 would be interested in using it. The long description can be displayed in the
@@ -141,12 +127,10 @@ help text of an application.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIattr\fR\fR
 .ad
 .RS 14n
-.rt  
 An optional list of semicolon-separated (\fB;\fR) key-value pairs that describe
 the attributes of an authorization. Zero or more keys may be specified. The
 keyword \fBhelp\fR identifies a help file in HTML.

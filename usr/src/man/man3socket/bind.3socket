@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH bind 3SOCKET "11 May 2009" "SunOS 5.11" "Sockets Library Functions"
+.TH BIND 3SOCKET "May 11, 2009"
 .SH NAME
 bind \- bind a name to a socket
 .SH SYNOPSIS
@@ -37,57 +37,47 @@ returned and \fBerrno\fR is set to indicate the error.
 The \fBbind()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 17n
-.rt  
 The requested address is protected, and \fB{PRIV_NET_PRIVADDR}\fR is not
 asserted in the effective set of the current process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEADDRINUSE\fR\fR
 .ad
 .RS 17n
-.rt  
 The specified address is already in use.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEADDRNOTAVAIL\fR\fR
 .ad
 .RS 17n
-.rt  
 The specified address is not available on the local machine.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 17n
-.rt  
 \fIs\fR is not a valid descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 17n
-.rt  
 \fInamelen\fR is not the size of a valid address for the specified address
 family.
 .sp
@@ -98,23 +88,19 @@ Socket options are inconsistent with port attributes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSR\fR\fR
 .ad
 .RS 17n
-.rt  
 There were insufficient \fBSTREAMS\fR resources for the operation to complete.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSOCK\fR\fR
 .ad
 .RS 17n
-.rt  
 \fIs\fR is a descriptor for a file, not a socket.
 .RE
 
@@ -123,81 +109,67 @@ There were insufficient \fBSTREAMS\fR resources for the operation to complete.
 The following errors are specific to binding names in the UNIX domain:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 11n
-.rt  
 Search permission is denied for a component of the path prefix of the pathname
 in \fIname\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 11n
-.rt  
 An I/O error occurred while making the directory entry or allocating the inode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEISDIR\fR\fR
 .ad
 .RS 11n
-.rt  
 A null pathname was specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBELOOP\fR\fR
 .ad
 .RS 11n
-.rt  
 Too many symbolic links were encountered in translating the pathname in
 \fIname\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 11n
-.rt  
 A component of the path prefix of the pathname in \fIname\fR does not exist.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTDIR\fR\fR
 .ad
 .RS 11n
-.rt  
 A component of the path prefix of the pathname in \fIname\fR is not a
 directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEROFS\fR\fR
 .ad
 .RS 11n
-.rt  
 The inode would reside on a read-only file system.
 .RE
 
@@ -209,13 +181,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

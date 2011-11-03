@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH md 7D "29 Aug 2003" "SunOS 5.11" "Devices"
+.TH MD 7D "Aug 29, 2003"
 .SH NAME
 md \- user configurable pseudo device driver
 .SH DESCRIPTION
@@ -44,12 +44,10 @@ The following ioctls are valid when issued to the raw metadevice, such as
 \fB/dev/md/rdsk/d0\fR. See \fBdkio\fR(7I) for additional information.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDKIOCGGEOM\fR\fR
 .ad
 .RS 14n
-.rt  
 This ioctl is used to get the disk geometry. The metadisk driver fills in the
 \fBdkg_nhead\fR, \fBdkg_nsect\fR, \fBdkg_rpm\fR, \fBdkg_write_reinstruct\fR and
 \fBdkg_read_reinstruct\fR from the first component of the metadevice (at
@@ -65,12 +63,10 @@ If the metadevice is not set up, then ENXIO is returned.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDKIOCINFO\fR\fR
 .ad
 .RS 14n
-.rt  
 When issued to the administrative device or metadevice, this ioctl sets
 \fBdki_unit\fR to the unit number of the metadevice, \fBdki_ctype\fR to a value
 of DKC_MD, and \fBdki_partition\fR to 0, because there are no slices.
@@ -78,12 +74,10 @@ of DKC_MD, and \fBdki_partition\fR to 0, because there are no slices.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDKIOCGVTOC\fR\fR
 .ad
 .RS 14n
-.rt  
 This ioctl returns the current vtoc. If one has not been written, then a
 default vtoc is returned. \fBv_nparts\fR is always 1. \fBv_part[0].p_start\fR
 is 0 if the first component of the metadevice starts on cylinder 0. Otherwise,
@@ -94,12 +88,10 @@ the \fBp_start\fR field is the starting sector of cylinder 1.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDKIOCSVTOC\fR\fR
 .ad
 .RS 14n
-.rt  
 This ioctl stores the vtoc in the metadevice state database so it is persistent
 across reboots.
 .RE
@@ -155,8 +147,8 @@ Memory could not be allocated in the \fBprop_op\fR entry point.
 .sp
 .in +2
 .nf
-md: db: Parsing error on '\fIdev\fR' 
-  
+md: db: Parsing error on '\fIdev\fR'
+
 .fi
 .in -2
 .sp
@@ -169,7 +161,7 @@ to put the correct set commands into the \fB/kernel/drv/md.conf\fR file.
 .sp
 .in +2
 .nf
-md: d\fInum\fR: \fIdev\fR(\fInum\fR,\fInum\fR) needs maintenance 
+md: d\fInum\fR: \fIdev\fR(\fInum\fR,\fInum\fR) needs maintenance
 md: d\fInum\fR: \fIdev\fR needs maintenance
 .fi
 .in -2
@@ -296,135 +288,111 @@ Failed metadevice state database commit or delete has been retried the default
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/md/dsk/\fR\fBd\fIn\fR\fR \fR
 .ad
 .RS 30n
-.rt  
 block device (where \fIn\fR is the device number)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/md/rdsk/\fR\fBd\fIn\fR\fR \fR
 .ad
 .RS 30n
-.rt  
 raw device (where \fIn\fR is the device number)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/md/\fIsetname\fR/dsk/\fR\fBd\fIn\fR\fR \fR
 .ad
 .RS 30n
-.rt  
 block device (where \fIsetname\fR is the name of the diskset and \fIn\fR is the
 device number)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/md/\fIsetname\fR/rdsk/\fR\fBd\fIn\fR\fR \fR
 .ad
 .RS 30n
-.rt  
 raw device (where \fIsetname\fR is the name of the diskset and \fIn\fR is the
 device number)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/md/admin\fR \fR
 .ad
 .RS 30n
-.rt  
 administrative device
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/md\fR \fR
 .ad
 .RS 30n
-.rt  
 driver module
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/md.conf\fR \fR
 .ad
 .RS 30n
-.rt  
 driver configuration file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/misc/md_stripe\fR \fR
 .ad
 .RS 30n
-.rt  
 stripe driver misc module
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/misc/md_mirror\fR \fR
 .ad
 .RS 30n
-.rt  
 mirror driver misc module
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/misc/md_hotspares\fR \fR
 .ad
 .RS 30n
-.rt  
 hotspares driver misc module
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/misc/md_trans\fR \fR
 .ad
 .RS 30n
-.rt  
 metatrans driver for UFS logging
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/misc/md_raid\fR \fR
 .ad
 .RS 30n
-.rt  
 RAID5 driver misc module
 .RE
 

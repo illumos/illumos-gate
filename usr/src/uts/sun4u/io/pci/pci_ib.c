@@ -1036,10 +1036,9 @@ ib_get_ino_devs(
 			for (i = 0, ih_p = ipil_p->ipil_ih_head;
 			    ((i < ipil_p->ipil_ih_size) && (i < *devs_ret));
 			    i++, j++, ih_p = ih_p->ih_next) {
-				(void) strncpy(devs[i].driver_name,
+				(void) strlcpy(devs[i].driver_name,
 				    ddi_driver_name(ih_p->ih_dip),
-				    MAXMODCONFNAME-1);
-				devs[i].driver_name[MAXMODCONFNAME] = '\0';
+				    MAXMODCONFNAME);
 				(void) ddi_pathname(ih_p->ih_dip, devs[i].path);
 				devs[i].dev_inst =
 				    ddi_get_instance(ih_p->ih_dip);

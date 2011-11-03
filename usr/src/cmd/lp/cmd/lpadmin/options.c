@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ctype.h"
 #include "stdio.h"
 #include "string.h"
@@ -155,7 +153,7 @@ void			options (argc, argv)
 	char		*cp,
 			*rest,
 			**av;
-	char stroptsw[3] = "-X";
+	char		stroptsw[] = "-X";
 
 #if	defined(__STDC__)
 	typedef char * const *	stupid;	/* dumb-ass ANSI C */
@@ -259,14 +257,12 @@ void			options (argc, argv)
 			 */
 			if (!*optarg) {
 				stroptsw[1] = optsw;
-				cp = stroptsw;
-				LP_ERRMSG1 (ERROR, E_LP_NULLARG, cp);
+				LP_ERRMSG1 (ERROR, E_LP_NULLARG, stroptsw);
 				done (1);
 			}
 			if (*optarg == '-') {
 				stroptsw[1] = optsw;
-				cp = stroptsw;
-				LP_ERRMSG1 (ERROR, E_LP_OPTARG, cp);
+				LP_ERRMSG1 (ERROR, E_LP_OPTARG, stroptsw);
 				done (1);
 			}
 			if (optsw == 'A')
@@ -278,8 +274,7 @@ void			options (argc, argv)
 			 */
 			if (*optarg == '-') {
 				stroptsw[1] = optsw;
-				cp = stroptsw;
-				LP_ERRMSG1 (ERROR, E_LP_OPTARG, cp);
+				LP_ERRMSG1 (ERROR, E_LP_OPTARG, stroptsw);
 				done (1);
 			}
 			break;
@@ -574,12 +569,13 @@ void			options (argc, argv)
 
 			} else {
 				stroptsw[1] = optsw;
-				cp = stroptsw;
 
 				if (strchr(OPT_LIST, optopt))
-					LP_ERRMSG1 (ERROR, E_LP_OPTARG, cp);
+					LP_ERRMSG1 (ERROR, E_LP_OPTARG,
+					    stroptsw);
 				else
-					LP_ERRMSG1 (ERROR, E_LP_OPTION, cp);
+					LP_ERRMSG1 (ERROR, E_LP_OPTION,
+					    stroptsw);
 				done (1);
 			}
 		}

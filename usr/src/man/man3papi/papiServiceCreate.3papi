@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH papiServiceCreate 3PAPI "17 Jan 2007" "SunOS 5.11" "PAPI Library Functions"
+.TH PAPISERVICECREATE 3PAPI "Jan 17, 2007"
 .SH NAME
 papiServiceCreate, papiServiceDestroy, papiServiceSetUserName,
 papiServiceSetPassword, papiServiceSetEncryption, papiServiceSetAuthCB,
@@ -14,7 +14,7 @@ manipulation
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpapi\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpapi\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <papi.h>
 
 \fBpapi_status_t\fR \fBpapiServiceCreate\fR(\fBpapi_service_t *\fR\fIhandle\fR,
@@ -96,35 +96,29 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpapi\fR [ \fIlibrary\fR\&.\|
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIapp_data\fR\fR
 .ad
 .RS 16n
-.rt  
 a set of additional data to be passed to the \fIauthCB\fR if/when it is called
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIauthCB\fR\fR
 .ad
 .RS 16n
-.rt  
 a callback routine use to gather additional authentication information on
 behalf of the print service
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIencryption\fR\fR
 .ad
 .RS 16n
-.rt  
 whether or not encryption should be used for communication with the print
 service, where applicable. If \fBPAPI_ENCRYPT_IF_REQUESTED\fR is specified,
 encryption will be used if the print service requests it.  If
@@ -136,24 +130,20 @@ communicating with the print service
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhandle\fR\fR
 .ad
 .RS 16n
-.rt  
 a pointer to a handle to be used for all \fBlibpapi\fR operations.  This handle
 should be initialized to \fINULL\fR prior to creation
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpassword\fR\fR
 .ad
 .RS 16n
-.rt  
 a plain text password to be used during any required user authentication with
 the print service function set with \fBpapiServiceSetAuthCB()\fR. This provides
 the callback function a means of interrogating the service context for user
@@ -162,23 +152,19 @@ information and setting a password.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIs\fR\fR
 .ad
 .RS 16n
-.rt  
 the service context passed into the the authentication callback
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIservice_name\fR\fR
 .ad
 .RS 16n
-.rt  
 the name of a print service to contact.  This can be \fINULL\fR, a print
 service name like "lpsched", a resolvable printer name, or a \fBprinter-uri\fR
 like \fBipp://server/printers/queue\fR.
@@ -186,12 +172,10 @@ like \fBipp://server/printers/queue\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsvc\fR\fR
 .ad
 .RS 16n
-.rt  
 a handle (service context) used by subsequent PAPI calls to keep/pass
 information across PAPI calls. It generally contains connection, state, and
 authentication information.
@@ -199,12 +183,10 @@ authentication information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIuser_name\fR\fR
 .ad
 .RS 16n
-.rt  
 the name of the user to act on behalf of while contacting the print service.
 If a value of \fINULL\fR is used, the user name associated with the current
 processes UID will be used. Specifying a user name might require further
@@ -317,15 +299,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityVolatile
+Interface Stability	Volatile
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

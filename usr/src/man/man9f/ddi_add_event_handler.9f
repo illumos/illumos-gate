@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_add_event_handler 9F "62 Nov 2003" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_ADD_EVENT_HANDLER 9F "Nov 2, 2003"
 .SH NAME
 ddi_add_event_handler \- add an NDI event service callback handler
 .SH SYNOPSIS
@@ -24,7 +24,6 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdev_info_t *\fR\fIdip\fR\fR
 .ad
@@ -35,7 +34,6 @@ Device node registering the callback.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBddi_eventcookie_t\fR \fIcookie\fR\fR
 .ad
@@ -46,7 +44,6 @@ Cookie returned from call to \fBddi_get_eventcookie\fR(9F).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvoid (*\fR\fIhandler\fR\fB)(dev_info_t *, ddi_eventcookie_t, void *, void
 *)\fR\fR
@@ -58,7 +55,6 @@ Callback handler responsible for handling an NDI event service notification.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvoid *\fR\fIarg\fR\fR
 .ad
@@ -70,7 +66,6 @@ pointer to the driver's \fBsoftstate\fR structure.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBddi_registration_id_t *\fR\fIid\fR\fR
 .ad
@@ -100,45 +95,37 @@ to be random.
 The routine handler will be invoked with the following arguments:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdev_info_t *\fR\fIdip\fR\fR
 .ad
 .RS 28n
-.rt  
 Device node requesting the notification.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBddi_eventcookie_t\fR \fIcookie\fR\fR
 .ad
 .RS 28n
-.rt  
 Structure describing event that occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvoid *\fR\fIarg\fR\fR
 .ad
 .RS 28n
-.rt  
 Opaque data pointer provided, by the driver, during callback registration.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvoid *\fR\fIimpl_data\fR\fR
 .ad
 .RS 28n
-.rt  
 Pointer to event specific data defined by the framework which invokes the
 callback function.
 .RE
@@ -146,23 +133,19 @@ callback function.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 15n
-.rt  
 Callback handler registered successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 15n
-.rt  
 Failed to register callback handler. Possible reasons include lack of resources
 or a bad cookie.
 .RE
@@ -180,13 +163,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Stability LevelCommitted
+Stability Level	Committed
 .TE
 
 .SH SEE ALSO

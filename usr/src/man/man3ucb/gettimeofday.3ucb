@@ -1,7 +1,7 @@
 '\" te
 .\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright (c) 1980 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement specifies the terms and conditions for redistribution.
-.TH gettimeofday 3UCB "30 Oct 2007" "SunOS 5.11" "SunOS/BSD Compatibility Library Functions"
+.TH GETTIMEOFDAY 3UCB "Oct 30, 2007"
 .SH NAME
 gettimeofday, settimeofday \- get or set the date and time
 .SH SYNOPSIS
@@ -65,23 +65,19 @@ code is stored in the global variable \fBerrno\fR.
 The following error codes may be set in \fBerrno\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 \fItp\fR specifies an invalid time.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 10n
-.rt  
 A user other than the privileged user attempted to set the time.
 .RE
 

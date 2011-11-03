@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH tnfdump 1 "22 Jan 2001" "SunOS 5.11" "User Commands"
+.TH TNFDUMP 1 "Jan 22, 2001"
 .SH NAME
 tnfdump \- convert binary TNF file to ASCII
 .SH SYNOPSIS
@@ -26,12 +26,10 @@ only. It also orders the events by time.
 The following option is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 6n
-.rt  
 Does a raw conversion of \fBTNF\fR to \fBASCII\fR. The output is a literal
 transalation of the binary \fBTNF\fR file and includes all the records in the
 file. This output is  useful only if you have a good understanding of
@@ -40,12 +38,10 @@ file. This output is  useful only if you have a good understanding of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 6n
-.rt  
 Prints all \fBTNF\fR unsigned type argument values in hexadecimal format
 instead of decimal format.
 .RE
@@ -309,8 +305,8 @@ probe       tnf_name: "final" tnf_string: "keys cookie main
 final;file test17.c;line 32;sunw%debug in the final"
 ------------  -----------  ---- ----- --- --------- ---------------------
     Elapsed         Delta  PID  LWPID TID CPU Probe  Data/Description ...
-     (ms)            (ms)                   Name      
-------------  -----------  ---- ----- --- --------- ---------------------   
+     (ms)            (ms)                   Name
+------------  -----------  ---- ----- --- --------- ---------------------
     0.000000     0.000000  6280   1    1  - start
  2455.211311  2455.211311  6280   1    1  - inloop  loop_count: 0x0
                                                 total_iterations: 0x0

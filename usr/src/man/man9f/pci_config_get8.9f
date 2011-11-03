@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pci_config_get8 9F "1 Nov 2005" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH PCI_CONFIG_GET8 9F "Nov 1, 2005"
 .SH NAME
 pci_config_get8, pci_config_get16, pci_config_get32, pci_config_get64,
 pci_config_put8, pci_config_put16, pci_config_put32, pci_config_put64,
@@ -14,7 +14,7 @@ write single datum of various sizes to the PCI Local Bus Configuration space
 .LP
 .nf
 #include <sys/ddi.h>
-#include <sys/sunddi.h> 
+#include <sys/sunddi.h>
 
 
 
@@ -38,25 +38,25 @@ write single datum of various sizes to the PCI Local Bus Configuration space
 
 .LP
 .nf
-\fBvoid\fR \fBpci_config_put8\fR(\fBddi_acc_handle_t\fR \fIhandle\fR, \fBoff_t\fR \fIoffset\fR, 
+\fBvoid\fR \fBpci_config_put8\fR(\fBddi_acc_handle_t\fR \fIhandle\fR, \fBoff_t\fR \fIoffset\fR,
      \fBuint8_t\fR \fIvalue\fR);
 .fi
 
 .LP
 .nf
-\fBvoid\fR \fBpci_config_put16\fR(\fBddi_acc_handle_t\fR \fIhandle\fR, \fBoff_t\fR \fIoffset\fR, 
+\fBvoid\fR \fBpci_config_put16\fR(\fBddi_acc_handle_t\fR \fIhandle\fR, \fBoff_t\fR \fIoffset\fR,
      \fBuint16_t\fR \fIvalue\fR);
 .fi
 
 .LP
 .nf
-\fBvoid\fR \fBpci_config_put32\fR(\fBddi_acc_handle_t\fR \fIhandle\fR, \fBoff_t\fR \fIoffset\fR, 
+\fBvoid\fR \fBpci_config_put32\fR(\fBddi_acc_handle_t\fR \fIhandle\fR, \fBoff_t\fR \fIoffset\fR,
      \fBuint32_t\fR \fIvalue\fR);
 .fi
 
 .LP
 .nf
-\fBvoid\fR \fBpci_config_put64\fR(\fBddi_acc_handle_t\fR \fIhandle\fR, \fBoff_t\fR \fIoffset\fR, 
+\fBvoid\fR \fBpci_config_put64\fR(\fBddi_acc_handle_t\fR \fIhandle\fR, \fBoff_t\fR \fIoffset\fR,
      \fBuint64_t\fR \fIvalue\fR);
 .fi
 
@@ -78,34 +78,28 @@ replaces \fBpci_config_putw()\fR.
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhandle\fR\fR
 .ad
 .RS 10n
-.rt  
 The data access handle returned from \fBpci_config_setup\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoffset\fR\fR
 .ad
 .RS 10n
-.rt  
 Byte offset from the beginning of the \fBPCI \fRConfiguration space.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvalue\fR\fR
 .ad
 .RS 10n
-.rt  
 Output data.
 .RE
 
@@ -146,13 +140,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityT{
+Interface Stability	T{
 \fBpci_config_getb()\fR, \fBpci_config_getl()\fR, \fBpci_config_getll()\fR, \fBpci_config_getw()\fR, \fBpci_config_putb()\fR, \fBpci_config_putl()\fR, \fBpci_config_putll()\fR, \fBpci_config_putw()\fR are Obsolete \fBpci_config_get8()\fR, \fBpci_config_get16()\fR, \fBpci_config_get32()\fR, \fBpci_config_get64()\fR, \fBpci_config_put8()\fR, \fBpci_config_put16()\fR, \fBpci_config_put32()\fR, \fBpci_config_put64()\fR are Committed
 T}
 .TE

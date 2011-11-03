@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sasl_chalprompt_t 3SASL "14 Oct 2003" "SunOS 5.11" "Simple Authentication Security Layer Library Functions"
+.TH SASL_CHALPROMPT_T 3SASL "Oct 14, 2003"
 .SH NAME
 sasl_chalprompt_t \- prompt for input in response to a challenge
 .SH SYNOPSIS
@@ -27,79 +27,65 @@ response to a server challenge.
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcontext\fR\fR
 .ad
 .RS 13n
-.rt  
 The context from the callback record.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIid\fR\fR
 .ad
 .RS 13n
-.rt  
 The callback id. \fIid\fR can have a value of \fBSASL_CB_ECHOPROMPT\fR or
 \fBSASL_CB_NOECHOPROMPT\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIchallenge\fR\fR
 .ad
 .RS 13n
-.rt  
 The server's challenge.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprompt\fR\fR
 .ad
 .RS 13n
-.rt  
 A prompt for the user.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdefresult\fR\fR
 .ad
 .RS 13n
-.rt  
 The default result. The value of \fIdefresult\fR can be \fINULL\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIresult\fR\fR
 .ad
 .RS 13n
-.rt  
 The user's response. \fIresult\fR is a null-terminated string.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlen\fR\fR
 .ad
 .RS 13n
-.rt  
 The length of the user's response.
 .RE
 
@@ -112,12 +98,10 @@ complete list of SASL error codes.
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_OK\fR\fR
 .ad
 .RS 11n
-.rt  
 The call to \fBsasl_chalprompt_t()\fR was successful.
 .RE
 
@@ -132,15 +116,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

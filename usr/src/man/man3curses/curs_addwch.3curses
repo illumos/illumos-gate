@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH curs_addwch 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.TH CURS_ADDWCH 3CURSES "Dec 31, 1996"
 .SH NAME
 curs_addwch, addwch, waddwch, mvaddwch, mvwaddwch, echowchar, wechowchar \- add
 a wchar_t character (with attributes) to a curses window and advance cursor
@@ -16,7 +16,7 @@ a wchar_t character (with attributes) to a curses window and advance cursor
 
 .LP
 .nf
-#include<curses.h> 
+#include<curses.h>
 
 \fBint\fR \fBaddwch\fR(\fBchtype\fR \fIwch\fR);
 .fi
@@ -94,61 +94,60 @@ nomenclature.
 
 .sp
 .TS
-tab() box;
-cw(1.83i) |cw(1.83i) |cw(1.83i) 
-lw(1.83i) |lw(1.83i) |lw(1.83i) 
-.
-NameDefaultGlyph Description
+box;
+c | c | c
+l | l | l .
+Name	Default	Glyph Description
 _
-ACS_ULCORNER+upper left-hand corner
+ACS_ULCORNER	+	upper left-hand corner
 _
-ACS_LLCORNER+lower left-hand corner
+ACS_LLCORNER	+	lower left-hand corner
 _
-ACS_URCORNER+upper right-hand corner
+ACS_URCORNER	+	upper right-hand corner
 _
-ACS_LRCORNER+lower right-hand corner
+ACS_LRCORNER	+	lower right-hand corner
 _
-ACS_RTEE+right tee
+ACS_RTEE	+	right tee
 _
-ACS_LTEE+left tee
+ACS_LTEE	+	left tee
 _
-ACS_BTEE+bottom tee
+ACS_BTEE	+	bottom tee
 _
-ACS_TTEE+top tee
+ACS_TTEE	+	top tee
 _
-ACS_HLINE-horizontal line
+ACS_HLINE	-	horizontal line
 _
-ACS_VLINE|vertical line
+ACS_VLINE	|	vertical line
 _
-ACS_PLUS+plus
+ACS_PLUS	+	plus
 _
-ACS_S1-scan line 1
+ACS_S1	-	scan line 1
 _
-ACS_S9-scan line 9
+ACS_S9	-	scan line 9
 _
-ACS_DIAMOND+diamond
+ACS_DIAMOND	+	diamond
 _
-ACS_CKBOARD:checker board (stipple)
+ACS_CKBOARD	:	checker board (stipple)
 _
-ACS_DEGREE\&'degree symbol
+ACS_DEGREE	\&'	degree symbol
 _
-ACS_PLMINUS#plus/minus
+ACS_PLMINUS	#	plus/minus
 _
-ACS_BULLETobullet
+ACS_BULLET	o	bullet
 _
-ACS_LARROW<arrow pointing left
+ACS_LARROW	<	arrow pointing left
 _
-ACS_RARRROW>arrow pointing right
+ACS_RARRROW	>	arrow pointing right
 _
-ACS_DARROWvarrow pointing down
+ACS_DARROW	v	arrow pointing down
 _
-ACS_UARROW^arrow pointing up
+ACS_UARROW	^	arrow pointing up
 _
-ACS_BOARD#board of squares
+ACS_BOARD	#	board of squares
 _
-ACS_LANTERN#lantern symbol
+ACS_LANTERN	#	lantern symbol
 _
-ACS_BLOCK#solid square block
+ACS_BLOCK	#	solid square block
 .TE
 
 .SH RETURN VALUE
@@ -165,13 +164,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelUnsafe
+MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO

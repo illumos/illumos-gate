@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libmp 3LIB "24 Mar 2004" "SunOS 5.11" "Interface Libraries"
+.TH LIBMP 3LIB "Mar 24, 2004"
 .SH NAME
 libmp \- multiple precision library
 .SH SYNOPSIS
@@ -27,51 +27,43 @@ interfaces.
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBmp_gcd\fR\fBmp_itom\fR
-\fBmp_madd\fR\fBmp_mcmp\fR
-\fBmp_mdiv\fR\fBmp_mfree\fR
-\fBmp_min\fR\fBmp_mout\fR
-\fBmp_msqrt\fR\fBmp_msub\fR
-\fBmp_mtox\fR\fBmp_mult\fR
-\fBmp_pow\fR\fBmp_rpow\fR
-\fBmp_sdiv\fR\fBmp_xtom\fR
+l l
+l l .
+\fBmp_gcd\fR	\fBmp_itom\fR
+\fBmp_madd\fR	\fBmp_mcmp\fR
+\fBmp_mdiv\fR	\fBmp_mfree\fR
+\fBmp_min\fR	\fBmp_mout\fR
+\fBmp_msqrt\fR	\fBmp_msub\fR
+\fBmp_mtox\fR	\fBmp_mult\fR
+\fBmp_pow\fR	\fBmp_rpow\fR
+\fBmp_sdiv\fR	\fBmp_xtom\fR
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/libmp.so.1\fR\fR
 .ad
 .RS 22n
-.rt  
 shared object for binary compatibility only
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/libmp.so.2\fR\fR
 .ad
 .RS 22n
-.rt  
 shared object
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/64/libmp.so.2\fR\fR
 .ad
 .RS 22n
-.rt  
 64-bit shared object
 .RE
 
@@ -83,13 +75,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelUnsafe
+MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO

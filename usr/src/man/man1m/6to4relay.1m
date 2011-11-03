@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH 6to4relay 1M "19 Nov 2002" "SunOS 5.11" "System Administration Commands"
+.TH 6TO4RELAY 1M "Nov 19, 2002"
 .SH NAME
 6to4relay \- administer configuration for 6to4 relay router communication
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/6to4relay\fR 
+\fB/usr/sbin/6to4relay\fR
 .fi
 
 .LP
@@ -61,46 +61,38 @@ tunnel down
 The \fB6to4relay\fR command supports the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIaddr\fR\fR
 .ad
 .RS 11n
-.rt  
 Use the specified address, \fIaddr\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 11n
-.rt  
 Enable support for relay router. Use \fB-a\fR \fIaddr\fR if it is specified.
 Otherwise, use the default \fBanycast\fR address, 192.88.99.1.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 11n
-.rt  
 Disable support for the relay router.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 11n
-.rt  
 Help
 .RE
 
@@ -110,12 +102,10 @@ Help
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaddr\fR\fR
 .ad
 .RS 8n
-.rt  
 A specific relay router's unicast address. \fIaddr\fR must be specified as a
 dotted decimal representation of an IPv4 address. Otherwise, an error will
 occur, and the command will fail.
@@ -168,35 +158,29 @@ IPv4 destination address of Relay Router = 192.88.99.1
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB>\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/sbin/6to4relay\fR \fR
 .ad
 .RS 24n
-.rt  
 The default installation root
 .RE
 

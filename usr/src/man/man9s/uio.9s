@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH uio 9S "26Mar 2009" "SunOS 5.11" "Data Structures for Drivers"
+.TH UIO 9S "Mar 26, 2009"
 .SH NAME
 uio \- scatter/gather I/O request structure
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/uio.h> 
+#include <sys/uio.h>
 .fi
 
 .SH INTERFACE LEVEL
@@ -41,7 +41,7 @@ before use, by \fBbzero\fR(9F), \fBkmem_zalloc\fR(9F), or an equivalent.
 iovec_t      *uio_iov;      /* pointer to start of iovec */
                             /* list for uio struc. */
 int          uio_iovcnt;    /* number of iovecs in list */
-off_t        uio_offset;    /* 32-bit offset into file where 
+off_t        uio_offset;    /* 32-bit offset into file where
                             /* data is xferred. See NOTES. */
 offset_t     uio_loffset;   /* 64-bit offset into file where */
                             /* data is xferred. See NOTES. */

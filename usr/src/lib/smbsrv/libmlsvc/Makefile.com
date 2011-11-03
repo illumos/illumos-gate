@@ -19,6 +19,7 @@
 # CDDL HEADER END
 #
 #
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
@@ -50,6 +51,7 @@ OBJS_COMMON =		\
 	smb_logon.o	\
 	smb_share.o	\
 	smb_quota.o	\
+	smbrdr_glue.o	\
 	spoolss_svc.o	\
 	srvsvc_clnt.o	\
 	srvsvc_sd.o	\
@@ -81,8 +83,8 @@ include ../../Makefile.lib
 INCS += -I$(SRC)/common/smbsrv
 
 LDLIBS +=	$(MACH_LDLIBS)
-LDLIBS += -lmlrpc -lsmbrdr -lsmb -lsmbns -lshare -lresolv -lnsl -lpkcs11 -lscf	\
-	-lavl -lcmdutils -lnvpair -lsec -luutil -luuid -lgen -lzfs -lc
+LDLIBS += -lmlrpc -lsmb -lsmbns -lshare -lsmbfs -lresolv -lnsl -lpkcs11 \
+	-lscf -lcmdutils -lsec -lavl -lnvpair -luutil -luuid -lgen -lzfs -lc
 
 CPPFLAGS += $(INCS) -D_REENTRANT
 

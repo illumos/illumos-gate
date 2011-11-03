@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SLPParseSrvURL 3SLP "16 Jan 2003" "SunOS 5.11" "Service Location Protocol Library Functions"
+.TH SLPPARSESRVURL 3SLP "Jan 16, 2003"
 .SH NAME
 SLPParseSrvURL \- parse service URL
 .SH SYNOPSIS
@@ -36,12 +36,10 @@ error  occurs, one  of the  \fBSLPError\fR  codes  is returned.
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpcSrvURL\fR\fR
 .ad
 .RS 12n
-.rt  
 A pointer to  a character buffer  containing the  null  terminated URL string
 to parse.  It is destructively modified to produce the output structure. It may
 not be \fINULL\fR.
@@ -49,12 +47,10 @@ not be \fINULL\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIppSrvURL\fR\fR
 .ad
 .RS 12n
-.rt  
  A pointer to a  ponter for the \fBSLPSrvURL\fR structure  to  receive the
 parsed \fBURL\fR. It may not be \fINULL\fR.
 .RE
@@ -85,12 +81,10 @@ err = SLPParseSrvURL("service:printer:lpr://serv/queue1", &surl);
 .SH ENVIRONMENT VARIABLES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLP_CONF_FILE\fR\fR
 .ad
 .RS 17n
-.rt  
 When set, use this file for configuration.
 .RE
 

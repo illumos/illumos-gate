@@ -497,6 +497,7 @@ extern uint32_t tcp_early_abort;
 #define	tcps_wroff_xtra			tcps_propinfo_tbl[57].prop_cur_uval
 #define	tcps_dev_flow_ctl		tcps_propinfo_tbl[58].prop_cur_bval
 #define	tcps_reass_timeout		tcps_propinfo_tbl[59].prop_cur_uval
+#define	tcps_iss_incr			tcps_propinfo_tbl[65].prop_cur_uval
 
 extern struct qinit tcp_rinitv4, tcp_rinitv6;
 extern boolean_t do_tcp_fusion;

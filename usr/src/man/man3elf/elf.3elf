@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH elf 3ELF "23 Jul 2001" "SunOS 5.11" "ELF Library Functions"
+.TH ELF 3ELF "Jul 23, 2001"
 .SH NAME
 elf \- object file access library
 .SH SYNOPSIS
@@ -60,23 +60,22 @@ file sizes, and so on, as in the following:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-NamePurpose
+box;
+c | c
+l | l .
+Name	Purpose
 _
-\fBElf32_Addr\fRUnsigned address
+\fBElf32_Addr\fR	Unsigned address
 _
-\fBElf32_Half\fRUnsigned medium integer
+\fBElf32_Half\fR	Unsigned medium integer
 _
-\fBElf32_Off\fRUnsigned file offset
+\fBElf32_Off\fR	Unsigned file offset
 _
-\fBElf32_Sword\fRSigned large integer
+\fBElf32_Sword\fR	Signed large integer
 _
-\fBElf32_Word\fRUnsigned large integer
+\fBElf32_Word\fR	Unsigned large integer
 _
-\fBunsigned char\fRUnsigned small integer
+\fBunsigned char\fR	Unsigned small integer
 .TE
 
 .sp
@@ -178,58 +177,48 @@ the job, an application controls its input and output model.
 Names associated with the library take several forms.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBelf_\fR\fIname\fR\fR
 .ad
 .RS 18n
-.rt  
 These class-independent names perform some service, \fIname\fR, for the
 program.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBelf32_\fR\fIname\fR\fR
 .ad
 .RS 18n
-.rt  
 Service names with an embedded class, \fB32\fR here, indicate they work only
 for the designated class of files.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBElf_\fR\fIType\fR\fR
 .ad
 .RS 18n
-.rt  
 Data types can be class-independent as well, distinguished by \fIType\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBElf32_\fR\fIType\fR\fR
 .ad
 .RS 18n
-.rt  
 Class-dependent data types have an embedded class name, \fB32\fR here.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBELF_C_\fR\fICMD\fR\fR
 .ad
 .RS 18n
-.rt  
 Several functions take commands that control their actions. These values are
 members of the \fBElf_Cmd\fR enumeration; they range from zero through
 \fBELF_C_NUM\fR\(mi1\fB\&.\fR
@@ -237,36 +226,30 @@ members of the \fBElf_Cmd\fR enumeration; they range from zero through
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBELF_F_\fR\fIFLAG\fR\fR
 .ad
 .RS 18n
-.rt  
 Several functions take flags that control library status and/or actions. Flags
 are bits that may be combined.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBELF32_FSZ_\fR\fITYPE\fR\fR
 .ad
 .RS 18n
-.rt  
 These constants give the file sizes in bytes of the basic \fBELF\fR types for
 the 32-bit class of files. See \fBelf32_fsize()\fR for more information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBELF_K_\fR\fIKIND\fR\fR
 .ad
 .RS 18n
-.rt  
 The function \fBelf_kind()\fR identifies the \fIKIND\fR of file associated with
 an \fBELF\fR descriptor. These values are members of the \fBElf_Kind\fR
 enumeration; they range from zero through \fBELF_K_NUM\fR\(mi1\fB\&.\fR
@@ -274,12 +257,10 @@ enumeration; they range from zero through \fBELF_K_NUM\fR\(mi1\fB\&.\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBELF_T_\fR\fITYPE\fR\fR
 .ad
 .RS 18n
-.rt  
 When a service function, such as \fBelf32_xlatetom()\fR or
 \fBelf32_xlatetof()\fR, deals with multiple types, names of this form specify
 the desired \fITYPE\fR. Thus, for example, \fBELF_T_EHDR\fR is directly related
@@ -378,15 +359,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStable
+Interface Stability	Stable
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
@@ -420,17 +400,16 @@ name as used in the \fBELF\fR file header.
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-NameProcessor
+box;
+c | c
+l | l .
+Name	Processor
 _
-\fBM32\fRAT&T WE 32100
+\fBM32\fR	AT&T WE 32100
 _
-\fBSPARC\fRSPARC
+\fBSPARC\fR	SPARC
 _
-\fB386\fRIntel 80386, 80486, Pentium
+\fB386\fR	Intel 80386, 80486, Pentium
 .TE
 
 .sp

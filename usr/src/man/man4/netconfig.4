@@ -1,10 +1,10 @@
 '\" te
-.\"  Copyright 1989 AT&T 
-.\" Copyright (C) 1999, Sun Microsystems, Inc. All Rights Reserved 
+.\"  Copyright 1989 AT&T
+.\" Copyright (C) 1999, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH netconfig 4 "18 Nov 2003" "SunOS 5.11" "File Formats"
+.TH NETCONFIG 4 "Nov 18, 2003"
 .SH NAME
 netconfig \- network configuration database
 .SH SYNOPSIS
@@ -46,12 +46,10 @@ network ID  semantics  flag  protocol-family \e
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInetwork ID\fR\fR
 .ad
 .RS 25n
-.rt  
 A string used to uniquely identify a network. \fInetwork ID\fR consists of
 non-null characters, and has a length of at least 1. No maximum length is
 specified. This namespace is locally significant and the local system
@@ -61,46 +59,38 @@ be unique.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsemantics\fR\fR
 .ad
 .RS 25n
-.rt  
 The \fIsemantics\fR field is a string identifying the ``semantics'' of the
 network, that is, the set of services it supports, by identifying the service
 interface it provides. The \fIsemantics\fR field is mandatory. The following
 semantics are recognized.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtpi_clts\fR\fR
 .ad
 .RS 16n
-.rt  
 Transport Provider Interface, connectionless
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtpi_cots\fR\fR
 .ad
 .RS 16n
-.rt  
 Transport Provider Interface, connection oriented
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtpi_cots_ord\fR\fR
 .ad
 .RS 16n
-.rt  
 Transport Provider Interface, connection oriented, supports orderly release.
 .RE
 
@@ -108,12 +98,10 @@ Transport Provider Interface, connection oriented, supports orderly release.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflag\fR\fR
 .ad
 .RS 25n
-.rt  
 The \fIflag\fR field records certain two-valued (``true'' and ``false'')
 attributes of networks. \fIflag\fR is a string composed of a combination of
 characters, each of which indicates the value of the corresponding attribute.
@@ -122,12 +110,10 @@ absent, the attribute is ``false.'' ``\fB-\fR'' indicates that none of the
 attributes are present. Only one character is currently recognized:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBv\fR\fR
 .ad
 .RS 5n
-.rt  
 Visible (``default'') network. Used when the environment variable \fBNETPATH\fR
 is unset.
 .RE
@@ -136,12 +122,10 @@ is unset.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprotocol family\fR\fR
 .ad
 .RS 25n
-.rt  
 The \fIprotocol family\fR and \fIprotocol name\fR fields are provided for
 protocol-specific applications. The \fIprotocol family\fR field contains a
 string that identifies a protocol family. The \fIprotocol family\fR identifier
@@ -152,254 +136,208 @@ indicates that no protocol family identifier applies (the network is
 experimental). The following are examples:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBloopback\fR\fR
 .ad
 .RS 13n
-.rt  
 Loopback (local to host).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinet\fR\fR
 .ad
 .RS 13n
-.rt  
 Internetwork: UDP, TCP, and the like.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinet6\fR\fR
 .ad
 .RS 13n
-.rt  
 Internetwork over IPv6: UDP, TCP, and the like.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBimplink\fR\fR
 .ad
 .RS 13n
-.rt  
 ARPANET imp addresses
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpup\fR\fR
 .ad
 .RS 13n
-.rt  
 PUP protocols: for example, BSP
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchaos\fR\fR
 .ad
 .RS 13n
-.rt  
 MIT CHAOS protocols
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBns\fR\fR
 .ad
 .RS 13n
-.rt  
 XEROX NS protocols
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnbs\fR\fR
 .ad
 .RS 13n
-.rt  
 NBS protocols
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBecma\fR\fR
 .ad
 .RS 13n
-.rt  
 European Computer Manufacturers Association
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdatakit\fR\fR
 .ad
 .RS 13n
-.rt  
 DATAKIT protocols
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBccitt\fR\fR
 .ad
 .RS 13n
-.rt  
 CCITT protocols, X.25, and the like.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsna\fR\fR
 .ad
 .RS 13n
-.rt  
 IBM SNA
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdecnet\fR\fR
 .ad
 .RS 13n
-.rt  
 DECNET
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdli\fR\fR
 .ad
 .RS 13n
-.rt  
 Direct data link interface
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlat\fR\fR
 .ad
 .RS 13n
-.rt  
 LAT
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhylink\fR\fR
 .ad
 .RS 13n
-.rt  
 NSC Hyperchannel
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBappletalk\fR\fR
 .ad
 .RS 13n
-.rt  
 Apple Talk
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnit\fR\fR
 .ad
 .RS 13n
-.rt  
 Network Interface Tap
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBieee802\fR\fR
 .ad
 .RS 13n
-.rt  
 IEEE 802.2; also ISO 8802
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBosi\fR\fR
 .ad
 .RS 13n
-.rt  
 Umbrella for all families used by OSI (for example, protosw lookup)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBx25\fR\fR
 .ad
 .RS 13n
-.rt  
 CCITT X.25 in particular
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBosinet\fR\fR
 .ad
 .RS 13n
-.rt  
 AFI = 47, IDI = 4
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgosip\fR\fR
 .ad
 .RS 13n
-.rt  
 U.S. Government OSI
 .RE
 
@@ -407,12 +345,10 @@ U.S. Government OSI
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprotocol name\fR\fR
 .ad
 .RS 25n
-.rt  
 The \fIprotocol name\fR field contains a string that identifies a protocol. The
 \fIprotocol name\fR identifier follows the same rules as those for \fInetwork
 ID\fRs; that is, the string consists of non-NULL characters, it has a length of
@@ -421,34 +357,28 @@ indicates that none of the names listed apply. The following protocol names are
 recognized.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtcp\fR\fR
 .ad
 .RS 8n
-.rt  
 Transmission Control Protocol
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBudp\fR\fR
 .ad
 .RS 8n
-.rt  
 User Datagram Protocol
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBicmp\fR\fR
 .ad
 .RS 8n
-.rt  
 Internet Control Message Protocol
 .RE
 
@@ -456,12 +386,10 @@ Internet Control Message Protocol
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInetwork device\fR\fR
 .ad
 .RS 25n
-.rt  
 The \fInetwork device\fR is the full pathname of the device used to connect to
 the transport provider. Typically, this device will be in the \fB/dev\fR
 directory. The \fInetwork device\fR must be specified.
@@ -469,12 +397,10 @@ directory. The \fInetwork device\fR must be specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItranslation libraries\fR\fR
 .ad
 .RS 25n
-.rt  
 The \fIname-to-address translation libraries\fR support a ``directory service''
 (a name-to-address mapping service) for the network. A ``\fB\(mi\fR\&'' in this
 field indicates the absence of any \fItranslation libraries\fR. This has a
@@ -494,100 +420,82 @@ Each field corresponds to an element in the \fBstruct netconfig\fR structure.
 defined in <\fBnetconfig.h\fR>. This structure includes the following members:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchar *\fR\fInc_netid\fR\fR
 .ad
 .RS 30n
-.rt  
 Network ID, including \fBNULL\fR terminator.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunsigned long\fR \fInc_semantics\fR\fR
 .ad
 .RS 30n
-.rt  
 Semantics.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunsigned long\fR \fInc_flag\fR\fR
 .ad
 .RS 30n
-.rt  
 Flags.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchar *\fR\fInc_protofmly\fR\fR
 .ad
 .RS 30n
-.rt  
 Protocol family.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchar *\fR\fInc_proto\fR\fR
 .ad
 .RS 30n
-.rt  
 Protocol name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchar *\fR\fInc_device\fR\fR
 .ad
 .RS 30n
-.rt  
 Full pathname of the network device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunsigned long\fR \fInc_nlookups\fR\fR
 .ad
 .RS 30n
-.rt  
 Number of directory lookup libraries.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchar **\fR\fInc_lookups\fR\fR
 .ad
 .RS 30n
-.rt  
 Names of the name-to-address translation libraries.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunsigned long\fR \fInc_unused[9]\fR\fR
 .ad
 .RS 30n
-.rt  
 Reserved for future expansion.
 .RE
 
@@ -659,12 +567,10 @@ ticots     tpi_cots      v   loopback -      /dev/ticots     straddr.so
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB<\fBnetconfig.h\fR>\fR
 .ad
 .RS 17n
-.rt  
 
 .RE
 

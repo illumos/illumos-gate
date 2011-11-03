@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -94,14 +95,17 @@ static void smbd_spool_copyfile(smb_inaddr_t *, char *, char *, char *);
 extern smbd_t smbd;
 
 /*
- * Initialize the spool thread.
+ * Start the spool thread.
  * Returns 0 on success, an error number if thread creation fails.
  */
 void
-smbd_spool_init(void)
+smbd_spool_start(void)
 {
 	pthread_attr_t	attr;
 	int		rc;
+
+	if (!smb_config_getbool(SMB_CI_PRINT_ENABLE))
+		return;
 
 	(void) pthread_attr_init(&attr);
 	(void) pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
@@ -119,7 +123,7 @@ smbd_spool_init(void)
  * around signal delivery.
  */
 void
-smbd_spool_fini(void)
+smbd_spool_stop(void)
 {
 	int	i;
 
@@ -168,9 +172,9 @@ smbd_spool_monitor(void *arg)
 		} else {
 			if (errno == ECANCELED)
 				break;
-
+			if ((errno != EINTR) && (errno != EAGAIN))
+				error_retry_cnt--;
 			(void) sleep(SMB_SPOOL_WAIT);
-			error_retry_cnt--;
 		}
 	}
 

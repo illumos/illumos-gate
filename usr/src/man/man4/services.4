@@ -1,7 +1,7 @@
 '\" te
-.\"  Copyright 1989 AT&T  Copyright (c) 1983 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement  specifies the terms and conditions for redistribution. 
+.\"  Copyright 1989 AT&T  Copyright (c) 1983 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement  specifies the terms and conditions for redistribution.
 .\" Copyright (C) 2000, Sun Microsystems, Inc. All Rights Reserved
-.TH services 4 "12 Oct 2000" "SunOS 5.11" "File Formats"
+.TH SERVICES 4 "Oct 12, 2000"
 .SH NAME
 services \- Internet services and aliases
 .SH SYNOPSIS
@@ -36,35 +36,29 @@ form:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIservice-name\fR\fR
 .ad
 .RS 17n
-.rt  
 This is the official Internet service name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIport\fR/\fIprotocol\fR\fR
 .ad
 .RS 17n
-.rt  
 This field is composed of the port number and protocol through which the
 service is provided, for instance, \fB512/tcp\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaliases\fR\fR
 .ad
 .RS 17n
-.rt  
 This is a list of alternate names by which the service might be requested.
 .RE
 
@@ -85,12 +79,10 @@ the service.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/nsswitch.conf\fR\fR
 .ad
 .RS 22n
-.rt  
 configuration file for name-service switch
 .RE
 

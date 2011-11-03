@@ -4,25 +4,25 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH useradd 1M "19 Feb 2008" "SunOS 5.11" "System Administration Commands"
+.TH USERADD 1M "Feb 19, 2008"
 .SH NAME
 useradd \- administer a new user login on the system
 .SH SYNOPSIS
 .LP
 .nf
-\fBuseradd\fR [\fB-A\fR \fIauthorization\fR [,\fIauthorization...\fR]] 
-     [\fB-b\fR \fIbase_dir\fR] [\fB-c\fR \fIcomment\fR] [\fB-d\fR \fIdir\fR] [\fB-e\fR \fIexpire\fR] 
-     [\fB-f\fR \fIinactive\fR] [\fB-g\fR \fIgroup\fR] [\fB-G\fR \fIgroup\fR [,\fIgroup\fR]...] 
-     [\fB-K\fR \fIkey=value\fR] [\fB-m\fR [\fB-k\fR \fIskel_dir\fR]] [\fB-p\fR \fIprojname\fR] 
-     [\fB-P\fR \fIprofile\fR [,\fIprofile...\fR]] [\fB-R\fR \fIrole\fR [,\fIrole...\fR]] 
+\fBuseradd\fR [\fB-A\fR \fIauthorization\fR [,\fIauthorization...\fR]]
+     [\fB-b\fR \fIbase_dir\fR] [\fB-c\fR \fIcomment\fR] [\fB-d\fR \fIdir\fR] [\fB-e\fR \fIexpire\fR]
+     [\fB-f\fR \fIinactive\fR] [\fB-g\fR \fIgroup\fR] [\fB-G\fR \fIgroup\fR [,\fIgroup\fR]...]
+     [\fB-K\fR \fIkey=value\fR] [\fB-m\fR [\fB-k\fR \fIskel_dir\fR]] [\fB-p\fR \fIprojname\fR]
+     [\fB-P\fR \fIprofile\fR [,\fIprofile...\fR]] [\fB-R\fR \fIrole\fR [,\fIrole...\fR]]
      [\fB-s\fR \fIshell\fR] [\fB-u\fR \fIuid\fR [\fB-o\fR]] \fIlogin\fR
 .fi
 
 .LP
 .nf
-\fBuseradd\fR \fB-D\fR [\fB-A\fR \fIauthorization\fR [,\fIauthorization...\fR]] 
-     [\fB-b\fR \fIbase_dir\fR] [\fB-s\fR \fIshell\fR [\fB-k\fR \fIskel_dir\fR]] [\fB-e\fR \fIexpire\fR] 
-     [\fB-f\fR \fIinactive\fR] [\fB-g\fR \fIgroup\fR] [\fB-K\fR \fIkey=value\fR] [\fB-p\fR \fIprojname\fR] 
+\fBuseradd\fR \fB-D\fR [\fB-A\fR \fIauthorization\fR [,\fIauthorization...\fR]]
+     [\fB-b\fR \fIbase_dir\fR] [\fB-s\fR \fIshell\fR [\fB-k\fR \fIskel_dir\fR]] [\fB-e\fR \fIexpire\fR]
+     [\fB-f\fR \fIinactive\fR] [\fB-g\fR \fIgroup\fR] [\fB-K\fR \fIkey=value\fR] [\fB-p\fR \fIprojname\fR]
      [\fB-P\fR \fIprofile\fR [,\fIprofile...\fR]] [\fB-R\fR \fIrole\fR [,\fIrole...\fR]]
 .fi
 
@@ -65,7 +65,6 @@ met. See \fBpasswd\fR(4) for the requirements for usernames.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR \fIauthorization\fR\fR
 .ad
@@ -78,7 +77,6 @@ an account.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR \fIbase_dir\fR\fR
 .ad
@@ -91,7 +89,6 @@ exist unless the \fB-m\fR option or the \fB-d\fR option is also specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIcomment\fR\fR
 .ad
@@ -104,7 +101,6 @@ stored in the user's \fB/etc/passwd\fR entry.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdir\fR\fR
 .ad
@@ -117,7 +113,6 @@ for new login home directories and \fIaccount_name\fR is the new login name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR\fR
 .ad
@@ -131,7 +126,6 @@ Display the default values for \fBgroup\fR, \fBbase_dir\fR, \fBskel_dir\fR,
 values are:
 .sp
 .ne 2
-.mk
 .na
 \fBgroup\fR
 .ad
@@ -142,7 +136,6 @@ values are:
 
 .sp
 .ne 2
-.mk
 .na
 \fBbase_dir\fR
 .ad
@@ -153,7 +146,6 @@ values are:
 
 .sp
 .ne 2
-.mk
 .na
 \fBskel_dir\fR
 .ad
@@ -164,7 +156,6 @@ values are:
 
 .sp
 .ne 2
-.mk
 .na
 \fBshell\fR
 .ad
@@ -175,7 +166,6 @@ values are:
 
 .sp
 .ne 2
-.mk
 .na
 \fBinactive\fR
 .ad
@@ -186,7 +176,6 @@ values are:
 
 .sp
 .ne 2
-.mk
 .na
 \fBexpire\fR
 .ad
@@ -197,7 +186,6 @@ null
 
 .sp
 .ne 2
-.mk
 .na
 \fBauths\fR
 .ad
@@ -208,7 +196,6 @@ null
 
 .sp
 .ne 2
-.mk
 .na
 \fBprofiles\fR
 .ad
@@ -219,7 +206,6 @@ null
 
 .sp
 .ne 2
-.mk
 .na
 \fBproj\fR
 .ad
@@ -230,7 +216,6 @@ null
 
 .sp
 .ne 2
-.mk
 .na
 \fBprojname\fR
 .ad
@@ -241,7 +226,6 @@ null
 
 .sp
 .ne 2
-.mk
 .na
 \fBkey=value (pairs defined in \fBuser_attr\fR(4)\fR
 .ad
@@ -252,7 +236,6 @@ not present
 
 .sp
 .ne 2
-.mk
 .na
 \fBroles\fR
 .ad
@@ -265,7 +248,6 @@ null
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fIexpire\fR\fR
 .ad
@@ -284,7 +266,6 @@ creating temporary logins.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIinactive\fR\fR
 .ad
@@ -297,7 +278,6 @@ The maximum number of days allowed between uses of a login ID before that
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR \fIgroup\fR\fR
 .ad
@@ -312,7 +292,6 @@ allocation by the Solaris Operating System.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-G\fR \fIgroup\fR\fR
 .ad
@@ -327,7 +306,6 @@ Operating System.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-K\fR \fIkey=value\fR\fR
 .ad
@@ -343,7 +321,6 @@ option. Keys may not be repeated.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR \fIskel_dir\fR\fR
 .ad
@@ -357,7 +334,6 @@ this purpose.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
@@ -370,7 +346,6 @@ directory already exists, it must have read, write, and execute permissions by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
@@ -381,7 +356,6 @@ This option allows a \fBUID\fR to be duplicated (non-unique).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR \fIprofile\fR\fR
 .ad
@@ -392,7 +366,6 @@ One or more comma-separated execution profiles defined in \fBprof_attr\fR(4).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIprojname\fR\fR
 .ad
@@ -404,7 +377,6 @@ Name of the project with which the added user is associated. See the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIrole\fR\fR
 .ad
@@ -416,7 +388,6 @@ Roles cannot be assigned to other roles.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIshell\fR\fR
 .ad
@@ -429,7 +400,6 @@ value of \fIshell\fR must be a valid executable file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fIuid\fR\fR
 .ad
@@ -473,13 +443,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
@@ -513,7 +482,7 @@ is not unique:
 .sp
 .in +2
 .nf
-UX: useradd: ERROR: uid \fIuid\fR is already in use. Choose another. 
+UX: useradd: ERROR: uid \fIuid\fR is already in use. Choose another.
 .fi
 .in -2
 .sp
@@ -525,7 +494,7 @@ is already in use:
 .sp
 .in +2
 .nf
-UX: useradd: ERROR: group \fIgroup\fR does not exist. Choose another. 
+UX: useradd: ERROR: group \fIgroup\fR does not exist. Choose another.
 .fi
 .in -2
 .sp

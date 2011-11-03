@@ -23,8 +23,7 @@
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 #
 #	This makefile drives the production of the sd driver kernel module.
 #
@@ -64,6 +63,11 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 # lint pass one enforcement 
 # 
 CFLAGS += $(CCVERBOSE)
+
+#
+# Define dependencies on scsi and cmlb
+#
+LDFLAGS += -dy -N misc/scsi -N misc/cmlb
 
 #
 # For now, disable these lint checks; maintainers should endeavor

@@ -1795,6 +1795,7 @@ gstat(char *file, int argfl, struct ditem *myparent)
 	rep->lct.tv_nsec = 0;
 	rep->lmt.tv_sec = time(NULL);
 	rep->lmt.tv_nsec = 0;
+	rep->aclp = NULL;
 	rep->exttr = NULL;
 	rep->extm = NULL;
 	rep->color = NULL;

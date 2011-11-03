@@ -1092,9 +1092,8 @@ static void
 px_fill_in_intr_devs(pcitool_intr_dev_t *dev, char *driver_name,
     char *path_name, int instance)
 {
-	(void) strncpy(dev->driver_name, driver_name, MAXMODCONFNAME-1);
-	dev->driver_name[MAXMODCONFNAME] = '\0';
-	(void) strncpy(dev->path, path_name, MAXPATHLEN-1);
+	(void) strlcpy(dev->driver_name, driver_name, MAXMODCONFNAME);
+	(void) strlcpy(dev->path, path_name, MAXPATHLEN);
 	dev->dev_inst = instance;
 }
 

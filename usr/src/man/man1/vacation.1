@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH vacation 1 "20 Aug 2005" "SunOS 5.11" "User Commands"
+.TH VACATION 1 "Aug 20, 2005"
 .SH NAME
 vacation \- reply to mail automatically
 .SH SYNOPSIS
@@ -15,7 +15,7 @@ vacation \- reply to mail automatically
 
 .LP
 .nf
-\fBvacation\fR [\fB-a\fR \fIalias\fR] [\fB-e\fR \fIfilter_file\fR] [\fB-f\fR \fIdatabase_file\fR] 
+\fBvacation\fR [\fB-a\fR \fIalias\fR] [\fB-e\fR \fIfilter_file\fR] [\fB-f\fR \fIdatabase_file\fR]
      [\fB-j\fR] [\fB-m\fR \fImessage_file\fR] [\fB-s\fR \fIsender\fR] [\fB-t\fR\fIN\fR] \fIusername\fR
 .fi
 
@@ -95,12 +95,10 @@ installation, these being \fB-a\fR, \fB-e\fR, \fB-f\fR, \fB-j\fR, \fB-m\fR,
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I\fR\fR
 .ad
 .RS 6n
-.rt  
 Initializes the \fB\&.vacation.pag\fR and \fB\&.vacation.dir\fR files and
 enables \fBvacation\fR. If the \fB-I\fR flag is not specified, and a \fIuser\fR
 argument is given, \fBvacation\fR reads the first line from the standard input
@@ -125,48 +123,40 @@ example,
 repeats replies to the sender every minute.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIalias\fR\fR
 .ad
 .RS 20n
-.rt  
 Indicates that \fIalias\fR is one of the valid aliases for the user running
 \fBvacation\fR, so that mail addressed to that alias generates a reply.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fIfilter_file\fR\fR
 .ad
 .RS 20n
-.rt  
 Uses \fIfilter_file\fR instead of \fB\&.vacation.filter\fR as the source of the
 domain and email address filters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIdatabase_file\fR\fR
 .ad
 .RS 20n
-.rt  
 Uses \fIdatabase_file\fR instead of \fB\&.vacation\fR as the base name for the
 database file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-j\fR\fR
 .ad
 .RS 20n
-.rt  
 Does not check whether the recipient appears in the \fBTo:\fR or the \fBCc:\fR
 line. Warning: use of this option can result in vacation replies being sent to
 mailing lists and other inappropriate places; its use is therefore strongly
@@ -175,12 +165,10 @@ discouraged.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fImessage_file\fR\fR
 .ad
 .RS 20n
-.rt  
 Uses \fB~/\fImessage_file\fR\fR as the message to send for the reply instead of
 \fB~/.vacation.msg\fR. \fImessage_file\fR is a relative path to the desired
 vacation message file. To prevent directory/file "not found" errors,
@@ -189,24 +177,20 @@ vacation message file. To prevent directory/file "not found" errors,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIsender\fR\fR
 .ad
 .RS 20n
-.rt  
 Replies to \fIsender\fR instead of the value read from the UNIX \fBFrom\fR line
 of the incoming message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fIN\fR\fR
 .ad
 .RS 20n
-.rt  
 Changes the interval between repeat replies to the same sender. The default is
 1 week. A trailing \fBs\fR, \fBm\fR, \fBh\fR, \fBd\fR, or \fBw\fR scales
 \fIN\fR to seconds, minutes, hours, days, or weeks, respectively.
@@ -219,12 +203,10 @@ reporting. The \fB-f\fRoption can also be used in conjunction with the
 \fB-l\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 6n
-.rt  
  Lists the addresses to which a reply has been sent since the last invocation
 of \fBvacation -I\fR, along with a date and time stamp.
 .RE

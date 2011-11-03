@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dsp 7I "11 May 2009" "SunOS 5.11" "Ioctl Requests"
+.TH DSP 7I "May 11, 2009"
 .SH NAME
 dsp \- generic audio device interface
 .SH SYNOPSIS
 .LP
 .nf
-\fB#include\fR \fB<sys/soundcard.h>\fR 
+\fB#include\fR \fB<sys/soundcard.h>\fR
 .fi
 
 .SH DESCRIPTION
@@ -180,12 +180,10 @@ SNDCTL_CARDINFO
 The \fBdsp\fR device supports the following ioctl commands:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSNDCTL_DSP_SYNC\fR\fR
 .ad
 .RS 27n
-.rt  
 The argument is ignored. This command suspends the calling process until the
 output FIFOs are empty and all queued samples have been played, or until a
 signal is delivered to the calling process. An implicit \fBSNDCTL_DSP_SYNC\fR
@@ -198,7 +196,6 @@ correct use of this ioctl is just before changing sample formats.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSNDCTL_DSP_HALT\fR\fR
 .ad
@@ -211,19 +208,16 @@ correct use of this ioctl is just before changing sample formats.
 \fB\fBSNDCTL_DSP_HALT_OUTPUT\fR\fR
 .ad
 .RS 27n
-.rt  
 The argument is ignored. All input or output (or both) associated with the file
 is halted, and any pending data is discarded.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSNDCTL_DSP_SPEED\fR\fR
 .ad
 .RS 27n
-.rt  
 The argument is a pointer to an integer, indicating the sample rate (in Hz) to
 be used. The rate applies to both input and output for the file descriptor. On
 return the actual rate, which can differ from that requested, is stored in the
@@ -233,12 +227,10 @@ changing it the value 0 can be used by the application
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSNDCTL_DSP_GETFMTS\fR\fR
 .ad
 .RS 27n
-.rt  
 The argument is a pointer to an integer, which receives a bit mask of encodings
 supported by the device. Possible values are
 .sp
@@ -247,31 +239,31 @@ supported by the device. Possible values are
 AFMT_MU_LAW      8-bit unsigned u-Law
 AFMT_A_LAW       8-bit unsigned a-Law
 AFMT_U8          8-bit unsigned linear PCM
-AFMT_S16_LE      16-bit signed 
+AFMT_S16_LE      16-bit signed
                   little-endian linear PCM
-AFMT_S16_BE      16-bit signed 
+AFMT_S16_BE      16-bit signed
                   big-endian linear PCM
-AFMT_S16_NE      16-bit signed native-endian 
+AFMT_S16_NE      16-bit signed native-endian
                   linear PCM
-AFMT_U16_LE      16-bit unsigned 
+AFMT_U16_LE      16-bit unsigned
                   little-endian linear PCM
-AFMT_U16_BE      16-bit unsigned big-endian 
+AFMT_U16_BE      16-bit unsigned big-endian
                   linear PCM
-AFMT_U16_NE      16-bit unsigned big-endian 
+AFMT_U16_NE      16-bit unsigned big-endian
                   linear PCM
-AFMT_S24_LE      24-bit signed little-endian 
+AFMT_S24_LE      24-bit signed little-endian
                   linear PCM, 32-bit aligned
-AFMT_S24_BE      24-bit signed big-endian 
+AFMT_S24_BE      24-bit signed big-endian
                   linear PCM, 32-bit aligned
-AFMT_S24_NE      24-bit signed native-endian 
+AFMT_S24_NE      24-bit signed native-endian
                   linear PCM, 32-bit aligned
-AFMT_S32_LE      32-bit signed little-endian 
+AFMT_S32_LE      32-bit signed little-endian
                   linear PCM
-AFMT_S32_BE      32-bit signed big-endian 
+AFMT_S32_BE      32-bit signed big-endian
                    linear PCM
-AFMT_S32_NE      32-bit signed native-endian 
+AFMT_S32_NE      32-bit signed native-endian
                    linear PCM
-AFMT_S24_PACKED  24-bit signed little-endian 
+AFMT_S24_PACKED  24-bit signed little-endian
                    packed linear PCM
 .fi
 .in -2
@@ -283,12 +275,10 @@ Not all devices support all of these encodings. This implementation uses
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSNDCTL_DSP_SETFMT\fR\fR
 .ad
 .RS 27n
-.rt  
 The argument is a pointer to an integer, which indicates the encoding to be
 used. The same values as for \fBSNDCTL_DSP_GETFMT\fR can be used, but the
 caller can only specify a single option. The encoding is used for both input
@@ -297,12 +287,10 @@ and output performed on the file descriptor.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSNDCTL_DSP_CHANNELS\fR\fR
 .ad
 .RS 27n
-.rt  
 The argument is a pointer to an integer, indicating the number of channels to
 be used (1 for mono, 2 for stereo, etc.) The value applies to both input and
 output for the file descriptor. On return the actual channel configuration
@@ -313,12 +301,10 @@ can be used by the application.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSNDDCTL_DSP_GETCAPS\fR\fR
 .ad
 .RS 27n
-.rt  
 The argument is a pointer to an integer bit mask, which indicates the
 capabilities of the device. The bits returned can include
 .sp
@@ -336,7 +322,6 @@ PCM_CAP_DUPLEX  Device supports simultaneous
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSNDCTL_DSP_GETPLAYVOL\fR\fR
 .ad
@@ -345,7 +330,6 @@ PCM_CAP_DUPLEX  Device supports simultaneous
 \fB\fBSNDCTL_DSP_GETRECVOL\fR\fR
 .ad
 .RS 27n
-.rt  
 The argument is a pointer to an integer to receive the volume level for either
 playback or record. The value is encoded as a stereo value with the values for
 two channels in the least significant two bytes. The value for each channel
@@ -356,7 +340,6 @@ both channel levels being identical) is returned for compatibility.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSNDCTL_DSP_SETPLAYVOL\fR\fR
 .ad
@@ -365,7 +348,6 @@ both channel levels being identical) is returned for compatibility.
 \fB\fBSNDCTL_DSP_SETRECVOL\fR\fR
 .ad
 .RS 27n
-.rt  
 The argument is a pointer to an integer indicating volume level for either
 playback or record. The value is encoded as a stereo value with the values for
 two channels in the least significant two bytes. The value for each channel has
@@ -376,7 +358,6 @@ should assign the same value to both bytes
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSNDCTL_DSP_GETISPACE\fR\fR
 .ad
@@ -385,7 +366,6 @@ should assign the same value to both bytes
 \fB\fBSNDCTL_DSP_GETOSPACE\fR\fR
 .ad
 .RS 27n
-.rt  
 The argument is a pointer to a \fBstruct audio_buf_info\fR, which has the
 following structure:
 .sp
@@ -399,7 +379,7 @@ typedef struct audio_buf_info {
         /* Size of a fragment in bytes */
    int bytes;
        /* Available space in bytes */
-   /* Note! 'bytes' could be more than 
+   /* Note! 'bytes' could be more than
       fragments*fragsize */
 } audio_buf_info;
 .fi
@@ -414,7 +394,6 @@ contains the number of bytes that can be transferred  without blocking.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSNDCTL_DSP_CURRENT_IPTR\fR\fR
 .ad
@@ -423,7 +402,6 @@ contains the number of bytes that can be transferred  without blocking.
 \fB\fBSNDCTL_DSP_CURRENT_OPTR\fR\fR
 .ad
 .RS 27n
-.rt  
 The argument is a pointer to an \fBoss_count_t\fR, which has the following
 definition:
 .sp
@@ -448,7 +426,6 @@ calculations.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSNDCTL_DSP_GETIPTR\fR\fR
 .ad
@@ -457,7 +434,6 @@ calculations.
 \fB\fBSNDCTL_DSP_GETOPTR\fR\fR
 .ad
 .RS 27n
-.rt  
 The argument is a pointer to a \fBstruct count_info\fR, which has the following
 definition:
 .sp
@@ -467,7 +443,7 @@ typedef struct count_info {
     unsigned int bytes;
       /* Total # of bytes processed */
     int blocks;
-      /* # of fragment transitions since 
+      /* # of fragment transitions since
       last time */
     int ptr;/* Current DMA pointer value */
 } count_info;
@@ -481,12 +457,10 @@ by most applications.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSNDCTL_DSP_GETODELAY\fR\fR
 .ad
 .RS 27n
-.rt  
 The argument is a pointer to an integer. On return, the integer contains the
 number of bytes still to be played before the next byte written are played.
 This can be used for accurate determination of device latency. The result can
@@ -496,12 +470,10 @@ typically 64 bytes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSNDCTL_DSP_GETERROR\fR\fR
 .ad
 .RS 27n
-.rt  
 The argument is a pointer to a \fBstruct audio_errinfo\fR, defined as follows:
 .sp
 .in +2
@@ -573,36 +545,30 @@ SNDCTL_ENGINEINFO
 An \fBopen()\fR fails if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBUSY\fR\fR
 .ad
 .RS 10n
-.rt  
 The requested play or record access isbusy and either the \fBO_NDELAY\fR or
 \fBO_NONBLOCK\fR flag was set in the \fBopen()\fR request.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 10n
-.rt  
 The requested play or record access is busy and a signal interrupted the
 \fBopen()\fR request.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The device cannot support the requested play or record access.
 .RE
 
@@ -611,12 +577,10 @@ The device cannot support the requested play or record access.
 An \fBioctl()\fR fails if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The parameter changes requested in the ioctl are invalid or are not supported
 by the device.
 .RE
@@ -628,45 +592,37 @@ The physical audio device names are system dependent and are rarely used by
 programmers. Programmers should use the generic device names listed below.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/dsp\fR\fR
 .ad
 .RS 28n
-.rt  
 Symbolic link to the system's primary audio device
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/mixer\fR\fR
 .ad
 .RS 28n
-.rt  
 Symbolic link to the pseudo mixer device for the system
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/sndstat\fR\fR
 .ad
 .RS 28n
-.rt  
 Symbolic link to the pseudo mixer device for the system
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/audio/samples\fR\fR
 .ad
 .RS 28n
-.rt  
 Audio files
 .RE
 
@@ -678,15 +634,14 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(1.82i) |cw(3.68i) 
-lw(1.82i) |lw(3.68i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureSPARC, x86
+Architecture	SPARC, x86
 _
-Stability LevelUncommitted
+Stability Level	Uncommitted
 .TE
 
 .SH SEE ALSO

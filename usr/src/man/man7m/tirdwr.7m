@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH tirdwr 7M "3 Jul 1990" "SunOS 5.11" "STREAMS Modules"
+.TH TIRDWR 7M "Jul 3, 1990"
 .SH NAME
 tirdwr \- Transport Interface read/write interface STREAMS module
 .SH SYNOPSIS
@@ -40,12 +40,10 @@ the stream, popped (see \fBI_POP\fR in  \fBstreamio\fR(7I)) off  the stream, or
 when data passes through it.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpush\fR\fR
 .ad
 .RS 9n
-.rt  
 When the module is pushed onto a stream, it checks any existing data destined
 for the user to ensure that only regular data messages are present. It ignores
 any messages on the stream that relate to process management, such as messages
@@ -56,12 +54,10 @@ other messages are present, the \fBI_PUSH\fR will return an error with
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwrite\fR\fR
 .ad
 .RS 9n
-.rt  
 The module takes the following actions on data that originated from a
 \fBwrite\fR system call:
 .RS +4
@@ -90,12 +86,10 @@ calls associated with the stream fails with \fBerrno\fR set to \fBEPROTO\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBread\fR\fR
 .ad
 .RS 9n
-.rt  
 The module takes the following actions on data that originated from the
 transport protocol provider.
 .sp
@@ -143,12 +137,10 @@ onto the module's upstream neighbor.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpop\fR\fR
 .ad
 .RS 9n
-.rt  
 When the module is popped off the stream or the stream is closed, the module
 takes the following action:
 .RS +4

@@ -1,7 +1,7 @@
 '\" te
 .\" Copyright (c) 1994, Sun Microsystems, Inc. All Rights Reserved.
 .\"  Copyright (c) 1983 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement specifies the terms and conditions for redistribution.
-.TH vgrindefs 5 "10 Aug 1994" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH VGRINDEFS 5 "Aug 10, 1994"
 .SH NAME
 vgrindefs \- vgrind's language definition data base
 .SH SYNOPSIS
@@ -27,79 +27,78 @@ The following table names and describes each capability.
 
 .sp
 .TS
-tab() box;
-cw(.6i) |cw(.64i) |cw(4.26i) 
-lw(.6i) |lw(.64i) |lw(4.26i) 
-.
-NameTypeDescription
+box;
+c | c | c
+l | l | l .
+Name	Type	Description
 _
-\fBab\fR\fBstr\fRT{
+\fBab\fR	\fBstr\fR	T{
 Regular expression for the start of an alternate form comment
 T}
 _
-\fBae\fR\fBstr\fRT{
+\fBae\fR	\fBstr\fR	T{
 Regular expression for the end of an alternate form comment
 T}
 _
-\fBbb\fR\fBstr\fRT{
+\fBbb\fR	\fBstr\fR	T{
 Regular expression for the start of a block
 T}
 _
-\fBbe\fR\fBstr\fRT{
+\fBbe\fR	\fBstr\fR	T{
 Regular expression for the end of a lexical block
 T}
 _
-\fBcb\fR\fBstr\fRT{
+\fBcb\fR	\fBstr\fR	T{
 Regular expression for the start of a comment
 T}
 _
-\fBce\fR\fBstr\fRT{
+\fBce\fR	\fBstr\fR	T{
 Regular expression for the end of a comment
 T}
 _
-\fBid\fR\fBstr\fRT{
+\fBid\fR	\fBstr\fR	T{
 String giving characters other than letters and digits that may legally occur in identifiers (default `_')
 T}
 _
-\fBkw\fR\fBstr\fRA list of keywords separated by spaces
+\fBkw\fR	\fBstr\fR	A list of keywords separated by spaces
 _
-\fBlb\fR\fBstr\fRT{
+\fBlb\fR	\fBstr\fR	T{
 Regular expression for the start of a character constant
 T}
 _
-\fBle\fR\fBstr\fRT{
+\fBle\fR	\fBstr\fR	T{
 Regular expression for the end of a character constant
 T}
 _
-\fBoc\fR\fBbool\fRT{
+\fBoc\fR	\fBbool\fR	T{
 Present means upper and lower case are equivalent
 T}
 _
-\fBpb\fR\fBstr\fRT{
+\fBpb\fR	\fBstr\fR	T{
 Regular expression for start of a procedure
 T}
 _
-\fBpl\fR\fBbool\fRT{
+\fBpl\fR	\fBbool\fR	T{
 Procedure definitions are constrained to the lexical level matched by the `px' capability
 T}
 _
-\fBpx\fR\fBstr\fRT{
+\fBpx\fR	\fBstr\fR	T{
 A match for this regular expression indicates that procedure definitions may occur at the next lexical level. Useful for lisp-like languages in which procedure definitions occur as subexpressions of defuns.
 T}
 _
-\fBsb\fR\fBstr\fRT{
+\fBsb\fR	\fBstr\fR	T{
 Regular expression for the start of a string
 T}
 _
-\fBse\fR\fBstr\fRT{
+\fBse\fR	\fBstr\fR	T{
 Regular expression for the end of a string
 T}
 _
-\fBtc\fR\fBstr\fRT{
+\fBtc\fR	\fBstr\fR	T{
 Use the named entry as a continuation of this one
 T}
 _
-\fBtl\fR\fBbool\fRT{
+\fBtl\fR	\fBbool\fR	T{
 Present means procedures are only defined at the top lexical level
 T}
 .TE
@@ -113,101 +112,83 @@ and must be `quoted' with a preceding \e if they are to be included as normal
 characters. The metasymbols and their meanings are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$\fR\fR
 .ad
 .RS 7n
-.rt  
 The end of a line
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^\fR\fR
 .ad
 .RS 7n
-.rt  
 The beginning of a line
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\ed\fR\fR
 .ad
 .RS 7n
-.rt  
 A delimiter (space, tab, newline, start of line)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\ea\fR\fR
 .ad
 .RS 7n
-.rt  
 Matches any string of symbols (like `.*' in lex)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\ep\fR\fR
 .ad
 .RS 7n
-.rt  
 Matches any identifier. In a procedure definition (the `pb' capability) the
 string that matches this symbol is used as the procedure name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB()\fR\fR
 .ad
 .RS 7n
-.rt  
 Grouping
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB|\fR\fR
 .ad
 .RS 7n
-.rt  
 Alternation
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB?\fR\fR
 .ad
 .RS 7n
-.rt  
 Last item is optional
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\ee\fR\fR
 .ad
 .RS 7n
-.rt  
 Preceding any string means that the string will not match an input string if
 the input string is preceded by an escape character (\e). This is typically
 used for languages (like C) that can include the string delimiter in a string
@@ -258,12 +239,10 @@ Thus the C language could be specified to \fBvgrind\fR(1) as `c' or `C'.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/vgrindefs\fR\fR
 .ad
 .RS 22n
-.rt  
 file containing vgrind descriptions
 .RE
 

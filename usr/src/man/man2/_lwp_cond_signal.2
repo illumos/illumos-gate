@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH _lwp_cond_signal 2 "8 Dec 1995" "SunOS 5.11" "System Calls"
+.TH _LWP_COND_SIGNAL 2 "Dec 8, 1995"
 .SH NAME
 _lwp_cond_signal, _lwp_cond_broadcast \- signal a condition variable
 .SH SYNOPSIS
@@ -51,23 +51,19 @@ The \fB_lwp_cond_signal()\fR and \fB_lwp_cond_broadcast()\fR functions will
 fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIcvp\fR argument points to an invalid LWP condition variable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIcvp\fR argument points to an invalid address.
 .RE
 

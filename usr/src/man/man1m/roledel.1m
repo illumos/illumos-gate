@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH roledel 1M "8 Sep 1999" "SunOS 5.11" "System Administration Commands"
+.TH ROLEDEL 1M "Sep 8, 1999"
 .SH NAME
 roledel \- delete a role's login from the system
 .SH SYNOPSIS
@@ -24,12 +24,10 @@ appropriate account-related changes to the system file and file system.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 6n
-.rt  
 Remove the role's home directory from the system. This directory must exist.
 The files and directories under the home directory will no longer be accessible
 following successful execution of the command.
@@ -41,12 +39,10 @@ following successful execution of the command.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrole\fR\fR
 .ad
 .RS 8n
-.rt  
 An existing role name to be deleted.
 .RE
 
@@ -56,114 +52,94 @@ An existing role name to be deleted.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 6n
-.rt  
 Invalid command syntax. A usage message for the \fBroledel\fR command is
 displayed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB6\fR\fR
 .ad
 .RS 6n
-.rt  
 The account to be removed does not exist.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB8\fR\fR
 .ad
 .RS 6n
-.rt  
 The account to be removed is in use.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB10\fR\fR
 .ad
 .RS 6n
-.rt  
 Cannot update the \fB/etc/group\fR or \fB/etc/user_attr\fR file but the login
 is removed from the \fB/etc/passwd\fR file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB12\fR\fR
 .ad
 .RS 6n
-.rt  
 Cannot remove or otherwise modify the home directory.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/passwd\fR\fR
 .ad
 .RS 18n
-.rt  
 system password file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/shadow\fR\fR
 .ad
 .RS 18n
-.rt  
 system file containing roles' encrypted passwords and related information
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/group\fR\fR
 .ad
 .RS 18n
-.rt  
 system file containing group definitions
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/user_attr\fR\fR
 .ad
 .RS 18n
-.rt  
 system file containing additional role attributes
 .RE
 

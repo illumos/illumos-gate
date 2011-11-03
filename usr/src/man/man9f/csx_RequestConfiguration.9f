@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH csx_RequestConfiguration 9F "19 Jul 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH CSX_REQUESTCONFIGURATION 9F "Jul 19, 1996"
 .SH NAME
 csx_RequestConfiguration \- configure the PC Card and socket
 .SH SYNOPSIS
@@ -23,23 +23,19 @@ Solaris \fBDDI\fR Specific (Solaris \fBDDI\fR)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIch\fR\fR
 .ad
 .RS 6n
-.rt  
 Client handle returned from \fBcsx_RegisterClient\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcr\fR\fR
 .ad
 .RS 6n
-.rt  
 Pointer to a \fBconfig_req_t\fR structure.
 .RE
 
@@ -85,7 +81,6 @@ uint32_t     ExtendedStatus;  /* value to write to EXSTAT register */
 The fields are defined as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSocket\fR\fR
 .ad
@@ -97,7 +92,6 @@ implementations, it should be set to the logical socket number.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAttributes\fR\fR
 .ad
@@ -108,7 +102,6 @@ resources to be enabled and whether Card Services should ignore the \fBVS\fR
 bits on the socket interface. The following bits are defined:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCONF_ENABLE_IRQ_STEERING\fR\fR
 .ad
@@ -124,7 +117,6 @@ at the \fBIRQ\fR callback handler established in the call to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCONF_VSOVERRIDE\fR\fR
 .ad
@@ -143,7 +135,6 @@ pin decoding), if a client desires to apply a voltage not indicated by the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVcc, Vpp1, Vpp2\fR\fR
 .ad
@@ -161,7 +152,6 @@ decoding without requiring the client to set \fBCONF_VSOVERRIDE.\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIntType\fR\fR
 .ad
@@ -171,7 +161,6 @@ This field is bit-mapped. It indicates how the socket should be configured. The
 following bits are defined:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSOCKET_INTERFACE_MEMORY\fR\fR
 .ad
@@ -182,7 +171,6 @@ Memory only interface.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSOCKET_INTERFACE_MEMORY_AND_IO\fR\fR
 .ad
@@ -195,7 +183,6 @@ Memory and I/O interface.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBConfigBase\fR\fR
 .ad
@@ -207,7 +194,6 @@ configuration registers.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPresent\fR\fR
 .ad
@@ -217,56 +203,46 @@ This field identifies which of the configuration registers are present. If
 present, the corresponding bit is set. This field is bit-mapped as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCONFIG_OPTION_REG_PRESENT\fR\fR
 .ad
 .RS 30n
-.rt  
 Configuration Option Register (COR) present
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCONFIG_STATUS_REG_PRESENT\fR\fR
 .ad
 .RS 30n
-.rt  
 Configuration Status Register (CCSR) present
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCONFIG_PINREPL_REG_PRESENT\fR\fR
 .ad
 .RS 30n
-.rt  
 Pin Replacement Register (PRR) present
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCONFIG_COPY_REG_PRESENT\fR\fR
 .ad
 .RS 30n
-.rt  
 Socket and Copy Register (SCR) present
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCONFIG_ESR_REG_PRESENT\fR\fR
 .ad
 .RS 30n
-.rt  
 Extended Status Register (ESR) present
 .RE
 
@@ -274,7 +250,6 @@ Extended Status Register (ESR) present
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBStatus, Pin, Copy, ExtendedStatus\fR\fR
 .ad
@@ -292,89 +267,73 @@ which are set are considered valid. This affects how status is returned by the
 bit definitions are provided for client use:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRR_WP_STATUS\fR\fR
 .ad
 .RS 20n
-.rt  
 \fBWRITE PROTECT\fR mask
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRR_READY_STATUS\fR\fR
 .ad
 .RS 20n
-.rt  
 \fBREADY\fR mask
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRR_BVD2_STATUS\fR\fR
 .ad
 .RS 20n
-.rt  
 \fBBVD2\fR mask
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRR_BVD1_STATUS\fR\fR
 .ad
 .RS 20n
-.rt  
 \fBBVD1\fR mask
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRR_WP_EVENT\fR\fR
 .ad
 .RS 20n
-.rt  
 \fBWRITE PROTECT\fR changed
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRR_READY_EVENT\fR\fR
 .ad
 .RS 20n
-.rt  
 \fBREADY\fR changed
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRR_BVD2_EVENT\fR\fR
 .ad
 .RS 20n
-.rt  
 \fBBVD2\fR changed
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRR_BVD1_EVENT\fR\fR
 .ad
 .RS 20n
-.rt  
 \fBBVD1\fR changed
 .RE
 
@@ -382,7 +341,6 @@ bit definitions are provided for client use:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBConfigIndex\fR\fR
 .ad
@@ -398,100 +356,82 @@ set to \fIlevel\fR mode by Card Services.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_SUCCESS\fR\fR
 .ad
 .RS 27n
-.rt  
 Successful operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_BAD_HANDLE\fR\fR
 .ad
 .RS 27n
-.rt  
 Client handle is invalid or \fBcsx_RequestConfiguration()\fR not done.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_BAD_SOCKET\fR\fR
 .ad
 .RS 27n
-.rt  
 Error in getting or setting socket hardware parameters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_BAD_VCC\fR\fR
 .ad
 .RS 27n
-.rt  
 Requested \fBVcc\fR is not available on socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_BAD_VPP\fR\fR
 .ad
 .RS 27n
-.rt  
 Requested \fBVpp\fR is not available on socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_NO_CARD\fR\fR
 .ad
 .RS 27n
-.rt  
 No \fBPC\fR Card in socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_BAD_TYPE\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBI/O\fR and memory interface not supported on socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_CONFIGURATION_LOCKED\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBcsx_RequestConfiguration()\fR already done.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_UNSUPPORTED_FUNCTION\fR\fR
 .ad
 .RS 27n
-.rt  
 No \fBPCMCIA\fR hardware installed.
 .RE
 

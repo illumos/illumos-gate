@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH getprojent 3PROJECT "5 Apr 2004" "SunOS 5.11" "Project Database Access Library Functions"
+.TH GETPROJENT 3PROJECT "Apr 5, 2004"
 .SH NAME
 getprojent, getprojbyname, getprojbyid, getdefaultproj, inproj,
 getprojidbyname, setprojent, endprojent, fgetprojent \- project database entry
@@ -178,9 +178,9 @@ struct project {
     char      *pj_name;     /* name of the project */
     projid_t  pj_projid;    /* numerical project id */
     char      *pj_comment;  /* project comment */
-    char      **pj_users;   /* vector of pointers to 
+    char      **pj_users;   /* vector of pointers to
                                project user names */
-    char      **pj_groups;  /* vector of pointers to 
+    char      **pj_groups;  /* vector of pointers to
                                project group names */
     char      *pj_attr;     /* project attributes */
 };
@@ -218,57 +218,47 @@ The \fBgetprojent()\fR, \fBgetprojbyname()\fR, \fBgetprojbyid()\fR,
 \fBgetdefaultproj()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 10n
-.rt  
 A signal was caught during the operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 10n
-.rt  
 An I/O error has occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEMFILE\fR\fR
 .ad
 .RS 10n
-.rt  
 There are \fBOPEN_MAX\fR file descriptors currently open in the calling
 process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENFILE\fR\fR
 .ad
 .RS 10n
-.rt  
 The maximum allowable number of files is currently open in the system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBERANGE\fR\fR
 .ad
 .RS 10n
-.rt  
 Insufficient storage was supplied by \fIbuffer\fR and \fIbufsize\fR to contain
 the data to be referenced by the resulting \fBproject\fR structure.
 .RE
@@ -301,15 +291,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.64i) |cw(2.86i) 
-lw(2.64i) |lw(2.86i) 
-.
-ATTRIBUTE  TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE  TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelSee Description.
+MT-Level	See Description.
 .TE
 
 .SH SEE ALSO

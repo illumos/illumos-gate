@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SLPDereg 3SLP "16 jan 2003" "SunOS 5.11" "Service Location Protocol Library Functions"
+.TH SLPDEREG 3SLP "Jan 16, 2003"
 .SH NAME
 SLPDereg \- deregister the SLP advertisement
 .SH SYNOPSIS
@@ -27,47 +27,39 @@ returned.
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhSLP\fR\fR
 .ad
 .RS 12n
-.rt  
 The language specific  \fBSLPHandle\fR to use for deregistering. \fIhSLP\fR
 cannot be \fINULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpcURL\fR\fR
 .ad
 .RS 12n
-.rt  
 The \fBURL\fRto deregister. The value of \fIpcURL\fR cannot be \fINULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcallback\fR\fR
 .ad
 .RS 12n
-.rt  
 A callback to report the operation completion  status. \fIcallback\fR cannot be
 \fINULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpvCookie\fR\fR
 .ad
 .RS 12n
-.rt  
 Memory passed to the callback code from the client.  \fIpvCookie\fR can be
 \fINULL\fR.
 .RE
@@ -99,12 +91,10 @@ err = SLPDereg(hSLP, "service:ftp://csserver", regreport, NULL);
 .SH ENVIRONMENT VARIABLES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLP_CONF_FILE\fR\fR
 .ad
 .RS 17n
-.rt  
 When set, use this file for configuration.
 .RE
 

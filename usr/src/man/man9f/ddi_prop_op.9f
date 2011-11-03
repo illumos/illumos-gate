@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_prop_op 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_PROP_OP 9F "Jan 16, 2006"
 .SH NAME
 ddi_prop_op, ddi_getprop, ddi_getlongprop, ddi_getlongprop_buf, ddi_getproplen
 \- get property information for leaf device drivers
@@ -16,7 +16,7 @@ ddi_prop_op, ddi_getprop, ddi_getlongprop, ddi_getlongprop_buf, ddi_getproplen
 
 
 
-\fBint\fR \fBddi_prop_op\fR(\fBdev_t\fR \fIdev\fR, \fBdev_info_t *\fR\fIdip\fR, \fBddi_prop_op_t\fR \fIprop_op\fR, 
+\fBint\fR \fBddi_prop_op\fR(\fBdev_t\fR \fIdev\fR, \fBdev_info_t *\fR\fIdip\fR, \fBddi_prop_op_t\fR \fIprop_op\fR,
      \fBint\fR \fIflags\fR, \fBchar *\fR\fIname\fR, \fBcaddr_t\fR \fIvaluep\fR, \fBint *\fR\fIlengthp\fR);
 .fi
 
@@ -56,77 +56,63 @@ functions are obsolete. Use \fBddi_prop_lookup\fR(9F) instead of
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdev\fR\fR
 .ad
 .RS 12n
-.rt  
 Device number associated with property or \fBDDI_DEV_T_ANY\fR as the
 \fIwildcard\fR device number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 12n
-.rt  
 Pointer to a device info node.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprop_op\fR\fR
 .ad
 .RS 12n
-.rt  
 Property operator.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 12n
-.rt  
 Possible flag values are some combination of:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_DONTPASS\fR\fR
 .ad
 .RS 21n
-.rt  
 do not pass request to parent device information node if property not found
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_CANSLEEP\fR\fR
 .ad
 .RS 21n
-.rt  
 the routine may sleep while allocating memory
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_NOTPROM\fR\fR
 .ad
 .RS 21n
-.rt  
 do not look at PROM properties (ignored on architectures that do not support
 PROM properties)
 .RE
@@ -135,23 +121,19 @@ PROM properties)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR\fR
 .ad
 .RS 12n
-.rt  
 String containing the name of the property.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvaluep\fR\fR
 .ad
 .RS 12n
-.rt  
 If \fIprop_op\fR is \fBPROP_LEN_AND_VAL_BUF\fR, this should be a pointer to the
 users buffer. If \fIprop_op\fR is \fBPROP_LEN_AND_VAL_ALLOC,\fR this should be
 the \fIaddress\fR of a pointer.
@@ -159,12 +141,10 @@ the \fIaddress\fR of a pointer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlengthp\fR\fR
 .ad
 .RS 12n
-.rt  
 On exit, \fI*lengthp\fR will contain the property length. If \fIprop_op\fR is
 \fBPROP_LEN_AND_VAL_BUF\fR then before calling \fBddi_prop_op()\fR,
 \fIlengthp\fR should point to an \fBint\fR that contains the length of callers
@@ -173,12 +153,10 @@ buffer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdefvalue\fR\fR
 .ad
 .RS 12n
-.rt  
 The value that \fBddi_getprop()\fR returns if the property is not found.
 .RE
 
@@ -270,57 +248,47 @@ The \fBddi_prop_op()\fR, \fBddi_getlongprop()\fR, \fBddi_getlongprop_buf()\fR,
 and \fBddi_getproplen()\fR functions return:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_SUCCESS\fR\fR
 .ad
 .RS 26n
-.rt  
 Property found and returned.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_NOT_FOUND\fR\fR
 .ad
 .RS 26n
-.rt  
 Property not found.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_UNDEFINED\fR\fR
 .ad
 .RS 26n
-.rt  
 Property already explicitly undefined.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_NO_MEMORY\fR\fR
 .ad
 .RS 26n
-.rt  
 Property found, but unable to allocate memory. \fIlengthp\fR points to the
 correct property length.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_BUF_TOO_SMALL\fR\fR
 .ad
 .RS 26n
-.rt  
 Property found, but the supplied buffer is too small. \fIlengthp\fR points to
 the correct property length.
 .RE
@@ -347,13 +315,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.51i) |cw(2.99i) 
-lw(2.51i) |lw(2.99i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Stability LevelT{
+Stability Level	T{
 \fBddi_getlongprop()\fR, \fBddi_getlongprop_buf()\fR, \fBddi_getprop()\fR, and \fBddi_getproplen()\fR functions are Obsolete
 T}
 .TE

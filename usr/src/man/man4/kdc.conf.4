@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH kdc.conf 4 "12 Nov 2008" "SunOS 5.11" "File Formats"
+.TH KDC.CONF 4 "Nov 12, 2008"
 .SH NAME
 kdc.conf \- Key Distribution Center (KDC) configuration file
 .SH SYNOPSIS
 .LP
 .nf
-\fB/etc/krb5/kdc.conf\fR 
+\fB/etc/krb5/kdc.conf\fR
 .fi
 
 .SH DESCRIPTION
@@ -52,7 +52,6 @@ or
 The \fBkdc.conf\fR file contains one of more of the following three sections:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkdcdefaults\fR\fR
 .ad
@@ -63,7 +62,6 @@ Contains default values for overall behavior of the \fBKDC\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrealms\fR\fR
 .ad
@@ -77,7 +75,6 @@ servers for that realm.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlogging\fR\fR
 .ad
@@ -92,7 +89,6 @@ Contains relations that determine how Kerberos programs perform logging.
 The following relation can be defined in the \fB[kdcdefaults]\fR section:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkdc_ports\fR\fR
 .ad
@@ -106,7 +102,6 @@ not specified, the Kerberos server listens on port \fB750\fR and port \fB88\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkdc_tcp_ports\fR\fR
 .ad
@@ -122,7 +117,6 @@ Kerberos server defaults to listen on TCP port 88.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkdc_max_tcp_connections\fR\fR
 .ad
@@ -144,7 +138,6 @@ relations that define \fBKDC\fR properties for that particular realm.
 The following relations can be specified in each subsection:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBacl_file\fR\fR
 .ad
@@ -157,7 +150,6 @@ database. The default location is \fB\fR\fB/etc/krb5/kadm5.acl\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadmin_keytab\fR\fR
 .ad
@@ -170,7 +162,6 @@ authenticate to the database. The default location is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdatabase_name\fR\fR
 .ad
@@ -182,7 +173,6 @@ is \fB/var/krb5/principal\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdefault_principal_expiration\fR\fR
 .ad
@@ -195,7 +185,6 @@ absolute time formats you can use for \fBdefault_principal_expiration\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdefault_principal_flags\fR\fR
 .ad
@@ -217,7 +206,6 @@ on an individual principal basis through the \fBkadmin\fR or \fBgkadmin\fR
 interface rather than as a blanket attribute to be applied to all principals.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpostdateable\fR\fR
 .ad
@@ -228,7 +216,6 @@ Create postdatable tickets.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBforwardable\fR\fR
 .ad
@@ -239,7 +226,6 @@ Create forwardable tickets.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtgt-based\fR\fR
 .ad
@@ -250,7 +236,6 @@ Allow TGT-based requests.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrenewable\fR\fR
 .ad
@@ -261,7 +246,6 @@ Create Renewable tickets.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBproxiable\fR\fR
 .ad
@@ -272,7 +256,6 @@ Create Proxiable tickets.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdup-skey\fR\fR
 .ad
@@ -283,7 +266,6 @@ Allow DUP_SKEY requests, this enables user-to-user authentication.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpreauth\fR\fR
 .ad
@@ -294,7 +276,6 @@ Require the use of pre-authentication data whenever principals request TGTs.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhwauth\fR\fR
 .ad
@@ -306,7 +287,6 @@ request TGTs.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB* allow-tickets\fR\fR
 .ad
@@ -317,7 +297,6 @@ Allow tickets to be issued for all principals.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB* pwdchange\fR\fR
 .ad
@@ -328,7 +307,6 @@ Require principal's to change their password.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB* service\fR\fR
 .ad
@@ -339,7 +317,6 @@ Enable or disable a service.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB* pwservice\fR\fR
 .ad
@@ -353,7 +330,6 @@ An example of \fBdefault_principal_flags\fR is shown in EXAMPLES, below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdict_file\fR\fR
 .ad
@@ -367,7 +343,6 @@ select a password in the dictionary. The default location is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkadmind_port\fR\fR
 .ad
@@ -379,7 +354,6 @@ realm. The assigned port for \fBkadmind\fR is 749.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkey_stash_file\fR\fR
 .ad
@@ -392,7 +366,6 @@ stash\fR). The default location is \fB/var/krb5/.k5.\fR\fIrealm\fR, where
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkdc_ports\fR\fR
 .ad
@@ -405,7 +378,6 @@ section is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkdc_tcp_ports\fR\fR
 .ad
@@ -418,7 +390,6 @@ ports specified by \fBkdc_ports\fR) for this realm. By default, the value of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmaster_key_name\fR\fR
 .ad
@@ -429,7 +400,6 @@ ports specified by \fBkdc_ports\fR) for this realm. By default, the value of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmaster_key_type\fR\fR
 .ad
@@ -447,7 +417,6 @@ support \fBdes3-cbc-sha1-kd\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmax_life\fR\fR
 .ad
@@ -460,7 +429,6 @@ time duration formats you can use for \fBmax_life\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmax_renewable_life\fR\fR
 .ad
@@ -474,7 +442,6 @@ renewed in this realm. See the \fBTime\fR \fBFormat\fR section in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsunw_dbprop_enable = [true | false]\fR\fR
 .ad
@@ -485,7 +452,6 @@ Enable or disable incremental database propagation. Default is \fBfalse\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsunw_dbprop_master_ulogsize = N\fR\fR
 .ad
@@ -498,7 +464,6 @@ propagation to the slave KDC servers. The maximum value that this can be is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsunw_dbprop_slave_poll = N[s, m, h]\fR\fR
 .ad
@@ -510,7 +475,6 @@ have. Default is \fB2m\fR (two minutes).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsupported_enctypes\fR\fR
 .ad
@@ -527,7 +491,7 @@ specified, the default setting is:
 .sp
 .in +2
 .nf
-aes256-cts-hmac-sha1-96:normal \e \fI(see note below)\fR 
+aes256-cts-hmac-sha1-96:normal \e \fI(see note below)\fR
 aes128-cts-hmac-sha1-96:normal \e
 des3-cbc-sha1-kd:normal \e
 arcfour-hmac-md5:normal \e
@@ -547,7 +511,6 @@ Kerberos.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBreject_bad_transit\fR\fR
 .ad
@@ -568,7 +531,6 @@ can be repeated if you want to assign it multiple logging methods. The
 following relations can be defined in the \fB[logging]\fR section:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkdc\fR\fR
 .ad
@@ -580,7 +542,6 @@ Specifies how the \fBKDC\fR is to perform its logging. The default is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadmin_server\fR\fR
 .ad
@@ -592,7 +553,6 @@ is \fBFILE:/var/krb5/kadmin.log\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdefault\fR\fR
 .ad
@@ -612,7 +572,6 @@ The \fB[logging]\fR relations can have the following values:
 or
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFILE=\fR\fIfilename\fR\fR
 .ad
@@ -625,7 +584,6 @@ file is appended to.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTDERR\fR\fR
 .ad
@@ -636,7 +594,6 @@ This value sends the entity's logging messages to its standard error stream.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCONSOLE\fR\fR
 .ad
@@ -648,7 +605,6 @@ supports it.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDEVICE=\fR\fIdevicename\fR\fR
 .ad
@@ -659,7 +615,6 @@ This sends the entity's logging messages to the specified device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSYSLOG[:\fR\fIseverity\fR\fB[:\fR\fIfacility\fR\fB]]\fR\fR
 .ad
@@ -716,12 +671,10 @@ to, a generic \fB[kdcdefaults]\fR specification. The search order is
 realm-specific subsection of \fB[realms]\fR
 .sp
 .ne 2
-.mk
 .na
 \fB[realms]\fR
 .ad
 .RS 12n
-.rt  
 .sp
 .in +2
 .nf
@@ -750,12 +703,10 @@ generic value in the \fB[kdcdefaults]\fR section
 .RE
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkinit_identity\fR \fB=\fR \fIURI\fR\fR
 .ad
 .RS 25n
-.rt  
 Specifies the location of the KDC's X.509 identity information. This option is
 required if \fBpkinit\fR is supported by the KDC. Valid \fIURI\fR types are
 \fBFILE\fR, \fBDIR\fR, \fBPKCS11\fR, \fBPKCS12\fR, and \fBENV\fR. See the
@@ -764,12 +715,10 @@ required if \fBpkinit\fR is supported by the KDC. Valid \fIURI\fR types are
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkinit_anchors\fR \fB=\fR \fIURI\fR\fR
 .ad
 .RS 25n
-.rt  
 Specifies the location of trusted anchor (root) certificates which the KDC
 trusts to sign client certificates. This option is required if \fBpkinit\fR is
 supported by the KDC. This option can be specified multiple times. Valid
@@ -779,12 +728,10 @@ section for details.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkinit_pool\fR\fR
 .ad
 .RS 25n
-.rt  
 Specifies the location of intermediate certificates which can be used by the
 KDC to complete the trust chain between a client's certificate and a trusted
 anchor. This option can be specified multiple times. Valid \fIURI\fR types are
@@ -794,12 +741,10 @@ details.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkinit_revoke\fR\fR
 .ad
 .RS 25n
-.rt  
 Specifies the location of Certificate Revocation List (CRL) information to be
 used by the KDC when verifying the validity of client certificates. This option
 can be specified multiple times. The default certificate verification process
@@ -817,24 +762,20 @@ such that up-to-date CRLs must be present for every CA.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkinit_dh_min_bits\fR\fR
 .ad
 .RS 25n
-.rt  
 Specifies the minimum number of bits the KDC is willing to accept for a
 client's Diffie-Hellman key.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkinit_allow_upn\fR\fR
 .ad
 .RS 25n
-.rt  
 Specifies that the KDC is willing to accept client certificates with the
 Microsoft UserPrincipalName (UPN) Subject Alternative Name (SAN). This means
 the KDC accepts the binding of the UPN in the certificate to the Kerberos
@@ -849,35 +790,29 @@ disable SAN checking in the KDC.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkinit_eku_checking\fR\fR
 .ad
 .RS 25n
-.rt  
 This option specifies what Extended Key Usage (EKU) values the KDC is willing
 to accept in client certificates. The values recognized in the \fBkdc.conf\fR
 file are:
 .sp
 .ne 2
-.mk
 .na
 \fBkpClientAuth\fR
 .ad
 .RS 16n
-.rt  
 This is the default value and specifies that client certificates must have the
 \fBid-pkinit-KPClientAuth EKU\fR as defined in RFC4556.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBscLogin\fR
 .ad
 .RS 16n
-.rt  
 If \fBscLogin\fR is specified, client certificates with the Microsoft Smart
 Card Login EKU (\fBid-ms-kp-sc-logon\fR) is accepted.
 .RE
@@ -887,7 +822,6 @@ Card Login EKU (\fBid-ms-kp-sc-logon\fR) is accepted.
 .SS "PKINIT URI Types"
 .sp
 .ne 2
-.mk
 .na
 \fBFILE:\fIfile-name\fR[\fI,key-file-name\fR]\fR
 .ad
@@ -896,12 +830,10 @@ Card Login EKU (\fBid-ms-kp-sc-logon\fR) is accepted.
 This option has context-specific behavior.
 .sp
 .ne 2
-.mk
 .na
 \fBpkinit_identity\fR
 .ad
 .RS 19n
-.rt  
 \fIfile-name\fR specifies the name of a PEM-format file containing the user's
 certificate. If \fIkey-file-name\fR is not specified, the user's private key is
 expected to be in \fIfile-name\fR as well. Otherwise, \fIkey-file-name\fR is
@@ -910,7 +842,6 @@ the name of the file containing the private key.
 
 .sp
 .ne 2
-.mk
 .na
 \fBpkinit_anchors\fR
 .ad
@@ -919,7 +850,6 @@ the name of the file containing the private key.
 \fBpkinit_pool\fR
 .ad
 .RS 19n
-.rt  
 \fIfile-name\fR is assumed to be the name of an OpenSSL-style ca-bundle file.
 The \fIca-bundle\fR file should be base-64 encoded.
 .RE
@@ -928,7 +858,6 @@ The \fIca-bundle\fR file should be base-64 encoded.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDIR:\fIdirectory-name\fR\fR
 .ad
@@ -937,12 +866,10 @@ The \fIca-bundle\fR file should be base-64 encoded.
 This option has context-specific behavior.
 .sp
 .ne 2
-.mk
 .na
 \fBpkinit_identity\fR
 .ad
 .RS 19n
-.rt  
 \fIdirectory-name\fR specifies a directory with files named \fB*.crt\fR and
 \fB*.key\fR, where the first part of the file name is the same for matching
 pairs of certificate and private key files. When a file with a name ending with
@@ -953,7 +880,6 @@ contain the private key. If no such file is found, then the certificate in the
 
 .sp
 .ne 2
-.mk
 .na
 \fBpkinit_anchors\fR
 .ad
@@ -962,7 +888,6 @@ contain the private key. If no such file is found, then the certificate in the
 \fBpkinit_pool\fR
 .ad
 .RS 19n
-.rt  
 \fIdirectory-name\fR is assumed to be an OpenSSL-style hashed CA directory
 where each CA cert is stored in a file named \fBhash-of-ca-cert.\fR\fI#\fR.
 This infrastructure is encouraged, but all files in the directory is examined
@@ -971,12 +896,10 @@ and if they contain certificates (in PEM format), they are used.
 
 .sp
 .ne 2
-.mk
 .na
 \fBpkinit_revoke\fR
 .ad
 .RS 19n
-.rt  
 \fIdirectory-name\fR is assumed to be an OpenSSL-style hashed CA directory
 where each revocation list is stored in a file named
 \fBhash-of-ca-cert.r\fR\fI#\fR. This infrastructure is encouraged, but all
@@ -988,7 +911,6 @@ PEM format), they are used.
 
 .sp
 .ne 2
-.mk
 .na
 \fBPKCS12:pkcs12-file-name\fR
 .ad
@@ -1000,7 +922,6 @@ user's certificate and private key.
 
 .sp
 .ne 2
-.mk
 .na
 \fBPKCS11:[slotid=\fIslot-id\fR][:token=\fItoken-label\fR][:certid=\fIcert-id\fR][:certlabel=\fIcert-label\fR]\fR
 .ad
@@ -1018,7 +939,6 @@ particular certificate to use for \fBpkinit\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBENV:\fIenvironment-variable-name\fR\fR
 .ad
@@ -1044,7 +964,7 @@ The following is an example of a \fBkdc.conf\fR file:
    kdc_ports = 88
 
 [realms]
-   ATHENA.MIT.EDU = { 
+   ATHENA.MIT.EDU = {
       kadmind_port = 749
       max_life = 10h 0m 0s
       max_renewable_life = 7d 0h 0m 0s
@@ -1062,7 +982,6 @@ The following is an example of a \fBkdc.conf\fR file:
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/kadm5.acl\fR\fR
 .ad
@@ -1073,7 +992,6 @@ List of principals and their \fBkadmin\fR administrative privileges.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/kadm5.keytab\fR\fR
 .ad
@@ -1085,7 +1003,6 @@ Keytab for \fBkadmind\fR principals: \fBkadmin\fR/\fIfqdn\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/krb5/principal\fR\fR
 .ad
@@ -1096,7 +1013,6 @@ Kerberos principal database.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/krb5/principal.ulog\fR\fR
 .ad
@@ -1107,7 +1023,6 @@ The update log file for incremental propagation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/krb5/kadm5.dict\fR\fR
 .ad
@@ -1118,7 +1033,6 @@ Dictionary of strings explicitly disallowed as passwords.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/krb5/kdc.log\fR\fR
 .ad
@@ -1129,7 +1043,6 @@ Dictionary of strings explicitly disallowed as passwords.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/krb5/kadmin.log\fR\fR
 .ad
@@ -1146,13 +1059,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

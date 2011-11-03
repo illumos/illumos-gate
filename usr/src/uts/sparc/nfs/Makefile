@@ -23,8 +23,7 @@
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 #
 #	This makefile drives the production of the nfs file system
 #	kernel module.
@@ -65,6 +64,11 @@ MODSTUBS_DIR	= $(OBJS_DIR)
 $(MODSTUBS_O)	:= AS_CPPFLAGS += -DNFS_MODULE
 CLEANFILES	+= $(MODSTUBS_O)
 CFLAGS		+= $(CCVERBOSE)
+
+#
+# Define dependencies on specfs, rpcmod, and rpcsec
+#
+LDFLAGS         += -dy -N fs/specfs -N strmod/rpcmod -N misc/rpcsec
 
 #
 # For now, disable these lint checks; maintainers should endeavor

@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH kdestroy 1 "30 Apr 2004" "SunOS 5.11" "User Commands"
+.TH KDESTROY 1 "Apr 30, 2004"
 .SH NAME
 kdestroy \- destroy Kerberos tickets
 .SH SYNOPSIS
@@ -37,24 +37,20 @@ file so that your tickets are destroyed automatically when you logout.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIcache_name\fR\fR
 .ad
 .RS 17n
-.rt  
 Uses \fIcache_name\fR as the credentials (ticket) cache name and location. If
 this option is not used, the default cache name and location are used.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
 .RS 17n
-.rt  
 Runs quietly. Your terminal will not beep when \fBkdestroy\fR fails to destroy
 the tickets.
 .RE
@@ -65,12 +61,10 @@ the tickets.
 \fBkdestroy\fR uses the following environment variable:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKRB5CCNAME\fR\fR
 .ad
 .RS 14n
-.rt  
 Location of the credentials (ticket) cache. See \fBkrb5envvar\fR(5) for syntax
 and details.
 .RE
@@ -78,12 +72,10 @@ and details.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/tmp/krb5cc_\fIuid\fR\fR\fR
 .ad
 .RS 19n
-.rt  
 Default credentials cache (\fIuid\fR is the decimal \fBUID\fR of the user).
 .RE
 
@@ -95,17 +87,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-Command argumentsEvolving
+Command arguments	Evolving
 _
-Command outputUnstable
+Command output	Unstable
 .TE
 
 .SH SEE ALSO

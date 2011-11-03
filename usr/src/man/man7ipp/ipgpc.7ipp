@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ipgpc 7ipp "29 Sep 2004" "SunOS 5.11" "IP Quality of Service Modules"
+.TH IPGPC 7IPP "Sep 29, 2004"
 .SH NAME
 ipgpc \- IP Generic Packet Classifier
 .SH DESCRIPTION
@@ -44,8 +44,8 @@ Global statistics:
 .nf
 module: ipgpc                           instance:<action id>
 name:   ipgpc global stats              class: <action name>
-        crtime                          
-        snaptime                        
+        crtime
+        snaptime
         nbytes                          <number of classified bytes>
         nclasses                        <number of classes>
         nfilters                        <number of filters>
@@ -62,8 +62,8 @@ Per-class statistics:
 .nf
 module: ipgpc                           instance:<action id>
 name:   <class name>                    class: <action name>
-        crtime                          
-        snaptime                        
+        crtime
+        snaptime
         last match                      <time of last match>
         nbytes                          <number of classified bytes>
         npackets                        <number of classified packets>
@@ -73,12 +73,10 @@ name:   <class name>                    class: <action name>
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/ipp/sparcv9/ipgpc\fR\fR
 .ad
 .RS 29n
-.rt  
 64-bit module (SPARC only.)
 .RE
 

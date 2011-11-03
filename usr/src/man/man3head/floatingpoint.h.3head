@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH floatingpoint.h 3HEAD "5 Mar 1993" "SunOS 5.11" "Headers"
+.TH FLOATINGPOINT.H 3HEAD "Mar 5, 1993"
 .SH NAME
 floatingpoint.h, floatingpoint \- IEEE floating point definitions
 .SH SYNOPSIS
@@ -22,24 +22,20 @@ defines certain types of interest to the kernel.
 .SS "IEEE Rounding Modes"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfp_direction_type\fR\fR
 .ad
 .RS 23n
-.rt  
 The type of the IEEE rounding direction mode. Note: the order of enumeration
 varies according to hardware.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfp_precision_type\fR\fR
 .ad
 .RS 23n
-.rt  
 The type of the IEEE rounding precision mode, which only applies on systems
 that support extended precision such as machines based on the Intel 80387 FPU
 or the 80486. \fBSIGFPE\fR handling:
@@ -47,35 +43,29 @@ or the 80486. \fBSIGFPE\fR handling:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsigfpe_code_type\fR\fR
 .ad
 .RS 23n
-.rt  
 The type of a \fBSIGFPE\fR code.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsigfpe_handler_type\fR\fR
 .ad
 .RS 23n
-.rt  
 The type of a user-definable \fBSIGFPE\fR exception handler called to handle a
 particular \fBSIGFPE\fR code.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGFPE_DEFAULT\fR \fR
 .ad
 .RS 23n
-.rt  
 A macro indicating the default \fBSIGFPE\fR exception handling, namely to
 perform the exception handling specified by the user, if any, and otherwise to
 dump core using \fBabort\fR(3C).
@@ -83,24 +73,20 @@ dump core using \fBabort\fR(3C).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGFPE_IGNORE\fR \fR
 .ad
 .RS 23n
-.rt  
 A macro indicating an alternate \fBSIGFPE\fR exception handling, namely to
 ignore and continue execution.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGFPE_ABORT\fR \fR
 .ad
 .RS 23n
-.rt  
 A macro indicating an alternate \fBSIGFPE\fR exception handling, namely to
 abort with a core dump.
 .RE
@@ -108,35 +94,29 @@ abort with a core dump.
 .SS "IEEE Exception Handling"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBN_IEEE_EXCEPTION\fR \fR
 .ad
 .RS 27n
-.rt  
 The number of distinct IEEE floating-point exceptions.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfp_exception_type\fR\fR
 .ad
 .RS 27n
-.rt  
 The type of the \fBN_IEEE_EXCEPTION\fR exceptions.  Each exception is given a
 bit number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfp_exception_field_type\fR\fR
 .ad
 .RS 27n
-.rt  
 The type intended to hold at least \fBN_IEEE_EXCEPTION\fR bits corresponding to
 the IEEE exceptions numbered by \fBfp_exception_type\fR. Thus \fBfp_inexact\fR
 corresponds to the least significant bit and \fBfp_invalid\fR to the fifth
@@ -146,7 +126,6 @@ least significant bit. Note: some operations may set more than one exception.
 .SS "IEEE Formats and Classification"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsingle\fR;\|\fBextended\fR;\|\fBquadruple\fR\fR
 .ad
@@ -157,7 +136,6 @@ Definitions of IEEE formats.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfp_class_type\fR\fR
 .ad
@@ -174,68 +152,56 @@ The functions described under \fBfloating_to_decimal\fR(3C) and
 also the stricter requirements of correct rounding for all arguments.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDECIMAL_STRING_LENGTH\fR \fR
 .ad
 .RS 26n
-.rt  
 The length of a \fBdecimal_string\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdecimal_string\fR\fR
 .ad
 .RS 26n
-.rt  
 The digit buffer in a \fBdecimal_record\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdecimal_record\fR\fR
 .ad
 .RS 26n
-.rt  
 The canonical form for representing an unpacked decimal floating-point number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdecimal_form\fR\fR
 .ad
 .RS 26n
-.rt  
 The type used to specify fixed or floating binary to decimal conversion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdecimal_mode\fR\fR
 .ad
 .RS 26n
-.rt  
 A struct that contains specifications for conversion between binary and
 decimal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdecimal_string_form\fR\fR
 .ad
 .RS 26n
-.rt  
 An enumeration of possible valid character strings representing floating-point
 numbers, infinities, or NaNs.
 .RE

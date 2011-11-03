@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH fwflash 1M "4 Nov 2008" "SunOS 5.11" "System Administration Commands"
+.TH FWFLASH 1M "Nov 4, 2008"
 .SH NAME
 fwflash \- firmware query and update utility
 .SH SYNOPSIS
@@ -43,7 +43,6 @@ devices.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIdevice_class\fR\fR
 .ad
@@ -58,7 +57,6 @@ defaults to \fBALL\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdev_path\fR\fR
 .ad
@@ -72,7 +70,6 @@ the command fails. If the \fB-d\fR option is specified, then either \fB-f\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIfile1\fR,\fIfile2\fR,\fIfile3\fR,...\fR
 .ad
@@ -94,7 +91,6 @@ correctly activate the new firmware.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
@@ -105,7 +101,6 @@ Display the command line usage message for \fBfwflash\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
@@ -125,7 +120,6 @@ target-port worldwide name is displayed, if available.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIfile\fR\fR
 .ad
@@ -142,7 +136,6 @@ operation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -153,7 +146,6 @@ Display \fBfwflash\fR version information and exit.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-y\fR\fR
 .ad
@@ -177,7 +169,7 @@ arguments.
 .in +2
 .nf
 example# \fBfwflash\fR
-Usage: 
+Usage:
 Usage:
       fwflash [-l [-c device_class | ALL]] | [-v] | [-h]
       fwflash [-f file1,file2,file3,... | -r file] [-y] -d device_path
@@ -356,7 +348,6 @@ currently supported, please see the \fBNOTES\fR section below.
 The \fBfwflash\fR command returns the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -367,7 +358,6 @@ Success
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
@@ -384,13 +374,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

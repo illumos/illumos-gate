@@ -2,28 +2,28 @@
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sort 1 "19 Nov 2001" "SunOS 5.11" "User Commands"
+.TH SORT 1 "Nov 19, 2001"
 .SH NAME
 sort \- sort, merge, or sequence check text files
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/sort\fR [\fB-bcdfimMnru\fR] [\fB-k\fR \fIkeydef\fR] [\fB-o\fR \fIoutput\fR] 
-     [\fB-S\fR \fIkmem\fR] [\fB-t\fR \fIchar\fR] [\fB-T\fR \fIdirectory\fR] [\fB-y\fR [\fIkmem\fR]] 
+\fB/usr/bin/sort\fR [\fB-bcdfimMnru\fR] [\fB-k\fR \fIkeydef\fR] [\fB-o\fR \fIoutput\fR]
+     [\fB-S\fR \fIkmem\fR] [\fB-t\fR \fIchar\fR] [\fB-T\fR \fIdirectory\fR] [\fB-y\fR [\fIkmem\fR]]
      [\fB-z\fR \fIrecsz\fR] [+\fIpos1\fR [-\fIpos2\fR]] [\fIfile\fR]...
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/sort\fR [\fB-bcdfimMnru\fR] [\fB-k\fR \fIkeydef\fR] [\fB-o\fR \fIoutput\fR] 
-     [\fB-S\fR \fIkmem\fR] [\fB-t\fR \fIchar\fR] [\fB-T\fR \fIdirectory\fR] [\fB-y\fR [\fIkmem\fR]] 
+\fB/usr/xpg4/bin/sort\fR [\fB-bcdfimMnru\fR] [\fB-k\fR \fIkeydef\fR] [\fB-o\fR \fIoutput\fR]
+     [\fB-S\fR \fIkmem\fR] [\fB-t\fR \fIchar\fR] [\fB-T\fR \fIdirectory\fR] [\fB-y\fR [\fIkmem\fR]]
      [\fB-z\fR \fIrecsz\fR] [+\fIpos1\fR [-\fIpos2\fR]] [\fIfile\fR]...
 .fi
 
@@ -44,12 +44,10 @@ The following options alter the default behavior:
 .SS "/usr/bin/sort"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 6n
-.rt  
 Checks that the single input file is ordered as specified by the arguments and
 the collating sequence of the current locale. The exit code is set and no
 output is produced unless the file is out of sort.
@@ -58,47 +56,39 @@ output is produced unless the file is out of sort.
 .SS "/usr/xpg4/bin/sort"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 16n
-.rt  
 Same as \fB/usr/bin/sort\fR except no output is produced under any
 circumstances.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
 .RS 16n
-.rt  
 Merges only. The input files are assumed to be already sorted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIoutput\fR\fR
 .ad
 .RS 16n
-.rt  
 Specifies the name of an output file to be used instead of the standard output.
 This file can be the same as one of the input files.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR \fIkmem\fR\fR
 .ad
 .RS 16n
-.rt  
 Specifies the maximum amount of swap-based memory used for sorting, in
 kilobytes (the default unit). \fIkmem\fR can also be specified directly as a
 number of bytes (b), kilobytes (k), megabytes (m), gigabytes (g), or terabytes
@@ -107,23 +97,19 @@ number of bytes (b), kilobytes (k), megabytes (m), gigabytes (g), or terabytes
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fIdirectory\fR\fR
 .ad
 .RS 16n
-.rt  
 Specifies the \fIdirectory\fR in which to place temporary files.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
 .RS 16n
-.rt  
 Unique: suppresses all but one in each set of lines having equal keys. If used
 with the \fB-c\fR option, checks that there are no lines with duplicate keys in
 addition to checking that the input file is sorted.
@@ -131,12 +117,10 @@ addition to checking that the input file is sorted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-y\fR \fIkmem\fR\fR
 .ad
 .RS 16n
-.rt  
 (obsolete). This option was used to specify the amount of main memory initially
 used by \fBsort\fR. Its functionality is not appropriate for a virtual memory
 system; memory usage for \fBsort\fR is now specified using the \fB-S\fR option.
@@ -144,12 +128,10 @@ system; memory usage for \fBsort\fR is now specified using the \fB-S\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fIrecsz\fR\fR
 .ad
 .RS 16n
-.rt  
 (obsolete). This option was used to prevent abnormal termination when lines
 longer than the system-dependent default buffer size are encountered. Because
 \fBsort\fR automatically allocates buffers large enough to hold the longest
@@ -175,46 +157,38 @@ one or more of these options follows a \fI+pos1\fR option, it affects only the
 key field specified by that preceding option.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 6n
-.rt  
 Dictionary order: only letters, digits, and blanks (spaces and tabs) are
 significant in comparisons.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 Folds lower-case letters into upper case.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 6n
-.rt  
 Ignores non-printable characters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR\fR
 .ad
 .RS 6n
-.rt  
 Compares as months. The first three non-blank characters of the field are
 folded to upper case and compared. For example, in English the sorting order is
 \fB"JAN" < "FEB" < .\|.\|. < "DEC"\fR. Invalid fields compare low to
@@ -223,12 +197,10 @@ folded to upper case and compared. For example, in English the sorting order is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 6n
-.rt  
 Restricts the sort key to an initial numeric string, consisting of optional
 blank characters, optional minus sign, and zero or more digits with an optional
 radix character and thousands separators (as defined in the current locale),
@@ -238,12 +210,10 @@ Leading zeros and signs on zeros do not affect ordering.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 6n
-.rt  
 Reverses the sense of comparisons.
 .RE
 
@@ -253,12 +223,10 @@ Reverses the sense of comparisons.
 The treatment of field separators can be altered using the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
 .RS 11n
-.rt  
 Ignores leading blank characters when determining the starting and ending
 positions of a restricted sort key. If the \fB-b\fR option is specified before
 the first sort key option, it is applied to all sort key options. Otherwise,
@@ -269,12 +237,10 @@ option-argument (see below).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fIchar\fR\fR
 .ad
 .RS 11n
-.rt  
 Use \fIchar\fR as the field separator character. \fIchar\fR is not considered
 to be part of a field (although it can be included in a sort key).  Each
 occurrence of \fIchar\fR is significant (for example, \fI<char><char>\fR
@@ -289,12 +255,10 @@ characters that follows a non-blank character is a field separator.
 Sort keys can be specified using the options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR \fIkeydef\fR\fR
 .ad
 .RS 19n
-.rt  
 The \fIkeydef\fR argument is a restricted sort key field definition. The format
 of this definition is:
 .sp
@@ -308,7 +272,6 @@ of this definition is:
 where:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfield_start\fR and \fIfield_end\fR\fR
 .ad
@@ -319,7 +282,6 @@ define a key field restricted to a portion of the line.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItype\fR\fR
 .ad
@@ -397,12 +359,10 @@ applies separately to \fIfirst_character\fR and \fIlast_character\fR.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB[\fB+\fR\fIpos1\fR [\fB-\fR\fIpos2\fR]]\fR
 .ad
 .RS 19n
-.rt  
 (obsolete). Provide functionality equivalent to the \fB-k\fR\fIkeydef\fR
 option.
 .sp
@@ -439,7 +399,7 @@ is equivalent to:
 .nf
 undefined (z==0 & U contains \fIb\fR & \fI-t\fR is present)
 -k w+1.x+1T,y.0U     (z==0 otherwise)
--k w+1.x+1T,y+1.zU   (z > 0) 
+-k w+1.x+1T,y+1.zU   (z > 0)
 .fi
 .in -2
 .sp
@@ -456,12 +416,10 @@ sort key is specified, a default sort key of the entire line is used.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fR
 .ad
 .RS 8n
-.rt  
 A path name of a file to be sorted, merged or checked. If no \fIfile\fR
 operands are specified, or if a \fIfile\fR operand is \fB\(mi\fR, the standard
 input is used.
@@ -489,7 +447,7 @@ second field as the sort key:
 .in +2
 .nf
 example% \fBsort -k 2,2 infile\fR
-example% \fBsort +1 \(mi2 infile\fR 
+example% \fBsort +1 \(mi2 infile\fR
 .fi
 .in -2
 .sp
@@ -506,7 +464,7 @@ first character of the second field is the field separator):
 .sp
 .in +2
 .nf
-example% \fBsort -r -o outfile -k 2.2,2.2 infile1 infile2\fR 
+example% \fBsort -r -o outfile -k 2.2,2.2 infile1 infile2\fR
 example% \fBsort -r -o outfile +1.1 \(mi1.2 infile1 infile2\fR
 .fi
 .in -2
@@ -523,7 +481,7 @@ sort key:
 .sp
 .in +2
 .nf
-example% \fBsort -k 2.2b,2.2b infile1 infile2\fR 
+example% \fBsort -k 2.2b,2.2b infile1 infile2\fR
 example% \fBsort +1.1b \(mi1.2b infile1 infile2\fR
 .fi
 .in -2
@@ -539,7 +497,7 @@ database) sorted by the numeric user ID (the third colon-separated field):
 .sp
 .in +2
 .nf
-example% \fBsort -t : -k 3,3n /etc/passwd\fR 
+example% \fBsort -t : -k 3,3n /etc/passwd\fR
 example% \fBsort -t : +2 \(mi3n /etc/passwd\fR
 .fi
 .in -2
@@ -556,8 +514,8 @@ field:
 .sp
 .in +2
 .nf
-example% \fBsort -um -k 3.1,3.0 infile\fR 
-example% \fBsort -um +2.0 \(mi3.0 infile\fR 
+example% \fBsort -um -k 3.1,3.0 infile\fR
+example% \fBsort -um +2.0 \(mi3.0 infile\fR
 .fi
 .in -2
 .sp
@@ -593,12 +551,10 @@ that affect the execution of \fBsort\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_COLLATE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_CTYPE\fR\fR
 .ad
 .RS 14n
-.rt  
 Determine the locale for the interpretation of sequences of bytes of text data
 as characters (for example, single- versus multi-byte characters in arguments
 and input files) and the behavior of character classification for the \fB-b\fR,
@@ -607,12 +563,10 @@ and input files) and the behavior of character classification for the \fB-b\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_NUMERIC\fR\fR
 .ad
 .RS 14n
-.rt  
 Determine the locale for the definition of the radix character and thousands
 separator for the \fB-n\fR option.
 .RE
@@ -623,24 +577,20 @@ separator for the \fB-n\fR option.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 All input files were output successfully, or \fB-c\fR was specified and the
 input file was correctly sorted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 6n
-.rt  
 Under the \fB-c\fR option, the file was not ordered as specified, or if the
 \fB-c\fR and \fB-u\fR options were both specified, two input lines were found
 with equal keys.
@@ -648,24 +598,20 @@ with equal keys.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>1\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/tmp/stm???\fR\fR
 .ad
 .RS 19n
-.rt  
 Temporary files
 .RE
 
@@ -678,13 +624,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 .TE
 
 .SS "/usr/xpg4/bin/sort"
@@ -692,15 +637,14 @@ CSIEnabled
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

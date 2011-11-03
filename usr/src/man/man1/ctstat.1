@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ctstat 1 "16 Jun 2009" "SunOS 5.11" "User Commands"
+.TH CTSTAT 1 "Jun 16, 2009"
 .SH NAME
 ctstat \- display active system contracts
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/ctstat\fR [\fB-a\fR] [\fB-i\fR \fIcontractid...\fR] [\fB-t\fR \fItype...\fR] [\fB-v\fR] 
+\fB/usr/bin/ctstat\fR [\fB-a\fR] [\fB-i\fR \fIcontractid...\fR] [\fB-t\fR \fItype...\fR] [\fB-v\fR]
      [\fB-T\fR u | d ] [\fIinterval\fR [\fIcount\fR]]
 .fi
 
@@ -28,7 +28,6 @@ statistics on all contracts in the system.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
@@ -40,7 +39,6 @@ which are in the owned, inherited, or orphan states are displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIcontractid\fR...\fR
 .ad
@@ -55,7 +53,6 @@ commas, or enclosed in quotes and separated by commas or spaces.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fBu\fR | \fBd\fR\fR
 .ad
@@ -70,7 +67,6 @@ time. See \fBtime\fR(2). Specify \fBd\fR for standard date format. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fItype\fR...\fR
 .ad
@@ -84,7 +80,6 @@ commas, or enclosed in quotes and separated by commas or spaces.
 The following types are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprocess\fR\fR
 .ad
@@ -97,7 +92,6 @@ Process contracts
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -112,7 +106,6 @@ Verbose output.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinterval\fR\fR
 .ad
@@ -123,7 +116,6 @@ Report once each \fIinterval\fR seconds.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcount\fR\fR
 .ad
@@ -139,7 +131,6 @@ The following list defines the column headings and the meanings of a
 \fBctstat\fR report:
 .sp
 .ne 2
-.mk
 .na
 \fBCTID\fR
 .ad
@@ -150,7 +141,6 @@ The contract \fBID\fR of the contract.
 
 .sp
 .ne 2
-.mk
 .na
 \fBZONEID\fR
 .ad
@@ -161,7 +151,6 @@ The zone ID of the contract's creator.
 
 .sp
 .ne 2
-.mk
 .na
 \fBTYPE\fR
 .ad
@@ -172,7 +161,6 @@ The contract type.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSTATE\fR
 .ad
@@ -181,7 +169,6 @@ The contract type.
 The state of the contract:
 .sp
 .ne 2
-.mk
 .na
 \fBowned\fR
 .ad
@@ -192,7 +179,6 @@ Contract is owned by a process.
 
 .sp
 .ne 2
-.mk
 .na
 \fBinherited\fR
 .ad
@@ -204,7 +190,6 @@ the owner's process contract.
 
 .sp
 .ne 2
-.mk
 .na
 \fBorphan\fR
 .ad
@@ -218,7 +203,6 @@ owner.
 
 .sp
 .ne 2
-.mk
 .na
 \fBdead\fR
 .ad
@@ -233,7 +217,6 @@ events) have been released.
 
 .sp
 .ne 2
-.mk
 .na
 \fBHOLDER\fR
 .ad
@@ -246,7 +229,6 @@ regent process contract.
 
 .sp
 .ne 2
-.mk
 .na
 \fBEVENTS\fR
 .ad
@@ -257,7 +239,6 @@ The number of unacknowledged critical events pending.
 
 .sp
 .ne 2
-.mk
 .na
 \fBQTIME\fR
 .ad
@@ -268,7 +249,6 @@ The time until quantum ends, or \fB-\fR if no negotiation is in progress.
 
 .sp
 .ne 2
-.mk
 .na
 \fBNTIME\fR
 .ad
@@ -343,7 +323,6 @@ CTID    TYPE    STATE   HOLDER  EVENTS  QTIME   NTIME
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -354,7 +333,6 @@ Successful completion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
@@ -365,7 +343,6 @@ An error occurred.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
@@ -386,13 +363,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

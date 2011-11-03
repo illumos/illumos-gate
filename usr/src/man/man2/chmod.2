@@ -1,15 +1,15 @@
 '\" te
 .\" Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved.
-.\" Copyright 1989 AT&T. 
+.\" Copyright 1989 AT&T.
 .\" Portions Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH chmod 2 "12 Sep 2005" "SunOS 5.11" "System Calls"
+.TH CHMOD 2 "Sep 12, 2005"
 .SH NAME
 chmod, fchmod \- change access permission mode of file
 .SH SYNOPSIS
@@ -37,29 +37,27 @@ by the open file descriptor \fIfildes\fR to the bit pattern contained in
 
 .sp
 .TS
-tab();
-lw(1.01i) lw(.69i) lw(3.79i) 
-lw(1.01i) lw(.69i) lw(3.79i) 
-.
-\fBS_ISUID\fR04000Set user ID on execution.
-\fBS_ISGID\fR020#0T{
+l l l
+l l l .
+\fBS_ISUID\fR	04000	Set user ID on execution.
+\fBS_ISGID\fR	020#0	T{
 Set group ID on execution if # is \fB7\fR, \fB5\fR, \fB3\fR, or \fB1\fR. Enable mandatory file/record locking if # is \fB6\fR, \fB4\fR, \fB2\fR, or \fB0\fR.
 T}
-\fBS_ISVTX\fR01000Sticky bit.
-\fBS_IRWXU\fR00700Read, write, execute by owner.
-\fBS_IRUSR\fR00400Read by owner.
-\fBS_IWUSR\fR00200Write by owner.
-\fBS_IXUSR\fR00100T{
+\fBS_ISVTX\fR	01000	Sticky bit.
+\fBS_IRWXU\fR	00700	Read, write, execute by owner.
+\fBS_IRUSR\fR	00400	Read by owner.
+\fBS_IWUSR\fR	00200	Write by owner.
+\fBS_IXUSR\fR	00100	T{
 Execute (search if a directory) by owner.
 T}
-\fBS_IRWXG\fR00070Read, write, execute by group.
-\fBS_IRGRP\fR00040Read by group.
-\fBS_IWGRP\fR00020Write by group.
-\fBS_IXGRP\fR00010Execute by group.
-\fBS_IRWXO\fR00007Read, write, execute (search) by others.
-\fBS_IROTH\fR00004Read by others.
-\fBS_IWOTH\fR00002Write by others.
-\fBS_IXOTH\fR00001Execute by others.
+\fBS_IRWXG\fR	00070	Read, write, execute by group.
+\fBS_IRGRP\fR	00040	Read by group.
+\fBS_IWGRP\fR	00020	Write by group.
+\fBS_IXGRP\fR	00010	Execute by group.
+\fBS_IRWXO\fR	00007	Read, write, execute (search) by others.
+\fBS_IROTH\fR	00004	Read by others.
+\fBS_IWOTH\fR	00002	Write by others.
+\fBS_IXOTH\fR	00001	Execute by others.
 .TE
 
 .sp
@@ -158,23 +156,19 @@ error.
 The \fBchmod()\fR and \fBfchmod()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 9n
-.rt  
 An I/O error occurred while reading from or writing to the file system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 9n
-.rt  
 The effective user ID does not match the owner of the file and the process does
 not have appropriate privilege.
 .sp
@@ -192,12 +186,10 @@ apply. See \fBprivileges\fR(5).
 The \fBchmod()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 16n
-.rt  
 Search permission is denied on a component of the path prefix of \fIpath\fR.
 The privilege {\fBFILE_DAC_SEARCH\fR} overrides file permissions restrictions
 in that case.
@@ -205,35 +197,29 @@ in that case.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIpath\fR argument points to an illegal address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBELOOP\fR\fR
 .ad
 .RS 16n
-.rt  
 A loop exists in symbolic links encountered during the resolution of the
 \fIpath\fR argument.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENAMETOOLONG\fR\fR
 .ad
 .RS 16n
-.rt  
 The length of the \fIpath\fR argument exceeds \fBPATH_MAX\fR, or the length of
 a \fIpath\fR component exceeds \fBNAME_MAX\fR while \fB_POSIX_NO_TRUNC\fR is in
 effect.
@@ -241,47 +227,39 @@ effect.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 16n
-.rt  
 Either a component of the path prefix or the file referred to by \fIpath\fR
 does not exist or is a null pathname.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOLINK\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIfildes\fR argument points to a remote machine and the link to that
 machine is no longer active.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTDIR\fR\fR
 .ad
 .RS 16n
-.rt  
 A component of the prefix of \fIpath\fR is not a directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEROFS\fR\fR
 .ad
 .RS 16n
-.rt  
 The file referred to by \fIpath\fR resides on a read-only file system.
 .RE
 
@@ -290,35 +268,29 @@ The file referred to by \fIpath\fR resides on a read-only file system.
 The \fBfchmod()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fIfildes\fR argument is not an open file descriptor
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOLINK\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fIpath\fR argument points to a remote machine and the link to that machine
 is no longer active.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEROFS\fR\fR
 .ad
 .RS 11n
-.rt  
 The file referred to by \fIfildes\fR resides on a read-only file system.
 .RE
 
@@ -327,23 +299,19 @@ The file referred to by \fIfildes\fR resides on a read-only file system.
 The \fBchmod()\fR and \fBfchmod()\fR functions may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 10n
-.rt  
 A signal was caught during execution of the function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The value of the \fImode\fR argument is invalid.
 .RE
 
@@ -352,24 +320,20 @@ The value of the \fImode\fR argument is invalid.
 The \fBchmod()\fR function may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBELOOP\fR\fR
 .ad
 .RS 16n
-.rt  
 More than {\fBSYMLOOP_MAX\fR} symbolic links were encountered during the
 resolution of the \fIpath\fR argument.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENAMETOOLONG\fR\fR
 .ad
 .RS 16n
-.rt  
 As a result of encountering a symbolic link in resolution of the\fIpath\fR
 argument, the length of the substituted pathname strings exceeds
 {\fBPATH_MAX\fR}.
@@ -380,12 +344,10 @@ argument, the length of the substituted pathname strings exceeds
 The \fBfchmod()\fR function may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIfildes\fR argument refers to a pipe and the system disallows execution
 of this function on a pipe.
 .RE
@@ -435,7 +397,7 @@ execute, group permissions to read and execute, and other permissions to read.
 .in +2
 .nf
 #include <sys/stat.h>
-#define CHANGEFILE "/etc/myfile" 
+#define CHANGEFILE "/etc/myfile"
 \&...
 chmod(CHANGEFILE, S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH);
 .fi
@@ -480,15 +442,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelAsync-Signal-Safe
+MT-Level	Async-Signal-Safe
 .TE
 
 .SH SEE ALSO

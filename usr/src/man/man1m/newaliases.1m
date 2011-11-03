@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH newaliases 1M "14 Sep 2001" "SunOS 5.11" "System Administration Commands"
+.TH NEWALIASES 1M "Sep 14, 2001"
 .SH NAME
 newaliases \- rebuild the data base for the mail aliases file
 .SH SYNOPSIS
 .LP
 .nf
-\fBnewaliases\fR 
+\fBnewaliases\fR
 .fi
 
 .SH DESCRIPTION
@@ -25,7 +25,6 @@ three of the \fBProcessing\fR \fBOptions\fR that can be set from a
 configuration file with the \fB-o\fR option:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fI /path/to/alt/config/file\fR\fR
 .ad
@@ -36,7 +35,6 @@ Use alternate configuration file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-oA\fR\fIfile\fR\fR
 .ad
@@ -47,7 +45,6 @@ Specify possible alias files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-oL\fR\fIn\fR\fR
 .ad
@@ -58,7 +55,6 @@ Set the default log level to \fIn\fR. Defaults to \fB9\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-on\fR\fR
 .ad
@@ -94,134 +90,110 @@ The following command runs \fBnewaliases\fR on an alias file different from the
 defined in \fB/usr/include/sysexits.h\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEX_OK\fR\fR
 .ad
 .RS 18n
-.rt  
 Successful completion on all addresses.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEX_NOUSER\fR\fR
 .ad
 .RS 18n
-.rt  
 User name not recognized.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEX_UNAVAILABLE\fR\fR
 .ad
 .RS 18n
-.rt  
 Catchall. Necessary resources were not available.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEX_SYNTAX\fR\fR
 .ad
 .RS 18n
-.rt  
 Syntax error in address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEX_SOFTWARE\fR\fR
 .ad
 .RS 18n
-.rt  
 Internal software error, including bad arguments.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEX_OSERR\fR\fR
 .ad
 .RS 18n
-.rt  
 Temporary operating system error, such as "cannot fork".
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEX_NOHOST\fR\fR
 .ad
 .RS 18n
-.rt  
 Host name not recognized.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEX_TEMPFAIL\fR\fR
 .ad
 .RS 18n
-.rt  
 Message could not be sent immediately, but was queued.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/aliases\fR\fR
 .ad
 .RS 25n
-.rt  
 Symbolic link to \fB/etc/mail/aliases\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/mail/aliases.pag\fR\fR
 .ad
 .RS 25n
-.rt  
- 
+
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/mail/aliases.dir\fR\fR
 .ad
 .RS 25n
-.rt  
 \fBndbm\fR files maintained by \fBnewaliases\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/mail/aliases.db\fR\fR
 .ad
 .RS 25n
-.rt  
 Berkeley DataBase file maintained by newaliases
 .RE
 

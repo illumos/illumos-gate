@@ -3,20 +3,20 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dpost 1 "9 Sep 1996" "SunOS 5.11" "User Commands"
+.TH DPOST 1 "Sep 9, 1996"
 .SH NAME
 dpost \- troff postprocessor for PostScript printers
 .SH SYNOPSIS
 .LP
 .nf
-\fBdpost\fR [\fB-c\fR \fInum\fR] [\fB-e\fR \fInum\fR] [\fB-m\fR \fInum\fR] [\fB-n\fR \fInum\fR] [\fB-o\fR \fIlist\fR] 
-     [\fB-w\fR \fInum\fR] [\fB-x\fR \fInum\fR] [\fB-y\fR \fInum\fR] [\fB-F\fR \fIdir\fR] [\fB-H\fR \fIdir\fR] 
+\fBdpost\fR [\fB-c\fR \fInum\fR] [\fB-e\fR \fInum\fR] [\fB-m\fR \fInum\fR] [\fB-n\fR \fInum\fR] [\fB-o\fR \fIlist\fR]
+     [\fB-w\fR \fInum\fR] [\fB-x\fR \fInum\fR] [\fB-y\fR \fInum\fR] [\fB-F\fR \fIdir\fR] [\fB-H\fR \fIdir\fR]
      [\fB-L\fR \fIfile\fR] [\fB-O\fR] [\fB-T\fR \fIname\fR] [\fIfile\fR]...
 .fi
 
 .LP
 .nf
-\fB/usr/lib/lp/postscript/dpost\fR 
+\fB/usr/lib/lp/postscript/dpost\fR
 .fi
 
 .SH DESCRIPTION
@@ -45,23 +45,19 @@ responsible for setting up an appropriate user coordinate system.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fI num\fR\fR
 .ad
 .RS 11n
-.rt  
 Print \fInum\fR copies of each page. By default only one copy is printed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fI num\fR\fR
 .ad
 .RS 11n
-.rt  
 Sets the text encoding level to \fInum\fR. The recognized choices are 0, 1, and
 2. The size of the output file and print time should decrease as \fInum\fR
 increases. Level 2 encoding will typically be about 20 percent faster than
@@ -71,12 +67,10 @@ previous versions of \fBdpost\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fI num\fR\fR
 .ad
 .RS 11n
-.rt  
 Magnify each logical page by the factor \fInum\fR. Pages are scaled uniformly
 about the origin, which is located near the upper left corner of each page. The
 default magnification is  \fB1.0\fR.
@@ -84,24 +78,20 @@ default magnification is  \fB1.0\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fI num\fR\fR
 .ad
 .RS 11n
-.rt  
 Print \fInum\fR logical pages on each piece of paper, where \fInum\fR can be
 any positive integer. By default, \fInum\fR is set to  \fB1\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fI list\fR\fR
 .ad
 .RS 11n
-.rt  
 Print those pages for which numbers are given in the comma-separated
 \fIlist\fR. The list contains single numbers \fIN\fR and ranges
 \fIN1\fR\fB\(mi\fR\fIN2.\fR A missing \fIN1\fR means the lowest numbered page,
@@ -116,24 +106,20 @@ appear on one physical sheet of paper.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fI mode\fR\fR
 .ad
 .RS 11n
-.rt  
 Print \fIfiles\fR in either portrait or landscape \fImode\fR. Only the first
 character of \fImode\fR is significant. The default \fImode\fR is portrait.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR\fI num\fR\fR
 .ad
 .RS 11n
-.rt  
 Set the line width used to implement \fBtroff\fR graphics commands to \fInum\fR
 points, where a point is approximately 1/72 of an inch. By default, \fInum\fR
 is set to  \fB0.3\fR points.
@@ -141,12 +127,10 @@ is set to  \fB0.3\fR points.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fI num\fR\fR
 .ad
 .RS 11n
-.rt  
 Translate the origin \fInum\fR inches along the positive x axis. The default
 coordinate system has the origin fixed near the upper left corner of the page,
 with positive x to the right and positive y down the page. Positive \fInum\fR
@@ -155,24 +139,20 @@ moves everything right. The default offset is  \fB0\fR inches.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-y\fR\fI num\fR\fR
 .ad
 .RS 11n
-.rt  
 Translate the origin \fInum\fR inches along the positive y axis. Positive
 \fInum\fR moves text up the page. The default offset is  \fB0\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fI dir\fR\fR
 .ad
 .RS 11n
-.rt  
 Use \fIdir\fR as the font directory. The default \fIdir\fR is
 \fB/usr/lib/font\fR, and \fBdpost\fR reads binary font files from directory
 \fB/usr/lib/font/devpost\fR.
@@ -180,12 +160,10 @@ Use \fIdir\fR as the font directory. The default \fIdir\fR is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-H\fR\fI dir\fR\fR
 .ad
 .RS 11n
-.rt  
 Use \fIdir\fR as the host resident font directory. Files in this directory
 should be complete PostScript font descriptions, and must be assigned a name
 that corresponds to the appropriate two-character \fBtroff\fR font name. Each
@@ -195,36 +173,30 @@ each job. There is no default directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fI file\fR\fR
 .ad
 .RS 11n
-.rt  
 Use \fBfile\fR as the PostScript prologue which, by default, is
 \fB/usr/lib/lp/postscript/dpost.ps\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-O\fR\fR
 .ad
 .RS 11n
-.rt  
 Disables PostScript picture inclusion. A recommended option when \fBdpost\fR is
 run by a spooler in a networked environment.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR\fI name\fR\fR
 .ad
 .RS 11n
-.rt  
 Use font files for device \fIname\fR as the best description of available
 PostScript fonts. By default, \fIname\fR is set to \fBpost\fR and \fBdpost\fR
 reads binary files from \fB/usr/lib/font/devpost\fR.
@@ -269,30 +241,25 @@ should give the best results.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnon-zero\fR
 .ad
 .RS 12n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/font/devpost/*.out\fR\fR
 .ad
@@ -303,7 +270,6 @@ An error occurred.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/font/devpost/charlib/*\fR\fR
 .ad
@@ -314,7 +280,6 @@ An error occurred.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/lp/postscript/color.ps\fR\fR
 .ad
@@ -325,7 +290,6 @@ An error occurred.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/lp/postscript/draw.ps\fR\fR
 .ad
@@ -336,7 +300,6 @@ An error occurred.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/lp/postscript/forms.ps\fR\fR
 .ad
@@ -347,7 +310,6 @@ An error occurred.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/lp/postscript/ps.requests\fR\fR
 .ad
@@ -358,7 +320,6 @@ An error occurred.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/macros/pictures\fR\fR
 .ad
@@ -369,7 +330,6 @@ An error occurred.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/macros/color\fR\fR
 .ad

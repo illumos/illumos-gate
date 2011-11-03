@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ypmap2src 1M "10 Apr 2003" "SunOS 5.11" "System Administration Commands"
+.TH YPMAP2SRC 1M "Apr 10, 2003"
 .SH NAME
 ypmap2src \- convert NIS maps to NIS source files
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/lib/netsvc/yp/ypmap2src\fR [\fB-t\fR] 
-     [ [\fB-c\fR \fIcustom-map-name\fR]]... [\fB-d\fR \fIdomain\fR] \fB-o\fR \fIoutput-directory\fR 
+\fB/usr/lib/netsvc/yp/ypmap2src\fR [\fB-t\fR]
+     [ [\fB-c\fR \fIcustom-map-name\fR]]... [\fB-d\fR \fIdomain\fR] \fB-o\fR \fIoutput-directory\fR
      [ [ \fIsource-file\fR]]...
 .fi
 
@@ -68,12 +68,10 @@ modified the NIS makefile, the equivalent changes must also be made to the
 \fBypmap2src\fR supports the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 18n
-.rt  
 Specifies that \fIcustom-map-name\fR should be converted to a source
 file by running \fBmakedbm\fR \fB-u\fR on it. This is a short cut so that
 simple custom maps can be handled without editing \fBypmap2src\fR.
@@ -81,26 +79,22 @@ simple custom maps can be handled without editing \fBypmap2src\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdomain-name\fR\fR
 .ad
 .RS 18n
-.rt  
  Specifies the domain to convert. The \fIdomain-name\fR can be a fully
-qualified file path, such as \fB/var/yp/a.b.c\fR, or just a domain  	     name,
+qualified file path, such as \fB/var/yp/a.b.c\fR, or just a domain name,
 a.b.c\fB\fR. In the latter case, \fBypmaptosrc\fR looks in \fB/var/yp\fR for
 the domain directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIdest\fR\fR
 .ad
 .RS 18n
-.rt  
  Specifies the destination directory for the converted files. A directory other
 than \fB/etc\fR should be specified. The maps generated are copied to the
 correct location, \fB/etc\fR, \fB/etc/security\fR or other source directory, as
@@ -109,12 +103,10 @@ appropriate.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 18n
-.rt  
 Specifies that traditional NIS maps, without N2L's \fBLDAP_\fR prefix, should
 be converted. By default, maps with the \fBLDAP_\fR prefix are converted.
 .RE
@@ -125,12 +117,10 @@ be converted. By default, maps with the \fBLDAP_\fR prefix are converted.
 \fBypmap2src\fR supports the following operands:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsource-file\fR\fR
 .ad
 .RS 15n
-.rt  
 Lists the standard source files to convert. If this option is not given, then
 all the standard source files, plus any custom files pecified by the \fB-c\fR
 option, are converted.
@@ -144,13 +134,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityObsolete
+Interface Stability	Obsolete
 .TE
 
 .SH SEE ALSO

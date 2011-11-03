@@ -21,9 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/t_lock.h>
@@ -143,8 +142,6 @@ static struct modlfs modlfs = {
 static struct modlinkage modlinkage = {
 	MODREV_1, (void *)&modlfs, NULL
 };
-
-char _depends_on[] = "fs/specfs";
 
 int32_t udf_fstype = -1;
 

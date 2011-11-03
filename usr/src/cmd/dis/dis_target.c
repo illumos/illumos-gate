@@ -21,6 +21,8 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ * Copyright 2011 Jason King.  All rights reserved.
  */
 
 #include <assert.h>
@@ -34,6 +36,8 @@
 
 #include <sys/fcntl.h>
 #include <sys/stat.h>
+#include <sys/sysmacros.h>
+#include <sys/types.h>
 
 #include "dis_target.h"
 #include "dis_util.h"
@@ -58,6 +62,19 @@ typedef struct sym_entry {
 } sym_entry_t;
 
 /*
+ * Create a map of the virtual address ranges of every section.  This will
+ * allow us to create dummpy mappings for unassigned addresses.  Otherwise
+ * multiple sections with unassigned addresses will appear to overlap and
+ * mess up symbol resolution (which uses the virtual address).
+ */
+typedef struct dis_shnmap {
+	const char 	*dm_name;	/* name of section */
+	uint64_t	dm_start;	/* virtual address of section */
+	size_t		dm_length;	/* address length */
+	boolean_t	dm_mapped;	/* did we assign the mapping */
+} dis_shnmap_t;
+
+/*
  * Target data structure.  This structure keeps track of the ELF file
  * information, a few bits of pre-processed section index information, and
  * sorted versions of the symbol table.  We also keep track of the last symbol
@@ -75,6 +92,8 @@ struct dis_tgt {
 	int		dt_symcount;	/* # of symbol table entries */
 	struct dis_tgt	*dt_next;	/* next target (for archives) */
 	Elf_Arhdr	*dt_arhdr;	/* archive header (for archives) */
+	dis_shnmap_t	*dt_shnmap;	/* section address map */
+	size_t		dt_shncount;	/* # of sections in target */
 };
 
 /*
@@ -105,16 +124,22 @@ struct dis_scn {
 #define	IS_DATA_TYPE(tp)	(((1 << (tp)) & DATA_TYPES) != 0)
 
 /*
- * Pick out the best symbol to used based on the sections available in the
- * target.  We prefer SHT_SYMTAB over SHT_DYNSYM.
+ * Save the virtual address range for this section and select the
+ * best section to use as the symbol table.  We prefer SHT_SYMTAB
+ * over SHT_DYNSYM.
  */
 /* ARGSUSED */
 static void
-get_symtab(dis_tgt_t *tgt, dis_scn_t *scn, void *data)
+tgt_scn_init(dis_tgt_t *tgt, dis_scn_t *scn, void *data)
 {
 	int *index = data;
 
 	*index += 1;
+
+	tgt->dt_shnmap[*index].dm_name = scn->ds_name;
+	tgt->dt_shnmap[*index].dm_start = scn->ds_shdr.sh_addr;
+	tgt->dt_shnmap[*index].dm_length = scn->ds_shdr.sh_size;
+	tgt->dt_shnmap[*index].dm_mapped = B_FALSE;
 
 	/*
 	 * Prefer SHT_SYMTAB over SHT_DYNSYM
@@ -292,6 +317,14 @@ construct_symtab(dis_tgt_t *tgt)
 			continue;
 		}
 
+		/*
+		 * If we had to map this section, its symbol value
+		 * also needs to be mapped.
+		 */
+		if (tgt->dt_shnmap[sym->se_shndx].dm_mapped)
+			sym->se_sym.st_value +=
+			    tgt->dt_shnmap[sym->se_shndx].dm_start;
+
 		sym++;
 	}
 
@@ -301,6 +334,40 @@ construct_symtab(dis_tgt_t *tgt)
 
 	qsort(tgt->dt_symtab, tgt->dt_symcount, sizeof (sym_entry_t),
 	    sym_compare);
+}
+
+/*
+ * Assign virtual address ranges for sections that need it
+ */
+static void
+create_addrmap(dis_tgt_t *tgt)
+{
+	uint64_t addr;
+	int i;
+
+	if (tgt->dt_shnmap == NULL)
+		return;
+
+	/* find the greatest used address */
+	for (addr = 0, i = 1; i < tgt->dt_shncount; i++)
+		if (tgt->dt_shnmap[i].dm_start > addr)
+			addr = tgt->dt_shnmap[i].dm_start +
+			    tgt->dt_shnmap[i].dm_length;
+
+	addr = P2ROUNDUP(addr, 0x1000);
+
+	/*
+	 * Assign section a starting address beyond the largest mapped section
+	 * if no address was given.
+	 */
+	for (i = 1; i < tgt->dt_shncount; i++) {
+		if (tgt->dt_shnmap[i].dm_start != 0)
+			continue;
+
+		tgt->dt_shnmap[i].dm_start = addr;
+		tgt->dt_shnmap[i].dm_mapped = B_TRUE;
+		addr = P2ROUNDUP(addr + tgt->dt_shnmap[i].dm_length, 0x1000);
+	}
 }
 
 /*
@@ -393,9 +460,14 @@ dis_tgt_create(const char *file)
 			return (NULL);
 		}
 
-		idx = 0;
-		dis_tgt_section_iter(current, get_symtab, &idx);
+		current->dt_shnmap = safe_malloc(sizeof (dis_shnmap_t) *
+		    ehdr.e_shnum);
+		current->dt_shncount = ehdr.e_shnum;
 
+		idx = 0;
+		dis_tgt_section_iter(current, tgt_scn_init, &idx);
+
+		create_addrmap(current);
 		if (current->dt_symidx != 0)
 			construct_symtab(current);
 
@@ -488,6 +560,28 @@ dis_tgt_destroy(dis_tgt_t *tgt)
 }
 
 /*
+ * Given an address, return the section it is in and set the offset within
+ * the section.
+ */
+const char *
+dis_find_section(dis_tgt_t *tgt, uint64_t addr, off_t *offset)
+{
+	int i;
+
+	for (i = 1; i < tgt->dt_shncount; i++) {
+		if ((addr >= tgt->dt_shnmap[i].dm_start) &&
+		    (addr < tgt->dt_shnmap[i].dm_start +
+		    tgt->dt_shnmap[i].dm_length)) {
+			*offset = addr - tgt->dt_shnmap[i].dm_start;
+			return (tgt->dt_shnmap[i].dm_name);
+		}
+	}
+
+	*offset = 0;
+	return (NULL);
+}
+
+/*
  * Given an address, returns the name of the corresponding symbol, as well as
  * the offset within that symbol.  If no matching symbol is found, then NULL is
  * returned.
@@ -577,29 +671,20 @@ dis_tgt_lookup(dis_tgt_t *tgt, uint64_t addr, off_t *offset, int cache_result,
 
 /*
  * Given an address, return the starting offset of the next symbol in the file.
- * Relies on the fact that this is only used when we encounter a bad instruction
- * in the input stream, so we know that the last symbol looked up will be in the
- * cache.
  */
 off_t
 dis_tgt_next_symbol(dis_tgt_t *tgt, uint64_t addr)
 {
-	sym_entry_t *sym = tgt->dt_symcache;
-	uint64_t start;
+	sym_entry_t *sym;
 
-	/* make sure the cached symbol and address are valid */
-	if (sym == NULL || addr < sym->se_sym.st_value ||
-	    addr >= sym->se_sym.st_value + sym->se_sym.st_size)
-		return (0);
+	for (sym = tgt->dt_symcache;
+	    sym != tgt->dt_symtab + tgt->dt_symcount;
+	    sym++) {
+		if (sym->se_sym.st_value >= addr)
+			return (sym->se_sym.st_value - addr);
+	}
 
-	start = sym->se_sym.st_value;
-
-	/* find the next symbol */
-	while (sym != tgt->dt_symtab + tgt->dt_symcount &&
-	    sym->se_sym.st_value == start)
-		sym++;
-
-	return (sym->se_sym.st_value - addr);
+	return (0);
 }
 
 /*
@@ -634,6 +719,15 @@ dis_tgt_section_iter(dis_tgt_t *tgt, section_iter_f func, void *data)
 			    tgt->dt_filename, sdata.ds_name);
 			continue;
 		}
+
+		/*
+		 * dis_tgt_section_iter is also used before the section map
+		 * is initialized, so only check when we need to.  If the
+		 * section map is uninitialized, it will return 0 and have
+		 * no net effect.
+		 */
+		if (sdata.ds_shdr.sh_addr == 0)
+			sdata.ds_shdr.sh_addr = tgt->dt_shnmap[idx].dm_start;
 
 		func(tgt, &sdata, data);
 	}
@@ -739,6 +833,9 @@ dis_tgt_function_iter(dis_tgt_t *tgt, function_iter_f func, void *data)
 			    tgt->dt_filename, sym->se_shndx);
 			continue;
 		}
+
+		if (tgt->dt_shnmap[sym->se_shndx].dm_mapped)
+			shdr.sh_addr = tgt->dt_shnmap[sym->se_shndx].dm_start;
 
 		/*
 		 * Verify that the address lies within the section that we think

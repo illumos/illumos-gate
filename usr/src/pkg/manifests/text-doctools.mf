@@ -39,8 +39,8 @@ dir path=usr/lib/font/devpost/charlib group=lp
 dir path=usr/lib/refer
 dir path=usr/lib/refer/papers
 dir path=usr/lib/sgml
-dir path=usr/share group=sys
-dir path=usr/share/lib group=sys
+dir path=usr/share
+dir path=usr/share/lib
 dir path=usr/share/lib/nterm
 dir path=usr/share/lib/pub
 dir path=usr/share/lib/sgml
@@ -54,7 +54,6 @@ dir path=usr/share/lib/tmac
 dir path=usr/share/man
 dir path=usr/share/man/man1
 dir path=usr/share/man/man1m
-dir path=usr/share/man/man4b
 dir path=usr/share/man/man5
 file path=usr/bin/addbib mode=0555
 file path=usr/bin/apropos mode=0555
@@ -372,7 +371,6 @@ file path=usr/share/man/man1/ul.1
 file path=usr/share/man/man1/vgrind.1
 file path=usr/share/man/man1/whatis.1
 file path=usr/share/man/man1m/catman.1m
-file path=usr/share/man/man4b/plot.4b
 file path=usr/share/man/man5/eqnchar.5
 file path=usr/share/man/man5/man.5
 file path=usr/share/man/man5/mansun.5

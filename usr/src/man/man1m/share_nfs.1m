@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH share_nfs 1M "6 May 2009" "SunOS 5.11" "System Administration Commands"
+.TH SHARE_NFS 1M "May 6, 2009"
 .SH NAME
 share_nfs \- make local NFS file systems available for mounting by remote
 systems
@@ -30,7 +30,6 @@ through other distributed file system packages.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdescription\fR\fR
 .ad
@@ -41,7 +40,6 @@ Provide a comment that describes the file system to be shared.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-F\fR \fBnfs\fR\fR
 .ad
@@ -52,7 +50,6 @@ Share \fBNFS\fR file system type.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIspecific_options\fR\fR
 .ad
@@ -65,7 +62,6 @@ read-write to all clients. \fIspecific_options\fR can be any combination of the
 following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBaclok\fR\fR
 .ad
@@ -80,7 +76,6 @@ minimal access is given to all clients.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBanon=\fR\fIuid\fR\fR
 .ad
@@ -93,7 +88,6 @@ unknown users are given the effective user \fBID\fR \fBUID_NOBODY\fR. If
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcharset\fR=\fIaccess_list\fR\fR
 .ad
@@ -111,7 +105,6 @@ converted to UTF-8 for the server.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBindex=\fR\fBfile\fR\fR
 .ad
@@ -123,7 +116,6 @@ when the directory is referenced by an \fBNFS URL\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlog=tag\fR\fR
 .ad
@@ -139,7 +131,6 @@ Version 3 requests.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnone=\fR\fIaccess_list\fR\fR
 .ad
@@ -152,7 +143,6 @@ is when the access list is an asterisk (\fB*\fR), in which case \fBro\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnosub\fR\fR
 .ad
@@ -175,7 +165,6 @@ only applies to NFS Version 2 and Version 3 requests.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnosuid\fR\fR
 .ad
@@ -189,7 +178,6 @@ bits.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpublic\fR\fR
 .ad
@@ -205,7 +193,6 @@ option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBro\fR\fR
 .ad
@@ -216,7 +203,6 @@ Sharing is read-only to all clients.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBro=\fR\fIaccess_list\fR\fR
 .ad
@@ -228,7 +214,6 @@ Sharing is read-only to the clients listed in \fIaccess_list\fR; overrides the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBroot=\fR\fIaccess_list\fR\fR
 .ad
@@ -243,7 +228,6 @@ authentication ( \fBAUTH_SYS\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBroot_mapping=\fIuid\fR\fR\fR
 .ad
@@ -255,7 +239,6 @@ user id.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrw\fR\fR
 .ad
@@ -266,7 +249,6 @@ Sharing is read-write to all clients.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrw=\fR\fIaccess_list\fR\fR
 .ad
@@ -278,7 +260,6 @@ Sharing is read-write to the clients listed in \fIaccess_list\fR; overrides the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsec=\fR\fImode\fR[\fB:\fR\fImode\fR].\|.\|.\fR
 .ad
@@ -300,7 +281,6 @@ so that more \fBwindow=,\fR \fBrw,\fR \fBro,\fR \fBrw=,\fR \fBro=\fR and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsec=\fR\fInone\fR\fR
 .ad
@@ -315,7 +295,6 @@ description of how unauthenticated requests are handled.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsecure\fR\fR
 .ad
@@ -326,7 +305,6 @@ This option has been deprecated in favor of the \fBsec=\fR\fIdh\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwindow=\fR\fIvalue\fR\fR
 .ad
@@ -348,7 +326,6 @@ The \fIaccess_list\fR argument is a colon-separated list whose components may
 be any number of the following:
 .sp
 .ne 2
-.mk
 .na
 \fBhostname\fR
 .ad
@@ -361,7 +338,6 @@ fully qualified \fBDNS\fR or \fBLDAP\fR name.
 
 .sp
 .ne 2
-.mk
 .na
 \fBnetgroup\fR
 .ad
@@ -375,7 +351,6 @@ hostname in a netgroup must be represented as a fully qualified \fBDNS\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fBdomain name suffix\fR
 .ad
@@ -400,7 +375,7 @@ and
 .sp
 .in +2
 .nf
-DNS or LDAP   172.16.45.9 --> 
+DNS or LDAP   172.16.45.9 -->
      "myhost.mydomain.mycompany.com"
 .fi
 .in -2
@@ -422,7 +397,6 @@ and \fBLDAP\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBnetwork\fR
 .ad
@@ -504,7 +478,6 @@ grants access to \fBterra\fR.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpathname\fR\fR
 .ad
@@ -545,7 +518,6 @@ line does not start the \fBnfslogd\fR(1M).
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -556,7 +528,6 @@ Successful completion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
@@ -568,7 +539,6 @@ An error occurred.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/dfs/fstypes\fR\fR
 .ad
@@ -579,7 +549,6 @@ list of system types, \fBNFS\fR by default
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/dfs/sharetab\fR\fR
 .ad
@@ -590,7 +559,6 @@ system record of shared file systems
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/nfs/nfslogtab\fR\fR
 .ad
@@ -601,7 +569,6 @@ system record of logged file systems
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/nfs/nfslog.conf\fR\fR
 .ad

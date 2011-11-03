@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH power.conf 4 "27 Feb 2009" "SunOS 5.11" "File Formats"
+.TH POWER.CONF 4 "Feb 27, 2009"
 .SH NAME
 power.conf \- Power Management configuration information file
 .SH SYNOPSIS
@@ -95,7 +95,7 @@ the system idleness threshold by using one of the following entries:
 .sp
 .in +2
 .nf
-cpu-threshold \fIthreshold\fR 
+cpu-threshold \fIthreshold\fR
 .fi
 .in -2
 
@@ -302,12 +302,10 @@ autopm \fIbehavior\fR
 Acceptable behavior values are described as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdefault\fR\fR
 .ad
 .RS 11n
-.rt  
 The behavior of the system depends upon its model. Desktop models that fall
 under the United States Environmental Protection Agency's \fIEnergy Star
 Memorandum of Understanding #3\fR have automatic device Power Management
@@ -317,23 +315,19 @@ for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBenable\fR\fR
 .ad
 .RS 11n
-.rt  
 Automatic device Power Management is started when this entry is encountered.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisable\fR\fR
 .ad
 .RS 11n
-.rt  
 Automatic device Power Management is stopped when this entry is encountered.
 .RE
 
@@ -354,12 +348,10 @@ cpupm \fIbehavior\fR
 Acceptable behavior values and their meanings are :
 .sp
 .ne 2
-.mk
 .na
 \fB\fBenable\fR\fR
 .ad
 .RS 11n
-.rt  
 CPU Power Management is started when this entry is encountered.
 .sp
 Where the behavior is \fBenable\fR, an optional \fImode\fR argument can be
@@ -374,12 +366,10 @@ cpupm enable \fImode\fR
 Acceptable \fImode\fR values and their meanings are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBevent-mode\fR\fR
 .ad
 .RS 14n
-.rt  
 CPU power state transitions is driven by thread scheduler/dispatcher events.
 The \fBcpu-threshold\fR, and \fBsystem-threshold\fR keywords are not used for
 CPUs in this mode.
@@ -387,12 +377,10 @@ CPUs in this mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpoll-mode\fR\fR
 .ad
 .RS 14n
-.rt  
 The Power Management framework polls the idleness of the system's CPUs, and
 manages their power once idle for the period of time specified by either the
 \fBsystem-threshold\fR or \fBcpu-threshold\fR.
@@ -402,12 +390,10 @@ manages their power once idle for the period of time specified by either the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisable\fR\fR
 .ad
 .RS 11n
-.rt  
 CPU Power Management is stopped when this entry is encountered.
 .RE
 
@@ -429,35 +415,29 @@ or disable automatic use of power saving cpu idle states. The format of the
 Acceptable values for \fIbehavior\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdefault\fR\fR
 .ad
 .RS 11n
-.rt  
 Advanced cpu idle power saving features are enabled on hardware which supports
 it. On X86 systems this can translate to the use of ACPI C-States beyond C1.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBenable\fR\fR
 .ad
 .RS 11n
-.rt  
 Enables the system to automatically use idle cpu power saving features.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisable\fR\fR
 .ad
 .RS 11n
-.rt  
 The system does not automatically use idle cpu power saving features. This
 option can be used when maximum performance is required at the expense of
 power.
@@ -465,12 +445,10 @@ power.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBabsent\fR\fR
 .ad
 .RS 11n
-.rt  
 It the \fBcpu_deep_idle\fR keyword is absent from \fBpower.conf\fR the behavior
 is the same as the default case.
 .RE
@@ -493,12 +471,10 @@ override this default, an S3-support entry (of the format S3-support
 Acceptable behavior values are:
 .sp
 .ne 2
-.mk
 .na
 \fBenable\fR
 .ad
 .RS 11n
-.rt  
 The system supports entry into S3 state. If the BIOS of a system enabled using
 an \fBS3-support enable\fR entry does not support entry into S3, the attempt
 fails and the system returns to normal operation. If support for S3 in the BIOS
@@ -508,12 +484,10 @@ unable to enter S3 or resume successfully, so use this entry with caution.
 
 .sp
 .ne 2
-.mk
 .na
 \fBdisable\fR
 .ad
 .RS 11n
-.rt  
 The system does not support entry into S3 state.
 .RE
 
@@ -534,12 +508,10 @@ The format of the autoS3 entry is autoS3 \fBbehavior\fR.
 Acceptable behavior values are:
 .sp
 .ne 2
-.mk
 .na
 \fBdefault\fR
 .ad
 .RS 11n
-.rt  
 System behavior depends upon model. Sun X86 desktop and workstation models that
 fall under the United States Environmental Protection Agency's \fIEnergy Star
 Memorandum of Understanding #3\fR have automatic entry into the S3 state
@@ -548,24 +520,20 @@ enabled. Non-Sun systems do not. See \fBNOTES\fR for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fBenable\fR
 .ad
 .RS 11n
-.rt  
 Enables the system to automatically enter the S3 state if autopm is enabled and
 every device is at its lowest power state.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdisable\fR
 .ad
 .RS 11n
-.rt  
 The system does not automatically enter the S3 state.
 .RE
 
@@ -607,12 +575,10 @@ To specify continuous operation, the \fIfinish_time\fR can be set equal to the
 Acceptable behavior values are described as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshutdown\fR\fR
 .ad
 .RS 16n
-.rt  
 The system is shut down automatically when it has been idle for the number of
 minutes specified in the \fIidle_time\fR value and the time of day falls
 between the \fIstart_time\fR and \fIfinish_time\fR values.
@@ -620,23 +586,19 @@ between the \fIstart_time\fR and \fIfinish_time\fR values.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoshutdown\fR\fR
 .ad
 .RS 16n
-.rt  
 The system is never shut down automatically.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBautowakeup\fR\fR
 .ad
 .RS 16n
-.rt  
 If the hardware has the capability to do \fBautowakeup\fR, the system is shut
 down as if the value were \fBshutdown\fR and the system is restarted
 automatically the next time the time of day equals \fIfinish_time\fR.
@@ -644,12 +606,10 @@ automatically the next time the time of day equals \fIfinish_time\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdefault\fR\fR
 .ad
 .RS 16n
-.rt  
 The behavior of the system depends upon its model. Desktop models that fall
 under the United States Environmental Protection Agency's \fIEnergy Star
 Memorandum of Understanding #2\fR have automatic \fBshutdown\fR enabled, as if
@@ -659,12 +619,10 @@ Memorandum of Understanding #2\fR have automatic \fBshutdown\fR enabled, as if
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunconfigured\fR\fR
 .ad
 .RS 16n
-.rt  
 The system does not be shut down automatically. If the system has just been
 installed or upgraded, the value of this field is changed upon the next reboot.
 .RE
@@ -680,12 +638,10 @@ You can use the following format to configure the system's notion of idleness:
 Where \fBidleness_parameter\fR can be:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBttychars\fR\fR
 .ad
 .RS 15n
-.rt  
 If the \fBidleness_parameter\fR is \fBttychars\fR, the \fIvalue\fR field is
 interpreted as the maximum number of tty characters that can pass through the
 \fBldterm\fR module while still allowing the system to be considered idle. This
@@ -694,12 +650,10 @@ value defaults to \fB0\fR if no entry is provided.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBloadaverage\fR\fR
 .ad
 .RS 15n
-.rt  
 If the \fBidleness_parameter\fR is \fBloadaverage\fR, the (floating point)
 \fIvalue\fR field is interpreted as the maximum load average that can be seen
 while still allowing the system to be considered idle. This value defaults to
@@ -708,12 +662,10 @@ while still allowing the system to be considered idle. This value defaults to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdiskreads\fR\fR
 .ad
 .RS 15n
-.rt  
 If the \fBidleness_parameter\fR is \fBdiskreads\fR, the \fIvalue\fR field is
 interpreted as the maximum number of disk reads that can be perform by the
 system while still allowing the system to be considered idle. This value
@@ -722,12 +674,10 @@ defaults to \fB0\fR if no entry is provided.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnfsreqs\fR\fR
 .ad
 .RS 15n
-.rt  
 If the \fBidleness_parameter\fR is \fBnfsreqs\fR, the \fIvalue\fR field is
 interpreted as the maximum number of NFS requests that can be sent or received
 by the system while still allowing the system to be considered idle. Null
@@ -737,12 +687,10 @@ count. This value defaults to \fB0\fR if no entry is provided.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBidlecheck\fR\fR
 .ad
 .RS 15n
-.rt  
 If the \fBidleness_parameter\fR is \fBidlecheck\fR, the \fIvalue\fR must be
 pathname of a program to be executed to determine if the system is idle. If
 \fBautoshutdown\fR is enabled and the console keyboard, mouse, tty, CPU (as
@@ -830,13 +778,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface stability Committed
+Interface stability 	Committed
 .TE
 
 .SH SEE ALSO

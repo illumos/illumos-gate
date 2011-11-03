@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH kproplog 1M "29 Mar 2004" "SunOS 5.11" "System Administration Commands"
+.TH KPROPLOG 1M "Mar 29, 2004"
 .SH NAME
 kproplog \- display the contents of the Kerberos principal update log
 .SH SYNOPSIS
@@ -42,12 +42,10 @@ time stamp of the last update.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 11n
-.rt  
 Display a summary of the update log. This information includes the database
 version number, state of the database, the number of updates in the log, the
 time stamp of the first and last update, and the version number of the first
@@ -56,24 +54,20 @@ and last update entry.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\ \fInum\fR\fR
 .ad
 .RS 11n
-.rt  
 Display the last \fInum\fR update entries in the log. This is useful when
 debugging synchronization between KDC servers.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 11n
-.rt  
 Display individual attributes per update. An example of the output generated
 for one entry:
 .sp
@@ -101,12 +95,10 @@ Update Entry
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/krb5/principal.ulog\fR\fR
 .ad
 .RS 28n
-.rt  
 The update log file for incremental propagation.
 .RE
 
@@ -118,13 +110,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

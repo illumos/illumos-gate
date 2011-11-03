@@ -33,6 +33,7 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -236,11 +237,10 @@ typedef struct smb_share {
 #define	ss_lock		ss_co.co_lock
 #define	ss_flags	ss_co.co_flags
 
+#define	ss_use		ss_ioc.sh_use
+#define	ss_type		ss_ioc.sh_type
 #define	ss_name		ss_ioc.sh_name
-#define	ss_pwlen	ss_ioc.sh_pwlen
 #define	ss_pass		ss_ioc.sh_pass
-#define	ss_type_req	ss_ioc.sh_type_req
-#define	ss_type_ret	ss_ioc.sh_type_ret
 
 #define	SMB_SS_LOCK(ssp)	mutex_enter(&(ssp)->ss_lock)
 #define	SMB_SS_UNLOCK(ssp)	mutex_exit(&(ssp)->ss_lock)
@@ -275,20 +275,18 @@ void smb_fscb_set(smb_fscb_t *);
  * Mostly used in: smb_dev.c, smb_usr.c
  */
 typedef struct smb_dev {
-	int		sd_opened;	/* Opened or not */
-	int		sd_level;	/* Future use */
+	dev_info_t	*sd_dip;	/* ptr to dev_info node */
+	struct cred	*sd_cred;	/* per dev credentails */
 	struct smb_vc	*sd_vc;		/* Reference to VC */
 	struct smb_share *sd_share;	/* Reference to share if any */
+	int		sd_level;	/* SMBL_VC, ... */
 	int		sd_vcgenid;	/* Generation of share or VC */
 	int		sd_poll;	/* Future use */
-	int		sd_seq;		/* Kind of minor number/instance no */
 	int		sd_flags;	/* State of connection */
 #define	NSMBFL_OPEN		0x0001
 #define	NSMBFL_IOD		0x0002
+	int		sd_smbfid;	/* library read/write */
 	zoneid_t	zoneid;		/* Zone id */
-	dev_info_t	*smb_dip;	/* ptr to dev_info node */
-	void		*sd_devfs;	/* Dont know how to use this. but */
-	struct cred	*smb_cred;	/* per dev credentails. Future use */
 } smb_dev_t;
 
 extern const uint32_t nsmb_version;
@@ -304,10 +302,15 @@ int  smb_dev2share(int fd, struct smb_share **sspp);
  */
 int smb_usr_get_flags2(smb_dev_t *sdp, intptr_t arg, int flags);
 int smb_usr_get_ssnkey(smb_dev_t *sdp, intptr_t arg, int flags);
+int smb_usr_dup_dev(smb_dev_t *sdp, intptr_t arg, int flags);
 
 int smb_usr_simplerq(smb_dev_t *sdp, intptr_t arg, int flags, cred_t *cr);
 int smb_usr_t2request(smb_dev_t *sdp, intptr_t arg, int flags, cred_t *cr);
+
+int smb_usr_closefh(smb_dev_t *, cred_t *);
 int smb_usr_rw(smb_dev_t *sdp, int cmd, intptr_t arg, int flags, cred_t *cr);
+int smb_usr_ntcreate(smb_dev_t *, intptr_t, int, cred_t *);
+int smb_usr_printjob(smb_dev_t *, intptr_t, int, cred_t *);
 
 int smb_usr_get_ssn(smb_dev_t *, int, intptr_t, int, cred_t *);
 int smb_usr_drop_ssn(smb_dev_t *sdp, int cmd);
@@ -377,15 +380,5 @@ void smb_share_kill(smb_share_t *ssp);
 
 void smb_share_invalidate(smb_share_t *ssp);
 int  smb_share_tcon(smb_share_t *, smb_cred_t *);
-
-/*
- * SMB protocol level functions
- */
-int  smb_smb_echo(smb_vc_t *vcp, smb_cred_t *scred, int timo);
-int  smb_smb_treeconnect(smb_share_t *ssp, smb_cred_t *scred);
-int  smb_smb_treedisconnect(smb_share_t *ssp, smb_cred_t *scred);
-
-int smb_rwuio(smb_share_t *ssp, uint16_t fid, uio_rw_t rw,
-	uio_t *uiop, smb_cred_t *scred, int timo);
 
 #endif /* _SMB_CONN_H */

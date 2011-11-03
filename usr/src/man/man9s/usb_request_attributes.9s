@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH usb_request_attributes 9S "5 Jan 2004" "SunOS 5.11" "Data Structures for Drivers"
+.TH USB_REQUEST_ATTRIBUTES 9S "Jan 5, 2004"
 .SH NAME
 usb_request_attributes \- Definition of USB request attributes
 .SH SYNOPSIS
@@ -27,12 +27,10 @@ to the enumerated type usb_req_attrs_t.
 Supported request attributes are:
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_ATTRS_SHORT_XFER_OK\fR
 .ad
 .RS 30n
-.rt  
 Use this attribute when the  maximum transfer  size is known,  but it is
 possible for the request to receive a smaller amount of data. This attribute
 tells the USBA framework to accept  without error transfers which are shorter
@@ -41,12 +39,10 @@ than expected.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_ATTRS_PIPE_RESET\fR
 .ad
 .RS 30n
-.rt  
 Have the USB framework reset the pipe automatically if an error     occurs
 during the transfer. Do not attempt to clear any stall. The USB_CB_RESET_PIPE
 callback flag is passed to the client driver's exception handler to show the
@@ -56,12 +52,10 @@ unless the pipe is the default pipe.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_ATTRS_AUTOCLEARING\fR
 .ad
 .RS 30n
-.rt  
 Have the USB framework reset the pipe and clear functional stalls automatically
 if an error occurs during the transfer. The callback flags passed to the client
 driver's exception handler show the status after the attempt to clear the
@@ -87,12 +81,10 @@ default pipe.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_ATTRS_ONE_XFER\fR
 .ad
 .RS 30n
-.rt  
 Applies only to interrupt-IN requests. Without this flag, interrupt-IN requests
 start periodic polling of the interrupt pipe. This flag specifies to perform
 only a single transfer.  Do not start periodic transfers with this request.
@@ -100,12 +92,10 @@ only a single transfer.  Do not start periodic transfers with this request.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_ATTRS_ISOC_START_FRAME\fR
 .ad
 .RS 30n
-.rt  
 Applies only to isochronous requests and specifies that a request be started at
 a given frame number. The starting frame number is provided in the
 isoc_frame_no field of the usb_isoc_req_t. Please see
@@ -122,12 +112,10 @@ starting frames which have passed are rejected.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_ATTRS_ISOC_XFER_ASAP\fR
 .ad
 .RS 30n
-.rt  
 Applies only to isochronous requests and specifies that a request start as soon
 as possible. The host controller driver picks a starting frame number which
 immediately follows the last frame of the last queued request. The
@@ -192,15 +180,14 @@ See attributes(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitecturePCI-based systems
+Architecture	PCI-based systems
 _
-Interface stabilityCommitted
+Interface stability	Committed
 .TE
 
 .SH SEE ALSO

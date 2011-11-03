@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH rcmscript 4 "18 Feb 2003" "SunOS 5.11" "File Formats"
+.TH RCMSCRIPT 4 "Feb 18, 2003"
 .SH NAME
 rcmscript \- script interface specification for the Reconfiguration and
 Coordination Manager
@@ -74,34 +74,28 @@ An RCM script is invoked on demand in response to DR as follows:
 Every script must implement the following RCM commands:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBscriptinfo\fR\fR
 .ad
 .RS 16n
-.rt  
 Get script information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBregister\fR\fR
 .ad
 .RS 16n
-.rt  
 Register devices the script handles.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBresourceinfo\fR\fR
 .ad
 .RS 16n
-.rt  
 Get resource information.
 .RE
 
@@ -110,45 +104,37 @@ Get resource information.
 A script might include some or all the of the following commands:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBqueryremove\fR\fR
 .ad
 .RS 15n
-.rt  
 Queries whether the resource can be released.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpreremove\fR\fR
 .ad
 .RS 15n
-.rt  
 Releases the resource.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpostremove\fR\fR
 .ad
 .RS 15n
-.rt  
 Provides post-resource removal notification.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBundoremove\fR\fR
 .ad
 .RS 15n
-.rt  
 Undo the actions done in preremove.
 .RE
 
@@ -384,12 +370,10 @@ controlling environment variables are specified otherwise.
 The \fBscriptinfo\fR command is invoked to gather information about the script.
 .sp
 .ne 2
-.mk
 .na
 \fBReturn data:\fR
 .ad
 .RS 16n
-.rt  
 If successful, the script must write the following name-value pairs to stdout
 and exit with status 0:
 .RS +4
@@ -440,12 +424,10 @@ by DR. The script has to supply all its resource names to RCM using the
 name-value pair \fBrcm_resource_name\fR.
 .sp
 .ne 2
-.mk
 .na
 \fBReturn Data:\fR
 .ad
 .RS 16n
-.rt  
 If successful, the script must write the following name-value pairs to stdout
 and exit with status 0:
 .sp
@@ -474,12 +456,10 @@ The \fBresourceinfo\fR command is invoked to get the usage information about
 \fIresourcename\fR.
 .sp
 .ne 2
-.mk
 .na
 \fBReturn Data:\fR
 .ad
 .RS 16n
-.rt  
 If successful, the script must write the following name-value pair to stdout
 and exit with status 0:
 .sp
@@ -511,32 +491,26 @@ service or application.
 Additional environment parameter:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRCM_ENV_FORCE\fR\fR
 .ad
 .RS 17n
-.rt  
 Can be one of:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFALSE\fR\fR
 .ad
 .RS 9n
-.rt  
 Normal request.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTRUE\fR\fR
 .ad
 .RS 9n
-.rt  
 Request is urgent. The script should check whether the resource can be released
 successfully by force, such as by using the force option to unmount a file
 system.
@@ -546,12 +520,10 @@ system.
 
 .sp
 .ne 2
-.mk
 .na
 \fBReturn Data:\fR
 .ad
 .RS 16n
-.rt  
 If the command succeeds, the script must return no data and exit with status 0.
 .sp
 If the script would not be able to release the resource, it must specify the
@@ -576,32 +548,26 @@ application.
 Additional environment parameter:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRCM_ENV_FORCE\fR\fR
 .ad
 .RS 17n
-.rt  
 Can be one of:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFALSE\fR\fR
 .ad
 .RS 9n
-.rt  
 Normal request.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTRUE\fR\fR
 .ad
 .RS 9n
-.rt  
 Request is urgent. The script should make extra effort to release the resource,
 such as by using the force option to unmount a file system.
 .RE
@@ -610,12 +576,10 @@ such as by using the force option to unmount a file system.
 
 .sp
 .ne 2
-.mk
 .na
 \fBReturn Data:\fR
 .ad
 .RS 16n
-.rt  
 If the command succeeds, the script must return no data and exit with status 0.
 .sp
 If the script cannot release the resource, it must specify the reason using the
@@ -632,12 +596,10 @@ The \fBpostremove\fR command is invoked after the given \fIresourcename\fR has
 been removed.
 .sp
 .ne 2
-.mk
 .na
 \fBReturn Data:\fR
 .ad
 .RS 16n
-.rt  
 If the command succeeds, the script must return no data and exit with status 0.
 .sp
 Upon failure, the script must specify the failure reason using the name-value
@@ -655,12 +617,10 @@ the state of the resource to the same state it was in when the script received
 the \fBpreremove\fR command for that resource.
 .sp
 .ne 2
-.mk
 .na
 \fBReturn Data:\fR
 .ad
 .RS 16n
-.rt  
 If the command succeeds, the script must return no data and exit with status 0.
 .sp
 Upon failure, the script must specify the failure reason using the name-value
@@ -675,45 +635,37 @@ name-value pairs listed below. The logged messages go to \fBsyslogd\fR(1M) with
 the \fBsyslog\fR facility of \fBLOG_DAEMON\fR. See \fBsyslog.conf\fR(4).
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrcm_log_err=\fR\fImessage\fR\fR
 .ad
 .RS 25n
-.rt  
 Logs the \fImessage\fR with the syslog level of \fBLOG_ERR\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrcm_log_warn=\fR\fImessage\fR\fR
 .ad
 .RS 25n
-.rt  
 Logs the \fImessage\fR with the syslog level of \fBLOG_WARNING\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrcm_log_info=\fR\fImessage\fR\fR
 .ad
 .RS 25n
-.rt  
 Logs the \fImessage\fR with the syslog level of \fBLOG_INFO\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrcm_log_debug=\fR\fImessage\fR\fR
 .ad
 .RS 25n
-.rt  
 Logs the \fImessage\fR with the syslog level of \fBLOG_DEBUG\fR.
 .RE
 
@@ -748,7 +700,6 @@ You must be a superuser (root) to install or remove an RCM script.
 Select one of the following directories where you want to place the script:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/rcm/scripts\fR\fR
 .ad
@@ -759,7 +710,6 @@ Scripts for specific systems
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/platform/`uname -i`/lib/rcm/scripts\fR\fR
 .ad
@@ -770,7 +720,6 @@ Scripts for specific hardware implementation
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/platform/`uname -m`/lib/rcm/scripts\fR\fR
 .ad
@@ -781,7 +730,6 @@ Scripts for specific hardware class
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/rcm/scripts\fR\fR
 .ad
@@ -837,16 +785,16 @@ Remove the script from the appropriate directory from the list above and send
 #   - if the tape drive is not being used for backup, it allows the
 #     DR to continue.
 #   - if the tape drive is being used for backup, and when DR is not
-#     forced (RCM_ENV_FORCE=FALSE) it indicates that it cannot release 
+#     forced (RCM_ENV_FORCE=FALSE) it indicates that it cannot release
 #     the tape drive with appropriate error message. When forced
 #     (RCM_ENV_FORCE=TRUE) it kills the tape backup application in
 #     order to allow the DR to continue.
 #
 # This script does not implement the postremove and undoremove commands
-# since there is nothing to cleanup after DR remove operation is 
-# completed or failed. If any cleanup is needed after the DR removal 
-# completed, postremove command needs to implemented. If any cleanup is 
-# needed in the event of DR removal failure, undoremove command needs  
+# since there is nothing to cleanup after DR remove operation is
+# completed or failed. If any cleanup is needed after the DR removal
+# completed, postremove command needs to implemented. If any cleanup is
+# needed in the event of DR removal failure, undoremove command needs
 # to be implemented.
 #
 
@@ -862,7 +810,7 @@ $cmd = shift(@ARGV);
     "register"      =>      \&do_register,
     "resourceinfo"  =>      \&do_resourceinfo,
     "queryremove"   =>      \&do_preremove,
-    "preremove"     =>      \&do_preremove   
+    "preremove"     =>      \&do_preremove
 );
 
 if (defined($dispatch{$cmd})) {
@@ -957,12 +905,10 @@ sub do_preremove
 A script must exit with following exit status values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Operation specified by the given RCM command has been executed successfully by
 the script. For \fBqueryremove\fR command it also means that the script can
 successfully release the resource.
@@ -970,12 +916,10 @@ successfully release the resource.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 An error occurred while processing the RCM command. The script should provide
 the error message to RCM using the name-value pair \fBrcm_failure_reason\fR
 before exiting.
@@ -983,24 +927,20 @@ before exiting.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 The script does not support the given RCM command. A script must exit with this
 status if it cannot understand the given RCM command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 5n
-.rt  
 Indicates that the script cannot release the resource for \fBpreremove\fR and
 \fBqueryremove\fR commands. The script should provide a message to RCM
 specifying the reason for not being able to release the resource using the
@@ -1034,13 +974,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

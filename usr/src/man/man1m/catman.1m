@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH catman 1M "27 Feb 1998" "SunOS 5.11" "System Administration Commands"
+.TH CATMAN 1M "Feb 27, 1998"
 .SH NAME
 catman \- create the formatted files for the reference manual
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/catman\fR [\fB-c\fR] [\fB-n\fR] [\fB-p\fR] [\fB-t\fR] [\fB-w\fR] [\fB-M\fR \fIdirectory\fR] 
+\fB/usr/bin/catman\fR [\fB-c\fR] [\fB-n\fR] [\fB-p\fR] [\fB-t\fR] [\fB-w\fR] [\fB-M\fR \fIdirectory\fR]
      [\fB-T\fR \fImacro-package\fR] [\fIsections\fR]
 .fi
 
@@ -60,12 +60,10 @@ file to be sourced.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 20n
-.rt  
 Create unformatted nroff source files in the appropriate \fBman\fR
 subdirectories from the  \fBSGML\fR sources. This option will overwrite any
 existing file in the \fBman\fR directory of the same name as the  \fBSGML\fR
@@ -74,12 +72,10 @@ file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 20n
-.rt  
 Do not create (or recreate) the \fBwindex\fR database. If the \fB-n\fR option
 is specified, the \fBwindex\fR database is not created and the \fBapropos\fR,
 \fBwhatis\fR, \fBman\fR \fB-f\fR, and \fBman\fR \fB-k\fR commands will fail.
@@ -87,47 +83,39 @@ is specified, the \fBwindex\fR database is not created and the \fBapropos\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 20n
-.rt  
 Print what would be done instead of doing it.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 20n
-.rt  
 Create \fBtroff\fRed entries in the appropriate \fBfmt\fR subdirectories
 instead of \fBnroff\fRing into the \fBcat\fR subdirectories.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR\fR
 .ad
 .RS 20n
-.rt  
 Only create the \fBwindex\fR database that is used by \fBwhatis\fR(1) and the
 \fBman\fR(1) \fB-f\fR and \fB-k\fR options.  No manual reformatting is done.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR\fI directory\fR\fR
 .ad
 .RS 20n
-.rt  
 Update manual pages located in the specified \fIdirectory\fR,
 (\fB/usr/share/man\fR by default). If the  \fB-M\fR option is specified, the
 directory argument must not contain a `,' (comma), since a comma is used to
@@ -136,12 +124,10 @@ delineate section numbers. See \fBman\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR\fI macro-package\fR\fR
 .ad
 .RS 20n
-.rt  
 Use \fImacro-package\fR in place of the standard manual page macros, (
 \fBman\fR(5) by default).
 .RE
@@ -152,12 +138,10 @@ Use \fImacro-package\fR in place of the standard manual page macros, (
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsections\fR\fR
 .ad
 .RS 12n
-.rt  
 If there is one parameter not starting with a `\fB\(mi\fR\&', it is taken to be
 a space separated list of manual sections to be processed by \fBcatman\fR. If
 this operand is specified, only the manual sections in the list will be
@@ -178,24 +162,20 @@ the environment variable \fBMANPATH\fR are processed.
 .SH ENVIRONMENT VARIABLES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTROFF\fR\fR
 .ad
 .RS 11n
-.rt  
 The name of the formatter to use when the \fB-t\fR flag is given. If not set,
 \fBtroff\fR(1) is used.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMANPATH\fR\fR
 .ad
 .RS 11n
-.rt  
 A colon-separated list of directories that are processed by \fBcatman\fR and
 \fBman\fR(1). Each directory can be followed by a comma-separated list of
 sections. If set, its value overrides \fB/usr/share/man\fR as the default
@@ -206,89 +186,73 @@ path. The \fB-M\fR and \fB-s\fR flags, in turn, override these values.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/man\fR\fR
 .ad
 .RS 28n
-.rt  
 default manual directory location
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/man/man*/*.*\fR\fR
 .ad
 .RS 28n
-.rt  
 raw nroff input files
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/man/sman*/*.*\fR\fR
 .ad
 .RS 28n
-.rt  
 raw  \fBSGML\fR input files
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/man/cat*/*.*\fR\fR
 .ad
 .RS 28n
-.rt  
 preformatted \fBnroff\fRed manual pages
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/man/fmt*/*.*\fR\fR
 .ad
 .RS 28n
-.rt  
 preformatted \fBtroff\fRed manual pages
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/man/windex\fR\fR
 .ad
 .RS 28n
-.rt  
 table of contents and keyword database
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/makewhatis\fR\fR
 .ad
 .RS 28n
-.rt  
 command script to make  \fBwindex\fR database
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/tmac/an\fR\fR
 .ad
 .RS 28n
-.rt  
 default macro package
 .RE
 
@@ -300,13 +264,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 .TE
 
 .SH SEE ALSO
@@ -318,7 +281,6 @@ CSIEnabled
 .SH DIAGNOSTICS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBman?/xxx.? (.so'ed from man?/yyy.?): No such file or directory\fR\fR
 .ad
@@ -330,7 +292,6 @@ inside them.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtarget of .so in man?/xxx.? must be relative to /usr/man\fR\fR
 .ad
@@ -342,7 +303,6 @@ directory \fB/usr/man\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBopendir:man?:\fR \fBNo\fR \fBsuch\fR \fBfile\fR \fBor\fR
 \fBdirectory\fR\fR
@@ -355,7 +315,6 @@ normally looks for is missing.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB*.*:\fR \fBNo\fR \fBsuch\fR \fBfile\fR \fBor\fR \fBdirectory\fR\fR
 .ad
@@ -406,7 +365,7 @@ An example of proper coding of these lines is:
 .sp
 .in +2
 .nf
-\&.TH nismatch 1M "10 Apr 1998"
+\&.TH NISMATCH 1M "Apr "10, 1998""
 \&.SH NAME
 nismatch, nisgrep \e- utilities for searching NIS+ tables
 .fi

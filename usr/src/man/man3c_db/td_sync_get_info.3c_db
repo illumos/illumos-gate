@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH td_sync_get_info 3C_DB "5 Jun 2007" "SunOS 5.11" "Threads Debugging Library Functions"
+.TH TD_SYNC_GET_INFO 3C_DB "Jun 5, 2007"
 .SH NAME
 td_sync_get_info, td_ta_sync_tracking_enable, td_sync_get_stats,
 td_sync_setstate, td_sync_waiters \- operations on a synchronization object in
@@ -81,12 +81,10 @@ identified by  \fBsh_p\fR. The \fBtd_syncinfo_t\fR structure contains the
 following fields:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtd_thragent_t *\fR\fIsi_ta_p\fR\fR
 .ad
 .RS 29n
-.rt  
 The internal process handle identifying the target process through which this
 synchronization object handle was obtained.  Synchronization objects may be
 process-private or process-shared. In the latter case, the same synchronization
@@ -96,151 +94,125 @@ synchronization object.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpsaddr_t\fR \fIsi_sv_addr\fR\fR
 .ad
 .RS 29n
-.rt  
 The address of the synchronization object in this target process's address
 space.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtd_sync_type_e\fR \fIsi_type\fR\fR
 .ad
 .RS 29n
-.rt  
 The type of the synchronization variable: mutex, condition variable, semaphore,
 or readers-writer lock.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBint\fR \fIsi_shared_type\fR\fR
 .ad
 .RS 29n
-.rt  
 If \fIsi_shared_type\fR is non-zero, this synchronization object is
 process-shared, otherwise it is process-private.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtd_sync_flags_t\fR \fIsi_flags\fR\fR
 .ad
 .RS 29n
-.rt  
 Flags dependent on the type of the synchronization object.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBint\fR \fIsi_state.sema_count\fR\fR
 .ad
 .RS 29n
-.rt  
 Semaphores only.  The current value of the semaphore
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBint\fR \fIsi_state.nreaders\fR\fR
 .ad
 .RS 29n
-.rt  
 Readers-writer locks only. The number of readers currently holding the lock, or
 \fB-1\fR, if a writer is currently holding the lock.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBint\fR \fIsi_state.mutex_locked\fR\fR
 .ad
 .RS 29n
-.rt  
 For mutexes only. Non-zero if and only if the mutex is currently locked.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBint\fR \fIsi_size\fR\fR
 .ad
 .RS 29n
-.rt  
 The size of the synchronization object.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuint8_t\fR \fIsi_has_waiters\fR\fR
 .ad
 .RS 29n
-.rt  
 Non-zero if and only if at least one thread is blocked on this synchronization
 object.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuint8_t\fR \fIsi_is_wlocked\fR\fR
 .ad
 .RS 29n
-.rt  
 For reader-writer locks only. The value is non-zero if and only if this lock is
 held by a writer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuint8_t\fR \fIsi_rcount\fR\fR
 .ad
 .RS 29n
-.rt  
 \fBPTHREAD_MUTEX_RECURSIVE\fR mutexes only. If the mutex is held, the recursion
 count.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuint8_t\fR \fIsi_prioceiling\fR\fR
 .ad
 .RS 29n
-.rt  
 \fBPTHREAD_PRIO_PROTECT\fR protocol mutexes only. The priority ceiling.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtd_thrhandle_t\fR \fIsi_owner\fR\fR
 .ad
 .RS 29n
-.rt  
 Mutexes and readers-writer locks only. This is the thread holding the mutex, or
 the write lock, if this is a reader-writer lock. The value is    \fINULL\fR if
 no one holds the mutex or write-lock.
@@ -248,12 +220,10 @@ no one holds the mutex or write-lock.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpid_t\fR \fIsi_ownerpid\fR\fR
 .ad
 .RS 29n
-.rt  
 Mutexes only.  For a locked process-shared mutex, this is the process-ID of the
 process containing the owning thread.
 .RE
@@ -293,45 +263,37 @@ is terminated early. See \fBtd_ta_thr_iter\fR(3C_DB).
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_OK\fR \fR
 .ad
 .RS 13n
-.rt  
 The call returned successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_BADTH\fR \fR
 .ad
 .RS 13n
-.rt  
 An invalid thread handle was passed in.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_DBERR\fR \fR
 .ad
 .RS 13n
-.rt  
 A call to one of the imported interface routines failed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_ERR\fR \fR
 .ad
 .RS 13n
-.rt  
 A libc_db-internal error occurred.
 .RE
 
@@ -343,13 +305,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

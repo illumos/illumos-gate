@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sdp_parse 3COMMPUTIL "12 Oct 2007" "SunOS 5.11" "Communication Protocol Parser Utilities Library Functions"
+.TH SDP_PARSE 3COMMPUTIL "Oct 12, 2007"
 .SH NAME
 sdp_parse \- parse the SDP description
 .SH SYNOPSIS
@@ -38,27 +38,25 @@ cannot be \fINULL\fR and can take any of the following values:
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBSDP_VERSION_ERROR\fR0x00000001
-\fBSDP_ORIGIN_ERROR\fR0x00000002
-\fBSDP_NAME_ERROR\fR0x00000004
-\fBSDP_INFO_ERROR\fR0x00000008
-\fBSDP_URI_ERROR\fR0x00000010
-\fBSDP_EMAIL_ERROR\fR0x00000020
-\fBSDP_PHONE_ERROR\fR0x00000040
-\fBSDP_CONNECTION_ERROR\fR0x00000080
-\fBSDP_BANDWIDTH_ERROR\fR0x00000100
-\fBSDP_TIME_ERROR\fR0x00000200
-\fBSDP_REPEAT_TIME_ERROR\fR0x00000400
-\fBSDP_ZONE_ERROR\fR0x00000800
-\fBSDP_KEY_ERROR\fR0x00001000
-\fBSDP_ATTRIBUTE_ERROR\fR0x00002000
-\fBSDP_MEDIA_ERROR\fR0x00004000
-\fBSDP_FIELDS_ORDER_ERROR\fR0x00008000
-\fBSDP_MISSING_FIELDS\fR0x00010000
+l l
+l l .
+\fBSDP_VERSION_ERROR\fR	0x00000001
+\fBSDP_ORIGIN_ERROR\fR	0x00000002
+\fBSDP_NAME_ERROR\fR	0x00000004
+\fBSDP_INFO_ERROR\fR	0x00000008
+\fBSDP_URI_ERROR\fR	0x00000010
+\fBSDP_EMAIL_ERROR\fR	0x00000020
+\fBSDP_PHONE_ERROR\fR	0x00000040
+\fBSDP_CONNECTION_ERROR\fR	0x00000080
+\fBSDP_BANDWIDTH_ERROR\fR	0x00000100
+\fBSDP_TIME_ERROR\fR	0x00000200
+\fBSDP_REPEAT_TIME_ERROR\fR	0x00000400
+\fBSDP_ZONE_ERROR\fR	0x00000800
+\fBSDP_KEY_ERROR\fR	0x00001000
+\fBSDP_ATTRIBUTE_ERROR\fR	0x00002000
+\fBSDP_MEDIA_ERROR\fR	0x00004000
+\fBSDP_FIELDS_ORDER_ERROR\fR	0x00008000
+\fBSDP_MISSING_FIELDS\fR	0x00010000
 .TE
 
 .sp
@@ -316,23 +314,19 @@ event of an error.
 The \fBsdp_parse()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 Arguments to the function were invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 Memory allocation failed while parsing \fIsdp_info\fR.
 .RE
 
@@ -414,15 +408,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

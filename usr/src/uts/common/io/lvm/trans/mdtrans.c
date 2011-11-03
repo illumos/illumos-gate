@@ -22,6 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -57,7 +58,6 @@
 
 md_ops_t		trans_md_ops;
 #ifndef	lint
-char			_depends_on[] = "drv/md fs/ufs";
 md_ops_t		*md_interface_ops = &trans_md_ops;
 #endif	/* lint */
 

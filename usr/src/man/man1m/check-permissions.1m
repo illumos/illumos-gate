@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH check-permissions 1M "10 Nov 2003" "SunOS 5.11" "System Administration Commands"
+.TH CHECK-PERMISSIONS 1M "Nov 10, 2003"
 .SH NAME
 check-permissions \- check permissions on mail rerouting files
 .SH SYNOPSIS
@@ -41,47 +41,39 @@ time-consuming.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlogin\fR\fR
 .ad
 .RS 9n
-.rt  
 Where \fIlogin\fR is a valid user name, checks the home directory for
 \fIlogin\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBALL\fR\fR
 .ad
 .RS 9n
-.rt  
 Checks the home directory of  \fBall\fR users.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/mail/sendmail.cf\fR\fR
 .ad
 .RS 25n
-.rt  
 Defines environment for  \fBsendmail\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/mail/aliases\fR\fR
 .ad
 .RS 25n
-.rt  
 Ascii mail aliases file
 .RE
 
@@ -93,13 +85,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

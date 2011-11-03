@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mioc2ack 9F "9 June 2004" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH MIOC2ACK 9F "Jun 9, 2004"
 .SH NAME
 mioc2ack \- Convert an M_IOCTL message to an M_IOCACK message
 .SH SYNOPSIS
@@ -24,45 +24,37 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fImp\fR\fR
 .ad
 .RS 9n
-.rt  
 M_IOCTL message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdp\fR\fR
 .ad
 .RS 9n
-.rt  
 Payload to associate with M_IOCACK message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcount\fR\fR
 .ad
 .RS 9n
-.rt  
 Value to set the ioc_count of the \fBiocblk\fR(9S) to.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrval\fR\fR
 .ad
 .RS 9n
-.rt  
 Value to set the ioc_rval of the  \fBiocblk\fR(9S) to.
 .RE
 

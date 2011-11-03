@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH refer 1 "14 Sep 1992" "SunOS 5.11" "User Commands"
+.TH REFER 1 "Sep 14, 1992"
 .SH NAME
 refer \- expand and insert references from a bibliographic database
 .SH SYNOPSIS
 .LP
 .nf
-\fBrefer\fR [\fB-ben\fR] [\fB-a\fR\fIr\fR] [\fB-c\fR\fIstring\fR] [\fB-k\fR\fIx\fR] [\fB-l\fR\fIm,n\fR] [\fB-p\fR \fIfilename\fR] 
+\fBrefer\fR [\fB-ben\fR] [\fB-a\fR\fIr\fR] [\fB-c\fR\fIstring\fR] [\fB-k\fR\fIx\fR] [\fB-l\fR\fIm,n\fR] [\fB-p\fR \fIfilename\fR]
      [\fB-s\fR\fIkeys\fR] \fIfilename\fR...
 .fi
 
@@ -34,23 +34,19 @@ data passed through pipes.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
 .RS 15n
-.rt  
 Bare mode \(em do not put any flags in text (neither numbers or labels).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 15n
-.rt  
 Accumulate references instead of leaving the references where encountered,
 until a sequence of the form:
 .sp
@@ -69,58 +65,48 @@ references to the same source.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 15n
-.rt  
 Do not search the default file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fIr\fR\fR
 .ad
 .RS 15n
-.rt  
 Reverse the first \fIr\fR author names (Jones, J. A. instead of J. A. Jones).
 If \fIr\fR is omitted, all author names are reversed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fIstring\fR\fR
 .ad
 .RS 15n
-.rt  
 Capitalize (with SMALL CAPS) the fields whose key-letters are in \fIstring\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR\fIx\fR\fR
 .ad
 .RS 15n
-.rt  
 Instead of numbering references, use labels as specified in a reference data
 line beginning with the characters \fI%x\fR; By default, \fIx\fR is \fBL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fIm,n\fR\fR
 .ad
 .RS 15n
-.rt  
 Instead of numbering references, use labels from the senior author's last name
 and the year of publication.  Only the first \fIm\fR letters of the last name
 and the last \fIn\fR digits of the date are used.  If either of \fIm\fR or
@@ -129,24 +115,20 @@ and the last \fIn\fR digits of the date are used.  If either of \fIm\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fI filename\fR\fR
 .ad
 .RS 15n
-.rt  
 Take the next argument as a file of references to be searched.  The default
 file is searched last.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fIkeys\fR\fR
 .ad
 .RS 15n
-.rt  
 Sort references by fields whose key-letters are in the \fIkeys\fR string, and
 permute reference numbers in the text accordingly. Using this option implies
 the \fB-e\fR option. The key-letters in \fIkeys\fR may be followed by a number
@@ -159,23 +141,19 @@ the options `\fB-sA+T\fR'.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/refer\fR\fR
 .ad
 .RS 25n
-.rt  
 directory of programs
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/refer/papers\fR\fR
 .ad
 .RS 25n
-.rt  
 directory of default publication lists and indexes
 .RE
 

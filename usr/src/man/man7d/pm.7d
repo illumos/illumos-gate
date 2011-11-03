@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pm 7D "20 Sep 1999" "SunOS 5.11" "Devices"
+.TH PM 7D "Sep 20, 1999"
 .SH NAME
 pm \- Power Management driver
 .SH SYNOPSIS
 .LP
 .nf
-\fB/dev/pm\fR 
+\fB/dev/pm\fR
 .fi
 
 .SH DESCRIPTION
@@ -65,12 +65,10 @@ typedef struct pm_req {
 The fields should contain the following data:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIphyspath\fR\fR
 .ad
 .RS 13n
-.rt  
 Pointer to the physical path of a device. See \fBlibdevinfo\fR(3LIB). For
 example, for the device \fB/devices/pseudo/pm@0:pm\fR the \fIphyspath\fR value
 would be \fB/pseudo/pm@0\fR.
@@ -78,48 +76,40 @@ would be \fB/pseudo/pm@0\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcomponent\fR\fR
 .ad
 .RS 13n
-.rt  
 Non-negative integer specifying which component is being configured. The
 numbering starts at zero.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvalue\fR\fR
 .ad
 .RS 13n
-.rt  
 Non-negative integer specifying the threshold value in seconds or the desired
 power level, or the number of levels being specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdata\fR\fR
 .ad
 .RS 13n
-.rt  
 Pointer to a buffer which contains or receives variable-sized data, such as the
 name of a device upon which this device has a dependency.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsize\fR\fR
 .ad
 .RS 13n
-.rt  
 Size of the data buffer.
 .RE
 
@@ -128,7 +118,6 @@ Size of the data buffer.
 Not all fields are used in each command.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPM_DIRECT_PM\fR\fR
 .ad
@@ -149,23 +138,19 @@ and the caller will be notified as described below for the
 Error codes:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBUSY\fR\fR
 .ad
 .RS 9n
-.rt  
 Device already disabled for Power Management by framework.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 9n
-.rt  
 Caller is neither superuser nor effective group ID of 0.
 .RE
 
@@ -173,7 +158,6 @@ Caller is neither superuser nor effective group ID of 0.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPM_RELEASE_DIRECT_PM\fR\fR
 .ad
@@ -186,12 +170,10 @@ framework.
 Error codes:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 Device component out of range.
 .RE
 
@@ -199,7 +181,6 @@ Device component out of range.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPM_DIRECT_NOTIFY \fR\fBPM_DIRECT_NOTIFY_WAIT\fR\fR
 .ad
@@ -218,7 +199,7 @@ typedef struct  pm_state_change {
    char   *physpath;    /* device which has changed state */
    int     component;   /* which component changed state */
 #if defined(_BIG_ENDIAN)
-	ushort_t flags;      /* PSC_EVENT_LOST, PSC_ALL_LOWEST */   
+	ushort_t flags;      /* PSC_EVENT_LOST, PSC_ALL_LOWEST */
 	ushort_t event;      /* type of event */
 #else
 	ushort_t event;      /* type of event *
@@ -257,7 +238,6 @@ has \fBPOLLIN \fR or \fBPOLLRDNORM \fR set in its event mask will return.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPM_SET_CURRENT_POWER\fR\fR
 .ad
@@ -277,23 +257,19 @@ included in the event list for PM_DIRECT_NOTIFY.
 Error codes:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 Device component out of range, or power level < 0.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 10n
-.rt  
 Failed to power device or its ancestors or the devices on which this device has
 dependency or their ancestors. Note that this may not indicate a failure, the
 device driver may have rejected the command as inappropriate because the
@@ -302,12 +278,10 @@ component has become busy.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 10n
-.rt  
 Caller has not previously issued a successful \fBPM_DIRECT_PM\fR command
 against this device.
 .RE
@@ -316,7 +290,6 @@ against this device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPM_GET_FULL_POWER\fR\fR
 .ad
@@ -328,7 +301,6 @@ named by \fIphyspath\fR is returned.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPM_GET_CURRENT_POWER\fR\fR
 .ad
@@ -340,12 +312,10 @@ The current power level of component \fIcomponent\fR of the device named by
 Error codes:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 10n
-.rt  
 Device component power level is not currently known.
 .RE
 
@@ -353,7 +323,6 @@ Device component power level is not currently known.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPM_GET_TIME_IDLE\fR\fR
 .ad
@@ -381,34 +350,28 @@ addition to the error codes listed above by command, the following error codes
 are common to all commands:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
  Bad address passed in as argument.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENODEV\fR\fR
 .ad
 .RS 10n
-.rt  
  Device is not power manageable, or device is not configured.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENXIO\fR\fR
 .ad
 .RS 10n
-.rt  
  Too many opens attempted.
 .RE
 
@@ -420,13 +383,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface stabilityUnstable
+Interface stability	Unstable
 .TE
 
 .SH SEE ALSO

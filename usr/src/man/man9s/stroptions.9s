@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH stroptions 9S "14 Nov 1996" "SunOS 5.11" "Data Structures for Drivers"
+.TH STROPTIONS 9S "Nov 14, 1996"
 .SH NAME
 stroptions \- options structure for M_SETOPTS message
 .SH SYNOPSIS
@@ -47,177 +47,145 @@ The following are the flags that can be set in the \fBso_flags\fR bit mask in
 the \fBstroptions\fR structure.  Note that multiple flags can be set.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_READOPT\fR\fR
 .ad
 .RS 21n
-.rt  
 Set read option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_WROFF\fR\fR
 .ad
 .RS 21n
-.rt  
 Set write offset.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_MINPSZ\fR\fR
 .ad
 .RS 21n
-.rt  
 Set minimum packet size
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_MAXPSZ\fR\fR
 .ad
 .RS 21n
-.rt  
 Set maximum packet size.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_HIWAT\fR\fR
 .ad
 .RS 21n
-.rt  
 Set high water mark.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_LOWAT\fR\fR
 .ad
 .RS 21n
-.rt  
 Set low water mark.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_MREADON\fR\fR
 .ad
 .RS 21n
-.rt  
 Set read notification ON.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_MREADOFF\fR\fR
 .ad
 .RS 21n
-.rt  
 Set read notification OFF.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_NDELON\fR\fR
 .ad
 .RS 21n
-.rt  
 Old TTY semantics for NDELAY reads and writes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_NDELOFFSTREAMS\fR\fR
 .ad
 .RS 21n
-.rt  
 Semantics for NDELAY reads and writes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_ISTTY\fR\fR
 .ad
 .RS 21n
-.rt  
 The stream is acting as a terminal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_ISNTTY\fR\fR
 .ad
 .RS 21n
-.rt  
 The stream is not acting as a terminal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_TOSTOP\fR\fR
 .ad
 .RS 21n
-.rt  
 Stop on background writes to this stream.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_TONSTOP\fR\fR
 .ad
 .RS 21n
-.rt  
 Do not stop on background writes to this stream.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_BAND\fR\fR
 .ad
 .RS 21n
-.rt  
 Water marks affect band.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_ERROPT\fR\fR
 .ad
 .RS 21n
-.rt  
 Set error option.
 .RE
 
@@ -228,34 +196,28 @@ When \fBSO_READOPT\fR is set, the \fBso_readopt\fR field of the
 \fBread\fR(2).
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRNORM\fR\fR
 .ad
 .RS 9n
-.rt  
 Read message normal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRMSGD\fR\fR
 .ad
 .RS 9n
-.rt  
 Read message discard.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRMSGN\fR\fR
 .ad
 .RS 9n
-.rt  
 Read message, no discard.
 .RE
 
@@ -269,23 +231,19 @@ When \fBSO_ERROPT\fR is set, the \fBso_erropt\fR field of the \fBstroptions\fR
 structure can take a value that is either none or one of:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRERRNORM\fR\fR
 .ad
 .RS 18n
-.rt  
 Persistent read errors; default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRERRNONPERSIST\fR\fR
 .ad
 .RS 18n
-.rt  
 Non-persistent read errors.
 .RE
 
@@ -294,23 +252,19 @@ Non-persistent read errors.
 \fBOR'ed \fRwith either none or one of:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWERRNORM\fR\fR
 .ad
 .RS 18n
-.rt  
 Persistent write errors; default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWERRNONPERSIST\fR\fR
 .ad
 .RS 18n
-.rt  
 Non-persistent write errors.
 .RE
 

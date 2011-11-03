@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH set 1 "20 Nov 2007" "SunOS 5.11" "User Commands"
+.TH SET 1 "Nov 20, 2007"
 .SH NAME
 set, unset, setenv, unsetenv, export \- shell built-in functions to determine
 the characteristics for environmental variables of the current shell and its
@@ -56,7 +56,7 @@ descendents
 .SS "ksh"
 .LP
 .nf
-\fBset\fR [\(+-abCefhkmnopstuvx] [\(+-o \fIoption\fR]... [\(+-A \fIname\fR] 
+\fBset\fR [\(+-abCefhkmnopstuvx] [\(+-o \fIoption\fR]... [\(+-A \fIname\fR]
      [\fIarg\fR]...
 .fi
 
@@ -78,7 +78,7 @@ descendents
 .SS "ksh93"
 .LP
 .nf
-\fB+set\fR [\(+-abCefGhkmnoprstuvx] [\(+-o \fIoption\fR]... [\(+-A \fIvname\fR] 
+\fB+set\fR [\(+-abCefGhkmnoprstuvx] [\(+-o \fIoption\fR]... [\(+-A \fIvname\fR]
      [\fIarg\fR]...
 .fi
 
@@ -99,125 +99,103 @@ descendents
 The \fBset\fR built-in command has the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--\fR\fR
 .ad
 .RS 6n
-.rt  
 Does not change any of the flags. This option is useful in setting \fB$1\fR to
 \fB\(mi\fR\&.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 6n
-.rt  
 Marks variables which are modified or created for export.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 6n
-.rt  
 Exits immediately if a command exits with a non-zero exit status.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 Disables file name generation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 6n
-.rt  
 Locates and remembers function commands as functions are defined. Function
 commands are normally located when the function is executed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR\fR
 .ad
 .RS 6n
-.rt  
 All keyword arguments are placed in the environment for a command, not just
 those that precede the command name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 6n
-.rt  
 Reads commands but does not execute them.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 6n
-.rt  
 Exits after reading and executing one command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
 .RS 6n
-.rt  
 Treats unset variables as an error when substituting.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 Prints shell input lines as they are read.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 6n
-.rt  
 Prints commands and their arguments as they are executed.
 .RE
 
@@ -251,23 +229,19 @@ argument alone, \fBset\fR assigns an empty (null) value to the variable
 assigns \fIvalue\fR to \fIvar\fR, where \fIvalue\fR is one of:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIword\fR\fR
 .ad
 .RS 14n
-.rt  
 A single word (or quoted string).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB(\fR\fIwordlist\fR\fB)\fR\fR
 .ad
 .RS 14n
-.rt  
 A space-separated list of words enclosed in parentheses.
 .RE
 
@@ -311,12 +285,10 @@ environment variables.
 The flags for the \fBset\fR built-in have meaning as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR\fR
 .ad
 .RS 13n
-.rt  
 Array assignment. Unsets the variable \fIname\fR and assigns values
 sequentially from the list \fIarg\fR. If \fB+A\fR is used, the variable
 \fIname\fR is not unset first.
@@ -324,35 +296,29 @@ sequentially from the list \fIarg\fR. If \fB+A\fR is used, the variable
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 13n
-.rt  
 All subsequent variables that are defined are automatically exported.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
 .RS 13n
-.rt  
 Causes the shell to notify the user asynchronously of background job
 completions.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
 .RS 13n
-.rt  
 Prevents existing files from being overwritten by the shell's \fB>\fR
 redirection operator. The \fB>|\fR redirection operator overrides this
 noclobber option for an individual file.
@@ -360,58 +326,48 @@ noclobber option for an individual file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 13n
-.rt  
 If a command has a non-zero exit status, executes the \fBERR\fR trap, if set,
 and exits. This mode is disabled while reading profiles.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 13n
-.rt  
 Disables file name generation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 13n
-.rt  
 Each command becomes a tracked alias when first encountered.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR\fR
 .ad
 .RS 13n
-.rt  
 All variable assignment arguments are placed in the environment for a command,
 not just those that precede the command name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
 .RS 13n
-.rt  
 Background jobs run in a separate process group and a line prints upon
 completion. The exit status of background jobs is reported in a completion
 message. On systems with job control, this flag is turned on automatically for
@@ -420,24 +376,20 @@ interactive shells.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 13n
-.rt  
 Reads commands and checks them for syntax errors, but does not execute them.
 Ignored for interactive shells.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+o\fR\fR
 .ad
 .RS 13n
-.rt  
 Writes the current option stettings to standard output in a format that is
 suitable for reinput to the shell as commands that achieve the same option
 settings.
@@ -445,234 +397,192 @@ settings.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIoption\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fIoption\fR argument can be one of the following option names:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBallexport\fR\fR
 .ad
 .RS 14n
-.rt  
 Same as \fB-a\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBerrexit\fR\fR
 .ad
 .RS 14n
-.rt  
 Same as \fB-e\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbgnice\fR\fR
 .ad
 .RS 14n
-.rt  
 All background jobs are run at a lower priority. This is the default mode.
 \fBemacs\fR Puts you in an \fBemacs\fR style in-line editor for command entry.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgmacs\fR\fR
 .ad
 .RS 14n
-.rt  
 Puts you in a \fBgmacs\fR style in-line editor for command entry.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBignoreeof\fR\fR
 .ad
 .RS 14n
-.rt  
 The shell does not exit on end-of-file. The command \fBexit\fR must be used.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkeyword\fR\fR
 .ad
 .RS 14n
-.rt  
 Same as \fB-k\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmarkdirs\fR\fR
 .ad
 .RS 14n
-.rt  
 All directory names resulting from file name generation have a trailing \fB/\fR
 appended.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmonitor\fR\fR
 .ad
 .RS 14n
-.rt  
 Same as \fB-m\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoclobber\fR\fR
 .ad
 .RS 14n
-.rt  
 Prevents redirection operator \fB>\fR from truncating existing files. Requires
 the \fB>|\fR operator to truncate a file when turned on. Same as \fB-C\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoexec\fR\fR
 .ad
 .RS 14n
-.rt  
 Same as \fB-n\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoglob\fR\fR
 .ad
 .RS 14n
-.rt  
 Same as \fB-f\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnolog\fR\fR
 .ad
 .RS 14n
-.rt  
 Does not save function definitions in history file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnotify\fR\fR
 .ad
 .RS 14n
-.rt  
 Same as \fB-b\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnounset\fR\fR
 .ad
 .RS 14n
-.rt  
 Same as \fB-u\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprivileged\fR\fR
 .ad
 .RS 14n
-.rt  
 Same as \fB-p\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBverbose\fR\fR
 .ad
 .RS 14n
-.rt  
 Same as \fB-v\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtrackall\fR\fR
 .ad
 .RS 14n
-.rt  
 Same as \fB-h\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvi\fR\fR
 .ad
 .RS 14n
-.rt  
 Puts you in insert mode of a \fBvi\fR style in-line editor until you hit escape
 character \fB033\fR. This puts you in control mode. A return sends the line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBviraw\fR\fR
 .ad
 .RS 14n
-.rt  
 Each character is processed as it is typed in \fBvi\fR mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxtrace\fR\fR
 .ad
 .RS 14n
-.rt  
 Same as \fB-x\fR.
 .RE
 
@@ -683,12 +593,10 @@ Same as \fB-x\fR.
 If no option name is supplied then the current option settings are printed.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 8n
-.rt  
 Disables processing of the \fB$HOME/.profile\fR file and uses the file
 \fB/etc/suid_profile\fR instead of the \fBENV\fR file. This mode is on whenever
 the effective uid is not equal to the real uid, or when the effective gid is
@@ -698,78 +606,64 @@ be set to the real uid and gid.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 8n
-.rt  
 Sorts the positional parameters lexicographically.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 8n
-.rt  
 Exits after reading and executing one command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
 .RS 8n
-.rt  
 Treats unset parameters as an error when substituting.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 8n
-.rt  
 Prints shell input lines as they are read.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 8n
-.rt  
 Prints commands and their arguments as they are executed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi\fR\fR
 .ad
 .RS 8n
-.rt  
 Turns off \fB-x\fR and \fB-v\fR flags and stops examining arguments for flags.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-\fR\fR
 .ad
 .RS 8n
-.rt  
 Does not change any of the flags. This option is useful in setting \fB$1\fR to
 a value beginning with \fB\(mi\fR\&. If no arguments follow this flag then the
 positional parameters are unset.
@@ -902,71 +796,59 @@ any additional arguments are specified, they replace the positional parameters.
 The options for set in \fBksh93\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 15n
-.rt  
 Set the export attribute for each variable whose name does not contain a . that
 you assign a value in the current shell environment.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR \fIname\fR\fR
 .ad
 .RS 15n
-.rt  
 Assign the arguments sequentially to the array named by \fIname\fR starting at
 subscript \fB0\fR rather than to the positional parameters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
 .RS 15n
-.rt  
 The shell writes a message to standard error as soon it detects that a
 background job completes rather than waiting until the next prompt.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-B\fR\fR
 .ad
 .RS 15n
-.rt  
 Enable \fB{...}\fR group expansion. On by default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
 .RS 15n
-.rt  
 Prevents existing regular files from being overwritten using the > redirection
 operator. The \fB>|\fR redirection overrides this \fBnoclobber\fR option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 15n
-.rt  
 A simple command that has a \fBnon-zero\fR exit status causes the shell to exit
 unless the simple command is:
 .RS +4
@@ -991,58 +873,48 @@ contained in the pipeline following \fB!\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 15n
-.rt  
 Pathname expansion is disabled.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-G\fR\fR
 .ad
 .RS 15n
-.rt  
 Causes \fB**\fR by itself to also match all sub-directories during pathname
 expansion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 15n
-.rt  
 Obsolete. Causes each command whose name has the syntax of an alias to become a
 tracked alias when it is first encountered.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-H\fR\fR
 .ad
 .RS 15n
-.rt  
 Enable \fB!\fR-style history expansion similar to csh.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR\fR
 .ad
 .RS 15n
-.rt  
 This is obsolete. All arguments of the form \fIname\fR\fB=\fR\fIvalue\fR are
 removed and placed in the variable assignment list for the command. Ordinarily,
 variable assignments must precede command arguments.
@@ -1050,12 +922,10 @@ variable assignments must precede command arguments.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
 .RS 15n
-.rt  
 When enabled, the shell runs background jobs in a separate process group and
 displays a line upon completion. This mode is enabled by default for
 interactive shells on systems that support job control.
@@ -1063,24 +933,20 @@ interactive shells on systems that support job control.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 15n
-.rt  
 The shell reads commands and checks for syntax errors, but does not execute the
 command. Usually specified on command invocation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR [\fIoption\fR]\fR
 .ad
 .RS 15n
-.rt  
 If option is not specified, the list of options and their current settings is
 written to standard output. When invoked with a \fB+\fR the options are written
 in a format that can be input again to the shell to restore the settings. This
@@ -1089,223 +955,183 @@ option can be repeated to enable or disable multiple options.
 The value of \fIoption\fR must be one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBallexport\fR\fR
 .ad
 .RS 15n
-.rt  
 Same as \fB-a\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbgnice\fR\fR
 .ad
 .RS 15n
-.rt  
 All background jobs are run at lower priorities.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbraceexpand\fR\fR
 .ad
 .RS 15n
-.rt  
 Same as \fB-B\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBemacs\fR\fR
 .ad
 .RS 15n
-.rt  
 Enables or disables \fBemacs\fR editing mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBerrexit\fR\fR
 .ad
 .RS 15n
-.rt  
 Same as \fB-e\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBglobstar\fR\fR
 .ad
 .RS 15n
-.rt  
 Equivalent to \fB-\fRG.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgmacs\fR\fR
 .ad
 .RS 15n
-.rt  
 Enables or disables \fBgmacs\fR. \fBgmacs\fR editing mode is the same as
 \fBemacs\fR editing mode, except for the handling of CTRL-T.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhistexpand\fR\fR
 .ad
 .RS 15n
-.rt  
 Same as \fB-H\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBignoreeof\fR\fR
 .ad
 .RS 15n
-.rt  
 The interactive shell does not exit on end-of-file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkeyword\fR\fR
 .ad
 .RS 15n
-.rt  
 Same as \fB-k\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmarkdirs\fR\fR
 .ad
 .RS 15n
-.rt  
 All directory names resulting from file name generation have a trailing \fB/\fR
 appended.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmonitor\fR\fR
 .ad
 .RS 15n
-.rt  
 Same as \fB-m\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmultiline\fR\fR
 .ad
 .RS 15n
-.rt  
 Use multiple lines when editing lines that are longer than the window width.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoclobber\fR\fR
 .ad
 .RS 15n
-.rt  
 Same as \fB-C\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoexec\fR\fR
 .ad
 .RS 15n
-.rt  
 Same as \fB-n\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoglob\fR\fR
 .ad
 .RS 15n
-.rt  
 Same as \fB-f\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnolog\fR\fR
 .ad
 .RS 15n
-.rt  
 This has no effect. It is provided for backward compatibility.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnotify\fR\fR
 .ad
 .RS 15n
-.rt  
 Same as \fB-b\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnounset\fR\fR
 .ad
 .RS 15n
-.rt  
 Same as \fB-u\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpipefail\fR\fR
 .ad
 .RS 15n
-.rt  
 A pipeline does not complete until all components of the pipeline have
 completed, and the exit status of the pipeline is the value of the last command
 to exit with \fBnon-zero\fR exit status, or is \fBzero\fR if all commands
@@ -1314,79 +1140,65 @@ return zero exit status.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprivileged\fR\fR
 .ad
 .RS 15n
-.rt  
 Same as \fB-p\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshowme\fR\fR
 .ad
 .RS 15n
-.rt  
 Simple commands preceded by a ; are traced as if \fB-x\fR were enabled but not
 executed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtrackall\fR\fR
 .ad
 .RS 15n
-.rt  
 Same as \fB-h\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBverbose\fR\fR
 .ad
 .RS 15n
-.rt  
 Same as \fB-v\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvi\fR\fR
 .ad
 .RS 15n
-.rt  
 Enables or disables \fBvi\fR editing mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBviraw\fR\fR
 .ad
 .RS 15n
-.rt  
 Does not use canonical input mode when using vi edit mode
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxtrace\fR\fR
 .ad
 .RS 15n
-.rt  
 Same as \fB-x\fR.
 .RE
 
@@ -1394,12 +1206,10 @@ Same as \fB-x\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 15n
-.rt  
 Privileged mode. Disabling \fB-p\fR sets the effective user id to the real user
 id, and the effective group id to the real group id. Enabling \fB-p\fR restores
 the effective user and group ids to their values when the shell was invoked.
@@ -1410,68 +1220,56 @@ processed when \fB-p\fR is enabled.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 15n
-.rt  
 Restricted. Enables restricted shell. This option cannot be unset once enabled.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 15n
-.rt  
 Sort the positional parameters
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 15n
-.rt  
 Obsolete. The shell reads one command and then exits.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
 .RS 15n
-.rt  
 If enabled, the shell displays an error message when it tries to expand a
 variable that is unset.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 15n
-.rt  
 Verbose. The shell displays its input onto standard error as it reads it.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 15n
-.rt  
 Execution trace. The shell displays each command after all expansion and before
 execution preceded by the expanded value of the \fBPS4\fR parameter.
 .RE
@@ -1481,23 +1279,19 @@ execution preceded by the expanded value of the \fBPS4\fR parameter.
 The following exit values are returned by \fBset\fR in \fBksh93\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -1511,24 +1305,20 @@ variables cannot be unset.
 The options for \fBunset\fR in \fBksh93\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 Where \fIname\fR refers to a function name, the shell unsets the function
 definition.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 6n
-.rt  
 If \fIname\fR refers to variable that is a reference, the variable \fIname\fR
 is unset rather than the variable it references. Otherwise, this option is
 equivalent to the \fB-v\fR option.
@@ -1536,12 +1326,10 @@ equivalent to the \fB-v\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 Where \fIname\fR refers to a variable name, the shell unsets it and removes it
 from the environment. This is the default behavior.
 .RE
@@ -1551,23 +1339,19 @@ from the environment. This is the default behavior.
 The following exit values are returned by \fBunset\fR in \fBksh93\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion. All names were successfully unset.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred, or one or more \fIname\fR operands could not be unset
 .RE
 
@@ -1591,12 +1375,10 @@ expansion occurs on value.
 The options for \fBexport\fR in \fBksh93\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 6n
-.rt  
 Causes the output to be in the form of \fBexport\fR commands that can be used
 as input to the shell to recreate the current exports.
 .RE
@@ -1606,23 +1388,19 @@ as input to the shell to recreate the current exports.
 The following exit values are returned by \fBexport\fR in \fBksh93\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 

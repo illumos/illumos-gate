@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH priocntl 2 "11 May 2006" "SunOS 5.11" "System Calls"
+.TH PRIOCNTL 2 "May 11, 2006"
 .SH NAME
 priocntl \- process scheduler control
 .SH SYNOPSIS
@@ -60,24 +60,20 @@ of \fIidtype\fR. The possible values for \fIidtype\fR and corresponding
 interpretations of \fIid\fR are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBP_ALL\fR\fR
 .ad
 .RS 12n
-.rt  
 The \fBpriocntl()\fR function applies to all existing LWPs. The value of
 \fIid\fR is ignored. The permission restrictions described below still apply.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBP_CID\fR\fR
 .ad
 .RS 12n
-.rt  
 The \fIid\fR argument is a class ID (returned by the \fBpriocntl()\fR
 \fBPC_GETCID\fR command as explained below). The \fBpriocntl()\fR function
 applies to all LWPs in the specified class.
@@ -85,36 +81,30 @@ applies to all LWPs in the specified class.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBP_GID\fR\fR
 .ad
 .RS 12n
-.rt  
 The \fIid\fR argument is a group ID. The \fBpriocntl()\fR function applies to
 all LWPs with this effective group ID.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBP_LWPID\fR\fR
 .ad
 .RS 12n
-.rt  
 The \fIid\fR argument is an LWP ID. The \fIpriocntl\fR function applies to the
 LWP with the specified ID within the calling process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBP_PGID\fR\fR
 .ad
 .RS 12n
-.rt  
 The \fIid\fR argument is a process group ID. The \fBpriocntl()\fR function
 applies to all LWPs currently associated with processes in the specified
 process group.
@@ -122,12 +112,10 @@ process group.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBP_PID\fR\fR
 .ad
 .RS 12n
-.rt  
 The \fIid\fR argument is a process ID specifying a single process. The
 \fBpriocntl()\fR function applies to all LWPs currently associated with the
 specified process.
@@ -135,12 +123,10 @@ specified process.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBP_PPID\fR\fR
 .ad
 .RS 12n
-.rt  
 The \fIid\fR argument is a parent process ID. The \fBpriocntl()\fR function
 applies to all LWPs currently associated with processes with the specified
 parent process ID.
@@ -148,72 +134,60 @@ parent process ID.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBP_PROJID\fR\fR
 .ad
 .RS 12n
-.rt  
 The \fIid\fR argument is a project ID. The \fBpriocntl()\fR function applies to
 all LWPs with this project ID.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBP_SID\fR\fR
 .ad
 .RS 12n
-.rt  
 The \fIid\fR argument is a session ID. The \fBpriocntl()\fR function applies to
 all LWPs currently associated with processes in the specified session.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBP_TASKID\fR\fR
 .ad
 .RS 12n
-.rt  
 The \fIid\fR argument is a task ID. The \fBpriocntl()\fR function applies to
 all LWPs currently associated with processes in the specified task.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBP_UID\fR\fR
 .ad
 .RS 12n
-.rt  
 The \fIid\fR argument is a user ID. The \fBpriocntl()\fR function applies to
 all LWPs with this effective user ID.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBP_ZONEID\fR\fR
 .ad
 .RS 12n
-.rt  
 The \fIid\fR argument is a zone ID. The \fBpriocntl()\fR function applies to
 all LWPs with this zone ID.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBP_CTID\fR\fR
 .ad
 .RS 12n
-.rt  
 The \fIid\fR argument is a process contract ID. The \fBpriocntl()\fR function
 applies to all LWPs with this process contract ID.
 .RE
@@ -337,12 +311,10 @@ and \fBPC_GETPARMS\fR on a long-term basis.
 Available \fBpriocntl()\fR commands are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPC_ADMIN\fR\fR
 .ad
 .RS 16n
-.rt  
 This command provides functionality needed for the implementation of the
 \fBdispadmin\fR(1M) utility. It is not intended for general use by other
 applications.
@@ -350,12 +322,10 @@ applications.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPC_DONICE\fR\fR
 .ad
 .RS 16n
-.rt  
 Set or get nice value of the specified LWP(s) associated with the specified
 process(es). When this command is used with the \fIidtype\fR of \fBP_LWPID\fR,
 it sets the nice value of the LWP. The \fIarg\fR argument points to a structure
@@ -379,12 +349,10 @@ set of target LWPs but returns the error immediately.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPC_GETCID\fR\fR
 .ad
 .RS 16n
-.rt  
 Get class ID and class attributes for a specific class given the class name.
 The \fIidtype\fR and \fIid\fR arguments are ignored. If \fIarg\fR is non-null,
 it points to a structure of type \fBpcinfo_t\fR. The \fIpc_clname\fR buffer
@@ -407,12 +375,10 @@ If \fIarg\fR is a null pointer, no attribute data is returned but the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPC_GETCLINFO\fR\fR
 .ad
 .RS 16n
-.rt  
 Get class name and class attributes for a specific class given class ID. The
 \fIidtype\fR and \fIid\fR arguments are ignored. If \fIarg\fR is non-null, it
 points to a structure of type \fBpcinfo_t\fR. The \fIpc_cid\fR member is the
@@ -433,12 +399,10 @@ If \fIarg\fR is a null pointer, no attribute data is returned but the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPC_GETPARMS\fR\fR
 .ad
 .RS 16n
-.rt  
 Get the class and/or class-specific scheduling parameters of an LWP. The
 \fIarg\fR member points to a structure of type \fBpcparms_t\fR.
 .sp
@@ -464,12 +428,10 @@ returned in the \fIpc_clparms\fR buffer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPC_GETXPARMS\fR\fR
 .ad
 .RS 16n
-.rt  
 Get the class or class-specific scheduling parameters of an LWP. The class name
 (first argument after \fBPC_GETXPARMS\fR) specifies the class and the (key,
 value) pair sequence contains a pointer to the class-specific parameters. The
@@ -507,12 +469,10 @@ char   pc_clname[PC_CLNMSZ];     /* Class name */
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPC_SETPARMS\fR\fR
 .ad
 .RS 16n
-.rt  
 Set the class and class-specific scheduling parameters of the specified LWP(s)
 associated with the specified process(es). When this command is used with the
 \fIidtype\fR of P_LWPID, it will set the class and class-specific scheduling
@@ -539,12 +499,10 @@ LWPs but returns the error immediately.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPC_SETXPARMS\fR\fR
 .ad
 .RS 16n
-.rt  
 Set the class and class-specific scheduling parameters of the specified LWP(s)
 associated with the specified process(es). When this command is used with
 \fBP_LWPID\fR as \fIidtype\fR, it will set the class and class-specific
@@ -728,34 +686,28 @@ values defined in \fB<sys/rtpriocntl.h>\fR, in which case the value of
 \fIrt_tqsecs\fR is ignored:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRT_TQINF\fR\fR
 .ad
 .RS 15n
-.rt  
 Set an infinite time quantum.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRT_TQDEF\fR\fR
 .ad
 .RS 15n
-.rt  
 Set the time quantum to the default for this priority (see \fBrt_dptbl\fR(4)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRT_NOCHANGE\fR\fR
 .ad
 .RS 15n
-.rt  
 Do not set the time quantum. This value is useful when you wish to change the
 realtime priority of an LWP without affecting the time quantum. Specifying this
 value when changing the class of an LWP to realtime from some other class is
@@ -774,18 +726,17 @@ same key results in an error return and \fBerrno\fR set to \fBEINVAL\fR.
 
 .sp
 .TS
-tab() box;
-cw(1.44i) |cw(1.08i) |cw(2.98i) 
-lw(1.44i) |lw(1.08i) |lw(2.98i) 
-.
-KeyValue TypeDescription
+box;
+c | c | c
+l | l | l .
+Key	Value Type	Description
 _
-\fBRT_KY_PRI\fR\fBpri_t\fRrealtime priority
-\fBRT_KY_TQSECS\fR\fBuint_t\fRseconds in time quantum
+\fBRT_KY_PRI\fR	\fBpri_t\fR	realtime priority
+\fBRT_KY_TQSECS\fR	\fBuint_t\fR	seconds in time quantum
 _
-\fBRT_KY_TQNSECS\fR\fBint\fRnanoseconds in time quantum
+\fBRT_KY_TQNSECS\fR	\fBint\fR	nanoseconds in time quantum
 _
-\fBRT_KY_TQSIG\fR\fBint\fRrealtime time quantum signal
+\fBRT_KY_TQSIG\fR	\fBint\fR	realtime time quantum signal
 .TE
 
 .sp
@@ -964,14 +915,13 @@ specification of the same key results in an error return and \fBerrno\fR set to
 
 .sp
 .TS
-tab() box;
-cw(1.44i) |cw(1.08i) |cw(2.98i) 
-lw(1.44i) |lw(1.08i) |lw(2.98i) 
-.
-KeyValue TypeDescription
+box;
+c | c | c
+l | l | l .
+Key	Value Type	Description
 _
-\fBTS_KY_UPRILIM\fR\fBpri_t\fRuser priority limit
-\fBTS_KY_UPRI\fR\fBpri_t\fRuser priority
+\fBTS_KY_UPRILIM\fR	\fBpri_t\fR	user priority limit
+\fBTS_KY_UPRI\fR	\fBpri_t\fR	user priority
 .TE
 
 .sp
@@ -1078,14 +1028,12 @@ results in an error return and \fBerrno\fR set to \fBEINVAL\fR.
 
 .sp
 .TS
-tab();
-cw(1.83i) cw(1.83i) cw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-KeyValue TypeDescription
-\fBIA_KY_UPRILIM\fR\fBpri_t\fRuser priority limit
-\fBIA_KY_UPRI\fR\fBpri_t\fRuser priority
-\fBIA_KY_MODE\fR\fBint\fRinteractive mode
+c c c
+l l l .
+Key	Value Type	Description
+\fBIA_KY_UPRILIM\fR	\fBpri_t\fR	user priority limit
+\fBIA_KY_UPRI\fR	\fBpri_t\fR	user priority
+\fBIA_KY_MODE\fR	\fBint\fR	interactive mode
 .TE
 
 .sp
@@ -1372,34 +1320,28 @@ values (defined in \fB<sys/fxpriocntl.h>\fR), in which case the value of
 \fIfx_tqsecs\fR is ignored:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFX_TQINF\fR\fR
 .ad
 .RS 15n
-.rt  
 Set an infinite time quantum.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFX_TQDEF\fR\fR
 .ad
 .RS 15n
-.rt  
 Set the time quantum to the default for this priority (see \fBfx_dptbl\fR(4)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFX_NOCHANGE\fR\fR
 .ad
 .RS 15n
-.rt  
 Do not set the time quantum. This value is useful in changing the user priority
 of an LWP without affecting the time quantum. Specifying this value when
 changing the class of an LWP to fixed-priority from some other class is
@@ -1418,18 +1360,17 @@ same key results in an error return and \fBerrno\fR set to \fBEINVAL\fR.
 
 .sp
 .TS
-tab() box;
-cw(1.44i) |cw(1.08i) |cw(2.98i) 
-lw(1.44i) |lw(1.08i) |lw(2.98i) 
-.
-KeyValue TypeDescription
+box;
+c | c | c
+l | l | l .
+Key	Value Type	Description
 _
-\fBFX_KY_UPRILIM\fR\fBpri_t\fRuser priority limit
-\fBFX_KY_UPRI\fR\fBpri_t\fRuser priority
+\fBFX_KY_UPRILIM\fR	\fBpri_t\fR	user priority limit
+\fBFX_KY_UPRI\fR	\fBpri_t\fR	user priority
 _
-\fBFX_KY_TQSECS\fR\fBuint_t\fRseconds in time quantum
+\fBFX_KY_TQSECS\fR	\fBuint_t\fR	seconds in time quantum
 _
-\fBFX_KY_TQNSECS\fR\fBint\fRnanoseconds in time quantum
+\fBFX_KY_TQNSECS\fR	\fBint\fR	nanoseconds in time quantum
 .TE
 
 .sp
@@ -1485,12 +1426,10 @@ the error.
 The \fBpriocntl()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 10n
-.rt  
 An attempt to change the class of an LWP failed because of insufficient
 resources other than memory (for example, class-specific kernel data
 structures).
@@ -1498,46 +1437,38 @@ structures).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 One of the arguments points to an illegal address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The argument \fIcmd\fR was invalid, an invalid or unconfigured class was
 specified, or one of the parameters specified was invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 An attempt to change the class of an LWP failed because of insufficient memory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 10n
-.rt  
 The {\fBPRIV_PROC_PRIOCNTL\fR} privilege is not asserted in the effective set
 of the calling LWP.
 .sp
@@ -1546,23 +1477,19 @@ The calling LWP does not have sufficient privileges to affect the target LWP.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBERANGE\fR\fR
 .ad
 .RS 10n
-.rt  
 The requested time quantum is out of range.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBESRCH\fR\fR
 .ad
 .RS 10n
-.rt  
 None of the specified LWPs exist.
 .RE
 

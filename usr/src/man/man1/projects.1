@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH projects 1 "13 May 2004" "SunOS 5.11" "User Commands"
+.TH PROJECTS 1 "May 13, 2004"
 .SH NAME
 projects \- print project membership of user
 .SH SYNOPSIS
@@ -30,35 +30,29 @@ associated \fBNIS\fR maps and \fBLDAP\fR databases for project information.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 6n
-.rt  
 Prints only default project.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 6n
-.rt  
 Prints verbose info on each project projectname. If no projectnames are given,
 info on all projects is printed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 Prints project descriptions along with project names.
 .RE
 
@@ -68,23 +62,19 @@ Prints project descriptions along with project names.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprojectname\fR\fR
 .ad
 .RS 15n
-.rt  
 Display information for the specified project.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIuser\fR\fR
 .ad
 .RS 15n
-.rt  
 Displays project memberships for the specified user.
 .RE
 
@@ -110,46 +100,38 @@ beatles
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 6n
-.rt  
 A fatal error occurred during execution.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 6n
-.rt  
 Invalid command line options were specified.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/project\fR\fR
 .ad
 .RS 16n
-.rt  
 Local database containing valid project definitions for this machine.
 .RE
 
@@ -161,12 +143,11 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
-StabilitySee below.
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+Stability	See below.
 .TE
 
 .sp

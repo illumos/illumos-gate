@@ -1,13 +1,13 @@
 '\" te
 .\" Copyright (c) 1992, X/Open Company Limited. All Rights Reserved.  Portions Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH wordexp 3C "1 Nov 2003" "SunOS 5.11" "Standard C Library Functions"
+.TH WORDEXP 3C "Nov 1, 2003"
 .SH NAME
 wordexp, wordfree \- perform word expansions
 .SH SYNOPSIS
@@ -60,34 +60,28 @@ The structure type \fBwordexp_t\fR is defined in the header <\fBwordexp.h\fR>
 and includes at least the following members:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsize_t we_wordc\fR\fR
 .ad
 .RS 19n
-.rt  
 Count of words matched by \fIwords\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchar **we_wordv\fR\fR
 .ad
 .RS 19n
-.rt  
 Pointer to list of expanded words.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsize_t we_offs\fR\fR
 .ad
 .RS 19n
-.rt  
 Slots to reserve at the beginning of \fIpwordexp\(mi>\fR\fBwe_wordv\fR.
 .RE
 
@@ -114,23 +108,19 @@ The value of \fIflags\fR is the bitwise inclusive \fBOR\fR of zero or more of
 the following constants, which are defined in \fB<wordexp.h>\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWRDE_APPEND\fR\fR
 .ad
 .RS 16n
-.rt  
 Append words generated to the ones from a previous call to \fBwordexp()\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWRDE_DOOFFS\fR\fR
 .ad
 .RS 16n
-.rt  
 Make use of \fIpwordexp\(mi>\fR\fBwe_offs.\fR If this flag is set,
 \fIpwordexp\(mi>\fR\fBwe_offs\fR is used to specify how many \fINULL\fR
 pointers to add to the beginning of \fIpwordexp\(mi>\fR\fBwe_wordv.\fR In other
@@ -142,23 +132,19 @@ pointer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWRDE_NOCMD\fR\fR
 .ad
 .RS 16n
-.rt  
 Fail if command substitution is requested.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWRDE_REUSE\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIpwordexp\fR argument was passed to a previous successful call to
 \fBwordexp()\fR, and has not been passed to \fBwordfree()\fR. The result will
 be the same as if the application had called \fBwordfree()\fR and then called
@@ -167,23 +153,19 @@ be the same as if the application had called \fBwordfree()\fR and then called
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWRDE_SHOWERR\fR\fR
 .ad
 .RS 16n
-.rt  
 Do not redirect \fBstderr\fR to \fB/dev/null\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWRDE_UNDEF\fR\fR
 .ad
 .RS 16n
-.rt  
 Report error on an attempt to expand an undefined shell variable.
 .RE
 
@@ -269,12 +251,10 @@ given \fIpwordexp\fR.
 The following constants are defined as error return values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWRDE_BADCHAR\fR\fR
 .ad
 .RS 16n
-.rt  
 One of the unquoted characters:
 .sp
 \fBNEWLINE\fR \fB|   &   ;   <   >   (   )   {   }\fR
@@ -284,46 +264,38 @@ appears in \fIwords\fR in an inappropriate context.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWRDE_BADVAL\fR\fR
 .ad
 .RS 16n
-.rt  
 Reference to undefined shell variable when \fBWRDE_UNDEF\fR is set in
 \fIflags\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWRDE_CMDSUB\fR\fR
 .ad
 .RS 16n
-.rt  
 Command substitution requested when \fBWRDE_NOCMD\fR was set in flags.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWRDE_NOSPACE\fR\fR
 .ad
 .RS 16n
-.rt  
 Attempt to allocate memory failed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWRDE_SYNTAX\fR\fR
 .ad
 .RS 16n
-.rt  
 Shell syntax error, such as unbalanced parentheses or unterminated string.
 .RE
 
@@ -367,15 +339,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

@@ -10,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH getpwnam 3C "5 Apr 2004" "SunOS 5.11" "Standard C Library Functions"
+.TH GETPWNAM 3C "Apr 5, 2004"
 .SH NAME
 getpwnam, getpwnam_r, getpwent, getpwent_r, getpwuid, getpwuid_r, setpwent,
 endpwent, fgetpwent, fgetpwent_r \- get password entry
@@ -249,23 +249,19 @@ The \fBgetpwent_r()\fR, \fBfgetpwent()\fR, and \fBfgetpwent_r()\fR functions
 will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 10n
-.rt  
 An I/O error has occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBERANGE\fR\fR
 .ad
 .RS 10n
-.rt  
 Insufficient storage was supplied by \fIbuffer\fR and \fIbufsize\fR to contain
 the data to be referenced by the resulting \fBpasswd\fR structure.
 .RE
@@ -275,24 +271,20 @@ the data to be referenced by the resulting \fBpasswd\fR structure.
 The \fBgetpwent_r()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEMFILE\fR\fR
 .ad
 .RS 10n
-.rt  
 There are {\fBOPEN_MAX\fR} file descriptors currently open in the calling
 process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENFILE\fR\fR
 .ad
 .RS 10n
-.rt  
 The maximum allowable number of files is currently open in the system.
 .RE
 
@@ -302,12 +294,10 @@ The \fBgetpwnam()\fR, \fBgetpwnam_r()\fR, \fBgetpwuid()\fR, \fBgetpwuid_r()\fR,
 \fBgetpwent()\fR, \fBsetpwent()\fR, and \fBendpwent()\fR functions may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 7n
-.rt  
 An I/O error has occurred.
 .RE
 
@@ -317,24 +307,20 @@ The \fBgetpwnam()\fR, \fBgetpwnam_r()\fR, \fBgetpwuid()\fR, \fBgetpwuid_r()\fR,
 \fBgetpwent()\fR, and \fBsetpwent()\fR functions may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEMFILE\fR\fR
 .ad
 .RS 10n
-.rt  
 There are {\fBOPEN_MAX\fR} file descriptors currently open in the calling
 process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENFILE\fR\fR
 .ad
 .RS 10n
-.rt  
 The maximum allowable number of files is currently open in the system.
 .RE
 
@@ -344,12 +330,10 @@ The \fBgetpwnam()\fR, \fBgetpwnam_r()\fR, \fBgetpwuid()\fR, and
 \fBgetpwuid_r()\fR functions may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 9n
-.rt  
 A signal was caught during the execution of the function call.
 .RE
 
@@ -358,12 +342,10 @@ A signal was caught during the execution of the function call.
 The \fBgetpwnam_r()\fR and \fBgetpwuid_r()\fR functions may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBERANGE\fR\fR
 .ad
 .RS 10n
-.rt  
 Insufficient storage was supplied by \fIbuffer\fR and \fIbufsize\fR to contain
 the data to be referenced by the resulting \fBpasswd\fR structure.
 .RE
@@ -384,17 +366,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSee \fBReentrant Interfaces\fR in \fBDESCRIPTION\fR.
+MT-Level	See \fBReentrant Interfaces\fR in \fBDESCRIPTION\fR.
 _
-StandardSee below.
+Standard	See below.
 .TE
 
 .sp

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cpuid 7D "16 Sep 2004" "SunOS 5.11" "Devices"
+.TH CPUID 7D "Sep 16, 2004"
 .SH NAME
 cpuid \- CPU identification driver
 .SH SYNOPSIS
@@ -115,24 +115,20 @@ fail:
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fBENXIO\fR
 .ad
 .RS 10n
-.rt  
 Results from attempting to read data from the device on a system that does not
 support the CPU identification interfaces
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBEINVAL\fR
 .ad
 .RS 10n
-.rt  
 Results from reading from an offset larger than UINT_MAX, or attempting to read
 with a size that is not multiple of 16 bytes.
 .RE
@@ -140,12 +136,10 @@ with a size that is not multiple of 16 bytes.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/cpu/self/cpuid\fR\fR
 .ad
 .RS 23n
-.rt  
 Provides access to CPU identification data.
 .RE
 
@@ -157,13 +151,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

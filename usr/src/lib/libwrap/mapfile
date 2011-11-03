@@ -1,5 +1,6 @@
 #
 # Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2011 Nexenta Systems, Inc. All rights reserved.
 #
 
 #
@@ -25,6 +26,6 @@ $mapfile_version 2
 
 SYMBOL_SCOPE {
 	global:
-		allow_severity		{ FLAGS = extern };
-		deny_severity		{ FLAGS = extern };
+		allow_severity		{ FLAGS = NODIRECT; };
+		deny_severity		{ FLAGS = NODIRECT; };
 };

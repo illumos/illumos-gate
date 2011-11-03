@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH elf_getarhdr 3ELF "11 Jul 2001" "SunOS 5.11" "ELF Library Functions"
+.TH ELF_GETARHDR 3ELF "Jul 11, 2001"
 .SH NAME
 elf_getarhdr \- retrieve archive member header
 .SH SYNOPSIS
@@ -50,12 +50,10 @@ distinguishing them from regular members (whose names may not contain a slash).
 These special members have the names (\fBar_name\fR) defined below.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/\fR\fR
 .ad
 .RS 6n
-.rt  
 This is the archive symbol table. If present, it will be the first archive
 member. A program may access the archive symbol table through
 \fBelf_getarsym()\fR. The information in the symbol table is useful for random
@@ -64,12 +62,10 @@ archive processing (see \fBelf_rand()\fR on \fBelf_begin\fR(3ELF)).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB//\fR\fR
 .ad
 .RS 6n
-.rt  
 This member, if present, holds a string table for long archive member names. An
 archive member's header contains a 16-byte area for the name, which may be
 exceeded in some file systems. The library automatically retrieves long member
@@ -89,15 +85,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStable
+Interface Stability	Stable
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

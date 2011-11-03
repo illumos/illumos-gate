@@ -20,6 +20,8 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_SBD_IMPL_H
@@ -199,10 +201,11 @@ typedef struct sbd_cmd {
 	uint8_t		flags;
 	uint8_t		nbufs;
 	uint16_t	cmd_type;	/* Type of command */
-	uint32_t	rsvd2;
+	uint32_t	trans_data_len;	/* Length of transient data buf */
 	uint64_t	addr;		/* current */
 	uint32_t	len;		/* len left */
 	uint32_t	current_ro;	/* running relative offset */
+	uint8_t		*trans_data;	/* Any transient data */
 } sbd_cmd_t;
 
 /*
@@ -212,6 +215,7 @@ typedef struct sbd_cmd {
 #define	SBD_SCSI_CMD_ABORT_REQUESTED	0x02
 #define	SBD_SCSI_CMD_XFER_FAIL		0x04
 #define	SBD_SCSI_CMD_SYNC_WRITE		0x08
+#define	SBD_SCSI_CMD_TRANS_DATA		0x10
 
 /*
  * cmd types

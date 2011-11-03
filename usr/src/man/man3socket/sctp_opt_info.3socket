@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sctp_opt_info 3SOCKET "25 Feb 2005" "SunOS 5.11" "Sockets Library Functions"
+.TH SCTP_OPT_INFO 3SOCKET "Feb 25, 2005"
 .SH NAME
 sctp_opt_info \- examine SCTP level options for an SCTP endpoint
 .SH SYNOPSIS
@@ -37,12 +37,10 @@ can be ignored for one-to-one style or branched-off one-to-many style SCTP
 sockets.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCTP_RTOINFO\fR\fR
 .ad
 .RS 27n
-.rt  
 Returns the protocol parameters used to initialize and bind retransmission
 timeout (RTO) tunable. The following structure is used to access these
 parameters:
@@ -67,12 +65,10 @@ where:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSSCTP_ASSOCINFO\fR\fR
 .ad
 .RS 27n
-.rt  
 Returns association-specific parameters. The following structure is used to
 access the parameters:
 .sp
@@ -106,12 +102,10 @@ All parameters with time values are in milliseconds.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCTP_DEFAULT_SEND_PARAM\fR\fR
 .ad
 .RS 27n
-.rt  
 Returns the default set of parameters used by the \fBsendto()\fR function on
 this association. The following structure is used to access the parameters:
 .sp
@@ -166,12 +160,10 @@ where:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCTP_PEER_ADDR_PARAMS\fR\fR
 .ad
 .RS 27n
-.rt  
 Returns the parameters for a specified peer address of the association. The
 following structure is used to access the parameters:
 .sp
@@ -187,8 +179,8 @@ where:
        spp_assoc_id            Association ID specified by the caller
        spp_address             Peer's address
        spp_hbinterval          Heartbeat interval in milliseconds
-       spp_pathmaxrxt          Maximum number of retransmissions 
-                               to an address before it is 
+       spp_pathmaxrxt          Maximum number of retransmissions
+                               to an address before it is
                                considered unreachable
 .fi
 .in -2
@@ -197,12 +189,10 @@ where:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCTP_STATUS\fR\fR
 .ad
 .RS 27n
-.rt  
 Returns the current status information about the association. The following
 structure is used to access the parameters:
 .sp
@@ -235,10 +225,10 @@ where:
                                SCTP_SHUTDOWN_SENT
                                SCTP_SHUTDOWN_RECEIVED
                                SCTP_SHUTDOWN_ACK_SENT
-       sstat_rwnd              Current receive window of the 
+       sstat_rwnd              Current receive window of the
                                association peer
        sstat_unackdata         Number of unacked DATA chunks
-       sstat_penddata          Number of DATA chunks pending 
+       sstat_penddata          Number of DATA chunks pending
                                receipt
        sstat_instrms           Number of inbound streams
        sstat_outstrms          Number of outbound streams
@@ -268,14 +258,14 @@ where:
                                                 SCTP_ACTIVE or
                                                 SCTP_INACTIVE
                         spinfo_cwnd             Congestion window
-                                                of the peer 
+                                                of the peer
                                                 address
                         spinfo_srtt             Smoothed round-trip
                                                 time calculation of
                                                 the peer address
-                        spinfo_rto              Current retransmission 
+                        spinfo_rto              Current retransmission
                                                 timeout value of the
-                                                peer address in 
+                                                peer address in
                                                 milliseconds
                         spinfo_mtu              P-MTU of the address
 .fi
@@ -295,67 +285,55 @@ error.
 The \fBsctp_opt_info()\fR call fails under the following conditions.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIsock\fR argument is an invalid file descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSOCK\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIsock\fR argument is not a socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 16n
-.rt  
 The association \fIid\fR is invalid for a one-to-many style SCTP socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 16n
-.rt  
 The input buffer length is insufficient for the option specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 16n
-.rt  
 The peer address is invalid or does not belong to the association.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAFNOSUPPORT\fR\fR
 .ad
 .RS 16n
-.rt  
 The address family for the peer's address is other than \fBAF_INET\fR or
 \fBAF_INET6\fR.
 .RE
@@ -368,15 +346,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

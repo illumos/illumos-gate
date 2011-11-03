@@ -3,15 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mtio 7I "15 Sep 2007" "SunOS 5.11" "Ioctl Requests"
+.TH MTIO 7I "Sep 15, 2007"
 .SH NAME
 mtio \- general magnetic tape interface
 .SH SYNOPSIS
 .LP
 .nf
 #include <sys/types.h>
-#include <sys/ioctl.h> 
-#include <sys/mtio.h> 
+#include <sys/ioctl.h>
+#include <sys/mtio.h>
 .fi
 
 .SH DESCRIPTION
@@ -323,11 +323,11 @@ Bits 7-15   behavior              Select    Select    on Close    Bits 0-1
 #define MT_BSD	(1 <<6)       /* BSD behavior on close */
 
 
-/* Structure for MTIOCTOP \(mi magnetic tape operation command */ 
+/* Structure for MTIOCTOP \(mi magnetic tape operation command */
 
-struct  mtop {  
-  short   mt_op;       /* operation */         
-  daddr_t mt_count;    /* number of operations */ 
+struct  mtop {
+  short   mt_op;       /* operation */
+  daddr_t mt_count;    /* number of operations */
 };
 .fi
 .in -2
@@ -351,243 +351,199 @@ The following operations of \fBMTIOCTOP\fR and \fBMTIOCLTOP\fR ioctls are
 supported:
 .sp
 .ne 2
-.mk
 .na
 \fBMTWEOF\fR
 .ad
 .RS 17n
-.rt  
 write an end-of-file record
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBMTFSF\fR
 .ad
 .RS 17n
-.rt  
 forward space over file mark
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBMTBSF\fR
 .ad
 .RS 17n
-.rt  
 backward space over file mark (1/2", 8mm only)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBMTFSR\fR
 .ad
 .RS 17n
-.rt  
 forward space to inter-record gap
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBMTBSR\fR
 .ad
 .RS 17n
-.rt  
 backward space to inter-record gap
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBMTREW\fR
 .ad
 .RS 17n
-.rt  
 rewind
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBMTOFFL\fR
 .ad
 .RS 17n
-.rt  
 rewind and take the drive off-line
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBMTNOP\fR
 .ad
 .RS 17n
-.rt  
 no operation, sets status only
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBMTRETEN\fR
 .ad
 .RS 17n
-.rt  
 retension the tape (cartridge tape only)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBMTERASE\fR
 .ad
 .RS 17n
-.rt  
 erase the entire tape and rewind
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBMTEOM\fR
 .ad
 .RS 17n
-.rt  
 position to EOM
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBMTNBSF\fR
 .ad
 .RS 17n
-.rt  
 backward space file to beginning of file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBMTSRSZ\fR
 .ad
 .RS 17n
-.rt  
 set record size
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBMTGRSZ\fR
 .ad
 .RS 17n
-.rt  
 get record size
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBMTTELL\fR
 .ad
 .RS 17n
-.rt  
 get current position
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBMTSEEK\fR
 .ad
 .RS 17n
-.rt  
 go to  requested  position
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBMTFSSF\fR
 .ad
 .RS 17n
-.rt  
 forward to requested number of sequential file marks
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBMTBSSF\fR
 .ad
 .RS 17n
-.rt  
 backward to requested number of sequential file marks
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBMTLOCK\fR
 .ad
 .RS 17n
-.rt  
 prevent media removal
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBMTUNLOCK\fR
 .ad
 .RS 17n
-.rt  
 allow media removal
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBMTLOAD\fR
 .ad
 .RS 17n
-.rt  
 load the next tape cartridge into the tape drive
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBMTIOCGETERROR\fR
 .ad
 .RS 17n
-.rt  
 retrieve error records from the st driver
 .RE
 
@@ -651,9 +607,9 @@ struct mtdrivetype {
        ST_EOM,                 /* at physical eot */
        ST_WRITE_AFTER_EOM      /* flag allowing writes after EOM */
  	}pstatus;
- 
+
  	typedef enum { invalid, legacy, logical } posmode;
- 
+
  	typedef struct tapepos {
  		   uint64_t lgclblkno;	/* Blks from start of partition */
  		   int32_t fileno;		/* Num. of current file */
@@ -663,7 +619,7 @@ struct mtdrivetype {
  		   posmode pmode;		 /* which pos. data is valid */
  		   char    pad[4];
  	}tapepos_t;
- 
+
      If the pmode is legacy,fileno and blkno fields are valid.
      If the pmode is logical, lgclblkno field is valid.
 .fi
@@ -832,45 +788,37 @@ The  MTIOCRESTPOS ioctl restores a saved position from the MTIOCGETPOS.
 .SS "Persistent Error Handling IOCTLs and Asynchronous Tape Operations"
 .sp
 .ne 2
-.mk
 .na
 \fBMTIOCPERSISTENT\fR
 .ad
 .RS 25n
-.rt  
 enables/disables persistent error handling
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBMTIOCPERSISTENTSTATUS\fR
 .ad
 .RS 25n
-.rt  
 queries for persistent error handling
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBMTIOCLRERR\fR
 .ad
 .RS 25n
-.rt  
 clears persistent error handling
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBMTIOCGUARANTEEDORDER\fR
 .ad
 .RS 25n
-.rt  
 checks whether driver guarantees order of I/O's
 .RE
 
@@ -933,12 +881,10 @@ on persistent error handling.
 .SS "Asynchronous and State Change IOCTLS"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMTIOCSTATE\fR\fR
 .ad
 .RS 14n
-.rt  
 This ioctl blocks until the state of the drive, inserted or ejected, is
 changed. The argument is a pointer to a \fBmtio_state\fR, \fBenum\fR, whose
 possible enumerations are listed below. The initial value should be either the
@@ -965,34 +911,28 @@ commands to complete before they are executed.
 .SS "IOCTLS for Multi-initiator Configurations"
 .sp
 .ne 2
-.mk
 .na
 \fBMTIOCRESERVE\fR
 .ad
 .RS 21n
-.rt  
 reserve the tape drive
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBMTIOCRELEASE\fR
 .ad
 .RS 21n
-.rt  
 revert back to the default behavior of reserve on open/release on close
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBMTIOCFORCERESERVE\fR
 .ad
 .RS 21n
-.rt  
 reserve the tape unit by breaking reservation held by another host
 .RE
 
@@ -1032,35 +972,29 @@ ioctl(fd, MTIOCFORCERESERVE);
 .SS "IOCTLS for Handling Tape Configuration Options"
 .sp
 .ne 2
-.mk
 .na
 \fBMTIOCSHORTFMK\fR
 .ad
 .RS 23n
-.rt  
 enables/disable support for writing short filemarks. This is specific to
 Exabyte drives.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBMTIOCREADIGNOREILI\fR
 .ad
 .RS 23n
-.rt  
 enables/disable supress incorrect length indicator support during reads
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBMTIOCREADIGNOREEOFS\fR
 .ad
 .RS 23n
-.rt  
 enables/disable support for reading past two EOF marks which otherwise indicate
 End-Of-recording-Media (EOM) in the case of 1/2" reel tape drives
 .RE

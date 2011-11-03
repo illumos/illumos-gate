@@ -44,8 +44,8 @@ dir path=usr/proc
 dir path=usr/proc/bin
 dir path=usr/sbin
 dir path=usr/sbin/$(ARCH64)
-dir path=usr/share group=sys
-dir path=usr/share/lib group=sys
+dir path=usr/share
+dir path=usr/share/lib
 dir path=usr/share/lib/dict
 dir path=usr/share/man/man1
 dir path=usr/share/man/man1m

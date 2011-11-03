@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2011 Gary Mills
+ *
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -26,12 +28,11 @@
 #ifndef	_AUTO_SENSE_H
 #define	_AUTO_SENSE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
+struct scsi_inquiry;	/* anonymous struct */
 
 #ifdef	__STDC__
 /*
@@ -53,12 +54,16 @@ int			delete_disk_type(
 				struct disk_type *disk_type);
 
 struct disk_type *auto_direct_get_geom_label(int fd, struct dk_label *label);
+char			*get_generic_disk_name(
+				char *disk_name,
+				struct scsi_inquiry *inquiry);
 #else
 
 struct disk_type	*auto_sense();
 struct disk_type	*auto_efi_sense();
 int			build_default_partition();
 struct disk_type *auto_direct_get_geom_label();
+char			*get_generic_disk_name();
 
 
 #endif	/* __STDC__ */

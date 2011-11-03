@@ -22,10 +22,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.9	*/
-/* EMACS_MODES: !fill, lnumb, !overwrite, !nodelete, !picture */
-
 #include "fcntl.h"
 #include "errno.h"
 #include "string.h"
@@ -180,7 +176,7 @@ _isterminfo (type, parent)
 #endif
 {
 	char			*path,
-				*type_letter	= "X";
+				type_letter[]	= "X";
 
 	int			ret;
 

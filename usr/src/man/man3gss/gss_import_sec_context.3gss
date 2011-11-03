@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH gss_import_sec_context 3GSS "15 Jan 2003" "SunOS 5.11" "Generic Security Services API Library Functions"
+.TH GSS_IMPORT_SEC_CONTEXT 3GSS "Jan 15, 2003"
 .SH NAME
 gss_import_sec_context \- import security context established by another
 process
 .SH SYNOPSIS
 .LP
 .nf
-\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lgss\fR  [ \fIlibrary\fR... ] 
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lgss\fR  [ \fIlibrary\fR... ]
 #include <gssapi/gssapi.h>
 
 \fBOM_uint32\fR \fBgss_import_sec_context\fR(\fBOM_uint32 *\fR\fIminor_status\fR,
@@ -29,34 +29,28 @@ be imported only once. See \fBgss_export_sec_context\fR(3GSS).
 The parameter descriptions for \fBgss_import_sec_context()\fR are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIminor_status\fR\fR
 .ad
 .RS 22n
-.rt  
 A mechanism-specific status code.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinterprocess_token\fR\fR
 .ad
 .RS 22n
-.rt  
 Token received from exporting process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcontext_handle\fR\fR
 .ad
 .RS 22n
-.rt  
 Context handle of newly reactivated context. Resources associated with this
 context handle must be released by the application after use with a call to
 \fBgss_delete_sec_context\fR(3GSS).
@@ -68,67 +62,55 @@ context handle must be released by the application after use with a call to
 \fBgss_import_sec_context()\fR returns one of the following status codes:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_COMPLETE\fR\fR
 .ad
 .RS 25n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_NO_CONTEXT\fR\fR
 .ad
 .RS 25n
-.rt  
 The token did not contain a valid context reference.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_DEFECTIVE_TOKEN\fR\fR
 .ad
 .RS 25n
-.rt  
 The token was invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_UNAVAILABLE\fR\fR
 .ad
 .RS 25n
-.rt  
 The operation is unavailable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_UNAUTHORIZED\fR\fR
 .ad
 .RS 25n
-.rt  
 Local policy prevents the import of this context by the current process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_FAILURE\fR\fR
 .ad
 .RS 25n
-.rt  
 The underlying mechanism detected an error for which no specific \fBGSS\fR
 status code is defined.  The mechanism-specific status code reported by means
 of the \fIminor_status\fR parameter details the error condition.
@@ -142,13 +124,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT LevelSafe
+MT Level	Safe
 .TE
 
 .SH SEE ALSO

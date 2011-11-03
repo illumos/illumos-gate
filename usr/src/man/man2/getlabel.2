@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH getlabel 2 "20 Jul 2007" "SunOS 5.11" "System Calls"
+.TH GETLABEL 2 "Jul 20, 2007"
 .SH NAME
 getlabel, fgetlabel \- get file sensitivity label
 .SH SYNOPSIS
@@ -52,12 +52,10 @@ Otherwise they return \(mi1 and set \fBerrno\fR to indicate the error.
 The \fBgetlabel()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 16n
-.rt  
 Search permission is denied for a component of the path prefix of \fIpath\fR.
 To override this restriction, the calling process can assert the
 \fBPRIV_FILE_DAC_SEARCH\fR privilege.
@@ -65,45 +63,37 @@ To override this restriction, the calling process can assert the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 16n
-.rt  
 \fIlabel_p\fR or \fIpath\fR points to an invalid address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 16n
-.rt  
 An \fBI/O\fR error occurred while reading from or writing to the file system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBELOOP\fR\fR
 .ad
 .RS 16n
-.rt  
 Too many symbolic links were encountered in translating \fIpath\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENAMETOOLONG\fR\fR
 .ad
 .RS 16n
-.rt  
 The length of the path argument exceeds \fIPATH_MAX\fR, or a pathname component
 is longer than \fINAME_MAX\fR while \fI_POSIX_NO_TRUNC\fR is in effect (see
 \fBpathconf\fR(2)).
@@ -111,23 +101,19 @@ is longer than \fINAME_MAX\fR while \fI_POSIX_NO_TRUNC\fR is in effect (see
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 16n
-.rt  
 The file referred to by \fIpath\fR does not exist.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTDIR\fR\fR
 .ad
 .RS 16n
-.rt  
 A component of the path prefix of \fIpath\fR is not a directory.
 .RE
 
@@ -136,34 +122,28 @@ A component of the path prefix of \fIpath\fR is not a directory.
 The \fBfgetlabel()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIfd\fR argument is not a valid open file descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIlabel_p\fR argument points to an invalid address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 10n
-.rt  
 An \fBI/O\fR error occurred while reading from or writing to the file system.
 .RE
 
@@ -175,13 +155,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

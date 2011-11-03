@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sha1 3EXT "13 Nov 2007" "SunOS 5.11" "Extended Library Functions"
+.TH SHA1 3EXT "Nov 13, 2007"
 .SH NAME
 sha1, SHA1Init, SHA1Update, SHA1Final \- SHA1 digest functions
 .SH SYNOPSIS
@@ -37,7 +37,6 @@ are "compressed" in a secure manner before being encrypted with a private
 (secret) key under a public-key cryptosystem such as RSA.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSHA1Init()\fR, \fBSHA1Update()\fR, \fBSHA1Final()\fR\fR
 .ad
@@ -93,7 +92,7 @@ contain the result of the \fBSHA1\fR digest.
 #include <sha1.h>
 
 int
-AuthenticateMsg(unsigned char *auth_buffer, struct iovec 
+AuthenticateMsg(unsigned char *auth_buffer, struct iovec
                 *messageIov, unsigned int num_buffers)
 {
     SHA1_CTX sha1_context;
@@ -123,15 +122,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

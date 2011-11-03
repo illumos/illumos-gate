@@ -1,13 +1,13 @@
 '\" te
 .\"  Copyright 1989 AT&T  Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH bc 1 "29 Aug 2003" "SunOS 5.11" "User Commands"
+.TH BC 1 "Aug 29, 2003"
 .SH NAME
 bc \- arbitrary precision arithmetic language
 .SH SYNOPSIS
@@ -38,35 +38,29 @@ case the \fBdc\fR input is sent to the standard output instead.
 The syntax for  \fBbc\fR programs is as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIL\fR\fR
 .ad
 .RS 5n
-.rt  
 Means a letter \fBa\fR\(mi\fBz\fR,
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIE\fR\fR
 .ad
 .RS 5n
-.rt  
 Means an expression: a (mathematical or logical) value, an operand  that takes
 a value, or a combination of operands and operators that evaluates to a value,
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIS\fR\fR
 .ad
 .RS 5n
-.rt  
 Means a statement.
 .RE
 
@@ -96,52 +90,43 @@ than \fBBC_STRING_MAX\fR characters, between double quotes ("). \fB(\fR \fIE\fR
 \fB)\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsqrt ( \fR\fIE\fR\fB )\fR\fR
 .ad
 .RS 21n
-.rt  
 Square root
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlength ( \fR\fIE\fR\fB )\fR\fR
 .ad
 .RS 21n
-.rt  
 Number of significant decimal digits.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBscale ( \fR\fIE\fR\fB )\fR\fR
 .ad
 .RS 21n
-.rt  
 Number of digits right of decimal point.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIL \fR\fB( \fR\fIE\fR , ... , \fIE\fR\fB )\fR\fR
 .ad
 .RS 21n
-.rt  
- 
+
 .RE
 
 .SS "Operators"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+   \(mi   *   /   %   ^\fR\fR
 .ad
@@ -152,7 +137,6 @@ Number of digits right of decimal point.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB++   \(mi\(mi \fR\fR
 .ad
@@ -163,24 +147,22 @@ Number of digits right of decimal point.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB==   <=   >=   !=   <   >\fR\fR
 .ad
 .sp .6
 .RS 4n
- 
+
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB=   =+   =\(mi   =*   =/   =%   =^\fR\fR
 .ad
 .sp .6
 .RS 4n
- 
+
 .RE
 
 .SS "Statements"
@@ -226,15 +208,15 @@ null statement
 .in -2
 .br
 .in +2
-\fB	auto\fR \fIL\fR \fB,\fR.\|.\|.\|\fB,\fR \fIL\fR
+\fBauto\fR \fIL\fR \fB,\fR.\|.\|.\|\fB,\fR \fIL\fR
 .in -2
 .br
 .in +2
-\fI	S\fR \fB;\fR.\|.\|.\| \fIS\fR
+\fIS\fR \fB;\fR.\|.\|.\| \fIS\fR
 .in -2
 .br
 .in +2
-\fB	return (\fR \fIE\fR \fB)\fR
+\fBreturn (\fR \fIE\fR \fB)\fR
 .in -2
 .br
 .in +2
@@ -243,67 +225,55 @@ null statement
 .SS "Functions in \fB-l\fR Math Library"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs(\fR\fIx\fR\fB)\fR\fR
 .ad
 .RS 10n
-.rt  
 sine
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBc(\fR\fIx\fR\fB)\fR\fR
 .ad
 .RS 10n
-.rt  
 cosine
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBe(\fR\fIx\fR\fB)\fR\fR
 .ad
 .RS 10n
-.rt  
 exponential
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBl(\fR\fIx\fR\fB)\fR\fR
 .ad
 .RS 10n
-.rt  
 log
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBa(\fR\fIx\fR\fB)\fR\fR
 .ad
 .RS 10n
-.rt  
 arctangent
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBj(\fR\fIn\fR\fB,\fR\fIx)\fR\fR
 .ad
 .RS 10n
-.rt  
 Bessel function
 .RE
 
@@ -330,12 +300,10 @@ array name.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 6n
-.rt  
 Compiles only. The output is \fBdc\fR commands that are sent to the standard
 output.
 .RE
@@ -343,12 +311,10 @@ output.
 .SS "/usr/bin/bc"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 6n
-.rt  
 Defines the math functions and initializes \fBscale\fR to \fB20\fR, instead of
 the default zero.
 .RE
@@ -356,12 +322,10 @@ the default zero.
 .SS "/usr/xpg6/bin/bc"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 6n
-.rt  
 Defines the math functions and initializes \fBscale\fR to \fB20\fR, instead of
 the default zero. All math results have the scale of \fB20\fR.
 .RE
@@ -372,12 +336,10 @@ the default zero. All math results have the scale of \fB20\fR.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fR
 .ad
 .RS 8n
-.rt  
 A pathname of a text file containing \fBbc\fR program statements. After all
 cases of \fIfile\fR have been read, \fBbc\fR reads the standard input.
 .RE
@@ -464,46 +426,38 @@ that affect the execution of \fBbc\fR: \fBLANG\fR, \fBLC_ALL\fR,
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 15n
-.rt  
 All input files were processed successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunspecified\fR\fR
 .ad
 .RS 15n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/lib.b\fR\fR
 .ad
 .RS 25n
-.rt  
 mathematical library
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/include/limits.h\fR\fR
 .ad
 .RS 25n
-.rt  
 to define BC_ parameters
 .RE
 
@@ -515,13 +469,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

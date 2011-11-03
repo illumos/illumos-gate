@@ -3,18 +3,18 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH rcapadm 1M "18 Dec 2006" "SunOS 5.11" "System Administration Commands"
+.TH RCAPADM 1M "Dec 18, 2006"
 .SH NAME
 rcapadm \- configure resource capping daemon
 .SH SYNOPSIS
 .LP
 .nf
-\fBrcapadm\fR 
+\fBrcapadm\fR
 .fi
 
 .LP
 .nf
-\fBrcapadm\fR [ [\fB-n\fR] \fB-E\fR | \fB-D\fR] 
+\fBrcapadm\fR [ [\fB-n\fR] \fB-E\fR | \fB-D\fR]
      [\fB-i\fR \fIinterval=value\fR,...,\fIinterval=value\fR] [\fB-c\fR \fIpercent\fR]
      [\fB-z\fR \fIzonename\fR \fB-m\fR \fImaxvalue\fR]
 .fi
@@ -35,7 +35,6 @@ includes the Process Management profile.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIpercent\fR\fR
 .ad
@@ -49,7 +48,6 @@ default) value is \fB0\fR, which means that memory caps are always enforced.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR\fR
 .ad
@@ -62,7 +60,6 @@ option is not specified and it is currently running.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-E\fR\fR
 .ad
@@ -75,7 +72,6 @@ option is not specified and it is not currently running.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIinterval=value\fR,...,\fIinterval=value\fR\fR
 .ad
@@ -85,36 +81,30 @@ Set intervals for various periodic operations performed by \fBrcapd\fR. All
 intervals are specified in seconds. You can set the following intervals:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBscan\fR\fR
 .ad
 .RS 10n
-.rt  
 The interval at which \fBrcapd\fR scans for new processes. The default scan
 interval is every 15 seconds. The minimum value is 1 second.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsample\fR\fR
 .ad
 .RS 10n
-.rt  
 The interval of process resident set size sampling. The default sample interval
 is every 5 seconds. The minimum value is 1 second.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBreport\fR\fR
 .ad
 .RS 10n
-.rt  
 The interval at which various paging statistics are updated by \fBrcapd\fR, in
 seconds. These statistics can be viewed by using \fBrcapstat\fR(1SRM). The
 default reporting interval is every 5 seconds. When the interval is set to
@@ -130,12 +120,10 @@ from physical memory. \fBrcapd\fR pages out the most infrequently used pages.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBconfig\fR\fR
 .ad
 .RS 10n
-.rt  
 The reconfiguration interval, in seconds. At each reconfiguration event,
 \fBrcapd\fR checks its configuration file for updates, and scans the project
 databases for new project caps. The default reconfiguration interval is every
@@ -148,7 +136,6 @@ still be reconfigured by sending it \fBSIGHUP\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fImaxvalue\fR\fR
 .ad
@@ -164,7 +151,6 @@ megabyte; \fBG\fR, gigabyte; and \fBT\fR, terabyte. For example, \fB100M\fR is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
@@ -176,7 +162,6 @@ disabling it.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fIzonename\fR\fR
 .ad
@@ -223,36 +208,30 @@ reboot. To set a persistent cap, use \fBzonecfg\fR(1M).
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful completion. The modifications to the current configuration were
 valid and made successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 An error occurred. A fatal error occurred either in obtaining or modifying the
 resource capping configuration.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Invalid command-line options were specified.
 .RE
 
@@ -264,13 +243,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .sp

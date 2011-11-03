@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH in.dhcpd 1M "10 Aug 2004" "SunOS 5.11" "System Administration Commands"
+.TH IN.DHCPD 1M "Aug 10, 2004"
 .SH NAME
 in.dhcpd \- Dynamic Host Configuration Protocol server
 .SH SYNOPSIS
@@ -91,7 +91,6 @@ contains all the server default settings, and can be modified by using the
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR \fB automatic | manual\fR\fR
 .ad
@@ -108,7 +107,6 @@ manual\fR). This option only affects \fBDHCP\fR server mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
@@ -122,7 +120,6 @@ DHCP/BOOTP server mode and \fBBOOTP\fR relay agent mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fI relay_hops\fR\fR
 .ad
@@ -136,7 +133,6 @@ mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fI interface, .\|.\|.\fR\fR
 .ad
@@ -153,7 +149,6 @@ DHCP/BOOTP server and \fBBOOTP\fR relay agent run modes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIsyslog_local_facility\fR\fR
 .ad
@@ -177,7 +172,7 @@ Protocol:
 .nf
   Relay mode:     "BOOTP"
   Server mode:    "BOOTP" or "DHCP" based upon client
-                       type. 
+                       type.
 .fi
 .in -2
 .sp
@@ -190,9 +185,9 @@ Type:
 .sp
 .in +2
 .nf
-Relay mode:     "RELAY-CLNT", "RELAY-SRVR" 
-Server mode:    "ASSIGN", "EXTEND", "RELEASE", 
-                    "DECLINE", "INFORM", "NAK" "ICMP-ECHO." 
+Relay mode:     "RELAY-CLNT", "RELAY-SRVR"
+Server mode:    "ASSIGN", "EXTEND", "RELEASE",
+                    "DECLINE", "INFORM", "NAK" "ICMP-ECHO."
 .fi
 .in -2
 .sp
@@ -210,7 +205,7 @@ Lease time:
 .sp
 .in +2
 .nf
-Relay mode:     Always 0. 
+Relay mode:     Always 0.
 Server mode:    0 for ICMP-ECHO events, absolute time in
                     seconds (unix time)  otherwise
 .fi
@@ -224,7 +219,7 @@ Server mode:    0 for ICMP-ECHO events, absolute time in
 Source IP address: Dotted Internet form
 .LP
 .nf
-Relay mode:     Relay interface IP on RELAY-CLNT,  INADDR_ANY on RELAY-SRVR. Server mode:    Client IP. 
+Relay mode:     Relay interface IP on RELAY-CLNT,  INADDR_ANY on RELAY-SRVR. Server mode:    Client IP.
 .fi
 
 .RE
@@ -244,7 +239,7 @@ Relay mode:     Client IP on RELAY-CLNT, Server IP on RELAY-SRVR. Server mode:  
 Client Identifier: Hex representation (0-9, A-F)
 .LP
 .nf
-Relay mode:     MAC address                          Server mode:    BOOTP - MAC address; DHCP - client id 
+Relay mode:     MAC address                          Server mode:    BOOTP - MAC address; DHCP - client id
 .fi
 
 .RE
@@ -255,7 +250,7 @@ Vendor Class identifier (white space converted to
 periods (.)).
 .LP
 .nf
-Relay mode:     Always "N/A" Server mode:    Vendor class ID tokenized by  converting white space characters  to periods (.) 
+Relay mode:     Always "N/A" Server mode:    Vendor class ID tokenized by  converting white space characters  to periods (.)
 .fi
 
 .RE
@@ -284,7 +279,6 @@ by \fBlogadm\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
@@ -299,7 +293,6 @@ client, to verify that the address is not in use by another machine.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fI DHCP_offer_time\fR\fR
 .ad
@@ -314,7 +307,6 @@ server mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fI IP_address | hostname, .\|.\|.\fR\fR
 .ad
@@ -341,7 +333,6 @@ identify the subnet mask of the foreign BOOTP/DHCP client's network. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fI dhcptab_rescan_interval\fR\fR
 .ad
@@ -356,7 +347,6 @@ off this option to avoid needless reinitialization of the server.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -411,7 +401,6 @@ packets whose hop count exceeds 5:
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/inet/dhcpsvc.conf\fR\fR
 .ad
@@ -422,24 +411,22 @@ packets whose hop count exceeds 5:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/init/hosts\fR\fR
 .ad
 .sp .6
 .RS 4n
- 
+
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/inet/dhcp/nsu/rfc2136.so.1\fR\fR
 .ad
 .sp .6
 .RS 4n
- 
+
 .RE
 
 .SH ATTRIBUTES
@@ -450,13 +437,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

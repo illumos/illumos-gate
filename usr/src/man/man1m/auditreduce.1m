@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH auditreduce 1M "10 Apr 2006" "SunOS 5.11" "System Administration Commands"
+.TH AUDITREDUCE 1M "Apr 10, 2006"
 .SH NAME
 auditreduce \- merge and select audit records from audit trail files
 .SH SYNOPSIS
@@ -72,7 +72,6 @@ The file selection options indicate which files are to be processed and certain
 types of special treatment.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR\fR
 .ad
@@ -88,7 +87,6 @@ then \fB-A\fR will not override that.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
@@ -103,7 +101,6 @@ not apply to files specified on the command line.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR \fIsuffix\fR\fR
 .ad
@@ -122,7 +119,6 @@ associated with the latter specification is in effect.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR \fImachine\fR\fR
 .ad
@@ -137,7 +133,6 @@ contain combined records from many machines and have a common suffix (such as
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-N\fR\fR
 .ad
@@ -153,7 +148,6 @@ to select objects, the \fB-o\fR option must be used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-O\fR \fIsuffix\fR\fR
 .ad
@@ -171,7 +165,6 @@ uses the times of the first and last records in the merge as the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Q\fR\fR
 .ad
@@ -182,7 +175,6 @@ Quiet. Suppress notification about errors with input files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIpathname\fR\fR
 .ad
@@ -205,7 +197,6 @@ zone's file system. See \fBzones\fR(5).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR \fIserver\fR\fR
 .ad
@@ -224,7 +215,6 @@ directory structure like that of \fB/etc/security/audit\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
@@ -244,7 +234,6 @@ are written to the output file produced by \fBauditreduce\fR.
 Multiple arguments of the same type are not permitted.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIdate-time\fR\fR
 .ad
@@ -258,7 +247,6 @@ range.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR \fIdate-time\fR\fR
 .ad
@@ -269,7 +257,6 @@ Select records that occurred before \fIdate-time\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIaudit-classes\fR\fR
 .ad
@@ -285,7 +272,6 @@ records based upon success and failure criteria.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdate-time\fR\fR
 .ad
@@ -301,7 +287,6 @@ with \fB-a\fR or \fB\fR\fB-b\fR\fB\&.\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fIeffective-user\fR\fR
 .ad
@@ -312,7 +297,6 @@ Select records with the specified \fIeffective-user.\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIeffective-group\fR\fR
 .ad
@@ -323,7 +307,6 @@ Select records with the specified \fIeffective-group.\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR \fIreal-group\fR\fR
 .ad
@@ -334,7 +317,6 @@ Select records with the specified \fIreal-group.\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-j\fR \fIsubject-ID\fR\fR
 .ad
@@ -346,7 +328,6 @@ process ID.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIlabel\fR\fR
 .ad
@@ -359,7 +340,6 @@ configured with Trusted Extensions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fIevent\fR\fR
 .ad
@@ -371,7 +351,6 @@ string or the \fIevent\fR number.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIobject_type=objectID_value\fR\fR
 .ad
@@ -383,7 +362,6 @@ the value specified by \fIobjectID_value.\fR The allowable object types and
 values are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBfile=\fIpathname\fR\fR
 .ad
@@ -406,7 +384,6 @@ prevent the shell from expanding any tildes.
 
 .sp
 .ne 2
-.mk
 .na
 \fBfilegroup\fI=group\fR\fR
 .ad
@@ -418,7 +395,6 @@ group.
 
 .sp
 .ne 2
-.mk
 .na
 \fBfileowner=\fIuser\fR\fR
 .ad
@@ -430,7 +406,6 @@ user.
 
 .sp
 .ne 2
-.mk
 .na
 \fBmsgqid=\fIID\fR\fR
 .ad
@@ -442,7 +417,6 @@ where \fIID\fR is a message queue \fBID\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBmsgqgroup=\fIgroup\fR\fR
 .ad
@@ -454,7 +428,6 @@ or creating group.
 
 .sp
 .ne 2
-.mk
 .na
 \fBmsgqowner=\fIuser\fR\fR
 .ad
@@ -466,7 +439,6 @@ or creating user.
 
 .sp
 .ne 2
-.mk
 .na
 \fBpid=\fIID\fR\fR
 .ad
@@ -479,7 +451,6 @@ signals.
 
 .sp
 .ne 2
-.mk
 .na
 \fBprocgroup=\fIgroup\fR\fR
 .ad
@@ -491,7 +462,6 @@ effective group.
 
 .sp
 .ne 2
-.mk
 .na
 \fBprocowner=\fIuser\fR\fR
 .ad
@@ -503,7 +473,6 @@ effective user.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsemid=\fIID\fR\fR
 .ad
@@ -515,7 +484,6 @@ Select records containing semaphore objects with the specified \fIID\fR where
 
 .sp
 .ne 2
-.mk
 .na
 \fBsemgroup=\fIgroup\fR\fR
 .ad
@@ -527,7 +495,6 @@ creating group.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsemowner=\fIuser\fR\fR
 .ad
@@ -539,7 +506,6 @@ creating user.
 
 .sp
 .ne 2
-.mk
 .na
 \fBshmid=\fIID\fR\fR
 .ad
@@ -551,7 +517,6 @@ where \fIID\fR is a shared memory \fBID\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBshmgroup=\fIgroup\fR\fR
 .ad
@@ -563,7 +528,6 @@ or creating group.
 
 .sp
 .ne 2
-.mk
 .na
 \fBshmowner=\fIuser\fR\fR
 .ad
@@ -575,7 +539,6 @@ or creating user.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsock=\fIport_number|machine\fR\fR
 .ad
@@ -588,7 +551,6 @@ in \fBhosts\fR(4).
 
 .sp
 .ne 2
-.mk
 .na
 \fBfmri=\fIservice instance\fR\fR
 .ad
@@ -602,7 +564,6 @@ with the specified \fIservice instance\fR. See \fBsmf\fR(5).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIreal-user\fR\fR
 .ad
@@ -613,7 +574,6 @@ Select records with the specified \fIreal-user\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIsession-id\fR\fR
 .ad
@@ -624,7 +584,6 @@ Select audit records with the specified \fIsession-id\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fIaudit-user\fR\fR
 .ad
@@ -635,7 +594,6 @@ Select records with the specified \fIaudit-user\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fIzone-name\fR\fR
 .ad
@@ -655,7 +613,6 @@ input is taken from the standard input.
 .SS "Option Arguments"
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaudit-trail-file\fR\fR
 .ad
@@ -680,7 +637,6 @@ trail file contains a combined group of records from many machines).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdate-time\fR\fR
 .ad
@@ -705,7 +661,6 @@ relative to the starting time. Thus, this form can only be used with the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIevent\fR\fR
 .ad
@@ -718,7 +673,6 @@ invalid.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIgroup\fR\fR
 .ad
@@ -731,7 +685,6 @@ The literal string or ordinal group ID number as found in \fBgroup\fR(4). If
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlabel\fR\fR
 .ad
@@ -747,7 +700,6 @@ used when specifying a range.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpathname\fR\fR
 .ad
@@ -758,7 +710,6 @@ A regular expression describing a pathname.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIuser\fR\fR
 .ad
@@ -908,7 +859,6 @@ To get an audit log of only the global zone:
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/security/audit/\fR\fIserver\fR\fB/files/*\fR\fR
 .ad
@@ -925,13 +875,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

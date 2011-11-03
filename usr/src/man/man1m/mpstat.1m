@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mpstat 1M "23 Mar 2009" "SunOS 5.11" "System Administration Commands"
+.TH MPSTAT 1M "Mar 23, 2009"
 .SH NAME
 mpstat \- report per-processor or per-processor-set statistics
 .SH SYNOPSIS
@@ -42,12 +42,10 @@ output, in one of the following forms:
 The \fBmpstat\fR command reports the following information:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCPU\fR or \fBSET\fR\fR
 .ad
 .RS 14n
-.rt  
 Without the \fB-a\fR option, \fBmpstat\fR reports \fBCPU\fR statistics for a
 processor ID. With the \fB-a\fR option, \fBmpstat\fR reports \fBSET\fR
 statistics for a processor set ID.
@@ -55,189 +53,155 @@ statistics for a processor set ID.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBminf\fR\fR
 .ad
 .RS 14n
-.rt  
 minor faults
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmjf\fR\fR
 .ad
 .RS 14n
-.rt  
 major faults
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxcal\fR\fR
 .ad
 .RS 14n
-.rt  
 inter-processor cross-calls
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBintr\fR\fR
 .ad
 .RS 14n
-.rt  
 interrupts
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBithr\fR\fR
 .ad
 .RS 14n
-.rt  
 interrupts as threads (not counting clock interrupt)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcsw\fR\fR
 .ad
 .RS 14n
-.rt  
 context switches
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBicsw\fR\fR
 .ad
 .RS 14n
-.rt  
 involuntary context switches
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmigr\fR\fR
 .ad
 .RS 14n
-.rt  
 thread migrations (to another processor)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsmtx\fR\fR
 .ad
 .RS 14n
-.rt  
 spins on mutexes (lock not acquired on first try)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsrw\fR\fR
 .ad
 .RS 14n
-.rt  
 spins on readers/writer locks (lock not acquired on first try)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsyscl\fR\fR
 .ad
 .RS 14n
-.rt  
 system calls
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBusr\fR\fR
 .ad
 .RS 14n
-.rt  
 percent user time
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsys\fR\fR
 .ad
 .RS 14n
-.rt  
 percent system time
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwt\fR\fR
 .ad
 .RS 14n
-.rt  
 the I/O wait time is no longer calculated as a percentage of \fBCPU\fR time,
 and this statistic will always return zero.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBidl\fR\fR
 .ad
 .RS 14n
-.rt  
 percent idle time
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsze\fR\fR
 .ad
 .RS 14n
-.rt  
 number of processors in the requested processor set
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBset\fR\fR
 .ad
 .RS 14n
-.rt  
 processor set membership of each \fBCPU\fR
 .RE
 
@@ -247,58 +211,48 @@ processor set membership of each \fBCPU\fR
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 13n
-.rt  
 Aggregate output by processor set. Sort the output by set. The default output
 is sorted by \fBCPU\fR number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 13n
-.rt  
 Report processor set membership of each \fBCPU\fR. Sort the output by set. The
 default output is sorted by \fBCPU\fR number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR \fIset\fR\fR
 .ad
 .RS 13n
-.rt  
 Display only those processors in the specified \fIset\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
 .RS 13n
-.rt  
 Suppress messages related to state changes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fBu\fR |  \fBd\fR\fR
 .ad
 .RS 13n
-.rt  
 Specify \fBu\fR for a printed representation of the internal representation of
 time. See \fBtime\fR(2). Specify \fBd\fR for standard date format. See
 \fBdate\fR(1).
@@ -306,23 +260,19 @@ time. See \fBtime\fR(2). Specify \fBd\fR for standard date format. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinterval\fR\fR
 .ad
 .RS 13n
-.rt  
 Report once each \fIinterval\fR seconds.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcount\fR\fR
 .ad
 .RS 13n
-.rt  
 Only print \fIcount\fR reports.
 .RE
 
@@ -365,13 +315,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

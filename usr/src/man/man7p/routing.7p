@@ -1,11 +1,11 @@
 '\" te
-.\"  Copyright 1989 AT&T  
+.\"  Copyright 1989 AT&T
 .\" Copyright (C) 1999, Sun Microsystems,
 .\" Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH routing 7P "9 Nov 1999" "SunOS 5.11" "Protocols"
+.TH ROUTING 7P "Nov 9, 1999"
 .SH NAME
 routing \- system support for packet network routing
 .SH DESCRIPTION
@@ -103,56 +103,46 @@ routing redirects can provide an economical mechanism for routing traffic.
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEEXIST\fR\fR
 .ad
 .RS 15n
-.rt  
 A request was made to duplicate an existing entry.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBESRCH\fR\fR
 .ad
 .RS 15n
-.rt  
 A request was made to delete a non-existent entry.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOBUFS\fR\fR
 .ad
 .RS 15n
-.rt  
 Insufficient resources were available to install a new route.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 15n
-.rt  
 Insufficient resources were available to install a new route.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENETUNREACH\fR\fR
 .ad
 .RS 15n
-.rt  
 The gateway is not directly reachable.  For example, it does not match the
 destination/subnet on any of the network interfaces.
 .RE
@@ -160,12 +150,10 @@ destination/subnet on any of the network interfaces.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/ip\fR\fR
 .ad
 .RS 11n
-.rt  
 \fBIP\fR device driver
 .RE
 

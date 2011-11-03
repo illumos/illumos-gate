@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH smf_security 5 "20 May 2009" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH SMF_SECURITY 5 "May 20, 2009"
 .SH NAME
 smf_security \- service management facility security behavior
 .SH DESCRIPTION
@@ -19,12 +19,10 @@ The following authorization is used to manipulate services and service
 instances.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsolaris.smf.modify\fR\fR
 .ad
 .RS 22n
-.rt  
 Authorized to add, delete, or modify services, service instances, or their
 properties, and to read protected property values.
 .RE
@@ -48,7 +46,6 @@ they conform to the extended naming convention in \fBsmf\fR(5). The following
 basic authorizations, however, apply only to the core property group types:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsolaris.smf.modify.method\fR\fR
 .ad
@@ -60,7 +57,6 @@ type \fBmethod\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsolaris.smf.modify.dependency\fR\fR
 .ad
@@ -72,7 +68,6 @@ type \fBdependency\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsolaris.smf.modify.application\fR\fR
 .ad
@@ -84,7 +79,6 @@ modify a property group of type application.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsolaris.smf.modify.framework\fR\fR
 .ad
@@ -96,7 +90,6 @@ type \fBframework\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsolaris.smf.modify\fR\fR
 .ad
@@ -112,12 +105,10 @@ Property group-specific authorization can be specified by properties contained
 in the property group.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmodify_authorization\fR\fR
 .ad
 .RS 24n
-.rt  
 Authorizations allow the addition, deletion, or modification of properties
 within the property group, and the retrieval of property values from the
 property group if protected.
@@ -125,12 +116,10 @@ property group if protected.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvalue_authorization\fR\fR
 .ad
 .RS 24n
-.rt  
 Authorizations allow changing the values of any property of the property group
 except \fBmodify_authorization\fR, and the retrieval of any property values
 except modify_authorization from the property group if protected.
@@ -138,12 +127,10 @@ except modify_authorization from the property group if protected.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBread_authorization\fR\fR
 .ad
 .RS 24n
-.rt  
 Authorizations allow the retrieval of property values within the property
 group. The presence of a string-valued property with this name identifies the
 containing property group as protected. This property has no effect on property
@@ -184,12 +171,10 @@ service instance in the maintenance or other non-operational state. The
 following authorization allows such actions to be requested:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsolaris.smf.manage\fR\fR
 .ad
 .RS 22n
-.rt  
 Authorized to request restart, refresh, or other state modification of any
 service instance.
 .RE
@@ -207,12 +192,10 @@ Two rights profiles are included that offer grouped authorizations for
 manipulating typical \fBsmf\fR(5) operations.
 .sp
 .ne 2
-.mk
 .na
 \fBService Management\fR
 .ad
 .RS 22n
-.rt  
 A service manager can manipulate any service in the repository in any way. It
 corresponds to the \fBsolaris.smf.manage\fR and \fBsolaris.smf.modify\fR
 authorizations.
@@ -224,12 +207,10 @@ that contain an inventory of services in its service manifest.
 
 .sp
 .ne 2
-.mk
 .na
 \fBService Operator\fR
 .ad
 .RS 22n
-.rt  
 A service operator has the ability to enable or disable any service instance on
 the system, as well as request that its restart or refresh method be executed.
 It corresponds to the \fBsolaris.smf.manage\fR and

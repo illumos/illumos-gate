@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ldapclient 1M "14 Feb 2009" "SunOS 5.11" "System Administration Commands"
+.TH LDAPCLIENT 1M "Feb 14, 2009"
 .SH NAME
 ldapclient \- initialize LDAP client machine or output an LDAP client profile
 in LDIF format
@@ -258,7 +258,6 @@ appropriate certificate databases to use TLS.
 The following commands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinit\fR\fR
 .ad
@@ -269,7 +268,6 @@ Initialize client from a profile on a server.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmanual\fR\fR
 .ad
@@ -280,7 +278,6 @@ Manually initialize client with the specified attribute values.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmod\fR\fR
 .ad
@@ -292,7 +289,6 @@ of the client.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlist\fR\fR
 .ad
@@ -304,7 +300,6 @@ readable form.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuninit\fR\fR
 .ad
@@ -316,7 +311,6 @@ initialize the client.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgenprofile\fR\fR
 .ad
@@ -332,7 +326,6 @@ directory for clients to use, with the \fBinit\fR form of this command.
 The following attributes are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadminDN\fR\fR
 .ad
@@ -346,7 +339,6 @@ default value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadminPassword\fR\fR
 .ad
@@ -359,7 +351,6 @@ is no default value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBattributeMap\fR\fR
 .ad
@@ -384,7 +375,6 @@ the LDAP client would use the LDAP attribute \fBemployeeNumber\fR rather than
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauthenticationMethod\fR\fR
 .ad
@@ -411,7 +401,6 @@ ipnodes: dns files
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbindTimeLimit\fR\fR
 .ad
@@ -423,7 +412,6 @@ operation. Set this to a positive integer. The default value is 30.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcertificatePath\fR\fR
 .ad
@@ -437,7 +425,6 @@ which is specified in the \fBauthenticationMethod\fR and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcredentialLevel\fR\fR
 .ad
@@ -457,7 +444,6 @@ self credential level is specified, the \fBauthenticationMethod\fR must be
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdefaultSearchBase\fR\fR
 .ad
@@ -470,7 +456,6 @@ Specify the default search base DN. There is no default. The
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdefaultSearchScope=one | sub\fR\fR
 .ad
@@ -483,7 +468,6 @@ default can be overridden for a given service by specifying a
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdefaultServerList\fR\fR
 .ad
@@ -532,7 +516,6 @@ resolve the host address.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdomainName\fR\fR
 .ad
@@ -545,7 +528,6 @@ initialization.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBenableShadowUpdate=true | false\fR\fR
 .ad
@@ -558,7 +540,6 @@ Specify whether the client is allowed to update shadow information. If set to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfollowReferrals=true | false\fR\fR
 .ad
@@ -571,7 +552,6 @@ The default is true.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBobjectclassMap\fR\fR
 .ad
@@ -585,7 +565,7 @@ The default value for all services is \fINULL\fR. In the example,
 .sp
 .in +2
 .nf
-objectclassMap=passwd:posixAccount=unixAccount 
+objectclassMap=passwd:posixAccount=unixAccount
 .fi
 .in -2
 .sp
@@ -597,7 +577,6 @@ multivalued attribute.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpreferredServerList\fR\fR
 .ad
@@ -647,7 +626,6 @@ resolve the host address.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprofileName\fR\fR
 .ad
@@ -661,7 +639,6 @@ is the name of the profile to be generated. The default value is \fBdefault\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprofileTTL\fR\fR
 .ad
@@ -677,7 +654,6 @@ The default value is 12 hours.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBproxyDN\fR\fR
 .ad
@@ -690,7 +666,6 @@ authentication methods requires a bind DN. There is no default value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBproxyPassword\fR\fR
 .ad
@@ -703,7 +678,6 @@ DN. There is no default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsearchTimeLimit\fR\fR
 .ad
@@ -715,7 +689,6 @@ default is 30 seconds. The server may have its own search time limit.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBserviceAuthenticationMethod\fR\fR
 .ad
@@ -749,7 +722,6 @@ attribute.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBserviceCredentialLevel\fR\fR
 .ad
@@ -764,7 +736,6 @@ attribute.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBserviceSearchDescriptor\fR\fR
 .ad
@@ -794,7 +765,6 @@ the LDAP client would do a one level search in
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fBattrName=\fR\fIattrValue\fR\fR
 .ad
@@ -806,7 +776,6 @@ possible attribute names and values.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR \fIbindDN\fR\fR
 .ad
@@ -817,7 +786,6 @@ Specifies an entry that has read permission for the requested database.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-j\fR \fIpasswdFile\fR\fR
 .ad
@@ -831,7 +799,6 @@ the \fB-w\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
@@ -842,7 +809,6 @@ Quiet mode. No output is generated.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -853,7 +819,6 @@ Verbose output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR \fIbindPassword\fR\fR
 .ad
@@ -873,7 +838,6 @@ password.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-y\fR \fIpasswdFile\fR\fR
 .ad
@@ -886,7 +850,6 @@ This option is mutually exclusive of the \fB-a\fR \fIproxyPassword\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fIadminrPasswdFile\fR\fR
 .ad
@@ -903,7 +866,6 @@ This option is mutually exclusive of the \fB-a\fR \fIadminPassword\fR option.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fILDAP_server\fR\fR
 .ad
@@ -1070,34 +1032,28 @@ example# \fBldapclient genprofile -a profileName=eng \e
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB0\fR
 .ad
 .RS 5n
-.rt  
 The command successfully executed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB1\fR
 .ad
 .RS 5n
-.rt  
 An error occurred. An error message is output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB2\fR
 .ad
 .RS 5n
-.rt  
 \fBproxyDN\fR and \fBproxyPassword\fR attributes are required, but they are not
 provided.
 .RE
@@ -1105,7 +1061,6 @@ provided.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/ldap/ldap_client_cred\fR\fR
 .ad
@@ -1122,7 +1077,6 @@ modified manually. Their content is not guaranteed to be human readable. Use
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/defaultdomain\fR\fR
 .ad
@@ -1134,7 +1088,6 @@ servers. See \fBdefaultdomain\fR(4).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/nsswitch.conf\fR\fR
 .ad
@@ -1145,7 +1098,6 @@ Configuration file for the name-service switch. See \fBnsswitch.conf\fR(4).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/nsswitch.ldap\fR\fR
 .ad
@@ -1163,13 +1115,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

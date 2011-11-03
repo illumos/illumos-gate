@@ -216,6 +216,7 @@ i386_MANFILES =	ahci.7d		\
 		npe.7d		\
 		ntxn.7d		\
 		nv_sata.7d	\
+		pcn.7d		\
 		radeon.7d	\
 		ral.7d		\
 		rtw.7d		\

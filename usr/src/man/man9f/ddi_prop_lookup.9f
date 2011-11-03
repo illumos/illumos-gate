@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_prop_lookup 9F "11 Apr 2001" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_PROP_LOOKUP 9F "Apr 11, 2001"
 .SH NAME
 ddi_prop_lookup, ddi_prop_lookup_int_array, ddi_prop_lookup_int64_array,
 ddi_prop_lookup_string_array, ddi_prop_lookup_string,
@@ -16,13 +16,13 @@ ddi_prop_lookup_byte_array, ddi_prop_free \- look up property information
 
 
 
-\fBint\fR \fBddi_prop_lookup_int_array\fR(\fBdev_t\fR \fImatch_dev\fR, \fBdev_info_t *\fR\fIdip\fR, 
+\fBint\fR \fBddi_prop_lookup_int_array\fR(\fBdev_t\fR \fImatch_dev\fR, \fBdev_info_t *\fR\fIdip\fR,
      \fBuint_t\fR \fIflags\fR, \fBchar *\fR\fIname\fR, \fBint **\fR\fIdatap\fR, \fBuint_t *\fR\fInelementsp\fR);
 .fi
 
 .LP
 .nf
-\fBint\fR \fBddi_prop_lookup_int64_array\fR(\fBdev_t\fR \fImatch_dev\fR, \fBdev_info_t *\fR\fIdip\fR, 
+\fBint\fR \fBddi_prop_lookup_int64_array\fR(\fBdev_t\fR \fImatch_dev\fR, \fBdev_info_t *\fR\fIdip\fR,
      \fBuint_t\fR \fIflags\fR, \fBchar *\fR\fIname\fR, \fBint64_t **\fR\fIdatap\fR, \fBuint_t *\fR\fInelementsp\fR);
 .fi
 
@@ -40,7 +40,7 @@ ddi_prop_lookup_byte_array, ddi_prop_free \- look up property information
 
 .LP
 .nf
-\fBint\fR \fBddi_prop_lookup_byte_array\fR(\fBdev_t\fR \fImatch_dev\fR, \fBdev_info_t *\fR\fIdip\fR, 
+\fBint\fR \fBddi_prop_lookup_byte_array\fR(\fBdev_t\fR \fImatch_dev\fR, \fBdev_info_t *\fR\fIdip\fR,
      \fBuint_t\fR \fIflags\fR, \fBchar *\fR\fIname\fR, \fBuchar_t **\fR\fIdatap\fR, \fBuint_t *\fR\fInelementsp\fR);
 .fi
 
@@ -52,56 +52,46 @@ ddi_prop_lookup_byte_array, ddi_prop_free \- look up property information
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fImatch_dev\fR\fR
 .ad
 .RS 14n
-.rt  
 Device number associated with property or \fBDDI_DEV_T_ANY.\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 14n
-.rt  
 Pointer to the device info node of device whose property list should be
 searched.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 14n
-.rt  
 Possible flag values are some combination of:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_DONTPASS\fR\fR
 .ad
 .RS 21n
-.rt  
 Do not pass request to parent device information node if the property is not
 found.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_NOTPROM\fR\fR
 .ad
 .RS 21n
-.rt  
 Do not look at \fBPROM \fRproperties (ignored on platforms that do not support
 \fBPROM \fRproperties).
 .RE
@@ -110,23 +100,19 @@ Do not look at \fBPROM \fRproperties (ignored on platforms that do not support
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR\fR
 .ad
 .RS 14n
-.rt  
 String containing the name of the property.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInelementsp\fR\fR
 .ad
 .RS 14n
-.rt  
 The address of an unsigned integer which, upon successful return, will contain
 the number of elements accounted for in the memory pointed at by \fIdatap\fR.
 The elements are either integers, strings or bytes depending on the interface
@@ -135,15 +121,12 @@ used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdatap\fR\fR
 .ad
 .RS 14n
-.rt  
 .sp
 .ne 2
-.mk
 .na
 \fB\fBddi_prop_lookup_int_array()\fR\fR
 .ad
@@ -155,7 +138,6 @@ will point to memory containing the integer array property value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBddi_prop_lookup_int64_array()\fR\fR
 .ad
@@ -167,7 +149,6 @@ return, will point to memory containing the integer array property value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBddi_prop_lookup_string_array()\fR\fR
 .ad
@@ -181,7 +162,6 @@ the \fIargv\fR argument to \fBexecve\fR(2).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBddi_prop_lookup_string()\fR\fR
 .ad
@@ -193,7 +173,6 @@ to memory containing the \fBNULL \fRterminated string value of the property.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBddi_prop_lookup_byte_array()\fR\fR
 .ad
@@ -289,7 +268,6 @@ then the companion free call would be
 \fBddi_prop_free(\fR\fImy_int_ptr\fR\fB)\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBddi_prop_lookup_int_array()\fR\fR
 .ad
@@ -304,7 +282,6 @@ integer array value of the property.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBddi_prop_lookup_int64_array()\fR\fR
 .ad
@@ -320,7 +297,6 @@ for 64-bit property values.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBddi_prop_lookup_string_array()\fR\fR
 .ad
@@ -335,7 +311,6 @@ strings, much like the \fIargv\fR argument to \fBexecve\fR(2).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBddi_prop_lookup_string()\fR\fR
 .ad
@@ -349,7 +324,6 @@ property.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBddi_prop_lookup_byte_array()\fR\fR
 .ad
@@ -363,7 +337,6 @@ value of the property.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBddi_prop_free()\fR\fR
 .ad
@@ -384,23 +357,19 @@ The functions \fBddi_prop_lookup_int_array()\fR,
 the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_SUCCESS\fR\fR
 .ad
 .RS 26n
-.rt  
 Upon success.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_INVAL_ARG\fR\fR
 .ad
 .RS 26n
-.rt  
 If an attempt is made to look up a property with \fImatch_dev\fR equal to
 \fBDDI_DEV_T_NONE\fR, \fIname\fR is \fBNULL \fRor \fIname\fR is the null
 string.
@@ -408,34 +377,28 @@ string.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_NOT_FOUND\fR\fR
 .ad
 .RS 26n
-.rt  
 Property not found.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_UNDEFINED\fR\fR
 .ad
 .RS 26n
-.rt  
 Property explicitly not defined (see \fBddi_prop_undefine\fR(9F)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_CANNOT_DECODE\fR\fR
 .ad
 .RS 26n
-.rt  
 The value of the property cannot be decoded.
 .RE
 

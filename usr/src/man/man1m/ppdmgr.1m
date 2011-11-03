@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ppdmgr 1M "9 Mar 2007" "SunOS 5.11" "System Administration Commands"
+.TH PPDMGR 1M "Mar 9, 2007"
 .SH NAME
 ppdmgr \- utility for managing PPD files
 .SH SYNOPSIS
@@ -56,7 +56,6 @@ name may not contain a semi-colon (:).
 The following subcommand are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIppd_file_path\fR\fR
 .ad
@@ -70,7 +69,6 @@ name to the PPD file. The utility accepts a valid PPD file with either a
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR \fIlabel\fR\fR
 .ad
@@ -82,57 +80,47 @@ option, the default label is "\fBuser\fR". When specified with the \fB-r\fR or
 labels:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcaches\fR\fR
 .ad
 .RS 16n
-.rt  
 may never be specified
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBppdcache\fR\fR
 .ad
 .RS 16n
-.rt  
 may never be specified
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmanufaliases\fR\fR
 .ad
 .RS 16n
-.rt  
 may never be specified
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBall\fR\fR
 .ad
 .RS 16n
-.rt  
 applies the specified action to all labels in a repository, and may only be
 specified with the \fB-r\fR or \fB-u\fR option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSUNW*\fR\fR
 .ad
 .RS 16n
-.rt  
 anything starting with \fBSUNW\fR is reserved and should not be specified with
 the \fB-a\fR option.
 .RE
@@ -141,7 +129,6 @@ the \fB-a\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIrepository_name\fR\fR
 .ad
@@ -158,7 +145,6 @@ The default repository name is "\fBuser\fR". Only the "\fBuser\fR" or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
@@ -170,7 +156,6 @@ repository.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
@@ -182,7 +167,6 @@ repository.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR\fR
 .ad
@@ -295,23 +279,19 @@ label in the "\fBuser\fR" repository:
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -323,13 +303,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

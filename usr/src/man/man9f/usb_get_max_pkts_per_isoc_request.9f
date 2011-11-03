@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH usb_get_max_pkts_per_isoc_request 9F "5 Jan 2004" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH USB_GET_MAX_PKTS_PER_ISOC_REQUEST 9F "Jan 5, 2004"
 .SH NAME
 usb_get_max_pkts_per_isoc_request \- Get maximum number of packets allowed per
 isochronous request
@@ -24,12 +24,10 @@ Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 7n
-.rt  
 Pointer to the device's \fBdev_info\fR structure.
 .RE
 
@@ -66,13 +64,13 @@ May be called from user, kernel or interrupt context.
 .in +2
 .nf
 /*
- * Set up to receive periodic isochronous data, requesting 
+ * Set up to receive periodic isochronous data, requesting
  * the maximum amount for each transfer.
  */
 
 int pkt;
 /* Get max packet size from endpoint descriptor. */
-uint_t ep_max_pkt_size = ep_descr.wMaxPacketSize; 
+uint_t ep_max_pkt_size = ep_descr.wMaxPacketSize;
 uint_t isoc_pkts_count = usb_get_max_pkts_per_isoc_request(dip);
 
 /*
@@ -112,15 +110,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitecturePCI-based systems
+Architecture	PCI-based systems
 _
-Interface stabilityCommitted
+Interface stability	Committed
 .TE
 
 .SH SEE ALSO

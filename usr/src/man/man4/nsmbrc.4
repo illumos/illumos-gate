@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH nsmbrc 4 "Dec 8 2008" "SunOS 5.11" "File Formats"
+.TH NSMBRC 4 "Dec 8, 2008"
 .SH NAME
 nsmbrc \- configuration file for Solaris CIFS client requests
 .SH SYNOPSIS
@@ -97,7 +97,6 @@ The following list describes the properties and states in which sections they
 can be set:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBaddr\fR\fR
 .ad
@@ -110,7 +109,6 @@ value as there is no default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdomain\fR\fR
 .ad
@@ -123,7 +121,6 @@ and server sections.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBminauth\fR\fR
 .ad
@@ -139,7 +136,6 @@ value is \fBntlm\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnbns\fR\fR
 .ad
@@ -153,7 +149,6 @@ value is empty, \fBnbns=""\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnbns_broadcast\fR\fR
 .ad
@@ -170,7 +165,6 @@ be set in the default section. Valid values are \fByes\fR, \fBtrue\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnbns_enable\fR\fR
 .ad
@@ -186,7 +180,6 @@ default value is \fByes\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpassword\fR\fR
 .ad
@@ -204,7 +197,6 @@ password.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsigning\fR\fR
 .ad
@@ -229,7 +221,6 @@ client has signing required, the client cannot connect to that server.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtimeout\fR\fR
 .ad
@@ -241,7 +232,6 @@ property can only be set in the default, server, and share sections.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuser\fR\fR
 .ad
@@ -254,7 +244,6 @@ property can only be set in the default and server sections.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBworkgroup\fR\fR
 .ad
@@ -373,7 +362,6 @@ shown are those set by the previous example.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.nsmbrc\fR\fR
 .ad
@@ -391,13 +379,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

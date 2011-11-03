@@ -3,15 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH kbd 1 "29 Jan 2007" "SunOS 5.11" "User Commands"
+.TH KBD 1 "Jan 29, 2007"
 .SH NAME
 kbd \- manipulate the state of keyboard, or display the type of keyboard, or
 change the default keyboard abort sequence effect
 .SH SYNOPSIS
 .LP
 .nf
-\fBkbd\fR [\fB-r\fR] [\fB-t\fR ] [\fB-l\fR] [\fB-a\fR enable | disable | alternate] 
-     [\fB-c\fR on | off] [\fB-d\fR \fIkeyboard device\fR] 
+\fBkbd\fR [\fB-r\fR] [\fB-t\fR ] [\fB-l\fR] [\fB-a\fR enable | disable | alternate]
+     [\fB-c\fR on | off] [\fB-d\fR \fIkeyboard device\fR]
      [\fB-D\fR \fIautorepeat delay\fR] [\fB-R\fR \fIautorepeat rate\fR]
 .fi
 
@@ -251,7 +251,6 @@ frequency, run \fBkbd\fR \fB-i\fR.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fBenable\fR | \fBdisable\fR | \fBalternate\fR\fR
 .ad
@@ -267,35 +266,29 @@ The default keyboard behavior can be changed using this option. The \fB-a\fR
 option can only be used by a super-user.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBenable\fR\fR
 .ad
 .RS 13n
-.rt  
 Enables the default effect of the keyboard abort sequence (suspend the
 operating system and enter the debugger or the monitor).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisable\fR\fR
 .ad
 .RS 13n
-.rt  
 Disables the default/alternate effect and ignores keyboard abort sequences.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBalternate\fR\fR
 .ad
 .RS 13n
-.rt  
 Enables the alternate effect of the keyboard abort sequences (suspend the
 operating system and enter the debugger or the monitor) upon receiving the
 Alternate Break character sequence on the console. The Alternate Break sequence
@@ -308,7 +301,6 @@ the serial console port when this value is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR \fBkeyboard\fR | \fBconsole\fR\fR
 .ad
@@ -317,23 +309,19 @@ the serial console port when this value is used.
 Sets the beeper frequency for keyboard or console.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkeyboard\fR\fR
 .ad
 .RS 12n
-.rt  
 Set the keyboard beeper frequency to the operand in HZ. See \fBOPERANDS\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBconsole\fR\fR
 .ad
 .RS 12n
-.rt  
 Sets the console beeper frequency to the operand in HZ. See \fBOPERANDS\fR.
 .RE
 
@@ -341,7 +329,6 @@ Sets the console beeper frequency to the operand in HZ. See \fBOPERANDS\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fBon\fR | \fBoff\fR\fR
 .ad
@@ -350,23 +337,19 @@ Sets the console beeper frequency to the operand in HZ. See \fBOPERANDS\fR.
 Turns the clicking of the keyboard on or off.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBon\fR\fR
 .ad
 .RS 7n
-.rt  
 Enables clicking
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBoff\fR\fR
 .ad
 .RS 7n
-.rt  
 Disables clicking
 .RE
 
@@ -374,7 +357,6 @@ Disables clicking
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIkeyboard device\fR\fR
 .ad
@@ -385,7 +367,6 @@ Specifies the keyboard device being set. The default setting is \fB/dev/kbd\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR \fIautorepeat delay\fR\fR
 .ad
@@ -396,7 +377,6 @@ Sets the autorepeat delay in milliseconds.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
@@ -412,7 +392,6 @@ Security Rights Profile.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
@@ -426,7 +405,6 @@ If used with -R or -D option, this option returns the value before the changes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
@@ -437,7 +415,6 @@ Resets the keyboard as if power-up.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIautorepeat rate\fR\fR
 .ad
@@ -448,7 +425,6 @@ Sets the autorepeat rate in milliseconds.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-s\fR \fB[\fR\fIlanguage\fR\fB]\fR\fR
 .ad
@@ -463,7 +439,6 @@ prompting for the user to specify the \fIlanguage\fR. See \fBOPERANDS\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
@@ -478,12 +453,10 @@ Returns the type of the keyboard being used.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fBfrequency\fR
 .ad
 .RS 13n
-.rt  
 The frequency value specified to be set in kernel. The receiver of this value
 is specified by the \fB-b\fR option. This value should be between 0 and 32767
 otherwise will be ejected with \fBEINVAL\fR.
@@ -491,12 +464,10 @@ otherwise will be ejected with \fBEINVAL\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBlanguage\fR
 .ad
 .RS 13n
-.rt  
 The language specified to be set in kernel. If the language is not found, the
 languages supported are listed for selection. It only applies to \fB-s\fR
 option.
@@ -605,7 +576,7 @@ example% kbd -s
 7. Dutch                         22. Slove
 \&......
 
-To select the keyboard layout, enter a number [default n]: 
+To select the keyboard layout, enter a number [default n]:
 
 example%
 .fi
@@ -643,23 +614,19 @@ example%
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/kbd\fR\fR
 .ad
 .RS 20n
-.rt  
 Keyboard device file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/default/kbd\fR\fR
 .ad
 .RS 20n
-.rt  
 Keyboard default file containing software defaults for keyboard configurations.
 .RE
 

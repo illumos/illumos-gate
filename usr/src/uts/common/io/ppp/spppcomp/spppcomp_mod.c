@@ -1,6 +1,15 @@
 /*
  * spppcomp_mod.c - modload support for PPP compression STREAMS module.
  *
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
+ *
+ * CONTRIBUTOR MAKES NO REPRESENTATION OR WARRANTIES ABOUT THE SUITABILITY
+ * OF THE SOFTWARE, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+ * TO THE IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+ * PARTICULAR PURPOSE, OR NON-INFRINGEMENT.  CONTRIBUTOR SHALL NOT BE LIABLE
+ * FOR ANY DAMAGES SUFFERED BY LICENSEE AS A RESULT OF USING, MODIFYING OR
+ * DISTRIBUTING THIS SOFTWARE OR ITS DERIVATIVES
+ *
  * Copyright (c) 2000 by Sun Microsystems, Inc.
  * All rights reserved.
  *
@@ -46,9 +55,6 @@
  * performance and scalability.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#define	RCSID	"$Id: spppcomp_mod.c,v 1.0 2000/05/08 01:10:12 masputra Exp $"
-
 #include <sys/types.h>
 #include <sys/syslog.h>
 #include <sys/conf.h>
@@ -63,7 +69,6 @@
 /*
  * Globals for PPP compression loadable module wrapper
  */
-char _depends_on[] = "drv/sppp";	/* we need some helper routines */
 extern struct streamtab spppcomp_tab;
 extern const char spppcomp_module_description[];
 

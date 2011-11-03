@@ -41,7 +41,8 @@ dir path=usr/share/man
 dir path=usr/share/man/man7d
 driver name=si3124 class=scsi-self-identifying perms="* 0644 root sys" \
     alias=pci1095,3124 \
-    alias=pci1095,3132
+    alias=pci1095,3132 \
+    alias=pci1095,3531
 file path=kernel/drv/$(ARCH64)/si3124 group=sys
 file path=kernel/drv/si3124 group=sys
 file path=usr/share/man/man7d/si3124.7d

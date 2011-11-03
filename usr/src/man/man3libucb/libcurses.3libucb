@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libcurses 3LIBUCB "14 Nov 2002" "SunOS 5.11" "SunOS/BSD Compatibility Interface Libraries"
+.TH LIBCURSES 3LIBUCB "Nov 14, 2002"
 .SH NAME
 libcurses \- SunOS/BSD-compatible screen handling and optimization library
 .SH SYNOPSIS
@@ -28,52 +28,49 @@ interfaces.
 
 .sp
 .TS
-tab();
-lw(1.38i) lw(1.38i) lw(1.38i) lw(1.38i) 
-lw(1.38i) lw(1.38i) lw(1.38i) lw(1.38i) 
-.
-\fBAL\fR\fBAL_PARM\fR\fBAM\fR\fBBC\fR
-\fBBS\fR\fBBT\fR\fBCA\fR\fBCD\fR
-\fBCE\fR\fBCL\fR\fBCM\fR\fBCOLS\fR
-\fBCR\fR\fBCS\fR\fBDA\fR\fBDB\fR
-\fBDC\fR\fBDL\fR\fBDL_PARM\fR\fBDM\fR
-\fBDO\fR\fBDOWN_PARM\fR\fBDef_term\fR\fBED\fR
-\fBEI\fR\fBEO\fR\fBGT\fR\fBHC\fR
-\fBHO\fR\fBHZ\fR\fBIC\fR\fBIM\fR
-\fBIN\fR\fBIP\fR\fBK0\fR\fBK1\fR
-\fBK2\fR\fBK3\fR\fBK4\fR\fBK5\fR
-\fBK6\fR\fBK7\fR\fBK8\fR\fBK9\fR
-\fBKD\fR\fBKE\fR\fBKH\fR\fBKL\fR
-\fBKR\fR\fBKS\fR\fBKU\fR\fBLEFT_PARM\fR
-\fBLINES\fR\fBLL\fR\fBMA\fR\fBMI\fR
-\fBMS\fR\fBMy_term\fR\fBNC\fR\fBND\fR
-\fBNL\fR\fBNONL\fR\fBNS\fR\fBOS\fR
-\fBPC\fR\fBRC\fR\fBRIGHT_PARM\fR\fBSC\fR
-\fBSE\fR\fBSF\fR\fBSO\fR\fBSR\fR
-\fBTA\fR\fBTE\fR\fBTI\fR\fBUC\fR
-\fBUE\fR\fBUL\fR\fBUP\fR\fBUPPERCASE\fR
-\fBUP_PARM\fR\fBUS\fR\fBVB\fR\fBVE\fR
-\fBVS\fR\fBXB\fR\fBXN\fR\fBXS\fR
-\fBXT\fR\fBXX\fR\fB_echoit\fR\fB_endwin\fR
-\fB_pfast\fR\fB_rawmode\fR\fB_res_flg\fR\fB_tty\fR
-\fB_tty_ch\fR\fB_unctrl\fR\fBbox\fR\fBcurscr\fR
-\fBdelwin\fR\fBendwin\fR\fBgetcap\fR\fBgettmode\fR
-\fBidlok\fR\fBinitscr\fR\fBlongname\fR\fBmvcur\fR
-\fBmvprintw\fR\fBmvscanw\fR\fBmvwin\fR\fBmvwprintw\fR
-\fBmvwscanw\fR\fBnewwin\fR\fBnormtty\fR\fBoverlay\fR
-\fBoverwrite\fR\fBprintw\fR\fBscanw\fR\fBscroll\fR
-\fBsetterm\fR\fBstdscr\fR\fBsubwin\fR\fBtouchline\fR
-\fBtouchwin\fR\fBttytype\fR\fBwaddch\fR\fBwaddstr\fR
-\fBwclear\fR\fBwclrtobot\fR\fBwclrtoeol\fR\fBwdelch\fR
-\fBwdeleteln\fR\fBwerase\fR\fBwgetch\fR\fBwgetstr\fR
-\fBwinsch\fR\fBwinsertln\fR\fBwmove\fR\fBwprintw\fR
-\fBwrefresh\fR\fBwscanw\fR\fBwstandend\fR\fBwstandout\fR
+l l l l
+l l l l .
+\fBAL\fR	\fBAL_PARM\fR	\fBAM\fR	\fBBC\fR
+\fBBS\fR	\fBBT\fR	\fBCA\fR	\fBCD\fR
+\fBCE\fR	\fBCL\fR	\fBCM\fR	\fBCOLS\fR
+\fBCR\fR	\fBCS\fR	\fBDA\fR	\fBDB\fR
+\fBDC\fR	\fBDL\fR	\fBDL_PARM\fR	\fBDM\fR
+\fBDO\fR	\fBDOWN_PARM\fR	\fBDef_term\fR	\fBED\fR
+\fBEI\fR	\fBEO\fR	\fBGT\fR	\fBHC\fR
+\fBHO\fR	\fBHZ\fR	\fBIC\fR	\fBIM\fR
+\fBIN\fR	\fBIP\fR	\fBK0\fR	\fBK1\fR
+\fBK2\fR	\fBK3\fR	\fBK4\fR	\fBK5\fR
+\fBK6\fR	\fBK7\fR	\fBK8\fR	\fBK9\fR
+\fBKD\fR	\fBKE\fR	\fBKH\fR	\fBKL\fR
+\fBKR\fR	\fBKS\fR	\fBKU\fR	\fBLEFT_PARM\fR
+\fBLINES\fR	\fBLL\fR	\fBMA\fR	\fBMI\fR
+\fBMS\fR	\fBMy_term\fR	\fBNC\fR	\fBND\fR
+\fBNL\fR	\fBNONL\fR	\fBNS\fR	\fBOS\fR
+\fBPC\fR	\fBRC\fR	\fBRIGHT_PARM\fR	\fBSC\fR
+\fBSE\fR	\fBSF\fR	\fBSO\fR	\fBSR\fR
+\fBTA\fR	\fBTE\fR	\fBTI\fR	\fBUC\fR
+\fBUE\fR	\fBUL\fR	\fBUP\fR	\fBUPPERCASE\fR
+\fBUP_PARM\fR	\fBUS\fR	\fBVB\fR	\fBVE\fR
+\fBVS\fR	\fBXB\fR	\fBXN\fR	\fBXS\fR
+\fBXT\fR	\fBXX\fR	\fB_echoit\fR	\fB_endwin\fR
+\fB_pfast\fR	\fB_rawmode\fR	\fB_res_flg\fR	\fB_tty\fR
+\fB_tty_ch\fR	\fB_unctrl\fR	\fBbox\fR	\fBcurscr\fR
+\fBdelwin\fR	\fBendwin\fR	\fBgetcap\fR	\fBgettmode\fR
+\fBidlok\fR	\fBinitscr\fR	\fBlongname\fR	\fBmvcur\fR
+\fBmvprintw\fR	\fBmvscanw\fR	\fBmvwin\fR	\fBmvwprintw\fR
+\fBmvwscanw\fR	\fBnewwin\fR	\fBnormtty\fR	\fBoverlay\fR
+\fBoverwrite\fR	\fBprintw\fR	\fBscanw\fR	\fBscroll\fR
+\fBsetterm\fR	\fBstdscr\fR	\fBsubwin\fR	\fBtouchline\fR
+\fBtouchwin\fR	\fBttytype\fR	\fBwaddch\fR	\fBwaddstr\fR
+\fBwclear\fR	\fBwclrtobot\fR	\fBwclrtoeol\fR	\fBwdelch\fR
+\fBwdeleteln\fR	\fBwerase\fR	\fBwgetch\fR	\fBwgetstr\fR
+\fBwinsch\fR	\fBwinsertln\fR	\fBwmove\fR	\fBwprintw\fR
+\fBwrefresh\fR	\fBwscanw\fR	\fBwstandend\fR	\fBwstandout\fR
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/libucb/libcurses.so.1\fR \fR
 .ad
@@ -84,7 +81,6 @@ shared object
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/libucb/64/libcurses.so.1\fR \fR
 .ad
@@ -101,12 +97,11 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
-MT-LevelUnsafe
+box;
+l l
+l l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO

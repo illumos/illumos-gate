@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH krb5.conf 4 "5 Jan 2009" "SunOS 5.11" "File Formats"
+.TH KRB5.CONF 4 "Jan 5, 2009"
 .SH NAME
 krb5.conf \- Kerberos configuration file
 .SH SYNOPSIS
@@ -50,7 +50,6 @@ or
 The \fBkrb5.conf\fR file can contain any or all of the following sections:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlibdefaults\fR\fR
 .ad
@@ -61,7 +60,6 @@ Contains default values used by the Kerberos V5 library.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBappdefaults\fR\fR
 .ad
@@ -74,7 +72,6 @@ describes application-specific defaults.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrealms\fR\fR
 .ad
@@ -87,7 +84,6 @@ properties for that particular realm.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdomain_realm\fR\fR
 .ad
@@ -100,7 +96,6 @@ given its fully qualified domain name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlogging\fR\fR
 .ad
@@ -112,7 +107,6 @@ logging.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcapaths\fR\fR
 .ad
@@ -127,7 +121,6 @@ field for trusted intermediate realms.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdbmodules\fR\fR
 .ad
@@ -139,7 +132,6 @@ information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkdc\fR\fR
 .ad
@@ -155,7 +147,6 @@ For a Key Distribution Center (\fBKDC\fR), can contain the location of the
 The \fB[libdefaults]\fR section can contain any of the following relations:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdatabase_module\fR\fR
 .ad
@@ -168,7 +159,6 @@ database. If this parameter is not present the code uses the standard
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdefault_keytab_name\fR\fR
 .ad
@@ -180,7 +170,6 @@ Specifies the default keytab name to be used by application servers such as
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdefault_realm\fR\fR
 .ad
@@ -192,7 +181,6 @@ Kerberos realm.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdefault_tgs_enctypes\fR\fR
 .ad
@@ -207,7 +195,6 @@ The supported encryption types are \fBdes3-cbc-sha1-kd\fR, \fBdes-cbc-crc\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdefault_tkt_enctypes\fR\fR
 .ad
@@ -223,7 +210,6 @@ requested by the client. The format is the same as for
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclockskew\fR\fR
 .ad
@@ -236,7 +222,6 @@ is 300 seconds, or five minutes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBforwardable =\fR [\fBtrue\fR | \fBfalse\fR]\fR
 .ad
@@ -251,7 +236,6 @@ realm.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpermitted_enctypes\fR\fR
 .ad
@@ -268,7 +252,6 @@ controls the encryption types of keys added to a \fBkeytab\fR by means of the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBproxiable =\fR [\fBtrue\fR | \fBfalse\fR]\fR
 .ad
@@ -283,7 +266,6 @@ below) to limit its use in particular applications or just to a specific realm.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrenew_lifetime =\fR\fIlifetime\fR\fR
 .ad
@@ -294,7 +276,6 @@ for \fIlifetime\fR must be followed immediately by one of the following
 delimiters:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fR
 .ad
@@ -305,7 +286,6 @@ seconds
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBm\fR\fR
 .ad
@@ -316,7 +296,6 @@ minutes
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBh\fR\fR
 .ad
@@ -327,7 +306,6 @@ hours
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd\fR\fR
 .ad
@@ -350,7 +328,6 @@ Do not mix units. A value of "\fB3h30m\fR" results in an error.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmax_lifetime =\fR\fIlifetime\fR\fR
 .ad
@@ -363,7 +340,6 @@ above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdns_lookup_kdc\fR\fR
 .ad
@@ -385,7 +361,6 @@ default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdns_lookup_realm\fR\fR
 .ad
@@ -404,7 +379,6 @@ either case, values (if present) in the \fB[libdefaults]\fR and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdns_fallback\fR\fR
 .ad
@@ -418,7 +392,6 @@ option has no effect.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBverify_ap_req_nofail [true | false]\fR\fR
 .ad
@@ -448,7 +421,6 @@ not all relations are recognized by all kerberized applications. Some are
 specific to particular applications.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBautologin =\fR [\fBtrue\fR | \fBfalse\fR]\fR
 .ad
@@ -461,7 +433,6 @@ credentials. This is valid for the following applications: \fBrlogin\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBencrypt =\fR [\fBtrue\fR | \fBfalse\fR]\fR
 .ad
@@ -475,7 +446,6 @@ applications: \fBrlogin\fR, \fBrsh\fR, \fBrcp\fR, \fBrdist\fR, and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBforward =\fR [\fBtrue\fR | \fBfalse\fR]\fR
 .ad
@@ -488,7 +458,6 @@ to the remote server. This is valid for the following applications:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBforwardable =\fR [\fBtrue\fR | \fBfalse\fR]\fR
 .ad
@@ -501,7 +470,6 @@ that can forward tickets to a remote server.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBproxiable =\fR [\fBtrue\fR | \fBfalse\fR]\fR
 .ad
@@ -513,7 +481,6 @@ any application that creates a ticket granting ticket.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrenewable =\fR [\fBtrue\fR | \fBfalse\fR]\fR
 .ad
@@ -525,7 +492,6 @@ is used by any application that creates a ticket granting ticket.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBno_addresses =\fR [\fBtrue\fR | \fBfalse\fR]\fR
 .ad
@@ -538,7 +504,6 @@ valid in the \fBkinit\fR \fB[appdefault]\fR section only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmax_life =\fR\fIlifetime\fR\fR
 .ad
@@ -552,7 +517,6 @@ in a future release of the Solaris operating system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmax_renewable_life =\fR\fIlifetime\fR\fR
 .ad
@@ -566,7 +530,6 @@ the Solaris operating system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrcmd_protocol =\fR [ \fBrcmdv1\fR | \fBrcmdv2\fR ]\fR
 .ad
@@ -653,7 +616,6 @@ relations that define the properties for that particular realm. The following
 relations can be specified in each \fB[realms]\fR subsection:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadmin_server\fR\fR
 .ad
@@ -665,7 +627,6 @@ running. Typically, this is the master \fBKDC\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIapplication defaults\fR\fR
 .ad
@@ -678,7 +639,6 @@ override the global defaults specified in the \fB[appdefaults]\fR section.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauth_to_local_realm\fR\fR
 .ad
@@ -690,7 +650,6 @@ default realm for authenticated name-to-local name mapping.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauth_to_local_names\fR\fR
 .ad
@@ -703,7 +662,6 @@ corresponding local user name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauth_to_local\fR\fR
 .ad
@@ -722,7 +680,6 @@ RULE:[<ncomps>:<format>](<regex>)s/<regex>/<text>/
 Each rule has three parts:
 .sp
 .ne 2
-.mk
 .na
 \fBFirst part\(emFormulate the string on which to perform operations:\fR
 .ad
@@ -752,7 +709,6 @@ inserted.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSecond part\(emselect rule validity:\fR
 .ad
@@ -776,7 +732,6 @@ applies.
 
 .sp
 .ne 2
-.mk
 .na
 \fBThird part\(emTransform rule:\fR
 .ad
@@ -813,7 +768,6 @@ The preceding maps \fB\fIusername\fR@ACME.COM\fR and all sub-realms of
 
 .sp
 .ne 2
-.mk
 .na
 \fBDEFAULT\fR
 .ad
@@ -828,7 +782,6 @@ the conversion fails.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdatabase_module\fR\fR
 .ad
@@ -840,7 +793,6 @@ database.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBextra_addresses\fR...\fR
 .ad
@@ -853,7 +805,6 @@ list.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkdc\fR\fR
 .ad
@@ -865,7 +816,6 @@ The name of a host running a \fBKDC\fR for that realm. An optional port number
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkpasswd_server\fR\fR
 .ad
@@ -881,7 +831,6 @@ port other than 464 (the default). The format of this parameter is:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkpasswd_protocol\fR\fR
 .ad
@@ -899,7 +848,6 @@ is used to communicate the password change request to the server in the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBudp_preference_limit\fR\fR
 .ad
@@ -913,7 +861,6 @@ Regardless of the size, both protocols are tried if the first attempt fails.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBverify_ap_req_nofail\fR [\fBtrue\fR | \fBfalse\fR]\fR
 .ad
@@ -987,7 +934,6 @@ The following relations can be defined to specify how to log. The same relation
 can be repeated if you want to assign it multiple logging methods.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadmin_server\fR\fR
 .ad
@@ -999,7 +945,6 @@ default is \fBFILE:/var/krb5/kadmin.log.\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdefault\fR\fR
 .ad
@@ -1011,7 +956,6 @@ otherwise.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkdc\fR\fR
 .ad
@@ -1027,7 +971,6 @@ The \fBadmin_server\fR, \fBdefault\fR, and \fBkdc\fR relations can have the
 following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFILE:\fR\fIfilename\fR\fR
 .ad
@@ -1044,7 +987,6 @@ file is appended to.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTDERR\fR\fR
 .ad
@@ -1056,7 +998,6 @@ stream.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCONSOLE\fR\fR
 .ad
@@ -1068,7 +1009,6 @@ system supports it.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDEVICE=\fR\fIdevicename\fR\fR
 .ad
@@ -1079,7 +1019,6 @@ This causes the entity's logging messages to go to the specified device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSYSLOG[:\fR\fIseverity\fR\fB[:\fR\fIfacility\fR\fB]]\fR\fR
 .ad
@@ -1114,7 +1053,6 @@ The following relation can be defined to specify how to rotate \fBkdc\fR log
 files if the \fBFILE:\fR value is being used to log:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkdc_rotate\fR\fR
 .ad
@@ -1138,7 +1076,6 @@ The following relations can be specified for the \fBkdc_rotate\fR relation
 subsection:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fBperiod=\fIdelta_time\fR\fR\fR
 .ad
@@ -1159,7 +1096,6 @@ occurring. Therefore, rotation occurs only when logging has actually occurred
 for the specified time interval.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBversions=\fR\fInumber\fR\fR
 .ad
@@ -1234,26 +1170,26 @@ like this:
 .in +2
 .nf
 [capaths]
-   ANL.GOV = { 
+   ANL.GOV = {
        TEST.ANL.GOV = .
        PNL.GOV = ES.NET
        NERSC.GOV = ES.NET
        ES.NET = .
    }
 
-   TEST.ANL.GOV = { 
+   TEST.ANL.GOV = {
        ANL.GOV = .
    }
 
-   PNL.GOV = { 
+   PNL.GOV = {
        ANL.GOV = ES.NET
    }
 
-   NERSC.GOV = { 
+   NERSC.GOV = {
       ANL.GOV = ES.NET
    }
 
-   ES.NET = { 
+   ES.NET = {
       ANL.GOV = .
    }
 .fi
@@ -1276,19 +1212,19 @@ systems would look like this:
       ES.NET = .
    }
 
-   ANL.GOV = { 
+   ANL.GOV = {
       NERSC.GOV = ES.NET
    }
 
-   PNL.GOV = { 
+   PNL.GOV = {
       NERSC.GOV = ES.NET
    }
 
-   ES.NET = { 
+   ES.NET = {
       NERSC.GOV = .
    }
 
-   TEST.ANL.GOV = { 
+   TEST.ANL.GOV = {
       NERSC.GOV = ANL.GOV
       NERSC.GOV = ES.NET
    }
@@ -1359,7 +1295,6 @@ The syntax for specifying Public Key identity, trust, and revocation
 information for \fBpkinit\fR is as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkinit_identities\fR \fB=\fR \fIURI\fR\fR
 .ad
@@ -1377,7 +1312,6 @@ and \fBENV\fR. See the \fBPKINIT URI Types\fR section for more details.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkinit_anchors\fR \fB=\fR \fIURI\fR\fR
 .ad
@@ -1394,7 +1328,6 @@ Types\fR section for more details.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkinit_pool\fR \fB=\fR \fIURI\fR\fR
 .ad
@@ -1410,7 +1343,6 @@ Types\fR section for more details.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkinit_revoke\fR \fB=\fR \fIURI\fR\fR
 .ad
@@ -1426,7 +1358,6 @@ section for more details.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkinit_require_crl_checking\fR \fB=\fR \fIvalue\fR\fR
 .ad
@@ -1446,7 +1377,6 @@ CA.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkinit_dh_min_bits\fR \fB=\fR \fIvalue\fR\fR
 .ad
@@ -1458,7 +1388,6 @@ acceptable values are currently 1024, 2048, and 4096. The default is 2048.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkinit_win2k\fR \fB=\fR \fIvalue\fR\fR
 .ad
@@ -1470,7 +1399,6 @@ old, pre-RFC version of the protocol. The default is \fBfalse\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkinit_win2k_require_binding\fR \fB=\fR \fIvalue\fR\fR
 .ad
@@ -1482,7 +1410,6 @@ return a reply with a checksum rather than a nonce. The default is \fBfalse\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkinit_eku_checking\fR \fB=\fR \fIvalue\fR\fR
 .ad
@@ -1495,36 +1422,30 @@ necessary since the issuing CA has certified this as a KDC certificate. The
 values recognized in the \fBkrb5.conf\fR file are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkpKDC\fR\fR
 .ad
 .RS 16n
-.rt  
 This is the default value and specifies that the KDC must have the
 \fBid-pkinit-KPKdc EKU\fR as defined in RFC4556.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkpServerAuth\fR\fR
 .ad
 .RS 16n
-.rt  
 If \fBkpServerAuth\fR is specified, a KDC certificate with the
 \fBid-kp-serverAuth EKU\fR as used by Microsoft is accepted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnone\fR\fR
 .ad
 .RS 16n
-.rt  
 If \fBnone\fR is specified, then the KDC certificate is not checked to verify
 it has an acceptable EKU. The use of this option is not recommended.
 .RE
@@ -1533,7 +1454,6 @@ it has an acceptable EKU. The use of this option is not recommended.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkinit_kdc_hostname\fR \fB=\fR \fIvalue\fR\fR
 .ad
@@ -1548,7 +1468,6 @@ the KDC (as contained in its certificate).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkinit_cert_match\fR \fB=\fR \fIrule\fR\fR
 .ad
@@ -1576,12 +1495,10 @@ The syntax of the matching rules is:
 where
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrelation-operator\fR\fR
 .ad
 .RS 21n
-.rt  
 Specify \fIrelation-operator\fR as \fB&&\fR, meaning all component rules must
 match,  or \fB||\fR, meaning only one component rule must match.  If
 \fIrelation-operator\fR is not specified, the default is \fB&&\fR\&.
@@ -1589,12 +1506,10 @@ match,  or \fB||\fR, meaning only one component rule must match.  If
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcomponent-rule\fR\fR
 .ad
 .RS 21n
-.rt  
 There is no punctuation or white space between component rules.Specify
 \fIcomponent-rule\fR as one of the following:
 .sp
@@ -1639,7 +1554,6 @@ pkinit_cert_match = <EKU>msScLogin,clientAuth<KU>digitalSignature
 .SS "PKINIT URI Types"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFILE:\fR\fIfile-name[,key-file-name]\fR\fR
 .ad
@@ -1648,12 +1562,10 @@ pkinit_cert_match = <EKU>msScLogin,clientAuth<KU>digitalSignature
 This option has context-specific behavior.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkinit_identities\fR\fR
 .ad
 .RS 21n
-.rt  
 \fIfile-name\fR specifies the name of a PEM-format file containing the user's
 certificate.  If \fIkey-file-name\fR is not specified, the user's private key
 is expected to be in \fIfile-name\fR as well.  Otherwise, \fIkey-file-name\fR
@@ -1662,7 +1574,6 @@ is the name of the file containing the private key.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkinit_anchors\fR\fR
 .ad
@@ -1671,7 +1582,6 @@ is the name of the file containing the private key.
 \fB\fBpkinit_pool\fR\fR
 .ad
 .RS 21n
-.rt  
 \fIfile-name\fR is assumed to be the name of an \fBOpenSSL-style ca-bundle\fR
 file. The \fBca-bundle\fR file should be base-64 encoded.
 .RE
@@ -1680,7 +1590,6 @@ file. The \fBca-bundle\fR file should be base-64 encoded.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDIR:\fR\fIdirectory-name\fR\fR
 .ad
@@ -1689,12 +1598,10 @@ file. The \fBca-bundle\fR file should be base-64 encoded.
 This option has context-specific behavior.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkinit_identities\fR\fR
 .ad
 .RS 21n
-.rt  
 \fIdirectory-name\fR specifies a directory with files named \fB*.crt\fR and
 \fB*.key\fR, where the first part of the file name is the same for matching
 pairs of certificate and private key files. When a file with a name ending with
@@ -1705,7 +1612,6 @@ contain the private key. If no such file is found, then the certificate in the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkintit_anchors\fR\fR
 .ad
@@ -1714,7 +1620,6 @@ contain the private key. If no such file is found, then the certificate in the
 \fB\fBpkinit_pool\fR\fR
 .ad
 .RS 21n
-.rt  
 \fIdirectory-name\fR is assumed to be an OpenSSL-style hashed CA directory
 where each CA cert is stored in a file named \fBhash-of-ca-cert\fR.\fI#\fR.
 This infrastructure is encouraged, but all files in the directory is examined
@@ -1725,7 +1630,6 @@ and if they contain certificates (in PEM format), they are used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPKCS12:\fR\fIpkcs12-file-name\fR\fR
 .ad
@@ -1737,7 +1641,6 @@ the user's certificate and private key.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPKCS11:[slotid=\fR\fIslot-id\fR\fB][:token=\fR\fItoken-label\fR\fB][:cert
 id=\fR\fIcert-id\fR\fB][:certlabel=\fR\fIcert-label\fR\fB]\fR\fR
@@ -1756,7 +1659,6 @@ particular certificate to use for \fBpkinit\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENV:\fR\fIenvironment-variable-name\fR\fR
 .ad
@@ -1777,7 +1679,6 @@ LDAP KDB plug-in. Use of the \fBdb2\fR KDB plug-in is the default behavior and
 that this section does not need to be filled out in that case.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdb_library\fR\fR
 .ad
@@ -1789,7 +1690,6 @@ Name of the plug-in library. To use the LDAP KDB plug-in the name must be
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdb_module_dir\fR\fR
 .ad
@@ -1800,7 +1700,6 @@ Path to the plug-in libraries. The default is \fB/usr/lib/krb5\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_cert_path\fR\fR
 .ad
@@ -1812,7 +1711,6 @@ connection. This is a required parameter when using the LDAP KDB plug-in.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_conns_per_server\fR\fR
 .ad
@@ -1823,7 +1721,6 @@ Number of connections per LDAP instance. The default is \fB5\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_kadmind_dn\fR\fR
 .ad
@@ -1836,7 +1733,6 @@ should be in the \fBldap_service_password_file\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_kdc_dn\fR\fR
 .ad
@@ -1849,7 +1745,6 @@ password for this bind DN should be in the \fBldap_service_password_file\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_servers\fR\fR
 .ad
@@ -1871,7 +1766,6 @@ Each server URI should be separated by whitespace.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_service_password_file\fR\fR
 .ad
@@ -1884,7 +1778,6 @@ created using \fBkdb5_ldap_util\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_ssl_port\fR\fR
 .ad
@@ -1909,7 +1802,7 @@ The following is an example of a generic \fBkrb5.conf\fR file:
    default_tgs_enctypes = des-cbc-crc
 
 [realms]
-   ATHENA.MIT.EDU = { 
+   ATHENA.MIT.EDU = {
       kdc = kerberos.mit.edu
       kdc = kerberos-1.mit.edu
       kdc = kerberos-2.mit.edu
@@ -1917,7 +1810,7 @@ The following is an example of a generic \fBkrb5.conf\fR file:
       auth_to_local_realm = KRBDEV.ATHENA.MIT.EDU
    }
 
-   FUBAR.ORG = { 
+   FUBAR.ORG = {
       kdc = kerberos.fubar.org
       kdc = kerberos-1.fubar.org
       admin_server = kerberos.fubar.org
@@ -1965,7 +1858,6 @@ a Kerberos configuration file when the KDC is using the LDAP KDB plug-in.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/krb5/kdc.log\fR\fR
 .ad
@@ -1982,13 +1874,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

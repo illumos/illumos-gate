@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH poll 7d "28 Mar 2007" "SunOS 5.11" "Devices"
+.TH POLL 7D "Mar 28, 2007"
 .SH NAME
 poll \- driver for fast poll on many file descriptors
 .SH SYNOPSIS
@@ -19,67 +19,55 @@ int n = ioctl(int fd, DP_ISPOLLED, struct pollfd* pfd);\fR
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfd\fR \fR
 .ad
 .RS 12n
-.rt  
 Open file descriptor that refers to the  \fB/dev/poll\fR driver.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpath\fR \fR
 .ad
 .RS 12n
-.rt  
 \fB/dev/poll\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbuf\fR \fR
 .ad
 .RS 12n
-.rt  
 Array of  \fBpollfd\fR structures.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbufsize\fR \fR
 .ad
 .RS 12n
-.rt  
 Size of  \fIbuf\fR in bytes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIarg\fR \fR
 .ad
 .RS 12n
-.rt  
 Pointer to  \fBpollcall\fR structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpfd\fR \fR
 .ad
 .RS 12n
-.rt  
 Pointer to \fBpollfd\fR structure.
 .RE
 
@@ -203,7 +191,7 @@ The following example shows how  \fB/dev/poll\fR may be used.
                 pollfd[i].fd = fds[i];
                 pollfd[i].events = POLLIN;
                 pollfd[i].revents = 0;
-        } 
+        }
         if (write(wfd, &pollfd[0], sizeof(struct pollfd) * MAXBUF) !=
                         sizeof(struct pollfd) * MAXBUF) {
                 perror("failed to write all pollfds");
@@ -300,54 +288,46 @@ The following example is part of a test program which shows how
                 }
                 loopcnt++;
         }
- 
+
 .fi
 .in -2
 
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR \fR
 .ad
 .RS 11n
-.rt  
 A process does not have permission to access the content cached in
 \fB/dev/poll\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR \fR
 .ad
 .RS 11n
-.rt  
 A signal was caught during the execution of the \fBioctl\fR(2) function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR \fR
 .ad
 .RS 11n
-.rt  
 The request argument requires a data transfer to or from a buffer pointed to by
 \fIarg\fR, but \fIarg\fR points to an illegal address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR \fR
 .ad
 .RS 11n
-.rt  
 The request or \fIarg\fR parameter is not valid for  this device, or field of
 the dvpoll struct pointed by \fIarg\fR is not valid  (for example, when using
 write/pwrite dp_nfds is greater than {OPEN_MAX}, or when using the DPPOLL ioctl
@@ -356,12 +336,10 @@ dp_nfds is greater than or equal to {OPEN_MAX}}.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENXIO\fR \fR
 .ad
 .RS 11n
-.rt  
 The \fBO_NONBLOCK\fR flag is set, the named file is a FIFO, the \fBO_WRONLY\fR
 flag is set, and no process has the file open for reading; or the named file is
 a character special or block special file and the device associated with this
@@ -376,14 +354,13 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
-ArchitectureSPARC, x86
-Interface StabilityObsolete
-MT-LevelSafe
+box;
+l l
+l l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+Architecture	SPARC, x86
+Interface Stability	Obsolete
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

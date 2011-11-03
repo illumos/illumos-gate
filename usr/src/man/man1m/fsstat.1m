@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH fsstat 1M "5 Jan 2007" "SunOS 5.11" "System Administration Commands"
+.TH FSSTAT 1M "Jan 5, 2007"
 .SH NAME
 fsstat \- report file system statistics
 .SH SYNOPSIS
 .LP
 .nf
-\fBfsstat\fR [\fB-a|f|i|n|v\fR] [\fB-T\fR | u|d] {\fB-F\fR | {\fIfstype\fR|\fIpath\fR}...} 
+\fBfsstat\fR [\fB-a|f|i|n|v\fR] [\fB-T\fR | u|d] {\fB-F\fR | {\fIfstype\fR|\fIpath\fR}...}
      [\fIinterval\fR [\fIcount\fR]]
 .fi
 
@@ -45,34 +45,28 @@ the units in a human readable form that fits in a maximum of 5 characters. For
 example:
 .sp
 .ne 2
-.mk
 .na
 \fB100\fR
 .ad
 .RS 11n
-.rt  
 is displayed as 100
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB2048\fR
 .ad
 .RS 11n
-.rt  
 is displayed as 2K
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB3000000\fR
 .ad
 .RS 11n
-.rt  
 is displayed as 2.86M
 .RE
 
@@ -110,123 +104,101 @@ The default report shows general file system activity. This display combines
 similar operations into general categories as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBnew file\fR
 .ad
 .RS 15n
-.rt  
 Number of creation operations for file system objects (for example, files,
 directories, symlinks, etc.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBname remov\fR
 .ad
 .RS 15n
-.rt  
 Number of name removal operations
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBname chng\fR
 .ad
 .RS 15n
-.rt  
 Number of name change operations
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBattr get\fR
 .ad
 .RS 15n
-.rt  
 Number of object attribute retrieval operations
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBattr set\fR
 .ad
 .RS 15n
-.rt  
 Number of object attribute change operations
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBlookup ops\fR
 .ad
 .RS 15n
-.rt  
 Number of object lookup operations
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBrddir ops\fR
 .ad
 .RS 15n
-.rt  
 Number of read directory operations
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBread ops\fR
 .ad
 .RS 15n
-.rt  
 Number of data read operations
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBread bytes\fR
 .ad
 .RS 15n
-.rt  
 Bytes transferred by data read operations
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwrite ops\fR
 .ad
 .RS 15n
-.rt  
 Number of data write operations
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwrite bytes\fR
 .ad
 .RS 15n
-.rt  
 Bytes transferred by data write operations
 .RE
 
@@ -240,55 +212,45 @@ last column.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 10n
-.rt  
 Report the activity for kernel attribute operations. The following statistics
 are reported:
 .sp
 .ne 2
-.mk
 .na
 \fBgetattr\fR
 .ad
 .RS 11n
-.rt  
 Number of file attribute retrieval calls
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBsetattr\fR
 .ad
 .RS 11n
-.rt  
 Number of file attribute modification calls
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBgetsec\fR
 .ad
 .RS 11n
-.rt  
 Number of file security attribute retrieval calls
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBsetsec\fR
 .ad
 .RS 11n
-.rt  
 Number of file security attribute modification calls
 .RE
 
@@ -298,34 +260,28 @@ last column.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 10n
-.rt  
 Report the full activity for all kernel file operations. Each file operation is
 listed in the left column. The following statistics are reported for each
 operation:
 .sp
 .ne 2
-.mk
 .na
 \fB#ops\fR
 .ad
 .RS 9n
-.rt  
 Number of calls for this operation
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBbytes\fR
 .ad
 .RS 9n
-.rt  
 Average transfer size in bytes (only applies to read, write, readdir)
 .RE
 
@@ -335,99 +291,81 @@ first row.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 10n
-.rt  
 Reports the activity for kernel I/O operations. The following statistics are
 reported:
 .sp
 .ne 2
-.mk
 .na
 \fBread ops\fR
 .ad
 .RS 15n
-.rt  
 Number of data read calls
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBread bytes\fR
 .ad
 .RS 15n
-.rt  
 Number of bytes read
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwrite ops\fR
 .ad
 .RS 15n
-.rt  
 Number of data write calls
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwrite bytes\fR
 .ad
 .RS 15n
-.rt  
 Number of bytes written
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBrddir ops\fR
 .ad
 .RS 15n
-.rt  
 Number of read directory calls
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBrddir bytes\fR
 .ad
 .RS 15n
-.rt  
 Number of bytes read by reading directories
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBrwlock ops\fR
 .ad
 .RS 15n
-.rt  
 Number of internal file system lock operations
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBrwulock ops\fR
 .ad
 .RS 15n
-.rt  
 Number of internal file system unlock operations
 .RE
 
@@ -437,121 +375,99 @@ last column.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 10n
-.rt  
 Reports the activity for kernel naming operations. The following statistics are
 reported:
 .sp
 .ne 2
-.mk
 .na
 \fBlookup\fR
 .ad
 .RS 11n
-.rt  
 Number of file name retrieval calls
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBcreat\fR
 .ad
 .RS 11n
-.rt  
 Number of file creation calls
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBremov\fR
 .ad
 .RS 11n
-.rt  
 Number of file remove calls
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBlink\fR
 .ad
 .RS 11n
-.rt  
 Number of link calls
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBrenam\fR
 .ad
 .RS 11n
-.rt  
 Number of file renaming calls
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmkdir\fR
 .ad
 .RS 11n
-.rt  
 Number of directory creation calls
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBrmdir\fR
 .ad
 .RS 11n
-.rt  
 Number of directory removal calls
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBrddir\fR
 .ad
 .RS 11n
-.rt  
 Number of directory read calls
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBsymlink\fR
 .ad
 .RS 11n
-.rt  
 Number of symlink creation calls
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBrdlink\fR
 .ad
 .RS 11n
-.rt  
 Number of symlink read calls
 .RE
 
@@ -561,77 +477,63 @@ last column.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 10n
-.rt  
 Reports the activity for calls to the virtual memory operations. The following
 statistics are reported.
 .sp
 .ne 2
-.mk
 .na
 \fBmap\fR
 .ad
 .RS 10n
-.rt  
 Number of calls mapping a file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBaddmap\fR
 .ad
 .RS 10n
-.rt  
 Number of calls setting additional mapping to a mapped file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdelmap\fR
 .ad
 .RS 10n
-.rt  
 Number of calls deleting mapping to a file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBgetpag\fR
 .ad
 .RS 10n
-.rt  
 Number of calls retrieving a page of data from a file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBputpag\fR
 .ad
 .RS 10n
-.rt  
 Number of calls writing a page of data to a file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBpagio\fR
 .ad
 .RS 10n
-.rt  
 Number of calls to transfer pages in file system swap files
 .RE
 
@@ -641,23 +543,19 @@ column.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
 .RS 10n
-.rt  
 Report on all available file system types.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fIu\fR|\fId\fR\fR
 .ad
 .RS 10n
-.rt  
 Display a time stamp.
 .sp
 Specify \fIu\fR for a printed representation of the internal representation of
@@ -671,46 +569,38 @@ time (see \fBtime\fR(2)) Specify \fId\fR for the standard date format. (See
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcount\fR\fR
 .ad
 .RS 12n
-.rt  
 Display only \fIcount\fR reports.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfstype\fR\fR
 .ad
 .RS 12n
-.rt  
 Explicitly specify the file system type(s) to be reported. The file system
 module must be loaded.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinterval\fR\fR
 .ad
 .RS 12n
-.rt  
 Report once each \fIinterval\fR seconds.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpath\fR\fR
 .ad
 .RS 12n
-.rt  
 Specify the path(s) of the mount point(s) to be reported. If path is not a
 mount point, the mount point containing path will be determined and displayed
 in the output.
@@ -871,35 +761,29 @@ that affect the execution of \fBfsstat\fR: \fBLANG\fR, \fBLC_ALL\fR,
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 A fatal error occurred. A fatal error could be a failed system call or another
 internal error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Invalid command-line options were specified.
 .RE
 
@@ -911,15 +795,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

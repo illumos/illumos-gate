@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH th_manage 1M "4 Jan 2001" "SunOS 5.11" "System Administration Commands"
+.TH TH_MANAGE 1M "Jan 4, 2001"
 .SH NAME
 th_manage \- manage the fault injection test harness
 .SH SYNOPSIS
@@ -30,12 +30,10 @@ fault injection specifications (errdefs) defined by \fBth_define\fR(1M).
 specified by \fIname\fR and \fIinstance\fR (or \fIpath\fR). The commands are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbroadcast\fR \fR
 .ad
 .RS 18n
-.rt  
 Awaken all \fBth_define\fR processes, causing them to display their current
 status and exit if the errdef is now defunct (that is, if \fIcount\fR,
 \fIfailcount \fR, and \fIacc_chk \fR are all zero).
@@ -43,12 +41,10 @@ status and exit if the errdef is now defunct (that is, if \fIcount\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclear_acc_chk\fR \fR
 .ad
 .RS 18n
-.rt  
 Awaken all \fBth_define\fR processes. If \fIcount\fR and \fIfailcount\fR are
 already zero, then set \fIacc_chk\fR to zero, so that \fBth_define\fR exits
 once it has displayed its status.
@@ -56,12 +52,10 @@ once it has displayed its status.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclear_errdefs\fR \fR
 .ad
 .RS 18n
-.rt  
 Awaken all \fBth_define\fR \fBprocesses\fR. \fIcount\fR, \fIfailcount\fR and
 \fIacc_chk\fR are all set to zero so that all \fBth_define\fR commands exit
 once they have displayed their status.
@@ -69,12 +63,10 @@ once they have displayed their status.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclear_errors\fR \fR
 .ad
 .RS 18n
-.rt  
 Awaken all \fBth_define\fR processes. If \fIcount\fR is already zero, set
 \fIfailcount\fR and \fIacc_chk\fR to zero, so that \fBth_define\fR exits once
 it has displayed its status.
@@ -82,34 +74,28 @@ it has displayed its status.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBget_handles\fR \fR
 .ad
 .RS 18n
-.rt  
 List all the access handles.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstart\fR \fR
 .ad
 .RS 18n
-.rt  
 Begin or resume execution of all errdefs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstop\fR \fR
 .ad
 .RS 18n
-.rt  
 Suspend all errdefs for this \fIname\fR and \fIinstance\fR (or \fIpath).\fR
 .RE
 

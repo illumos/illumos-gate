@@ -2,12 +2,14 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+#
 
-PROG =		safe_finger tcpd tcpdchk tcpdmatch try-from
+PROG=		safe_finger tcpd tcpdchk tcpdmatch try-from
 
-include ../Makefile.cmd
+include		../Makefile.cmd
 
-ERROFF =	-erroff=E_FUNC_HAS_NO_RETURN_STMT \
+ERROFF=		-erroff=E_FUNC_HAS_NO_RETURN_STMT \
 		-erroff=E_IMPLICIT_DECL_FUNC_RETURN_INT \
 		-_gcc=-Wno-return-type -_gcc=-Wno-implicit
 CFLAGS +=	$(CCVERBOSE) $(ERROFF)
@@ -18,126 +20,47 @@ CPPFLAGS +=	$(ACCESS) $(PARANOID) $(NETGROUP) $(TLI) \
 		-DREAL_DAEMON_DIR=\"$(REAL_DAEMON_DIR)\" \
 		-I../../lib/libwrap
 tcpd tcpdmatch try-from := \
-	LDLIBS += -lwrap
-tcpdchk := \
-	LDLIBS += -lwrap -lnsl
+		LDLIBS += -lwrap
+tcpdchk :=	LDLIBS += -lwrap -lnsl
 
 # Various components must export interfaces, but also contain name-space
 # clashes with system libraries.
-MAPFILE.INT.D =	$(MAPFILE.NGB) mapfile-intf-tcpdchk
-MAPFILE.INT.M =	$(MAPFILE.NGB) mapfile-intf-tcpdmatch
-MAPFILE.INT.F =	$(MAPFILE.NGB) mapfile-intf-tryfrom
+MAPFILE.INT.D=	$(MAPFILE.NGB) mapfile-intf-tcpdchk
+MAPFILE.INT.M=	$(MAPFILE.NGB) mapfile-intf-tcpdmatch
+MAPFILE.INT.F=	$(MAPFILE.NGB) mapfile-intf-tryfrom
 
 tcpdchk :=	LDFLAGS +=$(MAPFILE.INT.D:%=-M%)
 tcpdmatch :=	LDFLAGS +=$(MAPFILE.INT.M:%=-M%)
 try-from :=	LDFLAGS +=$(MAPFILE.INT.F:%=-M%)
 
-# SRCONLY files are not used for building but are included in the source code
-# package SUNWtcpdS for consistency and completeness with respect to the
-# public tcp_wrappers distribution.
-SRCONLY =	BLURB Banners.Makefile CHANGES DISCLAIMER Makefile \
-		Makefile.dist Makefile.org README README.IRIX README.NIS \
-		README.ipv6 hosts_access.c.org misc.c.org miscd.c myvsyslog.c \
-		ncr.c printf.ck ptx.c rfc931.c.org scaffold.c.org \
-		socket.c.diff socket.c.org strcasecmp.c tags tcpd.h.org \
-		tcpdchk.c.org tcpdmatch.c.org tli-sequent.c tli-sequent.h \
-		tli.c.org update.c.org vfprintf.c
-
-MANDIRS =	man3 man4 man1m
-MANPAGES =	man3/hosts_access.3 man3/libwrap.3 man4/hosts_access.4 \
-		man4/hosts_options.4 man4/hosts.allow.4 man4/hosts.deny.4 \
-		man1m/tcpd.1m man1m/tcpdchk.1m man1m/tcpdmatch.1m
-DISTFILES =	environ.c fakelog.c hosts_access.3 hosts_access.4 \
-		hosts_options.4 inetcf.c inetcf.h safe_finger.c scaffold.c \
-		scaffold.h tcpd.1m tcpd.c tcpdchk.1m tcpdchk.c tcpdmatch.1m \
-		tcpdmatch.c try-from.c README.sfw $(SRCONLY)
-
-ROOTSRC =	$(ROOT)/usr/share/src/tcp_wrappers
-ROOTMAN = $(ROOT)/usr/share/man
-ROOTMANPAGES = $(MANPAGES:%=$(ROOTMAN)/%)
-ROOTMANDIRS = $(MANDIRS:%=$(ROOTMAN)/%)
-ROOTSRCFILES = $(DISTFILES:%=$(ROOTSRC)/%)
-
 .KEEP_STATE:
 
-all: $(PROG) THIRDPARTYLICENSE
+all:		$(PROG)
 
-install: all $(ROOTUSRSBINPROG) $(ROOTMANPAGES) $(ROOTSRCFILES)
+install:	all $(ROOTUSRSBINPROG)
 
 clean:
-	$(RM) *.o
-	$(RM) -r sunman
+		$(RM) *.o
 
-lint:	lint_PROG
+lint:		lint_PROG
 
-# These Solaris-specific man page aliases are installed verbatim.
-sunman/libwrap.3: libwrap.3
-	mkdir -p sunman; cat libwrap.3 > $@
-sunman/hosts.allow.4: hosts.allow.4
-	mkdir -p sunman; cat hosts.allow.4 > $@
-sunman/hosts.deny.4: hosts.deny.4
-	mkdir -p sunman; cat hosts.deny.4 > $@
+TCPDMATCH_OBJ=	tcpdmatch.o fakelog.o inetcf.o scaffold.o
 
-# The rest of the man pages are in the form provided in the original
-# distribution, but get edited and renamed to follow Solaris man page
-# conventions.  E.g. tcpd.8 gets installed as /usr/share/man/man1m/tcpd.1m.
-# Create temporary copies in the sunman directory with modified names
-# and contents.  The sed program man.sed contains the content edits.
+tcpdmatch:	$(TCPDMATCH_OBJ) $(LIB) $(MAPFILE.INTF.M)
+		$(LINK.c) -o $@ $(TCPDMATCH_OBJ) $(LDLIBS)
+		$(POST_PROCESS)
 
-sunman/%.1m: %.8
-	mkdir -p sunman; sed -f man.sed < $< > $@
-sunman/%.4: %.5
-	mkdir -p sunman; sed -f man.sed < $< > $@
-sunman/%.3: %.3
-	mkdir -p sunman; sed -f man.sed < $< > $@
+try-from:	try-from.o fakelog.o $(LIB) $(MAPFILE.INTF.F)
+		$(LINK.c) -o $@ try-from.o fakelog.o $(LDLIBS)
+		$(POST_PROCESS)
 
-$(ROOTMANPAGES) := FILEMODE = 0444
-$(ROOTMANPAGES): $(ROOTMANDIRS) $(ROOT)/usr/share/man
-$(ROOTMANDIRS): $(ROOTMAN)
-	$(INS.dir)
-$(ROOTMAN):
-	$(INS.dir)
-$(ROOTMAN1M)/% $(ROOTMAN3)/% $(ROOTMAN)/man4/%: sunman/%
-	$(INS.file)
+TCPDCHK_OBJ=	tcpdchk.o fakelog.o inetcf.o scaffold.o
 
-$(ROOTSRCFILES) := FILEMODE = 0444
-$(ROOTSRCFILES): $(ROOTSRC)
-$(ROOTSRC): 
-	$(INS.dir)
-$(ROOTSRC)/%: %.sfwsrc
-	$(INS.rename)
-$(ROOTSRC)/%: sunman/%
-	$(INS.file)
-$(ROOTSRC)/%: %
-	$(INS.file)
+tcpdchk:	$(TCPDCHK_OBJ) $(LIB) $(MAPFILE.INTF.C)
+		$(LINK.c) -o $@ $(TCPDCHK_OBJ) $(LDLIBS)
+		$(POST_PROCESS)
 
-$(ROOT)/usr/share: $(ROOT)/usr
-	$(INS.dir)
-$(ROOT)/usr: $(ROOT)
-	$(INS.dir)
-
-TCPDMATCH_OBJ = tcpdmatch.o fakelog.o inetcf.o scaffold.o
-
-tcpdmatch: $(TCPDMATCH_OBJ) $(LIB) $(MAPFILE.INTF.M)
-	$(LINK.c) -o $@ $(TCPDMATCH_OBJ) $(LDLIBS)
-	$(POST_PROCESS)
-
-try-from: try-from.o fakelog.o $(LIB) $(MAPFILE.INTF.F)
-	$(LINK.c) -o $@ try-from.o fakelog.o $(LDLIBS)
-	$(POST_PROCESS)
-
-TCPDCHK_OBJ = tcpdchk.o fakelog.o inetcf.o scaffold.o
-
-tcpdchk: $(TCPDCHK_OBJ) $(LIB) $(MAPFILE.INTF.C)
-	$(LINK.c) -o $@ $(TCPDCHK_OBJ) $(LDLIBS)
-	$(POST_PROCESS)
-
-THIRDPARTYLICENSE: DISCLAIMER
-	$(GREP) -v '\*\*\*\*' DISCLAIMER > $@
-
-CLOBBERFILES += THIRDPARTYLICENSE
-
-include ../Makefile.targ
+include		../Makefile.targ
 
 # The rest of this file contains definitions more-or-less directly from the
 # original Makefile of the tcp_wrappers distribution.

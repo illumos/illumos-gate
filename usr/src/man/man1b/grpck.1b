@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH grpck 1B "10 Jan 2000" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.TH GRPCK 1B "Jan 10, 2000"
 .SH NAME
 grpck \- check group database entries
 .SH SYNOPSIS
@@ -28,7 +28,6 @@ any errors; it checks the \fB/etc/group\fR file by default.
 .SH DIAGNOSTICS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBToo many/few fields\fR\fR
 .ad
@@ -39,7 +38,6 @@ An entry in the group file does not have the proper number of fields.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNo group name\fR\fR
 .ad
@@ -50,7 +48,6 @@ The group name field of an entry is empty.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBBad character(s) in group name\fR\fR
 .ad
@@ -62,7 +59,6 @@ and digits.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBInvalid GID\fR\fR
 .ad
@@ -73,7 +69,6 @@ The group ID field in an entry is not numeric or is greater than 65535.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNull login name\fR\fR
 .ad
@@ -84,7 +79,6 @@ A login name in the list of login names in an entry is null.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLogname not found in password file\fR\fR
 .ad
@@ -96,7 +90,6 @@ file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLine too long\fR\fR
 .ad
@@ -108,7 +101,6 @@ length of 512 characters.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDuplicate logname entry\fR\fR
 .ad
@@ -120,7 +112,6 @@ entry.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOut of memory\fR\fR
 .ad
@@ -131,7 +122,6 @@ The program cannot allocate memory in order to continue.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMaximum groups exceeded for logname\fR\fR
 .ad

@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH df 1B "14 Sep 1992" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.TH DF 1B "Sep 14, 1992"
 .SH NAME
 df \- display status of disk space on file systems
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/ucb/df\fR [\fB-a\fR] [\fB-i\fR] [\fB-t\fR \fItype\fR] [\fIfilesystem...\fR] 
+\fB/usr/ucb/df\fR [\fB-a\fR] [\fB-i\fR] [\fB-t\fR \fItype\fR] [\fIfilesystem...\fR]
      [\fIfilename...\fR]
 .fi
 
@@ -30,36 +30,30 @@ on the file system containing the current directory.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 11n
-.rt  
 Report on all filesystems including the uninteresting ones which have zero
 total blocks (that is, auto-mounter).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 11n
-.rt  
 Report the number of used and free inodes. Print ` \fB*\fR ' if no information
 is available.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-t\fR\fB \fR\fItype\fR\fR
 .ad
 .RS 11n
-.rt  
 Report on filesystems of a given type (for example, nfs or ufs).
 .RE
 
@@ -95,23 +89,19 @@ can report that the file system is more than 100% utilized.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/mnttab\fR\fR
 .ad
 .RS 15n
-.rt  
 List of file systems currently mounted
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/vfstab\fR\fR
 .ad
 .RS 15n
-.rt  
 List of default parameters for each file system
 .RE
 

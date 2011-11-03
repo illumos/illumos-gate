@@ -41,5 +41,4 @@ legacy pkg=SUNWdmgtu desc="software for WBEM/CIM data device management" \
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/libfsmgt.so target=./libfsmgt.so.1
-depend fmri=system/library type=require
 depend fmri=system/library/libdiskmgt type=require

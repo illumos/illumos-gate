@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pam_sm_authenticate 3PAM "27 Jan 2005" "SunOS 5.11" "PAM Library Functions"
+.TH PAM_SM_AUTHENTICATE 3PAM "Jan 27, 2005"
 .SH NAME
 pam_sm_authenticate \- service provider implementation for pam_authenticate
 .SH SYNOPSIS
@@ -42,34 +42,28 @@ return the error, \fBPAM_USER_UNKNOWN\fR.
 The following flag may be passed in to \fBpam_sm_authenticate()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_SILENT\fR\fR
 .ad
 .RS 29n
-.rt  
 The authentication service should not generate any messages.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_DISALLOW_NULL_AUTHTOK\fR\fR
 .ad
 .RS 29n
-.rt  
 The authentication service should return
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_AUTH_ERR\fR\fR
 .ad
 .RS 29n
-.rt  
 The user has a null authentication token.
 .RE
 
@@ -100,67 +94,55 @@ Upon successful completion,  \fBPAM_SUCCESS\fR must be returned. In addition,
 the following values may be returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_MAXTRIES\fR\fR
 .ad
 .RS 25n
-.rt  
 Maximum number of authentication attempts exceeded.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_AUTH_ERR\fR\fR
 .ad
 .RS 25n
-.rt  
 Authentication failure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_CRED_INSUFFICIENT\fR\fR
 .ad
 .RS 25n
-.rt  
 Cannot access authentication data due to insufficient credentials.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_AUTHINFO_UNAVAIL\fR\fR
 .ad
 .RS 25n
-.rt  
 Underlying authentication service can not retrieve authentication information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_USER_UNKNOWN\fR\fR
 .ad
 .RS 25n
-.rt  
 User not known to underlying authentication module.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_IGNORE\fR\fR
 .ad
 .RS 25n
-.rt  
 Ignore underlying authentication module regardless of whether the control flag
 is \fIrequired\fR,\fIoptional,\fR or \fIsufficient\fR1.
 .RE
@@ -173,15 +155,14 @@ See \fBattributes\fR(5) for description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface Stability Stable
+Interface Stability	 Stable
 _
-MT-LevelMT-Safe with exceptions
+MT-Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO

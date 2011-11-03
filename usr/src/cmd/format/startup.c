@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2011 Gary Mills
+ *
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -1545,23 +1547,15 @@ static void
 get_disk_name(int fd, char *disk_name)
 {
 	struct scsi_inquiry	inquiry;
-	char	*p;
 
 	if (uscsi_inquiry(fd, (char *)&inquiry, sizeof (inquiry))) {
-		err_print("Failed to inquiry this logical disk");
+		if (option_msg)
+			err_print("\nInquiry failed - %s\n", strerror(errno));
+		(void) strcpy(disk_name, "Unknown-Unknown-0001");
 		return;
 	}
 
-	p = disk_name;
-	(void) memset(p, 0, MAXNAMELEN);
-
-	(void) strncpy(p, inquiry.inq_vid, sizeof (inquiry.inq_vid));
-	p += sizeof (inquiry.inq_vid) - 1;
-	*p++ = '-';
-	p = strncpy(p, inquiry.inq_pid, sizeof (inquiry.inq_pid));
-	p += sizeof (inquiry.inq_pid) - 1;
-	*p++ = '-';
-	p = strncpy(p, inquiry.inq_revision, sizeof (inquiry.inq_revision));
+	(void) get_generic_disk_name(disk_name, &inquiry);
 }
 
 /*

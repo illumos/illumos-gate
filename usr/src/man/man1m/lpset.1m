@@ -3,15 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH lpset 1M "23 May 2003" "SunOS 5.11" "System Administration Commands"
+.TH LPSET 1M "May 23, 2003"
 .SH NAME
 lpset \- set printing configuration in /etc/printers.conf or other supported
 databases
 .SH SYNOPSIS
 .LP
 .nf
-\fBlpset\fR [\fB-n\fR system | nisplus | fnsldap] [\fB-x\fR] 
-     [ [\fB-D\fR binddn] [\fB-w\fR passwd] [\fB-h\fR ldaphost]] 
+\fBlpset\fR [\fB-n\fR system | nisplus | fnsldap] [\fB-x\fR]
+     [ [\fB-D\fR binddn] [\fB-w\fR passwd] [\fB-h\fR ldaphost]]
      [\fB-a\fR \fIkey=value\fR] [\fB-d\fR \fIkey\fR] \fIdestination\fR
 .fi
 
@@ -31,12 +31,10 @@ Only a superuser or a member of Group 14 may execute \fBlpset\fR.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fBsystem\fR|\fBnisplus\fR|\fBldap\fR\fR
 .ad
 .RS 26n
-.rt  
 Create or update the configuration information  for the \fIdestination\fR entry
 in \fB/etc/printers.conf\fR, \fBprinters.org_dir\fR (NIS+), or LDAP printer
 contexts. \fBsystem\fR specifies that the information is created or updated in
@@ -49,24 +47,20 @@ If  \fB-n\fR is not specified, \fBsystem\fR is the default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 26n
-.rt  
 Remove all configuration for  the \fIdestination\fR entry from the database
 specified by the \fB-n\fR option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIkey\fR\fB=\fR\fIvalue\fR\fR
 .ad
 .RS 26n
-.rt  
 Configure the specified \fIkey\fR\fB=\fR\fIvalue\fR pair for the
 \fIdestination\fR. See \fBprinters.conf\fR(4) for information regarding the
 specification of \fIkey\fR\fB=\fR\fIvalue\fR pairs.
@@ -74,12 +68,10 @@ specification of \fIkey\fR\fB=\fR\fIvalue\fR pairs.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIkey\fR\fR
 .ad
 .RS 26n
-.rt  
 Delete the configuration option specified by \fIkey\fR for the
 \fIdestination\fR entry. See \fBprinters.conf\fR(4) for information regarding
 the specification of \fIkey\fR and  \fIkey\fR\fB=\fR\fIvalue\fR pairs.
@@ -87,36 +79,30 @@ the specification of \fIkey\fR and  \fIkey\fR\fB=\fR\fIvalue\fR pairs.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR \fBbinddn\fR\fR
 .ad
 .RS 26n
-.rt  
 Use the distinguished name (DN) \fBbinddn\fR to bind to the LDAP directory
 server.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR \fBpasswd\fR\fR
 .ad
 .RS 26n
-.rt  
 Use \fBpasswd\fR as the password for authentication to the LDAP directory
 server.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fBldaphost\fR\fR
 .ad
 .RS 26n
-.rt  
 Specify an alternate host on which the LDAP server is running. This option is
 only used when \fBldap\fR is specified as the naming service. If this option is
 not specified, the default is the current host system.
@@ -128,12 +114,10 @@ not specified, the default is the current host system.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdestination\fR\fR
 .ad
 .RS 15n
-.rt  
 Specifies the entry in  \fB/etc/printers.conf\fR, \fBprinters.org_dir\fR, or
 LDAP, in which to create or modify information. \fIdestination\fR names a
 printer of class of printers. See  \fBlpadmin\fR(1M). Each entry in
@@ -192,46 +176,38 @@ example% \fBlpset -n ldap -h ldapl.xyz.com -D "cn=Directory Manager" \e
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnon-zero\fR
 .ad
 .RS 12n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/printers.conf\fR\fR
 .ad
 .RS 26n
-.rt  
 System configuration database.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprinter.org_dir\fR (NIS+)\fR
 .ad
 .RS 26n
-.rt  
 \fBNIS+\fR version of \fB/etc/printers.conf\fR.
 .RE
 
@@ -243,13 +219,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Stability LevelStable
+Stability Level	Stable
 .TE
 
 .SH SEE ALSO

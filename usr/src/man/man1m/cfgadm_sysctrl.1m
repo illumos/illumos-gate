@@ -3,19 +3,19 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cfgadm_sysctrl 1M "10 Mar 1999" "SunOS 5.11" "System Administration Commands"
+.TH CFGADM_SYSCTRL 1M "Mar 10, 1999"
 .SH NAME
 cfgadm_sysctrl \- EXX00 system board administration
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/cfgadm\fR \fB-c\fR \fIfunction\fR [\fB-f\fR] 
+\fB/usr/sbin/cfgadm\fR \fB-c\fR \fIfunction\fR [\fB-f\fR]
      [\fB-o\fR disable-at-boot | enable-at-boot] [\fB-n\fR | \fB-y\fR] sysctrl0:slot# ...
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/cfgadm\fR \fB-x\fR quiesce-test sysctrl0:slot# 
+\fB/usr/sbin/cfgadm\fR \fB-x\fR quiesce-test sysctrl0:slot#
 .fi
 
 .LP
@@ -77,7 +77,6 @@ Refer to \fBcfgadm\fR(1M) for a more complete description options.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIfunction\fR\fR
 .ad
@@ -87,12 +86,10 @@ Perform the state change function. Specify \fIfunction\fR as \fBconnect\fR,
 \fBdisconnect\fR, \fBconfigure\fR or \fBunconfigure\fR.
 .sp
 .ne 2
-.mk
 .na
 \fBconfigure\fR
 .ad
 .RS 15n
-.rt  
 Change the occupant state to \fBconfigure\fR.
 .sp
 If the receptacle state is \fBdisconnect\fRed, the \fBconfigure\fR function
@@ -110,12 +107,10 @@ memory banks.
 
 .sp
 .ne 2
-.mk
 .na
 \fBconnect\fR
 .ad
 .RS 15n
-.rt  
 Change the receptacle state to \fBconnect\fRed.
 .sp
 Changing the receptacle state requires that the system bus be frozen while the
@@ -136,12 +131,10 @@ force flag, \fB-f\fR, or the enable at boot flag, \fB-o\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fBdisconnect\fR
 .ad
 .RS 15n
-.rt  
  Change the receptacle state to \fBdisconnect\fRed.
 .sp
 If the occupant state is \fBconfigure\fR, the \fBdisconnect\fR function first
@@ -152,12 +145,10 @@ powered-off ready for removal.
 
 .sp
 .ne 2
-.mk
 .na
 \fBunconfigure\fR
 .ad
 .RS 15n
-.rt  
 Change the occupant state to \fBunconfigure\fRed.
 .sp
 Devices on the board are made invisible to Solaris during this process. The
@@ -176,7 +167,6 @@ and\fBp_online\fR(2) for more information on off-lining \fBCPU\fRs.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
@@ -189,7 +179,6 @@ Enterprise 6x00/5x00/4x00/3x00 Systems\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
@@ -213,7 +202,6 @@ following additional information appears first: \fB{target: # | no disk}
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR disable-at-boot | enable-at-boot\fR
 .ad
@@ -229,7 +217,6 @@ block on connecting a \fBdisabled-at-boot\fR board.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR insert-test | remove-test\fR
 .ad
@@ -248,7 +235,6 @@ it had been inserted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR quiesce-test sysctrl0:slot1\fR
 .ad
@@ -266,7 +252,6 @@ systems have a slot1 the given form is recommended.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR set-condition-test=# \fR
 .ad
@@ -281,7 +266,7 @@ number indicating one of the following condition values:
 .in +2
 .nf
 0      unknown
-1      ok 
+1      ok
 2      failing
 3      failed
 4      unusable
@@ -297,12 +282,10 @@ number indicating one of the following condition values:
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fBsysctrl0:slot\fI#\fR\fR
 .ad
 .RS 28n
-.rt  
 The attachment points for boards on \fBEXX00\fR systems are published by
 instance \fB0\fR of the \fBsysctrl\fR driver (\fBsysctrl0\fR). The names of the
 attachment points are numbered from \fBslot0\fR through \fBslot15\fR. Specify
@@ -315,7 +298,6 @@ This form conforms to the logical \fBap_id\fR specification given in
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB/usr/platform/sun4u/lib/cfgadm/sysctrl.so.1\fR
 .ad
@@ -326,7 +308,6 @@ Hardware specific library
 
 .sp
 .ne 2
-.mk
 .na
 \fB/devices/central@1f,0/fhc@0,f8800000/clock-board@0,900000:slot*\fR
 .ad

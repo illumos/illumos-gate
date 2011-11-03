@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libdlpi 3LIB "11 Jan 2008" "SunOS 5.11" "Interface Libraries"
+.TH LIBDLPI 3LIB "Jan 11, 2008"
 .SH NAME
 libdlpi \- Data Link Provider Interface (DLPI) library
 .SH SYNOPSIS
@@ -29,44 +29,38 @@ interfaces.
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBdlpi_arptype\fR\fBdlpi_bind\fR
-\fBdlpi_close\fR\fBdlpi_disabmulti\fR
-\fBdlpi_disabnotify\fR\fBdlpi_enabmulti\fR
-\fBdlpi_enabnotify\fR\fBdlpi_fd\fR
-\fBdlpi_get_physaddr\fR\fBdlpi_iftype\fR
-\fBdlpi_info\fR\fBdlpi_linkname\fR
-\fBdlpi_mactype\fR\fBdlpi_open\fR
-\fBdlpi_promiscoff\fR\fBdlpi_promiscon\fR
-\fBdlpi_recv\fR\fBdlpi_send\fR
-\fBdlpi_set_physaddr\fR\fBdlpi_set_timeout\fR
-\fBdlpi_strerror\fR\fBdlpi_unbind\fR
-\fBdlpi_walk\fR
+l l
+l l .
+\fBdlpi_arptype\fR	\fBdlpi_bind\fR
+\fBdlpi_close\fR	\fBdlpi_disabmulti\fR
+\fBdlpi_disabnotify\fR	\fBdlpi_enabmulti\fR
+\fBdlpi_enabnotify\fR	\fBdlpi_fd\fR
+\fBdlpi_get_physaddr\fR	\fBdlpi_iftype\fR
+\fBdlpi_info\fR	\fBdlpi_linkname\fR
+\fBdlpi_mactype\fR	\fBdlpi_open\fR
+\fBdlpi_promiscoff\fR	\fBdlpi_promiscon\fR
+\fBdlpi_recv\fR	\fBdlpi_send\fR
+\fBdlpi_set_physaddr\fR	\fBdlpi_set_timeout\fR
+\fBdlpi_strerror\fR	\fBdlpi_unbind\fR
+\fBdlpi_walk\fR	
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/libdlpi.so.1\fR\fR
 .ad
 .RS 24n
-.rt  
 shared object
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/64/libdlpi.so.1\fR\fR
 .ad
 .RS 24n
-.rt  
 64-bit shared object
 .RE
 
@@ -78,15 +72,14 @@ See \fBattributes\fR(5) for description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

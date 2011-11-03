@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH devmap_callback_ctl 9S "24 Jul 1996" "SunOS 5.11" "Data Structures for Drivers"
+.TH DEVMAP_CALLBACK_CTL 9S "Jul 24, 1996"
 .SH NAME
 devmap_callback_ctl \- device mapping-control structure
 .SH SYNOPSIS
@@ -37,23 +37,19 @@ initialize the following fields, if the driver wants the entry points to be
 called by the system:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdevmap_rev\fR \fR
 .ad
 .RS 18n
-.rt  
 Version number. Set this to \fBDEVMAP_OPS_REV\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdevmap_map\fR \fR
 .ad
 .RS 18n
-.rt  
 Set to the address of the \fBdevmap_map\fR(9E) entry point or to  \fINULL\fR if
 the driver does not support this callback. If set, the system calls the
 \fBdevmap_map\fR(9E) entry point during the \fBmmap\fR(2) system call.  The
@@ -63,12 +59,10 @@ return the pointer to the private data structure to the system for later use.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdevmap_access\fR \fR
 .ad
 .RS 18n
-.rt  
 Set to the address of the \fBdevmap_access\fR(9E) entry point or to  \fINULL\fR
 if the driver does not support this callback. If set, the system calls the
 driver's \fBdevmap_access\fR(9E) entry point during memory access.  The system
@@ -79,12 +73,10 @@ it returns to the system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdevmap_dup\fR \fR
 .ad
 .RS 18n
-.rt  
 Set to the address of the \fBdevmap_dup\fR(9E) entry point or to  \fINULL\fR if
 the driver does not support this call. If set, the system calls the
 \fBdevmap_dup\fR(9E) entry point during the \fBfork\fR(2) system call.
@@ -92,12 +84,10 @@ the driver does not support this call. If set, the system calls the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdevmap_unmap\fR \fR
 .ad
 .RS 18n
-.rt  
 Set to the address of the \fBdevmap_unmap\fR(9E) entry point or to  \fINULL\fR
 if the driver does not support this call. If set, the system will call the
 \fBdevmap_unmap\fR(9E) entry point during the \fBmunmap\fR(2) or \fBexit\fR(2)
@@ -109,14 +99,14 @@ system calls.
 .in +2
 .nf
 int	devmap_rev;
-int	(*devmap_map)(devmap_cookie_t dhp, dev_t dev, 
+int	(*devmap_map)(devmap_cookie_t dhp, dev_t dev,
      uint_t flags,offset_t off, size_t len, void **pvtp);
-int	(*devmap_access)(devmap_cookie_t dhp, void *pvtp, 
+int	(*devmap_access)(devmap_cookie_t dhp, void *pvtp,
      offset_t off, size_t len, uint_t type, uint_t rw);
 int	(*devmap_dup)(devmap_cookie_t dhp, void *pvtp,
 		   devmap_cookie_t new_dhp, void **new_pvtp);
-void	(*devmap_unmap)(devmap_cookie_t dhp, void *pvtp, 
-     offset_t off, size_t len, devmap_cookie_t new_dhp1, 
+void	(*devmap_unmap)(devmap_cookie_t dhp, void *pvtp,
+     offset_t off, size_t len, devmap_cookie_t new_dhp1,
      void **new_pvtp1, devmap_cookie_t new_dhp2, void **new_pvtp2);
 .fi
 .in -2

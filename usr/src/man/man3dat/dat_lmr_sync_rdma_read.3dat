@@ -4,14 +4,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dat_lmr_sync_rdma_read 3DAT "16 Jul 2004" "SunOS 5.11" "Direct Access Transport Library Functions"
+.TH DAT_LMR_SYNC_RDMA_READ 3DAT "Jul 16, 2004"
 .SH NAME
 dat_lmr_sync_rdma_read \- synchronize local memory with RDMA read on
 non-coherent memory
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ldat\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ldat\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <\fBdat/udat.h\fR>
 
 DAT_RETURN
@@ -25,34 +25,28 @@ DAT_RETURN
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIia_handle\fR\fR
 .ad
 .RS 18n
-.rt  
 A handle for an open instance of the IA.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlocal_segments\fR\fR
 .ad
 .RS 18n
-.rt  
 An array of buffer segments.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInum_segments\fR\fR
 .ad
 .RS 18n
-.rt  
 The number of segments in the \fIlocal_segments\fR argument.
 .RE
 
@@ -87,34 +81,28 @@ to read from a memory range that is not properly synchronized using
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_SUCCESS\fR\fR
 .ad
 .RS 25n
-.rt  
 The operation was successful.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_INVALID_HANDLE\fR\fR
 .ad
 .RS 25n
-.rt  
 The DAT handle is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_INVALID_PARAMETER\fR\fR
 .ad
 .RS 25n
-.rt  
 One of the parameters is invalid. For example, the address range for a local
 segment fell outside the boundaries of the corresponding Local Memory Region or
 the LMR handle was invalid.
@@ -161,15 +149,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard: uDAPL, 1.2
+Interface Stability	Standard: uDAPL, 1.2
 _
-MT-LevelUnsafe
+MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO

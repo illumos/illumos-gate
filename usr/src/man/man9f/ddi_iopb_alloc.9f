@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_iopb_alloc 9F "04 Apr 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_IOPB_ALLOC 9F "Apr 04, 2006"
 .SH NAME
 ddi_iopb_alloc, ddi_iopb_free \- allocate and free non-sequentially accessed
 memory
@@ -13,7 +13,7 @@ memory
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 
-\fBint\fR \fBddi_iopb_alloc\fR(\fBdev_info_t *\fR\fIdip\fR, \fBddi_dma_lim_t *\fR\fIlimits\fR, 
+\fBint\fR \fBddi_iopb_alloc\fR(\fBdev_info_t *\fR\fIdip\fR, \fBddi_dma_lim_t *\fR\fIlimits\fR,
      \fBuint_t\fR \fIlength\fR, \fBcaddr_t *\fR\fIiopbp\fR);
 .fi
 
@@ -32,23 +32,19 @@ These interfaces are obsolete. Use \fBddi_dma_mem_alloc\fR(9F) instead of
 .SS "\fBddi_iopb_alloc()\fR"
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 10n
-.rt  
 A pointer to the device's \fBdev_info\fR structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlimits\fR\fR
 .ad
 .RS 10n
-.rt  
 A pointer to a \fBDMA \fRlimits structure for this device (see
 \fBddi_dma_lim_sparc\fR(9S) or \fBddi_dma_lim_x86\fR(9S)). If this pointer is
 \fINULL\fR, a default set of \fBDMA \fRlimits is assumed.
@@ -56,23 +52,19 @@ A pointer to a \fBDMA \fRlimits structure for this device (see
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlength\fR\fR
 .ad
 .RS 10n
-.rt  
 The length in bytes of the desired allocation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIiopbp\fR\fR
 .ad
 .RS 10n
-.rt  
 A pointer to a \fBcaddr_t\fR. On a successful return, \fI*iopbp\fR points to
 the allocated storage.
 .RE
@@ -80,12 +72,10 @@ the allocated storage.
 .SS "\fBddi_iopb_free()\fR"
 .sp
 .ne 2
-.mk
 .na
 \fB\fIiopb\fR\fR
 .ad
 .RS 8n
-.rt  
 The \fIiopb\fR returned from a successful call to \fBddi_iopb_alloc()\fR.
 .RE
 
@@ -121,23 +111,19 @@ The \fBddi_iopb_free()\fR function frees up memory allocated by
 The \fBddi_iopb_alloc()\fR function returns:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 15n
-.rt  
 Memory successfully allocated.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 15n
-.rt  
 Allocation failed.
 .RE
 
@@ -153,13 +139,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Stability LevelObsolete
+Stability Level	Obsolete
 .TE
 
 .SH SEE ALSO

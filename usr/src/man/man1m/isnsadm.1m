@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH isnsadm 1M "25 Sep 2008" "SunOS 5.11" "System Administration Commands"
+.TH ISNSADM 1M "Sep 25, 2008"
 .SH NAME
 isnsadm \- administer the internet Storage Name Server (iSNS) server
 .SH SYNOPSIS
@@ -40,7 +40,6 @@ described in the context of each subcommand description.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-?\fR, \fB--help\fR\fR
 .ad
@@ -51,7 +50,6 @@ Displays context help. Stops interpretation of any subsequent arguments.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR, \fB--version\fR\fR
 .ad
@@ -67,7 +65,6 @@ arguments.
 The following operands are used by one or more \fBisnsadm\fR subcommands.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIiscsi-node-name\fR\fR
 .ad
@@ -79,7 +76,6 @@ of 223 characters.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdiscovery-domain-name\fR\fR
 .ad
@@ -91,7 +87,6 @@ characters.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdiscovery-domain-set-name\fR\fR
 .ad
@@ -125,7 +120,6 @@ The \fBadd-dd\fR subcommand has the following syntax:
 \fBadd-dd\fR has the following option:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIdiscovery-domain-set-name\fR\fR
 .ad
@@ -154,7 +148,6 @@ The \fBadd-node\fR subcommand has the following syntax:
 \fBadd-node\fR has the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR,\fB--dd\fR \fIdiscovery-domain-name\fR\fR
 .ad
@@ -297,7 +290,6 @@ The \fBlist-dd\fR subcommand has the following syntax:
 \fBlist-dd\fR supports the following option:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR, \fB--verbose\fR\fR
 .ad
@@ -329,7 +321,6 @@ The \fBlist-dd-set\fR subcommand has the following syntax:
 \fBlist-dd-set\fR supports the following option:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR, \fB--verbose\fR\fR
 .ad
@@ -362,7 +353,6 @@ The \fBlist-node\fR subcommand has the following syntax:
 \fBlist-node\fR supports the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR, \fB--target\fR\fR
 .ad
@@ -373,7 +363,6 @@ Filters the list to display only iSCSI target nodes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR, \fB--initiator\fR\fR
 .ad
@@ -384,7 +373,6 @@ Filters the list to display only iSCSI initiator nodes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR, \fB--verbose\fR\fR
 .ad
@@ -415,7 +403,6 @@ The \fBmodify-dd\fR subcommand has the following syntax:
 \fBmodify-dd\fR has the following option:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fIdiscovery-domain-name\fR\fR
 .ad
@@ -445,7 +432,6 @@ The \fBmodify-dd-set\fR subcommand has the following syntax:
 \fBmodify-dd-set\fR has the following option:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fIdiscovery-domain-set-name\fR\fR
 .ad
@@ -476,13 +462,12 @@ The \fBremove-dd\fR subcommand has the following syntax:
 \fBremove-dd\fR has the following option:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIdiscovery-domain-set-name\fR\fR
 .ad
 .sp .6
 .RS 4n
-Specifies the discovery domain set from which the discovery domain will 	be
+Specifies the discovery domain set from which the discovery domain will be
 removed.
 .RE
 
@@ -506,7 +491,6 @@ The \fBremove-node\fR subcommand has the following syntax:
 \fBremove-node\fR has the following option:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdiscovery-domain-name\fR\fR
 .ad
@@ -556,7 +540,7 @@ iSCSI Name: iqn.1986-03.com.sun:01:000e0c9f10da.45173FEA.engr
                 Portal Group: 1
         DD Name: Default
 iSCSI Name: iqn.1986-03.com.sun:01:000e0c9f10da.454F00A2.acct
-        Alias: 
+        Alias:
         Type: Target
         Network Entity: SE5310
         Portal: 172.20.57.95:3260
@@ -756,13 +740,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityVolatile
+Interface Stability	Volatile
 .TE
 
 .SH SEE ALSO

@@ -1,14 +1,14 @@
 '\" te
 .\" Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
 .\" Portions Copyright (c) 1999, Sun Microsystems, Inc.  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH regex 5 "21 Apr 2005" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH REGEX 5 "Apr 21, 2005"
 .SH NAME
 regex \- internationalized basic and extended regular expression matching
 .SH DESCRIPTION
@@ -84,12 +84,10 @@ be a BRE that matches the special character itself. The BRE special characters
 and the contexts in which they have their special meaning are:
 .sp
 .ne 2
-.mk
 .na
 \fB\&. [ \e\fR
 .ad
 .RS 12n
-.rt  
 The period, left-bracket, and backslash are special except when used in a
 bracket expression (see \fBRE Bracket Expression\fR, below). An expression
 containing a [ that is not preceded by a backslash and is not part of a bracket
@@ -98,12 +96,10 @@ expression produces undefined results.
 
 .sp
 .ne 2
-.mk
 .na
 \fB*\fR
 .ad
 .RS 12n
-.rt  
 The asterisk is special except when used:
 .RS +4
 .TP
@@ -128,12 +124,10 @@ as the first character of a subexpression (after an initial ^, if any); see
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fI^\fR\fR
 .ad
 .RS 12n
-.rt  
 The circumflex is special when used:
 .RS +4
 .TP
@@ -152,12 +146,10 @@ Expression\fR, below).
 
 .sp
 .ne 2
-.mk
 .na
 \fB$\fR
 .ad
 .RS 12n
-.rt  
 The dollar sign is special when used as an anchor.
 .RE
 
@@ -276,13 +268,11 @@ The following character class expressions are supported in all locales:
 
 .sp
 .TS
-tab();
-lw(1.38i) lw(1.38i) lw(1.38i) lw(1.38i) 
-lw(1.38i) lw(1.38i) lw(1.38i) lw(1.38i) 
-.
-\fB[:alnum:]\fR\fB[:cntrl:]\fR\fB[:lower:]\fR\fB[:space:]\fR
-\fB[:alpha:]\fR\fB[:digit:]\fR\fB[:print:]\fR\fB[:upper:]\fR
-\fB[:blank:]\fR\fB[:graph:]\fR\fB[:punct:]\fR\fB[:xdigit:]\fR
+l l l l
+l l l l .
+\fB[:alnum:]\fR	\fB[:cntrl:]\fR	\fB[:lower:]\fR	\fB[:space:]\fR
+\fB[:alpha:]\fR	\fB[:digit:]\fR	\fB[:print:]\fR	\fB[:upper:]\fR
+\fB[:blank:]\fR	\fB[:graph:]\fR	\fB[:punct:]\fR	\fB[:xdigit:]\fR
 .TE
 
 In addition, character class expressions of the form:
@@ -450,18 +440,17 @@ The order of precedence is as shown in the following table:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
+box;
+l l
+l l .
 \fBBRE Precedence (from high to low)\fR
-collation-related bracket symbols[= =]  [: :]  [. .]
-escaped characters\e<\fIspecial character\fR>
-bracket expression[ ]
-subexpressions/back-references\e( \e) \e\fIn\fR
-single-character-BRE duplication* \e{\fIm\fR,\fIn\fR\e}
-concatenation
-anchoring^  $
+collation-related bracket symbols	[= =]  [: :]  [. .]
+escaped characters	\e<\fIspecial character\fR>
+bracket expression	[ ]
+subexpressions/back-references	\e( \e) \e\fIn\fR
+single-character-BRE duplication	* \e{\fIm\fR,\fIn\fR\e}
+concatenation	
+anchoring	^  $
 .TE
 
 .SS "BRE Expression Anchoring"
@@ -565,12 +554,10 @@ regular expression special characters and the contexts in which they have their
 special meaning are:
 .sp
 .ne 2
-.mk
 .na
 \fB\&. [ \e (\fR
 .ad
 .RS 14n
-.rt  
 The period, left-bracket, backslash, and left-parenthesis are special except
 when used in a bracket expression (see \fBRE Bracket Expression\fR, above).
 Outside a bracket expression, a left-parenthesis immediately followed by a
@@ -579,24 +566,20 @@ right-parenthesis produces undefined results.
 
 .sp
 .ne 2
-.mk
 .na
 \fB)\fR
 .ad
 .RS 14n
-.rt  
 The right-parenthesis is special when matched with a preceding
 left-parenthesis, both outside a bracket expression.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB* + ? {\fR
 .ad
 .RS 14n
-.rt  
 The asterisk, plus-sign, question-mark, and left-brace are special except when
 used in a bracket expression (see \fBRE Bracket Expression\fR, above). Any of
 the following uses produce undefined results:
@@ -617,12 +600,10 @@ if a left-brace is not part of a valid interval expression.
 
 .sp
 .ne 2
-.mk
 .na
 \fB|\fR
 .ad
 .RS 14n
-.rt  
 The vertical-line is special except when used in a bracket expression (see
 \fBRE Bracket Expression\fR, above). A vertical-line appearing first or last in
 an ERE, or immediately following a vertical-line or a left-parenthesis, or
@@ -631,12 +612,10 @@ immediately preceding a right-parenthesis, produces undefined results.
 
 .sp
 .ne 2
-.mk
 .na
 \fB^\fR
 .ad
 .RS 14n
-.rt  
 The circumflex is special when used:
 .RS +4
 .TP
@@ -655,12 +634,10 @@ Expression\fR, above).
 
 .sp
 .ne 2
-.mk
 .na
 \fB$\fR
 .ad
 .RS 14n
-.rt  
 The dollar sign is special when used as an anchor.
 .RE
 
@@ -757,19 +734,18 @@ The order of precedence will be as shown in the following table:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
+box;
+l l
+l l .
 \fBERE Precedence (from high to low)\fR
-collation-related bracket symbols[= =]  [: :]  [. .]
-escaped characters\e<\fIspecial character\fR>
-bracket expression[ ]
-grouping( )
-single-character-ERE duplication* + ? {\fIm\fR,\fIn\fR}
-concatenation
-anchoring^  $
-alternation|
+collation-related bracket symbols	[= =]  [: :]  [. .]
+escaped characters	\e<\fIspecial character\fR>
+bracket expression	[ ]
+grouping	( )
+single-character-ERE duplication	* + ? {\fIm\fR,\fIn\fR}
+concatenation	
+anchoring	^  $
+alternation	|
 .TE
 
 .sp

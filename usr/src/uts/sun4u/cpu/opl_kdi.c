@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * CPU-specific functions needed by the Kernel-Debugger Interface (KDI).  These
  * functions are invoked directly by the kernel debugger (kmdb) while the system
@@ -65,6 +63,8 @@ extern void shipit(int, int);
 extern void kdi_flush_idcache(int, int, int, int);
 extern int kdi_get_stick(uint64_t *);
 
+static void kdi_tickwait(clock_t);
+
 static int
 kdi_cpu_ready_iter(int (*cb)(int, void *), void *arg)
 {
@@ -88,7 +88,6 @@ kdi_xc_one(int cpuid, void (*func)(uintptr_t, uintptr_t), uintptr_t arg1,
     uintptr_t arg2)
 {
 	uint64_t idsr;
-	static void kdi_tickwait(clock_t);
 	uint64_t endtick, tick;
 
 	init_mondo_nocheck((xcfunc_t *)func, arg1, arg2);
@@ -123,7 +122,8 @@ kdi_tickwait(clock_t nticks)
 {
 	clock_t endtick = gettick() + nticks;
 
-	while (gettick() < endtick);
+	while (gettick() < endtick)
+		;
 }
 
 static void

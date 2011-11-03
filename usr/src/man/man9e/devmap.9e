@@ -4,18 +4,18 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH devmap 9E "15 Jan 1997" "SunOS 5.11" "Driver Entry Points"
+.TH DEVMAP 9E "Jan 15, 1997"
 .SH NAME
 devmap \- validate and translate virtual mapping for memory mapped device
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/ddi.h> 
+#include <sys/ddi.h>
 #include <sys/sunddi.h>
 
 
 
-\fBint prefix\fR\fBdevmap\fR(\fBdev_t\fR \fIdev\fR, \fBdevmap_cookie_t\fR \fIdhp\fR, \fBoffset_t\fR \fIoff\fR, 
+\fBint prefix\fR\fBdevmap\fR(\fBdev_t\fR \fIdev\fR, \fBdevmap_cookie_t\fR \fIdhp\fR, \fBoffset_t\fR \fIoff\fR,
      \fBsize_t\fR \fIlen\fR, \fBsize_t *\fR\fImaplen\fR, \fBuint_t\fR \fImodel\fR);
 .fi
 
@@ -26,68 +26,56 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdev\fR \fR
 .ad
 .RS 11n
-.rt  
 Device whose memory is to be mapped.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdhp\fR \fR
 .ad
 .RS 11n
-.rt  
 An opaque mapping handle that the system uses to describe the mapping.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoff\fR \fR
 .ad
 .RS 11n
-.rt  
 User offset within the logical device memory at which the mapping begins.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlen\fR \fR
 .ad
 .RS 11n
-.rt  
 Length (in bytes) of the mapping to be mapped.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImaplen\fR \fR
 .ad
 .RS 11n
-.rt  
 Pointer to length (in bytes) of mapping that has been validated. \fImaplen\fR
 is less than or equal to  \fIlen\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImodel\fR \fR
 .ad
 .RS 11n
-.rt  
 The data model type of the current thread.
 .RE
 
@@ -188,23 +176,19 @@ aligned with the kernel address being mapped for cache coherence.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 12n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBNon-zero\fR
 .ad
 .RS 12n
-.rt  
 An error occurred.
 .RE
 
@@ -231,7 +215,7 @@ made in the \fBdetach\fR(9E) routine to free up the kernel memory.
 .nf
 \&.\|.\|.
 #define MAPPING_SIZE 0x2000        /* size of the mapping */
-#define MAPPING_START 0x70000000   /* logical offset at beginning 
+#define MAPPING_START 0x70000000   /* logical offset at beginning
                                       of the mapping */
 static
 struct devmap_callback_ctl xxmap_ops = {
@@ -242,7 +226,7 @@ struct devmap_callback_ctl xxmap_ops = {
 	   xxmap_unmap,                   /* devmap_ops unmap routine  */
 };
 
- 
+
 static int
 xxdevmap(dev_t dev, devmap_cookie_t dhp, offset_t off, size_t len,
    size_t *maplen, uint_t model)
@@ -289,11 +273,11 @@ xxdevmap(dev_t dev, devmap_cookie_t dhp, offset_t off, size_t len,
       if ((err = devmap_devmem_setup(dhp, dip, callbackops, rnumber, roff,
                length, maxprot, flags, endian_attr)) < 0)
 
-           
+
           return (err);
 
    } else if (\fI off is referring to a kernel memory.\fR) {
-      cookie = xsp->cookie;      /* cookie is obtained from 
+      cookie = xsp->cookie;      /* cookie is obtained from
                                     ddi_umem_alloc(9F) */
       koff = XXX;                /* offset within the kernel memory. */
       callbackops = NULL;        /* don't do callback for this mapping */

@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cachefspack 1M "18 Mar 2004" "SunOS 5.11" "System Administration Commands"
+.TH CACHEFSPACK 1M "Mar 18, 2004"
 .SH NAME
 cachefspack \- pack files and file systems in the cache
 .SH SYNOPSIS
 .LP
 .nf
-\fBcachefspack\fR [\fB-h\fR] [\fB-i\fR | \fB-p\fR | \fB-u\fR] [\fB-f\fR \fIpacking-list\fR] 
+\fBcachefspack\fR [\fB-h\fR] [\fB-i\fR | \fB-p\fR | \fB-u\fR] [\fB-f\fR \fIpacking-list\fR]
      [\fB-U\fR \fIcache-directory\fR] [\fIfile\fR]...
 .fi
 
@@ -30,12 +30,10 @@ available for \fBcachefs\fR with NFSv4.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-f\fR\fB \fR\fIpacking-list\fR\fR
 .ad
 .RS 22n
-.rt  
 Specify a file containing a list of files and directories to be packed. Options
 within subdirectories and files can also be specified. The format and rules
 governing \fIpacking-list\fR are described on the \fBpackingrules\fR(4) manual
@@ -46,56 +44,46 @@ recursively processing directories are not followed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 22n
-.rt  
 Help. Print a brief summary of all the options.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 22n
-.rt  
 View information about the packed files.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 22n
-.rt  
 Pack the file or files specified by \fBfile\fR. This is the default behavior.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
 .RS 22n
-.rt  
 Unpack the file or files specified by \fBfile\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-U\fR\fB \fR\fIcache-directory\fR\fR
 .ad
 .RS 22n
-.rt  
 Unpack all files in the specified cache directory.
 .RE
 
@@ -105,12 +93,10 @@ Unpack all files in the specified cache directory.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfile\fR\fR
 .ad
 .RS 8n
-.rt  
 A path name of a file to be packed or unpacked.
 .RE
 
@@ -228,23 +214,19 @@ the file's path name:
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 

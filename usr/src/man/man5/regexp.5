@@ -8,7 +8,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH regexp 5 "20 May 2002" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH REGEXP 5 "May 20, 2002"
 .SH NAME
 regexp, compile, step, advance \- simple regular expression compile and match
 routines
@@ -86,34 +86,28 @@ for themselves.
 The following \fIone-character\fR \fIRE\fRs match a \fIsingle\fR character:
 .sp
 .ne 2
-.mk
 .na
 \fB1.1\fR
 .ad
 .RS 7n
-.rt  
 An ordinary character ( \fInot\fR one of those discussed in 1.2 below) is a
 one-character RE that matches itself.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB1.2\fR
 .ad
 .RS 7n
-.rt  
 A backslash (\fB\|\e\fR\|) followed by any special character is a one-character
 RE that matches the special character itself. The special characters are:
 .sp
 .ne 2
-.mk
 .na
 \fBa.\fR
 .ad
 .RS 6n
-.rt  
 \fB\&.\fR, \fB*\fR, \fB[\fR\|, and \fB\e\fR (period, asterisk, left square
 bracket, and backslash, respectively), which are always special, \fIexcept\fR
 when they appear within square brackets (\fB[\|]\fR; see 1.4 below).
@@ -121,12 +115,10 @@ when they appear within square brackets (\fB[\|]\fR; see 1.4 below).
 
 .sp
 .ne 2
-.mk
 .na
 \fBb.\fR
 .ad
 .RS 6n
-.rt  
 ^ (caret or circumflex), which is special at the \fIbeginning\fR of an
 \fIentire\fR RE (see 4.1 and 4.3 below), or when it immediately follows the
 left of a pair of square brackets (\fB[\|]\fR) (see 1.4 below).
@@ -134,24 +126,20 @@ left of a pair of square brackets (\fB[\|]\fR) (see 1.4 below).
 
 .sp
 .ne 2
-.mk
 .na
 \fBc.\fR
 .ad
 .RS 6n
-.rt  
 \fB$\fR (dollar sign), which is special at the \fBend\fR of an \fIentire\fR RE
 (see 4.2 below).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBd.\fR
 .ad
 .RS 6n
-.rt  
 The character used to bound (that is, delimit) an entire RE, which is special
 for that RE (for example, see how slash (\fB/\fR) is used in the \fBg\fR
 command, below.)
@@ -161,24 +149,20 @@ command, below.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB1.3\fR
 .ad
 .RS 7n
-.rt  
 A period (\fB\&.\fR) is a one-character RE that matches any character except
 new-line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB1.4\fR
 .ad
 .RS 7n
-.rt  
 A non-empty string of characters enclosed in square brackets (\fB[\|]\fR) is a
 one-character RE that matches \fIany one\fR character in that string. If,
 however, the first character of the string is a circumflex (^), the
@@ -200,23 +184,19 @@ stand for themselves within such a string of characters.
 The following rules may be used to construct REs from one-character REs:
 .sp
 .ne 2
-.mk
 .na
 \fB2.1\fR
 .ad
 .RS 7n
-.rt  
 A one-character RE is a RE that matches whatever the one-character RE matches.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB2.2\fR
 .ad
 .RS 7n
-.rt  
 A one-character RE followed by an asterisk (\fB*\fR) is a RE that matches
 \fB0\fR or more occurrences of the one-character RE. If there is any choice,
 the longest leftmost string that permits a match is chosen.
@@ -224,12 +204,10 @@ the longest leftmost string that permits a match is chosen.
 
 .sp
 .ne 2
-.mk
 .na
 \fB2.3\fR
 .ad
 .RS 7n
-.rt  
 A one-character RE followed by \fB\e{\fR\fIm\fR\fB\e}\fR,
 \fB\e{\fR\fIm,\fR\fB\e}\fR, or \fB\e{\fR\fIm,n\fR\fB\e}\fR is a RE that matches
 a \fIrange\fR of occurrences of the one-character RE. The values of \fIm\fR and
@@ -242,36 +220,30 @@ a choice exists, the RE matches as many occurrences as possible.
 
 .sp
 .ne 2
-.mk
 .na
 \fB2.4\fR
 .ad
 .RS 7n
-.rt  
 The concatenation of REs is a RE that matches the concatenation of the strings
 matched by each component of the RE.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB2.5\fR
 .ad
 .RS 7n
-.rt  
 A RE enclosed between the character sequences \fB\e\|(\fR and \fB\e\|)\fR is a
 RE that matches whatever the unadorned RE matches.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB2.6\fR
 .ad
 .RS 7n
-.rt  
 The expression \fB\e\|\fR\fIn\fR matches the same string of characters as was
 matched by an expression enclosed between \fB\e\|(\fR and \fB\e\|)\fR
 \fIearlier\fR in the same RE. Here \fIn\fR is a digit; the sub-expression
@@ -286,12 +258,10 @@ appearances of the same string.
 An RE may be constrained to match words.
 .sp
 .ne 2
-.mk
 .na
 \fB3.1\fR
 .ad
 .RS 7n
-.rt  
 \fB\e\|<\fR constrains a RE to match the beginning of a string or to follow a
 character that is not a digit, underscore, or letter. The first character
 matching the RE must be a digit, underscore, or letter.
@@ -299,12 +269,10 @@ matching the RE must be a digit, underscore, or letter.
 
 .sp
 .ne 2
-.mk
 .na
 \fB3.2\fR
 .ad
 .RS 7n
-.rt  
 \fB\e\|>\fR constrains a RE to match the end of a string or to precede a
 character that is not a digit, underscore, or letter.
 .RE
@@ -315,36 +283,30 @@ An \fIentire\fR \fIRE\fR may be constrained to match only an initial segment or
 final segment of a line (or both).
 .sp
 .ne 2
-.mk
 .na
 \fB4.1\fR
 .ad
 .RS 7n
-.rt  
 A circumflex (^) at the beginning of an entire RE constrains that RE to match
 an \fIinitial\fR segment of a line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB4.2\fR
 .ad
 .RS 7n
-.rt  
 A dollar sign (\fB$\fR) at the end of an entire RE constrains that RE to match
 a \fIfinal\fR segment of a line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB4.3\fR
 .ad
 .RS 7n
-.rt  
 The construction ^\fIentire RE\fR\|\fB$\fR constrains the entire RE to match
 the entire line.
 .RE
@@ -463,12 +425,10 @@ The macros \fBGETC\fR, \fBPEEKC\fR, and \fBUNGETC\fR operate on the regular
 expression given as input to \fBcompile()\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGETC\fR\fR
 .ad
 .RS 15n
-.rt  
 This macro returns the value of the next character (byte) in the regular
 expression pattern. Successive calls to  \fBGETC\fR should return successive
 characters of the regular expression.
@@ -476,12 +436,10 @@ characters of the regular expression.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPEEKC\fR\fR
 .ad
 .RS 15n
-.rt  
 This macro returns the next character (byte) in the regular expression.
 Immediately successive calls to  \fBPEEKC\fR should return the same character,
 which should also be the next character returned by \fBGETC\fR.
@@ -489,12 +447,10 @@ which should also be the next character returned by \fBGETC\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUNGETC\fR\fR
 .ad
 .RS 15n
-.rt  
 This macro causes the argument \fBc\fR to be returned by the next call to
 \fBGETC\fR and \fBPEEKC\fR. No more than one character of pushback is ever
 needed and this character is guaranteed to be the last character read by
@@ -503,12 +459,10 @@ needed and this character is guaranteed to be the last character read by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRETURN(\fR\fIptr\fR\fB)\fR\fR
 .ad
 .RS 15n
-.rt  
 This macro is used on normal exit of the \fBcompile()\fR routine. The value of
 the argument \fIptr\fR is a pointer to the character after the last character
 of the compiled regular expression. This is useful to programs which have
@@ -517,12 +471,10 @@ memory allocation to manage.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBERROR(\fR\fIval\fR\fB)\fR\fR
 .ad
 .RS 15n
-.rt  
 This macro is the abnormal return from the \fBcompile()\fR routine. The
 argument \fIval\fR is an error number (see \fBERRORS\fR below for meanings).
 This call should never return.
@@ -650,133 +602,109 @@ macro \fBERROR\fR on failure (see above). The functions \fBstep()\fR and
 match. Errors are:
 .sp
 .ne 2
-.mk
 .na
 \fB11\fR
 .ad
 .RS 6n
-.rt  
 range endpoint too large.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB16\fR
 .ad
 .RS 6n
-.rt  
 bad number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB25\fR
 .ad
 .RS 6n
-.rt  
 \fB\e\fR \fIdigit\fR out of range.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB36\fR
 .ad
 .RS 6n
-.rt  
 illegal or missing delimiter.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB41\fR
 .ad
 .RS 6n
-.rt  
 no remembered search string.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB42\fR
 .ad
 .RS 6n
-.rt  
 \fB\e( \e)\fR imbalance.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB43\fR
 .ad
 .RS 6n
-.rt  
 too many \fB\e(\fR\&.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB44\fR
 .ad
 .RS 6n
-.rt  
 more than 2 numbers given in \fB\e{ \e}\fR\&.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB45\fR
 .ad
 .RS 6n
-.rt  
 \fB}\fR expected after \fB\e\fR\&.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB46\fR
 .ad
 .RS 6n
-.rt  
 first number exceeds second in \fB\e{ \e}\fR\&.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB49\fR
 .ad
 .RS 6n
-.rt  
 \fB[ ]\fR imbalance.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB50\fR
 .ad
 .RS 6n
-.rt  
 regular expression overflow.
 .RE
 

@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH exec 1 "8 Apr 2008" "SunOS 5.11" "User Commands"
+.TH EXEC 1 "Apr 8, 2008"
 .SH NAME
 exec, eval, source \- shell built-in functions to execute other commands
 .SH SYNOPSIS
@@ -87,12 +87,10 @@ descriptors. An error in a sourced file at any level terminates all nested
 \fBsource\fR commands.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 6n
-.rt  
 Place commands from the file \fIname\fR on the history list without executing
 them.
 .RE
@@ -216,23 +214,19 @@ field splitting and file name generation are not performed.
 The following options are supported by \fBksh93 exec\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIname\fR\fR
 .ad
 .RS 11n
-.rt  
 \fBargv[0]\fR is set to \fIname\fR for command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 11n
-.rt  
 Clear all environment variables before executions except variable assignments
 that are part of the current \fBexec\fR command.
 .RE
@@ -244,45 +238,37 @@ that are part of the current \fBexec\fR command.
 The following exit values are returned by \fBexec\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 9n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1-125\fR\fR
 .ad
 .RS 9n
-.rt  
 A redirection error occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB127\fR\fR
 .ad
 .RS 9n
-.rt  
 \fIcommand\fR was not found.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB126\fR\fR
 .ad
 .RS 9n
-.rt  
 \fIcommand\fR was found, but it is not an executable utility.
 .RE
 
@@ -293,23 +279,19 @@ The following exit values are returned by \fBexec\fR. If \fIcommand\fR is
 specified, \fBexec\fR does not return.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion. All I/O redirections were successful.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -328,11 +310,10 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 .TE
 
 .SH SEE ALSO

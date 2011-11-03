@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libscf 3LIB "28 Aug 2007" "SunOS 5.11" "Interface Libraries"
+.TH LIBSCF 3LIB "Aug 28, 2007"
 .SH NAME
 libscf \- service configuration facility library
 .SH SYNOPSIS
@@ -28,145 +28,139 @@ interfaces.
 
 .sp
 .TS
-tab();
-lw(2.89i) lw(2.61i) 
-lw(2.89i) lw(2.61i) 
-.
-\fBscf_count_ranges_destroy\fR\fBscf_entry_add_value\fR
-\fBscf_entry_create\fR\fBscf_entry_destroy\fR
-\fBscf_entry_destroy_children\fR\fBscf_entry_handle\fR
-\fBscf_entry_reset\fR\fBscf_error\fR
-\fBscf_handle_bind\fR\fBscf_handle_create\fR
-\fBscf_handle_decode_fmri\fR\fBscf_handle_decorate\fR
-\fBscf_handle_destroy\fR\fBscf_handle_get_scope\fR
-\fBscf_handle_unbind\fR\fBscf_instance_add_pg\fR
-\fBscf_instance_create\fR\fBscf_instance_delete\fR
-\fBscf_instance_destroy\fR\fBscf_instance_get_name\fR
-\fBscf_instance_get_parent\fR\fBscf_instance_get_pg\fR
-\fBscf_instance_get_pg_composed\fR\fBscf_instance_get_snapshot\fR
-\fBscf_instance_handle\fR\fBscf_instance_to_fmri\fR
-\fBscf_int_ranges_destroy\fR\fBscf_iter_create\fR
-\fBscf_iter_destroy\fR\fBscf_iter_handle\fR
-\fBscf_iter_handle_scopes\fR\fBscf_iter_instance_pgs\fR
-\fBscf_iter_instance_pgs_composed\fR\fBscf_iter_instance_pgs_typed_composed\fR
-\fBscf_iter_instance_pgs_typed\fR\fBscf_iter_instance_snapshots\fR
-\fBscf_iter_next_instance\fR\fBscf_iter_next_pg\fR
-\fBscf_iter_next_property\fR\fBscf_iter_next_scope\fR
-\fBscf_iter_next_service\fR\fBscf_iter_next_snapshot\fR
-\fBscf_iter_next_value\fR\fBscf_iter_pg_properties\fR
-\fBscf_iter_property_values\fR\fBscf_iter_reset\fR
-\fBscf_iter_scope_services\fR\fBscf_iter_service_instances\fR
-\fBscf_iter_service_pgs\fR\fBscf_iter_service_pgs_typed\fR
-\fBscf_iter_snaplevel_pgs\fR\fBscf_iter_snaplevel_pgs_typed\fR
-\fBscf_limit\fR\fBscf_myname\fR
-\fBscf_pg_create\fR\fBscf_pg_delete\fR
-\fBscf_pg_destroy\fR\fBscf_pg_get_flags\fR
-\fBscf_pg_get_name\fR\fBscf_pg_get_parent_instance\fR
-\fBscf_pg_get_parent_service\fR\fBscf_pg_get_parent_snaplevel\fR
-\fBscf_pg_get_property\fR\fBscf_pg_get_type\fR
-\fBscf_pg_get_underlying_pg\fR\fBscf_pg_handle\fR
-\fBscf_pg_to_fmri\fR\fBscf_pg_update\fR
-\fBscf_property_create\fR\fBscf_property_destroy\fR
-\fBscf_property_get_name\fR\fBscf_property_get_value\fR
-\fBscf_property_handle\fR\fBscf_property_is_type\fR
-\fBscf_property_to_fmri\fR\fBscf_property_type\fR
-\fBscf_scope_add_service\fR\fBscf_scope_create\fR
-\fBscf_scope_destroy\fR\fBscf_scope_get_name\fR
-\fBscf_scope_get_service\fR\fBscf_scope_handle\fR
-\fBscf_scope_to_fmri\fR\fBscf_service_add_instance\fR
-\fBscf_service_add_pg\fR\fBscf_service_create\fR
-\fBscf_service_delete\fR\fBscf_service_destroy\fR
-\fBscf_service_get_instance\fR\fBscf_service_get_name\fR
-\fBscf_service_get_parent\fR\fBscf_service_get_pg\fR
-\fBscf_service_handle\fR\fBscf_service_to_fmri\fR
-\fBscf_simple_app_props_free\fR\fBscf_simple_app_props_get\fR
-\fBscf_simple_app_props_next\fR\fBscf_simple_app_props_search\fR
-\fBscf_simple_prop_free\fR\fBscf_simple_prop_get\fR
-\fBscf_simple_prop_name\fR\fBscf_simple_prop_next_astring\fR
-\fBscf_simple_prop_next_boolean\fR\fBscf_simple_prop_next_count\fR
-\fBscf_simple_prop_next_integer\fR\fBscf_simple_prop_next_opaque\fR
-\fBscf_simple_prop_next_reset\fR\fBscf_simple_prop_next_time\fR
-\fBscf_simple_prop_next_ustring\fR\fBscf_simple_prop_numvalues\fR
-\fBscf_simple_prop_pgname\fR\fBscf_simple_prop_type\fR
-\fBscf_simple_walk_instances\fR\fBscf_snaplevel_create\fR
-\fBscf_snaplevel_destroy\fR\fBscf_snaplevel_get_instance_name\fR
-\fBscf_snaplevel_get_next_snaplevel\fR\fBscf_snaplevel_get_parent\fR
-\fBscf_snaplevel_get_pg\fR\fBscf_snaplevel_get_scope_name\fR
-\fBscf_snaplevel_get_service_name\fR\fBscf_snaplevel_handle\fR
-\fBscf_snapshot_create\fR\fBscf_snapshot_destroy\fR
-\fBscf_snapshot_get_base_snaplevel\fR\fBscf_snapshot_get_name\fR
-\fBscf_snapshot_get_parent\fR\fBscf_snapshot_handle\fR
-\fBscf_strerror\fR\fBscf_string_to_type\fR
-\fBscf_tmpl_error_pg\fR\fBscf_tmpl_error_pg_tmpl\fR
-\fBscf_tmpl_error_prop\fR\fBscf_tmpl_error_prop_tmpl\fR
-\fBscf_tmpl_error_source_fmri\fR\fBscf_tmpl_error_type\fR
-\fBscf_tmpl_error_value\fR\fBscf_tmpl_errors_destroy\fR
-\fBscf_tmpl_get_by_pg\fR\fBscf_tmpl_get_by_pg_name\fR
-\fBscf_tmpl_get_by_prop\fR\fBscf_tmpl_iter_pgs\fR
-\fBscf_tmpl_iter_props\fR\fBscf_tmpl_next_error\fR
-\fBscf_tmpl_pg_common_name\fR\fBscf_tmpl_pg_create\fR
-\fBscf_tmpl_pg_description\fR\fBscf_tmpl_pg_destroy\fR
-\fBscf_tmpl_pg_name\fR\fBscf_tmpl_pg_required\fR
-\fBscf_tmpl_pg_reset\fR\fBscf_tmpl_pg_target\fR
-\fBscf_tmpl_pg_type\fR\fBscf_tmpl_prop_cardinality\fR
-\fBscf_tmpl_prop_common_name\fR\fBscf_tmpl_prop_create\fR
-\fBscf_tmpl_prop_description\fR\fBscf_tmpl_prop_destroy\fR
-\fBscf_tmpl_prop_internal_seps\fR\fBscf_tmpl_prop_name\fR
-\fBscf_tmpl_prop_required\fR\fBscf_tmpl_prop_reset\fR
-\fBscf_tmpl_prop_type\fR\fBscf_tmpl_prop_units\fR
-\fBscf_tmpl_prop_visibility\fR\fBscf_tmpl_reset_errors\fR
-\fBscf_tmpl_strerror\fR\fBscf_tmpl_validate_fmri\fR
-\fBscf_tmpl_value_common_name\fR\fBscf_tmpl_value_count_range_choices\fR
-\fBscf_tmpl_value_count_range_ constraints\fR\fBscf_tmpl_value_description\fR
-\fBscf_tmpl_value_in_constraint\fR\fBscf_tmpl_value_int_range_choices\fR
-\fBscf_tmpl_value_int_range_ constraints\fR\fBscf_tmpl_value_name_choices\fR
-\fBscf_tmpl_value_name_constraints\fR\fBscf_tmpl_visibility_to_string\fR
-\fBscf_transaction_commit\fR\fBscf_transaction_create\fR
-\fBscf_transaction_destroy\fR\fBscf_transaction_destroy_children\fR
-\fBscf_transaction_handle\fR\fBscf_transacion_property_change\fR
-\fBscf_transaction_property_change_ type\fR\fBscf_transaction_property_delete\fR
-\fBscf_transaction_property_new\fR\fBscf_transaction_reset\fR
-\fBscf_transaction_reset_all\fR\fBscf_transaction_start\fR
-\fBscf_type_base_type\fR\fBscf_type_to_string\fR
-\fBscf_value_base_type\fR\fBscf_value_create\fR
-\fBscf_value_destroy\fR\fBscf_value_get_as_string\fR
-\fBscf_value_get_as_string_typed\fR\fBscf_value_get_astring\fR
-\fBscf_value_get_boolean\fR\fBscf_value_get_count\fR
-\fBscf_value_get_integer\fR\fBscf_value_get_opaque\fR
-\fBscf_value_get_time\fR\fBscf_value_get_ustring\fR
-\fBscf_value_handle\fR\fBscf_value_is_type\fR
-\fBscf_value_reset\fR\fBscf_value_set_astring\fR
-\fBscf_value_set_boolean\fR\fBscf_value_set_count\fR
-\fBscf_value_set_from_string\fR\fBscf_value_set_integer\fR
-\fBscf_value_set_opaque\fR\fBscf_value_set_time\fR
-\fBscf_value_set_ustring\fR\fBscf_value_type\fR
-\fBscf_values_destroy\fR\fBsmf_degrade_instance\fR
-\fBsmf_disable_instance\fR\fBsmf_enable_instance\fR
-\fBsmf_get_state\fR\fBsmf_maintain_instance\fR
-\fBsmf_refresh_instance\fR\fBsmf_restart_instance\fR
-\fBsmf_restore_instance\fR
+l l
+l l .
+\fBscf_count_ranges_destroy\fR	\fBscf_entry_add_value\fR
+\fBscf_entry_create\fR	\fBscf_entry_destroy\fR
+\fBscf_entry_destroy_children\fR	\fBscf_entry_handle\fR
+\fBscf_entry_reset\fR	\fBscf_error\fR
+\fBscf_handle_bind\fR	\fBscf_handle_create\fR
+\fBscf_handle_decode_fmri\fR	\fBscf_handle_decorate\fR
+\fBscf_handle_destroy\fR	\fBscf_handle_get_scope\fR
+\fBscf_handle_unbind\fR	\fBscf_instance_add_pg\fR
+\fBscf_instance_create\fR	\fBscf_instance_delete\fR
+\fBscf_instance_destroy\fR	\fBscf_instance_get_name\fR
+\fBscf_instance_get_parent\fR	\fBscf_instance_get_pg\fR
+\fBscf_instance_get_pg_composed\fR	\fBscf_instance_get_snapshot\fR
+\fBscf_instance_handle\fR	\fBscf_instance_to_fmri\fR
+\fBscf_int_ranges_destroy\fR	\fBscf_iter_create\fR
+\fBscf_iter_destroy\fR	\fBscf_iter_handle\fR
+\fBscf_iter_handle_scopes\fR	\fBscf_iter_instance_pgs\fR
+\fBscf_iter_instance_pgs_composed\fR	\fBscf_iter_instance_pgs_typed_composed\fR
+\fBscf_iter_instance_pgs_typed\fR	\fBscf_iter_instance_snapshots\fR
+\fBscf_iter_next_instance\fR	\fBscf_iter_next_pg\fR
+\fBscf_iter_next_property\fR	\fBscf_iter_next_scope\fR
+\fBscf_iter_next_service\fR	\fBscf_iter_next_snapshot\fR
+\fBscf_iter_next_value\fR	\fBscf_iter_pg_properties\fR
+\fBscf_iter_property_values\fR	\fBscf_iter_reset\fR
+\fBscf_iter_scope_services\fR	\fBscf_iter_service_instances\fR
+\fBscf_iter_service_pgs\fR	\fBscf_iter_service_pgs_typed\fR
+\fBscf_iter_snaplevel_pgs\fR	\fBscf_iter_snaplevel_pgs_typed\fR
+\fBscf_limit\fR	\fBscf_myname\fR
+\fBscf_pg_create\fR	\fBscf_pg_delete\fR
+\fBscf_pg_destroy\fR	\fBscf_pg_get_flags\fR
+\fBscf_pg_get_name\fR	\fBscf_pg_get_parent_instance\fR
+\fBscf_pg_get_parent_service\fR	\fBscf_pg_get_parent_snaplevel\fR
+\fBscf_pg_get_property\fR	\fBscf_pg_get_type\fR
+\fBscf_pg_get_underlying_pg\fR	\fBscf_pg_handle\fR
+\fBscf_pg_to_fmri\fR	\fBscf_pg_update\fR
+\fBscf_property_create\fR	\fBscf_property_destroy\fR
+\fBscf_property_get_name\fR	\fBscf_property_get_value\fR
+\fBscf_property_handle\fR	\fBscf_property_is_type\fR
+\fBscf_property_to_fmri\fR	\fBscf_property_type\fR
+\fBscf_scope_add_service\fR	\fBscf_scope_create\fR
+\fBscf_scope_destroy\fR	\fBscf_scope_get_name\fR
+\fBscf_scope_get_service\fR	\fBscf_scope_handle\fR
+\fBscf_scope_to_fmri\fR	\fBscf_service_add_instance\fR
+\fBscf_service_add_pg\fR	\fBscf_service_create\fR
+\fBscf_service_delete\fR	\fBscf_service_destroy\fR
+\fBscf_service_get_instance\fR	\fBscf_service_get_name\fR
+\fBscf_service_get_parent\fR	\fBscf_service_get_pg\fR
+\fBscf_service_handle\fR	\fBscf_service_to_fmri\fR
+\fBscf_simple_app_props_free\fR	\fBscf_simple_app_props_get\fR
+\fBscf_simple_app_props_next\fR	\fBscf_simple_app_props_search\fR
+\fBscf_simple_prop_free\fR	\fBscf_simple_prop_get\fR
+\fBscf_simple_prop_name\fR	\fBscf_simple_prop_next_astring\fR
+\fBscf_simple_prop_next_boolean\fR	\fBscf_simple_prop_next_count\fR
+\fBscf_simple_prop_next_integer\fR	\fBscf_simple_prop_next_opaque\fR
+\fBscf_simple_prop_next_reset\fR	\fBscf_simple_prop_next_time\fR
+\fBscf_simple_prop_next_ustring\fR	\fBscf_simple_prop_numvalues\fR
+\fBscf_simple_prop_pgname\fR	\fBscf_simple_prop_type\fR
+\fBscf_simple_walk_instances\fR	\fBscf_snaplevel_create\fR
+\fBscf_snaplevel_destroy\fR	\fBscf_snaplevel_get_instance_name\fR
+\fBscf_snaplevel_get_next_snaplevel\fR	\fBscf_snaplevel_get_parent\fR
+\fBscf_snaplevel_get_pg\fR	\fBscf_snaplevel_get_scope_name\fR
+\fBscf_snaplevel_get_service_name\fR	\fBscf_snaplevel_handle\fR
+\fBscf_snapshot_create\fR	\fBscf_snapshot_destroy\fR
+\fBscf_snapshot_get_base_snaplevel\fR	\fBscf_snapshot_get_name\fR
+\fBscf_snapshot_get_parent\fR	\fBscf_snapshot_handle\fR
+\fBscf_strerror\fR	\fBscf_string_to_type\fR
+\fBscf_tmpl_error_pg\fR	\fBscf_tmpl_error_pg_tmpl\fR
+\fBscf_tmpl_error_prop\fR	\fBscf_tmpl_error_prop_tmpl\fR
+\fBscf_tmpl_error_source_fmri\fR	\fBscf_tmpl_error_type\fR
+\fBscf_tmpl_error_value\fR	\fBscf_tmpl_errors_destroy\fR
+\fBscf_tmpl_get_by_pg\fR	\fBscf_tmpl_get_by_pg_name\fR
+\fBscf_tmpl_get_by_prop\fR	\fBscf_tmpl_iter_pgs\fR
+\fBscf_tmpl_iter_props\fR	\fBscf_tmpl_next_error\fR
+\fBscf_tmpl_pg_common_name\fR	\fBscf_tmpl_pg_create\fR
+\fBscf_tmpl_pg_description\fR	\fBscf_tmpl_pg_destroy\fR
+\fBscf_tmpl_pg_name\fR	\fBscf_tmpl_pg_required\fR
+\fBscf_tmpl_pg_reset\fR	\fBscf_tmpl_pg_target\fR
+\fBscf_tmpl_pg_type\fR	\fBscf_tmpl_prop_cardinality\fR
+\fBscf_tmpl_prop_common_name\fR	\fBscf_tmpl_prop_create\fR
+\fBscf_tmpl_prop_description\fR	\fBscf_tmpl_prop_destroy\fR
+\fBscf_tmpl_prop_internal_seps\fR	\fBscf_tmpl_prop_name\fR
+\fBscf_tmpl_prop_required\fR	\fBscf_tmpl_prop_reset\fR
+\fBscf_tmpl_prop_type\fR	\fBscf_tmpl_prop_units\fR
+\fBscf_tmpl_prop_visibility\fR	\fBscf_tmpl_reset_errors\fR
+\fBscf_tmpl_strerror\fR	\fBscf_tmpl_validate_fmri\fR
+\fBscf_tmpl_value_common_name\fR	\fBscf_tmpl_value_count_range_choices\fR
+\fBscf_tmpl_value_count_range_ constraints\fR	\fBscf_tmpl_value_description\fR
+\fBscf_tmpl_value_in_constraint\fR	\fBscf_tmpl_value_int_range_choices\fR
+\fBscf_tmpl_value_int_range_ constraints\fR	\fBscf_tmpl_value_name_choices\fR
+\fBscf_tmpl_value_name_constraints\fR	\fBscf_tmpl_visibility_to_string\fR
+\fBscf_transaction_commit\fR	\fBscf_transaction_create\fR
+\fBscf_transaction_destroy\fR	\fBscf_transaction_destroy_children\fR
+\fBscf_transaction_handle\fR	\fBscf_transacion_property_change\fR
+\fBscf_transaction_property_change_ type\fR	\fBscf_transaction_property_delete\fR
+\fBscf_transaction_property_new\fR	\fBscf_transaction_reset\fR
+\fBscf_transaction_reset_all\fR	\fBscf_transaction_start\fR
+\fBscf_type_base_type\fR	\fBscf_type_to_string\fR
+\fBscf_value_base_type\fR	\fBscf_value_create\fR
+\fBscf_value_destroy\fR	\fBscf_value_get_as_string\fR
+\fBscf_value_get_as_string_typed\fR	\fBscf_value_get_astring\fR
+\fBscf_value_get_boolean\fR	\fBscf_value_get_count\fR
+\fBscf_value_get_integer\fR	\fBscf_value_get_opaque\fR
+\fBscf_value_get_time\fR	\fBscf_value_get_ustring\fR
+\fBscf_value_handle\fR	\fBscf_value_is_type\fR
+\fBscf_value_reset\fR	\fBscf_value_set_astring\fR
+\fBscf_value_set_boolean\fR	\fBscf_value_set_count\fR
+\fBscf_value_set_from_string\fR	\fBscf_value_set_integer\fR
+\fBscf_value_set_opaque\fR	\fBscf_value_set_time\fR
+\fBscf_value_set_ustring\fR	\fBscf_value_type\fR
+\fBscf_values_destroy\fR	\fBsmf_degrade_instance\fR
+\fBsmf_disable_instance\fR	\fBsmf_enable_instance\fR
+\fBsmf_get_state\fR	\fBsmf_maintain_instance\fR
+\fBsmf_refresh_instance\fR	\fBsmf_restart_instance\fR
+\fBsmf_restore_instance\fR	
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/libscf.so.1\fR\fR
 .ad
 .RS 27n
-.rt  
 shared object
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/64/libscf.so.1\fR\fR
 .ad
 .RS 27n
-.rt  
 64-bit shared object
 .RE
 
@@ -178,15 +172,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

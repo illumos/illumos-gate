@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH librt 3LIB "5 Feb 2008" "SunOS 5.11" "Interface Libraries"
+.TH LIBRT 3LIB "Feb 5, 2008"
 .SH NAME
 librt, libposix4 \- POSIX.1b Realtime Extensions library
 .SH SYNOPSIS
@@ -33,39 +33,37 @@ shared object interfaces.
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBaio_cancel\fR\fBaio_error\fR
-\fBaio_fsync\fR\fBaio_read\fR
-\fBaio_return\fR\fBaio_suspend\fR
-\fBaio_waitn\fR\fBaio_write\fR
-\fBclock_getres\fR\fBclock_gettime\fR
-\fBclock_nanosleep\fR\fBclock_settime\fR
-\fBclose\fR\fBfdatasync\fR
-\fBfork\fR\fBlio_listio\fR
-\fBmq_close\fR\fBmq_getattr\fR
-\fBmq_notify\fR\fBmq_open\fR
-\fBmq_receive\fR\fBmq_reltimedreceive_np\fR
-\fBmq_reltimedsend_np\fR\fBmq_send\fR
-\fBmq_setattr\fR\fBmq_timedreceive\fR
-\fBmq_timedsend\fR\fBmq_unlink\fR
-\fBnanosleep\fR\fBsched_get_priority_max\fR
-\fBsched_get_priority_min\fR\fBsched_getparam\fR
-\fBsched_getscheduler\fR\fBsched_rr_get_interval\fR
-\fBsched_setparam\fR\fBsched_setscheduler\fR
-\fBsched_yield\fR\fBsem_close\fR
-\fBsem_destroy\fR\fBsem_getvalue\fR
-\fBsem_init\fR\fBsem_open\fR
-\fBsem_post\fR\fBsem_reltimedwait_np\fR
-\fBsem_timedwait\fR\fBsem_trywait\fR
-\fBsem_unlink\fR\fBsem_wait\fR
-\fBshm_open\fR\fBshm_unlink\fR
-\fBsigqueue\fR\fBsigtimedwait\fR
-\fBsigwaitinfo\fR\fBtimer_create\fR
-\fBtimer_delete\fR\fBtimer_getoverrun\fR
-\fBtimer_gettime\fR\fBtimer_settime\fR
+l l
+l l .
+\fBaio_cancel\fR	\fBaio_error\fR
+\fBaio_fsync\fR	\fBaio_read\fR
+\fBaio_return\fR	\fBaio_suspend\fR
+\fBaio_waitn\fR	\fBaio_write\fR
+\fBclock_getres\fR	\fBclock_gettime\fR
+\fBclock_nanosleep\fR	\fBclock_settime\fR
+\fBclose\fR	\fBfdatasync\fR
+\fBfork\fR	\fBlio_listio\fR
+\fBmq_close\fR	\fBmq_getattr\fR
+\fBmq_notify\fR	\fBmq_open\fR
+\fBmq_receive\fR	\fBmq_reltimedreceive_np\fR
+\fBmq_reltimedsend_np\fR	\fBmq_send\fR
+\fBmq_setattr\fR	\fBmq_timedreceive\fR
+\fBmq_timedsend\fR	\fBmq_unlink\fR
+\fBnanosleep\fR	\fBsched_get_priority_max\fR
+\fBsched_get_priority_min\fR	\fBsched_getparam\fR
+\fBsched_getscheduler\fR	\fBsched_rr_get_interval\fR
+\fBsched_setparam\fR	\fBsched_setscheduler\fR
+\fBsched_yield\fR	\fBsem_close\fR
+\fBsem_destroy\fR	\fBsem_getvalue\fR
+\fBsem_init\fR	\fBsem_open\fR
+\fBsem_post\fR	\fBsem_reltimedwait_np\fR
+\fBsem_timedwait\fR	\fBsem_trywait\fR
+\fBsem_unlink\fR	\fBsem_wait\fR
+\fBshm_open\fR	\fBshm_unlink\fR
+\fBsigqueue\fR	\fBsigtimedwait\fR
+\fBsigwaitinfo\fR	\fBtimer_create\fR
+\fBtimer_delete\fR	\fBtimer_getoverrun\fR
+\fBtimer_gettime\fR	\fBtimer_settime\fR
 .TE
 
 .sp
@@ -75,59 +73,49 @@ The following interfaces are unique to the 32-bit version of this library:
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBaio_cancel64\fR\fBaio_error64\fR
-\fBaio_fsync64\fR\fBaio_read64\fR
-\fBaio_return64\fR\fBaio_suspend64\fR
-\fBaio_waitn64\fR\fBaio_write64\fR
-\fBlio_listio64\fR
+l l
+l l .
+\fBaio_cancel64\fR	\fBaio_error64\fR
+\fBaio_fsync64\fR	\fBaio_read64\fR
+\fBaio_return64\fR	\fBaio_suspend64\fR
+\fBaio_waitn64\fR	\fBaio_write64\fR
+\fBlio_listio64\fR	
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/librt.so.1\fR\fR
 .ad
 .RS 26n
-.rt  
 shared object
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/64/librt.so.1\fR\fR
 .ad
 .RS 26n
-.rt  
 64-bit shared object file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/libposix4.so.1\fR\fR
 .ad
 .RS 26n
-.rt  
 shared object
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/64/libposix4.so.1\fR\fR
 .ad
 .RS 26n
-.rt  
 64-bit shared object file
 .RE
 
@@ -139,13 +127,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

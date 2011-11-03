@@ -2,7 +2,7 @@
 .\" Copyright (c) 1982-2007 AT&T Knowledge Ventures
 .\" To view license terms, see http://www.opensource.org/licenses/cpl1.0.txt
 .\" Portions Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
-.TH rev 1 "11 Aug 2009" "SunOS 5.11" "User Commands"
+.TH REV 1 "Aug 11, 2009"
 .SH NAME
 rev \- reverse the characters or lines of one or more files
 .SH SYNOPSIS
@@ -29,7 +29,6 @@ file if \fB-l\fR is specified
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
@@ -38,7 +37,6 @@ The following options are supported:
 \fB\fB--line\fR\fR
 .ad
 .RS 10n
-.rt  
 Reverse the order of the lines of the file, instead of characters.
 .RE
 
@@ -48,12 +46,10 @@ Reverse the order of the lines of the file, instead of characters.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fR
 .ad
 .RS 8n
-.rt  
 Specifies the name of the file to use as input.
 .sp
 If \fIfile\fR is not specified, or if \fIfile\fR is a \fB-\fR, \fBrev\fR copies
@@ -66,23 +62,19 @@ from standard input starting at the current offset.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 All files copied successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 One or more files did not copy.
 .RE
 
@@ -94,15 +86,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

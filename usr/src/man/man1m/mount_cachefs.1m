@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mount_cachefs 1M "18 Mar 2004" "SunOS 5.11" "System Administration Commands"
+.TH MOUNT_CACHEFS 1M "Mar 18, 2004"
 .SH NAME
 mount_cachefs \- mount CacheFS file systems
 .SH SYNOPSIS
 .LP
 .nf
-\fBmount\fR \fB-F\fR cachefs [\fIgeneric_options\fR] \fB-o\fR backfstype=\fIfile_system_type\fR 
-     [\fIspecific_options\fR] 
+\fBmount\fR \fB-F\fR cachefs [\fIgeneric_options\fR] \fB-o\fR backfstype=\fIfile_system_type\fR
+     [\fIspecific_options\fR]
      [\fB-O\fR] \fIspecial\fR \fImount_point\fR
 .fi
 
@@ -36,17 +36,14 @@ To mount a CacheFS file system, use the generic \fBmount\fR command with the
 See \fBmount\fR(1M) for a list of supported \fIgeneric_options\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-o\fR\fB \fR\fIspecific_options\fR\fR
 .ad
 .RS 23n
-.rt  
 Specify CacheFS file system specific options in a comma-separated list with no
 intervening spaces.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBacdirmax=\fR\fIn\fR\fR
 .ad
@@ -59,7 +56,6 @@ purged from the cache. The default value is \fB30\fR seconds.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBacdirmin=\fR\fIn\fR\fR
 .ad
@@ -74,7 +70,6 @@ retrieved from the back file system. The default value is \fB30\fR seconds.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBacregmax=\fR\fIn\fR\fR
 .ad
@@ -87,7 +82,6 @@ from the cache. The default value is \fB30\fR seconds.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBacregmin=\fR\fIn\fR\fR
 .ad
@@ -102,7 +96,6 @@ from the back file system. The default value is \fB30\fR seconds.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBactimeo=\fR\fIn\fR\fR
 .ad
@@ -114,7 +107,6 @@ Sets \fBacregmin\fR, \fBacregmax\fR, \fBacdirmin\fR, and \fBacdirmax\fR to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbackfstype=\fR\fIfile_system_type\fR\fR
 .ad
@@ -125,7 +117,6 @@ The file system type of the back file system (can be \fBnfs\fR or \fBhsfs\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbackpath=\fR\fIpath\fR\fR
 .ad
@@ -138,7 +129,6 @@ back file system must be read-only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcachedir=\fR\fIdirectory\fR\fR
 .ad
@@ -149,7 +139,6 @@ The name of the cache directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcacheid=\fR\fIID\fR\fR
 .ad
@@ -161,7 +150,6 @@ specify a cache ID, CacheFS will construct one.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdemandconst\fR\fR
 .ad
@@ -176,7 +164,6 @@ useful for back file systems that change infrequently, for example,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlocal-access\fR\fR
 .ad
@@ -189,7 +176,6 @@ not use this argument with secure \fBNFS\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoconst\fR\fR
 .ad
@@ -204,7 +190,6 @@ will not be modified. Trying to perform cache consistency check using
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwrite-around\fR | \fBnon-shared\fR\fR
 .ad
@@ -222,12 +207,10 @@ back file system, and the file remains in the cache.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-O\fR\fR
 .ad
 .RS 23n
-.rt  
 Overlay mount. Allows the filesystem to be mounted over an existing mount
 point, making the underlying filesystem inaccessible. If a mount is attempted
 on a pre-existing mount point without setting this flag, mount will fail with
@@ -259,7 +242,7 @@ the \fBmount\fR command is executed:
 .sp
 .in +2
 .nf
-server1:/user2   /usr/abc        nfs 
+server1:/user2   /usr/abc        nfs
 /usr/abc         /cache1/xyz    cachefs     backfstype=nfs
 .fi
 .in -2

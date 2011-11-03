@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH scsi_errmsg 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH SCSI_ERRMSG 9F "Jan 16, 2006"
 .SH NAME
 scsi_errmsg \- display a SCSI request sense message
 .SH SYNOPSIS
@@ -14,7 +14,7 @@ scsi_errmsg \- display a SCSI request sense message
 
 
 \fBvoid\fR \fBscsi_errmsg\fR(\fBstruct scsi_device *\fR\fIdevp\fR, \fBstruct scsi_pkt *\fR\fIpktp\fR,
-     \fBchar *\fR\fIdrv_name\fR, \fBint\fR \fIseverity\fR, \fBdaddr_t\fR \fIblkno\fR, \fBdaddr_t\fR \fIerr_blkno\fR, 
+     \fBchar *\fR\fIdrv_name\fR, \fBint\fR \fIseverity\fR, \fBdaddr_t\fR \fIblkno\fR, \fBdaddr_t\fR \fIerr_blkno\fR,
      \fBstruct scsi_key_strings *\fR\fIcmdlist\fR, \fBstruct scsi_extended_sense *\fR\fIsensep\fR);
 .fi
 
@@ -25,89 +25,73 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevp\fR\fR
 .ad
 .RS 13n
-.rt  
 Pointer to the  \fBscsi_device\fR(9S) structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpktp\fR\fR
 .ad
 .RS 13n
-.rt  
 Pointer to a \fBscsi_pkt\fR(9S) structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdrv_name\fR\fR
 .ad
 .RS 13n
-.rt  
 String used by \fBscsi_log\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIseverity\fR\fR
 .ad
 .RS 13n
-.rt  
 Error severity level, maps to severity strings below.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIblkno\fR\fR
 .ad
 .RS 13n
-.rt  
 Requested block number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIerr_blkno\fR\fR
 .ad
 .RS 13n
-.rt  
 Error block number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcmdlist\fR\fR
 .ad
 .RS 13n
-.rt  
 An array of \fBSCSI \fRcommand description strings.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsensep\fR\fR
 .ad
 .RS 13n
-.rt  
 A pointer to a \fBscsi_extended_sense\fR(9S) structure.
 .RE
 
@@ -135,17 +119,15 @@ following table:
 
 .sp
 .TS
-tab();
-cw(2.68i) cw(2.76i) cw(.06i) 
-lw(2.68i) lw(2.76i) lw(.06i) 
-.
-\fBSeverity Value:\fR\fBString:\fR
-\fBSCSI_ERR_ALL\fR\fBAll\fR
-\fBSCSI_ERR_UNKNOWN\fR\fBUnknown\fR
-\fBSCSI_ERR_INFO\fR\fBInformational\fR
-\fBSCSI_ERR_RECOVERE\fR\fBRecovered\fR
-\fBSCSI_ERR_RETRYABL\fR\fBRetryable\fR
-\fBSCSI_ERR_FATAL\fR\fBFatal\fR
+c c c
+l l l .
+\fBSeverity Value:\fR	\fBString:\fR	
+\fBSCSI_ERR_ALL\fR	\fBAll\fR	
+\fBSCSI_ERR_UNKNOWN\fR	\fBUnknown\fR	
+\fBSCSI_ERR_INFO\fR	\fBInformational\fR	
+\fBSCSI_ERR_RECOVERE\fR	\fBRecovered\fR	
+\fBSCSI_ERR_RETRYABL\fR	\fBRetryable\fR	
+\fBSCSI_ERR_FATAL\fR	\fBFatal\fR	
 .TE
 
 .sp
@@ -215,7 +197,7 @@ This entry:
 .sp
 .in +2
 .nf
-scsi_errmsg(devp, pkt, "sd", SCSI_ERR_INFO, bp->b_blkno, 
+scsi_errmsg(devp, pkt, "sd", SCSI_ERR_INFO, bp->b_blkno,
          err_blkno, sd_cmds, rqsense);
 .fi
 .in -2

@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 #
 #	This makefile drives the production of the udfs file system
 #	kernel module.
@@ -62,6 +61,11 @@ MODSTUBS_DIR	 = $(OBJS_DIR)
 $(MODSTUBS_O)	:= AS_CPPFLAGS += -DUDFS_MODULE
 CLEANFILES	+= $(MODSTUBS_O)
 CFLAGS		+= $(CCVERBOSE)
+
+#
+# Define dependency on specfs
+#
+LDFLAGS         += -dy -N fs/specfs
 
 #
 # For now, disable these lint checks; maintainers should endeavor

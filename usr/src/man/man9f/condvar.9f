@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH condvar 9F "15 Dec 2003" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH CONDVAR 9F "Dec 15, 2003"
 .SH NAME
 condvar, cv_init, cv_destroy, cv_wait, cv_signal, cv_broadcast, cv_wait_sig,
 cv_timedwait, cv_timedwait_sig \- condition variable routines
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/ksynch.h> 
+#include <sys/ksynch.h>
 
 
 
@@ -59,69 +59,57 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcvp\fR\fR
 .ad
 .RS 11n
-.rt  
 A pointer to an abstract data type \fBkcondvar_t\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImp\fR\fR
 .ad
 .RS 11n
-.rt  
 A pointer to a mutual exclusion lock (\fBkmutex_t\fR), initialized by
 \fBmutex_init\fR(9F) and held by the caller.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR\fR
 .ad
 .RS 11n
-.rt  
 Descriptive string. This is obsolete and should be \fINULL\fR. (Non-\fINULL\fR
 strings are legal, but they're a waste of kernel memory.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItype\fR\fR
 .ad
 .RS 11n
-.rt  
 The constant \fBCV_DRIVER\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIarg\fR\fR
 .ad
 .RS 11n
-.rt  
 A type-specific argument, drivers should pass arg as \fINULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItimeout\fR\fR
 .ad
 .RS 11n
-.rt  
 A time, in absolute ticks since boot, when \fBcv_timedwait()\fR or
 \fBcv_timedwait_sig()\fR should return.
 .RE
@@ -183,12 +171,10 @@ calling \fBddi_get_lbolt\fR(9F).
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 9n
-.rt  
 For \fBcv_wait_sig()\fR and \fBcv_timedwait_sig()\fR indicates that the
 condition was not necessarily signaled and the function returned because a
 signal (as in \fBkill\fR(2)) was pending.
@@ -196,12 +182,10 @@ signal (as in \fBkill\fR(2)) was pending.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi1\fR\fR
 .ad
 .RS 9n
-.rt  
 For \fBcv_timedwait()\fR and \fBcv_timedwait_sig()\fR indicates that the
 condition was not necessarily signaled and the function returned because the
 timeout time was reached.
@@ -209,12 +193,10 @@ timeout time was reached.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 9n
-.rt  
 For \fBcv_wait_sig()\fR, \fBcv_timedwait()\fR or \fBcv_timedwait_sig()\fR
 indicates that the condition was met and the function returned due to a call to
 \fBcv_signal()\fR or \fBcv_broadcast()\fR, or due to a premature wakeup (see

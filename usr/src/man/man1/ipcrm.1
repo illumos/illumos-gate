@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ipcrm 1 "9 Jan 2004" "SunOS 5.11" "User Commands"
+.TH IPCRM 1 "Jan 9, 2004"
 .SH NAME
 ipcrm \- remove a message queue, semaphore set, or shared memory ID
 .SH SYNOPSIS
 .LP
 .nf
-\fBipcrm\fR [\fB-z\fR \fIzone\fR] [\fB-m\fR \fIshmid\fR] [\fB-q\fR \fImsqid\fR] [\fB-s\fR \fIsemid\fR] 
+\fBipcrm\fR [\fB-z\fR \fIzone\fR] [\fB-m\fR \fIshmid\fR] [\fB-q\fR \fImsqid\fR] [\fB-s\fR \fIsemid\fR]
      [\fB-M\fR \fIshmkey\fR] [\fB-Q\fR \fImsgkey\fR] [\fB-S\fR \fIsemkey\fR]
 .fi
 
@@ -25,12 +25,10 @@ identifiers.
 The following option is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fIzone\fR\fR
 .ad
 .RS 11n
-.rt  
 Keys specified by other options refer to facilities in the specified zone (see
 \fBzones\fR(5)). The default is the zone in which the command is executing.
 This option is only useful when the command is executed in the global zone.
@@ -41,12 +39,10 @@ This option is only useful when the command is executed in the global zone.
 The identifiers are specified by the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fIshmid\fR\fR
 .ad
 .RS 13n
-.rt  
 Removes the shared memory identifier \fIshmid\fR from the system. The shared
 memory segment and data structure associated with it are destroyed after the
 last detach.
@@ -54,36 +50,30 @@ last detach.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR \fImsqid\fR\fR
 .ad
 .RS 13n
-.rt  
 Removes the message queue identifier \fImsqid\fR from the system and destroys
 the message queue and data structure associated with it.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIsemid\fR\fR
 .ad
 .RS 13n
-.rt  
 Removes the semaphore identifier \fIsemid\fR from the system and destroys the
 set of semaphores and data structure associated with it.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR \fIshmkey\fR\fR
 .ad
 .RS 13n
-.rt  
 Removes the shared memory identifier, created with key \fIshmkey\fR, from the
 system. The shared memory segment and data structure associated with it are
 destroyed after the last detach.
@@ -91,24 +81,20 @@ destroyed after the last detach.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Q\fR \fImsgkey\fR\fR
 .ad
 .RS 13n
-.rt  
 Removes the message queue identifier, created with key \fImsgkey\fR, from the
 system and destroys the message queue and data structure associated with it.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR \fIsemkey\fR\fR
 .ad
 .RS 13n
-.rt  
 Removes the semaphore identifier, created with key \fIsemkey\fR, from the
 system and destroys the set of semaphores and data structure associated with
 it.
@@ -133,13 +119,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

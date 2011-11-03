@@ -12,7 +12,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH printf 3C "7 Jan 2009" "SunOS 5.11" "Standard C Library Functions"
+.TH PRINTF 3C "Jan 7, 2009"
 .SH NAME
 printf, fprintf, sprintf, snprintf, asprintf \- print formatted output
 .SH SYNOPSIS
@@ -236,12 +236,10 @@ string.
 The flag characters and their meanings are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&'\fR\fR
 .ad
 .RS 9n
-.rt  
 The integer portion of the result of a decimal conversion (\fB%i\fR, \fB%d\fR,
 \fB%u\fR, \fB%f\fR, \fB%F\fR, \fB%g\fR, or \fB%G\fR) will be formatted with
 thousands' grouping characters. For other conversions the behavior is
@@ -250,24 +248,20 @@ undefined. The non-monetary grouping character is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi\fR\fR
 .ad
 .RS 9n
-.rt  
 The result of the conversion will be left-justified within the field. The
 conversion will be right-justified if this flag is not specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+\fR\fR
 .ad
 .RS 9n
-.rt  
 The result of a signed conversion will always begin with a sign (+ or -). The
 conversion will begin with a sign only when a negative value is converted if
 this flag is not specified.
@@ -275,12 +269,10 @@ this flag is not specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBspace\fR\fR
 .ad
 .RS 9n
-.rt  
 If the first character of a signed conversion is not a sign or if a signed
 conversion results in no characters, a space will be placed before the result.
 This means that if the \fBspace\fR and \fB+\fR flags both appear, the space
@@ -289,12 +281,10 @@ flag will be ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB#\fR\fR
 .ad
 .RS 9n
-.rt  
 The value is to be converted to an alternate form. For \fBc\fR, \fBd\fR,
 \fBi\fR, \fBs\fR, and \fBu\fR conversions, the flag has no effect. For an
 \fBo\fR conversion, it increases the precision (if necessary) to force the
@@ -310,12 +300,10 @@ normally are.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 9n
-.rt  
 For \fBd\fR, \fBi\fR, \fBo\fR, \fBu\fR, \fBx\fR, \fBX\fR, \fBa\fR, \fBA\fR,
 \fBe\fR, \fBE\fR, \fBf\fR, \fBF\fR, \fBg\fR, and \fBG\fR conversions, leading
 zeros (following any indication of sign or base) are used to pad to the field
@@ -333,12 +321,10 @@ conversions, the behavior is undefined.
 The length modifiers and their meanings are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhh\fR\fR
 .ad
 .RS 16n
-.rt  
 Specifies that a following \fBd\fR, \fBi\fR, \fBo\fR, \fBu\fR, \fBx\fR, or
 \fBX\fR conversion specifier applies to a \fBsigned char\fR or \fBunsigned
 char\fR argument (the argument will have been promoted according to the integer
@@ -349,12 +335,10 @@ applies to a pointer to a \fBsigned char\fR argument.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBh\fR\fR
 .ad
 .RS 16n
-.rt  
 Specifies that a following \fBd\fR, \fBi\fR, \fBo\fR, \fBu\fR, \fBx\fR, or
 \fBX\fR conversion specifier applies to a \fBshort\fR or \fBunsigned short\fR
 argument (the argument will have been promoted according to the integer
@@ -365,12 +349,10 @@ applies to a pointer to a \fBshort\fR argument.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBl (ell)\fR\fR
 .ad
 .RS 16n
-.rt  
 Specifies that a following \fBd\fR, \fBi\fR, \fBo\fR, \fBu\fR, \fBx\fR, or
 \fBX\fR conversion specifier applies to a \fBlong\fR or \fBunsigned long\fR
 argument; that a following \fBn\fR conversion specifier applies to a pointer to
@@ -383,12 +365,10 @@ conversion specifier.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBll (ell-ell)\fR\fR
 .ad
 .RS 16n
-.rt  
 Specifies that a following \fBd\fR, \fBi\fR, \fBo\fR, \fBu\fR, \fBx\fR, or
 \fBX\fR conversion specifier applies to a \fBlong long\fR or \fBunsigned long
 long\fR argument; or that a following \fBn\fR conversion specifier applies to a
@@ -397,12 +377,10 @@ pointer to a \fBlong long\fR argument.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBj\fR\fR
 .ad
 .RS 16n
-.rt  
 Specifies that a following \fBd\fR, \fBi\fR, \fBo\fR, \fBu\fR, \fBx\fR, or
 \fBX\fR conversion specifier applies to an \fBintmax_t\fR or \fBuintmax_t\fR
 argument; or that a following \fBn\fR conversion specifier applies to a pointer
@@ -411,12 +389,10 @@ to an \fBintmax_t\fR argument. See NOTES.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBz\fR\fR
 .ad
 .RS 16n
-.rt  
 Specifies that a following \fBd\fR, \fBi\fR, \fBo\fR, \fBu\fR, \fBx\fR, or
 \fBX\fR conversion specifier applies to a \fBsize_t\fR or the corresponding
 signed integer type argument; or that a following \fBn\fR conversion specifier
@@ -426,12 +402,10 @@ argument.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBt\fR\fR
 .ad
 .RS 16n
-.rt  
 Specifies that a following \fBd\fR, \fBi\fR, \fBo\fR, \fBu\fR, \fBx\fR, or
 \fBX\fR conversion specifier applies to a \fBptrdiff_t\fR or the corresponding
 unsigned type argument; or that a following n conversion specifier applies to a
@@ -440,12 +414,10 @@ pointer to a \fBptrdiff_t\fR argument.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBL\fR\fR
 .ad
 .RS 16n
-.rt  
 Specifies that a following \fBa\fR, \fBA\fR, \fBe\fR, \fBE\fR, \fBf\fR,
 \fBF\fR, \fBg\fR, or \fBG\fR conversion specifier applies to a \fBlong
 double\fR argument.
@@ -467,12 +439,10 @@ ignored.
 The conversion specifiers and their meanings are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd\fR, \fBi\fR\fR
 .ad
 .RS 8n
-.rt  
 The \fBint\fR argument is converted to a signed decimal in the style
 \fB[\fR\(mi\fB]\fR\fIdddd\fR. The precision specifies the minimum number of
 digits to appear; if the value being converted can be represented in fewer
@@ -482,12 +452,10 @@ result of converting 0 with an explicit precision of 0 is no characters.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBo\fR\fR
 .ad
 .RS 8n
-.rt  
 The \fBunsigned int\fR argument is converted to unsigned octal format in the
 style \fIdddd\fR. The precision specifies the minimum number of digits to
 appear; if the value being converted can be represented in fewer digits, it
@@ -497,12 +465,10 @@ converting 0 with an explicit precision of 0 is no characters.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBu\fR\fR
 .ad
 .RS 8n
-.rt  
 The \fBunsigned int\fR argument is converted to unsigned decimal format in the
 style \fIdddd\fR. The precision specifies the minimum number of digits to
 appear; if the value being converted can be represented in fewer digits, it
@@ -512,12 +478,10 @@ converting 0 with an explicit precision of 0 is no characters.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBx\fR\fR
 .ad
 .RS 8n
-.rt  
 The \fBunsigned int\fR argument is converted to unsigned hexadecimal format in
 the style \fIdddd\fR; the letters \fBabcdef\fR are used. The precision
 specifies the minimum number of digits to appear; if the value being converted
@@ -528,24 +492,20 @@ of 0 is no characters.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBX\fR\fR
 .ad
 .RS 8n
-.rt  
 Behaves the same as the \fBx\fR conversion specifier except that letters
 \fBABCDEF\fR are used instead of \fBabcdef\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBf\fR, \fBF\fR\fR
 .ad
 .RS 8n
-.rt  
 The \fBdouble\fR argument is converted to decimal notation in the style
 [\fB\(mi\fR]\fIddd\fR\fB\&.\fR\fIddd\fR, where the number of digits after the
 radix character (see \fBsetlocale\fR(3C)) is equal to the precision
@@ -569,12 +529,10 @@ or "INF" is printed otherwise.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBe\fR, \fBE\fR\fR
 .ad
 .RS 8n
-.rt  
 The \fBdouble\fR argument is converted to the style
 [\fB\(mi\fR]\fId\fR\fB\&.\fR\fIddd\fR\fBe\fR\fI\(+-dd\fR, where there is one
 digit before the radix character (which is non-zero if the argument is
@@ -590,12 +548,10 @@ inexact exception is raised.
 Infinity and NaN values are handled in one of the following ways:
 .sp
 .ne 2
-.mk
 .na
 \fBSUSv3\fR
 .ad
 .RS 11n
-.rt  
 For the \fBe\fR specifier, a \fBdouble\fR argument representing an infinity is
 printed as "[\(mi]\fBinfinity\fR", when the precision for the conversion is at
 least 7 and as "[\(mi]\fBinf\fR" otherwise. A \fBdouble\fR argument
@@ -607,12 +563,10 @@ sign follows the rules described above.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDefault\fR
 .ad
 .RS 11n
-.rt  
 A \fBdouble\fR argument representing an infinity is printed as
 "[\(mi]\fBInfinity\fR", when the precision for the conversion is at least 7 and
 as "[\(mi]\fBInf\fR" otherwise. A double argument representing a NaN is printed
@@ -623,12 +577,10 @@ as "[\(mi]\fBNaN\fR". Printing of the sign follows the rules described above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBg\fR, \fBG\fR\fR
 .ad
 .RS 8n
-.rt  
 The \fBdouble\fR argument is printed in style \fBf\fR or \fBe\fR (or in style
 \fBE\fR in the case of a \fBG\fR conversion specifier), with the precision
 specifying the number of significant digits. If an explicit precision is 0, it
@@ -646,12 +598,10 @@ precision is at least 8 and "inf", "INF", or "Inf" is printed otherwise.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBa\fR, \fBA\fR\fR
 .ad
 .RS 8n
-.rt  
 A \fBdouble\fR argument representing a floating-point number is converted in
 the style "[-]0\fIxh\fR.\fIhhhhp\fR\(+-\fId\fR", where the single hexadecimal
 digit preceding the radix point is 0 if the value converted is zero and 1
@@ -677,12 +627,10 @@ SUSv3 style of an \fBe\fR or \fBE\fR conversion specifier.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBc\fR\fR
 .ad
 .RS 8n
-.rt  
 The \fBint\fR argument is converted to an \fBunsigned char\fR, and the
 resulting byte is printed.
 .sp
@@ -695,35 +643,29 @@ specification and the second element contains a null wide-character.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBC\fR\fR
 .ad
 .RS 8n
-.rt  
 Same as \fBlc\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwc\fR\fR
 .ad
 .RS 8n
-.rt  
 The \fBint\fR argument is converted to a wide character (\fBwchar_t\fR), and
 the resulting wide character is printed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fR
 .ad
 .RS 8n
-.rt  
 The argument must be a pointer to an array of \fBchar\fR. Bytes from the array
 are written up to (but not including) any terminating null byte. If a precision
 is specified, a standard-conforming application (see \fBstandards\fR(5)) will
@@ -751,23 +693,19 @@ character written.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS\fR\fR
 .ad
 .RS 8n
-.rt  
 Same as \fBls\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBws\fR\fR
 .ad
 .RS 8n
-.rt  
 The argument must be a pointer to an array of \fBwchar_t\fR. Bytes from the
 array are written up to (but not including) any terminating null character. If
 the precision is specified, only that portion of the wide-character array that
@@ -779,12 +717,10 @@ with a null value will yield undefined results.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBp\fR\fR
 .ad
 .RS 8n
-.rt  
 The argument must be a pointer to \fBvoid\fR. The value of the pointer is
 converted to a set of sequences of printable characters, which should be the
 same as the set of sequences that are matched by the \fB%p\fR conversion of the
@@ -793,12 +729,10 @@ same as the set of sequences that are matched by the \fB%p\fR conversion of the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBn\fR\fR
 .ad
 .RS 8n
-.rt  
 The argument must be a pointer to an integer into which is written the number
 of bytes written to the output standard I/O stream so far by this call to one
 of the \fBprintf()\fR functions. No argument is converted.
@@ -806,12 +740,10 @@ of the \fBprintf()\fR functions. No argument is converted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%\fR\fR
 .ad
 .RS 8n
-.rt  
 Print a \fB%\fR; no argument is converted. The entire conversion specification
 must be %%.
 .RE
@@ -861,12 +793,10 @@ may fail, refer to \fBfputc\fR(3C) or \fBfputwc\fR(3C).
 The \fBsnprintf()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOVERFLOW\fR\fR
 .ad
 .RS 13n
-.rt  
 The value of \fIn\fR is greater than \fBINT_MAX\fR or the number of bytes
 needed to hold the output excluding the terminating null is greater than
 \fBINT_MAX\fR.
@@ -878,24 +808,20 @@ The \fBprintf()\fR, \fBfprintf()\fR, \fBsprintf()\fR, and \fBsnprintf()\fR
 functions may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEILSEQ\fR\fR
 .ad
 .RS 10n
-.rt  
 A wide-character code that does not correspond to a valid character has been
 detected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 There are insufficient arguments.
 .RE
 
@@ -905,23 +831,19 @@ The \fBprintf()\fR, \fBfprintf()\fR, and \fBasprintf()\fR functions may fail
 due to an underlying \fBmalloc\fR(3C) failure if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 10n
-.rt  
 Storage space is temporarily unavailable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 Insufficient storage space is available.
 .RE
 
@@ -939,81 +861,67 @@ when entering format strings for the \fBprintf()\fR functions, but these
 sequences are processed by the C compiler, not by the \fBprintf()\fR function.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\ea\fR\fR
 .ad
 .RS 7n
-.rt  
 Alert. Ring the bell.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\eb\fR\fR
 .ad
 .RS 7n
-.rt  
 Backspace. Move the printing position to one character before the current
 position, unless the current position is the start of a line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\ef\fR\fR
 .ad
 .RS 7n
-.rt  
 Form feed. Move the printing position to the initial printing position of the
 next logical page.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\en\fR\fR
 .ad
 .RS 7n
-.rt  
 Newline. Move the printing position to the start of the next line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\er\fR\fR
 .ad
 .RS 7n
-.rt  
 Carriage return. Move the printing position to the start of the current line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\et\fR\fR
 .ad
 .RS 7n
-.rt  
 Horizontal tab. Move the printing position to the next implementation-defined
 horizontal tab position on the current line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\ev\fR\fR
 .ad
 .RS 7n
-.rt  
 Vertical tab. Move the printing position to the start of the next
 implementation-defined vertical tab position.
 .RE
@@ -1136,19 +1044,18 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) |lw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+l | l
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSee below.
+MT-Level	See below.
 _
-StandardSee below.
+Standard	See below.
 .TE
 
 .sp

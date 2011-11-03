@@ -3,15 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH msgfmt 1 "17 Sep 2001" "SunOS 5.11" "User Commands"
+.TH MSGFMT 1 "Sep 17, 2001"
 .SH NAME
 msgfmt \- create a message object from a message file
 .SH SYNOPSIS
 .LP
 .nf
-\fBmsgfmt\fR [\fB-D\fR \fIdir\fR | \fB-\(midirectory\fR=\fIdir\fR] 
-     [\fB-f\fR | \fB-\(miuse-fuzzy\fR] [\fB-g\fR] 
-     [\fB-o\fR \fIoutput-file\fR | \fB-\(mioutput-file\fR=\fIoutput-file\fR] 
+\fBmsgfmt\fR [\fB-D\fR \fIdir\fR | \fB-\(midirectory\fR=\fIdir\fR]
+     [\fB-f\fR | \fB-\(miuse-fuzzy\fR] [\fB-g\fR]
+     [\fB-o\fR \fIoutput-file\fR | \fB-\(mioutput-file\fR=\fIoutput-file\fR]
      [\fB-s\fR] [\fB-\(mistrict\fR] [\fB-v\fR] [\fB-\(miverbose\fR] \fIfilename\fR.po...
 .fi
 
@@ -40,7 +40,6 @@ the \fBLC_CTYPE\fR locale category or according to the codeset specified in the
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR \fIdir\fR\fR
 .ad
@@ -49,13 +48,11 @@ The following options are supported:
 \fB\fB-\(midirectory=\fR\fIdir\fR\fR
 .ad
 .RS 27n
-.rt  
 Adds \fIdir\fR to the list for input files search.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
@@ -64,7 +61,6 @@ Adds \fIdir\fR to the list for input files search.
 \fB\fB-\(miuse-fuzzy\fR\fR
 .ad
 .RS 27n
-.rt  
 Uses fuzzy entries in output. If this option is not specified, fuzzy entries
 are not included into the output. These options are ignored if Solaris message
 catalogs are processed.
@@ -72,19 +68,16 @@ catalogs are processed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR\fR
 .ad
 .RS 27n
-.rt  
 Directs the utility to generate the GNU-compatible message catalog file. This
 option cannot be specified with the \fB-s\fR option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIoutput-file\fR\fR
 .ad
@@ -93,31 +86,26 @@ option cannot be specified with the \fB-s\fR option.
 \fB\fB-\(mioutput=\fR\fIoutput-file\fR\fR
 .ad
 .RS 27n
-.rt  
 Specifies the output file name as \fIoutput-file\fR. All domain directives and
 duplicate msgids in the .\fBpo\fR file are ignored.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 27n
-.rt  
 Directs the utility to generate the Solaris message catalog file. This option
 cannot be specified with the \fB-g\fR option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-\(mistrict\fR\fR
 .ad
 .RS 27n
-.rt  
 Directs the utility to append the suffix \fB\&.mo\fR to the generating message
 object file name if it doesn't have this suffix. This option is ignored if
 Solaris message catalogs are processed.
@@ -125,7 +113,6 @@ Solaris message catalogs are processed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -134,7 +121,6 @@ Solaris message catalogs are processed.
 \fB\fB-\(miverbose\fR\fR
 .ad
 .RS 27n
-.rt  
 Verbose. Lists duplicate message identifiers if Solaris message catalog files
 are processed. Message strings are not redefined.
 .sp
@@ -260,11 +246,11 @@ the target string to be used with plural form handling functions
 \fBngettext()\fR, \fBdngettext()\fR, and \fBdcngetttext()\fR.
 .sp
 .LP
-Message strings can contain the escape sequences \fB\n\fR for newline, \fB\t\fR
-for tab, \fB\v\fR for vertical tab, \fB\b\fR for backspace, \fB\r\fR for
-carriage return, \fB\f\fR for formfeed, \fB\\\fR for  backslash, \fB\"\fR for
-double quote, \fB\a\fR for alarm, \fB\ddd\fR for octal bit pattern, and
-\fB\xDD\fR for hexadecimal bit pattern.
+Message strings can contain the escape sequences \fB\\n\fR for newline,
+\fB\\t\fR for tab, \fB\\v\fR for vertical tab, \fB\\b\fR for backspace,
+\fB\\r\fR for carriage return, \fB\\f\fR for formfeed, \fB\\\fR for backslash,
+\fB\\"\fR for double quote, \fB\\a\fR for alarm, \fB\\ddd\fR for octal bit
+pattern, and \fB\\xDD\fR for hexadecimal bit pattern.
 .sp
 .LP
 Comments for a GNU-compatible message file should be in one of the following
@@ -290,12 +276,10 @@ and '\fB#:\fR' comments are informative only and are silently ignored by the
 separated by the comma character. The following \fIflag\fRs can be specified:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfuzzy\fR\fR
 .ad
 .RS 15n
-.rt  
 This flag can be inserted by the translator. It shows that the \fBmsgstr\fR
 string might not be a correct translation (anymore). Only the translator can
 judge if the translation requires further modification or is acceptable as is.
@@ -306,7 +290,6 @@ entry for the immediately following msgid in the output message catalog.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBc-format\fR\fR
 .ad
@@ -315,7 +298,6 @@ entry for the immediately following msgid in the output message catalog.
 \fB\fBno-c-format\fR\fR
 .ad
 .RS 15n
-.rt  
 The \fBc-format\fR flag indicates that the \fBmsgid\fR string is used as a
 format string by printf-like functions. In case the \fBc-format\fR flag is
 given for a string, the \fBmsgfmt\fR utility does some more tests to check the
@@ -498,13 +480,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 .TE
 
 .SH SEE ALSO

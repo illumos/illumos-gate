@@ -4,7 +4,7 @@
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced
 .\" with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ncp 7D "7 June 2006" "SunOS 5.11" "Devices"
+.TH NCP 7D "Jun 7, 2006"
 .SH NAME
 ncp \- UltraSPARC T1 server crypto provider device driver
 .SH DESCRIPTION
@@ -26,12 +26,10 @@ You configure the \fBncp\fR driver by defining  properties in
 The following property is supported:
 .sp
 .ne 2
-.mk
 .na
 \fBnostats\fR
 .ad
 .RS 11n
-.rt  
 Disables the generation of  statistics. The \fBnostats\fR property may be used
 to help prevent traffic  analysis, but this may inhibit support personnel.
 .RE
@@ -43,79 +41,65 @@ Solaris network drivers must implement statistics variables. The \fBncp\fR
 driver maintains the following statistics:
 .sp
 .ne 2
-.mk
 .na
 \fBmauXqfull\fR
 .ad
 .RS 22n
-.rt  
 Number of times the queue for MAU X was found full when attempting to submit
 jobs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmauXupdate_failure\fR
 .ad
 .RS 22n
-.rt  
 Number of submit job failures on MAU X.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmauXsubmit\fR
 .ad
 .RS 22n
-.rt  
 Number of jobs submitted to MAU X since driver load (boot).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBrsapublic\fR
 .ad
 .RS 22n
-.rt  
 Total number of  jobs submitted to the device for RSA public key operations.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBrsaprivate\fR
 .ad
 .RS 22n
-.rt  
 Total number of  jobs submitted to the device for RSA private key operations.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdsasign\fR
 .ad
 .RS 22n
-.rt  
 Total number of  jobs submitted to the device for DSA signing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdsaverify\fR
 .ad
 .RS 22n
-.rt  
 Total number of jobs submitted to the device for DSA verification.
 .RE
 
@@ -131,21 +115,19 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureSPARC
+Architecture	SPARC
 _
-Interface Stability Unstable
+Interface Stability 	Unstable
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/sun4v/kernel/drv/sparcv9/ncp\fR\fR
 .ad
@@ -156,7 +138,6 @@ Interface Stability Unstable
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/sun4v/kernel/drv/ncp.conf\fR\fR
 .ad

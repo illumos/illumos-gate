@@ -2,38 +2,38 @@
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH grep 1 "26 Feb 2008" "SunOS 5.11" "User Commands"
+.TH GREP 1 "Feb 26, 2008"
 .SH NAME
 grep \- search a file for a pattern
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/grep\fR [\fB-bchilnsvw\fR] \fIlimited-regular-expression\fR 
+\fB/usr/bin/grep\fR [\fB-bchilnsvw\fR] \fIlimited-regular-expression\fR
      [\fIfilename\fR]...
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/grep\fR [\fB-E\fR | \fB-F\fR] [\fB-c\fR | \fB-l\fR | \fB-q\fR] [\fB-bhinsvwx\fR] \fB-e\fR \fIpattern_list\fR... 
+\fB/usr/xpg4/bin/grep\fR [\fB-E\fR | \fB-F\fR] [\fB-c\fR | \fB-l\fR | \fB-q\fR] [\fB-bhinsvwx\fR] \fB-e\fR \fIpattern_list\fR...
      [\fB-f\fR \fIpattern_file\fR]... [\fIfile\fR]...
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/grep\fR [\fB-E\fR | \fB-F\fR] [\fB-c\fR | \fB-l\fR | \fB-q\fR] [\fB-bhinsvwx\fR] 
+\fB/usr/xpg4/bin/grep\fR [\fB-E\fR | \fB-F\fR] [\fB-c\fR | \fB-l\fR | \fB-q\fR] [\fB-bhinsvwx\fR]
      [\fB-e\fR \fIpattern_list\fR]... \fB-f\fR \fIpattern_file\fR... [\fIfile\fR]...
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/grep\fR [\fB-E\fR | \fB-F\fR] [\fB-c\fR | \fB-l\fR | \fB-q\fR] [\fB-bhinsvwx\fR] \fIpattern\fR 
+\fB/usr/xpg4/bin/grep\fR [\fB-E\fR | \fB-F\fR] [\fB-c\fR | \fB-l\fR | \fB-q\fR] [\fB-bhinsvwx\fR] \fIpattern\fR
      [\fIfile\fR]...
 .fi
 
@@ -75,58 +75,48 @@ The following options are supported for both \fB/usr/bin/grep\fR and
 \fB/usr/xpg4/bin/grep\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
 .RS 6n
-.rt  
 Precedes each line by the block number on which it was found. This can be
 useful in locating block numbers by context (first block is 0).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 6n
-.rt  
 Prints only a count of the lines that contain the pattern.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 6n
-.rt  
 Prevents the name of the file containing the matching line from being prepended
 to that line.  Used when searching multiple files.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 6n
-.rt  
 Ignores upper/lower case distinction during comparisons.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 6n
-.rt  
 Prints only the names of files with matching lines, separated by NEWLINE
 characters.  Does not repeat the names of files when the pattern is found more
 than once.
@@ -134,45 +124,37 @@ than once.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 6n
-.rt  
 Precedes each line by its line number in the file (first line is 1).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 6n
-.rt  
 Suppresses error messages about nonexistent or unreadable files.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 Prints all lines except those that contain the pattern.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR\fR
 .ad
 .RS 6n
-.rt  
 Searches for the expression as a word as if surrounded by \fB\e<\fR and
 \fB\e>\fR\&.
 .RE
@@ -183,12 +165,10 @@ Searches for the expression as a word as if surrounded by \fB\e<\fR and
 The following options are supported for \fB/usr/xpg4/bin/grep\fR only:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fIpattern_list\fR\fR
 .ad
 .RS 19n
-.rt  
 Specifies one or more patterns to be used during the search for input. Patterns
 in \fIpattern_list\fR must be separated by a NEWLINE character. A null pattern
 can be specified by two adjacent newline characters in \fIpattern_list\fR.
@@ -200,12 +180,10 @@ matching lines, but the order of evaluation is unspecified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-E\fR\fR
 .ad
 .RS 19n
-.rt  
 Matches using full regular expressions. Treats each pattern specified as a full
 regular expression. If any entire full regular expression pattern matches an
 input line, the line is matched. A null full regular expression matches every
@@ -242,12 +220,10 @@ concatenation, then | and new-line.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIpattern_file\fR\fR
 .ad
 .RS 19n
-.rt  
 Reads one or more patterns from the file named by the path name
 \fIpattern_file\fR. Patterns in \fIpattern_file\fR are terminated by a NEWLINE
 character. A null pattern can be specified by an empty line in
@@ -257,12 +233,10 @@ each pattern is treated as a basic regular expression.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
 .RS 19n
-.rt  
 Matches using fixed strings. Treats each pattern specified as a string instead
 of a regular expression. If an input line contains any of the patterns as a
 contiguous sequence of bytes, the line is matched. A null string matches every
@@ -271,24 +245,20 @@ line. See \fBfgrep\fR(1) for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
 .RS 19n
-.rt  
 Quiet. Does not write anything to the standard output, regardless of matching
 lines. Exits with zero status if an input line is selected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 19n
-.rt  
 Considers only input lines that use all characters in the line to match an
 entire fixed string or regular expression to be matching lines.
 .RE
@@ -299,12 +269,10 @@ entire fixed string or regular expression to be matching lines.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fR
 .ad
 .RS 8n
-.rt  
 A path name of a file to be searched for the patterns. If no \fIfile\fR
 operands are specified, the standard input is used.
 .RE
@@ -312,24 +280,20 @@ operands are specified, the standard input is used.
 .SS "/usr/bin/grep"
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpattern\fR\fR
 .ad
 .RS 11n
-.rt  
 Specifies a pattern to be used during the search for input.
 .RE
 
 .SS "/usr/xpg4/bin/grep"
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpattern\fR\fR
 .ad
 .RS 11n
-.rt  
 Specifies one or more patterns to be used during the search for input. This
 operand is treated as if it were specified as \fB-e\fR \fIpattern_list\fR.
 .RE
@@ -462,34 +426,28 @@ that affect the execution of \fBgrep\fR: \fBLANG\fR, \fBLC_ALL\fR,
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 One or more matches were found.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 No matches were found.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Syntax errors or inaccessible files (even if matches were found).
 .RE
 
@@ -502,13 +460,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSINot Enabled
+CSI	Not Enabled
 .TE
 
 .SS "/usr/xpg4/bin/grep"
@@ -516,17 +473,16 @@ CSINot Enabled
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO

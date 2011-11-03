@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH send 3SOCKET "31 Aug 2009" "SunOS 5.11" "Sockets Library Functions"
+.TH SEND 3SOCKET "Aug 31, 2009"
 .SH NAME
 send, sendto, sendmsg \- send a message from a socket
 .SH SYNOPSIS
@@ -62,12 +62,10 @@ The \fIflags\fR parameter is formed from the bitwise OR of zero or more of the
 following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMSG_OOB\fR\fR
 .ad
 .RS 17n
-.rt  
 Send \fBout-of-band\fR data on sockets that support this notion. The underlying
 protocol must also support \fBout-of-band\fR data. Only \fBSOCK_STREAM\fR
 sockets created in the \fBAF_INET\fR or the \fBAF_INET6\fR address family
@@ -76,12 +74,10 @@ support out-of-band data.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMSG_DONTROUTE\fR\fR
 .ad
 .RS 17n
-.rt  
 The \fBSO_DONTROUTE\fR option is turned on for the duration of the operation.
 It is used only by diagnostic or routing programs.
 .RE
@@ -101,35 +97,29 @@ The \fBsend()\fR, \fBsendto()\fR, and \fBsendmsg()\fR functions return errors
 under the following conditions:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 16n
-.rt  
 \fIs\fR is not a valid file descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 16n
-.rt  
 The operation was interrupted by delivery of a signal before any data could be
 buffered to be sent.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEMSGSIZE\fR\fR
 .ad
 .RS 16n
-.rt  
 The message is too large to be sent all at once (as the socket requires), or
 the \fImsg_iovlen\fR member of the \fBmsghdr\fR structure pointed to by message
 is less than or equal to 0 or is greater than {\fBIOV_MAX\fR}.
@@ -137,45 +127,37 @@ is less than or equal to 0 or is greater than {\fBIOV_MAX\fR}.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 16n
-.rt  
 Insufficient memory is available to complete the operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSR\fR\fR
 .ad
 .RS 16n
-.rt  
 Insufficient STREAMS resources are available for the operation to complete.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSOCK\fR\fR
 .ad
 .RS 16n
-.rt  
 \fIs\fR is not a socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEWOULDBLOCK\fR\fR
 .ad
 .RS 16n
-.rt  
 The socket is marked non-blocking and the requested operation would block.
 \fBEWOULDBLOCK\fR is also returned when sufficient memory is not immediately
 available to allocate a suitable buffer. In such a case, the operation can be
@@ -184,12 +166,10 @@ retried later.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBECONNREFUSED\fR\fR
 .ad
 .RS 16n
-.rt  
 The requested connection was refused by the peer. For conected IPv4 and IPv6
 datagram sockets, this indicates that the system received an \fBICMP
 Destination Port Unreachable\fR message from the peer in response to some prior
@@ -202,12 +182,10 @@ The \fBsend()\fR and \fBsendto()\fR functions return errors under the following
 conditions:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIlen\fR argument overflows a \fBssize_t\fR.
 .sp
 Inconsistent port attributes for system call.
@@ -218,24 +196,20 @@ Inconsistent port attributes for system call.
 The \fBsendto()\fR function returns errors under the following conditions:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The value specified for the \fItolen\fR parameter is not the size of a valid
 address for the specified address family.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEISCON\fR\fR
 .ad
 .RS 10n
-.rt  
 A destination address was specified and the socket is already connected.
 .RE
 
@@ -244,12 +218,10 @@ A destination address was specified and the socket is already connected.
 The \fBsendmsg()\fR function returns errors under the following conditions:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fBmsg_iovlen\fR member of the \fBmsghdr\fR structure pointed to by
 \fImsg\fR is less than or equal to \fB0\fR, or the sum of the \fIiov_len\fR
 values in the \fBmsg_iov\fR array overflows a \fBssize_t\fR.
@@ -266,12 +238,10 @@ One of the \fIiov_len\fR values in the \fBmsg_iov\fR array member of the
 The \fBsend()\fR function returns errors under the following conditions:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPIPE\fR\fR
 .ad
 .RS 9n
-.rt  
 The socket is shut down for writing, or the socket is connection-mode and is no
 longer connected. In the latter case, if the socket is of type
 \fBSOCK_STREAM\fR, the \fBSIGPIPE\fR signal is generated to the calling thread.
@@ -285,15 +255,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

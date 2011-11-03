@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH getmsg 2 "1 Nov 2001" "SunOS 5.11" "System Calls"
+.TH GETMSG 2 "Nov 1, 2001"
 .SH NAME
 getmsg, getpmsg \- get next message off a stream
 .SH SYNOPSIS
@@ -146,81 +146,67 @@ previously received partial message.
 The \fBgetmsg()\fR and \fBgetpmsg()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fBO_NDELAY\fR or \fBO_NONBLOCK\fR flag is set and no messages are
 available.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fIfildes\fR argument is not a valid file descriptor open for reading.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADMSG\fR\fR
 .ad
 .RS 11n
-.rt  
 Queued message to be read is not valid for \fBgetmsg\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fIctlptr\fR, \fIdataptr\fR, \fIbandp\fR, or \fIflagsp\fR argument points
 to an illegal address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 11n
-.rt  
 A signal was caught during the execution of the \fBgetmsg\fR function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 11n
-.rt  
 An illegal value was specified in \fIflagsp\fR, or the stream referenced by
 \fIfildes\fR is linked under a multiplexor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSTR\fR\fR
 .ad
 .RS 11n
-.rt  
 A stream is not associated with \fIfildes\fR.
 .RE
 
@@ -237,13 +223,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fRATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

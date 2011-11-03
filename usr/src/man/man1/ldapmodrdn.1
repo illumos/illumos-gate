@@ -3,18 +3,18 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ldapmodrdn 1 "15 Jan 2004" "SunOS 5.11" "User Commands"
+.TH LDAPMODRDN 1 "Jan 15, 2004"
 .SH NAME
 ldapmodrdn \- ldap modify entry RDN tool
 .SH SYNOPSIS
 .LP
 .nf
-\fBldapmodrdn\fR [\fB-r\fR] [\fB-n\fR] [\fB-v\fR] [\fB-c\fR] [\fB-E\fR] [\fB-H\fR] [\fB-?\fR] [\fB-M\fR] [\fB-R\fR] 
-     [\fB-Z\fR] [\fB-V\fR \fIversion\fR] [\fB-d\fR \fIdebuglevel\fR] [\fB-D\fR \fIbindDN\fR] 
-     [\fB-w\fR \fIpasswd\fR] [\fB-h\fR \fIldaphost\fR] [\fB-i\fR \fIlocale\fR] [\fB-j\fR \fIfilename\fR] 
-     [\fB-J\fR [:\fIcriticality\fR]] [\fB-k\fR \fIpath\fR] [\fB-N\fR \fIcertificate\fR] 
-     [\fB-O\fR \fIhopLimit\fR] [\fB-P\fR \fIpath\fR] [\fB-W\fR \fIpassword\fR] [\fB-p\fR \fIldapport\fR] 
-     [\fB-o\fR \fIattributename\fR=\fIvalue\fR] [\fB-f\fR \fIfile\fR] [\fB-Y\fR \fIproxyDN\fR] 
+\fBldapmodrdn\fR [\fB-r\fR] [\fB-n\fR] [\fB-v\fR] [\fB-c\fR] [\fB-E\fR] [\fB-H\fR] [\fB-?\fR] [\fB-M\fR] [\fB-R\fR]
+     [\fB-Z\fR] [\fB-V\fR \fIversion\fR] [\fB-d\fR \fIdebuglevel\fR] [\fB-D\fR \fIbindDN\fR]
+     [\fB-w\fR \fIpasswd\fR] [\fB-h\fR \fIldaphost\fR] [\fB-i\fR \fIlocale\fR] [\fB-j\fR \fIfilename\fR]
+     [\fB-J\fR [:\fIcriticality\fR]] [\fB-k\fR \fIpath\fR] [\fB-N\fR \fIcertificate\fR]
+     [\fB-O\fR \fIhopLimit\fR] [\fB-P\fR \fIpath\fR] [\fB-W\fR \fIpassword\fR] [\fB-p\fR \fIldapport\fR]
+     [\fB-o\fR \fIattributename\fR=\fIvalue\fR] [\fB-f\fR \fIfile\fR] [\fB-Y\fR \fIproxyDN\fR]
      [\fIdn\fR \fIrdn\fR]
 .fi
 
@@ -28,7 +28,6 @@ pair \fIdn\fR and \fIrdn\fR.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
@@ -40,7 +39,6 @@ modifications. The default is to exit after reporting an error.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR\fI bindDN\fR\fR
 .ad
@@ -51,7 +49,6 @@ Use the distinguished name \fIbinddn\fR to bind to the directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fI debuglevel\fR\fR
 .ad
@@ -61,56 +58,46 @@ Set the LDAP debugging level. Useful values of \fIdebuglevel\fR for
 \fBldapmodrdn\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR \fR
 .ad
 .RS 8n
-.rt  
 Trace
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR \fR
 .ad
 .RS 8n
-.rt  
 Packets
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB4\fR \fR
 .ad
 .RS 8n
-.rt  
 Arguments
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB32\fR \fR
 .ad
 .RS 8n
-.rt  
 Filters
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB128\fR \fR
 .ad
 .RS 8n
-.rt  
 Access control
 .RE
 
@@ -121,7 +108,6 @@ example, to request trace and filter information, specify a \fIdebuglevel\fR of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-E\fR\fR
 .ad
@@ -133,7 +119,6 @@ control.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fI file\fR\fR
 .ad
@@ -145,7 +130,6 @@ standard input or the command-line.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-?\fR\fR
 .ad
@@ -156,7 +140,6 @@ Display the usage help text that briefly describes all options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-H\fR\fR
 .ad
@@ -167,7 +150,6 @@ Display the usage help text that briefly describes all options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fI ldaphost\fR\fR
 .ad
@@ -178,7 +160,6 @@ Specify an alternate host on which the LDAP server is running.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIlocale\fR\fR
 .ad
@@ -192,7 +173,6 @@ the specified character set to UTF8, thus overriding the \fBLANG\fR setting.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-J\fR [:\fIcriticality\fR[:\fIvalue\fR|::\fIb64value\fR|\fIb64value\fR|:\
 fIfileurl\fR]]\fR
@@ -204,7 +184,6 @@ Criticality is a boolean value (default is \fBfalse\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-j\fR \fIfilename\fR\fR
 .ad
@@ -218,7 +197,6 @@ the \fB-w\fR and \fB-W\fR options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR \fIpath\fR\fR
 .ad
@@ -231,7 +209,6 @@ your directory server. This is for NLS support.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR\fR
 .ad
@@ -244,7 +221,6 @@ referral.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fR
 .ad
@@ -256,7 +232,6 @@ with \fB-v\fR and \fB-d\fR for debugging.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-N\fR \fIcertificate\fR\fR
 .ad
@@ -268,7 +243,6 @@ authentication. For example: \fB-N\fR \fB"Directory-Cert"\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
@@ -280,7 +254,6 @@ conjunction with \fB-v\fR for debugging.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIattributename\fR=\fIvalue\fR\fR
 .ad
@@ -292,56 +265,46 @@ operation, authorization ID, authentication ID, and so forth.
 The different attribute names and their values are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsecProp\fR=\fI"number"\fR\fR
 .ad
 .RS 20n
-.rt  
 For defining SASL security properties.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrealm\fR=\fI"value"\fR\fR
 .ad
 .RS 20n
-.rt  
 Specifies SASL realm (default is \fBrealm=none\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauthzid\fR=\fI"value"\fR\fR
 .ad
 .RS 20n
-.rt  
 Specify the authorization ID name for SASL bind.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauthid\fR=\fI"value"\fR\fR
 .ad
 .RS 20n
-.rt  
 Specify the authentication ID for SASL bind.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmech\fR=\fI"value"\fR\fR
 .ad
 .RS 20n
-.rt  
 Specifies the various SASL mechanisms.
 .RE
 
@@ -349,7 +312,6 @@ Specifies the various SASL mechanisms.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-O\fR \fIhopLimit\fR\fR
 .ad
@@ -361,7 +323,6 @@ modify. By default, there is no limit.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR \fIpath\fR\fR
 .ad
@@ -390,7 +351,6 @@ Use the \fB-P\fR option alone to specify server authentication only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fI ldapport\fR\fR
 .ad
@@ -401,7 +361,6 @@ Specify an alternate TCP port where the secure LAPD server is listening.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR\fR
 .ad
@@ -412,7 +371,6 @@ Do not automatically follow referrals returned while searching.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
@@ -423,7 +381,6 @@ Remove old RDN values from the entry. By default, old values are kept.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR \fIversion\fR\fR
 .ad
@@ -436,7 +393,6 @@ servers that do not support v3.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -447,7 +403,6 @@ Use verbose mode, with diagnostics written to standard output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-W\fR \fIpassword\fR\fR
 .ad
@@ -463,7 +418,6 @@ mutually exclusive of \fB-j\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR\fI passwd\fR\fR
 .ad
@@ -480,7 +434,6 @@ the password will not be visible to other users.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Y\fR \fIproxyid\fR\fR
 .ad
@@ -492,7 +445,6 @@ operation, usually in double quotes ("") for the shell.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Z\fR\fR
 .ad
@@ -560,12 +512,11 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
-Stability LevelEvolving
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+Stability Level	Evolving
 .TE
 
 .SH SEE ALSO

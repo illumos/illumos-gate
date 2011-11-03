@@ -24,8 +24,36 @@
  */
 
 /*
- * IntelVersion: 1.151 v3-1-10-1_2009-9-18_Release14-6
+ * Copyright (c) 2001-2010, Intel Corporation
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ *  1. Redistributions of source code must retain the above copyright notice,
+ *     this list of conditions and the following disclaimer.
+ *
+ *  2. Redistributions in binary form must reproduce the above copyright
+ *     notice, this list of conditions and the following disclaimer in the
+ *     documentation and/or other materials provided with the distribution.
+ *
+ *  3. Neither the name of the Intel Corporation nor the names of its
+ *     contributors may be used to endorse or promote products derived from
+ *     this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  */
+
 #include "e1000_api.h"
 
 static u32 e1000_get_phy_addr_for_bm_page(u32 page, u32 reg);
@@ -198,32 +226,9 @@ e1000_get_phy_id(struct e1000_hw *hw)
 		if (phy->id != 0 && phy->id != PHY_REVISION_MASK)
 			goto out;
 
-		/*
-		 * If the PHY ID is still unknown, we may have an 82577
-		 * without link.  We will try again after setting Slow MDIC
-		 * mode. No harm in trying again in this case since the PHY
-		 * ID is unknown at this point anyway.
-		 */
-		ret_val = phy->ops.acquire(hw);
-		if (ret_val)
-			goto out;
-		ret_val = e1000_set_mdio_slow_mode_hv(hw, true);
-		if (ret_val)
-			goto out;
-		phy->ops.release(hw);
-
 		retry_count++;
 	}
 out:
-	/* Revert to MDIO fast mode, if applicable */
-	if (retry_count) {
-		ret_val = phy->ops.acquire(hw);
-		if (ret_val)
-			return (ret_val);
-		ret_val = e1000_set_mdio_slow_mode_hv(hw, false);
-		phy->ops.release(hw);
-	}
-
 	return (ret_val);
 }
 
@@ -305,6 +310,13 @@ e1000_read_phy_reg_mdic(struct e1000_hw *hw, u32 offset, u16 *data)
 	}
 	*data = (u16)mdic;
 
+	/*
+	 * Allow some time after each MDIC transaction to avoid
+	 * reading duplicate data in the next MDIC transaction.
+	 */
+	if (hw->mac.type == e1000_pch2lan)
+		usec_delay(100);
+
 out:
 	return (ret_val);
 }
@@ -359,6 +371,13 @@ e1000_write_phy_reg_mdic(struct e1000_hw *hw, u32 offset, u16 data)
 		ret_val = -E1000_ERR_PHY;
 		goto out;
 	}
+
+	/*
+	 * Allow some time after each MDIC transaction to avoid
+	 * reading duplicate data in the next MDIC transaction.
+	 */
+	if (hw->mac.type == e1000_pch2lan)
+		usec_delay(100);
 
 out:
 	return (ret_val);
@@ -2527,6 +2546,9 @@ e1000_get_phy_type_from_id(u32 phy_id)
 	case I82577_E_PHY_ID:
 		phy_type = e1000_phy_82577;
 		break;
+	case I82579_E_PHY_ID:
+		phy_type = e1000_phy_82579;
+		break;
 	default:
 		phy_type = e1000_phy_unknown;
 		break;
@@ -2965,40 +2987,6 @@ e1000_power_down_phy_copper(struct e1000_hw *hw)
 }
 
 /*
- * e1000_set_mdio_slow_mode_hv - Set slow MDIO access mode
- * @hw: pointer to the HW structure
- * @slow: true for slow mode, false for normal mode
- *
- * Assumes semaphore already acquired.
- */
-s32
-e1000_set_mdio_slow_mode_hv(struct e1000_hw *hw, bool slow)
-{
-	s32 ret_val = E1000_SUCCESS;
-	u16 data = 0;
-
-	/* Set MDIO mode - page 769, register 16: 0x2580==slow, 0x2180==fast */
-	hw->phy.addr = 1;
-	ret_val = e1000_write_phy_reg_mdic(hw, IGP01E1000_PHY_PAGE_SELECT,
-	    (BM_PORT_CTRL_PAGE << IGP_PAGE_SHIFT));
-	if (ret_val)
-		goto out;
-
-	ret_val = e1000_write_phy_reg_mdic(hw, BM_CS_CTRL1,
-	    (0x2180 | (slow << 10)));
-
-	if (ret_val)
-		goto out;
-
-	/* dummy read when reverting to fast mode - throw away result */
-	if (!slow)
-		ret_val = e1000_read_phy_reg_mdic(hw, BM_CS_CTRL1, &data);
-
-out:
-	return (ret_val);
-}
-
-/*
  * __e1000_read_phy_reg_hv -  Read HV PHY register
  * @hw: pointer to the HW structure
  * @offset: register offset to be read
@@ -3016,24 +3004,13 @@ __e1000_read_phy_reg_hv(struct e1000_hw *hw, u32 offset, u16 *data,
 	s32 ret_val;
 	u16 page = BM_PHY_REG_PAGE(offset);
 	u16 reg = BM_PHY_REG_NUM(offset);
-	bool in_slow_mode = false;
 
-	DEBUGFUNC("e1000_read_phy_reg_hv");
+	DEBUGFUNC("__e1000_read_phy_reg_hv");
 
 	if (!locked) {
 		ret_val = hw->phy.ops.acquire(hw);
 		if (ret_val)
 			return (ret_val);
-	}
-
-	/* Workaround failure in MDIO access while cable is disconnected */
-	if ((hw->phy.type == e1000_phy_82577) &&
-	    !(E1000_READ_REG(hw, E1000_STATUS) & E1000_STATUS_LU)) {
-		ret_val = e1000_set_mdio_slow_mode_hv(hw, true);
-		if (ret_val)
-			goto out;
-
-		in_slow_mode = true;
 	}
 
 	/* Page 800 works differently than the rest so it has its own func */
@@ -3063,14 +3040,13 @@ __e1000_read_phy_reg_hv(struct e1000_hw *hw, u32 offset, u16 *data,
 		ret_val = e1000_write_phy_reg_mdic(hw,
 		    IGP01E1000_PHY_PAGE_SELECT, (page << IGP_PAGE_SHIFT));
 		hw->phy.addr = phy_addr;
+
+		if (ret_val)
+			goto out;
 	}
 
 	ret_val = e1000_read_phy_reg_mdic(hw, MAX_PHY_REG_ADDRESS & reg, data);
 out:
-	/* Revert to MDIO fast mode, if applicable */
-	if ((hw->phy.type == e1000_phy_82577) && in_slow_mode)
-		ret_val = e1000_set_mdio_slow_mode_hv(hw, false);
-
 	if (!locked)
 		hw->phy.ops.release(hw);
 
@@ -3125,25 +3101,13 @@ __e1000_write_phy_reg_hv(struct e1000_hw *hw, u32 offset, u16 data,
 	s32 ret_val;
 	u16 page = BM_PHY_REG_PAGE(offset);
 	u16 reg = BM_PHY_REG_NUM(offset);
-	bool in_slow_mode = false;
-	struct e1000_dev_spec_ich8lan *dev_spec = &hw->dev_spec.ich8lan;
 
-	DEBUGFUNC("e1000_write_phy_reg_hv");
+	DEBUGFUNC("__e1000_write_phy_reg_hv");
 
 	if (!locked) {
 		ret_val = hw->phy.ops.acquire(hw);
 		if (ret_val)
 			return (ret_val);
-	}
-
-	/* Workaround failure in MDIO access while cable is disconnected */
-	if ((hw->phy.type == e1000_phy_82577) &&
-	    !(E1000_READ_REG(hw, E1000_STATUS) & E1000_STATUS_LU)) {
-		ret_val = e1000_set_mdio_slow_mode_hv(hw, true);
-		if (ret_val)
-			goto out;
-
-		in_slow_mode = true;
 	}
 
 	/* Page 800 works differently than the rest so it has its own func */
@@ -3159,9 +3123,7 @@ __e1000_write_phy_reg_hv(struct e1000_hw *hw, u32 offset, u16 data,
 		goto out;
 	}
 
-	/* The LCD Config workaround provides the phy address to use */
-	if (dev_spec->nvm_lcd_config_enabled == false)
-		hw->phy.addr = e1000_get_phy_addr_for_hv_page(page);
+	hw->phy.addr = e1000_get_phy_addr_for_hv_page(page);
 
 	if (page == HV_INTC_FC_PAGE_START)
 		page = 0;
@@ -3191,16 +3153,15 @@ __e1000_write_phy_reg_hv(struct e1000_hw *hw, u32 offset, u16 data,
 		ret_val = e1000_write_phy_reg_mdic(hw,
 		    IGP01E1000_PHY_PAGE_SELECT, (page << IGP_PAGE_SHIFT));
 		hw->phy.addr = phy_addr;
+
+		if (ret_val)
+			goto out;
 	}
 
 	ret_val = e1000_write_phy_reg_mdic(hw, MAX_PHY_REG_ADDRESS & reg,
 	    data);
 
 out:
-	/* Revert to MDIO fast mode, if applicable */
-	if ((hw->phy.type == e1000_phy_82577) && in_slow_mode)
-		ret_val = e1000_set_mdio_slow_mode_hv(hw, false);
-
 	if (!locked)
 		hw->phy.ops.release(hw);
 

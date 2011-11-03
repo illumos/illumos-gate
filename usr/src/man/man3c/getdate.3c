@@ -2,14 +2,14 @@
 .\" Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH getdate 3C "1 Nov 2003" "SunOS 5.11" "Standard C Library Functions"
+.TH GETDATE 3C "Nov 1, 2003"
 .SH NAME
 getdate \- convert user format date and time
 .SH SYNOPSIS
@@ -43,78 +43,64 @@ the internal time format.
 The following conversion specifications are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%%\fR\fR
 .ad
 .RS 6n
-.rt  
 Same as \fB%\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%a\fR\fR
 .ad
 .RS 6n
-.rt  
 Locale's abbreviated weekday name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%A\fR\fR
 .ad
 .RS 6n
-.rt  
 Locale's full weekday name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%b\fR\fR
 .ad
 .RS 6n
-.rt  
 Locale's abbreviated month name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%B\fR\fR
 .ad
 .RS 6n
-.rt  
 Locale's full month name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%c\fR\fR
 .ad
 .RS 6n
-.rt  
 Locale's appropriate date and time representation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%C\fR\fR
 .ad
 .RS 6n
-.rt  
 Century number (the year divided by 100 and truncated to an integer as a
 decimal number [1,99]); single digits are preceded by 0; see
 \fBstandards\fR(5). If used without the \fB%y\fR specifier, this format
@@ -124,156 +110,128 @@ specified. The only valid years are between 1902-2037.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%d\fR\fR
 .ad
 .RS 6n
-.rt  
 day of month [01,31]; leading zero is permitted but not required.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%D\fR\fR
 .ad
 .RS 6n
-.rt  
 Date as \fB%m\fR/\fB%d\fR/\fB%y\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%e\fR\fR
 .ad
 .RS 6n
-.rt  
 Same as \fB%d\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%h\fR\fR
 .ad
 .RS 6n
-.rt  
 Locale's abbreviated month name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%H\fR\fR
 .ad
 .RS 6n
-.rt  
 Hour (24-hour clock) [0,23]; leading zero is permitted but not required.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%I\fR\fR
 .ad
 .RS 6n
-.rt  
 Hour (12-hour clock) [1,12]; leading zero is permitted but not required.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%j\fR\fR
 .ad
 .RS 6n
-.rt  
 Day number of the year [1,366]; leading zeros are permitted but not required.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%m\fR\fR
 .ad
 .RS 6n
-.rt  
 Month number [1,12]; leading zero is permitted but not required.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%M\fR\fR
 .ad
 .RS 6n
-.rt  
 Minute [0,59]; leading zero is permitted but not required.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%n\fR\fR
 .ad
 .RS 6n
-.rt  
 Any white space.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%p\fR\fR
 .ad
 .RS 6n
-.rt  
 Locale's equivalent of either a.m. or p.m.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%r\fR\fR
 .ad
 .RS 6n
-.rt  
 Appropriate time representation in the 12-hour clock format with \fB%p\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%R\fR\fR
 .ad
 .RS 6n
-.rt  
 Time as \fB%H\fR:\fB%M\fR.
 .RE
 
 .SS "SUSv3"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%S\fR\fR
 .ad
 .RS 6n
-.rt  
 Seconds [0,60]; leading zero is permitted but not required. The range of values
 is [00,60] rather than [00,59] to allow for the occasional leap second.
 .RE
@@ -281,12 +239,10 @@ is [00,60] rather than [00,59] to allow for the occasional leap second.
 .SS "Default and other standards"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%S\fR\fR
 .ad
 .RS 6n
-.rt  
 Seconds [0,61]; leading zero is permitted but not required. The range of values
 is [00,61] rather than [00,59] to allow for the occasional leap second and even
 more occasional double leap second.
@@ -294,91 +250,75 @@ more occasional double leap second.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%t\fR\fR
 .ad
 .RS 6n
-.rt  
 Any white space.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%T\fR\fR
 .ad
 .RS 6n
-.rt  
 Time as \fB%H\fR:\fB%M\fR:\fB%S\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%U\fR\fR
 .ad
 .RS 6n
-.rt  
 Week number of the year as a decimal number [0,53], with Sunday as the first
 day of the week; leading zero is permitted but not required.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%w\fR\fR
 .ad
 .RS 6n
-.rt  
 Weekday as a decimal number [0,6], with 0 representing Sunday.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%W\fR\fR
 .ad
 .RS 6n
-.rt  
 Week number of the year as a decimal number [0,53], with Monday as the first
 day of the week; leading zero is permitted but not required.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%x\fR\fR
 .ad
 .RS 6n
-.rt  
 Locale's appropriate date representation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%X\fR\fR
 .ad
 .RS 6n
-.rt  
 Locale's appropriate time representation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%y\fR\fR
 .ad
 .RS 6n
-.rt  
 Year within century. When a century is not otherwise specified, values in the
 range 69-99 refer to years in the twentieth century (1969 to 1999 inclusive);
 values in the range 00-68 refer to years in the twenty-first century (2000 to
@@ -387,23 +327,19 @@ values in the range 00-68 refer to years in the twenty-first century (2000 to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%Y\fR\fR
 .ad
 .RS 6n
-.rt  
 Year, including the century (for example, 1993).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%Z\fR\fR
 .ad
 .RS 6n
-.rt  
 Time zone name or no characters if no time zone exists.
 .RE
 
@@ -418,192 +354,158 @@ current locale,  the behavior be as if the unmodified  conversion specification
 were used.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%Ec\fR\fR
 .ad
 .RS 7n
-.rt  
 Locale's alternative appropriate date and time representation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%EC\fR\fR
 .ad
 .RS 7n
-.rt  
 Name of the base year (period) in the locale's alternative representation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%Ex\fR\fR
 .ad
 .RS 7n
-.rt  
 Locale's alternative date representation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%EX\fR\fR
 .ad
 .RS 7n
-.rt  
 Locale's alternative time representation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%Ey\fR\fR
 .ad
 .RS 7n
-.rt  
 Offset from \fB%EC\fR (year only) in the locale's alternative representation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%EY\fR\fR
 .ad
 .RS 7n
-.rt  
 Full alternative year representation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%Od\fR\fR
 .ad
 .RS 7n
-.rt  
 Day of the month using the locale's alternative  numeric symbols; leading zeros
 are permitted but not required.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%Oe\fR\fR
 .ad
 .RS 7n
-.rt  
 Same as \fB%Od\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%OH\fR\fR
 .ad
 .RS 7n
-.rt  
 Hour (24-hour clock) using the locale's alternative numeric symbols.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%OI\fR\fR
 .ad
 .RS 7n
-.rt  
 Hour (12-hour clock) using the locale's alternative numeric symbols.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%Om\fR\fR
 .ad
 .RS 7n
-.rt  
 Month using the locale's alternative numeric symbols.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%OM\fR\fR
 .ad
 .RS 7n
-.rt  
 Minutes using the locale's alternative numeric symbols.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%OS\fR\fR
 .ad
 .RS 7n
-.rt  
 Seconds using the locale's alternative numeric symbols.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%OU\fR\fR
 .ad
 .RS 7n
-.rt  
 Week number of the year (Sunday as the first day of the week) using the
 locale's alternative numeric symbols.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%Ow\fR\fR
 .ad
 .RS 7n
-.rt  
 Number of the weekday (Sunday=0) using the  locale's alternative numeric
 symbols.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%OW\fR\fR
 .ad
 .RS 7n
-.rt  
 Week number of the year (Monday as the first day of the week) using the
 locale's alternative numeric symbols.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%Oy\fR\fR
 .ad
 .RS 7n
-.rt  
 Year (offset from \fB%C\fR) in the locale's alternative  representation and
 using the locale's alternative numeric symbols.
 .RE
@@ -700,89 +602,73 @@ The following is a complete list of the  \fBgetdate_err\fR settings and their
 meanings:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 The \fBDATEMSK\fR environment variable is null or undefined.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 The template file cannot be opened for reading.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 5n
-.rt  
 Failed to get file status information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB4\fR\fR
 .ad
 .RS 5n
-.rt  
 The template file is not a regular file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB5\fR\fR
 .ad
 .RS 5n
-.rt  
 An error is encountered while reading the template file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB6\fR\fR
 .ad
 .RS 5n
-.rt  
 The \fBmalloc()\fR function failed (not enough memory is available).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB7\fR\fR
 .ad
 .RS 5n
-.rt  
 There is no line in the template that matches the input.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB8\fR\fR
 .ad
 .RS 5n
-.rt  
 The input specification is invalid (for example, \fBFebruary 31\fR).
 .RE
 
@@ -851,16 +737,15 @@ show how local date and time specification can be defined in the template.
 
 .sp
 .TS
-tab() box;
-lw(2.75i) |lw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-InvocationLine in Template
+box;
+l | l
+l | l .
+Invocation	Line in Template
 _
-getdate("11/27/86")%m/%d/%y
-getdate("27.11.86")%d.%m.%y
-getdate("86-11-27")%y-%m-%d
-getdate("Friday 12:00:00")%A %H:%M:%S
+getdate("11/27/86")	%m/%d/%y
+getdate("27.11.86")	%d.%m.%y
+getdate("86-11-27")	%y-%m-%d
+getdate("Friday 12:00:00")	%A %H:%M:%S
 .TE
 
 .sp
@@ -873,26 +758,25 @@ environment variable is not set.
 
 .sp
 .TS
-tab() box;
-lw(1.32i) |lw(1.39i) |lw(2.79i) 
-lw(1.32i) |lw(1.39i) |lw(2.79i) 
-.
-InputTemplate Line Date
+box;
+l | l | l
+l | l | l .
+Input	Template Line 	Date
 _
-\fBMon\fR\fB%a\fRMon Sep 22 12:19:48 EDT 1986
-\fBSun\fR\fB%a\fRSun Sep 28 12:19:49 EDT 1986
-\fBFri\fR\fB%a\fRFri Sep 26 12:19:49 EDT 1986
-\fBSeptember\fR\fB%B\fRMon Sep  1 12:19:49 EDT 1986
-\fBJanuary\fR\fB%B\fRThu Jan  1 12:19:49 EST 1987
-\fBDecember\fR\fB%B\fRMon Dec  1 12:19:49 EDT 1986
-\fBSep Mon\fR\fB%b %a\fRMon Sep  1 12:19:50 EDT 1986
-\fBJan Fri\fR\fB%b %a\fRFri Jan  2 12:19:50 EST 1987
-\fBDec Mon\fR\fB%b %a\fRMon Dec  1 12:19:50 EST 1986
-\fBJan Wed 1989\fR\fB%b\fR \fB%a\fR \fB%Y\fRWed Jan  4 12:19:51 EST 1989
-\fBFri 9\fR\fB%a %H\fRFri Sep 26 09:00:00 EDT 1986
-\fBFeb 10:30\fR\fB%b %H:%S\fRSun Feb  1 10:00:30 EST 1987
-\fB10:30\fR\fB%H:%M\fRTue Sep 23 10:30:00 EDT 1986
-\fB13:30\fR\fB%H:%M\fRMon Sep 22 13:30:00 EDT 1986
+\fBMon\fR	\fB%a\fR	Mon Sep 22 12:19:48 EDT 1986
+\fBSun\fR	\fB%a\fR	Sun Sep 28 12:19:49 EDT 1986
+\fBFri\fR	\fB%a\fR	Fri Sep 26 12:19:49 EDT 1986
+\fBSeptember\fR	\fB%B\fR	Mon Sep  1 12:19:49 EDT 1986
+\fBJanuary\fR	\fB%B\fR	Thu Jan  1 12:19:49 EST 1987
+\fBDecember\fR	\fB%B\fR	Mon Dec  1 12:19:49 EDT 1986
+\fBSep Mon\fR	\fB%b %a\fR	Mon Sep  1 12:19:50 EDT 1986
+\fBJan Fri\fR	\fB%b %a\fR	Fri Jan  2 12:19:50 EST 1987
+\fBDec Mon\fR	\fB%b %a\fR	Mon Dec  1 12:19:50 EST 1986
+\fBJan Wed 1989\fR	\fB%b\fR \fB%a\fR \fB%Y\fR	Wed Jan  4 12:19:51 EST 1989
+\fBFri 9\fR	\fB%a %H\fR	Fri Sep 26 09:00:00 EDT 1986
+\fBFeb 10:30\fR	\fB%b %H:%S\fR	Sun Feb  1 10:00:30 EST 1987
+\fB10:30\fR	\fB%H:%M\fR	Tue Sep 23 10:30:00 EDT 1986
+\fB13:30\fR	\fB%H:%M\fR	Mon Sep 22 13:30:00 EDT 1986
 .TE
 
 .SH ATTRIBUTES
@@ -903,17 +787,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) |lw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+l | l
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

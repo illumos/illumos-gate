@@ -3,28 +3,28 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH llc1 7D "13 Feb 1997" "SunOS 5.11" "Devices"
+.TH LLC1 7D "Feb 13, 1997"
 .SH NAME
 llc1 \- Logical Link Control Protocol Class 1 Driver
 .SH SYNOPSIS
 .LP
 .nf
-\fB#include <sys/stropts.h>\fR 
+\fB#include <sys/stropts.h>\fR
 .fi
 
 .LP
 .nf
-\fB#include <sys/ethernet.h>\fR 
+\fB#include <sys/ethernet.h>\fR
 .fi
 
 .LP
 .nf
-\fB#include <sys/dlpi.h>\fR 
+\fB#include <sys/dlpi.h>\fR
 .fi
 
 .LP
 .nf
-\fB#include <sys/llc1.h>\fR 
+\fB#include <sys/llc1.h>\fR
 .fi
 
 .SH DESCRIPTION
@@ -204,12 +204,10 @@ received as a  \fBDL_XID_IND/DL_TEST_IND\fR message.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/llc1\fR\fR
 .ad
 .RS 13n
-.rt  
 cloning, character-special device
 .RE
 
@@ -221,13 +219,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Architecturex86
+Architecture	x86
 .TE
 
 .SH SEE ALSO

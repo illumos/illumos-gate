@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH di_prop_bytes 3DEVINFO "27 Mar 2001" "SunOS 5.11" "Device Information Library Functions"
+.TH DI_PROP_BYTES 3DEVINFO "Mar 27, 2001"
 .SH NAME
 di_prop_bytes, di_prop_devt, di_prop_ints, di_prop_name, di_prop_strings,
 di_prop_type, di_prop_int64 \- access property values and attributes
@@ -49,23 +49,19 @@ di_prop_type, di_prop_int64 \- access property values and attributes
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprop\fR\fR
 .ad
 .RS 13n
-.rt  
 Handle to a property returned by \fBdi_prop_next\fR(3DEVINFO).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprop_data\fR\fR
 .ad
 .RS 13n
-.rt  
 For \fBdi_prop_bytes()\fR, the address of a pointer to an unsigned character.
 .sp
 For \fBdi_prop_ints()\fR, the address of a pointer to an integer.
@@ -112,68 +108,56 @@ determines the appropriate interface to access property values. The following
 is a list of possible types:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDI_PROP_TYPE_BOOLEAN\fR\fR
 .ad
 .RS 25n
-.rt  
 There is no interface to call since there is no property data associated with
 boolean properties. The existence of the property defines a \fBTRUE\fR value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDI_PROP_TYPE_INT\fR\fR
 .ad
 .RS 25n
-.rt  
 Use \fBdi_prop_ints()\fR to access property data.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDI_PROP_TYPE_INT64\fR\fR
 .ad
 .RS 25n
-.rt  
 Use \fBdi_prop_int64()\fR to access property data.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDI_PROP_TYPE_STRING\fR\fR
 .ad
 .RS 25n
-.rt  
 Use \fBdi_prop_strings()\fR to access property data.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDI_PROP_TYPE_BYTE\fR\fR
 .ad
 .RS 25n
-.rt  
 Use \fBdi_prop_bytes()\fR to access property data.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
-\fB\fBDI_PROP_TYPE_UNKNOWN	\fR\fR
+\fB\fBDI_PROP_TYPE_UNKNOWN\fR\fR
 .ad
 .RS 25n
-.rt  
 Use \fBdi_prop_bytes()\fR to access property data. Since the type of property
 is unknown, the caller is responsible for interpreting the contents of the
 data.
@@ -181,12 +165,10 @@ data.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDI_PROP_TYPE_UNDEF_IT\fR\fR
 .ad
 .RS 25n
-.rt  
 The property has been undefined by the driver. No property data is available.
 .RE
 
@@ -216,12 +198,10 @@ DESCRIPTION section.
 These functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 Invalid argument. For example, the property type does not match the interface.
 .RE
 
@@ -233,15 +213,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

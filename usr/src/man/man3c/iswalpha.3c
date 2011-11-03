@@ -1,13 +1,13 @@
 '\" te
 .\" Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.  Portions Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH iswalpha 3C "19 Apr 2004" "SunOS 5.11" "Standard C Library Functions"
+.TH ISWALPHA 3C "Apr 19, 2004"
 .SH NAME
 iswalpha, isenglish, isideogram, isnumber, isphonogram, isspecial, iswalnum,
 iswascii, iswblank, iswcntrl, iswdigit, iswgraph, iswlower, iswprint, iswpunct,
@@ -120,108 +120,90 @@ must equal the value of the macro \fBWEOF\fR. If the argument has any other
 values, the behavior is undefined.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBiswalpha(\fR\fIwc\fR\fB)\fR\fR
 .ad
 .RS 19n
-.rt  
 Tests whether \fIwc\fR is a wide-character code representing a character of
 class "alpha" in the program's current locale.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBisenglish(\fR\fIwc\fR\fB)\fR\fR
 .ad
 .RS 19n
-.rt  
 Tests whether \fIwc\fR is a wide-character code representing an English
 language character, excluding \fBASCII\fR characters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBisideogram(\fR\fIwc\fR\fB)\fR\fR
 .ad
 .RS 19n
-.rt  
 Tests whether \fIwc\fR is a wide-character code representing an ideographic
 language character, excluding \fBASCII\fR characters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBisnumber(\fR\fIwc\fR\fB)\fR\fR
 .ad
 .RS 19n
-.rt  
 Tests whether \fIwc\fR is a wide-character code representing digit [0\(mi9],
 excluding \fBASCII\fR characters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBisphonogram(\fR\fIwc\fR\fB)\fR\fR
 .ad
 .RS 19n
-.rt  
 Tests whether \fIwc\fR is a wide-character code representing a phonetic
 language character, excluding \fBASCII\fR characters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBisspecial(\fR\fIwc\fR\fB)\fR\fR
 .ad
 .RS 19n
-.rt  
 Tests whether \fIwc\fR is a wide-character code representing a special language
 character, excluding \fBASCII\fR characters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBiswalnum(\fR\fIwc\fR\fB)\fR\fR
 .ad
 .RS 19n
-.rt  
 Tests whether \fIwc\fR is a wide-character code representing a character of
 class "alpha" or "digit" in the program's current locale.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBiswascii(\fR\fIwc\fR\fB)\fR\fR
 .ad
 .RS 19n
-.rt  
 Tests whether \fIwc\fR is a wide-character code representing an \fBASCII\fR
 character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBiswblank(\fR\fIwc\fR\fB)\fR\fR
 .ad
 .RS 19n
-.rt  
 Tests whether \fIwc\fR is a wide-character code representing a character of
 class "blank" in the program's current locale. This function is not available
 to applications conforming to standards prior to SUSv3. See \fBstandards\fR(5).
@@ -229,108 +211,90 @@ to applications conforming to standards prior to SUSv3. See \fBstandards\fR(5).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBiswlower(\fR\fIwc\fR\fB)\fR\fR
 .ad
 .RS 19n
-.rt  
 Tests whether \fIwc\fR is a wide-character code representing a character of
 class "lower" in the program's current locale.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBiswcntrl(\fR\fIwc\fR\fB)\fR\fR
 .ad
 .RS 19n
-.rt  
 Tests whether \fIwc\fR is a wide-character code representing a character of
 class "cntrl" in the program's current locale.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBiswdigit(\fR\fIwc\fR\fB)\fR\fR
 .ad
 .RS 19n
-.rt  
 Tests whether \fIwc\fR is a wide-character code representing a character of
 class "digit" in the program's current locale.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBiswgraph(\fR\fIwc\fR\fB)\fR\fR
 .ad
 .RS 19n
-.rt  
 Tests whether \fIwc\fR is a wide-character code representing a character of
 class "graph" in the program's current locale.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBiswprint(\fR\fIwc\fR\fB)\fR\fR
 .ad
 .RS 19n
-.rt  
 Tests whether \fIwc\fR is a wide-character code representing a character of
 class "print" in the program's current locale.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBiswpunct(\fR\fIwc\fR\fB)\fR\fR
 .ad
 .RS 19n
-.rt  
 Tests whether \fIwc\fR is a wide-character code representing a character of
 class "punct" in the program's current locale.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBiswspace(\fR\fIwc\fR\fB)\fR\fR
 .ad
 .RS 19n
-.rt  
 Tests whether \fIwc\fR is a wide-character code representing a character of
 class "space" in the program's current locale.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBiswupper(\fR\fIwc\fR\fB)\fR\fR
 .ad
 .RS 19n
-.rt  
 Tests whether \fIwc\fR is a wide-character code representing a character of
 class "upper" in the program's current locale.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBiswxdigit(\fR\fIwc\fR\fB)\fR\fR
 .ad
 .RS 19n
-.rt  
 Tests whether \fIwc\fR is a wide-character code representing a character of
 class "xdigit" in the program's current locale.
 .RE
@@ -343,17 +307,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) |lw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+l | l
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilitySee  below.
+Interface Stability	See  below.
 _
-MT-LevelMT-Safe with exceptions
+MT-Level	MT-Safe with exceptions
 .TE
 
 .sp

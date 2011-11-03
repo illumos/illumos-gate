@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH getsourcefilter 3SOCKET "20 Aug 2007" "SunOS 5.11" "Sockets Library Functions"
+.TH GETSOURCEFILTER 3SOCKET "Aug 20, 2007"
 .SH NAME
 getsourcefilter, setsourcefilter, getipv4sourcefilter, setipv4sourcefilter \-
 retrieve and set a socket's multicast filter
@@ -119,69 +119,57 @@ If successful, all four functions return \fB0\fR. Otherwise, they return
 These functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIs\fR argument is not a valid descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAFNOSUPPORT\fR\fR
 .ad
 .RS 16n
-.rt  
 The address family of the passed-in \fIsockaddr\fR is not \fBAF_INET\fR or
 \fBAF_INET6\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOPROTOOPT\fR\fR
 .ad
 .RS 16n
-.rt  
 The socket \fIs\fR is not of type \fBSOCK_DGRAM\fR or \fBSOCK_RAW\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOPROTOOPT\fR\fR
 .ad
 .RS 16n
-.rt  
 The address family of the group parameter does not match the protocol family of
 the socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSR\fR\fR
 .ad
 .RS 16n
-.rt  
 Insufficient \fBSTREAMS\fR resources available for the operation to complete.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENXIO\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIinterface\fR argument, either an index or an IPv4 address, does not
 identify a valid interface.
 .RE
@@ -192,12 +180,10 @@ The \fBgetsourcefilter()\fR and \fBgetipv4sourcefilter()\fR functions will fail
 if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEADDRNOTAVAIL\fR\fR
 .ad
 .RS 17n
-.rt  
 The tuple consisting of socket, interface, and multicast group values does not
 exist; \fIgroup\fR is not being listened to on \fIinterface\fR by \fIsocket\fR.
 .RE
@@ -208,12 +194,10 @@ The functions \fBsetsourcefilter()\fRand \fBsetipv4sourcefilter()\fR can fail
 in the following additional case:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOBUFS\fR\fR
 .ad
 .RS 11n
-.rt  
 The source filter list is larger than that allowed by the implementation.
 .RE
 
@@ -225,15 +209,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

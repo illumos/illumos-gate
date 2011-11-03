@@ -2,14 +2,14 @@
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH uname 1 "17 Sep 2003" "SunOS 5.11" "User Commands"
+.TH UNAME 1 "Sep 17, 2003"
 .SH NAME
 uname \- print name of current system
 .SH SYNOPSIS
@@ -38,91 +38,75 @@ options print selected information returned by \fBuname\fR(2),
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 18n
-.rt  
 Prints basic information currently available from the system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 18n
-.rt  
 Prints the name of the platform.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
 .RS 18n
-.rt  
 Prints the machine hardware name (class). Use of this option is discouraged.
 Use \fBuname\fR \fB-p\fR instead. See NOTES section below.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 18n
-.rt  
 Prints the nodename (the nodename is the name by which the system is known to a
 communications network).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 18n
-.rt  
 Prints the current host's \fBISA\fR or processor type.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 18n
-.rt  
 Prints the operating system release level.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 18n
-.rt  
 Prints the name of the operating system. This is the default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR \fIsystem_name\fR\fR
 .ad
 .RS 18n
-.rt  
 The nodename may be changed by specifying a system name argument. The system
 name argument is restricted to \fBSYS_NMLN\fR characters. \fBSYS_NMLN\fR is an
 implementation specific value defined in \fB<sys/utsname.h>\fR\&. Only the
@@ -133,23 +117,19 @@ permanently.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 18n
-.rt  
 Prints the operating system version.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-X\fR \fR
 .ad
 .RS 18n
-.rt  
 Prints expanded system information, one information element per line, as
 expected by SCO UNIX. The displayed information includes:
 .RS +4
@@ -200,12 +180,10 @@ that affect the execution of \fBuname\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSYSV3\fR \fR
 .ad
 .RS 10n
-.rt  
 This variable is used to override the default behavior of \fBuname\fR. This is
 necessary to make it possible for some INTERACTIVE UNIX Systems and SCO UNIX
 programs and scripts to work properly. Many scripts use \fBuname\fR to
@@ -232,67 +210,55 @@ setting \fBSYSV3\fR in the following format:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIos\fR \fR
 .ad
 .RS 12n
-.rt  
 Operating system (IUS or SCO).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsysname\fR \fR
 .ad
 .RS 12n
-.rt  
 System name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInode\fR \fR
 .ad
 .RS 12n
-.rt  
 Nodename as displayed by the \fB-n\fR option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrel\fR \fR
 .ad
 .RS 12n
-.rt  
 Release level as displayed by the \fB-r\fR option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIver\fR \fR
 .ad
 .RS 12n
-.rt  
 Version number as displayed by the \fB-v\fR option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImach\fR \fR
 .ad
 .RS 12n
-.rt  
 Machine name as displayed by \fB-m\fR option.
 .RE
 
@@ -306,23 +272,19 @@ system value will be used.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 7n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR \fR
 .ad
 .RS 7n
-.rt  
 An error occurred.
 .RE
 
@@ -334,13 +296,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH usb_isoc_request 9S "28 Dec 2006" "SunOS 5.11" "Data Structures for Drivers"
+.TH USB_ISOC_REQUEST 9S "Dec 28, 2006"
 .SH NAME
 usb_isoc_request \- USB isochronous request structure
 .SH SYNOPSIS
@@ -40,7 +40,7 @@ ushort_t       isoc_pkts_count; /* num USB pkts in this request */
  * The sum of all pkt lengths in an isoc request. Recommend to set it to
  * zero, so the sum of isoc_pkt_length in the isoc_pkt_descr list will be
  * used automatically and no check will be apply to this element.
- */ 
+ */
 ushort_t       isoc_pkts_length;
 ushort_t       isoc_error_count;/* num pkts completed w/errs */
 usb_req_attrs_t isoc_attributes;/* request-specific attrs */
@@ -107,36 +107,30 @@ Request attributes define special handling for transfers. The following
 attributes are valid for isochronous requests:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSB_ATTRS_ISOC_START_FRAME\fR\fR
 .ad
 .RS 30n
-.rt  
 Start transferring at the starting frame number specified in the
 \fBisoc_frame_no\fR field of the request.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSB_ATTRS_ISOC_XFER_ASAP\fR\fR
 .ad
 .RS 30n
-.rt  
 Start transferring as soon as possible. The \fBUSBA\fR framework picks an
 immediate frame number to map to the starting frame number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSB_ATTRS_SHORT_XFER_OK\fR\fR
 .ad
 .RS 30n
-.rt  
 Accept transfers where less data is received than expected.
 .RE
 
@@ -157,9 +151,9 @@ caveats:
 .in +2
 .nf
 1) The following table indicates combinations of usb_pipe_isoc_xfer
-   flags argument and fields of the usb_isoc_req_t request argument 
-   (X = don't care). (Note that attributes considered in this table 
-   are ONE_XFER, START_FRAME, XFER_ASAP, and SHORT_XFER, and that 
+   flags argument and fields of the usb_isoc_req_t request argument
+   (X = don't care). (Note that attributes considered in this table
+   are ONE_XFER, START_FRAME, XFER_ASAP, and SHORT_XFER, and that
    some transfer types are characterized by multiple table entries.)
 
 Flags Type     Attributes          Data    Semantics
@@ -172,8 +166,8 @@ X      X      ISOC_START_FRAME     X       illegal
               & ISOC_XFER_ASAP
 
 X      X      !ISOC_START_FRAME    X       illegal
-              & !ISOC_XFER_ASAP        
-              
+              & !ISOC_XFER_ASAP
+
 X      OUT    SHORT_XFER_OK        X       illegal
 
 X      IN     X                    !=NULL  See table note (A)
@@ -184,18 +178,18 @@ X      X      ISOC_XFER_ASAP       !=NULL  See table note (C)
 
 Table notes:
 
-    A) continuous polling, new data is returned in 
-       cloned request structures via continous callbacks, 
+    A) continuous polling, new data is returned in
+       cloned request structures via continous callbacks,
        original request is returned on stop polling
 
-    B) invalid if the current_frame number is past 
+    B) invalid if the current_frame number is past
        "isoc_frame_no" or "isoc_frame_no" == 0
 
-    C)"isoc_frame_no" is ignored. The USBA framework 
-       determines which frame to insert and start 
+    C)"isoc_frame_no" is ignored. The USBA framework
+       determines which frame to insert and start
        the transfer.
 
-2) USB_FLAGS_SLEEP indicates to wait for resources but 
+2) USB_FLAGS_SLEEP indicates to wait for resources but
    not for completion.
 
 3) For polled reads:
@@ -210,30 +204,30 @@ Table notes:
      match  the  isoc_pkt_length  field  of  the packet
      descriptor unless a  short  transfer  occurs.  The
      actual     size     is     returned     in     the
-     isoc_pkt_actual_length   field   of   the   packet 
+     isoc_pkt_actual_length   field   of   the   packet
      descriptor.  When  all packets of the request have
      been processed, a normal callback is done to  sig-
      nal the completion of the original request.
 
-  B. When continuous polling is stopped, the original 
-     request is returned in an exception callback with a 
-     completion reason of USB_CR_STOPPED_POLLING. 
+  B. When continuous polling is stopped, the original
+     request is returned in an exception callback with a
+     completion reason of USB_CR_STOPPED_POLLING.
      (NOTE: Polling can be restarted from  an exception
-     callback corresponding to an original request.  
+     callback corresponding to an original request.
      Please see usb_pipe_isoc_xfer(9F) for more information.
 
   C. Callbacks must be specified.
 
-  The isoc_completion_reason indicates the status of the transfer. See 
+  The isoc_completion_reason indicates the status of the transfer. See
   usb_completion_reason(9s) for usb_cr_t definitions.
 
-  The isoc_cb_flags are set prior to calling the exception 
-  callback handler to summarize recovery actions taken and 
-  errors encountered during recovery. See usb_callback_flags(9s) 
+  The isoc_cb_flags are set prior to calling the exception
+  callback handler to summarize recovery actions taken and
+  errors encountered during recovery. See usb_callback_flags(9s)
   for usb_cb_flags_t definitions.
 
 --- Callback handling ---
-All usb request types share the same callback handling. Please see 
+All usb request types share the same callback handling. Please see
 usb_callback_flags(9s) for a description of use and operation.
 .fi
 .in -2
@@ -246,15 +240,14 @@ See attributes(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitecturePCI-based systems
+Architecture	PCI-based systems
 _
-Interface stabilityCommitted
+Interface stability	Committed
 .TE
 
 .SH SEE ALSO

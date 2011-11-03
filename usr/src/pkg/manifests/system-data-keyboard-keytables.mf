@@ -32,8 +32,8 @@ set name=info.classification \
 set name=variant.arch value=$(ARCH)
 dir path=usr group=sys
 dir path=usr/lib
-dir path=usr/share group=sys
-dir path=usr/share/lib group=sys
+dir path=usr/share
+dir path=usr/share/lib
 dir path=usr/share/lib/keytables
 dir path=usr/share/lib/keytables/type_101
 $(sparc_ONLY)dir path=usr/share/lib/keytables/type_4

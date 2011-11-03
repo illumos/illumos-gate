@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH liblgrp 3LIB "26 Jan 2005" "SunOS 5.11" "Interface Libraries"
+.TH LIBLGRP 3LIB "Jan 26, 2005"
 .SH NAME
 liblgrp \- locality group library
 .SH SYNOPSIS
@@ -30,41 +30,35 @@ interfaces.
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBlgrp_affinity_get\fR\fBlgrp_affinity_set\fR
-\fBlgrp_children\fR\fBlgrp_cookie_stale\fR
-\fBlgrp_cpus\fR\fBlgrp_fini\fR
-\fBlgrp_home\fR\fBlgrp_init\fR
-\fBlgrp_latency\fR\fBlgrp_latency_cookie\fR
-\fBlgrp_mem_size\fR\fBlgrp_nlgrps\fR
-\fBlgrp_parents\fR\fBlgrp_resourcess\fR
-\fBlgrp_root\fR\fBlgrp_version\fR
-\fBlgrp_view\fR
+l l
+l l .
+\fBlgrp_affinity_get\fR	\fBlgrp_affinity_set\fR
+\fBlgrp_children\fR	\fBlgrp_cookie_stale\fR
+\fBlgrp_cpus\fR	\fBlgrp_fini\fR
+\fBlgrp_home\fR	\fBlgrp_init\fR
+\fBlgrp_latency\fR	\fBlgrp_latency_cookie\fR
+\fBlgrp_mem_size\fR	\fBlgrp_nlgrps\fR
+\fBlgrp_parents\fR	\fBlgrp_resourcess\fR
+\fBlgrp_root\fR	\fBlgrp_version\fR
+\fBlgrp_view\fR	
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/liblgrp.so.1\fR\fR
 .ad
 .RS 28n
-.rt  
 shared object
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/64/liblgrp.so.1\fR\fR
 .ad
 .RS 28n
-.rt  
 64-bit shared object
 .RE
 
@@ -76,15 +70,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

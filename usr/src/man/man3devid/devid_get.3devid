@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH devid_get 3DEVID "30 Nov 2001" "SunOS 5.11" "Device ID Library Functions"
+.TH DEVID_GET 3DEVID "Nov 30, 2001"
 .SH NAME
 devid_get, devid_compare, devid_deviceid_to_nmlist, devid_free,
 devid_free_nmlist, devid_get_minor_name, devid_sizeof, devid_str_decode,
@@ -183,36 +183,30 @@ return \fB\(mi1\fR\&.
 The \fBdevid_compare()\fR function returns the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi1\fR\fR
 .ad
 .RS 9n
-.rt  
 The device ID pointed to by \fIdevid1\fR is less than the device ID pointed to
 by \fIdevid2\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 9n
-.rt  
 The device ID pointed to by \fIdevid1\fR is equal to  the device ID pointed to
 by \fIdevid2\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 9n
-.rt  
 The device ID pointed to by \fIdevid1\fR is greater than the device ID pointed
 to by \fIdevid2\fR.
 .RE
@@ -283,7 +277,7 @@ int    err;
 if (devid_deviceid_to_nmlist("/dev/rdsk", devid,
     minor_name, &list))
         return (-1);
-/* loop through list and process device names and numbers */ 
+/* loop through list and process device names and numbers */
 devid_free_nmlist(list);
 .fi
 .in -2
@@ -296,15 +290,14 @@ See \fBattributes\fR(5) for description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelMT\(miSafe
+MT-Level	MT\(miSafe
 _
-Interface StabilityStable
+Interface Stability	Stable
 .TE
 
 .SH SEE ALSO

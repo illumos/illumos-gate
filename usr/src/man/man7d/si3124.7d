@@ -3,9 +3,9 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH si3124 7D "17 August 2007" "SunOS 5.11" "Devices"
+.TH SI3124 7D "Aug 17, 2007"
 .SH NAME
-si3124 \- SiliconImage 3124/3132 SATA controller driver
+si3124 \- SiliconImage 3124/3132/3531 SATA controller driver
 .SH SYNOPSIS
 .LP
 .nf
@@ -16,7 +16,7 @@ si3124 \- SiliconImage 3124/3132 SATA controller driver
 .sp
 .LP
 The \fBsi3124\fR driver is a \fBSATA\fR framework-compliant HBA driver that
-supports Silicon Image 3124 and 3132 \fBSATA\fR controllers. Note that while
+supports Silicon Image 3124, 3132 and 3531 \fBSATA\fR controllers. Note that while
 the Silicon Image controllers supports standard \fBSATA\fR features including
 SATA-II disks, NCQ, hotplug, port multiplier and ATAPI disks, the \fBsi3124\fR
 driver currently does not support NCQ, port multiplier or ATAPI features.
@@ -27,23 +27,19 @@ There are no tunable parameters in the \fBsi3124.conf\fR file.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/si3124\fR\fR
 .ad
 .RS 28n
-.rt  
 32-bit ELF kernel module (x86).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/amd64/si3124\fR\fR
 .ad
 .RS 28n
-.rt  
 64-bit ELF kernel module. (x86).
 .RE
 
@@ -55,13 +51,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Architecturex86
+Architecture	x86
 .TE
 
 .SH SEE ALSO

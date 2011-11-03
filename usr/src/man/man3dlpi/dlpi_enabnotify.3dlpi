@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dlpi_enabnotify 3DLPI "10 Mar 2009" "SunOS 5.11" "Data Link Provider Interface Library Functions"
+.TH DLPI_ENABNOTIFY 3DLPI "Mar 10, 2009"
 .SH NAME
 dlpi_enabnotify \- enable DLPI notification
 .SH SYNOPSIS
@@ -62,59 +62,49 @@ with the arguments \fIarg\fR, originally passed to
 below.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuint_t\fR \fIdni_note\fR\fR
 .ad
 .RS 27n
-.rt  
 Notification event type.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuint_t\fR \fIdni_speed\fR\fR
 .ad
 .RS 27n
-.rt  
 Current speed, in kilobits per second, of the DLPI link. Valid only for
 \fBDL_NOTE_SPEED\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuint_t\fR \fIdni_size\fR\fR
 .ad
 .RS 27n
-.rt  
 Current maximum message size, in bytes, that the DLPI link is able to accept
 for transmission. Valid only for \fBDL_NOTE_SDU_SIZE\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuchar_t\fR \fIdni_physaddrlen\fR\fR
 .ad
 .RS 27n
-.rt  
 Link-layer physical address length, in bytes. Valid only for
 \fBDL_NOTE_PHYS_ADDR\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuchar_t\fR \fIdni_physaddr\fR[]\fR
 .ad
 .RS 27n
-.rt  
 Link-layer physical address of DLPI link.  Valid only for
 \fBDL_NOTE_PHYS_ADDR\fR.
 .RE
@@ -139,67 +129,55 @@ following section is returned.
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDLPI_EINHANDLE\fR\fR
 .ad
 .RS 21n
-.rt  
 A DLPI handle is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDLPI_EINVAL\fR\fR
 .ad
 .RS 21n
-.rt  
 An argument is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDLPI_ENOTEIDINVAL\fR\fR
 .ad
 .RS 21n
-.rt  
 The DLPI notification ID is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDLPI_ENOTENOTSUP\fR\fR
 .ad
 .RS 21n
-.rt  
 The DLPI notification is not supported by the link.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDLPI_ETIMEDOUT\fR\fR
 .ad
 .RS 21n
-.rt  
 The DLPI operation timed out.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDLPI_FAILURE\fR\fR
 .ad
 .RS 21n
-.rt  
 The DLPI operation failed.
 .RE
 
@@ -211,15 +189,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

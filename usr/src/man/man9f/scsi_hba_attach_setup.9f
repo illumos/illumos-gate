@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH scsi_hba_attach_setup 9F "30 May 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH SCSI_HBA_ATTACH_SETUP 9F "May 30, 2006"
 .SH NAME
 scsi_hba_attach_setup, scsi_hba_attach, scsi_hba_detach \- SCSI HBA attach and
 detach routines
@@ -20,7 +20,7 @@ detach routines
 
 .LP
 .nf
-\fBint\fR \fBscsi_hba_attach\fR(\fBdev_info_t *\fR\fIdip\fR, \fBddi_dma_lim_t *\fR\fIhba_lim\fR, 
+\fBint\fR \fBscsi_hba_attach\fR(\fBdev_info_t *\fR\fIdip\fR, \fBddi_dma_lim_t *\fR\fIhba_lim\fR,
      \fBscsi_hba_tran_t *\fR\fIhba_tran\fR, \fBint\fR \fIhba_flags\fR, \fBvoid *\fR\fIhba_options\fR);
 .fi
 
@@ -36,70 +36,58 @@ Solaris architecture specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 16n
-.rt  
 Pointer to the \fBdev_info_t\fR structure that refers to the instance of the
 HBA device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhba_lim\fR\fR
 .ad
 .RS 16n
-.rt  
 Pointer to a \fBddi_dma_lim\fR(9S) structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhba_tran\fR\fR
 .ad
 .RS 16n
-.rt  
 Pointer to a \fBscsi_hba_tran\fR(9S) structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhba_flags\fR\fR
 .ad
 .RS 16n
-.rt  
 Flag modifiers. The defined flag values are \fBSCSI_HBA_TRAN_CLONE\fR,
 \fBSCSI_HBA_TRAN_SCB\fR, and \fBSCSI_HBA_TRAN_CDB\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhba_options\fR\fR
 .ad
 .RS 16n
-.rt  
 Optional features provided by the HBA driver for future extensions; must be
 \fINULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhba_dma_attr\fR\fR
 .ad
 .RS 16n
-.rt  
 Pointer to a \fBddi_dma_attr\fR(9S) structure.
 .RE
 
@@ -151,56 +139,46 @@ configuration parameters via \fBddi_prop_get_int\fR(9F), and respect any
 settings for features provided the HBA.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBscsi-options\fR\fR
 .ad
 .RS 26n
-.rt  
 \fBOptional\fR \fBSCSI\fR \fBconfiguration bits\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCSI_OPTIONS_DR\fR\fR
 .ad
 .RS 26n
-.rt  
 If not set, the HBA should not grant Disconnect privileges to target devices.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCSI_OPTIONS_TAG\fR\fR
 .ad
 .RS 26n
-.rt  
 If not set, the HBA should not operate in Command Tagged Queueing mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCSI_OPTIONS_PARITY\fR\fR
 .ad
 .RS 26n
-.rt  
 If not set, the HBA should not operate in parity mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCSI_OPTIONS_QAS\fR\fR
 .ad
 .RS 26n
-.rt  
 If not set, the HBA should not make use of the Quick Arbitration Select
 feature. Consult your Sun hardware documentation to determine whether your
 machine supports QAS.
@@ -208,111 +186,91 @@ machine supports QAS.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCSI_OPTIONS_FAST\fR\fR
 .ad
 .RS 26n
-.rt  
 If not set, the HBA should not operate the bus in FAST SCSI mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCSI_OPTIONS_FAST20\fR\fR
 .ad
 .RS 26n
-.rt  
 If not set, the HBA should not operate the bus in FAST20 SCSI mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCSI_OPTIONS_FAST40\fR\fR
 .ad
 .RS 26n
-.rt  
 If not set, the HBA should not operate the bus in FAST40 SCSI mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCSI_OPTIONS_FAST80\fR\fR
 .ad
 .RS 26n
-.rt  
 If not set, the HBA should not operate the bus in FAST80 SCSI mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCSI_OPTIONS_FAST160\fR\fR
 .ad
 .RS 26n
-.rt  
 If not set, the HBA should not operate the bus in FAST160 SCSI mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCSI_OPTIONS_FAST320\fR\fR
 .ad
 .RS 26n
-.rt  
 If not set, the HBA should not operate the bus in FAST320 SCSI mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCSI_OPTIONS_WIDE\fR\fR
 .ad
 .RS 26n
-.rt  
 If not set, the HBA should not operate the bus in WIDE SCSI mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCSI_OPTIONS_SYNC\fR\fR
 .ad
 .RS 26n
-.rt  
 If not set, the HBA should not operate the bus in synchronous transfer mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBscsi-reset-delay\fR\fR
 .ad
 .RS 26n
-.rt  
 SCSI bus or device reset recovery time, in milliseconds.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBscsi-selection-timeout\fR\fR
 .ad
 .RS 26n
-.rt  
 Default SCSI selection phase timeout value, in milliseconds. Please refer to
 individual HBA man pages for any HBA-specific information
 .RE

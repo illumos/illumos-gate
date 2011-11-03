@@ -28,7 +28,6 @@ set name=pkg.summary value=pkcs11_kms
 set name=info.classification \
     value=org.opensolaris.category.2008:System/Security
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=usr group=sys
 dir path=usr/bin
 dir path=usr/lib

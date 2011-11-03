@@ -1,7 +1,7 @@
 '\" te
 .\" Copyright (c) 2002, Sun Microsystems, Inc. - All Rights Reserved.
-.\" Copyright (c), 1980 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement  specifies the terms and conditions for redistribution. 
-.TH ps 1B "26 May 2006" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.\" Copyright (c), 1980 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement  specifies the terms and conditions for redistribution.
+.TH PS 1B "May 26, 2006"
 .SH NAME
 ps \- display the status of current processes
 .SH SYNOPSIS
@@ -35,56 +35,46 @@ running.
 The state is given by a single letter from the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO\fR\fR
 .ad
 .RS 5n
-.rt  
 Process is running on a processor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS\fR\fR
 .ad
 .RS 5n
-.rt  
 Sleeping. Process is waiting for an event to complete.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBR\fR\fR
 .ad
 .RS 5n
-.rt  
 Runnable. Process is on run queue.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBZ\fR\fR
 .ad
 .RS 5n
-.rt  
 Zombie state. Process terminated and parent not waiting.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT\fR\fR
 .ad
 .RS 5n
-.rt  
 Traced. Process stopped by a signal because parent is tracing it.
 .RE
 
@@ -94,45 +84,37 @@ Traced. Process stopped by a signal because parent is tracing it.
 The following options must all be combined to form the first argument:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 11n
-.rt  
 Includes information about processes owned by others.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 11n
-.rt  
 Displays the command name rather than the command arguments.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 11n
-.rt  
 Displays the environment as well as the arguments to the command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR\fR
 .ad
 .RS 11n
-.rt  
 Displays all processes. Without this option, \fBps\fR only prints interesting
 processes. Processes are deemed to be uninteresting if they are process group
 leaders. This normally eliminates top-level command interpreters and processes
@@ -141,59 +123,49 @@ waiting for users to login on free terminals.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 11n
-.rt  
 Displays a long listing, with fields \fBF\fR, \fBPPID\fR, \fBCP\fR, \fBPRI\fR,
 \fBNI\fR, \fBSZ\fR, \fBRSS\fR, and \fBWCHAN\fR as described below.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 11n
-.rt  
 Produces numerical output for some fields. In a user listing, the \fBUSER\fR
 field is replaced by a \fBUID\fR field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 11n
-.rt  
 Restricts output to running and runnable processes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR\fR
 .ad
 .RS 11n
-.rt  
 Displays accumulated \fBCPU\fR time used by this process and all of its reaped
 children.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fIterm\fR\fR
 .ad
 .RS 11n
-.rt  
 Lists only process data associated with the terminal, \fIterm\fR. Terminal
 identifiers may be specified in one of two forms:  the device's file name (for
 example,  \fBtty04\fR or \fBterm/14\fR ) or, if the device's file name starts
@@ -202,48 +174,40 @@ with  \fBtty\fR, just the digit identifier (for example, \fB04\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
 .RS 11n
-.rt  
 Displays user-oriented output. This includes fields \fBUSER\fR, \fB%CPU\fR,
 \fB%MEM\fR, \fBSZ\fR, \fBRSS\fR, and \fBSTART\fR as described below.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-U\fR\fR
 .ad
 .RS 11n
-.rt  
 Obsolete. This option no longer has any effect. It causes \fBps\fR to exit
 without printing the process listing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 11n
-.rt  
 Displays a version of the output containing virtual memory. This includes
 fields \fBSIZE\fR, \fB%CPU\fR, \fB%MEM\fR, and \fBRSS\fR, described below.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR\fR
 .ad
 .RS 11n
-.rt  
 Uses a wide output format, that is, 132 columns rather than 80. If the option
 letter is repeated, that is, \fB-ww\fR, this option uses arbitrarily wide
 output. This information is used to decide how much of long commands to print.
@@ -253,23 +217,19 @@ user who owns the process.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 11n
-.rt  
 Includes processes with no controlling terminal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInum\fR\fR
 .ad
 .RS 11n
-.rt  
 A process number may be given, in which case the output is restricted to that
 process. This option must be supplied last.
 .RE
@@ -280,124 +240,102 @@ process. This option must be supplied last.
 Fields that are not common to all output formats:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSER\fR\fR
 .ad
 .RS 9n
-.rt  
 Name of the owner of the process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%CPU\fR\fR
 .ad
 .RS 9n
-.rt  
 \fBCPU\fR use of the process. This is a decaying average over up to a minute of
 previous (real) time.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNI\fR\fR
 .ad
 .RS 9n
-.rt  
 Process scheduling increment (see \fBgetpriority\fR(3C) and \fBnice\fR(3UCB)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIZE\fR\fR
 .ad
 .RS 9n
-.rt  
 The total size of the process in virtual memory, including all mapped files and
 devices, in kilobyte units.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSZ\fR\fR
 .ad
 .RS 9n
-.rt  
 Same as \fBSIZE\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSS\fR\fR
 .ad
 .RS 9n
-.rt  
 Real memory (resident set) size of the process, in kilobyte units.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUID\fR\fR
 .ad
 .RS 9n
-.rt  
 Numerical user-ID of process owner.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPPID\fR\fR
 .ad
 .RS 9n
-.rt  
 Numerical \fBID\fR of parent of process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCP\fR\fR
 .ad
 .RS 9n
-.rt  
 Short-term \fBCPU\fR utilization factor (used in scheduling).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRI\fR\fR
 .ad
 .RS 9n
-.rt  
 The priority of the process (higher numbers mean lower priority).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTART\fR\fR
 .ad
 .RS 9n
-.rt  
 The starting time of the process, given in hours, minutes, and seconds. A
 process begun more than 24 hours before the \fBps\fR inquiry is executed is
 given in months and days.
@@ -405,36 +343,30 @@ given in months and days.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWCHAN\fR\fR
 .ad
 .RS 9n
-.rt  
 The address of an event for which the process is sleeping (if blank, the
 process is running).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%MEM\fR\fR
 .ad
 .RS 9n
-.rt  
 The ratio of the process's resident set size to the physical memory on the
 machine, expressed as a percentage.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF\fR\fR
 .ad
 .RS 9n
-.rt  
 Flags (hexadecimal and additive) associated with the process. These flags are
 available for historical purposes; no meaning should be currently ascribed to
 them.
@@ -452,12 +384,10 @@ the user block.
 \fB/dev/tty*\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/passwd\fR\fR
 .ad
 .RS 15n
-.rt  
 \fBUID\fR information supplier
 .RE
 

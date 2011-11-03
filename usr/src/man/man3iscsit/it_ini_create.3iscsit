@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH it_ini_create 3ISCSIT "1 Oct 2008" "SunOS 5.11" "iSCSI Management Library Functions"
+.TH IT_INI_CREATE 3ISCSIT "Oct 1, 2008"
 .SH NAME
 it_ini_create, it_ini_setprop, it_ini_delete, it_ini_free \- create, modify and
 delete iSCSI Initiator Contexts
@@ -36,56 +36,46 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-liscsit\fR [ \fIlibrary\fR\&.
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcfg\fR\fR
 .ad
 .RS 17n
-.rt  
 a pointer t the iSCSI configuration structure
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIini\fR\fR
 .ad
 .RS 17n
-.rt  
 a pointer to the \fBit_ini_t\fR structure representing the initiator context
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIini_node_name\fR\fR
 .ad
 .RS 17n
-.rt  
 the iSCSI node name of the remote initiator
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIproplist\fR\fR
 .ad
 .RS 17n
-.rt  
 a pointer to an \fBnvlist_t\fR containing the initiator properties to be set
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIerrlist\fR\fR
 .ad
 .RS 17n
-.rt  
 an optional pointer to an \fBnvlist_t\fR that will be used to store specific
 errors (if any) when validating initiator properties
 .RE
@@ -123,14 +113,12 @@ Initiator nvlist properties are as follows:
 
 .sp
 .TS
-tab();
-cw(.9i) cw(.95i) cw(3.65i) 
-lw(.9i) lw(.95i) lw(3.65i) 
-.
-\fBnvlist\fR KeyTypeValid Values
+c c c
+l l l .
+\fBnvlist\fR Key	Type	Valid Values
 _
-\fBchapuser\fR\fBstring\fRany string, or \fBnone\fR to remove
-\fBchapsecret\fR\fBstring\fRT{
+\fBchapuser\fR	\fBstring\fR	any string, or \fBnone\fR to remove
+\fBchapsecret\fR	\fBstring\fR	T{
 string of at least 12 characters but not more than 255 characters.  secret will be base64 encoded when stored.
 T}
 .TE
@@ -147,34 +135,28 @@ The \fBit_ini_create()\fR, \fBit_ini_setprop()\fR, and \fBit_ini_delete()\fR
 functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEEXIST\fR\fR
 .ad
 .RS 10n
-.rt  
 The requested initiator context is already configured.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 A parameter or property is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 Resources could not be allocated.
 .RE
 
@@ -186,15 +168,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cfgadm_usb 1M "1 Mar 2007" "SunOS 5.11" "System Administration Commands"
+.TH CFGADM_USB 1M "Mar 1, 2007"
 .SH NAME
 cfgadm_usb \- USB hardware-specific commands for cfgadm
 .SH SYNOPSIS
@@ -20,7 +20,7 @@ cfgadm_usb \- USB hardware-specific commands for cfgadm
 
 .LP
 .nf
-\fB/usr/sbin/cfgadm\fR \fB-v\fR [\fB-a\fR] [\fB-s\fR \fIlisting_option\fR] 
+\fB/usr/sbin/cfgadm\fR \fB-v\fR [\fB-a\fR] [\fB-s\fR \fIlisting_option\fR]
      [\fB-l\fR [\fIap_id\fR | \fIap_type\fR...]]
 .fi
 
@@ -206,7 +206,6 @@ The receptacle states for attachment points at the \fBUSB\fR port have the
 following meanings:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBconnected\fR\fR
 .ad
@@ -218,7 +217,6 @@ port. The device is logically connected to the USB bus.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisconnected\fR\fR
 .ad
@@ -231,7 +229,6 @@ the port. The device has been logically disconnected from the \fBUSB\fR bus
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBempty\fR\fR
 .ad
@@ -246,7 +243,6 @@ The occupant states for devices at \fBUSB\fR port attachment points at the
 \fBUSB\fR port have the following meanings:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBconfigured\fR\fR
 .ad
@@ -257,7 +253,6 @@ The \fBUSB\fR device at the \fBUSB\fR port is configured and usable by Solaris.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunconfigured\fR\fR
 .ad
@@ -273,7 +268,6 @@ use with Solaris, for example, having no driver or a device problem.
 The attachment point conditions are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBok\fR\fB\fR\fR
 .ad
@@ -284,7 +278,6 @@ Normal state - ready for use.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfailing\fR\fR
 .ad
@@ -295,7 +288,6 @@ Not used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfailed\fR\fR
 .ad
@@ -306,7 +298,6 @@ Not used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunusable\fR\fR
 .ad
@@ -323,7 +314,6 @@ instructions for clearing this attachment point condition.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunknown\fR\fR
 .ad
@@ -362,7 +352,6 @@ All other options have the same meaning as defined in \fBcfgadm\fR(1M).
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIfunction\fR\fR
 .ad
@@ -372,7 +361,6 @@ The following generic commands are defined for the \fBUSB\fR hardware specific
 library. The following configuration state change operations are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBconfigure\fR\fR
 .ad
@@ -388,7 +376,6 @@ this command, the device is ready for use under Solaris.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisconnect\fR\fR
 .ad
@@ -405,7 +392,6 @@ can be found and there are no problems enumerating and configuring the device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunconfigure\fR\fR
 .ad
@@ -422,7 +408,6 @@ condition, as it physically hotplugging the device on the port.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
@@ -433,7 +418,6 @@ Not supported.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fIap_id\fR\fR
 .ad
@@ -445,7 +429,6 @@ Not supported.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR[\fBv\fR]\fR
 .ad
@@ -492,7 +475,6 @@ See the Universal Serial Bus specification for a description of these fields.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIhardware_options\fR\fR
 .ad
@@ -505,7 +487,6 @@ of the options available.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIlisting_options\fR\fR
 .ad
@@ -517,7 +498,6 @@ sub-option. See \fBcfgadm\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR \fIhardware_function\fR\fR
 .ad
@@ -526,7 +506,6 @@ sub-option. See \fBcfgadm\fR(1M).
 The following hardware-specific functions are defined:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBusb_config\fR \fB-o\fR \fBconfig=\fR\fIn\fR\fR
 .ad
@@ -551,7 +530,6 @@ to their previous state and an error message is issued.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBusb_reset\fR\fR
 .ad
@@ -685,7 +663,7 @@ The following command lists the status of a port with no device plugged in:
 .nf
 example# \fBcfgadm -l usb0/1.3\fR
 Ap_Id           Type         Receptacle   Occupant     Condition
-usb0/1.3        unknown      empty        unconfigured ok       
+usb0/1.3        unknown      empty        unconfigured ok
 .fi
 .in -2
 .sp
@@ -746,7 +724,7 @@ attached to \fBusb0/1.3\fR:
 .nf
 example# \fBcfgadm -c disconnect usb0/1.3\fR
 Disconnect the device: /devices/pci@0,0/pci8086,7112@7,2/hub@2:2.3
-This operation suspends activity on the USB device 
+This operation suspends activity on the USB device
 Continue (yes/no)?
 
 Enter:
@@ -755,7 +733,7 @@ Enter:
 
 example# \fBcfgadm -l usb0/1.3\fR
 Ap_Id         Type         Receptacle     Occupant        Condition
-usb0/1.3      unknown      disconnected   unconfigured    ok    
+usb0/1.3      unknown      disconnected   unconfigured    ok
 .fi
 .in -2
 .sp
@@ -797,7 +775,7 @@ The following command resets a \fBUSB\fR device:
 .nf
 example# \fBcfgadm -x usb_reset usb0/1.3\fR
 Reset the device: /devices/pci@0,0/pci8086,7112@7,2/hub@2:2.3
-This operation suspends activity on the USB device 
+This operation suspends activity on the USB device
 Continue (yes/no)?
 
 Enter:
@@ -862,7 +840,7 @@ mega"  Product:"USB Zip 250"  NConfigs:1  Config:0 : Default
 .nf
 example# \fBcfgadm -l -s "cols=ap_id:info" usb0/1.5\fR
 Ap_Id                         Information
-usb0/1.5                      Mfg:"Iomega"  Product:"USB Zip 250"  
+usb0/1.5                      Mfg:"Iomega"  Product:"USB Zip 250"
 NConfigs:1  Config:0 : Default
 .fi
 .in -2
@@ -879,19 +857,19 @@ on the system:
 .in +2
 .nf
 example# \fBcfgadm -l -s "select=class(usb),cols=ap_id:info"\fR
-Ap_Id                         Information 
-usb0/1                        Mfg:<undefined>  Product:<undefined>  
+Ap_Id                         Information
+usb0/1                        Mfg:<undefined>  Product:<undefined>
 NConfigs:1  Config:0 <no cfg str descr>
-usb0/2             
-usb0/1.1                      Mfg:<undefined>  Product:<undefined>  
+usb0/2
+usb0/1.1                      Mfg:<undefined>  Product:<undefined>
 NConfigs:1  Config:0 <no cfg str descr>
-usb0/1.2         
-usb0/1.3         
-usb0/1.4                      Mfg:"Wizard"  Product:"Modem/ISDN"  
+usb0/1.2
+usb0/1.3
+usb0/1.4                      Mfg:"Wizard"  Product:"Modem/ISDN"
 NConfigs:3  Config:1 : V.90 Analog Modem
-usb0/1.5                      Mfg:"Iomega"  Product:"USB Zip 250"  
+usb0/1.5                      Mfg:"Iomega"  Product:"USB Zip 250"
 NConfigs:1  Config:0 : Default
-usb0/1.6                      Mfg:"SOLID YEAR"  Product:"SOLID YEAR 
+usb0/1.6                      Mfg:"SOLID YEAR"  Product:"SOLID YEAR
 USB"NConfigs:1  Config:0 <no cfg str descr>
 usb0/1.7
 .fi
@@ -908,15 +886,15 @@ information about those devices.
 .in +2
 .nf
 example# \fBcfgadm -l -s "select=class(usb),cols=ap_id:info" | grep Mfg\fR
-usb0/1                        Mfg:<undefined>  Product:<undefined>  
+usb0/1                        Mfg:<undefined>  Product:<undefined>
 NConfigs:1  Config:0 <no cfg str descr>
-usb0/1.1                      Mfg:<undefined>  Product:<undefined>  
+usb0/1.1                      Mfg:<undefined>  Product:<undefined>
 NConfigs:1  Config:0 <no cfg str descr>
-usb0/1.4                      Mfg:"Wizard"  Product:"Modem/ISDN"  
+usb0/1.4                      Mfg:"Wizard"  Product:"Modem/ISDN"
 NConfigs:3  Config:1 : V.90 Analog Modem
-usb0/1.5                      Mfg:"Iomega"  Product:"USB Zip 250"  
+usb0/1.5                      Mfg:"Iomega"  Product:"USB Zip 250"
 NConfigs:1  Config:0 : Default
-usb0/1.6                      Mfg:"SOLID YEAR"  Product:"SOLID YEAR USB" 
+usb0/1.6                      Mfg:"SOLID YEAR"  Product:"SOLID YEAR USB"
 Config:0 <no cfg str descr>
 .fi
 .in -2
@@ -939,7 +917,7 @@ are \fB0\fR, \fB1\fR, and \fB2\fR (\fB0\fR to (\fIN\fR\fBConfigs-1\fR)).
 .nf
 example# \fBcfgadm -l -s "cols=ap_id:info" usb0/1.4\fR
 Ap_Id                         Information
-usb0/1.4                      Mfg:"Wizard"  Product:"Modem/ISDN"  
+usb0/1.4                      Mfg:"Wizard"  Product:"Modem/ISDN"
 NConfigs:3  Config:1 V.90 Analog Modem"
 .fi
 .in -2
@@ -960,7 +938,7 @@ example# \fBcfgadm -o config=2 -x usb_config usb0/1.4\fR
 Setting the device: /devices/pci@1f,2000/usb@1/device@3
 to USB configuration 2
 This operation suspends activity on the USB device
-Continue (yes/no)? 
+Continue (yes/no)?
 
 Enter:
 
@@ -981,7 +959,6 @@ field.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/cfgadm/usb.so.1\fR\fR
 .ad

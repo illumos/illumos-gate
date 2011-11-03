@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* lpusers [-q priority-level] -u (user-list | "")
    lpusers -d priority-level
    lpusers -l
@@ -60,6 +58,7 @@ main(int argc, char *argv[])
 	list = FALSE, limit = -1, deflt = -1;
     int fd;
     char *userlist = 0, *user, **users, *p;
+    char stroptsw[] = "-X";
     short status;
     struct user_priority *ppri_tbl, *ld_priority_file();
     extern char *optarg;
@@ -127,12 +126,13 @@ usage:
 	    userlist = optarg;
 	    break;
 	case '?':
-	    if (optopt == '?') goto usage;
-	    (p = "-X")[1] = optopt;
+	    if (optopt == '?')
+		    goto usage;
+	    stroptsw[1] = optopt;
 	    if (strchr("ldqu", optopt))
-		LP_ERRMSG1(ERROR, E_LP_OPTARG, p);
+		LP_ERRMSG1(ERROR, E_LP_OPTARG, stroptsw);
 	    else
-		LP_ERRMSG1(ERROR, E_LP_OPTION, p);
+		LP_ERRMSG1(ERROR, E_LP_OPTION, stroptsw);
 	    exit(1);
 	}
 

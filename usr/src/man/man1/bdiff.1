@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH bdiff 1 "14 Sep 1992" "SunOS 5.11" "User Commands"
+.TH BDIFF 1 "Sep 14, 1992"
 .SH NAME
 bdiff \- big diff
 .SH SYNOPSIS
@@ -36,12 +36,10 @@ file differences.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIn\fR \fR
 .ad
 .RS 7n
-.rt  
 The number of line segments. The value of \fIn\fR is 3500 by default. If the
 optional third argument is given and it is numeric, it is used as the value for
 \fIn\fR. This is useful in those cases in which 3500-line segments are too
@@ -50,12 +48,10 @@ large for \fBdiff\fR, causing it to fail.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fR
 .ad
 .RS 7n
-.rt  
 Specifies that no diagnostics are to be printed by \fBbdiff\fR (silent option).
 Note:  However, this does not suppress possible diagnostic messages from
 \fBdiff\fR, which \fBbdiff\fR calls.
@@ -78,13 +74,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIenabled
+CSI	enabled
 .TE
 
 .SH SEE ALSO

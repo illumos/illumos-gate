@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH tnchkdb 1M "20 Jul 2007" "SunOS 5.11" "System Administration Commands"
+.TH TNCHKDB 1M "Jul 20, 2007"
 .SH NAME
 tnchkdb \- check file syntax of trusted network databases
 .SH SYNOPSIS
@@ -61,36 +61,30 @@ names in \fBtnrhdb\fR are not validated.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR [ \fIpath\fR ]\fR
 .ad
 .RS 15n
-.rt  
 Check \fIpath\fR for proper \fBtnrhdb\fR syntax. If \fIpath\fR is not
 specified, then check \fB/etc/security/tsol/tnrhdb\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR [ \fIpath\fR ]\fR
 .ad
 .RS 15n
-.rt  
 Check \fIpath\fR for proper \fBtnrhtp\fR syntax. If \fIpath\fR is not
 specified, then check \fB/etc/security/tsol/tnrhtp\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR [ \fIpath\fR ]\fR
 .ad
 .RS 15n
-.rt  
 Check \fIpath\fR for proper \fBtnzonecfg\fR syntax. If \fIpath\fR is not
 specified, then check \fB/etc/security/tsol/tnzonecfg\fR.
 .RE
@@ -122,7 +116,6 @@ checking /etc/security/tsol/tnzonecfg ...
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/security/tsol/tnrhdb\fR\fR
 .ad
@@ -133,7 +126,6 @@ Trusted network remote-host database
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/security/tsol/tnrhtp\fR\fR
 .ad
@@ -144,7 +136,6 @@ Trusted network remote-host templates
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/security/tsol/tnzonecfg\fR\fR
 .ad
@@ -161,13 +152,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

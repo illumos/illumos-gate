@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mr_sas 7D "28 May 2009" "SunOS 5.11" "Devices"
+.TH MR_SAS 7D "May 28, 2009"
 .SH NAME
 mr_sas \- LSI MegaRAID SAS2.0 Controller HBA driver
 .SH DESCRIPTION
@@ -107,45 +107,37 @@ that SAS and SATA drives can not be configured into the same virtual disk.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/mr_sas\fR\fR
 .ad
 .RS 30n
-.rt  
 32-bit x86 ELF kernel module
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/amd64/mr_sas\fR\fR
 .ad
 .RS 30n
-.rt  
 64-bit kernel module x86 ELF kernel module
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/sparcv9/mr_sas\fR\fR
 .ad
 .RS 30n
-.rt  
 64-bit SPARC ELF kernel module
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/mr_sas.conf\fR\fR
 .ad
 .RS 30n
-.rt  
 Driver configuration file containing one user-configurable option
 .RE
 
@@ -157,15 +149,14 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) |lw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+l | l
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureSPARC, x86
+Architecture	SPARC, x86
 _
-Interface StabilityUncommitted
+Interface Stability	Uncommitted
 .TE
 
 .SH SEE ALSO

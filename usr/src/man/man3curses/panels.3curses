@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH panels 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.TH PANELS 3CURSES "Dec 31, 1996"
 .SH NAME
 panels \- character based panels package
 .SH SYNOPSIS
@@ -43,26 +43,24 @@ page on which it is described.
 
 .sp
 .TS
-tab();
-cw(2.75i) cw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-panels Routine NameManual Page Name
-bottom_panel\fBpanel_top\fR(3CURSES)
-del_panel\fBpanel_new\fR(3CURSES)
-hide_panel\fBpanel_show\fR(3CURSES)
-move_panel\fBpanel_move\fR(3CURSES)
-new_panel\fBpanel_new\fR(3CURSES)
-panel_above\fBpanel_above\fR(3CURSES)
-panel_below\fBpanel_above\fR(3CURSES)
-panel_hidden\fBpanel_show\fR(3CURSES)
-panel_userptr\fBpanel_userptr\fR(3CURSES)
-panel_window\fBpanel_window\fR(3CURSES)
-replace_panel\fBpanel_window\fR(3CURSES)
-set_panel_userptr\fBpanel_userptr\fR(3CURSES)
-show_panel\fBpanel_show\fR(3CURSES)
-top_panel\fBpanel_top\fR(3CURSES)
-update_panels\fBpanel_update\fR(3CURSES)
+c c
+l l .
+panels Routine Name	Manual Page Name
+bottom_panel	\fBpanel_top\fR(3CURSES)
+del_panel	\fBpanel_new\fR(3CURSES)
+hide_panel	\fBpanel_show\fR(3CURSES)
+move_panel	\fBpanel_move\fR(3CURSES)
+new_panel	\fBpanel_new\fR(3CURSES)
+panel_above	\fBpanel_above\fR(3CURSES)
+panel_below	\fBpanel_above\fR(3CURSES)
+panel_hidden	\fBpanel_show\fR(3CURSES)
+panel_userptr	\fBpanel_userptr\fR(3CURSES)
+panel_window	\fBpanel_window\fR(3CURSES)
+replace_panel	\fBpanel_window\fR(3CURSES)
+set_panel_userptr	\fBpanel_userptr\fR(3CURSES)
+show_panel	\fBpanel_show\fR(3CURSES)
+top_panel	\fBpanel_top\fR(3CURSES)
+update_panels	\fBpanel_update\fR(3CURSES)
 .TE
 
 .SH RETURN VALUES
@@ -79,13 +77,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelUnsafe
+MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO

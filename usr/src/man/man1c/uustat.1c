@@ -1,19 +1,19 @@
 '\" te
 .\"  Copyright 1989 AT&T  Copyright (c) 1995, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH uustat 1C "28 Mar 1995" "SunOS 5.11" "Communication Commands"
+.TH UUSTAT 1C "Mar 28, 1995"
 .SH NAME
 uustat \- uucp status inquiry and job control
 .SH SYNOPSIS
 .LP
 .nf
-\fBuustat\fR 
+\fBuustat\fR
      [ [\fB-m\fR] | [\fB-p\fR] | [\fB-q\fR] | [\fB-k\fR \fIjobid\fR [\fB-n\fR]] | [\fB-r\fR \fIjobid\fR [\fB-n\fR]]]
 .fi
 
@@ -60,35 +60,29 @@ These options obtain general status of, or cancel, previously  specified
 \fBuucp\fR commands:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 11n
-.rt  
 Lists all jobs in queue.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-j\fR\fR
 .ad
 .RS 11n
-.rt  
 Lists the total number of jobs displayed. The \fB-j\fR option can be used in
 conjunction with the \fB-a\fR or the \fB-s\fR option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR\fIjobid\fR\fR
 .ad
 .RS 11n
-.rt  
 Kills the \fBuucp\fR request whose job identification is \fIjobid\fR. The
 killed \fBuucp\fR request must belong to the user  issuing the \fBuustat\fR
 command unless the user is the super-user or uucp administrator. If the job is
@@ -98,47 +92,39 @@ user.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
 .RS 11n
-.rt  
 Reports the status of accessibility of all machines.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 11n
-.rt  
 Suppresses all standard output, but not standard error. The \fB-n\fR option is
 used in conjunction with the \fB-k\fR and \fB-r\fR options.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 11n
-.rt  
 Executes the command \fBps\fR \fB-flp\fR for all the process-ids that are in
 the lock files.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
 .RS 11n
-.rt  
 Lists the jobs queued for each machine. If a status file exists for the
 machine, its date, time and status information are reported. In addition, if a
 number appears in parentheses next to the number of \fBC\fR or \fBX\fR files,
@@ -165,12 +151,10 @@ previous interaction with the system followed by the status of the interaction.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fIjobid\fR\fR
 .ad
 .RS 11n
-.rt  
 Rejuvenates \fIjobid\fR. The files associated with \fIjobid\fR are touched so
 that  their modification time is set to the current time. This prevents the
 cleanup daemon from deleting the job until the jobs' modification time reaches
@@ -185,12 +169,10 @@ average transfer rates or average queue times. The \fB-c\fR and \fB-d\fR
 options can only be used in conjunction with the \fB-t\fR option:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fIsystem\fR\fR
 .ad
 .RS 12n
-.rt  
 Reports the average transfer rate or average queue time for the past 60 minutes
 for the remote \fIsystem\fR. The following parameters can only be used with
 this option:
@@ -198,12 +180,10 @@ this option:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 12n
-.rt  
 Average queue time is calculated when the \fB-c\fR parameter is specified and
 average transfer rate when \fB-c\fR is not specified. For example, the command:
 .sp
@@ -239,12 +219,10 @@ average transfer rate with eagle for last 50 minutes:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fInumber\fR\fR
 .ad
 .RS 12n
-.rt  
 \fInumber\fR is specified in minutes. Used to override the 60 minute default
 used for calculations. These calculations are based on information contained in
 the optional performance log and therefore may not be available. Calculations
@@ -261,23 +239,19 @@ conjunction with the \fB-s\fR option to list the total number of jobs
 displayed:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fIsystem\fR\fR
 .ad
 .RS 12n
-.rt  
 Reports the status of all \fBuucp\fR requests for remote system \fIsystem.\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fIuser\fR\fR
 .ad
 .RS 12n
-.rt  
 Reports the status of all \fBuucp\fR requests issued by \fIuser\fR.
 .RE
 
@@ -308,54 +282,44 @@ internal name (for example, \fBD.3b2alce4924\fR) that is created for data files
 associated with remote executions (\fBrmail\fR in this example).
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR\fIqric\fR\fR
 .ad
 .RS 10n
-.rt  
 Reports the job state:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBq\fR\fR
 .ad
 .RS 5n
-.rt  
 for queued jobs
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBr\fR\fR
 .ad
 .RS 5n
-.rt  
 for running jobs
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBi\fR\fR
 .ad
 .RS 5n
-.rt  
 for interrupted jobs
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBc\fR\fR
 .ad
 .RS 5n
-.rt  
 for completed jobs
 .RE
 
@@ -396,57 +360,47 @@ that affect the execution of \fBuustat\fR: \fBLANG\fR, \fBLC_ALL\fR,
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/spool/uucp/\fR*\fR
 .ad
 .RS 28n
-.rt  
 spool directories
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/uucp/.Admin/account\fR\fR
 .ad
 .RS 28n
-.rt  
 accounting log
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/uucp/.Admin/perflog\fR\fR
 .ad
 .RS 28n
-.rt  
 performance log
 .RE
 
@@ -458,13 +412,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPE ATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE 	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

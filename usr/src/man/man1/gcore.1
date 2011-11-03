@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH gcore 1 "19 Jun 2006" "SunOS 5.11" "User Commands"
+.TH GCORE 1 "Jun 19, 2006"
 .SH NAME
 gcore \- get core images of running processes
 .SH SYNOPSIS
@@ -24,12 +24,10 @@ is \fIprocess-id\fR is \fBcore.\fR\fIprocess-id\fR.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIcontent\fR\fR
 .ad
 .RS 15n
-.rt  
 Produces core image files with the specified content. The content description
 uses the same tokens as in \fBcoreadm\fR(1M). The \fB-c\fR option does not
 apply to cores produced due to the \fB-p\fR or \fB-g\fR flags.
@@ -37,23 +35,19 @@ apply to cores produced due to the \fB-p\fR or \fB-g\fR flags.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
 .RS 15n
-.rt  
 Force. Grabs the target process even if another process has control.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR\fR
 .ad
 .RS 15n
-.rt  
 Produces core image files in the global core file repository with the global
 content as configured by \fBcoreadm\fR(1M). The command fails if the user does
 not have permissions to the global core file repository.
@@ -61,12 +55,10 @@ not have permissions to the global core file repository.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-o\fR \fIfilename\fR\fR
 .ad
 .RS 15n
-.rt  
 Substitutes \fIfilename\fR in place of \fBcore\fR as the first part of the name
 of the core image files. \fIfilename\fR can contain the same tokens to be
 expanded as the paths in \fBcoreadm\fR(1M).
@@ -74,12 +66,10 @@ expanded as the paths in \fBcoreadm\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 15n
-.rt  
 Produces a core image file in the process-specific location with the
 process-specific content for each process as configured by \fBcoreadm\fR(1M).
 The command fails if the user does not have permissions to the per-process core
@@ -92,12 +82,10 @@ file repository.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprocess-id\fR\fR
 .ad
 .RS 14n
-.rt  
 process \fBID\fR
 .RE
 
@@ -115,35 +103,29 @@ at the moment of application of the \fBproc\fR tool in question.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 On success.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnon-zero\fR
 .ad
 .RS 12n
-.rt  
 On failure, such as non-existent process \fBID\fR.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fBcore.\fR\fB\fIprocess-id\fR\fR\fR
 .ad
 .RS 19n
-.rt  
 core images
 .RE
 
@@ -155,13 +137,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

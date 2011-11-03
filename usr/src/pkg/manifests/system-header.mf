@@ -20,6 +20,7 @@
 #
 
 #
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
@@ -172,7 +173,7 @@ $(sparc_ONLY)dir path=usr/platform/sun4v group=sys
 $(sparc_ONLY)dir path=usr/platform/sun4v/include
 $(sparc_ONLY)dir path=usr/platform/sun4v/include/sys
 $(sparc_ONLY)dir path=usr/platform/sun4v/include/vm
-dir path=usr/share group=sys
+dir path=usr/share
 dir path=usr/share/man
 dir path=usr/share/man/man3head
 dir path=usr/share/man/man4
@@ -1615,6 +1616,7 @@ file path=usr/include/syslog.h
 file path=usr/include/tar.h
 file path=usr/include/tcpd.h
 file path=usr/include/term.h
+file path=usr/include/termcap.h
 file path=usr/include/termio.h
 file path=usr/include/termios.h
 file path=usr/include/thread.h

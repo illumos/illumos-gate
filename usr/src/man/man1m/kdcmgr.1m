@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing. See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH kdcmgr 1M "19 Sep 2007" "SunOS 5.11" "System Administration Commands"
+.TH KDCMGR 1M "Sep 19, 2007"
 .SH NAME
 kdcmgr \- set up a Kerberos Key Distribution Center (KDC)
 .SH SYNOPSIS
@@ -92,7 +92,6 @@ lowercase letters
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIadmprincipal\fR\fR
 .ad
@@ -110,7 +109,6 @@ the output of \fBlogname\fR(1) appended by \fB/admin\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fIenctype\fR\fR
 .ad
@@ -132,7 +130,6 @@ The default encryption type is \fBaes128-cts-hmac-sha1-96\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
@@ -143,7 +140,6 @@ Displays usage information for \fBkdcmgr\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIpwfile\fR\fR
 .ad
@@ -159,7 +155,6 @@ system. Once the KDC has been configured, you should remove \fIpwfile\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIrealm\fR\fR
 .ad
@@ -180,7 +175,6 @@ default realm name.
 The following subcommands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcreate\fR [ \fImaster\fR ]\fR
 .ad
@@ -194,7 +188,6 @@ Creates a KDC. If no option is specified, an attempt to create a master KDC is
 made.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcreate\fR [ \fImaster\fR ]\fR
 .ad
@@ -206,7 +199,6 @@ Create a master KDC. Upon successful configuration the \fBkrb5kdc\fR(1M) and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcreate\fR [ \fB-m\fR \fImasterkdc\fR ] slave\fR
 .ad
@@ -224,7 +216,6 @@ prompted for a master KDC host name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdestroy\fR\fR
 .ad
@@ -236,7 +227,6 @@ server. A confirmation is required before these files are deleted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstatus\fR\fR
 .ad
@@ -314,7 +304,6 @@ correct password for the master key is also required.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/krb5.conf\fR\fR
 .ad
@@ -325,7 +314,6 @@ Main Kerberos configuration file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/kdc.conf\fR\fR
 .ad
@@ -336,7 +324,6 @@ KDC configuration, used by both master and slave servers.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/krb5.keytab\fR\fR
 .ad
@@ -347,7 +334,6 @@ Default location of the local host's service keys.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/kadm5.acl\fR\fR
 .ad
@@ -358,7 +344,6 @@ Kerberos administrative access control list (ACL).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/kadm5.keytab\fR\fR
 .ad
@@ -369,7 +354,6 @@ Service keys specific to \fBkadmind\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/krb5/principal\fR\fR
 .ad
@@ -380,7 +364,6 @@ Kerberos principal database.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/krb5/principal.kadm5\fR\fR
 .ad
@@ -391,7 +374,6 @@ Kerberos policy database.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/kpropd.acl\fR\fR
 .ad
@@ -408,13 +390,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below
+Interface Stability	See below
 .TE
 
 .sp

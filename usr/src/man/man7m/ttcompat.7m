@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ttcompat 7M "2 Oct 2001" "SunOS 5.11" "STREAMS Modules"
+.TH TTCOMPAT 7M "Oct 2, 2001"
 .SH NAME
 ttcompat \- V7, 4BSD and XENIX STREAMS compatibility module
 .SH SYNOPSIS
@@ -86,33 +86,32 @@ structure. Other delay  mappings are  performed as follows:
 
 .sp
 .TS
-tab() box;
-cw(0i) |cw(5.5i) 
-lw(0i) |lw(5.5i) 
-.
-sg_flagsc_oflag
+box;
+c | c
+l | l .
+sg_flags	c_oflag
 _
-BS1BS1
+BS1	BS1
 _
-FF1VT1
+FF1	VT1
 _
-CR1CR2
+CR1	CR2
 _
-CR2CR3
+CR2	CR3
 _
-CR3CR0 (not supported)
+CR3	CR0 (not supported)
 _
-TAB1TAB1
+TAB1	TAB1
 _
-TAB2TAB2
+TAB2	TAB2
 _
-XTABSTAB3
+XTABS	TAB3
 _
-NL1ONLRET|CR1
+NL1	ONLRET|CR1
 _
-NL2NL1
+NL2	NL1
 _
-NL3NL0 (not supported)
+NL3	NL0 (not supported)
 .TE
 
 .sp
@@ -125,12 +124,10 @@ parity of characters sent to the terminal and accepted from the terminal, as
 follows:
 .sp
 .ne 2
-.mk
 .na
 \fB0 (neither EVENP nor ODDP)\fR
 .ad
 .RS 30n
-.rt  
 Parity is not to be generated on output or checked on input. The  character
 size is set to \fBCS8\fR and the \fBPARENB\fR flag is cleared in the
 \fBc_cflag\fR field of the \fBtermios\fR structure.
@@ -138,12 +135,10 @@ size is set to \fBCS8\fR and the \fBPARENB\fR flag is cleared in the
 
 .sp
 .ne 2
-.mk
 .na
 \fBEVENP\fR
 .ad
 .RS 30n
-.rt  
 Even parity characters are to be generated on output and accepted on input. The
 INPCK  flag is set in the \fBc_iflag\fR field of the \fBtermios\fR structure,
 the character size is set to \fBCS7\fR and the \fBPARENB\fR flag is set in the
@@ -152,12 +147,10 @@ the character size is set to \fBCS7\fR and the \fBPARENB\fR flag is set in the
 
 .sp
 .ne 2
-.mk
 .na
 \fBODDP\fR
 .ad
 .RS 30n
-.rt  
 Odd parity characters are to be generated on output and accepted on input. The
 \fBINPCK\fR flag is set in the \fBc_iflag\fR, the character size is set to
 \fBCS7\fR and the \fBPARENB\fR and \fBPARODD\fR flags are set in the
@@ -166,12 +159,10 @@ Odd parity characters are to be generated on output and accepted on input. The
 
 .sp
 .ne 2
-.mk
 .na
 \fBEVENP|ODDP or ANYP\fR
 .ad
 .RS 30n
-.rt  
 Even parity  characters are to be generated  on output and characters of
 either parity are to be  accepted on input. The \fBINPCK\fR flag is cleared in
 the \fBc_iflag\fR field, the character size is set to \fBCS7\fR and the
@@ -215,17 +206,16 @@ Other flags are directly mapped to flags in the \fBtermios\fR structure:
 
 .sp
 .TS
-tab() box;
-cw(0i) |cw(5.5i) 
-lw(0i) |lw(5.5i) 
-.
-sg_flagsFlags in termios structure
+box;
+c | c
+l | l .
+sg_flags	Flags in termios structure
 _
-CBREAKComplement of ICANON in c_lflag field
+CBREAK	Complement of ICANON in c_lflag field
 _
-ECHOECHO in c_lflag field
+ECHO	ECHO in c_lflag field
 _
-TANDEMIXOFF in c_iflag field
+TANDEM	IXOFF in c_iflag field
 .TE
 
 .sp
@@ -275,39 +265,38 @@ interface. Most of these flags are directly mapped to flags in the
 
 .sp
 .TS
-tab() box;
-cw(0i) |cw(5.5i) 
-lw(0i) |lw(5.5i) 
-.
-Local flagsFlags in termios structure
+box;
+c | c
+l | l .
+Local flags	Flags in termios structure
 _
-LCRTBSNot supported 
+LCRTBS	Not supported
 _
-LPRTERAECHOPRT in the c_lflag field
+LPRTERA	ECHOPRT in the c_lflag field
 _
-LCRTERAECHOE in the c_lflag field
+LCRTERA	ECHOE in the c_lflag field
 _
-LTILDENot supported
+LTILDE	Not supported
 _
-LMDMBUFNot supported
+LMDMBUF	Not supported
 _
-LTOSTOPTOSTOP in the c_lflag field
+LTOSTOP	TOSTOP in the c_lflag field
 _
-LFLUSHOFLUSHO in the c_lflag field
+LFLUSHO	FLUSHO in the c_lflag field
 _
-LNOHANGCLOCAL in the c_cflag field
+LNOHANG	CLOCAL in the c_cflag field
 _
-LCRTKILECHOKE in the c_lflag field
+LCRTKIL	ECHOKE in the c_lflag field
 _
-LPASS8CS8 in the c_cflag field
+LPASS8	CS8 in the c_cflag field
 _
-LCTLECHCTLECH in the c_lflag field 
+LCTLECH	CTLECH in the c_lflag field
 _
-LPENDINPENDIN in the c_lflag field
+LPENDIN	PENDIN in the c_lflag field
 _
-LDECCTQComplement of IXANY in the c_iflag field
+LDECCTQ	Complement of IXANY in the c_iflag field
 _
-LNOFLSHNOFLSH in the c_lflag field
+LNOFLSH	NOFLSH in the c_lflag field
 .TE
 
 .sp
@@ -342,23 +331,22 @@ The characters are mapped to members of the \fBc_cc\fR field of the
 
 .sp
 .TS
-tab() box;
-cw(0i) |cw(5.5i) 
-lw(0i) |lw(5.5i) 
-.
-ltcharsc_cc index
+box;
+c | c
+l | l .
+ltchars	c_cc index
 _
-t_suspc VSUS 
+t_suspc 	VSUS
 _
-t_dsuspcVDSUSP
+t_dsuspc	VDSUSP
 _
-t_rprntcVREPRINT
+t_rprntc	VREPRINT
 _
-t_flushcVDISCARD
+t_flushc	VDISCARD
 _
-t_werascVWERASE
+t_werasc	VWERASE
 _
-t_lnextcVLNEXT
+t_lnextc	VLNEXT
 .TE
 
 .SH IOCTLS
@@ -368,12 +356,10 @@ t_lnextcVLNEXT
 passed to the module below.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCGETP\fR \fR
 .ad
 .RS 14n
-.rt  
 The argument is a pointer to an \fBsgttyb\fR structure. The current  terminal
 state is fetched; the  appropriate characters in  the terminal  state are
 stored  in that structure, as are the input and output speeds. If the speed is
@@ -384,35 +370,29 @@ stored in the structure.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCEXCL\fR \fR
 .ad
 .RS 14n
-.rt  
 Set ``exclusive-use'' mode; no further opens are  permitted until the file has
 been closed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCNXCL\fR \fR
 .ad
 .RS 14n
-.rt  
 Turn off ``exclusive-use'' mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCSETP\fR \fR
 .ad
 .RS 14n
-.rt  
 The argument is a pointer to an \fBsgttyb\fR structure. The appropriate
 characters and input and output speeds in the terminal state are set from the
 values in that structure, and the flags in the terminal state are set to match
@@ -428,12 +408,10 @@ specified is set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCSETN\fR \fR
 .ad
 .RS 14n
-.rt  
 The argument is a pointer to an \fBsgttyb\fR structure. The terminal state is
 changed as  \fBTIOCSETP\fR would change it, but a \fBTCSETS\fR \fBioctl\fR is
 used, so that the interface neither delays nor discards input.
@@ -441,24 +419,20 @@ used, so that the interface neither delays nor discards input.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCHPCL\fR \fR
 .ad
 .RS 14n
-.rt  
 The argument is ignored. The \fBHUPCL\fR flag is set in the \fBc_cflag\fR word
 of the terminal state.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCFLUSH\fR \fR
 .ad
 .RS 14n
-.rt  
 The argument is a pointer to an \fBint\fR variable. If its value is zero, all
 characters waiting in input or output queues are flushed. Otherwise, the value
 of the \fBint\fR is treated as the logical \fBOR\fR of the \fBFREAD\fR and
@@ -469,82 +443,68 @@ set, all characters waiting in input queues are flushed, and if the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCSBRK\fR \fR
 .ad
 .RS 14n
-.rt  
 The argument is ignored. The break bit is set for the device. (This  is not
 supported  by \fBttcompat\fR. The underlying driver must support TIOCSBRK.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCCBRK\fR \fR
 .ad
 .RS 14n
-.rt  
 The argument is ignored. The break bit is cleared for the device. (This is not
 supported by \fBttcompat\fR. The underlying driver must support TIOCCBRK.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCSDTR\fR \fR
 .ad
 .RS 14n
-.rt  
 The argument is ignored. The Data Terminal Ready bit is set for the device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCCDTR\fR \fR
 .ad
 .RS 14n
-.rt  
 The argument is ignored. The Data Terminal Ready bit is cleared for the device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCSTOP\fR \fR
 .ad
 .RS 14n
-.rt  
 The argument is ignored. Output is stopped as if the \fBSTOP\fR character had
 been typed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCSTART\fR \fR
 .ad
 .RS 14n
-.rt  
 The argument is ignored. Output is restarted as if the \fBSTART\fR character
 had been typed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCGETC\fR \fR
 .ad
 .RS 14n
-.rt  
 The argument is a pointer to a \fBtchars\fR structure. The current terminal
 state is fetched, and the appropriate characters in the terminal state are
 stored in that structure.
@@ -552,12 +512,10 @@ stored in that structure.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCSETC\fR \fR
 .ad
 .RS 14n
-.rt  
 The argument is a pointer to a \fBtchars\fR structure. The values of the
 appropriate characters in the terminal state are set from the characters in
 that structure.
@@ -565,12 +523,10 @@ that structure.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCLGET\fR \fR
 .ad
 .RS 14n
-.rt  
 The argument is a pointer to an \fBint\fR. The current terminal state is
 fetched, and the values of the local flags are derived from the flags in the
 terminal state and stored in the \fBint\fR pointed to by the argument.
@@ -578,12 +534,10 @@ terminal state and stored in the \fBint\fR pointed to by the argument.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCLBIS\fR \fR
 .ad
 .RS 14n
-.rt  
 The argument is a pointer to an \fBint\fR whose value is a mask containing
 flags to be set in the local flags word. The current terminal state is fetched,
 and the values of the local flags are derived from the flags in the terminal
@@ -593,12 +547,10 @@ to match the new value of the local flags word.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCLBIC\fR \fR
 .ad
 .RS 14n
-.rt  
 The argument is a pointer to an \fBint\fR whose value is a mask containing
 flags to be cleared in the local flags word. The current terminal state is
 fetched, and the values of the local flags are derived from the flags in the
@@ -608,12 +560,10 @@ state are set to match the new value of the local flags word.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCLSET\fR \fR
 .ad
 .RS 14n
-.rt  
 The argument is a pointer to an int containing a new set of local flags. The
 flags in the terminal state are set to match the  new value of the local flags
 word.  (This \fBioctl\fR was added because \fBsg_flags\fR was once a 16  bit
@@ -623,24 +573,20 @@ controlled by TIOCSETP and \fBsg_flags\fR.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCGLTC\fR \fR
 .ad
 .RS 14n
-.rt  
 The argument is a pointer to an \fBltchars\fR structure. The values of the
 appropriate characters in the terminal state are stored in that structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCSLTC\fR \fR
 .ad
 .RS 14n
-.rt  
 The argument is a pointer to an \fBltchars\fR structure. The values of the
 appropriate characters in the terminal state are set from the characters in
 that structure.
@@ -648,24 +594,20 @@ that structure.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFIORDCHK\fR \fR
 .ad
 .RS 14n
-.rt  
 Returns the number of immediately readable characters. The argument is ignored.
 (This ioctl is  handled in the stream head, not in the \fBttcompat\fR module.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFIONREAD\fR \fR
 .ad
 .RS 14n
-.rt  
 Returns the number of immediately readable characters in the int pointed to by
 the argument. (This ioctl is  handled in the stream head, not in the
 \fBttcompat\fR module.)
@@ -680,11 +622,11 @@ changed in any way, and no message is passed through to the underlying
 .sp
 .in +2
 .nf
-         
+
 DIOCSETP
 DIOCSETP
 DIOCGETP
-LDCLOSE  
+LDCLOSE
 LDCHG
 LDOPEN
 LDGETT
@@ -704,7 +646,7 @@ are handled there.
 .in +2
 .nf
 TIOCREMOTE
-TIOCGWINSZ 
+TIOCGWINSZ
 TIOCSWINSZ
 .fi
 .in -2
@@ -718,7 +660,7 @@ and the \fBtty\fR drivers return EINVAL.
 .in +2
 .nf
 LDSMAP
-LDGMAP 
+LDGMAP
 LDNMAP
 TIOCNOTTY
 TIOCOUTQ

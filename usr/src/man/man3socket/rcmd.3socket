@@ -1,7 +1,7 @@
 '\" te
 .\"  Copyright (c) 1983 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement  specifies the terms and conditions for redistribution.
 .\" Copyright (C) 2004, Sun Microsystems, Inc. All Rights Reserved
-.TH rcmd 3SOCKET "10 Feb 2004" "SunOS 5.11" "Sockets Library Functions"
+.TH RCMD 3SOCKET "Feb 10, 2004"
 .SH NAME
 rcmd, rcmd_af, rresvport, rresvport_af, ruserok \- routines for returning a
 stream to a remote command
@@ -129,23 +129,19 @@ with the global value \fIerrno\fR set according to the reason for failure.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/hosts.equiv\fR\fR
 .ad
 .RS 20n
-.rt  
 system trusted hosts and users
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~/.rhosts\fR\fR
 .ad
 .RS 20n
-.rt  
 user's trusted hosts and users
 .RE
 
@@ -157,13 +153,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelUnsafe
+MT-Level	Unsafe
 .TE
 
 .sp

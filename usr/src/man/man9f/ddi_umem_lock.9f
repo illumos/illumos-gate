@@ -3,16 +3,16 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_umem_lock 9F "10 Apr 2007" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_UMEM_LOCK 9F "Apr 10, 2007"
 .SH NAME
 ddi_umem_lock, ddi_umem_unlock \- lock and unlock memory pages
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/ddi.h> 
+#include <sys/ddi.h>
 #include <sys/sunddi.h>
 
-\fBint\fR \fBddi_umem_lock\fR(\fBcaddr_t\fR \fIaddr\fR, \fBsize_t\fR \fIlen\fR, \fBint\fR \fIflags\fR, 
+\fBint\fR \fBddi_umem_lock\fR(\fBcaddr_t\fR \fIaddr\fR, \fBsize_t\fR \fIlen\fR, \fBint\fR \fIflags\fR,
      \fBddi_umem_cookie_t\fR *\fIcookiep\fR);
 .fi
 
@@ -29,54 +29,44 @@ Solaris DDI specific (Solaris DDI)
 .SS "ddi_umem_lock"
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaddr\fR\fR
 .ad
 .RS 11n
-.rt  
 Virtual address of memory object
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlen\fR\fR
 .ad
 .RS 11n
-.rt  
 Length of memory object in bytes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 11n
-.rt  
 Valid flags include:
 .sp
 .ne 2
-.mk
 .na
 \fBDDI_UMEMLOCK_READ\fR
 .ad
 .RS 21n
-.rt  
 Memory pages are locked to be read from. (Disk write or a network send.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDDI_UMEMLOCK_WRITE\fR
 .ad
 .RS 22n
-.rt  
 Memory pages are locked to be written to. (Disk read or a network receive.)
 .RE
 
@@ -84,24 +74,20 @@ Memory pages are locked to be written to. (Disk read or a network receive.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcookiep\fR\fR
 .ad
 .RS 11n
-.rt  
 Pointer to a kernel memory cookie.
 .RE
 
 .SS "ddi_umem_unlock"
 .sp
 .ne 2
-.mk
 .na
 \fBcookie\fR
 .ad
 .RS 10n
-.rt  
 Kernel memory cookie allocated by \fBddi_umem_lock()\fR.
 .RE
 
@@ -145,58 +131,48 @@ On success, a \fB0\fR is returned. Otherwise, one of the following \fBerrno\fR
 values is returned.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 User process has no mapping at that address range or does not support locking
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 10n
-.rt  
 User process does not have the required permission.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 The system does not have sufficient resources to lock memory, or locking
 \fIlen\fR memory would exceed a limit or resource control on locked memory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 10n
-.rt  
 Could not allocate system resources required to lock the pages. The
 \fBddi_umem_lock()\fR could succeed at a later time.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 Requested memory is not aligned on a system page boundary.
 .RE
 

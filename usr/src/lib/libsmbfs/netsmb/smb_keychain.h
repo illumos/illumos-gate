@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -27,14 +28,16 @@
 #ifndef _SMB_KEYCHAIN_H
 #define	_SMB_KEYCHAIN_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * External interface to the libsmbfs/netsmb keychain
  * storage mechanism.  This interface is consumed by
  * the "smbutil" commands: login, logout, ...
  * and by the SMBFS PAM module.
  */
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define	SMB_KEYCHAIN_SUCCESS	0
 #define	SMB_KEYCHAIN_BADPASSWD	300
@@ -46,6 +49,10 @@
 /* Add a password to the keychain. */
 int smbfs_keychain_add(uid_t uid, const char *domain, const char *user,
 	const char *password);
+
+/* Add an NT-hash (16-bytes) to the keychain. */
+int smbfs_keychain_addhash(uid_t uid, const char *domain, const char *user,
+	const uchar_t *nthash);
 
 /* Delete a password from the keychain. */
 int smbfs_keychain_del(uid_t uid, const char *domain, const char *user);
@@ -78,5 +85,9 @@ int smbfs_keychain_del_everyone(void);
 int
 smbfs_default_dom_usr(const char *home, const char *server,
 	char *dom, int maxdom, char *usr, int maxusr);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _SMB_KEYCHAIN_H */

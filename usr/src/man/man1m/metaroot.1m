@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH metaroot 1M "26 Mar 2006" "SunOS 5.11" "System Administration Commands"
+.TH METAROOT 1M "Mar 26, 2006"
 .SH NAME
 metaroot \- setup system files for root (/) metadevice
 .SH SYNOPSIS
@@ -14,7 +14,7 @@ metaroot \- setup system files for root (/) metadevice
 
 .LP
 .nf
-\fB/usr/sbin/metaroot\fR [\fB-n\fR] [\fB-k\fR \fIsystem-name\fR] [\fB-v\fR \fIvfstab-name\fR] 
+\fB/usr/sbin/metaroot\fR [\fB-n\fR] [\fB-k\fR \fIsystem-name\fR] [\fB-v\fR \fIvfstab-name\fR]
      [\fB-c\fR \fImddb.cf-name\fR] [\fB-m\fR \fImd.conf-name\fR] [\fB-R\fR \fIroot-path\fR] \fIdevice\fR
 .fi
 
@@ -40,70 +40,58 @@ Root privileges are required for all of the following options except \fB-h\fR.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fImddb.cf-name\fR\fR
 .ad
 .RS 19n
-.rt  
 Use \fImddb.cf-name\fR instead of the default \fB/etc/lvm/mddb.cf\fR file as a
 source of metadevice database locations.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 19n
-.rt  
 Display a usage message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR \fIsystem-name\fR\fR
 .ad
 .RS 19n
-.rt  
 Edit a user-supplied \fIsystem-name\fR instead of the default \fB/etc/system\fR
 system configuration information file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fImd.conf-name\fR\fR
 .ad
 .RS 19n
-.rt  
 Edit the configuration file specified by \fImd.conf-name\fR rather than the
 default, \fB/kernel/drv/md.conf\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 19n
-.rt  
 Print what would be done without actually doing it.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIroot-path\fR\fR
 .ad
 .RS 19n
-.rt  
 When metaroot modifies system files, it accesses them in their relative
 location under \fIroot-path\fR.
 .sp
@@ -122,12 +110,10 @@ zone's file system. See \fBzones\fR(5).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR \fIvfstab-name\fR\fR
 .ad
 .RS 19n
-.rt  
 Edit \fIvfstab-name\fR instead of the default \fB/etc/vfstab\fR table of file
 system defaults.
 .RE
@@ -138,12 +124,10 @@ system defaults.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevice\fR\fR
 .ad
 .RS 10n
-.rt  
 Specifies either the metadevice or the conventional disk device (slice) used
 for the root file system (\fB/\fR).
 .RE
@@ -196,45 +180,37 @@ that the root file system is now on the SCSI disk device
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/system\fR\fR
 .ad
 .RS 23n
-.rt  
 System configuration information file. See \fBsystem\fR(4).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/vfstab\fR\fR
 .ad
 .RS 23n
-.rt  
 File system defaults.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/lvm/mddb.cf\fR\fR
 .ad
 .RS 23n
-.rt  
 Metadevice state database locations.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/md.conf\fR\fR
 .ad
 .RS 23n
-.rt  
 Configuration file for the metadevice driver, \fBmd\fR.
 .RE
 
@@ -244,23 +220,19 @@ Configuration file for the metadevice driver, \fBmd\fR.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -272,13 +244,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStable
+Interface Stability	Stable
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cfgadm 1M "25 Oct 2004" "SunOS 5.11" "System Administration Commands"
+.TH CFGADM 1M "Oct 25, 2004"
 .SH NAME
 cfgadm \- configuration administration
 .SH SYNOPSIS
@@ -21,7 +21,7 @@ cfgadm \- configuration administration
 
 .LP
 .nf
-\fB/usr/sbin/cfgadm\fR [\fB-v\fR] [\fB-a\fR] [\fB-s\fR \fIlisting_options\fR] 
+\fB/usr/sbin/cfgadm\fR [\fB-v\fR] [\fB-a\fR] [\fB-s\fR \fIlisting_options\fR]
      [\fB-o\fR \fIhardware_options\fR] [\fB-l\fR [\fIap_id\fR | \fIap_type\fR]]
 .fi
 
@@ -32,7 +32,7 @@ cfgadm \- configuration administration
 
 .LP
 .nf
-\fB/usr/sbin/cfgadm\fR [\fB-v\fR] [\fB-o\fR \fIhardware_options\fR] \fB-h\fR 
+\fB/usr/sbin/cfgadm\fR [\fB-v\fR] [\fB-o\fR \fIhardware_options\fR] \fB-h\fR
      [\fIap_id\fR | \fIap_type\fR]
 .fi
 
@@ -215,7 +215,6 @@ The arguments for this command conform to the \fBgetopt\fR(3C) and
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
@@ -226,7 +225,6 @@ Specifies that the \fB-l\fR option must also list dynamic attachment points.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fIfunction\fR\fR
 .ad
@@ -241,12 +239,10 @@ state transitions at the attachment point by calling hardware specific library
 routines and are defined in the following list.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinsert\fR\fR
 .ad
 .RS 15n
-.rt  
 Performs operations that allows the user to manually insert an occupant or to
 activate a hardware supplied mechanism that performs the physical insertion.
 \fBinsert\fR can have hardware specific side effects that temporarily suspend
@@ -259,12 +255,10 @@ errors can cause this function to fail and set the receptacle condition to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBremove\fR\fR
 .ad
 .RS 15n
-.rt  
 Performs operations that allow the user to manually remove an occupant or to
 activate a hardware supplied mechanism to perform the physical removal.
 \fBremove\fR can have hardware specific side effects that temporarily suspend
@@ -277,12 +271,10 @@ unusable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisconnect\fR\fR
 .ad
 .RS 15n
-.rt  
 Performs hardware specific operations to put a receptacle in the disconnected
 state, which can prevent an occupant from operating in a normal fashion through
 the receptacle.
@@ -290,12 +282,10 @@ the receptacle.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBconnect\fR\fR
 .ad
 .RS 15n
-.rt  
 Performs hardware specific operations to put the receptacle in the
 \fBconnected\fR state, which allows an occupant to operate in a normal fashion
 through the receptacle.
@@ -303,12 +293,10 @@ through the receptacle.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBconfigure\fR\fR
 .ad
 .RS 15n
-.rt  
 Performs hardware specific operations that allow an occupant's hardware
 resources to be usable by Solaris. Occupants that are configured are part of
 the system configuration and are available for manipulation by Solaris device
@@ -318,12 +306,10 @@ manipulation maintenance commands (eg: \fBpsradm\fR(1M), \fBmount\fR(1M),
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunconfigure\fR\fR
 .ad
 .RS 15n
-.rt  
 Performs hardware specific operations that logically remove an occupant's
 hardware resources from the system. The occupant must currently be configured
 and its hardware resources must not be in use by Solaris.
@@ -352,7 +338,6 @@ the force option from having any effect.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
@@ -366,7 +351,6 @@ conditions, at the discretion of any hardware dependent safety checks.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-h\fR [\fIap_id\fR | \fIap_type\fR \|.\|.\|. ]\fR
 .ad
@@ -379,7 +363,6 @@ indicated by the argument is called.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-l\fR [\fIap_id\fR | \fIap_type\fR \|.\|.\|. ]\fR
 .ad
@@ -395,7 +378,6 @@ attachment points are dynamically expanded.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
@@ -410,7 +392,6 @@ these standard channels does not correspond to a terminal (as determined by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fIhardware_options\fR\fR
 .ad
@@ -424,7 +405,6 @@ convention.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fIlisting_options\fR\fR
 .ad
@@ -445,7 +425,7 @@ the following syntax:
 .sp
 .in +2
 .nf
-cfgadm \fB-s\fR select=attr1(value1):attr2(value2)... 
+cfgadm \fB-s\fR select=attr1(value1):attr2(value2)...
 .fi
 .in -2
 .sp
@@ -505,7 +485,6 @@ These listing options can be used to create parsable output. See \fBNOTES\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
@@ -533,7 +512,6 @@ unrecoverable errors were found. The attachment point should only be set to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -547,7 +525,6 @@ for each attachment point for the \fB-l\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fIhardware_function\fR\fR
 .ad
@@ -563,7 +540,6 @@ conforms to the \fBgetsubopt\fR(3C) syntax convention.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-y\fR\fR
 .ad
@@ -629,10 +605,10 @@ system:slot5       cpu/mem      connected       configured      ok
 system:slot6       unknown      disconnected    unconfigured    unusable
 system:slot7       unknown      empty           unconfigured    ok
 c0                 scsi-bus     connected       configured      unknown
-c0::dsk/c0t14d0    disk         connected       configured      unknown 
-c0::dsk/c0t11d0    disk         connected       configured      unknown 
+c0::dsk/c0t14d0    disk         connected       configured      unknown
+c0::dsk/c0t11d0    disk         connected       configured      unknown
 c0::dsk/c0t8d0     disk         connected       configured      unknown
-c0::rmt/0          tape         connected       configured      unknown 
+c0::rmt/0          tape         connected       configured      unknown
 c1                 scsi-bus     connected       configured      unknown
 .fi
 .in -2
@@ -757,36 +733,30 @@ that affect the execution of \fBcfgadm\fR: \fBLC_TIME\fR, \fBLC_MESSAGES\fR,
 \fBNLSPATH\fR and \fBTZ\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_MESSAGES\fR\fR
 .ad
 .RS 15n
-.rt  
 Determines how \fBcfgadm\fR displays column headings and error messages.
 Listing output data is not affected by the setting of this variable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_TIME\fR\fR
 .ad
 .RS 15n
-.rt  
 Determines how \fBcfgadm\fR displays human readable status changed time
 (\fBstatus_time\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTZ\fR\fR
 .ad
 .RS 15n
-.rt  
 Specifies the timezone used when converting the status changed time. This
 applies to both the human readable (\fBstatus_time\fR) and parsable
 (\fBstatus_time_p\fR) formats.
@@ -798,45 +768,37 @@ applies to both the human readable (\fBstatus_time\fR) and parsable
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 An error occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Configuration administration not supported on specified target.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 5n
-.rt  
 Usage error.
 .RE
 

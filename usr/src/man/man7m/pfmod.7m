@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pfmod 7M "18 June 2006" "SunOS 5.11" "STREAMS Modules"
+.TH PFMOD 7M "Jun 18, 2006"
 .SH NAME
 pfmod \- STREAMS Packet Filter Module
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/pfmod.h> 
+#include <sys/pfmod.h>
 .fi
 
 .LP
@@ -62,12 +62,10 @@ neighbor.
 \fBpfmod\fR responds to the following \fIioctl\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPFIOCSETF\fR \fR
 .ad
 .RS 14n
-.rt  
 This \fIioctl\fR directs the module to replace its current packet filter, if
 any, with the filter specified by the \fBstruct packetfilt\fR pointer named by
 its final argument. This structure is defined in \fB<sys/pfmod.h>\fR as:

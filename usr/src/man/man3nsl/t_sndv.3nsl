@@ -1,20 +1,20 @@
 '\" te
 .\"  Copyright 1994, The X/Open Company Ltd.  All Rights Reserved  Portions Copyright 1989 AT&T  Portions Copyright (c) 1998, Sun Microsystems, Inc.  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH t_sndv 3NSL "23 Aug 2001" "SunOS 5.11" "Networking Services Library Functions"
+.TH T_SNDV 3NSL "Aug 23, 2001"
 .SH NAME
 t_sndv \- send data or expedited data, from one or more non-contiguous buffers,
 on a connection
 .SH SYNOPSIS
 .LP
 .nf
-#include <xti.h> 
+#include <xti.h>
 
 
 
@@ -35,7 +35,7 @@ If the limit is exceeded, the function fails with \fBTBADDATA\fR.
 .sp
 .in +2
 .nf
-\fIiov(0).iov_len + . . + iov(iovcount-1).iov_len\fR) 
+\fIiov(0).iov_len + . . + iov(iovcount-1).iov_len\fR)
 .fi
 .in -2
 
@@ -54,24 +54,20 @@ sent or received using scatter/gather functions.
 The argument  \fIflags\fR specifies any optional flags described below:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT_EXPEDITED\fR \fR
 .ad
 .RS 16n
-.rt  
 If set in \fIflags\fR, the data will be sent as expedited data and will be
 subject to the interpretations of the transport provider.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT_MORE\fR \fR
 .ad
 .RS 16n
-.rt  
 If set in  \fIflags\fR, this indicates to the transport provider that the
 transport service data unit (TSDU) (or expedited transport service data unit -
 ETSDU) is being sent through multiple \fBt_sndv()\fR calls. Each
@@ -183,23 +179,19 @@ set and the communications provider is blocked due to flow control, or that
 On failure,  \fBt_errno\fR is set to one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTBADDATA\fR\fR
 .ad
 .RS 12n
-.rt  
 Illegal amount of data:
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTBADF\fR\fR
 .ad
 .RS 15n
-.rt  
 The specified file descriptor does not refer to a transport endpoint.
 .RS +4
 .TP
@@ -235,69 +227,57 @@ implementation-dependent. See \fBWARNINGS\fR, below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTBADFLAG\fR\fR
 .ad
 .RS 15n
-.rt  
 An invalid flag was specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTFLOW\fR\fR
 .ad
 .RS 15n
-.rt  
 \fBO_NONBLOCK\fR was set, but the flow control mechanism prevented the
 transport provider from accepting any data at this time.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTLOOK\fR\fR
 .ad
 .RS 15n
-.rt  
 An asynchronous event has occurred on this transport endpoint.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNOTSUPPORT\fR\fR
 .ad
 .RS 15n
-.rt  
 This function is not supported by the underlying transport provider.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTOUTSTATE\fR\fR
 .ad
 .RS 15n
-.rt  
 The communications endpoint referenced by \fIfd\fR is not in one of the states
 in which a call to this function is valid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTPROTO\fR\fR
 .ad
 .RS 15n
-.rt  
 This error indicates that a communication problem has been detected between XTI
 and the transport provider for which there is no other suitable XTI error
 \fB(t_errno)\fR.
@@ -305,12 +285,10 @@ and the transport provider for which there is no other suitable XTI error
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTSYSERR\fR\fR
 .ad
 .RS 15n
-.rt  
 A system error has occurred during execution of this function.
 .RE
 
@@ -327,13 +305,12 @@ See \fBattributes\fR(5)  for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT LevelSafe
+MT Level	Safe
 .TE
 
 .SH SEE ALSO

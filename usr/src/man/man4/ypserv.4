@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ypserv 4 "9 Aug 2004" "SunOS 5.11" "File Formats"
+.TH YPSERV 4 "Aug 9, 2004"
 .SH NAME
 ypserv \- configuration file for NIS to LDAP transition daemons
 .SH SYNOPSIS
@@ -41,7 +41,6 @@ values, override values that are obtained from LDAP. However, the
 The following are attributes that are used for initial configuration.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnisLDAPconfigDN\fR\fR
 .ad
@@ -53,7 +52,6 @@ all other \fBnisLDAPConfig*\fR values are ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnisLDAPconfigPreferredServerList\fR\fR
 .ad
@@ -73,7 +71,6 @@ nisLDAPconfigPreferredServerList=127.0.0.1:389
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnisLDAPconfigAuthenticationMethod\fR\fR
 .ad
@@ -83,46 +80,38 @@ The authentication method used to obtain the configuration information. The
 recognized values for \fBnisLDAPconfigAuthenticationMethod\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnone\fR\fR
 .ad
 .RS 19n
-.rt  
 No authentication attempted
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsimple\fR\fR
 .ad
 .RS 19n
-.rt  
 Password of proxy user sent in the clear to the LDAP server
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsasl/cram-md5\fR\fR
 .ad
 .RS 19n
-.rt  
 Use \fBSASL/CRAM-MD5\fR authentication. This authentication method may not be
 supported by all LDAP servers. A password must be supplied.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsasl/digest-md5\fR\fR
 .ad
 .RS 19n
-.rt  
 Use SASL/DIGEST-MD5 authentication. The \fBSASL/CRAM-MD5\fRauthentication
 method may not be supported by all LDAP servers. A password must be supplied.
 .RE
@@ -140,7 +129,6 @@ nisLDAPconfigAuthenticationMethod=simple
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnisLDAPconfigTLS\fR\fR
 .ad
@@ -150,23 +138,19 @@ The transport layer security used for the connection to the server. The
 recognized values are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnone\fR\fR
 .ad
 .RS 8n
-.rt  
 No encryption of transport layer data. The default value is \fBnone\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBssl\fR\fR
 .ad
 .RS 8n
-.rt  
 \fBSSL\fR encryption of transport layer data. A certificate is required.
 .RE
 
@@ -176,7 +160,6 @@ transport layer security.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnisLDAPconfigTLSCertificateDBPath\fR\fR
 .ad
@@ -188,7 +171,6 @@ path is \fB/var/yp\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnisLDAPconfigProxyUser\fR\fR
 .ad
@@ -209,7 +191,6 @@ nisLDAPconfigProxyUser=cn=nisAdmin,ou=People,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnisLDAPconfigProxyPassword\fR\fR
 .ad
@@ -228,7 +209,6 @@ The following are attributes used for data retrieval. The object class name
 used for these attributes is \fBnisLDAPconfig\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpreferredServerList\fR\fR
 .ad
@@ -247,7 +227,6 @@ preferredServerList=127.0.0.1:389
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauthenticationMethod\fR\fR
 .ad
@@ -267,7 +246,6 @@ authenticationMethod=simple
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnisLDAPTLS\fR\fR
 .ad
@@ -281,7 +259,6 @@ availability of transport layer security.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnisLDAPTLSCertificateDBPath\fR\fR
 .ad
@@ -294,7 +271,6 @@ recognized and default values for \fBnisLDAPTLSCertificateDBPath\fR, see the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnisLDAPproxyUser\fR\fR
 .ad
@@ -317,7 +293,6 @@ nisLDAPproxyUser=cn=nisAdmin,ou=People,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnisLDAPproxyPassword\fR\fR
 .ad
@@ -332,7 +307,6 @@ file must have an appropriate owner, group, and file mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnisLDAPsearchTimeout\fR\fR
 .ad
@@ -344,7 +318,6 @@ Establishes the timeout for the LDAP search operation. The default value for
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnisLDAPbindTimeout\fR\fR
 .ad
@@ -369,7 +342,6 @@ values are allowed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnisLDAPsearchTimeLimit\fR\fR
 .ad
@@ -389,7 +361,6 @@ value of \fBnisLDAPsearchTimeLimit\fR larger than the value of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnisLDAPsearchSizeLimit\fR\fR
 .ad
@@ -404,7 +375,6 @@ which means the size limit is unlimited. Only integer values are allowed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnisLDAPfollowReferral\fR\fR
 .ad
@@ -422,7 +392,6 @@ The values are all of the form \fBevent=action\fR. The default action is the
 first one listed for each event.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnisLDAPretrieveErrorAction\fR\fR
 .ad
@@ -432,12 +401,10 @@ If an error occurs while trying to retrieve an entry from LDAP, one of the
 following actions can be selected:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuse_cached\fR\fR
 .ad
 .RS 14n
-.rt  
 Retry the retrieval the number of time specified by
 \fBnisLDAPretrieveErrorAttempts\fR, with the \fBnisLDAPretrieveErrorTimeout\fR
 value controlling the wait between each attempt.
@@ -448,12 +415,10 @@ cache is returned to the client.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfail\fR\fR
 .ad
 .RS 14n
-.rt  
 Proceed as for \fBuse_cached\fR, but if all attempts fail, a \fBYPERR_YPERR\fR
 error is returned to the client.
 .RE
@@ -462,7 +427,6 @@ error is returned to the client.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnisLDAPretrieveErrorAttempts\fR\fR
 .ad
@@ -477,7 +441,6 @@ with caution.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnisLDAPretrieveErrorTimeout\fR\fR
 .ad
@@ -489,7 +452,6 @@ default value for \fBnisLDAPretrieveErrorTimeout\fR is 15 seconds.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnisLDAPstoreErrorAction\fR\fR
 .ad
@@ -498,12 +460,10 @@ default value for \fBnisLDAPretrieveErrorTimeout\fR is 15 seconds.
 An error occurred while trying to store data to the LDAP repository.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBretry\fR\fR
 .ad
 .RS 9n
-.rt  
 Retry operation \fBnisLDAPstoreErrorAttempts\fR times with
 \fBnisLDAPstoreErrorTimeout\fR seconds between each attempt. While retries are
 made, the NIS daemon will be prevented from servicing further requests. Use
@@ -512,12 +472,10 @@ with caution.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfail\fR\fR
 .ad
 .RS 9n
-.rt  
 Return \fBYPERR_YPERR\fR error to the client.
 .RE
 
@@ -525,7 +483,6 @@ Return \fBYPERR_YPERR\fR error to the client.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnisLDAPstoreErrorAttempts\fR\fR
 .ad
@@ -539,7 +496,6 @@ value for \fBnisLDAPstoreErrorAttempts\fR is unlimited. The value for
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnisLDAPstoreErrortimeout\fR\fR
 .ad
@@ -624,7 +580,7 @@ dn: cn=schema
      attributetypes: ( 1.3.6.1.4.1.42.2.27.5.42.43.1.13 \e
                NAME 'nisLDAPyppasswddDomains' \e
                DESC 'List of domains for which password changes are made' \e
-               SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )           
+               SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
      attributetypes: ( 1.3.6.1.4.1.42.2.27.5.42.43.1.14 \e
                NAME 'nisLDAPdatabaseIdMapping' \e
                DESC 'Defines a database id for a NIS object' \e
@@ -636,7 +592,7 @@ dn: cn=schema
      attributetypes: ( 1.3.6.1.4.1.42.2.27.5.42.43.1.16 \e
                NAME 'nisLDAPobjectDN' \e
                DESC 'Location in LDAP tree where NIS data is stored' \e
-               SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 ) 
+               SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 )
      attributetypes: ( 1.3.6.1.4.1.42.2.27.5.42.43.1.17 ) \e
                NAME 'nisLDAPnameFields' \e
                DESC 'Rules for breaking NIS entries into fields' \\e
@@ -677,7 +633,7 @@ dn: cn=schema
      objectclasses:  ( 1.3.6.1.4.1.42.2.27.5.42.43.1.0 NAME 'nisLDAPconfig' \e
                DESC 'NIS/LDAP mapping configuration' \e
                SUP top STRUCTURAL \e
-               MAY ( cn $ preferredServerList $ 
+               MAY ( cn $ preferredServerList $
                  authenticationMethod $ nisLDAPTLS $
                  nisLDAPTLSCertificateDBPath $
                  nisLDAPproxyUser $ nisLDAPproxyPassword $
@@ -744,13 +700,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityObsolete
+Interface Stability	Obsolete
 .TE
 
 .SH SEE ALSO

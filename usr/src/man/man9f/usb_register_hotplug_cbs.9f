@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH usb_register_hotplug_cbs 9F "17 Aug 2004" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH USB_REGISTER_HOTPLUG_CBS 9F "Aug 17, 2004"
 .SH NAME
 usb_register_hotplug_cbs, usb_unregister_hotplug_cbs \- Register/unregister for
 notification of device hotplug events
@@ -15,7 +15,7 @@ notification of device hotplug events
 
 
 
-\fB\fR\fBint\fR \fBusb_register_hotplug_cbs\fR(\fBdev_info_t *\fR\fIdip\fR, 
+\fB\fR\fBint\fR \fBusb_register_hotplug_cbs\fR(\fBdev_info_t *\fR\fIdip\fR,
      \fBint\fR \fI(*disconnection_event_handler)\fR(dev_info_t *\fIdip\fR,
      \fBint\fR \fI(*reconnection_event_handler)\fR(dev_info_t *\fIdip\fR);
 .fi
@@ -35,7 +35,6 @@ Solaris DDI specific (Solaris DDI)
 For \fBusb_register_hotplug_cbs()\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
@@ -46,7 +45,6 @@ Pointer to the device's \fBdev_info\fR structure.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdisconnection_event_handler\fR\fR
 .ad
@@ -59,7 +57,6 @@ USB_SUCCESS.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIreconnection_event_handler\fR\fR
 .ad
@@ -75,12 +72,10 @@ USB_SUCCESS.
 For \fBusb_unregister_hotplug_cbs()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 7n
-.rt  
 Pointer to the device's \fBdev_info\fR structure.
 .RE
 
@@ -100,23 +95,19 @@ hotplugged or removed.
 For \fBusb_register_hotplug_cbs()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_SUCCESS\fR
 .ad
 .RS 15n
-.rt  
 Callbacks were successfully registered.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_FAILURE\fR
 .ad
 .RS 15n
-.rt  
 One or more arguments were NULL.
 .sp
 Callbacks could not be successfully registered.
@@ -147,7 +138,7 @@ The registered callback handlers execute in kernel context.
 .sp
 .in +2
 .nf
-   
+
     int remove_device(dev_info_t *)
     {
             ...
@@ -168,7 +159,7 @@ The registered callback handlers execute in kernel context.
                 "%s%d: Could not register hotplug handlers.",
                 ddi_driver_name(dip), ddi_get_instance(dip));
     }
-            
+
 .fi
 .in -2
 
@@ -180,15 +171,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitecturePCI-based systems
+Architecture	PCI-based systems
 _
-Interface stabilityCommitted
+Interface stability	Committed
 .TE
 
 .SH SEE ALSO

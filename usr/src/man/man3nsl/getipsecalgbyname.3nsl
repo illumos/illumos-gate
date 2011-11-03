@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH getipsecalgbyname 3NSL "20 Aug 2003" "SunOS 5.11" "Networking Services Library Functions"
+.TH GETIPSECALGBYNAME 3NSL "Aug 20, 2003"
 .SH NAME
 getipsecalgbyname, getipsecalgbynum, freeipsecalgent \- query algorithm mapping
 entries
 .SH SYNOPSIS
 .LP
 .nf
-\fBcc\fR \fB-flag \&.\|.\|.\fR  \fIfile\fR \&.\|.\|.\fB-l\fRnsl [\fB -library \&.\|.\|. \fR] 
+\fBcc\fR \fB-flag \&.\|.\|.\fR  \fIfile\fR \&.\|.\|.\fB-l\fRnsl [\fB -library \&.\|.\|. \fR]
 #include <netdb.h>
 
 
@@ -57,24 +57,20 @@ the protocol identifier in which the algorithm is defined. See
 The following protocol numbers are pre-defined:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIPSEC_PROTO_ESP\fR\fR
 .ad
 .RS 19n
-.rt  
 Defines the encryption algorithms (transforms) that can be used by IPsec to
 provide data confidentiality.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIPSEC_PROTO_AH\fR\fR
 .ad
 .RS 19n
-.rt  
 Defines the authentication algorithms (transforms) that can be used by IPsec to
 provide authentication.
 .RE
@@ -86,12 +82,10 @@ provide authentication.
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIerrnop\fR\fR
 .ad
 .RS 10n
-.rt  
 A  pointer to an integer used to return an error status value on certain error
 conditions. See \fBERRORS\fR.
 .RE
@@ -108,15 +102,15 @@ The structure \fBipsecalgent_t\fR is defined as follows:
 .sp
 .in +2
 .nf
-typedef struct ipsecalgent {           
-     char **a_names;      /* algorithm names */           
-     int a_proto_num;     /* protocol number */           
-     int a_alg_num;       /* algorithm number */           
-     char *a_mech_name;   /* mechanism name */           
-     int *a_block_sizes;  /* supported block sizes */           
-     int *a_key_sizes;    /* supported key sizes */           
-     int a_key_increment; /* key size increment */     
-} ipsecalgent_t;       
+typedef struct ipsecalgent {
+     char **a_names;      /* algorithm names */
+     int a_proto_num;     /* protocol number */
+     int a_alg_num;       /* algorithm number */
+     char *a_mech_name;   /* mechanism name */
+     int *a_block_sizes;  /* supported block sizes */
+     int *a_key_sizes;    /* supported key sizes */
+     int a_key_increment; /* key size increment */
+} ipsecalgent_t;
 .fi
 .in -2
 
@@ -156,34 +150,28 @@ When the specified algorithm cannot be returned to the caller,
 of the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 Not enough memory
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 10n
-.rt  
 Specified algorithm not found
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 Specified protocol number not found
 .RE
 
@@ -195,14 +183,13 @@ See \fBattributes\fR(5)  for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
-MT LevelMT Safe
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+MT Level	MT Safe
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH snoop 1M "18 Feb 2009" "SunOS 5.11" "System Administration Commands"
+.TH SNOOP 1M "Feb 18, 2009"
 .SH NAME
 snoop \- capture and inspect network packets
 .SH SYNOPSIS
@@ -46,7 +46,6 @@ host names as numeric IP addresses.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
@@ -58,7 +57,6 @@ filter, or \fBsnoop\fR's own filter.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR\fR
 .ad
@@ -69,7 +67,6 @@ Display number of packets dropped during capture on the summary line.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-N\fR\fR
 .ad
@@ -86,7 +83,6 @@ are not displayed when this flag is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I\fR \fIinterface\fR\fR
 .ad
@@ -100,7 +96,6 @@ mutually exclusive.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR\fR
 .ad
@@ -112,7 +107,6 @@ addressed to the host machine will be seen.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR\fR
 .ad
@@ -123,7 +117,6 @@ Display size of the entire link layer frame in bytes on the summary line.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
@@ -142,7 +135,6 @@ grep RPC\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
@@ -153,7 +145,6 @@ Listen to packets on \fB/dev/audio\fR (warning: can be noisy).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fImaxcount\fR\fR
 .ad
@@ -165,7 +156,6 @@ there is no disk space left or until interrupted with Control-C.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdatalink\fR\fR
 .ad
@@ -179,7 +169,6 @@ by \fIdatalink\fR, for example, \fBbge0\fR or \fBnet0\fR. The \fBdladm\fR(1M)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIfilename\fR\fR
 .ad
@@ -193,7 +182,6 @@ the \fBsnoop\fR \fBIP\fR address-to-name mapping table (See \fB-N\fR flag).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fIfilename\fR\fR
 .ad
@@ -206,7 +194,6 @@ hostname).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIfilename\fR\fR
 .ad
@@ -221,7 +208,6 @@ without saving to a file, name the file \fB/dev/null\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIfirst\fR [ , \fBlast\fR ]\fR
 .ad
@@ -233,7 +219,6 @@ packet in the file is packet number 1.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
@@ -245,7 +230,6 @@ This can improve packet capturing performance.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
@@ -259,7 +243,6 @@ the mapping file, its corresponding name will be used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIsnaplen\fR\fR
 .ad
@@ -278,7 +261,6 @@ and for \fBTCP\fR use 54. You can capture \fBRPC\fR headers with a
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR [ \fBr\fR | \fBa\fR | \fBd\fR ]\fR
 .ad
@@ -294,7 +276,6 @@ to any selected packet.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -306,7 +287,6 @@ many lines per packet and should be used only on selected packets.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-x\fR\fIoffset\fR [ , \fIlength\fR]\fR
 .ad
@@ -321,7 +301,6 @@ provided, the rest of the packet is displayed.
 .SH OPERANDS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIexpression\fR\fR
 .ad
@@ -358,7 +337,6 @@ information about setting up more efficient filters.
 The primitives are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhost\fR \fIhostname\fR\fR
 .ad
@@ -380,7 +358,6 @@ words, snoop tries to filter on all IP addresses associated with hostname.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinet\fR or \fIinet6\fR\fR
 .ad
@@ -394,7 +371,6 @@ IPv6 addresses returned from a name lookup.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIipaddr\fR, \fIatalkaddr\fR, or \fIetheraddr\fR\fR
 .ad
@@ -436,7 +412,6 @@ zero to make it \fB0aa:0:45:23:52:44\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfrom\fR or \fBsrc\fR\fR
 .ad
@@ -449,7 +424,6 @@ just the source address, port, or \fBRPC\fR reply.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBto\fR or \fBdst\fR\fR
 .ad
@@ -462,7 +436,6 @@ just the destination address, port, or \fBRPC\fR call.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBether\fR\fR
 .ad
@@ -475,7 +448,6 @@ option is not supported on media such as IPoIB (IP over InfiniBand).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBethertype\fR \fInumber\fR\fR
 .ad
@@ -488,7 +460,6 @@ encapsulated Ethernet type.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBip\fR, \fBip6\fR, \fBarp\fR, \fBrarp\fR, \fBpppoed\fR, \fBpppoes\fR\fR
 .ad
@@ -499,7 +470,6 @@ True if the packet is of the appropriate ethertype.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvlan\fR\fR
 .ad
@@ -510,7 +480,6 @@ True if the packet has \fBethertype\fR VLAN and the VLAN ID is not zero.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvlan-id\fR \fIid\fR\fR
 .ad
@@ -521,7 +490,6 @@ True for packets of ethertype VLAN with the id \fIid\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpppoe\fR\fR
 .ad
@@ -532,7 +500,6 @@ True if the ethertype of the packet is either \fBpppoed\fR or \fBpppoes\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbroadcast\fR\fR
 .ad
@@ -545,7 +512,6 @@ True if the packet is a broadcast packet. Equivalent to \fBether[2:4] =
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmulticast\fR\fR
 .ad
@@ -558,7 +524,6 @@ InfiniBand).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbootp\fR, \fBdhcp\fR\fR
 .ad
@@ -571,7 +536,6 @@ port of \fBBOOTPC (68)\fR and a destination of \fBBOOTPS (67)\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdhcp6\fR\fR
 .ad
@@ -585,7 +549,6 @@ of \fBDHCPV6-SERVER\fR (547) and a destination port of \fBDHCPV6-CLIENT\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBapple\fR\fR
 .ad
@@ -597,7 +560,6 @@ True if the packet is an Apple Ethertalk packet. Equivalent to "\fBethertype
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdecnet\fR\fR
 .ad
@@ -608,7 +570,6 @@ True if the packet is a \fBDECNET\fR packet.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgreater\fR \fIlength\fR\fR
 .ad
@@ -619,7 +580,6 @@ True if the packet is longer than \fIlength\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBless\fR \fIlength\fR\fR
 .ad
@@ -630,7 +590,6 @@ True if the packet is shorter than \fIlength\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBudp\fR, \fBtcp\fR, \fBicmp\fR, \fBicmp6\fR, \fBah\fR, \fBesp\fR\fR
 .ad
@@ -641,7 +600,6 @@ True if the \fBIP\fR or IPv6 protocol is of the appropriate type.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnet\fR \fInet\fR\fR
 .ad
@@ -655,7 +613,6 @@ address.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBport\fR \fIport\fR\fR
 .ad
@@ -670,7 +627,6 @@ the \fIport\fR occurs only as the source or destination.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrpc\fR \fIprog\fR [ , \fIvers\fR [ , \fBproc\fR ] ]\fR
 .ad
@@ -687,7 +643,6 @@ select either call or reply packets only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBzone\fR \fIzoneid\fR\fR
 .ad
@@ -699,7 +654,6 @@ packet received on an \fBipnet\fR device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap\fR\fR
 .ad
@@ -710,7 +664,6 @@ True if the packet is an \fBLDAP\fR packet on port 389.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgateway\fR \fIhost\fR\fR
 .ad
@@ -723,7 +676,6 @@ Equivalent to "\fBether host\fR \fIhost\fR and not host \fIhost\fR".
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnofrag\fR\fR
 .ad
@@ -735,7 +687,6 @@ fragments. Equivalent to \fBip[6:2] & 0x1fff = 0\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIexpr\fR \fIrelop\fR \fIexpr\fR\fR
 .ad
@@ -818,7 +769,6 @@ instance "\fBlength > 60\fR" is equivalent to "\fBgreater 60\fR", and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBand\fR\fR
 .ad
@@ -831,7 +781,6 @@ example "\fBdinky pinky\fR" is the same as "\fBdinky AND pinky\fR".
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBor\fR or \fB,\fR\fR
 .ad
@@ -844,7 +793,6 @@ pinky\fR".
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnot\fR or \fB!\fR\fR
 .ad
@@ -856,7 +804,6 @@ operator is evaluated before \fBAND\fR or OR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBslp\fR\fR
 .ad
@@ -867,7 +814,6 @@ True if the packet is an \fBSLP\fR packet.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsctp\fR\fR
 .ad
@@ -878,7 +824,6 @@ True if the packet is an \fBSCTP\fR packet.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBospf\fR\fR
 .ad
@@ -1019,7 +964,7 @@ NFS:  File name = MTra00192
 NFS:  File handle = 000016430000000100080000305A1C47
 NFS:                597A0000000800002046314AFC450000
 NFS:  File name = .nfs08
-NFS:  
+NFS:
 .fi
 .in -2
 .sp
@@ -1033,7 +978,7 @@ To view just the \fBNFS\fR packets between \fBsunroof\fR and \fBboutique\fR:
 .nf
 example# \fBsnoop -i pkts rpc nfs and sunroof and boutique\fR
 1   0.0000   boutique -> sunroof    NFS C GETATTR FH=8E6C
-2   0.0046    sunroof -> boutique   NFS R GETATTR OK  
+2   0.0046    sunroof -> boutique   NFS R GETATTR OK
 3   0.0080   boutique -> sunroof   NFS C RENAME FH=8E6C MTra00192 to .nfs08
 .fi
 .in -2
@@ -1123,79 +1068,65 @@ example# \fBsnoop funky and pinky and (tcp or udp) and port 80\fR
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/audio\fR\fR
 .ad
 .RS 17n
-.rt  
 Symbolic link to the system's primary audio device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/null\fR\fR
 .ad
 .RS 17n
-.rt  
 The null file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/hosts\fR\fR
 .ad
 .RS 17n
-.rt  
 Host name database.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/rpc\fR\fR
 .ad
 .RS 17n
-.rt  
 RPC program number data base.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/services\fR\fR
 .ad
 .RS 17n
-.rt  
 Internet services and aliases.
 .RE
 

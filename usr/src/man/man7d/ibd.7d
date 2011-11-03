@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ibd 7D "20 Jul 2007" "SunOS 5.11" "Devices"
+.TH IBD 7D "Jul 20, 2007"
 .SH NAME
 ibd \- Infiniband IPoIB device driver
 .SH SYNOPSIS
@@ -118,7 +118,7 @@ indicating the interface on which the failure occurred:
 .sp
 .in +2
 .nf
-NOTICE: ibd0: Could not get list of IBA multicast groups    
+NOTICE: ibd0: Could not get list of IBA multicast groups
 NOTICE: ibd0: IBA promiscuous mode missed multicast group
 NOTICE: ibd0: IBA promiscuous mode missed new multicast gid
 .fi
@@ -201,56 +201,46 @@ the service off, or back on after turning it off, refer to documentation in
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/ibd*\fR\fR
 .ad
 .RS 27n
-.rt  
 special character device
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/ib.conf\fR\fR
 .ad
 .RS 27n
-.rt  
 configuration file to start IPoIB service
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/sparcv9/ibd\fR\fR
 .ad
 .RS 27n
-.rt  
 64-bit SPARC device driver
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/amd64/ibd\fR\fR
 .ad
 .RS 27n
-.rt  
 64-bit x86 device driver
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/ibd\fR\fR
 .ad
 .RS 27n
-.rt  
 32-bit x86 device driver
 .RE
 

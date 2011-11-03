@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH usb_callback_flags 9S "5 Jan 2004" "SunOS 5.11" "Data Structures for Drivers"
+.TH USB_CALLBACK_FLAGS 9S "Jan 5, 2004"
 .SH NAME
 usb_callback_flags \- USB callback flag definitions
 .SH SYNOPSIS
@@ -38,23 +38,19 @@ errors detected.
 The usb_cb_flags_t enumerated type contains the following definitions:
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_CB_NO_INFO\fR
 .ad
 .RS 27n
-.rt  
 No additional errors discovered or recovery actions taken.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_CB_FUNCTIONAL_STALL\fR
 .ad
 .RS 27n
-.rt  
 A functional stall occurred during the transfer. A functional      stall is
 usually caused by a hardware error, and must be explicitly cleared. A
 functional stall is fatal if it cannot be cleared. The default control pipe
@@ -63,24 +59,20 @@ never shows a functional stall.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_CB_STALL_CLEARED\fR
 .ad
 .RS 27n
-.rt  
 A functional stall has been cleared by the USBA framework. This             can
 happen if USB_ATTRS_AUTOCLEARING is set in the request's xxxx_attributes field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_CB_PROTOCOL_STALL\fR
 .ad
 .RS 27n
-.rt  
 A protocol stall has occurred during the transfer. A protocol stall is caused
 usually by an invalid or misunderstood command. It is cleared automatically
 when the device is given its next             command. The USBA framework
@@ -89,12 +81,10 @@ treats stalls detected on default pipe transfers as protocol stalls.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_CB_RESET_PIPE\fR
 .ad
 .RS 27n
-.rt  
 A pipe with a stall has been reset automatically via autoclearing, or via an
 explicit call to \fBusb_pipe_reset\fR(9F). Resetting a pipe consists of
 stopping all transactions on a pipe, setting the pipe to the idle state, and if
@@ -106,12 +96,10 @@ called.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_CB_ASYNC_REQ_FAILED\fR
 .ad
 .RS 27n
-.rt  
 Resources could not be allocated to process callbacks
 asynchronously. Callbacks receiving this flag must not block, since those
 callbacks are executing in a context which holds resources shared by the rest
@@ -123,12 +111,10 @@ to queue.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_CB_SUBMIT_FAILED\fR
 .ad
 .RS 27n
-.rt  
 A queued request was submitted to the host controller driver and
 was rejected. The usb_completion_reason shows why the request was rejected by
 the host controller.
@@ -136,23 +122,19 @@ the host controller.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_CB_NO_RESOURCES\fR
 .ad
 .RS 27n
-.rt  
 Insufficient resources were available for recovery to proceed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_CB_INTR_CONTEXT\fR
 .ad
 .RS 27n
-.rt  
 Callback is executing in interrupt context and should not block.
 .RE
 
@@ -344,15 +326,14 @@ See attributes(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitecturePCI-based systems
+Architecture	PCI-based systems
 _
-Interface stabilityCommitted
+Interface stability	Committed
 .TE
 
 .SH SEE ALSO

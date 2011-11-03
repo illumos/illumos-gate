@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH net_getlifaddr 9F "13 Oct 2008" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH NET_GETLIFADDR 9F "Oct 13, 2008"
 .SH NAME
 net_getlifaddr \- determine a network address for a given interface
 .SH SYNOPSIS
@@ -11,8 +11,8 @@ net_getlifaddr \- determine a network address for a given interface
 .nf
 #include <sys/neti.h>
 
-\fBint\fR \fBnet_getlifaddr\fR(\fBconst\fR \fBnet_data_t\fR \fInet\fR, \fBconst\fR \fBphy_if_t\fR \fIifp\fR, 
-     \fBconst\fR \fBnet_if_t\fR \fIlif\fR, \fBint\fR \fBconst\fR \fItype\fR, 
+\fBint\fR \fBnet_getlifaddr\fR(\fBconst\fR \fBnet_data_t\fR \fInet\fR, \fBconst\fR \fBphy_if_t\fR \fIifp\fR,
+     \fBconst\fR \fBnet_if_t\fR \fIlif\fR, \fBint\fR \fBconst\fR \fItype\fR,
      \fBstruct\fR \fBsockaddr*\fR \fIstorage\fR);
 .fi
 
@@ -23,23 +23,19 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fInet\fR\fR
 .ad
 .RS 11n
-.rt  
 value returned from a successful call to \fBnet_protocol_lookup\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIifp\fR\fR
 .ad
 .RS 11n
-.rt  
 value returned from a successful call to \fBnet_phylookup\fR(9F) or
 \fBnet_phygetnext\fR(9F), indicating which network interface the information
 should be returned from.
@@ -47,35 +43,29 @@ should be returned from.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlif\fR\fR
 .ad
 .RS 11n
-.rt  
 indicates the logical interface from which to fetch the address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItype\fR\fR
 .ad
 .RS 11n
-.rt  
 indicates what type of address should be returned. See below for more details
 on this field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstorage\fR\fR
 .ad
 .RS 11n
-.rt  
 pointer to an area of memory to store the address data.
 .RE
 
@@ -94,48 +84,40 @@ Each member of the address \fBtype\fR array should be one of the values listed
 here.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNA_ADDRESS\fR\fR
 .ad
 .RS 16n
-.rt  
 Return the network address associated with the logical interface (\fBlif\fR)
 that belongs to the network interface (\fBifp\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNA_PEER\fR\fR
 .ad
 .RS 16n
-.rt  
 Return the address assigned to the remote host for point to point network
 interfaces for the given network/logical interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNA_BROADCAST\fR\fR
 .ad
 .RS 16n
-.rt  
 Return the broadcast address assigned to the given network/logical interface
 for network interfaces that support broadcast packets.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNA_NETMASK\fR\fR
 .ad
 .RS 16n
-.rt  
 Return the netmask associated with the given network/logical interface for
 network interfaces that support broadcast packets.
 .RE
@@ -146,34 +128,28 @@ network interfaces that support broadcast packets.
 The \fBnet_getlifaddr()\fR function returns:
 .sp
 .ne 2
-.mk
 .na
 \fB-1\fR
 .ad
 .RS 6n
-.rt  
 The network protocol does not support this function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB0\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB1\fR
 .ad
 .RS 6n
-.rt  
 Unsuccessful.
 .RE
 
@@ -190,13 +166,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

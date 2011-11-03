@@ -4,14 +4,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH format 1M "25 Sep 2008" "SunOS 5.11" "System Administration Commands"
+.TH FORMAT 1M "Sep 25, 2008"
 .SH NAME
 format \- disk partitioning and maintenance utility
 .SH SYNOPSIS
 .LP
 .nf
-\fBformat\fR [\fB-f\fR \fIcommand-file\fR] [\fB-l\fR \fIlog-file\fR] [\fB-x\fR \fIdata-file\fR] 
-     [\fB-d\fR \fIdisk-name\fR] [\fB-t\fR \fIdisk-type\fR] [\fB-p\fR \fIpartition-name\fR] 
+\fBformat\fR [\fB-f\fR \fIcommand-file\fR] [\fB-l\fR \fIlog-file\fR] [\fB-x\fR \fIdata-file\fR]
+     [\fB-d\fR \fIdisk-name\fR] [\fB-t\fR \fIdisk-type\fR] [\fB-p\fR \fIpartition-name\fR]
      [\fB-s\fR] [\fB-m\fR] [\fB-M\fR] [\fB-e\fR] [\fIdisk-list\fR]
 .fi
 
@@ -54,12 +54,10 @@ compatibility. Use \fBrmformat\fR(1) for rewritable removable media devices.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdisk-name\fR\fR
 .ad
 .RS 21n
-.rt  
 Specify which disk should be made current upon entry into the program. The disk
 is specified by its logical name (for instance, \fB-d\fR \fBc0t1d0\fR). This
 can also be accomplished by specifying a single disk in the disk list.
@@ -67,24 +65,20 @@ can also be accomplished by specifying a single disk in the disk list.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 21n
-.rt  
 Enable \fBSCSI\fR expert menu. Note this option is not recommended for casual
 use.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIcommand-file\fR\fR
 .ad
 .RS 21n
-.rt  
 Take command input from \fIcommand-file\fR rather than the standard input. The
 file must contain commands that appear just as they would if they had been
 entered from the keyboard. With this option, \fBformat\fR does not issue
@@ -98,48 +92,40 @@ is invoked, or specify \fBdisk\fR and the disk selection number in the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIlog-file\fR\fR
 .ad
 .RS 21n
-.rt  
 Log a transcript of the \fBformat\fR session to the indicated \fIlog-file\fR,
 including the standard input, the standard output and the standard error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
 .RS 21n
-.rt  
 Enable extended messages. Provides more detailed information in the event of an
 error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR\fR
 .ad
 .RS 21n
-.rt  
 Enable extended and diagnostic messages. Provides extensive information on the
 state of a \fBSCSI\fR device's mode pages, during formatting.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIpartition-name\fR\fR
 .ad
 .RS 21n
-.rt  
 Specify the partition table for the disk which is current upon entry into the
 program. The table is specified by its name as defined in the data file. This
 option can be used only if a disk is being made current, and its type is either
@@ -148,24 +134,20 @@ specified or available from the disk label.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 21n
-.rt  
 Silent. Suppress all of the standard output. Error messages are still
 displayed. This is generally used in conjunction with the \fB-f\fR option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fIdisk-type\fR\fR
 .ad
 .RS 21n
-.rt  
 Specify the type of disk which is current upon entry into the program. A disk's
 type is specified by name in the data file. This option can only be used if a
 disk is being made current as described above.
@@ -173,12 +155,10 @@ disk is being made current as described above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR \fIdata-file\fR\fR
 .ad
 .RS 21n
-.rt  
 Use the list of disks contained in \fIdata-file\fR.
 .RE
 
@@ -203,12 +183,10 @@ After you specify a disk, \fBformat\fR displays its main menu. This menu
 enables you to perform the following tasks:
 .sp
 .ne 2
-.mk
 .na
 \fBanalyze\fR
 .ad
 .RS 13n
-.rt  
 Run read, write, compare tests, and data purge. The data purge function
 implements the National Computer Security Center Guide to Understanding Data
 Remnance (\fBNCSC-TG-025\fR version 2) Overwriting Algorithm. See NOTES.
@@ -216,23 +194,19 @@ Remnance (\fBNCSC-TG-025\fR version 2) Overwriting Algorithm. See NOTES.
 
 .sp
 .ne 2
-.mk
 .na
 \fBbackup\fR
 .ad
 .RS 13n
-.rt  
 Search for backup labels.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBcache\fR
 .ad
 .RS 13n
-.rt  
 Enable, disable, and query the state of the write cache and read cache. This
 menu item only appears when \fBformat\fR is invoked with the \fB-e\fR option,
 and is only supported on \fBSCSI\fR devices..
@@ -240,24 +214,20 @@ and is only supported on \fBSCSI\fR devices..
 
 .sp
 .ne 2
-.mk
 .na
 \fBcurrent\fR
 .ad
 .RS 13n
-.rt  
 Display the device name, the disk geometry, and the pathname to the disk
 device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdefect\fR
 .ad
 .RS 13n
-.rt  
 Retrieve and print defect lists. This option is supported only on \fBSCSI\fR
 devices. \fBIDE\fR disks perform automatic defect management. Upon using the
 \fBdefect\fR option on an \fBIDE\fR disk, you receive the message:
@@ -274,43 +244,37 @@ or disk supports automatic defect management.
 
 .sp
 .ne 2
-.mk
 .na
 \fBdisk\fR
 .ad
 .RS 13n
-.rt  
 Choose the disk that will be used in subsequent operations (known as the
 current disk.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBfdisk\fR
 .ad
 .RS 13n
-.rt  
 Run the \fBfdisk\fR(1M) program to create a \fBfdisk\fR partition for Solaris
 software (x86 based systems only).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBformat\fR
 .ad
 .RS 13n
-.rt  
 Format and verify the current disk. This option is supported only on \fBSCSI\fR
 devices. \fBIDE\fR disks are pre-formatted by the manufacturer. Upon using the
 \fBformat\fR option on an \fBIDE\fR disk, you receive the message:
 .sp
 .in +2
 .nf
-Cannot format this drive. Please use your 
+Cannot format this drive. Please use your
 manufacturer-supplied formatting utility.
 .fi
 .in -2
@@ -320,113 +284,93 @@ manufacturer-supplied formatting utility.
 
 .sp
 .ne 2
-.mk
 .na
 \fBinquiry\fR
 .ad
 .RS 13n
-.rt  
 Display the vendor, product name, and revision level of the current drive.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBlabel\fR
 .ad
 .RS 13n
-.rt  
 Write a new label to the current disk.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBpartition\fR
 .ad
 .RS 13n
-.rt  
 Create and modify slices.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBquit\fR
 .ad
 .RS 13n
-.rt  
 Exit the format menu.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBrepair\fR
 .ad
 .RS 13n
-.rt  
 Repair a specific block on the disk.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBsave\fR
 .ad
 .RS 13n
-.rt  
 Save new disk and slice information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBtype\fR
 .ad
 .RS 13n
-.rt  
 Select (define) a disk type.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBverify\fR
 .ad
 .RS 13n
-.rt  
 Read and display labels. Print information such as the number of cylinders,
 alternate cylinders, heads, sectors, and the partition table.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBvolname\fR
 .ad
 .RS 13n
-.rt  
 Label the disk with a new eight character volume name.
 .RE
 
 .SH ENVIRONMENT VARIABLES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFORMAT_PATH\fR\fR
 .ad
 .RS 15n
-.rt  
 a colon-separated list of filenames and/or directories of disk and partition
 definitions. If a directory is specified, \fBformat\fR searches for the file
 \fBformat.dat\fR in that directory.
@@ -435,12 +379,10 @@ definitions. If a directory is specified, \fBformat\fR searches for the file
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/format.dat\fR\fR
 .ad
 .RS 19n
-.rt  
 default data file
 .RE
 

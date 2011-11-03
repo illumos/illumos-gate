@@ -71,6 +71,8 @@ extern struct memlist	*phys_install;
 uint_t	dr_debug = 0;			/* dr.h for bit values */
 #endif /* DEBUG */
 
+static int	dr_dev_type_to_nt(char *);
+
 /*
  * NOTE: state_str, nt_str and SBD_CMD_STR are only used in a debug
  * kernel.  They are, however, referenced during both debug and non-debug
@@ -554,8 +556,6 @@ static int
 dr_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 	cred_t *cred_p, int *rval_p)
 {
-	static int	dr_dev_type_to_nt(char *);
-
 	int		rv = 0;
 	int		instance;
 	int		bd;

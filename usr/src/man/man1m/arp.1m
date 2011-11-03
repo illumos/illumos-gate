@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH arp 1M "5 Jan 2009" "SunOS 5.11" "System Administration Commands"
+.TH ARP 1M "Jan 5, 2009"
 .SH NAME
 arp \- address resolution display and control
 .SH SYNOPSIS
@@ -30,7 +30,7 @@ arp \- address resolution display and control
 
 .LP
 .nf
-\fBarp\fR \fB-s\fR \fIhostname\fR \fIether_address\fR [temp] [pub] [trail] 
+\fBarp\fR \fB-s\fR \fIhostname\fR \fIether_address\fR [temp] [pub] [trail]
      [permanent]
 .fi
 
@@ -52,22 +52,18 @@ Options that modify the ARP translation tables (\fB-d\fR, \fB-f\fR, and
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 6n
-.rt  
 Display all of the current \fBARP\fR entries. The definition for the flags in
 the table are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd\fR\fR
 .ad
 .RS 5n
-.rt  
 Unverified; this is a local IP address that is currently undergoing Duplicate
 Address Detection. ARP will not respond to requests for this address until
 Duplicate Address Detection completes.
@@ -75,24 +71,20 @@ Duplicate Address Detection completes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBo\fR\fR
 .ad
 .RS 5n
-.rt  
 Old; this entry is aging away. If IP requests it again, a new ARP query will be
 generated. This state is used for detecting peer address changes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBy\fR\fR
 .ad
 .RS 5n
-.rt  
 Delayed; periodic address defense and conflict detection was unable to send a
 packet due to internal network use limits for non-traffic-related messages (100
 packets per hour per interface). This occurs only on interfaces with very large
@@ -101,47 +93,39 @@ numbers of aliases.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA\fR\fR
 .ad
 .RS 5n
-.rt  
 Authority; this machine is authoritative for this IP address. ARP will not
 accept updates from other machines for this entry.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBL\fR\fR
 .ad
 .RS 5n
-.rt  
 Local; this is a local IP address configured on one of the machine's logical
 interfaces. ARP will defend this address if another node attempts to claim it.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM\fR\fR
 .ad
 .RS 5n
-.rt  
 Mapping; only used for the multicast entry for \fB224.0.0.0\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBP\fR\fR
 .ad
 .RS 5n
-.rt  
 Publish; includes IP address for the machine and the addresses that have
 explicitly been added by the \fB-s\fR option. ARP will respond to ARP requests
 for this address.
@@ -149,24 +133,20 @@ for this address.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS\fR\fR
 .ad
 .RS 5n
-.rt  
 Static; entry cannot be changed by learned information. This indicates that the
 \fBpermanent\fR flag was used when creating the entry.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBU\fR\fR
 .ad
 .RS 5n
-.rt  
 Unresolved; waiting for ARP response.
 .RE
 
@@ -195,12 +175,10 @@ option is equivalent to:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 6n
-.rt  
 Delete an entry for the host called \fIhostname\fR.
 .sp
 Note that ARP entries for IPMP (IP Network Multipathing) data and test
@@ -209,12 +187,10 @@ addresses are managed by the kernel and thus cannot be deleted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 Read the file named \fIfilename\fR and set multiple entries in the \fBARP\fR
 tables. Entries in the file should be of the form:
 .sp
@@ -230,12 +206,10 @@ See the \fB-s\fR option for argument definitions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 6n
-.rt  
 Create an \fBARP\fR entry for the host called \fIhostname\fR with the MAC
 address \fIMACaddress\fR. For example, an Ethernet address is given as six
 hexadecimal bytes separated by colons. The entry will not be subject to

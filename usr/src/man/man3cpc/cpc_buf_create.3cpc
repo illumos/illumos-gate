@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cpc_buf_create 3CPC "30 Jan 2004" "SunOS 5.11" "CPU Performance Counters Library Functions"
+.TH CPC_BUF_CREATE 3CPC "Jan 30, 2004"
 .SH NAME
 cpc_buf_create, cpc_buf_destroy, cpc_set_sample, cpc_buf_get, cpc_buf_set,
 cpc_buf_hrtime, cpc_buf_tick, cpc_buf_sub, cpc_buf_add, cpc_buf_copy,
@@ -11,7 +11,7 @@ cpc_buf_zero \- sample and manipulate CPC data
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lcpc\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lcpc\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <libcpc.h>
 
 \fBcpc_buf_t *\fR\fBcpc_buf_create\fR(\fBcpc_t *\fR\fIcpc\fR, \fBcpc_set_t *\fR\fIset\fR);
@@ -159,12 +159,10 @@ indicate the error.
 These functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 For \fBcpc_set_sample()\fR, the set is not bound, the set and/or CPC buffer
 were not created with the given \fIcpc\fR handle, or the CPC buffer was not
 created with the supplied set.
@@ -172,24 +170,20 @@ created with the supplied set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 10n
-.rt  
 When using \fBcpc_set_sample()\fR to sample a CPU-bound set, the LWP has been
 unbound from the processor it is measuring.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 The library could not allocate enough memory for its internal data structures.
 .RE
 
@@ -201,15 +195,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO
@@ -232,12 +225,10 @@ access is not possible, \fBcpc_set_sample()\fR must be used to read the
 counters.
 .sp
 .ne 2
-.mk
 .na
 \fBSPARC\fR
 .ad
 .RS 9n
-.rt  
 .sp
 .in +2
 .nf
@@ -250,12 +241,10 @@ wr %rN, %pic        ! (All UltraSPARC, but see text)
 
 .sp
 .ne 2
-.mk
 .na
 \fBx86\fR
 .ad
 .RS 9n
-.rt  
 .sp
 .in +2
 .nf

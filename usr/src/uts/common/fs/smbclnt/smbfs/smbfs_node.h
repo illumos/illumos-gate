@@ -33,6 +33,7 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -47,33 +48,11 @@
 
 #include <sys/avl.h>
 #include <sys/list.h>
+#include <netsmb/smb_subr.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/*
- * These are the attributes we can get from the server via
- * SMB commands such as TRANS2_QUERY_FILE_INFORMATION
- * with info level SMB_QFILEINFO_ALL_INFO, and directory
- * FindFirst/FindNext info. levels FIND_DIRECTORY_INFO
- * and FIND_BOTH_DIRECTORY_INFO, etc.
- *
- * Values in this struct are always native endian,
- * and times are converted converted to Unix form.
- * Note: zero in any of the times means "unknown".
- *
- * XXX: Later, move this to nsmb
- */
-typedef struct smbfattr {
-	timespec_t	fa_createtime;	/* Note, != ctime */
-	timespec_t	fa_atime;	/* these 3 are like unix */
-	timespec_t	fa_mtime;
-	timespec_t	fa_ctime;
-	u_offset_t	fa_size;	/* EOF position */
-	u_offset_t	fa_allocsz;	/* Allocated size. */
-	uint32_t	fa_attr;	/* Ext. file (DOS) attr */
-} smbfattr_t;
 
 /*
  * Cache whole directories (not yet)

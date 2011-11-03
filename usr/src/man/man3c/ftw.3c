@@ -2,14 +2,14 @@
 .\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ftw 3C "30 Jan 2007" "SunOS 5.11" "Standard C Library Functions"
+.TH FTW 3C "Jan 30, 2007"
 .SH NAME
 ftw, nftw \- walk a file tree
 .SH SYNOPSIS
@@ -40,46 +40,38 @@ integer. Possible values of the integer, defined in the <\fBftw.h\fR> header,
 are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFTW_F\fR\fR
 .ad
 .RS 11n
-.rt  
 The object is a file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFTW_D\fR\fR
 .ad
 .RS 11n
-.rt  
 The object is a directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFTW_DNR\fR\fR
 .ad
 .RS 11n
-.rt  
 The object is a directory that cannot be read. Descendants of the directory are
 not processed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFTW_NS\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fBstat()\fR function failed on the object because of lack of appropriate
 permission or the object is a symbolic link that points to a non-existent file.
 The \fBstat\fR buffer passed to \fIfn\fR is undefined.
@@ -103,12 +95,10 @@ additional argument \fIflags\fR, which is a bitwise-inclusive OR of zero or
 more of the following flags:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFTW_CHDIR\fR\fR
 .ad
 .RS 13n
-.rt  
 If set, \fBnftw()\fR changes the current working directory to each directory as
 it reports files in that directory. If clear, \fBnftw()\fR does not change the
 current working directory.
@@ -116,12 +106,10 @@ current working directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFTW_DEPTH\fR\fR
 .ad
 .RS 13n
-.rt  
 If set, \fBnftw()\fR reports all files in a directory before reporting the
 directory itself. If clear, \fBnftw()\fR reports any directory before reporting
 the files in that directory.
@@ -129,24 +117,20 @@ the files in that directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFTW_MOUNT\fR\fR
 .ad
 .RS 13n
-.rt  
 If set, \fBnftw()\fR reports only files in the same file system as path. If
 clear, \fBnftw()\fR reports all files encountered during the walk.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFTW_PHYS\fR\fR
 .ad
 .RS 13n
-.rt  
 If set, \fBnftw()\fR performs a physical walk and does not follow symbolic
 links.
 .RE
@@ -185,82 +169,68 @@ one of the following:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFTW_F\fR\fR
 .ad
 .RS 11n
-.rt  
 The object is a file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFTW_D\fR\fR
 .ad
 .RS 11n
-.rt  
 The object is a directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFTW_DP\fR\fR
 .ad
 .RS 11n
-.rt  
 The object is a directory and subdirectories have been visited. (This condition
 only occurs if the FTW_DEPTH flag is included in flags.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFTW_SL\fR\fR
 .ad
 .RS 11n
-.rt  
 The object is a symbolic link. (This condition only occurs if the FTW_PHYS flag
 is included in flags.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFTW_SLN\fR\fR
 .ad
 .RS 11n
-.rt  
 The object is a symbolic link that points to a non-existent file. (This
 condition only occurs if the FTW_PHYS flag is not included in flags.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFTW_DNR\fR\fR
 .ad
 .RS 11n
-.rt  
 The object is a directory that cannot be read.  The user-defined function
 \fIfn\fR will not be called for any of its descendants.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFTW_NS\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fBstat()\fR function failed on the object because of lack of appropriate
 permission. The stat buffer passed to \fIfn\fR is undefined.  Failure of
 \fBstat()\fR for any other reason is considered an error and \fBnftw()\fR
@@ -327,59 +297,49 @@ of the \fBstat\fR functions is executed on a directory or file.
 The \fBftw()\fR and \fBnftw()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBELOOP\fR\fR
 .ad
 .RS 16n
-.rt  
 A loop exists in symbolic links encountered during resolution of the \fIpath\fR
 argument
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENAMETOOLONG\fR\fR
 .ad
 .RS 16n
-.rt  
 The length of the path name pointed to by the \fIpath\fR argument exceeds
 {\fBPATH_MAX\fR}, or a path name component is longer than {\fBNAME_MAX\fR}.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 16n
-.rt  
 A component of \fIpath\fR does not name an existing file or \fIpath\fR is an
 empty string.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTDIR\fR\fR
 .ad
 .RS 16n
-.rt  
 A component of \fIpath\fR is not a directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOVERFLOW\fR\fR
 .ad
 .RS 16n
-.rt  
 A field in the \fBstat\fR structure cannot be represented correctly in the
 current programming environment for one or more files found in the file
 hierarchy.
@@ -390,24 +350,20 @@ hierarchy.
 The \fBftw()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 16n
-.rt  
 Search permission is denied for any component of \fIpath\fR or read permission
 is denied for \fIpath\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENAMETOOLONG\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fBftw()\fR function has descended to a path that exceeds {\fBPATH_MAX\fR}
 and the depth argument specified by the application is less than 2 and
 \fBFTW_CHDIR\fR is not set.
@@ -418,12 +374,10 @@ and the depth argument specified by the application is less than 2 and
 The \fBnftw()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 10n
-.rt  
 Search permission is denied for any component of \fIpath\fR or read permission
 is denied for \fIpath\fR, or \fIfn\fR() returns \(mi1 and does not reset
 \fBerrno\fR.
@@ -434,24 +388,20 @@ is denied for \fIpath\fR, or \fIfn\fR() returns \(mi1 and does not reset
 The \fBnftw()\fR and \fBftw()\fR functions may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBELOOP\fR\fR
 .ad
 .RS 16n
-.rt  
 Too many symbolic links were encountered during resolution of the \fIpath\fR
 argument.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENAMETOOLONG\fR\fR
 .ad
 .RS 16n
-.rt  
 Pathname resolution of a symbolic link in the path name pointed to by the
 \fIpath\fR argument produced an intermediate result whose length exceeds
 {\fBPATH_MAX\fR}.
@@ -462,12 +412,10 @@ Pathname resolution of a symbolic link in the path name pointed to by the
 The \fBftw()\fR function may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The value of the \fIdepth\fR argument is invalid.
 .RE
 
@@ -476,24 +424,20 @@ The value of the \fIdepth\fR argument is invalid.
 The \fBnftw()\fR function may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEMFILE\fR\fR
 .ad
 .RS 10n
-.rt  
 There are {\fBOPEN_MAX\fR} file descriptors currently open in the calling
 process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENFILE\fR\fR
 .ad
 .RS 10n
-.rt  
 Too many files are currently open in the system.
 .RE
 
@@ -532,7 +476,7 @@ levels deep.
 .sp
 .in +2
 .nf
-#include <ftw.h>  
+#include <ftw.h>
 \&...
 int nftwfunc(const char *, const struct stat *, int, struct FTW *);
 int nftwfunc(const char *filename, const struct stat *statptr,
@@ -581,15 +525,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelMT-Safe with exceptions
+MT-Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO

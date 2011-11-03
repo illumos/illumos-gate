@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH projdel 1M "4 May 2004" "SunOS 5.11" "System Administration Commands"
+.TH PROJDEL 1M "May 4, 2004"
 .SH NAME
 projdel \- delete a project from the system
 .SH SYNOPSIS
@@ -24,12 +24,10 @@ appropriate changes to the system file.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIfilename\fR\fR
 .ad
 .RS 15n
-.rt  
 Specify the project file to modify. If no \fIfilename\fR is specified, the
 system project file, \fB/etc/project\fR, is modified.
 .RE
@@ -40,12 +38,10 @@ system project file, \fB/etc/project\fR, is modified.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIproject\fR\fR
 .ad
 .RS 11n
-.rt  
 The name of the project to be deleted.
 .RE
 
@@ -55,112 +51,92 @@ The name of the project to be deleted.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 6n
-.rt  
 The command syntax was invalid. A usage message for \fBprojdel\fR is displayed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 6n
-.rt  
 An invalid argument was provided to an option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB4\fR\fR
 .ad
 .RS 6n
-.rt  
 The \fIprojid\fR given with the \fB-p\fR option is already in use.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB5\fR\fR
 .ad
 .RS 6n
-.rt  
 The project files contain an error. See \fBproject\fR(4).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB6\fR\fR
 .ad
 .RS 6n
-.rt  
 The project to be modified, group, user, or resource does not exist.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB9\fR\fR
 .ad
 .RS 6n
-.rt  
 The project is already in use.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB10\fR\fR
 .ad
 .RS 6n
-.rt  
 Cannot update the \fB/etc/project\fR file.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/project\fR\fR
 .ad
 .RS 16n
-.rt  
 System project file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fR
 .ad
 .RS 16n
-.rt  
 
 .RE
 
@@ -172,13 +148,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface stabilty		See below.
+Interface stabilty	See below.
 .TE
 
 .sp

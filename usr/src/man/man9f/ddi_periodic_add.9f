@@ -3,16 +3,16 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_periodic_add 9F "13 Apr 2009" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_PERIODIC_ADD 9F "Apr 13, 2009"
 .SH NAME
 ddi_periodic_add \- issue nanosecond periodic timeout requests
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/dditypes.h> 
+#include <sys/dditypes.h>
 #include <sys/sunddi.h>
 
-\fBddi_periodic_t\fR \fBddi_periodic_add\fR(\fBvoid (*\fR\fIfunc\fR)(\fBvoid *)\fR, \fBvoid\fR \fIarg\fR, 
+\fBddi_periodic_t\fR \fBddi_periodic_add\fR(\fBvoid (*\fR\fIfunc\fR)(\fBvoid *)\fR, \fBvoid\fR \fIarg\fR,
      \fBhrtime_t\fR \fIinterval\fR, \fBint\fR \fIlevel\fR);
 .fi
 
@@ -23,12 +23,10 @@ Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfunc\fR\fR
 .ad
 .RS 12n
-.rt  
 The callback function is invoked periodically in the specified interval. If the
 argument level is zero, the function is invoked in kernel context. Otherwise,
 it's invoked in interrupt context at the specified level.
@@ -36,34 +34,28 @@ it's invoked in interrupt context at the specified level.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIarg\fR\fR
 .ad
 .RS 12n
-.rt  
 The argument passed to the callback function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinterval\fR\fR
 .ad
 .RS 12n
-.rt  
 Interval time in nanoseconds.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlevel\fR\fR
 .ad
 .RS 12n
-.rt  
 Callback interrupt level. If the value is zero, the callback function is
 invoked in kernel context. If the value is more than zero, but less than or
 equal to ten, the callback function is invoked in interrupt context at the
@@ -167,7 +159,7 @@ invoked in interrupt context at level 7.
 
           /*
            * Register the callback function invoked periodically
-           * at interrupt level 7.             
+           * at interrupt level 7.
            */
           statep->periodic_id = ddi_periodic_add(my_periodic_int7_func,
               statep, interval, DDI_IPL_7);

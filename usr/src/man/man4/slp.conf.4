@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH slp.conf 4 "18 Feb 2003" "SunOS 5.11" "File Formats"
+.TH SLP.CONF 4 "Feb 18, 2003"
 .SH NAME
 slp.conf \- configuration file for Service Location Protocol agents
 .SH SYNOPSIS
@@ -109,42 +109,34 @@ Networking Configuration Parameters
 The following are configuration properties and their parameters for \fBDA\fRs:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnet.slp.isDA\fR\fR
 .ad
 .RS 24n
-.rt  
 .sp
 .ne 2
-.mk
 .na
 \fBSetting Type\fR
 .ad
 .RS 19n
-.rt  
 Boolean
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDefault Value\fR
 .ad
 .RS 19n
-.rt  
 \fBFalse\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBRange of Values\fR
 .ad
 .RS 19n
-.rt  
 \fBTrue\fR or \fBFalse\fR
 .RE
 
@@ -154,42 +146,34 @@ A boolean that indicates whether \fBslpd\fR(1M) is to act as  a \fBDA\fR. If
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnet.slp.DAHeartBeat\fR\fR
 .ad
 .RS 24n
-.rt  
 .sp
 .ne 2
-.mk
 .na
 \fBSetting Type\fR
 .ad
 .RS 19n
-.rt  
 Integer
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDefault Value\fR
 .ad
 .RS 19n
-.rt  
 10800 seconds (3 hours)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBRange of Values\fR
 .ad
 .RS 19n
-.rt  
 2000 - 259200000 seconds
 .RE
 
@@ -200,42 +184,34 @@ ignored if \fBnet.slp.isDA\fR is \fBFalse\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnet.slp.DAAttributes\fR\fR
 .ad
 .RS 24n
-.rt  
 .sp
 .ne 2
-.mk
 .na
 \fBSetting Type\fR
 .ad
 .RS 19n
-.rt  
 List of Strings
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDefault Value\fR
 .ad
 .RS 19n
-.rt  
 Unassigned
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBRange of Values\fR
 .ad
 .RS 19n
-.rt  
 List of Attribute Tag/Value List Pairs
 .RE
 
@@ -254,42 +230,34 @@ The following properties and their parameters allow you to configure various
 aspects of scope and \fBDA\fR handling:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnet.slp.useScopes\fR\fR
 .ad
 .RS 23n
-.rt  
 .sp
 .ne 2
-.mk
 .na
 \fBSetting Type\fR
 .ad
 .RS 19n
-.rt  
 List of Strings
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDefault Value\fR
 .ad
 .RS 19n
-.rt  
 \fBDefault\fR, for \fBSA\fR and \fBDA\fR; unassigned for \fBUA\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBRange of Values\fR
 .ad
 .RS 19n
-.rt  
 List of Strings
 .RE
 
@@ -309,42 +277,34 @@ programmatically after the configuration file has been  read are ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnet.slp.DAAddresses\fR\fR
 .ad
 .RS 23n
-.rt  
 .sp
 .ne 2
-.mk
 .na
 \fBSetting Type\fR
 .ad
 .RS 19n
-.rt  
 List of Strings
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDefault Value\fR
 .ad
 .RS 19n
-.rt  
 Unassigned
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBRange of Values\fR
 .ad
 .RS 19n
-.rt  
 IPv4 addresses or host names
 .RE
 
@@ -390,42 +350,34 @@ These properties direct tracing and logging information to be sent to
 \fBslpd\fR(1M) only.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnet.slp.traceDATraffic\fR\fR
 .ad
 .RS 26n
-.rt  
 .sp
 .ne 2
-.mk
 .na
 \fBSetting Type\fR
 .ad
 .RS 19n
-.rt  
 Boolean
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDefault Value\fR
 .ad
 .RS 19n
-.rt  
 \fBFalse\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBRange of Values\fR
 .ad
 .RS 19n
-.rt  
 \fBTrue\fR or \fBFalse\fR
 .RE
 
@@ -435,42 +387,34 @@ traffic by \fBslpd\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnet.slp.traceMsg\fR\fR
 .ad
 .RS 26n
-.rt  
 .sp
 .ne 2
-.mk
 .na
 \fBSetting Type\fR
 .ad
 .RS 19n
-.rt  
 Boolean
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDefault Value\fR
 .ad
 .RS 19n
-.rt  
 \fBFalse\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBRange of Values\fR
 .ad
 .RS 19n
-.rt  
 \fBTrue\fR or \fBFalse\fR
 .RE
 
@@ -481,42 +425,34 @@ printed by \fBslpd\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnet.slp.traceDrop\fR\fR
 .ad
 .RS 26n
-.rt  
 .sp
 .ne 2
-.mk
 .na
 \fBSetting Type\fR
 .ad
 .RS 19n
-.rt  
 Boolean
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDefault Value\fR
 .ad
 .RS 19n
-.rt  
 \fBFalse\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBRange of Values\fR
 .ad
 .RS 19n
-.rt  
 \fBTrue\fR or \fBFalse\fR
 .RE
 
@@ -526,42 +462,34 @@ dropped by \fBslpd\fR for any reason.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnet.slp.traceReg\fR\fR
 .ad
 .RS 26n
-.rt  
 .sp
 .ne 2
-.mk
 .na
 \fBSetting Type\fR
 .ad
 .RS 19n
-.rt  
 Boolean
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDefault Value\fR
 .ad
 .RS 19n
-.rt  
 \fBFalse\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBRange of Values\fR
 .ad
 .RS 19n
-.rt  
 \fBTrue\fR or \fBFalse\fR
 .RE
 
@@ -576,42 +504,34 @@ The following properties  control  reading  and  writing  serialized
 registrations.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnet.slp.serializedRegURL\fR\fR
 .ad
 .RS 28n
-.rt  
 .sp
 .ne 2
-.mk
 .na
 \fBSetting Type\fR
 .ad
 .RS 19n
-.rt  
 String
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDefault Value\fR
 .ad
 .RS 19n
-.rt  
 Unassigned
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBRange of Values\fR
 .ad
 .RS 19n
-.rt  
 Valid \fBURL\fR
 .RE
 
@@ -627,7 +547,6 @@ The properties that follow allow you to set various network configuration
 parameters:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnet.slp.isBroadcastOnly\fR\fR
 .ad
@@ -635,34 +554,28 @@ parameters:
 .RS 4n
 .sp
 .ne 2
-.mk
 .na
 \fBSetting Type\fR
 .ad
 .RS 19n
-.rt  
 Boolean
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDefault Value\fR
 .ad
 .RS 19n
-.rt  
 \fBFalse\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBRange of Values\fR
 .ad
 .RS 19n
-.rt  
 \fBTrue\fR or \fBFalse\fR
 .RE
 
@@ -671,7 +584,6 @@ A  boolean that indicates if  broadcast  should  be  used instead of multicast.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnet.slp.multicastTTL\fR\fR
 .ad
@@ -679,34 +591,28 @@ A  boolean that indicates if  broadcast  should  be  used instead of multicast.
 .RS 4n
 .sp
 .ne 2
-.mk
 .na
 \fBSetting Type\fR
 .ad
 .RS 19n
-.rt  
 Positive Integer
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDefault Value\fR
 .ad
 .RS 19n
-.rt  
 \fB255\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBRange of Values\fR
 .ad
 .RS 19n
-.rt  
 A positive integer from 1 to 255.
 .RE
 
@@ -716,7 +622,6 @@ A positive integer  less than or  equal to 255 that defines the multicast
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnet.slp.DAActiveDiscoveryInterval\fR\fR
 .ad
@@ -724,34 +629,28 @@ A positive integer  less than or  equal to 255 that defines the multicast
 .RS 4n
 .sp
 .ne 2
-.mk
 .na
 \fBSetting Type\fR
 .ad
 .RS 19n
-.rt  
 Integer
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDefault Value\fR
 .ad
 .RS 19n
-.rt  
 900 seconds (15 minutes)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBRange of Values\fR
 .ad
 .RS 19n
-.rt  
 From 300 to 10800 seconds
 .RE
 
@@ -764,7 +663,6 @@ the \fBDA\fRs available are explicitly restricted to those obtained from the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnet.slp.multicastMaximumWait\fR\fR
 .ad
@@ -772,34 +670,28 @@ the \fBDA\fRs available are explicitly restricted to those obtained from the
 .RS 4n
 .sp
 .ne 2
-.mk
 .na
 \fBSetting Type\fR
 .ad
 .RS 19n
-.rt  
 Integer
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDefault Value\fR
 .ad
 .RS 19n
-.rt  
 15000 milliseconds (15 seconds)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBRange of Values\fR
 .ad
 .RS 19n
-.rt  
  1000 to 60000 milliseconds
 .RE
 
@@ -810,7 +702,6 @@ values in milliseconds.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnet.slp.multicastTimeouts\fR\fR
 .ad
@@ -818,34 +709,28 @@ values in milliseconds.
 .RS 4n
 .sp
 .ne 2
-.mk
 .na
 \fBSetting Type\fR
 .ad
 .RS 19n
-.rt  
 List of Integers
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDefault Value\fR
 .ad
 .RS 19n
-.rt  
 \fB3000,3000,3000,3000\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBRange of Values\fR
 .ad
 .RS 19n
-.rt  
 List of Positive Integers
 .RE
 
@@ -859,7 +744,6 @@ must equal \fBnet.slp.multicastMaximumWait\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnet.slp.passiveDADetection\fR\fR
 .ad
@@ -867,34 +751,28 @@ must equal \fBnet.slp.multicastMaximumWait\fR.
 .RS 4n
 .sp
 .ne 2
-.mk
 .na
 \fBSetting Type\fR
 .ad
 .RS 19n
-.rt  
 Boolean
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDefault Value\fR
 .ad
 .RS 19n
-.rt  
 \fBTrue\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBRange of Values\fR
 .ad
 .RS 19n
-.rt  
 \fBTrue\fR or \fBFalse\fR
 .RE
 
@@ -904,7 +782,6 @@ detection.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnet.slp.DADiscoveryTimeouts\fR\fR
 .ad
@@ -912,34 +789,28 @@ detection.
 .RS 4n
 .sp
 .ne 2
-.mk
 .na
 \fBSetting Type\fR
 .ad
 .RS 19n
-.rt  
 List of  Integers.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDefault Value\fR
 .ad
 .RS 19n
-.rt  
 \fB2000,2000,2000,2000,3000,4000\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBRange of Values\fR
 .ad
 .RS 19n
-.rt  
 List of Positive Integers
 .RE
 
@@ -952,7 +823,6 @@ equal \fBnet.slp.multicastMaximumWait\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnet.slp.datagramTimeouts\fR\fR
 .ad
@@ -960,34 +830,28 @@ equal \fBnet.slp.multicastMaximumWait\fR.
 .RS 4n
 .sp
 .ne 2
-.mk
 .na
 \fBSetting Type\fR
 .ad
 .RS 19n
-.rt  
 List of Integers
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDefault Value\fR
 .ad
 .RS 19n
-.rt  
 \fB3000,3000,3000\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBRange of Values\fR
 .ad
 .RS 19n
-.rt  
 List of Positive Integers
 .RE
 
@@ -998,7 +862,6 @@ to block waiting for a reply on the \fIn\fRth try to contact the \fBDA\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnet.slp.randomWaitBound\fR\fR
 .ad
@@ -1006,34 +869,28 @@ to block waiting for a reply on the \fIn\fRth try to contact the \fBDA\fR.
 .RS 4n
 .sp
 .ne 2
-.mk
 .na
 \fBSetting Type\fR
 .ad
 .RS 19n
-.rt  
 Integer
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDefault Value\fR
 .ad
 .RS 19n
-.rt  
 1000 milliseconds (1 second)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBRange of Values\fR
 .ad
 .RS 19n
-.rt  
 1000 to 3000 milliseconds
 .RE
 
@@ -1043,7 +900,6 @@ contact a \fBDA\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnet.slp.MTU\fR\fR
 .ad
@@ -1051,34 +907,28 @@ contact a \fBDA\fR.
 .RS 4n
 .sp
 .ne 2
-.mk
 .na
 \fBSetting Type\fR
 .ad
 .RS 19n
-.rt  
 Integer
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDefault Value\fR
 .ad
 .RS 19n
-.rt  
 1400
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBRange of Values\fR
 .ad
 .RS 19n
-.rt  
 128 to 8192
 .RE
 
@@ -1088,7 +938,6 @@ size includes \fBIP\fR and \fBTCP\fR or \fBUDP\fR headers.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnet.slp.interfaces\fR\fR
 .ad
@@ -1096,34 +945,28 @@ size includes \fBIP\fR and \fBTCP\fR or \fBUDP\fR headers.
 .RS 4n
 .sp
 .ne 2
-.mk
 .na
 \fBSetting Type\fR
 .ad
 .RS 19n
-.rt  
 List of Strings
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDefault Value\fR
 .ad
 .RS 19n
-.rt  
 Default interface
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBRange of Values\fR
 .ad
 .RS 19n
-.rt  
 IPv4 addresses or host names
 .RE
 
@@ -1150,42 +993,34 @@ the network is renumbered.
 The following configuration parameters apply to the \fBUA\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnet.slp.locale\fR\fR
 .ad
 .RS 22n
-.rt  
 .sp
 .ne 2
-.mk
 .na
 \fBSetting Type\fR
 .ad
 .RS 19n
-.rt  
 String
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDefault Value\fR
 .ad
 .RS 19n
-.rt  
 \fBen\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBRange of Values\fR
 .ad
 .RS 19n
-.rt  
 See \fIRFC 1766\fR for a list of the locale language tag names.
 .RE
 
@@ -1196,42 +1031,34 @@ property causes the property  value  to become the default  locale for
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnet.slp.maxResults\fR\fR
 .ad
 .RS 22n
-.rt  
 .sp
 .ne 2
-.mk
 .na
 \fBSetting Type\fR
 .ad
 .RS 19n
-.rt  
 Integer
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDefault Value\fR
 .ad
 .RS 19n
-.rt  
 \fB-1\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBRange of Values\fR
 .ad
 .RS 19n
-.rt  
 \fB-1\fR, positive integer
 .RE
 
@@ -1244,42 +1071,34 @@ of \fBnet.slp.maxResults\fR is \fB-1\fR, all results should be returned.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnet.slp.typeHint\fR\fR
 .ad
 .RS 22n
-.rt  
 .sp
 .ne 2
-.mk
 .na
 \fBSetting Type\fR
 .ad
 .RS 19n
-.rt  
 List of Strings
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDefault Value\fR
 .ad
 .RS 19n
-.rt  
 Unassigned
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBRange of Values\fR
 .ad
 .RS 19n
-.rt  
 Service type names
 .RE
 
@@ -1299,15 +1118,14 @@ See \fBattributes\fR(5)  for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface Stability		Standard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

@@ -8,7 +8,7 @@
 .\" copyright notice(s) and this permission notice appear in all copies of
 .\" the Software and that both the above copyright notice(s) and this
 .\" permission notice appear in supporting documentation.
-.\" 
+.\"
 .\" THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
 .\" OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
 .\" MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
@@ -18,13 +18,13 @@
 .\" FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
 .\" NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION
 .\" WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-.\" 
+.\"
 .\" Except as contained in this notice, the name of a copyright holder
 .\" shall not be used in advertising or otherwise to promote the sale, use
 .\" or other dealings in this Software without prior written authorization
 .\" of the copyright holder.
 .\" Portions Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved.
-.TH tecla 5 "20 May 2004" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH TECLA 5 "May 20, 2004"
 .SH NAME
 tecla, teclarc \- User interface provided by the tecla library.
 .SH DESCRIPTION
@@ -50,24 +50,20 @@ In the rest of this man page, and also in all tecla configuration files, key
 sequences are expressed as follows.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^A\fR or \fBC-a\fR\fR
 .ad
 .RS 13n
-.rt  
 This is a 'CONTROL-A', entered by pressing the CONTROL key at the same time as
 the 'A' key.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\E\fR or \fBM-\fR\fR
 .ad
 .RS 13n
-.rt  
 In key sequences, both of these notations can be entered either by pressing the
 ESCAPE key, then the following key, or by pressing the META key at the same
 time as the following key. Thus the key sequence \fBM-p\fR can be typed in two
@@ -77,56 +73,46 @@ META key at the same time as 'P'.
 
 .sp
 .ne 2
-.mk
 .na
 \fBup\fR
 .ad
 .RS 13n
-.rt  
 This refers to the up-arrow key.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdown\fR
 .ad
 .RS 13n
-.rt  
 This refers to the down-arrow key.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBleft\fR
 .ad
 .RS 13n
-.rt  
 This refers to the left-arrow key.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBright\fR
 .ad
 .RS 13n
-.rt  
 This refers to the right-arrow key.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBa\fR
 .ad
 .RS 13n
-.rt  
 This is just a normal 'A' key.
 .RE
 
@@ -152,34 +138,28 @@ This will re-configure the default bindings for \fBvi\fR-mode. The complete set
 of arguments that this command accepts are:
 .sp
 .ne 2
-.mk
 .na
 \fBvi\fR
 .ad
 .RS 9n
-.rt  
 Install key bindings like those of the \fBvi\fR editor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBemacs\fR
 .ad
 .RS 9n
-.rt  
 Install key bindings like those of the \fBemacs\fR editor. This is the default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnone\fR
 .ad
 .RS 9n
-.rt  
 Use just the native line editing facilities provided by the terminal driver.
 .RE
 
@@ -491,201 +471,165 @@ They are also used in the next two sections to list the default key bindings in
 \fBemacs\fR and \fBvi\fR modes.
 .sp
 .ne 2
-.mk
 .na
 \fBuser-interrupt\fR
 .ad
 .RS 30n
-.rt  
 Send a SIGINT signal to the parent process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBsuspend\fR
 .ad
 .RS 30n
-.rt  
 Suspend the parent process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBstop-output\fR
 .ad
 .RS 30n
-.rt  
 Pause terminal output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBstart-output\fR
 .ad
 .RS 30n
-.rt  
 Resume paused terminal output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBliteral-next\fR
 .ad
 .RS 30n
-.rt  
 Arrange for the next character to be treated as a normal character. This allows
 control characters to be entered.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBcursor-right\fR
 .ad
 .RS 30n
-.rt  
 Move the cursor one character right.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBcursor-left\fR
 .ad
 .RS 30n
-.rt  
 Move the cursor one character left.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBinsert-mode\fR
 .ad
 .RS 30n
-.rt  
 Toggle between insert mode and overwrite mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBbeginning-of-line\fR
 .ad
 .RS 30n
-.rt  
 Move the cursor to the beginning of the line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBend-of-line\fR
 .ad
 .RS 30n
-.rt  
 Move the cursor to the end of the line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdelete-line\fR
 .ad
 .RS 30n
-.rt  
 Delete the contents of the current line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBkill-line\fR
 .ad
 .RS 30n
-.rt  
 Delete everything that follows the cursor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBbackward-kill-line\fR
 .ad
 .RS 30n
-.rt  
 Delete all characters between the cursor and the start of the line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBforward-word\fR
 .ad
 .RS 30n
-.rt  
 Move to the end of the word which follows the cursor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBforward-to-word\fR
 .ad
 .RS 30n
-.rt  
 Move the cursor to the start of the word that follows the cursor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBbackward-word\fR
 .ad
 .RS 30n
-.rt  
 Move to the start of the word which precedes the cursor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBgoto-column\fR
 .ad
 .RS 30n
-.rt  
 Move the cursor to the 1-relative column in the line specified by any preceding
 digit-argument sequences (see Entering Repeat Counts below).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBfind-parenthesis\fR
 .ad
 .RS 30n
-.rt  
 If the cursor is currently over a parenthesis character, move it to the
 matching parenthesis character. If not over a parenthesis character move right
 to the next close parenthesis.
@@ -693,34 +637,28 @@ to the next close parenthesis.
 
 .sp
 .ne 2
-.mk
 .na
 \fBforward-delete-char\fR
 .ad
 .RS 30n
-.rt  
 Delete the character under the cursor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBbackward-delete-char\fR
 .ad
 .RS 30n
-.rt  
 Delete the character which precedes the cursor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBlist-or-eof\fR
 .ad
 .RS 30n
-.rt  
 This is intended for binding to \fB^D\fR. When invoked when the cursor is
 within the line it displays all possible completions then redisplays the line
 unchanged. When invoked on an empty line, it signals end-of-input (EOF) to the
@@ -729,12 +667,10 @@ caller of \fBgl_get_line()\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBdel-char-or-list-or-eof\fR
 .ad
 .RS 30n
-.rt  
 This is intended for binding to \fB^D\fR. When invoked when the cursor is
 within the line it invokes forward-delete-char. When invoked at the end of the
 line it displays all possible completions then redisplays the line unchanged.
@@ -744,195 +680,161 @@ When invoked on an empty line, it signals end-of-input (EOF) to the caller of
 
 .sp
 .ne 2
-.mk
 .na
 \fBforward-delete-word\fR
 .ad
 .RS 30n
-.rt  
 Delete the word which follows the cursor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBbackward-delete-word\fR
 .ad
 .RS 30n
-.rt  
 Delete the word which precedes the cursor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBupcase-word\fR
 .ad
 .RS 30n
-.rt  
 Convert all of the characters of the word which follows the cursor, to upper
 case.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdowncase-word\fR
 .ad
 .RS 30n
-.rt  
 Convert all of the characters of the word which follows the cursor, to lower
 case.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBcapitalize-word\fR
 .ad
 .RS 30n
-.rt  
 Capitalize the word which follows the cursor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBchange-case\fR
 .ad
 .RS 30n
-.rt  
 If the next character is upper case, toggle it to lower case and vice versa.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBredisplay\fR
 .ad
 .RS 30n
-.rt  
 Redisplay the line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBclear-screen\fR
 .ad
 .RS 30n
-.rt  
 Clear the terminal, then redisplay the current line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBtranspose-chars\fR
 .ad
 .RS 30n
-.rt  
 Swap the character under the cursor with the character just before the cursor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBset-mark\fR
 .ad
 .RS 30n
-.rt  
 Set a mark at the position of the cursor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBexchange-point-and-mark\fR
 .ad
 .RS 30n
-.rt  
 Move the cursor to the last mark that was set, and move the mark to where the
 cursor used to be.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBkill-region\fR
 .ad
 .RS 30n
-.rt  
 Delete the characters that lie between the last mark that was set, and the
 cursor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBcopy-region-as-kill\fR
 .ad
 .RS 30n
-.rt  
 Copy the text between the mark and the cursor to the cut buffer, without
 deleting the original text.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fByank\fR
 .ad
 .RS 30n
-.rt  
 Insert the text that was last deleted, just before the current position of the
 cursor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBappend-yank\fR
 .ad
 .RS 30n
-.rt  
 Paste the current contents of the cut buffer, after the cursor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBup-history\fR
 .ad
 .RS 30n
-.rt  
 Recall the next oldest line that was entered. Note that in \fBvi\fR mode you
 are left in command mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdown-history\fR
 .ad
 .RS 30n
-.rt  
 Recall the next most recent line that was entered. If no history recall session
 is currently active, the next line from a previous recall session is recalled.
 Note that in vi mode you are left in command mode.
@@ -940,12 +842,10 @@ Note that in vi mode you are left in command mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fBhistory-search-backward\fR
 .ad
 .RS 30n
-.rt  
 Recall the next oldest line who's prefix matches the string which currently
 precedes the cursor (in \fBvi\fR command-mode the character under the cursor is
 also included in the search string). Note that in \fBvi\fR mode you are left in
@@ -954,12 +854,10 @@ command mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fBhistory-search-forward\fR
 .ad
 .RS 30n
-.rt  
 Recall the next newest line who's prefix matches the string which currently
 precedes the cursor (in \fBvi\fR command-mode the character under the cursor is
 also included in the search string). Note that in \fBvi\fR mode you are left in
@@ -968,36 +866,30 @@ command mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fBhistory-re-search-backward\fR
 .ad
 .RS 30n
-.rt  
 Recall the next oldest line who's prefix matches that established by the last
 invocation of either history-search-forward or history-search-backward.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBhistory-re-search-forward\fR
 .ad
 .RS 30n
-.rt  
 Recall the next newest line who's prefix matches that established by the last
 invocation of either history-search-forward or history-search-backward.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBcomplete-word\fR
 .ad
 .RS 30n
-.rt  
 Attempt to complete the incomplete word which precedes the cursor. Unless the
 host program has customized word completion, file name completion is attempted.
 In \fBvi\fR commmand mode the character under the cursor is also included in
@@ -1006,12 +898,10 @@ the word being completed, and you are left in \fBvi\fR insert mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fBexpand-filename\fR
 .ad
 .RS 30n
-.rt  
 Within the command line, expand wild cards, tilde expressions and dollar
 expressions in the file name which immediately precedes the cursor. In \fBvi\fR
 commmand mode the character under the cursor is also included in the file name
@@ -1020,12 +910,10 @@ being expanded, and you are left in \fBvi\fR insert mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fBlist-glob\fR
 .ad
 .RS 30n
-.rt  
 List any file names which match the wild-card, tilde and dollar expressions in
 the file name which immediately precedes the cursor, then redraw the input line
 unchanged.
@@ -1033,12 +921,10 @@ unchanged.
 
 .sp
 .ne 2
-.mk
 .na
 \fBlist-history\fR
 .ad
 .RS 30n
-.rt  
 Display the contents of the history list for the current history group. If a
 repeat count of \fB> 1\fR is specified, only that many of the most recent lines
 are displayed. See the Entering Repeat Counts section.
@@ -1046,71 +932,59 @@ are displayed. See the Entering Repeat Counts section.
 
 .sp
 .ne 2
-.mk
 .na
 \fBread-from-file\fR
 .ad
 .RS 30n
-.rt  
 Temporarily switch to reading input from the file who's name precedes the
 cursor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBread-init-files\fR
 .ad
 .RS 30n
-.rt  
 Re-read \fBteclarc\fR configuration files.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBbeginning-of-history\fR
 .ad
 .RS 30n
-.rt  
 Move to the oldest line in the history list. Note that in \fBvi\fR mode you are
 left in command mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBend-of-history\fR
 .ad
 .RS 30n
-.rt  
 Move to the newest line in the history list (ie. the current line). Note that
 in \fBvi\fR mode this leaves you in command mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdigit-argument\fR
 .ad
 .RS 30n
-.rt  
 Enter a repeat count for the next key binding function. For details, see the
 Entering Repeat Counts section.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnewline\fR
 .ad
 .RS 30n
-.rt  
 Terminate and return the current contents of the line, after appending a
 newline character. The newline character is normally '\n', but will be the
 first character of the key sequence that invoked the newline action, if this
@@ -1121,12 +995,10 @@ to the history buffer.
 
 .sp
 .ne 2
-.mk
 .na
 \fBrepeat-history\fR
 .ad
 .RS 30n
-.rt  
 Return the line that is being edited, then arrange for the next most recent
 entry in the history buffer to be recalled when tecla is next called.
 Repeatedly invoking this action causes successive historical input lines to be
@@ -1136,522 +1008,432 @@ ksh.
 
 .sp
 .ne 2
-.mk
 .na
 \fBring-bell\fR
 .ad
 .RS 30n
-.rt  
 Ring the terminal bell, unless the bell has been silenced via the nobeep
 configuration option (see The Tecla Configuration File section).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBforward-copy-char\fR
 .ad
 .RS 30n
-.rt  
 Copy the next character into the cut buffer (NB. use repeat counts to copy more
 than one).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBbackward-copy-char\fR
 .ad
 .RS 30n
-.rt  
 Copy the previous character into the cut buffer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBforward-copy-word\fR
 .ad
 .RS 30n
-.rt  
 Copy the next word into the cut buffer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBbackward-copy-word\fR
 .ad
 .RS 30n
-.rt  
 Copy the previous word into the cut buffer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBforward-find-char\fR
 .ad
 .RS 30n
-.rt  
 Move the cursor to the next occurrence of the next character that you type.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBbackward-find-char\fR
 .ad
 .RS 30n
-.rt  
 Move the cursor to the last occurrence of the next character that you type.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBforward-to-char\fR
 .ad
 .RS 30n
-.rt  
 Move the cursor to the character just before the next occurrence of the next
 character that the user types.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBbackward-to-char\fR
 .ad
 .RS 30n
-.rt  
 Move the cursor to the character just after the last occurrence before the
 cursor of the next character that the user types.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBrepeat-find-char\fR
 .ad
 .RS 30n
-.rt  
 Repeat the last backward-find-char, forward-find-char, backward-to-char or
 forward-to-char.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBinvert-refind-char\fR
 .ad
 .RS 30n
-.rt  
 Repeat the last backward-find-char, forward-find-char, backward-to-char, or
 forward-to-char in the opposite direction.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdelete-to-column\fR
 .ad
 .RS 30n
-.rt  
 Delete the characters from the cursor up to the column that is specified by the
 repeat count.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdelete-to-parenthesis\fR
 .ad
 .RS 30n
-.rt  
 Delete the characters from the cursor up to and including the matching
 parenthesis, or next close parenthesis.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBforward-delete-find\fR
 .ad
 .RS 30n
-.rt  
 Delete the characters from the cursor up to and including the following
 occurence of the next character typed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBbackward-delete-find\fR
 .ad
 .RS 30n
-.rt  
 Delete the characters from the cursor up to and including the preceding
 occurence of the next character typed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBforward-delete-to\fR
 .ad
 .RS 30n
-.rt  
 Delete the characters from the cursor up to, but not including, the following
 occurence of the next character typed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBbackward-delete-to\fR
 .ad
 .RS 30n
-.rt  
 Delete the characters from the cursor up to, but not including, the preceding
 occurence of the next character typed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdelete-refind\fR
 .ad
 .RS 30n
-.rt  
 Repeat the last *-delete-find or *-delete-to action.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdelete-invert-refind\fR
 .ad
 .RS 30n
-.rt  
 Repeat the last *-delete-find or *-delete-to action, in the opposite direction.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBcopy-to-column\fR
 .ad
 .RS 30n
-.rt  
 Copy the characters from the cursor up to the column that is specified by the
 repeat count, into the cut buffer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBcopy-to-parenthesis\fR
 .ad
 .RS 30n
-.rt  
 Copy the characters from the cursor up to and including the matching
 parenthesis, or next close parenthesis, into the cut buffer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBforward-copy-find\fR
 .ad
 .RS 30n
-.rt  
 Copy the characters from the cursor up to and including the following occurence
 of the next character typed, into the cut buffer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBbackward-copy-find\fR
 .ad
 .RS 30n
-.rt  
 Copy the characters from the cursor up to and including the preceding occurence
 of the next character typed, into the cut buffer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBforward-copy-to\fR
 .ad
 .RS 30n
-.rt  
 Copy the characters from the cursor up to, but not including, the following
 occurence of the next character typed, into the cut buffer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBbackward-copy-to\fR
 .ad
 .RS 30n
-.rt  
 Copy the characters from the cursor up to, but not including, the preceding
 occurence of the next character typed, into the cut buffer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBcopy-refind\fR
 .ad
 .RS 30n
-.rt  
 Repeat the last *-copy-find or *-copy-to action.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBcopy-invert-refind\fR
 .ad
 .RS 30n
-.rt  
 Repeat the last *-copy-find or *-copy-to action, in the opposite direction.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBvi-mode\fR
 .ad
 .RS 30n
-.rt  
 Switch to \fBvi\fR mode from emacs mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBemacs-mode\fR
 .ad
 .RS 30n
-.rt  
 Switch to \fBemacs\fR mode from \fBvi\fR mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBvi-insert\fR
 .ad
 .RS 30n
-.rt  
 From \fBvi\fR command mode, switch to insert mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBvi-overwrite\fR
 .ad
 .RS 30n
-.rt  
 From \fBvi\fR command mode, switch to overwrite mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBvi-insert-at-bol\fR
 .ad
 .RS 30n
-.rt  
 From \fBvi\fR command mode, move the cursor to the start of the line and switch
 to insert mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBvi-append-at-eol\fR
 .ad
 .RS 30n
-.rt  
 From \fBvi\fR command mode, move the cursor to the end of the line and switch
 to append mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBvi-append\fR
 .ad
 .RS 30n
-.rt  
 From \fBvi\fR command mode, move the cursor one position right, and switch to
 insert mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBvi-replace-char\fR
 .ad
 .RS 30n
-.rt  
 From \fBvi\fR command mode, replace the character under the cursor with the
 next character entered.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBvi-forward-change-char\fR
 .ad
 .RS 30n
-.rt  
 From \fBvi\fR command mode, delete the next character then enter insert mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBvi-backward-change-char\fR
 .ad
 .RS 30n
-.rt  
 From vi command mode, delete the preceding character then enter insert mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBvi-forward-change-word\fR
 .ad
 .RS 30n
-.rt  
 From \fBvi\fR command mode, delete the next word then enter insert mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBvi-backward-change-word\fR
 .ad
 .RS 30n
-.rt  
 From vi command mode, delete the preceding word then enter insert mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBvi-change-rest-of-line\fR
 .ad
 .RS 30n
-.rt  
 From \fBvi\fR command mode, delete from the cursor to the end of the line, then
 enter insert mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBvi-change-line\fR
 .ad
 .RS 30n
-.rt  
 From \fBvi\fR command mode, delete the current line, then enter insert mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBvi-change-to-bol\fR
 .ad
 .RS 30n
-.rt  
 From \fBvi\fR command mode, delete all characters between the cursor and the
 beginning of the line, then enter insert mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBvi-change-to-column\fR
 .ad
 .RS 30n
-.rt  
 From \fBvi\fR command mode, delete the characters from the cursor up to the
 column that is specified by the repeat count, then enter insert mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBvi-change-to-parenthesis\fR
 .ad
 .RS 30n
-.rt  
 Delete the characters from the cursor up to and including the matching
 parenthesis, or next close parenthesis, then enter \fBvi\fR insert mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBvi-forward-change-find\fR
 .ad
 .RS 30n
-.rt  
 From \fBvi\fR command mode, delete the characters from the cursor up to and
 including the following occurence of the next character typed, then enter
 insert mode.
@@ -1659,24 +1441,20 @@ insert mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fBvi-backward-change-find\fR
 .ad
 .RS 30n
-.rt  
 From vi command mode, delete the characters from the cursor up to and including
 the preceding occurence of the next character typed, then enter insert mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBvi-forward-change-to\fR
 .ad
 .RS 30n
-.rt  
 From \fBvi\fR command mode, delete the characters from the cursor up to, but
 not including, the following occurence of the next character typed, then enter
 insert mode.
@@ -1684,12 +1462,10 @@ insert mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fBvi-backward-change-to\fR
 .ad
 .RS 30n
-.rt  
 From \fBvi\fR command mode, delete the characters from the cursor up to, but
 not including, the preceding occurence of the next character typed, then enter
 insert mode.
@@ -1697,46 +1473,38 @@ insert mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fBvi-change-refind\fR
 .ad
 .RS 30n
-.rt  
 Repeat the last vi-*-change-find or vi-*-change-to action.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBvi-change-invert-refind\fR
 .ad
 .RS 30n
-.rt  
 Repeat the last vi-*-change-find or vi-*-change-to action, in the opposite
 direction.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBvi-undo\fR
 .ad
 .RS 30n
-.rt  
 In \fBvi\fR mode, undo the last editing operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBvi-repeat-change\fR
 .ad
 .RS 30n
-.rt  
 In \fBvi\fR command mode, repeat the last command that modified the line.
 .RE
 
@@ -1758,67 +1526,55 @@ examples of what they will probably be set to. If you have used the stty
 command to change these keys, then the default bindings should match.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^C\fR\fR
 .ad
 .RS 6n
-.rt  
 user-interrupt
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^\\fR\fR
 .ad
 .RS 6n
-.rt  
 abort
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^Z\fR\fR
 .ad
 .RS 6n
-.rt  
 suspend
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^Q\fR\fR
 .ad
 .RS 6n
-.rt  
 start-output
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^S\fR\fR
 .ad
 .RS 6n
-.rt  
 stop-output
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^V\fR\fR
 .ad
 .RS 6n
-.rt  
 literal-next
 .RE
 
@@ -1829,45 +1585,37 @@ different types of terminals generate different key sequences when their cursor
 keys are pressed.
 .sp
 .ne 2
-.mk
 .na
 \fBright\fR
 .ad
 .RS 9n
-.rt  
 cursor-right
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBleft\fR
 .ad
 .RS 9n
-.rt  
 cursor-left
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBup\fR
 .ad
 .RS 9n
-.rt  
 up-history
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdown\fR
 .ad
 .RS 9n
-.rt  
 down-history
 .RE
 
@@ -1876,474 +1624,388 @@ down-history
 The remaining bindings don't depend on the terminal setttings.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^F\fR\fR
 .ad
 .RS 21n
-.rt  
 cursor-right
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^B\fR\fR
 .ad
 .RS 21n
-.rt  
 cursor-left
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-i\fR\fR
 .ad
 .RS 21n
-.rt  
 insert-mode
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^A\fR\fR
 .ad
 .RS 21n
-.rt  
 beginning-of-line
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^E\fR\fR
 .ad
 .RS 21n
-.rt  
 end-of-line
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^U\fR\fR
 .ad
 .RS 21n
-.rt  
 delete-line
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^K\fR\fR
 .ad
 .RS 21n
-.rt  
 kill-line
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-f\fR\fR
 .ad
 .RS 21n
-.rt  
 forward-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-b\fR\fR
 .ad
 .RS 21n
-.rt  
 backward-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^D\fR\fR
 .ad
 .RS 21n
-.rt  
 del-char-or-list-or-eof
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^H\fR\fR
 .ad
 .RS 21n
-.rt  
 backward-delete-char
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^?\fR\fR
 .ad
 .RS 21n
-.rt  
 backward-delete-char
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-d\fR\fR
 .ad
 .RS 21n
-.rt  
 forward-delete-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-^H\fR\fR
 .ad
 .RS 21n
-.rt  
 backward-delete-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-^?\fR\fR
 .ad
 .RS 21n
-.rt  
 backward-delete-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-u\fR\fR
 .ad
 .RS 21n
-.rt  
 upcase-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-l\fR\fR
 .ad
 .RS 21n
-.rt  
 downcase-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-c\fR\fR
 .ad
 .RS 21n
-.rt  
 capitalize-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^R\fR\fR
 .ad
 .RS 21n
-.rt  
 redisplay
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^L\fR\fR
 .ad
 .RS 21n
-.rt  
 clear-screen
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^T\fR\fR
 .ad
 .RS 21n
-.rt  
 transpose-chars
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^@\fR\fR
 .ad
 .RS 21n
-.rt  
 set-mark
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^X^X\fR\fR
 .ad
 .RS 21n
-.rt  
 exchange-point-and-mark
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^W\fR\fR
 .ad
 .RS 21n
-.rt  
 kill-region
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-w\fR\fR
 .ad
 .RS 21n
-.rt  
 copy-region-as-kill
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^Y\fR\fR
 .ad
 .RS 21n
-.rt  
 yank
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^P\fR\fR
 .ad
 .RS 21n
-.rt  
 up-history
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^N\fR\fR
 .ad
 .RS 21n
-.rt  
 down-history
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-p\fR\fR
 .ad
 .RS 21n
-.rt  
 history-search-backward
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-n\fR\fR
 .ad
 .RS 21n
-.rt  
 history-search-forward
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^I\fR\fR
 .ad
 .RS 21n
-.rt  
 complete-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^X*\fR\fR
 .ad
 .RS 21n
-.rt  
 expand-filename
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^X^F\fR\fR
 .ad
 .RS 21n
-.rt  
 read-from-file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^X^R\fR\fR
 .ad
 .RS 21n
-.rt  
 read-init-files
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^Xg\fR\fR
 .ad
 .RS 21n
-.rt  
 list-glob
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^Xh\fR\fR
 .ad
 .RS 21n
-.rt  
 list-history
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-<\fR\fR
 .ad
 .RS 21n
-.rt  
 beginning-of-history
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM->\fR\fR
 .ad
 .RS 21n
-.rt  
 end-of-history
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\n\fR\fR
 .ad
 .RS 21n
-.rt  
 newline
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\r\fR\fR
 .ad
 .RS 21n
-.rt  
 newline
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-o\fR\fR
 .ad
 .RS 21n
-.rt  
 repeat-history
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-^V\fR\fR
 .ad
 .RS 21n
-.rt  
 \fBvi\fR-mode
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-0, M-1, ... M-9\fR\fR
 .ad
 .RS 21n
-.rt  
 digit-argument (see below)
 .RE
 
@@ -2378,122 +2040,100 @@ they will probably be set to. If you have used the \fBstty\fR command to change
 these keys, then the default bindings should match.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^C\fR\fR
 .ad
 .RS 8n
-.rt  
 user-interrupt
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^\\fR\fR
 .ad
 .RS 8n
-.rt  
 abort
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^Z\fR\fR
 .ad
 .RS 8n
-.rt  
 suspend
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^Q\fR\fR
 .ad
 .RS 8n
-.rt  
 start-output
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^S\fR\fR
 .ad
 .RS 8n
-.rt  
 stop-output
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^V\fR\fR
 .ad
 .RS 8n
-.rt  
 literal-next
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-^C\fR\fR
 .ad
 .RS 8n
-.rt  
 user-interrupt
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-^\\fR\fR
 .ad
 .RS 8n
-.rt  
 abort
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-^Z\fR\fR
 .ad
 .RS 8n
-.rt  
 suspend
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-^Q\fR\fR
 .ad
 .RS 8n
-.rt  
 start-output
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-^S\fR\fR
 .ad
 .RS 8n
-.rt  
 stop-output
 .RE
 
@@ -2515,45 +2155,37 @@ different types of terminals generate different key sequences when their cursor
 keys are pressed.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBright\fR\fR
 .ad
 .RS 9n
-.rt  
 cursor-right
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBleft\fR\fR
 .ad
 .RS 9n
-.rt  
 cursor-left
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBup\fR\fR
 .ad
 .RS 9n
-.rt  
 up-history
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdown\fR\fR
 .ad
 .RS 9n
-.rt  
 down-history
 .RE
 
@@ -2568,177 +2200,145 @@ The following are the terminal-independent key bindings for \fBvi\fR input
 mode.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^D\fR\fR
 .ad
 .RS 8n
-.rt  
 list-or-eof
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^G\fR\fR
 .ad
 .RS 8n
-.rt  
 list-glob
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^H\fR\fR
 .ad
 .RS 8n
-.rt  
 backward-delete-char
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^I\fR\fR
 .ad
 .RS 8n
-.rt  
 complete-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\r\fR\fR
 .ad
 .RS 8n
-.rt  
 newline
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\n\fR\fR
 .ad
 .RS 8n
-.rt  
 newline
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^L\fR\fR
 .ad
 .RS 8n
-.rt  
 clear-screen
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^N\fR\fR
 .ad
 .RS 8n
-.rt  
 down-history
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^P\fR\fR
 .ad
 .RS 8n
-.rt  
 up-history
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^R\fR\fR
 .ad
 .RS 8n
-.rt  
 redisplay
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^U\fR\fR
 .ad
 .RS 8n
-.rt  
 backward-kill-line
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^W\fR\fR
 .ad
 .RS 8n
-.rt  
 backward-delete-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^X*\fR\fR
 .ad
 .RS 8n
-.rt  
 expand-filename
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^X^F\fR\fR
 .ad
 .RS 8n
-.rt  
 read-from-file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^X^R\fR\fR
 .ad
 .RS 8n
-.rt  
 read-init-files
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^?\fR\fR
 .ad
 .RS 8n
-.rt  
 backward-delete-char
 .RE
 
@@ -2755,1475 +2355,1207 @@ equivalent META character, and the second because command mode was already
 active.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-\\fR\fR
 .ad
 .RS 21n
-.rt  
 cursor-right (META-space)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-$\fR\fR
 .ad
 .RS 21n
-.rt  
 end-of-line
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-*\fR\fR
 .ad
 .RS 21n
-.rt  
 expand-filename
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-+\fR\fR
 .ad
 .RS 21n
-.rt  
 down-history
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM--\fR\fR
 .ad
 .RS 21n
-.rt  
 up-history
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-<\fR\fR
 .ad
 .RS 21n
-.rt  
 beginning-of-history
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM->\fR\fR
 .ad
 .RS 21n
-.rt  
 end-of-history
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-^\fR\fR
 .ad
 .RS 21n
-.rt  
 beginning-of-line
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-\fR\fR
 .ad
 .RS 21n
-.rt  
 repeat-find-char
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-,\fR\fR
 .ad
 .RS 21n
-.rt  
 invert-refind-char
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-|\fR\fR
 .ad
 .RS 21n
-.rt  
 goto-column
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-~\fR\fR
 .ad
 .RS 21n
-.rt  
 change-case
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-.\fR\fR
 .ad
 .RS 21n
-.rt  
 vi-repeat-change
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-%\fR\fR
 .ad
 .RS 21n
-.rt  
 find-parenthesis
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-a\fR\fR
 .ad
 .RS 21n
-.rt  
 vi-append
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-A\fR\fR
 .ad
 .RS 21n
-.rt  
 vi-append-at-eol
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-b\fR\fR
 .ad
 .RS 21n
-.rt  
 backward-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-B\fR\fR
 .ad
 .RS 21n
-.rt  
 backward-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-C\fR\fR
 .ad
 .RS 21n
-.rt  
 vi-change-rest-of-line
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-cb\fR\fR
 .ad
 .RS 21n
-.rt  
 vi-backward-change-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-cB\fR\fR
 .ad
 .RS 21n
-.rt  
 vi-backward-change-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-cc\fR\fR
 .ad
 .RS 21n
-.rt  
 vi-change-line
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-ce\fR\fR
 .ad
 .RS 21n
-.rt  
 vi-forward-change-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-cE\fR\fR
 .ad
 .RS 21n
-.rt  
 vi-forward-change-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-cw\fR\fR
 .ad
 .RS 21n
-.rt  
 vi-forward-change-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-cW\fR\fR
 .ad
 .RS 21n
-.rt  
 vi-forward-change-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-cF\fR\fR
 .ad
 .RS 21n
-.rt  
 vi-backward-change-find
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-cf\fR\fR
 .ad
 .RS 21n
-.rt  
 vi-forward-change-find
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-cT\fR\fR
 .ad
 .RS 21n
-.rt  
 vi-backward-change-to
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-ct\fR\fR
 .ad
 .RS 21n
-.rt  
 vi-forward-change-to
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-c;\fR\fR
 .ad
 .RS 21n
-.rt  
 vi-change-refind
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-c,\fR\fR
 .ad
 .RS 21n
-.rt  
 vi-change-invert-refind
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-ch\fR\fR
 .ad
 .RS 21n
-.rt  
 vi-backward-change-char
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-c^H\fR\fR
 .ad
 .RS 21n
-.rt  
 vi-backward-change-char
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-c^?\fR\fR
 .ad
 .RS 21n
-.rt  
 vi-backward-change-char
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-cl\fR\fR
 .ad
 .RS 21n
-.rt  
 vi-forward-change-char
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-c\\fR\fR
 .ad
 .RS 21n
-.rt  
 vi-forward-change-char (META-c-space)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-c^\fR\fR
 .ad
 .RS 21n
-.rt  
 vi-change-to-bol
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-c0\fR\fR
 .ad
 .RS 21n
-.rt  
 vi-change-to-bol
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-c$\fR\fR
 .ad
 .RS 21n
-.rt  
 vi-change-rest-of-line
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-c|\fR\fR
 .ad
 .RS 21n
-.rt  
 vi-change-to-column
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-c%\fR\fR
 .ad
 .RS 21n
-.rt  
 vi-change-to-parenthesis
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-dh\fR\fR
 .ad
 .RS 21n
-.rt  
 backward-delete-char
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-d^H\fR\fR
 .ad
 .RS 21n
-.rt  
 backward-delete-char
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-d^?\fR\fR
 .ad
 .RS 21n
-.rt  
 backward-delete-char
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-dl\fR\fR
 .ad
 .RS 21n
-.rt  
 forward-delete-char
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-d\fR\fR
 .ad
 .RS 21n
-.rt  
 forward-delete-char (META-d-space)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-dd\fR\fR
 .ad
 .RS 21n
-.rt  
 delete-line
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-db\fR\fR
 .ad
 .RS 21n
-.rt  
 backward-delete-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-dB\fR\fR
 .ad
 .RS 21n
-.rt  
 backward-delete-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-de\fR\fR
 .ad
 .RS 21n
-.rt  
 forward-delete-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-dE\fR\fR
 .ad
 .RS 21n
-.rt  
 forward-delete-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-dw\fR\fR
 .ad
 .RS 21n
-.rt  
 forward-delete-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-dW\fR\fR
 .ad
 .RS 21n
-.rt  
 forward-delete-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-dF\fR\fR
 .ad
 .RS 21n
-.rt  
 backward-delete-find
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-df\fR\fR
 .ad
 .RS 21n
-.rt  
 forward-delete-find
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-dT\fR\fR
 .ad
 .RS 21n
-.rt  
 backward-delete-to
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-dt\fR\fR
 .ad
 .RS 21n
-.rt  
 forward-delete-to
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-d;\fR\fR
 .ad
 .RS 21n
-.rt  
 delete-refind
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-d,\fR\fR
 .ad
 .RS 21n
-.rt  
 delete-invert-refind
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-d^\fR\fR
 .ad
 .RS 21n
-.rt  
 backward-kill-line
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-d0\fR\fR
 .ad
 .RS 21n
-.rt  
 backward-kill-line
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-d$\fR\fR
 .ad
 .RS 21n
-.rt  
 kill-line
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-D\fR\fR
 .ad
 .RS 21n
-.rt  
 kill-line
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-d|\fR\fR
 .ad
 .RS 21n
-.rt  
 delete-to-column
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-d%\fR\fR
 .ad
 .RS 21n
-.rt  
 delete-to-parenthesis
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-e\fR\fR
 .ad
 .RS 21n
-.rt  
 forward-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-E\fR\fR
 .ad
 .RS 21n
-.rt  
 forward-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-f\fR\fR
 .ad
 .RS 21n
-.rt  
 forward-find-char
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-F\fR\fR
 .ad
 .RS 21n
-.rt  
 backward-find-char
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM--\fR\fR
 .ad
 .RS 21n
-.rt  
 up-history
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-h\fR\fR
 .ad
 .RS 21n
-.rt  
 cursor-left
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-H\fR\fR
 .ad
 .RS 21n
-.rt  
 beginning-of-history
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-i\fR\fR
 .ad
 .RS 21n
-.rt  
 vi-insert
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-I\fR\fR
 .ad
 .RS 21n
-.rt  
 vi-insert-at-bol
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-j\fR\fR
 .ad
 .RS 21n
-.rt  
 down-history
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-J\fR\fR
 .ad
 .RS 21n
-.rt  
 history-search-forward
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-k\fR\fR
 .ad
 .RS 21n
-.rt  
 up-history
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-K\fR\fR
 .ad
 .RS 21n
-.rt  
 history-search-backward
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-l\fR\fR
 .ad
 .RS 21n
-.rt  
 cursor-right
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-L\fR\fR
 .ad
 .RS 21n
-.rt  
 end-of-history
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-n\fR\fR
 .ad
 .RS 21n
-.rt  
 history-re-search-forward
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-N\fR\fR
 .ad
 .RS 21n
-.rt  
 history-re-search-backward
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-p\fR\fR
 .ad
 .RS 21n
-.rt  
 append-yank
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-P\fR\fR
 .ad
 .RS 21n
-.rt  
 yank
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-r\fR\fR
 .ad
 .RS 21n
-.rt  
 vi-replace-char
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-R\fR\fR
 .ad
 .RS 21n
-.rt  
 vi-overwrite
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-s\fR\fR
 .ad
 .RS 21n
-.rt  
 vi-forward-change-char
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-S\fR\fR
 .ad
 .RS 21n
-.rt  
 vi-change-line
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-t\fR\fR
 .ad
 .RS 21n
-.rt  
 forward-to-char
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-T\fR\fR
 .ad
 .RS 21n
-.rt  
 backward-to-char
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-u\fR\fR
 .ad
 .RS 21n
-.rt  
 vi-undo
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-w\fR\fR
 .ad
 .RS 21n
-.rt  
 forward-to-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-W\fR\fR
 .ad
 .RS 21n
-.rt  
 forward-to-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-x\fR\fR
 .ad
 .RS 21n
-.rt  
 forward-delete-char
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-X\fR\fR
 .ad
 .RS 21n
-.rt  
 backward-delete-char
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-yh\fR\fR
 .ad
 .RS 21n
-.rt  
 backward-copy-char
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-y^H\fR\fR
 .ad
 .RS 21n
-.rt  
 backward-copy-char
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-y^?\fR\fR
 .ad
 .RS 21n
-.rt  
 backward-copy-char
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-yl\fR\fR
 .ad
 .RS 21n
-.rt  
 forward-copy-char
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-y\\fR\fR
 .ad
 .RS 21n
-.rt  
 forward-copy-char (META-y-space)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-ye\fR\fR
 .ad
 .RS 21n
-.rt  
 forward-copy-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-yE\fR\fR
 .ad
 .RS 21n
-.rt  
 forward-copy-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-yw\fR\fR
 .ad
 .RS 21n
-.rt  
 forward-copy-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-yW\fR\fR
 .ad
 .RS 21n
-.rt  
 forward-copy-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-yb\fR\fR
 .ad
 .RS 21n
-.rt  
 backward-copy-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-yB\fR\fR
 .ad
 .RS 21n
-.rt  
 backward-copy-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-yf\fR\fR
 .ad
 .RS 21n
-.rt  
 forward-copy-find
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-yF\fR\fR
 .ad
 .RS 21n
-.rt  
 backward-copy-find
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-yt\fR\fR
 .ad
 .RS 21n
-.rt  
 forward-copy-to
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-yT\fR\fR
 .ad
 .RS 21n
-.rt  
 backward-copy-to
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-y;\fR\fR
 .ad
 .RS 21n
-.rt  
 copy-refind
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-y,\fR\fR
 .ad
 .RS 21n
-.rt  
 copy-invert-refind
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-y^\fR\fR
 .ad
 .RS 21n
-.rt  
 copy-to-bol
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-y0\fR\fR
 .ad
 .RS 21n
-.rt  
 copy-to-bol
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-y$\fR\fR
 .ad
 .RS 21n
-.rt  
 copy-rest-of-line
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-yy\fR\fR
 .ad
 .RS 21n
-.rt  
 copy-line
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-Y\fR\fR
 .ad
 .RS 21n
-.rt  
 copy-line
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-y|\fR\fR
 .ad
 .RS 21n
-.rt  
 copy-to-column
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-y%\fR\fR
 .ad
 .RS 21n
-.rt  
 copy-to-parenthesis
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-^E\fR\fR
 .ad
 .RS 21n
-.rt  
 emacs-mode
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-^H\fR\fR
 .ad
 .RS 21n
-.rt  
 cursor-left
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-^?\fR\fR
 .ad
 .RS 21n
-.rt  
 cursor-left
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-^L\fR\fR
 .ad
 .RS 21n
-.rt  
 clear-screen
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-^N\fR\fR
 .ad
 .RS 21n
-.rt  
 down-history
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-^P\fR\fR
 .ad
 .RS 21n
-.rt  
 up-history
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-^R\fR\fR
 .ad
 .RS 21n
-.rt  
 redisplay
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-^D\fR\fR
 .ad
 .RS 21n
-.rt  
 list-or-eof
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-^I\fR\fR
 .ad
 .RS 21n
-.rt  
 complete-word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-\r\fR\fR
 .ad
 .RS 21n
-.rt  
 newline
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-\n\fR\fR
 .ad
 .RS 21n
-.rt  
 newline
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-^X^R\fR\fR
 .ad
 .RS 21n
-.rt  
 read-init-files
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-^Xh\fR\fR
 .ad
 .RS 21n
-.rt  
 list-history
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-0, M-1, ... M-9\fR\fR
 .ad
 .RS 21n
-.rt  
 digit-argument (see below)
 .RE
 
@@ -4297,34 +3629,28 @@ which triggered the digit-argument action.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/libtecla.so\fR\fR
 .ad
 .RS 27n
-.rt  
 The tecla library
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/include/libtecla.h\fR\fR
 .ad
 .RS 27n
-.rt  
 The tecla header file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~/.teclarc\fR\fR
 .ad
 .RS 27n
-.rt  
 The personal tecla customization file
 .RE
 
@@ -4336,13 +3662,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

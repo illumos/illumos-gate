@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH tnfctl_trace_state_set 3TNF "4 Mar 1997" "SunOS 5.11" "TNF Library Functions"
+.TH TNFCTL_TRACE_STATE_SET 3TNF "Mar 4, 1997"
 .SH NAME
 tnfctl_trace_state_set, tnfctl_filter_state_set, tnfctl_filter_list_get,
 tnfctl_filter_list_add, tnfctl_filter_list_delete \- control kernel tracing and
@@ -93,45 +93,37 @@ The interfaces \fBtnfctl_trace_state_set()\fR, \fBtnfctl_filter_state_set()\fR,
 The following error codes apply to \fBtnfctl_trace_state_set\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_BADARG\fR\fR
 .ad
 .RS 24n
-.rt  
 The handle is not a kernel handle.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_NOBUF\fR\fR
 .ad
 .RS 24n
-.rt  
 Cannot turn on tracing without a buffer being allocated.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_BUFBROKEN\fR\fR
 .ad
 .RS 24n
-.rt  
 Tracing is broken in the target.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_INTERNAL\fR\fR
 .ad
 .RS 24n
-.rt  
 An internal error occurred.
 .RE
 
@@ -140,23 +132,19 @@ An internal error occurred.
 The following error codes apply to \fBtnfctl_filter_state_set\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_BADARG\fR\fR
 .ad
 .RS 23n
-.rt  
 The handle is not a kernel handle.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_INTERNAL\fR\fR
 .ad
 .RS 23n
-.rt  
 An internal error occurred.
 .RE
 
@@ -165,45 +153,37 @@ An internal error occurred.
 The following error codes apply to \fBtnfctl_filter_list_add\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_BADARG\fR\fR
 .ad
 .RS 24n
-.rt  
 The handle is not a kernel handle.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_NOPROCESS\fR\fR
 .ad
 .RS 24n
-.rt  
 No such process exists.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_ALLOCFAIL\fR\fR
 .ad
 .RS 24n
-.rt  
 A memory allocation failure occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_INTERNAL\fR\fR
 .ad
 .RS 24n
-.rt  
 An internal error occurred.
 .RE
 
@@ -212,34 +192,28 @@ An internal error occurred.
 The following error codes apply to \fBtnfctl_filter_list_delete\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_BADARG\fR\fR
 .ad
 .RS 24n
-.rt  
 The handle is not a kernel handle.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_NOPROCESS\fR\fR
 .ad
 .RS 24n
-.rt  
 No such process exists.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_INTERNAL\fR\fR
 .ad
 .RS 24n
-.rt  
 An internal error occurred.
 .RE
 
@@ -248,34 +222,28 @@ An internal error occurred.
 The following error codes apply to  \fBtnfctl_filter_list_get\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_BADARG\fR\fR
 .ad
 .RS 24n
-.rt  
 The handle is not a kernel handle.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_ALLOCFAIL\fR\fR
 .ad
 .RS 24n
-.rt  
 A memory allocation failure occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_INTERNAL\fR\fR
 .ad
 .RS 24n
-.rt  
 An internal error occurred.
 .RE
 
@@ -287,13 +255,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT LevelMT-Safe
+MT Level	MT-Safe
 .TE
 
 .SH SEE ALSO

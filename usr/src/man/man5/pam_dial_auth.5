@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pam_dial_auth 5 "9 Sept 2004" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH PAM_DIAL_AUTH 5 "Sep 9, 2004"
 .SH NAME
 pam_dial_auth \- authentication management PAM module for dialups
 .SH SYNOPSIS
 .LP
 .nf
-\fBpam_dial_auth.so.1\fR 
+\fBpam_dial_auth.so.1\fR
 .fi
 
 .SH DESCRIPTION
@@ -35,12 +35,10 @@ prompted for a password which is validated against the entry found.
 The following option may be passed in to this service module:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdebug\fR\fR
 .ad
 .RS 9n
-.rt  
 \fBsyslog\fR(3C) debugging information at \fBLOG_DEBUG\fR level.
 .RE
 
@@ -52,45 +50,37 @@ successful completion of \fBpam_sm_authenticate()\fR, \fBPAM_SUCCESS\fR is
 returned. The following error codes are returned upon error:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_AUTH_ERR\fR\fR
 .ad
 .RS 20n
-.rt  
 Authentication failure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_SERVICE_ERR\fR\fR
 .ad
 .RS 20n
-.rt  
 Error in the calling service, \fBPAM_TTY\fR is not set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_SYSTEM_ERR\fR\fR
 .ad
 .RS 20n
-.rt  
 System error (\fBd_passwd\fR(4) is not present).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_USER_UNKNOWN\fR\fR
 .ad
 .RS 20n
-.rt  
 No account is present for \fIuser\fR.
 .RE
 
@@ -102,13 +92,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT LevelMT-Safe with exceptions
+MT Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO

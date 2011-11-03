@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dc 1 "29 Aug 2003" "SunOS 5.11" "User Commands"
+.TH DC 1 "Aug 29, 2003"
 .SH NAME
 dc \- desk calculator
 .SH SYNOPSIS
@@ -38,12 +38,10 @@ The following constructions are recognized under both \fB/usr/bin/dc\fR and
 \fB/usr/xpg6/bin/dc\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fInumber\fR\fR
 .ad
 .RS 15n
-.rt  
 The value of the number is pushed on the stack. A number is an  unbroken string
 of the digits 0\(mi9. It may be preceded by an underscore (\fB_\fR) to input a
 negative number. Numbers may  contain decimal points.
@@ -51,12 +49,10 @@ negative number. Numbers may  contain decimal points.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fIx\fR\fR
 .ad
 .RS 15n
-.rt  
 The top of the stack is popped and stored into a register named \fIx\fR, where
 \fIx\fR may be any character.  If the \fBs\fR is capitalized, \fIx\fR is
 treated as a stack and the value is pushed on it.
@@ -64,12 +60,10 @@ treated as a stack and the value is pushed on it.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBl\fR\fIx\fR\fR
 .ad
 .RS 15n
-.rt  
 The value in register \fIx\fR is pushed on the stack. The register \fIx\fR is
 not altered. All registers start with zero value.  If the \fBl\fR is
 capitalized, register \fIx\fR is treated as a stack and its top value is popped
@@ -78,125 +72,103 @@ onto the main stack.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd\fR\fR
 .ad
 .RS 15n
-.rt  
 The top value on the stack is duplicated.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBp\fR\fR
 .ad
 .RS 15n
-.rt  
 The top value on the stack is printed. The top value remains  unchanged.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBP\fR\fR
 .ad
 .RS 15n
-.rt  
 Interprets the top of the stack as an ASCII string, removes it,  and prints it.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBf\fR\fR
 .ad
 .RS 15n
-.rt  
 All values on the stack are printed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBq\fR\fR
 .ad
 .RS 15n
-.rt  
 Exits the program. If executing a string, the recursion level is popped by two.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBQ\fR\fR
 .ad
 .RS 15n
-.rt  
 Exits the program.  The top value on the stack is popped and the string
 execution level is popped by that value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBx\fR\fR
 .ad
 .RS 15n
-.rt  
 Treats the top element of the stack as a character string and executes it as a
 string of \fBdc\fR commands.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBX\fR\fR
 .ad
 .RS 15n
-.rt  
 Replaces the number on the top of the stack with its scale factor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[ ... ]\fR\fR
 .ad
 .RS 15n
-.rt  
 Puts the bracketed ASCII string onto the top of the stack.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB<\fR\fIx \fR \fB>\fR\fIx \fR \fB=\fR\fIx \fR\fR
 .ad
 .RS 15n
-.rt  
 The top two elements of the stack are popped and compared. Register \fIx\fR is
 evaluated if they obey the stated relation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBv\fR\fR
 .ad
 .RS 15n
-.rt  
 Replaces the top element on the stack by its square root.  Any  existing
 fractional part of the argument is taken into account, but  otherwise the scale
 factor is ignored.
@@ -204,80 +176,66 @@ factor is ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!\fR\fR
 .ad
 .RS 15n
-.rt  
 Interprets the rest of the line as a shell command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBc\fR\fR
 .ad
 .RS 15n
-.rt  
 All values on the stack are popped.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBi\fR\fR
 .ad
 .RS 15n
-.rt  
 The top value on the stack is popped and used as the number radix  for further
 input.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBI\fR\fR
 .ad
 .RS 15n
-.rt  
 Pushes the input base on the top of the stack.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBo\fR\fR
 .ad
 .RS 15n
-.rt  
 The top value on the stack is popped and used as the number radix for  further
 output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO\fR\fR
 .ad
 .RS 15n
-.rt  
 Pushes the output base on the top of the stack.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBk\fR\fR
 .ad
 .RS 15n
-.rt  
 The top of the stack is popped, and that value is used as a  non-negative scale
 factor: the appropriate number of places are  printed on output, and maintained
 during multiplication, division,  and exponentiation.  The interaction of scale
@@ -287,68 +245,56 @@ together.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBK\fR\fR
 .ad
 .RS 15n
-.rt  
 Pushes the current scale factor on the top of the stack.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBz\fR\fR
 .ad
 .RS 15n
-.rt  
 The stack level is pushed onto the stack.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBZ\fR\fR
 .ad
 .RS 15n
-.rt  
 Replaces the number on the top of the stack with its length.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB?\fR\fR
 .ad
 .RS 15n
-.rt  
 A line of input is taken from the input source (usually the terminal) and
 executed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBY\fR\fR
 .ad
 .RS 15n
-.rt  
 Displays \fBdc\fR debugging information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB; :\fR\fR
 .ad
 .RS 15n
-.rt  
 Used by  \fBbc\fR(1) for array operations.
 .RE
 
@@ -359,12 +305,10 @@ The following construction is recognized under \fB/usr/bin/dc\fR, using the
 scale of whatever the result is.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+ \(mi / * % ^\fR\fR
 .ad
 .RS 18n
-.rt  
 The top two values on the stack are added (\fB+\fR), subtracted (\fB\(mi\fR),
 multiplied (\fB*\fR), divided (\fB/\fR), remaindered (\fB%\fR), or
 exponentiated (\fB^\fR). The two entries are popped off the stack; the result
@@ -379,12 +323,10 @@ The following construction is recognized under \fB/usr/xpg6/bin/dc\fR. The
 results of division are forced to be a scale of 20.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+ \(mi / * % ^\fR\fR
 .ad
 .RS 18n
-.rt  
 The top two values on the stack are added (\fB+\fR), subtracted (\fB\(mi\fR),
 multiplied (\fB*\fR), divided (\fB/\fR), remaindered (\fB%\fR), or
 exponentiated (\fB^\fR). The two entries are popped off the stack. The result
@@ -418,188 +360,154 @@ lyx
 .SH DIAGNOSTICS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIx\fR \fBis unimplemented\fR\fR
 .ad
 .RS 29n
-.rt  
 \fIx\fR is an octal number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBout of space\fR\fR
 .ad
 .RS 29n
-.rt  
 The free list is exhausted (too many digits).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBout of stack space\fR\fR
 .ad
 .RS 29n
-.rt  
 Too many pushes onto the stack (stack overflow).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBempty stack\fR\fR
 .ad
 .RS 29n
-.rt  
 Too many pops from the stack (stack underflow).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnesting depth\fR\fR
 .ad
 .RS 29n
-.rt  
 Too many levels of nested execution.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdivide by 0\fR\fR
 .ad
 .RS 29n
-.rt  
 Division by zero.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsqrt of neg number\fR\fR
 .ad
 .RS 29n
-.rt  
 Square root of a negative number is not defined (no imaginary numbers).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBexp not an integer\fR\fR
 .ad
 .RS 29n
-.rt  
 \fBdc\fR only processes integer exponentiation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBexp too big\fR\fR
 .ad
 .RS 29n
-.rt  
 The largest exponent allowed is 999.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinput base is too large\fR\fR
 .ad
 .RS 29n
-.rt  
 The input base x: 2<= x <= 16.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinput base is too small\fR\fR
 .ad
 .RS 29n
-.rt  
 The input base x: 2<= x <= 16.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBoutput base is too large\fR\fR
 .ad
 .RS 29n
-.rt  
 The output base must be no larger than  \fBBC_BASE_MAX\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinvalid scale factor\fR\fR
 .ad
 .RS 29n
-.rt  
 Scale factor cannot be less than 1.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBscale factor is too large\fR\fR
 .ad
 .RS 29n
-.rt  
 A scale factor cannot be larger than  \fBBC_SCALE_MAX\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsymbol table overflow\fR\fR
 .ad
 .RS 29n
-.rt  
 Too many variables have been specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinvalid index\fR\fR
 .ad
 .RS 29n
-.rt  
 Index cannot be less than 1.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBindex is too large\fR\fR
 .ad
 .RS 29n
-.rt  
 An index cannot be larger than  \fBBC_DIM_MAX\fR.
 .RE
 

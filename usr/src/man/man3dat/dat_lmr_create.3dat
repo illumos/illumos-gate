@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dat_lmr_create 3DAT "28 Jan 2009" "SunOS 5.11" "Direct Access Transport Library Functions"
+.TH DAT_LMR_CREATE 3DAT "Jan 28, 2009"
 .SH NAME
 dat_lmr_create \- register a memory region with an IA
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ldat\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ldat\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <\fBdat/udat.h\fR>
 
 DAT_RETURN
@@ -32,7 +32,6 @@ DAT_RETURN
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIia_handle\fR\fR
 .ad
@@ -43,7 +42,6 @@ Handle for an open instance of the IA.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImem_type\fR\fR
 .ad
@@ -53,7 +51,6 @@ Type of memory to be registered. The following list outlines the memory type
 specifications.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_MEM_TYPE_VIRTUAL\fR\fR
 .ad
@@ -68,7 +65,6 @@ Length: Length of the Memory Region.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_MEM_TYPE_SO_VIRTUAL\fR\fR
 .ad
@@ -86,7 +82,6 @@ Length: Length of the Memory Region.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_MEM_TYPE_LMR\fR\fR
 .ad
@@ -101,7 +96,6 @@ Length: Length parameter is ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_MEM_TYPE_SHARED_VIRTUAL\fR\fR
 .ad
@@ -124,7 +118,6 @@ Length: Length of the Memory Region
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIregion_description\fR\fR
 .ad
@@ -136,7 +129,6 @@ registered. The type is derived from the \fImem_type\fR parameter.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlength\fR\fR
 .ad
@@ -147,7 +139,6 @@ Length parameter accompanying the region_description.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpz_handle\fR\fR
 .ad
@@ -158,7 +149,6 @@ Handle for an instance of the Protection Zone.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImem_privileges:\fR\fR
 .ad
@@ -170,21 +160,17 @@ region. The Default value is \fBDAT_MEM_PRIV_NONE_FLAG\fR. The constant value
 privileges, is also defined. Memory privilege definitions are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBLocal Read\fR
 .ad
 .RS 16n
-.rt  
 \fBDAT_MEM_PRIV_LOCAL_READ_FLAG\fR
 .sp
 .ne 2
-.mk
 .na
 \fB0x01\fR
 .ad
 .RS 8n
-.rt  
 Local read access requested.
 .RE
 
@@ -192,21 +178,17 @@ Local read access requested.
 
 .sp
 .ne 2
-.mk
 .na
 \fBLocal Write\fR
 .ad
 .RS 16n
-.rt  
 \fBDAT_MEM_PRIV_LOCAL_WRITE_FLAG\fR
 .sp
 .ne 2
-.mk
 .na
 \fB0x10\fR
 .ad
 .RS 8n
-.rt  
 Local write access requested.
 .RE
 
@@ -214,21 +196,17 @@ Local write access requested.
 
 .sp
 .ne 2
-.mk
 .na
 \fBRemote Read\fR
 .ad
 .RS 16n
-.rt  
 \fBDAT_MEM_PRIV_REMOTE_READ_FLAG\fR
 .sp
 .ne 2
-.mk
 .na
 \fB0x02\fR
 .ad
 .RS 8n
-.rt  
 Remote read access requested.
 .RE
 
@@ -236,21 +214,17 @@ Remote read access requested.
 
 .sp
 .ne 2
-.mk
 .na
 \fBRemote Write\fR
 .ad
 .RS 16n
-.rt  
 \fBDAT_MEM_PRIV_REMOTE_WRITE_FLAG\fR
 .sp
 .ne 2
-.mk
 .na
 \fB0x20\fR
 .ad
 .RS 8n
-.rt  
 Remote write access requested.
 .RE
 
@@ -260,7 +234,6 @@ Remote write access requested.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlmr_handle\fR\fR
 .ad
@@ -271,7 +244,6 @@ Handle for the created instance of the LMR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlmr_context\fR\fR
 .ad
@@ -282,7 +254,6 @@ Context for the created instance of the LMR to use for DTO local buffers.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIregistered_size\fR\fR
 .ad
@@ -293,7 +264,6 @@ Actual memory size registered by the Provider.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIregistered_address\fR\fR
 .ad
@@ -349,68 +319,56 @@ Consumer.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_SUCCESS\fR\fR
 .ad
 .RS 30n
-.rt  
 The operation was successful.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_UNSUFFICIENT_RESOURCES\fR\fR
 .ad
 .RS 30n
-.rt  
 The operation failed due to resource limitations.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_INVALID_PARAMETER\fR\fR
 .ad
 .RS 30n
-.rt  
 Invalid parameter.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_INVALID_HANDLE\fR\fR
 .ad
 .RS 30n
-.rt  
 Invalid DAT handle.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_INVALID_STATE\fR\fR
 .ad
 .RS 30n
-.rt  
 Parameter in an invalid state. For example, shared virtual buffer was not
 created shared by the platform.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_MODEL_NOT_SUPPORTED\fR\fR
 .ad
 .RS 30n
-.rt  
 The requested Model was not supported by the Provider. For example, requested
 Memory Type was not supported by the Provider.
 .RE
@@ -434,17 +392,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 _
-StandardT{
+Standard	T{
 uDAPL, 1.1, 1.2 (except \fBDAT_MEM_TYPE_SO_VIRTUAL\fR)
 T}
 .TE

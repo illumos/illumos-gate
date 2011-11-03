@@ -2,14 +2,14 @@
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH fgrep 1 "24 Mar 2006" "SunOS 5.11" "User Commands"
+.TH FGREP 1 "Mar 24, 2006"
 .SH NAME
 fgrep \- search a file for a fixed-character string
 .SH SYNOPSIS
@@ -30,13 +30,13 @@ fgrep \- search a file for a fixed-character string
 
 .LP
 .nf
-\fB/usr/xpg4/bin/fgrep\fR [\fB-bchilnqsvx\fR] \fB-e\fR \fIpattern_list\fR [\fB-f\fR \fIfile\fR] 
+\fB/usr/xpg4/bin/fgrep\fR [\fB-bchilnqsvx\fR] \fB-e\fR \fIpattern_list\fR [\fB-f\fR \fIfile\fR]
      [\fIfile...\fR]
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/fgrep\fR [\fB-bchilnqsvx\fR] [\fB-e\fR \fIpattern_list\fR] \fB-f\fR \fIfile\fR 
+\fB/usr/xpg4/bin/fgrep\fR [\fB-bchilnqsvx\fR] [\fB-e\fR \fIpattern_list\fR] \fB-f\fR \fIfile\fR
      [\fIfile...\fR]
 .fi
 
@@ -72,126 +72,104 @@ The following options are supported for both \fB/usr/bin/fgrep\fR and
 \fB/usr/xpg4/bin/fgrep\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
 .RS 19n
-.rt  
 Precedes each line by the block number on which the line was found. This can be
 useful in locating block numbers by context. The first block is 0.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 19n
-.rt  
 Prints only a count of the lines that contain the pattern.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fIpattern_list\fR\fR
 .ad
 .RS 19n
-.rt  
 Searches for a \fIstring\fR in \fIpattern-list\fR. This is useful when the
 \fIstring\fR begins with a \fB\(mi\fR\&.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIpattern-file\fR\fR
 .ad
 .RS 19n
-.rt  
 Takes the list of patterns from \fIpattern-file\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 19n
-.rt  
 Suppresses printing of files when searching multiple files.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 19n
-.rt  
 Ignores upper/lower case distinction during comparisons.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 19n
-.rt  
 Prints the names of files with matching lines once, separated by new-lines.
 Does not repeat the names of files when the pattern is found more than once.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 19n
-.rt  
 Precedes each line by its line number in the file. The first line is 1.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 19n
-.rt  
 Works silently, that is, displays nothing except error messages. This is useful
 for checking the error status.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 19n
-.rt  
 Prints all lines except those that contain the pattern.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 19n
-.rt  
 Prints only lines that are matched entirely.
 .RE
 
@@ -201,12 +179,10 @@ Prints only lines that are matched entirely.
 The following options are supported for \fB/usr/xpg4/bin/fgrep\fR only:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
 .RS 6n
-.rt  
 Quiet. Does not write anything to the standard output, regardless of matching
 lines. Exits with zero status if an input line is selected.
 .RE
@@ -217,12 +193,10 @@ lines. Exits with zero status if an input line is selected.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fR
 .ad
 .RS 8n
-.rt  
 Specifies a path name of a file to be searched for the patterns. If no
 \fIfile\fR operands are specified, the standard input will be used.
 .RE
@@ -230,24 +204,20 @@ Specifies a path name of a file to be searched for the patterns. If no
 .SS "/usr/bin/fgrep"
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpattern\fR\fR
 .ad
 .RS 11n
-.rt  
 Specifies a pattern to be used during the search for input.
 .RE
 
 .SS "/usr/xpg4/bin/fgrep"
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpattern\fR\fR
 .ad
 .RS 11n
-.rt  
 Specifies one or more patterns to be used during the search for input. This
 operand is treated as if it were specified as \fB-e\fR \fIpattern_list\fR.
 .RE
@@ -269,34 +239,28 @@ that affect the execution of \fBfgrep\fR: \fBLC_COLLATE\fR, \fBLC_CTYPE\fR,
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 If any matches are found
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 If no matches are found
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 For syntax errors or inaccessible files, even if matches were found.
 .RE
 
@@ -309,13 +273,12 @@ For syntax errors or inaccessible files, even if matches were found.
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 .TE
 
 .SH SEE ALSO

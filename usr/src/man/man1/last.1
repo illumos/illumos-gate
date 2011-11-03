@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH last 1 "24 Jul 2004" "SunOS 5.11" "User Commands"
+.TH LAST 1 "Jul 24, 2004"
 .SH NAME
 last \- display login and logout information about users and terminals
 .SH SYNOPSIS
 .LP
 .nf
-\fBlast\fR [\fB-a\fR] [\fB-n\fR \fInumber\fR | \fB-number\fR] [\fB-f\fR \fIfilename\fR] 
+\fBlast\fR [\fB-a\fR] [\fB-n\fR \fInumber\fR | \fB-number\fR] [\fB-f\fR \fIfilename\fR]
      [\fIname\fR | \fItty\fR]...
 .fi
 
@@ -60,35 +60,29 @@ continues the search.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 25n
-.rt  
 Displays the hostname in the last column.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fI filename\fR\fR
 .ad
 .RS 25n
-.rt  
 Uses \fIfilename\fR as the name of the accounting file instead of
 \fB/var/adm/wtmpx\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fI number\||\|\fR\fB-\fR\fInumber\fR\fR
 .ad
 .RS 25n
-.rt  
 Limits the number of entries displayed to that specified by \fInumber\fR. These
 options are identical; the \fB-\fR\fInumber\fR option is provided as a
 transition tool only and is removed in future releases.
@@ -102,12 +96,10 @@ Date and time format is based on locale specified by the \fBLC_ALL\fR,
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/wtmpx\fR\fR
 .ad
 .RS 18n
-.rt  
 accounting file
 .RE
 

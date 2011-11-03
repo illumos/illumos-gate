@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -367,11 +368,12 @@ static void smb_dcmd_tree_help(void);
 static int smb_dcmd_tree(uintptr_t, uint_t, int, const mdb_arg_t *);
 static int smb_dcmd_odir(uintptr_t, uint_t, int, const mdb_arg_t *);
 static int smb_dcmd_ofile(uintptr_t, uint_t, int, const mdb_arg_t *);
-static int smb_vfs(uintptr_t, uint_t, int, const mdb_arg_t *);
+static int smb_dcmd_kshare(uintptr_t, uint_t, int, const mdb_arg_t *);
+static int smb_dcmd_vfs(uintptr_t, uint_t, int, const mdb_arg_t *);
 static int smb_vfs_walk_init(mdb_walk_state_t *);
 static int smb_vfs_walk_step(mdb_walk_state_t *);
 static void smb_node_help(void);
-static int smb_node(uintptr_t, uint_t, int, const mdb_arg_t *);
+static int smb_dcmd_node(uintptr_t, uint_t, int, const mdb_arg_t *);
 static int smb_node_walk_init(mdb_walk_state_t *);
 static int smb_node_walk_step(mdb_walk_state_t *);
 static int smb_lock(uintptr_t, uint_t, int, const mdb_arg_t *);
@@ -409,14 +411,18 @@ static const mdb_dcmd_t dcmds[] = {
 	    "[-seutfdwv]",
 	    "print smb_server information",
 	    smb_dcmd_server },
+	{   "smbshares",
+	    "[-v]",
+	    "print smb_kshare_t information",
+	    smb_dcmd_kshare },
 	{   "smbvfs",
 	    "[-v]",
 	    "print smb_vfs information",
-	    smb_vfs },
+	    smb_dcmd_vfs },
 	{   "smbnode",
 	    "?[-vps]",
 	    "print smb_node_t information",
-	    smb_node,
+	    smb_dcmd_node,
 	    smb_node_help },
 	{   "smbsess",
 	    "[-utfdwv]",
@@ -1266,6 +1272,96 @@ smb_dcmd_ofile(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 /*
  * *****************************************************************************
+ * ******************************** smb_kshare_t *******************************
+ * *****************************************************************************
+ */
+
+static int
+smb_kshare_cb(uintptr_t addr, const void *data, void *arg)
+{
+	uint_t *opts = arg;
+	uintptr_t ta, sa;
+	char name[32];
+	char path[64];
+	_NOTE(ARGUNUSED(data));
+
+	if (*opts & SMB_OPT_VERBOSE) {
+		mdb_arg_t	argv;
+
+		argv.a_type = MDB_TYPE_STRING;
+		argv.a_un.a_str = "smb_kshare_t";
+		/* Don't fail the walk if this fails. */
+		mdb_call_dcmd("print", addr, 0, 1, &argv);
+	} else {
+		/*
+		 * Summary line for a kshare
+		 * Don't fail the walk if any of these fail.
+		 */
+		ta = addr + OFFSETOF(smb_kshare_t, shr_name);
+		if (mdb_vread(&sa, sizeof (sa), ta) < 0 ||
+		    mdb_readstr(name, sizeof (name), sa) <= 0)
+			strcpy(name, "?");
+
+		ta = addr + OFFSETOF(smb_kshare_t, shr_path);
+		if (mdb_vread(&sa, sizeof (sa), ta) < 0 ||
+		    mdb_readstr(path, sizeof (path), sa) <= 0)
+			strcpy(path, "?");
+
+		mdb_printf("%-?p ", addr);	/* smb_kshare_t */
+		mdb_printf("%-16s ", name);
+		mdb_printf("%-s", path);
+		mdb_printf("\n");
+	}
+
+	return (WALK_NEXT);
+}
+
+/*
+ * ::smbshares
+ *
+ * dcmd - Print out smb_kshare structures.
+ */
+/*ARGSUSED*/
+static int
+smb_dcmd_kshare(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	GElf_Sym	sym;
+	uint_t		opts = 0;
+
+	if (mdb_getopts(argc, argv,
+	    'v', MDB_OPT_SETBITS, SMB_OPT_VERBOSE, &opts,
+	    NULL) != argc)
+		return (DCMD_USAGE);
+
+	if (!(flags & DCMD_ADDRSPEC)) {
+		if (mdb_lookup_by_name("smb_export", &sym) == -1) {
+			mdb_warn("failed to find symbol smb_export");
+			return (DCMD_ERR);
+		}
+		addr = (uintptr_t)sym.st_value +
+		    OFFSETOF(smb_export_t, e_share_avl.avl_tree);
+	}
+
+	if (DCMD_HDRSPEC(flags)) {
+		mdb_printf(
+		    "%<b>%<u>"
+		    "%-?s "
+		    "%-16s "
+		    "%-s"
+		    "%</u>%</b>\n",
+		    "smb_kshare_t", "name", "path");
+	}
+
+	if (mdb_pwalk("genunix`avl", smb_kshare_cb, &opts, addr) == -1) {
+		mdb_warn("cannot walk smb_kshare avl");
+		return (DCMD_ERR);
+	}
+
+	return (DCMD_OK);
+}
+
+/*
+ * *****************************************************************************
  * ******************************** smb_vfs_t **********************************
  * *****************************************************************************
  */
@@ -1277,7 +1373,7 @@ smb_dcmd_ofile(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
  */
 /*ARGSUSED*/
 static int
-smb_vfs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+smb_dcmd_vfs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	int		verbose = FALSE;
 	smb_vfs_t	*sf;
@@ -1402,7 +1498,7 @@ smb_node_help(void)
  * smb_node dcmd - Print out smb_node structure.
  */
 static int
-smb_node(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+smb_dcmd_node(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	smb_node_t	node;
 	int		rc;
