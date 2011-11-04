@@ -1007,9 +1007,11 @@ dls_devnet_unset(const char *macname, datalink_id_t *id, boolean_t wait)
 	ddp->dd_ref--;
 	*id = ddp->dd_linkid;
 
-	if (ddp->dd_zid != GLOBAL_ZONEID)
+	if (ddp->dd_zid != GLOBAL_ZONEID) {
+		dls_devnet_stat_destroy(ddp, ddp->dd_zid);
 		(void) i_dls_devnet_setzid(ddp, GLOBAL_ZONEID, B_FALSE,
 		    B_FALSE);
+	}
 
 	/*
 	 * Remove this dls_devnet_t from the hash table.
