@@ -27,8 +27,7 @@
 #ifndef _ASM_SUNDDI_H
 #define	_ASM_SUNDDI_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#include <sys/ccompile.h>
 #include <sys/types.h>
 
 #ifdef	__cplusplus
@@ -39,7 +38,7 @@ extern "C" {
 
 #if defined(_BOOT)
 
-extern __inline__ void
+extern __GNU_INLINE void
 sync_instruction_memory(caddr_t v, size_t len)
 {
 	__asm__ __volatile__("nop");

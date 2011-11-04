@@ -382,7 +382,7 @@ typedef struct gate_desc {
 
 #define	GATESEG_GETOFFSET(sgd)		((sgd)->sgd_looffset |		\
 					(sgd)->sgd_hioffset << 16 |	\
-					(sgd)->sgd_hi64offset << 32)
+					(uint64_t)(sgd)->sgd_hi64offset << 32)
 
 #endif	/* __amd64 */
 

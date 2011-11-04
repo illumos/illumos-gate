@@ -2499,7 +2499,8 @@ drmach_cpu_stop_self(void)
 	extern void	drmach_shutdown_asm(uint64_t);
 	extern void	drmach_shutdown_asm_end(void);
 
-	funclen = (uint_t)drmach_shutdown_asm_end - (uint_t)drmach_shutdown_asm;
+	funclen = (uintptr_t)drmach_shutdown_asm_end -
+	    (uintptr_t)drmach_shutdown_asm;
 	ASSERT(funclen <= MMU_PAGESIZE);
 	/*
 	 * We'll start from the 0th's base.

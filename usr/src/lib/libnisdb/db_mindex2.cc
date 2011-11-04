@@ -149,9 +149,9 @@ extern void	db_free_result(db_result *);
 zotypes
 updateMappingObj(__nis_table_mapping_t *t, char **objNameP,
 		bool_t *isMasterP) {
-	zotypes	type = NIS_BOGUS_OBJ;
-	char	*objName = 0;
-	char	*myself = "updateMappingObj";
+	zotypes         type = NIS_BOGUS_OBJ;
+	char            *objName = 0;
+	const char	*myself = "updateMappingObj";
 
 	if (t != 0)
 		objName = t->objName;
@@ -216,7 +216,7 @@ mappingFromObj(nis_object *obj, int *statP) {
 	__nis_table_mapping_t	*t;
 	__nis_buffer_t		b = {0, 0};
 	char			*objPath;
-	char			*myself = "mappingFromObj";
+	const char		*myself = "mappingFromObj";
 
 	if (obj == 0 || obj->zo_data.zo_type == NIS_ENTRY_OBJ)
 		return (0);
@@ -252,7 +252,7 @@ selectMapping(db_table *table, nis_object *obj, db_query *qin,
 	bool_t			doLDAP, asObj;
 	int			stat = LDAP_SUCCESS;
 	char			*objPath = 0, buf[MAXPATHLEN+NIS_MAXNAMELEN+1];
-	char			*myself = "db_mindex::selectMapping";
+	const char		*myself = "db_mindex::selectMapping";
 
 	/*
 	 * If 'table' is NULL, we try to find a mapping for 'obj'.
@@ -454,7 +454,7 @@ db_mindex::updateTableEntry(entry_object *e, int replace, char *tableName,
 	db_result		*dbres;
 	db_query		*qi;
 	nis_object		*oldObj = 0;
-	char			*myself = "db_mindex::updateTableEntry";
+	const char		*myself = "db_mindex::updateTableEntry";
 
 	if (table == 0 || e == 0)
 		return (LDAP_PARAM_ERROR);
@@ -688,7 +688,7 @@ static __nis_table_mapping_t *
 findDirEntryMapping(__nis_table_mapping_t *t, entry_object *e, char **name) {
 	__nis_table_mapping_t	*x;
 	char			*entryName;
-	char			*myself = "findDirEntryMapping";
+	const char			*myself = "findDirEntryMapping";
 	__nis_buffer_t		b = {0, 0};
 
 	if (e == 0 || e->en_cols.en_cols_len != 2 ||
@@ -735,7 +735,7 @@ db_mindex::queryLDAP(db_query *qin, char *dbId, int doAsynch) {
 	nis_attr		attr;
 	nis_object		*dirObj;
 	db_status		dstat;
-	char			*myself = "db_mindex::queryLDAP";
+	const char		*myself = "db_mindex::queryLDAP";
 
 	if (!useLDAPrespository || table == 0)
 		return (LDAP_SUCCESS);
@@ -1173,7 +1173,7 @@ db_mindex::storeObjLDAP(__nis_table_mapping_t *t, nis_object *o) {
 	int		numEa, doUnlock = 0;
 	db		*dbase = 0;
 	db_mindex	*dbm = 0;
-	char		*myself = "db_mindex::storeObjLDAP";
+	const char	*myself = "db_mindex::storeObjLDAP";
 
 	if (t == 0 || o == 0)
 		return (LDAP_SUCCESS);
@@ -1287,7 +1287,7 @@ db_mindex::storeLDAP(db_query *qin, entry_object *obj, nis_object *o,
 	db_query		*q, *qo, **qa;
 	__nis_rule_value_t	*rv = 0;
 	int			stat;
-	char			*myself = "db_mindex::storeLDAP";
+	const char		*myself = "db_mindex::storeLDAP";
 
 	if (!useLDAPrespository || table == 0)
 		return (LDAP_SUCCESS);

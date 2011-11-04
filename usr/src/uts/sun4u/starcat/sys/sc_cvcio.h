@@ -27,7 +27,7 @@
 #ifndef _SYS_SC_CVCIO_H
 #define	_SYS_SC_CVCIO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#include <sys/sysmacros.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -120,7 +120,7 @@ typedef struct cvc_ctl {
  * These macros can be used to determine the offset or size of any field in the
  * CONC chunk.
  */
-#define	CVC_CTL_OFFSET(field)  ((uint32_t)&(((cvc_ctl_t *)0)->field))
+#define	CVC_CTL_OFFSET(field)  offsetof(cvc_ctl_t, field)
 #define	CVC_CTL_SIZE(field)    (sizeof (((cvc_ctl_t *)0)->field))
 
 /*

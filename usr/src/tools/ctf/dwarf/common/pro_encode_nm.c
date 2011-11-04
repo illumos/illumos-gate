@@ -1,6 +1,6 @@
 /*
 
-  Copyright (C) 2000 Silicon Graphics, Inc.  All Rights Reserved.
+  Copyright (C) 2000,2004 Silicon Graphics, Inc.  All Rights Reserved.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms of version 2.1 of the GNU Lesser General Public License 
@@ -19,10 +19,10 @@
 
   You should have received a copy of the GNU Lesser General Public 
   License along with this program; if not, write the Free Software 
-  Foundation, Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, 
+  Foundation, Inc., 51 Franklin Street - Fifth Floor, Boston MA 02110-1301,
   USA.
 
-  Contact information:  Silicon Graphics, Inc., 1600 Amphitheatre Pky,
+  Contact information:  Silicon Graphics, Inc., 1500 Crittenden Lane,
   Mountain View, CA 94043, or:
 
   http://www.sgi.com
@@ -47,8 +47,8 @@
 
 
 /*-------------------------------------------------------------
-	Encode val as a leb128. This encodes it as an unsigned 
-	number.
+        Encode val as a leb128. This encodes it as an unsigned 
+        number.
 ---------------------------------------------------------------*/
 /* return DW_DLV_ERROR or DW_DLV_OK.
 ** space to write leb number is provided by caller, with caller
@@ -57,25 +57,25 @@
 */
 int
 _dwarf_pro_encode_leb128_nm(Dwarf_Unsigned val, int *nbytes,
-			    char *space, int splen)
+                            char *space, int splen)
 {
     char *a;
     char *end = space + splen;
 
     a = space;
     do {
-	unsigned char uc;
+        unsigned char uc;
 
-	if (a >= end) {
-	    return DW_DLV_ERROR;
-	}
-	uc = val & DATA_MASK;
-	val >>= DIGIT_WIDTH;
-	if (val != 0) {
-	    uc |= MORE_BYTES;
-	}
-	*a = uc;
-	a++;
+        if (a >= end) {
+            return DW_DLV_ERROR;
+        }
+        uc = val & DATA_MASK;
+        val >>= DIGIT_WIDTH;
+        if (val != 0) {
+            uc |= MORE_BYTES;
+        }
+        *a = uc;
+        a++;
     } while (val);
     *nbytes = a - space;
     return DW_DLV_OK;
@@ -89,7 +89,7 @@ _dwarf_pro_encode_leb128_nm(Dwarf_Unsigned val, int *nbytes,
 */
 int
 _dwarf_pro_encode_signed_leb128_nm(Dwarf_Signed value, int *nbytes,
-				   char *space, int splen)
+                                   char *space, int splen)
 {
     char *str;
     Dwarf_Signed sign = -(value < 0);
@@ -99,24 +99,24 @@ _dwarf_pro_encode_signed_leb128_nm(Dwarf_Signed value, int *nbytes,
     str = space;
 
     do {
-	unsigned char byte = value & DATA_MASK;
+        unsigned char byte = value & DATA_MASK;
 
-	value >>= DIGIT_WIDTH;
+        value >>= DIGIT_WIDTH;
 
-	if (str >= end) {
-	    return DW_DLV_ERROR;
-	}
-	/* 
-	 * Remaining chunks would just contain the sign bit, and this chunk
-	 * has already captured at least one sign bit.
-	 */
-	if (value == sign && ((byte & SIGN_BIT) == (sign & SIGN_BIT))) {
-	    more = 0;
-	} else {
-	    byte |= MORE_BYTES;
-	}
-	*str = byte;
-	str++;
+        if (str >= end) {
+            return DW_DLV_ERROR;
+        }
+        /* 
+         * Remaining chunks would just contain the sign bit, and this chunk
+         * has already captured at least one sign bit.
+         */
+        if (value == sign && ((byte & SIGN_BIT) == (sign & SIGN_BIT))) {
+            more = 0;
+        } else {
+            byte |= MORE_BYTES;
+        }
+        *str = byte;
+        str++;
     } while (more);
     *nbytes = str - space;
     return DW_DLV_OK;

@@ -3977,7 +3977,7 @@ scsi_hba_ident_nodename_compatible_get(struct scsi_inquiry *inq,
 	}
 
 	/* ( 4) scsiclass,DD.vV.pP.rR */
-	if (*vid && *pid && rev) {
+	if (*vid && *pid && *rev) {
 		*csp++ = p;
 		(void) snprintf(p, tlen, "scsiclass,%02x.v%s.p%s.r%s",
 		    dtype_node, vid, pid, rev);

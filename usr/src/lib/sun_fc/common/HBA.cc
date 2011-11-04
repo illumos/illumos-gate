@@ -37,6 +37,8 @@
 #include <unistd.h>
 #include <stropts.h>
 #include <errno.h>
+#include <climits>
+#include <cstring>
 
 #define	    NSECS_PER_SEC	1000000000l
 #define	    BUSY_SLEEP		NSECS_PER_SEC/10 /* 1/10 second */

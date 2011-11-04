@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * namespace utilities
  */
@@ -63,7 +61,7 @@ meta_getnmentbykey(
 	nm.setno = setno;
 	nm.side = sideno;
 	nm.key = key;
-	nm.devname = (uint64_t)device_name;
+	nm.devname = (uintptr_t)device_name;
 
 	if (metaioctl(MD_IOCGET_NM, &nm, &nm.mde, NULL) != 0) {
 		(void) mdstealerror(ep, &nm.mde);
@@ -189,7 +187,7 @@ meta_getdidminorbykey(
 	nm.setno = setno;
 	nm.side = sideno;
 	nm.key = key;
-	nm.minorname = (uint64_t)minorname;
+	nm.minorname = (uintptr_t)minorname;
 
 	if (metaioctl(MD_IOCGET_DIDMIN, &nm, &nm.mde, NULL) != 0) {
 		(void) mdstealerror(ep, &nm.mde);
@@ -356,7 +354,7 @@ meta_getnmentbydev(
 	nm.key = MD_KEYWILD;
 	nm.major = meta_getmajor(dev);
 	nm.mnum = meta_getminor(dev);
-	nm.devname = (uint64_t)device_name;
+	nm.devname = (uintptr_t)device_name;
 
 	if (metaioctl(MD_IOCGET_NM, &nm, &nm.mde, NULL) != 0) {
 		(void) mdstealerror(ep, &nm.mde);
@@ -750,16 +748,16 @@ add_self_name(
 	 * The valid qualified name
 	 */
 	if (metaislocalset(sp)) {
-	    len = strlen(p) + strlen("/dev/md/dsk/") + 1;
-	    devname = Malloc(len);
-	    (void) strcpy(devname, "/dev/md/dsk/");
-	    (void) strcat(devname, p);
+		len = strlen(p) + strlen("/dev/md/dsk/") + 1;
+		devname = Malloc(len);
+		(void) strcpy(devname, "/dev/md/dsk/");
+		(void) strcat(devname, p);
 	} else {
-	    len = strlen(sp->setname) + strlen(p) +
-		strlen("/dev/md//dsk/") + 1;
-	    devname = Malloc(len);
-	    (void) snprintf(devname, len, "/dev/md/%s/dsk/%s",
-			sp->setname, p);
+		len = strlen(sp->setname) + strlen(p) +
+		    strlen("/dev/md//dsk/") + 1;
+		devname = Malloc(len);
+		(void) snprintf(devname, len, "/dev/md/%s/dsk/%s",
+		    sp->setname, p);
 	}
 
 	/*
@@ -771,11 +769,11 @@ add_self_name(
 	}
 
 	if (metaislocalset(sp)) {
-	    if ((key = add_name(sp, myside, MD_KEYWILD, drvname,
-		minor, devname, NULL, NULL, ep)) == MD_KEYBAD) {
+		if ((key = add_name(sp, myside, MD_KEYWILD, drvname,
+		    minor, devname, NULL, NULL, ep)) == MD_KEYBAD) {
 			Free(devname);
 			return (-1);
-	    }
+		}
 	} else {
 		/*
 		 * Add myside first and use the returned key to add other sides
@@ -795,28 +793,29 @@ add_self_name(
 		}
 
 		if (MD_MNSET_DESC(sd)) {
-		    for (mnside = sd->sd_nodelist; mnside != NULL;
-			mnside = mnside->nd_next) {
-			if (mnside->nd_nodeid == myside)
-				continue;
-			if (add_name(sp, mnside->nd_nodeid, key, drvname,
-			    minor, devname, NULL, NULL, ep) == -1) {
-				Free(devname);
-				return (-1);
+			for (mnside = sd->sd_nodelist; mnside != NULL;
+			    mnside = mnside->nd_next) {
+				if (mnside->nd_nodeid == myside)
+					continue;
+				if (add_name(sp, mnside->nd_nodeid, key,
+				    drvname, minor, devname, NULL, NULL,
+				    ep) == -1) {
+					Free(devname);
+					return (-1);
+				}
 			}
-		    }
 		} else {
-		    for (side = 0; side < MD_MAXSIDES; side++) {
-			if (sd->sd_nodes[side][0] == '\0')
-				continue;
-			if (side == myside)
-				continue;
-			if (add_name(sp, side, key, drvname, minor, devname,
-			    NULL, NULL, ep) == -1) {
-				Free(devname);
-				return (-1);
+			for (side = 0; side < MD_MAXSIDES; side++) {
+				if (sd->sd_nodes[side][0] == '\0')
+					continue;
+				if (side == myside)
+					continue;
+				if (add_name(sp, side, key, drvname, minor,
+				    devname, NULL, NULL, ep) == -1) {
+					Free(devname);
+					return (-1);
+				}
 			}
-		    }
 		}
 	}
 
@@ -859,25 +858,26 @@ del_self_name(
 		}
 
 		if (MD_MNSET_DESC(sd)) {
-		    for (mnside = sd->sd_nodelist; mnside != NULL;
-			mnside = mnside->nd_next) {
-			if (mnside->nd_nodeid == myside)
-				continue;
-			if ((rval = del_name(sp, mnside->nd_nodeid, key,
-			    ep)) == -1) {
-				goto out;
+			for (mnside = sd->sd_nodelist; mnside != NULL;
+			    mnside = mnside->nd_next) {
+				if (mnside->nd_nodeid == myside)
+					continue;
+				if ((rval = del_name(sp, mnside->nd_nodeid, key,
+				    ep)) == -1) {
+					goto out;
+				}
 			}
-		    }
 		} else {
-		    for (side = 0; side < MD_MAXSIDES; side++) {
-			if (sd->sd_nodes[side][0] == '\0')
-				continue;
-			if (side == myside)
-				continue;
-			if ((rval = del_name(sp, side, key, ep)) == -1) {
-				goto out;
+			for (side = 0; side < MD_MAXSIDES; side++) {
+				if (sd->sd_nodes[side][0] == '\0')
+					continue;
+				if (side == myside)
+					continue;
+				if ((rval = del_name(sp, side, key,
+				    ep)) == -1) {
+					goto out;
+				}
 			}
-		    }
 		}
 
 		/*

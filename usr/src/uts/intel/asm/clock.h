@@ -26,8 +26,7 @@
 #ifndef _ASM_CLOCK_H
 #define	_ASM_CLOCK_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#include <sys/ccompile.h>
 #include <sys/types.h>
 #include <sys/time.h>
 
@@ -39,7 +38,8 @@ extern "C" {
 
 #include <sys/machlock.h>
 
-extern __inline__ void unlock_hres_lock(void)
+extern __GNU_INLINE void
+unlock_hres_lock(void)
 {
 	__asm__ __volatile__(
 	    "lock; incl %0"
@@ -50,7 +50,8 @@ extern __inline__ void unlock_hres_lock(void)
 
 #if defined(__xpv)
 
-extern __inline__ hrtime_t __rdtsc_insn(void)
+extern __GNU_INLINE hrtime_t
+__rdtsc_insn(void)
 {
 #if defined(__amd64)
 	uint32_t lobits, hibits;

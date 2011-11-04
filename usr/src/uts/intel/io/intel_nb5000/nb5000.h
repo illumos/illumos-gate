@@ -68,8 +68,8 @@ extern "C" {
 #define	TLOW_MAX	0x100000000ULL
 
 #define	MTR_PRESENT(mtr) \
-	((mtr) & (nb_chipset == INTEL_NB_5400 || nb_chipset == INTEL_NB_5100 ? \
-	0x0400 : 0x0100))
+	(((mtr) & (nb_chipset == INTEL_NB_5400 || nb_chipset == INTEL_NB_5100) \
+	? 0x0400 : 0x0100) != 0)
 #define	MTR_ETHROTTLE(mtr) \
 	((mtr) & (nb_chipset == INTEL_NB_5400 || nb_chipset == INTEL_NB_5100 ? \
 	? 0x0200 : 0x0080))

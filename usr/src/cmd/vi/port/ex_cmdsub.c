@@ -1734,7 +1734,7 @@ unsigned char *prompt;
 
 	/* In ex mode, let the system hassle with setting no echo */
 	if (!inopen)
-		return (unsigned char *)getpass(prompt);
+		return (unsigned char *)getpass((const char *)prompt);
 	viprintf("%s", prompt); flush();
 	for (p=pbuf; (c = getkey())!='\n' && c!=EOF && c!='\r';) {
 		if (p < &pbuf[8])

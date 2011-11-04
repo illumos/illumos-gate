@@ -61,11 +61,11 @@ db_status		db_table_exists(char *table_name);
  * 'tbl_prototype' is used to create a table that holds a directory.
  */
 static table_col cols[2] = {
-	{"object", TA_BINARY+TA_XDR, 0},
-	{"name", TA_CASE+TA_SEARCHABLE, 0}
+	{(char *)"object", TA_BINARY+TA_XDR, 0},
+	{(char *)"name", TA_CASE+TA_SEARCHABLE, 0}
 };
 
-table_obj tbl_prototype = { "DIRECTORY", 2, ' ', {2, &cols[0]}, NULL };
+table_obj tbl_prototype = { (char *)"DIRECTORY", 2, ' ', {2, &cols[0]}, NULL };
 }
 
 /*
@@ -148,10 +148,10 @@ db_in_dict_file(char *name)
 
 }
 
-char
+const char
 *db_perror(db_status dbstat)
 {
-	char	*str = NULL;
+	const char *str = NULL;
 
 	switch (dbstat) {
 		case DB_SUCCESS:
@@ -451,7 +451,7 @@ db_list_entries(char *table_name, int numattrs, nis_attr *attrname) {
 char *
 entryName(char *msg, char *objName, char **tableP) {
 	char	*name, *table, *dir;
-	char	*myself = "entryName";
+	char	*myself = (char *)"entryName";
 
 	if (msg == 0)
 		msg = myself;
@@ -505,7 +505,7 @@ dbFindObject(char *objName, db_status *statP) {
 	db_mindex	*mindex;
 	nis_object	*o;
 	int		lstat;
-	char		*myself = "dbFindObject";
+	const char	*myself = "dbFindObject";
 
 	if (objName == 0)
 		RETSTAT(0, DB_BADQUERY);
@@ -527,7 +527,7 @@ dbFindObject(char *objName, db_status *statP) {
 	/* If not the root dir, find the directory where the entry lives */
 
 	sfree(table);
-	name = entryName(myself, objName, &table);
+	name = entryName((char *)myself, objName, &table);
 	if (name == 0 || table == 0) {
 		sfree(name);
 		RETSTAT(0, DB_MEMORY_LIMIT);
@@ -548,7 +548,7 @@ dbFindObject(char *objName, db_status *statP) {
 		RETSTAT(0, DB_LOCK_ERROR);
 	}
 
-	attr.zattr_ndx = "name";
+	attr.zattr_ndx = (char *)"name";
 	attr.zattr_val.zattr_val_val = name;
 	attr.zattr_val.zattr_val_len = slen(name) + 1;
 
@@ -611,7 +611,7 @@ nis_object *
 ldapFindObj(__nis_table_mapping_t *t, char *objName, int *statP) {
 	nis_object	*o;
 	int		stat;
-	char		*myself = "ldapFindObj";
+	const char	*myself = "ldapFindObj";
 
 	if (t == 0) {
 		char	*table, tbuf[MAXPATHLEN + NIS_MAXNAMELEN + 1];
@@ -656,7 +656,7 @@ findObj(char *name, db_status *statP, int *lstatP) {
 	nis_object	*o;
 	db_status	stat = DB_SUCCESS;
 	int		lstat = LDAP_SUCCESS;
-	char		*myself = "findObj";
+	const char	*myself = "findObj";
 
 	o = dbFindObject(name, &stat);
 
@@ -695,7 +695,7 @@ dbDeleteObj(char *objName) {
 	db_status	stat;
 	nisdb_obj_del_t	*nod, *tmp;
 	int		xid;
-	char		*myself = "dbDeleteObj";
+	const char	*myself = "dbDeleteObj";
 
 	if (objName == 0)
 		return (DB_SUCCESS);
@@ -737,7 +737,7 @@ dbDeleteObj(char *objName) {
 	nod->objType = o->zo_data.zo_type;
 	nis_destroy_object(o);
 
-	nod->objName = sdup(myself, T, objName);
+	nod->objName = sdup((char *)myself, T, objName);
 	if (nod->objName == 0) {
 		sfree(nod);
 		return (DB_MEMORY_LIMIT);
@@ -772,7 +772,7 @@ dbTouchObj(char *objName) {
 	nis_attr	attr;
 	db_query	*query;
 	db_status	stat;
-	char		*myself = "dbTouchObj";
+	const char	*myself = "dbTouchObj";
 
 	table = internalTableName(objName);
 	if (table == 0)
@@ -789,7 +789,7 @@ dbTouchObj(char *objName) {
 
 	sfree(table);
 	table = 0;
-	ent = entryName(myself, objName, &table);
+	ent = entryName((char *)myself, objName, &table);
 	if (ent == 0 || table == 0) {
 		sfree(ent);
 		return (DB_MEMORY_LIMIT);
@@ -804,7 +804,7 @@ dbTouchObj(char *objName) {
 		return (DB_BADTABLE);
 	}
 
-	attr.zattr_ndx = "name";
+	attr.zattr_ndx = (char *)"name";
 	attr.zattr_val.zattr_val_val = ent;
 	attr.zattr_val.zattr_val_len = slen(ent) + 1;
 
@@ -833,7 +833,7 @@ dbCreateTable(char *intName, nis_object *obj) {
 	table_col	tc[NIS_MAXCOLUMNS+1];
 	table_obj	tobj, *t;
 	int		i;
-	char		*myself = "dbCreateTable";
+	const char	*myself = "dbCreateTable";
 
 	if (intName == 0 || obj == 0)
 		return (DB_BADTABLE);
@@ -879,7 +879,7 @@ dbRefreshObj(char *name, nis_object *o) {
 	db_status	stat;
 	char		*ent, *table, *objTable;
 	int		rstat, isDir = 0, isTable = 0;
-	char		*myself = "refreshObj";
+	const char	*myself = "refreshObj";
 
 	if (o == 0)
 		/* Delete it */
@@ -973,7 +973,7 @@ dbRefreshObj(char *name, nis_object *o) {
 	if (strcmp(ROOTDIRFILE, objTable) == 0) {
 		sfree(objTable);
 
-		rstat = update_root_object(ROOTOBJFILE, o);
+		rstat = update_root_object((char *)ROOTOBJFILE, o);
 		if (rstat == 1)
 			stat = DB_SUCCESS;
 		else
@@ -989,7 +989,7 @@ dbRefreshObj(char *name, nis_object *o) {
 		int		lstat;
 
 		/* Find parent */
-		ent = entryName(myself, objName, &table);
+		ent = entryName((char *)myself, objName, &table);
 		if (ent == 0 || table == 0) {
 			sfree(b.buf);
 			sfree(objTable);
@@ -1018,7 +1018,7 @@ dbRefreshObj(char *name, nis_object *o) {
 		}
 
 		/* Construct suitable nis_attr and entry_object */
-		attr.zattr_ndx = "name";
+		attr.zattr_ndx = (char *)"name";
 		attr.zattr_val.zattr_val_val = ent;
 		attr.zattr_val.zattr_val_len = slen(ent) + 1;
 
@@ -1026,7 +1026,7 @@ dbRefreshObj(char *name, nis_object *o) {
 		ec[1].ec_value.ec_value_val = ent;
 		ec[1].ec_value.ec_value_len = attr.zattr_val.zattr_val_len;
 
-		eo.en_type = "IN_DIRECTORY";
+		eo.en_type = (char *)"IN_DIRECTORY";
 		eo.en_cols.en_cols_val = ec;
 		eo.en_cols.en_cols_len = 2;
 
@@ -1224,7 +1224,7 @@ dbCreateFromLDAP(char *intName, int *ldapStat) {
 	int			lstat, doDestroy;
 	nis_object		*obj = 0;
 	db_status		dstat;
-	char			*myself = "dbCreateFromLDAP";
+	const char		*myself = "dbCreateFromLDAP";
 
 	if (!useLDAPrespository) {
 		if (ldapStat != 0)
@@ -1279,7 +1279,7 @@ loadAllLDAP(int fromLDAP, void *cookie, db_status *dstatP) {
 	db			*dbase;
 	db_table_desc		*tbl = 0;
 	db_mindex		*mindex;
-	char			*myself = "loadAllLDAP";
+	const char		*myself = "loadAllLDAP";
 
 	/*
 	 * If the 'cookie' and '*cookie' are non-NULL, start scanning
@@ -1416,7 +1416,8 @@ loadAllLDAP(int fromLDAP, void *cookie, db_status *dstatP) {
 				ent = 0;
 			} else {
 				objPath = 0;
-				ent = entryName(myself, t->objName, &objPath);
+				ent = entryName((char *)myself, t->objName,
+				    &objPath);
 				if (ent == 0 || objPath == 0) {
 					logmsg(MSG_NOTIMECHECK, LOG_ERR,
 	"%s: Error deriving entry/DB-table names for %s:%s; skipping up-load",
@@ -1474,7 +1475,7 @@ loadAllLDAP(int fromLDAP, void *cookie, db_status *dstatP) {
 				nis_attr	attr;
 				db_query	*q;
 
-				attr.zattr_ndx = "name";
+				attr.zattr_ndx = (char *)"name";
 				attr.zattr_val.zattr_val_val = ent;
 				attr.zattr_val.zattr_val_len = slen(ent) + 1;
 

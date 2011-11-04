@@ -1,6 +1,7 @@
 /*
 
-  Copyright (C) 2000 Silicon Graphics, Inc.  All Rights Reserved.
+  Copyright (C) 2000,2004 Silicon Graphics, Inc.  All Rights Reserved.
+  Portions Copyright 2002-2010 Sun Microsystems, Inc. All rights reserved.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms of version 2.1 of the GNU Lesser General Public License 
@@ -19,10 +20,10 @@
 
   You should have received a copy of the GNU Lesser General Public 
   License along with this program; if not, write the Free Software 
-  Foundation, Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, 
+  Foundation, Inc., 51 Franklin Street - Fifth Floor, Boston MA 02110-1301,
   USA.
 
-  Contact information:  Silicon Graphics, Inc., 1600 Amphitheatre Pky,
+  Contact information:  Silicon Graphics, Inc., 1500 Crittenden Lane,
   Mountain View, CA 94043, or:
 
   http://www.sgi.com
@@ -40,16 +41,17 @@
 #include "pro_incl.h"
 
 /*---------------------------------------------------------------
-	This routine deallocates all memory, and does some 
-	finishing up
+        This routine deallocates all memory, and does some 
+        finishing up
 -----------------------------------------------------------------*/
  /*ARGSUSED*/ Dwarf_Unsigned
 dwarf_producer_finish(Dwarf_P_Debug dbg, Dwarf_Error * error)
 {
     if (dbg->de_version_magic_number != PRO_VERSION_MAGIC) {
-	DWARF_P_DBG_ERROR(dbg, DW_DLE_IA, DW_DLV_NOCOUNT);
+        DWARF_P_DBG_ERROR(dbg, DW_DLE_IA, DW_DLV_NOCOUNT);
     }
 
-    dwarf_p_dealloc((void *) dbg, 0);
+    /* this frees all blocks, then frees dbg. */
+    _dwarf_p_dealloc_all(dbg);
     return 0;
 }
