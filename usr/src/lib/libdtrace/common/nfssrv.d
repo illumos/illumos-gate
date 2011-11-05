@@ -26,6 +26,7 @@
 
 #pragma	D depends_on library ip.d
 #pragma	D depends_on library net.d
+#pragma	D depends_on library nfs.d
 #pragma D depends_on module nfssrv
 
 #pragma D binding "1.5" translator
