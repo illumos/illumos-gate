@@ -103,12 +103,6 @@ translator nfsv4opinfo_t < struct compound_state *P > {
 	noi_curpath = (P->vp == NULL) ? "<unknown>" : P->vp->v_path;
 };
 
-#pragma D binding "1.5" translator
-translator nfsv4cbinfo_t < rfs4_deleg_state_t *P > {
-	nci_curpath = (P->rds_finfo->rf_vp == NULL) ? "<unknown>" :
-	    P->rds_finfo->rf_vp->v_path;
-};
-
 typedef struct nfsv3opinfo {
 	uint64_t noi_xid;	/* unique transation ID */
 	cred_t *noi_cred;	/* credentials for operation */
