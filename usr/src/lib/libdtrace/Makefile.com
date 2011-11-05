@@ -80,6 +80,7 @@ DLIBSRCS += \
 	iscsit.d \
 	net.d \
 	nfs.d \
+	nfssrv.d \
 	procfs.d \
 	regs.d \
 	sched.d \

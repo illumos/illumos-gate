@@ -187,6 +187,7 @@ file path=usr/lib/dtrace/ip.d
 file path=usr/lib/dtrace/iscsit.d
 file path=usr/lib/dtrace/net.d
 file path=usr/lib/dtrace/nfs.d
+file path=usr/lib/dtrace/nfssrv.d
 file path=usr/lib/dtrace/procfs.d
 file path=usr/lib/dtrace/regs.d
 file path=usr/lib/dtrace/sched.d
