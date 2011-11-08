@@ -63,13 +63,42 @@ SNAPSHOT_DIR=root/checkpoints
 #
 lock_file()
 {
+	local cnt=0
+	local prev_pid=0
 	while true; do
 		if (set -o noclobber; echo "$$" >$LOCKFILE) 2>/dev/null; then
 			trap 'rm -f $LOCKFILE; exit $?' INT TERM EXIT
 			break;
-		else
-			sleep 1
 		fi
+
+		local hold_pid=`cat $LOCKFILE 2>/dev/null`
+
+		# the file might be gone or empty when we run the cat cmd
+		if [[ -z "$hold_pid" ]]; then
+			sleep 1
+			cnt=0
+			continue
+		fi
+
+		# if held by a different process, restart counter
+		if [[ $prev_pid != $hold_pid ]]; then
+			prev_pid=$hold_pid
+			cnt=0
+		fi
+
+		[[ $cnt == 20 || $cnt == 40 ]] && \
+		    logger -p daemon.err "dlmgmtd lock file $LOCKFILE" \
+		    "held by pid $hold_pid for $cnt seconds"
+
+		if [[ $cnt == 60 ]]; then
+			logger -p daemon.err "breaking dlmgmtd lock" \
+			    "held by pid $hold_pid after $cnt seconds"
+			unlock_file
+			continue
+		fi
+
+		sleep 1
+		let cnt=$cnt+1
 	done
 }
 
