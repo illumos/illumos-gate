@@ -28,6 +28,9 @@
  *	All Rights Reserved
  */
 
+/*
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -1864,7 +1867,7 @@ nfs4_rnode_init(void)
 	    (ulong_t)((kmem_maxavail() >> 2) / sizeof (struct rnode4));
 	if (nrnode > nrnode4_max || (nrnode == 0 && ncsize == 0)) {
 		zcmn_err(GLOBAL_ZONEID, CE_NOTE,
-		    "setting nrnode to max value of %ld", nrnode4_max);
+		    "!setting nrnode to max value of %ld", nrnode4_max);
 		nrnode = nrnode4_max;
 	}
 	rtable4size = 1 << highbit(nrnode / rnode4_hashlen);
