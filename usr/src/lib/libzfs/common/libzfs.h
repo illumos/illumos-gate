@@ -22,7 +22,6 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2010 Nexenta Systems, Inc. All rights reserved.
- * Copyright (c) 2011 by Delphix. All rights reserved.
  */
 
 #ifndef	_LIBZFS_H
@@ -382,7 +381,6 @@ extern void zpool_explain_recover(libzfs_handle_t *, const char *, int,
  * underlying datasets, only the references to them.
  */
 extern zfs_handle_t *zfs_open(libzfs_handle_t *, const char *, int);
-extern zfs_handle_t *zfs_handle_dup(zfs_handle_t *);
 extern void zfs_close(zfs_handle_t *);
 extern zfs_type_t zfs_get_type(const zfs_handle_t *);
 extern const char *zfs_get_name(const zfs_handle_t *);
@@ -416,20 +414,12 @@ extern int zfs_prop_get_userquota_int(zfs_handle_t *zhp, const char *propname,
     uint64_t *propvalue);
 extern int zfs_prop_get_userquota(zfs_handle_t *zhp, const char *propname,
     char *propbuf, int proplen, boolean_t literal);
-extern int zfs_prop_get_written_int(zfs_handle_t *zhp, const char *propname,
-    uint64_t *propvalue);
-extern int zfs_prop_get_written(zfs_handle_t *zhp, const char *propname,
-    char *propbuf, int proplen, boolean_t literal);
-extern int zfs_get_snapused_int(zfs_handle_t *firstsnap, zfs_handle_t *lastsnap,
-    uint64_t *usedp);
 extern uint64_t zfs_prop_get_int(zfs_handle_t *, zfs_prop_t);
 extern int zfs_prop_inherit(zfs_handle_t *, const char *, boolean_t);
 extern const char *zfs_prop_values(zfs_prop_t);
 extern int zfs_prop_is_string(zfs_prop_t prop);
 extern nvlist_t *zfs_get_user_props(zfs_handle_t *);
 extern nvlist_t *zfs_get_recvd_props(zfs_handle_t *);
-extern nvlist_t *zfs_get_clones_nvl(zfs_handle_t *);
-
 
 typedef struct zprop_list {
 	int		pl_prop;
@@ -504,7 +494,6 @@ extern int zfs_iter_dependents(zfs_handle_t *, boolean_t, zfs_iter_f, void *);
 extern int zfs_iter_filesystems(zfs_handle_t *, zfs_iter_f, void *);
 extern int zfs_iter_snapshots(zfs_handle_t *, zfs_iter_f, void *);
 extern int zfs_iter_snapshots_sorted(zfs_handle_t *, zfs_iter_f, void *);
-extern int zfs_iter_snapspec(zfs_handle_t *, const char *, zfs_iter_f, void *);
 
 typedef struct get_all_cb {
 	zfs_handle_t	**cb_handles;
@@ -525,7 +514,6 @@ extern int zfs_create(libzfs_handle_t *, const char *, zfs_type_t,
 extern int zfs_create_ancestors(libzfs_handle_t *, const char *);
 extern int zfs_destroy(zfs_handle_t *, boolean_t);
 extern int zfs_destroy_snaps(zfs_handle_t *, char *, boolean_t);
-extern int zfs_destroy_snaps_nvl(zfs_handle_t *, nvlist_t *, boolean_t);
 extern int zfs_clone(zfs_handle_t *, const char *, nvlist_t *);
 extern int zfs_snapshot(libzfs_handle_t *, const char *, boolean_t, nvlist_t *);
 extern int zfs_rollback(zfs_handle_t *, zfs_handle_t *, boolean_t);
@@ -549,12 +537,6 @@ typedef struct sendflags {
 
 	/* send properties (ie, -p) */
 	int props : 1;
-
-	/* do not send (no-op, ie. -n) */
-	int noop : 1;
-
-	/* parsable verbose output (ie. -P) */
-	int parsable : 1;
 } sendflags_t;
 
 typedef boolean_t (snapfilter_cb_t)(zfs_handle_t *, void *);

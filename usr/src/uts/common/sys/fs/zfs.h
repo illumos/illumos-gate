@@ -124,8 +124,6 @@ typedef enum {
 	ZFS_PROP_MLSLABEL,
 	ZFS_PROP_SYNC,
 	ZFS_PROP_REFRATIO,
-	ZFS_PROP_WRITTEN,
-	ZFS_PROP_CLONES,
 	ZFS_NUM_PROPS
 } zfs_prop_t;
 
@@ -222,7 +220,6 @@ const char *zfs_prop_to_name(zfs_prop_t);
 zfs_prop_t zfs_name_to_prop(const char *);
 boolean_t zfs_prop_user(const char *);
 boolean_t zfs_prop_userquota(const char *);
-boolean_t zfs_prop_written(const char *);
 int zfs_prop_index_to_string(zfs_prop_t, uint64_t, const char **);
 int zfs_prop_string_to_index(zfs_prop_t, const char *, uint64_t *);
 uint64_t zfs_prop_random_value(zfs_prop_t, uint64_t seed);
@@ -757,6 +754,7 @@ typedef enum zfs_ioc {
 	ZFS_IOC_ERROR_LOG,
 	ZFS_IOC_CLEAR,
 	ZFS_IOC_PROMOTE,
+	ZFS_IOC_DESTROY_SNAPS,
 	ZFS_IOC_SNAPSHOT,
 	ZFS_IOC_DSOBJ_TO_DSNAME,
 	ZFS_IOC_OBJ_TO_PATH,
@@ -778,10 +776,7 @@ typedef enum zfs_ioc {
 	ZFS_IOC_NEXT_OBJ,
 	ZFS_IOC_DIFF,
 	ZFS_IOC_TMP_SNAPSHOT,
-	ZFS_IOC_OBJ_TO_STATS,
-	ZFS_IOC_SPACE_WRITTEN,
-	ZFS_IOC_SPACE_SNAPS,
-	ZFS_IOC_DESTROY_SNAPS_NVL
+	ZFS_IOC_OBJ_TO_STATS
 } zfs_ioc_t;
 
 /*

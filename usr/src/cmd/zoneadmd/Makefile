@@ -23,7 +23,6 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2011 by Delphix. All rights reserved.
 #
 
 PROG= zoneadmd
@@ -42,10 +41,6 @@ LDLIBS += -lsocket -lzonecfg -lnsl -ldevinfo -ldevice -lnvpair \
 	-lgen -lbsm -lcontract -lzfs -luuid -lbrand -ldladm -ltsnet -ltsol \
 	-linetutil
 XGETFLAGS += -a -x zoneadmd.xcl
-
-# lint is confused by libzfs.h:struct sendflags
-LINTFLAGS += -xerroff=E_INCONS_ARG_DECL2
-LINTFLAGS64 += -xerroff=E_INCONS_ARG_DECL2
 
 .KEEP_STATE:
 
