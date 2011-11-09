@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011 by Delphix. All rights reserved.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -172,6 +173,11 @@ mlsetup(struct regs *rp)
 		pci_cfgspace_init();
 #else
 	pci_cfgspace_init();
+	/*
+	 * Initialize the platform type from CPU 0 to ensure that
+	 * determine_platform() is only ever called once.
+	 */
+	determine_platform();
 #endif
 
 	/*

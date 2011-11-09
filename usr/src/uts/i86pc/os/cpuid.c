@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011 by Delphix. All rights reserved.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -590,12 +591,21 @@ cpuid_free_space(cpu_t *cpu)
 
 #if !defined(__xpv)
 
-static void
-determine_platform()
+/*
+ * Determine the type of the underlying platform. This is used to customize
+ * initialization of various subsystems (e.g. TSC). determine_platform() must
+ * only ever be called once to prevent two processors from seeing different
+ * values of platform_type, it must be called before cpuid_pass1(), the
+ * earliest consumer to execute.
+ */
+void
+determine_platform(void)
 {
 	struct cpuid_regs cp;
 	char *xen_str;
 	uint32_t xen_signature[4], base;
+
+	ASSERT(platform_type == -1);
 
 	platform_type = HW_NATIVE;
 
@@ -633,9 +643,7 @@ determine_platform()
 int
 get_hwenv(void)
 {
-	if (platform_type == -1)
-		determine_platform();
-
+	ASSERT(platform_type != -1);
 	return (platform_type);
 }
 
@@ -870,9 +878,6 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 	extern int idle_cpu_prefer_mwait;
 #endif
 
-#if !defined(__xpv)
-	determine_platform();
-#endif
 	/*
 	 * Space statically allocated for BSP, ensure pointer is set
 	 */

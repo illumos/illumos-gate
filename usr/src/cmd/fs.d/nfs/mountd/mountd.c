@@ -17,10 +17,9 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-
-/*
+ *
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -112,7 +111,6 @@ static int mount(struct svc_req *r);
 static void sh_free(struct sh_list *);
 static void umount(struct svc_req *);
 static void umountall(struct svc_req *);
-static int netmatch(struct netbuf *, char *);
 static void sigexit(int);
 static int newopts(char *);
 static tsol_tpent_t *get_client_template(struct sockaddr *);
@@ -1711,10 +1709,10 @@ done:
  * We match on aliases of the hostname as well as on the canonical name.
  * Names in the access list may be either hosts or netgroups;  they're
  * not distinguished syntactically.  We check for hosts first because
- * it's cheaper (just M*N strcmp()s), then try netgroups.
+ * it's cheaper, then try netgroups.
  *
  * If pnb and pclnames are NULL, it means that we have to use transp
- * to resolve client's IP address to host name. If they aren't NULL
+ * to resolve client IP address to hostname. If they aren't NULL
  * then transp argument won't be used and can be NULL.
  */
 int
@@ -1722,84 +1720,112 @@ in_access_list(SVCXPRT *transp, struct netbuf **pnb,
     struct nd_hostservlist **pclnames,
     char *access_list)	/* N.B. we clobber this "input" parameter */
 {
-	int nentries;
-	char *gr;
-	char *lasts;
+	char addr[INET_ADDRSTRLEN];
+	char buff[256];
+	int nentries = 0;
+	char *cstr = access_list;
+	char *gr = access_list;
 	char *host;
 	int off;
 	int i;
-	int netgroup_match;
 	int response;
+	int sbr = 0;
 	struct nd_hostservlist *clnames;
+	struct netent n, *np;
 
-	/*
-	 * If no access list - then it's unrestricted
-	 */
+	/* If no access list - then it's unrestricted */
 	if (access_list == NULL || *access_list == '\0')
 		return (1);
 
 	assert(transp != NULL || (*pnb != NULL && *pclnames != NULL));
 
-	nentries = 0;
+	/* Get client address if it wasn't provided */
+	if (*pnb == NULL)
+		/* Don't grant access if client address isn't known */
+		if ((*pnb = svc_getrpccaller(transp)) == NULL)
+			return (0);
 
-	for (gr = strtok_r(access_list, ":", &lasts);
-	    gr != NULL; gr = strtok_r(NULL, ":", &lasts)) {
+	/* Try to lookup client hostname if it wasn't provided */
+	if (*pclnames == NULL)
+		getclientsnames(transp, pnb, pclnames);
+	clnames = *pclnames;
+
+	for (;;) {
+		if ((cstr = strpbrk(cstr, "[]:")) != NULL) {
+			switch (*cstr) {
+			case '[':
+			case ']':
+				sbr = !sbr;
+				cstr++;
+				continue;
+			case ':':
+				if (sbr) {
+					cstr++;
+					continue;
+				}
+				*cstr = '\0';
+			}
+		}
 
 		/*
-		 * If the list name has a '-' prepended
-		 * then a match of the following name
-		 * implies failure instead of success.
+		 * If the list name has a '-' prepended then a match of
+		 * the following name implies failure instead of success.
 		 */
 		if (*gr == '-') {
 			response = 0;
 			gr++;
-		} else
+		} else {
 			response = 1;
+		}
 
 		/*
-		 * If the list name begins with an at
-		 * sign then do a network comparison.
+		 * First check if we have '@' entry, as it doesn't
+		 * require client hostname.
 		 */
 		if (*gr == '@') {
-			/*
-			 * Just get the netbuf, avoiding the costly name
-			 * lookup. This will suffice for access based
-			 * solely on addresses.
-			 */
-			if (*pnb == NULL) {
-				/*
-				 * Don't grant access if client's address isn't
-				 * known.
-				 */
-				if ((*pnb = svc_getrpccaller(transp)) == NULL)
-					return (0);
+			gr++;
+
+			/* Netname support */
+			if (!isdigit(*gr) && *gr != '[') {
+				if ((np = getnetbyname_r(gr, &n, buff,
+				    sizeof (buff))) != NULL &&
+				    np->n_net != 0) {
+					while ((np->n_net & 0xFF000000u) == 0)
+						np->n_net <<= 8;
+					np->n_net = htonl(np->n_net);
+					if (inet_ntop(AF_INET, &np->n_net, addr,
+					    INET_ADDRSTRLEN) == NULL)
+						break;
+					if (inet_matchaddr((*pnb)->buf, addr))
+						return (response);
+				}
+			} else {
+				if (inet_matchaddr((*pnb)->buf, gr))
+					return (response);
 			}
 
-			if (netmatch(*pnb, gr + 1))
-				return (response);
+			if (cstr == NULL)
+				break;
+
+			gr = ++cstr;
+
 			continue;
 		}
 
 		/*
-		 * We need to get the host name if we haven't gotten
-		 * it by now!
+		 * No other checks can be performed if client address
+		 * can't be resolved.
 		 */
-		if (*pclnames == NULL) {
-			DTRACE_PROBE(mountd, name_by_addrlist);
-			/*
-			 * Do not grant access if we can't
-			 * get a name!
-			 */
-			if (getclientsnames(transp, pnb, pclnames) != 0)
-				return (0);
+		if (clnames == NULL) {
+			if (cstr == NULL)
+				break;
+
+			gr = ++cstr;
+
+			continue;
 		}
 
-		clnames = *pclnames;
-
-		/*
-		 * The following loops through all the
-		 * client's aliases.  Usually it's just one name.
-		 */
+		/* Otherwise loop through all client hostname aliases */
 		for (i = 0; i < clnames->h_cnt; i++) {
 			host = clnames->h_hostservs[i].h_host;
 
@@ -1820,120 +1846,25 @@ in_access_list(SVCXPRT *transp, struct netbuf **pnb,
 						return (response);
 					}
 				}
-			} else
-
-			/*
-			 * Just do a hostname match
-			 */
-			if (strcasecmp(gr, host) == 0) {
-				return (response);	/* Matched a hostname */
+			} else {
+				/* Just do a hostname match */
+				if (strcasecmp(gr, host) == 0)
+					return (response);
 			}
 		}
 
 		nentries++;
+
+		if (cstr == NULL)
+			break;
+
+		gr = ++cstr;
 	}
 
-	/*
-	 * We need to get the host name if we haven't gotten
-	 * it by now!
-	 */
-	if (*pclnames == NULL) {
-		DTRACE_PROBE(mountd, name_by_netgroup);
-		/*
-		 * Do not grant access if we can't
-		 * get a name!
-		 */
-		if (getclientsnames(transp, pnb, pclnames) != 0)
-			return (0);
-	}
-
-	netgroup_match = netgroup_check(*pclnames, access_list, nentries);
-
-	return (netgroup_match);
-}
-
-int
-netmatch(struct netbuf *nb, char *name)
-{
-	uint_t claddr;
-	struct netent n, *np;
-	char *mp, *p;
-	uint_t addr, mask;
-	int i, bits;
-	char buff[256];
-
-	/*
-	 * Check if it's an IPv4 addr
-	 */
-	if (nb->len != sizeof (struct sockaddr_in))
+	if (clnames == NULL)
 		return (0);
 
-	(void) memcpy(&claddr,
-	    /* LINTED pointer alignment */
-	    &((struct sockaddr_in *)nb->buf)->sin_addr.s_addr,
-	    sizeof (struct in_addr));
-	claddr = ntohl(claddr);
-
-	mp = strchr(name, '/');
-	if (mp)
-		*mp++ = '\0';
-
-	if (isdigit(*name)) {
-		/*
-		 * Convert a dotted IP address
-		 * to an IP address. The conversion
-		 * is not the same as that in inet_addr().
-		 */
-		p = name;
-		addr = 0;
-		for (i = 0; i < 4; i++) {
-			addr |= atoi(p) << ((3-i) * 8);
-			p = strchr(p, '.');
-			if (p == NULL)
-				break;
-			p++;
-		}
-	} else {
-		/*
-		 * Turn the netname into
-		 * an IP address.
-		 */
-		np = getnetbyname_r(name, &n, buff, sizeof (buff));
-		if (np == NULL) {
-			syslog(LOG_DEBUG, "getnetbyname_r: %s: %m", name);
-			return (0);
-		}
-		addr = np->n_net;
-	}
-
-	/*
-	 * If the mask is specified explicitly then
-	 * use that value, e.g.
-	 *
-	 *    @109.104.56/28
-	 *
-	 * otherwise assume a mask from the zero octets
-	 * in the least significant bits of the address, e.g.
-	 *
-	 *   @109.104  or  @109.104.0.0
-	 */
-	if (mp) {
-		bits = atoi(mp);
-		mask = bits ? ~0 << ((sizeof (struct in_addr) * NBBY) - bits)
-		    : 0;
-		addr &= mask;
-	} else {
-		if ((addr & IN_CLASSA_HOST) == 0)
-			mask = IN_CLASSA_NET;
-		else if ((addr & IN_CLASSB_HOST) == 0)
-			mask = IN_CLASSB_NET;
-		else if ((addr & IN_CLASSC_HOST) == 0)
-			mask = IN_CLASSC_NET;
-		else
-			mask = IN_CLASSE_NET;
-	}
-
-	return ((claddr & mask) == addr);
+	return (netgroup_check(clnames, access_list, nentries));
 }
 
 

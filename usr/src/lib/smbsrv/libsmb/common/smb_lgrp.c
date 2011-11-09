@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -1033,14 +1034,25 @@ smb_lgrp_err_to_ntstatus(uint32_t lgrp_err)
  * smb_lgrp_chkmember
  *
  * Determines valid account types for being member of
- * a local group.
- *
- * Currently, we just support users as valid members.
+ * a local group.  We really have no business trying to
+ * keep track of the "type" of SIDs in a group, so just
+ * validate that the SID type is a known enum value.
  */
 static boolean_t
 smb_lgrp_chkmember(uint16_t sid_type)
 {
-	return (sid_type == SidTypeUser);
+	switch (sid_type) {
+	case SidTypeNull:
+	case SidTypeUser:
+	case SidTypeGroup:
+	case SidTypeAlias:
+	case SidTypeWellKnownGroup:
+	case SidTypeDeletedAccount:
+	case SidTypeInvalid:
+	case SidTypeUnknown:
+		return (B_TRUE);
+	}
+	return (B_FALSE);
 }
 
 /*

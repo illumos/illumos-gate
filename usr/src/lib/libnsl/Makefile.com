@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2011 Nexenta Systems, Inc. All rights reserved.
 #
 
 LIBRARY= libnsl.a
@@ -41,8 +42,8 @@ NETDIR=		netdir.o
 
 NSS= \
 gethostbyname_r.o gethostent.o gethostent_r.o gethostent6.o gethostby_door.o \
-getipnodeby_door.o getipnodeby.o getrpcent.o  getrpcent_r.o inet_pton.o \
-inet_ntop.o netdir_inet.o netdir_inet_sundry.o \
+getipnodeby_door.o getipnodeby.o getrpcent.o  getrpcent_r.o inet_matchaddr.o \
+inet_pton.o inet_ntop.o netdir_inet.o netdir_inet_sundry.o \
 parse.o getauthattr.o getprofattr.o getexecattr.o getuserattr.o getauuser.o
 
 NETSELECT= netselect.o
