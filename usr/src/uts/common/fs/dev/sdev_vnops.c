@@ -1142,9 +1142,21 @@ sdev_readdir(struct vnode *dvp, struct uio *uiop, struct cred *cred, int *eofp,
 	struct sdev_node *parent = VTOSDEV(dvp);
 	int error;
 
-	/* execute access is required to search the directory */
-	if ((error = VOP_ACCESS(dvp, VEXEC, 0, cred, ct)) != 0)
-		return (error);
+	/*
+	 * We must check that we have execute access to search the directory --
+	 * but because our sdev_contents lock is already held as a reader (the
+	 * caller must have done a VOP_RWLOCK()), we call directly into the
+	 * underlying access routine if sdev_attr is non-NULL.
+	 */
+	if (parent->sdev_attr != NULL) {
+		VERIFY(RW_READ_HELD(&parent->sdev_contents));
+
+		if (sdev_unlocked_access(parent, VEXEC, cred) != 0)
+			return (EACCES);
+	} else {
+		if ((error = VOP_ACCESS(dvp, VEXEC, 0, cred, ct)) != 0)
+			return (error);
+	}
 
 	ASSERT(parent);
 	if (!SDEV_IS_GLOBAL(parent))
