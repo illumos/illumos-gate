@@ -171,40 +171,6 @@ CMD_CPU_SIMPLEHANDLER(lfu_ce, lfu, CMD_PTR_CPU_LFU, "", "lfu-f")
 CMD_CPU_SIMPLEHANDLER(lfu_pe, lfu, CMD_PTR_CPU_LFU, "", "lfu-p")
 
 
-
-/*
- * Fp-scrubber errors
- */
-cmd_evdisp_t
-cmd_fps(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
-		const char *class, cmd_errcl_t clcode)
-{
-	uint8_t level = clcode & CMD_ERRCL_LEVEL_EXTRACT;
-	cmd_cpu_t *cpu;
-	nvlist_t *res;
-
-	clcode &= CMD_ERRCL_LEVEL_MASK;
-
-	/*
-	 * Ignore the event if resource FMRI is not present. Fp-Scrubber
-	 * puts the indicted CPU in resource. If resource is not present,
-	 * we cannot diagnose the ereport. It will simply get logged in
-	 * errlog for manual analysis, if needed.
-	 */
-	if (nvlist_lookup_nvlist(nvl, "resource", &res))
-		return (CMD_EVD_UNUSED);
-
-	if ((cpu = cmd_cpu_lookup(hdl, res, class, level)) == NULL ||
-	    cpu->cpu_faulting)
-		return (CMD_EVD_UNUSED);
-
-	return (cmd_cpuerr_common(hdl, ep, cpu, &cpu->cpu_fpu,
-	    CMD_PTR_CPU_FPU, "", "_n", "_t", "fpu", clcode));
-}
-
-
-
-
 #ifdef sun4u
 /*
  * The following macro handles UEs or CPU errors.
