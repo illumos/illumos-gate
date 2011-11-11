@@ -1802,7 +1802,7 @@ function git_wxfile
 	    $PERL -e 'my %files;
 
 	    while (<>) {
-	        chop;
+		chomp;
 	        my ($c, $m) = split / /, $_, 2;
 		open(F, "git show --name-only --pretty=format:'' $c |");
 		$_ = <F>;            # First line is trash
