@@ -94,47 +94,6 @@ smb_session_correct_keep_alive_values(smb_llist_t *ll, uint32_t new_keep_alive)
 }
 
 /*
- * smb_reconnection_check
- *
- * This function is called when a client indicates its current connection
- * should be the only one it has with the server, as indicated by VC=0 in
- * a SessionSetupX request. We go through the session list and destroy any
- * stale connections for that client.
- *
- * Clients don't associate IP addresses and servers. So a client may make
- * independent connections (i.e. with VC=0) to a server with multiple
- * IP addresses. So, when checking for a reconnection, we need to include
- * the local IP address, to which the client is connecting, when checking
- * for stale sessions.
- *
- * Also check the server's NetBIOS name to support simultaneous access by
- * multiple clients behind a NAT server.  This will only work for SMB over
- * NetBIOS on TCP port 139, it will not work SMB over TCP port 445 because
- * there is no NetBIOS name.  See also Knowledge Base article Q301673.
- */
-void
-smb_session_reconnection_check(smb_llist_t *ll, smb_session_t *sess)
-{
-	smb_session_t	*sn;
-
-	smb_llist_enter(ll, RW_READER);
-	sn = smb_llist_head(ll);
-	while (sn != NULL) {
-		SMB_SESSION_VALID(sn);
-		if ((sn != sess) &&
-		    smb_inet_equal(&sn->ipaddr, &sess->ipaddr) &&
-		    smb_inet_equal(&sn->local_ipaddr, &sess->local_ipaddr) &&
-		    (strcasecmp(sn->workstation, sess->workstation) == 0) &&
-		    (sn->opentime <= sess->opentime) &&
-		    (sn->s_kid < sess->s_kid)) {
-			smb_session_disconnect(sn);
-		}
-		sn = smb_llist_next(ll, sn);
-	}
-	smb_llist_exit(ll);
-}
-
-/*
  * Send a session message - supports SMB-over-NBT and SMB-over-TCP.
  *
  * The mbuf chain is copied into a contiguous buffer so that the whole
