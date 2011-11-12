@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #include <sys/atomic.h>
@@ -367,6 +368,7 @@ smb_request_cancel(smb_request_t *sr)
 	mutex_enter(&sr->sr_mutex);
 	switch (sr->sr_state) {
 
+	case SMB_REQ_STATE_INITIALIZING:
 	case SMB_REQ_STATE_SUBMITTED:
 	case SMB_REQ_STATE_ACTIVE:
 	case SMB_REQ_STATE_CLEANED_UP:
@@ -404,11 +406,8 @@ smb_request_cancel(smb_request_t *sr)
 		 * is completing.
 		 */
 		break;
-	/*
-	 * Cases included:
-	 *	SMB_REQ_STATE_FREE:
-	 *	SMB_REQ_STATE_INITIALIZING:
-	 */
+
+	case SMB_REQ_STATE_FREE:
 	default:
 		SMB_PANIC();
 	}
