@@ -822,6 +822,55 @@ mdb_object_iter(mdb_object_cb_t cb, void *data)
 }
 
 /*
+ * Private callback structure for implementing mdb_symbol_iter, below.
+ */
+typedef struct {
+	mdb_symbol_cb_t si_cb;
+	void *si_arg;
+	int si_rval;
+} symbol_iter_arg_t;
+
+/*ARGSUSED*/
+static int
+mdb_symbol_cb(void *data, const GElf_Sym *gsym, const char *name,
+    const mdb_syminfo_t *sip, const char *obj)
+{
+	symbol_iter_arg_t *arg = data;
+	mdb_symbol_t sym;
+
+	if (arg->si_rval != 0)
+		return (0);
+
+	bzero(&sym, sizeof (sym));
+	sym.sym_name = name;
+	sym.sym_object = obj;
+	sym.sym_sym = gsym;
+	sym.sym_table = sip->sym_table;
+	sym.sym_id = sip->sym_id;
+
+	arg->si_rval = arg->si_cb(&sym, arg->si_arg);
+
+	return (0);
+}
+
+int
+mdb_symbol_iter(const char *obj, uint_t which, uint_t type,
+    mdb_symbol_cb_t cb, void *data)
+{
+	symbol_iter_arg_t arg;
+
+	arg.si_cb = cb;
+	arg.si_arg = data;
+	arg.si_rval = 0;
+
+	if (mdb_tgt_symbol_iter(mdb.m_target, obj, which, type,
+	    mdb_symbol_cb, &arg) != 0)
+		return (-1);
+
+	return (arg.si_rval);
+}
+
+/*
  * Private structure and function for implementing mdb_dumpptr on top
  * of mdb_dump_internal
  */
