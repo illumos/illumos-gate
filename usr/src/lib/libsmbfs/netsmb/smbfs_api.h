@@ -90,7 +90,7 @@ typedef enum {
 #define	SMB_AT_NTLM1	4	/* NTLM (v1) */
 #define	SMB_AT_NTLM2	8	/* NTLMv2 */
 #define	SMB_AT_KRB5	0x10	/* Kerberos5 (AD) */
-#define	SMB_AT_DEFAULT	(SMB_AT_KRB5 | SMB_AT_NTLM2 | SMB_AT_NTLM1)
+#define	SMB_AT_DEFAULT	(SMB_AT_KRB5 | SMB_AT_NTLM2)
 
 struct smb_ctx;	/* anonymous here; real one in smb_lib.h */
 typedef struct smb_ctx smb_ctx_t;

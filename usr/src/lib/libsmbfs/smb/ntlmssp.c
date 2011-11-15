@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -242,6 +243,11 @@ ntlmssp_put_type1(struct ssp_ctx *sp, struct mbdata *out_mb)
 		ssp_st->ss_flags |= NTLMSSP_NEGOTIATE_ALWAYS_SIGN;
 		ctx->ct_hflags2 |= SMB_FLAGS2_SECURITY_SIGNATURE;
 	}
+
+	if (ctx->ct_authflags & SMB_AT_NTLM2)
+		ssp_st->ss_flags |= NTLMSSP_NEGOTIATE_EXTENDED_SESSIONSECURITY;
+	if (ctx->ct_authflags & SMB_AT_NTLM1)
+		ssp_st->ss_flags |= NTLMSSP_NEGOTIATE_LM_KEY;
 
 	bcopy(ntlmssp_id, &hdr.h_id, ID_SZ);
 	hdr.h_type = 1; /* Type 1 */
