@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -585,9 +586,7 @@ _get_hostserv_inetnetdir_byname(struct netconfig *nconf,
 				    ndbuf4switch->buflen, &h_errnop);
 				if (he == NULL) {
 					NSS_XbyY_FREE(&ndbuf4switch);
-					_nderror = h_errnop ?
-					    __herrno2netdir(h_errnop) :
-					    ND_NOHOST;
+					_nderror = __herrno2netdir(h_errnop);
 					return (_nderror);
 				}
 				/*
@@ -673,9 +672,7 @@ _get_hostserv_inetnetdir_byname(struct netconfig *nconf,
 				    args->arg.nss.host6.flags, &h_errnop);
 				if (he == NULL) {
 					NSS_XbyY_FREE(&ndbuf4switch);
-					_nderror = h_errnop ?
-					    __herrno2netdir(h_errnop) :
-					    ND_NOHOST;
+					_nderror = __herrno2netdir(h_errnop);
 					return (_nderror);
 				}
 				/*
@@ -1310,7 +1307,8 @@ _switch_gethostbyname_r(const char *name, struct hostent *result, char *buffer,
 	res = nss_search(&db_root_hosts, _nss_initf_hosts,
 	    NSS_DBOP_HOSTS_BYNAME, &arg);
 	arg.status = res;
-	*h_errnop = arg.h_errno;
+	if (res != NSS_SUCCESS)
+		*h_errnop = arg.h_errno ? arg.h_errno : __nss2herrno(res);
 	if (arg.returnval != NULL)
 		order_haddrlist_af(result->h_addrtype, result->h_addr_list);
 	return ((struct hostent *)NSS_XbyY_FINI(&arg));
@@ -1331,7 +1329,8 @@ _switch_getipnodebyname_r(const char *name, struct hostent *result,
 	res = nss_search(&db_root_ipnodes, _nss_initf_ipnodes,
 	    NSS_DBOP_IPNODES_BYNAME, &arg);
 	arg.status = res;
-	*h_errnop = arg.h_errno;
+	if (res != NSS_SUCCESS)
+		*h_errnop = arg.h_errno ? arg.h_errno : __nss2herrno(res);
 	if (arg.returnval != NULL)
 		order_haddrlist_af(result->h_addrtype, result->h_addr_list);
 	return ((struct hostent *)NSS_XbyY_FINI(&arg));
@@ -1352,7 +1351,8 @@ _switch_gethostbyaddr_r(const char *addr, int len, int type,
 	res = nss_search(&db_root_hosts, _nss_initf_hosts,
 	    NSS_DBOP_HOSTS_BYADDR, &arg);
 	arg.status = res;
-	*h_errnop = arg.h_errno;
+	if (res != NSS_SUCCESS)
+		*h_errnop = arg.h_errno ? arg.h_errno : __nss2herrno(res);
 	return (struct hostent *)NSS_XbyY_FINI(&arg);
 }
 
@@ -1371,7 +1371,8 @@ _switch_getipnodebyaddr_r(const char *addr, int len, int type,
 	res = nss_search(&db_root_ipnodes, _nss_initf_ipnodes,
 	    NSS_DBOP_IPNODES_BYADDR, &arg);
 	arg.status = res;
-	*h_errnop = arg.h_errno;
+	if (res != NSS_SUCCESS)
+		*h_errnop = arg.h_errno ? arg.h_errno : __nss2herrno(res);
 	return (struct hostent *)NSS_XbyY_FINI(&arg);
 }
 
