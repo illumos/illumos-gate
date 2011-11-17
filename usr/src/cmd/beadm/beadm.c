@@ -1046,6 +1046,11 @@ be_do_destroy(int argc, char **argv)
 		(void) fprintf(stderr, _("You have insufficient privileges to "
 		    "execute this command.\n"));
 		break;
+	case BE_ERR_SS_EXISTS:
+		(void) fprintf(stderr, _("Unable to destroy %s: "
+		    "BE has snapshots.\nUse 'beadm destroy -s %s' or "
+		    "'zfs -r destroy <dataset>'.\n"), be_name, be_name);
+		break;
 	default:
 		(void) fprintf(stderr, _("Unable to destroy %s.\n"), be_name);
 		(void) fprintf(stderr, "%s\n", be_err_to_str(err));
