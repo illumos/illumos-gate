@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -59,11 +60,15 @@ static boolean_t smb_open_overwrite(smb_arg_open_t *);
  *               FILE_WRITE_ATTRIBUTES, FILE_WRITE_EA, and FILE_APPEND_DATA
  *
  * GENERIC_EXECUTE	STANDARD_RIGHTS_EXECUTE, SYNCHRONIZE, and FILE_EXECUTE.
+ *
+ * Careful, we have to emulate some Windows behavior here.
+ * When requested access == zero, you get READ_CONTROL.
+ * MacOS 10.7 depends on this.
  */
 uint32_t
 smb_access_generic_to_file(uint32_t desired_access)
 {
-	uint32_t access = 0;
+	uint32_t access = READ_CONTROL;
 
 	if (desired_access & GENERIC_ALL)
 		return (FILE_ALL_ACCESS & ~SYNCHRONIZE);

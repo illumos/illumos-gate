@@ -2387,7 +2387,7 @@ be_send_fs_callback(zfs_handle_t *zhp, void *data)
 		(void) close(srpipe[0]);
 
 		/* Send dataset */
-		if (zfs_send(zhp, NULL, bt->obe_snap_name, send_flags,
+		if (zfs_send(zhp, NULL, bt->obe_snap_name, &send_flags,
 		    srpipe[1], NULL, NULL, NULL) != 0) {
 			_exit(1);
 		}
@@ -2399,7 +2399,7 @@ be_send_fs_callback(zfs_handle_t *zhp, void *data)
 	(void) close(srpipe[1]);
 
 	/* Receive dataset */
-	if (zfs_receive(g_zfs, clone_ds, flags, srpipe[0], NULL) != 0) {
+	if (zfs_receive(g_zfs, clone_ds, &flags, srpipe[0], NULL) != 0) {
 		be_print_err(gettext("be_send_fs_callback: failed to "
 		    "recv dataset (%s)\n"), clone_ds);
 	}

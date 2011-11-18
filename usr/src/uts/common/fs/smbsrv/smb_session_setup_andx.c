@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -157,9 +158,6 @@ smb_post_session_setup_andx(smb_request_t *sr)
 }
 
 /*
- * If the vcnumber is zero, discard any other connections associated with
- * this client.
- *
  * If signing has not already been enabled on this session check to see if
  * it should be enabled.  The first authenticated logon provides the MAC
  * key and sequence numbers for signing all subsequent sessions on the same
@@ -179,9 +177,6 @@ smb_com_session_setup_andx(smb_request_t *sr)
 	smb_session_key_t	*session_key = NULL;
 	char			ipaddr_buf[INET6_ADDRSTRLEN];
 	int			rc;
-
-	if (sr->session->vcnumber == 0)
-		smb_server_reconnection_check(sr->sr_server, sr->session);
 
 	if (smb_authenticate(sr, sinfo, &session_key) != 0)
 		return (SDRC_ERROR);

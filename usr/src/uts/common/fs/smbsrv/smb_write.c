@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -28,14 +29,6 @@
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/netbios.h>
 
-
-/*
- * The limit in bytes that the marshalling will grow the buffer
- * chain to accomodate incoming data on SmbWriteX requests.
- * This sets the upper limit for the data-count per SmbWriteX
- * request.
- */
-#define	SMB_WRITEX_MAX		102400
 
 static int smb_write_truncate(smb_request_t *, smb_rw_param_t *);
 
@@ -418,7 +411,6 @@ smb_com_write_andx(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
-	sr->smb_data.max_bytes = SMB_WRITEX_MAX;
 	rc = smbsr_decode_data(sr, "#.#B", param->rw_dsoff, param->rw_count,
 	    &param->rw_vdb);
 
