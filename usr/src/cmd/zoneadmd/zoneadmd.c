@@ -817,6 +817,7 @@ setup_subproc_env(boolean_t debug)
 		    rap = rap->zone_res_attr_next)
 			set_zonecfg_env(RSRC_NET, phys, rap->zone_res_attr_name,
 			    rap->zone_res_attr_value);
+		nwifent_free_attrs(&ntab);
 	}
 
 	(void) setenv("_ZONECFG_net_resources", net_resources, 1);
@@ -853,6 +854,19 @@ setup_subproc_env(boolean_t debug)
 done:
 	zonecfg_fini_handle(handle);
 	return (res);
+}
+
+void
+nwifent_free_attrs(struct zone_nwiftab *np)
+{
+	struct zone_res_attrtab *rap;
+
+	for (rap = np->zone_nwif_attrp; rap != NULL; ) {
+		struct zone_res_attrtab *tp = rap;
+
+		rap = rap->zone_res_attr_next;
+		free(tp);
+	}
 }
 
 /*

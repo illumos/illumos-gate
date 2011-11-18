@@ -97,6 +97,7 @@ extern dladm_handle_t dld_handle;
 
 extern void zerror(zlog_t *, boolean_t, const char *, ...);
 extern char *localize_msg(char *locale, const char *msg);
+extern void nwifent_free_attrs(struct zone_nwiftab *);
 
 /*
  * Eventstream interfaces.
