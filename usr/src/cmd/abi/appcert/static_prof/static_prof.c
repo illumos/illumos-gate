@@ -97,41 +97,28 @@ store_binding(binding_bucket * bind)
 {
 	unsigned long   bktno;
 	unsigned long   orig_bktno;
-	int		table_full = FALSE;
-	int		i;
-
+	
 	bktno = my_elf_hash(bind->sym) % DEFBKTS;
 	orig_bktno = bktno;
 
-	if (!bkts[bktno].sym) {
-		bkts[bktno].sym = bind->sym;
-		bkts[bktno].obj = bind->obj;
-		bkts[bktno].ref_lib = bind->ref_lib;
-		bkts[bktno].def_lib = bind->def_lib;
-		bkts[bktno].section = bind->section;
-		bkts[bktno].stbind = bind->stbind;
-		bkts[bktno].sttype = bind->sttype;
-	} else {
-		bktno = (bktno + 1) % DEFBKTS;
-		for (i = bktno; i < DEFBKTS; i = (i + 1) % DEFBKTS) {
-			if (i == orig_bktno) {
-				table_full = TRUE;
+	if (bkts[bktno].sym != NULL) {
+		do {
+			bktno = (bktno + 1) % DEFBKTS;
+
+			if (bktno == orig_bktno)
 				exit(1);
-			}
-			if (!bkts[i].sym)
-				break;
-		}
-		if ((i < DEFBKTS) && (!bkts[i].sym) && (table_full != TRUE)) {
-			bkts[i].sym = bind->sym;
-			bkts[i].obj = bind->obj;
-			bkts[i].ref_lib = bind->ref_lib;
-			bkts[i].def_lib = bind->def_lib;
-			bkts[i].section = bind->section;
-			bkts[i].stbind = bind->stbind;
-			bkts[i].sttype = bind->sttype;
-		}
+		} while (bkts[bktno].sym != NULL);
 	}
+
+	bkts[bktno].sym = bind->sym;
+	bkts[bktno].obj = bind->obj;
+	bkts[bktno].ref_lib = bind->ref_lib;
+	bkts[bktno].def_lib = bind->def_lib;
+	bkts[bktno].section = bind->section;
+	bkts[bktno].stbind = bind->stbind;
+	bkts[bktno].sttype = bind->sttype;
 }
+
 
 /* ========== check_store_binding ========================================= */
 /*
