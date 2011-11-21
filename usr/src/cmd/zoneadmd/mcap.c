@@ -585,7 +585,6 @@ again:
 			free(buf);
 			return (0);
 		}
-		goto again;
 	}
 
 	if (n > got) {
