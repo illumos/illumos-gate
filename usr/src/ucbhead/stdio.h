@@ -44,8 +44,6 @@
 #ifndef _STDIO_H
 #define	_STDIO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/feature_tests.h>
 #include <sys/va_list.h>
 #include <stdio_tag.h>
@@ -83,37 +81,7 @@ typedef long	fpos_t;
 #define	NULL		0
 #endif
 
-#if defined(__STDC__)
-
-#if #machine(pdp11)
-#define	BUFSIZ		512
-#define	_STDIO_REVERSE
-#elif #machine(u370)
-#define	BUFSIZ		4096
-#define	_STDIO_REVERSE
-#define	_STDIO_ALLOCATE
-#else
 #define	BUFSIZ		1024
-#endif
-
-#else	/* !defined(__STDC__) */
-
-#if pdp11 || u370
-
-#if pdp11
-#define	BUFSIZ		512
-#define	_STDIO_REVERSE
-#else 	/* u370 */
-#define	BUFSIZ		4096
-#define	_STDIO_REVERSE
-#define	_STDIO_ALLOCATE
-#endif
-
-#else
-#define	BUFSIZ		1024
-#endif
-
-#endif	/* __STDC__ */
 
 #if defined(__i386)
 #define	_NFILE	60	/* initial number of streams: Intel x86 ABI */
@@ -154,31 +122,19 @@ typedef long	fpos_t;
 
 #define	L_tmpnam	25	/* (sizeof(P_tmpdir) + 15) */
 
-#if defined(__STDC__)
 #define	stdin	(&__iob[0])
 #define	stdout	(&__iob[1])
 #define	stderr	(&__iob[2])
-#else
-#define	stdin	(&_iob[0])
-#define	stdout	(&_iob[1])
-#define	stderr	(&_iob[2])
-#endif
 
 #ifndef	_FILEDEFED
 #define	_FILEDEFED
 typedef	__FILE FILE;
 #endif
 
-#if defined(__STDC__)
 extern FILE		__iob[_NFILE];
-#else
-extern FILE		_iob[_NFILE];
-#endif
 extern FILE		*_lastbuf;
 extern unsigned char 	*_bufendtab[];
-#ifndef _STDIO_ALLOCATE
 extern unsigned char	 _sibuf[], _sobuf[];
-#endif
 
 /* Large file interfaces */
 /* transition back from explicit 64-bit offset to implicit (64-bit) offset */
@@ -203,7 +159,6 @@ extern unsigned char	 _sibuf[], _sobuf[];
 #endif
 #endif
 
-#if defined(__STDC__)
 
 extern int	remove(const char *);
 extern int	rename(const char *, const char *);
@@ -272,44 +227,16 @@ extern int	fileno(FILE *);
 
 #endif	/* !defined(_STRICT_STDC) */
 
-#else	/* !defined __STDC__ */
-#define	_bufend(p)	_bufendtab[fileno(p)]
-#define	_bufsiz(p)	(_bufend(p) - (p)->_base)
-
-extern FILE	*fopen(), *fdopen(), *freopen(), *popen();
-extern long	ftell();
-extern void	rewind(), setbuf(), setbuffer();
-extern int	setlinebuf();
-extern char	*ctermid(), *cuserid(), *fgets(), *gets(), *sprintf(),
-		*vsprintf();
-extern int	fclose(), fflush(), fread(), fwrite(), fseek(), fgetc(),
-		getw(), pclose(), printf(), fprintf(),
-		vprintf(), vfprintf(), fputc(), putw(),
-		puts(), fputs(), scanf(), fscanf(), sscanf(),
-		setvbuf(), system(), ungetc();
-extern int	fileno();
-extern int	getc(), getchar(), putc(), putchar(), feof(), ferror();
-extern void	clearerr();
-
-#endif	/* __STDC__ */
 
 #ifndef __lint
 
 #ifndef _LP64
 
-#ifdef __STDC__
 
 #define	getc(p)		(--(p)->_cnt < 0 ? __filbuf(p) : (int)*(p)->_ptr++)
 #define	putc(x, p)	(--(p)->_cnt < 0 ? __flsbuf((x), (p)) \
 				: (int)(*(p)->_ptr++ = (x)))
 
-#else /* __STDC__ */
-
-#define	getc(p)		(--(p)->_cnt < 0 ? _filbuf(p) : (int)*(p)->_ptr++)
-#define	putc(x, p)	(--(p)->_cnt < 0 ? \
-			_flsbuf((unsigned char) (x), (p)) : \
-			(int)(*(p)->_ptr++ = (unsigned char)(x)))
-#endif /* __STDC__ */
 
 #define	clearerr(p)	((void) ((p)->_flag &= ~(_IOERR | _IOEOF)))
 #define	feof(p)		((p)->_flag & _IOEOF)
@@ -324,12 +251,8 @@ extern void	clearerr();
 
 #if	defined(_LARGEFILE64_SOURCE) && !((_FILE_OFFSET_BITS == 64) && \
 	    !defined(__PRAGMA_REDEFINE_EXTNAME))
-#if defined(__STDC__)
 extern FILE	*fopen64(const char *, const char *);
 extern FILE	*freopen64(const char *, const char *, FILE *);
-#else
-extern FILE	*fopen64(), *freopen64();
-#endif
 #endif	/* _LARGEFILE64_SOURCE... */
 
 #ifdef __cplusplus

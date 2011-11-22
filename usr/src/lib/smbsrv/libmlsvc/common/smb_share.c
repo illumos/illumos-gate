@@ -17,9 +17,9 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-/*
+ *
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -739,9 +739,6 @@ smb_shr_exists(char *sharename)
  * Precedence is none is checked first followed by ro then rw if
  * needed.  If x is wildcard (< 0) then check to see if the other
  * values are a match. If a match, that wins.
- *
- * ipv6 is wide open (returns SMB_SHRF_ACC_OPEN) for now until the underlying
- * functions support ipv6.
  */
 uint32_t
 smb_shr_hostaccess(smb_inaddr_t *ipaddr, char *none_list, char *ro_list,
@@ -753,10 +750,6 @@ smb_shr_hostaccess(smb_inaddr_t *ipaddr, char *none_list, char *ro_list,
 	int rw = 0;
 
 	if (!smb_inet_iszero(ipaddr)) {
-
-		if (ipaddr->a_family == AF_INET6)
-			return (SMB_SHRF_ACC_OPEN);
-
 		if ((flag & SMB_SHRF_ACC_NONE) != 0)
 			none = smb_chk_hostaccess(ipaddr, none_list);
 		if ((flag & SMB_SHRF_ACC_RO) != 0)

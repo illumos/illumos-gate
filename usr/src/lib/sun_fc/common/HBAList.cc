@@ -33,6 +33,9 @@
 #include <sstream>
 #include "FCHBA.h"
 #include "TgtFCHBA.h"
+#include <cstring>
+#include <climits>
+#include <cstdlib>
 
 using namespace std;
 

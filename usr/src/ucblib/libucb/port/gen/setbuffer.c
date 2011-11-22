@@ -36,8 +36,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*LINTLIBRARY*/
 
 #include <sys/types.h>
@@ -61,14 +59,11 @@ setbuffer(FILE *iop, char *abuf, int asize)
 	iop->_flag &= ~(_IOMYBUF | _IONBF | _IOLBF);
 	if (buf == 0) {
 		iop->_flag |= _IONBF;
-#ifndef _STDIO_ALLOCATE
 		if (fno < 2) {
 			/* use special buffer for std{in,out} */
 			buf = (fno == 0) ? _sibuf : _sobuf;
 			size = BUFSIZ - _SMBFSZ;
-		} else /* needed for ifdef */
-#endif
-		if (fno < _NFILE) {
+		} else if (fno < _NFILE) {
 			buf = _smbuf[fno];
 			size = _SMBFSZ - PUSHBACK;
 		} else if ((buf = (Uchar *)malloc(_SMBFSZ * sizeof (Uchar))) !=

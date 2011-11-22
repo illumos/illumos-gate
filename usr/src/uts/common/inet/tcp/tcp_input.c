@@ -21,7 +21,6 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, Joyent, Inc. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2011 Joyent, Inc. All rights reserved.
  */
@@ -3749,6 +3748,13 @@ process_ack:
 				(void) tcp_close_detached(tcp);
 				return;
 			}
+			/*
+			 * tcp_newconn_notify() changes conn_upcalls and
+			 * connp->conn_upper_handle.  Fix things now, in case
+			 * there's data attached to this ack.
+			 */
+			if (connp->conn_upcalls != NULL)
+				sockupcalls = connp->conn_upcalls;
 			/*
 			 * For passive open, trace receipt of final ACK as
 			 * tcp:::accept-established.

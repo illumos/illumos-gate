@@ -20,12 +20,14 @@
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+# Copyright (c) 2011 by Delphix. All rights reserved.
 #
 
 syntax: glob
 exception_lists/closed-bins
 exception_lists/cstyle
 exception_lists/hdrchk
+usr/src/cmd/dtrace/test/tst/common/*/*.out
 usr/src/cmd/krb5/kadmin/cli/kadmin_ct.c
 usr/src/cmd/krb5/kadmin/cli/kadmin.h
 usr/src/cmd/krb5/kadmin/cli/ss_wrapper.c
