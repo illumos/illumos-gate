@@ -103,7 +103,6 @@ MANIFEST_SUBDIRS=			\
 	cmd-inet/usr.sbin/routeadm	\
 	dcs/sparc/sun4u			\
 	dfs.cmds/sharemgr		\
-	fps/fpsd			\
 	fs.d/autofs			\
 	fs.d/nfs/svc			\
 	fs.d/smbclnt/svc		\
