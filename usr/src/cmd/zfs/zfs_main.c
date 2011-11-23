@@ -877,6 +877,7 @@ badusage:
 typedef struct destroy_cbdata {
 	boolean_t	cb_first;
 	boolean_t	cb_force;
+	boolean_t cb_wait;
 	boolean_t	cb_recurse;
 	boolean_t	cb_error;
 	boolean_t	cb_doclones;
