@@ -74,6 +74,7 @@
 	<privilege set="default" name="net_privaddr" />
 	<privilege set="default" name="net_rawaccess" ip-type="exclusive" />
 	<privilege set="default" name="proc_chroot" />
+	<privilege set="default" name="proc_clock_highres" />
 	<privilege set="default" name="sys_audit" />
 	<privilege set="default" name="proc_audit" />
 	<privilege set="default" name="proc_lock_memory" />
