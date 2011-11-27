@@ -23,7 +23,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2011 Joyent, Inc.  All rights reserved.
+ */
 
 /*
  * Generic memory walker, used by both the genunix and libumem dmods.
@@ -154,8 +156,14 @@ kgrep_range_fancybits(uintptr_t base, uintptr_t lim, void *kg_arg)	\
 		for (pos = page; pos < page_end; pos++) {		\
 			cur = *pos;					\
 									\
+			/*						\
+			 * Due to C's (surprising) integral promotion	\
+			 * rules for unsigned types smaller than an	\
+			 * int, we need to explicitly cast the result	\
+			 * of cur minus pattern, below.			\
+			 */						\
 			if (((cur ^ pattern) & mask) != 0 &&		\
-			    (cur - pattern) >= dist)			\
+			    (uintbits_t)(cur - pattern) >= dist)	\
 				continue;				\
 									\
 			out = cur;					\
