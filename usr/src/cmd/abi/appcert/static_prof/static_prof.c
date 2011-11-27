@@ -28,6 +28,9 @@
 /*	Copyright (c) 1988 AT&T */
 /*	  All Rights Reserved	*/
 
+/* Copyright 2011 Nexenta Systems, Inc. All rights reserved. */
+
+
 /* ------------------------------------------------------------------------ */
 /* include headers */
 /* ------------------------------------------------------------------------ */
@@ -97,17 +100,15 @@ store_binding(binding_bucket * bind)
 {
 	unsigned long   bktno;
 	unsigned long   orig_bktno;
-	
+
 	bktno = my_elf_hash(bind->sym) % DEFBKTS;
 	orig_bktno = bktno;
 
-	if (bkts[bktno].sym != NULL) {
-		do {
-			bktno = (bktno + 1) % DEFBKTS;
+	while (bkts[bktno].sym != NULL) {
+		bktno = (bktno + 1) % DEFBKTS;
 
-			if (bktno == orig_bktno)
-				exit(1);
-		} while (bkts[bktno].sym != NULL);
+		if (bktno == orig_bktno)
+			exit(1);
 	}
 
 	bkts[bktno].sym = bind->sym;

@@ -147,8 +147,8 @@ shown below:
 .nf
                             (highest priority/greatest throughput)
         en_1000fdx_cap          1000Mbps full duplex
-        en_100fdx_cap           100Mpbs full duplex
-        en_10fdx_cap            10Mpbs full duplex
+        en_100fdx_cap           100Mbps full duplex
+        en_10fdx_cap            10Mbps full duplex
                          (lowest priority/least throughput)
 .fi
 .in -2

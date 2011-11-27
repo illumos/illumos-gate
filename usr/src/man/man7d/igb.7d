@@ -140,10 +140,10 @@ parameter in priority order as shown below:
 .nf
                         (highest priority/greatest throughput)
         adv_1000fdx_cap         1000Mbps full duplex
-        adv_100fdx_cap          100Mpbs full duplex
+        adv_100fdx_cap          100Mbps full duplex
         adv_100hdx_cap          100Mbps half duplex
-        adv_10fdx_cap           10Mpbs full duplex
-        adv_10hdx_cap           10Mpbs half duplex
+        adv_10fdx_cap           10Mbps full duplex
+        adv_10hdx_cap           10Mbps half duplex
                                 (lowest priority/least throughput)
 .fi
 .in -2

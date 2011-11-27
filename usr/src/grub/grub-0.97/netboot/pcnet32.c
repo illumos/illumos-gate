@@ -479,7 +479,7 @@ static void pcnet32_reset(struct nic *nic)
 	lp->a.write_csr(ioaddr, 124, val);
 
 	if (lp->mii && !(lp->options & PCNET32_PORT_ASEL)) {
-		val = lp->a.read_bcr(ioaddr, 32) & ~0x38;	/* disable Auto Negotiation, set 10Mpbs, HD */
+		val = lp->a.read_bcr(ioaddr, 32) & ~0x38;	/* disable Auto Negotiation, set 10Mbps, HD */
 		if (lp->options & PCNET32_PORT_FD)
 			val |= 0x10;
 		if (lp->options & PCNET32_PORT_100)

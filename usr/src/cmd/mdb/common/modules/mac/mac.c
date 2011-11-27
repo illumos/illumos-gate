@@ -107,7 +107,7 @@ mac_flow_priority2str(mac_priority_level_t prio)
 }
 
 /*
- *  Convert bandwidth in bps to a string in mpbs.
+ *  Convert bandwidth in bps to a string in Mbps.
  */
 static char *
 mac_flow_bw2str(uint64_t bw, char *buf, ssize_t len)
