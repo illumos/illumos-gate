@@ -923,9 +923,7 @@ do_cert_request(char *object)
 		    "This will be the prefix of the Certificate DN: "));
 		break;
 	}
-
-	(void) fgets(cn, sizeof (cn), stdin);
-	if ((cn == NULL) || (cn[0] == '\n')) {
+	if ((fgets(cn, sizeof (cn), stdin) == NULL) || (cn[0] == '\n')) {
 		es_error(gettext("you must specify a Certificate DN prefix"));
 		return (EXIT_INVALID_ARG);
 	}

@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 by Delphix. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -124,6 +125,8 @@ typedef enum {
 	ZFS_PROP_MLSLABEL,
 	ZFS_PROP_SYNC,
 	ZFS_PROP_REFRATIO,
+	ZFS_PROP_WRITTEN,
+	ZFS_PROP_CLONES,
 	ZFS_NUM_PROPS
 } zfs_prop_t;
 
@@ -163,8 +166,12 @@ typedef enum {
 	ZPOOL_PROP_FREE,
 	ZPOOL_PROP_ALLOCATED,
 	ZPOOL_PROP_READONLY,
+	ZPOOL_PROP_COMMENT,
 	ZPOOL_NUM_PROPS
 } zpool_prop_t;
+
+/* Small enough to not hog a whole line of printout in zpool(1M). */
+#define	ZPROP_MAX_COMMENT	32
 
 #define	ZPROP_CONT		-2
 #define	ZPROP_INVAL		-1
@@ -220,6 +227,7 @@ const char *zfs_prop_to_name(zfs_prop_t);
 zfs_prop_t zfs_name_to_prop(const char *);
 boolean_t zfs_prop_user(const char *);
 boolean_t zfs_prop_userquota(const char *);
+boolean_t zfs_prop_written(const char *);
 int zfs_prop_index_to_string(zfs_prop_t, uint64_t, const char **);
 int zfs_prop_string_to_index(zfs_prop_t, const char *, uint64_t *);
 uint64_t zfs_prop_random_value(zfs_prop_t, uint64_t seed);
@@ -490,6 +498,7 @@ typedef struct zpool_rewind_policy {
 #define	ZPOOL_CONFIG_SPLIT_LIST		"guid_list"
 #define	ZPOOL_CONFIG_REMOVING		"removing"
 #define	ZPOOL_CONFIG_RESILVERING	"resilvering"
+#define	ZPOOL_CONFIG_COMMENT		"comment"
 #define	ZPOOL_CONFIG_SUSPENDED		"suspended"	/* not stored on disk */
 #define	ZPOOL_CONFIG_TIMESTAMP		"timestamp"	/* not stored on disk */
 #define	ZPOOL_CONFIG_BOOTFS		"bootfs"	/* not stored on disk */
@@ -754,7 +763,6 @@ typedef enum zfs_ioc {
 	ZFS_IOC_ERROR_LOG,
 	ZFS_IOC_CLEAR,
 	ZFS_IOC_PROMOTE,
-	ZFS_IOC_DESTROY_SNAPS,
 	ZFS_IOC_SNAPSHOT,
 	ZFS_IOC_DSOBJ_TO_DSNAME,
 	ZFS_IOC_OBJ_TO_PATH,
@@ -776,7 +784,11 @@ typedef enum zfs_ioc {
 	ZFS_IOC_NEXT_OBJ,
 	ZFS_IOC_DIFF,
 	ZFS_IOC_TMP_SNAPSHOT,
-	ZFS_IOC_OBJ_TO_STATS
+	ZFS_IOC_OBJ_TO_STATS,
+	ZFS_IOC_SPACE_WRITTEN,
+	ZFS_IOC_SPACE_SNAPS,
+	ZFS_IOC_DESTROY_SNAPS_NVL,
+	ZFS_IOC_POOL_REGUID
 } zfs_ioc_t;
 
 /*
@@ -839,6 +851,7 @@ typedef enum {
  *	ESC_ZFS_RESILVER_START
  *	ESC_ZFS_RESILVER_END
  *	ESC_ZFS_POOL_DESTROY
+ *	ESC_ZFS_POOL_REGUID
  *
  *		ZFS_EV_POOL_NAME	DATA_TYPE_STRING
  *		ZFS_EV_POOL_GUID	DATA_TYPE_UINT64

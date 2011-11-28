@@ -1,6 +1,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  */
 /*
  * Copyright (c) 1982, 1986 Regents of the University of California.
@@ -838,6 +840,38 @@ struct sockaddr_in6 {
 	((addr1)->_S6_un._S6_u32[2] == (addr2)->_S6_un._S6_u32[2]) && \
 	((addr1)->_S6_un._S6_u32[1] == (addr2)->_S6_un._S6_u32[1]) && \
 	((addr1)->_S6_un._S6_u32[0] == (addr2)->_S6_un._S6_u32[0]))
+
+/*
+ * IN6_ARE_PREFIXEDADDR_EQUAL (not defined in RFCs)
+ *	Compares if prefixed parts of IPv6 addresses are equal.
+ *
+ * uint32_t IN6_MASK_FROM_PREFIX(int, int);
+ * bool     IN6_ARE_PREFIXEDADDR_EQUAL(const struct in6_addr *,
+ *				       const struct in6_addr *,
+ *				       int);
+ */
+#define	IN6_MASK_FROM_PREFIX(qoctet, prefix) \
+	((((qoctet) + 1) * 32 < (prefix)) ? 0xFFFFFFFFu : \
+	((((qoctet) * 32) >= (prefix)) ? 0x00000000u : \
+	0xFFFFFFFFu << (((qoctet) + 1) * 32 - (prefix))))
+
+#define	IN6_ARE_PREFIXEDADDR_EQUAL(addr1, addr2, prefix) \
+	(((ntohl((addr1)->_S6_un._S6_u32[0]) & \
+	IN6_MASK_FROM_PREFIX(0, prefix)) == \
+	(ntohl((addr2)->_S6_un._S6_u32[0]) & \
+	IN6_MASK_FROM_PREFIX(0, prefix))) && \
+	((ntohl((addr1)->_S6_un._S6_u32[1]) & \
+	IN6_MASK_FROM_PREFIX(1, prefix)) == \
+	(ntohl((addr2)->_S6_un._S6_u32[1]) & \
+	IN6_MASK_FROM_PREFIX(1, prefix))) && \
+	((ntohl((addr1)->_S6_un._S6_u32[2]) & \
+	IN6_MASK_FROM_PREFIX(2, prefix)) == \
+	(ntohl((addr2)->_S6_un._S6_u32[2]) & \
+	IN6_MASK_FROM_PREFIX(2, prefix))) && \
+	((ntohl((addr1)->_S6_un._S6_u32[3]) & \
+	IN6_MASK_FROM_PREFIX(3, prefix)) == \
+	(ntohl((addr2)->_S6_un._S6_u32[3]) & \
+	IN6_MASK_FROM_PREFIX(3, prefix))))
 
 #endif /* !defined(_XPG4_2) || defined(_XPG6) || defined(__EXTENSIONS__) */
 

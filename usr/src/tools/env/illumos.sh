@@ -181,6 +181,9 @@ export PARENT_TOOLS_ROOT="$PARENT_WS/usr/src/tools/proto/root_$MACH-nd"
 export PKGARCHIVE="${CODEMGR_WS}/packages/${MACH}/nightly"
 # export PKGPUBLISHER_REDIST='on-redist'
 
+# Package manifest format version.
+export PKGFMT_OUTPUT='v1'
+
 # we want make to do as much as it can, just in case there's more than
 # one problem.
 export MAKEFLAGS='k'

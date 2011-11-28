@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -58,6 +59,7 @@ typedef enum {
 	HELP_GET,
 	HELP_JOIN,
 	HELP_LIST,
+	HELP_LOOKUP,
 	HELP_RENAME,
 	HELP_SET,
 	HELP_SHOW,
@@ -69,6 +71,11 @@ typedef enum {
 #define	SMBADM_CMDF_USER	0x01
 #define	SMBADM_CMDF_GROUP	0x02
 #define	SMBADM_CMDF_TYPEMASK	0x0F
+
+typedef enum {
+	SMBADM_GRP_ADDMEMBER = 0,
+	SMBADM_GRP_DELMEMBER,
+} smbadm_grp_action_t;
 
 #define	SMBADM_ANSBUFSIZ	64
 
@@ -96,6 +103,9 @@ static void smbadm_extract_domain(char *, char **, char **);
 
 static int smbadm_join(int, char **);
 static int smbadm_list(int, char **);
+static int smbadm_lookup(int, char **);
+static void smbadm_lookup_name(char *);
+static void smbadm_lookup_sid(char *);
 static int smbadm_group_create(int, char **);
 static int smbadm_group_delete(int, char **);
 static int smbadm_group_rename(int, char **);
@@ -105,6 +115,8 @@ static int smbadm_group_getprop(int, char **);
 static int smbadm_group_setprop(int, char **);
 static int smbadm_group_addmember(int, char **);
 static int smbadm_group_delmember(int, char **);
+static int smbadm_group_add_del_member(char *, char *, smbadm_grp_action_t);
+
 static int smbadm_user_disable(int, char **);
 static int smbadm_user_enable(int, char **);
 
@@ -125,6 +137,8 @@ static smbadm_cmdinfo_t smbadm_cmdtable[] =
 	{ "join",		smbadm_join,		HELP_JOIN,
 		SMBADM_CMDF_NONE,	SMBADM_VALUE_AUTH },
 	{ "list",		smbadm_list,		HELP_LIST,
+		SMBADM_CMDF_NONE,	SMBADM_BASIC_AUTH },
+	{ "lookup",		smbadm_lookup,		HELP_LOOKUP,
 		SMBADM_CMDF_NONE,	SMBADM_BASIC_AUTH },
 	{ "remove-member",	smbadm_group_delmember,	HELP_DEL_MEMBER,
 		SMBADM_CMDF_GROUP,	SMBADM_ACTION_AUTH },
@@ -227,6 +241,12 @@ smbadm_cmdusage(FILE *fp, smbadm_cmdinfo_t *cmd)
 		(void) fprintf(fp, gettext("\t\t[-] other domains\n"));
 		(void) fprintf(fp,
 		    gettext("\t\t[+] selected domain controller\n"));
+		return;
+
+	case HELP_LOOKUP:
+		(void) fprintf(fp,
+		    gettext("\t%s user-or-group-name\n"),
+		    cmd->name);
 		return;
 
 	case HELP_DEL_MEMBER:
@@ -718,6 +738,70 @@ smbadm_list(int argc, char **argv)
 }
 
 /*
+ * smbadm_lookup
+ *
+ * Lookup the SID for a given account (user or group)
+ */
+static int
+smbadm_lookup(int argc, char **argv)
+{
+	int i;
+
+	if (argc < 2) {
+		(void) fprintf(stderr, gettext("missing account name\n"));
+		smbadm_usage(B_FALSE);
+	}
+
+	for (i = 1; i < argc; i++) {
+		if (strncmp(argv[i], "S-1-", 4) == 0)
+			smbadm_lookup_sid(argv[i]);
+		else
+			smbadm_lookup_name(argv[i]);
+	}
+	return (0);
+}
+
+static void
+smbadm_lookup_name(char *name)
+{
+	lsa_account_t	acct;
+	int rc;
+
+	if ((rc = smb_lookup_name(name, SidTypeUnknown, &acct)) != 0) {
+		(void) fprintf(stderr, gettext(
+		    "\t\t%s: lookup name failed, rc=%d\n"),
+		    name, rc);
+		return;
+	}
+	if (acct.a_status != NT_STATUS_SUCCESS) {
+		(void) fprintf(stderr, gettext("\t\t%s [%s]\n"),
+		    name, xlate_nt_status(acct.a_status));
+		return;
+	}
+	(void) printf("\t%s\n", acct.a_sid);
+}
+
+static void
+smbadm_lookup_sid(char *sidstr)
+{
+	lsa_account_t	acct;
+	int rc;
+
+	if ((rc = smb_lookup_sid(sidstr, &acct)) != 0) {
+		(void) fprintf(stderr, gettext(
+		    "\t\t%s: lookup SID failed, rc=%d\n"),
+		    sidstr, rc);
+		return;
+	}
+	if (acct.a_status != NT_STATUS_SUCCESS) {
+		(void) fprintf(stderr, gettext("\t\t%s [%s]\n"),
+		    sidstr, xlate_nt_status(acct.a_status));
+		return;
+	}
+	(void) printf("\t%s\\%s\n", acct.a_domain, acct.a_name);
+}
+
+/*
  * smbadm_group_create
  *
  * Creates a local SMB group
@@ -797,9 +881,9 @@ static void
 smbadm_group_show_name(const char *domain, const char *name)
 {
 	if (strchr(domain, '.') != NULL)
-		(void) printf(gettext("\t\t%s@%s\n"), name, domain);
+		(void) printf("\t\t%s@%s\n", name, domain);
 	else
-		(void) printf(gettext("\t\t%s\\%s\n"), domain, name);
+		(void) printf("\t\t%s\\%s\n", domain, name);
 }
 
 /*
@@ -1133,12 +1217,9 @@ smbadm_group_getprop(int argc, char **argv)
 static int
 smbadm_group_addmember(int argc, char **argv)
 {
-	lsa_account_t	acct;
 	char *gname = NULL;
 	char **mname;
 	char option;
-	smb_gsid_t msid;
-	int status;
 	int mcnt = 0;
 	int ret = 0;
 	int i;
@@ -1176,39 +1257,11 @@ smbadm_group_addmember(int argc, char **argv)
 		smbadm_usage(B_FALSE);
 	}
 
-
 	for (i = 0; i < mcnt; i++) {
-		ret = 0;
 		if (mname[i] == NULL)
 			continue;
-
-		ret = smb_lookup_name(mname[i], SidTypeUnknown, &acct);
-		if ((ret != 0) || (acct.a_status != NT_STATUS_SUCCESS)) {
-			(void) fprintf(stderr,
-			    gettext("failed to add %s: unable to obtain SID\n"),
-			    mname[i]);
-			continue;
-		}
-
-		msid.gs_type = acct.a_sidtype;
-
-		if ((msid.gs_sid = smb_sid_fromstr(acct.a_sid)) == NULL) {
-			(void) fprintf(stderr,
-			    gettext("failed to add %s: no memory\n"), mname[i]);
-			continue;
-		}
-
-		status = smb_lgrp_add_member(gname, msid.gs_sid, msid.gs_type);
-		smb_sid_free(msid.gs_sid);
-		if (status != SMB_LGRP_SUCCESS) {
-			(void) fprintf(stderr,
-			    gettext("failed to add %s (%s)\n"),
-			    mname[i], smb_lgrp_strerror(status));
-			ret = 1;
-		} else {
-			(void) printf(gettext("'%s' is now a member of '%s'\n"),
-			    mname[i], gname);
-		}
+		ret |= smbadm_group_add_del_member(
+		    gname, mname[i], SMBADM_GRP_ADDMEMBER);
 	}
 
 	free(mname);
@@ -1221,12 +1274,9 @@ smbadm_group_addmember(int argc, char **argv)
 static int
 smbadm_group_delmember(int argc, char **argv)
 {
-	lsa_account_t	acct;
 	char *gname = NULL;
 	char **mname;
 	char option;
-	smb_gsid_t msid;
-	int status;
 	int mcnt = 0;
 	int ret = 0;
 	int i;
@@ -1268,40 +1318,77 @@ smbadm_group_delmember(int argc, char **argv)
 		ret = 0;
 		if (mname[i] == NULL)
 			continue;
-
-		ret = smb_lookup_name(mname[i], SidTypeUnknown, &acct);
-		if ((ret != 0) || (acct.a_status != NT_STATUS_SUCCESS)) {
-			(void) fprintf(stderr,
-			    gettext("failed to remove %s: "
-			    "unable to obtain SID\n"),
-			    mname[i]);
-			continue;
-		}
-
-		msid.gs_type = acct.a_sidtype;
-
-		if ((msid.gs_sid = smb_sid_fromstr(acct.a_sid)) == NULL) {
-			(void) fprintf(stderr,
-			    gettext("failed to remove %s: no memory\n"),
-			    mname[i]);
-			continue;
-		}
-
-		status = smb_lgrp_del_member(gname, msid.gs_sid, msid.gs_type);
-		smb_sid_free(msid.gs_sid);
-		if (status != SMB_LGRP_SUCCESS) {
-			(void) fprintf(stderr,
-			    gettext("failed to remove %s (%s)\n"),
-			    mname[i], smb_lgrp_strerror(status));
-			ret = 1;
-		} else {
-			(void) printf(
-			    gettext("'%s' has been removed from %s\n"),
-			    mname[i], gname);
-		}
+		ret |= smbadm_group_add_del_member(
+		    gname, mname[i], SMBADM_GRP_DELMEMBER);
 	}
 
+	free(mname);
 	return (ret);
+}
+
+static int
+smbadm_group_add_del_member(char *gname, char *mname,
+	smbadm_grp_action_t act)
+{
+	lsa_account_t	acct;
+	smb_gsid_t msid;
+	char *sidstr;
+	char *act_str;
+	int rc;
+
+	if (strncmp(mname, "S-1-", 4) == 0) {
+		/*
+		 * We are given a SID.  Just use it.
+		 *
+		 * We'e like the real account type if we can get it,
+		 * but don't want to error out if we can't get it.
+		 */
+		sidstr = mname;
+		rc = smb_lookup_sid(sidstr, &acct);
+		if ((rc != 0) || (acct.a_status != NT_STATUS_SUCCESS))
+			acct.a_sidtype = SidTypeUnknown;
+	} else {
+		rc = smb_lookup_name(mname, SidTypeUnknown, &acct);
+		if ((rc != 0) || (acct.a_status != NT_STATUS_SUCCESS)) {
+			(void) fprintf(stderr,
+			    gettext("%s: name lookup failed\n"), mname);
+			return (1);
+		}
+		sidstr = acct.a_sid;
+	}
+
+	msid.gs_type = acct.a_sidtype;
+	if ((msid.gs_sid = smb_sid_fromstr(sidstr)) == NULL) {
+		(void) fprintf(stderr,
+		    gettext("%s: no memory for SID\n"), sidstr);
+		return (1);
+	}
+
+	switch (act) {
+	case SMBADM_GRP_ADDMEMBER:
+		act_str = gettext("add");
+		rc = smb_lgrp_add_member(gname,
+		    msid.gs_sid, msid.gs_type);
+		break;
+	case SMBADM_GRP_DELMEMBER:
+		act_str = gettext("remove");
+		rc = smb_lgrp_del_member(gname,
+		    msid.gs_sid, msid.gs_type);
+		break;
+	default:
+		rc = SMB_LGRP_INTERNAL_ERROR;
+		break;
+	}
+
+	smb_sid_free(msid.gs_sid);
+
+	if (rc != SMB_LGRP_SUCCESS) {
+		(void) fprintf(stderr,
+		    gettext("failed to %s %s (%s)\n"),
+		    act_str, mname, smb_lgrp_strerror(rc));
+		return (1);
+	}
+	return (0);
 }
 
 static int

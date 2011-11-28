@@ -65,6 +65,7 @@ static int be_destroy_callback(zfs_handle_t *, void *);
 static int be_send_fs_callback(zfs_handle_t *, void *);
 static int be_demote_callback(zfs_handle_t *, void *);
 static int be_demote_find_clone_callback(zfs_handle_t *, void *);
+static int be_has_snapshot_callback(zfs_handle_t *, void *);
 static int be_demote_get_one_clone(zfs_handle_t *, void *);
 static int be_get_snap(char *, char **);
 static int be_prep_clone_send_fs(zfs_handle_t *, be_transaction_data_t *,
@@ -386,6 +387,7 @@ be_destroy(nvlist_t *be_attrs)
 	be_destroy_data_t	dd = { 0 };
 	int			ret = BE_SUCCESS;
 	uint16_t		flags = 0;
+	boolean_t		bs_found = B_FALSE;
 	int			zret;
 	char			obe_root_ds[MAXPATHLEN];
 	char			*mp = NULL;
@@ -467,6 +469,16 @@ be_destroy(nvlist_t *be_attrs)
 		    "open BE root dataset (%s): %s\n"), bt.obe_root_ds,
 		    libzfs_error_description(g_zfs));
 		return (zfs_err_to_be_err(g_zfs));
+	}
+
+	/*
+	 * Check if BE has snapshots and BE_DESTROY_FLAG_SNAPSHOTS
+	 * is not set.
+	 */
+	(void) zfs_iter_snapshots(zhp, be_has_snapshot_callback, &bs_found);
+	if (!dd.destroy_snaps && bs_found) {
+		ZFS_CLOSE(zhp);
+		return (BE_ERR_SS_EXISTS);
 	}
 
 	/* Get the UUID of the global BE */
@@ -1228,6 +1240,32 @@ be_exists_callback(zpool_handle_t *zlp, void *data)
 	}
 
 	zpool_close(zlp);
+	return (0);
+}
+
+/*
+ * Function:	be_has_snapshots_callback
+ * Description:	Callback function used to find out if a BE has snapshots.
+ * Parameters:
+ *		zlp - zpool_handle_t pointer to the current pool being
+ *			looked at.
+ *		data - be_snap_found_t pointer.
+ * Return:
+ *		1 - BE has no snapshots.
+ *		0 - BE has snapshots.
+ * Scope:
+ *		Private
+ */
+static int
+be_has_snapshot_callback(zfs_handle_t *zhp, void *data)
+{
+	boolean_t *bs = data;
+	if (zfs_get_name(zhp) == NULL) {
+		zfs_close(zhp);
+		return (1);
+	}
+	*bs = B_TRUE;
+	zfs_close(zhp);
 	return (0);
 }
 
@@ -2387,7 +2425,7 @@ be_send_fs_callback(zfs_handle_t *zhp, void *data)
 		(void) close(srpipe[0]);
 
 		/* Send dataset */
-		if (zfs_send(zhp, NULL, bt->obe_snap_name, send_flags,
+		if (zfs_send(zhp, NULL, bt->obe_snap_name, &send_flags,
 		    srpipe[1], NULL, NULL, NULL) != 0) {
 			_exit(1);
 		}
@@ -2399,7 +2437,7 @@ be_send_fs_callback(zfs_handle_t *zhp, void *data)
 	(void) close(srpipe[1]);
 
 	/* Receive dataset */
-	if (zfs_receive(g_zfs, clone_ds, flags, srpipe[0], NULL) != 0) {
+	if (zfs_receive(g_zfs, clone_ds, &flags, srpipe[0], NULL) != 0) {
 		be_print_err(gettext("be_send_fs_callback: failed to "
 		    "recv dataset (%s)\n"), clone_ds);
 	}

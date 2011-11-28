@@ -27700,7 +27700,7 @@ sr_read_subchannel(dev_t dev, caddr_t data, int flag)
 
 	/* Process the returned Q sub-channel data */
 	subchnl->cdsc_audiostatus = buffer[1];
-	subchnl->cdsc_adr	= (buffer[5] & 0xF0);
+	subchnl->cdsc_adr	= (buffer[5] & 0xF0) >> 4;
 	subchnl->cdsc_ctrl	= (buffer[5] & 0x0F);
 	subchnl->cdsc_trk	= buffer[6];
 	subchnl->cdsc_ind	= buffer[7];
