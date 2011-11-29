@@ -21,6 +21,9 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -1846,10 +1849,10 @@ it_iqn_generate(char *iqn_buf, int iqn_buf_len, char *opt_iqn_suffix)
 	uuid_unparse(id, id_str);
 
 	if (opt_iqn_suffix) {
-		ret = snprintf(iqn_buf, iqn_buf_len, "iqn.1986-03.com.sun:"
+		ret = snprintf(iqn_buf, iqn_buf_len, DEFAULT_IQN
 		    "%02d:%s.%s", TARGET_NAME_VERS, id_str, opt_iqn_suffix);
 	} else {
-		ret = snprintf(iqn_buf, iqn_buf_len, "iqn.1986-03.com.sun:"
+		ret = snprintf(iqn_buf, iqn_buf_len, DEFAULT_IQN
 		    "%02d:%s", TARGET_NAME_VERS, id_str);
 	}
 
