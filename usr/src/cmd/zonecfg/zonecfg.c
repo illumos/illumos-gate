@@ -78,6 +78,7 @@
 #include <libinetutil.h>
 #include <pwd.h>
 #include <inet/ip.h>
+#include <uuid/uuid.h>
 
 #include <libzonecfg.h>
 #include "zonecfg.h"
@@ -187,6 +188,7 @@ char *res_types[] = {
 	"fs-allowed",
 	ALIAS_MAXPROCS,
 	ALIAS_ZFSPRI,
+	"uuid",
 	NULL
 };
 
@@ -239,6 +241,7 @@ char *prop_types[] = {
 	"vlan-id",
 	"global-nic",
 	"property",
+	"uuid",
 	NULL
 };
 
@@ -356,6 +359,7 @@ static const char *set_cmds[] = {
 	"set fs-allowed=",
 	"set " ALIAS_MAXPROCS "=",
 	"set " ALIAS_ZFSPRI "=",
+	"set uuid=",
 	NULL
 };
 
@@ -388,6 +392,7 @@ static const char *info_cmds[] = {
 	"info admin",
 	"info fs-allowed",
 	"info max-processes",
+	"info uuid",
 	NULL
 };
 
@@ -544,6 +549,7 @@ static zone_dochandle_t handle;
 /* used all over the place */
 static char zone[ZONENAME_MAX];
 static char revert_zone[ZONENAME_MAX];
+static char new_uuid[UUID_PRINTABLE_STRING_LENGTH];
 
 /* global brand operations */
 static brand_handle_t brand;
@@ -1190,8 +1196,10 @@ usage(boolean_t verbose, uint_t flags)
 		    execname, cmd_to_str(CMD_HELP));
 		(void) fprintf(fp, "\t%s {-z <zone>|-u <uuid>}\t\t\t(%s)\n",
 		    execname, gettext("interactive"));
-		(void) fprintf(fp, "\t%s {-z <zone>|-u <uuid>} <command>\n", execname);
-		(void) fprintf(fp, "\t%s {-z <zone>|-u <uuid>} -f <command-file>\n",
+		(void) fprintf(fp, "\t%s {-z <zone>|-u <uuid>} <command>\n",
+		    execname);
+		(void) fprintf(fp,
+		    "\t%s {-z <zone>|-u <uuid>} -f <command-file>\n",
 		    execname);
 	}
 	if (flags & HELP_SUBCMDS) {
@@ -1280,6 +1288,8 @@ usage(boolean_t verbose, uint_t flags)
 		    pt_to_str(PT_MAXSEMIDS));
 		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
 		    pt_to_str(PT_SHARES));
+		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
+		    pt_to_str(PT_UUID));
 		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
 		    pt_to_str(PT_ZFSPRI));
 		(void) fprintf(fp, "\t%s\t\t%s, %s, %s, %s, %s\n",
@@ -1618,6 +1628,7 @@ create_func(cmd_t *cmd)
 	boolean_t force = B_FALSE;
 	boolean_t attach = B_FALSE;
 	boolean_t arg_err = B_FALSE;
+	uuid_t uuid;
 
 	assert(cmd != NULL);
 
@@ -1718,6 +1729,10 @@ create_func(cmd_t *cmd)
 	zonecfg_fini_handle(handle);
 	handle = tmphandle;
 	got_handle = B_TRUE;
+
+	/* Allocate a new uuid for this new zone */
+	uuid_generate(uuid);
+	uuid_unparse(uuid, new_uuid);
 }
 
 /*
@@ -1778,6 +1793,7 @@ export_func(cmd_t *cmd)
 	FILE *of;
 	boolean_t autoboot;
 	zone_iptype_t iptype;
+	uuid_t uuid;
 	boolean_t need_to_close = B_FALSE;
 	boolean_t arg_err = B_FALSE;
 
@@ -1886,6 +1902,14 @@ export_func(cmd_t *cmd)
 	    sizeof (fsallowedp)) == Z_OK) {
 		(void) fprintf(of, "%s %s=%s\n", cmd_to_str(CMD_SET),
 		    pt_to_str(PT_FS_ALLOWED), fsallowedp);
+	}
+
+	if (zonecfg_get_uuid(zone, uuid) == Z_OK && !uuid_is_null(uuid)) {
+		char suuid[UUID_PRINTABLE_STRING_LENGTH];
+
+		uuid_unparse(uuid, suuid);
+		(void) fprintf(of, "%s %s=%s\n", cmd_to_str(CMD_SET),
+		    pt_to_str(PT_UUID), suuid);
 	}
 
 	if ((err = zonecfg_setfsent(handle)) != Z_OK) {
@@ -2542,7 +2566,7 @@ static boolean_t
 gz_invalid_rt_property(int type)
 {
 	return (global_zone && (type == RT_ZONENAME || type == RT_ZONEPATH ||
-	    type == RT_AUTOBOOT || type == RT_LIMITPRIV ||
+	    type == RT_AUTOBOOT || type == RT_LIMITPRIV || type == RT_UUID ||
 	    type == RT_BOOTARGS || type == RT_BRAND || type == RT_SCHED ||
 	    type == RT_IPTYPE || type == RT_HOSTID || type == RT_FS_ALLOWED));
 }
@@ -2551,7 +2575,7 @@ static boolean_t
 gz_invalid_property(int type)
 {
 	return (global_zone && (type == PT_ZONENAME || type == PT_ZONEPATH ||
-	    type == PT_AUTOBOOT || type == PT_LIMITPRIV ||
+	    type == PT_AUTOBOOT || type == PT_LIMITPRIV || type == PT_UUID ||
 	    type == PT_BOOTARGS || type == PT_BRAND || type == PT_SCHED ||
 	    type == PT_IPTYPE || type == PT_HOSTID || type == PT_FS_ALLOWED));
 }
@@ -3783,6 +3807,8 @@ clear_global(cmd_t *cmd)
 		/* FALLTHRU */
 	case PT_ZONEPATH:
 		/* FALLTHRU */
+	case PT_UUID:
+		/* FALLTHRU */
 	case PT_BRAND:
 		zone_perror(pt_to_str(type), Z_CLEAR_DISALLOW, B_TRUE);
 		return;
@@ -4340,6 +4366,8 @@ set_func(cmd_t *cmd)
 			res_type = RT_FS_ALLOWED;
 		} else if (prop_type == PT_ZFSPRI) {
 			res_type = RT_ZFSPRI;
+		} else if (prop_type == PT_UUID) {
+			res_type = RT_UUID;
 		} else {
 			zerr(gettext("Cannot set a resource-specific property "
 			    "from the global scope."));
@@ -4561,6 +4589,15 @@ set_func(cmd_t *cmd)
 			}
 			return;
 		}
+		need_to_commit = B_TRUE;
+		return;
+	case RT_UUID:
+		/*
+		 * We can't set here.  We have to wait until commit since the
+		 * uuid will be updating the index file and we may not have
+		 * created the zone yet.
+		 */
+		(void) strlcpy(new_uuid, prop_id, sizeof (new_uuid));
 		need_to_commit = B_TRUE;
 		return;
 	case RT_FS_ALLOWED:
@@ -5156,6 +5193,23 @@ info_hostid(zone_dochandle_t handle, FILE *fp)
 		(void) fprintf(fp, "%s: \n", pt_to_str(PT_HOSTID));
 	} else {
 		zone_perror(zone, err, B_TRUE);
+	}
+}
+
+static void
+info_uuid(FILE *fp)
+{
+	uuid_t uuid;
+	char suuid[UUID_PRINTABLE_STRING_LENGTH];
+
+	if (new_uuid[0] != '\0') {
+		(void) fprintf(fp, "%s: %s\n", pt_to_str(PT_UUID), new_uuid);
+	} else if (zonecfg_get_uuid(zone, uuid) == Z_OK &&
+	    !uuid_is_null(uuid)) {
+		uuid_unparse(uuid, suuid);
+		(void) fprintf(fp, "%s: %s\n", pt_to_str(PT_UUID), suuid);
+	} else {
+		(void) fprintf(fp, "%s:\n", pt_to_str(PT_UUID));
 	}
 }
 
@@ -5772,6 +5826,7 @@ info_func(cmd_t *cmd)
 			info_iptype(handle, fp);
 			info_hostid(handle, fp);
 			info_fs_allowed(handle, fp);
+			info_uuid(fp);
 		}
 		info_aliased_rctl(handle, fp, ALIAS_MAXLWPS);
 		info_aliased_rctl(handle, fp, ALIAS_MAXPROCS);
@@ -5876,6 +5931,9 @@ info_func(cmd_t *cmd)
 		break;
 	case RT_HOSTID:
 		info_hostid(handle, fp);
+		break;
+	case RT_UUID:
+		info_uuid(fp);
 		break;
 	case RT_ADMIN:
 		info_auth(handle, fp, cmd);
@@ -6354,6 +6412,18 @@ verify_func(cmd_t *cmd)
 				need_to_commit = B_FALSE;
 				(void) strlcpy(revert_zone, zone,
 				    sizeof (revert_zone));
+			}
+
+			/*
+			 * Commit a new uuid at this point since we now know the
+			 * zone index entry will exist.
+			 */
+			if (new_uuid[0] != '\0') {
+				if ((err = zonecfg_set_uuid(zone, zonepath,
+				    new_uuid)) != Z_OK)
+					zone_perror(zone, err, B_FALSE);
+				else
+					new_uuid[0] = '\0';
 			}
 		} else {
 			zerr(gettext("Zone %s failed to verify"), zone);
@@ -7465,8 +7535,8 @@ main(int argc, char *argv[])
 			if (uuid_parse((char *)optarg, uuidin) == -1)
 				return (Z_INVALID_PROPERTY);
 
-			if (zonecfg_get_name_by_uuid(uuidin, zonename, ZONENAME_MAX) !=
-			    Z_OK) {
+			if (zonecfg_get_name_by_uuid(uuidin, zonename,
+			    ZONENAME_MAX) != Z_OK) {
 				zone_perror(optarg, Z_BOGUS_ZONE_NAME, B_TRUE);
 				usage(B_FALSE, HELP_SYNTAX);
 				exit(Z_USAGE);

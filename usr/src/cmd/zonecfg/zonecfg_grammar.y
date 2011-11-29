@@ -137,7 +137,7 @@ complex_piece_func(int cp_type, const char *str, complex_property_ptr_t cp_next)
 %token OPEN_PAREN CLOSE_PAREN COMMA DATASET LIMITPRIV BOOTARGS BRAND PSET PCAP
 %token MCAP NCPUS IMPORTANCE SHARES MAXLWPS MAXSHMMEM MAXSHMIDS MAXMSGIDS
 %token MAXSEMIDS LOCKED SWAP SCHED CLEAR DEFROUTER ADMIN USER AUTHS MAXPROCS
-%token ZFSPRI MAC VLANID GNIC NPROP
+%token ZFSPRI MAC VLANID GNIC NPROP UUID
 
 %type <strval> TOKEN EQUAL OPEN_SQ_BRACKET CLOSE_SQ_BRACKET
     property_value OPEN_PAREN CLOSE_PAREN COMMA simple_prop_val
@@ -147,7 +147,7 @@ complex_piece_func(int cp_type, const char *str, complex_property_ptr_t cp_next)
 %type <ival> property_name SPECIAL RAW DIR OPTIONS TYPE ADDRESS PHYSICAL NAME
     MATCH ZONENAME ZONEPATH AUTOBOOT POOL LIMITPRIV BOOTARGS VALUE PRIV LIMIT
     ACTION BRAND SCHED IPTYPE DEFROUTER HOSTID USER AUTHS FS_ALLOWED
-    ALLOWED_ADDRESS MAC VLANID GNIC NPROP
+    ALLOWED_ADDRESS MAC VLANID GNIC NPROP UUID
 %type <cmd> command
 %type <cmd> add_command ADD
 %type <cmd> cancel_command CANCEL
@@ -652,6 +652,15 @@ info_command:	INFO
 		$$->cmd_res_type = RT_FS_ALLOWED;
 		$$->cmd_prop_nv_pairs = 0;
 	}
+	|	INFO UUID
+	{
+		if (($$ = alloc_cmd()) == NULL)
+			YYERROR;
+		cmd = $$;
+		$$->cmd_handler = &info_func;
+		$$->cmd_res_type = RT_UUID;
+		$$->cmd_prop_nv_pairs = 0;
+	}
 	|	INFO ZFSPRI
 	{
 		if (($$ = alloc_cmd()) == NULL)
@@ -1014,6 +1023,7 @@ property_name: SPECIAL	{ $$ = PT_SPECIAL; }
 	| USER		{ $$ = PT_USER; }
 	| AUTHS 	{ $$ = PT_AUTHS; }
 	| FS_ALLOWED	{ $$ = PT_FS_ALLOWED; }
+	| UUID		{ $$ = PT_UUID; }
 	| ZFSPRI	{ $$ = PT_ZFSPRI; }
 
 /*

@@ -322,6 +322,9 @@ static char *create_token(char *s);
 <TSTATE>fs-allowed	{ return FS_ALLOWED; }
 <CSTATE>fs-allowed	{ return FS_ALLOWED; }
 
+<TSTATE>uuid	{ return UUID; }
+<CSTATE>uuid	{ return UUID; }
+
 <TSTATE>zfs-io-priority	{ return ZFSPRI; }
 <CSTATE>zfs-io-priority	{ return ZFSPRI; }
 

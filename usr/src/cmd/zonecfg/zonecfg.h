@@ -92,9 +92,10 @@ extern "C" {
 #define	RT_FS_ALLOWED	27
 #define	RT_MAXPROCS	28	/* really a rctl alias property, but for info */
 #define	RT_ZFSPRI	29	/* really a rctl alias property, but for info */
+#define	RT_UUID		30	/* really a property, but for info */
 
 #define	RT_MIN		RT_UNKNOWN
-#define	RT_MAX		RT_ZFSPRI
+#define	RT_MAX		RT_UUID
 
 /* property types: increment PT_MAX when expanding this list */
 #define	PT_UNKNOWN	0
@@ -144,9 +145,10 @@ extern "C" {
 #define	PT_VLANID	44
 #define	PT_GNIC		45
 #define	PT_NPROP	46
+#define	PT_UUID		47
 
 #define	PT_MIN		PT_UNKNOWN
-#define	PT_MAX		PT_NPROP
+#define	PT_MAX		PT_UUID
 
 #define	MAX_EQ_PROP_PAIRS	3
 
