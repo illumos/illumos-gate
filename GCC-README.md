@@ -117,25 +117,6 @@ This should be sufficient to have GCC 4 used as the primary throughout the
 build (check nightly.log, and/or run `mcs -p foo.o` to check individual
 objects.
 
-## A note about closed binaries
-
-The debug information in the closed kernel modules refers to types defined by
-the debug information of the `genunix` and `ip` modules.  Because we're
-building with a different compiler and the closed modules are, obviously, not
-being rebuilt this information will not match.  In the worst case, this will
-prevent DTrace and any DTrace consumers from functioning.
-
-A workaround is to strip the type information from the closed drivers, and
-cause them to be reloaded (or reboot).
-
-```
-mcs -d -n .SUNW_ctf <driver>
-```
-
-Common sources of problems are `klmmod` and `klmops` which form the NFS lock
-manager and contain copies of type definitions used by the DTrace NFS
-provider.
-
 ## Illumos Live is really helpful
 
 A good and convenient way to test stuff is to use Joyent's illumos-live
