@@ -232,7 +232,7 @@ smb_tree_connect_core(smb_request_t *sr)
 	(void) smb_strlwr(unc_path);
 
 	if ((name = smb_tree_get_sharename(unc_path)) == NULL) {
-		smb_tree_log(sr, name, "invalid UNC path");
+		smb_tree_log(sr, unc_path, "invalid UNC path");
 		smbsr_error(sr, 0, ERRSRV, ERRinvnetname);
 		return (NULL);
 	}
