@@ -11912,6 +11912,7 @@ f usr/share/man/man1m/share.1m 0444 root bin
 f usr/share/man/man1m/shareall.1m 0444 root bin
 f usr/share/man/man1m/sharectl.1m 0444 root bin
 f usr/share/man/man1m/sharemgr.1m 0444 root bin
+f usr/share/man/man1m/share_nfs.1m 0444 root bin
 f usr/share/man/man1m/showmount.1m 0444 root bin
 f usr/share/man/man1m/shutdown.1m 0444 root bin
 f usr/share/man/man1m/smbios.1m 0444 root bin
@@ -11953,6 +11954,7 @@ f usr/share/man/man1m/umountall.1m 0444 root bin
 f usr/share/man/man1m/unlink.1m 0444 root bin
 f usr/share/man/man1m/unshare.1m 0444 root bin
 f usr/share/man/man1m/unshareall.1m 0444 root bin
+f usr/share/man/man1m/unshare_nfs.1m 0444 root bin
 f usr/share/man/man1m/update_drv.1m 0444 root bin
 f usr/share/man/man1m/updatemedia.1m 0444 root bin
 f usr/share/man/man1m/useradd.1m 0444 root bin
