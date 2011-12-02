@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2010, Intel Corporation.
  * All rights reserved.
  */
@@ -487,6 +488,7 @@ static int
 acpinex_event_install_handler(ACPI_HANDLE hdl, void *arg,
     ACPI_DEVICE_INFO *infop, acpidev_data_handle_t dhdl)
 {
+	ACPI_STATUS status;
 	int rc = DDI_SUCCESS;
 
 	ASSERT(hdl != NULL);
@@ -505,8 +507,9 @@ acpinex_event_install_handler(ACPI_HANDLE hdl, void *arg,
 	if (acpidev_data_get_flag(dhdl, ACPIDEV_DATA_HANDLER_READY)) {
 		return (DDI_SUCCESS);
 	}
-	if (ACPI_SUCCESS(AcpiInstallNotifyHandler(hdl, ACPI_SYSTEM_NOTIFY,
-	    acpinex_event_system_handler, arg))) {
+	status = AcpiInstallNotifyHandler(hdl, ACPI_SYSTEM_NOTIFY,
+	    acpinex_event_system_handler, arg);
+	if (status == AE_OK || status == AE_ALREADY_EXISTS) {
 		acpidev_data_set_flag(dhdl, ACPIDEV_DATA_HANDLER_READY);
 	} else {
 		char *objname;
