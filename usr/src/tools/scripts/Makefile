@@ -68,11 +68,15 @@ PERLMODULES= \
 PYFILES= \
 	cddlchk \
 	copyrightchk \
+	git-pbchk \
 	hdrchk \
 	hg-active \
 	mapfilechk \
 	validate_pkg \
 	wsdiff
+
+SCRIPTLINKS= \
+	git-nits
 
 MAN1FILES= \
 	Install.1 \
@@ -84,6 +88,7 @@ MAN1FILES= \
 	cstyle.1 \
 	find_elf.1 \
 	flg.flp.1 \
+	git-pbchk.1 \
 	hdrchk.1 \
 	interface_check.1 \
 	interface_cmp.1 \
@@ -98,6 +103,9 @@ MAN1FILES= \
 	ws.1 \
 	wsdiff.1 \
 	xref.1
+
+MAN1LINKS= \
+	git-nits.1
 
 MAKEFILES= \
 	xref.mk
@@ -116,6 +124,8 @@ CLEANFILES = $(SHFILES) $(PERLFILES) $(PYFILES) bldenv.1
 
 include ../Makefile.tools
 
+ROOTONBLDSCRIPTLINKS = $(SCRIPTLINKS:%=$(ROOTONBLDBIN)/%)
+ROOTONBLDMAN1LINKS = $(MAN1LINKS:%=$(ROOTONBLDMAN1)/%)
 
 $(ROOTONBLDETCFILES)	:= FILEMODE=	644
 $(ROOTONBLDEXCEPTFILES)	:= FILEMODE=	644
@@ -128,10 +138,19 @@ $(ROOTONBLDMAN1FILES)	:= FILEMODE=	644
 all:	$(SHFILES) $(PERLFILES) $(PERLMODULES) $(PYFILES) \
 	$(MAN1FILES) $(MAKEFILES)
 
+$(ROOTONBLDBIN)/git-nits:
+	$(RM) $(ROOTONBLDBIN)/git-nits
+	$(SYMLINK) git-pbchk $(ROOTONBLDBIN)/git-nits
+
+$(ROOTONBLDMAN1)/git-nits.1:
+	$(RM) $(ROOTONBLDMAN1)/git-nits.1
+	$(SYMLINK) git-pbchk.1 $(ROOTONBLDMAN1)/git-nits.1
+
 install: all .WAIT $(ROOTONBLDSHFILES) $(ROOTONBLDPERLFILES)	\
 		$(ROOTONBLDPERLMODULES) $(ROOTONBLDPYFILES)	\
-		$(ROOTONBLDMAN1FILES) $(ROOTONBLDMAKEFILES)	\
-		$(ROOTONBLDETCFILES) $(ROOTONBLDEXCEPTFILES)
+		$(ROOTONBLDSCRIPTLINKS) $(ROOTONBLDMAN1FILES)	\
+		$(ROOTONBLDMAKEFILES) $(ROOTONBLDETCFILES)	\
+		$(ROOTONBLDEXCEPTFILES) $(ROOTONBLDMAN1LINKS)
 
 clean:
 	$(RM) $(CLEANFILES)
