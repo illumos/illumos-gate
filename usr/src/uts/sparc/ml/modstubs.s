@@ -730,7 +730,6 @@ stubs_base:
 	MODULE(swapgeneric,misc);
 	STUB(swapgeneric, rootconf,     0);
 	STUB(swapgeneric, svm_rootconf, 0);
-	STUB(swapgeneric, getfstype,    0);
 	STUB(swapgeneric, getrootdev,   0);
 	STUB(swapgeneric, getfsname,    0);
 	STUB(swapgeneric, loadrootmodules, 0);

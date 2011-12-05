@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2011 Joyent, Inc.  All rights reserved.
  */
 /*
  * Copyright (c) 2009-2010, Intel Corporation.
@@ -712,7 +713,7 @@ AcpiOsGetThreadId(void)
 	 * ACPI CA assumes that thread ID is castable to a pointer,
 	 * so we use the current thread pointer.
 	 */
-	return (curthread);
+	return (ACPI_CAST_PTHREAD_T((uintptr_t)curthread));
 }
 
 /*
@@ -928,27 +929,27 @@ AcpiOsWriteMemory(ACPI_PHYSICAL_ADDRESS Address,
 
 
 ACPI_STATUS
-AcpiOsReadPciConfiguration(ACPI_PCI_ID *PciId, UINT32 Register,
-			void *Value, UINT32 Width)
+AcpiOsReadPciConfiguration(ACPI_PCI_ID *PciId, UINT32 Reg,
+		UINT64 *Value, UINT32 Width)
 {
 
 	switch (Width) {
 	case 8:
-		*((UINT64 *)Value) = (UINT64)(*pci_getb_func)
-		    (PciId->Bus, PciId->Device, PciId->Function, Register);
+		*Value = (UINT64)(*pci_getb_func)
+		    (PciId->Bus, PciId->Device, PciId->Function, Reg);
 		break;
 	case 16:
-		*((UINT64 *)Value) = (UINT64)(*pci_getw_func)
-		    (PciId->Bus, PciId->Device, PciId->Function, Register);
+		*Value = (UINT64)(*pci_getw_func)
+		    (PciId->Bus, PciId->Device, PciId->Function, Reg);
 		break;
 	case 32:
-		*((UINT64 *)Value) = (UINT64)(*pci_getl_func)
-		    (PciId->Bus, PciId->Device, PciId->Function, Register);
+		*Value = (UINT64)(*pci_getl_func)
+		    (PciId->Bus, PciId->Device, PciId->Function, Reg);
 		break;
 	case 64:
 	default:
 		cmn_err(CE_WARN, "!AcpiOsReadPciConfiguration: %x %u failed",
-		    Register, Width);
+		    Reg, Width);
 		return (AE_BAD_PARAMETER);
 	}
 	return (AE_OK);
@@ -960,34 +961,34 @@ AcpiOsReadPciConfiguration(ACPI_PCI_ID *PciId, UINT32 Register,
 int acpica_write_pci_config_ok = 1;
 
 ACPI_STATUS
-AcpiOsWritePciConfiguration(ACPI_PCI_ID *PciId, UINT32 Register,
-		ACPI_INTEGER Value, UINT32 Width)
+AcpiOsWritePciConfiguration(ACPI_PCI_ID *PciId, UINT32 Reg,
+		UINT64 Value, UINT32 Width)
 {
 
 	if (!acpica_write_pci_config_ok) {
 		cmn_err(CE_NOTE, "!write to PCI cfg %x/%x/%x %x"
 		    " %lx %d not permitted", PciId->Bus, PciId->Device,
-		    PciId->Function, Register, (long)Value, Width);
+		    PciId->Function, Reg, (long)Value, Width);
 		return (AE_OK);
 	}
 
 	switch (Width) {
 	case 8:
 		(*pci_putb_func)(PciId->Bus, PciId->Device, PciId->Function,
-		    Register, (uint8_t)Value);
+		    Reg, (uint8_t)Value);
 		break;
 	case 16:
 		(*pci_putw_func)(PciId->Bus, PciId->Device, PciId->Function,
-		    Register, (uint16_t)Value);
+		    Reg, (uint16_t)Value);
 		break;
 	case 32:
 		(*pci_putl_func)(PciId->Bus, PciId->Device, PciId->Function,
-		    Register, (uint32_t)Value);
+		    Reg, (uint32_t)Value);
 		break;
 	case 64:
 	default:
 		cmn_err(CE_WARN, "!AcpiOsWritePciConfiguration: %x %u failed",
-		    Register, Width);
+		    Reg, Width);
 		return (AE_BAD_PARAMETER);
 	}
 	return (AE_OK);
@@ -1222,9 +1223,11 @@ AcpiOsRedirectOutput(void *Destination)
 
 
 UINT32
-AcpiOsGetLine(char *Buffer)
+AcpiOsGetLine(char *Buffer, UINT32 len, UINT32 *BytesRead)
 {
 	_NOTE(ARGUNUSED(Buffer))
+	_NOTE(ARGUNUSED(len))
+	_NOTE(ARGUNUSED(BytesRead))
 
 	/* FUTUREWORK: debugger support */
 

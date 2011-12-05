@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ */
+
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -3451,7 +3455,7 @@ nfs_subrinit(void)
 	nrnode_max = (ulong_t)((kmem_maxavail() >> 2) / sizeof (struct rnode));
 	if (nrnode > nrnode_max || (nrnode == 0 && ncsize == 0)) {
 		zcmn_err(GLOBAL_ZONEID, CE_NOTE,
-		    "setting nrnode to max value of %ld", nrnode_max);
+		    "!setting nrnode to max value of %ld", nrnode_max);
 		nrnode = nrnode_max;
 	}
 

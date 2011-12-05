@@ -4,114 +4,42 @@
  *
  ******************************************************************************/
 
-/******************************************************************************
- *
- * 1. Copyright Notice
- *
- * Some or all of this work - Copyright (c) 1999 - 2009, Intel Corp.
+/*
+ * Copyright (C) 2000 - 2011, Intel Corp.
  * All rights reserved.
  *
- * 2. License
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions, and the following disclaimer,
+ *    without modification.
+ * 2. Redistributions in binary form must reproduce at minimum a disclaimer
+ *    substantially similar to the "NO WARRANTY" disclaimer below
+ *    ("Disclaimer") and any redistribution must be conditioned upon
+ *    including a substantially similar Disclaimer requirement for further
+ *    binary redistribution.
+ * 3. Neither the names of the above-listed copyright holders nor the names
+ *    of any contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
  *
- * 2.1. This is your license from Intel Corp. under its intellectual property
- * rights.  You may have additional license terms from the party that provided
- * you this software, covering your right to use that party's intellectual
- * property rights.
+ * Alternatively, this software may be distributed under the terms of the
+ * GNU General Public License ("GPL") version 2 as published by the Free
+ * Software Foundation.
  *
- * 2.2. Intel grants, free of charge, to any person ("Licensee") obtaining a
- * copy of the source code appearing in this file ("Covered Code") an
- * irrevocable, perpetual, worldwide license under Intel's copyrights in the
- * base code distributed originally by Intel ("Original Intel Code") to copy,
- * make derivatives, distribute, use and display any portion of the Covered
- * Code in any form, with the right to sublicense such rights; and
- *
- * 2.3. Intel grants Licensee a non-exclusive and non-transferable patent
- * license (with the right to sublicense), under only those claims of Intel
- * patents that are infringed by the Original Intel Code, to make, use, sell,
- * offer to sell, and import the Covered Code and derivative works thereof
- * solely to the minimum extent necessary to exercise the above copyright
- * license, and in no event shall the patent license extend to any additions
- * to or modifications of the Original Intel Code.  No other license or right
- * is granted directly or by implication, estoppel or otherwise;
- *
- * The above copyright and patent license is granted only if the following
- * conditions are met:
- *
- * 3. Conditions
- *
- * 3.1. Redistribution of Source with Rights to Further Distribute Source.
- * Redistribution of source code of any substantial portion of the Covered
- * Code or modification with rights to further distribute source must include
- * the above Copyright Notice, the above License, this list of Conditions,
- * and the following Disclaimer and Export Compliance provision.  In addition,
- * Licensee must cause all Covered Code to which Licensee contributes to
- * contain a file documenting the changes Licensee made to create that Covered
- * Code and the date of any change.  Licensee must include in that file the
- * documentation of any changes made by any predecessor Licensee.  Licensee
- * must include a prominent statement that the modification is derived,
- * directly or indirectly, from Original Intel Code.
- *
- * 3.2. Redistribution of Source with no Rights to Further Distribute Source.
- * Redistribution of source code of any substantial portion of the Covered
- * Code or modification without rights to further distribute source must
- * include the following Disclaimer and Export Compliance provision in the
- * documentation and/or other materials provided with distribution.  In
- * addition, Licensee may not authorize further sublicense of source of any
- * portion of the Covered Code, and must include terms to the effect that the
- * license from Licensee to its licensee is limited to the intellectual
- * property embodied in the software Licensee provides to its licensee, and
- * not to intellectual property embodied in modifications its licensee may
- * make.
- *
- * 3.3. Redistribution of Executable. Redistribution in executable form of any
- * substantial portion of the Covered Code or modification must reproduce the
- * above Copyright Notice, and the following Disclaimer and Export Compliance
- * provision in the documentation and/or other materials provided with the
- * distribution.
- *
- * 3.4. Intel retains all right, title, and interest in and to the Original
- * Intel Code.
- *
- * 3.5. Neither the name Intel nor any other trademark owned or controlled by
- * Intel shall be used in advertising or otherwise to promote the sale, use or
- * other dealings in products derived from or relating to the Covered Code
- * without prior written authorization from Intel.
- *
- * 4. Disclaimer and Export Compliance
- *
- * 4.1. INTEL MAKES NO WARRANTY OF ANY KIND REGARDING ANY SOFTWARE PROVIDED
- * HERE.  ANY SOFTWARE ORIGINATING FROM INTEL OR DERIVED FROM INTEL SOFTWARE
- * IS PROVIDED "AS IS," AND INTEL WILL NOT PROVIDE ANY SUPPORT,  ASSISTANCE,
- * INSTALLATION, TRAINING OR OTHER SERVICES.  INTEL WILL NOT PROVIDE ANY
- * UPDATES, ENHANCEMENTS OR EXTENSIONS.  INTEL SPECIFICALLY DISCLAIMS ANY
- * IMPLIED WARRANTIES OF MERCHANTABILITY, NONINFRINGEMENT AND FITNESS FOR A
- * PARTICULAR PURPOSE.
- *
- * 4.2. IN NO EVENT SHALL INTEL HAVE ANY LIABILITY TO LICENSEE, ITS LICENSEES
- * OR ANY OTHER THIRD PARTY, FOR ANY LOST PROFITS, LOST DATA, LOSS OF USE OR
- * COSTS OF PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, OR FOR ANY INDIRECT,
- * SPECIAL OR CONSEQUENTIAL DAMAGES ARISING OUT OF THIS AGREEMENT, UNDER ANY
- * CAUSE OF ACTION OR THEORY OF LIABILITY, AND IRRESPECTIVE OF WHETHER INTEL
- * HAS ADVANCE NOTICE OF THE POSSIBILITY OF SUCH DAMAGES.  THESE LIMITATIONS
- * SHALL APPLY NOTWITHSTANDING THE FAILURE OF THE ESSENTIAL PURPOSE OF ANY
- * LIMITED REMEDY.
- *
- * 4.3. Licensee shall not export, either directly or indirectly, any of this
- * software or system incorporating such software without first obtaining any
- * required license or other approval from the U. S. Department of Commerce or
- * any other agency or department of the United States Government.  In the
- * event Licensee exports any such software from the United States or
- * re-exports any such software from a foreign destination, Licensee shall
- * ensure that the distribution and export/re-export of the software is in
- * compliance with all laws, regulations, orders, or other restrictions of the
- * U.S. Export Administration Regulations. Licensee agrees that neither it nor
- * any of its subsidiaries will export/re-export any technical data, process,
- * software, or service, directly or indirectly, to any country for which the
- * United States government or any agency thereof requires an export license,
- * other governmental approval, or letter of assurance, without first obtaining
- * such license, approval or letter.
- *
- *****************************************************************************/
+ * NO WARRANTY
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDERS OR CONTRIBUTORS BE LIABLE FOR SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+ * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGES.
+ */
 
 
 #include "acpi.h"
@@ -125,7 +53,8 @@
         ACPI_MODULE_NAME    ("dbexec")
 
 
-static ACPI_DB_METHOD_INFO  AcpiGbl_DbMethodInfo;
+static ACPI_DB_METHOD_INFO          AcpiGbl_DbMethodInfo;
+#define DB_DEFAULT_PKG_ELEMENTS     33
 
 /* Local prototypes */
 
@@ -153,6 +82,348 @@ AcpiDbExecutionWalk (
     void                    *Context,
     void                    **ReturnValue);
 
+static ACPI_STATUS
+AcpiDbHexCharToValue (
+    int                     HexChar,
+    UINT8                   *ReturnValue);
+
+static ACPI_STATUS
+AcpiDbConvertToPackage (
+    char                    *String,
+    ACPI_OBJECT             *Object);
+
+static ACPI_STATUS
+AcpiDbConvertToObject (
+    ACPI_OBJECT_TYPE        Type,
+    char                    *String,
+    ACPI_OBJECT             *Object);
+
+static void
+AcpiDbDeleteObjects (
+    UINT32                  Count,
+    ACPI_OBJECT             *Objects);
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiDbHexCharToValue
+ *
+ * PARAMETERS:  HexChar             - Ascii Hex digit, 0-9|a-f|A-F
+ *              ReturnValue         - Where the converted value is returned
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Convert a single hex character to a 4-bit number (0-16).
+ *
+ ******************************************************************************/
+
+static ACPI_STATUS
+AcpiDbHexCharToValue (
+    int                     HexChar,
+    UINT8                   *ReturnValue)
+{
+    UINT8                   Value;
+
+
+    /* Digit must be ascii [0-9a-fA-F] */
+
+    if (!ACPI_IS_XDIGIT (HexChar))
+    {
+        return (AE_BAD_HEX_CONSTANT);
+    }
+
+    if (HexChar <= 0x39)
+    {
+        Value = (UINT8) (HexChar - 0x30);
+    }
+    else
+    {
+        Value = (UINT8) (ACPI_TOUPPER (HexChar) - 0x37);
+    }
+
+    *ReturnValue = Value;
+    return (AE_OK);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiDbHexByteToBinary
+ *
+ * PARAMETERS:  HexByte             - Double hex digit (0x00 - 0xFF) in format:
+ *                                    HiByte then LoByte.
+ *              ReturnValue         - Where the converted value is returned
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Convert two hex characters to an 8 bit number (0 - 255).
+ *
+ ******************************************************************************/
+
+static ACPI_STATUS
+AcpiDbHexByteToBinary (
+    char                    *HexByte,
+    UINT8                   *ReturnValue)
+{
+    UINT8                   Local0;
+    UINT8                   Local1;
+    ACPI_STATUS             Status;
+
+
+    /* High byte */
+
+    Status = AcpiDbHexCharToValue (HexByte[0], &Local0);
+    if (ACPI_FAILURE (Status))
+    {
+        return (Status);
+    }
+
+    /* Low byte */
+
+    Status = AcpiDbHexCharToValue (HexByte[1], &Local1);
+    if (ACPI_FAILURE (Status))
+    {
+        return (Status);
+    }
+
+    *ReturnValue = (UINT8) ((Local0 << 4) | Local1);
+    return (AE_OK);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiDbConvertToBuffer
+ *
+ * PARAMETERS:  String              - Input string to be converted
+ *              Object              - Where the buffer object is returned
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Convert a string to a buffer object. String is treated a list
+ *              of buffer elements, each separated by a space or comma.
+ *
+ ******************************************************************************/
+
+static ACPI_STATUS
+AcpiDbConvertToBuffer (
+    char                    *String,
+    ACPI_OBJECT             *Object)
+{
+    UINT32                  i;
+    UINT32                  j;
+    UINT32                  Length;
+    UINT8                   *Buffer;
+    ACPI_STATUS             Status;
+
+
+    /* Generate the final buffer length */
+
+    for (i = 0, Length = 0; String[i];)
+    {
+        i+=2;
+        Length++;
+
+        while (String[i] &&
+              ((String[i] == ',') || (String[i] == ' ')))
+        {
+            i++;
+        }
+    }
+
+    Buffer = ACPI_ALLOCATE (Length);
+    if (!Buffer)
+    {
+        return (AE_NO_MEMORY);
+    }
+
+    /* Convert the command line bytes to the buffer */
+
+    for (i = 0, j = 0; String[i];)
+    {
+        Status = AcpiDbHexByteToBinary (&String[i], &Buffer[j]);
+        if (ACPI_FAILURE (Status))
+        {
+            ACPI_FREE (Buffer);
+            return (Status);
+        }
+
+        j++;
+        i+=2;
+        while (String[i] &&
+              ((String[i] == ',') || (String[i] == ' ')))
+        {
+            i++;
+        }
+    }
+
+    Object->Type = ACPI_TYPE_BUFFER;
+    Object->Buffer.Pointer = Buffer;
+    Object->Buffer.Length = Length;
+    return (AE_OK);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiDbConvertToPackage
+ *
+ * PARAMETERS:  String              - Input string to be converted
+ *              Object              - Where the package object is returned
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Convert a string to a package object. Handles nested packages
+ *              via recursion with AcpiDbConvertToObject.
+ *
+ ******************************************************************************/
+
+static ACPI_STATUS
+AcpiDbConvertToPackage (
+    char                    *String,
+    ACPI_OBJECT             *Object)
+{
+    char                    *This;
+    char                    *Next;
+    UINT32                  i;
+    ACPI_OBJECT_TYPE        Type;
+    ACPI_OBJECT             *Elements;
+    ACPI_STATUS             Status;
+
+
+    Elements = ACPI_ALLOCATE_ZEROED (
+        DB_DEFAULT_PKG_ELEMENTS * sizeof (ACPI_OBJECT));
+
+    This = String;
+    for (i = 0; i < (DB_DEFAULT_PKG_ELEMENTS - 1); i++)
+    {
+        This = AcpiDbGetNextToken (This, &Next, &Type);
+        if (!This)
+        {
+            break;
+        }
+
+        /* Recursive call to convert each package element */
+
+        Status = AcpiDbConvertToObject (Type, This, &Elements[i]);
+        if (ACPI_FAILURE (Status))
+        {
+            AcpiDbDeleteObjects (i + 1, Elements);
+            ACPI_FREE (Elements);
+            return (Status);
+        }
+
+        This = Next;
+    }
+
+    Object->Type = ACPI_TYPE_PACKAGE;
+    Object->Package.Count = i;
+    Object->Package.Elements = Elements;
+    return (AE_OK);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiDbConvertToObject
+ *
+ * PARAMETERS:  Type                - Object type as determined by parser
+ *              String              - Input string to be converted
+ *              Object              - Where the new object is returned
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Convert a typed and tokenized string to an ACPI_OBJECT. Typing:
+ *              1) String objects were surrounded by quotes.
+ *              2) Buffer objects were surrounded by parentheses.
+ *              3) Package objects were surrounded by brackets "[]".
+ *              4) All standalone tokens are treated as integers.
+ *
+ ******************************************************************************/
+
+static ACPI_STATUS
+AcpiDbConvertToObject (
+    ACPI_OBJECT_TYPE        Type,
+    char                    *String,
+    ACPI_OBJECT             *Object)
+{
+    ACPI_STATUS             Status = AE_OK;
+
+
+    switch (Type)
+    {
+    case ACPI_TYPE_STRING:
+        Object->Type = ACPI_TYPE_STRING;
+        Object->String.Pointer = String;
+        Object->String.Length = (UINT32) ACPI_STRLEN (String);
+        break;
+
+    case ACPI_TYPE_BUFFER:
+        Status = AcpiDbConvertToBuffer (String, Object);
+        break;
+
+    case ACPI_TYPE_PACKAGE:
+        Status = AcpiDbConvertToPackage (String, Object);
+        break;
+
+    default:
+        Object->Type = ACPI_TYPE_INTEGER;
+        Status = AcpiUtStrtoul64 (String, 16, &Object->Integer.Value);
+        break;
+    }
+
+    return (Status);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiDbDeleteObjects
+ *
+ * PARAMETERS:  Count               - Count of objects in the list
+ *              Objects             - Array of ACPI_OBJECTs to be deleted
+ *
+ * RETURN:      None
+ *
+ * DESCRIPTION: Delete a list of ACPI_OBJECTS. Handles packages and nested
+ *              packages via recursion.
+ *
+ ******************************************************************************/
+
+static void
+AcpiDbDeleteObjects (
+    UINT32                  Count,
+    ACPI_OBJECT             *Objects)
+{
+    UINT32                  i;
+
+
+    for (i = 0; i < Count; i++)
+    {
+        switch (Objects[i].Type)
+        {
+        case ACPI_TYPE_BUFFER:
+            ACPI_FREE (Objects[i].Buffer.Pointer);
+            break;
+
+        case ACPI_TYPE_PACKAGE:
+
+            /* Recursive call to delete package elements */
+
+            AcpiDbDeleteObjects (Objects[i].Package.Count,
+                Objects[i].Package.Elements);
+
+            /* Free the elements array */
+
+            ACPI_FREE (Objects[i].Package.Elements);
+            break;
+
+        default:
+            break;
+        }
+    }
+}
+
 
 /*******************************************************************************
  *
@@ -176,8 +447,11 @@ AcpiDbExecuteMethod (
     ACPI_OBJECT_LIST        ParamObjects;
     ACPI_OBJECT             Params[ACPI_METHOD_NUM_ARGS];
     ACPI_HANDLE             Handle;
-    UINT32                  i;
     ACPI_DEVICE_INFO        *ObjInfo;
+    UINT32                  i;
+
+
+    ACPI_FUNCTION_TRACE (DbExecuteMethod);
 
 
     if (AcpiGbl_DbOutputToFile && !AcpiDbgLevel)
@@ -190,7 +464,7 @@ AcpiDbExecuteMethod (
     Status = AcpiGetHandle (NULL, Info->Pathname, &Handle);
     if (ACPI_FAILURE (Status))
     {
-        return (Status);
+        return_ACPI_STATUS (Status);
     }
 
     /* Get the object info for number of method parameters */
@@ -198,7 +472,7 @@ AcpiDbExecuteMethod (
     Status = AcpiGetObjectInfo (Handle, &ObjInfo);
     if (ACPI_FAILURE (Status))
     {
-        return (Status);
+        return_ACPI_STATUS (Status);
     }
 
     ParamObjects.Pointer = NULL;
@@ -208,22 +482,37 @@ AcpiDbExecuteMethod (
     {
         /* Are there arguments to the method? */
 
+        i = 0;
         if (Info->Args && Info->Args[0])
         {
-            for (i = 0; Info->Args[i] && i < ACPI_METHOD_NUM_ARGS; i++)
+            /* Get arguments passed on the command line */
+
+            for (; Info->Args[i] &&
+                (i < ACPI_METHOD_NUM_ARGS) &&
+                (i < ObjInfo->ParamCount);
+                i++)
             {
-                Params[i].Type          = ACPI_TYPE_INTEGER;
-                Params[i].Integer.Value = ACPI_STRTOUL (Info->Args[i], NULL, 16);
+                /* Convert input string (token) to an actual ACPI_OBJECT */
+
+                Status = AcpiDbConvertToObject (Info->Types[i],
+                    Info->Args[i], &Params[i]);
+                if (ACPI_FAILURE (Status))
+                {
+                    ACPI_EXCEPTION ((AE_INFO, Status,
+                        "While parsing method arguments"));
+                    goto Cleanup;
+                }
             }
-
-            ParamObjects.Pointer = Params;
-            ParamObjects.Count   = i;
         }
-        else
-        {
-            /* Setup default parameters */
 
-            for (i = 0; i < ObjInfo->ParamCount; i++)
+        /* Create additional "default" parameters as needed */
+
+        if (i < ObjInfo->ParamCount)
+        {
+            AcpiOsPrintf ("Adding %u arguments containing default values\n",
+                ObjInfo->ParamCount - i);
+
+            for (; i < ObjInfo->ParamCount; i++)
             {
                 switch (i)
                 {
@@ -243,17 +532,15 @@ AcpiDbExecuteMethod (
                 default:
 
                     Params[i].Type           = ACPI_TYPE_INTEGER;
-                    Params[i].Integer.Value  = i * (ACPI_INTEGER) 0x1000;
+                    Params[i].Integer.Value  = i * (UINT64) 0x1000;
                     break;
                 }
             }
-
-            ParamObjects.Pointer     = Params;
-            ParamObjects.Count       = ObjInfo->ParamCount;
         }
-    }
 
-    ACPI_FREE (ObjInfo);
+        ParamObjects.Count = ObjInfo->ParamCount;
+        ParamObjects.Pointer = Params;
+    }
 
     /* Prepare for a return object of arbitrary size */
 
@@ -264,12 +551,29 @@ AcpiDbExecuteMethod (
 
     AcpiGbl_MethodExecuting = TRUE;
     Status = AcpiEvaluateObject (NULL,
-                Info->Pathname, &ParamObjects, ReturnObj);
+        Info->Pathname, &ParamObjects, ReturnObj);
 
     AcpiGbl_CmSingleStep = FALSE;
     AcpiGbl_MethodExecuting = FALSE;
 
-    return (Status);
+    if (ACPI_FAILURE (Status))
+    {
+        ACPI_EXCEPTION ((AE_INFO, Status,
+            "while executing %s from debugger", Info->Pathname));
+
+        if (Status == AE_BUFFER_OVERFLOW)
+        {
+            ACPI_ERROR ((AE_INFO,
+                "Possible overflow of internal debugger buffer (size 0x%X needed 0x%X)",
+                ACPI_DEBUG_BUFFER_SIZE, (UINT32) ReturnObj->Length));
+        }
+    }
+
+Cleanup:
+    AcpiDbDeleteObjects (ObjInfo->ParamCount, Params);
+    ACPI_FREE (ObjInfo);
+
+    return_ACPI_STATUS (Status);
 }
 
 
@@ -433,6 +737,7 @@ void
 AcpiDbExecute (
     char                    *Name,
     char                    **Args,
+    ACPI_OBJECT_TYPE        *Types,
     UINT32                  Flags)
 {
     ACPI_STATUS             Status;
@@ -470,6 +775,7 @@ AcpiDbExecute (
         AcpiUtStrupr (NameString);
         AcpiGbl_DbMethodInfo.Name = NameString;
         AcpiGbl_DbMethodInfo.Args = Args;
+        AcpiGbl_DbMethodInfo.Types = Types;
         AcpiGbl_DbMethodInfo.Flags = Flags;
 
         ReturnObj.Pointer = NULL;
@@ -484,7 +790,7 @@ AcpiDbExecute (
      * Allow any handlers in separate threads to complete.
      * (Such as Notify handlers invoked from AML executed above).
      */
-    AcpiOsSleep ((ACPI_INTEGER) 10);
+    AcpiOsSleep ((UINT64) 10);
 
 
 #ifdef ACPI_DEBUG_OUTPUT
@@ -567,14 +873,12 @@ AcpiDbMethodThread (
     if (Info->InitArgs)
     {
         AcpiDbUInt32ToHexString (Info->NumCreated, Info->IndexOfThreadStr);
-        AcpiDbUInt32ToHexString (ACPI_TO_INTEGER (AcpiOsGetThreadId ()),
-            Info->IdOfThreadStr);
+        AcpiDbUInt32ToHexString ((UINT32) AcpiOsGetThreadId (), Info->IdOfThreadStr);
     }
 
     if (Info->Threads && (Info->NumCreated < Info->NumThreads))
     {
-        Info->Threads[Info->NumCreated++] =
-            ACPI_TO_INTEGER (AcpiOsGetThreadId());
+        Info->Threads[Info->NumCreated++] = AcpiOsGetThreadId();
     }
 
     LocalInfo = *Info;
@@ -583,6 +887,8 @@ AcpiDbMethodThread (
     LocalInfo.Arguments[1] = LocalInfo.IdOfThreadStr;
     LocalInfo.Arguments[2] = LocalInfo.IndexOfThreadStr;
     LocalInfo.Arguments[3] = NULL;
+
+    LocalInfo.Types = LocalInfo.ArgTypes;
 
     (void) AcpiOsSignalSemaphore (Info->InfoGate, 1);
 
@@ -602,7 +908,7 @@ AcpiDbMethodThread (
 #if 0
         if ((i % 100) == 0)
         {
-            AcpiOsPrintf ("%d executions, Thread 0x%x\n", i, AcpiOsGetThreadId ());
+            AcpiOsPrintf ("%u executions, Thread 0x%x\n", i, AcpiOsGetThreadId ());
         }
 
         if (ReturnObj.Length)
@@ -722,8 +1028,8 @@ AcpiDbCreateExecutionThreads (
     /* Array to store IDs of threads */
 
     AcpiGbl_DbMethodInfo.NumThreads = NumThreads;
-    Size = 4 * AcpiGbl_DbMethodInfo.NumThreads;
-    AcpiGbl_DbMethodInfo.Threads = (UINT32 *) AcpiOsAllocate (Size);
+    Size = sizeof (ACPI_THREAD_ID) * AcpiGbl_DbMethodInfo.NumThreads;
+    AcpiGbl_DbMethodInfo.Threads = AcpiOsAllocate (Size);
     if (AcpiGbl_DbMethodInfo.Threads == NULL)
     {
         AcpiOsPrintf ("No memory for thread IDs array\n");
@@ -751,6 +1057,12 @@ AcpiDbCreateExecutionThreads (
     AcpiGbl_DbMethodInfo.Arguments[1] = AcpiGbl_DbMethodInfo.IdOfThreadStr;
     AcpiGbl_DbMethodInfo.Arguments[2] = AcpiGbl_DbMethodInfo.IndexOfThreadStr;
     AcpiGbl_DbMethodInfo.Arguments[3] = NULL;
+
+    AcpiGbl_DbMethodInfo.Types = AcpiGbl_DbMethodInfo.ArgTypes;
+    AcpiGbl_DbMethodInfo.ArgTypes[0] = ACPI_TYPE_INTEGER;
+    AcpiGbl_DbMethodInfo.ArgTypes[1] = ACPI_TYPE_INTEGER;
+    AcpiGbl_DbMethodInfo.ArgTypes[2] = ACPI_TYPE_INTEGER;
+
     AcpiDbUInt32ToHexString (NumThreads, AcpiGbl_DbMethodInfo.NumThreadsStr);
 
     AcpiDbExecuteSetup (&AcpiGbl_DbMethodInfo);

@@ -160,7 +160,7 @@ from=$email
 
 [paths]
 onnv-gate=ssh://anon@hg.opensolaris.org//hg/onnv/onnv-gate
-illumos-gate=http://hg.illumos.org/illumos-gate
+illumos-gate=ssh://anonhg@hg.illumos.org/illumos-gate
 
 [merge-tools]
 filemerge.gui=True

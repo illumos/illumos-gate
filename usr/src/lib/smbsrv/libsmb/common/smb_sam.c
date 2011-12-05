@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -299,24 +300,45 @@ smb_sam_usr_cnt(void)
 }
 
 /*
- * Returns a list of local groups which the given user is
- * their member. A pointer to an array of smb_ids_t
- * structure is returned which must be freed by caller.
+ * Updates a list of groups in which the given user is a member
+ * by adding any local (SAM) groups.
+ *
+ * We are a member of local groups where the local group
+ * contains either the user's primary SID, or any of their
+ * other SIDs such as from domain groups, SID history, etc.
+ * We can have indirect membership via domain groups.
  */
 uint32_t
 smb_sam_usr_groups(smb_sid_t *user_sid, smb_ids_t *gids)
 {
-	smb_id_t *ids;
+	smb_ids_t new_gids;
+	smb_id_t *ids, *new_ids;
 	smb_giter_t gi;
 	smb_group_t lgrp;
-	int total_cnt, gcnt;
+	int i, gcnt, total_cnt;
+	uint32_t ret;
+	boolean_t member;
 
+	/*
+	 * First pass: count groups to be added (gcnt)
+	 */
 	gcnt = 0;
 	if (smb_lgrp_iteropen(&gi) != SMB_LGRP_SUCCESS)
 		return (NT_STATUS_INTERNAL_ERROR);
 
 	while (smb_lgrp_iterate(&gi, &lgrp) == SMB_LGRP_SUCCESS) {
+		member = B_FALSE;
 		if (smb_lgrp_is_member(&lgrp, user_sid))
+			member = B_TRUE;
+		else for (i = 0, ids = gids->i_ids;
+		    i < gids->i_cnt; i++, ids++) {
+			if (smb_lgrp_is_member(&lgrp, ids->i_sid)) {
+				member = B_TRUE;
+				break;
+			}
+		}
+		/* Careful: only count lgrp once */
+		if (member)
 			gcnt++;
 		smb_lgrp_free(&lgrp);
 	}
@@ -325,34 +347,85 @@ smb_sam_usr_groups(smb_sid_t *user_sid, smb_ids_t *gids)
 	if (gcnt == 0)
 		return (NT_STATUS_SUCCESS);
 
-	total_cnt = gids->i_cnt + gcnt;
-	gids->i_ids = realloc(gids->i_ids, total_cnt * sizeof (smb_id_t));
-	if (gids->i_ids == NULL)
-		return (NT_STATUS_NO_MEMORY);
-
+	/*
+	 * Second pass: add to groups list.
+	 * Do not modify gcnt after here.
+	 */
 	if (smb_lgrp_iteropen(&gi) != SMB_LGRP_SUCCESS)
 		return (NT_STATUS_INTERNAL_ERROR);
 
-	ids = gids->i_ids + gids->i_cnt;
+	/*
+	 * Expand the list (copy to a new, larger one)
+	 * Note: were're copying pointers from the old
+	 * array to the new (larger) array, and then
+	 * adding new pointers after what we copied.
+	 */
+	ret = 0;
+	new_gids.i_cnt = gids->i_cnt;
+	total_cnt = gids->i_cnt + gcnt;
+	new_gids.i_ids = malloc(total_cnt * sizeof (smb_id_t));
+	if (new_gids.i_ids == NULL) {
+		ret = NT_STATUS_NO_MEMORY;
+		goto out;
+	}
+	(void) memcpy(new_gids.i_ids, gids->i_ids,
+	    gids->i_cnt * sizeof (smb_id_t));
+	new_ids = new_gids.i_ids + gids->i_cnt;
+	(void) memset(new_ids, 0, gcnt * sizeof (smb_id_t));
+
+	/*
+	 * Add group SIDs starting at the end of the
+	 * previous list.  (new_ids)
+	 */
 	while (smb_lgrp_iterate(&gi, &lgrp) == SMB_LGRP_SUCCESS) {
-		if (gcnt == 0) {
-			smb_lgrp_free(&lgrp);
-			break;
-		}
-		if (smb_lgrp_is_member(&lgrp, user_sid)) {
-			ids->i_sid = smb_sid_dup(lgrp.sg_id.gs_sid);
-			if (ids->i_sid == NULL) {
-				smb_lgrp_free(&lgrp);
-				return (NT_STATUS_NO_MEMORY);
+		member = B_FALSE;
+		if (smb_lgrp_is_member(&lgrp, user_sid))
+			member = B_TRUE;
+		else for (i = 0, ids = gids->i_ids;
+		    i < gids->i_cnt; i++, ids++) {
+			if (smb_lgrp_is_member(&lgrp, ids->i_sid)) {
+				member = B_TRUE;
+				break;
 			}
-			ids->i_attrs = lgrp.sg_attr;
-			gids->i_cnt++;
-			gcnt--;
-			ids++;
+		}
+		if (member && (new_gids.i_cnt < (gids->i_cnt + gcnt))) {
+			new_ids->i_sid = smb_sid_dup(lgrp.sg_id.gs_sid);
+			if (new_ids->i_sid == NULL) {
+				smb_lgrp_free(&lgrp);
+				ret = NT_STATUS_NO_MEMORY;
+				goto out;
+			}
+			new_ids->i_attrs = lgrp.sg_attr;
+			new_ids++;
+			new_gids.i_cnt++;
 		}
 		smb_lgrp_free(&lgrp);
 	}
+
+out:
 	smb_lgrp_iterclose(&gi);
+
+	if (ret != 0) {
+		if (new_gids.i_ids != NULL) {
+			/*
+			 * Free only the new sids we added.
+			 * The old ones were copied ptrs.
+			 */
+			ids = new_gids.i_ids + gids->i_cnt;
+			for (i = 0; i < gcnt; i++, ids++) {
+				smb_sid_free(ids->i_sid);
+			}
+			free(new_gids.i_ids);
+		}
+		return (ret);
+	}
+
+	/*
+	 * Success! Update passed gids and
+	 * free the old array.
+	 */
+	free(gids->i_ids);
+	*gids = new_gids;
 
 	return (NT_STATUS_SUCCESS);
 }

@@ -22,6 +22,7 @@
 #
 # Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2011 Bayard G. Bell. All rights reserved.
+# Copyright (c) 2011 by Delphix. All rights reserved.
 #
 
 #
@@ -317,8 +318,8 @@ CTFMERGE_GENUNIX 	= \
 # is not being used, the value of $VERSION will be used.
 #
 # For the ease of developers dropping modules onto possibly unrelated systems,
-# you can set NO_GENUNIX_MERGE= in the environment to skip uniquifying against
-# genunix.
+# you can set NO_GENUNIX_UNIQUIFY= in the environment to skip uniquifying
+# against genunix.
 #
 NO_GENUNIX_UNIQUIFY=$(POUND_SIGN)
 SKIP_GENUNIX_UNIQUIFY=no

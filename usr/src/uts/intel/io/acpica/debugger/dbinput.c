@@ -4,114 +4,42 @@
  *
  ******************************************************************************/
 
-/******************************************************************************
- *
- * 1. Copyright Notice
- *
- * Some or all of this work - Copyright (c) 1999 - 2009, Intel Corp.
+/*
+ * Copyright (C) 2000 - 2011, Intel Corp.
  * All rights reserved.
  *
- * 2. License
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions, and the following disclaimer,
+ *    without modification.
+ * 2. Redistributions in binary form must reproduce at minimum a disclaimer
+ *    substantially similar to the "NO WARRANTY" disclaimer below
+ *    ("Disclaimer") and any redistribution must be conditioned upon
+ *    including a substantially similar Disclaimer requirement for further
+ *    binary redistribution.
+ * 3. Neither the names of the above-listed copyright holders nor the names
+ *    of any contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
  *
- * 2.1. This is your license from Intel Corp. under its intellectual property
- * rights.  You may have additional license terms from the party that provided
- * you this software, covering your right to use that party's intellectual
- * property rights.
+ * Alternatively, this software may be distributed under the terms of the
+ * GNU General Public License ("GPL") version 2 as published by the Free
+ * Software Foundation.
  *
- * 2.2. Intel grants, free of charge, to any person ("Licensee") obtaining a
- * copy of the source code appearing in this file ("Covered Code") an
- * irrevocable, perpetual, worldwide license under Intel's copyrights in the
- * base code distributed originally by Intel ("Original Intel Code") to copy,
- * make derivatives, distribute, use and display any portion of the Covered
- * Code in any form, with the right to sublicense such rights; and
- *
- * 2.3. Intel grants Licensee a non-exclusive and non-transferable patent
- * license (with the right to sublicense), under only those claims of Intel
- * patents that are infringed by the Original Intel Code, to make, use, sell,
- * offer to sell, and import the Covered Code and derivative works thereof
- * solely to the minimum extent necessary to exercise the above copyright
- * license, and in no event shall the patent license extend to any additions
- * to or modifications of the Original Intel Code.  No other license or right
- * is granted directly or by implication, estoppel or otherwise;
- *
- * The above copyright and patent license is granted only if the following
- * conditions are met:
- *
- * 3. Conditions
- *
- * 3.1. Redistribution of Source with Rights to Further Distribute Source.
- * Redistribution of source code of any substantial portion of the Covered
- * Code or modification with rights to further distribute source must include
- * the above Copyright Notice, the above License, this list of Conditions,
- * and the following Disclaimer and Export Compliance provision.  In addition,
- * Licensee must cause all Covered Code to which Licensee contributes to
- * contain a file documenting the changes Licensee made to create that Covered
- * Code and the date of any change.  Licensee must include in that file the
- * documentation of any changes made by any predecessor Licensee.  Licensee
- * must include a prominent statement that the modification is derived,
- * directly or indirectly, from Original Intel Code.
- *
- * 3.2. Redistribution of Source with no Rights to Further Distribute Source.
- * Redistribution of source code of any substantial portion of the Covered
- * Code or modification without rights to further distribute source must
- * include the following Disclaimer and Export Compliance provision in the
- * documentation and/or other materials provided with distribution.  In
- * addition, Licensee may not authorize further sublicense of source of any
- * portion of the Covered Code, and must include terms to the effect that the
- * license from Licensee to its licensee is limited to the intellectual
- * property embodied in the software Licensee provides to its licensee, and
- * not to intellectual property embodied in modifications its licensee may
- * make.
- *
- * 3.3. Redistribution of Executable. Redistribution in executable form of any
- * substantial portion of the Covered Code or modification must reproduce the
- * above Copyright Notice, and the following Disclaimer and Export Compliance
- * provision in the documentation and/or other materials provided with the
- * distribution.
- *
- * 3.4. Intel retains all right, title, and interest in and to the Original
- * Intel Code.
- *
- * 3.5. Neither the name Intel nor any other trademark owned or controlled by
- * Intel shall be used in advertising or otherwise to promote the sale, use or
- * other dealings in products derived from or relating to the Covered Code
- * without prior written authorization from Intel.
- *
- * 4. Disclaimer and Export Compliance
- *
- * 4.1. INTEL MAKES NO WARRANTY OF ANY KIND REGARDING ANY SOFTWARE PROVIDED
- * HERE.  ANY SOFTWARE ORIGINATING FROM INTEL OR DERIVED FROM INTEL SOFTWARE
- * IS PROVIDED "AS IS," AND INTEL WILL NOT PROVIDE ANY SUPPORT,  ASSISTANCE,
- * INSTALLATION, TRAINING OR OTHER SERVICES.  INTEL WILL NOT PROVIDE ANY
- * UPDATES, ENHANCEMENTS OR EXTENSIONS.  INTEL SPECIFICALLY DISCLAIMS ANY
- * IMPLIED WARRANTIES OF MERCHANTABILITY, NONINFRINGEMENT AND FITNESS FOR A
- * PARTICULAR PURPOSE.
- *
- * 4.2. IN NO EVENT SHALL INTEL HAVE ANY LIABILITY TO LICENSEE, ITS LICENSEES
- * OR ANY OTHER THIRD PARTY, FOR ANY LOST PROFITS, LOST DATA, LOSS OF USE OR
- * COSTS OF PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, OR FOR ANY INDIRECT,
- * SPECIAL OR CONSEQUENTIAL DAMAGES ARISING OUT OF THIS AGREEMENT, UNDER ANY
- * CAUSE OF ACTION OR THEORY OF LIABILITY, AND IRRESPECTIVE OF WHETHER INTEL
- * HAS ADVANCE NOTICE OF THE POSSIBILITY OF SUCH DAMAGES.  THESE LIMITATIONS
- * SHALL APPLY NOTWITHSTANDING THE FAILURE OF THE ESSENTIAL PURPOSE OF ANY
- * LIMITED REMEDY.
- *
- * 4.3. Licensee shall not export, either directly or indirectly, any of this
- * software or system incorporating such software without first obtaining any
- * required license or other approval from the U. S. Department of Commerce or
- * any other agency or department of the United States Government.  In the
- * event Licensee exports any such software from the United States or
- * re-exports any such software from a foreign destination, Licensee shall
- * ensure that the distribution and export/re-export of the software is in
- * compliance with all laws, regulations, orders, or other restrictions of the
- * U.S. Export Administration Regulations. Licensee agrees that neither it nor
- * any of its subsidiaries will export/re-export any technical data, process,
- * software, or service, directly or indirectly, to any country for which the
- * United States government or any agency thereof requires an export license,
- * other governmental approval, or letter of assurance, without first obtaining
- * such license, approval or letter.
- *
- *****************************************************************************/
+ * NO WARRANTY
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDERS OR CONTRIBUTORS BE LIABLE FOR SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+ * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGES.
+ */
 
 
 #include "acpi.h"
@@ -125,11 +53,6 @@
         ACPI_MODULE_NAME    ("dbinput")
 
 /* Local prototypes */
-
-static char *
-AcpiDbGetNextToken (
-    char                    *String,
-    char                    **Next);
 
 static UINT32
 AcpiDbGetLine (
@@ -145,7 +68,7 @@ AcpiDbSingleThread (
 
 static void
 AcpiDbDisplayHelp (
-    char                    *HelpType);
+    void);
 
 
 /*
@@ -176,6 +99,7 @@ enum AcpiExDebuggerCommands
     CMD_GO,
     CMD_GPE,
     CMD_GPES,
+    CMD_HANDLERS,
     CMD_HELP,
     CMD_HELP2,
     CMD_HISTORY,
@@ -194,6 +118,7 @@ enum AcpiExDebuggerCommands
     CMD_NOTIFY,
     CMD_OBJECT,
     CMD_OPEN,
+    CMD_OSI,
     CMD_OWNER,
     CMD_PREDEFINED,
     CMD_PREFIX,
@@ -242,6 +167,7 @@ static const COMMAND_INFO       AcpiGbl_DbCommands[] =
     {"GO",           0},
     {"GPE",          2},
     {"GPES",         0},
+    {"HANDLERS",     0},
     {"HELP",         0},
     {"?",            0},
     {"HISTORY",      0},
@@ -260,6 +186,7 @@ static const COMMAND_INFO       AcpiGbl_DbCommands[] =
     {"NOTIFY",       2},
     {"OBJECT",       1},
     {"OPEN",         1},
+    {"OSI",          0},
     {"OWNER",        1},
     {"PREDEFINED",   0},
     {"PREFIX",       0},
@@ -286,7 +213,7 @@ static const COMMAND_INFO       AcpiGbl_DbCommands[] =
  *
  * FUNCTION:    AcpiDbDisplayHelp
  *
- * PARAMETERS:  HelpType        - Subcommand (optional)
+ * PARAMETERS:  None
  *
  * RETURN:      None
  *
@@ -296,119 +223,84 @@ static const COMMAND_INFO       AcpiGbl_DbCommands[] =
 
 static void
 AcpiDbDisplayHelp (
-    char                    *HelpType)
+    void)
 {
 
-    AcpiUtStrupr (HelpType);
+    AcpiOsPrintf ("\nGeneral-Purpose Commands:\n");
+    AcpiOsPrintf ("  Allocations                         Display list of current memory allocations\n");
+    AcpiOsPrintf ("  Dump <Address>|<Namepath>\n");
+    AcpiOsPrintf ("       [Byte|Word|Dword|Qword]        Display ACPI objects or memory\n");
+    AcpiOsPrintf ("  EnableAcpi                          Enable ACPI (hardware) mode\n");
+    AcpiOsPrintf ("  Handlers                            Info about global handlers\n");
+    AcpiOsPrintf ("  Help                                This help screen\n");
+    AcpiOsPrintf ("  History                             Display command history buffer\n");
+    AcpiOsPrintf ("  Level [<DebugLevel>] [console]      Get/Set debug level for file or console\n");
+    AcpiOsPrintf ("  Locks                               Current status of internal mutexes\n");
+    AcpiOsPrintf ("  Osi [Install|Remove <name>]         Display or modify global _OSI list\n");
+    AcpiOsPrintf ("  Quit or Exit                        Exit this command\n");
+    AcpiOsPrintf ("  Stats [Allocations|Memory|Misc|\n");
+    AcpiOsPrintf ("        Objects|Sizes|Stack|Tables]   Display namespace and memory statistics\n");
+    AcpiOsPrintf ("     Allocations                      Display list of current memory allocations\n");
+    AcpiOsPrintf ("     Memory                           Dump internal memory lists\n");
+    AcpiOsPrintf ("     Misc                             Namespace search and mutex stats\n");
+    AcpiOsPrintf ("     Objects                          Summary of namespace objects\n");
+    AcpiOsPrintf ("     Sizes                            Sizes for each of the internal objects\n");
+    AcpiOsPrintf ("     Stack                            Display CPU stack usage\n");
+    AcpiOsPrintf ("     Tables                           Info about current ACPI table(s)\n");
+    AcpiOsPrintf ("  Tables                              Display info about loaded ACPI tables\n");
+    AcpiOsPrintf ("  Unload <TableSig> [Instance]        Unload an ACPI table\n");
+    AcpiOsPrintf ("  ! <CommandNumber>                   Execute command from history buffer\n");
+    AcpiOsPrintf ("  !!                                  Execute last command again\n");
 
-    /* No parameter, just give the overview */
+    AcpiOsPrintf ("\nNamespace Access Commands:\n");
+    AcpiOsPrintf ("  Businfo                             Display system bus info\n");
+    AcpiOsPrintf ("  Disassemble <Method>                Disassemble a control method\n");
+    AcpiOsPrintf ("  Event <F|G> <Value>                 Generate AcpiEvent (Fixed/GPE)\n");
+    AcpiOsPrintf ("  Find <AcpiName>  (? is wildcard)    Find ACPI name(s) with wildcards\n");
+    AcpiOsPrintf ("  Gpe <GpeNum> <GpeBlock>             Simulate a GPE\n");
+    AcpiOsPrintf ("  Gpes                                Display info on all GPEs\n");
+    AcpiOsPrintf ("  Integrity                           Validate namespace integrity\n");
+    AcpiOsPrintf ("  Methods                             Display list of loaded control methods\n");
+    AcpiOsPrintf ("  Namespace [Object] [Depth]          Display loaded namespace tree/subtree\n");
+    AcpiOsPrintf ("  Notify <Object> <Value>             Send a notification on Object\n");
+    AcpiOsPrintf ("  Objects <ObjectType>                Display all objects of the given type\n");
+    AcpiOsPrintf ("  Owner <OwnerId> [Depth]             Display loaded namespace by object owner\n");
+    AcpiOsPrintf ("  Predefined                          Check all predefined names\n");
+    AcpiOsPrintf ("  Prefix [<NamePath>]                 Set or Get current execution prefix\n");
+    AcpiOsPrintf ("  References <Addr>                   Find all references to object at addr\n");
+    AcpiOsPrintf ("  Resources <Device>                  Get and display Device resources\n");
+    AcpiOsPrintf ("  Set N <NamedObject> <Value>         Set value for named integer\n");
+    AcpiOsPrintf ("  Sleep <SleepState>                  Simulate sleep/wake sequence\n");
+    AcpiOsPrintf ("  Terminate                           Delete namespace and all internal objects\n");
+    AcpiOsPrintf ("  Type <Object>                       Display object type\n");
 
-    if (!HelpType)
-    {
-        AcpiOsPrintf ("ACPI CA Debugger Commands\n\n");
-        AcpiOsPrintf ("The following classes of commands are available.  Help is available for\n");
-        AcpiOsPrintf ("each class by entering \"Help <ClassName>\"\n\n");
-        AcpiOsPrintf ("    [GENERAL]       General-Purpose Commands\n");
-        AcpiOsPrintf ("    [NAMESPACE]     Namespace Access Commands\n");
-        AcpiOsPrintf ("    [METHOD]        Control Method Execution Commands\n");
-        AcpiOsPrintf ("    [STATISTICS]    Statistical Information\n");
-        AcpiOsPrintf ("    [FILE]          File I/O Commands\n");
-        return;
-    }
+    AcpiOsPrintf ("\nControl Method Execution Commands:\n");
+    AcpiOsPrintf ("  Arguments (or Args)                 Display method arguments\n");
+    AcpiOsPrintf ("  Breakpoint <AmlOffset>              Set an AML execution breakpoint\n");
+    AcpiOsPrintf ("  Call                                Run to next control method invocation\n");
+    AcpiOsPrintf ("  Debug <Namepath> [Arguments]        Single Step a control method\n");
+    AcpiOsPrintf ("  Execute <Namepath> [Arguments]      Execute control method\n");
+    AcpiOsPrintf ("     Hex Integer                      Integer method argument\n");
+    AcpiOsPrintf ("     \"Ascii String\"                   String method argument\n");
+    AcpiOsPrintf ("     (Byte List)                      Buffer method argument\n");
+    AcpiOsPrintf ("     [Package Element List]           Package method argument\n");
+    AcpiOsPrintf ("  Go                                  Allow method to run to completion\n");
+    AcpiOsPrintf ("  Information                         Display info about the current method\n");
+    AcpiOsPrintf ("  Into                                Step into (not over) a method call\n");
+    AcpiOsPrintf ("  List [# of Aml Opcodes]             Display method ASL statements\n");
+    AcpiOsPrintf ("  Locals                              Display method local variables\n");
+    AcpiOsPrintf ("  Results                             Display method result stack\n");
+    AcpiOsPrintf ("  Set <A|L> <#> <Value>               Set method data (Arguments/Locals)\n");
+    AcpiOsPrintf ("  Stop                                Terminate control method\n");
+    AcpiOsPrintf ("  Thread <Threads><Loops><NamePath>   Spawn threads to execute method(s)\n");
+    AcpiOsPrintf ("  Trace <method name>                 Trace method execution\n");
+    AcpiOsPrintf ("  Tree                                Display control method calling tree\n");
+    AcpiOsPrintf ("  <Enter>                             Single step next AML opcode (over calls)\n");
 
-    /*
-     * Parameter is the command class
-     *
-     * The idea here is to keep each class of commands smaller than a screenful
-     */
-    switch (HelpType[0])
-    {
-    case 'G':
-        AcpiOsPrintf ("\nGeneral-Purpose Commands\n\n");
-        AcpiOsPrintf ("Allocations                         Display list of current memory allocations\n");
-        AcpiOsPrintf ("Dump <Address>|<Namepath>\n");
-        AcpiOsPrintf ("     [Byte|Word|Dword|Qword]        Display ACPI objects or memory\n");
-        AcpiOsPrintf ("EnableAcpi                          Enable ACPI (hardware) mode\n");
-        AcpiOsPrintf ("Help                                This help screen\n");
-        AcpiOsPrintf ("History                             Display command history buffer\n");
-        AcpiOsPrintf ("Level [<DebugLevel>] [console]      Get/Set debug level for file or console\n");
-        AcpiOsPrintf ("Locks                               Current status of internal mutexes\n");
-        AcpiOsPrintf ("Quit or Exit                        Exit this command\n");
-        AcpiOsPrintf ("Stats [Allocations|Memory|Misc\n");
-        AcpiOsPrintf ("      |Objects|Sizes|Stack|Tables]  Display namespace and memory statistics\n");
-        AcpiOsPrintf ("Tables                              Display info about loaded ACPI tables\n");
-        AcpiOsPrintf ("Unload <TableSig> [Instance]        Unload an ACPI table\n");
-        AcpiOsPrintf ("! <CommandNumber>                   Execute command from history buffer\n");
-        AcpiOsPrintf ("!!                                  Execute last command again\n");
-        return;
-
-    case 'S':
-        AcpiOsPrintf ("\nStats Subcommands\n\n");
-        AcpiOsPrintf ("Allocations                         Display list of current memory allocations\n");
-        AcpiOsPrintf ("Memory                              Dump internal memory lists\n");
-        AcpiOsPrintf ("Misc                                Namespace search and mutex stats\n");
-        AcpiOsPrintf ("Objects                             Summary of namespace objects\n");
-        AcpiOsPrintf ("Sizes                               Sizes for each of the internal objects\n");
-        AcpiOsPrintf ("Stack                               Display CPU stack usage\n");
-        AcpiOsPrintf ("Tables                              Info about current ACPI table(s)\n");
-        return;
-
-    case 'N':
-        AcpiOsPrintf ("\nNamespace Access Commands\n\n");
-        AcpiOsPrintf ("Businfo                             Display system bus info\n");
-        AcpiOsPrintf ("Disassemble <Method>                Disassemble a control method\n");
-        AcpiOsPrintf ("Event <F|G> <Value>                 Generate AcpiEvent (Fixed/GPE)\n");
-        AcpiOsPrintf ("Find <AcpiName>  (? is wildcard)    Find ACPI name(s) with wildcards\n");
-        AcpiOsPrintf ("Gpe <GpeNum> <GpeBlock>             Simulate a GPE\n");
-        AcpiOsPrintf ("Gpes                                Display info on all GPEs\n");
-        AcpiOsPrintf ("Integrity                           Validate namespace integrity\n");
-        AcpiOsPrintf ("Methods                             Display list of loaded control methods\n");
-        AcpiOsPrintf ("Namespace [Object] [Depth]          Display loaded namespace tree/subtree\n");
-        AcpiOsPrintf ("Notify <Object> <Value>             Send a notification on Object\n");
-        AcpiOsPrintf ("Objects <ObjectType>                Display all objects of the given type\n");
-        AcpiOsPrintf ("Owner <OwnerId> [Depth]             Display loaded namespace by object owner\n");
-        AcpiOsPrintf ("Predefined                          Check all predefined names\n");
-        AcpiOsPrintf ("Prefix [<NamePath>]                 Set or Get current execution prefix\n");
-        AcpiOsPrintf ("References <Addr>                   Find all references to object at addr\n");
-        AcpiOsPrintf ("Resources <Device>                  Get and display Device resources\n");
-        AcpiOsPrintf ("Set N <NamedObject> <Value>         Set value for named integer\n");
-        AcpiOsPrintf ("Sleep <SleepState>                  Simulate sleep/wake sequence\n");
-        AcpiOsPrintf ("Terminate                           Delete namespace and all internal objects\n");
-        AcpiOsPrintf ("Type <Object>                       Display object type\n");
-        return;
-
-    case 'M':
-        AcpiOsPrintf ("\nControl Method Execution Commands\n\n");
-        AcpiOsPrintf ("Arguments (or Args)                 Display method arguments\n");
-        AcpiOsPrintf ("Breakpoint <AmlOffset>              Set an AML execution breakpoint\n");
-        AcpiOsPrintf ("Call                                Run to next control method invocation\n");
-        AcpiOsPrintf ("Debug <Namepath> [Arguments]        Single Step a control method\n");
-        AcpiOsPrintf ("Execute <Namepath> [Arguments]      Execute control method\n");
-        AcpiOsPrintf ("Go                                  Allow method to run to completion\n");
-        AcpiOsPrintf ("Information                         Display info about the current method\n");
-        AcpiOsPrintf ("Into                                Step into (not over) a method call\n");
-        AcpiOsPrintf ("List [# of Aml Opcodes]             Display method ASL statements\n");
-        AcpiOsPrintf ("Locals                              Display method local variables\n");
-        AcpiOsPrintf ("Results                             Display method result stack\n");
-        AcpiOsPrintf ("Set <A|L> <#> <Value>               Set method data (Arguments/Locals)\n");
-        AcpiOsPrintf ("Stop                                Terminate control method\n");
-        AcpiOsPrintf ("Thread <Threads><Loops><NamePath>   Spawn threads to execute method(s)\n");
-        AcpiOsPrintf ("Trace <method name>                 Trace method execution\n");
-        AcpiOsPrintf ("Tree                                Display control method calling tree\n");
-        AcpiOsPrintf ("<Enter>                             Single step next AML opcode (over calls)\n");
-        return;
-
-    case 'F':
-        AcpiOsPrintf ("\nFile I/O Commands\n\n");
-        AcpiOsPrintf ("Close                               Close debug output file\n");
-        AcpiOsPrintf ("Open <Output Filename>              Open a file for debug output\n");
-        AcpiOsPrintf ("Load <Input Filename>               Load ACPI table from a file\n");
-        return;
-
-    default:
-        AcpiOsPrintf ("Unrecognized Command Class: %s\n", HelpType);
-        return;
-    }
+    AcpiOsPrintf ("\nFile I/O Commands:\n");
+    AcpiOsPrintf ("  Close                               Close debug output file\n");
+    AcpiOsPrintf ("  Load <Input Filename>               Load ACPI table from a file\n");
+    AcpiOsPrintf ("  Open <Output Filename>              Open a file for debug output\n");
 }
 
 
@@ -425,12 +317,15 @@ AcpiDbDisplayHelp (
  *
  ******************************************************************************/
 
-static char *
+char *
 AcpiDbGetNextToken (
     char                    *String,
-    char                    **Next)
+    char                    **Next,
+    ACPI_OBJECT_TYPE        *ReturnType)
 {
     char                    *Start;
+    UINT32                  Depth;
+    ACPI_OBJECT_TYPE        Type = ACPI_TYPE_INTEGER;
 
 
     /* At end of buffer? */
@@ -440,7 +335,7 @@ AcpiDbGetNextToken (
         return (NULL);
     }
 
-    /* Get rid of any spaces at the beginning */
+    /* Remove any spaces at the beginning */
 
     if (*String == ' ')
     {
@@ -455,13 +350,97 @@ AcpiDbGetNextToken (
         }
     }
 
-    Start = String;
-
-    /* Find end of token */
-
-    while (*String && (*String != ' '))
+    switch (*String)
     {
+    case '"':
+
+        /* This is a quoted string, scan until closing quote */
+
         String++;
+        Start = String;
+        Type = ACPI_TYPE_STRING;
+
+        /* Find end of string */
+
+        while (*String && (*String != '"'))
+        {
+            String++;
+        }
+        break;
+
+    case '(':
+
+        /* This is the start of a buffer, scan until closing paren */
+
+        String++;
+        Start = String;
+        Type = ACPI_TYPE_BUFFER;
+
+        /* Find end of buffer */
+
+        while (*String && (*String != ')'))
+        {
+            String++;
+        }
+        break;
+
+    case '[':
+
+        /* This is the start of a package, scan until closing bracket */
+
+        String++;
+        Depth = 1;
+        Start = String;
+        Type = ACPI_TYPE_PACKAGE;
+
+        /* Find end of package (closing bracket) */
+
+        while (*String)
+        {
+            /* Handle String package elements */
+
+            if (*String == '"')
+            {
+                /* Find end of string */
+
+                String++;
+                while (*String && (*String != '"'))
+                {
+                    String++;
+                }
+                if (!(*String))
+                {
+                    break;
+                }
+            }
+            else if (*String == '[')
+            {
+                Depth++;         /* A nested package declaration */
+            }
+            else if (*String == ']')
+            {
+                Depth--;
+                if (Depth == 0) /* Found final package closing bracket */
+                {
+                    break;
+                }
+            }
+
+            String++;
+        }
+        break;
+
+    default:
+
+        Start = String;
+
+        /* Find end of token */
+
+        while (*String && (*String != ' '))
+        {
+            String++;
+        }
+        break;
     }
 
     if (!(*String))
@@ -474,6 +453,7 @@ AcpiDbGetNextToken (
         *Next = String + 1;
     }
 
+    *ReturnType = Type;
     return (Start);
 }
 
@@ -506,7 +486,8 @@ AcpiDbGetLine (
     This = AcpiGbl_DbParsedBuf;
     for (i = 0; i < ACPI_DEBUGGER_MAX_ARGS; i++)
     {
-        AcpiGbl_DbArgs[i] = AcpiDbGetNextToken (This, &Next);
+        AcpiGbl_DbArgs[i] = AcpiDbGetNextToken (This, &Next,
+            &AcpiGbl_DbArgTypes[i]);
         if (!AcpiGbl_DbArgs[i])
         {
             break;
@@ -613,7 +594,7 @@ AcpiDbCommandDispatch (
 
     if (ParamCount < AcpiGbl_DbCommands[CommandIndex].MinArgs)
     {
-        AcpiOsPrintf ("%d parameters entered, [%s] requires %d parameters\n",
+        AcpiOsPrintf ("%u parameters entered, [%s] requires %u parameters\n",
             ParamCount, AcpiGbl_DbCommands[CommandIndex].Name,
             AcpiGbl_DbCommands[CommandIndex].MinArgs);
 
@@ -665,7 +646,8 @@ AcpiDbCommandDispatch (
         break;
 
     case CMD_DEBUG:
-        AcpiDbExecute (AcpiGbl_DbArgs[1], &AcpiGbl_DbArgs[2], EX_SINGLE_STEP);
+        AcpiDbExecute (AcpiGbl_DbArgs[1],
+            &AcpiGbl_DbArgs[2], &AcpiGbl_DbArgTypes[2], EX_SINGLE_STEP);
         break;
 
     case CMD_DISASSEMBLE:
@@ -691,7 +673,7 @@ AcpiDbCommandDispatch (
 
     case CMD_EXECUTE:
         AcpiDbExecute (AcpiGbl_DbArgs[1],
-            &AcpiGbl_DbArgs[2], EX_NO_SINGLE_STEP);
+            &AcpiGbl_DbArgs[2], &AcpiGbl_DbArgTypes[2], EX_NO_SINGLE_STEP);
         break;
 
     case CMD_FIND:
@@ -710,9 +692,13 @@ AcpiDbCommandDispatch (
         AcpiDbDisplayGpes ();
         break;
 
+    case CMD_HANDLERS:
+        AcpiDbDisplayHandlers ();
+        break;
+
     case CMD_HELP:
     case CMD_HELP2:
-        AcpiDbDisplayHelp (AcpiGbl_DbArgs[1]);
+        AcpiDbDisplayHelp ();
         break;
 
     case CMD_HISTORY:
@@ -818,6 +804,10 @@ AcpiDbCommandDispatch (
 
     case CMD_OPEN:
         AcpiDbOpenDebugFile (AcpiGbl_DbArgs[1]);
+        break;
+
+    case CMD_OSI:
+        AcpiDbDisplayInterfaces (AcpiGbl_DbArgs[1], AcpiGbl_DbArgs[2]);
         break;
 
     case CMD_OWNER:
@@ -1043,7 +1033,13 @@ AcpiDbUserCommands (
 
         /* Get the user input line */
 
-        (void) AcpiOsGetLine (AcpiGbl_DbLineBuf);
+        Status = AcpiOsGetLine (AcpiGbl_DbLineBuf,
+            ACPI_DB_LINE_BUFFER_SIZE, NULL);
+        if (ACPI_FAILURE (Status))
+        {
+            ACPI_EXCEPTION ((AE_INFO, Status, "While parsing command line"));
+            return (Status);
+        }
 
         /* Check for single or multithreaded debug */
 

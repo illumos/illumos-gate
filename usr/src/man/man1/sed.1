@@ -1,6 +1,8 @@
 .\" Copyright (c) 1992, 1993
 .\"     The Regents of the University of California.  All rights reserved.
 .\"
+.\" Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+.\"
 .\" This code is derived from software contributed to Berkeley by
 .\" the Institute of Electrical and Electronics Engineers, Inc.
 .\"
@@ -28,7 +30,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.TH SED 1 "May 24, 2009"
+.TH SED 1 "Nov 2, 2011"
 .SH NAME
 \fBsed\fP
 \- stream editor
@@ -43,8 +45,7 @@
 [\fB\-Ealnr\fP]
 [\fB\-e\fP \fIcommand\fP]
 [\fB\-f\fP \fIcommand_file\fP]
-[\fB\-I\fP \fIextension\fP]
-[\fB\-i\fP \fIextension\fP]
+[\fB\-I\fP[\fIextension\fP] | \fB\-i\fP[\fIextension\fP]]
 [\fIfile ...\fP]
 .SH DESCRIPTION
 The
@@ -97,16 +98,11 @@ Append the editing commands found in the file
 to the list of commands.
 The editing commands should each be listed on a separate line.
 .TP
-\fB\-I\fP \fIextension\fP
-Edit files in-place, saving backups with the specified
-\fIextension\fP.
-If a zero-length
-\fIextension\fP
-is given, no backup will be saved.
-It is not recommended to give a zero-length
-\fIextension\fP
-when in-place editing files, as you risk corruption or partial content
-in situations where disk space is exhausted, etc.
+\fB\-I\fP[\fIextension\fP]
+Edit files in-place, saving backups if \fIextension\fP was specified.
+It is not recommended to omit saving backups when in-place editing files,
+as you risk corruption or partial content in situations where disk
+space is exhausted, etc.
 
 Note that in-place editing with
 \fB\-I\fP
@@ -124,7 +120,7 @@ where using
 \fB\-i\fP
 is desired.
 .TP
-\fB\-i\fP \fIextension\fP
+\fB\-i\fP[\fIextension\fP]
 Edit files in-place similarly to
 \fB\-I\fP,
 but treat each file independently from other files.

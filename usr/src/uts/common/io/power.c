@@ -21,6 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2011 Joyent, Inc.  All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -945,58 +947,6 @@ power_log_message(void)
 
 #ifdef	ACPI_POWER_BUTTON
 /*
- * Given a handle to a device object, locate a _PRW object
- * if present and fetch the GPE info for this device object
- */
-static ACPI_STATUS
-power_get_prw_gpe(ACPI_HANDLE dev, ACPI_HANDLE *gpe_dev, UINT32 *gpe_num)
-{
-	ACPI_BUFFER buf;
-	ACPI_STATUS status;
-	ACPI_HANDLE prw;
-	ACPI_OBJECT *gpe;
-
-	/*
-	 * Evaluate _PRW if present
-	 */
-	status = AcpiGetHandle(dev, "_PRW", &prw);
-	if (status != AE_OK)
-		return (status);
-	buf.Length = ACPI_ALLOCATE_BUFFER;
-	status = AcpiEvaluateObjectTyped(prw, NULL, NULL, &buf,
-	    ACPI_TYPE_PACKAGE);
-	if (status != AE_OK)
-		return (status);
-
-	/*
-	 * Sanity-check the package; need at least two elements
-	 */
-	status = AE_ERROR;
-	if (((ACPI_OBJECT *)buf.Pointer)->Package.Count < 2)
-		goto done;
-
-	gpe = &((ACPI_OBJECT *)buf.Pointer)->Package.Elements[0];
-	if (gpe->Type == ACPI_TYPE_INTEGER) {
-		*gpe_dev = NULL;
-		*gpe_num = gpe->Integer.Value;
-		status = AE_OK;
-	} else if (gpe->Type == ACPI_TYPE_PACKAGE) {
-		if ((gpe->Package.Count != 2) ||
-		    (gpe->Package.Elements[0].Type != ACPI_TYPE_DEVICE) ||
-		    (gpe->Package.Elements[1].Type != ACPI_TYPE_INTEGER))
-			goto done;
-		*gpe_dev = gpe->Package.Elements[0].Reference.Handle;
-		*gpe_num = gpe->Package.Elements[1].Integer.Value;
-		status = AE_OK;
-	}
-
-done:
-	AcpiOsFree(buf.Pointer);
-	return (status);
-}
-
-
-/*
  *
  */
 /*ARGSUSED*/
@@ -1051,16 +1001,10 @@ static int
 power_probe_method_button(struct power_soft_state *softsp)
 {
 	ACPI_HANDLE button_obj;
-	UINT32 gpe_num;
-	ACPI_HANDLE gpe_dev;
 
 	button_obj = probe_acpi_pwrbutton();
 	softsp->button_obj = button_obj;	/* remember obj */
 	if ((button_obj != NULL) &&
-	    (power_get_prw_gpe(button_obj, &gpe_dev, &gpe_num) == AE_OK) &&
-	    (AcpiSetGpeType(gpe_dev, gpe_num, ACPI_GPE_TYPE_WAKE_RUN) ==
-	    AE_OK) &&
-	    (AcpiEnableGpe(gpe_dev, gpe_num, ACPI_NOT_ISR) == AE_OK) &&
 	    (AcpiInstallNotifyHandler(button_obj, ACPI_DEVICE_NOTIFY,
 	    power_acpi_notify_event, (void*)softsp) == AE_OK))
 		return (1);

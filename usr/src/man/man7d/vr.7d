@@ -46,10 +46,10 @@ combination from the first non-zero parameter from this list:
 .sp
 .in +2
 .nf
-en_100fdx_cap     100Mpbs full duplex
-en_100hdx_cap     100Mpbs half duplex
-en_10fdx_cap      10Mpbs full duplex
-en_10hdx_cap      10Mpbs half duplex
+en_100fdx_cap     100Mbps full duplex
+en_100hdx_cap     100Mbps half duplex
+en_10fdx_cap      10Mbps full duplex
+en_10hdx_cap      10Mbps half duplex
 .fi
 .in -2
 .sp

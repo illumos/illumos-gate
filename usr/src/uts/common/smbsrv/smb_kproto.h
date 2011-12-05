@@ -377,7 +377,6 @@ int smb_server_file_close(smb_ioc_fileid_t *);
 int smb_server_sharevp(const char *, vnode_t **);
 int smb_server_unshare(const char *);
 
-void smb_server_reconnection_check(smb_server_t *, smb_session_t *);
 void smb_server_get_cfg(smb_server_t *, smb_kmod_cfg_t *);
 
 int smb_server_spooldoc(smb_ioc_spooldoc_t *);
@@ -511,7 +510,6 @@ void smb_request_wait(smb_request_t *);
 smb_session_t *smb_session_create(ksocket_t, uint16_t, smb_server_t *, int);
 void smb_session_receiver(smb_session_t *);
 void smb_session_disconnect(smb_session_t *);
-void smb_session_reconnection_check(smb_llist_t *, smb_session_t *);
 void smb_session_timers(smb_llist_t *);
 void smb_session_delete(smb_session_t *session);
 void smb_session_cancel_requests(smb_session_t *, smb_tree_t *,
@@ -661,8 +659,6 @@ void smb_mbuf_trim(struct mbuf *mhead, int nbytes);
 
 void smb_check_status(void);
 int smb_handle_write_raw(smb_session_t *session, smb_request_t *sr);
-
-void smb_reconnection_check(smb_session_t *);
 
 int32_t smb_time_gmt_to_local(smb_request_t *, int32_t);
 int32_t smb_time_local_to_gmt(smb_request_t *, int32_t);

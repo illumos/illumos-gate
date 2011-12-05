@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -201,7 +202,7 @@ smb_nt_transact_notify_change(struct smb_request *sr, struct smb_xa *xa)
 
 	node = sr->fid_ofile->f_node;
 
-	if (!smb_node_is_dir(node)) {
+	if (node == NULL || !smb_node_is_dir(node)) {
 		/*
 		 * Notify change requests are only valid on directories.
 		 */

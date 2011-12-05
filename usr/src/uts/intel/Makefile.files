@@ -207,7 +207,11 @@ ACPICA_OBJS	+= dbcmds.o dbdisply.o \
 		   utmutex.o utstate.o dmbuffer.o dmnames.o dmobject.o \
 		   dmopcode.o dmresrc.o dmresrcl.o dmresrcs.o dmutils.o \
 		   dmwalk.o psloop.o nspredef.o hwxface.o hwvalid.o \
-		   utlock.o utids.o nsrepair.o nsrepair2.o
+		   utlock.o utids.o nsrepair.o nsrepair2.o \
+		   dbmethod.o dbnames.o dsargs.o dscontrol.o dswload2.o \
+		   evglock.o evgpeinit.o evgpeutil.o evxfgpe.o exdebug.o \
+		   hwpci.o utdecode.o utosi.o utxferror.o
+
 
 AGP_OBJS += agpmaster.o
 FBT_OBJS += fbt.o

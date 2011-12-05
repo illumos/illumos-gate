@@ -298,7 +298,7 @@ mode of the link and the common mode of operation with the link partner.
 For users who want to select the speed and mode of  the link, the \fBeri\fR
 device supports programmable \fBIPG\fR (Inter-Packet Gap) parameters \fBipg1\fR
 and  \fBipg2\fR. Sometimes, the user may want to alter these values depending
-on whether the driver supports 10 Mbps or 100 Mpbs and accordingly, \fBIPG\fR
+on whether the driver supports 10 Mbps or 100 Mbps and accordingly, \fBIPG\fR
 will be set to 9.6 or 0.96 microseconds.
 .SS "eri Parameter List"
 .sp

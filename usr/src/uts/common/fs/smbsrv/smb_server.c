@@ -1102,17 +1102,6 @@ smb_server_disconnect_share(smb_llist_t *ll, const char *sharename)
  */
 
 void
-smb_server_reconnection_check(smb_server_t *sv, smb_session_t *session)
-{
-	ASSERT(sv == session->s_server);
-
-	smb_session_reconnection_check(&sv->sv_nbt_daemon.ld_session_list,
-	    session);
-	smb_session_reconnection_check(&sv->sv_tcp_daemon.ld_session_list,
-	    session);
-}
-
-void
 smb_server_get_cfg(smb_server_t *sv, smb_kmod_cfg_t *cfg)
 {
 	rw_enter(&sv->sv_cfg_lock, RW_READER);

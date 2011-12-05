@@ -535,10 +535,10 @@ dladm_str2bw(char *oarg, uint64_t *bw)
 }
 
 /*
- * Convert bandwidth in bps to a string in mpbs.  For values greater
- * than 1mbps or 1000000, print a whole mbps value.  For values that
- * have fractional Mbps in whole Kbps , print the bandwidth in a manner
- * simlilar to a floating point format.
+ * Convert bandwidth in bps to a string in Mbps.  For values greater
+ * than 1Mbps or 1000000, print a whole Mbps value.  For values that
+ * have fractional Mbps in whole Kbps, print the bandwidth in a manner
+ * similar to a floating point format.
  *
  *        bps       string
  *          0            0
@@ -1069,7 +1069,7 @@ fail:
 /*
  * Convert an array of strings (which can be ranges or individual
  * elements) into a single mac_propval_range_t structure which
- * allocated here but should be freed by the caller.
+ * is allocated here but should be freed by the caller.
  */
 dladm_status_t
 dladm_strs2range(char **prop_val, uint_t val_cnt,

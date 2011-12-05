@@ -18,7 +18,7 @@ beadm \- utility for managing zfs boot environments
 
 .LP
 .nf
-\fBbeadm\fR \fBdestroy\fR [\fB-fF\fR] \fIbeName\fR | \fIbeName@snapshot\fR
+\fBbeadm\fR \fBdestroy\fR [\fB-fFs\fR] \fIbeName\fR | \fIbeName@snapshot\fR
 .fi
 
 .LP
@@ -254,7 +254,7 @@ Creates a snapshot of the existing BE named beName.
 .sp
 .ne 2
 .na
-\fBbeadm\fR \fBdestroy\fR [\fB-fF\fR] \fIbeName\fR | \fIbeName@snapshot\fR
+\fBbeadm\fR \fBdestroy\fR [\fB-fFs\fR] \fIbeName\fR | \fIbeName@snapshot\fR
 .ad
 .sp .6
 .RS 4n
@@ -282,6 +282,16 @@ Forcefully unmount the boot environment if it is currently mounted.
 .sp .6
 .RS 4n
 Force the action without prompting to verify the destruction of the boot
+environment.
+.RE
+.sp
+.ne 2
+.na
+\fB-s\fR
+.ad
+.sp .6
+.RS 4n
+Destroy all snapshots of the boot
 environment.
 .RE
 .RE

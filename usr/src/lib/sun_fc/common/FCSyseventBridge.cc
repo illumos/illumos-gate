@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-
-
 #include "FCSyseventBridge.h"
 #include "Exceptions.h"
 #include "Trace.h"
@@ -36,6 +34,7 @@
 #include "sun_fc.h"
 #include <libnvpair.h>
 #include <iostream>
+#include <climits>
 
 using namespace std;
 

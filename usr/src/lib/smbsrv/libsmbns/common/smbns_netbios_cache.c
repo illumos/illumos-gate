@@ -420,8 +420,8 @@ smb_netbios_cache_status(unsigned char *buf, int bufsize, unsigned char *scope)
 		    (strcasecmp((char *)scope, (char *)name->scope) == 0)) {
 			bcopy(name->name, scan, NETBIOS_NAME_SZ);
 			scan += NETBIOS_NAME_SZ;
-			*scan++ = PUBLIC_BITS(name->attributes) >> 8;
-			*scan++ = PUBLIC_BITS(name->attributes);
+			*scan++ = (PUBLIC_BITS(name->attributes) >> 8) & 0xff;
+			*scan++ = PUBLIC_BITS(name->attributes) & 0xff;
 			(*numnames)++;
 		}
 
