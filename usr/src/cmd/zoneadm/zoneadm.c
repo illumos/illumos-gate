@@ -2913,7 +2913,6 @@ install_func(int argc, char *argv[])
 	boolean_t brand_help = B_FALSE;
 	boolean_t do_dataset = B_TRUE;
 	char opts[128];
-	char *new_uuid = NULL;
 
 	if (target_zone == NULL) {
 		sub_usage(SHELP_INSTALL, CMD_INSTALL);
@@ -2956,7 +2955,7 @@ install_func(int argc, char *argv[])
 	if (postcmdbuf[0] != '\0')
 		do_postinstall = B_TRUE;
 
-	(void) strcpy(opts, "?U:x:");
+	(void) strcpy(opts, "?x:");
 	/*
 	 * Fetch the list of recognized command-line options from
 	 * the brand configuration file.
@@ -2987,10 +2986,6 @@ install_func(int argc, char *argv[])
 				brand_help = B_TRUE;
 			}
 			/* Ignore unknown options - may be brand specific. */
-			break;
-		case 'U':
-			new_uuid = optarg;
-			continue; /* internal arg, don't pass thru */
 			break;
 		case 'x':
 			if (strcmp(optarg, "nodataset") == 0) {
@@ -3074,13 +3069,6 @@ install_func(int argc, char *argv[])
 	if ((err = zone_set_state(target_zone, ZONE_STATE_INSTALLED)) != Z_OK) {
 		errno = err;
 		zperror2(target_zone, gettext("could not set state"));
-		goto done;
-	}
-
-	if (new_uuid != NULL &&
-	    (err = zonecfg_set_uuid(target_zone, zonepath, new_uuid) != Z_OK)) {
-		errno = err;
-		zperror2(target_zone, gettext("could not set UUID"));
 		goto done;
 	}
 
