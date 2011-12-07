@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -45,7 +46,7 @@
  * Global pointer to the current codepage: defaults to ASCII,
  * and a flag indicating whether the codepage is Unicode or ASCII.
  */
-static smb_codepage_t *current_codepage = usascii_codepage;
+static const smb_codepage_t *current_codepage = usascii_codepage;
 static boolean_t is_unicode = B_FALSE;
 
 static smb_codepage_t *smb_unicode_init(void);
@@ -113,7 +114,7 @@ strcanon(char *buf, const char *class)
 void
 smb_codepage_init(void)
 {
-	smb_codepage_t *cp;
+	const smb_codepage_t *cp;
 
 	if (is_unicode)
 		return;

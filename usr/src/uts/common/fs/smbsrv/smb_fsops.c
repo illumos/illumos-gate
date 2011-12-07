@@ -123,9 +123,10 @@ smb_fsop_create_with_sd(smb_request_t *sr, cred_t *cr,
 {
 	vsecattr_t *vsap;
 	vsecattr_t vsecattr;
-	acl_t *acl, *dacl, *sacl;
 	smb_attr_t set_attr;
+	acl_t *acl, *dacl, *sacl;
 	vnode_t *vp;
+	cred_t *kcr = zone_kcred();
 	int aclbsize = 0;	/* size of acl list in bytes */
 	int flags = 0;
 	int rc;
@@ -205,7 +206,7 @@ smb_fsop_create_with_sd(smb_request_t *sr, cred_t *cr,
 		}
 
 		if (set_attr.sa_mask)
-			rc = smb_vop_setattr(vp, NULL, &set_attr, 0, kcred);
+			rc = smb_vop_setattr(vp, NULL, &set_attr, 0, kcr);
 
 		if (rc == 0) {
 			*ret_snode = smb_node_lookup(sr, &sr->arg.open, cr, vp,
@@ -243,7 +244,7 @@ smb_fsop_create_with_sd(smb_request_t *sr, cred_t *cr,
 		if (*ret_snode != NULL) {
 			if (!smb_tree_has_feature(sr->tid_tree,
 			    SMB_TREE_NFS_MOUNTED))
-				rc = smb_fsop_sdwrite(sr, kcred, *ret_snode,
+				rc = smb_fsop_sdwrite(sr, kcr, *ret_snode,
 				    fs_sd, 1);
 		} else {
 			rc = ENOMEM;
@@ -366,10 +367,11 @@ smb_fsop_create_stream(smb_request_t *sr, cred_t *cr,
     smb_node_t *dnode, char *fname, char *sname, int flags,
     smb_attr_t *attr, smb_node_t **ret_snode)
 {
-	smb_node_t	*fnode;
 	smb_attr_t	fattr;
+	smb_node_t	*fnode;
 	vnode_t		*xattrdvp;
 	vnode_t		*vp;
+	cred_t		*kcr = zone_kcred();
 	int		rc = 0;
 	boolean_t	fcreate = B_FALSE;
 
@@ -385,7 +387,7 @@ smb_fsop_create_stream(smb_request_t *sr, cred_t *cr,
 		return (rc);
 
 	fattr.sa_mask = SMB_AT_UID | SMB_AT_GID;
-	rc = smb_vop_getattr(fnode->vp, NULL, &fattr, 0, kcred);
+	rc = smb_vop_getattr(fnode->vp, NULL, &fattr, 0, kcr);
 
 	if (rc == 0) {
 		/* create the named stream, sname */
@@ -406,7 +408,7 @@ smb_fsop_create_stream(smb_request_t *sr, cred_t *cr,
 	attr->sa_vattr.va_gid = fattr.sa_vattr.va_gid;
 	attr->sa_mask = SMB_AT_UID | SMB_AT_GID;
 
-	rc = smb_vop_setattr(vp, NULL, attr, 0, kcred);
+	rc = smb_vop_setattr(vp, NULL, attr, 0, kcr);
 	if (rc != 0) {
 		smb_node_release(fnode);
 		return (rc);
@@ -1296,6 +1298,7 @@ int
 smb_fsop_read(smb_request_t *sr, cred_t *cr, smb_node_t *snode, uio_t *uio)
 {
 	caller_context_t ct;
+	cred_t *kcr = zone_kcred();
 	int svmand;
 	int rc;
 
@@ -1325,10 +1328,10 @@ smb_fsop_read(smb_request_t *sr, cred_t *cr, smb_node_t *snode, uio_t *uio)
 	 * extended attr kcred is passed for streams.
 	 */
 	if (SMB_IS_STREAM(snode))
-		cr = kcred;
+		cr = kcr;
 
 	smb_node_start_crit(snode, RW_READER);
-	rc = nbl_svmand(snode->vp, kcred, &svmand);
+	rc = nbl_svmand(snode->vp, kcr, &svmand);
 	if (rc) {
 		smb_node_end_crit(snode);
 		return (rc);
@@ -1372,6 +1375,7 @@ smb_fsop_write(
 	vnode_t *u_vp = NULL;
 	smb_ofile_t *of;
 	vnode_t *vp;
+	cred_t *kcr = zone_kcred();
 	int svmand;
 	int rc;
 
@@ -1410,11 +1414,11 @@ smb_fsop_write(
 		ASSERT(u_node->n_magic == SMB_NODE_MAGIC);
 		ASSERT(u_node->n_state != SMB_NODE_STATE_DESTROYING);
 		u_vp = u_node->vp;
-		cr = kcred;
+		cr = kcr;
 	}
 
 	smb_node_start_crit(snode, RW_WRITER);
-	rc = nbl_svmand(vp, kcred, &svmand);
+	rc = nbl_svmand(vp, kcr, &svmand);
 	if (rc) {
 		smb_node_end_crit(snode);
 		return (rc);
@@ -1446,7 +1450,7 @@ smb_fsop_write(
 	if (of->f_pending_attr.sa_mask & SMB_AT_MTIME) {
 		bcopy(&of->f_pending_attr, &attr, sizeof (attr));
 		attr.sa_mask = SMB_AT_MTIME;
-		(void) smb_vop_setattr(vp, u_vp, &attr, 0, kcred);
+		(void) smb_vop_setattr(vp, u_vp, &attr, 0, kcr);
 	}
 
 	smb_node_end_crit(snode);
@@ -1530,7 +1534,7 @@ smb_fsop_access(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 		 */
 		if (faccess & (FILE_READ_DATA | FILE_EXECUTE)) {
 			error = smb_vop_access(snode->vp, VREAD,
-			    0, NULL, kcred);
+			    0, NULL, zone_kcred());
 			if (error)
 				return (NT_STATUS_ACCESS_DENIED);
 		}
@@ -2118,7 +2122,7 @@ smb_fsop_sdread(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 		ga_cred = cr;
 	} else if (sr->tid_tree->t_acltype == ACE_T) {
 		getowner = 1;
-		ga_cred = kcred;
+		ga_cred = zone_kcred();
 	}
 
 	if (getowner) {
@@ -2182,6 +2186,7 @@ static int
 smb_fsop_sdmerge(smb_request_t *sr, smb_node_t *snode, smb_fssd_t *fs_sd)
 {
 	smb_fssd_t cur_sd;
+	cred_t *kcr = zone_kcred();
 	int error = 0;
 
 	if (sr->tid_tree->t_acltype != ACE_T)
@@ -2196,7 +2201,7 @@ smb_fsop_sdmerge(smb_request_t *sr, smb_node_t *snode, smb_fssd_t *fs_sd)
 			smb_fssd_init(&cur_sd, SMB_SACL_SECINFO,
 			    fs_sd->sd_flags);
 
-			error = smb_fsop_sdread(sr, kcred, snode, &cur_sd);
+			error = smb_fsop_sdread(sr, kcr, snode, &cur_sd);
 			if (error == 0) {
 				ASSERT(fs_sd->sd_zsacl == NULL);
 				fs_sd->sd_zsacl = cur_sd.sd_zsacl;
@@ -2211,7 +2216,7 @@ smb_fsop_sdmerge(smb_request_t *sr, smb_node_t *snode, smb_fssd_t *fs_sd)
 			smb_fssd_init(&cur_sd, SMB_DACL_SECINFO,
 			    fs_sd->sd_flags);
 
-			error = smb_fsop_sdread(sr, kcred, snode, &cur_sd);
+			error = smb_fsop_sdread(sr, kcr, snode, &cur_sd);
 			if (error == 0) {
 				ASSERT(fs_sd->sd_zdacl == NULL);
 				fs_sd->sd_zdacl = cur_sd.sd_zdacl;
@@ -2254,10 +2259,11 @@ int
 smb_fsop_sdwrite(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
     smb_fssd_t *fs_sd, int overwrite)
 {
-	int error = 0;
-	int access = 0;
 	smb_attr_t set_attr;
 	smb_attr_t orig_attr;
+	cred_t *kcr = zone_kcred();
+	int error = 0;
+	int access = 0;
 
 	ASSERT(cr);
 	ASSERT(fs_sd);
@@ -2297,7 +2303,7 @@ smb_fsop_sdwrite(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 
 	if (set_attr.sa_mask) {
 		orig_attr.sa_mask = SMB_AT_UID | SMB_AT_GID;
-		error = smb_fsop_getattr(sr, kcred, snode, &orig_attr);
+		error = smb_fsop_getattr(sr, kcr, snode, &orig_attr);
 		if (error == 0) {
 			error = smb_fsop_setattr(sr, cr, snode, &set_attr);
 			if (error == EPERM)
@@ -2322,7 +2328,7 @@ smb_fsop_sdwrite(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 			 */
 			if (set_attr.sa_mask) {
 				orig_attr.sa_mask = set_attr.sa_mask;
-				(void) smb_fsop_setattr(sr, kcred, snode,
+				(void) smb_fsop_setattr(sr, kcr, snode,
 				    &orig_attr);
 			}
 		}
@@ -2376,7 +2382,7 @@ smb_fsop_sdinherit(smb_request_t *sr, smb_node_t *dnode, smb_fssd_t *fs_sd)
 
 
 	/* Fetch parent directory's ACL */
-	error = smb_fsop_sdread(sr, kcred, dnode, fs_sd);
+	error = smb_fsop_sdread(sr, zone_kcred(), dnode, fs_sd);
 	if (error) {
 		return (error);
 	}

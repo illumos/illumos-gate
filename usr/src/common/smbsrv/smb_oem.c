@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -95,7 +96,7 @@ static oem_codepage_t oemcpg_table[] = {
 /*
  * The default SMB OEM codepage for English is codepage 850.
  */
-smb_wchar_t oem_codepage_850[256] = {
+const smb_wchar_t oem_codepage_850[256] = {
 	0x0000, 0x0001, 0x0002, 0x0003, 0x0004, 0x0005, 0x0006, 0x0007,
 	0x0008, 0x0009, 0x000A, 0x000B, 0x000C, 0x000D, 0x000E, 0x000F,
 	0x0010, 0x0011, 0x0012, 0x0013, 0x0014, 0x0015, 0x0016, 0x0017,
@@ -133,7 +134,7 @@ smb_wchar_t oem_codepage_850[256] = {
 /*
  * The default telnet OEM codepage for English is codepage 1252.
  */
-smb_wchar_t oem_codepage_1252[256] = {
+const smb_wchar_t oem_codepage_1252[256] = {
 	0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8,
 	0x9, 0x000A, 0x000B, 0x000C, 0x000D, 0x000E, 0x000F, 0x10,
 	0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18,
@@ -324,7 +325,7 @@ oem_codepage_init(uint32_t cpid)
 static void
 oem_codepage_setup(uint32_t cpid)
 {
-	smb_wchar_t	*default_oem_cp;
+	const smb_wchar_t *default_oem_cp;
 	oem_codepage_t	*oemcpg;
 	uint32_t	bytesperchar;
 	uint32_t	max_oem_index;

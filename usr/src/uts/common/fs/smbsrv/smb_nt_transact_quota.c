@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -48,8 +49,9 @@
 #define	SMB_QUOTA_EST_SIZE (SMB_QUOTA_SIZE_NO_SID + SMB_EST_SID_SIZE)
 #define	SMB_QUOTA_MAX_SIZE (SMB_QUOTA_SIZE_NO_SID + SMB_MAX_SID_SIZE)
 
-static int smb_quota_query(smb_quota_query_t *, smb_quota_response_t *);
-static int smb_quota_set(smb_quota_set_t *, uint32_t *);
+static int smb_quota_query(smb_server_t *, smb_quota_query_t *,
+    smb_quota_response_t *);
+static int smb_quota_set(smb_server_t *, smb_quota_set_t *, uint32_t *);
 static uint32_t smb_quota_init_sids(smb_xa_t *, smb_quota_query_t *,
     smb_ofile_t *);
 static uint32_t smb_quota_decode_sids(smb_xa_t *, list_t *);
@@ -186,7 +188,7 @@ smb_nt_transact_query_quota(smb_request_t *sr, smb_xa_t *xa)
 	status = smb_quota_init_sids(xa, &request, ofile);
 
 	if (status == NT_STATUS_SUCCESS) {
-		if (smb_quota_query(&request, &reply) != 0) {
+		if (smb_quota_query(sr->sr_server, &request, &reply) != 0) {
 			status = NT_STATUS_INTERNAL_ERROR;
 		} else {
 			status = reply.qr_status;
@@ -312,7 +314,7 @@ smb_nt_transact_set_quota(smb_request_t *sr, smb_xa_t *xa)
 	status = smb_quota_decode_quotas(xa, quota_list);
 	if (status == NT_STATUS_SUCCESS) {
 		request.qs_root_path = root_path;
-		if (smb_quota_set(&request, &reply) != 0) {
+		if (smb_quota_set(sr->sr_server, &request, &reply) != 0) {
 			status = NT_STATUS_INTERNAL_ERROR;
 		} else {
 			status = reply;
@@ -679,7 +681,7 @@ smb_quota_query_user_quota(smb_request_t *sr, uid_t uid, smb_quota_t *quota)
 	request.qq_query_op = SMB_QUOTA_QUERY_SIDLIST;
 	request.qq_single = B_TRUE;
 
-	if (smb_quota_query(&request, &reply) != 0) {
+	if (smb_quota_query(sr->sr_server, &request, &reply) != 0) {
 		status = NT_STATUS_INTERNAL_ERROR;
 	} else {
 		if (reply.qr_status != NT_STATUS_SUCCESS) {
@@ -712,11 +714,12 @@ smb_quota_query_user_quota(smb_request_t *sr, uid_t uid, smb_quota_t *quota)
  *	     0 - success. Status set in reply.
  */
 static int
-smb_quota_query(smb_quota_query_t *request, smb_quota_response_t *reply)
+smb_quota_query(smb_server_t *sv, smb_quota_query_t *request,
+    smb_quota_response_t *reply)
 {
 	int	rc;
 
-	rc = smb_kdoor_upcall(SMB_DR_QUOTA_QUERY,
+	rc = smb_kdoor_upcall(sv, SMB_DR_QUOTA_QUERY,
 	    request, smb_quota_query_xdr, reply, smb_quota_response_xdr);
 
 	return (rc);
@@ -730,11 +733,11 @@ smb_quota_query(smb_quota_query_t *request, smb_quota_response_t *reply)
  *	     0 - success. Status set in reply.
  */
 static int
-smb_quota_set(smb_quota_set_t *request, uint32_t *reply)
+smb_quota_set(smb_server_t *sv, smb_quota_set_t *request, uint32_t *reply)
 {
 	int	rc;
 
-	rc = smb_kdoor_upcall(SMB_DR_QUOTA_SET,
+	rc = smb_kdoor_upcall(sv, SMB_DR_QUOTA_SET,
 	    request, smb_quota_set_xdr, reply, xdr_uint32_t);
 
 	return (rc);

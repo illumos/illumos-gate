@@ -122,7 +122,8 @@ smb_com_open_print_file(smb_request_t *sr)
 	}
 	if ((rc = smbsr_encode_result(sr, 1, 0,
 	    "bww", 1, sr->smb_fid, 0)) == 0) {
-		if ((si = smb_kshare_lookup(SMB_SHARE_PRINT)) == NULL) {
+		si = smb_kshare_lookup(sr->sr_server, SMB_SHARE_PRINT);
+		if (si == NULL) {
 			cmn_err(CE_NOTE, "smb_com_open_print_file: SDRC_ERROR");
 			return (SDRC_ERROR);
 		}
@@ -134,9 +135,9 @@ smb_com_open_print_file(smb_request_t *sr)
 		(void) strlcpy(sp->sd_username, sr->uid_user->u_name,
 		    MAXNAMELEN);
 		sp->sd_fid = sr->smb_fid;
-		if (smb_spool_add_doc(sp))
+		if (smb_spool_add_doc(sr->tid_tree, sp))
 			kmem_free(sp, sizeof (smb_kspooldoc_t));
-		smb_kshare_release(si);
+		smb_kshare_release(sr->sr_server, si);
 	}
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }

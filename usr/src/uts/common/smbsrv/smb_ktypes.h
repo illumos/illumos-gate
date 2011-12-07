@@ -64,6 +64,7 @@ struct smb_disp_entry;
 struct smb_request;
 struct smb_server;
 struct smb_event;
+struct smb_export;
 
 /*
  * Accumulated time and queue length statistics.
@@ -150,6 +151,12 @@ typedef struct smb_latency {
 	hrtime_t	ly_d_mean;
 	hrtime_t	ly_d_stddev;
 } smb_latency_t;
+
+typedef struct smb_disp_stats {
+	volatile uint64_t sdt_txb;
+	volatile uint64_t sdt_rxb;
+	smb_latency_t	sdt_lat;
+} smb_disp_stats_t;
 
 int smb_noop(void *, size_t, int);
 
@@ -441,7 +448,7 @@ typedef struct smb_avl {
 	smb_avl_state_t	avl_state;
 	uint32_t	avl_refcnt;
 	uint32_t	avl_sequence;
-	smb_avl_nops_t	*avl_nops;
+	const smb_avl_nops_t	*avl_nops;
 } smb_avl_t;
 
 typedef struct {
@@ -450,6 +457,15 @@ typedef struct {
 	krwlock_t	rwx_lock;
 	boolean_t	rwx_waiting;
 } smb_rwx_t;
+
+typedef struct smb_export {
+	kmutex_t	e_mutex;
+	boolean_t	e_ready;
+	smb_llist_t	e_vfs_list;
+	smb_avl_t	e_share_avl;
+	smb_slist_t	e_unexport_list;
+	smb_thread_t	e_unexport_thread;
+} smb_export_t;
 
 /* NOTIFY CHANGE */
 typedef struct smb_node_fcn {
@@ -666,7 +682,6 @@ typedef struct smb_kshare {
 	char		*shr_access_ro;
 	char		*shr_access_rw;
 	avl_node_t	shr_link;
-	kmem_cache_t	*shr_cache;
 	kmutex_t	shr_mutex;
 } smb_kshare_t;
 
@@ -882,11 +897,10 @@ typedef struct smb_session {
 	smb_session_state_t	s_state;
 	uint32_t		s_flags;
 	int			s_write_raw_status;
+	taskqid_t		s_receiver_tqid;
 	kthread_t		*s_thread;
 	kt_did_t		s_ktdid;
 	smb_kmod_cfg_t		s_cfg;
-	kmem_cache_t		*s_cache;
-	kmem_cache_t		*s_cache_request;
 	struct smb_server	*s_server;
 	int32_t			s_gmtoff;
 	uint32_t		keep_alive;
@@ -1574,7 +1588,6 @@ typedef struct smb_request {
 	kmutex_t		sr_mutex;
 	list_node_t		sr_session_lnd;
 	smb_req_state_t		sr_state;
-	kmem_cache_t		*sr_cache;
 	struct smb_server	*sr_server;
 	pid_t			*sr_pid;
 	int32_t			sr_gmtoff;
@@ -1843,7 +1856,22 @@ typedef struct smb_server {
 	smb_kmod_cfg_t		sv_cfg;
 	smb_session_t		*sv_session;
 
+	struct smb_export	sv_export;
 	door_handle_t		sv_lmshrd;
+
+	/* Internal door for up-calls to smbd */
+	door_handle_t		sv_kdoor_hd;
+	int			sv_kdoor_id; /* init -1 */
+	uint64_t		sv_kdoor_ncall;
+	kmutex_t		sv_kdoor_mutex;
+	kcondvar_t		sv_kdoor_cv;
+
+	/* RPC pipes (client side) */
+	door_handle_t		sv_opipe_door_hd;
+	int			sv_opipe_door_id;
+	uint64_t		sv_opipe_door_ncall;
+	kmutex_t		sv_opipe_door_mutex;
+	kcondvar_t		sv_opipe_door_cv;
 
 	int32_t			si_gmtoff;
 
@@ -1851,15 +1879,6 @@ typedef struct smb_server {
 
 	taskq_t			*sv_worker_pool;
 	taskq_t			*sv_receiver_pool;
-
-	kmem_cache_t		*si_cache_request;
-	kmem_cache_t		*si_cache_session;
-	kmem_cache_t		*si_cache_user;
-	kmem_cache_t		*si_cache_tree;
-	kmem_cache_t		*si_cache_ofile;
-	kmem_cache_t		*si_cache_odir;
-	kmem_cache_t		*si_cache_opipe;
-	kmem_cache_t		*si_cache_event;
 
 	smb_node_t		*si_root_smb_node;
 	smb_llist_t		sv_opipe_list;
@@ -1884,6 +1903,7 @@ typedef struct smb_server {
 	smb_cmd_threshold_t	sv_opipe_ct;
 	kstat_t			*sv_legacy_ksp;
 	kmutex_t		sv_legacy_ksmtx;
+	smb_disp_stats_t	*sv_disp_stats;
 } smb_server_t;
 
 #define	SMB_EVENT_MAGIC		0x45564E54	/* EVNT */
@@ -1943,29 +1963,12 @@ typedef struct smb_disp_entry {
 	uint8_t		sdt_com;
 	char		sdt_dialect;
 	uint8_t		sdt_flags;
-	volatile uint64_t sdt_txb;
-	volatile uint64_t sdt_rxb;
-	smb_latency_t	sdt_lat;
 } smb_disp_entry_t;
 
 typedef struct smb_xlate {
 	int	code;
 	char	*str;
 } smb_xlate_t;
-
-typedef struct smb_export {
-	kmutex_t	e_mutex;
-	boolean_t	e_ready;
-	smb_llist_t	e_vfs_list;
-	smb_avl_t	e_share_avl;
-	smb_slist_t	e_unexport_list;
-
-	kmem_cache_t	*e_cache_share;
-	kmem_cache_t	*e_cache_vfs;
-	kmem_cache_t	*e_cache_unexport;
-
-	smb_thread_t	e_unexport_thread;
-} smb_export_t;
 
 /*
  * This structure is a helper for building RAP NetShareEnum response

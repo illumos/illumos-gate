@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -72,7 +73,7 @@
  *    owner: full access
  *    SYSTEM: full access
  */
-static ace_t default_dacl[DEFAULT_DACL_ACENUM] = {
+static const ace_t const default_dacl[DEFAULT_DACL_ACENUM] = {
 	{ (uid_t)-1, ACE_ALL_PERMS, 0, ACE_ACCESS_ALLOWED_ACE_TYPE },
 	{ IDMAP_WK_LOCAL_SYSTEM_GID, ACE_ALL_PERMS, ACE_IDENTIFIER_GROUP,
 	    ACE_ACCESS_ALLOWED_ACE_TYPE }

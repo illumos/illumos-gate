@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -278,7 +279,7 @@ typedef struct mbuf_chain {
 mbuf_t *m_free(mbuf_t *);
 void m_freem(mbuf_t *);
 int mbc_moveout(mbuf_chain_t *, caddr_t, int, int *);
-int smb_mbc_init(void);
+void smb_mbc_init(void);
 void smb_mbc_fini(void);
 mbuf_chain_t *smb_mbc_alloc(uint32_t);
 void smb_mbc_free(mbuf_chain_t *);

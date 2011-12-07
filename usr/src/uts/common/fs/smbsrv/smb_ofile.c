@@ -199,7 +199,7 @@ smb_ofile_open(
 	}
 	state = FIDALLOC;
 
-	of = kmem_cache_alloc(tree->t_server->si_cache_ofile, KM_SLEEP);
+	of = kmem_cache_alloc(smb_cache_ofile, KM_SLEEP);
 	bzero(of, sizeof (smb_ofile_t));
 	of->f_magic = SMB_OFILE_MAGIC;
 	of->f_refcnt = 1;
@@ -300,7 +300,7 @@ errout:
 	case CRHELD:
 		crfree(of->f_cr);
 		of->f_magic = 0;
-		kmem_cache_free(tree->t_server->si_cache_ofile, of);
+		kmem_cache_free(smb_cache_ofile, of);
 		/*FALLTHROUGH*/
 	case FIDALLOC:
 		smb_idpool_free(&tree->t_fid_pool, fid);
@@ -797,7 +797,7 @@ smb_ofile_seek(
 	case SMB_SEEK_END:
 		bzero(&attr, sizeof (smb_attr_t));
 		attr.sa_mask |= SMB_AT_SIZE;
-		rc = smb_fsop_getattr(NULL, kcred, of->f_node, &attr);
+		rc = smb_fsop_getattr(NULL, zone_kcred(), of->f_node, &attr);
 		if (rc != 0) {
 			mutex_exit(&of->f_mutex);
 			return (rc);
@@ -955,7 +955,7 @@ smb_ofile_delete(void *arg)
 	mutex_destroy(&of->f_mutex);
 	crfree(of->f_cr);
 	smb_user_release(of->f_user);
-	kmem_cache_free(of->f_tree->t_server->si_cache_ofile, of);
+	kmem_cache_free(smb_cache_ofile, of);
 }
 
 /*
@@ -968,7 +968,7 @@ uint32_t
 smb_ofile_access(smb_ofile_t *of, cred_t *cr, uint32_t access)
 {
 
-	if ((of == NULL) || (cr == kcred))
+	if ((of == NULL) || (cr == zone_kcred()))
 		return (NT_STATUS_SUCCESS);
 
 	/*

@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
@@ -391,14 +392,8 @@ smb_enable_share(sa_share_t share)
 	boolean_t online;
 
 	/*
-	 * We only start in the global zone and only run if we aren't
-	 * running Trusted Extensions.
+	 * Don't support Trusted Extensions.
 	 */
-	if (getzoneid() != GLOBAL_ZONEID) {
-		(void) printf(dgettext(TEXT_DOMAIN,
-		    "SMB: service not supported in local zone\n"));
-		return (SA_NOT_SUPPORTED);
-	}
 	if (is_system_labeled()) {
 		(void) printf(dgettext(TEXT_DOMAIN,
 		    "SMB: service not supported with Trusted Extensions\n"));

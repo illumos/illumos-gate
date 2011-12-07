@@ -331,7 +331,7 @@ smb_authenticate_core(smb_request_t *sr, smb_arg_sessionsetup_t *sinfo,
 
 	DTRACE_PROBE1(smb__sessionsetup__clntinfo, smb_logon_t *, &user_info);
 
-	if ((token = smb_get_token(&user_info)) == NULL) {
+	if ((token = smb_get_token(sr->session, &user_info)) == NULL) {
 		smbsr_error(sr, 0, ERRSRV, ERRbadpw);
 		return (-1);
 	}

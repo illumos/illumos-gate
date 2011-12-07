@@ -762,7 +762,7 @@ smb_encode_SHARE_INFO_2(struct mbuf_chain *output, struct mbuf_chain *text,
 	(void) smb_mbc_encodef(output, "wwwl9c.",
 	    access,
 	    sr->sr_cfg->skc_maxconnections,
-	    smb_server_get_session_count(),
+	    smb_server_get_session_count(sr->sr_server),
 	    MBC_LENGTH(text),
 	    pword);
 	(void) smb_mbc_encodef(text, "s", path);
@@ -837,7 +837,7 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 
 	esi.es_buf = smb_srm_zalloc(sr, esi.es_bufsize);
 	esi.es_posix_uid = crgetuid(sr->uid_user->u_cred);
-	smb_kshare_enum(&esi);
+	smb_kshare_enum(sr->sr_server, &esi);
 
 	/* client buffer size is not big enough to hold any shares */
 	if (esi.es_nsent == 0) {
@@ -964,12 +964,12 @@ smb_trans_net_share_getinfo(smb_request_t *sr, struct smb_xa *xa)
 	    &share, &level, &max_bytes) != 0)
 		return (SDRC_NOT_IMPLEMENTED);
 
-	si = smb_kshare_lookup(share);
+	si = smb_kshare_lookup(sr->sr_server, share);
 	if ((si == NULL) || (si->shr_oemname == NULL)) {
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "www",
 		    NERR_NetNameNotFound, 0, 0);
 		if (si)
-			smb_kshare_release(si);
+			smb_kshare_release(sr->sr_server, si);
 		return (SDRC_SUCCESS);
 	}
 
@@ -996,14 +996,14 @@ smb_trans_net_share_getinfo(smb_request_t *sr, struct smb_xa *xa)
 		break;
 
 	default:
-		smb_kshare_release(si);
+		smb_kshare_release(sr->sr_server, si);
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "www",
 		    ERROR_INVALID_LEVEL, 0, 0);
 		m_freem(str_mb.chain);
 		return (SDRC_NOT_IMPLEMENTED);
 	}
 
-	smb_kshare_release(si);
+	smb_kshare_release(sr->sr_server, si);
 	(void) smb_mbc_encodef(&xa->rep_param_mb, "www", NERR_Success,
 	    -MBC_LENGTH(&xa->rep_data_mb),
 	    MBC_LENGTH(&xa->rep_data_mb) + MBC_LENGTH(&str_mb));

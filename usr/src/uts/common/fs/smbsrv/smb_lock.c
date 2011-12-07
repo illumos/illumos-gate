@@ -400,7 +400,7 @@ smb_nbl_conflict(smb_node_t *node, uint64_t off, uint64_t len, nbl_op_t op)
 	if (op == NBL_RENAME || op == NBL_REMOVE)
 		op = NBL_READWRITE;
 
-	if (nbl_svmand(node->vp, kcred, &svmand))
+	if (nbl_svmand(node->vp, zone_kcred(), &svmand))
 		svmand = 1;
 
 	if (nbl_lock_conflict(node->vp, op, off, len, svmand, &smb_ct))

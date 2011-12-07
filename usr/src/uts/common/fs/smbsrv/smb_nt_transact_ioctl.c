@@ -42,7 +42,7 @@ static uint32_t smb_nt_trans_ioctl_set_zero_data(smb_request_t *, smb_xa_t *);
  * any oplocks on the file to none:
  *   smb_oplock_break(sr, node, SMB_OPLOCK_BREAK_TO_NONE);
  */
-static struct {
+static const struct {
 	uint32_t fcode;
 	uint32_t (*ioctl_func)(smb_request_t *sr, smb_xa_t *xa);
 } ioctl_ret_tbl[] = {
@@ -186,7 +186,7 @@ smb_nt_trans_ioctl_set_sparse(smb_request_t *sr, smb_xa_t *xa)
 	 */
 	bzero(&attr, sizeof (smb_attr_t));
 	attr.sa_mask = SMB_AT_DOSATTR;
-	rc = smb_node_getattr(sr, of->f_node, kcred, of, &attr);
+	rc = smb_node_getattr(sr, of->f_node, zone_kcred(), of, &attr);
 	if (rc != 0) {
 		smbsr_errno(sr, rc);
 		smbsr_release_file(sr);

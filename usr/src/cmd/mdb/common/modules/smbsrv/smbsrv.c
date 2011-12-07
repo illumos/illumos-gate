@@ -1347,12 +1347,12 @@ smb_kshare_cb(uintptr_t addr, const void *data, void *arg)
  * ::smbshares
  *
  * dcmd - Print out smb_kshare structures.
+ *	requires addr of an smb_server_t
  */
 /*ARGSUSED*/
 static int
 smb_dcmd_kshare(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	GElf_Sym	sym;
 	uint_t		opts = 0;
 
 	if (mdb_getopts(argc, argv,
@@ -1360,14 +1360,9 @@ smb_dcmd_kshare(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    NULL) != argc)
 		return (DCMD_USAGE);
 
-	if (!(flags & DCMD_ADDRSPEC)) {
-		if (mdb_lookup_by_name("smb_export", &sym) == -1) {
-			mdb_warn("failed to find symbol smb_export");
-			return (DCMD_ERR);
-		}
-		addr = (uintptr_t)sym.st_value +
-		    OFFSETOF(smb_export_t, e_share_avl.avl_tree);
-	}
+	if (!(flags & DCMD_ADDRSPEC))
+		return (DCMD_USAGE);
+	addr += OFFSETOF(smb_server_t, sv_export.e_share_avl.avl_tree);
 
 	if (DCMD_HDRSPEC(flags)) {
 		mdb_printf(
@@ -1462,26 +1457,20 @@ smb_dcmd_vfs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 }
 
 /*
- * Initialize the smb_vfs_t walker by reading the value of smb_export
- * in the kernel's symbol table. Only global walk supported.
+ * Initialize the smb_vfs_t walker to point to the smb_export
+ * in the specified smb_server_t instance.  (no global walks)
  */
 static int
 smb_vfs_walk_init(mdb_walk_state_t *wsp)
 {
-	GElf_Sym	sym;
 
-	if (wsp->walk_addr != NULL) {
-		mdb_printf("smb_vfs walk only supports global walks\n");
+	if (wsp->walk_addr == NULL) {
+		mdb_printf("require address of an smb_server_t\n");
 		return (WALK_ERR);
 	}
 
-	if (mdb_lookup_by_name("smb_export", &sym) == -1) {
-		mdb_warn("failed to find 'smb_export'");
-		return (WALK_ERR);
-	}
-
-	wsp->walk_addr = (uintptr_t)sym.st_value +
-	    offsetof(smb_export_t, e_vfs_list) + offsetof(smb_llist_t, ll_list);
+	wsp->walk_addr +=
+	    OFFSETOF(smb_server_t, sv_export.e_vfs_list.ll_list);
 
 	if (mdb_layered_walk("list", wsp) == -1) {
 		mdb_warn("failed to walk list of VFS");
