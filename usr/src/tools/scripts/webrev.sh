@@ -1799,35 +1799,50 @@ function git_wxfile
 
 	TMPFLIST=/tmp/$$.active
 	$PERL -e 'my (%files, %realfiles, $msg);
-	my $state = 1;		# 0|comments, 1|files
 	my $branch = $ARGV[0];
-
-	open(F, "git diff -M --name-only $branch |");
+	 
+	open(F, "git diff -M --name-status $branch |");
 	while (<F>) {
 	    chomp;
-	    $realfiles{$_} = 1;
+	    if (/^R(\d+)\s+([^ ]+)\s+([^ ]+)/) { # rename
+		if ($1 >= 75) {			 # Probably worth treating as a rename
+		    $realfiles{$3} = $2
+		} else {
+		    $realfiles{$3} = $3;
+		    $realfiles{$2} = $2;
+		}
+	    } else {
+		my $f = (split /\s+/, $_)[1];
+		$realfiles{$f} = $f;
+	    }
 	}
 	close(F);
-
-	open(F, "git whatchanged --pretty=format:\"%B\" $branch.. |");
+	 
+	my $state = 1;		    # 0|comments, 1|files
+	open(F, "git whatchanged --pretty=format:%B $branch.. |");
 	while (<F>) {
 	    chomp;
 	    if (/^:[0-9]{6}/) {
 		my $fname = (split /\t/, $_)[1];
+		next if !defined($realfiles{$fname}); # No real change
 		$state = 1;
 		$files{$fname} = $msg;
 	    } else {
 		if ($state == 1) {
-		$state = 0;
-		$msg = /^\n/ ? "" : "\n";
+		    $state = 0;
+		    $msg = /^\n/ ? "" : "\n";
 		}
 		$msg .= "$_\n" if ($_);
 	    }
 	}
 	close(F);
-
+	 
 	for (sort keys %files) {
-	    print "$_\n$files{$_}\n" if defined $realfiles{$_};
+	    if ($realfiles{$_} ne $_) {
+		print "$_ $realfiles{$_}\n$files{$_}\n";
+	    } else {
+		print "$_\n$files{$_}\n"
+	    }
 	}' ${parent} > $TMPFLIST
 
 	wxfile=$TMPFLIST
