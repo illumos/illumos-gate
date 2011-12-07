@@ -181,7 +181,14 @@ from the
 In the case of Git \fBwebrev\fR will attempt to use the output from the
 .BR git (1)
 "git rev-parse --git-dir" command to identify the workspace root, and will
-treat 'origin/master' as the workspace parent.
+attempt to use the remote branch which the current branch is tracking as the
+parent, if none is specified 'origin/master' will be used.
+
+The parent specified when git is, in all cases, a git 'tree-ish' and never an
+actual git repository, remote or otherwise.  Anything specifiable to git as a
+tree-ish should, similarly, be specifiable as a parent for webrev.  This
+includes branches, explicit revisions, reflog entries, etc. See
+.BR git-rev-parse (1)
 
 .SS Subversion
 In the case of Subversion \fBwebrev\fR will attempt to use the output
