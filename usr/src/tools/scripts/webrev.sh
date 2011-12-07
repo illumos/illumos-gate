@@ -1798,24 +1798,37 @@ function git_wxfile
 	typeset parent="$2"
 
 	TMPFLIST=/tmp/$$.active
-	$GIT whatchanged --pretty=format:'%B' "${parent}".. |\
-	    $PERL -e 'my (%files, $msg);
-	    my $state = 1;		# 0|comments, 1|files
-	    while (<>) {
-		chomp;
-		if (/^:[0-9]{6}/) {
-		    my $fname = (split /\t/, $_)[1];
-		    $state = 1;
-		    $files{$fname} = $msg;
-		} else {
-		    if ($state == 1) {
-			$state = 0;
-			$msg = /^\n/ ? "" : "\n";
-		    }
-		    $msg .= "$_\n" if ($_);
+	$PERL -e 'my (%files, %realfiles, $msg);
+	my $state = 1;		# 0|comments, 1|files
+	my $branch = $ARGV[0];
+
+	open(F, "git diff -M --name-only $branch |");
+	while (<F>) {
+	    chomp;
+	    $realfiles{$_} = 1;
+	}
+	close(F);
+
+	open(F, "git whatchanged --pretty=format:\"%B\" $branch.. |");
+	while (<F>) {
+	    chomp;
+	    if (/^:[0-9]{6}/) {
+		my $fname = (split /\t/, $_)[1];
+		$state = 1;
+		$files{$fname} = $msg;
+	    } else {
+		if ($state == 1) {
+		$state = 0;
+		$msg = /^\n/ ? "" : "\n";
 		}
+		$msg .= "$_\n" if ($_);
 	    }
-	    print "$_\n$files{$_}\n" for (sort keys %files);'> $TMPFLIST
+	}
+	close(F);
+
+	for (sort keys %files) {
+	    print "$_\n$files{$_}\n" if defined $realfiles{$_};
+	}' ${parent} > $TMPFLIST
 
 	wxfile=$TMPFLIST
 }
