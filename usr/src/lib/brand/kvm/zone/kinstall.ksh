@@ -81,12 +81,15 @@ if [ ! -d ${ZROOT}/tmp ]; then
     chmod 1777 ${ZROOT}/tmp
 fi
 
-
 # The dataset quota must be a number.
 case $ZQUOTA in *[!0-9]*)
 	print -u2 "Brand error: The quota $ZQUOTA is not a number"
 	exit $ZONE_SUBPROC_USAGE;;
 esac
+
+if [[ ${ZQUOTA} != "0" ]]; then
+    zfs set quota=${ZQUOTA}g ${PDS_NAME}/${bname}
+fi
 
 final_setup
 
