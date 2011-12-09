@@ -1838,6 +1838,27 @@ die_resolve(dwarf_t *dw)
 	} while (dw->dw_nunres != 0);
 }
 
+/*
+ * Any object containing at least one allocatable section of non-0 size is
+ * taken to be a file which should contain DWARF type information
+ */
+static boolean_t
+should_have_dwarf(Elf *elf)
+{
+	Elf_Scn *scn = NULL;
+
+	while ((scn = elf_nextscn(elf, scn)) != NULL) {
+		GElf_Shdr shdr;
+		gelf_getshdr(scn, &shdr);
+
+		if ((shdr.sh_flags & SHF_ALLOC) &&
+		    (shdr.sh_size != 0))
+			return (B_TRUE);
+	}
+
+	return (B_FALSE);
+}
+
 /*ARGSUSED*/
 int
 dw_read(tdata_t *td, Elf *elf, const char *filename)
@@ -1861,8 +1882,12 @@ dw_read(tdata_t *td, Elf *elf, const char *filename)
 
 	if ((rc = dwarf_elf_init(elf, DW_DLC_READ, NULL, NULL, &dw.dw_dw,
 	    &dw.dw_err)) == DW_DLV_NO_ENTRY) {
-		errno = ENOENT;
-		return (-1);
+		if (should_have_dwarf(elf)) {
+			errno = ENOENT;
+			return (-1);
+		} else {
+			return (0);
+		}
 	} else if (rc != DW_DLV_OK) {
 		if (dwarf_errno(dw.dw_err) == DW_DLE_DEBUG_INFO_NULL) {
 			/*
@@ -1881,10 +1906,18 @@ dw_read(tdata_t *td, Elf *elf, const char *filename)
 		terminate("file does not contain valid DWARF data: %s\n",
 		    dwarf_errmsg(dw.dw_err));
 
+	/*
+	 * Some compilers emit no DWARF for empty files, others emit an empty
+	 * compilation unit.
+	 */
 	if ((cu = die_sibling(&dw, NULL)) == NULL ||
-	    (child = die_child(&dw, cu)) == NULL)
+	    ((child = die_child(&dw, cu)) == NULL) &&
+	    should_have_dwarf(elf)) {
 		terminate("file does not contain dwarf type data "
 		    "(try compiling with -g)\n");
+	} else if (child == NULL) {
+		return (0);
+	}
 
 	dw.dw_maxoff = nxthdr - 1;
 
