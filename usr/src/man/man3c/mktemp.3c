@@ -32,8 +32,8 @@ created for each unique \fItemplate\fR.
 .SH RETURN VALUES
 .sp
 .LP
-The \fBmktemp()\fR function returns the pointer \fItemplate\fR. If a unique
-name cannot be created, \fItemplate\fR points to a null string.
+The \fBmktemp()\fR function returns a pointer to the \fItemplate\fR on success
+and \fBNULL\fR if unique name cannot be created.
 .SH ERRORS
 .sp
 .LP
@@ -52,7 +52,7 @@ pointer to the "template" string that contains the new filename.
 .nf
 #include <stdlib.h>
 \&...
-char *template = "/tmp/fileXXXXXX";
+char template[] = "/tmp/fileXXXXXX";
 char *ptr;
 ptr = mktemp(template);
 .fi
