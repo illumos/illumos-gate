@@ -4545,6 +4545,8 @@ f usr/kernel/kmdb/amd64/smbsrv 0555 root sys
 d usr/kernel/sched 0755 root sys
 d usr/kernel/sched/amd64 0755 root sys
 f usr/kernel/sched/amd64/FSS 0755 root sys
+f usr/kernel/sched/amd64/FX 0755 root sys
+f usr/kernel/sched/amd64/FX_DPTBL 0755 root sys
 f usr/kernel/sched/amd64/RT 0755 root sys
 f usr/kernel/sched/amd64/RT_DPTBL 0755 root sys
 d usr/kernel/socketmod 0755 root sys
