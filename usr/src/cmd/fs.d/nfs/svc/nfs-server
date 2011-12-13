@@ -49,13 +49,13 @@ configure_ipfilter()
 
         #
 	# Nothing to do if:
+	# - service's policy is 'use_global'
         # - ipfilter isn't online 
 	# - global policy is 'custom'
-	# - service's policy is 'use_global'
         #
+	[ "`get_policy $SMF_FMRI`" = "use_global" ] && return 0
         service_check_state $IPF_FMRI $SMF_ONLINE || return 0
         [ "`get_global_def_policy`" = "custom" ] && return 0
-	[ "`get_policy $SMF_FMRI`" = "use_global" ] && return 0
 
 	svcadm restart $IPF_FMRI
 }
