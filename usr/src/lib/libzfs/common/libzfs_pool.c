@@ -3750,8 +3750,7 @@ supported_dump_vdev_type(libzfs_handle_t *hdl, nvlist_t *config, char *errbuf)
 	uint_t children, c;
 
 	verify(nvlist_lookup_string(config, ZPOOL_CONFIG_TYPE, &type) == 0);
-	if (strcmp(type, VDEV_TYPE_RAIDZ) == 0 ||
-	    strcmp(type, VDEV_TYPE_FILE) == 0 ||
+	if (strcmp(type, VDEV_TYPE_FILE) == 0 ||
 	    strcmp(type, VDEV_TYPE_LOG) == 0 ||
 	    strcmp(type, VDEV_TYPE_HOLE) == 0 ||
 	    strcmp(type, VDEV_TYPE_MISSING) == 0) {

@@ -24,6 +24,7 @@
  */
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2011 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef _ZIO_H
@@ -79,6 +80,7 @@ enum zio_checksum {
 	ZIO_CHECKSUM_FLETCHER_4,
 	ZIO_CHECKSUM_SHA256,
 	ZIO_CHECKSUM_ZILOG2,
+	ZIO_CHECKSUM_NOPARITY,
 	ZIO_CHECKSUM_FUNCTIONS
 };
 

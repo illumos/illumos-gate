@@ -76,6 +76,7 @@
 #include <sys/zfs_rlock.h>
 #include <sys/vdev_disk.h>
 #include <sys/vdev_impl.h>
+#include <sys/vdev_raidz.h>
 #include <sys/zvol.h>
 #include <sys/dumphdr.h>
 #include <sys/zil_impl.h>
@@ -1060,27 +1061,28 @@ zvol_log_write(zvol_state_t *zv, dmu_tx_t *tx, offset_t off, ssize_t resid,
 }
 
 static int
-zvol_dumpio_vdev(vdev_t *vd, void *addr, uint64_t offset, uint64_t size,
-    boolean_t doread, boolean_t isdump)
+zvol_dumpio_vdev(vdev_t *vd, void *addr, uint64_t offset, uint64_t origoffset,
+    uint64_t size, boolean_t doread, boolean_t isdump)
 {
 	vdev_disk_t *dvd;
 	int c;
 	int numerrors = 0;
 
-	for (c = 0; c < vd->vdev_children; c++) {
-		ASSERT(vd->vdev_ops == &vdev_mirror_ops ||
-		    vd->vdev_ops == &vdev_replacing_ops ||
-		    vd->vdev_ops == &vdev_spare_ops);
-		int err = zvol_dumpio_vdev(vd->vdev_child[c],
-		    addr, offset, size, doread, isdump);
-		if (err != 0) {
-			numerrors++;
-		} else if (doread) {
-			break;
+	if (vd->vdev_ops == &vdev_mirror_ops ||
+	    vd->vdev_ops == &vdev_replacing_ops ||
+	    vd->vdev_ops == &vdev_spare_ops) {
+		for (c = 0; c < vd->vdev_children; c++) {
+			int err = zvol_dumpio_vdev(vd->vdev_child[c],
+			    addr, offset, origoffset, size, doread, isdump);
+			if (err != 0) {
+				numerrors++;
+			} else if (doread) {
+				break;
+			}
 		}
 	}
 
-	if (!vd->vdev_ops->vdev_op_leaf)
+	if (!vd->vdev_ops->vdev_op_leaf && vd->vdev_ops != &vdev_raidz_ops)
 		return (numerrors < vd->vdev_children ? 0 : EIO);
 
 	if (doread && !vdev_readable(vd))
@@ -1088,19 +1090,27 @@ zvol_dumpio_vdev(vdev_t *vd, void *addr, uint64_t offset, uint64_t size,
 	else if (!doread && !vdev_writeable(vd))
 		return (EIO);
 
-	dvd = vd->vdev_tsd;
-	ASSERT3P(dvd, !=, NULL);
+	if (vd->vdev_ops == &vdev_raidz_ops) {
+		return (vdev_raidz_physio(vd,
+		    addr, size, offset, origoffset, doread));
+	}
+
 	offset += VDEV_LABEL_START_SIZE;
 
 	if (ddi_in_panic() || isdump) {
 		ASSERT(!doread);
 		if (doread)
 			return (EIO);
+		dvd = vd->vdev_tsd;
+		ASSERT3P(dvd, !=, NULL);
 		return (ldi_dump(dvd->vd_lh, addr, lbtodb(offset),
 		    lbtodb(size)));
 	} else {
-		return (vdev_disk_physio(dvd->vd_lh, addr, size, offset,
-		    doread ? B_READ : B_WRITE));
+		dvd = vd->vdev_tsd;
+		ASSERT3P(dvd, !=, NULL);
+
+		return (vdev_disk_ldi_physio(dvd->vd_lh, addr, size,
+		    offset, doread ? B_READ : B_WRITE));
 	}
 }
 
@@ -1132,7 +1142,8 @@ zvol_dumpio(zvol_state_t *zv, void *addr, uint64_t offset, uint64_t size,
 
 	vd = vdev_lookup_top(spa, DVA_GET_VDEV(&ze->ze_dva));
 	offset += DVA_GET_OFFSET(&ze->ze_dva);
-	error = zvol_dumpio_vdev(vd, addr, offset, size, doread, isdump);
+	error = zvol_dumpio_vdev(vd, addr, offset, DVA_GET_OFFSET(&ze->ze_dva),
+	    size, doread, isdump);
 
 	if (!ddi_in_panic())
 		spa_config_exit(spa, SCL_STATE, FTAG);
@@ -1865,7 +1876,7 @@ zvol_dump_init(zvol_state_t *zv, boolean_t resize)
 		    ZIO_COMPRESS_OFF) == 0);
 		VERIFY(nvlist_add_uint64(nv,
 		    zfs_prop_to_name(ZFS_PROP_CHECKSUM),
-		    ZIO_CHECKSUM_OFF) == 0);
+		    ZIO_CHECKSUM_NOPARITY) == 0);
 		if (version >= SPA_VERSION_DEDUP) {
 			VERIFY(nvlist_add_uint64(nv,
 			    zfs_prop_to_name(ZFS_PROP_DEDUP),
