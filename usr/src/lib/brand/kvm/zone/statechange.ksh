@@ -91,6 +91,7 @@ setup_net()
 	do
 		# Get simplified versions of the network config. variables.
 		address=$(eval echo \$_ZONECFG_net_${nic}_address)
+        dhcp_server=$(eval echo \$_ZONECFG_net_${nic}_dhcp_server)
 		global_nic=$(eval echo \$_ZONECFG_net_${nic}_global_nic)
 		mac_addr=$(eval echo \$_ZONECFG_net_${nic}_mac_addr)
 		vlan_id=$(eval echo \$_ZONECFG_net_${nic}_vlan_id)
@@ -198,10 +199,7 @@ setup_net()
 
 		# Set up antispoof options
 
-		# XXX For backwards compatibility, special handling for
-		# zone named "dhcpd".  Remove this check once property
-		# is added to zone.
-		if [[ $ZONENAME == "dhcpd" ]] || [[ $dhcp_server == "1" ]]; then
+		if [[ $dhcp_server == "1" ]] || [[ $dhcp_server == "true" ]]; then
 			enable_dhcp="true"
 			# This needs to be off for dhcp server zones
 			allow_ip_spoof=1

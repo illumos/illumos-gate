@@ -309,6 +309,47 @@ construct_symtab(dis_tgt_t *tgt)
 			sym->se_shndx = sym->se_sym.st_shndx;
 		}
 
+		/* Deal with symbols with special section indicies */
+		if (sym->se_shndx == SHN_ABS) {
+			/*
+			 * If st_value == 0, references to these
+			 * symbols in code are modified in situ
+			 * thus we will never attempt to look
+			 * them up.
+			 */
+			if (sym->se_sym.st_value == 0) {
+				/*
+				 * References to these symbols in code
+				 * are modified in situ by the runtime
+				 * linker and no code on disk will ever
+				 * attempt to look them up.
+				 */
+				nsym++;
+				continue;
+			} else {
+				/*
+				 * If st_value != 0, (such as examining
+				 * something in /system/object/.../object)
+				 * the values should resolve to a value
+				 * within an existing section (such as
+				 * .data).  This also means it never needs
+				 * to have st_value mapped.
+				 */
+				sym++;
+				continue;
+			}
+		}
+
+		/*
+		 * Ignore the symbol if it has some other special
+		 * section index
+		 */
+		if (sym->se_shndx == SHN_UNDEF ||
+		    sym->se_shndx >= SHN_LORESERVE) {
+			nsym++;
+			continue;
+		}
+
 		if ((sym->se_name = elf_strptr(tgt->dt_elf, shdr.sh_link,
 		    (size_t)sym->se_sym.st_name)) == NULL) {
 			warn("%s: failed to lookup symbol %d name",
@@ -466,12 +507,11 @@ dis_tgt_create(const char *file)
 
 		idx = 0;
 		dis_tgt_section_iter(current, tgt_scn_init, &idx);
+		current->dt_filename = file;
 
 		create_addrmap(current);
 		if (current->dt_symidx != 0)
 			construct_symtab(current);
-
-		current->dt_filename = file;
 
 		cmd = elf_next(elf);
 	}
@@ -669,8 +709,10 @@ dis_tgt_lookup(dis_tgt_t *tgt, uint64_t addr, off_t *offset, int cache_result,
 	return (sym->se_name);
 }
 
+#if !defined(__sparc)
 /*
  * Given an address, return the starting offset of the next symbol in the file.
+ * Only needed on variable length instruction architectures.
  */
 off_t
 dis_tgt_next_symbol(dis_tgt_t *tgt, uint64_t addr)
@@ -686,6 +728,7 @@ dis_tgt_next_symbol(dis_tgt_t *tgt, uint64_t addr)
 
 	return (0);
 }
+#endif
 
 /*
  * Iterate over all sections in the target, executing the given callback for

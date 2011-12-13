@@ -403,14 +403,6 @@ putzoneent(struct zoneent *ze, zoneent_op_t operation)
 			 */
 			if (ze->zone_state >= 0) {
 				zone_state = zone_state_str(ze->zone_state);
-
-				/*
-				 * If the caller is uninstalling this zone,
-				 * then wipe out the uuid.  The zone's contents
-				 * are no longer known.
-				 */
-				if (ze->zone_state < ZONE_STATE_INSTALLED)
-					zone_uuid = "";
 			}
 
 			/* If a new name is supplied, use it. */

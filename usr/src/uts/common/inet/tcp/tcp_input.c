@@ -3749,6 +3749,13 @@ process_ack:
 				return;
 			}
 			/*
+			 * tcp_newconn_notify() changes conn_upcalls and
+			 * connp->conn_upper_handle.  Fix things now, in case
+			 * there's data attached to this ack.
+			 */
+			if (connp->conn_upcalls != NULL)
+				sockupcalls = connp->conn_upcalls;
+			/*
 			 * For passive open, trace receipt of final ACK as
 			 * tcp:::accept-established.
 			 */

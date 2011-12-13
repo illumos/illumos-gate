@@ -65,6 +65,7 @@
 #include <stdarg.h>
 #include <sys/proc.h>
 #include <priv_utils.h>
+#include <zone.h>
 
 #define	NTTYS	2	/* max ttys that can be specified with the -t option */
 			/* only one tty can be specified with SunOS ps */
@@ -803,10 +804,14 @@ static char *
 gettty(psinfo_t *psinfo)
 {
 	extern char *_ttyname_dev(dev_t, char *, size_t);
+	static zoneid_t zid = -1;
 	char devname[TTYNAME_MAX];
 	char *retval;
 
-	if (psinfo->pr_ttydev == PRNODEV)
+	if (zid == -1)
+		zid = getzoneid();
+
+	if (psinfo->pr_ttydev == PRNODEV || psinfo->pr_zoneid != zid)
 		return ("?");
 
 	if ((retval = devlookup(psinfo->pr_ttydev)) != NULL)

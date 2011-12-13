@@ -22,6 +22,10 @@
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2011 Joyent, Inc.  All rights reserved.
+ */
+
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_ctf.h>
 #include <sys/cpuvar.h>
@@ -745,6 +749,75 @@ ptable_help(void)
 	    "-m Interpret the PFN as an MFN (machine frame number)\n");
 }
 
+/*
+ * NSEC_SHIFT is replicated here (it is not defined in a header file),
+ * but for amusement, the reader is directed to the comment that explains
+ * the rationale for this particular value on x86.  Spoiler:  the value is
+ * selected to accommodate 60 MHz Pentiums!  (And a confession:  if the voice
+ * in that comment sounds too familiar, it's because your author also wrote
+ * that code -- some fifteen years prior to this writing in 2011...)
+ */
+#define	NSEC_SHIFT 5
+
+/*ARGSUSED*/
+static int
+scalehrtime_cmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	uint32_t nsec_scale;
+	hrtime_t tsc = addr, hrt;
+	unsigned int *tscp = (unsigned int *)&tsc;
+	uintptr_t scalehrtimef;
+	uint64_t scale;
+	GElf_Sym sym;
+
+	if (!(flags & DCMD_ADDRSPEC)) {
+		if (argc != 1)
+			return (DCMD_USAGE);
+
+		switch (argv[0].a_type) {
+		case MDB_TYPE_STRING:
+			tsc = mdb_strtoull(argv[0].a_un.a_str);
+			break;
+		case MDB_TYPE_IMMEDIATE:
+			tsc = argv[0].a_un.a_val;
+			break;
+		default:
+			return (DCMD_USAGE);
+		}
+	}
+
+	if (mdb_readsym(&scalehrtimef,
+	    sizeof (scalehrtimef), "scalehrtimef") == -1) {
+		mdb_warn("couldn't read 'scalehrtimef'");
+		return (DCMD_ERR);
+	}
+
+	if (mdb_lookup_by_name("tsc_scalehrtime", &sym) == -1) {
+		mdb_warn("couldn't find 'tsc_scalehrtime'");
+		return (DCMD_ERR);
+	}
+
+	if (sym.st_value != scalehrtimef) {
+		mdb_warn("::scalehrtime requires that scalehrtimef "
+		    "be set to tsc_scalehrtime\n");
+		return (DCMD_ERR);
+	}
+
+	if (mdb_readsym(&nsec_scale, sizeof (nsec_scale), "nsec_scale") == -1) {
+		mdb_warn("couldn't read 'nsec_scale'");
+		return (DCMD_ERR);
+	}
+
+	scale = (uint64_t)nsec_scale;
+
+	hrt = ((uint64_t)tscp[1] * scale) << NSEC_SHIFT;
+	hrt += ((uint64_t)tscp[0] * scale) >> (32 - NSEC_SHIFT);
+
+	mdb_printf("0x%llx\n", hrt);
+
+	return (DCMD_OK);
+}
+
 static const mdb_dcmd_t dcmds[] = {
 	{ "gate_desc", ":", "dump a gate descriptor", gate_desc },
 	{ "idt", ":[-v]", "dump an IDT", idt },
@@ -765,6 +838,8 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "mfntopfn", ":", "convert hypervisor machine page to physical page",
 	    mfntopfn_dcmd },
 	{ "memseg_list", ":", "show memseg list", memseg_list },
+	{ "scalehrtime", ":",
+	    "scale an unscaled high-res time", scalehrtime_cmd },
 	{ NULL }
 };
 

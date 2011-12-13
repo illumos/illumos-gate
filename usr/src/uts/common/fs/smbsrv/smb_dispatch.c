@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -523,6 +524,7 @@ smb_dispatch_request(struct smb_request *sr)
 	smb_session_t		*session;
 	uint32_t		capabilities;
 	uint32_t		byte_count;
+	uint32_t		max_bytes;
 
 	session = sr->session;
 	capabilities = session->capabilities;
@@ -624,12 +626,18 @@ andx_more:
 	 * and this is SmbReadX/SmbWriteX since this enables
 	 * large reads/write and bcc is only 16-bits.
 	 */
+	max_bytes = sr->command.max_bytes - sr->command.chain_offset;
 	if (((sr->smb_com == SMB_COM_READ_ANDX) &&
 	    (capabilities & CAP_LARGE_READX)) ||
 	    ((sr->smb_com == SMB_COM_WRITE_ANDX) &&
 	    (capabilities & CAP_LARGE_WRITEX))) {
-		byte_count = sr->command.max_bytes - sr->command.chain_offset;
+		/* May be > BCC */
+		byte_count = max_bytes;
+	} else if (max_bytes < (uint32_t)sr->smb_bcc) {
+		/* BCC is bogus.  Will fail later. */
+		byte_count = max_bytes;
 	} else {
+		/* ordinary case */
 		byte_count = (uint32_t)sr->smb_bcc;
 	}
 

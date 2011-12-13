@@ -327,8 +327,18 @@ vdev_disk_close(vdev_t *vd)
 }
 
 int
-vdev_disk_physio(ldi_handle_t vd_lh, caddr_t data, size_t size,
-    uint64_t offset, int flags)
+vdev_disk_physio(vdev_t *vd, caddr_t data,
+    size_t size, uint64_t offset, int flags)
+{
+	vdev_disk_t *dvd = vd->vdev_tsd;
+
+	ASSERT(vd->vdev_ops == &vdev_disk_ops);
+	return (vdev_disk_ldi_physio(dvd->vd_lh, data, size, offset, flags));
+}
+
+int
+vdev_disk_ldi_physio(ldi_handle_t vd_lh, caddr_t data,
+    size_t size, uint64_t offset, int flags)
 {
 	buf_t *bp;
 	int error = 0;
@@ -580,7 +590,7 @@ vdev_disk_read_rootlabel(char *devpath, char *devid, nvlist_t **config)
 
 		/* read vdev label */
 		offset = vdev_label_offset(size, l, 0);
-		if (vdev_disk_physio(vd_lh, (caddr_t)label,
+		if (vdev_disk_ldi_physio(vd_lh, (caddr_t)label,
 		    VDEV_SKIP_SIZE + VDEV_PHYS_SIZE, offset, B_READ) != 0)
 			continue;
 

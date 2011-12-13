@@ -20,7 +20,7 @@
 #
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
-#
+# Copyright 2011 Nexenta Systems, Inc. All rights reserved.
 #
 
 #
@@ -467,6 +467,7 @@ $endif
 
 SYMBOL_VERSION SUNWprivate_1.5 {
     global:
+	inet_matchaddr;
 	clnt_create_service_timed;
 } SUNWprivate_1.4;
 

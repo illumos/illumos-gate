@@ -2439,6 +2439,7 @@ configure_shared_network_interfaces(zlog_t *zlogp)
 		for (;;) {
 			if (zonecfg_getnwifent(handle, &nwiftab) != Z_OK)
 				break;
+			nwifent_free_attrs(&nwiftab);
 			if (configure_one_interface(zlogp, zoneid, &nwiftab) !=
 			    Z_OK) {
 				(void) zonecfg_endnwifent(handle);
@@ -2930,6 +2931,7 @@ configure_exclusive_network_interfaces(zlog_t *zlogp, zoneid_t zoneid)
 		if (zonecfg_getnwifent(handle, &nwiftab) != Z_OK)
 			break;
 
+		nwifent_free_attrs(&nwiftab);
 		if (prof == NULL) {
 			if (zone_get_devroot(zone_name, rootpath,
 			    sizeof (rootpath)) != Z_OK) {
@@ -4851,6 +4853,8 @@ error:
 	}
 	if (rctlbuf != NULL)
 		free(rctlbuf);
+	if (zfsbuf != NULL)
+		free(zfsbuf);
 	priv_freeset(privs);
 	if (fp != NULL)
 		zonecfg_close_scratch(fp);

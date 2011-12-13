@@ -4768,7 +4768,7 @@ get_pool_sched_class(char *poolname, char *class, int clsize)
 	pool_conf_t *poolconf;
 	pool_t *pool;
 	pool_elem_t *pe;
-	pool_value_t *pv = pool_value_alloc();
+	pool_value_t *pv;
 	const char *sched_str;
 
 	if (pool_get_status(&status) != PO_SUCCESS || status != POOL_ENABLED)
@@ -4789,15 +4789,23 @@ get_pool_sched_class(char *poolname, char *class, int clsize)
 		return (Z_NO_POOL);
 	}
 
+	if ((pv = pool_value_alloc()) == NULL) {
+		(void) pool_conf_close(poolconf);
+		pool_conf_free(poolconf);
+		return (Z_NO_POOL);
+	}
+
 	pe = pool_to_elem(poolconf, pool);
 	if (pool_get_property(poolconf, pe, "pool.scheduler", pv) !=
 	    POC_STRING) {
 		(void) pool_conf_close(poolconf);
+		pool_value_free(pv);
 		pool_conf_free(poolconf);
 		return (Z_NO_ENTRY);
 	}
 	(void) pool_value_get_string(pv, &sched_str);
 	(void) pool_conf_close(poolconf);
+	pool_value_free(pv);
 	pool_conf_free(poolconf);
 	if (strlcpy(class, sched_str, clsize) >= clsize)
 		return (Z_TOO_BIG);
