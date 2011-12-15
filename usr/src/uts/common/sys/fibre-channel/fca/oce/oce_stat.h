@@ -19,10 +19,7 @@
  * CDDL HEADER END
  */
 
-/*
- * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to license terms.
- */
+/* Copyright © 2003-2011 Emulex. All rights reserved.  */
 
 /*
  * Statistic specific data structures and function prototypes
@@ -74,6 +71,23 @@ struct oce_stat {
 	kstat_named_t tx_broadcast_frames;
 	kstat_named_t tx_pause_frames;
 	kstat_named_t tx_control_frames;
+
+
+	kstat_named_t rx_drops_no_pbuf;
+	kstat_named_t rx_drops_no_txpb;
+	kstat_named_t rx_drops_no_erx_descr;
+	kstat_named_t rx_drops_no_tpre_descr;
+	kstat_named_t rx_drops_too_many_frags;
+	kstat_named_t rx_drops_invalid_ring;
+	kstat_named_t rx_drops_mtu;
+
+	kstat_named_t rx_dropped_too_small;
+	kstat_named_t rx_dropped_too_short;
+	kstat_named_t rx_dropped_header_too_small;
+	kstat_named_t rx_dropped_tcp_length;
+	kstat_named_t rx_dropped_runt;
+
+	kstat_named_t rx_drops_no_fragments;
 };
 
 int oce_stat_init(struct oce_dev *dev);

@@ -37,15 +37,16 @@
 #pragma error_messages (off,E_INITIALIZATION_TYPE_MISMATCH)
 MECH_OID g_stcMechOIDList [] =
 {
-	{"\x06\x09\x2a\x86\x48\x82\xf7\x12\x01\x02\x02",	11,  9,
-	 spnego_mech_oid_Kerberos_V5_Legacy	},	// 1.2.840.48018.1.2.2 
-	{"\x06\x09\x2a\x86\x48\x86\xf7\x12\x01\x02\x02",	11,  9,
-	 spnego_mech_oid_Kerberos_V5		}, // 1.2.840.113554.1.2.2
-	{"\x06\x06\x2b\x06\x01\x05\x05\x02",			 8,  6,
-	 spnego_mech_oid_Spnego			}, // 1.3.6.1.5.5.2
-	{"\x06\x0a\x2b\x06\x01\x04\x01\x82\x37\x02\x02\x0a",	12, 10,
-	 spnego_mech_oid_NTLMSSP		}, // 1.3.6.1.4.1.311.2.2.10
-	{"", 0,  0, spnego_mech_oid_NotUsed	}  // Placeholder
+        {(unsigned char *)"\x06\x09\x2a\x86\x48\x82\xf7\x12\x01\x02\x02",
+         11,  9, spnego_mech_oid_Kerberos_V5_Legacy},	// 1.2.840.48018.1.2.2 
+	{(unsigned char *)"\x06\x09\x2a\x86\x48\x86\xf7\x12\x01\x02\x02",
+         11,  9, spnego_mech_oid_Kerberos_V5}, // 1.2.840.113554.1.2.2
+	{(unsigned char *)"\x06\x06\x2b\x06\x01\x05\x05\x02",
+         8,  6, spnego_mech_oid_Spnego}, // 1.3.6.1.5.5.2
+	{(unsigned char *)"\x06\x0a\x2b\x06\x01\x04\x01\x82\x37\x02\x02\x0a",
+         12, 10, spnego_mech_oid_NTLMSSP}, // 1.3.6.1.4.1.311.2.2.10
+	{(unsigned char *)"", 0,  0, spnego_mech_oid_NotUsed  // Placeholder
+        }
 };
 #pragma error_messages (default,E_INITIALIZATION_TYPE_MISMATCH)
 

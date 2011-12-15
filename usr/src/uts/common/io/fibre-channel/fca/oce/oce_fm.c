@@ -19,10 +19,7 @@
  * CDDL HEADER END
  */
 
-/*
- * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to license terms.
- */
+/* Copyright © 2003-2011 Emulex. All rights reserved.  */
 
 /*
  * Source file containing the implementation of fma support in driver
@@ -53,7 +50,6 @@ oce_fm_init(struct oce_dev *dev)
 
 	oce_set_dma_fma_flags(dev->fm_caps);
 	oce_set_reg_fma_flags(dev->fm_caps);
-	oce_set_tx_map_dma_fma_flags(dev->fm_caps);
 
 	(void) ddi_fm_init(dev->dip, &dev->fm_caps, &ibc);
 	if (DDI_FM_EREPORT_CAP(dev->fm_caps) ||
@@ -101,6 +97,7 @@ int
 oce_fm_check_acc_handle(struct oce_dev *dev, ddi_acc_handle_t acc_handle)
 {
 	ddi_fm_error_t fme;
+
 
 	if (!DDI_FM_ACC_ERR_CAP(dev->fm_caps)) {
 		return (DDI_FM_OK);

@@ -19,10 +19,8 @@
  * CDDL HEADER END
  */
 
-/*
- * Copyright 2010 Emulex.  All rights reserved.
- * Use is subject to license terms.
- */
+/* Copyright © 2003-2011 Emulex. All rights reserved.  */
+
 
 /*
  * Source file containing the implementation of the driver entry points
@@ -35,18 +33,20 @@
 
 #define	ATTACH_DEV_INIT 	0x1
 #define	ATTACH_FM_INIT		0x2
-#define	ATTACH_LOCK_INIT	0x4
-#define	ATTACH_PCI_INIT 	0x8
-#define	ATTACH_HW_INIT		0x10
-#define	ATTACH_SETUP_TXRX 	0x20
-#define	ATTACH_SETUP_ADAP	0x40
-#define	ATTACH_SETUP_INTR	0x80
-#define	ATTACH_STAT_INIT	0x100
-#define	ATTACH_MAC_REG		0x200
+#define	ATTACH_PCI_CFG		0x4
+#define	ATTACH_LOCK_INIT	0x8
+#define	ATTACH_PCI_INIT 	0x10
+#define	ATTACH_HW_INIT		0x20
+#define	ATTACH_SETUP_TXRX 	0x40
+#define	ATTACH_SETUP_ADAP	0x80
+#define	ATTACH_SETUP_INTR	0x100
+#define	ATTACH_STAT_INIT	0x200
+#define	ATTACH_MAC_REG		0x400
 
 /* ---[ globals and externs ]-------------------------------------------- */
 const char oce_ident_string[] = OCE_IDENT_STRING;
 const char oce_mod_name[] = OCE_MOD_NAME;
+struct oce_dev *oce_dev_list[MAX_DEVS + 1];	/* Last entry is invalid */
 
 /* driver properties */
 static const char flow_control[]	 = "flow_control";
@@ -192,6 +192,7 @@ oce_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	int ret = 0;
 	struct oce_dev *dev = NULL;
 	mac_register_t *mac;
+	uint8_t dev_index = 0;
 
 	switch (cmd) {
 	case DDI_RESUME:
@@ -211,6 +212,21 @@ oce_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	dev->dev_id = ddi_get_instance(dip);
 	dev->suspended = B_FALSE;
 
+	dev->dev_list_index = MAX_DEVS;
+	while (dev_index < MAX_DEVS) {
+		(void) atomic_cas_ptr(&oce_dev_list[dev_index], NULL, dev);
+		if (oce_dev_list[dev_index] == dev) {
+			break;
+		}
+		dev_index++;
+	}
+	if (dev_index == MAX_DEVS) {
+		oce_log(dev, CE_WARN, MOD_CONFIG, "%s",
+		    "Too many oce devices on the system. Failed to attach.");
+		goto attach_fail;
+	}
+	dev->dev_list_index = dev_index;
+
 	/* get the parameters */
 	oce_get_params(dev);
 
@@ -224,6 +240,31 @@ oce_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	oce_fm_init(dev);
 	dev->attach_state |= ATTACH_FM_INIT;
+
+	ret = pci_config_setup(dev->dip, &dev->pci_cfg_handle);
+	if (ret != DDI_SUCCESS) {
+		oce_log(dev, CE_WARN, MOD_CONFIG,
+		    "Map PCI config failed with  %d", ret);
+		goto attach_fail;
+	}
+	dev->attach_state |= ATTACH_PCI_CFG;
+
+	ret = oce_identify_hw(dev);
+
+	if (ret != DDI_SUCCESS) {
+		oce_log(dev, CE_WARN, MOD_CONFIG, "%s",
+		    "Device Unknown");
+		goto attach_fail;
+	}
+
+	ret = oce_get_bdf(dev);
+	if (ret != DDI_SUCCESS) {
+		oce_log(dev, CE_WARN, MOD_CONFIG,
+		    "Failed to read BDF, status = 0x%x", ret);
+		goto attach_fail;
+	}
+	/* Update the dev->rss */
+	oce_dev_rss_ready(dev);
 
 	/* setup PCI bars */
 	ret = oce_pci_init(dev);
@@ -301,7 +342,7 @@ oce_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	mac->m_callbacks = &oce_mac_cb;
 	mac->m_min_sdu = 0;
 	mac->m_max_sdu = dev->mtu;
-	mac->m_margin = VLAN_TAGSZ;
+	mac->m_margin = VTAG_SIZE;
 	mac->m_priv_props = oce_priv_props;
 
 	oce_log(dev, CE_NOTE, MOD_CONFIG,
@@ -491,29 +532,30 @@ oce_unconfigure(struct oce_dev *dev)
 	if (state & ATTACH_SETUP_ADAP) {
 		oce_unsetup_adapter(dev);
 	}
-
 	if (state & ATTACH_SETUP_TXRX) {
 		oce_fini_txrx(dev);
 	}
-
 	if (state & ATTACH_HW_INIT) {
 		oce_hw_fini(dev);
 	}
 	if (state & ATTACH_LOCK_INIT) {
 		oce_destroy_locks(dev);
 	}
-
 	if (state & ATTACH_SETUP_INTR) {
 		(void) oce_teardown_intr(dev);
 	}
 	if (state & ATTACH_PCI_INIT) {
 		oce_pci_fini(dev);
 	}
+	if (state & ATTACH_PCI_CFG) {
+		pci_config_teardown(&dev->pci_cfg_handle);
+	}
 	if (state & ATTACH_FM_INIT) {
 		oce_fm_fini(dev);
 	}
 	if (state & ATTACH_DEV_INIT) {
 		ddi_set_driver_private(dev->dip, NULL);
+		oce_dev_list[dev->dev_list_index] = NULL;
 		kmem_free(dev, sizeof (struct oce_dev));
 	}
 } /* oce_unconfigure */
@@ -587,7 +629,7 @@ oce_get_params(struct oce_dev *dev)
 	    0, dev->rx_ring_size/2, OCE_DEFAULT_RX_PKT_PER_INTR, rx_ppi_values);
 
 	dev->rx_rings = oce_get_prop(dev, (char *)rx_rings_name,
-	    OCE_DEFAULT_RQS, OCE_MAX_RQS, OCE_DEFAULT_RQS, rx_rings_values);
+	    OCE_MIN_RQ, OCE_MAX_RQ, OCE_DEFAULT_RQS, rx_rings_values);
 
 	dev->tx_rings = oce_get_prop(dev, (char *)tx_rings_name,
 	    OCE_DEFAULT_WQS, OCE_DEFAULT_WQS, OCE_DEFAULT_WQS, tx_rings_values);

@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -35,6 +36,9 @@ extern "C" {
 #include <sys/varargs.h>
 #include <sys/cpu.h>
 #include <sys/thread.h>
+
+/* Function name used for debug output. */
+#define	ACPI_GET_FUNCTION_NAME	__func__
 
 uint32_t __acpi_acquire_global_lock(void *);
 uint32_t __acpi_release_global_lock(void *);

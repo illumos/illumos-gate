@@ -66,6 +66,7 @@
 #include <sys/acpi/acpi.h>
 #include <sys/acpica.h>
 #include <sys/fp.h>
+#include <sys/sysmacros.h>
 
 #define	AFMT	"%lx"
 
@@ -356,7 +357,8 @@ i_cpr_pre_resume_cpus()
 		gdt.limit = cpup->wc_gdt_limit;
 
 #if defined(__amd64)
-		code_length = (uint32_t)wc_long_mode_64 - (uint32_t)wc_rm_start;
+		code_length = (uint32_t)((uintptr_t)wc_long_mode_64 -
+		    (uintptr_t)wc_rm_start);
 #else
 		code_length = 0;
 #endif
@@ -548,19 +550,20 @@ i_cpr_power_down(int sleeptype)
 	PMD(PMD_SX, ("ncpus=%d\n", ncpus))
 
 	PMD(PMD_SX, ("wc_rm_end - wc_rm_start=%lx WC_CODESIZE=%x\n",
-	    ((size_t)((uint_t)wc_rm_end - (uint_t)wc_rm_start)), WC_CODESIZE))
+	    ((size_t)((uintptr_t)wc_rm_end - (uintptr_t)wc_rm_start)),
+	    WC_CODESIZE))
 
 	PMD(PMD_SX, ("wakevirt=%p, wakephys=%x\n",
 	    (void *)wakevirt, (uint_t)wakephys))
 
-	ASSERT(((size_t)((uint_t)wc_rm_end - (uint_t)wc_rm_start)) <
+	ASSERT(((size_t)((uintptr_t)wc_rm_end - (uintptr_t)wc_rm_start)) <
 	    WC_CODESIZE);
 
 	bzero(wakevirt, PAGESIZE);
 
 	/* Copy code to rm_platter */
 	bcopy((caddr_t)wc_rm_start, wakevirt,
-	    (size_t)((uint_t)wc_rm_end - (uint_t)wc_rm_start));
+	    (size_t)((uintptr_t)wc_rm_end - (uintptr_t)wc_rm_start));
 
 	prt_other_cpus();
 
@@ -568,6 +571,7 @@ i_cpr_power_down(int sleeptype)
 
 	PMD(PMD_SX, ("real_mode_platter->rm_cr4=%lx, getcr4()=%lx\n",
 	    (ulong_t)real_mode_platter->rm_cr4, (ulong_t)getcr4()))
+
 	PMD(PMD_SX, ("real_mode_platter->rm_pdbr=%lx, getcr3()=%lx\n",
 	    (ulong_t)real_mode_platter->rm_pdbr, getcr3()))
 
@@ -581,11 +585,10 @@ i_cpr_power_down(int sleeptype)
 	 * mapped address, we need to calculate it here.
 	 */
 	real_mode_platter->rm_longmode64_addr = rm_platter_pa +
-	    ((uint32_t)wc_long_mode_64 - (uint32_t)wc_rm_start);
+	    (uint32_t)((uintptr_t)wc_long_mode_64 - (uintptr_t)wc_rm_start);
 
 	PMD(PMD_SX, ("real_mode_platter->rm_cr4=%lx, getcr4()=%lx\n",
 	    (ulong_t)real_mode_platter->rm_cr4, getcr4()))
-
 	PMD(PMD_SX, ("real_mode_platter->rm_pdbr=%lx, getcr3()=%lx\n",
 	    (ulong_t)real_mode_platter->rm_pdbr, getcr3()))
 
@@ -631,8 +634,8 @@ i_cpr_power_down(int sleeptype)
 		gdt.limit = cpup->wc_gdt_limit;
 
 #if defined(__amd64)
-		code_length = (uint32_t)wc_long_mode_64 -
-		    (uint32_t)wc_rm_start;
+		code_length = (uint32_t)((uintptr_t)wc_long_mode_64 -
+		    (uintptr_t)wc_rm_start);
 #else
 		code_length = 0;
 #endif
@@ -899,7 +902,7 @@ init_real_mode_platter(int cpun, uint32_t offset, uint_t cr4, wc_desctbr_t gdt)
 	real_mode_platter->rm_temp_gdt_lim = (ushort_t)
 	    (sizeof (real_mode_platter->rm_temp_gdt) - 1);
 	real_mode_platter->rm_temp_gdt_base = rm_platter_pa +
-	    (uint32_t)(&((rm_platter_t *)0)->rm_temp_gdt);
+	    offsetof(rm_platter_t, rm_temp_gdt);
 
 	real_mode_platter->rm_temp_idt_lim = 0;
 	real_mode_platter->rm_temp_idt_base = 0;

@@ -19,10 +19,7 @@
  * CDDL HEADER END
  */
 
-/*
- * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to license terms.
- */
+/* Copyright © 2003-2011 Emulex. All rights reserved.  */
 
 /*
  * Source file containing the implementation of the driver statistics
@@ -152,6 +149,37 @@ oce_update_stats(kstat_t *ksp, int rw)
 	    port_stats->tx_pause_frames;
 	stats->tx_control_frames.value.ul =
 	    port_stats->tx_control_frames;
+
+
+	stats->rx_drops_no_pbuf.value.ul =
+	    dev->hw_stats->params.rsp.rx.rx_drops_no_pbuf;
+	stats->rx_drops_no_txpb.value.ul =
+	    dev->hw_stats->params.rsp.rx.rx_drops_no_txpb;
+	stats->rx_drops_no_erx_descr.value.ul =
+	    dev->hw_stats->params.rsp.rx.rx_drops_no_erx_descr;
+	stats->rx_drops_no_tpre_descr.value.ul =
+	    dev->hw_stats->params.rsp.rx.rx_drops_no_tpre_descr;
+	stats->rx_drops_too_many_frags.value.ul =
+	    dev->hw_stats->params.rsp.rx.rx_drops_too_many_frags;
+	stats->rx_drops_invalid_ring.value.ul =
+	    dev->hw_stats->params.rsp.rx.rx_drops_invalid_ring;
+	stats->rx_drops_mtu.value.ul =
+	    dev->hw_stats->params.rsp.rx.rx_drops_mtu;
+
+	stats->rx_dropped_too_small.value.ul =
+	    port_stats->rx_dropped_too_small;
+	stats->rx_dropped_too_short.value.ul =
+	    port_stats->rx_dropped_too_short;
+	stats->rx_dropped_header_too_small.value.ul =
+	    port_stats->rx_dropped_header_too_small;
+	stats->rx_dropped_tcp_length.value.ul =
+	    port_stats->rx_dropped_tcp_length;
+	stats->rx_dropped_runt.value.ul =
+	    port_stats->rx_dropped_runt;
+
+	stats->rx_drops_no_fragments.value.ul =
+	    dev->hw_stats->params.rsp.err_rx.rx_drops_no_fragments[0];
+
 	mutex_exit(&dev->dev_lock);
 	return (DDI_SUCCESS);
 } /* oce_update_stats */
@@ -254,6 +282,37 @@ oce_stat_init(struct oce_dev *dev)
 	    "tx pause frames", KSTAT_DATA_ULONG);
 	kstat_named_init(&stats->tx_control_frames,
 	    "tx control frames", KSTAT_DATA_ULONG);
+
+
+	kstat_named_init(&stats->rx_drops_no_pbuf,
+	    "rx_drops_no_pbuf", KSTAT_DATA_ULONG);
+	kstat_named_init(&stats->rx_drops_no_txpb,
+	    "rx_drops_no_txpb", KSTAT_DATA_ULONG);
+	kstat_named_init(&stats->rx_drops_no_erx_descr,
+	    "rx_drops_no_erx_descr", KSTAT_DATA_ULONG);
+	kstat_named_init(&stats->rx_drops_no_tpre_descr,
+	    "rx_drops_no_tpre_descr", KSTAT_DATA_ULONG);
+	kstat_named_init(&stats->rx_drops_too_many_frags,
+	    "rx_drops_too_many_frags", KSTAT_DATA_ULONG);
+	kstat_named_init(&stats->rx_drops_invalid_ring,
+	    "rx_drops_invalid_ring", KSTAT_DATA_ULONG);
+	kstat_named_init(&stats->rx_drops_mtu,
+	    "rx_drops_mtu", KSTAT_DATA_ULONG);
+
+	kstat_named_init(&stats->rx_dropped_too_small,
+	    "rx_dropped_too_small", KSTAT_DATA_ULONG);
+	kstat_named_init(&stats->rx_dropped_too_short,
+	    "rx_dropped_too_short", KSTAT_DATA_ULONG);
+	kstat_named_init(&stats->rx_dropped_header_too_small,
+	    "rx_dropped_header_too_small", KSTAT_DATA_ULONG);
+	kstat_named_init(&stats->rx_dropped_tcp_length,
+	    "rx_dropped_tcp_length", KSTAT_DATA_ULONG);
+	kstat_named_init(&stats->rx_dropped_runt,
+	    "rx_dropped_runt", KSTAT_DATA_ULONG);
+
+	kstat_named_init(&stats->rx_drops_no_fragments,
+	    "rx_drop_no_frag", KSTAT_DATA_ULONG);
+
 
 	dev->oce_kstats->ks_update = oce_update_stats;
 	dev->oce_kstats->ks_private = (void *)dev;

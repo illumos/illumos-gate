@@ -19,10 +19,7 @@
  * CDDL HEADER END
  */
 
-/*
- * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to license terms.
- */
+/* Copyright © 2003-2011 Emulex. All rights reserved.  */
 
 /*
  * header file containing the data structure definitions for the NIC
