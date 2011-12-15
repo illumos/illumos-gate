@@ -73,7 +73,7 @@ FILEMODE	= 0755
 
 SRCDIR = ../common/
 
-CPPFLAGS +=	-I$(SRCDIR)
+CPPFLAGS +=	-I$(SRCDIR) -DELF_TARGET_ALL=1
 
 LDLIBS = -lelf -lc
 

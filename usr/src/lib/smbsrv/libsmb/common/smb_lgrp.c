@@ -1104,16 +1104,21 @@ smb_lgrp_start(void)
 	(void) mutex_unlock(&smb_localgrp.lg_mutex);
 
 	for (i = 0; i < ngrp; i++) {
+		char	*tname;
+
 		if ((wka = smb_wka_lookup_name(builtin[i])) == NULL)
 			continue;
 
-		if (!smb_lgrp_exists(wka->wka_name)) {
-			rc = smb_lgrp_add(wka->wka_name, wka->wka_desc);
+		if ((tname = strdup(wka->wka_name)) == NULL)
+			return (SMB_LGRP_NO_MEMORY);
+		if (!smb_lgrp_exists(tname)) {
+			rc = smb_lgrp_add(tname, wka->wka_desc);
 			if (rc != SMB_LGRP_SUCCESS) {
 				syslog(LOG_DEBUG, "failed to add %s",
-				    wka->wka_name);
+				    tname);
 			}
 		}
+		free(tname);
 	}
 
 	return (SMB_LGRP_SUCCESS);

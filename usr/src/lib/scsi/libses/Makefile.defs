@@ -50,10 +50,10 @@ CLEANFILES += \
 	../common/ses_errno.c
 
 #
-# On SPARC, gcc emits DWARF assembler directives for TLS data that are not
+# On SPARC, gcc 3.4 emits DWARF assembler directives for TLS data that are not
 # understood by the Sun assembler.  Until this problem is fixed, we turn down
 # the amount of generated debugging information, which seems to do the trick.
 #
-$(SPARC_BLD)CTF_FLAGS += -_gcc=-g1
+$(__GNUC3)$(SPARC_BLD)CTF_FLAGS += -_gcc=-g1
 
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)

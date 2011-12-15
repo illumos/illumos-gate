@@ -783,10 +783,6 @@ $(sparc_ONLY)file \
 $(sparc_ONLY)file \
     path=usr/platform/sun4u/lib/fm/fmd/plugins/datapath-retire.so mode=0555
 $(sparc_ONLY)file \
-    path=usr/platform/sun4u/lib/fm/fmd/plugins/fps-transport.conf
-$(sparc_ONLY)file path=usr/platform/sun4u/lib/fm/fmd/plugins/fps-transport.so \
-    mode=0555
-$(sparc_ONLY)file \
     path=usr/platform/sun4u/lib/fm/topo/maps/sun4u-hc-topology.xml mode=0444
 $(sparc_ONLY)file path=usr/platform/sun4u/lib/fm/topo/plugins/chip.so \
     mode=0555

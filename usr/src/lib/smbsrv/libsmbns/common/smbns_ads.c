@@ -2217,7 +2217,7 @@ smb_ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd,
 	int dclevel, num, usrctl_flags = 0;
 	smb_ads_qstat_t qstat;
 	char dn[SMB_ADS_DN_MAX];
-	char *tmpfile;
+	char tmpfile[] = SMBNS_KRB5_KEYTAB_TMP;
 	int cnt;
 	smb_krb5_pn_set_t spns;
 
@@ -2332,9 +2332,10 @@ smb_ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd,
 		goto adjoin_cleanup;
 	}
 
-	tmpfile = mktemp(SMBNS_KRB5_KEYTAB_TMP);
-	if (tmpfile == NULL)
-		tmpfile = SMBNS_KRB5_KEYTAB_TMP;
+	if (mktemp(tmpfile) == NULL) {
+		rc = SMB_ADJOIN_ERR_WRITE_KEYTAB;
+		goto adjoin_cleanup;
+	}
 
 	encptr = smb_ads_get_enctypes(dclevel, &num);
 	if (smb_krb5_kt_populate(ctx, ah->domain, krb5princs, cnt,
