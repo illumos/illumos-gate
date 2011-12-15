@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #ifndef	_LIBISCSIT_H
 #define	_LIBISCSIT_H
@@ -43,6 +46,13 @@ extern "C" {
 
 #define	IS_IQN_NAME(s) (strncmp((s), "iqn.", 4) == 0)
 #define	IS_EUI_NAME(s) (strncmp((s), "eui.", 4) == 0)
+
+/*
+ * We change the default IQN here to org.illumos.
+ * Other distros using it need to change accordingly.
+ */
+
+#define	DEFAULT_IQN	"iqn.2010-08.org.illumos:"
 
 /*
  * Object Hierarchy

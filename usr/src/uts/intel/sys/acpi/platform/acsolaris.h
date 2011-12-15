@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -36,7 +37,8 @@ extern "C" {
 #include <sys/cpu.h>
 #include <sys/thread.h>
 
-#define	strtoul simple_strtoul
+/* Function name used for debug output. */
+#define	ACPI_GET_FUNCTION_NAME	__func__
 
 uint32_t __acpi_acquire_global_lock(void *);
 uint32_t __acpi_release_global_lock(void *);
@@ -51,7 +53,7 @@ void	 __acpi_wbinvd(void);
 #define	COMPILER_DEPENDENT_INT64	int64_t
 #define	COMPILER_DEPENDENT_UINT64	uint64_t
 
-#define	ACPI_THREAD_ID		kthread_t *
+#define	ACPI_CAST_PTHREAD_T(pthread)	((ACPI_THREAD_ID) (pthread))
 
 #define	ACPI_PRINTF_LIKE_FUNC
 #define	ACPI_UNUSED_VAR

@@ -357,8 +357,8 @@ i_cpr_pre_resume_cpus()
 		gdt.limit = cpup->wc_gdt_limit;
 
 #if defined(__amd64)
-		code_length = (uintptr_t)wc_long_mode_64 -
-		    (uintptr_t)wc_rm_start;
+		code_length = (uint32_t)((uintptr_t)wc_long_mode_64 -
+		    (uintptr_t)wc_rm_start);
 #else
 		code_length = 0;
 #endif
@@ -571,6 +571,7 @@ i_cpr_power_down(int sleeptype)
 
 	PMD(PMD_SX, ("real_mode_platter->rm_cr4=%lx, getcr4()=%lx\n",
 	    (ulong_t)real_mode_platter->rm_cr4, (ulong_t)getcr4()))
+
 	PMD(PMD_SX, ("real_mode_platter->rm_pdbr=%lx, getcr3()=%lx\n",
 	    (ulong_t)real_mode_platter->rm_pdbr, getcr3()))
 
@@ -584,7 +585,7 @@ i_cpr_power_down(int sleeptype)
 	 * mapped address, we need to calculate it here.
 	 */
 	real_mode_platter->rm_longmode64_addr = rm_platter_pa +
-	    ((uintptr_t)wc_long_mode_64 - (uintptr_t)wc_rm_start);
+	    (uint32_t)((uintptr_t)wc_long_mode_64 - (uintptr_t)wc_rm_start);
 
 	PMD(PMD_SX, ("real_mode_platter->rm_cr4=%lx, getcr4()=%lx\n",
 	    (ulong_t)real_mode_platter->rm_cr4, getcr4()))
@@ -633,8 +634,8 @@ i_cpr_power_down(int sleeptype)
 		gdt.limit = cpup->wc_gdt_limit;
 
 #if defined(__amd64)
-		code_length = (uintptr_t)wc_long_mode_64 -
-		    (uintptr_t)wc_rm_start;
+		code_length = (uint32_t)((uintptr_t)wc_long_mode_64 -
+		    (uintptr_t)wc_rm_start);
 #else
 		code_length = 0;
 #endif

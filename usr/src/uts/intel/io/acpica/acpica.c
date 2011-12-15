@@ -20,6 +20,8 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 /*
  * Copyright (c) 2009, Intel Corporation.
@@ -64,7 +66,22 @@ static	struct modlinkage modlinkage = {
  * Local prototypes
  */
 
+struct parsed_prw {
+	ACPI_HANDLE	prw_gpeobj;
+	int		prw_gpebit;
+	int		prw_level;
+};
+
 static void	acpica_init_kstats(void);
+static ACPI_STATUS	acpica_init_PRW(
+	ACPI_HANDLE	hdl,
+	UINT32		lvl,
+	void		*ctxp,
+	void		**rvpp);
+
+static ACPI_STATUS	acpica_parse_PRW(
+	ACPI_BUFFER	*prw_buf,
+	struct parsed_prw *prw);
 
 /*
  * Local data
@@ -165,7 +182,11 @@ _fini(void)
 }
 
 /*
- * Install acpica-provided address-space handlers
+ * Install acpica-provided (default) address-space handlers
+ * that may be needed before AcpiEnableSubsystem() runs.
+ * See the comment in AcpiInstallAddressSpaceHandler().
+ * Default handlers for remaining address spaces are
+ * installed later, in AcpiEnableSubsystem.
  */
 static int
 acpica_install_handlers()
@@ -199,6 +220,13 @@ acpica_install_handlers()
 		rv = AE_ERROR;
 	}
 
+	if (AcpiInstallAddressSpaceHandler(ACPI_ROOT_OBJECT,
+	    ACPI_ADR_SPACE_DATA_TABLE,
+	    ACPI_DEFAULT_HANDLER, NULL, NULL) != AE_OK) {
+		cmn_err(CE_WARN, "!acpica: no default handler for"
+		    " Data Table");
+		rv = AE_ERROR;
+	}
 
 	return (rv);
 }
@@ -420,10 +448,21 @@ acpica_init()
 	/* do after AcpiEnableSubsystem() so GPEs are initialized */
 	acpica_ec_init();	/* initialize EC if present */
 
+	/* This runs all device _STA and _INI methods. */
 	if (ACPI_FAILURE(status = AcpiInitializeObjects(0)))
 		goto error;
 
 	acpica_init_state = ACPICA_INITIALIZED;
+
+	/*
+	 * [ACPI, sec. 4.4.1.1]
+	 * As of ACPICA version 20101217 (December 2010), the _PRW methods
+	 * (Power Resources for Wake) are no longer automatically executed
+	 * as part of the ACPICA initialization.  The OS must do this.
+	 */
+	(void) AcpiWalkNamespace(ACPI_TYPE_DEVICE, ACPI_ROOT_OBJECT,
+	    UINT32_MAX, acpica_init_PRW, NULL, NULL, NULL);
+	(void) AcpiUpdateAllGpes();
 
 	/*
 	 * If we are running on the Xen hypervisor as dom0 we need to
@@ -538,6 +577,47 @@ acpica_get_sci(int *sci_irq, iflag_t *sci_flags)
 }
 
 /*
+ * Call-back function used for _PRW initialization.  For every
+ * device node that has a _PRW method, evaluate, parse, and do
+ * AcpiSetupGpeForWake().
+ */
+static ACPI_STATUS
+acpica_init_PRW(
+	ACPI_HANDLE	devhdl,
+	UINT32		depth,
+	void		*ctxp,
+	void		**rvpp)
+{
+	ACPI_STATUS	status;
+	ACPI_BUFFER	prw_buf;
+	struct parsed_prw prw;
+
+	prw_buf.Pointer = NULL;
+	prw_buf.Length = ACPI_ALLOCATE_BUFFER;
+
+	/*
+	 * Attempt to evaluate _PRW object.
+	 * If no valid object is found, return quietly, since not all
+	 * devices have _PRW objects.
+	 */
+	status = AcpiEvaluateObject(devhdl, "_PRW", NULL, &prw_buf);
+	if (ACPI_FAILURE(status))
+		goto done;
+	status = acpica_parse_PRW(&prw_buf, &prw);
+	if (ACPI_FAILURE(status))
+		goto done;
+
+	(void) AcpiSetupGpeForWake(devhdl,
+	    prw.prw_gpeobj, prw.prw_gpebit);
+
+done:
+	if (prw_buf.Pointer != NULL)
+		AcpiOsFree(prw_buf.Pointer);
+
+	return (AE_OK);
+}
+
+/*
  * Sets ACPI wake state for device referenced by dip.
  * If level is S0 (0), disables wake event; otherwise,
  * enables wake event which will wake system from level.
@@ -546,12 +626,12 @@ static int
 acpica_ddi_setwake(dev_info_t *dip, int level)
 {
 	ACPI_STATUS	status;
-	ACPI_HANDLE	devobj, gpeobj;
-	ACPI_OBJECT	*prw, *gpe;
+	ACPI_HANDLE	devobj;
 	ACPI_BUFFER	prw_buf;
 	ACPI_OBJECT_LIST	arglist;
 	ACPI_OBJECT		args[3];
-	int		gpebit, pwr_res_count, prw_level, rv;
+	struct parsed_prw prw;
+	int		rv;
 
 	/*
 	 * initialize these early so we can use a common
@@ -626,12 +706,49 @@ acpica_ddi_setwake(dev_info_t *dip, int level)
 	 * devices have _PRW objects.
 	 */
 	status = AcpiEvaluateObject(devobj, "_PRW", NULL, &prw_buf);
-	prw = prw_buf.Pointer;
-	if (ACPI_FAILURE(status) || prw_buf.Length == 0 || prw == NULL ||
-	    prw->Type != ACPI_TYPE_PACKAGE || prw->Package.Count < 2 ||
-	    prw->Package.Elements[1].Type != ACPI_TYPE_INTEGER) {
+	if (ACPI_FAILURE(status))
 		goto done;
+	status = acpica_parse_PRW(&prw_buf, &prw);
+	if (ACPI_FAILURE(status))
+		goto done;
+
+	rv = -1;
+	if (level == 0) {
+		status = AcpiDisableGpe(prw.prw_gpeobj, prw.prw_gpebit);
+		if (ACPI_FAILURE(status))
+			goto done;
+	} else if (prw.prw_level >= level) {
+		status = AcpiSetGpeWakeMask(prw.prw_gpeobj, prw.prw_gpebit,
+		    ACPI_GPE_ENABLE);
+		if (ACPI_SUCCESS(status)) {
+			status = AcpiEnableGpe(prw.prw_gpeobj, prw.prw_gpebit);
+			if (ACPI_FAILURE(status))
+				goto done;
+		}
 	}
+	rv = 0;
+done:
+	if (prw_buf.Pointer != NULL)
+		AcpiOsFree(prw_buf.Pointer);
+	return (rv);
+}
+
+static ACPI_STATUS
+acpica_parse_PRW(
+	ACPI_BUFFER	*prw_buf,
+	struct parsed_prw *p_prw)
+{
+	ACPI_HANDLE	gpeobj;
+	ACPI_OBJECT	*prw, *gpe;
+	int		gpebit, prw_level;
+
+	if (prw_buf->Length == 0 || prw_buf->Pointer == NULL)
+		return (AE_NULL_OBJECT);
+
+	prw = prw_buf->Pointer;
+	if (prw->Type != ACPI_TYPE_PACKAGE || prw->Package.Count < 2 ||
+	    prw->Package.Elements[1].Type != ACPI_TYPE_INTEGER)
+		return (AE_TYPE);
 
 	/* fetch the lowest wake level from the _PRW */
 	prw_level = prw->Package.Elements[1].Integer.Value;
@@ -648,31 +765,21 @@ acpica_ddi_setwake(dev_info_t *dip, int level)
 		gpe = &prw->Package.Elements[0];
 		if (gpe->Package.Count != 2 ||
 		    gpe->Package.Elements[1].Type != ACPI_TYPE_INTEGER)
-			goto done;
+			return (AE_TYPE);
 		gpeobj = gpe->Package.Elements[0].Reference.Handle;
 		gpebit = gpe->Package.Elements[1].Integer.Value;
 		if (gpeobj == NULL)
-			goto done;
+			return (AE_NULL_OBJECT);
+		break;
 	default:
-		goto done;
+		return (AE_TYPE);
 	}
 
-	rv = -1;
-	if (level == 0) {
-		if (ACPI_FAILURE(AcpiDisableGpe(gpeobj, gpebit, ACPI_NOT_ISR)))
-			goto done;
-	} else if (prw_level >= level) {
-		if (ACPI_SUCCESS(
-		    AcpiSetGpeType(gpeobj, gpebit, ACPI_GPE_TYPE_WAKE)))
-			if (ACPI_FAILURE(
-			    AcpiEnableGpe(gpeobj, gpebit, ACPI_NOT_ISR)))
-				goto done;
-	}
-	rv = 0;
-done:
-	if (prw_buf.Pointer != NULL)
-		AcpiOsFree(prw_buf.Pointer);
-	return (rv);
+	p_prw->prw_gpeobj = gpeobj;
+	p_prw->prw_gpebit = gpebit;
+	p_prw->prw_level  = prw_level;
+
+	return (AE_OK);
 }
 
 /*
