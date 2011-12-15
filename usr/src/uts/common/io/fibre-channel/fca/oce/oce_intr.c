@@ -19,10 +19,7 @@
  * CDDL HEADER END
  */
 
-/*
- * Copyright 2010 Emulex.  All rights reserved.
- * Use is subject to license terms.
- */
+/* Copyright © 2003-2011 Emulex. All rights reserved.  */
 
 /*
  * Source file interrupt registration
@@ -30,6 +27,7 @@
  */
 
 #include <oce_impl.h>
+
 
 static uint_t oce_isr(caddr_t arg1, caddr_t arg2);
 
@@ -223,14 +221,8 @@ oce_chip_ei(struct oce_dev *dev)
 	uint32_t reg;
 
 	reg =  OCE_CFG_READ32(dev, PCICFG_INTR_CTRL);
-	if (oce_fm_check_acc_handle(dev, dev->dev_cfg_handle) != DDI_FM_OK) {
-		ddi_fm_service_impact(dev->dip, DDI_SERVICE_DEGRADED);
-	}
 	reg |= HOSTINTR_MASK;
 	OCE_CFG_WRITE32(dev, PCICFG_INTR_CTRL, reg);
-	if (oce_fm_check_acc_handle(dev, dev->dev_cfg_handle) != DDI_FM_OK) {
-		ddi_fm_service_impact(dev->dip, DDI_SERVICE_DEGRADED);
-	}
 }
 
 /*
@@ -268,14 +260,8 @@ oce_chip_di(struct oce_dev *dev)
 	uint32_t reg;
 
 	reg =  OCE_CFG_READ32(dev, PCICFG_INTR_CTRL);
-	if (oce_fm_check_acc_handle(dev, dev->dev_cfg_handle) != DDI_FM_OK) {
-		ddi_fm_service_impact(dev->dip, DDI_SERVICE_DEGRADED);
-	}
 	reg &= ~HOSTINTR_MASK;
 	OCE_CFG_WRITE32(dev, PCICFG_INTR_CTRL, reg);
-	if (oce_fm_check_acc_handle(dev, dev->dev_cfg_handle) != DDI_FM_OK) {
-		ddi_fm_service_impact(dev->dip, DDI_SERVICE_DEGRADED);
-	}
 }
 
 /*
@@ -303,6 +289,7 @@ oce_di(struct oce_dev *dev)
 			}
 		}
 	}
+
 } /* oce_di */
 
 /*

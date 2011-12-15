@@ -19,10 +19,7 @@
  * CDDL HEADER END
  */
 
-/*
- * Copyright 2010 Emulex.  All rights reserved.
- * Use is subject to license terms.
- */
+/* Copyright © 2003-2011 Emulex. All rights reserved.  */
 
 /*
  * Header file defining the driver buffer management interface
@@ -143,7 +140,7 @@ typedef struct _oce_rq_buf_hdr_s {
 } oce_rq_buf_hdr_t;
 #pragma pack()
 
-#define	OCE_RQE_BUF_HEADROOM	sizeof (oce_rq_buf_hdr_t)
+#define	OCE_RQE_BUF_HEADROOM	18
 #define	MAX_POOL_NAME		32
 
 #define	RING_NUM_PENDING(ring)	ring->num_used

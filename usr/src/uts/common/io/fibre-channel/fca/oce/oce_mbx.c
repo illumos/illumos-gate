@@ -19,10 +19,8 @@
  * CDDL HEADER END
  */
 
-/*
- * Copyright 2010 Emulex.  All rights reserved.
- * Use is subject to license terms.
- */
+/* Copyright © 2003-2011 Emulex. All rights reserved.  */
+
 
 /*
  * Source file containing the implementation of MBOX
@@ -137,6 +135,9 @@ oce_mbox_wait(struct oce_dev *dev, uint32_t tmo_sec)
 
 	tmo = (tmo_sec > 0) ? drv_usectohz(tmo_sec * 1000000) :
 	    drv_usectohz(DEFAULT_MQ_MBOX_TIMEOUT);
+
+	/* Add the default timeout to wait for a mailbox to complete */
+	tmo += drv_usectohz(MBX_READY_TIMEOUT);
 
 	tstamp = ddi_get_lbolt();
 	for (;;) {
@@ -289,18 +290,18 @@ oce_mbox_post(struct oce_dev *dev, struct oce_mbx *mbx,
 	mb_cqe = &mb->cqe;
 	DW_SWAP(u32ptr(&mb_cqe->u0.dw[0]), sizeof (struct oce_mq_cqe));
 
+	/* copy mbox mbx back */
+	bcopy(mb_mbx, mbx, sizeof (struct oce_mbx));
+
 	/* check mbox status */
 	if (mb_cqe->u0.s.completion_status != 0) {
 		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "MBOX   Failed with Status: %d %d",
+		    "MBOX Command Failed with Status: %d %d",
 		    mb_cqe->u0.s.completion_status,
 		    mb_cqe->u0.s.extended_status);
 		mutex_exit(&dev->bmbx_lock);
 		return (EIO);
 	}
-
-	/* copy mbox mbx back */
-	bcopy(mb_mbx, mbx, sizeof (struct oce_mbx));
 
 	/*
 	 * store the mbx context in the cqe tag section so that
@@ -800,6 +801,8 @@ oce_get_hw_stats(struct oce_dev *dev)
 
 	DW_SWAP(u32ptr(&mbx), sizeof (struct oce_mq_sge) + OCE_BMBX_RHDR_SZ);
 
+	bzero(&dev->hw_stats->params, sizeof (dev->hw_stats->params));
+
 	/* sync for device */
 	(void) DBUF_SYNC(dev->stats_dbuf, DDI_DMA_SYNC_FORDEV);
 
@@ -1257,7 +1260,7 @@ oce_issue_mbox(struct oce_dev *dev, queue_t *wq, mblk_t *mp,
 
 	is_embedded = (payload_length <= sizeof (struct oce_mbx_payload));
 
-	alloc_len = MBLKL(mp->b_cont);
+	alloc_len = msgdsize(mp->b_cont);
 
 	oce_log(dev, CE_NOTE, MOD_CONFIG, "Mailbox: "
 	    "DW[0] 0x%x DW[1] 0x%x DW[2]0x%x DW[3]0x%x,"
@@ -1265,6 +1268,9 @@ oce_issue_mbox(struct oce_dev *dev, queue_t *wq, mblk_t *mp,
 	    hdr.u0.dw[0], hdr.u0.dw[1],
 	    hdr.u0.dw[2], hdr.u0.dw[3],
 	    MBLKL(mp->b_cont), alloc_len);
+
+	/* get the timeout from the command header */
+	mbx.tag[0] = hdr.u0.req.timeout;
 
 	if (hdr.u0.req.opcode == OPCODE_WRITE_COMMON_FLASHROM) {
 		struct mbx_common_read_write_flashrom *fwcmd =
@@ -1278,9 +1284,6 @@ oce_issue_mbox(struct oce_dev *dev, queue_t *wq, mblk_t *mp,
 			dev->cookie = hdr.u0.req.rsvd0;
 		hdr.u0.req.rsvd0 = 0;
 
-		/* get the timeout from the command header */
-		mbx.tag[0] = hdr.u0.req.timeout;
-
 		oce_log(dev, CE_NOTE, MOD_CONFIG, "Mailbox params:"
 		    "OPCODE(%d) OPTYPE = %d  SIZE = %d  OFFSET = %d",
 		    fwcmd->flash_op_code, fwcmd->flash_op_type,
@@ -1288,9 +1291,10 @@ oce_issue_mbox(struct oce_dev *dev, queue_t *wq, mblk_t *mp,
 	}
 
 	if (!is_embedded) {
-		mblk_t *mp_w = mp->b_cont;
+		mblk_t *tmp = NULL;
 		ddi_dma_cookie_t cookie;
 		uint32_t count = 0;
+		int offset = 0;
 
 		/* allocate dma handle */
 		ret = ddi_dma_alloc_handle(dev->dip,
@@ -1316,13 +1320,16 @@ oce_issue_mbox(struct oce_dev *dev, queue_t *wq, mblk_t *mp,
 			goto dma_alloc_fail;
 		}
 
-		bcopy((caddr_t)mp_w->b_rptr, sg_va, MBLKL(mp->b_cont));
+		for (tmp = mp->b_cont; tmp != NULL; tmp = tmp->b_cont) {
+			bcopy((caddr_t)tmp->b_rptr, sg_va + offset, MBLKL(tmp));
+			offset += MBLKL(tmp);
+		}
 
 		/* bind mblk mem to handle */
 		ret = ddi_dma_addr_bind_handle(
 		    dma_handle,
 		    (struct as *)0, sg_va,
-		    MBLKL(mp_w),
+		    alloc_len,
 		    DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
 		    DDI_DMA_DONTWAIT, NULL, &cookie, &count);
 		if (ret != DDI_DMA_MAPPED) {
@@ -1408,6 +1415,8 @@ oce_issue_mbox(struct oce_dev *dev, queue_t *wq, mblk_t *mp,
 		bcopy(&mbx.payload, mp->b_cont->b_rptr,
 		    min(payload_length, MBLKL(mp->b_cont)));
 	} else {
+		mblk_t *tmp = NULL;
+		int offset = 0;
 		/* sync */
 		(void) ddi_dma_sync(dma_handle, 0, 0,
 		    DDI_DMA_SYNC_FORKERNEL);
@@ -1416,7 +1425,10 @@ oce_issue_mbox(struct oce_dev *dev, queue_t *wq, mblk_t *mp,
 		}
 
 		/* copy back from kernel allocated buffer to user buffer  */
-		bcopy(sg_va, mp->b_cont->b_rptr, MBLKL(mp->b_cont));
+		for (tmp = mp->b_cont; tmp != NULL; tmp = tmp->b_cont) {
+			bcopy(sg_va + offset, tmp->b_rptr, MBLKL(tmp));
+			offset += MBLKL(tmp);
+		}
 
 		/* unbind and free dma handles */
 		(void) ddi_dma_unbind_handle(dma_handle);

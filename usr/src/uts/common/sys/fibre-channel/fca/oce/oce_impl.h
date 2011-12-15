@@ -19,10 +19,7 @@
  * CDDL HEADER END
  */
 
-/*
- * Copyright 2010 Emulex.  All rights reserved.
- * Use is subject to license terms.
- */
+/* Copyright © 2003-2011 Emulex. All rights reserved.  */
 
 /*
  * Driver specific data structures and function prototypes
@@ -43,7 +40,7 @@ extern "C" {
 #include <sys/byteorder.h>
 #include <sys/mac_provider.h>
 #include <sys/mac_ether.h>
-#include <sys/vlan.h>
+#include <sys/gld.h>
 #include <sys/bitmap.h>
 #include <sys/ddidmareq.h>
 #include <sys/kmem.h>
@@ -82,6 +79,9 @@ extern "C" {
 
 #define	END		0xdeadface
 
+#define	MAX_DEVS		32
+#define	MAX_RSS_PER_ADAPTER	2
+
 #define	OCE_MAX_ETH_FRAME_SIZE	1500
 #define	OCE_MAX_JUMBO_FRAME_SIZE 9018
 #define	OCE_MIN_ETH_FRAME_SIZE	64
@@ -96,6 +96,7 @@ extern "C" {
 #define	OCE_MAX_CQ	1024
 #define	OCE_MAX_WQ	8
 #define	OCE_MAX_RQ	5
+#define	OCE_MIN_RQ	1
 
 #define	OCE_WQ_NUM_BUFFERS		2048
 #define	OCE_WQ_BUF_SIZE			2048
@@ -107,8 +108,11 @@ extern "C" {
 #define	OCE_DEFAULT_TX_RING_SIZE	2048
 #define	OCE_DEFAULT_RX_RING_SIZE	1024
 #define	OCE_DEFAULT_WQS			1
-#define	OCE_DEFAULT_RQS			1
-#define	OCE_MAX_RQS			5
+#if defined(__sparc)
+#define	OCE_DEFAULT_RQS			OCE_MAX_RQ
+#else
+#define	OCE_DEFAULT_RQS			OCE_MIN_RQ
+#endif
 
 #define	OCE_DEFAULT_RX_PKT_PER_INTR (OCE_DEFAULT_RX_RING_SIZE / 2)
 #define	OCE_DEFAULT_TX_RECLAIM_THRESHOLD 1024
@@ -133,10 +137,9 @@ extern "C" {
 				MBX_RX_IFACE_FLAGS_UNTAGGED	| \
 				MBX_RX_IFACE_FLAGS_PASS_L3L4)
 
-#define	OCE_FM_CAPABILITY		(DDI_FM_EREPORT_CAPABLE	|	\
-					DDI_FM_ACCCHK_CAPABLE	|	\
-					DDI_FM_DMACHK_CAPABLE)
-
+#define	OCE_FM_CAPABILITY	(DDI_FM_EREPORT_CAPABLE		| \
+				DDI_FM_ACCCHK_CAPABLE		| \
+				DDI_FM_DMACHK_CAPABLE)
 
 #define	OCE_DEFAULT_RSS_TYPE	(RSS_ENABLE_IPV4|RSS_ENABLE_TCP_IPV4)
 
@@ -273,6 +276,7 @@ struct oce_dev {
 	uint32_t rx_rings;
 	uint32_t pmac_id;		/* used to add or remove mac */
 	uint8_t unicast_addr[ETHERADDRL];
+	uint32_t num_smac;
 	uint32_t mtu;
 	int32_t fm_caps;
 	boolean_t rss_enable;		/* RSS support */
@@ -291,11 +295,22 @@ struct oce_dev {
 	uint32_t port_id;
 	uint32_t function_mode;
 	uint32_t function_caps;
+	uint32_t chip_rev;		/* Chip revision */
 	uint32_t max_tx_rings;		/* Max Rx rings available */
 	uint32_t max_rx_rings;		/* Max rx rings available */
 	int32_t if_id;			/* IF ID */
 	uint8_t fn;			/* function number */
 	uint8_t fw_version[32];		/* fw version string */
+
+	/* PCI related */
+	uint16_t vendor_id;
+	uint16_t device_id;
+	uint16_t subsys_id;
+	uint16_t subvendor_id;
+	uint8_t pci_bus;
+	uint8_t pci_device;
+	uint8_t pci_function;
+	uint8_t dev_list_index;
 
 	/* Logging related */
 	uint16_t mod_mask;		/* Log Mask */
@@ -323,6 +338,8 @@ int oce_m_stat(void *arg, uint_t stat, uint64_t *val);
 /* Hardware start/stop functions */
 int oce_start(struct oce_dev *dev);
 void oce_stop(struct oce_dev *dev);
+int oce_identify_hw(struct oce_dev *dev);
+int oce_get_bdf(struct oce_dev *dev);
 
 /* FMA support Functions */
 void oce_fm_init(struct oce_dev *dev);

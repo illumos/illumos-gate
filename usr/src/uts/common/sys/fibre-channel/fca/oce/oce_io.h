@@ -19,10 +19,7 @@
  * CDDL HEADER END
  */
 
-/*
- * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to license terms.
- */
+/* Copyright © 2003-2011 Emulex. All rights reserved.  */
 
 /*
  * Header file defining the HW IO elements
@@ -45,7 +42,8 @@ extern "C" {
 #include <oce_buf.h>
 
 #define	DEFAULT_MQ_MBOX_TIMEOUT	(5 * 1000 * 1000) /* 5 sec (in usec) */
-#define	DEFAULT_DRAIN_TIME 200	/* Default Drain Time */
+#define	MBX_READY_TIMEOUT	(1 * 1000 * 1000) /* 1 sec (in usec) */
+#define	DEFAULT_DRAIN_TIME 	200	/* Default Drain Time */
 #define	MBX_TIMEOUT_SEC		5
 #define	STAT_TIMEOUT		2000000 /* update stats every 2 sec */
 
@@ -217,19 +215,18 @@ struct oce_wq {
 	kmutex_t txc_lock; /* tx compl lock */
 	void *parent; /* parent of this wq */
 	oce_ring_buffer_t *ring; /* ring buffer managing the wqes */
-	struct oce_cq	*cq; 	/* cq associated with this wq */
-	kmem_cache_t	*wqed_cache; /* packet desc cache */
+	struct oce_cq *cq; 	/* cq associated with this wq */
+	kmem_cache_t *wqed_cache; /* packet desc cache */
 	oce_wq_bdesc_t *wq_bdesc_array; /* buffer desc array */
 	OCE_LIST_T wq_buf_list; /* buffer list */
 	OCE_LIST_T wqe_desc_list; /* packet descriptor list */
-	OCE_LIST_T 	wq_mdesc_list; /* free list of memory handles */
-	oce_wq_mdesc_t  *wq_mdesc_array; /* preallocated memory handles */
-	uint32_t	wqm_used; /* memory handles uses */
-	boolean_t	resched; /* used for mac_tx_update */
-	uint32_t	wq_free; /* Wqe free */
-	uint32_t	tx_deferd; /* Wqe free */
-	uint32_t	pkt_drops; /* drops */
-
+	OCE_LIST_T wq_mdesc_list; /* free list of memory handles */
+	oce_wq_mdesc_t *wq_mdesc_array; /* preallocated memory handles */
+	uint32_t wqm_used; /* memory handles uses */
+	boolean_t resched; /* used for mac_tx_update */
+	uint32_t wq_free; /* Wqe free */
+	uint32_t tx_deferd; /* Wqe free */
+	uint32_t pkt_drops; /* drops */
 	/* Queue state */
 	qstate_t qstate;
 	uint16_t wq_id; /* wq ID */
@@ -310,7 +307,7 @@ void oce_arm_eq(struct oce_dev *dev, int16_t qid, int npopped,
 void oce_arm_cq(struct oce_dev *dev, int16_t qid, int npopped,
     boolean_t rearm);
 void oce_drain_eq(struct oce_eq *eq);
-
+void oce_dev_rss_ready(struct oce_dev *dev);
 
 /* Bootstrap */
 int oce_mbox_init(struct oce_dev *dev);
@@ -394,7 +391,6 @@ int oce_config_rss(struct oce_dev *dev, uint16_t if_id, char *hkey, char *itbl,
     int  tbl_sz, uint16_t rss_type, uint8_t flush);
 int oce_issue_mbox(struct oce_dev *dev, queue_t *wq, mblk_t *mp,
     uint32_t *payload_length);
-
 #ifdef __cplusplus
 }
 #endif

@@ -19,10 +19,7 @@
  * CDDL HEADER END
  */
 
-/*
- * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to license terms.
- */
+/* Copyright © 2003-2011 Emulex. All rights reserved.  */
 
 /*
  * Driver private ioctls
@@ -41,7 +38,21 @@ extern "C" {
 
 #define	OCE_IOC			((((('O' << 8) + 'C') << 8) + 'E') << 8)
 
-#define	OCE_ISSUE_MBOX		(OCE_IOC|1)
+#define	OCE_ISSUE_MBOX		(OCE_IOC | 1)
+#define	OCE_QUERY_DRIVER_DATA	(OCE_IOC | 0x10)
+
+#define	OCN_VERSION_SUPPORTED	0x00
+
+#define	MAX_SMAC	32
+struct oce_driver_query {
+	uint8_t version;
+	uint8_t smac_addr[MAX_SMAC][ETHERADDRL];
+	uint8_t pmac_addr[ETHERADDRL];
+	uint8_t driver_name[32];
+	uint8_t driver_version[32];
+	uint32_t num_smac;
+};
+
 
 #ifdef __cplusplus
 }
