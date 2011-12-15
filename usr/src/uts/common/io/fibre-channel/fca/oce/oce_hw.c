@@ -19,10 +19,7 @@
  * CDDL HEADER END
  */
 
-/*
- * Copyright 2010 Emulex.  All rights reserved.
- * Use is subject to license terms.
- */
+/* Copyright © 2003-2011 Emulex. All rights reserved.  */
 
 /*
  * Source file containing the implementation of the Hardware specific
@@ -150,15 +147,9 @@ oce_pci_init(struct oce_dev *dev)
 {
 	int ret = 0;
 
-	ret = pci_config_setup(dev->dip, &dev->pci_cfg_handle);
-	if (ret != DDI_SUCCESS) {
-		return (DDI_FAILURE);
-	}
-
 	ret = oce_map_regs(dev);
 
 	if (ret != DDI_SUCCESS) {
-		pci_config_teardown(&dev->pci_cfg_handle);
 		return (DDI_FAILURE);
 	}
 	dev->fn =  OCE_PCI_FUNC(dev);
@@ -184,8 +175,74 @@ void
 oce_pci_fini(struct oce_dev *dev)
 {
 	oce_unmap_regs(dev);
-	pci_config_teardown(&dev->pci_cfg_handle);
 } /* oce_pci_fini */
+
+/*
+ * function to read the PCI Bus, Device, and function numbers for the
+ * device instance.
+ *
+ * dev - handle to device private data
+ */
+int
+oce_get_bdf(struct oce_dev *dev)
+{
+	pci_regspec_t *pci_rp;
+	uint32_t length;
+	int rc;
+
+	/* Get "reg" property */
+	rc = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dev->dip,
+	    0, "reg", (int **)&pci_rp, (uint_t *)&length);
+
+	if ((rc != DDI_SUCCESS) ||
+	    (length < (sizeof (pci_regspec_t) / sizeof (int)))) {
+		oce_log(dev, CE_WARN, MOD_CONFIG,
+		    "Failed to read \"reg\" property, Status = 0x%x", rc);
+		return (rc);
+	}
+
+	dev->pci_bus = PCI_REG_BUS_G(pci_rp->pci_phys_hi);
+	dev->pci_device = PCI_REG_DEV_G(pci_rp->pci_phys_hi);
+	dev->pci_function = PCI_REG_FUNC_G(pci_rp->pci_phys_hi);
+
+	oce_log(dev, CE_NOTE, MOD_CONFIG,
+	    "\"reg\" property num=%d, Bus=%d, Device=%d, Function=%d",
+	    length, dev->pci_bus, dev->pci_device, dev->pci_function);
+
+	/* Free the memory allocated by ddi_prop_lookup_int_array() */
+	ddi_prop_free(pci_rp);
+	return (rc);
+}
+
+int
+oce_identify_hw(struct oce_dev *dev)
+{
+	int ret = DDI_SUCCESS;
+
+	dev->vendor_id = pci_config_get16(dev->pci_cfg_handle,
+	    PCI_CONF_VENID);
+	dev->device_id = pci_config_get16(dev->pci_cfg_handle,
+	    PCI_CONF_DEVID);
+	dev->subsys_id = pci_config_get16(dev->pci_cfg_handle,
+	    PCI_CONF_SUBSYSID);
+	dev->subvendor_id = pci_config_get16(dev->pci_cfg_handle,
+	    PCI_CONF_SUBVENID);
+
+	switch (dev->device_id) {
+
+	case DEVID_TIGERSHARK:
+		dev->chip_rev = OC_CNA_GEN2;
+		break;
+	case DEVID_TOMCAT:
+		dev->chip_rev = OC_CNA_GEN3;
+		break;
+	default:
+		dev->chip_rev = 0;
+		ret = DDI_FAILURE;
+		break;
+	}
+	return (ret);
+}
 
 
 /*

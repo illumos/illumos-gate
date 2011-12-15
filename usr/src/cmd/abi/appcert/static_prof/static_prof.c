@@ -28,6 +28,9 @@
 /*	Copyright (c) 1988 AT&T */
 /*	  All Rights Reserved	*/
 
+/* Copyright 2011 Nexenta Systems, Inc. All rights reserved. */
+
+
 /* ------------------------------------------------------------------------ */
 /* include headers */
 /* ------------------------------------------------------------------------ */
@@ -97,41 +100,26 @@ store_binding(binding_bucket * bind)
 {
 	unsigned long   bktno;
 	unsigned long   orig_bktno;
-	int		table_full = FALSE;
-	int		i;
 
 	bktno = my_elf_hash(bind->sym) % DEFBKTS;
 	orig_bktno = bktno;
 
-	if (!bkts[bktno].sym) {
-		bkts[bktno].sym = bind->sym;
-		bkts[bktno].obj = bind->obj;
-		bkts[bktno].ref_lib = bind->ref_lib;
-		bkts[bktno].def_lib = bind->def_lib;
-		bkts[bktno].section = bind->section;
-		bkts[bktno].stbind = bind->stbind;
-		bkts[bktno].sttype = bind->sttype;
-	} else {
+	while (bkts[bktno].sym != NULL) {
 		bktno = (bktno + 1) % DEFBKTS;
-		for (i = bktno; i < DEFBKTS; i = (i + 1) % DEFBKTS) {
-			if (i == orig_bktno) {
-				table_full = TRUE;
-				exit(1);
-			}
-			if (!bkts[i].sym)
-				break;
-		}
-		if ((i < DEFBKTS) && (!bkts[i].sym) && (table_full != TRUE)) {
-			bkts[i].sym = bind->sym;
-			bkts[i].obj = bind->obj;
-			bkts[i].ref_lib = bind->ref_lib;
-			bkts[i].def_lib = bind->def_lib;
-			bkts[i].section = bind->section;
-			bkts[i].stbind = bind->stbind;
-			bkts[i].sttype = bind->sttype;
-		}
+
+		if (bktno == orig_bktno)
+			exit(1);
 	}
+
+	bkts[bktno].sym = bind->sym;
+	bkts[bktno].obj = bind->obj;
+	bkts[bktno].ref_lib = bind->ref_lib;
+	bkts[bktno].def_lib = bind->def_lib;
+	bkts[bktno].section = bind->section;
+	bkts[bktno].stbind = bind->stbind;
+	bkts[bktno].sttype = bind->sttype;
 }
+
 
 /* ========== check_store_binding ========================================= */
 /*

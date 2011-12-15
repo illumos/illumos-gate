@@ -19,10 +19,7 @@
  * CDDL HEADER END
  */
 
-/*
- * Copyright 2010 Emulex.  All rights reserved.
- * Use is subject to license terms.
- */
+/* Copyright © 2003-2011 Emulex. All rights reserved.  */
 
 /*
  * Source file containing the Receive Path handling
@@ -463,9 +460,9 @@ oce_rx_insert_tag(mblk_t *mp, uint16_t vtag)
 {
 	struct ether_vlan_header *ehp;
 
-	(void) memmove(mp->b_rptr - VLAN_TAGSZ,
+	(void) memmove(mp->b_rptr - VTAG_SIZE,
 	    mp->b_rptr, 2 * ETHERADDRL);
-	mp->b_rptr -= VLAN_TAGSZ;
+	mp->b_rptr -= VTAG_SIZE;
 	ehp = (struct ether_vlan_header *)voidptr(mp->b_rptr);
 	ehp->ether_tpid = htons(ETHERTYPE_VLAN);
 	ehp->ether_tci = LE_16(vtag);

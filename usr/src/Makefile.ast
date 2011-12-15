@@ -80,6 +80,3 @@ ASTCFLAGS64 = \
 	$(CCVERBOSE) \
 	-_cc=-xcsi \
 	-xstrconst
-	
-# We need this for C99/VLA support
-DEBUGFORMAT=-xdebugformat=dwarf

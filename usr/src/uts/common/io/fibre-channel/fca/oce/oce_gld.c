@@ -19,10 +19,7 @@
  * CDDL HEADER END
  */
 
-/*
- * Copyright 2010 Emulex.  All rights reserved.
- * Use is subject to license terms.
- */
+/* Copyright © 2003-2011 Emulex. All rights reserved.  */
 
 /*
  * Source file containing the implementation of the driver entry points
@@ -68,25 +65,6 @@ oce_m_start(void *arg)
 		mutex_exit(&dev->dev_lock);
 		return (EIO);
 	}
-
-	if (oce_fm_check_acc_handle(dev, dev->db_handle) != DDI_FM_OK) {
-		ddi_fm_service_impact(dev->dip, DDI_SERVICE_DEGRADED);
-		mutex_exit(&dev->dev_lock);
-		return (EIO);
-	}
-
-	if (oce_fm_check_acc_handle(dev, dev->csr_handle) != DDI_FM_OK) {
-		ddi_fm_service_impact(dev->dip, DDI_SERVICE_DEGRADED);
-		mutex_exit(&dev->dev_lock);
-		return (EIO);
-	}
-
-	if (oce_fm_check_acc_handle(dev, dev->cfg_handle) != DDI_FM_OK) {
-		ddi_fm_service_impact(dev->dip, DDI_SERVICE_DEGRADED);
-		mutex_exit(&dev->dev_lock);
-		return (EIO);
-	}
-
 	ret = oce_start(dev);
 	if (ret != DDI_SUCCESS) {
 		mutex_exit(&dev->dev_lock);
@@ -180,7 +158,6 @@ oce_stop(struct oce_dev *dev)
 int
 oce_m_multicast(void *arg, boolean_t add, const uint8_t *mca)
 {
-
 	struct oce_dev *dev = (struct oce_dev *)arg;
 	struct ether_addr  *mca_drv_list;
 	struct ether_addr  mca_hw_list[OCE_MAX_MCA];
@@ -233,7 +210,9 @@ oce_m_multicast(void *arg, boolean_t add, const uint8_t *mca)
 		ret = oce_set_multicast_table(dev, dev->if_id,
 		    &mca_hw_list[0], new_mcnt, B_FALSE);
 	}
-	if (ret != 0) {
+		if (ret != 0) {
+		oce_log(dev, CE_WARN, MOD_CONFIG,
+		    "mcast %s fails", add ? "ADD" : "DEL");
 		DEV_UNLOCK(dev);
 		return (EIO);
 	}
@@ -248,6 +227,11 @@ finish:
 		dev->num_mca = (uint16_t)new_mcnt;
 	}
 	DEV_UNLOCK(dev);
+	oce_log(dev, CE_NOTE, MOD_CONFIG,
+	    "mcast %s, addr=%02x:%02x:%02x:%02x:%02x:%02x, num_mca=%d",
+	    add ? "ADD" : "DEL",
+	    mca[0], mca[1], mca[2], mca[3], mca[4], mca[5],
+	    dev->num_mca);
 	return (0);
 } /* oce_m_multicast */
 
@@ -260,6 +244,7 @@ oce_m_unicast(void *arg, const uint8_t *uca)
 	DEV_LOCK(dev);
 	if (dev->suspended) {
 		bcopy(uca, dev->unicast_addr, ETHERADDRL);
+		dev->num_smac = 0;
 		DEV_UNLOCK(dev);
 		return (DDI_SUCCESS);
 	}
@@ -270,6 +255,7 @@ oce_m_unicast(void *arg, const uint8_t *uca)
 		DEV_UNLOCK(dev);
 		return (EIO);
 	}
+	dev->num_smac = 0;
 	bzero(dev->unicast_addr, ETHERADDRL);
 
 	/* Set the New MAC addr earlier is no longer valid */
@@ -279,6 +265,7 @@ oce_m_unicast(void *arg, const uint8_t *uca)
 		return (EIO);
 	}
 	bcopy(uca, dev->unicast_addr, ETHERADDRL);
+	dev->num_smac = 1;
 	DEV_UNLOCK(dev);
 	return (ret);
 } /* oce_m_unicast */
@@ -603,11 +590,46 @@ oce_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 
 	case OCE_ISSUE_MBOX: {
 		ret = oce_issue_mbox(dev, wq, mp, &payload_length);
-		if (ret != 0) {
-			miocnak(wq, mp, payload_length, ret);
-		} else {
-			miocack(wq, mp, payload_length, 0);
+		miocack(wq, mp, payload_length, ret);
+		break;
+	}
+	case OCE_QUERY_DRIVER_DATA: {
+		struct oce_driver_query *drv_query =
+		    (struct oce_driver_query *)(void *)mp->b_cont->b_rptr;
+
+		/* if the driver version does not match bail */
+		if (drv_query->version != OCN_VERSION_SUPPORTED) {
+			oce_log(dev, CE_NOTE, MOD_CONFIG, "%s",
+			    "One Connect version mismatch");
+			miocnak(wq, mp, 0, ENOTSUP);
+			break;
 		}
+
+		/* fill the return values */
+		bcopy(OCE_MOD_NAME, drv_query->driver_name,
+		    (sizeof (OCE_MOD_NAME) > 32) ?
+		    31 : sizeof (OCE_MOD_NAME));
+		drv_query->driver_name[31] = '\0';
+
+		bcopy(OCE_VERSION, drv_query->driver_version,
+		    (sizeof (OCE_VERSION) > 32) ? 31 :
+		    sizeof (OCE_VERSION));
+		drv_query->driver_version[31] = '\0';
+
+		if (dev->num_smac == 0) {
+			drv_query->num_smac = 1;
+			bcopy(dev->mac_addr, drv_query->smac_addr[0],
+			    ETHERADDRL);
+		} else {
+			drv_query->num_smac = dev->num_smac;
+			bcopy(dev->unicast_addr, drv_query->smac_addr[0],
+			    ETHERADDRL);
+		}
+
+		bcopy(dev->mac_addr, drv_query->pmac_addr, ETHERADDRL);
+
+		payload_length = sizeof (struct oce_driver_query);
+		miocack(wq, mp, payload_length, 0);
 		break;
 	}
 

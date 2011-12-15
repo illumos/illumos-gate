@@ -713,7 +713,7 @@ AcpiOsGetThreadId(void)
 	 * ACPI CA assumes that thread ID is castable to a pointer,
 	 * so we use the current thread pointer.
 	 */
-	return (ACPI_CAST_PTHREAD_T ((uintptr_t)curthread));
+	return (ACPI_CAST_PTHREAD_T((uintptr_t)curthread));
 }
 
 /*

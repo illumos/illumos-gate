@@ -19,10 +19,7 @@
  * CDDL HEADER END
  */
 
-/*
- * Copyright 2010 Emulex.  All rights reserved.
- * Use is subject to license terms.
- */
+/* Copyright © 2003-2011 Emulex. All rights reserved.  */
 
 /*
  * Source file containing the implementation of the Transmit
@@ -643,9 +640,9 @@ static inline void
 oce_insert_vtag(mblk_t *mp, uint16_t vlan_tag)
 {
 	struct ether_vlan_header  *evh;
-	(void) memmove(mp->b_rptr - VLAN_TAGSZ,
+	(void) memmove(mp->b_rptr - VTAG_SIZE,
 	    mp->b_rptr, 2 * ETHERADDRL);
-	mp->b_rptr -= VLAN_TAGSZ;
+	mp->b_rptr -= VTAG_SIZE;
 	evh = (struct ether_vlan_header *)(void *)mp->b_rptr;
 	evh->ether_tpid = htons(VLAN_TPID);
 	evh->ether_tci = htons(vlan_tag);
@@ -662,9 +659,9 @@ oce_insert_vtag(mblk_t *mp, uint16_t vlan_tag)
 static inline void
 oce_remove_vtag(mblk_t *mp)
 {
-	(void) memmove(mp->b_rptr + VLAN_TAGSZ, mp->b_rptr,
+	(void) memmove(mp->b_rptr + VTAG_SIZE, mp->b_rptr,
 	    ETHERADDRL * 2);
-	mp->b_rptr += VLAN_TAGSZ;
+	mp->b_rptr += VTAG_SIZE;
 }
 
 /*
@@ -678,7 +675,6 @@ oce_remove_vtag(mblk_t *mp)
 mblk_t *
 oce_send_packet(struct oce_wq *wq, mblk_t *mp)
 {
-
 	struct oce_nic_hdr_wqe *wqeh;
 	struct oce_dev *dev;
 	struct ether_header *eh;
@@ -755,7 +751,7 @@ oce_send_packet(struct oce_wq *wq, mblk_t *mp)
 		tagged = B_TRUE;
 		etype = ntohs(evh->ether_type);
 		ip_offset = sizeof (struct ether_vlan_header);
-		pkt_len -= VLAN_TAGSZ;
+		pkt_len -= VTAG_SIZE;
 		vlan_tag = ntohs(evh->ether_tci);
 		oce_remove_vtag(mp);
 	} else {
@@ -859,6 +855,10 @@ oce_send_packet(struct oce_wq *wq, mblk_t *mp)
 	/* fill the wq for adapter */
 	oce_fill_ring_descs(wq, wqed);
 
+	/* Set the mp pointer in the wqe descriptor */
+	if (use_copy == B_FALSE) {
+		wqed->mp = mp;
+	}
 	/* Add the packet desc to list to be retrieved during cmpl */
 	OCE_LIST_INSERT_TAIL(&wq->wqe_desc_list,  wqed);
 	(void) ddi_dma_sync(wq->ring->dbuf->dma_handle, 0, 0,
@@ -876,8 +876,7 @@ oce_send_packet(struct oce_wq *wq, mblk_t *mp)
 	/* free mp if copied or packet chain collapsed */
 	if (use_copy == B_TRUE) {
 		freemsg(mp);
-	} else
-		wqed->mp = mp;
+	}
 	return (NULL);
 
 wqe_fail:

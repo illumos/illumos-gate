@@ -102,23 +102,23 @@ my @fields = ( 'reads', 'writes', 'nread', 'nwritten', 'rtime', 'wtime',
 
 chomp(my $curzone = (`/sbin/zonename`));
 
-# Read list of visible zones and their zone IDs
-my @zones = ();
-my %zoneids = ();
-my $zoneadm = `zoneadm list -p | cut -d: -f1,2`;
-@lines = split(/\n/, $zoneadm);
-foreach $line (@lines) {
-	@tok = split(/:/, $line);
-	$zoneids->{$tok[1]} = $tok[0];
-	push(@zones, $tok[1]);
-}
-
 my %old = ();
 my $rows_printed = 0;
 
-$Kstat->update();
-
 for (my $ii = 0; $ii < $count; $ii++) {
+	# Read list of visible zones and their zone IDs
+	my @zones = ();
+	my %zoneids = ();
+	my $zoneadm = `zoneadm list -p | cut -d: -f1,2`;
+	@lines = split(/\n/, $zoneadm);
+	foreach $line (@lines) {
+		@tok = split(/:/, $line);
+		$zoneids->{$tok[1]} = $tok[0];
+		push(@zones, $tok[1]);
+	}
+
+	$Kstat->update();
+
 	# Print the column header every 20 rows
 	if ($rows_printed == 0 || $ALL_ZONES) {
 		printf($HEADER_FMT, $INTERVAL_SUFFIX, $INTERVAL_SUFFIX,
@@ -151,7 +151,6 @@ for (my $ii = 0; $ii < $count; $ii++) {
 	}
 
 	sleep ($interval);
-	$Kstat->update();
 }
 
 exit(0);

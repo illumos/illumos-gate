@@ -19,10 +19,7 @@
  * CDDL HEADER END
  */
 
-/*
- * Copyright 2010 Emulex.  All rights reserved.
- * Use is subject to license terms.
- */
+/* Copyright © 2003-2011 Emulex. All rights reserved.  */
 
 /*
  * Source file containing Queue handling functions
@@ -30,6 +27,7 @@
  */
 
 #include <oce_impl.h>
+extern struct oce_dev *oce_dev_list[];
 
 int oce_destroy_q(struct oce_dev  *oce, struct oce_mbx  *mbx, size_t req_size,
     enum qtype  qtype);
@@ -96,8 +94,7 @@ oce_eq_create(struct oce_dev *dev, uint32_t q_len, uint32_t item_size,
 
 	if (eq->ring == NULL) {
 		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "EQ ring alloc failed:0x%p",
-		    (void *)eq->ring);
+		    "EQ ring alloc failed:0x%p", (void *)eq->ring);
 		kmem_free(eq, sizeof (struct oce_eq));
 		return (NULL);
 	}
@@ -135,8 +132,7 @@ oce_eq_create(struct oce_dev *dev, uint32_t q_len, uint32_t item_size,
 	ret = oce_mbox_post(dev, &mbx, NULL);
 
 	if (ret != 0) {
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "EQ create failed: %d", ret);
+		oce_log(dev, CE_WARN, MOD_CONFIG, "EQ create failed: %d", ret);
 		destroy_ring_buffer(dev, eq->ring);
 		kmem_free(eq, sizeof (struct oce_eq));
 		return (NULL);
@@ -635,7 +631,6 @@ oce_wq_create(struct oce_wq *wq, struct oce_eq *eq)
 		    "WQ create failed: %d", ret);
 		oce_cq_del(dev, cq);
 		return (ret);
-
 	}
 
 	/* interpret the response */
@@ -650,6 +645,9 @@ oce_wq_create(struct oce_wq *wq, struct oce_eq *eq)
 	/* reset indicies */
 	wq->ring->cidx = 0;
 	wq->ring->pidx = 0;
+	oce_log(dev, CE_NOTE, MOD_CONFIG, "WQ CREATED WQID = %d",
+	    wq->wq_id);
+
 	return (0);
 }
 
@@ -776,14 +774,15 @@ oce_rq_init(struct oce_dev *dev, uint32_t q_len,
 rq_ringfail:
 	oce_rqb_cache_destroy(rq);
 rqb_fail:
-	kmem_free(rq->shadow_ring,
-	    (rq->cfg.q_len * sizeof (oce_rq_bdesc_t *)));
-rqb_free_list_fail:
 	kmem_free(rq->rqb_freelist,
 	    (rq->cfg.nbufs * sizeof (oce_rq_bdesc_t *)));
+rqb_free_list_fail:
+
+	kmem_free(rq->shadow_ring,
+	    (rq->cfg.q_len * sizeof (oce_rq_bdesc_t *)));
 rq_shdw_fail:
 	kmem_free(rq->rq_bdesc_array,
-	    (sizeof (oce_rq_bdesc_t) * rq->cfg.q_len));
+	    (sizeof (oce_rq_bdesc_t) * rq->cfg.nbufs));
 rqbd_alloc_fail:
 	kmem_free(rq, sizeof (struct oce_rq));
 	return (NULL);
@@ -882,6 +881,7 @@ oce_rq_create(struct oce_rq *rq, uint32_t if_id, struct oce_eq *eq)
 	rq->ring->cidx = 0;
 	rq->ring->pidx = 0;
 	rq->buf_avail = 0;
+	oce_log(dev, CE_NOTE, MOD_CONFIG, "RQ created, RQID : %d", rq->rq_id);
 	return (0);
 
 }
@@ -1248,5 +1248,42 @@ oce_delete_queues(struct oce_dev *dev)
 	for (i = 0; i < neqs; i++) {
 		oce_eq_del(dev, dev->eq[i]);
 		dev->eq[i] = NULL;
+	}
+}
+
+void
+oce_dev_rss_ready(struct oce_dev *dev)
+{
+	uint8_t dev_index = 0;
+	uint8_t adapter_rss = 0;
+
+	/* Return if rx_rings <= 1 (No RSS) */
+	if (dev->rx_rings <= 1) {
+		oce_log(dev, CE_NOTE, MOD_CONFIG,
+		    "Rx rings = %d, Not enabling RSS", dev->rx_rings);
+		return;
+	}
+
+	/*
+	 * Count the number of PCI functions enabling RSS on this
+	 * adapter
+	 */
+	while (dev_index < MAX_DEVS) {
+		if ((oce_dev_list[dev_index] != NULL) &&
+		    (dev->pci_bus == oce_dev_list[dev_index]->pci_bus) &&
+		    (dev->pci_device == oce_dev_list[dev_index]->pci_device) &&
+		    (oce_dev_list[dev_index]->rss_enable)) {
+			adapter_rss++;
+		}
+		dev_index++;
+	}
+
+	/*
+	 * If there are already MAX_RSS_PER_ADAPTER PCI functions using
+	 * RSS on this adapter, reduce the number of rx rings to 1
+	 * (No RSS)
+	 */
+	if (adapter_rss >= MAX_RSS_PER_ADAPTER) {
+		dev->rx_rings = 1;
 	}
 }

@@ -19,10 +19,7 @@
  * CDDL HEADER END
  */
 
-/*
- * Copyright 2010 Emulex.  All rights reserved.
- * Use is subject to license terms.
- */
+/* Copyright © 2003-2011 Emulex. All rights reserved.  */
 
 /*
  * Driver Version
@@ -36,9 +33,9 @@ extern "C" {
 #endif
 
 #define	OCE_MAJOR_VERSION	"1"
-#define	OCE_MINOR_VERSION	"1"
+#define	OCE_MINOR_VERSION	"2"
 #define	OCE_RELEASE_NUM		"0"
-#define	OCE_PROTO_LEVEL		"s"
+#define	OCE_PROTO_LEVEL		"e"
 
 #define	OCE_VERSION		OCE_MAJOR_VERSION "." \
 				OCE_MINOR_VERSION \

@@ -337,7 +337,7 @@ Sometimes, the user may want to select the speed and mode of  the link. The
 parameters \fBipg1\fR and  \fBipg2\fR. By default, the driver sets \fBipg1\fR
 to 8  \fBbyte-times\fR and \fBipg2\fR to 4 \fBbyte-times\fR (which are the
 standard values). Sometimes, the user may want to alter these values depending
-on whether the driver supports 10 Mbps or 100 Mpbs and accordingly, \fBIPG\fR
+on whether the driver supports 10 Mbps or 100 Mbps and accordingly, \fBIPG\fR
 will be set to 9.6 or 0.96 microseconds.
 .SS "hme Parameter List"
 .sp

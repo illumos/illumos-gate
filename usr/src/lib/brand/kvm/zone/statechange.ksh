@@ -115,6 +115,14 @@ setup_net()
 		orig_global=$global_nic
 		global_nic=$(eval echo \$SYSINFO_NIC_${orig_global})
 
+		# If the global nic is specified as a device or etherstub name
+		# rather than a tag
+		if [[ -z $global_nic ]]; then
+			echo "$(dladm show-phys -p -o LINK) $(dladm show-etherstub -p -o LINK)" \
+			  | egrep "(^| )${orig_global}( |$)" > /dev/null
+			(( $? == 0 )) && global_nic=${orig_global}
+		fi
+
 		# For backwards compatibility with the other parts of the
 		# system, check if this zone already has this vnic setup.
 		# If so, move on to the next vnic.

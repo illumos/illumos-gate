@@ -25,6 +25,9 @@
  * Copyright (c) 2010, Intel Corporation.
  * All rights reserved.
  */
+/*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #include <sys/time.h>
 #include <sys/psm.h>
@@ -286,8 +289,28 @@ oneshot_timer_reprogram(hrtime_t time)
 static void
 deadline_timer_enable(void)
 {
+	uint64_t ticks;
+
 	apic_reg_ops->apic_write(APIC_LOCAL_TIMER,
 	    (apic_clkvect + APIC_BASE_VECT) | AV_DEADLINE);
+	/*
+	 * Now we have to serialize this per the SDM.  That is to
+	 * say, the above enabling can race in the pipeline with
+	 * changes to the MSR.  We need to make sure the above
+	 * operation is complete before we proceed to reprogram
+	 * the deadline value in reprogram().  The algorithm
+	 * recommended by the Intel SDM 3A in 10.5.1.4 is:
+	 *
+	 * a) write a big value to the deadline register
+	 * b) read the register back
+	 * c) if it reads zero, go back to a and try again
+	 */
+
+	do {
+		/* write a really big value */
+		wrmsr(IA32_DEADLINE_TSC_MSR, 1ULL << 63);
+		ticks = rdmsr(IA32_DEADLINE_TSC_MSR);
+	} while (ticks == 0);
 }
 
 /* deadline timer disable */
@@ -302,17 +325,20 @@ deadline_timer_disable(void)
 static void
 deadline_timer_reprogram(hrtime_t time)
 {
+	int64_t		delta;
 	uint64_t	ticks;
 
-	if (time <= 0) {
-		/*
-		 * generate an immediate interrupt
-		 */
-		ticks = (uint64_t)tsc_read();
-	} else {
-		ticks = unscalehrtime(time);
-	}
+	/*
+	 * Note that this entire routine is called with
+	 * CBE_HIGH_PIL, so we needn't worry about preemption.
+	 */
+	delta = time - gethrtime();
 
+	/* The unscalehrtime wants unsigned values. */
+	delta = max(delta, 0);
+
+	/* Now we shouldn't be interrupted, we can set the deadline */
+	ticks = (uint64_t)tsc_read() + unscalehrtime(delta);
 	wrmsr(IA32_DEADLINE_TSC_MSR, ticks);
 }
 
