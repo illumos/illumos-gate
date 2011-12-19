@@ -87,6 +87,14 @@ check_proto()
 		     "${proto##https://}" == "$proto" ]; then
 			echo "${proto}/root_${MACH}"
 		fi
+	elif [ "$SCM_MODE" = "git" ]; then
+		#
+                # For git, we make no attempt to deal with the possibility of
+                # remote parent workspaces because, in the protodefs file, we
+                # don't actually acknowledge the concept of a parent workspace
+                # at all, in keeping with the rest of our git support.
+                #
+		echo "${1}/root_${MACH}"
 	fi
 }
 
@@ -105,7 +113,7 @@ else
 	setenv=false
 fi
 
-WHICH_SCM=$(dirname $(whence $0))/which_scm
+WHICH_SCM=$(/bin/dirname $(whence $0))/which_scm
 if [[ ! -x $WHICH_SCM ]]; then
 	WHICH_SCM=which_scm
 fi
@@ -215,6 +223,10 @@ if [ "$SCM_MODE" = "teamware" -a -d ${wsname}/Codemgr_wsdata ]; then
 	protofile=$wsosdir/protodefs
 elif [ "$SCM_MODE" = "mercurial" -a -d ${wsname}/.hg ]; then
 	CM_DATA=".hg"
+	wsosdir=$CODEMGR_WS/$CM_DATA
+	protofile=$wsosdir/org.opensolaris.protodefs
+elif [ "$SCM_MODE" = "git" -a -d ${wsname}/.git ]; then
+	CM_DATA=".git"
 	wsosdir=$CODEMGR_WS/$CM_DATA
 	protofile=$wsosdir/org.opensolaris.protodefs
 else
@@ -362,7 +374,7 @@ if [[ ! -v CLOSED_IS_PRESENT ]]; then
 fi
 
 if [[ -z "$ONBLD_DIR" ]]; then
-	ONBLD_DIR=$(dirname $(whence $0))
+	ONBLD_DIR=$(/bin/dirname $(whence $0))
 fi
 
 if ! echo ":$PATH:" | grep ":${ONBLD_DIR}:" > /dev/null; then
