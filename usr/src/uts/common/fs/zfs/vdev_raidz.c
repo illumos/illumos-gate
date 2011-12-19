@@ -1546,8 +1546,6 @@ vdev_raidz_physio(vdev_t *vd, caddr_t data, size_t size,
 	    SPA_MAXBLOCKSIZE, origoffset, tvd->vdev_ashift, vd->vdev_children,
 	    vd->vdev_nparity);
 
-	ASSERT3U(rm->rm_asize, ==, vdev_psize_to_asize(vd, size));
-
 	coloffset = origoffset;
 
 	for (c = rm->rm_firstdatacol; c < rm->rm_cols;
