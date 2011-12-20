@@ -72,7 +72,7 @@ find_files()
    	pat=$1
    	shift
 
-	if [ "$SCM_MODE" = "teamware" ] ; then
+	if [[ "$SCM_MODE" = "teamware" ]]; then
 		for dir; do
 			if [ -d $CODEMGR_WS/$dir ]; then
 				cd $CODEMGR_WS
@@ -81,7 +81,7 @@ find_files()
 				cd - > /dev/null
 			fi
 		done
-	elif [ "$SCM_MODE" = "mercurial" ]; then
+	elif [[ "$SCM_MODE" = "mercurial" || "$SCM_MODE" == "git" ]]; then
 		dirs=""
 		for dir; do
 			if [ -d $CODEMGR_WS/$dir ]; then
@@ -179,7 +179,9 @@ which_scm | read SCM_MODE CODEMGR_WS || exit 1
 if [[ $SCM_MODE == "unknown" ]]; then
 	fail "Unable to determine SCM type currently in use."
 elif [[ $SCM_MODE == "mercurial" ]]; then
-	FILELIST=`hg manifest`
+	FILELIST=$(hg manifest)
+elif [[ $SCM_MODE == "git" ]]; then
+	FILELIST=$(cd $(dirname $(git rev-parse --git-dir)); git ls-files)
 elif [[ $SCM_MODE != "teamware" ]]; then
 	fail "Unsupported SCM in use: $SCM_MODE"
 fi

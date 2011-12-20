@@ -45,7 +45,8 @@ COMMON_MODULES_PROC = \
 #
 COMMON_MODULES_PROC_32BIT = \
 	svc.configd \
-	svc.startd
+	svc.startd  \
+	v8
 
 #
 # MDB modules used for debugging kernels.
