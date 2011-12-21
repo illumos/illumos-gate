@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2011 Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -72,10 +73,8 @@
  * request. locks acquired by the call-back routine should not be held across
  * the call to tcp_timeout_cancel() or a deadlock may result.
  *
- * tcp_timeout_cancel() returns -1 if it can not cancel the timeout request.
- * Otherwise, it returns an integer value greater than or equal to 0. In
- * particular, if the call-back function is already placed on the squeue, it can
- * not be canceled.
+ * tcp_timeout_cancel() returns -1 if the timeout request is invalid.
+ * Otherwise, it returns an integer value greater than or equal to 0.
  *
  * NOTE: both tcp_timeout() and tcp_timeout_cancel() should always be called
  * 	within squeue context corresponding to the tcp instance. Since the
@@ -88,12 +87,6 @@
  *	MSEC_TO_TICK(intvl). It always uses tcp_timer() function as a call-back
  *	and stores the return value of tcp_timeout() in the tcp->tcp_timer_tid
  *	field.
- *
- * NOTE: since the timeout cancellation is not guaranteed, the cancelled
- *	call-back may still be called, so it is possible tcp_timer() will be
- *	called several times. This should not be a problem since tcp_timer()
- *	should always check the tcp instance state.
- *
  *
  * IMPLEMENTATION:
  *
@@ -173,6 +166,7 @@ tcp_timeout(conn_t *connp, void (*f)(void *), hrtime_t tim)
 	 */
 	tcpt->tcpt_tid = timeout_generic(CALLOUT_NORMAL, tcp_timer_callback, mp,
 	    tim * MICROSEC, CALLOUT_TCP_RESOLUTION, CALLOUT_FLAG_ROUNDUP);
+	VERIFY(!(tcpt->tcpt_tid & CALLOUT_ID_FREE));
 
 	return ((timeout_id_t)mp);
 }
@@ -202,6 +196,15 @@ tcp_timer_handler(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 	ASSERT(connp == tcpt->connp);
 	ASSERT((squeue_t *)arg2 == connp->conn_sqp);
 
+	if (tcpt->tcpt_tid & CALLOUT_ID_FREE) {
+		/*
+		 * This timeout was cancelled after it was enqueued to the
+		 * squeue; free the timer and return.
+		 */
+		tcp_timer_free(connp->conn_tcp, mp);
+		return;
+	}
+
 	/*
 	 * If the TCP has reached the closed state, don't proceed any
 	 * further. This TCP logically does not exist on the system.
@@ -213,6 +216,7 @@ tcp_timer_handler(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 	} else {
 		tcp->tcp_timer_tid = 0;
 	}
+
 	tcp_timer_free(connp->conn_tcp, mp);
 }
 
@@ -243,6 +247,18 @@ tcp_timeout_cancel(conn_t *connp, timeout_id_t id)
 		TCP_DBGSTAT(connp->conn_tcp->tcp_tcps, tcp_timeout_canceled);
 		tcp_timer_free(connp->conn_tcp, mp);
 		CONN_DEC_REF(connp);
+	} else {
+		/*
+		 * If we were unable to untimeout successfully, it has already
+		 * been enqueued on the squeue; mark the ID with the free
+		 * bit.	 This bit can never be set in a valid identifier, and
+		 * we'll use it to prevent the timeout from being executed.
+		 * And note that we're within the squeue perimeter here, so
+		 * we don't need to worry about racing with timer handling
+		 * (which also executes within the perimeter).
+		 */
+		tcpt->tcpt_tid |= CALLOUT_ID_FREE;
+		delta = 0;
 	}
 
 	return (TICK_TO_MSEC(delta));
