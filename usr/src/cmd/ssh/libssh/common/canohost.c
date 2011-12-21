@@ -13,12 +13,12 @@
 /*
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include "includes.h"
 RCSID("$OpenBSD: canohost.c,v 1.34 2002/09/23 20:46:27 stevesk Exp $");
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "packet.h"
 #include "xmalloc.h"
@@ -65,6 +65,9 @@ get_remote_hostname(int socket, int verify_reverse_mapping)
 	}
 #endif /* IPV4_IN_IPV6 */
 
+	if (!verify_reverse_mapping)
+		return xstrdup(ntop);
+
 	debug3("Trying to reverse map address %.100s.", ntop);
 	/* Map the IP address to a host name. */
 	if (getnameinfo((struct sockaddr *)&from, fromlen, name, sizeof(name),
@@ -86,8 +89,6 @@ get_remote_hostname(int socket, int verify_reverse_mapping)
 		if (isupper(name[i]))
 			name[i] = tolower(name[i]);
 
-	if (!verify_reverse_mapping)
-		return xstrdup(name);
 	/*
 	 * Map it back to an IP address and check that the given
 	 * address actually is an address of this host.  This is
