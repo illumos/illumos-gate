@@ -2703,7 +2703,8 @@ dbuf_write(dbuf_dirty_record_t *dr, arc_buf_t *data, dmu_tx_t *tx)
 		    dr->dt.dl.dr_copies);
 		mutex_exit(&db->db_mtx);
 	} else if (db->db_state == DB_NOFILL) {
-		ASSERT(zp.zp_checksum == ZIO_CHECKSUM_OFF);
+		ASSERT(zp.zp_checksum == ZIO_CHECKSUM_OFF ||
+		    zp.zp_checksum == ZIO_CHECKSUM_NOPARITY);
 		dr->dr_zio = zio_write(zio, os->os_spa, txg,
 		    db->db_blkptr, NULL, db->db.db_size, &zp,
 		    dbuf_write_nofill_ready, dbuf_write_nofill_done, db,
