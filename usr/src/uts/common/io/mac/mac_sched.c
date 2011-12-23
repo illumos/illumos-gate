@@ -22,6 +22,9 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2011 Joyent, Inc.  All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/callb.h>
@@ -29,6 +32,8 @@
 #include <sys/strsubr.h>
 #include <sys/strsun.h>
 #include <sys/vlan.h>
+#include <sys/stack.h>
+#include <sys/archsystm.h>
 #include <inet/ipsec_impl.h>
 #include <inet/ip_impl.h>
 #include <inet/sadb.h>
@@ -413,6 +418,28 @@ int mac_srs_worker_wakeup_ticks = 0;
 	cookie = (mac_tx_cookie_t)srs;					\
 	*ret_mp = mp_chain;						\
 }
+
+/*
+ * MAC_RX_SRS_TOODEEP
+ *
+ * Macro called as part of receive-side processing to determine if handling
+ * can occur in situ (in the interrupt thread) or if it should be left to a
+ * worker thread.  Note that the constant used to make this determination is
+ * not entirely made-up, and is a result of some emprical validation. That
+ * said, the constant is left as a static variable to allow it to be
+ * dynamically tuned in the field if and as needed.
+ */
+static uintptr_t mac_rx_srs_stack_needed = 10240;
+static uint_t mac_rx_srs_stack_toodeep;
+
+#ifndef STACK_GROWTH_DOWN
+#error Downward stack growth assumed.
+#endif
+
+#define	MAC_RX_SRS_TOODEEP() (STACK_BIAS + (uintptr_t)getfp() - \
+	(uintptr_t)curthread->t_stkbase < mac_rx_srs_stack_needed && \
+	++mac_rx_srs_stack_toodeep)
+
 
 /*
  * Drop the rx packet and advance to the next one in the chain.
@@ -2419,11 +2446,12 @@ mac_rx_srs_process(void *arg, mac_resource_handle_t srs, mblk_t *mp_chain,
 
 	if (!(mac_srs->srs_state & SRS_PROC)) {
 		/*
-		 * If we are coming via loopback or if we are not
-		 * optimizing for latency, we should signal the
-		 * worker thread.
+		 * If we are coming via loopback, if we are not optimizing for
+		 * latency, or if our stack is running deep, we should signal
+		 * the worker thread.
 		 */
-		if (loopback || !(mac_srs->srs_state & SRS_LATENCY_OPT)) {
+		if (loopback || !(mac_srs->srs_state & SRS_LATENCY_OPT) ||
+		    MAC_RX_SRS_TOODEEP()) {
 			/*
 			 * For loopback, We need to let the worker take
 			 * over as we don't want to continue in the same
