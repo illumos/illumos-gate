@@ -25,45 +25,44 @@
 
 PROG= zoneadmd
 
-include ../Makefile.cmd
+include ../../Makefile.cmd
 
-$(64ONLY)SUBDIRS= $(MACH)
-$(BUILD64)SUBDIRS += $(MACH64)
+ROOTCMDDIR=	$(ROOTLIB)/zones
 
-all	:=	TARGET = all
-install	:=	TARGET = install
-clean	:=	TARGET = clean
-clobber	:=	TARGET = clobber
-lint	:=	TARGET = lint
+OBJS= zoneadmd.o zcons.o vplat.o mcap.o
 
-XGETFLAGS += -a -x zoneadmd.xcl
-
-ROOTUSRLIBZONES			= $(ROOT)/usr/lib/zones
+CFLAGS += $(CCVERBOSE)
+LDLIBS += -lsocket -lzonecfg -lnsl -ldevinfo -ldevice -lnvpair \
+	-lgen -lbsm -lcontract -lzfs -luuid -lbrand -ldladm -ltsnet -ltsol \
+	-linetutil -lproc
 
 .KEEP_STATE:
 
-.PARALLEL:
+%.o:    ../%.c
+	$(COMPILE.c) $<
 
-all: $(SUBDIRS)
+ROOTUSRLIBZONES			= $(ROOT)/usr/lib/zones
+ROOTUSRLIBZONES32		= $(ROOTUSRLIBZONES)/$(MACH32)
+ROOTUSRLIBZONES64		= $(ROOTUSRLIBZONES)/$(MACH64)
+ROOTUSRLIBZONESPROG32		= $(ROOTUSRLIBZONES32)/$(PROG)
+ROOTUSRLIBZONESPROG64		= $(ROOTUSRLIBZONES64)/$(PROG)
+$(ROOTUSRLIBZONES32)/%: $(ROOTUSRLIBZONES32) %
+	$(INS.file)
+$(ROOTUSRLIBZONES64)/%: $(ROOTUSRLIBZONES64) %
+	$(INS.file)
+$(ROOTUSRLIBZONES32):
+	$(INS.dir)
+
+all: $(PROG)
 
 $(PROG): $(OBJS)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
-install: $(SUBDIRS)
-	-$(RM) $(ROOTUSRLIBZONES)/$(PROG)
-	-$(LN) $(ISAEXEC) $(ROOTUSRLIBZONES)/$(PROG)
+clean:
+	$(RM) $(OBJS)
 
-$(POFILE):
+lint:
+	$(LINT.c) ../*.c $(LDLIBS)
 
-clean clobebr lint:	$(SUBDIRS)
-
-check:
-	$(CSTYLE) -p -P *.c
-
-$(SUBDIRS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
-
-include ../Makefile.targ
+include ../../Makefile.targ
