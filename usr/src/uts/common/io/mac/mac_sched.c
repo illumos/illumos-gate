@@ -429,14 +429,14 @@ int mac_srs_worker_wakeup_ticks = 0;
  * said, the constant is left as a static variable to allow it to be
  * dynamically tuned in the field if and as needed.
  */
-static uintptr_t mac_rx_srs_stack_needed = 8192;
+static uintptr_t mac_rx_srs_stack_needed = 10240;
 static int mac_rx_srs_stack_toodeep;
 
 #ifndef STACK_GROWTH_DOWN
 #error Downward stack growth assumed.
 #endif
 
-#define MAC_RX_SRS_TOODEEP() (STACK_BIAS + (uintptr_t)getfp() - \
+#define	MAC_RX_SRS_TOODEEP() (STACK_BIAS + (uintptr_t)getfp() - \
 	    (uintptr_t)curthread->t_stkbase < mac_rx_srs_stack_needed && \
 	    ++mac_rx_srs_stack_toodeep)
 
