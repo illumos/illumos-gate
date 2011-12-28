@@ -24,6 +24,10 @@
  */
 
 /*
+ * Copyright 2011 Joyent, Inc.  All rights reserved.
+ */
+
+/*
  * Data-Link Services Module
  */
 
@@ -596,6 +600,22 @@ boolean_t
 dls_accept_promisc(dld_str_t *dsp, mac_header_info_t *mhip, dls_rx_t *ds_rx,
     void **ds_rx_arg, boolean_t loopback)
 {
+	if (dsp->ds_promisc == 0) {
+		/*
+		 * If there are active walkers of the mi_promisc_list when
+		 * promiscuousness is disabled, ds_promisc will be cleared,
+		 * but the DLS will remain on the mi_promisc_list until the
+		 * walk is completed.  If we do not recognize this case here,
+		 * we won't properly execute the ds_promisc case in the common
+		 * accept routine -- and we will potentially accept a packet
+		 * that has originated with this DLS (which in turn can
+		 * induce recursion and death by stack overflow).  If
+		 * ds_promisc is zero, we know that we are in this window --
+		 * and we refuse to accept the packet.
+		 */
+		return (B_FALSE);
+	}
+
 	return (dls_accept_common(dsp, mhip, ds_rx, ds_rx_arg, B_TRUE,
 	    loopback));
 }
