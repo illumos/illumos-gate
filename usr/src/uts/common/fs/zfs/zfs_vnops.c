@@ -4197,7 +4197,6 @@ zfs_putpage(vnode_t *vp, offset_t off, size_t len, int flags, cred_t *cr,
 	 * There's nothing to do if no data is cached.
 	 */
 	if (!vn_has_cached_data(vp)) {
-		ASSERT(len == 0);
 		ZFS_EXIT(zfsvfs);
 		return (0);
 	}
