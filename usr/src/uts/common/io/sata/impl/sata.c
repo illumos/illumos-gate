@@ -18451,7 +18451,7 @@ sata_process_port_failed_event(sata_hba_inst_t *sata_hba_inst,
 
 /*
  * Device Reset Event processing.
- * The seqeunce is managed by 3 stage flags:
+ * The sequence is managed by 3 stage flags:
  * - reset event reported,
  * - reset event being processed,
  * - request to clear device reset state.
