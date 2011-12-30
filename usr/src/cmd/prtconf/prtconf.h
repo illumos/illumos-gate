@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2011 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef	_PRT_CONF_H
@@ -52,6 +53,7 @@ struct prt_opts {
 	int o_drv_name;
 	int o_pseudodevs;
 	int o_fbname;
+	int o_memory;
 	int o_noheader;
 	int o_prominfo;
 	int o_productinfo;

@@ -1382,6 +1382,41 @@ static rctl_ops_t zone_cpu_cap_ops = {
 	rcop_no_test
 };
 
+/*ARGSUSED*/
+static rctl_qty_t
+zone_cpu_base_get(rctl_t *rctl, struct proc *p)
+{
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	return (cpucaps_zone_get_base(p->p_zone));
+}
+
+/*
+ * The zone cpu base is used to set the baseline CPU for the zone
+ * so we can track when the zone is bursting.
+ */
+/*ARGSUSED*/
+static int
+zone_cpu_base_set(rctl_t *rctl, struct proc *p, rctl_entity_p_t *e,
+    rctl_qty_t nv)
+{
+	zone_t *zone = e->rcep_p.zone;
+
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	ASSERT(e->rcep_t == RCENTITY_ZONE);
+
+	if (zone == NULL)
+		return (0);
+
+	return (cpucaps_zone_set_base(zone, nv));
+}
+
+static rctl_ops_t zone_cpu_base_ops = {
+	rcop_no_action,
+	zone_cpu_base_get,
+	zone_cpu_base_set,
+	rcop_no_test
+};
+
 /*
  * zone.zfs-io-pri resource control support (IO priority).
  */
@@ -2427,6 +2462,11 @@ zone_init(void)
 	    RCTL_GLOBAL_NOBASIC | RCTL_GLOBAL_COUNT |RCTL_GLOBAL_SYSLOG_NEVER |
 	    RCTL_GLOBAL_INFINITE,
 	    MAXCAP, MAXCAP, &zone_cpu_cap_ops);
+
+	rc_zone_cpu_cap = rctl_register("zone.cpu-baseline",
+	    RCENTITY_ZONE, RCTL_GLOBAL_SIGNAL_NEVER | RCTL_GLOBAL_DENY_NEVER |
+	    RCTL_GLOBAL_NOBASIC | RCTL_GLOBAL_COUNT |RCTL_GLOBAL_SYSLOG_NEVER,
+	    MAXCAP, MAXCAP, &zone_cpu_base_ops);
 
 	rc_zone_zfs_io_pri = rctl_register("zone.zfs-io-priority",
 	    RCENTITY_ZONE, RCTL_GLOBAL_SIGNAL_NEVER | RCTL_GLOBAL_DENY_NEVER |

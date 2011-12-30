@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2011 Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/disp.h>
@@ -73,6 +74,16 @@
  * returning from the trap back to the user-land when no kernel locks are held.
  * Putting threads on wait queues in random places while running in the
  * kernel might lead to all kinds of locking problems.
+ *
+ * Bursting
+ * ========
+ *
+ * CPU bursting occurs when the CPU usage is over the baseline but under the
+ * cap.  The baseline CPU (zone.cpu-baseline) is set in a multi-tenant
+ * environment so that we know how much CPU is allocated for a tenant under
+ * normal utilization.  We can then track how much time a zone is spending
+ * over the "normal" CPU utilization expected for that zone using the
+ * "above_base_sec" kstat.
  *
  * Accounting
  * ==========
@@ -203,18 +214,22 @@ static void caps_update();
  */
 struct cap_kstat {
 	kstat_named_t	cap_value;
+	kstat_named_t	cap_baseline;
 	kstat_named_t	cap_usage;
 	kstat_named_t	cap_nwait;
 	kstat_named_t	cap_below;
 	kstat_named_t	cap_above;
+	kstat_named_t	cap_above_base;
 	kstat_named_t	cap_maxusage;
 	kstat_named_t	cap_zonename;
 } cap_kstat = {
 	{ "value",	KSTAT_DATA_UINT64 },
+	{ "baseline",	KSTAT_DATA_UINT64 },
 	{ "usage",	KSTAT_DATA_UINT64 },
 	{ "nwait",	KSTAT_DATA_UINT64 },
 	{ "below_sec",	KSTAT_DATA_UINT64 },
 	{ "above_sec",	KSTAT_DATA_UINT64 },
+	{ "above_base_sec",	KSTAT_DATA_UINT64 },
 	{ "maxusage",	KSTAT_DATA_UINT64 },
 	{ "zonename",	KSTAT_DATA_STRING },
 };
@@ -494,6 +509,9 @@ cap_poke_waitq(cpucap_t *cap, int64_t gen)
 {
 	ASSERT(MUTEX_HELD(&caps_lock));
 
+	if (cap->cap_base != 0 && cap->cap_usage > cap->cap_base)
+		cap->cap_above_base++;
+
 	if (cap->cap_usage >= cap->cap_value) {
 		cap->cap_above++;
 	} else {
@@ -757,6 +775,55 @@ cpucaps_zone_set(zone_t *zone, rctl_qty_t cap_val)
 }
 
 /*
+ * Set zone's base cpu value to base_val
+ */
+int
+cpucaps_zone_set_base(zone_t *zone, rctl_qty_t base_val)
+{
+	cpucap_t *cap = NULL;
+	hrtime_t value;
+
+	ASSERT(base_val <= MAXCAP);
+	if (base_val > MAXCAP)
+		base_val = MAXCAP;
+
+	if (CPUCAPS_OFF() || !ZONE_IS_CAPPED(zone))
+		return (0);
+
+	if (zone->zone_cpucap == NULL)
+		cap = cap_alloc();
+
+	mutex_enter(&caps_lock);
+
+	if (cpucaps_busy) {
+		mutex_exit(&caps_lock);
+		return (EBUSY);
+	}
+
+	/*
+	 * Double-check whether zone->zone_cpucap is NULL, now with caps_lock
+	 * held. If it is still NULL, assign a newly allocated cpucap to it.
+	 */
+	if (zone->zone_cpucap == NULL) {
+		zone->zone_cpucap = cap;
+	} else if (cap != NULL) {
+		cap_free(cap);
+	}
+
+	cap = zone->zone_cpucap;
+
+	value = base_val * cap_tick_cost;
+	if (value < 0 || value > cap->cap_value)
+		value = 0;
+
+	cap->cap_base = value;
+
+	mutex_exit(&caps_lock);
+
+	return (0);
+}
+
+/*
  * The project is going away so disable its cap.
  */
 void
@@ -948,6 +1015,16 @@ cpucaps_zone_get(zone_t *zone)
 }
 
 /*
+ * Get current zone baseline.
+ */
+rctl_qty_t
+cpucaps_zone_get_base(zone_t *zone)
+{
+	return (zone->zone_cpucap != NULL ?
+	    (rctl_qty_t)(zone->zone_cpucap->cap_base / cap_tick_cost) : 0);
+}
+
+/*
  * Charge project of thread t the time thread t spent on CPU since previously
  * adjusted.
  *
@@ -1133,6 +1210,8 @@ cap_kstat_update(kstat_t *ksp, int rw)
 
 	capsp->cap_value.value.ui64 =
 	    ROUND_SCALE(cap->cap_value, cap_tick_cost);
+	capsp->cap_baseline.value.ui64 =
+	    ROUND_SCALE(cap->cap_base, cap_tick_cost);
 	capsp->cap_usage.value.ui64 =
 	    ROUND_SCALE(cap->cap_usage, cap_tick_cost);
 	capsp->cap_maxusage.value.ui64 =
@@ -1140,6 +1219,8 @@ cap_kstat_update(kstat_t *ksp, int rw)
 	capsp->cap_nwait.value.ui64 = cap->cap_waitq.wq_count;
 	capsp->cap_below.value.ui64 = ROUND_SCALE(cap->cap_below, tick_sec);
 	capsp->cap_above.value.ui64 = ROUND_SCALE(cap->cap_above, tick_sec);
+	capsp->cap_above_base.value.ui64 =
+	    ROUND_SCALE(cap->cap_above_base, tick_sec);
 	kstat_named_setstr(&capsp->cap_zonename, zonename);
 
 	return (0);
