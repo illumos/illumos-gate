@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2010, 2011 Joyent, Inc.  All rights reserved.
+# Copyright 2010, 2012 Joyent, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -406,6 +406,12 @@ setup_snapshots()
 #
 setup_cpu_baseline()
 {
+	# If there is already a baseline, don't set one heuristically
+	curr_base=`prctl -P -n zone.cpu-baseline -i zone $ZONENAME | nawk '{
+		if ($2 == "privileged") print $3
+	    }'`
+	[ -n "$curr_base" ] && return
+
 	# Get current cap and convert from zonecfg format into rctl format
 	cap=`zonecfg -z $ZONENAME info capped-cpu | nawk '{
 	    if ($1 == "[ncpus:") print (substr($2, 1, length($2) - 1) * 100)

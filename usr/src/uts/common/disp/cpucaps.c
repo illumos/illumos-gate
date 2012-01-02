@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2011 Joyent, Inc.  All rights reserved.
+ * Copyright 2011, 2012 Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/disp.h>
@@ -83,7 +83,23 @@
  * environment so that we know how much CPU is allocated for a tenant under
  * normal utilization.  We can then track how much time a zone is spending
  * over the "normal" CPU utilization expected for that zone using the
- * "above_base_sec" kstat.
+ * "above_base_sec" kstat. This kstat is cumulative.
+ *
+ * If the zone has a burst limit (zone.cpu-burst-time) then the zone can
+ * burst for that period of time (in seconds) before the effective cap is
+ * lowered to the baseline.  Once the effective cap is lowered, the zone
+ * will run at the baseline for the burst limit before the effective cap is
+ * raised again to the full value.  This will allow the zone to burst again.
+ * We can watch this behavior using the kstats.  The "effective" kstat shows
+ * which cap is being used, the baseline value or the burst value.  The
+ * "burst_limit_sec" shows the value of the zone.cpu-burst-time rctl and the
+ * "bursting_sec" kstat shows how many seconds the zone has currently been
+ * bursting.  When the CPU load is continuously greater than the baseline,
+ * bursting_sec will increase, up to the burst_limit_sec value, then the
+ * effective kstat will drop to the baseline and the bursting_sec value will
+ * decrease until it hits 0, at which time the effective kstat will return to
+ * the full burst value and the bursting_sec value will begin to increase
+ * again.
  *
  * Accounting
  * ==========
@@ -215,6 +231,9 @@ static void caps_update();
 struct cap_kstat {
 	kstat_named_t	cap_value;
 	kstat_named_t	cap_baseline;
+	kstat_named_t	cap_effective;
+	kstat_named_t	cap_burst_limit;
+	kstat_named_t	cap_bursting;
 	kstat_named_t	cap_usage;
 	kstat_named_t	cap_nwait;
 	kstat_named_t	cap_below;
@@ -225,11 +244,14 @@ struct cap_kstat {
 } cap_kstat = {
 	{ "value",	KSTAT_DATA_UINT64 },
 	{ "baseline",	KSTAT_DATA_UINT64 },
+	{ "effective",	KSTAT_DATA_UINT64 },
+	{ "burst_limit_sec", KSTAT_DATA_UINT64 },
+	{ "bursting_sec", KSTAT_DATA_UINT64 },
 	{ "usage",	KSTAT_DATA_UINT64 },
 	{ "nwait",	KSTAT_DATA_UINT64 },
 	{ "below_sec",	KSTAT_DATA_UINT64 },
 	{ "above_sec",	KSTAT_DATA_UINT64 },
-	{ "above_base_sec",	KSTAT_DATA_UINT64 },
+	{ "above_base_sec", KSTAT_DATA_UINT64 },
 	{ "maxusage",	KSTAT_DATA_UINT64 },
 	{ "zonename",	KSTAT_DATA_STRING },
 };
@@ -326,7 +348,7 @@ cap_enable(list_t *l, cpucap_t *cap, hrtime_t value)
 	cap->cap_below = cap->cap_above = 0;
 	cap->cap_maxusage = 0;
 	cap->cap_usage = 0;
-	cap->cap_value = value;
+	cap->cap_value = cap->cap_chk_value = value;
 	waitq_unblock(&cap->cap_waitq);
 	if (CPUCAPS_OFF()) {
 		cpucaps_enabled = B_TRUE;
@@ -360,7 +382,7 @@ cap_disable(list_t *l, cpucap_t *cap)
 		cpucaps_enabled = B_FALSE;
 		cpucaps_clock_callout = NULL;
 	}
-	cap->cap_value = 0;
+	cap->cap_value = cap->cap_chk_value = 0;
 	cap->cap_project = NULL;
 	cap->cap_zone = NULL;
 	if (cap->cap_kstat != NULL) {
@@ -502,6 +524,8 @@ cap_walk(list_t *l, void (*cb)(cpucap_t *, int64_t))
  * The waitq_isempty check is performed without the waitq lock. If a new thread
  * is placed on the waitq right after the check, it will be picked up during the
  * next invocation of cap_poke_waitq().
+ *
+ * Called once per tick for zones.
  */
 /* ARGSUSED */
 static void
@@ -509,10 +533,45 @@ cap_poke_waitq(cpucap_t *cap, int64_t gen)
 {
 	ASSERT(MUTEX_HELD(&caps_lock));
 
-	if (cap->cap_base != 0 && cap->cap_usage > cap->cap_base)
-		cap->cap_above_base++;
+	if (cap->cap_base != 0) {
+		/*
+		 * Because of the way usage is calculated and decayed, its
+		 * possible for the zone to be slightly over its cap, but we
+		 * don't want to count that after we have reduced the effective
+		 * cap to the baseline.  That way the zone will be able to
+		 * burst again after the burst_limit has expired.
+		 */
+		if (cap->cap_usage > cap->cap_base &&
+		    cap->cap_chk_value == cap->cap_value) {
+			cap->cap_above_base++;
 
-	if (cap->cap_usage >= cap->cap_value) {
+			/*
+			 * If bursting is limited and we've been bursting
+			 * longer than we're supposed to, then set the
+			 * effective cap to the baseline.
+			 */
+			if (cap->cap_burst_limit != 0) {
+				cap->cap_bursting++;
+				if (cap->cap_bursting >= cap->cap_burst_limit)
+					cap->cap_chk_value = cap->cap_base;
+			}
+		} else if (cap->cap_bursting > 0) {
+			/*
+			 * We're not bursting now, but we were, decay the
+			 * bursting timer.
+			 */
+			cap->cap_bursting--;
+			/*
+			 * Reset the effective cap once we decay to 0 so we
+			 * can burst again.
+			 */
+			if (cap->cap_bursting == 0 &&
+			    cap->cap_chk_value != cap->cap_value)
+				cap->cap_chk_value = cap->cap_value;
+		}
+	}
+
+	if (cap->cap_usage >= cap->cap_chk_value) {
 		cap->cap_above++;
 	} else {
 		waitq_t *wq = &cap->cap_waitq;
@@ -647,14 +706,14 @@ cap_project_zone_modify_walker(kproject_t *kpj, void *arg)
 		 * Remove all projects in this zone without caps
 		 * from the capped_projects list.
 		 */
-		if (project_cap->cap_value == MAX_USAGE) {
+		if (project_cap->cap_chk_value == MAX_USAGE) {
 			cap_project_disable(kpj);
 		}
 	} else if (CAP_DISABLED(project_cap)) {
 		/*
 		 * Add the project to capped_projects list.
 		 */
-		ASSERT(project_cap->cap_value == 0);
+		ASSERT(project_cap->cap_chk_value == 0);
 		cap_project_enable(kpj, MAX_USAGE);
 	}
 	mutex_exit(&caps_lock);
@@ -764,7 +823,7 @@ cpucaps_zone_set(zone_t *zone, rctl_qty_t cap_val)
 		/*
 		 * No state transitions, just change the value
 		 */
-		cap->cap_value = value;
+		cap->cap_value = cap->cap_chk_value = value;
 	}
 
 	ASSERT(MUTEX_HELD(&caps_lock));
@@ -817,6 +876,59 @@ cpucaps_zone_set_base(zone_t *zone, rctl_qty_t base_val)
 		value = 0;
 
 	cap->cap_base = value;
+
+	mutex_exit(&caps_lock);
+
+	return (0);
+}
+
+/*
+ * Set zone's maximum burst time in seconds.  A burst time of 0 means that
+ * the zone can run over its baseline indefinitely.
+ */
+int
+cpucaps_zone_set_burst_time(zone_t *zone, rctl_qty_t base_val)
+{
+	cpucap_t *cap = NULL;
+	hrtime_t value;
+
+	ASSERT(base_val <= INT_MAX);
+	/* Treat the default as 0 - no limit */
+	if (base_val == INT_MAX)
+		base_val = 0;
+	if (base_val > INT_MAX)
+		base_val = INT_MAX;
+
+	if (CPUCAPS_OFF() || !ZONE_IS_CAPPED(zone))
+		return (0);
+
+	if (zone->zone_cpucap == NULL)
+		cap = cap_alloc();
+
+	mutex_enter(&caps_lock);
+
+	if (cpucaps_busy) {
+		mutex_exit(&caps_lock);
+		return (EBUSY);
+	}
+
+	/*
+	 * Double-check whether zone->zone_cpucap is NULL, now with caps_lock
+	 * held. If it is still NULL, assign a newly allocated cpucap to it.
+	 */
+	if (zone->zone_cpucap == NULL) {
+		zone->zone_cpucap = cap;
+	} else if (cap != NULL) {
+		cap_free(cap);
+	}
+
+	cap = zone->zone_cpucap;
+
+	value = SEC_TO_TICK(base_val);
+	if (value < 0)
+		value = 0;
+
+	cap->cap_burst_limit = value;
 
 	mutex_exit(&caps_lock);
 
@@ -969,7 +1081,7 @@ cpucaps_project_set(kproject_t *kpj, rctl_qty_t cap_val)
 		if (CAP_DISABLED(cap))
 			cap_project_enable(kpj, value);
 		else
-			cap->cap_value = value;
+			cap->cap_value = cap->cap_chk_value = value;
 	} else if (CAP_ENABLED(cap)) {
 		/*
 		 * User requested to drop a cap on the project. If it is part of
@@ -977,7 +1089,7 @@ cpucaps_project_set(kproject_t *kpj, rctl_qty_t cap_val)
 		 * otherwise disable the cap.
 		 */
 		if (ZONE_IS_CAPPED(kpj->kpj_zone)) {
-			cap->cap_value = MAX_USAGE;
+			cap->cap_value = cap->cap_chk_value = MAX_USAGE;
 		} else {
 			cap_project_disable(kpj);
 		}
@@ -1022,6 +1134,16 @@ cpucaps_zone_get_base(zone_t *zone)
 {
 	return (zone->zone_cpucap != NULL ?
 	    (rctl_qty_t)(zone->zone_cpucap->cap_base / cap_tick_cost) : 0);
+}
+
+/*
+ * Get current zone maximum burst time.
+ */
+rctl_qty_t
+cpucaps_zone_get_burst_time(zone_t *zone)
+{
+	return (zone->zone_cpucap != NULL ?
+	    (rctl_qty_t)(TICK_TO_SEC(zone->zone_cpucap->cap_burst_limit)) : 0);
 }
 
 /*
@@ -1122,7 +1244,7 @@ cpucaps_charge(kthread_id_t t, caps_sc_t *csc, cpucaps_charge_t charge_type)
 
 	project_cap = kpj->kpj_cpucap;
 
-	if (project_cap->cap_usage >= project_cap->cap_value) {
+	if (project_cap->cap_usage >= project_cap->cap_chk_value) {
 		t->t_schedflag |= TS_PROJWAITQ;
 		rc = B_TRUE;
 	} else if (t->t_schedflag & TS_PROJWAITQ) {
@@ -1136,7 +1258,7 @@ cpucaps_charge(kthread_id_t t, caps_sc_t *csc, cpucaps_charge_t charge_type)
 	} else {
 		cpucap_t *zone_cap = zone->zone_cpucap;
 
-		if (zone_cap->cap_usage >= zone_cap->cap_value) {
+		if (zone_cap->cap_usage >= zone_cap->cap_chk_value) {
 			t->t_schedflag |= TS_ZONEWAITQ;
 			rc = B_TRUE;
 		} else if (t->t_schedflag & TS_ZONEWAITQ) {
@@ -1212,6 +1334,10 @@ cap_kstat_update(kstat_t *ksp, int rw)
 	    ROUND_SCALE(cap->cap_value, cap_tick_cost);
 	capsp->cap_baseline.value.ui64 =
 	    ROUND_SCALE(cap->cap_base, cap_tick_cost);
+	capsp->cap_effective.value.ui64 =
+	    ROUND_SCALE(cap->cap_chk_value, cap_tick_cost);
+	capsp->cap_burst_limit.value.ui64 =
+	    ROUND_SCALE(cap->cap_burst_limit, tick_sec);
 	capsp->cap_usage.value.ui64 =
 	    ROUND_SCALE(cap->cap_usage, cap_tick_cost);
 	capsp->cap_maxusage.value.ui64 =
@@ -1221,6 +1347,8 @@ cap_kstat_update(kstat_t *ksp, int rw)
 	capsp->cap_above.value.ui64 = ROUND_SCALE(cap->cap_above, tick_sec);
 	capsp->cap_above_base.value.ui64 =
 	    ROUND_SCALE(cap->cap_above_base, tick_sec);
+	capsp->cap_bursting.value.ui64 =
+	    ROUND_SCALE(cap->cap_bursting, tick_sec);
 	kstat_named_setstr(&capsp->cap_zonename, zonename);
 
 	return (0);

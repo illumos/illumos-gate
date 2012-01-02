@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2011 Joyent, Inc.  All rights reserved.
+ * Copyright 2011, 2012, Joyent, Inc.  All rights reserved.
  */
 
 #ifndef	_SYS_CPUCAPS_IMPL_H
@@ -67,9 +67,12 @@ typedef struct cpucap {
 	waitq_t		cap_waitq;	/* waitq for capped threads	*/
 	kstat_t		*cap_kstat;	/* cpucaps specific kstat	*/
 	int64_t		cap_gen;	/* zone cap specific 		*/
+	hrtime_t	cap_chk_value;	/* effective CPU usage cap	*/
 	hrtime_t	cap_value;	/* scaled CPU usage cap		*/
 	hrtime_t	cap_usage;	/* current CPU usage		*/
 	hrtime_t	cap_base;	/* base CPU for burst		*/
+	u_longlong_t	cap_burst_limit; /* max secs (in tics) for a burst */
+	u_longlong_t	cap_bursting;	/* # of ticks currently bursting */
 	disp_lock_t	cap_usagelock;	/* protects cap_usage above	*/
 	/*
 	 * Per cap statistics.
