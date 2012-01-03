@@ -24,7 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ */
 
 #include <sys/timer.h>
 #include <sys/systm.h>
@@ -772,25 +774,6 @@ timer_settime(timer_t tid, int flags, itimerspec_t *val, itimerspec_t *oval)
 	if ((it = timer_grab(p, tid)) == NULL)
 		return (set_errno(EINVAL));
 
-	/*
-	 * From the man page:
-	 *	Time values that are between two consecutive non-negative
-	 *	integer multiples of the resolution of the specified timer
-	 *	shall be rounded up to the larger multiple of the resolution.
-	 * We assume that the resolution of any clock is less than one second.
-	 */
-	if (it->it_backend->clk_clock_getres(&res) == 0 && res.tv_nsec > 1) {
-		long rem;
-
-		if ((rem = when.it_interval.tv_nsec % res.tv_nsec) != 0) {
-			when.it_interval.tv_nsec += res.tv_nsec - rem;
-			timespecfix(&when.it_interval);
-		}
-		if ((rem = when.it_value.tv_nsec % res.tv_nsec) != 0) {
-			when.it_value.tv_nsec += res.tv_nsec - rem;
-			timespecfix(&when.it_value);
-		}
-	}
 	error = it->it_backend->clk_timer_settime(it, flags, &when);
 
 	timer_release(p, it);
