@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2011 Joyent, Inc.  All rights reserved.
+ * Copyright 2011, 2012, Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -519,7 +519,8 @@ vmu_alloc_zone(id_t id)
 
 	zone->vmz_id = id;
 
-	if ((vmu_data.vmu_calc_flags & (VMUSAGE_ZONE | VMUSAGE_ALL_ZONES)) != 0)
+	if ((vmu_data.vmu_calc_flags &
+	    (VMUSAGE_ZONE | VMUSAGE_ALL_ZONES | VMUSAGE_A_ZONE)) != 0)
 		zone->vmz_zone = vmu_alloc_entity(id, VMUSAGE_ZONE, id);
 
 	if ((vmu_data.vmu_calc_flags & (VMUSAGE_PROJECTS |
@@ -1462,8 +1463,9 @@ vmu_calculate_proc(proc_t *p)
 		entities = tmp;
 	}
 	if (vmu_data.vmu_calc_flags &
-	    (VMUSAGE_ZONE | VMUSAGE_ALL_ZONES | VMUSAGE_PROJECTS |
-	    VMUSAGE_ALL_PROJECTS | VMUSAGE_TASKS | VMUSAGE_ALL_TASKS |
+	    (VMUSAGE_ZONE | VMUSAGE_ALL_ZONES | VMUSAGE_A_ZONE |
+	    VMUSAGE_PROJECTS | VMUSAGE_ALL_PROJECTS |
+	    VMUSAGE_TASKS | VMUSAGE_ALL_TASKS |
 	    VMUSAGE_RUSERS | VMUSAGE_ALL_RUSERS | VMUSAGE_EUSERS |
 	    VMUSAGE_ALL_EUSERS)) {
 		ret = i_mod_hash_find_nosync(vmu_data.vmu_zones_hash,
@@ -1767,7 +1769,7 @@ vmu_update_zone_rctls(vmu_cache_t *cache)
  */
 static int
 vmu_copyout_results(vmu_cache_t *cache, vmusage_t *buf, size_t *nres,
-    uint_t flags, int cpflg)
+    uint_t flags, id_t req_zone_id, int cpflg)
 {
 	vmusage_t *result, *out_result;
 	vmusage_t dummy;
@@ -1786,7 +1788,7 @@ vmu_copyout_results(vmu_cache_t *cache, vmusage_t *buf, size_t *nres,
 	/* figure out what results the caller is interested in. */
 	if ((flags & VMUSAGE_SYSTEM) && curproc->p_zone == global_zone)
 		types |= VMUSAGE_SYSTEM;
-	if (flags & (VMUSAGE_ZONE | VMUSAGE_ALL_ZONES))
+	if (flags & (VMUSAGE_ZONE | VMUSAGE_ALL_ZONES | VMUSAGE_A_ZONE))
 		types |= VMUSAGE_ZONE;
 	if (flags & (VMUSAGE_PROJECTS | VMUSAGE_ALL_PROJECTS |
 	    VMUSAGE_COL_PROJECTS))
@@ -1849,26 +1851,33 @@ vmu_copyout_results(vmu_cache_t *cache, vmusage_t *buf, size_t *nres,
 				continue;
 		}
 
-		/* Skip "other zone" results if not requested */
-		if (result->vmu_zoneid != curproc->p_zone->zone_id) {
-			if (result->vmu_type == VMUSAGE_ZONE &&
-			    (flags & VMUSAGE_ALL_ZONES) == 0)
+		if (result->vmu_type == VMUSAGE_ZONE &&
+		    flags & VMUSAGE_A_ZONE) {
+			/* Skip non-requested zone results */
+			if (result->vmu_zoneid != req_zone_id)
 				continue;
-			if (result->vmu_type == VMUSAGE_PROJECTS &&
-			    (flags & (VMUSAGE_ALL_PROJECTS |
-			    VMUSAGE_COL_PROJECTS)) == 0)
-				continue;
-			if (result->vmu_type == VMUSAGE_TASKS &&
-			    (flags & VMUSAGE_ALL_TASKS) == 0)
-				continue;
-			if (result->vmu_type == VMUSAGE_RUSERS &&
-			    (flags & (VMUSAGE_ALL_RUSERS |
-			    VMUSAGE_COL_RUSERS)) == 0)
-				continue;
-			if (result->vmu_type == VMUSAGE_EUSERS &&
-			    (flags & (VMUSAGE_ALL_EUSERS |
-			    VMUSAGE_COL_EUSERS)) == 0)
-				continue;
+		} else {
+			/* Skip "other zone" results if not requested */
+			if (result->vmu_zoneid != curproc->p_zone->zone_id) {
+				if (result->vmu_type == VMUSAGE_ZONE &&
+				    (flags & VMUSAGE_ALL_ZONES) == 0)
+					continue;
+				if (result->vmu_type == VMUSAGE_PROJECTS &&
+				    (flags & (VMUSAGE_ALL_PROJECTS |
+				    VMUSAGE_COL_PROJECTS)) == 0)
+					continue;
+				if (result->vmu_type == VMUSAGE_TASKS &&
+				    (flags & VMUSAGE_ALL_TASKS) == 0)
+					continue;
+				if (result->vmu_type == VMUSAGE_RUSERS &&
+				    (flags & (VMUSAGE_ALL_RUSERS |
+				    VMUSAGE_COL_RUSERS)) == 0)
+					continue;
+				if (result->vmu_type == VMUSAGE_EUSERS &&
+				    (flags & (VMUSAGE_ALL_EUSERS |
+				    VMUSAGE_COL_EUSERS)) == 0)
+					continue;
+			}
 		}
 		count++;
 		if (out_result != NULL) {
@@ -1924,10 +1933,12 @@ vm_getusage(uint_t flags, time_t age, vmusage_t *buf, size_t *nres, int cpflg)
 	int cacherecent = 0;
 	hrtime_t now;
 	uint_t flags_orig;
+	id_t req_zone_id;
 
 	/*
 	 * Non-global zones cannot request system wide and/or collated
-	 * results, or the system result, so munge the flags accordingly.
+	 * results, or the system result, or usage of another zone, so munge
+	 * the flags accordingly.
 	 */
 	flags_orig = flags;
 	if (curproc->p_zone != global_zone) {
@@ -1947,6 +1958,10 @@ vm_getusage(uint_t flags, time_t age, vmusage_t *buf, size_t *nres, int cpflg)
 			flags &= ~VMUSAGE_SYSTEM;
 			flags |= VMUSAGE_ZONE;
 		}
+		if (flags & VMUSAGE_A_ZONE) {
+			flags &= ~VMUSAGE_A_ZONE;
+			flags |= VMUSAGE_ZONE;
+		}
 	}
 
 	/* Check for unknown flags */
@@ -1956,6 +1971,21 @@ vm_getusage(uint_t flags, time_t age, vmusage_t *buf, size_t *nres, int cpflg)
 	/* Check for no flags */
 	if ((flags & VMUSAGE_MASK) == 0)
 		return (set_errno(EINVAL));
+
+	/* If requesting results for a specific zone, get the zone ID */
+	if (flags & VMUSAGE_A_ZONE) {
+		size_t bufsize;
+		vmusage_t zreq;
+
+		if (ddi_copyin((caddr_t)nres, &bufsize, sizeof (size_t), cpflg))
+			return (set_errno(EFAULT));
+		/* Requested zone ID is passed in buf, so 0 len not allowed */
+		if (bufsize == 0)
+			return (set_errno(EINVAL));
+		if (ddi_copyin((caddr_t)buf, &zreq, sizeof (vmusage_t), cpflg))
+			return (set_errno(EFAULT));
+		req_zone_id = zreq.vmu_id;
+	}
 
 	mutex_enter(&vmu_data.vmu_lock);
 	now = gethrtime();
@@ -1976,7 +2006,7 @@ start:
 			mutex_exit(&vmu_data.vmu_lock);
 
 			ret = vmu_copyout_results(cache, buf, nres, flags_orig,
-			    cpflg);
+			    req_zone_id, cpflg);
 			mutex_enter(&vmu_data.vmu_lock);
 			vmu_cache_rele(cache);
 			if (vmu_data.vmu_pending_waiters > 0)
@@ -2035,7 +2065,8 @@ start:
 		/* update zone's phys. mem. rctl usage */
 		vmu_update_zone_rctls(cache);
 		/* copy cache */
-		ret = vmu_copyout_results(cache, buf, nres, flags_orig, cpflg);
+		ret = vmu_copyout_results(cache, buf, nres, flags_orig,
+		    req_zone_id, cpflg);
 		mutex_enter(&vmu_data.vmu_lock);
 		vmu_cache_rele(cache);
 		mutex_exit(&vmu_data.vmu_lock);
