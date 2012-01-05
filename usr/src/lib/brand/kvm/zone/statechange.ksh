@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2010, 2011 Joyent, Inc.  All rights reserved.
+# Copyright 2010, 2012 Joyent, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -318,6 +318,69 @@ setup_fs()
 }
 
 #
+# If the zone has a CPU cap, calculate the CPU baseline and set it so we can
+# track when we're bursting.  There are many ways that the baseline can be
+# calculated based on the other settings in the zones (e.g. a simple way would
+# be as a precentage of the cap).
+#
+# For SmartMachines, our CPU baseline is calculated off of the system's
+# provisionable memory and the memory cap of the zone. We assume that 83% of
+# the system's memory is usable by zones (the rest is for the OS) and we assume
+# that the zone memory cap is set so that we're proportional to how many zones
+# we can provision on the system (i.e. we don't overprovision memory).  Using
+# these assumptions, we calculate the proportion of CPU for the zone based on
+# its proportion of memory. Thus, the zone's CPU baseline is calculated using:
+#     ((zone capped memsize in MB) * 100) / (MB/core).
+# Uncapped zones have no baseline (i.e. infrastructure zones).
+#
+# Remember that the cpu-cap rctl and the baseline are expressed in units of
+# a percent of a CPU, so 100 is 1 full CPU.
+#
+setup_cpu_baseline()
+{
+	# If there is already a baseline, don't set one heuristically
+	curr_base=`prctl -P -n zone.cpu-baseline -i zone $ZONENAME | nawk '{
+		if ($2 == "privileged") print $3
+	    }'`
+	[ -n "$curr_base" ] && return
+
+	# Get current cap and convert from zonecfg format into rctl format
+	cap=`zonecfg -z $ZONENAME info capped-cpu | nawk '{
+	    if ($1 == "[ncpus:") print (substr($2, 1, length($2) - 1) * 100)
+	}'`
+	[ -z "$cap" ] && return
+
+	# Get zone's memory cap in MB times 100
+	zmem=`zonecfg -z $ZONENAME info capped-memory | nawk '{
+	    if ($1 == "[physical:") {
+	        val = substr($2, 1, length($2) - 2)
+	        units = substr($2, length($2) - 1, 1)
+
+	        # convert GB to MB
+	        if (units == "G")
+	            val *= 1024
+	        print (val * 100)
+	    }
+	}'`
+	[ -z "$zmem" ] && return
+
+	# Get system's total memory in MB
+	smem=`prtconf -m`
+	# provisionable memory is 83% of total memory (bash can't do floats)
+	prov_mem=$((($smem * 83) / 100))
+	nprocs=`psrinfo -v | \
+	    nawk '/virtual processor/ {cnt++} END {print cnt}'`
+
+	mb_per_core=$(($prov_mem / $nprocs))
+
+	baseline=$(($zmem / $mb_per_core))
+	[[ $baseline == 0 ]] && baseline=1
+	[[ $baseline -gt $cap ]] && baseline=$cap
+
+	prctl -n zone.cpu-baseline -v $baseline -t priv -i zone $ZONENAME
+}
+
+#
 # We're halting the zone, perform network cleanup.
 #
 cleanup_net()
@@ -351,5 +414,7 @@ echo "statechange $subcommand $cmd" >>/tmp/kvm.log
 [[ "$subcommand" == "pre" && $cmd == 0 ]] && setup_fs
 [[ "$subcommand" == "pre" && $cmd == 4 ]] && cleanup_net
 [[ "$subcommand" == "post" && $cmd == 0 ]] && setup_net
+# We can't set a rctl until we have a process in the zone to grab
+[[ "$subcommand" == "post" && $cmd == 1 ]] && setup_cpu_baseline
 
 exit 0
