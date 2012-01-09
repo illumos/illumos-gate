@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
+ * Copyright(c) 2007-2012 Intel Corporation. All rights reserved.
  */
 
 /*
@@ -79,6 +79,15 @@ static s32 e1000_read_mac_addr_82575(struct e1000_hw *hw);
 static void e1000_power_down_phy_copper_82575(struct e1000_hw *hw);
 static void e1000_shutdown_serdes_link_82575(struct e1000_hw *hw);
 static s32 e1000_set_pcie_completion_timeout(struct e1000_hw *hw);
+
+static s32 e1000_update_nvm_checksum_with_offset(struct e1000_hw *hw,
+    u16 offset);
+static s32 e1000_validate_nvm_checksum_with_offset(struct e1000_hw *hw,
+    u16 offset);
+static s32 e1000_validate_nvm_checksum_i350(struct e1000_hw *hw);
+static s32 e1000_update_nvm_checksum_i350(struct e1000_hw *hw);
+static void e1000_write_vfta_i350(struct e1000_hw *hw, u32 offset, u32 value);
+static void e1000_clear_vfta_i350(struct e1000_hw *hw);
 
 static const u16 e1000_82580_rxpbs_table[] =
 	{36, 72, 144, 1, 2, 4, 8, 16, 35, 70, 140};
@@ -151,6 +160,7 @@ e1000_init_phy_params_82575(struct e1000_hw *hw)
 		phy->ops.set_d3_lplu_state = e1000_set_d3_lplu_state_generic;
 		break;
 	case I82580_I_PHY_ID:
+	case I350_I_PHY_ID:
 		phy->type = e1000_phy_82580;
 		phy->ops.check_polarity = e1000_check_polarity_82577;
 		phy->ops.force_speed_duplex =
@@ -222,6 +232,17 @@ e1000_init_nvm_params_82575(struct e1000_hw *hw)
 	nvm->ops.validate = e1000_validate_nvm_checksum_generic;
 	nvm->ops.write = e1000_write_nvm_spi;
 
+	/* override genric family function pointers for specific descendants */
+	switch (hw->mac.type) {
+	case e1000_i350:
+		nvm->ops.validate = e1000_validate_nvm_checksum_i350;
+		nvm->ops.update = e1000_update_nvm_checksum_i350;
+		break;
+	default:
+		break;
+	}
+
+
 	return (E1000_SUCCESS);
 }
 
@@ -284,6 +305,11 @@ e1000_init_mac_params_82575(struct e1000_hw *hw)
 		mac->rar_entry_count = E1000_RAR_ENTRIES_82576;
 	if (mac->type == e1000_82580)
 		mac->rar_entry_count = E1000_RAR_ENTRIES_82580;
+	if (mac->type == e1000_i350) {
+		mac->rar_entry_count = E1000_RAR_ENTRIES_I350;
+		/* Enable EEE default settings for i350 */
+		dev_spec->eee_disable = B_FALSE;
+	}
 	/* Set if part includes ASF firmware */
 	mac->asf_firmware_present = true;
 	/* Set if manageability features are enabled. */
@@ -319,10 +345,18 @@ e1000_init_mac_params_82575(struct e1000_hw *hw)
 	mac->ops.read_mac_addr = e1000_read_mac_addr_82575;
 	/* multicast address update */
 	mac->ops.update_mc_addr_list = e1000_update_mc_addr_list_generic;
-	/* writing VFTA */
-	mac->ops.write_vfta = e1000_write_vfta_generic;
-	/* clearing VFTA */
-	mac->ops.clear_vfta = e1000_clear_vfta_generic;
+
+	if (hw->mac.type == e1000_i350) {
+		/* writing VFTA */
+		mac->ops.write_vfta = e1000_write_vfta_i350;
+		/* clearing VFTA */
+		mac->ops.clear_vfta = e1000_clear_vfta_i350;
+	} else {
+		/* writing VFTA */
+		mac->ops.write_vfta = e1000_write_vfta_generic;
+		/* clearing VFTA */
+		mac->ops.clear_vfta = e1000_clear_vfta_generic;
+	}
 	/* setting MTA */
 	mac->ops.mta_set = e1000_mta_set_generic;
 	/* ID LED init */
@@ -696,6 +730,22 @@ e1000_acquire_nvm_82575(struct e1000_hw *hw)
 	ret_val = e1000_acquire_swfw_sync_82575(hw, E1000_SWFW_EEP_SM);
 	if (ret_val)
 		goto out;
+
+	/*
+	 * Check if there is some access
+	 * error this access may hook on
+	 */
+	if (hw->mac.type == e1000_i350) {
+		u32 eecd = E1000_READ_REG(hw, E1000_EECD);
+		if (eecd & (E1000_EECD_BLOCKED | E1000_EECD_ABORT |
+		    E1000_EECD_TIMEOUT)) {
+			/* Clear all access error flags */
+			E1000_WRITE_REG(hw, E1000_EECD, eecd |
+			    E1000_EECD_ERROR_CLR);
+			DEBUGOUT("Nvm bit banging access error "
+			    "detected and cleared.\n");
+		}
+	}
 
 	ret_val = e1000_acquire_nvm_generic(hw);
 
@@ -1863,6 +1913,232 @@ e1000_rxpbs_adjust_82580(u32 data)
 
 	if (data < E1000_82580_RXPBS_TABLE_SIZE)
 		ret_val = e1000_82580_rxpbs_table[data];
+
+	return (ret_val);
+}
+
+/*
+ * Due to a hw errata, if the host tries to  configure the VFTA register
+ * while performing queries from the BMC or DMA, then the VFTA in some
+ * cases won't be written.
+ */
+
+/*
+ *  e1000_clear_vfta_i350 - Clear VLAN filter table
+ *  @hw: pointer to the HW structure
+ *
+ *  Clears the register array which contains the VLAN filter table by
+ *  setting all the values to 0.
+ */
+void
+e1000_clear_vfta_i350(struct e1000_hw *hw)
+{
+	u32 offset;
+	int i;
+
+	DEBUGFUNC("e1000_clear_vfta_350");
+
+	for (offset = 0; offset < E1000_VLAN_FILTER_TBL_SIZE; offset++) {
+		for (i = 0; i < 10; i++)
+			E1000_WRITE_REG_ARRAY(hw, E1000_VFTA, offset, 0);
+
+		E1000_WRITE_FLUSH(hw);
+	}
+}
+
+/*
+ *  e1000_write_vfta_i350 - Write value to VLAN filter table
+ *  @hw: pointer to the HW structure
+ *  @offset: register offset in VLAN filter table
+ *  @value: register value written to VLAN filter table
+ *
+ *  Writes value at the given offset in the register array which stores
+ *  the VLAN filter table.
+ */
+void
+e1000_write_vfta_i350(struct e1000_hw *hw, u32 offset, u32 value)
+{
+	int i;
+
+	DEBUGFUNC("e1000_write_vfta_350");
+
+	for (i = 0; i < 10; i++)
+		E1000_WRITE_REG_ARRAY(hw, E1000_VFTA, offset, value);
+
+	E1000_WRITE_FLUSH(hw);
+}
+
+/*
+ *  e1000_validate_nvm_checksum_with_offset - Validate EEPROM
+ *  checksum
+ *  @hw: pointer to the HW structure
+ *  @offset: offset in words of the checksum protected region
+ *
+ *  Calculates the EEPROM checksum by reading/adding each word of the EEPROM
+ *  and then verifies that the sum of the EEPROM is equal to 0xBABA.
+ */
+s32
+e1000_validate_nvm_checksum_with_offset(struct e1000_hw *hw, u16 offset)
+{
+	s32 ret_val = E1000_SUCCESS;
+	u16 checksum = 0;
+	u16 i, nvm_data;
+
+	DEBUGFUNC("e1000_validate_nvm_checksum_with_offset");
+
+	for (i = offset; i < ((NVM_CHECKSUM_REG + offset) + 1); i++) {
+		ret_val = hw->nvm.ops.read(hw, i, 1, &nvm_data);
+		if (ret_val) {
+			DEBUGOUT("NVM Read Error\n");
+			goto out;
+		}
+		checksum += nvm_data;
+	}
+
+	if (checksum != (u16) NVM_SUM) {
+		DEBUGOUT("NVM Checksum Invalid\n");
+		ret_val = -E1000_ERR_NVM;
+		goto out;
+	}
+
+out:
+	return (ret_val);
+}
+
+/*
+ *  e1000_update_nvm_checksum_with_offset - Update EEPROM
+ *  checksum
+ *  @hw: pointer to the HW structure
+ *  @offset: offset in words of the checksum protected region
+ *
+ *  Updates the EEPROM checksum by reading/adding each word of the EEPROM
+ *  up to the checksum.  Then calculates the EEPROM checksum and writes the
+ *  value to the EEPROM.
+ */
+s32
+e1000_update_nvm_checksum_with_offset(struct e1000_hw *hw, u16 offset)
+{
+	s32 ret_val;
+	u16 checksum = 0;
+	u16 i, nvm_data;
+
+	DEBUGFUNC("e1000_update_nvm_checksum_with_offset");
+
+	for (i = offset; i < (NVM_CHECKSUM_REG + offset); i++) {
+		ret_val = hw->nvm.ops.read(hw, i, 1, &nvm_data);
+		if (ret_val) {
+			DEBUGOUT("NVM Read Error while updating checksum.\n");
+			goto out;
+		}
+		checksum += nvm_data;
+	}
+	checksum = (u16) NVM_SUM - checksum;
+	ret_val = hw->nvm.ops.write(hw, (NVM_CHECKSUM_REG + offset), 1,
+	    &checksum);
+	if (ret_val)
+		DEBUGOUT("NVM Write Error while updating checksum.\n");
+
+out:
+	return (ret_val);
+}
+
+/*
+ *  e1000_validate_nvm_checksum_i350 - Validate EEPROM checksum
+ *  @hw: pointer to the HW structure
+ *
+ *  Calculates the EEPROM section checksum by reading/adding each word of
+ *  the EEPROM and then verifies that the sum of the EEPROM is
+ *  equal to 0xBABA.
+ */
+static s32
+e1000_validate_nvm_checksum_i350(struct e1000_hw *hw)
+{
+	s32 ret_val = E1000_SUCCESS;
+	u16 j;
+	u16 nvm_offset;
+
+	DEBUGFUNC("e1000_validate_nvm_checksum_i350");
+
+	for (j = 0; j < 4; j++) {
+		nvm_offset = NVM_82580_LAN_FUNC_OFFSET(j);
+		ret_val = e1000_validate_nvm_checksum_with_offset(hw,
+		    nvm_offset);
+		if (ret_val != E1000_SUCCESS)
+			goto out;
+	}
+
+out:
+	return (ret_val);
+}
+
+/*
+ *  e1000_update_nvm_checksum_i350 - Update EEPROM checksum
+ *  @hw: pointer to the HW structure
+ *
+ *  Updates the EEPROM section checksums for all 4 ports by reading/adding
+ *  each word of the EEPROM up to the checksum.  Then calculates the EEPROM
+ *  checksum and writes the value to the EEPROM.
+ */
+static s32
+e1000_update_nvm_checksum_i350(struct e1000_hw *hw)
+{
+	s32 ret_val = E1000_SUCCESS;
+	u16 j;
+	u16 nvm_offset;
+
+	DEBUGFUNC("e1000_update_nvm_checksum_i350");
+
+	for (j = 0; j < 4; j++) {
+		nvm_offset = NVM_82580_LAN_FUNC_OFFSET(j);
+		ret_val = e1000_update_nvm_checksum_with_offset(hw, nvm_offset);
+		if (ret_val != E1000_SUCCESS)
+			goto out;
+	}
+
+out:
+	return (ret_val);
+}
+
+
+
+/*
+ *  e1000_set_eee_i350 - Enable/disable EEE support
+ *  @hw: pointer to the HW structure
+ *
+ *  Enable/disable EEE based on setting in dev_spec structure.
+ *
+ */
+s32
+e1000_set_eee_i350(struct e1000_hw *hw)
+{
+
+	s32 ret_val = E1000_SUCCESS;
+	u32 ipcnfg, eeer;
+
+	DEBUGFUNC("e1000_set_eee_i350");
+
+	if ((hw->mac.type < e1000_i350) ||
+	    (hw->phy.media_type != e1000_media_type_copper))
+		goto out;
+	ipcnfg = E1000_READ_REG(hw, E1000_IPCNFG);
+	eeer = E1000_READ_REG(hw, E1000_EEER);
+
+	/* enable or disable per user setting */
+	if (!(hw->dev_spec._82575.eee_disable)) {
+		ipcnfg |= (E1000_IPCNFG_EEE_1G_AN | E1000_IPCNFG_EEE_100M_AN);
+		eeer |= (E1000_EEER_TX_LPI_EN | E1000_EEER_RX_LPI_EN |
+		    E1000_EEER_LPI_FC);
+
+	} else {
+		ipcnfg &= ~(E1000_IPCNFG_EEE_1G_AN | E1000_IPCNFG_EEE_100M_AN);
+		eeer &= ~(E1000_EEER_TX_LPI_EN | E1000_EEER_RX_LPI_EN |
+		    E1000_EEER_LPI_FC);
+	}
+	E1000_WRITE_REG(hw, E1000_IPCNFG, ipcnfg);
+	E1000_WRITE_REG(hw, E1000_EEER, eeer);
+	E1000_READ_REG(hw, E1000_IPCNFG);
+	E1000_READ_REG(hw, E1000_EEER);
+out:
 
 	return (ret_val);
 }

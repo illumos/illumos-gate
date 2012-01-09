@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
+ * Copyright(c) 2007-2012 Intel Corporation. All rights reserved.
  */
 
 /*
@@ -1007,6 +1007,14 @@ extern "C" {
 #define	E1000_IMIR_PRIORITY_SHIFT	29 /* IMIR Priority Shift */
 #define	E1000_IMIREXT_CLEAR_MASK	0x7FFFF /* IMIREXT Reg Clear Mask */
 
+/* I350 EEE defines */
+#define	E1000_IPCNFG_EEE_1G_AN		0x00000008 /* IPCNFG EEE Ena 1G AN */
+#define	E1000_IPCNFG_EEE_100M_AN	0x00000004 /* IPCNFG EEE Ena 100M AN */
+#define	E1000_EEER_TX_LPI_EN		0x00010000 /* EEER Tx LPI Enable */
+#define	E1000_EEER_RX_LPI_EN		0x00020000 /* EEER Rx LPI Enable */
+#define	E1000_EEER_LPI_FC		0x00040000 /* EEER Ena on Flow Cntrl */
+
+
 /* PCI Express Control */
 #define	E1000_GCR_RXD_NO_SNOOP		0x00000001
 #define	E1000_GCR_RXDSCW_NO_SNOOP	0x00000002
@@ -1148,6 +1156,11 @@ extern "C" {
 #define	E1000_EECD_GNT		0x00000080 /* NVM Access Grant */
 #define	E1000_EECD_PRES		0x00000100 /* NVM Present */
 #define	E1000_EECD_SIZE		0x00000200 /* NVM Size (0=64 word 1=256 word) */
+#define	E1000_EECD_BLOCKED	0x00008000 /* Bit banging access blocked flag */
+#define	E1000_EECD_ABORT	0x00010000 /* NVM operation aborted flag */
+#define	E1000_EECD_TIMEOUT	0x00020000 /* NVM read operation timeout flag */
+#define	E1000_EECD_ERROR_CLR	0x00040000 /* NVM error status clear bit */
+
 /* NVM Addressing bits based on type 0=small, 1=large */
 #define	E1000_EECD_ADDR_BITS	0x00000400
 #define	E1000_EECD_TYPE		0x00002000 /* NVM Type (1-SPI, 0-Microwire) */
@@ -1307,6 +1320,7 @@ extern "C" {
 #define	IFE_PLUS_E_PHY_ID	0x02A80320
 #define	IFE_C_E_PHY_ID		0x02A80310
 #define	I82580_I_PHY_ID		0x015403A0
+#define	I350_I_PHY_ID		0x015403B0
 #define	IGP04E1000_E_PHY_ID	0x02A80391
 #define	M88_VENDOR		0x0141
 
