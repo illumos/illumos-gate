@@ -124,7 +124,6 @@ get_boot_cap(const char *osroot)
 	}
 
 	if (!is_grub(osroot)) {
-		bam_error(NOT_GRUB_ROOT, osroot);
 		return (BAM_ERROR);
 	}
 
