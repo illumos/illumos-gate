@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012, Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -573,7 +574,7 @@ proto_promiscon_req(dld_str_t *dsp, mblk_t *mp)
 	dl_promiscon_req_t *dlp = (dl_promiscon_req_t *)mp->b_rptr;
 	int		err = 0;
 	t_uscalar_t	dl_err;
-	uint32_t	promisc_saved;
+	uint32_t	new_flags, promisc_saved;
 	queue_t		*q = dsp->ds_wq;
 	mac_perim_handle_t	mph;
 
@@ -588,18 +589,20 @@ proto_promiscon_req(dld_str_t *dsp, mblk_t *mp)
 		goto failed;
 	}
 
-	promisc_saved = dsp->ds_promisc;
+	mac_perim_enter_by_mh(dsp->ds_mh, &mph);
+
+	new_flags = promisc_saved = dsp->ds_promisc;
 	switch (dlp->dl_level) {
 	case DL_PROMISC_SAP:
-		dsp->ds_promisc |= DLS_PROMISC_SAP;
+		new_flags |= DLS_PROMISC_SAP;
 		break;
 
 	case DL_PROMISC_MULTI:
-		dsp->ds_promisc |= DLS_PROMISC_MULTI;
+		new_flags |= DLS_PROMISC_MULTI;
 		break;
 
 	case DL_PROMISC_PHYS:
-		dsp->ds_promisc |= DLS_PROMISC_PHYS;
+		new_flags |= DLS_PROMISC_PHYS;
 		break;
 
 	default:
@@ -607,10 +610,8 @@ proto_promiscon_req(dld_str_t *dsp, mblk_t *mp)
 		goto failed;
 	}
 
-	mac_perim_enter_by_mh(dsp->ds_mh, &mph);
-
 	if ((promisc_saved == 0) && (err = dls_active_set(dsp)) != 0) {
-		dsp->ds_promisc = promisc_saved;
+		ASSERT(dsp->ds_promisc == promisc_saved);
 		dl_err = DL_SYSERR;
 		goto failed2;
 	}
@@ -618,7 +619,7 @@ proto_promiscon_req(dld_str_t *dsp, mblk_t *mp)
 	/*
 	 * Adjust channel promiscuity.
 	 */
-	err = dls_promisc(dsp, promisc_saved);
+	err = dls_promisc(dsp, new_flags);
 
 	if (err != 0) {
 		dl_err = DL_SYSERR;
@@ -648,7 +649,7 @@ proto_promiscoff_req(dld_str_t *dsp, mblk_t *mp)
 	dl_promiscoff_req_t *dlp = (dl_promiscoff_req_t *)mp->b_rptr;
 	int		err = 0;
 	t_uscalar_t	dl_err;
-	uint32_t	promisc_saved;
+	uint32_t	new_flags;
 	queue_t		*q = dsp->ds_wq;
 	mac_perim_handle_t	mph;
 
@@ -663,14 +664,16 @@ proto_promiscoff_req(dld_str_t *dsp, mblk_t *mp)
 		goto failed;
 	}
 
-	promisc_saved = dsp->ds_promisc;
+	mac_perim_enter_by_mh(dsp->ds_mh, &mph);
+
+	new_flags = dsp->ds_promisc;
 	switch (dlp->dl_level) {
 	case DL_PROMISC_SAP:
 		if (!(dsp->ds_promisc & DLS_PROMISC_SAP)) {
 			dl_err = DL_NOTENAB;
 			goto failed;
 		}
-		dsp->ds_promisc &= ~DLS_PROMISC_SAP;
+		new_flags &= ~DLS_PROMISC_SAP;
 		break;
 
 	case DL_PROMISC_MULTI:
@@ -678,7 +681,7 @@ proto_promiscoff_req(dld_str_t *dsp, mblk_t *mp)
 			dl_err = DL_NOTENAB;
 			goto failed;
 		}
-		dsp->ds_promisc &= ~DLS_PROMISC_MULTI;
+		new_flags &= ~DLS_PROMISC_MULTI;
 		break;
 
 	case DL_PROMISC_PHYS:
@@ -686,7 +689,7 @@ proto_promiscoff_req(dld_str_t *dsp, mblk_t *mp)
 			dl_err = DL_NOTENAB;
 			goto failed;
 		}
-		dsp->ds_promisc &= ~DLS_PROMISC_PHYS;
+		new_flags &= ~DLS_PROMISC_PHYS;
 		break;
 
 	default:
@@ -694,11 +697,10 @@ proto_promiscoff_req(dld_str_t *dsp, mblk_t *mp)
 		goto failed;
 	}
 
-	mac_perim_enter_by_mh(dsp->ds_mh, &mph);
 	/*
 	 * Adjust channel promiscuity.
 	 */
-	err = dls_promisc(dsp, promisc_saved);
+	err = dls_promisc(dsp, new_flags);
 
 	if (err != 0) {
 		mac_perim_exit(mph);
@@ -706,6 +708,7 @@ proto_promiscoff_req(dld_str_t *dsp, mblk_t *mp)
 		goto failed;
 	}
 
+	ASSERT(dsp->ds_promisc == new_flags);
 	if (dsp->ds_promisc == 0)
 		dls_active_clear(dsp, B_FALSE);
 
