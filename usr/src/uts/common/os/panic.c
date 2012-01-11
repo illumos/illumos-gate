@@ -23,6 +23,10 @@
  */
 
 /*
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ */
+
+/*
  * When the operating system detects that it is in an invalid state, a panic
  * is initiated in order to minimize potential damage to user data and to
  * facilitate debugging.  There are three major tasks to be performed in
@@ -154,6 +158,7 @@ char panic_stack[PANICSTKSIZE];		/* reserved stack for panic_thread */
 kthread_t *panic_thread;		/* first thread to call panicsys() */
 cpu_t panic_cpu;			/* cpu from first call to panicsys() */
 label_t panic_regs;			/* setjmp label from panic_thread */
+label_t panic_pcb;			/* t_pcb at time of panic */
 struct regs *panic_reg;			/* regs struct from first panicsys() */
 char *volatile panicstr;		/* format string to first panicsys() */
 va_list panicargs;			/* arguments to first panicsys() */
@@ -213,6 +218,7 @@ panicsys(const char *format, va_list alist, struct regs *rp, int on_panic_stack)
 	ushort_t schedflag = t->t_schedflag;
 	cpu_t *bound_cpu = t->t_bound_cpu;
 	char preempt = t->t_preempt;
+	label_t pcb = t->t_pcb;
 
 	(void) setjmp(&t->t_pcb);
 	t->t_flag |= T_PANIC;
@@ -290,6 +296,7 @@ panicsys(const char *format, va_list alist, struct regs *rp, int on_panic_stack)
 		panic_schedflag = schedflag;
 		panic_bound_cpu = bound_cpu;
 		panic_preempt = preempt;
+		panic_pcb = pcb;
 
 		if (intr_stack != NULL) {
 			panic_cpu.cpu_intr_stack = intr_stack;
