@@ -815,6 +815,11 @@ ire_round_robin(irb_t *irb_ptr, ire_ftable_args_t *margs, uint_t hash,
 
 	rw_enter(&irb_ptr->irb_lock, RW_WRITER);
 	maxwalk = irb_ptr->irb_ire_cnt;	/* Excludes condemned */
+	if (maxwalk == 0) {
+		rw_exit(&irb_ptr->irb_lock);
+		return (NULL);
+	}
+
 	hash %= maxwalk;
 	irb_refhold_locked(irb_ptr);
 	rw_exit(&irb_ptr->irb_lock);
