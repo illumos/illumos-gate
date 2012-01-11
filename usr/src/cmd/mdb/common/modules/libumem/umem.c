@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2011 Joyent, Inc.  All rights reserved.
+ */
+
 #include "umem.h"
 
 #include <sys/vmem_impl_user.h>
@@ -920,7 +924,7 @@ bufctl_walk_callback(umem_cache_t *cp, mdb_walk_state_t *wsp, uintptr_t buf)
 typedef struct umem_walk {
 	int umw_type;
 
-	int umw_addr;			/* cache address */
+	uintptr_t umw_addr;		/* cache address */
 	umem_cache_t *umw_cp;
 	size_t umw_csize;
 
@@ -1266,15 +1270,24 @@ umem_walk_step(mdb_walk_state_t *wsp)
 			buf = bc.bc_addr;
 		} else {
 			/*
-			 * Otherwise the buffer is in the slab which
-			 * we've read in;  we just need to determine
-			 * its offset in the slab to find the
-			 * umem_bufctl_t.
+			 * Otherwise the buffer is (or should be) in the slab
+			 * that we've read in; determine its offset in the
+			 * slab, validate that it's not corrupt, and add to
+			 * our base address to find the umem_bufctl_t.  (Note
+			 * that we don't need to add the size of the bufctl
+			 * to our offset calculation because of the slop that's
+			 * allocated for the buffer at ubase.)
 			 */
-			bc = *((umem_bufctl_t *)
-			    ((uintptr_t)bcp - (uintptr_t)kbase +
-			    (uintptr_t)ubase));
+			uintptr_t offs = (uintptr_t)bcp - (uintptr_t)kbase;
 
+			if (offs > chunks * chunksize) {
+				mdb_warn("found corrupt bufctl ptr %p"
+				    " in slab %p in cache %p\n", bcp,
+				    wsp->walk_addr, addr);
+				break;
+			}
+
+			bc = *((umem_bufctl_t *)((uintptr_t)ubase + offs));
 			buf = UMEM_BUF(cp, bcp);
 		}
 
