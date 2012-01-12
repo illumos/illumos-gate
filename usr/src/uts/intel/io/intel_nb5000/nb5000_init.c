@@ -389,7 +389,7 @@ nb_dimm_present(int channel, int dimm)
 			return (B_FALSE);
 		rc = (t & 0xf) == SPD_DDR2;
 	} else {
-		rc = MTR_PRESENT(MTR_RD(channel, dimm)) != 0;
+		rc = MTR_PRESENT(MTR_RD(channel, dimm));
 	}
 
 	return (rc);

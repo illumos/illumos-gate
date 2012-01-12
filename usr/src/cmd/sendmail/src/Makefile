@@ -19,6 +19,8 @@
 # CDDL HEADER END
 #
 
+# Copyright (c) 2011 Gary Mills
+
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -34,8 +36,8 @@ include 	../Makefile.cmd
 OBJS= alias.o arpadate.o bf.o collect.o conf.o control.o convtime.o daemon.o \
 	deliver.o domain.o envelope.o err.o headers.o macro.o main.o map.o \
 	mci.o milter.o mime.o parseaddr.o queue.o ratectrl.o readcf.o \
-	recipient.o savemail.o sfsasl.o sm_resolve.o srvrsmtp.o stab.o stats.o \
-	sysexits.o tls.o trace.o udb.o usersmtp.o util.o version.o
+	recipient.o sasl.o savemail.o sfsasl.o sm_resolve.o srvrsmtp.o stab.o \
+	stats.o sysexits.o tls.o trace.o udb.o usersmtp.o util.o version.o
 
 SRCS=	$(OBJS:%.o=%.c)
 
@@ -43,7 +45,7 @@ MAPFILES =	$(MAPFILE.INT) $(MAPFILE.NGB)
 LDFLAGS +=	$(MAPFILES:%=-M%)
 
 # EXPORT DELETE START
-CRYPTOLIBS=	-lssl -lcrypto
+CRYPTOLIBS=	-lssl -lcrypto -lsasl
 # EXPORT DELETE END
 LDLIBS += 	../libsmutil/libsmutil.a ../libsm/libsm.a -lresolv -lsocket \
 		-lnsl ../db/libdb.a -lldap -lsldap -lwrap -lumem \
@@ -52,7 +54,7 @@ LDLIBS += 	../libsmutil/libsmutil.a ../libsm/libsm.a -lresolv -lsocket \
 INCPATH=	-I. -I../include -I../db
 
 # EXPORT DELETE START
-CRYPTOENVDEF=	-DSTARTTLS
+CRYPTOENVDEF=	-DSTARTTLS -DSASL=20115
 # EXPORT DELETE END
 ENVDEF=		-DNETINET6 -DTCPWRAPPERS $(CRYPTOENVDEF)
 SUNENVDEF=	-DSUN_EXTENSIONS -DVENDOR_DEFAULT=VENDOR_SUN \

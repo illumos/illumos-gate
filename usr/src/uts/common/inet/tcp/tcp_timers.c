@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2011 Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -250,8 +251,11 @@ tcp_timeout_cancel(conn_t *connp, timeout_id_t id)
 		/*
 		 * If we were unable to untimeout successfully, it has already
 		 * been enqueued on the squeue; mark the ID with the free
-		 * bit.  This bit can never be set in a valid identifier, and
+		 * bit.	 This bit can never be set in a valid identifier, and
 		 * we'll use it to prevent the timeout from being executed.
+		 * And note that we're within the squeue perimeter here, so
+		 * we don't need to worry about racing with timer handling
+		 * (which also executes within the perimeter).
 		 */
 		tcpt->tcpt_tid |= CALLOUT_ID_FREE;
 		delta = 0;

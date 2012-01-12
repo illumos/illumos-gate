@@ -1263,6 +1263,9 @@ cmt_pad_enable(pghw_type_t type)
 	ASSERT(PGHW_IS_PM_DOMAIN(type));
 	ASSERT(MUTEX_HELD(&cpu_lock));
 
+	if (cmt_sched_disabled == 1)
+		return (-1);
+
 	if ((hwset = pghw_set_lookup(type)) == NULL ||
 	    cmt_hw_blacklisted[type]) {
 		/*
@@ -1312,6 +1315,9 @@ cmt_pad_disable(pghw_type_t type)
 
 	ASSERT(PGHW_IS_PM_DOMAIN(type));
 	ASSERT(MUTEX_HELD(&cpu_lock));
+
+	if (cmt_sched_disabled == 1)
+		return (-1);
 
 	if ((hwset = pghw_set_lookup(type)) == NULL) {
 		/*

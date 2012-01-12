@@ -942,7 +942,7 @@ Resume command-line editing.
 .LP
 Note that the \fIname\fR argument of \fBgl_register_action()\fR specifies the
 name by which a user can refer to the action in their configuration file. This
-allows them to re-bind the action to an alternate key-seqeunce. In order for
+allows them to re-bind the action to an alternate key-sequence. In order for
 this to work, it is necessary to call \fBgl_register_action()\fR between
 calling \fBnew_GetLine()\fR and the first call to \fBgl_get_line()\fR.
 .SS "History Files"
