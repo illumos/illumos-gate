@@ -1,5 +1,6 @@
 '\" te
 .\"  Copyright 1989 AT&T Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved
+.\"  Copyright 2011, Joyent, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
@@ -9,7 +10,7 @@ prtconf \- print system configuration
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/prtconf\fR [\fB-V\fR] | [\fB-F\fR] | [\fB-x\fR] | [\fB-bpv\fR] | [\fB-acdDPv\fR]
+\fB/usr/sbin/prtconf\fR [\fB-V\fR] | [\fB-F\fR] | [\fB-m\fr] | [\fB-x\fR] | [\fB-bpv\fR] | [\fB-acdDPv\fR]
      [\fIdev_path\fR]
 .fi
 
@@ -93,6 +94,16 @@ console, frame buffer device or a non-zero exit code. For example, if the
 console frame buffer on a SUNW,Ultra-30 is \fBffb\fR, the command returns:
 \fB/SUNW,ffb@1e,0:ffb0\fR. This option could be used to create a symlink for
 \fB/dev/fb\fR to the actual console device.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-m\fR\fR
+.ad
+.RS 6n
+Displays the amount system memory in megabytes.
+This flag must be used by itself.
 .RE
 
 .sp

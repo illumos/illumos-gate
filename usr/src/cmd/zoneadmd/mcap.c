@@ -20,7 +20,7 @@
  */
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Copyright 2011 Joyent, Inc.  All rights reserved.
+ * Copyright 2011, 2012, Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -563,52 +563,34 @@ done:
 static uint64_t
 get_mem_info(int age)
 {
-	uint64_t n = 400;	/* Initial guess on number of zones */
-	uint64_t got = n;
-	int i;
-	zsd_vmusage64_t *buf = NULL;
-	size_t size = sizeof (zsd_vmusage64_t) * n;
-	uint64_t zone_rss = 0;
+	uint64_t n = 1;
+	zsd_vmusage64_t buf;
+	uint64_t zone_rss;
 
-	/* Preallocate to try to get all zone mem data with only 1 syscall. */
-	if ((buf = (zsd_vmusage64_t *)malloc(size)) == NULL) {
-		debug("get_mem_info malloc failed\n");
+	buf.vmu_id = zid;
+
+	if (syscall(SYS_rusagesys, _RUSAGESYS_GETVMUSAGE, VMUSAGE_A_ZONE,
+	    age, (uintptr_t)&buf, (uintptr_t)&n) != 0) {
+		debug("vmusage failed\n");
+		(void) sleep_shutdown(1);
 		return (0);
 	}
 
-again:
-	if (syscall(SYS_rusagesys, _RUSAGESYS_GETVMUSAGE, VMUSAGE_ALL_ZONES,
-	    age, (uintptr_t)buf, (uintptr_t)&n) != 0) {
-		debug("vmusage failed\n");
+	if (n > 1) {
+		/* This should never happen */
+		debug("vmusage returned more than one result\n");
 		(void) sleep_shutdown(1);
-		if (shutting_down) {
-			free(buf);
-			return (0);
-		}
+		return (0);
 	}
 
-	if (n > got) {
-		size_t size = sizeof (zsd_vmusage64_t) * n;
-
-		if (buf != NULL)
-			free(buf);
-		buf = (zsd_vmusage64_t *)malloc(size);
-		if (buf == NULL) {
-			debug("get_mem_info malloc failed\n");
-			return (0);
-		}
-		got = n;
-		goto again;
+	if (buf.vmu_id != zid) {
+		/* This should never happen */
+		debug("vmusage returned the incorrect zone\n");
+		(void) sleep_shutdown(1);
+		return (0);
 	}
 
-	for (i = 0; i < n; i++) {
-		if (buf[i].vmu_id == zid) {
-			zone_rss = buf[i].vmu_rss_all / 1024;
-			break;
-		}
-	}
-
-	free(buf);
+	zone_rss = buf.vmu_rss_all / 1024;
 	return (zone_rss);
 }
 

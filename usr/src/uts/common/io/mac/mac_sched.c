@@ -429,16 +429,17 @@ int mac_srs_worker_wakeup_ticks = 0;
  * said, the constant is left as a static variable to allow it to be
  * dynamically tuned in the field if and as needed.
  */
-static uintptr_t mac_rx_srs_stack_needed = 8192;
-static int mac_rx_srs_stack_toodeep;
+static uintptr_t mac_rx_srs_stack_needed = 10240;
+static uint_t mac_rx_srs_stack_toodeep;
 
 #ifndef STACK_GROWTH_DOWN
 #error Downward stack growth assumed.
 #endif
 
-#define MAC_RX_SRS_TOODEEP() (STACK_BIAS + (uintptr_t)getfp() - \
-	    (uintptr_t)curthread->t_stkbase < mac_rx_srs_stack_needed && \
-	    ++mac_rx_srs_stack_toodeep)
+#define	MAC_RX_SRS_TOODEEP() (STACK_BIAS + (uintptr_t)getfp() - \
+	(uintptr_t)curthread->t_stkbase < mac_rx_srs_stack_needed && \
+	++mac_rx_srs_stack_toodeep)
+
 
 /*
  * Drop the rx packet and advance to the next one in the chain.
@@ -2531,9 +2532,9 @@ mac_rx_srs_process(void *arg, mac_resource_handle_t srs, mblk_t *mp_chain,
 
 	if (!(mac_srs->srs_state & SRS_PROC)) {
 		/*
-		 * If we are coming via loopback or if we are not optimizing
-		 * for latency or if our stack is running deep, we should
-		 * signal the worker thread.
+		 * If we are coming via loopback, if we are not optimizing for
+		 * latency, or if our stack is running deep, we should signal
+		 * the worker thread.
 		 */
 		if (loopback || !(mac_srs->srs_state & SRS_LATENCY_OPT) ||
 		    MAC_RX_SRS_TOODEEP()) {

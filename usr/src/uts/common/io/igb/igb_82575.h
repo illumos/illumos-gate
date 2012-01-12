@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
+ * Copyright(c) 2007-2012 Intel Corporation. All rights reserved.
  */
 
 /*
@@ -54,6 +54,7 @@ extern "C" {
 #define	E1000_RAR_ENTRIES_82575		16
 #define	E1000_RAR_ENTRIES_82576		24
 #define	E1000_RAR_ENTRIES_82580		24
+#define	E1000_RAR_ENTRIES_I350		32
 #define	E1000_SW_SYNCH_MB		0x00000100
 #define	E1000_STAT_DEV_RST_SET		0x00100000
 #define	E1000_CTRL_DEV_RST		0x20000000
@@ -466,6 +467,7 @@ struct e1000_adv_tx_context_desc {
 void e1000_vmdq_set_loopback_pf(struct e1000_hw *hw, bool enable);
 void e1000_vmdq_set_replication_pf(struct e1000_hw *hw, bool enable);
 u16 e1000_rxpbs_adjust_82580(u32 data);
+s32 e1000_set_eee_i350(struct e1000_hw *hw);
 
 #ifdef __cplusplus
 }

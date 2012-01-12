@@ -21,6 +21,11 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012, Nexenta Systems, Inc. All rights reserved.
+ */
+
+/*
+ * Copyright 2011 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -82,7 +87,6 @@ dls_close(dld_str_t *dsp)
 	dls_link_t		*dlp = dsp->ds_dlp;
 	dls_multicst_addr_t	*p;
 	dls_multicst_addr_t	*nextp;
-	uint32_t		old_flags;
 
 	ASSERT(dsp->ds_datathr_cnt == 0);
 	ASSERT(MAC_PERIM_HELD(dsp->ds_mh));
@@ -119,9 +123,7 @@ dls_close(dld_str_t *dsp)
 	 * If the MAC has been set in promiscuous mode then disable it.
 	 * This needs to be done before resetting ds_rx.
 	 */
-	old_flags = dsp->ds_promisc;
-	dsp->ds_promisc = 0;
-	(void) dls_promisc(dsp, old_flags);
+	(void) dls_promisc(dsp, 0);
 
 	/*
 	 * At this point we have cutoff inbound packet flow from the mac
@@ -234,51 +236,60 @@ dls_unbind(dld_str_t *dsp)
 	dsp->ds_sap = 0;
 }
 
+/*
+ * In order to prevent promiscuous-mode processing with dsp->ds_promisc
+ * set to inaccurate values, this function sets dsp->ds_promisc with new
+ * flags.  For enabling (mac_promisc_add), the flags are set prior to the
+ * actual enabling.  For disabling (mac_promisc_remove), the flags are set
+ * after the actual disabling.
+ */
 int
-dls_promisc(dld_str_t *dsp, uint32_t old_flags)
+dls_promisc(dld_str_t *dsp, uint32_t new_flags)
 {
-	int		err = 0;
+	int err = 0;
+	uint32_t old_flags = dsp->ds_promisc;
 
 	ASSERT(MAC_PERIM_HELD(dsp->ds_mh));
-	ASSERT(!(dsp->ds_promisc & ~(DLS_PROMISC_SAP | DLS_PROMISC_MULTI |
+	ASSERT(!(new_flags & ~(DLS_PROMISC_SAP | DLS_PROMISC_MULTI |
 	    DLS_PROMISC_PHYS)));
 
-	if (old_flags == 0 && dsp->ds_promisc != 0) {
+	if (dsp->ds_promisc == 0 && new_flags != 0) {
 		/*
 		 * If only DLS_PROMISC_SAP, we don't turn on the
 		 * physical promisc mode
 		 */
+		dsp->ds_promisc = new_flags;
 		err = mac_promisc_add(dsp->ds_mch, MAC_CLIENT_PROMISC_ALL,
 		    dls_rx_promisc, dsp, &dsp->ds_mph,
-		    (dsp->ds_promisc != DLS_PROMISC_SAP) ? 0 :
+		    (new_flags != DLS_PROMISC_SAP) ? 0 :
 		    MAC_PROMISC_FLAGS_NO_PHYS);
-		if (err != 0)
+		if (err != 0) {
+			dsp->ds_promisc = old_flags;
 			return (err);
+		}
 
 		/* Remove vlan promisc handle to avoid sending dup copy up */
 		if (dsp->ds_vlan_mph != NULL) {
 			mac_promisc_remove(dsp->ds_vlan_mph);
 			dsp->ds_vlan_mph = NULL;
 		}
-	} else if (old_flags != 0 && dsp->ds_promisc == 0) {
+	} else if (dsp->ds_promisc != 0 && new_flags == 0) {
 		ASSERT(dsp->ds_mph != NULL);
 
 		mac_promisc_remove(dsp->ds_mph);
+		dsp->ds_promisc = new_flags;
 		dsp->ds_mph = NULL;
 
 		if (dsp->ds_sap == ETHERTYPE_VLAN &&
 		    dsp->ds_dlstate != DL_UNBOUND) {
-			int err;
-
 			if (dsp->ds_vlan_mph != NULL)
 				return (EINVAL);
 			err = mac_promisc_add(dsp->ds_mch,
 			    MAC_CLIENT_PROMISC_ALL, dls_rx_vlan_promisc, dsp,
 			    &dsp->ds_vlan_mph, MAC_PROMISC_FLAGS_NO_PHYS);
-			return (err);
 		}
-	} else if (old_flags == DLS_PROMISC_SAP && dsp->ds_promisc != 0 &&
-	    dsp->ds_promisc != old_flags) {
+	} else if (dsp->ds_promisc == DLS_PROMISC_SAP && new_flags != 0 &&
+	    new_flags != dsp->ds_promisc) {
 		/*
 		 * If the old flag is PROMISC_SAP, but the current flag has
 		 * changed to some new non-zero value, we need to turn the
@@ -286,8 +297,15 @@ dls_promisc(dld_str_t *dsp, uint32_t old_flags)
 		 */
 		ASSERT(dsp->ds_mph != NULL);
 		mac_promisc_remove(dsp->ds_mph);
+		/* Honors both after-remove and before-add semantics! */
+		dsp->ds_promisc = new_flags;
 		err = mac_promisc_add(dsp->ds_mch, MAC_CLIENT_PROMISC_ALL,
 		    dls_rx_promisc, dsp, &dsp->ds_mph, 0);
+		if (err != 0)
+			dsp->ds_promisc = old_flags;
+	} else {
+		/* No adding or removing, but record the new flags anyway. */
+		dsp->ds_promisc = new_flags;
 	}
 
 	return (err);
@@ -596,6 +614,22 @@ boolean_t
 dls_accept_promisc(dld_str_t *dsp, mac_header_info_t *mhip, dls_rx_t *ds_rx,
     void **ds_rx_arg, boolean_t loopback)
 {
+	if (dsp->ds_promisc == 0) {
+		/*
+		 * If there are active walkers of the mi_promisc_list when
+		 * promiscuousness is disabled, ds_promisc will be cleared,
+		 * but the DLS will remain on the mi_promisc_list until the
+		 * walk is completed.  If we do not recognize this case here,
+		 * we won't properly execute the ds_promisc case in the common
+		 * accept routine -- and we will potentially accept a packet
+		 * that has originated with this DLS (which in turn can
+		 * induce recursion and death by stack overflow).  If
+		 * ds_promisc is zero, we know that we are in this window --
+		 * and we refuse to accept the packet.
+		 */
+		return (B_FALSE);
+	}
+
 	return (dls_accept_common(dsp, mhip, ds_rx, ds_rx_arg, B_TRUE,
 	    loopback));
 }

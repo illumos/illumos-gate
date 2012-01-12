@@ -82,10 +82,8 @@ next(s)
 		default:
 			clen = mbrtowc(&wch, s->str, MB_LEN_MAX, NULL);
 			if (clen == (size_t)-1 || clen == (size_t)-2 ||
-			    clen == 0) {
-				(void) fprintf(stderr, "Illegal seqeunce.\n");
-				exit(1);
-			}
+			    clen == 0)
+				errx(1, "illegal sequence");
 			is_octal = 0;
 			s->lastch = wch;
 			s->str += clen;
