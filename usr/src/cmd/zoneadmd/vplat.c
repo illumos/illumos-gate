@@ -199,7 +199,7 @@ autofs_cleanup(zoneid_t zoneid)
 	/*
 	 * Ask autofs to unmount all trigger nodes in the given zone.
 	 */
-	return (_autofssys(AUTOFS_UNMOUNTALL, (void *)zoneid));
+	return (_autofssys(AUTOFS_UNMOUNTALL, (void *)((uintptr_t)zoneid)));
 }
 
 static void
