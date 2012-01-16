@@ -814,6 +814,7 @@ fss_decay_usage()
 	fsszone_t *fsszone;
 	fsspri_t maxfsspri;
 	int psetid;
+	struct zone *zp;
 
 	mutex_enter(&fsspsets_lock);
 	/*
@@ -823,6 +824,8 @@ fss_decay_usage()
 	for (psetid = 0; psetid < max_ncpus; psetid++) {
 		fsspset = &fsspsets[psetid];
 		mutex_enter(&fsspset->fssps_lock);
+
+		fsspset->fssps_gen++;
 
 		if (fsspset->fssps_cpupart == NULL ||
 		    (fssproj = fsspset->fssps_list) == NULL) {
@@ -843,6 +846,21 @@ fss_decay_usage()
 		fsspset->fssps_maxfsspri = maxfsspri;
 
 		do {
+			fsszone = fssproj->fssp_fsszone;
+			zp = fsszone->fssz_zone;
+
+			/*
+			 * Reset zone's FSS kstats if they are from a
+			 * previous cycle.
+			 */
+			if (fsspset->fssps_gen != zp->zone_fss_gen) {
+				zp->zone_fss_gen = fsspset->fssps_gen;
+				zp->zone_fss_pri_hi = 0;
+				zp->zone_runq_cntr = 0;
+				zp->zone_fss_shr_pct = 0;
+				zp->zone_proc_cnt = 0;
+			}
+
 			/*
 			 * Decay usage for each project running on
 			 * this cpu partition.
@@ -850,9 +868,18 @@ fss_decay_usage()
 			fssproj->fssp_usage =
 			    (fssproj->fssp_usage * FSS_DECAY_USG) /
 			    FSS_DECAY_BASE + fssproj->fssp_ticks;
+
 			fssproj->fssp_ticks = 0;
 
-			fsszone = fssproj->fssp_fsszone;
+			zp->zone_run_ticks += fssproj->fssp_zone_ticks;
+			/*
+			 * This is the count for this one second cycle only,
+			 * and not cumulative.
+			 */
+			zp->zone_runq_cntr += fssproj->fssp_runnable;
+
+			fssproj->fssp_zone_ticks = 0;
+
 			/*
 			 * Readjust the project's number of shares if it has
 			 * changed since we checked it last time.
@@ -871,7 +898,7 @@ fss_decay_usage()
 			 * Readjust the zone's number of shares if it
 			 * has changed since we checked it last time.
 			 */
-			zone_ext_shares = fsszone->fssz_zone->zone_shares;
+			zone_ext_shares = zp->zone_shares;
 			if (fsszone->fssz_rshares != zone_ext_shares) {
 				if (fsszone->fssz_runnable != 0) {
 					fsspset->fssps_shares -=
@@ -883,6 +910,12 @@ fss_decay_usage()
 			}
 			zone_int_shares = fsszone->fssz_shares;
 			pset_shares = fsspset->fssps_shares;
+
+			if (zp->zone_runq_cntr > 0 && pset_shares > 0)
+				/* in tenths of a pct */
+				zp->zone_fss_shr_pct =
+				    (zone_ext_shares * 1000) / pset_shares;
+
 			/*
 			 * Calculate fssp_shusage value to be used
 			 * for fsspri increments for the next second.
@@ -1050,6 +1083,8 @@ fss_update_list(int i)
 	fssproc_t *fssproc;
 	fssproj_t *fssproj;
 	fsspri_t fsspri;
+	struct zone *zp;
+	pri_t fss_umdpri;
 	kthread_t *t;
 	int updated = 0;
 
@@ -1073,6 +1108,7 @@ fss_update_list(int i)
 		fssproj = FSSPROC2FSSPROJ(fssproc);
 		if (fssproj == NULL)
 			goto next;
+
 		if (fssproj->fssp_shares != 0) {
 			/*
 			 * Decay fsspri value.
@@ -1096,11 +1132,28 @@ fss_update_list(int i)
 		fss_newpri(fssproc);
 		updated = 1;
 
+		fss_umdpri = fssproc->fss_umdpri;
+
+		/*
+		 * Summarize a zone's process priorities for runnable
+		 * procs.
+		 */
+		zp = fssproj->fssp_fsszone->fssz_zone;
+
+		if (fss_umdpri > zp->zone_fss_pri_hi)
+			zp->zone_fss_pri_hi = fss_umdpri;
+
+		if (zp->zone_proc_cnt++ == 0)
+			zp->zone_fss_pri_avg = fss_umdpri;
+		else
+			zp->zone_fss_pri_avg =
+			    (zp->zone_fss_pri_avg + fss_umdpri) / 2;
+
 		/*
 		 * Only dequeue the thread if it needs to be moved; otherwise
 		 * it should just round-robin here.
 		 */
-		if (t->t_pri != fssproc->fss_umdpri)
+		if (t->t_pri != fss_umdpri)
 			fss_change_priority(t, fssproc);
 next:
 		thread_unlock(t);
@@ -2180,6 +2233,7 @@ fss_tick(kthread_t *t)
 		fsspset_t *fsspset = FSSPROJ2FSSPSET(fssproj);
 		disp_lock_enter_high(&fsspset->fssps_displock);
 		fssproj->fssp_ticks += fss_nice_tick[fssproc->fss_nice];
+		fssproj->fssp_zone_ticks++;
 		fssproc->fss_ticks++;
 		disp_lock_exit_high(&fsspset->fssps_displock);
 	}

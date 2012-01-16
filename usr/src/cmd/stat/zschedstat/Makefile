@@ -18,36 +18,33 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2011, 2012, Joyent, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# cmd/stat/Makefile
+# Copyright (c) 2012, Joyent, Inc. All rights reserved.
 #
 
-include ../Makefile.cmd
+include $(SRC)/cmd/Makefile.cmd
 
-SUBDIRS=	arcstat \
-		fsstat \
-		iostat \
-		mpstat \
-		vfsstat \
-		vmstat \
-		ziostat \
-		zschedstat
+PROG=	zschedstat
+OBJS = zschedstat.o
+SRCS =$(OBJS:%.o=%.c) $(COMMON_SRCS)
 
-all :=		TARGET = all
-install :=	TARGET = install
-clean :=	TARGET = clean
-clobber :=	TARGET = clobber
-lint :=		TARGET = lint
-_msg :=		TARGET = _msg
+LDLIBS += -lkstat
+
+lint := LINTFLAGS = -muxs
 
 .KEEP_STATE:
 
-all install lint clean clobber _msg: $(SUBDIRS)
+all: $(PROG)
 
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
+install: all .WAIT $(ROOTPROG)
 
-FRC:
+clean:
+
+$(ROOTBINPROG): $(PROG)
+	$(INS.file)
+
+lint: lint_SRCS
+
+check:
+	$(CSTYLE) -pP $(SRCS:%=%)
+
+include $(SRC)/cmd/Makefile.targ
