@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <libscf.h>
@@ -2338,37 +2339,39 @@ iPsGetSetStmfProp(int propType, char *propVal, int getSet)
 			default :
 				ret = STMF_PS_ERROR;
 				goto out;
-				break;
 		}
 	}
 	if (getSet == SET) {
 		switch (propType) {
 			case STMF_DEFAULT_LU_STATE :
 				psStmfProp = DEFAULT_LU_STATE;
-				if (strcasecmp(propVal, "online") == 0)
+				if (strcasecmp(propVal, "online") == 0) {
 					psStmfPropVal = STMF_PS_LU_ONLINE;
-				else if (strcasecmp(propVal, "offline") == 0)
+				} else if (strcasecmp(propVal,
+				    "offline") == 0) {
 					psStmfPropVal = STMF_PS_LU_OFFLINE;
-				else
+				} else {
 					ret = STMF_PS_ERROR;
 					goto out;
+				}
 				break;
 			case STMF_DEFAULT_TARGET_PORT_STATE :
 				psStmfProp = DEFAULT_TARGET_PORT_STATE;
-				if (strcasecmp(propVal, "online") == 0)
+				if (strcasecmp(propVal, "online") == 0) {
 					psStmfPropVal =
 					    STMF_PS_TARGET_PORT_ONLINE;
-				else if (strcasecmp(propVal, "offline") == 0)
+				} else if (strcasecmp(propVal,
+				    "offline") == 0) {
 					psStmfPropVal =
 					    STMF_PS_TARGET_PORT_OFFLINE;
-				else
+				} else {
 					ret = STMF_PS_ERROR;
 					goto out;
+				}
 				break;
 			default :
 				ret = STMF_PS_ERROR;
 				goto out;
-				break;
 		}
 	}
 
