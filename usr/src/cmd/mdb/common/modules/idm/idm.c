@@ -2841,7 +2841,7 @@ sa_to_str(struct sockaddr_storage *sa, char *buf)
 			return (-1);
 		}
 		strlcat(buf, "]", PORTAL_STR_LEN);
-		mdb_nhconvert(&port, &sin->sin_port, sizeof (uint16_t));
+		mdb_nhconvert(&port, &sin6->sin6_port, sizeof (uint16_t));
 	} else {
 		return (EINVAL);
 	}
