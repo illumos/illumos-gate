@@ -882,6 +882,8 @@ struct smb_sign {
 #define	SMB_SESSION_VALID(p)	\
     ASSERT(((p) != NULL) && ((p)->s_magic == SMB_SESSION_MAGIC))
 
+#define	SMB_CHALLENGE_SZ	8
+
 typedef enum {
 	SMB_SESSION_STATE_INITIALIZED = 0,
 	SMB_SESSION_STATE_DISCONNECTED,
@@ -939,7 +941,7 @@ typedef struct smb_session {
 	uint16_t		secmode;
 	uint32_t		sesskey;
 	uint32_t		challenge_len;
-	unsigned char		challenge_key[8];
+	unsigned char		challenge_key[SMB_CHALLENGE_SZ];
 	unsigned char		MAC_key[44];
 	int64_t			activity_timestamp;
 	/*

@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -188,7 +189,6 @@
 #include <sys/strsubr.h>
 #include <sys/socketvar.h>
 #include <sys/socket.h>
-#include <sys/random.h>
 #include <netinet/in.h>
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smbinfo.h>
@@ -229,7 +229,6 @@ static smb_xlate_t smb_dialect[] = {
 static uint32_t	smb_dos_tcp_rcvbuf = 8700;
 static uint32_t	smb_nt_tcp_rcvbuf = 1048560;	/* scale factor of 4 */
 
-static void smb_negotiate_genkey(smb_request_t *);
 static int smb_xlate_dialect(const char *);
 
 int smb_cap_passthru = 1;
@@ -303,13 +302,13 @@ smb_com_negotiate(smb_request_t *sr)
 	sr->session->secmode = NEGOTIATE_SECURITY_CHALLENGE_RESPONSE |
 	    NEGOTIATE_SECURITY_USER_LEVEL;
 	secmode = sr->session->secmode;
-
-	smb_negotiate_genkey(sr);
 	sesskey = sr->session->sesskey;
 
 	(void) microtime(&negprot->ni_servertime);
 	negprot->ni_tzcorrection = sr->sr_gmtoff / 60;
 	negprot->ni_maxmpxcount = sr->sr_cfg->skc_maxworkers;
+	negprot->ni_keylen = SMB_CHALLENGE_SZ;
+	bcopy(&sr->session->challenge_key, negprot->ni_key, SMB_CHALLENGE_SZ);
 	nbdomain = sr->sr_cfg->skc_nbdomain;
 
 	/*
@@ -482,23 +481,6 @@ smb_com_negotiate(smb_request_t *sr)
 	sr->session->dialect = negprot->ni_dialect;
 	sr->session->s_state = SMB_SESSION_STATE_NEGOTIATED;
 	return (SDRC_SUCCESS);
-}
-
-static void
-smb_negotiate_genkey(smb_request_t *sr)
-{
-	smb_arg_negotiate_t	*negprot = sr->sr_negprot;
-	uint8_t			tmp_key[8];
-
-	(void) random_get_pseudo_bytes(tmp_key, 8);
-	bcopy(tmp_key, &sr->session->challenge_key, 8);
-	sr->session->challenge_len = 8;
-	negprot->ni_keylen = 8;
-	bcopy(tmp_key, negprot->ni_key, 8);
-
-	(void) random_get_pseudo_bytes(tmp_key, 4);
-	sr->session->sesskey = tmp_key[0] | tmp_key[1] << 8 |
-	    tmp_key[2] << 16 | tmp_key[3] << 24;
 }
 
 static int
