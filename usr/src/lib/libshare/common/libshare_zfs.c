@@ -22,6 +22,9 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #include <stdio.h>
 #include <libzfs.h>
@@ -495,6 +498,15 @@ find_or_create_zfs_subgroup(sa_handle_t handle, char *groupname, char *proto,
 			/* If no optionset, add one. */
 			if (sa_get_optionset(group, proto) == NULL)
 				(void) sa_create_optionset(group, proto);
+
+			/*
+			 * Do not forget to update an optionset of
+			 * the parent group so that it contains
+			 * all protocols its subgroups have.
+			 */
+			if (sa_get_optionset(zfs, proto) == NULL)
+				(void) sa_create_optionset(zfs, proto);
+
 			free(options);
 		} else {
 			*err = SA_NO_MEMORY;
