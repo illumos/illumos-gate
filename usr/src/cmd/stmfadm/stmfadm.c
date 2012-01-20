@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <stdlib.h>
@@ -769,7 +770,7 @@ createHostGroupFunc(int operandLen, char *operands[],
 			ret++;
 			break;
 		case STMF_ERROR_BUSY:
-			(void) fprintf(stderr, "%s: %ws: %s\n", cmdName,
+			(void) fprintf(stderr, "%s: %s: %s\n", cmdName,
 			    operands[0], gettext("resource busy"));
 			ret++;
 			break;
@@ -2074,7 +2075,6 @@ printExtLuProps(stmfGuid *guid)
 			case STMF_ERROR_NOT_FOUND:
 				/* No error here */
 				return (0);
-				break;
 			default:
 				(void) fprintf(stderr, "%s: %s\n", cmdName,
 				    gettext("get extended properties failed"));
