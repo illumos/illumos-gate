@@ -33,8 +33,6 @@
  * California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #undef NULL
 #include <stdio.h>
 #include <sys/types.h>
@@ -128,7 +126,7 @@ main(argc, argv)
 	char *last_slash, *next_to_last_slash;
 	char *infilename, *outfilename, *mastername, *domainname,
 	    *interdomain_bind, *security, *lower_case_keys;
-	char *key_sep = DEFAULT_SEP;
+	char key_sep[] = DEFAULT_SEP;
 	char local_host[MAX_MASTER_NAME];
 	int cnt, i;
 	DBM *fdb;
@@ -179,14 +177,14 @@ main(argc, argv)
 					security = argv[0];
 					break;
 				case 'S' :
-					strcpy(key_sep, argv[1]);
-					argv++;
-					argc--;
-					if (strlen(key_sep) != 1) {
+					if (strlen(argv[1]) != 1) {
 						fprintf(stderr,
 							"bad separator\n");
 						usage();
 					}
+					key_sep[0] = argv[1][0];
+					argv++;
+					argc--;
 					break;
 				case 'D' :
 					num_del_to_match = atoi(argv[1]);
