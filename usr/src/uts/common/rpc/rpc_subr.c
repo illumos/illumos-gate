@@ -27,8 +27,10 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /* SVr4.0 1.1 */
 
 /*
@@ -49,6 +51,7 @@
 #include <sys/systm.h>
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
+#include <sys/sdt.h>
 #include <netinet/in.h>
 #include <rpc/types.h>
 #include <rpc/auth.h>
@@ -408,11 +411,97 @@ grow_netbuf(struct netbuf *nb, size_t length)
 }
 
 /*
+ * XXX: xdr_pmap is here, because it's the only XDR function
+ * of portmap protocol. If there'll be more portmap functions,
+ * it would be better to put them to a separate file.
+ */
+bool_t
+xdr_pmap(XDR *xdrs, PMAP *objp)
+{
+	if (!xdr_rpcprog(xdrs, &objp->pm_prog))
+		return (FALSE);
+	if (!xdr_rpcvers(xdrs, &objp->pm_vers))
+		return (FALSE);
+	if (!xdr_rpcprot(xdrs, &objp->pm_prot))
+		return (FALSE);
+	if (!xdr_u_int(xdrs, &objp->pm_port))
+		return (FALSE);
+
+	return (TRUE);
+}
+
+/*
+ * Get remote port via PORTMAP protocol version 2 (works for IPv4 only)
+ * according to RFC 1833, section 3.
+ */
+static enum clnt_stat
+portmap_getport(struct knetconfig *config, rpcprog_t prog, rpcvers_t vers,
+    struct netbuf *addr, struct timeval tmo)
+{
+	enum clnt_stat status;
+	CLIENT *client = NULL;
+	k_sigset_t oldmask;
+	k_sigset_t newmask;
+	ushort_t port = 0;
+	struct pmap parms;
+
+	ASSERT(strcmp(config->knc_protofmly, NC_INET) == 0);
+
+	bzero(&parms, sizeof (parms));
+	parms.pm_prog = prog;
+	parms.pm_vers = vers;
+	if (strcmp(config->knc_proto, NC_TCP) == 0) {
+		parms.pm_prot = IPPROTO_TCP;
+	} else { /*  NC_UDP */
+		parms.pm_prot = IPPROTO_UDP;
+	}
+
+
+	/*
+	 * Mask all signals before doing RPC network operations
+	 * in the same way rpcbind_getaddr() does (see comments
+	 * there).
+	 */
+	sigfillset(&newmask);
+	sigreplace(&newmask, &oldmask);
+
+	if (clnt_tli_kcreate(config, addr, PMAPPROG,
+	    PMAPVERS, 0, 0, CRED(), &client)) {
+		sigreplace(&oldmask, (k_sigset_t *)NULL);
+		return (RPC_TLIERROR);
+	}
+
+	client->cl_nosignal = 1;
+	status = CLNT_CALL(client, PMAPPROC_GETPORT,
+	    xdr_pmap, (char *)&parms,
+	    xdr_u_short, (char *)&port, tmo);
+
+	sigreplace(&oldmask, (k_sigset_t *)NULL);
+	if (status != RPC_SUCCESS)
+		goto out;
+	if (port == 0) {
+		status = RPC_PROGNOTREGISTERED;
+		goto out;
+	}
+
+	put_inet_port(addr, ntohs(port));
+
+out:
+	auth_destroy(client->cl_auth);
+	clnt_destroy(client);
+
+	return (status);
+}
+
+/*
  * Try to get the address for the desired service by using the rpcbind
  * protocol.  Ignores signals.  If addr is a loopback address, it is
  * expected to be initialized to "<hostname>.".
+ * rpcbind_getaddr() is able to work with RPCBIND protocol version 3 and 4
+ * and PORTMAP protocol version 2.
+ * It tries version 4 at first, then version 3 and finally (if both failed)
+ * it tries portmapper protocol version 2.
  */
-
 enum clnt_stat
 rpcbind_getaddr(struct knetconfig *config, rpcprog_t prog, rpcvers_t vers,
     struct netbuf *addr)
@@ -421,11 +510,11 @@ rpcbind_getaddr(struct knetconfig *config, rpcprog_t prog, rpcvers_t vers,
 	enum clnt_stat status;
 	RPCB parms;
 	struct timeval tmo;
-	CLIENT *client = NULL;
 	k_sigset_t oldmask;
 	k_sigset_t newmask;
 	ushort_t port;
 	int iptype;
+	rpcvers_t rpcbv;
 
 	/*
 	 * Call rpcbind (local or remote) to get an address we can use
@@ -438,11 +527,13 @@ rpcbind_getaddr(struct knetconfig *config, rpcprog_t prog, rpcvers_t vers,
 	parms.r_addr = parms.r_owner = "";
 
 	if (strcmp(config->knc_protofmly, NC_INET) == 0) {
+		put_inet_port(addr, htons(PMAPPORT));
+
 		if (strcmp(config->knc_proto, NC_TCP) == 0)
 			parms.r_netid = "tcp";
 		else
 			parms.r_netid = "udp";
-		put_inet_port(addr, htons(PMAPPORT));
+
 	} else if (strcmp(config->knc_protofmly, NC_INET6) == 0) {
 		if (strcmp(config->knc_proto, NC_TCP) == 0)
 			parms.r_netid = "tcp6";
@@ -465,39 +556,55 @@ rpcbind_getaddr(struct knetconfig *config, rpcprog_t prog, rpcvers_t vers,
 	}
 
 	/*
-	 * Mask signals for the duration of the handle creation and
-	 * RPC calls.  This allows relatively normal operation with a
-	 * signal already posted to our thread (e.g., when we are
-	 * sending an NLM_CANCEL in response to catching a signal).
-	 *
-	 * Any further exit paths from this routine must restore
-	 * the original signal mask.
+	 * Try RPCBIND versions 4 and 3 (if 4 fails).
 	 */
-	sigfillset(&newmask);
-	sigreplace(&newmask, &oldmask);
+	for (rpcbv = RPCBVERS4; rpcbv >= RPCBVERS; rpcbv--) {
+		CLIENT *client = NULL;
 
-	if (clnt_tli_kcreate(config, addr, RPCBPROG,
-	    RPCBVERS, 0, 0, CRED(), &client)) {
-		status = RPC_TLIERROR;
+		if (ua != NULL) {
+			xdr_free(xdr_wrapstring, (char *)&ua);
+			ua = NULL;
+		}
+
+		/*
+		 * Mask signals for the duration of the handle creation and
+		 * RPC calls.  This allows relatively normal operation with a
+		 * signal already posted to our thread (e.g., when we are
+		 * sending an NLM_CANCEL in response to catching a signal).
+		 *
+		 * Any further exit paths from this routine must restore
+		 * the original signal mask.
+		 */
+		sigfillset(&newmask);
+		sigreplace(&newmask, &oldmask);
+
+		if (clnt_tli_kcreate(config, addr, RPCBPROG,
+		    rpcbv, 0, 0, CRED(), &client)) {
+			status = RPC_TLIERROR;
+			sigreplace(&oldmask, (k_sigset_t *)NULL);
+			continue;
+		}
+
+		client->cl_nosignal = 1;
+		status = CLNT_CALL(client, RPCBPROC_GETADDR,
+		    xdr_rpcb, (char *)&parms,
+		    xdr_wrapstring, (char *)&ua, tmo);
+
 		sigreplace(&oldmask, (k_sigset_t *)NULL);
-		goto out;
-	}
+		auth_destroy(client->cl_auth);
+		clnt_destroy(client);
 
-	client->cl_nosignal = 1;
-	if ((status = CLNT_CALL(client, RPCBPROC_GETADDR,
-	    xdr_rpcb, (char *)&parms,
-	    xdr_wrapstring, (char *)&ua,
-	    tmo)) != RPC_SUCCESS) {
-		sigreplace(&oldmask, (k_sigset_t *)NULL);
-		goto out;
-	}
+		if (status == RPC_SUCCESS) {
+			if (ua == NULL || *ua == NULL) {
+				status = RPC_PROGNOTREGISTERED;
+				continue;
+			}
 
-	sigreplace(&oldmask, (k_sigset_t *)NULL);
-
-	if (ua == NULL || *ua == NULL) {
-		status = RPC_PROGNOTREGISTERED;
-		goto out;
+			break;
+		}
 	}
+	if (status != RPC_SUCCESS)
+		goto try_portmap;
 
 	/*
 	 * Convert the universal address to the transport address.
@@ -513,7 +620,7 @@ rpcbind_getaddr(struct knetconfig *config, rpcprog_t prog, rpcvers_t vers,
 		/* make sure that the ip address is the correct type */
 		if (rpc_iptype(ua, &iptype) != 0) {
 			status = RPC_UNKNOWNADDR;
-			goto out;
+			goto try_portmap;
 		}
 		port = rpc_uaddr2port(iptype, ua);
 		put_inet_port(addr, ntohs(port));
@@ -521,7 +628,7 @@ rpcbind_getaddr(struct knetconfig *config, rpcprog_t prog, rpcvers_t vers,
 		/* make sure that the ip address is the correct type */
 		if (rpc_iptype(ua, &iptype) != 0) {
 			status = RPC_UNKNOWNADDR;
-			goto out;
+			goto try_portmap;
 		}
 		port = rpc_uaddr2port(iptype, ua);
 		put_inet6_port(addr, ntohs(port));
@@ -532,11 +639,20 @@ rpcbind_getaddr(struct knetconfig *config, rpcprog_t prog, rpcvers_t vers,
 		cmn_err(CE_PANIC, "rpcbind_getaddr: bad protocol family");
 	}
 
-out:
-	if (client != NULL) {
-		auth_destroy(client->cl_auth);
-		clnt_destroy(client);
+try_portmap:
+	if (status != RPC_SUCCESS &&
+	    strcmp(config->knc_protofmly, NC_INET) == 0) {
+		/*
+		 * For IPv4 try to get remote port via PORTMAP protocol.
+		 * NOTE: if we're here, then all attempts to get remote
+		 * port via RPCBIND protocol failed.
+		 */
+
+		DTRACE_PROBE1(try__portmap, enum clnt_stat, status);
+		status = portmap_getport(config, prog, vers, addr, tmo);
 	}
+
+out:
 	if (ua != NULL)
 		xdr_free(xdr_wrapstring, (char *)&ua);
 	return (status);
