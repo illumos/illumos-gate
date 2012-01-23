@@ -22,9 +22,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <libintl.h>
@@ -72,15 +71,29 @@ __s_api_merge_SSD_filter(const ns_ldap_search_desc_t *desc,
 			const void *userdata)
 {
 	int	len;
+	char *checker;
 
 	/* sanity check */
 	if (realfilter == NULL)
 		return (NS_LDAP_INVALID_PARAM);
 	*realfilter = NULL;
 
-	if (desc == NULL || desc->filter == NULL ||
-			userdata == NULL)
+	if (desc == NULL || desc->filter == NULL || userdata == NULL)
 		return (NS_LDAP_INVALID_PARAM);
+
+	/* Parameter check.  We only want one %s here, otherwise bail. */
+	len = 0;	/* Reuse 'len' as "Number of %s hits"... */
+	checker = (char *)userdata;
+	do {
+		checker = strchr(checker, '%');
+		if (checker != NULL) {
+			if (len > 0 || *(checker + 1) != 's')
+				return (NS_LDAP_INVALID_PARAM);
+			len++;	/* Got our %s. */
+			checker += 2;
+		} else if (len != 1)
+			return (NS_LDAP_INVALID_PARAM);
+	} while (checker != NULL);
 
 	len = strlen(userdata) + strlen(desc->filter) + 1;
 
@@ -88,8 +101,7 @@ __s_api_merge_SSD_filter(const ns_ldap_search_desc_t *desc,
 	if (*realfilter == NULL)
 		return (NS_LDAP_MEMORY);
 
-	(void) sprintf(*realfilter, (char *)userdata,
-			desc->filter);
+	(void) sprintf(*realfilter, (char *)userdata, desc->filter);
 
 	return (NS_LDAP_SUCCESS);
 }
@@ -142,9 +154,9 @@ __getldapaliasbyname(char *alias, int *retval)
 
 	/* should we do hardlookup */
 	rc = __ns_ldap_list(service, (const char *)filter,
-		__s_api_merge_SSD_filter,
-		(const char **)attribute, NULL, 0, &result,
-		&errorp, NULL, userdata);
+	    __s_api_merge_SSD_filter,
+	    (const char **)attribute, NULL, 0, &result,
+	    &errorp, NULL, userdata);
 
 	if (rc == NS_LDAP_NOTFOUND) {
 		errno = ENOENT;
@@ -157,7 +169,7 @@ __getldapaliasbyname(char *alias, int *retval)
 		if (errorp) {
 			if (errorp->message)
 				(void) fprintf(stderr, "%s (%s)\n", p,
-					errorp->message);
+				    errorp->message);
 		} else
 			(void) fprintf(stderr, "%s\n", p);
 #endif /* DEBUG */

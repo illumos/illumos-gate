@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -147,11 +148,28 @@ merge_SSD_filter(const ns_ldap_search_desc_t *desc,
 	char **realfilter, const void *userdata)
 {
 	int	len;
+	char *checker;
+
 	if (realfilter == NULL)
 		return (NS_LDAP_INVALID_PARAM);
 	*realfilter = NULL;
 	if (desc == NULL || desc->filter == NULL || userdata == NULL)
 		return (NS_LDAP_INVALID_PARAM);
+
+	/* Parameter check.  We only want one %s here, otherwise bail. */
+	len = 0;	/* Reuse 'len' as "Number of %s hits"... */
+	checker = (char *)userdata;
+	do {
+		checker = strchr(checker, '%');
+		if (checker != NULL) {
+			if (len > 0 || *(checker + 1) != 's')
+				return (NS_LDAP_INVALID_PARAM);
+			len++;	/* Got our %s. */
+			checker += 2;
+		} else if (len != 1)
+			return (NS_LDAP_INVALID_PARAM);
+	} while (checker != NULL);
+
 	len = strlen(userdata) + strlen(desc->filter) + 1;
 	*realfilter = (char *)malloc(len);
 	if (*realfilter == NULL)
