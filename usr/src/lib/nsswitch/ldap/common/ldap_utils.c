@@ -22,9 +22,8 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/systeminfo.h>
 #include "ldap_common.h"
@@ -215,6 +214,7 @@ _merge_SSD_filter(const ns_ldap_search_desc_t *desc,
 			const void *userdata)
 {
 	int	len;
+	char *checker;
 
 #ifdef DEBUG
 	(void) fprintf(stdout, "\n[ldap_utils.c: _merge_SSD_filter]\n");
@@ -225,9 +225,22 @@ _merge_SSD_filter(const ns_ldap_search_desc_t *desc,
 		return (NS_LDAP_INVALID_PARAM);
 	*realfilter = NULL;
 
-	if (desc == NULL || desc->filter == NULL ||
-			userdata == NULL)
+	if (desc == NULL || desc->filter == NULL || userdata == NULL)
 		return (NS_LDAP_INVALID_PARAM);
+
+	/* Parameter check.  We only want one %s here, otherwise bail. */
+	len = 0;	/* Reuse 'len' as "Number of %s hits"... */
+	checker = (char *)userdata;
+	do {
+		checker = strchr(checker, '%');
+		if (checker != NULL) {
+			if (len > 0 || *(checker + 1) != 's')
+				return (NS_LDAP_INVALID_PARAM);
+			len++;	/* Got our %s. */
+			checker += 2;
+		} else if (len != 1)
+			return (NS_LDAP_INVALID_PARAM);
+	} while (checker != NULL);
 
 #ifdef DEBUG
 	(void) fprintf(stdout, "\n[userdata: %s]\n", (char *)userdata);
@@ -240,8 +253,7 @@ _merge_SSD_filter(const ns_ldap_search_desc_t *desc,
 	if (*realfilter == NULL)
 		return (NS_LDAP_MEMORY);
 
-	(void) sprintf(*realfilter, (char *)userdata,
-			desc->filter);
+	(void) sprintf(*realfilter, (char *)userdata, desc->filter);
 
 #ifdef DEBUG
 	(void) fprintf(stdout, "\n[new filter: %s]\n", *realfilter);
