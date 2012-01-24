@@ -21,6 +21,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Joyent, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -116,13 +117,17 @@ memcntl(caddr_t addr, size_t len, int cmd, caddr_t arg, int attr, int mask)
 		 * MS_SYNC used to be defined to be zero but is now non-zero.
 		 * For binary compatibility we still accept zero
 		 * (the absence of MS_ASYNC) to mean the same thing.
+		 * Binary compatibility is not an issue for MS_INVALCURPROC.
 		 */
 		iarg = (uintptr_t)arg;
 		if ((iarg & ~MS_INVALIDATE) == 0)
 			iarg |= MS_SYNC;
 
-		if (((iarg & ~(MS_SYNC|MS_ASYNC|MS_INVALIDATE)) != 0) ||
-			((iarg & (MS_SYNC|MS_ASYNC)) == (MS_SYNC|MS_ASYNC))) {
+		if (((iarg &
+		    ~(MS_SYNC|MS_ASYNC|MS_INVALIDATE|MS_INVALCURPROC)) != 0) ||
+		    ((iarg & (MS_SYNC|MS_ASYNC)) == (MS_SYNC|MS_ASYNC)) ||
+		    ((iarg & (MS_INVALIDATE|MS_INVALCURPROC)) ==
+		    (MS_INVALIDATE|MS_INVALCURPROC))) {
 			error = set_errno(EINVAL);
 		} else {
 			error = as_ctl(as, addr, len, cmd, attr, iarg, NULL, 0);

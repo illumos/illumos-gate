@@ -939,7 +939,10 @@ vmu_amp_update_incore_bounds(avl_tree_t *tree, struct anon_map *amp,
 
 			if (ap != NULL && vn != NULL && vn->v_pages != NULL &&
 			    (page = page_exists(vn, off)) != NULL) {
-				page_type = VMUSAGE_BOUND_INCORE;
+				if (PP_ISFREE(page))
+					page_type = VMUSAGE_BOUND_NOT_INCORE;
+				else
+					page_type = VMUSAGE_BOUND_INCORE;
 				if (page->p_szc > 0) {
 					pgcnt = page_get_pagecnt(page->p_szc);
 					pgshft = page_get_shift(page->p_szc);
@@ -1026,7 +1029,10 @@ vmu_vnode_update_incore_bounds(avl_tree_t *tree, vnode_t *vnode,
 
 			if (vnode->v_pages != NULL &&
 			    (page = page_exists(vnode, ptob(index))) != NULL) {
-				page_type = VMUSAGE_BOUND_INCORE;
+				if (PP_ISFREE(page))
+					page_type = VMUSAGE_BOUND_NOT_INCORE;
+				else
+					page_type = VMUSAGE_BOUND_INCORE;
 				if (page->p_szc > 0) {
 					pgcnt = page_get_pagecnt(page->p_szc);
 					pgshft = page_get_shift(page->p_szc);
@@ -1304,6 +1310,12 @@ vmu_calculate_seg(vmu_entity_t *vmu_entities, struct seg *seg)
 				p_index++;
 				s_index++;
 			}
+
+			/*
+			 * Pages on the free list aren't counted for the rss.
+			 */
+			if (PP_ISFREE(page))
+				continue;
 
 			/*
 			 * Assume anon structs with a refcnt
