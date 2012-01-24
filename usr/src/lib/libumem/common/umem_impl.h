@@ -21,13 +21,12 @@
  */
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2012 Joyent, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _UMEM_IMPL_H
 #define	_UMEM_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <umem.h>
 
@@ -353,7 +352,7 @@ typedef struct umem_cpu {
 	uint32_t cpu_number;
 } umem_cpu_t;
 
-#define	UMEM_MAXBUF	16384
+#define	UMEM_MAXBUF	131072
 
 #define	UMEM_ALIGN		8	/* min guaranteed alignment */
 #define	UMEM_ALIGN_SHIFT	3	/* log2(UMEM_ALIGN) */
