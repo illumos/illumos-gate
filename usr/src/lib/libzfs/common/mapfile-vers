@@ -20,7 +20,7 @@
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2011 Nexenta Systems, Inc. All rights reserved.
-# Copyright (c) 2011 by Delphix. All rights reserved.
+# Copyright (c) 2012 by Delphix. All rights reserved.
 #
 # MAPFILE HEADER START
 #
@@ -193,6 +193,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zpool_import_props;
 	zpool_import_status;
 	zpool_in_use;
+	zpool_is_bootable;
 	zpool_iter;
 	zpool_label_disk;
 	zpool_mount_datasets;
@@ -208,6 +209,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zpool_read_label;
 	zpool_refresh_stats;
 	zpool_reguid;
+	zpool_reopen;
 	zpool_scan;
 	zpool_search_import;
 	zpool_set_history_str;
@@ -230,6 +232,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zprop_get_list;
 	zprop_iter;
 	zprop_print_one_property;
+	zprop_width;
 	zvol_check_dump_config;
 	zvol_volsize_to_reservation;
     local:
