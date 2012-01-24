@@ -21,10 +21,9 @@
 
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2012 Joyent, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * based on usr/src/uts/common/os/kmem.c r1.64 from 2001/12/18
@@ -355,6 +354,17 @@
  *	umem_log_header_t's:
  *		lh_cpu[*].clh_lock
  *		lh_lock
+ *
+ * 7. Changing UMEM_MAXBUF
+ * -----------------------
+ *
+ * When changing UMEM_MAXBUF extra care has to be taken. It is not sufficient to
+ * simply increase this number. First, one must update the umem_alloc_table to
+ * have the appropriate number of entires based upon the new size. If this is
+ * not done, this will lead to libumem blowing an assertion.
+ *
+ * The second place to update, which is not required, is the umem_alloc_sizes.
+ * These determine the default cache sizes that we're going to support.
  */
 
 #include <umem_impl.h>
@@ -420,7 +430,9 @@ static int umem_alloc_sizes[] = {
 	P2ALIGN(8192 / 2, 64), 4544,
 	P2ALIGN(8192 / 1, 64), 9216,
 	4096 * 3,
-	UMEM_MAXBUF,				/* = 8192 * 2 */
+	8192 * 2,				/* = 8192 * 2 */
+	24576, 32768, 40960, 49152, 57344, 65536, 73728, 81920,
+	90112, 98304, 106496, 114688, 122880, UMEM_MAXBUF, /* 128k */
 	/* 24 slots for user expansion */
 	0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0,
@@ -591,6 +603,20 @@ umem_cache_t		umem_null_cache = {
 	ALLOC_TABLE_64, ALLOC_TABLE_64, ALLOC_TABLE_64, ALLOC_TABLE_64
 
 static umem_cache_t *umem_alloc_table[UMEM_MAXBUF >> UMEM_ALIGN_SHIFT] = {
+	ALLOC_TABLE_1024,
+	ALLOC_TABLE_1024,
+	ALLOC_TABLE_1024,
+	ALLOC_TABLE_1024,
+	ALLOC_TABLE_1024,
+	ALLOC_TABLE_1024,
+	ALLOC_TABLE_1024,
+	ALLOC_TABLE_1024,
+	ALLOC_TABLE_1024,
+	ALLOC_TABLE_1024,
+	ALLOC_TABLE_1024,
+	ALLOC_TABLE_1024,
+	ALLOC_TABLE_1024,
+	ALLOC_TABLE_1024,
 	ALLOC_TABLE_1024,
 	ALLOC_TABLE_1024
 };

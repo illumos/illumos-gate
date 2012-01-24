@@ -29,7 +29,7 @@
 #include "umem_base.h"
 
 uint_t vmem_backend = 0;
-uint_t vmem_allocator = 0;
+uint_t vmem_allocator = VM_BESTFIT;
 
 vmem_t *
 vmem_heap_arena(vmem_alloc_t **allocp, vmem_free_t **freep)
