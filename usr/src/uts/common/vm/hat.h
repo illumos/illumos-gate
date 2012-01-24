@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Joyent, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -460,6 +461,7 @@ void	hat_setstat(struct as *, caddr_t, size_t, uint_t);
  */
 #define	HAT_ADV_PGUNLOAD	0x00
 #define	HAT_FORCE_PGUNLOAD	0x01
+#define	HAT_CURPROC_PGUNLOAD	0x02
 
 /*
  * Attributes for hat_page_*attr, hat_setstats and

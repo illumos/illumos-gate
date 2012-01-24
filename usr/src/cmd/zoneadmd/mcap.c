@@ -40,7 +40,7 @@
  * checks that against the zone's zone.max-physical-memory rctl.  Once the
  * zone goes over its cap, then this thread will work through the zone's
  * /proc process list, Pgrab-bing each process and stepping through the
- * address space segments attempting to use pr_memcntl(...MS_INVALIDATE...)
+ * address space segments attempting to use pr_memcntl(...MS_INVALCURPROC...)
  * to pageout pages, until the zone is again under its cap.
  *
  * Although zone memory capping is implemented as a soft cap by this user-level
@@ -56,21 +56,14 @@
  * the thread will work to pageout until the zone is under the cap, as shown
  * by updated vm_usage data.
  *
- * There are a couple of interfaces (xmap, pagedata) in proc(4) that can be
- * used to examine a processes mapped segments while we are trying to pageout.
- * The observed xmap segement size data is frequently smaller than the
- * pagedata segement size data, so it is less effective in practice.  Thus we
- * use pagedata to determine the size of each segment.
- *
- * The pagedata page maps (at least on x86) are not useful.  Those flags
+ * NOTE: The pagedata page maps (at least on x86) are not useful.  Those flags
  * are set by hrm_setbits() and on x86 that code path is only executed by
  *     segvn_pagelock -> hat_setstat -> hrm_setbits
  *     segvn_softunlock -^
  * On SPARC there is an additional code path which may make this data
  * useful (sfmmu_ttesync), but since it is not generic, we ignore the page
- * maps and only use the segement info from pagedata.  If we ever fix this
- * issue, then we could generalize this mcap code to do more with the data on
- * active pages.
+ * maps.  If we ever fix this issue, then we could generalize this mcap code to
+ * do more with the data on active pages.
  *
  * For debugging, touch the file {zonepath}/mcap_debug.log.  This will
  * cause the thread to start logging its actions into that file (it may take
@@ -124,7 +117,6 @@ static cond_t	shutdown_cv;
 static int	shutting_down = 0;
 static thread_t mcap_tid;
 static FILE	*debug_log_fp = NULL;
-static uint64_t	sum_pageout = 0;	/* total bytes paged out in a pass */
 static uint64_t zone_rss_cap;		/* RSS cap(KB) */
 static char	over_cmd[2 * BUFSIZ];	/* same size as zone_attr_value */
 
@@ -135,13 +127,7 @@ static char	over_cmd[2 * BUFSIZ];	/* same size as zone_attr_value */
 typedef struct {
 	int pr_curr;		/* the # of the mapping we're working on */
 	int pr_nmap;		/* number of mappings in address space */
-	int pr_cnt;		/* number of mappings processed */
-
-	prpageheader_t *pr_pghp; /* process's complete pagedata */
-	prasmap_t *pr_asp;	/* current address space pointer */
-
-	uintptr_t pr_addr;	/* base of mapping */
-	uint64_t pr_size;	/* size of mapping */
+	prxmap_t *pr_xmapp;	/* process's xmap array */
 } proc_map_t;
 
 typedef struct zsd_vmusage64 {
@@ -293,40 +279,21 @@ control_proc(pid_t pid)
 }
 
 /*
- * Get data from the current prasmap_t and advance pr_asp to the next
- * asmap in the pagedata.
+ * Get the next mapping.
  */
-static uintptr_t
+static prxmap_t *
 nextmapping(proc_map_t *pmp)
 {
-	prasmap_t *pap;
-	void *pdp;		/* per-page data pointer */
-
-	pmp->pr_curr++;
-	if (pmp->pr_curr > pmp->pr_nmap)
+	if (pmp->pr_xmapp == NULL || pmp->pr_curr >= pmp->pr_nmap)
 		return (NULL);
 
-	pap = pmp->pr_asp;
-
-	pmp->pr_addr = pap->pr_vaddr;
-	pmp->pr_size = pap->pr_npage * pap->pr_pagesize;
-	pmp->pr_cnt++;
-
-	/* Advance the pr_asp pointer to the next asmap */
-	pdp = pap + 1;
-	pdp = (caddr_t)(uintptr_t)((uintptr_t)pdp + pap->pr_npage);
-
-	/* Skip to next 64-bit-aligned address to get the next prasmap_t. */
-	pdp = (caddr_t)(((uintptr_t)pdp + 7) & ~7);
-	pmp->pr_asp = (prasmap_t *)pdp;
-
-	return (pmp->pr_addr);
+	return (&pmp->pr_xmapp[pmp->pr_curr++]);
 }
 
 /*
  * Initialize the proc_map_t to access the first mapping of an address space.
  */
-static void *
+static prxmap_t *
 init_map(proc_map_t *pmp, pid_t pid)
 {
 	int fd;
@@ -337,39 +304,37 @@ init_map(proc_map_t *pmp, pid_t pid)
 	bzero(pmp, sizeof (proc_map_t));
 	pmp->pr_nmap = -1;
 
-	(void) snprintf(pathbuf, sizeof (pathbuf), "%s/%d/pagedata", zoneproc,
-	    pid);
+	(void) snprintf(pathbuf, sizeof (pathbuf), "%s/%d/xmap", zoneproc, pid);
 	if ((fd = open(pathbuf, O_RDONLY, 0)) < 0)
 		return (NULL);
 
 redo:
 	errno = 0;
 	if (fstat(fd, &st) != 0)
-		return (NULL);
+		goto done;
 
-	if ((pmp->pr_pghp = malloc(st.st_size)) == NULL) {
-		debug("cannot malloc() %ld bytes for pagedata", st.st_size);
-		return (NULL);
+	if ((pmp->pr_xmapp = malloc(st.st_size)) == NULL) {
+		debug("cannot malloc() %ld bytes for xmap", st.st_size);
+		goto done;
 	}
-	(void) bzero(pmp->pr_pghp, st.st_size);
+	(void) bzero(pmp->pr_xmapp, st.st_size);
 
 	errno = 0;
-	if ((res = read(fd, pmp->pr_pghp, st.st_size)) != st.st_size) {
-		free(pmp->pr_pghp);
-		pmp->pr_pghp = NULL;
+	if ((res = read(fd, pmp->pr_xmapp, st.st_size)) != st.st_size) {
+		free(pmp->pr_xmapp);
+		pmp->pr_xmapp = NULL;
 		if (res > 0 || errno == E2BIG) {
 			goto redo;
 		} else {
-			debug("pid %ld cannot read pagedata\n", pid);
-			return (NULL);
+			debug("pid %ld cannot read xmap\n", pid);
+			goto done;
 		}
 	}
 
-	pmp->pr_nmap = pmp->pr_pghp->pr_nmap;
-	pmp->pr_asp = (prasmap_t *)(pmp->pr_pghp + 1);
+	pmp->pr_nmap = st.st_size / sizeof (prxmap_t);
 done:
 	(void) close(fd);
-	return ((void *)nextmapping(pmp));
+	return (nextmapping(pmp));
 }
 
 /*
@@ -377,13 +342,24 @@ done:
  * return nonzero if not all of the pages may are pageable, for any reason.
  */
 static int
-pageout_mapping(struct ps_prochandle *Pr, proc_map_t *pmp)
+pageout_mapping(struct ps_prochandle *Pr, prxmap_t *pmp)
 {
 	int res;
 
+	/*
+	 * We particularly want to avoid the pr_memcntl on anonymous mappings
+	 * which show 0 since that will pull them back off of the free list
+	 * and increase the zone's RSS, even though the process itself has
+	 * them freed up.
+	 */
+	if (pmp->pr_mflags & MA_ANON && pmp->pr_anon == 0)
+		return (0);
+	else if (pmp->pr_mflags & MA_ISM || pmp->pr_mflags & MA_SHM)
+		return (0);
+
 	errno = 0;
-	res = pr_memcntl(Pr, (caddr_t)pmp->pr_addr, pmp->pr_size, MC_SYNC,
-	    (caddr_t)(MS_ASYNC | MS_INVALIDATE), 0, 0);
+	res = pr_memcntl(Pr, (caddr_t)pmp->pr_vaddr, pmp->pr_size, MC_SYNC,
+	    (caddr_t)(MS_ASYNC | MS_INVALCURPROC), 0, 0);
 
 	/*
 	 * EBUSY indicates none of the pages have backing store allocated, or
@@ -423,7 +399,7 @@ static int64_t
 pageout_process(pid_t pid, int64_t excess)
 {
 	int			psfd;
-	void			*praddr;
+	prxmap_t		*pxmap;
 	proc_map_t		cur;
 	struct ps_prochandle	*ph = NULL;
 	int			unpageable_mappings;
@@ -433,7 +409,6 @@ pageout_process(pid_t pid, int64_t excess)
 	int			incr_rss_check = 0;
 	char			pathbuf[MAXPATHLEN];
 
-	cur.pr_pghp = NULL;
 	(void) snprintf(pathbuf, sizeof (pathbuf), "%s/%d/psinfo", zoneproc,
 	    pid);
 	if ((psfd = open(pathbuf, O_RDONLY, 0000)) < 0)
@@ -459,11 +434,11 @@ pageout_process(pid_t pid, int64_t excess)
 	}
 
 	/* Get segment residency information. */
-	praddr = init_map(&cur, pid);
+	pxmap = init_map(&cur, pid);
 
 	/* Skip process if it has no mappings. */
-	if (cur.pr_pghp == NULL) {
-		debug("%ld: pagedata unreadable; ignoring\n", pid);
+	if (pxmap == NULL) {
+		debug("%ld: xmap unreadable; ignoring\n", pid);
 		goto done;
 	}
 
@@ -489,15 +464,15 @@ pageout_process(pid_t pid, int64_t excess)
 	 */
 	sum_att = sum_d_rss = 0;
 	unpageable_mappings = 0;
-	while (excess > 0 && praddr != NULL && !shutting_down) {
+	while (excess > 0 && pxmap != NULL && !shutting_down) {
 		/* Try to page out the mapping. */
-		if (pageout_mapping(ph, &cur) < 0) {
+		if (pageout_mapping(ph, pxmap) < 0) {
 			debug("pid %ld: exited or unpageable\n", pid);
 			break;
 		}
 
 		/* attempted is the size of the mapping */
-		sum_att += (cur.pr_size / 1024);
+		sum_att += pxmap->pr_size / 1024;
 
 		/*
 		 * This processes RSS is potentially enough to clear the
@@ -519,11 +494,10 @@ pageout_process(pid_t pid, int64_t excess)
 			} else {
 				excess += d_rss;
 				sum_d_rss += d_rss;
-				sum_pageout += (-d_rss * 1024);
 			}
 		}
 
-		praddr = (void *)nextmapping(&cur);
+		pxmap = nextmapping(&cur);
 	}
 
 	if (!incr_rss_check) {
@@ -531,12 +505,11 @@ pageout_process(pid_t pid, int64_t excess)
 		if (d_rss < 0) {
 			excess += d_rss;
 			sum_d_rss += d_rss;
-			sum_pageout += (-d_rss * 1024);
 		}
 	}
 
-	debug("pid %ld: map %d unp %d att %lluKB drss %lldKB excess %lldKB\n",
-	    pid, cur.pr_cnt, unpageable_mappings, (unsigned long long)sum_att,
+	debug("pid %ld: unp %d att %lluKB drss %lldKB excess %lldKB\n",
+	    pid, unpageable_mappings, (unsigned long long)sum_att,
 	    (unsigned long long)sum_d_rss, (long long)excess);
 
 done:
@@ -546,8 +519,8 @@ done:
 		(void) Prelease(ph, 0);
 	}
 
-	if (cur.pr_pghp != NULL)
-		free(cur.pr_pghp);
+	if (cur.pr_xmapp != NULL)
+		free(cur.pr_xmapp);
 
 	(void) close(psfd);
 
@@ -680,12 +653,13 @@ get_zone_cap()
  * is important considering that each zone will be monitoring its rss.
  */
 static int64_t
-check_suspend(int age)
+check_suspend(int age, boolean_t new_cycle)
 {
 	static hrtime_t last_cap_read = 0;
 	static uint64_t addon;
 	static uint64_t lo_thresh;	/* Thresholds for how long to  sleep */
 	static uint64_t hi_thresh;	/* when under the cap (80% & 90%). */
+	static uint64_t prev_zone_rss = 0;
 
 	/* Wait a second to give the async pageout a chance to catch up. */
 	(void) sleep_shutdown(1);
@@ -742,16 +716,6 @@ check_suspend(int age)
 			continue;
 		}
 
-		/*
-		 * If we did some paging out since our last invocation then
-		 * update the kstat so we can track how much was paged out.
-		 */
-		if (sum_pageout != 0) {
-			(void) zone_setattr(zid, ZONE_ATTR_PMCAP_PAGEOUT,
-			    &sum_pageout, 0);
-			sum_pageout = 0;
-		}
-
 		zone_rss = get_mem_info(age);
 
 		/* calculate excess */
@@ -760,18 +724,41 @@ check_suspend(int age)
 		debug("rss %lluKB, cap %lluKB, excess %lldKB\n",
 		    zone_rss, zone_rss_cap, new_excess);
 
-		if (new_excess > 0) {
-			uint64_t n = 1;
+		/*
+		 * If necessary, updates stats.
+		 */
 
-			/* Increment "nover" kstat. */
-			(void) zone_setattr(zid, ZONE_ATTR_PMCAP_NOVER, &n, 0);
+		/*
+		 * If it looks like we did some paging out since last over the
+		 * cap then update the kstat so we can approximate how much was
+		 * paged out.
+		 */
+		if (prev_zone_rss > zone_rss_cap && zone_rss < prev_zone_rss) {
+			uint64_t diff;
+
+			/* assume diff is num bytes we paged out */
+			diff = (prev_zone_rss - zone_rss) * 1024;
+
+			(void) zone_setattr(zid, ZONE_ATTR_PMCAP_PAGEOUT,
+			    &diff, 0);
+		}
+		prev_zone_rss = zone_rss;
+
+		if (new_excess > 0) {
+			if (new_cycle) {
+				uint64_t n = 1;
+
+				/* Increment "nover" kstat. */
+				(void) zone_setattr(zid, ZONE_ATTR_PMCAP_NOVER,
+				    &n, 0);
+			}
 
 			/*
-			 * Once we go over the cap, then we want to page out a
-			 * little extra instead of stopping right at the cap.
-			 * To do this we add 5% to the excess so that
-			 * pageout_proces will work a little longer before
-			 * stopping.
+			 * Once we go over the cap, then we want to
+			 * page out a little extra instead of stopping
+			 * right at the cap. To do this we add 5% to
+			 * the excess so that pageout_proces will work
+			 * a little longer before stopping.
 			 */
 			return ((int64_t)(new_excess + addon));
 		}
@@ -845,7 +832,7 @@ mcap_zone()
 		struct dirent *dirent;
 
 		/* Wait until we've gone over the cap. */
-		excess = check_suspend(age);
+		excess = check_suspend(age, B_TRUE);
 
 		debug("starting to scan, excess %lldk\n", (long long)excess);
 
@@ -885,10 +872,10 @@ mcap_zone()
 			excess = pageout_process(pid, excess);
 
 			if (excess <= 0) {
-				debug("done scanning; excess %lld\n",
+				debug("apparently under; excess %lld\n",
 				    (long long)excess);
 				/* Double check the current excess */
-				excess = check_suspend(1);
+				excess = check_suspend(1, B_FALSE);
 			}
 		}
 

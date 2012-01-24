@@ -7308,7 +7308,8 @@ segvn_sync(struct seg *seg, caddr_t addr, size_t len, int attr, uint_t flags)
 	vpp = svd->vpage;
 	offset = svd->offset + (uintptr_t)(addr - seg->s_base);
 	bflags = ((flags & MS_ASYNC) ? B_ASYNC : 0) |
-	    ((flags & MS_INVALIDATE) ? B_INVAL : 0);
+	    ((flags & MS_INVALIDATE) ? B_INVAL : 0) |
+	    ((flags & MS_INVALCURPROC) ? (B_INVALCURONLY | B_INVAL) : 0);
 
 	if (attr) {
 		pageprot = attr & ~(SHARED|PRIVATE);
@@ -7333,11 +7334,11 @@ segvn_sync(struct seg *seg, caddr_t addr, size_t len, int attr, uint_t flags)
 			vpp = &svd->vpage[seg_page(seg, addr)];
 
 	} else if (svd->vp && svd->amp == NULL &&
-	    (flags & MS_INVALIDATE) == 0) {
+	    (flags & (MS_INVALIDATE | MS_INVALCURPROC)) == 0) {
 
 		/*
-		 * No attributes, no anonymous pages and MS_INVALIDATE flag
-		 * is not on, just use one big request.
+		 * No attributes, no anonymous pages and MS_INVAL* flags
+		 * are not on, just use one big request.
 		 */
 		err = VOP_PUTPAGE(svd->vp, (offset_t)offset, len,
 		    bflags, svd->cred, NULL);
@@ -7389,7 +7390,7 @@ segvn_sync(struct seg *seg, caddr_t addr, size_t len, int attr, uint_t flags)
 		 * might race in and lock the page after we unlock and before
 		 * we do the PUTPAGE, then PUTPAGE simply does nothing.
 		 */
-		if (flags & MS_INVALIDATE) {
+		if (flags & (MS_INVALIDATE | MS_INVALCURPROC)) {
 			if ((pp = page_lookup(vp, off, SE_SHARED)) != NULL) {
 				if (pp->p_lckcnt != 0 || pp->p_cowcnt != 0) {
 					page_unlock(pp);
