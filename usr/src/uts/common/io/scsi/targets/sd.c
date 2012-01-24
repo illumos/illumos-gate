@@ -25,6 +25,7 @@
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2011 Bayard G. Bell.  All rights reserved.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 /*
  * Copyright 2011 cyril.galibern@opensvc.com
@@ -5291,6 +5292,18 @@ sd_update_block_info(struct sd_lun *un, uint32_t lbasize, uint64_t capacity)
 	if (capacity != 0) {
 		un->un_blockcount		= capacity;
 		un->un_f_blockcount_is_valid	= TRUE;
+
+		/*
+		 * The capacity has changed so update the errstats.
+		 */
+		if (un->un_errstats != NULL) {
+			struct sd_errstats *stp;
+
+			capacity *= un->un_sys_blocksize;
+			stp = (struct sd_errstats *)un->un_errstats->ks_data;
+			if (stp->sd_capacity.value.ui64 < capacity)
+				stp->sd_capacity.value.ui64 = capacity;
+		}
 	}
 }
 
