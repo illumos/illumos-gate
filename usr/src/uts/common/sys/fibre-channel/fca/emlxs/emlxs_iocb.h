@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -804,7 +804,7 @@ typedef struct emlxs_iocbq
 
 	struct emlxs_iocbq	*next;
 
-	uint8_t			*bp;	/* ptr to data buffer structure */
+	void			*bp;	/* ptr to data buffer structure */
 	void			*port;	/* Board info pointer */
 	void			*channel; /* IO Channel pointer */
 	void			*node;	/* Node pointer */

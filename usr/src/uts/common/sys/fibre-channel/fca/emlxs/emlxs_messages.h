@@ -80,6 +80,7 @@ extern "C" {
  * FIRMWARE		1500
  * CT			1600
  * FCSP			1700
+ * FCF			1800
  *
  */
 
@@ -111,6 +112,7 @@ emlxs_msg_group_t msg_group[] =
 	{1500,	1599,	"Firmware Download Events"},
 	{1600,	1699,	"Common Transport Events"},
 	{1700,	1799,	"Fibre Channel Security Protocol (FCSP) Events"},
+	{1800,	1899,	"Fibre Channel Fabric (FCF) Events"},
 };
 
 #define	MAX_MSG_GROUPS	(sizeof (msg_group) / sizeof (emlxs_msg_group_t))
@@ -138,7 +140,7 @@ emlxs_msg_group_t msg_group[] =
 #define	MSG_FIRMWARE		0x00008000	/* Firmware download events */
 #define	MSG_CT			0x00010000	/* CT events */
 #define	MSG_FCSP		0x00020000	/* FCSP events */
-#define	MSG_RESV18		0x00040000
+#define	MSG_FCF			0x00040000	/* FCF events */
 #define	MSG_RESV19		0x00080000
 #define	MSG_RESV20		0x00100000
 #define	MSG_RESV21		0x00200000
@@ -851,6 +853,15 @@ emlxs_msg_t emlxs_message[] =
 		NULL, \
 		0)
 
+	DEFINE_MSG(462, \
+		emlxs_sli_debug_msg, \
+		"SLI DEBUG.", \
+		EMLXS_DEBUG, \
+		MSG_SLI, \
+		"This provides debug information about an SLI event.", \
+		ACTION_NONE, \
+		NULL, \
+		0)
 
 	/* GROUP:  MBOX		500 - 599 */
 
@@ -1928,6 +1939,61 @@ emlxs_msg_t emlxs_message[] =
 		NULL, \
 		0)
 #endif	/* DHCHAP_SUPPORT */
+
+	/* GROUP: FCF		1800 - 1899 */
+
+	DEFINE_MSG(1800, \
+		emlxs_fcf_debug_msg, \
+		"FCF", \
+		EMLXS_DEBUG, \
+		MSG_FCF, \
+		"This provides general information about the driver's " \
+		"FCF interface.", \
+		ACTION_NONE, \
+		NULL, \
+		0)
+
+	DEFINE_MSG(1801, \
+		emlxs_fcf_detail_msg, \
+		"FCF detail.", \
+		EMLXS_DEBUG, \
+		MSG_FCF, \
+		"This provides detailed information about the driver's " \
+		"FCF interface.", \
+		ACTION_NONE, \
+		NULL, \
+		0)
+
+	DEFINE_MSG(1810, \
+		emlxs_fcf_error_msg, \
+		"FCF error. ", \
+		EMLXS_DEBUG, \
+		MSG_FCF, \
+		"This indicates that an error was found while processing " \
+		"an FCF request.", \
+		ACTION_NONE, \
+		NULL, \
+		0)
+
+	DEFINE_MSG(1820, \
+		emlxs_fcf_state_msg, \
+		"FCF state. ", \
+		EMLXS_DEBUG, \
+		MSG_FCF, \
+		"This indicates that an FCF object state is changing.", \
+		ACTION_NONE, \
+		NULL, \
+		0)
+
+	DEFINE_MSG(1830, \
+		emlxs_fcf_event_msg, \
+		"FCF event. ", \
+		EMLXS_DEBUG, \
+		MSG_FCF, \
+		"This indicates that an FCF event has occurred.", \
+		ACTION_NONE, \
+		NULL, \
+		0)
 
 #ifdef DEF_MSG_REPORT
 };	/* emlxs_message[] */

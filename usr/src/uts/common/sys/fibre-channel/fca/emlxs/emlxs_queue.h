@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -234,13 +234,6 @@ typedef struct CQE_ASYNC_FCOE
 	uint16_t	fcf_count;
 
 	uint32_t	event_tag;	/* Word 2 */
-
-	uint32_t	valid: 1;	/* Word 3 */
-	uint32_t	async_evt: 1;
-	uint32_t	Rsvd2: 6;
-	uint32_t	event_type: 8;
-	uint32_t	event_code: 8;
-	uint32_t	Rsvd3: 8;
 #endif
 #ifdef EMLXS_LITTLE_ENDIAN
 	uint32_t	ref_index;	/* Word 0 */
@@ -249,17 +242,10 @@ typedef struct CQE_ASYNC_FCOE
 	uint16_t	evt_type;	/* Word 1 */
 
 	uint32_t	event_tag;	/* Word 2 */
-
-	uint32_t	Rsvd3: 8;
-	uint32_t	event_code: 8;
-	uint32_t	event_type: 8;
-	uint32_t	Rsvd2: 6;
-	uint32_t	async_evt: 1;
-	uint32_t	valid: 1;	/* Word 3 */
 #endif
 } CQE_ASYNC_FCOE_t;
 
-typedef struct CQE_ASYNC
+typedef struct CQE_ASYNC_LINK_STATE
 {
 #ifdef EMLXS_BIG_ENDIAN
 	uint8_t		port_speed;	/* Word 0 */
@@ -272,13 +258,6 @@ typedef struct CQE_ASYNC
 	uint8_t		port_fault;
 
 	uint32_t	event_tag;	/* Word 2 */
-
-	uint32_t	valid: 1;	/* Word 3 */
-	uint32_t	async_evt: 1;
-	uint32_t	Rsvd2: 6;
-	uint32_t	event_type: 8;
-	uint32_t	event_code: 8;
-	uint32_t	Rsvd3: 8;
 #endif
 #ifdef EMLXS_LITTLE_ENDIAN
 	uint8_t		phys_port;
@@ -291,7 +270,56 @@ typedef struct CQE_ASYNC
 	uint16_t	qos_link_speed;
 
 	uint32_t	event_tag;	/* Word 2 */
+#endif
+} CQE_ASYNC_LINK_STATE_t;
 
+typedef struct CQE_ASYNC_GRP_5_QOS
+{
+#ifdef EMLXS_BIG_ENDIAN
+	uint8_t		Rsvd2;
+	uint8_t		Rsvd1;
+	uint8_t		Rsvd0;
+	uint8_t		phys_port;	/* Word 0 */
+
+	uint16_t	qos_link_speed;
+	uint8_t		Rsvd4;
+	uint8_t		Rsvd3;		/* Word 1 */
+
+	uint32_t	event_tag;	/* Word 2 */
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+	uint8_t		phys_port;
+	uint8_t		Rsvd0;
+	uint8_t		Rsvd1;
+	uint8_t		Rsvd2;		/* Word 0 */
+
+	uint8_t		Rsvd3;
+	uint8_t		Rsvd4;
+	uint16_t	qos_link_speed;	/* Word 1 */
+
+	uint32_t	event_tag;	/* Word 2 */
+#endif
+} CQE_ASYNC_GRP_5_QOS_t;
+
+typedef struct CQE_ASYNC
+{
+	/* Words 0-2 */
+	union
+	{
+		CQE_ASYNC_LINK_STATE_t	link;
+		CQE_ASYNC_FCOE_t	fcoe;
+		CQE_ASYNC_GRP_5_QOS_t	qos;
+	} un;
+
+#ifdef EMLXS_BIG_ENDIAN
+	uint32_t	valid: 1;
+	uint32_t	async_evt: 1;
+	uint32_t	Rsvd2: 6;
+	uint32_t	event_type: 8;
+	uint32_t	event_code: 8;
+	uint32_t	Rsvd3: 8;	/* Word 3 */
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
 	uint32_t	Rsvd3: 8;
 	uint32_t	event_code: 8;
 	uint32_t	event_type: 8;
@@ -309,6 +337,7 @@ typedef struct CQE_ASYNC
 #define	ASYNC_EVENT_CODE_LINK_STATE	1
 #define	ASYNC_EVENT_CODE_FCOE_FIP	2
 #define	ASYNC_EVENT_CODE_DCBX		3
+#define	ASYNC_EVENT_CODE_GRP_5		5
 
 /* LINK_STATE - link_status defines */
 #define	ASYNC_EVENT_PHYS_LINK_DOWN	0
@@ -321,6 +350,10 @@ typedef struct CQE_ASYNC
 #define	ASYNC_EVENT_FCF_TABLE_FULL	2
 #define	ASYNC_EVENT_FCF_DEAD		3
 #define	ASYNC_EVENT_VIRT_LINK_CLEAR	4
+#define	ASYNC_EVENT_FCF_MODIFIED	5
+
+/* GRP_5 - evt_type defines */
+#define	ASYNC_EVENT_QOS_SPEED		1
 
 typedef struct CQE_MBOX
 {

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -385,72 +385,6 @@ done:
 } /* emlxs_menlo_get_paniclog() */
 
 
-static uint32_t
-emlxs_menlo_get_sfp(
-	emlxs_hba_t *hba,
-	menlo_rsp_t *rsp_buf,
-	uint32_t rsp_size)
-{
-	emlxs_port_t *port = &PPORT;
-	uint32_t cmd_size;
-	menlo_cmd_t *cmd_buf = NULL;
-	uint32_t rval = 0;
-
-	if (hba->model_info.device_id != PCI_DEVICE_ID_LP21000_M) {
-		return (DFC_INVALID_ADAPTER);
-	}
-
-	cmd_size = sizeof (menlo_get_cmd_t);
-	cmd_buf = (menlo_cmd_t *)kmem_zalloc(cmd_size, KM_SLEEP);
-
-	cmd_buf->code = MENLO_CMD_GET_SFP_DATA;
-	cmd_buf->get.context = 0;
-	cmd_buf->get.length = rsp_size;
-
-#ifdef EMLXS_BIG_ENDIAN
-	emlxs_swap32_buffer((uint8_t *)cmd_buf, cmd_size);
-#endif /* EMLXS_BIG_ENDIAN */
-
-	if (rval = emlxs_send_menlo_cmd(hba, (uint8_t *)cmd_buf, cmd_size,
-	    (uint8_t *)rsp_buf, &rsp_size)) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "emlxs_menlo_get_sfp: Unable to send command.");
-		goto done;
-	}
-#ifdef EMLXS_BIG_ENDIAN
-	emlxs_swap32_buffer((uint8_t *)rsp_buf, rsp_size);
-#endif /* EMLXS_BIG_ENDIAN */
-
-	if (rsp_buf->code != 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "emlxs_menlo_get_sfp: Menlo command error. code=%d.\n",
-		    rsp_buf->code);
-	}
-
-	rval = rsp_buf->code;
-
-done:
-
-	if (cmd_buf) {
-		kmem_free(cmd_buf, sizeof (menlo_get_cmd_t));
-	}
-
-	return (rval);
-
-} /* emlxs_menlo_get_sfp() */
-
-
-static uint32_t
-emlxs_isgraph(
-	uint8_t c)
-{
-	if ((c >= 33) && (c <= 126)) {
-		return (1);
-	}
-
-	return (0);
-
-} /* emlxs_isgraph() */
 
 
 extern void
@@ -739,7 +673,8 @@ emlxs_get_dump(
 	}
 
 	if (size_cee) {
-		if (hba->model_info.chip == EMLXS_BE_CHIP) {
+		if ((hba->model_info.chip == EMLXS_BE2_CHIP) ||
+		    (hba->model_info.chip == EMLXS_BE3_CHIP)) {
 			wptr[i++] = EMLXS_FAT_FILE_ID;
 		} else {
 			wptr[i++] = EMLXS_CEE_FILE_ID;
@@ -1017,75 +952,6 @@ emlxs_dump_word_txtfile(
 } /* emlxs_dump_word_txtfile() */
 
 
-static uint32_t
-emlxs_dump_byte_txtfile(
-	emlxs_file_t *fpTxtFile,
-	uint8_t *pBuffer,
-	uint32_t ByteCount,
-	char *pSidLegend,
-	char *pLidLegend)
-{
-	char buf1[1024];
-	char buf2[1024];
-	uint8_t *ptr;
-	uint32_t j, k, m, p, cnt;
-
-	if (!fpTxtFile) {
-		return (1);
-	}
-
-	/* Write Legend String to the TXT File */
-	(void) emlxs_fprintf(fpTxtFile, "%s: %s\n", pSidLegend, pLidLegend);
-
-	/* Write the buffer to the TXT File */
-
-	ptr = pBuffer;
-	k = ByteCount;
-
-	for (j = 0; j < k; j++) { /* for all bytes in the buffer */
-		buf1[0] = 0;
-		buf2[0] = 0;
-
-		if ((j & 0x0F) == 0) {
-			(void) sprintf(buf1, "\n%04x:", j);
-			(void) strcat(buf2, buf1);
-			cnt = 0; /* count characters on the new line */
-		}
-		(void) sprintf(buf1, " %02x", ptr[j]);	/* print 1 byte */
-		(void) strcat(buf2, buf1);
-		cnt++;	/* count 1 byte */
-		if ((cnt == 16) || (j == k - 1)) {
-			(void) sprintf(buf1, " ");
-			(void) strcat(buf2, buf1);
-			if (j == k - 1) {
-				for (p = 0; p < 16 - cnt; p++) {
-					(void) sprintf(buf1, "   ");
-					(void) strcat(buf2, buf1);
-				}
-			}
-			for (m = 0; m < cnt; m++) {
-				if (emlxs_isgraph(ptr[j - cnt + 1 + m])) {
-					(void) sprintf(buf1, "%c",
-					    ptr[j - cnt + 1 + m]);
-					(void) strcat(buf2, buf1);
-				} else {
-					(void) sprintf(buf1, ".");
-					(void) strcat(buf2, buf1);
-				}
-			}
-		}
-		/* end if */
-		(void) emlxs_fwrite((uint8_t *)buf2, strlen(buf2), 1,
-		    fpTxtFile);
-
-	}	/* end for */
-
-	emlxs_fputc('\n', fpTxtFile);
-	emlxs_fputc('\n', fpTxtFile);
-	emlxs_fflush(fpTxtFile);
-	return (0);
-
-} /* emlxs_dump_byte_txtfile() */
 
 
 static uint32_t
@@ -2342,7 +2208,8 @@ emlxs_dump_file_create(
 		*fpCeeFile = NULL;
 
 		if ((hba->model_info.device_id == PCI_DEVICE_ID_LP21000_M) ||
-		    (hba->model_info.chip == EMLXS_BE_CHIP)) {
+		    (hba->model_info.chip == EMLXS_BE2_CHIP) ||
+		    (hba->model_info.chip == EMLXS_BE3_CHIP)) {
 			if ((*fpCeeFile =
 			    emlxs_fopen(hba, EMLXS_CEE_FILE)) == NULL) {
 				emlxs_fdelete(*fpTxtFile);
@@ -3024,7 +2891,7 @@ emlxs_dump_drv_region(
 	status = emlxs_get_dump_region(hba, regionId, *pBuf, &size);
 
 	if (status != 0) {
-		kmem_free(pBuf, size);
+		kmem_free(*pBuf, size);
 		*pBuf = NULL;
 
 		return (1);
@@ -3755,7 +3622,7 @@ emlxs_dump_saturn_log(
 			    "Unable to read event log. status=%x",
 			    mb->mbxStatus);
 
-			(void) emlxs_mem_buf_free(hba, mp);
+			emlxs_mem_buf_free(hba, mp);
 			kmem_free(mbq, sizeof (MAILBOXQ));
 			return (1);
 		}
@@ -3788,7 +3655,7 @@ emlxs_dump_saturn_log(
 	}
 #endif  /* FMA_SUPPORT */
 
-	(void) emlxs_mem_buf_free(hba, mp);
+	emlxs_mem_buf_free(hba, mp);
 	kmem_free(mbq, sizeof (MAILBOXQ));
 	return (status);
 
@@ -3816,7 +3683,8 @@ emlxs_dump_tigershark_log(
 	IOCTL_COMMON_MANAGE_FAT *fat;
 	mbox_req_hdr_t *hdr_req;
 
-	if (hba->model_info.chip != EMLXS_BE_CHIP) {
+	if ((hba->model_info.chip != EMLXS_BE2_CHIP) &&
+	    (hba->model_info.chip != EMLXS_BE3_CHIP)) {
 		return (1);
 	}
 
@@ -3839,7 +3707,7 @@ emlxs_dump_tigershark_log(
 
 	/* Query FAT */
 	mb->un.varSLIConfig.be.embedded = 0;
-	mbq->nonembed = (uint8_t *)mp;
+	mbq->nonembed = (void *)mp;
 	mbq->mbox_cmpl = NULL;
 
 	mb->mbxCommand = MBX_SLI_CONFIG;
@@ -3873,17 +3741,19 @@ emlxs_dump_tigershark_log(
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
 	    "FAT: log_size=%d", log_size);
 
-	if (log_size) {
-		if ((buffer = (uint8_t *)kmem_alloc(
-		    buffer_size, KM_NOSLEEP)) == NULL) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
-			    "Unable to allocate log buffer.");
-
-			rval = 1;
-			goto done;
-		}
-		bzero(buffer, buffer_size);
+	if (buffer_size == 0) {
+		goto done;
 	}
+
+	if ((buffer = (uint8_t *)kmem_alloc(
+	    buffer_size, KM_NOSLEEP)) == NULL) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
+		    "Unable to allocate log buffer.");
+
+		rval = 1;
+		goto done;
+	}
+	bzero(buffer, buffer_size);
 
 	/* Upload Log */
 	bptr = buffer;
@@ -3899,7 +3769,7 @@ emlxs_dump_tigershark_log(
 		xfer_size = min(BE_MAX_XFER_SIZE, log_size);
 
 		mb->un.varSLIConfig.be.embedded = 0;
-		mbq->nonembed = (uint8_t *)mp;
+		mbq->nonembed = (void *)mp;
 		mbq->mbox_cmpl = NULL;
 
 		mb->mbxCommand = MBX_SLI_CONFIG;
@@ -3962,11 +3832,11 @@ emlxs_dump_tigershark_log(
 done:
 
 	if (mbq) {
-		(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mbq);
+		emlxs_mem_put(hba, MEM_MBOX, (void *)mbq);
 	}
 
 	if (mp) {
-		(void) emlxs_mem_buf_free(hba, mp);
+		emlxs_mem_buf_free(hba, mp);
 	}
 
 	if (buffer) {
@@ -4015,7 +3885,8 @@ emlxs_dump_user_event(
 		(void) emlxs_dump_saturn_log(hba, fpTxtFile, fpDmpFile);
 	}
 
-	if (hba->model_info.chip == EMLXS_BE_CHIP) {
+	if ((hba->model_info.chip == EMLXS_BE2_CHIP) ||
+	    (hba->model_info.chip == EMLXS_BE3_CHIP)) {
 		(void) emlxs_dump_tigershark_log(hba, fpTxtFile, fpCeeFile);
 	}
 
@@ -4155,7 +4026,8 @@ emlxs_dump_drv_event(
 		(void) emlxs_dump_saturn_log(hba, fpTxtFile, fpDmpFile);
 	}
 
-	if (hba->model_info.chip == EMLXS_BE_CHIP) {
+	if ((hba->model_info.chip == EMLXS_BE2_CHIP) ||
+	    (hba->model_info.chip == EMLXS_BE3_CHIP)) {
 		(void) emlxs_dump_tigershark_log(hba, fpTxtFile, fpCeeFile);
 	}
 

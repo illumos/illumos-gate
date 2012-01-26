@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,7 +55,7 @@ emlxs_mem_alloc_buffer(emlxs_hba_t *hba)
 	 */
 	cnt = cfg[CFG_NUM_IOTAGS].current;
 	if (cnt) {
-		hba->max_iotag = cnt;
+		hba->max_iotag = (uint16_t)cnt;
 	}
 	/* ioatg 0 is not used, iotags 1 thru max_iotag-1 are used */
 
@@ -297,19 +297,19 @@ emlxs_mem_free_buffer(emlxs_hba_t *hba)
 
 				if ((mp = emlxs_mem_get_vaddr(hba, rp, addr))) {
 					if (j == hba->channel_els) {
-						(void) emlxs_mem_put(hba,
-						    MEM_ELSBUF, (uint8_t *)mp);
+						emlxs_mem_put(hba,
+						    MEM_ELSBUF, (void *)mp);
 					} else if (j == hba->channel_ct) {
-						(void) emlxs_mem_put(hba,
-						    MEM_CTBUF, (uint8_t *)mp);
+						emlxs_mem_put(hba,
+						    MEM_CTBUF, (void *)mp);
 					} else if (j == hba->channel_ip) {
-						(void) emlxs_mem_put(hba,
-						    MEM_IPBUF, (uint8_t *)mp);
+						emlxs_mem_put(hba,
+						    MEM_IPBUF, (void *)mp);
 					}
 #ifdef SFCT_SUPPORT
 					else if (j == hba->CHANNEL_FCT) {
-						(void) emlxs_mem_put(hba,
-						    MEM_FCTBUF, (uint8_t *)mp);
+						emlxs_mem_put(hba,
+						    MEM_FCTBUF, (void *)mp);
 					}
 #endif /* SFCT_SUPPORT */
 
@@ -434,7 +434,7 @@ emlxs_mem_pool_alloc(emlxs_hba_t *hba, MEMSEG *seg)
 			/* Free the mp object */
 			bzero(buf_info, sizeof (MBUF_INFO));
 			buf_info->size = sizeof (MATCHMAP);
-			buf_info->virt = (uint32_t *)mp;
+			buf_info->virt = (void *)mp;
 			emlxs_mem_free(hba, buf_info);
 
 			goto failed;
@@ -572,7 +572,7 @@ emlxs_mem_pool_free(emlxs_hba_t *hba, MEMSEG *seg)
 
 		bzero(buf_info, sizeof (MBUF_INFO));
 		buf_info->size = sizeof (MATCHMAP);
-		buf_info->virt = (uint32_t *)mp;
+		buf_info->virt = (void *)mp;
 		emlxs_mem_free(hba, buf_info);
 	}
 
@@ -592,7 +592,7 @@ emlxs_mem_pool_free(emlxs_hba_t *hba, MEMSEG *seg)
 
 		bzero(buf_info, sizeof (MBUF_INFO));
 		buf_info->size = sizeof (MATCHMAP);
-		buf_info->virt = (uint32_t *)mp;
+		buf_info->virt = (void *)mp;
 		emlxs_mem_free(hba, buf_info);
 	}
 
@@ -601,13 +601,13 @@ emlxs_mem_pool_free(emlxs_hba_t *hba, MEMSEG *seg)
 } /* emlxs_mem_pool_free() */
 
 
-extern uint8_t *
+extern void *
 emlxs_mem_pool_get(emlxs_hba_t *hba, MEMSEG *seg, uint32_t priority)
 {
-	emlxs_port_t *port = &PPORT;
-	uint8_t *bp = NULL;
-	MATCHMAP *mp;
-	uint32_t free;
+	emlxs_port_t	*port = &PPORT;
+	void		*bp = NULL;
+	MATCHMAP	*mp;
+	uint32_t	free;
 
 	mutex_enter(&EMLXS_MEMGET_LOCK);
 
@@ -684,13 +684,13 @@ top:
 } /* emlxs_mem_pool_get() */
 
 
-extern MEMSEG *
-emlxs_mem_pool_put(emlxs_hba_t *hba, MEMSEG *seg, uint8_t *bp)
+extern void
+emlxs_mem_pool_put(emlxs_hba_t *hba, MEMSEG *seg, void *bp)
 {
-	emlxs_port_t *port = &PPORT;
-	MATCHMAP *mp;
-	uint8_t *base;
-	uint8_t *end;
+	emlxs_port_t	*port = &PPORT;
+	MATCHMAP	*mp;
+	void		*base;
+	void		*end;
 
 	/* Free the pool object */
 	mutex_enter(&EMLXS_MEMPUT_LOCK);
@@ -698,7 +698,7 @@ emlxs_mem_pool_put(emlxs_hba_t *hba, MEMSEG *seg, uint8_t *bp)
 	/* Check if memory segment destroyed! */
 	if (seg->fc_total_memsize == 0) {
 		mutex_exit(&EMLXS_MEMPUT_LOCK);
-		return (NULL);
+		return;
 	}
 
 	/* Check if buffer was just freed */
@@ -707,7 +707,7 @@ emlxs_mem_pool_put(emlxs_hba_t *hba, MEMSEG *seg, uint8_t *bp)
 		    "%s: Freeing free object: bp=%p", seg->fc_label, bp);
 
 		mutex_exit(&EMLXS_MEMPUT_LOCK);
-		return (NULL);
+		return;
 	}
 
 	/* Validate the buffer belongs to this pool */
@@ -728,12 +728,13 @@ emlxs_mem_pool_put(emlxs_hba_t *hba, MEMSEG *seg, uint8_t *bp)
 			emlxs_thread_spawn(hba, emlxs_shutdown_thread,
 			    NULL, NULL);
 
-			return (NULL);
+			return;
 		}
 
 	} else { /* Vmem_pool */
 		base = seg->fc_memstart_virt;
-		end = seg->fc_memstart_virt + seg->fc_total_memsize;
+		end = (void *)((uint8_t *)seg->fc_memstart_virt +
+		    seg->fc_total_memsize);
 
 		if (bp < base || bp >= end) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pool_error_msg,
@@ -748,7 +749,7 @@ emlxs_mem_pool_put(emlxs_hba_t *hba, MEMSEG *seg, uint8_t *bp)
 			emlxs_thread_spawn(hba, emlxs_shutdown_thread,
 			    NULL, NULL);
 
-			return (NULL);
+			return;
 		}
 	}
 
@@ -757,15 +758,15 @@ emlxs_mem_pool_put(emlxs_hba_t *hba, MEMSEG *seg, uint8_t *bp)
 		seg->fc_memput_ptr = bp;
 		seg->fc_memput_cnt = 1;
 	} else {
-		*((uint8_t **)(seg->fc_memput_end)) = bp;
+		*((void **)(seg->fc_memput_end)) = bp;
 		seg->fc_memput_cnt++;
 	}
 	seg->fc_memput_end = bp;
-	*((uint8_t **)(bp)) = NULL;
+	*((void **)(bp)) = NULL;
 
 	mutex_exit(&EMLXS_MEMPUT_LOCK);
 
-	return (seg);
+	return;
 
 } /* emlxs_mem_pool_put() */
 
@@ -810,7 +811,7 @@ emlxs_mem_buf_alloc(emlxs_hba_t *hba, uint32_t size)
 		/* Free the mp object */
 		bzero(buf_info, sizeof (MBUF_INFO));
 		buf_info->size = sizeof (MATCHMAP);
-		buf_info->virt = (uint32_t *)mp;
+		buf_info->virt = (void *)mp;
 		emlxs_mem_free(hba, buf_info);
 
 		return (0);
@@ -831,7 +832,7 @@ emlxs_mem_buf_alloc(emlxs_hba_t *hba, uint32_t size)
 } /* emlxs_mem_buf_alloc() */
 
 
-extern MATCHMAP *
+extern void
 emlxs_mem_buf_free(emlxs_hba_t *hba, MATCHMAP *mp)
 {
 	MBUF_INFO bufinfo;
@@ -840,7 +841,7 @@ emlxs_mem_buf_free(emlxs_hba_t *hba, MATCHMAP *mp)
 	buf_info = &bufinfo;
 
 	if (!(mp->flag & MAP_BUF_ALLOCATED)) {
-		return (NULL);
+		return;
 	}
 
 	bzero(buf_info, sizeof (MBUF_INFO));
@@ -854,23 +855,23 @@ emlxs_mem_buf_free(emlxs_hba_t *hba, MATCHMAP *mp)
 
 	bzero(buf_info, sizeof (MBUF_INFO));
 	buf_info->size = sizeof (MATCHMAP);
-	buf_info->virt = (uint32_t *)mp;
+	buf_info->virt = (void *)mp;
 	emlxs_mem_free(hba, buf_info);
 
-	return (mp);
+	return;
 
 } /* emlxs_mem_buf_free() */
 
 
-extern uint8_t *
+extern void *
 emlxs_mem_get(emlxs_hba_t *hba, uint32_t seg_id, uint32_t priority)
 {
-	emlxs_port_t *port = &PPORT;
-	uint8_t *bp;
-	MAILBOXQ *mbq;
-	IOCBQ *iocbq;
-	NODELIST *node;
-	MEMSEG *seg;
+	emlxs_port_t	*port = &PPORT;
+	void		*bp;
+	MAILBOXQ	*mbq;
+	IOCBQ		*iocbq;
+	NODELIST	*node;
+	MEMSEG		*seg;
 
 	if (seg_id >= FC_MAX_SEG) {
 
@@ -909,15 +910,15 @@ emlxs_mem_get(emlxs_hba_t *hba, uint32_t seg_id, uint32_t priority)
 } /* emlxs_mem_get() */
 
 
-extern uint8_t *
-emlxs_mem_put(emlxs_hba_t *hba, uint32_t seg_id, uint8_t *bp)
+extern void
+emlxs_mem_put(emlxs_hba_t *hba, uint32_t seg_id, void *bp)
 {
-	emlxs_port_t *port = &PPORT;
-	MAILBOXQ *mbq;
-	IOCBQ *iocbq;
-	NODELIST *node;
-	MEMSEG *seg;
-	MATCHMAP *mp;
+	emlxs_port_t	*port = &PPORT;
+	MAILBOXQ	*mbq;
+	IOCBQ		*iocbq;
+	NODELIST	*node;
+	MEMSEG		*seg;
+	MATCHMAP	*mp;
 
 	if (seg_id >= FC_MAX_SEG) {
 
@@ -925,7 +926,7 @@ emlxs_mem_put(emlxs_hba_t *hba, uint32_t seg_id, uint8_t *bp)
 		    "emlxs_mem_put: Invalid segment id = %d: bp=%p",
 		    seg_id, bp);
 
-		return (NULL);
+		return;
 	}
 	seg = &hba->memseg[seg_id];
 
@@ -935,7 +936,7 @@ emlxs_mem_put(emlxs_hba_t *hba, uint32_t seg_id, uint8_t *bp)
 		mbq = (MAILBOXQ *)bp;
 
 		if (!(mbq->flag & MBQ_POOL_ALLOCATED)) {
-			return (NULL);
+			return;
 		}
 		break;
 
@@ -943,13 +944,13 @@ emlxs_mem_put(emlxs_hba_t *hba, uint32_t seg_id, uint8_t *bp)
 		iocbq = (IOCBQ *)bp;
 
 		if (!(iocbq->flag & IOCB_POOL_ALLOCATED)) {
-			return (NULL);
+			return;
 		}
 
 		/* Any IOCBQ with a packet attached did not come */
 		/* from our pool */
 		if (iocbq->sbp) {
-			return (NULL);
+			return;
 		}
 		break;
 
@@ -957,7 +958,7 @@ emlxs_mem_put(emlxs_hba_t *hba, uint32_t seg_id, uint8_t *bp)
 		node = (NODELIST *)bp;
 
 		if (!(node->flag & NODE_POOL_ALLOCATED)) {
-			return (NULL);
+			return;
 		}
 		break;
 
@@ -965,25 +966,24 @@ emlxs_mem_put(emlxs_hba_t *hba, uint32_t seg_id, uint8_t *bp)
 		mp = (MATCHMAP *)bp;
 
 		if (mp->flag & MAP_BUF_ALLOCATED) {
-			return ((uint8_t *)emlxs_mem_buf_free(hba, mp));
+			emlxs_mem_buf_free(hba, mp);
+			return;
 		}
 
 		if (mp->flag & MAP_TABLE_ALLOCATED) {
-			return (bp);
+			return;
 		}
 
 		if (!(mp->flag & MAP_POOL_ALLOCATED)) {
-			return (NULL);
+			return;
 		}
 		break;
 	}
 
 	/* Free a buffer to the pool */
-	if (emlxs_mem_pool_put(hba, seg, bp) == NULL) {
-		return (NULL);
-	}
+	emlxs_mem_pool_put(hba, seg, bp);
 
-	return (bp);
+	return;
 
 } /* emlxs_mem_put() */
 
@@ -1011,11 +1011,11 @@ emlxs_mem_get_vaddr(emlxs_hba_t *hba, RING *rp, uint64_t mapbp)
 					prev->fc_mptr = mp->fc_mptr;
 				}
 
-				if (rp->fc_mpon == (uint8_t *)mp) {
-					rp->fc_mpon = (uint8_t *)prev;
+				if (rp->fc_mpon == mp) {
+					rp->fc_mpon = (void *)prev;
 				}
 
-				mp->fc_mptr = 0;
+				mp->fc_mptr = NULL;
 
 				EMLXS_MPDATA_SYNC(mp->dma_handle, 0, mp->size,
 				    DDI_DMA_SYNC_FORKERNEL);
@@ -1046,11 +1046,11 @@ emlxs_mem_get_vaddr(emlxs_hba_t *hba, RING *rp, uint64_t mapbp)
 					prev->fc_mptr = mp->fc_mptr;
 				}
 
-				if (rp->fc_mpon == (uint8_t *)mp) {
-					rp->fc_mpon = (uint8_t *)prev;
+				if (rp->fc_mpon == mp) {
+					rp->fc_mpon = (void *)prev;
 				}
 
-				mp->fc_mptr = 0;
+				mp->fc_mptr = NULL;
 
 				EMLXS_MPDATA_SYNC(mp->dma_handle, 0, mp->size,
 				    DDI_DMA_SYNC_FORKERNEL);
@@ -1081,11 +1081,11 @@ emlxs_mem_get_vaddr(emlxs_hba_t *hba, RING *rp, uint64_t mapbp)
 					prev->fc_mptr = mp->fc_mptr;
 				}
 
-				if (rp->fc_mpon == (uint8_t *)mp) {
-					rp->fc_mpon = (uint8_t *)prev;
+				if (rp->fc_mpon == mp) {
+					rp->fc_mpon = (void *)prev;
 				}
 
-				mp->fc_mptr = 0;
+				mp->fc_mptr = NULL;
 
 				EMLXS_MPDATA_SYNC(mp->dma_handle, 0, mp->size,
 				    DDI_DMA_SYNC_FORKERNEL);
@@ -1116,11 +1116,11 @@ emlxs_mem_get_vaddr(emlxs_hba_t *hba, RING *rp, uint64_t mapbp)
 					prev->fc_mptr = mp->fc_mptr;
 				}
 
-				if (rp->fc_mpon == (uint8_t *)mp) {
-					rp->fc_mpon = (uint8_t *)prev;
+				if (rp->fc_mpon == mp) {
+					rp->fc_mpon = (void *)prev;
 				}
 
-				mp->fc_mptr = 0;
+				mp->fc_mptr = NULL;
 
 				EMLXS_MPDATA_SYNC(mp->dma_handle, 0, mp->size,
 				    DDI_DMA_SYNC_FORKERNEL);
@@ -1161,14 +1161,14 @@ emlxs_mem_map_vaddr(emlxs_hba_t *hba, RING *rp, MATCHMAP *mp,
 		 * fc_mpoff is pointer head of the list.
 		 * fc_mpon is pointer tail of the list.
 		 */
-		mp->fc_mptr = 0;
+		mp->fc_mptr = NULL;
 		if (rp->fc_mpoff == 0) {
-			rp->fc_mpoff = (uint8_t *)mp;
-			rp->fc_mpon = (uint8_t *)mp;
+			rp->fc_mpoff = (void *)mp;
+			rp->fc_mpon = (void *)mp;
 		} else {
 			((MATCHMAP *)(rp->fc_mpon))->fc_mptr =
-			    (uint8_t *)mp;
-			rp->fc_mpon = (uint8_t *)mp;
+			    (void *)mp;
+			rp->fc_mpon = (void *)mp;
 		}
 
 		if (hba->flag & FC_SLIM2_MODE) {
@@ -1190,14 +1190,14 @@ emlxs_mem_map_vaddr(emlxs_hba_t *hba, RING *rp, MATCHMAP *mp,
 		 * fc_mpoff is pointer head of the list.
 		 * fc_mpon is pointer tail of the list.
 		 */
-		mp->fc_mptr = 0;
+		mp->fc_mptr = NULL;
 		if (rp->fc_mpoff == 0) {
-			rp->fc_mpoff = (uint8_t *)mp;
-			rp->fc_mpon = (uint8_t *)mp;
+			rp->fc_mpoff = (void *)mp;
+			rp->fc_mpon = (void *)mp;
 		} else {
 			((MATCHMAP *)(rp->fc_mpon))->fc_mptr =
-			    (uint8_t *)mp;
-			rp->fc_mpon = (uint8_t *)mp;
+			    (void *)mp;
+			rp->fc_mpon = (void *)mp;
 		}
 
 		if (hba->flag & FC_SLIM2_MODE) {
@@ -1219,14 +1219,14 @@ emlxs_mem_map_vaddr(emlxs_hba_t *hba, RING *rp, MATCHMAP *mp,
 		 * fc_mpoff is pointer head of the list.
 		 * fc_mpon is pointer tail of the list.
 		 */
-		mp->fc_mptr = 0;
+		mp->fc_mptr = NULL;
 		if (rp->fc_mpoff == 0) {
-			rp->fc_mpoff = (uint8_t *)mp;
-			rp->fc_mpon = (uint8_t *)mp;
+			rp->fc_mpoff = (void *)mp;
+			rp->fc_mpon = (void *)mp;
 		} else {
 			((MATCHMAP *)(rp->fc_mpon))->fc_mptr =
-			    (uint8_t *)mp;
-			rp->fc_mpon = (uint8_t *)mp;
+			    (void *)mp;
+			rp->fc_mpon = (void *)mp;
 		}
 
 		if (hba->flag & FC_SLIM2_MODE) {
@@ -1247,14 +1247,14 @@ emlxs_mem_map_vaddr(emlxs_hba_t *hba, RING *rp, MATCHMAP *mp,
 		 * fc_mpoff is pointer head of the list.
 		 * fc_mpon is pointer tail of the list.
 		 */
-		mp->fc_mptr = 0;
+		mp->fc_mptr = NULL;
 		if (rp->fc_mpoff == 0) {
-			rp->fc_mpoff = (uint8_t *)mp;
-			rp->fc_mpon = (uint8_t *)mp;
+			rp->fc_mpoff = (void *)mp;
+			rp->fc_mpon = (void *)mp;
 		} else {
 			((MATCHMAP *)(rp->fc_mpon))->fc_mptr =
-			    (uint8_t *)mp;
-			rp->fc_mpon = (uint8_t *)mp;
+			    (void *)mp;
+			rp->fc_mpon = (void *)mp;
 		}
 
 		if (hba->flag & FC_SLIM2_MODE) {
@@ -1302,7 +1302,7 @@ emlxs_hbq_alloc(emlxs_hba_t *hba, uint32_t hbq_id)
 			return (ENOMEM);
 		}
 
-		hbq->HBQ_host_buf.virt = (void *)buf_info->virt;
+		hbq->HBQ_host_buf.virt = buf_info->virt;
 		hbq->HBQ_host_buf.phys = buf_info->phys;
 		hbq->HBQ_host_buf.data_handle = buf_info->data_handle;
 		hbq->HBQ_host_buf.dma_handle = buf_info->dma_handle;

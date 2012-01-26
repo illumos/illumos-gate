@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -205,7 +205,7 @@ emlxs_node_timeout(emlxs_port_t *port, NODELIST *ndlp, uint32_t channelno)
 	mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_timeout_msg,
-	    "node=%p did=%06x %s. Flushing.", ndlp, ndlp->nlp_DID,
+	    "node=%p did=%06x channel=%d. Flushing.", ndlp, ndlp->nlp_DID,
 	    channelno);
 
 	/* Flush tx queue for this channel */
@@ -289,16 +289,12 @@ emlxs_node_open(emlxs_port_t *port, NODELIST *ndlp, uint32_t channelno)
 	mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_opened_msg,
-	    "node=%p did=%06x channel=%d", ndlp, ndlp->nlp_DID, channelno);
+	    "node=%p did=%06x rpi=%x channel=%d", ndlp, ndlp->nlp_DID,
+	    ndlp->nlp_Rpi, channelno);
 
 	/* If link attention needs to be cleared */
 	if ((hba->state == FC_LINK_UP) && (channelno == hba->channel_fcp)) {
 		if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
-		/* re Think this code path. For SLI4 channel fcp == els */
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-			    "ADD CODE to RESUME RPIs node=%p did=%06x chan=%d",
-			    ndlp, ndlp->nlp_DID, channelno);
-
 			goto done;
 		}
 
@@ -338,8 +334,8 @@ emlxs_node_open(emlxs_port_t *port, NODELIST *ndlp, uint32_t channelno)
 				 */
 				if (hba->state != FC_LINK_UP) {
 					mutex_exit(&EMLXS_PORT_LOCK);
-					(void) emlxs_mem_put(hba, MEM_MBOX,
-					    (uint8_t *)mbox);
+					emlxs_mem_put(hba, MEM_MBOX,
+					    (void *)mbox);
 					goto done;
 				}
 
@@ -352,8 +348,8 @@ emlxs_node_open(emlxs_port_t *port, NODELIST *ndlp, uint32_t channelno)
 				rc =  EMLXS_SLI_ISSUE_MBOX_CMD(hba,
 				    mbox, MBX_NOWAIT, 0);
 				if ((rc != MBX_BUSY) && (rc != MBX_SUCCESS)) {
-					(void) emlxs_mem_put(hba, MEM_MBOX,
-					    (uint8_t *)mbox);
+					emlxs_mem_put(hba, MEM_MBOX,
+					    (void *)mbox);
 				}
 			} else {
 				/* Close the node and try again */
@@ -661,7 +657,7 @@ emlxs_node_find_index(emlxs_port_t *port, uint32_t index,
 	/* no match found */
 	return ((NODELIST *)0);
 
-} /* emlxs_node_find_wwpn() */
+} /* emlxs_node_find_index() */
 
 
 extern uint32_t
@@ -696,7 +692,7 @@ emlxs_node_destroy_all(emlxs_port_t *port)
 	emlxs_hba_t *hba = HBA;
 	NODELIST *next;
 	NODELIST *ndlp;
-	RPIobj_t *rp;
+	RPIobj_t *rpip;
 	uint8_t *wwn;
 	uint32_t i;
 
@@ -726,17 +722,16 @@ emlxs_node_destroy_all(emlxs_port_t *port)
 			(void) emlxs_tx_node_flush(port, ndlp, 0, 0, 0);
 
 			/* Break Node/RPI binding */
-			if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
-				rp = EMLXS_NODE_TO_RPI(hba, ndlp);
-				ndlp->RPIp = NULL;
+			if (ndlp->rpip) {
+				rpip = ndlp->rpip;
 
-				if (rp) {
-					rp->node = NULL;
-					(void) emlxs_sli4_free_rpi(hba, rp);
-				}
+				ndlp->rpip = NULL;
+				rpip->node = NULL;
+
+				(void) emlxs_rpi_free_notify(port, rpip);
 			}
 
-			(void) emlxs_mem_put(hba, MEM_NLP, (uint8_t *)ndlp);
+			emlxs_mem_put(hba, MEM_NLP, (void *)ndlp);
 
 			ndlp = next;
 		}
@@ -760,14 +755,158 @@ emlxs_node_destroy_all(emlxs_port_t *port)
 } /* emlxs_node_destroy_all() */
 
 
+extern NODELIST *
+emlxs_node_create(emlxs_port_t *port, uint32_t did, uint32_t rpi, SERV_PARM *sp)
+{
+	emlxs_hba_t *hba = HBA;
+	NODELIST *ndlp;
+	uint8_t *wwn;
+	emlxs_vvl_fmt_t vvl;
+	RPIobj_t *rpip;
+
+	ndlp = emlxs_node_find_did(port, did);
+
+	/* Update the node */
+	if (ndlp) {
+		rw_enter(&port->node_rwlock, RW_WRITER);
+
+		ndlp->nlp_Rpi = (uint16_t)rpi;
+		ndlp->nlp_DID = did;
+
+		bcopy((uint8_t *)sp, (uint8_t *)&ndlp->sparm,
+		    sizeof (SERV_PARM));
+
+		bcopy((uint8_t *)&sp->nodeName,
+		    (uint8_t *)&ndlp->nlp_nodename,
+		    sizeof (NAME_TYPE));
+
+		bcopy((uint8_t *)&sp->portName,
+		    (uint8_t *)&ndlp->nlp_portname,
+		    sizeof (NAME_TYPE));
+
+		/* Add Node/RPI binding */
+		if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+			rpip = emlxs_rpi_find(port, rpi);
+
+			if (rpip) {
+				rpip->node = ndlp;
+				ndlp->rpip = rpip;
+			} else {
+				ndlp->rpip = NULL;
+
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_node_create_msg,
+				    "Unable to find RPI. did=%x rpi=%x",
+				    did, rpi);
+			}
+		} else {
+			ndlp->rpip = NULL;
+		}
+		rw_exit(&port->node_rwlock);
+
+		wwn = (uint8_t *)&ndlp->nlp_portname;
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_update_msg,
+		    "node=%p did=%06x rpi=%x "
+		    "wwpn=%02x%02x%02x%02x%02x%02x%02x%02x",
+		    ndlp, ndlp->nlp_DID, ndlp->nlp_Rpi, wwn[0],
+		    wwn[1], wwn[2], wwn[3], wwn[4], wwn[5], wwn[6], wwn[7]);
+
+		goto done;
+	}
+
+	/* Allocate a new node */
+	ndlp = (NODELIST *)emlxs_mem_get(hba, MEM_NLP, 0);
+
+	if (ndlp) {
+		rw_enter(&port->node_rwlock, RW_WRITER);
+
+		ndlp->nlp_Rpi = (uint16_t)rpi;
+		ndlp->nlp_DID = did;
+
+		bcopy((uint8_t *)sp, (uint8_t *)&ndlp->sparm,
+		    sizeof (SERV_PARM));
+
+		bcopy((uint8_t *)&sp->nodeName,
+		    (uint8_t *)&ndlp->nlp_nodename,
+		    sizeof (NAME_TYPE));
+
+		bcopy((uint8_t *)&sp->portName,
+		    (uint8_t *)&ndlp->nlp_portname,
+		    sizeof (NAME_TYPE));
+
+		ndlp->nlp_active = 1;
+		ndlp->nlp_flag[hba->channel_ct]  |= NLP_CLOSED;
+		ndlp->nlp_flag[hba->channel_els] |= NLP_CLOSED;
+		ndlp->nlp_flag[hba->channel_fcp] |= NLP_CLOSED;
+		ndlp->nlp_flag[hba->channel_ip]  |= NLP_CLOSED;
+
+		/* Add Node/RPI binding */
+		if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+			rpip = emlxs_rpi_find(port, rpi);
+
+			if (rpip) {
+				rpip->node = ndlp;
+				ndlp->rpip = rpip;
+			} else {
+				ndlp->rpip = NULL;
+
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_node_create_msg,
+				    "Unable to find RPI. did=%x rpi=%x",
+				    did, rpi);
+			}
+		} else {
+			ndlp->rpip = NULL;
+		}
+		rw_exit(&port->node_rwlock);
+
+		/* Add the node */
+		emlxs_node_add(port, ndlp);
+
+		goto done;
+	}
+
+	wwn = (uint8_t *)&sp->portName;
+	EMLXS_MSGF(EMLXS_CONTEXT,
+	    &emlxs_node_create_failed_msg,
+	    "Unable to allocate node. did=%06x "
+	    "wwpn=%02x%02x%02x%02x%02x%02x%02x%02x",
+	    did, wwn[0], wwn[1], wwn[2],
+	    wwn[3], wwn[4], wwn[5], wwn[6], wwn[7]);
+
+	return (NULL);
+
+done:
+	if (sp->VALID_VENDOR_VERSION) {
+		bcopy((caddr_t *)&sp->vendorVersion[0],
+		    (caddr_t *)&vvl, sizeof (emlxs_vvl_fmt_t));
+
+		vvl.un0.word0 = LE_SWAP32(vvl.un0.word0);
+		vvl.un1.word1 = LE_SWAP32(vvl.un1.word1);
+
+		if ((vvl.un0.w0.oui == 0x0000C9) &&
+		    (vvl.un1.w1.vport)) {
+			ndlp->nlp_fcp_info |= NLP_EMLX_VPORT;
+		}
+	}
+
+	/* Open the node */
+	emlxs_node_open(port, ndlp, hba->channel_ct);
+	emlxs_node_open(port, ndlp, hba->channel_els);
+	emlxs_node_open(port, ndlp, hba->channel_ip);
+	emlxs_node_open(port, ndlp, hba->channel_fcp);
+
+	return (ndlp);
+
+} /* emlxs_node_create() */
+
+
 extern void
 emlxs_node_add(emlxs_port_t *port, NODELIST *ndlp)
 {
-	emlxs_hba_t *hba = HBA;
 	NODELIST *np;
 	uint8_t *wwn;
 	uint32_t hash;
-	RPIobj_t *rp;
 
 	rw_enter(&port->node_rwlock, RW_WRITER);
 	hash = EMLXS_DID_HASH(ndlp->nlp_DID);
@@ -790,20 +929,6 @@ emlxs_node_add(emlxs_port_t *port, NODELIST *ndlp)
 	    "count=%d", ndlp, ndlp->nlp_DID, ndlp->nlp_Rpi, wwn[0], wwn[1],
 	    wwn[2], wwn[3], wwn[4], wwn[5], wwn[6], wwn[7], port->node_count);
 
-	/* Add Node/RPI binding */
-	if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
-		rp = emlxs_sli4_find_rpi(hba, ndlp->nlp_Rpi);
-
-		if (rp) {
-			rp->node = ndlp;
-			ndlp->RPIp = rp;
-		} else {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_create_msg,
-			    "Unable to find RPI! did=%x rpi=%x",
-			    ndlp->nlp_DID, ndlp->nlp_Rpi);
-		}
-	}
-
 	rw_exit(&port->node_rwlock);
 
 	return;
@@ -817,7 +942,7 @@ emlxs_node_rm(emlxs_port_t *port, NODELIST *ndlp)
 	emlxs_hba_t *hba = HBA;
 	NODELIST *np;
 	NODELIST *prevp;
-	RPIobj_t *rp;
+	RPIobj_t *rpip;
 	uint8_t *wwn;
 	uint32_t hash;
 
@@ -850,17 +975,16 @@ emlxs_node_rm(emlxs_port_t *port, NODELIST *ndlp)
 			ndlp->nlp_active = 0;
 
 			/* Break Node/RPI binding */
-			if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
-				rp = EMLXS_NODE_TO_RPI(hba, ndlp);
-				ndlp->RPIp = NULL;
+			if (ndlp->rpip) {
+				rpip = ndlp->rpip;
 
-				if (rp) {
-					rp->node = NULL;
-					(void) emlxs_sli4_free_rpi(hba, rp);
-				}
+				ndlp->rpip = NULL;
+				rpip->node = NULL;
+
+				(void) emlxs_rpi_free_notify(port, rpip);
 			}
 
-			(void) emlxs_mem_put(hba, MEM_NLP, (uint8_t *)ndlp);
+			emlxs_mem_put(hba, MEM_NLP, (void *)ndlp);
 
 			break;
 		}
