@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,6 +57,7 @@ extern "C" {
 #define	EMLXS_SLI3_C		19
 #define	EMLXS_SLI4_C		20
 #define	EMLXS_EVENT_C		21
+#define	EMLXS_FCF_C		22
 
 #define	EMLXS_CONTEXT		port, _FILENO_, __LINE__
 #define	EMLXS_MSGF		emlxs_msg_printf

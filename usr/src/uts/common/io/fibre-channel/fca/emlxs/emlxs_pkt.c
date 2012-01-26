@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,7 +84,7 @@ emlxs_pkt_send(fc_packet_t *pkt, uint32_t now)
 	int32_t rval;
 
 	if (now) {
-		rval = emlxs_transport((opaque_t)port, pkt);
+		rval = emlxs_fca_transport((opaque_t)port, pkt);
 	} else {
 		/* Spawn a thread to send the pkt */
 		emlxs_thread_spawn(hba, emlxs_pkt_thread, (char *)pkt, NULL);
@@ -102,7 +102,7 @@ emlxs_pkt_free(fc_packet_t *pkt)
 {
 	emlxs_port_t *port = (emlxs_port_t *)pkt->pkt_ulp_private;
 
-	(void) emlxs_pkt_uninit((opaque_t)port, pkt);
+	(void) emlxs_fca_pkt_uninit((opaque_t)port, pkt);
 
 	if (pkt->pkt_datalen) {
 		(void) ddi_dma_unbind_handle(pkt->pkt_data_dma);
@@ -387,7 +387,7 @@ emlxs_pkt_alloc(emlxs_port_t *port, uint32_t cmdlen, uint32_t rsplen,
 	sbp = PKT2PRIV(pkt);
 	bzero((void *)sbp, sizeof (emlxs_buf_t));
 
-	mutex_init(&sbp->mtx, NULL, MUTEX_DRIVER, (void *)hba->intr_arg);
+	mutex_init(&sbp->mtx, NULL, MUTEX_DRIVER, DDI_INTR_PRI(hba->intr_arg));
 	sbp->pkt_flags = PACKET_VALID | PACKET_ULP_OWNED | PACKET_ALLOCATED;
 	sbp->port = port;
 	sbp->pkt = pkt;

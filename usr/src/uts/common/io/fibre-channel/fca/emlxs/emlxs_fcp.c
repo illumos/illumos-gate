@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2010 Emulex.  All rights reserved.
+ * Copyright 2011 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -211,6 +211,7 @@ emlxs_handle_fcp_event(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 		 * transferred. We saw a data corruption when Solaris received
 		 * a Task Abort from a tape.
 		 */
+
 		if (scsi_status == SCSI_STAT_TASK_ABORT) {
 			EMLXS_MSGF(EMLXS_CONTEXT,
 			    &emlxs_fcp_completion_error_msg,
@@ -487,9 +488,10 @@ if (cfg[CFG_ENABLE_PATCH].current & FCP_UNDERRUN_PATCH2) {
 		default:
 			EMLXS_MSGF(EMLXS_CONTEXT,
 			    &emlxs_fcp_completion_error_msg,
-			    "Local reject. %s did=0x%06x sbp=%p cmd=%02x",
+			    "Local reject. %s 0x%06x %p %02x (%x)(%x)",
 			    emlxs_error_xlate(localstat), did, sbp,
-			    scsi_opcode);
+			    scsi_opcode, (uint16_t)cmd->ULPIOTAG,
+			    (uint16_t)cmd->ULPCONTEXT);
 		}
 
 		break;
@@ -659,15 +661,14 @@ emlxs_post_buffer(emlxs_hba_t *hba, RING *rp, int16_t cnt)
 				for (j = 0; j < i; j++) {
 					mp = EMLXS_GET_VADDR(hba, rp, icmd);
 					if (mp) {
-						(void) emlxs_mem_put(hba, seg,
-						    (uint8_t *)mp);
+						emlxs_mem_put(hba, seg,
+						    (void *)mp);
 					}
 				}
 
 				rp->fc_missbufcnt = cnt + i;
 
-				(void) emlxs_mem_put(hba, MEM_IOCB,
-				    (uint8_t *)iocbq);
+				emlxs_mem_put(hba, MEM_IOCB, (void *)iocbq);
 
 				return (cnt + i);
 			}
@@ -700,7 +701,7 @@ emlxs_post_buffer(emlxs_hba_t *hba, RING *rp, int16_t cnt)
 		icmd->ULPLE = 1;
 		icmd->ULPOWNER = OWN_CHIP;
 		/* used for delimiter between commands */
-		iocbq->bp = (uint8_t *)mp;
+		iocbq->bp = (void *)mp;
 
 		EMLXS_SLI_ISSUE_IOCB_CMD(hba, &hba->chan[rp->ringno], iocbq);
 	}
@@ -728,6 +729,7 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 	uint32_t unreg_vpi;
 	uint32_t update;
 	uint32_t adisc_support;
+	uint32_t clear_all;
 	uint8_t format;
 
 	/* Target mode only uses this routine for linkdowns */
@@ -741,6 +743,7 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 	vlinkdown = 0;
 	unreg_vpi = 0;
 	update = 0;
+	clear_all = 0;
 
 	if (!(port->flag & EMLXS_PORT_BOUND)) {
 		return (0);
@@ -763,6 +766,12 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 
 	case 3:	/* Network */
 		mask = 0x00000000;
+		break;
+
+	case 0xfd:	/* New fabric */
+		mask = 0x00000000;
+		linkdown = 1;
+		clear_all = 1;
 		break;
 
 #ifdef DHCHAP_SUPPORT
@@ -791,11 +800,13 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 		mutex_enter(&EMLXS_PORT_LOCK);
 
 		port->flag &= EMLXS_PORT_LINKDOWN_MASK;
-		port->prev_did = port->did;
-		port->did = 0;
 
 		if (port->ulp_statec != FC_STATE_OFFLINE) {
 			port->ulp_statec = FC_STATE_OFFLINE;
+			port->prev_did = port->did;
+			bcopy(&port->fabric_sparam, &port->prev_fabric_sparam,
+			    sizeof (SERV_PARM));
+			port->did = 0;
 			update = 1;
 		}
 
@@ -909,7 +920,7 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 	}
 	rw_exit(&port->node_rwlock);
 
-	if (hba->flag & FC_ONLINE_MODE) {
+	if (!clear_all && (hba->flag & FC_ONLINE_MODE)) {
 		adisc_support = cfg[CFG_ADISC_SUPPORT].current;
 	} else {
 		adisc_support = 0;
@@ -922,7 +933,7 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 		for (;;) {
 			/*
 			 * We need to hold the locks this way because
-			 * emlxs_mb_unreg_did and the flush routines enter the
+			 * emlxs_mb_unreg_node and the flush routines enter the
 			 * same locks. Also, when we release the lock the list
 			 * can change out from under us.
 			 */
@@ -967,7 +978,7 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 			if (action == 0) {
 				break;
 			} else if (action == 1) {
-				(void) emlxs_mb_unreg_did(port, nlp->nlp_DID,
+				(void) emlxs_mb_unreg_node(port, nlp,
 				    NULL, NULL, NULL);
 			} else if (action == 2) {
 #ifdef DHCHAP_SUPPORT
@@ -1000,7 +1011,7 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 
 			/*
 			 * We need to hold the locks this way because
-			 * emlxs_mb_unreg_did and the flush routines enter the
+			 * emlxs_mb_unreg_node and the flush routines enter the
 			 * same locks. Also, when we release the lock the list
 			 * can change out from under us.
 			 */
@@ -1058,7 +1069,7 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 			if (action == 0) {
 				break;
 			} else if (action == 1) {
-				(void) emlxs_mb_unreg_did(port, nlp->nlp_DID,
+				(void) emlxs_mb_unreg_node(port, nlp,
 				    NULL, NULL, NULL);
 			} else if (action == 2) {
 #ifdef DHCHAP_SUPPORT
@@ -1082,6 +1093,11 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 
 			} else if (action == 3) {	/* FCP2 devices */
 				unreg_vpi = 0;
+
+				if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+					(void) emlxs_rpi_pause_notify(port,
+					    nlp->rpip);
+				}
 
 #ifdef DHCHAP_SUPPORT
 				emlxs_dhc_auth_stop(port, nlp);
@@ -1124,7 +1140,7 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 		for (;;) {
 			/*
 			 * We need to hold the locks this way because
-			 * emlxs_mb_unreg_did and the flush routines enter the
+			 * emlxs_mb_unreg_node and the flush routines enter the
 			 * same locks. Also, when we release the lock the list
 			 * can change out from under us.
 			 */
@@ -1179,7 +1195,7 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 			if (action == 0) {
 				break;
 			} else if (action == 1) {
-				(void) emlxs_mb_unreg_did(port, nlp->nlp_DID,
+				(void) emlxs_mb_unreg_node(port, nlp,
 				    NULL, NULL, NULL);
 			} else if (action == 2) {
 				/*
@@ -1199,6 +1215,11 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 
 			} else if (action == 3) {	/* FCP2 devices */
 				unreg_vpi = 0;
+
+				if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+					(void) emlxs_rpi_pause_notify(port,
+					    nlp->rpip);
+				}
 
 				/*
 				 * Close the node for any further normal IO
@@ -1233,10 +1254,8 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 
 done:
 
-	if (hba->sli_mode != EMLXS_HBA_SLI4_MODE) {
-		if (unreg_vpi) {
-			(void) emlxs_mb_unreg_vpi(port);
-		}
+	if (unreg_vpi) {
+		(void) emlxs_mb_unreg_vpi(port);
 	}
 
 	return (0);
@@ -1400,12 +1419,13 @@ emlxs_port_online(emlxs_port_t *vport)
 } /* emlxs_port_online() */
 
 
+/* SLI3 */
 extern void
 emlxs_linkdown(emlxs_hba_t *hba)
 {
 	emlxs_port_t *port = &PPORT;
-	RPIobj_t *rp;
 	int i;
+	uint32_t scope;
 
 	mutex_enter(&EMLXS_PORT_LOCK);
 
@@ -1414,20 +1434,13 @@ emlxs_linkdown(emlxs_hba_t *hba)
 		EMLXS_STATE_CHANGE_LOCKED(hba, FC_LINK_DOWN);
 	}
 
+	/* Set scope */
+	scope = (hba->flag & FC_NEW_FABRIC)? 0xFDFFFFFF:0xFFFFFFFF;
+
 	/* Filter hba flags */
 	hba->flag &= FC_LINKDOWN_MASK;
 	hba->discovery_timer = 0;
 	hba->linkup_timer = 0;
-
-	if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
-		rp = hba->sli.sli4.RPIp;
-		for (i = 0; i < hba->sli.sli4.RPICount; i++) {
-			if (rp->state & RESOURCE_ALLOCATED) {
-				rp->state |= RESOURCE_RPI_PAUSED;
-			}
-			rp++;
-		}
-	}
 
 	mutex_exit(&EMLXS_PORT_LOCK);
 
@@ -1438,15 +1451,18 @@ emlxs_linkdown(emlxs_hba_t *hba)
 			continue;
 		}
 
-		(void) emlxs_port_offline(port, 0xffffffff);
+		(void) emlxs_port_offline(port, scope);
 
 	}
+
+	emlxs_log_link_event(port);
 
 	return;
 
 } /* emlxs_linkdown() */
 
 
+/* SLI3 */
 extern void
 emlxs_linkup(emlxs_hba_t *hba)
 {
@@ -1470,6 +1486,8 @@ emlxs_linkup(emlxs_hba_t *hba)
 		cv_broadcast(&EMLXS_LINKUP_CV);
 		mutex_exit(&EMLXS_LINKUP_LOCK);
 
+		emlxs_log_link_event(port);
+
 		return;
 	}
 #endif /* MENLO_SUPPORT */
@@ -1481,6 +1499,8 @@ emlxs_linkup(emlxs_hba_t *hba)
 	    cfg[CFG_DISC_TIMEOUT].current;
 
 	mutex_exit(&EMLXS_PORT_LOCK);
+
+	emlxs_log_link_event(port);
 
 	return;
 
@@ -1517,6 +1537,14 @@ emlxs_reset_link(emlxs_hba_t *hba, uint32_t linkup, uint32_t wait)
 		goto reset_link_fail;
 	}
 
+	if (linkup) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_link_reset_msg,
+		    "Resetting link...");
+	} else {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_link_reset_msg,
+		    "Disabling link...");
+	}
+
 	mb = (MAILBOX *)mbq;
 
 	/* Bring link down first */
@@ -1535,9 +1563,6 @@ emlxs_reset_link(emlxs_hba_t *hba, uint32_t linkup, uint32_t wait)
 		rval = 1;
 		goto reset_link_fail;
 	}
-
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_link_reset_msg,
-	    "Disabling link...");
 
 	if (linkup) {
 		/*
@@ -1583,7 +1608,7 @@ emlxs_reset_link(emlxs_hba_t *hba, uint32_t linkup, uint32_t wait)
 reset_link_fail:
 
 	if ((wait == MBX_WAIT) && mbq) {
-		(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mbq);
+		emlxs_mem_put(hba, MEM_MBOX, (void *)mbq);
 	}
 
 	return (rval);
@@ -1709,8 +1734,11 @@ emlxs_offline(emlxs_hba_t *hba)
 	    "Going offline...");
 
 	if (port->ini_mode) {
-		/* Flush all IO */
-		emlxs_linkdown(hba);
+		if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+			(void) emlxs_fcf_shutdown_notify(port, 1);
+		} else {
+			emlxs_linkdown(hba);
+		}
 	}
 #ifdef SFCT_SUPPORT
 	else {
@@ -1783,26 +1811,12 @@ emlxs_power_down(emlxs_hba_t *hba)
 	emlxs_port_t *port = &PPORT;
 #endif  /* FMA_SUPPORT */
 	int32_t rval = 0;
-	uint32_t *ptr;
-	uint32_t i;
 
 	if ((rval = emlxs_offline(hba))) {
 		return (rval);
 	}
 	EMLXS_SLI_HBA_RESET(hba, 1, 1, 0);
 
-	/* Save pci config space */
-	ptr = (uint32_t *)hba->pm_config;
-	for (i = 0; i < PCI_CONFIG_SIZE; i += 4, ptr++) {
-		*ptr =
-		    ddi_get32(hba->pci_acc_handle,
-		    (uint32_t *)(hba->pci_addr + i));
-	}
-
-	/* Put chip in D3 state */
-	(void) ddi_put8(hba->pci_acc_handle,
-	    (uint8_t *)(hba->pci_addr + PCI_PM_CONTROL_REGISTER),
-	    (uint8_t)PCI_PM_D3_STATE);
 
 #ifdef FMA_SUPPORT
 	if (emlxs_fm_check_acc_handle(hba, hba->pci_acc_handle)
@@ -1825,24 +1839,7 @@ emlxs_power_up(emlxs_hba_t *hba)
 	emlxs_port_t *port = &PPORT;
 #endif  /* FMA_SUPPORT */
 	int32_t rval = 0;
-	uint32_t *ptr;
-	uint32_t i;
 
-
-	/* Take chip out of D3 state */
-	(void) ddi_put8(hba->pci_acc_handle,
-	    (uint8_t *)(hba->pci_addr + PCI_PM_CONTROL_REGISTER),
-	    (uint8_t)PCI_PM_D0_STATE);
-
-	/* Must have at least 10 ms delay here */
-	DELAYMS(100);
-
-	/* Restore pci config space */
-	ptr = (uint32_t *)hba->pm_config;
-	for (i = 0; i < PCI_CONFIG_SIZE; i += 4, ptr++) {
-		(void) ddi_put32(hba->pci_acc_handle,
-		    (uint32_t *)(hba->pci_addr + i), *ptr);
-	}
 
 #ifdef FMA_SUPPORT
 	if (emlxs_fm_check_acc_handle(hba, hba->pci_acc_handle)
@@ -1855,10 +1852,14 @@ emlxs_power_up(emlxs_hba_t *hba)
 
 	/* Bring adapter online */
 	if ((rval = emlxs_online(hba))) {
-		(void) ddi_put8(hba->pci_acc_handle,
-		    (uint8_t *)(hba->pci_addr + PCI_PM_CONTROL_REGISTER),
-		    (uint8_t)PCI_PM_D3_STATE);
-
+		if (hba->pci_cap_offset[PCI_CAP_ID_PM]) {
+			/* Put chip in D3 state */
+			(void) ddi_put8(hba->pci_acc_handle,
+			    (uint8_t *)(hba->pci_addr +
+			    hba->pci_cap_offset[PCI_CAP_ID_PM] +
+			    PCI_PMCSR),
+			    (uint8_t)PCI_PMCSR_D3HOT);
+		}
 		return (rval);
 	}
 
@@ -1895,12 +1896,7 @@ emlxs_ffcleanup(emlxs_hba_t *hba)
 		port = &VPORT(i);
 
 		if (port->node_count) {
-			if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
-				(void) emlxs_sli4_unreg_all_rpi_by_port(port);
-			} else {
-				(void) emlxs_mb_unreg_rpi(port, 0xffff, 0, 0,
-				    0);
-			}
+			(void) emlxs_mb_unreg_node(port, 0, 0, 0, 0);
 		}
 	}
 
@@ -2009,7 +2005,7 @@ emlxs_unregister_pkt(CHANNEL *cp, uint16_t iotag, uint32_t forced)
 	}
 
 	if (sbp->bmp) {
-		(void) emlxs_mem_put(hba, MEM_BPL, (uint8_t *)sbp->bmp);
+		emlxs_mem_put(hba, MEM_BPL, (void *)sbp->bmp);
 		sbp->bmp = 0;
 	}
 
@@ -2115,8 +2111,7 @@ emlxs_tx_channel_flush(emlxs_hba_t *hba, CHANNEL *cp, emlxs_buf_t *fpkt)
 		if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
 			sbp = iocbq->sbp;
 			if (sbp) {
-				hba->fc_table[sbp->iotag] = NULL;
-				emlxs_sli4_free_xri(hba, sbp, sbp->xp);
+				emlxs_sli4_free_xri(hba, sbp, sbp->xrip, 1);
 			}
 		} else {
 			sbp = emlxs_unregister_pkt((CHANNEL *)iocbq->channel,
@@ -2185,7 +2180,7 @@ emlxs_tx_channel_flush(emlxs_hba_t *hba, CHANNEL *cp, emlxs_buf_t *fpkt)
 					/* HBA is detaching or offlining */
 					if (icmd->ULPCOMMAND !=
 					    CMD_QUE_RING_LIST64_CN) {
-						uint8_t	*tmp;
+						void	*tmp;
 						RING *rp;
 
 						rp = &hba->sli.sli3.
@@ -2196,16 +2191,16 @@ emlxs_tx_channel_flush(emlxs_hba_t *hba, CHANNEL *cp, emlxs_buf_t *fpkt)
 							mp = EMLXS_GET_VADDR(
 							    hba, rp, icmd);
 
-							tmp = (uint8_t *)mp;
+							tmp = (void *)mp;
 							if (mp) {
-							(void) emlxs_mem_put(
+							emlxs_mem_put(
 							    hba, MEM_BUF, tmp);
 							}
 						}
 					}
 
-					(void) emlxs_mem_put(hba, MEM_IOCB,
-					    (uint8_t *)iocbq);
+					emlxs_mem_put(hba, MEM_IOCB,
+					    (void *)iocbq);
 				} else {
 					/* repost the unsolicited buffer */
 					EMLXS_SLI_ISSUE_IOCB_CMD(hba, cp,
@@ -2363,8 +2358,7 @@ emlxs_tx_node_flush(emlxs_port_t *port, NODELIST *ndlp, CHANNEL *chan,
 		if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
 			sbp = iocbq->sbp;
 			if (sbp) {
-				hba->fc_table[sbp->iotag] = NULL;
-				emlxs_sli4_free_xri(hba, sbp, sbp->xp);
+				emlxs_sli4_free_xri(hba, sbp, sbp->xrip, 1);
 			}
 		} else {
 			sbp = emlxs_unregister_pkt((CHANNEL *)iocbq->channel,
@@ -2434,7 +2428,7 @@ emlxs_tx_node_flush(emlxs_port_t *port, NODELIST *ndlp, CHANNEL *chan,
 					/* HBA is detaching or offlining */
 					if (icmd->ULPCOMMAND !=
 					    CMD_QUE_RING_LIST64_CN) {
-						uint8_t	*tmp;
+						void	*tmp;
 						RING *rp;
 						int ch;
 
@@ -2447,16 +2441,16 @@ emlxs_tx_node_flush(emlxs_port_t *port, NODELIST *ndlp, CHANNEL *chan,
 							mp = EMLXS_GET_VADDR(
 							    hba, rp, icmd);
 
-							tmp = (uint8_t *)mp;
+							tmp = (void *)mp;
 							if (mp) {
-							(void) emlxs_mem_put(
+							emlxs_mem_put(
 							    hba, MEM_BUF, tmp);
 							}
 						}
 					}
 
-					(void) emlxs_mem_put(hba, MEM_IOCB,
-					    (uint8_t *)iocbq);
+					emlxs_mem_put(hba, MEM_IOCB,
+					    (void *)iocbq);
 				} else {
 					/* repost the unsolicited buffer */
 					EMLXS_SLI_ISSUE_IOCB_CMD(hba,
@@ -2546,23 +2540,18 @@ emlxs_tx_lun_flush(emlxs_port_t *port, NODELIST *ndlp, uint32_t lun,
 	Q abort;
 	uint32_t i;
 	MATCHMAP *mp;
-	CHANNEL *cp;
-	CHANNEL *channel;
 	uint8_t flag[MAX_CHANNEL];
+
+	if (lun == EMLXS_LUN_NONE) {
+		return (0);
+	}
 
 	bzero((void *)&abort, sizeof (Q));
 
 	/* Flush I/O's on txQ to this target's lun */
 	mutex_enter(&EMLXS_TX_CHANNEL_LOCK);
 
-	channel = &hba->chan[hba->channel_fcp];
-
 	for (channelno = 0; channelno < hba->chan_count; channelno++) {
-		cp = &hba->chan[channelno];
-
-		if (channel && cp != channel) {
-			continue;
-		}
 
 		/* Scan the priority queue first */
 		prev = NULL;
@@ -2673,8 +2662,7 @@ emlxs_tx_lun_flush(emlxs_port_t *port, NODELIST *ndlp, uint32_t lun,
 		if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
 			sbp = iocbq->sbp;
 			if (sbp) {
-				hba->fc_table[sbp->iotag] = NULL;
-				emlxs_sli4_free_xri(hba, sbp, sbp->xp);
+				emlxs_sli4_free_xri(hba, sbp, sbp->xrip, 1);
 			}
 		} else {
 			sbp = emlxs_unregister_pkt((CHANNEL *)iocbq->channel,
@@ -2744,7 +2732,7 @@ emlxs_tx_lun_flush(emlxs_port_t *port, NODELIST *ndlp, uint32_t lun,
 					/* HBA is detaching or offlining */
 					if (icmd->ULPCOMMAND !=
 					    CMD_QUE_RING_LIST64_CN) {
-						uint8_t	*tmp;
+						void	*tmp;
 						RING *rp;
 						int ch;
 
@@ -2757,16 +2745,16 @@ emlxs_tx_lun_flush(emlxs_port_t *port, NODELIST *ndlp, uint32_t lun,
 							mp = EMLXS_GET_VADDR(
 							    hba, rp, icmd);
 
-							tmp = (uint8_t *)mp;
+							tmp = (void *)mp;
 							if (mp) {
-							(void) emlxs_mem_put(
+							emlxs_mem_put(
 							    hba, MEM_BUF, tmp);
 							}
 						}
 					}
 
-					(void) emlxs_mem_put(hba, MEM_IOCB,
-					    (uint8_t *)iocbq);
+					emlxs_mem_put(hba, MEM_IOCB,
+					    (void *)iocbq);
 				} else {
 					/* repost the unsolicited buffer */
 					EMLXS_SLI_ISSUE_IOCB_CMD(hba,
@@ -2839,8 +2827,7 @@ emlxs_tx_put(IOCBQ *iocbq, uint32_t lock)
 			mutex_exit(&sbp->mtx);
 
 			if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
-				hba->fc_table[sbp->iotag] = NULL;
-				emlxs_sli4_free_xri(hba, sbp, sbp->xp);
+				emlxs_sli4_free_xri(hba, sbp, sbp->xrip, 1);
 			} else {
 				(void) emlxs_unregister_pkt(cp, sbp->iotag, 0);
 			}
@@ -2862,7 +2849,7 @@ emlxs_tx_put(IOCBQ *iocbq, uint32_t lock)
 				mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 			}
 
-			(void) emlxs_mem_put(hba, MEM_IOCB, (uint8_t *)iocbq);
+			emlxs_mem_put(hba, MEM_IOCB, (void *)iocbq);
 		}
 
 		return;
@@ -3333,8 +3320,7 @@ emlxs_tx_move(NODELIST *ndlp, CHANNEL *from_chan, CHANNEL *to_chan,
 		if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
 			sbp = iocbq->sbp;
 			if (sbp) {
-				hba->fc_table[sbp->iotag] = NULL;
-				emlxs_sli4_free_xri(hba, sbp, sbp->xp);
+				emlxs_sli4_free_xri(hba, sbp, sbp->xrip, 1);
 			}
 		} else {
 			sbp = emlxs_unregister_pkt((CHANNEL *)iocbq->channel,
@@ -3399,7 +3385,7 @@ emlxs_tx_move(NODELIST *ndlp, CHANNEL *from_chan, CHANNEL *to_chan,
 					/* HBA is detaching or offlining */
 					if (icmd->ULPCOMMAND !=
 					    CMD_QUE_RING_LIST64_CN) {
-						uint8_t *tmp;
+						void *tmp;
 						RING *rp;
 						int ch;
 
@@ -3412,9 +3398,9 @@ emlxs_tx_move(NODELIST *ndlp, CHANNEL *from_chan, CHANNEL *to_chan,
 							mp = EMLXS_GET_VADDR(
 							    hba, rp, icmd);
 
-							tmp = (uint8_t *)mp;
+							tmp = (void *)mp;
 							if (mp) {
-							(void) emlxs_mem_put(
+							emlxs_mem_put(
 							    hba,
 							    MEM_BUF,
 							    tmp);
@@ -3423,8 +3409,8 @@ emlxs_tx_move(NODELIST *ndlp, CHANNEL *from_chan, CHANNEL *to_chan,
 
 					}
 
-					(void) emlxs_mem_put(hba, MEM_IOCB,
-					    (uint8_t *)iocbq);
+					emlxs_mem_put(hba, MEM_IOCB,
+					    (void *)iocbq);
 				} else {
 					/* repost the unsolicited buffer */
 					EMLXS_SLI_ISSUE_IOCB_CMD(hba,
@@ -3563,6 +3549,22 @@ emlxs_iotag_flush(emlxs_hba_t *hba)
 				continue;
 			}
 
+			hba->fc_table[iotag] = STALE_PACKET;
+			hba->io_count--;
+
+			/* Check if IO is valid */
+			if (!(sbp->pkt_flags & PACKET_VALID) ||
+			    (sbp->pkt_flags & (PACKET_ULP_OWNED|
+			    PACKET_COMPLETED|PACKET_IN_COMPLETION))) {
+				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_debug_msg,
+				    "iotag_flush: Invalid IO found. iotag=%x",
+				    iotag);
+
+				continue;
+			}
+
+			sbp->iotag = 0;
+
 			/* Set IOCB status */
 			iocbq = &sbp->iocbq;
 			iocb = &iocbq->iocb;
@@ -3573,13 +3575,23 @@ emlxs_iotag_flush(emlxs_hba_t *hba)
 			iocbq->next = NULL;
 
 			if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
-				hba->fc_table[iotag] = NULL;
-				emlxs_sli4_free_xri(hba, sbp, sbp->xp);
-			} else {
-				hba->fc_table[iotag] = STALE_PACKET;
-				hba->io_count --;
-				sbp->iotag = 0;
+				if (sbp->xrip) {
+					EMLXS_MSGF(EMLXS_CONTEXT,
+					    &emlxs_sli_debug_msg,
+					    "iotag_flush: iotag=%x sbp=%p "
+					    "xrip=%p state=%x flag=%x",
+					    iotag, sbp, sbp->xrip,
+					    sbp->xrip->state, sbp->xrip->flag);
+				} else {
+					EMLXS_MSGF(EMLXS_CONTEXT,
+					    &emlxs_sli_debug_msg,
+					    "iotag_flush: iotag=%x sbp=%p "
+					    "xrip=NULL",
+					    iotag, sbp);
+				}
 
+				emlxs_sli4_free_xri(hba, sbp, sbp->xrip, 0);
+			} else {
 				/* Clean up the sbp */
 				mutex_enter(&sbp->mtx);
 
@@ -3593,8 +3605,8 @@ emlxs_iotag_flush(emlxs_hba_t *hba)
 				}
 
 				if (sbp->bmp) {
-					(void) emlxs_mem_put(hba, MEM_BPL,
-					    (uint8_t *)sbp->bmp);
+					emlxs_mem_put(hba, MEM_BPL,
+					    (void *)sbp->bmp);
 					sbp->bmp = 0;
 				}
 
@@ -3635,8 +3647,8 @@ emlxs_iotag_flush(emlxs_hba_t *hba)
 			emlxs_thread_trigger2(&cp->intr_thread,
 			    emlxs_proc_channel, cp);
 
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_err_msg,
-			    "Forced iotag completion. channel=%d count=%d",
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_debug_msg,
+			    "iotag_flush: channel=%d count=%d",
 			    channelno, abort.q_cnt);
 
 			count += abort.q_cnt;
@@ -3706,6 +3718,10 @@ emlxs_chipq_lun_flush(emlxs_port_t *port, NODELIST *ndlp,
 	uint32_t iotag;
 	uint8_t flag[MAX_CHANNEL];
 	uint32_t channelno;
+
+	if (lun == EMLXS_LUN_NONE) {
+		return (0);
+	}
 
 	bzero((void *)flag, sizeof (flag));
 	bzero((void *)&abort, sizeof (Q));
@@ -3793,12 +3809,12 @@ emlxs_create_abort_xri_cn(emlxs_port_t *port, NODELIST *ndlp,
 		sbp = hba->fc_table[iotag];
 
 		/* Try to issue abort by XRI if possible */
-		if (sbp == NULL || sbp == STALE_PACKET || sbp->xp == NULL) {
+		if (sbp == NULL || sbp == STALE_PACKET || sbp->xrip == NULL) {
 			wqe->un.Abort.Criteria = ABORT_REQ_TAG;
 			wqe->AbortTag = iotag;
 		} else {
 			wqe->un.Abort.Criteria = ABORT_XRI_TAG;
-			wqe->AbortTag = sbp->xp->XRI;
+			wqe->AbortTag = sbp->xrip->XRI;
 		}
 		wqe->un.Abort.IA = 0;
 		wqe->RequestTag = abort_iotag;
@@ -3912,12 +3928,12 @@ emlxs_create_close_xri_cn(emlxs_port_t *port, NODELIST *ndlp,
 		sbp = hba->fc_table[iotag];
 
 		/* Try to issue close by XRI if possible */
-		if (sbp == NULL || sbp == STALE_PACKET || sbp->xp == NULL) {
+		if (sbp == NULL || sbp == STALE_PACKET || sbp->xrip == NULL) {
 			wqe->un.Abort.Criteria = ABORT_REQ_TAG;
 			wqe->AbortTag = iotag;
 		} else {
 			wqe->un.Abort.Criteria = ABORT_XRI_TAG;
-			wqe->AbortTag = sbp->xp->XRI;
+			wqe->AbortTag = sbp->xrip->XRI;
 		}
 		wqe->un.Abort.IA = 1;
 		wqe->RequestTag = abort_iotag;
@@ -4011,7 +4027,7 @@ emlxs_abort_fct_exchange(emlxs_hba_t *hba, emlxs_port_t *port, uint32_t rxid)
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_detail_msg,
 		    "Aborting FCT exchange: xid=%x", rxid);
 
-		if (emlxs_sli4_unreserve_xri(hba, rxid) == 0) {
+		if (emlxs_sli4_unreserve_xri(hba, rxid, 1) == 0) {
 			/* We have no way to abort unsolicited exchanges */
 			/* that we have not responded to at this time */
 			/* So we will return for now */
@@ -4047,6 +4063,47 @@ emlxs_abort_fct_exchange(emlxs_hba_t *hba, emlxs_port_t *port, uint32_t rxid)
 
 
 void
+emlxs_close_els_exchange(emlxs_hba_t *hba, emlxs_port_t *port, uint32_t rxid)
+{
+	CHANNEL *cp;
+	IOCBQ *iocbq;
+	IOCB *iocb;
+
+	if (rxid == 0 || rxid == 0xFFFF) {
+		return;
+	}
+
+	if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
+		    "Closing ELS exchange: xid=%x", rxid);
+
+		if (emlxs_sli4_unreserve_xri(hba, rxid, 1) == 0) {
+			return;
+		}
+	}
+
+	cp = &hba->chan[hba->channel_els];
+
+	mutex_enter(&EMLXS_FCTAB_LOCK);
+
+	/* Create the abort IOCB */
+	iocbq = emlxs_create_close_xri_cx(port, NULL, rxid, cp);
+
+	mutex_exit(&EMLXS_FCTAB_LOCK);
+
+	if (iocbq) {
+		iocb = &iocbq->iocb;
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
+		    "Closing ELS exchange: xid=%x iotag=%x", rxid,
+		    iocb->ULPIOTAG);
+
+		EMLXS_SLI_ISSUE_IOCB_CMD(hba, cp, iocbq);
+	}
+
+} /* emlxs_close_els_exchange() */
+
+
+void
 emlxs_abort_els_exchange(emlxs_hba_t *hba, emlxs_port_t *port, uint32_t rxid)
 {
 	CHANNEL *cp;
@@ -4062,7 +4119,7 @@ emlxs_abort_els_exchange(emlxs_hba_t *hba, emlxs_port_t *port, uint32_t rxid)
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
 		    "Aborting ELS exchange: xid=%x", rxid);
 
-		if (emlxs_sli4_unreserve_xri(hba, rxid) == 0) {
+		if (emlxs_sli4_unreserve_xri(hba, rxid, 1) == 0) {
 			/* We have no way to abort unsolicited exchanges */
 			/* that we have not responded to at this time */
 			/* So we will return for now */
@@ -4111,7 +4168,7 @@ emlxs_abort_ct_exchange(emlxs_hba_t *hba, emlxs_port_t *port, uint32_t rxid)
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_ct_msg,
 		    "Aborting CT exchange: xid=%x", rxid);
 
-		if (emlxs_sli4_unreserve_xri(hba, rxid) == 0) {
+		if (emlxs_sli4_unreserve_xri(hba, rxid, 1) == 0) {
 			/* We have no way to abort unsolicited exchanges */
 			/* that we have not responded to at this time */
 			/* So we will return for now */
@@ -4159,8 +4216,12 @@ emlxs_sbp_abort_add(emlxs_port_t *port, emlxs_buf_t *sbp, Q *abort,
 	ndlp = sbp->node;
 
 	/* Create the close XRI IOCB */
-	iocbq = emlxs_create_close_xri_cn(port, ndlp, sbp->iotag, cp);
-
+	if (hba->state >= FC_LINK_UP) {
+		iocbq = emlxs_create_abort_xri_cn(port, ndlp, sbp->iotag, cp,
+		    CLASS3, ABORT_TYPE_ABTS);
+	} else {
+		iocbq = emlxs_create_close_xri_cn(port, ndlp, sbp->iotag, cp);
+	}
 	/*
 	 * Add this iocb to our local abort Q
 	 * This way we don't hold the CHIPQ lock too long

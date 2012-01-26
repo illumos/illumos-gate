@@ -40,12 +40,11 @@ typedef struct emlxs_buf
 	struct emlxs_buf	*fc_fwd;	/* Use it by chip_Q */
 	struct emlxs_buf	*fc_bkwd;	/* Use it by chip_Q */
 	struct emlxs_buf	*next;		/* Use it when the iodone */
-	void 			*node;		/* Save node and used by */
-						/* abort */
+	struct emlxs_node 	*node;
 	void			*channel;	/* Save channel and used by */
 						/* abort */
 	struct emlxs_buf	*fpkt;		/* Flush pkt pointer */
-	struct XRIobject	*xp;		/* Exchange resource */
+	struct XRIobj		*xrip;		/* Exchange resource */
 	IOCBQ			iocbq;
 	kmutex_t		mtx;
 	uint32_t		pkt_flags;
@@ -53,8 +52,9 @@ typedef struct emlxs_buf
 	uint32_t		ticks;		/* save the timeout ticks */
 						/* for the fc_packet_t */
 	uint32_t		abort_attempts;
-	uint32_t		lun;		/* Save LUN id and used by */
-						/* abort */
+	uint32_t		lun;
+#define	EMLXS_LUN_NONE		0xFFFFFFFF
+
 	uint32_t		class;		/* Save class and used by */
 						/* abort */
 	uint32_t		ucmd;		/* Unsolicted command that */
@@ -84,9 +84,8 @@ typedef struct emlxs_buf
 #define	EMLXS_FCT_SEND_STATUS		0x01
 #define	EMLXS_FCT_ABORT_INP		0x02
 #define	EMLXS_FCT_IO_INP		0x04
-#define	EMLXS_FCT_REGISTERED		0x10
-#define	EMLXS_FCT_PLOGI_RECEIVED	0x20
-#define	EMLXS_FCT_FLOGI			0x40
+#define	EMLXS_FCT_PLOGI_RECEIVED	0x10
+#define	EMLXS_FCT_REGISTERED		0x20
 
 	uint16_t		fct_state;
 
@@ -251,14 +250,14 @@ typedef struct emlxs_vpd
 	char		id[80];
 
 	uint32_t	port_index;
-	uint8_t		link_speed;
+	uint16_t	link_speed;
 } emlxs_vpd_t;
 
 
 typedef struct emlxs_queue
 {
-	uint8_t		*q_first;	/* queue first element */
-	uint8_t		*q_last;	/* queue last element */
+	void		*q_first;	/* queue first element */
+	void		*q_last;	/* queue last element */
 	uint16_t	q_cnt;	/* current length of queue */
 	uint16_t	q_max;	/* max length queue can get */
 } emlxs_queue_t;
@@ -364,9 +363,9 @@ typedef struct emlxs_ring
 	void		*fc_rspringaddr;	/* virtual offset for rsp */
 						/* rings */
 
-	uint8_t		*fc_mpon;		/* index ptr for match */
+	void		*fc_mpon;		/* index ptr for match */
 						/* structure */
-	uint8_t		*fc_mpoff;		/* index ptr for match */
+	void		*fc_mpoff;		/* index ptr for match */
 						/* structure */
 	struct emlxs_hba *hba;			/* ptr to hba for ring */
 
@@ -459,9 +458,9 @@ typedef struct emlxs_node
 	sd_timestat_level0_t	sd_dev_bucket[SD_IO_LATENCY_MAX_BUCKETS];
 #endif
 
-	struct RPIobject	*RPIp;	/* SLI4 only */
-#define	EMLXS_NODE_TO_RPI(_h, _n)	\
-	((_n)?((_n->RPIp)?_n->RPIp:emlxs_sli4_find_rpi(_h, _n->nlp_Rpi)):NULL)
+	struct RPIobj		*rpip;	/* SLI4 only */
+#define	EMLXS_NODE_TO_RPI(_p, _n)	\
+	((_n)?((_n->rpip)?_n->rpip:emlxs_rpi_find(_p, _n->nlp_Rpi)):NULL)
 
 } emlxs_node_t;
 typedef emlxs_node_t NODELIST;
@@ -522,12 +521,12 @@ typedef emlxs_fcip_nethdr_t NETHDR;
 
 typedef struct emlxs_memseg
 {
-	uint8_t			*fc_memget_ptr;
-	uint8_t			*fc_memget_end;
-	uint8_t			*fc_memput_ptr;
-	uint8_t			*fc_memput_end;
+	void			*fc_memget_ptr;
+	void			*fc_memget_end;
+	void			*fc_memput_ptr;
+	void			*fc_memput_end;
 
-	uint8_t			*fc_memstart_virt;	/* beginning address */
+	void			*fc_memstart_virt;	/* beginning address */
 							/* of memory block */
 	uint64_t		fc_memstart_phys;	/* beginning address */
 							/* of memory block */
@@ -652,6 +651,14 @@ typedef struct emlxs_stats
 #endif /* SFCT_SUPPORT */
 
 	uint32_t	ResetTime;	/* Time of last reset */
+
+	uint32_t	ElsTestReceived;
+	uint32_t	ElsEstcReceived;
+	uint32_t	ElsFarprReceived;
+	uint32_t	ElsEchoReceived;
+	uint32_t	ElsRlsReceived;
+	uint32_t	ElsRtvReceived;
+
 } emlxs_stats_t;
 
 
@@ -964,6 +971,8 @@ typedef struct emlxs_iotrace
 #endif /* SFCT_SUPPORT */
 
 
+#include <emlxs_fcf.h>
+
 /*
  *     Port Information Data Structure
  */
@@ -973,31 +982,31 @@ typedef struct emlxs_port
 	struct emlxs_hba	*hba;
 
 	/* Virtual port management */
+	struct VPIobj		VPIobj;
 	uint32_t		vpi;
+
 	uint32_t		flag;
 #define	EMLXS_PORT_ENABLE		0x00000001
 #define	EMLXS_PORT_BOUND		0x00000002
 
-#define	EMLXS_PORT_REGISTERED		0x00010000	/* VPI registered */
-#define	EMLXS_PORT_INIT_VPI_CMPL	0x00020000	/* Init VPI - SLI4 */
-#define	EMLXS_PORT_REG_VPI_CMPL		0x00040000	/* Reg VPI - SLI4 */
+#define	EMLXS_PORT_REG_VPI		0x00010000 /* SLI3 */
+#define	EMLXS_PORT_REG_VPI_CMPL		0x00020000 /* SLI3 */
+
 #define	EMLXS_PORT_IP_UP		0x00000010
 #define	EMLXS_PORT_CONFIG		0x00000020
-#define	EMLXS_PORT_RESTRICTED		0x00000040	/* Restrict logins */
-							/* flag */
-#define	EMLXS_PORT_FLOGI_CMPL		0x00000080	/* Fabric login */
-							/* completed */
+#define	EMLXS_PORT_RESTRICTED		0x00000040 /* Restrict logins */
+#define	EMLXS_PORT_FLOGI_CMPL		0x00000080
 
-#define	EMLXS_PORT_RESET_MASK		0x0000FFFF	/* Flags to keep */
-							/* across hard reset */
-#define	EMLXS_PORT_LINKDOWN_MASK	0xFFFFFFFF	/* Flags to keep */
-							/* across link reset */
+#define	EMLXS_PORT_RESET_MASK		0x0000FFFF /* Flags to keep */
+						/* across hard reset */
+#define	EMLXS_PORT_LINKDOWN_MASK	0xFFFFFF7F /* Flags to keep */
+						/* across link reset */
 
 	uint32_t		options;
-#define	EMLXS_OPT_RESTRICT		0x00000001	/* Force restricted */
-							/* logins */
-#define	EMLXS_OPT_UNRESTRICT		0x00000002	/* Force Unrestricted */
-							/* logins */
+#define	EMLXS_OPT_RESTRICT		0x00000001 /* Force restricted */
+						/* logins */
+#define	EMLXS_OPT_UNRESTRICT		0x00000002 /* Force Unrestricted */
+						/* logins */
 #define	EMLXS_OPT_RESTRICT_MASK		0x00000003
 
 
@@ -1010,6 +1019,7 @@ typedef struct emlxs_port
 	/* Common service paramters */
 	SERV_PARM		sparam;
 	SERV_PARM		fabric_sparam;
+	SERV_PARM		prev_fabric_sparam;
 
 	/* fc_id management */
 	uint32_t		did;
@@ -1110,11 +1120,8 @@ typedef struct emlxs_port
 	uint32_t		sd_event_mask;   /* bit-mask */
 	emlxs_dfc_event_t	sd_events[MAX_DFC_EVENTS];
 #endif
-	/* Used for SLI4 */
-	uint16_t	outstandingRPIs;
-	struct VFIobject *VFIp;
-} emlxs_port_t;
 
+} emlxs_port_t;
 
 
 /* Host Attn reg */
@@ -1336,76 +1343,11 @@ extern emlxs_modsym_t emlxs_modsym;
 
 
 
-/* defines for resource state */
-#define	RESOURCE_FREE		0
-#define	RESOURCE_ALLOCATED	1
-
-#define	RESOURCE_FCFI_REG	2
-#define	RESOURCE_FCFI_DISC	4
-#define	RESOURCE_FCFI_VLAN_ID	8
-
-#define	RESOURCE_VFI_REG	2
-
-#define	RESOURCE_RPI_PAUSED	2
-
-#define	RESOURCE_XRI_RESERVED		2
-#define	RESOURCE_XRI_PENDING_IO		4
-#define	RESOURCE_XRI_ABORT_INP		8
-
-typedef struct VFIobject
-{
-	uint16_t	index;
-	uint16_t	VFI;
-	uint16_t	state;
-	uint16_t	outstandingVPIs;
-	struct FCFIobject *FCFIp;
-} VFIobj_t;
-
-typedef struct RPIobject
-{
-	uint16_t	index;
-	uint16_t	RPI;
-	uint16_t	state;
-	uint16_t	outstandingXRIs;
-	emlxs_port_t	*VPIp;
-	uint32_t	did;
-	emlxs_node_t	*node;
-} RPIobj_t;
-
-typedef struct XRIobject
-{
-	struct XRIobject *_f;
-	struct XRIobject *_b;
-	uint16_t	XRI;
-	uint16_t	state;
-	uint16_t	sge_count;
-	uint16_t	iotag;
-	MBUF_INFO	SGList;
-	RPIobj_t	*RPIp;
-	emlxs_buf_t	*sbp;
-	uint32_t 	rx_id; /* Used for unsol exchanges */
-} XRIobj_t;
-
-typedef struct FCFIobject
-{
-	uint16_t	index;
-	uint16_t	FCFI;
-	uint16_t	FCF_index;
-	uint16_t	state;
-	uint16_t	outstandingVFIs;
-	uint16_t	vlan_id;
-	uint32_t	EventTag;
-	struct VFIobject *fcf_vfi;
-	emlxs_port_t	*fcf_vpi;
-	struct RPIobject scratch_rpi;
-	SERV_PARM	fcf_sparam;
-	FCF_RECORD_t	fcf_rec;
-} FCFIobj_t;
-
 typedef struct RPIHdrTmplate
 {
 	uint32_t	Word[16];  /* 64 bytes */
 } RPIHdrTmplate_t;
+
 
 typedef struct EQ_DESC
 {
@@ -1417,6 +1359,7 @@ typedef struct EQ_DESC
 	uint16_t	lastwq;
 	MBUF_INFO	addr;
 } EQ_DESC_t;
+
 
 typedef struct CQ_DESC
 {
@@ -1434,6 +1377,7 @@ typedef struct CQ_DESC
 
 } CQ_DESC_t;
 
+
 typedef struct WQ_DESC
 {
 	uint16_t	host_index;
@@ -1445,6 +1389,7 @@ typedef struct WQ_DESC
 	uint16_t	cqid;
 	MBUF_INFO	addr;
 } WQ_DESC_t;
+
 
 typedef struct RQ_DESC
 {
@@ -1477,6 +1422,7 @@ typedef struct MQ_DESC
 	uint16_t	cqid;
 	MBUF_INFO	addr;
 } MQ_DESC_t;
+
 
 /* Define the number of queues the driver will be using */
 #define	EMLXS_MAX_EQS	EMLXS_MSI_MAX_INTRS
@@ -1604,7 +1550,9 @@ typedef struct emlxs_sli4
 	uint32_t	*RQDB_reg_addr;
 
 	uint32_t	flag;
-#define	EMLXS_SLI4_INTR_ENABLED		0x1
+#define	EMLXS_SLI4_INTR_ENABLED		0x00000001
+#define	EMLXS_SLI4_HW_ERROR		0x00000002
+#define	EMLXS_SLI4_DOWN_LINK		0x00000004
 
 	uint16_t	XRICount;
 	uint16_t	XRIBase;
@@ -1616,9 +1564,9 @@ typedef struct emlxs_sli4
 	uint16_t	VFIBase;
 	uint16_t	FCFICount;
 
-	kmutex_t	id_lock; /* for FCFI, VFI, VPI, RPI, XRI mgmt */
-	FCFIobj_t	*FCFIp;
-	VFIobj_t	*VFIp;
+	kmutex_t	fcf_lock;
+	FCFTable_t	fcftab;
+	VFIobj_t	*VFI_table;
 
 	/* Save Config Region 23 info */
 	tlv_fcoe_t	cfgFCOE;
@@ -1643,6 +1591,7 @@ typedef struct emlxs_sli4
 	XRIobj_t	*XRIinuse_b;
 	uint32_t	xria_count;
 
+	kmutex_t	que_lock[EMLXS_MAX_WQS];
 	EQ_DESC_t	eq[EMLXS_MAX_EQS];
 	CQ_DESC_t	cq[EMLXS_MAX_CQS];
 	WQ_DESC_t	wq[EMLXS_MAX_WQS];
@@ -1659,6 +1608,7 @@ typedef struct emlxs_sli4
 
 	uint32_t	ue_mask_lo;
 	uint32_t	ue_mask_hi;
+
 } emlxs_sli4_t;
 
 
@@ -1695,6 +1645,8 @@ typedef struct emlxs_hba
 	uint8_t		pci_function_number;
 	uint8_t		pci_device_number;
 	uint8_t		pci_bus_number;
+	uint8_t		pci_cap_offset[PCI_CAP_MAX_PTR];
+
 #ifdef FMA_SUPPORT
 	int32_t		fm_caps;	/* FMA capabilities */
 #endif	/* FMA_SUPPORT */
@@ -1788,6 +1740,7 @@ typedef struct emlxs_hba
 
 #define	FC_DUMP_SAFE		0x00010000	/* Safe to DUMP */
 #define	FC_DUMP_ACTIVE		0x00020000	/* DUMP in progress */
+#define	FC_NEW_FABRIC		0x00040000
 
 #define	FC_SLIM2_MODE		0x00100000	/* SLIM in host memory */
 #define	FC_INTERLOCKED		0x00200000
@@ -1884,8 +1837,8 @@ typedef struct emlxs_hba
 	/* Mailbox Management */
 	uint32_t	mbox_queue_flag;
 	emlxs_queue_t	mbox_queue;
-	uint32_t	*mbox_mqe;	/* active mbox mqe */
-	uint8_t		*mbox_mbq;	/* active MAILBOXQ */
+	void		*mbox_mqe;	/* active mbox mqe */
+	void		*mbox_mbq;	/* active MAILBOXQ */
 	kcondvar_t	mbox_lock_cv;	/* MBX_SLEEP */
 	kmutex_t	mbox_lock;	/* MBX_SLEEP */
 	uint32_t	mbox_timer;
@@ -1912,13 +1865,15 @@ typedef struct emlxs_hba
 	uint32_t	intr_cond;
 	uint32_t	intr_map[EMLXS_MSI_MAX_INTRS];
 	uint32_t	intr_mask;
-	uint32_t	msi_cap_offset;
-#define	MSI_CAP_ID	0x05
 
-	uint32_t	msix_cap_offset;
-#define	MSIX_CAP_ID	0x11
+	kmutex_t	msiid_lock; /* for last_msiid */
+	int		last_msiid;
 
 	kmutex_t	intr_lock[EMLXS_MSI_MAX_INTRS];
+	int			chan2msi[MAX_CHANNEL];
+					/* Index is the channel id */
+	int			msi2chan[EMLXS_MSI_MAX_INTRS];
+					/* Index is the MSX-X msg id */
 #endif	/* MSI_SUPPORT */
 
 	uint32_t	heartbeat_timer;
@@ -2107,7 +2062,14 @@ typedef struct emlxs_hba
 #define	EMLXS_PM_LOCK		hba->pm_lock		/* pm lock */
 #define	HBASTATS		hba->stats
 #define	EMLXS_CMD_RING_LOCK(n)	hba->sli.sli3.ring_cmd_lock[n]
+
+#define	EMLXS_QUE_LOCK(n)	hba->sli.sli4.que_lock[n]
+#define	EMLXS_MSIID_LOCK	hba->msiid_lock
+
 #define	EMLXS_FCTAB_LOCK	hba->iotag_lock
+
+#define	EMLXS_FCF_LOCK		hba->sli.sli4.fcf_lock
+
 #define	EMLXS_PORT_LOCK		hba->port_lock		/* locks ports, */
 							/* nodes, rings */
 #define	EMLXS_INTR_LOCK(_id)	hba->intr_lock[_id]	/* locks intr threads */

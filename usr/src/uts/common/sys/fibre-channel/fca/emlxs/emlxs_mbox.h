@@ -1868,7 +1868,8 @@ typedef struct
 {
 #ifdef EMLXS_BIG_ENDIAN
 	uint32_t	rsvd1;
-	uint32_t	rsvd2:8;
+	uint32_t	rsvd2:7;
+	uint32_t	upd:1;
 	uint32_t	sid:24;
 	uint32_t	portname[2];    /* N_PORT name */
 	uint32_t	rsvd5;
@@ -1878,7 +1879,8 @@ typedef struct
 #ifdef EMLXS_LITTLE_ENDIAN
 	uint32_t	rsvd1;
 	uint32_t	sid:24;
-	uint32_t	rsvd2:8;
+	uint32_t	upd:1;
+	uint32_t	rsvd2:7;
 	uint32_t	portname[2];    /* N_PORT name */
 	uint32_t	rsvd5;
 	uint16_t	vpi;
@@ -2547,6 +2549,13 @@ typedef struct mbox_rsp_hdr
 	uint32_t	allocated_length;	/* word 9 */
 } mbox_rsp_hdr_t;
 
+#define	MBX_RSP_STATUS_SUCCESS		0x00
+#define	MBX_RSP_STATUS_FAILED		0x01
+#define	MBX_RSP_STATUS_ILLEGAL_REQ	0x02
+#define	MBX_RSP_STATUS_ILLEGAL_FIELD	0x03
+#define	MBX_RSP_STATUS_FCF_IN_USE	0x3A
+#define	MBX_RSP_STATUS_NO_FCF		0x43
+
 typedef struct be_req_hdr
 {
 #ifdef EMLXS_BIG_ENDIAN
@@ -2592,13 +2601,16 @@ typedef struct be_req_hdr
 #define	COMMON_OPCODE_QUERY_FIRMWARE_CONFIG	0x3A
 #define	COMMON_OPCODE_RESET			0x3D
 #define	COMMON_OPCODE_MANAGE_FAT		0x44
+#define	COMMON_OPCODE_MCC_CREATE_EXT		0x5A
 
 #define	FCOE_OPCODE_WQ_CREATE			0x01
 #define	FCOE_OPCODE_CFG_POST_SGL_PAGES		0x03
 #define	FCOE_OPCODE_RQ_CREATE			0x05
 #define	FCOE_OPCODE_READ_FCF_TABLE		0x08
 #define	FCOE_OPCODE_ADD_FCF_TABLE		0x09
+#define	FCOE_OPCODE_DELETE_FCF_TABLE		0x0A
 #define	FCOE_OPCODE_POST_HDR_TEMPLATES		0x0B
+#define	FCOE_OPCODE_REDISCOVER_FCF_TABLE	0x10
 
 #define	DCBX_OPCODE_GET_DCBX_MODE		0x04
 #define	DCBX_OPCODE_SET_DCBX_MODE		0x05
@@ -2629,6 +2641,8 @@ typedef	struct
 #define	MGMT_FLASHROM_OPTYPE_FCOE_FIRMWARE	10
 #define	MGMT_FLASHROM_OPTYPE_FCOE_BACKUP	11
 #define	MGMT_FLASHROM_OPTYPE_CTRLP		12
+#define	MGMT_FLASHROM_OPTYPE_NCSI_FIRMWARE	13
+#define	MGMT_FLASHROM_OPTYPE_NCSI_8051		14
 
 		uint32_t data_buffer_size; /* Align to 4KB */
 		uint32_t offset;
@@ -2803,21 +2817,56 @@ typedef struct
 			FCF_RECORD_t fcf_entry;
 
 		} request;
+	} params;
 
+} IOCTL_FCOE_ADD_FCF_TABLE;
+
+
+/* IOCTL_FCOE_DELETE_FCF_TABLE */
+typedef struct
+{
+	union
+	{
+		struct
+		{
+#ifdef EMLXS_BIG_ENDIAN
+			uint16_t	fcf_indexes[1];
+			uint16_t	fcf_count;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+			uint16_t	fcf_count;
+			uint16_t	fcf_indexes[1];
+#endif
+
+		} request;
+	} params;
+
+} IOCTL_FCOE_DELETE_FCF_TABLE;
+
+
+/* IOCTL_FCOE_REDISCOVER_FCF_TABLE */
+typedef struct
+{
+	union
+	{
 		struct
 		{
 #ifdef EMLXS_BIG_ENDIAN
 			uint16_t	rsvd0;
-			uint16_t	fcf_index;
+			uint16_t	fcf_count;
 #endif
 #ifdef EMLXS_LITTLE_ENDIAN
-			uint16_t	fcf_index;
+			uint16_t	fcf_count;
 			uint16_t	rsvd0;
 #endif
-		} response;
+			uint32_t	rsvd1;
+			uint16_t	fcf_index[1];
+
+		} request;
 	} params;
 
-} IOCTL_FCOE_ADD_FCF_TABLE;
+} IOCTL_FCOE_REDISCOVER_FCF_TABLE;
+
 
 #define	FCOE_FCF_MAC0	0x0E
 #define	FCOE_FCF_MAC1	0xFC
@@ -2919,7 +2968,7 @@ typedef	struct _EQ_CONTEXT
 #define	EQ_ELEMENT_SIZE_4	0
 
 /* define for DelayMullt - used for interrupt coalescing */
-#define	EQ_DELAY_MULT		256
+#define	EQ_DELAY_MULT		64
 
 /*	Context for CQ create	*/
 typedef	struct _CQ_CONTEXT
@@ -3152,6 +3201,48 @@ typedef	struct
 	} params;
 
 } IOCTL_COMMON_MQ_CREATE;
+
+
+/* IOCTL_COMMON_MCC_CREATE_EXT */
+typedef	struct
+{
+	union
+	{
+		struct
+		{
+#ifdef EMLXS_BIG_ENDIAN
+			uint16_t	rsvd0;
+			uint16_t	num_pages;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+			uint16_t	num_pages;
+			uint16_t	rsvd0;
+#endif
+			uint32_t	async_event_bitmap;
+
+#define	ASYNC_LINK_EVENT	0x2
+#define	ASYNC_FCF_EVENT		0x4
+#define	ASYNC_GROUP5_EVENT	0x20
+
+			MQ_CONTEXT	context;
+			BE_PHYS_ADDR	pages[8];
+		} request;
+
+		struct
+		{
+#ifdef EMLXS_BIG_ENDIAN
+			uint16_t	rsvd0;
+			uint16_t	id;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+			uint16_t	id;
+			uint16_t	rsvd0;
+#endif
+		} response;
+
+	} params;
+
+} IOCTL_COMMON_MCC_CREATE_EXT;
 
 
 /* IOCTL_FCOE_RQ_CREATE */
@@ -3429,10 +3520,12 @@ typedef	union
 	IOCTL_COMMON_EQ_CREATE		EQCreateVar;
 	IOCTL_COMMON_CQ_CREATE		CQCreateVar;
 	IOCTL_COMMON_MQ_CREATE		MQCreateVar;
+	IOCTL_COMMON_MCC_CREATE_EXT	MCCCreateExtVar;
 	IOCTL_FCOE_CFG_POST_SGL_PAGES	PostSGLVar;
 	IOCTL_COMMON_GET_CNTL_ATTRIB	GetCntlAttributesVar;
 	IOCTL_FCOE_READ_FCF_TABLE	ReadFCFTableVar;
 	IOCTL_FCOE_ADD_FCF_TABLE	AddFCFTableVar;
+	IOCTL_FCOE_REDISCOVER_FCF_TABLE	RediscoverFCFTableVar;
 	IOCTL_COMMON_FLASHROM		FlashRomVar;
 	IOCTL_COMMON_MANAGE_FAT		FATVar;
 	IOCTL_DCBX_GET_DCBX_MODE	GetDCBX;
@@ -3517,16 +3610,17 @@ typedef struct emlxs_mbq
 	struct emlxs_mbq	*next;
 
 	/* Defferred handling pointers */
-	uint8_t			*nonembed;	/* ptr to data buffer */
+	void			*nonembed;	/* ptr to data buffer */
 						/* structure */
-	uint8_t			*bp;		/* ptr to data buffer */
+	void			*bp;		/* ptr to data buffer */
 						/* structure */
-	uint8_t			*sbp;		/* ptr to emlxs_buf_t */
+	void			*sbp;		/* ptr to emlxs_buf_t */
 						/* structure */
-	uint8_t			*ubp;		/* ptr to fc_unsol_buf_t */
+	void			*ubp;		/* ptr to fc_unsol_buf_t */
 						/* structure */
-	uint8_t			*iocbq;		/* ptr to IOCBQ structure */
-	uint8_t			*context;	/* ptr to mbox context data */
+	void			*iocbq;		/* ptr to IOCBQ structure */
+	void			*context;	/* ptr to mbox context data */
+	void			*port;		/* Sending port */
 	uint32_t		flag;
 
 #define	MBQ_POOL_ALLOCATED	0x00000001
@@ -3540,7 +3634,7 @@ typedef struct emlxs_mbq
 	uint8_t			*extbuf;	/* ptr to mailbox ext buffer */
 	uint32_t		extsize;	/* size of mailbox ext buffer */
 #endif /* MBOX_EXT_SUPPORT */
-	int			(*mbox_cmpl)(void *, struct emlxs_mbq *);
+	uint32_t		(*mbox_cmpl)();
 } emlxs_mbq_t;
 typedef emlxs_mbq_t MAILBOXQ;
 

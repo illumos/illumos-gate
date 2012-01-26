@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1851,7 +1851,7 @@ typedef struct DFC_FCoEParam
 
 typedef struct DFC_FCoEFCFConnectEntry
 {
-	uint32_t	flags;
+	uint16_t	flags;
 #define	FCFCNCT_RSVD		0x00000001
 #define	FCFCNCT_BOOT		0x00000002
 #define	FCFCNCT_PRIMARY		0x00000004

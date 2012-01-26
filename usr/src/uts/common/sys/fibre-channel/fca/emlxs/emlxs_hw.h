@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -469,22 +469,10 @@ typedef SliCtRequest_t SLI_CT_REQUEST;
 #define	PCI_SSDID_REGISTER		0x2E
 #define	PCI_EXPANSION_ROM		0x30	/* PCI Expansion ROM Base Reg */
 #define	PCI_CAP_POINTER			0x34
-#define	PCI_INTR_LINE_REGISTER		0x3C	/* PCI Interrupt Line Reg */
-#define	PCI_INTR_PIN_REGISTER		0x3D	/* PCI Interrupt Pin Reg */
-#define	PCI_MIN_GNT_REGISTER		0x3E	/* PCI Min-Gnt Reg */
-#define	PCI_MAX_LAT_REGISTER		0x3F	/* PCI Max_Lat Reg */
-#define	PCI_NODE_ADDR_REGISTER		0x40	/* PCI Node Address Reg */
+/* PCI capatability registers are defined in pci.h */
 
-#define	PCI_PM_CONTROL_REGISTER		0x50	/* PCI Power Mgmt Control Reg */
-
-/* PCIe adapters only */
-#define	PCIe_MSI_CONTROL_REG0	0x60	/* MSI Control */
-#define	PCIe_MSI_CONTROL_REG1	0x62	/* MSI Control */
-
-/* Power management command states */
-#define	PCI_PM_D0_STATE		0x00	/* Power up state */
-#define	PCI_PM_D3_STATE		0x03	/* Power down state */
-
+/* PCI Express cap register */
+#define	PCIE_DEVCTL_OFFSET	8
 
 /* PCI access methods */
 #define	P_CONF_T1	1
@@ -1294,6 +1282,7 @@ typedef struct
 #define	ELS_CMD_ECHO	0x10000000
 #define	ELS_CMD_TEST	0x11000000
 #define	ELS_CMD_RRQ	0x12000000
+#define	ELS_CMD_REC	0x13000000
 #define	ELS_CMD_PRLI	0x20000000
 #define	ELS_CMD_PRLO	0x21000000
 #define	ELS_CMD_SCN	0x22000000
@@ -1341,6 +1330,7 @@ typedef struct
 #define	ELS_CMD_ECHO	0x10
 #define	ELS_CMD_TEST	0x11
 #define	ELS_CMD_RRQ	0x12
+#define	ELS_CMD_REC	0x13
 #define	ELS_CMD_PRLI	0x20
 #define	ELS_CMD_PRLO	0x21
 #define	ELS_CMD_SCN	0x22
@@ -1822,10 +1812,10 @@ typedef	struct _BE_PHYS_ADDR
 
 typedef struct
 {
-	uint8_t		*fc_mptr;
+	void		*fc_mptr;
 	struct emlxs_memseg *segment;	/* Parent segment */
 
-	uint8_t		*virt;		/* virtual address ptr */
+	void		*virt;		/* virtual address ptr */
 	uint64_t	phys;		/* mapped address */
 	uint32_t	size;
 
@@ -2153,47 +2143,140 @@ typedef struct emlxs_fw_image
 #define	SLI_FCODE_REVISION_CHECK(x, y)	(x == y)
 
 
-/* ************ Tigershark ************** */
-#define	BE_SIGNATURE_SIZE	32
-#define	BE_BUILD_SIZE		24
-#define	BE_SIGNATURE		"ServerEngines Corp"
+/* ************ BladeEngine ************** */
+#define	BE_SIGNATURE		"ServerEngines"
 #define	BE_DIR_SIGNATURE	"*** SE FLAS"
+#define	BE_BUILD_SIZE		24
 #define	BE_VERSION_SIZE		32
 #define	BE_COOKIE_SIZE		32
 #define	BE_CONTROLLER_SIZE	8
 #define	BE_FLASH_ENTRIES	32
 #define	BE_MAX_XFER_SIZE	32768 /* 4K aligned */
 
-typedef struct emlxs_sli4_ufi_controller
+/* ************** BE3 **************** */
+#define	BE3_SIGNATURE_SIZE	52
+#define	BE3_MAX_IMAGE_HEADERS	32
+
+typedef struct emlxs_be3_image_header
+{
+	uint32_t id;
+#define	UFI_BE3_FLASH_ID	0x01
+
+	uint32_t offset;
+	uint32_t length;
+	uint32_t checksum;
+	uint8_t version[BE_VERSION_SIZE];
+
+} emlxs_be3_image_header_t;
+
+typedef struct emlxs_be3_ufi_header
+{
+	char signature[BE3_SIGNATURE_SIZE];
+	uint32_t ufi_version;
+	uint32_t file_length;
+	uint32_t checksum;
+	uint32_t antidote;
+	uint32_t image_cnt;
+	char build[BE_BUILD_SIZE];
+	uint8_t resv1[32];
+
+} emlxs_be3_ufi_header_t;
+
+typedef struct emlxs_be3_ufi_controller
 {
 	uint32_t vendor_id;
 	uint32_t device_id;
 	uint32_t sub_vendor_id;
 	uint32_t sub_device_id;
 
-} emlxs_sli4_ufi_controller_t;
+} emlxs_be3_ufi_controller_t;
 
-typedef struct emlxs_sli4_ufi_header /* 96 bytes */
+typedef struct emlxs_be3_flash_header
 {
-	char signature[BE_SIGNATURE_SIZE];
+	uint32_t format_rev;
 	uint32_t checksum;
 	uint32_t antidote;
-	emlxs_sli4_ufi_controller_t  controller;
+	uint32_t entry_count;
+	emlxs_be3_ufi_controller_t controller[BE_CONTROLLER_SIZE];
+	uint32_t resv0;
+	uint32_t resv1;
+	uint32_t resv2;
+	uint32_t resv3;
+} emlxs_be3_flash_header_t;
+
+typedef struct emlxs_be3_flash_entry
+{
+	uint32_t type;
+	uint32_t offset;
+	uint32_t block_size;
+	uint32_t image_size;
+	uint32_t checksum;
+	uint32_t entry_point;
+	uint32_t resv0;
+	uint32_t resv1;
+	char version[BE_VERSION_SIZE];
+
+} emlxs_be3_flash_entry_t;
+
+typedef struct emlxs_be3_flash_dir
+{
+	char cookie[BE_COOKIE_SIZE];
+	emlxs_be3_flash_header_t header;
+	emlxs_be3_flash_entry_t entry[BE_FLASH_ENTRIES];
+
+} emlxs_be3_flash_dir_t;
+
+typedef struct emlxs_be3_ncsi_header {
+	uint32_t magic;
+	uint8_t hdr_len;
+	uint8_t type;
+	uint16_t hdr_ver;
+	uint16_t rsvd0;
+	uint16_t load_offset;
+	uint32_t len;
+	uint32_t flash_offset;
+	uint8_t ver[16];
+	uint8_t name[24];
+	uint32_t img_cksum;
+	uint32_t rsvd1;
+	uint32_t hdr_cksum;
+} emlxs_be3_ncsi_header_t;
+
+
+/* ************** BE2 **************** */
+#define	BE2_SIGNATURE_SIZE	32
+
+
+typedef struct emlxs_be2_ufi_controller
+{
+	uint32_t vendor_id;
+	uint32_t device_id;
+	uint32_t sub_vendor_id;
+	uint32_t sub_device_id;
+
+} emlxs_be2_ufi_controller_t;
+
+typedef struct emlxs_be2_ufi_header
+{
+	char signature[BE2_SIGNATURE_SIZE];
+	uint32_t checksum;
+	uint32_t antidote;
+	emlxs_be2_ufi_controller_t  controller;
 	uint32_t file_length;
 	uint32_t chunk_num;
 	uint32_t chunk_cnt;
 	uint32_t image_cnt;
 	char build[BE_BUILD_SIZE];
 
-} emlxs_sli4_ufi_header_t;
+} emlxs_be2_ufi_header_t;
 
-typedef struct emlxs_sli4_flash_header
+typedef struct emlxs_be2_flash_header /* 96 bytes */
 {
 	uint32_t format_rev;
 	uint32_t checksum;
 	uint32_t antidote;
 	uint32_t build_num;
-	emlxs_sli4_ufi_controller_t  controller[BE_CONTROLLER_SIZE];
+	emlxs_be2_ufi_controller_t controller[BE_CONTROLLER_SIZE];
 	uint32_t active_entry_mask;
 	uint32_t valid_entry_mask;
 	uint32_t orig_content_mask;
@@ -2203,9 +2286,9 @@ typedef struct emlxs_sli4_flash_header
 	uint32_t resv3;
 	uint32_t resv4;
 
-} emlxs_sli4_flash_header_t;
+} emlxs_be2_flash_header_t;
 
-typedef struct emlxs_sli4_flash_entry
+typedef struct emlxs_be2_flash_entry
 {
 	uint32_t type;
 	uint32_t offset;
@@ -2217,21 +2300,23 @@ typedef struct emlxs_sli4_flash_entry
 	uint32_t resv1;
 	char version[BE_VERSION_SIZE];
 
-} emlxs_sli4_flash_entry_t;
+} emlxs_be2_flash_entry_t;
 
-typedef struct emlxs_sli4_flash_dir
+typedef struct emlxs_be2_flash_dir
 {
 	char cookie[BE_COOKIE_SIZE];
-	emlxs_sli4_flash_header_t header;
-	emlxs_sli4_flash_entry_t entry[BE_FLASH_ENTRIES];
+	emlxs_be2_flash_header_t header;
+	emlxs_be2_flash_entry_t entry[BE_FLASH_ENTRIES];
 
-} emlxs_sli4_flash_dir_t;
+} emlxs_be2_flash_dir_t;
 
 
 /* FLASH ENTRY TYPES */
+#define	BE_FLASHTYPE_NCSI_FIRMWARE	0x10 /* BE3 */
 #define	BE_FLASHTYPE_PXE_BIOS		0x20
 #define	BE_FLASHTYPE_FCOE_BIOS		0x21
 #define	BE_FLASHTYPE_ISCSI_BIOS		0x22
+#define	BE_FLASHTYPE_FLASH_ISM		0x30 /* BE3 */
 #define	BE_FLASHTYPE_ISCSI_FIRMWARE	0xA0
 #define	BE_FLASHTYPE_ISCSI_BACKUP	0xB0
 #define	BE_FLASHTYPE_FCOE_FIRMWARE	0xA2
@@ -2241,6 +2326,7 @@ typedef struct emlxs_sli4_flash_dir
 /* Flash types in download order */
 typedef enum emlxs_be_flashtypes
 {
+	NCSI_FIRMWARE_FLASHTYPE,
 	ISCSI_FIRMWARE_FLASHTYPE,
 	ISCSI_BACKUP_FLASHTYPE,
 	FCOE_FIRMWARE_FLASHTYPE,
@@ -2256,23 +2342,31 @@ typedef enum emlxs_be_flashtypes
 /* Driver level constructs */
 typedef struct emlxs_be_fw_file
 {
+	uint32_t 	be_version;
+	uint32_t	ufi_plus;
+
 	uint32_t	type;
 	uint32_t	image_offset;
 	uint32_t	image_size;
 	uint32_t	block_size;
 	uint32_t	block_crc;
-	uint32_t	load_address;
+	uint32_t	load_address; /* BE3 */
 	char		label[BE_VERSION_SIZE];
 } emlxs_be_fw_file_t;
 
 typedef struct emlxs_be_fw_image
 {
-	uint32_t version;
-	char label[BE_VERSION_SIZE];
+	uint32_t 	be_version;
+	uint32_t	ufi_plus;
+
+	uint32_t fcoe_version;
+	char fcoe_label[BE_VERSION_SIZE];
+
+	uint32_t iscsi_version;
+	char iscsi_label[BE_VERSION_SIZE];
 
 	emlxs_be_fw_file_t file[BE_MAX_FLASHTYPES];
 } emlxs_be_fw_image_t;
-
 
 #ifdef	__cplusplus
 }

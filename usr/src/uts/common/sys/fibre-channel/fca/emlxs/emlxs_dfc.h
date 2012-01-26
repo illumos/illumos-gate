@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -189,6 +189,8 @@ typedef struct sd_bucket_info
 #define	EMLXS_SD_SET_EVENT		107
 #define	EMLXS_SD_GET_EVENT		108
 
+
+
 /* EMLXS_SET_AUTH_CFG - flags */
 #define	EMLXS_AUTH_CFG_ADD		0
 #define	EMLXS_AUTH_CFG_DELETE		1
@@ -226,6 +228,7 @@ typedef struct sd_bucket_info
 
 /* FCOE_SUPPORT */
 #define	DFC_FCOE_NOTSUPPORTED	(DFC_ERRNO_START + 21) /* FCoE not supported */
+#define	DFC_FCOE_NO_DATA	(DFC_ERRNO_START + 22) /* No Data to return */
 
 /* DHCHAP_SUPPORT */
 #define	DFC_AUTH_NOT_CONFIGURED			(DFC_ERRNO_START + 30)

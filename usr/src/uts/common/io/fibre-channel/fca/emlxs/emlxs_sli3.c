@@ -34,7 +34,6 @@ static void emlxs_sli3_issue_iocb(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq);
 static void emlxs_sli3_handle_link_event(emlxs_hba_t *hba);
 static void emlxs_sli3_handle_ring_event(emlxs_hba_t *hba, int32_t ring_no,
 	uint32_t ha_copy);
-static int emlxs_sli3_mb_handle_cmd(emlxs_hba_t *hba, MAILBOXQ *mbq);
 #ifdef SFCT_SUPPORT
 static uint32_t emlxs_fct_bde_setup(emlxs_port_t *port, emlxs_buf_t *sbp);
 #endif /* SFCT_SUPPORT */
@@ -111,8 +110,7 @@ static void			emlxs_sli3_enable_intr(emlxs_hba_t *hba);
 static void			emlxs_sli3_disable_intr(emlxs_hba_t *hba,
 					uint32_t att);
 
-static uint32_t			emlxs_reset_ring(emlxs_hba_t *hba,
-					uint32_t ringno);
+
 static void			emlxs_handle_ff_error(emlxs_hba_t *hba);
 
 static uint32_t			emlxs_handle_mb_event(emlxs_hba_t *hba);
@@ -127,7 +125,7 @@ static void			emlxs_enable_latt(emlxs_hba_t *hba);
 static uint32_t			emlxs_check_attention(emlxs_hba_t *hba);
 
 static uint32_t			emlxs_get_attention(emlxs_hba_t *hba,
-					uint32_t msgid);
+					int32_t msgid);
 static void			emlxs_proc_attention(emlxs_hba_t *hba,
 					uint32_t ha_copy);
 /* static int			emlxs_handle_rcv_seq(emlxs_hba_t *hba, */
@@ -191,7 +189,7 @@ emlxs_sli3_online(emlxs_hba_t *hba)
 	uint8_t *inptr;
 	uint8_t *outptr;
 	uint32_t status;
-	uint32_t i;
+	uint16_t i;
 	uint32_t j;
 	uint32_t read_rev_reset;
 	uint32_t key = 0;
@@ -216,12 +214,13 @@ emlxs_sli3_online(emlxs_hba_t *hba)
 		(void) READ_SBUS_CSR_REG(hba, FC_SHS_REG(hba));
 	}
 
-	/*
-	 * Get a buffer which will be used repeatedly for mailbox commands
-	 */
-	mbq = (MAILBOXQ *) kmem_zalloc((sizeof (MAILBOXQ)), KM_SLEEP);
+	/* Set the fw_check flag */
+	fw_check = cfg[CFG_FW_CHECK].current;
 
-	mb = (MAILBOX *)mbq;
+	if ((fw_check & 0x04) ||
+	    (hba->fw_flag & FW_UPDATE_KERNEL)) {
+		kern_update = 1;
+	}
 
 	hba->mbox_queue_flag = 0;
 	hba->sli.sli3.hc_copy = 0;
@@ -230,13 +229,12 @@ emlxs_sli3_online(emlxs_hba_t *hba)
 	hba->fc_altov = FF_DEF_ALTOV;
 	hba->fc_arbtov = FF_DEF_ARBTOV;
 
-	/* Set the fw_check flag */
-	fw_check = cfg[CFG_FW_CHECK].current;
+	/*
+	 * Get a buffer which will be used repeatedly for mailbox commands
+	 */
+	mbq = (MAILBOXQ *) kmem_zalloc((sizeof (MAILBOXQ)), KM_SLEEP);
 
-	if ((fw_check & 0x04) ||
-	    (hba->fw_flag & FW_UPDATE_KERNEL)) {
-		kern_update = 1;
-	}
+	mb = (MAILBOX *)mbq;
 
 reset:
 	/* Initialize sli mode based on configuration parameter */
@@ -883,7 +881,7 @@ reset:
 	}
 
 	/* Save the link speed capabilities */
-	vpd->link_speed = mb->un.varRdConfig.lmt;
+	vpd->link_speed = (uint16_t)mb->un.varRdConfig.lmt;
 	emlxs_process_link_speed(hba);
 
 	/* Set the max node count */
@@ -993,9 +991,9 @@ reset:
 	}
 
 	/* Free the buffers since we were polling */
-	(void) emlxs_mem_put(hba, MEM_BUF, (uint8_t *)mp);
+	emlxs_mem_put(hba, MEM_BUF, (void *)mp);
 	mp = NULL;
-	(void) emlxs_mem_put(hba, MEM_BUF, (uint8_t *)mp1);
+	emlxs_mem_put(hba, MEM_BUF, (void *)mp1);
 	mp1 = NULL;
 
 	hba->channel_fcp = FC_FCP_RING;
@@ -1107,7 +1105,7 @@ reset:
 	 * We need to get login parameters for NID
 	 */
 	(void) emlxs_mb_read_sparam(hba, mbq);
-	mp = (MATCHMAP *)(mbq->bp);
+	mp = (MATCHMAP *)mbq->bp;
 	if (emlxs_sli3_issue_mbox_cmd(hba, mbq, MBX_WAIT, 0) != MBX_SUCCESS) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_failed_msg,
 		    "Unable to read parameters. Mailbox cmd=%x status=%x",
@@ -1118,7 +1116,7 @@ reset:
 	}
 
 	/* Free the buffer since we were polling */
-	(void) emlxs_mem_put(hba, MEM_BUF, (uint8_t *)mp);
+	emlxs_mem_put(hba, MEM_BUF, (void *)mp);
 	mp = NULL;
 
 	/* If no serial number in VPD data, then use the WWPN */
@@ -1160,7 +1158,7 @@ reset:
 	 * Make first attempt to set a port index
 	 * Check if this is a multifunction adapter
 	 */
-	if ((vpd->port_index == -1) &&
+	if ((vpd->port_index == (uint32_t)-1) &&
 	    (hba->model_info.chip >= EMLXS_THOR_CHIP)) {
 		char *buffer;
 		int32_t i;
@@ -1189,7 +1187,7 @@ reset:
 	}
 
 	/* Make final attempt to set a port index */
-	if (vpd->port_index == -1) {
+	if (vpd->port_index == (uint32_t)-1) {
 		dev_info_t *p_dip;
 		dev_info_t *c_dip;
 
@@ -1275,6 +1273,12 @@ reset:
 #ifdef MSI_SUPPORT
 	/* Configure MSI map if required */
 	if (hba->intr_count > 1) {
+
+		if (hba->intr_type == DDI_INTR_TYPE_MSIX) {
+			/* always start from 0 */
+			hba->last_msiid = 0;
+		}
+
 		/* Reuse mbq from previous mbox */
 		bzero(mbq, sizeof (MAILBOXQ));
 
@@ -1336,6 +1340,16 @@ reset:
 msi_configured:
 
 
+	if ((hba->intr_count >= 1) &&
+	    (hba->sli_mode == EMLXS_HBA_SLI3_MODE)) {
+		/* intr_count is a sequence of msi id */
+		/* Setup msi2chan[msi_id] */
+		for (i = 0; i < hba->intr_count; i ++) {
+			hba->msi2chan[i] = i;
+			if (i >= hba->chan_count)
+				hba->msi2chan[i] = (i - hba->chan_count);
+		}
+	}
 #endif /* MSI_SUPPORT */
 
 	/*
@@ -1462,9 +1476,7 @@ msi_configured:
 		    "CT  Ring: Posted %d buffers.", MEM_CTBUF_COUNT);
 	}
 
-
-	/* Reuse mbq from previous mbox */
-	bzero(mbq, sizeof (MAILBOXQ));
+	(void) kmem_free((uint8_t *)mbq, sizeof (MAILBOXQ));
 
 	/*
 	 * Setup and issue mailbox INITIALIZE LINK command
@@ -1472,17 +1484,27 @@ msi_configured:
 	 * Do this only if persist-linkdown is not set
 	 */
 	if (cfg[CFG_PERSIST_LINKDOWN].current == 0) {
+		mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX, 1);
+		if (mbq == NULL) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_failed_msg,
+			    "Unable to allocate mailbox buffer.");
+
+			rval = EIO;
+			goto failed;
+		}
+
 		emlxs_mb_init_link(hba, mbq, cfg[CFG_TOPOLOGY].current,
 		    cfg[CFG_LINK_SPEED].current);
 
 		rval = emlxs_sli3_issue_mbox_cmd(hba, mbq, MBX_NOWAIT, 0);
 		if ((rval != MBX_SUCCESS) && (rval != MBX_BUSY)) {
-
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_failed_msg,
 			    "Unable to initialize link. " \
 			    "Mailbox cmd=%x status=%x",
 			    mb->mbxCommand, mb->mbxStatus);
 
+			emlxs_mem_put(hba, MEM_MBOX, (void *)mbq);
+			mbq = NULL;
 			rval = EIO;
 			goto failed;
 		}
@@ -1499,9 +1521,9 @@ msi_configured:
 			if (hba->state == FC_ERROR) {
 				EMLXS_MSGF(EMLXS_CONTEXT,
 				    &emlxs_init_failed_msg,
-				    "Adapter error.", mb->mbxCommand,
-				    mb->mbxStatus);
+				    "Adapter error.");
 
+				mbq = NULL;
 				rval = EIO;
 				goto failed;
 			}
@@ -1517,7 +1539,6 @@ msi_configured:
 	 * The leadvile driver will now handle the FLOGI at the driver level
 	 */
 
-	(void) kmem_free((uint8_t *)mbq, sizeof (MAILBOXQ));
 	return (0);
 
 failed:
@@ -1529,12 +1550,12 @@ failed:
 	}
 
 	if (mp) {
-		(void) emlxs_mem_put(hba, MEM_BUF, (uint8_t *)mp);
+		emlxs_mem_put(hba, MEM_BUF, (void *)mp);
 		mp = NULL;
 	}
 
 	if (mp1) {
-		(void) emlxs_mem_put(hba, MEM_BUF, (uint8_t *)mp1);
+		emlxs_mem_put(hba, MEM_BUF, (void *)mp1);
 		mp1 = NULL;
 	}
 
@@ -1698,7 +1719,7 @@ emlxs_sli3_map_hdw(emlxs_hba_t *hba)
 			goto failed;
 		}
 
-		hba->sli.sli3.slim2.virt = (uint8_t *)buf_info->virt;
+		hba->sli.sli3.slim2.virt = buf_info->virt;
 		hba->sli.sli3.slim2.phys = buf_info->phys;
 		hba->sli.sli3.slim2.size = SLI_SLIM2_SIZE;
 		hba->sli.sli3.slim2.data_handle = buf_info->data_handle;
@@ -1784,11 +1805,11 @@ emlxs_sli3_unmap_hdw(emlxs_hba_t *hba)
 			buf_info->flags = FC_MBUF_DMA;
 		}
 
-		buf_info->virt = (uint32_t *)hba->sli.sli3.slim2.virt;
+		buf_info->virt = hba->sli.sli3.slim2.virt;
 		buf_info->size = hba->sli.sli3.slim2.size;
 		emlxs_mem_free(hba, buf_info);
 
-		hba->sli.sli3.slim2.virt = 0;
+		hba->sli.sli3.slim2.virt = NULL;
 	}
 
 
@@ -1803,7 +1824,7 @@ emlxs_sli3_hba_init(emlxs_hba_t *hba)
 	emlxs_port_t *port = &PPORT;
 	emlxs_port_t *vport;
 	emlxs_config_t *cfg;
-	int32_t i;
+	uint16_t i;
 
 	cfg = &CFG;
 	i = 0;
@@ -1884,6 +1905,10 @@ emlxs_sli3_hba_init(emlxs_hba_t *hba)
 		vport = &VPORT(i);
 		vport->hba = hba;
 		vport->vpi = i;
+		vport->VPIobj.index = i;
+		vport->VPIobj.VPI = i;
+		vport->VPIobj.port = vport;
+		vport->VPIobj.state = VPI_STATE_OFFLINE;
 	}
 
 	/*
@@ -2115,6 +2140,7 @@ done:
 		vport->prev_did = 0;
 		vport->lip_type = 0;
 		bzero(&vport->fabric_sparam, sizeof (SERV_PARM));
+		bzero(&vport->prev_fabric_sparam, sizeof (SERV_PARM));
 
 		bzero((caddr_t)&vport->node_base, sizeof (NODELIST));
 		vport->node_base.nlp_Rpi = 0;
@@ -3048,7 +3074,7 @@ static uint32_t
 emlxs_sli3_issue_mbox_cmd(emlxs_hba_t *hba, MAILBOXQ *mbq, int32_t flag,
     uint32_t tmo)
 {
-	emlxs_port_t		*port = &PPORT;
+	emlxs_port_t		*port;
 	SLIM2			*slim2p = (SLIM2 *)hba->sli.sli3.slim2.virt;
 	MAILBOX			*mbox;
 	MAILBOX			*mb;
@@ -3059,6 +3085,12 @@ emlxs_sli3_issue_mbox_cmd(emlxs_hba_t *hba, MAILBOXQ *mbq, int32_t flag,
 	MATCHMAP		*mbox_bp;
 	uint32_t		tmo_local;
 	MAILBOX			*swpmb;
+
+	if (!mbq->port) {
+		mbq->port = &PPORT;
+	}
+
+	port = (emlxs_port_t *)mbq->port;
 
 	mb = (MAILBOX *)mbq;
 	swpmb = (MAILBOX *)&word0;
@@ -3574,7 +3606,7 @@ emlxs_sli3_prep_fct_iocb(emlxs_port_t *port, emlxs_buf_t *cmd_sbp,
 
 	/* Initalize iocb */
 	iocb->ULPCONTEXT = (uint16_t)fct_cmd->cmd_rxid;
-	iocb->ULPIOTAG = iotag;
+	iocb->ULPIOTAG = (uint16_t)iotag;
 	iocb->ULPRSVDBYTE = ((timeout > 0xff) ? 0 : timeout);
 	iocb->ULPOWNER = OWN_CHIP;
 	iocb->ULPCLASS = cmd_sbp->class;
@@ -3590,9 +3622,10 @@ emlxs_sli3_prep_fct_iocb(emlxs_port_t *port, emlxs_buf_t *cmd_sbp,
 
 		if ((hba->sli_mode == EMLXS_HBA_SLI3_MODE) &&
 		    (dbuf->db_data_size ==
-		    fct_task->task_expected_xfer_length))
+		    fct_task->task_expected_xfer_length)) {
 			iocb->ULPCT = 0x1;
 			/* enable auto-rsp AP feature */
+		}
 	}
 
 	return (IOERR_SUCCESS);
@@ -3770,13 +3803,12 @@ emlxs_sli3_prep_ip_iocb(emlxs_port_t *port, emlxs_buf_t *sbp)
 		iocb->ULPCOMMAND = CMD_XMIT_BCAST64_CN;
 		iocb->ULPCONTEXT = 0;
 
-		if (hba->sli_mode == 3) {
+		if (hba->sli_mode == EMLXS_HBA_SLI3_MODE) {
 			if (hba->topology != TOPOLOGY_LOOP) {
 				iocb->ULPCT = 0x1;
 			}
 			iocb->ULPCONTEXT = port->vpi;
 		}
-
 	} else {
 		HBASTATS.IpSeqIssued++;
 
@@ -3861,17 +3893,20 @@ emlxs_sli3_prep_els_iocb(emlxs_port_t *port, emlxs_buf_t *sbp)
 		    (did == BCAST_DID) ? pkt->pkt_cmd_fhdr.seq_id : 0;
 		iocb->ULPCOMMAND = CMD_ELS_REQUEST64_CR;
 
-		if (hba->topology != TOPOLOGY_LOOP) {
-			cmd = *((uint32_t *)pkt->pkt_cmd);
-			cmd &= ELS_CMD_MASK;
+		if (hba->sli_mode == EMLXS_HBA_SLI3_MODE) {
+			if (hba->topology != TOPOLOGY_LOOP) {
+				cmd = *((uint32_t *)pkt->pkt_cmd);
+				cmd &= ELS_CMD_MASK;
 
-			if ((cmd == ELS_CMD_FLOGI) || (cmd == ELS_CMD_FDISC)) {
-				iocb->ULPCT = 0x2;
-			} else {
-				iocb->ULPCT = 0x1;
+				if ((cmd == ELS_CMD_FLOGI) ||
+				    (cmd == ELS_CMD_FDISC)) {
+					iocb->ULPCT = 0x2;
+				} else {
+					iocb->ULPCT = 0x1;
+				}
 			}
+			iocb->ULPCONTEXT = port->vpi;
 		}
-		iocb->ULPCONTEXT = port->vpi;
 	}
 	iocb->ULPIOTAG = iotag;
 	iocb->ULPRSVDBYTE =
@@ -4025,7 +4060,8 @@ emlxs_fct_bde_setup(emlxs_port_t *port, emlxs_buf_t *sbp)
 		return (1);
 	}
 
-	if ((hba->sli_mode < 3) || (sgllen > SLI3_MAX_BDE)) {
+	if ((hba->sli_mode < EMLXS_HBA_SLI3_MODE) ||
+	    (sgllen > SLI3_MAX_BDE)) {
 		rval = emlxs_sli2_fct_bde_setup(port, sbp);
 	} else {
 		rval = emlxs_sli3_fct_bde_setup(port, sbp);
@@ -4042,7 +4078,7 @@ emlxs_bde_setup(emlxs_port_t *port, emlxs_buf_t *sbp)
 	uint32_t	rval;
 	emlxs_hba_t	*hba = HBA;
 
-	if (hba->sli_mode < 3) {
+	if (hba->sli_mode < EMLXS_HBA_SLI3_MODE) {
 		rval = emlxs_sli2_bde_setup(port, sbp);
 	} else {
 		rval = emlxs_sli3_bde_setup(port, sbp);
@@ -4237,7 +4273,7 @@ emlxs_sli3_intx_intr(char *arg)
 
 /* EMLXS_PORT_LOCK must be held when call this routine */
 static uint32_t
-emlxs_get_attention(emlxs_hba_t *hba, uint32_t msgid)
+emlxs_get_attention(emlxs_hba_t *hba, int32_t msgid)
 {
 #ifdef FMA_SUPPORT
 	emlxs_port_t *port = &PPORT;
@@ -4550,8 +4586,8 @@ emlxs_sli3_handle_link_event(emlxs_hba_t *hba)
 			rc =  emlxs_sli3_issue_mbox_cmd(hba, mbq,
 			    MBX_NOWAIT, 0);
 			if ((rc != MBX_BUSY) && (rc != MBX_SUCCESS)) {
-				(void) emlxs_mem_put(hba, MEM_MBOX,
-				    (uint8_t *)mbq);
+				emlxs_mem_put(hba, MEM_MBOX,
+				    (void *)mbq);
 			}
 
 			mutex_enter(&EMLXS_PORT_LOCK);
@@ -4569,7 +4605,7 @@ emlxs_sli3_handle_link_event(emlxs_hba_t *hba)
 
 			mutex_exit(&EMLXS_PORT_LOCK);
 		} else {
-			(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mbq);
+			emlxs_mem_put(hba, MEM_MBOX, (void *)mbq);
 		}
 	}
 
@@ -5141,7 +5177,7 @@ done:
 		emlxs_update_HBQ_index(hba, hbq_id);
 	} else {
 		if (mp) {
-			(void) emlxs_mem_put(hba, buf_type, (uint8_t *)mp);
+			emlxs_mem_put(hba, buf_type, (void *)mp);
 		}
 		(void) emlxs_post_buffer(hba, rp, 1);
 	}
@@ -5223,7 +5259,7 @@ emlxs_sli3_issue_iocb(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 
 	/* Free the local iocb if there is no sbp tracking it */
 	if (!sbp) {
-		(void) emlxs_mem_put(hba, MEM_IOCB, (uint8_t *)iocbq);
+		emlxs_mem_put(hba, MEM_IOCB, (void *)iocbq);
 	}
 
 	/* update local ring index to next available ring index */
@@ -5304,7 +5340,7 @@ mode_A:
 
 interlock_A:
 
-	value = 0xFFFFFFFF;
+	value = 0x55555555;
 	word0 = 0;
 	swpmb->mbxCommand = MBX_KILL_BOARD;
 	swpmb->mbxOwner = OWN_CHIP;
@@ -5336,14 +5372,14 @@ interlock_A:
 	while (j++ < 1000) {
 		value = READ_SLIM_ADDR(hba, (((volatile uint32_t *)mb1) + 1));
 
-		if (value == 0) {
+		if (value == 0xAAAAAAAA) {
 			break;
 		}
 
 		DELAYUS(50);
 	}
 
-	if (value == 0) {
+	if (value == 0xAAAAAAAA) {
 		/* Now wait for mailbox ownership to clear */
 		while (j++ < 10000) {
 			word0 =
@@ -5374,7 +5410,7 @@ mode_B:
 
 interlock_B:
 
-	value = 0xFFFFFFFF;
+	value = 0x55555555;
 	word0 = 0;
 	swpmb->mbxCommand = MBX_KILL_BOARD;
 	swpmb->mbxOwner = OWN_CHIP;
@@ -5391,14 +5427,14 @@ interlock_B:
 	while (j++ < 1000) {
 		value = READ_SLIM_ADDR(hba, (((volatile uint32_t *)mb1) + 1));
 
-		if (value == 0) {
+		if (value == 0xAAAAAAAA) {
 			break;
 		}
 
 		DELAYUS(50);
 	}
 
-	if (value == 0) {
+	if (value == 0xAAAAAAAA) {
 		/* Now wait for mailbox ownership to clear */
 		while (j++ < 10000) {
 			word0 =
@@ -5493,7 +5529,7 @@ emlxs_sli3_hba_kill4quiesce(emlxs_hba_t *hba)
 	mb1 = FC_SLIM1_MAILBOX(hba);
 	swpmb = (MAILBOX *)&word0;
 
-	value = 0xFFFFFFFF;
+	value = 0x55555555;
 	word0 = 0;
 	swpmb->mbxCommand = MBX_KILL_BOARD;
 	swpmb->mbxOwner = OWN_CHIP;
@@ -5525,12 +5561,12 @@ emlxs_sli3_hba_kill4quiesce(emlxs_hba_t *hba)
 	while (j++ < 1000) {
 		value = READ_SLIM_ADDR(hba, (((volatile uint32_t *)mb1) + 1));
 
-		if (value == 0) {
+		if (value == 0xAAAAAAAA) {
 			break;
 		}
 		DELAYUS(50);
 	}
-	if (value == 0) {
+	if (value == 0xAAAAAAAA) {
 		/* Now wait for mailbox ownership to clear */
 		while (j++ < 10000) {
 			word0 =
@@ -5556,102 +5592,6 @@ done:
 } /* emlxs_sli3_hba_kill4quiesce */
 
 
-static uint32_t
-emlxs_reset_ring(emlxs_hba_t *hba, uint32_t ringno)
-{
-	emlxs_port_t *port = &PPORT;
-	RING *rp;
-	MAILBOXQ *mbq;
-	MAILBOX *mb;
-	PGP *pgp;
-	off_t offset;
-	NODELIST *ndlp;
-	uint32_t i;
-	emlxs_port_t *vport;
-
-	rp = &hba->sli.sli3.ring[ringno];
-	pgp =
-	    (PGP *)&((SLIM2 *)hba->sli.sli3.slim2.virt)->mbx.us.s2.port[ringno];
-
-	if ((mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX, 1)) == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_ring_reset_msg,
-		    "%s: Unable to allocate mailbox buffer.",
-		    emlxs_ring_xlate(ringno));
-
-		return ((uint32_t)FC_FAILURE);
-	}
-	mb = (MAILBOX *)mbq;
-
-	emlxs_mb_reset_ring(hba, mbq, ringno);
-	if (emlxs_sli3_issue_mbox_cmd(hba, mbq, MBX_WAIT, 0) != MBX_SUCCESS) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_ring_reset_msg,
-		    "%s: Unable to reset ring. Mailbox cmd=%x status=%x",
-		    emlxs_ring_xlate(ringno), mb->mbxCommand, mb->mbxStatus);
-
-		(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mbq);
-		return ((uint32_t)FC_FAILURE);
-	}
-
-	/* Free the mailbox */
-	(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mbq);
-
-	/* Update the response ring indicies */
-	offset = (off_t)((uint64_t)((unsigned long)&(pgp->rspPutInx))
-	    - (uint64_t)((unsigned long)hba->sli.sli3.slim2.virt));
-	EMLXS_MPDATA_SYNC(hba->sli.sli3.slim2.dma_handle, offset, 4,
-	    DDI_DMA_SYNC_FORKERNEL);
-	rp->fc_rspidx = rp->fc_port_rspidx = BE_SWAP32(pgp->rspPutInx);
-
-	/* Update the command ring indicies */
-	offset = (off_t)((uint64_t)((unsigned long)&(pgp->cmdGetInx)) -
-	    (uint64_t)((unsigned long)hba->sli.sli3.slim2.virt));
-	EMLXS_MPDATA_SYNC(hba->sli.sli3.slim2.dma_handle, offset, 4,
-	    DDI_DMA_SYNC_FORKERNEL);
-	rp->fc_cmdidx = rp->fc_port_cmdidx = BE_SWAP32(pgp->cmdGetInx);
-
-	for (i = 0; i < MAX_VPORTS; i++) {
-		vport = &VPORT(i);
-
-		if (!(vport->flag & EMLXS_PORT_BOUND)) {
-			continue;
-		}
-
-		/* Clear all node XRI contexts */
-		rw_enter(&vport->node_rwlock, RW_WRITER);
-		mutex_enter(&EMLXS_TX_CHANNEL_LOCK);
-		for (i = 0; i < EMLXS_NUM_HASH_QUES; i++) {
-			ndlp = vport->node_table[i];
-			while (ndlp != NULL) {
-				ndlp->nlp_flag[FC_IP_RING] &= ~NLP_RPI_XRI;
-				ndlp = ndlp->nlp_list_next;
-			}
-		}
-		mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
-		rw_exit(&vport->node_rwlock);
-	}
-
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_ring_reset_msg, "%s",
-	    emlxs_ring_xlate(ringno));
-
-#ifdef FMA_SUPPORT
-	if (emlxs_fm_check_dma_handle(hba, hba->sli.sli3.slim2.dma_handle)
-	    != DDI_FM_OK) {
-		EMLXS_MSGF(EMLXS_CONTEXT,
-		    &emlxs_invalid_dma_handle_msg,
-		    "emlxs_reset_ring: hdl=%p",
-		    hba->sli.sli3.slim2.dma_handle);
-
-		emlxs_thread_spawn(hba, emlxs_restart_thread,
-		    NULL, NULL);
-
-		return ((uint32_t)FC_FAILURE);
-	}
-#endif  /* FMA_SUPPORT */
-
-
-	return (FC_SUCCESS);
-
-} /* emlxs_reset_ring() */
 
 
 /*
@@ -5670,7 +5610,7 @@ emlxs_handle_mb_event(emlxs_hba_t *hba)
 	MAILBOX			*mb;
 	MAILBOX			*swpmb;
 	MAILBOX			*mbox;
-	MAILBOXQ		*mbq;
+	MAILBOXQ		*mbq = NULL;
 	volatile uint32_t	word0;
 	MATCHMAP		*mbox_bp;
 	off_t			offset;
@@ -5679,10 +5619,13 @@ emlxs_handle_mb_event(emlxs_hba_t *hba)
 
 	swpmb = (MAILBOX *)&word0;
 
+	mutex_enter(&EMLXS_PORT_LOCK);
 	switch (hba->mbox_queue_flag) {
 	case 0:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_stray_mbox_intr_msg,
 		    "No mailbox active.");
+
+		mutex_exit(&EMLXS_PORT_LOCK);
 		return (0);
 
 	case MBX_POLL:
@@ -5695,28 +5638,50 @@ emlxs_handle_mb_event(emlxs_hba_t *hba)
 
 		mutex_enter(&EMLXS_MBOX_LOCK);
 		mbq = (MAILBOXQ *)hba->mbox_mbq;
-		mutex_exit(&EMLXS_MBOX_LOCK);
 		if (mbq) {
+			port = (emlxs_port_t *)mbq->port;
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mbox_detail_msg,
 			    "Mailbox event. Completing Polled command.");
 			mbq->flag |= MBQ_COMPLETED;
 		}
+		mutex_exit(&EMLXS_MBOX_LOCK);
 
+		mutex_exit(&EMLXS_PORT_LOCK);
 		return (0);
 
 	case MBX_SLEEP:
 	case MBX_NOWAIT:
-		mutex_enter(&EMLXS_MBOX_LOCK);
-		mbq = (MAILBOXQ *)hba->mbox_mbq;
+		/* Check mbox_timer, it acts as a service flag too */
+		/* The first to service the mbox queue will clear the timer */
+		if (hba->mbox_timer) {
+			hba->mbox_timer = 0;
+
+			mutex_enter(&EMLXS_MBOX_LOCK);
+			mbq = (MAILBOXQ *)hba->mbox_mbq;
+			mutex_exit(&EMLXS_MBOX_LOCK);
+		}
+
+		if (!mbq) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mbox_detail_msg,
+			    "Mailbox event. No service required.");
+			mutex_exit(&EMLXS_PORT_LOCK);
+			return (0);
+		}
+
 		mb = (MAILBOX *)mbq;
-		mutex_exit(&EMLXS_MBOX_LOCK);
+		mutex_exit(&EMLXS_PORT_LOCK);
 		break;
 
 	default:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mbox_completion_error_msg,
 		    "Invalid Mailbox flag (%x).");
+
+		mutex_exit(&EMLXS_PORT_LOCK);
 		return (0);
 	}
+
+	/* Set port context */
+	port = (emlxs_port_t *)mbq->port;
 
 	/* Get first word of mailbox */
 	if (hba->flag & FC_SLIM2_MODE) {
@@ -5754,7 +5719,7 @@ emlxs_handle_mb_event(emlxs_hba_t *hba)
 			word0 =
 			    READ_SLIM_ADDR(hba, ((volatile uint32_t *)mbox));
 		}
-		}
+	}
 
 	/* Now that we are the owner, DMA Sync entire mailbox if needed */
 	if (hba->flag & FC_SLIM2_MODE) {
@@ -5855,7 +5820,7 @@ done:
 		/* Attempt to send pending mailboxes */
 		rc =  emlxs_sli3_issue_mbox_cmd(hba, mbq, MBX_NOWAIT, 0);
 		if ((rc != MBX_BUSY) && (rc != MBX_SUCCESS)) {
-			(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mbq);
+			emlxs_mem_put(hba, MEM_MBOX, (void *)mbq);
 		}
 	}
 	return (0);
@@ -5894,12 +5859,12 @@ emlxs_sli3_timer_check_mbox(emlxs_hba_t *hba)
 		mutex_exit(&EMLXS_PORT_LOCK);
 		return;
 	}
-	hba->mbox_timer = 0;
 
 	/* Mailbox timed out, first check for error attention */
 	ha_copy = emlxs_check_attention(hba);
 
 	if (ha_copy & HA_ERATT) {
+		hba->mbox_timer = 0;
 		mutex_exit(&EMLXS_PORT_LOCK);
 		emlxs_handle_ff_error(hba);
 		return;
@@ -5948,9 +5913,13 @@ emlxs_sli3_timer_check_mbox(emlxs_hba_t *hba)
 			return;
 		}
 
-		if (hba->mbox_mbq) {
-			mb = (MAILBOX *)hba->mbox_mbq;
-		}
+		/* The first to service the mbox queue will clear the timer */
+		/* We will service the mailbox here */
+		hba->mbox_timer = 0;
+
+		mutex_enter(&EMLXS_MBOX_LOCK);
+		mb = (MAILBOX *)hba->mbox_mbq;
+		mutex_exit(&EMLXS_MBOX_LOCK);
 	}
 
 	if (mb) {
@@ -6285,7 +6254,7 @@ emlxs_hbq_setup(emlxs_hba_t *hba, uint32_t hbq_id)
 	if (emlxs_hbq_alloc(hba, hbq_id)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_msg,
 		    "emlxs_hbq_setup: Unable to allocate HBQ.");
-		(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mbq);
+		emlxs_mem_put(hba, MEM_MBOX, (void *)mbq);
 		return (1);
 	}
 
@@ -6341,7 +6310,7 @@ emlxs_hbq_setup(emlxs_hba_t *hba, uint32_t hbq_id)
 		    "emlxs_hbq_setup: Unable to config HBQ. cmd=%x status=%x",
 		    mb->mbxCommand, mb->mbxStatus);
 
-		(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mbq);
+		emlxs_mem_put(hba, MEM_MBOX, (void *)mbq);
 		emlxs_hbq_free_all(hba, hbq_id);
 		return (1);
 	}
@@ -6353,7 +6322,7 @@ emlxs_hbq_setup(emlxs_hba_t *hba, uint32_t hbq_id)
 
 	hba->sli.sli3.hbq_count++;
 
-	(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mbq);
+	emlxs_mem_put(hba, MEM_MBOX, (void *)mbq);
 
 #ifdef FMA_SUPPORT
 	/* Access handle validation */
@@ -6412,8 +6381,8 @@ emlxs_hbq_free_all(emlxs_hba_t *hba, uint32_t hbq_id)
 
 	if (hbq->HBQ_host_buf.virt != 0) {
 		for (j = 0; j < hbq->HBQ_PostBufCnt; j++) {
-			(void) emlxs_mem_put(hba, seg,
-			    (uint8_t *)hbq->HBQ_PostBufs[j]);
+			emlxs_mem_put(hba, seg,
+			    (void *)hbq->HBQ_PostBufs[j]);
 			hbq->HBQ_PostBufs[j] = NULL;
 		}
 		hbq->HBQ_PostBufCnt = 0;
