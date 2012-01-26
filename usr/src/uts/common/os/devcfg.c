@@ -21,6 +21,9 @@
 /*
  * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ */
 
 #include <sys/note.h>
 #include <sys/t_lock.h>
@@ -4181,11 +4184,11 @@ quiesce_one_device(dev_info_t *dip, void *arg)
 
 		rc = devi_quiesce(dip);
 
-		/* quiesce() should never fail */
-		ASSERT(rc == DDI_SUCCESS);
-
 		if (rc != DDI_SUCCESS && should_quiesce) {
-
+#ifdef DEBUG
+			cmn_err(CE_WARN, "quiesce() failed for %s%d",
+			    ddi_driver_name(dip), ddi_get_instance(dip));
+#endif /* DEBUG */
 			if (arg != NULL)
 				*((int *)arg) = -1;
 		}
