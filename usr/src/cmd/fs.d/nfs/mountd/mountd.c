@@ -20,6 +20,7 @@
  *
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2012 Joyent, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -386,6 +387,13 @@ main(int argc, char *argv[])
 	    can_do_mlp ? PRIV_NET_BINDMLP : NULL, NULL) == -1) {
 		(void) fprintf(stderr,
 		    "%s: must be run with sufficient privileges\n",
+		    argv[0]);
+		exit(1);
+	}
+
+	/* Mountd cannot run in a non-global zone. */
+	if (getzoneid() != GLOBAL_ZONEID) {
+		(void) fprintf(stderr, "%s: can only run in the global zone\n",
 		    argv[0]);
 		exit(1);
 	}

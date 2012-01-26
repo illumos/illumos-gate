@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2011, 2012, Joyent, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -825,7 +825,9 @@ prt_mc4(private_t *pri, int raw, long val) /* print memcntl() (4th) argument */
 			return;
 
 		case MC_SYNC:
-			if ((val & ~(MS_SYNC|MS_ASYNC|MS_INVALIDATE)) == 0) {
+			if ((val &
+			    ~(MS_SYNC|MS_ASYNC|MS_INVALIDATE|MS_INVALCURPROC))
+			    == 0) {
 				*(s = pri->code_buf) = '\0';
 				if (val & MS_SYNC)
 					(void) strlcat(s, "|MS_SYNC", CBSIZE);
@@ -833,6 +835,9 @@ prt_mc4(private_t *pri, int raw, long val) /* print memcntl() (4th) argument */
 					(void) strlcat(s, "|MS_ASYNC", CBSIZE);
 				if (val & MS_INVALIDATE)
 					(void) strlcat(s, "|MS_INVALIDATE",
+					    CBSIZE);
+				if (val & MS_INVALCURPROC)
+					(void) strlcat(s, "|MS_INVALCURPROC",
 					    CBSIZE);
 			}
 			break;

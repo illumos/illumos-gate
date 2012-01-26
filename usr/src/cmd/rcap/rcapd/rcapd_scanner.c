@@ -21,6 +21,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Joyent, Inc.  All rights reserved.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -551,7 +552,7 @@ pageout(pid_t pid, struct ps_prochandle *Pr, caddr_t start, caddr_t end)
 
 	errno = 0;
 	res = pr_memcntl(Pr, start, (end - start), MC_SYNC,
-	    (caddr_t)(MS_ASYNC | MS_INVALIDATE), 0, 0);
+	    (caddr_t)(MS_ASYNC | MS_INVALCURPROC), 0, 0);
 	debug_high("pr_memcntl [%p-%p): %d", (void *)start, (void *)end, res);
 
 	/*

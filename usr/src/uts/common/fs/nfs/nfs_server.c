@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
+ * Copyright (c) 2012 Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -2519,6 +2520,9 @@ int
 nfs_srvinit(void)
 {
 	int error;
+
+	if (getzoneid() != GLOBAL_ZONEID)
+		return (EACCES);
 
 	error = nfs_exportinit();
 	if (error != 0)

@@ -2351,6 +2351,7 @@ f usr/bin/zcat 0555 root bin
 f usr/bin/ziostat 0555 root bin
 s usr/bin/zonename=../../sbin/zonename
 f usr/bin/zonestat 0555 root bin
+f usr/bin/zschedstat 0555 root bin
 d usr/ccs 0755 root bin
 d usr/ccs/bin 0755 root bin
 d usr/ccs/bin/amd64 0755 root bin
@@ -11983,6 +11984,7 @@ f usr/share/man/man1m/zic.1m 0444 root bin
 f usr/share/man/man1m/zoneadm.1m 0444 root bin
 f usr/share/man/man1m/zonecfg.1m 0444 root bin
 f usr/share/man/man1m/zpool.1m 0444 root bin
+f usr/share/man/man1m/zschedstat.1m 0444 root bin
 f usr/share/man/man1m/zstreamdump.1m 0444 root bin
 d usr/share/man/man2 0755 root bin
 f usr/share/man/man2/Intro.2 0444 root bin
