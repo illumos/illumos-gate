@@ -66,6 +66,14 @@ PDS_NAME=`mount | nawk -v p=$dname '{if ($1 == p) print $3}'`
 [ -z "$PDS_NAME" ] && \
     print -u2 "Brand error: missing parent ZFS dataset for $dname"
 
+# it's possible to specify a zone root here if you specified the
+# '-x nodataset' when installing the zone.
+if [[ -n ${TMPLZONE} ]]; then
+    zfs snapshot $PDS_NAME/${TMPLZONE}@${bname}
+    zfs clone -o quota=${ZQUOTA}g $PDS_NAME/${TMPLZONE}@${bname} \
+        $PDS_NAME/$bname
+fi
+
 if [ ! -d ${ZONEPATH}/config ]; then
     mkdir -p ${ZONEPATH}/config
     chmod 755 ${ZONEPATH}/config

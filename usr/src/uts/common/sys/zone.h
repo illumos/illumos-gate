@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, Joyent Inc. All rights reserved.
+ * Copyright (c) 2011, 2012, Joyent Inc. All rights reserved.
  */
 
 #ifndef _SYS_ZONE_H
@@ -441,6 +441,11 @@ typedef struct {
 	kstat_named_t	zm_avenrun1;
 	kstat_named_t	zm_avenrun5;
 	kstat_named_t	zm_avenrun15;
+	kstat_named_t	zm_run_ticks;
+	kstat_named_t	zm_run_wait;
+	kstat_named_t	zm_fss_shr_pct;
+	kstat_named_t	zm_fss_pri_hi;
+	kstat_named_t	zm_fss_pri_avg;
 } zone_misc_kstat_t;
 
 typedef struct zone {
@@ -671,6 +676,20 @@ typedef struct zone {
 	struct loadavg_s zone_loadavg;		/* loadavg for this zone */
 	uint64_t	zone_hp_avenrun[3];	/* high-precision avenrun */
 	int		zone_avenrun[3];	/* FSCALED avg. run queue len */
+
+	/*
+	 * FSS stats updated once per second by fss_decay_usage.
+	 * zone_runq_cntr is an instantaneous accumulation of the number of
+	 * processes in the run queue per project and is not computed over the
+	 * one second interval.
+	 */
+	uint32_t	zone_fss_gen;		/* FSS generation cntr */
+	uint32_t	zone_proc_cnt;		/* FSS process cntr */
+	uint64_t	zone_run_ticks;		/* tot # of ticks running */
+	uint64_t	zone_runq_cntr;		/* tot # of procs in runq */
+	uint32_t	zone_fss_shr_pct;	/* fss active shr % in intvl */
+	uint64_t	zone_fss_pri_hi;	/* fss high pri this interval */
+	uint64_t	zone_fss_pri_avg;	/* fss avg pri this interval */
 } zone_t;
 
 /*

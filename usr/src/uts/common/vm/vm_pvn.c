@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1986, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -431,7 +432,14 @@ pvn_write_done(page_t *plist, int flags)
 				page_io_unlock(pp);
 				page_unlock(pp);
 			}
-		} else if (flags & B_INVAL) {
+		} else if ((flags & (B_INVAL | B_INVALCURONLY)) == B_INVAL) {
+			/*
+			 * If B_INVALCURONLY is set, then we handle that case
+			 * in the next conditional if hat_page_is_mapped()
+			 * indicates that there are no additional mappings
+			 * to the page.
+			 */
+
 			/*
 			 * XXX - Failed writes with B_INVAL set are
 			 * not handled appropriately.
@@ -572,8 +580,9 @@ pvn_write_done(page_t *plist, int flags)
 }
 
 /*
- * Flags are composed of {B_ASYNC, B_INVAL, B_FREE, B_DONTNEED, B_DELWRI,
- * B_TRUNC, B_FORCE}.  B_DELWRI indicates that this page is part of a kluster
+ * Flags are composed of {B_ASYNC, B_INVAL, B_INVALCURONLY, B_FREE,
+ * B_DONTNEED, B_DELWRI, B_TRUNC, B_FORCE}.
+ * B_DELWRI indicates that this page is part of a kluster
  * operation and is only to be considered if it doesn't involve any
  * waiting here.  B_TRUNC indicates that the file is being truncated
  * and so no i/o needs to be done. B_FORCE indicates that the page
@@ -627,13 +636,17 @@ pvn_getdirty(page_t *pp, int flags)
 	 * If we want to free or invalidate the page then
 	 * we need to unload it so that anyone who wants
 	 * it will have to take a minor fault to get it.
+	 * If we are only invalidating the page for the
+	 * current process, then pass in a different flag.
 	 * Otherwise, we're just writing the page back so we
 	 * need to sync up the hardwre and software mod bit to
 	 * detect any future modifications.  We clear the
 	 * software mod bit when we put the page on the dirty
 	 * list.
 	 */
-	if (flags & (B_INVAL | B_FREE)) {
+	if (flags & B_INVALCURONLY) {
+		(void) hat_pageunload(pp, HAT_CURPROC_PGUNLOAD);
+	} else if (flags & (B_INVAL | B_FREE)) {
 		(void) hat_pageunload(pp, HAT_FORCE_PGUNLOAD);
 	} else {
 		(void) hat_pagesync(pp, HAT_SYNC_ZERORM);
@@ -645,7 +658,7 @@ pvn_getdirty(page_t *pp, int flags)
 		 * list after all.
 		 */
 		page_io_unlock(pp);
-		if (flags & B_INVAL) {
+		if ((flags & (B_INVAL | B_INVALCURONLY)) == B_INVAL) {
 			/*LINTED: constant in conditional context*/
 			VN_DISPOSE(pp, B_INVAL, 0, kcred);
 		} else if (flags & B_FREE) {
@@ -657,6 +670,9 @@ pvn_getdirty(page_t *pp, int flags)
 			 * of VOP_PUTPAGE() who prefer freeing the
 			 * page _only_ if no one else is accessing it.
 			 * E.g. segmap_release()
+			 * We also take this path for B_INVALCURONLY and
+			 * let page_release call VN_DISPOSE if no one else is
+			 * using the page.
 			 *
 			 * The above hat_ismod() check is useless because:
 			 * (1) we may not be holding SE_EXCL lock;
@@ -681,7 +697,7 @@ pvn_getdirty(page_t *pp, int flags)
 	 * We'll detect the fact that they used it when the
 	 * i/o is done and avoid freeing the page.
 	 */
-	if (flags & B_FREE)
+	if (flags & (B_FREE | B_INVALCURONLY))
 		page_downgrade(pp);
 
 
