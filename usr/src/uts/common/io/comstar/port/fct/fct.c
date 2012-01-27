@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/conf.h>
@@ -2739,7 +2740,7 @@ fct_create_solct(fct_local_port_t *port, fct_remote_port_t *query_rp,
 		ASSERT(0);
 	}
 
-	FCT_FILL_CTIU_PREAMPLE(p, ctop);
+	FCT_FILL_CTIU_PREAMBLE(p, ctop);
 	return (cmd);
 }
 
