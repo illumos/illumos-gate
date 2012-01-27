@@ -694,7 +694,7 @@ main(int argc, char *argv[])
 		    "\n\n%s Release %s Version %s %d-bit\r\n",
 		    un.sysname, un.release, un.version, bits);
 		console(B_FALSE,
-		    "Copyright (c) 2010-2011, Joyent Inc. All rights reserved.\r\n");
+		    "Copyright (c) 2010-2012, Joyent Inc. All rights reserved.\r\n");
 	}
 
 	/*
