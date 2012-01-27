@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2010, 2011 Joyent, Inc.  All rights reserved.
+# Copyright (c) 2012, Joyent, Inc. All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -57,6 +57,14 @@ if [[ -z "$PDS_NAME" ]]; then
 	print -u2 "Brand error: missing parent ZFS dataset for $dname"
 	exit $ZONE_SUBPROC_USAGE
 fi
+
+# Destroy snapshots we took when creating disks
+for origin in $(zfs list -H -o name,origin -t volume \
+    | grep "^${PDS_NAME}/${bname}-disk" \
+    | grep -v '\-$' | cut -f2); do
+
+    zfs destroy -rF ${origin} >/dev/null 2>&1
+done
 
 ORIGIN=`zfs get -H -ovalue  origin $PDS_NAME/$bname`
 
