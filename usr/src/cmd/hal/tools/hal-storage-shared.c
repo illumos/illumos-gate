@@ -379,7 +379,7 @@ handle_unmount (LibHalContext *hal_ctx,
 					mounted_by_other_uid = FALSE;
 				}
 #ifdef sun
-				if (stat("/dev/console", &st) == 0 &&
+				if (stat("/dev/vt/console_user", &st) == 0 &&
 				    st.st_uid == atoi (invoked_by_uid)) {
 					/*
 					 * Owner is allowed to take over. Before we have real
