@@ -27,12 +27,11 @@
 #ifndef _SYS_DOMAIND_H
 #define	_SYS_DOMAIND_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
+#include <sys/sysmacros.h>
 #include <sys/cpu_sgnblk_defs.h>
 
 typedef struct domain_data {
@@ -57,16 +56,16 @@ typedef struct domain_data {
 /*
  * offsets
  */
-#define	DOMD_MAGIC_OFFSET	((uint32_t)&((domain_data_t *)0)->magic)
-#define	DOMD_VERSION_OFFSET	((uint32_t)&((domain_data_t *)0)->version)
-#define	DOMD_KEYSWITCH_OFFSET	((uint32_t)&((domain_data_t *)0)->keyswitch)
-#define	DOMD_SCIP_OFFSET	((uint32_t)&((domain_data_t *)0)->master_sc_ip)
-#define	DOMD_LEDS_OFFSET	((uint32_t)&((domain_data_t *)0)->leds)
-#define	DOMD_DSTATE_OFFSET	((uint32_t)&((domain_data_t *)0)->domain_state)
-#define	DOMD_HEARTBEAT_OFFSET	((uint32_t)&((domain_data_t *)0)->heartbeat)
-#define	DOMD_CPUSPRESENT_OFFSET	((uint32_t)&((domain_data_t *)0)->cpus_present)
-#define	DOMD_CPUSIGS_OFFSET	((uint32_t)&((domain_data_t *)0)->cpu_sigs)
-#define	DOMD_RESETINFO_OFFSET	((uint32_t)&((domain_data_t *)0)->resetinfo_off)
+#define	DOMD_MAGIC_OFFSET	offsetof(domain_data_t, magic)
+#define	DOMD_VERSION_OFFSET	offsetof(domain_data_t, version)
+#define	DOMD_KEYSWITCH_OFFSET	offsetof(domain_data_t, keyswitch)
+#define	DOMD_SCIP_OFFSET	offsetof(domain_data_t, master_sc_ip)
+#define	DOMD_LEDS_OFFSET	offsetof(domain_data_t, leds)
+#define	DOMD_DSTATE_OFFSET	offsetof(domain_data_t, domain_state)
+#define	DOMD_HEARTBEAT_OFFSET	offsetof(domain_data_t, heartbeat)
+#define	DOMD_CPUSPRESENT_OFFSET	offsetof(domain_data_t, cpus_present)
+#define	DOMD_CPUSIGS_OFFSET	offsetof(domain_data_t, cpu_sigs)
+#define	DOMD_RESETINFO_OFFSET	offsetof(domain_data_t, resetinfo_off)
 
 /*
  * tod
