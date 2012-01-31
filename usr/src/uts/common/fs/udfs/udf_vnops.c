@@ -2759,7 +2759,7 @@ ud_putapage(struct vnode *vp,
 	struct buf *bp = NULL;
 	int32_t lbmask;
 	uint64_t isize;
-	int32_t crc_len;
+	uint16_t crc_len;
 	struct file_entry *fe;
 
 	ud_printf("ud_putapage\n");

@@ -1153,10 +1153,11 @@ void
 ud_iupdat(struct ud_inode *ip, int32_t waitfor)
 {
 	uint16_t flag, tag_flags;
-	int32_t error, crc_len = 0;
+	int32_t error;
 	struct buf *bp;
 	struct udf_vfs *udf_vfsp;
 	struct file_entry *fe;
+	uint16_t crc_len = 0;
 
 	ASSERT(RW_WRITE_HELD(&ip->i_contents));
 

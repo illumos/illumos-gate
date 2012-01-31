@@ -297,8 +297,8 @@ retry:
 				bp = ud_bread(vfsp->vfs_dev,
 				    ud_xlate_to_daddr(udf_vfsp,
 				    ud_part->udp_number,
-				    begin, 1, &dummy)
-				    << udf_vfsp->udf_l2d_shift, lbsz);
+				    begin, 1, &dummy) <<
+				    udf_vfsp->udf_l2d_shift, lbsz);
 				if (bp->b_flags & B_ERROR) {
 					brelse(bp);
 					return (EIO);
