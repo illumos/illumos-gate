@@ -91,11 +91,11 @@ SRCS =		$(OBJECTS:%.o=../common/%.c)
 
 LIBS =		$(LIBRARY) $(LINTLIB)
 
-# definitions for lint
-# Until libz is compiled against unsigned uid/gid ON bits.
-#LINTFLAGS +=	 -lcrypto -lz -lsocket -lnsl -lc
-LINTFLAGS +=	 -lcrypto -lsocket -lnsl -lc
-$(LINTLIB) :=	 SRCS = $(SRCDIR)/$(LINTSRC)
+# Define LDLIBS conditionally for lintcheck, rather than in general, since
+# we're building an archive library which itself links to nothing, we just
+# want lint to know about these libraries.
+lintcheck  :=	LDLIBS += -lcrypto -lz -lsocket -lnsl -lc
+$(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 POFILE_DIR =	../..
 
