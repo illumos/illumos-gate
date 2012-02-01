@@ -22,6 +22,9 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #include <scsi/libses.h>
 #include "ses_impl.h"
@@ -43,7 +46,7 @@ ses_plugin_ctlpage_lookup(ses_plugin_t *sp, ses_snap_t *snap, int pagenum,
 	if ((dp = ses_get_pagedesc(tp, pagenum, SES_PAGE_CTL)) == NULL)
 		return (NULL);
 
-	if (dp->spd_ctl_fill != NULL) {
+	if (np != NULL && dp->spd_ctl_fill != NULL) {
 		return (dp->spd_ctl_fill(sp, pp->ssp_page,
 		    pp->ssp_len, np));
 	} else {
@@ -135,7 +138,7 @@ ses_plugin_page_lookup(ses_plugin_t *sp, ses_snap_t *snap, int pagenum,
 	if ((pp = ses_snap_find_page(snap, pagenum, B_FALSE)) == NULL)
 		return (NULL);
 
-	if (dp->spd_index != NULL) {
+	if (np != NULL && dp->spd_index != NULL) {
 		return (dp->spd_index(sp, np, pp->ssp_page, pp->ssp_len,
 		    lenp));
 	} else {
