@@ -14,6 +14,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include "includes.h"
@@ -37,6 +39,8 @@ RCSID("$OpenBSD: sshconnect.c,v 1.135 2002/09/19 01:58:18 djm Exp $");
 #include "misc.h"
 #include "readpass.h"
 #include <langinfo.h>
+#include <regex.h>
+#include <err.h>
 #include "engine.h"
 
 char *client_version_string = NULL;
@@ -545,6 +549,9 @@ confirm(const char *prompt)
 	const char *msg;
 	char *p, *again = NULL;
 	int n, ret = -1;
+	regex_t yesre, nore;
+	char *errstr;
+	int rerr, errlen;
 
 	if (options.batch_mode)
 		return 0;
@@ -552,20 +559,38 @@ confirm(const char *prompt)
 		nl_langinfo(YESSTR), nl_langinfo(NOSTR));
 	again = xmalloc(n + 1);
 	(void) snprintf(again, n + 1, gettext("Please type '%s' or '%s': "),
-		    nl_langinfo(YESSTR), nl_langinfo(NOSTR));
+	    nl_langinfo(YESSTR), nl_langinfo(NOSTR));
+
+	if ((rerr = regcomp(&yesre, nl_langinfo(YESEXPR), REG_EXTENDED)) != 0) {
+		errlen = regerror(rerr, &yesre, NULL, 0);
+		if ((errstr = malloc(errlen)) == NULL)
+			err(1, "malloc");
+		regerror(rerr, &yesre, errstr, errlen);
+		errx(1, "YESEXPR: %s: %s", nl_langinfo(YESEXPR), errstr);
+	}
+
+	if ((rerr = regcomp(&nore, nl_langinfo(NOEXPR), REG_EXTENDED)) != 0) {
+		errlen = regerror(rerr, &nore, NULL, 0);
+		if ((errstr = malloc(errlen)) == NULL)
+			err(1, "malloc");
+		regerror(rerr, &nore, errstr, errlen);
+		errx(1, "NOEXPR: %s: %s", nl_langinfo(NOEXPR), errstr);
+	}
 
 	for (msg = prompt;;msg = again) {
 		p = read_passphrase(msg, RP_ECHO);
-		if (p == NULL ||
-		    (p[0] == '\0') || (p[0] == '\n') ||
-		    strcasecmp(p, nl_langinfo(NOSTR)) == 0)
+		if (p == NULL || (p[0] == '\0') || (p[0] == '\n') ||
+		    regexec(&nore, p, 0, NULL, 0) == 0)
 			ret = 0;
-		if (p && strcasecmp(p, nl_langinfo(YESSTR)) == 0)
+		if (p && regexec(&yesre, p, 0, NULL, 0) == 0)
 			ret = 1;
 		if (p)
 			xfree(p);
-		if (ret != -1)
+		if (ret != -1) {
+			regfree(&yesre);
+			regfree(&nore);
 			return ret;
+		}
 	}
 }
 
