@@ -22,6 +22,9 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #include <stddef.h>
 #include <strings.h>
@@ -227,6 +230,7 @@ ses2_ctl_fill(ses_plugin_t *sp, void *pagedata, size_t pagelen,
 	uint64_t index;
 	nvlist_t *props = ses_node_props(np);
 	ses2_control_page_impl_t *pip = pagedata;
+	ses2_elem_ctl_impl_t *eip;
 	void *data;
 	ses2_diag_page_t page = SES2_DIAGPAGE_ENCLOSURE_CTL_STATUS;
 
@@ -237,7 +241,13 @@ ses2_ctl_fill(ses_plugin_t *sp, void *pagedata, size_t pagelen,
 		return (NULL);
 	}
 
-	data = &pip->scpi_data[index];
+	data = eip = &pip->scpi_data[index];
+	/*
+	 * if control element was already modified "select" field is non-zero,
+	 * so skip setting default values to avoid fields overriding
+	 */
+	if (eip->seci_common.seci_select)
+		return (data);
 
 	if (ses2_ctl_common_setdef(np, page, data) != 0 ||
 	    ses2_element_setdef(np, page, data) != 0 ||
@@ -274,17 +284,21 @@ ses2_threshout_ctl_fill(ses_plugin_t *sp, void *pagedata, size_t pagelen,
 	uint64_t index;
 	nvlist_t *props = ses_node_props(np);
 	ses2_threshold_out_page_impl_t *pip = pagedata;
+	ses2_threshold_impl_t *tip;
 	ses2_diag_page_t page = SES2_DIAGPAGE_THRESHOLD_IO;
 	void *data;
 
 	VERIFY(nvlist_lookup_uint64(props, SES_PROP_ELEMENT_INDEX,
 	    &index) == 0);
 
-	data = &pip[index];
+	data = tip = &pip->stopi_thresholds[index];
 
-	if (ses2_ctl_common_setdef(np, page, data) != 0 ||
-	    ses2_element_setdef(np, page, data) != 0 ||
-	    ses2_enclosure_setdef(np, page, data) != 0)
+	/* check if threshold is dirty, so no need to set default values */
+	if ((tip->sti_high_crit | tip->sti_low_crit | tip->sti_high_warn |
+	    tip->sti_low_warn) != 0)
+		return (data);
+
+	if (ses2_element_setdef(np, page, data) != 0)
 		return (NULL);
 
 	return (data);
