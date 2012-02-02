@@ -17,6 +17,7 @@
 .\" " CDDL HEADER END
 .\" "
 .\" "Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+.\" "Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
 .\" "
 .TH nightly 1 "6 July 2010"
 .SH NAME
@@ -405,6 +406,12 @@ This may not be the same identify used by the SCM.
 .RS 5
 The address to be used to send completion e-mail at the end of
 the build (for the \-m option).
+.RE
+.LP
+.B MAILFROM
+.RS 5
+The address to be used for From: in the completion e-mail at the
+end of the build (for the \-m option).
 .RE
 .LP
 .B REF_PROTO_LIST

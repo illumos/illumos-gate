@@ -24,6 +24,7 @@
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2008, 2010, Richard Lowe
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
 #
 # Based on the nightly script from the integration folks,
 # Mostly modified and owned by mike_s.
@@ -1767,10 +1768,19 @@ function logshuffle {
 	run_hook POST_NIGHTLY $state
 	run_hook SYS_POST_NIGHTLY $state
 
+	#
+	# mailx(1) sets From: based on the -r flag
+	# if it is given.
+	#
+	mailx_r=
+	if [[ -n "${MAILFROM}" ]]; then
+		mailx_r="-r ${MAILFROM}"
+	fi
+
 	cat $build_time_file $build_environ_file $mail_msg_file \
 	    > ${LLOG}/mail_msg
 	if [ "$m_FLAG" = "y" ]; then
-	    	cat ${LLOG}/mail_msg | /usr/bin/mailx -s \
+	    	cat ${LLOG}/mail_msg | /usr/bin/mailx ${mailx_r} -s \
 	"Nightly ${MACH} Build of `basename ${CODEMGR_WS}` ${state}." \
 			${MAILTO}
 	fi
