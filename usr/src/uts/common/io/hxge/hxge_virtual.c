@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <hxge_impl.h>
@@ -43,11 +44,11 @@ extern uint16_t hxge_rcr_threshold;
 extern uint32_t hxge_rbr_size;
 extern uint32_t hxge_rcr_size;
 
-extern uint_t hxge_rx_intr();
-extern uint_t hxge_tx_intr();
-extern uint_t hxge_vmac_intr();
-extern uint_t hxge_syserr_intr();
-extern uint_t hxge_pfc_intr();
+extern uint_t hxge_rx_intr(caddr_t, caddr_t);
+extern uint_t hxge_tx_intr(caddr_t, caddr_t);
+extern uint_t hxge_vmac_intr(caddr_t, caddr_t);
+extern uint_t hxge_syserr_intr(caddr_t, caddr_t);
+extern uint_t hxge_pfc_intr(caddr_t, caddr_t);
 
 /*
  * Entry point to populate configuration parameters into the master hxge

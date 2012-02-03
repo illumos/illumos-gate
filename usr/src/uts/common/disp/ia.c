@@ -22,6 +22,7 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -30,7 +31,7 @@
 #include <sys/errno.h>
 #include <sys/modctl.h>
 
-extern pri_t ia_init();
+extern pri_t ia_init(id_t, int, classfuncs_t **);
 
 static sclass_t csw = {
 	"IA",

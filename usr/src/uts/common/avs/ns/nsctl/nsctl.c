@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -51,7 +52,7 @@
 #endif
 
 extern void nscsetup();
-extern int _nsc_init_raw();
+extern int _nsc_init_raw(int);
 extern void _nsc_deinit_raw();
 extern void _nsc_init_start();
 extern void _nsc_init_os(), _nsc_deinit_os();
@@ -63,7 +64,9 @@ extern void _nsc_init_ncio(), _nsc_deinit_ncio();
 extern void _nsc_deinit_mem(), _nsc_deinit_rmlock();
 extern void _nsc_deinit_dev();
 
-extern int _nsc_frz_start(), _nsc_frz_stop(), _nsc_frz_isfrozen();
+extern int _nsc_frz_start(char *, int *);
+extern int _nsc_frz_stop(char *, int *);
+extern int _nsc_frz_isfrozen(char *, int *);
 
 extern nsc_mem_t *_nsc_local_mem;
 extern nsc_rmhdr_t *_nsc_rmhdr_ptr;

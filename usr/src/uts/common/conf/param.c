@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1983, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -439,7 +440,7 @@ pri_t maxclsyspri = MAXCLSYSPRI;
 pri_t minclsyspri = MINCLSYSPRI;
 char sys_name[] = "SYS";
 
-extern pri_t sys_init();
+extern pri_t sys_init(id_t, int, classfuncs_t **);
 extern classfuncs_t sys_classfuncs;
 
 sclass_t sclass[] = {
