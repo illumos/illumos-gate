@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -70,8 +71,8 @@ extern int		md_ioctl_cnt;
 extern md_krwlock_t	md_unit_array_rw;
 extern major_t		md_major;
 extern mdq_anchor_t	md_ff_daemonq;
-extern void		md_probe_one();
-extern void		mirror_openfail_console_info();
+extern void		md_probe_one(probe_req_t *);
+extern void		mirror_openfail_console_info(mm_unit_t *, int, int);
 
 #ifdef DEBUG
 extern int		mirror_debug_flag;

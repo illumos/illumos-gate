@@ -22,13 +22,11 @@
 /*
  * Copyright (c) 1998, Sun Microsystems, Inc.
  * All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
-
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* from SVr4.0 1.78 */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -42,7 +40,8 @@
  * Profiling.
  */
 int
-profil(unsigned short *bufbase, size_t bufsize, u_long pcoffset, u_int pcscale)
+profil(unsigned short *bufbase, size_t bufsize, ulong_t pcoffset,
+    uint_t pcscale)
 {
 	struct proc *p = ttoproc(curthread);
 

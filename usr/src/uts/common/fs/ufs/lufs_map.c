@@ -18,11 +18,10 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <sys/systm.h>
@@ -47,7 +46,7 @@
  */
 extern pri_t minclsyspri;
 extern struct kmem_cache *lufs_bp;
-extern int ufs_trans_push_quota();
+extern int ufs_trans_push_quota(ufsvfs_t *, delta_t, struct dquot *);
 
 /*
  * globals

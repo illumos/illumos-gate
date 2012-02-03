@@ -25,6 +25,7 @@
 
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 
@@ -139,7 +140,7 @@ static	int debug  = 0;
 /*
  * PPS (Pulse Per Second) support.
  */
-void ddi_hardpps();
+void ddi_hardpps(struct timeval *, int);
 /*
  * This is protected by the asy_excl_hi of the port on which PPS event
  * handling is enabled.  Note that only one port should have this enabled at

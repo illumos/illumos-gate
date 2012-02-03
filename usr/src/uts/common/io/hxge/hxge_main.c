@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 /*
@@ -219,9 +220,9 @@ hxge_os_mutex_t hxge_common_lock;
 
 extern uint64_t hpi_debug_level;
 
-extern hxge_status_t hxge_ldgv_init();
-extern hxge_status_t hxge_ldgv_uninit();
-extern hxge_status_t hxge_intr_ldgv_init();
+extern hxge_status_t hxge_ldgv_init(p_hxge_t, int *, int *);
+extern hxge_status_t hxge_ldgv_uninit(p_hxge_t);
+extern hxge_status_t hxge_intr_ldgv_init(p_hxge_t);
 extern void hxge_fm_init(p_hxge_t hxgep, ddi_device_acc_attr_t *reg_attr,
     ddi_device_acc_attr_t *desc_attr, ddi_dma_attr_t *dma_attr);
 extern void hxge_fm_fini(p_hxge_t hxgep);

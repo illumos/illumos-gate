@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 
@@ -306,7 +307,7 @@ extern void rsm_kphysm_setup_func_unregister(kphysm_setup_vector_t *vec,
 extern void dbg_printf(int category, int level, char *fmt, ...);
 extern void rsmka_pathmanager_init();
 extern void rsmka_pathmanager_cleanup();
-extern void rele_sendq_token();
+extern void rele_sendq_token(sendq_token_t *);
 extern rsm_addr_t get_remote_hwaddr(adapter_t *, rsm_node_id_t);
 extern rsm_node_id_t get_remote_nodeid(adapter_t *, rsm_addr_t);
 extern int rsmka_topology_ioctl(caddr_t, int, int);

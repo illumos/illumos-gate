@@ -23,6 +23,7 @@
 
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -35,6 +36,21 @@
 #include <sys/systm.h>
 #include <sys/systrace.h>
 #include <sys/procfs.h>
+#include <sys/mman.h>
+#include <sys/int_types.h>
+#include <c2/audit.h>
+#include <sys/stat.h>
+#include <sys/times.h>
+#include <sys/statfs.h>
+#include <sys/stropts.h>
+#include <sys/statvfs.h>
+#include <sys/utsname.h>
+#include <sys/timex.h>
+#include <sys/socket.h>
+#include <sys/sendfile.h>
+
+struct hrtsysa;
+struct mmaplf32a;
 
 /* ONC_PLUS EXTRACT START */
 /*
@@ -46,228 +62,230 @@
  */
 /* ONC_PLUS EXTRACT END */
 
-int	access();
-int	alarm();
-int	auditsys();
-int64_t	brandsys();
-int	brk();
-int	chdir();
-int	chmod();
-int	chown();
-int	chroot();
-int	cladm();
-int	close();
-int	exece();
-int	faccessat();
-int	fchmodat();
-int	fchownat();
-int	fcntl();
+int	access(char *, int);
+int	alarm(int);
+int	auditsys(struct auditcalls *, rval_t *);
+int64_t	brandsys(int, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t,
+    uintptr_t);
+int	brk(caddr_t);
+int	chdir(char *);
+int	chmod(char *, int);
+int	chown(char *, uid_t, gid_t);
+int	chroot(char *);
+int	cladm(int, int, void *);
+int	close(int);
+int	exece(const char *, const char **, const char **);
+int	faccessat(int, char *, int, int);
+int	fchmodat(int, char *, int, int);
+int	fchownat(int, char *, uid_t, gid_t, int);
+int	fcntl(int, int, intptr_t);
 int64_t	vfork();
-int64_t	forksys();
-int	fstat();
-int	fdsync();
+int64_t	forksys(int, int);
+int	fstat(int, struct stat *);
+int	fdsync(int, int);
 int64_t	getgid();
-int	ucredsys();
+int	ucredsys(int, int, void *);
 int64_t	getpid();
 int64_t	getuid();
 time_t	gtime();
-int	getloadavg();
-int	rusagesys();
-int	getpagesizes();
-int	gtty();
+int	getloadavg(int *, int);
+int	rusagesys(int, void *, void *, void *, void *);
+int	getpagesizes(int, size_t *, int);
+int	gtty(int, intptr_t);
 #if defined(__i386) || defined(__amd64)
-int	hrtsys();
+int	hrtsys(struct hrtsysa *, rval_t *);
 #endif /* __i386 || __amd64 */
-int	ioctl();
+int	ioctl(int, int, intptr_t);
 int	kill();
-int	labelsys();
-int	link();
-int	linkat();
-off32_t	lseek32();
-off_t	lseek64();
-int	lgrpsys();
-int	mmapobjsys();
-int	mknod();
-int	mknodat();
-int	mount();
-int	nice();
+int	labelsys(int, void *, void *, void *, void *, void *);
+int	link(char *, char *);
+int	linkat(int, char *, int, char *, int);
+off32_t	lseek32(int32_t, off32_t, int32_t);
+off_t	lseek64(int, off_t, int);
+int	lgrpsys(int, long, void *);
+int	mmapobjsys(int, uint_t, mmapobj_result_t *, uint_t *, void *);
+int	mknod(char *, mode_t, dev_t);
+int	mknodat(int, char *, mode_t, dev_t);
+int	mount(long *, rval_t *);
+int	nice(int);
 int	nullsys();
-int	open();
-int	openat();
+int	open(char *, int, int);
+int	openat(int, char *, int, int);
 int	pause();
-long	pcsample();
-int	privsys();
-int	profil();
-ssize_t	pread();
-ssize_t	pwrite();
-ssize_t	read();
-int	rename();
-int	renameat();
-void	rexit();
+long	pcsample(void *, long);
+int	privsys(int, priv_op_t, priv_ptype_t, void *, size_t, int);
+int	profil(unsigned short *, size_t, ulong_t, uint_t);
+ssize_t	pread(int, void *, size_t, off_t);
+ssize_t	pwrite(int, void *, size_t, off_t);
+ssize_t	read(int, void *, size_t);
+int	rename(char *, char *);
+int	renameat(int, char *, int, char *);
+void	rexit(int);
 int	semsys();
-int	setgid();
-int	setpgrp();
-int	setuid();
+int	setgid(gid_t);
+int	setpgrp(int, int, int);
+int	setuid(uid_t);
 uintptr_t	shmsys();
-uint64_t	sidsys();
-int	sigprocmask();
-int	sigsuspend();
-int	sigaltstack();
-int	sigaction();
-int	sigpending();
-int	sigresend();
-int	sigtimedwait();
-int	getsetcontext();
-int	stat();
-int	fstatat();
-int	stime();
-int	stty();
+uint64_t	sidsys(int, int, int, int);
+int	sigprocmask(int, sigset_t *, sigset_t *);
+int	sigsuspend(sigset_t);
+int	sigaltstack(struct sigaltstack *, struct sigaltstack *);
+int	sigaction(int, struct sigaction *, struct sigaction *);
+int	sigpending(int, sigset_t *);
+int	sigresend(int, siginfo_t *, sigset_t *);
+int	sigtimedwait(sigset_t *, siginfo_t *, timespec_t *);
+int	getsetcontext(int, void *);
+int	stat(char *, struct stat *);
+int	fstatat(int, char *, struct stat *, int);
+int	stime(time_t);
+int	stty(int, intptr_t);
 int	syssync();
-int	sysacct();
-clock_t	times();
-long	ulimit();
-int	getrlimit32();
-int	setrlimit32();
-int	umask();
-int	umount2();
-int	unlink();
-int	unlinkat();
-int	utimesys();
-int64_t	utssys32();
-int64_t	utssys64();
-int	uucopy();
-ssize_t	uucopystr();
-ssize_t	write();
-ssize_t	readv();
-ssize_t	writev();
-int	syslwp_park();
-int	rmdir();
-int	mkdir();
-int	mkdirat();
-int	getdents32();
-int	statfs32();
-int	fstatfs32();
-int	sysfs();
-int	getmsg();
-int	pollsys();
-int	putmsg();
+int	sysacct(char *);
+clock_t	times(struct tms *);
+long	ulimit(int, long);
+int	getrlimit32(int, struct rlimit32 *);
+int	setrlimit32(int, struct rlimit32 *);
+int	umask(int);
+int	umount2(char *, int);
+int	unlink(char *);
+int	unlinkat(int, char *, int);
+int	utimesys(int, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
+int64_t	utssys32(void *, int, int, void *);
+int64_t	utssys64(void *, long, int, void *);
+int	uucopy(const void *, void *, size_t);
+ssize_t	uucopystr(const char *, char *, size_t);
+ssize_t	write(int, void *, size_t);
+ssize_t	readv(int, struct iovec *, int);
+ssize_t	writev(int, struct iovec *, int);
+int	syslwp_park(int, uintptr_t, uintptr_t);
+int	rmdir(char *);
+int	mkdir(char *, int);
+int	mkdirat(int, char *, int);
+int	getdents32(int, void *, size_t);
+int	statfs32(char *, struct statfs32 *, int32_t, int32_t);
+int	fstatfs32(int32_t, struct statfs32 *, int32_t, int32_t);
+int	sysfs(int, long, long);
+int	getmsg(int, struct strbuf *, struct strbuf *, int *);
+int	pollsys(pollfd_t *, nfds_t, timespec_t *, sigset_t *);
+int	putmsg(int, struct strbuf *, struct strbuf *, int);
 int	uadmin();
-int	lstat();
-int	symlink();
-int	symlinkat();
-ssize_t	readlink();
-ssize_t	readlinkat();
-int	resolvepath();
-int	setgroups();
-int	getgroups();
-int	fchdir();
-int	fchown();
-int	fchmod();
-int	getcwd();
-int	statvfs();
-int	fstatvfs();
-offset_t llseek32();
+int	lstat(char *, struct stat *);
+int	symlink(char *, char *);
+int	symlinkat(char *, int, char *);
+ssize_t	readlink(char *, char *, size_t);
+ssize_t	readlinkat(int, char *, char *, size_t);
+int	resolvepath(char *, char *, size_t);
+int	setgroups(int, gid_t *);
+int	getgroups(int, gid_t *);
+int	fchdir(int);
+int	fchown(int, uid_t, uid_t);
+int	fchmod(int, int);
+int	getcwd(char *, size_t);
+int	statvfs(char *, struct statvfs *);
+int	fstatvfs(int, struct statvfs *);
+offset_t llseek32(int32_t, uint32_t, uint32_t, int);
 
 #if (defined(__i386) && !defined(__amd64)) || defined(__i386_COMPAT)
-int	sysi86();
+int	sysi86(short, uintptr_t, uintptr_t, uintptr_t);
 #endif
 
-int	acl();
-int	facl();
-long	priocntlsys();
-int	waitsys();
-int	sigsendsys();
-int	mincore();
-caddr_t	smmap64();
-caddr_t smmap32();
-int	smmaplf32();
-int	mprotect();
-int	munmap();
-int	uname();
-int	lchown();
-int	getpmsg();
-int	putpmsg();
-int	memcntl();
-long	sysconfig();
-int	adjtime();
-long	systeminfo();
-int	setegid();
-int	seteuid();
+int	acl(const char *, int, int, void *);
+int	facl(int, int, int, void *);
+long	priocntlsys(int, procset_t *, int, caddr_t, caddr_t);
+int	waitsys(idtype_t, id_t, siginfo_t *, int);
+int	sigsendsys(procset_t *, int);
+int	mincore(caddr_t, size_t, char *);
+caddr_t	smmap64(caddr_t, size_t, int, int, int, off_t);
+caddr_t smmap32(caddr32_t, size32_t, int, int, int, off32_t);
+int	smmaplf32(struct mmaplf32a *, rval_t *);
+int	mprotect(caddr_t, size_t, int);
+int	munmap(caddr_t, size_t);
+int	uname(struct utsname *);
+int	lchown(char *, uid_t, gid_t);
+int	getpmsg(int, struct strbuf *, struct strbuf *, int *, int *);
+int	putpmsg(int, struct strbuf *, struct strbuf *, int, int);
+int	memcntl(caddr_t, size_t, int, caddr_t, int, int);
+long	sysconfig(int);
+int	adjtime(struct timeval *, struct timeval *);
+long	systeminfo(int, char *, long);
+int	setegid(gid_t);
+int	seteuid(uid_t);
 
-int	setreuid();
-int	setregid();
-int	install_utrap();
+int	setreuid(uid_t, uid_t);
+int	setregid(gid_t, gid_t);
+int	install_utrap(utrap_entry_t type, utrap_handler_t, utrap_handler_t *);
 #ifdef __sparc
-int	sparc_utrap_install();
+int	sparc_utrap_install(utrap_entry_t type, utrap_handler_t,
+    utrap_handler_t, utrap_handler_t *, utrap_handler_t *);
 #endif
 
-int	syslwp_create();
+int	syslwp_create(ucontext_t *, int, id_t *);
 void	syslwp_exit();
-int	syslwp_suspend();
-int	syslwp_continue();
-int	syslwp_private();
-int	lwp_detach();
-int	lwp_info();
-int	lwp_kill();
+int	syslwp_suspend(id_t);
+int	syslwp_continue(id_t);
+int	syslwp_private(int, int, uintptr_t);
+int	lwp_detach(id_t);
+int	lwp_info(timestruc_t *);
+int	lwp_kill(id_t, int);
 int	lwp_self();
-int64_t	lwp_sigmask();
+int64_t	lwp_sigmask(int, uint_t, uint_t, uint_t, uint_t);
 int	yield();
-int	lwp_wait();
-int	lwp_mutex_timedlock();
-int	lwp_mutex_wakeup();
-int	lwp_mutex_unlock();
-int	lwp_mutex_trylock();
-int	lwp_mutex_register();
-int	lwp_rwlock_sys();
-int	lwp_sema_post();
-int	lwp_sema_timedwait();
-int	lwp_sema_trywait();
-int	lwp_cond_wait();
-int	lwp_cond_signal();
-int	lwp_cond_broadcast();
+int	lwp_wait(id_t, id_t *);
+int	lwp_mutex_timedlock(lwp_mutex_t *, timespec_t *, uintptr_t);
+int	lwp_mutex_wakeup(lwp_mutex_t *, int);
+int	lwp_mutex_unlock(lwp_mutex_t *);
+int	lwp_mutex_trylock(lwp_mutex_t *, uintptr_t);
+int	lwp_mutex_register(lwp_mutex_t *, caddr_t);
+int	lwp_rwlock_sys(int, lwp_rwlock_t *, timespec_t *);
+int	lwp_sema_post(lwp_sema_t *);
+int	lwp_sema_timedwait(lwp_sema_t *, timespec_t *, int);
+int	lwp_sema_trywait(lwp_sema_t *);
+int	lwp_cond_wait(lwp_cond_t *, lwp_mutex_t *, timespec_t *, int);
+int	lwp_cond_signal(lwp_cond_t *);
+int	lwp_cond_broadcast(lwp_cond_t *);
 caddr_t	schedctl();
 
-long	pathconf();
-long	fpathconf();
-int	processor_bind();
-int	processor_info();
-int	p_online();
+long	pathconf(char *, int);
+long	fpathconf(int, int);
+int	processor_bind(idtype_t, id_t, processorid_t, processorid_t *);
+int	processor_info(processorid_t, processor_info_t *);
+int	p_online(processorid_t, int);
 
 /*
  *	POSIX .4 system calls *
  */
-int	clock_gettime();
-int	clock_settime();
-int	clock_getres();
-int	timer_create();
-int	timer_delete();
-int	timer_settime();
-int	timer_gettime();
-int	timer_getoverrun();
-int	nanosleep();
-int	sigqueue();
-int	signotify();
+int	clock_gettime(clockid_t, timespec_t *);
+int	clock_settime(clockid_t, timespec_t *);
+int	clock_getres(clockid_t, timespec_t *);
+int	timer_create(clockid_t, struct sigevent *, timer_t *);
+int	timer_delete(timer_t);
+int	timer_settime(timer_t, int, itimerspec_t *, itimerspec_t *);
+int	timer_gettime(timer_t, itimerspec_t *);
+int	timer_getoverrun(timer_t);
+int	nanosleep(timespec_t *, timespec_t *);
+int	sigqueue(pid_t, int, void *, int, int);
+int	signotify(int, siginfo_t *, signotify_id_t *);
 
-int	getdents64();
-int	stat64();
-int	lstat64();
-int	fstatat64();
-int	fstat64();
-int	statvfs64();
-int	fstatvfs64();
-int	setrlimit64();
-int	getrlimit64();
-int	pread64();
-int	pwrite64();
-int	open64();
-int	openat64();
+int	getdents64(int, void *, size_t);
+int	stat64(char *, struct stat64 *);
+int	lstat64(char *, struct stat64 *);
+int	fstatat64(int, char *, struct stat64 *, int);
+int	fstat64(int, struct stat64 *);
+int	statvfs64(char *, struct statvfs64 *);
+int	fstatvfs64(int, struct statvfs64 *);
+int	setrlimit64(int, struct rlimit64 *);
+int	getrlimit64(int, struct rlimit64 *);
+int	pread64(int, void *, size32_t, uint32_t, uint32_t);
+int	pwrite64(int, void *, size32_t, uint32_t, uint32_t);
+int	open64(char *, int, int);
+int	openat64(int, char *, int, int);
 
 /*
  * NTP syscalls
  */
 
-int ntp_gettime();
-int ntp_adjtime();
+int ntp_gettime(struct ntptimeval *);
+int ntp_adjtime(struct timex *);
 
 /*
  *	++++++++++++++++++++++++
@@ -277,41 +295,41 @@ int ntp_adjtime();
  *	fchroot, vhangup, gettimeofday
  */
 
-int	fchroot();
+int	fchroot(int);
 int	vhangup();
-int	gettimeofday();
-int	getitimer();
-int	setitimer();
+int	gettimeofday(struct timeval *);
+int	getitimer(uint_t, struct itimerval *);
+int	setitimer(uint_t, struct itimerval *, struct itimerval *);
 
-int	corectl();
-int	modctl();
+int	corectl(int, uintptr_t, uintptr_t, uintptr_t);
+int	modctl(int, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 int64_t loadable_syscall();
 int64_t indir();
 
-long	tasksys();
-long	rctlsys();
+long	tasksys(int, projid_t, uint_t, void *, size_t);
+long	rctlsys(int, char *, void *, void *, size_t, int);
 
 long	zone();
 
-int	so_socket();
-int	so_socketpair();
-int	bind();
-int	listen();
-int	accept();
-int	connect();
-int	shutdown();
-ssize_t	recv();
-ssize_t	recvfrom();
-ssize_t	recvmsg();
-ssize_t	send();
-ssize_t	sendmsg();
-ssize_t	sendto();
-int	getpeername();
-int	getsockname();
-int	getsockopt();
-int	setsockopt();
-int	sockconfig();
-ssize_t	sendfilev();
+int	so_socket(int, int, int, char *, int);
+int	so_socketpair(int[2]);
+int	bind(int, struct sockaddr *, socklen_t, int);
+int	listen(int, int, int);
+int	accept(int, struct sockaddr *, socklen_t *, int);
+int	connect(int, struct sockaddr *, socklen_t, int);
+int	shutdown(int, int, int);
+ssize_t	recv(int, void *, size_t, int);
+ssize_t	recvfrom(int, void *, size_t, int, struct sockaddr *, socklen_t *);
+ssize_t	recvmsg(int, struct nmsghdr *, int);
+ssize_t	send(int, void *, size_t, int);
+ssize_t	sendmsg(int, struct nmsghdr *, int);
+ssize_t	sendto(int, void *, size_t, int, struct sockaddr *, socklen_t);
+int	getpeername(int, struct sockaddr *, socklen_t *, int);
+int	getsockname(int, struct sockaddr *, socklen_t *, int);
+int	getsockopt(int, int, int, void *, socklen_t *, int);
+int	setsockopt(int, int, int, void *, socklen_t *, int);
+int	sockconfig(int, void *, void *, void *, void *);
+ssize_t	sendfilev(int, int, const struct sendfilevec *, int, size_t *);
 
 typedef int64_t	(*llfcn_t)();	/* for casting one-word returns */
 
@@ -753,50 +771,54 @@ struct sysent sysent[NSYSCALL] =
 
 #ifdef _SYSCALL32_IMPL
 
-extern int ulimit32();
-extern ssize_t read32();
-extern ssize_t write32();
-extern ssize_t pread32();
-extern ssize_t pwrite32();
-extern ssize_t readv32();
-extern ssize_t writev32();
-extern ssize_t readlink32();
-extern ssize_t readlinkat32();
-extern int open32();
-extern int openat32();
-extern int stat32();
-extern int fstatat32();
-extern int lstat32();
-extern int fstat32();
-extern int fstatat64_32();
-extern int stat64_32();
-extern int lstat64_32();
-extern int fstat64_32();
-extern int getmsg32();
-extern int putmsg32();
-extern int getpmsg32();
-extern int putpmsg32();
-extern int getsetcontext32();
-extern int statvfs32();
-extern int fstatvfs32();
-extern int statvfs64_32();
-extern int fstatvfs64_32();
-extern int sigaction32();
-extern clock32_t times32();
-extern int stime32();
-extern int getpagesizes32();
-extern int sigaltstack32();
-extern int sigqueue32();
-extern offset_t	llseek32();
-extern int waitsys32();
+extern int ulimit32(int, int);
+extern ssize_t read32(int32_t, caddr32_t, size32_t);
+extern ssize_t write32(int32_t, caddr32_t, size32_t);
+extern ssize_t pread32(int32_t, caddr32_t, size32_t, off32_t);
+extern ssize_t pwrite32(int32_t, caddr32_t, size32_t, off32_t);
+extern ssize_t readv32(int32_t, caddr32_t, int32_t);
+extern ssize_t writev32(int32_t, caddr32_t, int32_t);
+extern ssize_t readlink32(caddr32_t, caddr32_t, size32_t);
+extern ssize_t readlinkat32(int, caddr32_t, caddr32_t, size32_t);
+extern int open32(char *, int, int);
+extern int openat32(int, char *, int, int);
+extern int stat32(char *, struct stat32 *);
+extern int fstatat32(int, char *, struct stat32 *, int);
+extern int lstat32(char *, struct stat32 *);
+extern int fstat32(int, struct stat32 *);
+extern int fstatat64_32(int, char *, struct stat64_32 *, int);
+extern int stat64_32(char *, struct stat64_32 *);
+extern int lstat64_32(char *, struct stat64_32 *);
+extern int fstat64_32(int, struct stat64_32 *);
+extern int getmsg32(int, struct strbuf32 *, struct strbuf32 *, int32_t *);
+extern int putmsg32(int, struct strbuf32 *, struct strbuf32 *, int32_t *);
+extern int getpmsg32(int, struct strbuf32 *, struct strbuf32 *, int32_t *,
+    int32_t *);
+extern int putpmsg32(int, struct strbuf32 *, struct strbuf32 *, int32_t,
+    int32_t);
+extern int getsetcontext32(int, void *);
+extern int statvfs32(char *, struct statvfs32 *);
+extern int fstatvfs32(int, struct statvfs32 *);
+extern int statvfs64_32(char *, struct statvfs64_32 *);
+extern int fstatvfs64_32(int, struct statvfs64_32 *);
+extern int sigaction32(int, struct sigaction32 *, struct sigaction32 *);
+extern clock32_t times32(struct tms32 *);
+extern int stime32(time32_t);
+extern int getpagesizes32(int, size32_t *, int);
+extern int sigaltstack32(struct sigaltstack32 *, struct sigaltstack32 *);
+extern int sigqueue32(pid_t, int, caddr32_t, int, int);
+extern offset_t	llseek32(int32_t, uint32_t, uint32_t, int);
+extern int waitsys32(idtype_t, id_t, siginfo_t *, int);
 
-extern ssize_t recv32();
-extern ssize_t recvfrom32();
-extern ssize_t send32();
-extern ssize_t sendto32();
+extern ssize_t recv32(int32_t, caddr32_t, size32_t, int32_t);
+extern ssize_t recvfrom32(int32_t, caddr32_t, size32_t, int32_t, caddr32_t,
+    caddr32_t);
+extern ssize_t send32(int32_t, caddr32_t, size32_t, int32_t);
+extern ssize_t sendto32(int32_t, caddr32_t, size32_t, int32_t, caddr32_t,
+    socklen_t);
 
-extern int privsys32();
-extern int ucredsys32();
+extern int privsys32(int, priv_op_t, priv_ptype_t, caddr32_t, size32_t, int);
+extern int ucredsys32(int, int, caddr32_t);
 
 /* ONC_PLUS EXTRACT START */
 /*

@@ -22,6 +22,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 /*
@@ -53,7 +54,7 @@ extern struct mod_ops mod_miscops;
 extern int cpr_init(int);
 extern void cpr_done(void);
 extern void i_cpr_stop_other_cpus(void);
-extern int i_cpr_power_down();
+extern int i_cpr_power_down(int);
 
 #if defined(__sparc)
 extern void cpr_forget_cprconfig(void);

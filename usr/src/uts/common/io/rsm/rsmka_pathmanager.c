@@ -22,9 +22,8 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This module provides for the management of interconnect adapters
@@ -128,7 +127,8 @@ extern int   rsm_hash_size;
 
 extern rsm_node_id_t my_nodeid;
 extern rsmhash_table_t rsm_import_segs;
-extern rsm_intr_hand_ret_t rsm_srv_func();
+extern rsm_intr_hand_ret_t rsm_srv_func(rsm_controller_object_t *,
+    rsm_intr_q_op_t, rsm_addr_t, void *, size_t, rsm_intr_hand_arg_t);
 extern void rsmseg_unload(rsmseg_t *);
 extern void rsm_suspend_complete(rsm_node_id_t src_node, int flag);
 extern int rsmipc_send_controlmsg(path_t *path, int msgtype);
@@ -380,7 +380,7 @@ do_deferred_work(caddr_t arg /*ARGSUSED*/)
 					if (sendq_handle != NULL) {
 						adapter->rsmpi_ops->
 						    rsm_sendq_destroy(
-							    sendq_handle);
+						    sendq_handle);
 					}
 					mutex_enter(&path->mutex);
 				}
@@ -1469,7 +1469,7 @@ rsmka_do_path_active(path_t *path, int flags)
 
 				if (sqhdl != NULL) {
 					adapter->rsmpi_ops->rsm_sendq_destroy(
-						sqhdl);
+					    sqhdl);
 				}
 				mutex_enter(&path->mutex);
 			}
@@ -1550,7 +1550,7 @@ do_path_up(path_t *path, int flags)
 	/* path moved to ACTIVE by rsm_sqcreateop_callback - just return */
 	if (path->state == RSMKA_PATH_ACTIVE) {
 		DBG_PRINTF((category, RSM_DEBUG_VERBOSE,
-			"do_path_up done: already ACTIVE\n"));
+		    "do_path_up done: already ACTIVE\n"));
 		PATH_RELE_NOLOCK(path);
 		return (B_TRUE);
 	}
@@ -2934,7 +2934,7 @@ rsmka_topology_ioctl(caddr_t arg, int cmd, int mode)
 		/* calculate the max size of the topology structure */
 		max_toposize = sizeof (rsmka_topology_hdr_t) +
 		    RSM_MAX_CTRL * (sizeof (caddr_t) +
-			sizeof (rsmka_connections_hdr_t)) +
+		    sizeof (rsmka_connections_hdr_t)) +
 		    RSM_MAX_NODE * sizeof (rsmka_remote_cntlr_t);
 
 		if (request_size > max_toposize) { /* validate request_size */
