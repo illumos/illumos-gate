@@ -277,4 +277,4 @@ link path=usr/proc/bin/ptime target=../../bin/ptime
 link path=usr/proc/bin/ptree target=../../bin/ptree
 link path=usr/proc/bin/pwait target=../../bin/pwait
 link path=usr/proc/bin/pwdx target=../../bin/pwdx
-depend fmri=runtime/perl-584 type=require
+depend fmri=runtime/perl-510 type=require

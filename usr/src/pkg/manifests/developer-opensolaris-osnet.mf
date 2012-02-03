@@ -50,7 +50,6 @@ depend fmri=print/cups@1.4.2-0.133 type=require
 depend fmri=print/filter/ghostscript@8.64-0.133 type=require
 depend fmri=runtime/perl-510/extra@5.10.0-0.133 type=require
 depend fmri=runtime/perl-510@5.10.0-0.133 type=require
-depend fmri=runtime/perl-584/extra@5.8.4-0.133 type=require
 depend fmri=system/header@0.5.11-0.133 type=require
 depend fmri=system/library/dbus@0.5.11-0.133 type=require
 depend fmri=system/library/install@0.5.11-0.133 type=require
