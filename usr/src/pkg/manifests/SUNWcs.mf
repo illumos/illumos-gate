@@ -1897,7 +1897,10 @@ link path=var/ld/64 target=$(ARCH64)
 # The bootadm binary needs the etc/release file.
 #
 depend fmri=release/name type=require
-depend fmri=runtime/perl-584 type=require
+#
+# intrd and others use the illumos-defaulted perl interpreter
+#
+depend fmri=runtime/perl-510 type=require
 #
 # The loadkeys binary needs the keytables.
 #

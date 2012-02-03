@@ -80,4 +80,4 @@ link path=usr/sbin/accept target=./print-service
 link path=usr/sbin/lpadmin target=./print-service
 link path=usr/sbin/lpmove target=./print-service
 link path=usr/sbin/reject target=./print-service
-depend fmri=runtime/perl-584 type=require
+depend fmri=runtime/perl-510 type=require
