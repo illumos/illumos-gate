@@ -25,6 +25,7 @@
 syntax: glob
 #exception_lists/cstyle
 #exception_lists/hdrchk
+usr/src/cmd/localedef/data/zh_CN.UTF-8.src
 usr/src/cmd/localedef/data/zh_HK.UTF-8.src
 usr/src/cmd/localedef/data/zh_MO.UTF-8.src
 usr/src/cmd/localedef/data/zh_SG.UTF-8.src

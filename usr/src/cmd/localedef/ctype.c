@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2010,2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2012 Garrett D'Amore <garrett@damore.org>  All rights reserved.
  */
 
 /*
@@ -302,7 +303,7 @@ dump_ctype(void)
 		 * optimization.  Note that if we have not defined the
 		 * upper/lower case, then we identity map it.
 		 */
-		if (wc < _CACHED_RUNES) {
+		if ((unsigned)wc < _CACHED_RUNES) {
 			rl.runetype[wc] = ctn->ctype;
 			rl.maplower[wc] = ctn->tolower ? ctn->tolower : wc;
 			rl.mapupper[wc] = ctn->toupper ? ctn->toupper : wc;
