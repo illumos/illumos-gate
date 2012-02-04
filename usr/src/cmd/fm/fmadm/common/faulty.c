@@ -100,7 +100,7 @@
  *
  * Description	: The number of errors associated with this memory module has
  *		exceeded acceptable levels.  Refer to
- *		http://sun.com/msg/AMD-8000-2F for more information.
+ *		http://illumos.org/msg/AMD-8000-2F for more information.
  *
  * Response	: Pages of memory associated with this memory module are being
  *		removed from service as errors are reported.
@@ -125,7 +125,8 @@
  * 5ca4aeb3-36...f6be-c2e8166dc484 2 suspects in this FRU total certainty 100%
  *
  * Description	: A problem was detected for a PCI device.
- *		Refer to http://sun.com/msg/PCI-8000-7J for more information.
+ *		Refer to http://illumos.org/msg/PCI-8000-7J
+ *		for more information.
  *
  * Response	: One or more device instances may be disabled
  *

@@ -318,7 +318,7 @@ static const fmd_prop_t fmd_props[] = {
 	{ "facility", FMD_TYPE_STRING, "LOG_DAEMON" },
 	{ "gmt", FMD_TYPE_BOOL, "false" },
 	{ "syslogd", FMD_TYPE_BOOL, "true" },
-	{ "url", FMD_TYPE_STRING, "http://sun.com/msg/" },
+	{ "url", FMD_TYPE_STRING, "http://illumos.org/msg/" },
 	{ "message_all", FMD_TYPE_BOOL, "false" },
 	{ NULL, 0, NULL }
 };
