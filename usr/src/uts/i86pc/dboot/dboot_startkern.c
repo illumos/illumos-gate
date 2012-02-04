@@ -1114,7 +1114,7 @@ build_page_tables(void)
 The grub entry should be changed to:\n\
 kernel$ /platform/i86pc/kernel/$ISADIR/unix\n\
 module$ /platform/i86pc/$ISADIR/boot_archive\n\
-See http://www.sun.com/msg/SUNOS-8000-AK for details.\n"
+See http://illumos.org/msg/SUNOS-8000-AK for details.\n"
 
 /*
  * startup_kernel has a pretty simple job. It builds pagetables which reflect

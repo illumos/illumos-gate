@@ -24,32 +24,32 @@
 #
 code TEST-8000-08 item 0 = <<Defect>>
 code TEST-8000-08 item 1 = <<Minor>>
-code TEST-8000-08 item 2 = <<This entry tests URL variable expansion - url = http://sun.com/msg/TEST-8000-08>>
+code TEST-8000-08 item 2 = <<This entry tests URL variable expansion - url = http://illumos.org/msg/TEST-8000-08>>
 code TEST-8000-08 item 3 = <<This entry tests the percent character escape sequence: %>>
 code TEST-8000-08 item 4 = <<This entry tests variable expansion for event payload members: uuid = %<uuid>, de scheme = %<de.scheme>>>
 code TEST-8000-08 item 5 = <<Variable expansion for arrays: index = %<test_arr[1].index>>>
-code TEST-8000-08 item 6 = <<http://sun.com/msg/TEST-8000-08>>
+code TEST-8000-08 item 6 = <<http://illumos.org/msg/TEST-8000-08>>
 SUNW-MSG-ID: TEST-8000-08, TYPE: Defect, VER: 1, SEVERITY: Minor
 PLATFORM: -, CSN: -, HOSTNAME: -
 SOURCE: -, REV: -
 EVENT-ID: -
-DESC: This entry tests URL variable expansion - url = http://sun.com/msg/TEST-8000-08
+DESC: This entry tests URL variable expansion - url = http://illumos.org/msg/TEST-8000-08
 AUTO-RESPONSE: This entry tests the percent character escape sequence: %
 IMPACT: This entry tests variable expansion for event payload members: uuid = %<uuid>, de scheme = %<de.scheme>
 REC-ACTION: Variable expansion for arrays: index = %<test_arr[1].index>
 
 code TEST-8000-08 item 0 = <<Defect>>
 code TEST-8000-08 item 1 = <<Minor>>
-code TEST-8000-08 item 2 = <<This entry tests URL variable expansion - url = http://sun.com/msg/TEST-8000-08>>
+code TEST-8000-08 item 2 = <<This entry tests URL variable expansion - url = http://illumos.org/msg/TEST-8000-08>>
 code TEST-8000-08 item 3 = <<This entry tests the percent character escape sequence: %>>
 code TEST-8000-08 item 4 = <<This entry tests variable expansion for event payload members: uuid = 12345678, de scheme = fmd>>
 code TEST-8000-08 item 5 = <<Variable expansion for arrays: index = 1>>
-code TEST-8000-08 item 6 = <<http://sun.com/msg/TEST-8000-08>>
+code TEST-8000-08 item 6 = <<http://illumos.org/msg/TEST-8000-08>>
 SUNW-MSG-ID: TEST-8000-08, TYPE: Defect, VER: 1, SEVERITY: Minor
 PLATFORM: product, CSN: product_sn, HOSTNAME: server
 SOURCE: fmd_msg_test, REV: 1.0
 EVENT-ID: 12345678
-DESC: This entry tests URL variable expansion - url = http://sun.com/msg/TEST-8000-08
+DESC: This entry tests URL variable expansion - url = http://illumos.org/msg/TEST-8000-08
 AUTO-RESPONSE: This entry tests the percent character escape sequence: %
 IMPACT: This entry tests variable expansion for event payload members: uuid = 12345678, de scheme = fmd
 REC-ACTION: Variable expansion for arrays: index = 1
@@ -65,32 +65,32 @@ REC-ACTION: Variable expansion for arrays: index = 1
 
 code TEST-8000-08 item 0 = <<Defect>>
 code TEST-8000-08 item 1 = <<Minor>>
-code TEST-8000-08 item 2 = <<This entry tests URL variable expansion - url = http://sun.com/msg/TEST-8000-08>>
+code TEST-8000-08 item 2 = <<This entry tests URL variable expansion - url = http://illumos.org/msg/TEST-8000-08>>
 code TEST-8000-08 item 3 = <<This entry tests the percent character escape sequence: %>>
 code TEST-8000-08 item 4 = <<This entry tests variable expansion for event payload members: uuid = %<uuid>, de scheme = %<de.scheme>>>
 code TEST-8000-08 item 5 = <<Variable expansion for arrays: index = %<test_arr[1].index>>>
-code TEST-8000-08 item 6 = <<http://sun.com/msg/TEST-8000-08>>
+code TEST-8000-08 item 6 = <<http://illumos.org/msg/TEST-8000-08>>
 SUNW-MSG-ID: TEST-8000-08, TYPE: Defect, VER: 1, SEVERITY: Minor
 PLATFORM: -, CSN: -, HOSTNAME: -
 SOURCE: -, REV: -
 EVENT-ID: -
-DESC: This entry tests URL variable expansion - url = http://sun.com/msg/TEST-8000-08
+DESC: This entry tests URL variable expansion - url = http://illumos.org/msg/TEST-8000-08
 AUTO-RESPONSE: This entry tests the percent character escape sequence: %
 IMPACT: This entry tests variable expansion for event payload members: uuid = %<uuid>, de scheme = %<de.scheme>
 REC-ACTION: Variable expansion for arrays: index = %<test_arr[1].index>
 
 code TEST-8000-08 item 0 = <<Defect>>
 code TEST-8000-08 item 1 = <<Minor>>
-code TEST-8000-08 item 2 = <<This entry tests URL variable expansion - url = http://sun.com/msg/TEST-8000-08>>
+code TEST-8000-08 item 2 = <<This entry tests URL variable expansion - url = http://illumos.org/msg/TEST-8000-08>>
 code TEST-8000-08 item 3 = <<This entry tests the percent character escape sequence: %>>
 code TEST-8000-08 item 4 = <<This entry tests variable expansion for event payload members: uuid = 12345678, de scheme = fmd>>
 code TEST-8000-08 item 5 = <<Variable expansion for arrays: index = 1>>
-code TEST-8000-08 item 6 = <<http://sun.com/msg/TEST-8000-08>>
+code TEST-8000-08 item 6 = <<http://illumos.org/msg/TEST-8000-08>>
 SUNW-MSG-ID: TEST-8000-08, TYPE: Defect, VER: 1, SEVERITY: Minor
 PLATFORM: product, CSN: product_sn, HOSTNAME: server
 SOURCE: fmd_msg_test, REV: 1.0
 EVENT-ID: 12345678
-DESC: This entry tests URL variable expansion - url = http://sun.com/msg/TEST-8000-08
+DESC: This entry tests URL variable expansion - url = http://illumos.org/msg/TEST-8000-08
 AUTO-RESPONSE: This entry tests the percent character escape sequence: %
 IMPACT: This entry tests variable expansion for event payload members: uuid = 12345678, de scheme = fmd
 REC-ACTION: Variable expansion for arrays: index = 1

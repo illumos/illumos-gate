@@ -1,5 +1,6 @@
 '\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
@@ -16,7 +17,7 @@ fmadm \- fault management configuration tool
 .sp
 .LP
 The \fBfmadm\fR utility can be used by administrators and service personnel to
-view and modify system configuration parameters maintained by the Solaris Fault
+view and modify system configuration parameters maintained by the Fault
 Manager, \fBfmd\fR(1M). \fBfmd\fR receives telemetry information relating to
 problems detected by the system software, diagnoses these problems, and
 initiates proactive self-healing activities such as disabling faulty
@@ -47,18 +48,17 @@ perform administrative tasks related to these entities.
 .LP
 The Fault Manager attempts to automate as many activities as possible, so use
 of \fBfmadm\fR is typically not required. When the Fault Manager needs help
-from a human administrator, service repair technician, or Sun, it produces a
-message indicating its needs. It also refers you to a knowledge article on
-Sun's web site, http://www.sun.com/msg/. The web site might ask you to use
-\fBfmadm\fR or one of the other fault management utilities to gather more
-information or perform additional tasks. The documentation for \fBfmd\fR(1M),
-\fBfmdump\fR(1M), and \fBfmstat\fR(1M) describe more about tools to observe
-fault management activities.
+from a human administrator, it produces a message indicating its needs. It also
+refers you to a knowledge article on http://illumos.org/msg/. This web site
+might ask you to use \fBfmadm\fR or one of the other fault management utilities
+to gather more information or perform additional tasks. The documentation for
+\fBfmd\fR(1M), \fBfmdump\fR(1M), and \fBfmstat\fR(1M) describe more about tools
+to observe fault management activities.
 .sp
 .LP
 The \fBfmadm\fR utility requires the user to possess the \fBSYS_CONFIG\fR
 privilege. Refer to the \fI\fR for more information about how to configure
-Solaris privileges. The \fBfmadm\fR \fBload\fR subcommand requires that the
+privileges. The \fBfmadm\fR \fBload\fR subcommand requires that the
 user possess all privileges.
 .SS "SUBCOMMANDS"
 .sp
@@ -75,7 +75,7 @@ or require additional options and operands:
 Notify the Fault Manager that the specified resource is not to be considered to
 be a suspect in the fault event identified by \fIuuid\fR, or if no UUID is
 specified, then in any fault or faults that have been detected. The \fBfmadm
-acquit\fR subcommand should be used only at the direction of a documented Sun
+acquit\fR subcommand should be used only at the direction of a documented
 repair procedure. Administrators might need to apply additional commands to
 re-enable a previously faulted resource.
 .RE
@@ -89,7 +89,7 @@ re-enable a previously faulted resource.
 .RS 4n
 Notify the Fault Manager that the fault event identified by \fIuuid\fR can be
 safely ignored. The \fBfmadm acquit\fR subcommand should be used only at the
-direction of a documented Sun repair procedure. Administrators might need to
+direction of a documented repair procedure. Administrators might need to
 apply additional commands to re-enable any previously faulted resources.
 .RE
 
@@ -285,7 +285,7 @@ affected resource.
 .RS 4n
 Flush the information cached by the Fault Manager for the specified resource,
 named by its FMRI. This subcommand should only be used when indicated by a
-documented Sun repair procedure. Typically, the use of this command is not
+documented repair procedure. Typically, the use of this command is not
 necessary as the Fault Manager keeps its cache up-to-date automatically. If a
 faulty resource is flushed from the cache, administrators might need to apply
 additional commands to enable the specified resource.
@@ -301,7 +301,8 @@ additional commands to enable the specified resource.
 Load the specified Fault Manager module. \fIpath\fR must be an absolute path
 and must refer to a module present in one of the defined directories for
 modules. Typically, the use of this command is not necessary as the Fault
-Manager loads modules automatically when Solaris initially boots or as needed.
+Manager loads modules automatically when the operating system initially boots
+or as needed.
 .RE
 
 .sp
@@ -326,7 +327,7 @@ automatically based on the system configuration
 .RS 4n
 Notify the Fault Manager that a repair procedure has been carried out on the
 specified resource. The \fBfmadm repaired\fR subcommand should be used only at
-the direction of a documented Sun repair procedure. Administrators might need
+the direction of a documented repair procedure. Administrators might need
 to apply additional commands to re-enable a previously faulted resource.
 .RE
 
@@ -340,7 +341,7 @@ to apply additional commands to re-enable a previously faulted resource.
 Notify the Fault Manager that the specified resource has been replaced. This
 command should be used in those cases where the Fault Manager is unable to
 automatically detect the replacement. The \fBfmadm replaced\fR subcommand
-should be used only at the direction of a documented Sun repair procedure.
+should be used only at the direction of a documented repair procedure.
 Administrators might need to apply additional commands to re-enable a
 previously faulted resource.
 .RE
@@ -357,7 +358,7 @@ Reset the specified Fault Manager module or module subcomponent. If the
 engine is reset within the module. If the \fB-s\fR option is not present, the
 entire module is reset and all persistent state associated with the module is
 deleted. The \fBfmadm reset\fR subcommand should only be used at the direction
-of a documented Sun repair procedure. The use of this command is typically not
+of a documented repair procedure. The use of this command is typically not
 necessary as the Fault Manager manages its modules automatically.
 .RE
 
@@ -482,4 +483,4 @@ not-an-interface.
 \fI\fR
 .sp
 .LP
-http://www.sun.com/msg/
+http://illumos.org/msg/

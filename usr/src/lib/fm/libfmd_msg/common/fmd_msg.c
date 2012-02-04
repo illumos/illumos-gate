@@ -67,7 +67,7 @@
  * permitted to contain variable expansions, currently defined as follows:
  *
  * %%     - literal % character
- * %s     - knowledge article URL (e.g. http://sun.com/msg/<MSG-ID>)
+ * %s     - knowledge article URL (e.g. http://illumos.org/msg/<MSG-ID>)
  * %< x > - value x from the current event, using the expression syntax below:
  *
  * foo.bar  => print nvlist_t member "bar" contained within nvlist_t "foo"
@@ -145,7 +145,7 @@ static pthread_rwlock_t fmd_msg_rwlock = PTHREAD_RWLOCK_INITIALIZER;
 static const char FMD_MSG_DOMAIN[] = "FMD";
 static const char FMD_MSG_TEMPLATE[] = "syslog-msgs-message-template";
 static const char FMD_MSG_URLKEY[] = "syslog-url";
-static const char FMD_MSG_URLBASE[] = "http://sun.com/msg/";
+static const char FMD_MSG_URLBASE[] = "http://illumos.org/msg/";
 static const char FMD_MSG_NLSPATH[] = "NLSPATH=/usr/lib/fm/fmd/fmd.cat";
 static const char FMD_MSG_MISSING[] = "-";
 

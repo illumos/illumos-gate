@@ -1,5 +1,6 @@
 '\" te
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
@@ -17,8 +18,8 @@ fmdump \- fault management log viewer
 .sp
 .LP
 The \fBfmdump\fR utility can be used to display the contents of any of the log
-files associated with the Solaris Fault Manager, \fBfmd\fR(1M). The Fault
-Manager runs in the background on each Solaris system. It receives telemetry
+files associated with the Fault Manager, \fBfmd\fR(1M). The Fault
+Manager runs in the background on each system. It receives telemetry
 information relating to problems detected by the system software, diagnoses
 these problems, and initiates proactive self-healing activities such as
 disabling faulty components.
@@ -88,15 +89,14 @@ particular problem across any set of systems
 .ie t \(bu
 .el o
 A message identifier that can be used to access a corresponding knowledge
-article located at Sun's web site, http://www.sun.com/msg/
+article located on http://illumos.org/msg/
 .RE
 .sp
 .LP
 If a problem requires action by a human administrator or service technician or
 affects system behavior, the Fault Manager also issues a human-readable message
 to \fBsyslogd\fR(1M). This message provides a summary of the problem and a
-reference to the knowledge article on the Sun web site,
-http://www.sun.com/msg/.
+reference to the knowledge article on http://illumos.org/msg/.
 .sp
 .LP
 You can use the \fB-v\fR and \fB-V\fR options to expand the display from a
@@ -136,9 +136,7 @@ The following options are supported:
 .RS 4n
 Select events that match the specified class. The class argument can use the
 glob pattern matching syntax described in \fBsh\fR(1). The class represents a
-hierarchical classification string indicating the type of telemetry event. More
-information about Sun's telemetry protocol is available at Sun's web site,
-http://www.sun.com/msg/.
+hierarchical classification string indicating the type of telemetry event.
 .RE
 
 .sp
@@ -151,11 +149,10 @@ http://www.sun.com/msg/.
 Display events from the fault management error log instead of the fault log.
 This option is shorthand for specifying the pathname of the error log file.
 .sp
-The error log file contains Private telemetry information used by Sun's
-automated diagnosis software. This information is recorded to facilitate
-post-mortem analysis of problems and event replay, and should not be parsed or
-relied upon for the development of scripts and other tools. See
-\fBattributes\fR(5) for information about Sun's rules for Private interfaces.
+The error log file contains Private telemetry information. This information is
+recorded to facilitate post-mortem analysis of problems and event replay, and
+should not be parsed or relied upon for the development of scripts or other
+tools.
 .RE
 
 .sp
@@ -651,7 +648,7 @@ Private. The human-readable fault log output is Evolving.
 \fI\fR
 .sp
 .LP
-http://www.sun.com/msg/
+http://illumos.org/msg/
 .SH NOTES
 .sp
 .LP

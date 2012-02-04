@@ -37,7 +37,7 @@
 #include <fmd_rpc_adm.h>
 
 static const uint_t _fmd_adm_bufsize = 128 * 1024;
-static const char _url_fallback[] = "http://sun.com/msg/";
+static const char _url_fallback[] = "http://illumos.org/msg/";
 
 fmd_adm_t *
 fmd_adm_open(const char *host, uint32_t prog, int version)

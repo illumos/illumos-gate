@@ -193,7 +193,7 @@ static scf_value_t *g_val;
 static scf_iter_t *g_iter, *g_viter;
 static char *g_fmri, *g_value;
 static size_t g_fmri_sz, g_value_sz;
-static const char *g_msgbase = "http://sun.com/msg/";
+static const char *g_msgbase = "http://illumos.org/msg/";
 
 static char *emsg_nomem;
 static char *emsg_invalid_dep;

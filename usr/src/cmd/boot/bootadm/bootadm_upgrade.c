@@ -237,8 +237,8 @@ is_bfu_system(const char *root)
 }
 
 #define	MENU_URL(root)	(is_bfu_system(root) ?		\
-	"http://www.sun.com/msg/SUNOS-8000-CF" :	\
-	"http://www.sun.com/msg/SUNOS-8000-AK")
+	"http://illumos.org/msg/SUNOS-8000-CF" :	\
+	"http://illumos.org/msg/SUNOS-8000-AK")
 
 /*
  * Simply allocate a new line and copy in cmd + sep + arg

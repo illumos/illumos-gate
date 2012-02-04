@@ -1,5 +1,6 @@
 '\" te
 .\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
@@ -15,15 +16,14 @@ fmd \- fault manager daemon
 .SH DESCRIPTION
 .sp
 .LP
-\fBfmd\fR is a daemon that runs in the background on each Solaris system.
+\fBfmd\fR is a daemon that runs in the background on each system.
 \fBfmd\fR receives telemetry information relating to problems detected by the
 system software, diagnoses these problems, and initiates proactive self-healing
 activities such as disabling faulty components. When appropriate, the fault
 manager also sends a message to the \fBsyslogd\fR(1M) service to notify an
 administrator that a problem has been detected. The message directs
-administrators to a knowledge article on Sun's web site,
-http://www.sun.com/msg/, which explains more about the problem impact and
-appropriate responses.
+administrators to a knowledge article on http://illumos.org/msg/, which
+explains more about the problem impact and appropriate responses.
 .sp
 .LP
 Each problem diagnosed by the fault manager is assigned a Universal Unique
@@ -33,10 +33,8 @@ view the list of problems diagnosed by the fault manager, along with their
 \fBUUID\fRs and knowledge article message identifiers. The \fBfmadm\fR(1M)
 utility can be used to view the resources on the system believed to be faulty.
 The \fBfmstat\fR(1M) utility can be used to report statistics kept by the fault
-manager. The fault manager is started automatically when Solaris boots, so it
-is not necessary to use the \fBfmd\fR command directly. Sun's web site explains
-more about what capabilities are currently available for the fault manager on
-Solaris.
+manager. The fault manager is started automatically when the operating system
+boots, so it is not necessary to use the \fBfmd\fR command directly.
 .SH OPTIONS
 .sp
 .LP
@@ -164,7 +162,7 @@ Interface Stability	Evolving
 \fBsyslogd\fR(1M), \fBattributes\fR(5), \fBsmf\fR(5)
 .sp
 .LP
-http://www.sun.com/msg/
+http://illumos.org/msg/
 .SH NOTES
 .sp
 .LP
