@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -148,6 +149,13 @@ smb_iod_work(smb_ctx_t *ctx)
 				goto out;
 			}
 			vcst = work->wk_out_state;
+			/*
+			 * Go ahead and close the transport now,
+			 * rather than wait until reconnect to
+			 * this server.
+			 */
+			close(ctx->ct_tran_fd);
+			ctx->ct_tran_fd = -1;
 			continue;
 
 		case SMBIOD_ST_DEAD:
