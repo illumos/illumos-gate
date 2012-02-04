@@ -31,10 +31,11 @@
  *
  * $Id: smb_trantcp.h,v 1.8 2004/08/03 23:50:01 lindak Exp $
  */
+/*
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ */
 #ifndef _NETSMB_SMB_TRANTCP_H_
 #define	_NETSMB_SMB_TRANTCP_H_
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 enum nbstate {
 	NBST_CLOSED,
@@ -51,24 +52,27 @@ enum nbstate {
 struct nbpcb {
 	struct smb_vc	*nbp_vc;
 	struct tiuser	*nbp_tiptr;	/* KTLI transport handle... */
-	ushort_t	nbp_fmode;
 	mblk_t		*nbp_frag;	/* left-over from last recv */
 
 	struct sockaddr_nb *nbp_laddr;	/* local address */
 	struct sockaddr_nb *nbp_paddr;	/* peer address */
+	void		*nbp_selectid;
+	cred_t		*nbp_cred;
 
 	int		nbp_flags;
 #define	NBF_LOCADDR	0x0001		/* has local addr */
 #define	NBF_CONNECTED	0x0002
 #define	NBF_RECVLOCK	0x0004
-#define	NBF_UPCALLED	0x0010
+#define	NBF_SENDLOCK	0x0008
+#define	NBF_LOCKWAIT	0x0010
 
+	ushort_t	nbp_fmode;
 	enum nbstate	nbp_state;
 	struct timespec	nbp_timo;
 	int		nbp_sndbuf;
 	int		nbp_rcvbuf;
-	void		*nbp_selectid;
 	kmutex_t	nbp_lock;
+	kcondvar_t	nbp_cv;
 };
 typedef struct nbpcb nbpcb_t;
 

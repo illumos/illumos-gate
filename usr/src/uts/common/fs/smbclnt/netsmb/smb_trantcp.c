@@ -32,6 +32,7 @@
  * $Id: smb_trantcp.c,v 1.39 2005/03/02 01:27:44 lindak Exp $
  */
 /*
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -79,8 +80,6 @@
 static int smb_tcpsndbuf = 0x20000;
 static int smb_tcprcvbuf = 0x20000;
 
-static int  nbssn_recv(struct nbpcb *nbp, mblk_t **mpp, int *lenp,
-	uint8_t *rpcodep);
 static int  nb_disconnect(struct nbpcb *nbp);
 
 
@@ -99,6 +98,10 @@ nb_getmsg_mlen(struct nbpcb *nbp, mblk_t **mpp, size_t mlen)
 	size_t dlen;
 	int events, fmode, timo, waitflg;
 	int error = 0;
+
+	/* We should be the only reader. */
+	ASSERT(nbp->nbp_flags & NBF_RECVLOCK);
+	/* nbp->nbp_tiptr checked by caller */
 
 	/*
 	 * Get the first message (fragment) if
@@ -224,14 +227,19 @@ discon:
  * Send a T_DISCON_REQ (disconnect)
  */
 static int
-nb_snddis(TIUSER *tiptr)
+nb_snddis(struct nbpcb *nbp)
 {
-	cred_t *cr;
+	TIUSER *tiptr = nbp->nbp_tiptr;
+	cred_t *cr = nbp->nbp_cred;
 	mblk_t *mp;
 	struct T_discon_req *dreq;
-	int error, fmode, mlen;
+	int error, mlen;
 
-	cr = ddi_get_cred();
+	ASSERT(MUTEX_HELD(&nbp->nbp_lock));
+
+	if (tiptr == NULL)
+		return (EBADF);
+
 	mlen = sizeof (struct T_discon_req);
 	if (!(mp = allocb_cred_wait(mlen, STR_NOSIG, &error, cr, NOPID)))
 		return (error);
@@ -243,12 +251,12 @@ nb_snddis(TIUSER *tiptr)
 	dreq->SEQ_number = -1;
 	mp->b_wptr += sizeof (struct T_discon_req);
 
-	fmode = tiptr->fp->f_flag;
-	if ((error = tli_send(tiptr, mp, fmode)) != 0)
-		return (error);
-
-	fmode = 0; /* need to block */
-	error = get_ok_ack(tiptr, T_DISCON_REQ, fmode);
+	error = tli_send(tiptr, mp, tiptr->fp->f_flag);
+	/*
+	 * There is an OK/ACK response expected, which is
+	 * either handled by our receiver thread, or just
+	 * discarded if we're closing this endpoint.
+	 */
 
 	return (error);
 }
@@ -335,13 +343,13 @@ nbssn_peekhdr(struct nbpcb *nbp, size_t *lenp,	uint8_t *rpcodep)
  * zero-length message, return EAGAIN so the caller knows that
  * something was received.  This avoids false triggering of the
  * "server not responding" state machine.
+ *
+ * Calls to this are serialized at a higher level.
  */
-/*ARGSUSED*/
 static int
 nbssn_recv(struct nbpcb *nbp, mblk_t **mpp, int *lenp,
     uint8_t *rpcodep)
 {
-	TIUSER *tiptr = nbp->nbp_tiptr;
 	mblk_t *m0;
 	uint8_t rpcode;
 	int error;
@@ -349,10 +357,8 @@ nbssn_recv(struct nbpcb *nbp, mblk_t **mpp, int *lenp,
 
 	/* We should be the only reader. */
 	ASSERT(nbp->nbp_flags & NBF_RECVLOCK);
-	if ((nbp->nbp_flags & NBF_CONNECTED) == 0)
-		return (ENOTCONN);
 
-	if (tiptr == NULL)
+	if (nbp->nbp_tiptr == NULL)
 		return (EBADF);
 	if (mpp) {
 		if (*mpp) {
@@ -475,6 +481,9 @@ out:
 
 /*
  * SMB transport interface
+ *
+ * This is called only by the thread creating this endpoint,
+ * so we're single-threaded here.
  */
 /*ARGSUSED*/
 static int
@@ -489,13 +498,20 @@ smb_nbst_create(struct smb_vc *vcp, cred_t *cr)
 	nbp->nbp_vc = vcp;
 	nbp->nbp_sndbuf = smb_tcpsndbuf;
 	nbp->nbp_rcvbuf = smb_tcprcvbuf;
+	nbp->nbp_cred = cr;
+	crhold(cr);
 	mutex_init(&nbp->nbp_lock, NULL, MUTEX_DRIVER, NULL);
 	vcp->vc_tdata = nbp;
 
 	return (0);
 }
 
-/*ARGSUSED*/
+/*
+ * destroy a transport endpoint
+ *
+ * This is called only by the thread with the last reference
+ * to this endpoint, so we're single-threaded here.
+ */
 static int
 smb_nbst_done(struct smb_vc *vcp)
 {
@@ -518,42 +534,96 @@ smb_nbst_done(struct smb_vc *vcp)
 		smb_free_sockaddr((struct sockaddr *)nbp->nbp_laddr);
 	if (nbp->nbp_paddr)
 		smb_free_sockaddr((struct sockaddr *)nbp->nbp_paddr);
+	if (nbp->nbp_cred)
+		crfree(nbp->nbp_cred);
 	mutex_destroy(&nbp->nbp_lock);
 	kmem_free(nbp, sizeof (*nbp));
 	return (0);
+}
+
+/*
+ * Loan a transport file pointer (from user space) to this
+ * IOD endpoint.  There should be no other thread using this
+ * endpoint when we do this, but lock for consistency.
+ */
+static int
+nb_loan_fp(struct nbpcb *nbp, struct file *fp, cred_t *cr)
+{
+	TIUSER *tiptr;
+	int err;
+
+	err = t_kopen(fp, 0, 0, &tiptr, cr);
+	if (err != 0)
+		return (err);
+
+	mutex_enter(&nbp->nbp_lock);
+
+	nbp->nbp_tiptr = tiptr;
+	nbp->nbp_fmode = tiptr->fp->f_flag;
+	nbp->nbp_flags |= NBF_CONNECTED;
+	nbp->nbp_state = NBST_SESSION;
+
+	mutex_exit(&nbp->nbp_lock);
+
+	return (0);
+}
+
+/*
+ * Take back the transport file pointer we previously loaned.
+ * It's possible there may be another thread in here, so let
+ * others get out of the way before we pull the rug out.
+ *
+ * Some notes about the locking here:  The higher-level IOD code
+ * serializes activity such that at most one reader and writer
+ * thread can be active in this code (and possibly both).
+ * Keeping nbp_lock held during the activities of these two
+ * threads would lead to the possibility of nbp_lock being
+ * held by a blocked thread, so this instead sets one of the
+ * flags (NBF_SENDLOCK | NBF_RECVLOCK) when a sender or a
+ * receiver is active (respectively).  Lastly, tear-down is
+ * the only tricky bit (here) where we must wait for any of
+ * these activities to get out of current calls so they will
+ * notice that we've turned off the NBF_CONNECTED flag.
+ */
+static void
+nb_unloan_fp(struct nbpcb *nbp)
+{
+
+	mutex_enter(&nbp->nbp_lock);
+
+	nbp->nbp_flags &= ~NBF_CONNECTED;
+	while (nbp->nbp_flags & (NBF_SENDLOCK | NBF_RECVLOCK)) {
+		nbp->nbp_flags |= NBF_LOCKWAIT;
+		cv_wait(&nbp->nbp_cv, &nbp->nbp_lock);
+	}
+
+	if (nbp->nbp_tiptr != NULL) {
+		(void) t_kclose(nbp->nbp_tiptr, 0);
+		nbp->nbp_tiptr = NULL;
+	}
+	nbp->nbp_state = NBST_CLOSED;
+
+	mutex_exit(&nbp->nbp_lock);
 }
 
 static int
 smb_nbst_loan_fp(struct smb_vc *vcp, struct file *fp, cred_t *cr)
 {
 	struct nbpcb *nbp = vcp->vc_tdata;
-	TIUSER *tiptr;
 	int error = 0;
-
-	mutex_enter(&nbp->nbp_lock);
 
 	/*
 	 * Un-loan the existing one, if any.
 	 */
-	if (nbp->nbp_tiptr != NULL) {
-		(void) t_kclose(nbp->nbp_tiptr, 0);
-		nbp->nbp_tiptr = NULL;
-		nbp->nbp_flags &= ~NBF_CONNECTED;
-		nbp->nbp_state = NBST_CLOSED;
-	}
+	(void) nb_disconnect(nbp);
+	nb_unloan_fp(nbp);
 
 	/*
 	 * Loan the new one passed in.
 	 */
-	if (fp != NULL && 0 == (error =
-	    t_kopen(fp, 0, 0, &tiptr, cr))) {
-		nbp->nbp_tiptr = tiptr;
-		nbp->nbp_fmode = tiptr->fp->f_flag;
-		nbp->nbp_flags |= NBF_CONNECTED;
-		nbp->nbp_state = NBST_SESSION;
+	if (fp != NULL) {
+		error = nb_loan_fp(nbp, fp, cr);
 	}
-
-	mutex_exit(&nbp->nbp_lock);
 
 	return (error);
 }
@@ -587,47 +657,41 @@ smb_nbst_disconnect(struct smb_vc *vcp)
 static int
 nb_disconnect(struct nbpcb *nbp)
 {
-	TIUSER *tiptr;
-	int save_flags;
 	int err = 0;
 
-	tiptr = nbp->nbp_tiptr;
-	if (tiptr == NULL)
-		return (EBADF);
-
 	mutex_enter(&nbp->nbp_lock);
-	save_flags = nbp->nbp_flags;
-	nbp->nbp_flags &= ~NBF_CONNECTED;
-	if (nbp->nbp_frag) {
-		freemsg(nbp->nbp_frag);
-		nbp->nbp_frag = NULL;
+
+	if ((nbp->nbp_flags & NBF_CONNECTED) != 0) {
+		nbp->nbp_flags &= ~NBF_CONNECTED;
+
+		if (nbp->nbp_frag != NULL) {
+			freemsg(nbp->nbp_frag);
+			nbp->nbp_frag = NULL;
+		}
+
+		err = nb_snddis(nbp);
 	}
+
 	mutex_exit(&nbp->nbp_lock);
-
-	if (save_flags & NBF_CONNECTED)
-		err = nb_snddis(tiptr);
-
-	if (nbp->nbp_state != NBST_RETARGET) {
-		nbp->nbp_state = NBST_CLOSED;
-	}
-
 	return (err);
 }
 
 /*
- * Always consume the message.
- * (On error too!)
+ * Add the NetBIOS session header and send.
+ *
+ * Calls to this are serialized at a higher level.
  */
-/*ARGSUSED*/
 static int
-smb_nbst_send(struct smb_vc *vcp, mblk_t *m)
+nbssn_send(struct nbpcb *nbp, mblk_t *m)
 {
-	struct nbpcb *nbp = vcp->vc_tdata;
 	ptrdiff_t diff;
 	uint32_t mlen;
 	int error;
 
-	if (nbp == NULL || nbp->nbp_tiptr == NULL) {
+	/* We should be the only sender. */
+	ASSERT(nbp->nbp_flags & NBF_SENDLOCK);
+
+	if (nbp->nbp_tiptr == NULL) {
 		error = EBADF;
 		goto errout;
 	}
@@ -669,7 +733,7 @@ smb_nbst_send(struct smb_vc *vcp, mblk_t *m)
 
 		/* M_PREPEND */
 		m0 = allocb_wait(4, BPRI_LO, STR_NOSIG, &error);
-		if (!m0)
+		if (m0 == NULL)
 			goto errout;
 
 		m0->b_wptr += 4;
@@ -682,9 +746,48 @@ smb_nbst_send(struct smb_vc *vcp, mblk_t *m)
 	return (error);
 
 errout:
-	if (m)
+	if (m != NULL)
 		m_freem(m);
 	return (error);
+}
+
+/*
+ * Always consume the message.
+ * (On error too!)
+ */
+static int
+smb_nbst_send(struct smb_vc *vcp, mblk_t *m)
+{
+	struct nbpcb *nbp = vcp->vc_tdata;
+	int err;
+
+	mutex_enter(&nbp->nbp_lock);
+	if ((nbp->nbp_flags & NBF_CONNECTED) == 0) {
+		err = ENOTCONN;
+		goto out;
+	}
+	if (nbp->nbp_flags & NBF_SENDLOCK) {
+		NBDEBUG("multiple smb_nbst_send!\n");
+		err = EWOULDBLOCK;
+		goto out;
+	}
+	nbp->nbp_flags |= NBF_SENDLOCK;
+	mutex_exit(&nbp->nbp_lock);
+
+	err = nbssn_send(nbp, m);
+	m = NULL; /* nbssn_send always consumes this */
+
+	mutex_enter(&nbp->nbp_lock);
+	nbp->nbp_flags &= ~NBF_SENDLOCK;
+	if (nbp->nbp_flags & NBF_LOCKWAIT) {
+		nbp->nbp_flags &= ~NBF_LOCKWAIT;
+		cv_broadcast(&nbp->nbp_cv);
+	}
+out:
+	mutex_exit(&nbp->nbp_lock);
+	if (m != NULL)
+		m_freem(m);
+	return (err);
 }
 
 static int
@@ -692,21 +795,32 @@ smb_nbst_recv(struct smb_vc *vcp, mblk_t **mpp)
 {
 	struct nbpcb *nbp = vcp->vc_tdata;
 	uint8_t rpcode;
-	int error, rplen;
+	int err, rplen;
 
 	mutex_enter(&nbp->nbp_lock);
+	if ((nbp->nbp_flags & NBF_CONNECTED) == 0) {
+		err = ENOTCONN;
+		goto out;
+	}
 	if (nbp->nbp_flags & NBF_RECVLOCK) {
-		NBDEBUG("attempt to reenter session layer!\n");
-		mutex_exit(&nbp->nbp_lock);
-		return (EWOULDBLOCK);
+		NBDEBUG("multiple smb_nbst_recv!\n");
+		err = EWOULDBLOCK;
+		goto out;
 	}
 	nbp->nbp_flags |= NBF_RECVLOCK;
 	mutex_exit(&nbp->nbp_lock);
-	error = nbssn_recv(nbp, mpp, &rplen, &rpcode);
+
+	err = nbssn_recv(nbp, mpp, &rplen, &rpcode);
+
 	mutex_enter(&nbp->nbp_lock);
 	nbp->nbp_flags &= ~NBF_RECVLOCK;
+	if (nbp->nbp_flags & NBF_LOCKWAIT) {
+		nbp->nbp_flags &= ~NBF_LOCKWAIT;
+		cv_broadcast(&nbp->nbp_cv);
+	}
+out:
 	mutex_exit(&nbp->nbp_lock);
-	return (error);
+	return (err);
 }
 
 /*
@@ -718,16 +832,7 @@ smb_nbst_recv(struct smb_vc *vcp, mblk_t **mpp)
 static int
 smb_nbst_poll(struct smb_vc *vcp, int ticks)
 {
-	int error;
-	int events = 0;
-	int waitflg = READWAIT;
-	struct nbpcb *nbp = vcp->vc_tdata;
-
-	error = t_kspoll(nbp->nbp_tiptr, ticks, waitflg, &events);
-	if (!error && !events)
-		error = ETIME;
-
-	return (error);
+	return (ENOTSUP);
 }
 
 static int
