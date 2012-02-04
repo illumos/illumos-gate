@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2012 Garrett D'Amore <garrett@damore.org>  All rights reserved.
  */
 
 /*
@@ -22,26 +23,27 @@
 #include <stdlib.h>
 #include <wchar.h>
 #include <string.h>
+#include <note.h>
 #include <sys/types.h>
 #include "localedef.h"
 
-static int towide_none(wchar_t *, const char *, int);
-static int towide_utf8(wchar_t *, const char *, int);
-static int towide_big5(wchar_t *, const char *, int);
-static int towide_gbk(wchar_t *, const char *, int);
-static int towide_gb2312(wchar_t *, const char *, int);
-static int towide_gb18030(wchar_t *, const char *, int);
-static int towide_mskanji(wchar_t *, const char *, int);
-static int towide_euccn(wchar_t *, const char *, int);
-static int towide_eucjp(wchar_t *, const char *, int);
-static int towide_euckr(wchar_t *, const char *, int);
-static int towide_euctw(wchar_t *, const char *, int);
+static int towide_none(wchar_t *, const char *, unsigned);
+static int towide_utf8(wchar_t *, const char *, unsigned);
+static int towide_big5(wchar_t *, const char *, unsigned);
+static int towide_gbk(wchar_t *, const char *, unsigned);
+static int towide_gb2312(wchar_t *, const char *, unsigned);
+static int towide_gb18030(wchar_t *, const char *, unsigned);
+static int towide_mskanji(wchar_t *, const char *, unsigned);
+static int towide_euccn(wchar_t *, const char *, unsigned);
+static int towide_eucjp(wchar_t *, const char *, unsigned);
+static int towide_euckr(wchar_t *, const char *, unsigned);
+static int towide_euctw(wchar_t *, const char *, unsigned);
 
 static int tomb_none(char *, wchar_t);
 static int tomb_utf8(char *, wchar_t);
 static int tomb_mbs(char *, wchar_t);
 
-static int (*_towide)(wchar_t *, const char *, int) = towide_none;
+static int (*_towide)(wchar_t *, const char *, unsigned) = towide_none;
 static int (*_tomb)(char *, wchar_t) = tomb_none;
 static const char *_encoding = "NONE";
 static int _nbits = 7;
@@ -56,7 +58,7 @@ static struct {
 	const char *cname;
 	/* the maximum number of bits required for priorities */
 	int nbits;
-	int (*towide)(wchar_t *, const char *, int);
+	int (*towide)(wchar_t *, const char *, unsigned);
 	int (*tomb)(char *, wchar_t);
 } mb_encodings[] = {
 	/*
@@ -160,14 +162,12 @@ werr(const char *fmt, ...)
  * This is used for 8-bit encodings.
  */
 int
-towide_none(wchar_t *c, const char *mb, int n)
+towide_none(wchar_t *c, const char *mb, unsigned n)
 {
+	_NOTE(ARGUNUSED(n));
+
 	if (mb_cur_max != 1) {
 		werr("invalid or unsupported multibyte locale");
-		return (-1);
-	}
-	if (n < 1) {
-		werr("no character data");
 		return (-1);
 	}
 	*c = (uint8_t)*mb;
@@ -190,7 +190,7 @@ tomb_none(char *mb, wchar_t wc)
  * UTF-8 stores wide characters in UTF-32 form.
  */
 int
-towide_utf8(wchar_t *wc, const char *mb, int n)
+towide_utf8(wchar_t *wc, const char *mb, unsigned n)
 {
 	wchar_t	c;
 	int	nb;
@@ -198,10 +198,6 @@ towide_utf8(wchar_t *wc, const char *mb, int n)
 	int	i;
 	const uint8_t *s = (const uint8_t *)mb;
 
-	if (n < 1) {
-		werr("no utf8 data");
-		return (-1);
-	}
 	c = *s;
 
 	if ((c & 0x80) == 0) {
@@ -298,16 +294,12 @@ tomb_utf8(char *mb, wchar_t wc)
  * 0x8000 - 0xffff	- 2 byte encoding
  */
 static int
-towide_dbcs(wchar_t *wc, const char *mb, int n)
+towide_dbcs(wchar_t *wc, const char *mb, unsigned n)
 {
 	wchar_t	c;
 
 	c = *(uint8_t *)mb;
 
-	if (n < 1) {
-		werr("no character data");
-		return (-1);
-	}
 	if ((c & 0x80) == 0) {
 		/* 7-bit */
 		*wc = c;
@@ -361,7 +353,7 @@ tomb_mbs(char *mb, wchar_t wc)
  * big5 is a simple dual byte character set.
  */
 int
-towide_big5(wchar_t *wc, const char *mb, int n)
+towide_big5(wchar_t *wc, const char *mb, unsigned n)
 {
 	return (towide_dbcs(wc, mb, n));
 }
@@ -371,7 +363,7 @@ towide_big5(wchar_t *wc, const char *mb, int n)
  * bit of the first byte indicates a double byte character.
  */
 int
-towide_gbk(wchar_t *wc, const char *mb, int n)
+towide_gbk(wchar_t *wc, const char *mb, unsigned n)
 {
 	return (towide_dbcs(wc, mb, n));
 }
@@ -381,7 +373,7 @@ towide_gbk(wchar_t *wc, const char *mb, int n)
  * byte does not encode ASCII, but it supports characters.
  */
 int
-towide_gb2312(wchar_t *wc, const char *mb, int n)
+towide_gb2312(wchar_t *wc, const char *mb, unsigned n)
 {
 	return (towide_dbcs(wc, mb, n));
 }
@@ -392,16 +384,12 @@ towide_gb2312(wchar_t *wc, const char *mb, int n)
  * the second byte encodes 0x30-39 and all other sequences are 2 bytes.
  */
 int
-towide_gb18030(wchar_t *wc, const char *mb, int n)
+towide_gb18030(wchar_t *wc, const char *mb, unsigned n)
 {
 	wchar_t	c;
 
 	c = *(uint8_t *)mb;
 
-	if (n < 1) {
-		werr("no character data");
-		return (-1);
-	}
 	if ((c & 0x80) == 0) {
 		/* 7-bit */
 		*wc = c;
@@ -439,20 +427,16 @@ towide_gb18030(wchar_t *wc, const char *mb, int n)
  * also has a range of single byte characters above 0x80.  (0xa1-0xdf).
  */
 int
-towide_mskanji(wchar_t *wc, const char *mb, int n)
+towide_mskanji(wchar_t *wc, const char *mb, unsigned n)
 {
 	wchar_t	c;
 
 	c = *(uint8_t *)mb;
 
-	if (n < 1) {
-		werr("no character data");
-		return (-1);
-	}
 	if ((c < 0x80) || ((c > 0xa0) && (c < 0xe0))) {
 		/* 7-bit */
 		*wc = c;
-		return (-1);
+		return (1);
 	}
 
 	if (n < 2) {
@@ -476,7 +460,7 @@ towide_mskanji(wchar_t *wc, const char *mb, int n)
  * CS2 and CS3 are and what the first byte of them is.
  */
 static int
-towide_euc_impl(wchar_t *wc, const char *mb, int n,
+towide_euc_impl(wchar_t *wc, const char *mb, unsigned n,
     uint8_t cs2, uint8_t cs2width, uint8_t cs3, uint8_t cs3width)
 {
 	int i;
@@ -484,11 +468,6 @@ towide_euc_impl(wchar_t *wc, const char *mb, int n,
 	wchar_t	c;
 
 	c = *(uint8_t *)mb;
-
-	if (n < 1) {
-		werr("no character data");
-		return (-1);
-	}
 
 	/*
 	 * All variations of EUC encode 7-bit ASCII as one byte, and use
@@ -538,7 +517,7 @@ towide_euc_impl(wchar_t *wc, const char *mb, int n,
  * Code set 3:					unused
  */
 int
-towide_euccn(wchar_t *wc, const char *mb, int n)
+towide_euccn(wchar_t *wc, const char *mb, unsigned n)
 {
 	return (towide_euc_impl(wc, mb, n, 0x8e, 4, 0, 0));
 }
@@ -552,7 +531,7 @@ towide_euccn(wchar_t *wc, const char *mb, int n)
  * Code set 3 (JIS X 0212-1990):		0x8FA1A1-0x8FFEFE
  */
 int
-towide_eucjp(wchar_t *wc, const char *mb, int n)
+towide_eucjp(wchar_t *wc, const char *mb, unsigned n)
 {
 	return (towide_euc_impl(wc, mb, n, 0x8e, 2, 0x8f, 3));
 }
@@ -566,7 +545,7 @@ towide_eucjp(wchar_t *wc, const char *mb, int n)
  * Code set 3:					unused
  */
 int
-towide_euckr(wchar_t *wc, const char *mb, int n)
+towide_euckr(wchar_t *wc, const char *mb, unsigned n)
 {
 	return (towide_euc_impl(wc, mb, n, 0, 0, 0, 0));
 }
@@ -580,7 +559,7 @@ towide_euckr(wchar_t *wc, const char *mb, int n)
  * Code set 3:					unused
  */
 int
-towide_euctw(wchar_t *wc, const char *mb, int n)
+towide_euctw(wchar_t *wc, const char *mb, unsigned n)
 {
 	return (towide_euc_impl(wc, mb, n, 0x8e, 4, 0, 0));
 }
@@ -593,7 +572,7 @@ int
 to_wide(wchar_t *wc, const char *mb)
 {
 	/* this won't fail hard */
-	return (_towide(wc, mb, strlen(mb) + 1));
+	return (_towide(wc, mb, strlen(mb)));
 }
 
 int

@@ -65,8 +65,7 @@ ISO8859_5_LOCALES	= \
 		mk_MK \
 		ru_RU
 
-ISO8859_6_LOCALES	= \
-		ar_EG
+ISO8859_6_LOCALES	= 
 
 ISO8859_7_LOCALES	= \
 		el_GR
