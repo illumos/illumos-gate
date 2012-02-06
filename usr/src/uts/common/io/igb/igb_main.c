@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright(c) 2007-2012 Intel Corporation. All rights reserved.
+ * Copyright (c) 2007-2012 Intel Corporation. All rights reserved.
  */
 
 /*
@@ -546,7 +546,7 @@ igb_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * default.
 	 */
 	if (igb->hw.mac.type == e1000_i350)
-		e1000_set_eee_i350(&igb->hw);
+		(void) e1000_set_eee_i350(&igb->hw);
 
 	return (DDI_SUCCESS);
 
@@ -1734,7 +1734,7 @@ igb_start(igb_t *igb, boolean_t alloc_buffer)
 		goto start_failure;
 
 	if (igb->hw.mac.type == e1000_i350)
-		e1000_set_eee_i350(&igb->hw);
+		(void) e1000_set_eee_i350(&igb->hw);
 
 	for (i = igb->num_tx_rings - 1; i >= 0; i--)
 		mutex_exit(&igb->tx_rings[i].tx_lock);
