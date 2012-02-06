@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
+ * Copyright (c) 2007-2012 Intel Corporation. All rights reserved.
  */
 
 /*
@@ -46,6 +46,7 @@ struct e1000_hw;
 #define	E1000_DEV_ID_82576_FIBER		0x10E6
 #define	E1000_DEV_ID_82576_SERDES		0x10E7
 #define	E1000_DEV_ID_82576_QUAD_COPPER		0x10E8
+#define	E1000_DEV_ID_82576_QUAD_COPPER_ET2	0x1526
 #define	E1000_DEV_ID_82576_NS			0x150A
 #define	E1000_DEV_ID_82576_NS_SERDES		0x1518
 #define	E1000_DEV_ID_82576_SERDES_QUAD		0x150D
@@ -57,6 +58,7 @@ struct e1000_hw;
 #define	E1000_DEV_ID_82580_SERDES		0x1510
 #define	E1000_DEV_ID_82580_SGMII		0x1511
 #define	E1000_DEV_ID_82580_COPPER_DUAL		0x1516
+#define	E1000_DEV_ID_I350_COPPER		0x1521
 
 #define	E1000_REVISION_0 0
 #define	E1000_REVISION_1 1
@@ -79,6 +81,7 @@ enum e1000_mac_type {
 	e1000_82575,
 	e1000_82576,
 	e1000_82580,
+	e1000_i350,
 	e1000_num_macs  /* List is 1-based, so subtract 1 for true count. */
 };
 
@@ -640,6 +643,7 @@ struct e1000_fc_info {
 struct e1000_dev_spec_82575 {
 	bool sgmii_active;
 	bool global_device_reset;
+	int eee_disable;
 };
 
 struct e1000_dev_spec_vf {
