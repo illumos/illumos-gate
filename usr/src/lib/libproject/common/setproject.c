@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 
@@ -199,9 +200,7 @@ rctl_set(char *ctl_name, char *val, struct ps_prochandle *Pr, int flags)
 	int count = 0;
 	char *tmp;
 	int local_act;
-	rctlblk_t *rlast;
 	rctlblk_t *rnext;
-	rctlblk_t *rtmp;
 	int teardown_basic = 0;
 	int teardown_priv = 0;
 
@@ -358,44 +357,35 @@ rctl_set(char *ctl_name, char *val, struct ps_prochandle *Pr, int flags)
 	/* teardown rctls if required */
 	if (!project_entity) {
 
-		if ((rlast = (rctlblk_t *)malloc(rctlblk_size())) == NULL) {
-			free(ablk);
-			return (SETFAILED);
-		}
 		if ((rnext = (rctlblk_t *)malloc(rctlblk_size())) == NULL) {
 			free(ablk);
-			free(rlast);
 			return (SETFAILED);
 		}
 
+restart:
 		if (pr_getrctl(Pr, ctl_name, NULL, rnext, RCTL_FIRST) == 0) {
-
 			while (1) {
 				if ((rctlblk_get_privilege(rnext) ==
 				    RCPRIV_PRIVILEGED) &&
 				    (teardown_priv == 1)) {
 					(void) pr_setrctl(Pr, ctl_name, NULL,
 					    rnext, RCTL_DELETE);
+					goto restart;
 				}
 				if ((rctlblk_get_privilege(rnext) ==
 				    RCPRIV_BASIC) && (teardown_basic == 1)) {
 					(void) pr_setrctl(Pr, ctl_name, NULL,
 					    rnext, RCTL_DELETE);
+					goto restart;
 				}
 
-				rtmp = rnext;
-				rnext = rlast;
-				rlast = rtmp;
-				if (pr_getrctl(Pr, ctl_name, rlast, rnext,
+				if (pr_getrctl(Pr, ctl_name, rnext, rnext,
 				    RCTL_NEXT) == -1)
 					break;
 			}
-
 		}
 
 		free(rnext);
-		free(rlast);
-
 	}
 
 	/* set rctls */
