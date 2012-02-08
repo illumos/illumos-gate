@@ -592,6 +592,7 @@ f kernel/drv/amd64/ipsecah 0755 root sys
 f kernel/drv/amd64/ipsecesp 0755 root sys
 f kernel/drv/amd64/iptun 0755 root sys
 f kernel/drv/amd64/iscsi 0755 root sys
+f kernel/drv/amd64/iscsit 0755 root sys
 f kernel/drv/amd64/iwscn 0755 root sys
 f kernel/drv/amd64/ixgb 0755 root sys
 f kernel/drv/amd64/ixgbe 0755 root sys
@@ -655,6 +656,8 @@ f kernel/drv/amd64/softmac 0755 root sys
 f kernel/drv/amd64/spdsock 0755 root sys
 f kernel/drv/amd64/srn 0755 root sys
 f kernel/drv/amd64/st 0755 root sys
+f kernel/drv/amd64/stmf 0755 root sys
+f kernel/drv/amd64/stmf_sbd 0755 root sys
 f kernel/drv/amd64/sy 0755 root sys
 f kernel/drv/amd64/sysevent 0755 root sys
 f kernel/drv/amd64/sysmsg 0755 root sys
@@ -728,6 +731,7 @@ f kernel/drv/ipsecah.conf 0644 root sys
 f kernel/drv/ipsecesp.conf 0644 root sys
 f kernel/drv/iptun.conf 0644 root sys
 f kernel/drv/iscsi.conf 0644 root sys
+f kernel/drv/iscsit.conf 0644 root sys
 f kernel/drv/iwscn.conf 0644 root sys
 f kernel/drv/ixgbe.conf 0644 root sys
 f kernel/drv/keysock.conf 0644 root sys
@@ -776,6 +780,8 @@ f kernel/drv/softmac.conf 0644 root sys
 f kernel/drv/spdsock.conf 0644 root sys
 f kernel/drv/srn.conf 0644 root sys
 f kernel/drv/st.conf 0644 root sys
+f kernel/drv/stmf.conf 0644 root sys
+f kernel/drv/stmf_sbd.conf 0644 root sys
 f kernel/drv/sy.conf 0644 root sys
 f kernel/drv/sysevent.conf 0644 root sys
 f kernel/drv/sysmsg.conf 0644 root sys
@@ -886,6 +892,8 @@ f kernel/kmdb/amd64/sockfs 0555 root sys
 f kernel/kmdb/amd64/specfs 0555 root sys
 f kernel/kmdb/amd64/sppp 0555 root sys
 f kernel/kmdb/amd64/srpt 0555 root sys
+f kernel/kmdb/amd64/stmf 0555 root sys
+f kernel/kmdb/amd64/stmf_sbd 0555 root sys
 f kernel/kmdb/amd64/sv 0555 root sys
 f kernel/kmdb/amd64/ufs 0555 root sys
 f kernel/kmdb/amd64/uhci 0555 root sys
@@ -1432,6 +1440,9 @@ f lib/svc/manifest/network/ipsec/ike.xml 0444 root sys
 f lib/svc/manifest/network/ipsec/ipsecalgs.xml 0444 root sys
 f lib/svc/manifest/network/ipsec/manual-key.xml 0444 root sys
 f lib/svc/manifest/network/ipsec/policy.xml 0444 root sys
+d lib/svc/manifest/network/iscsi 0755 root sys
+f lib/svc/manifest/network/iscsi/iscsi-initiator.xml 0444 root sys
+f lib/svc/manifest/network/iscsi/iscsi-target.xml 0444 root sys
 f lib/svc/manifest/network/isns_server.xml 0444 root sys
 d lib/svc/manifest/network/ldap 0755 root sys
 f lib/svc/manifest/network/lms.xml 0444 root sys
@@ -10319,6 +10330,7 @@ f usr/sbin/ipsecalgs 0555 root bin
 f usr/sbin/ipsecconf 0555 root bin
 f usr/sbin/ipseckey 0555 root bin
 f usr/sbin/iscsiadm 0555 root bin
+f usr/sbin/itadm 0555 root bin
 f usr/sbin/keyserv 0555 root sys
 f usr/sbin/killall 0555 root bin
 f usr/sbin/ksslcfg 0555 root bin
