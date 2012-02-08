@@ -200,13 +200,16 @@ dt_print_hex(FILE *fp, caddr_t addr, size_t size)
 		(void) fprintf(fp, "%#x", *(uint8_t *)addr);
 		break;
 	case sizeof (uint16_t):
+		/* LINTED - alignment */
 		(void) fprintf(fp, "%#x", *(uint16_t *)addr);
 		break;
 	case sizeof (uint32_t):
+		/* LINTED - alignment */
 		(void) fprintf(fp, "%#x", *(uint32_t *)addr);
 		break;
 	case sizeof (uint64_t):
 		(void) fprintf(fp, "%#llx",
+		    /* LINTED - alignment */
 		    (unsigned long long)*(uint64_t *)addr);
 		break;
 	default:
@@ -283,12 +286,15 @@ dt_print_float(ctf_id_t base, ulong_t off, dt_printarg_t *pap)
 	if (ctf_type_encoding(ctfp, base, &e) == 0) {
 		if (e.cte_format == CTF_FP_SINGLE &&
 		    e.cte_bits == sizeof (float) * NBBY) {
+			/* LINTED - alignment */
 			(void) fprintf(fp, "%+.7e", *((float *)addr));
 		} else if (e.cte_format == CTF_FP_DOUBLE &&
 		    e.cte_bits == sizeof (double) * NBBY) {
+			/* LINTED - alignment */
 			(void) fprintf(fp, "%+.7e", *((double *)addr));
 		} else if (e.cte_format == CTF_FP_LDOUBLE &&
 		    e.cte_bits == sizeof (long double) * NBBY) {
+			/* LINTED - alignment */
 			(void) fprintf(fp, "%+.16LE", *((long double *)addr));
 		} else {
 			(void) fprintf(fp, "<unknown encoding>");
