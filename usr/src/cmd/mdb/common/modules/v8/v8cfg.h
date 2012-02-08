@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -47,7 +47,9 @@ typedef struct v8_cfg {
 	int (*v8cfg_readsym)(struct v8_cfg *, const char *, intptr_t *);
 } v8_cfg_t;
 
+extern v8_cfg_t v8_cfg_04;
+extern v8_cfg_t v8_cfg_06;
 extern v8_cfg_t v8_cfg_target;
-extern v8_cfg_t v8_cfgs[];
+extern v8_cfg_t *v8_cfgs[];
 
-#endif
+#endif /* V8CFG_H */
