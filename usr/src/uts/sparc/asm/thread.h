@@ -27,8 +27,7 @@
 #ifndef _ASM_THREAD_H
 #define	_ASM_THREAD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#include <sys/ccompile.h>
 #include <sys/types.h>
 
 #ifdef	__cplusplus
@@ -39,7 +38,7 @@ extern "C" {
 
 struct _kthread;
 
-extern __inline__ struct _kthread *
+extern __GNU_INLINE struct _kthread *
 threadp(void)
 {
 	void *__value;
@@ -55,7 +54,7 @@ threadp(void)
 	return (__value);
 }
 
-extern __inline__ caddr_t
+extern __GNU_INLINE caddr_t
 caller(void)
 {
 	caddr_t __value;
@@ -70,7 +69,7 @@ caller(void)
 	return (__value);
 }
 
-extern __inline__ caddr_t
+extern __GNU_INLINE caddr_t
 callee(void)
 {
 	caddr_t __value;

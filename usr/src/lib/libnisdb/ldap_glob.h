@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef	_LDAP_GLOB_H
 #define	_LDAP_GLOB_H
 
@@ -61,8 +59,8 @@ extern int		endTransaction(int xid, nis_object *dirObj);
 extern int		addUpdate(log_entry_t type, char *name,
 				int numAttr, nis_attr *attr, nis_object *obj,
 				nis_object *oldDir, uint32_t ttime);
-extern int		lockTransLog(char *msg, int wr, int trylock);
-extern void		unlockTransLog(char *msg, int wr);
+extern int		lockTransLog(const char *msg, int wr, int trylock);
+extern void		unlockTransLog(const char *msg, int wr);
 extern int		__nis_lock_db_table(nis_name name, int readwrite,
 						int *trylock, char *msg);
 extern int		__nis_ulock_db_table(nis_name name, int readwrite,

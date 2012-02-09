@@ -27,8 +27,7 @@
 #ifndef _ASM_CPUVAR_H
 #define	_ASM_CPUVAR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#include <sys/ccompile.h>
 #include <sys/types.h>
 
 #ifdef	__cplusplus
@@ -39,7 +38,8 @@ extern "C" {
 
 struct cpu;
 
-extern __inline__ struct cpu *curcpup(void)
+extern __GNU_INLINE struct cpu *
+curcpup(void)
 {
 	struct cpu *__value;
 

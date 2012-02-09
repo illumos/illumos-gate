@@ -376,7 +376,7 @@ kgss_add_cred_wrapped(minor_status,
 	arg.uid = (OM_uint32)uid;
 	arg.input_cred_handle.GSS_CRED_ID_T_len =
 			input_cred_handle ==
-			(gssd_cred_id_t)GSS_C_NO_CREDENTIAL ?
+			(gssd_cred_id_t)(uintptr_t)GSS_C_NO_CREDENTIAL ?
 			0 : (uint_t)sizeof (gssd_cred_id_t);
 	arg.input_cred_handle.GSS_CRED_ID_T_val = (char *)&input_cred_handle;
 	arg.gssd_cred_verifier = gssd_cred_verifier;
@@ -495,8 +495,10 @@ kgss_add_cred(minor_status,
 	if (input_cred_handle != GSS_C_NO_CREDENTIAL) {
 		gssd_cred_verifier = KCRED_TO_CREDV(input_cred_handle);
 		gssd_input_cred_handle = KCRED_TO_CRED(input_cred_handle);
-	} else
-		gssd_input_cred_handle = (gssd_cred_id_t)GSS_C_NO_CREDENTIAL;
+	} else {
+		gssd_input_cred_handle =
+		    (gssd_cred_id_t)(uintptr_t)GSS_C_NO_CREDENTIAL;
+	}
 
 	err = kgss_add_cred_wrapped(minor_status, gssd_input_cred_handle,
 			gssd_cred_verifier, desired_name, desired_mech_type,
@@ -638,15 +640,15 @@ kgss_init_sec_context_wrapped(
 
 	if ((clnt = getgssd_handle()) == NULL) {
 		GSSLOG(1,
-		"kgss_init_sec_context: can't connect to server on %s\n",
-		server);
+		    "kgss_init_sec_context: can't connect to server on %s\n",
+		    server);
 		return (GSS_S_FAILURE);
 	}
 
 	/* convert the target name from internal to external format */
 
 	if (gss_display_name(&minor_status_temp, target_name,
-		&external_name, &name_type) != GSS_S_COMPLETE) {
+	    &external_name, &name_type) != GSS_S_COMPLETE) {
 
 		*minor_status = (OM_uint32) minor_status_temp;
 		killgssd_handle(clnt);
@@ -660,34 +662,38 @@ kgss_init_sec_context_wrapped(
 	arg.uid = (OM_uint32)uid;
 
 	arg.context_handle.GSS_CTX_ID_T_len =
-		*context_handle == (gssd_ctx_id_t)GSS_C_NO_CONTEXT ?
-			0 : (uint_t)sizeof (gssd_ctx_id_t);
+	    *context_handle == (gssd_ctx_id_t)(uintptr_t)GSS_C_NO_CONTEXT ?
+	    0 : (uint_t)sizeof (gssd_ctx_id_t);
 	arg.context_handle.GSS_CTX_ID_T_val =  (char *)context_handle;
 
 	arg.gssd_context_verifier =  *gssd_context_verifier;
 
-	arg.claimant_cred_handle.GSS_CRED_ID_T_len =
-		claimant_cred_handle == (gssd_cred_id_t)GSS_C_NO_CREDENTIAL ?
-			0 : (uint_t)sizeof (gssd_cred_id_t);
+	if (claimant_cred_handle ==
+	    (gssd_cred_id_t)(uintptr_t)GSS_C_NO_CREDENTIAL) {
+		arg.claimant_cred_handle.GSS_CRED_ID_T_len = 0;
+	} else {
+		arg.claimant_cred_handle.GSS_CRED_ID_T_len =
+		    (uint_t)sizeof (gss_cred_id_t);
+	}
+
 	arg.claimant_cred_handle.GSS_CRED_ID_T_val =
-						(char *)&claimant_cred_handle;
+	    (char *)&claimant_cred_handle;
 	arg.gssd_cred_verifier = gssd_cred_verifier;
 
 	arg.target_name.GSS_BUFFER_T_len = (uint_t)external_name.length;
 	arg.target_name.GSS_BUFFER_T_val = (char *)external_name.value;
 
 	arg.name_type.GSS_OID_len =
-		name_type == GSS_C_NULL_OID ?
-			0 : (uint_t)name_type->length;
+	    name_type == GSS_C_NULL_OID ? 0 : (uint_t)name_type->length;
 
 	arg.name_type.GSS_OID_val =
-		name_type == GSS_C_NULL_OID ?
-			(char *)NULL : (char *)name_type->elements;
+	    name_type == GSS_C_NULL_OID ?
+	    (char *)NULL : (char *)name_type->elements;
 
-	arg.mech_type.GSS_OID_len = (uint_t)(mech_type != GSS_C_NULL_OID ?
-						mech_type->length : 0);
-	arg.mech_type.GSS_OID_val = (char *)(mech_type != GSS_C_NULL_OID ?
-						mech_type->elements : 0);
+	arg.mech_type.GSS_OID_len =
+	    (uint_t)(mech_type != GSS_C_NULL_OID ? mech_type->length : 0);
+	arg.mech_type.GSS_OID_val =
+	    (char *)(mech_type != GSS_C_NULL_OID ? mech_type->elements : 0);
 
 	arg.req_flags = req_flags;
 
@@ -696,21 +702,21 @@ kgss_init_sec_context_wrapped(
 	if (input_chan_bindings != GSS_C_NO_CHANNEL_BINDINGS) {
 		arg.input_chan_bindings.present = YES;
 		arg.input_chan_bindings.initiator_addrtype =
-			input_chan_bindings->initiator_addrtype;
+		    input_chan_bindings->initiator_addrtype;
 		arg.input_chan_bindings.initiator_address.GSS_BUFFER_T_len =
-			(uint_t)input_chan_bindings->initiator_address.length;
+		    (uint_t)input_chan_bindings->initiator_address.length;
 		arg.input_chan_bindings.initiator_address.GSS_BUFFER_T_val =
-			(void *)input_chan_bindings->initiator_address.value;
+		    (void *)input_chan_bindings->initiator_address.value;
 		arg.input_chan_bindings.acceptor_addrtype =
-			input_chan_bindings->acceptor_addrtype;
+		    input_chan_bindings->acceptor_addrtype;
 		arg.input_chan_bindings.acceptor_address.GSS_BUFFER_T_len =
-			(uint_t)input_chan_bindings->acceptor_address.length;
+		    (uint_t)input_chan_bindings->acceptor_address.length;
 		arg.input_chan_bindings.acceptor_address.GSS_BUFFER_T_val =
-			(void *)input_chan_bindings->acceptor_address.value;
+		    (void *)input_chan_bindings->acceptor_address.value;
 		arg.input_chan_bindings.application_data.GSS_BUFFER_T_len =
-			(uint_t)input_chan_bindings->application_data.length;
+		    (uint_t)input_chan_bindings->application_data.length;
 		arg.input_chan_bindings.application_data.GSS_BUFFER_T_val =
-			(void *)input_chan_bindings->application_data.value;
+		    (void *)input_chan_bindings->application_data.value;
 	} else {
 		arg.input_chan_bindings.present = NO;
 		arg.input_chan_bindings.initiator_addrtype = 0;
@@ -724,11 +730,9 @@ kgss_init_sec_context_wrapped(
 	}
 
 	arg.input_token.GSS_BUFFER_T_len =
-		(uint_t)(input_token != GSS_C_NO_BUFFER ?
-		input_token->length : 0);
+	    (uint_t)(input_token != GSS_C_NO_BUFFER ? input_token->length : 0);
 	arg.input_token.GSS_BUFFER_T_val =
-		(char *)(input_token != GSS_C_NO_BUFFER ?
-		input_token->value : 0);
+	    (char *)(input_token != GSS_C_NO_BUFFER ? input_token->value : 0);
 
 	/* call the remote procedure */
 
@@ -766,41 +770,36 @@ kgss_init_sec_context_wrapped(
 
 	if (output_token != NULL && res.output_token.GSS_BUFFER_T_val != NULL) {
 		output_token->length =
-			(size_t)res.output_token.GSS_BUFFER_T_len;
+		    (size_t)res.output_token.GSS_BUFFER_T_len;
 		output_token->value =
-			(void *)MALLOC(output_token->length);
+		    (void *)MALLOC(output_token->length);
 		(void) memcpy(output_token->value,
-			    res.output_token.GSS_BUFFER_T_val,
-			    output_token->length);
+		    res.output_token.GSS_BUFFER_T_val, output_token->length);
 	}
 
 	/* if the call was successful, copy out the results */
 	if (res.status == (OM_uint32) GSS_S_COMPLETE ||
-		res.status == (OM_uint32) GSS_S_CONTINUE_NEEDED) {
+	    res.status == (OM_uint32) GSS_S_CONTINUE_NEEDED) {
 		/*
 		 * if the return code is GSS_S_CONTINUE_NEEDED
 		 * ignore all return parameters except for
 		 * status codes, output token and context handle.
 		 */
 		*context_handle =
-			*((gssd_ctx_id_t *)
-			res.context_handle.GSS_CTX_ID_T_val);
+		    *((gssd_ctx_id_t *)res.context_handle.GSS_CTX_ID_T_val);
 		*gssd_context_verifier = res.gssd_context_verifier;
 
 		if (res.status == GSS_S_COMPLETE) {
 			if (actual_mech_type != NULL) {
 				*actual_mech_type =
-					(gss_OID) MALLOC(sizeof (gss_OID_desc));
+				    (gss_OID) MALLOC(sizeof (gss_OID_desc));
 				(*actual_mech_type)->length =
-					(OM_UINT32)
-					res.actual_mech_type.GSS_OID_len;
+				    (OM_UINT32)res.actual_mech_type.GSS_OID_len;
 				(*actual_mech_type)->elements =
-					(void *)
-					MALLOC((*actual_mech_type)->length);
+				    (void *)MALLOC((*actual_mech_type)->length);
 				(void) memcpy((*actual_mech_type)->elements,
-					(void *)
-					res.actual_mech_type.GSS_OID_val,
-					(*actual_mech_type)->length);
+				    (void *)res.actual_mech_type.GSS_OID_val,
+				    (*actual_mech_type)->length);
 			}
 
 
@@ -893,7 +892,7 @@ kgss_init_sec_context(
 		 * upcalls to gssd.
 		 */
 		kctx->mech = &default_gc;
-		kctx->gssd_ctx = (gssd_ctx_id_t)GSS_C_NO_CONTEXT;
+		kctx->gssd_ctx = (gssd_ctx_id_t)(uintptr_t)GSS_C_NO_CONTEXT;
 		*context_handle = (gss_ctx_id_t)kctx;
 	} else
 		kctx = (struct kgss_ctx *)*context_handle;
@@ -901,8 +900,10 @@ kgss_init_sec_context(
 	if (claimant_cred_handle != GSS_C_NO_CREDENTIAL) {
 		gssd_cred_verifier = KCRED_TO_CREDV(claimant_cred_handle);
 		gssd_cl_cred_handle = KCRED_TO_CRED(claimant_cred_handle);
-	} else
-		gssd_cl_cred_handle = (gssd_cred_id_t)GSS_C_NO_CREDENTIAL;
+	} else {
+		gssd_cl_cred_handle =
+		    (gssd_cred_id_t)(uintptr_t)GSS_C_NO_CREDENTIAL;
+	}
 
 	/*
 	 * We need to know the resulting mechanism oid, so allocate
@@ -912,10 +913,10 @@ kgss_init_sec_context(
 		actual_mech_type = &amt;
 
 	err = kgss_init_sec_context_wrapped(minor_status, gssd_cl_cred_handle,
-		gssd_cred_verifier, &kctx->gssd_ctx, &kctx->gssd_ctx_verifier,
-		target_name, mech_type, req_flags, time_req,
-		input_chan_bindings, input_token, actual_mech_type,
-		output_token, ret_flags, time_rec, uid);
+	    gssd_cred_verifier, &kctx->gssd_ctx, &kctx->gssd_ctx_verifier,
+	    target_name, mech_type, req_flags, time_req,
+	    input_chan_bindings, input_token, actual_mech_type,
+	    output_token, ret_flags, time_rec, uid);
 
 	if (GSS_ERROR(err)) {
 		KGSS_FREE(kctx);
@@ -965,8 +966,8 @@ kgss_accept_sec_context_wrapped(
 
 	if ((clnt = getgssd_handle()) == NULL) {
 		GSSLOG(1,
-		"kgss_accept_sec_context: can't connect to server on %s\n",
-		server);
+		    "kgss_accept_sec_context: can't connect to server on %s\n",
+		    server);
 		return (GSS_S_FAILURE);
 	}
 
@@ -975,44 +976,42 @@ kgss_accept_sec_context_wrapped(
 	arg.uid = (OM_uint32)uid;
 
 	arg.context_handle.GSS_CTX_ID_T_len =
-		*context_handle == (gssd_ctx_id_t)GSS_C_NO_CONTEXT ?
-			0 : (uint_t)sizeof (gssd_ctx_id_t);
+	    *context_handle == (gssd_ctx_id_t)(uintptr_t)GSS_C_NO_CONTEXT ?
+	    0 : (uint_t)sizeof (gssd_ctx_id_t);
 	arg.context_handle.GSS_CTX_ID_T_val =  (char *)context_handle;
 	arg.gssd_context_verifier = *gssd_context_verifier;
 
 	arg.verifier_cred_handle.GSS_CRED_ID_T_len =
-			verifier_cred_handle ==
-			(gssd_cred_id_t)GSS_C_NO_CREDENTIAL ?
-			0 : (uint_t)sizeof (gssd_cred_id_t);
+	    verifier_cred_handle ==
+	    (gssd_cred_id_t)(uintptr_t)GSS_C_NO_CREDENTIAL ?
+	    0 : (uint_t)sizeof (gssd_cred_id_t);
 	arg.verifier_cred_handle.GSS_CRED_ID_T_val =
-						(char *)&verifier_cred_handle;
+	    (char *)&verifier_cred_handle;
 	arg.gssd_cred_verifier = gssd_cred_verifier;
 
 	arg.input_token_buffer.GSS_BUFFER_T_len =
-			(uint_t)(input_token != GSS_C_NO_BUFFER ?
-						input_token->length : 0);
+	    (uint_t)(input_token != GSS_C_NO_BUFFER ? input_token->length : 0);
 	arg.input_token_buffer.GSS_BUFFER_T_val =
-			(char *)(input_token != GSS_C_NO_BUFFER ?
-						input_token->value : 0);
+	    (char *)(input_token != GSS_C_NO_BUFFER ? input_token->value : 0);
 
 	if (input_chan_bindings != GSS_C_NO_CHANNEL_BINDINGS) {
 		arg.input_chan_bindings.present = YES;
 		arg.input_chan_bindings.initiator_addrtype =
-			input_chan_bindings->initiator_addrtype;
+		    input_chan_bindings->initiator_addrtype;
 		arg.input_chan_bindings.initiator_address.GSS_BUFFER_T_len =
-			(uint_t)input_chan_bindings->initiator_address.length;
+		    (uint_t)input_chan_bindings->initiator_address.length;
 		arg.input_chan_bindings.initiator_address.GSS_BUFFER_T_val =
-			(void *)input_chan_bindings->initiator_address.value;
+		    (void *)input_chan_bindings->initiator_address.value;
 		arg.input_chan_bindings.acceptor_addrtype =
-			input_chan_bindings->acceptor_addrtype;
+		    input_chan_bindings->acceptor_addrtype;
 		arg.input_chan_bindings.acceptor_address.GSS_BUFFER_T_len =
-			(uint_t)input_chan_bindings->acceptor_address.length;
+		    (uint_t)input_chan_bindings->acceptor_address.length;
 		arg.input_chan_bindings.acceptor_address.GSS_BUFFER_T_val =
-			(void *)input_chan_bindings->acceptor_address.value;
+		    (void *)input_chan_bindings->acceptor_address.value;
 		arg.input_chan_bindings.application_data.GSS_BUFFER_T_len =
-			(uint_t)input_chan_bindings->application_data.length;
+		    (uint_t)input_chan_bindings->application_data.length;
 		arg.input_chan_bindings.application_data.GSS_BUFFER_T_val =
-			(void *)input_chan_bindings->application_data.value;
+		    (void *)input_chan_bindings->application_data.value;
 	} else {
 
 		arg.input_chan_bindings.present = NO;
@@ -1057,19 +1056,16 @@ kgss_accept_sec_context_wrapped(
 		*minor_status = res.minor_status;
 
 	if (output_token != NULL && res.output_token.GSS_BUFFER_T_val != NULL) {
-		output_token->length =
-			res.output_token.GSS_BUFFER_T_len;
-		output_token->value =
-			(void *)  MALLOC(output_token->length);
+		output_token->length = res.output_token.GSS_BUFFER_T_len;
+		output_token->value = (void *)  MALLOC(output_token->length);
 		(void) memcpy(output_token->value,
-			    res.output_token.GSS_BUFFER_T_val,
-			    output_token->length);
+		    res.output_token.GSS_BUFFER_T_val, output_token->length);
 	}
 
 	/* if the call was successful, copy out the results */
 
 	if (res.status == (OM_uint32) GSS_S_COMPLETE ||
-		res.status == (OM_uint32) GSS_S_CONTINUE_NEEDED) {
+	    res.status == (OM_uint32) GSS_S_CONTINUE_NEEDED) {
 
 		/*
 		 * the only parameters that are ready when we
@@ -1078,17 +1074,18 @@ kgss_accept_sec_context_wrapped(
 		 */
 
 		*context_handle = *((gssd_ctx_id_t *)
-			res.context_handle.GSS_CTX_ID_T_val);
+		    res.context_handle.GSS_CTX_ID_T_val);
 			*gssd_context_verifier = res.gssd_context_verifier;
 
 		/* these other parameters are only ready upon GSS_S_COMPLETE */
 		if (res.status == (OM_uint32) GSS_S_COMPLETE) {
 
 			if (src_name != NULL) {
-			    src_name->length = res.src_name.GSS_BUFFER_T_len;
-			    src_name->value = res.src_name.GSS_BUFFER_T_val;
-			    res.src_name.GSS_BUFFER_T_val = NULL;
-			    res.src_name.GSS_BUFFER_T_len = 0;
+				src_name->length =
+				    res.src_name.GSS_BUFFER_T_len;
+				src_name->value = res.src_name.GSS_BUFFER_T_val;
+				res.src_name.GSS_BUFFER_T_val = NULL;
+				res.src_name.GSS_BUFFER_T_len = 0;
 			}
 
 			/*
@@ -1096,15 +1093,15 @@ kgss_accept_sec_context_wrapped(
 			 * for gss_import_name_for_mech()
 			 */
 			if (mech_type != NULL) {
-				*mech_type = (gss_OID)
-					MALLOC(sizeof (gss_OID_desc));
+				*mech_type =
+				    (gss_OID)MALLOC(sizeof (gss_OID_desc));
 				(*mech_type)->length =
-					(OM_UINT32) res.mech_type.GSS_OID_len;
+				    (OM_UINT32) res.mech_type.GSS_OID_len;
 				(*mech_type)->elements =
-					(void *) MALLOC((*mech_type)->length);
+				    (void *) MALLOC((*mech_type)->length);
 				(void) memcpy((*mech_type)->elements,
-					res.mech_type.GSS_OID_val,
-					(*mech_type)->length);
+				    res.mech_type.GSS_OID_val,
+				    (*mech_type)->length);
 			}
 
 			if (ret_flags != NULL)
@@ -1114,14 +1111,14 @@ kgss_accept_sec_context_wrapped(
 				*time_rec = res.time_rec;
 
 			if ((delegated_cred_handle != NULL) &&
-				(res.delegated_cred_handle.GSS_CRED_ID_T_len
-				!= 0)) {
+			    (res.delegated_cred_handle.GSS_CRED_ID_T_len
+			    != 0)) {
 				kcred = KGSS_CRED_ALLOC();
 				kcred->gssd_cred =
-				*((gssd_cred_id_t *)
-				res.delegated_cred_handle.GSS_CRED_ID_T_val);
+				    *((gssd_cred_id_t *)
+				    res.delegated_cred_handle.GSS_CRED_ID_T_val);
 				kcred->gssd_cred_verifier =
-					res.gssd_context_verifier;
+				    res.gssd_context_verifier;
 				*delegated_cred_handle = (gss_cred_id_t)kcred;
 			}
 
@@ -1172,7 +1169,7 @@ kgss_accept_sec_context(
 	if (*context_handle == GSS_C_NO_CONTEXT) {
 		kctx = KGSS_ALLOC();
 		kctx->mech = &default_gc;
-		kctx->gssd_ctx = (gssd_ctx_id_t)GSS_C_NO_CONTEXT;
+		kctx->gssd_ctx = (gssd_ctx_id_t)(uintptr_t)GSS_C_NO_CONTEXT;
 		*context_handle = (gss_ctx_id_t)kctx;
 	} else
 		kctx = (struct kgss_ctx *)*context_handle;
@@ -1180,15 +1177,17 @@ kgss_accept_sec_context(
 	if (verifier_cred_handle != GSS_C_NO_CREDENTIAL) {
 		gssd_cred_verifier = KCRED_TO_CREDV(verifier_cred_handle);
 		gssd_ver_cred_handle = KCRED_TO_CRED(verifier_cred_handle);
-	} else
-		gssd_ver_cred_handle = (gssd_cred_id_t)GSS_C_NO_CREDENTIAL;
+	} else {
+		gssd_ver_cred_handle =
+		    (gssd_cred_id_t)(uintptr_t)GSS_C_NO_CREDENTIAL;
+	}
 
 	err = kgss_accept_sec_context_wrapped(minor_status,
-		&kctx->gssd_ctx, &kctx->gssd_ctx_verifier,
-		gssd_ver_cred_handle, gssd_cred_verifier,
-		input_token, input_chan_bindings, src_name,
-		mech_type, output_token, ret_flags,
-		time_rec, delegated_cred_handle, uid);
+	    &kctx->gssd_ctx, &kctx->gssd_ctx_verifier,
+	    gssd_ver_cred_handle, gssd_cred_verifier,
+	    input_token, input_chan_bindings, src_name,
+	    mech_type, output_token, ret_flags,
+	    time_rec, delegated_cred_handle, uid);
 
 	if (GSS_ERROR(err)) {
 		KGSS_FREE(kctx);
@@ -1304,7 +1303,7 @@ kgss_delete_sec_context_wrapped(void *private,
 	/* copy the procedure arguments into the rpc arg parameter */
 
 	arg.context_handle.GSS_CTX_ID_T_len =
-		*context_handle == (gssd_ctx_id_t)GSS_C_NO_CONTEXT ?
+		*context_handle == (gssd_ctx_id_t)(uintptr_t)GSS_C_NO_CONTEXT ?
 			0 : (uint_t)sizeof (gssd_ctx_id_t);
 	arg.context_handle.GSS_CTX_ID_T_val =  (char *)context_handle;
 
@@ -1377,17 +1376,18 @@ kgss_delete_sec_context(
 		kctx = (struct kgss_ctx *)*context_handle;
 
 	if (kctx->ctx_imported == FALSE) {
-		if (kctx->gssd_ctx == (gssd_ctx_id_t)GSS_C_NO_CONTEXT) {
+		if (kctx->gssd_ctx ==
+		    (gssd_ctx_id_t)(uintptr_t)GSS_C_NO_CONTEXT) {
 			KGSS_FREE(kctx);
 			*context_handle = GSS_C_NO_CONTEXT;
 			return (GSS_S_COMPLETE);
 		}
 		err = kgss_delete_sec_context_wrapped(
-				KCTX_TO_PRIVATE(*context_handle),
-				minor_status,
-				&kctx->gssd_ctx,
-				output_token,
-				kctx->gssd_ctx_verifier);
+		    KCTX_TO_PRIVATE(*context_handle),
+		    minor_status,
+		    &kctx->gssd_ctx,
+		    output_token,
+		    kctx->gssd_ctx_verifier);
 	} else {
 		if (kctx->gssd_i_ctx == (gss_ctx_id_t)GSS_C_NO_CONTEXT) {
 			KGSS_FREE(kctx);
@@ -1395,7 +1395,7 @@ kgss_delete_sec_context(
 			return (GSS_S_COMPLETE);
 		}
 		err = KGSS_DELETE_SEC_CONTEXT(minor_status, kctx,
-				&kctx->gssd_i_ctx,  output_token);
+		    &kctx->gssd_i_ctx,  output_token);
 	}
 	KGSS_FREE(kctx);
 	*context_handle = GSS_C_NO_CONTEXT;
@@ -1553,7 +1553,7 @@ gss_buffer_desc token;
 gss_ctx_id_t	internal_ctx_id;
 	kctx = (struct kgss_ctx *)context_handle;
 
-	if (kctx->gssd_ctx != (gssd_ctx_id_t)GSS_C_NO_CONTEXT) {
+	if (kctx->gssd_ctx != (gssd_ctx_id_t)(uintptr_t)GSS_C_NO_CONTEXT) {
 		return (GSS_S_FAILURE);
 	}
 
@@ -1682,7 +1682,7 @@ kgss_sign_wrapped(void *private,
 		msg_token->length = res.msg_token.GSS_BUFFER_T_len;
 		msg_token->value = (void *) MALLOC(msg_token->length);
 		(void) memcpy(msg_token->value, res.msg_token.GSS_BUFFER_T_val,
-			msg_token->length);
+		    msg_token->length);
 	}
 
 	/*
@@ -1707,7 +1707,7 @@ kgss_sign(
 	if (context_handle == GSS_C_NO_CONTEXT)
 		return (GSS_S_FAILURE);
 	return (KGSS_SIGN(minor_status, context_handle, qop_req,
-			message_buffer, msg_token));
+	    message_buffer, msg_token));
 }
 
 /*ARGSUSED*/
@@ -1732,7 +1732,7 @@ kgss_verify_wrapped(void *private,
 
 	if ((clnt = getgssd_handle()) == NULL) {
 		GSSLOG(1, "kgss_verify: can't connect to server on %s\n",
-			server);
+		    server);
 		return (GSS_S_FAILURE);
 	}
 
@@ -1796,9 +1796,7 @@ kgss_verify(OM_uint32 *minor_status,
 	if (context_handle == GSS_C_NO_CONTEXT)
 		return (GSS_S_FAILURE);
 	return (KGSS_VERIFY(minor_status, context_handle,
-			    message_buffer,
-			    token_buffer,
-			    qop_state));
+	    message_buffer, token_buffer, qop_state));
 }
 
 /* EXPORT DELETE START */
@@ -1844,10 +1842,10 @@ kgss_seal_wrapped(void *private,
 	arg.qop_req = qop_req;
 
 	arg.input_message_buffer.GSS_BUFFER_T_len =
-					(uint_t)input_message_buffer->length;
+	    (uint_t)input_message_buffer->length;
 
 	arg.input_message_buffer.GSS_BUFFER_T_val =
-					(char *)input_message_buffer->value;
+	    (char *)input_message_buffer->value;
 
 	/* call the remote procedure */
 
@@ -1881,13 +1879,13 @@ kgss_seal_wrapped(void *private,
 
 	if (output_message_buffer != NULL) {
 		output_message_buffer->length =
-				res.output_message_buffer.GSS_BUFFER_T_len;
+		    res.output_message_buffer.GSS_BUFFER_T_len;
 
 		output_message_buffer->value =
-				(void *) MALLOC(output_message_buffer->length);
+		    (void *) MALLOC(output_message_buffer->length);
 		(void) memcpy(output_message_buffer->value,
-			res.output_message_buffer.GSS_BUFFER_T_val,
-			output_message_buffer->length);
+		    res.output_message_buffer.GSS_BUFFER_T_val,
+		    output_message_buffer->length);
 	}
 
 	/*
@@ -1942,7 +1940,7 @@ kgss_unseal_wrapped(void *private,
 
 	if ((clnt = getgssd_handle()) == NULL) {
 		GSSLOG(1, "kgss_unseal: can't connect to server on %s\n",
-			server);
+		    server);
 		return (GSS_S_FAILURE);
 	}
 
@@ -1956,10 +1954,10 @@ kgss_unseal_wrapped(void *private,
 	arg.gssd_context_verifier = gssd_context_verifier;
 
 	arg.input_message_buffer.GSS_BUFFER_T_len =
-					(uint_t)input_message_buffer->length;
+	    (uint_t)input_message_buffer->length;
 
 	arg.input_message_buffer.GSS_BUFFER_T_val =
-					(char *)input_message_buffer->value;
+	    (char *)input_message_buffer->value;
 
 	/* call the remote procedure */
 
@@ -1992,13 +1990,13 @@ kgss_unseal_wrapped(void *private,
 
 	if (output_message_buffer != NULL) {
 		output_message_buffer->length =
-				res.output_message_buffer.GSS_BUFFER_T_len;
+		    res.output_message_buffer.GSS_BUFFER_T_len;
 
 		output_message_buffer->value =
-			(void *) MALLOC(output_message_buffer->length);
+		    (void *) MALLOC(output_message_buffer->length);
 		(void) memcpy(output_message_buffer->value,
-			res.output_message_buffer.GSS_BUFFER_T_val,
-			output_message_buffer->length);
+		    res.output_message_buffer.GSS_BUFFER_T_val,
+		    output_message_buffer->length);
 	}
 
 	if (conf_state != NULL)
@@ -2030,7 +2028,7 @@ kgss_unseal(OM_uint32 *minor_status,
 		return (GSS_S_FAILURE);
 
 	return (KGSS_UNSEAL(minor_status, context_handle, input_message_buffer,
-		output_message_buffer, conf_state, qop_state));
+	    output_message_buffer, conf_state, qop_state));
 }
 
 /* EXPORT DELETE END */
@@ -2258,8 +2256,8 @@ kgss_inquire_cred_wrapped(minor_status,
 	arg.uid = (OM_uint32) uid;
 
 	arg.cred_handle.GSS_CRED_ID_T_len =
-			cred_handle == (gssd_cred_id_t)GSS_C_NO_CREDENTIAL ?
-			0 : (uint_t)sizeof (gssd_cred_id_t);
+	    cred_handle == (gssd_cred_id_t)(uintptr_t)GSS_C_NO_CREDENTIAL ?
+	    0 : (uint_t)sizeof (gssd_cred_id_t);
 	arg.cred_handle.GSS_CRED_ID_T_val = (char *)&cred_handle;
 	arg.gssd_cred_verifier = gssd_cred_verifier;
 
@@ -2410,8 +2408,8 @@ kgss_inquire_cred_by_mech_wrapped(minor_status,
 	arg.uid = (OM_uint32) uid;
 
 	arg.cred_handle.GSS_CRED_ID_T_len =
-			cred_handle == (gssd_cred_id_t)GSS_C_NO_CREDENTIAL ?
-			0 : (uint_t)sizeof (gssd_cred_id_t);
+	    cred_handle == (gssd_cred_id_t)(uintptr_t)GSS_C_NO_CREDENTIAL ?
+	    0 : (uint_t)sizeof (gssd_cred_id_t);
 	arg.cred_handle.GSS_CRED_ID_T_val = (char *)&cred_handle;
 	arg.gssd_cred_verifier = gssd_cred_verifier;
 
@@ -2701,7 +2699,7 @@ kgss_get_kmod(gss_OID mech_oid)
 	/* get the client GSSD handle */
 	if ((clnt = getgssd_handle()) == NULL) {
 		GSSLOG(1, "kgss_get_kmod: can't connect to server on %s\n",
-			server);
+		    server);
 		return (NULL);
 	}
 
@@ -2763,9 +2761,9 @@ __kgss_reset_mech(gss_mechanism *mechp, gss_OID mech_oid)
 			 * appropriate comment
 			 */
 			cmn_err(CE_NOTE, "kgss_reset_mech: Algorithm modload "
-				"(%s) failed. Userland gssd will now handle "
-				"all GSSAPI calls, which may result in "
-				"reduced performance.\n", kmod);
+			    "(%s) failed. Userland gssd will now handle "
+			    "all GSSAPI calls, which may result in "
+			    "reduced performance.\n", kmod);
 		};
 
 		/*

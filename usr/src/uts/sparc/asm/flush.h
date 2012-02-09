@@ -27,6 +27,7 @@
 #ifndef _ASM_FLUSH_H
 #define	_ASM_FLUSH_H
 
+#include <sys/ccompile.h>
 #include <sys/types.h>
 
 #ifdef	__cplusplus
@@ -35,7 +36,7 @@ extern "C" {
 
 #if !defined(__lint) && defined(__GNUC__)
 
-extern __inline__ void
+extern __GNU_INLINE void
 doflush(void *addr)
 {
 #if defined(__sparcv9)

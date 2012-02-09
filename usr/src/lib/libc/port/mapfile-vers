@@ -2984,6 +2984,8 @@ $if sparc32
 	__cmpdi2;
 	__floatdidf;
 	__floatdisf;
+	__floatundidf;
+	__floatundisf;
 	__lshrdi3;
 	__muldi3;
 	__ucmpdi2;

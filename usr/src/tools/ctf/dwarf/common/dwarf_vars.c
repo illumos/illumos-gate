@@ -1,6 +1,7 @@
 /*
 
-  Copyright (C) 2000, 2002 Silicon Graphics, Inc.  All Rights Reserved.
+  Copyright (C) 2000,2002,2004,2005 Silicon Graphics, Inc.  All Rights Reserved.
+  Portions Copyright (C) 2009-2010 David Anderson. All Rights Reserved.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms of version 2.1 of the GNU Lesser General Public License 
@@ -19,10 +20,10 @@
 
   You should have received a copy of the GNU Lesser General Public 
   License along with this program; if not, write the Free Software 
-  Foundation, Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, 
+  Foundation, Inc., 51 Franklin Street - Fifth Floor, Boston MA 02110-1301,
   USA.
 
-  Contact information:  Silicon Graphics, Inc., 1600 Amphitheatre Pky,
+  Contact information:  Silicon Graphics, Inc., 1500 Crittenden Lane,
   Mountain View, CA 94043, or:
 
   http://www.sgi.com
@@ -43,32 +44,41 @@
 
 int
 dwarf_get_vars(Dwarf_Debug dbg,
-	       Dwarf_Var ** vars,
-	       Dwarf_Signed * ret_var_count, Dwarf_Error * error)
+    Dwarf_Var ** vars,
+    Dwarf_Signed * ret_var_count, Dwarf_Error * error)
 {
-    int res;
-
-    res =
-       _dwarf_load_section(dbg,
-		           dbg->de_debug_varnames_index,
-			   &dbg->de_debug_varnames,
-		           error);
+    int res = _dwarf_load_section(dbg, &dbg->de_debug_varnames,error);
     if (res != DW_DLV_OK) {
-	return res;
+        return res;
     }
 
-    return _dwarf_internal_get_pubnames_like_data(dbg, dbg->de_debug_varnames, dbg->de_debug_varnames_size, (Dwarf_Global **) vars,	/* type 
-																	   punning,
-																	   Dwarf_Type 
-																	   is never
-																	   a
-																	   completed 
-																	   type */
-						  ret_var_count,
-						  error,
-						  DW_DLA_VAR_CONTEXT,
-						  DW_DLE_DEBUG_VARNAMES_LENGTH_BAD,
-						  DW_DLE_DEBUG_VARNAMES_VERSION_ERROR);
+    return _dwarf_internal_get_pubnames_like_data(dbg, 
+        dbg->de_debug_varnames.dss_data, 
+        dbg->de_debug_varnames.dss_size, 
+        (Dwarf_Global **) vars, /* Type punning for sections 
+            with identical format. */
+        ret_var_count,
+        error,
+        DW_DLA_VAR_CONTEXT,
+        DW_DLA_VAR,
+        DW_DLE_DEBUG_VARNAMES_LENGTH_BAD,
+        DW_DLE_DEBUG_VARNAMES_VERSION_ERROR);
+}
+
+/* Deallocating fully requires deallocating the list
+   and all entries.  But some internal data is
+   not exposed, so we need a function with internal knowledge.
+*/
+
+void
+dwarf_vars_dealloc(Dwarf_Debug dbg, Dwarf_Var * dwgl,
+                   Dwarf_Signed count)
+{
+    _dwarf_internal_globals_dealloc(dbg, (Dwarf_Global *) dwgl,
+        count,
+        DW_DLA_VAR_CONTEXT,
+        DW_DLA_VAR, DW_DLA_LIST);
+    return;
 }
 
 
@@ -78,8 +88,8 @@ dwarf_varname(Dwarf_Var var_in, char **ret_varname, Dwarf_Error * error)
     Dwarf_Global var = (Dwarf_Global) var_in;
 
     if (var == NULL) {
-	_dwarf_error(NULL, error, DW_DLE_VAR_NULL);
-	return (DW_DLV_ERROR);
+        _dwarf_error(NULL, error, DW_DLE_VAR_NULL);
+        return (DW_DLV_ERROR);
     }
 
     *ret_varname = (char *) (var->gl_name);
@@ -89,7 +99,7 @@ dwarf_varname(Dwarf_Var var_in, char **ret_varname, Dwarf_Error * error)
 
 int
 dwarf_var_die_offset(Dwarf_Var var_in,
-		     Dwarf_Off * returned_offset, Dwarf_Error * error)
+        Dwarf_Off * returned_offset, Dwarf_Error * error)
 {
     Dwarf_Global var = (Dwarf_Global) var_in;
 
@@ -100,7 +110,7 @@ dwarf_var_die_offset(Dwarf_Var var_in,
 
 int
 dwarf_var_cu_offset(Dwarf_Var var_in,
-		    Dwarf_Off * returned_offset, Dwarf_Error * error)
+                    Dwarf_Off * returned_offset, Dwarf_Error * error)
 {
     Dwarf_Global var = (Dwarf_Global) var_in;
 
@@ -110,14 +120,14 @@ dwarf_var_cu_offset(Dwarf_Var var_in,
 
 int
 dwarf_var_name_offsets(Dwarf_Var var_in,
-		       char **returned_name,
-		       Dwarf_Off * die_offset,
-		       Dwarf_Off * cu_offset, Dwarf_Error * error)
+        char **returned_name,
+        Dwarf_Off * die_offset,
+        Dwarf_Off * cu_offset, Dwarf_Error * error)
 {
     Dwarf_Global var = (Dwarf_Global) var_in;
 
     return
-	dwarf_global_name_offsets(var,
-				  returned_name, die_offset, cu_offset,
-				  error);
+        dwarf_global_name_offsets(var,
+            returned_name, die_offset, cu_offset,
+            error);
 }

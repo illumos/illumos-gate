@@ -31,13 +31,6 @@ include $(SRC)/lib/Makefile.lib.64
 # CCNEEDED must be modified for 64-bit because the default only includes
 # -lCrun
 #
-CCNEEDED = -lCstd -lCrun
-
-#
-# If linking with gcc, we must fix the CCNEEDED and LDLIBS64
-# to get a clean link without duplicates.
-#
-$(__GNUC)CCNEEDED       = -L$(SFWLIBDIR) -R$(SFWLIBDIR) -lstdc++ -lgcc_s
-$(__GNUC)LDLIBS64 += $(CCNEEDED)
+$(__SUNC)CCNEEDED = -lCstd -lCrun
 
 install: all $(ROOTLIBS64) $(ROOTLINKS64)

@@ -26,8 +26,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <malloc.h>
 #include <string.h>
@@ -398,7 +396,7 @@ db_table::allocateExpire(long oldSize, long newSize) {
 db_status
 db_table::allocateEnumArray(long oldSize, long newSize) {
 	entry_object	**newEnumArray;
-	char		*myself = "db_table::allocateEnumArray";
+	char	*myself = (char *)"db_table::allocateEnumArray";
 
 	if (enumCount.flag > 0) {
 		if (enumIndex.ptr == 0) {
@@ -558,7 +556,7 @@ db_table::get_entry(entryp where)
 void
 db_table::setEntryExp(entryp where, entry_obj *obj, int initialLoad) {
 	nis_object		*o;
-	char			*myself = "db_table::setEntryExp";
+	char			*myself = (char *)"db_table::setEntryExp";
 
 	/*
 	 * If we don't know what type of object this is yet, we
@@ -601,7 +599,7 @@ db_table::setEntryExp(entryp where, entry_obj *obj, int initialLoad) {
 			if (o != 0) {
 				__nis_buffer_t	b = {0, 0};
 
-				bp2buf(myself, &b, "%s.%s",
+				bp2buf(myself, &b, (char *)"%s.%s",
 					o->zo_name, o->zo_domain);
 				t = getObjMapping(b.buf, 0, 1, 0, 0);
 				sfree(b.buf);
@@ -766,7 +764,7 @@ bool_t
 db_table::configure(char *tablePath) {
 	long		i;
 	struct timeval	now;
-	char		*myself = "db_table::configure";
+	char	*myself = (char *)"db_table::configure";
 
 	(void) gettimeofday(&now, NULL);
 
@@ -951,7 +949,7 @@ db_table::dupEntry(entry_object *obj, entryp loc) {
  */
 void
 db_table::setEnumMode(long enumNum) {
-	char	*myself = "setEnumMode";
+	const char	*myself = "setEnumMode";
 
 	enumMode.flag++;
 	if (enumMode.flag == 1) {
@@ -969,7 +967,7 @@ db_table::setEnumMode(long enumNum) {
 		if (stat != DB_SUCCESS) {
 			enumMode.flag = 0;
 			enumCount.flag = 0;
-			logmsg(MSG_NOTIMECHECK, LOG_ERR,
+			logmsg(MSG_NOTIMECHECK, LOG_ERR, (char *)
 		"%s: No memory for enum check array; entry removal disabled",
 				myself);
 		}

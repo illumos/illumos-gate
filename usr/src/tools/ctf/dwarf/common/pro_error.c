@@ -1,6 +1,6 @@
 /*
 
-  Copyright (C) 2000, 2002 Silicon Graphics, Inc.  All Rights Reserved.
+  Copyright (C) 2000,2002,2004 Silicon Graphics, Inc.  All Rights Reserved.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms of version 2.1 of the GNU Lesser General Public License 
@@ -19,10 +19,10 @@
 
   You should have received a copy of the GNU Lesser General Public 
   License along with this program; if not, write the Free Software 
-  Foundation, Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, 
+  Foundation, Inc., 51 Franklin Street - Fifth Floor, Boston MA 02110-1301,
   USA.
 
-  Contact information:  Silicon Graphics, Inc., 1600 Amphitheatre Pky,
+  Contact information:  Silicon Graphics, Inc., 1500 Crittenden Lane,
   Mountain View, CA 94043, or:
 
   http://www.sgi.com
@@ -58,39 +58,39 @@ extern char *_dwarf_errmsgs[];
 */
 void
 _dwarf_p_error(Dwarf_P_Debug dbg,
-	       Dwarf_Error * error, Dwarf_Word errval)
+               Dwarf_Error * error, Dwarf_Word errval)
 {
     Dwarf_Error errptr;
 
     /* Allow NULL dbg on entry, since sometimes that can happen and we
        want to report the upper-level error, not this one. */
     if ((Dwarf_Sword) errval < 0)
-	printf("ERROR VALUE: %ld - %s\n",
-	       (long) errval, _dwarf_errmsgs[-errval - 1]);
+        printf("ERROR VALUE: %ld - %s\n",
+               (long) errval, _dwarf_errmsgs[-errval - 1]);
     if (error != NULL) {
-	errptr = (Dwarf_Error)
-	    _dwarf_p_get_alloc(dbg, sizeof(struct Dwarf_Error_s));
-	if (errptr == NULL) {
-	    fprintf(stderr,
-		    "Could not allocate Dwarf_Error structure\n");
-	    abort();
-	}
-	errptr->er_errval = (Dwarf_Sword) errval;
-	*error = errptr;
-	return;
+        errptr = (Dwarf_Error)
+            _dwarf_p_get_alloc(dbg, sizeof(struct Dwarf_Error_s));
+        if (errptr == NULL) {
+            fprintf(stderr,
+                    "Could not allocate Dwarf_Error structure\n");
+            abort();
+        }
+        errptr->er_errval = (Dwarf_Sword) errval;
+        *error = errptr;
+        return;
     }
 
     if (dbg != NULL && dbg->de_errhand != NULL) {
-	errptr = (Dwarf_Error)
-	    _dwarf_p_get_alloc(dbg, sizeof(struct Dwarf_Error_s));
-	if (errptr == NULL) {
-	    fprintf(stderr,
-		    "Could not allocate Dwarf_Error structure\n");
-	    abort();
-	}
-	errptr->er_errval = (Dwarf_Sword) errval;
-	dbg->de_errhand(errptr, dbg->de_errarg);
-	return;
+        errptr = (Dwarf_Error)
+            _dwarf_p_get_alloc(dbg, sizeof(struct Dwarf_Error_s));
+        if (errptr == NULL) {
+            fprintf(stderr,
+                    "Could not allocate Dwarf_Error structure\n");
+            abort();
+        }
+        errptr->er_errval = (Dwarf_Sword) errval;
+        dbg->de_errhand(errptr, dbg->de_errarg);
+        return;
     }
 
     abort();

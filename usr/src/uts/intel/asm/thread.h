@@ -27,8 +27,7 @@
 #ifndef _ASM_THREAD_H
 #define	_ASM_THREAD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#include <sys/ccompile.h>
 #include <sys/types.h>
 
 #ifdef	__cplusplus
@@ -46,7 +45,8 @@ struct _kthread;
  * Yuck.
  */
 
-extern __inline__ struct _kthread *threadp(void)
+extern __GNU_INLINE struct _kthread
+*threadp(void)
 {
 	void *__value;
 

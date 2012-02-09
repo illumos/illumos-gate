@@ -1,6 +1,6 @@
 /*
 
-  Copyright (C) 2000 Silicon Graphics, Inc.  All Rights Reserved.
+  Copyright (C) 2000,2004 Silicon Graphics, Inc.  All Rights Reserved.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms of version 2.1 of the GNU Lesser General Public License 
@@ -17,12 +17,12 @@
   any, provided herein do not apply to combinations of this program with 
   other software, or any other product whatsoever.  
 
-  You should have received a copy of the GNU Lesser General Public 
-  License along with this program; if not, write the Free Software 
-  Foundation, Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, 
+  You should have received a copy of the GNU Lesser General Public
+  License along with this program; if not, write the Free Software
+  Foundation, Inc., 51 Franklin Street - Fifth Floor, Boston MA 02110-1301,
   USA.
 
-  Contact information:  Silicon Graphics, Inc., 1600 Amphitheatre Pky,
+  Contact information:  Silicon Graphics, Inc., 1500 Crittenden Lane,
   Mountain View, CA 94043, or:
 
   http://www.sgi.com
@@ -51,35 +51,41 @@
 */
 
 
-#if (!defined(HAVE___UINT32_T)) && defined(HAVE_SGIDEFS_H)
+#if (!defined(HAVE___UINT32_T)) && defined(HAVE___UINT32_T_IN_SGIDEFS_H)
 #include <sgidefs.h>		/* sgidefs.h defines them */
 #define HAVE___UINT32_T 1
-#define HAVE___UINT64_T 1
 #endif
 
+#if (!defined(HAVE___UINT64_T)) && defined(HAVE___UINT64_T_IN_SGIDEFS_H)
+#include <sgidefs.h>		/* sgidefs.h defines them */
+#define HAVE___UINT64_T 1
+#endif
 
 
 #if (!defined(HAVE___UINT32_T)) &&   \
 	defined(HAVE_SYS_TYPES_H) &&   \
 	defined(HAVE___UINT32_T_IN_SYS_TYPES_H)
 #  include <sys/types.h>
-/* we assume __[u]int32_t and __[u]int64_t defined 
-   since __uint32_t defined in the sys/types.h in use */
 #define HAVE___UINT32_T 1
+#endif
+
+#if (!defined(HAVE___UINT64_T)) &&   \
+	defined(HAVE_SYS_TYPES_H) &&   \
+	defined(HAVE___UINT64_T_IN_SYS_TYPES_H)
+#  include <sys/types.h>
 #define HAVE___UINT64_T 1
 #endif
 
 #ifndef HAVE___UINT32_T
 typedef int __int32_t;
 typedef unsigned __uint32_t;
-
 #define HAVE___UINT32_T 1
 #endif
+
 #ifndef HAVE___UINT64_T
 typedef long long __int64_t;
 typedef unsigned long long __uint64_t;
-
 #define HAVE___UINT64_T 1
 #endif
 
-#endif
+#endif /* LIBDWARFDEFS_H */

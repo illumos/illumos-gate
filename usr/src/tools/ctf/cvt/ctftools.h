@@ -26,8 +26,6 @@
 #ifndef _CTFTOOLS_H
 #define	_CTFTOOLS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Functions and data structures used in the manipulation of stabs and CTF data
  */
@@ -41,6 +39,17 @@
 
 #ifdef __cplusplus
 extern "C" {
+#endif
+
+/*
+ * XXX: This is hack to deal with GCC 4.x removing __builtin_stdarg_start
+ *
+ * We need to build on systems that don't have the fixed va_impl.h on the
+ * system, to achieve that, we stub it out here and in all similar places to
+ * give us a leg up.
+ */
+#if __GNUC__ >= 4
+#define	__builtin_stdarg_start(list, name)	__builtin_va_start(list, name)
 #endif
 
 #include "list.h"

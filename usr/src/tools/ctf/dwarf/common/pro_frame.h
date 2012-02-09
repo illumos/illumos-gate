@@ -1,6 +1,6 @@
 /*
 
-  Copyright (C) 2000 Silicon Graphics, Inc.  All Rights Reserved.
+  Copyright (C) 2000,2004 Silicon Graphics, Inc.  All Rights Reserved.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms of version 2.1 of the GNU Lesser General Public License 
@@ -17,12 +17,12 @@
   any, provided herein do not apply to combinations of this program with 
   other software, or any other product whatsoever.  
 
-  You should have received a copy of the GNU Lesser General Public 
-  License along with this program; if not, write the Free Software 
-  Foundation, Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, 
+  You should have received a copy of the GNU Lesser General Public
+  License along with this program; if not, write the Free Software
+  Foundation, Inc., 51 Franklin Street - Fifth Floor, Boston MA 02110-1301,
   USA.
 
-  Contact information:  Silicon Graphics, Inc., 1600 Amphitheatre Pky,
+  Contact information:  Silicon Graphics, Inc., 1500 Crittenden Lane,
   Mountain View, CA 94043, or:
 
   http://www.sgi.com
@@ -123,4 +123,10 @@ struct Dwarf_P_Fde_s {
     Dwarf_Unsigned fde_end_symbol;
 
     int fde_uwordb_size;
+    Dwarf_P_Debug fde_dbg;
+
+    /* If fde_block is non-null, then it is the set of instructions.
+       so we should use it rather than fde_inst. */
+    Dwarf_Unsigned fde_inst_block_size;
+    void *fde_block;
 };

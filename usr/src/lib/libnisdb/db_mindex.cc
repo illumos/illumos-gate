@@ -924,7 +924,7 @@ db_mindex::add(db_query *q, entry_object * obj)
 	bool_t valid;
 	db_index_entry *rp = NULL;
 	db_status rstat;
-	char		*myself = "db_mindex::add";
+	const char	*myself = "db_mindex::add";
 
 	/*
 	 *  The argument q is only NULL when we know that there are

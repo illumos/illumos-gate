@@ -140,9 +140,8 @@ CPPFLAGS +=	$(INCS) -DBUILD_TIME='"Wed Sep 24 12:00:00 2008"'
 LDLIBS		+= -ldevinfo
 LDLIBS		+= -lsysevent
 LDLIBS		+= -lnvpair
-CCRUNLIBS	= -lCstd -lCrun
-$(__GNUC)CCRUNLIBS	= -lstdc++ -lgcc_s
-LDLIBS		+= $(CCRUNLIBS)
+$(__SUNC)CCNEEDED	= -lCstd -lCrun
+LDLIBS		+= $(CCNEEDED)
 LDLIBS		+= -lc
 
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)

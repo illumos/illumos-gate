@@ -27,8 +27,6 @@
 #ifndef _CTF_HEADERS_H
 #define	_CTF_HEADERS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Because the ON tools are executed on the system where they are built,
  * the tools need to include the headers installed on the build system,
@@ -68,5 +66,16 @@
 #include <uts/common/sys/ctf.h>
 #include <uts/common/sys/ctf_api.h>
 #include <lib/libctf/common/libctf.h>
+
+/*
+ * XXX: This is hack to deal with GCC 4.x removing __builtin_stdarg_start
+ *
+ * We need to build on systems that don't have the fixed va_impl.h on the
+ * system, to achieve that, we stub it out here and in all similar places to
+ * give us a leg up.
+ */
+#if __GNUC__ >= 4
+#define	__builtin_stdarg_start(list, name)	__builtin_va_start(list, name)
+#endif
 
 #endif /* _CTF_HEADERS_H */

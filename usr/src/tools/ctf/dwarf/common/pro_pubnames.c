@@ -1,6 +1,6 @@
 /*
 
-  Copyright (C) 2000 Silicon Graphics, Inc.  All Rights Reserved.
+  Copyright (C) 2000,2004 Silicon Graphics, Inc.  All Rights Reserved.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms of version 2.1 of the GNU Lesser General Public License 
@@ -19,10 +19,10 @@
 
   You should have received a copy of the GNU Lesser General Public 
   License along with this program; if not, write the Free Software 
-  Foundation, Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, 
+  Foundation, Inc., 51 Franklin Street - Fifth Floor, Boston MA 02110-1301,
   USA.
 
-  Contact information:  Silicon Graphics, Inc., 1600 Amphitheatre Pky,
+  Contact information:  Silicon Graphics, Inc., 1500 Crittenden Lane,
   Mountain View, CA 94043, or:
 
   http://www.sgi.com
@@ -54,10 +54,10 @@
 
 Dwarf_Unsigned
 dwarf_add_pubname(Dwarf_P_Debug dbg,
-		  Dwarf_P_Die die,
-		  char *pubname_name, Dwarf_Error * error)
+                  Dwarf_P_Die die,
+                  char *pubname_name, Dwarf_Error * error)
 {
     return
-	_dwarf_add_simple_name_entry(dbg, die, pubname_name,
-				     dwarf_snk_pubname, error);
+        _dwarf_add_simple_name_entry(dbg, die, pubname_name,
+                                     dwarf_snk_pubname, error);
 }

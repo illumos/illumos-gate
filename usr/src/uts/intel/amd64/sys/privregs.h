@@ -27,7 +27,7 @@
 #ifndef	_AMD64_SYS_PRIVREGS_H
 #define	_AMD64_SYS_PRIVREGS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#include <sys/ccompile.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -255,7 +255,8 @@ struct regs {
 #if defined(_KERNEL) && !defined(_ASM)
 #if !defined(__lint) && defined(__GNUC__)
 
-extern __inline__ ulong_t getcr8(void)
+extern __GNU_INLINE ulong_t
+getcr8(void)
 {
 	uint64_t value;
 
@@ -265,7 +266,8 @@ extern __inline__ ulong_t getcr8(void)
 	return (value);
 }
 
-extern __inline__ void setcr8(ulong_t value)
+extern __GNU_INLINE void
+setcr8(ulong_t value)
 {
 	__asm__ __volatile__(
 	    "movq %0, %%cr8"

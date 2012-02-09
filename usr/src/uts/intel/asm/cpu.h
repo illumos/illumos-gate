@@ -26,6 +26,8 @@
 #ifndef _ASM_CPU_H
 #define	_ASM_CPU_H
 
+#include <sys/ccompile.h>
+
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -34,7 +36,7 @@ extern "C" {
 
 #if defined(__i386) || defined(__amd64)
 
-extern __inline__ void
+extern __GNU_INLINE void
 ht_pause(void)
 {
 	__asm__ __volatile__(
@@ -48,7 +50,7 @@ ht_pause(void)
  * older 32-bit processors, so define this as a no-op for now
  */
 
-extern __inline__ void
+extern __GNU_INLINE void
 prefetch_read_many(void *addr)
 {
 #if defined(__amd64)
@@ -60,8 +62,8 @@ prefetch_read_many(void *addr)
 #endif	/* __amd64 */
 }
 
-extern __inline__ void
-prefetch_read_once(void *addr)
+extern __GNU_INLINE void
+refetch_read_once(void *addr)
 {
 #if defined(__amd64)
 	__asm__(
@@ -72,7 +74,7 @@ prefetch_read_once(void *addr)
 #endif	/* __amd64 */
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 prefetch_write_many(void *addr)
 {
 #if defined(__amd64)
@@ -84,7 +86,7 @@ prefetch_write_many(void *addr)
 #endif	/* __amd64 */
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 prefetch_write_once(void *addr)
 {
 #if defined(__amd64)
@@ -98,21 +100,21 @@ prefetch_write_once(void *addr)
 
 #if !defined(__xpv)
 
-extern __inline__ void
+extern __GNU_INLINE void
 cli(void)
 {
 	__asm__ __volatile__(
 	    "cli" : : : "memory");
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 sti(void)
 {
 	__asm__ __volatile__(
 	    "sti");
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 i86_halt(void)
 {
 	__asm__ __volatile__(
@@ -125,7 +127,7 @@ i86_halt(void)
 
 #if defined(__amd64)
 
-extern __inline__ void
+extern __GNU_INLINE void
 __set_ds(selector_t value)
 {
 	__asm__ __volatile__(
@@ -134,7 +136,7 @@ __set_ds(selector_t value)
 	    : "r" (value));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 __set_es(selector_t value)
 {
 	__asm__ __volatile__(
@@ -143,7 +145,7 @@ __set_es(selector_t value)
 	    : "r" (value));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 __set_fs(selector_t value)
 {
 	__asm__ __volatile__(
@@ -152,7 +154,7 @@ __set_fs(selector_t value)
 	    : "r" (value));
 }
 
-extern __inline__ void
+extern __GNU_INLINE void
 __set_gs(selector_t value)
 {
 	__asm__ __volatile__(
@@ -163,7 +165,7 @@ __set_gs(selector_t value)
 
 #if !defined(__xpv)
 
-extern __inline__ void
+extern __GNU_INLINE void
 __swapgs(void)
 {
 	__asm__ __volatile__(

@@ -27,8 +27,7 @@
 #ifndef	_BASE_INLINES_H
 #define	_BASE_INLINES_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#include <sys/ccompile.h>
 #include <sys/types.h>
 
 #if !defined(__lint) && defined(__GNUC__)
@@ -41,7 +40,7 @@
  */
 
 #if defined(__sparc)
-extern __inline__ double
+extern __GNU_INLINE double
 __mul_set(double x, double y, int *pe)
 {
 	double __result;
@@ -49,19 +48,19 @@ __mul_set(double x, double y, int *pe)
 	uint32_t *__addr = &__fsr;
 
 	__asm__ __volatile__(
-		"fmuld %4, %5, %0\n\t"
-		"st %%fsr, %3\n\t"
-		"ld %3, %2\n\t"
-		"and %2, 1, %2\n\t"
-		"st %2, %1"
-		: "=&e" (__result), "=m" (*pe), "=r" (__fsr), "=m" (*__addr)
-		: "e" (x), "e" (y));
+	    "fmuld %4, %5, %0\n\t"
+	    "st %%fsr, %3\n\t"
+	    "ld %3, %2\n\t"
+	    "and %2, 1, %2\n\t"
+	    "st %2, %1"
+	    : "=&e" (__result), "=m" (*pe), "=r" (__fsr), "=m" (*__addr)
+	    : "e" (x), "e" (y));
 	return (__result);
 }
 #endif	/* __sparc */
 
 #if defined(__sparc)
-extern __inline__ double
+extern __GNU_INLINE double
 __div_set(double x, double y, int *pe)
 {
 	double __result;
@@ -69,37 +68,37 @@ __div_set(double x, double y, int *pe)
 	uint32_t *__addr = &__fsr;
 
 	__asm__ __volatile__(
-		"fdivd %4, %5, %0\n\t"
-		"st %%fsr, %3\n\t"
-		"ld %3, %2\n\t"
-		"and %2, 1, %2\n\t"
-		"st %2, %1"
-		: "=&e" (__result), "=m" (*pe), "=r" (__fsr), "=m" (*__addr)
-		: "e" (x), "e" (y));
+	    "fdivd %4, %5, %0\n\t"
+	    "st %%fsr, %3\n\t"
+	    "ld %3, %2\n\t"
+	    "and %2, 1, %2\n\t"
+	    "st %2, %1"
+	    : "=&e" (__result), "=m" (*pe), "=r" (__fsr), "=m" (*__addr)
+	    : "e" (x), "e" (y));
 	return (__result);
 }
 #endif	/* __sparc */
 
 #if defined(__sparc)
-extern __inline__ double
+extern __GNU_INLINE double
 __dabs(double *x)
 {
 	double __result;
 
 	__asm__ __volatile__(
 #if defined(__sparcv9)
-		"fabsd %1, %0"
+	    "fabsd %1, %0"
 #else
-		"fabss %1, %0"
+	    "fabss %1, %0"
 #endif
-		: "=e" (__result)
-		: "0" (*x));
+	    : "=e" (__result)
+	    : "0" (*x));
 	return (__result);
 }
 #endif	/* __sparc */
 
 #if defined(__sparc)
-extern __inline__ void
+extern  __GNU_INLINE void
 __get_ieee_flags(__ieee_flags_type *b)
 {
 	uint32_t __fsr;
@@ -109,16 +108,16 @@ __get_ieee_flags(__ieee_flags_type *b)
 	 * needed; however, it warns as it does so.  Add them here for now.
 	 */
 	__asm__ __volatile__(
-		"st %%fsr, %0\n\t"
-		"st %%g0, %1\n\t"
-		"ld %1, %%fsr\n\t"
-		"nop; nop; nop"
-		: "=m" (*b), "=m" (__fsr));
+	    "st %%fsr, %0\n\t"
+	    "st %%g0, %1\n\t"
+	    "ld %1, %%fsr\n\t"
+	    "nop; nop; nop"
+	    : "=m" (*b), "=m" (__fsr));
 }
 #endif	/* __sparc */
 
 #if defined(__sparc)
-extern __inline__ void
+extern __GNU_INLINE void
 __set_ieee_flags(__ieee_flags_type *b)
 {
 	/*
@@ -126,10 +125,10 @@ __set_ieee_flags(__ieee_flags_type *b)
 	 * needed; however, it warns as it does so.  Add them here for now.
 	 */
 	__asm__ __volatile__(
-		"ld %0, %%fsr\n\t"
-		"nop; nop; nop"
-		: /* no outputs */
-		: "m" (*b));
+	    "ld %0, %%fsr\n\t"
+	    "nop; nop; nop"
+	    : /* no outputs */
+	    : "m" (*b));
 }
 #endif	/* __sparc */
 
