@@ -732,15 +732,23 @@ read_heap_byte(uint8_t *valp, uintptr_t addr, const char *klass,
  * heap object and then retrieving the type byte from the Map object.
  */
 static int
-read_typebyte(uint8_t *valp, uintptr_t addr)
+read_typebyte(uint8_t *valp, uintptr_t addr, boolean_t silent)
 {
 	uintptr_t mapaddr;
+	ssize_t off;
 
-	if (read_heap_ptr(&mapaddr, addr, "HeapObject", "map") != 0)
+	if (heap_offset("HeapObject", "map", &off, silent) != 0)
 		return (-1);
 
+	if (mdb_vread(&mapaddr, sizeof (mapaddr), addr + off) == -1) {
+		if (!silent)
+			mdb_warn("failed to read type of %p", addr);
+		return (-1);
+	}
+
 	if (!V8_IS_HEAPOBJECT(mapaddr)) {
-		mdb_warn("heap object map is not itself a heap object\n");
+		if (!silent)
+			mdb_warn("object map is not a heap object\n");
 		return (-1);
 	}
 
@@ -800,7 +808,7 @@ obj_jstype(uintptr_t addr, char **bufp, size_t *lenp, uint8_t *typep)
 		return (0);
 	}
 
-	if (read_typebyte(&typebyte, addr) != 0)
+	if (read_typebyte(&typebyte, addr, B_FALSE) != 0)
 		return (-1);
 
 	if (typep)
@@ -936,7 +944,7 @@ jsstr_print(uintptr_t addr, boolean_t verbose, char **bufp, size_t *lenp)
 	size_t llen;
 	char buf[64];
 
-	if (read_typebyte(&typebyte, addr) != 0)
+	if (read_typebyte(&typebyte, addr, B_FALSE) != 0)
 		return (0);
 
 	if (!V8_TYPE_STRING(typebyte)) {
@@ -1074,7 +1082,7 @@ jsobj_is_undefined(uintptr_t addr)
 	char *bufp = buf;
 	size_t len = sizeof (buf);
 
-	if (read_typebyte(&type, addr) != 0)
+	if (read_typebyte(&type, addr, B_TRUE) != 0)
 		return (B_FALSE);
 
 	typename = enum_lookup_str(v8_types, type, "<unknown>");
@@ -1221,7 +1229,7 @@ jsobj_print(uintptr_t addr, boolean_t printaddr, int indent, int depth,
 		return (-1);
 	}
 
-	if (read_typebyte(&type, addr) != 0)
+	if (read_typebyte(&type, addr, B_FALSE) != 0)
 		return (-1);
 
 	if (V8_TYPE_STRING(type))
@@ -1294,7 +1302,7 @@ jsobj_print_jsobject(uintptr_t addr, boolean_t printaddr, int indent,
 	if (read_heap_ptr(&ptr, addr, "JSObject", "properties") != 0)
 		return (-1);
 
-	if (read_typebyte(&type, ptr) != 0)
+	if (read_typebyte(&type, ptr, B_FALSE) != 0)
 		return (-1);
 
 	if (strcmp(enum_lookup_str(v8_types, type, ""), "FixedArray") != 0) {
@@ -1554,7 +1562,7 @@ dcmd_v8function(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    NULL) != argc)
 		return (DCMD_USAGE);
 
-	if (read_typebyte(&type, addr) != 0)
+	if (read_typebyte(&type, addr, B_FALSE) != 0)
 		return (DCMD_ERR);
 
 	if (strcmp(enum_lookup_str(v8_types, type, ""), "JSFunction") != 0) {
@@ -1688,60 +1696,42 @@ dcmd_v8types(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
-/* ARGSUSED */
 static int
-dcmd_jsframe(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+load_current_context(uintptr_t *fpp, uintptr_t *raddrp)
 {
-	uint8_t type;
-	uintptr_t fptr, raddr, ftype, funcp;
-	uintptr_t funcinfop, tokpos, scriptp, lendsp, ptrp;
-	uintptr_t ii, nargs;
-	boolean_t opt_v = B_FALSE, opt_i = B_FALSE;
-	char typebuf[256];
-	char funcname[64];
-	char *bufp;
-	const char *ftypenm;
-	size_t len;
+	mdb_reg_t regfp, regip;
 
-	if (mdb_getopts(argc, argv, 'v', MDB_OPT_SETBITS, B_TRUE, &opt_v,
-	    'i', MDB_OPT_SETBITS, B_TRUE, &opt_i, NULL) != argc)
-		return (DCMD_USAGE);
-
-	/*
-	 * As with $C, we assume we are given a *pointer* to the frame pointer
-	 * for a frame, rather than the actual frame pointer for the frame of
-	 * interest. This is needed to show the instruction pointer, which is
-	 * actually stored with the next frame. For debugging, this can be
-	 * overridden with the "-i" option (for "immediate").
-	 */
-	if (opt_i) {
-		fptr = addr;
-		raddr = 0;
-	} else {
-		if (mdb_vread(&raddr, sizeof (raddr),
-		    addr + sizeof (uintptr_t)) == -1) {
-			mdb_warn("failed to read return address from %p",
-			    addr + sizeof (uintptr_t));
-			return (DCMD_ERR);
-		}
-
-		if (mdb_vread(&fptr, sizeof (fptr), addr) == -1) {
-			mdb_warn("failed to read frame pointer from %p", addr);
-			return (DCMD_ERR);
-		}
+	if (mdb_getareg(1, "ebp", &regfp) != 0 ||
+	    mdb_getareg(1, "eip", &regip) != 0) {
+		mdb_warn("failed to load current context");
+		return (-1);
 	}
 
+	if (fpp != NULL)
+		*fpp = (uintptr_t)regfp;
+
+	if (raddrp != NULL)
+		*raddrp = (uintptr_t)regip;
+
+	return (0);
+}
+
+static int
+do_jsframe_special(uintptr_t fptr, uintptr_t raddr)
+{
+	uintptr_t ftype;
+	const char *ftypename;
+
 	/*
-	 * First figure out what kind of frame this is using the same algorithm
-	 * as V8's ComputeType function.  First, look for an
-	 * ArgumentsAdaptorFrame.
+	 * Figure out what kind of frame this is using the same algorithm as
+	 * V8's ComputeType function.  First, look for an ArgumentsAdaptorFrame.
 	 */
 	if (mdb_vread(&ftype, sizeof (ftype), fptr + V8_OFF_FP_CONTEXT) != -1 &&
 	    V8_IS_SMI(ftype) &&
-	    (ftypenm = enum_lookup_str(v8_frametypes, V8_SMI_VALUE(ftype),
-	    NULL)) != NULL && strstr(ftypenm, "ArgumentsAdaptor") != NULL) {
-		mdb_printf("%p %a <%s>\n", fptr, raddr, ftypenm);
-		return (DCMD_OK);
+	    (ftypename = enum_lookup_str(v8_frametypes, V8_SMI_VALUE(ftype),
+	    NULL)) != NULL && strstr(ftypename, "ArgumentsAdaptor") != NULL) {
+		mdb_printf("%p %a <%s>\n", fptr, raddr, ftypename);
+		return (0);
 	}
 
 	/*
@@ -1749,40 +1739,65 @@ dcmd_jsframe(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	 */
 	if (mdb_vread(&ftype, sizeof (ftype), fptr + V8_OFF_FP_MARKER) != -1 &&
 	    V8_IS_SMI(ftype)) {
-		ftypenm = enum_lookup_str(v8_frametypes, V8_SMI_VALUE(ftype),
+		ftypename = enum_lookup_str(v8_frametypes, V8_SMI_VALUE(ftype),
 		    NULL);
 
-		if (ftypenm != NULL) {
-			mdb_printf("%p %a <%s>\n", fptr, raddr, ftypenm);
-			return (DCMD_OK);
-		}
+		if (ftypename != NULL)
+			mdb_printf("%p %a <%s>\n", fptr, raddr, ftypename);
+		else
+			mdb_printf("%p %a\n", fptr, raddr);
 
-		mdb_printf("%p %a\n", fptr, raddr);
-		return (DCMD_OK);
+		return (0);
 	}
+
+	return (-1);
+}
+
+static int
+do_jsframe(uintptr_t fptr, uintptr_t raddr, boolean_t verbose)
+{
+	uintptr_t funcp, funcinfop, tokpos, scriptp, lendsp, ptrp;
+	uintptr_t ii, nargs;
+	const char *typename;
+	char *bufp;
+	size_t len;
+	uint8_t type;
+	char buf[256];
+
+	/*
+	 * Check for non-JavaScript frames first.
+	 */
+	if (do_jsframe_special(fptr, raddr) == 0)
+		return (DCMD_OK);
 
 	/*
 	 * At this point we assume we're looking at a JavaScript frame.  As with
 	 * native frames, fish the address out of the parent frame.
 	 */
-	if (mdb_vread(&funcp, sizeof (funcp), fptr + V8_OFF_FP_FUNCTION) == -1)
+	if (mdb_vread(&funcp, sizeof (funcp),
+	    fptr + V8_OFF_FP_FUNCTION) == -1) {
+		mdb_warn("failed to read stack at %p",
+		    fptr + V8_OFF_FP_FUNCTION);
 		return (DCMD_ERR);
+	}
 
 	/*
-	 * See if this thing is really a JSFunction at all. For some frames,
+	 * Check if this thing is really a JSFunction at all. For some frames,
 	 * it's a Code object, presumably indicating some internal frame.
 	 */
-	if (read_typebyte(&type, funcp) != 0 ||
-	    (ftypenm = enum_lookup_str(v8_types, type, NULL)) == NULL)
-		return (DCMD_ERR);
+	if (read_typebyte(&type, funcp, B_TRUE) != 0 ||
+	    (typename = enum_lookup_str(v8_types, type, NULL)) == NULL) {
+		mdb_printf("%p %a\n", fptr, raddr);
+		return (DCMD_OK);
+	}
 
-	if (strcmp("Code", ftypenm) == 0) {
+	if (strcmp("Code", typename) == 0) {
 		mdb_printf("%p %a internal (Code: %p)\n", fptr, raddr, funcp);
 		return (DCMD_OK);
 	}
 
-	if (strcmp("JSFunction", ftypenm) != 0) {
-		mdb_printf("%p %a unknown (%s: %p)", fptr, raddr, ftypenm,
+	if (strcmp("JSFunction", typename) != 0) {
+		mdb_printf("%p %a unknown (%s: %p)", fptr, raddr, typename,
 		    funcp);
 		return (DCMD_OK);
 	}
@@ -1790,12 +1805,15 @@ dcmd_jsframe(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (read_heap_ptr(&funcinfop, funcp, "JSFunction", "shared") != 0)
 		return (DCMD_ERR);
 
-	bufp = funcname;
-	len = sizeof (funcname);
+	bufp = buf;
+	len = sizeof (buf);
 	if (jsfunc_name(funcinfop, &bufp, &len) != 0)
 		return (DCMD_ERR);
 
-	mdb_printf("%p %a %s (%p)", fptr, raddr, funcname, funcp);
+	mdb_printf("%p %a %s (%p)\n", fptr, raddr, buf, funcp);
+
+	if (!verbose)
+		return (DCMD_OK);
 
 	/*
 	 * Although the token position is technically an SMI, we're going to
@@ -1812,49 +1830,80 @@ dcmd_jsframe(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (read_heap_ptr(&ptrp, scriptp, "Script", "name") != 0)
 		return (DCMD_ERR);
 
-	if (opt_v) {
-		bufp = typebuf;
-		len = sizeof (typebuf);
-		(void) jsstr_print(ptrp, B_FALSE, &bufp, &len);
+	bufp = buf;
+	len = sizeof (buf);
+	(void) jsstr_print(ptrp, B_FALSE, &bufp, &len);
 
-		mdb_printf("\n");
-		(void) mdb_inc_indent(4);
-		mdb_printf("func: %p\n", funcp);
-		mdb_printf("file: %s\n", typebuf);
+	(void) mdb_inc_indent(4);
+	mdb_printf("file: %s\n", buf);
 
-		if (read_heap_ptr(&lendsp, scriptp, "Script", "line_ends") != 0)
-			return (DCMD_ERR);
+	if (read_heap_ptr(&lendsp, scriptp, "Script", "line_ends") != 0)
+		return (DCMD_ERR);
 
-		(void) jsfunc_lineno(lendsp, tokpos, typebuf, sizeof (typebuf));
+	(void) jsfunc_lineno(lendsp, tokpos, buf, sizeof (buf));
 
-		if (opt_v)
-			mdb_printf("posn: %s\n", typebuf);
-		else
-			mdb_printf("%s\n", typebuf);
+	mdb_printf("posn: %s\n", buf);
 
-		if (read_heap_smi(&nargs, funcinfop,
-		    "SharedFunctionInfo", "length") == 0) {
-			for (ii = 0; ii < nargs; ii++) {
-				uintptr_t argptr;
+	if (read_heap_smi(&nargs, funcinfop, "SharedFunctionInfo",
+	    "length") == 0) {
+		for (ii = 0; ii < nargs; ii++) {
+			uintptr_t argptr;
 
-				if (mdb_vread(&argptr, sizeof (argptr),
-				    fptr + V8_OFF_FP_ARGS + (nargs - ii - 1) *
-				    sizeof (uintptr_t)) == -1)
-					continue;
+			if (mdb_vread(&argptr, sizeof (argptr),
+			    fptr + V8_OFF_FP_ARGS + (nargs - ii - 1) *
+			    sizeof (uintptr_t)) == -1)
+				continue;
 
-				bufp = typebuf;
-				len = sizeof (typebuf);
-				(void) obj_jstype(argptr, &bufp, &len, NULL);
+			bufp = buf;
+			len = sizeof (buf);
+			(void) obj_jstype(argptr, &bufp, &len, NULL);
 
-				mdb_printf("arg%d: %p (%s)\n", (ii + 1),
-				    argptr, typebuf);
-			}
+			mdb_printf("arg%d: %p (%s)\n", (ii + 1), argptr, buf);
 		}
-
-		(void) mdb_dec_indent(4);
 	}
 
+	(void) mdb_dec_indent(4);
+
 	return (DCMD_OK);
+}
+
+/* ARGSUSED */
+static int
+dcmd_jsframe(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	uintptr_t fptr, raddr;
+	boolean_t opt_v = B_FALSE, opt_i = B_FALSE;
+
+	if (mdb_getopts(argc, argv, 'v', MDB_OPT_SETBITS, B_TRUE, &opt_v,
+	    'i', MDB_OPT_SETBITS, B_TRUE, &opt_i, NULL) != argc)
+		return (DCMD_USAGE);
+
+	/*
+	 * As with $C, we assume we are given a *pointer* to the frame pointer
+	 * for a frame, rather than the actual frame pointer for the frame of
+	 * interest. This is needed to show the instruction pointer, which is
+	 * actually stored with the next frame.  For debugging, this can be
+	 * overridden with the "-i" option (for "immediate").
+	 */
+	if (opt_i)
+		return (do_jsframe(addr, 0, opt_v));
+
+	if (mdb_vread(&raddr, sizeof (raddr),
+	    addr + sizeof (uintptr_t)) == -1) {
+		mdb_warn("failed to read return address from %p",
+		    addr + sizeof (uintptr_t));
+		return (DCMD_ERR);
+	}
+
+	if (mdb_vread(&fptr, sizeof (fptr), addr) == -1) {
+		mdb_warn("failed to read frame pointer from %p", addr);
+		return (DCMD_ERR);
+	}
+
+	if (fptr == NULL)
+		return (DCMD_OK);
+
+	return (do_jsframe(fptr, raddr, opt_v));
 }
 
 /* ARGSUSED */
@@ -1958,7 +2007,7 @@ dcmd_v8array(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	uintptr_t *array;
 	size_t ii, len;
 
-	if (read_typebyte(&type, addr) != 0)
+	if (read_typebyte(&type, addr, B_FALSE) != 0)
 		return (DCMD_ERR);
 
 	if (strcmp(enum_lookup_str(v8_types, type, ""), "FixedArray") != 0) {
@@ -1979,8 +2028,23 @@ dcmd_v8array(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 static int
 dcmd_jsstack(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	if (!(flags & DCMD_ADDRSPEC))
-		addr = NULL;
+	uintptr_t raddr;
+	boolean_t opt_v;
+
+	if (mdb_getopts(argc, argv, 'v', MDB_OPT_SETBITS, B_TRUE, &opt_v,
+	    NULL) != argc)
+		return (DCMD_USAGE);
+
+	/*
+	 * The "::jsframe" walker iterates the valid frame pointers, but the
+	 * "::jsframe" dcmd looks at the frame after the one it was given, so we
+	 * have to explicitly examine the top frame here.
+	 */
+	if (!(flags & DCMD_ADDRSPEC)) {
+		if (load_current_context(&addr, &raddr) != 0 ||
+		    do_jsframe(addr, raddr, opt_v) != 0)
+			return (DCMD_ERR);
+	}
 
 	if (mdb_pwalk_dcmd("jsframe", "jsframe", argc, argv, addr) == -1)
 		return (DCMD_ERR);
@@ -2072,17 +2136,12 @@ dcmd_v8load(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 static int
 walk_jsframes_init(mdb_walk_state_t *wsp)
 {
-	mdb_reg_t reg;
-
 	if (wsp->walk_addr != NULL)
 		return (WALK_NEXT);
 
-	if (mdb_getareg(1, "ebp", &reg) != 0) {
-		mdb_warn("failed to read ebp for thread 1");
+	if (load_current_context(&wsp->walk_addr, NULL) != 0)
 		return (WALK_ERR);
-	}
 
-	wsp->walk_addr = (uintptr_t)reg;
 	return (WALK_NEXT);
 }
 
