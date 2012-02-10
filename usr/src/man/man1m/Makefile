@@ -621,7 +621,6 @@ sparc_MANFILES =	cvcd.1m			\
 	 	 	dcs.1m			\
 	 	 	drd.1m			\
 	 	 	efdaemon.1m		\
-	 	 	fpsd.1m			\
 	 	 	ldmad.1m		\
 	 	 	monitor.1m		\
 	 	 	obpsym.1m		\

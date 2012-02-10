@@ -159,6 +159,7 @@ UNREF_OBJ	/lib.*\ of\ .*libxml2\.so\.2
 UNREF_OBJ	/lib.*\ of\ .*libxslt\.so\.1
 UNREF_OBJ	/lib.*\ of\ .*libpq\.so\.4
 UNREF_OBJ	/lib.*\ of\ .*libpython2\.4\.so\.1\.0
+UNREF_OBJ	/libgcc_s.*\ of\ .*libstdc\+\+\.so\.6
 
 # Unreferenced object of objects we can't change for other reasons
 UNREF_OBJ	/libmapmalloc\.so\.1;\ unused\ dependency\ of	# interposer
@@ -167,6 +168,8 @@ UNREF_OBJ	/libm\.so\.2.*\ of\ .*libstdc\+\+\.so\.6	# gcc build
 UNREF_OBJ	/lib.*\ of\ .*/lib/picl/plugins/		# picl
 UNREF_OBJ	/lib.*\ of\ .*kcfd				# interposer
 UNREF_OBJ	/libpkcs11\.so\.1; .*\ of\ .*libkmf\.so\.1	# interposed
+UNREF_OBJ	/libc\.so\.1.*\ of\ .*kldap\.so\.1              # gcc build
+
 
 # Objects that used to contain system functionalty that has since
 # migrated to libc. We preserve these libraries as pure filters for

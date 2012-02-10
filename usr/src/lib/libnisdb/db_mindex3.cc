@@ -99,7 +99,7 @@ db_mindex::entriesFromLDAP(__nis_table_mapping_t *t, db_query *qin, db_query *q,
 	__entries_from_ldap_arg_t	*arg;
 	int				stat;
 	db_status			dstat;
-	char				*myself = "db_mindex::entriesFromLDAP";
+	const char			*myself = "db_mindex::entriesFromLDAP";
 
 	arg = (__entries_from_ldap_arg_t *)am(myself, sizeof (*arg));
 	if (arg == 0) {
@@ -282,7 +282,7 @@ entriesFromLDAPthread(void *voidarg) {
 
 	/* Lock to prevent removal */
 	(void) __nis_lock_db_table(arg->tableName, 1, 0,
-					"entriesFromLDAPthread");
+					(char *)"entriesFromLDAPthread");
 
 	/*
 	 * It's possible that the db_mindex for the table has changed,
@@ -314,7 +314,7 @@ entriesFromLDAPthread(void *voidarg) {
 	stat = entriesFromLDAPreal(arg);
 
 	(void) __nis_ulock_db_table(arg->tableName, 1, 0,
-					"entriesFromLDAPthread");
+					(char *)"entriesFromLDAPthread");
 
 	freeQuery(arg->q);
 	if (arg->dirObj != 0)
@@ -343,7 +343,7 @@ entriesFromLDAPreal(__entries_from_ldap_arg_t *arg) {
 	bool_t				doEnum;
 	db_status			dstat;
 	struct timeval			start;
-	char				*myself =
+	const char			*myself =
 					"db_mindex::entriesFromLDAPreal";
 
 	if (arg == 0)
@@ -708,9 +708,9 @@ entriesFromLDAPreal(__entries_from_ldap_arg_t *arg) {
 				o.zo_ttl = to->zo_ttl;
 		} else {
 			tc = 0;
-			o.zo_owner = "";
-			o.zo_group = "";
-			o.zo_domain = "";
+			o.zo_owner = (char *)"";
+			o.zo_group = (char *)"";
+			o.zo_domain = (char *)"";
 		}
 
 		o.zo_data.zo_type = NIS_ENTRY_OBJ;

@@ -68,6 +68,7 @@ file path=opt/onbld/bin/$(ARCH)/ctfconvert mode=0555
 file path=opt/onbld/bin/$(ARCH)/ctfdump mode=0555
 file path=opt/onbld/bin/$(ARCH)/ctfmerge mode=0555
 file path=opt/onbld/bin/$(ARCH)/ctfstabs mode=0555
+file path=opt/onbld/bin/$(ARCH)/ctfstrip mode=0555
 file path=opt/onbld/bin/$(ARCH)/cw mode=0555
 $(i386_ONLY)file path=opt/onbld/bin/$(ARCH)/elfextract mode=0555
 file path=opt/onbld/bin/$(ARCH)/findunref mode=0555

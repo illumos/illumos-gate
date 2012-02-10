@@ -824,7 +824,8 @@ __td_ta_tsd_iter(td_thragent_t *ta_p, td_key_iter_f *cb, void *cbdata_p)
 		else {
 			for (key = 1; key < numkeys; key++) {
 				destruct32 = destructors32[key];
-				if (destruct32 != (caddr32_t)TSD_UNALLOCATED &&
+				if ((destruct32 !=
+				    (caddr32_t)(uintptr_t)TSD_UNALLOCATED) &&
 				    (*cb)(key, (PFrV)(uintptr_t)destruct32,
 				    cbdata_p))
 					break;

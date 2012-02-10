@@ -1455,9 +1455,9 @@ fcoei_fill_els_prli_cmd(fc_packet_t *fpkt, fcoe_frame_t *frm)
 	 * PRLI flags, only 3 bits are valid
 	 */
 	offset = 6;
-	FCOE_V2B_2((fcp_spp->orig_process_assoc_valid * BIT_15) |
+	FCOE_V2B_2((uint8_t)((fcp_spp->orig_process_assoc_valid * BIT_15) |
 	    (fcp_spp->resp_process_assoc_valid * BIT_14) |
-	    (fcp_spp->establish_image_pair * BIT_13), FPLD + offset);
+	    (fcp_spp->establish_image_pair * BIT_13)), FPLD + offset);
 
 	/*
 	 * process associator

@@ -156,10 +156,9 @@ typedef struct mboxsc_mbox {
 	(((tid) == 0) || ((tid) == (msgp)->msg_transid))
 
 /*
- * These macros can be used to determine the offset or size of any field in the
- * message header (or any other struct, for that matter).
+ * This macro can be used to determine the size of any field in the message
+ * header (or any other struct, for that matter).
  */
-#define	FIELD_OFFSET(type, field)	((uint32_t)&(((type *)0)->field))
 #define	FIELD_SIZE(type, field)		(sizeof (((type *)0)->field))
 
 /*
@@ -1079,7 +1078,7 @@ mboxsc_getmsg_retry:
 
 	if ((error == 0) && (data_valid == IOSRAM_DATA_VALID)) {
 		error = mboxsc_timed_read(deadline, key,
-		    FIELD_OFFSET(mboxsc_msghdr_t, msg_transid),
+		    offsetof(mboxsc_msghdr_t, msg_transid),
 		    FIELD_SIZE(mboxsc_msghdr_t, msg_transid),
 		    (caddr_t)&read_transid);
 	}

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -98,7 +98,7 @@ v8cfg_canned_readsym(v8_cfg_t *cfgp, const char *name, intptr_t *valp)
 /*
  * Canned configuration for the V8 bundled with Node.js v0.4.8 and later.
  */
-static v8_cfg_symbol_t v8_cfg_node_04[] = {
+static v8_cfg_symbol_t v8_symbols_node_04[] = {
 	{ "v8dbg_type_AccessCheckInfo__ACCESS_CHECK_INFO_TYPE", 0x91 },
 	{ "v8dbg_type_AccessorInfo__ACCESSOR_INFO_TYPE", 0x90 },
 	{ "v8dbg_type_BreakPointInfo__BREAK_POINT_INFO_TYPE", 0x9b },
@@ -169,6 +169,8 @@ static v8_cfg_symbol_t v8_cfg_node_04[] = {
 	{ "v8dbg_class_CallHandlerInfo__callback__Object", 0x4 },
 	{ "v8dbg_class_CallHandlerInfo__data__Object", 0x8 },
 	{ "v8dbg_class_Code__deoptimization_data__FixedArray", 0xc },
+	{ "v8dbg_class_Code__instruction_size__int", 0x4 },
+	{ "v8dbg_class_Code__instruction_start__int", 0x20 },
 	{ "v8dbg_class_Code__relocation_info__ByteArray", 0x8 },
 	{ "v8dbg_class_CodeCache__default_cache__FixedArray", 0x4 },
 	{ "v8dbg_class_CodeCache__normal_type_cache__Object", 0x8 },
@@ -252,6 +254,7 @@ static v8_cfg_symbol_t v8_cfg_node_04[] = {
 	{ "v8dbg_class_Script__type__Smi", 0x20 },
 	{ "v8dbg_class_Script__wrapper__Proxy", 0x1c },
 	{ "v8dbg_class_SeqAsciiString__chars__char", 0xc },
+	{ "v8dbg_class_SharedFunctionInfo__code__Code", 0x8 },
 	{ "v8dbg_class_SharedFunctionInfo__compiler_hints__SMI", 0x50 },
 	{ "v8dbg_class_SharedFunctionInfo__construct_stub__Code", 0x10 },
 	{ "v8dbg_class_SharedFunctionInfo__debug_info__Object", 0x20 },
@@ -388,7 +391,7 @@ static v8_cfg_symbol_t v8_cfg_node_04[] = {
 /*
  * Canned configuration for the V8 bundled with Node.js v0.6.5.
  */
-static v8_cfg_symbol_t v8_cfg_node_065[] = {
+static v8_cfg_symbol_t v8_symbols_node_06[] = {
 	{ "v8dbg_type_AccessCheckInfo__ACCESS_CHECK_INFO_TYPE", 0x93 },
 	{ "v8dbg_type_AccessorInfo__ACCESSOR_INFO_TYPE", 0x92 },
 	{ "v8dbg_type_BreakPointInfo__BREAK_POINT_INFO_TYPE", 0x9e },
@@ -468,6 +471,8 @@ static v8_cfg_symbol_t v8_cfg_node_065[] = {
 	{ "v8dbg_class_CallHandlerInfo__callback__Object", 0x4 },
 	{ "v8dbg_class_CallHandlerInfo__data__Object", 0x8 },
 	{ "v8dbg_class_Code__deoptimization_data__FixedArray", 0xc },
+	{ "v8dbg_class_Code__instruction_size__int", 0x4 },
+	{ "v8dbg_class_Code__instruction_start__int", 0x20 },
 	{ "v8dbg_class_Code__next_code_flushing_candidate__Object", 0x10 },
 	{ "v8dbg_class_Code__relocation_info__ByteArray", 0x8 },
 	{ "v8dbg_class_CodeCache__default_cache__FixedArray", 0x4 },
@@ -559,6 +564,7 @@ static v8_cfg_symbol_t v8_cfg_node_065[] = {
 	{ "v8dbg_class_Script__type__Smi", 0x20 },
 	{ "v8dbg_class_Script__wrapper__Foreign", 0x1c },
 	{ "v8dbg_class_SeqAsciiString__chars__char", 0xc },
+	{ "v8dbg_class_SharedFunctionInfo__code__Code", 0x8 },
 	{ "v8dbg_class_SharedFunctionInfo__compiler_hints__SMI", 0x50 },
 	{ "v8dbg_class_SharedFunctionInfo__construct_stub__Code", 0x10 },
 	{ "v8dbg_class_SharedFunctionInfo__debug_info__Object", 0x20 },
@@ -703,12 +709,16 @@ static v8_cfg_symbol_t v8_cfg_node_065[] = {
 	{ NULL },
 };
 
-v8_cfg_t v8_cfgs[] = {
-	{ "node-0.4", "node 0.4 versions starting with 0.4.8", v8_cfg_node_04,
-	    v8cfg_canned_iter, v8cfg_canned_readsym },
-	{ "node-0.6.5", "node v0.6.5", v8_cfg_node_065,
-	    v8cfg_canned_iter, v8cfg_canned_readsym },
-	{ NULL }
+v8_cfg_t v8_cfg_04 = { "node-0.4", "node v0.4", v8_symbols_node_04,
+    v8cfg_canned_iter, v8cfg_canned_readsym };
+
+v8_cfg_t v8_cfg_06 = { "node-0.6", "node v0.6", v8_symbols_node_06,
+    v8cfg_canned_iter, v8cfg_canned_readsym };
+
+v8_cfg_t *v8_cfgs[] = {
+	&v8_cfg_04,
+	&v8_cfg_06,
+	NULL
 };
 
 v8_cfg_t v8_cfg_target = { NULL, NULL, NULL, v8cfg_target_iter,

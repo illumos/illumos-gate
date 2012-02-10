@@ -32,6 +32,7 @@
 #include <sys/debug.h>
 #include <sys/ddi.h>
 #include <sys/nsc_thread.h>
+#include <sys/sysmacros.h>
 #include <sys/unistat/spcs_s.h>
 #include <sys/unistat/spcs_errors.h>
 
@@ -67,7 +68,7 @@
 
 
 #define	II_TAIL_COPY(d, s, m, t)	bcopy(&(s.m), &(d.m), \
-					sizeof (d) - (uint_t)&((t *)0)->m)
+					sizeof (d) - (uintptr_t)&((t *)0)->m)
 extern dev_info_t *ii_dip;
 
 #define	II_LINK_CLUSTER(ip, cluster) \
@@ -4234,7 +4235,8 @@ _ii_gc_list(intptr_t arg, int ilp32, int *rvp, kmutex_t *mutex,
 {
 	dsw_aioctl_t ulist;
 	dsw_aioctl32_t ulist32;
-	int name_offset, i;
+	size_t name_offset;
+	int i;
 	spcs_s_info_t kstatus;
 	char *carg = (char *)arg;
 	uint64_t hash;
@@ -4242,13 +4244,13 @@ _ii_gc_list(intptr_t arg, int ilp32, int *rvp, kmutex_t *mutex,
 	_ii_lstinfo_t *np;
 
 	*rvp = 0;
-	name_offset = (int)&(((dsw_aioctl_t *)0)->shadow_vol[0]);
+	name_offset = offsetof(dsw_aioctl_t, shadow_vol[0]);
 	if (ilp32) {
 		if (copyin((void *) arg, &ulist32, sizeof (ulist32)) < 0)
 			return (EFAULT);
 		II_TAIL_COPY(ulist, ulist32, flags, dsw_aioctl_t);
 		ulist.status = (spcs_s_info_t)ulist32.status;
-		name_offset = (int)&(((dsw_aioctl32_t *)0)->shadow_vol[0]);
+		name_offset = offsetof(dsw_aioctl32_t, shadow_vol[0]);
 	} else if (copyin((void *) arg, &ulist, sizeof (ulist)) < 0)
 		return (EFAULT);
 
@@ -4323,20 +4325,21 @@ _ii_olist(intptr_t arg, int ilp32, int *rvp)
 	dsw_aioctl_t ulist;
 	dsw_aioctl32_t ulist32;
 	_ii_overflow_t *op;
+	size_t name_offset;
 	int rc = 0;
-	int name_offset, i;
+	int i;
 	char *carg = (char *)arg;
 	spcs_s_info_t kstatus;
 
 	*rvp = 0;
 
-	name_offset = (int)&(((dsw_aioctl_t *)0)->shadow_vol[0]);
+	name_offset = offsetof(dsw_aioctl_t, shadow_vol[0]);
 	if (ilp32) {
 		if (copyin((void *)arg, &ulist32, sizeof (ulist32)) < 0)
 			return (EFAULT);
 		II_TAIL_COPY(ulist, ulist32, flags, dsw_aioctl_t);
 		ulist.status = (spcs_s_info_t)ulist32.status;
-		name_offset = (int)&(((dsw_aioctl32_t *)0)->shadow_vol[0]);
+		name_offset = offsetof(dsw_aioctl32_t, shadow_vol[0]);
 	} else if (copyin((void *)arg, &ulist, sizeof (ulist)) < 0)
 		return (EFAULT);
 
@@ -5220,7 +5223,7 @@ int
 _ii_acopy(intptr_t arg, int ilp32, int *rvp)
 {
 	int rc;
-	int name_offset;
+	size_t name_offset;
 	char *list;
 	char *nptr;
 	char name[DSW_NAMELEN];
@@ -5230,14 +5233,14 @@ _ii_acopy(intptr_t arg, int ilp32, int *rvp)
 
 	*rvp = 0;
 
-	name_offset = (int)&(((dsw_aioctl_t *)0)->shadow_vol[0]);
+	name_offset = offsetof(dsw_aioctl_t, shadow_vol[0]);
 
 	if (ilp32) {
 		if (copyin((void *)arg, &ucopy32, sizeof (ucopy32)) < 0)
 			return (EFAULT);
 		II_TAIL_COPY(ucopy, ucopy32, flags, dsw_ioctl_t);
 		ucopy.status = (spcs_s_info_t)ucopy32.status;
-		name_offset = (int)&(((dsw_aioctl32_t *)0)->shadow_vol[0]);
+		name_offset = offsetof(dsw_aioctl32_t, shadow_vol[0]);
 	} else if (copyin((void *)arg, &ucopy, sizeof (ucopy)) < 0)
 		return (EFAULT);
 

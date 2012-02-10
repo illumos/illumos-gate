@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/cmn_err.h>
 #include <sys/mman.h>
@@ -150,9 +148,9 @@ zulu_hat_steal_ctx()
 		ASSERT(zhat != NULL);
 
 		TNF_PROBE_3(steal_ctx_loop, "zulu_hat", /* CSTYLED */,
-			tnf_int, ctx, ctx,
-			tnf_long, last_used, zhat->last_used,
-			tnf_long, oldest, delta);
+		    tnf_int, ctx, ctx,
+		    tnf_long, last_used, zhat->last_used,
+		    tnf_long, oldest, delta);
 
 		if (zhat->last_used <  delta) {
 			zhat_oldest = zhat;
@@ -166,7 +164,7 @@ zulu_hat_steal_ctx()
 
 	/* Nobody should have the tsb lock bit set here */
 	ASSERT(((uint64_t)zulu_ctx_tab[zhat_oldest->zulu_ctx] & ZULU_CTX_LOCK)
-		== 0);
+	    == 0);
 
 	ctx = zhat_oldest->zulu_ctx;
 	zhat_oldest->zulu_ctx = -1;
@@ -362,17 +360,17 @@ zulu_shadow_tree_lookup(struct zulu_hat *zhat, uint64_t ivaddr,
 	 * avl_find.
 	 */
 	if ((zhat->sblk_last != NULL) &&
-		(proto.ivaddr == zhat->sblk_last->ivaddr)) {
+	    (proto.ivaddr == zhat->sblk_last->ivaddr)) {
 		sblk = zhat->sblk_last;
 	} else {
 		sblk = (struct zulu_shadow_blk *)avl_find(&zhat->shadow_tree,
-								&proto, where);
+		    &proto, where);
 		zhat->sblk_last = sblk;
 	}
 
 	TNF_PROBE_2(zulu_shadow_tree_lookup, "zulu_shadow_tree", /* CSTYLED */,
-		tnf_opaque, ivaddr, proto.ivaddr,
-		tnf_opaque, where, where ? *where : ~0);
+	    tnf_opaque, ivaddr, proto.ivaddr,
+	    tnf_opaque, where, where ? *where : ~0);
 
 	return (sblk);
 }
@@ -398,7 +396,7 @@ zulu_shadow_tree_insert(struct zulu_hat *zhat, struct zulu_hat_blk *zblk)
 		sblk->ref_count++;
 
 		end = zblk->zulu_hat_blk_vaddr +
-					ZULU_HAT_PGSZ(zblk->zulu_hat_blk_size);
+		    ZULU_HAT_PGSZ(zblk->zulu_hat_blk_size);
 		if (zblk->zulu_hat_blk_vaddr < sblk->min_addr) {
 			sblk->min_addr = zblk->zulu_hat_blk_vaddr;
 		}
@@ -421,8 +419,8 @@ zulu_shadow_tree_insert(struct zulu_hat *zhat, struct zulu_hat_blk *zblk)
 	}
 	zblk->zulu_shadow_blk = sblk;
 	TNF_PROBE_2(zulu_shadow_tree_insert, "zulu_shadow_tree", /* CSTYLED */,
-		tnf_opaque, vaddr, ivaddr,
-		tnf_opaque, ref_count, sblk->ref_count);
+	    tnf_opaque, vaddr, ivaddr,
+	    tnf_opaque, ref_count, sblk->ref_count);
 }
 
 /*
@@ -440,8 +438,8 @@ zulu_shadow_tree_delete(struct zulu_hat *zhat, struct zulu_hat_blk *zblk)
 	sblk = zblk->zulu_shadow_blk;
 
 	TNF_PROBE_2(zulu_shadow_tree_delete, "zulu_shadow_tree", /* CSTYLED */,
-		tnf_opaque, vaddr, sblk->ivaddr,
-		tnf_opaque, ref_count, sblk->ref_count-1);
+	    tnf_opaque, vaddr, sblk->ivaddr,
+	    tnf_opaque, ref_count, sblk->ref_count-1);
 
 	if (--sblk->ref_count == 0) {
 		if (zhat->sblk_last == sblk) {
@@ -461,7 +459,7 @@ zulu_shadow_tree_delete(struct zulu_hat *zhat, struct zulu_hat_blk *zblk)
 		 * the zblks are deleted in order.
 		 */
 		uint64_t end = zblk->zulu_hat_blk_vaddr +
-					ZULU_HAT_PGSZ(zblk->zulu_hat_blk_size);
+		    ZULU_HAT_PGSZ(zblk->zulu_hat_blk_size);
 
 		if (zblk->zulu_hat_blk_vaddr == sblk->min_addr) {
 			sblk->min_addr = end;
@@ -481,10 +479,10 @@ zulu_shadow_tree_destroy(struct zulu_hat *zhat)
 	void	*cookie = NULL;
 
 	while ((sblk = (struct zulu_shadow_blk *)avl_destroy_nodes(
-					&zhat->shadow_tree, &cookie)) != NULL) {
+	    &zhat->shadow_tree, &cookie)) != NULL) {
 		TNF_PROBE_2(shadow_tree_destroy, "zulu_hat", /* CSTYLED */,
-			tnf_opaque, vaddr, sblk->ivaddr,
-			tnf_opaque, ref_count, sblk->ref_count);
+		    tnf_opaque, vaddr, sblk->ivaddr,
+		    tnf_opaque, ref_count, sblk->ref_count);
 		kmem_free(sblk, sizeof (*sblk));
 	}
 	avl_destroy(&zhat->shadow_tree);
@@ -506,12 +504,12 @@ zulu_hat_insert_map(struct zulu_hat *zhat, struct zulu_hat_blk *zblk)
 	int tsb_hash;
 
 	tsb_hash = ZULU_TSB_HASH(zblk->zulu_hat_blk_vaddr,
-			    zblk->zulu_hat_blk_size, zhat->zulu_tsb_size);
+	    zblk->zulu_hat_blk_size, zhat->zulu_tsb_size);
 
 	TNF_PROBE_3(zulu_hat_insert_map, "zulu_hat", /* CSTYLED */,
-		tnf_opaque, zblkp, zblk,
-		tnf_opaque, vaddr, zblk->zulu_hat_blk_vaddr,
-		tnf_opaque, hash, tsb_hash);
+	    tnf_opaque, zblkp, zblk,
+	    tnf_opaque, vaddr, zblk->zulu_hat_blk_vaddr,
+	    tnf_opaque, hash, tsb_hash);
 
 	ASSERT(tsb_hash < zhat->zulu_tsb_size);
 
@@ -524,12 +522,12 @@ zulu_hat_insert_map(struct zulu_hat *zhat, struct zulu_hat_blk *zblk)
 	 */
 	zblk->zulu_hash_prev = NULL;
 	zblk->zulu_hash_next = ZULU_MAP_HASH_HEAD(zhat,
-			zblk->zulu_hat_blk_vaddr, zblk->zulu_hat_blk_size);
+	    zblk->zulu_hat_blk_vaddr, zblk->zulu_hat_blk_size);
 	if (zblk->zulu_hash_next) {
 		zblk->zulu_hash_next->zulu_hash_prev = zblk;
 	}
 	ZULU_MAP_HASH_HEAD(zhat, zblk->zulu_hat_blk_vaddr,
-				zblk->zulu_hat_blk_size) = zblk;
+	    zblk->zulu_hat_blk_size) = zblk;
 
 	zulu_ctx_tsb_lock_enter(zhat);
 	zhat->zulu_tsb[tsb_hash] = zblk->zulu_hat_blk_tte;
@@ -543,11 +541,11 @@ static void
 zulu_hat_remove_map(struct zulu_hat *zhat, struct zulu_hat_blk *zblk)
 {
 	int tsb_hash = ZULU_TSB_HASH(zblk->zulu_hat_blk_vaddr,
-			    zblk->zulu_hat_blk_size, zhat->zulu_tsb_size);
+	    zblk->zulu_hat_blk_size, zhat->zulu_tsb_size);
 
 	TNF_PROBE_2(zulu_hat_remove_map, "zulu_hat", /* CSTYLED */,
-		tnf_opaque, vaddr, zblk->zulu_hat_blk_vaddr,
-		tnf_opaque, hash, tsb_hash);
+	    tnf_opaque, vaddr, zblk->zulu_hat_blk_vaddr,
+	    tnf_opaque, hash, tsb_hash);
 
 	ASSERT(tsb_hash < zhat->zulu_tsb_size);
 	ASSERT(mutex_owned(&zhat->lock));
@@ -561,7 +559,7 @@ zulu_hat_remove_map(struct zulu_hat *zhat, struct zulu_hat_blk *zblk)
 		zblk->zulu_hash_prev->zulu_hash_next = zblk->zulu_hash_next;
 	} else {
 		ZULU_MAP_HASH_HEAD(zhat, zblk->zulu_hat_blk_vaddr,
-			zblk->zulu_hat_blk_size) = NULL;
+		    zblk->zulu_hat_blk_size) = NULL;
 	}
 	if (zblk->zulu_hash_next) {
 		zblk->zulu_hash_next->zulu_hash_prev = zblk->zulu_hash_prev;
@@ -593,7 +591,7 @@ zulu_lookup_map_bysize(struct zulu_hat *zhat, caddr_t vaddr, int page_sz)
 	ASSERT(mutex_owned(&zhat->lock));
 
 	for (zblkp = ZULU_MAP_HASH_HEAD(zhat, ivaddr, page_sz); zblkp != NULL;
-						zblkp = zblkp->zulu_hash_next) {
+	    zblkp = zblkp->zulu_hash_next) {
 		uint64_t	size;
 		uint64_t	iaddr;
 
@@ -606,8 +604,8 @@ zulu_lookup_map_bysize(struct zulu_hat *zhat, caddr_t vaddr, int page_sz)
 			int tsb_hash;
 
 			tsb_hash = ZULU_TSB_HASH(zblkp->zulu_hat_blk_vaddr,
-				    zblkp->zulu_hat_blk_size,
-				    zhat->zulu_tsb_size);
+			    zblkp->zulu_hat_blk_size,
+			    zhat->zulu_tsb_size);
 			ASSERT(tsb_hash < zhat->zulu_tsb_size);
 
 			zulu_ctx_tsb_lock_enter(zhat);
@@ -619,9 +617,9 @@ zulu_lookup_map_bysize(struct zulu_hat *zhat, caddr_t vaddr, int page_sz)
 	}
 
 	TNF_PROBE_3(zulu_hat_lookup_map_bysz, "zulu_hat", /* CSTYLED */,
-		tnf_opaque, zblkp, zblkp,
-		tnf_int, blks_checked, blks_checked,
-		tnf_int, page_sz, page_sz);
+	    tnf_opaque, zblkp, zblkp,
+	    tnf_int, blks_checked, blks_checked,
+	    tnf_int, page_sz, page_sz);
 
 	return (zblkp);
 }
@@ -684,8 +682,8 @@ zulu_hat_load(struct zulu_hat *zhat, caddr_t vaddr,
 	struct zulu_tte		tte;
 
 	TNF_PROBE_2(zulu_hat_load, "zulu_hat", /* CSTYLED */,
-		tnf_int, zulu_ctx, zhat->zulu_ctx,
-		tnf_opaque, vaddr, vaddr);
+	    tnf_int, zulu_ctx, zhat->zulu_ctx,
+	    tnf_opaque, vaddr, vaddr);
 
 	mutex_enter(&zhat->lock);
 	ASSERT(zhat->zulu_ctx >= 0);
@@ -703,7 +701,7 @@ zulu_hat_load(struct zulu_hat *zhat, caddr_t vaddr,
 		*p = flags_pfn;		/* load the flags */
 
 		zuluvm_load_tte(zhat, vaddr, flags_pfn, tte.zulu_tte_perm,
-			tte.zulu_tte_size);
+		    tte.zulu_tte_size);
 		if (ppg_size != NULL) {
 			*ppg_size = tte.zulu_tte_size;
 		}
@@ -720,7 +718,7 @@ zulu_hat_load(struct zulu_hat *zhat, caddr_t vaddr,
 		tte = zblkp->zulu_hat_blk_tte;
 		tte.zulu_tte_pfn = ZULU_HAT_ADJ_PFN((&tte), vaddr);
 		zuluvm_load_tte(zhat, vaddr,  tte.zulu_tte_pfn,
-			tte.zulu_tte_perm, tte.zulu_tte_size);
+		    tte.zulu_tte_perm, tte.zulu_tte_size);
 		if (ppg_size != NULL) {
 			*ppg_size = tte.zulu_tte_size;
 		}
@@ -739,8 +737,8 @@ zulu_hat_load(struct zulu_hat *zhat, caddr_t vaddr,
 	TNF_PROBE_0(calling_as_fault, "zulu_hat", /* CSTYLED */);
 
 	as_err = as_fault((struct hat *)zhat, zhat->zulu_xhat.xhat_as,
-			(caddr_t)(ZULU_VADDR((uint64_t)vaddr) & PAGEMASK),
-			PAGESIZE, F_INVAL, rw);
+	    (caddr_t)(ZULU_VADDR((uint64_t)vaddr) & PAGEMASK),
+	    PAGESIZE, F_INVAL, rw);
 
 	mutex_enter(&zhat->lock);
 	zhat->in_fault = 0;
@@ -787,7 +785,7 @@ zulu_hat_alloc(void *arg)
 	zhat->zulu_tsb_size = ZULU_TSB_NUM;
 	zhat->hash_tbl = kmem_zalloc(ZULU_HASH_TBL_SZ, KM_SLEEP);
 	avl_create(&zhat->shadow_tree, zulu_shadow_tree_compare,
-		sizeof (zhat->shadow_tree), ZULU_SHADOW_BLK_LINK_OFFSET);
+	    sizeof (zhat->shadow_tree), ZULU_SHADOW_BLK_LINK_OFFSET);
 	/*
 	 * The zulu hat has a few opaque data structs embedded in it.
 	 * This tag makes finding the our data easier with a debugger.
@@ -839,9 +837,9 @@ zulu_do_hat_memload(struct xhat *xhat, caddr_t vaddr, struct page *page,
 	pfn_t pfn;
 
 	TNF_PROBE_4(zulu_hat_memload, "zulu_hat", /* CSTYLED */,
-		tnf_int, zulu_ctx, zhat->zulu_ctx,
-		tnf_opaque, vaddr, vaddr, tnf_opaque, attr, attr,
-		tnf_opaque, flags, flags);
+	    tnf_int, zulu_ctx, zhat->zulu_ctx,
+	    tnf_opaque, vaddr, vaddr, tnf_opaque, attr, attr,
+	    tnf_opaque, flags, flags);
 
 	/*
 	 * keep track of the highest address that this zhat has had
@@ -893,10 +891,10 @@ zulu_do_hat_memload(struct xhat *xhat, caddr_t vaddr, struct page *page,
 	zulu_hat_insert_map(zhat, zblk);
 	if (!zhat->freed) {
 		zuluvm_load_tte(zhat, vaddr, zblk->zulu_hat_blk_pfn,
-			zblk->zulu_hat_blk_perm, zblk->zulu_hat_blk_size);
+		    zblk->zulu_hat_blk_perm, zblk->zulu_hat_blk_size);
 	}
 	zhat->fault_ivaddr_last =
-		ZULU_VADDR((uint64_t)zblk->zulu_hat_blk_vaddr);
+	    ZULU_VADDR((uint64_t)zblk->zulu_hat_blk_vaddr);
 
 	mutex_exit(&zhat->lock);
 }
@@ -924,9 +922,9 @@ zulu_hat_memload_array(struct xhat *xhat, caddr_t addr, size_t len,
 	struct zulu_hat *zhat = (struct zulu_hat *)xhat;
 
 	TNF_PROBE_3(zulu_hat_memload_array, "zulu_hat", /* CSTYLED */,
-		tnf_int, zulu_ctx, zhat->zulu_ctx,
-		tnf_opaque, addr, addr,
-		tnf_opaque, len, len);
+	    tnf_int, zulu_ctx, zhat->zulu_ctx,
+	    tnf_opaque, addr, addr,
+	    tnf_opaque, len, len);
 
 	for (; len > 0; len -= ZULU_HAT_PGSZ((*gen_pps)->p_szc),
 	    gen_pps += ZULU_HAT_NUM_PGS((*gen_pps)->p_szc)) {
@@ -1020,7 +1018,7 @@ zulu_hat_unload_region(struct zulu_hat *zhat, uint64_t ivaddr, size_t size,
 				zhat->fault_ivaddr_last = 0;
 			}
 			zulu_hat_demap_page(zhat, (caddr_t)iaddr,
-					zblkp->zulu_hat_blk_size);
+			    zblkp->zulu_hat_blk_size);
 		}
 
 		add_to_free_list(pfree_list, zblkp);
@@ -1047,10 +1045,10 @@ zulu_hat_unload(struct xhat *xhat, caddr_t vaddr, size_t size, uint_t flags)
 	(void) flags;
 
 	TNF_PROBE_4(zulu_hat_unload, "zulu_hat", /* CSTYLED */,
-		tnf_int, zulu_ctx, zhat->zulu_ctx,
-		tnf_opaque, vaddr, vaddr,
-		tnf_opaque, vaddr_max, zhat->vaddr_max,
-		tnf_opaque, size, size);
+	    tnf_int, zulu_ctx, zhat->zulu_ctx,
+	    tnf_opaque, vaddr, vaddr,
+	    tnf_opaque, vaddr_max, zhat->vaddr_max,
+	    tnf_opaque, size, size);
 
 	mutex_enter(&zhat->lock);
 
@@ -1086,7 +1084,7 @@ zulu_hat_unload(struct xhat *xhat, caddr_t vaddr, size_t size, uint_t flags)
 			found++;
 
 			sblk_end = (ivaddr + ZULU_SHADOW_BLK_RANGE) &
-					ZULU_SHADOW_BLK_MASK;
+			    ZULU_SHADOW_BLK_MASK;
 
 			if (sblk_end < end) {
 				region_size = sblk_end - ivaddr;
@@ -1094,7 +1092,7 @@ zulu_hat_unload(struct xhat *xhat, caddr_t vaddr, size_t size, uint_t flags)
 				region_size = end - ivaddr;
 			}
 			zulu_hat_unload_region(zhat, ivaddr, region_size, sblk,
-				&free_list);
+			    &free_list);
 
 		}
 		ivaddr += ZULU_SHADOW_BLK_RANGE;
@@ -1133,9 +1131,9 @@ zulu_hat_pageunload(struct xhat *xhat, struct page *pp, uint_t flags,
 	(void) flags;
 
 	TNF_PROBE_3(zulu_hat_pageunload, "zulu_hat", /* CSTYLED */,
-		tnf_int, zulu_ctx, zhat->zulu_ctx,
-		tnf_opaque, vaddr, zblk->zulu_hat_blk_vaddr,
-		tnf_int, pg_size, zblk->zulu_hat_blk_size);
+	    tnf_int, zulu_ctx, zhat->zulu_ctx,
+	    tnf_opaque, vaddr, zblk->zulu_hat_blk_vaddr,
+	    tnf_int, pg_size, zblk->zulu_hat_blk_size);
 
 	mutex_enter(&zhat->lock);
 	if (zblk->zulu_shadow_blk != NULL) {
@@ -1153,8 +1151,9 @@ zulu_hat_pageunload(struct xhat *xhat, struct page *pp, uint_t flags,
 		 */
 		if (!zhat->freed) {
 			zulu_hat_demap_page(zhat,
-			(caddr_t)(zblk->zulu_hat_blk_page << ZULU_HAT_BP_SHIFT),
-			zblk->zulu_hat_blk_size);
+			    (caddr_t)(uintptr_t)(zblk->zulu_hat_blk_page <<
+			    ZULU_HAT_BP_SHIFT),
+			    zblk->zulu_hat_blk_size);
 		}
 	} else {
 		/*
@@ -1165,7 +1164,7 @@ zulu_hat_pageunload(struct xhat *xhat, struct page *pp, uint_t flags,
 		do_delete = 0;
 
 		TNF_PROBE_0(zulu_hat_pageunload_skip, "zulu_hat",
-			    /* CSTYLED */);
+		    /* CSTYLED */);
 	}
 	mutex_exit(&zhat->lock);
 
@@ -1250,9 +1249,9 @@ zulu_hat_update_attr(struct xhat *xhat, caddr_t vaddr, size_t size,
 	struct zulu_hat *zhat = (struct zulu_hat *)xhat;
 
 	TNF_PROBE_5(zulu_hat_changeprot, "zulu_hat", /* CSTYLED */,
-		tnf_int, ctx, zhat->zulu_ctx,
-		tnf_opaque, vaddr, vaddr, tnf_opaque, size, size,
-		tnf_uint, flags, flags, tnf_int, op, op);
+	    tnf_int, ctx, zhat->zulu_ctx,
+	    tnf_opaque, vaddr, vaddr, tnf_opaque, size, size,
+	    tnf_uint, flags, flags, tnf_int, op, op);
 
 	zulu_hat_unload(xhat, vaddr, size, 0);
 }
@@ -1263,7 +1262,7 @@ zulu_hat_chgprot(struct xhat *xhat, caddr_t vaddr, size_t size, uint_t flags)
 	struct zulu_hat *zhat = (struct zulu_hat *)xhat;
 #ifdef DEBUG
 	printf("zulu_hat_chgprot: ctx: %d addr: %lx, size: %lx flags: %x\n",
-		zhat->zulu_ctx, (uint64_t)vaddr, size, flags);
+	    zhat->zulu_ctx, (uint64_t)vaddr, size, flags);
 #endif
 	zulu_hat_update_attr(xhat, vaddr, size, flags, ZULU_HAT_CHGATTR);
 }
@@ -1275,7 +1274,7 @@ zulu_hat_setattr(struct xhat *xhat, caddr_t vaddr, size_t size, uint_t flags)
 	struct zulu_hat *zhat = (struct zulu_hat *)xhat;
 #ifdef DEBUG
 	printf("zulu_hat_setattr: ctx: %d addr: %lx, size: %lx flags: %x\n",
-		zhat->zulu_ctx, (uint64_t)vaddr, size, flags);
+	    zhat->zulu_ctx, (uint64_t)vaddr, size, flags);
 #endif
 	zulu_hat_update_attr(xhat, vaddr, size, flags, ZULU_HAT_SETATTR);
 }
@@ -1286,7 +1285,7 @@ zulu_hat_clrattr(struct xhat *xhat, caddr_t vaddr, size_t size, uint_t flags)
 	struct zulu_hat *zhat = (struct zulu_hat *)xhat;
 #ifdef DEBUG
 	printf("zulu_hat_clrattr: ctx: %d addr: %lx, size: %lx flags: %x\n",
-		zhat->zulu_ctx, (uint64_t)vaddr, size, flags);
+	    zhat->zulu_ctx, (uint64_t)vaddr, size, flags);
 #endif
 	zulu_hat_update_attr(xhat, vaddr, size, flags, ZULU_HAT_CLRATTR);
 }
@@ -1296,12 +1295,12 @@ zulu_hat_chgattr(struct xhat *xhat, caddr_t vaddr, size_t size, uint_t flags)
 {
 	struct zulu_hat *zhat = (struct zulu_hat *)xhat;
 	TNF_PROBE_3(zulu_hat_chgattr, "zulu_hat", /* CSTYLED */,
-		tnf_int, ctx, zhat->zulu_ctx,
-		tnf_opaque, vaddr, vaddr,
-		tnf_opaque, flags, flags);
+	    tnf_int, ctx, zhat->zulu_ctx,
+	    tnf_opaque, vaddr, vaddr,
+	    tnf_opaque, flags, flags);
 #ifdef DEBUG
 	printf("zulu_hat_chgattr: ctx: %d addr: %lx, size: %lx flags: %x\n",
-		zhat->zulu_ctx, (uint64_t)vaddr, size, flags);
+	    zhat->zulu_ctx, (uint64_t)vaddr, size, flags);
 #endif
 	zulu_hat_update_attr(xhat, vaddr, size, flags, ZULU_HAT_CHGATTR);
 }
@@ -1408,7 +1407,7 @@ zulu_hat_proc_attach(struct as *as, void *zdev)
 	int		xhat_rval;
 
 	xhat_rval = xhat_attach_xhat(&zulu_hat_provider, as,
-			(struct xhat **)&zhat, NULL);
+	    (struct xhat **)&zhat, NULL);
 	if ((xhat_rval == 0) && (zhat != NULL)) {
 		mutex_enter(&zhat->lock);
 		ZULU_HAT2AS(zhat) = as;
@@ -1417,8 +1416,8 @@ zulu_hat_proc_attach(struct as *as, void *zdev)
 	}
 
 	TNF_PROBE_3(zulu_hat_proc_attach, "zulu_hat", /* CSTYLED */,
-		tnf_int, xhat_rval, xhat_rval, tnf_opaque, as, as,
-		tnf_opaque, zhat, zhat);
+	    tnf_int, xhat_rval, xhat_rval, tnf_opaque, as, as,
+	    tnf_opaque, zhat, zhat);
 
 	return (zhat);
 }

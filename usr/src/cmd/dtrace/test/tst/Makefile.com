@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include $(SRC)/cmd/Makefile.cmd
 
@@ -55,6 +53,12 @@ ROOT_EXES = $(EXES:%=$(TSTDIR)/%)
 
 $(ROOT_TSTS) := FILEMODE = 0444
 $(ROOT_EXES) := FILEMODE = 0555
+
+# The DTrace tests rely on "normal" behaviour from the compiler which
+# agressive optimization of small, simple, one compilation-unit programs may
+# utterly subvert.  We force the compiler to not optimize rather than engage
+# in an arms race with increasingly belligerent optimizers.
+COPTFLAG=	-xO0
 
 all: $(EXES)
 

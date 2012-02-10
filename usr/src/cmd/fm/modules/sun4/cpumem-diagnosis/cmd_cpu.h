@@ -604,25 +604,6 @@ extern cmd_evdisp_t cmd_fpu(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
     const char *, cmd_errcl_t);
 
 
-
-/*
- * FPU (FP-Scrubber) errors
- *
- *         SERD name
- *   Type  (if any)   Fault
- *  ------ --------- -------------------------------
- *   FPU       -     fault.cpu.<cputype>.fpu
- *
- * The expected resolution of FPU faults is the disabling of the CPU
- * indicted in the resource FMRI.
- */
-extern cmd_evdisp_t cmd_fps(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
-    const char *, cmd_errcl_t);
-
-
-
-
-
 /*
  * ireg errors
  *

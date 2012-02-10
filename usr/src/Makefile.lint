@@ -490,7 +490,6 @@ sparc_SUBDIRS= \
 	cmd/datadm \
 	cmd/dcs \
 	cmd/drd \
-	cmd/fps \
 	cmd/fruadm \
 	cmd/ldmad \
 	cmd/prtdscp \

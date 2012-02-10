@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <door.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -139,14 +137,14 @@ try_again:
 			if ((doorfd = dup(doorfd)) < 0) {
 				perror("couldn't dup");
 				while (i--)
-				    (void) close(tbc[i]);
+					(void) close(tbc[i]);
 				doorfd = -1;
 				(void) mutex_unlock(&_door_lock);
 				return (NOSERVER);
 			}
 		}
 		while (i--)
-		    (void) close(tbc[i]);
+			(void) close(tbc[i]);
 
 		/*
 		 * mark this door descriptor as close on exec
@@ -193,7 +191,7 @@ try_again:
 		(void) printf("\t\t id = %llx\n", real_door.di_uniquifier);
 #endif	/* DEBUG */
 		if ((real_door.di_attributes & DOOR_REVOKED) ||
-		    (real_door.di_data != (door_ptr_t)COOKIE)) {
+		    (real_door.di_data != (door_ptr_t)(uintptr_t)COOKIE)) {
 #ifdef	DEBUG
 			(void) printf("real door revoked\n");
 #endif	/* DEBUG */
@@ -204,8 +202,8 @@ try_again:
 		}
 	} else {
 		if ((door_info(doorfd, &my_door) < 0) ||
-		    (my_door.di_data != (door_ptr_t)COOKIE) ||
-			(my_door.di_uniquifier != real_door.di_uniquifier)) {
+		    (my_door.di_data != (door_ptr_t)(uintptr_t)COOKIE) ||
+		    (my_door.di_uniquifier != real_door.di_uniquifier)) {
 			perror("my door door_info");
 			/*
 			 * don't close it - someone else has clobbered fd

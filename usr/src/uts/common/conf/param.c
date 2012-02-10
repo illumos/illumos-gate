@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1983, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -564,8 +565,8 @@ char *isa_list = architecture;
 static pgcnt_t original_physmem = 0;
 
 #define	MIN_DEFAULT_MAXUSERS	8u
-#define	MAX_DEFAULT_MAXUSERS	2048u
-#define	MAX_MAXUSERS		4096u
+#define	MAX_DEFAULT_MAXUSERS	10000u
+#define	MAX_MAXUSERS		20000u
 
 void
 param_preset(void)
@@ -577,7 +578,7 @@ void
 param_calc(int platform_max_nprocs)
 {
 	/*
-	 * Default to about one "user" per megabyte, taking into
+	 * Default to about one "user" per 8MB, taking into
 	 * account both physical and virtual constraints.
 	 * Note: 2^20 is a meg; shifting right by (20 - PAGESHIFT)
 	 * converts pages to megs without integer overflow.
@@ -591,8 +592,9 @@ param_calc(int platform_max_nprocs)
 	if (maxusers == 0) {
 		pgcnt_t physmegs = physmem >> (20 - PAGESHIFT);
 		pgcnt_t virtmegs = vmem_size(heap_arena, VMEM_FREE) >> 20;
-		maxusers = MIN(MAX(MIN(physmegs, virtmegs),
-		    MIN_DEFAULT_MAXUSERS), MAX_DEFAULT_MAXUSERS);
+		maxusers = MIN(physmegs, virtmegs) >> 3; /* divide by 8 */
+		maxusers = MAX(maxusers, MIN_DEFAULT_MAXUSERS);
+		maxusers = MIN(maxusers, MAX_DEFAULT_MAXUSERS);
 	}
 	if (maxusers > MAX_MAXUSERS) {
 		maxusers = MAX_MAXUSERS;

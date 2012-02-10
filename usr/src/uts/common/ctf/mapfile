@@ -82,6 +82,7 @@ SYMBOL_SCOPE {
 		ctf_open;
 		ctf_parent_file;
 		ctf_parent_name;
+		ctf_parent_label;
 		ctf_setmodel;
 		ctf_setspecific;
 		ctf_set_array;

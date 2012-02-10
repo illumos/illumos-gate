@@ -24,6 +24,6 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-SUBDIRS = cpumem-diagnosis datapath-retire USII-io-diagnosis fps-transport
+SUBDIRS = cpumem-diagnosis datapath-retire USII-io-diagnosis
 
 include ../../Makefile.subdirs

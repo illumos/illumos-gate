@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/t_lock.h>
 #include <sys/param.h>
@@ -175,10 +173,10 @@ ud_alloc_space(struct vfs *vfsp, uint16_t prn,
 	if (ud_part->udp_nfree != 0) {
 		if (ud_part->udp_flags == UDP_BITMAPS) {
 			error = ud_alloc_space_bmap(vfsp, ud_part, proximity,
-				blkcount, start_blkno, size, less_is_ok);
+			    blkcount, start_blkno, size, less_is_ok);
 		} else {
 			error = ud_alloc_space_stbl(vfsp, ud_part, proximity,
-				blkcount, start_blkno, size, less_is_ok);
+			    blkcount, start_blkno, size, less_is_ok);
 		}
 		if (error == 0) {
 			mutex_enter(&udf_vfsp->udf_lock);
@@ -258,7 +256,7 @@ ud_alloc_space_bmap(struct vfs *vfsp,
 		 */
 		temp = blkcount;
 		if (ud_check_free_and_mark_used(vfsp,
-				ud_part, proximity, &temp) == 0) {
+		    ud_part, proximity, &temp) == 0) {
 			if (temp != 0) {
 				*start_blkno = proximity;
 				*size = temp;
@@ -290,17 +288,17 @@ retry:
 			 * due to the way bread is implemented
 			 */
 			if ((bp == NULL) ||
-				((eblk - bno) < blkcount)) {
+			    ((eblk - bno) < blkcount)) {
 				if (bp != NULL) {
 					brelse(bp);
 				}
 				begin = ud_part->udp_unall_loc +
-						bno / bb_count;
+				    bno / bb_count;
 				bp = ud_bread(vfsp->vfs_dev,
-					ud_xlate_to_daddr(udf_vfsp,
-						ud_part->udp_number,
-						begin, 1, &dummy)
-					<< udf_vfsp->udf_l2d_shift, lbsz);
+				    ud_xlate_to_daddr(udf_vfsp,
+				    ud_part->udp_number,
+				    begin, 1, &dummy)
+				    << udf_vfsp->udf_l2d_shift, lbsz);
 				if (bp->b_flags & B_ERROR) {
 					brelse(bp);
 					return (EIO);
@@ -317,14 +315,14 @@ retry:
 				temp = blkcount;
 			}
 			if ((new_size = ud_check_free(addr, eaddr,
-					bno - bblk, temp)) == temp) {
+			    bno - bblk, temp)) == temp) {
 				ud_mark_used(addr, bno - bblk, temp);
 				bdwrite(bp);
 				*start_blkno = bno - HDR_BLKS;
 				*size = temp;
 				mutex_enter(&udf_vfsp->udf_lock);
 				ud_part->udp_last_alloc =
-					bno + temp - HDR_BLKS;
+				    bno + temp - HDR_BLKS;
 				mutex_exit(&udf_vfsp->udf_lock);
 				return (0);
 			}
@@ -380,7 +378,7 @@ retry:
 		 * already allocated behind us
 		 */
 		if (ud_check_free_and_mark_used(vfsp,
-				ud_part, old_loc, &old_size) == 0) {
+		    ud_part, old_loc, &old_size) == 0) {
 			if (old_size != 0) {
 				*start_blkno = old_loc;
 				*size = old_size;
@@ -423,9 +421,9 @@ ud_check_free_and_mark_used(struct vfs *vfsp,
 	 */
 	begin = ud_part->udp_unall_loc + (start / bb_count);
 	bp = ud_bread(vfsp->vfs_dev,
-		ud_xlate_to_daddr(udf_vfsp, ud_part->udp_number,
-			begin, 1, &dummy) << udf_vfsp->udf_l2d_shift,
-			udf_vfsp->udf_lbsize);
+	    ud_xlate_to_daddr(udf_vfsp, ud_part->udp_number,
+	    begin, 1, &dummy) << udf_vfsp->udf_l2d_shift,
+	    udf_vfsp->udf_lbsize);
 	if (bp->b_flags & B_ERROR) {
 		brelse(bp);
 		return (EIO);
@@ -440,8 +438,8 @@ ud_check_free_and_mark_used(struct vfs *vfsp,
 		ASSERT(*count > 0);
 	}
 	if (ud_check_free((uint8_t *)bp->b_un.b_addr,
-			(uint8_t *)bp->b_un.b_addr + bp->b_bcount,
-			start, *count) != *count) {
+	    (uint8_t *)bp->b_un.b_addr + bp->b_bcount, start,
+	    *count) != *count) {
 		brelse(bp);
 		return (1);
 	}
@@ -517,9 +515,8 @@ ud_alloc_space_stbl(struct vfs *vfsp,
 	ASSERT((ud_part->udp_unall_len + 40) <= udf_vfsp->udf_lbsize);
 
 	bp = ud_bread(vfsp->vfs_dev,
-			ud_xlate_to_daddr(udf_vfsp, ud_part->udp_number,
-				ud_part->udp_unall_loc, 1, &temp),
-			udf_vfsp->udf_lbsize);
+	    ud_xlate_to_daddr(udf_vfsp, ud_part->udp_number,
+	    ud_part->udp_unall_loc, 1, &temp), udf_vfsp->udf_lbsize);
 
 	use = (struct unall_space_ent *)bp->b_un.b_addr;
 	sz = SWAP_32(use->use_len_ad);
@@ -538,7 +535,7 @@ ud_alloc_space_stbl(struct vfs *vfsp,
 		larg_index = larg_sz = 0;
 		for (index = 0; index < count; index++, sad++) {
 			temp = SWAP_32(sad->sad_ext_len) >>
-					udf_vfsp->udf_l2b_shift;
+			    udf_vfsp->udf_l2b_shift;
 			if (temp == blkcount) {
 				/*
 				 * We found the right fit
@@ -559,7 +556,7 @@ ud_alloc_space_stbl(struct vfs *vfsp,
 				*start_blkno = SWAP_32(sad->sad_ext_loc);
 				*size = blkcount;
 				temp = (temp - blkcount) <<
-					udf_vfsp->udf_l2b_shift;
+				    udf_vfsp->udf_l2b_shift;
 				sad->sad_ext_len = SWAP_32(temp);
 				temp = SWAP_32(sad->sad_ext_loc) + blkcount;
 				sad->sad_ext_loc = SWAP_32(temp);
@@ -577,8 +574,7 @@ ud_alloc_space_stbl(struct vfs *vfsp,
 			}
 		}
 compress_sad:
-		if ((less_is_ok) &&
-			(larg_sz != 0)) {
+		if ((less_is_ok) && (larg_sz != 0)) {
 			/*
 			 * If we came here we could
 			 * not find a extent to cover the entire size
@@ -590,7 +586,7 @@ compress_sad:
 			*start_blkno = SWAP_32(sad->sad_ext_loc);
 			*size = larg_sz;
 			for (index = larg_index; index < count;
-					index++, sad++) {
+			    index++, sad++) {
 				*sad = *(sad+1);
 			}
 			sz -= sizeof (struct short_ad);
@@ -613,7 +609,7 @@ compress_sad:
 		larg_index = larg_sz = 0;
 		for (index = 0; index < count; index++, lad++) {
 			temp = SWAP_32(lad->lad_ext_len) >>
-					udf_vfsp->udf_l2b_shift;
+			    udf_vfsp->udf_l2b_shift;
 			if (temp == blkcount) {
 				/*
 				 * We found the right fit
@@ -634,7 +630,7 @@ compress_sad:
 				*start_blkno = SWAP_32(lad->lad_ext_loc);
 				*size = blkcount;
 				temp = (temp - blkcount) <<
-					udf_vfsp->udf_l2b_shift;
+				    udf_vfsp->udf_l2b_shift;
 				lad->lad_ext_len = SWAP_32(temp);
 				temp = SWAP_32(lad->lad_ext_loc) + blkcount;
 				lad->lad_ext_loc = SWAP_32(temp);
@@ -652,8 +648,7 @@ compress_sad:
 			}
 		}
 compress_lad:
-		if ((less_is_ok) &&
-			(larg_sz != 0)) {
+		if ((less_is_ok) && (larg_sz != 0)) {
 			/*
 			 * If we came here we could
 			 * not find a extent to cover the entire size
@@ -665,7 +660,7 @@ compress_lad:
 			*start_blkno = SWAP_32(lad->lad_ext_loc);
 			*size = larg_sz;
 			for (index = larg_index; index < count;
-					index++, lad++) {
+			    index++, lad++) {
 				*lad = *(lad+1);
 			}
 			sz -= sizeof (struct long_ad);
@@ -755,7 +750,7 @@ ud_free_space_bmap(struct vfs *vfsp,
 
 	udf_vfsp = (struct udf_vfs *)vfsp->vfs_data;
 	if ((ud_part->udp_freed_len == 0) &&
-		(ud_part->udp_unall_len == 0)) {
+	    (ud_part->udp_unall_len == 0)) {
 		return (ENOSPC);
 	}
 	/*
@@ -782,10 +777,8 @@ ud_free_space_bmap(struct vfs *vfsp,
 	for (block = begin; block <= end; block++) {
 
 		bp = ud_bread(vfsp->vfs_dev,
-			ud_xlate_to_daddr(udf_vfsp,
-				ud_part->udp_number, block, 1, &dummy)
-				<< udf_vfsp->udf_l2d_shift,
-			udf_vfsp->udf_lbsize);
+		    ud_xlate_to_daddr(udf_vfsp, ud_part->udp_number, block, 1,
+		    &dummy) << udf_vfsp->udf_l2d_shift, udf_vfsp->udf_lbsize);
 		if (bp->b_flags & B_ERROR) {
 			brelse(bp);
 			return (EIO);
@@ -855,8 +848,7 @@ ud_free_space_stbl(struct vfs *vfsp,
 	ASSERT(ud_part);
 	ASSERT(ud_part->udp_flags == UDP_SPACETBLS);
 
-	if ((ud_part->udp_freed_len == 0) &&
-		(ud_part->udp_unall_len == 0)) {
+	if ((ud_part->udp_freed_len == 0) && (ud_part->udp_unall_len == 0)) {
 		return (ENOSPC);
 	}
 
@@ -870,8 +862,8 @@ ud_free_space_stbl(struct vfs *vfsp,
 	ASSERT((ud_part->udp_unall_len + 40) <= udf_vfsp->udf_lbsize);
 
 	bp = ud_bread(vfsp->vfs_dev,
-			ud_xlate_to_daddr(udf_vfsp, ud_part->udp_number,
-				block, 1, &dummy), udf_vfsp->udf_lbsize);
+	    ud_xlate_to_daddr(udf_vfsp, ud_part->udp_number, block, 1, &dummy),
+	    udf_vfsp->udf_lbsize);
 
 	use = (struct unall_space_ent *)bp->b_un.b_addr;
 	sz = SWAP_32(use->use_len_ad);
@@ -888,14 +880,14 @@ ud_free_space_stbl(struct vfs *vfsp,
 		 */
 		for (index = 0; index < count; index++, sad++) {
 			if (beginblk == (SWAP_32(sad->sad_ext_loc) +
-					(SWAP_32(sad->sad_ext_len) /
-					udf_vfsp->udf_lbsize))) {
+			    (SWAP_32(sad->sad_ext_len) /
+			    udf_vfsp->udf_lbsize))) {
 				dummy = SWAP_32(sad->sad_ext_len) +
-					blkcount * udf_vfsp->udf_lbsize;
+				    blkcount * udf_vfsp->udf_lbsize;
 				sad->sad_ext_len = SWAP_32(dummy);
 				goto end;
 			} else if ((beginblk + blkcount) ==
-					SWAP_32(sad->sad_ext_loc)) {
+			    SWAP_32(sad->sad_ext_loc)) {
 				sad->sad_ext_loc = SWAP_32(beginblk);
 				goto end;
 			}
@@ -906,7 +898,7 @@ ud_free_space_stbl(struct vfs *vfsp,
 		 * Check if we space.
 		 */
 		if ((40 + sz + sizeof (struct short_ad)) >
-				udf_vfsp->udf_lbsize) {
+		    udf_vfsp->udf_lbsize) {
 			error = ENOSPC;
 			goto end;
 		}
@@ -934,14 +926,14 @@ ud_free_space_stbl(struct vfs *vfsp,
 		 */
 		for (index = 0; index < count; index++, lad++) {
 			if (beginblk == (SWAP_32(lad->lad_ext_loc) +
-					(SWAP_32(lad->lad_ext_len) /
-					udf_vfsp->udf_lbsize))) {
+			    (SWAP_32(lad->lad_ext_len) /
+			    udf_vfsp->udf_lbsize))) {
 				dummy = SWAP_32(lad->lad_ext_len) +
-					blkcount * udf_vfsp->udf_lbsize;
+				    blkcount * udf_vfsp->udf_lbsize;
 				lad->lad_ext_len = SWAP_32(dummy);
 				goto end;
 			} else if ((beginblk + blkcount) ==
-					SWAP_32(lad->lad_ext_loc)) {
+			    SWAP_32(lad->lad_ext_loc)) {
 				lad->lad_ext_loc = SWAP_32(beginblk);
 				goto end;
 			}
@@ -952,7 +944,7 @@ ud_free_space_stbl(struct vfs *vfsp,
 		 * Check if we space.
 		 */
 		if ((40 + sz + sizeof (struct long_ad)) >
-				udf_vfsp->udf_lbsize) {
+		    udf_vfsp->udf_lbsize) {
 			error = ENOSPC;
 			goto end;
 		}
@@ -1019,7 +1011,7 @@ ud_ialloc(struct ud_inode *pip,
 	prn = pip->i_icb_prn;
 
 	if ((err = ud_alloc_space(pip->i_vfs, prn,
-			0, 1, &blkno, &size, 0, 1)) != 0) {
+	    0, 1, &blkno, &size, 0, 1)) != 0) {
 		return (err);
 	}
 	loc = ud_xlate_to_daddr(udf_vfsp, prn, blkno, 1, &dummy);
@@ -1048,8 +1040,8 @@ ud_ialloc(struct ud_inode *pip,
 	 * 3) Otherwise, set the group-id to the gid of the parent directory.
 	 */
 	if ((vap->va_mask & AT_GID) &&
-		((vap->va_gid == pip->i_gid) || groupmember(vap->va_gid, cr) ||
-		secpolicy_vnode_create_gid(cr) == 0)) {
+	    ((vap->va_gid == pip->i_gid) || groupmember(vap->va_gid, cr) ||
+	    secpolicy_vnode_create_gid(cr) == 0)) {
 		/*
 		 * XXX - is this only the case when a 4.0 NFS client, or a
 		 * client derived from that code, makes a call over the wire?
@@ -1058,7 +1050,7 @@ ud_ialloc(struct ud_inode *pip,
 	} else {
 		gid = crgetgid(cr);
 		fe->fe_gid = (pip->i_char & ISGID) ?
-				SWAP_32(pip->i_gid) : SWAP_32(gid);
+		    SWAP_32(pip->i_gid) : SWAP_32(gid);
 	}
 
 	imode = MAKEIMODE(vap->va_type, vap->va_mode);
@@ -1115,19 +1107,18 @@ ud_ialloc(struct ud_inode *pip,
 	mutex_exit(&udf_vfsp->udf_lock);
 
 	ea_len = 0;
-	if ((vap->va_type == VBLK) ||
-		(vap->va_type == VCHR)) {
+	if ((vap->va_type == VBLK) || (vap->va_type == VCHR)) {
 		eah = (struct ext_attr_hdr *)fe->fe_spec;
 		ea_len = (sizeof (struct ext_attr_hdr) + 3) & ~3;
 		eah->eah_ial = SWAP_32(ea_len);
 
 		ds = (struct dev_spec_ear *)&fe->fe_spec[ea_len];
 		ea_len += ud_make_dev_spec_ear(ds,
-			getmajor(vap->va_rdev), getminor(vap->va_rdev));
+		    getmajor(vap->va_rdev), getminor(vap->va_rdev));
 		ea_len = (ea_len + 3) & ~3;
 		eah->eah_aal = SWAP_32(ea_len);
 		ud_make_tag(udf_vfsp, &eah->eah_tag,
-			UD_EXT_ATTR_HDR, blkno, ea_len);
+		    UD_EXT_ATTR_HDR, blkno, ea_len);
 	}
 
 	fe->fe_len_ear = SWAP_32(ea_len);
@@ -1172,7 +1163,7 @@ ud_ialloc(struct ud_inode *pip,
 	} else {
 		if ((ichar & ISGID) &&
 		    secpolicy_vnode_setids_setgids(cr,
-			    (gid_t)SWAP_32(fe->fe_gid)) != 0) {
+		    (gid_t)SWAP_32(fe->fe_gid)) != 0) {
 			ichar &= ~ISGID;
 		}
 	}
@@ -1187,8 +1178,8 @@ ud_ialloc(struct ud_inode *pip,
 	}
 	icb->itag_flags = SWAP_16(flags);
 	ud_make_tag(udf_vfsp, &fe->fe_tag, UD_FILE_ENTRY, blkno,
-		((uint32_t)&((struct file_entry *)0)->fe_spec) +
-			SWAP_32(fe->fe_len_ear) + SWAP_32(fe->fe_len_adesc));
+	    offsetof(struct file_entry, fe_spec) +
+	    SWAP_32(fe->fe_len_ear) + SWAP_32(fe->fe_len_adesc));
 
 	BWRITE2(bp);
 
@@ -1206,7 +1197,7 @@ ud_ialloc(struct ud_inode *pip,
 
 		if ((ip = ud_search_icache(pip->i_vfs, prn, blkno)) != NULL) {
 			cmn_err(CE_NOTE, "duplicate %p %x\n",
-				(void *)ip, (uint32_t)ip->i_icb_lbano);
+			    (void *)ip, (uint32_t)ip->i_icb_lbano);
 		}
 	}
 #endif
@@ -1239,8 +1230,7 @@ ud_ifree(struct ud_inode *ip, vtype_t type)
 
 	udf_vfsp = (struct udf_vfs *)ip->i_vfs->vfs_data;
 	bp = ud_bread(ip->i_dev, ip->i_icb_lbano <<
-			udf_vfsp->udf_l2d_shift,
-			udf_vfsp->udf_lbsize);
+	    udf_vfsp->udf_l2d_shift, udf_vfsp->udf_lbsize);
 	if (bp->b_flags & B_ERROR) {
 		/*
 		 * Error get rid of bp
@@ -1253,8 +1243,7 @@ ud_ifree(struct ud_inode *ip, vtype_t type)
 		bzero(bp->b_un.b_addr, 0x10);
 		BWRITE(bp);
 	}
-	ud_free_space(ip->i_vfs, ip->i_icb_prn,
-		ip->i_icb_block, 1);
+	ud_free_space(ip->i_vfs, ip->i_icb_prn, ip->i_icb_block, 1);
 	mutex_enter(&udf_vfsp->udf_lock);
 	if (type == VDIR) {
 		if (udf_vfsp->udf_ndirs > 1) {
@@ -1377,8 +1366,7 @@ ud_alloc_from_cache(struct udf_vfs *udf_vfsp,
 		mutex_exit(&udf_vfsp->udf_lock);
 		/* allocate new cluster */
 		if ((error = ud_alloc_space(udf_vfsp->udf_vfs,
-				part->udp_number, 0, CLSTR_SIZE,
-				&bno, &sz, 1, 0)) != 0) {
+		    part->udp_number, 0, CLSTR_SIZE, &bno, &sz, 1, 0)) != 0) {
 			return (error);
 		}
 		if (sz == 0) {
@@ -1424,7 +1412,7 @@ ud_release_cache(struct udf_vfs *udf_vfsp)
 			part->udp_cache_count = 0;
 			mutex_exit(&udf_vfsp->udf_lock);
 			ud_free_space(udf_vfsp->udf_vfs,
-				part->udp_number, start, nblks);
+			    part->udp_number, start, nblks);
 			mutex_enter(&udf_vfsp->udf_lock);
 		}
 	}
