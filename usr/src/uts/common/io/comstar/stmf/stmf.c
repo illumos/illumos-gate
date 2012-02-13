@@ -22,7 +22,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright 2011, Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2012, Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/conf.h>
@@ -65,6 +65,8 @@ static uint64_t stmf_proxy_msg_id = 1;
 #define	MSG_ID_TM_BIT	0x8000000000000000
 #define	ALIGNED_TO_8BYTE_BOUNDARY(i)	(((i) + 7) & ~7)
 
+struct stmf_svc_clocks;
+
 static int stmf_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
 static int stmf_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
 static int stmf_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg,
@@ -91,7 +93,7 @@ stmf_status_t stmf_svc_fini();
 void stmf_svc(void *arg);
 void stmf_svc_queue(int cmd, void *obj, stmf_state_change_info_t *info);
 static void stmf_svc_kill_obj_requests(void *obj);
-static void stmf_svc_timeout(void);
+static void stmf_svc_timeout(struct stmf_svc_clocks *);
 void stmf_check_freetask();
 void stmf_abort_target_reset(scsi_task_t *task);
 stmf_status_t stmf_lun_reset_poll(stmf_lu_t *lu, struct scsi_task *task,
@@ -7777,6 +7779,12 @@ stmf_svc_fini()
 	return (STMF_SUCCESS);
 }
 
+struct stmf_svc_clocks {
+	clock_t drain_start, drain_next;
+	clock_t timing_start, timing_next;
+	clock_t worker_delay;
+};
+
 /* ARGSUSED */
 void
 stmf_svc(void *arg)
@@ -7785,13 +7793,14 @@ stmf_svc(void *arg)
 	stmf_lu_t *lu;
 	stmf_i_lu_t *ilu;
 	stmf_local_port_t *lport;
+	struct stmf_svc_clocks clks = { 0 };
 
 	mutex_enter(&stmf_state.stmf_lock);
 	stmf_state.stmf_svc_flags |= STMF_SVC_STARTED | STMF_SVC_ACTIVE;
 
 	while (!(stmf_state.stmf_svc_flags & STMF_SVC_TERMINATE)) {
 		if (stmf_state.stmf_svc_active == NULL) {
-			stmf_svc_timeout();
+			stmf_svc_timeout(&clks);
 			continue;
 		}
 
@@ -7846,12 +7855,9 @@ stmf_svc(void *arg)
 }
 
 static void
-stmf_svc_timeout(void)
+stmf_svc_timeout(struct stmf_svc_clocks *clks)
 {
 	clock_t td;
-	clock_t	drain_start, drain_next = 0;
-	clock_t	timing_start, timing_next = 0;
-	clock_t worker_delay = 0;
 	stmf_i_local_port_t *ilport, *next_ilport;
 	stmf_i_scsi_session_t *iss;
 
@@ -7861,21 +7867,22 @@ stmf_svc_timeout(void)
 
 	/* Do timeouts */
 	if (stmf_state.stmf_nlus &&
-	    ((!timing_next) || (ddi_get_lbolt() >= timing_next))) {
+	    ((!clks->timing_next) || (ddi_get_lbolt() >= clks->timing_next))) {
 		if (!stmf_state.stmf_svc_ilu_timing) {
 			/* we are starting a new round */
 			stmf_state.stmf_svc_ilu_timing =
 			    stmf_state.stmf_ilulist;
-			timing_start = ddi_get_lbolt();
+			clks->timing_start = ddi_get_lbolt();
 		}
 
 		stmf_check_ilu_timing();
 		if (!stmf_state.stmf_svc_ilu_timing) {
 			/* we finished a complete round */
-			timing_next = timing_start + drv_usectohz(5*1000*1000);
+			clks->timing_next =
+			    clks->timing_start + drv_usectohz(5*1000*1000);
 		} else {
 			/* we still have some ilu items to check */
-			timing_next =
+			clks->timing_next =
 			    ddi_get_lbolt() + drv_usectohz(1*1000*1000);
 		}
 
@@ -7885,22 +7892,22 @@ stmf_svc_timeout(void)
 
 	/* Check if there are free tasks to clear */
 	if (stmf_state.stmf_nlus &&
-	    ((!drain_next) || (ddi_get_lbolt() >= drain_next))) {
+	    ((!clks->drain_next) || (ddi_get_lbolt() >= clks->drain_next))) {
 		if (!stmf_state.stmf_svc_ilu_draining) {
 			/* we are starting a new round */
 			stmf_state.stmf_svc_ilu_draining =
 			    stmf_state.stmf_ilulist;
-			drain_start = ddi_get_lbolt();
+			clks->drain_start = ddi_get_lbolt();
 		}
 
 		stmf_check_freetask();
 		if (!stmf_state.stmf_svc_ilu_draining) {
 			/* we finished a complete round */
-			drain_next =
-			    drain_start + drv_usectohz(10*1000*1000);
+			clks->drain_next =
+			    clks->drain_start + drv_usectohz(10*1000*1000);
 		} else {
 			/* we still have some ilu items to check */
-			drain_next =
+			clks->drain_next =
 			    ddi_get_lbolt() + drv_usectohz(1*1000*1000);
 		}
 
@@ -7909,9 +7916,9 @@ stmf_svc_timeout(void)
 	}
 
 	/* Check if we need to run worker_mgmt */
-	if (ddi_get_lbolt() > worker_delay) {
+	if (ddi_get_lbolt() > clks->worker_delay) {
 		stmf_worker_mgmt();
-		worker_delay = ddi_get_lbolt() +
+		clks->worker_delay = ddi_get_lbolt() +
 		    stmf_worker_mgmt_delay;
 	}
 
