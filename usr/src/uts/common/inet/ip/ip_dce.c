@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -28,10 +29,12 @@
 #include <sys/strsun.h>
 #include <sys/zone.h>
 #include <sys/ddi.h>
+#include <sys/disp.h>
 #include <sys/sunddi.h>
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
 #include <sys/atomic.h>
+#include <sys/callb.h>
 #define	_SUN_TPI_VERSION 2
 #include <sys/tihdr.h>
 
@@ -102,7 +105,19 @@ static void	dce_delete_locked(dcb_t *, dce_t *);
 static void	dce_make_condemned(dce_t *);
 
 static kmem_cache_t *dce_cache;
+static kthread_t *dce_reclaim_thread;
+static kmutex_t dce_reclaim_lock;
+static kcondvar_t dce_reclaim_cv;
+static int dce_reclaim_shutdown;
 
+/* Global so it can be tuned in /etc/system. This must be a power of two. */
+uint_t ip_dce_hash_size = 1024;
+
+/* The time in seconds between executions of the IP DCE reclaim worker. */
+uint_t ip_dce_reclaim_interval = 60;
+
+/* The factor of the DCE threshold at which to start hard reclaims */
+uint_t ip_dce_reclaim_threshold_hard = 2;
 
 /* Operates on a uint64_t */
 #define	RANDOM_HASH(p) ((p) ^ ((p)>>16) ^ ((p)>>32) ^ ((p)>>48))
@@ -117,6 +132,11 @@ dcb_reclaim(dcb_t *dcb, ip_stack_t *ipst, uint_t fraction)
 	uint_t	fraction_pmtu = fraction*4;
 	uint_t	hash;
 	dce_t	*dce, *nextdce;
+	hrtime_t seed = gethrtime();
+	uint_t	retained = 0;
+	uint_t	max = ipst->ips_ip_dce_reclaim_threshold;
+
+	max *= ip_dce_reclaim_threshold_hard;
 
 	rw_enter(&dcb->dcb_lock, RW_WRITER);
 	for (dce = dcb->dcb_dce; dce != NULL; dce = nextdce) {
@@ -132,13 +152,21 @@ dcb_reclaim(dcb_t *dcb, ip_stack_t *ipst, uint_t fraction)
 		} else {
 			mutex_exit(&dce->dce_lock);
 		}
-		hash = RANDOM_HASH((uint64_t)(uintptr_t)dce);
-		if (dce->dce_flags & DCEF_PMTU) {
-			if (hash % fraction_pmtu != 0)
-				continue;
-		} else {
-			if (hash % fraction != 0)
-				continue;
+
+		if (max == 0 || retained < max) {
+			hash = RANDOM_HASH((uint64_t)((uintptr_t)dce | seed));
+
+			if (dce->dce_flags & DCEF_PMTU) {
+				if (hash % fraction_pmtu != 0) {
+					retained++;
+					continue;
+				}
+			} else {
+				if (hash % fraction != 0) {
+					retained++;
+					continue;
+				}
+			}
 		}
 
 		IP_STAT(ipst, ip_dce_reclaim_deleted);
@@ -175,16 +203,18 @@ ip_dce_reclaim_stack(ip_stack_t *ipst)
 }
 
 /*
- * Called by the memory allocator subsystem directly, when the system
- * is running low on memory.
+ * Called by dce_reclaim_worker() below, and no one else.  Typically this will
+ * mean that the number of entries in the hash buckets has exceeded a tunable
+ * threshold.
  */
-/* ARGSUSED */
-void
-ip_dce_reclaim(void *args)
+static void
+ip_dce_reclaim(void)
 {
 	netstack_handle_t nh;
 	netstack_t *ns;
 	ip_stack_t *ipst;
+
+	ASSERT(curthread == dce_reclaim_thread);
 
 	netstack_next_init(&nh);
 	while ((ns = netstack_next(&nh)) != NULL) {
@@ -196,25 +226,74 @@ ip_dce_reclaim(void *args)
 			netstack_rele(ns);
 			continue;
 		}
-		ip_dce_reclaim_stack(ipst);
+		if (atomic_swap_uint(&ipst->ips_dce_reclaim_needed, 0) != 0)
+			ip_dce_reclaim_stack(ipst);
 		netstack_rele(ns);
 	}
 	netstack_next_fini(&nh);
+}
+
+/* ARGSUSED */
+static void
+dce_reclaim_worker(void *arg)
+{
+	callb_cpr_t	cprinfo;
+
+	CALLB_CPR_INIT(&cprinfo, &dce_reclaim_lock, callb_generic_cpr,
+	    "dce_reclaim_worker");
+
+	mutex_enter(&dce_reclaim_lock);
+	while (!dce_reclaim_shutdown) {
+		CALLB_CPR_SAFE_BEGIN(&cprinfo);
+		(void) cv_timedwait(&dce_reclaim_cv, &dce_reclaim_lock,
+		    ddi_get_lbolt() + ip_dce_reclaim_interval * hz);
+		CALLB_CPR_SAFE_END(&cprinfo, &dce_reclaim_lock);
+
+		if (dce_reclaim_shutdown)
+			break;
+
+		mutex_exit(&dce_reclaim_lock);
+		ip_dce_reclaim();
+		mutex_enter(&dce_reclaim_lock);
+	}
+
+	ASSERT(MUTEX_HELD(&dce_reclaim_lock));
+	dce_reclaim_thread = NULL;
+	dce_reclaim_shutdown = 0;
+	cv_broadcast(&dce_reclaim_cv);
+	CALLB_CPR_EXIT(&cprinfo);	/* drops the lock */
+
+	thread_exit();
 }
 
 void
 dce_g_init(void)
 {
 	dce_cache = kmem_cache_create("dce_cache",
-	    sizeof (dce_t), 0, NULL, NULL, ip_dce_reclaim, NULL, NULL, 0);
+	    sizeof (dce_t), 0, NULL, NULL, NULL, NULL, NULL, 0);
+
+	mutex_init(&dce_reclaim_lock, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&dce_reclaim_cv, NULL, CV_DEFAULT, NULL);
+
+	dce_reclaim_thread = thread_create(NULL, 0, dce_reclaim_worker,
+	    NULL, 0, &p0, TS_RUN, minclsyspri);
 }
 
 void
 dce_g_destroy(void)
 {
+	mutex_enter(&dce_reclaim_lock);
+	dce_reclaim_shutdown = 1;
+	cv_signal(&dce_reclaim_cv);
+	while (dce_reclaim_thread != NULL)
+		cv_wait(&dce_reclaim_cv, &dce_reclaim_lock);
+	mutex_exit(&dce_reclaim_lock);
+
+	cv_destroy(&dce_reclaim_cv);
+	mutex_destroy(&dce_reclaim_lock);
+
 	kmem_cache_destroy(dce_cache);
 }
-
 
 /*
  * Allocate a default DCE and a hash table for per-IP address DCEs
@@ -234,7 +313,7 @@ dce_stack_init(ip_stack_t *ipst)
 	ipst->ips_dce_default->dce_ipst = ipst;
 
 	/* This must be a power of two since we are using IRE_ADDR_HASH macro */
-	ipst->ips_dce_hashsize = 256;
+	ipst->ips_dce_hashsize = ip_dce_hash_size;
 	ipst->ips_dce_hash_v4 = kmem_zalloc(ipst->ips_dce_hashsize *
 	    sizeof (dcb_t), KM_SLEEP);
 	ipst->ips_dce_hash_v6 = kmem_zalloc(ipst->ips_dce_hashsize *
@@ -414,6 +493,12 @@ dce_lookup_and_add_v4(ipaddr_t dst, ip_stack_t *ipst)
 
 	hash = IRE_ADDR_HASH(dst, ipst->ips_dce_hashsize);
 	dcb = &ipst->ips_dce_hash_v4[hash];
+	/*
+	 * Assuming that we get fairly even distribution across all of the
+	 * buckets, once one bucket is overly full, prune the whole cache.
+	 */
+	if (dcb->dcb_cnt > ipst->ips_ip_dce_reclaim_threshold)
+		atomic_or_uint(&ipst->ips_dce_reclaim_needed, 1);
 	rw_enter(&dcb->dcb_lock, RW_WRITER);
 	for (dce = dcb->dcb_dce; dce != NULL; dce = dce->dce_next) {
 		if (dce->dce_v4addr == dst) {
@@ -447,6 +532,7 @@ dce_lookup_and_add_v4(ipaddr_t dst, ip_stack_t *ipst)
 	dce->dce_ptpn = &dcb->dcb_dce;
 	dcb->dcb_dce = dce;
 	dce->dce_bucket = dcb;
+	atomic_add_32(&dcb->dcb_cnt, 1);
 	dce_refhold(dce);	/* For the caller */
 	rw_exit(&dcb->dcb_lock);
 
@@ -476,6 +562,12 @@ dce_lookup_and_add_v6(const in6_addr_t *dst, uint_t ifindex, ip_stack_t *ipst)
 
 	hash = IRE_ADDR_HASH_V6(*dst, ipst->ips_dce_hashsize);
 	dcb = &ipst->ips_dce_hash_v6[hash];
+	/*
+	 * Assuming that we get fairly even distribution across all of the
+	 * buckets, once one bucket is overly full, prune the whole cache.
+	 */
+	if (dcb->dcb_cnt > ipst->ips_ip_dce_reclaim_threshold)
+		atomic_or_uint(&ipst->ips_dce_reclaim_needed, 1);
 	rw_enter(&dcb->dcb_lock, RW_WRITER);
 	for (dce = dcb->dcb_dce; dce != NULL; dce = dce->dce_next) {
 		if (IN6_ARE_ADDR_EQUAL(&dce->dce_v6addr, dst) &&

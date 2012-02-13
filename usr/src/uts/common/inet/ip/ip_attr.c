@@ -909,6 +909,11 @@ ixa_safe_copy(ip_xmit_attr_t *src, ip_xmit_attr_t *ixa)
 	 */
 	if (ixa->ixa_free_flags & IXA_FREE_CRED)
 		crhold(ixa->ixa_cred);
+
+	/*
+	 * There is no cleanup in progress on this new copy.
+	 */
+	ixa->ixa_tcpcleanup = IXATC_IDLE;
 }
 
 /*
@@ -1295,9 +1300,7 @@ conn_ixa_cleanup(conn_t *connp, void *arg)
 
 	if (IPCL_IS_TCP(connp)) {
 		mblk_t		*mp;
-		tcp_stack_t	*tcps;
 
-		tcps = connp->conn_netstack->netstack_tcp;
 		mp = tcp_ixa_cleanup_getmblk(connp);
 
 		if (connp->conn_sqp->sq_run == curthread) {
