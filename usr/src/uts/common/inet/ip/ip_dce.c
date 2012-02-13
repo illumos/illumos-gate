@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -103,6 +104,8 @@ static void	dce_make_condemned(dce_t *);
 
 static kmem_cache_t *dce_cache;
 
+/* Global so it can be tuned in /etc/system. This must be a power of two. */
+uint_t ip_dce_hash_size = 256;
 
 /* Operates on a uint64_t */
 #define	RANDOM_HASH(p) ((p) ^ ((p)>>16) ^ ((p)>>32) ^ ((p)>>48))
@@ -117,6 +120,7 @@ dcb_reclaim(dcb_t *dcb, ip_stack_t *ipst, uint_t fraction)
 	uint_t	fraction_pmtu = fraction*4;
 	uint_t	hash;
 	dce_t	*dce, *nextdce;
+	hrtime_t seed = gethrtime();
 
 	rw_enter(&dcb->dcb_lock, RW_WRITER);
 	for (dce = dcb->dcb_dce; dce != NULL; dce = nextdce) {
@@ -132,7 +136,7 @@ dcb_reclaim(dcb_t *dcb, ip_stack_t *ipst, uint_t fraction)
 		} else {
 			mutex_exit(&dce->dce_lock);
 		}
-		hash = RANDOM_HASH((uint64_t)(uintptr_t)dce);
+		hash = RANDOM_HASH((uint64_t)((uintptr_t)dce | seed));
 		if (dce->dce_flags & DCEF_PMTU) {
 			if (hash % fraction_pmtu != 0)
 				continue;
@@ -234,7 +238,7 @@ dce_stack_init(ip_stack_t *ipst)
 	ipst->ips_dce_default->dce_ipst = ipst;
 
 	/* This must be a power of two since we are using IRE_ADDR_HASH macro */
-	ipst->ips_dce_hashsize = 256;
+	ipst->ips_dce_hashsize = ip_dce_hash_size;
 	ipst->ips_dce_hash_v4 = kmem_zalloc(ipst->ips_dce_hashsize *
 	    sizeof (dcb_t), KM_SLEEP);
 	ipst->ips_dce_hash_v6 = kmem_zalloc(ipst->ips_dce_hashsize *
@@ -414,6 +418,12 @@ dce_lookup_and_add_v4(ipaddr_t dst, ip_stack_t *ipst)
 
 	hash = IRE_ADDR_HASH(dst, ipst->ips_dce_hashsize);
 	dcb = &ipst->ips_dce_hash_v4[hash];
+	/*
+	 * Assuming that we get fairly even distribution across all of the
+	 * buckets, once one bucket is overly full, prune the whole cache.
+	 */
+	if (dcb->dcb_cnt > ipst->ips_ip_dce_reclaim_threshold)
+		ip_dce_reclaim_stack(ipst);
 	rw_enter(&dcb->dcb_lock, RW_WRITER);
 	for (dce = dcb->dcb_dce; dce != NULL; dce = dce->dce_next) {
 		if (dce->dce_v4addr == dst) {
@@ -447,6 +457,7 @@ dce_lookup_and_add_v4(ipaddr_t dst, ip_stack_t *ipst)
 	dce->dce_ptpn = &dcb->dcb_dce;
 	dcb->dcb_dce = dce;
 	dce->dce_bucket = dcb;
+	atomic_add_32(&dcb->dcb_cnt, 1);
 	dce_refhold(dce);	/* For the caller */
 	rw_exit(&dcb->dcb_lock);
 
@@ -476,6 +487,12 @@ dce_lookup_and_add_v6(const in6_addr_t *dst, uint_t ifindex, ip_stack_t *ipst)
 
 	hash = IRE_ADDR_HASH_V6(*dst, ipst->ips_dce_hashsize);
 	dcb = &ipst->ips_dce_hash_v6[hash];
+	/*
+	 * Assuming that we get fairly even distribution across all of the
+	 * buckets, once one bucket is overly full, prune the whole cache.
+	 */
+	if (dcb->dcb_cnt > ipst->ips_ip_dce_reclaim_threshold)
+		ip_dce_reclaim_stack(ipst);
 	rw_enter(&dcb->dcb_lock, RW_WRITER);
 	for (dce = dcb->dcb_dce; dce != NULL; dce = dce->dce_next) {
 		if (IN6_ARE_ADDR_EQUAL(&dce->dce_v6addr, dst) &&
