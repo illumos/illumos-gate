@@ -1176,6 +1176,59 @@ ixa_cleanup_stale(ip_xmit_attr_t *ixa)
 	}
 }
 
+static mblk_t *
+tcp_ixa_cleanup_getmblk(conn_t *connp)
+{
+	tcp_stack_t *tcps = connp->conn_netstack->netstack_tcp;
+	int need_retry;
+	mblk_t *mp;
+
+	mutex_enter(&tcps->tcps_ixa_cleanup_lock);
+
+	/*
+	 * It's possible that someone else came in and started cleaning up
+	 * another connection between the time we verified this one is not being
+	 * cleaned up and the time we actually get the shared mblk.  If that's
+	 * the case, we've dropped the lock, and some other thread may have
+	 * cleaned up this connection again, and is still waiting for
+	 * notification of that cleanup's completion.  Therefore we need to
+	 * recheck.
+	 */
+	do {
+		need_retry = 0;
+		while (connp->conn_ixa->ixa_tcpcleanup != IXATC_IDLE) {
+			cv_wait(&tcps->tcps_ixa_cleanup_done_cv,
+			    &tcps->tcps_ixa_cleanup_lock);
+		}
+
+		while ((mp = tcps->tcps_ixa_cleanup_mp) == NULL) {
+			/*
+			 * Multiple concurrent cleanups; need to have the last
+			 * one run since it could be an unplumb.
+			 */
+			need_retry = 1;
+			cv_wait(&tcps->tcps_ixa_cleanup_ready_cv,
+			    &tcps->tcps_ixa_cleanup_lock);
+		}
+	} while (need_retry);
+
+	/*
+	 * We now have the lock and the mblk; now make sure that no one else can
+	 * try to clean up this connection or enqueue it for cleanup, clear the
+	 * mblk pointer for this stack, drop the lock, and return the mblk.
+	 */
+	ASSERT(MUTEX_HELD(&tcps->tcps_ixa_cleanup_lock));
+	ASSERT(connp->conn_ixa->ixa_tcpcleanup == IXATC_IDLE);
+	ASSERT(tcps->tcps_ixa_cleanup_mp == mp);
+	ASSERT(mp != NULL);
+
+	connp->conn_ixa->ixa_tcpcleanup = IXATC_INPROGRESS;
+	tcps->tcps_ixa_cleanup_mp = NULL;
+	mutex_exit(&tcps->tcps_ixa_cleanup_lock);
+
+	return (mp);
+}
+
 /*
  * Used to run ixa_cleanup_stale inside the tcp squeue.
  * When done we hand the mp back by assigning it to tcps_ixa_cleanup_mp
@@ -1195,11 +1248,39 @@ tcp_ixa_cleanup(void *arg, mblk_t *mp, void *arg2,
 
 	mutex_enter(&tcps->tcps_ixa_cleanup_lock);
 	ASSERT(tcps->tcps_ixa_cleanup_mp == NULL);
+	connp->conn_ixa->ixa_tcpcleanup = IXATC_COMPLETE;
 	tcps->tcps_ixa_cleanup_mp = mp;
-	cv_signal(&tcps->tcps_ixa_cleanup_cv);
+	cv_signal(&tcps->tcps_ixa_cleanup_ready_cv);
+	/*
+	 * It is possible for any number of threads to be waiting for cleanup of
+	 * different connections.  Absent a per-connection (or per-IXA) CV, we
+	 * need to wake them all up even though only one can be waiting on this
+	 * particular cleanup.
+	 */
+	cv_broadcast(&tcps->tcps_ixa_cleanup_done_cv);
 	mutex_exit(&tcps->tcps_ixa_cleanup_lock);
 }
 
+static void
+tcp_ixa_cleanup_wait_and_finish(conn_t *connp)
+{
+	tcp_stack_t *tcps = connp->conn_netstack->netstack_tcp;
+
+	mutex_enter(&tcps->tcps_ixa_cleanup_lock);
+
+	ASSERT(connp->conn_ixa->ixa_tcpcleanup != IXATC_IDLE);
+
+	while (connp->conn_ixa->ixa_tcpcleanup == IXATC_INPROGRESS) {
+		cv_wait(&tcps->tcps_ixa_cleanup_done_cv,
+		    &tcps->tcps_ixa_cleanup_lock);
+	}
+
+	ASSERT(connp->conn_ixa->ixa_tcpcleanup == IXATC_COMPLETE);
+	connp->conn_ixa->ixa_tcpcleanup = IXATC_IDLE;
+	cv_broadcast(&tcps->tcps_ixa_cleanup_done_cv);
+
+	mutex_exit(&tcps->tcps_ixa_cleanup_lock);
+}
 
 /*
  * ipcl_walk() function to help release any IRE, NCE, or DCEs that
@@ -1214,21 +1295,8 @@ conn_ixa_cleanup(conn_t *connp, void *arg)
 
 	if (IPCL_IS_TCP(connp)) {
 		mblk_t		*mp;
-		tcp_stack_t	*tcps;
 
-		tcps = connp->conn_netstack->netstack_tcp;
-
-		mutex_enter(&tcps->tcps_ixa_cleanup_lock);
-		while ((mp = tcps->tcps_ixa_cleanup_mp) == NULL) {
-			/*
-			 * Multiple concurrent cleanups; need to have the last
-			 * one run since it could be an unplumb.
-			 */
-			cv_wait(&tcps->tcps_ixa_cleanup_cv,
-			    &tcps->tcps_ixa_cleanup_lock);
-		}
-		tcps->tcps_ixa_cleanup_mp = NULL;
-		mutex_exit(&tcps->tcps_ixa_cleanup_lock);
+		mp = tcp_ixa_cleanup_getmblk(connp);
 
 		if (connp->conn_sqp->sq_run == curthread) {
 			/* Already on squeue */
@@ -1237,15 +1305,8 @@ conn_ixa_cleanup(conn_t *connp, void *arg)
 			CONN_INC_REF(connp);
 			SQUEUE_ENTER_ONE(connp->conn_sqp, mp, tcp_ixa_cleanup,
 			    connp, NULL, SQ_PROCESS, SQTAG_TCP_IXA_CLEANUP);
-
-			/* Wait until tcp_ixa_cleanup has run */
-			mutex_enter(&tcps->tcps_ixa_cleanup_lock);
-			while (tcps->tcps_ixa_cleanup_mp == NULL) {
-				cv_wait(&tcps->tcps_ixa_cleanup_cv,
-				    &tcps->tcps_ixa_cleanup_lock);
-			}
-			mutex_exit(&tcps->tcps_ixa_cleanup_lock);
 		}
+		tcp_ixa_cleanup_wait_and_finish(connp);
 	} else if (IPCL_IS_SCTP(connp)) {
 		sctp_t	*sctp;
 		sctp_faddr_t *fp;

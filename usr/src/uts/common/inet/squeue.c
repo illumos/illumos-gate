@@ -546,6 +546,7 @@ squeue_enter(squeue_t *sqp, mblk_t *mp, mblk_t *tail, uint32_t cnt,
 		ASSERT(MUTEX_HELD(&sqp->sq_lock));
 		ASSERT(sqp->sq_first != NULL);
 		now = gethrtime();
+		sqp->sq_run = curthread;
 		sqp->sq_drain(sqp, SQS_ENTER, now + squeue_drain_ns);
 
 		/*
