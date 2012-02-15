@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -980,7 +981,7 @@ rtls_send(rtls_t *rtlsp, mblk_t *mp)
 #ifdef RTLS_DEBUG
 		cmn_err(CE_WARN,
 		    "%s: send fail--CHIP ERROR!",
-		    rtlsp->ifname);
+		    mac_name(rtlsp->mh));
 #endif
 		mutex_exit(&rtlsp->rtls_tx_lock);
 		freemsg(mp);
@@ -997,7 +998,7 @@ rtls_send(rtls_t *rtlsp, mblk_t *mp)
 #ifdef RTLS_DEBUG
 		cmn_err(CE_WARN,
 		    "%s: send fail--LINK DOWN!",
-		    rtlsp->ifname);
+		    mac_name(rtlsp->mh));
 #endif
 		rtlsp->stats.no_carrier++;
 		mutex_exit(&rtlsp->rtls_tx_lock);
@@ -1033,7 +1034,7 @@ rtls_send(rtls_t *rtlsp, mblk_t *mp)
 #ifdef RTLS_DEBUG
 		if (rtls_debug & RTLS_SEND) {
 			cmn_err(CE_NOTE,
-			    "%s: rtls_send: need_sched", rtlsp->ifname);
+			    "%s: rtls_send: need_sched", mac_name(rtlsp->mh));
 		}
 #endif
 		/*
@@ -1058,7 +1059,7 @@ rtls_send(rtls_t *rtlsp, mblk_t *mp)
 			if (!(tx_status & TX_COMPLETE_FLAG)) {
 #ifdef RTLS_DEBUG
 				cmn_err(CE_NOTE, "%s: tx chip_error = 0x%x",
-				    rtlsp->ifname, tx_status);
+				    mac_name(rtlsp->mh), tx_status);
 #endif
 				rtlsp->tx_retry = 0;
 				rtlsp->chip_error = B_TRUE;
@@ -1083,7 +1084,7 @@ rtls_send(rtls_t *rtlsp, mblk_t *mp)
 #ifdef RTLS_DEBUG
 		if (rtls_debug & RTLS_SEND) {
 			cmn_err(CE_NOTE, "%s: transmit error, status = 0x%x",
-			    rtlsp->ifname, tx_status);
+			    mac_name(rtlsp->mh), tx_status);
 		}
 #endif
 		rtlsp->stats.xmt_err++;
@@ -1115,7 +1116,7 @@ tx_ready:
 	if (totlen > (ETHERMAX + 4)) {	/* 4 bytes for VLAN header */
 		cmn_err(CE_NOTE,
 		    "%s: rtls_send: try to send large %d packet",
-		    rtlsp->ifname, totlen);
+		    mac_name(rtlsp->mh), totlen);
 		rtlsp->stats.mac_xmt_err++;
 		rtlsp->stats.xmt_err++;
 		freemsg(mp);
@@ -1226,7 +1227,7 @@ rtls_receive(rtls_t *rtlsp)
 #ifdef RTLS_DEBUG
 		cmn_err(CE_WARN,
 		    "%s: receive fail--CHIP ERROR!",
-		    rtlsp->ifname);
+		    mac_name(rtlsp->mh));
 #endif
 			break;
 		}
@@ -1241,7 +1242,7 @@ rtls_receive(rtls_t *rtlsp)
 		 */
 		if (packet_len == RX_STATUS_DMA_BUSY) {
 			cmn_err(CE_NOTE, "%s: Rx DMA still in progress",
-			    rtlsp->ifname);
+			    mac_name(rtlsp->mh));
 			break;
 		}
 
@@ -1255,7 +1256,7 @@ rtls_receive(rtls_t *rtlsp)
 #ifdef RTLS_DEBUG
 			cmn_err(CE_NOTE,
 			    "%s: receive error, status = 0x%x, length = %d",
-			    rtlsp->ifname, rx_status, packet_len);
+			    mac_name(rtlsp->mh), rx_status, packet_len);
 #endif
 			/*
 			 * Rx error statistics
@@ -1302,7 +1303,7 @@ rtls_receive(rtls_t *rtlsp)
 			if (rtls_debug & RTLS_RECV) {
 				cmn_err(CE_NOTE,
 				    "%s: Rx: packet_len = %d, wrap_size = %d",
-				    rtlsp->ifname, packet_len, wrap_size);
+				    mac_name(rtlsp->mh), packet_len, wrap_size);
 			}
 #endif
 
@@ -1442,7 +1443,7 @@ rtls_intr(caddr_t arg)
 		val32 = rtls_reg_get32(rtlsp, TX_CONFIG_REG);
 		val32 |= TX_CLEAR_ABORT;
 		rtls_reg_set32(rtlsp, TX_CONFIG_REG, val32);
-		cmn_err(CE_WARN, "%s: transmit abort!!!", rtlsp->ifname);
+		cmn_err(CE_WARN, "%s: transmit abort!!!", mac_name(rtlsp->mh));
 	}
 
 	/*
@@ -1503,7 +1504,7 @@ rtls_alloc_dma_mem(rtls_t *rtlsp, size_t memsize,
 	if (err != DDI_SUCCESS) {
 		cmn_err(CE_WARN,
 		    "%s: rtls_alloc_dma_mem: ddi_dma_alloc_handle failed: %d",
-		    rtlsp->ifname, err);
+		    mac_name(rtlsp->mh), err);
 		dma_p->dma_hdl = NULL;
 		return (DDI_FAILURE);
 	}
@@ -1517,7 +1518,7 @@ rtls_alloc_dma_mem(rtls_t *rtlsp, size_t memsize,
 	if (err != DDI_SUCCESS) {
 		cmn_err(CE_WARN,
 		    "%s: rtls_alloc_dma_mem: ddi_dma_mem_alloc failed: %d",
-		    rtlsp->ifname, err);
+		    mac_name(rtlsp->mh), err);
 		ddi_dma_free_handle(&dma_p->dma_hdl);
 		dma_p->dma_hdl = NULL;
 		dma_p->acc_hdl = NULL;
@@ -1535,7 +1536,7 @@ rtls_alloc_dma_mem(rtls_t *rtlsp, size_t memsize,
 		cmn_err(CE_WARN,
 		    "%s: rtls_alloc_dma_mem: "
 		    "ddi_dma_addr_bind_handle failed: %d",
-		    rtlsp->ifname, err);
+		    mac_name(rtlsp->mh), err);
 		ddi_dma_mem_free(&dma_p->acc_hdl);
 		ddi_dma_free_handle(&dma_p->dma_hdl);
 		dma_p->acc_hdl = NULL;
@@ -1679,7 +1680,8 @@ rtls_chip_reset(rtls_t *rtlsp, boolean_t quiesce)
 			 */
 			if (!quiesce)
 				cmn_err(CE_WARN,
-				    "%s: chip reset fail.", rtlsp->ifname);
+				    "%s: chip reset fail.",
+				    mac_name(rtlsp->mh));
 			return (DDI_FAILURE);
 		}
 		RTLS_RESET_WAIT_INTERVAL;
@@ -2016,51 +2018,51 @@ rtls_reg_print(rtls_t *rtlsp)
 
 	val8 = rtls_reg_get8(rtlsp, RT_COMMAND_REG);
 	cmn_err(CE_NOTE, "%s: RT_COMMAND_REG = 0x%x",
-	    rtlsp->ifname, val8);
+	    mac_name(rtlsp->mh), val8);
 	delay(drv_usectohz(1000));
 
 	val16 = rtls_reg_get16(rtlsp, RT_INT_STATUS_REG);
 	cmn_err(CE_NOTE, "%s: RT_INT_STATUS_REG = 0x%x",
-	    rtlsp->ifname, val16);
+	    mac_name(rtlsp->mh), val16);
 	delay(drv_usectohz(1000));
 
 	val16 = rtls_reg_get16(rtlsp, RT_INT_MASK_REG);
 	cmn_err(CE_NOTE, "%s: RT_INT_MASK_REG = 0x%x",
-	    rtlsp->ifname, val16);
+	    mac_name(rtlsp->mh), val16);
 	delay(drv_usectohz(1000));
 
 	val32 = rtls_reg_get32(rtlsp, RX_CONFIG_REG);
 	cmn_err(CE_NOTE, "%s: RX_CONFIG_REG = 0x%x",
-	    rtlsp->ifname, val32);
+	    mac_name(rtlsp->mh), val32);
 	delay(drv_usectohz(1000));
 
 	val16 = rtls_reg_get16(rtlsp, TX_DESC_STAUS_REG);
 	cmn_err(CE_NOTE, "%s: TX_DESC_STAUS_REG = 0x%x, cur_desc = %d",
-	    rtlsp->ifname, val16, rtlsp->tx_current_desc);
+	    mac_name(rtlsp->mh), val16, rtlsp->tx_current_desc);
 	delay(drv_usectohz(1000));
 
 	val32 = rtls_reg_get32(rtlsp, TX_STATUS_DESC0_REG);
 	cmn_err(CE_NOTE, "%s: TX_STATUS_DESC0_REG = 0x%x",
-	    rtlsp->ifname, val32);
+	    mac_name(rtlsp->mh), val32);
 	delay(drv_usectohz(1000));
 
 	val32 = rtls_reg_get32(rtlsp, TX_STATUS_DESC1_REG);
 	cmn_err(CE_NOTE, "%s: TX_STATUS_DESC1_REG = 0x%x",
-	    rtlsp->ifname, val32);
+	    mac_name(rtlsp->mh), val32);
 	delay(drv_usectohz(1000));
 
 	val32 = rtls_reg_get32(rtlsp, TX_STATUS_DESC2_REG);
 	cmn_err(CE_NOTE, "%s: TX_STATUS_DESC2_REG = 0x%x",
-	    rtlsp->ifname, val32);
+	    mac_name(rtlsp->mh), val32);
 	delay(drv_usectohz(1000));
 
 	val32 = rtls_reg_get32(rtlsp, TX_STATUS_DESC3_REG);
 	cmn_err(CE_NOTE, "%s: TX_STATUS_DESC3_REG = 0x%x",
-	    rtlsp->ifname, val32);
+	    mac_name(rtlsp->mh), val32);
 	delay(drv_usectohz(1000));
 
 	cmn_err(CE_NOTE, "%s: in  = %llu, multicast = %llu, broadcast = %llu",
-	    rtlsp->ifname,
+	    mac_name(rtlsp->mh),
 	    (unsigned long long)rtlsp->stats.ipackets,
 	    (unsigned long long)rtlsp->stats.multi_rcv,
 	    (unsigned long long)rtlsp->stats.brdcst_rcv);
