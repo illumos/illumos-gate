@@ -1705,9 +1705,9 @@ zvol_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 		} else {
 			zvol_log_truncate(zv, tx, df.df_start,
 			    df.df_length, B_TRUE);
+			dmu_tx_commit(tx);
 			error = dmu_free_long_range(zv->zv_objset, ZVOL_OBJ,
 			    df.df_start, df.df_length);
-			dmu_tx_commit(tx);
 		}
 
 		zfs_range_unlock(rl);
