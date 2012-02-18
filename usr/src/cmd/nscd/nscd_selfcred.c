@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <stdio.h>
@@ -456,14 +457,12 @@ forker_monitor(
 			(void) smf_maintain_instance(fmri, SMF_TEMPORARY);
 		}
 		return ((void *)1);
-		break;
 	case 0:
 		_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 		(me, "execv path = %s\n", execpath);
 
 		(void) execv(execpath, execargv);
 		exit(0);
-		break;
 	default:
 		_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 		(me, "new forker's pid is %d\n", fpid);

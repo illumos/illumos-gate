@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <assert.h>
@@ -2907,7 +2908,6 @@ log_item_commit(log_item_t *li)
 		li->li_state = LS_UNDO;
 		pool_seterror(POE_BADPARAM);
 		return (PO_FAIL);
-		break;
 	case POOL_XTRANSFER:
 		xtransfer = (pool_xtransfer_undo_t *)li->li_details;
 
@@ -3062,7 +3062,6 @@ log_item_undo(log_item_t *li)
 	case POOL_TRANSFER:
 		pool_seterror(POE_BADPARAM);
 		return (PO_FAIL);
-		break;
 	case POOL_XTRANSFER:
 		xtransfer = (pool_xtransfer_undo_t *)li->li_details;
 
@@ -3285,7 +3284,6 @@ log_item_undo(log_item_t *li)
 		li->li_state = LS_DO;
 		pool_seterror(POE_BADPARAM);
 		return (PO_FAIL);
-		break;
 	case POOL_XTRANSFER:
 		xtransfer = (pool_xtransfer_undo_t *)li->li_details;
 
@@ -3452,7 +3450,6 @@ log_item_release(log_item_t *li)
 	case POOL_TRANSFER:
 		pool_seterror(POE_BADPARAM);
 		return (PO_FAIL);
-		break;
 	case POOL_XTRANSFER:
 		xtransfer = (pool_xtransfer_undo_t *)li->li_details;
 

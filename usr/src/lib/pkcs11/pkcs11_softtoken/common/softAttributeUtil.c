@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <stdlib.h>
@@ -4568,7 +4569,6 @@ soft_get_certificate_attribute(soft_object_t *object_p,
 			src.value = (CK_BYTE *)&certtype;
 			src.length = sizeof (certtype);
 			return (get_cert_attr_from_object(&src, template));
-			break;
 		case CKA_TRUSTED:
 			return (get_bool_attr_from_object(object_p,
 			    TRUSTED_BOOL_ON, template));
@@ -4579,11 +4579,9 @@ soft_get_certificate_attribute(soft_object_t *object_p,
 		case CKA_ATTR_TYPES:
 			return (get_extra_attr_from_object(object_p,
 			    template));
-			break;
 		default:
 			return (soft_get_common_attrs(object_p, template,
 			    object_p->object_type));
-			break;
 	}
 
 	/*
@@ -4615,7 +4613,6 @@ soft_set_certificate_attribute(soft_object_t *object_p,
 		case CKA_VALUE:
 			/* VALUE attr cannot be modified. */
 			return (CKR_ATTRIBUTE_READ_ONLY);
-			break;
 		case CKA_ID:
 		case CKA_ISSUER:
 			if (certtype == CKC_X_509) {
@@ -4634,11 +4631,9 @@ soft_set_certificate_attribute(soft_object_t *object_p,
 		case CKA_LABEL:
 			return (set_extra_attr_to_object(object_p,
 			    template->type, template));
-			break;
 		default:
 			return (soft_set_common_storage_attribute(
 			    object_p, template, copy));
-			break;
 	}
 
 	/*

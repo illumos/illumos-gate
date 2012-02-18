@@ -21,9 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file implements the token object delete operation for this tool.
@@ -805,7 +804,6 @@ pk_delete(int argc, char *argv[])
 			break;
 		default:
 			return (PK_ERR_USAGE);
-			break;
 		}
 	}
 

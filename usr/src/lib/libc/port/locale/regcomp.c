@@ -1,5 +1,6 @@
 /*
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright (c) 1992, 1993, 1994 Henry Spencer.
  * Copyright (c) 1992, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
@@ -733,7 +734,6 @@ p_b_term(struct parse *p, cset *cs)
 	case '-':
 		SETERROR(REG_ERANGE);
 		return;			/* NOTE RETURN */
-		break;
 	default:
 		c = '\0';
 		break;

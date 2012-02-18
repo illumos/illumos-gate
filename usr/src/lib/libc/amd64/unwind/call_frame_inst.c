@@ -22,9 +22,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * interface used by unwind support to query frame descriptor info
@@ -373,10 +372,8 @@ _Unw_get_val(void **datap, ptrdiff_t reloc,
 		break;
 	case ULEB128_FAC:
 		return (daf * extractuleb(datap));
-		break;
 	case ULEB128:
 		return (extractuleb(datap));
-		break;
 	case ULEB128_SREG:
 		res = (uint64_t)(*((uint8_t *)data));
 		data += 1;
@@ -449,10 +446,8 @@ _Unw_get_val(void **datap, ptrdiff_t reloc,
 		break;
 	case SLEB128_FAC:
 		return (daf * extractsleb(datap));
-		break;
 	case SLEB128:
 		return (extractsleb(datap));
-		break;
 	case ZTSTRING:
 		/* max length of augmentation string is 4 */
 		rp = (char *)&res;
@@ -463,7 +458,6 @@ _Unw_get_val(void **datap, ptrdiff_t reloc,
 		break;
 	case ADDR:
 		return (get_encoded_val(datap, reloc, enc));
-		break;
 	case SIZE:
 		return (get_encoded_val(datap, reloc, enc & 0x7));
 	case BLOCK:

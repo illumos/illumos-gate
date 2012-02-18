@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <stdio.h>
@@ -186,7 +187,6 @@ i_match_onehost(const char *val, ilb_ip_addr_t *ip, addr_type_t *a_type)
 	}
 	default:
 		return (ILBADM_INVAL_AF);
-		break;
 	}
 
 	if (a_type != NULL)
@@ -328,12 +328,10 @@ i_expand_iprange(ilbadm_sgroup_t *sg, ilb_server_data_t *sr,
 		return (ILBADM_TOOMANYIPADDR);
 
 	switch (ip1->ia_af) {
-	case AF_INET: return (i_expand_ipv4range(sg, sr, ip1, ip2));
-		/* not reached */
-		break;
-	case AF_INET6: return (i_expand_ipv6range(sg, sr, ip1, ip2));
-		/* not reached */
-		break;
+	case AF_INET:
+		return (i_expand_ipv4range(sg, sr, ip1, ip2));
+	case AF_INET6:
+		return (i_expand_ipv6range(sg, sr, ip1, ip2));
 	}
 	return (ILBADM_INVAL_AF);
 }

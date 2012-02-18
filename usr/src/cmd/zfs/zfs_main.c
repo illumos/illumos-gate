@@ -24,6 +24,7 @@
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2011 by Delphix. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <assert.h>
@@ -758,7 +759,6 @@ zfs_do_create(int argc, char **argv)
 			(void) fprintf(stderr, gettext("missing size "
 			    "argument\n"));
 			goto badusage;
-			break;
 		case '?':
 			(void) fprintf(stderr, gettext("invalid option '%c'\n"),
 			    optopt);

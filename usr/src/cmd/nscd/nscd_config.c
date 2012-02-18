@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <stdio.h>
@@ -132,7 +133,6 @@ _nscd_cfg_get_list(
 		(me, "invalid argument: type (%d)\n", type);
 
 		return (NSCD_INVALID_ARGUMENT);
-		break;
 	}
 
 	size =  sizeof (nscd_cfg_list_t) + sizeof (nscd_cfg_id_t *) * (num + 1);

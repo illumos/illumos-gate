@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -9120,7 +9121,6 @@ sl_insert(dev_t device, ino_t inode, int ftype)
 			case 0:
 				/* found it */
 				return (p);
-				break;
 
 			case 1:
 				/* move right */

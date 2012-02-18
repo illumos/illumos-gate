@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <stdlib.h>
@@ -1823,10 +1824,8 @@ validateModifyDiskProp(uint32_t prop)
 		case STMF_LU_PROP_WRITE_PROTECT:
 		case STMF_LU_PROP_WRITE_CACHE_DISABLE:
 			return (STMF_STATUS_SUCCESS);
-			break;
 		default:
 			return (STMF_STATUS_ERROR);
-			break;
 	}
 }
 
@@ -2545,7 +2544,6 @@ setDiskGlobalProp(uint32_t resourceProp, const char *propVal)
 			break;
 		default:
 			return (STMF_ERROR_INVALID_PROP);
-			break;
 	}
 
 	/*

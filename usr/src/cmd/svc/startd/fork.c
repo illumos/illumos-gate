@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 /*
@@ -762,7 +763,6 @@ retry:
 		fork_sulogin(B_FALSE, "Could not set state of "
 		    "%s: %s\n", SCF_INSTANCE_EMI, strerror(r));
 		goto retry;
-		break;
 
 	case EINVAL:
 	default:

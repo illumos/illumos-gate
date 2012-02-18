@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 /*
@@ -4113,7 +4114,6 @@ addfile()
 			exit_val = 2;
 			free(line.str);
 			return;
-			break;
 		case GENENT_ERR:
 			(void) fprintf(stderr,
 			    gettext("Internal Error while adding line: %s\n"),
@@ -4121,7 +4121,6 @@ addfile()
 			exit_val = 3;
 			free(line.str);
 			return;
-			break;
 		}
 	}
 	free(line.str);
@@ -4726,16 +4725,12 @@ h_errno2str(int h_errno) {
 	switch (h_errno) {
 	case HOST_NOT_FOUND:
 		return ("HOST_NOT_FOUND");
-		break;
 	case TRY_AGAIN:
 		return ("TRY_AGAIN");
-		break;
 	case NO_RECOVERY:
 		return ("NO_RECOVERY");
-		break;
 	case NO_DATA:
 		return ("NO_DATA");
-		break;
 	default:
 		break;
 	}

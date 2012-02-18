@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1083,13 +1084,10 @@ topo_2_str(ilb_topo_t topo)
 	switch (topo) {
 	case ILB_TOPO_DSR:
 		return ("DSR");
-		break;
 	case ILB_TOPO_NAT:
 		return ("NAT");
-		break;
 	case ILB_TOPO_HALF_NAT:
 		return ("HALF_NAT");
-		break;
 	default:
 		/* Should not happen. */
 		logerr("%s: unknown topology", __func__);
@@ -1188,7 +1186,6 @@ create_argv(ilbd_hc_srv_t *srv, char *argv[])
 	default:
 		logerr("%s: unknown protocol", __func__);
 		goto cleanup;
-		break;
 	}
 	if (argv[3] == NULL)
 		goto cleanup;
@@ -1225,7 +1222,6 @@ create_argv(ilbd_hc_srv_t *srv, char *argv[])
 	default:
 		logerr("%s: unknown HC flag", __func__);
 		goto cleanup;
-		break;
 	}
 	(void) sprintf(buf, "%d", port);
 	if ((argv[5] = strdup(buf)) == NULL)

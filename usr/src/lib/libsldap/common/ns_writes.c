@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <stdio.h>
@@ -4142,7 +4143,6 @@ send_to_cachemgr(
 		MKERROR(LOG_WARNING, *errorp, NS_CONFIG_CACHEMGR,
 		    strdup(errstr), NULL);
 		return (NS_LDAP_OP_FAILED);
-		break;
 	default:
 		return (NS_LDAP_OP_FAILED);
 	}

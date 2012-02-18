@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <pthread.h>
@@ -440,13 +441,10 @@ util_get_keysize_flag(CK_ULONG size)
 	switch (size) {
 		case 512:
 			return (TSS_KEY_SIZE_512);
-			break;
 		case 1024:
 			return (TSS_KEY_SIZE_1024);
-			break;
 		case 2048:
 			return (TSS_KEY_SIZE_2048);
-			break;
 		default:
 			break;
 	}
@@ -1275,7 +1273,6 @@ token_generate_leaf_key(TSS_HCONTEXT hContext,
 		default:
 			stlogit("Unknown key type 0x%0x", key_type);
 			goto done;
-			break;
 	}
 
 	if (result = tss_generate_key(hContext, initFlags, passHash,

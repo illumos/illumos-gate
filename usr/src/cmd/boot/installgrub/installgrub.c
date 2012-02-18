@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <stdio.h>
@@ -786,7 +787,6 @@ get_start_sector(ig_device_t *device)
 			default:
 				(void) fprintf(stderr, LIBFDISK_INIT_FAIL);
 				return (BC_ERROR);
-				break;
 		}
 	}
 
