@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <limits.h>
@@ -1243,13 +1244,10 @@ obq_type(int qnum)
 	switch (qnum) {
 	case PMCS_OQ_IODONE:
 		return ("I/O");
-		break;
 	case PMCS_OQ_GENERAL:
 		return ("General");
-		break;
 	case PMCS_OQ_EVENTS:
 		return ("Events");
-		break;
 	default:
 		return ("UNKNOWN");
 	}
@@ -1261,16 +1259,12 @@ iomb_cat(uint32_t cat)
 	switch (cat) {
 	case PMCS_IOMB_CAT_NET:
 		return ("NET");
-		break;
 	case PMCS_IOMB_CAT_FC:
 		return ("FC");
-		break;
 	case PMCS_IOMB_CAT_SAS:
 		return ("SAS");
-		break;
 	case PMCS_IOMB_CAT_SCSI:
 		return ("SCSI");
-		break;
 	default:
 		return ("???");
 	}
@@ -1282,73 +1276,50 @@ iomb_event(uint8_t event)
 	switch (event) {
 	case IOP_EVENT_PHY_STOP_STATUS:
 		return ("PHY STOP");
-		break;
 	case IOP_EVENT_SAS_PHY_UP:
 		return ("PHY UP");
-		break;
 	case IOP_EVENT_SATA_PHY_UP:
 		return ("SATA PHY UP");
-		break;
 	case IOP_EVENT_SATA_SPINUP_HOLD:
 		return ("SATA SPINUP HOLD");
-		break;
 	case IOP_EVENT_PHY_DOWN:
 		return ("PHY DOWN");
-		break;
 	case IOP_EVENT_BROADCAST_CHANGE:
 		return ("BROADCAST CHANGE");
-		break;
 	case IOP_EVENT_BROADCAST_SES:
 		return ("BROADCAST SES");
-		break;
 	case IOP_EVENT_PHY_ERR_INBOUND_CRC:
 		return ("INBOUND CRC ERROR");
-		break;
 	case IOP_EVENT_HARD_RESET_RECEIVED:
 		return ("HARD RESET");
-		break;
 	case IOP_EVENT_EVENT_ID_FRAME_TIMO:
 		return ("IDENTIFY FRAME TIMEOUT");
-		break;
 	case IOP_EVENT_BROADCAST_EXP:
 		return ("BROADCAST EXPANDER");
-		break;
 	case IOP_EVENT_PHY_START_STATUS:
 		return ("PHY START");
-		break;
 	case IOP_EVENT_PHY_ERR_INVALID_DWORD:
 		return ("INVALID DWORD");
-		break;
 	case IOP_EVENT_PHY_ERR_DISPARITY_ERROR:
 		return ("DISPARITY ERROR");
-		break;
 	case IOP_EVENT_PHY_ERR_CODE_VIOLATION:
 		return ("CODE VIOLATION");
-		break;
 	case IOP_EVENT_PHY_ERR_LOSS_OF_DWORD_SYN:
 		return ("LOSS OF DWORD SYNC");
-		break;
 	case IOP_EVENT_PHY_ERR_PHY_RESET_FAILD:
 		return ("PHY RESET FAILED");
-		break;
 	case IOP_EVENT_PORT_RECOVERY_TIMER_TMO:
 		return ("PORT RECOVERY TIMEOUT");
-		break;
 	case IOP_EVENT_PORT_RECOVER:
 		return ("PORT RECOVERY");
-		break;
 	case IOP_EVENT_PORT_RESET_TIMER_TMO:
 		return ("PORT RESET TIMEOUT");
-		break;
 	case IOP_EVENT_PORT_RESET_COMPLETE:
 		return ("PORT RESET COMPLETE");
-		break;
 	case IOP_EVENT_BROADCAST_ASYNC_EVENT:
 		return ("BROADCAST ASYNC");
-		break;
 	case IOP_EVENT_IT_NEXUS_LOSS:
 		return ("I/T NEXUS LOSS");
-		break;
 	default:
 		return ("Unknown Event");
 	}
@@ -1360,124 +1331,84 @@ inbound_iomb_opcode(uint32_t opcode)
 	switch (opcode) {
 	case PMCIN_ECHO:
 		return ("ECHO");
-		break;
 	case PMCIN_GET_INFO:
 		return ("GET_INFO");
-		break;
 	case PMCIN_GET_VPD:
 		return ("GET_VPD");
-		break;
 	case PMCIN_PHY_START:
 		return ("PHY_START");
-		break;
 	case PMCIN_PHY_STOP:
 		return ("PHY_STOP");
-		break;
 	case PMCIN_SSP_INI_IO_START:
 		return ("INI_IO_START");
-		break;
 	case PMCIN_SSP_INI_TM_START:
 		return ("INI_TM_START");
-		break;
 	case PMCIN_SSP_INI_EXT_IO_START:
 		return ("INI_EXT_IO_START");
-		break;
 	case PMCIN_DEVICE_HANDLE_ACCEPT:
 		return ("DEVICE_HANDLE_ACCEPT");
-		break;
 	case PMCIN_SSP_TGT_IO_START:
 		return ("TGT_IO_START");
-		break;
 	case PMCIN_SSP_TGT_RESPONSE_START:
 		return ("TGT_RESPONSE_START");
-		break;
 	case PMCIN_SSP_INI_EDC_EXT_IO_START:
 		return ("INI_EDC_EXT_IO_START");
-		break;
 	case PMCIN_SSP_INI_EDC_EXT_IO_START1:
 		return ("INI_EDC_EXT_IO_START1");
-		break;
 	case PMCIN_SSP_TGT_EDC_IO_START:
 		return ("TGT_EDC_IO_START");
-		break;
 	case PMCIN_SSP_ABORT:
 		return ("SSP_ABORT");
-		break;
 	case PMCIN_DEREGISTER_DEVICE_HANDLE:
 		return ("DEREGISTER_DEVICE_HANDLE");
-		break;
 	case PMCIN_GET_DEVICE_HANDLE:
 		return ("GET_DEVICE_HANDLE");
-		break;
 	case PMCIN_SMP_REQUEST:
 		return ("SMP_REQUEST");
-		break;
 	case PMCIN_SMP_RESPONSE:
 		return ("SMP_RESPONSE");
-		break;
 	case PMCIN_SMP_ABORT:
 		return ("SMP_ABORT");
-		break;
 	case PMCIN_ASSISTED_DISCOVERY:
 		return ("ASSISTED_DISCOVERY");
-		break;
 	case PMCIN_REGISTER_DEVICE:
 		return ("REGISTER_DEVICE");
-		break;
 	case PMCIN_SATA_HOST_IO_START:
 		return ("SATA_HOST_IO_START");
-		break;
 	case PMCIN_SATA_ABORT:
 		return ("SATA_ABORT");
-		break;
 	case PMCIN_LOCAL_PHY_CONTROL:
 		return ("LOCAL_PHY_CONTROL");
-		break;
 	case PMCIN_GET_DEVICE_INFO:
 		return ("GET_DEVICE_INFO");
-		break;
 	case PMCIN_TWI:
 		return ("TWI");
-		break;
 	case PMCIN_FW_FLASH_UPDATE:
 		return ("FW_FLASH_UPDATE");
-		break;
 	case PMCIN_SET_VPD:
 		return ("SET_VPD");
-		break;
 	case PMCIN_GPIO:
 		return ("GPIO");
-		break;
 	case PMCIN_SAS_DIAG_MODE_START_END:
 		return ("SAS_DIAG_MODE_START_END");
-		break;
 	case PMCIN_SAS_DIAG_EXECUTE:
 		return ("SAS_DIAG_EXECUTE");
-		break;
 	case PMCIN_SAS_HW_EVENT_ACK:
 		return ("SAS_HW_EVENT_ACK");
-		break;
 	case PMCIN_GET_TIME_STAMP:
 		return ("GET_TIME_STAMP");
-		break;
 	case PMCIN_PORT_CONTROL:
 		return ("PORT_CONTROL");
-		break;
 	case PMCIN_GET_NVMD_DATA:
 		return ("GET_NVMD_DATA");
-		break;
 	case PMCIN_SET_NVMD_DATA:
 		return ("SET_NVMD_DATA");
-		break;
 	case PMCIN_SET_DEVICE_STATE:
 		return ("SET_DEVICE_STATE");
-		break;
 	case PMCIN_GET_DEVICE_STATE:
 		return ("GET_DEVICE_STATE");
-		break;
 	default:
 		return ("UNKNOWN");
-		break;
 	}
 }
 
@@ -1487,124 +1418,84 @@ outbound_iomb_opcode(uint32_t opcode)
 	switch (opcode) {
 	case PMCOUT_ECHO:
 		return ("ECHO");
-		break;
 	case PMCOUT_GET_INFO:
 		return ("GET_INFO");
-		break;
 	case PMCOUT_GET_VPD:
 		return ("GET_VPD");
-		break;
 	case PMCOUT_SAS_HW_EVENT:
 		return ("SAS_HW_EVENT");
-		break;
 	case PMCOUT_SSP_COMPLETION:
 		return ("SSP_COMPLETION");
-		break;
 	case PMCOUT_SMP_COMPLETION:
 		return ("SMP_COMPLETION");
-		break;
 	case PMCOUT_LOCAL_PHY_CONTROL:
 		return ("LOCAL_PHY_CONTROL");
-		break;
 	case PMCOUT_SAS_ASSISTED_DISCOVERY_EVENT:
 		return ("SAS_ASSISTED_DISCOVERY_SENT");
-		break;
 	case PMCOUT_SATA_ASSISTED_DISCOVERY_EVENT:
 		return ("SATA_ASSISTED_DISCOVERY_SENT");
-		break;
 	case PMCOUT_DEVICE_REGISTRATION:
 		return ("DEVICE_REGISTRATION");
-		break;
 	case PMCOUT_DEREGISTER_DEVICE_HANDLE:
 		return ("DEREGISTER_DEVICE_HANDLE");
-		break;
 	case PMCOUT_GET_DEVICE_HANDLE:
 		return ("GET_DEVICE_HANDLE");
-		break;
 	case PMCOUT_SATA_COMPLETION:
 		return ("SATA_COMPLETION");
-		break;
 	case PMCOUT_SATA_EVENT:
 		return ("SATA_EVENT");
-		break;
 	case PMCOUT_SSP_EVENT:
 		return ("SSP_EVENT");
-		break;
 	case PMCOUT_DEVICE_HANDLE_ARRIVED:
 		return ("DEVICE_HANDLE_ARRIVED");
-		break;
 	case PMCOUT_SSP_REQUEST_RECEIVED:
 		return ("SSP_REQUEST_RECEIVED");
-		break;
 	case PMCOUT_DEVICE_INFO:
 		return ("DEVICE_INFO");
-		break;
 	case PMCOUT_FW_FLASH_UPDATE:
 		return ("FW_FLASH_UPDATE");
-		break;
 	case PMCOUT_SET_VPD:
 		return ("SET_VPD");
-		break;
 	case PMCOUT_GPIO:
 		return ("GPIO");
-		break;
 	case PMCOUT_GPIO_EVENT:
 		return ("GPIO_EVENT");
-		break;
 	case PMCOUT_GENERAL_EVENT:
 		return ("GENERAL_EVENT");
-		break;
 	case PMCOUT_TWI:
 		return ("TWI");
-		break;
 	case PMCOUT_SSP_ABORT:
 		return ("SSP_ABORT");
-		break;
 	case PMCOUT_SATA_ABORT:
 		return ("SATA_ABORT");
-		break;
 	case PMCOUT_SAS_DIAG_MODE_START_END:
 		return ("SAS_DIAG_MODE_START_END");
-		break;
 	case PMCOUT_SAS_DIAG_EXECUTE:
 		return ("SAS_DIAG_EXECUTE");
-		break;
 	case PMCOUT_GET_TIME_STAMP:
 		return ("GET_TIME_STAMP");
-		break;
 	case PMCOUT_SAS_HW_EVENT_ACK_ACK:
 		return ("SAS_HW_EVENT_ACK_ACK");
-		break;
 	case PMCOUT_PORT_CONTROL:
 		return ("PORT_CONTROL");
-		break;
 	case PMCOUT_SKIP_ENTRIES:
 		return ("SKIP_ENTRIES");
-		break;
 	case PMCOUT_SMP_ABORT:
 		return ("SMP_ABORT");
-		break;
 	case PMCOUT_GET_NVMD_DATA:
 		return ("GET_NVMD_DATA");
-		break;
 	case PMCOUT_SET_NVMD_DATA:
 		return ("SET_NVMD_DATA");
-		break;
 	case PMCOUT_DEVICE_HANDLE_REMOVED:
 		return ("DEVICE_HANDLE_REMOVED");
-		break;
 	case PMCOUT_SET_DEVICE_STATE:
 		return ("SET_DEVICE_STATE");
-		break;
 	case PMCOUT_GET_DEVICE_STATE:
 		return ("GET_DEVICE_STATE");
-		break;
 	case PMCOUT_SET_DEVICE_INFO:
 		return ("SET_DEVICE_INFO");
-		break;
 	default:
 		return ("UNKNOWN");
-		break;
 	}
 }
 

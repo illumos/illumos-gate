@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #define	__STANDALONE_MODULE__
@@ -865,7 +866,6 @@ getDirBaseDN(LDAP *ld, const char *domain_name, char **dir_base_dn)
 			}
 
 			return (NS_LDAP_OP_FAILED);
-			break;
 	}
 
 	if ((ret_code = convert_to_door_line(ld,
@@ -1010,7 +1010,6 @@ getDUAProfile(LDAP *ld,
 			}
 
 			return (NS_LDAP_OP_FAILED);
-			break;
 	}
 
 	ret_code = convert_to_door_line(ld,
@@ -1805,16 +1804,13 @@ createDirServerList(dir_server_list_t **new_list,
 			(*new_list)->nsServers[i]->status =
 			    INFO_SERVER_ERROR;
 			continue;
-			break;
 		case ENOMEM:
 			(*new_list)->nsServers[i]->status =
 			    INFO_SERVER_ERROR;
 			continue;
-			break;
 		default:
 			thrPool[i] = thrID;
 			continue;
-			break;
 		}
 	}
 
@@ -2437,7 +2433,6 @@ __ns_ldap_pingOfflineServers(void)
 		case EAGAIN:
 			current_list->nsServers[i]->status = INFO_SERVER_ERROR;
 			continue;
-			break;
 		case ENOMEM:
 			current_list->nsServers[i]->status = INFO_SERVER_ERROR;
 			retCode = NS_LDAP_MEMORY;
@@ -2445,7 +2440,6 @@ __ns_ldap_pingOfflineServers(void)
 		default:
 			thrPool[i] = thrID;
 			continue;
-			break;
 		}
 		/* A memory allocation error has occured */
 		break;

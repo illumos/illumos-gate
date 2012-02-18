@@ -19,6 +19,7 @@
  * CDDL HEADER END
  *
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 #include <stdlib.h>
 #include <string.h>
@@ -976,7 +977,6 @@ kms_get_common_attrs(kms_object_t *object_p, CK_ATTRIBUTE_PTR template)
 	case CKA_LABEL:
 		return (get_extra_attr_from_object(object_p,
 		    template));
-		break;
 
 	default:
 		/*

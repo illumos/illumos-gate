@@ -21,9 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <cryptoutil.h>
 
@@ -355,7 +354,6 @@ pkcs11_mech2keygen(CK_MECHANISM_TYPE mech_type, CK_MECHANISM_TYPE *gen_mech)
 
 	default:
 		return (CKR_MECHANISM_INVALID);
-		break;
 	}
 
 	return (CKR_OK);

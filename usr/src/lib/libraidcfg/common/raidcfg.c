@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <fcntl.h>
@@ -775,7 +776,6 @@ raidcfg_get_attr(int handle, void *attr)
 			(void) mutex_unlock(&raidcfg_mp);
 			return (SUCCESS);
 		}
-		break;
 	default:
 		(void) mutex_unlock(&raidcfg_mp);
 		return (ERR_DEVICE_TYPE);
@@ -1315,7 +1315,6 @@ raid_space_noalign(raid_obj_tab_t *raid_tab, uint32_t raid_level, int num,
 		break;
 	default:
 		return (ERR_ARRAY_LEVEL);
-		break;
 	}
 
 	return (capacity);

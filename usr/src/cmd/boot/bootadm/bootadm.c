@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 /*
@@ -4961,7 +4962,6 @@ get_partition(char *device)
 				free(wholedisk);
 				libfdisk_fini(&epp);
 				return (partno);
-				break;
 		}
 	}
 #endif

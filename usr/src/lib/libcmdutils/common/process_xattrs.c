@@ -22,9 +22,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "libcmdutils.h"
 
@@ -318,7 +317,6 @@ sysattr_list(char *cmd, int fd, char *fname)
 			case DATA_TYPE_NVLIST:
 			default:
 				return (response);
-				break;
 		}
 	}
 	if (response != NULL)

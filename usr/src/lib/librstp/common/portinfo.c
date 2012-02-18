@@ -458,7 +458,6 @@ Bool STP_info_check_conditions (STATE_MACH_T* this)
       break; 
     case ENABLED: /* IEEE 802.1y, 17.21, Z.14 */
       return STP_hop_2_state (this, AGED);
-      break; 
     case AGED:
       if (port->selected && port->updtInfo) {
         return STP_hop_2_state (this, UPDATE);
@@ -466,7 +465,6 @@ Bool STP_info_check_conditions (STATE_MACH_T* this)
       break;
     case UPDATE:
       return STP_hop_2_state (this, CURRENT);
-      break;
     case CURRENT:
       if (port->selected && port->updtInfo) {
         return STP_hop_2_state (this, UPDATE);
@@ -493,16 +491,12 @@ Bool STP_info_check_conditions (STATE_MACH_T* this)
         default:
           return STP_hop_2_state (this, CURRENT);
       }
-      break;
     case SUPERIOR:
       return STP_hop_2_state (this, CURRENT);
-      break;
     case REPEAT:
       return STP_hop_2_state (this, CURRENT);
-      break;
     case AGREEMENT:
       return STP_hop_2_state (this, CURRENT);
-      break;
   }
 
   return False;

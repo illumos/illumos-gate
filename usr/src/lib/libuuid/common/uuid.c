@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 /*
@@ -143,7 +144,6 @@ uuid_create(struct uuid *uuid)
 					break;
 				case ENOTRECOVERABLE:
 					return (ret);
-					break;
 			}
 	}
 

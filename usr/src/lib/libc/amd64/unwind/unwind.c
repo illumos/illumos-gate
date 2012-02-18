@@ -22,9 +22,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * UNWIND - Unwind library
@@ -313,7 +312,6 @@ _Unwind_RaiseException_Body(struct _Unwind_Exception *exception_object,
 			break;
 		default:
 			return (res);
-			break;
 		}
 	} else {
 		finish_capture(entry_ctx, 1);
@@ -419,7 +417,6 @@ _Unwind_ForcedUnwind_Body(struct _Unwind_Exception *exception_object,
 			    exception_object->exception_class,
 			    exception_object, ctx, stop_parameter);
 			return (_URC_END_OF_STACK);
-			break;
 		default:
 			again = 0;
 			break;

@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <stdio.h>
@@ -662,8 +663,6 @@ ilbadm_show_rules(int argc, char *argv[])
 			    (char)optopt);
 			rc = ILBADM_LIBERR;
 			goto out;
-			/* not reached */
-			break;
 		case '?':
 		default:
 			unknown_opt(argv, optind-1);
@@ -864,8 +863,6 @@ ilbadm_show_server(int argc, char *argv[])
 			    (char)optopt);
 			rc = ILBADM_LIBERR;
 			goto out;
-			/* not reached */
-			break;
 		case '?':
 		default:
 			unknown_opt(argv, optind-1);

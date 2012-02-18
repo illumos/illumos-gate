@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 /*
@@ -504,7 +505,6 @@ main(int argc, char **argv)
 			close_door();
 			delete_doorfiles();
 			return (0);
-			break;
 		case SIGUSR1:			/* secret debug dump mode */
 			/* if in debug mode, use stdout */
 

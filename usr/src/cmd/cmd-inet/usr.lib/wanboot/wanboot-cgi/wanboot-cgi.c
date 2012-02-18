@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <stdio.h>
@@ -474,7 +475,6 @@ get_request_info(int *contentp, char **netp, char **cidp, char **noncep,
 		default:
 			print_status(400, "(illegal query string)");
 			return (B_FALSE);
-			break;
 		}
 	}
 

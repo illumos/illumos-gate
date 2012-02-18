@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Juri. All rights reserved.
  */
 
 #include <unistd.h>
@@ -3389,7 +3390,6 @@ ipsecutil_exit(exit_type_t type, char *fmri, FILE *fp, const char *fmt, ...)
 			break;
 		case SERVICE_DEGRADE:
 			return;
-			break;
 		case SERVICE_BADPERM:
 		case SERVICE_BADCONF:
 		case SERVICE_MAINTAIN:
@@ -3411,7 +3411,6 @@ ipsecutil_exit(exit_type_t type, char *fmri, FILE *fp, const char *fmt, ...)
 		case DEBUG_FATAL:
 			/* Keep running, don't exit(). */
 			return;
-			break;
 		case SERVICE_BADPERM:
 			warnxfp(fp, dgettext(TEXT_DOMAIN,
 			    "Permission error with %s."), fmri);

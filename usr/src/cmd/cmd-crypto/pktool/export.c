@@ -19,6 +19,7 @@
  * CDDL HEADER END
  *
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 /*
@@ -777,7 +778,6 @@ pk_export(int argc, char *argv[])
 			break;
 		default:
 			return (PK_ERR_USAGE);
-			break;
 		}
 	}
 

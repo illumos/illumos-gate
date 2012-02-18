@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 /*
@@ -619,7 +620,6 @@ ndr_outer(ndr_ref_t *outer_ref)
 			return (ndr_outer_conformant_construct(outer_ref));
 
 		return (ndr_outer_fixed(outer_ref));
-		break;
 
 	case NDR_F_SIZE_IS:
 	case NDR_F_DIMENSION_IS:
@@ -634,7 +634,6 @@ ndr_outer(ndr_ref_t *outer_ref)
 			return (ndr_outer_conformant_array(outer_ref));
 		else
 			return (ndr_outer_fixed_array(outer_ref));
-		break;
 
 	default:
 		error = NDR_ERR_OUTER_PARAMS_BAD;
@@ -1561,7 +1560,6 @@ ndr_inner(ndr_ref_t *arg_ref)
 			break;
 		}
 		return (*ti->ndr_func)(arg_ref);
-		break;
 
 	case NDR_F_SIZE_IS:
 	case NDR_F_DIMENSION_IS:
@@ -1581,7 +1579,6 @@ ndr_inner(ndr_ref_t *arg_ref)
 			return (ndr_inner_reference(arg_ref));
 		else
 			return (ndr_inner_array(arg_ref));
-		break;
 
 	case NDR_F_IS_POINTER:	/* type is pointer to one something */
 		if (is_union) {
@@ -1589,7 +1586,6 @@ ndr_inner(ndr_ref_t *arg_ref)
 			break;
 		}
 		return (ndr_inner_pointer(arg_ref));
-		break;
 
 	case NDR_F_IS_REFERENCE:	/* type is pointer to one something */
 		if (is_union) {
@@ -1597,7 +1593,6 @@ ndr_inner(ndr_ref_t *arg_ref)
 			break;
 		}
 		return (ndr_inner_reference(arg_ref));
-		break;
 
 	case NDR_F_SWITCH_IS:
 		if (!is_union) {
@@ -1605,7 +1600,6 @@ ndr_inner(ndr_ref_t *arg_ref)
 			break;
 		}
 		return (*ti->ndr_func)(arg_ref);
-		break;
 
 	default:
 		error = NDR_ERR_INNER_PARAMS_BAD;

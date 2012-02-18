@@ -1,6 +1,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 /*
@@ -222,10 +223,8 @@ match(char *patn, char *str)
 				str++;
 				patn++;
 				continue;
-			} else {
-				return (FALSE);
 			}
-			break;
+			return (FALSE);
 
 		case '*':
 			patn++;
@@ -276,11 +275,8 @@ match_ci(char *patn, char *str)
 				str++;
 				patn++;
 				continue;
-			} else {
-				return (FALSE);
 			}
-			break;
-
+			return (FALSE);
 
 		case '*':
 			patn++;
