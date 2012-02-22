@@ -743,7 +743,6 @@ int
 timer_settime(timer_t tid, int flags, itimerspec_t *val, itimerspec_t *oval)
 {
 	itimerspec_t when;
-	timespec_t res;
 	itimer_t *it;
 	proc_t *p = curproc;
 	int error;
