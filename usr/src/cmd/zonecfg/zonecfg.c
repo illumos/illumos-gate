@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, Joyent Inc. All rights reserved.
+ * Copyright (c) 2012, Joyent Inc. All rights reserved.
  */
 
 /*
@@ -2793,6 +2793,32 @@ fill_in_fstab(cmd_t *cmd, struct zone_fstab *fstab, boolean_t fill_in_only)
 	return (zonecfg_lookup_filesystem(handle, fstab));
 }
 
+/*
+ * Turn an addr that looks like f:2:0:44:5:6C into 0f:02:00:44:05:6c
+ * We're expecting a dst of at least MAXMACADDRLEN size here.
+ */
+static void
+normalize_mac_addr(char *dst, const char *src, int len)
+{
+	char *p, *e, *sep = "";
+	long n;
+	char buf[MAXMACADDRLEN], tmp[4];
+
+	*dst = '\0';
+	(void) strlcpy(buf, src, sizeof (buf));
+	p = strtok(buf, ":");
+	while (p != NULL) {
+		n = strtol(p, &e, 16);
+		if (*e != NULL || n > 0xff)
+			return;
+		(void) snprintf(tmp, sizeof (tmp), "%s%02x", sep, n);
+		(void) strlcat(dst, tmp, len);
+
+		sep = ":";
+		p = strtok(NULL, ":");
+	}
+}
+
 static int
 fill_in_nwiftab(cmd_t *cmd, struct zone_nwiftab *nwiftab,
     boolean_t fill_in_only)
@@ -2827,7 +2853,7 @@ fill_in_nwiftab(cmd_t *cmd, struct zone_nwiftab *nwiftab,
 			    sizeof (nwiftab->zone_nwif_physical));
 			break;
 		case PT_MAC:
-			(void) strlcpy(nwiftab->zone_nwif_mac,
+			normalize_mac_addr(nwiftab->zone_nwif_mac,
 			    pp->pv_simple,
 			    sizeof (nwiftab->zone_nwif_mac));
 			break;
@@ -4675,7 +4701,7 @@ set_func(cmd_t *cmd)
 			    sizeof (in_progress_nwiftab.zone_nwif_physical));
 			break;
 		case PT_MAC:
-			(void) strlcpy(in_progress_nwiftab.zone_nwif_mac,
+			normalize_mac_addr(in_progress_nwiftab.zone_nwif_mac,
 			    prop_id,
 			    sizeof (in_progress_nwiftab.zone_nwif_mac));
 			break;

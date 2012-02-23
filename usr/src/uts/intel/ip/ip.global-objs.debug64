@@ -21,6 +21,7 @@
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2011 Nexenta Systems, Inc. All rights reserved
+# Copyright 2012 Joyent, Inc. All rights reserved
 #
 
 arp_m_tbl
@@ -107,6 +108,7 @@ ip6_ftable_hash_size
 ip6opt_ls
 ip_cgtp_filter_rev
 ip_conn_cache
+ip_dce_hash_size
 ip_debug
 ip_g_all_ones
 ip_helper_stream_info
@@ -246,6 +248,8 @@ sqset_lock
 squeue_cache
 squeue_drain_ms
 squeue_drain_ns
+squeue_drain_stack_needed
+squeue_drain_stack_toodeep
 squeue_workerwait_ms
 squeue_workerwait_tick
 tcp_acceptor_rinit

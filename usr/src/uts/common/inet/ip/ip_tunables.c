@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -908,6 +909,11 @@ mod_prop_info_t ip_propinfo_tbl[] = {
 #else
 	{ "", 0, NULL, NULL, {0}, {0} },
 #endif
+
+	{ "_dce_reclaim_threshold", MOD_PROTO_IP,
+	    mod_set_uint32, mod_get_uint32,
+	    {1, 15000, 1000}, {1000} },
+
 	{ "mtu", MOD_PROTO_IPV4, NULL, ip_get_mtu, {0}, {0} },
 
 	{ "mtu", MOD_PROTO_IPV6, NULL, ip_get_mtu, {0}, {0} },
