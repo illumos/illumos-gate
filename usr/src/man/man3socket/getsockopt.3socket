@@ -425,7 +425,7 @@ The argument \fIs\fR is not a socket.
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 17n
-Invalid length for \fBIP_OPTIONS\fR.
+Invalid length for a given socket option.
 .RE
 
 .sp
