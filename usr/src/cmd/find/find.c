@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 
@@ -126,6 +126,8 @@ static struct Args commands[] =
 	"-iname",	INAME,		Str,
 	"-inum",	INUM,		Num,
 	"-iregex",	IREGEX,		Str,
+	"-links",	LINKS,		Num,
+	"-local",	LOCAL,		Unary,
 	"-ls",		LS,		Unary,
 	"-maxdepth",	MAXDEPTH,	Num,
 	"-mindepth",	MINDEPTH,	Num,
