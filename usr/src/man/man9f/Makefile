@@ -1,4 +1,16 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
 # Copyright 2011, Richard Lowe
+# Copyright 2012 Garrett D'Amore <garrett@damore>.  All rights reserved.
 
 include ../../Makefile.master
 
@@ -132,29 +144,16 @@ MANFILES = 	ASSERT.9f				\
 	 	ddi_device_zero.9f			\
 	 	ddi_devid_compare.9f			\
 	 	ddi_dma_addr_bind_handle.9f		\
-	 	ddi_dma_addr_setup.9f			\
 	 	ddi_dma_alloc_handle.9f			\
 	 	ddi_dma_buf_bind_handle.9f		\
-	 	ddi_dma_buf_setup.9f			\
 	 	ddi_dma_burstsizes.9f			\
-	 	ddi_dma_coff.9f				\
-	 	ddi_dma_curwin.9f			\
-	 	ddi_dma_devalign.9f			\
-	 	ddi_dma_free.9f				\
 	 	ddi_dma_free_handle.9f			\
-	 	ddi_dma_get_attr.9f			\
 	 	ddi_dma_getwin.9f			\
-	 	ddi_dma_htoc.9f				\
 	 	ddi_dma_mem_alloc.9f			\
 	 	ddi_dma_mem_free.9f			\
-	 	ddi_dma_movwin.9f			\
 	 	ddi_dma_nextcookie.9f			\
-	 	ddi_dma_nextseg.9f			\
-	 	ddi_dma_nextwin.9f			\
 	 	ddi_dma_numwin.9f			\
-	 	ddi_dma_segtocookie.9f			\
 	 	ddi_dma_set_sbus64.9f			\
-	 	ddi_dma_setup.9f			\
 	 	ddi_dma_sync.9f				\
 	 	ddi_dma_unbind_handle.9f		\
 	 	ddi_dmae.9f				\
@@ -200,10 +199,8 @@ MANFILES = 	ASSERT.9f				\
 	 	ddi_io_rep_get8.9f			\
 	 	ddi_io_rep_put8.9f			\
 	 	ddi_iomin.9f				\
-	 	ddi_iopb_alloc.9f			\
 	 	ddi_log_sysevent.9f			\
 	 	ddi_map_regs.9f				\
-	 	ddi_mem_alloc.9f			\
 	 	ddi_mem_get8.9f				\
 	 	ddi_mem_put8.9f				\
 	 	ddi_mem_rep_get8.9f			\
@@ -752,8 +749,6 @@ MANSOFILES =	SIZEOF_PTR.9f				\
 	 	ddi_io_rep_putb.9f			\
 	 	ddi_io_rep_putl.9f			\
 	 	ddi_io_rep_putw.9f			\
-	 	ddi_iopb_free.9f			\
-	 	ddi_mem_free.9f				\
 	 	ddi_mem_get16.9f			\
 	 	ddi_mem_get32.9f			\
 	 	ddi_mem_get64.9f			\
@@ -1478,11 +1473,7 @@ ddi_io_rep_putb.9f			:= SOSRC = man9f/ddi_io_rep_put8.9f
 ddi_io_rep_putl.9f			:= SOSRC = man9f/ddi_io_rep_put8.9f
 ddi_io_rep_putw.9f			:= SOSRC = man9f/ddi_io_rep_put8.9f
 
-ddi_iopb_free.9f			:= SOSRC = man9f/ddi_iopb_alloc.9f
-
 ddi_unmap_regs.9f			:= SOSRC = man9f/ddi_map_regs.9f
-
-ddi_mem_free.9f				:= SOSRC = man9f/ddi_mem_alloc.9f
 
 ddi_mem_get16.9f			:= SOSRC = man9f/ddi_mem_get8.9f
 ddi_mem_get32.9f			:= SOSRC = man9f/ddi_mem_get8.9f

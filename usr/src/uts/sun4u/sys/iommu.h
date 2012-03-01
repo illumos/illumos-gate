@@ -23,11 +23,12 @@
  * Copyright (c) 1991-2000 by Sun Microsystems, Inc.
  * All rights reserved.
  */
+/*
+ * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ */
 
 #ifndef _SYS_IOMMU_H
 #define	_SYS_IOMMU_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if defined(_KERNEL) && !defined(_ASM)
 #include <sys/sunddi.h>
@@ -131,8 +132,6 @@ extern int iommu_init(struct sbus_soft_state *, caddr_t);
 extern int iommu_resume_init(struct sbus_soft_state *);
 extern int iommu_dma_mctl(dev_info_t *, dev_info_t *, ddi_dma_handle_t,
 	enum ddi_dma_ctlops, off_t *, size_t *, caddr_t *, uint_t);
-extern int iommu_dma_map(dev_info_t *, dev_info_t *, struct ddi_dma_req *,
-	ddi_dma_handle_t *);
 extern int iommu_dma_allochdl(dev_info_t *, dev_info_t *, ddi_dma_attr_t *,
 	int (*waitfp)(caddr_t), caddr_t arg, ddi_dma_handle_t *);
 extern int iommu_dma_freehdl(dev_info_t *, dev_info_t *, ddi_dma_handle_t);

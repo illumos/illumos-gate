@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  */
 
 #include <sys/note.h>
@@ -736,145 +737,6 @@ static ddi_dma_lim_t standard_limits = {
 
 #endif
 
-int
-ddi_dma_setup(dev_info_t *dip, struct ddi_dma_req *dmareqp,
-    ddi_dma_handle_t *handlep)
-{
-	int (*funcp)() = ddi_dma_map;
-	struct bus_ops *bop;
-#if defined(__sparc)
-	auto ddi_dma_lim_t dma_lim;
-
-	if (dmareqp->dmar_limits == (ddi_dma_lim_t *)0) {
-		dma_lim = standard_limits;
-	} else {
-		dma_lim = *dmareqp->dmar_limits;
-	}
-	dmareqp->dmar_limits = &dma_lim;
-#endif
-#if defined(__x86)
-	if (dmareqp->dmar_limits == (ddi_dma_lim_t *)0)
-		return (DDI_FAILURE);
-#endif
-
-	/*
-	 * Handle the case that the requester is both a leaf
-	 * and a nexus driver simultaneously by calling the
-	 * requester's bus_dma_map function directly instead
-	 * of ddi_dma_map.
-	 */
-	bop = DEVI(dip)->devi_ops->devo_bus_ops;
-	if (bop && bop->bus_dma_map)
-		funcp = bop->bus_dma_map;
-	return ((*funcp)(dip, dip, dmareqp, handlep));
-}
-
-int
-ddi_dma_addr_setup(dev_info_t *dip, struct as *as, caddr_t addr, size_t len,
-    uint_t flags, int (*waitfp)(), caddr_t arg,
-    ddi_dma_lim_t *limits, ddi_dma_handle_t *handlep)
-{
-	int (*funcp)() = ddi_dma_map;
-	ddi_dma_lim_t dma_lim;
-	struct ddi_dma_req dmareq;
-	struct bus_ops *bop;
-
-	if (len == 0) {
-		return (DDI_DMA_NOMAPPING);
-	}
-	if (limits == (ddi_dma_lim_t *)0) {
-		dma_lim = standard_limits;
-	} else {
-		dma_lim = *limits;
-	}
-	dmareq.dmar_limits = &dma_lim;
-	dmareq.dmar_flags = flags;
-	dmareq.dmar_fp = waitfp;
-	dmareq.dmar_arg = arg;
-	dmareq.dmar_object.dmao_size = len;
-	dmareq.dmar_object.dmao_type = DMA_OTYP_VADDR;
-	dmareq.dmar_object.dmao_obj.virt_obj.v_as = as;
-	dmareq.dmar_object.dmao_obj.virt_obj.v_addr = addr;
-	dmareq.dmar_object.dmao_obj.virt_obj.v_priv = NULL;
-
-	/*
-	 * Handle the case that the requester is both a leaf
-	 * and a nexus driver simultaneously by calling the
-	 * requester's bus_dma_map function directly instead
-	 * of ddi_dma_map.
-	 */
-	bop = DEVI(dip)->devi_ops->devo_bus_ops;
-	if (bop && bop->bus_dma_map)
-		funcp = bop->bus_dma_map;
-
-	return ((*funcp)(dip, dip, &dmareq, handlep));
-}
-
-int
-ddi_dma_buf_setup(dev_info_t *dip, struct buf *bp, uint_t flags,
-    int (*waitfp)(), caddr_t arg, ddi_dma_lim_t *limits,
-    ddi_dma_handle_t *handlep)
-{
-	int (*funcp)() = ddi_dma_map;
-	ddi_dma_lim_t dma_lim;
-	struct ddi_dma_req dmareq;
-	struct bus_ops *bop;
-
-	if (limits == (ddi_dma_lim_t *)0) {
-		dma_lim = standard_limits;
-	} else {
-		dma_lim = *limits;
-	}
-	dmareq.dmar_limits = &dma_lim;
-	dmareq.dmar_flags = flags;
-	dmareq.dmar_fp = waitfp;
-	dmareq.dmar_arg = arg;
-	dmareq.dmar_object.dmao_size = (uint_t)bp->b_bcount;
-
-	if (bp->b_flags & B_PAGEIO) {
-		dmareq.dmar_object.dmao_type = DMA_OTYP_PAGES;
-		dmareq.dmar_object.dmao_obj.pp_obj.pp_pp = bp->b_pages;
-		dmareq.dmar_object.dmao_obj.pp_obj.pp_offset =
-		    (uint_t)(((uintptr_t)bp->b_un.b_addr) & MMU_PAGEOFFSET);
-	} else {
-		dmareq.dmar_object.dmao_type = DMA_OTYP_BUFVADDR;
-		dmareq.dmar_object.dmao_obj.virt_obj.v_addr = bp->b_un.b_addr;
-		if (bp->b_flags & B_SHADOW) {
-			dmareq.dmar_object.dmao_obj.virt_obj.v_priv =
-			    bp->b_shadow;
-		} else {
-			dmareq.dmar_object.dmao_obj.virt_obj.v_priv = NULL;
-		}
-
-		/*
-		 * If the buffer has no proc pointer, or the proc
-		 * struct has the kernel address space, or the buffer has
-		 * been marked B_REMAPPED (meaning that it is now
-		 * mapped into the kernel's address space), then
-		 * the address space is kas (kernel address space).
-		 */
-		if ((bp->b_proc == NULL) || (bp->b_proc->p_as == &kas) ||
-		    (bp->b_flags & B_REMAPPED)) {
-			dmareq.dmar_object.dmao_obj.virt_obj.v_as = 0;
-		} else {
-			dmareq.dmar_object.dmao_obj.virt_obj.v_as =
-			    bp->b_proc->p_as;
-		}
-	}
-
-	/*
-	 * Handle the case that the requester is both a leaf
-	 * and a nexus driver simultaneously by calling the
-	 * requester's bus_dma_map function directly instead
-	 * of ddi_dma_map.
-	 */
-	bop = DEVI(dip)->devi_ops->devo_bus_ops;
-	if (bop && bop->bus_dma_map)
-		funcp = bop->bus_dma_map;
-
-	return ((*funcp)(dip, dip, &dmareq, handlep));
-}
-
 #if !defined(__sparc)
 /*
  * Request bus_dma_ctl parent to fiddle with a dma request.
@@ -908,79 +770,18 @@ ddi_dma_mctl(dev_info_t *dip, dev_info_t *rdip,
 
 #define	HD	((ddi_dma_impl_t *)h)->dmai_rdip
 
-int
-ddi_dma_kvaddrp(ddi_dma_handle_t h, off_t off, size_t len, caddr_t *kp)
-{
-	return (ddi_dma_mctl(HD, HD, h, DDI_DMA_KVADDR, &off, &len, kp, 0));
-}
-
-int
-ddi_dma_htoc(ddi_dma_handle_t h, off_t o, ddi_dma_cookie_t *c)
-{
-	return (ddi_dma_mctl(HD, HD, h, DDI_DMA_HTOC, &o, 0, (caddr_t *)c, 0));
-}
-
-int
-ddi_dma_coff(ddi_dma_handle_t h, ddi_dma_cookie_t *c, off_t *o)
-{
-	return (ddi_dma_mctl(HD, HD, h, DDI_DMA_COFF,
-	    (off_t *)c, 0, (caddr_t *)o, 0));
-}
-
-int
-ddi_dma_movwin(ddi_dma_handle_t h, off_t *o, size_t *l, ddi_dma_cookie_t *c)
-{
-	return (ddi_dma_mctl(HD, HD, h, DDI_DMA_MOVWIN, o,
-	    l, (caddr_t *)c, 0));
-}
-
-int
-ddi_dma_curwin(ddi_dma_handle_t h, off_t *o, size_t *l)
-{
-	if ((((ddi_dma_impl_t *)h)->dmai_rflags & DDI_DMA_PARTIAL) == 0)
-		return (DDI_FAILURE);
-	return (ddi_dma_mctl(HD, HD, h, DDI_DMA_REPWIN, o, l, 0, 0));
-}
-
-int
-ddi_dma_nextwin(ddi_dma_handle_t h, ddi_dma_win_t win,
-    ddi_dma_win_t *nwin)
-{
-	return (ddi_dma_mctl(HD, HD, h, DDI_DMA_NEXTWIN, (off_t *)&win, 0,
-	    (caddr_t *)nwin, 0));
-}
-
-int
-ddi_dma_nextseg(ddi_dma_win_t win, ddi_dma_seg_t seg, ddi_dma_seg_t *nseg)
-{
-	ddi_dma_handle_t h = (ddi_dma_handle_t)win;
-
-	return (ddi_dma_mctl(HD, HD, h, DDI_DMA_NEXTSEG, (off_t *)&win,
-	    (size_t *)&seg, (caddr_t *)nseg, 0));
-}
-
-#if (defined(__i386) && !defined(__amd64)) || defined(__sparc)
 /*
- * This routine is Obsolete and should be removed from ALL architectures
- * in a future release of Solaris.
- *
- * It is deliberately NOT ported to amd64; please fix the code that
- * depends on this routine to use ddi_dma_nextcookie(9F).
- *
- * NOTE: even though we fixed the pointer through a 32-bit param issue (the fix
- * is a side effect to some other cleanup), we're still not going to support
- * this interface on x64.
+ * This routine is left in place to satisfy link dependencies
+ * for any 3rd party nexus drivers that rely on it.  It is never
+ * called, though.
  */
+/*ARGSUSED*/
 int
-ddi_dma_segtocookie(ddi_dma_seg_t seg, off_t *o, off_t *l,
-    ddi_dma_cookie_t *cookiep)
+ddi_dma_map(dev_info_t *dip, dev_info_t *rdip,
+	struct ddi_dma_req *dmareqp, ddi_dma_handle_t *handlep)
 {
-	ddi_dma_handle_t h = (ddi_dma_handle_t)seg;
-
-	return (ddi_dma_mctl(HD, HD, h, DDI_DMA_SEGTOC, o, (size_t *)l,
-	    (caddr_t *)cookiep, 0));
+	return (DDI_FAILURE);
 }
-#endif	/* (__i386 && !__amd64) || __sparc */
 
 #if !defined(__sparc)
 
@@ -988,20 +789,6 @@ ddi_dma_segtocookie(ddi_dma_seg_t seg, off_t *o, off_t *l,
  * The SPARC versions of these routines are done in assembler to
  * save register windows, so they're in sparc_subr.s.
  */
-
-int
-ddi_dma_map(dev_info_t *dip, dev_info_t *rdip,
-	struct ddi_dma_req *dmareqp, ddi_dma_handle_t *handlep)
-{
-	int (*funcp)(dev_info_t *, dev_info_t *, struct ddi_dma_req *,
-	    ddi_dma_handle_t *);
-
-	if (dip != ddi_root_node())
-		dip = (dev_info_t *)DEVI(dip)->devi_bus_dma_map;
-
-	funcp = DEVI(dip)->devi_ops->devo_bus_ops->bus_dma_map;
-	return ((*funcp)(dip, rdip, dmareqp, handlep));
-}
 
 int
 ddi_dma_allochdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_attr_t *attr,
@@ -1129,66 +916,9 @@ ddi_dma_unbind_handle(ddi_dma_handle_t h)
 
 #endif	/* !__sparc */
 
-int
-ddi_dma_free(ddi_dma_handle_t h)
-{
-	return (ddi_dma_mctl(HD, HD, h, DDI_DMA_FREE, 0, 0, 0, 0));
-}
-
-int
-ddi_iopb_alloc(dev_info_t *dip, ddi_dma_lim_t *limp, uint_t len, caddr_t *iopbp)
-{
-	ddi_dma_lim_t defalt;
-	size_t size = len;
-
-	if (!limp) {
-		defalt = standard_limits;
-		limp = &defalt;
-	}
-	return (i_ddi_mem_alloc_lim(dip, limp, size, 0, 0, 0,
-	    iopbp, NULL, NULL));
-}
-
-void
-ddi_iopb_free(caddr_t iopb)
-{
-	i_ddi_mem_free(iopb, NULL);
-}
-
-int
-ddi_mem_alloc(dev_info_t *dip, ddi_dma_lim_t *limits, uint_t length,
-	uint_t flags, caddr_t *kaddrp, uint_t *real_length)
-{
-	ddi_dma_lim_t defalt;
-	size_t size = length;
-
-	if (!limits) {
-		defalt = standard_limits;
-		limits = &defalt;
-	}
-	return (i_ddi_mem_alloc_lim(dip, limits, size, flags & 0x1,
-	    1, 0, kaddrp, real_length, NULL));
-}
-
-void
-ddi_mem_free(caddr_t kaddr)
-{
-	i_ddi_mem_free(kaddr, NULL);
-}
-
 /*
- * DMA attributes, alignment, burst sizes, and transfer minimums
+ * DMA burst sizes, and transfer minimums
  */
-int
-ddi_dma_get_attr(ddi_dma_handle_t handle, ddi_dma_attr_t *attrp)
-{
-	ddi_dma_impl_t *dimp = (ddi_dma_impl_t *)handle;
-
-	if (attrp == NULL)
-		return (DDI_FAILURE);
-	*attrp = dimp->dmai_attr;
-	return (DDI_SUCCESS);
-}
 
 int
 ddi_dma_burstsizes(ddi_dma_handle_t handle)
@@ -1199,26 +929,6 @@ ddi_dma_burstsizes(ddi_dma_handle_t handle)
 		return (0);
 	else
 		return (dimp->dmai_burstsizes);
-}
-
-int
-ddi_dma_devalign(ddi_dma_handle_t handle, uint_t *alignment, uint_t *mineffect)
-{
-	ddi_dma_impl_t *dimp = (ddi_dma_impl_t *)handle;
-
-	if (!dimp || !alignment || !mineffect)
-		return (DDI_FAILURE);
-	if (!(dimp->dmai_rflags & DDI_DMA_SBUS_64BIT)) {
-		*alignment = 1 << ddi_ffs(dimp->dmai_burstsizes);
-	} else {
-		if (dimp->dmai_burstsizes & 0xff0000) {
-			*alignment = 1 << ddi_ffs(dimp->dmai_burstsizes >> 16);
-		} else {
-			*alignment = 1 << ddi_ffs(dimp->dmai_burstsizes);
-		}
-	}
-	*mineffect = dimp->dmai_minxfer;
-	return (DDI_SUCCESS);
 }
 
 int

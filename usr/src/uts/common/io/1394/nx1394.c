@@ -23,8 +23,9 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ */
 
 /*
  * nx1394.c
@@ -72,7 +73,7 @@ struct bus_ops nx1394_busops = {
 	NULL,				/* bus_add_intrspec */
 	NULL,				/* bus_remove_intrspec */
 	i_ddi_map_fault,		/* XXXX bus_map_fault */
-	ddi_dma_map,			/* bus_dma_map */
+	NULL,				/* bus_dma_map */
 	nx1394_dma_allochdl,
 	ddi_dma_freehdl,
 	ddi_dma_bindhdl,
@@ -391,7 +392,7 @@ nx1394_add_eventcall(dev_info_t *dip, dev_info_t *rdip,
 #if defined(DEBUG)
 	event_name = ndi_event_cookie_to_name(hal->hal_ndi_event_hdl, cookie);
 	if (event_name == NULL)
-	    event_name = "";
+		event_name = "";
 #endif
 	TNF_PROBE_4_DEBUG(nx1394_add_eventcall_exit, S1394_TNF_SL_NEXUS_STACK,
 	    "", tnf_opaque, parent_dip, (void *)dip, tnf_opaque, requestor_dip,
@@ -430,7 +431,7 @@ nx1394_remove_eventcall(dev_info_t *dip, ddi_callback_id_t cb_id)
 #if defined(DEBUG)
 	event_name = ndi_event_cookie_to_name(hal->hal_ndi_event_hdl, cookie);
 	if (event_name == NULL)
-	    event_name = "";
+		event_name = "";
 
 	TNF_PROBE_4_DEBUG(nx1394_remove_eventcall_exit,
 	    S1394_TNF_SL_NEXUS_STACK, "", tnf_opaque, parent_dip, (void *)dip,
