@@ -23,6 +23,9 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -308,7 +311,7 @@ static struct bus_ops sbus_bus_ops = {
 	0,
 	0,
 	i_ddi_map_fault,
-	iommu_dma_map,
+	0,
 	iommu_dma_allochdl,
 	iommu_dma_freehdl,
 	iommu_dma_bindhdl,

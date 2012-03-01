@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ */
 
 
 #include <sys/types.h>
@@ -161,8 +164,6 @@ static int	bofi_errdef_check_w(struct bofi_errstate *,
 		    struct acc_log_elem **);
 static int	bofi_map(dev_info_t *, dev_info_t *, ddi_map_req_t *,
 		    off_t, off_t, caddr_t *);
-static int	bofi_dma_map(dev_info_t *, dev_info_t *,
-		    struct ddi_dma_req *, ddi_dma_handle_t *);
 static int	bofi_dma_allochdl(dev_info_t *, dev_info_t *,
 		    ddi_dma_attr_t *, int (*)(caddr_t), caddr_t,
 		    ddi_dma_handle_t *);
@@ -209,7 +210,7 @@ static struct bus_ops bofi_bus_ops = {
 	NULL,
 	NULL,
 	i_ddi_map_fault,
-	bofi_dma_map,
+	NULL,
 	bofi_dma_allochdl,
 	bofi_dma_freehdl,
 	bofi_dma_bindhdl,
@@ -3334,174 +3335,6 @@ xbcopy(void *from, void *to, u_longlong_t len)
 
 
 /*
- * our ddi_dma_map routine
- */
-static int
-bofi_dma_map(dev_info_t *dip, dev_info_t *rdip,
-		struct ddi_dma_req *dmareqp, ddi_dma_handle_t *handlep)
-{
-	struct bofi_shadow *hp, *xhp;
-	int maxrnumber = 0;
-	int retval = DDI_DMA_NORESOURCES;
-	auto struct ddi_dma_req dmareq;
-	int sleep;
-	struct bofi_shadow *dhashp;
-	struct bofi_shadow *hhashp;
-	ddi_dma_impl_t *mp;
-	unsigned long pagemask = ddi_ptob(rdip, 1) - 1;
-
-	/*
-	 * if driver_list is set, only intercept those drivers
-	 */
-	if (handlep == NULL || !driver_under_test(rdip))
-		return (save_bus_ops.bus_dma_map(dip, rdip, dmareqp, handlep));
-
-	sleep = (dmareqp->dmar_fp == DDI_DMA_SLEEP) ? KM_SLEEP : KM_NOSLEEP;
-	/*
-	 * allocate shadow handle structure and fill it in
-	 */
-	hp = kmem_zalloc(sizeof (struct bofi_shadow), sleep);
-	if (hp == NULL)
-		goto error;
-	(void) strncpy(hp->name, ddi_get_name(rdip), NAMESIZE);
-	hp->instance = ddi_get_instance(rdip);
-	hp->dip = rdip;
-	hp->flags = dmareqp->dmar_flags;
-	if (dmareqp->dmar_object.dmao_type == DMA_OTYP_PAGES) {
-		hp->map_flags = B_PAGEIO;
-		hp->map_pp = dmareqp->dmar_object.dmao_obj.pp_obj.pp_pp;
-	} else if (dmareqp->dmar_object.dmao_obj.virt_obj.v_priv != NULL) {
-		hp->map_flags = B_SHADOW;
-		hp->map_pplist = dmareqp->dmar_object.dmao_obj.virt_obj.v_priv;
-	} else {
-		hp->map_flags = 0;
-	}
-	hp->link = NULL;
-	hp->type = BOFI_DMA_HDL;
-	/*
-	 * get a kernel virtual mapping
-	 */
-	hp->addr = ddi_dmareq_mapin(dmareqp, &hp->mapaddr, &hp->len);
-	if (hp->addr == NULL)
-		goto error;
-	if (bofi_sync_check) {
-		/*
-		 * Take a copy and pass pointers to this up to nexus instead.
-		 * Data will be copied from the original on explicit
-		 * and implicit ddi_dma_sync()
-		 *
-		 * - maintain page alignment because some devices assume it.
-		 */
-		hp->origaddr = hp->addr;
-		hp->allocaddr = ddi_umem_alloc(
-		    ((uintptr_t)hp->addr & pagemask) + hp->len, sleep,
-		    &hp->umem_cookie);
-		if (hp->allocaddr == NULL)
-			goto error;
-		hp->addr = hp->allocaddr + ((uintptr_t)hp->addr & pagemask);
-		if (dmareqp->dmar_flags & DDI_DMA_WRITE)
-			xbcopy(hp->origaddr, hp->addr, hp->len);
-		dmareq = *dmareqp;
-		dmareq.dmar_object.dmao_size = hp->len;
-		dmareq.dmar_object.dmao_type = DMA_OTYP_VADDR;
-		dmareq.dmar_object.dmao_obj.virt_obj.v_as = &kas;
-		dmareq.dmar_object.dmao_obj.virt_obj.v_addr = hp->addr;
-		dmareq.dmar_object.dmao_obj.virt_obj.v_priv = NULL;
-		dmareqp = &dmareq;
-	}
-	/*
-	 * call nexus to do the real work
-	 */
-	retval = save_bus_ops.bus_dma_map(dip, rdip, dmareqp, handlep);
-	if (retval != DDI_SUCCESS)
-		goto error2;
-	/*
-	 * now set dma_handle to point to real handle
-	 */
-	hp->hdl.dma_handle = *handlep;
-	/*
-	 * unset DMP_NOSYNC
-	 */
-	mp = (ddi_dma_impl_t *)*handlep;
-	mp->dmai_rflags &= ~DMP_NOSYNC;
-	mp->dmai_fault_check = bofi_check_dma_hdl;
-	/*
-	 * bind and unbind are cached in devinfo - must overwrite them
-	 * - note that our bind and unbind are quite happy dealing with
-	 * any handles for this devinfo that were previously allocated
-	 */
-	if (save_bus_ops.bus_dma_bindhdl == DEVI(rdip)->devi_bus_dma_bindfunc)
-		DEVI(rdip)->devi_bus_dma_bindfunc = bofi_dma_bindhdl;
-	if (save_bus_ops.bus_dma_unbindhdl ==
-	    DEVI(rdip)->devi_bus_dma_unbindfunc)
-		DEVI(rdip)->devi_bus_dma_unbindfunc = bofi_dma_unbindhdl;
-	mutex_enter(&bofi_low_mutex);
-	mutex_enter(&bofi_mutex);
-	/*
-	 * get an "rnumber" for this handle - really just seeking to
-	 * get a unique number - generally only care for early allocated
-	 * handles - so we get as far as INT_MAX, just stay there
-	 */
-	dhashp = HDL_DHASH(hp->dip);
-	for (xhp = dhashp->dnext; xhp != dhashp; xhp = xhp->dnext)
-		if (ddi_name_to_major(xhp->name) ==
-		    ddi_name_to_major(hp->name) &&
-		    xhp->instance == hp->instance &&
-		    xhp->type == BOFI_DMA_HDL)
-			if (xhp->rnumber >= maxrnumber) {
-				if (xhp->rnumber == INT_MAX)
-					maxrnumber = INT_MAX;
-				else
-					maxrnumber = xhp->rnumber + 1;
-			}
-	hp->rnumber = maxrnumber;
-	/*
-	 * add to dhash, hhash and inuse lists
-	 */
-	hp->next = shadow_list.next;
-	shadow_list.next->prev = hp;
-	hp->prev = &shadow_list;
-	shadow_list.next = hp;
-	hhashp = HDL_HHASH(*handlep);
-	hp->hnext = hhashp->hnext;
-	hhashp->hnext->hprev = hp;
-	hp->hprev = hhashp;
-	hhashp->hnext = hp;
-	dhashp = HDL_DHASH(hp->dip);
-	hp->dnext = dhashp->dnext;
-	dhashp->dnext->dprev = hp;
-	hp->dprev = dhashp;
-	dhashp->dnext = hp;
-	/*
-	 * chain on any pre-existing errdefs that apply to this
-	 * acc_handle and corrupt if required (as there is an implicit
-	 * ddi_dma_sync() in this call)
-	 */
-	chain_on_errdefs(hp);
-	mutex_exit(&bofi_mutex);
-	mutex_exit(&bofi_low_mutex);
-	return (retval);
-error:
-	if (dmareqp->dmar_fp != DDI_DMA_DONTWAIT) {
-		/*
-		 * what to do here? Wait a bit and try again
-		 */
-		(void) timeout((void (*)())dmareqp->dmar_fp,
-		    dmareqp->dmar_arg, 10);
-	}
-error2:
-	if (hp) {
-		ddi_dmareq_mapout(hp->mapaddr, hp->len, hp->map_flags,
-		    hp->map_pp, hp->map_pplist);
-		if (bofi_sync_check && hp->allocaddr)
-			ddi_umem_free(hp->umem_cookie);
-		kmem_free(hp, sizeof (struct bofi_shadow));
-	}
-	return (retval);
-}
-
-
-/*
  * our ddi_dma_allochdl routine
  */
 static int
@@ -4003,14 +3836,11 @@ bofi_dma_ctl(dev_info_t *dip, dev_info_t *rdip,
 		ddi_dma_handle_t handle, enum ddi_dma_ctlops request,
 		off_t *offp, size_t *lenp, caddr_t *objp, uint_t flags)
 {
-	struct bofi_link *lp, *next_lp;
-	struct bofi_errent *ep;
 	struct bofi_shadow *hp;
 	struct bofi_shadow *hhashp;
 	int retval;
 	int i;
 	struct bofi_shadow *dummyhp;
-	ddi_dma_impl_t *mp;
 
 	/*
 	 * get nexus to do real work
@@ -4089,58 +3919,6 @@ bofi_dma_ctl(dev_info_t *dip, dev_info_t *rdip,
 		    sizeof (struct bofi_shadow *));
 		kmem_free(dummyhp, sizeof (struct bofi_shadow));
 		return (retval);
-	case DDI_DMA_FREE:
-		/*
-		 * ddi_dma_free case - remove from dhash, hhash and inuse lists
-		 */
-		hp->hnext->hprev = hp->hprev;
-		hp->hprev->hnext = hp->hnext;
-		hp->dnext->dprev = hp->dprev;
-		hp->dprev->dnext = hp->dnext;
-		hp->next->prev = hp->prev;
-		hp->prev->next = hp->next;
-		/*
-		 * free any errdef link structures tagged on to this
-		 * shadow handle
-		 */
-		for (lp = hp->link; lp != NULL; ) {
-			next_lp = lp->link;
-			/*
-			 * there is an implicit sync_for_cpu on free -
-			 * may need to corrupt
-			 */
-			ep = lp->errentp;
-			if ((ep->errdef.access_type & BOFI_DMA_R) &&
-			    (hp->flags & DDI_DMA_READ) &&
-			    (ep->state & BOFI_DEV_ACTIVE)) {
-				do_dma_corrupt(hp, ep, DDI_DMA_SYNC_FORCPU,
-				    0, hp->len);
-			}
-			lp->link = bofi_link_freelist;
-			bofi_link_freelist = lp;
-			lp = next_lp;
-		}
-		hp->link = NULL;
-		mutex_exit(&bofi_mutex);
-		mutex_exit(&bofi_low_mutex);
-
-		if (bofi_sync_check && (hp->flags & DDI_DMA_READ))
-			if (hp->allocaddr)
-				xbcopy(hp->addr, hp->origaddr, hp->len);
-		ddi_dmareq_mapout(hp->mapaddr, hp->len, hp->map_flags,
-		    hp->map_pp, hp->map_pplist);
-		if (bofi_sync_check && hp->allocaddr)
-			ddi_umem_free(hp->umem_cookie);
-		kmem_free(hp, sizeof (struct bofi_shadow));
-		return (retval);
-	case DDI_DMA_MOVWIN:
-		mp = (ddi_dma_impl_t *)handle;
-		mp->dmai_rflags &= ~DMP_NOSYNC;
-		break;
-	case DDI_DMA_NEXTWIN:
-		mp = (ddi_dma_impl_t *)handle;
-		mp->dmai_rflags &= ~DMP_NOSYNC;
-		break;
 	default:
 		break;
 	}

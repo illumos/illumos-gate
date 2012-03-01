@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  */
 
 #pragma ident	"@(#)iommulib.c	1.6	08/09/07 SMI"
@@ -245,21 +246,6 @@ iommulib_nexus_register(dev_info_t *dip, iommulib_nexops_t *nexops,
 		return (DDI_FAILURE);
 	}
 
-	/* Check for legacy ops */
-	if (nexops->nops_dma_map == NULL) {
-		cmn_err(CE_WARN, "%s: %s%d: NULL legacy nops_dma_map op. "
-		    "Failing registration for ops vector: %p", f,
-		    driver, instance, (void *)nexops);
-		return (DDI_FAILURE);
-	}
-
-	if (nexops->nops_dma_mctl == NULL) {
-		cmn_err(CE_WARN, "%s: %s%d: NULL legacy nops_dma_mctl op. "
-		    "Failing registration for ops vector: %p", f,
-		    driver, instance, (void *)nexops);
-		return (DDI_FAILURE);
-	}
-
 	nexp = kmem_zalloc(sizeof (iommulib_nex_t), KM_SLEEP);
 
 	mutex_enter(&iommulib_lock);
@@ -445,21 +431,6 @@ iommulib_iommu_register(dev_info_t *dip, iommulib_ops_t *ops,
 
 	if (ops->ilops_dma_win == NULL) {
 		cmn_err(CE_WARN, "%s: %s%d: NULL dma_win op. "
-		    "Failing registration for ops vector: %p", f,
-		    driver, instance, (void *)ops);
-		return (DDI_FAILURE);
-	}
-
-	/* Check for legacy ops */
-	if (ops->ilops_dma_map == NULL) {
-		cmn_err(CE_WARN, "%s: %s%d: NULL legacy dma_map op. "
-		    "Failing registration for ops vector: %p", f,
-		    driver, instance, (void *)ops);
-		return (DDI_FAILURE);
-	}
-
-	if (ops->ilops_dma_mctl == NULL) {
-		cmn_err(CE_WARN, "%s: %s%d: NULL legacy dma_mctl op. "
 		    "Failing registration for ops vector: %p", f,
 		    driver, instance, (void *)ops);
 		return (DDI_FAILURE);
@@ -757,37 +728,6 @@ iommulib_nexdma_win(dev_info_t *dip, dev_info_t *rdip,
 	    win, offp, lenp, cookiep, ccountp));
 }
 
-/* Obsolete DMA routines */
-
-int
-iommulib_nexdma_map(dev_info_t *dip, dev_info_t *rdip,
-    struct ddi_dma_req *dmareq, ddi_dma_handle_t *dma_handle)
-{
-	iommulib_handle_t handle = DEVI(rdip)->devi_iommulib_handle;
-	iommulib_unit_t *unitp = handle;
-
-	ASSERT(unitp);
-
-	/* No need to grab lock - the handle is reference counted */
-	return (unitp->ilu_ops->ilops_dma_map(handle, dip, rdip, dmareq,
-	    dma_handle));
-}
-
-int
-iommulib_nexdma_mctl(dev_info_t *dip, dev_info_t *rdip,
-    ddi_dma_handle_t dma_handle, enum ddi_dma_ctlops request,
-    off_t *offp, size_t *lenp, caddr_t *objpp, uint_t cache_flags)
-{
-	iommulib_handle_t handle = DEVI(rdip)->devi_iommulib_handle;
-	iommulib_unit_t *unitp = (iommulib_unit_t *)handle;
-
-	ASSERT(unitp);
-
-	/* No need to grab lock - the handle is reference counted */
-	return (unitp->ilu_ops->ilops_dma_mctl(handle, dip, rdip, dma_handle,
-	    request, offp, lenp, objpp, cache_flags));
-}
-
 int
 iommulib_nexdma_mapobject(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_handle_t dma_handle, struct ddi_dma_req *dmareq,
@@ -925,28 +865,6 @@ iommulib_iommu_dma_win(dev_info_t *dip, dev_info_t *rdip,
 	nexops = &DEVI(dip)->devi_iommulib_nex_handle->nex_ops;
 	return (nexops->nops_dma_win(dip, rdip, handle, win, offp, lenp,
 	    cookiep, ccountp));
-}
-
-int
-iommulib_iommu_dma_map(dev_info_t *dip, dev_info_t *rdip,
-    struct ddi_dma_req *dmareq, ddi_dma_handle_t *handlep)
-{
-	iommulib_nexops_t *nexops;
-
-	nexops = &DEVI(dip)->devi_iommulib_nex_handle->nex_ops;
-	return (nexops->nops_dma_map(dip, rdip, dmareq, handlep));
-}
-
-int
-iommulib_iommu_dma_mctl(dev_info_t *dip, dev_info_t *rdip,
-    ddi_dma_handle_t handle, enum ddi_dma_ctlops request, off_t *offp,
-    size_t *lenp, caddr_t *objpp, uint_t cache_flags)
-{
-	iommulib_nexops_t *nexops;
-
-	nexops = &DEVI(dip)->devi_iommulib_nex_handle->nex_ops;
-	return (nexops->nops_dma_mctl(dip, rdip, handle, request, offp, lenp,
-	    objpp, cache_flags));
 }
 
 int

@@ -22,6 +22,9 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ */
 
 /*
  * PCI nexus DVMA and DMA core routines:
@@ -1110,106 +1113,6 @@ pci_dvma_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_impl_t *mp,
 	uint_t cache_flags)
 {
 	switch (cmd) {
-	case DDI_DMA_SYNC:
-		return (pci_dma_sync(dip, rdip, (ddi_dma_handle_t)mp,
-		    *offp, *lenp, cache_flags));
-
-	case DDI_DMA_HTOC: {
-		int ret;
-		off_t wo_off, off = *offp;	/* wo_off: wnd's obj offset */
-		uint_t win_size = mp->dmai_winsize;
-		ddi_dma_cookie_t *cp = (ddi_dma_cookie_t *)objp;
-
-		if (off >= mp->dmai_object.dmao_size) {
-			cmn_err(CE_WARN, "%s%d invalid dma_htoc offset %lx",
-			    NAMEINST(mp->dmai_rdip), off);
-			return (DDI_FAILURE);
-		}
-		off += mp->dmai_roffset;
-		ret = pci_dma_win(dip, rdip, (ddi_dma_handle_t)mp,
-		    off / win_size, &wo_off, NULL, cp, NULL); /* lenp == NULL */
-		if (ret)
-			return (ret);
-		DEBUG4(DBG_DMA_CTL, dip, "HTOC:cookie=%x+%lx off=%lx,%lx\n",
-		    cp->dmac_address, cp->dmac_size, off, *offp);
-
-		/* adjust cookie addr/len if we are not on window boundary */
-		ASSERT((off % win_size) == (off -
-		    (PCI_DMA_CURWIN(mp) ? mp->dmai_roffset : 0) - wo_off));
-		off = PCI_DMA_CURWIN(mp) ? off % win_size : *offp;
-		ASSERT(cp->dmac_size > off);
-		cp->dmac_laddress += off;
-		cp->dmac_size -= off;
-		DEBUG5(DBG_DMA_CTL, dip,
-		    "HTOC:mp=%p cookie=%x+%lx off=%lx,%lx\n",
-		    mp, cp->dmac_address, cp->dmac_size, off, wo_off);
-		}
-		return (DDI_SUCCESS);
-
-	case DDI_DMA_REPWIN:
-		*offp = mp->dmai_offset;
-		*lenp = mp->dmai_size;
-		return (DDI_SUCCESS);
-
-	case DDI_DMA_MOVWIN: {
-		off_t off = *offp;
-		if (off >= mp->dmai_object.dmao_size)
-			return (DDI_FAILURE);
-		off += mp->dmai_roffset;
-		return (pci_dma_win(dip, rdip, (ddi_dma_handle_t)mp,
-		    off / mp->dmai_winsize, offp, lenp,
-		    (ddi_dma_cookie_t *)objp, NULL));
-		}
-
-	case DDI_DMA_NEXTWIN: {
-		window_t win = PCI_DMA_CURWIN(mp);
-		if (offp) {
-			if (*(window_t *)offp != win) {  /* window not active */
-				*(window_t *)objp = win; /* return cur win */
-				return (DDI_DMA_STALE);
-			}
-			win++;
-		} else	/* map win 0 */
-			win = 0;
-		if (win >= mp->dmai_nwin) {
-			*(window_t *)objp = win - 1;
-			return (DDI_DMA_DONE);
-		}
-		if (pci_dma_win(dip, rdip, (ddi_dma_handle_t)mp,
-		    win, 0, 0, 0, 0)) {
-			*(window_t *)objp = win - 1;
-			return (DDI_FAILURE);
-		}
-		*(window_t *)objp = win;
-		}
-		return (DDI_SUCCESS);
-
-	case DDI_DMA_NEXTSEG:
-		if (*(window_t *)offp != PCI_DMA_CURWIN(mp))
-			return (DDI_DMA_STALE);
-		if (lenp)				/* only 1 seg allowed */
-			return (DDI_DMA_DONE);
-							/* return mp as seg 0 */
-		*(ddi_dma_seg_t *)objp = (ddi_dma_seg_t)mp;
-		return (DDI_SUCCESS);
-
-	case DDI_DMA_SEGTOC:
-		MAKE_DMA_COOKIE((ddi_dma_cookie_t *)objp, mp->dmai_mapping,
-		    mp->dmai_size);
-		*offp = mp->dmai_offset;
-		*lenp = mp->dmai_size;
-		return (DDI_SUCCESS);
-
-	case DDI_DMA_COFF: {
-		ddi_dma_cookie_t *cp = (ddi_dma_cookie_t *)offp;
-		if (cp->dmac_address < mp->dmai_mapping ||
-		    (cp->dmac_address + cp->dmac_size) >
-		    (mp->dmai_mapping + mp->dmai_size))
-			return (DDI_FAILURE);
-		*objp = (caddr_t)(cp->dmac_address - mp->dmai_mapping +
-		    mp->dmai_offset);
-		}
-		return (DDI_SUCCESS);
 
 	case DDI_DMA_REMAP:
 		if (pci_dvma_remap_enabled)
@@ -1524,8 +1427,6 @@ pci_dma_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_impl_t *mp,
 	uint_t cache_flags)
 {
 	switch (cmd) {
-	case DDI_DMA_SYNC: /* XXX */
-		return (DDI_SUCCESS);
 
 	case DDI_DMA_HTOC: {
 		off_t off = *offp;
@@ -1558,92 +1459,6 @@ pci_dma_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_impl_t *mp,
 		DEBUG2(DBG_DMA_CTL, dip,
 		    "HTOC: cookie - dmac_laddress=%p dmac_size=%x\n",
 		    cp->dmac_laddress, cp->dmac_size);
-		}
-		return (DDI_SUCCESS);
-
-	case DDI_DMA_REPWIN:
-		*offp = mp->dmai_offset;
-		*lenp = mp->dmai_size;
-		return (DDI_SUCCESS);
-
-	case DDI_DMA_MOVWIN: {
-		off_t off = *offp;
-		ddi_dma_cookie_t *cp;
-		pci_dma_win_t *win_p = mp->dmai_winlst;
-
-		if (off >= mp->dmai_object.dmao_size)
-			return (DDI_FAILURE);
-
-		/* locate window */
-		while (win_p->win_offset + win_p->win_size <= off)
-			win_p = win_p->win_next;
-
-		cp = (ddi_dma_cookie_t *)(win_p + 1);
-		mp->dmai_offset = win_p->win_offset;
-		mp->dmai_size   = win_p->win_size;
-		mp->dmai_mapping = cp->dmac_laddress;	/* cookie0 star addr */
-		mp->dmai_cookie = cp + 1;
-		win_p->win_curseg = 0;
-
-		*(ddi_dma_cookie_t *)objp = *cp;
-		*offp = win_p->win_offset;
-		*lenp = win_p->win_size;
-		DEBUG2(DBG_DMA_CTL, dip,
-		    "HTOC: cookie - dmac_laddress=%p dmac_size=%x\n",
-		    cp->dmac_laddress, cp->dmac_size);
-		}
-		return (DDI_SUCCESS);
-
-	case DDI_DMA_NEXTWIN: {
-		pci_dma_win_t *win_p = *(pci_dma_win_t **)offp;
-		pci_dma_win_t **nw_pp = (pci_dma_win_t **)objp;
-		ddi_dma_cookie_t *cp;
-		if (!win_p) {
-			*nw_pp = mp->dmai_winlst;
-			return (DDI_SUCCESS);
-		}
-
-		if (win_p->win_offset != mp->dmai_offset)
-			return (DDI_DMA_STALE);
-		if (!win_p->win_next)
-			return (DDI_DMA_DONE);
-		win_p = win_p->win_next;
-		cp = (ddi_dma_cookie_t *)(win_p + 1);
-		mp->dmai_offset = win_p->win_offset;
-		mp->dmai_size   = win_p->win_size;
-		mp->dmai_mapping = cp->dmac_laddress;   /* cookie0 star addr */
-		mp->dmai_cookie = cp + 1;
-		win_p->win_curseg = 0;
-		*nw_pp = win_p;
-		}
-		return (DDI_SUCCESS);
-
-	case DDI_DMA_NEXTSEG: {
-		pci_dma_win_t *w_p = *(pci_dma_win_t **)offp;
-		if (w_p->win_offset != mp->dmai_offset)
-			return (DDI_DMA_STALE);
-		if (w_p->win_curseg + 1 >= w_p->win_ncookies)
-			return (DDI_DMA_DONE);
-		w_p->win_curseg++;
-		}
-		*(ddi_dma_seg_t *)objp = (ddi_dma_seg_t)mp;
-		return (DDI_SUCCESS);
-
-	case DDI_DMA_SEGTOC: {
-		pci_dma_win_t *win_p = mp->dmai_winlst;
-		off_t off = mp->dmai_offset;
-		ddi_dma_cookie_t *cp;
-		int i;
-
-		/* locate active window */
-		for (; win_p->win_offset != off; win_p = win_p->win_next)
-			;
-		cp = (ddi_dma_cookie_t *)(win_p + 1);
-		for (i = 0; i < win_p->win_curseg; i++, cp++)
-			off += cp->dmac_size;
-		*offp = off;
-		*lenp = cp->dmac_size;
-		*(ddi_dma_cookie_t *)objp = *cp;	/* copy cookie */
 		}
 		return (DDI_SUCCESS);
 

@@ -1,5 +1,6 @@
 \
 \ Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+\ Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
 \
 \ CDDL HEADER START
 \
@@ -241,7 +242,6 @@ ddi_dma_impl
 dev_info
 	devi_ops		DEVI_DEV_OPS
 	devi_bus_ctl
-	devi_bus_dma_map
 	devi_bus_dma_ctl
 	devi_bus_dma_allochdl
 	devi_bus_dma_freehdl

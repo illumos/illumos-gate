@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  */
 
 #include <sys/sunddi.h>
@@ -63,13 +64,6 @@ static int amd_iommu_mapobject(iommulib_handle_t handle, dev_info_t *dip,
     struct ddi_dma_req *dmareq, ddi_dma_obj_t *dmao);
 static int amd_iommu_unmapobject(iommulib_handle_t handle, dev_info_t *dip,
     dev_info_t *rdip, ddi_dma_handle_t dma_handle, ddi_dma_obj_t *dmao);
-static int amd_iommu_map(iommulib_handle_t handle, dev_info_t *dip,
-    dev_info_t *rdip, struct ddi_dma_req *dmareq,
-    ddi_dma_handle_t *dma_handle);
-static int amd_iommu_mctl(iommulib_handle_t handle, dev_info_t *dip,
-    dev_info_t *rdip, ddi_dma_handle_t dma_handle,
-    enum ddi_dma_ctlops request, off_t *offp, size_t *lenp,
-    caddr_t *objpp, uint_t cache_flags);
 
 static int unmap_current_window(amd_iommu_t *iommu, dev_info_t *rdip,
     ddi_dma_cookie_t *cookie_array, uint_t ccount, int ncookies, int locked);
@@ -112,8 +106,6 @@ struct iommulib_ops amd_iommulib_ops = {
 	amd_iommu_win,
 	amd_iommu_mapobject,
 	amd_iommu_unmapobject,
-	amd_iommu_map,
-	amd_iommu_mctl
 };
 
 static kmutex_t amd_iommu_pgtable_lock;
@@ -1894,30 +1886,6 @@ out:
 		kmem_free(cookie_array, sizeof (ddi_dma_cookie_t) * ccount);
 
 	return (error);
-}
-
-/* Obsoleted DMA routines */
-
-/*ARGSUSED*/
-static int
-amd_iommu_map(iommulib_handle_t handle, dev_info_t *dip,
-    dev_info_t *rdip, struct ddi_dma_req *dmareq,
-    ddi_dma_handle_t *dma_handle)
-{
-	ASSERT(0);
-	return (iommulib_iommu_dma_map(dip, rdip, dmareq, dma_handle));
-}
-
-/*ARGSUSED*/
-static int
-amd_iommu_mctl(iommulib_handle_t handle, dev_info_t *dip,
-    dev_info_t *rdip, ddi_dma_handle_t dma_handle,
-    enum ddi_dma_ctlops request, off_t *offp, size_t *lenp,
-    caddr_t *objpp, uint_t cache_flags)
-{
-	ASSERT(0);
-	return (iommulib_iommu_dma_mctl(dip, rdip, dma_handle,
-	    request, offp, lenp, objpp, cache_flags));
 }
 
 /*ARGSUSED*/

@@ -21,6 +21,9 @@
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ */
 
 #ifndef	_SYS_DDIDMAREQ_H
 #define	_SYS_DDIDMAREQ_H
@@ -712,21 +715,21 @@ typedef struct ddi_dma_req {
  */
 
 enum ddi_dma_ctlops {
-	DDI_DMA_FREE,		/* free reference to object		*/
-	DDI_DMA_SYNC,		/* synchronize cache references		*/
-	DDI_DMA_HTOC,		/* return DMA cookie for handle		*/
-	DDI_DMA_KVADDR,		/* return kernel virtual address	*/
-	DDI_DMA_MOVWIN,		/* change mapped DMA window on object	*/
-	DDI_DMA_REPWIN,		/* report current window on DMA object	*/
-	DDI_DMA_GETERR,		/* report any post-transfer DMA errors	*/
-	DDI_DMA_COFF,		/* convert a DMA cookie to an offset	*/
-	DDI_DMA_NEXTWIN,	/* get next window within object	*/
-	DDI_DMA_NEXTSEG,	/* get next segment within window	*/
-	DDI_DMA_SEGTOC,		/* return segment DMA cookie		*/
+	DDI_DMA_FREE,		/* obsolete - do not use		*/
+	DDI_DMA_SYNC,		/* obsolete - do not use		*/
+	DDI_DMA_HTOC,		/* obsolete - do not use		*/
+	DDI_DMA_KVADDR,		/* obsolete - do not use		*/
+	DDI_DMA_MOVWIN,		/* obsolete - do not use		*/
+	DDI_DMA_REPWIN,		/* obsolete - do not use		*/
+	DDI_DMA_GETERR,		/* obsolete - do not use		*/
+	DDI_DMA_COFF,		/* obsolete - do not use		*/
+	DDI_DMA_NEXTWIN,	/* obsolete - do not use		*/
+	DDI_DMA_NEXTSEG,	/* obsolete - do not use		*/
+	DDI_DMA_SEGTOC,		/* obsolete - do not use		*/
 	DDI_DMA_RESERVE,	/* reserve some DVMA range		*/
 	DDI_DMA_RELEASE,	/* free preallocated DVMA range		*/
-	DDI_DMA_RESETH,		/* reset next cookie ptr in handle	*/
-	DDI_DMA_CKSYNC,		/* sync intermediate buffer to cookies	*/
+	DDI_DMA_RESETH,		/* obsolete - do not use		*/
+	DDI_DMA_CKSYNC,		/* obsolete - do not use		*/
 	DDI_DMA_IOPB_ALLOC,	/* get contiguous DMA-able memory	*/
 	DDI_DMA_IOPB_FREE,	/* return contiguous DMA-able memory	*/
 	DDI_DMA_SMEM_ALLOC,	/* get contiguous DMA-able memory	*/

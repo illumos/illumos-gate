@@ -23,8 +23,9 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2012  Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ */
 
 /*
  * Assembler routines to make some DDI routines go faster.
@@ -160,30 +161,6 @@ ddi_ctlops(dev_info_t *d, dev_info_t *r, ddi_ctl_enum_t op, void *a, void *v)
 2:	retl
 	sub	%g0, 1, %o0	! return (DDI_FAILURE);
 	SET_SIZE(ddi_ctlops)
-
-#endif	/* lint */
-
-#if	defined(lint)
-
-/* ARGSUSED */
-int
-ddi_dma_map(dev_info_t *dip, dev_info_t *rdip,
-    struct ddi_dma_req *dmareqp, ddi_dma_handle_t *handlep)
-{
-	return (DDI_SUCCESS);
-}
-
-#else	/* lint */
-
-	ENTRY(ddi_dma_map)
-	ldn	[%o0 + DEVI_BUS_DMA_MAP], %o0
-			! dip = (dev_info_t *)DEVI(dip)->devi_bus_dma_map;
-	ldn	[%o0 + DEVI_DEV_OPS], %g1	! dip->dev_ops
-	ldn	[%g1 + DEVI_BUS_OPS], %g1	! dip->dev_ops->devo_bus_ops
-	ldn	[%g1 + OPS_MAP], %g1 ! dip->dev_ops->devo_bus_ops->bus_dma_map
-	jmpl	%g1, %g0	! bop off to new routine
-	nop			! as if we had never been here
-	SET_SIZE(ddi_dma_map)
 
 #endif	/* lint */
 
