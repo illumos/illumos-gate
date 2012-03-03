@@ -20,7 +20,6 @@
  */
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  */
 
 #ifndef _SYS_DDI_IMPLDEFS_H
@@ -161,6 +160,7 @@ struct dev_info  {
 	/* logical parents for busop primitives */
 
 	struct dev_info *devi_bus_map_fault;	/* bus_map_fault parent	 */
+	struct dev_info *devi_bus_dma_map;	/* bus_dma_map parent	 */
 	struct dev_info *devi_bus_dma_allochdl; /* bus_dma_newhdl parent */
 	struct dev_info *devi_bus_dma_freehdl;  /* bus_dma_freehdl parent */
 	struct dev_info *devi_bus_dma_bindhdl;  /* bus_dma_bindhdl parent */

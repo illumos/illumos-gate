@@ -22,9 +22,6 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-/*
- * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
- */
 
 /*
  * The Data Transfer Interface driver for Host Wire Adapter device
@@ -255,7 +252,7 @@ static struct bus_ops hwahc_busops = {
 	NULL,				/* bus_add_intrspec */
 	NULL,				/* bus_remove_intrspec */
 	NULL,				/* bus_map_fault */
-	NULL,				/* bus_dma_map */
+	ddi_dma_map,			/* bus_dma_map */
 	ddi_dma_allochdl,
 	ddi_dma_freehdl,
 	ddi_dma_bindhdl,

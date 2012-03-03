@@ -22,9 +22,6 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-/*
- * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
- */
 
 /*
  *	Host to PCI local bus driver
@@ -66,7 +63,7 @@ struct bus_ops pci_bus_ops = {
 	NULL,
 	NULL,
 	i_ddi_map_fault,
-	NULL,
+	ddi_dma_map,
 	ddi_dma_allochdl,
 	ddi_dma_freehdl,
 	ddi_dma_bindhdl,
