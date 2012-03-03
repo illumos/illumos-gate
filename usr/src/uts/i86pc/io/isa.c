@@ -20,7 +20,6 @@
  */
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  */
 
 /*
@@ -169,7 +168,7 @@ struct bus_ops isa_bus_ops = {
 	NULL,
 	NULL,
 	i_ddi_map_fault,
-	NULL,
+	ddi_dma_map,
 	isa_dma_allochdl,
 	ddi_dma_freehdl,
 	ddi_dma_bindhdl,
