@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -88,8 +88,7 @@ enum be_fmt {
 	BE_FMT_DEFAULT,
 	BE_FMT_DATASET,
 	BE_FMT_SNAPSHOT,
-	BE_FMT_ALL,
-	BE_NUM_FMTS
+	BE_FMT_ALL
 };
 
 /*
@@ -115,8 +114,6 @@ static const be_command_t be_command_tbl[] = {
 	{ "rollback",		be_do_rollback },
 	{ NULL,			NULL },
 };
-
-static struct hdr_info hdrs[BE_NUM_FMTS] = { 0 };
 
 static void
 usage(void)
@@ -358,20 +355,12 @@ count_widths(enum be_fmt be_fmt, struct hdr_info *hdr, be_node_list_t *be_nodes)
 }
 
 static void
-print_be_nodes(const char *be_name, boolean_t parsable, be_node_list_t *nodes)
+print_be_nodes(const char *be_name, boolean_t parsable, struct hdr_info *hdr,
+    be_node_list_t *nodes)
 {
 	char buf[64];
 	char datetime[DT_BUF_LEN];
-	struct hdr_info *hdr = NULL;
-	enum be_fmt be_fmt  = BE_FMT_DEFAULT;
 	be_node_list_t	*cur_be;
-
-	if (!parsable) {
-		hdr = hdrs;
-		init_hdr_cols(be_fmt, hdr);
-		count_widths(be_fmt, hdr, nodes);
-		print_hdr(hdr);
-	}
 
 	for (cur_be = nodes; cur_be != NULL; cur_be = cur_be->be_next_node) {
 		char active[3] = "-\0";
@@ -488,19 +477,11 @@ print_be_snapshots(be_node_list_t *be, struct hdr_info *hdr, boolean_t parsable)
 
 static void
 print_fmt_nodes(const char *be_name, enum be_fmt be_fmt, boolean_t parsable,
-    be_node_list_t *nodes)
+    struct hdr_info *hdr, be_node_list_t *nodes)
 {
 	char buf[64];
 	char datetime[DT_BUF_LEN];
-	struct hdr_info *hdr = NULL;
 	be_node_list_t	*cur_be;
-
-	hdr = hdrs + be_fmt;
-	init_hdr_cols(be_fmt, hdr);
-	count_widths(be_fmt, hdr, nodes);
-
-	if (!parsable)
-		print_hdr(hdr);
 
 	for (cur_be = nodes; cur_be != NULL; cur_be = cur_be->be_next_node) {
 		char active[3] = "-\0";
@@ -559,6 +540,7 @@ static void
 print_nodes(const char *be_name, boolean_t dsets, boolean_t snaps,
     boolean_t parsable, be_node_list_t *be_nodes)
 {
+	struct hdr_info hdr;
 	enum be_fmt be_fmt  = BE_FMT_DEFAULT;
 
 	if (dsets)
@@ -566,10 +548,16 @@ print_nodes(const char *be_name, boolean_t dsets, boolean_t snaps,
 	if (snaps)
 		be_fmt |= BE_FMT_SNAPSHOT;
 
+	if (!parsable) {
+		init_hdr_cols(be_fmt, &hdr);
+		count_widths(be_fmt, &hdr, be_nodes);
+		print_hdr(&hdr);
+	}
+
 	if (be_fmt == BE_FMT_DEFAULT)
-		print_be_nodes(be_name, parsable, be_nodes);
+		print_be_nodes(be_name, parsable, &hdr, be_nodes);
 	else
-		print_fmt_nodes(be_name, be_fmt, parsable, be_nodes);
+		print_fmt_nodes(be_name, be_fmt, parsable, &hdr, be_nodes);
 }
 
 static boolean_t
