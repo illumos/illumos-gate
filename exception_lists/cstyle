@@ -813,6 +813,16 @@ usr/src/uts/intel/io/acpica/utilities/utstate.c
 usr/src/uts/intel/io/acpica/utilities/uttrack.c
 usr/src/uts/intel/io/acpica/utilities/utxface.c
 usr/src/uts/intel/io/acpica/utilities/utxferror.c
+usr/src/uts/intel/io/vmxnet/buildNumber.h
+usr/src/uts/intel/io/vmxnet/includeCheck.h
+usr/src/uts/intel/io/vmxnet/net.h
+usr/src/uts/intel/io/vmxnet/net_sg.h
+usr/src/uts/intel/io/vmxnet/vm_basic_types.h
+usr/src/uts/intel/io/vmxnet/vm_device_version.h
+usr/src/uts/intel/io/vmxnet/vmnet_def.h
+usr/src/uts/intel/io/vmxnet/vmxnet.c
+usr/src/uts/intel/io/vmxnet/vmxnet2_def.h
+usr/src/uts/intel/io/vmxnet/vmxnet_def.h
 usr/src/uts/intel/sys/acpi/acapps.h
 usr/src/uts/intel/sys/acpi/accommon.h
 usr/src/uts/intel/sys/acpi/acconfig.h

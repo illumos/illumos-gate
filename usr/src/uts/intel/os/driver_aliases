@@ -1,1 +1,2 @@
 asy "pci11c1,480"
+vmxnet "pci15ad,720"
