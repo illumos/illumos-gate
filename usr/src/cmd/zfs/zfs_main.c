@@ -22,8 +22,8 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2011 Joyent, Inc. All rights reserved.
  * Copyright (c) 2011 by Delphix. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 #include <assert.h>
@@ -559,8 +559,9 @@ finish_progress(char *done)
 	free(pt_header);
 	pt_header = NULL;
 }
+
 /*
- * zfs clone [-p] [-o prop=value] ... <snap> <fs | vol>
+ * zfs clone [-Fp] [-o prop=value] ... <snap> <fs | vol>
  *
  * Given an existing dataset, create a writable copy whose initial contents
  * are the same as the source.  The newly created dataset maintains a
@@ -568,12 +569,18 @@ finish_progress(char *done)
  * the clone exists.
  *
  * The '-p' flag creates all the non-existing ancestors of the target first.
+ *
+ * The '-F' flag retries the zfs_mount() operation as long as zfs_mount() is
+ * still returning EBUSY.  Any callers which specify -F should be careful to
+ * ensure that no other process has a persistent hold on the mountpoint's
+ * directory.
  */
 static int
 zfs_do_clone(int argc, char **argv)
 {
 	zfs_handle_t *zhp = NULL;
 	boolean_t parents = B_FALSE;
+	boolean_t keeptrying = B_FALSE;
 	nvlist_t *props;
 	int ret;
 	int c;
@@ -582,8 +589,11 @@ zfs_do_clone(int argc, char **argv)
 		nomem();
 
 	/* check options */
-	while ((c = getopt(argc, argv, "o:p")) != -1) {
+	while ((c = getopt(argc, argv, "Fo:p")) != -1) {
 		switch (c) {
+		case 'F':
+			keeptrying = B_TRUE;
+			break;
 		case 'o':
 			if (parseprop(props))
 				return (1);
@@ -644,9 +654,14 @@ zfs_do_clone(int argc, char **argv)
 
 		clone = zfs_open(g_zfs, argv[1], ZFS_TYPE_DATASET);
 		if (clone != NULL) {
-			if (zfs_get_type(clone) != ZFS_TYPE_VOLUME)
-				if ((ret = zfs_mount(clone, NULL, 0)) == 0)
+			if (zfs_get_type(clone) != ZFS_TYPE_VOLUME) {
+				while ((ret = zfs_mount(clone, NULL, 0)) != 0) {
+					if (!keeptrying || errno != EBUSY)
+						break;
+				}
+				if (ret == 0)
 					ret = zfs_share(clone);
+			}
 			zfs_close(clone);
 		}
 	}
