@@ -34,7 +34,6 @@ DOCFILES= \
 	COMPATIBILITY \
 	OBSOLETE \
 	shell_styleguide.docbook \
-	shell_styleguide.html \
 	images/tag_bourne.png \
 	images/tag_i18n.png \
 	images/tag_ksh88.png \
