@@ -2964,6 +2964,8 @@ const mdb_dcmd_t mdb_dcmd_builtins[] = {
 	{ "print", "?[-aCdhiLptx] [-c lim] [-l lim] [type] [member|offset ...]",
 	    "print the contents of a data structure", cmd_print, print_help,
 	    cmd_print_tab },
+	{ "printf", "?format type member ...", "print and format the "
+	    "member(s) of a data structure", cmd_printf, printf_help },
 	{ "regs", NULL, "print general purpose registers", cmd_notsup },
 	{ "set", "[-wF] [+/-o opt] [-s dist] [-I path] [-L path] [-P prompt]",
 	    "get/set debugger properties", cmd_set },
