@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2010 Joyent, Inc.  All rights reserved.
+# Copyright (c) 2012, Joyent, Inc. All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -80,8 +80,8 @@ PDS_NAME=`mount | nawk -v p=$dname '{if ($1 == p) print $3}'`
 # created the dataset.
 
 zfs snapshot $PDS_NAME/${TMPLZONE}@${bname}
-zfs clone -o quota=${ZQUOTA}g $PDS_NAME/${TMPLZONE}@${bname} \
-    $PDS_NAME/$bname
+zfs clone -F -o quota=${ZQUOTA}g $PDS_NAME/${TMPLZONE}@${bname} \
+    $PDS_NAME/$bname || fatal "failed to clone zone dataset"
 
 if [ ! -d ${ZONEPATH}/config ]; then
     mkdir -p ${ZONEPATH}/config

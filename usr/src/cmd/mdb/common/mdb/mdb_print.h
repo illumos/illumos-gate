@@ -23,6 +23,9 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ */
 #ifndef	_MDB_PRINT_H
 #define	_MDB_PRINT_H
 
@@ -40,6 +43,8 @@ extern int cmd_list(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int cmd_array(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int cmd_print(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern void print_help(void);
+extern int cmd_printf(uintptr_t, uint_t, int, const mdb_arg_t *);
+extern void printf_help(void);
 
 #endif	/* _MDB */
 

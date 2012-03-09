@@ -24,6 +24,9 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ */
 #include <sys/elf.h>
 #include <sys/elf_SPARC.h>
 
@@ -2938,6 +2941,8 @@ const mdb_dcmd_t mdb_dcmd_builtins[] = {
 	    "or union member", cmd_offsetof },
 	{ "print", "?[-aCdhiLptx] [-c lim] [-l lim] [type] [member|offset ...]",
 	    "print the contents of a data structure", cmd_print, print_help },
+	{ "printf", "?[format] [type] [member ... ]", "print and format the "
+	    "member(s) of a data structure", cmd_printf, printf_help },
 	{ "regs", NULL, "print general purpose registers", cmd_notsup },
 	{ "set", "[-wF] [+/-o opt] [-s dist] [-I path] [-L path] [-P prompt]",
 	    "get/set debugger properties", cmd_set },

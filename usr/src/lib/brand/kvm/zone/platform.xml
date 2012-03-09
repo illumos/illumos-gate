@@ -45,10 +45,6 @@
 	    opt="ro,nodevices" type="lofs" />
 
 	<!-- Local filesystems to mount when booting the zone -->
-	<mount special="/proc" directory="/proc" type="proc" />
-	<mount special="ctfs" directory="/system/contract" type="ctfs" />
-	<mount special="mnttab" directory="/etc/mnttab" type="mntfs" />
-	<mount special="objfs" directory="/system/object" type="objfs" />
 	<mount special="swap" directory="/etc/svc/volatile" type="tmpfs" />
 
 	<!-- Devices to create under /dev -->
