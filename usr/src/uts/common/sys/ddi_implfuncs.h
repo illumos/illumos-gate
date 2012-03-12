@@ -23,6 +23,9 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ */
 
 #ifndef _SYS_DDI_IMPLFUNCS_H
 #define	_SYS_DDI_IMPLFUNCS_H
@@ -73,12 +76,6 @@ i_ddi_mem_alloc(dev_info_t *dip, ddi_dma_attr_t *attributes,
 	size_t length, int cansleep, int streaming,
 	ddi_device_acc_attr_t *accattrp, caddr_t *kaddrp,
 	size_t *real_length, ddi_acc_hdl_t *handlep);
-
-int
-i_ddi_mem_alloc_lim(dev_info_t *dip, ddi_dma_lim_t *limits,
-	size_t length, int cansleep, int streaming,
-	ddi_device_acc_attr_t *accattrp, caddr_t *kaddrp,
-	uint_t *real_length, ddi_acc_hdl_t *handlep);
 
 void
 i_ddi_mem_free(caddr_t kaddr, ddi_acc_hdl_t *ap);

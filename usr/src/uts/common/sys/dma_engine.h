@@ -19,6 +19,11 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ */
+
 /*
  * Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -33,8 +38,6 @@
 
 #ifndef	_SYS_DMAENGINE_H
 #define	_SYS_DMAENGINE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/dditypes.h>
@@ -232,9 +235,8 @@ int ddi_dmae_1stparty(dev_info_t *dip, int chnl);
  * ddi_dmae_prog() can have dmaereqp set to NULL if only the address and
  * count have to be updated.
  *
- * cookiep - pointer to a ddi_dma_cookie object obtained from
- * ddi_dma_segtocookie(),  which contains address, count and intermediate
- * memory mapping information.
+ * cookiep - pointer to a ddi_dma_cookie object which contains address,
+ * count and intermediate memory mapping information.
  */
 
 int ddi_dmae_prog(dev_info_t *dip, struct ddi_dmae_req *dmaereqp,

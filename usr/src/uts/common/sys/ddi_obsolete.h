@@ -2,6 +2,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ */
 
 #ifndef	_SYS_DDI_OBSOLETE_H
 #define	_SYS_DDI_OBSOLETE_H
@@ -33,38 +36,9 @@ int ddi_iomin(dev_info_t *dip, int initial, int streaming);
 extern long strtol(const char *, char **, int);
 extern unsigned long strtoul(const char *, char **, int);
 
-int ddi_dma_setup(dev_info_t *dip, struct ddi_dma_req *dmareqp,
-    ddi_dma_handle_t *handlep);
-int ddi_dma_addr_setup(dev_info_t *dip, struct as *as, caddr_t addr, size_t len,
-    uint_t flags, int (*waitfp)(), caddr_t arg, ddi_dma_lim_t *limits,
-    ddi_dma_handle_t *handlep);
-int ddi_dma_buf_setup(dev_info_t *dip, struct buf *bp, uint_t flags,
-    int (*waitfp)(), caddr_t arg, ddi_dma_lim_t *limits,
-    ddi_dma_handle_t *handlep);
-int ddi_dma_kvaddrp(ddi_dma_handle_t, off_t, size_t, caddr_t *);
-int ddi_dma_htoc(ddi_dma_handle_t handle, off_t off, ddi_dma_cookie_t *cookiep);
-int ddi_dma_coff(ddi_dma_handle_t handle, ddi_dma_cookie_t *cookiep,
-    off_t *offp);
-int ddi_dma_curwin(ddi_dma_handle_t handle, off_t *offp, size_t *lenp);
-int ddi_dma_nextwin(ddi_dma_handle_t, ddi_dma_win_t, ddi_dma_win_t *);
-int ddi_dma_nextseg(ddi_dma_win_t, ddi_dma_seg_t, ddi_dma_seg_t *);
-int ddi_dma_segtocookie(ddi_dma_seg_t, off_t *, off_t *, ddi_dma_cookie_t *);
-int ddi_dma_free(ddi_dma_handle_t handle);
-int ddi_iopb_alloc(dev_info_t *dip, ddi_dma_lim_t *limits, uint_t length,
-    caddr_t *iopbp);
-void ddi_iopb_free(caddr_t iopb);
-int ddi_mem_alloc(dev_info_t *dip, ddi_dma_lim_t *limits, uint_t length,
-    uint_t flags, caddr_t *kaddrp, uint_t *real_length);
-void ddi_mem_free(caddr_t kaddr);
-int ddi_dma_get_attr(ddi_dma_handle_t handle, ddi_dma_attr_t *attrp);
-int ddi_dma_devalign(ddi_dma_handle_t handle, uint_t *alignment,
-    uint_t *mineffect);
-void ddi_dmalim_merge(ddi_dma_lim_t *limit, ddi_dma_lim_t *modifier);
-
-#if defined(__sparc)
-int ddi_dma_movwin(ddi_dma_handle_t, off_t *offp, size_t *lenp,
-    ddi_dma_cookie_t *);
-#endif
+/* we'd really like to remove this; unbundled  nexus drivers might have it */
+int ddi_dma_map(dev_info_t *dip, dev_info_t *rdip,
+    struct ddi_dma_req *dmareqp, ddi_dma_handle_t *handlep);
 
 uint8_t ddi_mem_get8(ddi_acc_handle_t handle, uint8_t *host_addr);
 uint16_t ddi_mem_get16(ddi_acc_handle_t handle, uint16_t *host_addr);

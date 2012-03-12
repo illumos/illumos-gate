@@ -10,6 +10,7 @@
 #
 
 # Copyright 2011, Richard Lowe
+# Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
 
 file path=usr/share/man/man9f/ASSERT.9f
 file path=usr/share/man/man9f/Intro.9f
@@ -316,29 +317,16 @@ file path=usr/share/man/man9f/ddi_devid_unregister.9f
 file path=usr/share/man/man9f/ddi_devid_valid.9f
 file path=usr/share/man/man9f/ddi_devmap_segmap.9f
 file path=usr/share/man/man9f/ddi_dma_addr_bind_handle.9f
-file path=usr/share/man/man9f/ddi_dma_addr_setup.9f
 file path=usr/share/man/man9f/ddi_dma_alloc_handle.9f
 file path=usr/share/man/man9f/ddi_dma_buf_bind_handle.9f
-file path=usr/share/man/man9f/ddi_dma_buf_setup.9f
 file path=usr/share/man/man9f/ddi_dma_burstsizes.9f
-file path=usr/share/man/man9f/ddi_dma_coff.9f
-file path=usr/share/man/man9f/ddi_dma_curwin.9f
-file path=usr/share/man/man9f/ddi_dma_devalign.9f
-file path=usr/share/man/man9f/ddi_dma_free.9f
 file path=usr/share/man/man9f/ddi_dma_free_handle.9f
-file path=usr/share/man/man9f/ddi_dma_get_attr.9f
 file path=usr/share/man/man9f/ddi_dma_getwin.9f
-file path=usr/share/man/man9f/ddi_dma_htoc.9f
 file path=usr/share/man/man9f/ddi_dma_mem_alloc.9f
 file path=usr/share/man/man9f/ddi_dma_mem_free.9f
-file path=usr/share/man/man9f/ddi_dma_movwin.9f
 file path=usr/share/man/man9f/ddi_dma_nextcookie.9f
-file path=usr/share/man/man9f/ddi_dma_nextseg.9f
-file path=usr/share/man/man9f/ddi_dma_nextwin.9f
 file path=usr/share/man/man9f/ddi_dma_numwin.9f
-file path=usr/share/man/man9f/ddi_dma_segtocookie.9f
 file path=usr/share/man/man9f/ddi_dma_set_sbus64.9f
-file path=usr/share/man/man9f/ddi_dma_setup.9f
 file path=usr/share/man/man9f/ddi_dma_sync.9f
 file path=usr/share/man/man9f/ddi_dma_unbind_handle.9f
 file path=usr/share/man/man9f/ddi_dmae.9f
@@ -450,12 +438,8 @@ file path=usr/share/man/man9f/ddi_io_rep_putb.9f
 file path=usr/share/man/man9f/ddi_io_rep_putl.9f
 file path=usr/share/man/man9f/ddi_io_rep_putw.9f
 file path=usr/share/man/man9f/ddi_iomin.9f
-file path=usr/share/man/man9f/ddi_iopb_alloc.9f
-file path=usr/share/man/man9f/ddi_iopb_free.9f
 file path=usr/share/man/man9f/ddi_log_sysevent.9f
 file path=usr/share/man/man9f/ddi_map_regs.9f
-file path=usr/share/man/man9f/ddi_mem_alloc.9f
-file path=usr/share/man/man9f/ddi_mem_free.9f
 file path=usr/share/man/man9f/ddi_mem_get16.9f
 file path=usr/share/man/man9f/ddi_mem_get32.9f
 file path=usr/share/man/man9f/ddi_mem_get64.9f

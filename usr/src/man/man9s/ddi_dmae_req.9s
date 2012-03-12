@@ -1,9 +1,10 @@
 '\" te
 .\" Copyright (c) 2004, Sun Microsystems, Inc., All Rights Reserved
+.\" Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_DMAE_REQ 9S "Nov 18, 2004"
+.TH DDI_DMAE_REQ 9S "Feb 06, 2012"
 .SH NAME
 ddi_dmae_req \- DMA engine request structure
 .SH SYNOPSIS
@@ -106,9 +107,8 @@ Under the second option, the driver chooses to use the chaining feature, in
 which case, (a) it should leave the size of the scatter/gather list alone, and
 (b) it must set the \fBDMAE_BUF_CHAIN\fR flag in the \fBddi_dmae_req\fR
 structure. Before calling \fBddi_dmae_prog()\fR, the driver must \fIprefetch\fR
-cookies by repeatedly calling \fBddi_dma_nextseg\fR(9F) and
-\fBddi_dma_segtocookie\fR(9F) until either (1) the end of the DMA window is
-reached (\fBddi_dma_nextseg\fR(9F) returns \fBNULL\fR), or (2) the size of the
+cookies until either (1) the end of the DMA window is
+reached, or (2) the size of the
 scatter/gather list is reached, whichever occurs first. These cookies must be
 saved by the driver until they are requested by the nexus driver calling the
 driver's \fBnextcookie\fR routine. The driver's \fBnextcookie\fR routine must
@@ -148,8 +148,8 @@ number of segments remaining in the window.
 .el o
 Second, on some bus architectures, the driver's \fBnextcookie\fR routine can be
 called from a high-level interrupt routine. If the cookies were not prefetched,
-the \fBnextcookie\fR routine would have to call \fBddi_dma_nextseg()\fR and
-\fBddi_dma_segtocookie()\fR from a high-level interrupt routine, which is not
+the \fBnextcookie\fR routine would have to call \fBDMA\fR functions
+from a high-level interrupt routine, which is not
 recommended.
 .RE
 When breaking a \fBDMA\fR window into segments, the system arranges for the end
@@ -223,5 +223,5 @@ Architecture	x86
 .SH SEE ALSO
 .sp
 .LP
-\fBisa\fR(4), \fBattributes\fR(5), \fBddi_dma_segtocookie\fR(9F),
+\fBisa\fR(4), \fBattributes\fR(5),
 \fBddi_dmae\fR(9F), \fBddi_dma_lim_x86\fR(9S), \fBddi_dma_req\fR(9S)

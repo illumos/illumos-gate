@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  */
 
 /*
@@ -112,7 +113,7 @@ struct bus_ops usba_hubdi_busops =	{
 	NULL,				/* bus_add_intrspec */
 	NULL,				/* bus_remove_intrspec */
 	usba_hubdi_map_fault,		/* bus_map_fault */
-	ddi_dma_map,			/* bus_dma_map */
+	NULL,				/* bus_dma_map */
 	ddi_dma_allochdl,
 	ddi_dma_freehdl,
 	ddi_dma_bindhdl,

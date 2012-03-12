@@ -1,9 +1,10 @@
 '\" te
 .\"  Copyright (c) 2006 Sun Microsystems, Inc.  All Rights Reserved.
+.\"  Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_DMAE 9F "Apr 04, 2006"
+.TH DDI_DMAE 9F "Feb 02, 2012"
 .SH NAME
 ddi_dmae, ddi_dmae_alloc, ddi_dmae_release, ddi_dmae_prog, ddi_dmae_disable,
 ddi_dmae_enable, ddi_dmae_stop, ddi_dmae_getcnt, ddi_dmae_1stparty,
@@ -139,8 +140,8 @@ A pointer to a \fBDMA\fR engine request structure. See \fBddi_dmae_req\fR(9S).
 \fB\fIcookiep\fR\fR
 .ad
 .RS 12n
-A pointer to a \fBddi_dma_cookie\fR(9S) object, obtained from
-\fBddi_dma_segtocookie\fR(9F), which contains the address and count.
+A pointer to a \fBddi_dma_cookie\fR(9S) object, 
+which contains the address and count.
 .RE
 
 .sp
@@ -185,8 +186,7 @@ functions:
 If the device is capable of acting as a true bus master, then the driver should
 program the device's \fBDMA\fR registers directly and not make use of the
 \fBDMA\fR engine functions described here. The driver should obtain the
-\fBDMA\fR address and count from \fBddi_dma_segtocookie\fR(9F). See
-\fBddi_dma_cookie\fR(9S) for a description of a \fBDMA\fR cookie.
+\fBDMA\fR address and count from \fBddi_dma_cookie\fR(9S).
 .RE
 
 .sp
@@ -254,15 +254,15 @@ count. Once the channel has been programmed, subsequent calls to
 no changes to the programming are required other than the address and count
 values. It disables the channel prior to setup, and enables the channel before
 returning. The \fBDMA\fR address and count are specified by passing
-\fBddi_dmae_prog()\fR a cookie obtained from \fBddi_dma_segtocookie\fR(9F).
+\fBddi_dmae_prog()\fR a \fBDMA\fR cookie.
 Other \fBDMA\fR engine parameters are specified by the \fBDMA\fR engine request
 structure passed in through \fIdmaereqp\fR. The fields of that structure are
 documented in \fBddi_dmae_req\fR(9S).
 .sp
 .LP
 Before using \fBddi_dmae_prog()\fR, you must allocate system \fBDMA\fR
-resources using \fBDMA\fR setup functions such as \fBddi_dma_buf_setup\fR(9F).
-\fBddi_dma_segtocookie\fR(9F) can then be used to retrieve a cookie which
+resources using \fBDMA\fR setup functions such as \fBddi_dma_mem_alloc\fR(9F).
+\fBddi_dma_addr_bind_handle\fR(9F) can then be used to retrieve a cookie which
 contains the address and count. Then this cookie is passed to
 \fBddi_dmae_prog()\fR.
 .SS "\fBddi_dmae_disable()\fR"
@@ -299,7 +299,7 @@ When operating in \fBddi_dmae_1stparty()\fR mode, the  \fBDMA\fR channel must
 first be allocated using \fBddi_dmae_alloc()\fR and then configured using
 \fBddi_dmae_1stparty()\fR. The driver then programs the device to perform the
 I/O, including the necessary \fBDMA\fR address and count values obtained from
-\fBddi_dma_segtocookie\fR(9F).
+the \fBddi_dma_cookie\fR(9S).
 .SS "\fBddi_dmae_getlim()\fR"
 .sp
 .LP
@@ -313,8 +313,7 @@ engine. Drivers for devices that perform their own bus mastering or use
 first-party \fBDMA\fR must create and initialize their own \fBDMA\fR limit
 structures; they should not use \fBddi_dmae_getlim()\fR. The \fBDMA\fR limit
 structure must be passed to the \fBDMA\fR setup routines so that they will know
-how to break the \fBDMA\fR request into windows and segments (see
-\fBddi_dma_nextseg\fR(9F) and \fBddi_dma_nextwin\fR(9F)). If the device has any
+how to break the \fBDMA\fR request into windows.  If the device has any
 particular restrictions on transfer size or granularity (such as the size of
 disk sector), the driver should further restrict the values in the structure
 members before passing them to the \fBDMA\fR setup routines. The driver must
@@ -393,7 +392,6 @@ Architecture	x86
 .LP
 \fBisa\fR(4), \fBattributes\fR(5), \fBddi_dma_buf_setup\fR(9F),
 \fBddi_dma_getwin\fR(9F), \fBddi_dma_nextcookie\fR(9F),
-\fBddi_dma_nextseg\fR(9F), \fBddi_dma_nextwin\fR(9F),
-\fBddi_dma_segtocookie\fR(9F), \fBddi_dma_setup\fR(9F), \fBddi_dma_attr\fR(9S),
+\fBddi_dma_mem_alloc\fR(9F), \fBddi_dma_addr_bind_handle\fR(9F), \fBddi_dma_attr\fR(9S),
 \fBddi_dma_cookie\fR(9S), \fBddi_dma_lim_x86\fR(9S), \fBddi_dma_req\fR(9S),
 \fBddi_dmae_req\fR(9S)

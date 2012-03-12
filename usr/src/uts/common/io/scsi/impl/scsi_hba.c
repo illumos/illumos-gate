@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  */
 
 #include <sys/note.h>
@@ -293,7 +294,7 @@ static struct bus_ops scsi_hba_busops = {
 	NULL,				/* bus_add_intrspec */
 	NULL,				/* bus_remove_intrspec */
 	scsi_hba_map_fault,		/* bus_map_fault */
-	ddi_dma_map,			/* bus_dma_map */
+	NULL,				/* bus_dma_map */
 	ddi_dma_allochdl,		/* bus_dma_allochdl */
 	ddi_dma_freehdl,		/* bus_dma_freehdl */
 	ddi_dma_bindhdl,		/* bus_dma_bindhdl */

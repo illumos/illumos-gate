@@ -20,10 +20,8 @@
  */
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
- */
-
-/*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1680,7 +1678,7 @@ bd_mod_init(struct dev_ops *devops)
 		NULL,			/* bus_add_intrspec (OBSOLETE) */
 		NULL,			/* bus_remove_intrspec (OBSOLETE) */
 		i_ddi_map_fault,	/* bus_map_fault */
-		ddi_dma_map,		/* bus_dma_map */
+		NULL,			/* bus_dma_map (OBSOLETE) */
 		ddi_dma_allochdl,	/* bus_dma_allochdl */
 		ddi_dma_freehdl,	/* bus_dma_freehdl */
 		ddi_dma_bindhdl,	/* bus_dma_bindhdl */

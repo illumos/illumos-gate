@@ -1,9 +1,10 @@
 '\" te
+.\" Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
 .\" Copyright (c) 2005, Sun Microsystems, Inc., All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH INTRO 9F "Mar 11, 2008"
+.TH INTRO 9F "Feb 06, 2012"
 .SH NAME
 Intro, intro \- introduction to DDI/DKI functions
 .SH DESCRIPTION
@@ -351,29 +352,16 @@ _
 \fBddi_device_zero\fR	Solaris DDI
 \fBddi_devmap_segmap\fR	Solaris DDI
 \fBddi_dma_addr_bind_handle\fR	Solaris DDI
-\fBddi_dma_addr_setup\fR	Solaris DDI
 \fBddi_dma_alloc_handle\fR	Solaris DDI
 \fBddi_dma_buf_bind_handle\fR	Solaris DDI
-\fBddi_dma_buf_setup\fR	Solaris DDI
 \fBddi_dma_burstsizes\fR	Solaris DDI
-\fBddi_dma_coff\fR	Solaris SPARC DDI
-\fBddi_dma_curwin\fR	Solaris SPARC DDI
-\fBddi_dma_devalign\fR	Solaris DDI
-\fBddi_dma_free\fR	Solaris DDI
 \fBddi_dma_free_handle\fR	Solaris DDI
 \fBddi_dma_getwin\fR	Solaris DDI
-\fBddi_dma_get_attr\fR	Solaris DDI
-\fBddi_dma_htoc\fR	Solaris SPARC DDI
 \fBddi_dma_mem_alloc\fR	Solaris DDI
 \fBddi_dma_mem_free\fR	Solaris DDI
-\fBddi_dma_movwin\fR	Solaris SPARC DDI
 \fBddi_dma_nextcookie\fR	Solaris DDI
-\fBddi_dma_nextseg\fR	Solaris DDI
-\fBddi_dma_nextwin\fR	Solaris DDI
 \fBddi_dma_numwin\fR	Solaris DDI
-\fBddi_dma_segtocookie\fR	Solaris DDI
 \fBddi_dma_set_sbus64\fR	Solaris DDI
-\fBddi_dma_setup\fR	Solaris DDI
 \fBddi_dma_sync\fR	Solaris DDI
 \fBddi_dma_unbind_handle\fR	Solaris DDI
 \fBddi_dmae\fR	Solaris x86 DDI
@@ -475,16 +463,12 @@ _
 \fBddi_io_rep_putl\fR	Solaris DDI
 \fBddi_io_rep_putw\fR	Solaris DDI
 \fBddi_iomin\fR	Solaris DDI
-\fBddi_iopb_alloc\fR	Solaris DDI
-\fBddi_iopb_free\fR	Solaris DDI
 \fBddi_log_sysevent\fR	Solaris DDI
 \fBddi_map_regs\fR	Solaris DDI
 \fBddi_mapdev\fR	Solaris DDI
 \fBddi_mapdev_intercept\fR	Solaris DDI
 \fBddi_mapdev_nointercept\fR	Solaris DDI
 \fBddi_mapdev_set_device_acc_attr\fR	Solaris DDI
-\fBddi_mem_alloc\fR	Solaris DDI
-\fBddi_mem_free\fR	Solaris DDI
 \fBddi_mem_get16\fR	Solaris DDI
 \fBddi_mem_get32\fR	Solaris DDI
 \fBddi_mem_get64\fR	Solaris DDI

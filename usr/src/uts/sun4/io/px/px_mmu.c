@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  */
 
 /*
@@ -257,7 +258,7 @@ px_mmu_unmap_pages(px_mmu_t *mmu_p, ddi_dma_impl_t *mp, px_dvma_addr_t dvma_pg,
 
 /*
  * px_mmu_map_window - map a dvma window into the mmu
- * used by: px_dma_win(), px_dma_ctlops() - DDI_DMA_MOVWIN, DDI_DMA_NEXTWIN
+ * used by: px_dma_win()
  * return value: none
  */
 /*ARGSUSED*/

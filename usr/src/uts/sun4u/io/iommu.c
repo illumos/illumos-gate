@@ -22,6 +22,9 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -59,12 +62,7 @@
 #define	IOMMU_DMAMCTL_SYNC_DEBUG	0x8
 #define	IOMMU_DMAMCTL_HTOC_DEBUG	0x10
 #define	IOMMU_DMAMCTL_KVADDR_DEBUG	0x20
-#define	IOMMU_DMAMCTL_NEXTWIN_DEBUG	0x40
-#define	IOMMU_DMAMCTL_NEXTSEG_DEBUG	0x80
-#define	IOMMU_DMAMCTL_MOVWIN_DEBUG	0x100
-#define	IOMMU_DMAMCTL_REPWIN_DEBUG	0x200
 #define	IOMMU_DMAMCTL_GETERR_DEBUG	0x400
-#define	IOMMU_DMAMCTL_COFF_DEBUG	0x800
 #define	IOMMU_DMAMCTL_DMA_FREE_DEBUG	0x1000
 #define	IOMMU_REGISTERS_DEBUG		0x2000
 #define	IOMMU_DMA_SETUP_DEBUG		0x4000
@@ -1304,85 +1302,6 @@ iommu_map_window(ddi_dma_impl_t *mp, off_t newoff, size_t winsize)
 
 }
 
-int
-iommu_dma_map(dev_info_t *dip, dev_info_t *rdip,
-    struct ddi_dma_req *dmareq, ddi_dma_handle_t *handlep)
-{
-	ddi_dma_lim_t *dma_lim = dmareq->dmar_limits;
-	ddi_dma_impl_t *mp;
-	ddi_dma_attr_t *dma_attr;
-	struct dma_impl_priv *mppriv;
-	ioaddr_t addrlow, addrhigh;
-	ioaddr_t segalign;
-	int rval;
-	struct sbus_soft_state *softsp =
-	    (struct sbus_soft_state *)ddi_get_soft_state(sbusp,
-	    ddi_get_instance(dip));
-
-	addrlow = dma_lim->dlim_addr_lo;
-	addrhigh = dma_lim->dlim_addr_hi;
-	if ((addrhigh <= addrlow) ||
-	    (addrhigh < (ioaddr_t)softsp->iommu_dvma_base)) {
-		return (DDI_DMA_NOMAPPING);
-	}
-
-	/*
-	 * Setup DMA burstsizes and min-xfer counts.
-	 */
-	(void) iommu_dma_lim_setup(dip, rdip, softsp, &dma_lim->dlim_burstsizes,
-	    (uint_t)dma_lim->dlim_burstsizes, &dma_lim->dlim_minxfer,
-	    dmareq->dmar_flags);
-
-	if (dma_lim->dlim_burstsizes == 0)
-		return (DDI_DMA_NOMAPPING);
-	/*
-	 * If not an advisory call, get a DMA handle
-	 */
-	if (!handlep) {
-		return (DDI_DMA_MAPOK);
-	}
-
-	mppriv = kmem_zalloc(sizeof (*mppriv),
-	    (dmareq->dmar_fp == DDI_DMA_SLEEP) ? KM_SLEEP : KM_NOSLEEP);
-	if (mppriv == NULL) {
-		if (dmareq->dmar_fp != DDI_DMA_DONTWAIT) {
-			ddi_set_callback(dmareq->dmar_fp,
-			    dmareq->dmar_arg, &softsp->dvma_call_list_id);
-		}
-		return (DDI_DMA_NORESOURCES);
-	}
-	mp = (ddi_dma_impl_t *)mppriv;
-	mp->dmai_rdip = rdip;
-	mp->dmai_rflags = dmareq->dmar_flags & DMP_DDIFLAGS;
-	mp->dmai_minxfer = dma_lim->dlim_minxfer;
-	mp->dmai_burstsizes = dma_lim->dlim_burstsizes;
-	mp->dmai_offset = 0;
-	mp->dmai_ndvmapages = 0;
-	mp->dmai_minfo = 0;
-	mp->dmai_inuse = 0;
-	segalign = dma_lim->dlim_cntr_max;
-	/* See if the DMA engine has any limit restrictions. */
-	if (segalign == UINT32_MAX && addrhigh == UINT32_MAX &&
-	    addrlow == 0) {
-		mp->dmai_rflags |= DMP_NOLIMIT;
-	}
-	mppriv->softsp = softsp;
-	mppriv->phys_sync_flag = va_to_pa((caddr_t)&mppriv->sync_flag);
-	dma_attr = &mp->dmai_attr;
-	dma_attr->dma_attr_align = 1;
-	dma_attr->dma_attr_addr_lo = addrlow;
-	dma_attr->dma_attr_addr_hi = addrhigh;
-	dma_attr->dma_attr_seg = segalign;
-	dma_attr->dma_attr_burstsizes = dma_lim->dlim_burstsizes;
-	rval = iommu_dma_bindhdl(dip, rdip, (ddi_dma_handle_t)mp,
-	    dmareq, NULL, NULL);
-	if (rval && (rval != DDI_DMA_PARTIAL_MAP)) {
-		kmem_free(mppriv, sizeof (*mppriv));
-	} else {
-		*handlep = (ddi_dma_handle_t)mp;
-	}
-	return (rval);
-}
 
 /*ARGSUSED*/
 int
@@ -1390,57 +1309,11 @@ iommu_dma_mctl(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_handle_t handle, enum ddi_dma_ctlops request,
     off_t *offp, size_t *lenp, caddr_t *objp, uint_t cache_flags)
 {
-	ioaddr_t addr;
-	uint_t offset;
 	pgcnt_t npages;
-	size_t size;
-	ddi_dma_cookie_t *cp;
 	ddi_dma_impl_t *mp = (ddi_dma_impl_t *)handle;
 
 	DPRINTF(IOMMU_DMAMCTL_DEBUG, ("dma_mctl: handle %p ", (void *)mp));
 	switch (request) {
-	case DDI_DMA_FREE:
-	{
-		struct dma_impl_priv *mppriv = (struct dma_impl_priv *)mp;
-		struct sbus_soft_state *softsp = mppriv->softsp;
-		ASSERT(softsp != NULL);
-
-		/*
-		 * 'Free' the dma mappings.
-		 */
-		addr = (ioaddr_t)(mp->dmai_mapping & ~IOMMU_PAGEOFFSET);
-		npages = mp->dmai_ndvmapages;
-		size = iommu_ptob(npages);
-
-		DPRINTF(IOMMU_DMAMCTL_DMA_FREE_DEBUG, ("iommu_dma_mctl dmafree:"
-		    "freeing vaddr %x for %x pages.\n", addr,
-		    mp->dmai_ndvmapages));
-		/* sync the entire object */
-		if (!(mp->dmai_rflags & DDI_DMA_CONSISTENT)) {
-			/* flush stream write buffers */
-			sync_stream_buf(softsp, addr, npages,
-			    (int *)&mppriv->sync_flag, mppriv->phys_sync_flag);
-		}
-
-#if defined(DEBUG) && defined(IO_MEMDEBUG)
-		iommu_remove_mappings(mp);
-#endif /* DEBUG && IO_MEMDEBUG */
-
-		ASSERT(npages > (uint_t)0);
-		if (mp->dmai_rflags & DMP_NOLIMIT)
-			vmem_free(softsp->dvma_arena,
-			    (void *)(uintptr_t)addr, size);
-		else
-			vmem_xfree(softsp->dvma_arena,
-			    (void *)(uintptr_t)addr, size);
-
-		kmem_free(mppriv, sizeof (*mppriv));
-
-		if (softsp->dvma_call_list_id != 0)
-			ddi_run_callback(&softsp->dvma_call_list_id);
-
-		break;
-	}
 
 	case DDI_DMA_SET_SBUS64:
 	{
@@ -1450,203 +1323,6 @@ iommu_dma_mctl(dev_info_t *dip, dev_info_t *rdip,
 		    &mp->dmai_burstsizes, (uint_t)*lenp, &mp->dmai_minxfer,
 		    DDI_DMA_SBUS_64BIT));
 	}
-
-	case DDI_DMA_HTOC:
-		DPRINTF(IOMMU_DMAMCTL_HTOC_DEBUG, ("htoc off %lx mapping %lx "
-		    "size %x\n", *offp, mp->dmai_mapping,
-		    mp->dmai_size));
-
-		if ((uint_t)(*offp) >= mp->dmai_size)
-			return (DDI_FAILURE);
-
-		cp = (ddi_dma_cookie_t *)objp;
-		cp->dmac_notused = 0;
-		cp->dmac_address = (mp->dmai_mapping + (uint_t)(*offp));
-		cp->dmac_size =
-		    mp->dmai_mapping + mp->dmai_size - cp->dmac_address;
-		cp->dmac_type = 0;
-
-		break;
-
-	case DDI_DMA_KVADDR:
-		/*
-		 * If a physical address mapping has percolated this high,
-		 * that is an error (maybe?).
-		 */
-		if (mp->dmai_rflags & DMP_PHYSADDR) {
-			DPRINTF(IOMMU_DMAMCTL_KVADDR_DEBUG, ("kvaddr of phys "
-			    "mapping\n"));
-			return (DDI_FAILURE);
-		}
-
-		return (DDI_FAILURE);
-
-	case DDI_DMA_NEXTWIN:
-	{
-		ddi_dma_win_t *owin, *nwin;
-		uint_t winsize, newoff;
-		int rval;
-
-		DPRINTF(IOMMU_DMAMCTL_NEXTWIN_DEBUG, ("nextwin\n"));
-
-		mp = (ddi_dma_impl_t *)handle;
-		owin = (ddi_dma_win_t *)offp;
-		nwin = (ddi_dma_win_t *)objp;
-		if (mp->dmai_rflags & DDI_DMA_PARTIAL) {
-			if (*owin == NULL) {
-				DPRINTF(IOMMU_DMAMCTL_NEXTWIN_DEBUG,
-				    ("nextwin: win == NULL\n"));
-				mp->dmai_offset = 0;
-				*nwin = (ddi_dma_win_t)mp;
-				return (DDI_SUCCESS);
-			}
-
-			offset = (uint_t)(mp->dmai_mapping & IOMMU_PAGEOFFSET);
-			winsize = iommu_ptob(mp->dmai_ndvmapages -
-			    iommu_btopr(offset));
-
-			newoff = (uint_t)(mp->dmai_offset + winsize);
-			if (newoff > mp->dmai_object.dmao_size -
-			    mp->dmai_minxfer)
-				return (DDI_DMA_DONE);
-
-			if ((rval = iommu_map_window(mp, newoff, winsize))
-			    != DDI_SUCCESS)
-				return (rval);
-		} else {
-			DPRINTF(IOMMU_DMAMCTL_NEXTWIN_DEBUG, ("nextwin: no "
-			    "partial mapping\n"));
-			if (*owin != NULL)
-				return (DDI_DMA_DONE);
-			mp->dmai_offset = 0;
-			*nwin = (ddi_dma_win_t)mp;
-		}
-		break;
-	}
-
-	case DDI_DMA_NEXTSEG:
-	{
-		ddi_dma_seg_t *oseg, *nseg;
-
-		DPRINTF(IOMMU_DMAMCTL_NEXTSEG_DEBUG, ("nextseg:\n"));
-
-		oseg = (ddi_dma_seg_t *)lenp;
-		if (*oseg != NULL)
-			return (DDI_DMA_DONE);
-		nseg = (ddi_dma_seg_t *)objp;
-		*nseg = *((ddi_dma_seg_t *)offp);
-		break;
-	}
-
-	case DDI_DMA_SEGTOC:
-	{
-		ddi_dma_seg_impl_t *seg;
-
-		seg = (ddi_dma_seg_impl_t *)handle;
-		cp = (ddi_dma_cookie_t *)objp;
-		cp->dmac_notused = 0;
-		cp->dmac_address = (ioaddr_t)seg->dmai_mapping;
-		cp->dmac_size = *lenp = seg->dmai_size;
-		cp->dmac_type = 0;
-		*offp = seg->dmai_offset;
-		break;
-	}
-
-	case DDI_DMA_MOVWIN:
-	{
-		uint_t winsize;
-		uint_t newoff;
-		int rval;
-
-		offset = (uint_t)(mp->dmai_mapping & IOMMU_PAGEOFFSET);
-		winsize = iommu_ptob(mp->dmai_ndvmapages - iommu_btopr(offset));
-
-		DPRINTF(IOMMU_DMAMCTL_MOVWIN_DEBUG, ("movwin off %lx len %lx "
-		    "winsize %x\n", *offp, *lenp, winsize));
-
-		if ((mp->dmai_rflags & DDI_DMA_PARTIAL) == 0)
-			return (DDI_FAILURE);
-
-		if (*lenp != (uint_t)-1 && *lenp != winsize) {
-			DPRINTF(IOMMU_DMAMCTL_MOVWIN_DEBUG, ("bad length\n"));
-			return (DDI_FAILURE);
-		}
-		newoff = (uint_t)*offp;
-		if (newoff & (winsize - 1)) {
-			DPRINTF(IOMMU_DMAMCTL_MOVWIN_DEBUG, ("bad off\n"));
-			return (DDI_FAILURE);
-		}
-
-		if (newoff == mp->dmai_offset) {
-			/*
-			 * Nothing to do...
-			 */
-			break;
-		}
-
-		/*
-		 * Check out new address...
-		 */
-		if (newoff > mp->dmai_object.dmao_size - mp->dmai_minxfer) {
-			DPRINTF(IOMMU_DMAMCTL_MOVWIN_DEBUG, ("newoff out of "
-			    "range\n"));
-			return (DDI_FAILURE);
-		}
-
-		rval = iommu_map_window(mp, newoff, winsize);
-		if (rval != DDI_SUCCESS)
-			return (rval);
-
-		if ((cp = (ddi_dma_cookie_t *)objp) != 0) {
-			cp->dmac_notused = 0;
-			cp->dmac_address = (ioaddr_t)mp->dmai_mapping;
-			cp->dmac_size = mp->dmai_size;
-			cp->dmac_type = 0;
-		}
-		*offp = (off_t)newoff;
-		*lenp = (uint_t)winsize;
-		break;
-	}
-
-	case DDI_DMA_REPWIN:
-		if ((mp->dmai_rflags & DDI_DMA_PARTIAL) == 0) {
-			DPRINTF(IOMMU_DMAMCTL_REPWIN_DEBUG, ("repwin fail\n"));
-			return (DDI_FAILURE);
-		}
-
-		*offp = (off_t)mp->dmai_offset;
-
-		addr = mp->dmai_ndvmapages -
-		    iommu_btopr(mp->dmai_mapping & IOMMU_PAGEOFFSET);
-
-		*lenp = (uint_t)iommu_ptob(addr);
-
-		DPRINTF(IOMMU_DMAMCTL_REPWIN_DEBUG, ("repwin off %lx len %x\n",
-		    mp->dmai_offset, mp->dmai_size));
-
-		break;
-
-	case DDI_DMA_GETERR:
-		DPRINTF(IOMMU_DMAMCTL_GETERR_DEBUG,
-		    ("iommu_dma_mctl: geterr\n"));
-
-		break;
-
-	case DDI_DMA_COFF:
-		cp = (ddi_dma_cookie_t *)offp;
-		addr = cp->dmac_address;
-
-		if (addr < mp->dmai_mapping ||
-		    addr >= mp->dmai_mapping + mp->dmai_size)
-			return (DDI_FAILURE);
-
-		*objp = (caddr_t)(addr - mp->dmai_mapping);
-
-		DPRINTF(IOMMU_DMAMCTL_COFF_DEBUG, ("coff off %lx mapping %lx "
-		    "size %x\n", (ulong_t)*objp, mp->dmai_mapping,
-		    mp->dmai_size));
-
-		break;
 
 	case DDI_DMA_RESERVE:
 	{
