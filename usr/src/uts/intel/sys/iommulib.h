@@ -20,12 +20,11 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  */
 
 #ifndef	_SYS_IOMMULIB_H
 #define	_SYS_IOMMULIB_H
-
-#pragma ident	"@(#)iommulib.h	1.3	08/08/31 SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -45,10 +44,11 @@ typedef enum {
 typedef enum {
 	IOMMU_OPS_VERSION_INVALID = 0,
 	IOMMU_OPS_VERSION_1 = 1,
-	IOMMU_OPS_VERSION_2 = 2
+	IOMMU_OPS_VERSION_2 = 2,
+	IOMMU_OPS_VERSION_3 = 3
 } iommulib_opsversion_t;
 
-#define	IOMMU_OPS_VERSION IOMMU_OPS_VERSION_2
+#define	IOMMU_OPS_VERSION IOMMU_OPS_VERSION_3
 
 typedef struct iommulib_ops {
 	iommulib_opsversion_t	ilops_vers;
@@ -90,17 +90,6 @@ typedef struct iommulib_ops {
 	    dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t dma_handle,
 	    ddi_dma_obj_t *dmao);
 
-	/* Obsolete DMA routines */
-
-	int	(*ilops_dma_map)(iommulib_handle_t handle, dev_info_t *dip,
-	    dev_info_t *rdip, struct ddi_dma_req *dmareq,
-	    ddi_dma_handle_t *dma_handle);
-
-	int	(*ilops_dma_mctl)(iommulib_handle_t handle, dev_info_t *dip,
-	    dev_info_t *rdip, ddi_dma_handle_t dma_handle,
-	    enum ddi_dma_ctlops request, off_t *offp, size_t *lenp,
-	    caddr_t *objpp, uint_t cache_flags);
-
 } iommulib_ops_t;
 
 /*
@@ -130,10 +119,11 @@ typedef struct iommulib_ops {
 typedef enum {
 	IOMMU_NEXOPS_VERSION_INVALID = 0,
 	IOMMU_NEXOPS_VERSION_1 = 1,
-	IOMMU_NEXOPS_VERSION_2 = 2
+	IOMMU_NEXOPS_VERSION_2 = 2,
+	IOMMU_NEXOPS_VERSION_3 = 3
 } iommulib_nexops_version_t;
 
-#define	IOMMU_NEXOPS_VERSION IOMMU_NEXOPS_VERSION_2
+#define	IOMMU_NEXOPS_VERSION IOMMU_NEXOPS_VERSION_3
 
 typedef struct iommulib_nexops {
 	iommulib_nexops_version_t	nops_vers;
@@ -173,13 +163,6 @@ typedef struct iommulib_nexops {
 	int (*nops_dma_win)(dev_info_t *dip, dev_info_t *rdip,
 	    ddi_dma_handle_t handle, uint_t win, off_t *offp, size_t *lenp,
 	    ddi_dma_cookie_t *cookiep, uint_t *ccountp);
-
-	int (*nops_dma_map)(dev_info_t *dip, dev_info_t *rdip,
-	    struct ddi_dma_req *dmareq, ddi_dma_handle_t *handlep);
-
-	int (*nops_dma_mctl)(dev_info_t *dip, dev_info_t *rdip,
-	    ddi_dma_handle_t handle, enum ddi_dma_ctlops request, off_t *offp,
-	    size_t *lenp, caddr_t *objpp, uint_t cache_flags);
 
 	int (*nops_dmahdl_setprivate)(dev_info_t *dip, dev_info_t *rdip,
 	    ddi_dma_handle_t handle, void *priv);
@@ -255,13 +238,6 @@ int iommulib_nexdma_win(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_handle_t dma_handle, uint_t win, off_t *offp, size_t *lenp,
     ddi_dma_cookie_t *cookiep, uint_t *ccountp);
 
-int iommulib_nexdma_map(dev_info_t *dip, dev_info_t *rdip,
-    struct ddi_dma_req *dmareq, ddi_dma_handle_t *dma_handle);
-
-int iommulib_nexdma_mctl(dev_info_t *dip, dev_info_t *rdip,
-    ddi_dma_handle_t dma_handle, enum ddi_dma_ctlops request,
-    off_t *offp, size_t *lenp, caddr_t *objpp, uint_t cache_flags);
-
 int iommulib_nexdma_mapobject(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_handle_t dma_handle, struct ddi_dma_req *dmareq,
     ddi_dma_obj_t *dmao);
@@ -321,13 +297,6 @@ int iommulib_iommu_dma_sync(dev_info_t *dip, dev_info_t *rdip,
 int iommulib_iommu_dma_win(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_handle_t handle, uint_t win, off_t *offp, size_t *lenp,
     ddi_dma_cookie_t *cookiep, uint_t *ccountp);
-
-int iommulib_iommu_dma_map(dev_info_t *dip, dev_info_t *rdip,
-    struct ddi_dma_req *dmareq, ddi_dma_handle_t *handlep);
-
-int iommulib_iommu_dma_mctl(dev_info_t *dip, dev_info_t *rdip,
-    ddi_dma_handle_t handle, enum ddi_dma_ctlops request, off_t *offp,
-    size_t *lenp, caddr_t *objpp, uint_t cache_flags);
 
 int iommulib_iommu_dmahdl_setprivate(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_handle_t handle, void *priv);

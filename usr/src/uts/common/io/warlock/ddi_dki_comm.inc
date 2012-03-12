@@ -23,7 +23,9 @@
  * All rights reserved.  Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ */
 
 /*
  * ddi_dki_comm.inc - Part of a pseudo-kernel to use when analyzing drivers
@@ -188,22 +190,6 @@ ddi_dma_setup(
 }
 
 int
-ddi_dma_pp_setup(
-	dev_info_t *a,
-	struct page *b,
-	off_t c,
-	uint_t d,
-	uint_t e,
-	int (*fp)(),
-	caddr_t f,
-	ddi_dma_lim_t *g,
-	ddi_dma_handle_t *h)
-{
-	struct bus_ops *ops;
-	(*ops->bus_dma_map)(0, 0, 0, 0);
-}
-
-int
 ddi_dma_mctl(dev_info_t *a, dev_info_t *b, ddi_dma_handle_t c,
 	enum ddi_dma_ctlops d, off_t *e, size_t *f, caddr_t *g,
 	uint_t h)
@@ -228,35 +214,6 @@ ddi_dma_htoc(ddi_dma_handle_t h, off_t o, ddi_dma_cookie_t *c)
 
 int
 ddi_dma_coff(ddi_dma_handle_t h, ddi_dma_cookie_t *c, off_t *o)
-{
-	struct bus_ops *ops;
-	(*ops->bus_dma_ctl)(0, 0, 0, 0, 0, 0, 0, 0);
-}
-
-int
-ddi_dma_movwin(ddi_dma_handle_t h, off_t *o, size_t *l, ddi_dma_cookie_t *c)
-{
-	struct bus_ops *ops;
-	(*ops->bus_dma_ctl)(0, 0, 0, 0, 0, 0, 0, 0);
-}
-
-int
-ddi_dma_curwin(ddi_dma_handle_t h, off_t *o, size_t *l)
-{
-	struct bus_ops *ops;
-	(*ops->bus_dma_ctl)(0, 0, 0, 0, 0, 0, 0, 0);
-}
-
-int
-ddi_dma_nextwin(register ddi_dma_handle_t h, ddi_dma_win_t win,
-    ddi_dma_win_t *nwin)
-{
-	struct bus_ops *ops;
-	(*ops->bus_dma_ctl)(0, 0, 0, 0, 0, 0, 0, 0);
-}
-
-int
-ddi_dma_nextseg(ddi_dma_win_t win, ddi_dma_seg_t seg, ddi_dma_seg_t *nseg)
 {
 	struct bus_ops *ops;
 	(*ops->bus_dma_ctl)(0, 0, 0, 0, 0, 0, 0, 0);

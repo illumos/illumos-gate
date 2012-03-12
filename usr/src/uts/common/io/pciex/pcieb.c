@@ -21,6 +21,9 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ */
 
 /*
  * Common x86 and SPARC PCI-E to PCI bus bridge nexus driver
@@ -96,7 +99,7 @@ static struct bus_ops pcieb_bus_ops = {
 	0,
 	0,
 	i_ddi_map_fault,
-	ddi_dma_map,
+	0,
 	pcieb_dma_allochdl,
 	ddi_dma_freehdl,
 	ddi_dma_bindhdl,

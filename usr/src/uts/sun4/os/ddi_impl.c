@@ -23,6 +23,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ */
 
 /*
  * sun4 specific DDI implementation
@@ -1207,44 +1210,6 @@ i_ddi_mem_alloc(dev_info_t *dip, ddi_dma_attr_t *attr,
 		}
 		return (DDI_SUCCESS);
 	}
-}
-
-/*
- * covert old DMA limits structure to DMA attribute structure
- * and continue
- */
-int
-i_ddi_mem_alloc_lim(dev_info_t *dip, ddi_dma_lim_t *limits,
-    size_t length, int cansleep, int streaming,
-    ddi_device_acc_attr_t *accattrp, caddr_t *kaddrp,
-    uint_t *real_length, ddi_acc_hdl_t *ap)
-{
-	ddi_dma_attr_t dma_attr, *attrp;
-	size_t rlen;
-	int ret;
-
-	ASSERT(limits);
-	attrp = &dma_attr;
-	attrp->dma_attr_version = DMA_ATTR_V0;
-	attrp->dma_attr_addr_lo = (uint64_t)limits->dlim_addr_lo;
-	attrp->dma_attr_addr_hi = (uint64_t)limits->dlim_addr_hi;
-	attrp->dma_attr_count_max = (uint64_t)-1;
-	attrp->dma_attr_align = 1;
-	attrp->dma_attr_burstsizes = (uint_t)limits->dlim_burstsizes;
-	attrp->dma_attr_minxfer = (uint32_t)limits->dlim_minxfer;
-	attrp->dma_attr_maxxfer = (uint64_t)-1;
-	attrp->dma_attr_seg = (uint64_t)limits->dlim_cntr_max;
-	attrp->dma_attr_sgllen = 1;
-	attrp->dma_attr_granular = 1;
-	attrp->dma_attr_flags = 0;
-
-	ret = i_ddi_mem_alloc(dip, attrp, length, cansleep, streaming,
-	    accattrp, kaddrp, &rlen, ap);
-	if (ret == DDI_SUCCESS) {
-		if (real_length)
-			*real_length = (uint_t)rlen;
-	}
-	return (ret);
 }
 
 /* ARGSUSED */

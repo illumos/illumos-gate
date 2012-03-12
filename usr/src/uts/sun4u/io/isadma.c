@@ -22,6 +22,9 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ */
 
 
 #include <sys/conf.h>
@@ -90,7 +93,7 @@ static struct bus_ops isadma_bus_ops = {
 	NULL,
 	NULL,
 	i_ddi_map_fault,
-	ddi_dma_map,
+	NULL,
 	ddi_dma_allochdl,
 	ddi_dma_freehdl,
 	ddi_dma_bindhdl,
