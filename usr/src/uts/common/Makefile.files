@@ -25,7 +25,7 @@
 
 #
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
-# Copyright 2012 Joyent, Inc.  All rights reserved.
+# Copyright (c) 2012 Joyent, Inc.  All rights reserved.
 #
 
 #
@@ -1741,6 +1741,8 @@ WUSB_FWMOD_OBJS += wusb_fwmod.o
 IPF_OBJS += ip_fil_solaris.o fil.o solaris.o ip_state.o ip_frag.o ip_nat.o \
 	    ip_proxy.o ip_auth.o ip_pool.o ip_htable.o ip_lookup.o \
 	    ip_log.o misc.o ip_compat.o ip_nat6.o drand48.o
+
+IPD_OBJS += ipd.o
 
 IBD_OBJS +=	ibd.o ibd_cm.o
 

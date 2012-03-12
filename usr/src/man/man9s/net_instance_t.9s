@@ -1,9 +1,10 @@
 '\" te
 .\"  Copyright (c) 2008 Sun Microsystems, Inc. All Rights Reserved
+.\"  Copyright (c) 2012 Joyent, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NET_INSTANCE_T 9S "May 1, 2008"
+.TH NET_INSTANCE_T 9S "Mar 5, 2012"
 .SH NAME
 net_instance_t \- packet event structure passed through to hooks
 .SH SYNOPSIS
@@ -51,7 +52,8 @@ Name of the owner of the instance.
 \fB\fBnin_create\fR\fR
 .ad
 .RS 16n
-Function to be called when a new instance of \fBIP\fR is created.
+Function to be called when a new instance of \fBIP\fR is created. It may not
+return \fBNULL\fR.
 .RE
 
 .sp

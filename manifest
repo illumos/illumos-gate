@@ -585,6 +585,7 @@ f kernel/drv/amd64/intel_nhm 0755 root sys
 f kernel/drv/amd64/intel_nhmex 0755 root sys
 f kernel/drv/amd64/ip 0755 root sys
 f kernel/drv/amd64/ip6 0755 root sys
+f kernel/drv/amd64/ipd 0755 root sys
 f kernel/drv/amd64/ipnet 0755 root sys
 f kernel/drv/amd64/ippctl 0755 root sys
 f kernel/drv/amd64/iprb 0755 root sys
@@ -726,6 +727,7 @@ f kernel/drv/intel_nhm.conf 0644 root sys
 f kernel/drv/intel_nhmex.conf 0644 root sys
 f kernel/drv/ip.conf 0644 root sys
 f kernel/drv/ip6.conf 0644 root sys
+f kernel/drv/ipd.conf 0644 root sys
 f kernel/drv/ipnet.conf 0644 root sys
 f kernel/drv/ippctl.conf 0644 root sys
 f kernel/drv/ipsecah.conf 0644 root sys
@@ -10326,6 +10328,7 @@ s usr/sbin/installgrub=../../sbin/installgrub
 h usr/sbin/intrstat=usr/lib/isaexec
 f usr/sbin/ipaddrsel 0555 root bin
 s usr/sbin/ipadm=../../sbin/ipadm
+f usr/sbin/ipdadm 0555 root bin
 h usr/sbin/ipf=usr/lib/isaexec
 h usr/sbin/ipfs=usr/lib/isaexec
 h usr/sbin/ipfstat=usr/lib/isaexec
@@ -11825,6 +11828,7 @@ f usr/share/man/man1m/installgrub.1m 0444 root bin
 f usr/share/man/man1m/intrstat.1m 0444 root bin
 f usr/share/man/man1m/iostat.1m 0444 root bin
 f usr/share/man/man1m/ipaddrsel.1m 0444 root bin
+f usr/share/man/man1m/ipdadm.1m 0444 root bin
 f usr/share/man/man1m/ipf.1m 0444 root bin
 f usr/share/man/man1m/ipmpstat.1m 0444 root bin
 f usr/share/man/man1m/ipsecalgs.1m 0444 root bin
