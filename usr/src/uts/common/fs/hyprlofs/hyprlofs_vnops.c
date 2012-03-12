@@ -488,6 +488,7 @@ hyprlofs_loopback(vnode_t *dvp, vnode_t *rvp, char *nm, vattr_t *vap,
 
 /*
  * Create an in-memory directory based on the add-entry ioctl name.
+ * If the dir exists, return EEXIST but still also return node in vpp.
  */
 static int
 hyprlofs_mkdir(vnode_t *dvp, char *nm, vattr_t *va, vnode_t **vpp, cred_t *cr)
@@ -508,6 +509,7 @@ hyprlofs_mkdir(vnode_t *dvp, char *nm, vattr_t *va, vnode_t **vpp, cred_t *cr)
 	if (error == 0) {
 		ASSERT(self);
 		hlnode_rele(self);
+		*vpp = HLNTOV(self);
 		return (EEXIST);
 	}
 	if (error != ENOENT)
