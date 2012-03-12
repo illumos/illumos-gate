@@ -176,6 +176,10 @@ privilege PRIV_GRAPHICS_MAP
 	Allows a process to perform privileged mappings through a
 	graphics device.
 
+privilege PRIV_HYPRLOFS_CONTROL
+
+	Allows a process to manage hyprlofs entries.
+
 privilege PRIV_IPC_DAC_READ
 
 	Allows a process to read a System V IPC

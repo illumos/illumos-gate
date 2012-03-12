@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012, Joyent, Inc. All rights reserved.
 #
 
 include $(SRC)/uts/Makefile.uts
@@ -856,6 +857,8 @@ FSHDRS=				\
 	hsfs_rrip.h		\
 	hsfs_spec.h		\
 	hsfs_susp.h		\
+	hyprlofs.h		\
+	hyprlofs_info.h		\
 	lofs_info.h		\
 	lofs_node.h		\
 	mntdata.h		\

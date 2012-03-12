@@ -25,6 +25,7 @@
 
 #
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2012 Joyent, Inc.  All rights reserved.
 #
 
 #
@@ -242,6 +243,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/fs/fifofs/%.c
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/fs/hsfs/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/fs/hyprlofs/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -1737,6 +1742,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/fs/fifofs/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/fs/hsfs/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/fs/hyprlofs/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/fs/lofs/%.c

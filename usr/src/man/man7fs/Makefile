@@ -12,6 +12,7 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2012 Joyent, Inc. All rights reserved.
 #
 
 include ../../Makefile.master
@@ -24,6 +25,7 @@ MANFILES = 	ctfs.7fs	\
 	 	devfs.7fs	\
 		fd.7fs		\
 	 	hsfs.7fs	\
+	 	hyprlofs.7fs	\
 	 	lofs.7fs	\
 	 	objfs.7fs	\
 	 	pcfs.7fs	\

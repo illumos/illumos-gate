@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012, Joyent, Inc.  All rights reserved.
  *
  *	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
  *		All Rights Reserved
@@ -47,6 +48,7 @@ extern "C" {
 #define	MNTTYPE_PCFS	"pcfs"		/* PC (MSDOS) file system */
 #define	MNTTYPE_PC	MNTTYPE_PCFS	/* Deprecated name; use MNTTYPE_PCFS */
 #define	MNTTYPE_LOFS	"lofs"		/* Loop back file system */
+#define	MNTTYPE_HYPRLOFS "hyprlofs"	/* Hyperlofs file system */
 #define	MNTTYPE_LO	MNTTYPE_LOFS	/* Deprecated name; use MNTTYPE_LOFS */
 #define	MNTTYPE_HSFS	"hsfs"		/* High Sierra (9660) file system */
 #define	MNTTYPE_SWAP	"swap"		/* Swap file system */

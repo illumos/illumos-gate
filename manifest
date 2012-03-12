@@ -825,6 +825,7 @@ f kernel/fs/amd64/dev 0755 root sys
 f kernel/fs/amd64/devfs 0755 root sys
 f kernel/fs/amd64/fifofs 0755 root sys
 f kernel/fs/amd64/hsfs 0755 root sys
+f kernel/fs/amd64/hyprlofs 0755 root sys
 f kernel/fs/amd64/lofs 0755 root sys
 f kernel/fs/amd64/mntfs 0755 root sys
 f kernel/fs/amd64/namefs 0755 root sys
@@ -3637,6 +3638,8 @@ f usr/include/sys/fs/hsfs_node.h 0644 root bin
 f usr/include/sys/fs/hsfs_rrip.h 0644 root bin
 f usr/include/sys/fs/hsfs_spec.h 0644 root bin
 f usr/include/sys/fs/hsfs_susp.h 0644 root bin
+f usr/include/sys/fs/hyprlofs.h 0644 root bin
+f usr/include/sys/fs/hyprlofs_info.h 0644 root bin
 f usr/include/sys/fs/lofs_info.h 0644 root bin
 f usr/include/sys/fs/lofs_node.h 0644 root bin
 f usr/include/sys/fs/mntdata.h 0644 root bin
@@ -5356,6 +5359,9 @@ f usr/lib/fs/hsfs/fstyp.so.1 0555 root bin
 h usr/lib/fs/hsfs/fstyp=usr/sbin/fstyp
 f usr/lib/fs/hsfs/labelit 0555 root bin
 s usr/lib/fs/hsfs/mount=../../../../etc/fs/hsfs/mount
+d usr/lib/fs/hyprlofs 0755 root sys
+f usr/lib/fs/hyprlofs/hlcfg 0555 root bin
+f usr/lib/fs/hyprlofs/mount 0555 root bin
 d usr/lib/fs/lofs 0755 root sys
 f usr/lib/fs/lofs/mount 0555 root bin
 d usr/lib/fs/mntfs 0755 root sys
@@ -15214,6 +15220,7 @@ f usr/share/man/man7fs/dcfs.7fs 0444 root bin
 f usr/share/man/man7fs/dev.7fs 0444 root bin
 f usr/share/man/man7fs/devfs.7fs 0444 root bin
 f usr/share/man/man7fs/hsfs.7fs 0444 root bin
+f usr/share/man/man7fs/hyprlofs.7fs 0444 root bin
 f usr/share/man/man7fs/lofs.7fs 0444 root bin
 f usr/share/man/man7fs/objfs.7fs 0444 root bin
 f usr/share/man/man7fs/pcfs.7fs 0444 root bin
