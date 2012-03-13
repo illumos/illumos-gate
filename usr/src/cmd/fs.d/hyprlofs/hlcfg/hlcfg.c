@@ -36,19 +36,77 @@
 #include <fcntl.h>
 #include <libgen.h>
 #include <strings.h>
+#include <sys/errno.h>
 #include <sys/fs/hyprlofs.h>
+
+extern int errno;
 
 char *usage =	"usage: <fs path> add [<file name> <alias>]+\n"
 		"       <fs path> addl [<file name>]+\n"
 		"       <fs path> rm [<alias>]+\n"
-		"       <fs path> clear";
+		"       <fs path> clear"
+		"       <fs path> get";
 
 typedef enum {
 	CMD_ADD,
 	CMD_RM,
 	CMD_CLR,
-	CMD_ADDL
+	CMD_ADDL,
+	CMD_GET
 } cmd_t;
+
+static int
+get_entries(int fd)
+{
+	int err;
+	int i;
+	hyprlofs_curr_entries_t e;
+	hyprlofs_curr_entry_t *ep;
+
+	e.hce_cnt = 0;
+	e.hce_entries = NULL;
+
+	err = ioctl(fd, HYPRLOFS_GET_ENTRIES, &e);
+	if (err != 0 && errno != E2BIG) {
+		perror("ioctl");
+		return (1);
+	}
+
+	if (err == 0) {
+		(void) printf("success, but no entries\n");
+		return (0);
+	}
+
+	/*
+	 * E2BIG is what we expect when there are existing mappings
+	 * since the current cnt is still returned in that case.
+	 */
+	(void) printf("cnt: %d\n", e.hce_cnt);
+
+	/* alloc array and call again, then print array */
+	if ((ep = (hyprlofs_curr_entry_t *)
+	    malloc(sizeof (hyprlofs_curr_entry_t) * e.hce_cnt)) == NULL) {
+		(void) fprintf(stderr, "out of memory\n");
+		exit(1);
+	}
+
+	e.hce_entries = ep;
+	errno = 0;
+	if (ioctl(fd, HYPRLOFS_GET_ENTRIES, &e) != 0) {
+		/*
+		 * Not handling an increase here. We would need to free and
+		 * start over to do that, but ok for a test program.
+		 */
+		perror("ioctl");
+		free(ep);
+		return (1);
+	}
+	for (i = 0; i < e.hce_cnt; i++)
+		(void) printf("%s %s\n", ep[i].hce_path, ep[i].hce_name);
+
+	free(ep);
+	return (0);
+}
 
 int
 main(int argc, char **argv)
@@ -79,6 +137,8 @@ main(int argc, char **argv)
 		cmd = CMD_CLR;
 	} else if (strcmp(argv[2], "addl") == 0) {
 		cmd = CMD_ADDL;
+	} else if (strcmp(argv[2], "get") == 0) {
+		cmd = CMD_GET;
 	} else {
 		(void) fprintf(stderr, "%s\n", usage);
 		exit(1);
@@ -106,7 +166,8 @@ main(int argc, char **argv)
 	case CMD_RM:
 		cnt = argc - 3;
 		break;
-	case CMD_CLR:
+	case CMD_CLR:	/*FALLTHRU*/
+	case CMD_GET:
 		if (argc > 3) {
 			(void) fprintf(stderr, "%s\n", usage);
 			exit(1);
@@ -170,6 +231,9 @@ main(int argc, char **argv)
 			perror("ioctl");
 			rv = 1;
 		}
+		break;
+	case CMD_GET:
+		rv = get_entries(fd);
 		break;
 	}
 

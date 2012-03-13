@@ -40,6 +40,29 @@ extern "C" {
 #define	HYPRLOFS_ADD_ENTRIES	(HYPRLOFS_IOC | 1)
 #define	HYPRLOFS_RM_ENTRIES	(HYPRLOFS_IOC | 2)
 #define	HYPRLOFS_RM_ALL		(HYPRLOFS_IOC | 3)
+#define	HYPRLOFS_GET_ENTRIES	(HYPRLOFS_IOC | 4)
+
+typedef struct {
+	const char	*hle_path;
+	uint_t		hle_plen;
+	const char	*hle_name;
+	uint_t		hle_nlen;
+} hyprlofs_entry_t;
+
+typedef struct {
+	hyprlofs_entry_t	*hle_entries;
+	uint_t			hle_len;
+} hyprlofs_entries_t;
+
+typedef struct {
+	char		hce_path[MAXPATHLEN];
+	char		hce_name[MAXPATHLEN];
+} hyprlofs_curr_entry_t;
+
+typedef struct {
+	hyprlofs_curr_entry_t	*hce_entries;
+	uint_t			hce_cnt;
+} hyprlofs_curr_entries_t;
 
 #ifdef _KERNEL
 typedef struct {
@@ -54,19 +77,12 @@ typedef struct {
 	uint_t		hle_len;
 } hyprlofs_entries32_t;
 
+typedef struct {
+	caddr32_t	hce_entries;
+	uint_t		hce_cnt;
+} hyprlofs_curr_entries32_t;
+
 #endif /* _KERNEL */
-
-typedef struct {
-	const char	*hle_path;
-	uint_t		hle_plen;
-	const char	*hle_name;
-	uint_t		hle_nlen;
-} hyprlofs_entry_t;
-
-typedef struct {
-	hyprlofs_entry_t	*hle_entries;
-	uint_t			hle_len;
-} hyprlofs_entries_t;
 
 #ifdef	__cplusplus
 }

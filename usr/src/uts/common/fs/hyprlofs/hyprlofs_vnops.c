@@ -51,6 +51,7 @@
 #include <sys/policy.h>
 #include <fs/fs_subr.h>
 #include <sys/ddi.h>
+#include <sys/sunddi.h>
 
 static int hyprlofs_add_entry(vnode_t *, char *, char *, cred_t *,
 		caller_context_t *);
@@ -58,6 +59,8 @@ static int hyprlofs_rm_entry(vnode_t *, char *, cred_t *, caller_context_t *,
 		int);
 static int hyprlofs_rm_all(vnode_t *, cred_t *, caller_context_t *, int);
 static int hyprlofs_remove(vnode_t *, char *, cred_t *, caller_context_t *,
+		int);
+static int hyprlofs_get_all(vnode_t *, intptr_t, cred_t *, caller_context_t *,
 		int);
 
 /*
@@ -272,6 +275,10 @@ hyprlofs_ioctl(vnode_t *vp, int cmd, intptr_t data, int flag,
 
 	if (cmd == HYPRLOFS_RM_ALL) {
 		return (hyprlofs_rm_all(vp, cr, ct, flag));
+	}
+
+	if (cmd == HYPRLOFS_GET_ENTRIES) {
+		return (hyprlofs_get_all(vp, data, cr, ct, flag));
 	}
 
 	return (ENOTTY);
@@ -725,6 +732,190 @@ hyprlofs_rm_all(vnode_t *dvp, cred_t *cr, caller_context_t *ct,
 
 done:
 	hlnode_rele(hp);
+	return (error);
+}
+
+/*
+ * Get a list of all looped in files in the namespace.
+ */
+static int
+hyprlofs_get_all_entries(vnode_t *dvp, hyprlofs_curr_entry_t *hcp,
+    char *prefix, int *pcnt, int n_max,
+    cred_t *cr, caller_context_t *ct, int flags)
+{
+	int error = 0;
+	int too_big = 0;
+	int cnt;
+	int len;
+	hlnode_t *hp = (hlnode_t *)VTOHLN(dvp);
+	hldirent_t *hdp;
+	char *path;
+
+	cnt = *pcnt;
+	path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+
+	hlnode_hold(hp);
+
+	/*
+	 * There's a window here where someone could have removed
+	 * all the entries in the directory after we put a hold on the
+	 * vnode but before we grabbed the rwlock.  Just return.
+	 */
+	if (hp->hln_dir == NULL) {
+		if (hp->hln_nlink) {
+			panic("empty directory 0x%p", (void *)hp);
+			/*NOTREACHED*/
+		}
+		goto done;
+	}
+
+	hdp = hp->hln_dir;
+	while (hdp) {
+		hlnode_t *fndhp;
+		vnode_t *tvp;
+
+		if (strcmp(hdp->hld_name, ".") == 0 ||
+		    strcmp(hdp->hld_name, "..") == 0) {
+			hdp = hdp->hld_next;
+			continue;
+		}
+
+		/* This holds the fndhp vnode */
+		error = hyprlofs_dirlookup(hp, hdp->hld_name, &fndhp, cr);
+		if (error != 0)
+			goto done;
+		hlnode_rele(fndhp);
+
+		if (fndhp->hln_looped == 0) {
+			/* recursively get contents of this subdir */
+			VERIFY(fndhp->hln_type == VDIR);
+			tvp = HLNTOV(fndhp);
+
+			if (*prefix == '\0')
+				(void) strlcpy(path, hdp->hld_name, MAXPATHLEN);
+			else
+				(void) snprintf(path, MAXPATHLEN, "%s/%s",
+				    prefix, hdp->hld_name);
+
+			error = hyprlofs_get_all_entries(tvp, hcp, path,
+			    &cnt, n_max, cr, ct, flags);
+
+			if (error == E2BIG) {
+				too_big = 1;
+				error = 0;
+			}
+			if (error != 0)
+				goto done;
+		} else {
+			if (cnt < n_max) {
+				char *p;
+
+				if (*prefix == '\0')
+					(void) strlcpy(path, hdp->hld_name,
+					    MAXPATHLEN);
+				else
+					(void) snprintf(path, MAXPATHLEN,
+					    "%s/%s", prefix, hdp->hld_name);
+
+				len = strlen(path);
+				ASSERT(len <= MAXPATHLEN);
+				if (copyout(path, (void *)(hcp[cnt].hce_name),
+				    len)) {
+					error = EFAULT;
+					goto done;
+				}
+
+				tvp = REALVP(HLNTOV(fndhp));
+				if (tvp->v_path == NULL) {
+					p = "<unknown>";
+				} else {
+					p = tvp->v_path;
+				}
+				len = strlen(p);
+				ASSERT(len <= MAXPATHLEN);
+				if (copyout(p, (void *)(hcp[cnt].hce_path),
+				    len)) {
+					error = EFAULT;
+					goto done;
+				}
+			}
+
+			cnt++;
+			if (cnt > n_max)
+				too_big = 1;
+		}
+
+		hdp = hdp->hld_next;
+	}
+
+done:
+	hlnode_rele(hp);
+	kmem_free(path, MAXPATHLEN);
+
+	*pcnt = cnt;
+	if (error == 0 && too_big == 1)
+		error = E2BIG;
+
+	return (error);
+}
+
+/*
+ * Return a list of all looped in files in the namespace.
+ */
+static int
+hyprlofs_get_all(vnode_t *dvp, intptr_t data, cred_t *cr, caller_context_t *ct,
+    int flags)
+{
+	int limit, cnt, error;
+	model_t model;
+	hyprlofs_curr_entry_t *e;
+
+	model = get_udatamodel();
+
+	if (model == DATAMODEL_NATIVE) {
+		hyprlofs_curr_entries_t ebuf;
+
+		if (copyin((void *)data, &ebuf, sizeof (ebuf)))
+			return (EFAULT);
+		limit = ebuf.hce_cnt;
+		e = ebuf.hce_entries;
+		if (limit > MAX_IOCTL_PARAMS)
+			return (EINVAL);
+
+	} else {
+		hyprlofs_curr_entries32_t ebuf32;
+
+		if (copyin((void *)data, &ebuf32, sizeof (ebuf32)))
+			return (EFAULT);
+
+		limit = ebuf32.hce_cnt;
+		e = (hyprlofs_curr_entry_t *)(unsigned long)
+		    (ebuf32.hce_entries);
+		if (limit > MAX_IOCTL_PARAMS)
+			return (EINVAL);
+	}
+
+	cnt = 0;
+	error = hyprlofs_get_all_entries(dvp, e, "", &cnt, limit, cr, ct,
+	    flags);
+
+	if (error == 0 || error == E2BIG) {
+		if (model == DATAMODEL_NATIVE) {
+			hyprlofs_curr_entries_t ebuf;
+
+			ebuf.hce_cnt = cnt;
+			if (copyout(&ebuf, (void *)data, sizeof (ebuf)))
+				return (EFAULT);
+
+		} else {
+			hyprlofs_curr_entries32_t ebuf32;
+
+			ebuf32.hce_cnt = cnt;
+			if (copyout(&ebuf32, (void *)data, sizeof (ebuf32)))
+				return (EFAULT);
+		}
+	}
+
 	return (error);
 }
 
