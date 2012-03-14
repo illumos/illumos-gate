@@ -1003,9 +1003,6 @@ destroy_callback(zfs_handle_t *zhp, void *data)
 	    zfs_get_type(zhp) == ZFS_TYPE_FILESYSTEM)
 		goto out;
 
-	if ((err = zfs_unmount(zhp, NULL, cbp->cb_force ? MS_FORCE : 0)) != 0)
-		goto out;
-
 	if (cbp->cb_wait)
 		libzfs_print_on_error(g_zfs, B_FALSE);
 
@@ -1015,16 +1012,32 @@ destroy_callback(zfs_handle_t *zhp, void *data)
 	 * non-EBUSY error code.
 	 */
 	if (!cbp->cb_dryrun) {
-    while ((err = zfs_destroy(zhp, cbp->cb_defer_destroy)) != 0) {
-      if (cbp->cb_wait && libzfs_errno(g_zfs) == EZFS_BUSY) {
-        (void) nanosleep(&ts, NULL);
-        continue;
-      }
-      (void) fprintf(stderr, "%s: %s\n", libzfs_error_action(g_zfs),
-          libzfs_error_description(g_zfs));
-      break;
-    }
-  }
+		while ((err = zfs_unmount(zhp, NULL,
+		    cbp->cb_force ? MS_FORCE : 0)) != 0) {
+			if (cbp->cb_wait && libzfs_errno(g_zfs) == EZFS_BUSY) {
+				(void) nanosleep(&ts, NULL);
+				continue;
+			}
+			(void) fprintf(stderr, "%s: %s\n",
+			    libzfs_error_action(g_zfs),
+			    libzfs_error_description(g_zfs));
+			break;
+		}
+
+		if (err != 0)
+			goto out;
+
+		while ((err = zfs_destroy(zhp, cbp->cb_defer_destroy)) != 0) {
+			if (cbp->cb_wait && libzfs_errno(g_zfs) == EZFS_BUSY) {
+				(void) nanosleep(&ts, NULL);
+				continue;
+			}
+			(void) fprintf(stderr, "%s: %s\n",
+			    libzfs_error_action(g_zfs),
+			    libzfs_error_description(g_zfs));
+			break;
+		}
+	}
 
 	libzfs_print_on_error(g_zfs, B_TRUE);
 
