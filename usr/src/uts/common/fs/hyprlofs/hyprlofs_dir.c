@@ -446,6 +446,9 @@ hyprlofs_dirtrunc(hlnode_t *dir)
 	ASSERT(RW_WRITE_HELD(&dir->hln_rwlock));
 	ASSERT(dir->hln_type == VDIR);
 
+	if (dir->hln_looped)
+		return;
+
 	for (hdp = dir->hln_dir; hdp; hdp = dir->hln_dir) {
 		ASSERT(hdp->hld_next != hdp);
 		ASSERT(hdp->hld_prev != hdp);

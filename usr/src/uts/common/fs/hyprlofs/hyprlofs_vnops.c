@@ -516,6 +516,9 @@ hyprlofs_mkdir(vnode_t *dvp, char *nm, vattr_t *va, vnode_t **vpp, cred_t *cr)
 	if (error == 0) {
 		ASSERT(self);
 		hlnode_rele(self);
+		/* We can't loop in under a looped in directory */
+		if (self->hln_looped)
+			return (EACCES);
 		*vpp = HLNTOV(self);
 		return (EEXIST);
 	}
