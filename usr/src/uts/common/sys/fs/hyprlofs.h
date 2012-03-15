@@ -43,10 +43,10 @@ extern "C" {
 #define	HYPRLOFS_GET_ENTRIES	(HYPRLOFS_IOC | 4)
 
 typedef struct {
-	const char	*hle_path;
-	uint_t		hle_plen;
-	const char	*hle_name;
-	uint_t		hle_nlen;
+	char	*hle_path;
+	uint_t	hle_plen;
+	char	*hle_name;
+	uint_t	hle_nlen;
 } hyprlofs_entry_t;
 
 typedef struct {
