@@ -6072,6 +6072,7 @@ f usr/lib/lib.b 0444 root bin
 f usr/lib/libHBAAPI.so.1 0755 root bin
 s usr/lib/libHBAAPI.so=libHBAAPI.so.1
 s usr/lib/libMPAPI.so=../../lib/libMPAPI.so.1
+s usr/lib/libMPAPI.so.1=../../lib/libMPAPI.so.1
 f usr/lib/libSMHBAAPI.so.1 0755 root bin
 s usr/lib/libSMHBAAPI.so=libSMHBAAPI.so.1
 s usr/lib/libadm.so.1=../../lib/libadm.so.1
@@ -6122,6 +6123,7 @@ s usr/lib/libcrypt_d.so=libcrypt.so
 s usr/lib/libcrypt_i.so.1=libcrypt.so.1
 s usr/lib/libcrypt_i.so=libcrypt.so
 s usr/lib/libcryptoutil.so=../../lib/libcryptoutil.so.1
+s usr/lib/libcryptoutil.so.1=../../lib/libcryptoutil.so.1
 s usr/lib/libctf.so.1=../../lib/libctf.so.1
 s usr/lib/libctf.so=../../lib/libctf.so.1
 s usr/lib/libcurses.so.1=../../lib/libcurses.so.1
@@ -6147,6 +6149,7 @@ s usr/lib/libdiskmgt.so=libdiskmgt.so.1
 s usr/lib/libdl.so.1=../../lib/libdl.so.1
 s usr/lib/libdl.so=../../lib/libdl.so.1
 s usr/lib/libdladm.so=../../lib/libdladm.so.1
+s usr/lib/libdladm.so.1=../../lib/libdladm.so.1
 f usr/lib/libdll.so.1 0755 root bin
 s usr/lib/libdll.so=libdll.so.1
 s usr/lib/libdlpi.so.1=../../lib/libdlpi.so.1
@@ -6166,6 +6169,7 @@ s usr/lib/libefi.so=../../lib/libefi.so.1
 s usr/lib/libelf.so.1=../../lib/libelf.so.1
 s usr/lib/libelf.so=../../lib/libelf.so.1
 s usr/lib/libelfsign.so=../../lib/libelfsign.so.1
+s usr/lib/libelfsign.so.1=../../lib/libelfsign.so.1
 f usr/lib/libexacct.so.1 0755 root bin
 s usr/lib/libexacct.so=libexacct.so.1
 f usr/lib/libfcoe.so.1 0755 root bin
@@ -6189,6 +6193,7 @@ s usr/lib/libfstyp.so=libfstyp.so.1
 s usr/lib/libgen.so.1=../../lib/libgen.so.1
 s usr/lib/libgen.so=../../lib/libgen.so.1
 s usr/lib/libgrubmgmt.so=../../lib/libgrubmgmt.so.1
+s usr/lib/libgrubmgmt.so.1=../../lib/libgrubmgmt.so.1
 f usr/lib/libgss.so.1 0755 root bin
 s usr/lib/libgss.so=libgss.so.1
 f usr/lib/libhal-storage.so.1.0.0 0755 root bin
@@ -6216,9 +6221,11 @@ s usr/lib/libinstzones.so=libinstzones.so.1
 s usr/lib/libintl.so.1=../../lib/libintl.so.1
 s usr/lib/libintl.so=../../lib/libintl.so.1
 s usr/lib/libipadm.so=../../lib/libipadm.so.1
+s usr/lib/libipadm.so.1=../../lib/libipadm.so.1
 f usr/lib/libipmi.so.1 0755 root bin
 s usr/lib/libipmi.so=libipmi.so.1
 s usr/lib/libipmp.so=../../lib/libipmp.so.1
+s usr/lib/libipmp.so.1=../../lib/libipmp.so.1
 f usr/lib/libipp.so.1 0755 root bin
 s usr/lib/libipp.so=libipp.so.1
 f usr/lib/libipsecutil.so.1 0755 root bin
@@ -6228,8 +6235,11 @@ s usr/lib/libiscsit.so=libiscsit.so.1
 f usr/lib/libjdns_sd.so.1 0755 root bin
 s usr/lib/libjdns_sd.so=libjdns_sd.so.1
 s usr/lib/libkcfd.so=../../lib/libkcfd.so.1
+s usr/lib/libkcfd.so.1=../../lib/libkcfd.so.1
 s usr/lib/libkmf.so=../../lib/libkmf.so.1
+s usr/lib/libkmf.so.1=../../lib/libkmf.so.1
 s usr/lib/libkmfberder.so=../../lib/libkmfberder.so.1
+s usr/lib/libkmfberder.so.1=../../lib/libkmfberder.so.1
 f usr/lib/libkmsagent.so.1 0755 root bin
 s usr/lib/libkmsagent.so=libkmsagent.so.1
 f usr/lib/libkrb5.so.1 0755 root bin
@@ -6268,6 +6278,7 @@ s usr/lib/libmp.so.1=../../lib/libmp.so.1
 s usr/lib/libmp.so.2=../../lib/libmp.so.2
 s usr/lib/libmp.so=../../lib/libmp.so.2
 s usr/lib/libmpscsi_vhci.so=../../lib/libmpscsi_vhci.so.1
+s usr/lib/libmpscsi_vhci.so.1=../../lib/libmpscsi_vhci.so.1
 f usr/lib/libmtmalloc.so.1 0755 root bin
 s usr/lib/libmtmalloc.so=libmtmalloc.so.1
 f usr/lib/libndmp.so.1 0755 root bin
@@ -6287,6 +6298,7 @@ s usr/lib/libnvfru.so=libnvfru.so.1
 s usr/lib/libnvpair.so.1=../../lib/libnvpair.so.1
 s usr/lib/libnvpair.so=../../lib/libnvpair.so.1
 s usr/lib/libnwam.so=../../lib/libnwam.so.1
+s usr/lib/libnwam.so.1=../../lib/libnwam.so.1
 d usr/lib/libp 0755 root bin
 s usr/lib/libp/32=.
 s usr/lib/libp/64=amd64
@@ -6425,7 +6437,9 @@ s usr/lib/libtnfctl.so=libtnfctl.so.1
 f usr/lib/libtnfprobe.so.1 0755 root bin
 s usr/lib/libtnfprobe.so=libtnfprobe.so.1
 s usr/lib/libtsnet.so=../../lib/libtsnet.so.1
+s usr/lib/libtsnet.so.1=../../lib/libtsnet.so.1
 s usr/lib/libtsol.so=../../lib/libtsol.so.2
+s usr/lib/libtsol.so.2=../../lib/libtsol.so.2
 s usr/lib/libumem.so.1=../../lib/libumem.so.1
 s usr/lib/libumem.so=../../lib/libumem.so.1
 f usr/lib/libunistat.so.1 0755 root bin
@@ -11530,6 +11544,7 @@ f usr/share/man/man1/mkmsgs.1 0444 root bin
 f usr/share/man/man1/mktemp.1 0444 root bin
 f usr/share/man/man1/moe.1 0444 root bin
 f usr/share/man/man1/more.1 0444 root bin
+f usr/share/man/man1/mpss.so.1.1 0444 root bin
 f usr/share/man/man1/msgfmt.1 0444 root bin
 f usr/share/man/man1/mt.1 0444 root bin
 f usr/share/man/man1/mv.1 0444 root bin
@@ -14342,6 +14357,28 @@ f usr/share/man/man3project/getprojent.3project 0444 root bin
 f usr/share/man/man3project/project_walk.3project 0444 root bin
 f usr/share/man/man3project/setproject.3project 0444 root bin
 d usr/share/man/man3resolv 0755 root bin
+f usr/share/man/man3resolv/dn_comp.3resolv 0444 root bin
+f usr/share/man/man3resolv/dn_expand.3resolv 0444 root bin
+f usr/share/man/man3resolv/fp_resstat.3resolv 0444 root bin
+f usr/share/man/man3resolv/herror.3resolv 0444 root bin
+f usr/share/man/man3resolv/hstrerror.3resolv 0444 root bin
+f usr/share/man/man3resolv/res_getservers.3resolv 0444 root bin
+f usr/share/man/man3resolv/res_hostalias.3resolv 0444 root bin
+f usr/share/man/man3resolv/res_init.3resolv 0444 root bin
+f usr/share/man/man3resolv/res_mkquery.3resolv 0444 root bin
+f usr/share/man/man3resolv/res_nclose.3resolv 0444 root bin
+f usr/share/man/man3resolv/res_ndestroy.3resolv 0444 root bin
+f usr/share/man/man3resolv/res_ninit.3resolv 0444 root bin
+f usr/share/man/man3resolv/res_nmkquery.3resolv 0444 root bin
+f usr/share/man/man3resolv/res_nquery.3resolv 0444 root bin
+f usr/share/man/man3resolv/res_nquerydomain.3resolv 0444 root bin
+f usr/share/man/man3resolv/res_nsearch.3resolv 0444 root bin
+f usr/share/man/man3resolv/res_nsend.3resolv 0444 root bin
+f usr/share/man/man3resolv/res_nsendsigned.3resolv 0444 root bin
+f usr/share/man/man3resolv/res_query.3resolv 0444 root bin
+f usr/share/man/man3resolv/res_search.3resolv 0444 root bin
+f usr/share/man/man3resolv/res_send.3resolv 0444 root bin
+f usr/share/man/man3resolv/res_setservers.3resolv 0444 root bin
 f usr/share/man/man3resolv/resolver.3resolv 0444 root bin
 d usr/share/man/man3rpc 0755 root bin
 f usr/share/man/man3rpc/rstat.3rpc 0444 root bin
