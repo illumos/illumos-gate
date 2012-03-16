@@ -940,9 +940,7 @@ hyprlofs_remove(vnode_t *dvp, char *nm, cred_t *cr, caller_context_t *ct,
 	rw_enter(&parent->hln_rwlock, RW_WRITER);
 	rw_enter(&hp->hln_rwlock, RW_WRITER);
 
-	if (hp->hln_type != VDIR ||
-	    (error = secpolicy_fs_linkdir(cr, dvp->v_vfsp)) == 0)
-		error = hyprlofs_dirdelete(parent, hp, nm, DR_REMOVE, cr);
+	error = hyprlofs_dirdelete(parent, hp, nm, DR_REMOVE, cr);
 
 	rw_exit(&hp->hln_rwlock);
 	rw_exit(&parent->hln_rwlock);
