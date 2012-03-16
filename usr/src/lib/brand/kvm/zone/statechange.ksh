@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2010, 2012 Joyent, Inc.  All rights reserved.
+# Copyright 2012 Joyent, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -47,7 +47,13 @@ export PATH
 #
 # ready				0
 # boot				1
+# forceboot			2
+# reboot			3
 # halt				4
+# uninstalling			5
+# mount				6
+# forcemount			7
+# unmount			8
 
 subcommand=$1
 ZONENAME=$2
@@ -400,6 +406,70 @@ cleanup_net()
 	done
 }
 
+kill_gz_sockholder()
+{
+	echo "searching for GZ process holding socket $1"
+	logger -p daemon.err "zone $ZONENAME " \
+	    "searching for GZ process holding socket $1"
+
+	pid=`(cd /proc;
+	for i in *;
+	do
+		pfiles $i 2>/dev/null | egrep -s "AF_UNIX $1";
+		[ $? == 0 ] && echo "$i";
+	done)`
+
+	[ -z "$pid" ] && return
+
+	echo "killing GZ process $pid holding socket $1"
+	logger -p daemon.err "zone $ZONENAME " \
+	    "killing GZ process $pid holding socket $1"
+
+	kill -9 $pid
+}
+
+# zonadmd unable to unmount the given path, try to cleanup so unmount can
+# succeed.
+cleanup_mount()
+{
+	echo "attempting to cleanup mount $1"
+	logger -p daemon.err "zone $ZONENAME " \
+	    "attempting to cleanup mount $1"
+
+	cnt=`fuser -c $1 2>/dev/null | wc -w`
+	if [ $cnt -gt 0 ]; then
+		echo "trying to kill GZ processes under $1"
+		logger -p daemon.err "zone $ZONENAME " \
+		    "trying to kill GZ processes under $1"
+		fuser -ck $1
+
+		# Exit out to give the zoneadmd umount a chance to suceed now.
+		# Zoneadmd will give us another shot if it still can't umount.
+		sleep 1
+		exit 0
+	fi
+
+	# Processes which are injected into a zone and then open a file as a
+	# socket end-point will show in pfiles with the path relative to the
+	# zone's root. For example, a zone with its root at /zones/foo/root and
+	# an open socket as /zones/foo/root/var/run/x will show up in a pfiles
+	# search as /var/run/x. This is a problem since we have no way to
+	# narrow down which process to kill.
+	#
+	# Because the socket doesn't have enough information for us to tie to
+	# the specific GZ process, we hardcode to kill things we know will open
+	# sockets into the zone:
+	#    /var/run/smartdc/metadata.sock
+	#    /var/run/.smartdc-amon.sock
+
+	ZVR=$ZONEPATH/root/var/run
+	[ -S $ZVR/smartdc/metadata.sock ] &&
+	    kill_gz_sockholder /var/run/smartdc/metadata.sock
+
+	[ -S $ZVR/.smartdc-amon.sock ] &&
+	    kill_gz_sockholder /var/run/.smartdc-amon.sock
+}
+
 #
 # Main
 #
@@ -415,5 +485,9 @@ echo "statechange $subcommand $cmd" >>/tmp/kvm.log
 [[ "$subcommand" == "post" && $cmd == 0 ]] && setup_net
 # We can't set a rctl until we have a process in the zone to grab
 [[ "$subcommand" == "post" && $cmd == 1 ]] && setup_cpu_baseline
+
+# Zone halt is hung unmounting, try to recover
+[[ "$subcommand" == "post" && $state == 6 && $cmd == 8 ]] && \
+    cleanup_mount "$6"
 
 exit 0

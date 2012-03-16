@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, Joyent Inc. All rights reserved.
+ * Copyright (c) 2012, Joyent Inc. All rights reserved.
  */
 
 /*
@@ -117,8 +117,8 @@ static zoneid_t zone_id;
 static zoneid_t zone_did = 0;
 dladm_handle_t dld_handle = NULL;
 
-static char pre_statechg_hook[2 * MAXPATHLEN];
-static char post_statechg_hook[2 * MAXPATHLEN];
+char pre_statechg_hook[2 * MAXPATHLEN];
+char post_statechg_hook[2 * MAXPATHLEN];
 char query_hook[2 * MAXPATHLEN];
 
 zlog_t logsys;
