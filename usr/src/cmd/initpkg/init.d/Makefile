@@ -35,7 +35,6 @@ PROG=		\
 	dhcp		\
 	drvconfig	\
 	ldap.client	\
-	mkdtab		\
 	nfs.server	\
 	nscd		\
 	sendmail	\

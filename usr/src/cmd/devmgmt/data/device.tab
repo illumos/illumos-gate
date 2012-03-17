@@ -1,5 +1,3 @@
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.10.1.1 */
-#
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -39,7 +37,4 @@
 #			where attr is the attribute name and value is the
 #			value of that attribute.
 #
-ctape1:/dev/rSA/ctape1:/dev/SA/ctape1::desc="Cartridge Tape Drive" fmtcmd="/etc/ctcfmt" type="ctape" display="true" volume="cartridge tape"
-disk1:/dev/rdsk/c1d0s6:/dev/dsk/c1d0s6::desc="Disk Drive" type="disk" display="true" remove="true" part="true"
-disk2:/dev/rdsk/c1d1s6:/dev/dsk/c1d1s6::desc="Disk Drive" type="disk" display="true" remove="true" part="true"
 spool:::/var/spool/pkg:desc="Packaging Spool Directory"

@@ -313,8 +313,6 @@ DIRS= \
 	/usr/sadm/install \
 	/usr/sadm/install/bin \
 	/usr/sadm/install/scripts \
-	/usr/sadm/sysadm \
-	/usr/sadm/sysadm/add-ons \
 	/usr/sbin \
 	/usr/sbin/$(MACH32) \
 	/usr/share  \
