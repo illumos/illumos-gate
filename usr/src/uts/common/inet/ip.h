@@ -2196,6 +2196,8 @@ struct ip_xmit_attr_s {
 	 */
 	ixa_notify_t	ixa_notify;	/* Registered upcall notify function */
 	void		*ixa_notify_cookie; /* ULP cookie for ixa_notify */
+
+	uint_t		ixa_tcpcleanup;	/* Used by conn_ixa_cleanup */
 };
 
 /*
@@ -2265,6 +2267,14 @@ struct ip_xmit_attr_s {
  */
 #define	IXA_FREE_CRED		0x00000001	/* ixa_cred needs to be rele */
 #define	IXA_FREE_TSL		0x00000002	/* ixa_tsl needs to be rele */
+
+/*
+ * Trivial state machine used to synchronize IXA cleanup for TCP connections.
+ * See conn_ixa_cleanup().
+ */
+#define	IXATC_IDLE		0x00000000
+#define	IXATC_INPROGRESS	0x00000001
+#define	IXATC_COMPLETE		0x00000002
 
 /*
  * Simplistic way to set the ixa_xmit_hint for locally generated traffic
