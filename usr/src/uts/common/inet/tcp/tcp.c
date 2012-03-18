@@ -3792,7 +3792,8 @@ tcp_stack_init(netstackid_t stackid, netstack_t *ns)
 	ASSERT(error == 0);
 	tcps->tcps_ixa_cleanup_mp = allocb_wait(0, BPRI_MED, STR_NOSIG, NULL);
 	ASSERT(tcps->tcps_ixa_cleanup_mp != NULL);
-	cv_init(&tcps->tcps_ixa_cleanup_cv, NULL, CV_DEFAULT, NULL);
+	cv_init(&tcps->tcps_ixa_cleanup_ready_cv, NULL, CV_DEFAULT, NULL);
+	cv_init(&tcps->tcps_ixa_cleanup_done_cv, NULL, CV_DEFAULT, NULL);
 	mutex_init(&tcps->tcps_ixa_cleanup_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	mutex_init(&tcps->tcps_reclaim_lock, NULL, MUTEX_DEFAULT, NULL);
@@ -3857,7 +3858,8 @@ tcp_stack_fini(netstackid_t stackid, void *arg)
 
 	freeb(tcps->tcps_ixa_cleanup_mp);
 	tcps->tcps_ixa_cleanup_mp = NULL;
-	cv_destroy(&tcps->tcps_ixa_cleanup_cv);
+	cv_destroy(&tcps->tcps_ixa_cleanup_ready_cv);
+	cv_destroy(&tcps->tcps_ixa_cleanup_done_cv);
 	mutex_destroy(&tcps->tcps_ixa_cleanup_lock);
 
 	/*
