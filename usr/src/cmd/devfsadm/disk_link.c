@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -319,51 +320,102 @@ disk_callback_sas(di_minor_t minor, di_node_t node)
 /*
  * xVM virtual block device
  *
- * VBDs are enumerated into xenstore by xend and named using
- * the linux dev_t values for 'hd' and 'xvd' devices.  Linux
- * dev_t's are 16-bit values.  The upper 8 bits identify the major #
- * of the device (hd, xvd) and the lower 8 bits the instance and partition
+ * Xen passes device number in next format:
  *
- * For PV guests, VBDs are named by the virt-tools using
- * the form xvd[a-p][1-15].  The corresponding Solaris /dev/dsk name
- * created by this generator will be c0t[0-15]d[0-15]sN,
- * were the target (t) value represents [a-p] and the
- * disk (d) value is either 0 (e.g. xvda) or contains the partition
- * information if it has been specified [1-15] (e.g. xvda1)
+ *    1 << 28 | disk << 8 | partition      xvd, disks or partitions 16 onwards
+ *  202 <<  8 | disk << 4 | partition      xvd, disks and partitions up to 15
+ *    8 <<  8 | disk << 4 | partition      sd, disks and partitions up to 15
+ *    3 <<  8 | disk << 6 | partition      hd, disks 0..1, partitions 0..63
+ *   22 <<  8 | (disk-2) << 6 | partition  hd, disks 2..3, partitions 0..63
+ *    2 << 28 onwards                      reserved for future use
+ *   other values less than 1 << 28        deprecated / reserved
+ *
+ * The corresponding Solaris /dev/dsk name can be:
+ *
+ *          c0tYdXsN
+ *
+ * where Y,X >= 0.
  *
  * For PV guests using the legacy naming (0, 1, 2, ...)
  * the Solaris disk names created will be c0d[0..767]sN
- * The Solaris version of virt-install based on virtinst.101
- * named PV disks as sequential integers.  With virtinst.300_1 and
- * beyond, the virt-* tools will no longer create legacy disk
- * names.
  */
+
+#define	HD_BASE		(3 << 8)
+#define	XEN_EXT_SHIFT	(28)
+
+/*
+ * Return: Number of parsed and written parameters
+ */
+static int
+decode_xen_device(uint_t device, uint_t *disk, uint_t *plun)
+{
+	uint_t dsk, lun = 0;
+	int ret = 1;
+
+	if ((device >> XEN_EXT_SHIFT) > 1)
+		return (0);
+
+	if (device < HD_BASE) {
+		/* legacy device address */
+		dsk = device;
+		goto end;
+	}
+
+	ret = 2;
+	if (device & (1 << XEN_EXT_SHIFT)) {
+		/* extended */
+		dsk = device & (~0xff);
+		lun = device & 0xff;
+		goto end;
+	}
+
+	switch (device >> 8) {
+	case 202:				/* xvd */
+		dsk = (device >> 4) & 0xf;
+		lun =  device & 0xf;
+		break;
+	case 8:					/* sd */
+		dsk = device & (~0xf);
+		lun = device & 0xf;
+		break;
+	case 3:					/* hd, disk 0..1 */
+		dsk = device & (~0x3f);
+		lun = device & 0x3f;
+		break;
+	case 22:				/* hd, disk 2..3 */
+		dsk = device & (~0x3f);
+		lun = device & 0x3f;
+		break;
+	default:
+		return (0);
+	}
+end:
+	*disk = dsk;
+	*plun = lun;
+	return (ret);
+}
+
 static int
 disk_callback_xvmd(di_minor_t minor, di_node_t node)
 {
-#define	HD_BASE (3 << 8)
-#define	XVBDMAJ 202
-
 	char *addr;
 	char disk[16];
 	uint_t targ;
-	uint_t lun = 0;
-	uint_t fmaj;
+	uint_t dsk, lun;
+	int res;
 
 	addr = di_bus_addr(node);
 	targ = strtol(addr, (char **)NULL, 10);
-	fmaj = targ >> 8;
 
-	/* legacy device address */
-	if (targ < HD_BASE)
-		(void) snprintf(disk, sizeof (disk),  "d%d", targ);
-	/* PV VBD */
-	else if (fmaj == XVBDMAJ) {
-		lun = targ & 0xf;
-		targ = (targ & 0xff) >> 4;
-		(void) snprintf(disk, sizeof (disk), "t%dd%d", targ, lun);
+	res = decode_xen_device(targ, &dsk, &lun);
+
 	/* HVM device names are generated using the standard generator */
-	} else {
+
+	if (res == 1)
+		(void) snprintf(disk, sizeof (disk),  "d%d", dsk);
+	else if (res == 2)
+		(void) snprintf(disk, sizeof (disk), "t%dd%d", dsk, lun);
+	else {
 		devfsadm_errprint("%s: invalid disk device number (%s)\n",
 		    modname, addr);
 		return (DEVFSADM_CONTINUE);
