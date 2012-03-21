@@ -403,6 +403,7 @@ typedef struct {
 	kstat_named_t	zv_10ms_ops;
 	kstat_named_t	zv_100ms_ops;
 	kstat_named_t	zv_1s_ops;
+	kstat_named_t	zv_10s_ops;
 	kstat_named_t 	zv_delay_cnt;
 	kstat_named_t	zv_delay_time;
 } zone_vfs_kstat_t;

@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -203,6 +204,7 @@ static void 		(**vsd_destructor)(void *);
 #define	VOP_LATENCY_10MS	10000000
 #define	VOP_LATENCY_100MS	100000000
 #define	VOP_LATENCY_1S		1000000000
+#define	VOP_LATENCY_10S		10000000000
 
 /*
  * Convert stat(2) formats to vnode types and vice versa.  (Knows about
@@ -3263,10 +3265,15 @@ fop_read(
 			else if (lat < VOP_LATENCY_1S) {
 				atomic_inc_64(&zvp->zv_10ms_ops.value.ui64);
 				atomic_inc_64(&zvp->zv_100ms_ops.value.ui64);
+			} else if (lat < VOP_LATENCY_10S) {
+				atomic_inc_64(&zvp->zv_10ms_ops.value.ui64);
+				atomic_inc_64(&zvp->zv_100ms_ops.value.ui64);
+				atomic_inc_64(&zvp->zv_1s_ops.value.ui64);
 			} else {
 				atomic_inc_64(&zvp->zv_10ms_ops.value.ui64);
 				atomic_inc_64(&zvp->zv_100ms_ops.value.ui64);
 				atomic_inc_64(&zvp->zv_1s_ops.value.ui64);
+				atomic_inc_64(&zvp->zv_10s_ops.value.ui64);
 			}
 		}
 	}
@@ -3325,10 +3332,15 @@ fop_write(
 			else if (lat < VOP_LATENCY_1S) {
 				atomic_inc_64(&zvp->zv_10ms_ops.value.ui64);
 				atomic_inc_64(&zvp->zv_100ms_ops.value.ui64);
+			} else if (lat < VOP_LATENCY_10S) {
+				atomic_inc_64(&zvp->zv_10ms_ops.value.ui64);
+				atomic_inc_64(&zvp->zv_100ms_ops.value.ui64);
+				atomic_inc_64(&zvp->zv_1s_ops.value.ui64);
 			} else {
 				atomic_inc_64(&zvp->zv_10ms_ops.value.ui64);
 				atomic_inc_64(&zvp->zv_100ms_ops.value.ui64);
 				atomic_inc_64(&zvp->zv_1s_ops.value.ui64);
+				atomic_inc_64(&zvp->zv_10s_ops.value.ui64);
 			}
 		}
 	}

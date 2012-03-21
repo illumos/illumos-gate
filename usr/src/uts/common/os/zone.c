@@ -2051,6 +2051,7 @@ zone_vfs_kstat_create(zone_t *zone)
 	kstat_named_init(&zvp->zv_10ms_ops, "10ms_ops", KSTAT_DATA_UINT64);
 	kstat_named_init(&zvp->zv_100ms_ops, "100ms_ops", KSTAT_DATA_UINT64);
 	kstat_named_init(&zvp->zv_1s_ops, "1s_ops", KSTAT_DATA_UINT64);
+	kstat_named_init(&zvp->zv_10s_ops, "10s_ops", KSTAT_DATA_UINT64);
 	kstat_named_init(&zvp->zv_delay_cnt, "delay_cnt", KSTAT_DATA_UINT64);
 	kstat_named_init(&zvp->zv_delay_time, "delay_time", KSTAT_DATA_UINT64);
 
