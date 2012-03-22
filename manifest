@@ -1556,7 +1556,6 @@ f lib/svc/manifest/system/system-log.xml 0444 root sys
 f lib/svc/manifest/system/utmp.xml 0444 root sys
 f lib/svc/manifest/system/vtdaemon.xml 0444 root sys
 f lib/svc/manifest/system/zones.xml 0444 root sys
-f lib/svc/manifest/system/zonestat.xml 0444 root sys
 d lib/svc/method 0755 root bin
 f lib/svc/method/boot-archive 0555 root bin
 f lib/svc/method/boot-archive-update 0555 root bin
@@ -1645,7 +1644,6 @@ f lib/svc/method/svc-utmpd 0555 root bin
 f lib/svc/method/svc-vrrp 0555 root sys
 f lib/svc/method/svc-wusb 0555 root sys
 f lib/svc/method/svc-zones 0555 root sys
-f lib/svc/method/svc-zonestat 0555 root sys
 f lib/svc/method/system-log 0555 root bin
 f lib/svc/method/vtdaemon 0555 root bin
 f lib/svc/method/yp 0555 root bin
@@ -2366,7 +2364,6 @@ f usr/bin/ypwhich 0555 root other
 f usr/bin/zcat 0555 root bin
 f usr/bin/ziostat 0555 root bin
 s usr/bin/zonename=../../sbin/zonename
-f usr/bin/zonestat 0555 root bin
 f usr/bin/zschedstat 0555 root bin
 d usr/ccs 0755 root bin
 d usr/ccs/bin 0755 root bin
@@ -4518,8 +4515,6 @@ f usr/include/xti.h 0644 root bin
 f usr/include/xti_inet.h 0644 root bin
 f usr/include/zdoor.h 0644 root bin
 f usr/include/zone.h 0644 root bin
-f usr/include/zonestat.h 0644 root bin
-f usr/include/zonestat_impl.h 0644 root bin
 d usr/kernel 0755 root sys
 d usr/kernel/drv 0755 root sys
 d usr/kernel/drv/amd64 0755 root sys
@@ -4972,8 +4967,6 @@ f usr/lib/amd64/libzfs_jni.so.1 0755 root bin
 s usr/lib/amd64/libzfs_jni.so=libzfs_jni.so.1
 f usr/lib/amd64/libzonecfg.so.1 0755 root bin
 s usr/lib/amd64/libzonecfg.so=libzonecfg.so.1
-f usr/lib/amd64/libzonestat.so.1 0755 root bin
-s usr/lib/amd64/libzonestat.so=libzonestat.so.1
 f usr/lib/amd64/libzpool.so.1 0755 root bin
 s usr/lib/amd64/libzpool.so=libzpool.so.1
 f usr/lib/amd64/madv.so.1 0755 root bin
@@ -6474,8 +6467,6 @@ f usr/lib/libzonecfg.so.1 0755 root bin
 s usr/lib/libzonecfg.so=libzonecfg.so.1
 f usr/lib/libzoneinfo.so.1 0755 root bin
 s usr/lib/libzoneinfo.so=libzoneinfo.so.1
-f usr/lib/libzonestat.so.1 0755 root bin
-s usr/lib/libzonestat.so=libzonestat.so.1
 f usr/lib/libzpool.so.1 0755 root bin
 s usr/lib/libzpool.so=libzpool.so.1
 d usr/lib/link_audit 0755 root bin
@@ -9985,7 +9976,6 @@ d usr/lib/zones/i86 0755 root bin
 f usr/lib/zones/i86/zoneadmd 0555 root bin
 h usr/lib/zones/zoneadmd=usr/lib/isaexec
 f usr/lib/zones/zoneshare 0555 root bin
-f usr/lib/zones/zonestatd 0555 root bin
 f usr/lib/zones/zoneunshare 0555 root bin
 d usr/libexec 07555 root bin
 d usr/local 0755 root root

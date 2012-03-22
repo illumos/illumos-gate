@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012, Joyent, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -56,6 +57,7 @@
 #include <sys/debug.h>
 #include <sys/tnf_probe.h>
 #include <sys/vtrace.h>
+#include <sys/ddi.h>
 
 #include <vm/hat.h>
 #include <vm/xhat.h>
@@ -879,6 +881,7 @@ as_fault(struct hat *hat, struct as *as, caddr_t addr, size_t size,
 	struct seg *segsav;
 	int as_lock_held;
 	klwp_t *lwp = ttolwp(curthread);
+	zone_t *zonep = curzone;
 	int is_xhat = 0;
 	int holding_wpage = 0;
 	extern struct seg_ops   segdev_ops;
@@ -928,6 +931,23 @@ retry:
 			if (as == &kas)
 				CPU_STATS_ADDQ(CPU, vm, kernel_asflt, 1);
 			CPU_STATS_EXIT_K();
+			if (zonep->zone_pg_flt_delay != 0) {
+				/*
+				 * The zone in which this process is running
+				 * is currently over it's physical memory cap.
+				 * Throttle page faults to help the user-land
+				 * memory capper catch up. Note that
+				 * drv_usectohz() rounds up.
+				 */
+				atomic_add_64(&zonep->zone_pf_throttle, 1);
+				atomic_add_64(&zonep->zone_pf_throttle_usec,
+				    zonep->zone_pg_flt_delay);
+				if (zonep->zone_pg_flt_delay < TICK_TO_USEC(1))
+					drv_usecwait(zonep->zone_pg_flt_delay);
+				else
+					delay(drv_usectohz(
+					    zonep->zone_pg_flt_delay));
+			}
 			break;
 		}
 	}

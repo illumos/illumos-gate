@@ -2152,6 +2152,8 @@ zone_mcap_kstat_update(kstat_t *ksp, int rw)
 	zmp->zm_execpgin.value.ui64 = zone->zone_execpgin;
 	zmp->zm_fspgin.value.ui64 = zone->zone_fspgin;
 	zmp->zm_anon_alloc_fail.value.ui64 = zone->zone_anon_alloc_fail;
+	zmp->zm_pf_throttle.value.ui64 = zone->zone_pf_throttle;
+	zmp->zm_pf_throttle_usec.value.ui64 = zone->zone_pf_throttle_usec;
 
 	return (0);
 }
@@ -2190,6 +2192,10 @@ zone_mcap_kstat_create(zone_t *zone)
 	kstat_named_init(&zmp->zm_execpgin, "execpgin", KSTAT_DATA_UINT64);
 	kstat_named_init(&zmp->zm_fspgin, "fspgin", KSTAT_DATA_UINT64);
 	kstat_named_init(&zmp->zm_anon_alloc_fail, "anon_alloc_fail",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&zmp->zm_pf_throttle, "n_pf_throttle",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&zmp->zm_pf_throttle_usec, "n_pf_throttle_usec",
 	    KSTAT_DATA_UINT64);
 
 	ksp->ks_update = zone_mcap_kstat_update;
@@ -2935,6 +2941,40 @@ zone_set_mcap_pageout(zone_t *zone, const uint64_t *zone_pageout)
 
 	if ((err = copyin(zone_pageout, &pageout, sizeof (uint64_t))) == 0)
 		zone->zone_mcap_pagedout += pageout;
+
+	return (err);
+}
+
+/*
+ * The zone_set_page_fault_delay function is used to set the number of usecs
+ * to throttle page faults.  This is normally 0 but can be set to a non-0 value
+ * by the user-land memory capping code when the zone is over its physcial
+ * memory cap.
+ */
+static int
+zone_set_page_fault_delay(zone_t *zone, const uint32_t *pfdelay)
+{
+	uint32_t dusec;
+	int err;
+
+	if ((err = copyin(pfdelay, &dusec, sizeof (uint32_t))) == 0)
+		zone->zone_pg_flt_delay = dusec;
+
+	return (err);
+}
+
+/*
+ * The zone_set_rss function is used to set the zone's RSS when we do the
+ * fast, approximate calculation in user-land.
+ */
+static int
+zone_set_rss(zone_t *zone, const uint64_t *prss)
+{
+	uint64_t rss;
+	int err;
+
+	if ((err = copyin(prss, &rss, sizeof (uint64_t))) == 0)
+		zone->zone_phys_mem = rss;
 
 	return (err);
 }
@@ -5996,6 +6036,7 @@ zone_setattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 	 */
 	zone_status = zone_status_get(zone);
 	if (attr != ZONE_ATTR_PMCAP_NOVER && attr != ZONE_ATTR_PMCAP_PAGEOUT &&
+	    attr != ZONE_ATTR_PG_FLT_DELAY && attr != ZONE_ATTR_RSS &&
 	    zone_status > ZONE_IS_READY) {
 		err = EINVAL;
 		goto done;
@@ -6023,6 +6064,12 @@ zone_setattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 		break;
 	case ZONE_ATTR_PMCAP_PAGEOUT:
 		err = zone_set_mcap_pageout(zone, (const uint64_t *)buf);
+		break;
+	case ZONE_ATTR_PG_FLT_DELAY:
+		err = zone_set_page_fault_delay(zone, (const uint32_t *)buf);
+		break;
+	case ZONE_ATTR_RSS:
+		err = zone_set_rss(zone, (const uint64_t *)buf);
 		break;
 	case ZONE_ATTR_SCHED_CLASS:
 		err = zone_set_sched_class(zone, (const char *)buf);
