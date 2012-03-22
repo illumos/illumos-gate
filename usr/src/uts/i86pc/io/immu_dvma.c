@@ -26,6 +26,9 @@
  * Copyright (c) 2009, Intel Corporation.
  * All rights reserved.
  */
+/*
+ * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ */
 
 /*
  * DVMA code
@@ -105,13 +108,6 @@ static int immu_mapobject(iommulib_handle_t handle, dev_info_t *dip,
     struct ddi_dma_req *dmareq, ddi_dma_obj_t *dmao);
 static int immu_unmapobject(iommulib_handle_t handle, dev_info_t *dip,
     dev_info_t *rdip, ddi_dma_handle_t dma_handle, ddi_dma_obj_t *dmao);
-static int immu_map(iommulib_handle_t handle, dev_info_t *dip,
-    dev_info_t *rdip, struct ddi_dma_req *dmareq,
-    ddi_dma_handle_t *dma_handle);
-static int immu_mctl(iommulib_handle_t handle, dev_info_t *dip,
-    dev_info_t *rdip, ddi_dma_handle_t dma_handle,
-    enum ddi_dma_ctlops request, off_t *offp, size_t *lenp,
-    caddr_t *objpp, uint_t cachefl);
 
 /* static Globals */
 
@@ -154,8 +150,6 @@ struct iommulib_ops immulib_ops = {
 	immu_win,
 	immu_mapobject,
 	immu_unmapobject,
-	immu_map,
-	immu_mctl
 };
 
 /*
@@ -3182,25 +3176,4 @@ immu_unmapobject(iommulib_handle_t handle, dev_info_t *dip,
 	if (ihp->ihp_npremapped > 0)
 		return (DDI_SUCCESS);
 	return (immu_unmap_dvmaseg(rdip, dmao));
-}
-
-/*ARGSUSED*/
-static int
-immu_map(iommulib_handle_t handle, dev_info_t *dip,
-    dev_info_t *rdip, struct ddi_dma_req *dmareq,
-    ddi_dma_handle_t *dma_handle)
-{
-	ASSERT(0);
-	return (DDI_FAILURE);
-}
-
-/*ARGSUSED*/
-static int
-immu_mctl(iommulib_handle_t handle, dev_info_t *dip,
-    dev_info_t *rdip, ddi_dma_handle_t dma_handle,
-    enum ddi_dma_ctlops request, off_t *offp, size_t *lenp,
-    caddr_t *objpp, uint_t cachefl)
-{
-	ASSERT(0);
-	return (DDI_FAILURE);
 }

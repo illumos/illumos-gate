@@ -23,7 +23,9 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
+/*
+ * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ */
 
 /*
  * socal - Serial Optical Channel Arbitrated Loop host adapter driver.
@@ -308,7 +310,7 @@ static struct bus_ops socal_bus_ops = {
 	0,			/* int (*bus_add_intrspec)(); */
 	0,			/* void	(*bus_remove_intrspec)(); */
 	i_ddi_map_fault,	/* int (*bus_map_fault)() */
-	ddi_dma_map,		/* int (*bus_dma_map)() */
+	0,			/* int (*bus_dma_map)() */
 	ddi_dma_allochdl,
 	ddi_dma_freehdl,
 	ddi_dma_bindhdl,

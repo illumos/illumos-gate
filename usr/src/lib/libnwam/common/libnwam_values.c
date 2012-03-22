@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <assert.h>
@@ -905,7 +906,6 @@ nwam_condition_to_condition_string(nwam_condition_object_type_t object_type,
 		break;
 	default:
 		return (NWAM_INVALID_ARG);
-		break;
 	}
 	if ((string = malloc(NWAM_MAX_VALUE_LEN)) == NULL)
 		return (NWAM_NO_MEMORY);

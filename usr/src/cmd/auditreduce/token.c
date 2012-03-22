@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 
@@ -224,7 +225,6 @@ arbitrary_data_token(adr_t *adr)
 			break;
 		default:
 			return (-2);
-			break;
 		}
 	}
 	return (-1);

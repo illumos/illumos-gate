@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <stdlib.h>
@@ -146,7 +147,6 @@ sc_get(sa_handle_t handle, int flags, int argc, char *argv[])
 			(void) printf(gettext("usage: %s\n"),
 			    sc_get_usage(USAGE_CTL_GET));
 			return (SA_OK);
-			break;
 		}
 	}
 
@@ -291,7 +291,6 @@ sc_set(sa_handle_t handle, int flags, int argc, char *argv[])
 			(void) printf(gettext("usage: %s\n"),
 			    sc_get_usage(USAGE_CTL_SET));
 			return (SA_OK);
-			break;
 		}
 	}
 

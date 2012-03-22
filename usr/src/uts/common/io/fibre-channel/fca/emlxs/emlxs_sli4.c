@@ -36,11 +36,8 @@ static int		emlxs_sli4_post_hdr_tmplates(emlxs_hba_t *hba,
 				MAILBOXQ *mbq);
 static int		emlxs_sli4_post_sgl_pages(emlxs_hba_t *hba,
 				MAILBOXQ *mbq);
-static int		emlxs_fcf_bind(emlxs_hba_t *hba);
 
-static int		emlxs_fcf_unbind(emlxs_hba_t *hba, uint32_t index);
-
-static int		emlxs_sli4_poll_eq(emlxs_hba_t *hba, EQ_DESC_t *eq);
+static int		emlxs_sli4_read_eq(emlxs_hba_t *hba, EQ_DESC_t *eq);
 
 extern void		emlxs_parse_prog_types(emlxs_hba_t *hba, char *types);
 
@@ -71,10 +68,10 @@ static uint32_t		emlxs_sli4_hba_init(emlxs_hba_t *hba);
 
 static uint32_t		emlxs_sli4_bde_setup(emlxs_port_t *port,
 				emlxs_buf_t *sbp);
-static uint32_t		emlxs_sli4_fct_bde_setup(emlxs_port_t *port,
-				emlxs_buf_t *sbp);
+
+
 static void		emlxs_sli4_issue_iocb_cmd(emlxs_hba_t *hba,
-				CHANNEL *rp, IOCBQ *iocb_cmd);
+				CHANNEL *cp, IOCBQ *iocb_cmd);
 static uint32_t		emlxs_sli4_issue_mbox_cmd(emlxs_hba_t *hba,
 				MAILBOXQ *mbq, int32_t flg, uint32_t tmo);
 static uint32_t		emlxs_sli4_issue_mbox_cmd4quiesce(emlxs_hba_t *hba,
@@ -104,12 +101,8 @@ static void		emlxs_sli4_resource_free(emlxs_hba_t *hba);
 
 static int		emlxs_sli4_resource_alloc(emlxs_hba_t *hba);
 
-static void		emlxs_sli4_destroy_queues(emlxs_hba_t *hba);
-
 static XRIobj_t		*emlxs_sli4_alloc_xri(emlxs_hba_t *hba,
-				emlxs_buf_t *sbp, RPIobj_t *rp);
-static void		emlxs_sli4_free_vpi(emlxs_hba_t *hba, emlxs_port_t *pp);
-
+				emlxs_buf_t *sbp, RPIobj_t *rpip);
 static void		emlxs_sli4_enable_intr(emlxs_hba_t *hba);
 
 static void		emlxs_sli4_disable_intr(emlxs_hba_t *hba, uint32_t att);
@@ -118,14 +111,15 @@ extern void		emlxs_sli4_timer(emlxs_hba_t *hba);
 
 static void		emlxs_sli4_timer_check_mbox(emlxs_hba_t *hba);
 
-extern void		emlxs_sli4_poll_erratt(emlxs_hba_t *hba);
+static void		emlxs_sli4_poll_erratt(emlxs_hba_t *hba);
 
 static XRIobj_t 	*emlxs_sli4_register_xri(emlxs_hba_t *hba,
 				emlxs_buf_t *sbp, uint16_t xri);
 
-static XRIobj_t 	*emlxs_sli4_reserve_xri(emlxs_hba_t *hba, RPIobj_t *rp);
-
+static XRIobj_t 	*emlxs_sli4_reserve_xri(emlxs_hba_t *hba,
+				RPIobj_t *rpip);
 static int		emlxs_check_hdw_ready(emlxs_hba_t *);
+
 
 /* Define SLI4 API functions */
 emlxs_sli_api_t emlxs_sli4_api = {
@@ -183,6 +177,7 @@ emlxs_sli4_online(emlxs_hba_t *hba)
 	uint32_t kern_update = 0;
 	emlxs_firmware_t hba_fw;
 	emlxs_firmware_t *fw;
+	uint16_t ssvid;
 
 	cfg = &CFG;
 	vpd = &VPD;
@@ -323,7 +318,7 @@ reset:
 
 	}
 
-emlxs_data_dump(hba, "RD_REV", (uint32_t *)mb, 18, 0);
+emlxs_data_dump(port, "RD_REV", (uint32_t *)mb, 18, 0);
 	if (mb->un.varRdRev4.sliLevel != 4) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_failed_msg,
 		    "Invalid read rev Version for SLI4: 0x%x",
@@ -374,8 +369,10 @@ emlxs_data_dump(hba, "RD_REV", (uint32_t *)mb, 18, 0);
 	emlxs_decode_label(vpd->opFwName, vpd->opFwName, 0);
 	emlxs_decode_label(vpd->postKernName, vpd->postKernName, 0);
 
-	if (hba->model_info.chip == EMLXS_BE_CHIP) {
+	if (hba->model_info.chip == EMLXS_BE2_CHIP) {
 		(void) strcpy(vpd->sli4FwLabel, "be2.ufi");
+	} else if (hba->model_info.chip == EMLXS_BE3_CHIP) {
+		(void) strcpy(vpd->sli4FwLabel, "be3.ufi");
 	} else {
 		(void) strcpy(vpd->sli4FwLabel, "sli4.fw");
 	}
@@ -479,6 +476,18 @@ emlxs_data_dump(hba, "RD_REV", (uint32_t *)mb, 18, 0);
 			}
 		}
 
+		/* HP CNA port indices start at 1 instead of 0 */
+		if ((hba->model_info.chip == EMLXS_BE2_CHIP) ||
+		    (hba->model_info.chip == EMLXS_BE3_CHIP)) {
+
+			ssvid = ddi_get16(hba->pci_acc_handle,
+			    (uint16_t *)(hba->pci_addr + PCI_SSVID_REGISTER));
+
+			if ((ssvid == PCI_SSVID_HP) && (vpd->port_index > 0)) {
+				vpd->port_index--;
+			}
+		}
+
 		/*
 		 * Now lets update hba->model_info with the real
 		 * VPD data, if any.
@@ -561,7 +570,8 @@ emlxs_data_dump(hba, "RD_REV", (uint32_t *)mb, 18, 0);
 		if (fw) {
 
 			/* Obtain current firmware version info */
-			if (hba->model_info.chip == EMLXS_BE_CHIP) {
+			if ((hba->model_info.chip == EMLXS_BE2_CHIP) ||
+			    (hba->model_info.chip == EMLXS_BE3_CHIP)) {
 				(void) emlxs_sli4_read_fw_version(hba, &hba_fw);
 			} else {
 				hba_fw.kern = vpd->postKernRev;
@@ -673,7 +683,7 @@ emlxs_data_dump(hba, "RD_REV", (uint32_t *)mb, 18, 0);
 		rval = EIO;
 		goto failed1;
 	}
-emlxs_data_dump(hba, "REQ_FEATURE", (uint32_t *)mb, 6, 0);
+emlxs_data_dump(port, "REQ_FEATURE", (uint32_t *)mb, 6, 0);
 
 	/* Make sure we get the features we requested */
 	if (mb->un.varReqFeatures.featuresRequested !=
@@ -709,7 +719,7 @@ emlxs_data_dump(hba, "REQ_FEATURE", (uint32_t *)mb, 6, 0);
 		rval = EIO;
 		goto failed1;
 	}
-emlxs_data_dump(hba, "READ_CONFIG4", (uint32_t *)mb, 18, 0);
+emlxs_data_dump(port, "READ_CONFIG4", (uint32_t *)mb, 18, 0);
 
 	hba->sli.sli4.XRICount = (mb->un.varRdConfig4.XRICount);
 	hba->sli.sli4.XRIBase = (mb->un.varRdConfig4.XRIBase);
@@ -740,7 +750,7 @@ emlxs_data_dump(hba, "READ_CONFIG4", (uint32_t *)mb, 18, 0);
 	hba->max_iotag = hba->sli.sli4.XRICount;
 
 	/* Save the link speed capabilities */
-	vpd->link_speed = mb->un.varRdConfig4.lmt;
+	vpd->link_speed = (uint16_t)mb->un.varRdConfig4.lmt;
 	emlxs_process_link_speed(hba);
 
 	/*
@@ -767,7 +777,7 @@ emlxs_data_dump(hba, "READ_CONFIG4", (uint32_t *)mb, 18, 0);
 		rval = ENOMEM;
 		goto failed2;
 	}
-emlxs_data_dump(hba, "XRIp", (uint32_t *)hba->sli.sli4.XRIp, 18, 0);
+emlxs_data_dump(port, "XRIp", (uint32_t *)hba->sli.sli4.XRIp, 18, 0);
 
 #if (EMLXS_MODREV >= EMLXS_MODREV5)
 	if ((cfg[CFG_NPIV_ENABLE].current) && (hba->flag & FC_NPIV_ENABLED)) {
@@ -837,7 +847,7 @@ emlxs_data_dump(hba, "XRIp", (uint32_t *)hba->sli.sli4.XRIp, 18, 0);
 	 * We need to get login parameters for NID
 	 */
 	(void) emlxs_mb_read_sparam(hba, mbq);
-	mp = (MATCHMAP *)(mbq->bp);
+	mp = (MATCHMAP *)mbq->bp;
 	if (emlxs_sli4_issue_mbox_cmd(hba, mbq, MBX_WAIT, 0) != MBX_SUCCESS) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_failed_msg,
 		    "Unable to read parameters. Mailbox cmd=%x status=%x",
@@ -848,7 +858,7 @@ emlxs_data_dump(hba, "XRIp", (uint32_t *)hba->sli.sli4.XRIp, 18, 0);
 	}
 
 	/* Free the buffer since we were polling */
-	(void) emlxs_mem_put(hba, MEM_BUF, (uint8_t *)mp);
+	emlxs_mem_put(hba, MEM_BUF, (void *)mp);
 	mp = NULL;
 
 	/* If no serial number in VPD data, then use the WWPN */
@@ -887,7 +897,7 @@ emlxs_data_dump(hba, "XRIp", (uint32_t *)hba->sli.sli4.XRIp, 18, 0);
 	}
 
 	/* Make attempt to set a port index */
-	if (vpd->port_index == -1) {
+	if (vpd->port_index == (uint32_t)-1) {
 		dev_info_t *p_dip;
 		dev_info_t *c_dip;
 
@@ -967,7 +977,7 @@ emlxs_data_dump(hba, "XRIp", (uint32_t *)hba->sli.sli4.XRIp, 18, 0);
 		if (emlxs_sli4_issue_mbox_cmd(hba, mbq, MBX_WAIT, 0)
 		    != MBX_SUCCESS) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_failed_msg,
-			    "Unable to initialize link. " \
+			    "Unable to initialize link. "
 			    "Mailbox cmd=%x status=%x",
 			    mb->mbxCommand, mb->mbxStatus);
 
@@ -992,6 +1002,8 @@ emlxs_data_dump(hba, "XRIp", (uint32_t *)hba->sli.sli4.XRIp, 18, 0);
 			DELAYMS(1000);
 			i--;
 		}
+	} else {
+		EMLXS_STATE_CHANGE(hba, FC_LINK_DOWN_PERSIST);
 	}
 
 	/*
@@ -1009,7 +1021,7 @@ failed3:
 	EMLXS_STATE_CHANGE(hba, FC_ERROR);
 
 	if (mp) {
-		(void) emlxs_mem_put(hba, MEM_BUF, (uint8_t *)mp);
+		emlxs_mem_put(hba, MEM_BUF, (void *)mp);
 		mp = NULL;
 	}
 
@@ -1146,7 +1158,7 @@ emlxs_sli4_map_hdw(emlxs_hba_t *hba)
 			goto failed;
 		}
 
-		hba->sli.sli4.bootstrapmb.virt = (uint8_t *)buf_info->virt;
+		hba->sli.sli4.bootstrapmb.virt = buf_info->virt;
 		hba->sli.sli4.bootstrapmb.phys = buf_info->phys;
 		hba->sli.sli4.bootstrapmb.size = EMLXS_BOOTSTRAP_MB_SIZE +
 		    MBOX_EXTENSION_SIZE;
@@ -1214,11 +1226,11 @@ emlxs_sli4_unmap_hdw(emlxs_hba_t *hba)
 			buf_info->flags = FC_MBUF_DMA;
 		}
 
-		buf_info->virt = (uint32_t *)hba->sli.sli4.bootstrapmb.virt;
+		buf_info->virt = hba->sli.sli4.bootstrapmb.virt;
 		buf_info->size = hba->sli.sli4.bootstrapmb.size;
 		emlxs_mem_free(hba, buf_info);
 
-		hba->sli.sli4.bootstrapmb.virt = 0;
+		hba->sli.sli4.bootstrapmb.virt = NULL;
 	}
 
 	return;
@@ -1404,13 +1416,13 @@ emlxs_init_bootstrap_mb(emlxs_hba_t *hba)
 	EMLXS_MPDATA_SYNC(hba->sli.sli4.bootstrapmb.dma_handle, 0,
 	    MAILBOX_CMD_BSIZE, DDI_DMA_SYNC_FORDEV);
 
-emlxs_data_dump(hba, "EndianIN", (uint32_t *)iptr, 6, 0);
+emlxs_data_dump(port, "EndianIN", (uint32_t *)iptr, 6, 0);
 	if (!emlxs_issue_bootstrap_mb(hba, tmo)) {
 		return (1);
 	}
 	EMLXS_MPDATA_SYNC(hba->sli.sli4.bootstrapmb.dma_handle, 0,
 	    MAILBOX_CMD_BSIZE, DDI_DMA_SYNC_FORKERNEL);
-emlxs_data_dump(hba, "EndianOUT", (uint32_t *)iptr, 6, 0);
+emlxs_data_dump(port, "EndianOUT", (uint32_t *)iptr, 6, 0);
 
 #ifdef FMA_SUPPORT
 	if (emlxs_fm_check_dma_handle(hba, hba->sli.sli4.bootstrapmb.dma_handle)
@@ -1432,7 +1444,7 @@ static uint32_t
 emlxs_sli4_hba_init(emlxs_hba_t *hba)
 {
 	int rc;
-	uint32_t i;
+	uint16_t i;
 	emlxs_port_t *vport;
 	emlxs_config_t *cfg = &CFG;
 	CHANNEL *cp;
@@ -1454,6 +1466,10 @@ emlxs_sli4_hba_init(emlxs_hba_t *hba)
 		vport = &VPORT(i);
 		vport->hba = hba;
 		vport->vpi = i;
+
+		vport->VPIobj.index = i;
+		vport->VPIobj.VPI = i;
+		vport->VPIobj.port = vport;
 	}
 
 	/* Set the max node count */
@@ -1497,7 +1513,7 @@ emlxs_sli4_hba_reset(emlxs_hba_t *hba, uint32_t restart, uint32_t skip_post,
 	MAILBOXQ mboxq;
 	uint32_t i;
 	uint32_t rc;
-	uint32_t channelno;
+	uint16_t channelno;
 
 	if (!cfg[CFG_RESET_ENABLE].current) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_reset_failed_msg,
@@ -1541,7 +1557,7 @@ emlxs_sli4_hba_reset(emlxs_hba_t *hba, uint32_t restart, uint32_t skip_post,
 			return (1);
 		}
 	}
-emlxs_data_dump(hba, "resetPort", (uint32_t *)&mboxq, 12, 0);
+emlxs_data_dump(port, "resetPort", (uint32_t *)&mboxq, 12, 0);
 
 	/* Reset the hba structure */
 	hba->flag &= FC_RESET_MASK;
@@ -1571,6 +1587,7 @@ emlxs_data_dump(hba, "resetPort", (uint32_t *)&mboxq, 12, 0);
 		vport->prev_did = 0;
 		vport->lip_type = 0;
 		bzero(&vport->fabric_sparam, sizeof (SERV_PARM));
+		bzero(&vport->prev_fabric_sparam, sizeof (SERV_PARM));
 
 		bzero((caddr_t)&vport->node_base, sizeof (NODELIST));
 		vport->node_base.nlp_Rpi = 0;
@@ -1672,7 +1689,6 @@ emlxs_pkt_to_sgl(emlxs_port_t *port, ULP_SGE64 *sge, fc_packet_t *pkt,
 	cnt = 0;
 	for (i = 0; i < cookie_cnt && size > 0; i++, cp++) {
 
-
 		sge_size = cp->dmac_size;
 		sge_addr = cp->dmac_laddress;
 		while (sge_size && size) {
@@ -1694,7 +1710,7 @@ emlxs_pkt_to_sgl(emlxs_port_t *port, ULP_SGE64 *sge, fc_packet_t *pkt,
 				stage_sge.offset = cnt;
 			}
 #ifdef DEBUG_SGE
-			emlxs_data_dump(hba, "SGE", (uint32_t *)&stage_sge,
+			emlxs_data_dump(port, "SGE", (uint32_t *)&stage_sge,
 			    4, 0);
 #endif
 			sge_addr += len;
@@ -1710,6 +1726,7 @@ emlxs_pkt_to_sgl(emlxs_port_t *port, ULP_SGE64 *sge, fc_packet_t *pkt,
 	}
 	BE_SWAP32_BCOPY((uint8_t *)&stage_sge, (uint8_t *)sge,
 	    sizeof (ULP_SGE64));
+
 	sge++;
 
 	*pcnt = cnt;
@@ -1723,7 +1740,7 @@ uint32_t
 emlxs_sli4_bde_setup(emlxs_port_t *port, emlxs_buf_t *sbp)
 {
 	fc_packet_t *pkt;
-	XRIobj_t *xp;
+	XRIobj_t *xrip;
 	ULP_SGE64 *sge;
 	emlxs_wqe_t *wqe;
 	IOCBQ *iocbq;
@@ -1735,8 +1752,8 @@ emlxs_sli4_bde_setup(emlxs_port_t *port, emlxs_buf_t *sbp)
 	iocbq = (IOCBQ *) &sbp->iocbq;
 	wqe = &iocbq->wqe;
 	pkt = PRIV2PKT(sbp);
-	xp = sbp->xp;
-	sge = xp->SGList.virt;
+	xrip = sbp->xrip;
+	sge = xrip->SGList.virt;
 
 #if (EMLXS_MODREV >= EMLXS_MODREV3)
 	cp_cmd = pkt->pkt_cmd_cookie;
@@ -1803,13 +1820,6 @@ emlxs_sli4_bde_setup(emlxs_port_t *port, emlxs_buf_t *sbp)
 } /* emlxs_sli4_bde_setup */
 
 
-/*ARGSUSED*/
-static uint32_t
-emlxs_sli4_fct_bde_setup(emlxs_port_t *port, emlxs_buf_t *sbp)
-{
-	return (0);
-
-} /* emlxs_sli4_fct_bde_setup */
 
 
 static void
@@ -1824,7 +1834,7 @@ emlxs_sli4_issue_iocb_cmd(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 	WQ_DESC_t *wq;
 	uint32_t flag;
 	uint32_t wqdb;
-	uint32_t next_wqe;
+	uint16_t next_wqe;
 	off_t offset;
 
 
@@ -1849,7 +1859,7 @@ emlxs_sli4_issue_iocb_cmd(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 	}
 
 	/* Attempt to acquire CMD_RING lock */
-	if (mutex_tryenter(&EMLXS_CMD_RING_LOCK(channelno)) == 0) {
+	if (mutex_tryenter(&EMLXS_QUE_LOCK(channelno)) == 0) {
 		/* Queue it for later */
 		if (iocbq) {
 			if ((hba->io_count -
@@ -1858,13 +1868,13 @@ emlxs_sli4_issue_iocb_cmd(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 				return;
 			} else {
 
-				mutex_enter(&EMLXS_CMD_RING_LOCK(channelno));
+				mutex_enter(&EMLXS_QUE_LOCK(channelno));
 			}
 		} else {
 			return;
 		}
 	}
-	/* CMD_RING_LOCK acquired */
+	/* EMLXS_QUE_LOCK acquired */
 
 	/* Throttle check only applies to non special iocb */
 	if (iocbq && (!(iocbq->flag & IOCB_SPECIAL))) {
@@ -1933,7 +1943,7 @@ sendit:
 		sbp = iocbq->sbp;
 		if (sbp) {
 			/* If exchange removed after wqe was prep'ed, drop it */
-			if (!(sbp->xp)) {
+			if (!(sbp->xrip)) {
 				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
 				    "Xmit WQE iotag: %x xri: %x aborted",
 				    wqe->RequestTag, wqe->XRITag);
@@ -1982,7 +1992,7 @@ sendit:
 			mutex_exit(&sbp->mtx);
 
 			atomic_add_32(&hba->io_active, 1);
-			sbp->xp->state |= RESOURCE_XRI_PENDING_IO;
+			sbp->xrip->flag |= EMLXS_XRI_PENDING_IO;
 		}
 
 
@@ -2014,7 +2024,7 @@ sendit:
 		BE_SWAP32_BCOPY((uint8_t *)wqe, (uint8_t *)wqeslot,
 		    sizeof (emlxs_wqe_t));
 #ifdef DEBUG_WQE
-		emlxs_data_dump(hba, "WQE", (uint32_t *)wqe, 18, 0);
+		emlxs_data_dump(port, "WQE", (uint32_t *)wqe, 18, 0);
 #endif
 		offset = (off_t)((uint64_t)((unsigned long)
 		    wq->addr.virt) -
@@ -2043,7 +2053,7 @@ sendit:
 		 */
 
 		if (!sbp) {
-			(void) emlxs_mem_put(hba, MEM_IOCB, (uint8_t *)iocbq);
+			emlxs_mem_put(hba, MEM_IOCB, (void *)iocbq);
 		}
 
 		if (iocbq && (!(flag & IOCB_SPECIAL))) {
@@ -2070,7 +2080,7 @@ sendit:
 		iocbq = emlxs_tx_get(cp, 1);
 	}
 
-	mutex_exit(&EMLXS_CMD_RING_LOCK(channelno));
+	mutex_exit(&EMLXS_QUE_LOCK(channelno));
 
 	return;
 
@@ -2081,7 +2091,7 @@ busy:
 		HBASTATS.IocbRingFull[channelno]++;
 	}
 
-	mutex_exit(&EMLXS_CMD_RING_LOCK(channelno));
+	mutex_exit(&EMLXS_QUE_LOCK(channelno));
 
 	return;
 
@@ -2090,9 +2100,10 @@ busy:
 
 /*ARGSUSED*/
 static uint32_t
-emlxs_sli4_issue_mq(emlxs_hba_t *hba, MAILBOX4 *mqe, MAILBOX *mb, uint32_t tmo)
+emlxs_sli4_issue_mq(emlxs_port_t *port, MAILBOX4 *mqe, MAILBOX *mb,
+    uint32_t tmo)
 {
-	emlxs_port_t	*port = &PPORT;
+	emlxs_hba_t *hba = HBA;
 	MAILBOXQ	*mbq;
 	MAILBOX4	*mb4;
 	MATCHMAP	*mp;
@@ -2103,7 +2114,7 @@ emlxs_sli4_issue_mq(emlxs_hba_t *hba, MAILBOX4 *mqe, MAILBOX *mb, uint32_t tmo)
 	mbq = (MAILBOXQ *)mb;
 	mb4 = (MAILBOX4 *)mb;
 	mp = (MATCHMAP *) mbq->nonembed;
-	hba->mbox_mqe = (uint32_t *)mqe;
+	hba->mbox_mqe = (void *)mqe;
 
 	if ((mb->mbxCommand != MBX_SLI_CONFIG) ||
 	    (mb4->un.varSLIConfig.be.embedded)) {
@@ -2117,7 +2128,10 @@ emlxs_sli4_issue_mq(emlxs_hba_t *hba, MAILBOX4 *mqe, MAILBOX *mb, uint32_t tmo)
 		EMLXS_MPDATA_SYNC(hba->sli.sli4.mq.addr.dma_handle, 0,
 		    4096, DDI_DMA_SYNC_FORDEV);
 
-		emlxs_data_dump(hba, "MBOX CMD", (uint32_t *)mqe, 18, 0);
+		if (mb->mbxCommand != MBX_HEARTBEAT) {
+			emlxs_data_dump(port, "MBOX CMD", (uint32_t *)mqe,
+			    18, 0);
+		}
 	} else {
 		/* SLI_CONFIG and non-embedded */
 
@@ -2151,18 +2165,20 @@ emlxs_sli4_issue_mq(emlxs_hba_t *hba, MAILBOX4 *mqe, MAILBOX *mb, uint32_t tmo)
 		EMLXS_MPDATA_SYNC(hba->sli.sli4.mq.addr.dma_handle, offset,
 		    4096, DDI_DMA_SYNC_FORDEV);
 
-		emlxs_data_dump(hba, "MBOX EXT", (uint32_t *)mqe, 12, 0);
+		emlxs_data_dump(port, "MBOX EXT", (uint32_t *)mqe, 12, 0);
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mbox_detail_msg,
 		    "Extension Addr %p %p", mp->phys, (uint32_t *)(mp->virt));
-		emlxs_data_dump(hba, "EXT AREA", (uint32_t *)mp->virt, 24, 0);
+		emlxs_data_dump(port, "EXT AREA", (uint32_t *)mp->virt, 24, 0);
 	}
 
 	/* Ring the MQ Doorbell */
 	mqdb = hba->sli.sli4.mq.qid;
 	mqdb |= ((1 << MQ_DB_POP_SHIFT) & MQ_DB_POP_MASK);
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-	    "MQ RING: %08x", mqdb);
+	if (mb->mbxCommand != MBX_HEARTBEAT) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
+		    "MQ RING: %08x", mqdb);
+	}
 
 	WRITE_BAR2_REG(hba, FC_MQDB_REG(hba), mqdb);
 	return (MBX_SUCCESS);
@@ -2184,7 +2200,7 @@ emlxs_sli4_issue_bootstrap(emlxs_hba_t *hba, MAILBOX *mb, uint32_t tmo)
 	mbq = (MAILBOXQ *)mb;
 	mb4 = (MAILBOX4 *)mb;
 	mp = (MATCHMAP *) mbq->nonembed;
-	hba->mbox_mqe = (uint32_t *)hba->sli.sli4.bootstrapmb.virt;
+	hba->mbox_mqe = hba->sli.sli4.bootstrapmb.virt;
 
 	if ((mb->mbxCommand != MBX_SLI_CONFIG) ||
 	    (mb4->un.varSLIConfig.be.embedded)) {
@@ -2198,7 +2214,7 @@ emlxs_sli4_issue_bootstrap(emlxs_hba_t *hba, MAILBOX *mb, uint32_t tmo)
 
 		EMLXS_MPDATA_SYNC(hba->sli.sli4.bootstrapmb.dma_handle, 0,
 		    MAILBOX_CMD_SLI4_BSIZE, DDI_DMA_SYNC_FORDEV);
-		emlxs_data_dump(hba, "MBOX CMD", iptr, 18, 0);
+		emlxs_data_dump(port, "MBOX CMD", iptr, 18, 0);
 	} else {
 		/*
 		 * If this is not embedded, the bootstrap mailbox area
@@ -2228,12 +2244,12 @@ emlxs_sli4_issue_bootstrap(emlxs_hba_t *hba, MAILBOX *mb, uint32_t tmo)
 		    EMLXS_BOOTSTRAP_MB_SIZE + MBOX_EXTENSION_SIZE,
 		    DDI_DMA_SYNC_FORDEV);
 
-		emlxs_data_dump(hba, "MBOX EXT", iptr, 12, 0);
+		emlxs_data_dump(port, "MBOX EXT", iptr, 12, 0);
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mbox_detail_msg,
 		    "Extension Addr %p %p", mp->phys,
 		    (uint32_t *)((uint8_t *)mp->virt));
 		iptr = (uint32_t *)((uint8_t *)mp->virt);
-		emlxs_data_dump(hba, "EXT AREA", (uint32_t *)mp->virt, 24, 0);
+		emlxs_data_dump(port, "EXT AREA", (uint32_t *)mp->virt, 24, 0);
 	}
 
 
@@ -2251,7 +2267,7 @@ emlxs_sli4_issue_bootstrap(emlxs_hba_t *hba, MAILBOX *mb, uint32_t tmo)
 		BE_SWAP32_BCOPY((uint8_t *)iptr, (uint8_t *)mb,
 		    MAILBOX_CMD_SLI4_BSIZE);
 
-		emlxs_data_dump(hba, "MBOX CMPL", iptr, 18, 0);
+		emlxs_data_dump(port, "MBOX CMP", iptr, 18, 0);
 
 	} else {
 		EMLXS_MPDATA_SYNC(hba->sli.sli4.bootstrapmb.dma_handle, 0,
@@ -2267,9 +2283,9 @@ emlxs_sli4_issue_bootstrap(emlxs_hba_t *hba, MAILBOX *mb, uint32_t tmo)
 		BE_SWAP32_BCOPY((uint8_t *)iptr, (uint8_t *)mb,
 		    MAILBOX_CMD_SLI4_BSIZE);
 
-		emlxs_data_dump(hba, "MBOX CMPL", iptr, 12, 0);
+		emlxs_data_dump(port, "MBOX CMP", iptr, 12, 0);
 		iptr = (uint32_t *)((uint8_t *)mp->virt);
-		emlxs_data_dump(hba, "EXT AREA", (uint32_t *)iptr, 24, 0);
+		emlxs_data_dump(port, "EXT AREA", (uint32_t *)iptr, 24, 0);
 	}
 
 #ifdef FMA_SUPPORT
@@ -2305,7 +2321,7 @@ static uint32_t
 emlxs_sli4_issue_mbox_cmd(emlxs_hba_t *hba, MAILBOXQ *mbq, int32_t flag,
     uint32_t tmo)
 {
-	emlxs_port_t	*port = &PPORT;
+	emlxs_port_t	*port;
 	MAILBOX4	*mb4;
 	MAILBOX		*mb;
 	mbox_rsp_hdr_t	*hdr_rsp;
@@ -2314,6 +2330,12 @@ emlxs_sli4_issue_mbox_cmd(emlxs_hba_t *hba, MAILBOXQ *mbq, int32_t flag,
 	uint32_t	rc;
 	uint32_t	i;
 	uint32_t	tmo_local;
+
+	if (!mbq->port) {
+		mbq->port = &PPORT;
+	}
+
+	port = (emlxs_port_t *)mbq->port;
 
 	mb4 = (MAILBOX4 *)mbq;
 	mb = (MAILBOX *)mbq;
@@ -2364,7 +2386,7 @@ emlxs_sli4_issue_mbox_cmd(emlxs_hba_t *hba, MAILBOXQ *mbq, int32_t flag,
 			mutex_exit(&EMLXS_PORT_LOCK);
 
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mbox_detail_msg,
-			    "Mailbox Queue missing %s failed",
+			    "Interrupts disabled. %s failed.",
 			    emlxs_mb_cmd_xlate(mb->mbxCommand));
 
 			return (MBX_HARDWARE_ERROR);
@@ -2427,6 +2449,10 @@ emlxs_sli4_issue_mbox_cmd(emlxs_hba_t *hba, MAILBOXQ *mbq, int32_t flag,
 	/* Initialize mailbox area */
 	emlxs_mb_init(hba, mbq, flag, tmo);
 
+	if (mb->mbxCommand == MBX_DOWN_LINK) {
+		hba->sli.sli4.flag |= EMLXS_SLI4_DOWN_LINK;
+	}
+
 	mutex_exit(&EMLXS_PORT_LOCK);
 	switch (flag) {
 
@@ -2456,10 +2482,10 @@ emlxs_sli4_issue_mbox_cmd(emlxs_hba_t *hba, MAILBOXQ *mbq, int32_t flag,
 			    ((MATCHMAP *)mbq->bp)->virt,
 			    ((MATCHMAP *)mbq->bp)->phys,
 			    ((MATCHMAP *)mbq->bp)->size);
-			emlxs_data_dump(hba, "DATA",
+			emlxs_data_dump(port, "DATA",
 			    (uint32_t *)(((MATCHMAP *)mbq->bp)->virt), 30, 0);
 		}
-		rc = emlxs_sli4_issue_mq(hba, (MAILBOX4 *)iptr, mb, tmo_local);
+		rc = emlxs_sli4_issue_mq(port, (MAILBOX4 *)iptr, mb, tmo_local);
 		break;
 
 	case MBX_POLL:
@@ -2491,7 +2517,7 @@ emlxs_sli4_issue_mbox_cmd(emlxs_hba_t *hba, MAILBOXQ *mbq, int32_t flag,
 			    /* && mb->mbxCommand != MBX_DUMP_MEMORY */) {
 				EMLXS_MSGF(EMLXS_CONTEXT,
 				    &emlxs_mbox_detail_msg,
-				    "Completed.   %s: mb=%p status=%x Poll. " \
+				    "Completed.   %s: mb=%p status=%x Poll. "
 				    "embedded %d",
 				    emlxs_mb_cmd_xlate(mb->mbxCommand), mb, rc,
 				    ((mb->mbxCommand != MBX_SLI_CONFIG) ? 1 :
@@ -2512,6 +2538,12 @@ emlxs_sli4_issue_mbox_cmd(emlxs_hba_t *hba, MAILBOXQ *mbq, int32_t flag,
 		if (mp) {
 			hdr_rsp = (mbox_rsp_hdr_t *)mp->virt;
 			if (hdr_rsp->status) {
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_mbox_detail_msg,
+				    "%s: MBX_NONEMBED_ERROR: 0x%x, 0x%x",
+				    emlxs_mb_cmd_xlate(mb->mbxCommand),
+				    hdr_rsp->status, hdr_rsp->extra_status);
+
 				mb->mbxStatus = MBX_NONEMBED_ERROR;
 			}
 		}
@@ -2523,8 +2555,7 @@ emlxs_sli4_issue_mbox_cmd(emlxs_hba_t *hba, MAILBOXQ *mbq, int32_t flag,
 			/* Attempt to send pending mailboxes */
 			i =  emlxs_sli4_issue_mbox_cmd(hba, mbq, MBX_NOWAIT, 0);
 			if ((i != MBX_BUSY) && (i != MBX_SUCCESS)) {
-				(void) emlxs_mem_put(hba, MEM_MBOX,
-				    (uint8_t *)mbq);
+				emlxs_mem_put(hba, MEM_MBOX, (void *)mbq);
 			}
 		}
 		break;
@@ -2546,7 +2577,7 @@ emlxs_sli4_issue_mbox_cmd(emlxs_hba_t *hba, MAILBOXQ *mbq, int32_t flag,
 			hba->sli.sli4.mq.host_index = 0;
 		}
 
-		rc = emlxs_sli4_issue_mq(hba, (MAILBOX4 *)iptr, mb, tmo_local);
+		rc = emlxs_sli4_issue_mq(port, (MAILBOX4 *)iptr, mb, tmo_local);
 
 		if (rc != MBX_SUCCESS) {
 			break;
@@ -2565,6 +2596,12 @@ emlxs_sli4_issue_mbox_cmd(emlxs_hba_t *hba, MAILBOXQ *mbq, int32_t flag,
 		if (mp) {
 			hdr_rsp = (mbox_rsp_hdr_t *)mp->virt;
 			if (hdr_rsp->status) {
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_mbox_detail_msg,
+				    "%s: MBX_NONEMBED_ERROR: 0x%x, 0x%x",
+				    emlxs_mb_cmd_xlate(mb->mbxCommand),
+				    hdr_rsp->status, hdr_rsp->extra_status);
+
 				mb->mbxStatus = MBX_NONEMBED_ERROR;
 			}
 		}
@@ -2581,7 +2618,7 @@ emlxs_sli4_issue_mbox_cmd(emlxs_hba_t *hba, MAILBOXQ *mbq, int32_t flag,
 			    /* && mb->mbxCommand != MBX_DUMP_MEMORY */) {
 				EMLXS_MSGF(EMLXS_CONTEXT,
 				    &emlxs_mbox_detail_msg,
-				    "Completed.   %s: mb=%p status=%x Sleep. " \
+				    "Completed.   %s: mb=%p status=%x Sleep. "
 				    "embedded %d",
 				    emlxs_mb_cmd_xlate(mb->mbxCommand), mb, rc,
 				    ((mb->mbxCommand != MBX_SLI_CONFIG) ? 1 :
@@ -2659,6 +2696,12 @@ emlxs_sli4_issue_mbox_cmd4quiesce(emlxs_hba_t *hba, MAILBOXQ *mbq, int32_t flag,
 		if (mp) {
 			hdr_rsp = (mbox_rsp_hdr_t *)mp->virt;
 			if (hdr_rsp->status) {
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_mbox_detail_msg,
+				    "%s: MBX_NONEMBED_ERROR: 0x%x, 0x%x",
+				    emlxs_mb_cmd_xlate(mb->mbxCommand),
+				    hdr_rsp->status, hdr_rsp->extra_status);
+
 				mb->mbxStatus = MBX_NONEMBED_ERROR;
 			}
 		}
@@ -2691,8 +2734,8 @@ emlxs_sli4_prep_fcp_iocb(emlxs_port_t *port, emlxs_buf_t *sbp, int channel)
 	emlxs_hba_t *hba = HBA;
 	fc_packet_t *pkt;
 	CHANNEL *cp;
-	RPIobj_t *rp;
-	XRIobj_t *xp;
+	RPIobj_t *rpip;
+	XRIobj_t *xrip;
 	emlxs_wqe_t *wqe;
 	IOCBQ *iocbq;
 	NODELIST *node;
@@ -2713,9 +2756,9 @@ emlxs_sli4_prep_fcp_iocb(emlxs_port_t *port, emlxs_buf_t *sbp, int channel)
 
 	/* Find target node object */
 	node = (NODELIST *)iocbq->node;
-	rp = EMLXS_NODE_TO_RPI(hba, node);
+	rpip = EMLXS_NODE_TO_RPI(port, node);
 
-	if (!rp) {
+	if (!rpip) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
 		    "Unable to find rpi. did=0x%x", did);
 
@@ -2726,9 +2769,9 @@ emlxs_sli4_prep_fcp_iocb(emlxs_port_t *port, emlxs_buf_t *sbp, int channel)
 
 	sbp->channel = cp;
 	/* Next allocate an Exchange for this command */
-	xp = emlxs_sli4_alloc_xri(hba, sbp, rp);
+	xrip = emlxs_sli4_alloc_xri(hba, sbp, rpip);
 
-	if (!xp) {
+	if (!xrip) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
 		    "Adapter Busy. Unable to allocate exchange. did=0x%x", did);
 
@@ -2739,14 +2782,14 @@ emlxs_sli4_prep_fcp_iocb(emlxs_port_t *port, emlxs_buf_t *sbp, int channel)
 
 #ifdef SLI4_FASTPATH_DEBUG
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,  /* DEBUG */
-	    "Prep FCP iotag: %x xri: %x", iotag, xp->XRI);
+	    "Prep FCP iotag: %x xri: %x", iotag, xrip->XRI);
 #endif
 
 	/* Indicate this is a FCP cmd */
 	iocbq->flag |= IOCB_FCP_CMD;
 
 	if (emlxs_sli4_bde_setup(port, sbp)) {
-		emlxs_sli4_free_xri(hba, sbp, xp);
+		emlxs_sli4_free_xri(hba, sbp, xrip, 1);
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
 		    "Adapter Busy. Unable to setup SGE. did=0x%x", did);
 
@@ -2757,22 +2800,22 @@ emlxs_sli4_prep_fcp_iocb(emlxs_port_t *port, emlxs_buf_t *sbp, int channel)
 	/* DEBUG */
 #ifdef DEBUG_FCP
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-	    "SGLaddr virt %p phys %p size %d", xp->SGList.virt,
-	    xp->SGList.phys, pkt->pkt_datalen);
-	emlxs_data_dump(hba, "SGL", (uint32_t *)xp->SGList.virt, 20, 0);
+	    "SGLaddr virt %p phys %p size %d", xrip->SGList.virt,
+	    xrip->SGList.phys, pkt->pkt_datalen);
+	emlxs_data_dump(port, "SGL", (uint32_t *)xrip->SGList.virt, 20, 0);
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
 	    "CMD virt %p len %d:%d:%d",
 	    pkt->pkt_cmd, pkt->pkt_cmdlen, pkt->pkt_rsplen, pkt->pkt_datalen);
-	emlxs_data_dump(hba, "FCP CMD", (uint32_t *)pkt->pkt_cmd, 10, 0);
+	emlxs_data_dump(port, "FCP CMD", (uint32_t *)pkt->pkt_cmd, 10, 0);
 #endif
 
 	offset = (off_t)((uint64_t)((unsigned long)
-	    xp->SGList.virt) -
+	    xrip->SGList.virt) -
 	    (uint64_t)((unsigned long)
 	    hba->sli.sli4.slim2.virt));
 
-	EMLXS_MPDATA_SYNC(xp->SGList.dma_handle, offset,
-	    xp->SGList.size, DDI_DMA_SYNC_FORDEV);
+	EMLXS_MPDATA_SYNC(xrip->SGList.dma_handle, offset,
+	    xrip->SGList.size, DDI_DMA_SYNC_FORDEV);
 
 	/* if device is FCP-2 device, set the following bit */
 	/* that says to run the FC-TAPE protocol. */
@@ -2793,9 +2836,9 @@ emlxs_sli4_prep_fcp_iocb(emlxs_port_t *port, emlxs_buf_t *sbp, int channel)
 	}
 	wqe->un.FcpCmd.TotalTransferCount = pkt->pkt_datalen;
 
-	wqe->ContextTag = rp->RPI;
+	wqe->ContextTag = rpip->RPI;
 	wqe->ContextType = WQE_RPI_CONTEXT;
-	wqe->XRITag = xp->XRI;
+	wqe->XRITag = xrip->XRI;
 	wqe->Timer =
 	    ((pkt->pkt_timeout > 0xff) ? 0 : pkt->pkt_timeout);
 
@@ -2838,9 +2881,9 @@ emlxs_sli4_prep_els_iocb(emlxs_port_t *port, emlxs_buf_t *sbp)
 	IOCBQ *iocbq;
 	IOCB *iocb;
 	emlxs_wqe_t *wqe;
-	FCFIobj_t *fp;
-	RPIobj_t *rp = NULL;
-	XRIobj_t *xp;
+	FCFIobj_t *fcfp;
+	RPIobj_t *rpip = NULL;
+	XRIobj_t *xrip;
 	CHANNEL *cp;
 	uint32_t did;
 	uint32_t cmd;
@@ -2882,14 +2925,16 @@ emlxs_sli4_prep_els_iocb(emlxs_port_t *port, emlxs_buf_t *sbp)
 	sge->addrLow = PADDR_LO(cp_cmd->dmac_laddress);
 	sge->length = pkt->pkt_cmdlen;
 	sge->offset = 0;
+	sge->reserved = 0;
 
 	/* Initalize iocb */
 	if (pkt->pkt_tran_type == FC_PKT_OUTBOUND) {
 		/* ELS Response */
 
-		xp = emlxs_sli4_register_xri(hba, sbp, pkt->pkt_cmd_fhdr.rx_id);
+		xrip = emlxs_sli4_register_xri(hba, sbp,
+		    pkt->pkt_cmd_fhdr.rx_id);
 
-		if (!xp) {
+		if (!xrip) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_failed_msg,
 			    "Unable to find XRI. rxid=%x",
 			    pkt->pkt_cmd_fhdr.rx_id);
@@ -2899,9 +2944,9 @@ emlxs_sli4_prep_els_iocb(emlxs_port_t *port, emlxs_buf_t *sbp)
 			return (0xff);
 		}
 
-		rp = xp->RPIp;
+		rpip = xrip->rpip;
 
-		if (!rp) {
+		if (!rpip) {
 			/* This means that we had a node registered */
 			/* when the unsol request came in but the node */
 			/* has since been unregistered. */
@@ -2916,7 +2961,7 @@ emlxs_sli4_prep_els_iocb(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
 		    "Prep ELS XRI: xri=%x iotag=%x oxid=%x rpi=%x",
-		    xp->XRI, xp->iotag, xp->rx_id, rp->RPI);
+		    xrip->XRI, xrip->iotag, xrip->rx_id, rpip->RPI);
 
 		wqe->Command = CMD_XMIT_ELS_RSP64_CX;
 		wqe->CmdType = WQE_TYPE_GEN;
@@ -2931,39 +2976,39 @@ emlxs_sli4_prep_els_iocb(emlxs_port_t *port, emlxs_buf_t *sbp)
 		sge->last = 1;
 		/* Now sge is fully staged */
 
-		sge = xp->SGList.virt;
+		sge = xrip->SGList.virt;
 		BE_SWAP32_BCOPY((uint8_t *)&stage_sge, (uint8_t *)sge,
 		    sizeof (ULP_SGE64));
 
-		wqe->ContextTag = port->vpi + hba->vpi_base;
+		wqe->ContextTag = port->VPIobj.VPI;
 		wqe->ContextType = WQE_VPI_CONTEXT;
-		wqe->OXId = xp->rx_id;
+		wqe->OXId = xrip->rx_id;
 
 	} else {
 		/* ELS Request */
 
 		node = (emlxs_node_t *)iocbq->node;
-		rp = EMLXS_NODE_TO_RPI(hba, node);
+		rpip = EMLXS_NODE_TO_RPI(port, node);
+		fcfp = port->VPIobj.vfip->fcfp;
 
-		if (!rp) {
-			fp = hba->sli.sli4.FCFIp;
-			rp = &fp->scratch_rpi;
+		if (!rpip) {
+			rpip = port->VPIobj.rpip;
 		}
 
 		/* Next allocate an Exchange for this command */
-		xp = emlxs_sli4_alloc_xri(hba, sbp, rp);
+		xrip = emlxs_sli4_alloc_xri(hba, sbp, rpip);
 
-		if (!xp) {
+		if (!xrip) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
-			    "Adapter Busy. Unable to allocate exchange. " \
+			    "Adapter Busy. Unable to allocate exchange. "
 			    "did=0x%x", did);
 
 			return (FC_TRAN_BUSY);
 		}
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "Prep ELS XRI: xri=%x iotag=%x rpi=%x", xp->XRI,
-		    xp->iotag, rp->RPI);
+		    "Prep ELS XRI: xri=%x iotag=%x rpi=%x", xrip->XRI,
+		    xrip->iotag, rpip->RPI);
 
 		wqe->Command = CMD_ELS_REQUEST64_CR;
 		wqe->CmdType = WQE_TYPE_ELS;
@@ -2978,7 +3023,7 @@ emlxs_sli4_prep_els_iocb(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 		sge->last = 0;
 
-		sge = xp->SGList.virt;
+		sge = xrip->SGList.virt;
 		BE_SWAP32_BCOPY((uint8_t *)&stage_sge, (uint8_t *)sge,
 		    sizeof (ULP_SGE64));
 
@@ -2994,18 +3039,19 @@ emlxs_sli4_prep_els_iocb(emlxs_port_t *port, emlxs_buf_t *sbp)
 		sge->last = 1;
 		/* Now sge is fully staged */
 
-		sge = xp->SGList.virt;
+		sge = xrip->SGList.virt;
 		sge++;
 		BE_SWAP32_BCOPY((uint8_t *)&stage_sge, (uint8_t *)sge,
 		    sizeof (ULP_SGE64));
 #ifdef DEBUG_ELS
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
 		    "SGLaddr virt %p phys %p",
-		    xp->SGList.virt, xp->SGList.phys);
+		    xrip->SGList.virt, xrip->SGList.phys);
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
 		    "PAYLOAD virt %p phys %p",
 		    pkt->pkt_cmd, cp_cmd->dmac_laddress);
-		emlxs_data_dump(hba, "SGL", (uint32_t *)xp->SGList.virt, 12, 0);
+		emlxs_data_dump(port, "SGL", (uint32_t *)xrip->SGList.virt,
+		    12, 0);
 #endif
 
 		cmd = *((uint32_t *)pkt->pkt_cmd);
@@ -3014,7 +3060,7 @@ emlxs_sli4_prep_els_iocb(emlxs_port_t *port, emlxs_buf_t *sbp)
 		switch (cmd) {
 		case ELS_CMD_FLOGI:
 			wqe->un.ElsCmd.SP = 1;
-			wqe->ContextTag = fp->FCFI;
+			wqe->ContextTag = fcfp->FCFI;
 			wqe->ContextType = WQE_FCFI_CONTEXT;
 			if (hba->flag & FC_FIP_SUPPORTED) {
 				wqe->CmdType |= WQE_TYPE_MASK_FIP;
@@ -3023,7 +3069,7 @@ emlxs_sli4_prep_els_iocb(emlxs_port_t *port, emlxs_buf_t *sbp)
 			break;
 		case ELS_CMD_FDISC:
 			wqe->un.ElsCmd.SP = 1;
-			wqe->ContextTag = port->vpi + hba->vpi_base;
+			wqe->ContextTag = port->VPIobj.VPI;
 			wqe->ContextType = WQE_VPI_CONTEXT;
 			if (hba->flag & FC_FIP_SUPPORTED) {
 				wqe->CmdType |= WQE_TYPE_MASK_FIP;
@@ -3031,12 +3077,16 @@ emlxs_sli4_prep_els_iocb(emlxs_port_t *port, emlxs_buf_t *sbp)
 			}
 			break;
 		case ELS_CMD_LOGO:
-			wqe->ContextTag = port->vpi + hba->vpi_base;
-			wqe->ContextType = WQE_VPI_CONTEXT;
-			if ((hba->flag & FC_FIP_SUPPORTED) &&
-			    (did == FABRIC_DID)) {
-				wqe->CmdType |= WQE_TYPE_MASK_FIP;
-				wqe->ELSId |= WQE_ELSID_LOGO;
+			if (did == FABRIC_DID) {
+				wqe->ContextTag = fcfp->FCFI;
+				wqe->ContextType = WQE_FCFI_CONTEXT;
+				if (hba->flag & FC_FIP_SUPPORTED) {
+					wqe->CmdType |= WQE_TYPE_MASK_FIP;
+					wqe->ELSId |= WQE_ELSID_LOGO;
+				}
+			} else {
+				wqe->ContextTag = port->VPIobj.VPI;
+				wqe->ContextType = WQE_VPI_CONTEXT;
 			}
 			break;
 
@@ -3044,7 +3094,7 @@ emlxs_sli4_prep_els_iocb(emlxs_port_t *port, emlxs_buf_t *sbp)
 		case ELS_CMD_PLOGI:
 		case ELS_CMD_PRLI:
 		default:
-			wqe->ContextTag = port->vpi + hba->vpi_base;
+			wqe->ContextTag = port->VPIobj.VPI;
 			wqe->ContextType = WQE_VPI_CONTEXT;
 			break;
 		}
@@ -3053,12 +3103,12 @@ emlxs_sli4_prep_els_iocb(emlxs_port_t *port, emlxs_buf_t *sbp)
 	}
 
 	offset = (off_t)((uint64_t)((unsigned long)
-	    xp->SGList.virt) -
+	    xrip->SGList.virt) -
 	    (uint64_t)((unsigned long)
 	    hba->sli.sli4.slim2.virt));
 
-	EMLXS_MPDATA_SYNC(xp->SGList.dma_handle, offset,
-	    xp->SGList.size, DDI_DMA_SYNC_FORDEV);
+	EMLXS_MPDATA_SYNC(xrip->SGList.dma_handle, offset,
+	    xrip->SGList.size, DDI_DMA_SYNC_FORDEV);
 
 	if (pkt->pkt_cmd_fhdr.f_ctl & F_CTL_CHAINED_SEQ) {
 		wqe->CCPE = 1;
@@ -3075,8 +3125,8 @@ emlxs_sli4_prep_els_iocb(emlxs_port_t *port, emlxs_buf_t *sbp)
 		break;
 	}
 	sbp->class = wqe->Class;
-	wqe->XRITag = xp->XRI;
-	wqe->RequestTag = xp->iotag;
+	wqe->XRITag = xrip->XRI;
+	wqe->RequestTag = xrip->iotag;
 	wqe->CQId = 0x3ff;
 	return (FC_SUCCESS);
 
@@ -3094,8 +3144,8 @@ emlxs_sli4_prep_ct_iocb(emlxs_port_t *port, emlxs_buf_t *sbp)
 	emlxs_wqe_t *wqe;
 	NODELIST *node = NULL;
 	CHANNEL *cp;
-	RPIobj_t *rp;
-	XRIobj_t *xp;
+	RPIobj_t *rpip;
+	XRIobj_t *xrip;
 	uint32_t did;
 	off_t offset;
 
@@ -3120,9 +3170,10 @@ emlxs_sli4_prep_ct_iocb(emlxs_port_t *port, emlxs_buf_t *sbp)
 	if (pkt->pkt_tran_type == FC_PKT_OUTBOUND) {
 		/* CT Response */
 
-		xp = emlxs_sli4_register_xri(hba, sbp, pkt->pkt_cmd_fhdr.rx_id);
+		xrip = emlxs_sli4_register_xri(hba, sbp,
+		    pkt->pkt_cmd_fhdr.rx_id);
 
-		if (!xp) {
+		if (!xrip) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_failed_msg,
 			    "Unable to find XRI. rxid=%x",
 			    pkt->pkt_cmd_fhdr.rx_id);
@@ -3132,9 +3183,9 @@ emlxs_sli4_prep_ct_iocb(emlxs_port_t *port, emlxs_buf_t *sbp)
 			return (0xff);
 		}
 
-		rp = xp->RPIp;
+		rpip = xrip->rpip;
 
-		if (!rp) {
+		if (!rpip) {
 			/* This means that we had a node registered */
 			/* when the unsol request came in but the node */
 			/* has since been unregistered. */
@@ -3148,8 +3199,8 @@ emlxs_sli4_prep_ct_iocb(emlxs_port_t *port, emlxs_buf_t *sbp)
 		}
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "Prep CT XRI: xri=%x iotag=%x oxid=%x", xp->XRI,
-		    xp->iotag, xp->rx_id);
+		    "Prep CT XRI: xri=%x iotag=%x oxid=%x", xrip->XRI,
+		    xrip->iotag, xrip->rx_id);
 
 		if (emlxs_sli4_bde_setup(port, sbp)) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
@@ -3173,7 +3224,7 @@ emlxs_sli4_prep_ct_iocb(emlxs_port_t *port, emlxs_buf_t *sbp)
 		wqe->un.XmitSeq.DFctl  = pkt->pkt_cmd_fhdr.df_ctl;
 		wqe->un.XmitSeq.Rctl  = pkt->pkt_cmd_fhdr.r_ctl;
 		wqe->un.XmitSeq.Type  = pkt->pkt_cmd_fhdr.type;
-		wqe->OXId = xp->rx_id;
+		wqe->OXId = xrip->rx_id;
 		wqe->XC = 0; /* xri_tag is a new exchange */
 		wqe->CmdSpecific[0] = wqe->un.GenReq.Payload.tus.f.bdeSize;
 
@@ -3181,11 +3232,12 @@ emlxs_sli4_prep_ct_iocb(emlxs_port_t *port, emlxs_buf_t *sbp)
 		/* CT Request */
 
 		node = (emlxs_node_t *)iocbq->node;
-		rp = EMLXS_NODE_TO_RPI(hba, node);
+		rpip = EMLXS_NODE_TO_RPI(port, node);
 
-		if (!rp) {
+		if (!rpip) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_failed_msg,
-			    "Unable to find rpi. did=0x%x", did);
+			    "Unable to find rpi. did=0x%x rpi=%x",
+			    did, node->nlp_Rpi);
 
 			emlxs_set_pkt_state(sbp, IOSTAT_LOCAL_REJECT,
 			    IOERR_INVALID_RPI, 0);
@@ -3193,24 +3245,24 @@ emlxs_sli4_prep_ct_iocb(emlxs_port_t *port, emlxs_buf_t *sbp)
 		}
 
 		/* Next allocate an Exchange for this command */
-		xp = emlxs_sli4_alloc_xri(hba, sbp, rp);
+		xrip = emlxs_sli4_alloc_xri(hba, sbp, rpip);
 
-		if (!xp) {
+		if (!xrip) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
-			    "Adapter Busy. Unable to allocate exchange. " \
+			    "Adapter Busy. Unable to allocate exchange. "
 			    "did=0x%x", did);
 
 			return (FC_TRAN_BUSY);
 		}
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "Prep CT XRI: %x iotag %x", xp->XRI, xp->iotag);
+		    "Prep CT XRI: %x iotag %x", xrip->XRI, xrip->iotag);
 
 		if (emlxs_sli4_bde_setup(port, sbp)) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
 			    "Adapter Busy. Unable to setup SGE. did=0x%x", did);
 
-			emlxs_sli4_free_xri(hba, sbp, xp);
+			emlxs_sli4_free_xri(hba, sbp, xrip, 1);
 			return (FC_TRAN_BUSY);
 		}
 
@@ -3224,13 +3276,14 @@ emlxs_sli4_prep_ct_iocb(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 #ifdef DEBUG_CT
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "SGLaddr virt %p phys %p", xp->SGList.virt,
-		    xp->SGList.phys);
-		emlxs_data_dump(hba, "SGL", (uint32_t *)xp->SGList.virt, 12, 0);
+		    "SGLaddr virt %p phys %p", xrip->SGList.virt,
+		    xrip->SGList.phys);
+		emlxs_data_dump(port, "SGL", (uint32_t *)xrip->SGList.virt,
+		    12, 0);
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
 		    "CMD virt %p len %d:%d",
 		    pkt->pkt_cmd, pkt->pkt_cmdlen, pkt->pkt_rsplen);
-		emlxs_data_dump(hba, "DATA", (uint32_t *)pkt->pkt_cmd, 20, 0);
+		emlxs_data_dump(port, "DATA", (uint32_t *)pkt->pkt_cmd, 20, 0);
 #endif /* DEBUG_CT */
 	}
 
@@ -3241,16 +3294,16 @@ emlxs_sli4_prep_ct_iocb(emlxs_port_t *port, emlxs_buf_t *sbp)
 	iocb->ULPPU = 1;	/* Wd4 is relative offset */
 
 	offset = (off_t)((uint64_t)((unsigned long)
-	    xp->SGList.virt) -
+	    xrip->SGList.virt) -
 	    (uint64_t)((unsigned long)
 	    hba->sli.sli4.slim2.virt));
 
-	EMLXS_MPDATA_SYNC(xp->SGList.dma_handle, offset,
-	    xp->SGList.size, DDI_DMA_SYNC_FORDEV);
+	EMLXS_MPDATA_SYNC(xrip->SGList.dma_handle, offset,
+	    xrip->SGList.size, DDI_DMA_SYNC_FORDEV);
 
-	wqe->ContextTag = rp->RPI;
+	wqe->ContextTag = rpip->RPI;
 	wqe->ContextType = WQE_RPI_CONTEXT;
-	wqe->XRITag = xp->XRI;
+	wqe->XRITag = xrip->XRI;
 
 	if (pkt->pkt_cmd_fhdr.f_ctl & F_CTL_CHAINED_SEQ) {
 		wqe->CCPE = 1;
@@ -3267,7 +3320,7 @@ emlxs_sli4_prep_ct_iocb(emlxs_port_t *port, emlxs_buf_t *sbp)
 		break;
 	}
 	sbp->class = wqe->Class;
-	wqe->RequestTag = xp->iotag;
+	wqe->RequestTag = xrip->iotag;
 	wqe->CQId = 0x3ff;
 	return (FC_SUCCESS);
 
@@ -3276,21 +3329,16 @@ emlxs_sli4_prep_ct_iocb(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 /*ARGSUSED*/
 static int
-emlxs_sli4_poll_eq(emlxs_hba_t *hba, EQ_DESC_t *eq)
+emlxs_sli4_read_eq(emlxs_hba_t *hba, EQ_DESC_t *eq)
 {
 	uint32_t *ptr;
-	int num_entries = 0;
 	EQE_u eqe;
-	uint32_t host_index, shost_index;
 	int rc = 0;
 	off_t offset;
 
 	/* EMLXS_PORT_LOCK must be held when entering this routine */
 	ptr = eq->addr.virt;
 	ptr += eq->host_index;
-	host_index = eq->host_index;
-
-	shost_index = host_index;
 
 	offset = (off_t)((uint64_t)((unsigned long)
 	    eq->addr.virt) -
@@ -3302,36 +3350,18 @@ emlxs_sli4_poll_eq(emlxs_hba_t *hba, EQ_DESC_t *eq)
 
 	mutex_enter(&EMLXS_PORT_LOCK);
 
-	for (;;) {
-		eqe.word = *ptr;
-		eqe.word = BE_SWAP32(eqe.word);
+	eqe.word = *ptr;
+	eqe.word = BE_SWAP32(eqe.word);
 
-		if (eqe.word & EQE_VALID) {
-			rc = 1;
-			break;
-		}
-
-		*ptr = 0;
-		num_entries++;
-		host_index++;
-		if (host_index >= eq->max_index) {
-			host_index = 0;
-			ptr = eq->addr.virt;
-		} else {
-			ptr++;
-		}
-
-		if (host_index == shost_index) {
-			/* We donot need to loop forever */
-			break;
-		}
+	if (eqe.word & EQE_VALID) {
+		rc = 1;
 	}
 
 	mutex_exit(&EMLXS_PORT_LOCK);
 
 	return (rc);
 
-} /* emlxs_sli4_poll_eq */
+} /* emlxs_sli4_read_eq */
 
 
 /*ARGSUSED*/
@@ -3350,7 +3380,7 @@ emlxs_sli4_poll_intr(emlxs_hba_t *hba, uint32_t att_bit)
 	for (;;) {
 		if (hba->intr_type == DDI_INTR_TYPE_FIXED) {
 			/* only poll eqe0 */
-			rc = emlxs_sli4_poll_eq(hba,
+			rc = emlxs_sli4_read_eq(hba,
 			    &hba->sli.sli4.eq[0]);
 			if (rc == 1) {
 				(void) bcopy((char *)&arg[0],
@@ -3360,7 +3390,7 @@ emlxs_sli4_poll_intr(emlxs_hba_t *hba, uint32_t att_bit)
 		} else {
 			/* poll every msi vector */
 			for (i = 0; i < hba->intr_count; i++) {
-				rc = emlxs_sli4_poll_eq(hba,
+				rc = emlxs_sli4_read_eq(hba,
 				    &hba->sli.sli4.eq[i]);
 
 				if (rc == 1) {
@@ -3388,92 +3418,104 @@ static void
 emlxs_sli4_process_async_event(emlxs_hba_t *hba, CQE_ASYNC_t *cqe)
 {
 	emlxs_port_t *port = &PPORT;
-	CQE_ASYNC_FCOE_t *fcoe;
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-	    "CQ ENTRY: process async event %d stat %d tag %d",
-	    cqe->event_code, cqe->link_status, cqe->event_tag);
+	/* Save the event tag */
+	hba->link_event_tag = cqe->un.link.event_tag;
 
-	hba->link_event_tag = cqe->event_tag;
 	switch (cqe->event_code) {
 	case ASYNC_EVENT_CODE_LINK_STATE:
-		switch (cqe->link_status) {
+		switch (cqe->un.link.link_status) {
 		case ASYNC_EVENT_PHYS_LINK_UP:
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-			    "Physical link up received");
+			    "Link Async Event: PHYS_LINK_UP. val=%d type=%x",
+			    cqe->valid, cqe->event_type);
 			break;
 
 		case ASYNC_EVENT_PHYS_LINK_DOWN:
 		case ASYNC_EVENT_LOGICAL_LINK_DOWN:
-			if (hba->state > FC_LINK_DOWN) {
-				(void) emlxs_fcf_unbind(hba,
-				    MAX_FCFCONNECTLIST_ENTRIES);
-			}
-			/* Log the link event */
-			emlxs_log_link_event(port);
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
+			    "Link Async Event: LINK_DOWN. val=%d type=%x",
+			    cqe->valid, cqe->event_type);
+
+			(void) emlxs_fcf_linkdown_notify(port);
+
+			mutex_enter(&EMLXS_PORT_LOCK);
+			hba->sli.sli4.flag &= ~EMLXS_SLI4_DOWN_LINK;
+			mutex_exit(&EMLXS_PORT_LOCK);
 			break;
 
 		case ASYNC_EVENT_LOGICAL_LINK_UP:
-			/* If link not already up then declare it up now */
-			if (hba->state < FC_LINK_UP) {
-				if (cqe->port_speed == PHY_1GHZ_LINK) {
-					hba->linkspeed = LA_1GHZ_LINK;
-				} else {
-					hba->linkspeed = LA_10GHZ_LINK;
-				}
-				hba->topology = TOPOLOGY_PT_PT;
-				hba->qos_linkspeed = cqe->qos_link_speed;
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
+			    "Link Async Event: LOGICAL_LINK_UP. val=%d type=%x",
+			    cqe->valid, cqe->event_type);
 
-				/*
-				 * This link is not really up till we have
-				 * a valid FCF.
-				 */
-				(void) emlxs_fcf_bind(hba);
+			if (cqe->un.link.port_speed == PHY_1GHZ_LINK) {
+				hba->linkspeed = LA_1GHZ_LINK;
+			} else {
+				hba->linkspeed = LA_10GHZ_LINK;
 			}
-			/* Log the link event */
-			emlxs_log_link_event(port);
+			hba->topology = TOPOLOGY_PT_PT;
+			hba->qos_linkspeed = cqe->un.link.qos_link_speed;
+
+			(void) emlxs_fcf_linkup_notify(port);
 			break;
 		}
 		break;
 	case ASYNC_EVENT_CODE_FCOE_FIP:
-		fcoe = (CQE_ASYNC_FCOE_t *)cqe;
-		switch (fcoe->evt_type) {
+		switch (cqe->un.fcoe.evt_type) {
 		case ASYNC_EVENT_NEW_FCF_DISC:
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-			    "FCOE Async Event New FCF %d:%d: received ",
-			    fcoe->ref_index, fcoe->fcf_count);
-			(void) emlxs_fcf_bind(hba);
+			    "FCOE Async Event: FCF_FOUND %d:%d",
+			    cqe->un.fcoe.ref_index, cqe->un.fcoe.fcf_count);
+
+			(void) emlxs_fcf_found_notify(port,
+			    cqe->un.fcoe.ref_index);
 			break;
 		case ASYNC_EVENT_FCF_TABLE_FULL:
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_err_msg,
-			    "FCOE Async Event FCF Table Full %d:%d: received ",
-			    fcoe->ref_index, fcoe->fcf_count);
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
+			    "FCOE Async Event: FCFTAB_FULL %d:%d",
+			    cqe->un.fcoe.ref_index, cqe->un.fcoe.fcf_count);
+
+			(void) emlxs_fcf_full_notify(port);
 			break;
 		case ASYNC_EVENT_FCF_DEAD:
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-			    "FCOE Async Event FCF Disappeared %d:%d: received ",
-			    fcoe->ref_index, fcoe->fcf_count);
-			(void) emlxs_reset_link(hba, 1, 0);
+			    "FCOE Async Event: FCF_LOST %d:%d",
+			    cqe->un.fcoe.ref_index, cqe->un.fcoe.fcf_count);
+
+			(void) emlxs_fcf_lost_notify(port,
+			    cqe->un.fcoe.ref_index);
 			break;
 		case ASYNC_EVENT_VIRT_LINK_CLEAR:
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-			    "FCOE Async Event VLINK CLEAR %d: received ",
-			    fcoe->ref_index);
-			if (fcoe->ref_index == hba->vpi_base) {
-				/*
-				 * Bounce the link to force rediscovery for
-				 * VPI 0.  We are ignoring this event for
-				 * all other VPIs for now.
-				 */
-				(void) emlxs_reset_link(hba, 1, 0);
-			}
+			    "FCOE Async Event: CVL %d",
+			    cqe->un.fcoe.ref_index);
+
+			(void) emlxs_fcf_cvl_notify(port,
+			    (cqe->un.fcoe.ref_index - hba->vpi_base));
+			break;
+
+		case ASYNC_EVENT_FCF_MODIFIED:
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
+			    "FCOE Async Event: FCF_CHANGED %d",
+			    cqe->un.fcoe.ref_index);
+
+			(void) emlxs_fcf_changed_notify(port,
+			    cqe->un.fcoe.ref_index);
 			break;
 		}
 		break;
 	case ASYNC_EVENT_CODE_DCBX:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "DCBX Async Event Code %d: Not supported ",
+		    "DCBX Async Event Code %d: Not supported",
 		    cqe->event_code);
+		break;
+	case ASYNC_EVENT_CODE_GRP_5:
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
+		    "Group 5 Async Event type %d", cqe->event_type);
+		if (cqe->event_type == ASYNC_EVENT_QOS_SPEED) {
+			hba->qos_linkspeed = cqe->un.qos.qos_link_speed;
+		}
 		break;
 	default:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
@@ -3492,25 +3534,25 @@ emlxs_sli4_process_mbox_event(emlxs_hba_t *hba, CQE_MBOX_t *cqe)
 	MAILBOX4 *mb;
 	MATCHMAP *mbox_bp;
 	MATCHMAP *mbox_nonembed;
-	MAILBOXQ *mbq;
+	MAILBOXQ *mbq = NULL;
 	uint32_t size;
 	uint32_t *iptr;
 	int rc;
 	off_t offset;
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-	    "CQ ENTRY: process mbox event");
-
 	if (cqe->consumed && !cqe->completed) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "CQ ENTRY: Entry comsumed but not completed");
+		    "CQ ENTRY: Mbox event. Entry consumed but not completed");
 		return;
 	}
 
+	mutex_enter(&EMLXS_PORT_LOCK);
 	switch (hba->mbox_queue_flag) {
 	case 0:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_stray_mbox_intr_msg,
-		    "No mailbox active.");
+		    "CQ ENTRY: Mbox event. No mailbox active.");
+
+		mutex_exit(&EMLXS_PORT_LOCK);
 		return;
 
 	case MBX_POLL:
@@ -3524,27 +3566,50 @@ emlxs_sli4_process_mbox_event(emlxs_hba_t *hba, CQE_MBOX_t *cqe)
 		mutex_enter(&EMLXS_MBOX_LOCK);
 		mbq = (MAILBOXQ *)hba->mbox_mbq;
 		if (mbq) {
+			port = (emlxs_port_t *)mbq->port;
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mbox_detail_msg,
-			    "Mailbox event. Completing Polled command.");
+			    "CQ ENTRY: Mbox event. Completing Polled command.");
 			mbq->flag |= MBQ_COMPLETED;
 		}
 		mutex_exit(&EMLXS_MBOX_LOCK);
 
+		mutex_exit(&EMLXS_PORT_LOCK);
 		return;
 
 	case MBX_SLEEP:
 	case MBX_NOWAIT:
-		mutex_enter(&EMLXS_MBOX_LOCK);
-		mbq = (MAILBOXQ *)hba->mbox_mbq;
-		mutex_exit(&EMLXS_MBOX_LOCK);
+		/* Check mbox_timer, it acts as a service flag too */
+		/* The first to service the mbox queue will clear the timer */
+		if (hba->mbox_timer) {
+			hba->mbox_timer = 0;
+
+			mutex_enter(&EMLXS_MBOX_LOCK);
+			mbq = (MAILBOXQ *)hba->mbox_mbq;
+			mutex_exit(&EMLXS_MBOX_LOCK);
+		}
+
+		if (!mbq) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mbox_detail_msg,
+			    "Mailbox event. No service required.");
+			mutex_exit(&EMLXS_PORT_LOCK);
+			return;
+		}
+
 		mb = (MAILBOX4 *)mbq;
+		mutex_exit(&EMLXS_PORT_LOCK);
 		break;
 
 	default:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mbox_completion_error_msg,
-		    "Invalid Mailbox flag (%x).");
+		    "CQ ENTRY: Mbox event. Invalid Mailbox flag (%x).",
+		    hba->mbox_queue_flag);
+
+		mutex_exit(&EMLXS_PORT_LOCK);
 		return;
 	}
+
+	/* Set port context */
+	port = (emlxs_port_t *)mbq->port;
 
 	offset = (off_t)((uint64_t)((unsigned long)
 	    hba->sli.sli4.mq.addr.virt) -
@@ -3558,10 +3623,15 @@ emlxs_sli4_process_mbox_event(emlxs_hba_t *hba, CQE_MBOX_t *cqe)
 	BE_SWAP32_BCOPY((uint8_t *)hba->mbox_mqe, (uint8_t *)mb,
 	    MAILBOX_CMD_SLI4_BSIZE);
 
-	emlxs_data_dump(hba, "MBOX CMP", (uint32_t *)hba->mbox_mqe, 12, 0);
+	if (mb->mbxCommand != MBX_HEARTBEAT) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
+		    "CQ ENTRY: Mbox event. Mbox complete. status=%x cmd=%x",
+		    mb->mbxStatus, mb->mbxCommand);
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-	    "Mbox cmpl: %x cmd: %x", mb->mbxStatus, mb->mbxCommand);
+		emlxs_data_dump(port, "MBOX CMP", (uint32_t *)hba->mbox_mqe,
+		    12, 0);
+	}
+
 	if (mb->mbxCommand == MBX_SLI_CONFIG) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
 		    "Mbox sge_cnt: %d length: %d embed: %d",
@@ -3608,7 +3678,7 @@ emlxs_sli4_process_mbox_event(emlxs_hba_t *hba, CQE_MBOX_t *cqe)
 			mb->mbxStatus = MBXERR_DMA_ERROR;
 		}
 #endif
-emlxs_data_dump(hba, "EXT AREA", (uint32_t *)iptr, 24, 0);
+emlxs_data_dump(port, "EXT AREA", (uint32_t *)iptr, 24, 0);
 	}
 
 	/* Mailbox has been completely received at this point */
@@ -3667,7 +3737,7 @@ done:
 		/* Attempt to send pending mailboxes */
 		rc =  emlxs_sli4_issue_mbox_cmd(hba, mbq, MBX_NOWAIT, 0);
 		if ((rc != MBX_BUSY) && (rc != MBX_SUCCESS)) {
-			(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mbq);
+			emlxs_mem_put(hba, MEM_MBOX, (void *)mbq);
 		}
 	}
 	return;
@@ -3684,6 +3754,8 @@ emlxs_CQE_to_IOCB(emlxs_hba_t *hba, CQE_CmplWQ_t *cqe, emlxs_buf_t *sbp)
 #endif
 	IOCBQ *iocbq;
 	IOCB *iocb;
+	uint32_t *iptr;
+	fc_packet_t *pkt;
 	emlxs_wqe_t *wqe;
 
 	iocbq = &sbp->iocbq;
@@ -3727,6 +3799,13 @@ emlxs_CQE_to_IOCB(emlxs_hba_t *hba, CQE_CmplWQ_t *cqe, emlxs_buf_t *sbp)
 		if (iocb->ULPSTATUS == 0) {
 			iocb->unsli3.ext_iocb.rsplen = cqe->CmdSpecific;
 		}
+		if (iocb->ULPSTATUS == IOSTAT_LS_RJT) {
+			/* For LS_RJT, the driver populates the rsp buffer */
+			pkt = PRIV2PKT(sbp);
+			iptr = (uint32_t *)pkt->pkt_resp;
+			*iptr++ = ELS_CMD_LS_RJT;
+			*iptr = cqe->Parameter;
+		}
 		break;
 
 	case CMD_GEN_REQUEST64_CR:
@@ -3758,7 +3837,7 @@ emlxs_sli4_hba_flush_chipq(emlxs_hba_t *hba)
 	CHANNEL *cp;
 	emlxs_buf_t *sbp;
 	IOCBQ *iocbq;
-	uint32_t i;
+	uint16_t i;
 	uint32_t trigger;
 	CQE_CmplWQ_t cqe;
 
@@ -3768,8 +3847,9 @@ emlxs_sli4_hba_flush_chipq(emlxs_hba_t *hba)
 		if (sbp == NULL || sbp == STALE_PACKET) {
 			continue;
 		}
-		hba->fc_table[i] = NULL;
+		hba->fc_table[i] = STALE_PACKET;
 		hba->io_count--;
+		sbp->iotag = 0;
 		mutex_exit(&EMLXS_FCTAB_LOCK);
 
 		cp = sbp->channel;
@@ -3797,10 +3877,8 @@ emlxs_sli4_hba_flush_chipq(emlxs_hba_t *hba)
 
 		iocbq->next = NULL;
 
-		sbp->xp->state &= ~RESOURCE_XRI_PENDING_IO;
-
 		/* Exchange is no longer busy on-chip, free it */
-		emlxs_sli4_free_xri(hba, sbp, sbp->xp);
+		emlxs_sli4_free_xri(hba, sbp, sbp->xrip, 1);
 
 		if (!(sbp->pkt_flags &
 		    (PACKET_POLLED | PACKET_ALLOCATED))) {
@@ -3843,8 +3921,11 @@ emlxs_sli4_process_oor_wqe_cmpl(emlxs_hba_t *hba,
 	emlxs_port_t *port = &PPORT;
 	CHANNEL *cp;
 	uint16_t request_tag;
+	CQE_u	*cq_entry;
 
 	request_tag = cqe->RequestTag;
+
+	cq_entry = (CQE_u *)cqe;
 
 	/* 1 to 1 mapping between CQ and channel */
 	cp = cq->channelp;
@@ -3853,6 +3934,10 @@ emlxs_sli4_process_oor_wqe_cmpl(emlxs_hba_t *hba,
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
 	    "CQ ENTRY: OOR Cmpl: tag=%x", request_tag);
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
+	    "CQ ENTRY: %08x %08x %08x %08x", cq_entry->word[0],
+	    cq_entry->word[1], cq_entry->word[2], cq_entry->word[3]);
 
 } /* emlxs_sli4_process_oor_wqe_cmpl() */
 
@@ -3876,18 +3961,21 @@ emlxs_sli4_process_wqe_cmpl(emlxs_hba_t *hba, CQ_DESC_t *cq, CQE_CmplWQ_t *cqe)
 	/* 1 to 1 mapping between CQ and channel */
 	cp = cq->channelp;
 
+	mutex_enter(&EMLXS_FCTAB_LOCK);
 	sbp = hba->fc_table[request_tag];
 	atomic_add_32(&hba->io_active, -1);
 
 	if (sbp == STALE_PACKET) {
 		cp->hbaCmplCmd_sbp++;
+		mutex_exit(&EMLXS_FCTAB_LOCK);
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
 		    "CQ ENTRY: Stale sbp. tag=%x. Dropping...", request_tag);
 		return;
 	}
 
-	if (!sbp || !(sbp->xp)) {
+	if (!sbp || !(sbp->xrip)) {
 		cp->hbaCmplCmd++;
+		mutex_exit(&EMLXS_FCTAB_LOCK);
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
 		    "CQ ENTRY: NULL sbp %p. tag=%x. Dropping...",
 		    sbp, request_tag);
@@ -3901,6 +3989,29 @@ emlxs_sli4_process_wqe_cmpl(emlxs_hba_t *hba, CQ_DESC_t *cq, CQE_CmplWQ_t *cqe)
 
 	cp->hbaCmplCmd_sbp++;
 
+	/* Copy entry to sbp's iocbq */
+	iocbq = &sbp->iocbq;
+	emlxs_CQE_to_IOCB(hba, cqe, sbp);
+
+	iocbq->next = NULL;
+
+	if (cqe->XB) {
+		/* Mark exchange as ABORT in progress */
+		sbp->xrip->flag &= ~EMLXS_XRI_PENDING_IO;
+		sbp->xrip->flag |= EMLXS_XRI_ABORT_INP;
+
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
+		    "CQ ENTRY: ABORT INP: tag=%x xri=%x", request_tag,
+		    sbp->xrip->XRI);
+
+		emlxs_sli4_free_xri(hba, sbp, 0, 0);
+	} else {
+		/* Exchange is no longer busy on-chip, free it */
+		emlxs_sli4_free_xri(hba, sbp, sbp->xrip, 0);
+	}
+
+	mutex_exit(&EMLXS_FCTAB_LOCK);
+
 #ifdef SFCT_SUPPORT
 	fct_cmd = sbp->fct_cmd;
 	if (fct_cmd) {
@@ -3910,27 +4021,6 @@ emlxs_sli4_process_wqe_cmpl(emlxs_hba_t *hba, CQ_DESC_t *cq, CQE_CmplWQ_t *cqe)
 		mutex_exit(&cmd_sbp->fct_mtx);
 	}
 #endif /* SFCT_SUPPORT */
-
-	/* Copy entry to sbp's iocbq */
-	iocbq = &sbp->iocbq;
-	emlxs_CQE_to_IOCB(hba, cqe, sbp);
-
-	iocbq->next = NULL;
-
-	sbp->xp->state &= ~RESOURCE_XRI_PENDING_IO;
-	if (cqe->XB) {
-		/* Mark exchange as ABORT in progress */
-		sbp->xp->state |= RESOURCE_XRI_ABORT_INP;
-
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "CQ ENTRY: ABORT INP: tag=%x xri=%x", request_tag,
-		    sbp->xp->XRI);
-
-		emlxs_sli4_free_xri(hba, sbp, 0);
-	} else {
-		/* Exchange is no longer busy on-chip, free it */
-		emlxs_sli4_free_xri(hba, sbp, sbp->xp);
-	}
 
 	/*
 	 * If this is NOT a polled command completion
@@ -4097,9 +4187,9 @@ emlxs_sli4_rxq_put(emlxs_hba_t *hba, emlxs_iocbq_t *iocbq)
 
 
 static void
-emlxs_sli4_rq_post(emlxs_hba_t *hba, uint16_t rqid)
+emlxs_sli4_rq_post(emlxs_port_t *port, uint16_t rqid)
 {
-	emlxs_port_t *port = &PPORT;
+	emlxs_hba_t *hba = HBA;
 	emlxs_rqdbu_t rqdb;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
@@ -4142,9 +4232,8 @@ emlxs_sli4_process_unsol_rcv(emlxs_hba_t *hba, CQ_DESC_t *cq,
 	emlxs_wqe_t *wqe;
 	CHANNEL *cp;
 	uint16_t iotag;
-	XRIobj_t *xp;
-	RPIobj_t *rp = NULL;
-	FCFIobj_t *fp;
+	XRIobj_t *xrip;
+	RPIobj_t *rpip = NULL;
 	uint32_t	cmd;
 	uint32_t posted = 0;
 	uint32_t abort = 1;
@@ -4155,7 +4244,7 @@ emlxs_sli4_process_unsol_rcv(emlxs_hba_t *hba, CQ_DESC_t *cq,
 	data_rq = &hba->sli.sli4.rq[hdr_rqi + 1];
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-	    "CQ ENTRY: Unsol Rcv: RQid=%d,%d index=%d status=%x " \
+	    "CQ ENTRY: Unsol Rcv: RQid=%d,%d index=%d status=%x "
 	    "hdr_size=%d data_size=%d",
 	    cqe->RQid, hdr_rqi, hdr_rq->host_index, cqe->Status, cqe->hdr_size,
 	    cqe->data_size);
@@ -4219,7 +4308,7 @@ emlxs_sli4_process_unsol_rcv(emlxs_hba_t *hba, CQ_DESC_t *cq,
 	    sizeof (fc_frame_hdr_t));
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-	    "RQ HDR[%d]: rctl:%x type:%x " \
+	    "RQ HDR[%d]: rctl:%x type:%x "
 	    "sid:%x did:%x oxid:%x rxid:%x",
 	    host_index, fchdr.r_ctl, fchdr.type,
 	    fchdr.s_id,  fchdr.d_id, fchdr.ox_id, fchdr.rx_id);
@@ -4234,7 +4323,7 @@ emlxs_sli4_process_unsol_rcv(emlxs_hba_t *hba, CQ_DESC_t *cq,
 	case 0: /* BLS */
 		if (fchdr.r_ctl != 0x81) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-			    "RQ ENTRY: Unexpected FC rctl (0x%x) " \
+			    "RQ ENTRY: Unexpected FC rctl (0x%x) "
 			    "received. Dropping...",
 			    fchdr.r_ctl);
 
@@ -4258,7 +4347,7 @@ emlxs_sli4_process_unsol_rcv(emlxs_hba_t *hba, CQ_DESC_t *cq,
 		/* Make sure there is a payload */
 		if (cqe->data_size == 0) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_err_msg,
-			    "RQ ENTRY: Unsol Rcv: No ELS payload provided. " \
+			    "RQ ENTRY: Unsol Rcv: No ELS payload provided. "
 			    "Dropping...");
 
 			goto done;
@@ -4273,7 +4362,7 @@ emlxs_sli4_process_unsol_rcv(emlxs_hba_t *hba, CQ_DESC_t *cq,
 		/* Make sure there is a payload */
 		if (cqe->data_size == 0) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_err_msg,
-			    "RQ ENTRY: Unsol Rcv: No CT payload provided. " \
+			    "RQ ENTRY: Unsol Rcv: No CT payload provided. "
 			    "Dropping...");
 
 			goto done;
@@ -4300,7 +4389,7 @@ emlxs_sli4_process_unsol_rcv(emlxs_hba_t *hba, CQ_DESC_t *cq,
 		if (fchdr.type != 0) {
 			if (!(fchdr.f_ctl & F_CTL_FIRST_SEQ)) {
 				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-				    "RQ ENTRY: %s: First of sequence not" \
+				    "RQ ENTRY: %s: First of sequence not"
 				    " set.  Dropping...",
 				    label);
 
@@ -4310,7 +4399,7 @@ emlxs_sli4_process_unsol_rcv(emlxs_hba_t *hba, CQ_DESC_t *cq,
 
 		if (fchdr.seq_cnt != 0) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-			    "RQ ENTRY: %s: Sequence count not zero (%d).  " \
+			    "RQ ENTRY: %s: Sequence count not zero (%d).  "
 			    "Dropping...",
 			    label, fchdr.seq_cnt);
 
@@ -4333,7 +4422,7 @@ emlxs_sli4_process_unsol_rcv(emlxs_hba_t *hba, CQ_DESC_t *cq,
 
 		if (!iocbq) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-			    "RQ ENTRY: %s: Out of IOCB " \
+			    "RQ ENTRY: %s: Out of IOCB "
 			    "resources.  Dropping...",
 			    label);
 
@@ -4347,7 +4436,7 @@ emlxs_sli4_process_unsol_rcv(emlxs_hba_t *hba, CQ_DESC_t *cq,
 
 			if (!seq_mp) {
 				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-				    "RQ ENTRY: %s: Out of buffer " \
+				    "RQ ENTRY: %s: Out of buffer "
 				    "resources.  Dropping...",
 				    label);
 
@@ -4389,7 +4478,7 @@ emlxs_sli4_process_unsol_rcv(emlxs_hba_t *hba, CQ_DESC_t *cq,
 		/* Check sequence order */
 		if (fchdr.seq_cnt != seq_cnt) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-			    "RQ ENTRY: %s: Out of order frame received " \
+			    "RQ ENTRY: %s: Out of order frame received "
 			    "(%d != %d).  Dropping...",
 			    label, fchdr.seq_cnt, seq_cnt);
 
@@ -4398,6 +4487,15 @@ emlxs_sli4_process_unsol_rcv(emlxs_hba_t *hba, CQ_DESC_t *cq,
 	}
 
 	/* We now have an iocbq */
+
+	if (!port->VPIobj.vfip) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
+		    "RQ ENTRY: %s: No fabric connection. "
+		    "Dropping...",
+		    label);
+
+		goto done;
+	}
 
 	/* Save the frame data to our seq buffer */
 	if (cqe->data_size && seq_mp) {
@@ -4422,7 +4520,7 @@ emlxs_sli4_process_unsol_rcv(emlxs_hba_t *hba, CQ_DESC_t *cq,
 		/* Check sequence length */
 		if ((seq_len + cqe->data_size) > seq_mp->size) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_err_msg,
-			    "RQ ENTRY: %s: Sequence buffer overflow. " \
+			    "RQ ENTRY: %s: Sequence buffer overflow. "
 			    "(%d > %d). Dropping...",
 			    label, (seq_len + cqe->data_size), seq_mp->size);
 
@@ -4460,7 +4558,7 @@ emlxs_sli4_process_unsol_rcv(emlxs_hba_t *hba, CQ_DESC_t *cq,
 		goto done;
 	}
 
-	emlxs_sli4_rq_post(hba, hdr_rq->qid);
+	emlxs_sli4_rq_post(port, hdr_rq->qid);
 	posted = 1;
 
 	/* End of sequence found. Process request now. */
@@ -4513,7 +4611,7 @@ emlxs_sli4_process_unsol_rcv(emlxs_hba_t *hba, CQ_DESC_t *cq,
 		wqe->un.BlsRsp.RemoteId = fchdr.s_id;
 
 		wqe->PU = 0x3;
-		wqe->ContextTag = port->vpi + hba->vpi_base;
+		wqe->ContextTag = port->VPIobj.VPI;
 		wqe->ContextType = WQE_VPI_CONTEXT;
 		wqe->OXId = (volatile uint16_t) fchdr.ox_id;
 		wqe->XRITag = 0xffff;
@@ -4532,31 +4630,39 @@ emlxs_sli4_process_unsol_rcv(emlxs_hba_t *hba, CQ_DESC_t *cq,
 		break;
 
 	case 1: /* ELS */
+		if (!(port->VPIobj.flag & EMLXS_VPI_PORT_ENABLED)) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
+			    "RQ ENTRY: %s: Port not yet enabled. "
+			    "Dropping...",
+			    label);
+
+			goto done;
+		}
+
 		cmd = *((uint32_t *)seq_mp->virt);
 		cmd &= ELS_CMD_MASK;
-		rp = NULL;
+		rpip = NULL;
 
 		if (cmd != ELS_CMD_LOGO) {
-			rp = EMLXS_NODE_TO_RPI(hba, node);
+			rpip = EMLXS_NODE_TO_RPI(port, node);
 		}
 
-		if (!rp) {
-			fp = hba->sli.sli4.FCFIp;
-			rp = &fp->scratch_rpi;
+		if (!rpip) {
+			rpip = port->VPIobj.rpip;
 		}
 
-		xp = emlxs_sli4_reserve_xri(hba, rp);
+		xrip = emlxs_sli4_reserve_xri(hba, rpip);
 
-		if (!xp) {
+		if (!xrip) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-			    "RQ ENTRY: %s: Out of exchange " \
+			    "RQ ENTRY: %s: Out of exchange "
 			    "resources.  Dropping...",
 			    label);
 
 			goto done;
 		}
 
-		xp->rx_id = fchdr.ox_id;
+		xrip->rx_id = fchdr.ox_id;
 
 		/* Build CMD_RCV_ELS64_CX */
 		iocb->un.rcvels64.elsReq.tus.f.bdeFlags = 0;
@@ -4569,13 +4675,13 @@ emlxs_sli4_process_unsol_rcv(emlxs_hba_t *hba, CQ_DESC_t *cq,
 		iocb->un.rcvels64.parmRo = fchdr.d_id;
 
 		iocb->ULPPU = 0x3;
-		iocb->ULPCONTEXT = xp->XRI;
+		iocb->ULPCONTEXT = xrip->XRI;
 		iocb->ULPIOTAG = ((node)? node->nlp_Rpi:0);
 		iocb->ULPCLASS = CLASS3;
 		iocb->ULPCOMMAND = CMD_RCV_ELS64_CX;
 
 		iocb->unsli3.ext_rcv.seq_len = seq_len;
-		iocb->unsli3.ext_rcv.vpi = port->vpi + hba->vpi_base;
+		iocb->unsli3.ext_rcv.vpi = port->VPIobj.VPI;
 
 		if (fchdr.f_ctl & F_CTL_CHAINED_SEQ) {
 			iocb->unsli3.ext_rcv.ccpe = 1;
@@ -4588,39 +4694,47 @@ emlxs_sli4_process_unsol_rcv(emlxs_hba_t *hba, CQ_DESC_t *cq,
 		break;
 
 	case 0x20: /* CT */
+		if (!(port->VPIobj.flag & EMLXS_VPI_PORT_ENABLED)) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
+			    "RQ ENTRY: %s: Port not yet enabled. "
+			    "Dropping...",
+			    label);
+
+			goto done;
+		}
 
 		if (!node) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-			    "RQ ENTRY: %s: Node not found (did=%x).  " \
+			    "RQ ENTRY: %s: Node not found (did=%x).  "
 			    "Dropping...",
 			    label, fchdr.d_id);
 
 			goto done;
 		}
 
-		rp = EMLXS_NODE_TO_RPI(hba, node);
+		rpip = EMLXS_NODE_TO_RPI(port, node);
 
-		if (!rp) {
+		if (!rpip) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-			    "RQ ENTRY: %s: RPI not found (did=%x rpi=%x).  " \
+			    "RQ ENTRY: %s: RPI not found (did=%x rpi=%x).  "
 			    "Dropping...",
 			    label, fchdr.d_id, node->nlp_Rpi);
 
 			goto done;
 		}
 
-		xp = emlxs_sli4_reserve_xri(hba, rp);
+		xrip = emlxs_sli4_reserve_xri(hba, rpip);
 
-		if (!xp) {
+		if (!xrip) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-			    "RQ ENTRY: %s: Out of exchange " \
+			    "RQ ENTRY: %s: Out of exchange "
 			    "resources.  Dropping...",
 			    label);
 
 			goto done;
 		}
 
-		xp->rx_id = fchdr.ox_id;
+		xrip->rx_id = fchdr.ox_id;
 
 		/* Build CMD_RCV_SEQ64_CX */
 		iocb->un.rcvseq64.rcvBde.tus.f.bdeFlags = 0;
@@ -4636,13 +4750,13 @@ emlxs_sli4_process_unsol_rcv(emlxs_hba_t *hba, CQ_DESC_t *cq,
 		iocb->un.rcvseq64.w5.hcsw.Fctl = fchdr.f_ctl;
 
 		iocb->ULPPU = 0x3;
-		iocb->ULPCONTEXT = xp->XRI;
-		iocb->ULPIOTAG = rp->RPI;
+		iocb->ULPCONTEXT = xrip->XRI;
+		iocb->ULPIOTAG = rpip->RPI;
 		iocb->ULPCLASS = CLASS3;
 		iocb->ULPCOMMAND = CMD_RCV_SEQ64_CX;
 
 		iocb->unsli3.ext_rcv.seq_len = seq_len;
-		iocb->unsli3.ext_rcv.vpi = port->vpi + hba->vpi_base;
+		iocb->unsli3.ext_rcv.vpi = port->VPIobj.VPI;
 
 		if (fchdr.f_ctl & F_CTL_CHAINED_SEQ) {
 			iocb->unsli3.ext_rcv.ccpe = 1;
@@ -4661,7 +4775,7 @@ emlxs_sli4_process_unsol_rcv(emlxs_hba_t *hba, CQ_DESC_t *cq,
 done:
 
 	if (!posted) {
-		emlxs_sli4_rq_post(hba, hdr_rq->qid);
+		emlxs_sli4_rq_post(port, hdr_rq->qid);
 	}
 
 	if (abort) {
@@ -4673,11 +4787,10 @@ done:
 	/* Return memory resources to pools */
 	if (iocbq) {
 		if (iocbq->bp) {
-			(void) emlxs_mem_put(hba, buf_type,
-			    (uint8_t *)iocbq->bp);
+			emlxs_mem_put(hba, buf_type, (void *)iocbq->bp);
 		}
 
-		(void) emlxs_mem_put(hba, MEM_IOCB, (uint8_t *)iocbq);
+		emlxs_mem_put(hba, MEM_IOCB, (void *)iocbq);
 	}
 
 #ifdef FMA_SUPPORT
@@ -4690,7 +4803,7 @@ done:
 		    hba->sli.sli4.slim2.dma_handle);
 
 		emlxs_thread_spawn(hba, emlxs_restart_thread,
-		    NULL, NULL);
+		    0, 0);
 	}
 #endif
 	return;
@@ -4704,12 +4817,16 @@ emlxs_sli4_process_xri_aborted(emlxs_hba_t *hba, CQ_DESC_t *cq,
     CQE_XRI_Abort_t *cqe)
 {
 	emlxs_port_t *port = &PPORT;
-	XRIobj_t *xp;
+	XRIobj_t *xrip;
 
-	xp = emlxs_sli4_find_xri(hba, cqe->XRI);
-	if (xp == NULL) {
+	mutex_enter(&EMLXS_FCTAB_LOCK);
+
+	xrip = emlxs_sli4_find_xri(hba, cqe->XRI);
+	if (xrip == NULL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_err_msg,
 		    "CQ ENTRY: process xri aborted ignored");
+
+		mutex_exit(&EMLXS_FCTAB_LOCK);
 		return;
 	}
 
@@ -4717,15 +4834,21 @@ emlxs_sli4_process_xri_aborted(emlxs_hba_t *hba, CQ_DESC_t *cq,
 	    "CQ ENTRY: process xri x%x aborted: IA %d EO %d BR %d",
 	    cqe->XRI, cqe->IA, cqe->EO, cqe->BR);
 
-	if (!(xp->state & RESOURCE_XRI_ABORT_INP)) {
+	if (!(xrip->flag & EMLXS_XRI_ABORT_INP)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_err_msg,
 		    "XRI Aborted: Bad state: x%x xri x%x",
-		    xp->state, xp->XRI);
+		    xrip->flag, xrip->XRI);
+
+		mutex_exit(&EMLXS_FCTAB_LOCK);
 		return;
 	}
 
 	/* Exchange is no longer busy on-chip, free it */
-	emlxs_sli4_free_xri(hba, 0, xp);
+	emlxs_sli4_free_xri(hba, 0, xrip, 0);
+
+	mutex_exit(&EMLXS_FCTAB_LOCK);
+
+	return;
 
 } /* emlxs_sli4_process_xri_aborted () */
 
@@ -4963,14 +5086,10 @@ emlxs_sli4_msi_intr(char *arg1, char *arg2)
 	if (msgid >= hba->intr_count) {
 		msgid = 0;
 	}
-
-	mutex_enter(&EMLXS_INTR_LOCK(msgid));
-
 	mutex_enter(&EMLXS_PORT_LOCK);
 
 	if ((hba->state == FC_KILLED) || (hba->flag & FC_OFFLINE_MODE)) {
 		mutex_exit(&EMLXS_PORT_LOCK);
-		mutex_exit(&EMLXS_INTR_LOCK(msgid));
 		return (DDI_INTR_UNCLAIMED);
 	}
 
@@ -4978,7 +5097,6 @@ emlxs_sli4_msi_intr(char *arg1, char *arg2)
 	emlxs_sli4_process_eq(hba, &hba->sli.sli4.eq[msgid]);
 
 	mutex_exit(&EMLXS_PORT_LOCK);
-	mutex_exit(&EMLXS_INTR_LOCK(msgid));
 	return (DDI_INTR_CLAIMED);
 
 } /* emlxs_sli4_msi_intr() */
@@ -5102,21 +5220,7 @@ emlxs_sli4_resource_free(emlxs_hba_t *hba)
 	MBUF_INFO	*buf_info;
 	uint32_t	i;
 
-	if (hba->sli.sli4.FCFIp) {
-		kmem_free(hba->sli.sli4.FCFIp,
-		    (sizeof (FCFIobj_t) * hba->sli.sli4.FCFICount));
-		hba->sli.sli4.FCFIp = NULL;
-	}
-	if (hba->sli.sli4.VFIp) {
-		kmem_free(hba->sli.sli4.VFIp,
-		    (sizeof (VFIobj_t) * hba->sli.sli4.VFICount));
-		hba->sli.sli4.VFIp = NULL;
-	}
-	if (hba->sli.sli4.RPIp) {
-		kmem_free(hba->sli.sli4.RPIp,
-		    (sizeof (RPIobj_t) * hba->sli.sli4.RPICount));
-		hba->sli.sli4.RPIp = NULL;
-	}
+	emlxs_fcf_fini(hba);
 
 	buf_info = &hba->sli.sli4.HeaderTmplate;
 	if (buf_info->virt) {
@@ -5128,7 +5232,7 @@ emlxs_sli4_resource_free(emlxs_hba_t *hba)
 		    (XRIobj_t *)&hba->sli.sli4.XRIinuse_f) ||
 		    (hba->sli.sli4.XRIinuse_b !=
 		    (XRIobj_t *)&hba->sli.sli4.XRIinuse_f)) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_err_msg,
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_debug_msg,
 			    "XRIs inuse during free!: %p %p != %p\n",
 			    hba->sli.sli4.XRIinuse_f,
 			    hba->sli.sli4.XRIinuse_b,
@@ -5183,8 +5287,6 @@ emlxs_sli4_resource_free(emlxs_hba_t *hba)
 		hba->sli.sli4.wq_map[i] = 0xffff;
 	}
 
-	mutex_destroy(&hba->sli.sli4.id_lock);
-
 } /* emlxs_sli4_resource_free() */
 
 
@@ -5197,14 +5299,11 @@ emlxs_sli4_resource_alloc(emlxs_hba_t *hba)
 	uint16_t	index;
 	int		num_eq;
 	int		num_wq;
-	uint32_t	i;
+	uint16_t	i;
 	uint32_t	j;
 	uint32_t	k;
 	uint32_t	word;
-	FCFIobj_t	*fp;
-	VFIobj_t	*vp;
-	RPIobj_t	*rp;
-	XRIobj_t	*xp;
+	XRIobj_t	*xrip;
 	char		buf[64];
 	RQE_t		*rqe;
 	MBUF_INFO	*rqb;
@@ -5218,50 +5317,7 @@ emlxs_sli4_resource_alloc(emlxs_hba_t *hba)
 	off_t		offset;
 	uint32_t	count = 0;
 
-	(void) sprintf(buf, "%s_id_lock mutex", DRIVER_NAME);
-	mutex_init(&hba->sli.sli4.id_lock, buf, MUTEX_DRIVER, NULL);
-
-	if ((!hba->sli.sli4.FCFIp) && (hba->sli.sli4.FCFICount)) {
-		hba->sli.sli4.FCFIp = (FCFIobj_t *)kmem_zalloc(
-		    (sizeof (FCFIobj_t) * hba->sli.sli4.FCFICount), KM_SLEEP);
-
-		fp = hba->sli.sli4.FCFIp;
-		index = 0;	/* Start FCFIs at 0 */
-		for (i = 0; i < hba->sli.sli4.FCFICount; i++) {
-			fp->FCFI = index;
-			fp->index = i;
-			fp++;
-			index++;
-		}
-	}
-
-	if ((!hba->sli.sli4.VFIp) && (hba->sli.sli4.VFICount)) {
-		hba->sli.sli4.VFIp = (VFIobj_t *)kmem_zalloc(
-		    (sizeof (VFIobj_t) * hba->sli.sli4.VFICount), KM_SLEEP);
-
-		vp = hba->sli.sli4.VFIp;
-		index = hba->sli.sli4.VFIBase;
-		for (i = 0; i < hba->sli.sli4.VFICount; i++) {
-			vp->VFI = index;
-			vp->index = i;
-			vp++;
-			index++;
-		}
-	}
-
-	if ((!hba->sli.sli4.RPIp) && (hba->sli.sli4.RPICount)) {
-		hba->sli.sli4.RPIp = (RPIobj_t *)kmem_zalloc(
-		    (sizeof (RPIobj_t) * hba->sli.sli4.RPICount), KM_SLEEP);
-
-		rp = hba->sli.sli4.RPIp;
-		index = hba->sli.sli4.RPIBase;
-		for (i = 0; i < hba->sli.sli4.RPICount; i++) {
-			rp->RPI = index;
-			rp->index = i; /* offset into HdrTmplate */
-			rp++;
-			index++;
-		}
-	}
+	emlxs_fcf_init(hba);
 
 	/* EQs - 1 per Interrupt vector */
 	num_eq = hba->intr_count;
@@ -5322,7 +5378,7 @@ emlxs_sli4_resource_alloc(emlxs_hba_t *hba)
 			    FC_MBUF_DMA | FC_MBUF_SNGLSG | FC_MBUF_DMA32;
 			buf_info->align = ddi_ptob(hba->dip, 1L);
 			buf_info->phys = phys;
-			buf_info->virt = virt;
+			buf_info->virt = (void *)virt;
 			buf_info->data_handle = data_handle;
 			buf_info->dma_handle = dma_handle;
 
@@ -5348,7 +5404,7 @@ emlxs_sli4_resource_alloc(emlxs_hba_t *hba)
 			    FC_MBUF_DMA | FC_MBUF_SNGLSG | FC_MBUF_DMA32;
 			buf_info->align = ddi_ptob(hba->dip, 1L);
 			buf_info->phys = phys;
-			buf_info->virt = virt;
+			buf_info->virt = (void *)virt;
 			buf_info->data_handle = data_handle;
 			buf_info->dma_handle = dma_handle;
 
@@ -5370,7 +5426,7 @@ emlxs_sli4_resource_alloc(emlxs_hba_t *hba)
 			    FC_MBUF_DMA | FC_MBUF_SNGLSG | FC_MBUF_DMA32;
 			buf_info->align = ddi_ptob(hba->dip, 1L);
 			buf_info->phys = phys;
-			buf_info->virt = virt;
+			buf_info->virt = (void *)virt;
 			buf_info->data_handle = data_handle;
 			buf_info->dma_handle = dma_handle;
 
@@ -5392,7 +5448,7 @@ emlxs_sli4_resource_alloc(emlxs_hba_t *hba)
 		    FC_MBUF_DMA | FC_MBUF_SNGLSG | FC_MBUF_DMA32;
 		buf_info->align = ddi_ptob(hba->dip, 1L);
 		buf_info->phys = phys;
-		buf_info->virt = virt;
+		buf_info->virt = (void *)virt;
 		buf_info->data_handle = data_handle;
 		buf_info->dma_handle = dma_handle;
 
@@ -5424,7 +5480,7 @@ emlxs_sli4_resource_alloc(emlxs_hba_t *hba)
 		    FC_MBUF_DMA | FC_MBUF_SNGLSG | FC_MBUF_DMA32;
 		buf_info->align = ddi_ptob(hba->dip, 1L);
 		buf_info->phys = phys;
-		buf_info->virt = virt;
+		buf_info->virt = (void *)virt;
 		buf_info->data_handle = data_handle;
 		buf_info->dma_handle = dma_handle;
 
@@ -5462,7 +5518,7 @@ emlxs_sli4_resource_alloc(emlxs_hba_t *hba)
 				    FC_MBUF_SNGLSG | FC_MBUF_DMA32;
 				rqb->align = ddi_ptob(hba->dip, 1L);
 				rqb->phys = phys;
-				rqb->virt = virt;
+				rqb->virt = (void *)virt;
 				rqb->data_handle = data_handle;
 				rqb->dma_handle = dma_handle;
 
@@ -5505,41 +5561,41 @@ emlxs_sli4_resource_alloc(emlxs_hba_t *hba)
 		hba->sli.sli4.XRIp = (XRIobj_t *)kmem_zalloc(
 		    (sizeof (XRIobj_t) * hba->sli.sli4.XRICount), KM_SLEEP);
 
-		xp = hba->sli.sli4.XRIp;
+		xrip = hba->sli.sli4.XRIp;
 		index = hba->sli.sli4.XRIBase;
 		size = hba->sli.sli4.mem_sgl_size;
 		for (i = 0; i < hba->sli.sli4.XRICount; i++) {
-			xp->sge_count =
+			xrip->sge_count =
 			    (hba->sli.sli4.mem_sgl_size / sizeof (ULP_SGE64));
-			xp->XRI = index;
-			xp->iotag = i;
-			if ((xp->XRI == 0) || (xp->iotag == 0)) {
+			xrip->XRI = index;
+			xrip->iotag = i;
+			if ((xrip->XRI == 0) || (xrip->iotag == 0)) {
 				index++; /* Skip XRI 0 or IOTag 0 */
-				xp++;
+				xrip++;
 				continue;
 			}
-			/* Add xp to end of free list */
-			xp->_b = hba->sli.sli4.XRIfree_b;
-			hba->sli.sli4.XRIfree_b->_f = xp;
-			xp->_f = (XRIobj_t *)&hba->sli.sli4.XRIfree_f;
-			hba->sli.sli4.XRIfree_b = xp;
+			/* Add xrip to end of free list */
+			xrip->_b = hba->sli.sli4.XRIfree_b;
+			hba->sli.sli4.XRIfree_b->_f = xrip;
+			xrip->_f = (XRIobj_t *)&hba->sli.sli4.XRIfree_f;
+			hba->sli.sli4.XRIfree_b = xrip;
 			hba->sli.sli4.xrif_count++;
 
-			/* Allocate SGL for this xp */
-			buf_info = &xp->SGList;
+			/* Allocate SGL for this xrip */
+			buf_info = &xrip->SGList;
 			buf_info->size = size;
 			buf_info->flags =
 			    FC_MBUF_DMA | FC_MBUF_SNGLSG | FC_MBUF_DMA32;
 			buf_info->align = size;
 			buf_info->phys = phys;
-			buf_info->virt = virt;
+			buf_info->virt = (void *)virt;
 			buf_info->data_handle = data_handle;
 			buf_info->dma_handle = dma_handle;
 
 			phys += size;
 			virt += size;
 
-			xp++;
+			xrip++;
 			index++;
 		}
 	}
@@ -5552,7 +5608,7 @@ emlxs_sli4_resource_alloc(emlxs_hba_t *hba)
 		buf_info->flags = FC_MBUF_DMA | FC_MBUF_DMA32;
 		buf_info->align = ddi_ptob(hba->dip, 1L);
 		buf_info->phys = phys;
-		buf_info->virt = virt;
+		buf_info->virt = (void *)virt;
 		buf_info->data_handle = data_handle;
 		buf_info->dma_handle = dma_handle;
 	}
@@ -5581,161 +5637,18 @@ failed:
 } /* emlxs_sli4_resource_alloc */
 
 
-static FCFIobj_t *
-emlxs_sli4_alloc_fcfi(emlxs_hba_t *hba)
-{
-	emlxs_port_t		*port = &PPORT;
-	uint32_t	i;
-	FCFIobj_t	*fp;
-
-	mutex_enter(&hba->sli.sli4.id_lock);
-	fp = hba->sli.sli4.FCFIp;
-	for (i = 0; i < hba->sli.sli4.FCFICount; i++) {
-		if (fp->state == RESOURCE_FREE) {
-			fp->state = RESOURCE_ALLOCATED;
-			mutex_exit(&hba->sli.sli4.id_lock);
-			return (fp);
-		}
-		fp++;
-	}
-	mutex_exit(&hba->sli.sli4.id_lock);
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-	    "Unable to Alloc FCFI");
-	return (NULL);
-
-} /* emlxs_sli4_alloc_fcfi() */
-
-
-static FCFIobj_t *
-emlxs_sli4_find_fcfi_fcfrec(emlxs_hba_t *hba, FCF_RECORD_t *fcfrec)
-{
-	emlxs_port_t	*port = &PPORT;
-	uint32_t	i;
-	FCFIobj_t	*fp;
-
-	/* Check for BOTH a matching FCF index and mac address */
-	mutex_enter(&hba->sli.sli4.id_lock);
-	fp = hba->sli.sli4.FCFIp;
-	for (i = 0; i < hba->sli.sli4.FCFICount; i++) {
-		if (fp->state & RESOURCE_ALLOCATED) {
-			if ((fp->FCF_index == fcfrec->fcf_index) &&
-			    (bcmp((char *)fcfrec->fcf_mac_address_hi,
-			    fp->fcf_rec.fcf_mac_address_hi, 4) == 0) &&
-			    (bcmp((char *)fcfrec->fcf_mac_address_low,
-			    fp->fcf_rec.fcf_mac_address_low, 2) == 0)) {
-				mutex_exit(&hba->sli.sli4.id_lock);
-				return (fp);
-			}
-		}
-		fp++;
-	}
-	mutex_exit(&hba->sli.sli4.id_lock);
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-	    "Unable to Find FCF Index %d", fcfrec->fcf_index);
-	return (0);
-
-} /* emlxs_sli4_find_fcfi_fcfrec() */
-
-
-extern VFIobj_t *
-emlxs_sli4_alloc_vfi(emlxs_hba_t *hba, FCFIobj_t *fp)
-{
-	emlxs_port_t		*port = &PPORT;
-	uint32_t	i;
-	VFIobj_t	*vp;
-
-	mutex_enter(&hba->sli.sli4.id_lock);
-	vp = hba->sli.sli4.VFIp;
-	for (i = 0; i < hba->sli.sli4.VFICount; i++) {
-		if (vp->state == RESOURCE_FREE) {
-			vp->state = RESOURCE_ALLOCATED;
-			vp->FCFIp = fp;
-			fp->outstandingVFIs++;
-			mutex_exit(&hba->sli.sli4.id_lock);
-			return (vp);
-		}
-		vp++;
-	}
-	mutex_exit(&hba->sli.sli4.id_lock);
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-	    "Unable to Alloc VFI");
-	return (NULL);
-
-} /* emlxs_sli4_alloc_vfi() */
-
-
-extern RPIobj_t *
-emlxs_sli4_alloc_rpi(emlxs_port_t *port)
-{
-	emlxs_hba_t *hba = HBA;
-	uint32_t	i;
-	RPIobj_t	*rp;
-
-	mutex_enter(&hba->sli.sli4.id_lock);
-	rp = hba->sli.sli4.RPIp;
-	for (i = 0; i < hba->sli.sli4.RPICount; i++) {
-		/* To be consistent with SLI3, the RPI assignment */
-		/* starts with 1. ONLY one SLI4 HBA in the entire */
-		/* system will be sacrificed by one RPI and that  */
-		/* is the one having RPI base equal 0. */
-		if ((rp->state == RESOURCE_FREE) && (rp->RPI != 0)) {
-			rp->state = RESOURCE_ALLOCATED;
-			rp->VPIp = port;
-			port->outstandingRPIs++;
-			mutex_exit(&hba->sli.sli4.id_lock);
-			return (rp);
-		}
-		rp++;
-	}
-	mutex_exit(&hba->sli.sli4.id_lock);
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-	    "Unable to Alloc RPI");
-	return (NULL);
-
-} /* emlxs_sli4_alloc_rpi() */
-
-
-extern RPIobj_t *
-emlxs_sli4_find_rpi(emlxs_hba_t *hba, uint16_t rpi)
-{
-	emlxs_port_t	*port = &PPORT;
-	RPIobj_t	*rp;
-	int		index;
-
-	rp = hba->sli.sli4.RPIp;
-	index = rpi - hba->sli.sli4.RPIBase;
-	if ((rpi == 0xffff) || (index >= hba->sli.sli4.RPICount)) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "RPI %d out of range: Count = %d",
-		    index, hba->sli.sli4.RPICount);
-		return (NULL);
-	}
-	rp += index;
-	mutex_enter(&hba->sli.sli4.id_lock);
-	if ((index < 0) || !(rp->state & RESOURCE_ALLOCATED)) {
-		mutex_exit(&hba->sli.sli4.id_lock);
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "Unable to find RPI %d", index);
-		return (NULL);
-	}
-	mutex_exit(&hba->sli.sli4.id_lock);
-	return (rp);
-
-} /* emlxs_sli4_find_rpi() */
-
-
 static XRIobj_t *
-emlxs_sli4_reserve_xri(emlxs_hba_t *hba,  RPIobj_t *rp)
+emlxs_sli4_reserve_xri(emlxs_hba_t *hba,  RPIobj_t *rpip)
 {
 	emlxs_port_t	*port = &PPORT;
-	XRIobj_t	*xp;
+	XRIobj_t	*xrip;
 	uint16_t	iotag;
 
 	mutex_enter(&EMLXS_FCTAB_LOCK);
 
-	xp = hba->sli.sli4.XRIfree_f;
+	xrip = hba->sli.sli4.XRIfree_f;
 
-	if (xp == (XRIobj_t *)&hba->sli.sli4.XRIfree_f) {
+	if (xrip == (XRIobj_t *)&hba->sli.sli4.XRIfree_f) {
 		mutex_exit(&EMLXS_FCTAB_LOCK);
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_err_msg,
@@ -5744,11 +5657,11 @@ emlxs_sli4_reserve_xri(emlxs_hba_t *hba,  RPIobj_t *rp)
 		return (NULL);
 	}
 
-	iotag = xp->iotag;
+	iotag = xrip->iotag;
 
 	if ((!iotag) ||
-	    (hba->fc_table[iotag] != NULL &&
-	    hba->fc_table[iotag] != STALE_PACKET)) {
+	    ((hba->fc_table[iotag] != NULL) &&
+	    (hba->fc_table[iotag] != STALE_PACKET))) {
 		/*
 		 * No more command slots available, retry later
 		 */
@@ -5759,88 +5672,106 @@ emlxs_sli4_reserve_xri(emlxs_hba_t *hba,  RPIobj_t *rp)
 		return (NULL);
 	}
 
-	xp->state = (RESOURCE_ALLOCATED | RESOURCE_XRI_RESERVED);
-	xp->RPIp = rp;
-	xp->sbp = NULL;
+	xrip->state = XRI_STATE_ALLOCATED;
+	xrip->flag = EMLXS_XRI_RESERVED;
+	xrip->rpip = rpip;
+	xrip->sbp = NULL;
 
-	if (rp) {
-		rp->outstandingXRIs++;
+	if (rpip) {
+		rpip->xri_count++;
 	}
 
 	/* Take it off free list */
-	(xp->_b)->_f = xp->_f;
-	(xp->_f)->_b = xp->_b;
-	xp->_f = NULL;
-	xp->_b = NULL;
+	(xrip->_b)->_f = xrip->_f;
+	(xrip->_f)->_b = xrip->_b;
+	xrip->_f = NULL;
+	xrip->_b = NULL;
 	hba->sli.sli4.xrif_count--;
 
 	/* Add it to end of inuse list */
-	xp->_b = hba->sli.sli4.XRIinuse_b;
-	hba->sli.sli4.XRIinuse_b->_f = xp;
-	xp->_f = (XRIobj_t *)&hba->sli.sli4.XRIinuse_f;
-	hba->sli.sli4.XRIinuse_b = xp;
+	xrip->_b = hba->sli.sli4.XRIinuse_b;
+	hba->sli.sli4.XRIinuse_b->_f = xrip;
+	xrip->_f = (XRIobj_t *)&hba->sli.sli4.XRIinuse_f;
+	hba->sli.sli4.XRIinuse_b = xrip;
 	hba->sli.sli4.xria_count++;
 
 	mutex_exit(&EMLXS_FCTAB_LOCK);
-	return (xp);
+	return (xrip);
 
 } /* emlxs_sli4_reserve_xri() */
 
 
 extern uint32_t
-emlxs_sli4_unreserve_xri(emlxs_hba_t *hba, uint16_t xri)
+emlxs_sli4_unreserve_xri(emlxs_hba_t *hba, uint16_t xri, uint32_t lock)
 {
 	emlxs_port_t	*port = &PPORT;
-	XRIobj_t *xp;
+	XRIobj_t *xrip;
 
-	xp = emlxs_sli4_find_xri(hba, xri);
+	if (lock) {
+		mutex_enter(&EMLXS_FCTAB_LOCK);
+	}
 
-	mutex_enter(&EMLXS_FCTAB_LOCK);
+	xrip = emlxs_sli4_find_xri(hba, xri);
 
-	if (!xp || xp->state == RESOURCE_FREE) {
-		mutex_exit(&EMLXS_FCTAB_LOCK);
+	if (!xrip || xrip->state == XRI_STATE_FREE) {
+		if (lock) {
+			mutex_exit(&EMLXS_FCTAB_LOCK);
+		}
+
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "emlxs_sli4_unreserve_xri: xri=%x already freed.", xp->XRI);
+		    "emlxs_sli4_unreserve_xri: xri=%x already freed.",
+		    xrip->XRI);
 		return (0);
 	}
 
-	if (!(xp->state & RESOURCE_XRI_RESERVED)) {
-		mutex_exit(&EMLXS_FCTAB_LOCK);
+	if (!(xrip->flag & EMLXS_XRI_RESERVED)) {
+		if (lock) {
+			mutex_exit(&EMLXS_FCTAB_LOCK);
+		}
+
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "emlxs_sli4_unreserve_xri: xri=%x in use.", xp->XRI);
+		    "emlxs_sli4_unreserve_xri: xri=%x in use.", xrip->XRI);
 		return (1);
 	}
 
-	if (hba->fc_table[xp->iotag]) {
-		hba->fc_table[xp->iotag] = NULL;
+	if (xrip->iotag &&
+	    (hba->fc_table[xrip->iotag] != NULL) &&
+	    (hba->fc_table[xrip->iotag] != STALE_PACKET)) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_err_msg,
+		    "emlxs_sli4_unreserve_xri:%x  sbp dropped:%p",
+		    xrip->XRI, hba->fc_table[xrip->iotag]);
+
+		hba->fc_table[xrip->iotag] = NULL;
 		hba->io_count--;
 	}
 
-	xp->state = RESOURCE_FREE;
+	xrip->state = XRI_STATE_FREE;
 
-	if (xp->RPIp) {
-		xp->RPIp->outstandingXRIs--;
-		xp->RPIp = NULL;
+	if (xrip->rpip) {
+		xrip->rpip->xri_count--;
+		xrip->rpip = NULL;
 	}
 
 	/* Take it off inuse list */
-	(xp->_b)->_f = xp->_f;
-	(xp->_f)->_b = xp->_b;
-	xp->_f = NULL;
-	xp->_b = NULL;
+	(xrip->_b)->_f = xrip->_f;
+	(xrip->_f)->_b = xrip->_b;
+	xrip->_f = NULL;
+	xrip->_b = NULL;
 	hba->sli.sli4.xria_count--;
 
 	/* Add it to end of free list */
-	xp->_b = hba->sli.sli4.XRIfree_b;
-	hba->sli.sli4.XRIfree_b->_f = xp;
-	xp->_f = (XRIobj_t *)&hba->sli.sli4.XRIfree_f;
-	hba->sli.sli4.XRIfree_b = xp;
+	xrip->_b = hba->sli.sli4.XRIfree_b;
+	hba->sli.sli4.XRIfree_b->_f = xrip;
+	xrip->_f = (XRIobj_t *)&hba->sli.sli4.XRIfree_f;
+	hba->sli.sli4.XRIfree_b = xrip;
 	hba->sli.sli4.xrif_count++;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-	    "emlxs_sli4_unreserve_xri: xri=%x unreserved.", xp->XRI);
+	    "emlxs_sli4_unreserve_xri: xri=%x unreserved.", xrip->XRI);
 
-	mutex_exit(&EMLXS_FCTAB_LOCK);
+	if (lock) {
+		mutex_exit(&EMLXS_FCTAB_LOCK);
+	}
 
 	return (0);
 
@@ -5852,13 +5783,13 @@ emlxs_sli4_register_xri(emlxs_hba_t *hba, emlxs_buf_t *sbp, uint16_t xri)
 {
 	emlxs_port_t	*port = &PPORT;
 	uint16_t	iotag;
-	XRIobj_t	*xp;
-
-	xp = emlxs_sli4_find_xri(hba, xri);
+	XRIobj_t	*xrip;
 
 	mutex_enter(&EMLXS_FCTAB_LOCK);
 
-	if (!xp) {
+	xrip = emlxs_sli4_find_xri(hba, xri);
+
+	if (!xrip) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
 		    "emlxs_sli4_register_xri: XRI not found.");
 
@@ -5867,25 +5798,26 @@ emlxs_sli4_register_xri(emlxs_hba_t *hba, emlxs_buf_t *sbp, uint16_t xri)
 		return (NULL);
 	}
 
-	if (!(xp->state & RESOURCE_ALLOCATED) ||
-	    !(xp->state & RESOURCE_XRI_RESERVED)) {
+	if ((xrip->state == XRI_STATE_FREE) ||
+	    !(xrip->flag & EMLXS_XRI_RESERVED)) {
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
-		    "emlxs_sli4_register_xri: Invalid XRI. xp=%p state=%x",
-		    xp, xp->state);
+		    "emlxs_sli4_register_xri: Invalid XRI. xrip=%p "
+		    "state=%x flag=%x",
+		    xrip, xrip->state, xrip->flag);
 
 		mutex_exit(&EMLXS_FCTAB_LOCK);
 		return (NULL);
 	}
 
-	iotag = xp->iotag;
+	iotag = xrip->iotag;
 
 	if ((!iotag) ||
-	    (hba->fc_table[iotag] != NULL &&
-	    hba->fc_table[iotag] != STALE_PACKET)) {
+	    ((hba->fc_table[iotag] != NULL) &&
+	    (hba->fc_table[iotag] != STALE_PACKET))) {
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
-		    "emlxs_sli4_register_xri: Invalid fc_table entry. " \
+		    "emlxs_sli4_register_xri: Invalid fc_table entry. "
 		    "iotag=%x entry=%p",
 		    iotag, hba->fc_table[iotag]);
 
@@ -5897,50 +5829,48 @@ emlxs_sli4_register_xri(emlxs_hba_t *hba, emlxs_buf_t *sbp, uint16_t xri)
 	hba->io_count++;
 
 	sbp->iotag = iotag;
-	sbp->xp = xp;
+	sbp->xrip = xrip;
 
-	xp->state &= ~RESOURCE_XRI_RESERVED;
-	xp->sbp = sbp;
+	xrip->flag &= ~EMLXS_XRI_RESERVED;
+	xrip->sbp = sbp;
 
 	mutex_exit(&EMLXS_FCTAB_LOCK);
 
-	return (xp);
+	return (xrip);
 
 } /* emlxs_sli4_register_xri() */
 
 
 /* Performs both reserve and register functions for XRI */
 static XRIobj_t *
-emlxs_sli4_alloc_xri(emlxs_hba_t *hba, emlxs_buf_t *sbp, RPIobj_t *rp)
+emlxs_sli4_alloc_xri(emlxs_hba_t *hba, emlxs_buf_t *sbp, RPIobj_t *rpip)
 {
 	emlxs_port_t	*port = &PPORT;
-	XRIobj_t	*xp;
+	XRIobj_t	*xrip;
 	uint16_t	iotag;
 
 	mutex_enter(&EMLXS_FCTAB_LOCK);
 
-	xp = hba->sli.sli4.XRIfree_f;
+	xrip = hba->sli.sli4.XRIfree_f;
 
-	if (xp == (XRIobj_t *)&hba->sli.sli4.XRIfree_f) {
+	if (xrip == (XRIobj_t *)&hba->sli.sli4.XRIfree_f) {
 		mutex_exit(&EMLXS_FCTAB_LOCK);
-
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_err_msg,
-		    "Unable to allocate XRI");
 
 		return (NULL);
 	}
 
 	/* Get the iotag by registering the packet */
-	iotag = xp->iotag;
+	iotag = xrip->iotag;
 
 	if ((!iotag) ||
-	    (hba->fc_table[iotag] != NULL &&
-	    hba->fc_table[iotag] != STALE_PACKET)) {
+	    ((hba->fc_table[iotag] != NULL) &&
+	    (hba->fc_table[iotag] != STALE_PACKET))) {
 		/*
 		 * No more command slots available, retry later
 		 */
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
-		    "Adapter Busy. Unable to allocate iotag");
+		    "Adapter Busy. Unable to alloc iotag:(0x%x)(%p)",
+		    iotag, hba->fc_table[iotag]);
 
 		mutex_exit(&EMLXS_FCTAB_LOCK);
 		return (NULL);
@@ -5950,304 +5880,146 @@ emlxs_sli4_alloc_xri(emlxs_hba_t *hba, emlxs_buf_t *sbp, RPIobj_t *rp)
 	hba->io_count++;
 
 	sbp->iotag = iotag;
-	sbp->xp = xp;
+	sbp->xrip = xrip;
 
-	xp->state = RESOURCE_ALLOCATED;
-	xp->RPIp = rp;
-	xp->sbp = sbp;
+	xrip->state = XRI_STATE_ALLOCATED;
+	xrip->flag = 0;
+	xrip->rpip = rpip;
+	xrip->sbp = sbp;
 
-	if (rp) {
-		rp->outstandingXRIs++;
+	if (rpip) {
+		rpip->xri_count++;
 	}
 
 	/* Take it off free list */
-	(xp->_b)->_f = xp->_f;
-	(xp->_f)->_b = xp->_b;
-	xp->_f = NULL;
-	xp->_b = NULL;
+	(xrip->_b)->_f = xrip->_f;
+	(xrip->_f)->_b = xrip->_b;
+	xrip->_f = NULL;
+	xrip->_b = NULL;
 	hba->sli.sli4.xrif_count--;
 
 	/* Add it to end of inuse list */
-	xp->_b = hba->sli.sli4.XRIinuse_b;
-	hba->sli.sli4.XRIinuse_b->_f = xp;
-	xp->_f = (XRIobj_t *)&hba->sli.sli4.XRIinuse_f;
-	hba->sli.sli4.XRIinuse_b = xp;
+	xrip->_b = hba->sli.sli4.XRIinuse_b;
+	hba->sli.sli4.XRIinuse_b->_f = xrip;
+	xrip->_f = (XRIobj_t *)&hba->sli.sli4.XRIinuse_f;
+	hba->sli.sli4.XRIinuse_b = xrip;
 	hba->sli.sli4.xria_count++;
 
 	mutex_exit(&EMLXS_FCTAB_LOCK);
 
-	return (xp);
+	return (xrip);
 
 } /* emlxs_sli4_alloc_xri() */
 
 
+/* EMLXS_FCTAB_LOCK must be held to enter */
 extern XRIobj_t *
 emlxs_sli4_find_xri(emlxs_hba_t *hba, uint16_t xri)
 {
 	emlxs_port_t	*port = &PPORT;
-	XRIobj_t	*xp;
+	XRIobj_t	*xrip;
 
-	mutex_enter(&EMLXS_FCTAB_LOCK);
-	xp = (XRIobj_t *)hba->sli.sli4.XRIinuse_f;
-	while (xp != (XRIobj_t *)&hba->sli.sli4.XRIinuse_f) {
-		if ((xp->state & RESOURCE_ALLOCATED) &&
-		    (xp->XRI == xri)) {
-			break;
+	xrip = (XRIobj_t *)hba->sli.sli4.XRIinuse_f;
+	while (xrip != (XRIobj_t *)&hba->sli.sli4.XRIinuse_f) {
+		if ((xrip->state >= XRI_STATE_ALLOCATED) &&
+		    (xrip->XRI == xri)) {
+			return (xrip);
 		}
-		xp = xp->_f;
+		xrip = xrip->_f;
 	}
-	mutex_exit(&EMLXS_FCTAB_LOCK);
 
-	if (xp == (XRIobj_t *)&hba->sli.sli4.XRIinuse_f) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "Unable to find XRI x%x", xri);
-		return (NULL);
-	}
-	return (xp);
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
+	    "Unable to find XRI x%x", xri);
+
+	return (NULL);
 
 } /* emlxs_sli4_find_xri() */
 
-extern void
-emlxs_sli4_free_fcfi(emlxs_hba_t *hba, FCFIobj_t *fp)
-{
-	emlxs_port_t	*port = &PPORT;
 
-	mutex_enter(&hba->sli.sli4.id_lock);
-	if (fp->state == RESOURCE_FREE) {
-		mutex_exit(&hba->sli.sli4.id_lock);
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "Free FCFI:%d idx:%d, Already freed",
-		    fp->FCFI, fp->FCF_index);
-		return;
-	}
-
-	if (fp->outstandingVFIs) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "Free FCFI:%d, %d outstanding VFIs", fp->FCFI,
-		    fp->outstandingVFIs);
-	}
-	fp->state = RESOURCE_FREE;
-	fp->FCF_index = 0;
-	bzero(&fp->fcf_rec, sizeof (FCF_RECORD_t));
-	fp->fcf_vfi = 0;
-	fp->fcf_vpi = 0;
-
-	mutex_exit(&hba->sli.sli4.id_lock);
-
-} /* emlxs_sli4_free_fcfi() */
 
 
 extern void
-emlxs_sli4_free_vfi(emlxs_hba_t *hba, VFIobj_t *fp)
+emlxs_sli4_free_xri(emlxs_hba_t *hba, emlxs_buf_t *sbp, XRIobj_t *xrip,
+    uint8_t lock)
 {
 	emlxs_port_t	*port = &PPORT;
 
-	mutex_enter(&hba->sli.sli4.id_lock);
-	if (fp->state == RESOURCE_FREE) {
-		mutex_exit(&hba->sli.sli4.id_lock);
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "Free VFI:%d, Already freed", fp->VFI);
-		return;
+	if (lock) {
+		mutex_enter(&EMLXS_FCTAB_LOCK);
 	}
 
-	if (fp->outstandingVPIs) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "Free VFI:%d, %d outstanding VPIs", fp->VFI,
-		    fp->outstandingVPIs);
-	}
-	fp->state = RESOURCE_FREE;
-	fp->FCFIp->outstandingVFIs--;
-	mutex_exit(&hba->sli.sli4.id_lock);
-
-	if ((fp->FCFIp->outstandingVFIs == 0) &&
-	    (hba->state == FC_LINK_DOWN)) {
-
-		/* No more VPIs so unreg the VFI */
-		(void) emlxs_mb_unreg_fcfi(hba, fp->FCFIp);
-	}
-	fp->FCFIp = NULL;
-
-
-} /* emlxs_sli4_free_vfi() */
-
-
-static void
-emlxs_sli4_free_vpi(emlxs_hba_t *hba, emlxs_port_t *pp)
-{
-	emlxs_port_t	*port = &PPORT;
-
-	if (!(pp->flag & EMLXS_PORT_ENABLE)) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "Free VPI:%d, Already freed", pp->vpi);
-		return;
-	}
-
-	mutex_enter(&hba->sli.sli4.id_lock);
-	if (pp->outstandingRPIs) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "Free VPI:%d, %d outstanding RPIs", pp->vpi,
-		    pp->outstandingRPIs);
-	}
-	pp->VFIp->outstandingVPIs--;
-	if (pp->VFIp->outstandingVPIs == 0) {
-		/* No more VPIs so unreg the VFI */
-		(void) emlxs_mb_unreg_vfi(hba, pp->VFIp);
-	}
-
-	pp->VFIp = NULL;
-	mutex_exit(&hba->sli.sli4.id_lock);
-
-} /* emlxs_sli4_free_vpi() */
-
-
-static void
-emlxs_sli4_cmpl_io(emlxs_hba_t *hba, emlxs_buf_t *sbp)
-{
-	CHANNEL *cp;
-	IOCBQ *iocbq;
-	CQE_u cq_entry;
-
-	cp = sbp->channel;
-	iocbq = &sbp->iocbq;
-
-	bzero((void *) &cq_entry, sizeof (CQE_u));
-	cq_entry.cqCmplEntry.Status = IOSTAT_LOCAL_REJECT;
-	cq_entry.cqCmplEntry.Parameter = IOERR_SEQUENCE_TIMEOUT;
-	cq_entry.cqCmplEntry.RequestTag = sbp->iotag;
-	emlxs_CQE_to_IOCB(hba, &cq_entry.cqCmplEntry, sbp);
-
-	/*
-	 * If this is NOT a polled command completion
-	 * or a driver allocated pkt, then defer pkt
-	 * completion.
-	 */
-	if (!(sbp->pkt_flags &
-	    (PACKET_POLLED | PACKET_ALLOCATED))) {
-		/* Add the IOCB to the channel list */
-		mutex_enter(&cp->rsp_lock);
-		if (cp->rsp_head == NULL) {
-			cp->rsp_head = iocbq;
-			cp->rsp_tail = iocbq;
-		} else {
-			cp->rsp_tail->next = iocbq;
-			cp->rsp_tail = iocbq;
-		}
-		mutex_exit(&cp->rsp_lock);
-
-		/* Delay triggering thread till end of ISR */
-		cp->chan_flag |= EMLXS_NEEDS_TRIGGER;
-	} else {
-		emlxs_proc_channel_event(hba, cp, iocbq);
-	}
-} /* emlxs_sli4_cmpl_io() */
-
-extern void
-emlxs_sli4_free_rpi(emlxs_hba_t *hba, RPIobj_t *rp)
-{
-	emlxs_port_t	*port = &PPORT;
-	XRIobj_t	*xp;
-	XRIobj_t	*next_xp;
-
-	mutex_enter(&hba->sli.sli4.id_lock);
-	if (rp->state == RESOURCE_FREE) {
-		mutex_exit(&hba->sli.sli4.id_lock);
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "Free RPI:%d, Already freed", rp->RPI);
-		return;
-	}
-	if (rp->outstandingXRIs) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "Free RPI:%d, %d outstanding XRIs", rp->RPI,
-		    rp->outstandingXRIs);
-	}
-	rp->state = RESOURCE_FREE;
-	rp->VPIp = NULL;
-	mutex_exit(&hba->sli.sli4.id_lock);
-
-	/* Break node/RPI binding */
-	if (rp->node) {
-		rw_enter(&port->node_rwlock, RW_WRITER);
-		rp->node->RPIp = NULL;
-		rp->node = NULL;
-		rw_exit(&port->node_rwlock);
-	}
-
-	mutex_enter(&EMLXS_FCTAB_LOCK);
-	/* Remove all XRIs under this RPI */
-	xp = (XRIobj_t *)hba->sli.sli4.XRIinuse_f;
-	while (xp != (XRIobj_t *)&hba->sli.sli4.XRIinuse_f) {
-		next_xp = xp->_f;
-		if ((xp->state & RESOURCE_ALLOCATED) &&
-		    (xp->RPIp == rp)) {
-			xp->RPIp->outstandingXRIs--;
-			xp->RPIp = NULL;
-		}
-		xp = next_xp;
-	}
-	mutex_exit(&EMLXS_FCTAB_LOCK);
-
-} /* emlxs_sli4_free_rpi() */
-
-
-extern void
-emlxs_sli4_free_xri(emlxs_hba_t *hba, emlxs_buf_t *sbp, XRIobj_t *xp)
-{
-	emlxs_port_t	*port = &PPORT;
-
-	mutex_enter(&EMLXS_FCTAB_LOCK);
-	if (xp) {
-		if (xp->state == RESOURCE_FREE) {
-			mutex_exit(&EMLXS_FCTAB_LOCK);
+	if (xrip) {
+		if (xrip->state == XRI_STATE_FREE) {
+			if (lock) {
+				mutex_exit(&EMLXS_FCTAB_LOCK);
+			}
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-			    "Free XRI:%x, Already freed", xp->XRI);
+			    "Free XRI:%x, Already freed", xrip->XRI);
 			return;
 		}
 
-		if (hba->fc_table[xp->iotag]) {
-			hba->fc_table[xp->iotag] = NULL;
+		if (xrip->iotag &&
+		    (hba->fc_table[xrip->iotag] != NULL) &&
+		    (hba->fc_table[xrip->iotag] != STALE_PACKET)) {
+			hba->fc_table[xrip->iotag] = NULL;
 			hba->io_count--;
 		}
 
-		xp->state = RESOURCE_FREE;
+		xrip->state = XRI_STATE_FREE;
+		xrip->flag  = 0;
 
-		if (xp->RPIp) {
-			xp->RPIp->outstandingXRIs--;
-			xp->RPIp = NULL;
+		if (xrip->rpip) {
+			xrip->rpip->xri_count--;
+			xrip->rpip = NULL;
 		}
 
 		/* Take it off inuse list */
-		(xp->_b)->_f = xp->_f;
-		(xp->_f)->_b = xp->_b;
-		xp->_f = NULL;
-		xp->_b = NULL;
+		(xrip->_b)->_f = xrip->_f;
+		(xrip->_f)->_b = xrip->_b;
+		xrip->_f = NULL;
+		xrip->_b = NULL;
 		hba->sli.sli4.xria_count--;
 
 		/* Add it to end of free list */
-		xp->_b = hba->sli.sli4.XRIfree_b;
-		hba->sli.sli4.XRIfree_b->_f = xp;
-		xp->_f = (XRIobj_t *)&hba->sli.sli4.XRIfree_f;
-		hba->sli.sli4.XRIfree_b = xp;
+		xrip->_b = hba->sli.sli4.XRIfree_b;
+		hba->sli.sli4.XRIfree_b->_f = xrip;
+		xrip->_f = (XRIobj_t *)&hba->sli.sli4.XRIfree_f;
+		hba->sli.sli4.XRIfree_b = xrip;
 		hba->sli.sli4.xrif_count++;
 	}
 
 	if (sbp) {
-		sbp->xp = 0;
+		if (!(sbp->pkt_flags & PACKET_VALID) ||
+		    (sbp->pkt_flags &
+		    (PACKET_ULP_OWNED|PACKET_COMPLETED|PACKET_IN_COMPLETION))) {
+			if (lock) {
+				mutex_exit(&EMLXS_FCTAB_LOCK);
+			}
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
+			    "Free XRI: sbp invalid. sbp=%p flags=%x xri=%x",
+			    sbp, sbp->pkt_flags, ((xrip)? xrip->XRI:0));
+			return;
+		}
 
-		if (xp && (xp->iotag != sbp->iotag)) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_err_msg,
+		sbp->xrip = 0;
+
+		if (xrip && (xrip->iotag != sbp->iotag)) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_debug_msg,
 			    "sbp / iotag mismatch %p iotag:%d %d", sbp,
-			    sbp->iotag, xp->iotag);
+			    sbp->iotag, xrip->iotag);
 		}
 
 		if (sbp->iotag) {
-			if (hba->fc_table[sbp->iotag]) {
+			if (sbp == hba->fc_table[sbp->iotag]) {
 				hba->fc_table[sbp->iotag] = NULL;
 				hba->io_count--;
 			}
 			sbp->iotag = 0;
 		}
 
-		mutex_exit(&EMLXS_FCTAB_LOCK);
+		if (lock) {
+			mutex_exit(&EMLXS_FCTAB_LOCK);
+		}
 
 		/* Clean up the sbp */
 		mutex_enter(&sbp->mtx);
@@ -6263,7 +6035,9 @@ emlxs_sli4_free_xri(emlxs_hba_t *hba, emlxs_buf_t *sbp, XRIobj_t *xp)
 
 		mutex_exit(&sbp->mtx);
 	} else {
-		mutex_exit(&EMLXS_FCTAB_LOCK);
+		if (lock) {
+			mutex_exit(&EMLXS_FCTAB_LOCK);
+		}
 	}
 
 } /* emlxs_sli4_free_xri() */
@@ -6274,7 +6048,7 @@ emlxs_sli4_post_sgl_pages(emlxs_hba_t *hba, MAILBOXQ *mbq)
 {
 	MAILBOX4	*mb = (MAILBOX4 *)mbq;
 	emlxs_port_t	*port = &PPORT;
-	XRIobj_t	*xp;
+	XRIobj_t	*xrip;
 	MATCHMAP	*mp;
 	mbox_req_hdr_t 	*hdr_req;
 	uint32_t	i, cnt, xri_cnt;
@@ -6291,7 +6065,7 @@ emlxs_sli4_post_sgl_pages(emlxs_hba_t *hba, MAILBOXQ *mbq)
 		    mb->mbxCommand);
 		return (EIO);
 	}
-	mbq->nonembed = (uint8_t *)mp;
+	mbq->nonembed = (void *)mp;
 
 	/*
 	 * Signifies a non embedded command
@@ -6305,7 +6079,7 @@ emlxs_sli4_post_sgl_pages(emlxs_hba_t *hba, MAILBOXQ *mbq)
 	    (IOCTL_FCOE_CFG_POST_SGL_PAGES *)(hdr_req + 1);
 
 
-	xp = hba->sli.sli4.XRIp;
+	xrip = hba->sli.sli4.XRIp;
 	cnt = hba->sli.sli4.XRICount;
 	while (cnt) {
 		bzero((void *) hdr_req, mp->size);
@@ -6326,18 +6100,18 @@ emlxs_sli4_post_sgl_pages(emlxs_hba_t *hba, MAILBOXQ *mbq)
 		hdr_req->req_length = size;
 
 		post_sgl->params.request.xri_count = 0;
-		post_sgl->params.request.xri_start = xp->XRI;
+		post_sgl->params.request.xri_start = xrip->XRI;
 		xri_cnt = (size - sizeof (IOCTL_FCOE_CFG_POST_SGL_PAGES)) /
 		    sizeof (FCOE_SGL_PAGES);
 		for (i = 0; i < xri_cnt; i++) {
 
 			post_sgl->params.request.xri_count++;
 			post_sgl->params.request.pages[i].sgl_page0.addrLow =
-			    PADDR_LO(xp->SGList.phys);
+			    PADDR_LO(xrip->SGList.phys);
 			post_sgl->params.request.pages[i].sgl_page0.addrHigh =
-			    PADDR_HI(xp->SGList.phys);
+			    PADDR_HI(xrip->SGList.phys);
 			cnt--;
-			xp++;
+			xrip++;
 			if (cnt == 0) {
 				break;
 			}
@@ -6350,13 +6124,13 @@ emlxs_sli4_post_sgl_pages(emlxs_hba_t *hba, MAILBOXQ *mbq)
 			    mb->mbxCommand, mb->mbxStatus,
 			    post_sgl->params.request.xri_count,
 			    post_sgl->params.request.xri_start);
-			(void) emlxs_mem_buf_free(hba, mp);
-			mbq->nonembed = (uint8_t *)NULL;
+			emlxs_mem_buf_free(hba, mp);
+			mbq->nonembed = NULL;
 			return (EIO);
 		}
 	}
-	(void) emlxs_mem_buf_free(hba, mp);
-	mbq->nonembed = (uint8_t *)NULL;
+	emlxs_mem_buf_free(hba, mp);
+	mbq->nonembed = NULL;
 	return (0);
 
 } /* emlxs_sli4_post_sgl_pages() */
@@ -6414,7 +6188,7 @@ emlxs_sli4_post_hdr_tmplates(emlxs_hba_t *hba, MAILBOXQ *mbq)
 		    mb->mbxCommand, mb->mbxStatus);
 		return (EIO);
 	}
-emlxs_data_dump(hba, "POST_HDR", (uint32_t *)mb, 18, 0);
+emlxs_data_dump(port, "POST_HDR", (uint32_t *)mb, 18, 0);
 	return (0);
 
 } /* emlxs_sli4_post_hdr_tmplates() */
@@ -6431,10 +6205,11 @@ emlxs_sli4_create_queues(emlxs_hba_t *hba, MAILBOXQ *mbq)
 	IOCTL_FCOE_WQ_CREATE *wq;
 	IOCTL_FCOE_RQ_CREATE *rq;
 	IOCTL_COMMON_MQ_CREATE *mq;
+	IOCTL_COMMON_MCC_CREATE_EXT *mcc_ext;
 	emlxs_rqdbu_t	rqdb;
-	int i, j;
-	int num_cq, total_cq;
-	int num_wq, total_wq;
+	uint16_t i, j;
+	uint16_t num_cq, total_cq;
+	uint16_t num_wq, total_wq;
 
 	/*
 	 * The first CQ is reserved for ASYNC events,
@@ -6474,7 +6249,7 @@ emlxs_sli4_create_queues(emlxs_hba_t *hba, MAILBOXQ *mbq)
 		hba->sli.sli4.eq_map[eq->params.response.EQId] = i;
 		hba->sli.sli4.eq[i].lastwq = total_wq;
 
-emlxs_data_dump(hba, "EQ0_CREATE", (uint32_t *)mb, 18, 0);
+emlxs_data_dump(port, "EQ0_CREATE", (uint32_t *)mb, 18, 0);
 		num_wq = cfg[CFG_NUM_WQ].current;
 		num_cq = num_wq;
 		if (i == 0) {
@@ -6526,7 +6301,7 @@ emlxs_data_dump(hba, "EQ0_CREATE", (uint32_t *)mb, 18, 0);
 				    &hba->chan[total_cq - EMLXS_CQ_OFFSET_WQ];
 				break;
 			}
-emlxs_data_dump(hba, "CQX_CREATE", (uint32_t *)mb, 18, 0);
+emlxs_data_dump(port, "CQX_CREATE", (uint32_t *)mb, 18, 0);
 			total_cq++;
 		}
 
@@ -6555,9 +6330,10 @@ emlxs_data_dump(hba, "CQX_CREATE", (uint32_t *)mb, 18, 0);
 
 			hba->sli.sli4.wq[total_wq].cqid =
 			    hba->sli.sli4.cq[total_wq+EMLXS_CQ_OFFSET_WQ].qid;
-emlxs_data_dump(hba, "WQ_CREATE", (uint32_t *)mb, 18, 0);
+emlxs_data_dump(port, "WQ_CREATE", (uint32_t *)mb, 18, 0);
 			total_wq++;
 		}
+		hba->last_msiid = i;
 	}
 
 	/* We assume 1 RQ pair will handle ALL incoming data */
@@ -6591,7 +6367,7 @@ emlxs_data_dump(hba, "WQ_CREATE", (uint32_t *)mb, 18, 0);
 		rq = (IOCTL_FCOE_RQ_CREATE *)&mb->un.varSLIConfig.payload;
 		hba->sli.sli4.rq[i].qid = rq->params.response.RQId;
 		hba->sli.sli4.rq_map[rq->params.response.RQId] = i;
-emlxs_data_dump(hba, "RQ CREATE", (uint32_t *)mb, 18, 0);
+emlxs_data_dump(port, "RQ CREATE", (uint32_t *)mb, 18, 0);
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
 		    "RQ CREATE: rq[%d].qid=%d cqid=%d",
@@ -6624,82 +6400,35 @@ emlxs_data_dump(hba, "RQ CREATE", (uint32_t *)mb, 18, 0);
 	/* Reuse mbq from previous mbox */
 	bzero(mbq, sizeof (MAILBOXQ));
 
-	emlxs_mb_mq_create(hba, mbq);
+	emlxs_mb_mcc_create_ext(hba, mbq);
 	if (emlxs_sli4_issue_mbox_cmd(hba, mbq, MBX_WAIT, 0) !=
 	    MBX_SUCCESS) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_failed_msg,
-		    "Unable to Create MQ %d: Mailbox cmd=%x status=%x ",
+		    "Unable to Create MCC_EXT %d: Mailbox cmd=%x status=%x ",
 		    i, mb->mbxCommand, mb->mbxStatus);
-		return (EIO);
+
+		/* Reuse mbq from previous mbox */
+		bzero(mbq, sizeof (MAILBOXQ));
+
+		emlxs_mb_mq_create(hba, mbq);
+		if (emlxs_sli4_issue_mbox_cmd(hba, mbq, MBX_WAIT, 0) !=
+		    MBX_SUCCESS) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_failed_msg,
+			    "Unable to Create MQ %d: Mailbox cmd=%x status=%x ",
+			    i, mb->mbxCommand, mb->mbxStatus);
+			return (EIO);
+		}
+
+		mq = (IOCTL_COMMON_MQ_CREATE *)&mb->un.varSLIConfig.payload;
+		hba->sli.sli4.mq.qid = mq->params.response.MQId;
+		return (0);
 	}
-	mq = (IOCTL_COMMON_MQ_CREATE *)&mb->un.varSLIConfig.payload;
-	hba->sli.sli4.mq.qid = mq->params.response.MQId;
+
+	mcc_ext = (IOCTL_COMMON_MCC_CREATE_EXT *)&mb->un.varSLIConfig.payload;
+	hba->sli.sli4.mq.qid = mcc_ext->params.response.id;
 	return (0);
 
 } /* emlxs_sli4_create_queues() */
-
-
-static int
-emlxs_fcf_bind(emlxs_hba_t *hba)
-{
-	MAILBOXQ *mbq;
-	int rc;
-
-	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX, 1))) {
-		return (0);
-	}
-	if (!(hba->flag & FC_FIP_SUPPORTED)) {
-		/*
-		 * If the firmware donesn't support FIP, we must
-		 * build the fcf table manually first.
-		 */
-		rc =  emlxs_mbext_add_fcf_table(hba, mbq, 0);
-	} else {
-		rc =  emlxs_mbext_read_fcf_table(hba, mbq, -1);
-	}
-
-	if (rc == 0) {
-		(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mbq);
-		return (0);
-	}
-
-	rc =  emlxs_sli4_issue_mbox_cmd(hba, mbq, MBX_NOWAIT, 0);
-	if ((rc != MBX_BUSY) && (rc != MBX_SUCCESS)) {
-		(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mbq);
-	}
-	return (1);
-
-} /* emlxs_fcf_bind() */
-
-
-static int
-emlxs_fcf_unbind(emlxs_hba_t *hba, uint32_t index)
-{
-	FCFIobj_t *fp;
-	int i;
-
-	mutex_enter(&hba->sli.sli4.id_lock);
-	/* Loop thru all FCFIs */
-	fp = hba->sli.sli4.FCFIp;
-	for (i = 0; i < hba->sli.sli4.FCFICount; i++) {
-		if ((index == MAX_FCFCONNECTLIST_ENTRIES) ||
-		    (index == fp->FCF_index)) {
-			if (fp->state & RESOURCE_ALLOCATED) {
-				mutex_exit(&hba->sli.sli4.id_lock);
-				if (hba->state > FC_LINK_DOWN) {
-					fp->state &= ~RESOURCE_FCFI_DISC;
-					/* Declare link down here */
-					emlxs_linkdown(hba);
-				}
-				/* There should only be 1 FCF for now */
-				return (1);
-			}
-		}
-	}
-	mutex_exit(&hba->sli.sli4.id_lock);
-	return (0);
-
-} /* emlxs_fcf_unbind() */
 
 
 /*ARGSUSED*/
@@ -6707,7 +6436,6 @@ extern int
 emlxs_sli4_check_fcf_config(emlxs_hba_t *hba, FCF_RECORD_t *fcfrec)
 {
 	int i;
-	uint32_t rval = 1;
 
 	if (!(hba->flag & FC_FIP_SUPPORTED)) {
 		if (!hba->sli.sli4.cfgFCOE.length) {
@@ -6737,180 +6465,22 @@ emlxs_sli4_check_fcf_config(emlxs_hba_t *hba, FCF_RECORD_t *fcfrec)
 	/* Just check FabricName for now */
 	for (i = 0; i < MAX_FCFCONNECTLIST_ENTRIES; i++) {
 		if ((hba->sli.sli4.cfgFCF.entry[i].FabricNameValid) &&
-		    (hba->sli.sli4.cfgFCF.entry[i].Valid)) {
-			rval = 0;
-			if (bcmp((char *)fcfrec->fabric_name_identifier,
-			    hba->sli.sli4.cfgFCF.entry[i].FabricName, 8) == 0) {
-				return (1);  /* success */
-			}
+		    (bcmp((char *)fcfrec->fabric_name_identifier,
+		    hba->sli.sli4.cfgFCF.entry[i].FabricName, 8) == 0)) {
+			return (1);  /* success */
 		}
 	}
-	return (rval);
-}
+	return (0);
 
-
-extern FCFIobj_t *
-emlxs_sli4_assign_fcfi(emlxs_hba_t *hba, FCF_RECORD_t *fcfrec)
-{
-	emlxs_port_t *port = &PPORT;
-	FCFIobj_t *fcfp;
-	int i;
-
-	fcfp = emlxs_sli4_find_fcfi_fcfrec(hba, fcfrec);
-	if (!fcfp) {
-		fcfp = emlxs_sli4_alloc_fcfi(hba);
-		if (!fcfp) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_failed_msg,
-			    "Unable to alloc FCFI for fcf index %d",
-			    fcfrec->fcf_index);
-			return (0);
-		}
-		fcfp->FCF_index = fcfrec->fcf_index;
-	}
-
-	bcopy((char *)fcfrec, &fcfp->fcf_rec, sizeof (FCF_RECORD_t));
-
-	for (i = 0; i < 512; i++) {
-		if (fcfrec->vlan_bitmap[i / 8] == (1 << (i % 8))) {
-			fcfp->vlan_id = i;
-			fcfp->state |= RESOURCE_FCFI_VLAN_ID;
-			break;
-		}
-	}
-
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-	    "FCFI %d: idx %x av %x val %x ste %x macp %x vid %x "
-	    "addr: %02x:%02x:%02x:%02x:%02x:%02x",
-	    fcfp->FCFI,
-	    fcfrec->fcf_index,
-	    fcfrec->fcf_available,
-	    fcfrec->fcf_valid,
-	    fcfrec->fcf_state,
-	    fcfrec->mac_address_provider,
-	    fcfp->vlan_id,
-	    fcfrec->fcf_mac_address_hi[0],
-	    fcfrec->fcf_mac_address_hi[1],
-	    fcfrec->fcf_mac_address_hi[2],
-	    fcfrec->fcf_mac_address_hi[3],
-	    fcfrec->fcf_mac_address_low[0],
-	    fcfrec->fcf_mac_address_low[1]);
-
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-	    "fabric: %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x",
-	    fcfrec->fabric_name_identifier[0],
-	    fcfrec->fabric_name_identifier[1],
-	    fcfrec->fabric_name_identifier[2],
-	    fcfrec->fabric_name_identifier[3],
-	    fcfrec->fabric_name_identifier[4],
-	    fcfrec->fabric_name_identifier[5],
-	    fcfrec->fabric_name_identifier[6],
-	    fcfrec->fabric_name_identifier[7]);
-
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-	    "switch: %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x",
-	    fcfrec->switch_name_identifier[0],
-	    fcfrec->switch_name_identifier[1],
-	    fcfrec->switch_name_identifier[2],
-	    fcfrec->switch_name_identifier[3],
-	    fcfrec->switch_name_identifier[4],
-	    fcfrec->switch_name_identifier[5],
-	    fcfrec->switch_name_identifier[6],
-	    fcfrec->switch_name_identifier[7]);
-
-	return (fcfp);
-
-} /* emlxs_sli4_assign_fcfi() */
-
-
-extern FCFIobj_t *
-emlxs_sli4_bind_fcfi(emlxs_hba_t *hba)
-{
-	emlxs_port_t *port = &PPORT;
-	FCFIobj_t *fp;
-	VFIobj_t *vfip;
-	MAILBOXQ *mbq;
-	int rc;
-	uint32_t i;
-
-	mutex_enter(&hba->sli.sli4.id_lock);
-	/* Loop thru all FCFIs */
-	fp = hba->sli.sli4.FCFIp;
-	for (i = 0; i < hba->sli.sli4.FCFICount; i++) {
-		if (fp->state & RESOURCE_ALLOCATED) {
-			/*
-			 * Look for one thats valid, available
-			 * and matches our FCF configuration info.
-			 */
-			if (fp->fcf_rec.fcf_valid &&
-			    fp->fcf_rec.fcf_available &&
-			    emlxs_sli4_check_fcf_config(hba, &fp->fcf_rec)) {
-				/* Since we only support one FCF */
-				break;
-			}
-		}
-		fp++;
-	}
-	mutex_exit(&hba->sli.sli4.id_lock);
-
-	if (i == hba->sli.sli4.FCFICount) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "Not a valid FCF");
-		return (0);
-	}
-
-	if (fp->state & RESOURCE_FCFI_REG) {
-
-		if (!fp->fcf_vfi) {
-			vfip = emlxs_sli4_alloc_vfi(hba, fp);
-			if (!vfip) {
-				EMLXS_MSGF(EMLXS_CONTEXT,
-				    &emlxs_init_failed_msg,
-				    "Fabric VFI alloc failure, fcf index %d",
-				    fp->FCF_index);
-				(void) emlxs_sli4_free_fcfi(hba, fp);
-				return (0);
-			}
-			fp->fcf_vfi = vfip;
-		}
-
-		if (!fp->fcf_vpi) {
-			fp->fcf_vpi = port;
-			port->VFIp = fp->fcf_vfi;
-			port->VFIp->outstandingVPIs++;
-		}
-
-		if (!(fp->state & RESOURCE_FCFI_DISC)) {
-			fp->state |= RESOURCE_FCFI_DISC;
-			emlxs_linkup(hba);
-		}
-		return (fp);
-	}
-
-	if ((mbq = (MAILBOXQ *) emlxs_mem_get(hba, MEM_MBOX, 1)) == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_failed_msg,
-		    "Unable to alloc mbox for fcf index %d",
-		    fp->fcf_rec.fcf_index);
-		return (0);
-	}
-	emlxs_mb_reg_fcfi(hba, mbq, fp);
-
-	rc =  emlxs_sli4_issue_mbox_cmd(hba, mbq, MBX_NOWAIT, 0);
-	if ((rc != MBX_BUSY) && (rc != MBX_SUCCESS)) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_failed_msg,
-		    "Unable to issue mbox for fcf index %d",
-		    fp->fcf_rec.fcf_index);
-		(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mbq);
-	}
-
-	return (fp);
-
-} /* emlxs_sli4_bind_fcfi() */
+} /* emlxs_sli4_check_fcf_config() */
 
 
 extern void
 emlxs_sli4_timer(emlxs_hba_t *hba)
 {
 	/* Perform SLI4 level timer checks */
+
+	emlxs_fcf_timer_notify(hba);
 
 	emlxs_sli4_timer_check_mbox(hba);
 
@@ -6937,6 +6507,8 @@ emlxs_sli4_timer_check_mbox(emlxs_hba_t *hba)
 		mutex_exit(&EMLXS_PORT_LOCK);
 		return;
 	}
+
+	/* The first to service the mbox queue will clear the timer */
 	hba->mbox_timer = 0;
 
 	if (hba->mbox_queue_flag) {
@@ -6988,7 +6560,7 @@ emlxs_sli4_timer_check_mbox(emlxs_hba_t *hba)
 	emlxs_mb_fini(hba, NULL, MBX_TIMEOUT);
 
 	/* Trigger adapter shutdown */
-	emlxs_thread_spawn(hba, emlxs_shutdown_thread, NULL, NULL);
+	emlxs_thread_spawn(hba, emlxs_shutdown_thread, 0, 0);
 
 	return;
 
@@ -6996,9 +6568,8 @@ emlxs_sli4_timer_check_mbox(emlxs_hba_t *hba)
 
 
 extern void
-emlxs_data_dump(emlxs_hba_t *hba, char *str, uint32_t *iptr, int cnt, int err)
+emlxs_data_dump(emlxs_port_t *port, char *str, uint32_t *iptr, int cnt, int err)
 {
-	emlxs_port_t		*port = &PPORT;
 	void *msg;
 
 	if (err) {
@@ -7076,7 +6647,7 @@ emlxs_ue_dump(emlxs_hba_t *hba, char *str)
 } /* emlxs_ue_dump() */
 
 
-void
+static void
 emlxs_sli4_poll_erratt(emlxs_hba_t *hba)
 {
 	emlxs_port_t *port = &PPORT;
@@ -7093,7 +6664,8 @@ emlxs_sli4_poll_erratt(emlxs_hba_t *hba)
 	    (uint32_t *)(hba->pci_addr + PCICFG_UE_STATUS_HI_OFFSET));
 
 	if ((~hba->sli.sli4.ue_mask_lo & ue_l) ||
-	    (~hba->sli.sli4.ue_mask_hi & ue_h)) {
+	    (~hba->sli.sli4.ue_mask_hi & ue_h) ||
+	    (hba->sli.sli4.flag & EMLXS_SLI4_HW_ERROR)) {
 		/* Unrecoverable error detected */
 		/* Shut the HBA down */
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_hardware_error_msg,
@@ -7106,37 +6678,162 @@ emlxs_sli4_poll_erratt(emlxs_hba_t *hba)
 
 		emlxs_sli4_hba_flush_chipq(hba);
 
-		emlxs_thread_spawn(hba, emlxs_shutdown_thread, NULL, NULL);
+		emlxs_thread_spawn(hba, emlxs_shutdown_thread, 0, 0);
 	}
 
 } /* emlxs_sli4_poll_erratt() */
 
-int
-emlxs_sli4_unreg_all_rpi_by_port(emlxs_port_t *port)
+
+extern uint32_t
+emlxs_sli4_reg_did(emlxs_port_t *port, uint32_t did, SERV_PARM *param,
+    emlxs_buf_t *sbp, fc_unsol_buf_t *ubp, IOCBQ *iocbq)
 {
 	emlxs_hba_t	*hba = HBA;
+	NODELIST	*node;
+	RPIobj_t	*rpip;
+	uint32_t	rval;
+
+	/* Check for invalid node ids to register */
+	if ((did == 0) && (!(hba->flag & FC_LOOPBACK_MODE))) {
+		return (1);
+	}
+
+	if (did & 0xff000000) {
+		return (1);
+	}
+
+	if ((rval = emlxs_mb_check_sparm(hba, param))) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_create_failed_msg,
+		    "Invalid service parameters. did=%06x rval=%d", did,
+		    rval);
+
+		return (1);
+	}
+
+	/* Check if the node limit has been reached */
+	if (port->node_count >= hba->max_nodes) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_create_failed_msg,
+		    "Limit reached. did=%06x count=%d", did,
+		    port->node_count);
+
+		return (1);
+	}
+
+	node = emlxs_node_find_did(port, did);
+	rpip = EMLXS_NODE_TO_RPI(port, node);
+
+	rval = emlxs_rpi_online_notify(port, rpip, did, param, (void *)sbp,
+	    (void *)ubp, (void *)iocbq);
+
+	return (rval);
+
+} /* emlxs_sli4_reg_did() */
+
+
+extern uint32_t
+emlxs_sli4_unreg_node(emlxs_port_t *port, emlxs_node_t *node,
+    emlxs_buf_t *sbp, fc_unsol_buf_t *ubp, IOCBQ *iocbq)
+{
+	RPIobj_t	*rpip;
+	uint32_t	rval;
+
+	if (!node) {
+		/* Unreg all nodes */
+		(void) emlxs_sli4_unreg_all_nodes(port);
+		return (1);
+	}
+
+	/* Check for base node */
+	if (node == &port->node_base) {
+		/* Just flush base node */
+		(void) emlxs_tx_node_flush(port, &port->node_base,
+		    0, 0, 0);
+
+		(void) emlxs_chipq_node_flush(port, 0,
+		    &port->node_base, 0);
+
+		port->did = 0;
+
+		/* Return now */
+		return (1);
+	}
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
+	    "unreg_node:%p did=%x rpi=%d",
+	    node, node->nlp_DID, node->nlp_Rpi);
+
+	rpip = EMLXS_NODE_TO_RPI(port, node);
+
+	if (!rpip) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_err_msg,
+		    "unreg_node:%p did=%x rpi=%d. RPI not found.",
+		    node, node->nlp_DID, node->nlp_Rpi);
+
+		emlxs_node_rm(port, node);
+		return (1);
+	}
+
+	rval = emlxs_rpi_offline_notify(port, rpip, (void *)sbp, (void *)ubp,
+	    (void *)iocbq);
+
+	return (rval);
+
+} /* emlxs_sli4_unreg_node() */
+
+
+extern uint32_t
+emlxs_sli4_unreg_all_nodes(emlxs_port_t *port)
+{
 	NODELIST	*nlp;
 	int		i;
+	uint32_t 	found;
 
-	rw_enter(&port->node_rwlock, RW_WRITER);
+	/* Set the node tags */
+	/* We will process all nodes with this tag */
+	rw_enter(&port->node_rwlock, RW_READER);
+	found = 0;
 	for (i = 0; i < EMLXS_NUM_HASH_QUES; i++) {
 		nlp = port->node_table[i];
 		while (nlp != NULL) {
-			if (nlp->nlp_Rpi != 0xffff) {
-				rw_exit(&port->node_rwlock);
-				(void) emlxs_mb_unreg_rpi(port,
-				    nlp->nlp_Rpi, 0, 0, 0);
-				rw_enter(&port->node_rwlock, RW_WRITER);
-			} else {
-				/* Just free nlp back to the pool */
-				port->node_table[i] = nlp->nlp_list_next;
-				(void) emlxs_mem_put(hba, MEM_NLP,
-				    (uint8_t *)nlp);
-			}
-			nlp = port->node_table[i];
+			found = 1;
+			nlp->nlp_tag = 1;
+			nlp = nlp->nlp_list_next;
 		}
 	}
 	rw_exit(&port->node_rwlock);
 
+	if (!found) {
+		return (0);
+	}
+
+	for (;;) {
+		rw_enter(&port->node_rwlock, RW_READER);
+		found = 0;
+		for (i = 0; i < EMLXS_NUM_HASH_QUES; i++) {
+			nlp = port->node_table[i];
+			while (nlp != NULL) {
+				if (!nlp->nlp_tag) {
+					nlp = nlp->nlp_list_next;
+					continue;
+				}
+				nlp->nlp_tag = 0;
+				found = 1;
+				break;
+			}
+
+			if (found) {
+				break;
+			}
+		}
+		rw_exit(&port->node_rwlock);
+
+		if (!found) {
+			break;
+		}
+
+		(void) emlxs_sli4_unreg_node(port, nlp, 0, 0, 0);
+	}
+
 	return (0);
-} /* emlxs_sli4_unreg_all_rpi_by_port() */
+
+} /* emlxs_sli4_unreg_all_nodes() */

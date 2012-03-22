@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -161,7 +161,7 @@ emlxs_taskq_create(emlxs_hba_t *hba, emlxs_taskq_t *taskq)
 	(void) sprintf(buf, "%s%d_thread_taskq_get mutex", DRIVER_NAME,
 	    hba->ddiinst);
 	mutex_init(&taskq->get_lock, buf, MUTEX_DRIVER,
-	    (void *)hba->intr_arg);
+	    DDI_INTR_PRI(hba->intr_arg));
 
 	mutex_enter(&taskq->get_lock);
 
@@ -170,7 +170,7 @@ emlxs_taskq_create(emlxs_hba_t *hba, emlxs_taskq_t *taskq)
 	(void) sprintf(buf, "%s%d_thread_taskq_put mutex", DRIVER_NAME,
 	    hba->ddiinst);
 	mutex_init(&taskq->put_lock, buf, MUTEX_DRIVER,
-	    (void *)hba->intr_arg);
+	    DDI_INTR_PRI(hba->intr_arg));
 
 	for (i = 0; i < EMLXS_MAX_TASKQ_THREADS; i++) {
 		tthread = &taskq->thread_list[i];
@@ -179,7 +179,7 @@ emlxs_taskq_create(emlxs_hba_t *hba, emlxs_taskq_t *taskq)
 		(void) sprintf(buf, "%s%d_thread%d mutex", DRIVER_NAME,
 		    hba->ddiinst, i);
 		mutex_init(&tthread->lock, buf, MUTEX_DRIVER,
-		    (void *)hba->intr_arg);
+		    DDI_INTR_PRI(hba->intr_arg));
 
 		(void) sprintf(buf, "%s%d_thread%d cv", DRIVER_NAME,
 		    hba->ddiinst, i);
@@ -369,7 +369,8 @@ emlxs_thread_create(emlxs_hba_t *hba, emlxs_thread_t *ethread)
 
 	(void) sprintf(buf, "%s%d_thread_%08x mutex", DRIVER_NAME, hba->ddiinst,
 	    (uint32_t)((uintptr_t)ethread & 0xFFFFFFFF));
-	mutex_init(&ethread->lock, buf, MUTEX_DRIVER, (void *)hba->intr_arg);
+	mutex_init(&ethread->lock, buf, MUTEX_DRIVER,
+	    DDI_INTR_PRI(hba->intr_arg));
 
 	(void) sprintf(buf, "%s%d_thread_%08x cv", DRIVER_NAME, hba->ddiinst,
 	    (uint32_t)((uintptr_t)ethread & 0xFFFFFFFF));

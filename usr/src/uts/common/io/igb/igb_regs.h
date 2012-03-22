@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright(c) 2007-2012 Intel Corporation. All rights reserved.
+ * Copyright (c) 2007-2012 Intel Corporation. All rights reserved.
  */
 
 /*

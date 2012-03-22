@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <stdlib.h>
@@ -940,8 +941,6 @@ soft_object_to_asn1(soft_object_t *objp, uchar_t *buf, ulong_t *buf_len)
 		default:
 			return (CKR_FUNCTION_NOT_SUPPORTED);
 		} /* keytype */
-
-		break;
 
 	default:
 		return (CKR_FUNCTION_NOT_SUPPORTED);

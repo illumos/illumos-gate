@@ -23,6 +23,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ */
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/ddi.h>
@@ -161,7 +164,7 @@ static struct bus_ops ssm_bus_ops = {
 	0,			/* add_intrspec */
 	0,			/* remove_intrspec */
 	i_ddi_map_fault,	/* map_fault */
-	ddi_dma_map,		/* dma_map */
+	0,			/* dma_map */
 	ddi_dma_allochdl,
 	ddi_dma_freehdl,
 	ddi_dma_bindhdl,

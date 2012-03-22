@@ -105,7 +105,7 @@ static void	dce_make_condemned(dce_t *);
 static kmem_cache_t *dce_cache;
 
 /* Global so it can be tuned in /etc/system. This must be a power of two. */
-uint_t ip_dce_hash_size = 256;
+uint_t ip_dce_hash_size = 1024;
 
 /* Operates on a uint64_t */
 #define	RANDOM_HASH(p) ((p) ^ ((p)>>16) ^ ((p)>>32) ^ ((p)>>48))

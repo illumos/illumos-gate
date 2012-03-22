@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <stdio.h>
@@ -361,13 +362,9 @@ of_itemize_stats(ofmt_arg_t *of_arg, char *buf, uint_t bufsize)
 		(void) snprintf(buf, bufsize, "%s",
 		    sta->ilbst_rlist[rule_index].ird_rulename);
 		return (B_TRUE);
-		/* not reached */
-		break;
 	case ILBST_ITEMIZE_SNAME:
 		(void) snprintf(buf, bufsize, "%s", srv->isd_servername);
 		return (B_TRUE);
-		/* not reached */
-		break;
 	}
 
 	count = srv->isd_serverstats[stat_ind].is_value;

@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  *
  * fme.c -- fault management exercise module
  *
@@ -2949,7 +2950,6 @@ undiag_2defect_str(int ud)
 	case UD_VAL_BADOBS:
 	case UD_VAL_CFGMISMATCH:
 		return (UNDIAG_DEFECT_CHKPT);
-		break;
 
 	case UD_VAL_BADEVENTI:
 	case UD_VAL_BADEVENTPATH:
@@ -2958,16 +2958,13 @@ undiag_2defect_str(int ud)
 	case UD_VAL_NOPATH:
 	case UD_VAL_UNSOLVD:
 		return (UNDIAG_DEFECT_FME);
-		break;
 
 	case UD_VAL_MAXFME:
 		return (UNDIAG_DEFECT_LIMIT);
-		break;
 
 	case UD_VAL_UNKNOWN:
 	default:
 		return (UNDIAG_DEFECT_UNKNOWN);
-		break;
 	}
 }
 

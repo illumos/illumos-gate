@@ -708,9 +708,9 @@ entriesFromLDAPreal(__entries_from_ldap_arg_t *arg) {
 				o.zo_ttl = to->zo_ttl;
 		} else {
 			tc = 0;
-			o.zo_owner = (char *)"";
-			o.zo_group = (char *)"";
-			o.zo_domain = (char *)"";
+			o.zo_owner = (nis_name)"";
+			o.zo_group = (nis_name)"";
+			o.zo_domain = (nis_name)"";
 		}
 
 		o.zo_data.zo_type = NIS_ENTRY_OBJ;

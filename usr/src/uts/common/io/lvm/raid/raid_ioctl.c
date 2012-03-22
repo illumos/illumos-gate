@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 /*
@@ -96,7 +97,7 @@ extern mdq_anchor_t	md_done_daemon;
 extern mdq_anchor_t	md_ff_daemonq;
 extern	int		mdopen();
 extern	int		mdclose();
-extern	void		md_probe_one();
+extern	void		md_probe_one(probe_req_t *);
 extern int		md_init_probereq(md_probedev_impl_t *,
 				daemon_queue_t **);
 extern md_resync_t	md_cpr_resync;

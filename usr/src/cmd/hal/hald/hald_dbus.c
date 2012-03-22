@@ -959,7 +959,7 @@ user_at_console(unsigned long uid)
 {
 	struct stat st;
 
-	return ((stat("/dev/console", &st) == 0) && (st.st_uid == uid));
+	return ((stat("/dev/vt/console_user", &st) == 0) && (st.st_uid == uid));
 }
 #endif /* sun */
 

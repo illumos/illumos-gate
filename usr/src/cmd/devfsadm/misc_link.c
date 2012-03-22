@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 #include <regex.h>
@@ -106,6 +107,9 @@ static devfsadm_create_t misc_cbt[] = {
 	    "(^rts$)|(^arp$)|(^ipsecah$)|(^ipsecesp$)|(^keysock$)|(^spdsock$)|"
 	    "(^nca$)|(^rds$)|(^sdp$)|(^ipnet$)|(^dlpistub$)|(^bpf$)",
 	    TYPE_EXACT | DRV_RE, ILEVEL_1, minor_name
+	},
+	{ "pseudo", "ddi_pseudo", "ipd",
+	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, minor_name
 	},
 	{ "pseudo", "ddi_pseudo",
 	    "(^ipf$)|(^ipnat$)|(^ipstate$)|(^ipauth$)|"

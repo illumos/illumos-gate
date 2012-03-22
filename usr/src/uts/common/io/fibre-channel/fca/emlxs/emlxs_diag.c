@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -407,7 +407,7 @@ done:
 			rval = EMLXS_TEST_FAILED;
 		}
 #endif  /* FMA_SUPPORT */
-		(void) emlxs_mem_put(hba, MEM_BUF, (uint8_t *)mp);
+		emlxs_mem_put(hba, MEM_BUF, (void *)mp);
 	}
 	if (mp1) {
 #ifdef FMA_SUPPORT
@@ -420,10 +420,10 @@ done:
 			rval = EMLXS_TEST_FAILED;
 		}
 #endif  /* FMA_SUPPORT */
-		(void) emlxs_mem_put(hba, MEM_BUF, (uint8_t *)mp1);
+		emlxs_mem_put(hba, MEM_BUF, (void *)mp1);
 	}
 	if (mbq) {
-		(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mbq);
+		emlxs_mem_put(hba, MEM_MBOX, (void *)mbq);
 	}
 
 	return (rval);

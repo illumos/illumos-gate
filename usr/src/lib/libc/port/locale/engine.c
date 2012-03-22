@@ -1,5 +1,6 @@
 /*
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright (c) 1992, 1993, 1994 Henry Spencer.
  * Copyright (c) 1992, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
@@ -607,18 +608,14 @@ backref(struct match *m, const char *start, const char *stop, sopno startst,
 			    (m->g->cflags&REG_NEWLINE))) {
 				break;
 			}
-			else
-				return (NULL);
-			break;
+			return (NULL);
 		case OEOL:
 			if ((sp == m->endp && !(m->eflags&REG_NOTEOL)) ||
 			    (sp < m->endp && *sp == '\n' &&
 			    (m->g->cflags&REG_NEWLINE))) {
 				break;
 			}
-			else
-				return (NULL);
-			break;
+			return (NULL);
 		case OBOW:
 			if (((sp == m->beginp && !(m->eflags&REG_NOTBOL)) ||
 			    (sp < m->endp && *(sp-1) == '\n' &&
@@ -626,9 +623,8 @@ backref(struct match *m, const char *start, const char *stop, sopno startst,
 			    (sp > m->beginp && !ISWORD(*(sp-1)))) &&
 			    (sp < m->endp && ISWORD(*sp))) {
 				break;
-			} else
-				return (NULL);
-			break;
+			}
+			return (NULL);
 		case OEOW:
 			if (((sp == m->endp && !(m->eflags&REG_NOTEOL)) ||
 			    (sp < m->endp && *sp == '\n' &&
@@ -636,9 +632,8 @@ backref(struct match *m, const char *start, const char *stop, sopno startst,
 			    (sp < m->endp && !ISWORD(*sp))) &&
 			    (sp > m->beginp && ISWORD(*(sp-1)))) {
 				break;
-			} else
-				return (NULL);
-			break;
+			}
+			return (NULL);
 		case O_QUEST:
 			break;
 		case OOR1:	/* matches null but needs to skip */
@@ -683,19 +678,16 @@ backref(struct match *m, const char *start, const char *stop, sopno startst,
 		while (m->g->strip[ss] != SOP(O_BACK, i))
 			ss++;
 		return (backref(m, sp+len, stop, ss+1, stopst, lev, rec));
-		break;
 	case OQUEST_:		/* to null or not */
 		dp = backref(m, sp, stop, ss+1, stopst, lev, rec);
 		if (dp != NULL)
 			return (dp);	/* not */
 		return (backref(m, sp, stop, ss+OPND(s)+1, stopst, lev, rec));
-		break;
 	case OPLUS_:
 		assert(m->lastpos != NULL);
 		assert(lev+1 <= m->g->nplus);
 		m->lastpos[lev+1] = sp;
 		return (backref(m, sp, stop, ss+1, stopst, lev+1, rec));
-		break;
 	case O_PLUS:
 		if (sp == m->lastpos[lev])	/* last pass matched null */
 			return (backref(m, sp, stop, ss+1, stopst, lev-1, rec));
@@ -704,9 +696,7 @@ backref(struct match *m, const char *start, const char *stop, sopno startst,
 		dp = backref(m, sp, stop, ss-OPND(s)+1, stopst, lev, rec);
 		if (dp == NULL)
 			return (backref(m, sp, stop, ss+1, stopst, lev-1, rec));
-		else
-			return (dp);
-		break;
+		return (dp);
 	case OCH_:		/* find the right one, if any */
 		ssub = ss + 1;
 		esub = ss + OPND(s) - 1;
@@ -727,6 +717,7 @@ backref(struct match *m, const char *start, const char *stop, sopno startst,
 			else
 				assert(OP(m->g->strip[esub]) == O_CH);
 		}
+		/* NOTREACHED */
 		break;
 	case OLPAREN:		/* must undo assignment if rest fails */
 		i = OPND(s);
@@ -738,7 +729,6 @@ backref(struct match *m, const char *start, const char *stop, sopno startst,
 			return (dp);
 		m->pmatch[i].rm_so = offsave;
 		return (NULL);
-		break;
 	case ORPAREN:		/* must undo assignment if rest fails */
 		i = OPND(s);
 		assert(0 < i && i <= m->g->nsub);
@@ -749,7 +739,6 @@ backref(struct match *m, const char *start, const char *stop, sopno startst,
 			return (dp);
 		m->pmatch[i].rm_eo = offsave;
 		return (NULL);
-		break;
 	default:		/* uh oh */
 		assert(0);
 		break;

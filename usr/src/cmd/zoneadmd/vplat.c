@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, 2012, Joyent Inc. All rights reserved.
+ * Copyright (c) 2012, Joyent Inc. All rights reserved.
  */
 
 /*
@@ -163,6 +163,7 @@ extern int getnetmaskbyaddr(struct in_addr, struct in_addr *);
 
 /* from zoneadmd */
 extern char query_hook[];
+extern char post_statechg_hook[];
 
 /*
  * For each "net" resource configured in zonecfg, we track a zone_addr_list_t
@@ -590,6 +591,24 @@ root_to_lu(zlog_t *zlogp, char *zroot, size_t zrootlen, boolean_t isresolved)
 }
 
 /*
+ * Perform brand-specific cleanup if we are unable to unmount a FS.
+ */
+static void
+brand_umount_cleanup(zlog_t *zlogp, char *path)
+{
+	char cmdbuf[2 * MAXPATHLEN];
+
+	if (post_statechg_hook[0] == '\0')
+		return;
+
+	if (snprintf(cmdbuf, sizeof (cmdbuf), "%s %d %d %s", post_statechg_hook,
+	    ZONE_STATE_DOWN, Z_UNMOUNT, path) > sizeof (cmdbuf))
+		return;
+
+	(void) do_subproc(zlogp, cmdbuf, NULL, B_FALSE);
+}
+
+/*
  * The general strategy for unmounting filesystems is as follows:
  *
  * - Remote filesystems may be dead, and attempting to contact them as
@@ -731,27 +750,17 @@ unmount_filesystems(zlog_t *zlogp, zoneid_t zoneid, boolean_t unmount_cmd)
 						    "retrying in 1 second",
 						    path);
 						(void) sleep(1);
-					} else if (fail == 16) {
-						char cmdbuf[MAXPATHLEN + 21];
-
-						zerror(zlogp, B_FALSE,
-						    "unable to unmount '%s', "
-						    "trying to kill GZ "
-						    "processes",
-						    path);
-						(void) snprintf(cmdbuf,
-						    sizeof (cmdbuf),
-						    "/usr/sbin/fuser -ck %s",
-						    path);
-						(void) system(cmdbuf);
-						(void) sleep(2);
-					} else {
+					} else if (fail > 17) {
 						error++;
 						zerror(zlogp, B_FALSE,
 						    "unable to unmount '%s'",
 						    path);
 						free_mnttable(mnts, nmnt);
 						goto out;
+					} else {
+						/* Try the hook 2 times */
+						brand_umount_cleanup(zlogp,
+						    path);
 					}
 				}
 			}

@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 /*
@@ -497,10 +498,9 @@ c_type()
 				}
 			}
 			return (0);
-			break;
 		default:
-		/* Should never happen */
-		return (-1);
+			/* Should never happen */
+			return (-1);
 		}
 	} else if ((index == other_choice) && (cur_label == L_TYPE_SOLARIS)) {
 		/*

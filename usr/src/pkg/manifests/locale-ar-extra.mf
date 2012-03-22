@@ -10,6 +10,7 @@
 
 #
 # Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2012 Garrett D'Amore <garrett@damore.org>. All rights reserved.
 #
 
 #
@@ -18,27 +19,5 @@
 #
 
 set name=pkg.fmri value=pkg:/locale/ar-extra@$(PKGVERS)
-set name=pkg.description value="Arabic language support extra files"
-set name=pkg.summary value="Arabic language support extra files"
-set name=info.classification \
-    value=org.opensolaris.category.2008:System/Localizations
+set name=pkg.obsolete value=true
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/lib
-dir path=usr/lib/locale
-dir path=usr/lib/locale/ar_EG.ISO8859-6
-dir path=usr/lib/locale/ar_EG.ISO8859-6/LC_COLLATE
-dir path=usr/lib/locale/ar_EG.ISO8859-6/LC_CTYPE
-dir path=usr/lib/locale/ar_EG.ISO8859-6/LC_MESSAGES
-dir path=usr/lib/locale/ar_EG.ISO8859-6/LC_MONETARY
-dir path=usr/lib/locale/ar_EG.ISO8859-6/LC_NUMERIC
-dir path=usr/lib/locale/ar_EG.ISO8859-6/LC_TIME
-file path=usr/lib/locale/ar_EG.ISO8859-6/LC_COLLATE/LCL_DATA mode=0444
-file path=usr/lib/locale/ar_EG.ISO8859-6/LC_CTYPE/LCL_DATA mode=0444
-file path=usr/lib/locale/ar_EG.ISO8859-6/LC_MESSAGES/LCL_DATA mode=0444
-file path=usr/lib/locale/ar_EG.ISO8859-6/LC_MONETARY/LCL_DATA mode=0444
-file path=usr/lib/locale/ar_EG.ISO8859-6/LC_NUMERIC/LCL_DATA mode=0444
-file path=usr/lib/locale/ar_EG.ISO8859-6/LC_TIME/LCL_DATA mode=0444
-license lic_CDDL license=lic_CDDL
-license usr/src/cmd/localedef/data/THIRDPARTYLICENSE \
-    license=usr/src/cmd/localedef/data/THIRDPARTYLICENSE

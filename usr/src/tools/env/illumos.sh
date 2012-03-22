@@ -20,6 +20,7 @@
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2010, 2011 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
 #
 
 # Configuration variables for the runtime environment of the nightly
@@ -117,6 +118,10 @@ export CLONE_WS='ssh://anonhg@hg.illumos.org/illumos-gate'
 #
 export STAFFER="$LOGNAME"
 export MAILTO="$STAFFER"
+
+# If you wish the mail messages to be From: an arbitrary address, export
+# MAILFROM.
+#export MAILFROM="user@example.com"
 
 # The project (see project(4)) under which to run this build.  If not
 # specified, the build is simply run in a new task in the current project.

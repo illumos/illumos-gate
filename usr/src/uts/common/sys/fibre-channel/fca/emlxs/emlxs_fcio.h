@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,6 +63,7 @@ extern "C" {
 #define	EMLXS_BAR_IO			(EMLXS_DIAG | 253)
 #define	EMLXS_TEST_CODE   		(EMLXS_DIAG | 254)
 #define	EMLXS_HW_ERROR_TEST   		(EMLXS_DIAG | 255)
+#define	EMLXS_MB_TIMEOUT_TEST		(EMLXS_DIAG | 256)
 
 #define	EMLXS_LOG_GET			(EMLXS_DIAG | 300)
 

@@ -1,5 +1,6 @@
 \ offsets.in: input file to produce assym.h using the stabs program
 \ Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+\ Copyright 2012 Garrett D'Amore <garett@damore.org>.  All rights reserved.
 \
 \ CDDL HEADER START
 \
@@ -466,7 +467,6 @@ syncq	SQ_SIZE
 	sq_exitwait
 
 bus_ops		BUS_OPS_SIZE
-	bus_dma_map		OPS_MAP
 	bus_dma_allochdl	OPS_ALLOCHDL
 	bus_dma_freehdl		OPS_FREEHDL
 	bus_dma_bindhdl		OPS_BINDHDL
@@ -489,7 +489,6 @@ dev_info	DEVI_SIZE
 	devi_bus_dma_flush
 	devi_bus_dma_unbindfunc
 	devi_bus_ctl
-	devi_bus_dma_map
 	devi_bus_dma_ctl
 
 kstat_io

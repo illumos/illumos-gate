@@ -26,8 +26,6 @@
 #ifndef _CMD_CPU_H
 #define	_CMD_CPU_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Each CPU of interest has a cmd_cpu_t structure.  CPUs become of interest when
  * they are the focus of ereports, or when they detect UEs.  CPUs may be the

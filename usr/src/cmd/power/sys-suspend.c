@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 /*
@@ -641,7 +642,6 @@ main(int argc, char **argv)
 				(void) printf(gettext("USAGE: suspend "
 				    "[-fnxh] [-d <display>]\n"));
 				return (1);
-				break;
 		}
 	}
 

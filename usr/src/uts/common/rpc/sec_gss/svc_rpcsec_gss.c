@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 /*
@@ -48,7 +49,7 @@
 extern bool_t __rpc_gss_make_principal(rpc_gss_principal_t *, gss_buffer_t);
 
 #ifdef	DEBUG
-extern void prom_printf();
+extern void prom_printf(const char *, ...);
 #endif
 
 #ifdef  _KERNEL

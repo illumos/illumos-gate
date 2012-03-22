@@ -22,8 +22,9 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <stddef.h>
@@ -689,14 +690,45 @@ elem_common_setprop_threshold(ses_plugin_t *sp, ses_node_t *np,
     ses2_diag_page_t page, nvpair_t *nvp)
 {
 	ses2_threshold_impl_t *tip;
+	ses2_threshold_in_page_impl_t *tp;
+	ses2_threshold_out_page_impl_t *tpout;
 	const char *name;
 	uint64_t v;
+	size_t len = 0;
+	size_t i, trnums;
 
 	ASSERT(page == SES2_DIAGPAGE_THRESHOLD_IO);
 
 	if ((tip = ses_plugin_ctlpage_lookup(sp, ses_node_snapshot(np),
 	    page, 0, np, B_FALSE)) == NULL)
 		return (-1);
+
+	/* Get whole IN and OUT pages to copy filled thresholds */
+	if ((tpout = ses_plugin_ctlpage_lookup(sp, ses_node_snapshot(np),
+	    page, 0, NULL, B_FALSE)) == NULL)
+		return (-1);
+	if ((tp = ses_plugin_page_lookup(sp, ses_node_snapshot(np),
+	    page, NULL, &len)) == NULL)
+		return (-1);
+
+	len -= offsetof(ses2_threshold_in_page_impl_t, stipi_thresholds[0]);
+	trnums = len / sizeof (ses2_threshold_impl_t);
+
+	/* Do copy filled thresholds from In to Out page */
+	for (i = 0; i < trnums; i++) {
+		boolean_t filled = B_FALSE;
+		ses2_threshold_impl_t *toutp = &tpout->stopi_thresholds[i];
+		ses2_threshold_impl_t *tinp = &tp->stipi_thresholds[i];
+
+		if (tinp->sti_high_crit != 0 || tinp->sti_high_warn != 0 ||
+		    tinp->sti_low_crit != 0 || tinp->sti_low_warn != 0)
+			filled = B_TRUE;
+
+		if (toutp->sti_high_crit == 0 && toutp->sti_high_warn == 0 &&
+		    toutp->sti_low_crit == 0 && toutp->sti_low_warn == 0 &&
+		    filled)
+			*toutp = *tinp;
+	}
 
 	name = nvpair_name(nvp);
 	(void) nvpair_value_uint64(nvp, &v);

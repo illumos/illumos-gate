@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012, Josef 'Jeff' Sipek <jeffpc@31bits.net>. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989  AT&T.	*/
@@ -527,6 +528,15 @@ doargs:
 
 	/* release pathv allocated by split() */
 	freev(pathv);
+
+	/*
+	 * Since we can't make use of GNU troff, set the path to ensure we
+	 * find the one in /usr/bin first.
+	 */
+	if (putenv("PATH=/usr/bin") != 0) {
+		perror("putenv");
+		exit(1);
+	}
 
 	fullpaths(&manpage);
 

@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1220,7 +1221,6 @@ sa_create(sa_handle_t handle, int flags, int argc, char *argv[])
 			(void) printf(gettext(
 			    "Invalid protocol specified: %s\n"), protocol);
 			return (SA_INVALID_PROTOCOL);
-			break;
 		case 'p':
 			ret = add_opt(&optlist, optarg, 0);
 			switch (ret) {

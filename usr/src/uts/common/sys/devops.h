@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ */
 
 #ifndef	_SYS_DEVOPS_H
 #define	_SYS_DEVOPS_H
@@ -74,10 +77,12 @@ extern "C" {
  *	  c		XXwrite		DDI/DKI
  *	  c		XXioctl		DDI/DKI
  *	  c		XXdevmap	DDI(Sun)
- *	  c		XXmmap		DKI
+ *	  c		XXmmap		DKI(Obsolete)
  *	  c		XXsegmap	DKI
  *	  c		XXchpoll	DDI/DKI
  *	  c		XXprop_op	DDI(Sun)
+ *	  c		XXaread		DDI(Sun)
+ *	  c		XXawrite	DDI(Sun)
  */
 
 struct cb_ops  {
@@ -129,14 +134,33 @@ struct cb_ops  {
  * they will be called from outside the ddi.
  *
  *	bus_map			-  Map/unmap/control IU -> device mappings.
- *	bus_get_intrspec	-  get interrupt specification by number
- *	bus_add_intrspec	-  add interrupt specification, return cookie
- *	bus_remove_intrspec	-  remove interrupt specification
+ *	bus_get_intrspec	-  obsolete, not called
+ *	bus_add_intrspec	-  obsolete, not called
+ *	bus_remove_intrspec	-  obsolete, not called
  *	bus_map_fault		-  bus fault handler
- *	bus_dma_map		-  setup dma mapping
- *	bus_dma_mapctl		-  control (and free) dma mapping
+ *	bus_dma_map		-  obsolete, not called
+ *	bus_dma_allochdl	-  allocate a DMA handle
+ *	bus_dma_freehdl		-  free a DMA handle
+ *	bus_dma_bindhdl		-  bind a DMA handle to physical mapping
+ *	bus_dma_unbindhdl	-  unbind a DMA handle to physical mapping
+ *	bus_dma_flush		-  flush DMA caches
+ *	bus_dma_win		-  access DMA windows
+ *	bus_dma_ctl		-  control dma mapping (legacy use only)
  *	bus_ctl			-  generic control operations
- *	bus_prop_op		_  request for property
+ *	bus_prop_op		-  request for property
+ *	bus_get_eventcookie	-  get an event cookie
+ *	bus_add_eventcall	-  event call management
+ *	bus_remove_eventcall	-  event call management
+ *	bus_post_event		-  post an event
+ *	bus_config		-  child node configuration
+ *	bus_unconfig		-  child node unconfiguration
+ *	bus_fm_init		-  FMA support
+ *	bus_fm_fini		-  FMA support
+ *	bus_fm_access_enter	-  FMA support
+ *	bus_fm_access_exit	-  FMA support
+ *	bus_power		-  power management
+ *	bus_intr_op		-  control interrupt mappings
+ *	bus_hp_op		-  hotplug support
  */
 
 #define	BUSO_REV_3	3

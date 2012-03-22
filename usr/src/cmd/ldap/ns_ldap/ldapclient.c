@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 /*
@@ -1703,7 +1704,6 @@ client_init(clientopts_t *arglist)
 					break;
 				default:
 					continue;
-					break;
 				}
 				if (strcmp(cred,
 				    arglist->credentialLevel) == 0) {

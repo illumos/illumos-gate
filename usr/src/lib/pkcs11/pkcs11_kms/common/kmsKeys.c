@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <strings.h>
@@ -78,7 +79,6 @@ C_GenerateKey(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 		default:
 			rv = CKR_MECHANISM_INVALID;
 			goto failed_exit;
-			break;
 	}
 
 	/* Create an object record */

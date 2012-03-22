@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -797,14 +797,6 @@ typedef struct dh_group_st
 	unsigned long   length;
 	unsigned char   value[256];
 } DH_GROUP, *PDH_GROUP;
-
-static char *emlxs_local_pwd  = "11223344556677881122334455667788";
-static char *emlxs_remote_pwd = "aabbccddeeffgghhaabbccddeeffgghh";
-
-static uint8_t emlxs_null_wwn[8] =
-	{0, 0, 0, 0, 0, 0, 0, 0};
-static uint8_t emlxs_fabric_wwn[8] =
-	{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
 #pragma weak random_get_pseudo_bytes
 

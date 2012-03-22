@@ -191,7 +191,7 @@ try_again:
 		(void) printf("\t\t id = %llx\n", real_door.di_uniquifier);
 #endif	/* DEBUG */
 		if ((real_door.di_attributes & DOOR_REVOKED) ||
-		    (real_door.di_data != (door_ptr_t)(uintptr_t)COOKIE)) {
+		    (real_door.di_data != COOKIE)) {
 #ifdef	DEBUG
 			(void) printf("real door revoked\n");
 #endif	/* DEBUG */
@@ -202,7 +202,7 @@ try_again:
 		}
 	} else {
 		if ((door_info(doorfd, &my_door) < 0) ||
-		    (my_door.di_data != (door_ptr_t)(uintptr_t)COOKIE) ||
+		    (my_door.di_data != COOKIE) ||
 		    (my_door.di_uniquifier != real_door.di_uniquifier)) {
 			perror("my door door_info");
 			/*

@@ -20,6 +20,8 @@
  */
 /*
  * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  */
 
 #include <sys/note.h>
@@ -3182,7 +3184,6 @@ ddi_optimize_dtree(dev_info_t *devi)
 	 * Set the unoptimized values
 	 */
 	DEVI(devi)->devi_bus_map_fault = pdevi;
-	DEVI(devi)->devi_bus_dma_map = pdevi;
 	DEVI(devi)->devi_bus_dma_allochdl = pdevi;
 	DEVI(devi)->devi_bus_dma_freehdl = pdevi;
 	DEVI(devi)->devi_bus_dma_bindhdl = pdevi;
@@ -3207,11 +3208,6 @@ ddi_optimize_dtree(dev_info_t *devi)
 		DEVI(devi)->devi_bus_map_fault = pdevi->devi_bus_map_fault;
 		debug_dtree(devi, DEVI(devi)->devi_bus_map_fault,
 		    "bus_map_fault");
-	}
-
-	if (ddi_dma_map == b->bus_dma_map) {
-		DEVI(devi)->devi_bus_dma_map = pdevi->devi_bus_dma_map;
-		debug_dtree(devi, DEVI(devi)->devi_bus_dma_map, "bus_dma_map");
 	}
 
 	if (ddi_dma_allochdl == b->bus_dma_allochdl) {
@@ -4181,11 +4177,11 @@ quiesce_one_device(dev_info_t *dip, void *arg)
 
 		rc = devi_quiesce(dip);
 
-		/* quiesce() should never fail */
-		ASSERT(rc == DDI_SUCCESS);
-
 		if (rc != DDI_SUCCESS && should_quiesce) {
-
+#ifdef DEBUG
+			cmn_err(CE_WARN, "quiesce() failed for %s%d",
+			    ddi_driver_name(dip), ddi_get_instance(dip));
+#endif /* DEBUG */
 			if (arg != NULL)
 				*((int *)arg) = -1;
 		}

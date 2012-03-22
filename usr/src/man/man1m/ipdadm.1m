@@ -1,0 +1,223 @@
+'\" te
+.\" Copyright (c) 2012, Joyent, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH IPDADM 1M "Mar 1, 2012"
+.SH NAME
+ipdadm \- administer the Internet packet disturber
+.SH SYNOPSIS
+.LP
+.nf
+\fBipdadm\fR [\fB-z\fR \fIzonename\fR] \fIsubcommand\fR [\fIsubcommand-options\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The ipdadm utility is used to administer the illumos facility for simulating
+pathological networks by induce packet drops, delays, and corruption.
+
+This functionality is only able to the global zone and zones with exclusive
+networking stacks. If this is enabled for the global zone, any zone with a
+shared networking stack will be affected.
+
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.na
+\fB-z\fR
+.ad
+.sp .6
+.RS 4n
+The string of the zonename to control. If this is not specified, the current
+zone is used. For the list subcommand, this option is not supported.
+.RE
+
+.SH SUBCOMMANDS
+.sp
+.LP
+The following subcommands are supported:
+
+.sp
+.ne 2
+.na
+\fBcorrupt\fR \fIpercent\fR
+.ad
+.sp .6
+.RS 4n
+Sets the chance for packets to be corrupted to \fIpercent\fR which must be an
+integer between 0 and 100. Setting \fIpercent\fR to 0 disables packet corruption
+and is equivalent to calling \fBremove\fR \fIcorrupt\fR. When enabled, a random
+byte will have a single bit flipped.
+.sp
+.RE
+
+.sp
+.ne 2
+.na
+\fBdelay\fR \fImicroseconds\fR
+.ad
+.sp .6
+.RS 4n
+Inserts \fImicroseconds\fR of delay between both the transmit and receive of
+each packet. Setting \fImicroseconds\fR to zero is equivalent to calling
+\fBremove\fR \fIdelay\fR.
+.sp
+.RE
+
+.sp
+.ne 2
+.na
+\fBdrop\fR \fIpercent\fR
+.ad
+.sp .6
+.RS 4n
+Sets the chance for packets to be dropped to \fIpercent\fR. \fIpercent\fR must
+be an integer between 0 and 100. Setting \fIpercent\fR to zero is equivalent to
+calling \fBremove\fR \fIdrop\fR.
+.sp
+.RE
+
+.sp
+.ne 2
+.na
+\fBinfo\fR
+.ad
+.sp .6
+.RS 4n
+Prints the current values for packet corruption, packet dropping, and packet
+delay for the zone.
+.sp
+.RE
+
+.sp
+.ne 2
+.na
+\fBlist\fR
+.ad
+.sp .6
+.RS 4n
+Prints out the zonename of each zone that has active (non-zero) packet
+corruption, packet delay, and packet drop.
+.sp
+.RE
+
+.sp
+.ne 2
+.na
+\fBremove\fR \fIcorrupt\fR,\fIdelay\fI,\fIdrop\fR
+.ad
+.sp .6
+.RS 4n
+Disables the requested forms of packet perturbation for the zone. This is
+functionally equivalent to setting the value to zero. One or more of
+\fIcorrupt\fR, \fIdelay\fR, and \fIdrop\fR can be specified as a comma separated
+list.
+.sp
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRViewing zone information
+.sp
+.LP
+The following command illustrates how to obtain information about a specific
+zone while in the global zone.
+
+.sp
+.in +2
+.nf
+# \fBipdadm -z 949860c5-52e2-4f32-965d-02e60e116b72 info\fR
+ipd information for zone 949860c5-52e2-4f32-965d-02e60e116b72:
+        corrupt:        0% chance of packet corruption
+        drop:           0% chance of packet drop
+        delay:          0 microsecond delay per packet
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRRemoving multiple perturbations
+.sp
+.LP
+The following command illustrates the use of the \fBremove\fR subcommand from
+inside of a zone.
+
+.sp
+.in +2
+.nf
+# \fBipdadm remove corrupt,drop\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fREnabling packet drops
+.sp
+.LP
+The following command illustrates the use of the \fBdrop\fR subcommand from the
+global zone.
+
+.sp
+.in +2
+.nf
+# \fBipdadm -z 949860c5-52e2-4f32-965d-02e60e116b72 drop 25\fR
+.fi
+.in -2
+.sp
+
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.na
+\fB0\fR
+.ad
+.RS 5n
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 5n
+An error occurred.
+.sp
+.sp
+.ne 2
+.na
+\fB\fB2\fR\fR
+.ad
+.RS 5n
+Invalid command line options or arguments were specified.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Evolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBzonename\fR(1),\fBzoneadm\fR(1M), \fBattributes\fR(5), \fBzones(5)\fR

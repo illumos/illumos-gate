@@ -24,6 +24,7 @@
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2011 Bayard G. Bell.  All rights reserved.
+ * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  */
 
 /*
@@ -194,8 +195,6 @@ static int rootnex_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 static int rootnex_map_fault(dev_info_t *dip, dev_info_t *rdip,
     struct hat *hat, struct seg *seg, caddr_t addr,
     struct devpage *dp, pfn_t pfn, uint_t prot, uint_t lock);
-static int rootnex_dma_map(dev_info_t *dip, dev_info_t *rdip,
-    struct ddi_dma_req *dmareq, ddi_dma_handle_t *handlep);
 static int rootnex_dma_allochdl(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_attr_t *attr, int (*waitfp)(caddr_t), caddr_t arg,
     ddi_dma_handle_t *handlep);
@@ -266,7 +265,7 @@ static struct bus_ops rootnex_bus_ops = {
 	NULL,
 	NULL,
 	rootnex_map_fault,
-	rootnex_dma_map,
+	0,
 	rootnex_dma_allochdl,
 	rootnex_dma_freehdl,
 	rootnex_dma_bindhdl,
@@ -338,8 +337,6 @@ static iommulib_nexops_t iommulib_nexops = {
 	rootnex_coredma_get_sleep_flags,
 	rootnex_coredma_sync,
 	rootnex_coredma_win,
-	rootnex_dma_map,
-	rootnex_dma_mctl,
 	rootnex_coredma_hdl_setprivate,
 	rootnex_coredma_hdl_getprivate
 };
@@ -5003,91 +5000,9 @@ rootnex_coredma_hdl_getprivate(dev_info_t *dip, dev_info_t *rdip,
  */
 
 /*
- * rootnex_dma_map()
- *    called from ddi_dma_setup()
- * NO IOMMU in 32 bit mode. The below routines doesn't work in 64 bit mode.
- */
-/* ARGSUSED */
-static int
-rootnex_dma_map(dev_info_t *dip, dev_info_t *rdip,
-    struct ddi_dma_req *dmareq, ddi_dma_handle_t *handlep)
-{
-#if defined(__amd64)
-	/*
-	 * this interface is not supported in 64-bit x86 kernel. See comment in
-	 * rootnex_dma_mctl()
-	 */
-	return (DDI_DMA_NORESOURCES);
-
-#else /* 32-bit x86 kernel */
-	ddi_dma_handle_t *lhandlep;
-	ddi_dma_handle_t lhandle;
-	ddi_dma_cookie_t cookie;
-	ddi_dma_attr_t dma_attr;
-	ddi_dma_lim_t *dma_lim;
-	uint_t ccnt;
-	int e;
-
-
-	/*
-	 * if the driver is just testing to see if it's possible to do the bind,
-	 * we'll use local state. Otherwise, use the handle pointer passed in.
-	 */
-	if (handlep == NULL) {
-		lhandlep = &lhandle;
-	} else {
-		lhandlep = handlep;
-	}
-
-	/* convert the limit structure to a dma_attr one */
-	dma_lim = dmareq->dmar_limits;
-	dma_attr.dma_attr_version = DMA_ATTR_V0;
-	dma_attr.dma_attr_addr_lo = dma_lim->dlim_addr_lo;
-	dma_attr.dma_attr_addr_hi = dma_lim->dlim_addr_hi;
-	dma_attr.dma_attr_minxfer = dma_lim->dlim_minxfer;
-	dma_attr.dma_attr_seg = dma_lim->dlim_adreg_max;
-	dma_attr.dma_attr_count_max = dma_lim->dlim_ctreg_max;
-	dma_attr.dma_attr_granular = dma_lim->dlim_granular;
-	dma_attr.dma_attr_sgllen = dma_lim->dlim_sgllen;
-	dma_attr.dma_attr_maxxfer = dma_lim->dlim_reqsize;
-	dma_attr.dma_attr_burstsizes = dma_lim->dlim_burstsizes;
-	dma_attr.dma_attr_align = MMU_PAGESIZE;
-	dma_attr.dma_attr_flags = 0;
-
-	e = rootnex_dma_allochdl(dip, rdip, &dma_attr, dmareq->dmar_fp,
-	    dmareq->dmar_arg, lhandlep);
-	if (e != DDI_SUCCESS) {
-		return (e);
-	}
-
-	e = rootnex_dma_bindhdl(dip, rdip, *lhandlep, dmareq, &cookie, &ccnt);
-	if ((e != DDI_DMA_MAPPED) && (e != DDI_DMA_PARTIAL_MAP)) {
-		(void) rootnex_dma_freehdl(dip, rdip, *lhandlep);
-		return (e);
-	}
-
-	/*
-	 * if the driver is just testing to see if it's possible to do the bind,
-	 * free up the local state and return the result.
-	 */
-	if (handlep == NULL) {
-		(void) rootnex_dma_unbindhdl(dip, rdip, *lhandlep);
-		(void) rootnex_dma_freehdl(dip, rdip, *lhandlep);
-		if (e == DDI_DMA_MAPPED) {
-			return (DDI_DMA_MAPOK);
-		} else {
-			return (DDI_DMA_NOMAPPING);
-		}
-	}
-
-	return (e);
-#endif /* defined(__amd64) */
-}
-
-/*
  * rootnex_dma_mctl()
  *
- * No IOMMU in 32 bit mode. The below routine doesn't work in 64 bit mode.
+ * We don't support this legacy interface any more on x86.
  */
 /* ARGSUSED */
 static int
@@ -5095,185 +5010,11 @@ rootnex_dma_mctl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
     enum ddi_dma_ctlops request, off_t *offp, size_t *lenp, caddr_t *objpp,
     uint_t cache_flags)
 {
-#if defined(__amd64)
 	/*
-	 * DDI_DMA_SMEM_ALLOC & DDI_DMA_IOPB_ALLOC we're changed to have a
-	 * common implementation in genunix, so they no longer have x86
-	 * specific functionality which called into dma_ctl.
-	 *
-	 * The rest of the obsoleted interfaces were never supported in the
-	 * 64-bit x86 kernel. For s10, the obsoleted DDI_DMA_SEGTOC interface
-	 * was not ported to the x86 64-bit kernel do to serious x86 rootnex
-	 * implementation issues.
-	 *
-	 * If you can't use DDI_DMA_SEGTOC; DDI_DMA_NEXTSEG, DDI_DMA_FREE, and
-	 * DDI_DMA_NEXTWIN are useless since you can get to the cookie, so we
-	 * reflect that now too...
-	 *
-	 * Even though we fixed the pointer problem in DDI_DMA_SEGTOC, we are
-	 * not going to put this functionality into the 64-bit x86 kernel now.
-	 * It wasn't ported to the 64-bit kernel for s10, no reason to change
-	 * that in a future release.
+	 * The only thing dma_mctl is usef for anymore is legacy SPARC
+	 * dvma and sbus-specific routines.
 	 */
 	return (DDI_FAILURE);
-
-#else /* 32-bit x86 kernel */
-	ddi_dma_cookie_t lcookie;
-	ddi_dma_cookie_t *cookie;
-	rootnex_window_t *window;
-	ddi_dma_impl_t *hp;
-	rootnex_dma_t *dma;
-	uint_t nwin;
-	uint_t ccnt;
-	size_t len;
-	off_t off;
-	int e;
-
-
-	/*
-	 * DDI_DMA_SEGTOC, DDI_DMA_NEXTSEG, and DDI_DMA_NEXTWIN are a little
-	 * hacky since were optimizing for the current interfaces and so we can
-	 * cleanup the mess in genunix. Hopefully we will remove the this
-	 * obsoleted routines someday soon.
-	 */
-
-	switch (request) {
-
-	case DDI_DMA_SEGTOC: /* ddi_dma_segtocookie() */
-		hp = (ddi_dma_impl_t *)handle;
-		cookie = (ddi_dma_cookie_t *)objpp;
-
-		/*
-		 * convert segment to cookie. We don't distinguish between the
-		 * two :-)
-		 */
-		*cookie = *hp->dmai_cookie;
-		*lenp = cookie->dmac_size;
-		*offp = cookie->dmac_type & ~ROOTNEX_USES_COPYBUF;
-		return (DDI_SUCCESS);
-
-	case DDI_DMA_NEXTSEG: /* ddi_dma_nextseg() */
-		hp = (ddi_dma_impl_t *)handle;
-		dma = (rootnex_dma_t *)hp->dmai_private;
-
-		if ((*lenp != NULL) && ((uintptr_t)*lenp != (uintptr_t)hp)) {
-			return (DDI_DMA_STALE);
-		}
-
-		/* handle the case where we don't have any windows */
-		if (dma->dp_window == NULL) {
-			/*
-			 * if seg == NULL, and we don't have any windows,
-			 * return the first cookie in the sgl.
-			 */
-			if (*lenp == NULL) {
-				dma->dp_current_cookie = 0;
-				hp->dmai_cookie = dma->dp_cookies;
-				*objpp = (caddr_t)handle;
-				return (DDI_SUCCESS);
-
-			/* if we have more cookies, go to the next cookie */
-			} else {
-				if ((dma->dp_current_cookie + 1) >=
-				    dma->dp_sglinfo.si_sgl_size) {
-					return (DDI_DMA_DONE);
-				}
-				dma->dp_current_cookie++;
-				hp->dmai_cookie++;
-				return (DDI_SUCCESS);
-			}
-		}
-
-		/* We have one or more windows */
-		window = &dma->dp_window[dma->dp_current_win];
-
-		/*
-		 * if seg == NULL, return the first cookie in the current
-		 * window
-		 */
-		if (*lenp == NULL) {
-			dma->dp_current_cookie = 0;
-			hp->dmai_cookie = window->wd_first_cookie;
-
-		/*
-		 * go to the next cookie in the window then see if we done with
-		 * this window.
-		 */
-		} else {
-			if ((dma->dp_current_cookie + 1) >=
-			    window->wd_cookie_cnt) {
-				return (DDI_DMA_DONE);
-			}
-			dma->dp_current_cookie++;
-			hp->dmai_cookie++;
-		}
-		*objpp = (caddr_t)handle;
-		return (DDI_SUCCESS);
-
-	case DDI_DMA_NEXTWIN: /* ddi_dma_nextwin() */
-		hp = (ddi_dma_impl_t *)handle;
-		dma = (rootnex_dma_t *)hp->dmai_private;
-
-		if ((*offp != NULL) && ((uintptr_t)*offp != (uintptr_t)hp)) {
-			return (DDI_DMA_STALE);
-		}
-
-		/* if win == NULL, return the first window in the bind */
-		if (*offp == NULL) {
-			nwin = 0;
-
-		/*
-		 * else, go to the next window then see if we're done with all
-		 * the windows.
-		 */
-		} else {
-			nwin = dma->dp_current_win + 1;
-			if (nwin >= hp->dmai_nwin) {
-				return (DDI_DMA_DONE);
-			}
-		}
-
-		/* switch to the next window */
-		e = rootnex_dma_win(dip, rdip, handle, nwin, &off, &len,
-		    &lcookie, &ccnt);
-		ASSERT(e == DDI_SUCCESS);
-		if (e != DDI_SUCCESS) {
-			return (DDI_DMA_STALE);
-		}
-
-		/* reset the cookie back to the first cookie in the window */
-		if (dma->dp_window != NULL) {
-			window = &dma->dp_window[dma->dp_current_win];
-			hp->dmai_cookie = window->wd_first_cookie;
-		} else {
-			hp->dmai_cookie = dma->dp_cookies;
-		}
-
-		*objpp = (caddr_t)handle;
-		return (DDI_SUCCESS);
-
-	case DDI_DMA_FREE: /* ddi_dma_free() */
-		(void) rootnex_dma_unbindhdl(dip, rdip, handle);
-		(void) rootnex_dma_freehdl(dip, rdip, handle);
-		if (rootnex_state->r_dvma_call_list_id) {
-			ddi_run_callback(&rootnex_state->r_dvma_call_list_id);
-		}
-		return (DDI_SUCCESS);
-
-	case DDI_DMA_IOPB_ALLOC:	/* get contiguous DMA-able memory */
-	case DDI_DMA_SMEM_ALLOC:	/* get contiguous DMA-able memory */
-		/* should never get here, handled in genunix */
-		ASSERT(0);
-		return (DDI_FAILURE);
-
-	case DDI_DMA_KVADDR:
-	case DDI_DMA_GETERR:
-	case DDI_DMA_COFF:
-		return (DDI_FAILURE);
-	}
-
-	return (DDI_FAILURE);
-#endif /* defined(__amd64) */
 }
 
 /*

@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ */
 
 /*
  * The following notice accompanied the original version of this file:
@@ -156,7 +159,7 @@ static struct bus_ops fcoe_busops = {
 	NULL,				/* bus_add_intrspec */
 	NULL,				/* bus_remove_intrspec */
 	i_ddi_map_fault,		/* bus_map_fault */
-	ddi_dma_map,			/* bus_dma_map */
+	NULL,				/* bus_dma_map */
 	ddi_dma_allochdl,		/* bus_dma_allochdl */
 	ddi_dma_freehdl,		/* bus_dma_freehdl */
 	ddi_dma_bindhdl,		/* bus_dma_bindhdl */

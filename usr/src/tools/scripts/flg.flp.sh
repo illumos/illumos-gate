@@ -74,7 +74,7 @@ find_files()
 
 	if [[ "$SCM_MODE" = "teamware" ]]; then
 		for dir; do
-			if [ -d $CODEMGR_WS/$dir ]; then
+			if [[ -d $CODEMGR_WS/$dir ]]; then
 				cd $CODEMGR_WS
 				find $dir -name "$pat" | \
 					sed -n s:/SCCS/s.:/:p | prpath
@@ -84,7 +84,7 @@ find_files()
 	elif [[ "$SCM_MODE" = "mercurial" || "$SCM_MODE" == "git" ]]; then
 		dirs=""
 		for dir; do
-			if [ -d $CODEMGR_WS/$dir ]; then
+			if [[ -d $CODEMGR_WS/$dir ]]; then
 				dirs="$dirs|${dir%/}"
 			fi
 		done
@@ -111,7 +111,7 @@ echo_file()
 #
 exec_file()
 {
-	if [ "${1##/}" = "$1" ]; then
+	if [[ "${1##/}" = "$1" ]]; then
 		. $CODEMGR_WS/$1
 	else
 		. $1
@@ -133,7 +133,7 @@ incflg()
 			exec_file $1/$i
 			;;
 		*)
-			if [ -d $i -a ! -h $i ]; then
+			if [[ -d $i && ! -h $i ]]; then
 				incflg $1/$i
 				cd $1
 			fi
@@ -158,14 +158,14 @@ prpath()
 	reltree=${CURTREE##$CODEMGR_WS?(/)}
 
 	while read srcfile; do
-		if [ "$RELPATHS" != y ]; then
+		if [[ "$RELPATHS" != y ]]; then
 			echo $srcfile
 			continue
 		fi
 
 		dots=
 		tree=$reltree
-		while [ "${srcfile##$tree}" = "$srcfile" ]; do
+		while [[ "${srcfile##$tree}" = "$srcfile" ]]; do
 			dots=../$dots
 			tree=`dirname $tree`
 			[ "$tree" = "." ] && break
@@ -181,7 +181,7 @@ if [[ $SCM_MODE == "unknown" ]]; then
 elif [[ $SCM_MODE == "mercurial" ]]; then
 	FILELIST=$(hg manifest)
 elif [[ $SCM_MODE == "git" ]]; then
-	FILELIST=$(cd $(dirname $(git rev-parse --git-dir)); git ls-files)
+	FILELIST=$(cd $(dirname $(git rev-parse --git-dir)) && git ls-files)
 elif [[ $SCM_MODE != "teamware" ]]; then
 	fail "Unsupported SCM in use: $SCM_MODE"
 fi
@@ -206,11 +206,11 @@ CURTREE=`/bin/pwd`
 #
 # Determine the subtree being examined.
 #
-if [ $# -eq 0 ]; then
+if [[ $# -eq 0 ]]; then
 	SUBTREE=$CURTREE
-elif [ -d $1 ]; then
+elif [[ -d $1 ]]; then
 	SUBTREE=$1
-elif [ -d $CODEMGR_WS/$1 ]; then
+elif [[ -d $CODEMGR_WS/$1 ]]; then
 	SUBTREE=$CODEMGR_WS/$1
 else
 	fail "neither \$CODEMGR_WS/$1 nor $1 exists as a directory"
@@ -234,11 +234,11 @@ CURTREE=`/bin/pwd`
 cd $CODEMGR_WS
 CODEMGR_WS=`/bin/pwd`
 
-if [ "${SUBTREE##$CODEMGR_WS}" = "$SUBTREE" ]; then
+if [[ "${SUBTREE##$CODEMGR_WS}" = "$SUBTREE" ]]; then
 	fail "$SUBTREE is not a subtree of \$CODEMGR_WS"
 fi
 
-if [ "${CURTREE##$CODEMGR_WS}" = "$CURTREE" ]; then
+if [[ "${CURTREE##$CODEMGR_WS}" = "$CURTREE" ]]; then
 	fail "$CURTREE is not a subtree of \$CODEMGR_WS"
 fi
 
@@ -251,8 +251,8 @@ incflg $SUBTREE
 # Find and execute all req.flg's at or above our subtree.
 #
 TREE=$SUBTREE
-while [ $TREE != $CODEMGR_WS ]; do
-	[ -f $TREE/req.flg ] && exec_file $TREE/req.flg
+while [[ $TREE != $CODEMGR_WS ]]; do
+	[[ -f $TREE/req.flg ]] && exec_file $TREE/req.flg
 	TREE=`dirname $TREE`
 done
 

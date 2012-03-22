@@ -65,8 +65,7 @@ ISO8859_5_LOCALES	= \
 		mk_MK \
 		ru_RU
 
-ISO8859_6_LOCALES	= \
-		ar_EG
+ISO8859_6_LOCALES	= 
 
 ISO8859_7_LOCALES	= \
 		el_GR
@@ -96,6 +95,9 @@ ISO8859_15_LOCALES	= \
 
 KOI8_R_LOCALES		= \
 		ru_RU
+
+GB18030_LOCALES		= \
+		zh_CN
 
 #
 # All new locales should be in UTF-8 form.
@@ -192,6 +194,7 @@ LOCNAMES	= \
 		$(ISO8859_13_LOCALES:%=%.ISO8859-13) \
 		$(ISO8859_15_LOCALES:%=%.ISO8859-15) \
 		$(KOI8_R_LOCALES:%=%.KOI8-R) \
+		$(GB18030_LOCALES:%=%.GB18030) \
 		$(UTF_8_LOCALES:%=%.UTF-8)
 
 LOCDIRS		= $(LOCNAMES:%=locale/%)
@@ -290,6 +293,9 @@ locale/%.ISO8859-15/stamp:	data/%.UTF-8.src 8859-15.cm locale $(PROG)
 locale/%.KOI8-R/stamp:		data/%.UTF-8.src KOI8-R.cm locale $(PROG)
 	./$(PROG) -U -i $< -f KOI8-R.cm $(@D)
 	$(TOUCH) $@
+locale/%.GB18030/stamp:		data/%.UTF-8.src GB18030.cm locale $(PROG)
+	./$(PROG) -U -i $< -f GB18030.cm $(@D)
+	$(TOUCH) $@
 
 locale/%/$(DCOLL):	locale/%/stamp
 locale/%/$(DCTYPE):	locale/%/stamp
@@ -303,6 +309,9 @@ UTF-8.cm: data/UTF-8.cm
 
 UTF-8.ct: $(UTF8SRCS)
 	$(SH) data/ctype.sh $(UTF8SRCS) > $@
+
+GB18030.cm: data/GB18030.cm
+	$(LN) -sf data/GB18030.cm  $@
 
 %.cm: data/%.TXT UTF-8.cm
 	$(RM) $@

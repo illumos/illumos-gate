@@ -21,9 +21,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <string.h>
 #include <stdlib.h>
@@ -79,7 +78,6 @@ get_master_attributes_by_object(slot_session_t *session,
 			break;
 		case CKO_DATA:
 			goto get_attr;
-			break;
 		default:
 			/* should never be here */
 			return (CKR_ATTRIBUTE_VALUE_INVALID);
@@ -148,7 +146,7 @@ get_master_attributes_by_template(
 	}
 
 	return (get_master_attributes_by_type(class, subtype,
-		attributes, num_attributes));
+	    attributes, num_attributes));
 }
 
 /*
@@ -166,125 +164,125 @@ get_master_template_by_type(CK_OBJECT_CLASS class, CK_ULONG subtype,
 	size_t master_template_size = 0;
 
 	switch (class) {
-	    case CKO_HW_FEATURE:
+	case CKO_HW_FEATURE:
 		switch (subtype) {
-		    case CKO_HW_FEATURE:
+		case CKO_HW_FEATURE:
 			master_template = (generic_attr_t *)OBJ_HW_CLOCK;
 			master_template_size = sizeof (OBJ_HW_CLOCK);
 			break;
 
-		    case CKH_MONOTONIC_COUNTER:
+		case CKH_MONOTONIC_COUNTER:
 			master_template = (generic_attr_t *)OBJ_HW_MONOTONIC;
 			master_template_size = sizeof (OBJ_HW_MONOTONIC);
 			break;
 
-		    default:
+		default:
 			/* Unsupported. */
 			break;
 		}
 		break;
 
-	    case CKO_DATA:
+	case CKO_DATA:
 		/* Objects of this class have no subtype. */
 		master_template = (generic_attr_t *)OBJ_DATA;
 		master_template_size = sizeof (OBJ_DATA);
 		break;
 
-	    case CKO_CERTIFICATE:
+	case CKO_CERTIFICATE:
 		switch (subtype) {
-		    case CKC_X_509:
+		case CKC_X_509:
 			master_template = (generic_attr_t *)OBJ_CERT_X509;
 			master_template_size = sizeof (OBJ_CERT_X509);
 			break;
 
-		    case CKC_X_509_ATTR_CERT:
+		case CKC_X_509_ATTR_CERT:
 			master_template = (generic_attr_t *)OBJ_CERT_X509ATTR;
 			master_template_size = sizeof (OBJ_CERT_X509ATTR);
 			break;
 
-		    default:
+		default:
 			/* Unsupported. */
 			break;
 		}
 		break;
 
-	    case CKO_PUBLIC_KEY:
+	case CKO_PUBLIC_KEY:
 		switch (subtype) {
-		    case CKK_RSA:
+		case CKK_RSA:
 			master_template = (generic_attr_t *)OBJ_PUBKEY_RSA;
 			master_template_size = sizeof (OBJ_PUBKEY_RSA);
 			break;
 
-		    case CKK_DSA:
+		case CKK_DSA:
 			master_template = (generic_attr_t *)OBJ_PUBKEY_DSA;
 			master_template_size = sizeof (OBJ_PUBKEY_DSA);
 			break;
 
-		    case CKK_EC:
+		case CKK_EC:
 			master_template = (generic_attr_t *)OBJ_PUBKEY_EC;
 			master_template_size = sizeof (OBJ_PUBKEY_EC);
 			break;
 
-		    case CKK_DH:
+		case CKK_DH:
 			master_template = (generic_attr_t *)OBJ_PUBKEY_DH;
 			master_template_size = sizeof (OBJ_PUBKEY_DH);
 			break;
 
-		    case CKK_X9_42_DH:
+		case CKK_X9_42_DH:
 			master_template = (generic_attr_t *)OBJ_PUBKEY_X942DH;
 			master_template_size = sizeof (OBJ_PUBKEY_X942DH);
 			break;
 
-		    case CKK_KEA:
+		case CKK_KEA:
 			master_template = (generic_attr_t *)OBJ_PUBKEY_KEA;
 			master_template_size = sizeof (OBJ_PUBKEY_KEA);
 			break;
 
-		    default:
+		default:
 			/* Unsupported. */
 			break;
 		}
 		break;
 
-	    case CKO_PRIVATE_KEY:
+	case CKO_PRIVATE_KEY:
 		switch (subtype) {
-		    case CKK_RSA:
+		case CKK_RSA:
 			master_template = (generic_attr_t *)OBJ_PRIVKEY_RSA;
 			master_template_size = sizeof (OBJ_PRIVKEY_RSA);
 			break;
 
-		    case CKK_DSA:
+		case CKK_DSA:
 			master_template = (generic_attr_t *)OBJ_PRIVKEY_DSA;
 			master_template_size = sizeof (OBJ_PRIVKEY_DSA);
 			break;
 
-		    case CKK_EC:
+		case CKK_EC:
 			master_template = (generic_attr_t *)OBJ_PRIVKEY_EC;
 			master_template_size = sizeof (OBJ_PRIVKEY_EC);
 			break;
 
-		    case CKK_DH:
+		case CKK_DH:
 			master_template = (generic_attr_t *)OBJ_PRIVKEY_DH;
 			master_template_size = sizeof (OBJ_PRIVKEY_DH);
 			break;
 
-		    case CKK_X9_42_DH:
+		case CKK_X9_42_DH:
 			master_template = (generic_attr_t *)OBJ_PRIVKEY_X942DH;
 			master_template_size = sizeof (OBJ_PRIVKEY_X942DH);
 			break;
 
-		    case CKK_KEA:
+		case CKK_KEA:
 			master_template = (generic_attr_t *)OBJ_PRIVKEY_KEA;
 			master_template_size = sizeof (OBJ_PRIVKEY_KEA);
 			break;
 
-		    default:
+		default:
 			/* Unsupported. */
 			break;
 		}
 		break;
 
-	    case CKO_SECRET_KEY:
+	case CKO_SECRET_KEY:
 		/*
 		 * The only difference between secret keys is that some
 		 * are valiable length (eg CKK_AES), while others are not
@@ -302,61 +300,61 @@ get_master_template_by_type(CK_OBJECT_CLASS class, CK_ULONG subtype,
 		 *
 		 */
 		switch (subtype) {
-		    case CKK_DES:
-		    case CKK_DES2:
-		    case CKK_DES3:
-		    case CKK_IDEA:
-		    case CKK_CDMF:
-		    case CKK_SKIPJACK:
-		    case CKK_BATON:
-		    case CKK_JUNIPER:
+		case CKK_DES:
+		case CKK_DES2:
+		case CKK_DES3:
+		case CKK_IDEA:
+		case CKK_CDMF:
+		case CKK_SKIPJACK:
+		case CKK_BATON:
+		case CKK_JUNIPER:
 			master_template = (generic_attr_t *)OBJ_SECKEY;
 			master_template_size = sizeof (OBJ_SECKEY);
 			break;
 
-		    case CKK_GENERIC_SECRET:
-		    case CKK_RC2:
-		    case CKK_RC4:
-		    case CKK_RC5:
-		    case CKK_AES:
-		    case CKK_BLOWFISH:
-		    case CKK_CAST:
-		    case CKK_CAST3:
-		    case CKK_CAST128:
+		case CKK_GENERIC_SECRET:
+		case CKK_RC2:
+		case CKK_RC4:
+		case CKK_RC5:
+		case CKK_AES:
+		case CKK_BLOWFISH:
+		case CKK_CAST:
+		case CKK_CAST3:
+		case CKK_CAST128:
 			master_template = (generic_attr_t *)OBJ_SECKEY_WITHLEN;
 			master_template_size = sizeof (OBJ_SECKEY_WITHLEN);
 			break;
 
-		    default:
+		default:
 			/* Unsupported. */
 			break;
 		}
 		break;
 
-	    case CKO_DOMAIN_PARAMETERS:
+	case CKO_DOMAIN_PARAMETERS:
 		switch (subtype) {
-		    case CKK_DSA:
+		case CKK_DSA:
 			master_template = (generic_attr_t *)OBJ_DOM_DSA;
 			master_template_size = sizeof (OBJ_DOM_DSA);
 			break;
 
-		    case CKK_DH:
+		case CKK_DH:
 			master_template = (generic_attr_t *)OBJ_DOM_DH;
 			master_template_size = sizeof (OBJ_DOM_DH);
 			break;
 
-		    case CKK_X9_42_DH:
+		case CKK_X9_42_DH:
 			master_template = (generic_attr_t *)OBJ_DOM_X942DH;
 			master_template_size = sizeof (OBJ_DOM_X942DH);
 			break;
 
-		    default:
+		default:
 			/* Unsupported. */
 			break;
 		}
 		break;
 
-	    default:
+	default:
 		/* Unsupported. */
 		break;
 	}
@@ -390,7 +388,7 @@ get_master_attributes_by_type(CK_OBJECT_CLASS class, CK_ULONG subtype,
 
 	/* Determine the appropriate master template needed. */
 	rv = get_master_template_by_type(class, subtype,
-		&master_template, &master_template_size);
+	    &master_template, &master_template_size);
 	if (rv != CKR_OK)
 		return (rv);
 
@@ -465,7 +463,7 @@ get_master_attributes_by_duplication(
 
 		if (src->isMalloced) {
 			dst->attribute.pValue =
-				malloc(src->attribute.ulValueLen);
+			    malloc(src->attribute.ulValueLen);
 
 			if (dst->attribute.pValue == NULL) {
 				/*
@@ -492,7 +490,7 @@ get_master_attributes_by_duplication(
 		}
 
 		(void) memcpy(dst->attribute.pValue, src->attribute.pValue,
-			src->attribute.ulValueLen);
+		    src->attribute.ulValueLen);
 	}
 
 	if (rv != CKR_OK) {
@@ -566,7 +564,7 @@ attribute_set_value(CK_ATTRIBUTE *new_attr,
 
 		/* bzero() out any data that won't be overwritten. */
 		bzero((char *)attr->attribute.pValue + new_attr->ulValueLen,
-			attr->attribute.ulValueLen - new_attr->ulValueLen);
+		    attr->attribute.ulValueLen - new_attr->ulValueLen);
 
 	} else if (new_attr->ulValueLen <= sizeof (attr->generic_data)) {
 		/* Use generic storage to avoid a malloc. */
@@ -602,7 +600,7 @@ attribute_set_value(CK_ATTRIBUTE *new_attr,
 	}
 
 	(void) memcpy(attr->attribute.pValue, new_attr->pValue,
-		new_attr->ulValueLen);
+	    new_attr->ulValueLen);
 	attr->attribute.ulValueLen = new_attr->ulValueLen;
 	attr->hasValueForClone = B_TRUE;
 

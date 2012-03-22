@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 /*
@@ -138,19 +139,14 @@ describeKey(KMF_KEY_HANDLE *key)
 		switch (key->keyalg) {
 			case KMF_AES:
 				return (gettext("AES"));
-				break;
 			case KMF_RC4:
 				return (gettext("ARCFOUR"));
-				break;
 			case KMF_DES:
 				return (gettext("DES"));
-				break;
 			case KMF_DES3:
 				return (gettext("Triple-DES"));
-				break;
 			default:
 				return (gettext("symmetric"));
-				break;
 		}
 	}
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2010 Emulex.  All rights reserved.
+ * Copyright 2011 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,12 +31,12 @@
 extern "C" {
 #endif
 
-#define	EMLXS_VERSION		"2.50q"
-#define	EMLXS_DATE_MINUTE	"00"	/* 00-59 */
-#define	EMLXS_DATE_HOUR		"17"	/* 00-23 */
-#define	EMLXS_DATE_DAY		"30"	/* 00-31 */
-#define	EMLXS_DATE_MONTH	"07"	/* 01-12 */
-#define	EMLXS_DATE_YEAR		"2010"	/* YYYY  */
+#define	EMLXS_VERSION		"2.60k"
+#define	EMLXS_DATE_MINUTE	"45"	/* 00-59 */
+#define	EMLXS_DATE_HOUR		"16"	/* 00-23 */
+#define	EMLXS_DATE_DAY		"24"	/* 00-31 */
+#define	EMLXS_DATE_MONTH	"03"	/* 01-12 */
+#define	EMLXS_DATE_YEAR		"2011"	/* YYYY  */
 
 #define	EMLXS_REVISION		EMLXS_DATE_YEAR "." EMLXS_DATE_MONTH "." \
 				    EMLXS_DATE_DAY "." EMLXS_DATE_HOUR "." \

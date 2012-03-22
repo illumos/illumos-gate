@@ -688,7 +688,7 @@ static __nis_table_mapping_t *
 findDirEntryMapping(__nis_table_mapping_t *t, entry_object *e, char **name) {
 	__nis_table_mapping_t	*x;
 	char			*entryName;
-	const char			*myself = "findDirEntryMapping";
+	const char		*myself = "findDirEntryMapping";
 	__nis_buffer_t		b = {0, 0};
 
 	if (e == 0 || e->en_cols.en_cols_len != 2 ||

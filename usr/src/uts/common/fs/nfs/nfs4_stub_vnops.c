@@ -208,7 +208,8 @@ extern int	nfs4_realvp(vnode_t *, vnode_t **, caller_context_t *);
 static int	nfs4_trigger_mount(vnode_t *, cred_t *, vnode_t **);
 static int	nfs4_trigger_domount(vnode_t *, domount_args_t *, vfs_t **,
     cred_t *, vnode_t **);
-static domount_args_t  *nfs4_trigger_domount_args_create(vnode_t *, cred_t *);
+static int 	nfs4_trigger_domount_args_create(vnode_t *, cred_t *,
+    domount_args_t **dmap);
 static void	nfs4_trigger_domount_args_destroy(domount_args_t *dma,
     vnode_t *vp);
 static ephemeral_servinfo_t *nfs4_trigger_esi_create(vnode_t *, servinfo4_t *,
@@ -835,11 +836,9 @@ nfs4_trigger_mount(vnode_t *vp, cred_t *cr, vnode_t **newvpp)
 
 	must_unlock = TRUE;
 
-	dma = nfs4_trigger_domount_args_create(vp, cr);
-	if (dma == NULL) {
-		error = EINVAL;
+	error = nfs4_trigger_domount_args_create(vp, cr, &dma);
+	if (error)
 		goto done;
-	}
 
 	/*
 	 * Note that since we define mirror mounts to work
@@ -850,6 +849,7 @@ nfs4_trigger_mount(vnode_t *vp, cred_t *cr, vnode_t **newvpp)
 	mcred = crdup(cr);
 	if (mcred == NULL) {
 		error = EINVAL;
+		nfs4_trigger_domount_args_destroy(dma, vp);
 		goto done;
 	}
 
@@ -898,8 +898,8 @@ done:
 /*
  * Collect together both the generic & mount-type specific args.
  */
-static domount_args_t *
-nfs4_trigger_domount_args_create(vnode_t *vp, cred_t *cr)
+static int
+nfs4_trigger_domount_args_create(vnode_t *vp, cred_t *cr, domount_args_t **dmap)
 {
 	int nointr;
 	char *hostlist;
@@ -920,7 +920,7 @@ nfs4_trigger_domount_args_create(vnode_t *vp, cred_t *cr)
 		esi_first = nfs4_trigger_esi_create(vp, svp, cr);
 		if (esi_first == NULL) {
 			kmem_free(hostlist, MAXPATHLEN);
-			return (NULL);
+			return (EINVAL);
 		}
 
 		(void) strlcpy(hostlist, esi_first->esi_hostname, MAXPATHLEN);
@@ -989,9 +989,20 @@ nfs4_trigger_domount_args_create(vnode_t *vp, cred_t *cr)
 
 			/* check if the server is responding */
 			status = nfs4_trigger_ping_server(svp, nointr);
-			/* if the server did not respond, ignore it */
-			if (status != RPC_SUCCESS)
+			if (status == RPC_INTR) {
+				kmem_free(hostlist, MAXPATHLEN);
+				nfs4_trigger_esi_destroy(esi_first, vp);
+				nargs = nargs_head;
+				while (nargs != NULL) {
+					next = nargs->nfs_ext_u.nfs_extB.next;
+					nfs4_trigger_nargs_destroy(nargs);
+					nargs = next;
+				}
+				return (EINTR);
+			} else if (status != RPC_SUCCESS) {
+				/* if the server did not respond, ignore it */
 				continue;
+			}
 
 			esi = nfs4_trigger_esi_create(vp, svp, cr);
 			if (esi == NULL)
@@ -1039,8 +1050,9 @@ nfs4_trigger_domount_args_create(vnode_t *vp, cred_t *cr)
 	dma->dma_esi = esi_first;
 	dma->dma_hostlist = hostlist;
 	dma->dma_nargs = nargs_head;
+	*dmap = dma;
 
-	return (dma);
+	return (0);
 }
 
 static void

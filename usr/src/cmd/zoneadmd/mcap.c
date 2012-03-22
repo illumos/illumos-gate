@@ -107,6 +107,22 @@
 
 #define	CAP_REFRESH	((uint64_t)300 * NANOSEC) /* every 5 minutes */
 
+/*
+ * zonecfg attribute tunables for memory capping.
+ *    phys-mcap-cmd
+ *	type: string
+ *	specifies a command that can be run when over the cap
+ *    phys-mcap-no-vmusage
+ *	type: boolean
+ *	true disables vm_getusage and just uses zone's proc. rss sum
+ *    phys-mcap-no-pageout
+ *	type: boolean
+ *	true disables pageout when over
+ */
+#define	TUNE_CMD	"phys-mcap-cmd"
+#define	TUNE_NVMU	"phys-mcap-no-vmusage"
+#define	TUNE_NPAGE	"phys-mcap-no-pageout"
+
 static char	zonename[ZONENAME_MAX];
 static char	zonepath[MAXPATHLEN];
 static char	zoneproc[MAXPATHLEN];
@@ -119,6 +135,8 @@ static thread_t mcap_tid;
 static FILE	*debug_log_fp = NULL;
 static uint64_t zone_rss_cap;		/* RSS cap(KB) */
 static char	over_cmd[2 * BUFSIZ];	/* same size as zone_attr_value */
+static boolean_t skip_vmusage = B_FALSE;
+static boolean_t skip_pageout = B_FALSE;
 
 /*
  * Structure to hold current state about a process address space that we're
@@ -536,9 +554,70 @@ done:
 static uint64_t
 get_mem_info(int age)
 {
-	uint64_t n = 1;
-	zsd_vmusage64_t buf;
-	uint64_t zone_rss;
+	uint64_t		n = 1;
+	zsd_vmusage64_t		buf;
+	uint64_t		zone_rss;
+	DIR			*pdir = NULL;
+	struct dirent		*dent;
+
+	/*
+	 * Start by doing the fast, cheap RSS calculation using the rss value
+	 * in psinfo_t.  Because that's per-process, it can lead to double
+	 * counting some memory and overestimating how much is being used, but
+	 * as long as that's not over the cap, then we don't need do the
+	 * expensive calculation.
+	 */
+	if (shutting_down)
+		return (0);
+
+	if ((pdir = opendir(zoneproc)) == NULL)
+		return (0);
+
+	zone_rss = 0;
+	while (!shutting_down && (dent = readdir(pdir)) != NULL) {
+		pid_t		pid;
+		int		psfd;
+		int64_t		rss;
+		char		pathbuf[MAXPATHLEN];
+		psinfo_t	psinfo;
+
+		if (strcmp(".", dent->d_name) == 0 ||
+		    strcmp("..", dent->d_name) == 0)
+			continue;
+
+		pid = atoi(dent->d_name);
+		if (pid == 0 || pid == 1)
+			continue;
+
+		(void) snprintf(pathbuf, sizeof (pathbuf), "%s/%d/psinfo",
+		    zoneproc, pid);
+
+		rss = 0;
+		if ((psfd = open(pathbuf, O_RDONLY, 0000)) != -1) {
+			if (pread(psfd, &psinfo, sizeof (psinfo), 0) ==
+			    sizeof (psinfo))
+				rss = (int64_t)psinfo.pr_rssize;
+
+			(void) close(psfd);
+		}
+
+		zone_rss += rss;
+	}
+
+	(void) closedir(pdir);
+
+	if (shutting_down)
+		return (0);
+
+	debug("fast rss %lluKB\n", zone_rss);
+	if (zone_rss <= zone_rss_cap || skip_vmusage) {
+		uint64_t zone_rss_bytes;
+
+		zone_rss_bytes = zone_rss * 1024;
+		/* Use the zone's approx. RSS in the kernel */
+		(void) zone_setattr(zid, ZONE_ATTR_RSS, &zone_rss_bytes, 0);
+		return (zone_rss);
+	}
 
 	buf.vmu_id = zid;
 
@@ -660,6 +739,7 @@ check_suspend(int age, boolean_t new_cycle)
 	static uint64_t lo_thresh;	/* Thresholds for how long to  sleep */
 	static uint64_t hi_thresh;	/* when under the cap (80% & 90%). */
 	static uint64_t prev_zone_rss = 0;
+	static uint32_t pfdelay = 0;	/* usec page fault delay when over */
 
 	/* Wait a second to give the async pageout a chance to catch up. */
 	(void) sleep_shutdown(1);
@@ -705,6 +785,9 @@ check_suspend(int age, boolean_t new_cycle)
 			hi_thresh = (uint64_t)(zone_rss_cap * .9);
 			addon = (uint64_t)(zone_rss_cap * 0.05);
 
+			debug("%s: %s\n", TUNE_CMD, over_cmd);
+			debug("%s: %d\n", TUNE_NVMU, skip_vmusage);
+			debug("%s: %d\n", TUNE_NPAGE, skip_pageout);
 			debug("current cap %lluKB lo %lluKB hi %lluKB\n",
 			    zone_rss_cap, lo_thresh, hi_thresh);
 		}
@@ -753,6 +836,30 @@ check_suspend(int age, boolean_t new_cycle)
 				    &n, 0);
 			}
 
+			if (!skip_pageout) {
+				/*
+				 * Tell the kernel to start throttling page
+				 * faults by some number of usecs to help us
+				 * catch up. If we are persistently over the
+				 * cap the delay ramps up to a max of 2000usecs.
+				 * Note that for delays less than 1 tick
+				 * (i.e. all of these) we busy-wait in as_fault.
+				 *	delay	faults/sec
+				 *	 125	8000
+				 *	 250	4000
+				 *	 500	2000
+				 *	1000	1000
+				 *	2000	 500
+				 */
+				if (pfdelay == 0)
+					pfdelay = 125;
+				else if (pfdelay < 2000)
+					pfdelay *= 2;
+
+				(void) zone_setattr(zid, ZONE_ATTR_PG_FLT_DELAY,
+				    &pfdelay, 0);
+			}
+
 			/*
 			 * Once we go over the cap, then we want to
 			 * page out a little extra instead of stopping
@@ -766,11 +873,19 @@ check_suspend(int age, boolean_t new_cycle)
 		/*
 		 * At this point we are under the cap.
 		 *
+		 * Tell the kernel to stop throttling page faults.
+		 *
 		 * Scale the amount of time we sleep before rechecking the
 		 * zone's memory usage.  Also, scale the accpetable age of
 		 * cached results from vm_getusage.  We do this based on the
 		 * penetration into the capped limit.
 		 */
+		if (pfdelay > 0) {
+			pfdelay = 0;
+			(void) zone_setattr(zid, ZONE_ATTR_PG_FLT_DELAY,
+			    &pfdelay, 0);
+		}
+
 		if (zone_rss <= lo_thresh) {
 			sleep_time = 120;
 			age = 15;
@@ -786,7 +901,51 @@ check_suspend(int age, boolean_t new_cycle)
 		(void) sleep_shutdown(sleep_time);
 	}
 
+	/* Shutting down, tell the kernel so it doesn't throttle */
+	if (pfdelay > 0) {
+		pfdelay = 0;
+		(void) zone_setattr(zid, ZONE_ATTR_PG_FLT_DELAY, &pfdelay, 0);
+	}
+
 	return (0);
+}
+
+static void
+get_mcap_tunables()
+{
+	zone_dochandle_t handle;
+	struct zone_attrtab attr;
+
+	over_cmd[0] = '\0';
+	if ((handle = zonecfg_init_handle()) == NULL)
+		return;
+
+	if (zonecfg_get_handle(zonename, handle) != Z_OK)
+		goto done;
+
+	/* Reset to defaults in case rebooting and settings have changed */
+	over_cmd[0] = '\0';
+	skip_vmusage = B_FALSE;
+	skip_pageout = B_FALSE;
+
+	if (zonecfg_setattrent(handle) != Z_OK)
+		goto done;
+	while (zonecfg_getattrent(handle, &attr) == Z_OK) {
+		if (strcmp(TUNE_CMD, attr.zone_attr_name) == 0) {
+			(void) strlcpy(over_cmd, attr.zone_attr_value,
+			    sizeof (over_cmd));
+		} else if (strcmp(TUNE_NVMU, attr.zone_attr_name) == 0) {
+			if (strcmp("true", attr.zone_attr_value) == 0)
+				skip_vmusage = B_TRUE;
+		} else if (strcmp(TUNE_NPAGE, attr.zone_attr_name) == 0) {
+			if (strcmp("true", attr.zone_attr_value) == 0)
+				skip_pageout = B_TRUE;
+		}
+	}
+	(void) zonecfg_endattrent(handle);
+
+done:
+	zonecfg_fini_handle(handle);
 }
 
 /*
@@ -801,6 +960,8 @@ mcap_zone()
 	int64_t excess;
 
 	debug("thread startup\n");
+
+	get_mcap_tunables();
 
 	/*
 	 * When first starting it is likely lots of other zones are starting
@@ -869,7 +1030,10 @@ mcap_zone()
 			if (pid == 0 || pid == 1)
 				continue;
 
-			excess = pageout_process(pid, excess);
+			if (skip_pageout)
+				(void) sleep_shutdown(2);
+			else
+				excess = pageout_process(pid, excess);
 
 			if (excess <= 0) {
 				debug("apparently under; excess %lld\n",
@@ -888,34 +1052,6 @@ mcap_zone()
 	debug("thread shutdown\n");
 }
 
-static void
-get_over_cmd()
-{
-	zone_dochandle_t handle;
-	struct zone_attrtab attr;
-
-	over_cmd[0] = '\0';
-	if ((handle = zonecfg_init_handle()) == NULL)
-		return;
-
-	if (zonecfg_get_handle(zonename, handle) != Z_OK)
-		goto done;
-
-	if (zonecfg_setattrent(handle) != Z_OK)
-		goto done;
-	while (zonecfg_getattrent(handle, &attr) == Z_OK) {
-		if (strcmp("phys-mcap-cmd", attr.zone_attr_name) != 0)
-			continue;	/* no match */
-		(void) strlcpy(over_cmd, attr.zone_attr_value,
-		    sizeof (over_cmd));
-		break;
-	}
-	(void) zonecfg_endattrent(handle);
-
-done:
-	zonecfg_fini_handle(handle);
-}
-
 void
 create_mcap_thread(zlog_t *zlogp, zoneid_t id)
 {
@@ -930,7 +1066,6 @@ create_mcap_thread(zlog_t *zlogp, zoneid_t id)
 	(void) snprintf(zoneproc, sizeof (zoneproc), "%s/root/proc", zonepath);
 	(void) snprintf(debug_log, sizeof (debug_log), "%s/mcap_debug.log",
 	    zonepath);
-	get_over_cmd();
 
 	res = thr_create(NULL, NULL, (void *(*)(void *))mcap_zone, NULL, NULL,
 	    &mcap_tid);

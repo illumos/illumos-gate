@@ -24,6 +24,7 @@
  * Copyright 2011 Joyent, Inc. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2011 by Delphix. All rights reserved.
+ * Copyright (c) 2012 by Frederik Wessels. All rights reserved.
  */
 
 #include <assert.h>
@@ -1489,7 +1490,7 @@ show_import(nvlist_t *config)
 	}
 
 	if (msgid != NULL)
-		(void) printf(gettext("   see: http://www.sun.com/msg/%s\n"),
+		(void) printf(gettext("   see: http://illumos.org/msg/%s\n"),
 		    msgid);
 
 	(void) printf(gettext(" config:\n\n"));
@@ -2224,7 +2225,8 @@ get_namewidth(zpool_handle_t *zhp, void *data)
 		if (!cb->cb_verbose)
 			cb->cb_namewidth = strlen(zpool_get_name(zhp));
 		else
-			cb->cb_namewidth = max_width(zhp, nvroot, 0, 0);
+			cb->cb_namewidth = max_width(zhp, nvroot, 0,
+			    cb->cb_namewidth);
 	}
 
 	/*
@@ -3562,7 +3564,7 @@ print_dedup_stats(nvlist_t *config)
  *        pool: tank
  *	status: DEGRADED
  *	reason: One or more devices ...
- *         see: http://www.sun.com/msg/ZFS-xxxx-01
+ *         see: http://illumos.org/msg/ZFS-xxxx-01
  *	config:
  *		mirror		DEGRADED
  *                c1t0d0	OK
@@ -3770,7 +3772,7 @@ status_callback(zpool_handle_t *zhp, void *data)
 	}
 
 	if (msgid != NULL)
-		(void) printf(gettext("   see: http://www.sun.com/msg/%s\n"),
+		(void) printf(gettext("   see: http://illumos.org/msg/%s\n"),
 		    msgid);
 
 	if (config != NULL) {

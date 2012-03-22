@@ -588,9 +588,10 @@ _collate_sxfrm(const wchar_t *src, char *xf, size_t room)
 				if (room) {
 					while (b) {
 						b--;
-						if (room)
+						if (room) {
 							*xf++ = buf[b];
-						room--;
+							room--;
+						}
 					}
 				}
 				need = want;
@@ -613,9 +614,10 @@ _collate_sxfrm(const wchar_t *src, char *xf, size_t room)
 
 					while (b) {
 						b--;
-						if (room)
+						if (room) {
 							*xf++ = buf[b];
-						room--;
+							room--;
+						}
 					}
 				}
 				need = want;

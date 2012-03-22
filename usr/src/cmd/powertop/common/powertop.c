@@ -397,7 +397,8 @@ main(int argc, char **argv)
 		 * specified an interval we skip this bit and keep it fixed.
 		 */
 		if (g_features & FEATURE_CSTATE && !PT_ON_TIME &&
-		    g_longest_cstate > 0) {
+		    g_longest_cstate > 0 &&
+		    g_cstate_info[g_longest_cstate].events > 0) {
 			double deep_idle_res = (((double)
 			    g_cstate_info[g_longest_cstate].total_time/MICROSEC
 			    /g_ncpus)/g_cstate_info[g_longest_cstate].events);

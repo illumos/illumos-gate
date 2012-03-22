@@ -18,7 +18,9 @@
  *
  * CDDL HEADER END
  */
-
+/*
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ */
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -176,10 +178,8 @@ todpc_get(tod_ops_t *top)
 	ASSERT(MUTEX_HELD(&tod_lock));
 
 	if (todpc_rtcget((unsigned char *)&rtc)) {
-		ts.tv_sec = 0;
-		ts.tv_nsec = 0;
 		tod_status_set(TOD_GET_FAILED);
-		return (ts);
+		return (hrestime);
 	}
 
 	/* assume that we wrap the rtc year back to zero at 2000 */

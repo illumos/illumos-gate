@@ -28,6 +28,9 @@
  * All rights reserved.
  */
 /*
+ * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ */
+/*
  * This module implements a nexus driver for the ACPI virtual bus.
  * It does not handle any of the DDI functions passed up to it by the child
  * drivers, but instead allows them to bubble up to the root node.
@@ -87,7 +90,7 @@ static struct bus_ops acpinex_bus_ops = {
 	NULL,				/* bus_add_intrspec */
 	NULL,				/* bus_remove_intrspec */
 	i_ddi_map_fault,		/* bus_map_fault */
-	ddi_dma_map,			/* bus_dma_map */
+	NULL,				/* bus_dma_map */
 	ddi_dma_allochdl,		/* bus_dma_allochdl */
 	ddi_dma_freehdl,		/* bus_dma_freehdl */
 	ddi_dma_bindhdl,		/* bus_dma_bindhdl */

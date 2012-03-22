@@ -559,7 +559,7 @@ fm_smb_fmacompat()
 	oemstypes->type = SMB_TYPE_OEMSTR;
 	smb_strcnt(shp, oemstypes);
 
-	for (i = 0; i < oemstypes->count; i++) {
+	for (i = 0; i < oemstypes->count && compat == 0; i++) {
 		id = oemstypes->ids[i]->id;
 		cnt = smbios_info_strtab(shp, id, 0, NULL);
 		if (cnt > 0) {
@@ -570,26 +570,17 @@ fm_smb_fmacompat()
 			for (j = 0; j < cnt; j++) {
 				if (strncmp(oem_strings[j], SMB_PRMS1,
 				    strlen(SMB_PRMS1) + 1) == 0) {
-					kmem_free(oem_strings,
-					    sizeof (char *) * cnt);
-					smb_free_strcnt(oemstypes, strcnt);
 					compat = 1;
 					break;
 				}
 			}
+			kmem_free(oem_strings, sizeof (char *) * cnt);
 		}
 	}
-
-	if (compat == 0) {
-		/* didn't find x86pi magic cookie */
-		if (oem_strings != NULL)
-			kmem_free(oem_strings, sizeof (char *) * cnt);
-		smb_free_strcnt(oemstypes, strcnt);
-		goto bad;
-	}
+	smb_free_strcnt(oemstypes, strcnt);
 
 	/* sanity check SMBIOS structures */
-	if (fm_smb_check(shp) == 0)
+	if ((compat != 0) && (fm_smb_check(shp) == 0))
 		return;
 
 bad:

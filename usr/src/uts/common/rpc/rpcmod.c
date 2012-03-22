@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -199,7 +200,8 @@ extern int nulldev();
 
 #define	RPCMOD_ID	2049
 
-int rmm_open(), rmm_close();
+int rmm_open(queue_t *, dev_t *, int, int, cred_t *);
+int rmm_close(queue_t *, int, cred_t *);
 
 /*
  * To save instructions, since STREAMS ignores the return value
@@ -210,9 +212,12 @@ void rmm_wput(queue_t *, mblk_t *);
 void rmm_rsrv(queue_t *);
 void rmm_wsrv(queue_t *);
 
-int rpcmodopen(), rpcmodclose();
-void rpcmodrput(), rpcmodwput();
-void rpcmodrsrv(), rpcmodwsrv();
+int rpcmodopen(queue_t *, dev_t *, int, int, cred_t *);
+int rpcmodclose(queue_t *, int, cred_t *);
+void rpcmodrput(queue_t *, mblk_t *);
+void rpcmodwput(queue_t *, mblk_t *);
+void rpcmodrsrv();
+void rpcmodwsrv(queue_t *);
 
 static	void	rpcmodwput_other(queue_t *, mblk_t *);
 static	int	mir_close(queue_t *q);

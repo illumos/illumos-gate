@@ -2132,6 +2132,10 @@ verify_fs_special(struct zone_fstab *fstab)
 	if (strcmp(fstab->zone_fs_type, MNTTYPE_ZFS) == 0)
 		return (verify_fs_zfs(fstab));
 
+	if (strcmp(fstab->zone_fs_type, MNTTYPE_HYPRLOFS) == 0 &&
+	    strcmp(fstab->zone_fs_special, "swap") == 0)
+			return (Z_OK);
+
 	if (stat64(fstab->zone_fs_special, &st) != 0) {
 		(void) fprintf(stderr, gettext("could not verify fs "
 		    "%s: could not access %s: %s\n"), fstab->zone_fs_dir,

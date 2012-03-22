@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 #include <stdlib.h>
 #include <stdio.h>
@@ -653,7 +654,6 @@ print_lu_attr(stmfGuid *guid)
 			case STMF_ERROR_NOT_FOUND:
 				/* No error here */
 				return (0);
-				break;
 			default:
 				(void) fprintf(stderr, "%s: %s\n", cmdName,
 				    gettext("get extended properties failed"));

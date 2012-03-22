@@ -1002,7 +1002,7 @@ boot_hsfs_getdents(int fd, struct dirent *dep, unsigned size)
 	struct hs_direct *hdp;
 	unsigned long oldoff, oldblok;
 
-#define	SLOP (sizeof (struct dirent) - offsetof(struct direct, d_name[1]))
+#define	SLOP (sizeof (struct dirent) - offsetof(struct dirent, d_name[1]))
 
 	if (!(dir.fi = find_fp(fd)) ||
 	    ((dir.fi->fi_inode->i_smode & IFMT) != IFDIR)) {

@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 /*
@@ -792,7 +793,6 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 			    "input file - expected %d, got %d."),
 			    SUNW_ENCRYPT_FILE_VERSION, version);
 			goto cleanup;
-			break;
 		}
 	}
 

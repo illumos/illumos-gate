@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2010, 2011 Joyent, Inc.  All rights reserved.
+# Copyright 2012 Joyent, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -31,12 +31,11 @@ if [[ -n $_ZONEADMD_brand_debug ]]; then
 	logfile=/var/log/zone_bh.$1
 	date >>$logfile
 	echo "zone $1 post-state-change $3 $4" >>$logfile
-	ksh -x /usr/lib/brand/kvm/statechange "post" $1 $2 $3 $4 \
-	    >>$logfile 2>&1
+	ksh -x /usr/lib/brand/joyent/statechange "post" $@ >>$logfile 2>&1
 	res=$?
 	echo "zone $1 post-state-change result $?" >>$logfile
 else
-	/usr/lib/brand/kvm/statechange "post" $1 $2 $3 $4
+	/usr/lib/brand/joyent/statechange "post" $@
 	res=$?
 fi
 

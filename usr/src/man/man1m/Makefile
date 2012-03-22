@@ -12,7 +12,7 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2011 Nexenta Systems, Inc. All rights reserved.
-# Copyright 2012 Joyent, Inc. All rights reserved.
+# Copyright (c) 2012 Joyent, Inc. All rights reserved.
 #
 
 include ../../Makefile.master
@@ -237,6 +237,7 @@ COMMON_MANFILES = 	6to4relay.1m		\
 	 	 	intrstat.1m		\
 	 	 	iostat.1m		\
 	 	 	ipaddrsel.1m		\
+	 	 	ipdadm.1m		\
 	 	 	ipf.1m			\
 	 	 	ipfs.1m			\
 	 	 	ipfstat.1m		\

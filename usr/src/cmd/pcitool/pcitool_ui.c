@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 /*
@@ -823,10 +824,8 @@ get_confirmation()
 		case 'y':
 		case 'Y':
 			return (B_TRUE);
-			break;
 		default:
 			return (B_FALSE);
-			break;
 		}
 	}
 }

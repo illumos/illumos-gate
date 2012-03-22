@@ -62,9 +62,9 @@ extern int		addUpdate(log_entry_t type, char *name,
 extern int		lockTransLog(const char *msg, int wr, int trylock);
 extern void		unlockTransLog(const char *msg, int wr);
 extern int		__nis_lock_db_table(nis_name name, int readwrite,
-						int *trylock, char *msg);
+						int *trylock, const char *msg);
 extern int		__nis_ulock_db_table(nis_name name, int readwrite,
-						int remove, char *msg);
+						int remove, const char *msg);
 
 #ifdef	__cplusplus
 }

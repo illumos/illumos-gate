@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include	<ctype.h>
@@ -227,7 +228,6 @@ cap_group_id(ARGSTATE *argstate)
 			argstate_add_str(argstate, TRUE);
 			return (elfedit_offset_to_str(argstate->str.sec,
 			    cap->c_un.c_val, ELFEDIT_MSG_ERR, 0));
-			break;
 		}
 
 		if (cap->c_tag == CA_SUNW_NULL)

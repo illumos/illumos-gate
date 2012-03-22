@@ -1,6 +1,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 /*
@@ -330,11 +331,9 @@ ndmp_smf_create_service_pgroup(ndmp_scfhandle_t *handle, char *pgroup)
 			case SCF_ERROR_PERMISSION_DENIED:
 				ndmp_errno = ENDMP_SMF_PERM;
 				return (-1);
-				break;
 			default:
 				ndmp_errno = ENDMP_SMF_INTERNAL;
 				return (-1);
-				break;
 			}
 		}
 	}

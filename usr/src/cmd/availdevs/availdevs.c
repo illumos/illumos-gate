@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include "availdevs.h"
@@ -217,7 +218,6 @@ main(int argc, char **argv)
 
 		default:
 			return (1);
-			break;
 	}
 
 	argc -= optind;

@@ -20,6 +20,7 @@
 
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2012 David Höppner. All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,7 +64,7 @@ e1000_tbi_adjust_stats(struct e1000g *Adapter,
 	 * the packet as a good packet
 	 */
 	/* This packet should not be counted as a CRC error */
-	e1000g_ksp->Crcerrs.value.ul--;
+	Adapter->fcs_errors--;
 	/* This packet does count as a Good Packet Received */
 	e1000g_ksp->Gprc.value.ul++;
 
@@ -93,12 +94,12 @@ e1000_tbi_adjust_stats(struct e1000g *Adapter,
 		/*
 		 * Broadcast packet
 		 */
-		e1000g_ksp->Bprc.value.ul++;
+		Adapter->brdcstrcv++;
 	} else if (*mac_addr & 0x01) {
 		/*
 		 * Multicast packet
 		 */
-		e1000g_ksp->Mprc.value.ul++;
+		Adapter->multircv++;
 	}
 
 	if (frame_len == Adapter->max_frame_size) {
@@ -106,8 +107,8 @@ e1000_tbi_adjust_stats(struct e1000g *Adapter,
 		 * In this case, the hardware has overcounted the number of
 		 * oversize frames.
 		 */
-		if (e1000g_ksp->Roc.value.ul > 0)
-			e1000g_ksp->Roc.value.ul--;
+		if (Adapter->toolong_errors > 0)
+			Adapter->toolong_errors--;
 	}
 
 #ifdef E1000G_DEBUG
@@ -175,7 +176,6 @@ e1000g_update_stats(kstat_t *ksp, int rw)
 
 	rw_enter(&Adapter->chip_lock, RW_WRITER);
 
-	e1000g_ksp->link_speed.value.ul = Adapter->link_speed;
 	e1000g_ksp->reset_count.value.ul = Adapter->reset_count;
 
 	e1000g_ksp->rx_error.value.ul = rx_ring->stat_error;
@@ -257,11 +257,7 @@ e1000g_update_stats(kstat_t *ksp, int rw)
 
 	e1000g_ksp->Gprc.value.ul += E1000_READ_REG(hw, E1000_GPRC);
 	e1000g_ksp->Gptc.value.ul += E1000_READ_REG(hw, E1000_GPTC);
-	e1000g_ksp->Ruc.value.ul += E1000_READ_REG(hw, E1000_RUC);
 	e1000g_ksp->Rfc.value.ul += E1000_READ_REG(hw, E1000_RFC);
-	e1000g_ksp->Roc.value.ul += E1000_READ_REG(hw, E1000_ROC);
-	e1000g_ksp->Rjc.value.ul += E1000_READ_REG(hw, E1000_RJC);
-	e1000g_ksp->Tpr.value.ul += E1000_READ_REG(hw, E1000_TPR);
 	e1000g_ksp->Tncrs.value.ul += e1000g_read_phy_stat(hw, E1000_TNCRS);
 	e1000g_ksp->Tsctc.value.ul += E1000_READ_REG(hw, E1000_TSCTC);
 	e1000g_ksp->Tsctfc.value.ul += E1000_READ_REG(hw, E1000_TSCTFC);
@@ -270,7 +266,7 @@ e1000g_update_stats(kstat_t *ksp, int rw)
 	 * Adaptive Calculations
 	 */
 	hw->mac.tx_packet_delta = E1000_READ_REG(hw, E1000_TPT);
-	e1000g_ksp->Tpt.value.ul += hw->mac.tx_packet_delta;
+	Adapter->opackets += hw->mac.tx_packet_delta;
 
 	/*
 	 * The 64-bit register will reset whenever the upper
@@ -295,19 +291,13 @@ e1000g_update_stats(kstat_t *ksp, int rw)
 
 	low_val = E1000_READ_REG(hw, E1000_TORL);
 	high_val = E1000_READ_REG(hw, E1000_TORH);
-	val = (uint64_t)e1000g_ksp->Torh.value.ul << 32 |
-	    (uint64_t)e1000g_ksp->Torl.value.ul;
-	val += (uint64_t)high_val << 32 | (uint64_t)low_val;
-	e1000g_ksp->Torl.value.ul = (uint32_t)val;
-	e1000g_ksp->Torh.value.ul = (uint32_t)(val >> 32);
+	Adapter->rbytes +=
+	    (uint64_t)high_val << 32 | (uint64_t)low_val;
 
 	low_val = E1000_READ_REG(hw, E1000_TOTL);
 	high_val = E1000_READ_REG(hw, E1000_TOTH);
-	val = (uint64_t)e1000g_ksp->Toth.value.ul << 32 |
-	    (uint64_t)e1000g_ksp->Totl.value.ul;
-	val += (uint64_t)high_val << 32 | (uint64_t)low_val;
-	e1000g_ksp->Totl.value.ul = (uint32_t)val;
-	e1000g_ksp->Toth.value.ul = (uint32_t)(val >> 32);
+	Adapter->obytes +=
+	    (uint64_t)high_val << 32 | (uint64_t)low_val;
 
 	rw_exit(&Adapter->chip_lock);
 
@@ -342,51 +332,51 @@ e1000g_m_stat(void *arg, uint_t stat, uint64_t *val)
 		break;
 
 	case MAC_STAT_MULTIRCV:
-		e1000g_ksp->Mprc.value.ul +=
+		Adapter->multircv +=
 		    E1000_READ_REG(hw, E1000_MPRC);
-		*val = e1000g_ksp->Mprc.value.ul;
+		*val = Adapter->multircv;
 		break;
 
 	case MAC_STAT_BRDCSTRCV:
-		e1000g_ksp->Bprc.value.ul +=
+		Adapter->brdcstrcv +=
 		    E1000_READ_REG(hw, E1000_BPRC);
-		*val = e1000g_ksp->Bprc.value.ul;
+		*val = Adapter->brdcstrcv;
 		break;
 
 	case MAC_STAT_MULTIXMT:
-		e1000g_ksp->Mptc.value.ul +=
+		Adapter->multixmt +=
 		    E1000_READ_REG(hw, E1000_MPTC);
-		*val = e1000g_ksp->Mptc.value.ul;
+		*val = Adapter->multixmt;
 		break;
 
 	case MAC_STAT_BRDCSTXMT:
-		e1000g_ksp->Bptc.value.ul +=
+		Adapter->brdcstxmt +=
 		    E1000_READ_REG(hw, E1000_BPTC);
-		*val = e1000g_ksp->Bptc.value.ul;
+		*val = Adapter->brdcstxmt;
 		break;
 
 	case MAC_STAT_NORCVBUF:
-		e1000g_ksp->Rnbc.value.ul +=
+		Adapter->norcvbuf +=
 		    E1000_READ_REG(hw, E1000_RNBC);
-		*val = e1000g_ksp->Rnbc.value.ul;
+		*val = Adapter->norcvbuf;
 		break;
 
 	case MAC_STAT_IERRORS:
-		e1000g_ksp->Rxerrc.value.ul +=
+		Adapter->macrcv_errors +=
 		    E1000_READ_REG(hw, E1000_RXERRC);
-		e1000g_ksp->Algnerrc.value.ul +=
+		Adapter->align_errors +=
 		    E1000_READ_REG(hw, E1000_ALGNERRC);
 		e1000g_ksp->Rlec.value.ul +=
 		    E1000_READ_REG(hw, E1000_RLEC);
-		e1000g_ksp->Crcerrs.value.ul +=
+		Adapter->fcs_errors +=
 		    E1000_READ_REG(hw, E1000_CRCERRS);
-		e1000g_ksp->Cexterr.value.ul +=
+		Adapter->carrier_errors +=
 		    E1000_READ_REG(hw, E1000_CEXTERR);
-		*val = e1000g_ksp->Rxerrc.value.ul +
-		    e1000g_ksp->Algnerrc.value.ul +
+		*val = Adapter->macrcv_errors +
+		    Adapter->align_errors +
 		    e1000g_ksp->Rlec.value.ul +
-		    e1000g_ksp->Crcerrs.value.ul +
-		    e1000g_ksp->Cexterr.value.ul;
+		    Adapter->fcs_errors +
+		    Adapter->carrier_errors;
 		break;
 
 	case MAC_STAT_NOXMTBUF:
@@ -394,15 +384,15 @@ e1000g_m_stat(void *arg, uint_t stat, uint64_t *val)
 		break;
 
 	case MAC_STAT_OERRORS:
-		e1000g_ksp->Ecol.value.ul +=
+		Adapter->oerrors +=
 		    e1000g_read_phy_stat(hw, E1000_ECOL);
-		*val = e1000g_ksp->Ecol.value.ul;
+		*val = Adapter->oerrors;
 		break;
 
 	case MAC_STAT_COLLISIONS:
-		e1000g_ksp->Colc.value.ul +=
+		Adapter->collisions +=
 		    e1000g_read_phy_stat(hw, E1000_COLC);
-		*val = e1000g_ksp->Colc.value.ul;
+		*val = Adapter->collisions;
 		break;
 
 	case MAC_STAT_RBYTES:
@@ -413,18 +403,15 @@ e1000g_m_stat(void *arg, uint_t stat, uint64_t *val)
 		 */
 		low_val = E1000_READ_REG(hw, E1000_TORL);
 		high_val = E1000_READ_REG(hw, E1000_TORH);
-		*val = (uint64_t)e1000g_ksp->Torh.value.ul << 32 |
-		    (uint64_t)e1000g_ksp->Torl.value.ul;
-		*val += (uint64_t)high_val << 32 | (uint64_t)low_val;
-
-		e1000g_ksp->Torl.value.ul = (uint32_t)*val;
-		e1000g_ksp->Torh.value.ul = (uint32_t)(*val >> 32);
+		Adapter->rbytes +=
+		    (uint64_t)high_val << 32 | (uint64_t)low_val;
+		*val = Adapter->rbytes;
 		break;
 
 	case MAC_STAT_IPACKETS:
-		e1000g_ksp->Tpr.value.ul +=
+		Adapter->ipackets +=
 		    E1000_READ_REG(hw, E1000_TPR);
-		*val = e1000g_ksp->Tpr.value.ul;
+		*val = Adapter->ipackets;
 		break;
 
 	case MAC_STAT_OBYTES:
@@ -435,90 +422,99 @@ e1000g_m_stat(void *arg, uint_t stat, uint64_t *val)
 		 */
 		low_val = E1000_READ_REG(hw, E1000_TOTL);
 		high_val = E1000_READ_REG(hw, E1000_TOTH);
-		*val = (uint64_t)e1000g_ksp->Toth.value.ul << 32 |
-		    (uint64_t)e1000g_ksp->Totl.value.ul;
-		*val += (uint64_t)high_val << 32 | (uint64_t)low_val;
-
-		e1000g_ksp->Totl.value.ul = (uint32_t)*val;
-		e1000g_ksp->Toth.value.ul = (uint32_t)(*val >> 32);
+		Adapter->obytes +=
+		    (uint64_t)high_val << 32 | (uint64_t)low_val;
+		*val = Adapter->obytes;
 		break;
 
 	case MAC_STAT_OPACKETS:
-		e1000g_ksp->Tpt.value.ul +=
+		Adapter->opackets +=
 		    E1000_READ_REG(hw, E1000_TPT);
-		*val = e1000g_ksp->Tpt.value.ul;
+		*val = Adapter->opackets;
 		break;
 
 	case ETHER_STAT_ALIGN_ERRORS:
-		e1000g_ksp->Algnerrc.value.ul +=
+		Adapter->align_errors +=
 		    E1000_READ_REG(hw, E1000_ALGNERRC);
-		*val = e1000g_ksp->Algnerrc.value.ul;
+		*val = Adapter->align_errors;
 		break;
 
 	case ETHER_STAT_FCS_ERRORS:
-		e1000g_ksp->Crcerrs.value.ul +=
+		Adapter->fcs_errors +=
 		    E1000_READ_REG(hw, E1000_CRCERRS);
-		*val = e1000g_ksp->Crcerrs.value.ul;
+		*val = Adapter->fcs_errors;
 		break;
 
 	case ETHER_STAT_SQE_ERRORS:
-		e1000g_ksp->Sec.value.ul +=
+		Adapter->sqe_errors +=
 		    E1000_READ_REG(hw, E1000_SEC);
-		*val = e1000g_ksp->Sec.value.ul;
+		*val = Adapter->sqe_errors;
 		break;
 
 	case ETHER_STAT_CARRIER_ERRORS:
-		e1000g_ksp->Cexterr.value.ul +=
+		Adapter->carrier_errors +=
 		    E1000_READ_REG(hw, E1000_CEXTERR);
-		*val = e1000g_ksp->Cexterr.value.ul;
+		*val = Adapter->carrier_errors;
 		break;
 
 	case ETHER_STAT_EX_COLLISIONS:
-		e1000g_ksp->Ecol.value.ul +=
+		Adapter->ex_collisions +=
 		    e1000g_read_phy_stat(hw, E1000_ECOL);
-		*val = e1000g_ksp->Ecol.value.ul;
+		*val = Adapter->ex_collisions;
 		break;
 
 	case ETHER_STAT_TX_LATE_COLLISIONS:
-		e1000g_ksp->Latecol.value.ul +=
+		Adapter->tx_late_collisions +=
 		    e1000g_read_phy_stat(hw, E1000_LATECOL);
-		*val = e1000g_ksp->Latecol.value.ul;
+		*val = Adapter->tx_late_collisions;
 		break;
 
 	case ETHER_STAT_DEFER_XMTS:
-		e1000g_ksp->Dc.value.ul +=
+		Adapter->defer_xmts +=
 		    e1000g_read_phy_stat(hw, E1000_DC);
-		*val = e1000g_ksp->Dc.value.ul;
+		*val = Adapter->defer_xmts;
 		break;
 
 	case ETHER_STAT_FIRST_COLLISIONS:
-		e1000g_ksp->Scc.value.ul +=
+		Adapter->first_collisions +=
 		    e1000g_read_phy_stat(hw, E1000_SCC);
-		*val = e1000g_ksp->Scc.value.ul;
+		*val = Adapter->first_collisions;
 		break;
 
 	case ETHER_STAT_MULTI_COLLISIONS:
-		e1000g_ksp->Mcc.value.ul +=
+		Adapter->multi_collisions +=
 		    e1000g_read_phy_stat(hw, E1000_MCC);
-		*val = e1000g_ksp->Mcc.value.ul;
+		*val = Adapter->multi_collisions;
 		break;
 
 	case ETHER_STAT_MACRCV_ERRORS:
-		e1000g_ksp->Rxerrc.value.ul +=
+		Adapter->macrcv_errors +=
 		    E1000_READ_REG(hw, E1000_RXERRC);
-		*val = e1000g_ksp->Rxerrc.value.ul;
+		*val = Adapter->macrcv_errors;
 		break;
 
 	case ETHER_STAT_MACXMT_ERRORS:
-		e1000g_ksp->Ecol.value.ul +=
+		Adapter->macxmt_errors +=
 		    e1000g_read_phy_stat(hw, E1000_ECOL);
-		*val = e1000g_ksp->Ecol.value.ul;
+		*val = Adapter->macxmt_errors;
 		break;
 
 	case ETHER_STAT_TOOLONG_ERRORS:
-		e1000g_ksp->Roc.value.ul +=
+		Adapter->toolong_errors +=
 		    E1000_READ_REG(hw, E1000_ROC);
-		*val = e1000g_ksp->Roc.value.ul;
+		*val = Adapter->toolong_errors;
+		break;
+
+	case ETHER_STAT_TOOSHORT_ERRORS:
+		Adapter->tooshort_errors +=
+		    E1000_READ_REG(hw, E1000_RUC);
+		*val = Adapter->tooshort_errors;
+		break;
+
+	case ETHER_STAT_JABBER_ERRORS:
+		Adapter->jabber_errors +=
+		    E1000_READ_REG(hw, E1000_RJC);
+		*val = Adapter->jabber_errors;
 		break;
 
 	case ETHER_STAT_XCVR_ADDR:
@@ -736,8 +732,6 @@ e1000g_init_stats(struct e1000g *Adapter)
 	/*
 	 * Initialize all the statistics
 	 */
-	kstat_named_init(&e1000g_ksp->link_speed, "link_speed",
-	    KSTAT_DATA_ULONG);
 	kstat_named_init(&e1000g_ksp->reset_count, "Reset Count",
 	    KSTAT_DATA_ULONG);
 
@@ -801,25 +795,7 @@ e1000g_init_stats(struct e1000g *Adapter)
 	    KSTAT_DATA_ULONG);
 	kstat_named_init(&e1000g_ksp->Goth, "Good_Octets_Xmitd_Hi",
 	    KSTAT_DATA_ULONG);
-	kstat_named_init(&e1000g_ksp->Ruc, "Recv_Undersize",
-	    KSTAT_DATA_ULONG);
 	kstat_named_init(&e1000g_ksp->Rfc, "Recv_Frag",
-	    KSTAT_DATA_ULONG);
-	kstat_named_init(&e1000g_ksp->Roc, "Recv_Oversize",
-	    KSTAT_DATA_ULONG);
-	kstat_named_init(&e1000g_ksp->Rjc, "Recv_Jabber",
-	    KSTAT_DATA_ULONG);
-	kstat_named_init(&e1000g_ksp->Torl, "Total_Octets_Recvd_Lo",
-	    KSTAT_DATA_ULONG);
-	kstat_named_init(&e1000g_ksp->Torh, "Total_Octets_Recvd_Hi",
-	    KSTAT_DATA_ULONG);
-	kstat_named_init(&e1000g_ksp->Totl, "Total_Octets_Xmitd_Lo",
-	    KSTAT_DATA_ULONG);
-	kstat_named_init(&e1000g_ksp->Toth, "Total_Octets_Xmitd_Hi",
-	    KSTAT_DATA_ULONG);
-	kstat_named_init(&e1000g_ksp->Tpr, "Total_Packets_Recvd",
-	    KSTAT_DATA_ULONG);
-	kstat_named_init(&e1000g_ksp->Tpt, "Total_Packets_Xmitd",
 	    KSTAT_DATA_ULONG);
 #ifdef E1000G_DEBUG
 	kstat_named_init(&e1000g_ksp->Ptc64, "Pkts_Xmitd_(  64b)",
@@ -981,8 +957,6 @@ e1000g_rx_ring_stat(mac_ring_driver_t rh, uint_t stat, uint64_t *val)
 	e1000g_rx_ring_t *rx_ring = (e1000g_rx_ring_t *)rh;
 	struct e1000g *Adapter = rx_ring->adapter;
 	struct e1000_hw *hw = &Adapter->shared;
-	p_e1000g_stat_t e1000g_ksp =
-	    (p_e1000g_stat_t)Adapter->e1000g_ksp->ks_data;
 	uint32_t low_val, high_val;
 
 	rw_enter(&Adapter->chip_lock, RW_READER);
@@ -1001,18 +975,15 @@ e1000g_rx_ring_stat(mac_ring_driver_t rh, uint_t stat, uint64_t *val)
 		 */
 		low_val = E1000_READ_REG(hw, E1000_TORL);
 		high_val = E1000_READ_REG(hw, E1000_TORH);
-		*val = (uint64_t)e1000g_ksp->Torh.value.ul << 32 |
-		    (uint64_t)e1000g_ksp->Torl.value.ul;
-		*val += (uint64_t)high_val << 32 | (uint64_t)low_val;
-
-		e1000g_ksp->Torl.value.ul = (uint32_t)*val;
-		e1000g_ksp->Torh.value.ul = (uint32_t)(*val >> 32);
+		Adapter->rbytes +=
+		    (uint64_t)high_val << 32 | (uint64_t)low_val;
+		*val = Adapter->rbytes;
 		break;
 
 	case MAC_STAT_IPACKETS:
-		e1000g_ksp->Tpr.value.ul +=
+		Adapter->ipackets +=
 		    E1000_READ_REG(hw, E1000_TPR);
-		*val = e1000g_ksp->Tpr.value.ul;
+		*val = Adapter->ipackets;
 		break;
 
 	default:

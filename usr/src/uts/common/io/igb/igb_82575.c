@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright(c) 2007-2012 Intel Corporation. All rights reserved.
+ * Copyright (c) 2007-2012 Intel Corporation. All rights reserved.
  */
 
 /*
@@ -2136,8 +2136,8 @@ e1000_set_eee_i350(struct e1000_hw *hw)
 	}
 	E1000_WRITE_REG(hw, E1000_IPCNFG, ipcnfg);
 	E1000_WRITE_REG(hw, E1000_EEER, eeer);
-	E1000_READ_REG(hw, E1000_IPCNFG);
-	E1000_READ_REG(hw, E1000_EEER);
+	ipcnfg = E1000_READ_REG(hw, E1000_IPCNFG);
+	eeer = E1000_READ_REG(hw, E1000_EEER);
 out:
 
 	return (ret_val);

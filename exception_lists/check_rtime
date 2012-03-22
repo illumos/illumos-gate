@@ -128,8 +128,12 @@ UNUSED_RPATH	/usr/X11/lib.*\ from\ .*libgthread-2\.0\.so\.0
 UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libcrypto\.so\.0\.9\.8
 UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libnetsnmp\.so\.15
 UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libgcc_s\.so\.1
+UNUSED_RPATH	/usr/ccs/lib.*\ from\ .*libgcc_s\.so\.1
+UNUSED_RPATH	/usr/lib.*\ from\ .*libgcc_s\.so\.1
 UNUSED_RPATH	/usr/postgres/8.3/lib.*\ from\ .*libpq\.so\.5
 UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libpq\.so\.5
+UNUSED_RPATH	/usr/lib.*\ from\ .*/usr/lib/mps
+UNUSED_RPATH	/usr/ccs/lib.*\ from\ .*/usr/lib/mps
 
 # Unused runpaths for reasons not captured above
 UNUSED_RPATH	/usr/lib/smbsrv.*\ from\ .*libsmb\.so\.1 	# future needs

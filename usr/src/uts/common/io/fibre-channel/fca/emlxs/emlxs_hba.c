@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,10 +33,11 @@
 /* Required for EMLXS_CONTEXT in EMLXS_MSGF calls */
 EMLXS_MSG_DEF(EMLXS_HBA_C);
 
-static uint32_t emlxs_decode_biu_rev(uint32_t rev);
-static uint32_t emlxs_decode_endec_rev(uint32_t rev);
+
 static void emlxs_handle_async_event(emlxs_hba_t *hba, CHANNEL *cp,
     IOCBQ *iocbq);
+
+static void emlxs_pci_cap_offsets(emlxs_hba_t *hba);
 
 #ifdef MSI_SUPPORT
 uint32_t emlxs_msi_map[EMLXS_MSI_MODES][EMLXS_MSI_MAX_INTRS] =
@@ -49,6 +50,29 @@ uint32_t emlxs_msi_mask[EMLXS_MSI_MODES] =
 emlxs_firmware_t emlxs_fw_table[] = EMLXS_FW_TABLE;
 int emlxs_fw_count = sizeof (emlxs_fw_table) / sizeof (emlxs_firmware_t);
 
+emlxs_table_t emlxs_pci_cap[] = {
+	{PCI_CAP_ID_PM, "PCI_CAP_ID_PM"},
+	{PCI_CAP_ID_AGP, "PCI_CAP_ID_AGP"},
+	{PCI_CAP_ID_VPD, "PCI_CAP_ID_VPD"},
+	{PCI_CAP_ID_SLOT_ID, "PCI_CAP_ID_SLOT_ID"},
+	{PCI_CAP_ID_MSI, "PCI_CAP_ID_MSI"},
+	{PCI_CAP_ID_cPCI_HS, "PCI_CAP_ID_cPCI_HS"},
+	{PCI_CAP_ID_PCIX, "PCI_CAP_ID_PCIX"},
+	{PCI_CAP_ID_HT, "PCI_CAP_ID_HT"},
+	{PCI_CAP_ID_VS, "PCI_CAP_ID_VS"},
+	{PCI_CAP_ID_DEBUG_PORT, "PCI_CAP_ID_DEBUG_PORT"},
+	{PCI_CAP_ID_cPCI_CRC, "PCI_CAP_ID_cPCI_CRC"},
+	{PCI_CAP_ID_PCI_HOTPLUG, "PCI_CAP_ID_PCI_HOTPLUG"},
+	{PCI_CAP_ID_P2P_SUBSYS, "PCI_CAP_ID_P2P_SUBSYS"},
+	{PCI_CAP_ID_AGP_8X, "PCI_CAP_ID_AGP_8X"},
+	{PCI_CAP_ID_SECURE_DEV, "PCI_CAP_ID_SECURE_DEV"},
+	{PCI_CAP_ID_PCI_E, "PCI_CAP_ID_PCI_E"},
+	{PCI_CAP_ID_MSI_X, "PCI_CAP_ID_MSI_X"},
+	{PCI_CAP_ID_SATA, "PCI_CAP_ID_SATA"},
+	{PCI_CAP_ID_FLR, "PCI_CAP_ID_FLR"}
+
+}; /* emlxs_pci_cap */
+
 emlxs_table_t emlxs_ring_table[] = {
 	{FC_FCP_RING, "FCP Ring"},
 	{FC_IP_RING, "IP  Ring"},
@@ -56,7 +80,6 @@ emlxs_table_t emlxs_ring_table[] = {
 	{FC_CT_RING, "CT  Ring"}
 
 }; /* emlxs_ring_table */
-
 
 emlxs_table_t emlxs_ffstate_table[] = {
 	{0, "NULL"},
@@ -249,6 +272,7 @@ initialize:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_debug_msg,
 		    "MSI: Unable to allocate interrupts. error=%d", ret);
 
+		actual = 0;
 		goto init_failed;
 	}
 
@@ -383,7 +407,7 @@ initialize:
 		(void) sprintf(buf, "%s%d_msi%d mutex", DRIVER_NAME,
 		    hba->ddiinst, i);
 		mutex_init(&hba->intr_lock[i], buf, MUTEX_DRIVER,
-		    (void *)hba->intr_arg);
+		    DDI_INTR_PRI(hba->intr_arg));
 	}
 
 	/* Set flag to indicate support */
@@ -394,7 +418,7 @@ initialize:
 		(void) sprintf(buf, "%s%d_channel%d mutex", DRIVER_NAME,
 		    hba->ddiinst, i);
 		mutex_init(&hba->chan[i].rsp_lock, buf, MUTEX_DRIVER,
-		    (void *)hba->intr_arg);
+		    DDI_INTR_PRI(hba->intr_arg));
 
 		emlxs_thread_create(hba, &hba->chan[i].intr_thread);
 	}
@@ -792,7 +816,7 @@ emlxs_intx_init(emlxs_hba_t *hba, uint32_t max)
 		(void) sprintf(buf, "%s%d_channel%d mutex", DRIVER_NAME,
 		    hba->ddiinst, i);
 		mutex_init(&hba->chan[i].rsp_lock, buf, MUTEX_DRIVER,
-		    (void *)hba->intr_arg);
+		    DDI_INTR_PRI(hba->intr_arg));
 
 		emlxs_thread_create(hba, &hba->chan[i].intr_thread);
 	}
@@ -1255,21 +1279,6 @@ emlxs_parse_fcoe(emlxs_hba_t *hba, uint8_t *fcoep, uint32_t size)
 	return (1);
 
 } /* emlxs_parse_fcoe */
-
-
-
-static uint32_t
-emlxs_decode_biu_rev(uint32_t rev)
-{
-	return (rev & 0xf);
-} /* End emlxs_decode_biu_rev */
-
-
-static uint32_t
-emlxs_decode_endec_rev(uint32_t rev)
-{
-	return ((rev >> 28) & 0xf);
-} /* End emlxs_decode_endec_rev */
 
 
 extern void
@@ -2018,78 +2027,22 @@ emlxs_init_adapter_info(emlxs_hba_t *hba)
 		}
 #endif /* !SATURN_MSI_SUPPORT */
 
+		/* Scan the PCI capabilities */
+		emlxs_pci_cap_offsets(hba);
 
 #ifdef MSI_SUPPORT
 		/* Verify MSI support */
-		if (hba->model_info.flags & EMLXS_MSI_SUPPORTED) {
-			uint32_t offset;
-			uint32_t reg;
-
-			/* Scan for MSI capabilities register */
-			offset =
-			    ddi_get32(hba->pci_acc_handle,
-			    (uint32_t *)(hba->pci_addr + PCI_CAP_POINTER));
-			offset &= 0xff;
-
-			while (offset) {
-				reg =
-				    ddi_get32(hba->pci_acc_handle,
-				    (uint32_t *)(hba->pci_addr + offset));
-
-				if ((reg & 0xff) == MSI_CAP_ID) {
-					break;
-				}
-				offset = (reg >> 8) & 0xff;
-			}
-
-			if (offset) {
-				hba->msi_cap_offset = offset + 2;
-			} else {
-				hba->msi_cap_offset = 0;
-				hba->model_info.flags &= ~EMLXS_MSI_SUPPORTED;
-
-				EMLXS_MSGF(EMLXS_CONTEXT,
-				    &emlxs_init_debug_msg,
-				    "MSI: control_reg capability not found!");
-			}
+		if ((hba->model_info.flags & EMLXS_MSI_SUPPORTED) &&
+		    !hba->pci_cap_offset[PCI_CAP_ID_MSI]) {
+			hba->model_info.flags &= ~EMLXS_MSI_SUPPORTED;
 		}
 
 		/* Verify MSI-X support */
-		if (hba->model_info.flags & EMLXS_MSIX_SUPPORTED) {
-			uint32_t offset;
-			uint32_t reg;
-
-			/* Scan for MSI capabilities register */
-			offset =
-			    ddi_get32(hba->pci_acc_handle,
-			    (uint32_t *)(hba->pci_addr + PCI_CAP_POINTER));
-			offset &= 0xff;
-
-			while (offset) {
-				reg =
-				    ddi_get32(hba->pci_acc_handle,
-				    (uint32_t *)(hba->pci_addr + offset));
-
-				if ((reg & 0xff) == MSIX_CAP_ID) {
-					break;
-				}
-				offset = (reg >> 8) & 0xff;
-			}
-
-			if (offset) {
-				hba->msix_cap_offset = offset;
-			} else {
-				hba->msix_cap_offset = 0;
-				hba->model_info.flags &=
-				    ~EMLXS_MSIX_SUPPORTED;
-
-				EMLXS_MSGF(EMLXS_CONTEXT,
-				    &emlxs_init_debug_msg,
-				    "MSIX: control_reg capability not found!");
-			}
+		if ((hba->model_info.flags & EMLXS_MSIX_SUPPORTED) &&
+		    !hba->pci_cap_offset[PCI_CAP_ID_MSI_X]) {
+			hba->model_info.flags &= ~EMLXS_MSIX_SUPPORTED;
 		}
 #endif /* MSI_SUPPORT */
-
 	}
 
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, hba->dip, 0,
@@ -2308,7 +2261,7 @@ emlxs_proc_channel_event(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 	iocb = &iocbq->iocb;
 
 #ifdef DEBUG_CMPL_IOCB
-	emlxs_data_dump(hba, "CMPL_IOCB", (uint32_t *)iocb, 8, 0);
+	emlxs_data_dump(port, "CMPL_IOCB", (uint32_t *)iocb, 8, 0);
 #endif
 
 	sbp = (emlxs_buf_t *)iocbq->sbp;
@@ -2616,6 +2569,25 @@ emlxs_ring_xlate(uint32_t ringno)
 } /* emlxs_ring_xlate() */
 
 
+extern char *
+emlxs_pci_cap_xlate(uint32_t id)
+{
+	static char buffer[32];
+	uint32_t i;
+	uint32_t count;
+
+	count = sizeof (emlxs_pci_cap) / sizeof (emlxs_table_t);
+	for (i = 0; i < count; i++) {
+		if (id == emlxs_pci_cap[i].code) {
+			return (emlxs_pci_cap[i].string);
+		}
+	}
+
+	(void) sprintf(buffer, "PCI_CAP_ID_%02X", id);
+	return (buffer);
+
+} /* emlxs_pci_cap_xlate() */
+
 
 extern void
 emlxs_pcix_mxr_update(emlxs_hba_t *hba, uint32_t verbose)
@@ -2683,7 +2655,7 @@ xlate:
 		}
 	}
 
-	(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mbq);
+	emlxs_mem_put(hba, MEM_MBOX, (void *)mbq);
 
 	return;
 
@@ -2826,3 +2798,41 @@ emlxs_fw_unload(emlxs_hba_t *hba, emlxs_firmware_t *fw)
 
 } /* emlxs_fw_unload() */
 #endif /* MODFW_SUPPORT */
+
+
+static void
+emlxs_pci_cap_offsets(emlxs_hba_t *hba)
+{
+	emlxs_port_t *port = &PPORT;
+	uint8_t	offset;
+	uint8_t	id;
+
+	bzero(hba->pci_cap_offset, sizeof (hba->pci_cap_offset));
+
+	/* Read first offset */
+	offset = ddi_get8(hba->pci_acc_handle,
+	    (uint8_t *)(hba->pci_addr + PCI_CAP_POINTER));
+	offset &= PCI_CAP_PTR_MASK;
+
+	while (offset >= PCI_CAP_PTR_OFF) {
+		/* Read the next cap id */
+		id = ddi_get8(hba->pci_acc_handle,
+		    (uint8_t *)(hba->pci_addr + offset));
+
+		if (id < PCI_CAP_MAX_PTR) {
+			hba->pci_cap_offset[id] = offset;
+		}
+
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_debug_msg,
+		    "%s: offset=0x%x",
+		    emlxs_pci_cap_xlate(id), offset);
+
+		/* Read next offset */
+		offset = ddi_get8(hba->pci_acc_handle,
+		    (uint8_t *)(hba->pci_addr + offset + PCI_CAP_NEXT_PTR));
+		offset &= PCI_CAP_PTR_MASK;
+	}
+
+	return;
+
+} /* emlxs_pci_cap_offsets() */

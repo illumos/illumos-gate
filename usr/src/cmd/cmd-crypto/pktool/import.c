@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 /*
@@ -916,7 +917,6 @@ pk_import(int argc, char *argv[])
 			break;
 		default:
 			return (PK_ERR_USAGE);
-			break;
 		}
 	}
 

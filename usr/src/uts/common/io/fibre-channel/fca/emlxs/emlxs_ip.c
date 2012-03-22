@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -252,7 +252,7 @@ emlxs_ip_handle_unsol_req(emlxs_port_t *port, CHANNEL *cp, IOCBQ *iocbq,
 			    "Node not found. mac=%02x%02x%02x%02x%02x%02x",
 			    mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
-			(void) emlxs_ub_release((opaque_t)port, 1,
+			(void) emlxs_fca_ub_release((opaque_t)port, 1,
 			    &ubp->ub_token);
 
 			continue;
@@ -360,7 +360,7 @@ out:
 		emlxs_update_HBQ_index(hba, hbq_id);
 	} else {
 		if (mp) {
-			(void) emlxs_mem_put(hba, MEM_IPBUF, (uint8_t *)mp);
+			emlxs_mem_put(hba, MEM_IPBUF, (void *)mp);
 		}
 		(void) emlxs_post_buffer(hba, rp, 1);
 	}

@@ -22,6 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <stdio.h>
@@ -81,10 +82,8 @@ _sa_get_token(char *string)
 				if (*curp) {
 					curp++;
 					break;
-				} else {
-					return (ret);
 				}
-				break;
+				return (ret);
 			default:
 				if (*curp == '\0' || isspace(c)) {
 					*curp++ = '\0';

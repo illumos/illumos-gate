@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <stdlib.h>
@@ -2243,7 +2244,6 @@ kernel_get_common_attrs(kernel_object_t *object_p, CK_ATTRIBUTE_PTR template)
 	case CKA_LABEL:
 		return (get_extra_attr_from_object(object_p,
 		    template));
-		break;
 
 	default:
 		/*

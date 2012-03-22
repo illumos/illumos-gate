@@ -148,6 +148,58 @@ extern "C" {
 #include <sys/scsi/scsi.h>
 #include <sys/varargs.h>
 #include <sys/atomic.h>
+#ifdef S11
+#include <sys/pci.h>
+#else	/* !S11 */
+/*
+ * Capabilities linked list entry offsets
+ */
+#define	PCI_CAP_ID		0x0	/* capability identifier, 1 byte */
+#define	PCI_CAP_NEXT_PTR	0x1	/* next entry pointer, 1 byte */
+#define	PCI_CAP_ID_REGS_OFF	0x2	/* cap id register offset */
+#define	PCI_CAP_MAX_PTR		0x30	/* maximum number of cap pointers */
+#define	PCI_CAP_PTR_OFF		0x40	/* minimum cap pointer offset */
+#define	PCI_CAP_PTR_MASK	0xFC	/* mask for capability pointer */
+
+/*
+ * Capability identifier values
+ */
+#define	PCI_CAP_ID_PM		0x1	/* power management entry */
+#define	PCI_CAP_ID_AGP		0x2	/* AGP supported */
+#define	PCI_CAP_ID_VPD		0x3	/* VPD supported */
+#define	PCI_CAP_ID_SLOT_ID	0x4	/* Slot Identification supported */
+#define	PCI_CAP_ID_MSI		0x5	/* MSI supported */
+#define	PCI_CAP_ID_cPCI_HS	0x6	/* CompactPCI Host Swap supported */
+#define	PCI_CAP_ID_PCIX		0x7	/* PCI-X supported */
+#define	PCI_CAP_ID_HT		0x8	/* HyperTransport supported */
+#define	PCI_CAP_ID_VS		0x9	/* Vendor Specific */
+#define	PCI_CAP_ID_DEBUG_PORT	0xA	/* Debug Port supported */
+#define	PCI_CAP_ID_cPCI_CRC	0xB	/* CompactPCI central resource ctrl */
+#define	PCI_CAP_ID_PCI_HOTPLUG	0xC	/* PCI Hot Plug supported */
+#define	PCI_CAP_ID_P2P_SUBSYS	0xD	/* PCI bridge Sub-system ID */
+#define	PCI_CAP_ID_AGP_8X	0xE	/* AGP 8X supported */
+#define	PCI_CAP_ID_SECURE_DEV	0xF	/* Secure Device supported */
+#define	PCI_CAP_ID_PCI_E	0x10	/* PCI Express supported */
+#define	PCI_CAP_ID_MSI_X	0x11	/* MSI-X supported */
+#define	PCI_CAP_ID_SATA		0x12	/* SATA Data/Index Config supported */
+#define	PCI_CAP_ID_FLR		0x13	/* Function Level Reset supported */
+
+/*
+ * PCI power management (PM) capability entry offsets
+ */
+#define	PCI_PMCAP		0x2	/* PM capabilities, 2 bytes */
+#define	PCI_PMCSR		0x4	/* PM control/status reg, 2 bytes */
+#define	PCI_PMCSR_BSE		0x6	/* PCI-PCI bridge extensions, 1 byte */
+#define	PCI_PMDATA		0x7	/* PM data, 1 byte */
+
+/*
+ * PM control/status values - 2 bytes
+ */
+#define	PCI_PMCSR_D0			0x0	/* power state D0 */
+#define	PCI_PMCSR_D1			0x1	/* power state D1 */
+#define	PCI_PMCSR_D2			0x2	/* power state D2 */
+#define	PCI_PMCSR_D3HOT			0x3	/* power state D3hot */
+#endif	/* S11 */
 
 #include <emlxs_hbaapi.h>
 

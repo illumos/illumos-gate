@@ -23,6 +23,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -67,7 +68,7 @@ extern md_set_t		md_set[];
 extern int		md_status;
 extern major_t		md_major;
 
-extern int		md_trans_ioctl();
+extern int		md_trans_ioctl(dev_t, int, void *, int, IOLOCK *);
 extern md_krwlock_t	md_unit_array_rw;
 
 extern mdq_anchor_t	md_done_daemon;

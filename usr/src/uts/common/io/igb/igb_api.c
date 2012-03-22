@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright(c) 2007-2012 Intel Corporation. All rights reserved.
+ * Copyright (c) 2007-2012 Intel Corporation. All rights reserved.
  */
 
 /*
@@ -139,6 +139,7 @@ e1000_set_mac_type(struct e1000_hw *hw)
 	case E1000_DEV_ID_82576_FIBER:
 	case E1000_DEV_ID_82576_SERDES:
 	case E1000_DEV_ID_82576_QUAD_COPPER:
+	case E1000_DEV_ID_82576_QUAD_COPPER_ET2:
 	case E1000_DEV_ID_82576_NS:
 	case E1000_DEV_ID_82576_NS_SERDES:
 	case E1000_DEV_ID_82576_SERDES_QUAD:

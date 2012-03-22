@@ -98,6 +98,7 @@ static void	emlxs_disp_aif_header(emlxs_hba_t *hba, PAIF_HDR AifHdr);
 
 static void	emlxs_dump_image_header(emlxs_hba_t *hba, PIMAGE_HDR image);
 
+
 static uint32_t	emlxs_type_check(uint32_t type);
 
 static uint32_t	emlxs_kern_check(emlxs_hba_t *hba, uint32_t version);
@@ -119,11 +120,12 @@ static uint32_t	emlxs_sbus_fcode_check(emlxs_hba_t *hba, uint32_t version);
 static uint32_t	emlxs_validate_version(emlxs_hba_t *hba,
 			emlxs_fw_file_t *file, uint32_t id, uint32_t type,
 			char *file_type);
-static uint32_t emlxs_sli4_validate_image(emlxs_hba_t *hba, caddr_t buffer,
+static uint32_t emlxs_be2_validate_image(emlxs_hba_t *hba, caddr_t buffer,
 			uint32_t len, emlxs_be_fw_image_t *fw_image);
-static int32_t emlxs_sli4_verify_image(emlxs_hba_t *hba, caddr_t buffer,
-			emlxs_be_fw_file_t *file,
-			MAILBOXQ *mbq, MATCHMAP *mp);
+static uint32_t emlxs_be3_validate_image(emlxs_hba_t *hba, caddr_t buffer,
+			uint32_t len, emlxs_be_fw_image_t *fw_image);
+
+
 static int32_t emlxs_sli4_verify_crc(emlxs_hba_t *hba,
 			emlxs_be_fw_file_t *file,
 			MAILBOXQ *mbq, MATCHMAP *mp);
@@ -131,7 +133,8 @@ static int32_t emlxs_sli4_flash_image(emlxs_hba_t *hba, caddr_t buffer,
 			emlxs_be_fw_file_t *file, MAILBOXQ *mbq, MATCHMAP *mp);
 static int32_t emlxs_sli4_fw_download(emlxs_hba_t *hba, caddr_t buffer,
 			uint32_t len, uint32_t offline);
-
+static uint32_t emlxs_be_version(caddr_t buffer, uint32_t size,
+			uint32_t *plus_flag);
 static uint32_t emlxs_proc_rel_2mb(emlxs_hba_t *hba, caddr_t buffer,
 			emlxs_fw_image_t *fw_image);
 static uint32_t emlxs_delete_load_entry(emlxs_hba_t *hba, PROG_ID *progId);
@@ -353,7 +356,7 @@ done:
 } /* emlxs_fw_download */
 
 
-static void
+extern void
 emlxs_memset(uint8_t *buffer, uint8_t value, uint32_t size)
 {
 	while (size--) {
@@ -401,7 +404,7 @@ emlxs_sli4_flash_image(emlxs_hba_t *hba, caddr_t buffer,
 		xfer_size = min(BE_MAX_XFER_SIZE, block_size);
 
 		mb->un.varSLIConfig.be.embedded = 0;
-		mbq->nonembed = (uint8_t *)mp;
+		mbq->nonembed = (void *)mp;
 		mbq->mbox_cmpl = NULL;
 
 		mb->mbxCommand = MBX_SLI_CONFIG;
@@ -433,10 +436,9 @@ emlxs_sli4_flash_image(emlxs_hba_t *hba, caddr_t buffer,
 			image_ptr  += count;
 		}
 
-		/* Set last three words of last payload with */
-		/* load address, image size and block crc */
 		if (flashrom->params.opcode == MGMT_FLASHROM_OPCODE_FLASH) {
 			wptr = (uint32_t *)&payload[(xfer_size - 12)];
+
 			wptr[0] = file->load_address;
 			wptr[1] = file->image_size;
 			wptr[2] = file->block_crc;
@@ -465,131 +467,6 @@ done:
 } /* emlxs_sli4_flash_image() */
 
 
-static int32_t
-emlxs_sli4_verify_image(emlxs_hba_t *hba, caddr_t buffer,
-    emlxs_be_fw_file_t *file, MAILBOXQ *mbq, MATCHMAP *mp)
-{
-	emlxs_port_t *port = &PPORT;
-	uint8_t *image_ptr;
-	uint32_t *wptr;
-	uint32_t *wptr1;
-	uint8_t *payload;
-	MAILBOX4 *mb;
-	IOCTL_COMMON_FLASHROM *flashrom;
-	mbox_req_hdr_t	*hdr_req;
-	uint32_t	xfer_size;
-	uint32_t	block_size;
-	uint32_t	block_offset;
-	uint32_t	rval = 0;
-	uint32_t	i;
-	char signature[BE_SIGNATURE_SIZE];
-	uint32_t ufi_plus = 0;
-
-	/* Check for special deflated format */
-	(void) sprintf(signature, "%s+", BE_SIGNATURE);
-	if (strncmp(signature, buffer,
-	    sizeof (signature)-1) == 0) {
-		ufi_plus = 1;
-	}
-
-	image_ptr  = (uint8_t *)buffer + file->image_offset;
-	block_size = (ufi_plus)? file->image_size: file->block_size;
-	block_offset = 0;
-	mb = (MAILBOX4*)mbq;
-
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_msg,
-	    "%s: Verifying image...", file->label);
-
-	while (block_size) {
-		bzero((void *) mb, MAILBOX_CMD_SLI4_BSIZE);
-		bzero((void *) mp->virt, mp->size);
-
-		xfer_size = min(BE_MAX_XFER_SIZE, block_size);
-
-		mb->un.varSLIConfig.be.embedded = 0;
-		mbq->nonembed = (uint8_t *)mp;
-		mbq->mbox_cmpl = NULL;
-
-		mb->mbxCommand = MBX_SLI_CONFIG;
-		mb->mbxOwner = OWN_HOST;
-
-		hdr_req = (mbox_req_hdr_t *)mp->virt;
-		hdr_req->subsystem = IOCTL_SUBSYSTEM_COMMON;
-		hdr_req->opcode = COMMON_OPCODE_READ_FLASHROM;
-		hdr_req->timeout = 0;
-		hdr_req->req_length = sizeof (IOCTL_COMMON_FLASHROM) +
-		    xfer_size;
-
-		flashrom = (IOCTL_COMMON_FLASHROM *)(hdr_req + 1);
-		flashrom->params.opcode = MGMT_FLASHROM_OPCODE_REPORT;
-		flashrom->params.optype = file->type;
-		flashrom->params.data_buffer_size = xfer_size;
-		flashrom->params.offset = block_offset;
-
-		/* Send read request */
-		if (EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbq, MBX_WAIT, 0) !=
-		    MBX_SUCCESS) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_msg,
-			    "%s: Unable to read image. status=%x",
-			    file->label, mb->mbxStatus);
-
-			rval = EMLXS_IMAGE_FAILED;
-			goto done;
-		}
-
-		payload = (uint8_t *)(&flashrom->params.data_buffer);
-
-		BE_SWAP32_BUFFER(payload, xfer_size);
-
-		wptr = (uint32_t *)image_ptr;
-		wptr1 = (uint32_t *)payload;
-		for (i = 0; i < xfer_size; i += 4, wptr++, wptr1++) {
-			if (*wptr != *wptr1) {
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_msg,
-				    "%s: Image mismatch. [%08x] %x, %x",
-				    file->label, i,
-				    BE_MAX_XFER_SIZE, xfer_size);
-
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_msg,
-				    "%08x: %08x %08x %08x %08x %08x " \
-				    "%08x %08x %08x",
-				    i, wptr[0], wptr[1], wptr[2],
-				    wptr[3], wptr[4], wptr[5], wptr[6],
-				    wptr[7]);
-
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_msg,
-				    "%08x: %08x %08x %08x %08x %08x " \
-				    "%08x %08x %08x",
-				    i, wptr1[0], wptr1[1], wptr1[2],
-				    wptr1[3], wptr1[4], wptr1[5], wptr1[6],
-				    wptr1[7]);
-
-				rval = EMLXS_IMAGE_FAILED;
-				goto done;
-			}
-		}
-
-		bcopy((uint8_t *)(&flashrom->params.data_buffer), image_ptr,
-		    xfer_size);
-
-		block_size -= xfer_size;
-		block_offset += xfer_size;
-		image_ptr += xfer_size;
-	}
-
-	/* Verify CRC */
-	rval = emlxs_sli4_verify_crc(hba, file, mbq, mp);
-
-done:
-
-	if (rval == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_msg,
-		    "%s: Image verified.", file->label);
-	}
-
-	return (rval);
-
-} /* emlxs_sli4_verify_image() */
 
 
 static int32_t
@@ -618,7 +495,7 @@ emlxs_sli4_verify_crc(emlxs_hba_t *hba,
 	bzero((void *) mp->virt, mp->size);
 
 	mb->un.varSLIConfig.be.embedded = 0;
-	mbq->nonembed = (uint8_t *)mp;
+	mbq->nonembed = (void *)mp;
 	mbq->mbox_cmpl = NULL;
 
 	mb->mbxCommand = MBX_SLI_CONFIG;
@@ -644,7 +521,7 @@ emlxs_sli4_verify_crc(emlxs_hba_t *hba,
 		    "%s: Unable to read CRC. status=%x",
 		    file->label, mb->mbxStatus);
 
-		rval = EMLXS_IMAGE_FAILED;
+		rval = 2;
 		goto done;
 	}
 
@@ -658,7 +535,7 @@ emlxs_sli4_verify_crc(emlxs_hba_t *hba,
 		    "%s: Image size mismatch. %08x != %08x",
 		    file->label, value, file->image_size);
 
-		rval = EMLXS_IMAGE_FAILED;
+		rval = 1;
 		goto done;
 	}
 
@@ -668,7 +545,7 @@ emlxs_sli4_verify_crc(emlxs_hba_t *hba,
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_msg,
 		    "%s: CRC mismatch. %08x != %08x",
 		    file->label, value, file->block_crc);
-		rval = EMLXS_IMAGE_FAILED;
+		rval = 1;
 	}
 
 done:
@@ -728,7 +605,7 @@ emlxs_sli4_read_fw_version(emlxs_hba_t *hba, emlxs_firmware_t *fw)
 	bzero((void *) mp->virt, mp->size);
 
 	mb->un.varSLIConfig.be.embedded = 0;
-	mbq->nonembed = (uint8_t *)mp;
+	mbq->nonembed = (void *)mp;
 	mbq->mbox_cmpl = NULL;
 
 	mb->mbxCommand = MBX_SLI_CONFIG;
@@ -774,7 +651,7 @@ emlxs_sli4_read_fw_version(emlxs_hba_t *hba, emlxs_firmware_t *fw)
 	bzero((void *) mp->virt, mp->size);
 
 	mb->un.varSLIConfig.be.embedded = 0;
-	mbq->nonembed = (uint8_t *)mp;
+	mbq->nonembed = (void *)mp;
 	mbq->mbox_cmpl = NULL;
 
 	mb->mbxCommand = MBX_SLI_CONFIG;
@@ -814,11 +691,11 @@ emlxs_sli4_read_fw_version(emlxs_hba_t *hba, emlxs_firmware_t *fw)
 done:
 
 	if (mbq) {
-		(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mbq);
+		emlxs_mem_put(hba, MEM_MBOX, (void *)mbq);
 	}
 
 	if (mp) {
-		(void) emlxs_mem_buf_free(hba, mp);
+		emlxs_mem_buf_free(hba, mp);
 	}
 
 	return (rval);
@@ -827,13 +704,53 @@ done:
 
 
 static uint32_t
-emlxs_sli4_validate_image(emlxs_hba_t *hba, caddr_t buffer,
+emlxs_be_version(caddr_t buffer, uint32_t size, uint32_t *plus_flag)
+{
+	emlxs_be2_ufi_header_t *ufi_hdr;
+	char signature[BE2_SIGNATURE_SIZE];
+	uint32_t be_version = 0;
+
+	if (size < sizeof (emlxs_be2_ufi_header_t)) {
+		return (0);
+	}
+	ufi_hdr = (emlxs_be2_ufi_header_t *)buffer;
+
+	(void) sprintf(signature, "%s+", BE_SIGNATURE);
+
+	/* Check if this is a UFI image */
+	if (strncmp(signature, (char *)ufi_hdr->signature,
+	    strlen(BE_SIGNATURE)) != 0) {
+		return (0);
+	}
+
+	/* Check if this is a UFI plus image */
+	if (plus_flag) {
+		/* Check if this is a UFI plus image */
+		if (strncmp(signature, (char *)ufi_hdr->signature,
+		    strlen(BE_SIGNATURE)+1) == 0) {
+			*plus_flag = 1;
+		} else {
+			*plus_flag = 0;
+		}
+	}
+
+	if ((ufi_hdr->build[0] >= '1') && (ufi_hdr->build[0] <= '9')) {
+		be_version = ufi_hdr->build[0] - '0';
+	}
+
+	return (be_version);
+
+} /* emlxs_be_version() */
+
+
+static uint32_t
+emlxs_be2_validate_image(emlxs_hba_t *hba, caddr_t buffer,
     uint32_t len, emlxs_be_fw_image_t *fw_image)
 {
 	emlxs_port_t *port = &PPORT;
-	emlxs_sli4_ufi_header_t *ufi_hdr;
-	emlxs_sli4_flash_dir_t *flash_dir;
-	emlxs_sli4_flash_entry_t *entry;
+	emlxs_be2_ufi_header_t *ufi_hdr;
+	emlxs_be2_flash_dir_t *flash_dir;
+	emlxs_be2_flash_entry_t *entry;
 	uint8_t *bptr;
 	uint32_t *wptr;
 	uint32_t i;
@@ -843,41 +760,37 @@ emlxs_sli4_validate_image(emlxs_hba_t *hba, caddr_t buffer,
 	uint32_t image_size;
 	emlxs_be_fw_file_t *file;
 	emlxs_be_fw_file_t *file2;
-	char signature[BE_SIGNATURE_SIZE];
 	uint32_t ufi_plus = 0;
+	uint32_t be_version = 0;
+	uint32_t found;
 
 	bzero(fw_image, sizeof (emlxs_be_fw_image_t));
 
-	if (hba->model_info.chip != EMLXS_BE_CHIP) {
+	if (hba->model_info.chip != EMLXS_BE2_CHIP) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_incompat_msg,
 		    "Invalid adapter model.");
 		return (EMLXS_IMAGE_INCOMPATIBLE);
 	}
 
-	if (len < (sizeof (emlxs_sli4_ufi_header_t) +
-	    sizeof (emlxs_sli4_flash_dir_t))) {
+	if (len < (sizeof (emlxs_be2_ufi_header_t) +
+	    sizeof (emlxs_be2_flash_dir_t))) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_bad_msg,
 		    "Image too small. (%d < %d)",
-		    len, (sizeof (emlxs_sli4_ufi_header_t) +
-		    sizeof (emlxs_sli4_flash_dir_t)));
+		    len, (sizeof (emlxs_be2_ufi_header_t) +
+		    sizeof (emlxs_be2_flash_dir_t)));
 		return (EMLXS_IMAGE_BAD);
 	}
-	ufi_hdr = (emlxs_sli4_ufi_header_t *)buffer;
 
-	/* Check if this is a standard UFI image */
-	if (strncmp(BE_SIGNATURE, ufi_hdr->signature,
-	    sizeof (BE_SIGNATURE)-1) != 0) {
+	be_version = emlxs_be_version(buffer, len, &ufi_plus);
+
+	/* Check if this is a standard BE2 image */
+	if (be_version != 2) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_incompat_msg,
 		    "Invalid image provided.");
 		return (EMLXS_IMAGE_INCOMPATIBLE);
 	}
 
-	/* Check for special deflated format */
-	(void) sprintf(signature, "%s+", BE_SIGNATURE);
-	if (strncmp(signature, ufi_hdr->signature,
-	    sizeof (signature)-1) == 0) {
-		ufi_plus = 1;
-	}
+	ufi_hdr = (emlxs_be2_ufi_header_t *)buffer;
 
 #ifdef EMLXS_BIG_ENDIAN
 	/* Big Endian Swapping */
@@ -918,7 +831,7 @@ emlxs_sli4_validate_image(emlxs_hba_t *hba, caddr_t buffer,
 	for (i = 0; i < len; i++, bptr++) {
 		if (strncmp((char *)bptr, BE_DIR_SIGNATURE,
 		    sizeof (BE_DIR_SIGNATURE)) == 0) {
-			flash_dir = (emlxs_sli4_flash_dir_t *)bptr;
+			flash_dir = (emlxs_be2_flash_dir_t *)bptr;
 			break;
 		}
 	}
@@ -971,7 +884,10 @@ emlxs_sli4_validate_image(emlxs_hba_t *hba, caddr_t buffer,
 		}
 
 		entry = &flash_dir->entry[i];
-		if (entry->image_size == 0) {
+
+		if ((entry->type == 0) ||
+		    (entry->type == (uint32_t)-1) ||
+		    (entry->image_size == 0)) {
 			continue;
 		}
 
@@ -994,7 +910,25 @@ emlxs_sli4_validate_image(emlxs_hba_t *hba, caddr_t buffer,
 	}
 #endif /* EMLXS_BIG_ENDIAN */
 
+	/* Verify adapter model */
+	found = 0;
+	for (i = 0; i < BE_CONTROLLER_SIZE; i++) {
+		if (flash_dir->header.controller[i].device_id ==
+		    hba->model_info.device_id) {
+			found = 1;
+		}
+	}
+
+	if (!found) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_incompat_msg,
+		    "Invalid adapter device id=0x%x.",
+		    hba->model_info.device_id);
+		return (EMLXS_IMAGE_INCOMPATIBLE);
+	}
+
 	/* Build fw_image table */
+	fw_image->be_version = 2;
+	fw_image->ufi_plus = ufi_plus;
 	for (i = 0, mask = 1; i < BE_FLASH_ENTRIES; i++, mask <<= 1) {
 
 		if (!(flash_dir->header.valid_entry_mask & mask)) {
@@ -1002,7 +936,10 @@ emlxs_sli4_validate_image(emlxs_hba_t *hba, caddr_t buffer,
 		}
 
 		entry = &flash_dir->entry[i];
-		if (entry->image_size == 0) {
+
+		if ((entry->type == 0) ||
+		    (entry->type == (uint32_t)-1) ||
+		    (entry->image_size == 0)) {
 			continue;
 		}
 
@@ -1048,6 +985,8 @@ emlxs_sli4_validate_image(emlxs_hba_t *hba, caddr_t buffer,
 			continue;
 		}
 
+		file->be_version = fw_image->be_version;
+		file->ufi_plus = fw_image->ufi_plus;
 		file->image_size = entry->image_size;
 		image_size = BE_SWAP32(entry->image_size);
 
@@ -1056,9 +995,10 @@ emlxs_sli4_validate_image(emlxs_hba_t *hba, caddr_t buffer,
 			file->block_size   = entry->pad_size;
 			file->block_crc    = entry->checksum;
 			file->load_address = entry->entry_point;
+
 		} else {
 			file->image_offset = entry->offset +
-			    sizeof (emlxs_sli4_ufi_header_t);
+			    sizeof (emlxs_be2_ufi_header_t);
 
 			/* Get entry block size and crc */
 			k = file->image_offset + file->image_size;
@@ -1106,34 +1046,36 @@ emlxs_sli4_validate_image(emlxs_hba_t *hba, caddr_t buffer,
 		/* Automatically create a backup file entry for firmware */
 		if (file->type == MGMT_FLASHROM_OPTYPE_FCOE_FIRMWARE) {
 			file2 = &fw_image->file[FCOE_BACKUP_FLASHTYPE];
-			(void) strcpy(file2->label, "FCOE BACKUP");
+
+			bcopy((uint8_t *)file, (uint8_t *)file2,
+			    sizeof (emlxs_be_fw_file_t));
 			file2->type = MGMT_FLASHROM_OPTYPE_FCOE_BACKUP;
-			file2->image_offset = file->image_offset;
-			file2->image_size = file->image_size;
-			file2->block_size = file->block_size;
-			file2->block_crc = file->block_crc;
-			file2->load_address = file->load_address;
+			(void) strcpy(file2->label, "FCOE BACKUP");
 
 			/* Save FCOE version info */
 			bptr = (uint8_t *)buffer + file->image_offset + 0x30;
-			(void) strncpy(fw_image->label, (char *)bptr,
+			(void) strncpy(fw_image->fcoe_label, (char *)bptr,
 			    BE_VERSION_SIZE);
-			fw_image->version = file->block_crc;
+			fw_image->fcoe_version = file->block_crc;
 
 		} else if (file->type ==
 		    MGMT_FLASHROM_OPTYPE_ISCSI_FIRMWARE) {
 			file2 = &fw_image->file[ISCSI_BACKUP_FLASHTYPE];
-			(void) strcpy(file2->label, "ISCSI BACKUP");
+
+			bcopy((uint8_t *)file, (uint8_t *)file2,
+			    sizeof (emlxs_be_fw_file_t));
 			file2->type = MGMT_FLASHROM_OPTYPE_ISCSI_BACKUP;
-			file2->image_offset = file->image_offset;
-			file2->image_size = file->image_size;
-			file2->block_size = file->block_size;
-			file2->block_crc = file->block_crc;
-			file2->load_address = file->load_address;
+			(void) strcpy(file2->label, "ISCSI BACKUP");
+
+			/* Save ISCSI version info */
+			bptr = (uint8_t *)buffer + file->image_offset + 0x30;
+			(void) strncpy(fw_image->iscsi_label, (char *)bptr,
+			    BE_VERSION_SIZE);
+			fw_image->iscsi_version = file->block_crc;
 		}
 	}
 
-	if (fw_image->version == 0) {
+	if (fw_image->fcoe_version == 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_bad_msg,
 		    "Unable to find FCOE firmware component.");
 
@@ -1143,7 +1085,8 @@ emlxs_sli4_validate_image(emlxs_hba_t *hba, caddr_t buffer,
 
 	/* Display contents */
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_msg,
-	    "UFI Image: %08x, %s", fw_image->version, fw_image->label);
+	    "BE2 UFI Image: %08x, %s", fw_image->fcoe_version,
+	    fw_image->fcoe_label);
 
 	for (i = 0; i < BE_MAX_FLASHTYPES; i++) {
 		file = &fw_image->file[i];
@@ -1153,15 +1096,368 @@ emlxs_sli4_validate_image(emlxs_hba_t *hba, caddr_t buffer,
 		}
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_msg,
-		    "%s: type=%x block=%x image=%x offset=%x crc=%x load=%x",
-		    file->label, file->type, file->block_size,
-		    file->image_size, file->image_offset, file->block_crc,
-		    file->load_address);
+		    "%s: be=%x%s type=%x block=%x image=%x offset=%x crc=%x "
+		    "load=%x",
+		    file->label, file->be_version, (file->ufi_plus)?"+":"",
+		    file->type, file->block_size, file->image_size,
+		    file->image_offset, file->block_crc, file->load_address);
 	}
 
 	return (0);
 
-} /* emlxs_sli4_validate_image() */
+} /* emlxs_be2_validate_image() */
+
+
+static uint32_t
+emlxs_be3_validate_image(emlxs_hba_t *hba, caddr_t buffer,
+    uint32_t len, emlxs_be_fw_image_t *fw_image)
+{
+	emlxs_port_t *port = &PPORT;
+	emlxs_be3_ufi_header_t *ufi_hdr;
+	emlxs_be3_flash_dir_t *flash_dir;
+	emlxs_be3_flash_entry_t *entry;
+	emlxs_be3_image_header_t *flash_image_hdr;
+	emlxs_be3_image_header_t *image_hdr;
+	uint8_t *bptr;
+	uint32_t *wptr;
+	uint32_t i;
+	uint32_t value;
+	emlxs_be_fw_file_t *file;
+	emlxs_be_fw_file_t *file2;
+	uint32_t ufi_plus = 0;
+	uint32_t be_version = 0;
+	uint32_t found;
+
+	bzero(fw_image, sizeof (emlxs_be_fw_image_t));
+
+	if (hba->model_info.chip != EMLXS_BE3_CHIP) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_incompat_msg,
+		    "Invalid adapter model.");
+		return (EMLXS_IMAGE_INCOMPATIBLE);
+	}
+
+	if (len < (sizeof (emlxs_be3_ufi_header_t) +
+	    sizeof (emlxs_be3_flash_dir_t))) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_bad_msg,
+		    "Image too small. (%d < %d)",
+		    len, (sizeof (emlxs_be3_ufi_header_t) +
+		    sizeof (emlxs_be3_flash_dir_t)));
+		return (EMLXS_IMAGE_BAD);
+	}
+
+	be_version = emlxs_be_version(buffer, len, &ufi_plus);
+
+	/* Check if this is a standard BE3 image */
+	if (be_version != 3) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_incompat_msg,
+		    "Invalid image provided.");
+		return (EMLXS_IMAGE_INCOMPATIBLE);
+	}
+
+	ufi_hdr = (emlxs_be3_ufi_header_t *)buffer;
+
+#ifdef EMLXS_BIG_ENDIAN
+	/* Big Endian Swapping */
+	/* Swap ufi header */
+	ufi_hdr->ufi_version =
+	    SWAP32(ufi_hdr->ufi_version);
+	ufi_hdr->file_length =
+	    SWAP32(ufi_hdr->file_length);
+	ufi_hdr->checksum =
+	    SWAP32(ufi_hdr->checksum);
+	ufi_hdr->antidote =
+	    SWAP32(ufi_hdr->antidote);
+	ufi_hdr->image_cnt =
+	    SWAP32(ufi_hdr->image_cnt);
+#endif /* EMLXS_BIG_ENDIAN */
+
+	if (len != ufi_hdr->file_length) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_bad_msg,
+		    "Invalid image size (%d != %d)",
+		    len, ufi_hdr->file_length);
+
+		return (EMLXS_IMAGE_BAD);
+	}
+
+	flash_image_hdr = NULL;
+	image_hdr = (emlxs_be3_image_header_t *)(buffer +
+	    sizeof (emlxs_be3_ufi_header_t));
+	for (i = 0; i < ufi_hdr->image_cnt; i++, image_hdr++) {
+#ifdef EMLXS_BIG_ENDIAN
+		image_hdr->id = SWAP32(image_hdr->id);
+		image_hdr->offset = SWAP32(image_hdr->offset);
+		image_hdr->length = SWAP32(image_hdr->length);
+		image_hdr->checksum = SWAP32(image_hdr->checksum);
+#endif /* EMLXS_BIG_ENDIAN */
+
+		if (image_hdr->id == UFI_BE3_FLASH_ID) {
+			flash_image_hdr = image_hdr;
+		}
+	}
+
+	if (!flash_image_hdr) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_bad_msg,
+		    "No flash image found.");
+
+		return (EMLXS_IMAGE_BAD);
+	}
+
+	/* Scan for flash dir signature */
+	bptr = (uint8_t *)buffer + flash_image_hdr->offset;
+	flash_dir = NULL;
+	for (i = 0; i < flash_image_hdr->length; i++, bptr++) {
+		if (strncmp((char *)bptr, BE_DIR_SIGNATURE,
+		    sizeof (BE_DIR_SIGNATURE)) == 0) {
+			flash_dir = (emlxs_be3_flash_dir_t *)bptr;
+			break;
+		}
+	}
+
+	if (!flash_dir) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_bad_msg,
+		    "Unable to find flash directory.");
+
+		return (EMLXS_IMAGE_BAD);
+	}
+
+#ifdef EMLXS_BIG_ENDIAN
+	/* Big Endian Swapping */
+	/* Swap flash dir */
+	flash_dir->header.format_rev =
+	    SWAP32(flash_dir->header.format_rev);
+	flash_dir->header.checksum =
+	    SWAP32(flash_dir->header.checksum);
+	flash_dir->header.antidote =
+	    SWAP32(flash_dir->header.antidote);
+	flash_dir->header.entry_count =
+	    SWAP32(flash_dir->header.entry_count);
+	flash_dir->header.resv0 = SWAP32(flash_dir->header.resv0);
+	flash_dir->header.resv1 = SWAP32(flash_dir->header.resv1);
+	flash_dir->header.resv2 = SWAP32(flash_dir->header.resv2);
+	flash_dir->header.resv3 = SWAP32(flash_dir->header.resv3);
+
+	for (i = 0; i < BE_CONTROLLER_SIZE; i++) {
+		flash_dir->header.controller[i].vendor_id =
+		    SWAP32(flash_dir->header.controller[i].vendor_id);
+		flash_dir->header.controller[i].device_id =
+		    SWAP32(flash_dir->header.controller[i].device_id);
+		flash_dir->header.controller[i].sub_vendor_id =
+		    SWAP32(flash_dir->header.controller[i].sub_vendor_id);
+		flash_dir->header.controller[i].sub_device_id =
+		    SWAP32(flash_dir->header.controller[i].sub_device_id);
+	}
+
+	for (i = 0; i < flash_dir->header.entry_count; i++) {
+		entry = &flash_dir->entry[i];
+
+		if ((entry->type == 0) ||
+		    (entry->type == (uint32_t)-1) ||
+		    (entry->image_size == 0)) {
+			continue;
+		}
+
+		flash_dir->entry[i].type =
+		    SWAP32(flash_dir->entry[i].type);
+		flash_dir->entry[i].offset =
+		    SWAP32(flash_dir->entry[i].offset);
+		flash_dir->entry[i].block_size =
+		    SWAP32(flash_dir->entry[i].block_size);
+		flash_dir->entry[i].image_size =
+		    SWAP32(flash_dir->entry[i].image_size);
+		flash_dir->entry[i].checksum =
+		    SWAP32(flash_dir->entry[i].checksum);
+		flash_dir->entry[i].entry_point =
+		    SWAP32(flash_dir->entry[i].entry_point);
+		flash_dir->entry[i].resv0 =
+		    SWAP32(flash_dir->entry[i].resv0);
+		flash_dir->entry[i].resv1 =
+		    SWAP32(flash_dir->entry[i].resv1);
+	}
+#endif /* EMLXS_BIG_ENDIAN */
+
+	/* Verify image checksum */
+	if (flash_dir->header.checksum != flash_image_hdr->checksum) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_bad_msg,
+		    "Invalid flash directory checksum. (%x != %x)\n",
+		    flash_dir->header.checksum, flash_image_hdr->checksum);
+		return (EMLXS_IMAGE_BAD);
+	}
+
+	/* Verify adapter model */
+	found = 0;
+	for (i = 0; i < BE_CONTROLLER_SIZE; i++) {
+		if (flash_dir->header.controller[i].device_id ==
+		    hba->model_info.device_id) {
+			found = 1;
+		}
+	}
+
+	if (!found) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_incompat_msg,
+		    "Invalid adapter device id=0x%x.",
+		    hba->model_info.device_id);
+		return (EMLXS_IMAGE_INCOMPATIBLE);
+	}
+
+	/* Build fw_image table */
+	fw_image->be_version = 3;
+	fw_image->ufi_plus = ufi_plus;
+	for (i = 0; i < flash_dir->header.entry_count; i++) {
+		entry = &flash_dir->entry[i];
+
+		if ((entry->type == 0) ||
+		    (entry->type == (uint32_t)-1) ||
+		    (entry->image_size == 0)) {
+			continue;
+		}
+
+		switch (entry->type) {
+		case BE_FLASHTYPE_REDBOOT:
+			file = &fw_image->file[REDBOOT_FLASHTYPE];
+			(void) strcpy(file->label, "REDBOOT");
+			file->type = MGMT_FLASHROM_OPTYPE_REDBOOT;
+			break;
+		case BE_FLASHTYPE_ISCSI_BIOS:
+			file = &fw_image->file[ISCSI_BIOS_FLASHTYPE];
+			(void) strcpy(file->label, "ISCSI BIOS");
+			file->type = MGMT_FLASHROM_OPTYPE_ISCSI_BIOS;
+			break;
+		case BE_FLASHTYPE_PXE_BIOS:
+			file = &fw_image->file[PXE_BIOS_FLASHTYPE];
+			(void) strcpy(file->label, "PXE BIOS");
+			file->type = MGMT_FLASHROM_OPTYPE_PXE_BIOS;
+			break;
+		case BE_FLASHTYPE_FCOE_BIOS:
+			file = &fw_image->file[FCOE_BIOS_FLASHTYPE];
+			(void) strcpy(file->label, "FCOE BIOS");
+			file->type = MGMT_FLASHROM_OPTYPE_FCOE_BIOS;
+			break;
+		case BE_FLASHTYPE_ISCSI_FIRMWARE:
+			file = &fw_image->file[ISCSI_FIRMWARE_FLASHTYPE];
+			(void) strcpy(file->label, "ISCSI FIRMWARE");
+			file->type = MGMT_FLASHROM_OPTYPE_ISCSI_FIRMWARE;
+			break;
+		case BE_FLASHTYPE_FCOE_FIRMWARE:
+			file = &fw_image->file[FCOE_FIRMWARE_FLASHTYPE];
+			(void) strcpy(file->label, "FCOE FIRMWARE");
+			file->type = MGMT_FLASHROM_OPTYPE_FCOE_FIRMWARE;
+			break;
+		case BE_FLASHTYPE_NCSI_FIRMWARE:
+			file = &fw_image->file[NCSI_FIRMWARE_FLASHTYPE];
+			(void) strcpy(file->label, "NCSI FIRMWARE");
+			file->type = MGMT_FLASHROM_OPTYPE_NCSI_FIRMWARE;
+			break;
+		case BE_FLASHTYPE_FLASH_ISM:
+		case BE_FLASHTYPE_FCOE_BACKUP:
+		case BE_FLASHTYPE_ISCSI_BACKUP:
+			continue;
+
+		default:
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_bad_msg,
+			    "Unknown image type found.  type=%x",
+			    entry->type);
+			continue;
+		}
+
+		file->be_version = fw_image->be_version;
+		file->ufi_plus = fw_image->ufi_plus;
+		file->image_size = entry->image_size;
+
+		if (ufi_plus) {
+			file->image_offset = entry->offset;
+			file->block_size   = entry->block_size;
+			file->block_crc    = entry->checksum;
+			file->load_address = entry->entry_point;
+		} else {
+			file->image_offset = entry->offset +
+			    flash_image_hdr->offset;
+			file->block_size   = entry->block_size;
+
+			wptr = (uint32_t *)(buffer +  file->image_offset +
+			    file->block_size);
+
+			/* Read load address */
+			value = *(wptr - 3);
+			file->load_address = BE_SWAP32(value);
+
+			/* Read block_crc */
+			value = *(wptr - 1);
+			file->block_crc = BE_SWAP32(value);
+		}
+
+		/* Make sure image will fit in block specified */
+		if (file->image_size + 12 > file->block_size) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_bad_msg,
+			    "%s: Image too large for block. image=%x block=%x",
+			    file->label, file->image_size, file->block_size);
+
+			bzero(fw_image, sizeof (emlxs_be_fw_image_t));
+			return (EMLXS_IMAGE_BAD);
+		}
+
+		/* Automatically create a backup file entry for firmware */
+		if (file->type == MGMT_FLASHROM_OPTYPE_FCOE_FIRMWARE) {
+			file2 = &fw_image->file[FCOE_BACKUP_FLASHTYPE];
+
+			bcopy((uint8_t *)file, (uint8_t *)file2,
+			    sizeof (emlxs_be_fw_file_t));
+			file2->type = MGMT_FLASHROM_OPTYPE_FCOE_BACKUP;
+			(void) strcpy(file2->label, "FCOE BACKUP");
+
+			/* Save FCOE version info */
+			bptr = (uint8_t *)buffer + file->image_offset + 0x30;
+			(void) strncpy(fw_image->fcoe_label, (char *)bptr,
+			    BE_VERSION_SIZE);
+			fw_image->fcoe_version = file->block_crc;
+
+		} else if (file->type ==
+		    MGMT_FLASHROM_OPTYPE_ISCSI_FIRMWARE) {
+			file2 = &fw_image->file[ISCSI_BACKUP_FLASHTYPE];
+
+			bcopy((uint8_t *)file, (uint8_t *)file2,
+			    sizeof (emlxs_be_fw_file_t));
+			file2->type = MGMT_FLASHROM_OPTYPE_ISCSI_BACKUP;
+			(void) strcpy(file2->label, "ISCSI BACKUP");
+
+			/* Save ISCSI version info */
+			bptr = (uint8_t *)buffer + file->image_offset + 0x30;
+			(void) strncpy(fw_image->iscsi_label, (char *)bptr,
+			    BE_VERSION_SIZE);
+			fw_image->iscsi_version = file->block_crc;
+		}
+	}
+
+	if (fw_image->fcoe_version == 0) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_bad_msg,
+		    "Unable to find FCOE firmware component.");
+
+		bzero(fw_image, sizeof (emlxs_be_fw_image_t));
+		return (EMLXS_IMAGE_BAD);
+	}
+
+	/* Display contents */
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_msg,
+	    "BE3 UFI Image: %08x, %s", fw_image->fcoe_version,
+	    fw_image->fcoe_label);
+
+	for (i = 0; i < BE_MAX_FLASHTYPES; i++) {
+		file = &fw_image->file[i];
+
+		if (file->image_size == 0) {
+			continue;
+		}
+
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_msg,
+		    "%s: be=%x%s type=%x block=%x image=%x offset=%x crc=%x "
+		    "load=%x",
+		    file->label, file->be_version, (file->ufi_plus)? "+":"",
+		    file->type, file->block_size, file->image_size,
+		    file->image_offset, file->block_crc, file->load_address);
+	}
+
+	return (0);
+
+} /* emlxs_be3_validate_image() */
 
 
 static int32_t
@@ -1176,6 +1472,7 @@ emlxs_sli4_fw_download(emlxs_hba_t *hba, caddr_t buffer, uint32_t len,
 	MATCHMAP *mp = NULL;
 	emlxs_be_fw_image_t fw_image;
 	emlxs_be_fw_file_t *file;
+	uint32_t be_version;
 
 	/* For now we will not take the driver offline during a download */
 	offline = 0;
@@ -1192,9 +1489,30 @@ emlxs_sli4_fw_download(emlxs_hba_t *hba, caddr_t buffer, uint32_t len,
 		return (EMLXS_IMAGE_BAD);
 	}
 
-	/* Validate image */
-	if ((rval = emlxs_sli4_validate_image(hba, buffer, len, &fw_image))) {
-		return (rval);
+	be_version = emlxs_be_version(buffer, len, 0);
+
+	switch (be_version) {
+	case 0:
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_incompat_msg,
+		    "Invalid image provided. Non-UFI format.");
+		return (EMLXS_IMAGE_INCOMPATIBLE);
+	case 2:
+		rval = emlxs_be2_validate_image(hba, buffer, len, &fw_image);
+		if (rval) {
+			return (rval);
+		}
+		break;
+	case 3:
+		rval = emlxs_be3_validate_image(hba, buffer, len, &fw_image);
+		if (rval) {
+			return (rval);
+		}
+		break;
+	default:
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_incompat_msg,
+		    "Invalid image provided. Unknown BE version. (%x)",
+		    be_version);
+		return (EMLXS_IMAGE_INCOMPATIBLE);
 	}
 
 	/* Allocate resources */
@@ -1230,6 +1548,7 @@ emlxs_sli4_fw_download(emlxs_hba_t *hba, caddr_t buffer, uint32_t len,
 		rval = emlxs_sli4_verify_crc(hba, file, mbq, mp);
 
 		if (rval == 0) {
+			/* Do not update */
 			file->image_size = 0;
 			continue;
 		}
@@ -1239,6 +1558,7 @@ emlxs_sli4_fw_download(emlxs_hba_t *hba, caddr_t buffer, uint32_t len,
 
 	if (!update) {
 		offline = 0;
+		rval = 0;
 		goto done;
 	}
 
@@ -1274,11 +1594,11 @@ emlxs_sli4_fw_download(emlxs_hba_t *hba, caddr_t buffer, uint32_t len,
 
 done:
 	if (mbq) {
-		(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mbq);
+		emlxs_mem_put(hba, MEM_MBOX, (void *)mbq);
 	}
 
 	if (mp) {
-		(void) emlxs_mem_buf_free(hba, mp);
+		emlxs_mem_buf_free(hba, mp);
 	}
 
 	if (offline) {
@@ -1292,7 +1612,8 @@ done:
 
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_updated_msg,
 			    "Please reboot system or power cycle adapter "
-			    "to activate new firmware: %s", fw_image.label);
+			    "to activate new firmware: %s",
+			    fw_image.fcoe_label);
 
 		} else {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_detail_msg,
@@ -1679,7 +2000,6 @@ emlxs_start_abs_download(emlxs_hba_t *hba,
 
 		return (rval);
 	}
-
 	mb = (MAILBOX *)mbox;
 
 	AbsChangeParams = emlxs_build_parms(Buffer,
@@ -2598,6 +2918,9 @@ download:
 		return (EMLXS_IMAGE_FAILED);
 	}
 
+	/* Cleanup using old wakeup paramters */
+	(void) emlxs_clean_flash(hba, &WakeUpParms, &RelWakeUpParms);
+
 	return (0);
 
 } /* emlxs_proc_rel_2mb() */
@@ -3189,6 +3512,7 @@ done:
 	return (0);
 
 } /* emlxs_read_load_list() */
+
 
 
 
@@ -4286,7 +4610,6 @@ emlxs_proc_abs_2mb(emlxs_hba_t *hba, caddr_t EntireBuffer,
 		rval = EMLXS_IMAGE_BAD;
 
 		goto EXIT_ABS_DOWNLOAD;
-
 	}
 
 	EraseByteCount = AifHdr->Area_Size;
@@ -4758,6 +5081,7 @@ emlxs_sbus_fcode_check(emlxs_hba_t *hba, uint32_t version)
 
 } /* emlxs_sbus_fcode_check() */
 
+
 static uint32_t
 emlxs_type_check(uint32_t type)
 {
@@ -4774,7 +5098,6 @@ emlxs_type_check(uint32_t type)
 } /* emlxs_type_check() */
 
 
-
 extern int32_t
 emlxs_boot_code_disable(emlxs_hba_t *hba)
 {
@@ -4784,7 +5107,8 @@ emlxs_boot_code_disable(emlxs_hba_t *hba)
 
 	vpd = &VPD;
 
-	if (hba->model_info.chip == EMLXS_BE_CHIP) {
+	if ((hba->model_info.chip == EMLXS_BE2_CHIP) ||
+	    (hba->model_info.chip == EMLXS_BE3_CHIP)) {
 		return (EMLXS_OP_NOT_SUP);
 	}
 
@@ -4840,7 +5164,8 @@ emlxs_boot_code_enable(emlxs_hba_t *hba)
 
 	vpd = &VPD;
 
-	if (hba->model_info.chip == EMLXS_BE_CHIP) {
+	if ((hba->model_info.chip == EMLXS_BE2_CHIP) ||
+	    (hba->model_info.chip == EMLXS_BE3_CHIP)) {
 		return (FC_SUCCESS);
 	}
 
@@ -4911,7 +5236,8 @@ emlxs_boot_code_state(emlxs_hba_t *hba)
 {
 	emlxs_port_t *port = &PPORT;
 
-	if (hba->model_info.chip == EMLXS_BE_CHIP) {
+	if ((hba->model_info.chip == EMLXS_BE2_CHIP) ||
+	    (hba->model_info.chip == EMLXS_BE3_CHIP)) {
 		return (FC_SUCCESS);
 	}
 

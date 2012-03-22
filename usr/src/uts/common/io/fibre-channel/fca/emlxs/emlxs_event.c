@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,12 +66,6 @@ emlxs_event_queue_create(emlxs_hba_t *hba)
 {
 	emlxs_event_queue_t *eventq = &EVENTQ;
 	char buf[40];
-#ifdef MSI_SUPPORT
-	ddi_intr_handle_t handle;
-	uint32_t intr_pri;
-	int32_t actual;
-	uint32_t ret;
-#endif /* MSI_SUPPORT */
 	ddi_iblock_cookie_t iblock;
 
 	/* Clear the queue */
@@ -94,42 +88,9 @@ emlxs_event_queue_create(emlxs_hba_t *hba)
 	}
 #ifdef  MSI_SUPPORT
 	else {
-		/* Allocate a temporary interrupt handle */
-		actual = 0;
-		ret =
-		    ddi_intr_alloc(hba->dip, &handle, DDI_INTR_TYPE_FIXED,
-		    EMLXS_MSI_INUMBER, 1, &actual, DDI_INTR_ALLOC_NORMAL);
-
-		if (ret != DDI_SUCCESS || actual == 0) {
-			cmn_err(CE_WARN,
-			    "?%s%d: Unable to allocate temporary interrupt "
-			    "handle. ret=%d actual=%d", DRIVER_NAME,
-			    hba->ddiinst, ret, actual);
-
-			bzero(eventq, sizeof (emlxs_event_queue_t));
-
-			return (0);
-		}
-
-		/* Get the current interrupt priority */
-		ret = ddi_intr_get_pri(handle, &intr_pri);
-
-		if (ret != DDI_SUCCESS) {
-			cmn_err(CE_WARN,
-			    "?%s%d: Unable to get interrupt priority. ret=%d",
-			    DRIVER_NAME, hba->ddiinst, ret);
-
-			bzero(eventq, sizeof (emlxs_event_queue_t));
-
-			return (0);
-		}
-
-		/* Create the log mutex lock */
+		/* Create event mutex lock */
 		mutex_init(&eventq->lock, buf, MUTEX_DRIVER,
-		    (void *)((unsigned long)intr_pri));
-
-		/* Free the temporary handle */
-		(void) ddi_intr_free(handle);
+		    DDI_INTR_PRI(hba->intr_arg));
 	}
 #endif
 

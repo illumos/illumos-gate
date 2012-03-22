@@ -70,11 +70,11 @@ check_proto()
 		return
 	fi
 
-	if [ "$SCM_MODE" = "teamware" ]; then
+	if [[ "$SCM_MODE" = "teamware" ]]; then
 		# Check for problematic parent specification and adjust
 		proto=`echo $1|fmtwsname`
 		echo "${proto}/root_${MACH}"
-	elif [ "$SCM_MODE" = "mercurial" ]; then
+	elif [[ "$SCM_MODE" = "mercurial" ]]; then
 		proto=$1
 		#
 		# If the proto is a local repository then we can use it
@@ -82,12 +82,12 @@ check_proto()
 		# check if it exists or not, we never did for Teamware,
 		# since it might appear later anyway.
 		#
-		if [ "${proto##ssh://}" == "$proto" -a \
+		if [[ "${proto##ssh://}" == "$proto" -a \
 		     "${proto##http://}" == "$proto" -a \
-		     "${proto##https://}" == "$proto" ]; then
+		     "${proto##https://}" == "$proto" ]]; then
 			echo "${proto}/root_${MACH}"
 		fi
-	elif [ "$SCM_MODE" = "git" ]; then
+	elif [[ "$SCM_MODE" = "git" ]]; then
 		#
                 # For git, we make no attempt to deal with the possibility of
                 # remote parent workspaces because, in the protodefs file, we
@@ -106,7 +106,7 @@ cleanup_env()
 	return 0
 }
 
-if [ "$1" = "-e" ]; then
+if [[ "$1" = "-e" ]]; then
 	setenv=true
 	shift
 else
@@ -122,7 +122,7 @@ fi
 # No workspace/repository path was given, so try and detect one from our
 # current directory we're in
 #
-if [ $# -lt 1 ]; then
+if [[ $# -lt 1 ]]; then
 	if env CODEMGR_WS="" $WHICH_SCM | read SCM_MODE tmpwsname && \
 	    [[ $SCM_MODE != unknown ]]; then
 		echo "Defaulting to $SCM_MODE repository $tmpwsname"
@@ -159,14 +159,14 @@ unset tmpwsname
 #
 # Checking for CODEMGR_WSPATH
 #
-if [ "(" "${CODEMGR_WSPATH}x" != "x" ")" -a "(" ! -d $wsname ")" -a \
-     "(" `expr "$wsname" : "\/"` = "0" ")" ] 
+if [[ "(" "${CODEMGR_WSPATH}x" != "x" ")" -a "(" ! -d $wsname ")" -a \
+     "(" `expr "$wsname" : "\/"` = "0" ")" ]] 
 then
 	ofs=$IFS
 	IFS=": 	"
 	for i in $CODEMGR_WSPATH 
 	do
-		if [ -d ${i}/${wsname} ]; then
+		if [[ -d ${i}/${wsname} ]]; then
 			wsname=${i}/${wsname}
 			break
 		fi
@@ -178,7 +178,7 @@ fi
 # to translate it to an absolute pathname.  We need an
 # absolute pathname in order to set CODEMGR_WS.
 #
-if [ `expr "$wsname" : "\/"` = "0" ] 
+if [[ `expr "$wsname" : "\/"` = "0" ]] 
 then
 	pwd=`pwd`
 	wsname="$pwd/$wsname"
@@ -187,7 +187,7 @@ fi
 #
 #	Check to see if this is a valid workspace
 #
-if [ ! -d $wsname ]; then
+if [[ ! -d $wsname ]]; then
 	echo "$wsname . . . no such directory" >&2
 	if $setenv; then
 		cleanup_env
@@ -217,15 +217,15 @@ CODEMGR_WS=$wsname ; export CODEMGR_WS
 SRC=$wsname/usr/src; export SRC
 TSRC=$wsname/usr/ontest; export TSRC
 
-if [ "$SCM_MODE" = "teamware" -a -d ${wsname}/Codemgr_wsdata ]; then
+if [[ "$SCM_MODE" = "teamware" -a -d ${wsname}/Codemgr_wsdata ]]; then
 	CM_DATA="Codemgr_wsdata"
 	wsosdir=$CODEMGR_WS/$CM_DATA/sunos
 	protofile=$wsosdir/protodefs
-elif [ "$SCM_MODE" = "mercurial" -a -d ${wsname}/.hg ]; then
+elif [[ "$SCM_MODE" = "mercurial" -a -d ${wsname}/.hg ]]; then
 	CM_DATA=".hg"
 	wsosdir=$CODEMGR_WS/$CM_DATA
 	protofile=$wsosdir/org.opensolaris.protodefs
-elif [ "$SCM_MODE" = "git" -a -d ${wsname}/.git ]; then
+elif [[ "$SCM_MODE" = "git" -a -d ${wsname}/.git ]]; then
 	CM_DATA=".git"
 	wsosdir=$CODEMGR_WS/$CM_DATA
 	protofile=$wsosdir/org.opensolaris.protodefs
@@ -241,8 +241,8 @@ fi
 
 MACH=`uname -p`
 
-if [ ! -f $protofile ]; then
-	if [ ! -w $CODEMGR_WS/$CM_DATA ]; then
+if [[ ! -f $protofile ]]; then
+	if [[ ! -w $CODEMGR_WS/$CM_DATA ]]; then
 		#
 		# The workspace doesn't have a protodefs file and I am
 		# unable to create one.  Tell user and use /tmp instead.
@@ -254,7 +254,7 @@ if [ ! -f $protofile ]; then
 		protofile=$wsosdir/protodefs
 	fi
 
-	if [ ! -d $wsosdir ]; then
+	if [[ ! -d $wsosdir ]]; then
 		mkdir $wsosdir
 	fi
 
@@ -286,9 +286,9 @@ if [ ! -f $protofile ]; then
 PROTO1=\$CODEMGR_WS/proto
 PROTOFILE_EoF
 	
-	if [ "$SCM_MODE" = "teamware" ]; then
+	if [[ "$SCM_MODE" = "teamware" ]]; then
 		cat << PROTOFILE_EoF >> $protofile
-if [ -f "\$CODEMGR_WS/Codemgr_wsdata/parent" ]; then
+if [[ -f "\$CODEMGR_WS/Codemgr_wsdata/parent" ]]; then
    #
    # If this workspace has an codemgr parent then set PROTO2 to
    # point to the parents proto space.
@@ -299,7 +299,7 @@ if [ -f "\$CODEMGR_WS/Codemgr_wsdata/parent" ]; then
    fi
 fi
 PROTOFILE_EoF
-	elif [ "$SCM_MODE" = "mercurial" ]; then
+	elif [[ "$SCM_MODE" = "mercurial" ]]; then
 		cat << PROTOFILE_EoF >> $protofile
 parent=\`(cd \$CODEMGR_WS && hg path default 2>/dev/null)\`
 if [[ \$? -eq 0 && -n \$parent ]]; then
@@ -408,16 +408,16 @@ fi
 
 echo ""
 echo "Workspace                    : $wsname"
-if [ -n "$parent" ]; then
+if [[ -n "$parent" ]]; then
    echo "Workspace Parent             : $parent"
 fi
 echo "Proto area (\$ROOT)           : $ROOT"
-if [ -n "$PARENT_ROOT" ]; then
+if [[ -n "$PARENT_ROOT" ]]; then
    echo "Parent proto area (\$PARENT_ROOT) : $PARENT_ROOT"
 fi
 echo "Root of source (\$SRC)        : $SRC"
 echo "Root of test source (\$TSRC)  : $TSRC"
-if [ $osbld_flag = "1" ]; then
+if [[ $osbld_flag = "1" ]]; then
    echo "Prepended to PATH            : $ONBLD_DIR"
 fi
 echo "Current directory (\$PWD)     : $wsname"

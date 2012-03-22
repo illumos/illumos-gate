@@ -25,6 +25,7 @@
 
 #
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+# Copyright (c) 2012 Joyent, Inc.  All rights reserved.
 #
 
 #
@@ -940,7 +941,7 @@ ST_OBJS +=	st.o	st_conf.o
 
 EMLXS_OBJS +=	emlxs_clock.o emlxs_dfc.o emlxs_dhchap.o emlxs_diag.o \
 		emlxs_download.o emlxs_dump.o emlxs_els.o emlxs_event.o \
-		emlxs_fcp.o emlxs_fct.o emlxs_hba.o emlxs_ip.o \
+		emlxs_fcf.o emlxs_fcp.o emlxs_fct.o emlxs_hba.o emlxs_ip.o \
 		emlxs_mbox.o emlxs_mem.o emlxs_msg.o emlxs_node.o \
 		emlxs_pkt.o emlxs_sli3.o emlxs_sli4.o emlxs_solaris.o \
 		emlxs_thread.o
@@ -1145,6 +1146,9 @@ PIPE_OBJS +=	pipe.o
 
 HSFS_OBJS +=	hsfs_node.o	hsfs_subr.o	hsfs_vfsops.o	hsfs_vnops.o \
 		hsfs_susp.o	hsfs_rrip.o	hsfs_susp_subr.o
+
+HYPRLOFS_OBJS += hyprlofs_dir.o hyprlofs_subr.o \
+		hyprlofs_vnops.o hyprlofs_vfsops.o
 
 LOFS_OBJS +=	lofs_subr.o	lofs_vfsops.o	lofs_vnops.o
 
@@ -1737,6 +1741,8 @@ WUSB_FWMOD_OBJS += wusb_fwmod.o
 IPF_OBJS += ip_fil_solaris.o fil.o solaris.o ip_state.o ip_frag.o ip_nat.o \
 	    ip_proxy.o ip_auth.o ip_pool.o ip_htable.o ip_lookup.o \
 	    ip_log.o misc.o ip_compat.o ip_nat6.o drand48.o
+
+IPD_OBJS += ipd.o
 
 IBD_OBJS +=	ibd.o ibd_cm.o
 

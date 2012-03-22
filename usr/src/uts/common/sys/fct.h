@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 #ifndef	_FCT_H
 #define	_FCT_H
@@ -367,14 +368,14 @@ typedef struct fct_port_stat {
 #define	FCT_IOF_FORCE_FCA_DONE		0x20000
 
 /*
- * Fill CTIU preample
+ * Fill CTIU preamble
  */
 #ifdef	lint
-#define	FCT_FILL_CTIU_PREAMPLE(x_payload, x_ctop)	_NOTE(EMPTY)
+#define	FCT_FILL_CTIU_PREAMBLE(x_payload, x_ctop)	_NOTE(EMPTY)
 #else
-#define	FCT_FILL_CTIU_PREAMPLE(x_payload, x_ctop)	\
+#define	FCT_FILL_CTIU_PREAMBLE(x_payload, x_ctop)	\
 	do {						\
-		x_payload[0] = 0x02;			\
+		x_payload[0] = 0x01;			\
 		x_payload[4] = 0xFC;			\
 		x_payload[5] = 0x02;			\
 		x_payload[8] = 0xFF & (x_ctop >> 8);	\

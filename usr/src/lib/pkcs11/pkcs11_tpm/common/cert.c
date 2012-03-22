@@ -289,6 +289,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include "tpmtok_int.h"
@@ -330,7 +331,6 @@ cert_validate_attribute(TEMPLATE *tmpl, CK_ATTRIBUTE *attr, CK_ULONG mode)
 
 	switch (attr->type) {
 		case CKA_CERTIFICATE_TYPE:
-		{
 			if (mode != MODE_CREATE) {
 				return (CKR_ATTRIBUTE_READ_ONLY);
 			}
@@ -340,11 +340,9 @@ cert_validate_attribute(TEMPLATE *tmpl, CK_ATTRIBUTE *attr, CK_ULONG mode)
 			else {
 				return (CKR_ATTRIBUTE_VALUE_INVALID);
 			}
-		}
-		break;
-
 		default:
-		return (template_validate_base_attribute(tmpl, attr, mode));
+			return (
+			    template_validate_base_attribute(tmpl, attr, mode));
 	}
 }
 

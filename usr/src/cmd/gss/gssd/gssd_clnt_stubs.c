@@ -326,8 +326,7 @@ kgss_add_cred_wrapped(minor_status,
 
 	arg.uid = (OM_uint32) uid;
 	arg.input_cred_handle.GSS_CRED_ID_T_len =
-			input_cred_handle ==
-			(gssd_cred_id_t)GSS_C_NO_CREDENTIAL ?
+			input_cred_handle == GSSD_NO_CREDENTIAL ?
 			0 : (uint_t)sizeof (gssd_cred_id_t);
 	arg.input_cred_handle.GSS_CRED_ID_T_val =
 						(char *)&input_cred_handle;
@@ -454,7 +453,7 @@ kgss_add_cred(minor_status,
 		gssd_cred_verifier = KCRED_TO_CREDV(input_cred_handle);
 		gssd_input_cred_handle = KCRED_TO_CRED(input_cred_handle);
 	} else
-		gssd_input_cred_handle = (gssd_cred_id_t)GSS_C_NO_CREDENTIAL;
+		gssd_input_cred_handle = GSSD_NO_CREDENTIAL;
 
 	err = kgss_add_cred_wrapped(minor_status, gssd_input_cred_handle,
 			gssd_cred_verifier, desired_name, desired_mech_type,
@@ -620,7 +619,7 @@ kgss_init_sec_context_wrapped(minor_status,
 	arg.gssd_context_verifier = *gssd_context_verifier;
 
 	arg.claimant_cred_handle.GSS_CRED_ID_T_len =
-		claimant_cred_handle == (gssd_cred_id_t)GSS_C_NO_CREDENTIAL ?
+		claimant_cred_handle == GSSD_NO_CREDENTIAL ?
 		0 : (uint_t)sizeof (gssd_cred_id_t);
 	arg.claimant_cred_handle.GSS_CRED_ID_T_val =
 		(char *)&claimant_cred_handle;
@@ -803,20 +802,20 @@ kgss_init_sec_context(
 
 		if (claimant_cred_handle != GSS_C_NO_CREDENTIAL) {
 			gssd_cred_verifier =
-				KCRED_TO_CREDV(claimant_cred_handle);
+			    KCRED_TO_CREDV(claimant_cred_handle);
 			gssd_cl_cred_handle =
-				KCRED_TO_CRED(claimant_cred_handle);
-		} else
-			gssd_cl_cred_handle =
-					(gssd_cred_id_t)GSS_C_NO_CREDENTIAL;
+			    KCRED_TO_CRED(claimant_cred_handle);
+		} else {
+			gssd_cl_cred_handle = GSSD_NO_CREDENTIAL;
+		}
 
 		err = kgss_init_sec_context_wrapped(minor_status,
-			gssd_cl_cred_handle,
-			gssd_cred_verifier, &kctx->gssd_ctx,
-			&kctx->gssd_ctx_verifier,
-			target_name, mech_type, req_flags, time_req,
-			input_chan_bindings, input_token, actual_mech_type,
-			output_token, ret_flags, time_rec, uid);
+		    gssd_cl_cred_handle,
+		    gssd_cred_verifier, &kctx->gssd_ctx,
+		    &kctx->gssd_ctx_verifier,
+		    target_name, mech_type, req_flags, time_req,
+		    input_chan_bindings, input_token, actual_mech_type,
+		    output_token, ret_flags, time_rec, uid);
 
 		if (GSS_ERROR(err)) {
 			KGSS_FREE(kctx);
@@ -868,7 +867,7 @@ kgss_accept_sec_context_wrapped(minor_status,
 	arg.uid = (OM_uint32) uid;
 
 	arg.context_handle.GSS_CTX_ID_T_len =
-		*context_handle == (gssd_ctx_id_t)GSS_C_NO_CONTEXT ?
+		*context_handle == GSSD_NO_CONTEXT ?
 			0 : (uint_t)sizeof (gssd_ctx_id_t);
 	arg.context_handle.GSS_CTX_ID_T_val =  (char *)context_handle;
 	arg.gssd_context_verifier =
@@ -876,8 +875,7 @@ kgss_accept_sec_context_wrapped(minor_status,
 			0 : *gssd_context_verifier;
 
 	arg.verifier_cred_handle.GSS_CRED_ID_T_len =
-			verifier_cred_handle ==
-			(gssd_cred_id_t)GSS_C_NO_CREDENTIAL ?
+			verifier_cred_handle == GSSD_NO_CREDENTIAL ?
 			0 : (uint_t)sizeof (gssd_cred_id_t);
 	arg.verifier_cred_handle.GSS_CRED_ID_T_val =
 						(char *)&verifier_cred_handle;
@@ -1054,24 +1052,24 @@ kgss_accept_sec_context(
 		if (*context_handle == GSS_C_NO_CONTEXT) {
 			kctx = KGSS_ALLOC();
 			*context_handle = (gss_ctx_id_t)kctx;
-		kctx->gssd_ctx = (gssd_ctx_id_t)GSS_C_NO_CONTEXT;
+		kctx->gssd_ctx = GSSD_NO_CONTEXT;
 		} else
 			kctx = (struct kgss_ctx *)*context_handle;
 
 	if (verifier_cred_handle != GSS_C_NO_CREDENTIAL) {
 			gssd_cred_verifier =
-				KCRED_TO_CREDV(verifier_cred_handle);
+			    KCRED_TO_CREDV(verifier_cred_handle);
 			gssd_ver_cred_handle =
-				KCRED_TO_CRED(verifier_cred_handle);
+			    KCRED_TO_CRED(verifier_cred_handle);
 	} else
-		gssd_ver_cred_handle = (gssd_cred_id_t)GSS_C_NO_CREDENTIAL;
+		gssd_ver_cred_handle = GSSD_NO_CREDENTIAL;
 
 		err = kgss_accept_sec_context_wrapped(minor_status,
-			&kctx->gssd_ctx,
-			&kctx->gssd_ctx_verifier, gssd_ver_cred_handle,
-			gssd_cred_verifier, input_token, input_chan_bindings,
-			src_name, mech_type, output_token, ret_flags,
-			time_rec, delegated_cred_handle, uid);
+		    &kctx->gssd_ctx,
+		    &kctx->gssd_ctx_verifier, gssd_ver_cred_handle,
+		    gssd_cred_verifier, input_token, input_chan_bindings,
+		    src_name, mech_type, output_token, ret_flags,
+		    time_rec, delegated_cred_handle, uid);
 
 	if (GSS_ERROR(err)) {
 		KGSS_FREE(kctx);
@@ -1234,10 +1232,10 @@ kgss_delete_sec_context(
 			kctx = KCTX_TO_KGSS_CTX(*context_handle);
 
 		err = kgss_delete_sec_context_wrapped(minor_status,
-				&kctx->gssd_ctx, kctx->gssd_ctx_verifier,
-				output_token);
+		    &kctx->gssd_ctx, kctx->gssd_ctx_verifier,
+		    output_token);
 
-		if (kctx->gssd_ctx != (gssd_ctx_id_t)GSS_C_NO_CONTEXT)
+		if (kctx->gssd_ctx != GSSD_NO_CONTEXT)
 			err = GSS_S_FAILURE;
 		else
 			err = GSS_S_COMPLETE;
@@ -1348,8 +1346,8 @@ kgss_sign(
 			return (GSS_S_FAILURE);
 
 		return (KGSS_SIGN(minor_status,
-			context_handle, qop_req, message_buffer,
-			msg_token));
+		    context_handle, qop_req, message_buffer,
+		    msg_token));
 }
 
 OM_uint32
@@ -1432,8 +1430,7 @@ kgss_verify(OM_uint32 *minor_status,
 			return (GSS_S_FAILURE);
 
 		return (KGSS_VERIFY(minor_status, context_handle,
-			message_buffer,
-			token_buffer, qop_state));
+		    message_buffer, token_buffer, qop_state));
 }
 
 
@@ -1657,9 +1654,8 @@ kgss_unseal(OM_uint32 *minor_status,
 			return (GSS_S_FAILURE);
 
 		return (KGSS_UNSEAL(minor_status, context_handle,
-			input_message_buffer,
-			output_message_buffer,
-			conf_state, qop_state));
+		    input_message_buffer, output_message_buffer,
+		    conf_state, qop_state));
 }
 
 /* EXPORT DELETE END */
@@ -1856,7 +1852,7 @@ kgss_inquire_cred_wrapped(minor_status,
 	arg.uid = (OM_uint32) uid;
 
 	arg.cred_handle.GSS_CRED_ID_T_len =
-			cred_handle == (gssd_cred_id_t)GSS_C_NO_CREDENTIAL ?
+			cred_handle == GSSD_NO_CREDENTIAL ?
 			0 : (uint_t)sizeof (gssd_cred_id_t);
 	arg.cred_handle.GSS_CRED_ID_T_val = (char *)&cred_handle;
 	arg.gssd_cred_verifier = gssd_cred_verifier;
@@ -2019,7 +2015,7 @@ kgss_inquire_cred_by_mech_wrapped(minor_status,
 	arg.uid = (OM_uint32) uid;
 
 	arg.cred_handle.GSS_CRED_ID_T_len =
-			cred_handle == (gssd_cred_id_t)GSS_C_NO_CREDENTIAL ?
+			cred_handle == GSSD_NO_CREDENTIAL ?
 			0 : (uint_t)sizeof (gssd_cred_id_t);
 	arg.cred_handle.GSS_CRED_ID_T_val = (char *)&cred_handle;
 	arg.gssd_cred_verifier = gssd_cred_verifier;
@@ -2505,7 +2501,7 @@ static int gssd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	switch (cmd) {
 	case DDI_ATTACH:
 		if (ddi_create_minor_node(dip, "gssd", S_IFCHR, 0, "gssd", 0)
-			== DDI_FAILURE) {
+		    == DDI_FAILURE) {
 			ddi_remove_minor_node(dip, NULL);
 			return (DDI_FAILURE);
 		}
@@ -2651,7 +2647,7 @@ _init(void)
 	int status;
 
 	if ((status = ddi_soft_state_init(&gssd_state,
-			sizeof (gssd_devstate_t), 1)) != 0)
+	    sizeof (gssd_devstate_t), 1)) != 0)
 		return (status);
 
 	if ((status = mod_install((struct modlinkage *)&modlinkage)) != 0)

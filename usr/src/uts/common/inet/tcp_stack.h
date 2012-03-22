@@ -101,7 +101,8 @@ struct tcp_stack {
 	/* Used to synchronize access when reclaiming memory */
 	mblk_t		*tcps_ixa_cleanup_mp;
 	kmutex_t	tcps_ixa_cleanup_lock;
-	kcondvar_t	tcps_ixa_cleanup_cv;
+	kcondvar_t	tcps_ixa_cleanup_ready_cv;
+	kcondvar_t	tcps_ixa_cleanup_done_cv;
 
 	/* Variables for handling kmem reclaim call back. */
 	kmutex_t	tcps_reclaim_lock;

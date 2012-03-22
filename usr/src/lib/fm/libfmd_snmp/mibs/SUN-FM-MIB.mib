@@ -166,7 +166,7 @@ sunFmProblemCode OBJECT-TYPE
 	DESCRIPTION
 		"The SUNW-MSG-ID static message identifier for this class of
 		problem, as recorded by fmd(1M) and shown by fmdump(1M).  The
-		message identifier can be used as a key at http://sun.com/msg/"
+		message identifier can be used as a key at http://illumos.org/msg/"
 	::= { sunFmProblemEntry 3 }
 
 sunFmProblemURL OBJECT-TYPE

@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -1502,12 +1503,7 @@ trans_get_cgapart(
 }
 
 static int
-trans_admin_ioctl(
-	int	cmd,
-	caddr_t	data,
-	int	mode,
-	IOLOCK	*lockp
-)
+trans_admin_ioctl(int cmd, void *data, int mode, IOLOCK *lockp)
 {
 	size_t	sz = 0;
 	void	*d = NULL;
@@ -1936,13 +1932,7 @@ trans_admin_ioctl(
 }
 
 int
-md_trans_ioctl(
-	dev_t		dev,
-	int		cmd,
-	caddr_t		data,
-	int		mode,
-	IOLOCK		*lockp
-)
+md_trans_ioctl(dev_t dev, int cmd, void *data, int mode, IOLOCK *lockp)
 {
 	minor_t		mnum = getminor(dev);
 	mt_unit_t	*un;

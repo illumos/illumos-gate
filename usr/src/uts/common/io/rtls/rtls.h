@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ */
+
+/*
  * rtls -- REALTEK 8139-serials PCI Fast Ethernet Driver.
  *
  * This product is covered by one or more of the following patents:
@@ -150,9 +154,6 @@ typedef struct rtls_instance {
 	mii_handle_t	mii;
 	dev_info_t	*devinfo;	/* device instance */
 	int32_t		instance;
-
-	/* instance name: "rtls" + instance num, 32 bytes is enough */
-	char		ifname[32];
 
 	caddr_t		io_reg;		/* mapped chip register address */
 

@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #if defined(DEBUG)
@@ -116,7 +117,7 @@ static struct ra_type_map	*ra_map_list_head = NULL;
 extern struct mod_ops mod_miscops;
 
 #ifdef BUSRA_DEBUG
-void ra_dump_all();
+void ra_dump_all(char *, dev_info_t *);
 #endif
 
 /* internal function prototypes */

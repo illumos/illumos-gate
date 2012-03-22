@@ -1993,7 +1993,7 @@ integrity_fail:
 "    /lib/svc/bin/restore_repository\n"
 "\n"
 "  can be run to restore a backup version of your repository.  See\n"
-"  http://sun.com/msg/SMF-8000-MY for more information.\n"
+"  http://illumos.org/msg/SMF-8000-MY for more information.\n"
 "\n",
 			    db_file,
 			    (fname == NULL)? ":\n\n" : " is in:\n\n    ",

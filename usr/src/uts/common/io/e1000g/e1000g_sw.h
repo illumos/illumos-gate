@@ -20,6 +20,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 David Höppner. All rights reserved.
  */
 
 #ifndef _E1000G_SW_H
@@ -618,8 +619,6 @@ typedef union _e1000g_ether_addr {
 } e1000g_ether_addr_t;
 
 typedef struct _e1000g_stat {
-
-	kstat_named_t link_speed;	/* Link Speed */
 	kstat_named_t reset_count;	/* Reset Count */
 
 	kstat_named_t rx_error;		/* Rx Error in Packet */
@@ -652,16 +651,8 @@ typedef struct _e1000g_stat {
 	kstat_named_t tx_lack_desc;	/* Tx Lack of Desc */
 #endif
 
-	kstat_named_t Crcerrs;	/* CRC Error Count */
 	kstat_named_t Symerrs;	/* Symbol Error Count */
 	kstat_named_t Mpc;	/* Missed Packet Count */
-	kstat_named_t Scc;	/* Single Collision Count */
-	kstat_named_t Ecol;	/* Excessive Collision Count */
-	kstat_named_t Mcc;	/* Multiple Collision Count */
-	kstat_named_t Latecol;	/* Late Collision Count */
-	kstat_named_t Colc;	/* Collision Count */
-	kstat_named_t Dc;	/* Defer Count */
-	kstat_named_t Sec;	/* Sequence Error Count */
 	kstat_named_t Rlec;	/* Receive Length Error Count */
 	kstat_named_t Xonrxc;	/* XON Received Count */
 	kstat_named_t Xontxc;	/* XON Xmitted Count */
@@ -677,24 +668,12 @@ typedef struct _e1000g_stat {
 	kstat_named_t Prc1522;	/* Packets Received - 1024-1522b */
 #endif
 	kstat_named_t Gprc;	/* Good Packets Received Count */
-	kstat_named_t Bprc;	/* Broadcasts Pkts Received Count */
-	kstat_named_t Mprc;	/* Multicast Pkts Received Count */
 	kstat_named_t Gptc;	/* Good Packets Xmitted Count */
 	kstat_named_t Gorl;	/* Good Octets Recvd Lo Count */
 	kstat_named_t Gorh;	/* Good Octets Recvd Hi Count */
 	kstat_named_t Gotl;	/* Good Octets Xmitd Lo Count */
 	kstat_named_t Goth;	/* Good Octets Xmitd Hi Count */
-	kstat_named_t Rnbc;	/* Receive No Buffers Count */
-	kstat_named_t Ruc;	/* Receive Undersize Count */
 	kstat_named_t Rfc;	/* Receive Frag Count */
-	kstat_named_t Roc;	/* Receive Oversize Count */
-	kstat_named_t Rjc;	/* Receive Jabber Count */
-	kstat_named_t Torl;	/* Total Octets Recvd Lo Count */
-	kstat_named_t Torh;	/* Total Octets Recvd Hi Count */
-	kstat_named_t Totl;	/* Total Octets Xmted Lo Count */
-	kstat_named_t Toth;	/* Total Octets Xmted Hi Count */
-	kstat_named_t Tpr;	/* Total Packets Received */
-	kstat_named_t Tpt;	/* Total Packets Xmitted */
 #ifdef E1000G_DEBUG
 	kstat_named_t Ptc64;	/* Packets Xmitted (64b) */
 	kstat_named_t Ptc127;	/* Packets Xmitted (64-127b) */
@@ -703,14 +682,7 @@ typedef struct _e1000g_stat {
 	kstat_named_t Ptc1023;	/* Packets Xmitted (512-1023b) */
 	kstat_named_t Ptc1522;	/* Packets Xmitted (1024-1522b */
 #endif
-	kstat_named_t Mptc;	/* Multicast Packets Xmited Count */
-	kstat_named_t Bptc;	/* Broadcast Packets Xmited Count */
-	kstat_named_t Algnerrc;	/* Alignment Error count */
-	kstat_named_t Tuc;	/* Transmit Underrun count */
-	kstat_named_t Rxerrc;	/* Rx Error Count */
 	kstat_named_t Tncrs;	/* Transmit with no CRS */
-	kstat_named_t Cexterr;	/* Carrier Extension Error count */
-	kstat_named_t Rutec;	/* Receive DMA too Early count */
 	kstat_named_t Tsctc;	/* TCP seg contexts xmit count */
 	kstat_named_t Tsctfc;	/* TCP seg contexts xmit fail count */
 } e1000g_stat_t, *p_e1000g_stat_t;
@@ -860,7 +832,7 @@ typedef struct e1000g {
 	boolean_t rx_buffer_setup;
 	boolean_t esb2_workaround;
 	link_state_t link_state;
-	uint32_t link_speed;
+	uint64_t link_speed;
 	uint32_t link_duplex;
 	uint32_t master_latency_timer;
 	uint32_t smartspeed;	/* smartspeed w/a counter */
@@ -872,6 +844,32 @@ typedef struct e1000g {
 	uint32_t attach_progress;	/* attach tracking */
 	uint32_t loopback_mode;
 	uint32_t pending_rx_count;
+
+	uint32_t align_errors;
+	uint32_t brdcstrcv;
+	uint32_t brdcstxmt;
+	uint32_t carrier_errors;
+	uint32_t collisions;
+	uint32_t defer_xmts;
+	uint32_t ex_collisions;
+	uint32_t fcs_errors;
+	uint32_t first_collisions;
+	uint32_t ipackets;
+	uint32_t jabber_errors;
+	uint32_t macrcv_errors;
+	uint32_t macxmt_errors;
+	uint32_t multi_collisions;
+	uint32_t multircv;
+	uint32_t multixmt;
+	uint32_t norcvbuf;
+	uint32_t oerrors;
+	uint32_t opackets;
+	uint32_t sqe_errors;
+	uint32_t toolong_errors;
+	uint32_t tooshort_errors;
+	uint32_t tx_late_collisions;
+	uint64_t obytes;
+	uint64_t rbytes;
 
 	uint32_t tx_desc_num;
 	uint32_t tx_freelist_num;

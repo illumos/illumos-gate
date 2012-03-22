@@ -22,8 +22,6 @@
 Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 Use is subject to license terms.
 
-ident	"%Z%%M%	%I%	%E% SMI"
-
 /lib/svc/share/README
 
 smf(5):  Notes on maintenance mode and recovery
@@ -145,5 +143,5 @@ route(1M) command.  On typical IPv4 networks, this invocation would be
 --
 
 (An extended version of this document is available at
-http://sun.com/msg/SMF-8000-QD.  That version includes additional
+http://illumos.org/msg/SMF-8000-QD.  That version includes additional
 document references.)

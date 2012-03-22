@@ -2199,9 +2199,8 @@ typedef struct idn_mboxmsg {
 
 typedef idn_mboxmsg_t	idn_mboxq_t[1];
 
-#define	IDN_CKSUM_MBOX_COUNT	\
-			(((int)(uintptr_t) \
-			    &((idn_mboxhdr_t *)(0))->mh_svr_ready) / 2)
+#define	IDN_CKSUM_MBOX_COUNT	(offsetof(idn_mboxhdr_t, mh_svr_ready) / 2)
+
 #define	IDN_CKSUM_MBOX(h)	\
 			(IDN_CHECKSUM ? \
 			idn_cksum((ushort_t *)(h), IDN_CKSUM_MBOX_COUNT) : 0)

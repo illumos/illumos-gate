@@ -640,7 +640,7 @@ sbdp_cpu_stop_self(uint64_t pa)
 	int		cpuid = cp->cpu_id;
 	tte_t		tte;
 	volatile uint_t	*src, *dst;
-	uint_t		funclen;
+	size_t		funclen;
 	sbdp_shutdown_t	sht;
 	uint_t		bbsram_pfn;
 	uint64_t	bbsram_addr;

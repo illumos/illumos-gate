@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -117,10 +117,7 @@ static fc_packet_t *emlxs_prep_els_fc_pkt(emlxs_port_t *port,
 static uint32_t *emlxs_hash_vrf(emlxs_port_t *port,
 	emlxs_port_dhc_t *port_dhc, NODELIST *ndlp, uint32_t tran_id,
 	union challenge_val un_cval);
-static void emlxs_md5_digest_to_hex(const uint8_t digest[MD5_LEN],
-	char *output);
-static void emlxs_sha1_digest_to_hex(const uint8_t digest[SHA1_LEN],
-	char *output);
+
 
 static BIG_ERR_CODE
 emlxs_interm_hash(emlxs_port_t *port, emlxs_port_dhc_t *port_dhc,
@@ -210,25 +207,9 @@ emlxs_rcv_auth_msg_dhchap_success_cmpl_wait4next(emlxs_port_t *port,
 static uint32_t
 emlxs_cmpl_auth_msg_dhchap_success_cmpl_wait4next(emlxs_port_t *port,
 	void *arg1, void *arg2, void *arg3, void *arg4, uint32_t evt);
-static uint32_t emlxs_device_rm_plogi_issue(emlxs_port_t *port, void *arg1,
-	void *arg2, void *arg3, void *arg4, uint32_t evt);
-static uint32_t emlxs_device_recov_plogi_issue(emlxs_port_t *port,
-	void *arg1, void *arg2, void *arg3, void *arg4, uint32_t evt);
-static uint32_t emlxs_device_rm_adisc_issue(emlxs_port_t *port, void *arg1,
-	void *arg2, void *arg3, void *arg4, uint32_t evt);
-static uint32_t emlxs_device_recov_adisc_issue(emlxs_port_t *port,
-	void *arg1, void *arg2, void *arg3, void *arg4, uint32_t evt);
-static uint32_t emlxs_device_rm_reglogin_issue(emlxs_port_t *port,
-	void *arg1, void *arg2, void *arg3, void *arg4, uint32_t evt);
-static uint32_t emlxs_device_recov_reglogin_issue(emlxs_port_t *port,
-	void *arg1, void *arg2, void *arg3, void *arg4, uint32_t evt);
-static uint32_t emlxs_device_rm_prli_issue(emlxs_port_t *port, void *arg1,
-	void *arg2, void *arg3, void *arg4, uint32_t evt);
-static uint32_t emlxs_device_recov_prli_issue(emlxs_port_t *port,
-	void *arg1, void *arg2, void *arg3, void *arg4, uint32_t evt);
+
+
 static uint32_t emlxs_device_recov_unmapped_node(emlxs_port_t *port,
-	void *arg1, void *arg2, void *arg3, void *arg4, uint32_t evt);
-static uint32_t emlxs_device_recov_mapped_node(emlxs_port_t *port,
 	void *arg1, void *arg2, void *arg3, void *arg4, uint32_t evt);
 static uint32_t emlxs_device_rm_npr_node(emlxs_port_t *port, void *arg1,
 	void *arg2, void *arg3, void *arg4, uint32_t evt);
@@ -239,6 +220,10 @@ static uint32_t emlxs_device_rem_auth(emlxs_port_t *port, void *arg1,
 static uint32_t emlxs_device_recov_auth(emlxs_port_t *port, void *arg1,
 	void *arg2, void *arg3, void *arg4, uint32_t evt);
 
+static uint8_t emlxs_null_wwn[8] =
+	{0, 0, 0, 0, 0, 0, 0, 0};
+static uint8_t emlxs_fabric_wwn[8] =
+	{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
 unsigned char dhgp1_pVal[] =
 {0xEE, 0xAF, 0x0A, 0xB9, 0xAD, 0xB3, 0x8D, 0xD6, 0x9C, 0x33, 0xF8, 0x0A, 0xFA,
@@ -442,7 +427,7 @@ emlxs_dhc_state(emlxs_port_t *port, emlxs_node_t *ndlp, uint32_t state,
 		    emlxs_dhc_nstate_xlate(state));
 
 		node_dhc->prev_state = node_dhc->state;
-		node_dhc->state = state;
+		node_dhc->state = (uint16_t)state;
 
 		/* Perform common functions based on state */
 		switch (state) {
@@ -4070,173 +4055,6 @@ uint32_t evt)
 
 /* ARGSUSED */
 static uint32_t
-emlxs_device_rm_plogi_issue(
-			    emlxs_port_t *port,
-			    void *arg1,
-			    void *arg2,
-			    void *arg3,
-			    void *arg4,
-			    uint32_t evt)
-{
-	NODELIST *ndlp = (NODELIST *)arg4;
-
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-	    "device_rm_plogi_issue called. did=0x%x. Not implemented.",
-	    ndlp->nlp_DID);
-
-	return (0);
-
-} /* emlxs_device_rm_plogi_issue */
-
-
-/* ARGSUSED */
-static uint32_t
-emlxs_device_recov_plogi_issue(
-	emlxs_port_t *port,
-	void *arg1,
-	void *arg2,
-	void *arg3,
-	void *arg4,
-	uint32_t evt)
-{
-	NODELIST *ndlp = (NODELIST *)arg4;
-
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-	    "emlxs_device_recov_plogi_issue called. 0x%x. Not implemented.",
-	    ndlp->nlp_DID);
-
-	return (0);
-
-} /* emlxs_device_recov_plogi_issue */
-
-
-/* ARGSUSED */
-static uint32_t
-emlxs_device_rm_adisc_issue(
-			    emlxs_port_t *port,
-			    void *arg1,
-			    void *arg2,
-			    void *arg3,
-			    void *arg4,
-			    uint32_t evt)
-{
-	NODELIST *ndlp = (NODELIST *) arg4;
-
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-	    "emlxs_device_rm_adisc_issue called. 0x%x. Not implemented.",
-	    ndlp->nlp_DID);
-
-	return (0);
-
-} /* emlxs_device_rm_adisc_issue */
-
-
-/* ARGSUSED */
-static uint32_t
-emlxs_device_recov_adisc_issue(
-	emlxs_port_t *port,
-	void *arg1,
-	void *arg2,
-	void *arg3,
-	void *arg4,
-	uint32_t evt)
-{
-	NODELIST *ndlp = (NODELIST *)arg4;
-
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-	    "emlxs_device_recov_adisc_issue called. 0x%x. Not implemented.",
-	    ndlp->nlp_DID);
-
-	return (0);
-
-} /* emlxs_device_recov_adisc_issue */
-
-
-/* ARGSUSED */
-static uint32_t
-emlxs_device_rm_reglogin_issue(
-	emlxs_port_t *port,
-	void *arg1,
-	void *arg2,
-	void *arg3,
-	void *arg4,
-	uint32_t evt)
-{
-	NODELIST *ndlp = (NODELIST *)arg4;
-
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-	    "emlxs_device_rm_reglogin_issue called. 0x%x. Not implemented.",
-	    ndlp->nlp_DID);
-
-	return (0);
-
-} /* emlxs_device_rm_reglogin_issue */
-
-
-/* ARGSUSED */
-static uint32_t
-emlxs_device_recov_reglogin_issue(
-	emlxs_port_t *port,
-	void *arg1,
-	void *arg2,
-	void *arg3,
-	void *arg4,
-	uint32_t evt)
-{
-	NODELIST *ndlp = (NODELIST *)arg4;
-
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-	    "emlxs_device_recov_reglogin_issue called. 0x%x. Not implemented.",
-	    ndlp->nlp_DID);
-
-	return (0);
-
-} /* emlxs_device_recov_reglogin_issue */
-
-
-/* ARGSUSED */
-static uint32_t
-emlxs_device_rm_prli_issue(
-	emlxs_port_t *port,
-	void *arg1,
-	void *arg2,
-	void *arg3,
-	void *arg4,
-	uint32_t evt)
-{
-	NODELIST *ndlp = (NODELIST *)arg4;
-
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-	    "emlxs_device_rm_prli_issue called. 0x%x. Not implemented.",
-	    ndlp->nlp_DID);
-
-	return (0);
-
-} /* emlxs_device_rm_prli_issue */
-
-
-/* ARGSUSED */
-static uint32_t
-emlxs_device_recov_prli_issue(
-	emlxs_port_t *port,
-	void *arg1,
-	void *arg2,
-	void *arg3,
-	void *arg4,
-	uint32_t evt)
-{
-	NODELIST *ndlp = (NODELIST *)arg4;
-
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-	    "emlxs_device_recov_prli_issue called. 0x%x. Not implemented.",
-	    ndlp->nlp_DID);
-
-	return (0);
-
-} /* emlxs_device_recov_prli_issue */
-
-/* ARGSUSED */
-static uint32_t
 emlxs_device_recov_unmapped_node(
 	emlxs_port_t *port,
 	void *arg1,
@@ -4255,25 +4073,6 @@ emlxs_device_recov_unmapped_node(
 
 } /* emlxs_device_recov_unmapped_node */
 
-/* ARGSUSED */
-static uint32_t
-emlxs_device_recov_mapped_node(
-	emlxs_port_t *port,
-	void *arg1,
-	void *arg2,
-	void *arg3,
-	void *arg4,
-	uint32_t evt)
-{
-	NODELIST *ndlp = (NODELIST *)arg4;
-
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-	    "emlxs_device_recov_mapped_node called. 0x%x. Not implemented.",
-	    ndlp->nlp_DID);
-
-	return (0);
-
-} /* emlxs_device_recov_mapped_node */
 
 
 /* ARGSUSED */
@@ -5211,42 +5010,6 @@ AUTH_Reject:
 } /* emlxs_rcv_auth_msg_unmapped_node */
 
 
-void
-emlxs_sha1_digest_to_hex(const uint8_t digest[SHA1_LEN], char *output)
-{
-	int i, j;
-	char *c = output;
-
-	for (i = 0; i < SHA1_LEN / 4; i++) {
-		for (j = 0; j < 4; j++) {
-			(void) sprintf(c, "%02X", digest[i * 4 + j]);
-			c += 2;
-		}
-		(void) sprintf(c, " ");
-		c += 1;
-	}
-	*(c - 1) = '\0';
-
-} /* emlxs_sha1_digest_to_hex */
-
-
-static void
-emlxs_md5_digest_to_hex(const uint8_t digest[MD5_LEN], char *output)
-{
-	int i, j;
-	char *c = output;
-
-	for (i = 0; i < MD5_LEN / 4; i++) {
-		for (j = 0; j < 4; j++) {
-			(void) sprintf(c, "%02X", digest[i * 4 + j]);
-			c += 2;
-		}
-		(void) sprintf(c, " ");
-		c += 1;
-	}
-	*(c - 1) = '\0';
-
-} /* emlxs_md5_digest_to_hex */
 
 
 /*
@@ -7490,8 +7253,6 @@ emlxs_dhc_auth_complete(
 			uint32_t status)
 {
 	emlxs_node_dhc_t *node_dhc = &ndlp->node_dhc;
-	emlxs_buf_t *sbp;
-	fc_unsol_buf_t *ubp;
 	uint32_t fabric;
 	uint32_t fabric_switch;
 
@@ -7521,28 +7282,15 @@ emlxs_dhc_auth_complete(
 		    ndlp->nlp_DID);
 		emlxs_send_logo(port, ndlp->nlp_DID);
 	}
-	/* If a packet is being held then complete it now */
-	if ((sbp = (emlxs_buf_t *)node_dhc->deferred_sbp) != 0) {
-		node_dhc->deferred_sbp = 0;
 
-		if (status != 0) {
-			/* Set error status */
-			sbp->pkt_flags &= ~PACKET_STATE_VALID;
-			emlxs_set_pkt_state(sbp, IOSTAT_LOCAL_REJECT,
-			    IOERR_NO_RESOURCES, 1);
-		}
-		emlxs_pkt_complete(sbp, -1, 0, 1);
-	}
-	/* If a buffer is being held then handle it now */
-	if ((ubp = (fc_unsol_buf_t *)node_dhc->deferred_ubp) != 0) {
-		node_dhc->deferred_ubp = 0;
+	/* Process deferred cmpl now */
+	emlxs_mb_deferred_cmpl(port, status,
+	    (emlxs_buf_t *)node_dhc->deferred_sbp,
+	    (fc_unsol_buf_t *)node_dhc->deferred_ubp, 0);
 
-		if (status == 0) {
-			emlxs_ub_callback(port, ubp);
-		} else {
-			(void) emlxs_ub_release(port, 1, &ubp->ub_token);
-		}
-	}
+	node_dhc->deferred_sbp = 0;
+	node_dhc->deferred_ubp = 0;
+
 	return;
 
 } /* emlxs_dhc_auth_complete */
@@ -8373,7 +8121,7 @@ emlxs_auth_cfg_parse(
 			errors++;
 		}
 
-		*np++ = sum;
+		*np++ = (uint8_t)sum;
 	}
 
 	if (*s++ != ':') {
@@ -8415,7 +8163,7 @@ emlxs_auth_cfg_parse(
 			errors++;
 		}
 
-		*np++ = sum;
+		*np++ = (uint8_t)sum;
 	}
 
 	if (*s++ != ':') {
@@ -9021,7 +8769,7 @@ emlxs_auth_key_parse(
 			errors++;
 		}
 
-		*np++ = sum;
+		*np++ = (uint8_t)sum;
 	}
 
 	if (*s++ != ':') {
@@ -9063,7 +8811,7 @@ emlxs_auth_key_parse(
 			errors++;
 		}
 
-		*np++ = sum;
+		*np++ = (uint8_t)sum;
 	}
 
 	if (*s++ != ':') {
@@ -9092,7 +8840,7 @@ emlxs_auth_key_parse(
 		}
 
 	} while (*s != ':' && *s != 0);
-	auth_key->local_password_type = sum;
+	auth_key->local_password_type = (uint16_t)sum;
 
 	if (*s++ != ':') {
 		EMLXS_MSGF(EMLXS_CONTEXT,
@@ -9143,7 +8891,7 @@ emlxs_auth_key_parse(
 				errors++;
 			}
 
-			*np++ = sum;
+			*np++ = (uint8_t)sum;
 			j++;
 
 		} while (*s != ':' && *s != 0);
@@ -9163,7 +8911,7 @@ emlxs_auth_key_parse(
 		errors++;
 		goto out;
 	}
-	auth_key->local_password_length = j;
+	auth_key->local_password_length = (uint16_t)j;
 
 	if (*s++ != ':') {
 		EMLXS_MSGF(EMLXS_CONTEXT,
@@ -9191,7 +8939,7 @@ emlxs_auth_key_parse(
 		}
 
 	} while (*s != ':' && *s != 0);
-	auth_key->remote_password_type = sum;
+	auth_key->remote_password_type = (uint16_t)sum;
 
 	if (*s++ != ':') {
 		EMLXS_MSGF(EMLXS_CONTEXT,
@@ -9242,7 +8990,7 @@ emlxs_auth_key_parse(
 				errors++;
 			}
 
-			*np++ = sum;
+			*np++ = (uint8_t)sum;
 			j++;
 
 		} while (*s != ':' && *s != 0);
@@ -9262,7 +9010,7 @@ emlxs_auth_key_parse(
 		errors++;
 		goto out;
 	}
-	auth_key->remote_password_length = j;
+	auth_key->remote_password_length = (uint16_t)j;
 
 	if (errors) {
 		goto out;

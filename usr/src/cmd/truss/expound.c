@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -90,6 +91,8 @@
 #include <libnvpair.h>
 #include <sys/rctl_impl.h>
 #include <sys/socketvar.h>
+#include <sys/fs/zfs.h>
+#include <sys/zfs_ioctl.h>
 
 #include "ramdata.h"
 #include "systable.h"
@@ -97,6 +100,7 @@
 
 void	show_sigset(private_t *, long, const char *);
 void	show_ioctl(private_t *, int, long);
+void	show_zfs_ioc(private_t *, long);
 
 static void
 mk_ctime(char *str, size_t maxsize, time_t value)
@@ -1481,6 +1485,11 @@ show_ioctl(private_t *pri, int code, long offset)
 		break;
 
 	default:
+		if ((code & ~0xff) == ZFS_IOC) {
+			show_zfs_ioc(pri, offset);
+			break;
+		}
+
 		if (code & IOC_INOUT) {
 			const char *str = ioctldatastruct(code);
 
@@ -4405,7 +4414,7 @@ show_packed_nvlist(private_t *pri, uintptr_t offset, size_t size)
 
 		result = nvlist_unpack(buf, size, &nvl, 0);
 		if (result == 0) {
-			nvlist_print(stdout, nvl);
+			dump_nvlist(nvl, 8);
 			nvlist_free(nvl);
 		} else {
 			(void) printf("%s\tunpack of nvlist"
@@ -4844,6 +4853,271 @@ show_sockconfig(private_t *pri)
 		break;
 	default:
 		break;
+	}
+}
+
+void
+show_zfs_ioc(private_t *pri, long addr)
+{
+	static const zfs_share_t zero_share = {0};
+	static const dmu_objset_stats_t zero_objstats = {0};
+	static const struct drr_begin zero_drrbegin = {0};
+	static const zinject_record_t zero_injectrec = {0};
+	static const zfs_stat_t zero_zstat = {0};
+	zfs_cmd_t zc;
+
+	if (Pread(Proc, &zc, sizeof (zc), addr) != sizeof (zc)) {
+		(void) printf(" zfs_ioctl read failed\n");
+		return;
+	}
+
+	if (zc.zc_name[0])
+		(void) printf("    zc_name=%s\n", zc.zc_name);
+	if (zc.zc_value[0])
+		(void) printf("    zc_value=%s\n", zc.zc_value);
+	if (zc.zc_string[0])
+		(void) printf("    zc_strign=%s\n", zc.zc_string);
+	if (zc.zc_top_ds[0])
+		(void) printf("    zc_top_ds=%s\n", zc.zc_top_ds);
+	if (zc.zc_guid != 0) {
+		(void) printf("    zc_guid=%llu\n",
+		    (u_longlong_t)zc.zc_guid);
+	}
+	if (zc.zc_nvlist_conf_size) {
+		(void) printf("    nvlist_conf:\n");
+		show_packed_nvlist(pri, zc.zc_nvlist_conf,
+		    zc.zc_nvlist_conf_size);
+	}
+	if (zc.zc_nvlist_src_size) {
+		(void) printf("    nvlist_src:\n");
+		show_packed_nvlist(pri, zc.zc_nvlist_src,
+		    zc.zc_nvlist_src_size);
+	}
+	if (zc.zc_nvlist_dst_size) {
+		(void) printf("    nvlist_dst:\n");
+		show_packed_nvlist(pri, zc.zc_nvlist_dst,
+		    zc.zc_nvlist_dst_size);
+	}
+	if (zc.zc_cookie != 0) {
+		(void) printf("    zc_cookie=%llu\n",
+		    (u_longlong_t)zc.zc_cookie);
+	}
+	if (zc.zc_objset_type != 0) {
+		(void) printf("    zc_objset_type=%llu\n",
+		    (u_longlong_t)zc.zc_objset_type);
+	}
+	if (zc.zc_perm_action != 0) {
+		(void) printf("    zc_perm_action=%llu\n",
+		    (u_longlong_t)zc.zc_perm_action);
+	}
+	if (zc.zc_history != 0) {
+		(void) printf("    zc_history=%llu\n",
+		    (u_longlong_t)zc.zc_history);
+	}
+	if (zc.zc_obj != 0) {
+		(void) printf("    zc_obj=%llu\n",
+		    (u_longlong_t)zc.zc_obj);
+	}
+	if (zc.zc_iflags != 0) {
+		(void) printf("    zc_obj=0x%llx\n",
+		    (u_longlong_t)zc.zc_iflags);
+	}
+
+	if (memcmp(&zc.zc_share, &zero_share, sizeof (zc.zc_share))) {
+		zfs_share_t *z = &zc.zc_share;
+		(void) printf("    zc_share:\n");
+		if (z->z_exportdata) {
+			(void) printf("\tz_exportdata=0x%llx\n",
+			    (u_longlong_t)z->z_exportdata);
+		}
+		if (z->z_sharedata) {
+			(void) printf("\tz_sharedata=0x%llx\n",
+			    (u_longlong_t)z->z_sharedata);
+		}
+		if (z->z_sharetype) {
+			(void) printf("\tz_sharetype=%llu\n",
+			    (u_longlong_t)z->z_sharetype);
+		}
+		if (z->z_sharemax) {
+			(void) printf("\tz_sharemax=%llu\n",
+			    (u_longlong_t)z->z_sharemax);
+		}
+	}
+
+	if (memcmp(&zc.zc_objset_stats, &zero_objstats,
+	    sizeof (zc.zc_objset_stats))) {
+		dmu_objset_stats_t *dds = &zc.zc_objset_stats;
+		(void) printf("    zc_objset_stats:\n");
+		if (dds->dds_num_clones) {
+			(void) printf("\tdds_num_clones=%llu\n",
+			    (u_longlong_t)dds->dds_num_clones);
+		}
+		if (dds->dds_creation_txg) {
+			(void) printf("\tdds_creation_txg=%llu\n",
+			    (u_longlong_t)dds->dds_creation_txg);
+		}
+		if (dds->dds_guid) {
+			(void) printf("\tdds_guid=%llu\n",
+			    (u_longlong_t)dds->dds_guid);
+		}
+		if (dds->dds_type)
+			(void) printf("\tdds_type=%u\n", dds->dds_type);
+		if (dds->dds_is_snapshot) {
+			(void) printf("\tdds_is_snapshot=%u\n",
+			    dds->dds_is_snapshot);
+		}
+		if (dds->dds_inconsistent) {
+			(void) printf("\tdds_inconsitent=%u\n",
+			    dds->dds_inconsistent);
+		}
+		if (dds->dds_origin[0]) {
+			(void) printf("\tdds_origin=%s\n", dds->dds_origin);
+		}
+	}
+
+	if (memcmp(&zc.zc_begin_record, &zero_drrbegin,
+	    sizeof (zc.zc_begin_record))) {
+		struct drr_begin *drr = &zc.zc_begin_record;
+		(void) printf("    zc_begin_record:\n");
+		if (drr->drr_magic) {
+			(void) printf("\tdrr_magic=%llu\n",
+			    (u_longlong_t)drr->drr_magic);
+		}
+		if (drr->drr_versioninfo) {
+			(void) printf("\tdrr_versioninfo=%llu\n",
+			    (u_longlong_t)drr->drr_versioninfo);
+		}
+		if (drr->drr_creation_time) {
+			(void) printf("\tdrr_creation_time=%llu\n",
+			    (u_longlong_t)drr->drr_creation_time);
+		}
+		if (drr->drr_type)
+			(void) printf("\tdrr_type=%u\n", drr->drr_type);
+		if (drr->drr_flags)
+			(void) printf("\tdrr_flags=0x%x\n", drr->drr_flags);
+		if (drr->drr_toguid) {
+			(void) printf("\tdrr_toguid=%llu\n",
+			    (u_longlong_t)drr->drr_toguid);
+		}
+		if (drr->drr_fromguid) {
+			(void) printf("\tdrr_fromguid=%llu\n",
+			    (u_longlong_t)drr->drr_fromguid);
+		}
+		if (drr->drr_toname[0]) {
+			(void) printf("\tdrr_toname=%s\n", drr->drr_toname);
+		}
+	}
+
+	if (memcmp(&zc.zc_inject_record, &zero_injectrec,
+	    sizeof (zc.zc_inject_record))) {
+		zinject_record_t *zi = &zc.zc_inject_record;
+		(void) printf("    zc_inject_record:\n");
+		if (zi->zi_objset) {
+			(void) printf("\tzi_objset=%llu\n",
+			    (u_longlong_t)zi->zi_objset);
+		}
+		if (zi->zi_object) {
+			(void) printf("\tzi_object=%llu\n",
+			    (u_longlong_t)zi->zi_object);
+		}
+		if (zi->zi_start) {
+			(void) printf("\tzi_start=%llu\n",
+			    (u_longlong_t)zi->zi_start);
+		}
+		if (zi->zi_end) {
+			(void) printf("\tzi_end=%llu\n",
+			    (u_longlong_t)zi->zi_end);
+		}
+		if (zi->zi_guid) {
+			(void) printf("\tzi_guid=%llu\n",
+			    (u_longlong_t)zi->zi_guid);
+		}
+		if (zi->zi_level) {
+			(void) printf("\tzi_level=%lu\n",
+			    (ulong_t)zi->zi_level);
+		}
+		if (zi->zi_error) {
+			(void) printf("\tzi_error=%lu\n",
+			    (ulong_t)zi->zi_error);
+		}
+		if (zi->zi_type) {
+			(void) printf("\tzi_type=%llu\n",
+			    (u_longlong_t)zi->zi_type);
+		}
+		if (zi->zi_freq) {
+			(void) printf("\tzi_freq=%lu\n",
+			    (ulong_t)zi->zi_freq);
+		}
+		if (zi->zi_failfast) {
+			(void) printf("\tzi_failfast=%lu\n",
+			    (ulong_t)zi->zi_failfast);
+		}
+		if (zi->zi_func[0])
+			(void) printf("\tzi_func=%s\n", zi->zi_func);
+		if (zi->zi_iotype) {
+			(void) printf("\tzi_iotype=%lu\n",
+			    (ulong_t)zi->zi_iotype);
+		}
+		if (zi->zi_duration) {
+			(void) printf("\tzi_duration=%ld\n",
+			    (long)zi->zi_duration);
+		}
+		if (zi->zi_timer) {
+			(void) printf("\tzi_timer=%llu\n",
+			    (u_longlong_t)zi->zi_timer);
+		}
+	}
+
+	if (zc.zc_defer_destroy) {
+		(void) printf("    zc_defer_destroy=%d\n",
+		    (int)zc.zc_defer_destroy);
+	}
+	if (zc.zc_temphold) {
+		(void) printf("    zc_temphold=%d\n",
+		    (int)zc.zc_temphold);
+	}
+	if (zc.zc_action_handle) {
+		(void) printf("    zc_action_handle=%llu\n",
+		    (u_longlong_t)zc.zc_action_handle);
+	}
+	if (zc.zc_cleanup_fd >= 0)
+		(void) printf("    zc_cleanup_fd=%d\n", zc.zc_cleanup_fd);
+	if (zc.zc_sendobj) {
+		(void) printf("    zc_sendobj=%llu\n",
+		    (u_longlong_t)zc.zc_sendobj);
+	}
+	if (zc.zc_fromobj) {
+		(void) printf("    zc_fromobj=%llu\n",
+		    (u_longlong_t)zc.zc_fromobj);
+	}
+	if (zc.zc_createtxg) {
+		(void) printf("    zc_createtxg=%llu\n",
+		    (u_longlong_t)zc.zc_createtxg);
+	}
+
+	if (memcmp(&zc.zc_stat, &zero_zstat, sizeof (zc.zc_stat))) {
+		zfs_stat_t *zs = &zc.zc_stat;
+		(void) printf("    zc_stat:\n");
+		if (zs->zs_gen) {
+			(void) printf("\tzs_gen=%llu\n",
+			    (u_longlong_t)zs->zs_gen);
+		}
+		if (zs->zs_mode) {
+			(void) printf("\tzs_mode=%llu\n",
+			    (u_longlong_t)zs->zs_mode);
+		}
+		if (zs->zs_links) {
+			(void) printf("\tzs_links=%llu\n",
+			    (u_longlong_t)zs->zs_links);
+		}
+		if (zs->zs_ctime[0]) {
+			(void) printf("\tzs_ctime[0]=%llu\n",
+			    (u_longlong_t)zs->zs_ctime[0]);
+		}
+		if (zs->zs_ctime[1]) {
+			(void) printf("\tzs_ctime[1]=%llu\n",
+			    (u_longlong_t)zs->zs_ctime[1]);
+		}
 	}
 }
 

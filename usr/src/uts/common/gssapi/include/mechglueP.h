@@ -727,6 +727,9 @@ gssint_put_der_length(
 typedef unsigned int gssd_ctx_id_t;
 typedef unsigned int gssd_cred_id_t;
 
+#define	GSSD_NO_CONTEXT		((gssd_ctx_id_t)0)
+#define	GSSD_NO_CREDENTIAL	((gssd_cred_id_t)0)
+
 #ifdef	_KERNEL
 
 #ifndef	_KRB5_H

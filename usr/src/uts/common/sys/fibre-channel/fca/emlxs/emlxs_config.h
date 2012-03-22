@@ -124,6 +124,10 @@ typedef enum emlxs_cfg_parm
 	CFG_FAST_TGT_RESET,	/* fast-tgt-reset (hidden) */
 	CFG_FAST_TGT_RESET_TMR,	/* fast-tgt-reset-timer (hidden) */
 
+	CFG_FCF_SOLICIT_DELAY,	/* fcf-solicit-delay (hidden) */
+	CFG_FCF_FAILOVER_DELAY,	/* fcf-failover-delay (hidden) */
+	CFG_FCF_RESOLICIT_DELAY, /* fcf-resolicit-delay (hidden) */
+
 	NUM_CFG_PARAM
 
 } emlxs_cfg_parm_t;
@@ -399,7 +403,7 @@ emlxs_config_t  emlxs_cfg[] = {
 		0, 1, 0, 0,
 		PARM_DYNAMIC_RESET | PARM_BOOLEAN,
 	"Enables NPIV. [0=Disabled-remove all vports first, "
-		"1=Enabled-requires SLI3]"},
+		"1=Enabled-requires SLI3+]"},
 
 	/* CFG_VPORT_RESTRICTED */
 	{"vport-restrict-login",
@@ -531,6 +535,26 @@ emlxs_config_t  emlxs_cfg[] = {
 	"RSCN notification timer for fast target reset. "
 		"[0=Disabled 1-60=seconds]"},
 
+	/* CFG_FCF_SOLICIT_DELAY */
+	{"fcf-solicit-delay",
+		0, 60, 3, 0,
+		PARM_DYNAMIC | PARM_HIDDEN,
+	"Sets delay after FCF solicit request before reading FCF table. "
+		"[0-60=seconds]"},
+
+	/* CFG_FCF_FAILOVER_DELAY */
+	{"fcf-failover-delay",
+		0, 60, 0, 0,
+		PARM_DYNAMIC | PARM_HIDDEN,
+	"Sets delay before attempting failover to a new FCF. "
+		"[0-60=seconds]"},
+
+	/* CFG_FCF_RESOLICIT_DELAY */
+	{"fcf-resolicit-delay",
+		0, 60, 3, 0,
+		PARM_DYNAMIC | PARM_HIDDEN,
+	"Sets delay after total FCF failure before resoliciting. "
+		"[0-60=seconds]"},
 };
 
 #endif	/* DEF_ICFG */

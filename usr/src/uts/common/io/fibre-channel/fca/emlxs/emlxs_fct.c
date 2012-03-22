@@ -40,12 +40,8 @@ static fct_status_t emlxs_fct_cmd_accept(emlxs_port_t *port,
 static void emlxs_fct_cmd_release(emlxs_port_t *port, fct_cmd_t *fct_cmd,
 	uint16_t fct_state);
 
-static void emlxs_fct_handle_acc(emlxs_port_t *port, emlxs_buf_t *sbp,
-    IOCBQ *iocbq);
-static void emlxs_fct_handle_reject(emlxs_port_t *port, emlxs_buf_t *sbp,
-    IOCBQ *iocbq);
 static emlxs_buf_t *emlxs_fct_cmd_init(emlxs_port_t *port,
-    fct_cmd_t *fct_cmd, uint32_t fct_state);
+    fct_cmd_t *fct_cmd, uint16_t fct_state);
 static void emlxs_fct_cmd_done(emlxs_port_t *port, fct_cmd_t *fct_cmd,
 	uint16_t fct_state);
 static void emlxs_fct_cmd_post(emlxs_port_t *port, fct_cmd_t *fct_cmd,
@@ -996,7 +992,7 @@ emlxs_fct_cfg_init(emlxs_hba_t *hba)
 	    KM_SLEEP);
 
 	mutex_init(&port->iotrace_mtx, NULL, MUTEX_DRIVER,
-	    (void *)hba->intr_arg);
+	    DDI_INTR_PRI(hba->intr_arg));
 	emlxs_iotrace = (uint8_t *)port->iotrace;
 	emlxs_iotrace_cnt = port->iotrace_cnt;
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_detail_msg,
@@ -1159,12 +1155,7 @@ emlxs_fct_unbind_port(emlxs_port_t *port)
 
 	/* Destroy & flush all port nodes, if they exist */
 	if (port->node_count) {
-		if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
-			(void) emlxs_sli4_unreg_all_rpi_by_port(port);
-		} else {
-			(void) emlxs_mb_unreg_rpi(port, 0xffff, 0, 0,
-			    0);
-		}
+		(void) emlxs_mb_unreg_node(port, NULL, NULL, NULL, NULL);
 	}
 
 	port->flag &= ~EMLXS_PORT_BOUND;
@@ -1532,7 +1523,7 @@ emlxs_fct_port_info(uint32_t cmd, fct_local_port_t *fct_port, void *arg,
 			    mb->un.varRdLnk.crcCnt;
 		}
 
-		(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mbq);
+		emlxs_mem_put(hba, MEM_MBOX, (void *)mbq);
 		break;
 
 	default:
@@ -1722,11 +1713,21 @@ emlxs_fct_ctl(fct_local_port_t *fct_port, int cmd, void *arg)
 		break;
 
 	case FCT_CMD_FORCE_LIP:
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_detail_msg,
-		    "emlxs_fct_ctl: FCT_CMD_FORCE_LIP");
+		if (hba->fw_flag & FW_UPDATE_NEEDED) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_detail_msg,
+			    "emlxs_fct_ctl: FCT_CMD_FORCE_LIP -> "
+			    "FCT_CMD_RESET");
 
-		/* Reset the link */
-		(void) emlxs_reset(port, FC_FCA_LINK_RESET);
+			hba->fw_flag |= FW_UPDATE_KERNEL;
+			/* Reset the adapter */
+			(void) emlxs_reset(port, FC_FCA_RESET);
+		} else {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_detail_msg,
+			    "emlxs_fct_ctl: FCT_CMD_FORCE_LIP");
+
+			/* Reset the link */
+			(void) emlxs_reset(port, FC_FCA_LINK_RESET);
+		}
 		break;
 	}
 
@@ -2181,6 +2182,8 @@ emlxs_fct_register_remote_port(fct_local_port_t *fct_port,
 		/* mutex_enter(&cmd_sbp->fct_mtx); */
 	}
 
+	cmd_sbp->fct_flags &= ~EMLXS_FCT_REGISTERED;
+
 	if (!cmd_sbp->node) {
 		cmd_sbp->node =
 		    emlxs_node_find_did(port, fct_cmd->cmd_rportid);
@@ -2239,7 +2242,7 @@ emlxs_fct_register_remote_port(fct_local_port_t *fct_port,
 			pkt_ret = 0;
 			while ((pkt_ret != -1) &&
 			    (cmd_sbp->fct_state == EMLXS_FCT_REG_PENDING) &&
-			    (cmd_sbp->node == NULL)) {
+			    !(cmd_sbp->fct_flags & EMLXS_FCT_REGISTERED)) {
 				pkt_ret = cv_timedwait(&EMLXS_PKT_CV,
 				    &EMLXS_PKT_LOCK, timeout);
 			}
@@ -2265,6 +2268,8 @@ done:
 	ndlp = (emlxs_node_t *)cmd_sbp->node;
 
 	if (ndlp) {
+		cmd_sbp->fct_flags |= EMLXS_FCT_REGISTERED;
+
 		*((emlxs_node_t **)remote_port->rp_fca_private) =
 		    cmd_sbp->node;
 		remote_port->rp_handle = ndlp->nlp_Rpi;
@@ -2305,6 +2310,7 @@ emlxs_fct_deregister_remote_port(fct_local_port_t *fct_port,
     fct_remote_port_t *remote_port)
 {
 	emlxs_port_t *port = (emlxs_port_t *)fct_port->port_fca_private;
+	emlxs_node_t *ndlp;
 
 #ifdef FCT_API_TRACE
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_api_msg,
@@ -2316,8 +2322,13 @@ emlxs_fct_deregister_remote_port(fct_local_port_t *fct_port,
 	    remote_port->rp_id, remote_port->rp_handle);
 #endif /* FCT_API_TRACE */
 
+	ndlp = *((emlxs_node_t **)remote_port->rp_fca_private);
 	*((emlxs_node_t **)remote_port->rp_fca_private) = NULL;
-	(void) emlxs_mb_unreg_did(port, remote_port->rp_id, NULL, NULL, NULL);
+
+	if (ndlp) {
+		(void) emlxs_mb_unreg_node(port, ndlp, NULL,
+		    NULL, NULL);
+	}
 
 	TGTPORTSTAT.FctPortDeregister++;
 	return (FCT_SUCCESS);
@@ -3237,7 +3248,7 @@ emlxs_fct_handle_unsol_els(emlxs_port_t *port, CHANNEL *cp, IOCBQ *iocbq,
 	    sizeof (emlxs_iocb_t));
 
 	els = (fct_els_t *)fct_cmd->cmd_specific;
-	els->els_req_size = size;
+	els->els_req_size = (uint16_t)size;
 	els->els_req_payload =
 	    GET_BYTE_OFFSET(fct_cmd->cmd_fca_private,
 	    GET_STRUCT_SIZE(emlxs_buf_t));
@@ -3385,15 +3396,16 @@ emlxs_fct_pkt_init(emlxs_port_t *port, fct_cmd_t *fct_cmd,
 
 /* Mutex will be acquired */
 static emlxs_buf_t *
-emlxs_fct_cmd_init(emlxs_port_t *port, fct_cmd_t *fct_cmd, uint32_t fct_state)
+emlxs_fct_cmd_init(emlxs_port_t *port, fct_cmd_t *fct_cmd, uint16_t fct_state)
 {
 	emlxs_hba_t *hba = HBA;
 	emlxs_buf_t *cmd_sbp = (emlxs_buf_t *)fct_cmd->cmd_fca_private;
 
 	bzero((void *)cmd_sbp, sizeof (emlxs_buf_t));
 	mutex_init(&cmd_sbp->fct_mtx, NULL, MUTEX_DRIVER,
-	    (void *)hba->intr_arg);
-	mutex_init(&cmd_sbp->mtx, NULL, MUTEX_DRIVER, (void *)hba->intr_arg);
+	    DDI_INTR_PRI(hba->intr_arg));
+	mutex_init(&cmd_sbp->mtx, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(hba->intr_arg));
 
 	mutex_enter(&cmd_sbp->fct_mtx);
 	cmd_sbp->pkt_flags = PACKET_VALID;
@@ -3663,8 +3675,8 @@ emlxs_fct_cmd_done(emlxs_port_t *port, fct_cmd_t *fct_cmd, uint16_t fct_state)
 
 		if (cmd_sbp->channel) {
 			if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
-				hba->fc_table[cmd_sbp->iotag] = NULL;
-				emlxs_sli4_free_xri(hba, cmd_sbp, cmd_sbp->xp);
+				emlxs_sli4_free_xri(hba, cmd_sbp, cmd_sbp->xrip,
+				    1);
 			} else {
 				(void) emlxs_unregister_pkt(cmd_sbp->channel,
 				    cmd_sbp->iotag, 0);
@@ -4347,8 +4359,7 @@ emlxs_fct_pkt_abort_txq(emlxs_port_t *port, emlxs_buf_t *cmd_sbp)
 
 		/* The IOCB points to iocb_sbp (no packet) or a sbp (packet) */
 		if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
-			hba->fc_table[iocb_sbp->iotag] = NULL;
-			emlxs_sli4_free_xri(hba, iocb_sbp, iocb_sbp->xp);
+			emlxs_sli4_free_xri(hba, iocb_sbp, iocb_sbp->xrip, 1);
 		} else {
 			(void) emlxs_unregister_pkt(cp, iocb_sbp->iotag, 0);
 		}
@@ -4799,7 +4810,7 @@ emlxs_fct_dmem_init(emlxs_port_t *port)
 		(void) sprintf(buf, "%s%d_bucket%d mutex", DRIVER_NAME,
 		    hba->ddiinst, i);
 		mutex_init(&p->dmem_lock, buf, MUTEX_DRIVER,
-		    (void *)hba->intr_arg);
+		    DDI_INTR_PRI(hba->intr_arg));
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_detail_msg,
 		    "bufsize=%d cnt=%d", p->dmem_buf_size, p->dmem_nbufs);

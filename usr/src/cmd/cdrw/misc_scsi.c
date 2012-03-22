@@ -21,9 +21,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <stdlib.h>
@@ -917,13 +916,11 @@ cd_speed_ctrl(cd_device *dev, int cmd, int speed)
 		rate = cd_speed_get(dev, GET_WRITE_SPEED);
 		return (set_cd_speed(dev->d_fd,
 		    cdrw_x_to_bandwidth(speed), rate));
-		break;
 
 	case SET_WRITE_SPEED:
 		rate = cd_speed_get(dev, GET_READ_SPEED);
 		return (set_cd_speed(dev->d_fd, rate,
 		    cdrw_x_to_bandwidth(speed)));
-		break;
 
 	default:
 		return (0);
