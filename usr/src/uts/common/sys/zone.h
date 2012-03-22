@@ -106,6 +106,8 @@ extern "C" {
 #define	ZONE_ATTR_DID		18
 #define	ZONE_ATTR_PMCAP_PAGEOUT	19
 #define	ZONE_ATTR_INITNORESTART	20
+#define	ZONE_ATTR_PG_FLT_DELAY	21
+#define	ZONE_ATTR_RSS		22
 
 /* Start of the brand-specific attribute namespace */
 #define	ZONE_ATTR_BRAND_ATTRS	32768
@@ -397,6 +399,8 @@ typedef struct {
 	kstat_named_t	zm_execpgin;
 	kstat_named_t	zm_fspgin;
 	kstat_named_t	zm_anon_alloc_fail;
+	kstat_named_t	zm_pf_throttle;
+	kstat_named_t	zm_pf_throttle_usec;
 } zone_mcap_kstat_t;
 
 typedef struct {
@@ -617,6 +621,11 @@ typedef struct zone {
 	uint64_t	zone_execpgin;		/* exec pages paged in */
 	uint64_t	zone_fspgin;		/* fs pages paged in */
 	uint64_t	zone_anon_alloc_fail;	/* cnt of anon alloc fails */
+	uint64_t	zone_pf_throttle;	/* cnt of page flt throttles */
+	uint64_t	zone_pf_throttle_usec;	/* time of page flt throttles */
+
+	/* Num usecs to throttle page fault when zone is over phys. mem cap */
+	uint32_t	zone_pg_flt_delay;
 
 	/*
 	 * Misc. kstats and counters for zone cpu-usage aggregation.
