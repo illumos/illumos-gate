@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -834,9 +834,7 @@ system_misc_kstat_update(kstat_t *ksp, int rw)
 		zone_lbolt = ddi_get_lbolt();
 		zone_nproc = nproc;
 	} else {
-		struct timeval tvp;
-		hrt2tv(curproc->p_zone->zone_zsched->p_mstart, &tvp);
-		zone_boot_time = tvp.tv_sec;
+		zone_boot_time = curproc->p_zone->zone_boot_time;
 
 		zone_hrtime = gethrtime();
 		zone_lbolt = (clock_t)(NSEC_TO_TICK(zone_hrtime) -
