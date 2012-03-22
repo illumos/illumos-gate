@@ -21,6 +21,7 @@
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2011 Nexenta Systems, Inc. All rights reserved.
 # Copyright (c) 2011 by Delphix. All rights reserved.
+# Copyright (c) 2012, Joyent, Inc. All rights reserved.
 #
 # MAPFILE HEADER START
 #
@@ -59,6 +60,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	libzfs_init;
 	libzfs_mnttab_cache;
 	libzfs_print_on_error;
+	libzfs_set_cachedprops;
 	zfs_allocatable_devs;
 	zfs_asprintf;
 	zfs_clone;

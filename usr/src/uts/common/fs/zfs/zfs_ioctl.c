@@ -1758,7 +1758,8 @@ zfs_ioc_vdev_setfru(zfs_cmd_t *zc)
 }
 
 static int
-zfs_ioc_objset_stats_impl(zfs_cmd_t *zc, objset_t *os)
+zfs_ioc_objset_stats_impl(zfs_cmd_t *zc, objset_t *os,
+    boolean_t cachedpropsonly)
 {
 	int error = 0;
 	nvlist_t *nv;
@@ -1776,7 +1777,8 @@ zfs_ioc_objset_stats_impl(zfs_cmd_t *zc, objset_t *os)
 		 * XXX reading with out owning
 		 */
 		if (!zc->zc_objset_stats.dds_inconsistent &&
-		    dmu_objset_type(os) == DMU_OST_ZVOL) {
+		    dmu_objset_type(os) == DMU_OST_ZVOL &&
+		    !cachedpropsonly) {
 			error = zvol_get_stats(os, nv);
 			if (error == EIO)
 				return (error);
@@ -1803,13 +1805,25 @@ static int
 zfs_ioc_objset_stats(zfs_cmd_t *zc)
 {
 	objset_t *os = NULL;
+	nvlist_t *nvl = NULL;
+	boolean_t cachedpropsonly = B_FALSE;
 	int error;
+
+	if (zc->zc_nvlist_src != NULL &&
+	    (error = get_nvlist(zc->zc_nvlist_src, zc->zc_nvlist_src_size,
+	    zc->zc_iflags, &nvl) != 0))
+		return (error);
+
+	if (nvl != NULL) {
+		(void) nvlist_lookup_boolean_value(nvl, "cachedpropsonly",
+		    &cachedpropsonly);
+		nvlist_free(nvl);
+	}
 
 	if (error = dmu_objset_hold(zc->zc_name, FTAG, &os))
 		return (error);
 
-	error = zfs_ioc_objset_stats_impl(zc, os);
-
+	error = zfs_ioc_objset_stats_impl(zc, os, cachedpropsonly);
 	dmu_objset_rele(os, FTAG);
 
 	return (error);
@@ -2023,7 +2037,20 @@ static int
 zfs_ioc_snapshot_list_next(zfs_cmd_t *zc)
 {
 	objset_t *os;
+	nvlist_t *nvl = NULL;
+	boolean_t cachedpropsonly = B_FALSE;
 	int error;
+
+	if (zc->zc_nvlist_src != NULL &&
+	    (error = get_nvlist(zc->zc_nvlist_src, zc->zc_nvlist_src_size,
+	    zc->zc_iflags, &nvl) != 0))
+		return (error);
+
+	if (nvl != NULL) {
+		(void) nvlist_lookup_boolean_value(nvl, "cachedpropsonly",
+		    &cachedpropsonly);
+		nvlist_free(nvl);
+	}
 
 top:
 	if (zc->zc_cookie == 0)
@@ -2073,8 +2100,10 @@ top:
 			objset_t *ossnap;
 
 			error = dmu_objset_from_ds(ds, &ossnap);
-			if (error == 0)
-				error = zfs_ioc_objset_stats_impl(zc, ossnap);
+			if (error == 0) {
+				error = zfs_ioc_objset_stats_impl(zc,
+				    ossnap, cachedpropsonly);
+			}
 			dsl_dataset_rele(ds, FTAG);
 		}
 	} else if (error == ENOENT) {

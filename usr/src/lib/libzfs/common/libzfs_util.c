@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 by Delphix. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -78,6 +79,9 @@ libzfs_error_description(libzfs_handle_t *hdl)
 		return (dgettext(TEXT_DOMAIN, "property cannot be inherited"));
 	case EZFS_PROPSPACE:
 		return (dgettext(TEXT_DOMAIN, "invalid quota or reservation"));
+	case EZFS_PROPCACHED:
+		return (dgettext(TEXT_DOMAIN, "property unavailable since "
+		    "cachedprops flag set"));
 	case EZFS_BADTYPE:
 		return (dgettext(TEXT_DOMAIN, "operation not applicable to "
 		    "datasets of this type"));
@@ -605,6 +609,42 @@ libzfs_print_on_error(libzfs_handle_t *hdl, boolean_t printerr)
 	hdl->libzfs_printerr = printerr;
 }
 
+/*
+ * Set the value of the cachedprops flag.  If the cachedprops flag is set,
+ * operations which get ZFS properties will only retrieve a property if the
+ * property is cached somewhere in memory.
+ *
+ * Consumers of libzfs should take care when setting this flag, as they will
+ * prevent themselves from listing the full set of ZFS properties.
+ *
+ * ZFS properties which always require disk I/O are ZPL properties (utf8only,
+ * normalization, etc.) and the volsize and volblocksize properties for volumes.
+ */
+void
+libzfs_set_cachedprops(libzfs_handle_t *hdl, boolean_t cachedprops)
+{
+	hdl->libzfs_cachedprops = cachedprops;
+}
+
+/*
+ * Adds a src nvlist to a zfs_cmd_t which specifies that only cached (i.e., will
+ * not require a disk access) properties should be retrieved.
+ */
+int
+libzfs_cmd_set_cachedprops(libzfs_handle_t *hdl, zfs_cmd_t *zc)
+{
+	nvlist_t *nvl;
+	int ret;
+
+	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0 ||
+	    nvlist_add_boolean_value(nvl, "cachedpropsonly", B_TRUE) != 0)
+		return (no_memory(hdl));
+
+	ret = zcmd_write_src_nvlist(hdl, zc, nvl);
+	nvlist_free(nvl);
+	return (ret);
+}
+
 libzfs_handle_t *
 libzfs_init(void)
 {
@@ -630,6 +670,8 @@ libzfs_init(void)
 	zfs_prop_init();
 	zpool_prop_init();
 	libzfs_mnttab_init(hdl);
+
+	hdl->libzfs_cachedprops = B_FALSE;
 
 	return (hdl);
 }
