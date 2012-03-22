@@ -82,8 +82,8 @@ check_proto()
 		# check if it exists or not, we never did for Teamware,
 		# since it might appear later anyway.
 		#
-		if [[ "${proto##ssh://}" == "$proto" -a \
-		     "${proto##http://}" == "$proto" -a \
+		if [[ "${proto##ssh://}" == "$proto" && \
+		     "${proto##http://}" == "$proto" && \
 		     "${proto##https://}" == "$proto" ]]; then
 			echo "${proto}/root_${MACH}"
 		fi
@@ -159,8 +159,8 @@ unset tmpwsname
 #
 # Checking for CODEMGR_WSPATH
 #
-if [[ "(" "${CODEMGR_WSPATH}x" != "x" ")" -a "(" ! -d $wsname ")" -a \
-     "(" `expr "$wsname" : "\/"` = "0" ")" ]] 
+if [[ -n ${CODEMGR_WSPATH} && ( ! -d $wsname ) && \
+     ( `expr "$wsname" : "\/"` = "0" ) ]] 
 then
 	ofs=$IFS
 	IFS=": 	"
@@ -217,15 +217,15 @@ CODEMGR_WS=$wsname ; export CODEMGR_WS
 SRC=$wsname/usr/src; export SRC
 TSRC=$wsname/usr/ontest; export TSRC
 
-if [[ "$SCM_MODE" = "teamware" -a -d ${wsname}/Codemgr_wsdata ]]; then
+if [[ "$SCM_MODE" = "teamware" && -d ${wsname}/Codemgr_wsdata ]]; then
 	CM_DATA="Codemgr_wsdata"
 	wsosdir=$CODEMGR_WS/$CM_DATA/sunos
 	protofile=$wsosdir/protodefs
-elif [[ "$SCM_MODE" = "mercurial" -a -d ${wsname}/.hg ]]; then
+elif [[ "$SCM_MODE" = "mercurial" && -d ${wsname}/.hg ]]; then
 	CM_DATA=".hg"
 	wsosdir=$CODEMGR_WS/$CM_DATA
 	protofile=$wsosdir/org.opensolaris.protodefs
-elif [[ "$SCM_MODE" = "git" -a -d ${wsname}/.git ]]; then
+elif [[ "$SCM_MODE" = "git" && -d ${wsname}/.git ]]; then
 	CM_DATA=".git"
 	wsosdir=$CODEMGR_WS/$CM_DATA
 	protofile=$wsosdir/org.opensolaris.protodefs
