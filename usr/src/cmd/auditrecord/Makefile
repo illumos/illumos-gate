@@ -66,7 +66,7 @@ $(ROOTUSRSBINPROG): $(PROG)
 	$(INS.file) $(PROG)
 
 $(PROG).po: $(PROG) $(ATTR) $(AGETTEXT)
-	export PERL5LIB; PERL5LIB=../perl/contrib; \
+	export PERL5LIB; PERL5LIB=../perl/5.14.2-$(MACH64)/Sun/Solaris/Utils/blib/lib:../perl/5.14.2-$(MACH64)/Sun/Solaris/Utils/blib/arch:../perl/5.14.2-$(MACH64)/Sun/Solaris/BSM/blib/lib:../perl/5.14.2-$(MACH64)/Sun/Solaris/BSM/blib/arch; \
 	./$(AGETTEXT) $(TEXT_DOMAIN) $(PROG).po; \
 	$(XGETTEXT) -d $(PROG) -j $(PROG)
 

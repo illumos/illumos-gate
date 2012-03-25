@@ -1865,7 +1865,7 @@ depend fmri=release/name type=require
 #
 # intrd and others use the illumos-defaulted perl interpreter
 #
-depend fmri=runtime/perl-510 type=require
+depend fmri=runtime/perl-5142 type=require
 #
 # The loadkeys binary needs the keytables.
 #
