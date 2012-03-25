@@ -1767,7 +1767,7 @@ password_cb(char *buf, int buflen, int rwflag, void *userdata)
 static SSL_CTX *
 initialize_ctx(http_conn_t *c_id)
 {
-	SSL_METHOD	*meth;
+	const SSL_METHOD	*meth;
 	SSL_CTX		*ctx;
 
 	ERR_clear_error();
