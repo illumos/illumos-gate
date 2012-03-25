@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
  */
 
 /*
@@ -27,6 +28,7 @@
  * sets non-/attributable mask in the kernel context.
  */
 
+#include <zone.h>
 #include <audit_scf.h>
 #include <bsm/adt.h>
 #include <bsm/libbsm.h>
@@ -88,6 +90,13 @@ main(void)
 		} else {
 			(void) printf("%s\n", strerror(errno));
 		}
+#endif
+		return (SMF_EXIT_OK);
+	}
+
+	if (getzoneid() != 0) {
+#ifdef	DEBUG
+		(void) printf("auditset service is disabled within zones.\n");
 #endif
 		return (SMF_EXIT_OK);
 	}
