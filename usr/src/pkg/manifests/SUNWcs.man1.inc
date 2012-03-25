@@ -10,6 +10,7 @@
 #
 
 # Copyright 2011, Richard Lowe
+# Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 
 file path=usr/share/man/man1/Intro.1
 file path=usr/share/man/man1/alias.1
@@ -134,11 +135,6 @@ file path=usr/share/man/man1/hist.1
 file path=usr/share/man/man1/history.1
 file path=usr/share/man/man1/hostid.1
 file path=usr/share/man/man1/hostname.1
-file path=usr/share/man/man1/i286.1
-file path=usr/share/man/man1/i386.1
-file path=usr/share/man/man1/i486.1
-file path=usr/share/man/man1/i860.1
-file path=usr/share/man/man1/iAPX286.1
 file path=usr/share/man/man1/iconv.1
 file path=usr/share/man/man1/if.1
 file path=usr/share/man/man1/intro.1
@@ -171,7 +167,6 @@ file path=usr/share/man/man1/ls.1
 file path=usr/share/man/man1/m4.1
 file path=usr/share/man/man1/mac.1
 file path=usr/share/man/man1/mach.1
-file path=usr/share/man/man1/machid.1
 file path=usr/share/man/man1/mail.1
 file path=usr/share/man/man1/mailx.1
 file path=usr/share/man/man1/makekey.1
@@ -196,7 +191,6 @@ file path=usr/share/man/man1/paste.1
 file path=usr/share/man/man1/pathchk.1
 file path=usr/share/man/man1/pax.1
 file path=usr/share/man/man1/pcred.1
-file path=usr/share/man/man1/pdp11.1
 file path=usr/share/man/man1/pfcsh.1
 file path=usr/share/man/man1/pfexec.1
 file path=usr/share/man/man1/pfiles.1
@@ -255,13 +249,11 @@ file path=usr/share/man/man1/shell_builtins.1
 file path=usr/share/man/man1/shift.1
 file path=usr/share/man/man1/sleep.1
 file path=usr/share/man/man1/source.1
-file path=usr/share/man/man1/sparc.1
 file path=usr/share/man/man1/stop.1
 file path=usr/share/man/man1/strchg.1
 file path=usr/share/man/man1/strconf.1
 file path=usr/share/man/man1/stty.1
 file path=usr/share/man/man1/sum.1
-file path=usr/share/man/man1/sun.1
 file path=usr/share/man/man1/suspend.1
 file path=usr/share/man/man1/svcprop.1
 file path=usr/share/man/man1/svcs.1
@@ -282,11 +274,6 @@ file path=usr/share/man/man1/true.1
 file path=usr/share/man/man1/tty.1
 file path=usr/share/man/man1/type.1
 file path=usr/share/man/man1/typeset.1
-file path=usr/share/man/man1/u370.1
-file path=usr/share/man/man1/u3b.1
-file path=usr/share/man/man1/u3b15.1
-file path=usr/share/man/man1/u3b2.1
-file path=usr/share/man/man1/u3b5.1
 file path=usr/share/man/man1/ulimit.1
 file path=usr/share/man/man1/umask.1
 file path=usr/share/man/man1/unalias.1

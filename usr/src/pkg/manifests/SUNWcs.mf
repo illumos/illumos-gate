@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 #
 
 <include SUNWcs.man1.inc>
@@ -778,7 +779,6 @@ file path=usr/bin/groups mode=0555
 file path=usr/bin/head mode=0555
 file path=usr/bin/hostid mode=0555
 file path=usr/bin/hostname mode=0555
-file path=usr/bin/i286 mode=0555
 file path=usr/bin/iconv mode=0555
 file path=usr/bin/id mode=0555
 file path=usr/bin/infocmp mode=0555
@@ -1528,11 +1528,6 @@ hardlink path=usr/bin/fc target=../../usr/bin/alias
 hardlink path=usr/bin/fg target=../../usr/bin/alias
 hardlink path=usr/bin/getopts target=../../usr/bin/alias
 hardlink path=usr/bin/hash target=../../usr/bin/alias
-hardlink path=usr/bin/i386 target=../../usr/bin/i286
-hardlink path=usr/bin/i486 target=../../usr/bin/i286
-hardlink path=usr/bin/i860 target=../../usr/bin/i286
-hardlink path=usr/bin/i86pc target=../../usr/bin/i286
-hardlink path=usr/bin/iAPX286 target=../../usr/bin/i286
 hardlink path=usr/bin/jobs target=../../usr/bin/alias
 hardlink path=usr/bin/join target=../../usr/bin/alias
 hardlink path=usr/bin/kill target=../../usr/bin/alias
@@ -1540,19 +1535,12 @@ hardlink path=usr/bin/ksh target=../../usr/lib/isaexec
 hardlink path=usr/bin/ksh93 target=../../usr/lib/isaexec
 hardlink path=usr/bin/ln target=../../usr/bin/cp
 hardlink path=usr/bin/logname target=../../usr/bin/alias
-hardlink path=usr/bin/m68k target=../../usr/bin/i286
 hardlink path=usr/bin/mac target=../../usr/lib/isaexec
-hardlink path=usr/bin/mc68000 target=../../usr/bin/i286
-hardlink path=usr/bin/mc68010 target=../../usr/bin/i286
-hardlink path=usr/bin/mc68020 target=../../usr/bin/i286
-hardlink path=usr/bin/mc68030 target=../../usr/bin/i286
-hardlink path=usr/bin/mc68040 target=../../usr/bin/i286
 hardlink path=usr/bin/mv target=../../usr/bin/cp
 hardlink path=usr/bin/newtask target=../../usr/lib/isaexec
 hardlink path=usr/bin/nohup target=../../usr/lib/isaexec
 hardlink path=usr/bin/page target=../../usr/bin/more
 hardlink path=usr/bin/paste target=../../usr/bin/alias
-hardlink path=usr/bin/pdp11 target=../../usr/bin/i286
 hardlink path=usr/bin/pfbash target=../../usr/bin/pfexec
 hardlink path=usr/bin/pfcsh target=../../usr/bin/pfexec
 hardlink path=usr/bin/pfksh target=../../usr/bin/pfexec
@@ -1575,32 +1563,16 @@ hardlink path=usr/bin/rksh93 target=../../usr/lib/isaexec
 hardlink path=usr/bin/savecore target=../../usr/lib/isaexec
 hardlink path=usr/bin/setuname target=../../usr/lib/isaexec
 hardlink path=usr/bin/sleep target=../../usr/bin/alias
-hardlink path=usr/bin/sparc target=../../usr/bin/i286
 hardlink path=usr/bin/sum target=../../usr/bin/alias
-hardlink path=usr/bin/sun target=../../usr/bin/i286
-hardlink path=usr/bin/sun2 target=../../usr/bin/i286
-hardlink path=usr/bin/sun3 target=../../usr/bin/i286
-hardlink path=usr/bin/sun3x target=../../usr/bin/i286
-hardlink path=usr/bin/sun4 target=../../usr/bin/i286
-hardlink path=usr/bin/sun4c target=../../usr/bin/i286
-hardlink path=usr/bin/sun4d target=../../usr/bin/i286
-hardlink path=usr/bin/sun4e target=../../usr/bin/i286
-hardlink path=usr/bin/sun4m target=../../usr/bin/i286
 hardlink path=usr/bin/tee target=../../usr/bin/alias
 hardlink path=usr/bin/test target=../../usr/bin/alias
 hardlink path=usr/bin/touch target=../../usr/bin/settime
 hardlink path=usr/bin/type target=../../usr/bin/alias
-hardlink path=usr/bin/u370 target=../../usr/bin/i286
-hardlink path=usr/bin/u3b target=../../usr/bin/i286
-hardlink path=usr/bin/u3b15 target=../../usr/bin/i286
-hardlink path=usr/bin/u3b2 target=../../usr/bin/i286
-hardlink path=usr/bin/u3b5 target=../../usr/bin/i286
 hardlink path=usr/bin/ulimit target=../../usr/bin/alias
 hardlink path=usr/bin/umask target=../../usr/bin/alias
 hardlink path=usr/bin/unalias target=../../usr/bin/alias
 hardlink path=usr/bin/uniq target=../../usr/bin/alias
 hardlink path=usr/bin/uptime target=../../usr/lib/isaexec
-hardlink path=usr/bin/vax target=../../usr/bin/i286
 hardlink path=usr/bin/vedit target=../has/bin/edit
 hardlink path=usr/bin/w target=../../usr/lib/isaexec
 hardlink path=usr/bin/wait target=../../usr/bin/alias
