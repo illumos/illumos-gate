@@ -21,6 +21,7 @@
 #
 # Copyright (c) 2008-2009, Intel Corporation.
 # All Rights Reserved.
+# Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 #
 
 PROG = latencytop
@@ -32,7 +33,7 @@ include ../../Makefile.cmd
 CFLAGS += $(CCVERBOSE)
 CFLAGS64 += $(CCVERBOSE)
 
-CPPFLAGS += -DEMBED_CONFIGS -I/usr/include/glib-2.0 -I/usr/lib/glib-2.0/include
+CPPFLAGS += -DEMBED_CONFIGS -I/usr/include/glib-2.0
 C99MODE = $(C99_ENABLE)
 LDLIBS += -lcurses -ldtrace
 all install	:= LDLIBS += -lglib-2.0

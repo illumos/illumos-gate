@@ -20,10 +20,12 @@
 #
 # Copyright (c) 2008-2009, Intel Corporation.
 # All Rights Reserved.
+# Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 #
 
 include ../Makefile.com
 
 WRAPOPT =
+CPPFLAGS += -I/usr/lib/glib-2.0/include
 
 install: all $(ROOTPROG32)
