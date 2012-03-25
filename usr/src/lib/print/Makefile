@@ -20,6 +20,7 @@
 #
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -33,8 +34,7 @@ SUBDIRS = \
 	libipp-core \
 	libhttp-core \
 	libpapi-ipp \
-	libipp-listener \
-	mod_ipp
+	libipp-listener
 
 all :=                  TARGET = all
 clean :=                TARGET = clean

@@ -20,6 +20,7 @@
 #
 #
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 # Use is subject to license terms.
 # 
 # This file is for historical purposes only, and should not be modified.
@@ -163,8 +164,6 @@ svc:/network/ipfilter:default var/svc/manifest/network/ipfilter.xml
 svc:/network/ipfilter var/svc/manifest/network/ipfilter.xml
 svc:/network/pfil:default var/svc/manifest/network/pfil.xml
 svc:/network/pfil var/svc/manifest/network/pfil.xml
-svc:/application/print/ipp-listener:default var/svc/manifest/application/print/ipp-listener.xml
-svc:/application/print/ipp-listener var/svc/manifest/application/print/ipp-listener.xml
 svc:/network/security/krb5_prop:default var/svc/manifest/network/security/krb5_prop.xml
 svc:/network/security/krb5_prop var/svc/manifest/network/security/krb5_prop.xml
 svc:/network/security/kadmin:default var/svc/manifest/network/security/kadmin.xml

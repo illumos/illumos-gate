@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/library/print/open-printing/ipp@$(PKGVERS)
@@ -106,7 +107,6 @@ file path=usr/share/man/man3papi/papiServiceSetAuthCB.3papi
 file path=usr/share/man/man3papi/papiServiceSetEncryption.3papi
 file path=usr/share/man/man3papi/papiServiceSetPassword.3papi
 file path=usr/share/man/man3papi/papiServiceSetUserName.3papi
-file path=usr/share/man/man4/mod_ipp.4
 legacy pkg=SUNWpsm-ipp \
     desc="Client side support for communicating with IPP based print servers" \
     name="FSG Open Printing API IPP Print Service Module" \
