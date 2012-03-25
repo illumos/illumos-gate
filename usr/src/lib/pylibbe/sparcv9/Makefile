@@ -20,43 +20,10 @@
 #
 
 #
-# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 #
 
-LIBRARY =	libbe_py.a
-VERS =
-OBJECTS =	libbe_py.o
+include ../Makefile.com
+include ../../Makefile.lib.64
 
-include ../../Makefile.lib
-
-PYTHON = 	$(PYTHON_26)
-LIBLINKS = 
-SRCDIR =	../common
-ROOTLIBDIR=	$(ROOT)/usr/lib/python2.6/vendor-packages
-ROOTLIBDIR64=	$(ROOT)/usr/lib/python2.6/vendor-packages/64
-PYOBJS=		$(PYSRCS:%.py=$(SRCDIR)/%.pyc)
-PYFILES=	$(PYSRCS) $(PYSRCS:%.py=%.pyc)
-ROOTPYBEFILES=  $(PYFILES:%=$(ROOTLIBDIR)/%)
-
-C99MODE=        $(C99_ENABLE)
-
-LIBS =		$(DYNLIB)
-LDLIBS +=	-lbe -lnvpair -lc
-CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS +=	-I/usr/include/python2.6 -D_FILE_OFFSET_BITS=64 -I../../libbe/common
-
-.KEEP_STATE:
-
-all install := LDLIBS += -lpython2.6
-
-all: $(PYOBJS) $(LIBS)
-
-install: all $(ROOTPYBEFILES)
-
-$(ROOTLIBDIR)/%: %
-	$(INS.pyfile)
-
-lint: lintcheck
-
-include ../../Makefile.targ
+install: all $(ROOTLIBS64)

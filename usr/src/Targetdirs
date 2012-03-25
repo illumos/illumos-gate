@@ -291,6 +291,7 @@ DIRS= \
 	/usr/lib/pool \
 	/usr/lib/python2.6 \
 	/usr/lib/python2.6/vendor-packages \
+	/usr/lib/python2.6/vendor-packages/64 \
 	/usr/lib/python2.6/vendor-packages/solaris \
 	/usr/lib/python2.6/vendor-packages/zfs \
 	/usr/lib/python2.6/vendor-packages/beadm \
