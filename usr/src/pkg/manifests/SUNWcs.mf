@@ -558,6 +558,7 @@ $(i386_ONLY)file path=lib/svc/manifest/system/hostid.xml group=sys mode=0444
 file path=lib/svc/manifest/system/hotplug.xml group=sys mode=0444
 file path=lib/svc/manifest/system/identity.xml group=sys mode=0444
 file path=lib/svc/manifest/system/idmap.xml group=sys mode=0444
+file path=lib/svc/manifest/system/initial-boot.xml group=sys mode=0444
 file path=lib/svc/manifest/system/keymap.xml group=sys mode=0444
 file path=lib/svc/manifest/system/logadm-upgrade.xml group=sys mode=0444
 file path=lib/svc/manifest/system/manifest-import.xml group=sys mode=0444
@@ -584,6 +585,7 @@ file path=lib/svc/method/fs-usr mode=0555
 file path=lib/svc/method/identity-domain mode=0555
 file path=lib/svc/method/identity-node mode=0555
 file path=lib/svc/method/inetd-upgrade mode=0555
+file path=lib/svc/method/initial-boot mode=0555
 file path=lib/svc/method/keymap mode=0555
 file path=lib/svc/method/ldap-client mode=0555
 file path=lib/svc/method/logadm-upgrade mode=0555
@@ -629,6 +631,7 @@ file path=lib/svc/seed/nonglobal.db group=sys mode=0444 \
     variant.opensolaris.zone=nonglobal
 file path=lib/svc/share/README mode=0444
 file path=lib/svc/share/fs_include.sh mode=0444
+file path=lib/svc/share/initial_include.sh mode=0444
 file path=lib/svc/share/ipf_include.sh mode=0444
 file path=lib/svc/share/mfsthistory mode=0444
 file path=lib/svc/share/net_include.sh mode=0444

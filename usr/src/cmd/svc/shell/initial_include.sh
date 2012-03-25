@@ -1,3 +1,4 @@
+#!/bin/sh
 #
 # CDDL HEADER START
 #
@@ -18,33 +19,41 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+#
 # Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
 
-include ../../Makefile.cmd
+#
+# set system hostname
+#
+set_hostname()
+{
+	/bin/hostname "$1"
+	echo "$1" > /etc/nodename
+}
 
-FILEMODE = 0444
+#
+# set system timezone
+#
+set_timezone()
+{
+	sed -i -e "s:^TZ=.*:TZ=${1}:" /etc/default/init
+}
 
-SRCS = \
-	fs_include.sh \
-	ipf_include.sh \
-	net_include.sh \
-	routing_include.sh \
-	sendmail_include.sh \
-	initial_include.sh \
-	smf_include.sh \
-	mfsthistory
-
-SCRIPTS = $(SRCS:%=$(ROOT)/lib/svc/share/%)
-
-install: all $(SCRIPTS)
-
-$(ROOT)/lib/svc/share/%: %
-	$(INS.file)
-
-all:
-
-lint _msg:
-
-clobber clean:
+#
+# sc_profile_timezone
+#
+sc_profile_timezone()
+{
+	FILE=${1}
+	if [ -z "${FILE}" ]; then
+		FILE=/etc/svc/profile/site/sc_profile.xml
+	fi
+	if [ -f "${FILE}" ]; then
+		NEWTZ=`awk -F'"' '/name="localtime"/{print $6;}' "${FILE}"`
+		if [ -n "${NEWTZ}" ]; then
+			set_timezone ${NEWTZ}
+		fi
+	fi
+}

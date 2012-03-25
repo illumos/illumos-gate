@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 #
 
 include ../../Makefile.cmd
@@ -74,6 +74,7 @@ SYSTEMSVCS= \
 	console-login.xml \
 	early-manifest-import.xml \
 	identity.xml \
+	initial-boot.xml \
 	manifest-import.xml \
 	rmtmpfiles.xml	\
 	vtdaemon.xml
@@ -108,6 +109,7 @@ SVCMETHOD=\
 	fs-usr \
 	identity-domain \
 	identity-node \
+	initial-boot \
 	manifest-import \
 	net-loc \
 	net-loopback \

@@ -1,3 +1,4 @@
+#!/bin/sh
 #
 # CDDL HEADER START
 #
@@ -18,33 +19,34 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+#
 # Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
+#
 
-include ../../Makefile.cmd
+. /lib/svc/share/smf_include.sh
+. /lib/svc/share/initial_include.sh
 
-FILEMODE = 0444
+if [ /etc/svc/profile/site/sc_profile.xml -nt /etc/default/init ] ; then
+	# special case the profile that might have been dropped by the
+	# caiman installer
+	sc_profile_timezone /etc/svc/profile/site/sc_profile.xml
+fi
 
-SRCS = \
-	fs_include.sh \
-	ipf_include.sh \
-	net_include.sh \
-	routing_include.sh \
-	sendmail_include.sh \
-	initial_include.sh \
-	smf_include.sh \
-	mfsthistory
+if [ -e "/.initialboot" ]; then
+	SCRIPT=`/bin/mktemp`
+	echo "#!/bin/sh" > $SCRIPT
+	echo ". /lib/svc/share/smf_include.sh" >> $SCRIPT
+	echo ". /lib/svc/share/initial_include.sh" >> $SCRIPT
+	cat /.initialboot >> $SCRIPT
+	chmod 550 $SCRIPT
+	$SCRIPT
+	rv=$?
+	if [ "$rv" != "$SMF_EXIT_OK" ]; then
+		exit $rv
+	fi
+	rm -f /.initialboot
+fi
 
-SCRIPTS = $(SRCS:%=$(ROOT)/lib/svc/share/%)
+/usr/sbin/svcadm disable $SMF_FMRI
+exit $SMF_EXIT_OK
 
-install: all $(SCRIPTS)
-
-$(ROOT)/lib/svc/share/%: %
-	$(INS.file)
-
-all:
-
-lint _msg:
-
-clobber clean:
