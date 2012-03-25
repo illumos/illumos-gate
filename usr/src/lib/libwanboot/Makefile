@@ -21,6 +21,7 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
@@ -28,6 +29,7 @@
 include $(SRC)/lib/Makefile.lib
 
 SUBDIRS	=	$(MACH)
+$(BUILD64)SUBDIRS += $(MACH64)
 
 HDRS =		boot_http.h \
 		bootinfo.h \

@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/package/svr4@$(PKGVERS)
@@ -36,6 +37,7 @@ dir path=lib/svc/manifest/system group=sys
 dir path=usr group=sys
 dir path=usr/bin
 dir path=usr/lib
+dir path=usr/lib/$(ARCH64)
 dir path=usr/sadm
 dir path=usr/sadm/install
 dir path=usr/sadm/install/bin
@@ -62,6 +64,7 @@ file path=usr/bin/pkgmk mode=0555
 file path=usr/bin/pkgparam group=sys mode=0555
 file path=usr/bin/pkgproto mode=0555
 file path=usr/bin/pkgtrans mode=0555
+file path=usr/lib/$(ARCH64)/libinstzones.so.1
 file path=usr/lib/libinstzones.so.1
 file path=usr/lib/libpkg.so.1
 file path=usr/sadm/install/bin/pkginstall group=sys mode=0555

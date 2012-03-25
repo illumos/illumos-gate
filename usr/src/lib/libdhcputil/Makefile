@@ -20,6 +20,7 @@
 #
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -34,6 +35,7 @@ LOCHDRDIR =	common
 COMHDRDIR =	$(SRC)/common/net/dhcp
 HDRDIR =	$(LOCHDRDIR)
 SUBDIRS =	$(MACH)
+$(BUILD64)SUBDIRS += $(MACH64)
 POFILE =	libdhcputil.po
 MSGFILES =	common/dhcpmsg.c
 XGETFLAGS =	-a -x libdhcputil.xcl
