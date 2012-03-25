@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 #
 #
 # Makefile.master, global definitions for system source
@@ -176,9 +177,8 @@ CTFFINDMOD=	$(ONBLD_TOOLS)/bin/ctffindmod
 XREF=		$(ONBLD_TOOLS)/bin/xref
 FIND=		/usr/bin/find
 PERL=		/usr/bin/perl
-PYTHON_24=	/usr/bin/python2.4
 PYTHON_26=	/usr/bin/python2.6
-PYTHON=		$(PYTHON_24)
+PYTHON=		$(PYTHON_26)
 SORT=		/usr/bin/sort
 TOUCH=		/usr/bin/touch
 WC=		/usr/bin/wc

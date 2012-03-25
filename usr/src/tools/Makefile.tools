@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 #
 # Definitions common to tool source.
 #
@@ -38,7 +39,6 @@ ROOTONBLDLIB=		$(ROOTONBLD)/lib
 ROOTONBLDLIBMACH=	$(ROOTONBLD)/lib/$(MACH)
 ROOTONBLDLIBPERL=	$(ROOTONBLD)/lib/perl
 ROOTONBLDLIBPY=		$(ROOTONBLD)/lib/python
-ROOTONBLDLIBPY_24=	$(ROOTONBLD)/lib/python2.4
 ROOTONBLDLIBPY_26=	$(ROOTONBLD)/lib/python2.6
 ROOTONBLDENV=		$(ROOTONBLD)/env
 ROOTONBLDGK=		$(ROOTONBLD)/gk

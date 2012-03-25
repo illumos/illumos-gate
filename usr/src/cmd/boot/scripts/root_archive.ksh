@@ -22,6 +22,7 @@
 
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 #
 
 # utility to pack and unpack a boot/root archive
@@ -155,7 +156,7 @@ archive_Gnome()
 		    usr/lib/metacity-dialog usr/lib/window-manager-settings \
 		    usr/lib/bonobo-2.0 usr/lib/bononbo usr/lib/gtk-2.0 \
 		    usr/lib/GConf usr/lib/bonobo-activation-server \
-		    usr/lib/python2.4 usr/lib/gstreamer-0.10 \
+		    usr/lib/python2.6 usr/lib/gstreamer-0.10 \
 		    usr/lib/gconf-sanity-check-2 usr/lib/gconfd \
 		    usr/lib/gnome-vfs-2.0 usr/lib/dbus-daemon \
 		    usr/lib/gnome-vfs-daemon usr/lib/gnome-settings-daemon \
