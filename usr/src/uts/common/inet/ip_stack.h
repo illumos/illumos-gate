@@ -269,6 +269,7 @@ struct ip_stack {
 	uint_t		ips_dce_hashsize;
 	struct dcb_s	*ips_dce_hash_v4;
 	struct dcb_s	*ips_dce_hash_v6;
+	uint_t		ips_dce_reclaim_needed;
 
 	/* pending binds */
 	mblk_t		*ips_ip6_asp_pending_ops;

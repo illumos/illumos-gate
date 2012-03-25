@@ -912,7 +912,7 @@ mod_prop_info_t ip_propinfo_tbl[] = {
 
 	{ "_dce_reclaim_threshold", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
-	    {1, 100000, 1000}, {1000} },
+	    {1, 100000, 32}, {32} },
 
 	{ "mtu", MOD_PROTO_IPV4, NULL, ip_get_mtu, {0}, {0} },
 
