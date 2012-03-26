@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -186,7 +187,7 @@ static time_t	fss_minrun = 2;	/* t_pri becomes 59 within 2 secs */
 static time_t	fss_minslp = 2;	/* min time on sleep queue for hardswap */
 static int	fss_quantum = 11;
 
-static void	fss_newpri(fssproc_t *);
+static void	fss_newpri(fssproc_t *, boolean_t);
 static void	fss_update(void *);
 static int	fss_update_list(int);
 static void	fss_change_priority(kthread_t *, fssproc_t *);
@@ -720,15 +721,53 @@ fss_init(id_t cid, int clparmsz, classfuncs_t **clfuncspp)
 /*
  * Calculate the new cpupri based on the usage, the number of shares and
  * the number of active threads.  Reset the tick counter for this thread.
+ *
+ * When calculating the new priority using the standard formula we can hit
+ * a scenario where we don't have good round-robin behavior.  This would be
+ * most commonly seen when there is a zone with lots of runnable threads.
+ * In the bad scenario we will see the following behavior when using the
+ * standard formula and these conditions:
+ *
+ *	- there are multiple runnable threads in the zone (project)
+ *	- the fssps_maxfsspri is a very large value
+ *	- (we also know all of these threads will use the project's
+ *	    fssp_shusage)
+ *
+ * Under these conditions, a thread with a low fss_fsspri value is chosen
+ * to run and the thread gets a high fss_umdpri.  This thread can run for
+ * it's full quanta (fss_timeleft) at which time fss_newpri is called to
+ * calculate the thread's new priority.
+ *
+ * In this case, because the newly calculated fsspri value is much smaller
+ * (orders of magnitude) than the fssps_maxfsspri value, if we used the
+ * standard formula the thread will still get a high fss_umdpri value and
+ * will run again for another quanta, even though there are other runnable
+ * threads in the project.
+ *
+ * For a thread that is runnable for a long time, the thread can continue
+ * to run for many quanta (totaling many seconds) before the thread's fsspri
+ * exceeds the fssps_maxfsspri and the thread's fss_umdpri is reset back
+ * down to 1.  This behavior also keeps the fssps_maxfsspr at a high value,
+ * so that the next runnable thread might repeat this cycle.
+ *
+ * This leads to the case where we don't have round-robin behavior at quanta
+ * granularity, but instead, runnable threads within the project only run
+ * at several second intervals.
+ *
+ * To prevent this scenario from occuring, when a thread has consumed its
+ * quanta and there are multiple runnable threads in the project, we
+ * immediately cause the thread to hit fssps_maxfsspri so that it gets
+ * reset back to 1 and another runnable thread in the project can run.
  */
 static void
-fss_newpri(fssproc_t *fssproc)
+fss_newpri(fssproc_t *fssproc, boolean_t quanta_up)
 {
 	kthread_t *tp;
 	fssproj_t *fssproj;
 	fsspset_t *fsspset;
 	fsszone_t *fsszone;
 	fsspri_t fsspri, maxfsspri;
+	uint32_t n_runnable;
 	pri_t invpri;
 	uint32_t ticks;
 
@@ -761,13 +800,21 @@ fss_newpri(fssproc_t *fssproc)
 		return;
 	}
 
-	/*
-	 * fsspri += shusage * nrunnable * ticks
-	 */
 	ticks = fssproc->fss_ticks;
 	fssproc->fss_ticks = 0;
-	fsspri = fssproc->fss_fsspri;
-	fsspri += fssproj->fssp_shusage * fssproj->fssp_runnable * ticks;
+	maxfsspri = fsspset->fssps_maxfsspri;
+	n_runnable = fssproj->fssp_runnable;
+
+	if (quanta_up && n_runnable > 1) {
+		fsspri = maxfsspri;
+	} else {
+		/*
+		 * fsspri += shusage * nrunnable * ticks
+		 */
+		fsspri = fssproc->fss_fsspri;
+		fsspri += fssproj->fssp_shusage * n_runnable * ticks;
+	}
+
 	fssproc->fss_fsspri = fsspri;
 
 	if (fsspri < fss_maxumdpri)
@@ -788,7 +835,6 @@ fss_newpri(fssproc_t *fssproc)
 	 * values; if it is changed, additional checks may need  to  be
 	 * added.
 	 */
-	maxfsspri = fsspset->fssps_maxfsspri;
 	if (fsspri >= maxfsspri) {
 		fsspset->fssps_maxfsspri = fsspri;
 		disp_lock_exit_high(&fsspset->fssps_displock);
@@ -1129,7 +1175,7 @@ fss_update_list(int i)
 			aston(t);
 			goto next;
 		}
-		fss_newpri(fssproc);
+		fss_newpri(fssproc, B_FALSE);
 		updated = 1;
 
 		fss_umdpri = fssproc->fss_umdpri;
@@ -1677,7 +1723,7 @@ fss_forkret(kthread_t *t, kthread_t *ct)
 	thread_lock(t);
 
 	fssproc = FSSPROC(t);
-	fss_newpri(fssproc);
+	fss_newpri(fssproc, B_FALSE);
 	fssproc->fss_timeleft = fss_quantum;
 	t->t_pri = fssproc->fss_umdpri;
 	ASSERT(t->t_pri >= 0 && t->t_pri <= fss_maxglobpri);
@@ -1778,7 +1824,7 @@ fss_parmsset(kthread_t *t, void *parmsp, id_t reqpcid, cred_t *reqpcredp)
 	fssproc->fss_uprilim = reqfssuprilim;
 	fssproc->fss_upri = reqfssupri;
 	fssproc->fss_nice = nice;
-	fss_newpri(fssproc);
+	fss_newpri(fssproc, B_FALSE);
 
 	if ((fssproc->fss_flags & FSSKPRI) != 0) {
 		thread_unlock(t);
@@ -2277,7 +2323,7 @@ fss_tick(kthread_t *t)
 			}
 			fssproc->fss_flags &= ~FSSRESTORE;
 
-			fss_newpri(fssproc);
+			fss_newpri(fssproc, B_TRUE);
 			new_pri = fssproc->fss_umdpri;
 			ASSERT(new_pri >= 0 && new_pri <= fss_maxglobpri);
 
@@ -2316,7 +2362,7 @@ fss_tick(kthread_t *t)
 		 * queue so that it gets charged for the CPU time from its
 		 * quantum even before that quantum expires.
 		 */
-		fss_newpri(fssproc);
+		fss_newpri(fssproc, B_FALSE);
 		if (t->t_pri != fssproc->fss_umdpri)
 			fss_change_priority(t, fssproc);
 
