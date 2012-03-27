@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <alloca.h>
@@ -488,7 +489,7 @@ ses_contract_thread(void *arg)
 		ses_ct_print(buf);
 		event = ct_event_get_type(ev);
 		if (event != CT_DEV_EV_OFFLINE && event != CT_EV_NEGEND) {
-			snprintf(buf, sizeof (buf),
+			(void) snprintf(buf, sizeof (buf),
 			    "bad contract event %x", event);
 			ses_ct_print(buf);
 			ct_event_free(ev);
@@ -501,25 +502,25 @@ ses_contract_thread(void *arg)
 		(void) snprintf(path, PATH_MAX, CTFS_ROOT "/device/%ld/status",
 		    ctid);
 		statfd = open64(path, O_RDONLY);
-		ct_status_read(statfd, CTD_COMMON, &stathdl);
+		(void) ct_status_read(statfd, CTD_COMMON, &stathdl);
 		stp = (ses_enum_target_t *)(uintptr_t)
 		    ct_status_get_cookie(stathdl);
 		ct_status_free(stathdl);
-		close(statfd);
+		(void) close(statfd);
 
 		/* check if target pointer is still valid */
 		if (ses_ssl_valid(stp) == 0) {
-			snprintf(buf, sizeof (buf),
+			(void) snprintf(buf, sizeof (buf),
 			    "contract already abandoned %x", event);
 			ses_ct_print(buf);
 			(void) snprintf(path, PATH_MAX,
 			    CTFS_ROOT "/device/%ld/ctl", ctid);
 			ctlfd = open64(path, O_WRONLY);
 			if (event != CT_EV_NEGEND)
-				ct_ctl_ack(ctlfd, evid);
+				(void) ct_ctl_ack(ctlfd, evid);
 			else
-				ct_ctl_abandon(ctlfd);
-			close(ctlfd);
+				(void) ct_ctl_abandon(ctlfd);
+			(void) close(ctlfd);
 			ct_event_free(ev);
 			(void) pthread_mutex_unlock(&ses_sslmt);
 			continue;
@@ -539,7 +540,7 @@ ses_contract_thread(void *arg)
 				ses_close(stp->set_target);
 				stp->set_target = NULL;
 			}
-			ct_ctl_ack(ctlfd, evid);
+			(void) ct_ctl_ack(ctlfd, evid);
 		} else {
 			/* if this is the negend, then abandon the contract */
 			ses_ct_print("got contract negend");
@@ -549,7 +550,7 @@ ses_contract_thread(void *arg)
 				ses_ct_print(buf);
 				stp->set_ctid = NULL;
 			}
-			ct_ctl_abandon(ctlfd);
+			(void) ct_ctl_abandon(ctlfd);
 		}
 		close(ctlfd);
 		(void) pthread_mutex_unlock(&stp->set_lock);
@@ -680,8 +681,8 @@ ses_create_contract(topo_mod_t *mod, ses_enum_target_t *stp)
 
 	/* set up template to create new contract */
 	tfd = open64(CTFS_ROOT "/device/template", O_RDWR);
-	ct_tmpl_set_critical(tfd, CT_DEV_EV_OFFLINE);
-	ct_tmpl_set_cookie(tfd, (uint64_t)(uintptr_t)stp);
+	(void) ct_tmpl_set_critical(tfd, CT_DEV_EV_OFFLINE);
+	(void) ct_tmpl_set_cookie(tfd, (uint64_t)(uintptr_t)stp);
 
 	/* strip "../../devices" off the front and create the contract */
 	if ((rval = ct_dev_tmpl_set_minor(tfd, &link_path[13])) != 0)
@@ -1184,7 +1185,7 @@ ses_create_disk(ses_enum_data_t *sdp, tnode_t *pnode, nvlist_t *props)
 	}
 
 	if (s == nsas)
-		disk_declare_non_enumerated(mod, pnode, &child);
+		(void) disk_declare_non_enumerated(mod, pnode, &child);
 
 	/* copy sas_addresses (target-ports) from parent (with 'w'added) */
 	if (child != NULL) {
@@ -1916,7 +1917,7 @@ ses_create_esc_sasspecific(ses_enum_data_t *sdp, ses_enum_node_t *snp,
 		 * The phy count goes up to 38 for Sun supported
 		 * JBOD.
 		 */
-		memset(cidxlist, 0, sizeof (int64_t) * 64);
+		(void) memset(cidxlist, 0, sizeof (int64_t) * 64);
 		if (ses_set_expander_props(sdp, xsnp, pnode, exptn, &phycount,
 		    cidxlist) != 0) {
 			/*
@@ -1931,7 +1932,8 @@ ses_create_esc_sasspecific(ses_enum_data_t *sdp, ses_enum_node_t *snp,
 		 * count represetns the number of connectors discovered so far.
 		 */
 		count = 0;
-		memset(connectors, 0, sizeof (sas_connector_phy_data_t) * 64);
+		(void) memset(connectors, 0,
+		    sizeof (sas_connector_phy_data_t) * 64);
 		for (i = 0; i < phycount; i++) {
 			if (cidxlist[i] != -1) {
 				/* connector index is valid. */
@@ -3475,7 +3477,7 @@ ses_process_dir(const char *dirpath, ses_enum_data_t *sdp)
 
 	err = 0;
 error:
-	closedir(dir);
+	(void) closedir(dir);
 	return (err);
 }
 
