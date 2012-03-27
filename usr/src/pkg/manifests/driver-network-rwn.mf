@@ -42,8 +42,12 @@ dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
 dir path=usr/share/man
 dir path=usr/share/man/man7d
-driver name=rwn alias=pci1814,781 clone_perms="rwn 0666 root sys" \
-    perms="* 0666 root sys"
+driver name=rwn clone_perms="rwn 0666 root sys" perms="* 0666 root sys" \
+    alias=pci1814,601 \
+    alias=pci1814,681 \
+    alias=pci1814,701 \
+    alias=pci1814,781 \
+    alias=pci1a3b,1059
 file path=kernel/drv/$(ARCH64)/rwn group=sys
 file path=kernel/drv/rwn group=sys
 file path=usr/share/man/man7d/rwn.7d
