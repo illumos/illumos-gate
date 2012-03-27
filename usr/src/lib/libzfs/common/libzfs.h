@@ -182,6 +182,7 @@ extern libzfs_handle_t *zpool_get_handle(zpool_handle_t *);
 extern libzfs_handle_t *zfs_get_handle(zfs_handle_t *);
 
 extern void libzfs_print_on_error(libzfs_handle_t *, boolean_t);
+extern void libzfs_set_cachedprops(libzfs_handle_t *, boolean_t);
 
 extern int libzfs_errno(libzfs_handle_t *);
 extern const char *libzfs_error_action(libzfs_handle_t *);
