@@ -116,6 +116,7 @@ typedef struct ucode_file_amd {
 	uint8_t uf_resv[896];
 	uint8_t uf_code_present;
 	uint8_t uf_code[191];
+	uint8_t uf_encr[2048];
 #else
 	uint8_t *ucodep;
 	uint32_t usize;
