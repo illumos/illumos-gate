@@ -6107,6 +6107,23 @@ dtrace_probe(dtrace_id_t id, uintptr_t arg0, uintptr_t arg1,
 					continue;
 				}
 
+				/*
+				 * Clear the string space, since there's no
+				 * helper to do it for us.
+				 */
+				if (DTRACE_USTACK_STRSIZE(rec->dtrd_arg) != 0) {
+					int depth = DTRACE_USTACK_NFRAMES(
+					    rec->dtrd_arg);
+					size_t strsize = DTRACE_USTACK_STRSIZE(
+					    rec->dtrd_arg);
+					uint64_t *buf = (uint64_t *)(tomax +
+					    valoffs);
+					void *strspace = &buf[depth + 1];
+
+					dtrace_bzero(strspace,
+					    MIN(depth, strsize));
+				}
+
 				DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
 				dtrace_getupcstack((uint64_t *)
 				    (tomax + valoffs),
