@@ -661,12 +661,12 @@ sn_addhash_locked(smbnode_t *np, avl_index_t where)
 	smbmntinfo_t *mi = np->n_mount;
 
 	ASSERT(RW_WRITE_HELD(&mi->smi_hash_lk));
-	ASSERT(!(np->r_flags & RHASHED));
-
-	avl_insert(&mi->smi_hash_avl, np, where);
 
 	mutex_enter(&np->r_statelock);
-	np->r_flags |= RHASHED;
+	if ((np->r_flags & RHASHED) == 0) {
+		avl_insert(&mi->smi_hash_avl, np, where);
+		np->r_flags |= RHASHED;
+	}
 	mutex_exit(&np->r_statelock);
 }
 
@@ -683,12 +683,12 @@ sn_rmhash_locked(smbnode_t *np)
 	smbmntinfo_t *mi = np->n_mount;
 
 	ASSERT(RW_WRITE_HELD(&mi->smi_hash_lk));
-	ASSERT(np->r_flags & RHASHED);
-
-	avl_remove(&mi->smi_hash_avl, np);
 
 	mutex_enter(&np->r_statelock);
-	np->r_flags &= ~RHASHED;
+	if ((np->r_flags & RHASHED) != 0) {
+		np->r_flags &= ~RHASHED;
+		avl_remove(&mi->smi_hash_avl, np);
+	}
 	mutex_exit(&np->r_statelock);
 }
 
@@ -1048,8 +1048,43 @@ smbfs_rflush(struct vfs *vfsp, cred_t *cr)
 	/* Todo: mmap support. */
 }
 
-/* access cache */
-/* client handles */
+/* access cache (nfs_subr.c) not used here */
+
+static kmutex_t smbfs_newnum_lock;
+static uint32_t smbfs_newnum_val = 0;
+
+/*
+ * Return a number 0..0xffffffff that's different from the last
+ * 0xffffffff numbers this returned.  Used for unlinked files.
+ * (This too was copied from nfs_subr.c)
+ */
+uint32_t
+smbfs_newnum(void)
+{
+	uint32_t id;
+
+	mutex_enter(&smbfs_newnum_lock);
+	if (smbfs_newnum_val == 0)
+		smbfs_newnum_val = (uint32_t)gethrestime_sec();
+	id = smbfs_newnum_val++;
+	mutex_exit(&smbfs_newnum_lock);
+	return (id);
+}
+
+/*
+ * Fill in a temporary name at buf
+ */
+int
+smbfs_newname(char *buf, size_t buflen)
+{
+	uint_t id;
+	int n;
+
+	id = smbfs_newnum();
+	n = snprintf(buf, buflen, "~$smbfs%08X", id);
+	return (n);
+}
+
 
 /*
  * initialize resources that are used by smbfs_subr.c
