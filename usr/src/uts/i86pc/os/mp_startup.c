@@ -649,6 +649,10 @@ int opteron_workaround_6323525;	/* if non-zero -> at least one cpu has it */
 int opteron_erratum_298;
 #endif
 
+#if defined(OPTERON_ERRATUM_721)
+int opteron_erratum_721;
+#endif
+
 static void
 workaround_warning(cpu_t *cp, uint_t erratum)
 {
@@ -1177,6 +1181,16 @@ workaround_errata(struct cpu *cpu)
 
 	missing += do_erratum_298(cpu);
 
+	if (cpuid_opteron_erratum(cpu, 721) > 0) {
+#if defined(OPTERON_ERRATUM_721)
+		wrmsr(MSR_AMD_DE_CFG, rdmsr(MSR_AMD_DE_CFG) | AMD_DE_CFG_E721);
+		opteron_erratum_721++;
+#else
+		workaround_warning(cpu, 721);
+		missing++;
+#endif
+	}
+
 #ifdef __xpv
 	return (0);
 #else
@@ -1266,6 +1280,10 @@ workaround_errata_end()
 		    " microcode patch is HIGHLY recommended or erroneous"
 		    " system\noperation may occur.\n");
 	}
+#endif
+#if defined(OPTERON_ERRATUM_721)
+	if (opteron_erratum_721)
+		workaround_applied(721);
 #endif
 }
 

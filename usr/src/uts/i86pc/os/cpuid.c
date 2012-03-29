@@ -3336,6 +3336,13 @@ cpuid_opteron_erratum(cpu_t *cpu, uint_t erratum)
 		return (DR_AX(eax) || DR_B0(eax) || DR_B1(eax) || DR_BA(eax) ||
 		    DR_B2(eax) || RB_C0(eax));
 
+	case 721:
+#if defined(__amd64)
+		return (cpi->cpi_family == 0x10 || cpi->cpi_family == 0x12);
+#else
+		return (0);
+#endif
+
 	default:
 		return (-1);
 
