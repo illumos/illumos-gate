@@ -21,6 +21,7 @@
 #
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Milan Jurik. All rights reserved.
 #
 # Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T.
 # All rights reserved.
@@ -67,10 +68,12 @@ if smf_is_globalzone; then
 	# read-only at this point. It will be done later by ibd-post-upgrade
 	# service.
 	#
-	ibd_upgraded=`/bin/svcprop -c -p ibd/ibd_upgraded \
-	    $SMF_FMRI 2> /dev/null`
-	if [ "$ibd_upgraded" != "true" ]; then
-		/sbin/ibd_upgrade -v
+	if [ -x /sbin/ibd_upgrade ]; then
+		ibd_upgraded=`/bin/svcprop -c -p ibd/ibd_upgraded \
+		    $SMF_FMRI 2> /dev/null`
+		if [ "$ibd_upgraded" != "true" ]; then
+			/sbin/ibd_upgrade -v
+		fi
 	fi
 
 	#
