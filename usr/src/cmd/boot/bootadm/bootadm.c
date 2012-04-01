@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright 2012 OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
 /*
@@ -4700,7 +4701,7 @@ add_boot_entry(menu_t *mp,
 	}
 
 	if (title == NULL) {
-		title = "Solaris";	/* default to Solaris */
+		title = "Illumos";	/* default to Solaris */
 	}
 	if (kernel == NULL) {
 		bam_error(SUBOPT_MISS, menu_cmds[KERNEL_CMD]);
@@ -7155,7 +7156,7 @@ get_title(char *rootdir)
 	(void) fclose(fp);
 
 out:
-	cp = cp ? cp : "Oracle Solaris";
+	cp = cp ? cp : "Illumos";
 
 	BAM_DPRINTF((D_GET_TITLE, fcn, cp));
 
@@ -8325,7 +8326,7 @@ restore_default_entry(menu_t *mp, const char *which, line_t *lp)
  * Note that we are always rebooting the current OS instance
  * so osroot == / always.
  */
-#define	REBOOT_TITLE	"Solaris_reboot_transient"
+#define	REBOOT_TITLE	"Illumos_reboot_transient"
 
 /*ARGSUSED*/
 static error_t
@@ -8783,7 +8784,7 @@ set_archive_line(entry_t *entryp, line_t *kernelp)
 /*
  * Title for an entry to set properties that once went in bootenv.rc.
  */
-#define	BOOTENV_RC_TITLE	"Solaris bootenv rc"
+#define	BOOTENV_RC_TITLE	"Illumos bootenv rc"
 
 /*
  * If path is NULL, return the kernel (optnum == KERNEL_CMD) or arguments

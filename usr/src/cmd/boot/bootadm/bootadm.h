@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
 #ifndef _BOOTADM_H
@@ -211,10 +212,10 @@ extern int is_sparc(void);
 #define	BAM_LIBBE_FTR	"============ End of LIBBE entry ============="
 
 /* Title used for failsafe entries */
-#define	FAILSAFE_TITLE	"Solaris failsafe"
+#define	FAILSAFE_TITLE	"Illumos failsafe"
 
 /* Title used for hv entries */
-#define	NEW_HV_ENTRY	"Solaris xVM"
+#define	NEW_HV_ENTRY	"Illumos xVM"
 
 /* ZFS boot option */
 #define	ZFS_BOOT	"-B $ZFS-BOOTFS"

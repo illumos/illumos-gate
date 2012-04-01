@@ -21,7 +21,9 @@ timeout 10
 #   terminal serial
 #
 # Uncomment the following line to enable GRUB splashimage on console
-#   splashimage /boot/grub/splash.xpm.gz
+splashimage /boot/grub/splash.xpm.gz
+foreground F7FBFF
+background 333333
 #
 # To chainload another OS
 #
