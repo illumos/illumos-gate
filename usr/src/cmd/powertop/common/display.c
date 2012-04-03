@@ -454,14 +454,26 @@ pt_display_states(void)
 		 * mode is supported
 		 */
 		if (g_turbo_supported) {
+			int p_diff = 1;
+			p0_speed = g_pstate_info[g_npstates - 1].speed;
 			p1_speed = g_pstate_info[g_npstates - 2].speed;
 
 			/*
+			 * AMD systems don't have a visible extra Pstate
+			 * indicating turbo mode as Intel does. Use the
+			 * actual P0 frequency in that case.
+			 */
+			if (p0_speed != p1_speed + 1) {
+				p1_speed = p0_speed;
+				p_diff = 0;
+			}
+
+			/*
 			 * If g_turbo_ratio <= 1.0, it will be ignored.
-			 * we display P(0) as P(1) + 1.
+			 * we display P(0) as P(1) + p_diff.
 			 */
 			if (g_turbo_ratio <= 1.0) {
-				p0_speed = p1_speed + 1;
+				p0_speed = p1_speed + p_diff;
 			} else {
 				/*
 				 * If g_turbo_ratio > 1.0, that means
@@ -470,8 +482,8 @@ pt_display_states(void)
 				 */
 				p0_speed = (uint64_t)(p1_speed *
 				    g_turbo_ratio);
-				if (p0_speed < (p1_speed + 1))
-					p0_speed = p1_speed + 1;
+				if (p0_speed < (p1_speed + p_diff))
+					p0_speed = p1_speed + p_diff;
 			}
 			/*
 			 * Reset the ratio for the next round
