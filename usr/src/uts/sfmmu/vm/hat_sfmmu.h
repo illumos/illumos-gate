@@ -1673,12 +1673,10 @@ typedef struct {
 #define	DMR_MAXBIT ((ulong_t)1<<63) /* dmr_bit high bit */
 
 #define	DEMAP_RANGE_INIT(sfmmup, dmrp) \
-	if ((dmrp) != NULL) { \
 	(dmrp)->dmr_sfmmup = (sfmmup); \
 	(dmrp)->dmr_bitvec = 0; \
 	(dmrp)->dmr_maxbit = sfmmu_dmr_maxbit; \
-	(dmrp)->dmr_pgsz = MMU_PAGESIZE; \
-	}
+	(dmrp)->dmr_pgsz = MMU_PAGESIZE;
 
 #define	DEMAP_RANGE_PGSZ(dmrp) ((dmrp)? (dmrp)->dmr_pgsz : MMU_PAGESIZE)
 
@@ -1690,10 +1688,9 @@ typedef struct {
 	}
 
 #define	DEMAP_RANGE_FLUSH(dmrp) \
-	if ((dmrp) != NULL) { \
-		if ((dmrp)->dmr_bitvec != 0) \
-			sfmmu_tlb_range_demap(dmrp); \
-	}
+	if ((dmrp)->dmr_bitvec != 0)			\
+		sfmmu_tlb_range_demap(dmrp);
+
 
 #define	DEMAP_RANGE_MARKPG(dmrp, addr) \
 	if ((dmrp) != NULL) { \

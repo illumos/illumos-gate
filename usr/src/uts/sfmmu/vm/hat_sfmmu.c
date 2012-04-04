@@ -5032,7 +5032,7 @@ sfmmu_hblk_chgattr(struct hat *sfmmup, struct hme_blk *hmeblkp, caddr_t addr,
 	use_demap_range = (TTEBYTES(ttesz) == DEMAP_RANGE_PGSZ(dmrp));
 	if (use_demap_range) {
 		DEMAP_RANGE_CONTINUE(dmrp, addr, endaddr);
-	} else {
+	} else if (dmrp != NULL) {
 		DEMAP_RANGE_FLUSH(dmrp);
 	}
 
@@ -5389,7 +5389,7 @@ sfmmu_hblk_chgprot(sfmmu_t *sfmmup, struct hme_blk *hmeblkp, caddr_t addr,
 	use_demap_range = (TTEBYTES(ttesz) == MMU_PAGESIZE);
 	if (use_demap_range) {
 		DEMAP_RANGE_CONTINUE(dmrp, addr, endaddr);
-	} else {
+	} else if (dmrp != NULL) {
 		DEMAP_RANGE_FLUSH(dmrp);
 	}
 
@@ -5741,12 +5741,13 @@ hat_unload_callback(
 	 * If the process is exiting, we can save a lot of fuss since
 	 * we'll flush the TLB when we free the ctx anyway.
 	 */
-	if (sfmmup->sfmmu_free)
+	if (sfmmup->sfmmu_free) {
 		dmrp = NULL;
-	else
+	} else {
 		dmrp = &dmr;
+		DEMAP_RANGE_INIT(sfmmup, dmrp);
+	}
 
-	DEMAP_RANGE_INIT(sfmmup, dmrp);
 	endaddr = addr + len;
 	hblktag.htag_id = sfmmup;
 	hblktag.htag_rid = SFMMU_INVALID_SHMERID;
@@ -5919,8 +5920,8 @@ hat_unload_callback(
 		 * to minimize the number of xt_sync()s that need to occur.
 		 */
 		if (callback != NULL && addr_count == MAX_CB_ADDR) {
-			DEMAP_RANGE_FLUSH(dmrp);
 			if (dmrp != NULL) {
+				DEMAP_RANGE_FLUSH(dmrp);
 				cpuset = sfmmup->sfmmu_cpusran;
 				xt_sync(cpuset);
 			}
@@ -5960,8 +5961,8 @@ hat_unload_callback(
 	}
 
 	sfmmu_hblks_list_purge(&list, 0);
-	DEMAP_RANGE_FLUSH(dmrp);
 	if (dmrp != NULL) {
+		DEMAP_RANGE_FLUSH(dmrp);
 		cpuset = sfmmup->sfmmu_cpusran;
 		xt_sync(cpuset);
 	}
@@ -6054,7 +6055,7 @@ sfmmu_hblk_unload(struct hat *sfmmup, struct hme_blk *hmeblkp, caddr_t addr,
 
 	if (use_demap_range) {
 		DEMAP_RANGE_CONTINUE(dmrp, addr, endaddr);
-	} else {
+	} else if (dmrp != NULL) {
 		DEMAP_RANGE_FLUSH(dmrp);
 	}
 	ttecnt = 0;

@@ -3429,10 +3429,10 @@ struct idn_gkstat_named {
 	(x)[2] = (uint_t)(a2), (x)[3] = (uint_t)(a3))
 
 #define	GET_XARGS(x, a0, a1, a2, a3) \
-	(((a0) ? *(uint_t *)(a0) = (x)[0] : 1), \
-	((a1) ? *(uint_t *)(a1) = (x)[1] : 1), \
-	((a2) ? *(uint_t *)(a2) = (x)[2] : 1), \
-	((a3) ? *(uint_t *)(a3) = (x)[3] : 1))
+	((*(uint_t *)(a0) = (x)[0]), \
+	(*(uint_t *)(a1) = (x)[1]), \
+	(*(uint_t *)(a2) = (x)[2]), \
+	(*(uint_t *)(a3) = (x)[3]))
 
 #define	CLR_XARGS(x) \
 		((x)[0] = (x)[1] = (x)[2] = (x)[3] = 0)
