@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 by Delphix. All rights reserved.
- * Copyright (c) 2011 by Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -406,6 +406,23 @@ zfs_prop_delegatable(zfs_prop_t prop)
 		return (B_FALSE);
 
 	return (pd->pd_attr != PROP_READONLY);
+}
+
+boolean_t
+zfs_prop_cacheable(zfs_prop_t prop)
+{
+	/*
+	 * It'd be nice if each prop had a flags field which could have flag
+	 * like PROP_CACHEABLE, but since zprop_attr_t is an enum and this
+	 * setting is orthogonal to the concepts of PROP_READONLY, etc., we have
+	 * this function.
+	 */
+	return (prop == ZFS_PROP_VERSION ||
+	    prop == ZFS_PROP_NORMALIZE ||
+	    prop == ZFS_PROP_UTF8ONLY ||
+	    prop == ZFS_PROP_CASE ||
+	    prop == ZFS_PROP_VOLSIZE ||
+	    prop == ZFS_PROP_VOLBLOCKSIZE);
 }
 
 /*

@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2010 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2011 Joyent, Inc. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 
@@ -325,6 +325,10 @@ static int
 get_stats_ioctl(zfs_handle_t *zhp, zfs_cmd_t *zc)
 {
 	libzfs_handle_t *hdl = zhp->zfs_hdl;
+
+	if (hdl->libzfs_cachedprops &&
+	    libzfs_cmd_set_cachedprops(hdl, zc) != 0)
+		return (-1);
 
 	(void) strlcpy(zc->zc_name, zhp->zfs_name, sizeof (zc->zc_name));
 
@@ -1808,6 +1812,11 @@ get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zprop_source_t *src,
 	case ZFS_PROP_NORMALIZE:
 	case ZFS_PROP_UTF8ONLY:
 	case ZFS_PROP_CASE:
+		if (zhp->zfs_hdl->libzfs_cachedprops) {
+			return (zfs_error(zhp->zfs_hdl, EZFS_PROPCACHED,
+			    "property unavailable since not cached"));
+		}
+
 		if (!zfs_prop_valid_for_type(prop, zhp->zfs_head_type) ||
 		    zcmd_alloc_dst_nvlist(zhp->zfs_hdl, &zc, 0) != 0)
 			return (-1);
@@ -2047,6 +2056,7 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 	char *str;
 	const char *strval;
 	boolean_t received = zfs_is_recvd_props_mode(zhp);
+	boolean_t printerr;
 
 	/*
 	 * Check to see if this property applies to our object
@@ -2056,6 +2066,16 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 
 	if (received && zfs_prop_readonly(prop))
 		return (-1);
+
+	if (zhp->zfs_hdl->libzfs_cachedprops &&
+	    zfs_prop_cacheable(prop)) {
+		printerr = zhp->zfs_hdl->libzfs_printerr;
+		libzfs_print_on_error(zhp->zfs_hdl, B_FALSE);
+		(void) zfs_error(zhp->zfs_hdl, EZFS_PROPCACHED,
+		    "property unavailable since not cached");
+		libzfs_print_on_error(zhp->zfs_hdl, printerr);
+		return (-1);
+	}
 
 	if (src)
 		*src = ZPROP_SRC_NONE;

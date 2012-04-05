@@ -21,9 +21,9 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Joyent, Inc. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2011 by Delphix. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 #ifndef	_LIBZFS_H
@@ -61,6 +61,7 @@ enum {
 	EZFS_PROPTYPE,		/* property does not apply to dataset type */
 	EZFS_PROPNONINHERIT,	/* property is not inheritable */
 	EZFS_PROPSPACE,		/* bad quota or reservation */
+	EZFS_PROPCACHED,	/* prop unavail since cachedprops flag set */
 	EZFS_BADTYPE,		/* dataset is not of appropriate type */
 	EZFS_BUSY,		/* pool or dataset is busy */
 	EZFS_EXISTS,		/* pool or dataset already exists */
@@ -181,6 +182,7 @@ extern libzfs_handle_t *zpool_get_handle(zpool_handle_t *);
 extern libzfs_handle_t *zfs_get_handle(zfs_handle_t *);
 
 extern void libzfs_print_on_error(libzfs_handle_t *, boolean_t);
+extern void libzfs_set_cachedprops(libzfs_handle_t *, boolean_t);
 
 extern int libzfs_errno(libzfs_handle_t *);
 extern const char *libzfs_error_action(libzfs_handle_t *);

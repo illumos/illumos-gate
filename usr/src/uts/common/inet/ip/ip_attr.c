@@ -1295,9 +1295,7 @@ conn_ixa_cleanup(conn_t *connp, void *arg)
 
 	if (IPCL_IS_TCP(connp)) {
 		mblk_t		*mp;
-		tcp_stack_t	*tcps;
 
-		tcps = connp->conn_netstack->netstack_tcp;
 		mp = tcp_ixa_cleanup_getmblk(connp);
 
 		if (connp->conn_sqp->sq_run == curthread) {

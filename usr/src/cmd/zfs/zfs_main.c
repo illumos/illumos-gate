@@ -217,7 +217,7 @@ get_usage(zfs_help_t idx)
 		    "\tdestroy [-dnpRrv] "
 		    "<filesystem|volume>@<snap>[%<snap>][,...]\n"));
 	case HELP_GET:
-		return (gettext("\tget [-rHp] [-d max] "
+		return (gettext("\tget [-crHp] [-d max] "
 		    "[-o \"all\" | field[,...]] [-t type[,...]] "
 		    "[-s source[,...]]\n"
 		    "\t    <\"all\" | property[,...]> "
@@ -1530,8 +1530,11 @@ zfs_do_get(int argc, char **argv)
 	cb.cb_type = ZFS_TYPE_DATASET;
 
 	/* check options */
-	while ((c = getopt(argc, argv, ":d:o:s:rt:Hp")) != -1) {
+	while ((c = getopt(argc, argv, ":d:o:s:rt:Hcp")) != -1) {
 		switch (c) {
+		case 'c':
+			libzfs_set_cachedprops(g_zfs, B_TRUE);
+			break;
 		case 'p':
 			cb.cb_literal = B_TRUE;
 			break;
@@ -3078,6 +3081,8 @@ zfs_do_list(int argc, char **argv)
 	 */
 	if (strcmp(fields, "space") == 0 && types_specified == B_FALSE)
 		types &= ~ZFS_TYPE_SNAPSHOT;
+
+	libzfs_set_cachedprops(g_zfs, B_TRUE);
 
 	/*
 	 * If the user specifies '-o all', the zprop_get_list() doesn't

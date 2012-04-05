@@ -50,6 +50,10 @@ cl_sctp_listen
 cl_sctp_unlisten
 conn_drain_nthreads
 dce_cache
+dce_reclaim_cv
+dce_reclaim_lock
+dce_reclaim_shutdown
+dce_reclaim_thread
 default_ip6_asp_table
 do_tcp_fusion
 do_tcpzcopy
@@ -109,6 +113,8 @@ ip6opt_ls
 ip_cgtp_filter_rev
 ip_conn_cache
 ip_dce_hash_size
+ip_dce_reclaim_interval
+ip_dce_reclaim_threshold_hard
 ip_debug
 ip_g_all_ones
 ip_helper_stream_info

@@ -16,11 +16,7 @@
 
 #
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
-<<<<<<< HEAD
-# Copyright 2008, 2011 Richard Lowe
-=======
 # Copyright 2008, 2012 Richard Lowe
->>>>>>> 8bcea97... 1960 developer tools should support git
 #
 
 import getopt
@@ -35,18 +31,6 @@ from cStringIO import StringIO
 # for NOT files.
 from mercurial import ignore
 
-<<<<<<< HEAD
-sys.path.insert(1, os.path.join('/opt/onbld/lib',
-                                "python%d.%d" % sys.version_info[:2]))
-
-from onbld.Checks import Comments, Copyright, CStyle, HdrChk
-from onbld.Checks import JStyle, Keywords, Mapfile
-
-def run(command):
-    if type(command) != list:
-        command = command.split()
-
-=======
 #
 # Adjust the load path based on our location and the version of python into
 # which it is being loaded.  This assumes the normal onbld directory
@@ -78,18 +62,11 @@ def git(command):
 
     command = ["git"] + command
 
->>>>>>> 8bcea97... 1960 developer tools should support git
     p = subprocess.Popen(command,
                          stdout=subprocess.PIPE,
                          stderr=subprocess.STDOUT)
 
     err = p.wait()
-<<<<<<< HEAD
-    return err != 0 and None or p.stdout
-
-def git_root():
-    p = run('git rev-parse --git-dir')
-=======
     if err != 0:
         raise GitError(p.stdout.read())
 
@@ -100,7 +77,6 @@ def git_root():
     """Return the root of the current git workspace"""
 
     p = git('rev-parse --git-dir')
->>>>>>> 8bcea97... 1960 developer tools should support git
 
     if not p:
         sys.stderr.write("Failed finding git workspace\n")
@@ -109,16 +85,11 @@ def git_root():
     return os.path.abspath(os.path.join(p.readlines()[0],
                                         os.path.pardir))
 
-<<<<<<< HEAD
-def git_branch():
-    p = run('git branch')
-=======
 
 def git_branch():
     """Return the current git branch"""
 
     p = git('branch')
->>>>>>> 8bcea97... 1960 developer tools should support git
 
     if not p:
         sys.stderr.write("Failed finding git branch\n")
@@ -126,14 +97,6 @@ def git_branch():
 
     for elt in p:
         if elt[0] == '*':
-<<<<<<< HEAD
-            return elt.split()[1]
-
-def git_parent_branch(branch):
-    p = run(["git", "for-each-ref",
-             "--format=%(refname:short) %(upstream:short)",
-             "refs/heads/"])
-=======
             if elt.endswith('(no branch)'):
                 return None
             return elt.split()[1]
@@ -150,7 +113,6 @@ def git_parent_branch(branch):
 
     p = git("for-each-ref --format=%(refname:short) %(upstream:short) " +
             "refs/heads/")
->>>>>>> 8bcea97... 1960 developer tools should support git
 
     if not p:
         sys.stderr.write("Failed finding git parent branch\n")
@@ -164,16 +126,11 @@ def git_parent_branch(branch):
                 return remote
     return 'origin/master'
 
-<<<<<<< HEAD
-def git_comments(branch):
-    p = run('git log --pretty=format:%%B %s..' % branch)
-=======
 
 def git_comments(parent):
     """Return a list of any checkin comments on this git branch"""
 
     p = git('log --pretty=format:%%B %s..' % parent)
->>>>>>> 8bcea97... 1960 developer tools should support git
 
     if not p:
         sys.stderr.write("Failed getting git comments\n")
@@ -182,12 +139,6 @@ def git_comments(parent):
     return map(lambda x: x.strip(), p.readlines())
 
 
-<<<<<<< HEAD
-def git_file_list(branch, paths=''):
-    '''Set of files which have ever changed between BRANCH and here'''
-    p = run("git log --name-only --pretty=format: %s.. %s" %
-             (branch, paths))
-=======
 def git_file_list(parent, paths=None):
     """Return the set of files which have ever changed on this branch.
 
@@ -196,7 +147,6 @@ def git_file_list(parent, paths=None):
 
     p = git("log --name-only --pretty=format: %s.. %s" %
              (parent, ' '.join(paths)))
->>>>>>> 8bcea97... 1960 developer tools should support git
 
     if not p:
         sys.stderr.write("Failed building file-list from git\n")
@@ -211,12 +161,8 @@ def git_file_list(parent, paths=None):
 
 
 def not_check(root, cmd):
-<<<<<<< HEAD
-    '''Return a function to do NOT matching'''
-=======
     """Return a function which returns True if a file given as an argument
     should be excluded from the check named by 'cmd'"""
->>>>>>> 8bcea97... 1960 developer tools should support git
 
     ignorefiles = filter(os.path.exists,
                          [os.path.join(root, ".git", "%s.NOT" % cmd),
@@ -227,17 +173,12 @@ def not_check(root, cmd):
         return lambda x: False
 
 
-<<<<<<< HEAD
-def gen_files(root, branch, paths, exclude):
-    # Taken entirely from 2.6's os.path.relpath which we would use if we
-=======
 def gen_files(root, parent, paths, exclude):
     """Return a function producing file names, relative to the current
     directory, of any file changed on this branch (limited to 'paths' if
     requested), and excluding files for which exclude returns a true value """
 
     # Taken entirely from Python 2.6's os.path.relpath which we would use if we
->>>>>>> 8bcea97... 1960 developer tools should support git
     # could.
     def relpath(path, here):
         c = os.path.abspath(os.path.join(root, path)).split(os.path.sep)
@@ -245,30 +186,16 @@ def gen_files(root, parent, paths, exclude):
         l = len(os.path.commonprefix((s, c)))
         return os.path.join(*[os.path.pardir] * (len(s)-l) + c[l:])
 
-<<<<<<< HEAD
-    def ret(select=lambda x: True):
-        for f in git_file_list(branch, paths):
-=======
     def ret(select=None):
         if not select:
             select = lambda x: True
 
         for f in git_file_list(parent, paths):
->>>>>>> 8bcea97... 1960 developer tools should support git
             f = relpath(f, '.')
             if (os.path.exists(f) and select(f) and not exclude(f)):
                 yield f
     return ret
 
-<<<<<<< HEAD
-def comchk(root, branch, flist, output):
-    output.write("Comments:\n")
-
-    return Comments.comchk(git_comments(branch), check_db=True,
-                           output=output)
-
-def mapfilechk(root, branch, flist, output):
-=======
 
 def comchk(root, parent, flist, output):
     output.write("Comments:\n")
@@ -278,7 +205,6 @@ def comchk(root, parent, flist, output):
 
 
 def mapfilechk(root, parent, flist, output):
->>>>>>> 8bcea97... 1960 developer tools should support git
     ret = 0
 
     # We are interested in examining any file that has the following
@@ -304,11 +230,7 @@ def mapfilechk(root, parent, flist, output):
     return ret
 
 
-<<<<<<< HEAD
-def copyright(root, branch, flist, output):
-=======
 def copyright(root, parent, flist, output):
->>>>>>> 8bcea97... 1960 developer tools should support git
     ret = 0
     output.write("Copyrights:\n")
     for f in flist():
@@ -318,11 +240,7 @@ def copyright(root, parent, flist, output):
     return ret
 
 
-<<<<<<< HEAD
-def hdrchk(root, branch, flist, output):
-=======
 def hdrchk(root, parent, flist, output):
->>>>>>> 8bcea97... 1960 developer tools should support git
     ret = 0
     output.write("Header format:\n")
     for f in flist(lambda x: x.endswith('.h')):
@@ -332,11 +250,7 @@ def hdrchk(root, parent, flist, output):
     return ret
 
 
-<<<<<<< HEAD
-def cstyle(root, branch, flist, output):
-=======
 def cstyle(root, parent, flist, output):
->>>>>>> 8bcea97... 1960 developer tools should support git
     ret = 0
     output.write("C style:\n")
     for f in flist(lambda x: x.endswith('.c') or x.endswith('.h')):
@@ -348,11 +262,7 @@ def cstyle(root, parent, flist, output):
     return ret
 
 
-<<<<<<< HEAD
-def jstyle(root, branch, flist, output):
-=======
 def jstyle(root, parent, flist, output):
->>>>>>> 8bcea97... 1960 developer tools should support git
     ret = 0
     output.write("Java style:\n")
     for f in flist(lambda x: x.endswith('.java')):
@@ -362,11 +272,7 @@ def jstyle(root, parent, flist, output):
     return ret
 
 
-<<<<<<< HEAD
-def keywords(root, branch, flist, output):
-=======
 def keywords(root, parent, flist, output):
->>>>>>> 8bcea97... 1960 developer tools should support git
     ret = 0
     output.write("SCCS Keywords:\n")
     for f in flist():
@@ -376,9 +282,6 @@ def keywords(root, parent, flist, output):
     return ret
 
 
-<<<<<<< HEAD
-def run_checks(root, branch, cmds, paths='', opts={}):
-=======
 def run_checks(root, parent, cmds, paths='', opts={}):
     """Run the checks given in 'cmds', expected to have well-known signatures,
     and report results for any which fail.
@@ -388,18 +291,13 @@ def run_checks(root, parent, cmds, paths='', opts={}):
     NB: the function name of the commands passed in is used to name the NOT
     file which excepts files from them."""
 
->>>>>>> 8bcea97... 1960 developer tools should support git
     ret = 0
 
     for cmd in cmds:
         s = StringIO()
 
         exclude = not_check(root, cmd.func_name)
-<<<<<<< HEAD
-        result = cmd(root, branch, gen_files(root, branch, paths, exclude),
-=======
         result = cmd(root, parent, gen_files(root, parent, paths, exclude),
->>>>>>> 8bcea97... 1960 developer tools should support git
                      output=s)
         ret |= result
 
@@ -409,27 +307,17 @@ def run_checks(root, parent, cmds, paths='', opts={}):
     return ret
 
 
-<<<<<<< HEAD
-def nits(root, branch, paths=''):
-=======
 def nits(root, parent, paths):
->>>>>>> 8bcea97... 1960 developer tools should support git
     cmds = [copyright,
             cstyle,
             hdrchk,
             jstyle,
             keywords,
             mapfilechk]
-<<<<<<< HEAD
-    run_checks(root, branch, cmds, paths='')
-
-def pbchk(root, branch):
-=======
     run_checks(root, parent, cmds, paths)
 
 
 def pbchk(root, parent, paths):
->>>>>>> 8bcea97... 1960 developer tools should support git
     cmds = [comchk,
             copyright,
             cstyle,
@@ -437,18 +325,6 @@ def pbchk(root, parent, paths):
             jstyle,
             keywords,
             mapfilechk]
-<<<<<<< HEAD
-    run_checks(root, branch, cmds)
-
-if __name__ == '__main__':
-    branch = None
-
-    try:
-        opts, args = getopt.getopt(sys.argv[1:], 'b:')
-    except getopt.GetoptError, e:
-        sys.stderr.write(str(e))
-        sys.stderr.write("Usage: git-nits [-b branch] [path...]\n")
-=======
     run_checks(root, parent, cmds)
 
 
@@ -460,23 +336,10 @@ def main(cmd, args):
     except getopt.GetoptError, e:
         sys.stderr.write(str(e) + '\n')
         sys.stderr.write("Usage: %s [-b branch] [path...]\n" % cmd)
->>>>>>> 8bcea97... 1960 developer tools should support git
         sys.exit(1)
 
     for opt, arg in opts:
         if opt == '-b':
-<<<<<<< HEAD
-            branch = arg
-
-    if not branch:
-        branch = git_parent_branch(git_branch())
-
-    func = nits
-    if sys.argv[0].endswith('/git-pbchk'):
-        func = pbchk
-
-    func(git_root(), branch)
-=======
             parent_branch = arg
 
     if not parent_branch:
@@ -497,4 +360,3 @@ if __name__ == '__main__':
     except GitError, e:
         sys.stderr.write("failed to run git:\n %s\n" % str(e))
         sys.exit(1)
->>>>>>> 8bcea97... 1960 developer tools should support git

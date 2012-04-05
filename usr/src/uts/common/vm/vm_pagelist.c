@@ -22,6 +22,10 @@
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2012 Joyent, Inc.  All rights reserved.
+ */
+
 /* Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
 /*	All Rights Reserved   */
 
@@ -3181,7 +3185,14 @@ skipptcpcheck:
 			page_unlock_nocapture(pp);
 			return (0);
 		}
-		if (PP_ISNORELOC(pp)) {
+
+		/*
+		 * If a page has been marked non-relocatable or has been
+		 * explicitly locked in memory, we don't want to relocate it;
+		 * unlock the pages and fail the operation.
+		 */
+		if (PP_ISNORELOC(pp) ||
+		    pp->p_lckcnt != 0 || pp->p_cowcnt != 0) {
 			VM_STAT_ADD(vmm_vmstats.ptcpfailcage[szc]);
 			while (i != (pgcnt_t)-1) {
 				pp = &spp[i];
