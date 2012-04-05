@@ -20,6 +20,8 @@
  */
 
 /*
+ * Copyright (c) 2012 Gary Mills
+ *
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -62,29 +64,39 @@ plat_support_serial_kbd_and_ms() {
 
 #define	A_CNT(arr)	(sizeof (arr) / sizeof (arr[0]))
 
-#define	CONS_INVALID	-1
-#define	CONS_SCREEN	0
-#define	CONS_TTYA	1
-#define	CONS_TTYB	2
-#define	CONS_USBSER	3
-#define	CONS_HYPERVISOR	4
+#ifndef	CONS_INVALID
+#define	CONS_INVALID		-1
+#define	CONS_SCREEN_TEXT	0
+#define	CONS_TTY		1
+#define	CONS_XXX		2	/* Unused */
+#define	CONS_USBSER		3
+#define	CONS_HYPERVISOR		4
+#define	CONS_SCREEN_GRAPHICS	5
+#endif	/* CONS_INVALID */
 
 char *plat_fbpath(void);
 
 static int
-console_type()
+console_type(int *tnum)
 {
 	static int boot_console = CONS_INVALID;
+	static int tty_num = 0;
 
 	char *cons;
 	dev_info_t *root;
 
-	if (boot_console != CONS_INVALID)
+	/* If we already have determined the console, just return it. */
+	if (boot_console != CONS_INVALID) {
+		if (tnum != NULL)
+			*tnum = tty_num;
 		return (boot_console);
+	}
 
 #if defined(__xpv)
 	if (!DOMAIN_IS_INITDOMAIN(xen_info) || bcons_hypervisor_redirect()) {
 		boot_console = CONS_HYPERVISOR;
+		if (tnum != NULL)
+			*tnum = tty_num;
 		return (boot_console);
 	}
 #endif /* __xpv */
@@ -94,7 +106,7 @@ console_type()
 	 * fallback on the old "input-device" property.
 	 * If "input-device" is not defined either, also check "output-device".
 	 */
-	boot_console = CONS_SCREEN;	/* default is screen/kb */
+	boot_console = CONS_SCREEN_TEXT;	/* default is screen/kb */
 	root = ddi_root_node();
 	if ((ddi_prop_lookup_string(DDI_DEV_T_ANY, root,
 	    DDI_PROP_DONTPASS, "console", &cons) == DDI_SUCCESS) ||
@@ -102,10 +114,10 @@ console_type()
 	    DDI_PROP_DONTPASS, "input-device", &cons) == DDI_SUCCESS) ||
 	    (ddi_prop_lookup_string(DDI_DEV_T_ANY, root,
 	    DDI_PROP_DONTPASS, "output-device", &cons) == DDI_SUCCESS)) {
-		if (strcmp(cons, "ttya") == 0) {
-			boot_console = CONS_TTYA;
-		} else if (strcmp(cons, "ttyb") == 0) {
-			boot_console = CONS_TTYB;
+		if (strlen(cons) == 4 && strncmp(cons, "tty", 3) == 0 &&
+		    cons[3] >= 'a' && cons[3] <= 'd') {
+			boot_console = CONS_TTY;
+			tty_num = cons[3] - 'a';
 		} else if (strcmp(cons, "usb-serial") == 0) {
 			(void) i_ddi_attach_hw_nodes("ehci");
 			(void) i_ddi_attach_hw_nodes("uhci");
@@ -129,22 +141,26 @@ console_type()
 	 * could be found, fallback to "ttya" since it's likely to exist
 	 * and it matches longstanding behavior on SPARC.
 	 */
-	if (boot_console == CONS_SCREEN && plat_fbpath() == NULL)
-		boot_console = CONS_TTYA;
+	if (boot_console == CONS_SCREEN_TEXT && plat_fbpath() == NULL) {
+		boot_console = CONS_TTY;
+		tty_num = 0;
+	}
 
+	if (tnum != NULL)
+		*tnum = tty_num;
 	return (boot_console);
 }
 
 int
 plat_stdin_is_keyboard(void)
 {
-	return (console_type() == CONS_SCREEN);
+	return (console_type(NULL) == CONS_SCREEN_TEXT);
 }
 
 int
 plat_stdout_is_framebuffer(void)
 {
-	return (console_type() == CONS_SCREEN);
+	return (console_type(NULL) == CONS_SCREEN_TEXT);
 }
 
 static char *
@@ -432,7 +448,9 @@ plat_ttypath(int inum)
 {
 	static char *defaultpath[] = {
 	    "/isa/asy@1,3f8:a",
-	    "/isa/asy@1,2f8:b"
+	    "/isa/asy@1,2f8:b",
+	    "/isa/asy@1,3e8:c",
+	    "/isa/asy@1,2e8:d"
 	};
 	static char path[MAXPATHLEN];
 	char *bp;
@@ -466,25 +484,24 @@ plat_ttypath(int inum)
 }
 
 /*
- * Lacking support for com2 and com3, if that matters.
  * Another possible enhancement could be to use properties
  * for the port mapping rather than simply hard-code them.
  */
 char *
 plat_stdinpath(void)
 {
-	switch (console_type()) {
+	int tty_num = 0;
+
+	switch (console_type(&tty_num)) {
 #if defined(__xpv)
 	case CONS_HYPERVISOR:
 		return ("/xpvd/xencons@0");
 #endif /* __xpv */
-	case CONS_TTYA:
-		return (plat_ttypath(0));
-	case CONS_TTYB:
-		return (plat_ttypath(1));
+	case CONS_TTY:
+		return (plat_ttypath(tty_num));
 	case CONS_USBSER:
 		return (plat_usbser_path());
-	case CONS_SCREEN:
+	case CONS_SCREEN_TEXT:
 	default:
 		break;
 	};
@@ -494,18 +511,18 @@ plat_stdinpath(void)
 char *
 plat_stdoutpath(void)
 {
-	switch (console_type()) {
+	int tty_num = 0;
+
+	switch (console_type(&tty_num)) {
 #if defined(__xpv)
 	case CONS_HYPERVISOR:
 		return ("/xpvd/xencons@0");
 #endif /* __xpv */
-	case CONS_TTYA:
-		return (plat_ttypath(0));
-	case CONS_TTYB:
-		return (plat_ttypath(1));
+	case CONS_TTY:
+		return (plat_ttypath(tty_num));
 	case CONS_USBSER:
 		return (plat_usbser_path());
-	case CONS_SCREEN:
+	case CONS_SCREEN_TEXT:
 	default:
 		break;
 	};

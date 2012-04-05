@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2012 Gary Mills
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -56,10 +58,22 @@ extern int bcons_ischar_xen(void);
 #endif /* __xpv */
 
 static int cons_color = CONS_COLOR;
-int console = CONS_SCREEN_TEXT;
+static int console = CONS_SCREEN_TEXT;
+static int tty_num = 0;
+static int tty_addr[] = {0x3f8, 0x2f8, 0x3e8, 0x2e8};
 #if defined(__xpv)
 static int console_hypervisor_redirect = B_FALSE;
-int console_hypervisor_device = CONS_INVALID;
+static int console_hypervisor_device = CONS_INVALID;
+static int console_hypervisor_tty_num = 0;
+
+/* Obtain the hypervisor console type */
+int
+console_hypervisor_dev_type(int *tnum)
+{
+	if (tnum != NULL)
+		*tnum = console_hypervisor_tty_num;
+	return (console_hypervisor_device);
+}
 #endif /* __xpv */
 
 static int serial_ischar(void);
@@ -140,14 +154,7 @@ static int port;
 static void
 serial_init(void)
 {
-	switch (console) {
-	case CONS_TTYA:
-		port = 0x3f8;
-		break;
-	case CONS_TTYB:
-		port = 0x2f8;
-		break;
-	}
+	port = tty_addr[tty_num];
 
 	outb(port + ISR, 0x20);
 	if (inb(port + ISR) & 0x20) {
@@ -377,7 +384,7 @@ serial_adjust_prop(void)
 	uchar_t mcr = DTR | RTS;
 
 	(void) strcpy(propname, "ttyX-mode");
-	propname[3] = 'a' + console - CONS_TTYA;
+	propname[3] = 'a' + tty_num;
 	propval = get_mode_value(propname);
 	if (propval == NULL)
 		propval = "9600,8,n,1,-";
@@ -472,7 +479,7 @@ serial_adjust_prop(void)
 	outb(port + LCR, lcr);
 
 	(void) strcpy(propname, "ttyX-rts-dtr-off");
-	propname[3] = 'a' + console - CONS_TTYA;
+	propname[3] = 'a' + tty_num;
 	propval = get_mode_value(propname);
 	if (propval == NULL)
 		propval = "false";
@@ -480,6 +487,15 @@ serial_adjust_prop(void)
 		mcr = 0;
 	/* set modem control bits */
 	outb(port + MCR, mcr | OUT2);
+}
+
+/* Obtain the console type */
+int
+boot_console_type(int *tnum)
+{
+	if (tnum != NULL)
+		*tnum = tty_num;
+	return (console);
 }
 
 /*
@@ -491,8 +507,10 @@ typedef struct {
 } console_value_t;
 
 console_value_t console_devices[] = {
-	{ "ttya", CONS_TTYA },
-	{ "ttyb", CONS_TTYB },
+	{ "ttya", CONS_TTY },	/* 0 */
+	{ "ttyb", CONS_TTY },	/* 1 */
+	{ "ttyc", CONS_TTY },	/* 2 */
+	{ "ttyd", CONS_TTY },	/* 3 */
 	{ "text", CONS_SCREEN_TEXT },
 	{ "graphics", CONS_SCREEN_GRAPHICS },
 #if defined(__xpv)
@@ -501,7 +519,7 @@ console_value_t console_devices[] = {
 #if !defined(_BOOT)
 	{ "usb-serial", CONS_USBSER },
 #endif
-	{ "", CONS_INVALID }
+	{ NULL, CONS_INVALID }
 };
 
 void
@@ -537,15 +555,19 @@ bcons_init(char *bootstr)
 	 * a comma or white space.
 	 */
 	if (cons_str != NULL) {
+		int n;
+
 		cons_len = strlen(cons_str);
-		consolep = console_devices;
-		for (; consolep->name[0] != '\0'; consolep++) {
+		for (n = 0; console_devices[n].name != NULL; n++) {
+			consolep = &console_devices[n];
 			len = strlen(consolep->name);
 			if ((len <= cons_len) && ((cons_str[len] == '\0') ||
 			    (cons_str[len] == ',') || (cons_str[len] == '\'') ||
 			    (cons_str[len] == '"') || ISSPACE(cons_str[len])) &&
 			    (strncmp(cons_str, consolep->name, len) == 0)) {
 				console = consolep->value;
+				if (console == CONS_TTY)
+					tty_num = n;
 				break;
 			}
 		}
@@ -577,10 +599,9 @@ bcons_init(char *bootstr)
 	if (DOMAIN_IS_INITDOMAIN(xen_info)) {
 		switch (HYPERVISOR_console_io(CONSOLEIO_get_device, 0, NULL)) {
 			case XEN_CONSOLE_COM1:
-				console_hypervisor_device = CONS_TTYA;
-				break;
 			case XEN_CONSOLE_COM2:
-				console_hypervisor_device = CONS_TTYB;
+				console_hypervisor_device = CONS_TTY;
+				console_hypervisor_tty_num = tty_num;
 				break;
 			case XEN_CONSOLE_VGA:
 				/*
@@ -610,8 +631,7 @@ bcons_init(char *bootstr)
 #endif /* __xpv */
 
 	switch (console) {
-	case CONS_TTYA:
-	case CONS_TTYB:
+	case CONS_TTY:
 		serial_init();
 		break;
 
@@ -652,6 +672,7 @@ void
 bcons_init2(char *inputdev, char *outputdev, char *consoledev)
 {
 	int cons = CONS_INVALID;
+	int ttyn;
 	char *devnames[] = { consoledev, outputdev, inputdev, NULL };
 	console_value_t *consolep;
 	int i;
@@ -667,17 +688,20 @@ bcons_init2(char *inputdev, char *outputdev, char *consoledev)
 			 * but the ttyX-mode was not, we only need to
 			 * check bootenv.rc for that setting.
 			 */
-			if ((!console_mode_set) &&
-			    (console == CONS_TTYA || console == CONS_TTYB))
+			if ((!console_mode_set) && (console == CONS_TTY))
 				serial_init();
 			return;
 		}
 
 		for (i = 0; devnames[i] != NULL; i++) {
-			consolep = console_devices;
-			for (; consolep->name[0] != '\0'; consolep++) {
+			int n;
+
+			for (n = 0; console_devices[n].name != NULL; n++) {
+				consolep = &console_devices[n];
 				if (strcmp(devnames[i], consolep->name) == 0) {
 					cons = consolep->value;
+					if (cons == CONS_TTY)
+						ttyn = n;
 				}
 			}
 			if (cons != CONS_INVALID)
@@ -704,7 +728,8 @@ bcons_init2(char *inputdev, char *outputdev, char *consoledev)
 		}
 
 		console = cons;
-		if (cons == CONS_TTYA || cons == CONS_TTYB) {
+		if (cons == CONS_TTY) {
+			tty_num = ttyn;
 			serial_init();
 			return;
 		}
@@ -741,8 +766,10 @@ bcons_device_change(int new_console)
 
 	console = new_console;
 
-	if (new_console == CONS_TTYA || new_console == CONS_TTYB)
+	if (new_console == CONS_TTY) {
+		tty_num = console_hypervisor_tty_num;
 		serial_init();
+	}
 }
 #endif /* __xpv */
 
@@ -799,8 +826,7 @@ static void
 _doputchar(int c)
 {
 	switch (console) {
-	case CONS_TTYA:
-	case CONS_TTYB:
+	case CONS_TTY:
 		serial_putchar(c);
 		return;
 	case CONS_SCREEN_TEXT:
@@ -862,8 +888,7 @@ bcons_getchar(void)
 #endif /* __xpv */
 
 	switch (console) {
-	case CONS_TTYA:
-	case CONS_TTYB:
+	case CONS_TTY:
 		return (serial_getchar());
 	default:
 		return (kb_getchar());
@@ -883,8 +908,7 @@ bcons_ischar(void)
 #endif /* __xpv */
 
 	switch (console) {
-	case CONS_TTYA:
-	case CONS_TTYB:
+	case CONS_TTY:
 		return (serial_ischar());
 	default:
 		return (kb_ischar());

@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2012 Gary Mills
+ *
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -121,7 +123,7 @@ xpv_panic_putc(int m)
 	struct cons_polledio *c = cons_polledio;
 
 	/* This really shouldn't happen */
-	if (console == CONS_HYPERVISOR)
+	if (boot_console_type(NULL) == CONS_HYPERVISOR)
 		return;
 
 	if (use_polledio == B_TRUE)
@@ -700,7 +702,7 @@ xpv_do_panic(void *arg)
 	 * to stop.
 	 */
 	use_polledio = B_FALSE;
-	if (console == CONS_HYPERVISOR) {
+	if (boot_console_type(NULL) == CONS_HYPERVISOR) {
 		bcons_device_change(CONS_HYPERVISOR);
 	} else if (cons_polledio != NULL &&
 	    cons_polledio->cons_polledio_putchar != NULL)  {

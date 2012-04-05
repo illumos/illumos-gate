@@ -21,17 +21,21 @@
 #
 # CDDL HEADER END
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 #	bootenv.rc -- boot "environment variables"
 #
 setprop keyboard-layout Unknown
 setprop ata-dma-enabled 1
 setprop atapi-cd-dma-enabled 1
+setprop ttyd-rts-dtr-off false
+setprop ttyd-ignore-cd true
+setprop ttyc-rts-dtr-off false
+setprop ttyc-ignore-cd true
 setprop ttyb-rts-dtr-off false
 setprop ttyb-ignore-cd true
 setprop ttya-rts-dtr-off false
 setprop ttya-ignore-cd true
+setprop ttyd-mode 9600,8,n,1,-
+setprop ttyc-mode 9600,8,n,1,-
 setprop ttyb-mode 9600,8,n,1,-
 setprop ttya-mode 9600,8,n,1,-
 setprop lba-access-ok 1
