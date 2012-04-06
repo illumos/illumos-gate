@@ -20,6 +20,8 @@
  */
 
 /*
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ *
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
@@ -43,7 +45,6 @@ static size_t optbufsz = OPTUNIT;
 static void usage(int);
 static void sigexit(int);
 static int setup_sectname(char *, int);
-static void check_swap();
 static void queue(int, char *);
 
 int
@@ -51,7 +52,7 @@ main(int argc, char ** argv, char ** envp)
 {
 	const char	*opt;
 	char		*str;
-	int		error_count = 0, num_sect = 0, errflag = 0, Dflag = 0;
+	int		error_count = 0, num_sect = 0, errflag = 0;
 	int		c, i, my_prog;
 	Cmd_Info	*cmd_info;
 
@@ -72,10 +73,10 @@ main(int argc, char ** argv, char ** envp)
 
 	if (strcmp(str, "mcs") == 0) {
 		my_prog = MCS;
-		opt = "Da:cdn:pVz?";
+		opt = "a:cdn:pVz?";
 	} else if (strcmp(str, "strip") == 0) {
 		my_prog = STRIP;
-		opt = "DlxV?";
+		opt = "lxV?";
 	} else
 		exit(FAILURE);
 
@@ -108,10 +109,6 @@ main(int argc, char ** argv, char ** envp)
 
 	while ((c = getopt(argc, argv, (char *)opt)) != EOF) {
 		switch (c) {
-		case 'D':
-			optcnt++;
-			Dflag++;
-			break;
 		case 'a':
 			optcnt++;
 			queue(ACT_APPEND, optarg);
@@ -168,9 +165,6 @@ main(int argc, char ** argv, char ** envp)
 		usage(my_prog);
 		exit(FAILURE);
 	}
-
-	if (Dflag)
-		check_swap();
 
 	/*
 	 * strip command may not take any options.
@@ -235,8 +229,6 @@ main(int argc, char ** argv, char ** envp)
 		}
 	}
 
-	if (Dflag)
-		check_swap();
 	mcs_exit(error_count);
 	/*NOTREACHED*/
 	return (0);
@@ -371,10 +363,4 @@ sectcmp(char *name)
 		}
 	}
 	return (1);
-}
-
-static void
-check_swap()
-{
-	(void) system("/usr/sbin/swap -s");
 }
