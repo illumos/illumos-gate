@@ -1,5 +1,5 @@
 '\" te
-.\" Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+.\" Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 .TH BEADM 1M "Feb 26, 2011"
 .SH NAME
 beadm \- utility for managing zfs boot environments
@@ -33,7 +33,7 @@ beadm \- utility for managing zfs boot environments
 
 .LP
 .nf
-\fBbeadm\fR \fBunmount\fR [\fB-f\fR] \fIbeName\fR
+\fBbeadm\fR \fBunmount\fR [\fB-f\fR] \fIbeName\fR | \fImountpoint\fR
 .fi
 
 .LP
@@ -374,11 +374,12 @@ already existing empty directory.
 .sp
 .ne 2
 .na
-\fBbeadm\fR \fBunmount\fR [\fB-f\fR] \fIbeName\fR
+\fBbeadm\fR \fBunmount\fR [\fB-f\fR] \fIbeName\fR | \fImountpoint\fR
 .ad
 .sp .6
 .RS 4n
-Unmounts the boot environment named beName.
+Unmounts the boot environment named beName. The command can also be given a path to a
+beName mount point on the system.
 .sp
 .ne 2
 .na
