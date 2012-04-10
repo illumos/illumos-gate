@@ -47,6 +47,15 @@
 			value='svc:/system/filesystem/root'/>
 	</dependency>
 
+	<dependency
+	  name='fs-minimal'
+	  grouping='require_all'
+	  restart_on='none'
+	  type='service'>
+		<service_fmri
+			value='svc:/system/filesystem/minimal'/>
+	</dependency>
+
 	<dependent
 	  name='ibootsvc_single'
 	  grouping='optional_all'
