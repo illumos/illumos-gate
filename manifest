@@ -2369,6 +2369,7 @@ d usr/ccs 0755 root bin
 d usr/ccs/bin 0755 root bin
 d usr/ccs/bin/amd64 0755 root bin
 s usr/ccs/bin/amd64/ld=../../../bin/amd64/ld
+s usr/ccs/bin/ar=../../bin/ar
 s usr/ccs/bin/ld=../../bin/ld
 s usr/ccs/bin/m4=../../bin/m4
 s usr/ccs/bin/regcmp=../../bin/regcmp
