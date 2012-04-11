@@ -21,12 +21,16 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2012 Joyent, Inc. All Rights Reserved.
+#
 
 PROG= wall
 
 include ../Makefile.cmd
 
 FILEMODE = 02555
+
+LDLIBS += -lzonecfg -lcontract
 
 .KEEP_STATE:
 
