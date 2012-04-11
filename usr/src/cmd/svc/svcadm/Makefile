@@ -21,6 +21,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2012, Joyent, Inc.  All rights reserved.
 #
 
 PROG =		svcadm
@@ -46,7 +47,11 @@ $(PROG): $(OBJS)
 $(POFILE): $(POFILES)
 	cat $(POFILES) > $(POFILE)
 
-install: all $(ROOTUSRSBINPROG)
+install: all $(ROOTSBINPROG) $(ROOTUSRSBINPROG)
+
+$(ROOTUSRSBINPROG):
+	-$(RM) $@
+	-$(SYMLINK) ../../sbin/$(PROG) $@
 
 clean:
 	$(RM) $(OBJS)

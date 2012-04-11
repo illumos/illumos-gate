@@ -1795,6 +1795,7 @@ f sbin/soconfig 0555 root bin
 f sbin/su.static 0555 root sys
 s sbin/su=../usr/bin/su
 f sbin/sulogin 0555 root bin
+f sbin/svcadm 0555 root bin
 f sbin/swapadd 0744 root sys
 f sbin/sync 0555 root bin
 f sbin/tzreload 0555 root bin
@@ -10444,7 +10445,7 @@ f usr/sbin/strace 0555 root sys
 f usr/sbin/strclean 0555 root sys
 f usr/sbin/strerr 0555 root sys
 f usr/sbin/sttydefs 0755 root sys
-f usr/sbin/svcadm 0555 root bin
+s usr/sbin/svcadm=../../sbin/svcadm
 f usr/sbin/svccfg 0555 root bin
 h usr/sbin/swap=usr/lib/isaexec
 s usr/sbin/sync=../../sbin/sync
