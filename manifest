@@ -4660,6 +4660,7 @@ f usr/lib/amd64/lddstub 0555 root bin
 f usr/lib/amd64/libHBAAPI.so.1 0755 root bin
 s usr/lib/amd64/libHBAAPI.so=libHBAAPI.so.1
 s usr/lib/amd64/libMPAPI.so=../../../lib/amd64/libMPAPI.so.1
+s usr/lib/amd64/libMPAPI.so.1=../../../lib/amd64/libMPAPI.so.1
 f usr/lib/amd64/libSMHBAAPI.so.1 0755 root bin
 s usr/lib/amd64/libSMHBAAPI.so=libSMHBAAPI.so.1
 s usr/lib/amd64/libadm.so.1=../../../lib/amd64/libadm.so.1
@@ -4704,6 +4705,7 @@ s usr/lib/amd64/libcrypt_d.so=libcrypt.so
 s usr/lib/amd64/libcrypt_i.so.1=libcrypt.so.1
 s usr/lib/amd64/libcrypt_i.so=libcrypt.so
 s usr/lib/amd64/libcryptoutil.so=../../../lib/amd64/libcryptoutil.so.1
+s usr/lib/amd64/libcryptoutil.so.1=../../../lib/amd64/libcryptoutil.so.1
 s usr/lib/amd64/libctf.so.1=../../../lib/amd64/libctf.so.1
 s usr/lib/amd64/libctf.so=../../../lib/amd64/libctf.so.1
 s usr/lib/amd64/libcurses.so.1=../../../lib/amd64/libcurses.so.1
@@ -4723,6 +4725,7 @@ s usr/lib/amd64/libdiskmgt.so=libdiskmgt.so.1
 s usr/lib/amd64/libdl.so.1=../../../lib/amd64/libdl.so.1
 s usr/lib/amd64/libdl.so=../../../lib/amd64/libdl.so.1
 s usr/lib/amd64/libdladm.so=../../../lib/amd64/libdladm.so.1
+s usr/lib/amd64/libdladm.so.1=../../../lib/amd64/libdladm.so.1
 f usr/lib/amd64/libdll.so.1 0755 root bin
 s usr/lib/amd64/libdll.so=libdll.so.1
 s usr/lib/amd64/libdlpi.so.1=../../../lib/amd64/libdlpi.so.1
@@ -4790,6 +4793,7 @@ s usr/lib/amd64/libiscsit.so=libiscsit.so.1
 f usr/lib/amd64/libjdns_sd.so.1 0755 root bin
 s usr/lib/amd64/libjdns_sd.so=libjdns_sd.so.1
 s usr/lib/amd64/libkmfberder.so=../../../lib/amd64/libkmfberder.so.1
+s usr/lib/amd64/libkmfberder.so.1=../../../lib/amd64/libkmfberder.so.1
 f usr/lib/amd64/libkmsagent.so.1 0755 root bin
 s usr/lib/amd64/libkmsagent.so=libkmsagent.so.1
 f usr/lib/amd64/libkrb5.so.1 0755 root bin
@@ -4825,6 +4829,7 @@ s usr/lib/amd64/libmenu.so=libmenu.so.1
 s usr/lib/amd64/libmp.so.2=../../../lib/amd64/libmp.so.2
 s usr/lib/amd64/libmp.so=../../../lib/amd64/libmp.so.2
 s usr/lib/amd64/libmpscsi_vhci.so=../../../lib/amd64/libmpscsi_vhci.so.1
+s usr/lib/amd64/libmpscsi_vhci.so.1=../../../lib/amd64/libmpscsi_vhci.so.1
 f usr/lib/amd64/libmtmalloc.so.1 0755 root bin
 s usr/lib/amd64/libmtmalloc.so=libmtmalloc.so.1
 f usr/lib/amd64/libndmp.so.1 0755 root bin
@@ -4944,7 +4949,9 @@ s usr/lib/amd64/libtnfctl.so=libtnfctl.so.1
 f usr/lib/amd64/libtnfprobe.so.1 0755 root bin
 s usr/lib/amd64/libtnfprobe.so=libtnfprobe.so.1
 s usr/lib/amd64/libtsnet.so=../../../lib/amd64/libtsnet.so.1
+s usr/lib/amd64/libtsnet.so.1=../../../lib/amd64/libtsnet.so.1
 s usr/lib/amd64/libtsol.so=../../../lib/amd64/libtsol.so.2
+s usr/lib/amd64/libtsol.so.2=../../../lib/amd64/libtsol.so.2
 s usr/lib/amd64/libumem.so.1=../../../lib/amd64/libumem.so.1
 s usr/lib/amd64/libumem.so=../../../lib/amd64/libumem.so.1
 s usr/lib/amd64/libuuid.so.1=../../../lib/amd64/libuuid.so.1
