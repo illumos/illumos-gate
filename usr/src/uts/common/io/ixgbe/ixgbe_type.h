@@ -1,6 +1,6 @@
 /******************************************************************************
 
-  Copyright (c) 2001-2010, Intel Corporation 
+  Copyright (c) 2001-2012, Intel Corporation 
   All rights reserved.
   
   Redistribution and use in source and binary forms, with or without 
@@ -41,30 +41,34 @@
 #define IXGBE_INTEL_VENDOR_ID   0x8086
 
 /* Device IDs */
-#define IXGBE_DEV_ID_82598               0x10B6
-#define IXGBE_DEV_ID_82598_BX            0x1508
-#define IXGBE_DEV_ID_82598AF_DUAL_PORT   0x10C6
-#define IXGBE_DEV_ID_82598AF_SINGLE_PORT 0x10C7
-#define IXGBE_DEV_ID_82598AT             0x10C8
-#define IXGBE_DEV_ID_82598AT2            0x150B
-#define IXGBE_DEV_ID_82598EB_SFP_LOM     0x10DB
-#define IXGBE_DEV_ID_82598EB_CX4         0x10DD
-#define IXGBE_DEV_ID_82598_CX4_DUAL_PORT 0x10EC
-#define IXGBE_DEV_ID_82598_DA_DUAL_PORT  0x10F1
+#define IXGBE_DEV_ID_82598               	0x10B6
+#define IXGBE_DEV_ID_82598_BX            	0x1508
+#define IXGBE_DEV_ID_82598AF_DUAL_PORT   	0x10C6
+#define IXGBE_DEV_ID_82598AF_SINGLE_PORT 	0x10C7
+#define IXGBE_DEV_ID_82598AT             	0x10C8
+#define IXGBE_DEV_ID_82598AT2            	0x150B
+#define IXGBE_DEV_ID_82598EB_SFP_LOM     	0x10DB
+#define IXGBE_DEV_ID_82598EB_CX4         	0x10DD
+#define IXGBE_DEV_ID_82598_CX4_DUAL_PORT 	0x10EC
+#define IXGBE_DEV_ID_82598_DA_DUAL_PORT  	0x10F1
 #define IXGBE_DEV_ID_82598_SR_DUAL_PORT_EM      0x10E1
-#define IXGBE_DEV_ID_82598EB_XF_LR       0x10F4
-#define IXGBE_DEV_ID_82599_KX4  0x10F7
-#define IXGBE_DEV_ID_82599_KX4_MEZZ      0x1514
+#define IXGBE_DEV_ID_82598EB_XF_LR       	0x10F4
+#define IXGBE_DEV_ID_82599_KX4  		0x10F7
+#define IXGBE_DEV_ID_82599_KX4_MEZZ      	0x1514
+#define	IXGBE_DEV_ID_82599_KR			0x1517
 #define IXGBE_DEV_ID_82599_COMBO_BACKPLANE      0x10F8
 #define IXGBE_SUBDEV_ID_82599_KX4_KR_MEZZ       0x000C
-#define IXGBE_DEV_ID_82599_CX4  0x10F9
-#define IXGBE_DEV_ID_82599_SFP  0x10FB
-#define IXGBE_SUBDEV_ID_82599_SFP        0x11A9
+#define IXGBE_DEV_ID_82599_CX4			0x10F9
+#define IXGBE_DEV_ID_82599_SFP			0x10FB
+#define IXGBE_SUBDEV_ID_82599_SFP       	0x11A9
 #define IXGBE_DEV_ID_82599_BACKPLANE_FCOE       0x152A
-#define IXGBE_DEV_ID_82599_SFP_FCOE      0x1529
-#define IXGBE_DEV_ID_82599_XAUI_LOM      0x10FC
-#define IXGBE_DEV_ID_82599_T3_LOM        0x151C
-#define IXGBE_DEV_ID_82599_VF   0x10ED
+#define IXGBE_DEV_ID_82599_SFP_FCOE      	0x1529
+#define IXGBE_DEV_ID_82599_SFP_EM		0x1507
+#define	IXGBE_DEV_ID_82599_SFP_SF2		0x154D
+#define IXGBE_DEV_ID_82599EN_SFP		0x1557
+#define IXGBE_DEV_ID_82599_XAUI_LOM      	0x10FC
+#define IXGBE_DEV_ID_82599_T3_LOM        	0x151C
+#define IXGBE_DEV_ID_82599_VF   		0x10ED
 
 /* General Registers */
 #define IXGBE_CTRL      0x00000
