@@ -49,10 +49,12 @@ sub round1_step
     my ($pos, $dst, $x, $y, $z, $k_next, $T_i, $s) = @_;
     $code .= "	mov	0*4(%rsi),	%r10d		/* (NEXT STEP) X[0] */\n" if ($pos == -1);
     $code .= "	mov	%edx,		%r11d		/* (NEXT STEP) z' = %edx */\n" if ($pos == -1);
+    $T_i = sprintf("-0x%08x", (0xffffffff ^ hex($T_i))+1)
+        if (hex($T_i) >= 0x80000000);
 
     $code .= <<EOF;
 	xor	$y,		%r11d		/* y ^ ... */
-	lea	$T_i($dst,%r10d),$dst		/* Const + dst + ... */
+	lea	$T_i($dst,%r10d),$dst		/* Const + dst + ... r1 */
 	and	$x,		%r11d		/* x & ... */
 	xor	$z,		%r11d		/* z ^ ... */
 	mov	$k_next*4(%rsi),%r10d		/* (NEXT STEP) X[$k_next] */
@@ -75,10 +77,12 @@ sub round2_step
     $code .= "	mov	1*4(%rsi),	%r10d		/* (NEXT STEP) X[1] */\n" if ($pos == -1);
     $code .= "	mov	%edx,		%r11d		/* (NEXT STEP) z' = %edx */\n" if ($pos == -1);
     $code .= "	mov	%edx,		%r12d		/* (NEXT STEP) z' = %edx */\n" if ($pos == -1);
+    $T_i = sprintf("-0x%08x", (0xffffffff ^ hex($T_i))+1)
+        if (hex($T_i) >= 0x80000000);
 
     $code .= <<EOF;
 	not	%r11d				/* not z */
-	lea	$T_i($dst,%r10d),$dst		/* Const + dst + ... */
+	lea	$T_i($dst,%r10d),$dst		/* Const + dst + ... r2 */
 	and	$x,		%r12d		/* x & z */
 	and	$y,		%r11d		/* y & (not z) */
 	mov	$k_next*4(%rsi),%r10d		/* (NEXT STEP) X[$k_next] */
@@ -101,9 +105,11 @@ sub round3_step
     my ($pos, $dst, $x, $y, $z, $k_next, $T_i, $s) = @_;
     $code .= "	mov	5*4(%rsi),	%r10d		/* (NEXT STEP) X[5] */\n" if ($pos == -1);
     $code .= "	mov	%ecx,		%r11d		/* (NEXT STEP) y' = %ecx */\n" if ($pos == -1);
+    $T_i = sprintf("-0x%08x", (0xffffffff ^ hex($T_i))+1)
+        if (hex($T_i) >= 0x80000000);
 
     $code .= <<EOF;
-	lea	$T_i($dst,%r10d),$dst		/* Const + dst + ... */
+	lea	$T_i($dst,%r10d),$dst		/* Const + dst + ... r3 */
 	mov	$k_next*4(%rsi),%r10d		/* (NEXT STEP) X[$k_next] */
 	xor	$z,		%r11d		/* z ^ ... */
 	xor	$x,		%r11d		/* x ^ ... */
@@ -126,9 +132,11 @@ sub round4_step
     $code .= "	mov	\$0xffffffff,	%r11d\n" if ($pos == -1);
     $code .= "	xor	%edx,		%r11d		/* (NEXT STEP) not z' = not %edx*/\n"
     if ($pos == -1);
+    $T_i = sprintf("-0x%08x", (0xffffffff ^ hex($T_i))+1)
+        if (hex($T_i) >= 0x80000000);
 
     $code .= <<EOF;
-	lea	$T_i($dst,%r10d),$dst		/* Const + dst + ... */
+	lea	$T_i($dst,%r10d),$dst		/* Const + dst + ... r4 */
 	or	$x,		%r11d		/* x | ... */
 	xor	$y,		%r11d		/* y ^ ... */
 	add	%r11d,		$dst		/* dst += ... */

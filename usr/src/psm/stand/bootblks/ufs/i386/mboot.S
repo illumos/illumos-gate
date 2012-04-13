@@ -21,9 +21,8 @@
  */
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- * ident	"%Z%%M%	%I%	%E% SMI"
  */
 
 /*
@@ -103,7 +102,7 @@
  * between two labels.  The ending label must be the same as the starting label
  * but with a suffix "_end".
  */
-#define	SIZEOF(label)	(offset label##_end - offset label)
+#define	SIZEOF(label)	(label##_end - label)
 
 
 	.title	"Solaris_Master_Boot"
