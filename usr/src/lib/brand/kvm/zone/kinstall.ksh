@@ -53,6 +53,13 @@ do
 done
 shift OPTIND-1
 
+ZONE_STATE=$(/usr/vm/sbin/vmadm list -p zonename="${ZONENAME}" -o state)
+if [[ ${ZONE_STATE} == "receiving" ]]; then
+    # Here we're doing an install for a received zone, the dataset should have
+    # already been created.
+    exit $ZONE_SUBPROC_OK
+fi
+
 if [[ -z $ZONEPATH || -z $ZONENAME ]]; then
 	print -u2 "Brand error: No zone path or name"
 	exit $ZONE_SUBPROC_USAGE
