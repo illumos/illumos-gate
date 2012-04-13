@@ -170,7 +170,7 @@ typedef   int8_t     int8;
 typedef unsigned __int64 uint64;
 typedef signed __int64 int64;
 
-#elif __GNUC__
+#elif defined(__GNUC__) || defined(__SUNPRO_C)
 /* The Xserver source compiles with -ansi -pendantic */
 #   if !defined(__STRICT_ANSI__) || defined(__FreeBSD__)
 #      if defined(VM_X86_64)
@@ -317,7 +317,7 @@ typedef int64 VmTimeVirtualClock;  /* Virtual Clock kept in CPU cycles */
    #endif
    #define FMTPD "l"
    #define FMTH ""
-#elif __GNUC__
+#elif defined(__GNUC__) || defined(__SUNPRO_C)
    #define FMTH ""
    #if defined(N_PLAT_NLM) || defined(sun) || \
        (defined(__FreeBSD__) && (__FreeBSD__ + 0) && ((__FreeBSD__ + 0) < 5))
@@ -385,7 +385,7 @@ typedef int64 VmTimeVirtualClock;  /* Virtual Clock kept in CPU cycles */
 #elif defined __APPLE__
 #define CONST64(c) c##LL
 #define CONST64U(c) c##uLL
-#elif __GNUC__
+#elif defined(__GNUC__) || defined(__SUNPRO_C)
 #ifdef VM_X86_64
 #define CONST64(c) c##L
 #define CONST64U(c) c##uL
