@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -336,6 +337,7 @@ init_console_dev(zlog_t *zlogp)
 	int ndevs;
 	int masterfd;
 	int slavefd;
+	int i;
 
 	/*
 	 * Don't re-setup console if it is working and ready already; just
@@ -421,11 +423,25 @@ devlinks:
 		(void) close(masterfd);
 		goto error;
 	}
-	if (ioctl(masterfd, ZC_HOLDSLAVE, (caddr_t)(intptr_t)slavefd) == 0)
-		rv = 0;
-	else
+	/*
+	 * This ioctl can occasionally return ENXIO if devfs doesn't have
+	 * everything plumbed up yet due to heavy zone startup load. Wait for
+	 * 1 sec. and retry a few times before we fail to boot the zone.
+	 */
+	for (i = 0; i < 5; i++) {
+		if (ioctl(masterfd, ZC_HOLDSLAVE, (caddr_t)(intptr_t)slavefd)
+		    == 0) {
+			rv = 0;
+			break;
+		} else if (errno != ENXIO) {
+			break;
+		}
+		(void) sleep(1);
+	}
+	if (rv != 0)
 		zerror(zlogp, B_TRUE, "ERROR: error while acquiring slave "
 		    "handle of zone console for %s", zone_name);
+
 	(void) close(slavefd);
 	(void) close(masterfd);
 

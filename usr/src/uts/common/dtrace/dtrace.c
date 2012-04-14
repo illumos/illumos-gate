@@ -119,7 +119,7 @@ dtrace_optval_t	dtrace_dof_maxsize = (256 * 1024);
 size_t		dtrace_global_maxsize = (16 * 1024);
 size_t		dtrace_actions_max = (16 * 1024);
 size_t		dtrace_retain_max = 1024;
-dtrace_optval_t	dtrace_helper_actions_max = 32;
+dtrace_optval_t	dtrace_helper_actions_max = 1024;
 dtrace_optval_t	dtrace_helper_providers_max = 32;
 dtrace_optval_t	dtrace_dstate_defsize = (1 * 1024 * 1024);
 size_t		dtrace_strsize_default = 256;
@@ -6105,6 +6105,23 @@ dtrace_probe(dtrace_id_t id, uintptr_t arg0, uintptr_t arg1,
 					    (uint64_t *)(tomax + valoffs),
 					    rec->dtrd_arg);
 					continue;
+				}
+
+				/*
+				 * Clear the string space, since there's no
+				 * helper to do it for us.
+				 */
+				if (DTRACE_USTACK_STRSIZE(rec->dtrd_arg) != 0) {
+					int depth = DTRACE_USTACK_NFRAMES(
+					    rec->dtrd_arg);
+					size_t strsize = DTRACE_USTACK_STRSIZE(
+					    rec->dtrd_arg);
+					uint64_t *buf = (uint64_t *)(tomax +
+					    valoffs);
+					void *strspace = &buf[depth + 1];
+
+					dtrace_bzero(strspace,
+					    MIN(depth, strsize));
 				}
 
 				DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);

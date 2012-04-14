@@ -209,6 +209,10 @@ extern "C" {
 
 #define	AMD_BU_CFG_E298			(UINT64_C(1) << 1)
 
+#define	MSR_AMD_DE_CFG	0xc0011029
+
+#define	AMD_DE_CFG_E721			(UINT64_C(1))
+
 /* AMD's osvw MSRs */
 #define	MSR_AMD_OSVW_ID_LEN		0xc0010140
 #define	MSR_AMD_OSVW_STATUS		0xc0010141

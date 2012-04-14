@@ -21,6 +21,7 @@
 #
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Milan Jurik. All rights reserved.
 #
 
 . /lib/svc/share/smf_include.sh
@@ -537,15 +538,17 @@ case "$1" in
 
 		#
 		# Upgrade handling for ibd:
-		# After we are done with the upgrade handling, we can not set the
-		# ibd/ibd_upgraded property to "true" as the file system is
-		# read-only at this point. It will be done later by ibd-post-upgrade
-		# service.
+		# After we are done with the upgrade handling, we can not set
+		# the ibd/ibd_upgraded property to "true" as the file system is
+		# read-only at this point. It will be done later by
+		# ibd-post-upgrade service.
 		#
-		ibd_upgraded=`/bin/svcprop -c -p ibd/ibd_upgraded \
-		    svc:/network/physical:default 2> /dev/null`
-		if [ "$ibd_upgraded" != "true" ]; then
-			/sbin/ibd_upgrade -v
+		if [ -x /sbin/ibd_upgrade ]; then
+			ibd_upgraded=`/bin/svcprop -c -p ibd/ibd_upgraded \
+			    svc:/network/physical:default 2> /dev/null`
+			if [ "$ibd_upgraded" != "true" ]; then
+				/sbin/ibd_upgrade -v
+			fi
 		fi
 
 		# Bring up simnet instances

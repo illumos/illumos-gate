@@ -38,33 +38,11 @@
 #include <sys/dtrace.h>
 #include <sys/sdt.h>
 
-/*
- * turbo related structure definitions
- */
-typedef struct cpupm_turbo_info {
-	kstat_t		*turbo_ksp;		/* turbo kstat */
-	int		in_turbo;		/* in turbo? */
-	int		turbo_supported;	/* turbo flag */
-	uint64_t	t_mcnt;			/* turbo mcnt */
-	uint64_t	t_acnt;			/* turbo acnt */
-} cpupm_turbo_info_t;
-
-typedef struct turbo_kstat_s {
-	struct kstat_named	turbo_supported;	/* turbo flag */
-	struct kstat_named	t_mcnt;			/* IA32_MPERF_MSR */
-	struct kstat_named	t_acnt;			/* IA32_APERF_MSR */
-} turbo_kstat_t;
-
 static int speedstep_init(cpu_t *);
 static void speedstep_fini(cpu_t *);
 static void speedstep_power(cpuset_t, uint32_t);
 static void speedstep_stop(cpu_t *);
-static boolean_t turbo_supported(void);
-static int turbo_kstat_update(kstat_t *, int);
-static void get_turbo_info(cpupm_turbo_info_t *);
-static void reset_turbo_info(void);
-static void record_turbo_info(cpupm_turbo_info_t *, uint32_t, uint32_t);
-static void update_turbo_info(cpupm_turbo_info_t *);
+static boolean_t speedstep_turbo_supported(void);
 
 /*
  * Interfaces for modules implementing Intel's Enhanced SpeedStep.
@@ -96,16 +74,6 @@ cpupm_state_ops_t speedstep_ops = {
 #define	IA32_MISC_ENABLE_CXE		(1<<25)
 
 #define	CPUID_TURBO_SUPPORT		(1 << 1)
-#define	CPU_ACPI_P0			0
-#define	CPU_IN_TURBO			1
-
-/*
- * MSR for hardware coordination feedback mechanism
- *   - IA32_MPERF: increments in proportion to a fixed frequency
- *   - IA32_APERF: increments in proportion to actual performance
- */
-#define	IA32_MPERF_MSR			0xE7
-#define	IA32_APERF_MSR			0xE8
 
 /*
  * Debugging support
@@ -116,116 +84,6 @@ volatile int ess_debug = 0;
 #else
 #define	ESSDEBUG(arglist)
 #endif
-
-static kmutex_t turbo_mutex;
-
-turbo_kstat_t turbo_kstat = {
-	{ "turbo_supported",	KSTAT_DATA_UINT32 },
-	{ "turbo_mcnt",		KSTAT_DATA_UINT64 },
-	{ "turbo_acnt",		KSTAT_DATA_UINT64 },
-};
-
-/*
- * kstat update function of the turbo mode info
- */
-static int
-turbo_kstat_update(kstat_t *ksp, int flag)
-{
-	cpupm_turbo_info_t *turbo_info = ksp->ks_private;
-
-	if (flag == KSTAT_WRITE) {
-		return (EACCES);
-	}
-
-	/*
-	 * update the count in case CPU is in the turbo
-	 * mode for a long time
-	 */
-	if (turbo_info->in_turbo == CPU_IN_TURBO)
-		update_turbo_info(turbo_info);
-
-	turbo_kstat.turbo_supported.value.ui32 =
-	    turbo_info->turbo_supported;
-	turbo_kstat.t_mcnt.value.ui64 = turbo_info->t_mcnt;
-	turbo_kstat.t_acnt.value.ui64 = turbo_info->t_acnt;
-
-	return (0);
-}
-
-/*
- * Get count of MPERF/APERF MSR
- */
-static void
-get_turbo_info(cpupm_turbo_info_t *turbo_info)
-{
-	ulong_t		iflag;
-	uint64_t	mcnt, acnt;
-
-	iflag = intr_clear();
-	mcnt = rdmsr(IA32_MPERF_MSR);
-	acnt = rdmsr(IA32_APERF_MSR);
-	turbo_info->t_mcnt += mcnt;
-	turbo_info->t_acnt += acnt;
-	intr_restore(iflag);
-}
-
-/*
- * Clear MPERF/APERF MSR
- */
-static void
-reset_turbo_info(void)
-{
-	ulong_t		iflag;
-
-	iflag = intr_clear();
-	wrmsr(IA32_MPERF_MSR, 0);
-	wrmsr(IA32_APERF_MSR, 0);
-	intr_restore(iflag);
-}
-
-/*
- * sum up the count of one CPU_ACPI_P0 transition
- */
-static void
-record_turbo_info(cpupm_turbo_info_t *turbo_info,
-    uint32_t cur_state, uint32_t req_state)
-{
-	if (!turbo_info->turbo_supported)
-		return;
-	/*
-	 * enter P0 state
-	 */
-	if (req_state == CPU_ACPI_P0) {
-		reset_turbo_info();
-		turbo_info->in_turbo = CPU_IN_TURBO;
-	}
-	/*
-	 * Leave P0 state
-	 */
-	else if (cur_state == CPU_ACPI_P0) {
-		turbo_info->in_turbo = 0;
-		get_turbo_info(turbo_info);
-	}
-}
-
-/*
- * update the sum of counts and clear MSRs
- */
-static void
-update_turbo_info(cpupm_turbo_info_t *turbo_info)
-{
-	ulong_t		iflag;
-	uint64_t	mcnt, acnt;
-
-	iflag = intr_clear();
-	mcnt = rdmsr(IA32_MPERF_MSR);
-	acnt = rdmsr(IA32_APERF_MSR);
-	wrmsr(IA32_MPERF_MSR, 0);
-	wrmsr(IA32_APERF_MSR, 0);
-	turbo_info->t_mcnt += mcnt;
-	turbo_info->t_acnt += acnt;
-	intr_restore(iflag);
-}
 
 /*
  * Write the ctrl register. How it is written, depends upon the _PCT
@@ -276,8 +134,6 @@ speedstep_pstate_transition(uint32_t req_state)
 	cpu_acpi_handle_t handle = mach_state->ms_acpi_handle;
 	cpu_acpi_pstate_t *req_pstate;
 	uint32_t ctrl;
-	cpupm_turbo_info_t *turbo_info =
-	    (cpupm_turbo_info_t *)(mach_state->ms_vendor);
 
 	req_pstate = (cpu_acpi_pstate_t *)CPU_ACPI_PSTATES(handle);
 	req_pstate += req_state;
@@ -290,10 +146,9 @@ speedstep_pstate_transition(uint32_t req_state)
 	ctrl = CPU_ACPI_PSTATE_CTRL(req_pstate);
 	write_ctrl(handle, ctrl);
 
-	if (turbo_info)
-		record_turbo_info(turbo_info,
+	if (mach_state->ms_turbo != NULL)
+		cpupm_record_turbo_info(mach_state->ms_turbo,
 		    mach_state->ms_pstate.cma_state.pstate, req_state);
-
 
 	mach_state->ms_pstate.cma_state.pstate = req_state;
 	cpu_set_curr_clock(((uint64_t)CPU_ACPI_FREQ(req_pstate) * 1000000));
@@ -330,7 +185,6 @@ speedstep_init(cpu_t *cp)
 	    (cpupm_mach_state_t *)cp->cpu_m.mcpu_pm_mach_state;
 	cpu_acpi_handle_t handle = mach_state->ms_acpi_handle;
 	cpu_acpi_pct_t *pct_stat;
-	cpupm_turbo_info_t *turbo_info;
 
 	ESSDEBUG(("speedstep_init: processor %d\n", cp->cpu_id));
 
@@ -363,34 +217,8 @@ speedstep_init(cpu_t *cp)
 
 	cpupm_alloc_domains(cp, CPUPM_P_STATES);
 
-	if (!turbo_supported()) {
-		mach_state->ms_vendor = NULL;
-		goto ess_ret_success;
-	}
-	/*
-	 * turbo mode supported
-	 */
-	turbo_info = mach_state->ms_vendor =
-	    kmem_zalloc(sizeof (cpupm_turbo_info_t), KM_SLEEP);
-	turbo_info->turbo_supported = 1;
-	turbo_info->turbo_ksp = kstat_create("turbo", cp->cpu_id,
-	    "turbo", "misc", KSTAT_TYPE_NAMED,
-	    sizeof (turbo_kstat) / sizeof (kstat_named_t),
-	    KSTAT_FLAG_VIRTUAL);
-
-	if (turbo_info->turbo_ksp == NULL) {
-		cmn_err(CE_NOTE, "kstat_create(turbo) fail");
-	} else {
-		turbo_info->turbo_ksp->ks_data = &turbo_kstat;
-		turbo_info->turbo_ksp->ks_lock = &turbo_mutex;
-		turbo_info->turbo_ksp->ks_update = turbo_kstat_update;
-		turbo_info->turbo_ksp->ks_data_size += MAXNAMELEN;
-		turbo_info->turbo_ksp->ks_private = turbo_info;
-
-		kstat_install(turbo_info->turbo_ksp);
-	}
-
-ess_ret_success:
+	if (speedstep_turbo_supported())
+		mach_state->ms_turbo = cpupm_turbo_init(cp);
 
 	ESSDEBUG(("Processor %d succeeded.\n", cp->cpu_id))
 	return (ESS_RET_SUCCESS);
@@ -405,17 +233,13 @@ speedstep_fini(cpu_t *cp)
 	cpupm_mach_state_t *mach_state =
 	    (cpupm_mach_state_t *)(cp->cpu_m.mcpu_pm_mach_state);
 	cpu_acpi_handle_t handle = mach_state->ms_acpi_handle;
-	cpupm_turbo_info_t *turbo_info =
-	    (cpupm_turbo_info_t *)(mach_state->ms_vendor);
 
 	cpupm_free_domains(&cpupm_pstate_domains);
 	cpu_acpi_free_pstate_data(handle);
 
-	if (turbo_info) {
-		if (turbo_info->turbo_ksp != NULL)
-			kstat_delete(turbo_info->turbo_ksp);
-		kmem_free(turbo_info, sizeof (cpupm_turbo_info_t));
-	}
+	if (mach_state->ms_turbo != NULL)
+		cpupm_turbo_fini(mach_state->ms_turbo);
+	mach_state->ms_turbo = NULL;
 }
 
 static void
@@ -424,17 +248,13 @@ speedstep_stop(cpu_t *cp)
 	cpupm_mach_state_t *mach_state =
 	    (cpupm_mach_state_t *)(cp->cpu_m.mcpu_pm_mach_state);
 	cpu_acpi_handle_t handle = mach_state->ms_acpi_handle;
-	cpupm_turbo_info_t *turbo_info =
-	    (cpupm_turbo_info_t *)(mach_state->ms_vendor);
 
 	cpupm_remove_domains(cp, CPUPM_P_STATES, &cpupm_pstate_domains);
 	cpu_acpi_free_pstate_data(handle);
 
-	if (turbo_info) {
-		if (turbo_info->turbo_ksp != NULL)
-			kstat_delete(turbo_info->turbo_ksp);
-		kmem_free(turbo_info, sizeof (cpupm_turbo_info_t));
-	}
+	if (mach_state->ms_turbo != NULL)
+		cpupm_turbo_fini(mach_state->ms_turbo);
+	mach_state->ms_turbo = NULL;
 }
 
 boolean_t
@@ -470,7 +290,7 @@ speedstep_supported(uint_t family, uint_t model)
 }
 
 boolean_t
-turbo_supported(void)
+speedstep_turbo_supported(void)
 {
 	struct cpuid_regs cpu_regs;
 

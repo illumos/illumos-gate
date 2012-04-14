@@ -142,21 +142,14 @@ ucode_validate_amd(uint8_t *ucodep, int size)
 	ptr = (uint32_t *)(((uint8_t *)ptr) + count);
 	size -= count;
 
-	/*
-	 * minimum valid size:
-	 * - type and size fields (8 bytes)
-	 * - patch header (64 bytes)
-	 * - one patch triad (28 bytes)
-	 */
-	while (size >= 100) {
+	while (size > 8) {
 		/* microcode patch */
 		size -= 4;
 		if (*ptr++ != 1)
 			return (EM_FILEFORMAT);
 
 		size -= 4;
-		if (((count = *ptr++) > size) ||
-		    ((count - sizeof (ucode_header_amd_t)) % 28))
+		if (((count = *ptr++) > size))
 			return (EM_FILEFORMAT);
 
 		/* LINTED: pointer alignment */

@@ -20,11 +20,11 @@
  */
 
 /*
+ * Copyright (c) 2012 Gary Mills
+ *
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -59,7 +59,7 @@ dboot_panic(char *fmt, ...)
 	va_start(args, fmt);
 	do_dboot_printf(fmt, args);
 
-	if (console == CONS_SCREEN_TEXT) {
+	if (boot_console_type(NULL) == CONS_SCREEN_TEXT) {
 		dboot_printf("Press any key to reboot\n");
 		(void) bcons_getchar();
 	}

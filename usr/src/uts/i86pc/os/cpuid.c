@@ -1218,30 +1218,28 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 		if (cp->cp_ecx & CPUID_INTC_ECX_SSE3) {
 			add_x86_feature(featureset, X86FSET_SSE3);
 		}
-		if (cpi->cpi_vendor == X86_VENDOR_Intel) {
-			if (cp->cp_ecx & CPUID_INTC_ECX_SSSE3) {
-				add_x86_feature(featureset, X86FSET_SSSE3);
-			}
-			if (cp->cp_ecx & CPUID_INTC_ECX_SSE4_1) {
-				add_x86_feature(featureset, X86FSET_SSE4_1);
-			}
-			if (cp->cp_ecx & CPUID_INTC_ECX_SSE4_2) {
-				add_x86_feature(featureset, X86FSET_SSE4_2);
-			}
-			if (cp->cp_ecx & CPUID_INTC_ECX_AES) {
-				add_x86_feature(featureset, X86FSET_AES);
-			}
-			if (cp->cp_ecx & CPUID_INTC_ECX_PCLMULQDQ) {
-				add_x86_feature(featureset, X86FSET_PCLMULQDQ);
-			}
+		if (cp->cp_ecx & CPUID_INTC_ECX_SSSE3) {
+			add_x86_feature(featureset, X86FSET_SSSE3);
+		}
+		if (cp->cp_ecx & CPUID_INTC_ECX_SSE4_1) {
+			add_x86_feature(featureset, X86FSET_SSE4_1);
+		}
+		if (cp->cp_ecx & CPUID_INTC_ECX_SSE4_2) {
+			add_x86_feature(featureset, X86FSET_SSE4_2);
+		}
+		if (cp->cp_ecx & CPUID_INTC_ECX_AES) {
+			add_x86_feature(featureset, X86FSET_AES);
+		}
+		if (cp->cp_ecx & CPUID_INTC_ECX_PCLMULQDQ) {
+			add_x86_feature(featureset, X86FSET_PCLMULQDQ);
+		}
 
-			if (cp->cp_ecx & CPUID_INTC_ECX_XSAVE) {
-				add_x86_feature(featureset, X86FSET_XSAVE);
-				/* We only test AVX when there is XSAVE */
-				if (cp->cp_ecx & CPUID_INTC_ECX_AVX) {
-					add_x86_feature(featureset,
-					    X86FSET_AVX);
-				}
+		if (cp->cp_ecx & CPUID_INTC_ECX_XSAVE) {
+			add_x86_feature(featureset, X86FSET_XSAVE);
+			/* We only test AVX when there is XSAVE */
+			if (cp->cp_ecx & CPUID_INTC_ECX_AVX) {
+				add_x86_feature(featureset,
+				    X86FSET_AVX);
 			}
 		}
 	}
@@ -1797,7 +1795,7 @@ cpuid_pass2(cpu_t *cpu)
 	/*
 	 * XSAVE enumeration
 	 */
-	if (cpi->cpi_maxeax >= 0xD && cpi->cpi_vendor == X86_VENDOR_Intel) {
+	if (cpi->cpi_maxeax >= 0xD) {
 		struct cpuid_regs regs;
 		boolean_t cpuid_d_valid = B_TRUE;
 
@@ -2531,23 +2529,21 @@ cpuid_pass4(cpu_t *cpu)
 		if (!is_x86_feature(x86_featureset, X86FSET_SSE3))
 			*ecx &= ~CPUID_INTC_ECX_SSE3;
 
-		if (cpi->cpi_vendor == X86_VENDOR_Intel) {
-			if (!is_x86_feature(x86_featureset, X86FSET_SSSE3))
-				*ecx &= ~CPUID_INTC_ECX_SSSE3;
-			if (!is_x86_feature(x86_featureset, X86FSET_SSE4_1))
-				*ecx &= ~CPUID_INTC_ECX_SSE4_1;
-			if (!is_x86_feature(x86_featureset, X86FSET_SSE4_2))
-				*ecx &= ~CPUID_INTC_ECX_SSE4_2;
-			if (!is_x86_feature(x86_featureset, X86FSET_AES))
-				*ecx &= ~CPUID_INTC_ECX_AES;
-			if (!is_x86_feature(x86_featureset, X86FSET_PCLMULQDQ))
-				*ecx &= ~CPUID_INTC_ECX_PCLMULQDQ;
-			if (!is_x86_feature(x86_featureset, X86FSET_XSAVE))
-				*ecx &= ~(CPUID_INTC_ECX_XSAVE |
-				    CPUID_INTC_ECX_OSXSAVE);
-			if (!is_x86_feature(x86_featureset, X86FSET_AVX))
-				*ecx &= ~CPUID_INTC_ECX_AVX;
-		}
+		if (!is_x86_feature(x86_featureset, X86FSET_SSSE3))
+			*ecx &= ~CPUID_INTC_ECX_SSSE3;
+		if (!is_x86_feature(x86_featureset, X86FSET_SSE4_1))
+			*ecx &= ~CPUID_INTC_ECX_SSE4_1;
+		if (!is_x86_feature(x86_featureset, X86FSET_SSE4_2))
+			*ecx &= ~CPUID_INTC_ECX_SSE4_2;
+		if (!is_x86_feature(x86_featureset, X86FSET_AES))
+			*ecx &= ~CPUID_INTC_ECX_AES;
+		if (!is_x86_feature(x86_featureset, X86FSET_PCLMULQDQ))
+			*ecx &= ~CPUID_INTC_ECX_PCLMULQDQ;
+		if (!is_x86_feature(x86_featureset, X86FSET_XSAVE))
+			*ecx &= ~(CPUID_INTC_ECX_XSAVE |
+			    CPUID_INTC_ECX_OSXSAVE);
+		if (!is_x86_feature(x86_featureset, X86FSET_AVX))
+			*ecx &= ~CPUID_INTC_ECX_AVX;
 
 		/*
 		 * [no explicit support required beyond x87 fp context]
@@ -2567,23 +2563,21 @@ cpuid_pass4(cpu_t *cpu)
 			hwcap_flags |= AV_386_SSE2;
 		if (*ecx & CPUID_INTC_ECX_SSE3)
 			hwcap_flags |= AV_386_SSE3;
-		if (cpi->cpi_vendor == X86_VENDOR_Intel) {
-			if (*ecx & CPUID_INTC_ECX_SSSE3)
-				hwcap_flags |= AV_386_SSSE3;
-			if (*ecx & CPUID_INTC_ECX_SSE4_1)
-				hwcap_flags |= AV_386_SSE4_1;
-			if (*ecx & CPUID_INTC_ECX_SSE4_2)
-				hwcap_flags |= AV_386_SSE4_2;
-			if (*ecx & CPUID_INTC_ECX_MOVBE)
-				hwcap_flags |= AV_386_MOVBE;
-			if (*ecx & CPUID_INTC_ECX_AES)
-				hwcap_flags |= AV_386_AES;
-			if (*ecx & CPUID_INTC_ECX_PCLMULQDQ)
-				hwcap_flags |= AV_386_PCLMULQDQ;
-			if ((*ecx & CPUID_INTC_ECX_XSAVE) &&
-			    (*ecx & CPUID_INTC_ECX_OSXSAVE))
-				hwcap_flags |= AV_386_XSAVE;
-		}
+		if (*ecx & CPUID_INTC_ECX_SSSE3)
+			hwcap_flags |= AV_386_SSSE3;
+		if (*ecx & CPUID_INTC_ECX_SSE4_1)
+			hwcap_flags |= AV_386_SSE4_1;
+		if (*ecx & CPUID_INTC_ECX_SSE4_2)
+			hwcap_flags |= AV_386_SSE4_2;
+		if (*ecx & CPUID_INTC_ECX_MOVBE)
+			hwcap_flags |= AV_386_MOVBE;
+		if (*ecx & CPUID_INTC_ECX_AES)
+			hwcap_flags |= AV_386_AES;
+		if (*ecx & CPUID_INTC_ECX_PCLMULQDQ)
+			hwcap_flags |= AV_386_PCLMULQDQ;
+		if ((*ecx & CPUID_INTC_ECX_XSAVE) &&
+		    (*ecx & CPUID_INTC_ECX_OSXSAVE))
+			hwcap_flags |= AV_386_XSAVE;
 		if (*ecx & CPUID_INTC_ECX_VMX)
 			hwcap_flags |= AV_386_VMX;
 		if (*ecx & CPUID_INTC_ECX_POPCNT)
@@ -3335,6 +3329,13 @@ cpuid_opteron_erratum(cpu_t *cpu, uint_t erratum)
 	case 298:
 		return (DR_AX(eax) || DR_B0(eax) || DR_B1(eax) || DR_BA(eax) ||
 		    DR_B2(eax) || RB_C0(eax));
+
+	case 721:
+#if defined(__amd64)
+		return (cpi->cpi_family == 0x10 || cpi->cpi_family == 0x12);
+#else
+		return (0);
+#endif
 
 	default:
 		return (-1);
@@ -4134,6 +4135,9 @@ cpuid_set_cpu_properties(void *dip, processorid_t cpu_id,
 	switch (cpi->cpi_vendor) {
 	case X86_VENDOR_Intel:
 		create = IS_NEW_F6(cpi) || cpi->cpi_family >= 0xf;
+		break;
+	case X86_VENDOR_AMD:
+		create = cpi->cpi_family >= 0xf;
 		break;
 	default:
 		create = 0;

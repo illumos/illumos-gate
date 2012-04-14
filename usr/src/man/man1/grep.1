@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
@@ -15,7 +16,7 @@ grep \- search a file for a pattern
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/grep\fR [\fB-bchilnsvw\fR] \fIlimited-regular-expression\fR
+\fB/usr/bin/grep\fR [\fB-c\fR | \fB-l\fR | \fB-q\fR] [\fB-bhinsvw\fR] \fIlimited-regular-expression\fR
      [\fIfilename\fR]...
 .fi
 
@@ -134,6 +135,16 @@ Precedes each line by its line number in the file (first line is 1).
 .sp
 .ne 2
 .na
+\fB\fB-q\fR\fR
+.ad
+.RS 6n
+Quiet. Does not write anything to the standard output, regardless of matching
+lines. Exits with zero status if an input line is selected.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fB-s\fR\fR
 .ad
 .RS 6n
@@ -241,16 +252,6 @@ Matches using fixed strings. Treats each pattern specified as a string instead
 of a regular expression. If an input line contains any of the patterns as a
 contiguous sequence of bytes, the line is matched. A null string matches every
 line. See \fBfgrep\fR(1) for more information.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-q\fR\fR
-.ad
-.RS 19n
-Quiet. Does not write anything to the standard output, regardless of matching
-lines. Exits with zero status if an input line is selected.
 .RE
 
 .sp

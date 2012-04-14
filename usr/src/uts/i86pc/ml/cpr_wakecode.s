@@ -84,12 +84,6 @@ wc_save_context(wc_cpu_t *pcpu)
 
 #else	/* lint */
 
-#if defined(__GNU_AS__)
-
-	NOTHING AT ALL YET!
-
-#else	/* !defined(__GNU_AS__) */
-
 #if defined(__amd64)
 
 	ENTRY_NP(wc_save_context)
@@ -230,8 +224,6 @@ wc_save_context(wc_cpu_t *pcpu)
 
 #endif	/* __amd64 */
 
-#endif	/* __GNU_AS__ */
-
 #endif /* lint */
 
 
@@ -263,20 +255,18 @@ wc_rm_end(void)
 
 #else	/* lint */
 
-#if defined(__GNU_AS__)
-
-	NOTHING AT ALL YET!
-
-#else	/* __GNU_AS__ */
-
 #if defined(__amd64)
 
 	ENTRY_NP(wc_rm_start)
 
 	/*
-	 * For vulcan as we need to do a .code32 and mentally invert the
-	 * meaning of the addr16 and data16 prefixes to get 32-bit access when
-	 * generating code to be executed in 16-bit mode (sigh...)
+	 * For the Sun Studio 10 assembler we needed to do a .code32 and
+	 * mentally invert the meaning of the addr16 and data16 prefixes to
+	 * get 32-bit access when generating code to be executed in 16-bit
+	 * mode (sigh...)
+	 *
+	 * This code, despite always being built with GNU as, has inherited
+	 * the conceptual damage.
 	 */
 
 	.code32
@@ -309,7 +299,7 @@ wc_rm_end(void)
 	 * %cr0 has already been initialsed to zero
 	 */
 	movl		%cr0, %eax
-	D16 orl		$[CR0_PE|CR0_WP|CR0_AM], %eax
+	D16 orl		$_CONST(CR0_PE|CR0_WP|CR0_AM), %eax
 	movl		%eax, %cr0
 
 	/*
@@ -494,45 +484,45 @@ cominit:
  */
 
 / select COM1
-	D16 movl	$[COM1+LCR], %edx
+	D16 movl	$_CONST(COM1+LCR), %edx
 	D16 movb	$DLAB, %al		/ divisor latch
 	outb	(%dx)
 
-	D16 movl	$[COM1+DLL], %edx	/ divisor latch lsb
+	D16 movl	$_CONST(COM1+DLL), %edx	/ divisor latch lsb
 	D16 movb	$B9600L, %al		/ divisor latch
 	outb	(%dx)
 
-	D16 movl	$[COM1+DLH], %edx	/ divisor latch hsb
+	D16 movl	$_CONST(COM1+DLH), %edx	/ divisor latch hsb
 	D16 movb	$B9600H, %al		/ divisor latch
 	outb	(%dx)
 
-	D16 movl	$[COM1+LCR], %edx	/ select COM1
-	D16 movb	$[STOP1|BITS8], %al	/ 1 stop bit, 8bit word len
+	D16 movl	$_CONST(COM1+LCR), %edx	/ select COM1
+	D16 movb	$_CONST(STOP1|BITS8), %al	/ 1 stop bit, 8bit word len
 	outb	(%dx)
 
-	D16 movl	$[COM1+MCR], %edx	/ select COM1
-	D16 movb	$[RTS|DTR], %al		/ data term ready & req to send
+	D16 movl	$_CONST(COM1+MCR), %edx	/ select COM1
+	D16 movb	$_CONST(RTS|DTR), %al		/ data term ready & req to send
 	outb	(%dx)
 
 / select COM2
-	D16 movl	$[COM2+LCR], %edx
+	D16 movl	$_CONST(COM2+LCR), %edx
 	D16 movb	$DLAB, %al		/ divisor latch
 	outb	(%dx)
 
-	D16 movl	$[COM2+DLL], %edx	/ divisor latch lsb
+	D16 movl	$_CONST(COM2+DLL), %edx	/ divisor latch lsb
 	D16 movb	$B9600L, %al		/ divisor latch
 	outb	(%dx)
 
-	D16 movl	$[COM2+DLH], %edx	/ divisor latch hsb
+	D16 movl	$_CONST(COM2+DLH), %edx	/ divisor latch hsb
 	D16 movb	$B9600H, %al		/ divisor latch
 	outb	(%dx)
 
-	D16 movl	$[COM2+LCR], %edx	/ select COM1
-	D16 movb	$[STOP1|BITS8], %al	/ 1 stop bit, 8bit word len
+	D16 movl	$_CONST(COM2+LCR), %edx	/ select COM1
+	D16 movb	$_CONST(STOP1|BITS8), %al	/ 1 stop bit, 8bit word len
 	outb	(%dx)
 
-	D16 movl	$[COM2+MCR], %edx	/ select COM1
-	D16 movb	$[RTS|DTR], %al		/ data term ready & req to send
+	D16 movl	$_CONST(COM2+MCR), %edx	/ select COM1
+	D16 movb	$_CONST(RTS|DTR), %al		/ data term ready & req to send
 	outb	(%dx)
 #endif	/*	DEBUG	*/
 
@@ -949,7 +939,7 @@ wc_rm_end:
 #endif
 
 	D16 A16 movl	%cs:WC_CR4(%ebx), %eax	/ restore cr4
-	D16 andl	$-1!CR4_PGE, %eax	/ don't set Global Enable yet
+	D16 andl	$_BITNOT(CR4_PGE), %eax / don't set Global Enable yet
 	movl		%eax, %cr4
 
 #if     LED
@@ -1015,45 +1005,45 @@ cominit:
  */
 
 / select COM1
-	D16 movl	$[COM1+LCR], %edx
+	D16 movl	$_CONST(COM1+LCR), %edx
 	D16 movb	$DLAB, %al		/ divisor latch
 	outb	(%dx)
 
-	D16 movl	$[COM1+DLL], %edx	/ divisor latch lsb
+	D16 movl	$_CONST(COM1+DLL), %edx	/ divisor latch lsb
 	D16 movb	$B9600L, %al		/ divisor latch
 	outb	(%dx)
 
-	D16 movl	$[COM1+DLH], %edx	/ divisor latch hsb
+	D16 movl	$_CONST(COM1+DLH), %edx	/ divisor latch hsb
 	D16 movb	$B9600H, %al		/ divisor latch
 	outb	(%dx)
 
-	D16 movl	$[COM1+LCR], %edx	/ select COM1
-	D16 movb	$[STOP1|BITS8], %al	/ 1 stop bit, 8bit word len
+	D16 movl	$_CONST(COM1+LCR), %edx	/ select COM1
+	D16 movb	$_CONST(STOP1|BITS8), %al	/ 1 stop bit, 8bit word len
 	outb	(%dx)
 
-	D16 movl	$[COM1+MCR], %edx	/ select COM1
-	D16 movb	$[RTS|DTR], %al		/ 1 stop bit, 8bit word len
+	D16 movl	$_CONST(COM1+MCR), %edx	/ select COM1
+	D16 movb	$_CONST(RTS|DTR), %al		/ 1 stop bit, 8bit word len
 	outb	(%dx)
 
 / select COM2
-	D16 movl	$[COM2+LCR], %edx
+	D16 movl	$_CONST(COM2+LCR), %edx
 	D16 movb	$DLAB, %al		/ divisor latch
 	outb	(%dx)
 
-	D16 movl	$[COM2+DLL], %edx	/ divisor latch lsb
+	D16 movl	$_CONST(COM2+DLL), %edx	/ divisor latch lsb
 	D16 movb	$B9600L, %al		/ divisor latch
 	outb	(%dx)
 
-	D16 movl	$[COM2+DLH], %edx	/ divisor latch hsb
+	D16 movl	$_CONST(COM2+DLH), %edx	/ divisor latch hsb
 	D16 movb	$B9600H, %al		/ divisor latch
 	outb	(%dx)
 
-	D16 movl	$[COM2+LCR], %edx	/ select COM1
-	D16 movb	$[STOP1|BITS8], %al	/ 1 stop bit, 8bit word len
+	D16 movl	$_CONST(COM2+LCR), %edx	/ select COM1
+	D16 movb	$_CONST(STOP1|BITS8), %al	/ 1 stop bit, 8bit word len
 	outb	(%dx)
 
-	D16 movl	$[COM2+MCR], %edx	/ select COM1
-	D16 movb	$[RTS|DTR], %al		/ 1 stop bit, 8bit word len
+	D16 movl	$_CONST(COM2+MCR), %edx	/ select COM1
+	D16 movb	$_CONST(RTS|DTR), %al		/ 1 stop bit, 8bit word len
 	outb	(%dx)
 #endif	/*	DEBUG	*/
 
@@ -1106,7 +1096,7 @@ kernel_wc_code:
 
 	movzwl	WC_TR(%ebx), %eax	/ clear TSS busy bit
 	addl	WC_GDT+2(%ebx), %eax
-	andl	$-1!0x200, 4(%eax)
+	andl	$_BITNOT(0x200), 4(%eax)
 	ltr	WC_TR(%ebx)		/ $UTSS_SEL
 
 	movw	WC_SS(%ebx), %ss	/ restore segment registers
@@ -1171,8 +1161,6 @@ kernel_wc_code:
 
 
 #endif	/* defined(__amd64) */
-
-#endif	/* !defined(__GNU_AS__) */
 
 #endif /* lint */
 

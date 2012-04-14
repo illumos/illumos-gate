@@ -29,14 +29,16 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2012 Joyent, Inc. All rights reserved.
+ */
 
 #include <signal.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <grp.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 #include <sys/stat.h>
@@ -51,6 +53,11 @@
 #include <syslog.h>
 #include <sys/wait.h>
 #include <limits.h>
+#include <libzonecfg.h>
+#include <zone.h>
+#include <sys/contract/process.h>
+#include <libcontract.h>
+#include <sys/ctfs.h>
 
 /*
  * utmpx defines wider fields for user and line.  For compatibility of output,
@@ -79,15 +86,17 @@ static char	who[9]	= "???";
 static char	time_buf[50];
 #define	DATE_FMT	"%a %b %e %H:%M:%S"
 
-static void sendmes(struct utmpx *);
+static void sendmes(struct utmpx *, zoneid_t);
+static void sendmes_tozone(zoneid_t, int);
 static int chkgrp(char *);
 static char *copy_str_till(char *, char *, char, int);
+
+static int init_template(void);
+int contract_abandon_id(ctid_t);
 
 int
 main(int argc, char *argv[])
 {
-	int	i = 0;
-	struct utmpx *p;
 	FILE	*f;
 	char	*ptr, *start;
 	struct	passwd *pwd;
@@ -95,10 +104,16 @@ main(int argc, char *argv[])
 	int	c;
 	int	aflag = 0;
 	int	errflg = 0;
+	int zflg = 0;
+	int Zflg = 0;
+
+	char *zonename = NULL;
+	zoneid_t *zoneidlist = NULL;
+	uint_t nzids_saved, nzids = 0;
 
 	(void) setlocale(LC_ALL, "");
 
-	while ((c = getopt(argc, argv, "g:a")) != EOF)
+	while ((c = getopt(argc, argv, "g:az:Z")) != EOF)
 		switch (c) {
 		case 'a':
 			aflag++;
@@ -107,14 +122,26 @@ main(int argc, char *argv[])
 			if (gflag) {
 				(void) fprintf(stderr,
 				    "Only one group allowed\n");
-				exit(1);
+				return (1);
 			}
 			if ((pgrp = getgrnam(grpname = optarg)) == NULL) {
 				(void) fprintf(stderr, "Unknown group %s\n",
 				    grpname);
-				exit(1);
+				return (1);
 			}
 			gflag++;
+			break;
+		case 'z':
+			zflg++;
+			zonename = optarg;
+			if (getzoneidbyname(zonename) == -1) {
+				(void) fprintf(stderr, "Specified zone %s "
+				    "is invalid", zonename);
+				return (1);
+			}
+			break;
+		case 'Z':
+			Zflg++;
 			break;
 		case '?':
 			errflg++;
@@ -123,7 +150,12 @@ main(int argc, char *argv[])
 
 	if (errflg) {
 		(void) fprintf(stderr,
-		    "Usage: wall [-a] [-g group] [files...]\n");
+		    "Usage: wall [-a] [-g group] [-z zone] [-Z] [files...]\n");
+		return (1);
+	}
+
+	if (zflg && Zflg) {
+		(void) fprintf(stderr, "Cannot use -z with -Z\n");
 		return (1);
 	}
 
@@ -133,7 +165,7 @@ main(int argc, char *argv[])
 	if (uname(&utsn) == -1) {
 		(void) fprintf(stderr, "wall: uname() failed, %s\n",
 		    strerror(errno));
-		exit(2);
+		return (2);
 	}
 	(void) strcpy(systm, utsn.nodename);
 
@@ -158,7 +190,7 @@ main(int argc, char *argv[])
 		f = fopen(infile, "r");
 		if (f == NULL) {
 			(void) fprintf(stderr, "Cannot open %s\n", infile);
-			exit(1);
+			return (1);
 		}
 	}
 
@@ -202,24 +234,37 @@ main(int argc, char *argv[])
 	}
 	(void) time(&tloc);
 	(void) strftime(time_buf, sizeof (time_buf),
-			    DATE_FMT, localtime(&tloc));
+	    DATE_FMT, localtime(&tloc));
 
-	setutxent();
-	while ((p = getutxent()) != NULL) {
-		if (p->ut_type != USER_PROCESS)
-			continue;
-		/*
-		 * if (-a option OR NOT pty window login), send the message
-		 */
-		if (aflag || !nonuser(*p))
-			sendmes(p);
+	if (zflg != 0) {
+		if ((zoneidlist =
+		    malloc(sizeof (zoneid_t))) == NULL ||
+		    (*zoneidlist = getzoneidbyname(zonename)) == -1)
+			return (errno);
+		nzids = 1;
+	} else if (Zflg != 0) {
+		if (zone_list(NULL, &nzids) != 0)
+			return (errno);
+again:
+		nzids *= 2;
+		if ((zoneidlist = malloc(nzids * sizeof (zoneid_t))) == NULL)
+			exit(errno);
+		nzids_saved = nzids;
+		if (zone_list(zoneidlist, &nzids) != 0) {
+			(void) free(zoneidlist);
+			return (errno);
+		}
+		if (nzids > nzids_saved) {
+			free(zoneidlist);
+			goto again;
+		}
 	}
-	endutxent();
-
-	(void) alarm(60);
-	do {
-		i = (int)wait((int *)0);
-	} while (i != -1 || errno != ECHILD);
+	if (zflg || Zflg) {
+		for (; nzids > 0; --nzids)
+			sendmes_tozone(zoneidlist[nzids-1], aflag);
+		free(zoneidlist);
+	} else
+		sendmes_tozone(getzoneid(), aflag);
 
 	return (0);
 }
@@ -249,6 +294,43 @@ copy_str_till(char *dst, char *src, char delim, int len)
 	return (src);
 }
 
+static void
+sendmes_tozone(zoneid_t zid, int aflag) {
+	int i = 0;
+	char zonename[ZONENAME_MAX], root[MAXPATHLEN];
+	struct utmpx *p;
+
+	if (zid != getzoneid()) {
+		root[0] = '\0';
+		(void) getzonenamebyid(zid, zonename, ZONENAME_MAX);
+		(void) zone_get_rootpath(zonename, root, sizeof (root));
+		(void) strlcat(root, UTMPX_FILE, sizeof (root));
+		if (!utmpxname(root)) {
+			(void) fprintf(stderr, "Cannot open %s\n", root);
+			return;
+		}
+	} else {
+		(void) utmpxname(UTMPX_FILE);
+	}
+	setutxent();
+	while ((p = getutxent()) != NULL) {
+		if (p->ut_type != USER_PROCESS)
+			continue;
+		/*
+		 * if (-a option OR NOT pty window login), send the message
+		 */
+		if (aflag || !nonuser(*p))
+			sendmes(p, zid);
+	}
+	endutxent();
+
+	(void) alarm(60);
+	do {
+		i = (int)wait((int *)0);
+	} while (i != -1 || errno != ECHILD);
+
+}
+
 /*
  * Note to future maintainers: with the change of wall to use the
  * getutxent() API, the forked children (created by this function)
@@ -257,7 +339,7 @@ copy_str_till(char *dst, char *src, char delim, int len)
  * processing).
  */
 static void
-sendmes(struct utmpx *p)
+sendmes(struct utmpx *p, zoneid_t zid)
 {
 	int i;
 	char *s;
@@ -265,11 +347,19 @@ sendmes(struct utmpx *p)
 	char *bp;
 	int ibp;
 	FILE *f;
-	int fd;
+	int fd, tmpl_fd;
+	boolean_t zoneenter = B_FALSE;
 
-	if (gflag)
-		if (!chkgrp(p->ut_user))
+	if (zid != getzoneid()) {
+		zoneenter = B_TRUE;
+		tmpl_fd = init_template();
+		if (tmpl_fd == -1) {
+			(void) fprintf(stderr, "Could not initialize "
+			    "process contract");
 			return;
+		}
+	}
+
 	while ((i = (int)fork()) == -1) {
 		(void) alarm(60);
 		(void) wait((int *)0);
@@ -278,6 +368,19 @@ sendmes(struct utmpx *p)
 
 	if (i)
 		return;
+
+	if (zoneenter && zone_enter(zid) == -1) {
+		char zonename[ZONENAME_MAX];
+		(void) getzonenamebyid(zid, zonename, ZONENAME_MAX);
+		(void) fprintf(stderr, "Could not enter zone "
+		    "%s\n", zonename);
+	}
+	if (zoneenter)
+		(void) ct_tmpl_clear(tmpl_fd);
+
+	if (gflag)
+		if (!chkgrp(p->ut_user))
+			_exit(0);
 
 	(void) signal(SIGHUP, SIG_IGN);
 	(void) alarm(60);
@@ -370,11 +473,33 @@ chkgrp(char *name)
 	char *p;
 
 	for (i = 0; pgrp->gr_mem[i] && pgrp->gr_mem[i][0]; i++) {
-		for (p = name; *p && *p != ' '; p++);
+		for (p = name; *p && *p != ' '; p++)
+		;
 		*p = 0;
 		if (strncmp(name, pgrp->gr_mem[i], 8) == 0)
 			return (1);
 	}
 
 	return (0);
+}
+
+static int
+init_template(void) {
+	int fd = 0;
+	int err = 0;
+
+	fd = open64(CTFS_ROOT "/process/template", O_RDWR);
+	if (fd == -1)
+		return (-1);
+
+	err |= ct_tmpl_set_critical(fd, 0);
+	err |= ct_tmpl_set_informative(fd, 0);
+	err |= ct_pr_tmpl_set_fatal(fd, CT_PR_EV_HWERR);
+	err |= ct_pr_tmpl_set_param(fd, CT_PR_PGRPONLY | CT_PR_REGENT);
+	if (err || ct_tmpl_activate(fd)) {
+		(void) close(fd);
+		return (-1);
+	}
+
+	return (fd);
 }

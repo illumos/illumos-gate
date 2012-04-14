@@ -1708,8 +1708,6 @@ sgenv_get_board_info_data(void)
 
 	DCMN_ERR_EVENT(CE_NOTE, "%s: entered.", f);
 
-	ASSERT(board_cache != NULL);
-
 	if (first_time) {
 		sgenv_set_valid_node_positions(node_present);
 		first_time = FALSE;

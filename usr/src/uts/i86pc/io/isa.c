@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2012 Gary Mills
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  */
@@ -53,7 +54,7 @@
 #include <sys/hypervisor.h>
 #include <sys/evtchn_impl.h>
 
-extern int console_hypervisor_device;
+extern int console_hypervisor_dev_type(int *);
 #endif
 
 
@@ -62,11 +63,12 @@ extern int isa_resource_setup(void);
 extern int (*psm_intr_ops)(dev_info_t *, ddi_intr_handle_impl_t *,
     psm_intr_op_t, int *);
 extern void pci_register_isa_resources(int, uint32_t, uint32_t);
-static char USED_RESOURCES[] = "used-resources";
 static void isa_enumerate(int);
 static void enumerate_BIOS_serial(dev_info_t *);
 static void adjust_prtsz(dev_info_t *isa_dip);
 static void isa_create_ranges_prop(dev_info_t *);
+
+#define	USED_RESOURCES	"used-resources"
 
 /*
  * The following typedef is used to represent an entry in the "ranges"
@@ -89,10 +91,15 @@ typedef struct {
 #define	USED_CELL_SIZE	2	/* 1 byte addr, 1 byte size */
 #define	ISA_ADDR_IO	1	/* IO address space */
 #define	ISA_ADDR_MEM	0	/* memory adress space */
-#define	BIOS_DATA_AREA	0x400
+
 /*
  * #define ISA_DEBUG 1
  */
+
+#define	num_BIOS_serial	4	/* number of BIOS serial ports to look at */
+#define	min_BIOS_serial	2	/* minimum number of BIOS serial ports */
+#define	COM_ISR		2	/* 16550 intr status register */
+#define	COM_SCR		7	/* 16550 scratch register */
 
 /*
  * For serial ports not enumerated by ACPI, and parallel ports with
@@ -102,6 +109,17 @@ typedef struct {
 #define	MAX_EXTRA_RESOURCE	7
 static struct regspec isa_extra_resource[MAX_EXTRA_RESOURCE];
 static int isa_extra_count = 0;
+
+/* Register definitions for COM1 to COM4. */
+static struct regspec asy_regs[] = {
+	{1, 0x3f8, 0x8},
+	{1, 0x2f8, 0x8},
+	{1, 0x3e8, 0x8},
+	{1, 0x2e8, 0x8}
+};
+
+/* Serial port interrupt vectors for COM1 to COM4. */
+static int asy_intrs[] = {0x4, 0x3, 0x4, 0x3};
 
 /*
  *      Local data
@@ -346,7 +364,7 @@ isa_create_ranges_prop(dev_info_t *dip)
 	uint_t nio = 0, nmem = 0, nrng = 0, n;
 	pib_ranges_t *ranges;
 
-	used = ddi_find_devinfo("used-resources", -1, 0);
+	used = ddi_find_devinfo(USED_RESOURCES, -1, 0);
 	if (used == NULL) {
 		cmn_err(CE_WARN, "Failed to find used-resources <%s>\n",
 		    ddi_get_name(dip));
@@ -439,8 +457,10 @@ isa_apply_range(dev_info_t *dip, struct regspec *isa_reg_p,
 	 * BIOS data area. Parallel port on some machines comes with
 	 * illegal size.
 	 */
-	if (isa_reg_p->regspec_bustype != ISA_ADDR_IO)
-		goto out_of_range;
+	if (isa_reg_p->regspec_bustype != ISA_ADDR_IO) {
+		cmn_err(CE_WARN, "Bus type not ISA I/O\n");
+		return (DDI_ME_REGSPEC_RANGE);
+	}
 
 	for (i = 0; i < isa_extra_count; i++) {
 		struct regspec *reg_p = &isa_extra_resource[i];
@@ -461,7 +481,6 @@ isa_apply_range(dev_info_t *dip, struct regspec *isa_reg_p,
 	if (i < isa_extra_count)
 		return (DDI_SUCCESS);
 
-out_of_range:
 	cmn_err(CE_WARN, "isa_apply_range: Out of range base <0x%x>, size <%d>",
 	    isa_reg_p->regspec_addr, isa_reg_p->regspec_size);
 	return (DDI_ME_REGSPEC_RANGE);
@@ -753,7 +772,11 @@ isa_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
     ddi_intr_handle_impl_t *hdlp, void *result)
 {
 	struct intrspec *ispec;
+#if defined(__xpv)
+	int cons, ttyn;
 
+	cons = console_hypervisor_dev_type(&ttyn);
+#endif
 	if (pseudo_isa)
 		return (i_ddi_intr_ops(pdip, rdip, intr_op, hdlp, result));
 
@@ -827,12 +850,8 @@ isa_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		 * console, make sure we don't try to use that interrupt as
 		 * it will cause us to panic when xen_bind_pirq() fails.
 		 */
-		if (((ispec->intrspec_vec == 4) &&
-		    (console_hypervisor_device == CONS_TTYA)) ||
-		    ((ispec->intrspec_vec == 3) &&
-		    (console_hypervisor_device == CONS_TTYB))) {
+		if (cons == CONS_TTY && ispec->intrspec_vec == asy_intrs[ttyn])
 			return (DDI_FAILURE);
-		}
 #endif
 		((ihdl_plat_t *)hdlp->ih_private)->ip_ispecp = ispec;
 		if ((*psm_intr_ops)(rdip, hdlp, PSM_INTR_OP_XLATE_VECTOR,
@@ -1148,19 +1167,23 @@ add_known_used_resources(void)
 
 }
 
+/*
+ * Return non-zero if UART device exists.
+ */
+static int
+uart_exists(ushort_t port)
+{
+	outb(port + COM_SCR, (char)0x5a);
+	outb(port + COM_ISR, (char)0x00);
+	return (inb(port + COM_SCR) == (char)0x5a);
+}
+
 static void
 isa_enumerate(int reprogram)
 {
 	int circ, i;
 	dev_info_t *xdip;
 	dev_info_t *isa_dip = ddi_find_devinfo("isa", -1, 0);
-
-	/* hard coded isa stuff */
-	struct regspec asy_regs[] = {
-		{1, 0x3f8, 0x8},
-		{1, 0x2f8, 0x8}
-	};
-	int asy_intrs[] = {0x4, 0x3};
 
 	struct regspec i8042_regs[] = {
 		{1, 0x60, 0x1},
@@ -1169,7 +1192,11 @@ isa_enumerate(int reprogram)
 	int i8042_intrs[] = {0x1, 0xc};
 	char *acpi_prop;
 	int acpi_enum = 1; /* ACPI is default to be on */
+#if defined(__xpv)
+	int cons, ttyn;
 
+	cons = console_hypervisor_dev_type(&ttyn);
+#endif
 	if (reprogram || !isa_dip)
 		return;
 
@@ -1205,20 +1232,27 @@ isa_enumerate(int reprogram)
 	cmn_err(CE_NOTE, "!ACPI is off");
 
 	/* serial ports */
-	for (i = 0; i < 2; i++) {
-#if defined(__xpv)
-		if ((i == 0 && console_hypervisor_device == CONS_TTYA) ||
-		    (i == 1 && console_hypervisor_device == CONS_TTYB)) {
+	for (i = 0; i < min_BIOS_serial; i++) {
+		ushort_t addr = asy_regs[i].regspec_addr;
+		if (!uart_exists(addr))
 			continue;
-		}
+#if defined(__xpv)
+		if (cons == CONS_TTY && ttyn == i)
+			continue;
 #endif
 		ndi_devi_alloc_sleep(isa_dip, "asy",
 		    (pnode_t)DEVI_SID_NODEID, &xdip);
+		(void) ndi_prop_update_string(DDI_DEV_T_NONE, xdip,
+		    "compatible", "PNP0500");
+		/* This should be gotten from master file: */
+		(void) ndi_prop_update_string(DDI_DEV_T_NONE, xdip,
+		    "model", "Standard PC COM port");
 		(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, xdip,
 		    "reg", (int *)&asy_regs[i], 3);
 		(void) ndi_prop_update_int(DDI_DEV_T_NONE, xdip,
 		    "interrupts", asy_intrs[i]);
 		(void) ndi_devi_bind_driver(xdip, 0);
+		/* Adjusting isa_extra here causes a kernel dump later. */
 	}
 
 	/* i8042 node */
@@ -1241,40 +1275,31 @@ isa_enumerate(int reprogram)
 
 /*
  * On some machines, serial port 2 isn't listed in the ACPI table.
- * This function goes through the BIOS data area and makes sure all
+ * This function goes through the base I/O addresses and makes sure all
  * the serial ports there are in the dev_info tree.  If any are missing,
  * this function will add them.
  */
 
-static int num_BIOS_serial = 2;	/* number of BIOS serial ports to look at */
-
 static void
 enumerate_BIOS_serial(dev_info_t *isa_dip)
 {
-	ushort_t *bios_data;
 	int i;
 	dev_info_t *xdip;
 	int found;
 	int ret;
 	struct regspec *tmpregs;
 	int tmpregs_len;
-	static struct regspec tmp_asy_regs[] = {
-		{1, 0x3f8, 0x8},
-	};
-	static int default_asy_intrs[] = { 4, 3, 4, 3 };
-	static size_t size = 4;
+#if defined(__xpv)
+	int cons, ttyn;
+
+	cons = console_hypervisor_dev_type(&ttyn);
+#endif
 
 	/*
-	 * The first four 2-byte quantities of the BIOS data area contain
-	 * the base I/O addresses of the first four serial ports.
+	 * Scan the base I/O addresses of the first four serial ports.
 	 */
-	bios_data = (ushort_t *)psm_map_new((paddr_t)BIOS_DATA_AREA, size,
-	    PSM_PROT_READ);
 	for (i = 0; i < num_BIOS_serial; i++) {
-		if (bios_data[i] == 0) {
-			/* no COM[i]: port */
-			continue;
-		}
+		ushort_t addr = asy_regs[i].regspec_addr;
 
 		/* Look for it in the dev_info tree */
 		found = 0;
@@ -1294,18 +1319,21 @@ enumerate_BIOS_serial(dev_info_t *isa_dip)
 				continue;
 			}
 
-			if (tmpregs->regspec_addr == bios_data[i])
+			if (tmpregs->regspec_addr == addr)
 				found = 1;
+
 			/*
 			 * Free the memory allocated by
 			 * ddi_prop_lookup_int_array().
 			 */
 			ddi_prop_free(tmpregs);
 
+			if (found)
+				break;
 		}
 
 		/* If not found, then add it */
-		if (!found) {
+		if (!found && uart_exists(addr)) {
 			ndi_devi_alloc_sleep(isa_dip, "asy",
 			    (pnode_t)DEVI_SID_NODEID, &xdip);
 			(void) ndi_prop_update_string(DDI_DEV_T_NONE, xdip,
@@ -1313,15 +1341,14 @@ enumerate_BIOS_serial(dev_info_t *isa_dip)
 			/* This should be gotten from master file: */
 			(void) ndi_prop_update_string(DDI_DEV_T_NONE, xdip,
 			    "model", "Standard PC COM port");
-			tmp_asy_regs[0].regspec_addr = bios_data[i];
 			(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, xdip,
-			    "reg", (int *)&tmp_asy_regs[0], 3);
+			    "reg", (int *)&asy_regs[i], 3);
 			(void) ndi_prop_update_int(DDI_DEV_T_NONE, xdip,
-			    "interrupts", default_asy_intrs[i]);
+			    "interrupts", asy_intrs[i]);
 			(void) ndi_devi_bind_driver(xdip, 0);
 
 			ASSERT(isa_extra_count < MAX_EXTRA_RESOURCE);
-			bcopy(tmp_asy_regs,
+			bcopy(&asy_regs[i],
 			    isa_extra_resource + isa_extra_count,
 			    sizeof (struct regspec));
 			isa_extra_count++;
@@ -1346,8 +1373,7 @@ enumerate_BIOS_serial(dev_info_t *isa_dip)
 		if (strncmp(ddi_node_name(curdip), "asy", 3) != 0)
 			continue;
 
-		if ((i == 0 && console_hypervisor_device == CONS_TTYA) ||
-		    (i == 1 && console_hypervisor_device == CONS_TTYB)) {
+		if (cons == CONS_TTY && ttyn == i) {
 			ret = ndi_devi_free(curdip);
 			if (ret != DDI_SUCCESS) {
 				cmn_err(CE_WARN,
@@ -1362,7 +1388,6 @@ enumerate_BIOS_serial(dev_info_t *isa_dip)
 	}
 #endif
 
-	psm_unmap((caddr_t)bios_data, size);
 }
 
 /*

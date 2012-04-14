@@ -38,6 +38,8 @@ static void pwrnow_fini(cpu_t *);
 static void pwrnow_power(cpuset_t, uint32_t);
 static void pwrnow_stop(cpu_t *);
 
+static boolean_t pwrnow_cpb_supported(void);
+
 /*
  * Interfaces for modules implementing AMD's PowerNow!.
  */
@@ -67,6 +69,7 @@ cpupm_state_ops_t pwrnow_ops = {
 
 #define	AMD_CPUID_PSTATE_HARDWARE	(1<<7)
 #define	AMD_CPUID_TSC_CONSTANT		(1<<8)
+#define	AMD_CPUID_CPB			(1<<9)
 
 /*
  * Debugging support
@@ -127,6 +130,10 @@ pwrnow_pstate_transition(uint32_t req_state)
 	 */
 	ctrl = CPU_ACPI_PSTATE_CTRL(req_pstate);
 	write_ctrl(handle, ctrl);
+
+	if (mach_state->ms_turbo != NULL)
+		cpupm_record_turbo_info(mach_state->ms_turbo,
+		    mach_state->ms_pstate.cma_state.pstate, req_state);
 
 	mach_state->ms_pstate.cma_state.pstate = req_state;
 	cpu_set_curr_clock((uint64_t)CPU_ACPI_FREQ(req_pstate) * 1000000);
@@ -192,6 +199,12 @@ pwrnow_init(cpu_t *cp)
 
 	cpupm_alloc_domains(cp, CPUPM_P_STATES);
 
+	/*
+	 * Check for Core Performance Boost support
+	 */
+	if (pwrnow_cpb_supported())
+		mach_state->ms_turbo = cpupm_turbo_init(cp);
+
 	PWRNOW_DEBUG(("Processor %d succeeded.\n", cp->cpu_id))
 	return (PWRNOW_RET_SUCCESS);
 }
@@ -208,6 +221,10 @@ pwrnow_fini(cpu_t *cp)
 
 	cpupm_free_domains(&cpupm_pstate_domains);
 	cpu_acpi_free_pstate_data(handle);
+
+	if (mach_state->ms_turbo != NULL)
+		cpupm_turbo_fini(mach_state->ms_turbo);
+	mach_state->ms_turbo = NULL;
 }
 
 boolean_t
@@ -249,6 +266,30 @@ pwrnow_supported()
 	return (B_TRUE);
 }
 
+static boolean_t
+pwrnow_cpb_supported(void)
+{
+	struct cpuid_regs cpu_regs;
+
+	/* Required features */
+	if (!is_x86_feature(x86_featureset, X86FSET_CPUID) ||
+	    !is_x86_feature(x86_featureset, X86FSET_MSR)) {
+		PWRNOW_DEBUG(("No CPUID or MSR support."));
+		return (B_FALSE);
+	}
+
+	/*
+	 * Get the Advanced Power Management Information.
+	 */
+	cpu_regs.cp_eax = 0x80000007;
+	(void) __cpuid_insn(&cpu_regs);
+
+	if (!(cpu_regs.cp_edx & AMD_CPUID_CPB))
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
 static void
 pwrnow_stop(cpu_t *cp)
 {
@@ -258,4 +299,8 @@ pwrnow_stop(cpu_t *cp)
 
 	cpupm_remove_domains(cp, CPUPM_P_STATES, &cpupm_pstate_domains);
 	cpu_acpi_free_pstate_data(handle);
+
+	if (mach_state->ms_turbo != NULL)
+		cpupm_turbo_fini(mach_state->ms_turbo);
+	mach_state->ms_turbo = NULL;
 }

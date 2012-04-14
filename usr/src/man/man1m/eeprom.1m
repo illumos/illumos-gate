@@ -104,7 +104,8 @@ and then, if you do not obtain satisfactory results, \fB0x02\fR.
 .ad
 .sp .6
 .RS 4n
-Specifies the console device. Possible values are \fBttya\fR, \fBttyb\fR, and
+Specifies the console device.
+Possible values are \fBttya\fR, \fBttyb\fR, \fBttyc\fR, \fBttyd\fR, and
 \fBtext\fR. In \fBtext\fR mode, console output goes to the frame buffer and
 input comes from the keyboard. When this property is not present, the console
 device falls back to the device specified by \fBinput-device\fR and
@@ -360,8 +361,8 @@ System version information.
 .ad
 .sp .6
 .RS 4n
-Input device used at power-on (usually \fBkeyboard\fR, \fBttya\fR, or
-\fBttyb\fR). Defaults to \fBkeyboard\fR.
+Input device used at power-on (usually \fBkeyboard\fR, \fBttya\fR,
+\fBttyb\fR, \fBttyc\fR, or \fBttyd\fR). Defaults to \fBkeyboard\fR.
 .RE
 
 .sp
@@ -680,8 +681,8 @@ specific platform.
 .ad
 .sp .6
 .RS 4n
-Output device used at power-on (usually \fBscreen\fR, \fBttya\fR, or
-\fBttyb\fR). Defaults to \fBscreen\fR.
+Output device used at power-on (usually \fBscreen\fR, \fBttya\fR,
+\fBttyb\fR, \fBttyc\fR, or \fBttyd\fR). Defaults to \fBscreen\fR.
 .RE
 
 .sp
@@ -959,11 +960,11 @@ n(none), e(even), o(odd), m(mark), s(space)
 .sp
 .ne 2
 .na
-\fBttyb-mode\fR
+\fBtty\fIX\fR-mode\fR
 .ad
 .sp .6
 .RS 4n
-\fBTTYB\fR (baud rate, #bits, parity, #stop, handshake). Defaults to
+\fBTTYB, TTYC, or TTYD\fR (baud rate, #bits, parity, #stop, handshake). Defaults to
 \fB9600,8,n,1,\(mi\fR.
 .sp
 Fields, in left-to-right order, are:
@@ -1033,12 +1034,12 @@ If \fBtrue\fR, operating system ignores carrier-detect on TTYA. Defaults to
 .sp
 .ne 2
 .na
-\fBttyb-ignore-cd\fR
+\fBtty\fIX\fR-ignore-cd\fR
 .ad
 .sp .6
 .RS 4n
-If \fBtrue\fR, operating system ignores carrier-detect on TTYB. Defaults to
-\fBtrue\fR.
+If \fBtrue\fR, operating system ignores carrier-detect on TTYB, TTYC, or TTYD.
+Defaults to \fBtrue\fR.
 .RE
 
 .sp
@@ -1055,12 +1056,12 @@ to \fBfalse\fR.
 .sp
 .ne 2
 .na
-\fBttyb-rts-dtr-off\fR
+\fBtty\fIX\fR-rts-dtr-off\fR
 .ad
 .sp .6
 .RS 4n
-If \fBtrue\fR, operating system does not assert DTR and RTS on TTYB. Defaults
-to \fBfalse\fR.
+If \fBtrue\fR, operating system does not assert DTR and RTS on TTYB, TTYC,
+or TTYD. Defaults to \fBfalse\fR.
 .RE
 
 .sp

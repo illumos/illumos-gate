@@ -33,6 +33,7 @@
 #include <sys/kobj.h>
 #include <sys/kobj_impl.h>
 #include <sys/machsystm.h>
+#include <sys/ontrap.h>
 #include <sys/param.h>
 #include <sys/machparam.h>
 #include <sys/promif.h>
@@ -646,15 +647,16 @@ ucode_match_amd(uint16_t eq_sig, cpu_ucode_info_t *uinfop,
 	if (ucodefp == NULL || size < sizeof (ucode_header_amd_t))
 		return (EM_NOMATCH);
 
+	uh = &ucodefp->uf_header;
+
 	/*
 	 * Don't even think about loading patches that would require code
-	 * execution.
+	 * execution. Does not apply to patches for family 0x14 and beyond.
 	 */
-	if (size > offsetof(ucode_file_amd_t, uf_code_present) &&
+	if (uh->uh_cpu_rev < 0x5000 &&
+	    size > offsetof(ucode_file_amd_t, uf_code_present) &&
 	    ucodefp->uf_code_present)
 		return (EM_NOMATCH);
-
-	uh = &ucodefp->uf_header;
 
 	if (eq_sig != uh->uh_cpu_rev)
 		return (EM_NOMATCH);
@@ -671,7 +673,7 @@ ucode_match_amd(uint16_t eq_sig, cpu_ucode_info_t *uinfop,
 		return (EM_NOMATCH);
 	}
 
-	if (uh->uh_patch_id <= uinfop->cui_rev)
+	if (uh->uh_patch_id <= uinfop->cui_rev && !ucode_force_update)
 		return (EM_HIGHERREV);
 
 	return (EM_OK);
@@ -726,6 +728,9 @@ ucode_write(xc_arg_t arg1, xc_arg_t unused2, xc_arg_t unused3)
 {
 	ucode_update_t *uusp = (ucode_update_t *)arg1;
 	cpu_ucode_info_t *uinfop = CPU->cpu_m.mcpu_ucode_info;
+#ifndef __xpv
+	on_trap_data_t otd;
+#endif
 
 	ASSERT(ucode);
 	ASSERT(uusp->ucodep);
@@ -743,7 +748,10 @@ ucode_write(xc_arg_t arg1, xc_arg_t unused2, xc_arg_t unused3)
 			return (0);
 	}
 
-	wrmsr(ucode->write_msr, (uintptr_t)uusp->ucodep);
+	if (!on_trap(&otd, OT_DATA_ACCESS))
+		wrmsr(ucode->write_msr, (uintptr_t)uusp->ucodep);
+
+	no_trap();
 #endif
 	ucode->read_rev(uinfop);
 	uusp->new_rev = uinfop->cui_rev;
@@ -758,6 +766,8 @@ ucode_load_amd(ucode_file_t *ufp, cpu_ucode_info_t *uinfop, cpu_t *cp)
 	ucode_file_amd_t *ucodefp = ufp->amd;
 #ifdef	__xpv
 	ucode_update_t uus;
+#else
+	on_trap_data_t otd;
 #endif
 
 	ASSERT(ucode);
@@ -765,7 +775,13 @@ ucode_load_amd(ucode_file_t *ufp, cpu_ucode_info_t *uinfop, cpu_t *cp)
 
 #ifndef	__xpv
 	kpreempt_disable();
+	if (on_trap(&otd, OT_DATA_ACCESS)) {
+		no_trap();
+		kpreempt_enable();
+		return (0);
+	}
 	wrmsr(ucode->write_msr, (uintptr_t)ucodefp);
+	no_trap();
 	ucode->read_rev(uinfop);
 	kpreempt_enable();
 
@@ -1093,7 +1109,8 @@ ucode_update(uint8_t *ucodep, int size)
 		kpreempt_enable();
 		CPUSET_DEL(cpuset, id);
 
-		if (uusp->new_rev != 0 && uusp->info.cui_rev == uusp->new_rev) {
+		if (uusp->new_rev != 0 && uusp->info.cui_rev == uusp->new_rev &&
+		    !ucode_force_update) {
 			rc = EM_HIGHERREV;
 		} else if ((uusp->new_rev == 0) || (uusp->expected_rev != 0 &&
 		    uusp->expected_rev != uusp->new_rev)) {
