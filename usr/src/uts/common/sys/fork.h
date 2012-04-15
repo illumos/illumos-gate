@@ -39,7 +39,7 @@ extern "C" {
 
 extern pid_t forkx(int);
 extern pid_t forkallx(int);
-extern pid_t vforkx(int);
+extern pid_t vforkx(int) __RETURNS_TWICE;
 
 #pragma unknown_control_flow(vforkx)
 

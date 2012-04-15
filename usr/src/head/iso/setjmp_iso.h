@@ -43,9 +43,6 @@
 #ifndef _ISO_SETJMP_ISO_H
 #define	_ISO_SETJMP_ISO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-/* SVr4.0 1.9.2.9 */
-
 #include <sys/feature_tests.h>
 
 #ifdef	__cplusplus
@@ -92,18 +89,18 @@ typedef int	jmp_buf[_JBLEN];
 
 #if defined(__STDC__)
 
-extern int setjmp(jmp_buf);
+extern int setjmp(jmp_buf) __RETURNS_TWICE;
 #pragma unknown_control_flow(setjmp)
-extern int _setjmp(jmp_buf);
+extern int _setjmp(jmp_buf) __RETURNS_TWICE;
 #pragma unknown_control_flow(_setjmp)
 extern void longjmp(jmp_buf, int) __NORETURN;
 extern void _longjmp(jmp_buf, int) __NORETURN;
 
 #else
 
-extern int setjmp();
+extern int setjmp() __RETURNS_TWICE;
 #pragma unknown_control_flow(setjmp)
-extern int _setjmp();
+extern int _setjmp() __RETURNS_TWICE;
 #pragma unknown_control_flow(_setjmp)
 extern void longjmp();
 extern void _longjmp();

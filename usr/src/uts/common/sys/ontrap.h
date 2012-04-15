@@ -26,8 +26,6 @@
 #ifndef	_ONTRAP_H
 #define	_ONTRAP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if !defined(_ASM)
 #include <sys/types.h>
 #endif
@@ -104,7 +102,7 @@ typedef struct on_trap_data {
 
 #if defined(_KERNEL)
 
-extern int on_trap(on_trap_data_t *, uint_t);
+extern int on_trap(on_trap_data_t *, uint_t) __RETURNS_TWICE;
 #pragma	unknown_control_flow(on_trap)
 extern void no_trap(void);
 

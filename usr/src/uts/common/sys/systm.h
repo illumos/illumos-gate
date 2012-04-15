@@ -247,7 +247,7 @@ void suword64_noerr(void *, uint64_t);
 #endif
 
 #if !defined(_BOOT)
-int setjmp(label_t *);
+int setjmp(label_t *) __RETURNS_TWICE;
 extern void longjmp(label_t *)
 	__NORETURN;
 #pragma unknown_control_flow(setjmp)
@@ -260,7 +260,7 @@ void prefetch_write_many(void *);
 caddr_t caller(void);
 caddr_t callee(void);
 int getpcstack(pc_t *, int);
-int on_fault(label_t *);
+int on_fault(label_t *) __RETURNS_TWICE;
 void no_fault(void);
 void halt(char *);
 int scanc(size_t, uchar_t *, uchar_t *, uchar_t);

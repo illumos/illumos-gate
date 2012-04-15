@@ -536,7 +536,7 @@ extern int unlink(const char *);
 extern int usleep(useconds_t);
 #endif /* !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2)... */
 #if !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2) || defined(__EXTENSIONS__)
-extern pid_t vfork(void);
+extern pid_t vfork(void) __RETURNS_TWICE;
 #endif /* !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2)... */
 #if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
 extern void vhangup(void);

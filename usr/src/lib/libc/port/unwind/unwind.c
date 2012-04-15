@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include "thr_uberdata.h"
 #include <dlfcn.h>
@@ -40,9 +38,13 @@
  * _ex_unwind() is provided by libC, but if libC is not loaded we
  * need to call a local version of _ex_unwind() which does exactly
  * the same thing except for calling C++ destructors.
+ *
+ * Note that neither of these literally "returns twice" as, for eg, setjmp
+ * does, but they induce unusual control flow which the compiler should treat
+ * in the same manner (make all registers dead, etc.).
  */
-extern	void	_ex_clnup_handler(void *, void (*)(void *));
-extern	void	_ex_unwind_local(void);
+extern	void	_ex_clnup_handler(void *, void (*)(void *)) __RETURNS_TWICE;
+extern	void	_ex_unwind_local(void) __RETURNS_TWICE;
 #pragma unknown_control_flow(_ex_clnup_handler)
 #pragma unknown_control_flow(_ex_unwind_local)
 

@@ -74,7 +74,7 @@
 	.section ".text"
 	.volatile
 	.global	__rtboot
-	.local	__rtld
+	.global	__rtld
 	.local	s.LDSO, s.ZERO
 	.local	f.PANIC, f.OPENAT, f.MMAP, f.FSTATAT, f.SYSCONFIG
 	.local	f.CLOSE, f.EXIT, f.MUNMAP
