@@ -2,6 +2,7 @@
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
 	Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+	Copyright 2012, Nexenta Systems, Inc. All rights reserved.
 
  CDDL HEADER START
 
@@ -81,6 +82,108 @@
 				<manpage title='ksslcfg' section='1M'
 				    manpath='/usr/share/man' />
 			</documentation>
+		</template>
+	</instance>
+
+	<instance name='http' enabled='false'>
+		<dependency
+		    name='http-filter-filesystem-root'
+		    grouping='require_all'
+		    restart_on='none'
+		    type='service'>
+			<service_fmri value='svc:/system/filesystem/root' />	
+		</dependency>
+
+		<exec_method
+			type='method'
+			name='start'
+			exec='/lib/svc/method/svc-sockfilter start'
+			timeout_seconds='60' />
+
+		<exec_method
+			type='method'
+			name='stop'
+			exec='/lib/svc/method/svc-sockfilter stop'
+			timeout_seconds='60' />
+
+		<property_group name='startd' type='framework'>
+			<propval name='duration' type='astring'
+				value='transient' />
+		</property_group>
+
+		<property_group name='socket-filter' type='framework'>
+			<propval name='name' type='astring' value='httpfilt' />
+			<propval name='module_name' type='astring'
+				value='httpfilt' />
+			<propval name='attach_semantics' type='astring'
+				value='prog' />
+			<propval name='socket_tuples' type='astring'
+				value='2:2:0,2:2:6,26:2:0,26:2:6' />
+		</property_group>
+		
+		<template>
+			<common_name>
+				<loctext xml:lang='C'>
+				kernel inbound HTTP request socket filter 
+				</loctext>
+			</common_name>
+<!--
+			<documentation>
+				<manpage title='ksslcfg' section='1M'
+				    manpath='/usr/share/man' />
+			</documentation>
+-->
+		</template>
+	</instance>
+
+	<instance name='data' enabled='false'>
+		<dependency
+		    name='data-filter-filesystem-root'
+		    grouping='require_all'
+		    restart_on='none'
+		    type='service'>
+			<service_fmri value='svc:/system/filesystem/root' />	
+		</dependency>
+
+		<exec_method
+			type='method'
+			name='start'
+			exec='/lib/svc/method/svc-sockfilter start'
+			timeout_seconds='60' />
+
+		<exec_method
+			type='method'
+			name='stop'
+			exec='/lib/svc/method/svc-sockfilter stop'
+			timeout_seconds='60' />
+
+		<property_group name='startd' type='framework'>
+			<propval name='duration' type='astring'
+				value='transient' />
+		</property_group>
+
+		<property_group name='socket-filter' type='framework'>
+			<propval name='name' type='astring' value='datafilt' />
+			<propval name='module_name' type='astring'
+				value='datafilt' />
+			<propval name='attach_semantics' type='astring'
+				value='prog' />
+			<propval name='socket_tuples' type='astring'
+				value='2:2:0,2:2:6,26:2:0,26:2:6' />
+		</property_group>
+		
+		<template>
+			<common_name>
+				<loctext xml:lang='C'>
+				TCP inbound data socket filter
+				</loctext>
+			</common_name>
+<!--
+			<documentation>
+				<manpage title='ksslcfg' section='1M'
+				    manpath='/usr/share/man' />
+			</documentation>
+-->
 		</template>
 	</instance>
 
