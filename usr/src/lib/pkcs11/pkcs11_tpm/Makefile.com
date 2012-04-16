@@ -73,7 +73,7 @@ TSSLIB=-L$(TSPILIBDIR)
 TSSLIB64=-L$(TSPILIBDIR)/$(MACH64)
 TSSINC=-I$(TSPIINCDIR)
 
-LDLIBS += $(TSSLIB) -L/lib -lc -luuid -lmd -ltspi -lcrypto -lz -lsocket
+LDLIBS += $(TSSLIB) -L/lib -lc -luuid -lmd -ltspi -lcrypto
 CPPFLAGS += -xCC -D_POSIX_PTHREAD_SEMANTICS $(TSSINC)
 CPPFLAGS64 += $(CPPFLAGS)
 C99MODE=        $(C99_ENABLE)

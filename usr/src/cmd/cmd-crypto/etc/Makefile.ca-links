@@ -180,3 +180,6 @@ $(ROOTETCCADIR)/%:    $(CASRCDIR)/%
 	ROOTCALINK=$(ROOTETCCALINKDIR)/`$(OPENSSL) x509 -noout -hash -in $<`.0; \
 	$(RM) $$ROOTCALINK; \
 	$(LN) -s $(CATARGDIR)/$(@F) $$ROOTCALINK
+	ROOTCALINK=$(ROOTETCCALINKDIR)/`$(OPENSSL) x509 -noout -subject_hash_old -in $<`.0 2>/dev/null; \
+	test -z "$$ROOTCALINK" || $(RM) $$ROOTCALINK; \
+	test -z "$$ROOTCALINK" || $(LN) -s $(CATARGDIR)/$(@F) $$ROOTCALINK
