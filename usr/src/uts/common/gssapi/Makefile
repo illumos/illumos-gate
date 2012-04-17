@@ -23,7 +23,7 @@
 # Copyright (c) 1989,1997,1999 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2012 Milan Jurik. All rights reserved.
 #
 # uts/common/gssd/Makefile
 #
@@ -64,7 +64,7 @@ $(GSSDDIRS):
 
 gssd_prot.h:	gssd.x
 	$(RM) $@
-	$(RPCGEN) -M -h gssd.x > $@
+	$(RPCGEN) -CM -h gssd.x > $@
 
 gssd_prot.c:   gssd.x
 	$(RM) $@
