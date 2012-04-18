@@ -127,9 +127,10 @@ ONBLD_TOOLS=		$(BUILD_TOOLS)/onbld
 JAVA_ROOT=	/usr/java
 
 SFW_ROOT=	/usr/sfw
-SFWINCDIR=	$(SFW_ROOT)/include
-SFWLIBDIR=	$(SFW_ROOT)/lib
-SFWLIBDIR64=	$(SFW_ROOT)/lib/$(MACH64)
+# In OmniOS, we've shipped the related bits in /usr/lib
+SFWINCDIR=	/usr/include
+SFWLIBDIR=	/usr/lib
+SFWLIBDIR64=	/usr/lib/$(MACH64)
 
 RPCGEN=		/usr/bin/rpcgen
 STABS=		$(ONBLD_TOOLS)/bin/$(MACH)/stabs
