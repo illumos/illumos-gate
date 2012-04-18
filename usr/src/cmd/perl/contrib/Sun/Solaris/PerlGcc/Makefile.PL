@@ -84,19 +84,10 @@ if (! -f $configpm) {
 	$configpm = "Config.pm";
 }
 
-our %man1pods;
-# Only install the pods for onn-ON builds.
-if (! exists($ENV{CODEMGR_WS}) && ! exists($ENV{ENVCPPFLAGS1})) {
-	$man1pods{'pod/perlgcc.pod'} = '$(INST_MAN1DIR)/perlgcc.$(MAN1EXT)';
-}
-
 WriteMakefile(
     NAME         => 'Sun::Solaris::PerlGcc',
     VERSION_FROM => 'perlgcc.PL',
-    PL_FILES     => { 'perlgcc.PL' => 'perlgcc' },
-    EXE_FILES    => [ 'perlgcc' ],
     PM           => { $configpm => '$(INST_LIBDIR)/PerlGcc/Config.pm' },
-    MAN1PODS     => \%man1pods,
+    MAN1PODS     => { },
     MAN3PODS     => { }, # Stop autopodification.
-    clean        => { FILES => 'perlgcc' },
 );

@@ -38,7 +38,6 @@ dir path=usr group=sys
 dir path=usr/bin
 dir path=usr/perl5
 dir path=usr/perl5/5.14.2
-dir path=usr/perl5/5.14.2/bin
 dir path=usr/perl5/5.14.2/lib
 dir path=usr/perl5/5.14.2/lib/PLAT-solaris-thread-multi-64
 dir path=usr/perl5/5.14.2/lib/PLAT-solaris-thread-multi-64/Sun
