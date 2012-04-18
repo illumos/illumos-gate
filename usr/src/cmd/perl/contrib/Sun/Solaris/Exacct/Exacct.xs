@@ -531,7 +531,7 @@ putacct(idtype, id, value)
 	SV		*value;
 PREINIT:
 	HV		*stash;
-	unsigned int	bufsz;
+	STRLEN		bufsz;
 	int		flags, ret;
 	char		*buf;
 CODE:
