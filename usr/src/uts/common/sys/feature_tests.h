@@ -366,7 +366,11 @@ extern "C" {
  * declarations regardless of compiler version.
  */
 #if (defined(__STDC__) && defined(_STDC_C99))
+#if defined(__GNUG__)
+#define	_RESTRICT_KYWD	__restrict
+#else
 #define	_RESTRICT_KYWD	restrict
+#endif
 #else
 #define	_RESTRICT_KYWD
 #endif

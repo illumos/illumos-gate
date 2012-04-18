@@ -164,11 +164,13 @@ UNREF_OBJ	/lib.*\ of\ .*libxml2\.so\.2
 UNREF_OBJ	/lib.*\ of\ .*libxslt\.so\.1
 UNREF_OBJ	/lib.*\ of\ .*libpq\.so\.4
 UNREF_OBJ	/lib.*\ of\ .*libpython2\.4\.so\.1\.0
+UNREF_OBJ	/lib.*\ of\ .*libpython2\.6\.so\.1\.0
 
 # Unreferenced object of objects we can't change for other reasons
 UNREF_OBJ	/libmapmalloc\.so\.1;\ unused\ dependency\ of	# interposer
 UNREF_OBJ	/libstdc\+\+\.so\.6;\ unused\ dependency\ of	# gcc build
 UNREF_OBJ	/libm\.so\.2.*\ of\ .*libstdc\+\+\.so\.6	# gcc build
+UNREF_OBJ	/libgcc_s\.so\.1.*\ of\ .*libstdc\+\+\.so\.6    # omnios gcc mix
 UNREF_OBJ	/lib.*\ of\ .*/lib/picl/plugins/		# picl
 UNREF_OBJ	/lib.*\ of\ .*kcfd				# interposer
 UNREF_OBJ	/libpkcs11\.so\.1; .*\ of\ .*libkmf\.so\.1	# interposed
@@ -201,6 +203,9 @@ NOSYMSORT	opt/SUNWdtrt/tst/common/pid/tst.weak2.exe	# DTrace test
 NOSYMSORT	lib/amd64/libnsl\.so\.1				# C++
 NOSYMSORT	lib/sparcv9/libnsl\.so\.1			# C++
 NOSYMSORT	lib/sparcv9/libfru\.so\.1			# C++
+NOSYMSORT	usr/bin/audioconvert				# C++
+NOSYMSORT	usr/lib/libfru\.so\.1				# C++
+NOSYMSORT	usr/lib/libnisdb\.so\.2				# C++
 NOSYMSORT	usr/lib/sgml/nsgmls				# C++
 NOSYMSORT	usr/lib/lms					# C++
 NOSYMSORT	ld\.so\.1					# libc_pic.a user
