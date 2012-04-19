@@ -23,6 +23,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2012 Milan Jurik. All rights reserved.
+#
 
 # This is a "lint tail" that removes all the
 # uninteresting lines from our lint output.
@@ -31,6 +33,7 @@
 
 # There's no lintlib for krb5 yet (CR 6911968)
 /: Warning: -lkrb5 not found/			{ next; }
+/: Warning: library -lkrb5 not found/		{ next; }
 
 # Kill noise from xti.h with _XOPEN_SOURCE vs not. (CR 6911717)
 /: _xti_.* .E_INCONS_ARG_DECL2./		{ next; }

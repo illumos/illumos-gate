@@ -21,6 +21,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2012 Milan Jurik. All rights reserved.
+#
 # Common definitions for all of usr/src/cmd/ssh subdirs
 #
 
@@ -74,6 +76,7 @@ LINTFLAGS += \
 	-erroff=E_GLOBAL_COULD_BE_STATIC2 \
 	-erroff=E_CONSTANT_CONDITION \
 	-erroff=E_EXPR_NULL_EFFECT \
+	-erroff=E_STMT_NOT_REACHED \
 	-errtags=yes
 
 ROOTLIBSSH=	$(ROOTLIB)/ssh

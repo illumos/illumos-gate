@@ -20,11 +20,11 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
+ *
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- * ident	"%Z%%M%	%I%	%E% SMI"
  */
 
 /*
