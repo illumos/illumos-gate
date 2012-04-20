@@ -2986,6 +2986,7 @@ zfs_do_list(int argc, char **argv)
 	int types = ZFS_TYPE_DATASET;
 	boolean_t types_specified = B_FALSE;
 	char *fields = NULL;
+	zprop_list_t *pl;
 	list_cbdata_t cb = { 0 };
 	char *value;
 	int limit = 0;
@@ -3082,8 +3083,6 @@ zfs_do_list(int argc, char **argv)
 	if (strcmp(fields, "space") == 0 && types_specified == B_FALSE)
 		types &= ~ZFS_TYPE_SNAPSHOT;
 
-	libzfs_set_cachedprops(g_zfs, B_TRUE);
-
 	/*
 	 * If the user specifies '-o all', the zprop_get_list() doesn't
 	 * normally include the name of the dataset.  For 'zfs list', we always
@@ -3092,6 +3091,18 @@ zfs_do_list(int argc, char **argv)
 	if (zprop_get_list(g_zfs, fields, &cb.cb_proplist, ZFS_TYPE_DATASET)
 	    != 0)
 		usage(B_FALSE);
+
+	/*
+	 * The default set of properties contains only properties which can be
+	 * retrieved from the set of cached properties.  If any user-specfied
+	 * properties cannot be retrieved from that set, unset the cachedprops
+	 * flags on the ZFS handle.
+	 */
+	libzfs_set_cachedprops(g_zfs, B_TRUE);
+	for (pl = cb.cb_proplist; pl != NULL; pl = pl->pl_next) {
+		if (zfs_prop_cacheable(pl->pl_prop))
+			libzfs_set_cachedprops(g_zfs, B_FALSE);
+	}
 
 	cb.cb_scripted = scripted;
 	cb.cb_first = B_TRUE;
