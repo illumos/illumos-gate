@@ -35,7 +35,7 @@ extern "C" {
 #endif
 
 #define	IPD_DEV_PATH	"/dev/ipd"
-#define	IPD_MAX_DELAY	10000		/* 10 ms in us */
+#define	IPD_MAX_DELAY	1000000		/* 1s in us */
 
 typedef struct ipd_ioc_perturb {
 	zoneid_t	ipip_zoneid;

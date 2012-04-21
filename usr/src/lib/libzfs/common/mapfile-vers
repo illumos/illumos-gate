@@ -103,6 +103,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zfs_path_to_zhandle;
 	zfs_promote;
 	zfs_prop_align_right;
+	zfs_prop_cacheable;
 	zfs_prop_column_name;
 	zfs_prop_default_numeric;
 	zfs_prop_default_string;
