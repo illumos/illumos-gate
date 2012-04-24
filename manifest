@@ -1510,12 +1510,10 @@ f lib/svc/manifest/system/extended-accounting.xml 0444 root sys
 d lib/svc/manifest/system/filesystem 0755 root sys
 f lib/svc/manifest/system/filesystem/autofs.xml 0444 root sys
 f lib/svc/manifest/system/filesystem/local-fs.xml 0444 root sys
-f lib/svc/manifest/system/filesystem/rmvolmgr.xml 0444 root sys
 f lib/svc/manifest/system/filesystem/root-fs.xml 0444 root sys
 f lib/svc/manifest/system/filesystem/usr-fs.xml 0444 root sys
 f lib/svc/manifest/system/filesystem/vscan.xml 0444 root sys
 f lib/svc/manifest/system/fmd.xml 0444 root sys
-f lib/svc/manifest/system/hal.xml 0444 root sys
 f lib/svc/manifest/system/hostid.xml 0444 root sys
 f lib/svc/manifest/system/hotplug.xml 0444 root sys
 d lib/svc/manifest/system/ibsrp 0755 root sys
@@ -1609,7 +1607,6 @@ f lib/svc/method/svc-fcoei 0555 root sys
 f lib/svc/method/svc-fcoet 0555 root sys
 f lib/svc/method/svc-forwarding 0555 root bin
 f lib/svc/method/svc-ftp 0555 root sys
-f lib/svc/method/svc-hal 0555 root sys
 f lib/svc/method/svc-hostid 0555 root bin
 f lib/svc/method/svc-hotplug 0555 root bin
 f lib/svc/method/svc-ii 0744 root sys
@@ -1630,7 +1627,6 @@ f lib/svc/method/svc-rdcsyncd 0744 root sys
 f lib/svc/method/svc-rdisc 0555 root bin
 f lib/svc/method/svc-resource-mgmt 0555 root sys
 f lib/svc/method/svc-ripng 0555 root bin
-f lib/svc/method/svc-rmvolmgr 0555 root sys
 f lib/svc/method/svc-route 0555 root bin
 f lib/svc/method/svc-scheduler 0555 root sys
 f lib/svc/method/svc-scm 0744 root sys
@@ -2662,9 +2658,6 @@ f usr/include/grp.h 0644 root bin
 d usr/include/gssapi 0755 root bin
 f usr/include/gssapi/gssapi.h 0644 root bin
 f usr/include/gssapi/gssapi_ext.h 0644 root bin
-d usr/include/hal 0755 root bin
-f usr/include/hal/libhal-storage.h 0644 root bin
-f usr/include/hal/libhal.h 0644 root bin
 f usr/include/hbaapi.h 0644 root bin
 d usr/include/ia32 0755 root bin
 d usr/include/ia32/sys 0755 root bin
@@ -2862,8 +2855,6 @@ f usr/include/libnvpair.h 0644 root bin
 f usr/include/libnwam.h 0644 root bin
 f usr/include/libnwam_priv.h 0644 root bin
 f usr/include/libpctx.h 0644 root bin
-d usr/include/libpolkit 0755 root bin
-f usr/include/libpolkit/libpolkit.h 0644 root bin
 f usr/include/libproc.h 0644 root bin
 f usr/include/librcm.h 0644 root bin
 f usr/include/librcm_event.h 0644 root bin
@@ -4762,12 +4753,6 @@ s usr/lib/amd64/libgen.so.1=../../../lib/amd64/libgen.so.1
 s usr/lib/amd64/libgen.so=../../../lib/amd64/libgen.so.1
 f usr/lib/amd64/libgss.so.1 0755 root bin
 s usr/lib/amd64/libgss.so=libgss.so.1
-f usr/lib/amd64/libhal-storage.so.1.0.0 0755 root bin
-s usr/lib/amd64/libhal-storage.so.1=libhal-storage.so.1.0.0
-s usr/lib/amd64/libhal-storage.so=libhal-storage.so.1.0.0
-f usr/lib/amd64/libhal.so.1.0.0 0755 root bin
-s usr/lib/amd64/libhal.so.1=libhal.so.1.0.0
-s usr/lib/amd64/libhal.so=libhal.so.1.0.0
 f usr/lib/amd64/libhotplug.so.1 0755 root bin
 s usr/lib/amd64/libhotplug.so=libhotplug.so.1
 f usr/lib/amd64/libidmap.so.1 0755 root bin
@@ -4992,8 +4977,6 @@ s usr/lib/amd64/nss_nis.so.1=../../../lib/amd64/nss_nis.so.1
 s usr/lib/amd64/nss_user.so.1=../../../lib/amd64/nss_user.so.1
 f usr/lib/amd64/passwdutil.so.1 0755 root bin
 d usr/lib/amd64/pkgconfig 0755 root other
-f usr/lib/amd64/pkgconfig/hal-storage.pc 0644 root bin
-f usr/lib/amd64/pkgconfig/hal.pc 0644 root bin
 f usr/lib/amd64/rpcsec.so.1 0755 root bin
 s usr/lib/amd64/rpcsec.so=rpcsec.so.1
 f usr/lib/amd64/straddr.so.2 0755 root bin
@@ -5464,40 +5447,6 @@ s usr/lib/gss/mech_dh.so=mech_dh.so.1
 f usr/lib/gss/mech_krb5.so.1 0755 root bin
 s usr/lib/gss/mech_krb5.so=mech_krb5.so.1
 f usr/lib/gss/mech_spnego.so.1 0755 root bin
-d usr/lib/hal 0755 root bin
-f usr/lib/hal/hal-functions 0555 root bin
-f usr/lib/hal/hal-is-caller-privileged 0555 root bin
-f usr/lib/hal/hal-storage-cleanup-all-mountpoints 0555 root bin
-f usr/lib/hal/hal-storage-cleanup-mountpoint 0555 root bin
-f usr/lib/hal/hal-storage-closetray 0555 root bin
-f usr/lib/hal/hal-storage-eject 0555 root bin
-f usr/lib/hal/hal-storage-mount 0555 root bin
-f usr/lib/hal/hal-storage-unmount 0555 root bin
-f usr/lib/hal/hal-storage-zpool-export 0555 root bin
-f usr/lib/hal/hal-storage-zpool-import 0555 root bin
-f usr/lib/hal/hal-system-lcd-get-brightness 0555 root bin
-f usr/lib/hal/hal-system-lcd-set-brightness 0555 root bin
-f usr/lib/hal/hal-system-power-hibernate 0555 root bin
-f usr/lib/hal/hal-system-power-reboot 0555 root bin
-f usr/lib/hal/hal-system-power-shutdown 0555 root bin
-f usr/lib/hal/hal-system-power-suspend 0555 root bin
-f usr/lib/hal/hald 0555 root bin
-f usr/lib/hal/hald-addon-acpi 0555 root bin
-f usr/lib/hal/hald-addon-cpufreq 0555 root bin
-f usr/lib/hal/hald-addon-network-discovery 0555 root bin
-f usr/lib/hal/hald-addon-storage 0555 root bin
-f usr/lib/hal/hald-probe-acpi 0555 root bin
-f usr/lib/hal/hald-probe-storage 0555 root bin
-f usr/lib/hal/hald-probe-volume 0555 root bin
-f usr/lib/hal/hald-probe-xkb 0555 root bin
-f usr/lib/hal/hald-runner 0555 root bin
-d usr/lib/hal/sunos 0755 root bin
-f usr/lib/hal/sunos/hal-system-lcd-get-brightness-sunos 0555 root bin
-f usr/lib/hal/sunos/hal-system-lcd-set-brightness-sunos 0555 root bin
-f usr/lib/hal/sunos/hal-system-power-hibernate-sunos 0555 root bin
-f usr/lib/hal/sunos/hal-system-power-reboot-sunos 0555 root bin
-f usr/lib/hal/sunos/hal-system-power-shutdown-sunos 0555 root bin
-f usr/lib/hal/sunos/hal-system-power-suspend-sunos 0555 root bin
 d usr/lib/help 0755 root bin
 d usr/lib/help/auths 0755 root bin
 d usr/lib/help/auths/locale 0755 root bin
@@ -6198,12 +6147,6 @@ s usr/lib/libgrubmgmt.so=../../lib/libgrubmgmt.so.1
 s usr/lib/libgrubmgmt.so.1=../../lib/libgrubmgmt.so.1
 f usr/lib/libgss.so.1 0755 root bin
 s usr/lib/libgss.so=libgss.so.1
-f usr/lib/libhal-storage.so.1.0.0 0755 root bin
-s usr/lib/libhal-storage.so.1=libhal-storage.so.1.0.0
-s usr/lib/libhal-storage.so=libhal-storage.so.1.0.0
-f usr/lib/libhal.so.1.0.0 0755 root bin
-s usr/lib/libhal.so.1=libhal.so.1.0.0
-s usr/lib/libhal.so=libhal.so.1.0.0
 f usr/lib/libhotplug.so.1 0755 root bin
 s usr/lib/libhotplug.so=libhotplug.so.1
 f usr/lib/libidmap.so.1 0755 root bin
@@ -6325,9 +6268,6 @@ f usr/lib/libpkcs11.so.1 0755 root bin
 s usr/lib/libpkcs11.so=libpkcs11.so.1
 f usr/lib/libpkg.so.1 0755 root bin
 s usr/lib/libpkg.so=libpkg.so.1
-f usr/lib/libpolkit.so.0.0.0 0755 root bin
-s usr/lib/libpolkit.so.0=libpolkit.so.0.0.0
-s usr/lib/libpolkit.so=libpolkit.so.0.0.0
 f usr/lib/libpool.so.1 0755 root bin
 s usr/lib/libpool.so=libpool.so.1
 s usr/lib/libposix4.so.1=../../lib/librt.so.1
@@ -9606,9 +9546,6 @@ s usr/lib/picl/plugins/libpiclfrutree.so=libpiclfrutree.so.1
 f usr/lib/picl/plugins/libpiclmemcfg.so.1 0755 root sys
 s usr/lib/picl/plugins/libpiclmemcfg.so=libpiclmemcfg.so.1
 d usr/lib/pkgconfig 0755 root bin
-f usr/lib/pkgconfig/hal-storage.pc 0644 root bin
-f usr/lib/pkgconfig/hal.pc 0644 root bin
-f usr/lib/pkgconfig/polkit.pc 0644 root bin
 f usr/lib/platexec 0555 root bin
 d usr/lib/pool 0755 root bin
 f usr/lib/pool/libjkstat.so.1 0755 root bin
@@ -9672,7 +9609,6 @@ s usr/lib/reparse/libnfs_basic.so=libnfs_basic.so.1
 f usr/lib/reparse/libreparse_smb.so.1 0755 root bin
 s usr/lib/reparse/libreparse_smb.so=libreparse_smb.so.1
 f usr/lib/reparse/reparsed 0555 root sys
-f usr/lib/rmvolmgr 0555 root bin
 f usr/lib/rpcsec.so.1 0755 root bin
 s usr/lib/rpcsec.so=rpcsec.so.1
 s usr/lib/rsh=../bin/ksh93
@@ -10264,12 +10200,6 @@ f usr/sbin/groupmod 0555 root sys
 f usr/sbin/grpck 0555 root bin
 f usr/sbin/grub 0555 root bin
 f usr/sbin/gsscred 0555 root sys
-f usr/sbin/hal-device 0555 root bin
-f usr/sbin/hal-fdi-validate 0555 root bin
-f usr/sbin/hal-find-by-capability 0555 root bin
-f usr/sbin/hal-find-by-property 0555 root bin
-f usr/sbin/hal-get-property 0555 root bin
-f usr/sbin/hal-set-property 0555 root bin
 f usr/sbin/halt 0755 root bin
 f usr/sbin/hextoalabel 0555 root sys
 f usr/sbin/host 0555 root bin
@@ -10386,7 +10316,6 @@ f usr/sbin/ping 4555 root bin
 h usr/sbin/plockstat=usr/lib/isaexec
 f usr/sbin/pmadm 0555 root sys
 f usr/sbin/pmconfig 4555 root bin
-f usr/sbin/polkit-is-privileged 0555 root bin
 f usr/sbin/pooladm 0555 root bin
 f usr/sbin/poolbind 0555 root bin
 f usr/sbin/poolcfg 0555 root bin
@@ -15094,7 +15023,6 @@ f usr/share/man/man5/formats.5 0444 root bin
 f usr/share/man/man5/fsattr.5 0444 root bin
 f usr/share/man/man5/grub.5 0444 root bin
 f usr/share/man/man5/gss_auth_rules.5 0444 root bin
-f usr/share/man/man5/hal.5 0444 root bin
 f usr/share/man/man5/iconv.5 0444 root bin
 f usr/share/man/man5/iconv_unicode.5 0444 root bin
 f usr/share/man/man5/ieee802.11.5 0444 root bin
