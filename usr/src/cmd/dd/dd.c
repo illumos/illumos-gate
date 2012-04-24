@@ -23,12 +23,11 @@
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012, Josef 'Jeff' Sipek <jeffpc@31bits.net>. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	convert and copy
@@ -1642,7 +1641,8 @@ true:
 /* Arg:		big - maximum valid input number			*/
 /* Global arg:	string - pointer to command arg				*/
 /*									*/
-/* Valid forms:	123 | 123k | 123w | 123b | 123*123 | 123x123		*/
+/* Valid forms:	123 | 123k | 123M | 123G | 123T | 123P | 123E | 123Z |	*/
+/*		123w | 123b | 123*123 | 123x123				*/
 /*		plus combinations such as 2b*3kw*4w			*/
 /*									*/
 /* Return:	converted number					*/
@@ -1667,6 +1667,30 @@ long long big;
 	{
 		switch (*cs++)
 		{
+
+		case 'Z':
+			n *= 1024;
+			/* FALLTHROUGH */
+
+		case 'E':
+			n *= 1024;
+			/* FALLTHROUGH */
+
+		case 'P':
+			n *= 1024;
+			/* FALLTHROUGH */
+
+		case 'T':
+			n *= 1024;
+			/* FALLTHROUGH */
+
+		case 'G':
+			n *= 1024;
+			/* FALLTHROUGH */
+
+		case 'M':
+			n *= 1024;
+			/* FALLTHROUGH */
 
 		case 'k':
 			n *= 1024;
