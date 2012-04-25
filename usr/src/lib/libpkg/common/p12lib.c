@@ -58,6 +58,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2012, OmniTI Computer Consulting, Inc. All rights reserved.
+ */
+
 
 #include <strings.h>
 #include <stdlib.h>
@@ -1137,7 +1141,11 @@ sunw_get_pkey_fname(getdo_actions_t dowhat, EVP_PKEY *pkey, char **fname)
 	}
 
 	str = ty->value.bmpstring;
+#if OPENSSL_VERSION_NUMBER < 0x10000000L
 	*fname = uni2asc(str->data, str->length);
+#else
+	*fname = OPENSSL_uni2asc(str->data, str->length);
+#endif
 	if (*fname == NULL) {
 		SUNWerr(SUNW_F_GET_PKEY_FNAME, SUNW_R_MEMORY_FAILURE);
 		return (-1);
@@ -2295,7 +2303,11 @@ asc2bmpstring(const char *str, int len)
 	int unilen;
 
 	/* Convert the character to the bmp format. */
+#if OPENSSL_VERSION_NUMBER < 0x10000000L
 	if (asc2uni(str, len, &uni, &unilen) == 0) {
+#else
+	if (OPENSSL_asc2uni(str, len, &uni, &unilen) == 0) {
+#endif
 		SUNWerr(SUNW_F_ASC2BMPSTRING, SUNW_R_MEMORY_FAILURE);
 		return (NULL);
 	}
