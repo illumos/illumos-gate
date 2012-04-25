@@ -829,6 +829,7 @@ f kernel/fs/amd64/fifofs 0755 root sys
 f kernel/fs/amd64/hsfs 0755 root sys
 f kernel/fs/amd64/hyprlofs 0755 root sys
 f kernel/fs/amd64/lofs 0755 root sys
+f kernel/fs/amd64/lxprocfs 0755 root sys
 f kernel/fs/amd64/mntfs 0755 root sys
 f kernel/fs/amd64/namefs 0755 root sys
 f kernel/fs/amd64/nfs 0755 root sys
@@ -5355,6 +5356,8 @@ f usr/lib/fs/hyprlofs/hlcfg 0555 root bin
 f usr/lib/fs/hyprlofs/mount 0555 root bin
 d usr/lib/fs/lofs 0755 root sys
 f usr/lib/fs/lofs/mount 0555 root bin
+d usr/lib/fs/lxproc 0755 root sys
+f usr/lib/fs/lxproc/mount 0555 root bin
 d usr/lib/fs/mntfs 0755 root sys
 f usr/lib/fs/mntfs/mount 0555 root bin
 d usr/lib/fs/nfs 0755 root sys
@@ -15206,6 +15209,7 @@ f usr/share/man/man7fs/devfs.7fs 0444 root bin
 f usr/share/man/man7fs/hsfs.7fs 0444 root bin
 f usr/share/man/man7fs/hyprlofs.7fs 0444 root bin
 f usr/share/man/man7fs/lofs.7fs 0444 root bin
+f usr/share/man/man7fs/lxproc.7fs 0444 root bin
 f usr/share/man/man7fs/objfs.7fs 0444 root bin
 f usr/share/man/man7fs/pcfs.7fs 0444 root bin
 f usr/share/man/man7fs/sharefs.7fs 0444 root bin
