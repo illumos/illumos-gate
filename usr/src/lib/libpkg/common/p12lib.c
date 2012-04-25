@@ -58,6 +58,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2012, OmniTI Computer Consulting, Inc. All rights reserved.
+ */
+
 
 #include <strings.h>
 #include <stdlib.h>

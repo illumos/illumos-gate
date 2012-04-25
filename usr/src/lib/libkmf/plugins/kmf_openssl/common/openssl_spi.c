@@ -4,6 +4,9 @@
  * Use is subject to license terms.
  */
 /*
+ * Copyright (c) 2012, OmniTI Computer Consulting, Inc. All rights reserved.
+ */
+/*
  * Written by Dr Stephen N Henson (shenson@bigfoot.com) for the OpenSSL
  * project 2000.
  */

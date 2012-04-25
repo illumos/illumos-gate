@@ -61,6 +61,10 @@
  * in this library.  None of these are exposed.
  */
 
+/*
+ * Copyright (c) 2012, OmniTI Computer Consulting, Inc. All rights reserved.
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>

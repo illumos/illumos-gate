@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2000-2006, 2008, 2009 Sendmail, Inc. and its suppliers.
  *	All rights reserved.
+ * Copyright (c) 2012, OmniTI Computer Consulting, Inc. All rights reserved.
  *
  * By using this file, you agree to the terms and conditions set
  * forth in the LICENSE file which can be found at the top level of
