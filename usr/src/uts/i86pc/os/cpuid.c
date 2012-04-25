@@ -30,7 +30,7 @@
  * Portions Copyright 2009 Advanced Micro Devices, Inc.
  */
 /*
- * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 /*
  * Various routines to handle identification
@@ -2576,8 +2576,12 @@ cpuid_pass4(cpu_t *cpu)
 		if (*ecx & CPUID_INTC_ECX_PCLMULQDQ)
 			hwcap_flags |= AV_386_PCLMULQDQ;
 		if ((*ecx & CPUID_INTC_ECX_XSAVE) &&
-		    (*ecx & CPUID_INTC_ECX_OSXSAVE))
+		    (*ecx & CPUID_INTC_ECX_OSXSAVE)) {
 			hwcap_flags |= AV_386_XSAVE;
+
+			if (*ecx & CPUID_INTC_ECX_AVX)
+				hwcap_flags |= AV_386_AVX;
+		}
 		if (*ecx & CPUID_INTC_ECX_VMX)
 			hwcap_flags |= AV_386_VMX;
 		if (*ecx & CPUID_INTC_ECX_POPCNT)
