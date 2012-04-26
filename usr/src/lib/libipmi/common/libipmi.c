@@ -26,8 +26,6 @@
 #include <libipmi.h>
 #include <string.h>
 
-#include <sys/bmc_intf.h>
-
 #include "ipmi_impl.h"
 
 ipmi_handle_t *
@@ -119,7 +117,6 @@ static struct ipmi_err_conv {
 	{ 0xD5,			EIPMI_UNAVAILABLE },
 	{ 0xD6,			EIPMI_UNAVAILABLE },
 	{ 0xFF,			EIPMI_UNSPECIFIED },
-	{ BMC_IPMI_OEM_FAILURE_SENDBMC,	EIPMI_SEND_FAILED },
 };
 
 #define	IPMI_ERROR_COUNT \
