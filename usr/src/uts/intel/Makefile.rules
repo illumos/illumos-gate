@@ -21,6 +21,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2012 Joyent, Inc.  All rights reserved.
 #
 
 #
@@ -165,6 +166,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/drm/%.c
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/hotplug/pcicfg/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/ipmi/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -415,6 +420,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/intel_nb5000/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/intel_nhm/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/ipmi/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(SRC)/common/mc/mc-amd/%.c

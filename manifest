@@ -3781,6 +3781,7 @@ f usr/include/sys/iommulib.h 0644 root bin
 f usr/include/sys/ipc.h 0644 root bin
 f usr/include/sys/ipc_impl.h 0644 root bin
 f usr/include/sys/ipc_rctl.h 0644 root bin
+f usr/include/sys/ipmi.h 0644 root bin
 f usr/include/sys/isa_defs.h 0644 root bin
 f usr/include/sys/iscsi_authclient.h 0644 root bin
 f usr/include/sys/iscsi_authclientglue.h 0644 root bin
@@ -4515,6 +4516,7 @@ f usr/kernel/drv/amd64/bpf 0755 root sys
 f usr/kernel/drv/amd64/dump 0755 root sys
 f usr/kernel/drv/amd64/fssnap 0755 root sys
 f usr/kernel/drv/amd64/ipf 0755 root sys
+f usr/kernel/drv/amd64/ipmi 0755 root sys
 f usr/kernel/drv/amd64/kstat 0755 root sys
 f usr/kernel/drv/amd64/ksyms 0755 root sys
 f usr/kernel/drv/amd64/logindmux 0755 root sys
@@ -4531,6 +4533,7 @@ f usr/kernel/drv/bpf.conf 0644 root sys
 f usr/kernel/drv/dump.conf 0644 root sys
 f usr/kernel/drv/fssnap.conf 0644 root sys
 f usr/kernel/drv/ipf.conf 0644 root sys
+f usr/kernel/drv/ipmi.conf 0644 root sys
 f usr/kernel/drv/kstat.conf 0644 root sys
 f usr/kernel/drv/ksyms.conf 0644 root sys
 f usr/kernel/drv/logindmux.conf 0644 root sys
@@ -15117,6 +15120,7 @@ f usr/share/man/man7d/hwahc.7d 0444 root bin
 f usr/share/man/man7d/hwarc.7d 0444 root bin
 f usr/share/man/man7d/hxge.7d 0444 root bin
 f usr/share/man/man7d/igb.7d 0444 root bin
+f usr/share/man/man7d/ipmi.7d 0444 root bin
 f usr/share/man/man7d/ipnet.7d 0444 root bin
 f usr/share/man/man7d/iscsi.7d 0444 root bin
 f usr/share/man/man7d/ixgbe.7d 0444 root bin
