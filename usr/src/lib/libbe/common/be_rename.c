@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 
 #include <assert.h>
@@ -175,7 +176,7 @@ be_rename(nvlist_t *be_attrs)
 	}
 
 	/* Rename of BE's root dataset. */
-	if (zfs_rename(zhp, bt.nbe_root_ds, B_FALSE) != 0) {
+	if (zfs_rename(zhp, bt.nbe_root_ds, B_FALSE, B_FALSE) != 0) {
 		be_print_err(gettext("be_rename: failed to "
 		    "rename dataset (%s): %s\n"), bt.obe_root_ds,
 		    libzfs_error_description(g_zfs));
