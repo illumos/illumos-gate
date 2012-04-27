@@ -19,38 +19,27 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2012 Joyent, Inc. All rights reserved.
 #
 
-PROG=	prtconf
-OBJS=	$(PROG).o pdevinfo.o prt_xxx.o
-SRCS=	$(OBJS:%.o=../%.c)
+LIBRARY = libpcidb.a
+VERS = .1
+OBJECTS = pcidb.o
 
-include ../../Makefile.cmd
+include ../../Makefile.lib
 
-CFLAGS	+=	$(CCVERBOSE)
-LDLIBS	+= -ldevinfo -lnvpair -lpcidb
+LIBS = $(DYNLIB) $(LINTLIB)
 
-FILEMODE= 02555
+SRCDIR = ../common
 
-CLEANFILES += $(OBJS)
+LDLIBS += -lc
+
+$(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(LIBS)
 
-$(PROG): $(OBJS)
-	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
-	$(POST_PROCESS)
-
-lint:	lint_SRCS
-
-%.o:	../%.c
-	$(COMPILE.c) $<
-
-clean:
-	$(RM) $(CLEANFILES)
+lint: lintcheck
 
 include ../../Makefile.targ
-

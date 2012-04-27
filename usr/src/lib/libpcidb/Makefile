@@ -19,38 +19,37 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright (c) 2012 Joyent, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-PROG=	prtconf
-OBJS=	$(PROG).o pdevinfo.o prt_xxx.o
-SRCS=	$(OBJS:%.o=../%.c)
+include ../Makefile.lib
 
-include ../../Makefile.cmd
+HDRS = pcidb.h
+HDRDIR = common
 
-CFLAGS	+=	$(CCVERBOSE)
-LDLIBS	+= -ldevinfo -lnvpair -lpcidb
+SUBDIRS = $(MACH) 
+$(BUILD64)SUBDIRS += $(MACH64)
 
-FILEMODE= 02555
-
-CLEANFILES += $(OBJS)
+all := TARGET = all
+clean := TARGET = clean
+clobber := TARGET = clobber
+install := TARGET = install
+lint := TARGET = lint
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all clean clobber install lint: $(SUBDIRS)
 
-$(PROG): $(OBJS)
-	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
-	$(POST_PROCESS)
+install: install_h $(SUBDIRS)
 
-lint:	lint_SRCS
+install_h: $(ROOTHDRS)
 
-%.o:	../%.c
-	$(COMPILE.c) $<
+check: $(CHECKHDRS)
 
-clean:
-	$(RM) $(CLEANFILES)
+$(SUBDIRS): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
-include ../../Makefile.targ
+FRC:
 
+include ../Makefile.targ

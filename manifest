@@ -4834,6 +4834,7 @@ s usr/lib/amd64/libpam.so.1=../../../lib/amd64/libpam.so.1
 s usr/lib/amd64/libpam.so=../../../lib/amd64/libpam.so.1
 f usr/lib/amd64/libpanel.so.1 0755 root bin
 s usr/lib/amd64/libpanel.so=libpanel.so.1
+f usr/lib/amd64/libpcidb.so.1 0755 root bin
 f usr/lib/amd64/libpctx.so.1 0755 root bin
 s usr/lib/amd64/libpctx.so=libpctx.so.1
 f usr/lib/amd64/libpicl.so.1 0755 root bin
@@ -6259,6 +6260,7 @@ f usr/lib/libpanel.so.1 0755 root bin
 s usr/lib/libpanel.so=libpanel.so.1
 f usr/lib/libparted.so.8 0755 root bin
 s usr/lib/libparted.so=libparted.so.8
+f usr/lib/libpcidb.so.1 0755 root bin
 f usr/lib/libpctx.so.1 0755 root bin
 s usr/lib/libpctx.so=libpctx.so.1
 f usr/lib/libpicl.so.1 0755 root bin
@@ -10448,6 +10450,8 @@ d usr/sfw/bin/amd64 0755 root bin
 s usr/sfw/man=share/man
 d usr/sfw/share 0755 root bin
 d usr/share 0755 root sys
+d usr/share/hwdata 0755 root sys
+f usr/share/hwdata/pci.ids 0444 root bin
 d usr/share/lib 0755 root sys
 d usr/share/lib/dict 0755 root bin
 f usr/share/lib/dict/words 0444 root bin

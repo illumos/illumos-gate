@@ -1,0 +1,69 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2012 Joyent, Inc. All rights reserved.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNWprivate {
+    global:
+	pcidb_open;
+	pcidb_close;
+	pcidb_lookup_vendor;
+	pcidb_vendor_iter;
+	pcidb_vendor_iter_next;
+	pcidb_vendor_name;
+	pcidb_vendor_id;
+	pcidb_lookup_device;
+	pcidb_lookup_device_by_vendor;
+	pcidb_device_iter;
+	pcidb_device_iter_next;
+	pcidb_device_name;
+	pcidb_device_id;
+	pcidb_device_vendor;
+	pcidb_lookup_subvd;
+	pcidb_lookup_subvd_by_vendor;	
+	pcidb_lookup_subvd_by_device;	
+	pcidb_subvd_iter;
+	pcidb_subvd_iter_next;
+	pcidb_subvd_name;
+	pcidb_subvd_svid;
+	pcidb_subvd_sdid;
+	pcidb_subvd_device;
+	pcidb_subvd_vendor;
+    local:
+	*;
+};
