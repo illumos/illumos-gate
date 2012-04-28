@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Joyent, Inc.  All rights reserved.
  */
 
 #include <regex.h>
@@ -41,7 +42,7 @@ static int serial(di_minor_t minor, di_node_t node);
 static int diskette(di_minor_t minor, di_node_t node);
 static int vt00(di_minor_t minor, di_node_t node);
 static int kdmouse(di_minor_t minor, di_node_t node);
-static int bmc(di_minor_t minor, di_node_t node);
+static int ipmi(di_minor_t minor, di_node_t node);
 static int smbios(di_minor_t minor, di_node_t node);
 static int agp_process(di_minor_t minor, di_node_t node);
 static int drm_node(di_minor_t minor, di_node_t node);
@@ -62,8 +63,8 @@ static devfsadm_create_t misc_cbt[] = {
 	{ "mouse", "ddi_mouse", "mouse8042",
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, kdmouse
 	},
-	{ "pseudo", "ddi_pseudo", "bmc",
-	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, bmc,
+	{ "pseudo", "ddi_pseudo", "ipmi",
+	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, ipmi,
 	},
 	{ "pseudo", "ddi_pseudo", "smbios",
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_1, smbios,
@@ -350,9 +351,9 @@ kdmouse(di_minor_t minor, di_node_t node)
 }
 
 static int
-bmc(di_minor_t minor, di_node_t node)
+ipmi(di_minor_t minor, di_node_t node)
 {
-	(void) devfsadm_mklink("bmc", node, minor, 0);
+	(void) devfsadm_mklink("ipmi", node, minor, 0);
 	return (DEVFSADM_CONTINUE);
 }
 
