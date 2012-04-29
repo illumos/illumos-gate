@@ -212,6 +212,7 @@ ipmi_ioctl(dev_t dv, int cmd, intptr_t data, int flags, cred_t *cr, int *rvalp)
 	int error, len;
 	model_t model;
 	int orig_cmd = 0;
+	uchar_t	t_lun;
 
 	if (secpolicy_sys_config(cr, B_FALSE) != 0)
 		return (EPERM);
@@ -371,25 +372,41 @@ ipmi_ioctl(dev_t dv, int cmd, intptr_t data, int flags, cred_t *cr, int *rvalp)
 
 	case IPMICTL_SET_MY_ADDRESS_CMD:
 		IPMI_LOCK(sc);
-		dev->ipmi_address = *(int *)data;
+		if (copyin((void *)data, &dev->ipmi_address,
+		    sizeof (dev->ipmi_address))) {
+			IPMI_UNLOCK(sc);
+			return (EFAULT);
+		}
 		IPMI_UNLOCK(sc);
 		break;
 
 	case IPMICTL_GET_MY_ADDRESS_CMD:
 		IPMI_LOCK(sc);
-		*(int *)data = dev->ipmi_address;
+		if (copyout(&dev->ipmi_address, (void *)data,
+		    sizeof (dev->ipmi_address))) {
+			IPMI_UNLOCK(sc);
+			return (EFAULT);
+		}
 		IPMI_UNLOCK(sc);
 		break;
 
 	case IPMICTL_SET_MY_LUN_CMD:
 		IPMI_LOCK(sc);
-		dev->ipmi_lun = *(int *)data & 0x3;
+		if (copyin((void *)data, &t_lun, sizeof (t_lun))) {
+			IPMI_UNLOCK(sc);
+			return (EFAULT);
+		}
+		dev->ipmi_lun = t_lun & 0x3;
 		IPMI_UNLOCK(sc);
 		break;
 
 	case IPMICTL_GET_MY_LUN_CMD:
 		IPMI_LOCK(sc);
-		*(int *)data = dev->ipmi_lun;
+		if (copyout(&dev->ipmi_lun, (void *)data,
+		    sizeof (dev->ipmi_lun))) {
+			IPMI_UNLOCK(sc);
+			return (EFAULT);
+		}
 		IPMI_UNLOCK(sc);
 		break;
 
