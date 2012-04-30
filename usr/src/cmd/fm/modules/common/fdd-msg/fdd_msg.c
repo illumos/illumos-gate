@@ -188,7 +188,7 @@ send_fma_cap_to_ilom(fmd_hdl_t *hdl, uint32_t fma_cap)
 	if ((ipmi_hdl = ipmi_open(&error, &msg, IPMI_TRANSPORT_BMC, NULL))
 	    == NULL) {
 		/*
-		 * If /dev/bmc doesn't exist on the system, then return
+		 * If /dev/ipmi doesn't exist on the system, then return
 		 * without doing anything.
 		 */
 		if (error != EIPMI_BMC_OPEN_FAILED)
