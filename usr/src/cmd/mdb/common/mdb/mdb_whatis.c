@@ -21,9 +21,11 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012 Joyent, Inc. All rights reserved.
  */
 
-#include <sys/mdb_modapi.h>
+#include <mdb/mdb_modapi.h>
 #include <mdb/mdb.h>
 #include <mdb/mdb_io.h>
 #include <mdb/mdb_module.h>
