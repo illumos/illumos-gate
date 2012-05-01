@@ -4890,7 +4890,7 @@ screen-16color-s|GNU Screen with 16 colors and status line,
 screen-16color-bce|GNU Screen with 16 colors and BCE,
 	use=ibm+16color, use=screen-bce,
 
-screen-16color-bce-s|GNU Screen with 16 colors, BCE, and status line,
+screen-16color-bce-s|GNU Screen with 16 colors BCE and status line,
 	bce, use=ibm+16color, use=screen-s,
 
 # ======================================================================
@@ -4908,7 +4908,7 @@ screen-256color-bce|GNU Screen with 256 colors and BCE,
 	ccc@,
 	initc@, use=xterm+256color, use=screen-bce,
 
-screen-256color-bce-s|GNU Screen with 256 colors, BCE, and status line,
+screen-256color-bce-s|GNU Screen with 256 colors BCE and status line,
 	bce, ccc@,
 	initc@, use=xterm+256color, use=screen-s,
 

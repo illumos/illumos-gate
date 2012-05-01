@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *	tic.h			Terminal Information Compiler
  *
@@ -114,12 +112,15 @@ extern int debug_level;		/* level of debugging output */
  *	The first three are also used in the hash table of capability
  *	names.  The scanner returns one of these values after loading
  *	the specifics into the global structure curr_token.
+ *
+ *	Note that EOF is also, implicitly, a token type.
  */
-#define BOOLEAN 0	/* Boolean capability */
-#define NUMBER 1	/* Numeric capability */
-#define STRING 2	/* String-valued capability */
-#define CANCEL 3	/* Capability to be cancelled in following tc's */
-#define NAMES  4	/* The names for a terminal type */
+#define	BOOLEAN	0	/* Boolean capability */
+#define	NUMBER 	1	/* Numeric capability */
+#define	STRING 	2	/* String-valued capability */
+#define	CANCEL 	3	/* Capability to be cancelled in following tc's */
+#define	NAMES  	4	/* The names for a terminal type */
+#define	UNDEF	5	/* Invalid token */
 
 /*
  *	The global structure in which the specific parts of a
