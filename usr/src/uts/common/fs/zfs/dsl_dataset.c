@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 by Delphix. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/dmu_objset.h>
@@ -4133,9 +4134,13 @@ dsl_dataset_space_written(dsl_dataset_t *oldsnap, dsl_dataset_t *new,
 		dsl_dataset_t *snap;
 		uint64_t used, comp, uncomp;
 
-		err = dsl_dataset_hold_obj(dp, snapobj, FTAG, &snap);
-		if (err != 0)
-			break;
+		if (snapobj == new->ds_object) {
+			snap = new;
+		} else {
+			err = dsl_dataset_hold_obj(dp, snapobj, FTAG, &snap);
+			if (err != 0)
+				break;
+		}
 
 		if (snap->ds_phys->ds_prev_snap_txg ==
 		    oldsnap->ds_phys->ds_creation_txg) {
@@ -4164,7 +4169,8 @@ dsl_dataset_space_written(dsl_dataset_t *oldsnap, dsl_dataset_t *new,
 		 * was not a snapshot of/before new.
 		 */
 		snapobj = snap->ds_phys->ds_prev_snap_obj;
-		dsl_dataset_rele(snap, FTAG);
+		if (snap != new)
+			dsl_dataset_rele(snap, FTAG);
 		if (snapobj == 0) {
 			err = EINVAL;
 			break;
