@@ -10625,6 +10625,7 @@ f usr/share/lib/terminfo/a/at386 0644 root bin
 d usr/share/lib/terminfo/s 0755 root bin
 f usr/share/lib/terminfo/s/screen 0644 root bin
 f usr/share/lib/terminfo/s/screen-w 0644 root bin
+f usr/share/lib/terminfo/s/screen-256color 0644 root bin
 f usr/share/lib/terminfo/s/sun 0644 root bin
 f usr/share/lib/terminfo/s/sun-color 0644 root bin
 d usr/share/lib/terminfo/u 0755 root bin
@@ -10634,6 +10635,7 @@ f usr/share/lib/terminfo/v/vt100 0644 root bin
 f usr/share/lib/terminfo/v/vt220 0644 root bin
 d usr/share/lib/terminfo/x 0755 root bin
 f usr/share/lib/terminfo/x/xterm 0644 root bin
+f usr/share/lib/terminfo/x/xterm-256color 0644 root bin
 f usr/share/lib/terminfo/x/xterm-color 0644 root bin
 f usr/share/lib/terminfo/x/xtermc 0644 root bin
 f usr/share/lib/terminfo/x/xtermm 0644 root bin
