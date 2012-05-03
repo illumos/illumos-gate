@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
@@ -322,7 +320,7 @@ catgets		{
 
 -((([ \t]+)1)|1) {	/* -1 */
 			if (end_of_cat == FALSE) {
-				REJECT;
+				REJECT
 			} else if (IsActiveMode(ReplaceMode)) {
 				if (IsActiveMode(PreProcessMode)) {
 					int id = get_linemsgid(lineno);

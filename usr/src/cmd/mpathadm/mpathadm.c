@@ -3144,7 +3144,7 @@ displayWideArray(MP_WCHAR *arrayToDisplay, int arraySize)
 
 	for (i = 0; i < numChars; i++) {
 		if (L'\0' != arrayToDisplay[i]) {
-			(void) fprintf(stdout, "%wc", arrayToDisplay[i]);
+			(void) fprintf(stdout, "%wc", (int)arrayToDisplay[i]);
 		}
 	}
 }

@@ -342,7 +342,6 @@ proc_object(char *optarg)
 			return (-1);
 		}
 		return (0);
-		/* NOTREACHED */
 	case OBJ_SOCK:
 		if (!a_isnum(obj_val, TRUE)) {
 			obj_id = atol(obj_val);
@@ -389,41 +388,34 @@ proc_object(char *optarg)
 		freehostent(he);
 		socket_flag = SOCKFLG_MACHINE;
 		return (0);
-		break;
 	case OBJ_MSG:
 	case OBJ_SEM:
 	case OBJ_SHM:
 	case OBJ_PROC:
 		obj_id = atol(obj_val);
 		return (0);
-		/* NOTREACHED */
 	case OBJ_FGROUP:
 	case OBJ_MSGGROUP:
 	case OBJ_SEMGROUP:
 	case OBJ_SHMGROUP:
 	case OBJ_PGROUP:
 		return (proc_group(obj_val, &obj_group));
-		/* NOTREACHED */
 	case OBJ_FOWNER:
 	case OBJ_MSGOWNER:
 	case OBJ_SEMOWNER:
 	case OBJ_SHMOWNER:
 	case OBJ_POWNER:
 		return (proc_user(obj_val, &obj_owner));
-		/* NOTREACHED */
 	case OBJ_FMRI:
 		return (proc_fmri(obj_val));
-		/* NOTREACHED */
 	case OBJ_USER:
 		return (proc_user(obj_val, &obj_user));
-		/* NOTREACHED */
 	case OBJ_LP: /* lp objects have not yet been defined */
 	default: /* impossible */
 		(void) sprintf(errbuf, gettext("invalid object type (%s)"),
 		    obj_str);
 		error_str = errbuf;
 		return (-1);
-		/* NOTREACHED */
 	} /* switch */
 	/*NOTREACHED*/
 }
@@ -538,7 +530,6 @@ proc_id(char *optstr, int opt)
 		}
 		flags |= M_USERE;
 		return (proc_user(optstr, &m_usere));
-		/* NOTREACHED */
 	case 'f': 		/* effective group id */
 		if (flags & M_GROUPE) {
 			error_str = gettext(
@@ -547,7 +538,6 @@ proc_id(char *optstr, int opt)
 		}
 		flags |= M_GROUPE;
 		return (proc_group(optstr, &m_groupe));
-		/* NOTREACHED */
 	case 'r': 		/* real user id */
 		if (flags & M_USERR) {
 			error_str = gettext(
@@ -556,7 +546,6 @@ proc_id(char *optstr, int opt)
 		}
 		flags |= M_USERR;
 		return (proc_user(optstr, &m_userr));
-		/* NOTREACHED */
 	case 'u': 		/* audit user id */
 		if (flags & M_USERA) {
 			error_str = gettext(
@@ -565,7 +554,6 @@ proc_id(char *optstr, int opt)
 		}
 		flags |= M_USERA;
 		return (proc_user(optstr, &m_usera));
-		/* NOTREACHED */
 	case 'g': 		/* real group id */
 		if (flags & M_GROUPR) {
 			error_str = gettext(
@@ -574,12 +562,10 @@ proc_id(char *optstr, int opt)
 		}
 		flags |= M_GROUPR;
 		return (proc_group(optstr, &m_groupr));
-		/* NOTREACHED */
 	default: 		/* impossible */
 		(void) sprintf(errbuf, gettext("'%c' unknown option"), opt);
 		error_str = errbuf;
 		return (-1);
-		/* NOTREACHED */
 	}
 	/*NOTREACHED*/
 }

@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright Milan Jurik 2012. All rights reserved.
  */
 
 
@@ -64,17 +65,6 @@ static idmap_stat	idmap_strdupnull(char **, const char *);
 	itera->retcode = IDMAP_NEXT;\
 	itera->limit = 1024;\
 	itera->arg = argu;
-
-
-#define	__ITER_ERR_RETURN(itera, argu, xdr_argu, iretcod)\
-	if (argu) {\
-		xdr_free(xdr_argu, (caddr_t)argu);\
-		free(argu);\
-	}\
-	if (itera)\
-		free(itera);\
-	return (iretcod);
-
 
 #define	__ITER_CHECK(itera, ityp)\
 	if (itera == NULL) {\
@@ -606,8 +596,14 @@ idmap_iter_namerules(const char *windomain,
 	return (IDMAP_SUCCESS);
 
 errout:
-	__ITER_ERR_RETURN(tmpiter, arg,
-	    xdr_idmap_list_namerules_1_argument, retcode);
+	if (arg) {
+		xdr_free(xdr_idmap_list_namerules_1_argument, (char *)arg);
+		free(arg);
+	}
+	if (tmpiter)
+		free(tmpiter);
+
+	return (retcode);
 }
 
 
