@@ -4220,6 +4220,18 @@ sd_set_properties(struct sd_lun *un, char *name, char *value)
 		    "RMW type set to %d\n", un->un_f_rmw_type);
 	}
 
+	if (strcasecmp(name, "physical-block-size") == 0) {
+		if (ddi_strtol(value, &endptr, 0, &val) == 0 &&
+		    ISP2(val) && val >= un->un_tgt_blocksize &&
+		    val >= un->un_sys_blocksize) {
+			un->un_phy_blocksize = val;
+		} else {
+			goto value_invalid;
+		}
+		SD_INFO(SD_LOG_ATTACH_DETACH, un, "sd_set_properties: "
+		    "physical block size set to %d\n", un->un_phy_blocksize);
+	}
+
 	/*
 	 * Validate the throttle values.
 	 * If any of the numbers are invalid, set everything to defaults.
@@ -7620,6 +7632,13 @@ sd_unit_attach(dev_info_t *devi)
 	un->un_f_mmc_gesn_polling = TRUE;
 
 	/*
+	 * physical sector size defaults to DEV_BSIZE currently. We can
+	 * override this value via the driver configuration file so we must
+	 * set it before calling sd_read_unit_properties().
+	 */
+	un->un_phy_blocksize = DEV_BSIZE;
+
+	/*
 	 * Retrieve the properties from the static driver table or the driver
 	 * configuration file (.conf) for this unit and update the soft state
 	 * for the device as needed for the indicated properties.
@@ -7662,11 +7681,6 @@ sd_unit_attach(dev_info_t *devi)
 	 */
 	un->un_tgt_blocksize  = un->un_sys_blocksize  = DEV_BSIZE;
 	un->un_blockcount = 0;
-
-	/*
-	 * physical sector size default to DEV_BSIZE currently.
-	 */
-	un->un_phy_blocksize = DEV_BSIZE;
 
 	/*
 	 * Set up the per-instance info needed to determine the correct
@@ -23478,9 +23492,16 @@ sd_get_media_info_com(dev_t dev, uint_t *dki_media_type, uint_t *dki_lbsize,
 	 * Now read the capacity so we can provide the lbasize,
 	 * pbsize and capacity.
 	 */
-	if (dki_pbsize && un->un_f_descr_format_supported)
+	if (dki_pbsize && un->un_f_descr_format_supported) {
 		rval = sd_send_scsi_READ_CAPACITY_16(ssc, &capacity, &lbasize,
 		    &pbsize, SD_PATH_DIRECT);
+
+		/*
+		 * Override the physical blocksize if the instance already
+		 * has a larger value.
+		 */
+		pbsize = MAX(pbsize, un->un_phy_blocksize);
+	}
 
 	if (dki_pbsize == NULL || rval != 0 ||
 	    !un->un_f_descr_format_supported) {
@@ -31743,7 +31764,11 @@ sd_check_emulation_mode(sd_ssc_t *ssc)
 		} else {
 			if (!ISP2(pbsize % DEV_BSIZE) || pbsize == 0) {
 				un->un_phy_blocksize = DEV_BSIZE;
-			} else {
+			} else if (pbsize > un->un_phy_blocksize) {
+				/*
+				 * Don't reset the physical blocksize
+				 * unless we've detected a larger value.
+				 */
 				un->un_phy_blocksize = pbsize;
 			}
 		}
