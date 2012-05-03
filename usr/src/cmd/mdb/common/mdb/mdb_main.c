@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012, Josef 'Jeff' Sipek <jeffpc@31bits.net>. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -803,6 +804,9 @@ main(int argc, char *argv[], char *envp[])
 			tgt_argc -= c;
 		}
 
+		if (fflag)
+			goto tcreate; /* skip re-exec and just create target */
+
 		/*
 		 * If we just have an object file name, and that file doesn't
 		 * exist, and it's a string of digits, infer it to be a
@@ -866,8 +870,7 @@ main(int argc, char *argv[], char *envp[])
 		 * it is not and the target is unknown, use the rawfile tgt.
 		 * Otherwise an ELF-based target is needed, so we must abort.
 		 */
-		if (tgt_ctor != mdb_rawfile_tgt_create &&
-		    mdb_gelf_check(io, &ehdr, ET_NONE) == -1) {
+		if (mdb_gelf_check(io, &ehdr, ET_NONE) == -1) {
 			if (tgt_ctor != NULL) {
 				(void) mdb_gelf_check(io, &ehdr, ET_EXEC);
 				mdb_io_destroy(io);
@@ -878,8 +881,7 @@ main(int argc, char *argv[], char *envp[])
 
 		mdb_io_destroy(io);
 
-		if (identify_xvm_file(tgt_argv[0], &longmode) == 1 &&
-		    !fflag) {
+		if (identify_xvm_file(tgt_argv[0], &longmode) == 1) {
 #ifdef _LP64
 			if (!longmode)
 				goto reexec;
@@ -890,9 +892,6 @@ main(int argc, char *argv[], char *envp[])
 			tgt_ctor = mdb_kvm_tgt_create;
 			goto tcreate;
 		}
-
-		if (tgt_ctor == mdb_rawfile_tgt_create)
-			goto tcreate; /* skip re-exec and just create target */
 
 		/*
 		 * The object file turned out to be a user core file (ET_CORE),
