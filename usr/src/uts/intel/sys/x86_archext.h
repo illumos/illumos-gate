@@ -187,9 +187,11 @@ extern "C" {
 #define	CPUID_AMD_ECX_SSE5	0x00000800	/* AMD: SSE5 */
 #define	CPUID_AMD_ECX_SKINIT	0x00001000	/* AMD: SKINIT */
 #define	CPUID_AMD_ECX_WDT	0x00002000	/* AMD: WDT */
+#define	CPUID_AMD_ECX_TOPOEXT	0x00400000	/* AMD: Topology Extensions */
 
 #define	FMT_CPUID_AMD_ECX					\
 	"\20"							\
+	"\22topoext"						\
 	"\14wdt\13skinit\12sse5\11ibs\10osvw\93dnp\8mas"	\
 	"\7sse4a\6lzcnt\5cr8d\3svm\2lcmplgcy\1ahf64"
 
@@ -368,6 +370,7 @@ extern "C" {
 #define	X86FSET_AVX		34
 #define	X86FSET_VMX		35
 #define	X86FSET_SVM		36
+#define	X86FSET_TOPOEXT		37
 
 /*
  * flags to patch tsc_read routine.
@@ -591,7 +594,7 @@ extern "C" {
 
 #if defined(_KERNEL) || defined(_KMEMUSER)
 
-#define	NUM_X86_FEATURES	37
+#define	NUM_X86_FEATURES	38
 extern uchar_t x86_featureset[];
 
 extern void free_x86_featureset(void *featureset);
@@ -676,6 +679,8 @@ extern int cpuid_get_cacheid(struct cpu *);
 extern uint32_t cpuid_get_apicid(struct cpu *);
 extern uint_t cpuid_get_procnodeid(struct cpu *cpu);
 extern uint_t cpuid_get_procnodes_per_pkg(struct cpu *cpu);
+extern uint_t cpuid_get_compunitid(struct cpu *cpu);
+extern uint_t cpuid_get_cores_per_compunit(struct cpu *cpu);
 extern int cpuid_is_cmt(struct cpu *);
 extern int cpuid_syscall32_insn(struct cpu *);
 extern int getl2cacheinfo(struct cpu *, int *, int *, int *);
