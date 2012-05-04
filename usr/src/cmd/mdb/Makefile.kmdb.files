@@ -23,6 +23,11 @@
 # Use is subject to license terms.
 #
 
+#
+# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012 Joyent, Inc. All rights reserved.
+#
+
 KMDBSRCS += \
 	ffs.c \
 	kaif_start.c \
@@ -84,7 +89,8 @@ KMDBSRCS += \
 	mdb_vcb.c \
 	mdb_wcb.c \
 	mdb_whatis.c \
-	kmdb_wr.c
+	kmdb_wr.c \
+	mdb_tab.c
 
 KMDBML +=
 

@@ -27,6 +27,7 @@ MANFILES = 	ctfs.7fs	\
 	 	hsfs.7fs	\
 	 	hyprlofs.7fs	\
 	 	lofs.7fs	\
+	 	lxproc.7fs	\
 	 	objfs.7fs	\
 	 	pcfs.7fs	\
 	 	sharefs.7fs	\

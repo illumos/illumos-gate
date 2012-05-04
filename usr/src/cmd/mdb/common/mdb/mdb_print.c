@@ -21,11 +21,10 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012 Joyent, Inc. All rights reserved.
  */
 
-/*
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
- */
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_target.h>
 #include <mdb/mdb_argvec.h>
@@ -37,6 +36,7 @@
 #include <mdb/mdb_ctf.h>
 #include <mdb/mdb_ctf_impl.h>
 #include <mdb/mdb.h>
+#include <mdb/mdb_tab.h>
 
 #include <sys/isa_defs.h>
 #include <sys/param.h>
@@ -211,6 +211,28 @@ cmd_sizeof(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf("sizeof (%s) = %#lr\n", tn, mdb_ctf_type_size(id));
 
 	return (DCMD_OK);
+}
+
+int
+cmd_sizeof_tab(mdb_tab_cookie_t *mcp, uint_t flags, int argc,
+    const mdb_arg_t *argv)
+{
+	char tn[MDB_SYM_NAMLEN];
+	int ret;
+
+	if (argc == 0 && !(flags & DCMD_TAB_SPACE))
+		return (0);
+
+	if (argc == 0 && (flags & DCMD_TAB_SPACE))
+		return (mdb_tab_complete_type(mcp, NULL, MDB_TABC_NOPOINT));
+
+	if ((ret = mdb_tab_typename(&argc, &argv, tn, sizeof (tn))) < 0)
+		return (ret);
+
+	if (argc == 1)
+		return (mdb_tab_complete_type(mcp, tn, MDB_TABC_NOPOINT));
+
+	return (0);
 }
 
 /*ARGSUSED*/
@@ -1984,6 +2006,170 @@ parse_member(printarg_t *pap, const char *str, mdb_ctf_id_t id,
 	return (0);
 }
 
+int
+cmd_print_tab(mdb_tab_cookie_t *mcp, uint_t flags, int argc,
+    const mdb_arg_t *argv)
+{
+	char tn[MDB_SYM_NAMLEN];
+	char member[64];
+	int i, dummy, delim, kind;
+	int ret = 0;
+	mdb_ctf_id_t id, rid;
+	mdb_ctf_arinfo_t ar;
+	char *start, *end;
+	ulong_t dul;
+
+	/*
+	 * This getopts is only here to make the tab completion work better when
+	 * including options in the ::print arguments. None of the values should
+	 * be used. This should only be updated with additional arguments, if
+	 * they are added to cmd_print.
+	 */
+	i = mdb_getopts(argc, argv,
+	    'a', MDB_OPT_SETBITS, PA_SHOWADDR, &dummy,
+	    'C', MDB_OPT_SETBITS, TRUE, &dummy,
+	    'c', MDB_OPT_UINTPTR, &dummy,
+	    'd', MDB_OPT_SETBITS, PA_INTDEC, &dummy,
+	    'h', MDB_OPT_SETBITS, PA_SHOWHOLES, &dummy,
+	    'i', MDB_OPT_SETBITS, TRUE, &dummy,
+	    'L', MDB_OPT_SETBITS, TRUE, &dummy,
+	    'l', MDB_OPT_UINTPTR, &dummy,
+	    'n', MDB_OPT_SETBITS, PA_NOSYMBOLIC, &dummy,
+	    'p', MDB_OPT_SETBITS, TRUE, &dummy,
+	    's', MDB_OPT_UINTPTR, &dummy,
+	    'T', MDB_OPT_SETBITS, PA_SHOWTYPE | PA_SHOWBASETYPE, &dummy,
+	    't', MDB_OPT_SETBITS, PA_SHOWTYPE, &dummy,
+	    'x', MDB_OPT_SETBITS, PA_INTHEX, &dummy,
+	    NULL);
+
+	argc -= i;
+	argv += i;
+
+	if (argc == 0 && !(flags & DCMD_TAB_SPACE))
+		return (0);
+
+	if (argc == 0 && (flags & DCMD_TAB_SPACE))
+		return (mdb_tab_complete_type(mcp, NULL, MDB_TABC_NOPOINT |
+		    MDB_TABC_NOARRAY));
+
+	if ((ret = mdb_tab_typename(&argc, &argv, tn, sizeof (tn))) < 0)
+		return (ret);
+
+	if (argc == 1 && (!(flags & DCMD_TAB_SPACE) || ret == 1))
+		return (mdb_tab_complete_type(mcp, tn, MDB_TABC_NOPOINT |
+		    MDB_TABC_NOARRAY));
+
+	if (argc == 1 && (flags & DCMD_TAB_SPACE))
+		return (mdb_tab_complete_member(mcp, tn, NULL));
+
+	/*
+	 * This is the reason that tab completion was created. We're going to go
+	 * along and walk the delimiters until we find something in a member
+	 * that we don't recognize, at which point we'll try and tab complete
+	 * it.  Note that ::print takes multiple args, so this is going to
+	 * operate on whatever the last arg that we have is.
+	 */
+	if (mdb_ctf_lookup_by_name(tn, &id) != 0)
+		return (1);
+
+	(void) mdb_ctf_type_resolve(id, &rid);
+	start = (char *)argv[argc-1].a_un.a_str;
+	delim = parse_delimiter(&start);
+
+	/*
+	 * If we hit the case where we actually have no delimiters, then we need
+	 * to make sure that we properly set up the fields the loops would.
+	 */
+	if (delim == MEMBER_DELIM_DONE)
+		(void) mdb_snprintf(member, sizeof (member), start);
+
+	while (delim != MEMBER_DELIM_DONE) {
+		switch (delim) {
+		case MEMBER_DELIM_PTR:
+			kind = mdb_ctf_type_kind(rid);
+			if (kind != CTF_K_POINTER)
+				return (1);
+
+			(void) mdb_ctf_type_reference(rid, &id);
+			(void) mdb_ctf_type_resolve(id, &rid);
+			break;
+		case MEMBER_DELIM_DOT:
+			kind = mdb_ctf_type_kind(rid);
+			if (kind != CTF_K_STRUCT && kind != CTF_K_UNION)
+				return (1);
+			break;
+		case MEMBER_DELIM_LBR:
+			end = strchr(start, ']');
+			/*
+			 * We're not going to try and tab complete the indexes
+			 * here. So for now, punt on it. Also, we're not going
+			 * to try and validate you're within the bounds, just
+			 * that you get the type you asked for.
+			 */
+			if (end == NULL)
+				return (1);
+
+			switch (mdb_ctf_type_kind(rid)) {
+			case CTF_K_POINTER:
+				(void) mdb_ctf_type_reference(rid, &id);
+				(void) mdb_ctf_type_resolve(id, &rid);
+				break;
+			case CTF_K_ARRAY:
+				(void) mdb_ctf_array_info(rid, &ar);
+				id = ar.mta_contents;
+				(void) mdb_ctf_type_resolve(id, &rid);
+				break;
+			default:
+				return (1);
+			}
+
+			start = end + 1;
+			delim = parse_delimiter(&start);
+			break;
+		case MEMBER_DELIM_ERR:
+		default:
+			break;
+		}
+
+		for (end = start + 1; isalnum(*end) || *end == '_'; end++)
+			continue;
+
+		(void) mdb_snprintf(member, end - start + 1, start);
+
+		/*
+		 * We are going to try to resolve this name as a member. There
+		 * are a two different questions that we need to answer. The
+		 * first is do we recognize this member. The second is are we at
+		 * the end of the string. If we encounter a member that we don't
+		 * recognize before the end, then we have to error out and can't
+		 * complete it. But if there are no more delimiters then we can
+		 * try and complete it.
+		 */
+		ret = mdb_ctf_member_info(rid, member, &dul, &id);
+		start = end;
+		delim = parse_delimiter(&start);
+		if (ret != 0 && errno == EMDB_CTFNOMEMB) {
+			if (delim != MEMBER_DELIM_DONE)
+				return (1);
+			continue;
+		} else if (ret != 0)
+			return (1);
+
+		if (delim == MEMBER_DELIM_DONE)
+			return (mdb_tab_complete_member_by_id(mcp, rid,
+			    member));
+
+		(void) mdb_ctf_type_resolve(id, &rid);
+	}
+
+	/*
+	 * If we've reached here, then we need to try and tab complete the last
+	 * field, which is currently member, based on the ctf type id that we
+	 * already have in rid.
+	 */
+	return (mdb_tab_complete_member_by_id(mcp, rid, member));
+}
+
 /*
  * Recursively descend a print a given data structure.  We create a struct of
  * the relevant print arguments and then call mdb_ctf_type_visit() to do the
@@ -2008,6 +2194,10 @@ cmd_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_syminfo_t s_info;
 	GElf_Sym sym;
 
+	/*
+	 * If a new option is added, make sure the getopts above in
+	 * cmd_print_tab is also updated.
+	 */
 	i = mdb_getopts(argc, argv,
 	    'a', MDB_OPT_SETBITS, PA_SHOWADDR, &uflags,
 	    'C', MDB_OPT_SETBITS, TRUE, &opt_C,

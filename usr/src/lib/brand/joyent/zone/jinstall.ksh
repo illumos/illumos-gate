@@ -90,6 +90,12 @@ zfs snapshot $PDS_NAME/${TMPLZONE}@${bname}
 zfs clone -F -o quota=${ZQUOTA}g $PDS_NAME/${TMPLZONE}@${bname} \
     $PDS_NAME/$bname || fatal "failed to clone zone dataset"
 
+# Make sure zoneinit is setup to use -o xtrace, this handles old datasets where
+# is not yet enabled by default.
+if [[ -f ${ZROOT}/root/zoneinit && -z $(grep "^set -o xtrace" ${ZROOT}/root/zoneinit) ]]; then
+    sed -i "" -e "s/^#set -o xtrace/set -o xtrace/" ${ZROOT}/root/zoneinit
+fi
+
 if [ ! -d ${ZONEPATH}/config ]; then
     mkdir -p ${ZONEPATH}/config
     chmod 755 ${ZONEPATH}/config

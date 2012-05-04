@@ -24,6 +24,11 @@
 # Use is subject to license terms.
 #
 
+#
+# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012 Joyent, Inc. All rights reserved.
+#
+
 .KEEP_STATE:
 .SUFFIXES:
 
@@ -76,6 +81,7 @@ SRCS += \
 	mdb_stdlib.c \
 	mdb_string.c \
 	mdb_strio.c \
+	mdb_tab.c \
 	mdb_target.c \
 	mdb_tdb.c \
 	mdb_termio.c \

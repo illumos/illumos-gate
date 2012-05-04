@@ -21,6 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012 Joyent, Inc. All rights reserved.
  */
 
 #ifndef	_MDB_H
@@ -38,6 +40,7 @@
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_list.h>
 #include <mdb/mdb_vcb.h>
+#include <mdb/mdb_tab.h>
 #ifdef _KMDB
 #include <kmdb/kmdb_wr.h>
 #endif
@@ -206,6 +209,8 @@ extern void mdb_destroy(void);
 
 extern int mdb_call_idcmd(mdb_idcmd_t *, uintmax_t, uintmax_t, uint_t,
     mdb_argvec_t *, mdb_addrvec_t *, mdb_vcb_t *);
+extern void mdb_call_tab(mdb_idcmd_t *, mdb_tab_cookie_t *, uint_t, uintmax_t,
+    mdb_arg_t *);
 
 extern int mdb_call(uintmax_t, uintmax_t, uint_t);
 extern int mdb_run(void);

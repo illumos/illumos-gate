@@ -271,7 +271,7 @@ ipmi_platform_message(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 		/*
 		 * The spec states that any values between 0x20 and 0x29 are
 		 * legitimate for "system software".  However, some versions of
-		 * Sun's ILOM rejects messages over /dev/bmc with a generator
+		 * Sun's ILOM rejects messages over /dev/ipmi with a generator
 		 * of 0x20, so we use 0x21 instead.
 		 */
 		pem.ipem_generator = 0x21;

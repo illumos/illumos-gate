@@ -209,6 +209,7 @@ i386_MANFILES =	ahci.7d		\
 		ecpp.7d		\
 		heci.7d		\
 		i915.7d		\
+		ipmi.7d		\
 		ipw.7d		\
 		iwh.7d		\
 		iwi.7d		\

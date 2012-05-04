@@ -360,15 +360,14 @@ main(int argc, char *argv[])
 
 	pagesize = sysconf(_SC_PAGESIZE);
 	npages = sysconf(_SC_PHYS_PAGES);
-	if (pagesize == -1 || npages == -1)
+	if (pagesize == -1 || npages == -1) {
 		if (opts.o_memory) {
 			(void) printf("0\n");
 			return (1);
 		} else {
 			(void) printf("Memory size: unable to determine\n");
 		}
-	else {
-		const int64_t kbyte = 1024;
+	} else {
 		const int64_t mbyte = 1024 * 1024;
 		int64_t ii = (int64_t)pagesize * npages;
 

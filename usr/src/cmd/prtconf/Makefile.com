@@ -30,7 +30,7 @@ SRCS=	$(OBJS:%.o=../%.c)
 include ../../Makefile.cmd
 
 CFLAGS	+=	$(CCVERBOSE)
-LDLIBS	+= -ldevinfo -lnvpair
+LDLIBS	+= -ldevinfo -lnvpair -lpcidb
 
 FILEMODE= 02555
 

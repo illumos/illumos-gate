@@ -22,12 +22,12 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012 Joyent, Inc. All rights reserved.
  */
 
 #ifndef	_MDB_MODULE_H
 #define	_MDB_MODULE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <mdb/mdb_argvec.h>
 #include <mdb/mdb_nv.h>
@@ -67,6 +67,7 @@ typedef struct mdb_idcmd {
 	const char *idc_descr;		/* Description */
 	mdb_dcmd_f *idc_funcp;		/* Command function */
 	void (*idc_help)(void);		/* Help function */
+	mdb_dcmd_tab_f *idc_tabp;	/* Tab completion pointer */
 	mdb_module_t *idc_modp;		/* Backpointer to module */
 	mdb_var_t *idc_var;		/* Backpointer to global variable */
 } mdb_idcmd_t;

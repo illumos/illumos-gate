@@ -22,11 +22,10 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012 Joyent, Inc. All rights reserved.
  */
 
-/*
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
- */
 #include <sys/elf.h>
 #include <sys/elf_SPARC.h>
 
@@ -64,6 +63,7 @@
 #include <mdb/mdb_whatis.h>
 #include <mdb/mdb_whatis_impl.h>
 #include <mdb/mdb_macalias.h>
+#include <mdb/mdb_tab.h>
 #ifdef _KMDB
 #include <kmdb/kmdb_kdi.h>
 #endif
@@ -2132,6 +2132,24 @@ cmd_walk(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+static int
+cmd_walk_tab(mdb_tab_cookie_t *mcp, uint_t flags, int argc,
+    const mdb_arg_t *argv)
+{
+	if (argc > 1)
+		return (1);
+
+	if (argc == 1) {
+		ASSERT(argv[0].a_type == MDB_TYPE_STRING);
+		return (mdb_tab_complete_walker(mcp, argv[0].a_un.a_str));
+	}
+
+	if (argc == 0 && flags & DCMD_TAB_SPACE)
+		return (mdb_tab_complete_walker(mcp, NULL));
+
+	return (1);
+}
+
 static ssize_t
 mdb_partial_xread(void *buf, size_t nbytes, uintptr_t addr, void *arg)
 {
@@ -2927,7 +2945,8 @@ const mdb_dcmd_t mdb_dcmd_builtins[] = {
 	    head_help },
 	{ "help", "[cmd]", "list commands/command help", cmd_help },
 	{ "list", "?type member [variable]",
-	    "walk list using member as link pointer", cmd_list },
+	    "walk list using member as link pointer", cmd_list, NULL,
+	    mdb_tab_complete_mt },
 	{ "map", "?expr", "print dot after evaluating expression", cmd_map },
 	{ "mappings", "?[name]", "print address space mappings", cmd_mappings },
 	{ "nm", "?[-DPdghnopuvx] [-f format] [-t types] [object]",
@@ -2938,16 +2957,18 @@ const mdb_dcmd_t mdb_dcmd_builtins[] = {
 	{ "obey", NULL, NULL, cmd_obey },
 	{ "objects", "[-v]", "print load objects information", cmd_objects },
 	{ "offsetof", "type member", "print the offset of a given struct "
-	    "or union member", cmd_offsetof },
+	    "or union member", cmd_offsetof, NULL, mdb_tab_complete_mt },
 	{ "print", "?[-aCdhiLptx] [-c lim] [-l lim] [type] [member|offset ...]",
-	    "print the contents of a data structure", cmd_print, print_help },
+	    "print the contents of a data structure", cmd_print, print_help,
+	    cmd_print_tab },
 	{ "printf", "?[format] [type] [member ... ]", "print and format the "
 	    "member(s) of a data structure", cmd_printf, printf_help },
 	{ "regs", NULL, "print general purpose registers", cmd_notsup },
 	{ "set", "[-wF] [+/-o opt] [-s dist] [-I path] [-L path] [-P prompt]",
 	    "get/set debugger properties", cmd_set },
 	{ "showrev", "[-pv]", "print version information", cmd_showrev },
-	{ "sizeof", "type", "print the size of a type", cmd_sizeof },
+	{ "sizeof", "type", "print the size of a type", cmd_sizeof, NULL,
+	    cmd_sizeof_tab },
 	{ "stack", "?[cnt]", "print stack backtrace", cmd_notsup },
 	{ "stackregs", "?", "print stack backtrace and registers",
 	    cmd_notsup },
@@ -2959,7 +2980,8 @@ const mdb_dcmd_t mdb_dcmd_builtins[] = {
 	{ "version", NULL, "print debugger version string", cmd_version },
 	{ "vtop", ":[-a as]", "print physical mapping of virtual address",
 	    cmd_vtop },
-	{ "walk", "?name [variable]", "walk data structure", cmd_walk },
+	{ "walk", "?name [variable]", "walk data structure", cmd_walk, NULL,
+	    cmd_walk_tab },
 	{ "walkers", NULL, "list available walkers", cmd_walkers },
 	{ "whatis", ":[-aikqv]", "given an address, return information",
 	    cmd_whatis, whatis_help },

@@ -21,6 +21,8 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012 Joyent, Inc. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -201,6 +203,7 @@ mdb_module_load_all(int mode)
 	mdb_iob_setflags(mdb.m_out, oflag);
 }
 
+/*ARGSUSED*/
 int
 mdb_module_unload(const char *name, int mode)
 {
