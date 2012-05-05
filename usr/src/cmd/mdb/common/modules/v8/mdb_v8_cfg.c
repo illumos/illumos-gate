@@ -541,7 +541,7 @@ static v8_cfg_symbol_t v8_symbols_node_06[] = {
 	{ "v8dbg_class_Map__constructor__Object", 0x10 },
 	{ "v8dbg_class_Map__inobject_properties__int", 0x5 },
 	{ "v8dbg_class_Map__instance_attributes__int", 0x8 },
-	{ "v8dbg_class_Map__instance_descriptors__int", 0x14 },
+	{ "v8dbg_class_Map__instance_descriptors__FixedArray", 0x14 },
 	{ "v8dbg_class_Map__instance_size__int", 0x4 },
 	{ "v8dbg_class_Map__prototype_transitions__FixedArray", 0x1c },
 	{ "v8dbg_class_ObjectTemplateInfo__constructor__Object", 0xc },

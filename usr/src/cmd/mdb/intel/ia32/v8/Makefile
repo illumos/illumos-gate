@@ -34,6 +34,8 @@ include ../../../../Makefile.cmd
 include ../../Makefile.ia32
 include ../../../Makefile.module
 
+dmod/$(MODULE) := LDLIBS += -lproc -lavl
+
 %.o: $(MODSRCS_DIR)/%.c
 	$(COMPILE.c) $<
 	$(CTFCONVERT_O)
