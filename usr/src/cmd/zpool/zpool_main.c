@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
- * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2011 by Delphix. All rights reserved.
  * Copyright (c) 2012 by Frederik Wessels. All rights reserved.
  */
 
@@ -43,7 +43,6 @@
 #include <priv.h>
 #include <pwd.h>
 #include <zone.h>
-#include <zfs_prop.h>
 #include <sys/fs/zfs.h>
 #include <sys/stat.h>
 
@@ -67,7 +66,6 @@ static int zpool_do_status(int, char **);
 static int zpool_do_online(int, char **);
 static int zpool_do_offline(int, char **);
 static int zpool_do_clear(int, char **);
-static int zpool_do_reopen(int, char **);
 
 static int zpool_do_reguid(int, char **);
 
@@ -129,8 +127,7 @@ typedef enum {
 	HELP_GET,
 	HELP_SET,
 	HELP_SPLIT,
-	HELP_REGUID,
-	HELP_REOPEN
+	HELP_REGUID
 } zpool_help_t;
 
 
@@ -163,7 +160,6 @@ static zpool_command_t command_table[] = {
 	{ "online",	zpool_do_online,	HELP_ONLINE		},
 	{ "offline",	zpool_do_offline,	HELP_OFFLINE		},
 	{ "clear",	zpool_do_clear,		HELP_CLEAR		},
-	{ "reopen",	zpool_do_reopen,	HELP_REOPEN		},
 	{ NULL },
 	{ "attach",	zpool_do_attach,	HELP_ATTACH		},
 	{ "detach",	zpool_do_detach,	HELP_DETACH		},
@@ -236,8 +232,6 @@ get_usage(zpool_help_t idx) {
 		    "[new-device]\n"));
 	case HELP_REMOVE:
 		return (gettext("\tremove <pool> <device> ...\n"));
-	case HELP_REOPEN:
-		return (""); /* Undocumented command */
 	case HELP_SCRUB:
 		return (gettext("\tscrub [-s] <pool> ...\n"));
 	case HELP_STATUS:
@@ -1987,10 +1981,10 @@ error:
 }
 
 typedef struct iostat_cbdata {
-	boolean_t cb_verbose;
-	int cb_namewidth;
-	int cb_iteration;
 	zpool_list_t *cb_list;
+	int cb_verbose;
+	int cb_iteration;
+	int cb_namewidth;
 } iostat_cbdata_t;
 
 static void
@@ -2460,9 +2454,8 @@ zpool_do_iostat(int argc, char **argv)
 }
 
 typedef struct list_cbdata {
-	boolean_t	cb_verbose;
-	int		cb_namewidth;
 	boolean_t	cb_scripted;
+	boolean_t	cb_first;
 	zprop_list_t	*cb_proplist;
 } list_cbdata_t;
 
@@ -2470,26 +2463,15 @@ typedef struct list_cbdata {
  * Given a list of columns to display, output appropriate headers for each one.
  */
 static void
-print_header(list_cbdata_t *cb)
+print_header(zprop_list_t *pl)
 {
-	zprop_list_t *pl = cb->cb_proplist;
 	const char *header;
 	boolean_t first = B_TRUE;
 	boolean_t right_justify;
-	size_t width = 0;
 
 	for (; pl != NULL; pl = pl->pl_next) {
 		if (pl->pl_prop == ZPROP_INVAL)
 			continue;
-
-		width = pl->pl_width;
-		if (first && cb->cb_verbose) {
-			/*
-			 * Reset the width to accommodate the verbose listing
-			 * of devices.
-			 */
-			width = cb->cb_namewidth;
-		}
 
 		if (!first)
 			(void) printf("  ");
@@ -2502,10 +2484,9 @@ print_header(list_cbdata_t *cb)
 		if (pl->pl_next == NULL && !right_justify)
 			(void) printf("%s", header);
 		else if (right_justify)
-			(void) printf("%*s", width, header);
+			(void) printf("%*s", pl->pl_width, header);
 		else
-			(void) printf("%-*s", width, header);
-
+			(void) printf("%-*s", pl->pl_width, header);
 	}
 
 	(void) printf("\n");
@@ -2516,28 +2497,17 @@ print_header(list_cbdata_t *cb)
  * to the described layout.
  */
 static void
-print_pool(zpool_handle_t *zhp, list_cbdata_t *cb)
+print_pool(zpool_handle_t *zhp, zprop_list_t *pl, int scripted)
 {
-	zprop_list_t *pl = cb->cb_proplist;
 	boolean_t first = B_TRUE;
 	char property[ZPOOL_MAXPROPLEN];
 	char *propstr;
 	boolean_t right_justify;
-	size_t width;
+	int width;
 
 	for (; pl != NULL; pl = pl->pl_next) {
-
-		width = pl->pl_width;
-		if (first && cb->cb_verbose) {
-			/*
-			 * Reset the width to accommodate the verbose listing
-			 * of devices.
-			 */
-			width = cb->cb_namewidth;
-		}
-
 		if (!first) {
-			if (cb->cb_scripted)
+			if (scripted)
 				(void) printf("\t");
 			else
 				(void) printf("  ");
@@ -2547,10 +2517,7 @@ print_pool(zpool_handle_t *zhp, list_cbdata_t *cb)
 
 		right_justify = B_FALSE;
 		if (pl->pl_prop != ZPROP_INVAL) {
-			if (pl->pl_prop == ZPOOL_PROP_EXPANDSZ &&
-			    zpool_get_prop_int(zhp, pl->pl_prop, NULL) == 0)
-				propstr = "-";
-			else if (zpool_get_prop(zhp, pl->pl_prop, property,
+			if (zpool_get_prop(zhp, pl->pl_prop, property,
 			    sizeof (property), NULL) != 0)
 				propstr = "-";
 			else
@@ -2561,13 +2528,14 @@ print_pool(zpool_handle_t *zhp, list_cbdata_t *cb)
 			propstr = "-";
 		}
 
+		width = pl->pl_width;
 
 		/*
 		 * If this is being called in scripted mode, or if this is the
 		 * last column and it is left-justified, don't include a width
 		 * format specifier.
 		 */
-		if (cb->cb_scripted || (pl->pl_next == NULL && !right_justify))
+		if (scripted || (pl->pl_next == NULL && !right_justify))
 			(void) printf("%s", propstr);
 		else if (right_justify)
 			(void) printf("%*s", width, propstr);
@@ -2578,101 +2546,6 @@ print_pool(zpool_handle_t *zhp, list_cbdata_t *cb)
 	(void) printf("\n");
 }
 
-static void
-print_one_column(zpool_prop_t prop, uint64_t value, boolean_t scripted)
-{
-	char propval[64];
-	boolean_t fixed;
-	size_t width = zprop_width(prop, &fixed, ZFS_TYPE_POOL);
-
-	zfs_nicenum(value, propval, sizeof (propval));
-
-	if (prop == ZPOOL_PROP_EXPANDSZ && value == 0)
-		(void) strlcpy(propval, "-", sizeof (propval));
-
-	if (scripted)
-		(void) printf("\t%s", propval);
-	else
-		(void) printf("  %*s", width, propval);
-}
-
-void
-print_list_stats(zpool_handle_t *zhp, const char *name, nvlist_t *nv,
-    list_cbdata_t *cb, int depth)
-{
-	nvlist_t **child;
-	vdev_stat_t *vs;
-	uint_t c, children;
-	char *vname;
-	boolean_t scripted = cb->cb_scripted;
-
-	verify(nvlist_lookup_uint64_array(nv, ZPOOL_CONFIG_VDEV_STATS,
-	    (uint64_t **)&vs, &c) == 0);
-
-	if (name != NULL) {
-		if (scripted)
-			(void) printf("\t%s", name);
-		else if (strlen(name) + depth > cb->cb_namewidth)
-			(void) printf("%*s%s", depth, "", name);
-		else
-			(void) printf("%*s%s%*s", depth, "", name,
-			    (int)(cb->cb_namewidth - strlen(name) - depth), "");
-
-		/* only toplevel vdevs have capacity stats */
-		if (vs->vs_space == 0) {
-			if (scripted)
-				(void) printf("\t-\t-\t-");
-			else
-				(void) printf("      -      -      -");
-		} else {
-			print_one_column(ZPOOL_PROP_SIZE, vs->vs_space,
-			    scripted);
-			print_one_column(ZPOOL_PROP_CAPACITY, vs->vs_alloc,
-			    scripted);
-			print_one_column(ZPOOL_PROP_FREE,
-			    vs->vs_space - vs->vs_alloc, scripted);
-		}
-		print_one_column(ZPOOL_PROP_EXPANDSZ, vs->vs_esize,
-		    scripted);
-		(void) printf("\n");
-	}
-
-	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN,
-	    &child, &children) != 0)
-		return;
-
-	for (c = 0; c < children; c++) {
-		uint64_t ishole = B_FALSE;
-
-		if (nvlist_lookup_uint64(child[c],
-		    ZPOOL_CONFIG_IS_HOLE, &ishole) == 0 && ishole)
-			continue;
-
-		vname = zpool_vdev_name(g_zfs, zhp, child[c], B_FALSE);
-		print_list_stats(zhp, vname, child[c], cb, depth + 2);
-		free(vname);
-	}
-
-	/*
-	 * Include level 2 ARC devices in iostat output
-	 */
-	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_L2CACHE,
-	    &child, &children) != 0)
-		return;
-
-	if (children > 0) {
-		(void) printf("%-*s      -      -      -      -      -      "
-		    "-\n", cb->cb_namewidth, "cache");
-		for (c = 0; c < children; c++) {
-			vname = zpool_vdev_name(g_zfs, zhp, child[c],
-			    B_FALSE);
-			print_list_stats(zhp, vname, child[c], cb, depth + 2);
-			free(vname);
-		}
-	}
-}
-
-
 /*
  * Generic callback function to list a pool.
  */
@@ -2680,18 +2553,14 @@ int
 list_callback(zpool_handle_t *zhp, void *data)
 {
 	list_cbdata_t *cbp = data;
-	nvlist_t *config;
-	nvlist_t *nvroot;
 
-	config = zpool_get_config(zhp, NULL);
+	if (cbp->cb_first) {
+		if (!cbp->cb_scripted)
+			print_header(cbp->cb_proplist);
+		cbp->cb_first = B_FALSE;
+	}
 
-	print_pool(zhp, cbp);
-	if (!cbp->cb_verbose)
-		return (0);
-
-	verify(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
-	    &nvroot) == 0);
-	print_list_stats(zhp, NULL, nvroot, cbp, 0);
+	print_pool(zhp, cbp->cb_proplist, cbp->cb_scripted);
 
 	return (0);
 }
@@ -2715,15 +2584,12 @@ zpool_do_list(int argc, char **argv)
 	int ret;
 	list_cbdata_t cb = { 0 };
 	static char default_props[] =
-	    "name,size,allocated,free,expandsize,capacity,dedupratio,"
-	    "health,altroot";
+	    "name,size,allocated,free,capacity,dedupratio,health,altroot";
 	char *props = default_props;
 	unsigned long interval = 0, count = 0;
-	zpool_list_t *list;
-	boolean_t first = B_TRUE;
 
 	/* check options */
-	while ((c = getopt(argc, argv, ":Ho:T:v")) != -1) {
+	while ((c = getopt(argc, argv, ":Ho:T:")) != -1) {
 		switch (c) {
 		case 'H':
 			cb.cb_scripted = B_TRUE;
@@ -2733,9 +2599,6 @@ zpool_do_list(int argc, char **argv)
 			break;
 		case 'T':
 			get_timestamp_arg(*optarg);
-			break;
-		case 'v':
-			cb.cb_verbose = B_TRUE;
 			break;
 		case ':':
 			(void) fprintf(stderr, gettext("missing argument for "
@@ -2757,32 +2620,21 @@ zpool_do_list(int argc, char **argv)
 	if (zprop_get_list(g_zfs, props, &cb.cb_proplist, ZFS_TYPE_POOL) != 0)
 		usage(B_FALSE);
 
-	if ((list = pool_list_get(argc, argv, &cb.cb_proplist, &ret)) == NULL)
-		return (1);
-
-	if (argc == 0 && !cb.cb_scripted && pool_list_count(list) == 0) {
-		(void) printf(gettext("no pools available\n"));
-		zprop_free_list(cb.cb_proplist);
-		return (0);
-	}
+	cb.cb_first = B_TRUE;
 
 	for (;;) {
-		pool_list_update(list);
-
-		if (pool_list_count(list) == 0)
-			break;
-
-		cb.cb_namewidth = 0;
-		(void) pool_list_iter(list, B_FALSE, get_namewidth, &cb);
 
 		if (timestamp_fmt != NODATE)
 			print_timestamp(timestamp_fmt);
 
-		if (!cb.cb_scripted && (first || cb.cb_verbose)) {
-			print_header(&cb);
-			first = B_FALSE;
+		ret = for_each_pool(argc, argv, B_TRUE, &cb.cb_proplist,
+		    list_callback, &cb);
+
+		if (argc == 0 && cb.cb_first && !cb.cb_scripted) {
+			(void) printf(gettext("no pools available\n"));
+			zprop_free_list(cb.cb_proplist);
+			return (0);
 		}
-		ret = pool_list_iter(list, B_TRUE, list_callback, &cb);
 
 		if (interval == 0)
 			break;
@@ -3401,36 +3253,6 @@ zpool_do_reguid(int argc, char **argv)
 	return (ret);
 }
 
-
-/*
- * zpool reopen <pool>
- *
- * Reopen the pool so that the kernel can update the sizes of all vdevs.
- *
- * NOTE: This command is currently undocumented.  If the command is ever
- * exposed then the appropriate usage() messages will need to be made.
- */
-int
-zpool_do_reopen(int argc, char **argv)
-{
-	int ret = 0;
-	zpool_handle_t *zhp;
-	char *pool;
-
-	argc--;
-	argv++;
-
-	if (argc != 1)
-		return (2);
-
-	pool = argv[0];
-	if ((zhp = zpool_open_canfail(g_zfs, pool)) == NULL)
-		return (1);
-
-	ret = zpool_reopen(zhp);
-	zpool_close(zhp);
-	return (ret);
-}
 
 typedef struct scrub_cbdata {
 	int	cb_type;
