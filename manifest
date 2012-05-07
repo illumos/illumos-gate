@@ -335,7 +335,6 @@ f etc/init.d/dhcp 0744 root sys
 f etc/init.d/dodatadm.udaplt 0744 root sys
 f etc/init.d/drvconfig 0744 root sys
 f etc/init.d/ldap.client 0744 root sys
-f etc/init.d/mkdtab 0744 root sys
 f etc/init.d/nfs.server 0744 root sys
 f etc/init.d/nscd 0744 root sys
 f etc/init.d/pppd 0744 root sys
@@ -4783,8 +4782,6 @@ f usr/lib/amd64/libjdns_sd.so.1 0755 root bin
 s usr/lib/amd64/libjdns_sd.so=libjdns_sd.so.1
 s usr/lib/amd64/libkmfberder.so=../../../lib/amd64/libkmfberder.so.1
 s usr/lib/amd64/libkmfberder.so.1=../../../lib/amd64/libkmfberder.so.1
-f usr/lib/amd64/libkmsagent.so.1 0755 root bin
-s usr/lib/amd64/libkmsagent.so=libkmsagent.so.1
 f usr/lib/amd64/libkrb5.so.1 0755 root bin
 s usr/lib/amd64/libkrb5.so=libkrb5.so.1
 s usr/lib/amd64/libkstat.so.1=../../../lib/amd64/libkstat.so.1
@@ -6192,8 +6189,6 @@ s usr/lib/libkmf.so=../../lib/libkmf.so.1
 s usr/lib/libkmf.so.1=../../lib/libkmf.so.1
 s usr/lib/libkmfberder.so=../../lib/libkmfberder.so.1
 s usr/lib/libkmfberder.so.1=../../lib/libkmfberder.so.1
-f usr/lib/libkmsagent.so.1 0755 root bin
-s usr/lib/libkmsagent.so=libkmsagent.so.1
 f usr/lib/libkrb5.so.1 0755 root bin
 s usr/lib/libkrb5.so=libkrb5.so.1
 s usr/lib/libkstat.so.1=../../lib/libkstat.so.1
@@ -9750,8 +9745,6 @@ f usr/lib/security/amd64/pam_unix_session.so.1 0755 root bin
 s usr/lib/security/amd64/pam_unix_session.so=pam_unix_session.so.1
 f usr/lib/security/amd64/pkcs11_kernel.so.1 0755 root bin
 s usr/lib/security/amd64/pkcs11_kernel.so=pkcs11_kernel.so.1
-f usr/lib/security/amd64/pkcs11_kms.so.1 0755 root bin
-s usr/lib/security/amd64/pkcs11_kms.so=pkcs11_kms.so.1
 f usr/lib/security/amd64/pkcs11_softtoken.so.1 0755 root bin
 s usr/lib/security/amd64/pkcs11_softtoken.so=pkcs11_softtoken.so.1
 f usr/lib/security/audit_binfile.so.1 0755 root bin
@@ -9817,8 +9810,6 @@ f usr/lib/security/pam_unix_session.so.1 0755 root bin
 s usr/lib/security/pam_unix_session.so=pam_unix_session.so.1
 f usr/lib/security/pkcs11_kernel.so.1 0755 root bin
 s usr/lib/security/pkcs11_kernel.so=pkcs11_kernel.so.1
-f usr/lib/security/pkcs11_kms.so.1 0755 root bin
-s usr/lib/security/pkcs11_kms.so=pkcs11_kms.so.1
 f usr/lib/security/pkcs11_softtoken.so.1 0755 root bin
 s usr/lib/security/pkcs11_softtoken.so=pkcs11_softtoken.so.1
 f usr/lib/sendmail 2555 root smmsp
@@ -10109,7 +10100,6 @@ f usr/sadm/install/scripts/r.rbac 0555 root sys
 d usr/sadm/sysadm 0755 root bin
 d usr/sadm/sysadm/add-ons 0755 root bin
 d usr/sadm/sysadm/bin 0755 root bin
-f usr/sadm/sysadm/bin/mkdtab 0755 root bin
 f usr/sadm/ugdates 0444 root bin
 d usr/sbin 0755 root bin
 f usr/sbin/6to4relay 0555 root bin
