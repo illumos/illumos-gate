@@ -29,16 +29,19 @@
  * that predate this metadata.  See mdb_v8_cfg.c for details.
  */
 
+#include <sys/mdb_modapi.h>
 #include <assert.h>
 #include <ctype.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
-
-#include <sys/mdb_modapi.h>
+#include <libproc.h>
+#include <sys/avl.h>
 
 #include "v8dbg.h"
 #include "v8cfg.h"
+
+#define	offsetof(s, m)	((size_t)(&(((s *)0)->m)))
 
 /*
  * The "v8_class" and "v8_field" structures describe the C++ classes used to
@@ -79,6 +82,8 @@ static int 		v8_next_type;
 
 static v8_enum_t 	v8_frametypes[16];
 static int 		v8_next_frametype;
+
+static int		v8_silent;
 
 /*
  * The following constants describe offsets from the frame pointer that are used
@@ -125,10 +130,34 @@ static intptr_t	V8_PROP_TYPE_MASK;
  * Although we have this information in v8_classes, the following offsets are
  * defined explicitly because they're used directly in code below.
  */
-static ssize_t	V8_OFF_FIXEDARRAY_DATA;
-static ssize_t	V8_OFF_SEQASCIISTR_CHARS;
-
-static const char *V8_FIXEDARRAY_BASE;
+static ssize_t V8_OFF_CODE_INSTRUCTION_SIZE;
+static ssize_t V8_OFF_CODE_INSTRUCTION_START;
+static ssize_t V8_OFF_CONSSTRING_FIRST;
+static ssize_t V8_OFF_CONSSTRING_SECOND;
+static ssize_t V8_OFF_EXTERNALSTRING_RESOURCE;
+static ssize_t V8_OFF_FIXEDARRAY_DATA;
+static ssize_t V8_OFF_FIXEDARRAY_LENGTH;
+static ssize_t V8_OFF_HEAPNUMBER_VALUE;
+static ssize_t V8_OFF_HEAPOBJECT_MAP;
+static ssize_t V8_OFF_JSFUNCTION_SHARED;
+static ssize_t V8_OFF_JSOBJECT_ELEMENTS;
+static ssize_t V8_OFF_JSOBJECT_PROPERTIES;
+static ssize_t V8_OFF_MAP_CONSTRUCTOR;
+static ssize_t V8_OFF_MAP_INOBJECT_PROPERTIES;
+static ssize_t V8_OFF_MAP_INSTANCE_ATTRIBUTES;
+static ssize_t V8_OFF_MAP_INSTANCE_DESCRIPTORS;
+static ssize_t V8_OFF_MAP_INSTANCE_SIZE;
+static ssize_t V8_OFF_ODDBALL_TO_STRING;
+static ssize_t V8_OFF_SCRIPT_LINE_ENDS;
+static ssize_t V8_OFF_SCRIPT_NAME;
+static ssize_t V8_OFF_SEQASCIISTR_CHARS;
+static ssize_t V8_OFF_SHAREDFUNCTIONINFO_CODE;
+static ssize_t V8_OFF_SHAREDFUNCTIONINFO_FUNCTION_TOKEN_POSITION;
+static ssize_t V8_OFF_SHAREDFUNCTIONINFO_INFERRED_NAME;
+static ssize_t V8_OFF_SHAREDFUNCTIONINFO_LENGTH;
+static ssize_t V8_OFF_SHAREDFUNCTIONINFO_SCRIPT;
+static ssize_t V8_OFF_SHAREDFUNCTIONINFO_NAME;
+static ssize_t V8_OFF_STRING_LENGTH;
 
 #define	NODE_OFF_EXTSTR_DATA		0x4	/* see node_string.h */
 
@@ -175,6 +204,51 @@ static v8_constant_t v8_constants[] = {
 
 static int v8_nconstants = sizeof (v8_constants) / sizeof (v8_constants[0]);
 
+typedef struct v8_offset {
+	ssize_t		*v8o_valp;
+	const char	*v8o_class;
+	const char	*v8o_member;
+} v8_offset_t;
+
+static v8_offset_t v8_offsets[] = {
+	{ &V8_OFF_CODE_INSTRUCTION_SIZE,	"Code", "instruction_size" },
+	{ &V8_OFF_CODE_INSTRUCTION_START,	"Code", "instruction_start" },
+	{ &V8_OFF_CONSSTRING_FIRST,		"ConsString", "first" },
+	{ &V8_OFF_CONSSTRING_SECOND,		"ConsString", "second" },
+	{ &V8_OFF_EXTERNALSTRING_RESOURCE,	"ExternalString", "resource" },
+	{ &V8_OFF_FIXEDARRAY_DATA,		"FixedArray", "data" },
+	{ &V8_OFF_FIXEDARRAY_LENGTH,		"FixedArray", "length" },
+	{ &V8_OFF_HEAPNUMBER_VALUE,		"HeapNumber", "value" },
+	{ &V8_OFF_HEAPOBJECT_MAP,		"HeapObject", "map" },
+	{ &V8_OFF_JSFUNCTION_SHARED,		"JSFunction", "shared" },
+	{ &V8_OFF_JSOBJECT_ELEMENTS,		"JSObject", "elements" },
+	{ &V8_OFF_JSOBJECT_PROPERTIES,		"JSObject", "properties" },
+	{ &V8_OFF_MAP_CONSTRUCTOR,		"Map", "constructor" },
+	{ &V8_OFF_MAP_INOBJECT_PROPERTIES,	"Map", "inobject_properties" },
+	{ &V8_OFF_MAP_INSTANCE_ATTRIBUTES,	"Map", "instance_attributes" },
+	{ &V8_OFF_MAP_INSTANCE_DESCRIPTORS,	"Map", "instance_descriptors" },
+	{ &V8_OFF_MAP_INSTANCE_SIZE,		"Map", "instance_size" },
+	{ &V8_OFF_ODDBALL_TO_STRING,		"Oddball", "to_string" },
+	{ &V8_OFF_SCRIPT_LINE_ENDS,		"Script", "line_ends" },
+	{ &V8_OFF_SCRIPT_NAME,			"Script", "name" },
+	{ &V8_OFF_SEQASCIISTR_CHARS,		"SeqAsciiString", "chars" },
+	{ &V8_OFF_SHAREDFUNCTIONINFO_CODE,
+	    "SharedFunctionInfo", "code" },
+	{ &V8_OFF_SHAREDFUNCTIONINFO_FUNCTION_TOKEN_POSITION,
+	    "SharedFunctionInfo", "function_token_position" },
+	{ &V8_OFF_SHAREDFUNCTIONINFO_INFERRED_NAME,
+	    "SharedFunctionInfo", "inferred_name" },
+	{ &V8_OFF_SHAREDFUNCTIONINFO_LENGTH,
+	    "SharedFunctionInfo", "length" },
+	{ &V8_OFF_SHAREDFUNCTIONINFO_NAME,
+	    "SharedFunctionInfo", "name" },
+	{ &V8_OFF_SHAREDFUNCTIONINFO_SCRIPT,
+	    "SharedFunctionInfo", "script" },
+	{ &V8_OFF_STRING_LENGTH,	"String", "length" },
+};
+
+static int v8_noffsets = sizeof (v8_offsets) / sizeof (v8_offsets[0]);
+
 static int autoconf_iter_symbol(mdb_symbol_t *, void *);
 static v8_class_t *conf_class_findcreate(const char *);
 static v8_field_t *conf_field_create(v8_class_t *, const char *, size_t);
@@ -187,7 +261,7 @@ static int conf_update_type(v8_cfg_t *, const char *);
 static int conf_update_frametype(v8_cfg_t *, const char *);
 static void conf_class_compute_offsets(v8_class_t *);
 
-static int heap_offset(const char *, const char *, ssize_t *, boolean_t);
+static int heap_offset(const char *, const char *, ssize_t *);
 
 /*
  * Invoked when this dmod is initially loaded to load the set of classes, enums,
@@ -198,7 +272,6 @@ autoconfigure(v8_cfg_t *cfgp)
 {
 	v8_class_t *clp;
 	struct v8_constant *cnp;
-	ssize_t unused;
 	int ii;
 
 	assert(v8_classes == NULL);
@@ -224,7 +297,7 @@ autoconfigure(v8_cfg_t *cfgp)
 	};
 
 	/*
-	 * Finally, load various constants used directly in the module.
+	 * Load various constants used directly in the module.
 	 */
 	for (ii = 0; ii < v8_nconstants; ii++) {
 		cnp = &v8_constants[ii];
@@ -236,18 +309,33 @@ autoconfigure(v8_cfg_t *cfgp)
 		}
 	}
 
-	if (heap_offset("SeqAsciiString", "chars", &V8_OFF_SEQASCIISTR_CHARS,
-	    B_FALSE) != 0 || heap_offset("FixedArray", "data",
-	    &V8_OFF_FIXEDARRAY_DATA, B_FALSE) != 0)
-		return (-1);
-
 	/*
-	 * The V8 included in node v0.6 uses a FixedArrayBase class to contain
-	 * the "length" field, while the one in v0.4 has no such base class and
-	 * stores the field directly in FixedArray.  We handle both cases here.
+	 * Finally, load various class offsets.
 	 */
-	V8_FIXEDARRAY_BASE = heap_offset("FixedArray", "length", &unused,
-	    B_TRUE) == 0 ?  "FixedArray" : "FixedArrayBase";
+	for (ii = 0; ii < v8_noffsets; ii++) {
+		struct v8_offset *offp = &v8_offsets[ii];
+		const char *klass = offp->v8o_class;
+
+again:
+		if (heap_offset(klass, offp->v8o_member, offp->v8o_valp) == 0)
+			continue;
+
+		if (strcmp(klass, "FixedArray") == 0) {
+			/*
+			 * The V8 included in node v0.6 uses a FixedArrayBase
+			 * class to contain the "length" field, while the one
+			 * in v0.4 has no such base class and stores the field
+			 * directly in FixedArray; if we failed to derive
+			 * the offset from FixedArray, try FixedArrayBase.
+			 */
+			klass = "FixedArrayBase";
+			goto again;
+		}
+
+		mdb_warn("couldn't find class \"%s\", field \"%s\"\n",
+		    offp->v8o_class, offp->v8o_member);
+		return (-1);
+	}
 
 	return (0);
 }
@@ -583,12 +671,38 @@ bsnprintf(char **bufp, size_t *buflenp, const char *format, ...)
 	return (rv);
 }
 
+static void
+v8_warn(const char *format, ...)
+{
+	char buf[512];
+	va_list alist;
+	int len;
+
+	if (v8_silent)
+		return;
+
+	va_start(alist, format);
+	(void) vsnprintf(buf, sizeof (buf), format, alist);
+	va_end(alist);
+
+	/*
+	 * This is made slightly annoying because we need to effectively
+	 * preserve the original format string to allow for mdb to use the
+	 * new-line at the end to indicate that strerror should be elided.
+	 */
+	if ((len = strlen(format)) > 0 && format[len - 1] == '\n') {
+		buf[strlen(buf) - 1] = '\0';
+		mdb_warn("%s\n", buf);
+	} else {
+		mdb_warn("%s", buf);
+	}
+}
+
 /*
  * Returns in "offp" the offset of field "field" in C++ class "klass".
  */
 static int
-heap_offset(const char *klass, const char *field, ssize_t *offp,
-    boolean_t silent)
+heap_offset(const char *klass, const char *field, ssize_t *offp)
 {
 	v8_class_t *clp;
 	v8_field_t *flp;
@@ -598,23 +712,16 @@ heap_offset(const char *klass, const char *field, ssize_t *offp,
 			break;
 	}
 
-	if (clp == NULL) {
-		if (!silent)
-			mdb_warn("couldn't find class \"%s\"\n", klass);
+	if (clp == NULL)
 		return (-1);
-	}
 
 	for (flp = clp->v8c_fields; flp != NULL; flp = flp->v8f_next) {
 		if (strcmp(field, flp->v8f_name) == 0)
 			break;
 	}
 
-	if (flp == NULL) {
-		if (!silent)
-			mdb_warn("couldn't find class \"%s\" field \"%s\"\n",
-			    klass, field);
+	if (flp == NULL)
 		return (-1);
-	}
 
 	*offp = V8_OFF_HEAP(flp->v8f_offset);
 	return (0);
@@ -625,17 +732,10 @@ heap_offset(const char *klass, const char *field, ssize_t *offp,
  * the pointer-sized value of field "field".
  */
 static int
-read_heap_ptr(uintptr_t *valp, uintptr_t addr, const char *klass,
-    const char *field)
+read_heap_ptr(uintptr_t *valp, uintptr_t addr, ssize_t off)
 {
-	ssize_t off;
-
-	if (heap_offset(klass, field, &off, B_FALSE) != 0)
-		return (-1);
-
 	if (mdb_vread(valp, sizeof (*valp), addr + off) == -1) {
-		mdb_warn("failed to read %s::%s from %p", klass, field,
-		    addr + off);
+		v8_warn("failed to read offset %d from %p", off, addr);
 		return (-1);
 	}
 
@@ -647,14 +747,13 @@ read_heap_ptr(uintptr_t *valp, uintptr_t addr, const char *klass,
  * into *valp rather than the encoded representation.
  */
 static int
-read_heap_smi(uintptr_t *valp, uintptr_t addr, const char *klass,
-    const char *field)
+read_heap_smi(uintptr_t *valp, uintptr_t addr, ssize_t off)
 {
-	if (read_heap_ptr(valp, addr, klass, field) != 0)
+	if (read_heap_ptr(valp, addr, off) != 0)
 		return (-1);
 
 	if (!V8_IS_SMI(*valp)) {
-		mdb_warn("expected SMI, got %p\n", *valp);
+		v8_warn("expected SMI, got %p\n", *valp);
 		return (-1);
 	}
 
@@ -664,16 +763,10 @@ read_heap_smi(uintptr_t *valp, uintptr_t addr, const char *klass,
 }
 
 static int
-read_heap_double(double *valp, uintptr_t addr, const char *klass,
-    const char *field)
+read_heap_double(double *valp, uintptr_t addr, ssize_t off)
 {
-	ssize_t off;
-
-	if (heap_offset(klass, field, &off, B_FALSE) != 0)
-		return (-1);
-
 	if (mdb_vread(valp, sizeof (*valp), addr + off) == -1) {
-		mdb_warn("failed to read heap value at %p", addr + off);
+		v8_warn("failed to read heap value at %p", addr + off);
 		return (-1);
 	}
 
@@ -685,11 +778,11 @@ read_heap_double(double *valp, uintptr_t addr, const char *klass,
  * representing its contents.
  */
 static int
-read_heap_array(uintptr_t addr, uintptr_t **retp, size_t *lenp)
+read_heap_array(uintptr_t addr, uintptr_t **retp, size_t *lenp, int flags)
 {
 	uintptr_t len;
 
-	if (read_heap_smi(&len, addr, V8_FIXEDARRAY_BASE, "length") != 0)
+	if (read_heap_smi(&len, addr, V8_OFF_FIXEDARRAY_LENGTH) != 0)
 		return (-1);
 
 	*lenp = len;
@@ -699,27 +792,25 @@ read_heap_array(uintptr_t addr, uintptr_t **retp, size_t *lenp)
 		return (0);
 	}
 
-	if ((*retp = mdb_zalloc(len * sizeof (uintptr_t), UM_GC)) == NULL)
+	if ((*retp = mdb_zalloc(len * sizeof (uintptr_t), flags)) == NULL)
 		return (-1);
 
 	if (mdb_vread(*retp, len * sizeof (uintptr_t),
-	    addr + V8_OFF_FIXEDARRAY_DATA) == -1)
+	    addr + V8_OFF_FIXEDARRAY_DATA) == -1) {
+		if (flags != UM_GC)
+			mdb_free(*retp, len * sizeof (uintptr_t));
+
 		return (-1);
+	}
 
 	return (0);
 }
 
 static int
-read_heap_byte(uint8_t *valp, uintptr_t addr, const char *klass,
-    const char *field)
+read_heap_byte(uint8_t *valp, uintptr_t addr, ssize_t off)
 {
-	ssize_t off;
-
-	if (heap_offset(klass, field, &off, B_FALSE) != 0)
-		return (-1);
-
 	if (mdb_vread(valp, sizeof (*valp), addr + off) == -1) {
-		mdb_warn("failed to read heap value at %p", addr + off);
+		v8_warn("failed to read heap value at %p", addr + off);
 		return (-1);
 	}
 
@@ -732,27 +823,22 @@ read_heap_byte(uint8_t *valp, uintptr_t addr, const char *klass,
  * heap object and then retrieving the type byte from the Map object.
  */
 static int
-read_typebyte(uint8_t *valp, uintptr_t addr, boolean_t silent)
+read_typebyte(uint8_t *valp, uintptr_t addr)
 {
 	uintptr_t mapaddr;
-	ssize_t off;
-
-	if (heap_offset("HeapObject", "map", &off, silent) != 0)
-		return (-1);
+	ssize_t off = V8_OFF_HEAPOBJECT_MAP;
 
 	if (mdb_vread(&mapaddr, sizeof (mapaddr), addr + off) == -1) {
-		if (!silent)
-			mdb_warn("failed to read type of %p", addr);
+		v8_warn("failed to read type of %p", addr);
 		return (-1);
 	}
 
 	if (!V8_IS_HEAPOBJECT(mapaddr)) {
-		if (!silent)
-			mdb_warn("object map is not a heap object\n");
+		v8_warn("object map is not a heap object\n");
 		return (-1);
 	}
 
-	if (read_heap_byte(valp, mapaddr, "Map", "instance_attributes") == -1)
+	if (read_heap_byte(valp, mapaddr, V8_OFF_MAP_INSTANCE_ATTRIBUTES) == -1)
 		return (-1);
 
 	return (0);
@@ -768,15 +854,15 @@ read_size(size_t *valp, uintptr_t addr)
 	uintptr_t mapaddr;
 	uint8_t size;
 
-	if (read_heap_ptr(&mapaddr, addr, "HeapObject", "map") != 0)
+	if (read_heap_ptr(&mapaddr, addr, V8_OFF_HEAPOBJECT_MAP) != 0)
 		return (-1);
 
 	if (!V8_IS_HEAPOBJECT(mapaddr)) {
-		mdb_warn("heap object map is not itself a heap object\n");
+		v8_warn("heap object map is not itself a heap object\n");
 		return (-1);
 	}
 
-	if (read_heap_byte(&size, mapaddr, "Map", "instance_size") != 0)
+	if (read_heap_byte(&size, mapaddr, V8_OFF_MAP_INSTANCE_SIZE) != 0)
 		return (-1);
 
 	*valp = size << V8_PointerSizeLog2;
@@ -808,7 +894,7 @@ obj_jstype(uintptr_t addr, char **bufp, size_t *lenp, uint8_t *typep)
 		return (0);
 	}
 
-	if (read_typebyte(&typebyte, addr, B_FALSE) != 0)
+	if (read_typebyte(&typebyte, addr) != 0)
 		return (-1);
 
 	if (typep)
@@ -818,8 +904,8 @@ obj_jstype(uintptr_t addr, char **bufp, size_t *lenp, uint8_t *typep)
 	(void) bsnprintf(bufp, lenp, typename);
 
 	if (strcmp(typename, "Oddball") == 0) {
-		if (read_heap_ptr(&strptr, addr, "Oddball",
-		    "to_string") != -1) {
+		if (read_heap_ptr(&strptr, addr,
+		    V8_OFF_ODDBALL_TO_STRING) != -1) {
 			(void) bsnprintf(bufp, lenp, ": \"");
 			(void) jsstr_print(strptr, B_FALSE, bufp, lenp);
 			(void) bsnprintf(bufp, lenp, "\"");
@@ -944,7 +1030,7 @@ jsstr_print(uintptr_t addr, boolean_t verbose, char **bufp, size_t *lenp)
 	size_t llen;
 	char buf[64];
 
-	if (read_typebyte(&typebyte, addr, B_FALSE) != 0)
+	if (read_typebyte(&typebyte, addr) != 0)
 		return (0);
 
 	if (!V8_TYPE_STRING(typebyte)) {
@@ -988,7 +1074,7 @@ jsstr_print_seq(uintptr_t addr, boolean_t verbose, char **bufp, size_t *lenp)
 	uintptr_t len, rlen;
 	char buf[256];
 
-	if (read_heap_smi(&len, addr, "String", "length") != 0)
+	if (read_heap_smi(&len, addr, V8_OFF_STRING_LENGTH) != 0)
 		return (-1);
 
 	rlen = len <= sizeof (buf) - 1 ? len : sizeof (buf) - sizeof ("[...]");
@@ -1000,7 +1086,7 @@ jsstr_print_seq(uintptr_t addr, boolean_t verbose, char **bufp, size_t *lenp)
 
 	if (rlen > 0 && mdb_readstr(buf, rlen + 1,
 	    addr + V8_OFF_SEQASCIISTR_CHARS) == -1) {
-		mdb_warn("failed to read SeqString data");
+		v8_warn("failed to read SeqString data");
 		return (-1);
 	}
 
@@ -1019,8 +1105,8 @@ jsstr_print_cons(uintptr_t addr, boolean_t verbose, char **bufp, size_t *lenp)
 {
 	uintptr_t ptr1, ptr2;
 
-	if (read_heap_ptr(&ptr1, addr, "ConsString", "first") != 0 ||
-	    read_heap_ptr(&ptr2, addr, "ConsString", "second") != 0)
+	if (read_heap_ptr(&ptr1, addr, V8_OFF_CONSSTRING_FIRST) != 0 ||
+	    read_heap_ptr(&ptr2, addr, V8_OFF_CONSSTRING_SECOND) != 0)
 		return (-1);
 
 	if (verbose) {
@@ -1044,23 +1130,23 @@ jsstr_print_external(uintptr_t addr, boolean_t verbose, char **bufp,
 	if (verbose)
 		mdb_printf("assuming Node.js string\n");
 
-	if (read_heap_ptr(&ptr1, addr, "ExternalString", "resource") != 0)
+	if (read_heap_ptr(&ptr1, addr, V8_OFF_EXTERNALSTRING_RESOURCE) != 0)
 		return (-1);
 
 	if (mdb_vread(&ptr2, sizeof (ptr2),
 	    ptr1 + NODE_OFF_EXTSTR_DATA) == -1) {
-		mdb_warn("failed to read node external pointer: %p",
+		v8_warn("failed to read node external pointer: %p",
 		    ptr1 + NODE_OFF_EXTSTR_DATA);
 		return (-1);
 	}
 
 	if (mdb_readstr(buf, sizeof (buf), ptr2) == -1) {
-		mdb_warn("failed to read ExternalString data");
+		v8_warn("failed to read ExternalString data");
 		return (-1);
 	}
 
 	if (buf[0] != '\0' && !isascii(buf[0])) {
-		mdb_warn("failed to read ExternalString ascii data\n");
+		v8_warn("failed to read ExternalString ascii data\n");
 		return (-1);
 	}
 
@@ -1082,20 +1168,161 @@ jsobj_is_undefined(uintptr_t addr)
 	char *bufp = buf;
 	size_t len = sizeof (buf);
 
-	if (read_typebyte(&type, addr, B_TRUE) != 0)
+	v8_silent++;
+
+	if (read_typebyte(&type, addr) != 0) {
+		v8_silent--;
 		return (B_FALSE);
+	}
+
+	v8_silent--;
 
 	typename = enum_lookup_str(v8_types, type, "<unknown>");
 	if (strcmp(typename, "Oddball") != 0)
 		return (B_FALSE);
 
-	if (read_heap_ptr(&strptr, addr, "Oddball", "to_string") == -1)
+	if (read_heap_ptr(&strptr, addr, V8_OFF_ODDBALL_TO_STRING) == -1)
 		return (B_FALSE);
 
 	if (jsstr_print(strptr, B_FALSE, &bufp, &len) != 0)
 		return (B_FALSE);
 
 	return (strcmp(buf, "undefined") == 0);
+}
+
+static int
+jsobj_properties(uintptr_t addr,
+    int (*func)(const char *, uintptr_t, void *), void *arg)
+{
+	uintptr_t ptr, map;
+	uintptr_t *props = NULL, *descs = NULL, *content = NULL;
+	size_t ii, size, nprops, rndescs, ndescs, ncontent;
+	uint8_t type, ninprops;
+	int rval = -1;
+	size_t ps = sizeof (uintptr_t);
+
+	/*
+	 * Objects have either "fast" properties represented with a FixedArray
+	 * or slow properties represented with a Dictionary.  We only support
+	 * the former, so we check that up front.
+	 */
+	if (mdb_vread(&ptr, ps, addr + V8_OFF_JSOBJECT_PROPERTIES) == -1)
+		return (-1);
+
+	if (read_typebyte(&type, ptr) != 0)
+		return (-1);
+
+	if (strcmp(enum_lookup_str(v8_types, type, ""), "FixedArray") != 0)
+		return (func(NULL, 0, arg));
+
+	if (read_heap_array(ptr, &props, &nprops, UM_SLEEP) != 0)
+		return (-1);
+
+	/*
+	 * To iterate the properties, we need to examine the instance
+	 * descriptors of the associated Map object.  Some properties may be
+	 * stored inside the object itself, in which case we need to know how
+	 * big the object is and how many such properties there are.
+	 */
+	if (mdb_vread(&map, ps, addr + V8_OFF_HEAPOBJECT_MAP) == -1 ||
+	    mdb_vread(&ptr, ps, map + V8_OFF_MAP_INSTANCE_DESCRIPTORS) == -1 ||
+	    read_heap_array(ptr, &descs, &ndescs, UM_SLEEP) != 0)
+		goto err;
+
+	if (read_size(&size, addr) != 0)
+		size = 0;
+
+	if (mdb_vread(&ninprops, 1, map + V8_OFF_MAP_INOBJECT_PROPERTIES) == -1)
+		goto err;
+
+	if (V8_PROP_IDX_CONTENT < ndescs &&
+	    read_heap_array(descs[V8_PROP_IDX_CONTENT], &content,
+	    &ncontent, UM_SLEEP) != 0)
+		return (-1);
+
+	/*
+	 * The first FIRST (2) entries in the descriptors array are special.
+	 */
+	rndescs = ndescs <= V8_PROP_IDX_FIRST ? 0 : ndescs - V8_PROP_IDX_FIRST;
+
+	for (ii = 0; ii < rndescs; ii++) {
+		uintptr_t keyidx, validx, detidx;
+		char buf[1024];
+		intptr_t val;
+		uint_t len = sizeof (buf);
+		char *c = buf;
+
+		keyidx = V8_DESC_KEYIDX(ii);
+		validx = V8_DESC_VALIDX(ii);
+		detidx = V8_DESC_DETIDX(ii);
+
+		if (detidx >= ncontent) {
+			v8_warn("property descriptor %d: detidx (%d) "
+			    "out of bounds for content array (length %d)\n",
+			    ii, detidx, ncontent);
+			continue;
+		}
+
+		if (!V8_DESC_ISFIELD(content[detidx]))
+			continue;
+
+		if (keyidx >= ndescs) {
+			v8_warn("property descriptor %d: keyidx (%d) "
+			    "out of bounds for descriptor array (length %d)\n",
+			    ii, keyidx, ndescs);
+			continue;
+		}
+
+		if (jsstr_print(descs[keyidx], B_FALSE, &c, &len) != 0)
+			continue;
+
+		val = (intptr_t)content[validx];
+
+		if (!V8_IS_SMI(val)) {
+			v8_warn("property descriptor %d: value index value "
+			    "is not an SMI: %p\n", ii, val);
+			continue;
+		}
+
+		val = V8_SMI_VALUE(val) - ninprops;
+
+		if (val < 0) {
+			/* property is stored directly in the object */
+			if (mdb_vread(&ptr, sizeof (ptr), addr + V8_OFF_HEAP(
+			    size + val * sizeof (uintptr_t))) == -1) {
+				v8_warn("failed to read in-object "
+				    "property at %p\n", addr + V8_OFF_HEAP(
+				    size + val * sizeof (uintptr_t)));
+				continue;
+			}
+		} else {
+			/* property should be in "props" array */
+			if (val >= nprops) {
+				v8_warn("property descriptor %d: value index "
+				    "value (%d) out of bounds (%d)\n", ii, val,
+				    nprops);
+				continue;
+			}
+
+			ptr = props[val];
+		}
+
+		if (func(buf, ptr, arg) != 0)
+			goto err;
+	}
+
+	rval = 0;
+err:
+	if (props != NULL)
+		mdb_free(props, nprops * sizeof (uintptr_t));
+
+	if (descs != NULL)
+		mdb_free(descs, ndescs * sizeof (uintptr_t));
+
+	if (content != NULL)
+		mdb_free(content, ncontent * sizeof (uintptr_t));
+
+	return (rval);
 }
 
 /*
@@ -1114,18 +1341,18 @@ jsfunc_lineno(uintptr_t lendsp, uintptr_t tokpos, char *buf, size_t buflen)
 		return (0);
 	}
 
-	if (read_heap_smi(&size, lendsp, V8_FIXEDARRAY_BASE, "length") != 0)
+	if (read_heap_smi(&size, lendsp, V8_OFF_FIXEDARRAY_LENGTH) != 0)
 		return (-1);
 
 	bufsz = size * sizeof (data[0]);
 
 	if ((data = mdb_alloc(bufsz, UM_NOSLEEP)) == NULL) {
-		mdb_warn("failed to alloc %d bytes for FixedArray data", bufsz);
+		v8_warn("failed to alloc %d bytes for FixedArray data", bufsz);
 		return (-1);
 	}
 
 	if (mdb_vread(data, bufsz, lendsp + V8_OFF_FIXEDARRAY_DATA) != bufsz) {
-		mdb_warn("failed to read FixedArray data");
+		v8_warn("failed to read FixedArray data");
 		mdb_free(data, bufsz);
 		return (-1);
 	}
@@ -1171,15 +1398,16 @@ jsfunc_name(uintptr_t funcinfop, char **bufp, size_t *lenp)
 	uintptr_t ptrp;
 	char *bufs = *bufp;
 
-	if (read_heap_ptr(&ptrp, funcinfop, "SharedFunctionInfo",
-	    "name") != 0 || jsstr_print(ptrp, B_FALSE, bufp, lenp) != 0)
+	if (read_heap_ptr(&ptrp, funcinfop,
+	    V8_OFF_SHAREDFUNCTIONINFO_NAME) != 0 ||
+	    jsstr_print(ptrp, B_FALSE, bufp, lenp) != 0)
 		return (-1);
 
 	if (*bufp != bufs)
 		return (0);
 
-	if (read_heap_ptr(&ptrp, funcinfop, "SharedFunctionInfo",
-	    "inferred_name") != 0) {
+	if (read_heap_ptr(&ptrp, funcinfop,
+	    V8_OFF_SHAREDFUNCTIONINFO_INFERRED_NAME) != 0) {
 		(void) bsnprintf(bufp, lenp, "<anonymous>");
 		return (0);
 	}
@@ -1201,22 +1429,42 @@ jsfunc_name(uintptr_t funcinfop, char **bufp, size_t *lenp)
 /*
  * JavaScript-level object printing
  */
-static int jsobj_print_number(uintptr_t, char **, size_t *);
-static int jsobj_print_oddball(uintptr_t, char **, size_t *);
-static int jsobj_print_jsobject(uintptr_t, boolean_t, int, int, char **,
-    size_t *);
-static int jsobj_print_jsarray(uintptr_t, boolean_t, int, int, char **,
-    size_t *);
-static int jsobj_print_jsfunction(uintptr_t, char **, size_t *);
+typedef struct jsobj_print {
+	char **jsop_bufp;
+	size_t *jsop_lenp;
+	int jsop_indent;
+	uint64_t jsop_depth;
+	boolean_t jsop_printaddr;
+	int jsop_nprops;
+} jsobj_print_t;
+
+static int jsobj_print_number(uintptr_t, jsobj_print_t *);
+static int jsobj_print_oddball(uintptr_t, jsobj_print_t *);
+static int jsobj_print_jsobject(uintptr_t, jsobj_print_t *);
+static int jsobj_print_jsarray(uintptr_t, jsobj_print_t *);
+static int jsobj_print_jsfunction(uintptr_t, jsobj_print_t *);
 
 static int
-jsobj_print(uintptr_t addr, boolean_t printaddr, int indent, int depth,
-    char **bufp, size_t *lenp)
+jsobj_print(uintptr_t addr, jsobj_print_t *jsop)
 {
 	uint8_t type;
 	const char *klass;
+	char **bufp = jsop->jsop_bufp;
+	size_t *lenp = jsop->jsop_lenp;
 
-	if (printaddr)
+	const struct {
+		char *name;
+		int (*func)(uintptr_t, jsobj_print_t *);
+	} table[] = {
+		{ "HeapNumber", jsobj_print_number },
+		{ "Oddball", jsobj_print_oddball },
+		{ "JSObject", jsobj_print_jsobject },
+		{ "JSArray", jsobj_print_jsarray },
+		{ "JSFunction", jsobj_print_jsfunction },
+		{ NULL }
+	}, *ent;
+
+	if (jsop->jsop_printaddr)
 		(void) bsnprintf(bufp, lenp, "%p: ", addr);
 
 	if (V8_IS_SMI(addr)) {
@@ -1225,40 +1473,35 @@ jsobj_print(uintptr_t addr, boolean_t printaddr, int indent, int depth,
 	}
 
 	if (!V8_IS_HEAPOBJECT(addr)) {
-		mdb_warn("not a heap object: %p\n", addr);
+		v8_warn("not a heap object: %p\n", addr);
 		return (-1);
 	}
 
-	if (read_typebyte(&type, addr, B_FALSE) != 0)
+	if (read_typebyte(&type, addr) != 0)
 		return (-1);
 
 	if (V8_TYPE_STRING(type))
 		return (jsstr_print(addr, B_FALSE, bufp, lenp));
 
 	klass = enum_lookup_str(v8_types, type, "<unknown>");
-	if (strcmp(klass, "HeapNumber") == 0)
-		return (jsobj_print_number(addr, bufp, lenp));
-	if (strcmp(klass, "Oddball") == 0)
-		return (jsobj_print_oddball(addr, bufp, lenp));
-	if (strcmp(klass, "JSObject") == 0)
-		return (jsobj_print_jsobject(addr, printaddr, indent, depth,
-		    bufp, lenp));
-	if (strcmp(klass, "JSArray") == 0)
-		return (jsobj_print_jsarray(addr, printaddr, indent, depth,
-		    bufp, lenp));
-	if (strcmp(klass, "JSFunction") == 0)
-		return (jsobj_print_jsfunction(addr, bufp, lenp));
 
-	mdb_warn("unknown JavaScript object type \"%s\"\n", klass);
+	for (ent = &table[0]; ent->name != NULL; ent++) {
+		if (strcmp(klass, ent->name) == 0)
+			return (ent->func(addr, jsop));
+	}
+
+	v8_warn("unknown JavaScript object type \"%s\"\n", klass);
 	return (-1);
 }
 
 static int
-jsobj_print_number(uintptr_t addr, char **bufp, size_t *lenp)
+jsobj_print_number(uintptr_t addr, jsobj_print_t *jsop)
 {
+	char **bufp = jsop->jsop_bufp;
+	size_t *lenp = jsop->jsop_lenp;
 	double numval;
 
-	if (read_heap_double(&numval, addr, "HeapNumber", "value") == -1)
+	if (read_heap_double(&numval, addr, V8_OFF_HEAPNUMBER_VALUE) == -1)
 		return (-1);
 
 	if (numval == (long long)numval)
@@ -1270,170 +1513,92 @@ jsobj_print_number(uintptr_t addr, char **bufp, size_t *lenp)
 }
 
 static int
-jsobj_print_oddball(uintptr_t addr, char **bufp, size_t *lenp)
+jsobj_print_oddball(uintptr_t addr, jsobj_print_t *jsop)
 {
+	char **bufp = jsop->jsop_bufp;
+	size_t *lenp = jsop->jsop_lenp;
 	uintptr_t strptr;
 
-	if (read_heap_ptr(&strptr, addr, "Oddball", "to_string") != 0)
+	if (read_heap_ptr(&strptr, addr, V8_OFF_ODDBALL_TO_STRING) != 0)
 		return (-1);
 
 	return (jsstr_print(strptr, B_FALSE, bufp, lenp));
 }
 
 static int
-jsobj_print_jsobject(uintptr_t addr, boolean_t printaddr, int indent,
-    int depth, char **bufp, size_t *lenp)
+jsobj_print_prop(const char *desc, uintptr_t val, void *arg)
 {
-	uintptr_t ptr, map;
-	uintptr_t *props, *descs, *content;
-	size_t ii, size, nprops, rndescs, ndescs, ncontent;
-	uint8_t type, ninprops;
+	jsobj_print_t *jsop = arg, descend;
+	char **bufp = jsop->jsop_bufp;
+	size_t *lenp = jsop->jsop_lenp;
 
-	if (depth == 0) {
+	if (desc == NULL) {
+		jsop->jsop_nprops = -1;
+		return (0);
+	}
+
+	(void) bsnprintf(bufp, lenp, "%s\n%*s%s: ", jsop->jsop_nprops == 0 ?
+	    "{" : "", jsop->jsop_indent + 4, "", desc);
+
+	descend = *jsop;
+	descend.jsop_depth--;
+	descend.jsop_indent += 4;
+
+	(void) jsobj_print(val, &descend);
+	(void) bsnprintf(bufp, lenp, ",");
+
+	jsop->jsop_nprops++;
+
+	return (0);
+}
+
+static int
+jsobj_print_jsobject(uintptr_t addr, jsobj_print_t *jsop)
+{
+	char **bufp = jsop->jsop_bufp;
+	size_t *lenp = jsop->jsop_lenp;
+
+	if (jsop->jsop_depth == 0) {
 		(void) bsnprintf(bufp, lenp, "[...]");
 		return (0);
 	}
 
-	/*
-	 * Objects have either "fast" properties represented with a FixedArray
-	 * or slow properties represented with a Dictionary.  We only support
-	 * the former, so we check that up front.
-	 */
-	if (read_heap_ptr(&ptr, addr, "JSObject", "properties") != 0)
+	jsop->jsop_nprops = 0;
+
+	if (jsobj_properties(addr, jsobj_print_prop, jsop) != 0)
 		return (-1);
 
-	if (read_typebyte(&type, ptr, B_FALSE) != 0)
-		return (-1);
-
-	if (strcmp(enum_lookup_str(v8_types, type, ""), "FixedArray") != 0) {
-		(void) bsnprintf(bufp, lenp, "{ /* unknown property */ }");
-		return (0);
+	if (jsop->jsop_nprops > 0) {
+		(void) bsnprintf(bufp, lenp, "\n%*s", jsop->jsop_indent, "");
+	} else if (jsop->jsop_nprops == 0) {
+		(void) bsnprintf(bufp, lenp, "{");
+	} else {
+		(void) bsnprintf(bufp, lenp, "{ /* unknown property */ ");
 	}
-
-	if (read_heap_array(ptr, &props, &nprops) != 0)
-		return (-1);
-
-	/*
-	 * To iterate the properties, we need to examine the instance
-	 * descriptors of the associated Map object.  Some properties may be
-	 * stored inside the object itself, in which case we need to know how
-	 * big the object is and how many such properties there are.
-	 */
-	if (read_heap_ptr(&map, addr, "HeapObject", "map") != 0 ||
-	    read_heap_ptr(&ptr, map, "Map", "instance_descriptors") != 0 ||
-	    read_heap_array(ptr, &descs, &ndescs) != 0)
-		return (-1);
-
-	if (read_size(&size, addr) != 0)
-		size = 0;
-
-	if (read_heap_byte(&ninprops, map, "Map", "inobject_properties") != 0)
-		return (-1);
-
-	if (V8_PROP_IDX_CONTENT < ndescs &&
-	    read_heap_array(descs[V8_PROP_IDX_CONTENT], &content,
-	    &ncontent) != 0)
-		return (-1);
-
-	(void) bsnprintf(bufp, lenp, "{");
-
-	/*
-	 * The first FIRST (2) entries in the descriptors array are special.
-	 */
-	rndescs = ndescs <= V8_PROP_IDX_FIRST ? 0 : ndescs - V8_PROP_IDX_FIRST;
-
-	for (ii = 0; ii < rndescs; ii++) {
-		uintptr_t keyidx, validx, detidx;
-		intptr_t val;
-
-		keyidx = V8_DESC_KEYIDX(ii);
-		validx = V8_DESC_VALIDX(ii);
-		detidx = V8_DESC_DETIDX(ii);
-
-		if (detidx >= ncontent) {
-			mdb_warn("property descriptor %d: detidx (%d) "
-			    "out of bounds for content array (length %d)\n",
-			    ii, detidx, ncontent);
-			continue;
-		}
-
-		if (!V8_DESC_ISFIELD(content[detidx]))
-			continue;
-
-		if (keyidx >= ndescs) {
-			mdb_warn("property descriptor %d: keyidx (%d) "
-			    "out of bounds for descriptor array (length %d)\n",
-			    ii, keyidx, ndescs);
-			continue;
-		}
-
-		(void) bsnprintf(bufp, lenp, "\n%*s", indent + 4, "");
-		if (jsstr_print(descs[keyidx], B_FALSE, bufp, lenp) != 0)
-			continue;
-
-		(void) bsnprintf(bufp, lenp, ": ");
-
-		val = (intptr_t)content[validx];
-
-		if (!V8_IS_SMI(val)) {
-			mdb_warn("property descriptor %d: value index value "
-			    "is not an SMI: %p\n", ii, val);
-			continue;
-		}
-
-		val = V8_SMI_VALUE(val) - ninprops;
-
-		if (val < 0) {
-			/* property is stored directly in the object */
-			if (mdb_vread(&ptr, sizeof (ptr), addr + V8_OFF_HEAP(
-			    size + val * sizeof (uintptr_t))) == -1) {
-				mdb_warn("failed to read in-object "
-				    "property at %p\n", addr + V8_OFF_HEAP(
-				    size + val * sizeof (uintptr_t)));
-				continue;
-			}
-		} else {
-			/* property should be in "props" array */
-			if (val >= nprops) {
-				mdb_warn("property descriptor %d: value index "
-				    "value (%d) out of bounds (%d)\n", ii, val,
-				    nprops);
-				continue;
-			}
-
-			ptr = props[val];
-		}
-
-
-		(void) jsobj_print(ptr, printaddr, indent + 4,
-		    depth - 1, bufp, lenp);
-
-		(void) bsnprintf(bufp, lenp, ",");
-	}
-
-	if (ii > 0)
-		(void) bsnprintf(bufp, lenp, "\n%*s", indent, "");
 
 	(void) bsnprintf(bufp, lenp, "}");
 
-	return (DCMD_OK);
+	return (0);
 }
 
 static int
-jsobj_print_jsarray(uintptr_t addr, boolean_t printaddr, int indent,
-    int depth, char **bufp, size_t *lenp)
+jsobj_print_jsarray(uintptr_t addr, jsobj_print_t *jsop)
 {
+	char **bufp = jsop->jsop_bufp;
+	size_t *lenp = jsop->jsop_lenp;
+	int indent = jsop->jsop_indent;
+	jsobj_print_t descend;
 	uintptr_t ptr;
 	uintptr_t *elts;
 	size_t ii, len;
 
-	if (depth == 0) {
+	if (jsop->jsop_depth == 0) {
 		(void) bsnprintf(bufp, lenp, "[...]");
 		return (0);
 	}
 
-	if (read_heap_ptr(&ptr, addr, "JSObject", "elements") != 0 ||
-	    read_heap_array(ptr, &elts, &len) != 0)
+	if (read_heap_ptr(&ptr, addr, V8_OFF_JSOBJECT_ELEMENTS) != 0 ||
+	    read_heap_array(ptr, &elts, &len, UM_GC) != 0)
 		return (-1);
 
 	if (len == 0) {
@@ -1441,19 +1606,22 @@ jsobj_print_jsarray(uintptr_t addr, boolean_t printaddr, int indent,
 		return (0);
 	}
 
+	descend = *jsop;
+	descend.jsop_depth--;
+	descend.jsop_indent += 4;
+
 	if (len == 1) {
 		(void) bsnprintf(bufp, lenp, "[ ");
-		(void) jsobj_print(elts[0], printaddr, indent + 4,
-		    depth - 1, bufp, lenp);
+		(void) jsobj_print(elts[0], &descend);
 		(void) bsnprintf(bufp, lenp, " ]");
 		return (0);
 	}
 
 	(void) bsnprintf(bufp, lenp, "[\n");
+
 	for (ii = 0; ii < len; ii++) {
 		(void) bsnprintf(bufp, lenp, "%*s", indent + 4, "");
-		(void) jsobj_print(elts[ii], printaddr, indent + 4,
-		    depth - 1, bufp, lenp);
+		(void) jsobj_print(elts[ii], &descend);
 		(void) bsnprintf(bufp, lenp, ",\n");
 	}
 
@@ -1464,11 +1632,13 @@ jsobj_print_jsarray(uintptr_t addr, boolean_t printaddr, int indent,
 }
 
 static int
-jsobj_print_jsfunction(uintptr_t addr, char **bufp, size_t *lenp)
+jsobj_print_jsfunction(uintptr_t addr, jsobj_print_t *jsop)
 {
+	char **bufp = jsop->jsop_bufp;
+	size_t *lenp = jsop->jsop_lenp;
 	uintptr_t shared;
 
-	if (read_heap_ptr(&shared, addr, "JSFunction", "shared") != 0)
+	if (read_heap_ptr(&shared, addr, V8_OFF_JSFUNCTION_SHARED) != 0)
 		return (-1);
 
 	(void) bsnprintf(bufp, lenp, "function ");
@@ -1495,10 +1665,9 @@ static int
 do_v8code(uintptr_t addr, boolean_t opt_d)
 {
 	uintptr_t instrlen;
-	ssize_t instroff;
+	ssize_t instroff = V8_OFF_CODE_INSTRUCTION_START;
 
-	if (read_heap_ptr(&instrlen, addr, "Code", "instruction_size") != 0 ||
-	    heap_offset("Code", "instruction_start", &instroff, B_FALSE) != 0)
+	if (read_heap_ptr(&instrlen, addr, V8_OFF_CODE_INSTRUCTION_SIZE) != 0)
 		return (DCMD_ERR);
 
 	mdb_printf("code: %p\n", addr);
@@ -1525,7 +1694,7 @@ do_v8code(uintptr_t addr, boolean_t opt_d)
 		if (mdb_eval("/i") != 0 ||
 		    mdb_eval("+=p ! cat > /dev/null") != 0) {
 			(void) mdb_dec_indent(8);
-			mdb_warn("failed to disassemble at %p", mdb_get_dot());
+			v8_warn("failed to disassemble at %p", mdb_get_dot());
 			return (DCMD_ERR);
 		}
 	} while (mdb_get_dot() < addr + instroff + instrlen);
@@ -1562,21 +1731,21 @@ dcmd_v8function(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    NULL) != argc)
 		return (DCMD_USAGE);
 
-	if (read_typebyte(&type, addr, B_FALSE) != 0)
+	if (read_typebyte(&type, addr) != 0)
 		return (DCMD_ERR);
 
 	if (strcmp(enum_lookup_str(v8_types, type, ""), "JSFunction") != 0) {
-		mdb_warn("%p is not an instance of JSFunction\n", addr);
+		v8_warn("%p is not an instance of JSFunction\n", addr);
 		return (DCMD_ERR);
 	}
 
-	if (read_heap_ptr(&funcinfop, addr, "JSFunction", "shared") != 0 ||
+	if (read_heap_ptr(&funcinfop, addr, V8_OFF_JSFUNCTION_SHARED) != 0 ||
 	    read_heap_ptr(&tokpos, funcinfop,
-	    "SharedFunctionInfo", "function_token_position") != 0 ||
+	    V8_OFF_SHAREDFUNCTIONINFO_FUNCTION_TOKEN_POSITION) != 0 ||
 	    read_heap_ptr(&scriptp, funcinfop,
-	    "SharedFunctionInfo", "script") != 0 ||
-	    read_heap_ptr(&namep, scriptp, "Script", "name") != 0 ||
-	    read_heap_ptr(&lendsp, scriptp, "Script", "line_ends") != 0)
+	    V8_OFF_SHAREDFUNCTIONINFO_SCRIPT) != 0 ||
+	    read_heap_ptr(&namep, scriptp, V8_OFF_SCRIPT_NAME) != 0 ||
+	    read_heap_ptr(&lendsp, scriptp, V8_OFF_SCRIPT_LINE_ENDS) != 0)
 		return (DCMD_ERR);
 
 	bufp = buf;
@@ -1598,7 +1767,8 @@ dcmd_v8function(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	mdb_printf("\n");
 
-	if (read_heap_ptr(&codep, funcinfop, "SharedFunctionInfo", "code") != 0)
+	if (read_heap_ptr(&codep,
+	    funcinfop, V8_OFF_SHAREDFUNCTIONINFO_CODE) != 0)
 		return (DCMD_ERR);
 
 	return (do_v8code(codep, opt_d));
@@ -1650,7 +1820,7 @@ dcmd_v8print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		}
 
 		if ((rqclass = enum_lookup_str(v8_types, type, NULL)) == NULL) {
-			mdb_warn("object has unknown type\n");
+			v8_warn("object has unknown type\n");
 			return (DCMD_ERR);
 		}
 	} else {
@@ -1666,7 +1836,7 @@ dcmd_v8print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	if (clp == NULL) {
-		mdb_warn("unknown class '%s'\n", rqclass);
+		v8_warn("unknown class '%s'\n", rqclass);
 		return (DCMD_USAGE);
 	}
 
@@ -1703,7 +1873,7 @@ load_current_context(uintptr_t *fpp, uintptr_t *raddrp)
 
 	if (mdb_getareg(1, "ebp", &regfp) != 0 ||
 	    mdb_getareg(1, "eip", &regip) != 0) {
-		mdb_warn("failed to load current context");
+		v8_warn("failed to load current context");
 		return (-1);
 	}
 
@@ -1776,7 +1946,7 @@ do_jsframe(uintptr_t fptr, uintptr_t raddr, boolean_t verbose)
 	 */
 	if (mdb_vread(&funcp, sizeof (funcp),
 	    fptr + V8_OFF_FP_FUNCTION) == -1) {
-		mdb_warn("failed to read stack at %p",
+		v8_warn("failed to read stack at %p",
 		    fptr + V8_OFF_FP_FUNCTION);
 		return (DCMD_ERR);
 	}
@@ -1785,11 +1955,16 @@ do_jsframe(uintptr_t fptr, uintptr_t raddr, boolean_t verbose)
 	 * Check if this thing is really a JSFunction at all. For some frames,
 	 * it's a Code object, presumably indicating some internal frame.
 	 */
-	if (read_typebyte(&type, funcp, B_TRUE) != 0 ||
+	v8_silent++;
+
+	if (read_typebyte(&type, funcp) != 0 ||
 	    (typename = enum_lookup_str(v8_types, type, NULL)) == NULL) {
+		v8_silent--;
 		mdb_printf("%p %a\n", fptr, raddr);
 		return (DCMD_OK);
 	}
+
+	v8_silent--;
 
 	if (strcmp("Code", typename) == 0) {
 		mdb_printf("%p %a internal (Code: %p)\n", fptr, raddr, funcp);
@@ -1802,7 +1977,7 @@ do_jsframe(uintptr_t fptr, uintptr_t raddr, boolean_t verbose)
 		return (DCMD_OK);
 	}
 
-	if (read_heap_ptr(&funcinfop, funcp, "JSFunction", "shared") != 0)
+	if (read_heap_ptr(&funcinfop, funcp, V8_OFF_JSFUNCTION_SHARED) != 0)
 		return (DCMD_ERR);
 
 	bufp = buf;
@@ -1820,14 +1995,14 @@ do_jsframe(uintptr_t fptr, uintptr_t raddr, boolean_t verbose)
 	 * byte-compare it to other SMI values so we don't want decode it here.
 	 */
 	if (read_heap_ptr(&tokpos, funcinfop,
-	    "SharedFunctionInfo", "function_token_position") != 0)
+	    V8_OFF_SHAREDFUNCTIONINFO_FUNCTION_TOKEN_POSITION) != 0)
 		return (DCMD_ERR);
 
 	if (read_heap_ptr(&scriptp, funcinfop,
-	    "SharedFunctionInfo", "script") != 0)
+	    V8_OFF_SHAREDFUNCTIONINFO_SCRIPT) != 0)
 		return (DCMD_ERR);
 
-	if (read_heap_ptr(&ptrp, scriptp, "Script", "name") != 0)
+	if (read_heap_ptr(&ptrp, scriptp, V8_OFF_SCRIPT_NAME) != 0)
 		return (DCMD_ERR);
 
 	bufp = buf;
@@ -1837,15 +2012,15 @@ do_jsframe(uintptr_t fptr, uintptr_t raddr, boolean_t verbose)
 	(void) mdb_inc_indent(4);
 	mdb_printf("file: %s\n", buf);
 
-	if (read_heap_ptr(&lendsp, scriptp, "Script", "line_ends") != 0)
+	if (read_heap_ptr(&lendsp, scriptp, V8_OFF_SCRIPT_LINE_ENDS) != 0)
 		return (DCMD_ERR);
 
 	(void) jsfunc_lineno(lendsp, tokpos, buf, sizeof (buf));
 
 	mdb_printf("posn: %s\n", buf);
 
-	if (read_heap_smi(&nargs, funcinfop, "SharedFunctionInfo",
-	    "length") == 0) {
+	if (read_heap_smi(&nargs, funcinfop,
+	    V8_OFF_SHAREDFUNCTIONINFO_LENGTH) == 0) {
 		for (ii = 0; ii < nargs; ii++) {
 			uintptr_t argptr;
 
@@ -1863,6 +2038,553 @@ do_jsframe(uintptr_t fptr, uintptr_t raddr, boolean_t verbose)
 	}
 
 	(void) mdb_dec_indent(4);
+
+	return (DCMD_OK);
+}
+
+typedef struct findjsobjects_prop {
+	struct findjsobjects_prop *fjsp_next;
+	char fjsp_desc[1];
+} findjsobjects_prop_t;
+
+typedef struct findjsobjects_instance {
+	uintptr_t fjsi_addr;
+	struct findjsobjects_instance *fjsi_next;
+} findjsobjects_instance_t;
+
+typedef struct findjsobjects_obj {
+	findjsobjects_prop_t *fjso_props;
+	findjsobjects_prop_t *fjso_last;
+	int fjso_nprops;
+	findjsobjects_instance_t fjso_instances;
+	int fjso_ninstances;
+	avl_node_t fjso_node;
+	struct findjsobjects_obj *fjso_next;
+} findjsobjects_obj_t;
+
+typedef struct findjsobjects_stats {
+	int fjss_heapobjs;
+	int fjss_jsobjs;
+	int fjss_objects;
+	int fjss_uniques;
+} findjsobjects_stats_t;
+
+typedef struct findjsobjects_state {
+	uintptr_t fjs_addr;
+	uintptr_t fjs_size;
+	boolean_t fjs_verbose;
+	boolean_t fjs_brk;
+	boolean_t fjs_initialized;
+	uintptr_t fjs_referent;
+	boolean_t fjs_referred;
+	avl_tree_t fjs_tree;
+	findjsobjects_obj_t *fjs_current;
+	findjsobjects_obj_t *fjs_objects;
+	findjsobjects_stats_t fjs_stats;
+} findjsobjects_state_t;
+
+findjsobjects_obj_t *
+findjsobjects_alloc(uintptr_t addr)
+{
+	findjsobjects_obj_t *obj;
+
+	obj = mdb_zalloc(sizeof (findjsobjects_obj_t), UM_SLEEP);
+	obj->fjso_instances.fjsi_addr = addr;
+	obj->fjso_ninstances = 1;
+
+	return (obj);
+}
+
+void
+findjsobjects_free(findjsobjects_obj_t *obj)
+{
+	findjsobjects_prop_t *prop, *next;
+
+	for (prop = obj->fjso_props; prop != NULL; prop = next) {
+		next = prop->fjsp_next;
+		mdb_free(prop, sizeof (findjsobjects_prop_t) +
+		    strlen(prop->fjsp_desc));
+	}
+
+	mdb_free(obj, sizeof (findjsobjects_obj_t));
+}
+
+int
+findjsobjects_cmp(findjsobjects_obj_t *lhs, findjsobjects_obj_t *rhs)
+{
+	findjsobjects_prop_t *lprop, *rprop;
+	int rv;
+
+	lprop = lhs->fjso_props;
+	rprop = rhs->fjso_props;
+
+	for (;;) {
+		if (lprop == NULL || rprop == NULL)
+			return (lprop != NULL ? 1 : rprop != NULL ? -1 : 0);
+
+		if ((rv = strcmp(lprop->fjsp_desc, rprop->fjsp_desc)) != 0)
+			return (rv > 0 ? 1 : -1);
+
+		lprop = lprop->fjsp_next;
+		rprop = rprop->fjsp_next;
+	}
+}
+
+int
+findjsobjects_cmp_ninstances(const void *l, const void *r)
+{
+	findjsobjects_obj_t *lhs = *((findjsobjects_obj_t **)l);
+	findjsobjects_obj_t *rhs = *((findjsobjects_obj_t **)r);
+
+	if (lhs->fjso_ninstances < rhs->fjso_ninstances)
+		return (-1);
+
+	if (lhs->fjso_ninstances > rhs->fjso_ninstances)
+		return (1);
+
+	if (lhs->fjso_nprops < rhs->fjso_nprops)
+		return (-1);
+
+	if (lhs->fjso_nprops > rhs->fjso_nprops)
+		return (1);
+
+	return (0);
+}
+
+/*ARGSUSED*/
+int
+findjsobjects_prop(const char *desc, uintptr_t val, void *arg)
+{
+	findjsobjects_state_t *fjs = arg;
+	findjsobjects_obj_t *current = fjs->fjs_current;
+	findjsobjects_prop_t *prop;
+
+	if (desc == NULL)
+		desc = "<unknown>";
+
+	prop = mdb_zalloc(sizeof (findjsobjects_prop_t) +
+	    strlen(desc), UM_SLEEP);
+
+	strcpy(prop->fjsp_desc, desc);
+
+	if (current->fjso_last != NULL) {
+		current->fjso_last->fjsp_next = prop;
+	} else {
+		current->fjso_props = prop;
+	}
+
+	current->fjso_last = prop;
+	current->fjso_nprops++;
+
+	return (0);
+}
+
+int
+findjsobjects_range(findjsobjects_state_t *fjs, uintptr_t addr, uintptr_t size)
+{
+	uintptr_t limit;
+	findjsobjects_stats_t *stats = &fjs->fjs_stats;
+	uint8_t type;
+	int jsobject = -1, fixedarray = -1;
+	v8_enum_t *ep;
+
+	for (ep = v8_types; ep->v8e_name[0] != '\0'; ep++) {
+		if (strcmp(ep->v8e_name, "JSObject") == 0)
+			jsobject = ep->v8e_value;
+
+		if (strcmp(ep->v8e_name, "FixedArray") == 0)
+			fixedarray = ep->v8e_value;
+	}
+
+	if (jsobject == -1 || fixedarray == -1) {
+		v8_warn("couldn't find %s type\n",
+		    jsobject == -1 ? "JSObject" : "FixedArray");
+		return (-1);
+	}
+
+	for (limit = addr + size; addr < limit; addr++) {
+		findjsobjects_instance_t *inst;
+		findjsobjects_obj_t *obj;
+		avl_index_t where;
+
+		if (V8_IS_SMI(addr))
+			continue;
+
+		if (!V8_IS_HEAPOBJECT(addr))
+			continue;
+
+		stats->fjss_heapobjs++;
+
+		if (read_typebyte(&type, addr) == -1)
+			continue;
+
+		if (type != jsobject)
+			continue;
+
+		stats->fjss_jsobjs++;
+
+		fjs->fjs_current = findjsobjects_alloc(addr);
+
+		if (jsobj_properties(addr, findjsobjects_prop, fjs) != 0) {
+			findjsobjects_free(fjs->fjs_current);
+			fjs->fjs_current = NULL;
+			continue;
+		}
+
+		/*
+		 * Now determine if we already have an object matching our
+		 * properties.  If we don't, we'll add our new object; if we
+		 * do we'll merely enqeuue our instance.
+		 */
+		obj = avl_find(&fjs->fjs_tree, fjs->fjs_current, &where);
+		stats->fjss_objects++;
+
+		if (obj == NULL) {
+			avl_add(&fjs->fjs_tree, fjs->fjs_current);
+			fjs->fjs_current->fjso_next = fjs->fjs_objects;
+			fjs->fjs_objects = fjs->fjs_current;
+			fjs->fjs_current = NULL;
+			stats->fjss_uniques++;
+			continue;
+		}
+
+		findjsobjects_free(fjs->fjs_current);
+		fjs->fjs_current = NULL;
+
+		inst = mdb_alloc(sizeof (findjsobjects_instance_t), UM_SLEEP);
+		inst->fjsi_addr = addr;
+		inst->fjsi_next = obj->fjso_instances.fjsi_next;
+		obj->fjso_instances.fjsi_next = inst;
+		obj->fjso_ninstances++;
+	}
+
+	return (0);
+}
+
+static int
+findjsobjects_mapping(findjsobjects_state_t *fjs, const prmap_t *pmp,
+    const char *name)
+{
+	if (name != NULL && !(fjs->fjs_brk && (pmp->pr_mflags & MA_BREAK)))
+		return (0);
+
+	if (fjs->fjs_addr != NULL && (fjs->fjs_addr < pmp->pr_vaddr ||
+	    fjs->fjs_addr >= pmp->pr_vaddr + pmp->pr_size))
+		return (0);
+
+	return (findjsobjects_range(fjs, pmp->pr_vaddr, pmp->pr_size));
+}
+
+static int
+findjsobjects_references_prop(const char *desc, uintptr_t val, void *arg)
+{
+	findjsobjects_state_t *fjs = arg;
+
+	if (val == fjs->fjs_referent) {
+		mdb_printf("%p referred to by %p.%s\n", fjs->fjs_referent,
+		    fjs->fjs_addr, desc);
+		fjs->fjs_referred = B_TRUE;
+		return (0);
+	}
+
+	return (0);
+}
+
+static void
+findjsobjects_references(findjsobjects_state_t *fjs, uintptr_t addr)
+{
+	findjsobjects_instance_t *inst;
+	findjsobjects_obj_t *obj;
+
+	fjs->fjs_referent = addr;
+	fjs->fjs_referred = B_FALSE;
+
+	v8_silent++;
+
+	for (obj = fjs->fjs_objects; obj != NULL; obj = obj->fjso_next) {
+		for (inst = &obj->fjso_instances;
+		    inst != NULL; inst = inst->fjsi_next) {
+			fjs->fjs_addr = inst->fjsi_addr;
+			(void) jsobj_properties(inst->fjsi_addr,
+			    findjsobjects_references_prop, fjs);
+		}
+	}
+
+	v8_silent--;
+
+	if (!fjs->fjs_referred)
+		mdb_printf("%p is not referred to by a known object.\n", addr);
+
+	fjs->fjs_addr = NULL;
+}
+
+static char *
+findjsobjects_constructor(findjsobjects_obj_t *obj)
+{
+	static char buf[80];
+	char *bufp = buf, *rval = NULL;
+	unsigned int len = sizeof (buf);
+	uintptr_t map, funcinfop;
+	uintptr_t addr = obj->fjso_instances.fjsi_addr;
+	uint8_t type;
+
+	v8_silent++;
+
+	if (read_heap_ptr(&map, addr, V8_OFF_HEAPOBJECT_MAP) != 0 ||
+	    read_heap_ptr(&addr, map, V8_OFF_MAP_CONSTRUCTOR) != 0)
+		goto out;
+
+	if (read_typebyte(&type, addr) != 0)
+		goto out;
+
+	if (strcmp(enum_lookup_str(v8_types, type, ""), "JSFunction") != 0)
+		goto out;
+
+	if (read_heap_ptr(&funcinfop, addr, V8_OFF_JSFUNCTION_SHARED) != 0)
+		goto out;
+
+	if (jsfunc_name(funcinfop, &bufp, &len) != 0)
+		goto out;
+
+	rval = buf;
+out:
+	v8_silent--;
+
+	return (rval);
+}
+
+static void
+findjsobjects_print(findjsobjects_obj_t *obj)
+{
+	int col = 17 + (sizeof (uintptr_t) * 2) + strlen("..."), len;
+	uintptr_t addr = obj->fjso_instances.fjsi_addr;
+	char *buf = findjsobjects_constructor(obj);
+	findjsobjects_prop_t *prop;
+
+	mdb_printf("%?p %8d %6d ",
+	    addr, obj->fjso_ninstances, obj->fjso_nprops);
+
+	if (buf != NULL) {
+		mdb_printf("%s: ", buf);
+		col += strlen(buf) + 2;
+	}
+
+	for (prop = obj->fjso_props; prop != NULL; prop = prop->fjsp_next) {
+		if (col + (len = strlen(prop->fjsp_desc) + 2) < 80) {
+			mdb_printf("%s%s", prop->fjsp_desc,
+			    prop->fjsp_next != NULL ? ", " : "");
+			col += len;
+		} else {
+			mdb_printf("...");
+			break;
+		}
+	}
+
+	mdb_printf("\n", col);
+}
+
+static void
+dcmd_findjsobjects_help(void)
+{
+	mdb_printf("%s\n\n",
+"Finds all JavaScript objects in the V8 heap via brute force iteration over\n"
+"all mapped anonymous memory.  (This can take up to several minutes on large\n"
+"dumps.)  The output consists of representative objects, the number of\n"
+"instances of that object and the number of properties on the object --\n"
+"followed by the constructor and first few properties of the objects.  Once\n"
+"run, subsequent calls to ::findjsobjects use cached data.  If provided an\n"
+"address (and in the absence of -r, described below), ::findjsobjects treats\n"
+"the address as that of a representative object, and emits all instances of\n"
+"that object (that is, all objects that have a matching property signature).");
+
+	mdb_dec_indent(2);
+	mdb_printf("%<b>OPTIONS%</b>\n");
+	mdb_inc_indent(2);
+
+	mdb_printf("%s\n",
+"  -b       Include the heap denoted by the brk(2) (normally excluded)\n"
+"  -c cons  Display representative objects with the specified constructor\n"
+"  -p prop  Display representative objects that have the specified property\n"
+"  -r       Find references to the specified object\n"
+"  -v       Provide verbose statistics\n");
+}
+
+static int
+dcmd_findjsobjects(uintptr_t addr,
+    uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	static findjsobjects_state_t fjs;
+	static findjsobjects_stats_t *stats = &fjs.fjs_stats;
+	findjsobjects_obj_t *obj;
+	findjsobjects_prop_t *prop;
+	struct ps_prochandle *Pr;
+	boolean_t references = B_FALSE;
+	const char *propname = NULL;
+	const char *constructor = NULL;
+
+	fjs.fjs_verbose = B_FALSE;
+	fjs.fjs_brk = B_FALSE;
+
+	if (mdb_getopts(argc, argv,
+	    'b', MDB_OPT_SETBITS, B_TRUE, &fjs.fjs_brk,
+	    'c', MDB_OPT_STR, &constructor,
+	    'p', MDB_OPT_STR, &propname,
+	    'r', MDB_OPT_SETBITS, B_TRUE, &references,
+	    'v', MDB_OPT_SETBITS, B_TRUE, &fjs.fjs_verbose,
+	    NULL) != argc)
+		return (DCMD_USAGE);
+
+	if (!fjs.fjs_initialized) {
+		avl_create(&fjs.fjs_tree,
+		    (int(*)(const void *, const void *))findjsobjects_cmp,
+		    sizeof (findjsobjects_obj_t),
+		    offsetof(findjsobjects_obj_t, fjso_node));
+		fjs.fjs_initialized = B_TRUE;
+	}
+
+	if (avl_is_empty(&fjs.fjs_tree)) {
+		findjsobjects_obj_t **sorted;
+		int nobjs, i;
+		hrtime_t start = gethrtime();
+
+		if (mdb_get_xdata("pshandle", &Pr, sizeof (Pr)) == -1) {
+			mdb_warn("couldn't read pshandle xdata");
+			return (DCMD_ERR);
+		}
+
+		v8_silent++;
+
+		if (Pmapping_iter(Pr,
+		    (proc_map_f *)findjsobjects_mapping, &fjs) != 0) {
+			v8_silent--;
+			return (DCMD_ERR);
+		}
+
+		nobjs = avl_numnodes(&fjs.fjs_tree);
+
+		/*
+		 * We have the objects -- now sort them.
+		 */
+		sorted = mdb_alloc(nobjs * sizeof (void *), UM_GC);
+
+		for (obj = fjs.fjs_objects, i = 0; obj != NULL;
+		    obj = obj->fjso_next, i++) {
+			sorted[i] = obj;
+		}
+
+		qsort(sorted, avl_numnodes(&fjs.fjs_tree), sizeof (void *),
+		    findjsobjects_cmp_ninstances);
+
+		for (i = 1, fjs.fjs_objects = sorted[0]; i < nobjs; i++)
+			sorted[i - 1]->fjso_next = sorted[i];
+
+		sorted[nobjs - 1]->fjso_next = NULL;
+
+		v8_silent--;
+
+		if (fjs.fjs_verbose) {
+			const char *f = "findjsobjects: %30s => %d\n";
+			int elapsed = (int)((gethrtime() - start) / NANOSEC);
+
+			mdb_printf(f, "elapsed time (seconds)", elapsed);
+			mdb_printf(f, "heap objects", stats->fjss_heapobjs);
+			mdb_printf(f, "JavaScript objects", stats->fjss_jsobjs);
+			mdb_printf(f, "processed objects", stats->fjss_objects);
+			mdb_printf(f, "unique objects", stats->fjss_uniques);
+		}
+	}
+
+	if (propname != NULL) {
+		if (flags & DCMD_ADDRSPEC) {
+			mdb_warn("cannot specify an object when "
+			    "specifying a property name\n");
+			return (DCMD_ERR);
+		}
+
+		if (constructor != NULL) {
+			mdb_warn("cannot specify both a property name "
+			    "and a constructor\n");
+			return (DCMD_ERR);
+		}
+
+		for (obj = fjs.fjs_objects; obj != NULL; obj = obj->fjso_next) {
+			for (prop = obj->fjso_props; prop != NULL;
+			    prop = prop->fjsp_next) {
+				if (strcmp(prop->fjsp_desc, propname) == 0)
+					break;
+			}
+
+			if (prop == NULL)
+				continue;
+
+			mdb_printf("%p\n", obj->fjso_instances.fjsi_addr);
+		}
+
+		return (DCMD_OK);
+	}
+
+	if (constructor != NULL) {
+		if (flags & DCMD_ADDRSPEC) {
+			mdb_warn("cannot specify an object when "
+			    "specifying a constructor\n");
+			return (DCMD_ERR);
+		}
+
+		for (obj = fjs.fjs_objects; obj != NULL; obj = obj->fjso_next) {
+			char *cons = findjsobjects_constructor(obj);
+
+			if (cons == NULL || strcmp(constructor, cons) != 0)
+				continue;
+
+			mdb_printf("%p\n", obj->fjso_instances.fjsi_addr);
+		}
+
+		return (DCMD_OK);
+	}
+
+	if (references && !(flags & DCMD_ADDRSPEC)) {
+		mdb_warn("must specify an object to find references\n");
+		return (DCMD_ERR);
+	}
+
+	if (flags & DCMD_ADDRSPEC) {
+		/*
+		 * If we've been passed an address, we're either looking for
+		 * similar objects or for references (if -r has been set).
+		 */
+		if (references) {
+			findjsobjects_references(&fjs, addr);
+			return (DCMD_OK);
+		}
+
+		for (obj = fjs.fjs_objects; obj != NULL; obj = obj->fjso_next) {
+			findjsobjects_instance_t *inst, *h;
+
+			h = &obj->fjso_instances;
+
+			for (inst = h; inst != NULL; inst = inst->fjsi_next) {
+				if (inst->fjsi_addr == addr)
+					break;
+			}
+
+			if (inst == NULL)
+				continue;
+
+			for (inst = h; inst != NULL; inst = inst->fjsi_next)
+				mdb_printf("%p\n", inst->fjsi_addr);
+
+			return (DCMD_OK);
+		}
+
+		mdb_warn("%p is not a valid object\n", addr);
+		return (DCMD_ERR);
+	}
+
+	mdb_printf("%-?s %8s %6s %s\n", "OBJECT",
+	    "#OBJECTS", "#PROPS", "CONSTRUCTOR: PROPS");
+
+	for (obj = fjs.fjs_objects; obj != NULL; obj = obj->fjso_next)
+		findjsobjects_print(obj);
 
 	return (DCMD_OK);
 }
@@ -1910,27 +2632,27 @@ dcmd_jsframe(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 static int
 dcmd_jsprint(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	char *buf;
-	char *bufp;
-	size_t len, bufsz = 262144;
-	boolean_t verbose;
-	uint64_t depth;
+	char *buf, *bufp;
+	size_t bufsz = 262144, len = bufsz;
+	jsobj_print_t jsop;
 	int rv;
 
-	verbose = B_FALSE;
-	depth = 2;
+	bzero(&jsop, sizeof (jsop));
+	jsop.jsop_depth = 2;
+	jsop.jsop_printaddr = B_FALSE;
 
 	if (mdb_getopts(argc, argv,
-	    'a', MDB_OPT_SETBITS, B_TRUE, &verbose,
-	    'd', MDB_OPT_UINT64, &depth, NULL) != argc)
+	    'a', MDB_OPT_SETBITS, B_TRUE, &jsop.jsop_printaddr,
+	    'd', MDB_OPT_UINT64, &jsop.jsop_depth, NULL) != argc)
 		return (DCMD_USAGE);
 
-	if ((buf = mdb_zalloc(bufsz, UM_NOSLEEP)) == NULL)
+	if ((buf = bufp = mdb_zalloc(bufsz, UM_NOSLEEP)) == NULL)
 		return (DCMD_ERR);
 
-	bufp = buf;
-	len = bufsz;
-	rv = jsobj_print(addr, verbose, 0, (int)depth, &bufp, &len);
+	jsop.jsop_bufp = &bufp;
+	jsop.jsop_lenp = &len;
+
+	rv = jsobj_print(addr, &jsop);
 	(void) mdb_printf("%s\n", buf);
 	mdb_free(buf, bufsz);
 	return (rv == 0 ? DCMD_OK : DCMD_ERR);
@@ -2007,7 +2729,7 @@ dcmd_v8array(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	uintptr_t *array;
 	size_t ii, len;
 
-	if (read_typebyte(&type, addr, B_FALSE) != 0)
+	if (read_typebyte(&type, addr) != 0)
 		return (DCMD_ERR);
 
 	if (strcmp(enum_lookup_str(v8_types, type, ""), "FixedArray") != 0) {
@@ -2015,7 +2737,7 @@ dcmd_v8array(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	if (read_heap_array(addr, &array, &len) != 0)
+	if (read_heap_array(addr, &array, &len, UM_GC) != 0)
 		return (DCMD_ERR);
 
 	for (ii = 0; ii < len; ii++)
@@ -2190,6 +2912,8 @@ static const mdb_dcmd_t v8_mdb_dcmds[] = {
 		dcmd_jsprint },
 	{ "jsstack", "[-v]", "print a JavaScript stacktrace",
 		dcmd_jsstack },
+	{ "findjsobjects", "?[-vb] [-r | -c cons | -p prop]", "find JavaScript "
+		"objects", dcmd_findjsobjects, dcmd_findjsobjects_help },
 
 	/*
 	 * Commands to inspect V8-level state
