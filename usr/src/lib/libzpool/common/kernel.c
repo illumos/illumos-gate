@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 
 #include <assert.h>
@@ -45,6 +46,7 @@ int aok;
 uint64_t physmem;
 vnode_t *rootdir = (vnode_t *)0xabcd1234;
 char hw_serial[HW_HOSTID_LEN];
+vmem_t *zio_arena = NULL;
 
 struct utsname utsname = {
 	"userland", "libzpool", "1", "1", "na"

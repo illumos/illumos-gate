@@ -24,6 +24,10 @@
  */
 
 /*
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ */
+
+/*
  * Big Theory Statement for the virtual memory allocator.
  *
  * For a more complete description of the main ideas, see:
@@ -1704,6 +1708,19 @@ vmem_update(void *dummy)
 	mutex_exit(&vmem_list_lock);
 
 	(void) timeout(vmem_update, dummy, vmem_update_interval * hz);
+}
+
+void
+vmem_qcache_reap(vmem_t *vmp)
+{
+	int i;
+
+	/*
+	 * Reap any quantum caches that may be part of this vmem.
+	 */
+	for (i = 0; i < VMEM_NQCACHE_MAX; i++)
+		if (vmp->vm_qcache[i])
+			kmem_cache_reap_now(vmp->vm_qcache[i]);
 }
 
 /*
