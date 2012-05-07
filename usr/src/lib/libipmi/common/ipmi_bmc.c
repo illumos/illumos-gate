@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Joyent, Inc.  All rights reserved.
  */
 
 #include <errno.h>
@@ -33,23 +34,23 @@
 #include <stropts.h>
 #include <unistd.h>
 
-#include <sys/bmc_intf.h>
+#include <sys/ipmi.h>
 
 #include "ipmi_impl.h"
 
 /*
- * IPMI transport for /dev/bmc
+ * IPMI transport for the local BMC at /dev/ipmi.
  */
 
 typedef struct ipmi_bmc {
 	ipmi_handle_t	*ib_ihp;	/* ipmi handle */
-	int		ib_fd;		/* /dev/bmc filedescriptor */
+	int		ib_fd;		/* /dev/ipmi filedescriptor */
 	uint32_t	ib_msgseq;	/* message sequence number */
-	bmc_msg_t	*ib_msg;	/* message buffer */
+	uint8_t		*ib_msg;	/* message buffer */
 	size_t		ib_msglen;	/* size of message buffer */
 } ipmi_bmc_t;
 
-#define	BMC_DEV	"/dev/bmc"
+#define	BMC_DEV	"/dev/ipmi"
 
 static void
 ipmi_bmc_close(void *data)
@@ -73,7 +74,7 @@ ipmi_bmc_open(ipmi_handle_t *ihp, nvlist_t *params)
 		return (NULL);
 	ibp->ib_ihp = ihp;
 
-	/* open /dev/bmc */
+	/* open /dev/ipmi */
 	if ((ibp->ib_fd = open(BMC_DEV, O_RDWR)) < 0) {
 		ipmi_free(ihp, ibp);
 		(void) ipmi_set_error(ihp, EIPMI_BMC_OPEN_FAILED, "%s",
@@ -81,7 +82,7 @@ ipmi_bmc_open(ipmi_handle_t *ihp, nvlist_t *params)
 		return (NULL);
 	}
 
-	if ((ibp->ib_msg = (bmc_msg_t *)ipmi_zalloc(ihp, BUFSIZ)) == NULL) {
+	if ((ibp->ib_msg = (uint8_t *)ipmi_zalloc(ihp, BUFSIZ)) == NULL) {
 		ipmi_bmc_close(ibp);
 		return (NULL);
 	}
@@ -95,84 +96,80 @@ ipmi_bmc_send(void *data, ipmi_cmd_t *cmd, ipmi_cmd_t *response,
     int *completion)
 {
 	ipmi_bmc_t *ibp = data;
-	struct strbuf sb;
-	int flags = 0;
-	size_t msgsz;
-	bmc_msg_t *msg;
-	bmc_req_t *bmcreq;
-	bmc_rsp_t *bmcrsp;
+	struct ipmi_req req;
+	struct ipmi_recv recv;
+	struct ipmi_addr addr;
+	fd_set rset;
+	struct ipmi_system_interface_addr bmc_addr;
 
-	/*
-	 * The length of the message structure is equal to the size of the
-	 * bmc_req_t structure, PLUS any additional data space in excess of
-	 * the data space already reserved in the data member + <n> for
-	 * the rest of the members in the bmc_msg_t structure.
-	 */
-	msgsz = offsetof(bmc_msg_t, msg) + sizeof (bmc_req_t) +
-	    ((cmd->ic_dlen > SEND_MAX_PAYLOAD_SIZE) ?
-	    (cmd->ic_dlen - SEND_MAX_PAYLOAD_SIZE) : 0);
+	bmc_addr.addr_type = IPMI_SYSTEM_INTERFACE_ADDR_TYPE;
+	bmc_addr.channel = IPMI_BMC_CHANNEL;
+	bmc_addr.lun = cmd->ic_lun;
 
-	/* construct and send the message */
-	if ((msg = ipmi_zalloc(ibp->ib_ihp, msgsz)) == NULL)
-		return (-1);
-	bmcreq = (bmc_req_t *)&msg->msg[0];
+	(void) memset(&req, 0, sizeof (struct ipmi_req));
 
-	msg->m_type = BMC_MSG_REQUEST;
-	msg->m_id = ibp->ib_msgseq++;
-	bmcreq->fn = cmd->ic_netfn;
-	bmcreq->lun = cmd->ic_lun;
-	bmcreq->cmd = cmd->ic_cmd;
-	bmcreq->datalength = cmd->ic_dlen;
-	(void) memcpy(bmcreq->data, cmd->ic_data, cmd->ic_dlen);
-	sb.len = msgsz;
-	sb.buf = (char *)msg;
+	req.addr = (unsigned char *) &bmc_addr;
+	req.addr_len = sizeof (bmc_addr);
 
-	if (putmsg(ibp->ib_fd, NULL, &sb, 0) < 0) {
-		ipmi_free(ibp->ib_ihp, msg);
+	req.msgid = ibp->ib_msgseq++;
+	req.msg.netfn = cmd->ic_netfn;
+	req.msg.cmd = cmd->ic_cmd;
+	req.msg.data = cmd->ic_data;
+	req.msg.data_len = cmd->ic_dlen;
+
+	if (ioctl(ibp->ib_fd, IPMICTL_SEND_COMMAND, &req) < 0) {
 		(void) ipmi_set_error(ibp->ib_ihp, EIPMI_BMC_PUTMSG, "%s",
 		    strerror(errno));
 		return (-1);
 	}
 
-	ipmi_free(ibp->ib_ihp, msg);
-
 	/* get the response from the BMC */
-	sb.buf = (char *)ibp->ib_msg;
-	sb.maxlen = ibp->ib_msglen;
 
-	if (getmsg(ibp->ib_fd, NULL, &sb, &flags) < 0) {
+	FD_ZERO(&rset);
+	FD_SET(ibp->ib_fd, &rset);
+
+	if (select(ibp->ib_fd + 1, &rset, NULL, NULL, NULL) < 0) {
+		(void) ipmi_set_error(ibp->ib_ihp, EIPMI_BMC_GETMSG, "%s",
+		    strerror(errno));
+		return (-1);
+	}
+	if (FD_ISSET(ibp->ib_fd, &rset) == 0) {
+		(void) ipmi_set_error(ibp->ib_ihp, EIPMI_BMC_GETMSG, "%s",
+		    "No data available");
+		return (-1);
+	}
+
+	recv.addr = (unsigned char *) &addr;
+	recv.addr_len = sizeof (addr);
+	recv.msg.data = (unsigned char *)ibp->ib_msg;
+	recv.msg.data_len = ibp->ib_msglen;
+
+	/* get data */
+	if (ioctl(ibp->ib_fd, IPMICTL_RECEIVE_MSG_TRUNC, &recv) < 0) {
 		(void) ipmi_set_error(ibp->ib_ihp, EIPMI_BMC_GETMSG, "%s",
 		    strerror(errno));
 		return (-1);
 	}
 
-	switch (ibp->ib_msg->m_type) {
-	case BMC_MSG_RESPONSE:
-		bmcrsp = (bmc_rsp_t *)&ibp->ib_msg->msg[0];
-
-		response->ic_netfn = bmcrsp->fn;
-		response->ic_lun = bmcrsp->lun;
-		response->ic_cmd = bmcrsp->cmd;
-		if (bmcrsp->ccode != 0) {
-			*completion = bmcrsp->ccode;
-			response->ic_dlen = 0;
-			response->ic_data = NULL;
-		} else {
-			*completion = 0;
-			response->ic_dlen = bmcrsp->datalength;
-			response->ic_data = bmcrsp->data;
-		}
-		break;
-
-	case BMC_MSG_ERROR:
-		(void) ipmi_set_error(ibp->ib_ihp, EIPMI_BMC_RESPONSE, "%s",
-		    strerror(ibp->ib_msg->msg[0]));
-		return (-1);
-
-	default:
+	if (recv.recv_type != IPMI_RESPONSE_RECV_TYPE) {
 		(void) ipmi_set_error(ibp->ib_ihp, EIPMI_BMC_RESPONSE,
-		    "unknown BMC message type %d", ibp->ib_msg->m_type);
+		    "unknown BMC message type %d", recv.recv_type);
 		return (-1);
+	}
+
+	response->ic_netfn = recv.msg.netfn;
+	/* The lun is not returned in addr, return the lun passed in */
+	response->ic_lun = cmd->ic_lun;
+	response->ic_cmd = recv.msg.cmd;
+	if (recv.msg.data[0] != 0) {
+		*completion = recv.msg.data[0];
+		response->ic_dlen = 0;
+		response->ic_data = NULL;
+	} else {
+		*completion = 0;
+		response->ic_dlen = (recv.msg.data_len > 0) ?
+		    recv.msg.data_len - 1 : 0;
+		response->ic_data = &(recv.msg.data[1]);
 	}
 
 	return (0);

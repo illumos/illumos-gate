@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
  */
 
 #include <assert.h>
@@ -60,6 +61,7 @@
 #define	DTD_ELEM_FORCELOGIN_CMD	((const xmlChar *) "forcedlogin_cmd")
 #define	DTD_ELEM_MODNAME	((const xmlChar *) "modname")
 #define	DTD_ELEM_MOUNT		((const xmlChar *) "mount")
+#define	DTD_ELEM_RESTARTINIT	((const xmlChar *) "restartinit")
 #define	DTD_ELEM_POSTATTACH	((const xmlChar *) "postattach")
 #define	DTD_ELEM_POSTCLONE	((const xmlChar *) "postclone")
 #define	DTD_ELEM_POSTINSTALL	((const xmlChar *) "postinstall")
@@ -319,6 +321,7 @@ i_substitute_tokens(const char *sbuf, char *dbuf, int dbuf_size,
     const char *curr_zone)
 {
 	int dst, src;
+	static char *env_pool = NULL;
 
 	/*
 	 * Walk through the characters, substituting values as needed.
@@ -334,6 +337,13 @@ i_substitute_tokens(const char *sbuf, char *dbuf, int dbuf_size,
 		switch (sbuf[++src]) {
 		case '%':
 			dst += strlcpy(dbuf + dst, "%", dbuf_size - dst);
+			break;
+		case 'P':
+			if (env_pool == NULL)
+				env_pool = getenv("_ZONEADMD_ZPOOL");
+			if (env_pool == NULL)
+				break;
+			dst += strlcpy(dbuf + dst, env_pool, dbuf_size - dst);
 			break;
 		case 'R':
 			if (zonepath == NULL)
@@ -507,6 +517,21 @@ brand_get_initname(brand_handle_t bh, char *buf, size_t len)
 	struct brand_handle *bhp = (struct brand_handle *)bh;
 	return (brand_get_value(bhp, NULL, NULL, NULL, NULL,
 	    buf, len, DTD_ELEM_INITNAME, B_FALSE, B_FALSE));
+}
+
+boolean_t
+brand_restartinit(brand_handle_t bh)
+{
+	struct brand_handle *bhp = (struct brand_handle *)bh;
+	char val[80];
+
+	if (brand_get_value(bhp, NULL, NULL, NULL, NULL,
+	    val, 80, DTD_ELEM_RESTARTINIT, B_FALSE, B_FALSE) != 0)
+		return (B_TRUE);
+
+	if (strcmp(val, "false") == 0)
+		return (B_FALSE);
+	return (B_TRUE);
 }
 
 int

@@ -23,6 +23,10 @@
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ */
+
 /*	Copyright (c) 1984,	 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -335,6 +339,15 @@ propen(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 				pcp->prc_flags &= ~PRC_EXCL;
 		}
 	}
+
+	/*
+	 * If this is a large file open, indicate that in our flags -- some
+	 * procfs structures are not off_t-neutral (e.g., priovec_t), and
+	 * the open will need to be differentiated where 32-bit processes
+	 * pass these structures across the user/kernel boundary.
+	 */
+	if (flag & FOFFMAX)
+		pnp->pr_flags |= PR_OFFMAX;
 
 	/*
 	 * Do file-specific things.

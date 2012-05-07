@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent Inc. All rights reserved.
  */
 
 /*
@@ -99,6 +100,7 @@ typedef struct zone_entry {
 	char		zroot[MAXPATHLEN];
 	char		zuuid[UUID_PRINTABLE_STRING_LENGTH];
 	zone_iptype_t	ziptype;
+	zoneid_t	zdid;
 } zone_entry_t;
 
 #define	CLUSTER_BRAND_NAME	"cluster"
@@ -434,6 +436,7 @@ zone_print(zone_entry_t *zent, boolean_t verbose, boolean_t parsable)
 	}
 	if (!verbose) {
 		char *cp, *clim;
+		char zdid[80];
 
 		if (!parsable) {
 			(void) printf("%s\n", zent->zname);
@@ -449,8 +452,12 @@ zone_print(zone_entry_t *zent, boolean_t verbose, boolean_t parsable)
 			(void) printf("%.*s\\:", clim - cp, cp);
 			cp = clim + 1;
 		}
-		(void) printf("%s:%s:%s:%s\n", cp, zent->zuuid, zent->zbrand,
-		    ip_type_str);
+		if (zent->zdid == -1)
+			zdid[0] = '\0';
+		else
+			(void) snprintf(zdid, sizeof (zdid), "%d", zent->zdid);
+		(void) printf("%s:%s:%s:%s:%s\n", cp, zent->zuuid, zent->zbrand,
+		    ip_type_str, zdid);
 		return;
 	}
 	if (zent->zstate_str != NULL) {
@@ -545,6 +552,22 @@ lookup_zone_info(const char *zone_name, zoneid_t zid, zone_entry_t *zent)
 		return (Z_OK);
 	}
 
+	if ((handle = zonecfg_init_handle()) == NULL) {
+		zperror2(zent->zname, gettext("could not init handle"));
+		return (Z_ERR);
+	}
+	if ((err = zonecfg_get_handle(zent->zname, handle)) != Z_OK) {
+		zperror2(zent->zname, gettext("could not get handle"));
+		zonecfg_fini_handle(handle);
+		return (Z_ERR);
+	}
+
+	if ((err = zonecfg_get_iptype(handle, &zent->ziptype)) != Z_OK) {
+		zperror2(zent->zname, gettext("could not get ip-type"));
+		zonecfg_fini_handle(handle);
+		return (Z_ERR);
+	}
+
 	/*
 	 * There is a race condition where the zone could boot while
 	 * we're walking the index file.  In this case the zone state
@@ -565,25 +588,11 @@ lookup_zone_info(const char *zone_name, zoneid_t zid, zone_entry_t *zent)
 				zent->ziptype = ZS_EXCLUSIVE;
 			else
 				zent->ziptype = ZS_SHARED;
-			return (Z_OK);
 		}
 	}
 
-	if ((handle = zonecfg_init_handle()) == NULL) {
-		zperror2(zent->zname, gettext("could not init handle"));
-		return (Z_ERR);
-	}
-	if ((err = zonecfg_get_handle(zent->zname, handle)) != Z_OK) {
-		zperror2(zent->zname, gettext("could not get handle"));
-		zonecfg_fini_handle(handle);
-		return (Z_ERR);
-	}
+	zent->zdid = zonecfg_get_did(handle);
 
-	if ((err = zonecfg_get_iptype(handle, &zent->ziptype)) != Z_OK) {
-		zperror2(zent->zname, gettext("could not get ip-type"));
-		zonecfg_fini_handle(handle);
-		return (Z_ERR);
-	}
 	zonecfg_fini_handle(handle);
 
 	return (Z_OK);
@@ -1169,6 +1178,7 @@ static int
 ready_func(int argc, char *argv[])
 {
 	zone_cmd_arg_t zarg;
+	boolean_t debug = B_FALSE;
 	int arg;
 
 	if (zonecfg_in_alt_root()) {
@@ -1177,11 +1187,14 @@ ready_func(int argc, char *argv[])
 	}
 
 	optind = 0;
-	if ((arg = getopt(argc, argv, "?")) != EOF) {
+	if ((arg = getopt(argc, argv, "?X")) != EOF) {
 		switch (arg) {
 		case '?':
 			sub_usage(SHELP_READY, CMD_READY);
 			return (optopt == '?' ? Z_OK : Z_USAGE);
+		case 'X':
+			debug = B_TRUE;
+			break;
 		default:
 			sub_usage(SHELP_READY, CMD_READY);
 			return (Z_USAGE);
@@ -1198,6 +1211,7 @@ ready_func(int argc, char *argv[])
 		return (Z_ERR);
 
 	zarg.cmd = Z_READY;
+	zarg.debug = debug;
 	if (zonecfg_call_zoneadmd(target_zone, &zarg, locale, B_TRUE) != 0) {
 		zerror(gettext("call to %s failed"), "zoneadmd");
 		return (Z_ERR);
@@ -1210,6 +1224,7 @@ boot_func(int argc, char *argv[])
 {
 	zone_cmd_arg_t zarg;
 	boolean_t force = B_FALSE;
+	boolean_t debug = B_FALSE;
 	int arg;
 
 	if (zonecfg_in_alt_root()) {
@@ -1236,7 +1251,7 @@ boot_func(int argc, char *argv[])
 	 *	zoneadm -z myzone boot -- -s -v -m verbose.
 	 */
 	optind = 0;
-	while ((arg = getopt(argc, argv, "?fs")) != EOF) {
+	while ((arg = getopt(argc, argv, "?fsX")) != EOF) {
 		switch (arg) {
 		case '?':
 			sub_usage(SHELP_BOOT, CMD_BOOT);
@@ -1247,6 +1262,9 @@ boot_func(int argc, char *argv[])
 			break;
 		case 'f':
 			force = B_TRUE;
+			break;
+		case 'X':
+			debug = B_TRUE;
 			break;
 		default:
 			sub_usage(SHELP_BOOT, CMD_BOOT);
@@ -1273,6 +1291,7 @@ boot_func(int argc, char *argv[])
 	if (verify_details(CMD_BOOT, argv) != Z_OK)
 		return (Z_ERR);
 	zarg.cmd = force ? Z_FORCEBOOT : Z_BOOT;
+	zarg.debug = debug;
 	if (zonecfg_call_zoneadmd(target_zone, &zarg, locale, B_TRUE) != 0) {
 		zerror(gettext("call to %s failed"), "zoneadmd");
 		return (Z_ERR);
@@ -1783,6 +1802,7 @@ static int
 halt_func(int argc, char *argv[])
 {
 	zone_cmd_arg_t zarg;
+	boolean_t debug = B_FALSE;
 	int arg;
 
 	if (zonecfg_in_alt_root()) {
@@ -1791,11 +1811,14 @@ halt_func(int argc, char *argv[])
 	}
 
 	optind = 0;
-	if ((arg = getopt(argc, argv, "?")) != EOF) {
+	if ((arg = getopt(argc, argv, "?X")) != EOF) {
 		switch (arg) {
 		case '?':
 			sub_usage(SHELP_HALT, CMD_HALT);
 			return (optopt == '?' ? Z_OK : Z_USAGE);
+		case 'X':
+			debug = B_TRUE;
+			break;
 		default:
 			sub_usage(SHELP_HALT, CMD_HALT);
 			return (Z_USAGE);
@@ -1821,6 +1844,7 @@ halt_func(int argc, char *argv[])
 		return (Z_ERR);
 
 	zarg.cmd = Z_HALT;
+	zarg.debug = debug;
 	return ((zonecfg_call_zoneadmd(target_zone, &zarg, locale,
 	    B_TRUE) == 0) ?  Z_OK : Z_ERR);
 }
@@ -1829,6 +1853,7 @@ static int
 reboot_func(int argc, char *argv[])
 {
 	zone_cmd_arg_t zarg;
+	boolean_t debug = B_FALSE;
 	int arg;
 
 	if (zonecfg_in_alt_root()) {
@@ -1837,11 +1862,14 @@ reboot_func(int argc, char *argv[])
 	}
 
 	optind = 0;
-	if ((arg = getopt(argc, argv, "?")) != EOF) {
+	if ((arg = getopt(argc, argv, "?X")) != EOF) {
 		switch (arg) {
 		case '?':
 			sub_usage(SHELP_REBOOT, CMD_REBOOT);
 			return (optopt == '?' ? Z_OK : Z_USAGE);
+		case 'X':
+			debug = B_TRUE;
+			break;
 		default:
 			sub_usage(SHELP_REBOOT, CMD_REBOOT);
 			return (Z_USAGE);
@@ -1876,6 +1904,7 @@ reboot_func(int argc, char *argv[])
 		return (Z_ERR);
 
 	zarg.cmd = Z_REBOOT;
+	zarg.debug = debug;
 	return ((zonecfg_call_zoneadmd(target_zone, &zarg, locale, B_TRUE) == 0)
 	    ? Z_OK : Z_ERR);
 }
@@ -2102,6 +2131,10 @@ verify_fs_special(struct zone_fstab *fstab)
 
 	if (strcmp(fstab->zone_fs_type, MNTTYPE_ZFS) == 0)
 		return (verify_fs_zfs(fstab));
+
+	if (strcmp(fstab->zone_fs_type, MNTTYPE_HYPRLOFS) == 0 &&
+	    strcmp(fstab->zone_fs_special, "swap") == 0)
+			return (Z_OK);
 
 	if (stat64(fstab->zone_fs_special, &st) != 0) {
 		(void) fprintf(stderr, gettext("could not verify fs "
@@ -2506,7 +2539,6 @@ verify_handle(int cmd_num, zone_dochandle_t handle, char *argv[])
 	dladm_handle_t dh;
 	dladm_status_t status;
 	datalink_id_t linkid;
-	char errmsg[DLADM_STRSIZE];
 
 	in_alt_root = zonecfg_in_alt_root();
 	if (in_alt_root)
@@ -2589,11 +2621,6 @@ verify_handle(int cmd_num, zone_dochandle_t handle, char *argv[])
 				dladm_close(dh);
 			}
 			if (status != DLADM_STATUS_OK) {
-				(void) fprintf(stderr,
-				    gettext("WARNING: skipping network "
-				    "interface '%s': %s\n"),
-				    nwiftab.zone_nwif_physical,
-				    dladm_status2str(status, errmsg));
 				break;
 			}
 			dl_owner_zid = ALL_ZONES;
@@ -2677,6 +2704,61 @@ no_net:
 	return (return_code);
 }
 
+/*
+ * Called when readying or booting a zone.  We double check that the zone's
+ * debug ID is set and is unique.  This covers the case of pre-existing zones
+ * with no ID.  Also, its possible that a zone was migrated to this host
+ * and as a result it has a duplicate ID.  In this case we preserve the ID
+ * of the first zone we match on in the index file (since it was there before
+ * the current zone) and we assign a new unique ID to the current zone.
+ * Return true if we assigned a new ID, indicating that the zone configuration
+ * needs to be saved.
+ */
+static boolean_t
+verify_fix_did(zone_dochandle_t handle)
+{
+	zoneid_t mydid;
+	zone_entry_t zent;
+	FILE *cookie;
+	char *name;
+	boolean_t fix = B_FALSE;
+
+	mydid = zonecfg_get_did(handle);
+	if (mydid == -1) {
+		zonecfg_set_did(handle);
+		return (B_TRUE);
+	}
+
+	/* Get the full list of zones from the configuration. */
+	cookie = setzoneent();
+	while ((name = getzoneent(cookie)) != NULL) {
+		if (strcmp(target_zone, name) == 0) {
+			free(name);
+			break;	/* Once we find our entry, stop. */
+		}
+
+		if (strcmp(name, "global") == 0 ||
+		    lookup_zone_info(name, ZONE_ID_UNDEFINED, &zent) != Z_OK) {
+			free(name);
+			continue;
+		}
+
+		free(name);
+		if (zent.zdid == mydid) {
+			fix = B_TRUE;
+			break;
+		}
+	}
+	endzoneent(cookie);
+
+	if (fix) {
+		zonecfg_set_did(handle);
+		return (B_TRUE);
+	}
+
+	return (B_FALSE);
+}
+
 static int
 verify_details(int cmd_num, char *argv[])
 {
@@ -2735,6 +2817,18 @@ verify_details(int cmd_num, char *argv[])
 
 	if (verify_handle(cmd_num, handle, argv) != Z_OK)
 		return_code = Z_ERR;
+
+	if (cmd_num == CMD_READY || cmd_num == CMD_BOOT) {
+		int vcommit = 0, obscommit = 0;
+
+		vcommit = verify_fix_did(handle);
+		obscommit = zonecfg_fix_obsolete(handle);
+
+		if (vcommit || obscommit)
+			if (zonecfg_save(handle) != Z_OK)
+				(void) fprintf(stderr, gettext("Could not save "
+				    "updated configuration.\n"));
+	}
 
 	zonecfg_fini_handle(handle);
 	if (return_code == Z_ERR)
@@ -2821,6 +2915,7 @@ install_func(int argc, char *argv[])
 	int status;
 	boolean_t do_postinstall = B_FALSE;
 	boolean_t brand_help = B_FALSE;
+	boolean_t do_dataset = B_TRUE;
 	char opts[128];
 
 	if (target_zone == NULL) {
@@ -2896,6 +2991,12 @@ install_func(int argc, char *argv[])
 			}
 			/* Ignore unknown options - may be brand specific. */
 			break;
+		case 'x':
+			if (strcmp(optarg, "nodataset") == 0) {
+				do_dataset = B_FALSE;
+				continue; /* internal arg, don't pass thru */
+			}
+			break;
 		default:
 			/* Ignore unknown options - may be brand specific. */
 			break;
@@ -2948,7 +3049,8 @@ install_func(int argc, char *argv[])
 			goto done;
 		}
 
-		create_zfs_zonepath(zonepath);
+		if (do_dataset)
+			create_zfs_zonepath(zonepath);
 	}
 
 	status = do_subproc(cmdbuf);
@@ -4911,6 +5013,7 @@ uninstall_func(int argc, char *argv[])
 		if (zonecfg_ping_zoneadmd(target_zone) == Z_OK) {
 			zone_cmd_arg_t zarg;
 			zarg.cmd = Z_NOTE_UNINSTALLING;
+			zarg.debug = B_FALSE;
 			/* we don't care too much if this fails, just plow on */
 			(void) zonecfg_call_zoneadmd(target_zone, &zarg, locale,
 			    B_TRUE);
@@ -5026,6 +5129,7 @@ mount_func(int argc, char *argv[])
 		return (Z_ERR);
 
 	zarg.cmd = force ? Z_FORCEMOUNT : Z_MOUNT;
+	zarg.debug = B_FALSE;
 	zarg.bootbuf[0] = '\0';
 	if (zonecfg_call_zoneadmd(target_zone, &zarg, locale, B_TRUE) != 0) {
 		zerror(gettext("call to %s failed"), "zoneadmd");
@@ -5047,6 +5151,7 @@ unmount_func(int argc, char *argv[])
 		return (Z_ERR);
 
 	zarg.cmd = Z_UNMOUNT;
+	zarg.debug = B_FALSE;
 	if (zonecfg_call_zoneadmd(target_zone, &zarg, locale, B_TRUE) != 0) {
 		zerror(gettext("call to %s failed"), "zoneadmd");
 		return (Z_ERR);
@@ -5268,7 +5373,7 @@ apply_func(int argc, char *argv[])
 	priv_set_t *privset;
 	zoneid_t zoneid;
 	zone_dochandle_t handle;
-	struct zone_mcaptab mcap;
+	uint64_t mcap;
 	char pool_err[128];
 
 	zoneid = getzoneid();
@@ -5359,18 +5464,11 @@ apply_func(int argc, char *argv[])
 	}
 
 	/*
-	 * If a memory cap is configured, set the cap in the kernel using
-	 * zone_setattr() and make sure the rcapd SMF service is enabled.
+	 * If a memory cap is configured, make sure the rcapd SMF service is
+	 * enabled.
 	 */
-	if (zonecfg_getmcapent(handle, &mcap) == Z_OK) {
-		uint64_t num;
+	if (zonecfg_get_aliased_rctl(handle, ALIAS_MAXPHYSMEM, &mcap) == Z_OK) {
 		char smf_err[128];
-
-		num = (uint64_t)strtoll(mcap.zone_physmem_cap, NULL, 10);
-		if (zone_setattr(zoneid, ZONE_ATTR_PHYS_MCAP, &num, 0) == -1) {
-			zerror(gettext("could not set zone memory cap"));
-			res = Z_ERR;
-		}
 
 		if (zonecfg_enable_rcapd(smf_err, sizeof (smf_err)) != Z_OK) {
 			zerror(gettext("enabling system/rcap service failed: "

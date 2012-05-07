@@ -21,12 +21,14 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent Inc. All rights reserved.
  */
 
 #include <sys/types.h>
 #include <sys/tihdr.h>
 #include <sys/policy.h>
 #include <sys/tsol/tnet.h>
+#include <sys/kstat.h>
 
 #include <inet/common.h>
 #include <inet/ip.h>
@@ -505,7 +507,7 @@ tcp_kstat_init(netstackid_t stackid)
 		{ "connTableSize6",	KSTAT_DATA_INT32, 0 }
 	};
 
-	ksp = kstat_create_netstack(TCP_MOD_NAME, 0, TCP_MOD_NAME, "mib2",
+	ksp = kstat_create_netstack(TCP_MOD_NAME, stackid, TCP_MOD_NAME, "mib2",
 	    KSTAT_TYPE_NAMED, NUM_OF_FIELDS(tcp_named_kstat_t), 0, stackid);
 
 	if (ksp == NULL)
@@ -517,6 +519,13 @@ tcp_kstat_init(netstackid_t stackid)
 	bcopy(&template, ksp->ks_data, sizeof (template));
 	ksp->ks_update = tcp_kstat_update;
 	ksp->ks_private = (void *)(uintptr_t)stackid;
+
+	/*
+	 * If this is an exclusive netstack for a local zone, the global zone
+	 * should still be able to read the kstat.
+	 */
+	if (stackid != GLOBAL_NETSTACKID)
+		kstat_zone_add(ksp, GLOBAL_ZONEID);
 
 	kstat_install(ksp);
 	return (ksp);
@@ -733,7 +742,7 @@ tcp_kstat2_init(netstackid_t stackid)
 #endif
 	};
 
-	ksp = kstat_create_netstack(TCP_MOD_NAME, 0, "tcpstat", "net",
+	ksp = kstat_create_netstack(TCP_MOD_NAME, stackid, "tcpstat", "net",
 	    KSTAT_TYPE_NAMED, sizeof (template) / sizeof (kstat_named_t), 0,
 	    stackid);
 
@@ -743,6 +752,13 @@ tcp_kstat2_init(netstackid_t stackid)
 	bcopy(&template, ksp->ks_data, sizeof (template));
 	ksp->ks_private = (void *)(uintptr_t)stackid;
 	ksp->ks_update = tcp_kstat2_update;
+
+	/*
+	 * If this is an exclusive netstack for a local zone, the global zone
+	 * should still be able to read the kstat.
+	 */
+	if (stackid != GLOBAL_NETSTACKID)
+		kstat_zone_add(ksp, GLOBAL_ZONEID);
 
 	kstat_install(ksp);
 	return (ksp);

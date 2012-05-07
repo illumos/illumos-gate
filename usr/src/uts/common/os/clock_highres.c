@@ -24,7 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2012, Joyent Inc. All rights reserved.
+ */
 
 #include <sys/timer.h>
 #include <sys/systm.h>
@@ -112,6 +114,25 @@ clock_highres_timer_settime(itimer_t *it, int flags,
 	cyctime.cyt_when = ts2hrt(&when->it_value);
 	cyctime.cyt_interval = ts2hrt(&when->it_interval);
 
+	if (cyctime.cyt_when != 0 && cyctime.cyt_interval == 0 &&
+	    it->it_itime.it_interval.tv_sec == 0 &&
+	    it->it_itime.it_interval.tv_nsec == 0 &&
+	    (cyc = *cycp) != CYCLIC_NONE) {
+		/*
+		 * If our existing timer is a one-shot and our new timer is a
+		 * one-shot, we'll save ourselves a world of grief and just
+		 * reprogram the cyclic.
+		 */
+		it->it_itime = *when;
+
+		if (!(flags & TIMER_ABSTIME))
+			cyctime.cyt_when += gethrtime();
+
+		hrt2ts(cyctime.cyt_when, &it->it_itime.it_value);
+		(void) cyclic_reprogram(cyc, cyctime.cyt_when);
+		return (0);
+	}
+
 	mutex_enter(&cpu_lock);
 	if ((cyc = *cycp) != CYCLIC_NONE) {
 		cyclic_remove(cyc);
@@ -162,17 +183,14 @@ clock_highres_timer_settime(itimer_t *it, int flags,
 
 	if (cyctime.cyt_interval == 0) {
 		/*
-		 * If this is a one-shot, then we set the interval to assure
-		 * that the cyclic will next fire INT64_MAX nanoseconds after
-		 * boot (which corresponds to over 292 years -- yes, Buck Rogers
-		 * may have his 292-year-uptime-Solaris box malfunction).  If
-		 * this timer is never touched, this cyclic will simply
-		 * consume space in the cyclic subsystem.  As soon as
+		 * If this is a one-shot, then we set the interval to be
+		 * inifinite.  If this timer is never touched, this cyclic will
+		 * simply consume space in the cyclic subsystem.  As soon as
 		 * timer_settime() or timer_delete() is called, the cyclic is
 		 * removed (so it's not possible to run the machine out
 		 * of resources by creating one-shots).
 		 */
-		cyctime.cyt_interval = INT64_MAX - cyctime.cyt_when;
+		cyctime.cyt_interval = CY_INFINITY;
 	}
 
 	it->it_itime = *when;
@@ -185,8 +203,6 @@ clock_highres_timer_settime(itimer_t *it, int flags,
 
 	if (cyctime.cyt_when != 0)
 		*cycp = cyc = cyclic_add(&hdlr, &cyctime);
-	else
-		*cycp = cyc = CYCLIC_NONE;
 
 	/*
 	 * Now that we have the cyclic created, we need to bind it to our

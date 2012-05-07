@@ -65,6 +65,9 @@ $(XPG6) := CFLAGS += -DXPG4 -DXPG6 -I$(SRC)/lib/libc/inc
 
 CPPFLAGS +=  -DUSG -DSTDIO -DVMUNIX -DTABS=8 -DSINGLE -DTAG_STACK
 
+# vi intentionally uses foo[-1] as a sentinal value to q*column()
+$(__GNUC4)CERRWARN += -_gcc=-Wno-array-bounds
+
 # vi maintains its own versions of various routines from libc and libcurses,
 # so localize all symbols to avoid name space collisions.
 LDFLAGS +=	$(MAPFILE.NGB:%=-M%)

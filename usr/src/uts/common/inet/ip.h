@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  * Copyright (c) 1990 Mentat Inc.
  */
 
@@ -2195,6 +2196,8 @@ struct ip_xmit_attr_s {
 	 */
 	ixa_notify_t	ixa_notify;	/* Registered upcall notify function */
 	void		*ixa_notify_cookie; /* ULP cookie for ixa_notify */
+
+	uint_t		ixa_tcpcleanup;	/* Used by conn_ixa_cleanup */
 };
 
 /*
@@ -2264,6 +2267,14 @@ struct ip_xmit_attr_s {
  */
 #define	IXA_FREE_CRED		0x00000001	/* ixa_cred needs to be rele */
 #define	IXA_FREE_TSL		0x00000002	/* ixa_tsl needs to be rele */
+
+/*
+ * Trivial state machine used to synchronize IXA cleanup for TCP connections.
+ * See conn_ixa_cleanup().
+ */
+#define	IXATC_IDLE		0x00000000
+#define	IXATC_INPROGRESS	0x00000001
+#define	IXATC_COMPLETE		0x00000002
 
 /*
  * Simplistic way to set the ixa_xmit_hint for locally generated traffic
@@ -3030,6 +3041,7 @@ extern vmem_t *ip_minor_arena_la;
 #define	ips_ip_strict_src_multihoming	ips_propinfo_tbl[80].prop_cur_uval
 #define	ips_ipv6_strict_src_multihoming	ips_propinfo_tbl[81].prop_cur_uval
 #define	ips_ipv6_drop_inbound_icmpv6	ips_propinfo_tbl[82].prop_cur_bval
+#define	ips_ip_dce_reclaim_threshold	ips_propinfo_tbl[83].prop_cur_uval
 
 extern int	dohwcksum;	/* use h/w cksum if supported by the h/w */
 #ifdef ZC_TEST

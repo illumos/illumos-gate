@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ */
+
+/*
  * vm_usage
  *
  * This file implements the getvmusage() private system call.
@@ -114,7 +118,7 @@
  *	For accurate counting of map-shared and COW-shared pages.
  *
  *    - visited private anons (refcnt > 1) for each collective.
- *	(entity->vme_anon_hash)
+ *	(entity->vme_anon)
  *	For accurate counting of COW-shared pages.
  *
  * The common accounting structure is the vmu_entity_t, which represents
@@ -152,6 +156,7 @@
 #include <sys/vm_usage.h>
 #include <sys/zone.h>
 #include <sys/sunddi.h>
+#include <sys/sysmacros.h>
 #include <sys/avl.h>
 #include <vm/anon.h>
 #include <vm/as.h>
@@ -199,6 +204,14 @@ typedef struct vmu_object {
 } vmu_object_t;
 
 /*
+ * Node for tree of visited COW anons.
+ */
+typedef struct vmu_anon {
+	avl_node_t vma_node;
+	uintptr_t vma_addr;
+} vmu_anon_t;
+
+/*
  * Entity by which to count results.
  *
  * The entity structure keeps the current rss/swap counts for each entity
@@ -221,7 +234,7 @@ typedef struct vmu_entity {
 	struct vmu_entity *vme_next_calc;
 	mod_hash_t	*vme_vnode_hash; /* vnodes visited for entity */
 	mod_hash_t	*vme_amp_hash;	 /* shared amps visited for entity */
-	mod_hash_t	*vme_anon_hash;	 /* COW anons visited for entity */
+	avl_tree_t	vme_anon;	 /* COW anons visited for entity */
 	vmusage_t	vme_result;	 /* identifies entity and results */
 } vmu_entity_t;
 
@@ -324,6 +337,23 @@ bounds_cmp(const void *bnd1, const void *bnd2)
 }
 
 /*
+ * Comparison routine for our AVL tree of anon structures.
+ */
+static int
+vmu_anon_cmp(const void *lhs, const void *rhs)
+{
+	const vmu_anon_t *l = lhs, *r = rhs;
+
+	if (l->vma_addr == r->vma_addr)
+		return (0);
+
+	if (l->vma_addr < r->vma_addr)
+		return (-1);
+
+	return (1);
+}
+
+/*
  * Save a bound on the free list.
  */
 static void
@@ -363,13 +393,18 @@ static void
 vmu_free_entity(mod_hash_val_t val)
 {
 	vmu_entity_t *entity = (vmu_entity_t *)val;
+	vmu_anon_t *anon;
+	void *cookie = NULL;
 
 	if (entity->vme_vnode_hash != NULL)
 		i_mod_hash_clear_nosync(entity->vme_vnode_hash);
 	if (entity->vme_amp_hash != NULL)
 		i_mod_hash_clear_nosync(entity->vme_amp_hash);
-	if (entity->vme_anon_hash != NULL)
-		i_mod_hash_clear_nosync(entity->vme_anon_hash);
+
+	while ((anon = avl_destroy_nodes(&entity->vme_anon, &cookie)) != NULL)
+		kmem_free(anon, sizeof (vmu_anon_t));
+
+	avl_destroy(&entity->vme_anon);
 
 	entity->vme_next = vmu_data.vmu_free_entities;
 	vmu_data.vmu_free_entities = entity;
@@ -485,10 +520,10 @@ vmu_alloc_entity(id_t id, int type, id_t zoneid)
 		    "vmusage amp hash", VMUSAGE_HASH_SIZE, vmu_free_object,
 		    sizeof (struct anon_map));
 
-	if (entity->vme_anon_hash == NULL)
-		entity->vme_anon_hash = mod_hash_create_ptrhash(
-		    "vmusage anon hash", VMUSAGE_HASH_SIZE,
-		    mod_hash_null_valdtor, sizeof (struct anon));
+	VERIFY(avl_first(&entity->vme_anon) == NULL);
+
+	avl_create(&entity->vme_anon, vmu_anon_cmp, sizeof (struct vmu_anon),
+	    offsetof(struct vmu_anon, vma_node));
 
 	entity->vme_next = vmu_data.vmu_entities;
 	vmu_data.vmu_entities = entity;
@@ -518,7 +553,8 @@ vmu_alloc_zone(id_t id)
 
 	zone->vmz_id = id;
 
-	if ((vmu_data.vmu_calc_flags & (VMUSAGE_ZONE | VMUSAGE_ALL_ZONES)) != 0)
+	if ((vmu_data.vmu_calc_flags &
+	    (VMUSAGE_ZONE | VMUSAGE_ALL_ZONES | VMUSAGE_A_ZONE)) != 0)
 		zone->vmz_zone = vmu_alloc_entity(id, VMUSAGE_ZONE, id);
 
 	if ((vmu_data.vmu_calc_flags & (VMUSAGE_PROJECTS |
@@ -613,21 +649,19 @@ vmu_find_insert_object(mod_hash_t *hash, caddr_t key, uint_t type)
 }
 
 static int
-vmu_find_insert_anon(mod_hash_t *hash, caddr_t key)
+vmu_find_insert_anon(vmu_entity_t *entity, void *key)
 {
-	int ret;
-	caddr_t val;
+	vmu_anon_t anon, *ap;
 
-	ret = i_mod_hash_find_nosync(hash, (mod_hash_key_t)key,
-	    (mod_hash_val_t *)&val);
+	anon.vma_addr = (uintptr_t)key;
 
-	if (ret == 0)
+	if (avl_find(&entity->vme_anon, &anon, NULL) != NULL)
 		return (0);
 
-	ret = i_mod_hash_insert_nosync(hash, (mod_hash_key_t)key,
-	    (mod_hash_val_t)key, (mod_hash_hndl_t)0);
+	ap = kmem_alloc(sizeof (vmu_anon_t), KM_SLEEP);
+	ap->vma_addr = (uintptr_t)key;
 
-	ASSERT(ret == 0);
+	avl_add(&entity->vme_anon, ap);
 
 	return (1);
 }
@@ -937,7 +971,10 @@ vmu_amp_update_incore_bounds(avl_tree_t *tree, struct anon_map *amp,
 
 			if (ap != NULL && vn != NULL && vn->v_pages != NULL &&
 			    (page = page_exists(vn, off)) != NULL) {
-				page_type = VMUSAGE_BOUND_INCORE;
+				if (PP_ISFREE(page))
+					page_type = VMUSAGE_BOUND_NOT_INCORE;
+				else
+					page_type = VMUSAGE_BOUND_INCORE;
 				if (page->p_szc > 0) {
 					pgcnt = page_get_pagecnt(page->p_szc);
 					pgshft = page_get_shift(page->p_szc);
@@ -1024,7 +1061,10 @@ vmu_vnode_update_incore_bounds(avl_tree_t *tree, vnode_t *vnode,
 
 			if (vnode->v_pages != NULL &&
 			    (page = page_exists(vnode, ptob(index))) != NULL) {
-				page_type = VMUSAGE_BOUND_INCORE;
+				if (PP_ISFREE(page))
+					page_type = VMUSAGE_BOUND_NOT_INCORE;
+				else
+					page_type = VMUSAGE_BOUND_INCORE;
 				if (page->p_szc > 0) {
 					pgcnt = page_get_pagecnt(page->p_szc);
 					pgshft = page_get_shift(page->p_szc);
@@ -1304,6 +1344,12 @@ vmu_calculate_seg(vmu_entity_t *vmu_entities, struct seg *seg)
 			}
 
 			/*
+			 * Pages on the free list aren't counted for the rss.
+			 */
+			if (PP_ISFREE(page))
+				continue;
+
+			/*
 			 * Assume anon structs with a refcnt
 			 * of 1 are not COW shared, so there
 			 * is no reason to track them per entity.
@@ -1320,8 +1366,7 @@ vmu_calculate_seg(vmu_entity_t *vmu_entities, struct seg *seg)
 				 * Track COW anons per entity so
 				 * they are not double counted.
 				 */
-				if (vmu_find_insert_anon(entity->vme_anon_hash,
-				    (caddr_t)ap) == 0)
+				if (vmu_find_insert_anon(entity, ap) == 0)
 					continue;
 
 				result->vmu_rss_all += (pgcnt << PAGESHIFT);
@@ -1461,8 +1506,9 @@ vmu_calculate_proc(proc_t *p)
 		entities = tmp;
 	}
 	if (vmu_data.vmu_calc_flags &
-	    (VMUSAGE_ZONE | VMUSAGE_ALL_ZONES | VMUSAGE_PROJECTS |
-	    VMUSAGE_ALL_PROJECTS | VMUSAGE_TASKS | VMUSAGE_ALL_TASKS |
+	    (VMUSAGE_ZONE | VMUSAGE_ALL_ZONES | VMUSAGE_A_ZONE |
+	    VMUSAGE_PROJECTS | VMUSAGE_ALL_PROJECTS |
+	    VMUSAGE_TASKS | VMUSAGE_ALL_TASKS |
 	    VMUSAGE_RUSERS | VMUSAGE_ALL_RUSERS | VMUSAGE_EUSERS |
 	    VMUSAGE_ALL_EUSERS)) {
 		ret = i_mod_hash_find_nosync(vmu_data.vmu_zones_hash,
@@ -1594,8 +1640,7 @@ vmu_free_extra()
 			mod_hash_destroy_hash(te->vme_vnode_hash);
 		if (te->vme_amp_hash != NULL)
 			mod_hash_destroy_hash(te->vme_amp_hash);
-		if (te->vme_anon_hash != NULL)
-			mod_hash_destroy_hash(te->vme_anon_hash);
+		VERIFY(avl_first(&te->vme_anon) == NULL);
 		kmem_free(te, sizeof (vmu_entity_t));
 	}
 	while (vmu_data.vmu_free_zones != NULL) {
@@ -1739,12 +1784,34 @@ vmu_cache_rele(vmu_cache_t *cache)
 }
 
 /*
+ * When new data is calculated, update the phys_mem rctl usage value in the
+ * zones.
+ */
+static void
+vmu_update_zone_rctls(vmu_cache_t *cache)
+{
+	vmusage_t	*rp;
+	size_t		i = 0;
+	zone_t		*zp;
+
+	for (rp = cache->vmc_results; i < cache->vmc_nresults; rp++, i++) {
+		if (rp->vmu_type == VMUSAGE_ZONE &&
+		    rp->vmu_zoneid != ALL_ZONES) {
+			if ((zp = zone_find_by_id(rp->vmu_zoneid)) != NULL) {
+				zp->zone_phys_mem = rp->vmu_rss_all;
+				zone_rele(zp);
+			}
+		}
+	}
+}
+
+/*
  * Copy out the cached results to a caller.  Inspect the callers flags
  * and zone to determine which cached results should be copied.
  */
 static int
 vmu_copyout_results(vmu_cache_t *cache, vmusage_t *buf, size_t *nres,
-    uint_t flags, int cpflg)
+    uint_t flags, id_t req_zone_id, int cpflg)
 {
 	vmusage_t *result, *out_result;
 	vmusage_t dummy;
@@ -1763,7 +1830,7 @@ vmu_copyout_results(vmu_cache_t *cache, vmusage_t *buf, size_t *nres,
 	/* figure out what results the caller is interested in. */
 	if ((flags & VMUSAGE_SYSTEM) && curproc->p_zone == global_zone)
 		types |= VMUSAGE_SYSTEM;
-	if (flags & (VMUSAGE_ZONE | VMUSAGE_ALL_ZONES))
+	if (flags & (VMUSAGE_ZONE | VMUSAGE_ALL_ZONES | VMUSAGE_A_ZONE))
 		types |= VMUSAGE_ZONE;
 	if (flags & (VMUSAGE_PROJECTS | VMUSAGE_ALL_PROJECTS |
 	    VMUSAGE_COL_PROJECTS))
@@ -1826,26 +1893,33 @@ vmu_copyout_results(vmu_cache_t *cache, vmusage_t *buf, size_t *nres,
 				continue;
 		}
 
-		/* Skip "other zone" results if not requested */
-		if (result->vmu_zoneid != curproc->p_zone->zone_id) {
-			if (result->vmu_type == VMUSAGE_ZONE &&
-			    (flags & VMUSAGE_ALL_ZONES) == 0)
+		if (result->vmu_type == VMUSAGE_ZONE &&
+		    flags & VMUSAGE_A_ZONE) {
+			/* Skip non-requested zone results */
+			if (result->vmu_zoneid != req_zone_id)
 				continue;
-			if (result->vmu_type == VMUSAGE_PROJECTS &&
-			    (flags & (VMUSAGE_ALL_PROJECTS |
-			    VMUSAGE_COL_PROJECTS)) == 0)
-				continue;
-			if (result->vmu_type == VMUSAGE_TASKS &&
-			    (flags & VMUSAGE_ALL_TASKS) == 0)
-				continue;
-			if (result->vmu_type == VMUSAGE_RUSERS &&
-			    (flags & (VMUSAGE_ALL_RUSERS |
-			    VMUSAGE_COL_RUSERS)) == 0)
-				continue;
-			if (result->vmu_type == VMUSAGE_EUSERS &&
-			    (flags & (VMUSAGE_ALL_EUSERS |
-			    VMUSAGE_COL_EUSERS)) == 0)
-				continue;
+		} else {
+			/* Skip "other zone" results if not requested */
+			if (result->vmu_zoneid != curproc->p_zone->zone_id) {
+				if (result->vmu_type == VMUSAGE_ZONE &&
+				    (flags & VMUSAGE_ALL_ZONES) == 0)
+					continue;
+				if (result->vmu_type == VMUSAGE_PROJECTS &&
+				    (flags & (VMUSAGE_ALL_PROJECTS |
+				    VMUSAGE_COL_PROJECTS)) == 0)
+					continue;
+				if (result->vmu_type == VMUSAGE_TASKS &&
+				    (flags & VMUSAGE_ALL_TASKS) == 0)
+					continue;
+				if (result->vmu_type == VMUSAGE_RUSERS &&
+				    (flags & (VMUSAGE_ALL_RUSERS |
+				    VMUSAGE_COL_RUSERS)) == 0)
+					continue;
+				if (result->vmu_type == VMUSAGE_EUSERS &&
+				    (flags & (VMUSAGE_ALL_EUSERS |
+				    VMUSAGE_COL_EUSERS)) == 0)
+					continue;
+			}
 		}
 		count++;
 		if (out_result != NULL) {
@@ -1901,10 +1975,12 @@ vm_getusage(uint_t flags, time_t age, vmusage_t *buf, size_t *nres, int cpflg)
 	int cacherecent = 0;
 	hrtime_t now;
 	uint_t flags_orig;
+	id_t req_zone_id;
 
 	/*
 	 * Non-global zones cannot request system wide and/or collated
-	 * results, or the system result, so munge the flags accordingly.
+	 * results, or the system result, or usage of another zone, so munge
+	 * the flags accordingly.
 	 */
 	flags_orig = flags;
 	if (curproc->p_zone != global_zone) {
@@ -1924,6 +2000,10 @@ vm_getusage(uint_t flags, time_t age, vmusage_t *buf, size_t *nres, int cpflg)
 			flags &= ~VMUSAGE_SYSTEM;
 			flags |= VMUSAGE_ZONE;
 		}
+		if (flags & VMUSAGE_A_ZONE) {
+			flags &= ~VMUSAGE_A_ZONE;
+			flags |= VMUSAGE_ZONE;
+		}
 	}
 
 	/* Check for unknown flags */
@@ -1933,6 +2013,21 @@ vm_getusage(uint_t flags, time_t age, vmusage_t *buf, size_t *nres, int cpflg)
 	/* Check for no flags */
 	if ((flags & VMUSAGE_MASK) == 0)
 		return (set_errno(EINVAL));
+
+	/* If requesting results for a specific zone, get the zone ID */
+	if (flags & VMUSAGE_A_ZONE) {
+		size_t bufsize;
+		vmusage_t zreq;
+
+		if (ddi_copyin((caddr_t)nres, &bufsize, sizeof (size_t), cpflg))
+			return (set_errno(EFAULT));
+		/* Requested zone ID is passed in buf, so 0 len not allowed */
+		if (bufsize == 0)
+			return (set_errno(EINVAL));
+		if (ddi_copyin((caddr_t)buf, &zreq, sizeof (vmusage_t), cpflg))
+			return (set_errno(EFAULT));
+		req_zone_id = zreq.vmu_id;
+	}
 
 	mutex_enter(&vmu_data.vmu_lock);
 	now = gethrtime();
@@ -1953,7 +2048,7 @@ start:
 			mutex_exit(&vmu_data.vmu_lock);
 
 			ret = vmu_copyout_results(cache, buf, nres, flags_orig,
-			    cpflg);
+			    req_zone_id, cpflg);
 			mutex_enter(&vmu_data.vmu_lock);
 			vmu_cache_rele(cache);
 			if (vmu_data.vmu_pending_waiters > 0)
@@ -2009,8 +2104,11 @@ start:
 
 		mutex_exit(&vmu_data.vmu_lock);
 
+		/* update zone's phys. mem. rctl usage */
+		vmu_update_zone_rctls(cache);
 		/* copy cache */
-		ret = vmu_copyout_results(cache, buf, nres, flags_orig, cpflg);
+		ret = vmu_copyout_results(cache, buf, nres, flags_orig,
+		    req_zone_id, cpflg);
 		mutex_enter(&vmu_data.vmu_lock);
 		vmu_cache_rele(cache);
 		mutex_exit(&vmu_data.vmu_lock);

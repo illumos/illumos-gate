@@ -21,6 +21,8 @@
 
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012 Joyent, Inc. All rights reserved.
  */
 
 #ifndef	_MDB_MODAPI_H
@@ -69,7 +71,7 @@ extern "C" {
 #define	MAX(x, y) ((x) > (y) ? (x) : (y))
 #endif
 
-#define	MDB_API_VERSION	3	/* Current API version number */
+#define	MDB_API_VERSION	4	/* Current API version number */
 
 /*
  * Debugger command function flags:
@@ -81,6 +83,11 @@ extern "C" {
 #define	DCMD_PIPE_OUT	0x10	/* Dcmd invoked with output set to pipe */
 
 #define	DCMD_HDRSPEC(fl)	(((fl) & DCMD_LOOPFIRST) || !((fl) & DCMD_LOOP))
+
+/*
+ * Debugger tab command function flags
+ */
+#define	DCMD_TAB_SPACE	0x01	/* Tab cb invoked with trailing space */
 
 /*
  * Debugger command function return values:
@@ -111,7 +118,10 @@ typedef struct mdb_arg {
 	} a_un;
 } mdb_arg_t;
 
+typedef struct mdb_tab_cookie mdb_tab_cookie_t;
 typedef int mdb_dcmd_f(uintptr_t, uint_t, int, const mdb_arg_t *);
+typedef int mdb_dcmd_tab_f(mdb_tab_cookie_t *, uint_t, int,
+    const mdb_arg_t *);
 
 typedef struct mdb_dcmd {
 	const char *dc_name;		/* Command name */
@@ -119,6 +129,7 @@ typedef struct mdb_dcmd {
 	const char *dc_descr;		/* Description */
 	mdb_dcmd_f *dc_funcp;		/* Command function */
 	void (*dc_help)(void);		/* Command help function (or NULL) */
+	mdb_dcmd_tab_f *dc_tabp;	/* Tab completion function */
 } mdb_dcmd_t;
 
 #define	WALK_ERR	-1		/* Walk fatal error (terminate walk) */
@@ -168,6 +179,14 @@ typedef struct mdb_object {
 	uintptr_t obj_base;		/* base address of object */
 	uintptr_t obj_size;		/* in memory size of object in bytes */
 } mdb_object_t;
+
+typedef struct mdb_symbol {
+	const char *sym_name;		/* name of symbol */
+	const char *sym_object;		/* name of containing object */
+	const GElf_Sym *sym_sym;	/* ELF symbol information */
+	uint_t sym_table;		/* symbol table id */
+	uint_t sym_id;			/* symbol identifier */
+} mdb_symbol_t;
 
 extern int mdb_pwalk(const char *, mdb_walk_cb_t, void *, uintptr_t);
 extern int mdb_walk(const char *, mdb_walk_cb_t, void *);
@@ -285,6 +304,28 @@ extern ssize_t mdb_get_xdata(const char *, void *, size_t);
 typedef int (*mdb_object_cb_t)(mdb_object_t *, void *);
 extern int mdb_object_iter(mdb_object_cb_t, void *);
 
+#define	MDB_SYMTAB		1	/* Normal symbol table (.symtab) */
+#define	MDB_DYNSYM		2	/* Dynamic symbol table (.dynsym) */
+
+#define	MDB_BIND_LOCAL		0x0001	/* Local (static-scope) symbols */
+#define	MDB_BIND_GLOBAL		0x0002	/* Global symbols */
+#define	MDB_BIND_WEAK		0x0004	/* Weak binding symbols */
+#define	MDB_BIND_ANY		0x0007	/* Any of the above */
+
+#define	MDB_TYPE_NOTYPE		0x0100	/* Symbol has no type */
+#define	MDB_TYPE_OBJECT		0x0200	/* Symbol refers to data */
+#define	MDB_TYPE_FUNC		0x0400	/* Symbol refers to text */
+#define	MDB_TYPE_SECT		0x0800	/* Symbol refers to a section */
+#define	MDB_TYPE_FILE		0x1000	/* Symbol refers to a source file */
+#define	MDB_TYPE_COMMON		0x2000	/* Symbol refers to a common block */
+#define	MDB_TYPE_TLS		0x4000	/* Symbol refers to TLS */
+
+#define	MDB_TYPE_ANY		0x7f00	/* Any of the above */
+
+typedef int (*mdb_symbol_cb_t)(mdb_symbol_t *, void *);
+extern int mdb_symbol_iter(const char *, uint_t, uint_t, mdb_symbol_cb_t,
+    void *);
+
 #define	MDB_STATE_IDLE		0	/* Target is idle (not running yet) */
 #define	MDB_STATE_RUNNING	1	/* Target is currently executing */
 #define	MDB_STATE_STOPPED	2	/* Target is stopped */
@@ -301,6 +342,31 @@ typedef void (*mdb_callback_f)(void *);
 
 extern void *mdb_callback_add(int, mdb_callback_f, void *);
 extern void mdb_callback_remove(void *);
+
+#define	MDB_TABC_ALL_TYPES	0x1	/* Include array types in type output */
+#define	MDB_TABC_MEMBERS	0x2	/* Tab comp. types with members */
+#define	MDB_TABC_NOPOINT	0x4	/* Tab comp. everything but pointers */
+#define	MDB_TABC_NOARRAY	0x8	/* Don't include array data in output */
+
+/*
+ * Module's interaction path
+ */
+extern void mdb_tab_insert(mdb_tab_cookie_t *, const char *);
+extern void mdb_tab_setmbase(mdb_tab_cookie_t *, const char *);
+
+/*
+ * Tab completion utility functions for modules.
+ */
+extern int mdb_tab_complete_type(mdb_tab_cookie_t *, const char *, uint_t);
+extern int mdb_tab_complete_member(mdb_tab_cookie_t *, const char *,
+    const char *);
+extern int mdb_tab_typename(int *, const mdb_arg_t **, char *buf, size_t len);
+
+/*
+ * Tab completion functions for common signatures.
+ */
+extern int mdb_tab_complete_mt(mdb_tab_cookie_t *, uint_t, int,
+    const mdb_arg_t *);
 
 extern size_t strlcat(char *, const char *, size_t);
 extern char *strcat(char *, const char *);

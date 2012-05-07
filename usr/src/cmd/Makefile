@@ -21,12 +21,12 @@
 
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
-# Copyright 2011 Joyent, Inc.  All rights reserved.
+# Copyright (c) 2012 Joyent, Inc.  All rights reserved.
 
 include ../Makefile.master
 
 #
-#	Note that the commands 'agents', 'lp', 'perl', and 'man' are first in
+#	Note that the commands 'perl', and 'man' are first in
 #	the list, violating alphabetical order.  This is because they are very
 #	long-running and should be given the most wall-clock time for a
 #	parallel build.
@@ -48,7 +48,6 @@ FIRST_SUBDIRS=		\
 COMMON_SUBDIRS=		\
 	allocate	\
 	availdevs	\
-	lp		\
 	perl		\
 	man		\
 	Adm		\
@@ -205,6 +204,7 @@ COMMON_SUBDIRS=		\
 	intrstat	\
 	ipcrm		\
 	ipcs		\
+	ipdadm		\
 	ipf		\
 	isainfo		\
 	isalist		\
@@ -224,7 +224,6 @@ COMMON_SUBDIRS=		\
 	kvmstat		\
 	last		\
 	lastcomm	\
-	latencytop	\
 	ldap		\
 	ldapcachemgr	\
 	lgrpinfo	\
@@ -245,7 +244,6 @@ COMMON_SUBDIRS=		\
 	look		\
 	ls		\
 	luxadm		\
-	lvm		\
 	mach		\
 	machid		\
 	mail		\
@@ -310,7 +308,6 @@ COMMON_SUBDIRS=		\
 	plockstat	\
 	pr		\
 	prctl		\
-	print		\
 	printf		\
 	priocntl	\
 	profiles	\
@@ -328,7 +325,6 @@ COMMON_SUBDIRS=		\
 	pwck		\
 	pwconv		\
 	pwd		\
-	pyzfs		\
 	raidctl		\
 	ramdiskadm	\
 	rcap		\
@@ -369,7 +365,6 @@ COMMON_SUBDIRS=		\
 	sh		\
 	shcomp		\
 	smbios		\
-	smbsrv		\
 	smserverd	\
 	soelim		\
 	sort		\
@@ -509,11 +504,10 @@ sparc_SUBDIRS=		\
 	vntsd
 
 #
-# Commands that are messaged.  Note that 'lp' and 'man' come first
-# (see previous comment about 'lp' and 'man').
+# Commands that are messaged.  Note that 'man' comes first
+# (see previous comment about 'man').
 #
 MSGSUBDIRS=		\
-	lp		\
 	man		\
 	abi		\
 	acctadm		\
@@ -627,7 +621,6 @@ MSGSUBDIRS=		\
 	logins		\
 	ls		\
 	luxadm		\
-	lvm		\
 	mailx		\
 	mesg		\
 	mkdir		\
@@ -656,7 +649,6 @@ MSGSUBDIRS=		\
 	power		\
 	pr		\
 	praudit		\
-	print		\
 	profiles	\
 	projadd		\
 	projects	\
@@ -667,7 +659,6 @@ MSGSUBDIRS=		\
 	ptools		\
 	pwconv		\
 	pwd		\
-	pyzfs		\
 	raidctl		\
 	ramdiskadm	\
 	rcap		\
@@ -691,7 +682,6 @@ MSGSUBDIRS=		\
 	sgs		\
 	sh		\
 	shcomp		\
-	smbsrv		\
 	sort		\
 	split		\
 	srptadm		\
@@ -854,7 +844,6 @@ _dc: $(DCSUBDIRS)
 fs.d: fstyp
 ksh:	shcomp isaexec
 mdb:	terminfo
-print:	lp
 
 $(FIRST_SUBDIRS) $(BWOSDIRS) $(SUBDIRS) $(AUDITSUBDIRS): FRC
 	@if [ -f $@/Makefile  ]; then \

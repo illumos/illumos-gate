@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 #ifndef	_LIBIPMI_H
@@ -32,8 +33,8 @@
 
 /*
  * Private interfaces for communicating with attached services over IPMI.  This
- * library is designed for system software communicating with Sun-supported
- * service processors over /dev/bmc.  It is not a generic IPMI library.
+ * library is designed for system software communicating with Illumos-supported
+ * service processors over /dev/ipmi.  It is not a generic IPMI library.
  *
  * Documentation references refer to "Intelligent Platform Management Interface
  * Specification Second Generation v2.0", document revision 1.0 with Februrary
@@ -66,10 +67,10 @@ typedef struct ipmi_handle ipmi_handle_t;
 
 typedef enum {
 	EIPMI_NOMEM = EIPMI_BASE,	/* memory allocation failure */
-	EIPMI_BMC_OPEN_FAILED,		/* failed to open /dev/bmc */
-	EIPMI_BMC_PUTMSG,		/* failed to send message to /dev/bmc */
-	EIPMI_BMC_GETMSG,	/* failed to read response from /dev/bmc */
-	EIPMI_BMC_RESPONSE,		/* response from /dev/bmc failed */
+	EIPMI_BMC_OPEN_FAILED,		/* failed to open /dev/ipmi */
+	EIPMI_BMC_PUTMSG,	/* failed to send message to /dev/ipmi */
+	EIPMI_BMC_GETMSG,	/* failed to read response from /dev/ipmi */
+	EIPMI_BMC_RESPONSE,		/* response from /dev/ipmi failed */
 	EIPMI_INVALID_COMMAND,		/* invalid command */
 	EIPMI_COMMAND_TIMEOUT,		/* command timeout */
 	EIPMI_DATA_LENGTH_EXCEEDED,	/* maximum data length exceeded */

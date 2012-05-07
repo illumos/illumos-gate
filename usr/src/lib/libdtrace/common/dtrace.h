@@ -81,6 +81,7 @@ extern const char *dtrace_subrstr(dtrace_hdl_t *, int);
 
 extern int dtrace_setopt(dtrace_hdl_t *, const char *, const char *);
 extern int dtrace_getopt(dtrace_hdl_t *, const char *, dtrace_optval_t *);
+extern int dtrace_setopts(dtrace_hdl_t *);
 
 extern void dtrace_update(dtrace_hdl_t *);
 extern int dtrace_ctlfd(dtrace_hdl_t *);

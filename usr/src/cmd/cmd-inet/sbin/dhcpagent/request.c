@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2011 Joyent, Inc.  All rights reserved.
  *
  * REQUESTING state of the client state machine.
  */
@@ -38,6 +39,7 @@
 #include <dhcp_hostconf.h>
 #include <dhcpagent_util.h>
 #include <dhcpmsg.h>
+#include <strings.h>
 
 #include "states.h"
 #include "util.h"
@@ -641,8 +643,24 @@ accept_v4_acknak(dhcp_smach_t *dsmp, PKT_LIST *plp)
 	stop_pkt_retransmission(dsmp);
 
 	if (*plp->opts[CD_DHCP_TYPE]->value == NAK) {
-		dhcpmsg(MSG_WARNING, "accept_v4_acknak: NAK on interface %s",
-		    dsmp->dsm_name);
+		char saddr[18];
+
+		saddr[0] = '\0';
+		if (plp->opts[CD_SERVER_ID] != NULL &&
+		    plp->opts[CD_SERVER_ID]->len == sizeof (struct in_addr)) {
+			struct in_addr	t_server;
+
+			bcopy(plp->opts[CD_SERVER_ID]->value, &t_server,
+			    plp->opts[CD_SERVER_ID]->len);
+			(void) strlcpy(saddr, inet_ntoa(t_server),
+			    sizeof (saddr));
+		}
+
+		dhcpmsg(MSG_WARNING, "accept_v4_acknak: NAK on interface %s "
+		    "from %s %s",
+		    dsmp->dsm_name,
+		    inet_ntoa(plp->pktfrom.v4.sin_addr), saddr);
+
 		dsmp->dsm_bad_offers++;
 		free_pkt_entry(plp);
 		dhcp_restart(dsmp);

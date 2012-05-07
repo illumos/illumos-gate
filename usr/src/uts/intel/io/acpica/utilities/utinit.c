@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2012, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -58,30 +58,39 @@
 static void AcpiUtTerminate (
     void);
 
+#if (!ACPI_REDUCED_HARDWARE)
 
+static void
+AcpiUtFreeGpeLists (
+    void);
+
+#else
+
+#define AcpiUtFreeGpeLists()
+#endif /* !ACPI_REDUCED_HARDWARE */
+
+
+#if (!ACPI_REDUCED_HARDWARE)
 /******************************************************************************
  *
- * FUNCTION:    AcpiUtTerminate
+ * FUNCTION:    AcpiUtFreeGpeLists
  *
  * PARAMETERS:  none
  *
  * RETURN:      none
  *
- * DESCRIPTION: Free global memory
+ * DESCRIPTION: Free global GPE lists
  *
  ******************************************************************************/
 
 static void
-AcpiUtTerminate (
+AcpiUtFreeGpeLists (
     void)
 {
     ACPI_GPE_BLOCK_INFO     *GpeBlock;
     ACPI_GPE_BLOCK_INFO     *NextGpeBlock;
     ACPI_GPE_XRUPT_INFO     *GpeXruptInfo;
     ACPI_GPE_XRUPT_INFO     *NextGpeXruptInfo;
-
-
-    ACPI_FUNCTION_TRACE (UtTerminate);
 
 
     /* Free global GPE blocks and related info structures */
@@ -103,7 +112,30 @@ AcpiUtTerminate (
         ACPI_FREE (GpeXruptInfo);
         GpeXruptInfo = NextGpeXruptInfo;
     }
+}
+#endif /* !ACPI_REDUCED_HARDWARE */
 
+
+/******************************************************************************
+ *
+ * FUNCTION:    AcpiUtTerminate
+ *
+ * PARAMETERS:  none
+ *
+ * RETURN:      none
+ *
+ * DESCRIPTION: Free global memory
+ *
+ ******************************************************************************/
+
+static void
+AcpiUtTerminate (
+    void)
+{
+    ACPI_FUNCTION_TRACE (UtTerminate);
+
+    AcpiUtFreeGpeLists ();
+    AcpiUtDeleteAddressLists ();
     return_VOID;
 }
 

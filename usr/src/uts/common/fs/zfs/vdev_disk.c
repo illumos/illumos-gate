@@ -20,9 +20,11 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
+#include <sys/zfs_zone.h>
 #include <sys/spa_impl.h>
 #include <sys/refcount.h>
 #include <sys/vdev_disk.h>
@@ -325,8 +327,18 @@ vdev_disk_close(vdev_t *vd)
 }
 
 int
-vdev_disk_physio(ldi_handle_t vd_lh, caddr_t data, size_t size,
-    uint64_t offset, int flags)
+vdev_disk_physio(vdev_t *vd, caddr_t data,
+    size_t size, uint64_t offset, int flags)
+{
+	vdev_disk_t *dvd = vd->vdev_tsd;
+
+	ASSERT(vd->vdev_ops == &vdev_disk_ops);
+	return (vdev_disk_ldi_physio(dvd->vd_lh, data, size, offset, flags));
+}
+
+int
+vdev_disk_ldi_physio(ldi_handle_t vd_lh, caddr_t data,
+    size_t size, uint64_t offset, int flags)
 {
 	buf_t *bp;
 	int error = 0;
@@ -479,6 +491,8 @@ vdev_disk_io_start(zio_t *zio)
 	bp->b_bufsize = zio->io_size;
 	bp->b_iodone = (int (*)())vdev_disk_io_intr;
 
+	zfs_zone_zio_start(zio);
+
 	/* ldi_strategy() will return non-zero only on programming errors */
 	VERIFY(ldi_strategy(dvd->vd_lh, bp) == 0);
 
@@ -489,6 +503,8 @@ static void
 vdev_disk_io_done(zio_t *zio)
 {
 	vdev_t *vd = zio->io_vd;
+
+	zfs_zone_zio_done(zio);
 
 	/*
 	 * If the device returned EIO, then attempt a DKIOCSTATE ioctl to see if
@@ -574,7 +590,7 @@ vdev_disk_read_rootlabel(char *devpath, char *devid, nvlist_t **config)
 
 		/* read vdev label */
 		offset = vdev_label_offset(size, l, 0);
-		if (vdev_disk_physio(vd_lh, (caddr_t)label,
+		if (vdev_disk_ldi_physio(vd_lh, (caddr_t)label,
 		    VDEV_SKIP_SIZE + VDEV_PHYS_SIZE, offset, B_READ) != 0)
 			continue;
 

@@ -98,10 +98,13 @@ STRIP_COMMENTS=	$(INTERNAL_RELEASE_BUILD)
 TONICBUILD=     $(POUND_SIGN)
 $(TONICBUILD)CLOSEDROOT= $(ROOT)-closed
 
-
 # set __GNUC= in the environment to build 32-bit with the gcc compiler.
 # The default is to use the Sun Studio compiler for all processor types.
 __GNUC=		$(POUND_SIGN)
+
+# __SUNC is the default, Sun C compiler, set to $(POUND_SIGN) if __GNUC is
+# primary to facilitate conditional make rules.
+$(__GNUC)__SUNC=	$(POUND_SIGN)
 
 # set __GNUC64= in the environment to build 64-bit with the gcc compiler.
 # Inherit the __GNUC value by default, and if that is set to $(POUND_SIGN)
@@ -112,6 +115,13 @@ __GNUC64=	$(__GNUC)
 # the Sun Studio compiler. This will cause command line options specific
 # to the 'next' version of the Sun Studio compiler to be used.
 __SSNEXT=	$(POUND_SIGN)
+
+# set __GNUC4 in the environment to build with GCC 4.4 These two variables are
+# operative even when __GNUC is not, as they affect flags that will be used by
+# the shadow compile.
+__GNUC3=
+__GNUC4=		$(POUND_SIGN)
+$(__GNUC4)__GNUC3=	$(POUND_SIGN)
 
 # CLOSED is the root of the tree that contains source which isn't released
 # as open source
@@ -129,6 +139,11 @@ SFW_ROOT=	/usr/sfw
 SFWINCDIR=	$(SFW_ROOT)/include
 SFWLIBDIR=	$(SFW_ROOT)/lib
 SFWLIBDIR64=	$(SFW_ROOT)/lib/$(MACH64)
+
+$(__GNUC3)GCC_ROOT=	$(SFW_ROOT)
+$(__GNUC4)GCC_ROOT=	/opt/gcc/4.4.4
+GCCLIBDIR=	$(GCC_ROOT)/lib
+GCCLIBDIR64=	$(GCC_ROOT)/lib/$(MACH64)
 
 RPCGEN=		/usr/bin/rpcgen
 STABS=		$(ONBLD_TOOLS)/bin/$(MACH)/stabs
@@ -169,6 +184,7 @@ JAR=		$(JAVA_ROOT)/bin/jar
 CTFCONVERT=	$(ONBLD_TOOLS)/bin/$(MACH)/ctfconvert
 CTFMERGE=	$(ONBLD_TOOLS)/bin/$(MACH)/ctfmerge
 CTFSTABS=	$(ONBLD_TOOLS)/bin/$(MACH)/ctfstabs
+CTFSTRIP=	$(ONBLD_TOOLS)/bin/$(MACH)/ctfstrip
 NDRGEN=		$(ONBLD_TOOLS)/bin/$(MACH)/ndrgen
 GENOFFSETS=	$(ONBLD_TOOLS)/bin/genoffsets
 CTFCVTPTBL=	$(ONBLD_TOOLS)/bin/ctfcvtptbl
@@ -375,6 +391,10 @@ CERRWARN = -errtags=yes -errwarn=%all
 CERRWARN += -erroff=E_EMPTY_TRANSLATION_UNIT
 CERRWARN += -erroff=E_STATEMENT_NOT_REACHED
 
+# Normally cw(1) would translate -v into a set of options including these
+# but as they're GCC 4.x specific, we can't do that
+$(__GNUC4)CERRWARN +=	-_gcc=-Wno-address
+
 #
 # turn warnings into errors (C++)
 CCERRWARN=		-xwe
@@ -404,8 +424,16 @@ sparcv9_COPTFLAG=	-xO3
 i386_COPTFLAG=		-O
 amd64_COPTFLAG=		-xO3
 
+# This would normally be added by cw(1) but cannot be while we want to support
+# Both GCC 3.x and GCC 4.x
+$(__GNUC4)$(MACH)_COPTFLAG += -_gcc=-fno-inline-small-functions \
+	-_gcc=-fno-inline-functions-called-once
+$(__GNUC4)$(MACH64)_COPTFLAG += -_gcc=-fno-inline-small-functions \
+	-_gcc=-fno-inline-functions-called-once
+
 COPTFLAG= $($(MACH)_COPTFLAG)
 COPTFLAG64= $($(MACH64)_COPTFLAG)
+
 
 # When -g is used, the compiler globalizes static objects
 # (gives them a unique prefix). Disable that.
@@ -637,7 +665,7 @@ COMPILE.java=	$(JAVAC) $(JAVAFLAGS) -classpath $(CLASSPATH)
 # Link time macros
 #
 CCNEEDED		= -lC
-$(__GNUC)CCNEEDED	= -L$(SFWLIBDIR) -R$(SFWLIBDIR) -lstdc++ -lgcc_s
+$(__GNUC)CCNEEDED	= -L$(GCCLIBDIR) -R$(GCCLIBDIR) -lstdc++ -lgcc_s
 
 LINK.c=		$(CC) $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 LINK64.c=	$(CC) $(CFLAGS64) $(CPPFLAGS) $(LDFLAGS)
@@ -727,7 +755,6 @@ sparcv9_AS=		/usr/ccs/bin/as -xregsym=no
 sparcv9_LD=		/usr/ccs/bin/ld
 sparcv9_LINT=		$(SPRO_ROOT)/sunstudio12.1/bin/lint
 
-# We compile 32-bit objects with cc by default
 i386_CC=		$(ONBLD_TOOLS)/bin/$(MACH)/cw -_cc
 $(__GNUC)i386_CC=	$(ONBLD_TOOLS)/bin/$(MACH)/cw -_gcc
 i386_CCC=		$(ONBLD_TOOLS)/bin/$(MACH)/cw -_CC
@@ -738,7 +765,6 @@ $(__GNUC)i386_AS=	$(ONBLD_TOOLS)/bin/$(MACH)/aw
 i386_LD=		/usr/ccs/bin/ld
 i386_LINT=		$(SPRO_ROOT)/sunstudio12.1/bin/lint
 
-# We compile 64-bit objects with gcc
 amd64_CC=		$(ONBLD_TOOLS)/bin/$(MACH)/cw -_cc
 $(__GNUC64)amd64_CC=	$(ONBLD_TOOLS)/bin/$(MACH)/cw -_gcc
 amd64_CCC=		$(ONBLD_TOOLS)/bin/$(MACH)/cw -_CC

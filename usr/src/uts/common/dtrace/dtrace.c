@@ -745,7 +745,7 @@ static int
 dtrace_vcanload(void *src, dtrace_diftype_t *type, dtrace_mstate_t *mstate,
     dtrace_vstate_t *vstate)
 {
-	size_t sz;
+	size_t sz, strsize;
 	ASSERT(type->dtdt_flags & DIF_TF_BYREF);
 
 	/*
@@ -755,11 +755,24 @@ dtrace_vcanload(void *src, dtrace_diftype_t *type, dtrace_mstate_t *mstate,
 	if ((mstate->dtms_access & DTRACE_ACCESS_KERNEL) != 0)
 		return (1);
 
-	if (type->dtdt_kind == DIF_TYPE_STRING)
-		sz = dtrace_strlen(src,
-		    vstate->dtvs_state->dts_options[DTRACEOPT_STRSIZE]) + 1;
-	else
+	if (type->dtdt_kind == DIF_TYPE_STRING) {
+		dtrace_state_t *state = vstate->dtvs_state;
+
+		if (state != NULL) {
+			strsize = state->dts_options[DTRACEOPT_STRSIZE];
+		} else {
+			/*
+			 * In helper context, we have a NULL state; fall back
+			 * to using the system-wide default for the string size
+			 * in this case.
+			 */
+			strsize = dtrace_strsize_default;
+		}
+
+		sz = dtrace_strlen(src, strsize) + 1;
+	} else {
 		sz = type->dtdt_size;
+	}
 
 	return (dtrace_canload((uintptr_t)src, sz, mstate, vstate));
 }
@@ -6679,7 +6692,7 @@ dtrace_cred2priv(cred_t *cr, uint32_t *privp, uid_t *uidp, zoneid_t *zoneidp)
 		priv = DTRACE_PRIV_ALL;
 	} else {
 		*uidp = crgetuid(cr);
-		*zoneidp = crgetzoneid(cr);
+		*zoneidp = crgetzonedid(cr);
 
 		priv = 0;
 		if (PRIV_POLICY_ONLY(cr, PRIV_DTRACE_KERNEL, B_FALSE))
@@ -7175,7 +7188,7 @@ dtrace_register(const char *name, const dtrace_pattr_t *pap, uint32_t priv,
 	provider->dtpv_priv.dtpp_flags = priv;
 	if (cr != NULL) {
 		provider->dtpv_priv.dtpp_uid = crgetuid(cr);
-		provider->dtpv_priv.dtpp_zoneid = crgetzoneid(cr);
+		provider->dtpv_priv.dtpp_zoneid = crgetzonedid(cr);
 	}
 	provider->dtpv_pops = *pops;
 
@@ -7786,6 +7799,7 @@ dtrace_probe_enable(const dtrace_probedesc_t *desc, dtrace_enabling_t *enab)
 	uint32_t priv;
 	uid_t uid;
 	zoneid_t zoneid;
+	dtrace_state_t *state = enab->dten_vstate->dtvs_state;
 
 	ASSERT(MUTEX_HELD(&dtrace_lock));
 	dtrace_ecb_create_cache = NULL;
@@ -7800,8 +7814,22 @@ dtrace_probe_enable(const dtrace_probedesc_t *desc, dtrace_enabling_t *enab)
 	}
 
 	dtrace_probekey(desc, &pkey);
-	dtrace_cred2priv(enab->dten_vstate->dtvs_state->dts_cred.dcr_cred,
-	    &priv, &uid, &zoneid);
+	dtrace_cred2priv(state->dts_cred.dcr_cred, &priv, &uid, &zoneid);
+
+	if ((priv & DTRACE_PRIV_ZONEOWNER) &&
+	    state->dts_options[DTRACEOPT_ZONE] != DTRACEOPT_UNSET) {
+		/*
+		 * If we have the privilege of instrumenting all zones but we
+		 * have been told to instrument but one, we will spoof this up
+		 * depriving ourselves of DTRACE_PRIV_ZONEOWNER for purposes
+		 * of dtrace_match().  (Note that DTRACEOPT_ZONE is not for
+		 * security but rather for performance: it allows the global
+		 * zone to instrument USDT probes in a local zone without
+		 * requiring all zones to be instrumented.)
+		 */
+		priv &= ~DTRACE_PRIV_ZONEOWNER;
+		zoneid = state->dts_options[DTRACEOPT_ZONE];
+	}
 
 	return (dtrace_match(&pkey, priv, uid, zoneid, dtrace_ecb_create_enable,
 	    enab));

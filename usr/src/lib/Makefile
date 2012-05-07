@@ -21,6 +21,7 @@
 
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012, Joyent, Inc. All rights reserved.
 
 include ../Makefile.master
 
@@ -83,6 +84,8 @@ SUBDIRS += \
 	librt			\
 	libadm			\
 	libctf			\
+	libbrand	.WAIT   \
+	libzonecfg	.WAIT	\
 	libdtrace		\
 	libdtrace_jni		\
 	libcurses		\
@@ -157,7 +160,8 @@ SUBDIRS += \
 	libdscfg	\
 	librdc		\
 	libinstzones	\
-	libpkg
+	libpkg		\
+	libpcidb
 
 SUBDIRS += \
 	passwdutil	\
@@ -185,7 +189,6 @@ $(CLOSED_BUILD)SUBDIRS += \
 	$(CLOSED)/lib/libike
 SUBDIRS += \
 	nsswitch	\
-	print		\
 	libuutil	\
 	libscf		\
 	libinetsvc	\
@@ -203,10 +206,10 @@ SUBDIRS += \
 	libwrap		\
 	libxcurses	\
 	libxcurses2	\
-	libbrand	.WAIT   \
-	libzonecfg	\
+	libzdoor	\
 	libzoneinfo	\
 	libzonestat	\
+	libsmartsshd	\
 	libtsnet	\
 	libtsol		\
 	gss_mechs/mech_spnego	\
@@ -221,7 +224,6 @@ SUBDIRS += \
 	raidcfg_plugins	\
 	cfgadm_plugins	\
 	libmail		\
-	lvm		\
 	libsmedia	\
 	libipp		\
 	libdiskmgt	\
@@ -237,10 +239,7 @@ SUBDIRS += \
 	libzpool	\
 	libzfs		\
 	libbe 		\
-	pylibbe 	\
 	libzfs_jni	\
-	pyzfs		\
-	pysolaris	\
 	libmapid	\
 	brand		\
 	policykit	\
@@ -300,9 +299,6 @@ fm:			\
 #
 NOWAIT_SUBDIRS= $(SUBDIRS:.WAIT=)
 
-DCSUBDIRS =		\
-	lvm
-
 MSGSUBDIRS=		\
 	abi		\
 	auditd_plugins	\
@@ -358,12 +354,11 @@ MSGSUBDIRS=		\
 	libwanbootutil	\
 	libzfs		\
 	libzonecfg	\
-	lvm		\
+	libzdoor	\
+	libsmartsshd	\
 	madv		\
 	mpss		\
 	pam_modules	\
-	pyzfs		\
-	pysolaris	\
 	rpcsec_gss	\
 	libreparse
 MSGSUBDIRS += \
@@ -430,6 +425,7 @@ HDRSUBDIRS=		\
 	libnsl		\
 	libnwam		\
 	libpam		\
+	libpcidb	\
 	libpctx		\
 	libpicl		\
 	libpicltree	\
@@ -480,7 +476,6 @@ HDRSUBDIRS=		\
 	libzonestat	\
 	hal		\
 	policykit	\
-	lvm		\
 	pkcs11		\
 	passwdutil	\
 	../cmd/sendmail/libmilter	\
@@ -621,6 +616,8 @@ libpool:	libnvpair libexacct
 libpp:		libast
 libzonecfg:	libc libsocket libnsl libuuid libnvpair libsysevent libsec \
 		libbrand libpool libscf
+libzdoor:	libc libzonecfg libcontract
+libsmartsshd:	libc libcontract
 libproc:	../cmd/sgs/librtld_db ../cmd/sgs/libelf libctf
 libproject:	libpool libproc libsecdb
 libtermcap:	libcurses
@@ -635,8 +632,6 @@ libinetsvc:	libscf
 librestart:	libuutil libscf
 ../cmd/sgs/libdl:	../cmd/sgs/libconv
 ../cmd/sgs/libelf:	../cmd/sgs/libconv
-pkcs11:		libcryptoutil
-print:		libldap5
 udapl/udapl_tavor:	udapl/libdat
 libzfs:		libdevid libgen libnvpair libuutil \
 		libadm libavl libefi libidmap libmd
@@ -660,9 +655,6 @@ sun_fc:		libdevinfo libsysevent libnvpair
 libsun_ima:	libdevinfo libsysevent libnsl
 sun_sas:	libdevinfo libsysevent libnvpair libkstat libdevid
 libgrubmgmt:	libdevinfo libzfs libfstyp
-pylibbe: 	libbe libzfs
-pyzfs:		libnvpair libzfs
-pysolaris:	libsec libidmap
 libreparse:	libnvpair
 libhotplug:	libnvpair
 cfgadm_plugins:	libhotplug

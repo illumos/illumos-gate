@@ -2792,7 +2792,11 @@ lgrp_plat_process_sli(uint32_t domain_id, uchar_t *sli_info,
 /*
  * Read ACPI System Resource Affinity Table (SRAT) to determine which CPUs
  * and memory are local to each other in the same NUMA node and return number
- * of nodes
+ * of nodes.
+ *
+ * The SRAT table pointer is populated during bootup by
+ * build_firmware_properties() in fakebop.c. Several motherboard and BIOS
+ * manufacturers are guilty of not having a SRAT table.
  */
 static int
 lgrp_plat_process_srat(struct srat *tp, struct msct *mp,
@@ -2810,8 +2814,14 @@ lgrp_plat_process_srat(struct srat *tp, struct msct *mp,
 	/*
 	 * Nothing to do when no SRAT or disabled
 	 */
-	if (tp == NULL || !lgrp_plat_srat_enable)
+	if (!lgrp_plat_srat_enable)
 		return (-1);
+
+	if (tp == NULL) {
+		cmn_err(CE_WARN, "Couldn't read ACPI SRAT table from BIOS. "
+		   "lgrp support will be limited to one group.\n");
+		return (-1);
+	}
 
 	/*
 	 * Try to get domain information from MSCT table.

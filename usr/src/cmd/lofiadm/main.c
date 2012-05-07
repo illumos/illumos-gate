@@ -340,7 +340,8 @@ out:
  * DO NOT use this function if the filename is actually the device name.
  */
 static int
-lofi_map_file(int lfd, struct lofi_ioctl li, const char *filename)
+lofi_map_file(int lfd, struct lofi_ioctl li, const char *filename,
+    boolean_t no_devlink_flag)
 {
 	int	minor;
 
@@ -353,7 +354,8 @@ lofi_map_file(int lfd, struct lofi_ioctl li, const char *filename)
 			    "unsupported"));
 		die(gettext("could not map file %s"), filename);
 	}
-	wait_until_dev_complete(minor);
+	if (!no_devlink_flag)
+		wait_until_dev_complete(minor);
 	return (minor);
 }
 
@@ -363,7 +365,8 @@ lofi_map_file(int lfd, struct lofi_ioctl li, const char *filename)
  */
 static void
 add_mapping(int lfd, const char *devicename, const char *filename,
-    mech_alias_t *cipher, const char *rkey, size_t rksz)
+    mech_alias_t *cipher, const char *rkey, size_t rksz,
+    boolean_t no_devlink_flag)
 {
 	struct lofi_ioctl li;
 
@@ -397,7 +400,7 @@ add_mapping(int lfd, const char *devicename, const char *filename,
 		int	minor;
 
 		/* pick one via the driver */
-		minor = lofi_map_file(lfd, li, filename);
+		minor = lofi_map_file(lfd, li, filename, no_devlink_flag);
 		/* if mapping succeeds, print the one picked */
 		(void) printf("/dev/%s/%d\n", LOFI_BLOCK_NAME, minor);
 		return;
@@ -418,7 +421,8 @@ add_mapping(int lfd, const char *devicename, const char *filename,
 		die(gettext("could not map file %s to %s"), filename,
 		    devicename);
 	}
-	wait_until_dev_complete(li.li_minor);
+	if (!no_devlink_flag)
+		wait_until_dev_complete(li.li_minor);
 }
 
 /*
@@ -1286,7 +1290,7 @@ lofi_uncompress(int lfd, const char *filename)
 	if (statbuf.st_size == 0)
 		return;
 
-	minor = lofi_map_file(lfd, li, filename);
+	minor = lofi_map_file(lfd, li, filename, B_FALSE);
 	(void) snprintf(devicename, sizeof (devicename), "/dev/%s/%d",
 	    LOFI_BLOCK_NAME, minor);
 
@@ -1791,6 +1795,7 @@ main(int argc, char *argv[])
 	boolean_t ephflag = B_FALSE;
 	boolean_t compressflag = B_FALSE;
 	boolean_t uncompressflag = B_FALSE;
+	boolean_t no_devlink_flag = B_FALSE;
 	/* the next two work together for -c, -k, -T, -e options only */
 	boolean_t need_crypto = B_FALSE;	/* if any -c, -k, -T, -e */
 	boolean_t cipher_only = B_TRUE;		/* if -c only */
@@ -1806,7 +1811,7 @@ main(int argc, char *argv[])
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 
-	while ((c = getopt(argc, argv, "a:c:Cd:efk:o:s:T:U")) != EOF) {
+	while ((c = getopt(argc, argv, "a:c:Cd:efk:o:s:T:UX")) != EOF) {
 		switch (c) {
 		case 'a':
 			addflag = B_TRUE;
@@ -1880,6 +1885,13 @@ main(int argc, char *argv[])
 			break;
 		case 'U':
 			uncompressflag = B_TRUE;
+			break;
+		case 'X':
+			/*
+			 * Private flag to skip the wait for the /dev links to
+			 * be created.
+			 */
+			no_devlink_flag = B_TRUE;
 			break;
 		case '?':
 		default:
@@ -2007,7 +2019,8 @@ main(int argc, char *argv[])
 	 * Now to the real work.
 	 */
 	if (addflag)
-		add_mapping(lfd, devicename, filename, cipher, rkey, rksz);
+		add_mapping(lfd, devicename, filename, cipher, rkey, rksz,
+		    no_devlink_flag);
 	else if (compressflag)
 		lofi_compress(&lfd, filename, compress_index, segsize);
 	else if (uncompressflag)

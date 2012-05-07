@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -145,20 +146,29 @@ out:
 	scf_handle_destroy(h);
 }
 
+static int
+set_zone_cap(char *zonename, uint64_t mcap)
+{
+	char cmd[128 + ZONENAME_MAX];
+
+	(void) snprintf(cmd, sizeof (cmd), "/usr/bin/prctl -r "
+	    "-n zone.max-physical-memory -v %llu -i zone %s", mcap, zonename);
+	return (system(cmd));
+}
+
 /*
  * Update the in-kernel memory cap for the specified zone.
  */
 static int
 update_zone_mcap(char *zonename, char *maxrss)
 {
-	zoneid_t zone_id;
 	uint64_t num;
 
 	if (getzoneid() != GLOBAL_ZONEID || zonecfg_in_alt_root())
 		return (E_SUCCESS);
 
 	/* get the running zone from the kernel */
-	if ((zone_id = getzoneidbyname(zonename)) == -1) {
+	if (getzoneidbyname(zonename) == -1) {
 		(void) fprintf(stderr, gettext("zone '%s' must be running\n"),
 		    zonename);
 		return (E_ERROR);
@@ -169,7 +179,7 @@ update_zone_mcap(char *zonename, char *maxrss)
 		return (E_ERROR);
 	}
 
-	if (zone_setattr(zone_id, ZONE_ATTR_PHYS_MCAP, &num, 0) == -1) {
+	if (set_zone_cap(zonename, num) == -1) {
 		(void) fprintf(stderr, gettext("could not set memory "
 		    "cap for zone '%s'\n"), zonename);
 		return (E_ERROR);

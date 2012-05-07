@@ -22,6 +22,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012 Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -76,6 +78,7 @@
 #include <mdb/mdb_string.h>
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_frame.h>
+#include <mdb/mdb_tab.h>
 #include <mdb/mdb.h>
 
 #ifdef ERR
@@ -174,6 +177,7 @@ typedef void (*putp_t)(struct termio_data *, const char *, uint_t);
 #define	TIO_TTYWARN	0x20		/* Warnings about tty issued */
 #define	TIO_CAPWARN	0x40		/* Warnings about terminfo issued */
 #define	TIO_XTERM	0x80		/* Terminal is xterm compatible */
+#define	TIO_TAB		0x100		/* Tab completion mode */
 
 static const mdb_bitmask_t tio_flag_masks[] = {
 	{ "FINDHIST", TIO_FINDHIST, TIO_FINDHIST },
@@ -184,6 +188,7 @@ static const mdb_bitmask_t tio_flag_masks[] = {
 	{ "TTYWARN", TIO_TTYWARN, TIO_TTYWARN },
 	{ "CAPWARN", TIO_CAPWARN, TIO_CAPWARN },
 	{ "XTERM", TIO_XTERM, TIO_XTERM },
+	{ "TAB", TIO_TAB, TIO_TAB},
 	{ NULL, 0, 0 }
 };
 
@@ -256,6 +261,7 @@ static void termio_clear(termio_data_t *);
 static void termio_redraw(termio_data_t *);
 static void termio_prompt(termio_data_t *);
 
+static const char *termio_tab(termio_data_t *, int);
 static const char *termio_insert(termio_data_t *, int);
 static const char *termio_accept(termio_data_t *, int);
 static const char *termio_backspace(termio_data_t *, int);
@@ -398,7 +404,10 @@ termio_read(mdb_io_t *io, void *buf, size_t nbytes)
 		goto out;
 	}
 
-	termio_prompt(td);
+	if (td->tio_flags & TIO_TAB)
+		termio_redraw(td);
+	else
+		termio_prompt(td);
 
 	/*
 	 * We need to redraw the entire command-line and restart our read loop
@@ -427,6 +436,13 @@ termio_read(mdb_io_t *io, void *buf, size_t nbytes)
 		mdb_iob_resize(td->tio_link, td->tio_rows, td->tio_cols);
 
 	td->tio_active = TRUE;
+
+	/*
+	 * We may have had some error while in tab completion mode which sent us
+	 * longjmping all over the place. If that's the case, come back here and
+	 * make sure the flag is off.
+	 */
+	td->tio_flags &= ~TIO_TAB;
 
 	do {
 char_loop:
@@ -1488,6 +1504,11 @@ mdb_termio_create(const char *name, mdb_io_t *rio, mdb_io_t *wio)
 	td->tio_keymap['['] = termio_accel;
 	td->tio_keymap[']'] = termio_accel;
 
+	/*
+	 * Grab tabs
+	 */
+	td->tio_keymap['\t'] = termio_tab;
+
 	td->tio_x = 0;
 	td->tio_y = 0;
 	td->tio_max_x = 0;
@@ -1586,6 +1607,66 @@ termio_backspace(termio_data_t *td, int c)
 		else
 			termio_redraw(td);
 	}
+
+	return (NULL);
+}
+
+/*
+ * This function may end up calling termio_read recursively as part of invoking
+ * the mdb pager. To work around this fact, we need to go through and make sure
+ * that we change the underlying terminal settings before and after this
+ * function call. If we don't do this, we invoke the pager, and don't abort
+ * (which will longjmp us elsewhere) we're going to return to the read loop with
+ * the wrong termio settings.
+ *
+ * Furthermore, because of the fact that we're being invoked in a user context
+ * that allows us to be interrupted, we need to actually allocate the memory
+ * that we're using with GC so that it gets cleaned up in case of the pager
+ * resetting us and never reaching the end.
+ */
+/*ARGSUSED*/
+static const char *
+termio_tab(termio_data_t *td, int c)
+{
+	char *buf;
+	const char *result;
+	int nres;
+	mdb_tab_cookie_t *mtp;
+
+	if (termio_ctl(td->tio_io, TCSETSW, &td->tio_dtios) == -1)
+		warn("failed to restore terminal attributes");
+
+	buf = mdb_alloc(td->tio_cmdbuf.cmd_bufidx + 1, UM_SLEEP | UM_GC);
+	(void) strncpy(buf, td->tio_cmdbuf.cmd_buf, td->tio_cmdbuf.cmd_bufidx);
+	buf[td->tio_cmdbuf.cmd_bufidx] = '\0';
+	buf = strndup(td->tio_cmdbuf.cmd_buf, td->tio_cmdbuf.cmd_bufidx);
+	td->tio_flags |= TIO_TAB;
+	mtp = mdb_tab_init();
+	nres = mdb_tab_command(mtp, buf);
+
+	if (nres == 0) {
+		result = NULL;
+	} else {
+		result = mdb_tab_match(mtp);
+		if (nres != 1)
+			mdb_tab_print(mtp);
+	}
+
+	if (result != NULL) {
+		int index = 0;
+
+		while (result[index] != '\0') {
+			(void) termio_insert(td, result[index]);
+			index++;
+		}
+	}
+
+	termio_redraw(td);
+	mdb_tab_fini(mtp);
+	td->tio_flags &= ~TIO_TAB;
+	if (termio_ctl(td->tio_io, TCSETSW, &td->tio_rtios) == -1)
+		warn("failed to set terminal attributes");
+
 
 	return (NULL);
 }

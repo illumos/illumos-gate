@@ -1,5 +1,6 @@
 '\" te
 .\" Copyright (c) 2004, 2009 Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright (c) 2011 Joyent, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
@@ -9,17 +10,17 @@ zonecfg \- set up zone configuration
 .SH SYNOPSIS
 .LP
 .nf
-\fBzonecfg\fR \fB-z\fR \fIzonename\fR
+\fBzonecfg\fR {\fB-z\fR \fIzonename\fR | \fB-u\fR \fIuuid\fR}
 .fi
 
 .LP
 .nf
-\fBzonecfg\fR \fB-z\fR \fIzonename\fR \fIsubcommand\fR
+\fBzonecfg\fR {\fB-z\fR \fIzonename\fR | \fB-u\fR \fIuuid\fR} \fIsubcommand\fR
 .fi
 
 .LP
 .nf
-\fBzonecfg\fR \fB-z\fR \fIzonename\fR \fB-f\fR \fIcommand_file\fR
+\fBzonecfg\fR {\fB-z\fR \fIzonename\fR | \fB-u\fR \fIuuid\fR} \fB-f\fR \fIcommand_file\fR
 .fi
 
 .LP
@@ -42,7 +43,8 @@ The following synopsis of the \fBzonecfg\fR command is for interactive usage:
 .sp
 .in +2
 .nf
-zonecfg \fB-z\fR \fIzonename subcommand\fR
+{\fB-z\fR \fIzonename\fR | \fB-u\fR \fIuuid\fR}
+zonecfg {\fB-z\fR \fIzonename | \fB-u\fR \fIuuid} subcommand\fR
 .fi
 .in -2
 .sp
@@ -179,134 +181,6 @@ Network interface.
 Resource control.
 .RE
 
-.SS "Sparse and Whole Root Non-Global Zones"
-.sp
-.LP
-In the administration of zones, it is useful to distinguish between the global
-zone and non-global zones. Within non-global zones, there are two zone root
-file system models: sparse and whole root. The sparse root zone model optimizes
-the sharing of objects. The whole root zone model provides the maximum
-configurability. Note that not all brands support the sparse zone model.
-.SS "Sparse Root Zones"
-.sp
-.LP
-Non-global zones that have \fBinherit-pkg-dir\fR resources are called sparse
-root zones.
-.sp
-.LP
-The sparse root zone model optimizes the sharing of objects in the following
-ways:
-.RS +4
-.TP
-.ie t \(bu
-.el o
-Only a subset of the packages installed in the global zone are installed
-directly into the non-global zone.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-Read-only loopback file systems, identified as \fBinherit-pkg-dir\fR resources,
-are used to gain access to other files.
-.RE
-.sp
-.LP
-In this model, all packages appear to be installed in the non-global zone.
-Packages that do not deliver content into read-only loopback mount file systems
-are fully installed. There is no need to install content delivered into
-read-only loopback mounted file systems since that content is inherited (and
-visible) from the global zone.
-.RS +4
-.TP
-.ie t \(bu
-.el o
-As a general guideline, a zone requires about 100 megabytes of free disk space
-per zone when the global zone has been installed with all of the standard
-Solaris packages.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-By default, any additional packages installed in the global zone also populate
-the non-global zones. The amount of disk space required might be increased
-accordingly, depending on whether the additional packages deliver files that
-reside in the \fBinherit-pkg-dir\fR resource space.
-.RE
-.sp
-.LP
-An additional 40 megabytes of RAM per zone are suggested, but not required on a
-machine with sufficient swap space.
-.sp
-.LP
-A sparse zone inherits the following directories:
-.sp
-.in +2
-.nf
-/lib
-/platform
-/sbin
-/usr
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-Although \fBzonecfg\fR allows you to remove one of these as an inherited
-directory, you should not do so. You should either follow the whole-root model
-or the sparse model; a subset of the sparse model is not tested and you might
-encounter unexpected problems.
-.sp
-.LP
-Adding an additional \fBinherit-pkg-dir\fR directory, such as \fB/opt\fR, to a
-sparse root zone is acceptable.
-.SS "Whole Root Zones"
-.sp
-.LP
-The whole root zone model provides the maximum configurability. All of the
-required and any selected optional Solaris packages are installed into the
-private file systems of the zone. The advantages of this model include the
-capability for global administrators to customize their zones file system
-layout. This would be done, for example, to add arbitrary unbundled or
-third-party packages.
-.sp
-.LP
-The disk requirements for this model are determined by the disk space used by
-the packages currently installed in the global zone.
-.LP
-Note -
-.sp
-.RS 2
-If you create a sparse root zone that contains the following
-\fBinherit-pkg-dir\fR directories, you must remove these directories from the
-non-global zone's configuration before the zone is installed to have a whole
-root zone:
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fB/lib\fR
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fB/platform\fR
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fB/sbin\fR
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fB/usr\fR
-.RE
 .RE
 .SS "Properties"
 .sp
@@ -470,6 +344,27 @@ The following properties are supported:
 .sp
 .ne 2
 .na
+\fB(global)\fR
+.ad
+.sp .6
+.RS 4n
+\fBfs-allowed\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB(global)\fR
+.ad
+.sp .6
+.RS 4n
+\fBzfs-io-priority\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
 \fB\fBfs\fR\fR
 .ad
 .sp .6
@@ -480,21 +375,11 @@ The following properties are supported:
 .sp
 .ne 2
 .na
-\fB\fBinherit-pkg-dir\fR\fR
-.ad
-.sp .6
-.RS 4n
-\fBdir\fR
-.RE
-
-.sp
-.ne 2
-.na
 \fB\fBnet\fR\fR
 .ad
 .sp .6
 .RS 4n
-\fBaddress\fR, \fBphysical\fR, \fBdefrouter\fR
+\fBaddress\fR, \fBallowed-address\fR, \fBdefrouter\fR, \fBglobal-nic\fR, \fBmac-addr\fR, \fBphysical\fR, \fBproperty\fR, \fBvlan-id\fR
 .RE
 
 .sp
@@ -767,7 +652,7 @@ The directory path.
 .sp
 .ne 2
 .na
-\fB\fBnet\fR: address, physical, defrouter\fR
+\fB\fBnet\fR: address, allowed-address, defrouter, global-nic, mac-addr, physical, property, vlan-id\fR
 .ad
 .sp .6
 .RS 4n
@@ -805,6 +690,10 @@ property must be plumbed in the global zone prior to booting the non-global
 zone. However, if the interface is not used by the global zone, it should be
 configured \fBdown\fR in the global zone, and the default router for the
 interface should be specified here.
+.sp
+The global-nic is used for exclusive stack zones which will use a VNIC on-demand.  When the zone boots, a VNIC named using the physical property will be created on the global NIC.  If provided, the mac-addr and vlan-id will be set on this VNIC.
+.sp
+The \fBproperty\fR setting is a resource which can be used to set arbitrary name/value pairs on the network.  These name/value pairs are made available to the zone's brand, which can use them as needed to set up the network interface.
 .sp
 For an exclusive-IP zone, the physical property must be set and the address and
 default router properties cannot be set.
@@ -1014,6 +903,37 @@ control and is related to the \fBzone.cpu-cap\fR resource control. See
 .RE
 
 .sp
+.ne 2
+.mk
+.na
+\fBglobal: \fBfs-allowed\fR\fR
+.ad
+.sp .6
+.RS 4n
+A comma-separated list of additional filesystems that may be mounted within
+the zone; for example "ufs,pcfs". By default, only hsfs(7fs) and network
+filesystems can be mounted.
+
+This property does not apply to filesystems mounted into the zone via "add fs"
+or "add dataset".
+
+WARNING: allowing filesystem mounts other than the default may allow the zone
+administrator to compromise the system with a malicious filesystem image, and
+is not supported.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBglobal: \fBzfs-io-priority\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies a priority for this zone's ZFS I/O. The priority is used by the ZFS I/O scheduler as in input to determine how to schedule I/O across zones. By default all zones have a priority of 1. The value can be increased for zones whose I/O is more critical. This property is the preferred way to set the \fBzone.zfs-io-priority\fR rctl.
+.RE
+
+.sp
 .LP
 The following table summarizes resources, property-names, and types:
 .sp
@@ -1036,14 +956,22 @@ resource          property-name   type
 (global)          max-shm-ids     simple
 (global)          max-shm-memory  simple
 (global)          scheduling-class simple
+(global)          zfs-io-priority simple
 fs                dir             simple
                    special         simple
                    raw             simple
                    type            simple
                    options         list of simple
-inherit-pkg-dir   dir             simple
 net               address         simple
+                   allowed-address simple
+                   defrouter       simple
+                   global-nic      simple
+                   mac-addr        simple
                    physical        simple
+                   property        list of complex
+                    name            simple
+                    value           simple
+                   vlan-id         simple
 device            match           simple
 rctl              name            simple
                    value           list of complex
@@ -1256,6 +1184,17 @@ name \fBglobal\fR and all names beginning with \fBSUNW\fR are reserved and
 cannot be used.
 .RE
 
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-u\fR \fIuuid\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify the uuid of a zone instead of the Zone name.
+.RE
+
 .SH SUBCOMMANDS
 .sp
 .LP
@@ -1346,8 +1285,7 @@ correct to be committed, this operation automatically does a verify.
 .sp
 .ne 2
 .na
-\fB\fBcreate [\fR\fB-F\fR\fB] [\fR \fB-a\fR \fIpath\fR |\fB-b\fR \fB|\fR
-\fB-t\fR \fItemplate\fR\fB]\fR\fR
+\fB\fBcreate [\fR\fB-F\fR\fB] [\fR \fB-a\fR \fIpath\fR |\fB-b\fR \fB|\fR \fB-t\fR \fItemplate\fR\fB] [\fR\fB-X\fR\fB]\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -1369,6 +1307,8 @@ configured, it should be installed using the "\fBzoneadm attach\fR" command
 .sp
 Use the \fB-b\fR option to create a blank configuration. Without arguments,
 \fBcreate\fR applies the Sun default settings.
+.sp
+Use the \fB-X\fR option to facilitate creating a zone whose XML definition already exists on the host. The zone will be atomically added to the zone index file.
 .RE
 
 .sp
@@ -1567,9 +1507,6 @@ zonecfg:myzone3:fs> \fBset special=/dev/dsk/c0t0d0s7\fR
 zonecfg:myzone3:fs> \fBset raw=/dev/rdsk/c0t0d0s7\fR
 zonecfg:myzone3:fs> \fBset type=ufs\fR
 zonecfg:myzone3:fs> \fBend\fR
-zonecfg:myzone3> \fBadd inherit-pkg-dir\fR
-zonecfg:myzone3:inherit-pkg-dir> \fBset dir=/opt/sfw\fR
-zonecfg:myzone3:inherit-pkg-dir> \fBend\fR
 zonecfg:myzone3> \fBadd net\fR
 zonecfg:myzone3:net> \fBset address=192.168.0.1/24\fR
 zonecfg:myzone3:net> \fBset physical=eri0\fR

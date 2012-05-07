@@ -32,7 +32,7 @@ clean	:= TARGET = clean
 test	:= TARGET = test
 
 # PERL_LEGACY is versions of Perl still delivered through ON
-PERL_VERSIONS = 5.10.0
+PERL_VERSIONS = 5.12
 
 .PARALLEL: $(PERL_VERSIONS)
 

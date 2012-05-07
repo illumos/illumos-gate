@@ -527,7 +527,7 @@ dbFindObject(char *objName, db_status *statP) {
 	/* If not the root dir, find the directory where the entry lives */
 
 	sfree(table);
-	name = entryName(myself, objName, &table);
+	name = entryName((char *)myself, objName, &table);
 	if (name == 0 || table == 0) {
 		sfree(name);
 		RETSTAT(0, DB_MEMORY_LIMIT);
@@ -737,7 +737,7 @@ dbDeleteObj(char *objName) {
 	nod->objType = o->zo_data.zo_type;
 	nis_destroy_object(o);
 
-	nod->objName = sdup(myself, T, objName);
+	nod->objName = sdup((char *)myself, T, objName);
 	if (nod->objName == 0) {
 		sfree(nod);
 		return (DB_MEMORY_LIMIT);
@@ -789,7 +789,7 @@ dbTouchObj(char *objName) {
 
 	sfree(table);
 	table = 0;
-	ent = entryName(myself, objName, &table);
+	ent = entryName((char *)myself, objName, &table);
 	if (ent == 0 || table == 0) {
 		sfree(ent);
 		return (DB_MEMORY_LIMIT);
@@ -989,7 +989,7 @@ dbRefreshObj(char *name, nis_object *o) {
 		int		lstat;
 
 		/* Find parent */
-		ent = entryName(myself, objName, &table);
+		ent = entryName((char *)myself, objName, &table);
 		if (ent == 0 || table == 0) {
 			sfree(b.buf);
 			sfree(objTable);

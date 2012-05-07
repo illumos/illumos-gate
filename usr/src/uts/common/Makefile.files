@@ -25,6 +25,7 @@
 
 #
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+# Copyright (c) 2012 Joyent, Inc.  All rights reserved.
 #
 
 #
@@ -1146,7 +1147,12 @@ PIPE_OBJS +=	pipe.o
 HSFS_OBJS +=	hsfs_node.o	hsfs_subr.o	hsfs_vfsops.o	hsfs_vnops.o \
 		hsfs_susp.o	hsfs_rrip.o	hsfs_susp_subr.o
 
+HYPRLOFS_OBJS += hyprlofs_dir.o hyprlofs_subr.o \
+		hyprlofs_vnops.o hyprlofs_vfsops.o
+
 LOFS_OBJS +=	lofs_subr.o	lofs_vfsops.o	lofs_vnops.o
+
+LXPROC_OBJS +=	lxpr_subr.o	lxpr_vfsops.o	lxpr_vnops.o
 
 NAMEFS_OBJS +=	namevfs.o	namevno.o
 
@@ -1384,6 +1390,7 @@ ZFS_COMMON_OBJS +=		\
 	zfs_fuid.o		\
 	zfs_sa.o		\
 	zfs_znode.o		\
+	zfs_zone.o		\
 	zil.o			\
 	zio.o			\
 	zio_checksum.o		\
@@ -1736,6 +1743,8 @@ WUSB_FWMOD_OBJS += wusb_fwmod.o
 IPF_OBJS += ip_fil_solaris.o fil.o solaris.o ip_state.o ip_frag.o ip_nat.o \
 	    ip_proxy.o ip_auth.o ip_pool.o ip_htable.o ip_lookup.o \
 	    ip_log.o misc.o ip_compat.o ip_nat6.o drand48.o
+
+IPD_OBJS += ipd.o
 
 IBD_OBJS +=	ibd.o ibd_cm.o
 

@@ -22,6 +22,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2011, 2012, Joyent, Inc.  All rights reserved.
  */
 
 #ifndef	_SYS_CPUCAPS_H
@@ -84,12 +85,16 @@ extern void cpucaps_zone_remove(zone_t *);
  */
 extern int cpucaps_project_set(kproject_t *, rctl_qty_t);
 extern int cpucaps_zone_set(zone_t *, rctl_qty_t);
+extern int cpucaps_zone_set_base(zone_t *, rctl_qty_t);
+extern int cpucaps_zone_set_burst_time(zone_t *, rctl_qty_t);
 
 /*
  * Get current CPU usage for a project/zone.
  */
 extern rctl_qty_t cpucaps_project_get(kproject_t *);
 extern rctl_qty_t cpucaps_zone_get(zone_t *);
+extern rctl_qty_t cpucaps_zone_get_base(zone_t *);
+extern rctl_qty_t cpucaps_zone_get_burst_time(zone_t *);
 
 /*
  * Scheduling class hooks into CPU caps framework.

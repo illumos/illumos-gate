@@ -19,10 +19,6 @@
  * CDDL HEADER END
  */
 
-/*
- * Copyright (c) 2011, Joyent, Inc. All rights reserved.
- */
-
 #pragma D option quiet
 
 BEGIN

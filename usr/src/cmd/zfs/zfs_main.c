@@ -23,6 +23,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
@@ -216,7 +217,7 @@ get_usage(zfs_help_t idx)
 		    "\tdestroy [-dnpRrv] "
 		    "<filesystem|volume>@<snap>[%<snap>][,...]\n"));
 	case HELP_GET:
-		return (gettext("\tget [-rHp] [-d max] "
+		return (gettext("\tget [-crHp] [-d max] "
 		    "[-o \"all\" | field[,...]] [-t type[,...]] "
 		    "[-s source[,...]]\n"
 		    "\t    <\"all\" | property[,...]> "
@@ -228,7 +229,7 @@ get_usage(zfs_help_t idx)
 		return (gettext("\tupgrade [-v]\n"
 		    "\tupgrade [-r] [-V version] <-a | filesystem ...>\n"));
 	case HELP_LIST:
-		return (gettext("\tlist [-rH][-d max] "
+		return (gettext("\tlist [-rHp][-d max] "
 		    "[-o property[,...]] [-t type[,...]] [-s property] ...\n"
 		    "\t    [-S property] ... "
 		    "[filesystem|volume|snapshot] ...\n"));
@@ -560,8 +561,9 @@ finish_progress(char *done)
 	free(pt_header);
 	pt_header = NULL;
 }
+
 /*
- * zfs clone [-p] [-o prop=value] ... <snap> <fs | vol>
+ * zfs clone [-Fp] [-o prop=value] ... <snap> <fs | vol>
  *
  * Given an existing dataset, create a writable copy whose initial contents
  * are the same as the source.  The newly created dataset maintains a
@@ -569,12 +571,18 @@ finish_progress(char *done)
  * the clone exists.
  *
  * The '-p' flag creates all the non-existing ancestors of the target first.
+ *
+ * The '-F' flag retries the zfs_mount() operation as long as zfs_mount() is
+ * still returning EBUSY.  Any callers which specify -F should be careful to
+ * ensure that no other process has a persistent hold on the mountpoint's
+ * directory.
  */
 static int
 zfs_do_clone(int argc, char **argv)
 {
 	zfs_handle_t *zhp = NULL;
 	boolean_t parents = B_FALSE;
+	boolean_t keeptrying = B_FALSE;
 	nvlist_t *props;
 	int ret = 0;
 	int c;
@@ -583,8 +591,11 @@ zfs_do_clone(int argc, char **argv)
 		nomem();
 
 	/* check options */
-	while ((c = getopt(argc, argv, "o:p")) != -1) {
+	while ((c = getopt(argc, argv, "Fo:p")) != -1) {
 		switch (c) {
+		case 'F':
+			keeptrying = B_TRUE;
+			break;
 		case 'o':
 			if (parseprop(props))
 				return (1);
@@ -645,9 +656,14 @@ zfs_do_clone(int argc, char **argv)
 
 		clone = zfs_open(g_zfs, argv[1], ZFS_TYPE_DATASET);
 		if (clone != NULL) {
-			if (zfs_get_type(clone) != ZFS_TYPE_VOLUME)
-				if ((ret = zfs_mount(clone, NULL, 0)) == 0)
+			if (zfs_get_type(clone) != ZFS_TYPE_VOLUME) {
+				while ((ret = zfs_mount(clone, NULL, 0)) != 0) {
+					if (!keeptrying || errno != EBUSY)
+						break;
+				}
+				if (ret == 0)
 					ret = zfs_share(clone);
+			}
 			zfs_close(clone);
 		}
 	}
@@ -861,12 +877,13 @@ badusage:
 }
 
 /*
- * zfs destroy [-rRf] <fs, vol>
+ * zfs destroy [-rRfF] <fs, vol>
  * zfs destroy [-rRd] <snap>
  *
  *	-r	Recursively destroy all children
  *	-R	Recursively destroy all dependents, including clones
  *	-f	Force unmounting of any dependents
+ *	-F	Continue retrying on seeing EBUSY
  *	-d	If we can't destroy now, mark for deferred destruction
  *
  * Destroys the given dataset.  By default, it will unmount any filesystems,
@@ -876,6 +893,7 @@ badusage:
 typedef struct destroy_cbdata {
 	boolean_t	cb_first;
 	boolean_t	cb_force;
+	boolean_t cb_wait;
 	boolean_t	cb_recurse;
 	boolean_t	cb_error;
 	boolean_t	cb_doclones;
@@ -957,13 +975,18 @@ out:
 static int
 destroy_callback(zfs_handle_t *zhp, void *data)
 {
-	destroy_cbdata_t *cb = data;
+	destroy_cbdata_t *cbp = data;
+	struct timespec ts;
+	int err = 0;
+
+	ts.tv_sec = 0;
+	ts.tv_nsec = 500 * (NANOSEC / MILLISEC);
 	const char *name = zfs_get_name(zhp);
 
-	if (cb->cb_verbose) {
-		if (cb->cb_parsable) {
+	if (cbp->cb_verbose) {
+		if (cbp->cb_parsable) {
 			(void) printf("destroy\t%s\n", name);
-		} else if (cb->cb_dryrun) {
+		} else if (cbp->cb_dryrun) {
 			(void) printf(gettext("would destroy %s\n"),
 			    name);
 		} else {
@@ -977,21 +1000,50 @@ destroy_callback(zfs_handle_t *zhp, void *data)
 	 * here).
 	 */
 	if (strchr(zfs_get_name(zhp), '/') == NULL &&
-	    zfs_get_type(zhp) == ZFS_TYPE_FILESYSTEM) {
-		zfs_close(zhp);
-		return (0);
-	}
+	    zfs_get_type(zhp) == ZFS_TYPE_FILESYSTEM)
+		goto out;
 
-	if (!cb->cb_dryrun) {
-		if (zfs_unmount(zhp, NULL, cb->cb_force ? MS_FORCE : 0) != 0 ||
-		    zfs_destroy(zhp, cb->cb_defer_destroy) != 0) {
-			zfs_close(zhp);
-			return (-1);
+	if (cbp->cb_wait)
+		libzfs_print_on_error(g_zfs, B_FALSE);
+
+	/*
+	 * Unless instructed to retry on EBUSY, bail out on the first error.
+	 * When retrying, try every 500ms until either succeeding or seeing a
+	 * non-EBUSY error code.
+	 */
+	if (!cbp->cb_dryrun) {
+		while ((err = zfs_unmount(zhp, NULL,
+		    cbp->cb_force ? MS_FORCE : 0)) != 0) {
+			if (cbp->cb_wait && libzfs_errno(g_zfs) == EZFS_BUSY) {
+				(void) nanosleep(&ts, NULL);
+				continue;
+			}
+			(void) fprintf(stderr, "%s: %s\n",
+			    libzfs_error_action(g_zfs),
+			    libzfs_error_description(g_zfs));
+			break;
+		}
+
+		if (err != 0)
+			goto out;
+
+		while ((err = zfs_destroy(zhp, cbp->cb_defer_destroy)) != 0) {
+			if (cbp->cb_wait && libzfs_errno(g_zfs) == EZFS_BUSY) {
+				(void) nanosleep(&ts, NULL);
+				continue;
+			}
+			(void) fprintf(stderr, "%s: %s\n",
+			    libzfs_error_action(g_zfs),
+			    libzfs_error_description(g_zfs));
+			break;
 		}
 	}
 
+	libzfs_print_on_error(g_zfs, B_TRUE);
+
+out:
 	zfs_close(zhp);
-	return (0);
+	return (err);
 }
 
 static int
@@ -1143,7 +1195,7 @@ zfs_do_destroy(int argc, char **argv)
 	zfs_type_t type = ZFS_TYPE_DATASET;
 
 	/* check options */
-	while ((c = getopt(argc, argv, "vpndfrR")) != -1) {
+	while ((c = getopt(argc, argv, "vpndfFrR")) != -1) {
 		switch (c) {
 		case 'v':
 			cb.cb_verbose = B_TRUE;
@@ -1161,6 +1213,9 @@ zfs_do_destroy(int argc, char **argv)
 			break;
 		case 'f':
 			cb.cb_force = B_TRUE;
+			break;
+		case 'F':
+			cb.cb_wait = B_TRUE;
 			break;
 		case 'r':
 			cb.cb_recurse = B_TRUE;
@@ -1475,8 +1530,11 @@ zfs_do_get(int argc, char **argv)
 	cb.cb_type = ZFS_TYPE_DATASET;
 
 	/* check options */
-	while ((c = getopt(argc, argv, ":d:o:s:rt:Hp")) != -1) {
+	while ((c = getopt(argc, argv, ":d:o:s:rt:Hcp")) != -1) {
 		switch (c) {
+		case 'c':
+			libzfs_set_cachedprops(g_zfs, B_TRUE);
+			break;
 		case 'p':
 			cb.cb_literal = B_TRUE;
 			break;
@@ -2758,11 +2816,12 @@ zfs_do_userspace(int argc, char **argv)
 }
 
 /*
- * list [-r][-d max] [-H] [-o property[,property]...] [-t type[,type]...]
+ * list [-r][-p][-d max] [-H] [-o property[,property]...] [-t type[,type]...]
  *      [-s property [-s property]...] [-S property [-S property]...]
  *      <dataset> ...
  *
  *	-r	Recurse over all children
+ *	-p	Display values in parsable (literal) format.
  *	-d	Limit recursion by depth.
  *	-H	Scripted mode; elide headers and separate columns by tabs
  *	-o	Control which fields to display.
@@ -2777,6 +2836,7 @@ zfs_do_userspace(int argc, char **argv)
 typedef struct list_cbdata {
 	boolean_t	cb_first;
 	boolean_t	cb_scripted;
+	boolean_t	cb_literal;
 	zprop_list_t	*cb_proplist;
 } list_cbdata_t;
 
@@ -2826,7 +2886,8 @@ print_header(zprop_list_t *pl)
  * to the described layout.
  */
 static void
-print_dataset(zfs_handle_t *zhp, zprop_list_t *pl, boolean_t scripted)
+print_dataset(zfs_handle_t *zhp, zprop_list_t *pl, boolean_t scripted,
+    boolean_t literal)
 {
 	boolean_t first = B_TRUE;
 	char property[ZFS_MAXPROPLEN];
@@ -2848,7 +2909,7 @@ print_dataset(zfs_handle_t *zhp, zprop_list_t *pl, boolean_t scripted)
 
 		if (pl->pl_prop != ZPROP_INVAL) {
 			if (zfs_prop_get(zhp, pl->pl_prop, property,
-			    sizeof (property), NULL, NULL, 0, B_FALSE) != 0)
+			    sizeof (property), NULL, NULL, 0, literal) != 0)
 				propstr = "-";
 			else
 				propstr = property;
@@ -2856,7 +2917,7 @@ print_dataset(zfs_handle_t *zhp, zprop_list_t *pl, boolean_t scripted)
 			right_justify = zfs_prop_align_right(pl->pl_prop);
 		} else if (zfs_prop_userquota(pl->pl_user_prop)) {
 			if (zfs_prop_get_userquota(zhp, pl->pl_user_prop,
-			    property, sizeof (property), B_FALSE) != 0)
+			    property, sizeof (property), literal) != 0)
 				propstr = "-";
 			else
 				propstr = property;
@@ -2910,7 +2971,7 @@ list_callback(zfs_handle_t *zhp, void *data)
 		cbp->cb_first = B_FALSE;
 	}
 
-	print_dataset(zhp, cbp->cb_proplist, cbp->cb_scripted);
+	print_dataset(zhp, cbp->cb_proplist, cbp->cb_scripted, cbp->cb_literal);
 
 	return (0);
 }
@@ -2925,6 +2986,7 @@ zfs_do_list(int argc, char **argv)
 	int types = ZFS_TYPE_DATASET;
 	boolean_t types_specified = B_FALSE;
 	char *fields = NULL;
+	zprop_list_t *pl;
 	list_cbdata_t cb = { 0 };
 	char *value;
 	int limit = 0;
@@ -2933,8 +2995,11 @@ zfs_do_list(int argc, char **argv)
 	int flags = ZFS_ITER_PROP_LISTSNAPS | ZFS_ITER_ARGS_CAN_BE_PATHS;
 
 	/* check options */
-	while ((c = getopt(argc, argv, ":d:o:rt:Hs:S:")) != -1) {
+	while ((c = getopt(argc, argv, ":pd:o:rt:Hs:S:")) != -1) {
 		switch (c) {
+		case 'p':
+			cb.cb_literal = B_TRUE;
+			break;
 		case 'o':
 			fields = optarg;
 			break;
@@ -3026,6 +3091,18 @@ zfs_do_list(int argc, char **argv)
 	if (zprop_get_list(g_zfs, fields, &cb.cb_proplist, ZFS_TYPE_DATASET)
 	    != 0)
 		usage(B_FALSE);
+
+	/*
+	 * The default set of properties contains only properties which can be
+	 * retrieved from the set of cached properties.  If any user-specfied
+	 * properties cannot be retrieved from that set, unset the cachedprops
+	 * flags on the ZFS handle.
+	 */
+	libzfs_set_cachedprops(g_zfs, B_TRUE);
+	for (pl = cb.cb_proplist; pl != NULL; pl = pl->pl_next) {
+		if (zfs_prop_cacheable(pl->pl_prop))
+			libzfs_set_cachedprops(g_zfs, B_FALSE);
+	}
 
 	cb.cb_scripted = scripted;
 	cb.cb_first = B_TRUE;

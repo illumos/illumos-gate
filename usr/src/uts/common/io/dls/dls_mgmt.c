@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2011 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -105,12 +106,13 @@ typedef struct dls_devnet_s {
 	zoneid_t	dd_zid;		/* current zone */
 	boolean_t	dd_prop_loaded;
 	taskqid_t	dd_prop_taskid;
+	boolean_t	dd_transient;	/* link goes away when zone does */
 } dls_devnet_t;
 
 static int i_dls_devnet_create_iptun(const char *, const char *,
     datalink_id_t *);
 static int i_dls_devnet_destroy_iptun(datalink_id_t);
-static int i_dls_devnet_setzid(dls_devnet_t *, zoneid_t, boolean_t);
+static int i_dls_devnet_setzid(dls_devnet_t *, zoneid_t, boolean_t, boolean_t);
 static int dls_devnet_unset(const char *, datalink_id_t *, boolean_t);
 
 /*ARGSUSED*/
@@ -145,7 +147,12 @@ dls_zone_remove(datalink_id_t linkid, void *arg)
 	dls_devnet_t *ddp;
 
 	if (dls_devnet_hold_tmp(linkid, &ddp) == 0) {
-		(void) dls_devnet_setzid(ddp, GLOBAL_ZONEID);
+		/*
+		 * Don't bother moving transient links back to the global zone
+		 * since we will simply delete them in dls_devnet_unset.
+		 */
+		if (!ddp->dd_transient)
+			(void) dls_devnet_setzid(ddp, GLOBAL_ZONEID, B_FALSE);
 		dls_devnet_rele_tmp(ddp);
 	}
 	return (0);
@@ -526,6 +533,7 @@ dls_mgmt_get_linkid(const char *link, datalink_id_t *linkid)
 
 	getlinkid.ld_cmd = DLMGMT_CMD_GETLINKID;
 	(void) strlcpy(getlinkid.ld_link, link, MAXLINKNAMELEN);
+	getlinkid.ld_zoneid = getzoneid();
 
 	if ((err = i_dls_mgmt_upcall(&getlinkid, sizeof (getlinkid), &retval,
 	    sizeof (retval))) == 0) {
@@ -740,12 +748,23 @@ dls_devnet_stat_update(kstat_t *ksp, int rw)
  * Create the "link" kstats.
  */
 static void
-dls_devnet_stat_create(dls_devnet_t *ddp, zoneid_t zoneid)
+dls_devnet_stat_create(dls_devnet_t *ddp, zoneid_t zoneid, zoneid_t newzoneid)
 {
 	kstat_t	*ksp;
+	char	*nm;
+	char	kname[MAXLINKNAMELEN];
 
-	if (dls_stat_create("link", 0, ddp->dd_linkname, zoneid,
-	    dls_devnet_stat_update, ddp, &ksp) == 0) {
+	if (zoneid != newzoneid) {
+		ASSERT(zoneid == GLOBAL_ZONEID);
+		(void) snprintf(kname, sizeof (kname), "z%d_%s", newzoneid,
+		    ddp->dd_linkname);
+		nm = kname;
+	} else {
+		nm = ddp->dd_linkname;
+	}
+
+	if (dls_stat_create("link", 0, nm, zoneid,
+	    dls_devnet_stat_update, ddp, &ksp, newzoneid) == 0) {
 		ASSERT(ksp != NULL);
 		if (zoneid == ddp->dd_owner_zid) {
 			ASSERT(ddp->dd_ksp == NULL);
@@ -765,12 +784,12 @@ dls_devnet_stat_destroy(dls_devnet_t *ddp, zoneid_t zoneid)
 {
 	if (zoneid == ddp->dd_owner_zid) {
 		if (ddp->dd_ksp != NULL) {
-			kstat_delete(ddp->dd_ksp);
+			dls_stat_delete(ddp->dd_ksp);
 			ddp->dd_ksp = NULL;
 		}
 	} else {
 		if (ddp->dd_zone_ksp != NULL) {
-			kstat_delete(ddp->dd_zone_ksp);
+			dls_stat_delete(ddp->dd_zone_ksp);
 			ddp->dd_zone_ksp = NULL;
 		}
 	}
@@ -781,15 +800,25 @@ dls_devnet_stat_destroy(dls_devnet_t *ddp, zoneid_t zoneid)
  * and create the new set using the new name.
  */
 static void
-dls_devnet_stat_rename(dls_devnet_t *ddp)
+dls_devnet_stat_rename(dls_devnet_t *ddp, boolean_t zoneinit)
 {
 	if (ddp->dd_ksp != NULL) {
-		kstat_delete(ddp->dd_ksp);
+		dls_stat_delete(ddp->dd_ksp);
 		ddp->dd_ksp = NULL;
 	}
-	/* We can't rename a link while it's assigned to a non-global zone. */
+	if (zoneinit && ddp->dd_zone_ksp != NULL) {
+		dls_stat_delete(ddp->dd_zone_ksp);
+		ddp->dd_zone_ksp = NULL;
+	}
+	/*
+	 * We can't rename a link while it's assigned to a non-global zone
+	 * unless we're first initializing the zone while readying it.
+	 */
 	ASSERT(ddp->dd_zone_ksp == NULL);
-	dls_devnet_stat_create(ddp, ddp->dd_owner_zid);
+	dls_devnet_stat_create(ddp, ddp->dd_owner_zid,
+	    (zoneinit ? ddp->dd_zid : ddp->dd_owner_zid));
+	if (zoneinit)
+		dls_devnet_stat_create(ddp, ddp->dd_zid, ddp->dd_zid);
 }
 
 /*
@@ -878,7 +907,8 @@ done:
 	rw_exit(&i_dls_devnet_lock);
 	if (err == 0) {
 		if (zoneid != GLOBAL_ZONEID &&
-		    (err = i_dls_devnet_setzid(ddp, zoneid, B_FALSE)) != 0)
+		    (err = i_dls_devnet_setzid(ddp, zoneid, B_FALSE,
+		    B_FALSE)) != 0)
 			(void) dls_devnet_unset(macname, &linkid, B_TRUE);
 		/*
 		 * The kstat subsystem holds its own locks (rather perimeter)
@@ -887,7 +917,7 @@ done:
 		 * lock hierarchy is kstat locks -> i_dls_devnet_lock.
 		 */
 		if (stat_create)
-			dls_devnet_stat_create(ddp, zoneid);
+			dls_devnet_stat_create(ddp, zoneid, zoneid);
 		if (ddpp != NULL)
 			*ddpp = ddp;
 	}
@@ -924,17 +954,64 @@ dls_devnet_unset(const char *macname, datalink_id_t *id, boolean_t wait)
 	ASSERT(ddp->dd_ref != 0);
 	if ((ddp->dd_ref != 1) || (!wait &&
 	    (ddp->dd_tref != 0 || ddp->dd_prop_taskid != NULL))) {
-		mutex_exit(&ddp->dd_mutex);
-		rw_exit(&i_dls_devnet_lock);
-		return (EBUSY);
+		int zstatus = 0;
+
+		/*
+		 * There are a couple of alternatives that might be going on
+		 * here; a) the zone is shutting down and it has a transient
+		 * link assigned, in which case we want to clean it up instead
+		 * of moving it back to the global zone, or b) its possible
+		 * that we're trying to clean up an orphaned vnic that was
+		 * delegated to a zone and which wasn't cleaned up properly
+		 * when the zone went away.  Check for either of these cases
+		 * before we simply return EBUSY.
+		 *
+		 * zstatus indicates which situation we are dealing with:
+		 *	 0 - means return EBUSY
+		 *	 1 - means case (a), cleanup transient link
+		 *	-1 - means case (b), orphained VNIC
+		 */
+		if (ddp->dd_ref > 1 && ddp->dd_zid != GLOBAL_ZONEID) {
+			zone_t	*zp;
+
+			if ((zp = zone_find_by_id(ddp->dd_zid)) == NULL) {
+				zstatus = -1;
+			} else {
+				if (ddp->dd_transient) {
+					zone_status_t s = zone_status_get(zp);
+
+					if (s >= ZONE_IS_SHUTTING_DOWN)
+						zstatus = 1;
+				}
+				zone_rele(zp);
+			}
+		}
+
+		if (zstatus == 0) {
+			mutex_exit(&ddp->dd_mutex);
+			rw_exit(&i_dls_devnet_lock);
+			return (EBUSY);
+		}
+
+		/*
+		 * We want to delete the link, reset ref to 1;
+		 */
+		if (zstatus == -1)
+			/* Log a warning, but continue in this case */
+			cmn_err(CE_WARN, "clear orphaned datalink: %s\n",
+			    ddp->dd_linkname);
+		ddp->dd_ref = 1;
 	}
 
 	ddp->dd_flags |= DD_CONDEMNED;
 	ddp->dd_ref--;
 	*id = ddp->dd_linkid;
 
-	if (ddp->dd_zid != GLOBAL_ZONEID)
-		(void) i_dls_devnet_setzid(ddp, GLOBAL_ZONEID, B_FALSE);
+	if (ddp->dd_zid != GLOBAL_ZONEID) {
+		dls_devnet_stat_destroy(ddp, ddp->dd_zid);
+		(void) i_dls_devnet_setzid(ddp, GLOBAL_ZONEID, B_FALSE,
+		    B_FALSE);
+	}
 
 	/*
 	 * Remove this dls_devnet_t from the hash table.
@@ -1261,9 +1338,15 @@ dls_devnet_phydev(datalink_id_t vlanid, dev_t *devp)
  *
  *    This case does not change the <link name, linkid> mapping, so the link's
  *    kstats need to be updated with using name associated the given id2.
+ *
+ * The zonename parameter is used to allow us to create a VNIC in the global
+ * zone which is assigned to a non-global zone.  Since there is a race condition
+ * in the create process if two VNICs have the same name, we need to rename it
+ * after it has been assigned to the zone.
  */
 int
-dls_devnet_rename(datalink_id_t id1, datalink_id_t id2, const char *link)
+dls_devnet_rename(datalink_id_t id1, datalink_id_t id2, const char *link,
+    boolean_t zoneinit)
 {
 	dls_dev_handle_t	ddh = NULL;
 	int			err = 0;
@@ -1313,13 +1396,16 @@ dls_devnet_rename(datalink_id_t id1, datalink_id_t id2, const char *link)
 	 * is currently accessing the link kstats, or if the link is on-loan
 	 * to a non-global zone. Then set the DD_KSTAT_CHANGING flag to
 	 * prevent any access to the kstats while we delete and recreate
-	 * kstats below.
+	 * kstats below.  However, we skip this check if we're renaming the
+	 * vnic as part of bringing it up for a zone.
 	 */
 	mutex_enter(&ddp->dd_mutex);
-	if (ddp->dd_ref > 1) {
-		mutex_exit(&ddp->dd_mutex);
-		err = EBUSY;
-		goto done;
+	if (!zoneinit) {
+		if (ddp->dd_ref > 1) {
+			mutex_exit(&ddp->dd_mutex);
+			err = EBUSY;
+			goto done;
+		}
 	}
 
 	ddp->dd_flags |= DD_KSTAT_CHANGING;
@@ -1333,7 +1419,15 @@ dls_devnet_rename(datalink_id_t id1, datalink_id_t id2, const char *link)
 		/* rename mac client name and its flow if exists */
 		if ((err = mac_open(ddp->dd_mac, &mh)) != 0)
 			goto done;
-		(void) mac_rename_primary(mh, link);
+		if (zoneinit) {
+			char tname[MAXLINKNAMELEN];
+
+			(void) snprintf(tname, sizeof (tname), "z%d_%s",
+			    ddp->dd_zid, link);
+			(void) mac_rename_primary(mh, tname);
+		} else {
+			(void) mac_rename_primary(mh, link);
+		}
 		mac_close(mh);
 		goto done;
 	}
@@ -1406,7 +1500,7 @@ done:
 	 */
 	rw_exit(&i_dls_devnet_lock);
 	if (err == 0)
-		dls_devnet_stat_rename(ddp);
+		dls_devnet_stat_rename(ddp, zoneinit);
 
 	if (clear_dd_flag) {
 		mutex_enter(&ddp->dd_mutex);
@@ -1421,7 +1515,8 @@ done:
 }
 
 static int
-i_dls_devnet_setzid(dls_devnet_t *ddp, zoneid_t new_zoneid, boolean_t setprop)
+i_dls_devnet_setzid(dls_devnet_t *ddp, zoneid_t new_zoneid, boolean_t setprop,
+    boolean_t transient)
 {
 	int			err;
 	mac_perim_handle_t	mph;
@@ -1454,6 +1549,7 @@ i_dls_devnet_setzid(dls_devnet_t *ddp, zoneid_t new_zoneid, boolean_t setprop)
 	}
 	if ((err = dls_link_setzid(ddp->dd_mac, new_zoneid)) == 0) {
 		ddp->dd_zid = new_zoneid;
+		ddp->dd_transient = transient;
 		devnet_need_rebuild = B_TRUE;
 	}
 
@@ -1468,7 +1564,7 @@ done:
 }
 
 int
-dls_devnet_setzid(dls_dl_handle_t ddh, zoneid_t new_zid)
+dls_devnet_setzid(dls_dl_handle_t ddh, zoneid_t new_zid, boolean_t transient)
 {
 	dls_devnet_t	*ddp;
 	int		err;
@@ -1490,7 +1586,7 @@ dls_devnet_setzid(dls_dl_handle_t ddh, zoneid_t new_zid)
 		refheld = B_TRUE;
 	}
 
-	if ((err = i_dls_devnet_setzid(ddh, new_zid, B_TRUE)) != 0) {
+	if ((err = i_dls_devnet_setzid(ddh, new_zid, B_TRUE, transient)) != 0) {
 		if (refheld)
 			dls_devnet_rele(ddp);
 		return (err);
@@ -1507,7 +1603,7 @@ dls_devnet_setzid(dls_dl_handle_t ddh, zoneid_t new_zid)
 	if (old_zid != GLOBAL_ZONEID)
 		dls_devnet_stat_destroy(ddh, old_zid);
 	if (new_zid != GLOBAL_ZONEID)
-		dls_devnet_stat_create(ddh, new_zid);
+		dls_devnet_stat_create(ddh, new_zid, new_zid);
 
 	return (0);
 }

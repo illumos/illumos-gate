@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent Inc. All rights reserved.
  */
 
 #include <door.h>
@@ -528,11 +529,23 @@ dladm_getnext_conf_linkprop(dladm_handle_t handle, dladm_conf_t conf,
 }
 
 /*
- * Get the link ID that is associated with the given name.
+ * Get the link ID that is associated with the given name in the current zone.
  */
 dladm_status_t
 dladm_name2info(dladm_handle_t handle, const char *link, datalink_id_t *linkidp,
     uint32_t *flagp, datalink_class_t *classp, uint32_t *mediap)
+{
+	return (dladm_zname2info(handle, NULL, link, linkidp, flagp, classp,
+	   mediap));
+}
+
+/*
+ * Get the link ID that is associated with the given zone/name pair.
+ */
+dladm_status_t
+dladm_zname2info(dladm_handle_t handle, const char *zonename, const char *link,
+    datalink_id_t *linkidp, uint32_t *flagp, datalink_class_t *classp,
+    uint32_t *mediap)
 {
 	dlmgmt_door_getlinkid_t		getlinkid;
 	dlmgmt_getlinkid_retval_t	retval;
@@ -542,6 +555,10 @@ dladm_name2info(dladm_handle_t handle, const char *link, datalink_id_t *linkidp,
 
 	getlinkid.ld_cmd = DLMGMT_CMD_GETLINKID;
 	(void) strlcpy(getlinkid.ld_link, link, MAXLINKNAMELEN);
+	if (zonename != NULL)
+		getlinkid.ld_zoneid = getzoneidbyname(zonename);
+	else
+		getlinkid.ld_zoneid = -1;
 
 	if ((status = dladm_door_call(handle, &getlinkid, sizeof (getlinkid),
 	    &retval, &sz)) != DLADM_STATUS_OK) {

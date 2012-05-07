@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent Inc. All rights reserved.
  */
 
 #include <stdio.h>
@@ -537,27 +538,35 @@ dladm_vnic_create(dladm_handle_t handle, const char *vnic, datalink_id_t linkid,
 	vnic_created = B_TRUE;
 
 	/* Save vnic configuration and its properties */
-	if (!(flags & DLADM_OPT_PERSIST))
-		goto done;
+	if (flags & DLADM_OPT_PERSIST) {
+		status = dladm_vnic_persist_conf(handle, name, &attr, class);
+		if (status == DLADM_STATUS_OK)
+			conf_set = B_TRUE;
+	}
 
-	status = dladm_vnic_persist_conf(handle, name, &attr, class);
-	if (status != DLADM_STATUS_OK)
-		goto done;
-	conf_set = B_TRUE;
+done:
+	if (status == DLADM_STATUS_OK && proplist != NULL) {
+    		uint32_t flg;
 
-	if (proplist != NULL) {
+		flg = (flags & DLADM_OPT_PERSIST) ?
+		    DLADM_OPT_PERSIST : DLADM_OPT_ACTIVE;
+
 		for (i = 0; i < proplist->al_count; i++) {
 			dladm_arg_info_t	*aip = &proplist->al_info[i];
 
+			if (strcmp(aip->ai_name, "zone") == 0 &&
+			    flags & DLADM_OPT_TRANSIENT)
+				flg |= DLADM_OPT_TRANSIENT;
+			else
+				flg &= ~DLADM_OPT_TRANSIENT;
+
 			status = dladm_set_linkprop(handle, vnic_id,
-			    aip->ai_name, aip->ai_val, aip->ai_count,
-			    DLADM_OPT_PERSIST);
+			    aip->ai_name, aip->ai_val, aip->ai_count, flg);
 			if (status != DLADM_STATUS_OK)
 				break;
 		}
 	}
 
-done:
 	if (status != DLADM_STATUS_OK) {
 		if (conf_set)
 			(void) dladm_remove_conf(handle, vnic_id);

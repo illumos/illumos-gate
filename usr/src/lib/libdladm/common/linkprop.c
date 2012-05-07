@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
  */
 
 #include <stdlib.h>
@@ -1512,6 +1513,9 @@ set_zone(dladm_handle_t handle, prop_desc_t *pdp, datalink_id_t linkid,
 	zid_new = dzp->diz_zid;
 	if (zid_new == zid_old)
 		return (DLADM_STATUS_OK);
+
+	if (flags & DLADM_OPT_TRANSIENT)
+		dzp->diz_transient = B_TRUE;
 
 	if ((status = set_public_prop(handle, pdp, linkid, vdp, val_cnt,
 	    flags, media)) != DLADM_STATUS_OK)

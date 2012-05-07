@@ -22,6 +22,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent Inc. All rights reserved.
  */
 
 #include <assert.h>
@@ -57,10 +58,11 @@ extern void yyerror(char *s);
 static char *create_token(char *s);
 %}
 
-%a 7000
+%a 8000
 %p 5000
 %e 2000
 %n 1000
+%o 13000
 
 %{
 /*
@@ -236,6 +238,18 @@ static char *create_token(char *s);
 <TSTATE>defrouter	{ return DEFROUTER; }
 <CSTATE>defrouter	{ return DEFROUTER; }
 
+<TSTATE>mac-addr	{ return MAC; }
+<CSTATE>mac-addr	{ return MAC; }
+
+<TSTATE>vlan-id		{ return VLANID; }
+<CSTATE>vlan-id		{ return VLANID; }
+
+<TSTATE>global-nic	{ return GNIC; }
+<CSTATE>global-nic	{ return GNIC; }
+
+<TSTATE>property	{ return NPROP; }
+<CSTATE>property	{ return NPROP; }
+
 <TSTATE>dir	{ return DIR; }
 <CSTATE>dir	{ return DIR; }
 
@@ -308,6 +322,12 @@ static char *create_token(char *s);
 <TSTATE>fs-allowed	{ return FS_ALLOWED; }
 <CSTATE>fs-allowed	{ return FS_ALLOWED; }
 
+<TSTATE>uuid	{ return UUID; }
+<CSTATE>uuid	{ return UUID; }
+
+<TSTATE>zfs-io-priority	{ return ZFSPRI; }
+<CSTATE>zfs-io-priority	{ return ZFSPRI; }
+
 <TSTATE>=	{ return EQUAL; }
 <LSTATE>=	{ return EQUAL; }
 <CSTATE>=	{ return EQUAL; }
@@ -354,6 +374,13 @@ static char *create_token(char *s);
 
 <CSTATE>[^ \t\n\",;=\(\)]+	{
 			yylval.strval = create_token(yytext);
+			return TOKEN;
+		}
+
+<CSTATE>\"[^\"\n]*[\"\n] {
+			yylval.strval = create_token(yytext + 1);
+			if (yylval.strval[yyleng - 2] == '"')
+				yylval.strval[yyleng - 2] = 0;
 			return TOKEN;
 		}
 

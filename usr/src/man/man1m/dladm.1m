@@ -1,5 +1,6 @@
 '\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright (c) 2011, Joyent, Inc. All Rights Reserved
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text
 .\" are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical
@@ -15,7 +16,7 @@ dladm \- administer data links
 .LP
 .nf
 \fBdladm show-link\fR [\fB-P\fR] [\fB-s\fR [\fB-i\fR \fIinterval\fR]] [[\fB-p\fR] \fB-o\fR \fIfield\fR[,...]] [\fIlink\fR]
-\fBdladm rename-link\fR [\fB-R\fR \fIroot-dir\fR] \fIlink\fR \fInew-link\fR
+\fBdladm rename-link\fR [\fB-R\fR \fIroot-dir\fR] [\fB-z\fR \fIzonename\fR] \fIlink\fR \fInew-link\fR
 .fi
 
 .LP
@@ -98,9 +99,11 @@ dladm \- administer data links
 
 .LP
 .nf
-\fBdladm set-linkprop\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] \fB-p\fR \fIprop\fR=\fIvalue\fR[,...] \fIlink\fR
-\fBdladm reset-linkprop\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-p\fR \fIprop\fR[,...]] \fIlink\fR
-\fBdladm show-linkprop\fR [\fB-P\fR] [[\fB-c\fR] \fB-o\fR \fIfield\fR[,...]] [\fB-p\fR \fIprop\fR[,...]] [\fIlink\fR]
+\fBdladm set-linkprop\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-z\fR \fIzonename\fR] \fB-p\fR \fIprop\fR=\fIvalue\fR[,...]
+     \fIlink\fR
+\fBdladm reset-linkprop\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-z\fR \fIzonename\fR] [\fB-p\fR \fIprop\fR[,...]] \fIlink\fR
+\fBdladm show-linkprop\fR [\fB-P\fR] [\fB-z\fR \fIzonename\fR] [[\fB-c\fR] \fB-o\fR \fIfield\fR[,...]]
+     [\fB-p\fR \fIprop\fR[,...]] [\fIlink\fR]
 .fi
 
 .LP
@@ -115,9 +118,9 @@ dladm \- administer data links
 \fBdladm create-vnic\fR [\fB-t\fR] \fB-l\fR \fIlink\fR [\fB-R\fR \fIroot-dir\fR] [\fB-m\fR \fIvalue\fR | auto |
      {factory \fB-n\fR \fIslot-identifier\fR]} | {random [\fB-r\fR \fIprefix\fR]}]
      [\fB-v\fR \fIvlan-id\fR] [\fB-p\fR \fIprop\fR=\fIvalue\fR[,...]] \fIvnic-link\fR
-\fBdladm delete-vnic\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] \fIvnic-link\fR
+\fBdladm delete-vnic\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-z\fR \fIzonename\fR] \fIvnic-link\fR
 \fBdladm show-vnic\fR [\fB-pP\fR] [\fB-s\fR [\fB-i\fR \fIinterval\fR]] [\fB-o\fR \fIfield\fR[,...]]
-     [\fB-l\fR \fIlink\fR] [\fIvnic-link\fR]
+     [\fB-l\fR \fIlink\fR] [\fB-z\fR \fIzonename\fR] [\fIvnic-link\fR]
 .fi
 
 .LP
@@ -570,8 +573,7 @@ will be displayed only once.
 .sp
 .ne 2
 .na
-\fB\fBdladm rename-link\fR [\fB-R\fR \fIroot-dir\fR] \fIlink\fR
-\fInew-link\fR\fR
+\fB\fBdladm rename-link\fR [\fB-R\fR \fIroot-dir\fR] [\fB-z\fR \fIzonename\fR] \fIlink\fR \fInew-link\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -587,6 +589,17 @@ examples of how this subcommand is used.
 .sp .6
 .RS 4n
 See "Options," above.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-z\fR \fIzonename\fR
+.ad
+.sp .6
+.RS 4n
+A link assigned to a zone can only be renamed while the zone is in the ready state.
 .RE
 
 .RE
@@ -3135,8 +3148,7 @@ Extended output is displayed for \fBPTYPE\fR values of \fBcurrent\fR,
 .sp
 .ne 2
 .na
-\fB\fBdladm set-linkprop\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] \fB-p\fR
-\fIprop\fR=\fIvalue\fR[,...] \fIlink\fR\fR
+\fB\fBdladm set-linkprop\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-z\fR \fIzonename\fR] \fB-p\fR \fIprop\fR=\fIvalue\fR[,...] \fIlink\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -3168,6 +3180,17 @@ See "Options," above.
 .sp
 .ne 2
 .na
+\fB\fB-z\fR \fIzonenme\fR
+.ad
+.sp .6
+.RS 4n
+Operate on a link that has been delegated to the specified zone.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
 \fB\fB-p\fR \fIprop\fR=\fIvalue\fR[,...], \fB--prop\fR
 \fIprop\fR=\fIvalue\fR[,...]\fR
 .ad
@@ -3187,8 +3210,7 @@ same value.
 .sp
 .ne 2
 .na
-\fB\fBdladm reset-linkprop\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-p\fR
-\fIprop\fR,...] \fIlink\fR\fR
+\fB\fBdladm reset-linkprop\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-z\fR \fIzonename\fR] [\fB-p\fR \fIprop\fR,...] \fIlink\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -3220,6 +3242,17 @@ See "Options," above.
 .sp
 .ne 2
 .na
+\fB\fB-z\fR \fIzonenme\fR
+.ad
+.sp .6
+.RS 4n
+Operate on a link that has been delegated to the specified zone.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
 \fB\fB-p\fR \fIprop, ...\fR, \fB--prop\fR=\fIprop, ...\fR\fR
 .ad
 .sp .6
@@ -3234,8 +3267,7 @@ the same value.
 .sp
 .ne 2
 .na
-\fB\fBdladm show-linkprop\fR [\fB-P\fR] [[\fB-c\fR] \fB-o\fR
-\fIfield\fR[,...]][\fB-p\fR \fIprop\fR[,...]] [\fIlink\fR]\fR
+\fB\fBdladm show-linkprop\fR [\fB-P\fR] [\fB-z\fR \fIzonename\fR] [[\fB-c\fR] \fB-o\fR \fIfield\fR[,...]][\fB-p\fR \fIprop\fR[,...]] [\fIlink\fR]\fR
 .ad
 .sp .6
 .RS 4n
@@ -3352,6 +3384,17 @@ Display persistent link property information
 
 .sp
 .ne 2
+.na
+\fB\fB-z\fR \fIzonenme\fR
+.ad
+.sp .6
+.RS 4n
+Operate on a link that has been delegated to the specified zone.
+.RE
+
+.sp
+.ne 2
+.mk
 .na
 \fB\fB-p\fR \fIprop, ...\fR, \fB--prop\fR=\fIprop, ...\fR\fR
 .ad
@@ -3670,8 +3713,7 @@ A comma-separated list of properties to set to the specified values.
 .sp
 .ne 2
 .na
-\fB\fBdladm delete-vnic\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR]
-\fIvnic-link\fR\fR
+\fB\fBdladm delete-vnic\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-z\fR \fIzonename\fR] \fIvnic-link\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -3697,13 +3739,23 @@ next reboot.
 See "Options," above.
 .RE
 
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-z\fR \fIzonenme\fR
+.ad
+.sp .6
+.RS 4n
+Operate on a link that has been delegated to the specified zone.
+.RE
+
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fBdladm show-vnic\fR [\fB-pP\fR] [\fB-s\fR [\fB-i\fR \fIinterval\fR]]
-[\fB-o\fR \fIfield\fR[,...]] [\fB-l\fR \fIlink\fR] [\fIvnic-link\fR]\fR
+\fB\fBdladm show-vnic\fR [\fB-pP\fR] [\fB-s\fR [\fB-i\fR \fIinterval\fR]] [\fB-o\fR \fIfield\fR[,...]] [\fB-l\fR \fIlink\fR] [\fB-z\fR \fIzonename\fR] [\fIvnic-link\fR]\fR
 .ad
 .sp .6
 .RS 4n
@@ -3844,6 +3896,17 @@ will be displayed only once.
 .sp .6
 .RS 4n
 Display information for all VNICs on the named link.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-z\fR \fIzonenme\fR
+.ad
+.sp .6
+.RS 4n
+Operate on a link that has been delegated to the specified zone.
 .RE
 
 .RE

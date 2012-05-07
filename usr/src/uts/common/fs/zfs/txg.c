@@ -30,6 +30,7 @@
 #include <sys/dsl_pool.h>
 #include <sys/dsl_scan.h>
 #include <sys/callb.h>
+#include <sys/zfs_zone.h>
 
 /*
  * Pool-wide transaction groups.
@@ -410,6 +411,8 @@ txg_sync_thread(dsl_pool_t *dp)
 		dprintf("txg=%llu quiesce_txg=%llu sync_txg=%llu\n",
 		    txg, tx->tx_quiesce_txg_waiting, tx->tx_sync_txg_waiting);
 		mutex_exit(&tx->tx_sync_lock);
+
+		zfs_zone_report_txg_sync(dp);
 
 		start = ddi_get_lbolt();
 		spa_sync(spa, txg);

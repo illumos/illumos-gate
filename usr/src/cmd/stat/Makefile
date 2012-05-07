@@ -19,17 +19,22 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2011, 2012, Joyent, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/stat/Makefile
 #
 
 include ../Makefile.cmd
 
-SUBDIRS=	iostat mpstat vmstat fsstat
+SUBDIRS=	arcstat \
+		fsstat \
+		iostat \
+		mpstat \
+		vfsstat \
+		vmstat \
+		ziostat \
+		zschedstat
 
 all :=		TARGET = all
 install :=	TARGET = install

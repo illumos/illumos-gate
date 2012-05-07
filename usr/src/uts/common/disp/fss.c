@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -54,6 +55,152 @@
 #include <sys/cpucaps.h>
 
 /*
+ * The fair share scheduling class ensures that collections of processes
+ * (zones and projects) each get their configured share of CPU.  This is in
+ * contrast to the TS class which considers individual processes.
+ *
+ * The FSS cpu-share is set on zones using the zone.cpu-shares rctl and on
+ * projects using the project.cpu-shares rctl.  By default the value is 1
+ * and it can range from 0 - 64k.  A value of 0 means that processes in the
+ * collection will only get CPU resources when there are no other processes
+ * that need CPU. The cpu-share is used as one of the inputs to calculate a
+ * thread's "user-mode" priority (umdpri) for the scheduler.  The umdpri falls
+ * in the range 0-59.  FSS calculates other, internal, priorities which are not
+ * visible outside of the FSS class.
+ *
+ * The FSS class should approximate TS behavior when there are excess CPU
+ * resources.  When there is a backlog of runnable processes, then the share
+ * is used as input into the runnable process's priority calculation, where
+ * the final umdpri is used by the scheduler to determine when the process runs.
+ *
+ * Projects in a zone compete with each other for CPU time, receiving CPU
+ * allocation within a zone proportional to the project's share; at a higher
+ * level zones compete with each other, receiving allocation in a pset
+ * proportional to the zone's share.
+ *
+ * The FSS priority calculation consists of several parts.
+ *
+ * 1) Once per second the fss_update function runs.  The first thing it does
+ *    is call fss_decay_usage.  This function updates the priorities of all
+ *    projects with runnable threads, based on their shares and their usage.
+ *    The priority is based on the project's normalized usage (shusage) value
+ *    which is calculated this way:
+ *
+ *                pset_shares^2    zone_int_shares^2
+ *        usage * ------------- * ------------------
+ *                kpj_shares^2	   zone_ext_shares^2
+ *
+ *    - usage - see below for more details
+ *    - pset_shares is the total of all *active* shares in the pset (by default
+ *      there is only one pset)
+ *    - kpj_shares is the individual project's share (project.cpu-shares rctl)
+ *    - zone_int_shares is the sum of shares of all active projects within the
+ *      zone
+ *    - zone_ext_shares is the share value for the zone (zone.cpu-shares rctl)
+ *
+ *    The usage value (thought of as the share-usage, or shusage) is the recent
+ *    CPU usage for all of the threads in the project and is calculated this
+ *    way:
+ *
+ *                  (usage * FSS_DECAY_USG)
+ *        usage =  ------------------------- + ticks;
+ *                       FSS_DECAY_BASE
+ *
+ *     - FSS_DECAY_BASE is 128 - used instead of 100 so we can shift vs divide
+ *     - FSS_DECAY_USG is 96 - approximates 75% (96/128)
+ *     - ticks is incremented whenever a process in this project is running
+ *       when the scheduler's tick processing fires and is reset in
+ *       fss_decay_usage every second.
+ *
+ *    fss_decay_usage then decays the maxfsspri value for the pset.  This
+ *    value is used in the per-process priority calculation described in the
+ *    next section.  The maxfsspri is decayed using the following formula:
+ *
+ *                      maxfsspri * fss_nice_decay[NZERO])
+ *        maxfsspri =  ------------------------------------
+ *                            FSS_DECAY_BASE
+ *
+ *
+ *     - NZERO is the default process priority (i.e. 20)
+ *
+ *    The fss_nice_decay array is a fixed set of values used to adjust the
+ *    decay rate of processes based on their nice value.  Entries in this
+ *    array are initialized in fss_init using the following formula:
+ *
+ *                        (FSS_DECAY_MAX - FSS_DECAY_MIN) * i
+ *       FSS_DECAY_MIN + -------------------------------------
+ *                               FSS_NICE_RANGE - 1
+ *
+ *     - FSS_DECAY_MIN is 82 = approximates 65% (82/128)
+ *     - FSS_DECAY_MAX is 108 = approximates 85% (108/128)
+ *     - FSS_NICE_RANGE is 40 (range is 0 - 39)
+ *
+ * 2) The fss_update function uses the project's shusage (calculated above) as
+ *    input to update the user-mode priority (umdpri) of the runnable threads.
+ *    This can cause the threads to change their position in the run queue.
+ *
+ *    First the process's priority is decayed using the following formula:
+ *
+ *                  fsspri * fss_nice_decay[nice_value])
+ *        fsspri =  ------------------------------------
+ *                            FSS_DECAY_BASE
+ *
+ *    Then the process's new fsspri is calculated in the fss_newpri function,
+ *    using the following formula. All runnable threads in the project will use
+ *    the same shusage and nrunnable values in their calculation.
+ *
+ *        fsspri = fsspri + shusage * nrunnable * ticks
+ *
+ *     - shusage is the project's share usage, calculated above
+ *     - nrunnable is the number of runnable threads in the project
+ *     - ticks is the number of ticks this thread ran since the last fss_newpri
+ *       invocation.
+ *
+ *    Finally the process's new umdpri is calculated using the following
+ *    formula:
+ *
+ *                              (fsspri * umdprirange)
+ *        umdpri = maxumdpri - ------------------------
+ *                                    maxfsspri
+ *
+ *     - maxumdpri is MINCLSYSPRI - 1 (i.e. 59)
+ *     - umdprirange is maxumdpri - 1 (i.e. 58)
+ *     - maxfsspri is the largest fsspri seen so far, as we're iterating all
+ *       runnable processes
+ *
+ *    This code has various checks to ensure the resulting umdpri is in the
+ *    range 1-59.  See fss_newpri for more details.
+ *
+ * To reiterate, the above processing is performed once per second to recompute
+ * the runnable thread priorities.
+ *
+ * 3) The final major component in the priority calculation is the tick
+ *    processing which occurs on a process that is running when the scheduler
+ *    calls fss_tick.
+ *
+ *    A thread can run continuously in user-land (compute-bound) for the
+ *    fss_quantum (see "dispadmin -c FSS -g" for the configurable properties).
+ *    Once the quantum has been consumed, the thread will call fss_newpri to
+ *    recompute its umdpri priority, as described above. To ensure that
+ *    runnable threads within a project see the expected round-robin behavior,
+ *    there is a special case in fss_newpri for a thread that has run for its
+ *    quanta within the one second update interval.  See the handling for the
+ *    quanta_up parameter within fss_newpri.
+ *
+ *    Also of interest, the fss_tick code increments the project's tick counter
+ *    using the fss_nice_tick array value for the thread's nice value. The idea
+ *    behind the fss_nice_tick array is that the cost of a tick is lower at
+ *    positive nice values (so that it doesn't increase the project's shusage
+ *    as much as normal) with a 50% drop at the maximum level and a 50%
+ *    increase at the minimum level. The fss_nice_tick array is initialized in
+ *    fss_init using the following formula:
+ *
+ *         FSS_TICK_COST * (((3 * FSS_NICE_RANGE) / 2) - i)
+ *        --------------------------------------------------
+ *                          FSS_NICE_RANGE
+ *
+ *     - FSS_TICK_COST is 1000, the tick cost for threads with nice level 0
+ *
  * FSS Data Structures:
  *
  *                 fsszone
@@ -72,7 +219,6 @@
  *                -----       -----       -----
  *               fssproj
  *
- *
  * That is, fsspsets contain a list of fsszone's that are currently active in
  * the pset, and a list of fssproj's, corresponding to projects with runnable
  * threads on the pset.  fssproj's in turn point to the fsszone which they
@@ -81,12 +227,6 @@
  * An fssproj_t is removed when there are no threads in it.
  *
  * An fsszone_t is removed when there are no projects with threads in it.
- *
- * Projects in a zone compete with each other for cpu time, receiving cpu
- * allocation within a zone proportional to fssproj->fssp_shares
- * (project.cpu-shares); at a higher level zones compete with each other,
- * receiving allocation in a pset proportional to fsszone->fssz_shares
- * (zone.cpu-shares).  See fss_decay_usage() for the precise formula.
  */
 
 static pri_t fss_init(id_t, int, classfuncs_t **);
@@ -186,7 +326,7 @@ static time_t	fss_minrun = 2;	/* t_pri becomes 59 within 2 secs */
 static time_t	fss_minslp = 2;	/* min time on sleep queue for hardswap */
 static int	fss_quantum = 11;
 
-static void	fss_newpri(fssproc_t *);
+static void	fss_newpri(fssproc_t *, boolean_t);
 static void	fss_update(void *);
 static int	fss_update_list(int);
 static void	fss_change_priority(kthread_t *, fssproc_t *);
@@ -720,15 +860,53 @@ fss_init(id_t cid, int clparmsz, classfuncs_t **clfuncspp)
 /*
  * Calculate the new cpupri based on the usage, the number of shares and
  * the number of active threads.  Reset the tick counter for this thread.
+ *
+ * When calculating the new priority using the standard formula we can hit
+ * a scenario where we don't have good round-robin behavior.  This would be
+ * most commonly seen when there is a zone with lots of runnable threads.
+ * In the bad scenario we will see the following behavior when using the
+ * standard formula and these conditions:
+ *
+ *	- there are multiple runnable threads in the zone (project)
+ *	- the fssps_maxfsspri is a very large value
+ *	- (we also know all of these threads will use the project's
+ *	    fssp_shusage)
+ *
+ * Under these conditions, a thread with a low fss_fsspri value is chosen
+ * to run and the thread gets a high fss_umdpri.  This thread can run for
+ * its full quanta (fss_timeleft) at which time fss_newpri is called to
+ * calculate the thread's new priority.
+ *
+ * In this case, because the newly calculated fsspri value is much smaller
+ * (orders of magnitude) than the fssps_maxfsspri value, if we used the
+ * standard formula the thread will still get a high fss_umdpri value and
+ * will run again for another quanta, even though there are other runnable
+ * threads in the project.
+ *
+ * For a thread that is runnable for a long time, the thread can continue
+ * to run for many quanta (totaling many seconds) before the thread's fsspri
+ * exceeds the fssps_maxfsspri and the thread's fss_umdpri is reset back
+ * down to 1.  This behavior also keeps the fssps_maxfsspr at a high value,
+ * so that the next runnable thread might repeat this cycle.
+ *
+ * This leads to the case where we don't have round-robin behavior at quanta
+ * granularity, but instead, runnable threads within the project only run
+ * at several second intervals.
+ *
+ * To prevent this scenario from occuring, when a thread has consumed its
+ * quanta and there are multiple runnable threads in the project, we
+ * immediately cause the thread to hit fssps_maxfsspri so that it gets
+ * reset back to 1 and another runnable thread in the project can run.
  */
 static void
-fss_newpri(fssproc_t *fssproc)
+fss_newpri(fssproc_t *fssproc, boolean_t quanta_up)
 {
 	kthread_t *tp;
 	fssproj_t *fssproj;
 	fsspset_t *fsspset;
 	fsszone_t *fsszone;
 	fsspri_t fsspri, maxfsspri;
+	uint32_t n_runnable;
 	pri_t invpri;
 	uint32_t ticks;
 
@@ -761,13 +939,21 @@ fss_newpri(fssproc_t *fssproc)
 		return;
 	}
 
-	/*
-	 * fsspri += shusage * nrunnable * ticks
-	 */
 	ticks = fssproc->fss_ticks;
 	fssproc->fss_ticks = 0;
-	fsspri = fssproc->fss_fsspri;
-	fsspri += fssproj->fssp_shusage * fssproj->fssp_runnable * ticks;
+	maxfsspri = fsspset->fssps_maxfsspri;
+	n_runnable = fssproj->fssp_runnable;
+
+	if (quanta_up && n_runnable > 1) {
+		fsspri = maxfsspri;
+	} else {
+		/*
+		 * fsspri += shusage * nrunnable * ticks
+		 */
+		fsspri = fssproc->fss_fsspri;
+		fsspri += fssproj->fssp_shusage * n_runnable * ticks;
+	}
+
 	fssproc->fss_fsspri = fsspri;
 
 	if (fsspri < fss_maxumdpri)
@@ -788,7 +974,6 @@ fss_newpri(fssproc_t *fssproc)
 	 * values; if it is changed, additional checks may need  to  be
 	 * added.
 	 */
-	maxfsspri = fsspset->fssps_maxfsspri;
 	if (fsspri >= maxfsspri) {
 		fsspset->fssps_maxfsspri = fsspri;
 		disp_lock_exit_high(&fsspset->fssps_displock);
@@ -814,6 +999,7 @@ fss_decay_usage()
 	fsszone_t *fsszone;
 	fsspri_t maxfsspri;
 	int psetid;
+	struct zone *zp;
 
 	mutex_enter(&fsspsets_lock);
 	/*
@@ -823,6 +1009,8 @@ fss_decay_usage()
 	for (psetid = 0; psetid < max_ncpus; psetid++) {
 		fsspset = &fsspsets[psetid];
 		mutex_enter(&fsspset->fssps_lock);
+
+		fsspset->fssps_gen++;
 
 		if (fsspset->fssps_cpupart == NULL ||
 		    (fssproj = fsspset->fssps_list) == NULL) {
@@ -843,6 +1031,21 @@ fss_decay_usage()
 		fsspset->fssps_maxfsspri = maxfsspri;
 
 		do {
+			fsszone = fssproj->fssp_fsszone;
+			zp = fsszone->fssz_zone;
+
+			/*
+			 * Reset zone's FSS kstats if they are from a
+			 * previous cycle.
+			 */
+			if (fsspset->fssps_gen != zp->zone_fss_gen) {
+				zp->zone_fss_gen = fsspset->fssps_gen;
+				zp->zone_fss_pri_hi = 0;
+				zp->zone_runq_cntr = 0;
+				zp->zone_fss_shr_pct = 0;
+				zp->zone_proc_cnt = 0;
+			}
+
 			/*
 			 * Decay usage for each project running on
 			 * this cpu partition.
@@ -850,9 +1053,18 @@ fss_decay_usage()
 			fssproj->fssp_usage =
 			    (fssproj->fssp_usage * FSS_DECAY_USG) /
 			    FSS_DECAY_BASE + fssproj->fssp_ticks;
+
 			fssproj->fssp_ticks = 0;
 
-			fsszone = fssproj->fssp_fsszone;
+			zp->zone_run_ticks += fssproj->fssp_zone_ticks;
+			/*
+			 * This is the count for this one second cycle only,
+			 * and not cumulative.
+			 */
+			zp->zone_runq_cntr += fssproj->fssp_runnable;
+
+			fssproj->fssp_zone_ticks = 0;
+
 			/*
 			 * Readjust the project's number of shares if it has
 			 * changed since we checked it last time.
@@ -871,7 +1083,7 @@ fss_decay_usage()
 			 * Readjust the zone's number of shares if it
 			 * has changed since we checked it last time.
 			 */
-			zone_ext_shares = fsszone->fssz_zone->zone_shares;
+			zone_ext_shares = zp->zone_shares;
 			if (fsszone->fssz_rshares != zone_ext_shares) {
 				if (fsszone->fssz_runnable != 0) {
 					fsspset->fssps_shares -=
@@ -883,6 +1095,12 @@ fss_decay_usage()
 			}
 			zone_int_shares = fsszone->fssz_shares;
 			pset_shares = fsspset->fssps_shares;
+
+			if (zp->zone_runq_cntr > 0 && pset_shares > 0)
+				/* in tenths of a pct */
+				zp->zone_fss_shr_pct =
+				    (zone_ext_shares * 1000) / pset_shares;
+
 			/*
 			 * Calculate fssp_shusage value to be used
 			 * for fsspri increments for the next second.
@@ -1050,6 +1268,8 @@ fss_update_list(int i)
 	fssproc_t *fssproc;
 	fssproj_t *fssproj;
 	fsspri_t fsspri;
+	struct zone *zp;
+	pri_t fss_umdpri;
 	kthread_t *t;
 	int updated = 0;
 
@@ -1073,6 +1293,7 @@ fss_update_list(int i)
 		fssproj = FSSPROC2FSSPROJ(fssproc);
 		if (fssproj == NULL)
 			goto next;
+
 		if (fssproj->fssp_shares != 0) {
 			/*
 			 * Decay fsspri value.
@@ -1093,14 +1314,31 @@ fss_update_list(int i)
 			aston(t);
 			goto next;
 		}
-		fss_newpri(fssproc);
+		fss_newpri(fssproc, B_FALSE);
 		updated = 1;
+
+		fss_umdpri = fssproc->fss_umdpri;
+
+		/*
+		 * Summarize a zone's process priorities for runnable
+		 * procs.
+		 */
+		zp = fssproj->fssp_fsszone->fssz_zone;
+
+		if (fss_umdpri > zp->zone_fss_pri_hi)
+			zp->zone_fss_pri_hi = fss_umdpri;
+
+		if (zp->zone_proc_cnt++ == 0)
+			zp->zone_fss_pri_avg = fss_umdpri;
+		else
+			zp->zone_fss_pri_avg =
+			    (zp->zone_fss_pri_avg + fss_umdpri) / 2;
 
 		/*
 		 * Only dequeue the thread if it needs to be moved; otherwise
 		 * it should just round-robin here.
 		 */
-		if (t->t_pri != fssproc->fss_umdpri)
+		if (t->t_pri != fss_umdpri)
 			fss_change_priority(t, fssproc);
 next:
 		thread_unlock(t);
@@ -1624,7 +1862,7 @@ fss_forkret(kthread_t *t, kthread_t *ct)
 	thread_lock(t);
 
 	fssproc = FSSPROC(t);
-	fss_newpri(fssproc);
+	fss_newpri(fssproc, B_FALSE);
 	fssproc->fss_timeleft = fss_quantum;
 	t->t_pri = fssproc->fss_umdpri;
 	ASSERT(t->t_pri >= 0 && t->t_pri <= fss_maxglobpri);
@@ -1725,7 +1963,7 @@ fss_parmsset(kthread_t *t, void *parmsp, id_t reqpcid, cred_t *reqpcredp)
 	fssproc->fss_uprilim = reqfssuprilim;
 	fssproc->fss_upri = reqfssupri;
 	fssproc->fss_nice = nice;
-	fss_newpri(fssproc);
+	fss_newpri(fssproc, B_FALSE);
 
 	if ((fssproc->fss_flags & FSSKPRI) != 0) {
 		thread_unlock(t);
@@ -2180,6 +2418,7 @@ fss_tick(kthread_t *t)
 		fsspset_t *fsspset = FSSPROJ2FSSPSET(fssproj);
 		disp_lock_enter_high(&fsspset->fssps_displock);
 		fssproj->fssp_ticks += fss_nice_tick[fssproc->fss_nice];
+		fssproj->fssp_zone_ticks++;
 		fssproc->fss_ticks++;
 		disp_lock_exit_high(&fsspset->fssps_displock);
 	}
@@ -2223,7 +2462,7 @@ fss_tick(kthread_t *t)
 			}
 			fssproc->fss_flags &= ~FSSRESTORE;
 
-			fss_newpri(fssproc);
+			fss_newpri(fssproc, B_TRUE);
 			new_pri = fssproc->fss_umdpri;
 			ASSERT(new_pri >= 0 && new_pri <= fss_maxglobpri);
 
@@ -2262,7 +2501,7 @@ fss_tick(kthread_t *t)
 		 * queue so that it gets charged for the CPU time from its
 		 * quantum even before that quantum expires.
 		 */
-		fss_newpri(fssproc);
+		fss_newpri(fssproc, B_FALSE);
 		if (t->t_pri != fssproc->fss_umdpri)
 			fss_change_priority(t, fssproc);
 

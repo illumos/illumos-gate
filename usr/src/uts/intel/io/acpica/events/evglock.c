@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2012, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -49,6 +49,7 @@
 #define _COMPONENT          ACPI_EVENTS
         ACPI_MODULE_NAME    ("evglock")
 
+#if (!ACPI_REDUCED_HARDWARE) /* Entire module */
 
 /* Local prototypes */
 
@@ -78,6 +79,13 @@ AcpiEvInitGlobalLockHandler (
 
     ACPI_FUNCTION_TRACE (EvInitGlobalLockHandler);
 
+
+    /* If Hardware Reduced flag is set, there is no global lock */
+
+    if (AcpiGbl_ReducedHardware)
+    {
+        return_ACPI_STATUS (AE_OK);
+    }
 
     /* Attempt installation of the global lock handler */
 
@@ -365,3 +373,5 @@ AcpiEvReleaseGlobalLock (
     AcpiOsReleaseMutex (AcpiGbl_GlobalLockMutex->Mutex.OsMutex);
     return_ACPI_STATUS (Status);
 }
+
+#endif /* !ACPI_REDUCED_HARDWARE */

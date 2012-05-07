@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent Inc. All rights reserved.
  */
 
 /*
@@ -162,6 +163,7 @@ extern int getnetmaskbyaddr(struct in_addr, struct in_addr *);
 
 /* from zoneadmd */
 extern char query_hook[];
+extern char post_statechg_hook[];
 
 /*
  * For each "net" resource configured in zonecfg, we track a zone_addr_list_t
@@ -198,7 +200,7 @@ autofs_cleanup(zoneid_t zoneid)
 	/*
 	 * Ask autofs to unmount all trigger nodes in the given zone.
 	 */
-	return (_autofssys(AUTOFS_UNMOUNTALL, (void *)zoneid));
+	return (_autofssys(AUTOFS_UNMOUNTALL, (void *)((uintptr_t)zoneid)));
 }
 
 static void
@@ -589,6 +591,24 @@ root_to_lu(zlog_t *zlogp, char *zroot, size_t zrootlen, boolean_t isresolved)
 }
 
 /*
+ * Perform brand-specific cleanup if we are unable to unmount a FS.
+ */
+static void
+brand_umount_cleanup(zlog_t *zlogp, char *path)
+{
+	char cmdbuf[2 * MAXPATHLEN];
+
+	if (post_statechg_hook[0] == '\0')
+		return;
+
+	if (snprintf(cmdbuf, sizeof (cmdbuf), "%s %d %d %s", post_statechg_hook,
+	    ZONE_STATE_DOWN, Z_UNMOUNT, path) > sizeof (cmdbuf))
+		return;
+
+	(void) do_subproc(zlogp, cmdbuf, NULL, B_FALSE);
+}
+
+/*
  * The general strategy for unmounting filesystems is as follows:
  *
  * - Remote filesystems may be dead, and attempting to contact them as
@@ -621,6 +641,7 @@ static int
 unmount_filesystems(zlog_t *zlogp, zoneid_t zoneid, boolean_t unmount_cmd)
 {
 	int error = 0;
+	int fail = 0;
 	FILE *mnttab;
 	struct mnttab *mnts;
 	uint_t nmnt;
@@ -708,18 +729,39 @@ unmount_filesystems(zlog_t *zlogp, zoneid_t zoneid, boolean_t unmount_cmd)
 				if (umount2(path, MS_FORCE) == 0) {
 					unmounted = B_TRUE;
 					stuck = B_FALSE;
+					fail = 0;
 				} else {
 					/*
-					 * The first failure indicates a
-					 * mount we won't be able to get
-					 * rid of automatically, so we
-					 * bail.
+					 * We may hit a failure here if there
+					 * is an app in the GZ with an open
+					 * pipe into the zone (commonly into
+					 * the zone's /var/run).  This type
+					 * of app will notice the closed
+					 * connection and cleanup, but it may
+					 * take a while and we have no easy
+					 * way to notice that.  To deal with
+					 * this case, we will wait and retry
+					 * a few times before we give up.
 					 */
-					error++;
-					zerror(zlogp, B_FALSE,
-					    "unable to unmount '%s'", path);
-					free_mnttable(mnts, nmnt);
-					goto out;
+					fail++;
+					if (fail < 16) {
+						zerror(zlogp, B_FALSE,
+						    "unable to unmount '%s', "
+						    "retrying in 1 second",
+						    path);
+						(void) sleep(1);
+					} else if (fail > 17) {
+						error++;
+						zerror(zlogp, B_FALSE,
+						    "unable to unmount '%s'",
+						    path);
+						free_mnttable(mnts, nmnt);
+						goto out;
+					} else {
+						/* Try the hook 2 times */
+						brand_umount_cleanup(zlogp,
+						    path);
+					}
 				}
 			}
 			/*
@@ -2187,13 +2229,7 @@ configure_one_interface(zlog_t *zlogp, zoneid_t zone_id,
 	if (ioctl(s, SIOCLIFADDIF, (caddr_t)&lifr) < 0) {
 		/*
 		 * Here, we know that the interface can't be brought up.
-		 * A similar warning message was already printed out to
-		 * the console by zoneadm(1M) so instead we log the
-		 * message to syslog and continue.
 		 */
-		zerror(&logsys, B_TRUE, "WARNING: skipping network interface "
-		    "'%s' which may not be present/plumbed in the "
-		    "global zone.", lifr.lifr_name);
 		(void) close(s);
 		return (Z_OK);
 	}
@@ -2428,6 +2464,7 @@ configure_shared_network_interfaces(zlog_t *zlogp)
 		for (;;) {
 			if (zonecfg_getnwifent(handle, &nwiftab) != Z_OK)
 				break;
+			nwifent_free_attrs(&nwiftab);
 			if (configure_one_interface(zlogp, zoneid, &nwiftab) !=
 			    Z_OK) {
 				(void) zonecfg_endnwifent(handle);
@@ -2919,6 +2956,7 @@ configure_exclusive_network_interfaces(zlog_t *zlogp, zoneid_t zoneid)
 		if (zonecfg_getnwifent(handle, &nwiftab) != Z_OK)
 			break;
 
+		nwifent_free_attrs(&nwiftab);
 		if (prof == NULL) {
 			if (zone_get_devroot(zone_name, rootpath,
 			    sizeof (rootpath)) != Z_OK) {
@@ -2956,10 +2994,11 @@ configure_exclusive_network_interfaces(zlog_t *zlogp, zoneid_t zoneid)
 		    nwiftab.zone_nwif_physical) == 0) {
 			added = B_TRUE;
 		} else {
-			(void) zonecfg_endnwifent(handle);
-			zonecfg_fini_handle(handle);
-			zerror(zlogp, B_TRUE, "failed to add network device");
-			return (-1);
+			/*
+			 * Failed to add network device, but the brand hook
+			 * might be doing this for us, so keep silent.
+			 */
+			continue;
 		}
 		/* set up the new IP interface, and add them all later */
 		new = malloc(sizeof (*new));
@@ -3121,44 +3160,19 @@ remove_datalink_protect(zlog_t *zlogp, zoneid_t zoneid)
 			/* datalink does not belong to the GZ */
 			continue;
 		}
-		if (dlstatus != DLADM_STATUS_OK) {
+		if (dlstatus != DLADM_STATUS_OK)
 			zerror(zlogp, B_FALSE,
+			    "clear 'protection' link property: %s",
 			    dladm_status2str(dlstatus, dlerr));
-			free(dllinks);
-			return (-1);
-		}
+
 		dlstatus = dladm_set_linkprop(dld_handle, *dllink,
 		    "allowed-ips", NULL, 0, DLADM_OPT_ACTIVE);
-		if (dlstatus != DLADM_STATUS_OK) {
+		if (dlstatus != DLADM_STATUS_OK)
 			zerror(zlogp, B_FALSE,
+			    "clear 'allowed-ips' link property: %s",
 			    dladm_status2str(dlstatus, dlerr));
-			free(dllinks);
-			return (-1);
-		}
 	}
 	free(dllinks);
-	return (0);
-}
-
-static int
-unconfigure_exclusive_network_interfaces(zlog_t *zlogp, zoneid_t zoneid)
-{
-	int dlnum = 0;
-
-	/*
-	 * The kernel shutdown callback for the dls module should have removed
-	 * all datalinks from this zone.  If any remain, then there's a
-	 * problem.
-	 */
-	if (zone_list_datalink(zoneid, &dlnum, NULL) != 0) {
-		zerror(zlogp, B_TRUE, "unable to list network interfaces");
-		return (-1);
-	}
-	if (dlnum != 0) {
-		zerror(zlogp, B_FALSE,
-		    "datalinks remain in zone after shutdown");
-		return (-1);
-	}
 	return (0);
 }
 
@@ -3497,7 +3511,7 @@ get_implicit_datasets(zlog_t *zlogp, char **retstr)
 	    > sizeof (cmdbuf))
 		return (-1);
 
-	if (do_subproc(zlogp, cmdbuf, retstr) != 0)
+	if (do_subproc(zlogp, cmdbuf, retstr, B_FALSE) != 0)
 		return (-1);
 
 	return (0);
@@ -4385,15 +4399,13 @@ duplicate_reachable_path(zlog_t *zlogp, const char *rootpath)
 }
 
 /*
- * Set memory cap and pool info for the zone's resource management
- * configuration.
+ * Set pool info for the zone's resource management configuration.
  */
 static int
 setup_zone_rm(zlog_t *zlogp, char *zone_name, zoneid_t zoneid)
 {
 	int res;
 	uint64_t tmp;
-	struct zone_mcaptab mcap;
 	char sched[MAXNAMELEN];
 	zone_dochandle_t handle = NULL;
 	char pool_err[128];
@@ -4407,29 +4419,6 @@ setup_zone_rm(zlog_t *zlogp, char *zone_name, zoneid_t zoneid)
 		zerror(zlogp, B_FALSE, "invalid configuration");
 		zonecfg_fini_handle(handle);
 		return (res);
-	}
-
-	/*
-	 * If a memory cap is configured, set the cap in the kernel using
-	 * zone_setattr() and make sure the rcapd SMF service is enabled.
-	 */
-	if (zonecfg_getmcapent(handle, &mcap) == Z_OK) {
-		uint64_t num;
-		char smf_err[128];
-
-		num = (uint64_t)strtoull(mcap.zone_physmem_cap, NULL, 10);
-		if (zone_setattr(zoneid, ZONE_ATTR_PHYS_MCAP, &num, 0) == -1) {
-			zerror(zlogp, B_TRUE, "could not set zone memory cap");
-			zonecfg_fini_handle(handle);
-			return (Z_INVAL);
-		}
-
-		if (zonecfg_enable_rcapd(smf_err, sizeof (smf_err)) != Z_OK) {
-			zerror(zlogp, B_FALSE, "enabling system/rcap service "
-			    "failed: %s", smf_err);
-			zonecfg_fini_handle(handle);
-			return (Z_INVAL);
-		}
 	}
 
 	/* Get the scheduling class set in the zone configuration. */
@@ -4637,8 +4626,14 @@ out:
 	return (res);
 }
 
+/*
+ * The zone_did is a persistent debug ID.  Each zone should have a unique ID
+ * in the kernel.  This is used for things like DTrace which want to monitor
+ * zones across reboots.  They can't use the zoneid since that changes on
+ * each boot.
+ */
 zoneid_t
-vplat_create(zlog_t *zlogp, zone_mnt_t mount_cmd)
+vplat_create(zlog_t *zlogp, zone_mnt_t mount_cmd, zoneid_t zone_did)
 {
 	zoneid_t rval = -1;
 	priv_set_t *privs;
@@ -4779,7 +4774,7 @@ vplat_create(zlog_t *zlogp, zone_mnt_t mount_cmd)
 	xerr = 0;
 	if ((zoneid = zone_create(kzone, rootpath, privs, rctlbuf,
 	    rctlbufsz, zfsbuf, zfsbufsz, &xerr, match, doi, zlabel,
-	    flags)) == -1) {
+	    flags, zone_did)) == -1) {
 		if (xerr == ZE_AREMOUNTS) {
 			if (zonecfg_find_mounts(rootpath, NULL, NULL) < 1) {
 				zerror(zlogp, B_FALSE,
@@ -4883,6 +4878,8 @@ error:
 	}
 	if (rctlbuf != NULL)
 		free(rctlbuf);
+	if (zfsbuf != NULL)
+		free(zfsbuf);
 	priv_freeset(privs);
 	if (fp != NULL)
 		zonecfg_close_scratch(fp);
@@ -5100,7 +5097,8 @@ unmounted:
 }
 
 int
-vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting)
+vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting,
+    boolean_t debug)
 {
 	char *kzone;
 	zoneid_t zoneid;
@@ -5139,16 +5137,12 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting)
 		goto error;
 	}
 
-	if (remove_datalink_pool(zlogp, zoneid) != 0) {
+	if (remove_datalink_pool(zlogp, zoneid) != 0)
 		zerror(zlogp, B_FALSE, "unable clear datalink pool property");
-		goto error;
-	}
 
-	if (remove_datalink_protect(zlogp, zoneid) != 0) {
+	if (remove_datalink_protect(zlogp, zoneid) != 0)
 		zerror(zlogp, B_FALSE,
 		    "unable clear datalink protect property");
-		goto error;
-	}
 
 	/*
 	 * The datalinks assigned to the zone will be removed from the NGZ as
@@ -5188,7 +5182,7 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting)
 	brand_close(bh);
 
 	if ((strlen(cmdbuf) > EXEC_LEN) &&
-	    (do_subproc(zlogp, cmdbuf, NULL) != Z_OK)) {
+	    (do_subproc(zlogp, cmdbuf, NULL, debug) != Z_OK)) {
 		zerror(zlogp, B_FALSE, "%s failed", cmdbuf);
 		goto error;
 	}
@@ -5220,12 +5214,6 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting)
 			}
 			break;
 		case ZS_EXCLUSIVE:
-			if (unconfigure_exclusive_network_interfaces(zlogp,
-			    zoneid) != 0) {
-				zerror(zlogp, B_FALSE, "unable to unconfigure "
-				    "network interfaces in zone");
-				goto error;
-			}
 			status = dladm_zone_halt(dld_handle, zoneid);
 			if (status != DLADM_STATUS_OK) {
 				zerror(zlogp, B_FALSE, "unable to notify "

@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent Inc. All rights reserved.
  */
 
 /*
@@ -77,6 +78,7 @@
 #include <libinetutil.h>
 #include <pwd.h>
 #include <inet/ip.h>
+#include <uuid/uuid.h>
 
 #include <libzonecfg.h>
 #include "zonecfg.h"
@@ -185,6 +187,8 @@ char *res_types[] = {
 	"admin",
 	"fs-allowed",
 	ALIAS_MAXPROCS,
+	ALIAS_ZFSPRI,
+	"uuid",
 	NULL
 };
 
@@ -232,6 +236,12 @@ char *prop_types[] = {
 	"fs-allowed",
 	ALIAS_MAXPROCS,
 	"allowed-address",
+	ALIAS_ZFSPRI,
+	"mac-addr",
+	"vlan-id",
+	"global-nic",
+	"property",
+	"uuid",
 	NULL
 };
 
@@ -297,6 +307,7 @@ static const char *clear_cmds[] = {
 	"clear " ALIAS_MAXSEMIDS,
 	"clear " ALIAS_SHARES,
 	"clear " ALIAS_MAXPROCS,
+	"clear " ALIAS_ZFSPRI,
 	NULL
 };
 
@@ -347,6 +358,8 @@ static const char *set_cmds[] = {
 	"set hostid=",
 	"set fs-allowed=",
 	"set " ALIAS_MAXPROCS "=",
+	"set " ALIAS_ZFSPRI "=",
+	"set uuid=",
 	NULL
 };
 
@@ -379,6 +392,7 @@ static const char *info_cmds[] = {
 	"info admin",
 	"info fs-allowed",
 	"info max-processes",
+	"info uuid",
 	NULL
 };
 
@@ -404,9 +418,20 @@ static const char *net_res_scope_cmds[] = {
 	"exit",
 	"help",
 	"info",
+	"add property ",
+	"clear allowed-address",
+	"clear defrouter",
+	"clear global-nic",
+	"clear mac-addr",
+	"clear vlan-id",
+	"remove property ",
 	"set address=",
-	"set physical=",
+	"set allowed-address=",
 	"set defrouter=",
+	"set global-nic=",
+	"set mac-addr=",
+	"set physical=",
+	"set vlan-id=",
 	NULL
 };
 
@@ -416,6 +441,7 @@ static const char *device_res_scope_cmds[] = {
 	"exit",
 	"help",
 	"info",
+	"add property ",
 	"set match=",
 	NULL
 };
@@ -523,6 +549,7 @@ static zone_dochandle_t handle;
 /* used all over the place */
 static char zone[ZONENAME_MAX];
 static char revert_zone[ZONENAME_MAX];
+static char new_uuid[UUID_PRINTABLE_STRING_LENGTH];
 
 /* global brand operations */
 static brand_handle_t brand;
@@ -577,7 +604,6 @@ static struct zone_rctltab	old_rctltab, in_progress_rctltab;
 static struct zone_attrtab	old_attrtab, in_progress_attrtab;
 static struct zone_dstab	old_dstab, in_progress_dstab;
 static struct zone_psettab	old_psettab, in_progress_psettab;
-static struct zone_mcaptab	old_mcaptab, in_progress_mcaptab;
 static struct zone_admintab	old_admintab, in_progress_admintab;
 
 static GetLine *gl;	/* The gl_get_line() resource object */
@@ -992,11 +1018,20 @@ usage(boolean_t verbose, uint_t flags)
 			(void) fprintf(fp, gettext("Valid commands:\n"));
 			(void) fprintf(fp, "\t%s %s=%s\n", cmd_to_str(CMD_SET),
 			    pt_to_str(PT_ADDRESS), gettext("<IP-address>"));
+			(void) fprintf(fp, "\t%s %s (%s=<value>,%s=<value>)\n",
+			    cmd_to_str(CMD_ADD), pt_to_str(PT_NPROP),
+			    pt_to_str(PT_NAME), pt_to_str(PT_VALUE));
 			(void) fprintf(fp, "\t%s %s=%s\n", cmd_to_str(CMD_SET),
 			    pt_to_str(PT_ALLOWED_ADDRESS),
 			    gettext("<IP-address>"));
 			(void) fprintf(fp, "\t%s %s=%s\n", cmd_to_str(CMD_SET),
 			    pt_to_str(PT_PHYSICAL), gettext("<interface>"));
+			(void) fprintf(fp, "\t%s %s=%s\n", cmd_to_str(CMD_SET),
+			    pt_to_str(PT_MAC), gettext("<mac-address>"));
+			(void) fprintf(fp, "\t%s %s=%s\n", cmd_to_str(CMD_SET),
+			    pt_to_str(PT_GNIC), gettext("<global zone NIC>"));
+			(void) fprintf(fp, "\t%s %s=%s\n", cmd_to_str(CMD_SET),
+			    pt_to_str(PT_VLANID), gettext("<vlan ID>"));
 			(void) fprintf(fp, gettext("See ifconfig(1M) for "
 			    "details of the <interface> string.\n"));
 			(void) fprintf(fp, gettext("%s %s is valid "
@@ -1004,10 +1039,12 @@ usage(boolean_t verbose, uint_t flags)
 			    "must not be set.\n"),
 			    cmd_to_str(CMD_SET), pt_to_str(PT_ADDRESS),
 			    pt_to_str(PT_IPTYPE), gettext("shared"));
-			(void) fprintf(fp, gettext("%s %s is valid "
-			    "if the %s property is set to %s, otherwise it "
-			    "must not be set.\n"),
-			    cmd_to_str(CMD_SET), pt_to_str(PT_ALLOWED_ADDRESS),
+			(void) fprintf(fp, gettext("%s (%s, %s, %s, %s) are "
+			    "valid if the %s property is set to %s, otherwise "
+			    "they must not be set.\n"),
+			    cmd_to_str(CMD_SET),
+			    pt_to_str(PT_ALLOWED_ADDRESS), pt_to_str(PT_MAC),
+			    pt_to_str(PT_VLANID), pt_to_str(PT_GNIC),
 			    pt_to_str(PT_IPTYPE), gettext("exclusive"));
 			(void) fprintf(fp, gettext("\t%s %s=%s\n%s %s "
 			    "is valid if the %s or %s property is set, "
@@ -1023,6 +1060,9 @@ usage(boolean_t verbose, uint_t flags)
 			    "used to configure a device node.\n"),
 			    rt_to_str(resource_scope));
 			(void) fprintf(fp, gettext("Valid commands:\n"));
+			(void) fprintf(fp, "\t%s %s (%s=<value>,%s=<value>)\n",
+			    cmd_to_str(CMD_ADD), pt_to_str(PT_NPROP),
+			    pt_to_str(PT_NAME), pt_to_str(PT_VALUE));
 			(void) fprintf(fp, "\t%s %s=%s\n", cmd_to_str(CMD_SET),
 			    pt_to_str(PT_MATCH), gettext("<device-path>"));
 			break;
@@ -1154,10 +1194,12 @@ usage(boolean_t verbose, uint_t flags)
 	if (flags & HELP_USAGE) {
 		(void) fprintf(fp, "%s:\t%s %s\n", gettext("usage"),
 		    execname, cmd_to_str(CMD_HELP));
-		(void) fprintf(fp, "\t%s -z <zone>\t\t\t(%s)\n",
+		(void) fprintf(fp, "\t%s {-z <zone>|-u <uuid>}\t\t\t(%s)\n",
 		    execname, gettext("interactive"));
-		(void) fprintf(fp, "\t%s -z <zone> <command>\n", execname);
-		(void) fprintf(fp, "\t%s -z <zone> -f <command-file>\n",
+		(void) fprintf(fp, "\t%s {-z <zone>|-u <uuid>} <command>\n",
+		    execname);
+		(void) fprintf(fp,
+		    "\t%s {-z <zone>|-u <uuid>} -f <command-file>\n",
 		    execname);
 	}
 	if (flags & HELP_SUBCMDS) {
@@ -1246,15 +1288,22 @@ usage(boolean_t verbose, uint_t flags)
 		    pt_to_str(PT_MAXSEMIDS));
 		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
 		    pt_to_str(PT_SHARES));
+		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
+		    pt_to_str(PT_UUID));
+		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
+		    pt_to_str(PT_ZFSPRI));
 		(void) fprintf(fp, "\t%s\t\t%s, %s, %s, %s, %s\n",
 		    rt_to_str(RT_FS), pt_to_str(PT_DIR),
 		    pt_to_str(PT_SPECIAL), pt_to_str(PT_RAW),
 		    pt_to_str(PT_TYPE), pt_to_str(PT_OPTIONS));
-		(void) fprintf(fp, "\t%s\t\t%s, %s, %s|%s\n", rt_to_str(RT_NET),
+		(void) fprintf(fp, "\t%s\t\t%s, %s, %s, %s, %s, %s, %s %s\n",
+		    rt_to_str(RT_NET),
 		    pt_to_str(PT_ADDRESS), pt_to_str(PT_ALLOWED_ADDRESS),
-		    pt_to_str(PT_PHYSICAL), pt_to_str(PT_DEFROUTER));
-		(void) fprintf(fp, "\t%s\t\t%s\n", rt_to_str(RT_DEVICE),
-		    pt_to_str(PT_MATCH));
+		    pt_to_str(PT_GNIC), pt_to_str(PT_MAC),
+		    pt_to_str(PT_PHYSICAL), pt_to_str(PT_NPROP),
+		    pt_to_str(PT_VLANID), pt_to_str(PT_DEFROUTER));
+		(void) fprintf(fp, "\t%s\t\t%s, %s\n", rt_to_str(RT_DEVICE),
+		    pt_to_str(PT_MATCH), pt_to_str(PT_NPROP));
 		(void) fprintf(fp, "\t%s\t\t%s, %s\n", rt_to_str(RT_RCTL),
 		    pt_to_str(PT_NAME), pt_to_str(PT_VALUE));
 		(void) fprintf(fp, "\t%s\t\t%s, %s, %s\n", rt_to_str(RT_ATTR),
@@ -1309,6 +1358,9 @@ initialize(boolean_t handle_expected)
 	if (zonecfg_check_handle(handle) != Z_OK) {
 		if ((err = zonecfg_get_handle(zone, handle)) == Z_OK) {
 			got_handle = B_TRUE;
+
+			(void) zonecfg_fix_obsolete(handle);
+
 			if (zonecfg_get_brand(handle, brandname,
 			    sizeof (brandname)) != Z_OK) {
 				zerr("Zone %s is inconsistent: missing "
@@ -1576,6 +1628,7 @@ create_func(cmd_t *cmd)
 	boolean_t force = B_FALSE;
 	boolean_t attach = B_FALSE;
 	boolean_t arg_err = B_FALSE;
+	uuid_t uuid;
 
 	assert(cmd != NULL);
 
@@ -1583,7 +1636,7 @@ create_func(cmd_t *cmd)
 	(void) strlcpy(zone_template, "SUNWdefault", sizeof (zone_template));
 
 	optind = 0;
-	while ((arg = getopt(cmd->cmd_argc, cmd->cmd_argv, "?a:bFt:"))
+	while ((arg = getopt(cmd->cmd_argc, cmd->cmd_argv, "?a:bFt:X"))
 	    != EOF) {
 		switch (arg) {
 		case '?':
@@ -1609,6 +1662,17 @@ create_func(cmd_t *cmd)
 			(void) strlcpy(zone_template, optarg,
 			    sizeof (zone_template));
 			break;
+		case 'X':
+			(void) snprintf(zone_template, sizeof (zone_template),
+			    "%s/%s.xml", ZONE_CONFIG_ROOT, zone);
+			err = zonecfg_get_xml_handle(zone_template, handle);
+			if (err != Z_OK) {
+				zone_perror(execname, err, B_TRUE);
+				exit(Z_ERR);
+			}
+			got_handle = B_TRUE;
+			need_to_commit = B_TRUE;
+			return;
 		default:
 			short_usage(CMD_CREATE);
 			arg_err = B_TRUE;
@@ -1665,6 +1729,10 @@ create_func(cmd_t *cmd)
 	zonecfg_fini_handle(handle);
 	handle = tmphandle;
 	got_handle = B_TRUE;
+
+	/* Allocate a new uuid for this new zone */
+	uuid_generate(uuid);
+	uuid_unparse(uuid, new_uuid);
 }
 
 /*
@@ -1711,8 +1779,8 @@ export_func(cmd_t *cmd)
 	struct zone_rctltab rctltab;
 	struct zone_dstab dstab;
 	struct zone_psettab psettab;
-	struct zone_mcaptab mcaptab;
 	struct zone_rctlvaltab *valptr;
+	struct zone_res_attrtab *rap;
 	struct zone_admintab admintab;
 	int err, arg;
 	char zonepath[MAXPATHLEN], outfile[MAXPATHLEN], pool[MAXNAMELEN];
@@ -1725,6 +1793,7 @@ export_func(cmd_t *cmd)
 	FILE *of;
 	boolean_t autoboot;
 	zone_iptype_t iptype;
+	uuid_t uuid;
 	boolean_t need_to_close = B_FALSE;
 	boolean_t arg_err = B_FALSE;
 
@@ -1835,6 +1904,14 @@ export_func(cmd_t *cmd)
 		    pt_to_str(PT_FS_ALLOWED), fsallowedp);
 	}
 
+	if (zonecfg_get_uuid(zone, uuid) == Z_OK && !uuid_is_null(uuid)) {
+		char suuid[UUID_PRINTABLE_STRING_LENGTH];
+
+		uuid_unparse(uuid, suuid);
+		(void) fprintf(of, "%s %s=%s\n", cmd_to_str(CMD_SET),
+		    pt_to_str(PT_UUID), suuid);
+	}
+
 	if ((err = zonecfg_setfsent(handle)) != Z_OK) {
 		zone_perror(zone, err, B_FALSE);
 		goto done;
@@ -1882,7 +1959,17 @@ export_func(cmd_t *cmd)
 		export_prop(of, PT_ALLOWED_ADDRESS,
 		    nwiftab.zone_nwif_allowed_address);
 		export_prop(of, PT_PHYSICAL, nwiftab.zone_nwif_physical);
+		export_prop(of, PT_MAC, nwiftab.zone_nwif_mac);
+		export_prop(of, PT_VLANID, nwiftab.zone_nwif_vlan_id);
+		export_prop(of, PT_GNIC, nwiftab.zone_nwif_gnic);
 		export_prop(of, PT_DEFROUTER, nwiftab.zone_nwif_defrouter);
+		for (rap = nwiftab.zone_nwif_attrp; rap != NULL;
+		    rap = rap->zone_res_attr_next) {
+			fprintf(of, "%s %s (%s=%s,%s=\"%s\")\n",
+			    cmd_to_str(CMD_ADD), pt_to_str(PT_NPROP),
+			    pt_to_str(PT_NAME), rap->zone_res_attr_name,
+			    pt_to_str(PT_VALUE), rap->zone_res_attr_value);
+		}
 		(void) fprintf(of, "%s\n", cmd_to_str(CMD_END));
 	}
 	(void) zonecfg_endnwifent(handle);
@@ -1895,20 +1982,16 @@ export_func(cmd_t *cmd)
 		(void) fprintf(of, "%s %s\n", cmd_to_str(CMD_ADD),
 		    rt_to_str(RT_DEVICE));
 		export_prop(of, PT_MATCH, devtab.zone_dev_match);
+		for (rap = devtab.zone_dev_attrp; rap != NULL;
+		    rap = rap->zone_res_attr_next) {
+			fprintf(of, "%s %s (%s=%s,%s=\"%s\")\n",
+			    cmd_to_str(CMD_ADD), pt_to_str(PT_NPROP),
+			    pt_to_str(PT_NAME), rap->zone_res_attr_name,
+			    pt_to_str(PT_VALUE), rap->zone_res_attr_value);
+		}
 		(void) fprintf(of, "%s\n", cmd_to_str(CMD_END));
 	}
 	(void) zonecfg_enddevent(handle);
-
-	if (zonecfg_getmcapent(handle, &mcaptab) == Z_OK) {
-		char buf[128];
-
-		(void) fprintf(of, "%s %s\n", cmd_to_str(CMD_ADD),
-		    rt_to_str(RT_MCAP));
-		bytes_to_units(mcaptab.zone_physmem_cap, buf, sizeof (buf));
-		(void) fprintf(of, "%s %s=%s\n", cmd_to_str(CMD_SET),
-		    pt_to_str(PT_PHYSICAL), buf);
-		(void) fprintf(of, "%s\n", cmd_to_str(CMD_END));
-	}
 
 	if ((err = zonecfg_setrctlent(handle)) != Z_OK) {
 		zone_perror(zone, err, B_FALSE);
@@ -2063,7 +2146,6 @@ add_resource(cmd_t *cmd)
 {
 	int type;
 	struct zone_psettab tmp_psettab;
-	struct zone_mcaptab tmp_mcaptab;
 	uint64_t tmp;
 	uint64_t tmp_mcap;
 	char pool[MAXNAMELEN];
@@ -2155,9 +2237,10 @@ add_resource(cmd_t *cmd)
 		 * Make sure there isn't already a mem-cap entry or max-swap
 		 * or max-locked rctl.
 		 */
-		if (zonecfg_lookup_mcap(handle, &tmp_mcaptab) == Z_OK ||
-		    zonecfg_get_aliased_rctl(handle, ALIAS_MAXSWAP, &tmp_mcap)
-		    == Z_OK ||
+		if (zonecfg_get_aliased_rctl(handle, ALIAS_MAXSWAP,
+		    &tmp_mcap) == Z_OK ||
+		    zonecfg_get_aliased_rctl(handle, ALIAS_MAXPHYSMEM,
+		    &tmp_mcap) == Z_OK ||
 		    zonecfg_get_aliased_rctl(handle, ALIAS_MAXLOCKEDMEM,
 		    &tmp_mcap) == Z_OK) {
 			zerr(gettext("The %s resource or a related resource "
@@ -2170,7 +2253,6 @@ add_resource(cmd_t *cmd)
 			    "to even the root user; "
 			    "this could render the system impossible\n"
 			    "to administer.  Please use caution."));
-		bzero(&in_progress_mcaptab, sizeof (in_progress_mcaptab));
 		return;
 	case RT_ADMIN:
 		bzero(&in_progress_admintab, sizeof (in_progress_admintab));
@@ -2273,6 +2355,68 @@ bad:
 	zonecfg_free_rctl_value_list(rctlvaltab);
 }
 
+/*
+ * Resource attribute ("property" resource embedded on net or dev resource)
+ */
+static void
+do_res_attr(struct zone_res_attrtab **headp, complex_property_ptr_t cpp)
+{
+	complex_property_ptr_t cp;
+	struct zone_res_attrtab *np;
+	int err;
+	boolean_t seen_name = B_FALSE, seen_value = B_FALSE;
+
+	if ((np = calloc(1, sizeof (struct zone_res_attrtab))) == NULL) {
+		zone_perror(zone, Z_NOMEM, B_TRUE);
+		exit(Z_ERR);
+	}
+
+	for (cp = cpp; cp != NULL; cp = cp->cp_next) {
+		switch (cp->cp_type) {
+		case PT_NAME:
+			if (seen_name) {
+				zerr(gettext("%s already specified"),
+				    pt_to_str(PT_NAME));
+				goto bad;
+			}
+			(void) strlcpy(np->zone_res_attr_name, cp->cp_value,
+			    sizeof (np->zone_res_attr_name));
+			seen_name = B_TRUE;
+			break;
+		case PT_VALUE:
+			if (seen_value) {
+				zerr(gettext("%s already specified"),
+				    pt_to_str(PT_VALUE));
+				goto bad;
+			}
+			(void) strlcpy(np->zone_res_attr_value, cp->cp_value,
+			    sizeof (np->zone_res_attr_value));
+			seen_value = B_TRUE;
+			break;
+		default:
+			zone_perror(pt_to_str(PT_NPROP), Z_NO_PROPERTY_TYPE,
+			    B_TRUE);
+			long_usage(CMD_ADD, B_TRUE);
+			usage(B_FALSE, HELP_PROPS);
+			zonecfg_free_res_attr_list(np);
+			return;
+		}
+	}
+
+	if (!seen_name)
+		zerr(gettext("%s not specified"), pt_to_str(PT_NAME));
+	if (!seen_value)
+		zerr(gettext("%s not specified"), pt_to_str(PT_VALUE));
+
+	err = zonecfg_add_res_attr(headp, np);
+	if (err != Z_OK)
+		zone_perror(pt_to_str(PT_NPROP), err, B_TRUE);
+	return;
+
+bad:
+	zonecfg_free_res_attr_list(np);
+}
+
 static void
 add_property(cmd_t *cmd)
 {
@@ -2340,6 +2484,44 @@ add_property(cmd_t *cmd)
 			}
 		}
 		return;
+	case RT_NET:
+		if (prop_type != PT_NPROP) {
+			zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE,
+			    B_TRUE);
+			long_usage(CMD_ADD, B_TRUE);
+			usage(B_FALSE, HELP_PROPS);
+			return;
+		}
+		pp = cmd->cmd_property_ptr[0];
+		if (pp->pv_type != PROP_VAL_COMPLEX) {
+			zerr(gettext("A %s value was expected here."),
+			    pvt_to_str(PROP_VAL_COMPLEX));
+			saw_error = B_TRUE;
+			return;
+		}
+
+		do_res_attr(&(in_progress_nwiftab.zone_nwif_attrp),
+		    pp->pv_complex);
+		return;
+	case RT_DEVICE:
+		if (prop_type != PT_NPROP) {
+			zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE,
+			    B_TRUE);
+			long_usage(CMD_ADD, B_TRUE);
+			usage(B_FALSE, HELP_PROPS);
+			return;
+		}
+		pp = cmd->cmd_property_ptr[0];
+		if (pp->pv_type != PROP_VAL_COMPLEX) {
+			zerr(gettext("A %s value was expected here."),
+			    pvt_to_str(PROP_VAL_COMPLEX));
+			saw_error = B_TRUE;
+			return;
+		}
+
+		do_res_attr(&(in_progress_devtab.zone_dev_attrp),
+		    pp->pv_complex);
+		return;
 	case RT_RCTL:
 		if (prop_type != PT_VALUE) {
 			zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE,
@@ -2384,7 +2566,7 @@ static boolean_t
 gz_invalid_rt_property(int type)
 {
 	return (global_zone && (type == RT_ZONENAME || type == RT_ZONEPATH ||
-	    type == RT_AUTOBOOT || type == RT_LIMITPRIV ||
+	    type == RT_AUTOBOOT || type == RT_LIMITPRIV || type == RT_UUID ||
 	    type == RT_BOOTARGS || type == RT_BRAND || type == RT_SCHED ||
 	    type == RT_IPTYPE || type == RT_HOSTID || type == RT_FS_ALLOWED));
 }
@@ -2393,7 +2575,7 @@ static boolean_t
 gz_invalid_property(int type)
 {
 	return (global_zone && (type == PT_ZONENAME || type == PT_ZONEPATH ||
-	    type == PT_AUTOBOOT || type == PT_LIMITPRIV ||
+	    type == PT_AUTOBOOT || type == PT_LIMITPRIV || type == PT_UUID ||
 	    type == PT_BOOTARGS || type == PT_BRAND || type == PT_SCHED ||
 	    type == PT_IPTYPE || type == PT_HOSTID || type == PT_FS_ALLOWED));
 }
@@ -2444,8 +2626,9 @@ add_func(cmd_t *cmd)
 		resource_scope = cmd->cmd_res_type;
 		end_op = CMD_ADD;
 		add_resource(cmd);
-	} else
+	} else {
 		add_property(cmd);
+	}
 }
 
 /*
@@ -2610,6 +2793,32 @@ fill_in_fstab(cmd_t *cmd, struct zone_fstab *fstab, boolean_t fill_in_only)
 	return (zonecfg_lookup_filesystem(handle, fstab));
 }
 
+/*
+ * Turn an addr that looks like f:2:0:44:5:6C into 0f:02:00:44:05:6c
+ * We're expecting a dst of at least MAXMACADDRLEN size here.
+ */
+static void
+normalize_mac_addr(char *dst, const char *src, int len)
+{
+	char *p, *e, *sep = "";
+	long n;
+	char buf[MAXMACADDRLEN], tmp[4];
+
+	*dst = '\0';
+	(void) strlcpy(buf, src, sizeof (buf));
+	p = strtok(buf, ":");
+	while (p != NULL) {
+		n = strtol(p, &e, 16);
+		if (*e != NULL || n > 0xff)
+			return;
+		(void) snprintf(tmp, sizeof (tmp), "%s%02x", sep, n);
+		(void) strlcat(dst, tmp, len);
+
+		sep = ":";
+		p = strtok(NULL, ":");
+	}
+}
+
 static int
 fill_in_nwiftab(cmd_t *cmd, struct zone_nwiftab *nwiftab,
     boolean_t fill_in_only)
@@ -2642,6 +2851,21 @@ fill_in_nwiftab(cmd_t *cmd, struct zone_nwiftab *nwiftab,
 			(void) strlcpy(nwiftab->zone_nwif_physical,
 			    pp->pv_simple,
 			    sizeof (nwiftab->zone_nwif_physical));
+			break;
+		case PT_MAC:
+			normalize_mac_addr(nwiftab->zone_nwif_mac,
+			    pp->pv_simple,
+			    sizeof (nwiftab->zone_nwif_mac));
+			break;
+		case PT_VLANID:
+			(void) strlcpy(nwiftab->zone_nwif_vlan_id,
+			    pp->pv_simple,
+			    sizeof (nwiftab->zone_nwif_vlan_id));
+			break;
+		case PT_GNIC:
+			(void) strlcpy(nwiftab->zone_nwif_gnic,
+			    pp->pv_simple,
+			    sizeof (nwiftab->zone_nwif_gnic));
 			break;
 		case PT_DEFROUTER:
 			(void) strlcpy(nwiftab->zone_nwif_defrouter,
@@ -3160,10 +3384,9 @@ remove_mcap()
 {
 	int err, res1, res2, res3;
 	uint64_t tmp;
-	struct zone_mcaptab mcaptab;
 	boolean_t revert = B_FALSE;
 
-	res1 = zonecfg_lookup_mcap(handle, &mcaptab);
+	res1 = zonecfg_get_aliased_rctl(handle, ALIAS_MAXPHYSMEM, &tmp);
 	res2 = zonecfg_get_aliased_rctl(handle, ALIAS_MAXSWAP, &tmp);
 	res3 = zonecfg_get_aliased_rctl(handle, ALIAS_MAXLOCKEDMEM, &tmp);
 
@@ -3175,13 +3398,15 @@ remove_mcap()
 		return;
 	}
 	if (res1 == Z_OK) {
-		if ((err = zonecfg_delete_mcap(handle)) != Z_OK) {
+		if ((err = zonecfg_rm_aliased_rctl(handle, ALIAS_MAXPHYSMEM))
+		    != Z_OK) {
 			z_cmd_rt_perror(CMD_REMOVE, RT_MCAP, err, B_TRUE);
 			revert = B_TRUE;
 		} else {
 			need_to_commit = B_TRUE;
 		}
 	}
+
 	if (res2 == Z_OK) {
 		if ((err = zonecfg_rm_aliased_rctl(handle, ALIAS_MAXSWAP))
 		    != Z_OK) {
@@ -3324,6 +3549,7 @@ remove_property(cmd_t *cmd)
 	int err, res_type, prop_type;
 	property_value_ptr_t pp;
 	struct zone_rctlvaltab *rctlvaltab;
+	struct zone_res_attrtab *np;
 	complex_property_ptr_t cx;
 
 	res_type = resource_scope;
@@ -3384,6 +3610,56 @@ remove_property(cmd_t *cmd)
 			}
 		}
 		return;
+	case RT_NET:		/* FALLTHRU */
+	case RT_DEVICE:
+		if (prop_type != PT_NPROP) {
+			zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE,
+			    B_TRUE);
+			long_usage(CMD_REMOVE, B_TRUE);
+			usage(B_FALSE, HELP_PROPS);
+			return;
+		}
+		pp = cmd->cmd_property_ptr[0];
+		if (pp->pv_type != PROP_VAL_COMPLEX) {
+			zerr(gettext("A %s value was expected here."),
+			    pvt_to_str(PROP_VAL_COMPLEX));
+			saw_error = B_TRUE;
+			return;
+		}
+
+		np = alloca(sizeof (struct zone_res_attrtab));
+		for (cx = pp->pv_complex; cx != NULL; cx = cx->cp_next) {
+			switch (cx->cp_type) {
+			case PT_NAME:
+				(void) strlcpy(np->zone_res_attr_name,
+				    cx->cp_value,
+				    sizeof (np->zone_res_attr_name));
+				break;
+			case PT_VALUE:
+				(void) strlcpy(np->zone_res_attr_value,
+				    cx->cp_value,
+				    sizeof (np->zone_res_attr_value));
+				break;
+			default:
+				zone_perror(pt_to_str(prop_type),
+				    Z_NO_PROPERTY_TYPE, B_TRUE);
+				long_usage(CMD_REMOVE, B_TRUE);
+				usage(B_FALSE, HELP_PROPS);
+				return;
+			}
+		}
+		np->zone_res_attr_next = NULL;
+
+		if (res_type == RT_NET) {
+			err = zonecfg_remove_res_attr(
+			    &(in_progress_nwiftab.zone_nwif_attrp), np);
+		} else {				/* RT_DEVICE */
+			err = zonecfg_remove_res_attr(
+			    &(in_progress_devtab.zone_dev_attrp), np);
+		}
+		if (err != Z_OK)
+			zone_perror(pt_to_str(prop_type), err, B_TRUE);
+		return;
 	case RT_RCTL:
 		if (prop_type != PT_VALUE) {
 			zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE,
@@ -3436,18 +3712,6 @@ remove_property(cmd_t *cmd)
 			zone_perror(pt_to_str(prop_type), err, B_TRUE);
 		zonecfg_free_rctl_value_list(rctlvaltab);
 		return;
-	case RT_NET:
-		if (prop_type != PT_DEFROUTER) {
-			zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE,
-			    B_TRUE);
-			long_usage(CMD_REMOVE, B_TRUE);
-			usage(B_FALSE, HELP_PROPS);
-			return;
-		} else {
-			bzero(&in_progress_nwiftab.zone_nwif_defrouter,
-			    sizeof (in_progress_nwiftab.zone_nwif_defrouter));
-			return;
-		}
 	default:
 		zone_perror(rt_to_str(res_type), Z_NO_RESOURCE_TYPE, B_TRUE);
 		long_usage(CMD_REMOVE, B_TRUE);
@@ -3510,14 +3774,37 @@ clear_property(cmd_t *cmd)
 	case RT_MCAP:
 		switch (prop_type) {
 		case PT_PHYSICAL:
-			in_progress_mcaptab.zone_physmem_cap[0] = '\0';
-			need_to_commit = B_TRUE;
+			remove_aliased_rctl(PT_PHYSICAL, ALIAS_MAXPHYSMEM);
 			return;
 		case PT_SWAP:
 			remove_aliased_rctl(PT_SWAP, ALIAS_MAXSWAP);
 			return;
 		case PT_LOCKED:
 			remove_aliased_rctl(PT_LOCKED, ALIAS_MAXLOCKEDMEM);
+			return;
+		}
+		break;
+	case RT_NET:
+		switch (prop_type) {
+		case PT_ALLOWED_ADDRESS:
+			in_progress_nwiftab.zone_nwif_allowed_address[0] = '\0';
+			need_to_commit = B_TRUE;
+			return;
+		case PT_DEFROUTER:
+			in_progress_nwiftab.zone_nwif_defrouter[0] = '\0';
+			need_to_commit = B_TRUE;
+			return;
+		case PT_GNIC:
+			in_progress_nwiftab.zone_nwif_gnic[0] = '\0';
+			need_to_commit = B_TRUE;
+			return;
+		case PT_MAC:
+			in_progress_nwiftab.zone_nwif_mac[0] = '\0';
+			need_to_commit = B_TRUE;
+			return;
+		case PT_VLANID:
+			in_progress_nwiftab.zone_nwif_vlan_id[0] = '\0';
+			need_to_commit = B_TRUE;
 			return;
 		}
 		break;
@@ -3545,6 +3832,8 @@ clear_global(cmd_t *cmd)
 	case PT_ZONENAME:
 		/* FALLTHRU */
 	case PT_ZONEPATH:
+		/* FALLTHRU */
+	case PT_UUID:
 		/* FALLTHRU */
 	case PT_BRAND:
 		zone_perror(pt_to_str(type), Z_CLEAR_DISALLOW, B_TRUE);
@@ -3608,6 +3897,9 @@ clear_global(cmd_t *cmd)
 	case PT_SHARES:
 		remove_aliased_rctl(PT_SHARES, ALIAS_SHARES);
 		return;
+	case PT_ZFSPRI:
+		remove_aliased_rctl(PT_ZFSPRI, ALIAS_ZFSPRI);
+		return;
 	case PT_HOSTID:
 		if ((err = zonecfg_set_hostid(handle, NULL)) != Z_OK)
 			z_cmd_rt_perror(CMD_CLEAR, RT_HOSTID, err, B_TRUE);
@@ -3653,7 +3945,7 @@ clear_func(cmd_t *cmd)
 void
 select_func(cmd_t *cmd)
 {
-	int type, err, res;
+	int type, err;
 	uint64_t limit;
 	uint64_t tmp;
 
@@ -3748,7 +4040,8 @@ select_func(cmd_t *cmd)
 		return;
 	case RT_MCAP:
 		/* if none of these exist, there is no resource to select */
-		if ((res = zonecfg_lookup_mcap(handle, &old_mcaptab)) != Z_OK &&
+		if (zonecfg_get_aliased_rctl(handle, ALIAS_MAXPHYSMEM, &limit)
+		    != Z_OK &&
 		    zonecfg_get_aliased_rctl(handle, ALIAS_MAXSWAP, &limit)
 		    != Z_OK &&
 		    zonecfg_get_aliased_rctl(handle, ALIAS_MAXLOCKEDMEM, &limit)
@@ -3757,12 +4050,6 @@ select_func(cmd_t *cmd)
 			    B_TRUE);
 			global_scope = B_TRUE;
 		}
-		if (res == Z_OK)
-			bcopy(&old_mcaptab, &in_progress_mcaptab,
-			    sizeof (struct zone_mcaptab));
-		else
-			bzero(&in_progress_mcaptab,
-			    sizeof (in_progress_mcaptab));
 		return;
 	case RT_ADMIN:
 		if ((err = fill_in_admintab(cmd, &old_admintab, B_FALSE))
@@ -4029,7 +4316,6 @@ set_func(cmd_t *cmd)
 	boolean_t autoboot;
 	zone_iptype_t iptype;
 	boolean_t force_set = B_FALSE;
-	size_t physmem_size = sizeof (in_progress_mcaptab.zone_physmem_cap);
 	uint64_t mem_cap, mem_limit;
 	float cap;
 	char *unitp;
@@ -4104,6 +4390,10 @@ set_func(cmd_t *cmd)
 			res_type = RT_HOSTID;
 		} else if (prop_type == PT_FS_ALLOWED) {
 			res_type = RT_FS_ALLOWED;
+		} else if (prop_type == PT_ZFSPRI) {
+			res_type = RT_ZFSPRI;
+		} else if (prop_type == PT_UUID) {
+			res_type = RT_UUID;
 		} else {
 			zerr(gettext("Cannot set a resource-specific property "
 			    "from the global scope."));
@@ -4133,10 +4423,12 @@ set_func(cmd_t *cmd)
 	 * A nasty expression but not that complicated:
 	 * 1. fs options are simple or list (tested below)
 	 * 2. rctl value's are complex or list (tested below)
+	 * 3. net attr's are complex (tested below)
 	 * Anything else should be simple.
 	 */
 	if (!(res_type == RT_FS && prop_type == PT_OPTIONS) &&
 	    !(res_type == RT_RCTL && prop_type == PT_VALUE) &&
+	    !(res_type == RT_NET && prop_type == PT_NPROP) &&
 	    (pp->pv_type != PROP_VAL_SIMPLE ||
 	    (prop_id = pp->pv_simple) == NULL)) {
 		zerr(gettext("A %s value was expected here."),
@@ -4309,6 +4601,9 @@ set_func(cmd_t *cmd)
 	case RT_SHARES:
 		set_aliased_rctl(ALIAS_SHARES, prop_type, prop_id);
 		return;
+	case RT_ZFSPRI:
+		set_aliased_rctl(ALIAS_ZFSPRI, prop_type, prop_id);
+		return;
 	case RT_HOSTID:
 		if ((err = zonecfg_set_hostid(handle, prop_id)) != Z_OK) {
 			if (err == Z_TOO_BIG) {
@@ -4320,6 +4615,15 @@ set_func(cmd_t *cmd)
 			}
 			return;
 		}
+		need_to_commit = B_TRUE;
+		return;
+	case RT_UUID:
+		/*
+		 * We can't set here.  We have to wait until commit since the
+		 * uuid will be updating the index file and we may not have
+		 * created the zone yet.
+		 */
+		(void) strlcpy(new_uuid, prop_id, sizeof (new_uuid));
 		need_to_commit = B_TRUE;
 		return;
 	case RT_FS_ALLOWED:
@@ -4396,6 +4700,21 @@ set_func(cmd_t *cmd)
 			    prop_id,
 			    sizeof (in_progress_nwiftab.zone_nwif_physical));
 			break;
+		case PT_MAC:
+			normalize_mac_addr(in_progress_nwiftab.zone_nwif_mac,
+			    prop_id,
+			    sizeof (in_progress_nwiftab.zone_nwif_mac));
+			break;
+		case PT_VLANID:
+			(void) strlcpy(in_progress_nwiftab.zone_nwif_vlan_id,
+			    prop_id,
+			    sizeof (in_progress_nwiftab.zone_nwif_vlan_id));
+			break;
+		case PT_GNIC:
+			(void) strlcpy(in_progress_nwiftab.zone_nwif_gnic,
+			    prop_id,
+			    sizeof (in_progress_nwiftab.zone_nwif_gnic));
+			break;
 		case PT_DEFROUTER:
 			if (validate_net_address_syntax(prop_id, B_TRUE)
 			    != Z_OK) {
@@ -4405,6 +4724,20 @@ set_func(cmd_t *cmd)
 			(void) strlcpy(in_progress_nwiftab.zone_nwif_defrouter,
 			    prop_id,
 			    sizeof (in_progress_nwiftab.zone_nwif_defrouter));
+			break;
+		case PT_NPROP:
+			if (pp->pv_type != PROP_VAL_COMPLEX) {
+				zerr(gettext("A %s value was expected here."),
+				    pvt_to_str(PROP_VAL_COMPLEX));
+				saw_error = B_TRUE;
+				return;
+			}
+			zonecfg_free_res_attr_list(
+			    in_progress_nwiftab.zone_nwif_attrp);
+			in_progress_nwiftab.zone_nwif_attrp = NULL;
+			if (!(pp->pv_type == PROP_VAL_LIST &&
+			    pp->pv_list == NULL))
+				add_property(cmd);
 			break;
 		default:
 			zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE,
@@ -4420,6 +4753,20 @@ set_func(cmd_t *cmd)
 			(void) strlcpy(in_progress_devtab.zone_dev_match,
 			    prop_id,
 			    sizeof (in_progress_devtab.zone_dev_match));
+			break;
+		case PT_NPROP:
+			if (pp->pv_type != PROP_VAL_COMPLEX) {
+				zerr(gettext("A %s value was expected here."),
+				    pvt_to_str(PROP_VAL_COMPLEX));
+				saw_error = B_TRUE;
+				return;
+			}
+			zonecfg_free_res_attr_list(
+			    in_progress_devtab.zone_dev_attrp);
+			in_progress_devtab.zone_dev_attrp = NULL;
+			if (!(pp->pv_type == PROP_VAL_LIST &&
+			    pp->pv_list == NULL))
+				add_property(cmd);
 			break;
 		default:
 			zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE,
@@ -4581,18 +4928,30 @@ set_func(cmd_t *cmd)
 	case RT_MCAP:
 		switch (prop_type) {
 		case PT_PHYSICAL:
-			if (!zonecfg_valid_memlimit(prop_id, &mem_cap)) {
-				zerr(gettext("A positive number with a "
-				    "required scale suffix (K, M, G or T) was "
-				    "expected here."));
+			/*
+			 * We have to check if an rctl is allowed here since
+			 * there might already be a rctl defined that blocks
+			 * the alias.
+			 */
+			if (!zonecfg_aliased_rctl_ok(handle,
+			    ALIAS_MAXPHYSMEM)) {
+				zone_perror(pt_to_str(PT_LOCKED),
+				    Z_ALIAS_DISALLOW, B_FALSE);
 				saw_error = B_TRUE;
-			} else if (mem_cap < ONE_MB) {
-				zerr(gettext("%s value is too small.  It must "
-				    "be at least 1M."), pt_to_str(PT_PHYSICAL));
+				return;
+			}
+
+			if (!zonecfg_valid_memlimit(prop_id, &mem_cap)) {
+				zerr(gettext("A non-negative number with a "
+				    "required scale suffix (K, M, G or T) was "
+				    "expected\nhere."));
 				saw_error = B_TRUE;
 			} else {
-				snprintf(in_progress_mcaptab.zone_physmem_cap,
-				    physmem_size, "%llu", mem_cap);
+				if ((err = zonecfg_set_aliased_rctl(handle,
+				    ALIAS_MAXPHYSMEM, mem_cap)) != Z_OK)
+					zone_perror(zone, err, B_TRUE);
+				else
+					need_to_commit = B_TRUE;
 			}
 			break;
 		case PT_SWAP:
@@ -4864,6 +5223,23 @@ info_hostid(zone_dochandle_t handle, FILE *fp)
 }
 
 static void
+info_uuid(FILE *fp)
+{
+	uuid_t uuid;
+	char suuid[UUID_PRINTABLE_STRING_LENGTH];
+
+	if (new_uuid[0] != '\0') {
+		(void) fprintf(fp, "%s: %s\n", pt_to_str(PT_UUID), new_uuid);
+	} else if (zonecfg_get_uuid(zone, uuid) == Z_OK &&
+	    !uuid_is_null(uuid)) {
+		uuid_unparse(uuid, suuid);
+		(void) fprintf(fp, "%s: %s\n", pt_to_str(PT_UUID), suuid);
+	} else {
+		(void) fprintf(fp, "%s:\n", pt_to_str(PT_UUID));
+	}
+}
+
+static void
 info_fs_allowed(zone_dochandle_t handle, FILE *fp)
 {
 	char fsallowedp[ZONE_FS_ALLOWED_MAX];
@@ -4945,12 +5321,25 @@ loopend:
 static void
 output_net(FILE *fp, struct zone_nwiftab *nwiftab)
 {
+	struct zone_res_attrtab *np;
+
 	(void) fprintf(fp, "%s:\n", rt_to_str(RT_NET));
 	output_prop(fp, PT_ADDRESS, nwiftab->zone_nwif_address, B_TRUE);
 	output_prop(fp, PT_ALLOWED_ADDRESS,
 	    nwiftab->zone_nwif_allowed_address, B_TRUE);
-	output_prop(fp, PT_PHYSICAL, nwiftab->zone_nwif_physical, B_TRUE);
 	output_prop(fp, PT_DEFROUTER, nwiftab->zone_nwif_defrouter, B_TRUE);
+	output_prop(fp, PT_GNIC, nwiftab->zone_nwif_gnic, B_TRUE);
+	output_prop(fp, PT_MAC, nwiftab->zone_nwif_mac, B_TRUE);
+	output_prop(fp, PT_PHYSICAL, nwiftab->zone_nwif_physical, B_TRUE);
+	output_prop(fp, PT_VLANID, nwiftab->zone_nwif_vlan_id, B_TRUE);
+
+	for (np = nwiftab->zone_nwif_attrp; np != NULL;
+	    np = np->zone_res_attr_next) {
+		fprintf(fp, "\t%s: (%s=%s,%s=\"%s\")\n",
+		    pt_to_str(PT_NPROP),
+		    pt_to_str(PT_NAME), np->zone_res_attr_name,
+		    pt_to_str(PT_VALUE), np->zone_res_attr_value);
+	}
 }
 
 static void
@@ -4993,8 +5382,18 @@ info_net(zone_dochandle_t handle, FILE *fp, cmd_t *cmd)
 static void
 output_dev(FILE *fp, struct zone_devtab *devtab)
 {
+	struct zone_res_attrtab *np;
+
 	(void) fprintf(fp, "%s:\n", rt_to_str(RT_DEVICE));
 	output_prop(fp, PT_MATCH, devtab->zone_dev_match, B_TRUE);
+
+	for (np = devtab->zone_dev_attrp; np != NULL;
+	    np = np->zone_res_attr_next) {
+		fprintf(fp, "\t%s: (%s=%s,%s=\"%s\")\n",
+		    pt_to_str(PT_NPROP),
+		    pt_to_str(PT_NAME), np->zone_res_attr_name,
+		    pt_to_str(PT_VALUE), np->zone_res_attr_value);
+	}
 }
 
 static void
@@ -5253,15 +5652,18 @@ bytes_to_units(char *str, char *buf, int bufsize)
 }
 
 static void
-output_mcap(FILE *fp, struct zone_mcaptab *mcaptab, int showswap,
+output_mcap(FILE *fp, int showphys, uint64_t maxphys, int showswap,
     uint64_t maxswap, int showlocked, uint64_t maxlocked)
 {
 	char buf[128];
 
 	(void) fprintf(fp, "%s:\n", rt_to_str(RT_MCAP));
-	if (mcaptab->zone_physmem_cap[0] != '\0') {
-		bytes_to_units(mcaptab->zone_physmem_cap, buf, sizeof (buf));
-		output_prop(fp, PT_PHYSICAL, buf, B_TRUE);
+
+	if (showphys == Z_OK) {
+		(void) snprintf(buf, sizeof (buf), "%llu", maxphys);
+		bytes_to_units(buf, buf, sizeof (buf));
+		/* Print directly since "physical" also is a net property. */
+		(void) fprintf(fp, "\t[%s: %s]\n", pt_to_str(PT_PHYSICAL), buf);
 	}
 
 	if (showswap == Z_OK) {
@@ -5283,16 +5685,16 @@ info_mcap(zone_dochandle_t handle, FILE *fp)
 	int res1, res2, res3;
 	uint64_t swap_limit;
 	uint64_t locked_limit;
-	struct zone_mcaptab lookup;
+	uint64_t phys_limit;
 
-	bzero(&lookup, sizeof (lookup));
-	res1 = zonecfg_getmcapent(handle, &lookup);
+	res1 = zonecfg_get_aliased_rctl(handle, ALIAS_MAXPHYSMEM, &phys_limit);
 	res2 = zonecfg_get_aliased_rctl(handle, ALIAS_MAXSWAP, &swap_limit);
 	res3 = zonecfg_get_aliased_rctl(handle, ALIAS_MAXLOCKEDMEM,
 	    &locked_limit);
 
 	if (res1 == Z_OK || res2 == Z_OK || res3 == Z_OK)
-		output_mcap(fp, &lookup, res2, swap_limit, res3, locked_limit);
+		output_mcap(fp, res1, phys_limit, res2, swap_limit,
+		    res3, locked_limit);
 }
 
 static void
@@ -5344,9 +5746,10 @@ info_func(cmd_t *cmd)
 	boolean_t need_to_close = B_FALSE;
 	char *pager, *space;
 	int type;
-	int res1, res2;
+	int res1, res2, res3;
 	uint64_t swap_limit;
 	uint64_t locked_limit;
+	uint64_t phys_limit;
 	struct stat statbuf;
 
 	assert(cmd != NULL);
@@ -5407,7 +5810,9 @@ info_func(cmd_t *cmd)
 			    &swap_limit);
 			res2 = zonecfg_get_aliased_rctl(handle,
 			    ALIAS_MAXLOCKEDMEM, &locked_limit);
-			output_mcap(fp, &in_progress_mcaptab, res1, swap_limit,
+			res3 = zonecfg_get_aliased_rctl(handle,
+			    ALIAS_MAXPHYSMEM, &phys_limit);
+			output_mcap(fp, res3, phys_limit, res1, swap_limit,
 			    res2, locked_limit);
 			break;
 		case RT_ADMIN:
@@ -5447,6 +5852,7 @@ info_func(cmd_t *cmd)
 			info_iptype(handle, fp);
 			info_hostid(handle, fp);
 			info_fs_allowed(handle, fp);
+			info_uuid(fp);
 		}
 		info_aliased_rctl(handle, fp, ALIAS_MAXLWPS);
 		info_aliased_rctl(handle, fp, ALIAS_MAXPROCS);
@@ -5455,6 +5861,7 @@ info_func(cmd_t *cmd)
 		info_aliased_rctl(handle, fp, ALIAS_MAXMSGIDS);
 		info_aliased_rctl(handle, fp, ALIAS_MAXSEMIDS);
 		info_aliased_rctl(handle, fp, ALIAS_SHARES);
+		info_aliased_rctl(handle, fp, ALIAS_ZFSPRI);
 		if (!global_zone) {
 			info_fs(handle, fp, cmd);
 			info_net(handle, fp, cmd);
@@ -5518,6 +5925,9 @@ info_func(cmd_t *cmd)
 	case RT_SHARES:
 		info_aliased_rctl(handle, fp, ALIAS_SHARES);
 		break;
+	case RT_ZFSPRI:
+		info_aliased_rctl(handle, fp, ALIAS_ZFSPRI);
+		break;
 	case RT_FS:
 		info_fs(handle, fp, cmd);
 		break;
@@ -5547,6 +5957,9 @@ info_func(cmd_t *cmd)
 		break;
 	case RT_HOSTID:
 		info_hostid(handle, fp);
+		break;
+	case RT_UUID:
+		info_uuid(fp);
 		break;
 	case RT_ADMIN:
 		info_auth(handle, fp, cmd);
@@ -6015,10 +6428,28 @@ verify_func(cmd_t *cmd)
 
 	if (save) {
 		if (ret_val == Z_OK) {
+			/*
+			 * If the zone doesn't yet have a debug ID, set one now.
+			 */
+			if (zonecfg_get_did(handle) == -1)
+				zonecfg_set_did(handle);
+
 			if ((ret_val = zonecfg_save(handle)) == Z_OK) {
 				need_to_commit = B_FALSE;
 				(void) strlcpy(revert_zone, zone,
 				    sizeof (revert_zone));
+			}
+
+			/*
+			 * Commit a new uuid at this point since we now know the
+			 * zone index entry will exist.
+			 */
+			if (new_uuid[0] != '\0') {
+				if ((err = zonecfg_set_uuid(zone, zonepath,
+				    new_uuid)) != Z_OK)
+					zone_perror(zone, err, B_FALSE);
+				else
+					new_uuid[0] = '\0';
 			}
 		} else {
 			zerr(gettext("Zone %s failed to verify"), zone);
@@ -6189,6 +6620,7 @@ end_func(cmd_t *cmd)
 	int err, arg, res1, res2, res3;
 	uint64_t swap_limit;
 	uint64_t locked_limit;
+	uint64_t phys_limit;
 	uint64_t proc_cap;
 
 	assert(cmd != NULL);
@@ -6492,8 +6924,8 @@ end_func(cmd_t *cmd)
 		break;
 	case RT_MCAP:
 		/* Make sure everything was filled in. */
-		res1 = strlen(in_progress_mcaptab.zone_physmem_cap) == 0 ?
-		    Z_ERR : Z_OK;
+		res1 = zonecfg_get_aliased_rctl(handle, ALIAS_MAXPHYSMEM,
+		    &phys_limit);
 		res2 = zonecfg_get_aliased_rctl(handle, ALIAS_MAXSWAP,
 		    &swap_limit);
 		res3 = zonecfg_get_aliased_rctl(handle, ALIAS_MAXLOCKEDMEM,
@@ -6509,11 +6941,6 @@ end_func(cmd_t *cmd)
 
 		/* if phys & locked are both set, verify locked <= phys */
 		if (res1 == Z_OK && res3 == Z_OK) {
-			uint64_t phys_limit;
-			char *endp;
-
-			phys_limit = strtoull(
-			    in_progress_mcaptab.zone_physmem_cap, &endp, 10);
 			if (phys_limit < locked_limit) {
 				zerr(gettext("The %s cap must be less than or "
 				    "equal to the %s cap."),
@@ -6525,23 +6952,6 @@ end_func(cmd_t *cmd)
 		}
 
 		err = Z_OK;
-		if (res1 == Z_OK) {
-			/*
-			 * We could be ending from either an add operation
-			 * or a select operation.  Since all of the properties
-			 * within this resource are optional, we always use
-			 * modify on the mcap entry.  zonecfg_modify_mcap()
-			 * will handle both adding and modifying a memory cap.
-			 */
-			err = zonecfg_modify_mcap(handle, &in_progress_mcaptab);
-		} else if (end_op == CMD_SELECT) {
-			/*
-			 * If we're ending from a select and the physical
-			 * memory cap is empty then the user could have cleared
-			 * the physical cap value, so try to delete the entry.
-			 */
-			(void) zonecfg_delete_mcap(handle);
-		}
 		break;
 	case RT_ADMIN:
 		/* First make sure everything was filled in. */
@@ -7090,8 +7500,10 @@ get_execbasename(char *execfullname)
 int
 main(int argc, char *argv[])
 {
-	int err, arg;
+	int err, arg, uflag = 0, zflag = 0;
 	struct stat st;
+	uuid_t uuidin;
+	char zonename[ZONENAME_MAX + 1];
 
 	/* This must be before anything goes to stdout. */
 	setbuf(stdout, NULL);
@@ -7118,7 +7530,7 @@ main(int argc, char *argv[])
 		exit(Z_OK);
 	}
 
-	while ((arg = getopt(argc, argv, "?f:R:z:")) != EOF) {
+	while ((arg = getopt(argc, argv, "?f:R:z:u:")) != EOF) {
 		switch (arg) {
 		case '?':
 			if (optopt == '?')
@@ -7145,6 +7557,21 @@ main(int argc, char *argv[])
 			}
 			zonecfg_set_root(optarg);
 			break;
+		case 'u':
+			if (uuid_parse((char *)optarg, uuidin) == -1)
+				return (Z_INVALID_PROPERTY);
+
+			if (zonecfg_get_name_by_uuid(uuidin, zonename,
+			    ZONENAME_MAX) != Z_OK) {
+				zone_perror(optarg, Z_BOGUS_ZONE_NAME, B_TRUE);
+				usage(B_FALSE, HELP_SYNTAX);
+				exit(Z_USAGE);
+			}
+
+			(void) strlcpy(zone, zonename, sizeof (zone));
+			(void) strlcpy(revert_zone, zonename, sizeof (zone));
+			uflag = 1;
+			break;
 		case 'z':
 			if (strcmp(optarg, GLOBAL_ZONENAME) == 0) {
 				global_zone = B_TRUE;
@@ -7155,6 +7582,7 @@ main(int argc, char *argv[])
 			}
 			(void) strlcpy(zone, optarg, sizeof (zone));
 			(void) strlcpy(revert_zone, optarg, sizeof (zone));
+			zflag = 1;
 			break;
 		default:
 			usage(B_FALSE, HELP_USAGE);
@@ -7162,7 +7590,7 @@ main(int argc, char *argv[])
 		}
 	}
 
-	if (optind > argc || strcmp(zone, "") == 0) {
+	if (optind > argc || strcmp(zone, "") == 0 || (uflag && zflag)) {
 		usage(B_FALSE, HELP_USAGE);
 		exit(Z_USAGE);
 	}

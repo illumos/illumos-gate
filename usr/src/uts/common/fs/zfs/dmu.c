@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/dmu.h>
@@ -950,6 +951,7 @@ xuio_stat_wbuf_nocopy()
 }
 
 #ifdef _KERNEL
+
 int
 dmu_read_uio(objset_t *os, uint64_t object, uio_t *uio, uint64_t size)
 {
@@ -1562,7 +1564,7 @@ dmu_write_policy(objset_t *os, dnode_t *dn, int level, int wp, zio_prop_t *zp)
 
 	if (wp & WP_NOFILL) {
 		ASSERT(!ismd && level == 0);
-		checksum = ZIO_CHECKSUM_OFF;
+		checksum = ZIO_CHECKSUM_NOPARITY;
 		compress = ZIO_COMPRESS_OFF;
 		dedup = B_FALSE;
 	}

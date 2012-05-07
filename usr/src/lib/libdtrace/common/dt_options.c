@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ */
+
 #include <sys/resource.h>
 #include <sys/mman.h>
 #include <sys/types.h>
@@ -36,6 +40,8 @@
 #include <alloca.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <zone.h>
+#include <libzonecfg.h>
 
 #include <dt_impl.h>
 #include <dt_string.h>
@@ -778,6 +784,44 @@ dt_opt_bufresize(dtrace_hdl_t *dtp, const char *arg, uintptr_t option)
 	return (0);
 }
 
+/*ARGSUSED*/
+static int
+dt_opt_zone(dtrace_hdl_t *dtp, const char *arg, uintptr_t option)
+{
+	zoneid_t z, did;
+
+	if (arg == NULL)
+		return (dt_set_errno(dtp, EDT_BADOPTVAL));
+
+	/*
+	 * If the specified zone is currently running, we'll query the kernel
+	 * for its debugger ID.  If it doesn't appear to be running, we'll look
+	 * for it for among all installed zones (thereby allowing a zdefs
+	 * enabling against a halted zone).
+	 */
+	if ((z = getzoneidbyname(arg)) != -1) {
+		if (zone_getattr(z, ZONE_ATTR_DID, &did, sizeof (did)) < 0)
+			return (dt_set_errno(dtp, EDT_BADOPTVAL));
+	} else {
+		zone_dochandle_t handle;
+
+		if ((handle = zonecfg_init_handle()) == NULL)
+			return (dt_set_errno(dtp, errno));
+
+		if (zonecfg_get_handle(arg, handle) != Z_OK) {
+			zonecfg_fini_handle(handle);
+			return (dt_set_errno(dtp, EDT_BADOPTVAL));
+		}
+
+		did = zonecfg_get_did(handle);
+		zonecfg_fini_handle(handle);
+	}
+
+	dtp->dt_options[DTRACEOPT_ZONE] = did;
+
+	return (0);
+}
+
 int
 dt_options_load(dtrace_hdl_t *dtp)
 {
@@ -909,6 +953,7 @@ static const dt_option_t _dtrace_rtoptions[] = {
 	{ "statusrate", dt_opt_rate, DTRACEOPT_STATUSRATE },
 	{ "strsize", dt_opt_strsize, DTRACEOPT_STRSIZE },
 	{ "ustackframes", dt_opt_runtime, DTRACEOPT_USTACKFRAMES },
+	{ "zone", dt_opt_zone, DTRACEOPT_ZONE },
 	{ NULL }
 };
 
@@ -985,9 +1030,41 @@ dtrace_setopt(dtrace_hdl_t *dtp, const char *opt, const char *val)
 			if (dtp->dt_active)
 				return (dt_set_errno(dtp, EDT_ACTIVE));
 
+			/*
+			 * If our options had been previously ioctl'd down,
+			 * clear dt_optset to indicate that a run-time option
+			 * has since been set.
+			 */
+			dtp->dt_optset = B_FALSE;
+
 			return (op->o_func(dtp, val, op->o_option));
 		}
 	}
 
 	return (dt_set_errno(dtp, EDT_BADOPTNAME));
+}
+
+int
+dtrace_setopts(dtrace_hdl_t *dtp)
+{
+	void *dof;
+	int err;
+
+	if (dtp->dt_optset)
+		return (0);
+
+	if ((dof = dtrace_getopt_dof(dtp)) == NULL)
+		return (-1); /* dt_errno has been set for us */
+
+	if ((err = dt_ioctl(dtp, DTRACEIOC_ENABLE, dof)) == -1)
+		(void) dt_set_errno(dtp, errno);
+
+	dtrace_dof_destroy(dtp, dof);
+
+	if (err == -1)
+		return (-1);
+
+	dtp->dt_optset = B_TRUE;
+
+	return (0);
 }

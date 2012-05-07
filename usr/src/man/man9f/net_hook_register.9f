@@ -1,9 +1,10 @@
 '\" te
 .\" Copyright (C) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright (C) 2012, Joyent, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NET_HOOK_REGISTER 9F "May 1, 2008"
+.TH NET_HOOK_REGISTER 9F "Mar 5, 2012"
 .SH NAME
 net_hook_register \- add a hook to be called in event processing
 .SH SYNOPSIS
@@ -11,7 +12,7 @@ net_hook_register \- add a hook to be called in event processing
 .nf
 #include <sys/neti.h>
 
-\fBnet_hook_t\fR \fBnet_hook_register\fR(\fBconst\fR \fBnet_data_t\fR \fInet\fR, \fBhook_t\fR *\fIhook\fR);
+\fBint\fR \fBnet_hook_register\fR(\fBnet_handle_t\fR \fIinfo\fR, \fBchar\fR *\fIevent\fR, \fBhook_t\fR *\fIhook\fR);
 .fi
 
 .SH INTERFACE LEVEL
@@ -22,10 +23,19 @@ Solaris DDI specific (Solaris DDI).
 .sp
 .ne 2
 .na
-\fB\fInet\fR\fR
+\fB\fIinfo\fR\fR
 .ad
 .RS 8n
 value returned from a successful call to \fBnet_protocol_register()\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIname\fR\fR
+.ad
+.RS 8n
+unique name for this hook.
 .RE
 
 .sp
@@ -42,9 +52,10 @@ pointer to a \fBhook_t\fR structure.
 .LP
 The \fBnet_hook_register()\fR function uses hooks that allow callbacks to be
 registered with events that belong to a network protocol. A successful call to
-\fBnet_hook_register()\fR requires that a valid handle for a network protocol
-be provided (the \fInet\fR parameter), along with a hook description that
-includes a reference to an available event.
+\fBnet_hook_register()\fR requires that a valid handle for a network protocol be
+provided (the \fIinfo\fR parameter), along with a unique name and a hook
+description that includes a reference to an available event. No two hooks on the
+same netstack may share a name.
 .sp
 .LP
 While it is possible to use the same \fBhook_t\fR structure with multiple calls
@@ -153,6 +164,14 @@ because it conflicts with another hook. An example of this might be specifying
 \fBHH_FIRST\fR or \fBHH_LAST\fR when another hook has already been registered
 with this value.
 .RE
+
+.sp
+.ne 2
+.na
+\fBESHUTDOWN\fR
+.ad
+.RS 10n
+The netstack corresponding to \fIinfo\fR is condemned or no longer exists.
 
 .SH CONTEXT
 .sp

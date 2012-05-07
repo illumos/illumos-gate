@@ -24,6 +24,7 @@
  */
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2011 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef _ZIO_H
@@ -79,6 +80,8 @@ enum zio_checksum {
 	ZIO_CHECKSUM_FLETCHER_4,
 	ZIO_CHECKSUM_SHA256,
 	ZIO_CHECKSUM_ZILOG2,
+	ZIO_CHECKSUM_SHA256_MAC,
+	ZIO_CHECKSUM_NOPARITY,
 	ZIO_CHECKSUM_FUNCTIONS
 };
 
@@ -421,6 +424,9 @@ struct zio {
 	zio_cksum_report_t *io_cksum_report;
 	uint64_t	io_ena;
 
+	zoneid_t	io_zoneid;	/* zone which originated this I/O */
+	hrtime_t	io_start;	/* time I/O entered zio pipeline */
+	hrtime_t	io_dispatched;	/* time I/O was dispatched to disk */
 	/* Taskq dispatching state */
 	taskq_ent_t	io_tqent;
 };

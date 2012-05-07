@@ -1,0 +1,163 @@
+'\" te
+.\" Copyright (c) 2012, Joyent, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH IMPI 7D "Apr 21, 2012"
+.SH NAME
+ipmi \- OpenIPMI compatible IPMI interface driver
+.SH SYNOPSIS
+.LP
+.nf
+\fB/dev/ipmi\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBipmi\fR device is a character special file that provides access to the
+Intelligent Platform Management Interface for the system.  For more
+information on \fBIPMI\fR and to obtain a copy of the \fBIPMI\fR
+specification and implementation guidelines, refer to
+http://\fIhttp://www.intel.com/design/servers/ipmi/\fR.
+The driver is adapted from the FreeBSD driver which is in turn adapted from
+the Linux driver, however, not all features described in the standard are
+supported. The current implementation depends on the \fBsmbios\fR(7d) to
+discover the existence of an IPMI device.
+.sp
+.LP
+
+.SH IOCTLS
+.sp
+.LP
+Sending and receiving messages through the IPMI drivers requires the use of
+\fBioctl\fR(2).
+
+The ioctl command codes below are defined in \fBsys/ipmi.h\fR.
+The third argument to ioctl should be a pointer to the type indicated.
+Currently the following ioctls are supported:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+IPMICTL_RECEIVE_MSG "struct ipmi_recv"
+.br
+Receive a message.
+.br
+Possible error values:
+.RS +8
+EAGAIN No messages are in the process queue.
+.br
+EFAULT An address supplied was invalid.
+.br
+EMSGSIZE The address could not fit in the message buffer and
+will remain in the buffer.
+.RE
+.RE
+
+.RS +4
+.TP
+.ie t \(bu
+.el o
+IPMICTL_RECEIVE_MSG_TRUNC "struct ipmi_recv"
+.br
+Like IPMICTL_RECEIVE_MSG but if the message cannot fit into the buffer, it
+will truncate the contents instead of leaving the data in the buffer.
+.RE
+
+.RS +4
+.TP
+.ie t \(bu
+.el o
+IPMICTL_SEND_COMMAND "struct ipmi_req"
+.br
+Send a message to the interface.
+.br
+Possible error values:
+.RS +8
+EFAULT An address supplied was invalid
+.br
+ENOMEM Buffers could not be allowed for the command, out of memory.
+.RE
+.RE
+
+.RS +4
+.TP
+.ie t \(bu
+.el o
+IPMICTL_SET_MY_ADDRESS_CMD "unsigned int"
+.br
+Set the slave address for source messages.
+.RE
+
+.RS +4
+.TP
+.ie t \(bu
+.el o
+IPMICTL_GET_MY_ADDRESS_CMD "unsigned int"
+.br
+Get the slave address for source messages.
+.RE
+
+.RS +4
+.TP
+.ie t \(bu
+.el o
+IPMICTL_SET_MY_LUN_CMD "unsigned int"
+.br
+Set the slave LUN for source messages.
+.RE
+
+.RS +4
+.TP
+.ie t \(bu
+.el o
+IPMICTL_GET_MY_LUN_CMD "unsigned int"
+.br
+Get the slave LUN for source messages.
+.RE
+
+Stub Only Ioctl
+
+.RS +4
+.TP
+.ie t \(bu
+.el o
+IPMICTL_SET_GETS_EVENTS_CMD int
+.br
+Set whether this interface receives events.
+.RE
+
+Unimplemented Ioctls
+
+.RS +4
+.TP
+.ie t \(bu
+.el o
+IPMICTL_REGISTER_FOR_CMD
+.br
+Register to receive a specific command
+.RE
+
+.RS +4
+.TP
+.ie t \(bu
+.el o
+IPMICTL_UNREGISTER_FOR_CMD
+.br
+Unregister to receive a specific command
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBipmitool\fR(1M), \fBioctl\fR(2), \fBsmbios\fR(7d)
+.sp
+.LP
+\fIIntelligent Platform Management Interface Specification Second
+Generation\fR, v2.0 \(em
+June 12, 2009 Markup
+.SH NOTES
+.sp
+.LP
+Not all systems include an \fBIPMI\fR.

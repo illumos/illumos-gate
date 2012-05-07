@@ -22,6 +22,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2011 by Delphix. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -125,6 +126,7 @@
 #include <sys/refcount.h>
 #include <sys/vdev.h>
 #include <sys/vdev_impl.h>
+#include <sys/zfs_zone.h>
 #ifdef _KERNEL
 #include <sys/vmsystm.h>
 #include <vm/anon.h>
@@ -2017,6 +2019,16 @@ arc_reclaim_needed(void)
 	if (availrmem < swapfs_minfree + swapfs_reserve + extra)
 		return (1);
 
+	/*
+	 * Check that we have enough availrmem that memory locking (e.g., via
+	 * mlock(3C) or memcntl(2)) can still succeed.  (pages_pp_maximum
+	 * stores the number of pages that cannot be locked; when availrmem
+	 * drops below pages_pp_maximum, page locking mechanisms such as
+	 * page_pp_lock() will fail.)
+	 */
+	if (availrmem <= pages_pp_maximum)
+		return (1);
+
 #if defined(__i386)
 	/*
 	 * If we're on an i386 platform, it's possible that we'll exhaust the
@@ -2917,6 +2929,14 @@ top:
 		rzio = zio_read(pio, spa, bp, buf->b_data, size,
 		    arc_read_done, buf, priority, zio_flags, zb);
 
+		/*
+		 * At this point, this read I/O has already missed in the ARC
+		 * and will be going through to the disk.  The I/O throttle
+		 * should delay this I/O if this zone is using more than its I/O
+		 * priority allows.
+		 */
+		zfs_zone_io_throttle(ZFS_ZONE_IOP_READ);
+
 		if (*arc_flags & ARC_WAIT)
 			return (zio_wait(rzio));
 
@@ -3483,9 +3503,6 @@ arc_init(void)
 	/* Allow the tunable to override if it is reasonable */
 	if (zfs_arc_meta_limit > 0 && zfs_arc_meta_limit <= arc_c_max)
 		arc_meta_limit = zfs_arc_meta_limit;
-
-	if (arc_c_min < arc_meta_limit / 2 && zfs_arc_min == 0)
-		arc_c_min = arc_meta_limit / 2;
 
 	if (zfs_arc_grow_retry > 0)
 		arc_grow_retry = zfs_arc_grow_retry;

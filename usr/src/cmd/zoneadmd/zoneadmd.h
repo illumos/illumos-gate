@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent Inc. All rights reserved.
  */
 
 #ifndef	_ZONEADMD_H
@@ -96,6 +97,7 @@ extern dladm_handle_t dld_handle;
 
 extern void zerror(zlog_t *, boolean_t, const char *, ...);
 extern char *localize_msg(char *locale, const char *msg);
+extern void nwifent_free_attrs(struct zone_nwiftab *);
 
 /*
  * Eventstream interfaces.
@@ -130,9 +132,9 @@ typedef enum {
 /*
  * Virtual platform interfaces.
  */
-extern zoneid_t vplat_create(zlog_t *, zone_mnt_t);
+extern zoneid_t vplat_create(zlog_t *, zone_mnt_t, zoneid_t);
 extern int vplat_bringup(zlog_t *, zone_mnt_t, zoneid_t);
-extern int vplat_teardown(zlog_t *, boolean_t, boolean_t);
+extern int vplat_teardown(zlog_t *, boolean_t, boolean_t, boolean_t);
 extern int vplat_get_iptype(zlog_t *, zone_iptype_t *);
 
 /*
@@ -151,6 +153,12 @@ extern int init_console(zlog_t *);
 extern void serve_console(zlog_t *);
 
 /*
+ * Memory capping thread creation.
+ */
+extern void create_mcap_thread(zlog_t *, zoneid_t);
+extern void destroy_mcap_thread();
+
+/*
  * Contract handling.
  */
 extern int init_template(void);
@@ -158,7 +166,7 @@ extern int init_template(void);
 /*
  * Routine to manage child processes.
  */
-extern int do_subproc(zlog_t *, char *, char **);
+extern int do_subproc(zlog_t *, char *, char **, boolean_t);
 
 #ifdef __cplusplus
 }

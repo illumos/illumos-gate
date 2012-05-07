@@ -1,5 +1,6 @@
 '\" te
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright (c) 2011, Joyent, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
@@ -11,14 +12,14 @@ services, containers, and virtual machines
 .LP
 .nf
 \fBflowadm show-flow\fR [\fB-pP\fR] [\fB-S\fR] [\fB-s\fR [\fB-i\fR \fIinterval\fR]] [\fB-l\fR \fIlink\fR]
-     [\fB-o\fR \fIfield\fR[,...]] [\fIflow\fR]
+     [\fB-o\fR \fIfield\fR[,...]] [\fB-z\fR \fIzonename\fR] [\fIflow\fR]
 .fi
 
 .LP
 .nf
-\fBflowadm add-flow\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] \fB-l\fR \fIlink\fR \fB-a\fR \fIattr\fR=\fIvalue\fR[,...]
-     \fB-p\fR \fIprop\fR=\fIvalue\fR[,...] \fIflow\fR
-\fBflowadm remove-flow\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] {\fB-l\fR \fIlink\fR | \fIflow\fR}
+\fBflowadm add-flow\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-z\fR \fIzonename\fR] \fB-l\fR \fIlink\fR
+     \fB-a\fR \fIattr\fR=\fIvalue\fR[,...] \fB-p\fR \fIprop\fR=\fIvalue\fR[,...] \fIflow\fR
+\fBflowadm remove-flow\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-z\fR \fIzonename\fR] {\fB-l\fR \fIlink\fR | \fIflow\fR}
 .fi
 
 .LP
@@ -77,8 +78,7 @@ The following subcommands are supported:
 .sp
 .ne 2
 .na
-\fB\fBflowadm show-flow\fR [\fB-pP\fR] [\fB-s\fR [\fB-i\fR \fIinterval\fR]]
-[\fB-o\fR \fIfield\fR[,...]] [\fB-l\fR \fIlink\fR] [\fIflow\fR]\fR
+\fB\fBflowadm show-flow\fR [\fB-pP\fR] [\fB-s\fR [\fB-i\fR \fIinterval\fR]] [\fB-o\fR \fIfield\fR[,...]] [\fB-l\fR \fIlink\fR] [\fB-z\fR \fIzonename\fR] [\fIflow\fR]\fR
 .ad
 .sp .6
 .RS 4n
@@ -223,14 +223,23 @@ Display information for all flows on the named link or information for the
 named flow.
 .RE
 
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-z\fR \fIzonename\fR
+.ad
+.sp .6
+.RS 4n
+Operate on a link that has been delegated to the specified zone.
+.RE
+
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fBflowadm add-flow\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] \fB-l\fR
-\fIlink\fR \fB-a\fR \fIattr\fR=\fIvalue\fR[,...] \fB-p\fR
-\fIprop\fR=\fIvalue\fR[,...] \fIflow\fR\fR
+\fB\fBflowadm add-flow\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-z\fR \fIzonename\fR] \fB-l\fR \fIlink\fR \fB-a\fR \fIattr\fR=\fIvalue\fR[,...] \fB-p\fR \fIprop\fR=\fIvalue\fR[,...] \fIflow\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -268,6 +277,17 @@ persistent creation.
 .sp
 .ne 2
 .na
+\fB\fB-z\fR \fIzonename\fR
+.ad
+.sp .6
+.RS 4n
+Operate on a link that has been delegated to the specified zone.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
 \fB\fB-l\fR \fIlink\fR, \fB--link\fR=\fIlink\fR\fR
 .ad
 .sp .6
@@ -300,8 +320,7 @@ A comma-separated list of properties to be set to the specified values.
 .sp
 .ne 2
 .na
-\fB\fBflowadm remove-flow\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] \fB-l\fR
-{\fIlink\fR | \fIflow\fR}\fR
+\fB\fBflowadm remove-flow\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-z\fR \fIzonename\fR] \fB-l\fR {\fIlink\fR | \fIflow\fR}\fR
 .ad
 .sp .6
 .RS 4n
@@ -330,6 +349,17 @@ persistent removal.
 
 .sp
 .ne 2
+.na
+\fB\fB-z\fR \fIzonename\fR
+.ad
+.sp .6
+.RS 4n
+Operate on a link that has been delegated to the specified zone.
+.RE
+
+.sp
+.ne 2
+.mk
 .na
 \fB\fB-l\fR \fIlink\fR | \fIflow\fR, \fB--link\fR=\fIlink\fR | \fIflow\fR\fR
 .ad

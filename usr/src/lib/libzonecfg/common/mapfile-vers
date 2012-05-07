@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2011, Joyent Inc. All rights reserved.
 #
 
 #
@@ -53,6 +54,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zonecfg_add_fs_option;
 	zonecfg_add_admin;
 	zonecfg_add_nwif;
+	zonecfg_add_res_attr;
 	zonecfg_add_pkg;
 	zonecfg_add_pset;
 	zonecfg_add_rctl;
@@ -79,7 +81,6 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zonecfg_delete_dev;
 	zonecfg_delete_ds;
 	zonecfg_delete_filesystem;
-	zonecfg_delete_mcap;
 	zonecfg_delete_nwif;
 	zonecfg_delete_pset;
 	zonecfg_delete_rctl;
@@ -104,7 +105,9 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zonecfg_find_mounts;
 	zonecfg_find_scratch;
 	zonecfg_fini_handle;
+	zonecfg_fix_obsolete;
 	zonecfg_free_fs_option_list;
+	zonecfg_free_res_attr_list;
 	zonecfg_free_rctl_value_list;
 	zonecfg_get_aliased_rctl;
 	zonecfg_get_attach_handle;
@@ -118,6 +121,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zonecfg_get_bootargs;
 	zonecfg_get_brand;
 	zonecfg_get_dflt_sched_class;
+	zonecfg_get_did;
 	zonecfg_getdevent;
 	zonecfg_getdevperment;
 	zonecfg_getdsent;
@@ -127,7 +131,6 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zonecfg_get_hostid;
 	zonecfg_get_iptype;
 	zonecfg_get_limitpriv;
-	zonecfg_getmcapent;
 	zonecfg_get_name;
 	zonecfg_get_name_by_uuid;
 	zonecfg_getnwifent;
@@ -160,7 +163,6 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zonecfg_lookup_dev;
 	zonecfg_lookup_ds;
 	zonecfg_lookup_filesystem;
-	zonecfg_lookup_mcap;
 	zonecfg_lookup_nwif;
 	zonecfg_lookup_pset;
 	zonecfg_lookup_rctl;
@@ -169,7 +171,6 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zonecfg_modify_dev;
 	zonecfg_modify_ds;
 	zonecfg_modify_filesystem;
-	zonecfg_modify_mcap;
 	zonecfg_modify_nwif;
 	zonecfg_modify_pset;
 	zonecfg_modify_rctl;
@@ -183,6 +184,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zonecfg_ping_zoneadmd;
 	zonecfg_release_lock_file;
 	zonecfg_remove_fs_option;
+	zonecfg_remove_res_attr;
 	zonecfg_remove_rctl_value;
 	zonecfg_remove_userauths;
 	zonecfg_reverse_scratch;
@@ -196,6 +198,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zonecfg_set_autoboot;
 	zonecfg_set_bootargs;
 	zonecfg_set_brand;
+	zonecfg_set_did;
 	zonecfg_setdevent;
 	zonecfg_setdevperment;
 	zonecfg_setdsent;
@@ -211,6 +214,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zonecfg_set_root;
 	zonecfg_set_sched;
 	zonecfg_set_swinv;
+	zonecfg_set_uuid;
 	zonecfg_set_zonepath;
 	zonecfg_strerror;
 	zonecfg_str_to_bytes;
@@ -229,6 +233,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zonecfg_verify_save;
 	zonecfg_warn_poold;
 	zone_get_brand;
+	zone_get_did;
 	zone_get_devroot;
 	zone_get_id;
 	zone_get_rootpath;

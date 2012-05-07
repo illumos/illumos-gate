@@ -1,6 +1,7 @@
 '\" te
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright (c) 2011, Joyent, Inc. All Rights Reserved
 .\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at  http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text
@@ -86,6 +87,15 @@ users' crontabs.
 .LP
 If \fBcrontab\fR is invoked with \fIfilename\fR, this overwrites an existing
 \fBcrontab\fR entry for the user that invokes it.
+.sp
+.LP
+Cron supports a merged crontab with entries coming from either the user's
+\fB/var/spool/cron/crontabs\fR file or from the user's
+\fB/etc/cron.d/crontabs\fR file.  The entries in the user's
+\fB/var/spool/cron/crontabs\fR file are meant to be editable whereas those in
+\fB/etc/cron.d/crontabs\fR are meant as system-defined entries which are not
+intended to be customized by the user.  The dual set of crontab entries is only
+of interest to system-defined users such as \fBroot\fR.
 .SS "\fBcrontab\fR Access Control"
 .sp
 .LP
@@ -343,6 +353,9 @@ file using the \fB-r\fR option.
 If \fIusername\fR is specified, the specified user's \fBcrontab\fR file is
 edited, rather than the current user's \fBcrontab\fR file. This can only be
 done by root or by a user with the \fBsolaris.jobs.admin\fR authorization.
+.sp
+Only the entries in the user's \fB/var/spool/cron/crontabs\fR file are
+editable.
 .RE
 
 .sp
@@ -354,6 +367,9 @@ done by root or by a user with the \fBsolaris.jobs.admin\fR authorization.
 Lists the \fBcrontab\fR file for the invoking user. Only root or a user with
 the \fBsolaris.jobs.admin\fR authorization can specify a username following the
 \fB-l\fR option to list the \fBcrontab\fR file of the specified user.
+.sp
+Entries from both the user's \fB/var/spool/cron/crontabs\fR file and thhe user's
+\fB/etc/cron.d/crontabs\fR file will be merged in the output.
 .RE
 
 .sp
@@ -582,6 +598,17 @@ list of denied users
 
 .sp
 .ne 2
+.na
+\fB\fB/etc/cron.d/crontabs\fR\fR
+.ad
+.RS 28n
+.rt  
+system spool area for \fBcrontab\fR
+.RE
+
+.sp
+.ne 2
+.mk
 .na
 \fB\fB/var/cron/log\fR\fR
 .ad

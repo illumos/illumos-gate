@@ -724,6 +724,14 @@ crgetzoneid(const cred_t *cr)
 	    cr->cr_zone->zone_id);
 }
 
+zoneid_t
+crgetzonedid(const cred_t *cr)
+{
+	return (cr->cr_zone == NULL ?
+	    (cr->cr_uid == -1 ? (zoneid_t)-1 : GLOBAL_ZONEID) :
+	    cr->cr_zone->zone_did);
+}
+
 projid_t
 crgetprojid(const cred_t *cr)
 {

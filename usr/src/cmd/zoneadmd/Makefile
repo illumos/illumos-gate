@@ -18,52 +18,52 @@
 #
 # CDDL HEADER END
 
-
-#
-
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2011, Joyent, Inc. All rights reserved.
 #
 
 PROG= zoneadmd
 
 include ../Makefile.cmd
 
-ROOTCMDDIR=	$(ROOTLIB)/zones
+$(64ONLY)SUBDIRS= $(MACH)
+$(BUILD64)SUBDIRS += $(MACH64)
 
-OBJS= zoneadmd.o zcons.o vplat.o
-SRCS = $(OBJS:.o=.c)
-POFILE=zoneadmd_all.po
-POFILES= $(OBJS:%.o=%.po)
+all	:=	TARGET = all
+install	:=	TARGET = install
+clean	:=	TARGET = clean
+clobber	:=	TARGET = clobber
+lint	:=	TARGET = lint
 
-CFLAGS += $(CCVERBOSE)
-LDLIBS += -lsocket -lzonecfg -lnsl -ldevinfo -ldevice -lnvpair \
-	-lgen -lbsm -lcontract -lzfs -luuid -lbrand -ldladm -ltsnet -ltsol \
-	-linetutil
 XGETFLAGS += -a -x zoneadmd.xcl
+
+ROOTUSRLIBZONES			= $(ROOT)/usr/lib/zones
 
 .KEEP_STATE:
 
 .PARALLEL:
 
-all: $(PROG)
+all: $(SUBDIRS)
 
 $(PROG): $(OBJS)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
-install: all $(ROOTCMD)
+install: $(SUBDIRS)
+	-$(RM) $(ROOTUSRLIBZONES)/$(PROG)
+	-$(LN) $(ISAEXEC) $(ROOTUSRLIBZONES)/$(PROG)
 
-$(POFILE): $(POFILES)
-	$(RM) $@
-	$(CAT) $(POFILES) > $@
+$(POFILE):
 
-clean:
-	$(RM) $(OBJS)
-
-lint:	lint_SRCS
+clean clobebr lint:	$(SUBDIRS)
 
 check:
-	$(CSTYLE) -p -P $(SRCS:%=%)
+	$(CSTYLE) -p -P *.c
+
+$(SUBDIRS):	FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
+
+FRC:
 
 include ../Makefile.targ

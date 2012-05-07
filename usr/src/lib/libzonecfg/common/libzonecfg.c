@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent Inc. All rights reserved.
  */
 
 #include <libsysevent.h>
@@ -77,6 +78,8 @@
 #define	ZONE_EVENT_PING_SUBCLASS	"ping"
 #define	ZONE_EVENT_PING_PUBLISHER	"solaris"
 
+#define	DEBUGID_FILE	"/etc/zones/did.txt"
+
 /* Hard-code the DTD element/attribute/entity names just once, here. */
 #define	DTD_ELEM_ATTR		(const xmlChar *) "attr"
 #define	DTD_ELEM_COMMENT	(const xmlChar *) "comment"
@@ -84,6 +87,7 @@
 #define	DTD_ELEM_FS		(const xmlChar *) "filesystem"
 #define	DTD_ELEM_FSOPTION	(const xmlChar *) "fsoption"
 #define	DTD_ELEM_NET		(const xmlChar *) "network"
+#define	DTD_ELEM_NETATTR	(const xmlChar *) "net-attr"
 #define	DTD_ELEM_RCTL		(const xmlChar *) "rctl"
 #define	DTD_ELEM_RCTLVALUE	(const xmlChar *) "rctl-value"
 #define	DTD_ELEM_ZONE		(const xmlChar *) "zone"
@@ -103,10 +107,12 @@
 #define	DTD_ATTR_IPTYPE		(const xmlChar *) "ip-type"
 #define	DTD_ATTR_DEFROUTER	(const xmlChar *) "defrouter"
 #define	DTD_ATTR_DIR		(const xmlChar *) "directory"
+#define	DTD_ATTR_GNIC		(const xmlChar *) "global-nic"
 #define	DTD_ATTR_LIMIT		(const xmlChar *) "limit"
 #define	DTD_ATTR_LIMITPRIV	(const xmlChar *) "limitpriv"
 #define	DTD_ATTR_BOOTARGS	(const xmlChar *) "bootargs"
 #define	DTD_ATTR_SCHED		(const xmlChar *) "scheduling-class"
+#define	DTD_ATTR_MAC		(const xmlChar *) "mac-addr"
 #define	DTD_ATTR_MATCH		(const xmlChar *) "match"
 #define	DTD_ATTR_NAME		(const xmlChar *) "name"
 #define	DTD_ATTR_PHYSICAL	(const xmlChar *) "physical"
@@ -116,6 +122,7 @@
 #define	DTD_ATTR_SPECIAL	(const xmlChar *) "special"
 #define	DTD_ATTR_TYPE		(const xmlChar *) "type"
 #define	DTD_ATTR_VALUE		(const xmlChar *) "value"
+#define	DTD_ATTR_VLANID		(const xmlChar *) "vlan-id"
 #define	DTD_ATTR_ZONEPATH	(const xmlChar *) "zonepath"
 #define	DTD_ATTR_NCPU_MIN	(const xmlChar *) "ncpu_min"
 #define	DTD_ATTR_NCPU_MAX	(const xmlChar *) "ncpu_max"
@@ -128,6 +135,7 @@
 #define	DTD_ATTR_MODE		(const xmlChar *) "mode"
 #define	DTD_ATTR_ACL		(const xmlChar *) "acl"
 #define	DTD_ATTR_BRAND		(const xmlChar *) "brand"
+#define	DTD_ATTR_DID		(const xmlChar *) "debugid"
 #define	DTD_ATTR_HOSTID		(const xmlChar *) "hostid"
 #define	DTD_ATTR_USER		(const xmlChar *) "user"
 #define	DTD_ATTR_AUTHS		(const xmlChar *) "auths"
@@ -174,9 +182,12 @@ static struct alias {
 	{ALIAS_MAXSEMIDS, "zone.max-sem-ids", "privileged", "deny", 0},
 	{ALIAS_MAXLOCKEDMEM, "zone.max-locked-memory", "privileged", "deny", 0},
 	{ALIAS_MAXSWAP, "zone.max-swap", "privileged", "deny", 0},
+	{ALIAS_MAXPHYSMEM, "zone.max-physical-memory", "privileged", "deny",
+	    1048576},
 	{ALIAS_SHARES, "zone.cpu-shares", "privileged", "none", 0},
 	{ALIAS_CPUCAP, "zone.cpu-cap", "privileged", "deny", 0},
 	{ALIAS_MAXPROCS, "zone.max-processes", "privileged", "deny", 100},
+	{ALIAS_ZFSPRI, "zone.zfs-io-priority", "privileged", "none", 1},
 	{NULL, NULL, NULL, NULL, 0}
 };
 
@@ -2082,13 +2093,17 @@ zonecfg_ifname_exists(sa_family_t af, char *ifname)
 int
 zonecfg_lookup_nwif(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 {
-	xmlNodePtr cur;
+	xmlNodePtr cur, val;
 	xmlNodePtr firstmatch;
 	int err;
 	char address[INET6_ADDRSTRLEN];
 	char physical[LIFNAMSIZ];
+	char mac[MAXMACADDRLEN];
+	char gnic[LIFNAMSIZ];
 	size_t addrspec;		/* nonzero if tabptr has IP addr */
 	size_t physspec;		/* nonzero if tabptr has interface */
+	size_t macspec;			/* nonzero if tabptr has mac addr */
+	size_t gnicspec;		/* nonzero if tabptr has gnic */
 	size_t defrouterspec;		/* nonzero if tabptr has def. router */
 	size_t allowed_addrspec;
 	zone_iptype_t iptype;
@@ -2100,17 +2115,20 @@ zonecfg_lookup_nwif(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 	 * Determine the fields that will be searched.  There must be at least
 	 * one.
 	 *
-	 * zone_nwif_address, zone_nwif_physical, and zone_nwif_defrouter are
+	 * zone_nwif_address, zone_nwif_physical, zone_nwif_defrouter,
+	 * zone_nwif_mac, zone_nwif_vlan_id and zone_nwif_gnic  are
 	 * arrays, so no NULL checks are necessary.
 	 */
 	addrspec = strlen(tabptr->zone_nwif_address);
 	physspec = strlen(tabptr->zone_nwif_physical);
+	macspec = strlen(tabptr->zone_nwif_mac);
+	gnicspec = strlen(tabptr->zone_nwif_gnic);
 	defrouterspec = strlen(tabptr->zone_nwif_defrouter);
 	allowed_addrspec = strlen(tabptr->zone_nwif_allowed_address);
 	if (addrspec != 0 && allowed_addrspec != 0)
 		return (Z_INVAL); /* can't specify both */
 	if (addrspec == 0 && physspec == 0 && defrouterspec == 0 &&
-	    allowed_addrspec == 0)
+	    allowed_addrspec == 0 && macspec == 0 && gnicspec == 0)
 		return (Z_INSUFFICIENT_SPEC);
 
 	if ((err = operation_prep(handle)) != Z_OK)
@@ -2136,6 +2154,15 @@ zonecfg_lookup_nwif(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 		if (physspec != 0 && (fetchprop(cur, DTD_ATTR_PHYSICAL,
 		    physical, sizeof (physical)) != Z_OK ||
 		    strcmp(tabptr->zone_nwif_physical, physical) != 0))
+			continue;
+		if (iptype == ZS_EXCLUSIVE && macspec != 0 &&
+		    (fetchprop(cur, DTD_ATTR_MAC, mac, sizeof (mac)) != Z_OK ||
+		    strcmp(tabptr->zone_nwif_mac, mac) != 0))
+			continue;
+		if (iptype == ZS_EXCLUSIVE && gnicspec != 0 &&
+		    (fetchprop(cur, DTD_ATTR_GNIC, gnic,
+		    sizeof (gnic)) != Z_OK ||
+		    strcmp(tabptr->zone_nwif_gnic, gnic) != 0))
 			continue;
 		if (iptype == ZS_SHARED && addrspec != 0 &&
 		    (fetchprop(cur, DTD_ATTR_ADDRESS, address,
@@ -2179,6 +2206,21 @@ zonecfg_lookup_nwif(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 		return (err);
 
 	if (iptype == ZS_EXCLUSIVE &&
+	    (err = fetchprop(cur, DTD_ATTR_MAC, tabptr->zone_nwif_mac,
+	    sizeof (tabptr->zone_nwif_mac))) != Z_OK)
+		return (err);
+
+	if (iptype == ZS_EXCLUSIVE &&
+	    (err = fetchprop(cur, DTD_ATTR_VLANID, tabptr->zone_nwif_vlan_id,
+	    sizeof (tabptr->zone_nwif_vlan_id))) != Z_OK)
+		return (err);
+
+	if (iptype == ZS_EXCLUSIVE &&
+	    (err = fetchprop(cur, DTD_ATTR_GNIC, tabptr->zone_nwif_gnic,
+	    sizeof (tabptr->zone_nwif_gnic))) != Z_OK)
+		return (err);
+
+	if (iptype == ZS_EXCLUSIVE &&
 	    (err = fetchprop(cur, DTD_ATTR_ALLOWED_ADDRESS,
 	    tabptr->zone_nwif_allowed_address,
 	    sizeof (tabptr->zone_nwif_allowed_address))) != Z_OK)
@@ -2189,13 +2231,40 @@ zonecfg_lookup_nwif(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 	    sizeof (tabptr->zone_nwif_defrouter))) != Z_OK)
 		return (err);
 
+	tabptr->zone_nwif_attrp = NULL;
+	for (val = cur->xmlChildrenNode; val != NULL; val = val->next) {
+		struct zone_res_attrtab *valptr;
+
+		valptr = (struct zone_res_attrtab *)malloc(
+		    sizeof (struct zone_res_attrtab));
+		if (valptr == NULL)
+			return (Z_NOMEM);
+
+		valptr->zone_res_attr_name[0] =
+		    valptr->zone_res_attr_value[0] = '\0';
+		if (zonecfg_add_res_attr(&(tabptr->zone_nwif_attrp), valptr)
+		    != Z_OK) {
+			free(valptr);
+			break;
+		}
+
+		if ((fetchprop(val, DTD_ATTR_NAME, valptr->zone_res_attr_name,
+		    sizeof (valptr->zone_res_attr_name)) != Z_OK))
+			break;
+		if ((fetchprop(val, DTD_ATTR_VALUE,
+		    valptr->zone_res_attr_value,
+		    sizeof (valptr->zone_res_attr_value)) != Z_OK))
+			break;
+	}
+
 	return (Z_OK);
 }
 
 static int
 zonecfg_add_nwif_core(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 {
-	xmlNodePtr newnode, cur = handle->zone_dh_cur;
+	xmlNodePtr newnode, cur = handle->zone_dh_cur, valnode;
+	struct zone_res_attrtab *valptr;
 	int err;
 
 	newnode = xmlNewTextChild(cur, NULL, DTD_ELEM_NET, NULL);
@@ -2211,13 +2280,40 @@ zonecfg_add_nwif_core(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 	    tabptr->zone_nwif_physical)) != Z_OK)
 		return (err);
 	/*
-	 * Do not add this property when it is not set, for backwards
-	 * compatibility and because it is optional.
+	 * Do not add these properties when they are not set, for backwards
+	 * compatibility and because they are optional.
 	 */
 	if ((strlen(tabptr->zone_nwif_defrouter) > 0) &&
 	    ((err = newprop(newnode, DTD_ATTR_DEFROUTER,
 	    tabptr->zone_nwif_defrouter)) != Z_OK))
 		return (err);
+	if (strlen(tabptr->zone_nwif_mac) > 0 &&
+	    (err = newprop(newnode, DTD_ATTR_MAC,
+	    tabptr->zone_nwif_mac)) != Z_OK)
+		return (err);
+	if (strlen(tabptr->zone_nwif_vlan_id) > 0 &&
+	    (err = newprop(newnode, DTD_ATTR_VLANID,
+	    tabptr->zone_nwif_vlan_id)) != Z_OK)
+		return (err);
+	if (strlen(tabptr->zone_nwif_gnic) > 0 &&
+	    (err = newprop(newnode, DTD_ATTR_GNIC,
+	    tabptr->zone_nwif_gnic)) != Z_OK)
+		return (err);
+
+	for (valptr = tabptr->zone_nwif_attrp; valptr != NULL;
+	    valptr = valptr->zone_res_attr_next) {
+		valnode = xmlNewTextChild(newnode, NULL, DTD_ELEM_NETATTR,
+		    NULL);
+		err = newprop(valnode, DTD_ATTR_NAME,
+		    valptr->zone_res_attr_name);
+		if (err != Z_OK)
+			return (err);
+		err = newprop(valnode, DTD_ATTR_VALUE,
+		    valptr->zone_res_attr_value);
+		if (err != Z_OK)
+			return (err);
+	}
+
 	return (Z_OK);
 }
 
@@ -2242,7 +2338,8 @@ static int
 zonecfg_delete_nwif_core(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 {
 	xmlNodePtr cur = handle->zone_dh_cur;
-	boolean_t addr_match, phys_match, allowed_addr_match;
+	boolean_t addr_match, phys_match, allowed_addr_match, mac_match,
+	    gnic_match;
 
 	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
 		if (xmlStrcmp(cur->name, DTD_ELEM_NET))
@@ -2254,8 +2351,13 @@ zonecfg_delete_nwif_core(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 		    tabptr->zone_nwif_allowed_address);
 		phys_match = match_prop(cur, DTD_ATTR_PHYSICAL,
 		    tabptr->zone_nwif_physical);
+		mac_match = match_prop(cur, DTD_ATTR_MAC,
+		    tabptr->zone_nwif_mac);
+		gnic_match = match_prop(cur, DTD_ATTR_GNIC,
+		    tabptr->zone_nwif_gnic);
 
-		if ((addr_match || allowed_addr_match) && phys_match) {
+		if ((addr_match || allowed_addr_match || mac_match ||
+		    gnic_match) && phys_match) {
 			xmlUnlinkNode(cur);
 			xmlFreeNode(cur);
 			return (Z_OK);
@@ -2302,6 +2404,58 @@ zonecfg_modify_nwif(
 		return (err);
 
 	return (Z_OK);
+}
+
+void
+zonecfg_free_res_attr_list(struct zone_res_attrtab *valtab)
+{
+	if (valtab == NULL)
+		return;
+	zonecfg_free_res_attr_list(valtab->zone_res_attr_next);
+	free(valtab);
+}
+
+int
+zonecfg_add_res_attr(struct zone_res_attrtab **headptr,
+    struct zone_res_attrtab *valtabptr)
+{
+	struct zone_res_attrtab *last, *old, *new;
+
+	last = *headptr;
+	for (old = last; old != NULL; old = old->zone_res_attr_next)
+		last = old;	/* walk to the end of the list */
+	new = valtabptr;	/* alloc'd by caller */
+	new->zone_res_attr_next = NULL;
+	if (last == NULL)
+		*headptr = new;
+	else
+		last->zone_res_attr_next = new;
+	return (Z_OK);
+}
+
+int
+zonecfg_remove_res_attr(struct zone_res_attrtab **headptr,
+    struct zone_res_attrtab *valtabptr)
+{
+	struct zone_res_attrtab *last, *this, *next;
+
+	last = *headptr;
+	for (this = last; this != NULL; this = this->zone_res_attr_next) {
+		if (strcmp(this->zone_res_attr_name,
+		    valtabptr->zone_res_attr_name) == 0 &&
+		    strcmp(this->zone_res_attr_value,
+		    valtabptr->zone_res_attr_value) == 0) {
+			next = this->zone_res_attr_next;
+			if (this == *headptr)
+				*headptr = next;
+			else
+				last->zone_res_attr_next = next;
+			free(this);
+			return (Z_OK);
+		} else
+			last = this;
+	}
+	return (Z_NO_PROPERTY_ID);
 }
 
 /*
@@ -2453,7 +2607,7 @@ zonecfg_set_hostid(zone_dochandle_t handle, const char *hostidp)
 int
 zonecfg_lookup_dev(zone_dochandle_t handle, struct zone_devtab *tabptr)
 {
-	xmlNodePtr cur, firstmatch;
+	xmlNodePtr cur, val, firstmatch;
 	int err;
 	char match[MAXPATHLEN];
 
@@ -2498,13 +2652,40 @@ zonecfg_lookup_dev(zone_dochandle_t handle, struct zone_devtab *tabptr)
 	    sizeof (tabptr->zone_dev_match))) != Z_OK)
 		return (err);
 
+	tabptr->zone_dev_attrp = NULL;
+	for (val = cur->xmlChildrenNode; val != NULL; val = val->next) {
+		struct zone_res_attrtab *valptr;
+
+		valptr = (struct zone_res_attrtab *)malloc(
+		    sizeof (struct zone_res_attrtab));
+		if (valptr == NULL)
+			return (Z_NOMEM);
+
+		valptr->zone_res_attr_name[0] =
+		    valptr->zone_res_attr_value[0] = '\0';
+		if (zonecfg_add_res_attr(&(tabptr->zone_dev_attrp), valptr)
+		    != Z_OK) {
+			free(valptr);
+			break;
+		}
+
+		if ((fetchprop(val, DTD_ATTR_NAME, valptr->zone_res_attr_name,
+		    sizeof (valptr->zone_res_attr_name)) != Z_OK))
+			break;
+		if ((fetchprop(val, DTD_ATTR_VALUE,
+		    valptr->zone_res_attr_value,
+		    sizeof (valptr->zone_res_attr_value)) != Z_OK))
+			break;
+	}
+
 	return (Z_OK);
 }
 
 static int
 zonecfg_add_dev_core(zone_dochandle_t handle, struct zone_devtab *tabptr)
 {
-	xmlNodePtr newnode, cur = handle->zone_dh_cur;
+	xmlNodePtr newnode, cur = handle->zone_dh_cur, valnode;
+	struct zone_res_attrtab *valptr;
 	int err;
 
 	newnode = xmlNewTextChild(cur, NULL, DTD_ELEM_DEVICE, NULL);
@@ -2512,6 +2693,21 @@ zonecfg_add_dev_core(zone_dochandle_t handle, struct zone_devtab *tabptr)
 	if ((err = newprop(newnode, DTD_ATTR_MATCH,
 	    tabptr->zone_dev_match)) != Z_OK)
 		return (err);
+
+	for (valptr = tabptr->zone_dev_attrp; valptr != NULL;
+	    valptr = valptr->zone_res_attr_next) {
+		valnode = xmlNewTextChild(newnode, NULL, DTD_ELEM_NETATTR,
+		    NULL);
+		err = newprop(valnode, DTD_ATTR_NAME,
+		    valptr->zone_res_attr_name);
+		if (err != Z_OK)
+			return (err);
+		err = newprop(valnode, DTD_ATTR_VALUE,
+		    valptr->zone_res_attr_value);
+		if (err != Z_OK)
+			return (err);
+	}
+
 
 	return (Z_OK);
 }
@@ -4572,7 +4768,7 @@ get_pool_sched_class(char *poolname, char *class, int clsize)
 	pool_conf_t *poolconf;
 	pool_t *pool;
 	pool_elem_t *pe;
-	pool_value_t *pv = pool_value_alloc();
+	pool_value_t *pv;
 	const char *sched_str;
 
 	if (pool_get_status(&status) != PO_SUCCESS || status != POOL_ENABLED)
@@ -4593,15 +4789,23 @@ get_pool_sched_class(char *poolname, char *class, int clsize)
 		return (Z_NO_POOL);
 	}
 
+	if ((pv = pool_value_alloc()) == NULL) {
+		(void) pool_conf_close(poolconf);
+		pool_conf_free(poolconf);
+		return (Z_NO_POOL);
+	}
+
 	pe = pool_to_elem(poolconf, pool);
 	if (pool_get_property(poolconf, pe, "pool.scheduler", pv) !=
 	    POC_STRING) {
 		(void) pool_conf_close(poolconf);
+		pool_value_free(pv);
 		pool_conf_free(poolconf);
 		return (Z_NO_ENTRY);
 	}
 	(void) pool_value_get_string(pv, &sched_str);
 	(void) pool_conf_close(poolconf);
+	pool_value_free(pv);
 	pool_conf_free(poolconf);
 	if (strlcpy(class, sched_str, clsize) >= clsize)
 		return (Z_TOO_BIG);
@@ -4710,7 +4914,8 @@ zonecfg_setnwifent(zone_dochandle_t handle)
 int
 zonecfg_getnwifent(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 {
-	xmlNodePtr cur;
+	xmlNodePtr cur, val;
+	struct zone_res_attrtab *valptr;
 	int err;
 
 	if (handle == NULL)
@@ -4746,11 +4951,52 @@ zonecfg_getnwifent(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 		return (err);
 	}
 
+	if ((err = fetchprop(cur, DTD_ATTR_MAC, tabptr->zone_nwif_mac,
+	    sizeof (tabptr->zone_nwif_mac))) != Z_OK) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (err);
+	}
+
+	if ((err = fetchprop(cur, DTD_ATTR_VLANID, tabptr->zone_nwif_vlan_id,
+	    sizeof (tabptr->zone_nwif_vlan_id))) != Z_OK) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (err);
+	}
+
+	if ((err = fetchprop(cur, DTD_ATTR_GNIC, tabptr->zone_nwif_gnic,
+	    sizeof (tabptr->zone_nwif_gnic))) != Z_OK) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (err);
+	}
+
 	if ((err = fetchprop(cur, DTD_ATTR_DEFROUTER,
 	    tabptr->zone_nwif_defrouter,
 	    sizeof (tabptr->zone_nwif_defrouter))) != Z_OK) {
 		handle->zone_dh_cur = handle->zone_dh_top;
 		return (err);
+	}
+
+	tabptr->zone_nwif_attrp = NULL;
+	for (val = cur->xmlChildrenNode; val != NULL; val = val->next) {
+		valptr = (struct zone_res_attrtab *)malloc(
+		    sizeof (struct zone_res_attrtab));
+		if (valptr == NULL)
+			return (Z_NOMEM);
+
+		valptr->zone_res_attr_name[0] =
+		    valptr->zone_res_attr_value[0] = '\0';
+		if (zonecfg_add_res_attr(&(tabptr->zone_nwif_attrp), valptr)
+		    != Z_OK) {
+			free(valptr);
+			break;
+		}
+
+		if (fetchprop(val, DTD_ATTR_NAME, valptr->zone_res_attr_name,
+		    sizeof (valptr->zone_res_attr_name)) != Z_OK)
+			break;
+		if (fetchprop(val, DTD_ATTR_VALUE, valptr->zone_res_attr_value,
+		    sizeof (valptr->zone_res_attr_value)) != Z_OK)
+			break;
 	}
 
 	handle->zone_dh_cur = cur->next;
@@ -4772,7 +5018,7 @@ zonecfg_setdevent(zone_dochandle_t handle)
 int
 zonecfg_getdevent(zone_dochandle_t handle, struct zone_devtab *tabptr)
 {
-	xmlNodePtr cur;
+	xmlNodePtr cur, val;
 	int err;
 
 	if (handle == NULL)
@@ -4793,6 +5039,31 @@ zonecfg_getdevent(zone_dochandle_t handle, struct zone_devtab *tabptr)
 	    sizeof (tabptr->zone_dev_match))) != Z_OK) {
 		handle->zone_dh_cur = handle->zone_dh_top;
 		return (err);
+	}
+
+	tabptr->zone_dev_attrp = NULL;
+	for (val = cur->xmlChildrenNode; val != NULL; val = val->next) {
+		struct zone_res_attrtab *valptr;
+
+		valptr = (struct zone_res_attrtab *)malloc(
+		    sizeof (struct zone_res_attrtab));
+		if (valptr == NULL)
+			return (Z_NOMEM);
+
+		valptr->zone_res_attr_name[0] =
+		    valptr->zone_res_attr_value[0] = '\0';
+		if (zonecfg_add_res_attr(&(tabptr->zone_dev_attrp), valptr)
+		    != Z_OK) {
+			free(valptr);
+			break;
+		}
+
+		if ((fetchprop(val, DTD_ATTR_NAME, valptr->zone_res_attr_name,
+		    sizeof (valptr->zone_res_attr_name)) != Z_OK))
+			break;
+		if ((fetchprop(val, DTD_ATTR_VALUE, valptr->zone_res_attr_value,
+		    sizeof (valptr->zone_res_attr_value)) != Z_OK))
+			break;
 	}
 
 	handle->zone_dh_cur = cur->next;
@@ -5523,6 +5794,164 @@ zone_get_brand(char *zone_name, char *brandname, size_t rp_sz)
 }
 
 /*
+ * Atomically get a new zone_did value.  The currently allocated value
+ * is stored in /etc/zones/did.txt.  Lock the file, read the current value,
+ * increment, save the new value and unlock the file.  Return the new value
+ * or -1 if there was an error.  The ID namespace is large enough that we
+ * don't worry about recycling an ID when a zone is deleted.
+ */
+static zoneid_t
+new_zone_did()
+{
+	int fd;
+	int len;
+	int val;
+	struct flock lck;
+	char buf[80];
+
+	if ((fd = open(DEBUGID_FILE, O_RDWR | O_CREAT,
+	    S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) < 0) {
+		perror("new_zone_did open failed");
+		return (-1);
+	}
+
+	/* Initialize the lock. */
+	lck.l_whence = SEEK_SET;
+	lck.l_start = 0;
+	lck.l_len = 0;
+
+	/* Wait until we acquire an exclusive lock on the file. */
+	lck.l_type = F_WRLCK;
+	if (fcntl(fd, F_SETLKW, &lck) == -1) {
+		perror("new_zone_did lock failed");
+		(void) close(fd);
+		return (-1);
+	}
+
+	/* Get currently allocated value */
+	len = read(fd, buf, sizeof (buf));
+	if (len == -1) {
+		perror("new_zone_did read failed");
+		val = -1;
+	} else {
+		if (lseek(fd, 0L, SEEK_SET) == -1) {
+			perror("new_zone_did seek failed");
+			val = -1;
+		} else {
+			if (len == 0) {
+				/* Just created the file, initialize at 1 */
+				val = 1;
+			} else {
+				val = atoi(buf);
+				val++;
+			}
+
+			(void) snprintf(buf, sizeof (buf), "%d\n", val);
+			len = strlen(buf);
+
+			/* Save newly allocated value */
+			if (write(fd, buf, len) == -1) {
+				perror("new_zone_did write failed");
+				val = -1;
+			}
+		}
+	}
+
+	/* Release the file lock. */
+	lck.l_type = F_UNLCK;
+	if (fcntl(fd, F_SETLK, &lck) == -1) {
+		perror("new_zone_did unlock failed");
+		val = -1;
+	}
+
+	if (close(fd) != 0)
+		perror("new_zone_did close failed");
+
+	return (val);
+}
+
+/*
+ * Called by zoneadmd to get the zone's debug ID.
+ * If the zone doesn't already have an ID, a new one is generated and
+ * persistently saved onto the zone.  Normally either zoneadm or zonecfg
+ * will assign a new ID for the zone, so zoneadmd should never have to
+ * generate one, but we also handle that here just to be paranoid.
+ */
+zoneid_t
+zone_get_did(char *zone_name)
+{
+	int res;
+	zoneid_t new_did;
+	zone_dochandle_t handle;
+	char did_str[80];
+
+	if ((handle = zonecfg_init_handle()) == NULL)
+		return (getpid());
+
+	if (zonecfg_get_handle((char *)zone_name, handle) != Z_OK)
+		return (getpid());
+
+	res = getrootattr(handle, DTD_ATTR_DID, did_str, sizeof (did_str));
+
+	/* If the zone already has an assigned debug ID, return it. */
+	if (res == Z_OK && did_str[0] != '\0') {
+		zonecfg_fini_handle(handle);
+		return (atoi(did_str));
+	}
+
+	/*
+	 * The zone doesn't have an assigned debug ID yet, generate one and
+	 * save it as part of the zone definition.
+	 */
+	if ((new_did = new_zone_did()) == -1) {
+		/*
+		 * We should really never hit this block of code.
+		 * Generating a new ID failed for some reason.  Use the current
+		 * pid as a temporary ID so that the zone can continue to boot
+		 * but we don't persistently save this temporary ID on the zone.
+		 */
+		zonecfg_fini_handle(handle);
+		return (getpid());
+	}
+
+	/* Now persistently save this new ID onto the zone. */
+	(void) snprintf(did_str, sizeof (did_str), "%d", new_did);
+	(void) setrootattr(handle, DTD_ATTR_DID, did_str);
+	(void) zonecfg_save(handle);
+
+	zonecfg_fini_handle(handle);
+	return (new_did);
+}
+
+zoneid_t
+zonecfg_get_did(zone_dochandle_t handle)
+{
+	char did_str[80];
+	int err;
+	zoneid_t did;
+
+	err = getrootattr(handle, DTD_ATTR_DID, did_str, sizeof (did_str));
+	if (err == Z_OK && did_str[0] != '\0')
+		did = atoi(did_str);
+	else
+		did = -1;
+
+	return (did);
+}
+
+void
+zonecfg_set_did(zone_dochandle_t handle)
+{
+	zoneid_t new_did;
+	char did_str[80];
+
+	if ((new_did = new_zone_did()) == -1)
+		return;
+	(void) snprintf(did_str, sizeof (did_str), "%d", new_did);
+	(void) setrootattr(handle, DTD_ATTR_DID, did_str);
+}
+
+/*
  * Return the appropriate root for the active /dev.
  * For normal zone, the path is $ZONEPATH/root;
  * for scratch zone, the dev path is $ZONEPATH/lu.
@@ -5802,6 +6231,30 @@ zonecfg_get_uuid(const char *zonename, uuid_t uuid)
 	} else {
 		return (Z_NO_ZONE);
 	}
+}
+
+/*
+ * Changes a zone's UUID to the given value. Returns an error if the UUID is
+ * malformed or if the zone cannot be located.
+ */
+int
+zonecfg_set_uuid(const char *zonename, const char *zonepath,
+    const char *uuid)
+{
+	int err;
+	struct zoneent ze;
+
+	bzero(&ze, sizeof (ze));
+	ze.zone_state = -1;	/* Preserve existing state in index */
+	(void) strlcpy(ze.zone_name, zonename, sizeof (ze.zone_name));
+	(void) strlcpy(ze.zone_path, zonepath, sizeof (ze.zone_path));
+	if (uuid_parse((char *)uuid, ze.zone_uuid) == -1)
+		return (Z_INVALID_PROPERTY);
+
+	if ((err = putzoneent(&ze, PZE_MODIFY)) != Z_OK)
+		return (err);
+
+	return (Z_OK);
 }
 
 /*
@@ -6838,131 +7291,49 @@ zonecfg_getpsetent(zone_dochandle_t handle, struct zone_psettab *tabptr)
 	return (err);
 }
 
-static int
-add_mcap(zone_dochandle_t handle, struct zone_mcaptab *tabptr)
-{
-	xmlNodePtr newnode, cur = handle->zone_dh_cur;
-	int err;
-
-	newnode = xmlNewTextChild(cur, NULL, DTD_ELEM_MCAP, NULL);
-	if ((err = newprop(newnode, DTD_ATTR_PHYSCAP, tabptr->zone_physmem_cap))
-	    != Z_OK)
-		return (err);
-
-	return (Z_OK);
-}
-
+/*
+ * Cleanup obsolete constructs in the configuration.
+ * Return true of the config has been updated and must be commited.
+ */
 int
-zonecfg_delete_mcap(zone_dochandle_t handle)
+zonecfg_fix_obsolete(zone_dochandle_t handle)
 {
-	int err;
-	xmlNodePtr cur = handle->zone_dh_cur;
-
-	if ((err = operation_prep(handle)) != Z_OK)
-		return (err);
-
-	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
-		if (xmlStrcmp(cur->name, DTD_ELEM_MCAP) != 0)
-			continue;
-
-		xmlUnlinkNode(cur);
-		xmlFreeNode(cur);
-		return (Z_OK);
-	}
-	return (Z_NO_RESOURCE_ID);
-}
-
-int
-zonecfg_modify_mcap(zone_dochandle_t handle, struct zone_mcaptab *tabptr)
-{
-	int err;
-
-	if (tabptr == NULL)
-		return (Z_INVAL);
-
-	err = zonecfg_delete_mcap(handle);
-	/* it is ok if there is no mcap entry */
-	if (err != Z_OK && err != Z_NO_RESOURCE_ID)
-		return (err);
-
-	if ((err = add_mcap(handle, tabptr)) != Z_OK)
-		return (err);
-
-	return (Z_OK);
-}
-
-int
-zonecfg_lookup_mcap(zone_dochandle_t handle, struct zone_mcaptab *tabptr)
-{
+	int res = 0;
+	int add_physmem_rctl = 0;
 	xmlNodePtr cur;
-	int err;
+	char	zone_physmem_cap[MAXNAMELEN];
 
-	if (tabptr == NULL)
-		return (Z_INVAL);
+	if (operation_prep(handle) != Z_OK)
+		return (res);
 
-	if ((err = operation_prep(handle)) != Z_OK)
-		return (err);
-
+	/*
+	 * If an obsolete mcap entry exists, convert it to the rctl.
+	 */
 	cur = handle->zone_dh_cur;
 	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
 		if (xmlStrcmp(cur->name, DTD_ELEM_MCAP) != 0)
 			continue;
-		if ((err = fetchprop(cur, DTD_ATTR_PHYSCAP,
-		    tabptr->zone_physmem_cap,
-		    sizeof (tabptr->zone_physmem_cap))) != Z_OK) {
-			handle->zone_dh_cur = handle->zone_dh_top;
-			return (err);
+
+		if (fetchprop(cur, DTD_ATTR_PHYSCAP,
+		    zone_physmem_cap, sizeof (zone_physmem_cap)) == Z_OK) {
+			res = 1;
+			add_physmem_rctl = 1;
 		}
 
-		return (Z_OK);
+		xmlUnlinkNode(cur);
+		xmlFreeNode(cur);
+		break;
 	}
 
-	return (Z_NO_ENTRY);
-}
+	if (add_physmem_rctl) {
+		uint64_t cap;
+		char *endp;
 
-static int
-getmcapent_core(zone_dochandle_t handle, struct zone_mcaptab *tabptr)
-{
-	xmlNodePtr cur;
-	int err;
-
-	if (handle == NULL)
-		return (Z_INVAL);
-
-	if ((cur = handle->zone_dh_cur) == NULL)
-		return (Z_NO_ENTRY);
-
-	for (; cur != NULL; cur = cur->next)
-		if (xmlStrcmp(cur->name, DTD_ELEM_MCAP) == 0)
-			break;
-	if (cur == NULL) {
-		handle->zone_dh_cur = handle->zone_dh_top;
-		return (Z_NO_ENTRY);
+		cap = strtoull(zone_physmem_cap, &endp, 10);
+		(void) zonecfg_set_aliased_rctl(handle, ALIAS_MAXPHYSMEM, cap);
 	}
 
-	if ((err = fetchprop(cur, DTD_ATTR_PHYSCAP, tabptr->zone_physmem_cap,
-	    sizeof (tabptr->zone_physmem_cap))) != Z_OK) {
-		handle->zone_dh_cur = handle->zone_dh_top;
-		return (err);
-	}
-
-	handle->zone_dh_cur = cur->next;
-	return (Z_OK);
-}
-
-int
-zonecfg_getmcapent(zone_dochandle_t handle, struct zone_mcaptab *tabptr)
-{
-	int err;
-
-	if ((err = zonecfg_setent(handle)) != Z_OK)
-		return (err);
-
-	err = getmcapent_core(handle, tabptr);
-
-	(void) zonecfg_endent(handle);
-
-	return (err);
+	return (res);
 }
 
 /*

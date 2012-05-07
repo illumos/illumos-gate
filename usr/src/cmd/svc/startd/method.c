@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright 2011 Joyent Inc.
+ */
+
+/*
  * method.c - method execution functions
  *
  * This file contains the routines needed to run a method:  a fork(2)-exec(2)

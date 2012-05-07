@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 by Delphix. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 #ifndef	_LIBFS_IMPL_H
@@ -79,6 +80,7 @@ struct libzfs_handle {
 	libzfs_fru_t **libzfs_fru_hash;
 	libzfs_fru_t *libzfs_fru_list;
 	char libzfs_chassis_id[256];
+	boolean_t libzfs_cachedprops;
 };
 
 #define	ZFSSHARE_MISS	0x01	/* Didn't find entry in cache */
@@ -149,6 +151,7 @@ int zpool_standard_error_fmt(libzfs_handle_t *, int, const char *, ...);
 int get_dependents(libzfs_handle_t *, boolean_t, const char *, char ***,
     size_t *);
 zfs_handle_t *make_dataset_handle_zc(libzfs_handle_t *, zfs_cmd_t *);
+int libzfs_cmd_set_cachedprops(libzfs_handle_t *, zfs_cmd_t *);
 
 
 int zprop_parse_value(libzfs_handle_t *, nvpair_t *, int, zfs_type_t,

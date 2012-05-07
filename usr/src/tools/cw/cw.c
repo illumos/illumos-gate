@@ -1842,7 +1842,7 @@ main(int argc, char **argv)
 		    "%s/SUNWspro/SS12/bin", dir);
 	}
 
-	if ((dir = getenv("GNU_ROOT")) != NULL) {
+	if ((dir = getenv("GCC_ROOT")) != NULL) {
 		(void) snprintf(default_dir[CW_C_GCC], MAXPATHLEN,
 		    "%s/bin", dir);
 	}

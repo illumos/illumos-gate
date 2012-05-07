@@ -22,6 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Joyent, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -353,6 +354,7 @@ struct memcntl_mha32 {
 #define	MS_SYNC		0x4		/* wait for msync */
 #define	MS_ASYNC	0x1		/* return immediately */
 #define	MS_INVALIDATE	0x2		/* invalidate caches */
+#define	MS_INVALCURPROC	0x8		/* invalidate cache for curproc only */
 
 #if	(_POSIX_C_SOURCE <= 2) && !defined(_XPG4_2) || defined(__EXTENSIONS__)
 /* functions to mctl */

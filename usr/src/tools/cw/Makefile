@@ -22,8 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG	= cw
 
@@ -34,8 +32,8 @@ include ../Makefile.tools
 # Bootstrap problem -- we have to build cw before we can use it
 i386_CC=		$(SPRO_VROOT)/bin/cc
 sparc_CC=		$(SPRO_VROOT)/bin/cc
-$(__GNUC)i386_CC=	$(GNU_ROOT)/bin/gcc
-$(__GNUC)sparc_CC=	$(GNU_ROOT)/bin/gcc
+$(__GNUC)i386_CC=	$(GCC_ROOT)/bin/gcc
+$(__GNUC)sparc_CC=	$(GCC_ROOT)/bin/gcc
 
 CFLAGS += $(CCVERBOSE)
 
@@ -48,9 +46,9 @@ $(__GNUC)LDLIBS +=	-lc
 $(__GNUC)LDFLAGS= 	$(MAPFILE.NES:%=-Wl,-M%)
 
 CPPFLAGS += -DDEFAULT_CC_DIR='"$(SPRO_VROOT)/bin"'
-CPPFLAGS += -DDEFAULT_GCC_DIR='"$(GNU_ROOT)/bin"'
+CPPFLAGS += -DDEFAULT_GCC_DIR='"$(GCC_ROOT)/bin"'
 CPPFLAGS += -DDEFAULT_CPLUSPLUS_DIR='"$(SPRO_VROOT)/bin"'
-CPPFLAGS += -DDEFAULT_GPLUSPLUS_DIR='"$(GNU_ROOT)/bin"'
+CPPFLAGS += -DDEFAULT_GPLUSPLUS_DIR='"$(GCC_ROOT)/bin"'
 
 $(ROOTONBLDMAN1FILES) := FILEMODE=      644
 

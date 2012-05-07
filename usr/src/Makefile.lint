@@ -459,7 +459,6 @@ COMMON_SUBDIRS = \
 	lib/pam_modules \
 	lib/passwdutil \
 	lib/pkcs11 \
-	lib/print \
 	lib/raidcfg_plugins \
 	lib/scsi \
 	lib/smbsrv \

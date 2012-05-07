@@ -40,6 +40,7 @@
 #include <sys/zfs_znode.h>
 #include <sys/spa_impl.h>
 #include <sys/dsl_deadlist.h>
+#include <sys/zfs_zone.h>
 
 int zfs_no_write_throttle = 0;
 int zfs_write_limit_shift = 3;			/* 1/8th of physical memory */
@@ -529,11 +530,11 @@ dsl_pool_tempreserve_space(dsl_pool_t *dp, uint64_t space, dmu_tx_t *tx)
 
 	/*
 	 * If this transaction group is over 7/8ths capacity, delay
-	 * the caller 1 clock tick.  This will slow down the "fill"
-	 * rate until the sync process can catch up with us.
+	 * the caller some number of clock ticks.  This will slow down the
+	 * "fill" rate until the sync process can catch up with us.
 	 */
 	if (reserved && reserved > (write_limit - (write_limit >> 3)))
-		txg_delay(dp, tx->tx_txg, 1);
+		txg_delay(dp, tx->tx_txg, zfs_zone_txg_delay());
 
 	return (0);
 }

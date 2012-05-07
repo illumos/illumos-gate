@@ -4032,16 +4032,15 @@ mac_info_get(const char *name, mac_info_t *minfop)
 /*
  * To get the capabilities that MAC layer cares about, such as rings, factory
  * mac address, vnic or not, it should directly invoke this function.  If the
- * link is part of a bridge, then the only "capability" it has is the inability
- * to do zero copy.
+ * link is part of a bridge, then the link is unable to do zero copy.
  */
 boolean_t
 i_mac_capab_get(mac_handle_t mh, mac_capab_t cap, void *cap_data)
 {
 	mac_impl_t *mip = (mac_impl_t *)mh;
 
-	if (mip->mi_bridge_link != NULL)
-		return (cap == MAC_CAPAB_NO_ZCOPY);
+	if (mip->mi_bridge_link != NULL && cap == MAC_CAPAB_NO_ZCOPY)
+		return (B_TRUE);
 	else if (mip->mi_callbacks->mc_callbacks & MC_GETCAPAB)
 		return (mip->mi_getcapab(mip->mi_driver, cap, cap_data));
 	else

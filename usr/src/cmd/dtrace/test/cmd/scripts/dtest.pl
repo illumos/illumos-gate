@@ -565,7 +565,7 @@ $defdir = -d $dt_tst ? $dt_tst : '.';
 $bindir = -d $dt_bin ? $dt_bin : '.';
 
 if (!$opt_F) {
-	my @dependencies = ("gcc", "make", "java", "perl");
+	my @dependencies = ("gcc", "cc", "make", "java", "perl");
 	
 	for my $dep (@dependencies) {
 		if (!inpath($dep)) {

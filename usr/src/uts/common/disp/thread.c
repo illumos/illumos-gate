@@ -1049,6 +1049,8 @@ installctx(
 	ctx->free_op = free;
 	ctx->arg = arg;
 	ctx->next = t->t_ctx;
+	ctx->save_ts = 0;
+	ctx->restore_ts = 0;
 	t->t_ctx = ctx;
 }
 
@@ -1120,9 +1122,12 @@ savectx(kthread_t *t)
 	struct ctxop *ctx;
 
 	ASSERT(t == curthread);
-	for (ctx = t->t_ctx; ctx != 0; ctx = ctx->next)
-		if (ctx->save_op != NULL)
+	for (ctx = t->t_ctx; ctx != 0; ctx = ctx->next) {
+		if (ctx->save_op != NULL) {
+			ctx->save_ts = gethrtime_unscaled();
 			(ctx->save_op)(ctx->arg);
+		}
+	}
 }
 
 void
@@ -1131,9 +1136,12 @@ restorectx(kthread_t *t)
 	struct ctxop *ctx;
 
 	ASSERT(t == curthread);
-	for (ctx = t->t_ctx; ctx != 0; ctx = ctx->next)
-		if (ctx->restore_op != NULL)
+	for (ctx = t->t_ctx; ctx != 0; ctx = ctx->next) {
+		if (ctx->restore_op != NULL) {
+			ctx->restore_ts = gethrtime_unscaled();
 			(ctx->restore_op)(ctx->arg);
+		}
+	}
 }
 
 void

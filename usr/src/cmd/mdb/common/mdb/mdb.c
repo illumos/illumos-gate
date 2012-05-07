@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012 Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -1130,6 +1132,16 @@ done:
 	}
 
 	return (status);
+}
+
+void
+mdb_call_tab(mdb_idcmd_t *idcp, mdb_tab_cookie_t *mcp, uint_t flags,
+    uintmax_t argc, mdb_arg_t *argv)
+{
+	if (idcp->idc_tabp == NULL)
+		return;
+
+	idcp->idc_tabp(mcp, flags, argc, argv);
 }
 
 /*

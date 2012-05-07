@@ -22,9 +22,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Joyent, Inc. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <ctype.h>
 #include <errno.h>
@@ -84,6 +83,7 @@ typedef struct umem_env_item {
 
 #ifndef UMEM_STANDALONE
 static arg_process_t umem_backend_process;
+static arg_process_t umem_allocator_process;
 #endif
 
 static arg_process_t umem_log_process;
@@ -99,6 +99,11 @@ static umem_env_item_t umem_options_items[] = {
 		"=sbrk for sbrk(2), =mmap for mmap(2)",
 		NULL, 0, NULL, NULL,
 		&umem_backend_process
+	},
+	{ "allocator",		"Evolving",	ITEM_SPECIAL,
+		"=best, =first, =next, or =instant",
+		NULL, 0, NULL, NULL,
+		&umem_allocator_process
 	},
 #endif
 
@@ -472,6 +477,35 @@ fail:
 	log_message("%s: %s: must be %s=sbrk or %s=mmap\n",
 	    CURRENT, name, name, name);
 	return (ARG_BAD);
+}
+
+
+static int
+umem_allocator_process(const umem_env_item_t *item, const char *item_arg)
+{
+	const char *name = item->item_name;
+
+	if (item_arg == NULL)
+		goto fail;
+
+	if (strcmp(item_arg, "best") == 0)
+		vmem_allocator = VM_BESTFIT;
+	else if (strcmp(item_arg, "next") == 0)
+		vmem_allocator = VM_NEXTFIT;
+	else if (strcmp(item_arg, "first") == 0)
+		vmem_allocator = VM_FIRSTFIT;
+	else if (strcmp(item_arg, "instant") == 0)
+		vmem_allocator = 0;
+	else
+		goto fail;
+
+	return (ARG_SUCCESS);
+
+fail:
+	log_message("%s: %s: must be %s=best, %s=next or %s=first\n",
+	    CURRENT, name, name, name, name);
+	return (ARG_BAD);
+
 }
 #endif
 

@@ -1,6 +1,6 @@
 /******************************************************************************
 
-  Copyright (c) 2001-2010, Intel Corporation 
+  Copyright (c) 2001-2012, Intel Corporation 
   All rights reserved.
   
   Redistribution and use in source and binary forms, with or without 
@@ -109,9 +109,13 @@ s32 ixgbe_set_mac_type(struct ixgbe_hw *hw)
 		case IXGBE_DEV_ID_82599_KX4_MEZZ:
 		case IXGBE_DEV_ID_82599_XAUI_LOM:
 		case IXGBE_DEV_ID_82599_COMBO_BACKPLANE:
+		case IXGBE_DEV_ID_82599_KR:
 		case IXGBE_DEV_ID_82599_SFP:
 		case IXGBE_DEV_ID_82599_BACKPLANE_FCOE:
 		case IXGBE_DEV_ID_82599_SFP_FCOE:
+		case IXGBE_DEV_ID_82599_SFP_EM:
+		case IXGBE_DEV_ID_82599_SFP_SF2:
+		case IXGBE_DEV_ID_82599EN_SFP:
 		case IXGBE_DEV_ID_82599_CX4:
 		case IXGBE_DEV_ID_82599_T3_LOM:
 			hw->mac.type = ixgbe_mac_82599EB;

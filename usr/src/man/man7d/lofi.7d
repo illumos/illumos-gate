@@ -136,7 +136,3 @@ through the \fBlofi\fR file driver.
 .LP
 For compatibility purposes, a raw device is also exported with the block
 device. (For example, \fBnewfs\fR(1M)).
-.sp
-.LP
-The \fBlofi\fR driver isn't available in a zone and will not work inside a
-zone.

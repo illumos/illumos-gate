@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011 Gary Mills
- * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1992 Diomidis Spinellis.
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -41,9 +41,7 @@
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <getopt.h>
 #include <libgen.h>
-#include <libintl.h>
 #include <limits.h>
 #include <locale.h>
 #include <regex.h>
@@ -52,6 +50,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <libintl.h>
 
 #include "defs.h"
 #include "extern.h"
@@ -106,11 +105,6 @@ static char tmpfname[PATH_MAX];	/* Temporary file name (for in-place editing) */
 static const char *inplace;	/* Inplace edit file extension. */
 ulong_t linenum;
 
-static const struct option lopts[] = {
-	{"in-place",	optional_argument,	NULL,	'i'},
-	{NULL,		0,			NULL,	0}
-};
-
 static void add_compunit(enum e_cut, char *);
 static void add_file(char *);
 static void usage(void);
@@ -133,18 +127,14 @@ main(int argc, char *argv[])
 	fflag = 0;
 	inplace = NULL;
 
-	while ((c = getopt_long(argc, argv, "EI::ae:f:i::lnr", lopts, NULL)) !=
-	    -1)
+	while ((c = getopt(argc, argv, "EI:ae:f:i:lnr")) != -1)
 		switch (c) {
 		case 'r':		/* Gnu sed compat */
 		case 'E':
 			rflags = REG_EXTENDED;
 			break;
 		case 'I':
-			if (optarg != NULL)
-				inplace = optarg;
-			else
-				inplace = "";
+			inplace = optarg;
 			ispan = 1;	/* span across input files */
 			break;
 		case 'a':
@@ -161,10 +151,7 @@ main(int argc, char *argv[])
 			add_compunit(CU_FILE, optarg);
 			break;
 		case 'i':
-			if (optarg != NULL)
-				inplace = optarg;
-			else
-				inplace = "";
+			inplace = optarg;
 			ispan = 0;	/* don't span across input files */
 			break;
 		case 'l':
@@ -205,8 +192,8 @@ main(int argc, char *argv[])
 static void
 usage(void)
 {
-	(void) fputs(_("usage: sed script [-Ealn] [-i[extension]] [file...]\n"
-	    "       sed [-Ealn] [-i[extension]] [-e script]... "
+	(void) fputs(_("usage: sed script [-Ealn] [-i extension] [file...]\n"
+	    "       sed [-Ealn] [-i extension] [-e script]... "
 	    "[-f script_file]... [file...]\n"),
 	    stderr);
 	exit(1);

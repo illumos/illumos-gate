@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2011 Joyent Inc.  All rights reserved.
  */
 
 #include "lint.h"
@@ -39,7 +40,8 @@
 zoneid_t
 zone_create(const char *name, const char *root, const struct priv_set *privs,
     const char *rctls, size_t rctlsz, const char *zfs, size_t zfssz,
-    int *extended_error, int match, int doi, const bslabel_t *label, int flags)
+    int *extended_error, int match, int doi, const bslabel_t *label, int flags,
+    zoneid_t req_zoneid)
 {
 	zone_def  zd;
 	priv_data_t *d;
@@ -59,6 +61,7 @@ zone_create(const char *name, const char *root, const struct priv_set *privs,
 	zd.doi = doi;
 	zd.label = label;
 	zd.flags = flags;
+	zd.zoneid = req_zoneid;
 
 	return ((zoneid_t)syscall(SYS_zone, ZONE_CREATE, &zd));
 }

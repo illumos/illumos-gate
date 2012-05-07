@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -183,6 +187,7 @@ typedef struct prnode {
 #define	PR_INVAL	0x01		/* vnode is invalidated */
 #define	PR_ISSELF	0x02		/* vnode is a self-open */
 #define	PR_AOUT		0x04		/* vnode is for an a.out path */
+#define	PR_OFFMAX	0x08		/* vnode is a large file open */
 
 /*
  * Conversion macros.

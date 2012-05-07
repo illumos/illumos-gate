@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -169,6 +170,8 @@ struct tgdk_objops dadk_ops = {
 static	int	dadk_debug = DGEOM;
 
 #endif	/* DADK_DEBUG */
+
+#define ONE_MIN	((longlong_t)60 * NANOSEC)
 
 static int dadk_check_media_time = 3000000;	/* 3 Second State Check */
 static int dadk_dk_maxphys = 0x80000;
@@ -1378,6 +1381,47 @@ static struct dadkio_derr dadk_errtab[] = {
 	{COMMAND_DONE_ERROR, GDA_FATAL},	/* 23 DERR_RESV		*/
 };
 
+/*
+ * A bad disk can result in a large number of errors spewed to the log.
+ * This can in turn lead to /var/adm/messages filling up the file system on
+ * a machine with a small root or /var file system.
+ *
+ * Instead of logging every error, if we're seeing repeated errors on a disk
+ * only log them periodically.
+ */
+static void
+dadk_logerr(struct dadk *dadkp, struct cmpkt *pktp, char *label,
+    int severity, daddr_t blkno, daddr_t err_blkno,
+    char **cmdvec, char **senvec)
+{
+	hrtime_t now;
+
+	now = gethrtime();
+	if ((now - dadkp->dad_last_log) < ONE_MIN) {
+		atomic_add_32(&dadkp->dad_err_cnt, 1);
+		return;
+	}
+
+	if (dadkp->dad_err_cnt > 0) {
+		dev_info_t *dev = dadkp->dad_sd->sd_dev;
+		char name[256], buf[256];
+
+		if (dev)
+			(void) snprintf(name, sizeof (name), "%s (%s%d)",
+                            ddi_pathname(dev, buf), label,
+                            ddi_get_instance(dev));
+		else
+			(void) strlcpy(name, label, sizeof (name));
+		cmn_err(CE_WARN, "%s: %d additional unlogged errors\n",
+		    name, dadkp->dad_err_cnt);
+	}
+
+	gda_errmsg(dadkp->dad_sd, pktp, label, severity, blkno, err_blkno,
+	    cmdvec, senvec);
+	dadkp->dad_err_cnt = 0;
+	dadkp->dad_last_log = now;
+}
+
 static int
 dadk_chkerr(struct cmpkt *pktp)
 {
@@ -1464,7 +1508,7 @@ dadk_chkerr(struct cmpkt *pktp)
 		return (COMMAND_DONE);
 	}
 	if (pktp->cp_passthru == NULL) {
-		gda_errmsg(dadkp->dad_sd, pktp, dadk_name,
+		dadk_logerr(dadkp, pktp, dadk_name,
 		    dadk_errtab[scb].d_severity, pktp->cp_srtsec,
 		    err_blkno, dadk_cmds, dadk_sense);
 	}
@@ -1521,7 +1565,7 @@ dadk_recorderr(struct cmpkt *pktp, struct dadkio_rwcmd *rwcmdp)
 
 	if (rwcmdp->flags & DADKIO_FLAG_SILENT)
 		return;
-	gda_errmsg(dadkp->dad_sd, pktp, dadk_name, dadk_errtab[scb].d_severity,
+	dadk_logerr(dadkp, pktp, dadk_name, dadk_errtab[scb].d_severity,
 	    rwcmdp->blkaddr, rwcmdp->status.failed_blk,
 	    dadk_cmds, dadk_sense);
 }

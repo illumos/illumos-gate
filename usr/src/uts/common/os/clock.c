@@ -23,6 +23,7 @@
 
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -66,6 +67,7 @@
 #include <sys/ddi_timer.h>
 #include <sys/random.h>
 #include <sys/modctl.h>
+#include <sys/zone.h>
 
 /*
  * for NTP support
@@ -1158,6 +1160,10 @@ loadavg_update()
 
 	} while ((cpupart = cpupart->cp_next) != cp_list_head);
 
+	/*
+	 * Third pass totals up per-zone statistics.
+	 */
+	zone_loadavg_update();
 }
 
 /*

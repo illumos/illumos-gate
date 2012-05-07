@@ -240,7 +240,25 @@ ht_free(void)
 static void
 ht_init(void)
 {
-	assert(ht_buckets == NULL);
+	if (ht_buckets != NULL) {
+		/*
+		 * If we already have a hash table (e.g., because we are
+		 * processing multiple zones), destroy it before creating
+		 * a new one.
+		 */
+		struct ht_elem *elem, *next;
+		int i;
+
+		for (i = 0; i < ht_buckets_num; i++) {
+			for (elem = ht_buckets[i]; elem != NULL; elem = next) {
+				next = elem->next;
+				free((char *)elem->fmri);
+				free(elem);
+			}
+		}
+
+		free(ht_buckets);
+	}
 
 	ht_buckets_num = 8;
 	ht_buckets = safe_malloc(sizeof (*ht_buckets) * ht_buckets_num);
@@ -1002,13 +1020,14 @@ reverse_bytes(char *buf, size_t len)
 
 /* CTID */
 #define	CTID_COLUMN_WIDTH		6
+#define	CTID_COLUMN_BUFSIZE		20	/* max ctid_t + space + \0 */
 
 static void
 sprint_ctid(char **buf, scf_walkinfo_t *wip)
 {
 	int r;
 	uint64_t c;
-	size_t newsize = (*buf ? strlen(*buf) : 0) + CTID_COLUMN_WIDTH + 2;
+	size_t newsize = (*buf ? strlen(*buf) : 0) + CTID_COLUMN_BUFSIZE;
 	char *newbuf = safe_malloc(newsize);
 	int restarter_spec;
 
@@ -3662,6 +3681,24 @@ again:
 		assert(opt_zone == NULL || zids == NULL);
 
 		if (opt_zone == NULL) {
+			zone_status_t status;
+
+			if (zone_getattr(zids[zent], ZONE_ATTR_STATUS,
+			    &status, sizeof (status)) < 0 ||
+			    status != ZONE_IS_RUNNING) {
+				/*
+				 * If this zone is not running or we cannot
+				 * get its status, we do not want to attempt
+				 * to bind an SCF handle to it, lest we
+				 * accidentally interfere with a zone that
+				 * is not yet running by looking up a door
+				 * to its svc.configd (which could potentially
+				 * block a mount with an EBUSY).
+				 */
+				zent++;
+				goto nextzone;
+			}
+
 			if (getzonenamebyid(zids[zent++],
 			    zonename, sizeof (zonename)) < 0) {
 				uu_warn(gettext("could not get name for "
@@ -3688,14 +3725,12 @@ again:
 
 	if (scf_handle_bind(h) == -1) {
 		if (g_zonename != NULL) {
-			uu_warn(gettext("Could not bind to repository "
+			if (show_zones)
+				goto nextzone;
+
+			uu_die(gettext("Could not bind to repository "
 			    "server for zone %s: %s\n"), g_zonename,
 			    scf_strerror(scf_error()));
-
-			if (!show_zones)
-				return (UU_EXIT_FATAL);
-
-			goto nextzone;
 		}
 
 		uu_die(gettext("Could not bind to repository server: %s.  "

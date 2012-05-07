@@ -14,7 +14,7 @@ detach \- detach or suspend a device
 
 
 
-\fBint prefix\fR \fBdetach\fR(\fBdev_info_t\fR \fIdip\fR, \fBddi_detach_cmd_t\fR \fIcmd\fR);
+\fBint prefix\fR \fBdetach\fR(\fBdev_info_t\fR *\fIdip\fR, \fBddi_detach_cmd_t\fR \fIcmd\fR);
 .fi
 
 .SH INTERFACE LEVEL

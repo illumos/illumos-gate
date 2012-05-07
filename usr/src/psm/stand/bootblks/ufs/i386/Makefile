@@ -23,8 +23,6 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # psm/stand/bootblks/ufs/i386/Makefile
 #
 .KEEP_STATE:
@@ -34,8 +32,8 @@ BASEDIR = ../..
 include $(BASEDIR)/ufs/Makefile.ufs
 
 
-CC		= $(GNU_ROOT)/bin/gcc
-ASFLAGS		= -B$(GNU_ROOT)/bin/ -fno-builtin -nostdinc
+CC		= $(GCC_ROOT)/bin/gcc
+ASFLAGS		= -B$(GCC_ROOT)/bin/ -fno-builtin -nostdinc
 CPPFLAGS	=
 
 LD		= $(GNU_ROOT)/bin/gld
