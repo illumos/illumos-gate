@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -342,8 +343,23 @@ fs_smf_get_prop(smf_fstype_t fstype, char *prop_name, char *cbuf,
 	} else {
 		ret = scf_error();
 	}
-	if ((ret != 0) && scf_error() != SCF_ERROR_NONE)
-		fprintf(stdout, gettext("%s\n"), scf_strerror(ret));
+	if ((ret != 0) && scf_error() != SCF_ERROR_NONE) {
+		/*
+		 * This is a workaround for the NFS service manifests not
+		 * containing the proper properties in local zones.
+		 *
+		 * When in a local zone and the property doesn't exist on an NFS
+		 * service (most likely nfs/server or nfs/client), don't print
+		 * the error.  The caller will still see the correct error code,
+		 * but a user creating a delegated dataset or mounting an NFS
+		 * share won't see this spurious error.
+		 */
+		if (getzoneid() == GLOBAL_ZONEID ||
+		    scf_error() != SCF_ERROR_NOT_FOUND) {
+			fprintf(stdout, gettext("%s\n"), scf_strerror(ret));
+		}
+	}
+
 out:
 	fs_smf_fini(phandle);
 	return (ret);
