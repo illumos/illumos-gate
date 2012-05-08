@@ -22,6 +22,7 @@
 # CDDL HEADER END
 #
 # Network services, Internet style
+# Look at http://www.iana.org/assignments/port-numbers for more
 #
 tcpmux		1/tcp
 echo		7/tcp
@@ -32,21 +33,33 @@ systat		11/tcp		users
 daytime		13/tcp
 daytime		13/udp
 netstat		15/tcp
+qotd		17/tcp 				# Quote of the Day
 chargen		19/tcp		ttytst source
 chargen		19/udp		ttytst source
 ftp-data	20/tcp
 ftp		21/tcp
+ftp		21/sctp
 ssh		22/tcp				# Secure Shell
+ssh		22/sctp
 telnet		23/tcp
 smtp		25/tcp		mail
 time		37/tcp		timserver
 time		37/udp		timserver
+rlp		39/tcp				# Resource Location Protocol
+rlp		39/udp				# Resource Location Protocol
 name		42/udp		nameserver
 whois		43/tcp		nicname		# usually to sri-nic
+tacacs		49/tcp
+tacacs		49/udp
 domain		53/udp
 domain		53/tcp
+tacacs-ds	65/tcp
+tacacs-ds	65/udp
 bootps		67/udp				# BOOTP/DHCP server
 bootpc		68/udp				# BOOTP/DHCP client
+http		80/tcp		www www-http
+http		80/udp		www www-http
+http		80/sctp
 kerberos	88/udp		kdc		# Kerberos V5 KDC
 kerberos	88/tcp		kdc		# Kerberos V5 KDC
 hostnames	101/tcp		hostname	# usually to sri-nic
@@ -54,16 +67,89 @@ pop2		109/tcp		pop-2		# Post Office Protocol - V2
 pop3		110/tcp				# Post Office Protocol - Version 3
 sunrpc		111/udp		rpcbind
 sunrpc		111/tcp		rpcbind
+sftp		115/tcp
 imap		143/tcp		imap2		# Internet Mail Access Protocol v2
+bgp		179/tcp				# Border Gateway Protocol
+bgp		179/udp
+bgp		179/sctp
+irc		194/tcp
+irc		194/udp
+smux		199/tcp
+smux		199/udp
+imap3		220/tcp
+imap3		220/udp
+clearcase	371/tcp
+clearcase	371/udp
 ldap		389/tcp				# Lightweight Directory Access Protocol	
 ldap		389/udp				# Lightweight Directory Access Protocol
+https		443/tcp
+https		443/udp
+https		443/sctp
+kpasswd		464/tcp
+kpasswd		464/udp
 dhcpv6-client	546/udp		dhcpv6c		# DHCPv6 Client (RFC 3315)
+dhcpv6-client	546/tcp
 dhcpv6-server	547/udp		dhcpv6s		# DHCPv6 Server (RFC 3315)
+dhcpv6-server	547/tcp
+rtsp		554/tcp
+rtsp		554/udp
+nntps		563/tcp		snntp
+nntps		563/udp		snntp
 submission	587/tcp				# Mail Message Submission
 submission	587/udp				#    see RFC 2476
+ipp		631/tcp
+ipp		631/udp
 ldaps		636/tcp				# LDAP protocol over TLS/SSL (was sldap)
 ldaps		636/udp				# LDAP protocol over TLS/SSL (was sldap)
+silc		706/tcp
+silc		706/udp
+iscsi		860/tcp
+iscsi		860/udp
+rsync		873/tcp
+rsync		873/udp
+ftps-data	989/tcp
+ftps-data	989/udp
+ftps		990/tcp
+ftps		990/udp
+imaps		993/tcp
+imaps		993/udp
+pop3s		995/tcp
+pop3s		995/udp
+socks		1080/tcp
+socks		1080/udp
+openvpn		1194/tcp
+openvpn		1194/udp
 icap		1344/tcp			# Internet Content Adaptation Protocol
+wins		1512/tcp
+wins		1512/udp
+radius		1812/tcp
+radius		1812/udp
+radius-acct	1813/tcp
+radius-acct	1813/udp
+cvspserver	2401/tcp
+icpv2		3130/tcp
+icpv2		3130/udp
+iscsi-target	3260/tcp
+iscsi-target	3260/udp
+mysql		3306/tcp
+mysql		3306/udp
+nut		3493/tcp			# Network UPS Tools
+svn		3690/tcp
+svn		3690/udp
+epmd		4369/tcp			# Erlang Port Mapper Daemon
+epmd		4369/udp
+sip		5060/tcp
+sip		5060/udp
+sip-tls		5061/tcp
+sip-tls		5061/udp
+xmpp-client	5222/tcp
+xmpp-server	5269/tcp
+postgresql	5432/tcp	postgres
+postgresql	5432/udp	postgres
+http-alt	8080/tcp	webcache	# HTTP Alternate, webcache
+http-alt	8080/udp
+memcache	11211/tcp
+memcache	11211/udp
 #
 # Host specific functions
 #
@@ -76,9 +162,8 @@ iso-tsap	102/tcp
 x400		103/tcp				# ISO Mail
 x400-snd	104/tcp
 csnet-ns	105/tcp
-pop-2		109/tcp				# Post Office
 uucp-path	117/tcp
-nntp            119/tcp         usenet		# Network News Transfer
+nntp		119/tcp		usenet		# Network News Transfer
 ntp		123/tcp				# Network Time Protocol
 ntp		123/udp				# Network Time Protocol
 netbios-ns	137/tcp				# NETBIOS Name Service
@@ -90,7 +175,7 @@ netbios-ssn	139/udp				# NETBIOS Session Service
 NeWS		144/tcp		news		# Window System
 snmpd		161/udp		snmp		# Net-SNMP snmp daemon
 slp		427/tcp		slp		# Service Location Protocol, V2
-slp             427/udp         slp             # Service Location Protocol, V2
+slp		427/udp		slp		# Service Location Protocol, V2
 mobile-ip	434/udp		mobile-ip	# Mobile-IP
 cvc_hostd	442/tcp				# Network Console
 microsoft-ds	445/tcp				# Microsoft Directory Services
@@ -125,18 +210,19 @@ pcserver	600/tcp				# ECD Integrated PC board srvr
 sun-dr		665/tcp				# Remote Dynamic Reconfiguration
 kerberos-adm	749/tcp				# Kerberos V5 Administration
 kerberos-adm	749/udp				# Kerberos V5 Administration
-kerberos-iv	750/udp         		# Kerberos V4 key server
+kerberos-iv	750/udp				# Kerberos V4 key server
 krb5_prop	754/tcp				# Kerberos V5 KDC propogation
 swat		901/tcp				# Samba Web Adm.Tool
 ufsd		1008/tcp	ufsd		# UFS-aware server
 ufsd		1008/udp	ufsd
 cvc		1495/tcp			# Network Console
-ingreslock      1524/tcp
+ingreslock	1524/tcp
 www-ldap-gw	1760/tcp			# HTTP to LDAP gateway
 www-ldap-gw	1760/udp			# HTTP to LDAP gateway
-listen          2766/tcp                        # System V listener port
+listen		2766/tcp			# System V listener port
 nfsd		2049/udp	nfs		# NFS server daemon (clts)
 nfsd		2049/tcp	nfs		# NFS server daemon (cots)
+nfsd		2049/sctp	nfs
 eklogin		2105/tcp			# Kerberos encrypted rlogin
 lockd		4045/udp			# NFS lock daemon/manager
 lockd		4045/tcp
