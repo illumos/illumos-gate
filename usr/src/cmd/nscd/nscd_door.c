@@ -22,9 +22,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <string.h>
@@ -48,14 +47,16 @@ initdoor(void *buf, int *doorfd)
 
 	_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_DEBUG)
 		(me, "door is %s (fd is %d)\n", NAME_SERVICE_DOOR,
-		*doorfd);
+		    *doorfd);
 
-	if (*doorfd == -1)
-		NSCD_RETURN_STATUS(phdr, NSS_ERROR, errno);
+	if (*doorfd == -1) {
+		NSCD_SET_STATUS(phdr, NSS_ERROR, errno);
+		return;
+	}
 
 	if (door_info(*doorfd, &doori) < 0 ||
-		(doori.di_attributes & DOOR_REVOKED) ||
-		doori.di_data != (uintptr_t)NAME_SERVICE_DOOR_COOKIE) {
+	    (doori.di_attributes & DOOR_REVOKED) ||
+	    doori.di_data != (uintptr_t)NAME_SERVICE_DOOR_COOKIE) {
 
 		/*
 		 * we should close doorfd because we just opened it
@@ -65,10 +66,11 @@ initdoor(void *buf, int *doorfd)
 		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_DEBUG)
 		(me, "door %d not valid\n", *doorfd);
 
-		NSCD_RETURN_STATUS(phdr, NSS_ERROR, ECONNREFUSED);
+		NSCD_SET_STATUS(phdr, NSS_ERROR, ECONNREFUSED);
+		return;
 	}
 
-	NSCD_RETURN_STATUS_SUCCESS(phdr);
+	NSCD_SET_STATUS_SUCCESS(phdr);
 }
 
 /* general door call functions used by nscd */
@@ -87,15 +89,14 @@ copy_output(void *outdata, int outdlen,
 			(void) memmove(outdata, dp, phdr->data_len);
 		} else {
 
-			_NSCD_LOG(NSCD_LOG_FRONT_END,
-				NSCD_LOG_LEVEL_DEBUG)
+			_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_DEBUG)
 			(me, "output buffer not large enough "
-			" should be > %d but is %d\n",
-			phdr->data_len, outdlen);
+			    " should be > %d but is %d\n",
+			    phdr->data_len, outdlen);
 
 			if (outphdr != NULL) {
 				NSCD_SET_N2N_STATUS(phdr, NSS_NSCD_PRIV,
-				0, NSCD_INVALID_ARGUMENT);
+				    0, NSCD_INVALID_ARGUMENT);
 				NSCD_COPY_STATUS(outphdr, phdr);
 			}
 			ret = NSS_NSCD_PRIV;
@@ -130,7 +131,7 @@ _nscd_doorcall(int callnum)
 		phdr = (nss_pheader_t *)dptr;
 		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_DEBUG)
 		(me, "door call (%d) failed (status = %d, error = %s)\n",
-			callnum, ret, strerror(NSCD_GET_ERRNO(phdr)));
+		    callnum, ret, strerror(NSCD_GET_ERRNO(phdr)));
 	}
 
 	return (ret);
@@ -169,7 +170,7 @@ _nscd_doorcall_data(int callnum, void *indata, int indlen,
 	if (ret != NSS_SUCCESS) {
 		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_DEBUG)
 		(me, "door call (%d) failed (status = %d, error = %s)\n",
-			callnum, ret, strerror(NSCD_GET_ERRNO(phdr_d)));
+		    callnum, ret, strerror(NSCD_GET_ERRNO(phdr_d)));
 	} else {
 		if (phdr != NULL) {
 			NSCD_COPY_STATUS(phdr, phdr_d);
@@ -230,7 +231,7 @@ _nscd_doorcall_fd(int fd, int callnum, void *indata, int indlen,
 
 		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_DEBUG)
 		(me, "door call (%d to %d) did not get through (%s)\n",
-			callnum, fd, strerror(errnum));
+		    callnum, fd, strerror(errnum));
 
 		return (NSS_ERROR);
 	}
@@ -250,9 +251,9 @@ _nscd_doorcall_fd(int fd, int callnum, void *indata, int indlen,
 
 		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_DEBUG)
 		(me, "door call (%d to %d) failed: p_status = %d, "
-		"p_errno = %s, nscd status = %d\n", callnum, fd,
-		ret, strerror(NSCD_GET_ERRNO(phdr_d)),
-		NSCD_GET_NSCD_STATUS(phdr_d));
+		    "p_errno = %s, nscd status = %d\n", callnum, fd,
+		    ret, strerror(NSCD_GET_ERRNO(phdr_d)),
+		    NSCD_GET_NSCD_STATUS(phdr_d));
 	} else
 		ret = copy_output(outdata, outdlen, phdr_d, phdr);
 
@@ -291,21 +292,20 @@ send_doorfd(void **dptr, size_t *ndata, size_t *adata,
 
 		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_DEBUG)
 		(me, "door call (to fd %d) failed (%s)\n",
-			doorfd, strerror(errnum));
+		    doorfd, strerror(errnum));
 		(void) close(doorfd);
-		NSCD_RETURN_STATUS(phdr, NSS_ERROR, errnum);
+		NSCD_SET_STATUS(phdr, NSS_ERROR, errnum);
+		return;
 	}
 	*adata = param.data_size;
 	*ndata = param.rsize;
 	*dptr = (void *)param.data_ptr;
 
 	if (*adata == 0 || *dptr == NULL) {
-		(void) close(doorfd);
-
 		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_DEBUG)
 		(me, "no data\n");
 
-		NSCD_RETURN_STATUS(phdr, NSS_ERROR, ENOTCONN);
+		NSCD_SET_STATUS(phdr, NSS_ERROR, ENOTCONN);
 	}
 
 	(void) close(doorfd);
@@ -348,8 +348,8 @@ _nscd_doorcall_sendfd(int fd, int callnum, void *indata, int indlen,
 
 		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_DEBUG)
 		(me, "door call (%d) failed (status = %d, error = %s)\n",
-			callnum, NSCD_GET_STATUS(phdr_d),
-			strerror(NSCD_GET_ERRNO(phdr_d)));
+		    callnum, NSCD_GET_STATUS(phdr_d),
+		    strerror(NSCD_GET_ERRNO(phdr_d)));
 	}
 
 	return (NSCD_GET_STATUS(phdr_d));

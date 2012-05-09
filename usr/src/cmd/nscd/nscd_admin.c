@@ -21,9 +21,8 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <locale.h>
@@ -72,11 +71,11 @@ _nscd_door_getadmin(void *outbuf)
 		} else {
 			admin_c.cache_cfg[i] = cfg_default;
 			(void) memset(&admin_c.cache_stats[i], 0,
-				sizeof (admin_c.cache_stats[0]));
+			    sizeof (admin_c.cache_stats[0]));
 		}
 	}
 	(void) memcpy(((char *)outbuf) + phdr->data_off,
-		&admin_c, sizeof (admin_c));
+	    &admin_c, sizeof (admin_c));
 
 	return (0);
 }
@@ -114,16 +113,16 @@ _nscd_server_setadmin(nscd_admin_mod_t *set)
 		_nscd_logit(me, "total_size = %d\n", set->total_size);
 
 		_nscd_logit(me, "debug_level_set = %d, debug_level = %d\n",
-			set->debug_level_set, set->debug_level);
+		    set->debug_level_set, set->debug_level);
 
 		_nscd_logit(me, "logfile_set = %d, logfile = %s\n",
-			set->logfile_set, *set->logfile == '\0' ?
-				"" : set->logfile);
+		    set->logfile_set, *set->logfile == '\0' ?
+		    "" : set->logfile);
 
 		_nscd_logit(me, "cache_cfg_num = %d\n",
-			set->cache_cfg_num);
+		    set->cache_cfg_num);
 		_nscd_logit(me, "cache_flush_num = %d\n",
-			set->cache_flush_num);
+		    set->cache_flush_num);
 	}
 
 	/*
@@ -132,11 +131,11 @@ _nscd_server_setadmin(nscd_admin_mod_t *set)
 
 	if (set->debug_level_set == nscd_true) {
 		if (_nscd_set_debug_level(set->debug_level)
-			!= NSCD_SUCCESS) {
+		    != NSCD_SUCCESS) {
 
 			_NSCD_LOG(NSCD_LOG_ADMIN, NSCD_LOG_LEVEL_ERROR)
 			(me, "unable to set debug level %d\n",
-				set->debug_level);
+			    set->debug_level);
 
 			goto err_exit;
 		}
@@ -152,7 +151,7 @@ _nscd_server_setadmin(nscd_admin_mod_t *set)
 			goto err_exit;
 		}
 		(void) strlcpy(admin_c.logfile, set->logfile,
-				NSCD_LOGFILE_LEN);
+		    NSCD_LOGFILE_LEN);
 	}
 
 	/*
@@ -162,7 +161,7 @@ _nscd_server_setadmin(nscd_admin_mod_t *set)
 
 		_NSCD_LOG(NSCD_LOG_ADMIN, NSCD_LOG_LEVEL_ERROR)
 		(me, "number of caches (%d) to change out of bound %s\n",
-			set->cache_cfg_num);
+		    set->cache_cfg_num);
 
 		goto err_exit;
 	}
@@ -177,14 +176,14 @@ _nscd_server_setadmin(nscd_admin_mod_t *set)
 		if (cache_ctx_p[j] == NULL) {
 			_NSCD_LOG(NSCD_LOG_ADMIN, NSCD_LOG_LEVEL_ERROR)
 			(me, "unable to find cache context for %s\n",
-			dbname);
+			    dbname);
 		}
 
 		rc = _nscd_cfg_get_handle(group, dbname, &h, NULL);
 		if (rc != NSCD_SUCCESS) {
 			_NSCD_LOG(NSCD_LOG_ADMIN, NSCD_LOG_LEVEL_ERROR)
 			(me, "unable to get handle for < %s : %s >\n",
-			dbname, group);
+			    dbname, group);
 
 			goto err_exit;
 		}
@@ -193,7 +192,7 @@ _nscd_server_setadmin(nscd_admin_mod_t *set)
 		if (rc != NSCD_SUCCESS) {
 			_NSCD_LOG(NSCD_LOG_ADMIN, NSCD_LOG_LEVEL_ERROR)
 			(me, "unable to set admin data for < %s : %s >\n",
-			dbname, group);
+			    dbname, group);
 
 			_nscd_cfg_free_handle(h);
 
@@ -209,7 +208,7 @@ _nscd_server_setadmin(nscd_admin_mod_t *set)
 
 		_NSCD_LOG(NSCD_LOG_ADMIN, NSCD_LOG_LEVEL_ERROR)
 		(me, "number of caches (%d) to flush out of bound %s\n",
-			set->cache_flush_num);
+		    set->cache_flush_num);
 
 		goto err_exit;
 	}
@@ -222,7 +221,7 @@ _nscd_server_setadmin(nscd_admin_mod_t *set)
 		if (cache_ctx_p[j] == NULL) {
 			_NSCD_LOG(NSCD_LOG_ADMIN, NSCD_LOG_LEVEL_ERROR)
 			(me, "unable to find cache context for %s\n",
-			dbname);
+			    dbname);
 		}
 		nsc_invalidate(cache_ctx_p[j], NULL, NULL);
 	}
@@ -248,9 +247,9 @@ _nscd_door_setadmin(void *buf)
 		_NSCD_LOG(NSCD_LOG_ADMIN, NSCD_LOG_LEVEL_ERROR)
 		(me, "SETADMIN call failed\n");
 
-		NSCD_RETURN_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0, rc);
+		NSCD_SET_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0, rc);
 	} else {
-		NSCD_RETURN_STATUS_SUCCESS(phdr);
+		NSCD_SET_STATUS_SUCCESS(phdr);
 	}
 }
 
@@ -393,7 +392,7 @@ _nscd_client_getadmin(char opt)
 		callnum = NSCD_GETADMIN;
 
 	(void) _nscd_doorcall_data(callnum, NULL, sizeof (admin_c),
-		&admin_c, sizeof (admin_c), &phdr);
+	    &admin_c, sizeof (admin_c), &phdr);
 
 	if (NSCD_STATUS_IS_NOT_OK(&phdr)) {
 		return (1);
@@ -406,5 +405,5 @@ int
 _nscd_client_setadmin()
 {
 	return (_nscd_doorcall_data(NSCD_SETADMIN, &admin_mod,
-		sizeof (admin_mod), NULL, 0, NULL));
+	    sizeof (admin_mod), NULL, 0, NULL));
 }

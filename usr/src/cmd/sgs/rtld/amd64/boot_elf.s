@@ -22,9 +22,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2012 Joyent, Inc. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if	defined(lint)
 
@@ -33,6 +32,7 @@
 #include	<_audit.h>
 #include	<_elf.h>
 #include	<sys/regset.h>
+#include	<sys/auxv_386.h>
 
 /* ARGSUSED0 */
 int
@@ -45,6 +45,7 @@ elf_plt_trace()
 #include	<link.h>
 #include	<_audit.h>
 #include	<sys/asm_linkage.h>
+#include	<sys/auxv_386.h>
 
 	.file	"boot_elf.s"
 	.text
@@ -106,12 +107,12 @@ elf_plt_trace()
  *	    %r11			 8
  *	    %rax			 8
  *				    =======
- *			    Subtotal:	144 (16byte aligned)
+ *			    Subtotal:	144 (32byte aligned)
  *
  *	Saved Media Regs (used to pass floating point args):
- *	    %xmm0 - %xmm7   16 * 8:	128
+ *	    %xmm0 - %xmm7   32 * 8:	256
  *				    =======
- *			    Total:	272 (16byte aligned)
+ *			    Total:	400 (32byte aligned)
  *  
  *  So - will subtract the following to create enough space
  *
@@ -131,14 +132,14 @@ elf_plt_trace()
  *	-144(%rbp)	entering %r10
  *	-152(%rbp)	entering %r11
  *	-160(%rbp)	entering %rax
- *	-176(%rbp)	entering %xmm0
- *	-192(%rbp)	entering %xmm1
- *	-208(%rbp)	entering %xmm2
- *	-224(%rbp)	entering %xmm3
- *	-240(%rbp)	entering %xmm4
- *	-256(%rbp)	entering %xmm5
- *	-272(%rbp)	entering %xmm6
- *	-288(%rbp)	entering %xmm7
+ *	-192(%rbp)	entering %xmm0
+ *	-224(%rbp)	entering %xmm1
+ *	-256(%rbp)	entering %xmm2
+ *	-288(%rbp)	entering %xmm3
+ *	-320(%rbp)	entering %xmm4
+ *	-384(%rbp)	entering %xmm5
+ *	-416(%rbp)	entering %xmm6
+ *	-448(%rbp)	entering %xmm7
  *
  */
 #define	SPDYNOFF    -8
@@ -148,39 +149,41 @@ elf_plt_trace()
 
 /*
  * The next set of offsets are relative to %rsp.
- * We guarantee %rsp is ABI compliant 16-byte aligned.  This guarantees the
- * xmm registers are saved to 16-byte aligned addresses.
+ * We guarantee %rsp is ABI compliant 32-byte aligned.  This guarantees the
+ * ymm registers are saved to 32-byte aligned addresses.
  * %rbp may only be 8 byte aligned if we came in from non-ABI compliant code.
  */ 
-#define	SPRDIOFF	192
-#define	SPRSIOFF	184
-#define	SPRDXOFF	176
-#define	SPRCXOFF	168
-#define	SPR8OFF		160
-#define	SPR9OFF		152
-#define	SPR10OFF	144
-#define	SPR11OFF	136
-#define	SPRAXOFF	128
-#define	SPXMM0OFF	112
-#define	SPXMM1OFF	96
-#define	SPXMM2OFF	80
-#define	SPXMM3OFF	64
-#define	SPXMM4OFF	48
-#define	SPXMM5OFF	32
-#define	SPXMM6OFF	16
+#define	SPRDIOFF	320
+#define	SPRSIOFF	312
+#define	SPRDXOFF	304
+#define	SPRCXOFF	296
+#define	SPR8OFF		288
+#define	SPR9OFF		280
+#define	SPR10OFF	272
+#define	SPR11OFF	264
+#define	SPRAXOFF	256
+#define	SPXMM0OFF	224
+#define	SPXMM1OFF	192
+#define	SPXMM2OFF	160
+#define	SPXMM3OFF	128
+#define	SPXMM4OFF	96
+#define	SPXMM5OFF	64
+#define	SPXMM6OFF	32
 #define	SPXMM7OFF	0
 
+	/* See elf_rtbndr for explanation behind org_scapset */
+	.extern org_scapset
 	.globl	elf_plt_trace
 	.type	elf_plt_trace,@function
 	.align 16
 elf_plt_trace:
 	/*
-	 * Enforce ABI 16-byte stack alignment here.
+	 * Enforce ABI 32-byte stack alignment here.
 	 * The next andq instruction does this pseudo code:
 	 * If %rsp is 8 byte aligned then subtract 8 from %rsp.
 	 */
-	andq    $-16, %rsp	/* enforce ABI 16-byte stack alignment */
-	subq	$272,%rsp	/ create some local storage
+	andq    $-32, %rsp	/* enforce ABI 32-byte stack alignment */
+	subq	$400,%rsp	/ create some local storage
 
 	movq	%rdi, SPRDIOFF(%rsp)
 	movq	%rsi, SPRSIOFF(%rsp)
@@ -191,6 +194,14 @@ elf_plt_trace:
 	movq	%r10, SPR10OFF(%rsp)
 	movq	%r11, SPR11OFF(%rsp)
 	movq	%rax, SPRAXOFF(%rsp)
+
+	movq	org_scapset@GOTPCREL(%rip),%r9
+	movq	(%r9),%r9
+	movl	(%r9),%edx
+	testl	$AV_386_AVX,%edx
+	jne	.trace_save_ymm
+
+.trace_save_xmm:
 	movdqa	%xmm0, SPXMM0OFF(%rsp)
 	movdqa	%xmm1, SPXMM1OFF(%rsp)
 	movdqa	%xmm2, SPXMM2OFF(%rsp)
@@ -199,6 +210,19 @@ elf_plt_trace:
 	movdqa	%xmm5, SPXMM5OFF(%rsp)
 	movdqa	%xmm6, SPXMM6OFF(%rsp)
 	movdqa	%xmm7, SPXMM7OFF(%rsp)
+	jmp	.trace_save_finish	
+
+.trace_save_ymm:
+	vmovdqa	%ymm0, SPXMM0OFF(%rsp)
+	vmovdqa	%ymm1, SPXMM1OFF(%rsp)
+	vmovdqa	%ymm2, SPXMM2OFF(%rsp)
+	vmovdqa	%ymm3, SPXMM3OFF(%rsp)
+	vmovdqa	%ymm4, SPXMM4OFF(%rsp)
+	vmovdqa	%ymm5, SPXMM5OFF(%rsp)
+	vmovdqa	%ymm6, SPXMM6OFF(%rsp)
+	vmovdqa	%ymm7, SPXMM7OFF(%rsp)
+
+.trace_save_finish:
 
 	movq	SPDYNOFF(%rbp), %rax			/ %rax = dyndata
 	testb	$LA_SYMB_NOPLTENTER, SBFLAGS_OFF(%rax)	/ <link.h>
@@ -273,6 +297,34 @@ elf_plt_trace:
 	/
 	/ Restore registers
 	/
+	movq	org_scapset@GOTPCREL(%rip),%r9
+	movq	(%r9),%r9
+	movl	(%r9),%edx
+	testl	$AV_386_AVX,%edx
+	jne	.trace_restore_ymm
+
+.trace_restore_xmm:
+	movdqa	SPXMM0OFF(%rsp), %xmm0
+	movdqa	SPXMM1OFF(%rsp), %xmm1
+	movdqa	SPXMM2OFF(%rsp), %xmm2
+	movdqa	SPXMM3OFF(%rsp), %xmm3
+	movdqa	SPXMM4OFF(%rsp), %xmm4
+	movdqa	SPXMM5OFF(%rsp), %xmm5
+	movdqa	SPXMM6OFF(%rsp), %xmm6
+	movdqa	SPXMM7OFF(%rsp), %xmm7
+	jmp	.trace_restore_finish
+
+.trace_restore_ymm:
+	vmovdqa	SPXMM0OFF(%rsp), %ymm0
+	vmovdqa	SPXMM1OFF(%rsp), %ymm1
+	vmovdqa	SPXMM2OFF(%rsp), %ymm2
+	vmovdqa	SPXMM3OFF(%rsp), %ymm3
+	vmovdqa	SPXMM4OFF(%rsp), %ymm4
+	vmovdqa	SPXMM5OFF(%rsp), %ymm5
+	vmovdqa	SPXMM6OFF(%rsp), %ymm6
+	vmovdqa	SPXMM7OFF(%rsp), %ymm7
+
+.trace_restore_finish:
 	movq	SPRDIOFF(%rsp), %rdi
 	movq	SPRSIOFF(%rsp), %rsi
 	movq	SPRDXOFF(%rsp), %rdx
@@ -282,14 +334,6 @@ elf_plt_trace:
 	movq	SPR10OFF(%rsp), %r10
 	movq	SPR11OFF(%rsp), %r11
 	movq	SPRAXOFF(%rsp), %rax
-	movdqa	SPXMM0OFF(%rsp), %xmm0
-	movdqa	SPXMM1OFF(%rsp), %xmm1
-	movdqa	SPXMM2OFF(%rsp), %xmm2
-	movdqa	SPXMM3OFF(%rsp), %xmm3
-	movdqa	SPXMM4OFF(%rsp), %xmm4
-	movdqa	SPXMM5OFF(%rsp), %xmm5
-	movdqa	SPXMM6OFF(%rsp), %xmm6
-	movdqa	SPXMM7OFF(%rsp), %xmm7
 
 	subq	$8, %rbp			/ adjust %rbp for 'ret'
 	movq	%rbp, %rsp			/
@@ -365,14 +409,15 @@ elf_plt_trace:
 	/ Restore registers using %r11 which contains our old %rsp value
 	/ before growing the stack.
 	/
-	movq	SPRDIOFF(%r11), %rdi
-	movq	SPRSIOFF(%r11), %rsi
-	movq	SPRDXOFF(%r11), %rdx
-	movq	SPRCXOFF(%r11), %rcx
-	movq	SPR8OFF(%r11), %r8
-	movq	SPR9OFF(%r11), %r9
-	movq	SPR10OFF(%r11), %r10
-	movq	SPRAXOFF(%r11), %rax
+
+	/ Yes, we have to do this dance again. Sorry.
+	movq	org_scapset@GOTPCREL(%rip),%r9
+	movq	(%r9),%r9
+	movl	(%r9),%edx
+	testl	$AV_386_AVX,%edx
+	jne	.trace_r2_ymm
+
+.trace_r2_xmm:
 	movdqa	SPXMM0OFF(%r11), %xmm0
 	movdqa	SPXMM1OFF(%r11), %xmm1
 	movdqa	SPXMM2OFF(%r11), %xmm2
@@ -381,6 +426,27 @@ elf_plt_trace:
 	movdqa	SPXMM5OFF(%r11), %xmm5
 	movdqa	SPXMM6OFF(%r11), %xmm6
 	movdqa	SPXMM7OFF(%r11), %xmm7
+	jmp	.trace_r2_finish
+
+.trace_r2_ymm:
+	vmovdqa	SPXMM0OFF(%r11), %ymm0
+	vmovdqa	SPXMM1OFF(%r11), %ymm1
+	vmovdqa	SPXMM2OFF(%r11), %ymm2
+	vmovdqa	SPXMM3OFF(%r11), %ymm3
+	vmovdqa	SPXMM4OFF(%r11), %ymm4
+	vmovdqa	SPXMM5OFF(%r11), %ymm5
+	vmovdqa	SPXMM6OFF(%r11), %ymm6
+	vmovdqa	SPXMM7OFF(%r11), %ymm7
+
+.trace_r2_finish:
+	movq	SPRDIOFF(%r11), %rdi
+	movq	SPRSIOFF(%r11), %rsi
+	movq	SPRDXOFF(%r11), %rdx
+	movq	SPRCXOFF(%r11), %rcx
+	movq	SPR8OFF(%r11), %r8
+	movq	SPR9OFF(%r11), %r9
+	movq	SPR10OFF(%r11), %r10
+	movq	SPRAXOFF(%r11), %rax
 	movq	SPR11OFF(%r11), %r11		/ retore %r11 last
 
 	/*
@@ -493,7 +559,14 @@ elf_rtbndr(Rt_map * lmp, unsigned long reloc, caddr_t pc)
  * the AMD64 ABI.  We must save on the local stack all possible register
  * arguments before interposing functions to resolve the called function. 
  * Possible arguments must be restored before invoking the resolved function.
- *
+ * 
+ * Before the AVX instruction set enhancements to AMD64 there were no changes in
+ * the set of registers and their sizes across different processors. With AVX,
+ * the xmm registers became the lower 128 bits of the ymm registers. Because of
+ * this, we need to conditionally save 256 bits instead of 128 bits. Regardless
+ * of whether we have ymm registers or not, we're always going to push the stack
+ * space assuming that we do to simplify the code.
+ * 
  * Local stack space storage for elf_rtbndr is allocated as follows:
  *
  *	Saved regs:
@@ -506,12 +579,12 @@ elf_rtbndr(Rt_map * lmp, unsigned long reloc, caddr_t pc)
  *	    %r9				 8
  *	    %r10			 8
  *				    =======
- *			    Subtotal:   64 (16byte aligned)
+ *			    Subtotal:   64 (32byte aligned)
  *
  *	Saved Media Regs (used to pass floating point args):
- *	    %xmm0 - %xmm7   16 * 8:    128
+ *	    %ymm0 - %ymm7   32 * 8     256
  *				    =======
- *			    Total:     192 (16byte aligned)
+ *			    Total:     320 (32byte aligned)
  *  
  *  So - will subtract the following to create enough space
  *
@@ -523,21 +596,25 @@ elf_rtbndr(Rt_map * lmp, unsigned long reloc, caddr_t pc)
  *	40(%rsp)	save %r8
  *	48(%rsp)	save %r9
  *	56(%rsp)	save %r10
- *	64(%rsp)	save %xmm0
- *	80(%rsp)	save %xmm1
- *	96(%rsp)	save %xmm2
- *	112(%rsp)	save %xmm3
- *	128(%rsp)	save %xmm4
- *	144(%rsp)	save %xmm5
- *	160(%rsp)	save %xmm6
- *	176(%rsp)	save %xmm7
+ *	64(%rsp)	save %ymm0
+ *	96(%rsp)	save %ymm1
+ *	128(%rsp)	save %ymm2
+ *	160(%rsp)	save %ymm3
+ *	192(%rsp)	save %ymm4
+ *	224(%rsp)	save %ymm5
+ *	256(%rsp)	save %ymm6
+ *	288(%rsp)	save %ymm7
  *
  * Note: Some callers may use 8-byte stack alignment instead of the
  * ABI required 16-byte alignment.  We use %rsp offsets to save/restore
  * registers because %rbp may not be 16-byte aligned.  We guarantee %rsp
  * is 16-byte aligned in the function preamble.
  */
-#define	LS_SIZE	$192	/* local stack space to save all possible arguments */
+/*
+ * As the registers may either be xmm or ymm, we've left the name as xmm, but
+ * increased the offset between them to always cover the xmm and ymm cases.
+ */
+#define	LS_SIZE	$320	/* local stack space to save all possible arguments */
 #define	LSRAXOFF	0	/* for SSE register count */
 #define	LSRDIOFF	8	/* arg 0 ... */
 #define	LSRSIOFF	16
@@ -547,14 +624,23 @@ elf_rtbndr(Rt_map * lmp, unsigned long reloc, caddr_t pc)
 #define	LSR9OFF		48
 #define	LSR10OFF	56	/* ... arg 5 */
 #define	LSXMM0OFF	64	/* SSE arg 0 ... */
-#define	LSXMM1OFF	80
-#define	LSXMM2OFF	96
-#define	LSXMM3OFF	112
-#define	LSXMM4OFF	128
-#define	LSXMM5OFF	144
-#define	LSXMM6OFF	160
-#define	LSXMM7OFF	176	/* ... SSE arg 7 */
+#define	LSXMM1OFF	96
+#define	LSXMM2OFF	128
+#define	LSXMM3OFF	160
+#define	LSXMM4OFF	192
+#define	LSXMM5OFF	224
+#define	LSXMM6OFF	256
+#define	LSXMM7OFF	288	/* ... SSE arg 7 */
 
+	/*
+	 * The org_scapset is a global variable that is a part of rtld. It
+	 * contains the capabilities that the kernel has told us are supported
+	 * (auxv_hwcap). This is necessary for determining whether or not we
+	 * need to save and restore AVX registers or simple SSE registers. Note,
+	 * that the field we care about is currently at offset 0, if that
+	 * changes, this code will have to be updated.
+	 */
+	.extern org_scapset
 	.weak	_elf_rtbndr
 	_elf_rtbndr = elf_rtbndr
 
@@ -569,7 +655,7 @@ elf_rtbndr(Rt_map * lmp, unsigned long reloc, caddr_t pc)
 	 * The next andq instruction does this pseudo code:
 	 * If %rsp is 8 byte aligned then subtract 8 from %rsp.
 	 */
-	andq	$-16, %rsp	/* enforce ABI 16-byte stack alignment */
+	andq	$-32, %rsp	/* enforce ABI 32-byte stack alignment */
 
 	subq	LS_SIZE, %rsp	/* save all ABI defined argument registers */
 
@@ -582,6 +668,16 @@ elf_rtbndr(Rt_map * lmp, unsigned long reloc, caddr_t pc)
 	movq	%r9, LSR9OFF(%rsp)	/* .. arg 5 */
 	movq	%r10, LSR10OFF(%rsp)	/* call chain reg */
 
+	/*
+	 * Our xmm registers could secretly by ymm registers in disguise.
+	 */
+	movq	org_scapset@GOTPCREL(%rip),%r9
+	movq	(%r9),%r9
+	movl	(%r9),%edx
+	testl	$AV_386_AVX,%edx
+	jne	.save_ymm
+
+.save_xmm:
 	movdqa	%xmm0, LSXMM0OFF(%rsp)	/* SSE arg 0 ... */
 	movdqa	%xmm1, LSXMM1OFF(%rsp)
 	movdqa	%xmm2, LSXMM2OFF(%rsp)
@@ -590,23 +686,36 @@ elf_rtbndr(Rt_map * lmp, unsigned long reloc, caddr_t pc)
 	movdqa	%xmm5, LSXMM5OFF(%rsp)
 	movdqa	%xmm6, LSXMM6OFF(%rsp)
 	movdqa	%xmm7, LSXMM7OFF(%rsp)	/* ... SSE arg 7 */
+	jmp	.save_finish	
 
+.save_ymm:
+	vmovdqa	%ymm0, LSXMM0OFF(%rsp)	/* SSE arg 0 ... */
+	vmovdqa	%ymm1, LSXMM1OFF(%rsp)
+	vmovdqa	%ymm2, LSXMM2OFF(%rsp)
+	vmovdqa	%ymm3, LSXMM3OFF(%rsp)
+	vmovdqa	%ymm4, LSXMM4OFF(%rsp)
+	vmovdqa	%ymm5, LSXMM5OFF(%rsp)
+	vmovdqa	%ymm6, LSXMM6OFF(%rsp)
+	vmovdqa	%ymm7, LSXMM7OFF(%rsp)	/* ... SSE arg 7 */
+
+.save_finish:
 	movq	LBPLMPOFF(%rbp), %rdi	/* arg1 - *lmp */
 	movq	LBPRELOCOFF(%rbp), %rsi	/* arg2 - reloc index */
 	movq	LBRPCOFF(%rbp), %rdx	/* arg3 - pc of caller */
 	call	elf_bndr@PLT		/* call elf_rtbndr(lmp, relndx, pc) */
 	movq	%rax, LBPRELOCOFF(%rbp)	/* store final destination */
 
-	/* restore possible arguments before invoking resolved function */
-	movq	LSRAXOFF(%rsp), %rax
-	movq	LSRDIOFF(%rsp), %rdi
-	movq	LSRSIOFF(%rsp), %rsi
-	movq	LSRDXOFF(%rsp), %rdx
-	movq	LSRCXOFF(%rsp), %rcx
-	movq	LSR8OFF(%rsp), %r8
-	movq	LSR9OFF(%rsp), %r9
-	movq	LSR10OFF(%rsp), %r10
+	/*
+	 * Restore possible arguments before invoking resolved function. We
+	 * check the xmm vs. ymm regs first so we can use the others.
+	 */
+	movq	org_scapset@GOTPCREL(%rip),%r9
+	movq	(%r9),%r9
+	movl	(%r9),%edx
+	testl	$AV_386_AVX,%edx
+	jne	.restore_ymm
 
+.restore_xmm:
 	movdqa	LSXMM0OFF(%rsp), %xmm0
 	movdqa	LSXMM1OFF(%rsp), %xmm1
 	movdqa	LSXMM2OFF(%rsp), %xmm2
@@ -615,6 +724,27 @@ elf_rtbndr(Rt_map * lmp, unsigned long reloc, caddr_t pc)
 	movdqa	LSXMM5OFF(%rsp), %xmm5
 	movdqa	LSXMM6OFF(%rsp), %xmm6
 	movdqa	LSXMM7OFF(%rsp), %xmm7
+	jmp .restore_finish
+
+.restore_ymm:
+	vmovdqa	LSXMM0OFF(%rsp), %ymm0
+	vmovdqa	LSXMM1OFF(%rsp), %ymm1
+	vmovdqa	LSXMM2OFF(%rsp), %ymm2
+	vmovdqa	LSXMM3OFF(%rsp), %ymm3
+	vmovdqa	LSXMM4OFF(%rsp), %ymm4
+	vmovdqa	LSXMM5OFF(%rsp), %ymm5
+	vmovdqa	LSXMM6OFF(%rsp), %ymm6
+	vmovdqa	LSXMM7OFF(%rsp), %ymm7
+
+.restore_finish:
+	movq	LSRAXOFF(%rsp), %rax
+	movq	LSRDIOFF(%rsp), %rdi
+	movq	LSRSIOFF(%rsp), %rsi
+	movq	LSRDXOFF(%rsp), %rdx
+	movq	LSRCXOFF(%rsp), %rcx
+	movq	LSR8OFF(%rsp), %r8
+	movq	LSR9OFF(%rsp), %r9
+	movq	LSR10OFF(%rsp), %r10
 
 	movq	%rbp, %rsp
 	popq	%rbp

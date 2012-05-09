@@ -235,7 +235,7 @@ void
 dump_list(char *str)
 {
 	struct use_item *ptr;
-	char line[512];
+	char line[1024];
 
 	fprintf(stderr, "dump_list %s\n", str);
 	for (ptr = use_list.head; ptr != NULL; ptr = ptr->fptr) {

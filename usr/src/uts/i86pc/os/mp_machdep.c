@@ -245,6 +245,11 @@ pg_plat_hw_shared(cpu_t *cp, pghw_type_t hw)
 		} else {
 			return (0);
 		}
+	case PGHW_FPU:
+		if (cpuid_get_cores_per_compunit(cp) > 1)
+			return (1);
+		else
+			return (0);
 	case PGHW_PROCNODE:
 		if (cpuid_get_procnodes_per_pkg(cp) > 1)
 			return (1);
@@ -306,6 +311,8 @@ pg_plat_hw_instance_id(cpu_t *cpu, pghw_type_t hw)
 		return (cpuid_get_coreid(cpu));
 	case PGHW_CACHE:
 		return (cpuid_get_last_lvl_cacheid(cpu));
+	case PGHW_FPU:
+		return (cpuid_get_compunitid(cpu));
 	case PGHW_PROCNODE:
 		return (cpuid_get_procnodeid(cpu));
 	case PGHW_CHIP:
@@ -331,6 +338,7 @@ pg_plat_hw_rank(pghw_type_t hw1, pghw_type_t hw2)
 	static pghw_type_t hw_hier[] = {
 		PGHW_IPIPE,
 		PGHW_CACHE,
+		PGHW_FPU,
 		PGHW_PROCNODE,
 		PGHW_CHIP,
 		PGHW_POW_IDLE,
@@ -361,8 +369,13 @@ pg_plat_cmt_policy(pghw_type_t hw)
 	/*
 	 * For shared caches, also load balance across them to
 	 * maximize aggregate cache capacity
+	 *
+	 * On AMD family 0x15 CPUs, cores come in pairs called
+	 * compute units, sharing the FPU and the I$ and L2
+	 * caches. Use balancing and cache affinity.
 	 */
 	switch (hw) {
+	case PGHW_FPU:
 	case PGHW_CACHE:
 		return (CMT_BALANCE|CMT_AFFINITY);
 	default:

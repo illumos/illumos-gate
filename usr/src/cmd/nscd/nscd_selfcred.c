@@ -520,8 +520,9 @@ _nscd_proc_iamhere(
 		_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 		(me, "door_ucred failed: %s\n", strerror(errnum));
 
-		NSCD_RETURN_N2N_STATUS(phdr, NSS_NSCD_PRIV, errnum,
+		NSCD_SET_N2N_STATUS(phdr, NSS_NSCD_PRIV, errnum,
 		    NSCD_DOOR_UCRED_ERROR);
+		return;
 	}
 	uid = ucred_geteuid(uc);
 
@@ -716,8 +717,9 @@ _nscd_proc_pulse(
 		_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 		(me, "MAIN IMPOSTER CAUGHT! i am %d not NSCD_MAIN\n", iam);
 
-		NSCD_RETURN_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
+		NSCD_SET_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
 		    NSCD_SELF_CRED_MAIN_IMPOSTER);
+		return;
 	}
 
 	/* forker doesn't return stats, it just pauses */
@@ -725,11 +727,8 @@ _nscd_proc_pulse(
 		_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 		(me, "forker ready to pause ...\n");
 
-		/*CONSTCOND*/
-		while (1)
+		for (;;)
 			(void) pause();
-
-		NSCD_RETURN_STATUS_SUCCESS(phdr);
 	}
 
 	/* remember the current activity sequence number */
@@ -784,8 +783,9 @@ _nscd_proc_fork(
 		_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 		(me, "MAIN IMPOSTER CAUGHT! i am %d not NSCD_MAIN\n", iam);
 
-		NSCD_RETURN_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
+		NSCD_SET_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
 		    NSCD_SELF_CRED_MAIN_IMPOSTER);
+		return;
 	}
 
 	/* only forker handles fork requests */
@@ -793,8 +793,9 @@ _nscd_proc_fork(
 		_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 		(me, "MAIN IMPOSTER CAUGHT! I AM NOT FORKER!\n");
 
-		NSCD_RETURN_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
+		NSCD_SET_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
 		    NSCD_SELF_CRED_WRONG_NSCD);
+		return;
 	}
 
 	/* fork a child for the slot assigned by the main nscd */
@@ -809,8 +810,9 @@ _nscd_proc_fork(
 		_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 		(me, "bas slot number\n");
 
-		NSCD_RETURN_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
+		NSCD_SET_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
 		    NSCD_SELF_CRED_INVALID_SLOT_NUMBER);
+		return;
 	}
 
 	_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
@@ -854,7 +856,8 @@ _nscd_proc_fork(
 			    NSCD_IMHERE | (NSCD_CHILD & NSCD_WHOAMI),
 			    &ih, sizeof (ih), NULL);
 
-			NSCD_RETURN_STATUS_SUCCESS(phdr);
+		NSCD_SET_STATUS_SUCCESS(phdr);
+		return;
 	} if (cid  == (pid_t)-1) {
 		_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 		(me, "forker unable to fork ...\n");
@@ -953,8 +956,9 @@ _nscd_proc_alt_get(
 		_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_ERROR)
 		(me, "no door to talk to the forker\n");
 
-		NSCD_RETURN_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
+		NSCD_SET_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
 		    NSCD_SELF_CRED_NO_FORKER);
+		return;
 	}
 
 	/* get door client's credential information */
@@ -963,8 +967,9 @@ _nscd_proc_alt_get(
 		_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 		(me, "door_ucred failed: %s\n", strerror(errnum));
 
-		NSCD_RETURN_N2N_STATUS(phdr, NSS_NSCD_PRIV, errnum,
+		NSCD_SET_N2N_STATUS(phdr, NSS_NSCD_PRIV, errnum,
 		    NSCD_DOOR_UCRED_ERROR);
+		return;
 	}
 
 	/* get door client's effective uid and effective gid */
@@ -983,8 +988,9 @@ _nscd_proc_alt_get(
 		(me, "no child slot available (child array = %p, slot = %d)\n",
 		    child, ch->child_slot);
 
-		NSCD_RETURN_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
+		NSCD_SET_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
 		    NSCD_SELF_CRED_NO_CHILD_SLOT);
+		return;
 	}
 
 	/* create the per user nscd if necessary */
@@ -1036,8 +1042,9 @@ _nscd_proc_alt_get(
 
 	if (ch->child_state != CHILD_STATE_PIDKNOWN) {
 
-		NSCD_RETURN_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
+		NSCD_SET_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
 		    NSCD_SELF_CRED_INVALID_SLOT_STATE);
+		return;
 	}
 
 	*door = ch->child_door;
@@ -1046,7 +1053,7 @@ _nscd_proc_alt_get(
 	(me, "returning door %d for slot %d, uid %d, gid = %d\n",
 	    *door, ch->child_slot, set2uid, set2gid);
 
-	NSCD_RETURN_STATUS(phdr, NSS_ALTRETRY, 0);
+	NSCD_SET_STATUS(phdr, NSS_ALTRETRY, 0);
 }
 
 static char **
@@ -1260,8 +1267,9 @@ _nscd_peruser_getadmin(
 		_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 		(me, "door_ucred failed: %s\n", strerror(errnum));
 
-		NSCD_RETURN_N2N_STATUS(phdr, NSS_NSCD_PRIV, errnum,
+		NSCD_SET_N2N_STATUS(phdr, NSS_NSCD_PRIV, errnum,
 		    NSCD_DOOR_UCRED_ERROR);
+		return;
 	}
 
 	/* get door client's effective uid */
@@ -1275,8 +1283,9 @@ _nscd_peruser_getadmin(
 	/* is the per-user nscd running ? if not, no one to serve */
 	ch = get_cslot(uid, 1);
 	if (ch == NULL) {
-		NSCD_RETURN_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
+		NSCD_SET_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
 		    NSCD_SELF_CRED_NO_CHILD_SLOT);
+		return;
 	}
 
 	ret = _nscd_doorcall_fd(ch->child_door, NSCD_GETADMIN,
@@ -1457,8 +1466,7 @@ check_user_process(void *arg)
 	int		found;
 	char		*me = "check_user_process";
 
-	/*CONSTCOND*/
-	while (1) {
+	for (;;) {
 		(void) sleep(60);
 
 		found = 0;
@@ -1492,7 +1500,6 @@ check_user_process(void *arg)
 		}
 		(void) closedir(dp);
 	}
-	/* NOTREACHED */
 	/*LINTED E_FUNC_HAS_NO_RETURN_STMT*/
 }
 

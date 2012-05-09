@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <stdlib.h>	/* getenv() */
@@ -1352,13 +1353,15 @@ nss_psearch(void *buffer, size_t length)
 	char			*me = "nss_psearch";
 
 	if (buffer == NULL || length == 0) {
-		NSCD_RETURN_STATUS(pbuf, NSS_ERROR, EFAULT);
+		NSCD_SET_STATUS(pbuf, NSS_ERROR, EFAULT);
+		return;
 	}
 
 	status = nss_packed_arg_init(buffer, length,
 	    NULL, &initf, &dbop, &arg);
 	if (status != NSS_SUCCESS) {
-		NSCD_RETURN_STATUS(pbuf, status, -1);
+		NSCD_SET_STATUS(pbuf, status, -1);
+		return;
 	}
 
 	/*
@@ -1376,7 +1379,8 @@ nss_psearch(void *buffer, size_t length)
 	 */
 	rc = set_initf_key(pbuf);
 	if (rc != 0) {
-		NSCD_RETURN_STATUS(pbuf, NSS_UNAVAIL, EINVAL);
+		NSCD_SET_STATUS(pbuf, NSS_UNAVAIL, EINVAL);
+		return;
 	}
 	initf = nscd_initf;
 
@@ -1443,7 +1447,8 @@ nscd_map_contextp(void *buffer, nss_getent_t *contextp,
 	nscd_getent_p1_cookie_t	*cookie;
 
 	if (buffer == NULL) {
-		NSCD_RETURN_STATUS(pbuf, NSS_ERROR, EFAULT);
+		NSCD_SET_STATUS(pbuf, NSS_ERROR, EFAULT);
+		return;
 	}
 
 	off = pbuf->key_off;
@@ -1464,7 +1469,8 @@ nscd_map_contextp(void *buffer, nss_getent_t *contextp,
 	if (cookie_num_p != NULL)
 		*cookie_num_p = &cookie->p1_cookie_num;
 	if (setent == 1 && cookie->p1_cookie_num == NSCD_NEW_COOKIE) {
-			NSCD_RETURN_STATUS_SUCCESS(pbuf);
+		NSCD_SET_STATUS_SUCCESS(pbuf);
+		return;
 	}
 
 	/*
@@ -1475,8 +1481,10 @@ nscd_map_contextp(void *buffer, nss_getent_t *contextp,
 	if (cookie->p1_seqnum == NSCD_P0_COOKIE_SEQNUM) {
 		nscd_getent_p0_cookie_t *p0c =
 		    (nscd_getent_p0_cookie_t *)cookie;
-		if (p0c->p0_time == _nscd_get_start_time())
-			NSCD_RETURN_STATUS_SUCCESS(pbuf);
+		if (p0c->p0_time == _nscd_get_start_time()) {
+			NSCD_SET_STATUS_SUCCESS(pbuf);
+			return;
+		}
 	}
 
 	_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
@@ -1490,7 +1498,8 @@ nscd_map_contextp(void *buffer, nss_getent_t *contextp,
 		(me, "No matching context found (cookie number: %lld)\n",
 		    cookie->p1_cookie_num);
 
-		NSCD_RETURN_STATUS(pbuf, NSS_ERROR, EFAULT);
+		NSCD_SET_STATUS(pbuf, NSS_ERROR, EFAULT);
+		return;
 	}
 
 	/* if not called by nss_psetent, verify sequence number */
@@ -1500,12 +1509,13 @@ nscd_map_contextp(void *buffer, nss_getent_t *contextp,
 		(me, "invalid sequence # (%lld)\n", cookie->p1_seqnum);
 
 		_nscd_free_ctx_if_aborted(ctx);
-		NSCD_RETURN_STATUS(pbuf, NSS_ERROR, EFAULT);
+		NSCD_SET_STATUS(pbuf, NSS_ERROR, EFAULT);
+		return;
 	}
 
 	contextp->ctx = (struct nss_getent_context *)ctx;
 
-	NSCD_RETURN_STATUS_SUCCESS(pbuf);
+	NSCD_SET_STATUS_SUCCESS(pbuf);
 }
 
 void
@@ -1520,7 +1530,8 @@ nss_psetent(void *buffer, size_t length, pid_t pid)
 	char			*me = "nss_psetent";
 
 	if (buffer == NULL || length == 0) {
-		NSCD_RETURN_STATUS(pbuf, NSS_ERROR, EFAULT);
+		NSCD_SET_STATUS(pbuf, NSS_ERROR, EFAULT);
+		return;
 	}
 
 	/*
@@ -1542,7 +1553,8 @@ nss_psetent(void *buffer, size_t length, pid_t pid)
 				_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE,
 				    NSCD_LOG_LEVEL_DEBUG)
 			(me, "NSS_TRYLOCAL: fallback to caller process\n");
-				NSCD_RETURN_STATUS(pbuf, NSS_TRYLOCAL, 0);
+				NSCD_SET_STATUS(pbuf, NSS_TRYLOCAL, 0);
+				return;
 			}
 		}
 	}
@@ -1590,7 +1602,7 @@ nss_psetent(void *buffer, size_t length, pid_t pid)
 	(me, "returning a p0 cookie: pid = %ld, time = %ld, seq #= %llx\n",
 	    p0c->p0_pid, p0c->p0_time, p0c->p0_seqnum);
 
-	NSCD_RETURN_STATUS(pbuf, NSS_SUCCESS, 0);
+	NSCD_SET_STATUS(pbuf, NSS_SUCCESS, 0);
 }
 
 static void
@@ -1639,14 +1651,15 @@ delayed_setent(nss_pheader_t *pbuf, nss_db_initf_t initf,
 		_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
 		(me, "NSS_TRYLOCAL: cookie # = %lld,  sequence # = %lld\n",
 		    *cookie_num_p, *seqnum_p);
-		NSCD_RETURN_STATUS(pbuf, NSS_TRYLOCAL, 0);
+		NSCD_SET_STATUS(pbuf, NSS_TRYLOCAL, 0);
+		return;
 	}
 
 	_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
 	(me, "NSS_SUCCESS: cookie # = %lld,  sequence # = %lld\n",
 	    ctx->cookie_num, ctx->seq_num);
 
-	NSCD_RETURN_STATUS(pbuf, NSS_SUCCESS, 0);
+	NSCD_SET_STATUS(pbuf, NSS_SUCCESS, 0);
 }
 
 void
@@ -1666,7 +1679,8 @@ nss_pgetent(void *buffer, size_t length)
 	char			*me = "nss_pgetent";
 
 	if (buffer == NULL || length == 0) {
-		NSCD_RETURN_STATUS(pbuf, NSS_ERROR, EFAULT);
+		NSCD_SET_STATUS(pbuf, NSS_ERROR, EFAULT);
+		return;
 	}
 
 	/* verify the cookie passed in */
@@ -1680,7 +1694,8 @@ nss_pgetent(void *buffer, size_t length)
 	 */
 	rc = set_initf_key(pbuf);
 	if (rc != 0) {
-		NSCD_RETURN_STATUS(pbuf, NSS_UNAVAIL, EINVAL);
+		NSCD_SET_STATUS(pbuf, NSS_UNAVAIL, EINVAL);
+		return;
 	}
 	initf = nscd_initf;
 
@@ -1703,7 +1718,8 @@ nss_pgetent(void *buffer, size_t length)
 		clear_initf_key();
 		_nscd_free_ctx_if_aborted(
 		    (nscd_getent_context_t *)contextp->ctx);
-		NSCD_RETURN_STATUS(pbuf, status, -1);
+		NSCD_SET_STATUS(pbuf, status, -1);
+		return;
 	}
 
 	/* Perform local search and pack results into return buffer */
@@ -1751,7 +1767,8 @@ nss_pendent(void *buffer, size_t length)
 	char			*me = "nss_pendent";
 
 	if (buffer == NULL || length == 0) {
-		NSCD_RETURN_STATUS(pbuf, NSS_ERROR, EFAULT);
+		NSCD_SET_STATUS(pbuf, NSS_ERROR, EFAULT);
+		return;
 	}
 
 	/* map the contextp from the cookie information */
@@ -1769,7 +1786,7 @@ nss_pendent(void *buffer, size_t length)
 	/* Perform local endent and reset context */
 	nss_endent(NULL, NULL, contextp);
 
-	NSCD_RETURN_STATUS(pbuf, NSS_SUCCESS, 0);
+	NSCD_SET_STATUS(pbuf, NSS_SUCCESS, 0);
 }
 
 /*ARGSUSED*/
@@ -1779,5 +1796,5 @@ nss_pdelete(void *buffer, size_t length)
 	nss_pheader_t	*pbuf = (nss_pheader_t *)buffer;
 
 	/* unnecessary, kept for completeness */
-	NSCD_RETURN_STATUS_SUCCESS(pbuf);
+	NSCD_SET_STATUS_SUCCESS(pbuf);
 }

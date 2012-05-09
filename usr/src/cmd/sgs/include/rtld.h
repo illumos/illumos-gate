@@ -1106,6 +1106,10 @@ struct sresult {
  * capabilities of the system.  This structure follows the Objcapset definition
  * from libld.h, however the system can only have one platform or machine
  * hardware name, thus this structure is a little simpler.
+ *
+ * Note, the amd64 version of elf_rtbndr assumes that the sc_hw_1 value is at
+ * offset zero. If you are changing this structure in a way that invalidates
+ * this you need to update that code.
  */
 typedef	struct {
 	elfcap_mask_t	sc_hw_1;	/* CA_SUNW_HW_1 capabilities */

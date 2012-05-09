@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 /*
@@ -692,11 +693,11 @@ init_cache(int debug_level) {
  */
 nsc_db_t *
 make_cache(enum db_type dbtype, int dbop, char *name,
-		int (*compar) (const void *, const void *),
-		void (*getlogstr)(char *, char *, size_t, nss_XbyY_args_t *),
-		uint_t (*gethash)(nss_XbyY_key_t *, int),
-		enum hash_type httype, int htsize) {
-
+    int (*compar) (const void *, const void *),
+    void (*getlogstr)(char *, char *, size_t, nss_XbyY_args_t *),
+    uint_t (*gethash)(nss_XbyY_key_t *, int),
+    enum hash_type httype, int htsize)
+{
 	nsc_db_t	*nscdb;
 	char		*me = "make_cache";
 
@@ -728,7 +729,7 @@ make_cache(enum db_type dbtype, int dbop, char *name,
 
 	/* The cache is an AVL tree */
 	avl_create(&nscdb->tree, nscdb->compar, sizeof (nsc_entry_t),
-			offsetof(nsc_entry_t, avl_link));
+	    offsetof(nsc_entry_t, avl_link));
 
 	/* Assign log routine */
 	if (getlogstr == NULL) {
@@ -957,7 +958,7 @@ _nscd_cfg_cache_get_stat(
  */
 void
 nsc_info(nsc_ctx_t *ctx, char *dbname, nscd_cfg_cache_t cfg[],
-	nscd_cfg_stat_cache_t stats[])
+    nscd_cfg_stat_cache_t stats[])
 {
 	int		i;
 	char		*me = "nsc_info";
@@ -1040,7 +1041,8 @@ ctx_info(nsc_ctx_t *ctx) {
  * not a daemon.
  */
 int
-nsc_dump(char *dbname, int dbop) {
+nsc_dump(char *dbname, int dbop)
+{
 	nsc_ctx_t	*ctx;
 	nsc_db_t	*nscdb;
 	nscd_bool_t	enabled;
@@ -1091,35 +1093,38 @@ nsc_dump(char *dbname, int dbop) {
 /*
  * These macros are for exclusive use of nsc_lookup
  */
-#define	NSC_LOOKUP_RETURN(retcode, loglevel, fmt) \
-	(void) mutex_unlock(&nscdb->db_mutex); \
+#define	NSC_LOOKUP_LOG(loglevel, fmt) \
 	_NSCD_LOG(NSCD_LOG_CACHE, NSCD_LOG_LEVEL_##loglevel) \
-		(me, fmt, whoami); \
-	return (retcode);
+		(me, fmt, whoami);
 
-#define	NSC_LOOKUP_NO_CACHE(str) \
-	_NSCD_LOG(NSCD_LOG_CACHE, NSCD_LOG_LEVEL_DEBUG) \
-		(me, "%s: name service lookup (bypassing cache\n", \
-		str); \
-	nss_psearch(largs->buffer, largs->bufsize); \
-	status = NSCD_GET_STATUS(largs->buffer); \
-	_NSCD_LOG(NSCD_LOG_CACHE, NSCD_LOG_LEVEL_DEBUG) \
-		(me, "%s: name service lookup status = %d\n", \
-		str, status); \
-	if (status == NSS_SUCCESS) { \
-		return (SUCCESS); \
-	} else if (status == NSS_NOTFOUND) \
-		return (NOTFOUND); \
-	else \
+static int
+nsc_lookup_no_cache(nsc_lookup_args_t *largs, const char *str)
+{
+	char *me = "nsc_lookup_no_cache";
+	nss_status_t status;
+
+	_NSCD_LOG(NSCD_LOG_CACHE, NSCD_LOG_LEVEL_DEBUG)
+		(me, "%s: name service lookup (bypassing cache)\n", str);
+	nss_psearch(largs->buffer, largs->bufsize);
+	status = NSCD_GET_STATUS(largs->buffer);
+	_NSCD_LOG(NSCD_LOG_CACHE, NSCD_LOG_LEVEL_DEBUG)
+		(me, "%s: name service lookup status = %d\n", str, status);
+	if (status == NSS_SUCCESS) {
+		return (SUCCESS);
+	} else if (status == NSS_NOTFOUND) {
+		return (NOTFOUND);
+	} else {
 		return (SERVERERROR);
+	}
+}
 
 /*
  * This function starts the revalidation and reaper threads
  * for a cache
  */
 static void
-start_threads(nsc_ctx_t *ctx) {
-
+start_threads(nsc_ctx_t *ctx)
+{
 	int	errnum;
 	char	*me = "start_threads";
 
@@ -1128,11 +1133,11 @@ start_threads(nsc_ctx_t *ctx) {
 	 */
 	if (ctx->revalidate_on != nscd_true) {
 		if (thr_create(NULL, NULL, (void *(*)(void *))revalidate,
-			ctx, 0, NULL) != 0) {
+		    ctx, 0, NULL) != 0) {
 			errnum = errno;
 			_NSCD_LOG(NSCD_LOG_CACHE, NSCD_LOG_LEVEL_ERROR)
-		(me, "thr_create (revalidate thread for %s): %s\n",
-			ctx->dbname, strerror(errnum));
+			(me, "thr_create (revalidate thread for %s): %s\n",
+			    ctx->dbname, strerror(errnum));
 			exit(1);
 		}
 		ctx->revalidate_on = nscd_true;
@@ -1143,11 +1148,11 @@ start_threads(nsc_ctx_t *ctx) {
 	 */
 	if (ctx->reaper_on != nscd_true) {
 		if (thr_create(NULL, NULL, (void *(*)(void *))reaper,
-			ctx, 0, NULL) != 0) {
+		    ctx, 0, NULL) != 0) {
 			errnum = errno;
 			_NSCD_LOG(NSCD_LOG_CACHE, NSCD_LOG_LEVEL_ERROR)
-		(me, "thr_create (reaper thread for %s): %s\n",
-			ctx->dbname, strerror(errnum));
+			(me, "thr_create (reaper thread for %s): %s\n",
+			    ctx->dbname, strerror(errnum));
 			exit(1);
 		}
 		ctx->reaper_on = nscd_true;
@@ -1239,11 +1244,10 @@ get_dns_ttl(void *pbuf, char *dbname)
 
 static int
 check_config(nsc_lookup_args_t *largs, nscd_cfg_cache_t *cfgp,
-	char *whoami, int flag)
+    char *whoami, int flag)
 {
 	nsc_db_t	*nscdb;
 	nsc_ctx_t	*ctx;
-	nss_status_t	status;
 	char		*me = "check_config";
 
 	ctx = largs->ctx;
@@ -1267,18 +1271,16 @@ check_config(nsc_lookup_args_t *largs, nscd_cfg_cache_t *cfgp,
 
 		if (UPDATEBIT & flag)
 			return (NOTFOUND);
-		else {
-			NSC_LOOKUP_NO_CACHE(whoami);
-		}
+		else
+			return (nsc_lookup_no_cache(largs, whoami));
 	}
 
 	/*
 	 * if caller requests lookup using his
 	 * own nsswitch config, bypass cache
 	 */
-	if (nsw_config_in_phdr(largs->buffer)) {
-		NSC_LOOKUP_NO_CACHE(whoami);
-	}
+	if (nsw_config_in_phdr(largs->buffer))
+		return (nsc_lookup_no_cache(largs, whoami));
 
 	/* no need of cache if we are dealing with 0 ttls */
 	if (cfgp->pos_ttl <= 0 && cfgp->neg_ttl <= 0) {
@@ -1286,7 +1288,7 @@ check_config(nsc_lookup_args_t *largs, nscd_cfg_cache_t *cfgp,
 			return (NOTFOUND);
 		else if (cfgp->avoid_ns == nscd_true)
 			return (SERVERERROR);
-		NSC_LOOKUP_NO_CACHE(whoami);
+		return (nsc_lookup_no_cache(largs, whoami));
 	}
 
 	return (CONTINUE);
@@ -1298,7 +1300,7 @@ check_config(nsc_lookup_args_t *largs, nscd_cfg_cache_t *cfgp,
  */
 static void
 check_db_file(nsc_ctx_t *ctx, nscd_cfg_cache_t cfg,
-	char *whoami, time_t now)
+    char *whoami, time_t now)
 {
 	struct stat	buf;
 	nscd_bool_t	file_modified = nscd_false;
@@ -1343,8 +1345,8 @@ check_db_file(nsc_ctx_t *ctx, nscd_cfg_cache_t cfg,
 }
 
 static int
-lookup_int(nsc_lookup_args_t *largs, int flag) {
-
+lookup_int(nsc_lookup_args_t *largs, int flag)
+{
 	nsc_ctx_t		*ctx;
 	nsc_db_t		*nscdb;
 	nscd_cfg_cache_t	cfg;
@@ -1364,7 +1366,7 @@ lookup_int(nsc_lookup_args_t *largs, int flag) {
 
 	/* extract dbop, dbname, key and cred */
 	status = nss_packed_getkey(largs->buffer, largs->bufsize, &dbname,
-				&dbop, &args);
+	    &dbop, &args);
 	if (status != NSS_SUCCESS) {
 		_NSCD_LOG(NSCD_LOG_CACHE, NSCD_LOG_LEVEL_ERROR)
 			(me, "nss_packed_getkey failure (%d)\n", status);
@@ -1379,9 +1381,8 @@ lookup_int(nsc_lookup_args_t *largs, int flag) {
 
 			if (UPDATEBIT & flag)
 				return (NOTFOUND);
-			else {
-				NSC_LOOKUP_NO_CACHE(dbname);
-			}
+			else
+				return (nsc_lookup_no_cache(largs, dbname));
 		}
 	}
 	ctx = largs->ctx;
@@ -1390,13 +1391,12 @@ lookup_int(nsc_lookup_args_t *largs, int flag) {
 		if ((largs->nscdb = nsc_get_db(ctx, dbop)) == NULL) {
 			_NSCD_LOG(NSCD_LOG_CACHE, NSCD_LOG_LEVEL_WARNING)
 				(me, "%s:%d: no cache found\n",
-				dbname, dbop);
+				    dbname, dbop);
 
 			if (UPDATEBIT & flag)
 				return (NOTFOUND);
-			else {
-				NSC_LOOKUP_NO_CACHE(dbname);
-			}
+			else
+				return (nsc_lookup_no_cache(largs, dbname));
 		}
 	}
 
@@ -1404,7 +1404,7 @@ lookup_int(nsc_lookup_args_t *largs, int flag) {
 
 	_NSCD_LOG_IF(NSCD_LOG_CACHE, NSCD_LOG_LEVEL_ALL) {
 		(void) nscdb->getlogstr(nscdb->name, whoami,
-			sizeof (whoami), &args);
+		    sizeof (whoami), &args);
 	}
 
 	if (UPDATEBIT & flag) {
@@ -1436,7 +1436,7 @@ lookup_int(nsc_lookup_args_t *largs, int flag) {
 
 			/* Either no entry and avoid name service */
 			if (rc == NSCD_DB_ENTRY_NOT_FOUND ||
-					rc == NSCD_INVALID_ARGUMENT)
+			    rc == NSCD_INVALID_ARGUMENT)
 				return (NOTFOUND);
 
 			/* OR memory error */
@@ -1483,10 +1483,10 @@ lookup_int(nsc_lookup_args_t *largs, int flag) {
 			if (cfg.avoid_ns == nscd_true)
 				next_action = _NSC_USECACHED;
 			else if ((flag & UPDATEBIT) ||
-					(this_stats->timestamp < now)) {
+			    (this_stats->timestamp < now)) {
 				_NSCD_LOG(NSCD_LOG_CACHE, NSCD_LOG_LEVEL_DEBUG)
 			(me, "%s: cached entry needs to be updated\n",
-				whoami);
+			    whoami);
 				next_action = _NSC_NSLOOKUP;
 			} else
 				next_action = _NSC_USECACHED;
@@ -1506,8 +1506,10 @@ lookup_int(nsc_lookup_args_t *largs, int flag) {
 				_NSCD_LOG(NSCD_LOG_CACHE,
 				    NSCD_LOG_LEVEL_DEBUG_6)
 				(me, "%s: throttling load\n", whoami);
-				NSC_LOOKUP_RETURN(NOSERVER, WARNING,
-				"%s: no clearance to wait\n");
+				(void) mutex_unlock(&nscdb->db_mutex);
+				NSC_LOOKUP_LOG(WARNING,
+				    "%s: no clearance to wait\n");
+				return (NOSERVER);
 			}
 			/* yes can wait */
 			(void) nscd_wait(ctx, nscdb, this_entry);
@@ -1535,13 +1537,15 @@ lookup_int(nsc_lookup_args_t *largs, int flag) {
 			(void) mutex_lock(&ctx->stats_mutex);
 			ctx->stats.drop_count++;
 			(void) mutex_unlock(&ctx->stats_mutex);
-			NSC_LOOKUP_RETURN(NOSERVER, WARNING,
-			"%s: no clearance for lookup\n");
+			(void) mutex_unlock(&nscdb->db_mutex);
+			NSC_LOOKUP_LOG(WARNING,
+			    "%s: no clearance for lookup\n");
+			return (NOSERVER);
 		}
 
 		/* block any threads accessing this entry */
-		this_stats->status = (flag & UPDATEBIT)?
-				ST_UPDATE_PENDING:ST_LOOKUP_PENDING;
+		this_stats->status = (flag & UPDATEBIT) ?
+		    ST_UPDATE_PENDING : ST_LOOKUP_PENDING;
 
 		/* release lock and do name service lookup */
 		(void) mutex_unlock(&nscdb->db_mutex);
@@ -1556,7 +1560,7 @@ lookup_int(nsc_lookup_args_t *largs, int flag) {
 
 		_NSCD_LOG(NSCD_LOG_CACHE, NSCD_LOG_LEVEL_DEBUG)
 		(me, "%s: name service lookup status = %d\n",
-			whoami, status);
+		    whoami, status);
 
 		if (status == NSS_SUCCESS) {
 			int ttl;
@@ -1568,20 +1572,24 @@ lookup_int(nsc_lookup_args_t *largs, int flag) {
 			status = dup_packed_buffer(largs, this_entry);
 			if (status != NSS_SUCCESS) {
 				delete_entry(nscdb, ctx, this_entry);
-				NSC_LOOKUP_RETURN(SERVERERROR, ERROR,
-				"%s: failed to update cache\n");
+				(void) mutex_unlock(&nscdb->db_mutex);
+				NSC_LOOKUP_LOG(ERROR,
+				    "%s: failed to update cache\n");
+				return (SERVERERROR);
 			}
 
 			/*
 			 * store unpacked key in cache
 			 */
 			status = nss_packed_getkey(this_entry->buffer,
-					this_entry->bufsize,
-					&dbname, &dbop, &args);
+			    this_entry->bufsize,
+			    &dbname, &dbop, &args);
 			if (status != NSS_SUCCESS) {
 				delete_entry(nscdb, ctx, this_entry);
-				NSC_LOOKUP_RETURN(SERVERERROR, ERROR,
-				"%s: failed to extract key\n");
+				(void) mutex_unlock(&nscdb->db_mutex);
+				NSC_LOOKUP_LOG(ERROR,
+				    "%s: failed to extract key\n");
+				return (SERVERERROR);
 			}
 			this_entry->key = args.key; /* struct copy */
 
@@ -1605,8 +1613,10 @@ lookup_int(nsc_lookup_args_t *largs, int flag) {
 			 */
 			start_threads(ctx);
 
-			NSC_LOOKUP_RETURN(SUCCESS, DEBUG,
-			"%s: cache updated with positive entry\n");
+			(void) mutex_unlock(&nscdb->db_mutex);
+			NSC_LOOKUP_LOG(DEBUG,
+			    "%s: cache updated with positive entry\n");
+			return (SUCCESS);
 		} else if (status == NSS_NOTFOUND) {
 			/*
 			 * data not found in name service
@@ -1617,25 +1627,32 @@ lookup_int(nsc_lookup_args_t *largs, int flag) {
 
 			if (NSCD_GET_ERRNO(largs->buffer) == ERANGE) {
 				delete_entry(nscdb, ctx, this_entry);
-				NSC_LOOKUP_RETURN(NOTFOUND, DEBUG,
-		"%s: ERANGE, cache not updated with negative entry\n");
+				(void) mutex_unlock(&nscdb->db_mutex);
+				NSC_LOOKUP_LOG(DEBUG,
+				    "%s: ERANGE, cache not updated "
+				    "with negative entry\n");
+				return (NOTFOUND);
 			}
 
 			status = dup_packed_buffer(largs, this_entry);
 			if (status != NSS_SUCCESS) {
 				delete_entry(nscdb, ctx, this_entry);
-				NSC_LOOKUP_RETURN(SERVERERROR, ERROR,
-				"%s: failed to update cache\n");
+				(void) mutex_unlock(&nscdb->db_mutex);
+				NSC_LOOKUP_LOG(ERROR,
+				    "%s: failed to update cache\n");
+				return (SERVERERROR);
 			}
 
 			/* store unpacked key in cache */
 			status = nss_packed_getkey(this_entry->buffer,
-					this_entry->bufsize,
-					&dbname, &dbop, &args);
+			    this_entry->bufsize,
+			    &dbname, &dbop, &args);
 			if (status != NSS_SUCCESS) {
 				delete_entry(nscdb, ctx, this_entry);
-				NSC_LOOKUP_RETURN(SERVERERROR, ERROR,
-				"%s: failed to extract key\n");
+				(void) mutex_unlock(&nscdb->db_mutex);
+				NSC_LOOKUP_LOG(ERROR,
+				    "%s: failed to extract key\n");
+				return (SERVERERROR);
 			}
 			this_entry->key = args.key; /* struct copy */
 
@@ -1655,8 +1672,10 @@ lookup_int(nsc_lookup_args_t *largs, int flag) {
 			 */
 			start_threads(ctx);
 
-			NSC_LOOKUP_RETURN(NOTFOUND, DEBUG,
-			"%s: cache updated with negative entry\n");
+			(void) mutex_unlock(&nscdb->db_mutex);
+			NSC_LOOKUP_LOG(DEBUG,
+			    "%s: cache updated with negative entry\n");
+			return (NOTFOUND);
 		} else {
 			/*
 			 * name service lookup failed
@@ -1672,8 +1691,9 @@ lookup_int(nsc_lookup_args_t *largs, int flag) {
 
 			(void) mutex_unlock(&nscdb->db_mutex);
 			_NSCD_LOG(NSCD_LOG_CACHE, NSCD_LOG_LEVEL_WARNING)
-	(me, "%s: name service lookup failed (status=%d, errno=%d)\n",
-				whoami, status, errnum);
+			(me, "%s: name service lookup failed "
+			    "(status=%d, errno=%d)\n",
+			    whoami, status, errnum);
 
 			return (SERVERERROR);
 		}
@@ -1682,12 +1702,13 @@ lookup_int(nsc_lookup_args_t *largs, int flag) {
 		 * found entry in cache
 		 */
 		if (UPDATEBIT & flag) {
-			NSC_LOOKUP_RETURN(SUCCESS, DEBUG,
-			"%s: no need to update\n");
+			(void) mutex_unlock(&nscdb->db_mutex);
+			NSC_LOOKUP_LOG(DEBUG, "%s: no need to update\n");
+			return (SUCCESS);
 		}
 
 		if (NSCD_GET_STATUS((nss_pheader_t *)this_entry->buffer) ==
-			NSS_SUCCESS) {
+		    NSS_SUCCESS) {
 			/* positive hit */
 			(void) mutex_lock(&ctx->stats_mutex);
 			ctx->stats.pos_hits++;
@@ -1695,13 +1716,17 @@ lookup_int(nsc_lookup_args_t *largs, int flag) {
 
 			/* update response buffer */
 			if (copy_result(largs->buffer,
-				this_entry->buffer) != NSS_SUCCESS) {
-				NSC_LOOKUP_RETURN(SERVERERROR, ERROR,
-				"%s: response buffer insufficient\n");
+			    this_entry->buffer) != NSS_SUCCESS) {
+				(void) mutex_unlock(&nscdb->db_mutex);
+				NSC_LOOKUP_LOG(ERROR,
+				    "%s: response buffer insufficient\n");
+				return (SERVERERROR);
 			}
 
-			NSC_LOOKUP_RETURN(SUCCESS, DEBUG,
-			"%s: positive entry in cache\n");
+			(void) mutex_unlock(&nscdb->db_mutex);
+			NSC_LOOKUP_LOG(DEBUG,
+			    "%s: positive entry in cache\n");
+			return (SUCCESS);
 		} else {
 			/* negative hit */
 			(void) mutex_lock(&ctx->stats_mutex);
@@ -1709,18 +1734,21 @@ lookup_int(nsc_lookup_args_t *largs, int flag) {
 			(void) mutex_unlock(&ctx->stats_mutex);
 
 			NSCD_SET_STATUS((nss_pheader_t *)largs->buffer,
-				NSCD_GET_STATUS(this_entry->buffer),
-				NSCD_GET_ERRNO(this_entry->buffer));
+			    NSCD_GET_STATUS(this_entry->buffer),
+			    NSCD_GET_ERRNO(this_entry->buffer));
 			NSCD_SET_HERRNO((nss_pheader_t *)largs->buffer,
-				NSCD_GET_HERRNO(this_entry->buffer));
+			    NSCD_GET_HERRNO(this_entry->buffer));
 
-			NSC_LOOKUP_RETURN(NOTFOUND, DEBUG,
-			"%s: negative entry in cache\n");
+			(void) mutex_unlock(&nscdb->db_mutex);
+			NSC_LOOKUP_LOG(DEBUG,
+			    "%s: negative entry in cache\n");
+			return (NOTFOUND);
 		}
 	}
 
-	NSC_LOOKUP_RETURN(SERVERERROR, ERROR,
-	"%s: cache backend failure\n");
+	(void) mutex_unlock(&nscdb->db_mutex);
+	NSC_LOOKUP_LOG(ERROR, "%s: cache backend failure\n");
+	return (SERVERERROR);
 }
 
 /*
@@ -1741,11 +1769,11 @@ nsc_lookup(nsc_lookup_args_t *largs, int flag) {
 	switch (rc) {
 
 	case SUCCESS:
-		NSCD_RETURN_STATUS(phdr, NSS_SUCCESS, 0);
+		NSCD_SET_STATUS(phdr, NSS_SUCCESS, 0);
 		break;
 
 	case NOTFOUND:
-		NSCD_RETURN_STATUS(phdr, NSS_NOTFOUND, -1);
+		NSCD_SET_STATUS(phdr, NSS_NOTFOUND, -1);
 		break;
 
 	case SERVERERROR:
@@ -1759,7 +1787,7 @@ nsc_lookup(nsc_lookup_args_t *largs, int flag) {
 		break;
 
 	case NOSERVER:
-		NSCD_RETURN_STATUS(phdr, NSS_TRYLOCAL, -1);
+		NSCD_SET_STATUS(phdr, NSS_TRYLOCAL, -1);
 		break;
 	}
 }
@@ -1946,7 +1974,8 @@ do_update(nsc_lookup_args_t *in) {
  * Invalidate cache
  */
 void
-nsc_invalidate(nsc_ctx_t *ctx, char *dbname, nsc_ctx_t **ctxs) {
+nsc_invalidate(nsc_ctx_t *ctx, char *dbname, nsc_ctx_t **ctxs)
+{
 	int	i;
 	char	*me = "nsc_invalidate";
 
@@ -1957,16 +1986,14 @@ nsc_invalidate(nsc_ctx_t *ctx, char *dbname, nsc_ctx_t **ctxs) {
 
 	if (dbname) {
 		if ((i = get_cache_idx(dbname)) == -1) {
-			_NSCD_LOG(NSCD_LOG_CACHE,
-				NSCD_LOG_LEVEL_WARNING)
+			_NSCD_LOG(NSCD_LOG_CACHE, NSCD_LOG_LEVEL_WARNING)
 			(me, "%s: invalid cache name\n", dbname);
 			return;
 		}
 		if ((ctx = cache_ctx_p[i]) == NULL)  {
-			_NSCD_LOG(NSCD_LOG_CACHE,
-				NSCD_LOG_LEVEL_WARNING)
+			_NSCD_LOG(NSCD_LOG_CACHE, NSCD_LOG_LEVEL_WARNING)
 			(me, "%s: no cache context found\n",
-				dbname);
+			    dbname);
 			return;
 		}
 		ctx_invalidate(ctx);
@@ -1987,7 +2014,8 @@ nsc_invalidate(nsc_ctx_t *ctx, char *dbname, nsc_ctx_t **ctxs) {
  * Invalidate cache by context
  */
 static void
-ctx_invalidate(nsc_ctx_t *ctx) {
+ctx_invalidate(nsc_ctx_t *ctx)
+{
 	int 		i;
 	nsc_entry_t	*entry;
 	char		*me = "ctx_invalidate";
@@ -2041,8 +2069,8 @@ delete_entry(nsc_db_t *nscdb, nsc_ctx_t *ctx, nsc_entry_t *entry) {
 
 static nscd_rc_t
 lookup_cache(nsc_lookup_args_t *largs, nscd_cfg_cache_t *cfgp,
-	nss_XbyY_args_t *argp, char *whoami, nsc_entry_t **entry) {
-
+    nss_XbyY_args_t *argp, char *whoami, nsc_entry_t **entry)
+{
 	nsc_db_t	*nscdb;
 	nsc_ctx_t	*ctx;
 	uint_t		hash;
@@ -2073,8 +2101,8 @@ lookup_cache(nsc_lookup_args_t *largs, nscd_cfg_cache_t *cfgp,
 		/* move it to the hash table */
 		if (nscdb->htable) {
 			if (nscdb->htable[hash] == NULL ||
-					(*entry)->stats.hits >=
-					nscdb->htable[hash]->stats.hits) {
+			    (*entry)->stats.hits >=
+			    nscdb->htable[hash]->stats.hits) {
 				nscdb->htable[hash] = *entry;
 			}
 		}
@@ -2086,18 +2114,16 @@ lookup_cache(nsc_lookup_args_t *largs, nscd_cfg_cache_t *cfgp,
 		(me, "%s: cache miss\n", whoami);
 
 	if (cfgp->avoid_ns == nscd_true) {
-		_NSCD_LOG(NSCD_LOG_CACHE,
-			NSCD_LOG_LEVEL_DEBUG)
+		_NSCD_LOG(NSCD_LOG_CACHE, NSCD_LOG_LEVEL_DEBUG)
 			(me, "%s: avoid name service\n", whoami);
 		return (NSCD_DB_ENTRY_NOT_FOUND);
 	}
 
 	/* allocate memory for new entry (stub) */
 	*entry = (nsc_entry_t *)umem_cache_alloc(nsc_entry_cache,
-		UMEM_DEFAULT);
+	    UMEM_DEFAULT);
 	if (*entry == NULL) {
-		_NSCD_LOG(NSCD_LOG_CACHE,
-			NSCD_LOG_LEVEL_ERROR)
+		_NSCD_LOG(NSCD_LOG_CACHE, NSCD_LOG_LEVEL_ERROR)
 			(me, "%s: memory allocation failure\n", whoami);
 		return (NSCD_NO_MEMORY);
 	}
@@ -2132,13 +2158,13 @@ lookup_cache(nsc_lookup_args_t *largs, nscd_cfg_cache_t *cfgp,
 	if (cfgp->maxentries > 0 && nentries > cfgp->maxentries) {
 		_NSCD_LOG(NSCD_LOG_CACHE, NSCD_LOG_LEVEL_DEBUG)
 			(me, "%s: maximum entries exceeded -- "
-				"deleting least recently used entry\n",
-			whoami);
+			    "deleting least recently used entry\n",
+			    whoami);
 
 		node = nscdb->qhead;
 		while (node != NULL && node != *entry) {
 			if (node->stats.status == ST_DISCARD ||
-					!(node->stats.status & ST_PENDING)) {
+			    !(node->stats.status & ST_PENDING)) {
 				delete_entry(nscdb, ctx, node);
 				break;
 			}
@@ -2156,7 +2182,8 @@ lookup_cache(nsc_lookup_args_t *largs, nscd_cfg_cache_t *cfgp,
 }
 
 static void
-reaper(nsc_ctx_t *ctx) {
+reaper(nsc_ctx_t *ctx)
+{
 	uint_t		ttl, extra_sleep, total_sleep, intervals;
 	uint_t		nodes_per_interval, seconds_per_interval;
 	ulong_t		nsc_entries;
@@ -2207,12 +2234,12 @@ reaper(nsc_ctx_t *ctx) {
 
 		_NSCD_LOG(NSCD_LOG_CACHE, NSCD_LOG_LEVEL_DEBUG)
 			(me, "%s: total entries = %d, "
-			"seconds per interval = %d, "
-			"nodes per interval = %d\n",
-			ctx->dbname, nsc_entries, seconds_per_interval,
-			nodes_per_interval);
+			    "seconds per interval = %d, "
+			    "nodes per interval = %d\n",
+			    ctx->dbname, nsc_entries, seconds_per_interval,
+			    nodes_per_interval);
 		total_sleep = reap_cache(ctx, nodes_per_interval,
-				seconds_per_interval);
+		    seconds_per_interval);
 		extra_sleep = 1 + ttl - total_sleep;
 		if (extra_sleep > 0)
 			(void) sleep(extra_sleep);
@@ -2222,7 +2249,8 @@ reaper(nsc_ctx_t *ctx) {
 
 static uint_t
 reap_cache(nsc_ctx_t *ctx, uint_t nodes_per_interval,
-		uint_t seconds_per_interval) {
+    uint_t seconds_per_interval)
+{
 	uint_t		nodes_togo, total_sleep;
 	time_t		now;
 	nsc_entry_t	*node, *next_node;
@@ -2254,8 +2282,8 @@ reap_cache(nsc_ctx_t *ctx, uint_t nodes_per_interval,
 			if ((node = nscdb->reap_node) == NULL)
 				break;
 			if (node->stats.status == ST_DISCARD ||
-					(!(node->stats.status & ST_PENDING) &&
-					node->stats.timestamp < now)) {
+			    (!(node->stats.status & ST_PENDING) &&
+			    node->stats.timestamp < now)) {
 				/*
 				 * Delete entry if its discard flag is
 				 * set OR if it has expired. Entries
@@ -2287,8 +2315,9 @@ reap_cache(nsc_ctx_t *ctx, uint_t nodes_per_interval,
 		 */
 		nentries = avl_numnodes(&nscdb->tree);
 		for (slot = 0, value = _NSC_INIT_HTSIZE_SLOT_VALUE;
-			slot < _NSC_HTSIZE_NUM_SLOTS && nentries > value;
-			value = (value << 1) + 1, slot++);
+		    slot < _NSC_HTSIZE_NUM_SLOTS && nentries > value;
+		    value = (value << 1) + 1, slot++)
+			;
 		if (nscdb->hash_type == nsc_ht_power2)
 			newhtsize = _NSC_INIT_HTSIZE_POWER2 << slot;
 		else
@@ -2302,7 +2331,7 @@ reap_cache(nsc_ctx_t *ctx, uint_t nodes_per_interval,
 
 		_NSCD_LOG(NSCD_LOG_CACHE, NSCD_LOG_LEVEL_DEBUG)
 			(me, "%s: resizing hash table from %d to %d\n",
-			nscdb->name, nscdb->htsize, newhtsize);
+			    nscdb->name, nscdb->htsize, newhtsize);
 
 		/*
 		 * Dump old hashes because it would be time
@@ -2312,9 +2341,8 @@ reap_cache(nsc_ctx_t *ctx, uint_t nodes_per_interval,
 		nscdb->htable = calloc(newhtsize, sizeof (*(nscdb->htable)));
 		if (nscdb->htable == NULL) {
 			_NSCD_LOG(NSCD_LOG_CACHE, NSCD_LOG_LEVEL_ERROR)
-				(me,
-				"%s: memory allocation failure\n",
-				nscdb->name);
+				(me, "%s: memory allocation failure\n",
+				    nscdb->name);
 			/* -1 to try later */
 			nscdb->htsize = -1;
 		} else {
@@ -2366,7 +2394,7 @@ reap_cache(nsc_ctx_t *ctx, uint_t nodes_per_interval,
 			node = next_node;
 			next_node = next_node->qprev;
 			if (node->stats.status == ST_DISCARD ||
-					!(node->stats.status & ST_PENDING)) {
+			    !(node->stats.status & ST_PENDING)) {
 				/* Leave nodes with pending updates alone  */
 				delete_entry(nscdb, ctx, node);
 				count++;

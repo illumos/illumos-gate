@@ -22,12 +22,11 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #ifndef	_NSCD_DOOR_H
 #define	_NSCD_DOOR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Definitions for nscd to nscd door interfaces
@@ -97,23 +96,9 @@ extern "C" {
 	(ph)->p_herrno = herrno;
 
 
-#define	NSCD_RETURN_STATUS(ph, st, errno) \
-	{ \
-		int e = errno; \
-		(ph)->p_status = st; \
-		if (e != -1) \
-			(ph)->p_errno = e; \
-		return; \
-	}
-
 #define	NSCD_SET_STATUS_SUCCESS(ph) \
 	(ph)->p_status = NSS_SUCCESS; \
 	(ph)->p_errno = 0;
-
-#define	NSCD_RETURN_STATUS_SUCCESS(ph) \
-	(ph)->p_status = NSS_SUCCESS; \
-	(ph)->p_errno = 0; \
-	return;
 
 #define	NSCD_SET_N2N_STATUS(ph, st, errno, n2nst) \
 	{ \
@@ -122,16 +107,6 @@ extern "C" {
 		if (e != -1) \
 			(ph)->p_errno = e; \
 		(ph)->nscdpriv = n2nst; \
-	}
-
-#define	NSCD_RETURN_N2N_STATUS(ph, st, errno, n2nst) \
-	{ \
-		int	e = errno; \
-		(ph)->p_status = st; \
-		if (e != -1) \
-			(ph)->p_errno = e; \
-		(ph)->nscdpriv = n2nst; \
-		return; \
 	}
 
 #define	NSCD_STATUS_IS_OK(ph) \

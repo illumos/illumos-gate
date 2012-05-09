@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <stdlib.h>
@@ -389,7 +390,8 @@ N2N_check_priv(
 		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_DEBUG)
 		(me, "door_ucred: %s\n", strerror(errno));
 
-		NSCD_RETURN_STATUS(phdr, NSS_ERROR, errnum);
+		NSCD_SET_STATUS(phdr, NSS_ERROR, errnum);
+		return;
 	}
 
 	eset = ucred_getprivset(uc, PRIV_EFFECTIVE);
@@ -405,7 +407,8 @@ N2N_check_priv(
 		    ucred_getruid(uc), ucred_geteuid(uc), zoneid);
 		ucred_free(uc);
 
-		NSCD_RETURN_STATUS(phdr, NSS_ERROR, EACCES);
+		NSCD_SET_STATUS(phdr, NSS_ERROR, EACCES);
+		return;
 	}
 
 	_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_DEBUG)
@@ -415,7 +418,7 @@ N2N_check_priv(
 
 	ucred_free(uc);
 
-	NSCD_RETURN_STATUS_SUCCESS(phdr);
+	NSCD_SET_STATUS_SUCCESS(phdr);
 }
 
 void
@@ -439,7 +442,8 @@ _nscd_APP_check_cred(
 		_NSCD_LOG(log_comp, NSCD_LOG_LEVEL_ERROR)
 		(me, "door_ucred: %s\n", strerror(errno));
 
-		NSCD_RETURN_STATUS(phdr, NSS_ERROR, errnum);
+		NSCD_SET_STATUS(phdr, NSS_ERROR, errnum);
+		return;
 	}
 
 	NSCD_SET_STATUS_SUCCESS(phdr);

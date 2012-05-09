@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 
 /*
@@ -723,7 +724,7 @@ rename_snap(zfs_handle_t *zhp, void *data)
 	(void) snprintf(template, sizeof (template), "%s%d", cbp->match_name,
 	    cbp->max++);
 
-	res = (zfs_rename(zhp, template, B_FALSE) != 0);
+	res = (zfs_rename(zhp, template, B_FALSE, B_FALSE) != 0);
 	if (res != 0)
 		(void) fprintf(stderr, gettext("failed to rename snapshot %s "
 		    "to %s: %s\n"), zfs_get_name(zhp), template,
