@@ -1180,7 +1180,7 @@ f lib/amd64/libsocket.so.1 0755 root bin
 s lib/amd64/libsocket.so=libsocket.so.1
 f lib/amd64/libsysevent.so.1 0755 root bin
 s lib/amd64/libsysevent.so=libsysevent.so.1
-s lib/amd64/libtermcap.so.1=libcurses.so.1
+f lib/amd64/libtermcap.so.1 0755 root bin
 s lib/amd64/libtermcap.so=libtermcap.so.1
 s lib/amd64/libtermlib.so.1=libcurses.so.1
 s lib/amd64/libtermlib.so=libtermlib.so.1
@@ -1372,7 +1372,7 @@ f lib/libsocket.so.1 0755 root bin
 s lib/libsocket.so=libsocket.so.1
 f lib/libsysevent.so.1 0755 root bin
 s lib/libsysevent.so=libsysevent.so.1
-s lib/libtermcap.so.1=libcurses.so.1
+f lib/libtermcap.so.1 0755 root bin
 s lib/libtermcap.so=libtermcap.so.1
 s lib/libtermlib.so.1=libcurses.so.1
 s lib/libtermlib.so=libtermlib.so.1
@@ -2372,27 +2372,27 @@ s usr/ccs/bin/m4=../../bin/m4
 s usr/ccs/bin/regcmp=../../bin/regcmp
 d usr/ccs/lib 0755 root bin
 d usr/ccs/lib/amd64 0755 root bin
-s usr/ccs/lib/amd64/libcurses.so=../../../../lib/amd64/libcurses.so.1
-s usr/ccs/lib/amd64/libform.so=../../../lib/amd64/libform.so.1
-s usr/ccs/lib/amd64/libgen.so=../../../../lib/amd64/libgen.so.1
-s usr/ccs/lib/amd64/libl.so=../../../lib/amd64/libl.so.1
-s usr/ccs/lib/amd64/libmalloc.so=../../../lib/amd64/libmalloc.so.1
-s usr/ccs/lib/amd64/libmenu.so=../../../lib/amd64/libmenu.so.1
-s usr/ccs/lib/amd64/libpanel.so=../../../lib/amd64/libpanel.so.1
-s usr/ccs/lib/amd64/libtermcap.so=../../../../lib/amd64/libcurses.so.1
-s usr/ccs/lib/amd64/libtermlib.so=../../../../lib/amd64/libcurses.so.1
-s usr/ccs/lib/amd64/liby.so=../../../lib/amd64/liby.so.1
+s usr/ccs/lib/amd64/libcurses.so.1=../../../../lib/amd64/libcurses.so.1
+s usr/ccs/lib/amd64/libform.so.1=../../../lib/amd64/libform.so.1
+s usr/ccs/lib/amd64/libgen.so.1=../../../../lib/amd64/libgen.so.1
+s usr/ccs/lib/amd64/libl.so.1=../../../lib/amd64/libl.so.1
+s usr/ccs/lib/amd64/libmalloc.so.1=../../../lib/amd64/libmalloc.so.1
+s usr/ccs/lib/amd64/libmenu.so.1=../../../lib/amd64/libmenu.so.1
+s usr/ccs/lib/amd64/libpanel.so.1=../../../lib/amd64/libpanel.so.1
+s usr/ccs/lib/amd64/libtermcap.so.1=../../../../lib/amd64/libtermcap.so.1
+s usr/ccs/lib/amd64/libtermlib.so.1=../../../../lib/amd64/libcurses.so.1
+s usr/ccs/lib/amd64/liby.so.1=../../../lib/amd64/liby.so.1
 s usr/ccs/lib/cpp=../../../lib/cpp
-s usr/ccs/lib/libcurses.so=../../../lib/libcurses.so.1
-s usr/ccs/lib/libform.so=../../lib/libform.so.1
-s usr/ccs/lib/libgen.so=../../../lib/libgen.so.1
-s usr/ccs/lib/libl.so=../../lib/libl.so.1
-s usr/ccs/lib/libmalloc.so=../../lib/libmalloc.so.1
-s usr/ccs/lib/libmenu.so=../../lib/libmenu.so.1
-s usr/ccs/lib/libpanel.so=../../lib/libpanel.so.1
-s usr/ccs/lib/libtermcap.so=../../../lib/libcurses.so.1
-s usr/ccs/lib/libtermlib.so=../../../lib/libcurses.so.1
-s usr/ccs/lib/liby.so=../../lib/liby.so.1
+s usr/ccs/lib/libcurses.so.1=../../../lib/libcurses.so.1
+s usr/ccs/lib/libform.so.1=../../lib/libform.so.1
+s usr/ccs/lib/libgen.so.1=../../../lib/libgen.so.1
+s usr/ccs/lib/libl.so.1=../../lib/libl.so.1
+s usr/ccs/lib/libmalloc.so.1=../../lib/libmalloc.so.1
+s usr/ccs/lib/libmenu.so.1=../../lib/libmenu.so.1
+s usr/ccs/lib/libpanel.so.1=../../lib/libpanel.so.1
+s usr/ccs/lib/libtermcap.so.1=../../../lib/libtermcap.so.1
+s usr/ccs/lib/libtermlib.so.1=../../../lib/libcurses.so.1
+s usr/ccs/lib/liby.so.1=../../lib/liby.so.1
 s usr/ccs/lib/link_audit=../../lib/link_audit
 s usr/dict=share/lib/dict
 d usr/gnu 0755 root bin
