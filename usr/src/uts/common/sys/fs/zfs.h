@@ -23,6 +23,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -791,7 +792,8 @@ typedef enum zfs_ioc {
 	ZFS_IOC_SPACE_SNAPS,
 	ZFS_IOC_DESTROY_SNAPS_NVL,
 	ZFS_IOC_POOL_REGUID,
-	ZFS_IOC_POOL_REOPEN
+	ZFS_IOC_POOL_REOPEN,
+	ZFS_IOC_SEND_PROGRESS
 } zfs_ioc_t;
 
 /*
