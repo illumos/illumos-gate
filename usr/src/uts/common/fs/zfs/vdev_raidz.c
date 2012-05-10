@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Joyent, Inc. All rights reserved.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -1445,7 +1446,8 @@ vdev_raidz_reconstruct(raidz_map_t *rm, int *t, int nt)
 }
 
 static int
-vdev_raidz_open(vdev_t *vd, uint64_t *asize, uint64_t *ashift)
+vdev_raidz_open(vdev_t *vd, uint64_t *asize, uint64_t *max_asize,
+    uint64_t *ashift)
 {
 	vdev_t *cvd;
 	uint64_t nparity = vd->vdev_nparity;
@@ -1473,10 +1475,12 @@ vdev_raidz_open(vdev_t *vd, uint64_t *asize, uint64_t *ashift)
 		}
 
 		*asize = MIN(*asize - 1, cvd->vdev_asize - 1) + 1;
+		*max_asize = MIN(*max_asize - 1, cvd->vdev_max_asize - 1) + 1;
 		*ashift = MAX(*ashift, cvd->vdev_ashift);
 	}
 
 	*asize *= vd->vdev_children;
+	*max_asize *= vd->vdev_children;
 
 	if (numerrors > nparity) {
 		vd->vdev_stat.vs_aux = VDEV_AUX_NO_REPLICAS;

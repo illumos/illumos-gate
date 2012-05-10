@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011 by Delphix. All rights reserved.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  */
 
@@ -1248,11 +1248,13 @@ const struct ioc {
 		"zfs_cmd_t" },
 	{ (uint_t)ZFS_IOC_OBJ_TO_STATS,		"ZFS_IOC_OBJ_TO_STATS",
 		"zfs_cmd_t" },
-	{ (uint_t)ZFS_IOC_POOL_REGUID,		"ZFS_IOC_POOL_REGUID",
-		"zfs_cmd_t" },
 	{ (uint_t)ZFS_IOC_SPACE_WRITTEN,	"ZFS_IOC_SPACE_WRITTEN",
 		"zfs_cmd_t" },
 	{ (uint_t)ZFS_IOC_DESTROY_SNAPS_NVL,	"ZFS_IOC_DESTROY_SNAPS_NVL",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_POOL_REGUID,		"ZFS_IOC_POOL_REGUID",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_POOL_REOPEN,		"ZFS_IOC_POOL_REOPEN",
 		"zfs_cmd_t" },
 
 	/* kssl ioctls */
