@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -2988,6 +2989,9 @@ mac_prop_check_size(mac_prop_id_t id, uint_t valsize, boolean_t is_range)
 		break;
 	case MAC_PROP_WL_MLME:
 		minsize = sizeof (wl_mlme_t);
+		break;
+	case MAC_PROP_VN_PROMISC_FILTERED:
+		minsize = sizeof (boolean_t);
 		break;
 	}
 

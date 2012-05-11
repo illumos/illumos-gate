@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -81,6 +82,7 @@ static int vnic_m_stat(void *, uint_t, uint64_t *);
 static void vnic_m_ioctl(void *, queue_t *, mblk_t *);
 static int vnic_m_setprop(void *, const char *, mac_prop_id_t, uint_t,
     const void *);
+static int vnic_m_getprop(void *, const char *, mac_prop_id_t, uint_t, void *);
 static void vnic_m_propinfo(void *, const char *, mac_prop_id_t,
     mac_prop_info_handle_t);
 static mblk_t *vnic_m_tx(void *, mblk_t *);
@@ -100,7 +102,7 @@ static mod_hash_t	*vnic_hash;
 #define	VNIC_HASH_KEY(vnic_id)	((mod_hash_key_t)(uintptr_t)vnic_id)
 
 #define	VNIC_M_CALLBACK_FLAGS	\
-	(MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_PROPINFO)
+	(MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP | MC_PROPINFO)
 
 static mac_callbacks_t vnic_m_callbacks = {
 	VNIC_M_CALLBACK_FLAGS,
@@ -117,7 +119,7 @@ static mac_callbacks_t vnic_m_callbacks = {
 	NULL,
 	NULL,
 	vnic_m_setprop,
-	NULL,
+	vnic_m_getprop,
 	vnic_m_propinfo
 };
 
@@ -848,13 +850,13 @@ vnic_m_setprop(void *m_driver, const char *pr_name, mac_prop_id_t pr_num,
 	int 		err = ENOTSUP;
 	vnic_t		*vn = m_driver;
 
-	/* allow setting MTU only on an etherstub */
-	if (vn->vn_link_id != DATALINK_INVALID_LINKID)
-		return (err);
-
 	switch (pr_num) {
 	case MAC_PROP_MTU: {
 		uint32_t	mtu;
+
+		/* allow setting MTU only on an etherstub */
+		if (vn->vn_link_id != DATALINK_INVALID_LINKID)
+			return (err);
 
 		if (pr_valsize < sizeof (mtu)) {
 			err = EINVAL;
@@ -868,10 +870,43 @@ vnic_m_setprop(void *m_driver, const char *pr_name, mac_prop_id_t pr_num,
 		err = mac_maxsdu_update(vn->vn_mh, mtu);
 		break;
 	}
+	case MAC_PROP_VN_PROMISC_FILTERED: {
+		boolean_t filtered;
+
+		if (pr_valsize < sizeof (filtered)) {
+			err = EINVAL;
+			break;
+		}
+
+		bcopy(pr_val, &filtered, sizeof (filtered));
+		err = mac_set_promisc_filtered(vn->vn_mch, filtered);
+	}
 	default:
 		break;
 	}
 	return (err);
+}
+
+static int
+vnic_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
+    uint_t pr_valsize, void *pr_val)
+{
+	vnic_t		*vn = arg;
+	int 		ret = 0;
+	boolean_t	out;
+
+	switch (pr_num) {
+	case MAC_PROP_VN_PROMISC_FILTERED:
+		out = mac_get_promisc_filtered(vn->vn_mch);
+		ASSERT(pr_valsize >= sizeof (boolean_t));
+		bcopy(&out, pr_val, sizeof (boolean_t));
+		break;
+	default:
+		ret = EINVAL;
+		break;
+	}
+
+	return (ret);
 }
 
 /* ARGSUSED */
