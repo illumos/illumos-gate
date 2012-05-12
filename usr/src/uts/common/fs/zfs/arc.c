@@ -125,6 +125,7 @@
 #include <sys/refcount.h>
 #include <sys/vdev.h>
 #include <sys/vdev_impl.h>
+#include <sys/zfs_zone.h>
 #ifdef _KERNEL
 #include <sys/vmsystm.h>
 #include <vm/anon.h>
@@ -2929,6 +2930,14 @@ top:
 
 		rzio = zio_read(pio, spa, bp, buf->b_data, size,
 		    arc_read_done, buf, priority, zio_flags, zb);
+
+		/*
+		 * At this point, this read I/O has already missed in the ARC
+		 * and will be going through to the disk.  The I/O throttle
+		 * should delay this I/O if this zone is using more than its I/O
+		 * priority allows.
+		 */
+		zfs_zone_io_throttle(ZFS_ZONE_IOP_READ);
 
 		if (*arc_flags & ARC_WAIT)
 			return (zio_wait(rzio));

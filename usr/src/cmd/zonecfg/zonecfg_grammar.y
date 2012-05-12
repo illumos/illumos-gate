@@ -22,6 +22,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent Inc. All rights reserved.
  */
 
 /*
@@ -136,6 +137,7 @@ complex_piece_func(int cp_type, const char *str, complex_property_ptr_t cp_next)
 %token OPEN_PAREN CLOSE_PAREN COMMA DATASET LIMITPRIV BOOTARGS BRAND PSET PCAP
 %token MCAP NCPUS IMPORTANCE SHARES MAXLWPS MAXSHMMEM MAXSHMIDS MAXMSGIDS
 %token MAXSEMIDS LOCKED SWAP SCHED CLEAR DEFROUTER ADMIN USER AUTHS MAXPROCS
+%token ZFSPRI
 
 %type <strval> TOKEN EQUAL OPEN_SQ_BRACKET CLOSE_SQ_BRACKET
     property_value OPEN_PAREN CLOSE_PAREN COMMA simple_prop_val
@@ -650,6 +652,15 @@ info_command:	INFO
 		$$->cmd_res_type = RT_FS_ALLOWED;
 		$$->cmd_prop_nv_pairs = 0;
 	}
+	|	INFO ZFSPRI
+	{
+		if (($$ = alloc_cmd()) == NULL)
+			YYERROR;
+		cmd = $$;
+		$$->cmd_handler = &info_func;
+		$$->cmd_res_type = RT_ZFSPRI;
+		$$->cmd_prop_nv_pairs = 0;
+	}
 	|	INFO resource_type property_name EQUAL property_value
 	{
 		if (($$ = alloc_cmd()) == NULL)
@@ -999,6 +1010,7 @@ property_name: SPECIAL	{ $$ = PT_SPECIAL; }
 	| USER		{ $$ = PT_USER; }
 	| AUTHS 	{ $$ = PT_AUTHS; }
 	| FS_ALLOWED	{ $$ = PT_FS_ALLOWED; }
+	| ZFSPRI	{ $$ = PT_ZFSPRI; }
 
 /*
  * The grammar builds data structures from the bottom up.  Thus various
