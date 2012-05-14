@@ -22,8 +22,7 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/* Copyright (c) 2012 by Delphix. All rights reserved */
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -164,8 +163,8 @@ Usage: %s [-signal] [-fnovx] [-P ppidlist] [-g pgrplist] [-s sidlist]\n\
 	[-u euidlist] [-U uidlist] [-G gidlist] [-J projidlist]\n\
 	[-T taskidlist] [-t termlist] [-z zonelist] [-c ctidlist] [pattern]\n";
 
-static const char PGREP_OPTS[] = "flnovxc:d:D:u:U:G:P:g:s:t:z:J:T:";
-static const char PKILL_OPTS[] = "fnovxc:D:u:U:G:P:g:s:t:z:J:T:";
+static const char PGREP_OPTS[] = ":flnovxc:d:D:u:U:G:P:g:s:t:z:J:T:";
+static const char PKILL_OPTS[] = ":fnovxc:D:u:U:G:P:g:s:t:z:J:T:";
 
 static const char LSEP[] = ",\t ";	/* Argument list delimiter chars */
 
@@ -630,8 +629,13 @@ main(int argc, char *argv[])
 	while (optind < argc) {
 		while ((c = getopt(argc, argv, optstr)) != (int)EOF) {
 
-			if (c == '?' || g_optdtab[c - 'A'].o_opts == 0) {
-				if (optopt != '?') {
+			if (c == ':' || c == '?' ||
+			    g_optdtab[c - 'A'].o_opts == 0) {
+				if (c == ':') {
+					uu_warn(
+					    gettext("missing argument -- %c\n"),
+					    optopt);
+				} else if (optopt != '?') {
 					uu_warn(
 					    gettext("illegal option -- %c\n"),
 					    optopt);
