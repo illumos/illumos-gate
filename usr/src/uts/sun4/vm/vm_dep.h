@@ -696,9 +696,6 @@ typedef struct {
 #define	VM_CPU_DATA_PADSIZE						\
 	(P2ROUNDUP(sizeof (vm_cpu_data_t), L2CACHE_ALIGN_MAX))
 
-/* for boot cpu before kmem is initialized */
-extern char	vm_cpu_data0[];
-
 /*
  * Function to get an ecache color bin: F(as, cnt, vcolor).
  * the goal of this function is to:
