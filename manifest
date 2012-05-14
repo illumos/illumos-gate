@@ -11778,6 +11778,7 @@ f usr/share/man/man1m/installgrub.1m 0444 root bin
 f usr/share/man/man1m/intrstat.1m 0444 root bin
 f usr/share/man/man1m/iostat.1m 0444 root bin
 f usr/share/man/man1m/ipaddrsel.1m 0444 root bin
+f usr/share/man/man1m/ipadm.1m 0444 root bin
 f usr/share/man/man1m/ipdadm.1m 0444 root bin
 f usr/share/man/man1m/ipf.1m 0444 root bin
 f usr/share/man/man1m/ipmpstat.1m 0444 root bin
