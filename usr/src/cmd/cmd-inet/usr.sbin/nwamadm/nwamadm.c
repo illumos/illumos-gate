@@ -1364,7 +1364,7 @@ select_wifi_func(int argc, char *argv[])
 			}
 		}
 
-		err = nwam_wlan_set_key(linkname, essid, NULL, security_mode,
+		err = nwam_wlan_set_key(linkname, essid, bssid, security_mode,
 		    keyslot, key);
 		if (err != NWAM_SUCCESS)
 			die_nwamerr(err, "could not set WiFi key");

@@ -351,6 +351,44 @@ key_string_to_secobj_value(char *buf, uint8_t *obj_val, uint_t *obj_lenp,
 }
 
 /*
+ * Callback used on each known WLAN:
+ * return 1 if a secobj, linked with an existing kwown wlan, has the same name
+ * of the secobj that is being created.
+ */
+
+static int
+find_keyname_cb(nwam_known_wlan_handle_t kwh, void *new_keyname)
+{
+	nwam_error_t err;
+	nwam_value_t old_key;
+
+	char **old_keyname;
+	uint_t num_old_keyname, i;
+
+	if ((err = nwam_known_wlan_get_prop_value(kwh,
+	    NWAM_KNOWN_WLAN_PROP_KEYNAME, &old_key)) != NWAM_SUCCESS) {
+		nlog(LOG_ERR, "find_keyname_cb: nwam_known_wlan_get_prop: %s",
+		    nwam_strerror(err));
+		return (0);
+	}
+	if ((err = nwam_value_get_string_array(old_key, &old_keyname,
+	    &num_old_keyname))
+	    != NWAM_SUCCESS) {
+		nlog(LOG_ERR, "find_keyname_cb: nwam_value_get_string: %s",
+		    nwam_strerror(err));
+		nwam_value_free(old_key);
+		return (0);
+	}
+	nwam_value_free(old_key);
+	for (i = 0; i < num_old_keyname; i++) {
+		if (strcmp(old_keyname[i], (const char *)new_keyname) == 0)
+			/* Found matching keyname so terminate walk */
+			return (1);
+	}
+	return (0);
+}
+
+/*
  * Print the key name format into the appropriate field, then convert any ":"
  * characters to ".", as ":[1-4]" is the slot indicator, which otherwise
  * would trip us up.  Invalid characters for secobj names are ignored.
@@ -403,9 +441,11 @@ nwamd_wlan_set_key(const char *linkname, const char *essid, const char *bssid,
 	nwamd_object_t ncu_obj;
 	nwamd_ncu_t *ncu;
 	nwamd_link_t *link;
+	int ret = 0;
 	uint8_t obj_val[DLADM_SECOBJ_VAL_MAX];
 	uint_t obj_len = sizeof (obj_val);
 	char obj_name[DLADM_SECOBJ_NAME_MAX];
+	char obj_tempname[DLADM_SECOBJ_NAME_MAX];
 	dladm_status_t status;
 	char errmsg[DLADM_STRSIZE];
 	dladm_secobj_class_t class;
@@ -419,14 +459,6 @@ nwamd_wlan_set_key(const char *linkname, const char *essid, const char *bssid,
 	ncu = ncu_obj->nwamd_object_data;
 	link = &ncu->ncu_link;
 
-	nlog(LOG_DEBUG, "nwamd_wlan_set_key: running for link %s", linkname);
-	/*
-	 * Name key object for this WLAN so it can be later retrieved
-	 * (name is unique for each ESSID/BSSID combination).
-	 */
-	nwamd_set_key_name(essid, bssid, obj_name, sizeof (obj_name));
-	nlog(LOG_DEBUG, "store_key: obj_name is %s", obj_name);
-
 	class = (security_mode == DLADM_WLAN_SECMODE_WEP ?
 	    DLADM_SECOBJ_CLASS_WEP : DLADM_SECOBJ_CLASS_WPA);
 	if (key_string_to_secobj_value(raw_key, obj_val, &obj_len,
@@ -436,7 +468,38 @@ nwamd_wlan_set_key(const char *linkname, const char *essid, const char *bssid,
 		return (NWAM_ERROR_INTERNAL);
 	}
 
-	/* we've validated the new key, so remove the old one */
+	nlog(LOG_DEBUG, "nwamd_wlan_set_key: running for link %s", linkname);
+	/*
+	 * Name key object for this WLAN so it can be later retrieved.
+	 * (bssid is appended if an object, with the same keyname,
+	 * already exists and is associated to a known wlan)
+	 */
+	nwamd_set_key_name(essid, NULL, obj_tempname, sizeof (obj_tempname));
+	(void) nwam_walk_known_wlans(find_keyname_cb, obj_tempname, 0, &ret);
+	/*
+	 * We also check if the keyval is the same. The user might want
+	 * to use the same key for more APs with the same ESSID.
+	 * This can result in a known wlan with multiple BSSIDs
+	 */
+	if (ret == 1) {
+		dladm_wlan_key_t *old_secobj = nwamd_wlan_get_key_named(
+		    obj_tempname, security_mode);
+		nlog(LOG_DEBUG, "found existing obj_name %s", obj_tempname);
+		ret = memcmp((*old_secobj).wk_val, obj_val, obj_len);
+		nwamd_set_key_name(essid, ret ? bssid : NULL, obj_name,
+		    sizeof (obj_name));
+		free(old_secobj);
+	} else {
+		nwamd_set_key_name(essid, NULL, obj_name,
+		    sizeof (obj_name));
+	}
+	nlog(LOG_DEBUG, "store_key: obj_name is %s", obj_name);
+
+	/*
+	 * We have validated the new key, so remove the old one.
+	 * This will actually delete the keyobj only if the user had set
+	 * a wrong key and is replacing it with a new one for the same AP.
+	 */
 	status = dladm_unset_secobj(dld_handle, obj_name,
 	    DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST);
 	if (status != DLADM_STATUS_OK && status != DLADM_STATUS_NOTFOUND) {
@@ -755,8 +818,7 @@ nwamd_wlan_select(const char *linkname, const char *essid, const char *bssid,
 	nwamd_object_t ncu_obj;
 	nwamd_ncu_t *ncu;
 	nwamd_link_t *link;
-	char key[DLADM_STRSIZE];
-	boolean_t found_old_key = B_FALSE, found_key = B_FALSE;
+	boolean_t found_key = B_FALSE;
 
 	if ((ncu_obj = nwamd_ncu_object_find(NWAM_NCU_TYPE_LINK, linkname))
 	    == NULL) {
@@ -799,24 +861,24 @@ nwamd_wlan_select(const char *linkname, const char *essid, const char *bssid,
 	/* does this WLAN require a key? If so go to NEED_KEY */
 	if (NEED_ENC(link->nwamd_link_wifi_security_mode)) {
 		/*
-		 * First, if a key name may have been specified for a
-		 * known WLAN.  If so, use it.  Otherwise, try both the
-		 * new nwamd key name format (ESSID) and old (ESSID/BSSID).
-		 * The user may have set the key without adding a known WLAN,
-		 * so we need to try all these options to save going to
-		 * NEED_KEY state.
+		 * nwam secobjs can have two formats: nwam-ESSID-BSSID and
+		 * nwam-ESSID. There is no reason for searching through known
+		 * wlan keynames since this is only the selection process.
 		 */
-		if (known_wlan_get_keyname(link->nwamd_link_wifi_essid,
-		    link->nwamd_link_wifi_keyname) == NWAM_SUCCESS &&
-		    (link->nwamd_link_wifi_key = nwamd_wlan_get_key_named
-		    (link->nwamd_link_wifi_keyname,
+		if ((link->nwamd_link_wifi_key = nwamd_wlan_get_key
+		    (link->nwamd_link_wifi_essid, link->nwamd_link_wifi_bssid,
 		    link->nwamd_link_wifi_security_mode)) != NULL) {
-			(void) known_wlan_get_keyslot
-			    (link->nwamd_link_wifi_essid,
-			    &link->nwamd_link_wifi_key->wk_idx);
-			nlog(LOG_DEBUG, "nwamd_wlan_select: got known WLAN "
-			    "key %s, slot %d", link->nwamd_link_wifi_keyname,
-			    link->nwamd_link_wifi_key->wk_idx);
+			/*
+			 * Found old key format,
+			 * known wlans with similar names might exist
+			 */
+			nwamd_set_key_name(link->nwamd_link_wifi_essid,
+			    link->nwamd_link_wifi_bssid,
+			    link->nwamd_link_wifi_keyname,
+			    DLADM_SECOBJ_NAME_MAX);
+			nlog(LOG_DEBUG, "nwamd_wlan_select: got old format "
+			    "WLAN key %s",
+			    link->nwamd_link_wifi_keyname);
 			found_key = B_TRUE;
 		} else if ((link->nwamd_link_wifi_key = nwamd_wlan_get_key
 		    (link->nwamd_link_wifi_essid, NULL,
@@ -827,27 +889,6 @@ nwamd_wlan_select(const char *linkname, const char *essid, const char *bssid,
 			nlog(LOG_DEBUG, "nwamd_wlan_select: got WLAN key %s",
 			    link->nwamd_link_wifi_keyname);
 			found_key = B_TRUE;
-		} else if ((link->nwamd_link_wifi_key = nwamd_wlan_get_key
-		    (link->nwamd_link_wifi_essid, link->nwamd_link_wifi_bssid,
-		    link->nwamd_link_wifi_security_mode)) != NULL) {
-			/*
-			 * Found old key format - prepare to save
-			 * it as new ESSID-only key, but don't
-			 * do it until we're released the object
-			 * lock (since nwamd_wlan_set_key()
-			 * takes the object lock).
-			 */
-			(void) strlcpy(key,
-			    (char *)link->nwamd_link_wifi_key->wk_val,
-			    link->nwamd_link_wifi_key->wk_len + 1);
-			found_old_key = B_TRUE;
-			found_key = B_TRUE;
-			nwamd_set_key_name(link->nwamd_link_wifi_essid, NULL,
-			    link->nwamd_link_wifi_keyname,
-			    DLADM_SECOBJ_NAME_MAX);
-			nlog(LOG_DEBUG, "nwamd_wlan_select: got old format "
-			    "WLAN key, converting to %s",
-			    link->nwamd_link_wifi_keyname);
 		} else {
 			nlog(LOG_ERR, "nwamd_wlan_select: could not "
 			    "find key for WLAN '%s'",
@@ -871,10 +912,6 @@ nwamd_wlan_select(const char *linkname, const char *essid, const char *bssid,
 	}
 	nwamd_object_release(ncu_obj);
 
-	if (found_old_key) {
-		(void) nwamd_wlan_set_key(linkname, essid, NULL, security_mode,
-		    1, key);
-	}
 	return (NWAM_SUCCESS);
 }
 
@@ -882,28 +919,28 @@ nwamd_wlan_select(const char *linkname, const char *essid, const char *bssid,
  * See if BSSID is in visited list of BSSIDs for known WLAN. Used for
  * strict BSSID matching (depends on wireless_strict_bssid property value).
  */
-static boolean_t
-bssid_match(nwam_known_wlan_handle_t kwh, const char *bssid)
+static int
+bssid_match(nwam_known_wlan_handle_t kwh, void *bssid)
 {
 	nwam_value_t bssidsval;
 	nwam_error_t err;
 	char **bssids;
 	uint_t nelem, i;
-	boolean_t found = B_FALSE;
+	int found = 0;
 
 	if ((err = nwam_known_wlan_get_prop_value(kwh,
 	    NWAM_KNOWN_WLAN_PROP_BSSIDS, &bssidsval)) != NWAM_SUCCESS) {
 		nlog(LOG_ERR, "bssid_match: %s", nwam_strerror(err));
-		return (B_FALSE);
+		return (0);
 	}
 	if ((err = nwam_value_get_string_array(bssidsval, &bssids, &nelem))
 	    != NWAM_SUCCESS) {
 		nwam_value_free(bssidsval);
-		return (B_FALSE);
+		return (0);
 	}
 	for (i = 0; i < nelem; i++) {
-		if (strcmp(bssid, bssids[i]) == 0) {
-			found = B_TRUE;
+		if (strcmp((const char *)bssid, bssids[i]) == 0) {
+			found = 1;
 			break;
 		}
 	}
@@ -951,7 +988,7 @@ find_best_wlan_cb(nwam_known_wlan_handle_t kwh, void *data)
 
 	for (i = 0; i < s->nwamd_wifi_scan_curr_num; i++) {
 		nwam_wlan_t *cur_wlan = &(s->nwamd_wifi_scan_curr[i]);
-		boolean_t b_match = bssid_match(kwh, cur_wlan->nww_bssid);
+		int b_match = bssid_match(kwh, cur_wlan->nww_bssid);
 
 		/*
 		 * We need to either match the scanned essid, or in the case
@@ -1332,6 +1369,22 @@ wlan_scan_thread(void *arg)
 			char keyname[NWAM_MAX_VALUE_LEN];
 			dladm_wlan_key_t *key = NULL;
 
+			/*
+			 * If strict_bssid is true, we start checking for
+			 * known wlans with the same BSSID.
+			 * This would prevent the selection of secobjs
+			 * that actually are referenced by different kwl
+			 * with the same ESSID.
+			 */
+			if (wireless_strict_bssid) {
+				int b_match = 0;
+				(void) nwam_walk_known_wlans(bssid_match,
+				    s.nwamd_wifi_scan_curr[i].nww_bssid, 0,
+				    &b_match);
+				if (b_match == 0)
+					continue;
+			}
+
 			if (known_wlan_get_keyname
 			    (s.nwamd_wifi_scan_curr[i].nww_essid, keyname)
 			    == NWAM_SUCCESS &&
@@ -1345,6 +1398,8 @@ wlan_scan_thread(void *arg)
 				    nww_security_mode ==
 				    DLADM_WLAN_SECMODE_WEP ?
 				    key->wk_idx : 1;
+				nlog(LOG_DEBUG, "found matching keyname for \
+				    %s", s.nwamd_wifi_scan_curr[i].nww_bssid);
 				free(key);
 			}
 		}

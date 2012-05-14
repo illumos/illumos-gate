@@ -463,32 +463,6 @@ known_wlan_get_keyname(const char *essid, char *name)
 	return (err);
 }
 
-nwam_error_t
-known_wlan_get_keyslot(const char *essid, uint_t *keyslotp)
-{
-	nwam_known_wlan_handle_t kwh = NULL;
-	nwam_value_t keyslotval = NULL;
-	uint64_t slot;
-	nwam_error_t err;
-
-	if ((err = nwam_known_wlan_read(essid, 0, &kwh)) != NWAM_SUCCESS)
-		return (err);
-	if ((err = nwam_known_wlan_get_prop_value(kwh,
-	    NWAM_KNOWN_WLAN_PROP_KEYSLOT, &keyslotval)) == NWAM_SUCCESS &&
-	    (err = nwam_value_get_uint64(keyslotval, &slot)) == NWAM_SUCCESS) {
-		*keyslotp = (uint_t)slot;
-	} else {
-		if (err == NWAM_ENTITY_NOT_FOUND)
-			err = NWAM_SUCCESS;
-		*keyslotp = 1;
-	}
-	if (keyslotval != NULL)
-		nwam_value_free(keyslotval);
-	if (kwh != NULL)
-		nwam_known_wlan_free(kwh);
-	return (err);
-}
-
 /* Performs a scan on a wifi link NCU */
 /* ARGSUSED */
 static int

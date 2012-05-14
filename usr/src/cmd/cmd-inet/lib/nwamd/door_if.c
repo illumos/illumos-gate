@@ -237,7 +237,8 @@ nwamd_door_req_wlan_set_key(nwamd_door_arg_t *req, ucred_t *ucr,
 	    req->nwda_data.nwdad_wlan_info.nwdad_bssid);
 	return (nwamd_wlan_set_key
 	    (req->nwda_data.nwdad_wlan_info.nwdad_name,
-	    req->nwda_data.nwdad_wlan_info.nwdad_essid, NULL,
+	    req->nwda_data.nwdad_wlan_info.nwdad_essid,
+	    req->nwda_data.nwdad_wlan_info.nwdad_bssid,
 	    req->nwda_data.nwdad_wlan_info.nwdad_security_mode,
 	    req->nwda_data.nwdad_wlan_info.nwdad_keyslot,
 	    req->nwda_data.nwdad_wlan_info.nwdad_key));
