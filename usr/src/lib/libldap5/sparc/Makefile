@@ -11,7 +11,7 @@ PR_MDUSOBJS = os_SunOS.o
 
 include ../Makefile.com
 
-LDLIBS +=	-L$(NSS_LDPATH) $(NSS_LIBS)
+LDLIBS +=	-L$(ADJUNCT_PROTO)$(NSS_LDPATH) $(NSS_LIBS)
 DYNFLAGS +=	-R$(NSS_LDPATH)
 
 

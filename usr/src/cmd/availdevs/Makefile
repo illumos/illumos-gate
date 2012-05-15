@@ -32,7 +32,7 @@ include ../Makefile.cmd
 
 ROOTCMDDIR=	$(ROOTLIB)/zfs
 
-INCS += -I/usr/include/libxml2
+INCS += -I$(ADJUNCT_PROTO)/usr/include/libxml2
 
 #
 # There is no lint library for libxml2, so we need to avoid linking against

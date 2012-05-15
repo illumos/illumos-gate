@@ -47,7 +47,7 @@ LDLIBS +=	-lshare -ldlpi -lnsl -lnvpair -lscf -lumem -lc
 all install := LDLIBS += -lxml2
 
 CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS +=	-D_REENTRANT -I/usr/include/libxml2 \
+CPPFLAGS +=	-D_REENTRANT -I$(ADJUNCT_PROTO)/usr/include/libxml2 \
 		-I$(SRCDIR)/../common
 
 .KEEP_STATE:

@@ -38,7 +38,7 @@ SRCDIR = ../sparc
 LIBS = $(DYNLIB) $(LINTLIB)
 
 CPPFLAGS += -I. -I$(SRC)/uts/sun4v -I$(ROOT)/usr/platform/sun4v/include \
-	-I/usr/include/libxml2 -I/usr/sfw/include
+	-I$(ADJUNCT_PROTO)/usr/include/libxml2
 CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
 CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
 

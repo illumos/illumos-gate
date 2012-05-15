@@ -32,7 +32,8 @@ include ../../Makefile.cmd
 CFLAGS += $(CCVERBOSE)
 CFLAGS64 += $(CCVERBOSE)
 
-CPPFLAGS += -DEMBED_CONFIGS -I/usr/include/glib-2.0 -I/usr/lib/glib-2.0/include
+CPPFLAGS += -DEMBED_CONFIGS -I$(ADJUNCT_PROTO)/usr/include/glib-2.0 \
+	-I$(ADJUNCT_PROTO)/usr/lib/glib-2.0/include
 C99MODE = $(C99_ENABLE)
 LDLIBS += -lcurses -ldtrace
 all install	:= LDLIBS += -lglib-2.0

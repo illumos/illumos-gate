@@ -42,7 +42,8 @@ $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 #add nfs/lib directory as part of the include path
 CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS +=	-D_REENTRANT -I$(NFSLIB_DIR) -I/usr/include/libxml2
+CPPFLAGS +=	-D_REENTRANT -I$(NFSLIB_DIR) \
+		-I$(ADJUNCT_PROTO)/usr/include/libxml2
 
 .KEEP_STATE:
 

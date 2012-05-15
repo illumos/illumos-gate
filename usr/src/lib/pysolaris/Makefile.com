@@ -44,7 +44,7 @@ C99LMODE=       -Xc99=%all
 LIBS =		$(DYNLIB)
 LDLIBS +=	-lc -lsec -lidmap -lpython2.6
 CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS +=	-I/usr/include/python2.6
+CPPFLAGS +=	-I$(ADJUNCT_PROTO)/usr/include/python2.6
 
 .KEEP_STATE:
 

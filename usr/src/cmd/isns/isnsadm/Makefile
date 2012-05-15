@@ -31,7 +31,7 @@ include ../../Makefile.cmd
 
 LDLIBS += -lxml2 -lscf -lc
 CFLAGS += $(CCVERBOSE)
-CPPFLAGS += -I. -I/usr/include/libxml2 -I../isnsd
+CPPFLAGS += -I. -I$(ADJUNCT_PROTO)/usr/include/libxml2 -I../isnsd
 POFILE = isnsadm_all.po
 POFILES = $(OBJS:%.o=%.po)
 

@@ -1225,7 +1225,6 @@ f lib/amd64/nss_files.so.1 0755 root bin
 f lib/amd64/nss_nis.so.1 0755 root bin
 f lib/amd64/nss_user.so.1 0755 root bin
 f lib/c_synonyms.so.1 0755 root bin
-s lib/cpp=../usr/lib/cpp
 d lib/crypto 0755 root bin
 s lib/crypto/32=.
 s lib/crypto/64=amd64
@@ -2403,7 +2402,6 @@ s usr/ccs/lib/amd64/libpanel.so.1=../../../lib/amd64/libpanel.so.1
 s usr/ccs/lib/amd64/libtermcap.so.1=../../../../lib/amd64/libtermcap.so.1
 s usr/ccs/lib/amd64/libtermlib.so.1=../../../../lib/amd64/libcurses.so.1
 s usr/ccs/lib/amd64/liby.so.1=../../../lib/amd64/liby.so.1
-s usr/ccs/lib/cpp=../../../lib/cpp
 s usr/ccs/lib/libcurses.so.1=../../../lib/libcurses.so.1
 s usr/ccs/lib/libform.so.1=../../lib/libform.so.1
 s usr/ccs/lib/libgen.so.1=../../../lib/libgen.so.1
@@ -5073,7 +5071,6 @@ f usr/lib/class/SDC/SDCpriocntl 0555 root bin
 d usr/lib/class/TS 0755 root bin
 f usr/lib/class/TS/TSdispadmin 0555 root bin
 f usr/lib/class/TS/TSpriocntl 0555 root bin
-f usr/lib/cpp 0555 root bin
 s usr/lib/cron=../../etc/cron.d
 f usr/lib/crt1.o 0644 root bin
 f usr/lib/crti.o 0644 root bin
@@ -6303,7 +6300,6 @@ s usr/lib/librcm.so.1=../../lib/librcm.so.1
 s usr/lib/librcm.so=../../lib/librcm.so.1
 f usr/lib/librdc.so.1 0755 root bin
 s usr/lib/librdc.so=librdc.so.1
-f usr/lib/libreadline.so.5 0555 root bin
 f usr/lib/libreparse.so.1 0755 root bin
 s usr/lib/libreparse.so=libreparse.so.1
 s usr/lib/libresolv.so.1=../../lib/libresolv.so.1
@@ -6403,7 +6399,6 @@ s usr/lib/libumem.so.1=../../lib/libumem.so.1
 s usr/lib/libumem.so=../../lib/libumem.so.1
 f usr/lib/libunistat.so.1 0755 root bin
 s usr/lib/libunistat.so=libunistat.so.1
-f usr/lib/libusb.so.1 0555 root bin
 s usr/lib/libuuid.so.1=../../lib/libuuid.so.1
 s usr/lib/libuuid.so=../../lib/libuuid.so.1
 s usr/lib/libuutil.so.1=../../lib/libuutil.so.1
@@ -10183,7 +10178,6 @@ s usr/sbin/devnm=df
 f usr/sbin/df 0555 root bin
 f usr/sbin/dfmounts 0555 root bin
 h usr/sbin/dfshares=usr/sbin/dfmounts
-f usr/sbin/dig 0555 root bin
 h usr/sbin/disks=usr/sbin/devfsadm
 f usr/sbin/dispadmin 0555 root bin
 s usr/sbin/dladm=../../sbin/dladm
@@ -10234,7 +10228,6 @@ f usr/sbin/grub 0555 root bin
 f usr/sbin/gsscred 0555 root sys
 f usr/sbin/halt 0755 root bin
 f usr/sbin/hextoalabel 0555 root sys
-f usr/sbin/host 0555 root bin
 s usr/sbin/hostconfig=../../sbin/hostconfig
 f usr/sbin/hotplug 0555 root bin
 f usr/sbin/htable 0555 root bin
@@ -10294,7 +10287,6 @@ f usr/sbin/ipdadm 0555 root bin
 h usr/sbin/ipf=usr/lib/isaexec
 h usr/sbin/ipfs=usr/lib/isaexec
 h usr/sbin/ipfstat=usr/lib/isaexec
-f usr/sbin/ipmitool 0555 root bin
 h usr/sbin/ipmon=usr/lib/isaexec
 s usr/sbin/ipmpstat=../../sbin/ipmpstat
 h usr/sbin/ipnat=usr/lib/isaexec
@@ -10340,7 +10332,6 @@ f usr/sbin/newkey 0555 root sys
 f usr/sbin/nfsref 0555 root bin
 f usr/sbin/nlsadmin 0755 root adm
 f usr/sbin/nscd 0555 root bin
-f usr/sbin/nslookup 0555 root bin
 f usr/sbin/nwamadm 0555 root bin
 f usr/sbin/nwamcfg 0555 root bin
 h usr/sbin/pbind=usr/lib/isaexec
@@ -16805,7 +16796,6 @@ d var/inet 0755 root sys
 d var/krb5 0755 root sys
 d var/krb5/rcache 1777 root sys
 d var/krb5/rcache/root 0700 root sys
-f var/ld/ld.config 0644 root root
 d var/ldap 0755 root sys
 d var/lib 0755 root other
 d var/lib/sgml 0755 root sys

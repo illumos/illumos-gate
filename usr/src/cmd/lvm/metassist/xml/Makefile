@@ -35,7 +35,7 @@ MSGFILES = $(SRCS:%.c=%.i)
 include $(METASSIST_TOPLEVEL)/../../Makefile.cmd
 include $(METASSIST_TOPLEVEL)/Makefile.env
 
-INCLUDES += -I /usr/include/libxml2 -I../common
+INCLUDES += -I$(ADJUNCT_PROTO)/usr/include/libxml2 -I../common
 CFLAGS   += $(INCLUDES)
 
 POFILE = xmlp.po

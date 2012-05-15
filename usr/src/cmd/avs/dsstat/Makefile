@@ -40,7 +40,7 @@ OBJS=	dsstat.o ii_stats.o sndr_stats.o sdbc_stats.o \
 SRCS= $(OBJS:%.o=%.c)
 
 CFLAGS += -v
-LDLIBS += -L/usr/lib -lkstat
+LDLIBS += -lkstat
 LINTFLAGS += -Xa -n -s -x -m -u -Dlint -errhdr=%user
 LINTFLAGS += -erroff=E_SEC_PRINTF_VAR_FMT -erroff=E_SEC_SPRINTF_UNBOUNDED_COPY
 LINTDIR = $(KBASE)/lintdir

@@ -36,7 +36,7 @@ include $(METASSIST_TOPLEVEL)/../../Makefile.cmd
 include $(METASSIST_TOPLEVEL)/Makefile.env
 
 INCLUDES += -I.. -I../common -I../xml -I../layout \
-            -I/usr/include/libxml2
+	-I$(ADJUNCT_PROTO)/usr/include/libxml2
 CFLAGS   += $(INCLUDES)
 
 POFILE = controllerp.po

@@ -39,7 +39,8 @@ CPPFLAGS += -I ../include -I $(ROOT)/usr/platform/sun4u/include
 LDFLAGS += -R/usr/lib/efcode/$(MACH64) -M mapfile64
 
 LIBS	= fcode.so fcdriver.so
-$(PROG) := LDLIBS += -L/usr/lib/efcode/$(MACH64) $(LIBS:%=$(EFCODEDIR64)/%)
+$(PROG) := LDLIBS += -L$(ADJUNCT_PROTO)/usr/lib/efcode/$(MACH64) \
+	$(LIBS:%=$(EFCODEDIR64)/%)
 
 all: $(PROG)
 

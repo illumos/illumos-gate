@@ -35,7 +35,8 @@ PROG=		sharemgr
 OBJS	= sharemgr_main.o commands.o shareutil.o
 SRCS	= $(OBJS:%.o=../%.c)
 
-MYCPPFLAGS = -I../../../../lib/libfsmgt/common -I/usr/include/libxml2 \
+MYCPPFLAGS = -I../../../../lib/libfsmgt/common \
+	-I$(ADJUNCT_PROTO)/usr/include/libxml2 \
 		-I../..
 CPPFLAGS += $(MYCPPFLAGS)
 LDLIBS += -lshare -lscf -lsecdb -lumem

@@ -28,6 +28,17 @@
 ROOT=		/proto
 
 #
+# Adjunct root, containing an additional proto area to be used for headers
+# and libraries.
+#
+ADJUNCT_PROTO=
+
+#
+# Adjunct for building things that run on the build machine.
+#
+NATIVE_ADJUNCT=	/usr
+
+#
 # RELEASE_BUILD should be cleared for final release builds.
 # NOT_RELEASE_BUILD is exactly what the name implies.
 #
@@ -531,8 +542,10 @@ NATIVE_CFLAGS=	$(COPTFLAG) $($(NATIVE_MACH)_CFLAGS) $(CCMODE) \
 DTEXTDOM=-DTEXT_DOMAIN=\"$(TEXT_DOMAIN)\"	# For messaging.
 DTS_ERRNO=-D_TS_ERRNO
 CPPFLAGS.master=$(DTEXTDOM) $(DTS_ERRNO) \
-	$(ENVCPPFLAGS1) $(ENVCPPFLAGS2) $(ENVCPPFLAGS3) $(ENVCPPFLAGS4)
-CPPFLAGS.native=$(ENVCPPFLAGS1) $(ENVCPPFLAGS2) $(ENVCPPFLAGS3) $(ENVCPPFLAGS4)
+	$(ENVCPPFLAGS1) $(ENVCPPFLAGS2) $(ENVCPPFLAGS3) $(ENVCPPFLAGS4) \
+	$(ADJUNCT_PROTO:%=-I%/usr/include)
+CPPFLAGS.native=$(ENVCPPFLAGS1) $(ENVCPPFLAGS2) $(ENVCPPFLAGS3) \
+		$(ENVCPPFLAGS4) -I$(NATIVE_ADJUNCT)/include
 CPPFLAGS=	$(CPPFLAGS.master)
 AS_CPPFLAGS=	$(CPPFLAGS.master)
 JAVAFLAGS=	-deprecation
@@ -642,6 +655,7 @@ MAPFILE.INT =		mapfile-intf
 #	LDLIBS64=-YP,$ROOT/lib/$MACH64:$ROOT/usr/lib/$MACH64
 #
 LDLIBS32 =	$(ENVLDLIBS1) $(ENVLDLIBS2) $(ENVLDLIBS3)
+LDLIBS32 +=	$(ADJUNCT_PROTO:%=-L%/usr/lib -L%/lib)
 LDLIBS.cmd = 	$(LDLIBS32)
 LDLIBS.lib =	$(LDLIBS32)
 #

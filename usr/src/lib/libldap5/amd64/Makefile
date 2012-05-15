@@ -10,7 +10,7 @@ PR_MDUSOBJS = os_SunOS_x86.o
 include ../Makefile.com
 include ../../Makefile.lib.64
 
-LDLIBS +=	-L$(NSS_LDPATH64) $(NSS_LIBS)
+LDLIBS +=	-L$(ADJUNCT_PROTO)$(NSS_LDPATH64) $(NSS_LIBS)
 DYNFLAGS +=	-R$(NSS_LDPATH64)
 
 all: $(LIBS)
