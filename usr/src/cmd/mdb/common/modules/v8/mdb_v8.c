@@ -1337,7 +1337,13 @@ jsfunc_lineno(uintptr_t lendsp, uintptr_t tokpos, char *buf, size_t buflen)
 	uintptr_t *data;
 
 	if (jsobj_is_undefined(lendsp)) {
-		mdb_snprintf(buf, buflen, "position %d", tokpos);
+		/*
+		 * The token position is an SMI, but it comes in as its raw
+		 * value so we can more easily compare it to values in the line
+		 * endings table.  If we're just printing the position directly,
+		 * we must convert it here.
+		 */
+		mdb_snprintf(buf, buflen, "position %d", V8_SMI_VALUE(tokpos));
 		return (0);
 	}
 
@@ -1891,6 +1897,17 @@ do_jsframe_special(uintptr_t fptr, uintptr_t raddr)
 {
 	uintptr_t ftype;
 	const char *ftypename;
+
+	/*
+	 * First see if this looks like a native frame rather than a JavaScript
+	 * frame.  We check this by asking MDB to print the return address
+	 * symbolically.  If that works, we assume this was NOT a V8 frame,
+	 * since those are never in the symbol table.
+	 */
+	if (mdb_snprintf(NULL, 0, "%A", raddr) > 1) {
+		mdb_printf("%p %a\n", fptr, raddr);
+		return (0);
+	}
 
 	/*
 	 * Figure out what kind of frame this is using the same algorithm as
@@ -2870,7 +2887,7 @@ walk_jsframes_init(mdb_walk_state_t *wsp)
 static int
 walk_jsframes_step(mdb_walk_state_t *wsp)
 {
-	uintptr_t ftype, addr, next;
+	uintptr_t addr, next;
 	int rv;
 
 	addr = wsp->walk_addr;
@@ -2878,15 +2895,6 @@ walk_jsframes_step(mdb_walk_state_t *wsp)
 
 	if (rv != WALK_NEXT)
 		return (rv);
-
-	/*
-	 * Figure out the type of this frame.
-	 */
-	if (mdb_vread(&ftype, sizeof (ftype), addr + V8_OFF_FP_MARKER) == -1)
-		return (WALK_ERR);
-
-	if (V8_IS_SMI(ftype) && V8_SMI_VALUE(ftype) == 0)
-		return (WALK_DONE);
 
 	if (mdb_vread(&next, sizeof (next), addr) == -1)
 		return (WALK_ERR);
@@ -2952,8 +2960,8 @@ static const mdb_walker_t v8_mdb_walkers[] = {
 
 static mdb_modinfo_t v8_mdb = { MDB_API_VERSION, v8_mdb_dcmds, v8_mdb_walkers };
 
-const mdb_modinfo_t *
-_mdb_init(void)
+static void
+configure(void)
 {
 	uintptr_t v8major, v8minor, v8build, v8patch;
 	GElf_Sym sym;
@@ -2967,7 +2975,7 @@ _mdb_init(void)
 	    mdb_readsym(&v8patch, sizeof (v8patch),
 	    "_ZN2v88internal7Version6patch_E") == -1) {
 		mdb_warn("failed to determine V8 version");
-		return (&v8_mdb);
+		return;
 	}
 
 	mdb_printf("V8 version: %d.%d.%d.%d\n", v8major, v8minor, v8build,
@@ -2982,24 +2990,50 @@ _mdb_init(void)
 			mdb_warn("failed to autoconfigure from target\n");
 
 		else
-			mdb_printf("Autoconfigured V8 support from target.\n");
+			mdb_printf("Autoconfigured V8 support from target\n");
 
-		return (&v8_mdb);
+		return;
 	}
 
 	if (v8major == 3 && v8minor == 1 && v8build == 8 &&
 	    autoconfigure(&v8_cfg_04) == 0) {
-		mdb_printf("Configured V8 support based on node v0.4");
-		return (&v8_mdb);
+		mdb_printf("Configured V8 support based on node v0.4\n");
+		return;
 	}
 
 	if (v8major == 3 && v8minor == 6 && v8build == 6 &&
 	    autoconfigure(&v8_cfg_06) == 0) {
-		mdb_printf("Configured V8 support based on node v0.6");
-		return (&v8_mdb);
+		mdb_printf("Configured V8 support based on node v0.6\n");
+		return;
 	}
 
 	mdb_printf("mdb_v8: target has no debug metadata and no existing "
-	    "config found");
+	    "config found\n");
+}
+
+static void
+enable_demangling(void)
+{
+	const char *symname = "_ZN2v88internal7Version6major_E";
+	GElf_Sym sym;
+	char buf[64];
+
+	/*
+	 * Try to determine whether C++ symbol demangling has been enabled.  If
+	 * not, enable it.
+	 */
+	if (mdb_lookup_by_name("_ZN2v88internal7Version6major_E", &sym) != 0)
+		return;
+
+	(void) mdb_snprintf(buf, sizeof (buf), "%a", sym.st_value);
+	if (strstr(buf, symname) != NULL)
+		(void) mdb_eval("$G");
+}
+
+const mdb_modinfo_t *
+_mdb_init(void)
+{
+	configure();
+	enable_demangling();
 	return (&v8_mdb);
 }
