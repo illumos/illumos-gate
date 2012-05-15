@@ -1099,23 +1099,10 @@ mount_one_dev_symlink_cb(void *arg, const char *source, const char *target)
 int
 vplat_get_iptype(zlog_t *zlogp, zone_iptype_t *iptypep)
 {
-	zone_dochandle_t handle;
-
-	if ((handle = zonecfg_init_handle()) == NULL) {
-		zerror(zlogp, B_TRUE, "getting zone configuration handle");
-		return (-1);
-	}
-	if (zonecfg_get_snapshot_handle(zone_name, handle) != Z_OK) {
-		zerror(zlogp, B_FALSE, "invalid configuration");
-		zonecfg_fini_handle(handle);
-		return (-1);
-	}
-	if (zonecfg_get_iptype(handle, iptypep) != Z_OK) {
+	if (zonecfg_get_iptype(snap_hndl, iptypep) != Z_OK) {
 		zerror(zlogp, B_FALSE, "invalid ip-type configuration");
-		zonecfg_fini_handle(handle);
 		return (-1);
 	}
-	zonecfg_fini_handle(handle);
 	return (0);
 }
 
@@ -1128,7 +1115,6 @@ static int
 mount_one_dev(zlog_t *zlogp, char *devpath, zone_mnt_t mount_cmd)
 {
 	char			brand[MAXNAMELEN];
-	zone_dochandle_t	handle = NULL;
 	brand_handle_t		bh = NULL;
 	struct zone_devtab	ztab;
 	di_prof_t		prof = NULL;
@@ -1184,28 +1170,19 @@ mount_one_dev(zlog_t *zlogp, char *devpath, zone_mnt_t mount_cmd)
 	}
 
 	/* Add user-specified devices and directories */
-	if ((handle = zonecfg_init_handle()) == NULL) {
-		zerror(zlogp, B_FALSE, "can't initialize zone handle");
-		goto cleanup;
-	}
-	if (err = zonecfg_get_handle(zone_name, handle)) {
-		zerror(zlogp, B_FALSE, "can't get handle for zone "
-		    "%s: %s", zone_name, zonecfg_strerror(err));
-		goto cleanup;
-	}
-	if (err = zonecfg_setdevent(handle)) {
+	if (err = zonecfg_setdevent(snap_hndl)) {
 		zerror(zlogp, B_FALSE, "%s: %s", zone_name,
 		    zonecfg_strerror(err));
 		goto cleanup;
 	}
-	while (zonecfg_getdevent(handle, &ztab) == Z_OK) {
+	while (zonecfg_getdevent(snap_hndl, &ztab) == Z_OK) {
 		if (di_prof_add_dev(prof, ztab.zone_dev_match)) {
 			zerror(zlogp, B_TRUE, "failed to add "
 			    "user-specified device");
 			goto cleanup;
 		}
 	}
-	(void) zonecfg_enddevent(handle);
+	(void) zonecfg_enddevent(snap_hndl);
 
 	/* Send profile to kernel */
 	if (di_prof_commit(prof)) {
@@ -1218,8 +1195,6 @@ mount_one_dev(zlog_t *zlogp, char *devpath, zone_mnt_t mount_cmd)
 cleanup:
 	if (bh != NULL)
 		brand_close(bh);
-	if (handle != NULL)
-		zonecfg_fini_handle(handle);
 	if (prof)
 		di_prof_fini(prof);
 	return (retval);
@@ -1714,7 +1689,6 @@ mount_filesystems(zlog_t *zlogp, zone_mnt_t mount_cmd)
 	char luroot[MAXPATHLEN];
 	int i, num_fs = 0;
 	struct zone_fstab *fs_ptr = NULL;
-	zone_dochandle_t handle = NULL;
 	zone_state_t zstate;
 	brand_handle_t bh;
 	plat_gmount_cb_data_t cb;
@@ -1738,12 +1712,7 @@ mount_filesystems(zlog_t *zlogp, zone_mnt_t mount_cmd)
 		goto bad;
 	}
 
-	if ((handle = zonecfg_init_handle()) == NULL) {
-		zerror(zlogp, B_TRUE, "getting zone configuration handle");
-		goto bad;
-	}
-	if (zonecfg_get_snapshot_handle(zone_name, handle) != Z_OK ||
-	    zonecfg_setfsent(handle) != Z_OK) {
+	if (zonecfg_setfsent(snap_hndl) != Z_OK) {
 		zerror(zlogp, B_FALSE, "invalid configuration");
 		goto bad;
 	}
@@ -1761,7 +1730,6 @@ mount_filesystems(zlog_t *zlogp, zone_mnt_t mount_cmd)
 	/* Get a handle to the brand info for this zone */
 	if ((bh = brand_open(brand)) == NULL) {
 		zerror(zlogp, B_FALSE, "unable to determine zone brand");
-		zonecfg_fini_handle(handle);
 		return (-1);
 	}
 
@@ -1776,7 +1744,6 @@ mount_filesystems(zlog_t *zlogp, zone_mnt_t mount_cmd)
 	    plat_gmount_cb, &cb) != 0) {
 		zerror(zlogp, B_FALSE, "unable to mount filesystems");
 		brand_close(bh);
-		zonecfg_fini_handle(handle);
 		return (-1);
 	}
 	brand_close(bh);
@@ -1787,12 +1754,9 @@ mount_filesystems(zlog_t *zlogp, zone_mnt_t mount_cmd)
 	 * higher level directories (e.g., /usr) get mounted before
 	 * any beneath them (e.g., /usr/local).
 	 */
-	if (mount_filesystems_fsent(handle, zlogp, &fs_ptr, &num_fs,
+	if (mount_filesystems_fsent(snap_hndl, zlogp, &fs_ptr, &num_fs,
 	    mount_cmd) != 0)
 		goto bad;
-
-	zonecfg_fini_handle(handle);
-	handle = NULL;
 
 	/*
 	 * Normally when we mount a zone all the zone filesystems
@@ -1872,8 +1836,6 @@ mount_filesystems(zlog_t *zlogp, zone_mnt_t mount_cmd)
 	return (0);
 
 bad:
-	if (handle != NULL)
-		zonecfg_fini_handle(handle);
 	free_fs_data(fs_ptr, num_fs);
 	return (-1);
 }
@@ -2442,7 +2404,6 @@ bad:
 static int
 configure_shared_network_interfaces(zlog_t *zlogp)
 {
-	zone_dochandle_t handle;
 	struct zone_nwiftab nwiftab, loopback_iftab;
 	zoneid_t zoneid;
 
@@ -2451,30 +2412,19 @@ configure_shared_network_interfaces(zlog_t *zlogp)
 		return (-1);
 	}
 
-	if ((handle = zonecfg_init_handle()) == NULL) {
-		zerror(zlogp, B_TRUE, "getting zone configuration handle");
-		return (-1);
-	}
-	if (zonecfg_get_snapshot_handle(zone_name, handle) != Z_OK) {
-		zerror(zlogp, B_FALSE, "invalid configuration");
-		zonecfg_fini_handle(handle);
-		return (-1);
-	}
-	if (zonecfg_setnwifent(handle) == Z_OK) {
+	if (zonecfg_setnwifent(snap_hndl) == Z_OK) {
 		for (;;) {
-			if (zonecfg_getnwifent(handle, &nwiftab) != Z_OK)
+			if (zonecfg_getnwifent(snap_hndl, &nwiftab) != Z_OK)
 				break;
 			nwifent_free_attrs(&nwiftab);
 			if (configure_one_interface(zlogp, zoneid, &nwiftab) !=
 			    Z_OK) {
-				(void) zonecfg_endnwifent(handle);
-				zonecfg_fini_handle(handle);
+				(void) zonecfg_endnwifent(snap_hndl);
 				return (-1);
 			}
 		}
-		(void) zonecfg_endnwifent(handle);
+		(void) zonecfg_endnwifent(snap_hndl);
 	}
-	zonecfg_fini_handle(handle);
 	if (is_system_labeled()) {
 		/*
 		 * Labeled zones share the loopback interface
@@ -2928,7 +2878,6 @@ free_ip_interface(zone_addr_list_t *zalist)
 static int
 configure_exclusive_network_interfaces(zlog_t *zlogp, zoneid_t zoneid)
 {
-	zone_dochandle_t handle;
 	struct zone_nwiftab nwiftab;
 	char rootpath[MAXPATHLEN];
 	char path[MAXPATHLEN];
@@ -2937,31 +2886,18 @@ configure_exclusive_network_interfaces(zlog_t *zlogp, zoneid_t zoneid)
 	boolean_t added = B_FALSE;
 	zone_addr_list_t *zalist = NULL, *new;
 
-	if ((handle = zonecfg_init_handle()) == NULL) {
-		zerror(zlogp, B_TRUE, "getting zone configuration handle");
-		return (-1);
-	}
-	if (zonecfg_get_snapshot_handle(zone_name, handle) != Z_OK) {
-		zerror(zlogp, B_FALSE, "invalid configuration");
-		zonecfg_fini_handle(handle);
-		return (-1);
-	}
-
-	if (zonecfg_setnwifent(handle) != Z_OK) {
-		zonecfg_fini_handle(handle);
+	if (zonecfg_setnwifent(snap_hndl) != Z_OK)
 		return (0);
-	}
 
 	for (;;) {
-		if (zonecfg_getnwifent(handle, &nwiftab) != Z_OK)
+		if (zonecfg_getnwifent(snap_hndl, &nwiftab) != Z_OK)
 			break;
 
 		nwifent_free_attrs(&nwiftab);
 		if (prof == NULL) {
 			if (zone_get_devroot(zone_name, rootpath,
 			    sizeof (rootpath)) != Z_OK) {
-				(void) zonecfg_endnwifent(handle);
-				zonecfg_fini_handle(handle);
+				(void) zonecfg_endnwifent(snap_hndl);
 				zerror(zlogp, B_TRUE,
 				    "unable to determine dev root");
 				return (-1);
@@ -2969,8 +2905,7 @@ configure_exclusive_network_interfaces(zlog_t *zlogp, zoneid_t zoneid)
 			(void) snprintf(path, sizeof (path), "%s%s", rootpath,
 			    "/dev");
 			if (di_prof_init(path, &prof) != 0) {
-				(void) zonecfg_endnwifent(handle);
-				zonecfg_fini_handle(handle);
+				(void) zonecfg_endnwifent(snap_hndl);
 				zerror(zlogp, B_TRUE,
 				    "failed to initialize profile");
 				return (-1);
@@ -3005,7 +2940,6 @@ configure_exclusive_network_interfaces(zlog_t *zlogp, zoneid_t zoneid)
 		if (new == NULL) {
 			zerror(zlogp, B_TRUE, "no memory for %s",
 			    nwiftab.zone_nwif_physical);
-			zonecfg_fini_handle(handle);
 			free_ip_interface(zalist);
 		}
 		bzero(new, sizeof (*new));
@@ -3015,16 +2949,14 @@ configure_exclusive_network_interfaces(zlog_t *zlogp, zoneid_t zoneid)
 	}
 	if (zalist != NULL) {
 		if ((errno = add_net(zlogp, zoneid, zalist)) != 0) {
-			(void) zonecfg_endnwifent(handle);
-			zonecfg_fini_handle(handle);
+			(void) zonecfg_endnwifent(snap_hndl);
 			zerror(zlogp, B_TRUE, "failed to add address");
 			free_ip_interface(zalist);
 			return (-1);
 		}
 		free_ip_interface(zalist);
 	}
-	(void) zonecfg_endnwifent(handle);
-	zonecfg_fini_handle(handle);
+	(void) zonecfg_endnwifent(snap_hndl);
 
 	if (prof != NULL && added) {
 		if (di_prof_commit(prof) != 0) {
@@ -3258,26 +3190,14 @@ static int
 get_privset(zlog_t *zlogp, priv_set_t *privs, zone_mnt_t mount_cmd)
 {
 	int error = -1;
-	zone_dochandle_t handle;
 	char *privname = NULL;
-
-	if ((handle = zonecfg_init_handle()) == NULL) {
-		zerror(zlogp, B_TRUE, "getting zone configuration handle");
-		return (-1);
-	}
-	if (zonecfg_get_snapshot_handle(zone_name, handle) != Z_OK) {
-		zerror(zlogp, B_FALSE, "invalid configuration");
-		zonecfg_fini_handle(handle);
-		return (-1);
-	}
 
 	if (ALT_MOUNT(mount_cmd)) {
 		zone_iptype_t	iptype;
 		const char	*curr_iptype;
 
-		if (zonecfg_get_iptype(handle, &iptype) != Z_OK) {
+		if (zonecfg_get_iptype(snap_hndl, &iptype) != Z_OK) {
 			zerror(zlogp, B_TRUE, "unable to determine ip-type");
-			zonecfg_fini_handle(handle);
 			return (-1);
 		}
 
@@ -3290,17 +3210,15 @@ get_privset(zlog_t *zlogp, priv_set_t *privs, zone_mnt_t mount_cmd)
 			break;
 		}
 
-		if (zonecfg_default_privset(privs, curr_iptype) == Z_OK) {
-			zonecfg_fini_handle(handle);
+		if (zonecfg_default_privset(privs, curr_iptype) == Z_OK)
 			return (0);
-		}
+
 		zerror(zlogp, B_FALSE,
 		    "failed to determine the zone's default privilege set");
-		zonecfg_fini_handle(handle);
 		return (-1);
 	}
 
-	switch (zonecfg_get_privset(handle, privs, &privname)) {
+	switch (zonecfg_get_privset(snap_hndl, privs, &privname)) {
 	case Z_OK:
 		error = 0;
 		break;
@@ -3323,7 +3241,6 @@ get_privset(zlog_t *zlogp, priv_set_t *privs, zone_mnt_t mount_cmd)
 	}
 
 	free(privname);
-	zonecfg_fini_handle(handle);
 	return (error);
 }
 
@@ -3336,7 +3253,6 @@ get_rctls(zlog_t *zlogp, char **bufp, size_t *bufsizep)
 	nvlist_t **nvlv = NULL;
 	int rctlcount = 0;
 	int error = -1;
-	zone_dochandle_t handle;
 	struct zone_rctltab rctltab;
 	rctlblk_t *rctlblk = NULL;
 	uint64_t maxlwps;
@@ -3344,16 +3260,6 @@ get_rctls(zlog_t *zlogp, char **bufp, size_t *bufsizep)
 
 	*bufp = NULL;
 	*bufsizep = 0;
-
-	if ((handle = zonecfg_init_handle()) == NULL) {
-		zerror(zlogp, B_TRUE, "getting zone configuration handle");
-		return (-1);
-	}
-	if (zonecfg_get_snapshot_handle(zone_name, handle) != Z_OK) {
-		zerror(zlogp, B_FALSE, "invalid configuration");
-		zonecfg_fini_handle(handle);
-		return (-1);
-	}
 
 	rctltab.zone_rctl_valptr = NULL;
 	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0) {
@@ -3367,18 +3273,18 @@ get_rctls(zlog_t *zlogp, char **bufp, size_t *bufsizep)
 	 * max-processes property.  If only the max-processes property is set,
 	 * we add a max-lwps property with a limit derived from max-processes.
 	 */
-	if (zonecfg_get_aliased_rctl(handle, ALIAS_MAXPROCS, &maxprocs)
+	if (zonecfg_get_aliased_rctl(snap_hndl, ALIAS_MAXPROCS, &maxprocs)
 	    == Z_OK &&
-	    zonecfg_get_aliased_rctl(handle, ALIAS_MAXLWPS, &maxlwps)
+	    zonecfg_get_aliased_rctl(snap_hndl, ALIAS_MAXLWPS, &maxlwps)
 	    == Z_NO_ENTRY) {
-		if (zonecfg_set_aliased_rctl(handle, ALIAS_MAXLWPS,
+		if (zonecfg_set_aliased_rctl(snap_hndl, ALIAS_MAXLWPS,
 		    maxprocs * LWPS_PER_PROCESS) != Z_OK) {
 			zerror(zlogp, B_FALSE, "unable to set max-lwps alias");
 			goto out;
 		}
 	}
 
-	if (zonecfg_setrctlent(handle) != Z_OK) {
+	if (zonecfg_setrctlent(snap_hndl) != Z_OK) {
 		zerror(zlogp, B_FALSE, "%s failed", "zonecfg_setrctlent");
 		goto out;
 	}
@@ -3387,7 +3293,7 @@ get_rctls(zlog_t *zlogp, char **bufp, size_t *bufsizep)
 		zerror(zlogp, B_TRUE, "memory allocation failed");
 		goto out;
 	}
-	while (zonecfg_getrctlent(handle, &rctltab) == Z_OK) {
+	while (zonecfg_getrctlent(snap_hndl, &rctltab) == Z_OK) {
 		struct zone_rctlvaltab *rctlval;
 		uint_t i, count;
 		const char *name = rctltab.zone_rctl_name;
@@ -3469,7 +3375,7 @@ get_rctls(zlog_t *zlogp, char **bufp, size_t *bufsizep)
 		nvlv = NULL;
 		rctlcount++;
 	}
-	(void) zonecfg_endrctlent(handle);
+	(void) zonecfg_endrctlent(snap_hndl);
 
 	if (rctlcount == 0) {
 		error = 0;
@@ -3494,8 +3400,6 @@ out:
 		nvlist_free(nvl);
 	if (nvlv != NULL)
 		free(nvlv);
-	if (handle != NULL)
-		zonecfg_fini_handle(handle);
 	return (error);
 }
 
@@ -3520,7 +3424,6 @@ get_implicit_datasets(zlog_t *zlogp, char **retstr)
 static int
 get_datasets(zlog_t *zlogp, char **bufp, size_t *bufsizep)
 {
-	zone_dochandle_t handle;
 	struct zone_dstab dstab;
 	size_t total, offset, len;
 	int error = -1;
@@ -3531,30 +3434,20 @@ get_datasets(zlog_t *zlogp, char **bufp, size_t *bufsizep)
 	*bufp = NULL;
 	*bufsizep = 0;
 
-	if ((handle = zonecfg_init_handle()) == NULL) {
-		zerror(zlogp, B_TRUE, "getting zone configuration handle");
-		return (-1);
-	}
-	if (zonecfg_get_snapshot_handle(zone_name, handle) != Z_OK) {
-		zerror(zlogp, B_FALSE, "invalid configuration");
-		zonecfg_fini_handle(handle);
-		return (-1);
-	}
-
 	if (get_implicit_datasets(zlogp, &implicit_datasets) != 0) {
 		zerror(zlogp, B_FALSE, "getting implicit datasets failed");
 		goto out;
 	}
 
-	if (zonecfg_setdsent(handle) != Z_OK) {
+	if (zonecfg_setdsent(snap_hndl) != Z_OK) {
 		zerror(zlogp, B_FALSE, "%s failed", "zonecfg_setdsent");
 		goto out;
 	}
 
 	total = 0;
-	while (zonecfg_getdsent(handle, &dstab) == Z_OK)
+	while (zonecfg_getdsent(snap_hndl, &dstab) == Z_OK)
 		total += strlen(dstab.zone_dataset_name) + 1;
-	(void) zonecfg_enddsent(handle);
+	(void) zonecfg_enddsent(snap_hndl);
 
 	if (implicit_datasets != NULL)
 		implicit_len = strlen(implicit_datasets);
@@ -3571,12 +3464,12 @@ get_datasets(zlog_t *zlogp, char **bufp, size_t *bufsizep)
 		goto out;
 	}
 
-	if (zonecfg_setdsent(handle) != Z_OK) {
+	if (zonecfg_setdsent(snap_hndl) != Z_OK) {
 		zerror(zlogp, B_FALSE, "%s failed", "zonecfg_setdsent");
 		goto out;
 	}
 	offset = 0;
-	while (zonecfg_getdsent(handle, &dstab) == Z_OK) {
+	while (zonecfg_getdsent(snap_hndl, &dstab) == Z_OK) {
 		len = strlen(dstab.zone_dataset_name);
 		(void) strlcpy(str + offset, dstab.zone_dataset_name,
 		    total - offset);
@@ -3584,7 +3477,7 @@ get_datasets(zlog_t *zlogp, char **bufp, size_t *bufsizep)
 		if (offset < total - 1)
 			str[offset++] = ',';
 	}
-	(void) zonecfg_enddsent(handle);
+	(void) zonecfg_enddsent(snap_hndl);
 
 	if (implicit_len > 0)
 		(void) strlcpy(str + offset, implicit_datasets, total - offset);
@@ -3596,8 +3489,6 @@ get_datasets(zlog_t *zlogp, char **bufp, size_t *bufsizep)
 out:
 	if (error != 0 && str != NULL)
 		free(str);
-	if (handle != NULL)
-		zonecfg_fini_handle(handle);
 	if (implicit_datasets != NULL)
 		free(implicit_datasets);
 
@@ -3607,40 +3498,26 @@ out:
 static int
 validate_datasets(zlog_t *zlogp)
 {
-	zone_dochandle_t handle;
 	struct zone_dstab dstab;
 	zfs_handle_t *zhp;
 	libzfs_handle_t *hdl;
 
-	if ((handle = zonecfg_init_handle()) == NULL) {
-		zerror(zlogp, B_TRUE, "getting zone configuration handle");
-		return (-1);
-	}
-	if (zonecfg_get_snapshot_handle(zone_name, handle) != Z_OK) {
+	if (zonecfg_setdsent(snap_hndl) != Z_OK) {
 		zerror(zlogp, B_FALSE, "invalid configuration");
-		zonecfg_fini_handle(handle);
-		return (-1);
-	}
-
-	if (zonecfg_setdsent(handle) != Z_OK) {
-		zerror(zlogp, B_FALSE, "invalid configuration");
-		zonecfg_fini_handle(handle);
 		return (-1);
 	}
 
 	if ((hdl = libzfs_init()) == NULL) {
 		zerror(zlogp, B_FALSE, "opening ZFS library");
-		zonecfg_fini_handle(handle);
 		return (-1);
 	}
 
-	while (zonecfg_getdsent(handle, &dstab) == Z_OK) {
+	while (zonecfg_getdsent(snap_hndl, &dstab) == Z_OK) {
 
 		if ((zhp = zfs_open(hdl, dstab.zone_dataset_name,
 		    ZFS_TYPE_FILESYSTEM)) == NULL) {
 			zerror(zlogp, B_FALSE, "cannot open ZFS dataset '%s'",
 			    dstab.zone_dataset_name);
-			zonecfg_fini_handle(handle);
 			libzfs_fini(hdl);
 			return (-1);
 		}
@@ -3655,7 +3532,6 @@ validate_datasets(zlog_t *zlogp)
 			zerror(zlogp, B_FALSE, "cannot set 'zoned' "
 			    "property for ZFS dataset '%s'\n",
 			    dstab.zone_dataset_name);
-			zonecfg_fini_handle(handle);
 			zfs_close(zhp);
 			libzfs_fini(hdl);
 			return (-1);
@@ -3663,9 +3539,8 @@ validate_datasets(zlog_t *zlogp)
 
 		zfs_close(zhp);
 	}
-	(void) zonecfg_enddsent(handle);
+	(void) zonecfg_enddsent(snap_hndl);
 
-	zonecfg_fini_handle(handle);
 	libzfs_fini(hdl);
 
 	return (0);
@@ -4407,29 +4282,17 @@ setup_zone_rm(zlog_t *zlogp, char *zone_name, zoneid_t zoneid)
 	int res;
 	uint64_t tmp;
 	char sched[MAXNAMELEN];
-	zone_dochandle_t handle = NULL;
 	char pool_err[128];
 
-	if ((handle = zonecfg_init_handle()) == NULL) {
-		zerror(zlogp, B_TRUE, "getting zone configuration handle");
-		return (Z_BAD_HANDLE);
-	}
-
-	if ((res = zonecfg_get_snapshot_handle(zone_name, handle)) != Z_OK) {
-		zerror(zlogp, B_FALSE, "invalid configuration");
-		zonecfg_fini_handle(handle);
-		return (res);
-	}
-
 	/* Get the scheduling class set in the zone configuration. */
-	if (zonecfg_get_sched_class(handle, sched, sizeof (sched)) == Z_OK &&
+	if (zonecfg_get_sched_class(snap_hndl, sched, sizeof (sched)) == Z_OK &&
 	    strlen(sched) > 0) {
 		if (zone_setattr(zoneid, ZONE_ATTR_SCHED_CLASS, sched,
 		    strlen(sched)) == -1)
 			zerror(zlogp, B_TRUE, "WARNING: unable to set the "
 			    "default scheduling class");
 
-	} else if (zonecfg_get_aliased_rctl(handle, ALIAS_SHARES, &tmp)
+	} else if (zonecfg_get_aliased_rctl(snap_hndl, ALIAS_SHARES, &tmp)
 	    == Z_OK) {
 		/*
 		 * If the zone has the zone.cpu-shares rctl set then we want to
@@ -4440,7 +4303,7 @@ setup_zone_rm(zlog_t *zlogp, char *zone_name, zoneid_t zoneid)
 		 */
 		char class_name[PC_CLNMSZ];
 
-		if (zonecfg_get_dflt_sched_class(handle, class_name,
+		if (zonecfg_get_dflt_sched_class(snap_hndl, class_name,
 		    sizeof (class_name)) != Z_OK) {
 			zerror(zlogp, B_FALSE, "WARNING: unable to determine "
 			    "the zone's scheduling class");
@@ -4473,7 +4336,7 @@ setup_zone_rm(zlog_t *zlogp, char *zone_name, zoneid_t zoneid)
 	 * right thing in all cases (reuse or create) based on the current
 	 * zonecfg.
 	 */
-	if ((res = zonecfg_bind_tmp_pool(handle, zoneid, pool_err,
+	if ((res = zonecfg_bind_tmp_pool(snap_hndl, zoneid, pool_err,
 	    sizeof (pool_err))) != Z_OK) {
 		if (res == Z_POOL || res == Z_POOL_CREATE || res == Z_POOL_BIND)
 			zerror(zlogp, B_FALSE, "%s: %s\ndedicated-cpu setting "
@@ -4482,14 +4345,13 @@ setup_zone_rm(zlog_t *zlogp, char *zone_name, zoneid_t zoneid)
 		else
 			zerror(zlogp, B_FALSE, "could not bind zone to "
 			    "temporary pool: %s", zonecfg_strerror(res));
-		zonecfg_fini_handle(handle);
 		return (Z_POOL_BIND);
 	}
 
 	/*
 	 * Check if we need to warn about poold not being enabled.
 	 */
-	if (zonecfg_warn_poold(handle)) {
+	if (zonecfg_warn_poold(snap_hndl)) {
 		zerror(zlogp, B_FALSE, "WARNING: A range of dedicated-cpus has "
 		    "been specified\nbut the dynamic pool service is not "
 		    "enabled.\nThe system will not dynamically adjust the\n"
@@ -4499,7 +4361,7 @@ setup_zone_rm(zlog_t *zlogp, char *zone_name, zoneid_t zoneid)
 	}
 
 	/* The following is a warning, not an error. */
-	if ((res = zonecfg_bind_pool(handle, zoneid, pool_err,
+	if ((res = zonecfg_bind_pool(snap_hndl, zoneid, pool_err,
 	    sizeof (pool_err))) != Z_OK) {
 		if (res == Z_POOL_BIND)
 			zerror(zlogp, B_FALSE, "WARNING: unable to bind to "
@@ -4513,10 +4375,9 @@ setup_zone_rm(zlog_t *zlogp, char *zone_name, zoneid_t zoneid)
 	}
 
 	/* Update saved pool name in case it has changed */
-	(void) zonecfg_get_poolname(handle, zone_name, pool_name,
+	(void) zonecfg_get_poolname(snap_hndl, zone_name, pool_name,
 	    sizeof (pool_name));
 
-	zonecfg_fini_handle(handle);
 	return (Z_OK);
 }
 
@@ -4601,28 +4462,17 @@ setup_zone_fs_allowed(zone_dochandle_t handle, zlog_t *zlogp, zoneid_t zoneid)
 }
 
 static int
-setup_zone_attrs(zlog_t *zlogp, char *zone_namep, zoneid_t zoneid)
+setup_zone_attrs(zlog_t *zlogp, zoneid_t zoneid)
 {
-	zone_dochandle_t handle;
 	int res = Z_OK;
 
-	if ((handle = zonecfg_init_handle()) == NULL) {
-		zerror(zlogp, B_TRUE, "getting zone configuration handle");
-		return (Z_BAD_HANDLE);
-	}
-	if ((res = zonecfg_get_snapshot_handle(zone_namep, handle)) != Z_OK) {
-		zerror(zlogp, B_FALSE, "invalid configuration");
-		goto out;
-	}
-
-	if ((res = setup_zone_hostid(handle, zlogp, zoneid)) != Z_OK)
+	if ((res = setup_zone_hostid(snap_hndl, zlogp, zoneid)) != Z_OK)
 		goto out;
 
-	if ((res = setup_zone_fs_allowed(handle, zlogp, zoneid)) != Z_OK)
+	if ((res = setup_zone_fs_allowed(snap_hndl, zlogp, zoneid)) != Z_OK)
 		goto out;
 
 out:
-	zonecfg_fini_handle(handle);
 	return (res);
 }
 
@@ -4820,7 +4670,7 @@ vplat_create(zlog_t *zlogp, zone_mnt_t mount_cmd, zoneid_t zone_did)
 		struct brand_attr attr;
 		char modname[MAXPATHLEN];
 
-		if (setup_zone_attrs(zlogp, zone_name, zoneid) != Z_OK)
+		if (setup_zone_attrs(zlogp, zoneid) != Z_OK)
 			goto error;
 
 		if ((bh = brand_open(brand_name)) == NULL) {
@@ -5250,14 +5100,9 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting,
 
 		if (rebooting) {
 			struct zone_psettab pset_tab;
-			zone_dochandle_t handle;
 
-			if ((handle = zonecfg_init_handle()) != NULL &&
-			    zonecfg_get_handle(zone_name, handle) == Z_OK &&
-			    zonecfg_lookup_pset(handle, &pset_tab) == Z_OK)
+			if (zonecfg_lookup_pset(snap_hndl, &pset_tab) == Z_OK)
 				destroy_tmp_pool = B_FALSE;
-
-			zonecfg_fini_handle(handle);
 		}
 
 		if (destroy_tmp_pool) {

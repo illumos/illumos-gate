@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, Joyent Inc. All rights reserved.
+ * Copyright (c) 2012, Joyent Inc. All rights reserved.
  */
 
 #ifndef	_ZONEADMD_H
@@ -86,6 +86,7 @@ extern mutex_t msglock;
 extern boolean_t in_death_throes;
 extern boolean_t bringup_failure_recovery;
 extern char *zone_name;
+extern zone_dochandle_t snap_hndl;
 extern char pool_name[MAXNAMELEN];
 extern char brand_name[MAXNAMELEN];
 extern char default_brand[MAXNAMELEN];
