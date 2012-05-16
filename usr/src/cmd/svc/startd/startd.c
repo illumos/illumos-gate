@@ -158,6 +158,18 @@ _umem_logging_init(void)
 }
 #endif
 
+const char *
+_umem_options_init(void)
+{
+	/*
+	 * To reduce our memory footprint, we set our UMEM_OPTIONS to indicate
+	 * that we do not wish to have per-CPU magazines -- if svc.startd is so
+	 * hot on CPU such that this becomes a scalability problem, there are
+	 * likely deeper things amiss...
+	 */
+	return ("nomagazines");		/* UMEM_OPTIONS setting */
+}
+
 /*
  * startd_alloc_retry()
  *   Wrapper for allocation functions.  Retries with a decaying time
