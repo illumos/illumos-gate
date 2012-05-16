@@ -1483,6 +1483,8 @@ f lib/svc/manifest/network/shares/reparsed.xml 0444 root sys
 f lib/svc/manifest/network/shell.xml 0444 root sys
 f lib/svc/manifest/network/slp.xml 0444 root sys
 d lib/svc/manifest/network/smb 0755 root sys
+f lib/svc/manifest/network/smb/client.xml 0444 root sys
+f lib/svc/manifest/network/smb/server.xml 0444 root sys
 f lib/svc/manifest/network/ssh.xml 0444 root sys
 f lib/svc/manifest/network/time.xml 0444 root sys
 f lib/svc/manifest/network/vrrp.xml 0444 root sys
@@ -2255,6 +2257,7 @@ s usr/bin/sh=ksh93
 f usr/bin/shcomp 0555 root bin
 f usr/bin/size 0555 root bin
 h usr/bin/sleep=usr/bin/alias
+f usr/bin/smbutil 0555 root bin
 f usr/bin/soelim 0555 root bin
 h usr/bin/sort=usr/lib/isaexec
 f usr/bin/sortbib 0555 root bin
@@ -4548,8 +4551,10 @@ d usr/kernel/fs 0755 root sys
 d usr/kernel/fs/amd64 0755 root sys
 f usr/kernel/fs/amd64/fdfs 0755 root sys
 f usr/kernel/fs/amd64/pcfs 0755 root sys
+f usr/kernel/fs/amd64/smbfs 0755 root sys
 d usr/kernel/kmdb 0755 root sys
 d usr/kernel/kmdb/amd64 0755 root sys
+f usr/kernel/kmdb/amd64/smbfs 0555 root sys
 f usr/kernel/kmdb/amd64/smbsrv 0555 root sys
 d usr/kernel/sched 0755 root sys
 d usr/kernel/sched/amd64 0755 root sys
@@ -5380,6 +5385,21 @@ d usr/lib/fs/proc 0755 root sys
 f usr/lib/fs/proc/mount 0555 root bin
 d usr/lib/fs/sharefs 0755 root sys
 f usr/lib/fs/sharefs/mount 0555 root bin
+d usr/lib/fs/smb 0755 root sys
+d usr/lib/fs/smb/amd64 0755 root sys
+f usr/lib/fs/smb/amd64/libshare_smb.so.1 0755 root sys
+f usr/lib/fs/smb/libshare_smb.so.1 0755 root sys
+d usr/lib/fs/smbfs 0755 root sys
+d usr/lib/fs/smbfs/amd64 0755 root sys
+f usr/lib/fs/smbfs/amd64/libshare_smbfs.so.1 0755 root sys
+s usr/lib/fs/smbfs/amd64/libshare_smbfs.so=libshare_smbfs.so.1
+f usr/lib/fs/smbfs/dfshares 0555 root bin
+f usr/lib/fs/smbfs/libshare_smbfs.so.1 0755 root sys
+s usr/lib/fs/smbfs/libshare_smbfs.so=libshare_smbfs.so.1
+f usr/lib/fs/smbfs/mount 0555 root bin
+f usr/lib/fs/smbfs/share 0555 root bin
+f usr/lib/fs/smbfs/umount 0555 root bin
+f usr/lib/fs/smbfs/unshare 0555 root bin
 d usr/lib/fs/tmpfs 0755 root sys
 f usr/lib/fs/tmpfs/mount 0555 root bin
 d usr/lib/fs/ufs 0755 root sys
@@ -9842,6 +9862,7 @@ f usr/lib/smbsrv/libsmbns.so.1 0755 root bin
 s usr/lib/smbsrv/libsmbns.so=libsmbns.so.1
 f usr/lib/smbsrv/libsqlite.so.1 0755 root bin
 s usr/lib/smbsrv/libsqlite.so=libsqlite.so.1
+f usr/lib/smbsrv/smbd 0755 root bin
 d usr/lib/smedia 0755 root bin
 d usr/lib/smedia/amd64 0755 root bin
 f usr/lib/smedia/amd64/sm_blkdev.so.1 0555 root bin
@@ -10387,7 +10408,9 @@ f usr/sbin/sharectl 0555 root bin
 f usr/sbin/sharemgr 0555 root bin
 s usr/sbin/showmount=../lib/fs/nfs/showmount
 f usr/sbin/shutdown 0755 root sys
+f usr/sbin/smbadm 0555 root bin
 f usr/sbin/smbios 0555 root bin
+f usr/sbin/smbstat 0555 root bin
 f usr/sbin/snoop 0555 root bin
 f usr/sbin/sppptun 0555 root bin
 f usr/sbin/spray 0555 root bin
@@ -11592,6 +11615,7 @@ f usr/share/man/man1/sftp.1 0444 root bin
 s usr/share/man/man1/sh.1=ksh93.1
 f usr/share/man/man1/shcomp.1 0444 root bin
 f usr/share/man/man1/sleep.1 0444 root bin
+f usr/share/man/man1/smbutil.1 0444 root bin
 f usr/share/man/man1/soelim.1 0444 root bin
 f usr/share/man/man1/sort.1 0444 root bin
 f usr/share/man/man1/sortbib.1 0444 root bin
@@ -11898,7 +11922,9 @@ f usr/share/man/man1m/sharemgr.1m 0444 root bin
 f usr/share/man/man1m/share_nfs.1m 0444 root bin
 f usr/share/man/man1m/showmount.1m 0444 root bin
 f usr/share/man/man1m/shutdown.1m 0444 root bin
+f usr/share/man/man1m/smbadm.1m 0444 root bin
 f usr/share/man/man1m/smbios.1m 0444 root bin
+f usr/share/man/man1m/smbstat.1m 0444 root bin
 f usr/share/man/man1m/snoop.1m 0444 root bin
 f usr/share/man/man1m/soconfig.1m 0444 root bin
 f usr/share/man/man1m/spray.1m 0444 root bin
