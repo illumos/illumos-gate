@@ -1275,7 +1275,9 @@ static int
 hyprlofs_seek(vnode_t *vp, offset_t ooff, offset_t *noffp,
     caller_context_t *ct)
 {
-	ASSERT(VTOHLN(vp)->hln_looped == 1);
+	if (VTOHLN(vp)->hln_looped == 0)
+		return ((*noffp < 0 || *noffp > MAXOFFSET_T) ? EINVAL : 0);
+
 	return (VOP_SEEK(REALVP(vp), ooff, noffp, ct));
 }
 
