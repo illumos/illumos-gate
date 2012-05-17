@@ -950,7 +950,7 @@ set_valid(HV *self, void *arg)
 
 	mg = mg_find((SV *)self, '~');
 	PERL_ASSERTMSG(mg != 0, "set_valid: lost ~ magic");
-	((KstatInfo_t *)SvPVX(mg->mg_obj))->valid = (int)arg;
+	((KstatInfo_t *)SvPVX(mg->mg_obj))->valid = (int)(intptr_t)arg;
 	return (1);
 }
 

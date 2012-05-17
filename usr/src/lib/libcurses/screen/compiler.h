@@ -40,8 +40,6 @@
 #ifndef	_COMPILER_H
 #define	_COMPILER_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *			COPYRIGHT NOTICE
  *
@@ -131,11 +129,12 @@ EXTERN int	debug_level;	/* level of debugging output */
 	 *
 	 */
 
-#define	BOOLEAN 0	/* Boolean capability */
-#define	NUMBER 1	/* Numeric capability */
-#define	STRING 2	/* String-valued capability */
-#define	CANCEL 3	/* Capability to be cancelled in following tc's */
-#define	NAMES  4	/* The names for a terminal type */
+#define	BOOLEAN	0	/* Boolean capability */
+#define	NUMBER	1	/* Numeric capability */
+#define	STRING	2	/* String-valued capability */
+#define	CANCEL	3	/* Capability to be cancelled in following tc's */
+#define	NAMES	4	/* The names for a terminal type */
+#define	UNDEF	5	/* Invalid token type */
 
 #define	MAXBOOLS 64	/* Maximum # of boolean caps we can handle */
 #define	MAXNUMS	64	/* Maximum # of numeric caps we can handle */

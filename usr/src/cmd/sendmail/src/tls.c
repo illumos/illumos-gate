@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2000-2006, 2008, 2009 Sendmail, Inc. and its suppliers.
  *	All rights reserved.
+ * Copyright (c) 2012, OmniTI Computer Consulting, Inc. All rights reserved.
  *
  * By using this file, you agree to the terms and conditions set
  * forth in the LICENSE file which can be found at the top level of
@@ -1168,7 +1169,7 @@ tls_get_info(ssl, srv, host, mac, certreq)
 	MACROS_T *mac;
 	bool certreq;
 {
-	SSL_CIPHER *c;
+	const SSL_CIPHER *c;
 	int b, r;
 	long verifyok;
 	char *s, *who;

@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Joyent, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -2521,6 +2522,9 @@ ex(struct event *e)
 	} else {
 		r = audit_cron_session(e->u->name, CRONDIR,
 		    e->u->uid, e->u->gid, NULL);
+		if (r != 0)
+			r = audit_cron_session(e->u->name, SYSCRONDIR,
+			    e->u->uid, e->u->gid, NULL);
 	}
 	if (r != 0) {
 		msg("cron audit problem. job failed (%s) for user %s",

@@ -22,6 +22,9 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ */
 
 /*
  * System includes
@@ -167,6 +170,8 @@ int
 be_unmount(nvlist_t *be_attrs)
 {
 	char		*be_name = NULL;
+	char		*be_name_mnt = NULL;
+	char		*ds = NULL;
 	uint16_t	flags = 0;
 	int		ret = BE_SUCCESS;
 
@@ -180,6 +185,20 @@ be_unmount(nvlist_t *be_attrs)
 		be_print_err(gettext("be_unmount: failed to lookup "
 		    "BE_ATTR_ORIG_BE_NAME attribute\n"));
 		return (BE_ERR_INVAL);
+	}
+
+	/* Check if we have mountpoint argument instead of BE name */
+	if (be_name[0] == '/') {
+		if ((ds = be_get_ds_from_dir(be_name)) != NULL) {
+			if ((be_name_mnt = strrchr(ds, '/')) != NULL) {
+				free(be_name);
+				be_name = be_name_mnt + 1;
+			}
+		} else {
+			be_print_err(gettext("be_unmount: no datasets mounted "
+			    "at '%s'\n"), be_name);
+			return (BE_ERR_INVAL);
+		}
 	}
 
 	/* Validate original BE name */
@@ -449,7 +468,7 @@ _be_unmount(char *be_name, int flags)
 		}
 
 		ZFS_CLOSE(zhp);
-		return (BE_SUCCESS);
+		return (BE_ERR_NOTMOUNTED);
 	}
 
 	/*

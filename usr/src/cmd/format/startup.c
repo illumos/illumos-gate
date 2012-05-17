@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ *
  * Copyright (c) 2011 Gary Mills
  *
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
@@ -2962,22 +2964,24 @@ char *arglist[];
  * one of the conventional whole disk name.
  */
 static int
-name_represents_wholedisk(name)
-char	*name;
+name_represents_wholedisk(char	*name)
 {
 	char	symname[MAXPATHLEN];
 	char	localname[MAXPATHLEN];
 	char	*nameptr;
+	ssize_t symname_size;
 
+	if (strlcpy(localname, name, MAXPATHLEN) >= MAXPATHLEN)
+		return (1); /* buffer overflow, reject this name */
 
-	(void) memset(symname, 0, MAXPATHLEN);
-	(void) memset(localname, 0, MAXPATHLEN);
-	(void) strcpy(localname, name);
-
-	while (readlink(localname, symname, MAXPATHLEN) != -1) {
+	while ((symname_size = readlink(
+	    localname, symname, MAXPATHLEN - 1)) != -1) {
+		symname[symname_size] = '\0';
 		nameptr = symname;
-		if (strncmp(symname, DISK_PREFIX, strlen(DISK_PREFIX)) == 0)
-			nameptr += strlen(DISK_PREFIX);
+		if (strncmp(symname, DISK_PREFIX,
+		    (sizeof (DISK_PREFIX) - 1)) == 0)
+			nameptr += (sizeof (DISK_PREFIX) - 1);
+
 		if (conventional_name(nameptr)) {
 			if (whole_disk_name(nameptr))
 				return (0);
@@ -2985,7 +2989,6 @@ char	*name;
 				return (1);
 		}
 		(void) strcpy(localname, symname);
-		(void) memset(symname, 0, MAXPATHLEN);
 	}
 	return (0);
 }

@@ -21,6 +21,7 @@
 #
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012, Joyent, Inc. All rights reserved.
 #
 # This daemon stores address object to logical interface number mappings
 # (among other things) and reads/writes from/to ipmgmtd data store.
@@ -38,14 +39,16 @@ fi
 # When the non-global shared-IP stack zone boots, it tries to bring up this
 # service as well. If we don't start a background process and simply exit the
 # service, the service will go into maintenance mode and so will all it's
-# dependents.
+# dependents.  Ideally we would simply exit with SMF_EXIT_NODAEMON, but since
+# this method is also used in an S10C zone, where support for SMF_EXIT_NODAEMON
+# does not exist, we have to stick around.
 #
 # In S10C zone (where this script is also used) smf_isnonglobalzone
 # function is unavailable in smf_include.sh
 #
 if [ `/sbin/zonename` != global ]; then
 	if [ `/sbin/zonename -t` = shared ]; then
-		(while true ; do sleep 3600 ; done) & 
+		(while true ; do sleep 3600 ; done) &
 		exit $SMF_EXIT_OK
 	fi
 fi

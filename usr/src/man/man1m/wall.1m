@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright (c) 2012 Joyent, Inc.  All Rights Reserved.
 .\" Copyright (c) 2000 Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
@@ -10,7 +11,7 @@ wall \- write to all users
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/wall\fR [\fB-a\fR] [\fB-g\fR \fIgrpname\fR] [\fIfilename\fR]
+\fB/usr/sbin/wall\fR [\fB-a\fR] [\fB-g\fR \fIgrpname\fR] [\fB-z\fR \fIzonename\fR] [\fB-Z\fR] [\fIfilename\fR]
 .fi
 
 .SH DESCRIPTION
@@ -31,7 +32,9 @@ If \fIfilename\fR is given, then the message is read in from that file.
 Normally, pseudo-terminals that do not correspond to rlogin sessions are
 ignored. Thus, when using a window system, the message appears only on the
 console window. However, \fB-a\fR will send the message even to such
-pseudo-terminals.
+pseudo-terminals. Normally, \fBwall\fR sends messages to the current zone
+only, from the global zone \fB-Z\fR will send messages to all nonglobal zones,
+and \fB-z\fR will send messages to a specified nonglobal zone
 .sp
 .LP
 It is used to warn all users, typically prior to shutting down the system.
@@ -71,6 +74,25 @@ Broadcast message to the console and pseudo-terminals.
 .RS 14n
 Broadcast to the users in a specified group only, per the group database (see
 \fBgroup\fR(4)).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-\fR\fBz\fR \fIzonename\fR\fR
+.ad
+.RS 14n
+Broadcast to the users in a specified zone only
+.RE
+
+
+.sp
+.ne 2
+.na
+\fB\fB-Z\fR\fR
+.ad
+.RS 14n
+Broadcast message to the console and pseudo-terminals of all zones.
 .RE
 
 .SH ENVIRONMENT VARIABLES

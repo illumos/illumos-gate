@@ -37,7 +37,7 @@ ___floatundidf(u_longlong_t a)
 	union uu aa;
 	double d;
 
-	aa.q = a;
+	aa.uq = a;
 	d = aa.ul[H];
 	d *= (1 << HALF_BITS);
 	d *= (1 << HALF_BITS);

@@ -133,8 +133,8 @@ usage(void)
 	    "\tbeadm destroy [-F] beName@snapshot \n"
 	    "\tbeadm list [[-a] | [-d] [-s]] [-H] [beName]\n"
 	    "\tbeadm mount [-s ro|rw] beName [mountpoint]\n"
-	    "\tbeadm unmount [-f] beName\n"
-	    "\tbeadm umount [-f] beName\n"
+	    "\tbeadm unmount [-f] beName | mountpoint\n"
+	    "\tbeadm umount [-f] beName | mountpoint\n"
 	    "\tbeadm rename origBeName newBeName\n"
 	    "\tbeadm rollback beName snapshot\n"
 	    "\tbeadm rollback beName@snapshot\n"));

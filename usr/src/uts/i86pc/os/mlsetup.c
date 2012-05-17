@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2012 Gary Mills
+ *
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 by Delphix. All rights reserved.
  */
@@ -110,7 +112,6 @@ mlsetup(struct regs *rp)
 	extern disp_t cpu0_disp;
 	extern char t0stack[];
 	extern int post_fastreboot;
-	extern int console;
 	extern uint64_t plat_dr_options;
 
 	ASSERT_STACK_ALIGNED();
@@ -348,7 +349,7 @@ mlsetup(struct regs *rp)
 	 * Explicitly set console to text mode (0x3) if this is a boot
 	 * post Fast Reboot, and the console is set to CONS_SCREEN_TEXT.
 	 */
-	if (post_fastreboot && console == CONS_SCREEN_TEXT)
+	if (post_fastreboot && boot_console_type(NULL) == CONS_SCREEN_TEXT)
 		set_console_mode(0x3);
 
 	/*

@@ -35,10 +35,10 @@
 
 #include <signal.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <grp.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 #include <sys/stat.h>
@@ -76,7 +76,6 @@
 static char	mesg[3000];
 static char	*infile;
 static int	gflag;
-static int	aflag;
 static struct	group *pgrp;
 static char	*grpname;
 static char	line[MAXNAMLEN+1] = "???";
@@ -88,12 +87,12 @@ static char	time_buf[50];
 #define	DATE_FMT	"%a %b %e %H:%M:%S"
 
 static void sendmes(struct utmpx *, zoneid_t);
-static void sendmes_tozone(zoneid_t);
+static void sendmes_tozone(zoneid_t, int);
 static int chkgrp(char *);
 static char *copy_str_till(char *, char *, char, int);
 
 static int init_template(void);
-static int contract_abandon_id(ctid_t);
+int contract_abandon_id(ctid_t);
 
 int
 main(int argc, char *argv[])
@@ -103,6 +102,7 @@ main(int argc, char *argv[])
 	struct	passwd *pwd;
 	char	*term_name;
 	int	c;
+	int	aflag = 0;
 	int	errflg = 0;
 	int zflg = 0;
 	int Zflg = 0;
@@ -110,8 +110,6 @@ main(int argc, char *argv[])
 	char *zonename = NULL;
 	zoneid_t *zoneidlist = NULL;
 	uint_t nzids_saved, nzids = 0;
-
-	aflag = 0;
 
 	(void) setlocale(LC_ALL, "");
 
@@ -124,12 +122,12 @@ main(int argc, char *argv[])
 			if (gflag) {
 				(void) fprintf(stderr,
 				    "Only one group allowed\n");
-				exit(1);
+				return (1);
 			}
 			if ((pgrp = getgrnam(grpname = optarg)) == NULL) {
 				(void) fprintf(stderr, "Unknown group %s\n",
 				    grpname);
-				exit(1);
+				return (1);
 			}
 			gflag++;
 			break;
@@ -139,7 +137,7 @@ main(int argc, char *argv[])
 			if (getzoneidbyname(zonename) == -1) {
 				(void) fprintf(stderr, "Specified zone %s "
 				    "is invalid", zonename);
-				exit(1);
+				return (1);
 			}
 			break;
 		case 'Z':
@@ -156,13 +154,18 @@ main(int argc, char *argv[])
 		return (1);
 	}
 
+	if (zflg && Zflg) {
+		(void) fprintf(stderr, "Cannot use -z with -Z\n");
+		return (1);
+	}
+
 	if (optind < argc)
 		infile = argv[optind];
 
 	if (uname(&utsn) == -1) {
 		(void) fprintf(stderr, "wall: uname() failed, %s\n",
 		    strerror(errno));
-		exit(2);
+		return (2);
 	}
 	(void) strcpy(systm, utsn.nodename);
 
@@ -187,7 +190,7 @@ main(int argc, char *argv[])
 		f = fopen(infile, "r");
 		if (f == NULL) {
 			(void) fprintf(stderr, "Cannot open %s\n", infile);
-			exit(1);
+			return (1);
 		}
 	}
 
@@ -235,24 +238,20 @@ main(int argc, char *argv[])
 
 	if (zflg != 0) {
 		if ((zoneidlist =
-		    (zoneid_t *)malloc(sizeof (zoneid_t))) == NULL ||
+		    malloc(sizeof (zoneid_t))) == NULL ||
 		    (*zoneidlist = getzoneidbyname(zonename)) == -1)
-			exit(errno);
+			return (errno);
 		nzids = 1;
-	}
-	if (Zflg != 0) {
-		if (zflg != 0 && zoneidlist != NULL) {
-			free(zoneidlist);
-		}
+	} else if (Zflg != 0) {
 		if (zone_list(NULL, &nzids) != 0)
-			exit(errno);
+			return (errno);
 again:
 		nzids *= 2;
 		if ((zoneidlist = malloc(nzids * sizeof (zoneid_t))) == NULL)
 			exit(errno);
 		nzids_saved = nzids;
 		if (zone_list(zoneidlist, &nzids) != 0) {
-			free(zoneidlist);
+			(void) free(zoneidlist);
 			return (errno);
 		}
 		if (nzids > nzids_saved) {
@@ -262,10 +261,10 @@ again:
 	}
 	if (zflg || Zflg) {
 		for (; nzids > 0; --nzids)
-			sendmes_tozone(zoneidlist[nzids-1]);
+			sendmes_tozone(zoneidlist[nzids-1], aflag);
 		free(zoneidlist);
 	} else
-		sendmes_tozone(getzoneid());
+		sendmes_tozone(getzoneid(), aflag);
 
 	return (0);
 }
@@ -296,20 +295,22 @@ copy_str_till(char *dst, char *src, char delim, int len)
 }
 
 static void
-sendmes_tozone(zoneid_t zid) {
+sendmes_tozone(zoneid_t zid, int aflag) {
 	int i = 0;
 	char zonename[ZONENAME_MAX], root[MAXPATHLEN];
 	struct utmpx *p;
 
 	if (zid != getzoneid()) {
 		root[0] = '\0';
-		getzonenamebyid(zid, zonename, ZONENAME_MAX);
+		(void) getzonenamebyid(zid, zonename, ZONENAME_MAX);
 		(void) zone_get_rootpath(zonename, root, sizeof (root));
 		(void) strlcat(root, UTMPX_FILE, sizeof (root));
 		if (!utmpxname(root)) {
 			(void) fprintf(stderr, "Cannot open %s\n", root);
 			return;
 		}
+	} else {
+		(void) utmpxname(UTMPX_FILE);
 	}
 	setutxent();
 	while ((p = getutxent()) != NULL) {
@@ -472,7 +473,8 @@ chkgrp(char *name)
 	char *p;
 
 	for (i = 0; pgrp->gr_mem[i] && pgrp->gr_mem[i][0]; i++) {
-		for (p = name; *p && *p != ' '; p++);
+		for (p = name; *p && *p != ' '; p++)
+		;
 		*p = 0;
 		if (strncmp(name, pgrp->gr_mem[i], 8) == 0)
 			return (1);

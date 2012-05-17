@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 #ifndef	_LIBSCF_H
@@ -831,8 +832,13 @@ int smf_notify_del_params(const char *, const char *, int32_t);
 
 /*
  * SMF exit status definitions
+ *
+ * The SMF_EXIT_NODAEMON exit status should be used when a method does not
+ * need to run any persistent process. This indicates success, abandons the
+ * contract, and allows dependencies to be met.
  */
 #define	SMF_EXIT_OK		  0
+#define	SMF_EXIT_NODAEMON	 94
 #define	SMF_EXIT_ERR_FATAL	 95
 #define	SMF_EXIT_ERR_CONFIG	 96
 #define	SMF_EXIT_MON_DEGRADE	 97

@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2012 Gary Mills
+ *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -36,8 +38,8 @@ extern "C" {
 
 #define	CONS_INVALID		-1
 #define	CONS_SCREEN_TEXT	0
-#define	CONS_TTYA		1
-#define	CONS_TTYB		2
+#define	CONS_TTY		1
+#define	CONS_XXX		2	/* Unused */
 #define	CONS_USBSER		3
 #define	CONS_HYPERVISOR		4
 #define	CONS_SCREEN_GRAPHICS	5
@@ -51,6 +53,8 @@ extern void kb_init(void);
 extern int kb_getchar(void);
 extern int kb_ischar(void);
 
+extern int boot_console_type(int *);
+
 extern void bcons_init(char *);
 extern void bcons_putchar(int);
 extern int bcons_getchar(void);
@@ -62,8 +66,6 @@ extern void bcons_init2(char *, char *, char *);
 extern boolean_t bcons_hypervisor_redirect(void);
 extern void bcons_device_change(int);
 #endif /* !_BOOT */
-
-extern int console;
 
 #ifdef __cplusplus
 }

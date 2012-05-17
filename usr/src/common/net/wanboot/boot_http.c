@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
 #include <errno.h>
@@ -1767,7 +1768,11 @@ password_cb(char *buf, int buflen, int rwflag, void *userdata)
 static SSL_CTX *
 initialize_ctx(http_conn_t *c_id)
 {
+#if OPENSSL_VERSION_NUMBER < 0x10000000L
 	SSL_METHOD	*meth;
+#else
+	const SSL_METHOD	*meth;
+#endif
 	SSL_CTX		*ctx;
 
 	ERR_clear_error();

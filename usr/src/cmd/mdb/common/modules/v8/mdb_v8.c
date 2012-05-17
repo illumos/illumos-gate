@@ -126,6 +126,9 @@ static intptr_t	V8_PROP_TYPE_FIELD;
 static intptr_t	V8_PROP_FIRST_PHANTOM;
 static intptr_t	V8_PROP_TYPE_MASK;
 
+static intptr_t V8_TYPE_JSOBJECT = -1;
+static intptr_t V8_TYPE_FIXEDARRAY = -1;
+
 /*
  * Although we have this information in v8_classes, the following offsets are
  * defined explicitly because they're used directly in code below.
@@ -261,6 +264,7 @@ static int conf_update_type(v8_cfg_t *, const char *);
 static int conf_update_frametype(v8_cfg_t *, const char *);
 static void conf_class_compute_offsets(v8_class_t *);
 
+static int read_typebyte(uint8_t *, uintptr_t);
 static int heap_offset(const char *, const char *, ssize_t *);
 
 /*
@@ -271,6 +275,7 @@ static int
 autoconfigure(v8_cfg_t *cfgp)
 {
 	v8_class_t *clp;
+	v8_enum_t *ep;
 	struct v8_constant *cnp;
 	int ii;
 
@@ -307,6 +312,23 @@ autoconfigure(v8_cfg_t *cfgp)
 			mdb_warn("failed to read \"%s\"", cnp->v8c_symbol);
 			return (-1);
 		}
+	}
+
+	/*
+	 * Load type values for well-known classes that we use a lot.
+	 */
+	for (ep = v8_types; ep->v8e_name[0] != '\0'; ep++) {
+		if (strcmp(ep->v8e_name, "JSObject") == 0)
+			V8_TYPE_JSOBJECT = ep->v8e_value;
+
+		if (strcmp(ep->v8e_name, "FixedArray") == 0)
+			V8_TYPE_FIXEDARRAY = ep->v8e_value;
+	}
+
+	if (V8_TYPE_JSOBJECT == -1 || V8_TYPE_FIXEDARRAY == -1) {
+		mdb_warn("couldn't find %s type\n",
+		    V8_TYPE_JSOBJECT == -1 ? "JSObject" : "FixedArray");
+		return (-1);
 	}
 
 	/*
@@ -780,7 +802,17 @@ read_heap_double(double *valp, uintptr_t addr, ssize_t off)
 static int
 read_heap_array(uintptr_t addr, uintptr_t **retp, size_t *lenp, int flags)
 {
+	uint8_t type;
 	uintptr_t len;
+
+	if (!V8_IS_HEAPOBJECT(addr))
+		return (-1);
+
+	if (read_typebyte(&type, addr) != 0)
+		return (-1);
+
+	if (type != V8_TYPE_FIXEDARRAY)
+		return (-1);
 
 	if (read_heap_smi(&len, addr, V8_OFF_FIXEDARRAY_LENGTH) != 0)
 		return (-1);
@@ -1212,7 +1244,7 @@ jsobj_properties(uintptr_t addr,
 	if (read_typebyte(&type, ptr) != 0)
 		return (-1);
 
-	if (strcmp(enum_lookup_str(v8_types, type, ""), "FixedArray") != 0)
+	if (type != V8_TYPE_FIXEDARRAY)
 		return (func(NULL, 0, arg));
 
 	if (read_heap_array(ptr, &props, &nprops, UM_SLEEP) != 0)
@@ -1337,7 +1369,13 @@ jsfunc_lineno(uintptr_t lendsp, uintptr_t tokpos, char *buf, size_t buflen)
 	uintptr_t *data;
 
 	if (jsobj_is_undefined(lendsp)) {
-		mdb_snprintf(buf, buflen, "position %d", tokpos);
+		/*
+		 * The token position is an SMI, but it comes in as its raw
+		 * value so we can more easily compare it to values in the line
+		 * endings table.  If we're just printing the position directly,
+		 * we must convert it here.
+		 */
+		mdb_snprintf(buf, buflen, "position %d", V8_SMI_VALUE(tokpos));
 		return (0);
 	}
 
@@ -1893,6 +1931,17 @@ do_jsframe_special(uintptr_t fptr, uintptr_t raddr)
 	const char *ftypename;
 
 	/*
+	 * First see if this looks like a native frame rather than a JavaScript
+	 * frame.  We check this by asking MDB to print the return address
+	 * symbolically.  If that works, we assume this was NOT a V8 frame,
+	 * since those are never in the symbol table.
+	 */
+	if (mdb_snprintf(NULL, 0, "%A", raddr) > 1) {
+		mdb_printf("%p %a\n", fptr, raddr);
+		return (0);
+	}
+
+	/*
 	 * Figure out what kind of frame this is using the same algorithm as
 	 * V8's ComputeType function.  First, look for an ArgumentsAdaptorFrame.
 	 */
@@ -2185,22 +2234,8 @@ findjsobjects_range(findjsobjects_state_t *fjs, uintptr_t addr, uintptr_t size)
 	uintptr_t limit;
 	findjsobjects_stats_t *stats = &fjs->fjs_stats;
 	uint8_t type;
-	int jsobject = -1, fixedarray = -1;
-	v8_enum_t *ep;
+	int jsobject = V8_TYPE_JSOBJECT;
 
-	for (ep = v8_types; ep->v8e_name[0] != '\0'; ep++) {
-		if (strcmp(ep->v8e_name, "JSObject") == 0)
-			jsobject = ep->v8e_value;
-
-		if (strcmp(ep->v8e_name, "FixedArray") == 0)
-			fixedarray = ep->v8e_value;
-	}
-
-	if (jsobject == -1 || fixedarray == -1) {
-		v8_warn("couldn't find %s type\n",
-		    jsobject == -1 ? "JSObject" : "FixedArray");
-		return (-1);
-	}
 
 	for (limit = addr + size; addr < limit; addr++) {
 		findjsobjects_instance_t *inst;
@@ -2732,7 +2767,7 @@ dcmd_v8array(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (read_typebyte(&type, addr) != 0)
 		return (DCMD_ERR);
 
-	if (strcmp(enum_lookup_str(v8_types, type, ""), "FixedArray") != 0) {
+	if (type != V8_TYPE_FIXEDARRAY) {
 		mdb_warn("%p is not an instance of FixedArray\n", addr);
 		return (DCMD_ERR);
 	}
@@ -2870,7 +2905,7 @@ walk_jsframes_init(mdb_walk_state_t *wsp)
 static int
 walk_jsframes_step(mdb_walk_state_t *wsp)
 {
-	uintptr_t ftype, addr, next;
+	uintptr_t addr, next;
 	int rv;
 
 	addr = wsp->walk_addr;
@@ -2878,15 +2913,6 @@ walk_jsframes_step(mdb_walk_state_t *wsp)
 
 	if (rv != WALK_NEXT)
 		return (rv);
-
-	/*
-	 * Figure out the type of this frame.
-	 */
-	if (mdb_vread(&ftype, sizeof (ftype), addr + V8_OFF_FP_MARKER) == -1)
-		return (WALK_ERR);
-
-	if (V8_IS_SMI(ftype) && V8_SMI_VALUE(ftype) == 0)
-		return (WALK_DONE);
 
 	if (mdb_vread(&next, sizeof (next), addr) == -1)
 		return (WALK_ERR);
@@ -2952,8 +2978,8 @@ static const mdb_walker_t v8_mdb_walkers[] = {
 
 static mdb_modinfo_t v8_mdb = { MDB_API_VERSION, v8_mdb_dcmds, v8_mdb_walkers };
 
-const mdb_modinfo_t *
-_mdb_init(void)
+static void
+configure(void)
 {
 	uintptr_t v8major, v8minor, v8build, v8patch;
 	GElf_Sym sym;
@@ -2967,7 +2993,7 @@ _mdb_init(void)
 	    mdb_readsym(&v8patch, sizeof (v8patch),
 	    "_ZN2v88internal7Version6patch_E") == -1) {
 		mdb_warn("failed to determine V8 version");
-		return (&v8_mdb);
+		return;
 	}
 
 	mdb_printf("V8 version: %d.%d.%d.%d\n", v8major, v8minor, v8build,
@@ -2982,24 +3008,50 @@ _mdb_init(void)
 			mdb_warn("failed to autoconfigure from target\n");
 
 		else
-			mdb_printf("Autoconfigured V8 support from target.\n");
+			mdb_printf("Autoconfigured V8 support from target\n");
 
-		return (&v8_mdb);
+		return;
 	}
 
 	if (v8major == 3 && v8minor == 1 && v8build == 8 &&
 	    autoconfigure(&v8_cfg_04) == 0) {
-		mdb_printf("Configured V8 support based on node v0.4");
-		return (&v8_mdb);
+		mdb_printf("Configured V8 support based on node v0.4\n");
+		return;
 	}
 
 	if (v8major == 3 && v8minor == 6 && v8build == 6 &&
 	    autoconfigure(&v8_cfg_06) == 0) {
-		mdb_printf("Configured V8 support based on node v0.6");
-		return (&v8_mdb);
+		mdb_printf("Configured V8 support based on node v0.6\n");
+		return;
 	}
 
 	mdb_printf("mdb_v8: target has no debug metadata and no existing "
-	    "config found");
+	    "config found\n");
+}
+
+static void
+enable_demangling(void)
+{
+	const char *symname = "_ZN2v88internal7Version6major_E";
+	GElf_Sym sym;
+	char buf[64];
+
+	/*
+	 * Try to determine whether C++ symbol demangling has been enabled.  If
+	 * not, enable it.
+	 */
+	if (mdb_lookup_by_name("_ZN2v88internal7Version6major_E", &sym) != 0)
+		return;
+
+	(void) mdb_snprintf(buf, sizeof (buf), "%a", sym.st_value);
+	if (strstr(buf, symname) != NULL)
+		(void) mdb_eval("$G");
+}
+
+const mdb_modinfo_t *
+_mdb_init(void)
+{
+	configure();
+	enable_demangling();
 	return (&v8_mdb);
 }

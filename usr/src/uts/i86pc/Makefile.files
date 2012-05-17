@@ -114,6 +114,7 @@ CORE_OBJS +=			\
 	timestamp.o		\
 	todpc_subr.o		\
 	trap.o			\
+	turbo.o			\
 	vm_machdep.o		\
 	xpv_platform.o		\
 	x_call.o

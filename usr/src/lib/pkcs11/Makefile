@@ -36,7 +36,6 @@ SUBDIRS = \
 	libsoftcrypto   \
 	libkcfd		\
 	pkcs11_kernel	\
-	pkcs11_kms	\
 	pkcs11_softtoken \
 	pkcs11_tpm
 

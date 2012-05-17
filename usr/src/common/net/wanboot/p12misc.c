@@ -58,6 +58,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2012, OmniTI Computer Consulting, Inc. All rights reserved.
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
@@ -440,7 +444,11 @@ sunw_get_pkey_fname(getdo_actions_t dowhat, EVP_PKEY *pkey, char **fname)
 	}
 
 	str = ty->value.bmpstring;
+#if OPENSSL_VERSION_NUMBER < 0x10000000L
 	*fname = uni2asc(str->data, str->length);
+#else
+	*fname = OPENSSL_uni2asc(str->data, str->length);
+#endif
 	if (*fname == NULL) {
 		SUNWerr(SUNW_F_GET_PKEY_FNAME, SUNW_R_MEMORY_FAILURE);
 		return (-1);

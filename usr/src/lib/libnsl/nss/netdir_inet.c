@@ -23,6 +23,7 @@
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 /*
@@ -160,6 +161,17 @@ static boolean_t _read_nsw_file(void);
  * Top Level Interfaces that gethost/serv/netdir funnel through.
  */
 
+static int
+inetdir_free(int ret, struct in_addr *inaddrs, char **baddrlist)
+{
+	if (inaddrs)
+		free(inaddrs);
+	if (baddrlist)
+		free(baddrlist);
+	_nderror = ret;
+	return (ret);
+}
+
 /*
  * gethost/servbyname always call this function; if they call
  * with nametoaddr libs in nconf, we call netdir_getbyname
@@ -181,7 +193,6 @@ _get_hostserv_inetnetdir_byname(struct netconfig *nconf,
 	struct in_addr	*inaddrs = NULL;
 	struct in6_addr	v6nameaddr;
 	char	**baddrlist = NULL;
-
 
 	if (nconf == NULL) {
 		_nderror = ND_BADARG;
@@ -332,7 +343,7 @@ _get_hostserv_inetnetdir_byname(struct netconfig *nconf,
 				 * memory at each 'return()' point.
 				 *
 				 * Early return protection (using
-				 * FREE_return()) is needed only in NETDIR_BY
+				 * inetdir_free()) is needed only in NETDIR_BY
 				 * cases because dynamic allocation is used
 				 * when args->op_t == NETDIR_BY.
 				 *
@@ -344,15 +355,6 @@ _get_hostserv_inetnetdir_byname(struct netconfig *nconf,
 				 * servp!=0 conditionals because this is handled
 				 * (and returned) first.
 				 */
-#define	FREE_return(ret) \
-				{ \
-					if (inaddrs) \
-						free(inaddrs); \
-					if (baddrlist) \
-						free(baddrlist); \
-					_nderror = ret; \
-					return (ret); \
-				}
 				int i, bnets;
 
 				bnets = getbroadcastnets(nconf, &inaddrs);
@@ -362,7 +364,8 @@ _get_hostserv_inetnetdir_byname(struct netconfig *nconf,
 				}
 				baddrlist = malloc((bnets+1)*sizeof (char *));
 				if (baddrlist == NULL)
-					FREE_return(ND_NOMEM);
+					return (inetdir_free(ND_NOMEM, inaddrs,
+					    baddrlist));
 				for (i = 0; i < bnets; i++)
 					baddrlist[i] = (char *)&inaddrs[i];
 				baddrlist[i] = NULL;
@@ -381,7 +384,7 @@ _get_hostserv_inetnetdir_byname(struct netconfig *nconf,
 				 */
 				ret = hent2ndaddr(AF_INET, haddrlist, servp,
 				    res->nd_alist);
-				FREE_return(ret);
+				return (inetdir_free(ret, inaddrs, baddrlist));
 			}
 			break;
 
@@ -475,7 +478,7 @@ _get_hostserv_inetnetdir_byname(struct netconfig *nconf,
 				 */
 				ret = hent2ndaddr(AF_INET6, haddrlist,
 				    servp, res->nd_alist);
-				FREE_return(ret);
+				return (inetdir_free(ret, inaddrs, baddrlist));
 			}
 			break;
 
@@ -544,13 +547,15 @@ _get_hostserv_inetnetdir_byname(struct netconfig *nconf,
 			ndbuf4switch = _nss_XbyY_buf_alloc(
 			    sizeof (struct servent), NSS_BUFLEN_SERVICES);
 			if (ndbuf4switch == 0)
-				FREE_return(ND_NOMEM);
+				return (inetdir_free(ND_NOMEM, inaddrs,
+				    baddrlist));
 			se = _switch_getservbyname_r(args->arg.nd_hs->h_serv,
 			    proto, ndbuf4switch->result,
 			    ndbuf4switch->buffer, ndbuf4switch->buflen);
 			if (!se) {
 				NSS_XbyY_FREE(&ndbuf4switch);
-				FREE_return(ND_NOSERV);
+				return (inetdir_free(ND_NOSERV, inaddrs,
+				    baddrlist));
 			}
 			server_port = se->s_port;
 			NSS_XbyY_FREE(&ndbuf4switch);
@@ -618,7 +623,7 @@ _get_hostserv_inetnetdir_byname(struct netconfig *nconf,
 			 */
 			ret = hent2ndaddr(AF_INET, haddrlist,
 			    &server_port, res->nd_alist);
-			FREE_return(ret);
+			return (inetdir_free(ret, inaddrs, baddrlist));
 		}
 
 
@@ -641,14 +646,16 @@ _get_hostserv_inetnetdir_byname(struct netconfig *nconf,
 				    sizeof (struct servent),
 				    NSS_BUFLEN_SERVICES);
 				if (ndbuf4switch == 0)
-					FREE_return(ND_NOMEM);
+					return (inetdir_free(ND_NOMEM, inaddrs,
+					    baddrlist));
 				se = _switch_getservbyname_r(
 				    args->arg.nd_hs->h_serv,
 				    proto, ndbuf4switch->result,
 				    ndbuf4switch->buffer, ndbuf4switch->buflen);
 				if (!se) {
 					NSS_XbyY_FREE(&ndbuf4switch);
-					FREE_return(ND_NOSERV);
+					return (inetdir_free(ND_NOSERV, inaddrs,
+					    baddrlist));
 				}
 				server_port = se->s_port;
 				NSS_XbyY_FREE(&ndbuf4switch);
@@ -696,7 +703,7 @@ _get_hostserv_inetnetdir_byname(struct netconfig *nconf,
 				 */
 				ret = hent2ndaddr(AF_INET6, haddrlist,
 				    &server_port, res->nd_alist);
-				FREE_return(ret);
+				return (inetdir_free(ret, inaddrs, baddrlist));
 			}
 
 		default:

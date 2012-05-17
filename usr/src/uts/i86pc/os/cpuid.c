@@ -30,7 +30,7 @@
  * Portions Copyright 2009 Advanced Micro Devices, Inc.
  */
 /*
- * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 /*
  * Various routines to handle identification
@@ -160,7 +160,8 @@ static char *x86_feature_names[NUM_X86_FEATURES] = {
 	"xsave",
 	"avx",
 	"vmx",
-	"svm"
+	"svm",
+	"topoext"
 };
 
 boolean_t
@@ -269,7 +270,7 @@ struct xsave_info {
  */
 
 #define	NMAX_CPI_STD	6		/* eax = 0 .. 5 */
-#define	NMAX_CPI_EXTD	0x1c		/* eax = 0x80000000 .. 0x8000001b */
+#define	NMAX_CPI_EXTD	0x1f		/* eax = 0x80000000 .. 0x8000001e */
 
 /*
  * Some terminology needs to be explained:
@@ -283,6 +284,8 @@ struct xsave_info {
  *    memory controllers, PCI configuration spaces. They are connected
  *    inside the package with Hypertransport links. On single-node
  *    processors, processor node is equivalent to chip/socket/package.
+ *  - Compute Unit: Some AMD processors pair cores in "compute units" that
+ *    share the FPU and the I$ and L2 caches.
  */
 
 struct cpuid_info {
@@ -343,6 +346,8 @@ struct cpuid_info {
 	uint_t cpi_procnodeid;		/* AMD: nodeID on HT, Intel: chipid */
 	uint_t cpi_procnodes_per_pkg;	/* AMD: # of nodes in the package */
 					/* Intel: 1 */
+	uint_t cpi_compunitid;		/* AMD: ComputeUnit ID, Intel: coreid */
+	uint_t cpi_cores_per_compunit;	/* AMD: # of cores in the ComputeUnit */
 
 	struct xsave_info cpi_xsave;	/* fn D: xsave/xrestor info */
 };
@@ -727,6 +732,7 @@ cpuid_intel_getids(cpu_t *cpu, void *feature)
 		cpi->cpi_pkgcoreid = 0;
 	}
 	cpi->cpi_procnodeid = cpi->cpi_chipid;
+	cpi->cpi_compunitid = cpi->cpi_coreid;
 }
 
 static void
@@ -736,6 +742,7 @@ cpuid_amd_getids(cpu_t *cpu)
 	uint32_t nb_caps_reg;
 	uint_t node2_1;
 	struct cpuid_info *cpi = cpu->cpu_m.mcpu_cpi;
+	struct cpuid_regs *cp;
 
 	/*
 	 * AMD CMP chips currently have a single thread per core.
@@ -753,9 +760,15 @@ cpuid_amd_getids(cpu_t *cpu)
 	 * from 0 regardless of how many or which are disabled, and there
 	 * is no way for operating system to discover the real core id when some
 	 * are disabled.
+	 *
+	 * In family 0x15, the cores come in pairs called compute units. They
+	 * share I$ and L2 caches and the FPU. Enumeration of this feature is
+	 * simplified by the new topology extensions CPUID leaf, indicated by
+	 * the X86 feature X86FSET_TOPOEXT.
 	 */
 
 	cpi->cpi_coreid = cpu->cpu_id;
+	cpi->cpi_compunitid = cpu->cpu_id;
 
 	if (cpi->cpi_xmaxeax >= 0x80000008) {
 
@@ -784,10 +797,21 @@ cpuid_amd_getids(cpu_t *cpu)
 	    cpi->cpi_apicid & ((1<<coreidsz) - 1);
 	cpi->cpi_ncpu_per_chip = cpi->cpi_ncore_per_chip;
 
-	/* Get nodeID */
-	if (cpi->cpi_family == 0xf) {
+	/* Get node ID, compute unit ID */
+	if (is_x86_feature(x86_featureset, X86FSET_TOPOEXT) &&
+	    cpi->cpi_xmaxeax >= 0x8000001e) {
+		cp = &cpi->cpi_extd[0x1e];
+		cp->cp_eax = 0x8000001e;
+		(void) __cpuid_insn(cp);
+
+		cpi->cpi_procnodes_per_pkg = BITX(cp->cp_ecx, 10, 8) + 1;
+		cpi->cpi_procnodeid = BITX(cp->cp_ecx, 7, 0);
+		cpi->cpi_cores_per_compunit = BITX(cp->cp_ebx, 15, 8) + 1;
+		cpi->cpi_compunitid = BITX(cp->cp_ebx, 7, 0)
+		    + (cpi->cpi_ncore_per_chip / cpi->cpi_cores_per_compunit)
+		    * (cpi->cpi_procnodeid / cpi->cpi_procnodes_per_pkg);
+	} else if (cpi->cpi_family == 0xf || cpi->cpi_family >= 0x11) {
 		cpi->cpi_procnodeid = (cpi->cpi_apicid >> coreidsz) & 7;
-		cpi->cpi_chipid = cpi->cpi_procnodeid;
 	} else if (cpi->cpi_family == 0x10) {
 		/*
 		 * See if we are a multi-node processor.
@@ -798,7 +822,6 @@ cpuid_amd_getids(cpu_t *cpu)
 			/* Single-node */
 			cpi->cpi_procnodeid = BITX(cpi->cpi_apicid, 5,
 			    coreidsz);
-			cpi->cpi_chipid = cpi->cpi_procnodeid;
 		} else {
 
 			/*
@@ -813,7 +836,6 @@ cpuid_amd_getids(cpu_t *cpu)
 			if (cpi->cpi_apicid == cpi->cpi_pkgcoreid) {
 				/* We are BSP */
 				cpi->cpi_procnodeid = (first_half ? 0 : 1);
-				cpi->cpi_chipid = cpi->cpi_procnodeid >> 1;
 			} else {
 
 				/* We are AP */
@@ -833,17 +855,14 @@ cpuid_amd_getids(cpu_t *cpu)
 				else
 					cpi->cpi_procnodeid = node2_1 +
 					    first_half;
-
-				cpi->cpi_chipid = cpi->cpi_procnodeid >> 1;
 			}
 		}
-	} else if (cpi->cpi_family >= 0x11) {
-		cpi->cpi_procnodeid = (cpi->cpi_apicid >> coreidsz) & 7;
-		cpi->cpi_chipid = cpi->cpi_procnodeid;
 	} else {
 		cpi->cpi_procnodeid = 0;
-		cpi->cpi_chipid = cpi->cpi_procnodeid;
 	}
+
+	cpi->cpi_chipid =
+	    cpi->cpi_procnodeid / cpi->cpi_procnodes_per_pkg;
 }
 
 /*
@@ -1218,30 +1237,28 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 		if (cp->cp_ecx & CPUID_INTC_ECX_SSE3) {
 			add_x86_feature(featureset, X86FSET_SSE3);
 		}
-		if (cpi->cpi_vendor == X86_VENDOR_Intel) {
-			if (cp->cp_ecx & CPUID_INTC_ECX_SSSE3) {
-				add_x86_feature(featureset, X86FSET_SSSE3);
-			}
-			if (cp->cp_ecx & CPUID_INTC_ECX_SSE4_1) {
-				add_x86_feature(featureset, X86FSET_SSE4_1);
-			}
-			if (cp->cp_ecx & CPUID_INTC_ECX_SSE4_2) {
-				add_x86_feature(featureset, X86FSET_SSE4_2);
-			}
-			if (cp->cp_ecx & CPUID_INTC_ECX_AES) {
-				add_x86_feature(featureset, X86FSET_AES);
-			}
-			if (cp->cp_ecx & CPUID_INTC_ECX_PCLMULQDQ) {
-				add_x86_feature(featureset, X86FSET_PCLMULQDQ);
-			}
+		if (cp->cp_ecx & CPUID_INTC_ECX_SSSE3) {
+			add_x86_feature(featureset, X86FSET_SSSE3);
+		}
+		if (cp->cp_ecx & CPUID_INTC_ECX_SSE4_1) {
+			add_x86_feature(featureset, X86FSET_SSE4_1);
+		}
+		if (cp->cp_ecx & CPUID_INTC_ECX_SSE4_2) {
+			add_x86_feature(featureset, X86FSET_SSE4_2);
+		}
+		if (cp->cp_ecx & CPUID_INTC_ECX_AES) {
+			add_x86_feature(featureset, X86FSET_AES);
+		}
+		if (cp->cp_ecx & CPUID_INTC_ECX_PCLMULQDQ) {
+			add_x86_feature(featureset, X86FSET_PCLMULQDQ);
+		}
 
-			if (cp->cp_ecx & CPUID_INTC_ECX_XSAVE) {
-				add_x86_feature(featureset, X86FSET_XSAVE);
-				/* We only test AVX when there is XSAVE */
-				if (cp->cp_ecx & CPUID_INTC_ECX_AVX) {
-					add_x86_feature(featureset,
-					    X86FSET_AVX);
-				}
+		if (cp->cp_ecx & CPUID_INTC_ECX_XSAVE) {
+			add_x86_feature(featureset, X86FSET_XSAVE);
+			/* We only test AVX when there is XSAVE */
+			if (cp->cp_ecx & CPUID_INTC_ECX_AVX) {
+				add_x86_feature(featureset,
+				    X86FSET_AVX);
 			}
 		}
 	}
@@ -1439,6 +1456,10 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 			if (cp->cp_ecx & CPUID_AMD_ECX_SVM) {
 				add_x86_feature(featureset, X86FSET_SVM);
 			}
+
+			if (cp->cp_ecx & CPUID_AMD_ECX_TOPOEXT) {
+				add_x86_feature(featureset, X86FSET_TOPOEXT);
+			}
 			break;
 		default:
 			break;
@@ -1547,6 +1568,7 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 
 	cpi->cpi_apicid = CPI_APIC_ID(cpi);
 	cpi->cpi_procnodes_per_pkg = 1;
+	cpi->cpi_cores_per_compunit = 1;
 	if (is_x86_feature(featureset, X86FSET_HTT) == B_FALSE &&
 	    is_x86_feature(featureset, X86FSET_CMP) == B_FALSE) {
 		/*
@@ -1573,6 +1595,7 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 			cpi->cpi_coreid = cpi->cpi_chipid;
 			cpi->cpi_pkgcoreid = 0;
 			cpi->cpi_procnodeid = cpi->cpi_chipid;
+			cpi->cpi_compunitid = cpi->cpi_chipid;
 		}
 	}
 
@@ -1797,7 +1820,7 @@ cpuid_pass2(cpu_t *cpu)
 	/*
 	 * XSAVE enumeration
 	 */
-	if (cpi->cpi_maxeax >= 0xD && cpi->cpi_vendor == X86_VENDOR_Intel) {
+	if (cpi->cpi_maxeax >= 0xD) {
 		struct cpuid_regs regs;
 		boolean_t cpuid_d_valid = B_TRUE;
 
@@ -2531,23 +2554,21 @@ cpuid_pass4(cpu_t *cpu)
 		if (!is_x86_feature(x86_featureset, X86FSET_SSE3))
 			*ecx &= ~CPUID_INTC_ECX_SSE3;
 
-		if (cpi->cpi_vendor == X86_VENDOR_Intel) {
-			if (!is_x86_feature(x86_featureset, X86FSET_SSSE3))
-				*ecx &= ~CPUID_INTC_ECX_SSSE3;
-			if (!is_x86_feature(x86_featureset, X86FSET_SSE4_1))
-				*ecx &= ~CPUID_INTC_ECX_SSE4_1;
-			if (!is_x86_feature(x86_featureset, X86FSET_SSE4_2))
-				*ecx &= ~CPUID_INTC_ECX_SSE4_2;
-			if (!is_x86_feature(x86_featureset, X86FSET_AES))
-				*ecx &= ~CPUID_INTC_ECX_AES;
-			if (!is_x86_feature(x86_featureset, X86FSET_PCLMULQDQ))
-				*ecx &= ~CPUID_INTC_ECX_PCLMULQDQ;
-			if (!is_x86_feature(x86_featureset, X86FSET_XSAVE))
-				*ecx &= ~(CPUID_INTC_ECX_XSAVE |
-				    CPUID_INTC_ECX_OSXSAVE);
-			if (!is_x86_feature(x86_featureset, X86FSET_AVX))
-				*ecx &= ~CPUID_INTC_ECX_AVX;
-		}
+		if (!is_x86_feature(x86_featureset, X86FSET_SSSE3))
+			*ecx &= ~CPUID_INTC_ECX_SSSE3;
+		if (!is_x86_feature(x86_featureset, X86FSET_SSE4_1))
+			*ecx &= ~CPUID_INTC_ECX_SSE4_1;
+		if (!is_x86_feature(x86_featureset, X86FSET_SSE4_2))
+			*ecx &= ~CPUID_INTC_ECX_SSE4_2;
+		if (!is_x86_feature(x86_featureset, X86FSET_AES))
+			*ecx &= ~CPUID_INTC_ECX_AES;
+		if (!is_x86_feature(x86_featureset, X86FSET_PCLMULQDQ))
+			*ecx &= ~CPUID_INTC_ECX_PCLMULQDQ;
+		if (!is_x86_feature(x86_featureset, X86FSET_XSAVE))
+			*ecx &= ~(CPUID_INTC_ECX_XSAVE |
+			    CPUID_INTC_ECX_OSXSAVE);
+		if (!is_x86_feature(x86_featureset, X86FSET_AVX))
+			*ecx &= ~CPUID_INTC_ECX_AVX;
 
 		/*
 		 * [no explicit support required beyond x87 fp context]
@@ -2567,22 +2588,24 @@ cpuid_pass4(cpu_t *cpu)
 			hwcap_flags |= AV_386_SSE2;
 		if (*ecx & CPUID_INTC_ECX_SSE3)
 			hwcap_flags |= AV_386_SSE3;
-		if (cpi->cpi_vendor == X86_VENDOR_Intel) {
-			if (*ecx & CPUID_INTC_ECX_SSSE3)
-				hwcap_flags |= AV_386_SSSE3;
-			if (*ecx & CPUID_INTC_ECX_SSE4_1)
-				hwcap_flags |= AV_386_SSE4_1;
-			if (*ecx & CPUID_INTC_ECX_SSE4_2)
-				hwcap_flags |= AV_386_SSE4_2;
-			if (*ecx & CPUID_INTC_ECX_MOVBE)
-				hwcap_flags |= AV_386_MOVBE;
-			if (*ecx & CPUID_INTC_ECX_AES)
-				hwcap_flags |= AV_386_AES;
-			if (*ecx & CPUID_INTC_ECX_PCLMULQDQ)
-				hwcap_flags |= AV_386_PCLMULQDQ;
-			if ((*ecx & CPUID_INTC_ECX_XSAVE) &&
-			    (*ecx & CPUID_INTC_ECX_OSXSAVE))
-				hwcap_flags |= AV_386_XSAVE;
+		if (*ecx & CPUID_INTC_ECX_SSSE3)
+			hwcap_flags |= AV_386_SSSE3;
+		if (*ecx & CPUID_INTC_ECX_SSE4_1)
+			hwcap_flags |= AV_386_SSE4_1;
+		if (*ecx & CPUID_INTC_ECX_SSE4_2)
+			hwcap_flags |= AV_386_SSE4_2;
+		if (*ecx & CPUID_INTC_ECX_MOVBE)
+			hwcap_flags |= AV_386_MOVBE;
+		if (*ecx & CPUID_INTC_ECX_AES)
+			hwcap_flags |= AV_386_AES;
+		if (*ecx & CPUID_INTC_ECX_PCLMULQDQ)
+			hwcap_flags |= AV_386_PCLMULQDQ;
+		if ((*ecx & CPUID_INTC_ECX_XSAVE) &&
+		    (*ecx & CPUID_INTC_ECX_OSXSAVE)) {
+			hwcap_flags |= AV_386_XSAVE;
+
+			if (*ecx & CPUID_INTC_ECX_AVX)
+				hwcap_flags |= AV_386_AVX;
 		}
 		if (*ecx & CPUID_INTC_ECX_VMX)
 			hwcap_flags |= AV_386_VMX;
@@ -3006,6 +3029,20 @@ cpuid_get_procnodes_per_pkg(cpu_t *cpu)
 	return (cpu->cpu_m.mcpu_cpi->cpi_procnodes_per_pkg);
 }
 
+uint_t
+cpuid_get_compunitid(cpu_t *cpu)
+{
+	ASSERT(cpuid_checkpass(cpu, 1));
+	return (cpu->cpu_m.mcpu_cpi->cpi_compunitid);
+}
+
+uint_t
+cpuid_get_cores_per_compunit(cpu_t *cpu)
+{
+	ASSERT(cpuid_checkpass(cpu, 1));
+	return (cpu->cpu_m.mcpu_cpi->cpi_cores_per_compunit);
+}
+
 /*ARGSUSED*/
 int
 cpuid_have_cr8access(cpu_t *cpu)
@@ -3335,6 +3372,13 @@ cpuid_opteron_erratum(cpu_t *cpu, uint_t erratum)
 	case 298:
 		return (DR_AX(eax) || DR_B0(eax) || DR_B1(eax) || DR_BA(eax) ||
 		    DR_B2(eax) || RB_C0(eax));
+
+	case 721:
+#if defined(__amd64)
+		return (cpi->cpi_family == 0x10 || cpi->cpi_family == 0x12);
+#else
+		return (0);
+#endif
 
 	default:
 		return (-1);
@@ -4134,6 +4178,9 @@ cpuid_set_cpu_properties(void *dip, processorid_t cpu_id,
 	switch (cpi->cpi_vendor) {
 	case X86_VENDOR_Intel:
 		create = IS_NEW_F6(cpi) || cpi->cpi_family >= 0xf;
+		break;
+	case X86_VENDOR_AMD:
+		create = cpi->cpi_family >= 0xf;
 		break;
 	default:
 		create = 0;

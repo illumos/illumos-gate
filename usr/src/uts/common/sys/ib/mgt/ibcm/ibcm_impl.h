@@ -2170,15 +2170,15 @@ void	ibcm_dump_noderec(sa_node_record_t *);
 
 void	ibcm_query_classport_info(ibt_channel_hdl_t channel);
 
-#define	IBCM_DUMP_RAW_MSG	ibcm_dump_raw_message
-#define	IBCM_DUMP_SERVICE_REC	ibcm_dump_srvrec
-#define	IBCM_DUMP_PATH_REC	ibcm_dump_pathrec
-#define	IBCM_DUMP_NODE_REC	ibcm_dump_noderec
+#define	IBCM_DUMP_RAW_MSG(x)		ibcm_dump_raw_message(x)
+#define	IBCM_DUMP_SERVICE_REC(x)	ibcm_dump_srvrec(x)
+#define	IBCM_DUMP_PATH_REC(x)		ibcm_dump_pathrec(x)
+#define	IBCM_DUMP_NODE_REC(x)		ibcm_dump_noderec(x)
 #else
-#define	IBCM_DUMP_RAW_MSG	0 &&
-#define	IBCM_DUMP_SERVICE_REC	0 &&
-#define	IBCM_DUMP_PATH_REC	0 &&
-#define	IBCM_DUMP_NODE_REC	0 &&
+#define	IBCM_DUMP_RAW_MSG(x)
+#define	IBCM_DUMP_SERVICE_REC(x)
+#define	IBCM_DUMP_PATH_REC(x)
+#define	IBCM_DUMP_NODE_REC(x)
 #endif
 
 ibt_status_t ibcm_ibmf_analyze_error(int ibmf_status);

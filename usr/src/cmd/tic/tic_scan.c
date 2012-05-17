@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *			COPYRIGHT NOTICE
  *
@@ -135,7 +133,7 @@ int
 get_token()
 {
 	long		number;
-	int		type;
+	int		type = UNDEF;
 	register int	ch;
 	static char	buffer[1024];
 	register char	*ptr;

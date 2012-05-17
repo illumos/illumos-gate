@@ -151,6 +151,9 @@ APlist		*free_alp = NULL;	/* defragmentation list */
  * override the system capabilities for testing purposes.  Furthermore, these
  * alternative capabilities can be specified such that they only apply to
  * specified files rather than to all objects.
+ *
+ * The org_scapset is relied upon by the amd64 version of elf_rtbndr to
+ * determine whether or not AVX registers are present in the system.
  */
 static Syscapset	scapset = { 0 };
 Syscapset	*org_scapset = &scapset;	/* original system and */

@@ -365,6 +365,7 @@ COMMON_SUBDIRS=		\
 	sh		\
 	shcomp		\
 	smbios		\
+	smbsrv		\
 	smserverd	\
 	soelim		\
 	sort		\
@@ -682,6 +683,7 @@ MSGSUBDIRS=		\
 	sgs		\
 	sh		\
 	shcomp		\
+	smbsrv		\
 	sort		\
 	split		\
 	srptadm		\

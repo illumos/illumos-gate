@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2011 Joyent, Inc.  All rights reserved.
+ * Copyright 2012 Joyent, Inc.  All rights reserved.
  */
 
 /*

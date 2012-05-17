@@ -23,25 +23,5 @@
 
 set name=pkg.fmri \
     value=pkg:/system/library/security/crypto/pkcs11_kms@$(PKGVERS)
-set name=pkg.description value="PKCS#11 KMS Provider"
-set name=pkg.summary value=pkcs11_kms
-set name=info.classification \
-    value=org.opensolaris.category.2008:System/Security
+set name=pkg.obsolete value=true
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/bin
-dir path=usr/lib
-dir path=usr/lib/$(ARCH64)
-dir path=usr/lib/security
-dir path=usr/lib/security/$(ARCH64)
-file path=usr/bin/kmscfg group=sys mode=0555
-file path=usr/lib/$(ARCH64)/libkmsagent.so.1
-file path=usr/lib/libkmsagent.so.1
-file path=usr/lib/security/$(ARCH64)/pkcs11_kms.so.1
-file path=usr/lib/security/pkcs11_kms.so.1
-license cr_Sun license=cr_Sun
-license lic_CDDL license=lic_CDDL
-license usr/src/lib/libkmsagent/THIRDPARTYLICENSE \
-    license=usr/src/lib/libkmsagent/THIRDPARTYLICENSE
-link path=usr/lib/security/$(ARCH64)/pkcs11_kms.so target=pkcs11_kms.so.1
-link path=usr/lib/security/pkcs11_kms.so target=pkcs11_kms.so.1

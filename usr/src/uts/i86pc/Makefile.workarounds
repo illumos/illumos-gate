@@ -21,8 +21,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # This makefile contains workaround defines to be shared
 # by Makefile.i86pc and the genunix Makefile.
 #
@@ -117,3 +115,8 @@ WORKAROUND_DEFS += -DOPTERON_ERRATUM_172
 # Accessed or Dirty Bit.
 #
 WORKAROUND_DEFS += -DOPTERON_ERRATUM_298
+
+#
+# Processor May Incorrectly Update Stack Pointer
+#
+WORKAROUND_DEFS += -DOPTERON_ERRATUM_721

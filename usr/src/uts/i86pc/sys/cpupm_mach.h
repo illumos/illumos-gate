@@ -107,6 +107,14 @@ typedef struct cpupm_mach_acpi_state {
 	cma_state_t		cma_state;
 } cpupm_mach_acpi_state_t;
 
+typedef struct cpupm_mach_turbo_info {
+	kstat_t		*turbo_ksp;		/* turbo kstat */
+	int		in_turbo;		/* in turbo? */
+	int		turbo_supported;	/* turbo flag */
+	uint64_t	t_mcnt;			/* turbo mcnt */
+	uint64_t	t_acnt;			/* turbo acnt */
+} cpupm_mach_turbo_info_t;
+
 typedef struct cpupm_mach_state {
 	void			*ms_acpi_handle;
 	cpupm_mach_acpi_state_t	ms_pstate;
@@ -115,7 +123,7 @@ typedef struct cpupm_mach_state {
 	uint32_t		ms_caps;
 	dev_info_t		*ms_dip;
 	kmutex_t		ms_lock;
-	void			*ms_vendor;
+	cpupm_mach_turbo_info_t	*ms_turbo;
 	struct cpupm_notification *ms_handlers;
 } cpupm_mach_state_t;
 
@@ -191,6 +199,10 @@ extern void cpupm_add_notify_handler(cpu_t *, CPUPM_NOTIFY_HANDLER, void *);
 extern int cpupm_get_top_speed(cpu_t *);
 extern void cpupm_idle_cstate_data(cma_c_state_t *, int);
 extern void cpupm_wakeup_cstate_data(cma_c_state_t *, hrtime_t);
+extern void cpupm_record_turbo_info(cpupm_mach_turbo_info_t *, uint32_t,
+    uint32_t);
+extern cpupm_mach_turbo_info_t *cpupm_turbo_init(cpu_t *);
+extern void cpupm_turbo_fini(cpupm_mach_turbo_info_t *);
 
 #ifdef __cplusplus
 }

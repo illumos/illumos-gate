@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 
 /*
@@ -552,8 +553,16 @@ zfsdle_vdev_online(zpool_handle_t *zhp, void *data)
 		    &wholedisk) == 0);
 
 		(void) strlcpy(fullpath, path, sizeof (fullpath));
-		if (wholedisk)
+		if (wholedisk) {
 			fullpath[strlen(fullpath) - 2] = '\0';
+
+			/*
+			 * We need to reopen the pool associated with this
+			 * device so that the kernel can update the size
+			 * of the expanded device.
+			 */
+			(void) zpool_reopen(zhp);
+		}
 
 		if (zpool_get_prop_int(zhp, ZPOOL_PROP_AUTOEXPAND, NULL)) {
 			syseventd_print(9, "zfsdle_vdev_online: setting device"

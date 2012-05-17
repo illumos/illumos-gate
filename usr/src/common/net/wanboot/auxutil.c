@@ -61,6 +61,10 @@
  * in this library.  None of these are exposed.
  */
 
+/*
+ * Copyright (c) 2012, OmniTI Computer Consulting, Inc. All rights reserved.
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
@@ -97,7 +101,11 @@ asc2bmpstring(const char *str, int len)
 	int unilen;
 
 	/* Convert the character to the bmp format. */
+#if OPENSSL_VERSION_NUMBER < 0x10000000L
 	if (asc2uni(str, len, &uni, &unilen) == 0) {
+#else
+	if (OPENSSL_asc2uni(str, len, &uni, &unilen) == 0) {
+#endif
 		SUNWerr(SUNW_F_ASC2BMPSTRING, SUNW_R_MEMORY_FAILURE);
 		return (NULL);
 	}

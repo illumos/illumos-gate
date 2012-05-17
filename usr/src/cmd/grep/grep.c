@@ -30,7 +30,7 @@
 /*	Copyright (c) 1987, 1988 Microsoft Corporation	*/
 /*	  All Rights Reserved	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/* Copyright 2012 Nexenta Systems, Inc.  All rights reserved. */
 
 /*
  * grep -- print lines matching (or not matching) a pattern
@@ -88,6 +88,7 @@ static int	sflag;
 static int	iflag;
 static int	wflag;
 static int	hflag;
+static int	qflag;
 static int	errflg;
 static int	nfile;
 static long long	tln;
@@ -113,10 +114,13 @@ main(int argc, char **argv)
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
-	while ((c = getopt(argc, argv, "hblcnsviyw")) != -1)
+	while ((c = getopt(argc, argv, "hqblcnsviyw")) != -1)
 		switch (c) {
 		case 'h':
 			hflag++;
+			break;
+		case 'q':	/* POSIX: quiet: status only */
+			qflag++;
 			break;
 		case 'v':
 			vflag++;
@@ -148,7 +152,7 @@ main(int argc, char **argv)
 		}
 
 	if (errflg || (optind >= argc)) {
-		errmsg("Usage: grep -hblcnsviw pattern file . . .\n",
+		errmsg("Usage: grep [-c|-l|-q] -hbnsviw pattern file . . .\n",
 		    (char *)NULL);
 		exit(2);
 	}
@@ -228,7 +232,7 @@ execute(char *file)
 	if ((count = read(temp, prntbuf, GBUFSIZ)) <= 0) {
 		(void) close(temp);
 
-		if (cflag) {
+		if (cflag && !qflag) {
 			if (nfile > 1 && !hflag && file)
 				(void) fprintf(stdout, "%s:", file);
 			(void) fprintf(stdout, "%lld\n", tln);
@@ -324,7 +328,7 @@ execute(char *file)
 	}
 	(void) close(temp);
 
-	if (cflag) {
+	if (cflag && !qflag) {
 		if (nfile > 1 && !hflag && file)
 			(void) fprintf(stdout, "%s:", file);
 		(void) fprintf(stdout, "%lld\n", tln);
@@ -339,6 +343,11 @@ succeed(char *f)
 
 	if (f == NULL)
 		f = "<stdin>";
+
+	if (qflag) {
+		/* no need to continue */
+		return (1);
+	}
 
 	if (cflag) {
 		tln++;

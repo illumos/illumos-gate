@@ -381,6 +381,7 @@ extern "C" {
 #define	X86FSET_AVX		34
 #define	X86FSET_VMX		35
 #define	X86FSET_SVM		36
+#define	X86FSET_TOPOEXT		37
 
 /*
  * flags to patch tsc_read routine.
@@ -604,7 +605,7 @@ extern "C" {
 
 #if defined(_KERNEL) || defined(_KMEMUSER)
 
-#define	NUM_X86_FEATURES	37
+#define	NUM_X86_FEATURES	38
 extern uchar_t x86_featureset[];
 
 extern void free_x86_featureset(void *featureset);
@@ -689,6 +690,8 @@ extern int cpuid_get_cacheid(struct cpu *);
 extern uint32_t cpuid_get_apicid(struct cpu *);
 extern uint_t cpuid_get_procnodeid(struct cpu *cpu);
 extern uint_t cpuid_get_procnodes_per_pkg(struct cpu *cpu);
+extern uint_t cpuid_get_compunitid(struct cpu *cpu);
+extern uint_t cpuid_get_cores_per_compunit(struct cpu *cpu);
 extern int cpuid_is_cmt(struct cpu *);
 extern int cpuid_syscall32_insn(struct cpu *);
 extern int getl2cacheinfo(struct cpu *, int *, int *, int *);

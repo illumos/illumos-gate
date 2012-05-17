@@ -2110,8 +2110,10 @@ recov_retry:
 			goto out;
 		}
 	}
-	va.va_type = VNON;
-	pva.va_type = VNON;
+
+	pgar.n4g_va.va_type = VNON;
+	gar.n4g_va.va_type = VNON;
+
 	remap_lookup(np, rootvp, RML_ORDINARY, cr,
 	    &newfh, &gar, &newpfh, &pgar, &e);
 	if (nfs4_needs_recovery(&e, FALSE, mi->mi_vfsp)) {
@@ -2137,10 +2139,8 @@ recov_retry:
 		goto out;
 	}
 
-	if (!e.error) {
-		va = gar.n4g_va;
-		pva = pgar.n4g_va;
-	}
+	va = gar.n4g_va;
+	pva = pgar.n4g_va;
 
 	if ((e.error != 0) ||
 	    (va.va_type != VDIR)) {
@@ -2173,6 +2173,13 @@ recov_retry:
 		if (pnp != NULL) {
 			remap_lookup(pnp, rootvp, RML_ORDINARY, cr,
 			    &newpfh, &pgar, NULL, NULL, &e);
+			/*
+			 * This remap_lookup call modifies pgar. The following
+			 * line prevents trouble when checking the va_type of
+			 * pva later in this code.
+			 */
+			pva = pgar.n4g_va;
+
 			if (nfs4_needs_recovery(&e, FALSE,
 			    mi->mi_vfsp)) {
 				if (need_start_op) {

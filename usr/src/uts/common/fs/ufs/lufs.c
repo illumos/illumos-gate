@@ -1492,7 +1492,7 @@ lufs_init(void)
 
 	_init_top();
 
-	if (&bio_lufs_strategy != NULL)
+	if (bio_lufs_strategy == NULL)
 		bio_lufs_strategy = (void (*) (void *, buf_t *)) lufs_strategy;
 
 	/*

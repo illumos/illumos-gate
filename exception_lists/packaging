@@ -59,9 +59,6 @@ usr/lib/llib-lsoftcrypto
 usr/lib/llib-lsoftcrypto.ln
 usr/lib/amd64/llib-lsoftcrypto.ln	i386
 usr/lib/sparcv9/llib-lsoftcrypto.ln	sparc
-usr/lib/libkmsagent.so
-usr/lib/amd64/libkmsagent.so	i386
-usr/lib/sparcv9/libkmsagent.so	sparc
 
 #
 # The following files are used by the DHCP service, the

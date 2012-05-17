@@ -26,6 +26,9 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #include	<stdio.h>
 #include	<stdio_ext.h>
@@ -503,9 +506,6 @@ gettext("%s: special cannot be determined\n"),
 	}
 
 out:
-	if (check_fields(fstype, mountp))
-		exit(1);
-
 	if (realpath(mountp, realdir) == NULL) {
 		(void) fprintf(stderr, "mount: ");
 		perror(mountp);
@@ -514,6 +514,9 @@ out:
 
 	if ((mountp = strdup(realdir)) == NULL)
 		nomem();
+
+	if (check_fields(fstype, mountp))
+		exit(1);
 
 	/* create the new arg list, and end the list with a null pointer */
 	ii = 2;

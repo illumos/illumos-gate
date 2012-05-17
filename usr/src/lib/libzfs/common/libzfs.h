@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
- * Copyright (c) 2011 by Delphix. All rights reserved.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
@@ -235,6 +235,7 @@ typedef struct splitflags {
 extern int zpool_scan(zpool_handle_t *, pool_scan_func_t);
 extern int zpool_clear(zpool_handle_t *, const char *, nvlist_t *);
 extern int zpool_reguid(zpool_handle_t *);
+extern int zpool_reopen(zpool_handle_t *);
 
 extern int zpool_vdev_online(zpool_handle_t *, const char *, int,
     vdev_state_t *);
@@ -533,7 +534,7 @@ extern int zfs_destroy_snaps_nvl(zfs_handle_t *, nvlist_t *, boolean_t);
 extern int zfs_clone(zfs_handle_t *, const char *, nvlist_t *);
 extern int zfs_snapshot(libzfs_handle_t *, const char *, boolean_t, nvlist_t *);
 extern int zfs_rollback(zfs_handle_t *, zfs_handle_t *, boolean_t);
-extern int zfs_rename(zfs_handle_t *, const char *, boolean_t);
+extern int zfs_rename(zfs_handle_t *, const char *, boolean_t, boolean_t);
 
 typedef struct sendflags {
 	/* print informational messages (ie, -v was specified) */

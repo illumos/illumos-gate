@@ -20,7 +20,7 @@
 #
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-#
+# Copyright (c) 2012, OmniTI Computer Consulting, Inc. All rights reserved.
 
 #
 # These CA certs are extracted from the NSS database libnssckbi.so.
@@ -180,3 +180,6 @@ $(ROOTETCCADIR)/%:    $(CASRCDIR)/%
 	ROOTCALINK=$(ROOTETCCALINKDIR)/`$(OPENSSL) x509 -noout -hash -in $<`.0; \
 	$(RM) $$ROOTCALINK; \
 	$(LN) -s $(CATARGDIR)/$(@F) $$ROOTCALINK
+	-ROOTCALINK=$(ROOTETCCALINKDIR)/`$(OPENSSL) x509 -noout -subject_hash_old -in $< 2>/dev/null`.0; \
+	test "$$ROOTCALINK" = "$(ROOTETCCALINKDIR)/.0" || $(RM) $$ROOTCALINK; \
+	test "$$ROOTCALINK" = "$(ROOTETCCALINKDIR)/.0" || $(LN) -s $(CATARGDIR)/$(@F) $$ROOTCALINK

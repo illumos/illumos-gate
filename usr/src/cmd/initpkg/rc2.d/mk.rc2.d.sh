@@ -28,8 +28,7 @@
 COMMON_STARTLST="\
 20sysetup \
 70uucp \
-73cachefs.daemon \
-82mkdtab"
+73cachefs.daemon"
 
 INSDIR=${ROOT}/etc/rc2.d
 

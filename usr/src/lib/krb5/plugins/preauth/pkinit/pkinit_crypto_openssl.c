@@ -30,6 +30,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
 #include <errno.h>
@@ -1278,7 +1279,7 @@ cms_signeddata_verify(krb5_context context,
 	revoked = sk_X509_CRL_new_null();
 	for (i = 0; i < size; i++)
 	    sk_X509_CRL_push(revoked, sk_X509_CRL_value(idctx->revoked, i));
-	size = sk_X509_num(p7->d.sign->crl);
+	size = sk_X509_CRL_num(p7->d.sign->crl);
 	for (i = 0; i < size; i++)
 	    sk_X509_CRL_push(revoked, sk_X509_CRL_value(p7->d.sign->crl, i));
     }
@@ -1419,7 +1420,7 @@ cms_signeddata_verify(krb5_context context,
 	    pkiDebug("PKCS7 Verification successful\n");
 	else {
 	    pkiDebug("wrong oid in eContentType\n");
-	    print_buffer(p7->d.sign->contents->type->data, 
+	    print_buffer((unsigned char *)p7->d.sign->contents->type->data, 
 		(unsigned int)p7->d.sign->contents->type->length);
 	    retval = KRB5KDC_ERR_PREAUTH_FAILED;
 	    krb5_set_error_message(context, retval, "wrong oid\n");
@@ -4773,7 +4774,11 @@ decode_data(unsigned char **out_data, unsigned int *out_data_len,
     if (buf == NULL)
 	return ENOMEM;
 
+#if OPENSSL_VERSION_NUMBER < 0x10000000L
     len = EVP_PKEY_decrypt(buf, data, (int)data_len, pkey);
+#else
+    len = EVP_PKEY_decrypt_old(buf, data, (int)data_len, pkey);
+#endif
     if (len <= 0) {
 	pkiDebug("unable to decrypt received data (len=%d)\n", data_len);
 	/* Solaris Kerberos */
@@ -5908,7 +5913,7 @@ load_cas_and_crls(krb5_context context,
 		    continue;
 	    }
 	    if (flag != 0) {
-		sk_X509_push(ca_crls, X509_CRL_dup(xi->crl));
+		sk_X509_CRL_push(ca_crls, X509_CRL_dup(xi->crl));
 	    }
 	}
     }
@@ -5938,7 +5943,7 @@ load_cas_and_crls(krb5_context context,
 	}
 	break;
     case CATYPE_CRLS:
-	if (sk_X509_num(ca_crls) == 0) {
+	if (sk_X509_CRL_num(ca_crls) == 0) {
 	    pkiDebug("no crls in file, %s\n", filename);
 	    if (id_cryptoctx->revoked == NULL)
 		sk_X509_CRL_free(ca_crls);

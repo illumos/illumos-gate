@@ -107,6 +107,7 @@
 
 static char *progname;
 char *zone_name;	/* zone which we are managing */
+zone_dochandle_t snap_hndl;	/* handle for snapshot created when ready */
 char pool_name[MAXNAMELEN];
 char default_brand[MAXNAMELEN];
 char brand_name[MAXNAMELEN];
@@ -278,7 +279,7 @@ filter_bootargs(zlog_t *zlogp, const char *inargs, char *outargs,
 {
 	int argc = 0, argc_save;
 	int i;
-	int err;
+	int err = Z_OK;
 	char *arg, *lasts, **argv = NULL, **argv_save;
 	char zonecfg_args[BOOTARGS_MAX];
 	char scratchargs[BOOTARGS_MAX], *sargs;
@@ -293,25 +294,10 @@ filter_bootargs(zlog_t *zlogp, const char *inargs, char *outargs,
 	 * and use them if applicable.
 	 */
 	if (inargs == NULL || inargs[0] == '\0')  {
-		zone_dochandle_t handle;
-		if ((handle = zonecfg_init_handle()) == NULL) {
-			zerror(zlogp, B_TRUE,
-			    "getting zone configuration handle");
-			return (Z_BAD_HANDLE);
-		}
-		err = zonecfg_get_snapshot_handle(zone_name, handle);
-		if (err != Z_OK) {
-			zerror(zlogp, B_FALSE,
-			    "invalid configuration snapshot");
-			zonecfg_fini_handle(handle);
-			return (Z_BAD_HANDLE);
-		}
-
 		bzero(zonecfg_args, sizeof (zonecfg_args));
-		(void) zonecfg_get_bootargs(handle, zonecfg_args,
+		(void) zonecfg_get_bootargs(snap_hndl, zonecfg_args,
 		    sizeof (zonecfg_args));
 		inargs = zonecfg_args;
-		zonecfg_fini_handle(handle);
 	}
 
 	if (strlen(inargs) >= BOOTARGS_MAX) {
@@ -537,32 +523,37 @@ static int
 zone_ready(zlog_t *zlogp, zone_mnt_t mount_cmd, int zstate, boolean_t debug)
 {
 	int err;
+	boolean_t snapped = B_FALSE;
 
-	if (brand_prestatechg(zlogp, zstate, Z_READY, debug) != 0)
-		return (-1);
-
+	if ((snap_hndl = zonecfg_init_handle()) == NULL) {
+		zerror(zlogp, B_TRUE, "getting zone configuration handle");
+		goto bad;
+	}
 	if ((err = zonecfg_create_snapshot(zone_name)) != Z_OK) {
 		zerror(zlogp, B_FALSE, "unable to create snapshot: %s",
 		    zonecfg_strerror(err));
+		goto bad;
+	}
+	snapped = B_TRUE;
+
+	if (zonecfg_get_snapshot_handle(zone_name, snap_hndl) != Z_OK) {
+		zerror(zlogp, B_FALSE, "invalid configuration snapshot");
 		goto bad;
 	}
 
 	if (zone_did == 0)
 		zone_did = zone_get_did(zone_name);
 
-	if ((zone_id = vplat_create(zlogp, mount_cmd, zone_did)) == -1) {
-		if ((err = zonecfg_destroy_snapshot(zone_name)) != Z_OK)
-			zerror(zlogp, B_FALSE, "destroying snapshot: %s",
-			    zonecfg_strerror(err));
+	if (brand_prestatechg(zlogp, zstate, Z_READY, debug) != 0)
 		goto bad;
-	}
+
+	if ((zone_id = vplat_create(zlogp, mount_cmd, zone_did)) == -1)
+		goto bad;
+
 	if (vplat_bringup(zlogp, mount_cmd, zone_id) != 0) {
 		bringup_failure_recovery = B_TRUE;
 		(void) vplat_teardown(NULL, (mount_cmd != Z_MNT_BOOT), B_FALSE,
 		    debug);
-		if ((err = zonecfg_destroy_snapshot(zone_name)) != Z_OK)
-			zerror(zlogp, B_FALSE, "destroying snapshot: %s",
-			    zonecfg_strerror(err));
 		goto bad;
 	}
 
@@ -577,6 +568,12 @@ bad:
 	 * state, READY, and then invoke the hook as if we're halting.
 	 */
 	(void) brand_poststatechg(zlogp, ZONE_STATE_READY, Z_HALT, debug);
+	if (snapped)
+		if ((err = zonecfg_destroy_snapshot(zone_name)) != Z_OK)
+			zerror(zlogp, B_FALSE, "destroying snapshot: %s",
+			    zonecfg_strerror(err));
+	zonecfg_fini_handle(snap_hndl);
+	snap_hndl = NULL;
 	return (-1);
 }
 
@@ -774,23 +771,16 @@ static int
 setup_subproc_env(boolean_t debug)
 {
 	int res;
-	zone_dochandle_t handle;
 	struct zone_nwiftab ntab;
 	struct zone_devtab dtab;
 	char net_resources[MAXNAMELEN * 2];
 	char dev_resources[MAXNAMELEN * 2];
 
-	if ((handle = zonecfg_init_handle()) == NULL)
-		exit(Z_NOMEM);
-
 	net_resources[0] = '\0';
-	if ((res = zonecfg_get_handle(zone_name, handle)) != Z_OK)
+	if ((res = zonecfg_setnwifent(snap_hndl)) != Z_OK)
 		goto done;
 
-	if ((res = zonecfg_setnwifent(handle)) != Z_OK)
-		goto done;
-
-	while (zonecfg_getnwifent(handle, &ntab) == Z_OK) {
+	while (zonecfg_getnwifent(snap_hndl, &ntab) == Z_OK) {
 		struct zone_res_attrtab *rap;
 		char *phys;
 
@@ -822,12 +812,12 @@ setup_subproc_env(boolean_t debug)
 
 	(void) setenv("_ZONECFG_net_resources", net_resources, 1);
 
-	(void) zonecfg_endnwifent(handle);
+	(void) zonecfg_endnwifent(snap_hndl);
 
-	if ((res = zonecfg_setdevent(handle)) != Z_OK)
+	if ((res = zonecfg_setdevent(snap_hndl)) != Z_OK)
 		goto done;
 
-	while (zonecfg_getdevent(handle, &dtab) == Z_OK) {
+	while (zonecfg_getdevent(snap_hndl, &dtab) == Z_OK) {
 		struct zone_res_attrtab *rap;
 		char *match;
 
@@ -842,7 +832,7 @@ setup_subproc_env(boolean_t debug)
 			    rap->zone_res_attr_name, rap->zone_res_attr_value);
 	}
 
-	(void) zonecfg_enddevent(handle);
+	(void) zonecfg_enddevent(snap_hndl);
 
 	if (debug)
 		(void) setenv("_ZONEADMD_brand_debug", "1", 1);
@@ -852,7 +842,6 @@ setup_subproc_env(boolean_t debug)
 	res = Z_OK;
 
 done:
-	zonecfg_fini_handle(handle);
 	return (res);
 }
 
@@ -943,6 +932,49 @@ do_subproc(zlog_t *zlogp, char *cmdbuf, char **retstr, boolean_t debug)
 	return (WEXITSTATUS(status));
 }
 
+/*
+ * Get the path for this zone's init(1M) (or equivalent) process. First look
+ * for a zone-specific init-name attr, then get it from the brand.
+ */
+static int
+get_initname(brand_handle_t bh, char *initname, int len)
+{
+	struct zone_attrtab a;
+
+	bzero(&a, sizeof (a));
+	(void) strlcpy(a.zone_attr_name, "init-name",
+	    sizeof (a.zone_attr_name));
+
+	if (zonecfg_lookup_attr(snap_hndl, &a) == Z_OK) {
+		(void) strlcpy(initname, a.zone_attr_value, len);
+		return (0);
+	}
+
+	return (brand_get_initname(bh, initname, len));
+}
+
+/*
+ * Get the restart-init flag for this zone's init(1M) (or equivalent) process.
+ * First look for a zone-specific restart-init attr, then get it from the brand.
+ */
+static boolean_t
+restartinit(brand_handle_t bh)
+{
+	struct zone_attrtab a;
+
+	bzero(&a, sizeof (a));
+	(void) strlcpy(a.zone_attr_name, "restart-init",
+	    sizeof (a.zone_attr_name));
+
+	if (zonecfg_lookup_attr(snap_hndl, &a) == Z_OK) {
+		if (strcmp(a.zone_attr_value, "false") == 0)
+			return (B_FALSE);
+		return (B_TRUE);
+	}
+
+	return (brand_restartinit(bh));
+}
+
 static int
 zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate, boolean_t debug)
 {
@@ -1008,15 +1040,15 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate, boolean_t debug)
 	}
 
 	/* Get the path for this zone's init(1M) (or equivalent) process.  */
-	if (brand_get_initname(bh, init_file, MAXPATHLEN) != 0) {
+	if (get_initname(bh, init_file, MAXPATHLEN) != 0) {
 		zerror(zlogp, B_FALSE,
 		    "unable to determine zone's init(1M) location");
 		brand_close(bh);
 		goto bad;
 	}
 
-	/* See if this zone's brand should restart init if it dies. */
-	restart_init = brand_restartinit(bh);
+	/* See if we should restart init if it dies. */
+	restart_init = restartinit(bh);
 
 	brand_close(bh);
 
@@ -1138,12 +1170,15 @@ zone_halt(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting, int zstate,
 		return (-1);
 	}
 
+	if (brand_poststatechg(zlogp, zstate, Z_HALT, debug) != 0)
+		return (-1);
+
 	if ((err = zonecfg_destroy_snapshot(zone_name)) != Z_OK)
 		zerror(zlogp, B_FALSE, "destroying snapshot: %s",
 		    zonecfg_strerror(err));
 
-	if (brand_poststatechg(zlogp, zstate, Z_HALT, debug) != 0)
-		return (-1);
+	zonecfg_fini_handle(snap_hndl);
+	snap_hndl = NULL;
 
 	return (0);
 }
@@ -1785,6 +1820,20 @@ top:
 			 */
 			if ((zid = getzoneidbyname(zone_name)) != -1)
 				create_mcap_thread(zlogp, zid);
+
+			/* recover the global configuration snapshot */
+			if (snap_hndl == NULL) {
+				if ((snap_hndl = zonecfg_init_handle())
+				    == NULL ||
+				    zonecfg_create_snapshot(zone_name)
+				    != Z_OK ||
+				    zonecfg_get_snapshot_handle(zone_name,
+				    snap_hndl) != Z_OK) {
+					zerror(zlogp, B_FALSE, "recovering "
+					    "zone configuration handle");
+					goto out;
+				}
+			}
 		}
 
 		(void) fdetach(zone_door_path);
@@ -1809,6 +1858,8 @@ static int
 set_brand_env(zlog_t *zlogp)
 {
 	int ret = 0;
+	int err;
+	boolean_t snapped = B_FALSE;
 	static char *env_vars = NULL;
 	char buf[2 * MAXPATHLEN];
 
@@ -1818,8 +1869,32 @@ set_brand_env(zlog_t *zlogp)
 	if (snprintf(buf, sizeof (buf), "%s env", query_hook) > sizeof (buf))
 		return (-1);
 
-	if (do_subproc(zlogp, buf, &env_vars, B_FALSE) != 0)
-		return (-1);
+	if (snap_hndl == NULL) {
+		if ((snap_hndl = zonecfg_init_handle()) == NULL) {
+			zerror(zlogp, B_TRUE,
+			    "getting zone configuration handle");
+			return (-1);
+		}
+		snapped = B_TRUE;
+		if ((err = zonecfg_create_snapshot(zone_name)) != Z_OK) {
+			zerror(zlogp, B_FALSE, "unable to create snapshot: %s",
+			    zonecfg_strerror(err));
+			ret = -1;
+			goto done;
+		}
+		if ((err = zonecfg_get_snapshot_handle(zone_name, snap_hndl))
+		    != Z_OK) {
+			zerror(zlogp, B_FALSE, "unable to get snapshot: %s",
+			    zonecfg_strerror(err));
+			ret = -1;
+			goto done;
+		}
+	}
+
+	if (do_subproc(zlogp, buf, &env_vars, B_FALSE) != 0) {
+		ret = -1;
+		goto done;
+	}
 
 	if (env_vars != NULL) {
 		char *sp;
@@ -1832,6 +1907,16 @@ set_brand_env(zlog_t *zlogp)
 			}
 			sp = strtok(NULL, "\t");
 		}
+	}
+
+done:
+	if (snapped) {
+		if ((err = zonecfg_destroy_snapshot(zone_name)) != Z_OK)
+			zerror(zlogp, B_FALSE, "destroying snapshot: %s",
+			    zonecfg_strerror(err));
+
+		zonecfg_fini_handle(snap_hndl);
+		snap_hndl = NULL;
 	}
 
 	return (ret);
