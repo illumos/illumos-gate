@@ -43,7 +43,7 @@
 #include <locale.h>
 #include <errno.h>
 #include <sys/types.h>
-#include <sys/zone.h>
+#include <zone.h>
 
 #ifdef	__cplusplus
 extern	"C" {
