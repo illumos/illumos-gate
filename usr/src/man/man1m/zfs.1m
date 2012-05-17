@@ -86,7 +86,7 @@ zfs \- configures ZFS file systems
 
 .LP
 .nf
-\fBzfs\fR \fBget\fR [\fB-r\fR|\fB-d\fR \fIdepth\fR][\fB-Hp\fR][\fB-o\fR \fIfield\fR[,...]] [\fB-t\fR \fItype\fR[,...]] 
+\fBzfs\fR \fBget\fR [\fB-r\fR|\fB-d\fR \fIdepth\fR][\fB-Hpc\fR][\fB-o\fR \fIfield\fR[,...]] [\fB-t\fR \fItype\fR[,...]] 
     [\fB-s\fR \fIsource\fR[,...]] "\fIall\fR" | \fIproperty\fR[,...] \fIfilesystem\fR|\fIvolume\fR|\fIsnapshot\fR ...
 .fi
 
@@ -2219,7 +2219,7 @@ Properties" section.
 .sp
 .ne 2
 .na
-\fB\fBzfs get\fR [\fB-r\fR|\fB-d\fR \fIdepth\fR] [\fB-Hp\fR] [\fB-o\fR
+\fB\fBzfs get\fR [\fB-r\fR|\fB-d\fR \fIdepth\fR] [\fB-Hpc\fR] [\fB-o\fR
 \fIfield\fR[,...] [\fB-t\fR \fItype\fR[,...]] [\fB-s\fR \fIsource\fR[,...] "\fIall\fR" |
 \fIproperty\fR[,...] \fIfilesystem\fR|\fIvolume\fR|\fIsnapshot\fR ...\fR
 .ad
@@ -2312,6 +2312,19 @@ is all sources.
 .sp .6
 .RS 4n
 Display numbers in parseable (exact) values.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-c\fR\fR
+.ad
+.sp .6
+.RS 4n
+Only display properties which can be retrieved without issuing any I/O requests,
+i.e. properties which are already cached.  Most properties are cached except for
+create-time properties (normalization, utf8only, casesensitivity) as well as a
+volume's size and block size.
 .RE
 
 .RE
