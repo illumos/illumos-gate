@@ -126,6 +126,9 @@ static intptr_t	V8_PROP_TYPE_FIELD;
 static intptr_t	V8_PROP_FIRST_PHANTOM;
 static intptr_t	V8_PROP_TYPE_MASK;
 
+static intptr_t V8_TYPE_JSOBJECT = -1;
+static intptr_t V8_TYPE_FIXEDARRAY = -1;
+
 /*
  * Although we have this information in v8_classes, the following offsets are
  * defined explicitly because they're used directly in code below.
@@ -261,6 +264,7 @@ static int conf_update_type(v8_cfg_t *, const char *);
 static int conf_update_frametype(v8_cfg_t *, const char *);
 static void conf_class_compute_offsets(v8_class_t *);
 
+static int read_typebyte(uint8_t *, uintptr_t);
 static int heap_offset(const char *, const char *, ssize_t *);
 
 /*
@@ -271,6 +275,7 @@ static int
 autoconfigure(v8_cfg_t *cfgp)
 {
 	v8_class_t *clp;
+	v8_enum_t *ep;
 	struct v8_constant *cnp;
 	int ii;
 
@@ -307,6 +312,23 @@ autoconfigure(v8_cfg_t *cfgp)
 			mdb_warn("failed to read \"%s\"", cnp->v8c_symbol);
 			return (-1);
 		}
+	}
+
+	/*
+	 * Load type values for well-known classes that we use a lot.
+	 */
+	for (ep = v8_types; ep->v8e_name[0] != '\0'; ep++) {
+		if (strcmp(ep->v8e_name, "JSObject") == 0)
+			V8_TYPE_JSOBJECT = ep->v8e_value;
+
+		if (strcmp(ep->v8e_name, "FixedArray") == 0)
+			V8_TYPE_FIXEDARRAY = ep->v8e_value;
+	}
+
+	if (V8_TYPE_JSOBJECT == -1 || V8_TYPE_FIXEDARRAY == -1) {
+		mdb_warn("couldn't find %s type\n",
+		    V8_TYPE_JSOBJECT == -1 ? "JSObject" : "FixedArray");
+		return (-1);
 	}
 
 	/*
@@ -780,7 +802,17 @@ read_heap_double(double *valp, uintptr_t addr, ssize_t off)
 static int
 read_heap_array(uintptr_t addr, uintptr_t **retp, size_t *lenp, int flags)
 {
+	uint8_t type;
 	uintptr_t len;
+
+	if (!V8_IS_HEAPOBJECT(addr))
+		return (-1);
+
+	if (read_typebyte(&type, addr) != 0)
+		return (-1);
+
+	if (type != V8_TYPE_FIXEDARRAY)
+		return (-1);
 
 	if (read_heap_smi(&len, addr, V8_OFF_FIXEDARRAY_LENGTH) != 0)
 		return (-1);
@@ -1212,7 +1244,7 @@ jsobj_properties(uintptr_t addr,
 	if (read_typebyte(&type, ptr) != 0)
 		return (-1);
 
-	if (strcmp(enum_lookup_str(v8_types, type, ""), "FixedArray") != 0)
+	if (type != V8_TYPE_FIXEDARRAY)
 		return (func(NULL, 0, arg));
 
 	if (read_heap_array(ptr, &props, &nprops, UM_SLEEP) != 0)
@@ -2202,22 +2234,8 @@ findjsobjects_range(findjsobjects_state_t *fjs, uintptr_t addr, uintptr_t size)
 	uintptr_t limit;
 	findjsobjects_stats_t *stats = &fjs->fjs_stats;
 	uint8_t type;
-	int jsobject = -1, fixedarray = -1;
-	v8_enum_t *ep;
+	int jsobject = V8_TYPE_JSOBJECT;
 
-	for (ep = v8_types; ep->v8e_name[0] != '\0'; ep++) {
-		if (strcmp(ep->v8e_name, "JSObject") == 0)
-			jsobject = ep->v8e_value;
-
-		if (strcmp(ep->v8e_name, "FixedArray") == 0)
-			fixedarray = ep->v8e_value;
-	}
-
-	if (jsobject == -1 || fixedarray == -1) {
-		v8_warn("couldn't find %s type\n",
-		    jsobject == -1 ? "JSObject" : "FixedArray");
-		return (-1);
-	}
 
 	for (limit = addr + size; addr < limit; addr++) {
 		findjsobjects_instance_t *inst;
@@ -2749,7 +2767,7 @@ dcmd_v8array(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (read_typebyte(&type, addr) != 0)
 		return (DCMD_ERR);
 
-	if (strcmp(enum_lookup_str(v8_types, type, ""), "FixedArray") != 0) {
+	if (type != V8_TYPE_FIXEDARRAY) {
 		mdb_warn("%p is not an instance of FixedArray\n", addr);
 		return (DCMD_ERR);
 	}
