@@ -1922,6 +1922,7 @@ f usr/bin/compress 0555 root bin
 f usr/bin/coreadm 0555 root bin
 f usr/bin/cp 0555 root bin
 f usr/bin/cpio 0555 root bin
+f usr/bin/cputrack 0555 root bin
 f usr/bin/crle 0555 root bin
 f usr/bin/crontab 4555 root bin
 f usr/bin/crypt 0555 root bin
@@ -11378,6 +11379,7 @@ f usr/share/man/man1/command.1 0444 root bin
 f usr/share/man/man1/compress.1 0444 root bin
 f usr/share/man/man1/cp.1 0444 root bin
 f usr/share/man/man1/cpio.1 0444 root bin
+f usr/share/man/man1/cputrack.1 0444 root bin
 f usr/share/man/man1/crle.1 0444 root bin
 f usr/share/man/man1/crontab.1 0444 root bin
 f usr/share/man/man1/crypt.1 0444 root bin
@@ -11721,6 +11723,7 @@ f usr/share/man/man1m/clinfo.1m 0444 root bin
 f usr/share/man/man1m/clri.1m 0444 root bin
 f usr/share/man/man1m/consadm.1m 0444 root bin
 f usr/share/man/man1m/coreadm.1m 0444 root bin
+f usr/share/man/man1m/cpustat.1m 0444 root bin
 f usr/share/man/man1m/cron.1m 0444 root bin
 f usr/share/man/man1m/cryptoadm.1m 0444 root bin
 f usr/share/man/man1m/dcopy.1m 0444 root bin
