@@ -18,35 +18,24 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2011 Joyent, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# cmd/stat/Makefile
+# Copyright (c) 2011, Joyent, Inc. All rights reserved.
 #
 
-include ../Makefile.cmd
+include $(SRC)/cmd/Makefile.cmd
 
-SUBDIRS=	arcstat \
-		fsstat \
-		iostat \
-		mpstat \
-		vfsstat \
-		vmstat \
-		ziostat
-
-all :=		TARGET = all
-install :=	TARGET = install
-clean :=	TARGET = clean
-clobber :=	TARGET = clobber
-lint :=		TARGET = lint
-_msg :=		TARGET = _msg
+PROG=	ziostat
 
 .KEEP_STATE:
 
-all install lint clean clobber _msg: $(SUBDIRS)
+all: $(PROG)
 
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
+install: all .WAIT $(ROOTPROG)
 
-FRC:
+clean:
+
+$(ROOTBINPROG): $(PROG)
+	$(INS.file)
+
+lint:
+
+include $(SRC)/cmd/Makefile.targ

@@ -422,7 +422,10 @@ struct zio {
 	uint64_t	io_ena;
 
 	/* Taskq dispatching state */
-	taskq_ent_t	io_tqent;
+	taskq_ent_t     io_tqent;
+	zoneid_t	io_zoneid;	/* zone which originated this I/O */
+	hrtime_t	io_start;	/* time I/O entered zio pipeline */
+	hrtime_t	io_dispatched;	/* time I/O was dispatched to disk */
 };
 
 extern zio_t *zio_null(zio_t *pio, spa_t *spa, vdev_t *vd,

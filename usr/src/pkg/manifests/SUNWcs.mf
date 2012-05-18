@@ -708,6 +708,7 @@ $(i386_ONLY)file path=usr/bin/addbadsec mode=0555
 file path=usr/bin/alias mode=0555
 file path=usr/bin/amt mode=0555
 file path=usr/bin/arch mode=0555
+file path=usr/bin/arcstat mode=0555
 file path=usr/bin/at group=sys mode=4755
 file path=usr/bin/atq group=sys mode=4755
 file path=usr/bin/atrm group=sys mode=4755
@@ -864,6 +865,7 @@ file path=usr/bin/true mode=0555
 file path=usr/bin/tty mode=0555
 file path=usr/bin/tzselect mode=0555
 file path=usr/bin/userattr mode=0555
+file path=usr/bin/vfsstat mode=0555
 file path=usr/bin/vmstat mode=0555
 file path=usr/bin/which mode=0555
 file path=usr/bin/who mode=0555
@@ -871,6 +873,7 @@ file path=usr/bin/wracct mode=0555
 file path=usr/bin/write group=tty mode=2555
 file path=usr/bin/xargs mode=0555
 file path=usr/bin/xstr mode=0555
+file path=usr/bin/ziostat mode=0555
 file path=usr/has/bin/edit mode=0555
 file path=usr/has/bin/sh mode=0555
 file path=usr/has/man/man1has/edit.1has

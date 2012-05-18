@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent Inc. All rights reserved.
  */
 
 #ifndef _SYS_ZONE_H
@@ -367,7 +368,7 @@ typedef struct zone_dataset {
 } zone_dataset_t;
 
 /*
- * structure for zone kstats
+ * structure for rctl zone kstats
  */
 typedef struct zone_kstat {
 	kstat_named_t zk_zonename;
@@ -376,6 +377,41 @@ typedef struct zone_kstat {
 } zone_kstat_t;
 
 struct cpucap;
+
+typedef struct {
+	hrtime_t	cycle_start;
+	uint_t		cycle_cnt;
+	hrtime_t	zone_avg_cnt;
+} sys_zio_cntr_t;
+
+typedef struct zone_vfs_kstat {
+	kstat_named_t 	zv_zonename;
+	kstat_named_t	zv_nread;
+	kstat_named_t	zv_reads;
+	kstat_named_t	zv_rtime;
+	kstat_named_t	zv_rlentime;
+	kstat_named_t	zv_nwritten;
+	kstat_named_t	zv_writes;
+	kstat_named_t	zv_wtime;
+	kstat_named_t	zv_wlentime;
+	kstat_named_t	zv_10ms_ops;
+	kstat_named_t	zv_100ms_ops;
+	kstat_named_t	zv_1s_ops;
+	kstat_named_t	zv_10s_ops;
+	kstat_named_t 	zv_delay_cnt;
+	kstat_named_t	zv_delay_time;
+} zone_vfs_kstat_t;
+
+typedef struct {
+	kstat_named_t	zz_zonename;
+	kstat_named_t	zz_nread;
+	kstat_named_t	zz_reads;
+	kstat_named_t	zz_rtime;
+	kstat_named_t	zz_rlentime;
+	kstat_named_t	zz_nwritten;
+	kstat_named_t	zz_writes;
+	kstat_named_t	zz_waittime;
+} zone_zfs_kstat_t;
 
 typedef struct zone {
 	/*
@@ -490,6 +526,8 @@ typedef struct zone {
 	hrtime_t	zone_pool_mod;	/* last pool bind modification time */
 	/* zone_psetid is protected by cpu_lock */
 	psetid_t	zone_psetid;	/* pset the zone is bound to */
+	time_t		zone_boot_time;	/* Similar to boot_time */
+
 	/*
 	 * The following two can be read without holding any locks.  They are
 	 * updated under cpu_lock.
@@ -517,6 +555,37 @@ typedef struct zone {
 	list_t		zone_dl_list;
 	netstack_t	*zone_netstack;
 	struct cpucap	*zone_cpucap;	/* CPU caps data */
+
+	/*
+	 * Data and counters used for ZFS fair-share disk IO.
+	 */
+	rctl_qty_t	zone_zfs_io_pri;	/* ZFS IO priority */
+	uint_t		zone_zfs_queued;	/* enqueued count */
+	uint64_t	zone_zfs_weight;	/* used to prevent starvation */
+	uint64_t	zone_io_util;		/* IO utilization metric */
+	boolean_t	zone_io_util_above_avg;	/* IO util percent > avg. */
+	uint16_t	zone_io_delay;		/* IO delay on logical r/w */
+	kmutex_t	zone_stg_io_lock;	/* protects IO window data */
+	sys_zio_cntr_t	zone_rd_ops;		/* Counters for ZFS reads, */
+	sys_zio_cntr_t	zone_wr_ops;		/* writes and logical writes. */
+	sys_zio_cntr_t	zone_lwr_ops;
+
+	/*
+	 * kstats and counters for VFS ops and bytes.
+	 */
+	kmutex_t	zone_vfs_lock;		/* protects VFS statistics */
+	kstat_t		*zone_vfs_ksp;
+	kstat_io_t	zone_vfs_rwstats;
+	zone_vfs_kstat_t *zone_vfs_stats;
+
+	/*
+	 * kstats for ZFS I/O ops and bytes.
+	 */
+	kmutex_t	zone_zfs_lock;		/* protects ZFS statistics */
+	kstat_t		*zone_zfs_ksp;
+	kstat_io_t	zone_zfs_rwstats;
+	zone_zfs_kstat_t *zone_zfs_stats;
+
 	/*
 	 * Solaris Auditing per-zone audit context
 	 */
