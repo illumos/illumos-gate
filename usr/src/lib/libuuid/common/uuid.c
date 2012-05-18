@@ -71,7 +71,6 @@ shared_buffer_t		*data;
 
 static	uuid_node_t	node_id_cache;
 static	int		node_init;
-static	int		buffer_init;
 static	int		file_type;
 static	int		fd;
 
@@ -123,11 +122,8 @@ uuid_create(struct uuid *uuid)
 	 * file_type tells us whether we had access to the state file or
 	 * created a temporary one.
 	 */
-	buffer_init = map_state();
-
-	if (!buffer_init) {
-		return (buffer_init);
-	}
+	if (map_state() == -1)
+		return (-1);
 
 	/*
 	 * Acquire the lock

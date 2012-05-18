@@ -1508,7 +1508,7 @@ sink(int argc, char *argv[])
 				error("%s\n", cp);
 				exit(1);
 			}
-			SCREWUP("expected control record");
+			SCREWUP("expected control record")
 		}
 		mode = 0;
 		for (++cp; cp < buf + 5; cp++) {

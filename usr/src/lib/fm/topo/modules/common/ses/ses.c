@@ -545,19 +545,19 @@ ses_contract_thread(void *arg)
 			/* if this is the negend, then abandon the contract */
 			ses_ct_print("got contract negend");
 			if (stp->set_ctid) {
-				snprintf(buf, sizeof (buf),
+				(void) snprintf(buf, sizeof (buf),
 				    "abandon old contract %d", stp->set_ctid);
 				ses_ct_print(buf);
 				stp->set_ctid = NULL;
 			}
 			(void) ct_ctl_abandon(ctlfd);
 		}
-		close(ctlfd);
+		(void) close(ctlfd);
 		(void) pthread_mutex_unlock(&stp->set_lock);
 		ct_event_free(ev);
 		(void) pthread_mutex_unlock(&ses_sslmt);
 	}
-	close(efd);
+	(void) close(efd);
 	return (NULL);
 }
 
@@ -692,7 +692,7 @@ ses_create_contract(topo_mod_t *mod, ses_enum_target_t *stp)
 		topo_mod_dprintf(mod, "failed to create ctid rval = %d", rval);
 	else
 		topo_mod_dprintf(mod, "created ctid=%d", stp->set_ctid);
-	close(tfd);
+	(void) close(tfd);
 }
 
 static void
@@ -715,8 +715,8 @@ ses_target_free(topo_mod_t *mod, ses_enum_target_t *stp)
 			(void) snprintf(path, PATH_MAX,
 			    CTFS_ROOT "/device/%ld/ctl", stp->set_ctid);
 			ctlfd = open64(path, O_WRONLY);
-			ct_ctl_abandon(ctlfd);
-			close(ctlfd);
+			(void) ct_ctl_abandon(ctlfd);
+			(void) close(ctlfd);
 			stp->set_ctid = NULL;
 		}
 		(void) pthread_mutex_unlock(&stp->set_lock);

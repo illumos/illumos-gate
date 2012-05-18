@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012 Joyent, Inc. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -41,6 +43,20 @@
 #include <mdb/mdb_frame.h>
 #include <mdb/mdb_whatis_impl.h>
 #include <mdb/mdb.h>
+
+/*
+ * The format of an mdb dcmd changed between MDB_API_VERSION 3 and 4, with an
+ * addition of a new field to the public interface. To maintain backwards
+ * compatibility with older versions, we know to keep around the old version of
+ * the structure so we can correctly read the set of dcmds passed in.
+ */
+typedef struct mdb_dcmd_v3 {
+	const char *dco_name;		/* Command name */
+	const char *dco_usage;		/* Usage message (optional) */
+	const char *dco_descr;		/* Description */
+	mdb_dcmd_f *dco_funcp;		/* Command function */
+	void (*dco_help)(void);		/* Command help function (or NULL) */
+} mdb_dcmd_v3_t;
 
 /*
  * For builtin modules, we set mod_init to this function, which just
@@ -91,6 +107,9 @@ mdb_module_create(const char *name, const char *fname, int mode,
 	const mdb_modinfo_t *info;
 	const mdb_dcmd_t *dcp;
 	const mdb_walker_t *wp;
+
+	const mdb_dcmd_v3_t *dcop;
+	mdb_dcmd_t *dctp = NULL;
 
 	mdb_module_t *mod;
 
@@ -164,6 +183,7 @@ mdb_module_create(const char *name, const char *fname, int mode,
 	 */
 	switch (info->mi_dvers) {
 	case MDB_API_VERSION:
+	case 3:
 	case 2:
 	case 1:
 		/*
@@ -183,6 +203,35 @@ mdb_module_create(const char *name, const char *fname, int mode,
 		warn("%s module is compiled for obsolete mdb API "
 		    "version %hu\n", name, info->mi_dvers);
 		goto err;
+	}
+
+	/*
+	 * In MDB_API_VERSION 4, the size of the mdb_dcmd_t struct changed. If
+	 * our module is from an earlier version, we need to walk it in the old
+	 * structure and convert it to the new one.
+	 *
+	 * Note that we purposefully don't predicate on whether or not we have
+	 * the empty list case and duplicate it anyways. That case is rare and
+	 * it makes our logic simpler when we need to unload the module.
+	 */
+	if (info->mi_dvers < 4) {
+		int ii = 0;
+		for (dcop = (mdb_dcmd_v3_t *)&mod->mod_info->mi_dcmds[0];
+		    dcop->dco_name != NULL; dcop++)
+			ii++;
+		/* Don't forget null terminated one at the end */
+		dctp = mdb_zalloc(sizeof (mdb_dcmd_t) * (ii + 1), UM_SLEEP);
+		ii = 0;
+		for (dcop = (mdb_dcmd_v3_t *)&mod->mod_info->mi_dcmds[0];
+		    dcop->dco_name != NULL; dcop++, ii++) {
+			dctp[ii].dc_name = dcop->dco_name;
+			dctp[ii].dc_usage = dcop->dco_usage;
+			dctp[ii].dc_descr = dcop->dco_descr;
+			dctp[ii].dc_funcp = dcop->dco_funcp;
+			dctp[ii].dc_help = dcop->dco_help;
+			dctp[ii].dc_tabp = NULL;
+		}
+		mod->mod_info->mi_dcmds = dctp;
 	}
 
 	/*
@@ -300,6 +349,7 @@ mdb_module_unload_common(const char *name)
 {
 	mdb_var_t *v = mdb_nv_lookup(&mdb.m_modules, name);
 	mdb_module_t *mod;
+	const mdb_dcmd_t *dcp;
 
 	if (v == NULL)
 		return (set_errno(EMDB_NOMOD));
@@ -358,6 +408,18 @@ mdb_module_unload_common(const char *name)
 	mdb_nv_destroy(&mod->mod_dcmds);
 
 	strfree((char *)mod->mod_name);
+
+	if (mod->mod_info->mi_dvers < 4) {
+		int ii = 0;
+
+		for (dcp = &mod->mod_info->mi_dcmds[0]; dcp->dc_name != NULL;
+		    dcp++)
+			ii++;
+
+		mdb_free((void *)mod->mod_info->mi_dcmds,
+		    sizeof (mdb_dcmd_t) * (ii + 1));
+	}
+
 	mdb_free(mod->mod_info, sizeof (mdb_modinfo_t));
 	mdb_free(mod, sizeof (mdb_module_t));
 
@@ -384,6 +446,7 @@ mdb_module_add_dcmd(mdb_module_t *mod, const mdb_dcmd_t *dcp, int flags)
 	idcp->idc_descr = dcp->dc_descr;
 	idcp->idc_help = dcp->dc_help;
 	idcp->idc_funcp = dcp->dc_funcp;
+	idcp->idc_tabp = dcp->dc_tabp;
 	idcp->idc_modp = mod;
 
 	v = mdb_nv_insert(&mod->mod_dcmds, dcp->dc_name, NULL,

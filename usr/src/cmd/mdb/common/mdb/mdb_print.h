@@ -23,8 +23,15 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012 Joyent, Inc. All rights reserved.
+ */
+
 #ifndef	_MDB_PRINT_H
 #define	_MDB_PRINT_H
+
+#include <mdb/mdb_tab.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -35,10 +42,12 @@ extern "C" {
 extern int cmd_enum(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern void enum_help(void);
 extern int cmd_sizeof(uintptr_t, uint_t, int, const mdb_arg_t *);
+extern int cmd_sizeof_tab(mdb_tab_cookie_t *, uint_t, int, const mdb_arg_t *);
 extern int cmd_offsetof(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int cmd_list(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int cmd_array(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int cmd_print(uintptr_t, uint_t, int, const mdb_arg_t *);
+extern int cmd_print_tab(mdb_tab_cookie_t *, uint_t, int, const mdb_arg_t *);
 extern void print_help(void);
 
 #endif	/* _MDB */

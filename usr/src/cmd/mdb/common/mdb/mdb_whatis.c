@@ -23,7 +23,12 @@
  * Use is subject to license terms.
  */
 
-#include <sys/mdb_modapi.h>
+/*
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012 Joyent, Inc. All rights reserved.
+ */
+
+#include <mdb/mdb_modapi.h>
 #include <mdb/mdb.h>
 #include <mdb/mdb_io.h>
 #include <mdb/mdb_module.h>

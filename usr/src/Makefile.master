@@ -22,7 +22,9 @@
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
+# Copyright (c) 2012 by Delphix. All rights reserved.
 #
+
 #
 # Makefile.master, global definitions for system source
 #
@@ -186,7 +188,7 @@ WC=		/usr/bin/wc
 XARGS=		/usr/bin/xargs
 ELFEDIT=	/usr/bin/elfedit
 ELFSIGN=	/usr/bin/elfsign
-DTRACE=		/usr/sbin/dtrace
+DTRACE=		/usr/sbin/dtrace -xnolibs
 UNIQ=		/usr/bin/uniq
 TAR=		/usr/bin/tar
 

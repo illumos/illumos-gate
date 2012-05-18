@@ -757,7 +757,7 @@ __priv_getbyname(const priv_data_t *d, const char *name)
 int
 priv_getbyname(const char *name)
 {
-	WITHPRIVLOCKED(int, -1, __priv_getbyname(GETPRIVDATA(), name));
+	WITHPRIVLOCKED(int, -1, __priv_getbyname(GETPRIVDATA(), name))
 }
 
 int
@@ -806,7 +806,7 @@ __priv_getbynum(const priv_data_t *d, int num)
 const char *
 priv_getbynum(int num)
 {
-	WITHPRIVLOCKED(const char *, NULL, __priv_getbynum(GETPRIVDATA(), num));
+	WITHPRIVLOCKED(const char *, NULL, __priv_getbynum(GETPRIVDATA(), num))
 }
 
 const char *
