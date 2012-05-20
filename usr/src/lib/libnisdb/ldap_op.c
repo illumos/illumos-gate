@@ -1664,24 +1664,10 @@ retry_noVLV:
 						goto cleanup;
 					}
 				}
-				/*
-				 * XXX the ldap_first_attribute(3LDAP) man
-				 * page says that the ldap_first_attribute/
-				 * ldap_next_attribute should be treated as
-				 * static, but the libldap.so.4 code mallocs
-				 * (and it's not TSD). So, in order to avoid
-				 * a leak, we free the return value.
-				 */
 				ldap_memfree(nm);
 				if (val != 0)
 					ldap_value_free_len(val);
 			}
-			/*
-			 * XXX ldap_next_attribute(3LDAP) says that the 'ber'
-			 * pointer is freed when it returns NULL, but that's
-			 * not implemented in the libldap.so.4 code, so we
-			 * free it here in order to avoid a memory leak.
-			 */
 			if (ber != 0)
 				ber_free(ber, 0);
 		}

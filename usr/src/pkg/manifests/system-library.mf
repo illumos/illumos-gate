@@ -334,7 +334,6 @@ file path=usr/lib/$(ARCH64)/libipp.so.1
 file path=usr/lib/$(ARCH64)/libipsecutil.so.1
 file path=usr/lib/$(ARCH64)/libkvm.so.1
 file path=usr/lib/$(ARCH64)/libl.so.1
-file path=usr/lib/$(ARCH64)/libldap.so.4
 file path=usr/lib/$(ARCH64)/libldap.so.5
 file path=usr/lib/$(ARCH64)/liblgrp.so.1
 file path=usr/lib/$(ARCH64)/liblm.so.1
@@ -405,7 +404,6 @@ file path=usr/lib/libipp.so.1
 file path=usr/lib/libipsecutil.so.1
 file path=usr/lib/libkvm.so.1
 file path=usr/lib/libl.so.1
-file path=usr/lib/libldap.so.4
 file path=usr/lib/libldap.so.5
 file path=usr/lib/liblgrp.so.1
 file path=usr/lib/liblm.so.1
@@ -556,8 +554,6 @@ license usr/src/lib/libinetutil/common/THIRDPARTYLICENSE \
     license=usr/src/lib/libinetutil/common/THIRDPARTYLICENSE
 license usr/src/lib/libkmf/THIRDPARTYLICENSE \
     license=usr/src/lib/libkmf/THIRDPARTYLICENSE
-license usr/src/lib/libldap4/THIRDPARTYLICENSE \
-    license=usr/src/lib/libldap4/THIRDPARTYLICENSE
 license usr/src/lib/libldap5/THIRDPARTYLICENSE \
     license=usr/src/lib/libldap5/THIRDPARTYLICENSE
 license usr/src/lib/libmp/common/THIRDPARTYLICENSE \
