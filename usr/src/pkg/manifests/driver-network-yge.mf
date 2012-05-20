@@ -42,6 +42,7 @@ dir path=kernel/drv/$(ARCH64) group=sys
 dir path=usr/share/man
 dir path=usr/share/man/man7d
 driver name=yge perms="* 0666 root sys" \
+    alias=pciex1148,9e00 \
     alias=pciex1186,4b00 \
     alias=pciex11ab,4354 \
     alias=pciex11ab,4355 \
