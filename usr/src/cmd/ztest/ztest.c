@@ -106,6 +106,7 @@
 #include <sys/dsl_scan.h>
 #include <sys/zio_checksum.h>
 #include <sys/refcount.h>
+#include <sys/zfeature.h>
 #include <stdio.h>
 #include <stdio_ext.h>
 #include <stdlib.h>
@@ -5572,10 +5573,9 @@ make_random_props()
 {
 	nvlist_t *props;
 
-	if (ztest_random(2) == 0)
-		return (NULL);
-
 	VERIFY(nvlist_alloc(&props, NV_UNIQUE_NAME, 0) == 0);
+	if (ztest_random(2) == 0)
+		return (props);
 	VERIFY(nvlist_add_uint64(props, "autoreplace", 1) == 0);
 
 	return (props);
@@ -5606,6 +5606,12 @@ ztest_init(ztest_shared_t *zs)
 	nvroot = make_vdev_root(NULL, NULL, ztest_opts.zo_vdev_size, 0,
 	    0, ztest_opts.zo_raidz, zs->zs_mirrors, 1);
 	props = make_random_props();
+	for (int i = 0; i < SPA_FEATURES; i++) {
+		char buf[1024];
+		(void) snprintf(buf, sizeof (buf), "feature@%s",
+		    spa_feature_table[i].fi_uname);
+		VERIFY3U(0, ==, nvlist_add_uint64(props, buf, 0));
+	}
 	VERIFY3U(0, ==, spa_create(ztest_opts.zo_pool, nvroot, props,
 	    NULL, NULL));
 	nvlist_free(nvroot);
@@ -5613,6 +5619,7 @@ ztest_init(ztest_shared_t *zs)
 	VERIFY3U(0, ==, spa_open(ztest_opts.zo_pool, &spa, FTAG));
 	zs->zs_metaslab_sz =
 	    1ULL << spa->spa_root_vdev->vdev_child[0]->vdev_ms_shift;
+
 	spa_close(spa, FTAG);
 
 	kernel_fini();
@@ -5642,14 +5649,31 @@ setup_fds(void)
 	ASSERT3U(fd, ==, ZTEST_FD_RAND);
 }
 
+static int
+shared_data_size(ztest_shared_hdr_t *hdr)
+{
+	int size;
+
+	size = hdr->zh_hdr_size;
+	size += hdr->zh_opts_size;
+	size += hdr->zh_size;
+	size += hdr->zh_stats_size * hdr->zh_stats_count;
+	size += hdr->zh_ds_size * hdr->zh_ds_count;
+
+	return (size);
+}
+
 static void
 setup_hdr(void)
 {
+	int size;
 	ztest_shared_hdr_t *hdr;
 
 	hdr = (void *)mmap(0, P2ROUNDUP(sizeof (*hdr), getpagesize()),
 	    PROT_READ | PROT_WRITE, MAP_SHARED, ZTEST_FD_DATA, 0);
 	ASSERT(hdr != MAP_FAILED);
+
+	VERIFY3U(0, ==, ftruncate(ZTEST_FD_DATA, sizeof (ztest_shared_hdr_t)));
 
 	hdr->zh_hdr_size = sizeof (ztest_shared_hdr_t);
 	hdr->zh_opts_size = sizeof (ztest_shared_opts_t);
@@ -5658,6 +5682,9 @@ setup_hdr(void)
 	hdr->zh_stats_count = ZTEST_FUNCS;
 	hdr->zh_ds_size = sizeof (ztest_shared_ds_t);
 	hdr->zh_ds_count = ztest_opts.zo_datasets;
+
+	size = shared_data_size(hdr);
+	VERIFY3U(0, ==, ftruncate(ZTEST_FD_DATA, size));
 
 	(void) munmap((caddr_t)hdr, P2ROUNDUP(sizeof (*hdr), getpagesize()));
 }
@@ -5673,11 +5700,7 @@ setup_data(void)
 	    PROT_READ, MAP_SHARED, ZTEST_FD_DATA, 0);
 	ASSERT(hdr != MAP_FAILED);
 
-	size = hdr->zh_hdr_size;
-	size += hdr->zh_opts_size;
-	size += hdr->zh_size;
-	size += hdr->zh_stats_size * hdr->zh_stats_count;
-	size += hdr->zh_ds_size * hdr->zh_ds_count;
+	size = shared_data_size(hdr);
 
 	(void) munmap((caddr_t)hdr, P2ROUNDUP(sizeof (*hdr), getpagesize()));
 	hdr = ztest_shared_hdr = (void *)mmap(0, P2ROUNDUP(size, getpagesize()),

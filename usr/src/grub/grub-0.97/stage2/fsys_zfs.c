@@ -16,9 +16,14 @@
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
+
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ */
+
+/*
+ * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 
 /*
@@ -118,16 +123,16 @@ zio_checksum_off(const void *buf, uint64_t size, zio_cksum_t *zcp)
 
 /* Checksum Table and Values */
 zio_checksum_info_t zio_checksum_table[ZIO_CHECKSUM_FUNCTIONS] = {
-	NULL,			NULL,			0, 0,	"inherit",
-	NULL,			NULL,			0, 0,	"on",
-	zio_checksum_off,	zio_checksum_off,	0, 0,	"off",
-	zio_checksum_SHA256,	zio_checksum_SHA256,	1, 1,	"label",
-	zio_checksum_SHA256,	zio_checksum_SHA256,	1, 1,	"gang_header",
-	NULL,			NULL,			0, 0,	"zilog",
-	fletcher_2_native,	fletcher_2_byteswap,	0, 0,	"fletcher2",
-	fletcher_4_native,	fletcher_4_byteswap,	1, 0,	"fletcher4",
-	zio_checksum_SHA256,	zio_checksum_SHA256,	1, 0,	"SHA256",
-	NULL,			NULL,			0, 0,	"zilog2",
+	{{NULL,			NULL},			0, 0,	"inherit"},
+	{{NULL,			NULL},			0, 0,	"on"},
+	{{zio_checksum_off,	zio_checksum_off},	0, 0,	"off"},
+	{{zio_checksum_SHA256,	zio_checksum_SHA256},	1, 1,	"label"},
+	{{zio_checksum_SHA256,	zio_checksum_SHA256},	1, 1,	"gang_header"},
+	{{NULL,			NULL},			0, 0,	"zilog"},
+	{{fletcher_2_native,	fletcher_2_byteswap},	0, 0,	"fletcher2"},
+	{{fletcher_4_native,	fletcher_4_byteswap},	1, 0,	"fletcher4"},
+	{{zio_checksum_SHA256,	zio_checksum_SHA256},	1, 0,	"SHA256"},
+	{{NULL,			NULL},			0, 0,	"zilog2"},
 };
 
 /*
@@ -217,9 +222,6 @@ vdev_uberblock_compare(uberblock_t *ub1, uberblock_t *ub2)
  * Three pieces of information are needed to verify an uberblock: the magic
  * number, the version number, and the checksum.
  *
- * Currently Implemented: version number, magic number
- * Need to Implement: checksum
- *
  * Return:
  *     0 - Success
  *    -1 - Failure
@@ -238,7 +240,7 @@ uberblock_verify(uberblock_t *uber, uint64_t ub_size, uint64_t offset)
 		return (-1);
 
 	if (uber->ub_magic == UBERBLOCK_MAGIC &&
-	    uber->ub_version > 0 && uber->ub_version <= SPA_VERSION)
+	    SPA_VERSION_IS_SUPPORTED(uber->ub_version))
 		return (0);
 
 	return (-1);
@@ -296,7 +298,7 @@ zio_read_gang(blkptr_t *bp, dva_t *dva, void *buf, char *stack)
 	zio_gb = (zio_gbh_phys_t *)stack;
 	stack += SPA_GANGBLOCKSIZE;
 	offset = DVA_GET_OFFSET(dva);
-	sector =  DVA_OFFSET_TO_PHYS_SECTOR(offset);
+	sector = DVA_OFFSET_TO_PHYS_SECTOR(offset);
 
 	/* read in the gang block header */
 	if (devread(sector, 0, SPA_GANGBLOCKSIZE, (char *)zio_gb) == 0) {
@@ -355,8 +357,8 @@ zio_read_data(blkptr_t *bp, void *buf, char *stack)
 		} else {
 			/* read in a data block */
 			offset = DVA_GET_OFFSET(&bp->blk_dva[i]);
-			sector =  DVA_OFFSET_TO_PHYS_SECTOR(offset);
-			if (devread(sector, 0, psize, buf))
+			sector = DVA_OFFSET_TO_PHYS_SECTOR(offset);
+			if (devread(sector, 0, psize, buf) != 0)
 				return (0);
 		}
 	}
@@ -400,7 +402,7 @@ zio_read(blkptr_t *bp, void *buf, char *stack)
 		stack += psize;
 	}
 
-	if (zio_read_data(bp, buf, stack)) {
+	if (zio_read_data(bp, buf, stack) != 0) {
 		grub_printf("zio_read_data failed\n");
 		return (ERR_FSYS_CORRUPT);
 	}
@@ -466,13 +468,13 @@ dmu_read(dnode_phys_t *dn, uint64_t blkid, void *buf, char *stack)
  *	errnum - failure
  */
 static int
-mzap_lookup(mzap_phys_t *zapobj, int objsize, char *name,
+mzap_lookup(mzap_phys_t *zapobj, int objsize, const char *name,
 	uint64_t *value)
 {
 	int i, chunks;
 	mzap_ent_phys_t *mzap_ent = zapobj->mz_chunk;
 
-	chunks = objsize/MZAP_ENT_LEN - 1;
+	chunks = objsize / MZAP_ENT_LEN - 1;
 	for (i = 0; i < chunks; i++) {
 		if (grub_strcmp(mzap_ent[i].mze_name, name) == 0) {
 			*value = mzap_ent[i].mze_value;
@@ -512,8 +514,8 @@ zap_hash(uint64_t salt, const char *name)
 	/*
 	 * Only use 28 bits, since we need 4 bits in the cookie for the
 	 * collision differentiator.  We MUST use the high bits, since
-	 * those are the onces that we first pay attention to when
-	 * chosing the bucket.
+	 * those are the ones that we first pay attention to when
+	 * choosing the bucket.
 	 */
 	crc &= ~((1ULL << (64 - 28)) - 1);
 
@@ -618,7 +620,7 @@ zap_leaf_lookup(zap_leaf_phys_t *l, int blksft, uint64_t h,
  */
 static int
 fzap_lookup(dnode_phys_t *zap_dnode, zap_phys_t *zap,
-    char *name, uint64_t *value, char *stack)
+    const char *name, uint64_t *value, char *stack)
 {
 	zap_leaf_phys_t *l;
 	uint64_t hash, idx, blkid;
@@ -661,7 +663,8 @@ fzap_lookup(dnode_phys_t *zap_dnode, zap_phys_t *zap,
  *	errnum - failure
  */
 static int
-zap_lookup(dnode_phys_t *zap_dnode, char *name, uint64_t *val, char *stack)
+zap_lookup(dnode_phys_t *zap_dnode, const char *name, uint64_t *val,
+    char *stack)
 {
 	uint64_t block_type;
 	int size;
@@ -672,7 +675,7 @@ zap_lookup(dnode_phys_t *zap_dnode, char *name, uint64_t *val, char *stack)
 	size = zap_dnode->dn_datablkszsec << SPA_MINBLOCKSHIFT;
 	stack += size;
 
-	if (errnum = dmu_read(zap_dnode, 0, zapbuf, stack))
+	if ((errnum = dmu_read(zap_dnode, 0, zapbuf, stack)) != 0)
 		return (errnum);
 
 	block_type = *((uint64_t *)zapbuf);
@@ -686,6 +689,56 @@ zap_lookup(dnode_phys_t *zap_dnode, char *name, uint64_t *val, char *stack)
 	}
 
 	return (ERR_FSYS_CORRUPT);
+}
+
+typedef struct zap_attribute {
+	int za_integer_length;
+	uint64_t za_num_integers;
+	uint64_t za_first_integer;
+	char *za_name;
+} zap_attribute_t;
+
+typedef int (zap_cb_t)(zap_attribute_t *za, void *arg, char *stack);
+
+static int
+zap_iterate(dnode_phys_t *zap_dnode, zap_cb_t *cb, void *arg, char *stack)
+{
+	uint32_t size = zap_dnode->dn_datablkszsec << SPA_MINBLOCKSHIFT;
+	zap_attribute_t za;
+	int i;
+	mzap_phys_t *mzp = (mzap_phys_t *)stack;
+	stack += size;
+
+	if ((errnum = dmu_read(zap_dnode, 0, mzp, stack)) != 0)
+		return (errnum);
+
+	/*
+	 * Iteration over fatzap objects has not yet been implemented.
+	 * If we encounter a pool in which there are more features for
+	 * read than can fit inside a microzap (i.e., more than 2048
+	 * features for read), we can add support for fatzap iteration.
+	 * For now, fail.
+	 */
+	if (mzp->mz_block_type != ZBT_MICRO) {
+		grub_printf("feature information stored in fatzap, pool "
+		    "version not supported\n");
+		return (1);
+	}
+
+	za.za_integer_length = 8;
+	za.za_num_integers = 1;
+	for (i = 0; i < size / MZAP_ENT_LEN - 1; i++) {
+		mzap_ent_phys_t *mzep = &mzp->mz_chunk[i];
+		int err;
+
+		za.za_first_integer = mzep->mze_value;
+		za.za_name = mzep->mze_name;
+		err = cb(&za, arg, stack);
+		if (err != 0)
+			return (err);
+	}
+
+	return (0);
 }
 
 /*
@@ -767,6 +820,24 @@ is_top_dataset_file(char *str)
 	return (0);
 }
 
+static int
+check_feature(zap_attribute_t *za, void *arg, char *stack)
+{
+	const char **names = arg;
+	int i;
+
+	if (za->za_first_integer == 0)
+		return (0);
+
+	for (i = 0; names[i] != NULL; i++) {
+		if (grub_strcmp(za->za_name, names[i]) == 0) {
+			return (0);
+		}
+	}
+	grub_printf("missing feature for read '%s'\n", za->za_name);
+	return (ERR_NEWER_VERSION);
+}
+
 /*
  * Get the file dnode for a given file name where mdn is the meta dnode
  * for this ZFS object set. When found, place the file dnode in dn.
@@ -803,11 +874,11 @@ dnode_get_path(dnode_phys_t *mdn, char *path, dnode_phys_t *dn,
 	while (*path == '/')
 		path++;
 
-	while (*path && !isspace(*path)) {
+	while (*path && !grub_isspace(*path)) {
 
 		/* get the next component name */
 		cname = path;
-		while (*path && !isspace(*path) && *path != '/')
+		while (*path && !grub_isspace(*path) && *path != '/')
 			path++;
 		ch = *path;
 		*path = 0;   /* ensure null termination */
@@ -869,6 +940,53 @@ get_default_bootfsobj(dnode_phys_t *mosmdn, uint64_t *obj, char *stack)
 }
 
 /*
+ * List of pool features that the grub implementation of ZFS supports for
+ * read. Note that features that are only required for write do not need
+ * to be listed here since grub opens pools in read-only mode.
+ */
+static const char *spa_feature_names[] = {
+	NULL
+};
+
+/*
+ * Checks whether the MOS features that are active are supported by this
+ * (GRUB's) implementation of ZFS.
+ *
+ * Return:
+ *	0: Success.
+ *	errnum: Failure.
+ */
+static int
+check_mos_features(dnode_phys_t *mosmdn, char *stack)
+{
+	uint64_t objnum;
+	dnode_phys_t *dn;
+	uint8_t error = 0;
+
+	dn = (dnode_phys_t *)stack;
+	stack += DNODE_SIZE;
+
+	if ((errnum = dnode_get(mosmdn, DMU_POOL_DIRECTORY_OBJECT,
+	    DMU_OT_OBJECT_DIRECTORY, dn, stack)) != 0)
+		return (errnum);
+
+	/*
+	 * Find the object number for 'features_for_read' and retrieve its
+	 * corresponding dnode. Note that we don't check features_for_write
+	 * because GRUB is not opening the pool for write.
+	 */
+	if ((errnum = zap_lookup(dn, DMU_POOL_FEATURES_FOR_READ, &objnum,
+	    stack)) != 0)
+		return (errnum);
+
+	if ((errnum = dnode_get(mosmdn, objnum, DMU_OTN_ZAP_METADATA,
+	    dn, stack)) != 0)
+		return (errnum);
+
+	return (zap_iterate(dn, check_feature, spa_feature_names, stack));
+}
+
+/*
  * Given a MOS metadnode, get the metadnode of a given filesystem name (fsname),
  * e.g. pool/rootfs, or a given object number (obj), e.g. the object number
  * of pool/rootfs.
@@ -915,23 +1033,24 @@ get_objset_mdn(dnode_phys_t *mosmdn, char *fsname, uint64_t *obj,
 	}
 
 	/* take out the pool name */
-	while (*fsname && !isspace(*fsname) && *fsname != '/')
+	while (*fsname && !grub_isspace(*fsname) && *fsname != '/')
 		fsname++;
 
-	while (*fsname && !isspace(*fsname)) {
+	while (*fsname && !grub_isspace(*fsname)) {
 		uint64_t childobj;
 
 		while (*fsname == '/')
 			fsname++;
 
 		cname = fsname;
-		while (*fsname && !isspace(*fsname) && *fsname != '/')
+		while (*fsname && !grub_isspace(*fsname) && *fsname != '/')
 			fsname++;
 		ch = *fsname;
 		*fsname = 0;
 
 		snapname = cname;
-		while (*snapname && !isspace(*snapname) && *snapname != '@')
+		while (*snapname && !grub_isspace(*snapname) && *snapname !=
+		    '@')
 			snapname++;
 		if (*snapname == '@') {
 			issnapshot = 1;
@@ -1020,8 +1139,7 @@ nvlist_unpack(char *nvlist, char **out)
 	if (nvlist[0] != NV_ENCODE_XDR || nvlist[1] != HOST_ENDIAN)
 		return (1);
 
-	nvlist += 4;
-	*out = nvlist;
+	*out = nvlist + 4;
 	return (0);
 }
 
@@ -1043,69 +1161,159 @@ nvlist_array(char *nvlist, int index)
 	return (nvlist);
 }
 
+/*
+ * The nvlist_next_nvpair() function returns a handle to the next nvpair in the
+ * list following nvpair. If nvpair is NULL, the first pair is returned. If
+ * nvpair is the last pair in the nvlist, NULL is returned.
+ */
+static char *
+nvlist_next_nvpair(char *nvl, char *nvpair)
+{
+	char *cur, *prev;
+	int encode_size;
+
+	if (nvl == NULL)
+		return (NULL);
+
+	if (nvpair == NULL) {
+		/* skip over nvl_version and nvl_nvflag */
+		nvpair = nvl + 4 * 2;
+	} else {
+		/* skip to the next nvpair */
+		encode_size = BSWAP_32(*(uint32_t *)nvpair);
+		nvpair += encode_size;
+	}
+
+	/* 8 bytes of 0 marks the end of the list */
+	if (*(uint64_t *)nvpair == 0)
+		return (NULL);
+
+	return (nvpair);
+}
+
+/*
+ * This function returns 0 on success and 1 on failure. On success, a string
+ * containing the name of nvpair is saved in buf.
+ */
+static int
+nvpair_name(char *nvp, char *buf, int buflen)
+{
+	int len;
+
+	/* skip over encode/decode size */
+	nvp += 4 * 2;
+
+	len = BSWAP_32(*(uint32_t *)nvp);
+	if (buflen < len + 1)
+		return (1);
+
+	grub_memmove(buf, nvp + 4, len);
+	buf[len] = '\0';
+
+	return (0);
+}
+
+/*
+ * This function retrieves the value of the nvpair in the form of enumerated
+ * type data_type_t. This is used to determine the appropriate type to pass to
+ * nvpair_value().
+ */
+static int
+nvpair_type(char *nvp)
+{
+	int name_len, type;
+
+	/* skip over encode/decode size */
+	nvp += 4 * 2;
+
+	/* skip over name_len */
+	name_len = BSWAP_32(*(uint32_t *)nvp);
+	nvp += 4;
+
+	/* skip over name */
+	nvp = nvp + ((name_len + 3) & ~3); /* align */
+
+	type = BSWAP_32(*(uint32_t *)nvp);
+
+	return (type);
+}
+
+static int
+nvpair_value(char *nvp, void *val, int valtype, int *nelmp)
+{
+	int name_len, type, slen;
+	char *strval = val;
+	uint64_t *intval = val;
+
+	/* skip over encode/decode size */
+	nvp += 4 * 2;
+
+	/* skip over name_len */
+	name_len = BSWAP_32(*(uint32_t *)nvp);
+	nvp += 4;
+
+	/* skip over name */
+	nvp = nvp + ((name_len + 3) & ~3); /* align */
+
+	/* skip over type */
+	type = BSWAP_32(*(uint32_t *)nvp);
+	nvp += 4;
+
+	if (type == valtype) {
+		int nelm;
+
+		nelm = BSWAP_32(*(uint32_t *)nvp);
+		if (valtype != DATA_TYPE_BOOLEAN && nelm < 1)
+			return (1);
+		nvp += 4;
+
+		switch (valtype) {
+		case DATA_TYPE_BOOLEAN:
+			return (0);
+
+		case DATA_TYPE_STRING:
+			slen = BSWAP_32(*(uint32_t *)nvp);
+			nvp += 4;
+			grub_memmove(strval, nvp, slen);
+			strval[slen] = '\0';
+			return (0);
+
+		case DATA_TYPE_UINT64:
+			*intval = BSWAP_64(*(uint64_t *)nvp);
+			return (0);
+
+		case DATA_TYPE_NVLIST:
+			*(void **)val = (void *)nvp;
+			return (0);
+
+		case DATA_TYPE_NVLIST_ARRAY:
+			*(void **)val = (void *)nvp;
+			if (nelmp)
+				*nelmp = nelm;
+			return (0);
+		}
+	}
+
+	return (1);
+}
+
 static int
 nvlist_lookup_value(char *nvlist, char *name, void *val, int valtype,
     int *nelmp)
 {
-	int name_len, type, slen, encode_size;
-	char *nvpair, *nvp_name, *strval = val;
-	uint64_t *intval = val;
+	char *nvpair;
 
-	/* skip the header, nvl_version, and nvl_nvflag */
-	nvlist = nvlist + 4 * 2;
-
-	/*
-	 * Loop thru the nvpair list
-	 * The XDR representation of an integer is in big-endian byte order.
-	 */
-	while (encode_size = BSWAP_32(*(uint32_t *)nvlist))  {
-
-		nvpair = nvlist + 4 * 2; /* skip the encode/decode size */
-
-		name_len = BSWAP_32(*(uint32_t *)nvpair);
-		nvpair += 4;
-
-		nvp_name = nvpair;
-		nvpair = nvpair + ((name_len + 3) & ~3); /* align */
-
-		type = BSWAP_32(*(uint32_t *)nvpair);
-		nvpair += 4;
+	for (nvpair = nvlist_next_nvpair(nvlist, NULL);
+	    nvpair != NULL;
+	    nvpair = nvlist_next_nvpair(nvlist, nvpair)) {
+		int name_len = BSWAP_32(*(uint32_t *)(nvpair + 4 * 2));
+		char *nvp_name = nvpair + 4 * 3;
 
 		if ((grub_strncmp(nvp_name, name, name_len) == 0) &&
-		    type == valtype) {
-			int nelm;
-
-			if ((nelm = BSWAP_32(*(uint32_t *)nvpair)) < 1)
-				return (1);
-			nvpair += 4;
-
-			switch (valtype) {
-			case DATA_TYPE_STRING:
-				slen = BSWAP_32(*(uint32_t *)nvpair);
-				nvpair += 4;
-				grub_memmove(strval, nvpair, slen);
-				strval[slen] = '\0';
-				return (0);
-
-			case DATA_TYPE_UINT64:
-				*intval = BSWAP_64(*(uint64_t *)nvpair);
-				return (0);
-
-			case DATA_TYPE_NVLIST:
-				*(void **)val = (void *)nvpair;
-				return (0);
-
-			case DATA_TYPE_NVLIST_ARRAY:
-				*(void **)val = (void *)nvpair;
-				if (nelmp)
-					*nelmp = nelm;
-				return (0);
-			}
+		    nvpair_type(nvpair) == valtype) {
+			return (nvpair_value(nvpair, val, valtype, nelmp));
 		}
-
-		nvlist += encode_size; /* goto the next nvpair */
 	}
-
 	return (1);
 }
 
@@ -1142,7 +1350,7 @@ vdev_get_bootpath(char *nv, uint64_t inguid, char *devid, char *bootpath,
 	    NULL))
 		return (ERR_FSYS_CORRUPT);
 
-	if (strcmp(type, VDEV_TYPE_DISK) == 0) {
+	if (grub_strcmp(type, VDEV_TYPE_DISK) == 0) {
 		uint64_t guid;
 
 		if (vdev_validate(nv) != 0)
@@ -1172,15 +1380,15 @@ vdev_get_bootpath(char *nv, uint64_t inguid, char *devid, char *bootpath,
 		    devid, DATA_TYPE_STRING, NULL) != 0)
 			devid[0] = '\0';
 
-		if (strlen(bootpath) >= MAXPATHLEN ||
-		    strlen(devid) >= MAXPATHLEN)
+		if (grub_strlen(bootpath) >= MAXPATHLEN ||
+		    grub_strlen(devid) >= MAXPATHLEN)
 			return (ERR_WONT_FIT);
 
 		return (0);
 
-	} else if (strcmp(type, VDEV_TYPE_MIRROR) == 0 ||
-	    strcmp(type, VDEV_TYPE_REPLACING) == 0 ||
-	    (is_spare = (strcmp(type, VDEV_TYPE_SPARE) == 0))) {
+	} else if (grub_strcmp(type, VDEV_TYPE_MIRROR) == 0 ||
+	    grub_strcmp(type, VDEV_TYPE_REPLACING) == 0 ||
+	    (is_spare = (grub_strcmp(type, VDEV_TYPE_SPARE) == 0))) {
 		int nelm, i;
 		char *child;
 
@@ -1208,15 +1416,14 @@ vdev_get_bootpath(char *nv, uint64_t inguid, char *devid, char *bootpath,
  *	0 - success
  *	ERR_* - failure
  */
-int
+static int
 check_pool_label(uint64_t sector, char *stack, char *outdevid,
-    char *outpath, uint64_t *outguid, uint64_t *outashift)
+    char *outpath, uint64_t *outguid, uint64_t *outashift, uint64_t *outversion)
 {
 	vdev_phys_t *vdev;
 	uint64_t pool_state, txg = 0;
-	char *nvlist, *nv;
+	char *nvlist, *nv, *features;
 	uint64_t diskguid;
-	uint64_t version;
 
 	sector += (VDEV_SKIP_SIZE >> SPA_MINBLOCKSHIFT);
 
@@ -1249,10 +1456,10 @@ check_pool_label(uint64_t sector, char *stack, char *outdevid,
 	if (txg == 0)
 		return (ERR_NO_BOOTPATH);
 
-	if (nvlist_lookup_value(nvlist, ZPOOL_CONFIG_VERSION, &version,
+	if (nvlist_lookup_value(nvlist, ZPOOL_CONFIG_VERSION, outversion,
 	    DATA_TYPE_UINT64, NULL))
 		return (ERR_FSYS_CORRUPT);
-	if (version > SPA_VERSION)
+	if (!SPA_VERSION_IS_SUPPORTED(*outversion))
 		return (ERR_NEWER_VERSION);
 	if (nvlist_lookup_value(nvlist, ZPOOL_CONFIG_VDEV_TREE, &nv,
 	    DATA_TYPE_NVLIST, NULL))
@@ -1268,6 +1475,30 @@ check_pool_label(uint64_t sector, char *stack, char *outdevid,
 	if (nvlist_lookup_value(nvlist, ZPOOL_CONFIG_POOL_GUID, outguid,
 	    DATA_TYPE_UINT64, NULL))
 		return (ERR_FSYS_CORRUPT);
+
+	if (nvlist_lookup_value(nvlist, ZPOOL_CONFIG_FEATURES_FOR_READ,
+	    &features, DATA_TYPE_NVLIST, NULL) == 0) {
+		char *nvp;
+		char *name = stack;
+		stack += MAXNAMELEN;
+
+		for (nvp = nvlist_next_nvpair(features, NULL);
+		    nvp != NULL;
+		    nvp = nvlist_next_nvpair(features, nvp)) {
+			zap_attribute_t za;
+
+			if (nvpair_name(nvp, name, MAXNAMELEN) != 0)
+				return (ERR_FSYS_CORRUPT);
+
+			za.za_integer_length = 8;
+			za.za_num_integers = 1;
+			za.za_first_integer = 1;
+			za.za_name = name;
+			if (check_feature(&za, spa_feature_names, stack) != 0)
+				return (ERR_NEWER_VERSION);
+		}
+	}
+
 	return (0);
 }
 
@@ -1288,7 +1519,7 @@ zfs_mount(void)
 	objset_phys_t *osp;
 	char tmp_bootpath[MAXNAMELEN];
 	char tmp_devid[MAXNAMELEN];
-	uint64_t tmp_guid, ashift;
+	uint64_t tmp_guid, ashift, version;
 	uint64_t adjpl = (uint64_t)part_length << SPA_MINBLOCKSHIFT;
 	int err = errnum; /* preserve previous errnum state */
 
@@ -1331,7 +1562,7 @@ zfs_mount(void)
 			continue;
 
 		if (check_pool_label(sector, stack, tmp_devid,
-		    tmp_bootpath, &tmp_guid, &ashift))
+		    tmp_bootpath, &tmp_guid, &ashift, &version))
 			continue;
 
 		if (pool_guid == 0)
@@ -1342,6 +1573,10 @@ zfs_mount(void)
 			continue;
 
 		VERIFY_OS_TYPE(osp, DMU_OST_META);
+
+		if (version >= SPA_VERSION_FEATURES &&
+		    check_mos_features(&osp->os_meta_dnode, stack) != 0)
+			continue;
 
 		if (find_best_root && ((pool_guid != tmp_guid) ||
 		    vdev_uberblock_compare(ubbest, &(current_uberblock)) <= 0))
@@ -1479,7 +1714,6 @@ int
 zfs_read(char *buf, int len)
 {
 	char *stack;
-	char *tmpbuf;
 	int blksz, length, movesize;
 
 	if (file_buf == NULL) {

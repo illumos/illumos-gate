@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -1237,6 +1238,9 @@ do_print_vdev(uintptr_t addr, int flags, int depth, int stats,
 		case VDEV_AUX_VERSION_OLDER:
 			aux = "VERS_OLDER";
 			break;
+		case VDEV_AUX_UNSUP_FEAT:
+			aux = "UNSUP_FEAT";
+			break;
 		case VDEV_AUX_SPARED:
 			aux = "SPARED";
 			break;
@@ -2182,7 +2186,7 @@ zfs_blkstats(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	tzb = &stats.zab_type[DN_MAX_LEVELS][DMU_OT_NUMTYPES];
+	tzb = &stats.zab_type[DN_MAX_LEVELS][DMU_OT_TOTAL];
 	if (tzb->zb_gangs != 0) {
 		mdb_printf("Ganged blocks: %llu\n",
 		    (longlong_t)tzb->zb_gangs);
@@ -2198,7 +2202,7 @@ zfs_blkstats(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_printf("\nBlocks\tLSIZE\tPSIZE\tASIZE"
 	    "\t  avg\t comp\t%%Total\tType\n");
 
-	for (t = 0; t <= DMU_OT_NUMTYPES; t++) {
+	for (t = 0; t <= DMU_OT_TOTAL; t++) {
 		char csize[NICENUM_BUFLEN], lsize[NICENUM_BUFLEN];
 		char psize[NICENUM_BUFLEN], asize[NICENUM_BUFLEN];
 		char avg[NICENUM_BUFLEN];
@@ -2209,6 +2213,8 @@ zfs_blkstats(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 		if (t == DMU_OT_DEFERRED)
 			strcpy(typename, "deferred free");
+		else if (t == DMU_OT_OTHER)
+			strcpy(typename, "other");
 		else if (t == DMU_OT_TOTAL)
 			strcpy(typename, "Total");
 		else if (mdb_readstr(typename, sizeof (typename),

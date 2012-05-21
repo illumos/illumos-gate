@@ -20,13 +20,14 @@
 #
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2011 by Delphix. All rights reserved.
+# Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
 LIBRARY= libzfs.a
 VERS= .1
 
 OBJS_SHARED=			\
+	zfeature_common.o	\
 	zfs_comutil.o		\
 	zfs_deleg.o		\
 	zfs_fletcher.o		\

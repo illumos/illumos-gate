@@ -22,7 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
 LIBRARY=	libnvpair.a
@@ -31,7 +31,8 @@ VERS=		.1
 OBJECTS=	libnvpair.o \
 		nvpair_alloc_system.o \
 		nvpair_alloc_fixed.o \
-		nvpair.o
+		nvpair.o \
+		fnvpair.o
 
 include ../../Makefile.lib
 include ../../Makefile.rootfs
@@ -39,7 +40,8 @@ include ../../Makefile.rootfs
 SRCS=		../libnvpair.c \
 		../nvpair_alloc_system.c \
 		$(SRC)/common/nvpair/nvpair_alloc_fixed.c \
-		$(SRC)/common/nvpair/nvpair.c
+		$(SRC)/common/nvpair/nvpair.c \
+		$(SRC)/common/nvpair/fnvpair.c
 
 #
 # Libraries added to the next line must be present in miniroot

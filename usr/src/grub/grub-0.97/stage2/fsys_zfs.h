@@ -16,10 +16,16 @@
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
+
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ */
+
 #ifndef _FSYS_ZFS_H
 #define	_FSYS_ZFS_H
 
@@ -119,10 +125,36 @@ typedef struct uberblock uberblock_t;
 #define	NV_ENCODE_NATIVE	0
 #define	NV_ENCODE_XDR		1
 #define	HOST_ENDIAN		1	/* for x86 machine */
-#define	DATA_TYPE_UINT64	8
-#define	DATA_TYPE_STRING	9
-#define	DATA_TYPE_NVLIST	19
-#define	DATA_TYPE_NVLIST_ARRAY	20
+typedef enum {
+	DATA_TYPE_UNKNOWN = 0,
+	DATA_TYPE_BOOLEAN,
+	DATA_TYPE_BYTE,
+	DATA_TYPE_INT16,
+	DATA_TYPE_UINT16,
+	DATA_TYPE_INT32,
+	DATA_TYPE_UINT32,
+	DATA_TYPE_INT64,
+	DATA_TYPE_UINT64,
+	DATA_TYPE_STRING,
+	DATA_TYPE_BYTE_ARRAY,
+	DATA_TYPE_INT16_ARRAY,
+	DATA_TYPE_UINT16_ARRAY,
+	DATA_TYPE_INT32_ARRAY,
+	DATA_TYPE_UINT32_ARRAY,
+	DATA_TYPE_INT64_ARRAY,
+	DATA_TYPE_UINT64_ARRAY,
+	DATA_TYPE_STRING_ARRAY,
+	DATA_TYPE_HRTIME,
+	DATA_TYPE_NVLIST,
+	DATA_TYPE_NVLIST_ARRAY,
+	DATA_TYPE_BOOLEAN_VALUE,
+	DATA_TYPE_INT8,
+	DATA_TYPE_UINT8,
+	DATA_TYPE_BOOLEAN_ARRAY,
+	DATA_TYPE_INT8_ARRAY,
+	DATA_TYPE_UINT8_ARRAY,
+	DATA_TYPE_DOUBLE
+} data_type_t;
 
 /*
  * Decompression Entry - lzjb

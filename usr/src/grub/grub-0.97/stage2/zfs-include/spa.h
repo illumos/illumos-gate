@@ -16,9 +16,14 @@
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
+
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ */
+
+/*
+ * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 
 #ifndef _SYS_SPA_H
@@ -65,7 +70,7 @@
 /*
  * Size of block to hold the configuration data (a packed nvlist)
  */
-#define	SPA_CONFIG_BLOCKSIZE	(1 << 14)
+#define	SPA_CONFIG_BLOCKSIZE	(1ULL << 14)
 
 /*
  * The DVA size encodings for LSIZE and PSIZE support blocks up to 32MB.

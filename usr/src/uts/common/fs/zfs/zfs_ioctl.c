@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Portions Copyright 2011 Martin Matuska
@@ -1134,6 +1135,8 @@ getzfsvfs(const char *dsname, zfsvfs_t **zfvp)
 /*
  * Find a zfsvfs_t for a mounted filesystem, or create our own, in which
  * case its z_vfs will be NULL, and it will be opened as the owner.
+ * If 'writer' is set, the z_teardown_lock will be held for RW_WRITER,
+ * which prevents all vnode ops from running.
  */
 static int
 zfsvfs_hold(const char *name, void *tag, zfsvfs_t **zfvp, boolean_t writer)
@@ -1197,7 +1200,7 @@ zfs_ioc_pool_create(zfs_cmd_t *zc)
 
 		(void) nvlist_lookup_uint64(props,
 		    zpool_prop_to_name(ZPOOL_PROP_VERSION), &version);
-		if (version < SPA_VERSION_INITIAL || version > SPA_VERSION) {
+		if (!SPA_VERSION_IS_SUPPORTED(version)) {
 			error = EINVAL;
 			goto pool_props_bad;
 		}
@@ -1321,6 +1324,15 @@ zfs_ioc_pool_configs(zfs_cmd_t *zc)
 	return (error);
 }
 
+/*
+ * inputs:
+ * zc_name		name of the pool
+ *
+ * outputs:
+ * zc_cookie		real errno
+ * zc_nvlist_dst	config nvlist
+ * zc_nvlist_dst_size	size of config nvlist
+ */
 static int
 zfs_ioc_pool_stats(zfs_cmd_t *zc)
 {
@@ -1422,7 +1434,8 @@ zfs_ioc_pool_upgrade(zfs_cmd_t *zc)
 	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
 		return (error);
 
-	if (zc->zc_cookie < spa_version(spa) || zc->zc_cookie > SPA_VERSION) {
+	if (zc->zc_cookie < spa_version(spa) ||
+	    !SPA_VERSION_IS_SUPPORTED(zc->zc_cookie)) {
 		spa_close(spa, FTAG);
 		return (EINVAL);
 	}

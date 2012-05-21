@@ -21,10 +21,8 @@
 
 #
 # Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
-#
-
-#
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+# Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
 #
@@ -245,6 +243,7 @@ GENUNIX_OBJS +=	\
 		nvpair.o	\
 		nvpair_alloc_system.o	\
 		nvpair_alloc_fixed.o	\
+		fnvpair.o	\
 		octet.o		\
 		open.o		\
 		p_online.o	\
@@ -1088,7 +1087,7 @@ DRM_OBJS += drm_sunmod.o drm_kstat.o drm_agpsupport.o \
 	    drm_auth.o drm_bufs.o drm_context.o drm_dma.o \
 	    drm_drawable.o drm_drv.o drm_fops.o drm_ioctl.o drm_irq.o \
 	    drm_lock.o drm_memory.o drm_msg.o drm_pci.o drm_scatter.o \
-	    drm_cache.o drm_gem.o drm_mm.o ati_pcigart.o 
+	    drm_cache.o drm_gem.o drm_mm.o ati_pcigart.o
 
 FM_OBJS += devfm.o devfm_machdep.o
 
@@ -1330,6 +1329,7 @@ ZFS_COMMON_OBJS +=		\
 	arc.o			\
 	bplist.o		\
 	bpobj.o			\
+	bptree.o		\
 	dbuf.o			\
 	ddt.o			\
 	ddt_zap.o		\
@@ -1351,6 +1351,7 @@ ZFS_COMMON_OBJS +=		\
 	dsl_deleg.o		\
 	dsl_prop.o		\
 	dsl_scan.o		\
+	zfeature.o		\
 	gzip.o			\
 	lzjb.o			\
 	metaslab.o		\
@@ -1393,11 +1394,12 @@ ZFS_COMMON_OBJS +=		\
 	zrlock.o
 
 ZFS_SHARED_OBJS +=		\
-	zfs_namecheck.o		\
-	zfs_deleg.o		\
-	zfs_prop.o		\
+	zfeature_common.o	\
 	zfs_comutil.o		\
+	zfs_deleg.o		\
 	zfs_fletcher.o		\
+	zfs_namecheck.o		\
+	zfs_prop.o		\
 	zpool_prop.o		\
 	zprop_common.o
 
@@ -1555,7 +1557,7 @@ SWRANDPROV_OBJS += swrand.o
 #
 #			kernel SSL
 #
-KSSL_OBJS +=	kssl.o ksslioctl.o 
+KSSL_OBJS +=	kssl.o ksslioctl.o
 
 KSSL_SOCKFIL_MOD_OBJS += ksslfilter.o ksslapi.o ksslrec.o
 

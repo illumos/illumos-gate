@@ -59,6 +59,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	libzfs_init;
 	libzfs_mnttab_cache;
 	libzfs_print_on_error;
+	spa_feature_table;
 	zfs_allocatable_devs;
 	zfs_asprintf;
 	zfs_clone;
@@ -201,10 +202,14 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zpool_obj_to_path;
 	zpool_open;
 	zpool_open_canfail;
+	zpool_print_unsup_feat;
 	zpool_prop_align_right;
 	zpool_prop_column_name;
+	zpool_prop_feature;
+	zpool_prop_get_feature;
 	zpool_prop_readonly;
 	zpool_prop_to_name;
+	zpool_prop_unsupported;
 	zpool_prop_values;
 	zpool_read_label;
 	zpool_refresh_stats;
