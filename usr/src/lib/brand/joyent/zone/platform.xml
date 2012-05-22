@@ -37,7 +37,8 @@
 
 	<global_mount special="/lib" directory="/lib"
 	    opt="ro,nodevices" type="lofs" />
-	<global_mount special="%P/manifests" directory="/lib/svc/manifest"
+	<global_mount special="%P/manifests/joyent"
+	    directory="/lib/svc/manifest"
 	    opt="ro,nodevices" type="lofs" />
 	<global_mount special="%R/site" directory="/lib/svc/manifest/site"
 	    opt="nodevices" type="lofs" />
