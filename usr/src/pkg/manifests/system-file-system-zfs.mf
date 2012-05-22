@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/file-system/zfs@$(PKGVERS)
@@ -131,6 +132,7 @@ file path=usr/share/man/man1m/zdb.1m
 file path=usr/share/man/man1m/zfs.1m
 file path=usr/share/man/man1m/zpool.1m
 file path=usr/share/man/man1m/zstreamdump.1m
+file path=usr/share/man/man5/zpool-features.5
 hardlink path=kernel/fs/$(ARCH64)/zfs target=../../../kernel/drv/$(ARCH64)/zfs
 $(i386_ONLY)hardlink path=kernel/fs/zfs target=../../kernel/drv/zfs
 hardlink path=usr/lib/fs/zfs/fstyp target=../../../sbin/fstyp

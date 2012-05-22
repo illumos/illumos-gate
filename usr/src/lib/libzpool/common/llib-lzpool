@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ */
+
 /* LINTLIBRARY */
 /* PROTOLIB1 */
 
@@ -52,6 +56,8 @@
 #include <sys/ddt.h>
 #include <sys/sa.h>
 #include <sys/zfs_sa.h>
+#include <sys/zfeature.h>
 
 extern uint64_t metaslab_gang_bang;
 extern uint64_t metaslab_df_alloc_threshold;
+extern boolean_t zfeature_checks_disable;

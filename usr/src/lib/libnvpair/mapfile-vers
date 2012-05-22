@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
 #
@@ -37,6 +38,73 @@
 #
 
 $mapfile_version 2
+
+SYMBOL_VERSION ILLUMOS_0.1 {	# Illumos additions
+    global:
+    fnvlist_alloc;
+    fnvlist_free;
+    fnvlist_size;
+    fnvlist_pack;
+    fnvlist_pack_free;
+    fnvlist_unpack;
+    fnvlist_dup;
+    fnvlist_merge;
+    fnvlist_add_boolean;
+    fnvlist_add_boolean_value;
+    fnvlist_add_byte;
+    fnvlist_add_int8;
+    fnvlist_add_uint8;
+    fnvlist_add_int16;
+    fnvlist_add_uint16;
+    fnvlist_add_int32;
+    fnvlist_add_uint32;
+    fnvlist_add_int64;
+    fnvlist_add_uint64;
+    fnvlist_add_string;
+    fnvlist_add_nvlist;
+    fnvlist_add_nvpair;
+    fnvlist_add_boolean_array;
+    fnvlist_add_byte_array;
+    fnvlist_add_int8_array;
+    fnvlist_add_uint8_array;
+    fnvlist_add_int16_array;
+    fnvlist_add_uint16_array;
+    fnvlist_add_int32_array;
+    fnvlist_add_uint32_array;
+    fnvlist_add_int64_array;
+    fnvlist_add_uint64_array;
+    fnvlist_add_string_array;
+    fnvlist_add_nvlist_array;
+    fnvlist_remove;
+    fnvlist_remove_nvpair;
+    fnvlist_lookup_nvpair;
+    fnvlist_lookup_boolean;
+    fnvlist_lookup_boolean_value;
+    fnvlist_lookup_byte;
+    fnvlist_lookup_int8;
+    fnvlist_lookup_int16;
+    fnvlist_lookup_int32;
+    fnvlist_lookup_int64;
+    fnvlist_lookup_uint8_t;
+    fnvlist_lookup_uint16;
+    fnvlist_lookup_uint32;
+    fnvlist_lookup_uint64;
+    fnvlist_lookup_string;
+    fnvlist_lookup_nvlist;
+    fnvpair_value_boolean_value;
+    fnvpair_value_byte;
+    fnvpair_value_int8;
+    fnvpair_value_int16;
+    fnvpair_value_int32;
+    fnvpair_value_int64;
+    fnvpair_value_uint8_t;
+    fnvpair_value_uint16;
+    fnvpair_value_uint32;
+    fnvpair_value_uint64;
+    fnvpair_value_string;
+    fnvpair_value_nvlist;
+} SUNW_1.3;
+
 
 SYMBOL_VERSION SUNW_1.3 {
     global:

@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+ /*
+  * Copyright (c) 2012 by Delphix. All rights reserved.
+  */
+
 /*LINTLIBRARY*/
 /*PROTOLIB1*/
 
@@ -31,3 +35,4 @@
 #include "../../../common/zfs/zfs_comutil.h"
 #include "../../../common/zfs/zfs_fletcher.h"
 #include "../../../common/zfs/zfs_prop.h"
+#include "../../../common/zfs/zfeature_common.h"
