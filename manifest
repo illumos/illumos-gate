@@ -5001,29 +5001,6 @@ f usr/lib/audit/audit_record_attr 0444 root bin
 d usr/lib/autofs 0755 root sys
 f usr/lib/autofs/automountd 0555 root bin
 d usr/lib/brand 0755 root bin
-d usr/lib/brand/joyent 0755 root bin
-f usr/lib/brand/joyent/common.ksh 0444 root root
-f usr/lib/brand/joyent/config.xml 0444 root root
-f usr/lib/brand/joyent/jattach 0755 root root
-f usr/lib/brand/joyent/jdetach 0755 root root
-f usr/lib/brand/joyent/jinstall 0755 root root
-f usr/lib/brand/joyent/juninstall 0755 root root
-f usr/lib/brand/joyent/platform.xml 0444 root root
-f usr/lib/brand/joyent/poststate 0755 root root
-f usr/lib/brand/joyent/prestate 0755 root root
-f usr/lib/brand/joyent/query 0755 root root
-f usr/lib/brand/joyent/statechange 0755 root root
-d usr/lib/brand/kvm 0755 root bin
-f usr/lib/brand/kvm/common.ksh 0444 root root
-f usr/lib/brand/kvm/config.xml 0444 root root
-f usr/lib/brand/kvm/kattach 0755 root root
-f usr/lib/brand/kvm/kdetach 0755 root root
-f usr/lib/brand/kvm/kinstall 0755 root root
-f usr/lib/brand/kvm/kuninstall 0755 root root
-f usr/lib/brand/kvm/platform.xml 0444 root root
-f usr/lib/brand/kvm/poststate 0755 root root
-f usr/lib/brand/kvm/prestate 0755 root root
-f usr/lib/brand/kvm/statechange 0755 root root
 d usr/lib/brand/shared 0755 root sys
 f usr/lib/brand/shared/common.ksh 0444 root bin
 f usr/lib/brand/shared/query 0755 root bin
@@ -10476,7 +10453,6 @@ f usr/sbin/zic 0555 root bin
 f usr/sbin/zlogin 0555 root bin
 f usr/sbin/zoneadm 0555 root bin
 f usr/sbin/zonecfg 0555 root bin
-f usr/sbin/zonemon 0555 root bin
 s usr/sbin/zpool=../../sbin/zpool
 f usr/sbin/zstreamdump 0555 root bin
 d usr/sfw 0755 root bin

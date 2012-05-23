@@ -30,7 +30,7 @@ include ../../Makefile.master
 # Build everything in parallel; use .WAIT for dependencies
 .PARALLEL:
 
-SUBDIRS= shared .WAIT sn1 solaris10 ipkg joyent kvm labeled $($(MACH)_SUBDIRS)
+SUBDIRS= shared .WAIT sn1 solaris10 ipkg labeled $($(MACH)_SUBDIRS)
 MSGSUBDIRS= solaris10 shared $($(MACH)_MSGSUBDIRS)
 
 all :=		TARGET= all
