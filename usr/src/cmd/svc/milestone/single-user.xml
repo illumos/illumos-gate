@@ -95,7 +95,7 @@
 
 	<dependency
 		name='manifests'
-		grouping='require_all'
+		grouping='optional_all'
 		restart_on='none'
 		type='service'>
 		<service_fmri value='svc:/system/manifest-import' />
