@@ -495,7 +495,6 @@ d etc/xdg 0755 root sys
 d etc/xdg/autostart 0755 root sys
 d etc/zfs 0755 root sys
 d etc/zones 0755 root sys
-f etc/zones/Joyent.xml 0444 root bin
 f etc/zones/SUNWblank.xml 0444 root bin
 f etc/zones/index 0644 root sys
 s etc/zprofile=profile
