@@ -44,6 +44,7 @@
 #include <sys/kmem.h>
 #include <sys/sunddi.h>
 #include <sys/sysmacros.h>
+#include <sys/fcntl.h>
 
 #include <netsmb/smb_osdep.h>
 
@@ -151,18 +152,20 @@ make_smbnode(smbmntinfo_t *, const char *, int, int *);
  * Free the resources associated with an smbnode.
  * Note: This is different from smbfs_inactive
  *
- * NFS: nfs_subr.c:rinactive
+ * From NFS: nfs_subr.c:rinactive
  */
 static void
 sn_inactive(smbnode_t *np)
 {
 	vsecattr_t	ovsa;
 	cred_t		*oldcr;
-	char 		*orpath;
+	char		*orpath;
 	int		orplen;
+	vnode_t		*vp;
 
 	/*
-	 * Flush and invalidate all pages (todo)
+	 * Here NFS has:
+	 * Flush and invalidate all pages (done by caller)
 	 * Free any held credentials and caches...
 	 * etc.  (See NFS code)
 	 */
@@ -181,6 +184,11 @@ sn_inactive(smbnode_t *np)
 	np->n_rplen = 0;
 
 	mutex_exit(&np->r_statelock);
+
+	vp = SMBTOV(np);
+	if (vn_has_cached_data(vp)) {
+		ASSERT3P(vp,==,NULL);
+	}
 
 	if (ovsa.vsa_aclentp != NULL)
 		kmem_free(ovsa.vsa_aclentp, ovsa.vsa_aclentsz);
@@ -204,7 +212,7 @@ sn_inactive(smbnode_t *np)
  *
  * Note: make_smbnode() may upgrade the "hash" lock to exclusive.
  *
- * NFS: nfs_subr.c:makenfsnode
+ * Based on NFS: nfs_subr.c:makenfsnode
  */
 smbnode_t *
 smbfs_node_findcreate(
@@ -286,13 +294,6 @@ smbfs_node_findcreate(
 	 * dealing with any cache impact, etc.
 	 */
 	vp = SMBTOV(np);
-	if (!newnode) {
-		/*
-		 * Found an existing node.
-		 * Maybe purge caches...
-		 */
-		smbfs_cache_check(vp, fap);
-	}
 	smbfs_attrcache_fa(vp, fap);
 
 	/*
@@ -305,13 +306,13 @@ smbfs_node_findcreate(
 }
 
 /*
- * NFS: nfs_subr.c:rtablehash
+ * Here NFS has: nfs_subr.c:rtablehash
  * We use smbfs_hash().
  */
 
 /*
  * Find or create an smbnode.
- * NFS: nfs_subr.c:make_rnode
+ * From NFS: nfs_subr.c:make_rnode
  */
 static smbnode_t *
 make_smbnode(
@@ -434,14 +435,10 @@ start:
 	np->n_gid = mi->smi_gid;
 	/* Leave attributes "stale." */
 
-#if 0 /* XXX dircache */
 	/*
-	 * We don't know if it's a directory yet.
-	 * Let the caller do this?  XXX
+	 * Here NFS has avl_create(&np->r_dir, ...)
+	 * for the readdir cache (not used here).
 	 */
-	avl_create(&np->r_dir, compar, sizeof (rddir_cache),
-	    offsetof(rddir_cache, tree));
-#endif
 
 	/* Now fill in the vnode. */
 	vn_setops(vp, smbfs_vnodeops);
@@ -499,7 +496,7 @@ start:
  * Normally called by smbfs_inactive, but also
  * called in here during cleanup operations.
  *
- * NFS: nfs_subr.c:rp_addfree
+ * From NFS: nfs_subr.c:rp_addfree
  */
 void
 smbfs_addfree(smbnode_t *np)
@@ -627,7 +624,7 @@ smbfs_addfree(smbnode_t *np)
  * The caller must be holding smbfreelist_lock and the smbnode
  * must be on the freelist.
  *
- * NFS: nfs_subr.c:rp_rmfree
+ * From NFS: nfs_subr.c:rp_rmfree
  */
 static void
 sn_rmfree(smbnode_t *np)
@@ -653,7 +650,7 @@ sn_rmfree(smbnode_t *np)
  *
  * The caller must be hold the rwlock as writer.
  *
- * NFS: nfs_subr.c:rp_addhash
+ * From NFS: nfs_subr.c:rp_addhash
  */
 static void
 sn_addhash_locked(smbnode_t *np, avl_index_t where)
@@ -675,7 +672,7 @@ sn_addhash_locked(smbnode_t *np, avl_index_t where)
  *
  * The caller must hold the rwlock as writer.
  *
- * NFS: nfs_subr.c:rp_rmhash_locked
+ * From NFS: nfs_subr.c:rp_rmhash_locked
  */
 static void
 sn_rmhash_locked(smbnode_t *np)
@@ -712,7 +709,7 @@ smbfs_rmhash(smbnode_t *np)
  *
  * The caller must be holding the AVL rwlock, either shared or exclusive.
  *
- * NFS: nfs_subr.c:rfind
+ * From NFS: nfs_subr.c:rfind
  */
 static smbnode_t *
 sn_hashfind(
@@ -867,7 +864,7 @@ int smbfs_check_table_debug = 0;
  * etc. will redo the necessary checks before actually destroying
  * any smbnodes.
  *
- * NFS: nfs_subr.c:check_rtable
+ * From NFS: nfs_subr.c:check_rtable
  *
  * Debugging changes here relative to NFS.
  * Relatively harmless, so left 'em in.
@@ -926,7 +923,7 @@ smbfs_check_table(struct vfs *vfsp, smbnode_t *rtnp)
  * vfs.  It is essential that we destroy all inactive vnodes during a
  * forced unmount as well as during a normal unmount.
  *
- * NFS: nfs_subr.c:destroy_rtable
+ * Based on NFS: nfs_subr.c:destroy_rtable
  *
  * In here, we're normally destrying all or most of the AVL tree,
  * so the natural choice is to use avl_destroy_nodes.  However,
@@ -1011,7 +1008,7 @@ smbfs_destroy_table(struct vfs *vfsp)
  * This routine destroys all the resources associated with the smbnode
  * and then the smbnode itself.  Note: sn_inactive has been called.
  *
- * NFS: nfs_subr.c:destroy_rnode
+ * From NFS: nfs_subr.c:destroy_rnode
  */
 static void
 sn_destroy_node(smbnode_t *np)
@@ -1038,17 +1035,146 @@ sn_destroy_node(smbnode_t *np)
 }
 
 /*
+ * From NFS rflush()
  * Flush all vnodes in this (or every) vfs.
- * Used by nfs_sync and by nfs_unmount.
+ * Used by smbfs_sync and by smbfs_unmount.
  */
 /*ARGSUSED*/
 void
 smbfs_rflush(struct vfs *vfsp, cred_t *cr)
 {
-	/* Todo: mmap support. */
+	smbmntinfo_t *mi;
+	smbnode_t *np;
+	vnode_t *vp, **vplist;
+	long num, cnt;
+
+	mi = VFTOSMI(vfsp);
+
+	/*
+	 * Check to see whether there is anything to do.
+	 */
+	num = avl_numnodes(&mi->smi_hash_avl);
+	if (num == 0)
+		return;
+
+	/*
+	 * Allocate a slot for all currently active rnodes on the
+	 * supposition that they all may need flushing.
+	 */
+	vplist = kmem_alloc(num * sizeof (*vplist), KM_SLEEP);
+	cnt = 0;
+
+	/*
+	 * Walk the AVL tree looking for rnodes with page
+	 * lists associated with them.  Make a list of these
+	 * files.
+	 */
+	rw_enter(&mi->smi_hash_lk, RW_READER);
+	for (np = avl_first(&mi->smi_hash_avl); np != NULL;
+	    np = avl_walk(&mi->smi_hash_avl, np, AVL_AFTER)) {
+		vp = SMBTOV(np);
+		/*
+		 * Don't bother sync'ing a vp if it
+		 * is part of virtual swap device or
+		 * if VFS is read-only
+		 */
+		if (IS_SWAPVP(vp) || vn_is_readonly(vp))
+			continue;
+		/*
+		 * If the vnode has pages and is marked as either
+		 * dirty or mmap'd, hold and add this vnode to the
+		 * list of vnodes to flush.
+		 */
+		if (vn_has_cached_data(vp) &&
+		    ((np->r_flags & RDIRTY) || np->r_mapcnt > 0)) {
+			VN_HOLD(vp);
+			vplist[cnt++] = vp;
+			if (cnt == num)
+				break;
+		}
+	}
+	rw_exit(&mi->smi_hash_lk);
+
+	/*
+	 * Flush and release all of the files on the list.
+	 */
+	while (cnt-- > 0) {
+		vp = vplist[cnt];
+		(void) VOP_PUTPAGE(vp, (u_offset_t)0, 0, B_ASYNC, cr, NULL);
+		VN_RELE(vp);
+	}
+
+	kmem_free(vplist, num * sizeof (vnode_t *));
 }
 
-/* access cache (nfs_subr.c) not used here */
+/* Here NFS has access cache stuff (nfs_subr.c) not used here */
+
+/*
+ * Set or Clear direct I/O flag
+ * VOP_RWLOCK() is held for write access to prevent a race condition
+ * which would occur if a process is in the middle of a write when
+ * directio flag gets set. It is possible that all pages may not get flushed.
+ * From nfs_common.c
+ */
+
+/* ARGSUSED */
+int
+smbfs_directio(vnode_t *vp, int cmd, cred_t *cr)
+{
+	int	error = 0;
+	smbnode_t	*np;
+
+	np = VTOSMB(vp);
+
+	if (cmd == DIRECTIO_ON) {
+
+		if (np->r_flags & RDIRECTIO)
+			return (0);
+
+		/*
+		 * Flush the page cache.
+		 */
+
+		(void) VOP_RWLOCK(vp, V_WRITELOCK_TRUE, NULL);
+
+		if (np->r_flags & RDIRECTIO) {
+			VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, NULL);
+			return (0);
+		}
+
+		/* Here NFS also checks ->r_awcount */
+		if (vn_has_cached_data(vp) &&
+		    (np->r_flags & RDIRTY) != 0) {
+			error = VOP_PUTPAGE(vp, (offset_t)0, (uint_t)0,
+			    B_INVAL, cr, NULL);
+			if (error) {
+				if (error == ENOSPC || error == EDQUOT) {
+					mutex_enter(&np->r_statelock);
+					if (!np->r_error)
+						np->r_error = error;
+					mutex_exit(&np->r_statelock);
+				}
+				VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, NULL);
+				return (error);
+			}
+		}
+
+		mutex_enter(&np->r_statelock);
+		np->r_flags |= RDIRECTIO;
+		mutex_exit(&np->r_statelock);
+		VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, NULL);
+		return (0);
+	}
+
+	if (cmd == DIRECTIO_OFF) {
+		mutex_enter(&np->r_statelock);
+		np->r_flags &= ~RDIRECTIO;	/* disable direct mode */
+		mutex_exit(&np->r_statelock);
+		return (0);
+	}
+
+	return (EINVAL);
+}
 
 static kmutex_t smbfs_newnum_lock;
 static uint32_t smbfs_newnum_val = 0;
@@ -1056,7 +1182,7 @@ static uint32_t smbfs_newnum_val = 0;
 /*
  * Return a number 0..0xffffffff that's different from the last
  * 0xffffffff numbers this returned.  Used for unlinked files.
- * (This too was copied from nfs_subr.c)
+ * From NFS nfs_subr.c newnum
  */
 uint32_t
 smbfs_newnum(void)
@@ -1090,7 +1216,7 @@ smbfs_newname(char *buf, size_t buflen)
  * initialize resources that are used by smbfs_subr.c
  * this is called from the _init() routine (by the way of smbfs_clntinit())
  *
- * NFS: nfs_subr.c:nfs_subrinit
+ * From NFS: nfs_subr.c:nfs_subrinit
  */
 int
 smbfs_subrinit(void)
@@ -1134,7 +1260,7 @@ smbfs_subrinit(void)
 
 /*
  * free smbfs hash table, etc.
- * NFS: nfs_subr.c:nfs_subrfini
+ * From NFS: nfs_subr.c:nfs_subrfini
  */
 void
 smbfs_subrfini(void)
@@ -1209,5 +1335,7 @@ smbfs_kmem_reclaim(void *cdrarg)
 	smbfs_node_reclaim();
 }
 
-/* nfs failover stuff */
-/* nfs_rw_xxx - see smbfs_rwlock.c */
+/*
+ * Here NFS has failover stuff and
+ * nfs_rw_xxx - see smbfs_rwlock.c
+ */

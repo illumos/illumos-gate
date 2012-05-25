@@ -202,11 +202,6 @@ smbfs_nget(vnode_t *dvp, const char *name, int nmlen,
 }
 
 /*
- * smbfs_attrcache_enter, smbfs_attrcache_lookup replaced by
- * code more closely resembling NFS.  See smbfs_client.c
- */
-
-/*
  * Update the local notion of the mtime of some directory.
  * See comments re. r_mtime in smbfs_node.h
  */
