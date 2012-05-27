@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 /*
@@ -913,8 +914,10 @@ _get_snapshot(scf_instance_t *inst, const char *snapshot,
 	scf_handle_t *h;
 
 	h = scf_instance_handle(inst);
-	if (h == NULL)
+	if (h == NULL) {
+		*snap = NULL;
 		return (-1);
+	}
 
 	if ((*snap = scf_snapshot_create(h)) == NULL) {
 		return (-1);
@@ -2150,7 +2153,8 @@ _get_next_iterator(scf_handle_t *h, scf_pg_tmpl_t *t, const char *snapshot,
 				scf_instance_destroy(t->pt_inst);
 			t->pt_inst = _get_restarter_inst(h, t->pt_orig_svc,
 			    t->pt_orig_inst, t->pt_snap);
-			scf_service_destroy(t->pt_svc);
+			if (t->pt_svc != t->pt_orig_svc)
+				scf_service_destroy(t->pt_svc);
 			t->pt_svc = NULL;
 			break;
 
@@ -2159,7 +2163,8 @@ _get_next_iterator(scf_handle_t *h, scf_pg_tmpl_t *t, const char *snapshot,
 			if (t->pt_inst != t->pt_orig_inst)
 				scf_instance_destroy(t->pt_inst);
 			t->pt_inst = _get_global_inst(h);
-			scf_service_destroy(t->pt_svc);
+			if (t->pt_svc != t->pt_orig_svc)
+				scf_service_destroy(t->pt_svc);
 			t->pt_svc = NULL;
 			break;
 
@@ -2180,7 +2185,6 @@ _get_next_iterator(scf_handle_t *h, scf_pg_tmpl_t *t, const char *snapshot,
 		    &t->pt_snap) == -1)
 			goto fail;
 	}
-
 
 	iter = _get_svc_or_inst_iter(h, t);
 fail:
