@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -1313,7 +1314,7 @@ void mptsas_dma_addr_destroy(ddi_dma_handle_t *, ddi_acc_handle_t *);
  */
 int mptsas_ioc_wait_for_response(mptsas_t *mpt);
 int mptsas_ioc_wait_for_doorbell(mptsas_t *mpt);
-int mptsas_ioc_reset(mptsas_t *mpt);
+int mptsas_ioc_reset(mptsas_t *mpt, int);
 int mptsas_send_handshake_msg(mptsas_t *mpt, caddr_t memp, int numbytes,
     ddi_acc_handle_t accessp);
 int mptsas_get_handshake_msg(mptsas_t *mpt, caddr_t memp, int numbytes,
