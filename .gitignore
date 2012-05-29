@@ -2535,6 +2535,8 @@ usr/src/cmd/zdb/amd64/zdb
 usr/src/cmd/zdb/i386/zdb
 usr/src/cmd/zdump/zdump
 usr/src/cmd/zfs/zfs
+usr/src/cmd/zhack/amd64/zhack
+usr/src/cmd/zhack/i386/zhack
 usr/src/cmd/zic/native/
 usr/src/cmd/zic/tzselect
 usr/src/cmd/zic/zic
