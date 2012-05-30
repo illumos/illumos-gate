@@ -1829,6 +1829,7 @@ f usr/bin/amd64/ld 0755 root bin
 f usr/bin/amd64/ldd 0555 root bin
 f usr/bin/amd64/ls 0555 root bin
 f usr/bin/amd64/mac 0555 root bin
+f usr/bin/amd64/mcs 0555 root bin
 f usr/bin/amd64/mdb 0555 root bin
 f usr/bin/amd64/moe 0555 root bin
 f usr/bin/amd64/newtask 4555 root sys
@@ -2122,6 +2123,7 @@ h usr/bin/mc68010=usr/bin/sun
 h usr/bin/mc68020=usr/bin/sun
 h usr/bin/mc68030=usr/bin/sun
 h usr/bin/mc68040=usr/bin/sun
+f usr/bin/mcs 0555 root bin
 h usr/bin/mdb=usr/lib/isaexec
 f usr/bin/mesg 0555 root bin
 f usr/bin/mkbootmedia 0555 root bin
