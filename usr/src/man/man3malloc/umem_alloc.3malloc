@@ -1,5 +1,6 @@
 '\" te
 .\" Copyright (c) 2008 Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright (c) 2012 Joyent, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
@@ -172,6 +173,31 @@ Set the underlying function used to allocate memory. This option can be set to
 \fBsbrk\fR (the default) for an \fBsbrk\fR(2)-based source or \fBmmap\fR for an
 \fBmmap\fR(2)-based source. If set to a value that is not supported, \fBsbrk\fR
 will be used.
+.RE
+
+.ne 2
+.na
+\fB\fBallocator\fR=\fBbest\fR\fR
+.ad
+.br
+.na
+\fB\fBallocator\fR=\fBfirst\fR\fR
+.ad
+.br
+.na
+\fB\fBallocator\fR=\fBinstant\fR\fR
+.ad
+.br
+.na
+\fB\fBallocator\fR=\fBnext\fR\fR
+.ad
+.RS 16n
+Set the underlying allocation strategy. The \fBbest\fR fit strategy tells
+libumem to use the smallest free segment possible. The \fBinstant\fR fit
+strategy approximates the best fit strategy in constant cpu time. The
+\fBfirst\fR fit strategy takes the first free segment that can honor the
+allocation. The \fBnext\fR fit strategy uses the next free segment after the
+previously allocated one.
 .RE
 
 .RE
