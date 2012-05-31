@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
  */
 
 #ifndef	_SYS_MAC_IMPL_H
@@ -885,6 +886,8 @@ extern void mac_protect_fini(mac_client_impl_t *);
 extern int mac_set_resources(mac_handle_t, mac_resource_props_t *);
 extern void mac_get_resources(mac_handle_t, mac_resource_props_t *);
 extern void mac_get_effective_resources(mac_handle_t, mac_resource_props_t *);
+extern void mac_set_promisc_filtered(mac_client_handle_t, boolean_t);
+extern boolean_t mac_get_promisc_filtered(mac_client_handle_t);
 
 extern cpupart_t *mac_pset_find(mac_resource_props_t *, boolean_t *);
 extern void mac_set_pool_effective(boolean_t, cpupart_t *,

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011 Joyent Inc. All rights reserved.
+ * Copyright (c) 2012 Joyent, Inc. All rights reserved.
  */
 
 #include <stdio.h>
@@ -961,6 +961,7 @@ typedef struct show_linkprop_state {
 	char			ls_link[MAXLINKNAMELEN];
 	char			*ls_line;
 	char			**ls_propvals;
+	char			*ls_zonename;
 	dladm_arg_list_t	*ls_proplist;
 	boolean_t		ls_parsable;
 	boolean_t		ls_persist;
@@ -6797,6 +6798,7 @@ do_show_linkprop(int argc, char **argv, const char *use)
 	    != DLADM_STATUS_OK)
 		die("invalid link properties specified");
 	state.ls_proplist = proplist;
+	state.ls_zonename = zonename;
 	state.ls_status = DLADM_STATUS_OK;
 
 	if (state.ls_parsable)
@@ -6839,6 +6841,17 @@ show_linkprop_onelink(dladm_handle_t hdl, datalink_id_t linkid, void *arg)
 	    statep->ls_link, MAXLINKNAMELEN) != DLADM_STATUS_OK) {
 		statep->ls_status = DLADM_STATUS_NOTFOUND;
 		return (DLADM_WALK_CONTINUE);
+	}
+
+	if (statep->ls_zonename != NULL) {
+		datalink_id_t	tlinkid;
+
+		if (dladm_zname2info(hdl, statep->ls_zonename, statep->ls_link,
+		    &tlinkid, NULL, NULL, NULL) != DLADM_STATUS_OK ||
+		    linkid != tlinkid) {
+			statep->ls_status = DLADM_STATUS_NOTFOUND;
+			return (DLADM_WALK_CONTINUE);
+		}
 	}
 
 	if ((statep->ls_persist && !(flags & DLADM_OPT_PERSIST)) ||

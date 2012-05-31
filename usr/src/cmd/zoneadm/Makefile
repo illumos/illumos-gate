@@ -25,7 +25,7 @@
 #
 
 PROG=		zoneadm
-SCRIPTS=	zonemon
+SCRIPTS=
 MANIFEST=	zones.xml resource-mgmt.xml
 SVCMETHOD=	svc-zones svc-resource-mgmt
 
