@@ -144,11 +144,11 @@ amd_generic_mc_create(topo_mod_t *mod, uint16_t smbid, tnode_t *cnode,
 	/*
 	 * Elsewhere we have already returned for families less than 0xf.
 	 * This "generic" topology is adequate for all of family 0xf and
-	 * for revisions A to D of family 0x10 (for the list of models
+	 * for revisions A to E of family 0x10 (for the list of models
 	 * in each revision, refer to usr/src/uts/i86pc/os/cpuid_subr.c).
-	 * We cover all family 0x10 models, till model 9.
+	 * We cover all family 0x10 models, till model 10.
 	 */
-	if (family > 0x10 || (family == 0x10 && model > 9))
+	if (family > 0x10 || (family == 0x10 && model > 10))
 		return (1);
 
 	if (topo_node_range_create(mod, mcnode, CHAN_NODE_NAME, 0,
