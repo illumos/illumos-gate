@@ -24,10 +24,12 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ */
+
 #ifndef _SYS_SDT_IMPL_H
 #define	_SYS_SDT_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -45,6 +47,7 @@ typedef struct sdt_provider {
 	char			*sdtp_name;	/* name of provider */
 	char			*sdtp_prefix;	/* prefix for probe names */
 	dtrace_pattr_t		*sdtp_attr;	/* stability attributes */
+	uint32_t		sdtp_priv;	/* privilege, if any */
 	dtrace_provider_id_t	sdtp_id;	/* provider ID */
 } sdt_provider_t;
 
@@ -75,6 +78,7 @@ typedef struct sdt_argdesc {
 } sdt_argdesc_t;
 
 extern void sdt_getargdesc(void *, dtrace_id_t, void *, dtrace_argdesc_t *);
+extern int sdt_mode(void *, dtrace_id_t, void *);
 
 #ifdef	__cplusplus
 }

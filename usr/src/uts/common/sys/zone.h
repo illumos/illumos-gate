@@ -538,6 +538,11 @@ typedef struct zone {
 	rctl_qty_t	zone_nprocs_ctl;	/* current limit protected by */
 						/* zone_rctls->rcs_lock */
 	kstat_t		*zone_nprocs_kstat;
+
+	/*
+	 * DTrace-private per-zone state
+	 */
+	int		zone_dtrace_getf;	/* # of unprivileged getf()s */
 } zone_t;
 
 /*

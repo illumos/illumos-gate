@@ -23,7 +23,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ */
 
 #pragma D depends_on module unix
 #pragma D depends_on provider io
@@ -197,9 +199,7 @@ translator fileinfo_t < struct file *F > {
 	fi_oflags = F == NULL ? 0 : F->f_flag + (int)@FOPEN@;
 };
 
-inline fileinfo_t fds[int fd] = xlate <fileinfo_t> (
-    fd >= 0 && fd < curthread->t_procp->p_user.u_finfo.fi_nfiles ?
-    curthread->t_procp->p_user.u_finfo.fi_list[fd].uf_file : NULL);
+inline fileinfo_t fds[int fd] = xlate <fileinfo_t> (getf(fd));
 
 #pragma D attributes Stable/Stable/Common fds
 #pragma D binding "1.1" fds
