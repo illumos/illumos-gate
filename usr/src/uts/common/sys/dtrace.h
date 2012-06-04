@@ -287,8 +287,9 @@ typedef enum dtrace_probespec {
 #define	DIF_SUBR_INET_NTOA6		43
 #define	DIF_SUBR_TOUPPER		44
 #define	DIF_SUBR_TOLOWER		45
+#define	DIF_SUBR_GETF			46
 
-#define	DIF_SUBR_MAX			45	/* max subroutine value */
+#define	DIF_SUBR_MAX			46	/* max subroutine value */
 
 typedef uint32_t dif_instr_t;
 
@@ -2244,6 +2245,7 @@ extern void (*dtrace_helpers_cleanup)();
 extern void (*dtrace_helpers_fork)(proc_t *parent, proc_t *child);
 extern void (*dtrace_cpustart_init)();
 extern void (*dtrace_cpustart_fini)();
+extern void (*dtrace_closef)();
 
 extern void (*dtrace_debugger_init)();
 extern void (*dtrace_debugger_fini)();

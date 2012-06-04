@@ -703,6 +703,11 @@ typedef struct zone {
 	uint32_t	zone_fss_shr_pct;	/* fss active shr % in intvl */
 	uint64_t	zone_fss_pri_hi;	/* fss high pri this interval */
 	uint64_t	zone_fss_pri_avg;	/* fss avg pri this interval */
+
+	/*
+	 * DTrace-private per-zone state
+	 */
+	int		zone_dtrace_getf;	/* # of unprivileged getf()s */
 } zone_t;
 
 /*

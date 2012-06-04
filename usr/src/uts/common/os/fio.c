@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -54,6 +55,7 @@
 #include <sys/poll.h>
 #include <sys/rctl.h>
 #include <sys/port_impl.h>
+#include <sys/dtrace.h>
 
 #include <c2/audit.h>
 #include <sys/nbmlock.h>
@@ -951,6 +953,18 @@ closef(file_t *fp)
 	}
 	ASSERT(fp->f_count == 0);
 	mutex_exit(&fp->f_tlock);
+
+	/*
+	 * If DTrace has getf() subroutines active, it will set dtrace_closef
+	 * to point to code that implements a barrier with respect to probe
+	 * context.  This must be called before the file_t is freed (and the
+	 * vnode that it refers to is released) -- but it must be after the
+	 * file_t has been removed from the uf_entry_t.  That is, there must
+	 * be no way for a racing getf() in probe context to yield the fp that
+	 * we're operating upon.
+	 */
+	if (dtrace_closef != NULL)
+		(*dtrace_closef)();
 
 	VN_RELE(vp);
 	/*

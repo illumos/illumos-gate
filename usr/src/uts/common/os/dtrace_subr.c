@@ -44,6 +44,7 @@ void (*dtrace_helpers_fork)(proc_t *, proc_t *);
 void (*dtrace_cpustart_init)(void);
 void (*dtrace_cpustart_fini)(void);
 void (*dtrace_cpc_fire)(uint64_t);
+void (*dtrace_closef)(void);
 
 void (*dtrace_debugger_init)(void);
 void (*dtrace_debugger_fini)(void);
