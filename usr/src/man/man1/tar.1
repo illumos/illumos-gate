@@ -16,7 +16,7 @@ tar \- create tape archives and add or extract files
 .SH SYNOPSIS
 .LP
 .nf
-\fBtar\fR c[BDeEFhilnopPqTvw@/[0-7]][bfk][X...][j|J|z|Z] [\fIblocksize\fR]
+\fBtar\fR c[BDeEFhilnopPqTvw@/[0-7]][bfk][X...][a|j|J|z|Z] [\fIblocksize\fR]
      [\fItarfile\fR] [\fIsize\fR] [\fIexclude-file\fR]...
      {\fIfile\fR | \(miI \fIinclude-file\fR | \(miC \fIdirectory\fR \fIfile\fR}...
 .fi
@@ -239,6 +239,17 @@ displays how each file was archived.
 .LP
 The characters below can be used in conjunction with the letter that selects
 the desired function.
+.sp
+.ne 2
+.na
+\fB\fBa\fR\fR
+.ad
+.sp .6
+.RS 4n
+During a \fBcreate\fR operation autodetect compression based on the archive
+suffix.
+.RE
+
 .sp
 .ne 2
 .na
