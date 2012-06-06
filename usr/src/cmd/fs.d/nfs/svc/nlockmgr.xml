@@ -38,7 +38,7 @@
 <service
 	name='network/nfs/nlockmgr'
 	type='service'
-	version='1'>
+	version='2'>
 
 	<dependency name='network'
 	    grouping='require_any'
@@ -96,7 +96,7 @@
 	    <propval name='grace_period' type='integer' value='90'/>
 	    <propval name='lockd_listen_backlog' type='integer' value='32'/>
 	    <propval name='lockd_retransmit_timeout' type='integer' value='5'/>
-	    <propval name='lockd_servers' type='integer' value='20'/>
+	    <propval name='lockd_servers' type='integer' value='256'/>
 	  </property_group>
 	</instance>
 	<stability value='Stable' />

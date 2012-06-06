@@ -19,7 +19,7 @@
 .\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2016 Nexenta Systems, Inc.
 .\"
-.Dd November 16, 2016
+.Dd December 16, 2016
 .Dt NFS 4
 .Os
 .Sh NAME
@@ -140,7 +140,7 @@ Maximum number of concurrent NFS requests. Equivalent to last numeric argument
 on the
 .Nm nfsd
 command line. The default is
-.Li 16 .
+.Li 1024 .
 .It Sy lockd_listen_backlog Ns = Ns Ar num
 Set connection queue length for
 .Nm lockd
@@ -149,7 +149,7 @@ over a connection-oriented transport. The default and minimum value is
 .It Sy lockd_servers Ns = Ns Ar num
 Maximum number of concurrent
 .Nm lockd
-requests. The default is 20.
+requests. The default is 256.
 .It Sy lockd_retransmit_timeout Ns = Ns Ar num
 Retransmit timeout, in seconds, before
 .Nm lockd

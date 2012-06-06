@@ -93,7 +93,7 @@ struct lm_svc_args lmargs = {
 	.grace = 90,
 	.retransmittimeout = 5
 };
-int max_servers = 20;
+int max_servers = 256;
 
 
 #define	RET_OK		0	/* return code for no error */
