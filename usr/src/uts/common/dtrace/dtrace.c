@@ -1313,19 +1313,17 @@ dtrace_priv_probe(dtrace_state_t *state, dtrace_mstate_t *mstate,
 		mode = pops->dtps_mode(prov->dtpv_arg,
 		    probe->dtpr_id, probe->dtpr_arg);
 
-		ASSERT((mode & DTRACE_MODE_USER) ||
-		    (mode & DTRACE_MODE_KERNEL));
-		ASSERT((mode & DTRACE_MODE_NOPRIV_RESTRICT) ||
-		    (mode & DTRACE_MODE_NOPRIV_DROP));
+		ASSERT(mode & (DTRACE_MODE_USER | DTRACE_MODE_KERNEL));
+		ASSERT(mode & (DTRACE_MODE_NOPRIV_RESTRICT |
+		    DTRACE_MODE_NOPRIV_DROP));
 	}
 
 	/*
 	 * If the dte_cond bits indicate that this consumer is only allowed to
-	 * see user-mode firings of this probe, call the provider's dtps_mode()
-	 * entry point to check that the probe was fired while in a user
-	 * context.  If that's not the case, use the policy specified by the
-	 * provider to determine if we drop the probe or merely restrict
-	 * operation.
+	 * see user-mode firings of this probe, check that the probe was fired
+	 * while in a user context.  If that's not the case, use the policy
+	 * specified by the provider to determine if we drop the probe or
+	 * merely restrict operation.
 	 */
 	if (ecb->dte_cond & DTRACE_COND_USERMODE) {
 		ASSERT(mode != DTRACE_MODE_NOPRIV_DROP);
@@ -1391,6 +1389,15 @@ dtrace_priv_probe(dtrace_state_t *state, dtrace_mstate_t *mstate,
 			    ~(DTRACE_ACCESS_PROC | DTRACE_ACCESS_ARGS);
 		}
 	}
+
+	/*
+	 * By merits of being in this code path at all, we have limited
+	 * privileges.  If the provider has indicated that limited privileges
+	 * are to denote restricted operation, strip off the ability to access
+	 * arguments.
+	 */
+	if (mode & DTRACE_MODE_LIMITEDPRIV_RESTRICT)
+		mstate->dtms_access &= ~DTRACE_ACCESS_ARGS;
 
 	return (1);
 }
