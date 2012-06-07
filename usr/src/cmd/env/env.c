@@ -20,6 +20,9 @@
  */
 
 /*
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ */
+/*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -101,7 +104,8 @@ main(int argc, char **argv)
 			(void) puts(*p++);
 	} else {
 		(void) execvp(argv[optind],  &argv[optind]);
-		(void) perror(argv[0]);
+		(void) fprintf(stderr, "%s: %s: %s\n", argv[0], argv[optind],
+		    strerror(errno));
 		exit(((errno == ENOENT) || (errno == ENOTDIR)) ? 127 : 126);
 	}
 	return (0);

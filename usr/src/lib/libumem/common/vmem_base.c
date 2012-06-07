@@ -22,14 +22,14 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Joyent, Inc. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "vmem_base.h"
 #include "umem_base.h"
 
 uint_t vmem_backend = 0;
+uint_t vmem_allocator = 0;
 
 vmem_t *
 vmem_heap_arena(vmem_alloc_t **allocp, vmem_free_t **freep)

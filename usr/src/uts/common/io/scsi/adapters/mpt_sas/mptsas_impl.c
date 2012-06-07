@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -955,7 +956,7 @@ mptsas_kick_start(mptsas_t *mpt)
 }
 
 int
-mptsas_ioc_reset(mptsas_t *mpt)
+mptsas_ioc_reset(mptsas_t *mpt, int first_time)
 {
 	int		polls = 0;
 	uint32_t	reset_msg;
@@ -973,8 +974,16 @@ mptsas_ioc_reset(mptsas_t *mpt)
 	 * it a message unit reset to put it back in the ready state
 	 */
 	if (ioc_state & MPI2_IOC_STATE_OPERATIONAL) {
-		if (mpt->m_event_replay && (mpt->m_softstate &
-		    MPTSAS_SS_MSG_UNIT_RESET)) {
+		/*
+		 * If the first time, try MUR anyway, because we haven't even
+		 * queried the card for m_event_replay and other capabilities.
+		 * Other platforms do it this way, we can still do a hard
+		 * reset if we need to, MUR takes less time than a full
+		 * adapter reset, and there are reports that some HW
+		 * combinations will lock up when receiving a hard reset.
+		 */
+		if ((first_time || mpt->m_event_replay) &&
+		    (mpt->m_softstate & MPTSAS_SS_MSG_UNIT_RESET)) {
 			mpt->m_softstate &= ~MPTSAS_SS_MSG_UNIT_RESET;
 			reset_msg = MPI2_FUNCTION_IOC_MESSAGE_UNIT_RESET;
 			ddi_put32(mpt->m_datap, &mpt->m_reg->Doorbell,
