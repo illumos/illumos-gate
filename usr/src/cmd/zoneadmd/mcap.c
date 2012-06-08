@@ -432,6 +432,8 @@ pageout_process(pid_t pid, int64_t excess)
 	if ((psfd = open(pathbuf, O_RDONLY, 0000)) < 0)
 		return (excess);
 
+	cur.pr_xmapp = NULL;
+
 	if (pread(psfd, &psinfo, sizeof (psinfo), 0) != sizeof (psinfo))
 		goto done;
 
