@@ -23,9 +23,7 @@
  * Use is subject to license terms.
  */
 
-/*
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
- */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <assert.h>
 #include <door.h>
@@ -110,18 +108,6 @@ int		is_main_repository = 1;
 int		max_repository_backups = 4;
 
 #define	CONFIGD_MAX_FDS		262144
-
-const char *
-_umem_options_init(void)
-{
-	/*
-	 * Like svc.startd, we set our UMEM_OPTIONS to indicate that we do not
-	 * wish to have per-CPU magazines to reduce our memory footprint.  And
-	 * as with svc.startd, if svc.configd is so MT-hot that this becomes a
-	 * scalability problem, there are deeper issues...
-	 */
-	return ("nomagazines");		/* UMEM_OPTIONS setting */
-}
 
 /*
  * Thanks, Mike

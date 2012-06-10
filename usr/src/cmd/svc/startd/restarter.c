@@ -373,11 +373,9 @@ rep_retry:
 	if (inst->ri_logstem != NULL)
 		startd_free(inst->ri_logstem, PATH_MAX);
 	if (inst->ri_common_name != NULL)
-		startd_free(inst->ri_common_name,
-		    strlen(inst->ri_common_name) + 1);
+		startd_free(inst->ri_common_name, max_scf_value_size);
 	if (inst->ri_C_common_name != NULL)
-		startd_free(inst->ri_C_common_name,
-		    strlen(inst->ri_C_common_name) + 1);
+		startd_free(inst->ri_C_common_name, max_scf_value_size);
 	snap = NULL;
 	inst->ri_logstem = NULL;
 	inst->ri_common_name = NULL;
@@ -531,25 +529,8 @@ rep_retry:
 		abort();
 	}
 
-	r = libscf_get_template_values(scf_inst, snap,
-	    &inst->ri_common_name, &inst->ri_C_common_name);
-
-	/*
-	 * Copy our names to smaller buffers to reduce our memory footprint.
-	 */
-	if (inst->ri_common_name != NULL) {
-		char *tmp = safe_strdup(inst->ri_common_name);
-		startd_free(inst->ri_common_name, max_scf_value_size);
-		inst->ri_common_name = tmp;
-	}
-
-	if (inst->ri_C_common_name != NULL) {
-		char *tmp = safe_strdup(inst->ri_C_common_name);
-		startd_free(inst->ri_C_common_name, max_scf_value_size);
-		inst->ri_C_common_name = tmp;
-	}
-
-	switch (r) {
+	switch (libscf_get_template_values(scf_inst, snap,
+	    &inst->ri_common_name, &inst->ri_C_common_name)) {
 	case 0:
 		break;
 
@@ -697,11 +678,9 @@ deleted:
 	if (inst->ri_logstem != NULL)
 		startd_free(inst->ri_logstem, PATH_MAX);
 	if (inst->ri_common_name != NULL)
-		startd_free(inst->ri_common_name,
-		    strlen(inst->ri_common_name) + 1);
+		startd_free(inst->ri_common_name, max_scf_value_size);
 	if (inst->ri_C_common_name != NULL)
-		startd_free(inst->ri_C_common_name,
-		    strlen(inst->ri_C_common_name) + 1);
+		startd_free(inst->ri_C_common_name, max_scf_value_size);
 	startd_free(inst->ri_utmpx_prefix, max_scf_value_size);
 	startd_free(inst, sizeof (restarter_inst_t));
 	return (ENOENT);
@@ -761,11 +740,9 @@ restarter_delete_inst(restarter_inst_t *ri)
 	startd_free((void *)ri->ri_i.i_fmri, strlen(ri->ri_i.i_fmri) + 1);
 	startd_free(ri->ri_logstem, PATH_MAX);
 	if (ri->ri_common_name != NULL)
-		startd_free(ri->ri_common_name,
-		    strlen(ri->ri_common_name) + 1);
+		startd_free(ri->ri_common_name, max_scf_value_size);
 	if (ri->ri_C_common_name != NULL)
-		startd_free(ri->ri_C_common_name,
-		    strlen(ri->ri_C_common_name) + 1);
+		startd_free(ri->ri_C_common_name, max_scf_value_size);
 	startd_free(ri->ri_utmpx_prefix, max_scf_value_size);
 	(void) pthread_mutex_destroy(&ri->ri_lock);
 	(void) pthread_mutex_destroy(&ri->ri_queue_lock);
@@ -1864,7 +1841,6 @@ cont:
 
 	rip->ri_queue_thread = 0;
 	MUTEX_UNLOCK(&rip->ri_queue_lock);
-
 out:
 	(void) scf_handle_unbind(h);
 	scf_handle_destroy(h);

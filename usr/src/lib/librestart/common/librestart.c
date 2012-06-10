@@ -21,7 +21,6 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 #include <libintl.h>
@@ -3334,10 +3333,6 @@ restarter_get_method_context(uint_t version, scf_instance_t *inst,
 	 * defaults that provide historic init behavior.
 	 */
 	if (mc_used == 0) {
-		free(cip->pwbuf);
-		free(cip->vbuf);
-		free(cip->working_dir);
-
 		(void) memset(cip, 0, sizeof (*cip));
 		cip->uid = 0;
 		cip->gid = 0;
@@ -3353,11 +3348,8 @@ out:
 	scf_pg_destroy(instpg);
 	scf_pg_destroy(methpg);
 
-	if (cip->pwbuf != NULL) {
+	if (cip->pwbuf != NULL)
 		free(cip->pwbuf);
-		cip->pwbuf = NULL;
-	}
-
 	free(cip->vbuf);
 
 	if (err->type != 0) {

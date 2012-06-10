@@ -21,7 +21,6 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -144,7 +143,6 @@ static uint8_t prop_reconfig = 0;
 
 pthread_mutexattr_t mutex_attrs;
 
-#ifdef DEBUG
 const char *
 _umem_debug_init(void)
 {
@@ -155,19 +153,6 @@ const char *
 _umem_logging_init(void)
 {
 	return ("fail,contents");	/* UMEM_LOGGING setting */
-}
-#endif
-
-const char *
-_umem_options_init(void)
-{
-	/*
-	 * To reduce our memory footprint, we set our UMEM_OPTIONS to indicate
-	 * that we do not wish to have per-CPU magazines -- if svc.startd is so
-	 * hot on CPU such that this becomes a scalability problem, there are
-	 * likely deeper things amiss...
-	 */
-	return ("nomagazines");		/* UMEM_OPTIONS setting */
 }
 
 /*
