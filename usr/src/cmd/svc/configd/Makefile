@@ -53,7 +53,7 @@ CPPFLAGS += $(MYCPPFLAGS)
 CFLAGS	+= -v
 MYLDLIBS = -lumem -luutil -lbsm
 LDLIBS	+= -lsecdb $(MYLDLIBS)
-LINTFLAGS += -errtags -erroff=E_BAD_FORMAT_ARG_TYPE2
+LINTFLAGS += -errtags -erroff=E_BAD_FORMAT_ARG_TYPE2 -erroff=E_NAME_DEF_NOT_USED2
 
 CLOBBERFILES +=	$(MYPROG:%=%-native)
 
