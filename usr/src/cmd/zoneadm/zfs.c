@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -69,34 +70,6 @@ typedef struct clone_data {
 	time_t		origin_creation; /* snapshot creation time of clone */
 	const char	*snapshot;	/* snapshot of dataset being demoted */
 } clone_data_t;
-
-/*
- * A ZFS file system iterator call-back function which is used to validate
- * datasets imported into the zone.
- */
-/* ARGSUSED */
-static int
-check_zvol(zfs_handle_t *zhp, void *unused)
-{
-	int ret;
-
-	if (zfs_get_type(zhp) == ZFS_TYPE_VOLUME) {
-		/*
-		 * TRANSLATION_NOTE
-		 * zfs and dataset are literals that should not be translated.
-		 */
-		(void) fprintf(stderr, gettext("cannot verify zfs dataset %s: "
-		    "volumes cannot be specified as a zone dataset resource\n"),
-		    zfs_get_name(zhp));
-		ret = -1;
-	} else {
-		ret = zfs_iter_children(zhp, check_zvol, NULL);
-	}
-
-	zfs_close(zhp);
-
-	return (ret);
-}
 
 /*
  * A ZFS file system iterator call-back function which returns the
@@ -1258,17 +1231,6 @@ verify_datasets(zone_dochandle_t handle)
 			zfs_close(zhp);
 			continue;
 		}
-
-		if (zfs_get_type(zhp) == ZFS_TYPE_VOLUME) {
-			(void) fprintf(stderr, gettext("cannot verify zfs "
-			    "dataset %s: volumes cannot be specified as a "
-			    "zone dataset resource\n"),
-			    dstab.zone_dataset_name);
-			return_code = Z_ERR;
-		}
-
-		if (zfs_iter_children(zhp, check_zvol, NULL) != 0)
-			return_code = Z_ERR;
 
 		zfs_close(zhp);
 	}

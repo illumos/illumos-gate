@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -537,7 +538,7 @@ static struct sdev_vop_table vtab[] =
 	SDEV_DYNAMIC | SDEV_VTOR },
 
 	{ "zvol", devzvol_vnodeops_tbl, NULL, &devzvol_vnodeops,
-	devzvol_validate, SDEV_DYNAMIC | SDEV_VTOR | SDEV_SUBDIR },
+	devzvol_validate, SDEV_ZONED | SDEV_DYNAMIC | SDEV_VTOR | SDEV_SUBDIR },
 
 	{ "zcons", NULL, NULL, NULL, NULL, SDEV_NO_NCACHE },
 
