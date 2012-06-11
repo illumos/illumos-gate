@@ -473,6 +473,7 @@ f etc/sock2path.d/system%2Fkernel 0644 root sys
 d etc/ssh 0755 root sys
 f etc/ssh/moduli 0644 root sys
 f etc/ssh/ssh_config 0644 root sys
+s etc/sulogin=../sbin/sulogin
 d etc/svc 0755 root sys
 d etc/svc/volatile 0755 root sys
 d etc/sysconfig 0755 root root
