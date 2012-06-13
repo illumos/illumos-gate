@@ -359,6 +359,19 @@ f etc/logindevperm 0644 root sys
 f etc/mach 0644 root sys
 f etc/magic 0444 root bin
 f etc/mailcap 0644 root bin
+d etc/mail 0755 root sys
+f etc/mail/aliases 0644 root mail
+d etc/mail/cf 0755 root mail
+f etc/mail/helpfile 0644 root mail
+f etc/mail/local-host-names 0644 root mail
+f etc/mail/Mail.rc 0644 root mail
+f etc/mail/mailx.rc 0644 root mail
+s etc/mail/main.cf=sendmail.cf
+f etc/mail/sendmail.cf 0444 root mail
+s etc/mail/sendmail.hf=helpfile
+f etc/mail/submit.cf 0444 root mail
+s etc/mail/subsidiary.cf=sendmail.cf
+f etc/mail/trusted-users 0644 root mail
 f etc/mime.types 0644 root bin
 f etc/mnttab 0444 root root
 f etc/mpapi.conf 0644 root bin
