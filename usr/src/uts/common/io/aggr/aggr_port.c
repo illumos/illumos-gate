@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 OmniTI Computer Consulting, Inc  All rights reserved.
  */
 
 /*
@@ -528,8 +529,13 @@ aggr_port_promisc(aggr_port_t *port, boolean_t on)
 
 	if (on) {
 		mac_rx_clear(port->lp_mch);
+		/* We use the promisc callback because without hardware
+		 * rings, we deliver through flows that will cause duplicate
+		 * delivery of packets when we've flipped into this mode
+		 * to compensate for the lack of hardware MAC matching
+		 */
 		rc = mac_promisc_add(port->lp_mch, MAC_CLIENT_PROMISC_ALL,
-		    aggr_recv_cb, port, &port->lp_mphp,
+		    aggr_recv_promisc_cb, port, &port->lp_mphp,
 		    MAC_PROMISC_FLAGS_NO_TX_LOOP);
 		if (rc != 0) {
 			mac_rx_set(port->lp_mch, aggr_recv_cb, port);

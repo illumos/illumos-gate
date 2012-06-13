@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 OmniTI Computer Consulting, Inc  All rights reserved.
  */
 
 /*
@@ -68,15 +69,26 @@ aggr_recv_lacp(aggr_port_t *port, mac_resource_handle_t mrh, mblk_t *mp)
 
 /*
  * Callback function invoked by MAC service module when packets are
- * made available by a MAC port.
+ * made available by a MAC port, both in promisc_on mode and not.
  */
 /* ARGSUSED */
-void
-aggr_recv_cb(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
-    boolean_t loopback)
+static void
+aggr_recv_path_cb(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
+    boolean_t loopback, boolean_t promisc_path)
 {
 	aggr_port_t *port = (aggr_port_t *)arg;
 	aggr_grp_t *grp = port->lp_grp;
+
+	/* In the case where lp_promisc_on has been turned on to
+	 * compensate for insufficient hardware MAC matching and
+	 * hardware rings are not in use we will fall back to
+	 * using flows for delivery which can result in duplicates
+	 * pushed up the stack. Only respect the chosen path.
+	 */
+	if (port->lp_promisc_on != promisc_path) {
+		freemsgchain(mp);
+		return;
+	}
 
 	if (grp->lg_lacp_mode == AGGR_LACP_OFF) {
 		aggr_mac_rx(grp->lg_mh, mrh, mp);
@@ -160,4 +172,20 @@ aggr_recv_cb(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 				freemsgchain(head);
 		}
 	}
+}
+
+/* ARGSUSED */
+void
+aggr_recv_cb(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
+    boolean_t loopback)
+{
+	aggr_recv_path_cb(arg, mrh, mp, loopback, B_FALSE);
+}
+
+/* ARGSUSED */
+void
+aggr_recv_promisc_cb(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
+    boolean_t loopback)
+{
+	aggr_recv_path_cb(arg, mrh, mp, loopback, B_TRUE);
 }
