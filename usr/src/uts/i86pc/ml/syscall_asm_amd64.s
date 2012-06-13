@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/asm_linkage.h>
@@ -565,6 +566,33 @@ _syscall_invoke:
 	CLI(%r14)
 	CHECK_POSTSYS_NE(%r15, %r14, %ebx)
 	jne	_syscall_post
+
+	/*
+	 * We need to protect ourselves against non-canonical return values
+	 * because Intel doesn't check for them on sysret (AMD does).  Canonical
+	 * addresses on current amd64 processors only use 48-bits for VAs; an
+	 * address is canonical if all upper bits (47-63) are identical. If we
+	 * find a non-canonical %rip, we opt to go through the full
+	 * _syscall_post path which takes us into an iretq which is not
+	 * susceptible to the same problems sysret is.
+	 * 
+	 * We're checking for a canonical address by first doing an arithmetic
+	 * shift. This will fill in the remaining bits with the value of bit 63.
+	 * If the address were canonical, the register would now have either all
+	 * zeroes or all ones in it. Therefore we add one (inducing overflow)
+	 * and compare against 1. A canonical address will either be zero or one
+	 * at this point, hence the use of ja.
+	 *
+	 * At this point, r12 and r13 have the return value so we can't use
+	 * those registers.
+	 */
+	movq	REGOFF_RIP(%rsp), %rcx
+	sarq	$47, %rcx
+	incq	%rcx
+	cmpq	$1, %rcx
+	ja	_syscall_post
+
+
 	SIMPLE_SYSCALL_POSTSYS(%r15, %r14, %bx)
 
 	movq	%r12, REGOFF_RAX(%rsp)
