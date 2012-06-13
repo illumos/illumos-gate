@@ -21,6 +21,7 @@
 #
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
 #
 
 # Start/stop processes required for server NFS
@@ -131,26 +132,6 @@ case "$1" in
 	# Unshare all shared file systems using NFS
 
 	/usr/sbin/sharemgr stop -P nfs -a
-
-	#
-	# Wait up to 10 seconds for nfslogd to gracefully handle SIGHUP
-	#
-	/usr/bin/pkill -HUP -x -u 0 -z $zone nfslogd
-	wtime=10
-
-	while [ $wtime -gt 0 ]; do
-		/usr/bin/pgrep -x -u 0 -z $zone nfslogd >/dev/null || break
-		wtime=`expr $wtime - 1`
-		sleep 1
-	done
-
-	#
-	# Kill nfslogd more forcefully if it did not shutdown during
-	# the grace period
-	#
-	if [ $wtime -eq 0 ]; then
-		/usr/bin/pkill -TERM -x -u 0 -z $zone nfslogd
-	fi
 
 	# Kill any processes left in service contract
 	smf_kill_contract $2 TERM 1
