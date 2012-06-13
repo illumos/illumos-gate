@@ -1,0 +1,68 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+  This file and its contents are supplied under the terms of the
+  Common Development and Distribution License ("CDDL"), version 1.0.
+  You may only use this file in accordance with the terms of version
+  1.0 of the CDDL.
+
+  A full copy of the text of the CDDL should have accompanied this
+  source.  A copy of the CDDL is also available via the Internet at
+  http://www.illumos.org/license/CDDL.
+
+
+  Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+-->
+
+<service_bundle type='manifest' name='SUNWnfssr:nfslogd'>
+
+<service
+	name='network/nfs/log'
+	type='service'
+	version='1'>
+
+	<dependency name='nfs-server'
+	    grouping='require_all'
+	    restart_on='refresh'
+	    type='service'>
+		<service_fmri value='svc:/network/nfs/server' />
+	</dependency>
+
+	<dependency name='filesystem-minimal'
+	    grouping='require_all'
+	    restart_on='error'
+	    type='service'>
+		<service_fmri value='svc:/system/filesystem/minimal' />
+	</dependency>
+
+	<exec_method
+	    type='method'
+	    name='start'
+	    exec='/usr/lib/nfs/nfslogd'
+	    timeout_seconds='60' />
+
+	<exec_method
+	    type='method'
+	    name='stop'
+	    exec=':kill -TERM'
+	    timeout_seconds='10' />
+
+	<instance name='default' enabled='false'>
+	</instance>
+
+	<stability value='Stable' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+				NFS log daemon
+			</loctext>
+		</common_name>
+		<documentation>
+			<manpage title='nfslogd' section='1M'
+				manpath='/usr/share/man' />
+		</documentation>
+	</template>
+</service>
+
+</service_bundle>

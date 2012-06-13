@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/service/file-system/nfs@$(PKGVERS)
@@ -62,6 +63,7 @@ file path=etc/nfs/nfslog.conf group=sys \
     original_name=SUNWnfss:etc/nfs/nfslog.conf preserve=true
 file path=kernel/misc/$(ARCH64)/nfssrv group=sys mode=0755
 $(i386_ONLY)file path=kernel/misc/nfssrv group=sys mode=0755
+file path=lib/svc/manifest/network/nfs/nfslogd.xml group=sys mode=0444
 file path=lib/svc/manifest/network/nfs/rquota.xml group=sys mode=0444
 file path=lib/svc/manifest/network/nfs/server.xml group=sys mode=0444
 file path=lib/svc/method/nfs-server mode=0555
