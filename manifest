@@ -11412,6 +11412,16 @@ f usr/share/man/man1/encrypt.1 0444 root bin
 f usr/share/man/man1/enhance.1 0444 root bin
 f usr/share/man/man1/env.1 0444 root bin
 f usr/share/man/man1/eqn.1 0444 root bin
+f usr/share/man/man1/errange.1 044 root bin
+f usr/share/man/man1/errdate.1 044 root bin
+f usr/share/man/man1/errgid.1 044 root bin
+f usr/share/man/man1/errint.1 044 root bin
+f usr/share/man/man1/erritem.1 044 root bin
+f usr/share/man/man1/errpath.1 044 root bin
+f usr/share/man/man1/errstr.1 044 root bin
+f usr/share/man/man1/errtime.1 044 root bin
+f usr/share/man/man1/erruid.1 044 root bin
+f usr/share/man/man1/erryorn.1 044 root bin
 f usr/share/man/man1/expand.1 0444 root bin
 f usr/share/man/man1/expr.1 0444 root bin
 f usr/share/man/man1/exstr.1 0444 root bin
@@ -11441,6 +11451,16 @@ f usr/share/man/man1/grep.1 0444 root bin
 f usr/share/man/man1/groups.1 0444 root bin
 f usr/share/man/man1/hash.1 0444 root bin
 f usr/share/man/man1/head.1 0444 root bin
+f usr/share/man/man1/helpdate.1 044 root bin
+f usr/share/man/man1/helpgid.1 044 root bin
+f usr/share/man/man1/helpint.1 044 root bin
+f usr/share/man/man1/helpitem.1 044 root bin
+f usr/share/man/man1/helppath.1 044 root bin
+f usr/share/man/man1/helprange.1 044 root bin
+f usr/share/man/man1/helpstr.1 044 root bin
+f usr/share/man/man1/helptime.1 044 root bin
+f usr/share/man/man1/helpuid.1 044 root bin
+f usr/share/man/man1/helpyorn.1 044 root bin
 f usr/share/man/man1/history.1 0444 root bin
 f usr/share/man/man1/hostid.1 0444 root bin
 f usr/share/man/man1/hostname.1 0444 root bin
@@ -11591,6 +11611,7 @@ f usr/share/man/man1/rlogin.1 0444 root bin
 f usr/share/man/man1/rm.1 0444 root bin
 f usr/share/man/man1/rmail.1 0444 root bin
 f usr/share/man/man1/rmdir.1 0444 root bin
+f usr/share/man/man1/rmformat.1 044 root bin
 f usr/share/man/man1/roffbib.1 0444 root bin
 f usr/share/man/man1/roles.1 0444 root bin
 f usr/share/man/man1/rsh.1 0444 root bin
@@ -11608,6 +11629,7 @@ f usr/share/man/man1/settime.1 0444 root bin
 f usr/share/man/man1/sftp.1 0444 root bin
 s usr/share/man/man1/sh.1=ksh93.1
 f usr/share/man/man1/shcomp.1 0444 root bin
+f usr/share/man/man1/size.1 044 root bin
 f usr/share/man/man1/sleep.1 0444 root bin
 f usr/share/man/man1/smbutil.1 0444 root bin
 f usr/share/man/man1/soelim.1 0444 root bin
@@ -11626,6 +11648,7 @@ f usr/share/man/man1/ssh.1 0444 root bin
 f usr/share/man/man1/strchg.1 0444 root bin
 f usr/share/man/man1/strconf.1 0444 root bin
 f usr/share/man/man1/strings.1 0444 root bin
+f usr/share/man/man1/strip.1 044 root bin
 f usr/share/man/man1/stty.1 0444 root bin
 f usr/share/man/man1/sum.1 0444 root bin
 f usr/share/man/man1/sun.1 0444 root bin
@@ -11639,6 +11662,7 @@ f usr/share/man/man1/tcopy.1 0444 root bin
 f usr/share/man/man1/tee.1 0444 root bin
 f usr/share/man/man1/test.1 0444 root bin
 f usr/share/man/man1/time.1 0444 root bin
+f usr/share/man/man1/timex.1 044 root bin
 f usr/share/man/man1/tip.1 0444 root bin
 f usr/share/man/man1/touch.1 0444 root bin
 f usr/share/man/man1/tput.1 0444 root bin
@@ -11661,6 +11685,15 @@ f usr/share/man/man1/units.1 0444 root bin
 f usr/share/man/man1/unix2dos.1 0444 root bin
 f usr/share/man/man1/unpack.1 0444 root bin
 f usr/share/man/man1/uptime.1 0444 root bin
+f usr/share/man/man1/valdate.1 044 root bin
+f usr/share/man/man1/valgid.1 044 root bin
+f usr/share/man/man1/valint.1 044 root bin
+f usr/share/man/man1/valpath.1 044 root bin
+f usr/share/man/man1/valrange.1 044 root bin
+f usr/share/man/man1/valstr.1 044 root bin
+f usr/share/man/man1/valtime.1 044 root bin
+f usr/share/man/man1/valuid.1 044 root bin
+f usr/share/man/man1/valyorn.1 044 root bin
 f usr/share/man/man1/vax.1 0444 root bin
 f usr/share/man/man1/vedit.1 0444 root bin
 f usr/share/man/man1/vgrind.1 0444 root bin
@@ -11684,6 +11717,9 @@ f usr/share/man/man1/ypwhich.1 0444 root bin
 f usr/share/man/man1/zcat.1 0444 root bin
 f usr/share/man/man1/zlogin.1 0444 root bin
 f usr/share/man/man1/zonename.1 0444 root bin
+d usr/share/man/man1c 0755 root bin
+f usr/share/man/man1c/uudecode.1c 044 root bin
+f usr/share/man/man1c/uuencode.1c 044 root bin
 d usr/share/man/man1m 0755 root bin
 f usr/share/man/man1m/6to4relay.1m 0444 root bin
 f usr/share/man/man1m/acctadm.1m 0444 root bin
