@@ -21,12 +21,19 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2012 DEY Storage Systems, Inc.  All rights reserved.
+#
 # cmd/psrinfo/Makefile
 #
 
 PROG=	psrinfo
 
 include	../Makefile.cmd
+
+LDLIBS += -lkstat
+XGETFLAGS +=  
+$(PROG).po	:= CPPFLAGS += -DXGETTEXT
+
 
 .KEEP_STATE:
 
@@ -41,6 +48,6 @@ clean:
 $(ROOTUSRSBINBINPROG): $(PROG)
 	$(INS.file)
 
-lint:
+lint:	lint_PROG
 
 include ../Makefile.targ
