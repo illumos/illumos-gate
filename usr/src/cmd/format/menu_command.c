@@ -1563,20 +1563,24 @@ c_label()
 		fmt_print("[1] EFI Label\n");
 		ioparam.io_bounds.lower = 0;
 		ioparam.io_bounds.upper = 1;
-		if (cur_label == L_TYPE_SOLARIS)
-			deflt = 0;
+		if ((cur_label == L_TYPE_SOLARIS) &&
+		    (cur_disk->fdisk_part.systid != EFI_PMBR))
+			deflt = L_TYPE_SOLARIS;
 		else
-			deflt = 1;
+			deflt = L_TYPE_EFI;
 		defltptr = &deflt;
 		choice = input(FIO_INT, "Specify Label type", ':',
 		    &ioparam, defltptr, DATA_INPUT);
-		if ((choice == 0) && (cur_label == L_TYPE_SOLARIS)) {
+		if ((choice == L_TYPE_SOLARIS) &&
+		    (cur_label == L_TYPE_SOLARIS) &&
+		    (cur_disk->fdisk_part.systid != EFI_PMBR)) {
 			goto expert_end;
-		} else if ((choice == 1) && (cur_label == L_TYPE_EFI)) {
+		} else if ((choice == L_TYPE_EFI) &&
+		    (cur_label == L_TYPE_EFI)) {
 			goto expert_end;
 		}
 		switch (choice) {
-		case 0:
+		case L_TYPE_SOLARIS:
 		/*
 		 * EFI label to SMI label
 		 */
@@ -1648,17 +1652,19 @@ c_label()
 		}
 
 
-		case 1:
+		case L_TYPE_EFI:
 		/*
 		 * SMI label to EFI label
 		 */
 
-
-		fmt_print("Warning: This disk has an SMI label. Changing to "
-		    "EFI label will erase all\ncurrent partitions.\n");
-
-		if (check("Continue")) {
-			return (-1);
+		if ((cur_disk->fdisk_part.systid == SUNIXOS) ||
+		    (cur_disk->fdisk_part.systid == SUNIXOS2)) {
+			fmt_print("Warning: This disk has an SMI label. "
+			    "Changing to EFI label will erase all\ncurrent "
+			    "partitions.\n");
+			if (check("Continue")) {
+				return (-1);
+			}
 		}
 
 		if (get_disk_info(cur_file, &efinfo) != 0) {
