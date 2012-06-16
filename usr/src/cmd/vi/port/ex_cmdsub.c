@@ -39,6 +39,8 @@
 #undef getchar
 #undef putchar
 #endif
+
+
 /*
  * Command mode subroutines implementing
  *	append, args, copy, delete, join, move, put,
@@ -1725,12 +1727,11 @@ unsigned char c;
 
 unsigned char *
 vgetpass(prompt)
-unsigned char *prompt;
+char *prompt;
 {
 	unsigned char *p;
 	int c;
 	static unsigned char pbuf[9];
-	char *getpass();
 
 	/* In ex mode, let the system hassle with setting no echo */
 	if (!inopen)

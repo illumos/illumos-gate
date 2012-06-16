@@ -102,19 +102,36 @@ TONICBUILD=     $(POUND_SIGN)
 $(TONICBUILD)CLOSEDROOT= $(ROOT)-closed
 
 
-# set __GNUC= in the environment to build 32-bit with the gcc compiler.
-# The default is to use the Sun Studio compiler for all processor types.
-__GNUC=		$(POUND_SIGN)
+# The variables below control the compilers used during the build.
+# There are a number of permutations.
+#
+# __GNUC and __SUNC control (and indicate) the primary compiler.  Whichever
+# one is not POUND_SIGN is the primary, with the other as the shadow.  They
+# may also be used to control entirely compiler-specific Makefile assignments.
+# __SUNC and Sun Studio are the default.
+#
+# __GNUC64 indicates that the 64bit build should use the GNU C compiler.
+# There is no Sun C analogue.
+#
+# The following version-specific options are operative regardless of which
+# compiler is primary, and control the versions of the given compilers to be
+# used.  They also allow compiler-version specific Makefile fragments.
+#
+# __SSNEXT when set to the empty string enables options specific to the 'next'
+# version of the Sun Studio compiler.
+#
+# __GNUC3 when the empty string uses and refers to GCC 3.x, it is the default.
+# __GNUC4 when the empty string uses and refers to GCC 4.x.
 
-# set __GNUC64= in the environment to build 64-bit with the gcc compiler.
-# Inherit the __GNUC value by default, and if that is set to $(POUND_SIGN)
-# then this means use the Sun Studio compiler.
-__GNUC64=	$(__GNUC)
+__GNUC=			$(POUND_SIGN)
+$(__GNUC)__SUNC=	$(POUND_SIGN)
+__GNUC64=		$(__GNUC)
 
-# set __SSNEXT= in the enviroment to build with the 'next' release of
-# the Sun Studio compiler. This will cause command line options specific
-# to the 'next' version of the Sun Studio compiler to be used.
-__SSNEXT=	$(POUND_SIGN)
+__SSNEXT=		$(POUND_SIGN)
+
+__GNUC3=
+__GNUC4=		$(POUND_SIGN)
+$(__GNUC4)__GNUC3=	$(POUND_SIGN)
 
 # CLOSED is the root of the tree that contains source which isn't released
 # as open source
@@ -133,6 +150,11 @@ SFW_ROOT=	/usr/sfw
 SFWINCDIR=	/usr/include
 SFWLIBDIR=	/usr/lib
 SFWLIBDIR64=	/usr/lib/$(MACH64)
+
+$(__GNUC3)GCC_ROOT=	$(SFW_ROOT)
+$(__GNUC4)GCC_ROOT=	/opt/gcc/4.4.4
+GCCLIBDIR=	$(GCC_ROOT)/lib
+GCCLIBDIR64=	$(GCC_ROOT)/lib/$(MACH64)
 
 RPCGEN=		/usr/bin/rpcgen
 STABS=		$(ONBLD_TOOLS)/bin/$(MACH)/stabs
@@ -315,6 +337,15 @@ CCSTATICSYM=		-Wc,-Qassembler-ounrefsym=0
 #
 # generate 32-bit addresses in the v9 kernel. Saves memory.
 CCABS32=		-Wc,-xcode=abs32
+#
+# generate v9 code which tolerates callers using the v7 ABI, for the sake of
+# system calls.
+$(__GNUC4)CC32BITCALLERS=		-_gcc=-massume-32bit-callers
+
+# GCC, especially, is increasingly beginning to auto-inline functions and
+# sadly does so separately not under the general -fno-inline-functions
+$(__GNUC4)CCNOAUTOINLINE= -_gcc=-fno-inline-small-functions \
+	-_gcc=-fno-inline-functions-called-once
 
 # One optimization the compiler might perform is to turn this:
 #	#pragma weak foo
@@ -378,6 +409,10 @@ CERRWARN = -errtags=yes -errwarn=%all
 CERRWARN += -erroff=E_EMPTY_TRANSLATION_UNIT
 CERRWARN += -erroff=E_STATEMENT_NOT_REACHED
 
+# Normally cw(1) would translate -v into a set of options including these
+# but as they're GCC 4.x specific, we can't do that
+$(__GNUC4)CERRWARN +=	-_gcc=-Wno-address -_gcc=-Wno-array-bounds
+
 #
 # turn warnings into errors (C++)
 CCERRWARN=		-xwe
@@ -421,10 +456,6 @@ CNOGLOBAL= -W0,-noglobal
 #
 # In the same spirit, this will also remove the date from the N_OPT stab.
 CGLOBALSTATIC= -W0,-xglobalstatic
-
-# Normally, gcc uses indirect DWARF strings to save space.  However,
-# this causes relocations that ctfconvert cannot handle.  Disable this.
-CDWARFSTR=	-_gcc=-fno-dwarf2-indirect-strings
 
 # Sometimes we want all symbols and types in debugging information even
 # if they aren't used.
@@ -491,17 +522,17 @@ XREGSFLAG64		= $($(MACH64)_XREGSFLAG)
 
 CFLAGS=         $(COPTFLAG) $($(MACH)_CFLAGS) $(SPACEFLAG) $(CCMODE) \
 		$(ILDOFF) $(CERRWARN) $(C99MODE) $(CCUNBOUND) $(IROPTFLAG) \
-		$(CGLOBALSTATIC)
+		$(CGLOBALSTATIC) $(CCNOAUTOINLINE)
 CFLAGS64=       $(COPTFLAG64) $($(MACH64)_CFLAGS) $(SPACEFLAG64) $(CCMODE64) \
 		$(ILDOFF) $(CERRWARN) $(C99MODE) $(CCUNBOUND) $(IROPTFLAG64) \
-		$(CGLOBALSTATIC)
+		$(CGLOBALSTATIC) $(CCNOAUTOINLINE)
 #
 # Flags that are used to build parts of the code that are subsequently
 # run on the build machine (also known as the NATIVE_BUILD).
 #
 NATIVE_CFLAGS=	$(COPTFLAG) $($(NATIVE_MACH)_CFLAGS) $(CCMODE) \
 		$(ILDOFF) $(CERRWARN) $(C99MODE) $($(NATIVE_MACH)_CCUNBOUND) \
-		$(IROPTFLAG) $(CGLOBALSTATIC)
+		$(IROPTFLAG) $(CGLOBALSTATIC) $(CCNOAUTOINLINE)
 
 DTEXTDOM=-DTEXT_DOMAIN=\"$(TEXT_DOMAIN)\"	# For messaging.
 DTS_ERRNO=-D_TS_ERRNO
@@ -640,7 +671,9 @@ COMPILE.java=	$(JAVAC) $(JAVAFLAGS) -classpath $(CLASSPATH)
 # Link time macros
 #
 CCNEEDED		= -lC
-$(__GNUC)CCNEEDED	= -L$(SFWLIBDIR) -R$(SFWLIBDIR) -lstdc++ -lgcc_s
+CCEXTNEEDED		= -lCrun -lCstd
+$(__GNUC)CCNEEDED	= -L$(GCCLIBDIR) -R$(GCCLIBDIR) -lstdc++ -lgcc_s
+$(__GNUC)CCEXTNEEDED	= $(CCNEEDED)
 
 LINK.c=		$(CC) $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 LINK64.c=	$(CC) $(CFLAGS64) $(CPPFLAGS) $(LDFLAGS)
@@ -730,7 +763,6 @@ sparcv9_AS=		/usr/ccs/bin/as -xregsym=no
 sparcv9_LD=		/usr/ccs/bin/ld
 sparcv9_LINT=		$(SPRO_ROOT)/sunstudio12.1/bin/lint
 
-# We compile 32-bit objects with cc by default
 i386_CC=		$(ONBLD_TOOLS)/bin/$(MACH)/cw -_cc
 $(__GNUC)i386_CC=	$(ONBLD_TOOLS)/bin/$(MACH)/cw -_gcc
 i386_CCC=		$(ONBLD_TOOLS)/bin/$(MACH)/cw -_CC
@@ -741,7 +773,6 @@ $(__GNUC)i386_AS=	$(ONBLD_TOOLS)/bin/$(MACH)/aw
 i386_LD=		/usr/ccs/bin/ld
 i386_LINT=		$(SPRO_ROOT)/sunstudio12.1/bin/lint
 
-# We compile 64-bit objects with gcc
 amd64_CC=		$(ONBLD_TOOLS)/bin/$(MACH)/cw -_cc
 $(__GNUC64)amd64_CC=	$(ONBLD_TOOLS)/bin/$(MACH)/cw -_gcc
 amd64_CCC=		$(ONBLD_TOOLS)/bin/$(MACH)/cw -_CC

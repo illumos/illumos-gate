@@ -30,8 +30,6 @@
 #ifndef _UCONTEXT_H
 #define	_UCONTEXT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/ucontext.h>
 
 #if !defined(_XPG4_2) || defined(__EXTENSIONS__)
@@ -52,7 +50,7 @@ extern "C" {
 
 #if defined(__STDC__)
 
-extern int getcontext(ucontext_t *);
+extern int getcontext(ucontext_t *) __RETURNS_TWICE;
 #pragma unknown_control_flow(getcontext)
 extern int setcontext(const ucontext_t *) __NORETURN;
 extern int swapcontext(ucontext_t *_RESTRICT_KYWD,
@@ -75,7 +73,7 @@ extern void *_stack_grow(void *);
 #endif
 #else
 
-extern int getcontext();
+extern int getcontext() __RETURNS_TWICE;
 #pragma unknown_control_flow(getcontext)
 extern int setcontext();
 extern int swapcontext();

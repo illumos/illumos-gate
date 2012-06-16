@@ -47,8 +47,6 @@
 #ifndef _SETJMP_H
 #define	_SETJMP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/signal.h>
 #include <sys/ucontext.h>
@@ -110,21 +108,21 @@ typedef long sigjmp_buf[_SIGJBLEN];
 
 #if defined(__STDC__)
 
-extern int _sigsetjmp(sigjmp_buf, int);
+extern int _sigsetjmp(sigjmp_buf, int) __RETURNS_TWICE;
 #pragma unknown_control_flow(_sigsetjmp)
 extern void _siglongjmp(sigjmp_buf, int) __NORETURN;
 
-extern int	sigsetjmp(sigjmp_buf, int);
+extern int	sigsetjmp(sigjmp_buf, int) __RETURNS_TWICE;
 #pragma unknown_control_flow(sigsetjmp)
 extern void	siglongjmp(sigjmp_buf, int) __NORETURN;
 
 #else
 
-extern int _sigsetjmp();
+extern int _sigsetjmp() __RETURNS_TWICE;
 #pragma unknown_control_flow(_sigsetjmp)
 extern void _siglongjmp();
 
-extern int sigsetjmp();
+extern int sigsetjmp() __RETURNS_TWICE;
 #pragma unknown_control_flow(sigsetjmp)
 extern void siglongjmp();
 

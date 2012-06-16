@@ -1204,8 +1204,9 @@ TIL=				\
 
 $(TIL:%=pics/%) := CFLAGS += $(LIBCBASE)/threads/sparc.il
 
-# This hack is needed until the sparc gcc is fixed for TLS
-pics/tls_data.o := CC = env 'CW_NO_SHADOW=1' $(ONBLD_TOOLS)/bin/$(MACH)/cw -_cc
+# This hack is needed because sparc GCC3 generates DWARF data about TLS which
+# The Sun assembler cannot process
+$(__GNUC3)pics/tls_data.o := CTF_FLAGS += -_gcc=-g1
 
 # special kludge for inlines with 'cas':
 pics/rwlock.o pics/synch.o pics/lwp.o pics/door_calls.o := \
