@@ -396,9 +396,12 @@ bd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	bzero(&drive, sizeof (drive));
 	bd->d_ops.o_drive_info(bd->d_private, &drive);
 	bd->d_qsize = drive.d_qsize;
-	bd->d_maxxfer = drive.d_maxxfer;
 	bd->d_removable = drive.d_removable;
 	bd->d_hotpluggable = drive.d_hotpluggable;
+
+	if (drive.d_maxxfer && drive.d_maxxfer < bd->d_maxxfer)
+		bd->d_maxxfer = drive.d_maxxfer;
+
 
 	rv = cmlb_attach(dip, &bd_tg_ops, DTYPE_DIRECT,
 	    bd->d_removable, bd->d_hotpluggable,
