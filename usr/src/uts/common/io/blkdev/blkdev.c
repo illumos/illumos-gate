@@ -899,32 +899,51 @@ bd_dump(dev_t dev, caddr_t caddr, daddr_t blkno, int nblk)
 	return (rv);
 }
 
+void
+bd_minphys(struct buf *bp)
+{
+	minor_t inst;
+	bd_t	*bd;
+	inst = BDINST(bp->b_edev);
+
+	bd = ddi_get_soft_state(bd_state, inst);
+
+	/*
+	 * In a non-debug kernel, bd_strategy will catch !bd as
+	 * well, and will fail nicely.
+	 */
+	ASSERT(bd);
+
+	if (bp->b_bcount > bd->d_maxxfer)
+		bp->b_bcount = bd->d_maxxfer;
+}
+
 static int
 bd_read(dev_t dev, struct uio *uio, cred_t *credp)
 {
 	_NOTE(ARGUNUSED(credp));
-	return (physio(bd_strategy, NULL, dev, B_READ, minphys, uio));
+	return (physio(bd_strategy, NULL, dev, B_READ, bd_minphys, uio));
 }
 
 static int
 bd_write(dev_t dev, struct uio *uio, cred_t *credp)
 {
 	_NOTE(ARGUNUSED(credp));
-	return (physio(bd_strategy, NULL, dev, B_WRITE, minphys, uio));
+	return (physio(bd_strategy, NULL, dev, B_WRITE, bd_minphys, uio));
 }
 
 static int
 bd_aread(dev_t dev, struct aio_req *aio, cred_t *credp)
 {
 	_NOTE(ARGUNUSED(credp));
-	return (aphysio(bd_strategy, anocancel, dev, B_READ, minphys, aio));
+	return (aphysio(bd_strategy, anocancel, dev, B_READ, bd_minphys, aio));
 }
 
 static int
 bd_awrite(dev_t dev, struct aio_req *aio, cred_t *credp)
 {
 	_NOTE(ARGUNUSED(credp));
-	return (aphysio(bd_strategy, anocancel, dev, B_WRITE, minphys, aio));
+	return (aphysio(bd_strategy, anocancel, dev, B_WRITE, bd_minphys, aio));
 }
 
 static int
