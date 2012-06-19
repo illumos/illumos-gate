@@ -63,7 +63,8 @@ driver name=usbftdi perms="* 0666 root sys" \
     alias=usb7cc,0421 \
     alias=usb856,ac01 \
     alias=usb93c,0601 \
-    alias=usb93c,0701
+    alias=usb93c,0701 \
+    alias=usbif9e88,9e8f.config1.1
 file path=kernel/drv/$(ARCH64)/usbftdi group=sys
 $(i386_ONLY)file path=kernel/drv/usbftdi group=sys
 file path=kernel/drv/usbftdi.conf group=sys \

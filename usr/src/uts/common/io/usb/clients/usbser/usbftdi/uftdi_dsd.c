@@ -95,11 +95,11 @@ static usb_pipe_handle_t uftdi_in_pipe(ds_hdl_t, uint_t);
 /* configuration routines */
 static void	uftdi_cleanup(uftdi_state_t *, int);
 static int	uftdi_dev_attach(uftdi_state_t *);
-static int	uftdi_open_hw_port(uftdi_state_t *, int, int);
+static int	uftdi_open_hw_port(uftdi_state_t *, int);
 
 /* hotplug */
 static int	uftdi_restore_device_state(uftdi_state_t *);
-static int	uftdi_restore_port_state(uftdi_state_t *, int);
+static int	uftdi_restore_port_state(uftdi_state_t *);
 
 /* power management */
 static int	uftdi_create_pm_components(uftdi_state_t *);
@@ -202,6 +202,8 @@ uftdi_attach(ds_attach_info_t *aip)
 		return (USB_FAILURE);
 	}
 
+	uf->uf_hwport = FTDI_PIT_SIOA + uf->uf_dev_data->dev_curr_if;
+
 	mutex_init(&uf->uf_lock, NULL, MUTEX_DRIVER,
 	    uf->uf_dev_data->dev_iblock_cookie);
 
@@ -281,6 +283,15 @@ uftdi_attach(ds_attach_info_t *aip)
 			break;
 		}
 		break;
+	case USB_VENDOR_MARVELL:
+		switch (dd->idProduct) {
+		case USB_PRODUCT_MARVELL_SHEEVAPLUG_JTAG:
+			break;
+		default:
+			recognized = B_FALSE;
+			break;
+		}
+		break;
 	default:
 		recognized = B_FALSE;
 		break;
@@ -296,8 +307,8 @@ uftdi_attach(ds_attach_info_t *aip)
 	}
 
 	USB_DPRINTF_L3(DPRINT_ATTACH, uf->uf_lh,
-	    "uftdi: matched vendor 0x%x product 0x%x",
-	    dd->idVendor, dd->idProduct);
+	    "uftdi: matched vendor 0x%x product 0x%x port %d",
+	    dd->idVendor, dd->idProduct, uf->uf_hwport);
 
 	uf->uf_def_ph = uf->uf_dev_data->dev_default_ph;
 
@@ -363,6 +374,8 @@ uftdi_register_cb(ds_hdl_t hdl, uint_t portno, ds_cb_t *cb)
 {
 	uftdi_state_t *uf = (uftdi_state_t *)hdl;
 
+	ASSERT(portno == 0);
+
 	uf->uf_cb = *cb;
 	return (USB_SUCCESS);
 }
@@ -376,6 +389,8 @@ static void
 uftdi_unregister_cb(ds_hdl_t hdl, uint_t portno)
 {
 	uftdi_state_t *uf = (uftdi_state_t *)hdl;
+
+	ASSERT(portno == 0);
 
 	bzero(&uf->uf_cb, sizeof (uf->uf_cb));
 }
@@ -393,6 +408,8 @@ uftdi_open_port(ds_hdl_t hdl, uint_t portno)
 
 	USB_DPRINTF_L4(DPRINT_OPEN, uf->uf_lh, "uftdi_open_port %d", portno);
 
+	ASSERT(portno == 0);
+
 	mutex_enter(&uf->uf_lock);
 	if (uf->uf_dev_state == USB_DEV_DISCONNECTED ||
 	    uf->uf_port_state != UFTDI_PORT_CLOSED) {
@@ -405,7 +422,7 @@ uftdi_open_port(ds_hdl_t hdl, uint_t portno)
 		return (rval);
 
 	/* initialize hardware serial port */
-	rval = uftdi_open_hw_port(uf, portno, 0);
+	rval = uftdi_open_hw_port(uf, 0);
 
 	if (rval == USB_SUCCESS) {
 		mutex_enter(&uf->uf_lock);
@@ -434,6 +451,8 @@ uftdi_close_port(ds_hdl_t hdl, uint_t portno)
 	uftdi_state_t *uf = (uftdi_state_t *)hdl;
 
 	USB_DPRINTF_L4(DPRINT_CLOSE, uf->uf_lh, "uftdi_close_port %d", portno);
+
+	ASSERT(portno == 0);
 
 	mutex_enter(&uf->uf_lock);
 
@@ -754,7 +773,7 @@ uftdi_param2regs(uftdi_state_t *uf, ds_port_params_t *tp, uftdi_regs_t *ur)
  * If there are errors, return the device to its previous state.
  */
 static int
-uftdi_setregs(uftdi_state_t *uf, uint_t portno, uftdi_regs_t *ur)
+uftdi_setregs(uftdi_state_t *uf, uftdi_regs_t *ur)
 {
 	int rval;
 	uftdi_regs_t uold;
@@ -767,10 +786,10 @@ uftdi_setregs(uftdi_state_t *uf, uint_t portno, uftdi_regs_t *ur)
 		ur = &uold;	/* NULL => restore previous values */
 
 	rval = uftdi_cmd_vendor_write0(uf, FTDI_SIO_SET_BAUD_RATE,
-	    ur->ur_baud, portno);
+	    ur->ur_baud, uf->uf_hwport);
 	if (rval != USB_SUCCESS) {
 		(void) uftdi_cmd_vendor_write0(uf, FTDI_SIO_SET_BAUD_RATE,
-		    uold.ur_baud, portno);
+		    uold.ur_baud, uf->uf_hwport);
 		goto out;
 	} else {
 		mutex_enter(&uf->uf_lock);
@@ -779,10 +798,10 @@ uftdi_setregs(uftdi_state_t *uf, uint_t portno, uftdi_regs_t *ur)
 	}
 
 	rval = uftdi_cmd_vendor_write0(uf, FTDI_SIO_SET_DATA,
-	    ur->ur_data, portno);
+	    ur->ur_data, uf->uf_hwport);
 	if (rval != USB_SUCCESS) {
 		(void) uftdi_cmd_vendor_write0(uf, FTDI_SIO_SET_DATA,
-		    uold.ur_data, portno);
+		    uold.ur_data, uf->uf_hwport);
 		goto out;
 	} else {
 		mutex_enter(&uf->uf_lock);
@@ -791,10 +810,10 @@ uftdi_setregs(uftdi_state_t *uf, uint_t portno, uftdi_regs_t *ur)
 	}
 
 	rval = uftdi_cmd_vendor_write0(uf, FTDI_SIO_SET_FLOW_CTRL,
-	    ur->ur_flowval, ur->ur_flowidx | portno);
+	    ur->ur_flowval, ur->ur_flowidx | uf->uf_hwport);
 	if (rval != USB_SUCCESS) {
 		(void) uftdi_cmd_vendor_write0(uf, FTDI_SIO_SET_FLOW_CTRL,
-		    uold.ur_flowval, uold.ur_flowidx | portno);
+		    uold.ur_flowval, uold.ur_flowidx | uf->uf_hwport);
 		goto out;
 	} else {
 		mutex_enter(&uf->uf_lock);
@@ -816,11 +835,13 @@ uftdi_set_port_params(ds_hdl_t hdl, uint_t portno, ds_port_params_t *tp)
 	int rval;
 	uftdi_regs_t uregs;
 
+	ASSERT(portno == 0);
+
 	USB_DPRINTF_L4(DPRINT_CTLOP, uf->uf_lh, "uftdi_set_port_params");
 
 	rval = uftdi_param2regs(uf, tp, &uregs);
 	if (rval == USB_SUCCESS)
-		rval = uftdi_setregs(uf, portno, &uregs);
+		rval = uftdi_setregs(uf, &uregs);
 	return (rval);
 }
 
@@ -834,6 +855,8 @@ uftdi_set_modem_ctl(ds_hdl_t hdl, uint_t portno, int mask, int val)
 	int rval;
 	uint16_t mctl;
 
+	ASSERT(portno == 0);
+
 	USB_DPRINTF_L4(DPRINT_CTLOP, uf->uf_lh, "uftdi_set_modem_ctl");
 
 	/*
@@ -846,7 +869,7 @@ uftdi_set_modem_ctl(ds_hdl_t hdl, uint_t portno, int mask, int val)
 		    FTDI_SIO_SET_DTR_HIGH : FTDI_SIO_SET_DTR_LOW;
 
 		rval = uftdi_cmd_vendor_write0(uf,
-		    FTDI_SIO_MODEM_CTRL, mctl, portno);
+		    FTDI_SIO_MODEM_CTRL, mctl, uf->uf_hwport);
 
 		if (rval == USB_SUCCESS) {
 			mutex_enter(&uf->uf_lock);
@@ -862,7 +885,7 @@ uftdi_set_modem_ctl(ds_hdl_t hdl, uint_t portno, int mask, int val)
 		    FTDI_SIO_SET_RTS_HIGH : FTDI_SIO_SET_RTS_LOW;
 
 		rval = uftdi_cmd_vendor_write0(uf,
-		    FTDI_SIO_MODEM_CTRL, mctl, portno);
+		    FTDI_SIO_MODEM_CTRL, mctl, uf->uf_hwport);
 
 		if (rval == USB_SUCCESS) {
 			mutex_enter(&uf->uf_lock);
@@ -929,6 +952,8 @@ uftdi_break_ctl(ds_hdl_t hdl, uint_t portno, int ctl)
 	uftdi_regs_t *ur = &uf->uf_softr;
 	uint16_t data;
 
+	ASSERT(portno == 0);
+
 	USB_DPRINTF_L4(DPRINT_CTLOP, uf->uf_lh, "uftdi_break_ctl");
 
 	mutex_enter(&uf->uf_lock);
@@ -936,7 +961,7 @@ uftdi_break_ctl(ds_hdl_t hdl, uint_t portno, int ctl)
 	mutex_exit(&uf->uf_lock);
 
 	return (uftdi_cmd_vendor_write0(uf, FTDI_SIO_SET_DATA,
-	    data, portno));
+	    data, uf->uf_hwport));
 }
 
 
@@ -948,6 +973,8 @@ static int
 uftdi_tx(ds_hdl_t hdl, uint_t portno, mblk_t *mp)
 {
 	uftdi_state_t *uf = (uftdi_state_t *)hdl;
+
+	ASSERT(portno == 0);
 
 	USB_DPRINTF_L4(DPRINT_CTLOP, uf->uf_lh, "uftdi_tx");
 
@@ -972,6 +999,8 @@ uftdi_rx(ds_hdl_t hdl, uint_t portno)
 	uftdi_state_t *uf = (uftdi_state_t *)hdl;
 	mblk_t *mp;
 
+	ASSERT(portno == 0);
+
 	USB_DPRINTF_L4(DPRINT_CTLOP, uf->uf_lh, "uftdi_rx");
 
 	mutex_enter(&uf->uf_lock);
@@ -992,6 +1021,8 @@ uftdi_stop(ds_hdl_t hdl, uint_t portno, int dir)
 {
 	uftdi_state_t *uf = (uftdi_state_t *)hdl;
 
+	ASSERT(portno == 0);
+
 	USB_DPRINTF_L4(DPRINT_CTLOP, uf->uf_lh, "uftdi_stop");
 
 	if (dir & DS_TX) {
@@ -1010,6 +1041,8 @@ static void
 uftdi_start(ds_hdl_t hdl, uint_t portno, int dir)
 {
 	uftdi_state_t *uf = (uftdi_state_t *)hdl;
+
+	ASSERT(portno == 0);
 
 	USB_DPRINTF_L4(DPRINT_CTLOP, uf->uf_lh, "uftdi_start");
 
@@ -1033,6 +1066,8 @@ uftdi_fifo_flush(ds_hdl_t hdl, uint_t portno, int dir)
 {
 	uftdi_state_t *uf = (uftdi_state_t *)hdl;
 
+	ASSERT(portno == 0);
+
 	USB_DPRINTF_L4(DPRINT_CTLOP, uf->uf_lh,
 	    "uftdi_fifo_flush: dir=0x%x", dir);
 
@@ -1052,11 +1087,11 @@ uftdi_fifo_flush(ds_hdl_t hdl, uint_t portno, int dir)
 
 	if (dir & DS_TX)
 		(void) uftdi_cmd_vendor_write0(uf,
-		    FTDI_SIO_RESET, FTDI_SIO_RESET_PURGE_TX, portno);
+		    FTDI_SIO_RESET, FTDI_SIO_RESET_PURGE_TX, uf->uf_hwport);
 
 	if (dir & DS_RX)
 		(void) uftdi_cmd_vendor_write0(uf,
-		    FTDI_SIO_RESET, FTDI_SIO_RESET_PURGE_RX, portno);
+		    FTDI_SIO_RESET, FTDI_SIO_RESET_PURGE_RX, uf->uf_hwport);
 
 	return (USB_SUCCESS);
 }
@@ -1074,6 +1109,8 @@ uftdi_fifo_drain(ds_hdl_t hdl, uint_t portno, int timeout)
 	const uint_t countmax = 50;	/* at least 500ms */
 	const uint8_t txempty =
 	    FTDI_LSR_STATUS_TEMT | FTDI_LSR_STATUS_THRE;
+
+	ASSERT(portno == 0);
 
 	USB_DPRINTF_L4(DPRINT_CTLOP, uf->uf_lh, "uftdi_fifo_drain");
 
@@ -1194,7 +1231,7 @@ uftdi_restore_device_state(uftdi_state_t *uf)
 	state = uf->uf_dev_state = USB_DEV_ONLINE;
 	mutex_exit(&uf->uf_lock);
 
-	if ((uftdi_restore_port_state(uf, 0) != USB_SUCCESS)) {
+	if ((uftdi_restore_port_state(uf) != USB_SUCCESS)) {
 		USB_DPRINTF_L2(DPRINT_HOTPLUG, uf->uf_lh,
 		    "uftdi_restore_device_state: failed");
 	}
@@ -1207,7 +1244,7 @@ uftdi_restore_device_state(uftdi_state_t *uf)
  * restore ports state after CPR resume or reconnect
  */
 static int
-uftdi_restore_port_state(uftdi_state_t *uf, int portno)
+uftdi_restore_port_state(uftdi_state_t *uf)
 {
 	int rval;
 
@@ -1219,7 +1256,7 @@ uftdi_restore_port_state(uftdi_state_t *uf, int portno)
 	mutex_exit(&uf->uf_lock);
 
 	/* open hardware serial port, restoring old settings */
-	if ((rval = uftdi_open_hw_port(uf, portno, 1)) != USB_SUCCESS) {
+	if ((rval = uftdi_open_hw_port(uf, 1)) != USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_HOTPLUG, uf->uf_lh,
 		    "uftdi_restore_port_state: failed");
 	}
@@ -1935,7 +1972,7 @@ uftdi_wait_tx_drain(uftdi_state_t *uf, int timeout)
  * initialize hardware serial port
  */
 static int
-uftdi_open_hw_port(uftdi_state_t *uf, int portno, int dorestore)
+uftdi_open_hw_port(uftdi_state_t *uf, int dorestore)
 {
 	int rval;
 
@@ -1943,7 +1980,7 @@ uftdi_open_hw_port(uftdi_state_t *uf, int portno, int dorestore)
 	 * Perform a full reset on the device
 	 */
 	rval = uftdi_cmd_vendor_write0(uf,
-	    FTDI_SIO_RESET, FTDI_SIO_RESET_SIO, portno);
+	    FTDI_SIO_RESET, FTDI_SIO_RESET_SIO, uf->uf_hwport);
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_DEF_PIPE, uf->uf_lh,
 		    "uftdi_open_hw_port: failed to reset!");
@@ -1954,7 +1991,7 @@ uftdi_open_hw_port(uftdi_state_t *uf, int portno, int dorestore)
 		/*
 		 * Restore settings from our soft copy of HW registers
 		 */
-		(void) uftdi_setregs(uf, portno, NULL);
+		(void) uftdi_setregs(uf, NULL);
 	} else {
 		/*
 		 * 9600 baud, 2 stop bits, no parity, 8-bit, h/w flow control
@@ -1979,7 +2016,7 @@ uftdi_open_hw_port(uftdi_state_t *uf, int portno, int dorestore)
 			sizeof (ents) / sizeof (ents[0])
 		};
 
-		rval = uftdi_set_port_params(uf, portno, &params);
+		rval = uftdi_set_port_params(uf, 0, &params);
 		if (rval != USB_SUCCESS) {
 			USB_DPRINTF_L2(DPRINT_DEF_PIPE, uf->uf_lh,
 			    "uftdi_open_hw_port: failed 9600/2/n/8 rval %d",
@@ -2052,6 +2089,8 @@ uftdi_put_head(mblk_t **mpp, mblk_t *bp)
 static usb_pipe_handle_t
 uftdi_out_pipe(ds_hdl_t hdl, uint_t portno)
 {
+	ASSERT(portno == 0);
+
 	return (((uftdi_state_t *)hdl)->uf_bulkout_ph);
 }
 
@@ -2059,5 +2098,7 @@ uftdi_out_pipe(ds_hdl_t hdl, uint_t portno)
 static usb_pipe_handle_t
 uftdi_in_pipe(ds_hdl_t hdl, uint_t portno)
 {
+	ASSERT(portno == 0);
+
 	return (((uftdi_state_t *)hdl)->uf_bulkin_ph);
 }

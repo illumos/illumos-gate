@@ -67,6 +67,7 @@ typedef struct uftdi_state {
 	kmutex_t		uf_lock;		/* structure lock */
 	dev_info_t		*uf_dip;		/* device info */
 	int			uf_dev_flags;		/* device flags */
+	int			uf_hwport;		/* hw port number */
 	int			uf_port_state;		/* port state */
 	int			uf_port_flags;		/* port flags */
 	ds_cb_t			uf_cb;			/* DSD callbacks */
@@ -117,6 +118,7 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(uftdi_state::{
 	uf_cb
 	uf_bulkin_ph
 	uf_bulkout_ph
+	uf_hwport
 }))
 
 /* port state */
