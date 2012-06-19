@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -48,6 +50,7 @@
 #include <sys/panic.h>
 #include <sys/spl.h>
 #include <sys/zone.h>
+#include <sys/sunddi.h>
 
 /*
  * In some debugging situations it's useful to log all messages to panicbuf,
@@ -285,6 +288,21 @@ zcmn_err(zoneid_t zoneid, int ce, const char *fmt, ...)
 		cprintf(fmt, adx, ce_to_sl[ce] | SL_CONSOLE, ce_prefix[ce],
 		    ce_suffix[ce], caller(), 0, 0, 0, zoneid);
 	va_end(adx);
+}
+
+/*PRINTFLIKE3*/
+void
+dev_err(dev_info_t *dip, int ce, char *fmt, ...)
+{
+	va_list ap;
+	char buf[LOG_MSGSIZE];
+
+	(void) snprintf(buf, sizeof (buf), "%s%d: %s",
+	    ddi_driver_name(dip), ddi_get_instance(dip), fmt);
+
+	va_start(ap, fmt);
+	vcmn_err(ce, buf, ap);
+	va_end(ap);
 }
 
 int
