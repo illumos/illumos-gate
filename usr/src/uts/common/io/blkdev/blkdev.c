@@ -1616,7 +1616,7 @@ bd_xfer_done(bd_xfer_t *xfer, int err)
 {
 	bd_xfer_impl_t	*xi = (void *)xfer;
 	buf_t		*bp = xi->i_bp;
-	int		rv;
+	int		rv = DDI_SUCCESS;
 	bd_t		*bd = xi->i_bd;
 	size_t		len;
 
