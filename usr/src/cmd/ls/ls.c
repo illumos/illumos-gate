@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -309,6 +310,7 @@ static mode_t		flags;
 static int		err = 0;	/* Contains return code */
 static int		colorflg;
 static int		file_typeflg;
+static int		noflist = 0;
 
 static uid_t		lastuid	= (uid_t)-1;
 static gid_t		lastgid = (gid_t)-1;
@@ -998,6 +1000,15 @@ main(int argc, char *argv[])
 #endif
 	}
 
+	/*
+	 * When certain options (-f, or -U and -1, and not -l, etc.) are
+	 * specified, don't cache each dirent as it's read.  This 'noflist'
+	 * option is set when there's no need to cache those dirents; instead,
+	 * print them out as they're read.
+	 */
+	if ((Uflg || fflg) && !Cflg && !lflg && !iflg && statreq == 0)
+		noflist = 1;
+
 	if (num_cols < 20 || num_cols > 1000)
 		/* assume it is an error */
 		num_cols = 80;
@@ -1156,7 +1167,7 @@ pdirectory(char *name, int title, int lp, int cdetect, struct ditem *myinfo)
 
 	nfiles = lp;
 	rddir(name, myinfo);
-	if (nomocore)
+	if (nomocore || noflist)
 		return;
 	if (fflg == 0 && Uflg == 0)
 		qsort(&flist[lp], (unsigned)(nfiles - lp),
@@ -1249,6 +1260,11 @@ pentry(struct lbuf *ap)
 	char *dmark = "";	/* Used if -p or -F option active */
 	char *cp;
 	char *str;
+
+	if (noflist) {
+		(void) printf("%s\n", ap->ln.lname);
+		return;
+	}
 
 	p = ap;
 	column();
@@ -1572,6 +1588,15 @@ rddir(char *dir, struct ditem *myinfo)
 				for (j = 0; dentry->d_name[j] != '\0'; j++)
 					ep->ln.lname[j] = dentry->d_name[j];
 				ep->ln.lname[j] = '\0';
+
+				/*
+				 * Since this entry doesn't need to be sorted
+				 * or further processed, print it right away.
+				 */
+				if (noflist) {
+					pem(&ep, &ep + 1, 0);
+					nfiles--;
+				}
 			}
 		}
 		if (errno) {
@@ -1783,6 +1808,14 @@ gstat(char *file, int argfl, struct ditem *myparent)
 	} else {
 		rep = flist[nfiles++];
 	}
+
+	/*
+	 * When noflist is set, none of the extra information about the dirent
+	 * will be printed, so omit initialization of this lbuf as well as the
+	 * stat(2) call.
+	 */
+	if (!argfl && noflist)
+		return (rep);
 
 	/* Initialize */
 
