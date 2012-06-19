@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _RDSV3_IMPL_H
@@ -120,9 +121,6 @@ uint_t	rdsv3_one_sec_in_hz;
 
 #define	jiffies	100
 #define	HZ	(drv_hztousec(1))
-#define	container_of(m, s, name)			\
-	(void *)((uintptr_t)(m) - (uintptr_t)offsetof(s, name))
-#define	ARRAY_SIZE(x)	(sizeof (x) / sizeof (x[0]))
 /* setting this to PAGESIZE throws build errors */
 #define	PAGE_SIZE	4096 /* xxx - fix this */
 #define	BITS_PER_LONG	(sizeof (unsigned long) * 8)
