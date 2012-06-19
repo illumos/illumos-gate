@@ -1094,9 +1094,11 @@ bd_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp, int *rvalp)
 		return (0);
 	}
 	case DKIOCFLUSHWRITECACHE: {
-		struct dk_callback *dkc;
+		struct dk_callback *dkc = NULL;
 
-		dkc = flag & FKIOCTL ? (void *)arg : NULL;
+		if (flag & FKIOCTL)
+			dkc = (void *)arg;
+
 		rv = bd_flush_write_cache(bd, dkc);
 		return (rv);
 	}
@@ -1437,24 +1439,24 @@ bd_flush_write_cache(bd_t *bd, struct dk_callback *dkc)
 		return (rv);
 	}
 
-	if (dkc != NULL) {
+	/* Make an asynchronous flush, but only if there is a callback */
+	if (dkc != NULL && dkc->dkc_callback != NULL) {
 		/* Make a private copy of the callback structure */
 		dc = kmem_alloc(sizeof (*dc), KM_SLEEP);
 		*dc = *dkc;
 		bp->b_private = dc;
 		bp->b_iodone = bd_flush_write_cache_done;
+
+		bd_submit(bd, xi);
+		return (0);
 	}
 
+	/* In case there is no callback, perform a synchronous flush */
 	bd_submit(bd, xi);
-	if (dkc == NULL) {
-		/* wait synchronously */
-		(void) biowait(bp);
-		rv = geterror(bp);
-		freerbuf(bp);
-	} else {
-		/* deferred via callback */
-		rv = 0;
-	}
+	(void) biowait(bp);
+	rv = geterror(bp);
+	freerbuf(bp);
+
 	return (rv);
 }
 
