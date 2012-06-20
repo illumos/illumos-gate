@@ -24,6 +24,10 @@
  */
 
 /*
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ */
+
+/*
  * **********************************************************************
  *									*
  * Module Name:								*
@@ -610,6 +614,7 @@ e1000g_fill_tx_ring(e1000g_tx_ring_t *tx_ring, LIST_DESCRIBER *pending_list,
 	struct e1000_tx_desc *first_data_desc;
 	struct e1000_tx_desc *next_desc;
 	struct e1000_tx_desc *descriptor;
+	struct e1000_data_desc zeroed;
 	int desc_count;
 	boolean_t buff_overrun_flag;
 	int i;
@@ -624,6 +629,7 @@ e1000g_fill_tx_ring(e1000g_tx_ring_t *tx_ring, LIST_DESCRIBER *pending_list,
 	first_packet = NULL;
 	packet = NULL;
 	buff_overrun_flag = B_FALSE;
+	zeroed.upper.data = 0;
 
 	next_desc = tx_ring->tbd_next;
 
@@ -649,6 +655,30 @@ e1000g_fill_tx_ring(e1000g_tx_ring_t *tx_ring, LIST_DESCRIBER *pending_list,
 
 	first_data_desc = next_desc;
 
+	/*
+	 * According to the documentation, the packet options field (POPTS) is
+	 * "ignored except on the first data descriptor of a packet."  However,
+	 * there is a bug in QEMU (638955) whereby the POPTS field within a
+	 * given data descriptor is used to interpret that data descriptor --
+	 * regardless of whether or not the descriptor is the first in a packet
+	 * or not.  For a packet that spans multiple descriptors, the (virtual)
+	 * HW checksum (either TCP/UDP or IP or both) will therefore _not_ be
+	 * performed on descriptors after the first, resulting in incorrect
+	 * checksums and mysteriously dropped/retransmitted packets.  Other
+	 * drivers do not have this issue because they (harmlessly) set the
+	 * POPTS field on every data descriptor to be the intended options for
+	 * the entire packet.  To circumvent this QEMU bug, we engage in this
+	 * same behavior iff our type matches that which is emulated by QEMU
+	 * (the 82540).
+	 */
+	if (hw->mac.type == e1000_82540 && cur_context->cksum_flags) {
+		if (cur_context->cksum_flags & HCK_IPV4_HDRCKSUM)
+			zeroed.upper.fields.popts |= E1000_TXD_POPTS_IXSM;
+
+		if (cur_context->cksum_flags & HCK_PARTIALCKSUM)
+			zeroed.upper.fields.popts |= E1000_TXD_POPTS_TXSM;
+	}
+
 	packet = (p_tx_sw_packet_t)QUEUE_GET_HEAD(pending_list);
 	while (packet) {
 		ASSERT(packet->num_desc);
@@ -663,7 +693,7 @@ e1000g_fill_tx_ring(e1000g_tx_ring_t *tx_ring, LIST_DESCRIBER *pending_list,
 			    packet->desc[i].length;
 
 			/* Zero out status */
-			descriptor->upper.data = 0;
+			descriptor->upper.data = zeroed.upper.data;
 
 			descriptor->lower.data |=
 			    E1000_TXD_CMD_DEXT | E1000_TXD_DTYP_D;
@@ -708,7 +738,7 @@ e1000g_fill_tx_ring(e1000g_tx_ring_t *tx_ring, LIST_DESCRIBER *pending_list,
 				    E1000_TX_BUFFER_OEVRRUN_THRESHOLD;
 
 				/* Zero out status */
-				next_desc->upper.data = 0;
+				next_desc->upper.data = zeroed.upper.data;
 
 				next_desc->lower.data |=
 				    E1000_TXD_CMD_DEXT | E1000_TXD_DTYP_D;
@@ -771,7 +801,7 @@ e1000g_fill_tx_ring(e1000g_tx_ring_t *tx_ring, LIST_DESCRIBER *pending_list,
 		next_desc->lower.data = 4;
 
 		/* Zero out status */
-		next_desc->upper.data = 0;
+		next_desc->upper.data = zeroed.upper.data;
 		/* It must be part of a LSO packet */
 		next_desc->lower.data |=
 		    E1000_TXD_CMD_DEXT | E1000_TXD_DTYP_D |
