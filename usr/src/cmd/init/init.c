@@ -693,8 +693,8 @@ main(int argc, char *argv[])
 		console(B_FALSE,
 		    "\n\n%s Release %s Version %s %d-bit\r\n",
 		    un.sysname, un.release, un.version, bits);
-		console(B_FALSE,
-		    "Copyright (c) 2010-2012, Joyent Inc. All rights reserved.\r\n");
+		console(B_FALSE, "Copyright (c) 2010-2012, "
+		    "Joyent Inc. All rights reserved.\r\n");
 	}
 
 	/*
@@ -4291,9 +4291,7 @@ contract_event(struct pollfd *poll)
 		if (ret == 0) {
 			if (cookie == STARTD_COOKIE &&
 			    do_restart_startd) {
-				if (smf_debug)
-					console(B_TRUE, "Restarting "
-					    "svc.startd.\n");
+				console(B_TRUE, "Restarting svc.startd.\n");
 
 				/*
 				 * Account for the failure.  If the failure rate
