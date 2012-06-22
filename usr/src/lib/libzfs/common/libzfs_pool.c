@@ -21,9 +21,9 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Joyent, Inc. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 #include <ctype.h>
@@ -3772,7 +3772,6 @@ supported_dump_vdev_type(libzfs_handle_t *hdl, nvlist_t *config, char *errbuf)
 
 	verify(nvlist_lookup_string(config, ZPOOL_CONFIG_TYPE, &type) == 0);
 	if (strcmp(type, VDEV_TYPE_FILE) == 0 ||
-	    strcmp(type, VDEV_TYPE_LOG) == 0 ||
 	    strcmp(type, VDEV_TYPE_HOLE) == 0 ||
 	    strcmp(type, VDEV_TYPE_MISSING) == 0) {
 		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
@@ -3791,8 +3790,12 @@ supported_dump_vdev_type(libzfs_handle_t *hdl, nvlist_t *config, char *errbuf)
 }
 
 /*
- * check if this zvol is allowable for use as a dump device; zero if
- * it is, > 0 if it isn't, < 0 if it isn't a zvol
+ * Check if this zvol is allowable for use as a dump device; zero if
+ * it is, > 0 if it isn't, < 0 if it isn't a zvol.
+ *
+ * Allowable storage configurations include mirrors, all raidz variants, and
+ * pools with log, cache, and spare devices.  Pools which are backed by files or
+ * have missing/hole vdevs are not suitable.
  */
 int
 zvol_check_dump_config(char *arg)
@@ -3854,12 +3857,6 @@ zvol_check_dump_config(char *arg)
 
 	verify(nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_CHILDREN,
 	    &top, &toplevels) == 0);
-	if (toplevels != 1) {
-		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-		    "'%s' has multiple top level vdevs"), poolname);
-		(void) zfs_error(hdl, EZFS_DEVOVERFLOW, errbuf);
-		goto out;
-	}
 
 	if (!supported_dump_vdev_type(hdl, top[0], errbuf)) {
 		goto out;
