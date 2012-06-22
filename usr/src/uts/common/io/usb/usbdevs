@@ -675,6 +675,7 @@ vendor 3COM2		0x6891	3Com
 vendor INTEL		0x8086	Intel
 vendor SITECOM2		0x9016	Sitecom
 vendor MOSCHIP		0x9710	MosChip Semiconductor
+vendor MARVELL		0x9e88	Marvell Technology Group Ltd.
 vendor 3COM3		0xa727	3Com
 vendor HP2		0xf003	Hewlett Packard
 vendor USRP		0xfffe	GNU Radio USRP
@@ -1663,6 +1664,9 @@ product LUWEN EASYDISK		0x0005	EasyDisc
 
 /* Macally products */
 product MACALLY MOUSE1		0x0101	mouse
+
+/* Marvell Technology Group, Ltd. products */
+product MARVELL SHEEVAPLUG_JTAG	0x9e8f	SheevaPlug JTAGKey
 
 /* MCT Corp. */
 product MCT HUB0100		0x0100	Hub

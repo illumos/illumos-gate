@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 
@@ -1850,6 +1851,7 @@ libscf_extract_runlevel(scf_property_t *prop, char *rlp)
 	val = safe_scf_value_create(scf_property_handle(prop));
 
 	if (scf_property_get_value(prop, val) != 0) {
+		scf_value_destroy(val);
 		switch (scf_error()) {
 		case SCF_ERROR_CONNECTION_BROKEN:
 			return (ECONNABORTED);
@@ -1875,11 +1877,14 @@ libscf_extract_runlevel(scf_property_t *prop, char *rlp)
 	}
 
 	if (scf_value_get_astring(val, buf, sizeof (buf)) < 0) {
+		scf_value_destroy(val);
 		if (scf_error() != SCF_ERROR_TYPE_MISMATCH)
 			bad_error("scf_value_get_astring", scf_error());
 
 		return (EINVAL);
 	}
+
+	scf_value_destroy(val);
 
 	if (buf[0] == '\0' || buf[1] != '\0')
 		return (EINVAL);
