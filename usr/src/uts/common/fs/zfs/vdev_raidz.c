@@ -21,8 +21,8 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Joyent, Inc. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -1500,12 +1500,40 @@ vdev_raidz_close(vdev_t *vd)
 }
 
 /*
- * Handle a read or write request to a RAID-Z dump device.
+ * Handle a read or write I/O to a RAID-Z dump device.
  *
- * Unlike the normal RAID-Z codepath in vdev_raidz_io_start(), reads and writes
- * to the dump zvol are written across a full 128Kb block.  As a result, an
- * individual I/O may not span all columns in the RAID-Z map; moreover, a small
- * I/O may only span a single column.
+ * Unlike the normal RAID-Z codepath in vdev_raidz_io_start() in which the
+ * raidz_map_t is allocated based on the I/O size, reads and writes here always
+ * use a 128 KB logical I/O size.  The RAID-Z topology is allocated assuming a
+ * that I/O size, and if the actual data is less than 128 KB, only the actual
+ * portions of data are written.  As a result, an individual I/O may not span
+ * all columns in the RAID-Z map; moreover, a small I/O may only span a single
+ * column.
+ *
+ * This example simplifies the allocation of the raidz_map_t with respect to the
+ * parity columns but hopefully will still be instructive.  It will show the
+ * difference between the normal (vdev_raidz_io_start) case and the dump device
+ * case.
+ *
+ * Let's assume a request is made to write data to a single-parity RAID-Z vdev
+ * with 5 disks.  In the normal case, the resulting raidz_map_t may look
+ * something like:
+ *
+ *   |  XX  |  XX  |  XX  |  XX  |  PP  |
+ *   |      |  XX  |  XX  |  XX  |  PP  |
+ *
+ *   (XX = data, PP = parity bits)
+ *
+ * This example glosses over some complexity in vdev_raidz_map_alloc(), but the
+ * idea is that each child vdev contains some portion of either the data or
+ * parity bits.
+ *
+ * However, since vdev_raidz_physio() always allocates a raidz_map_t across a
+ * 128 KB block, it may write the same data in the following fashion:
+ *
+ *   |      |  XX  |      |      |      |
+ *   |      |  XX  |  XX  |      |      |
+ *
  *
  * Note that since there are no parity bits calculated or written, this format
  * remains the same no matter how many parity bits are used in a normal RAID-Z
@@ -1535,8 +1563,8 @@ vdev_raidz_physio(vdev_t *vd, caddr_t data, size_t size,
 
 	/*
 	 * Even if this I/O operation doesn't span the full block size, let's
-	 * treat the on-disk format as if the only blocks are the complete 128k
-	 * size.
+	 * treat the on-disk format as if the only blocks are the complete 128
+	 * KB size.
 	 */
 	start = offset;
 	end = start + size;
@@ -1558,12 +1586,12 @@ vdev_raidz_physio(vdev_t *vd, caddr_t data, size_t size,
 		cvd = vd->vdev_child[rc->rc_devidx];
 
 		/*
-		 * Find the start and end of this column in the RAID-Z matrix,
+		 * Find the start and end of this column in the RAID-Z map,
 		 * keeping in mind that the stated size and offset of the
 		 * operation may not fill the entire column for this vdev.
 		 *
-		 * If any portion of the data being read or written spans this
-		 * column, issue the appropriate operation to the child vdev.
+		 * If any portion of the data spans this column, issue the
+		 * appropriate operation to the vdev.
 		 */
 		if (coloffset + rc->rc_size <= start)
 			continue;
@@ -1770,7 +1798,7 @@ raidz_parity_verify(zio_t *zio, raidz_map_t *rm)
 	raidz_col_t *rc;
 
 	blkptr_t *bp = zio->io_bp;
-	uint_t checksum = (bp == NULL ? zio->io_prop.zp_checksum :
+	enum zio_checksum checksum = (bp == NULL ? zio->io_prop.zp_checksum :
 	    (BP_IS_GANG(bp) ? ZIO_CHECKSUM_GANG_HEADER : BP_GET_CHECKSUM(bp)));
 
 	if (checksum == ZIO_CHECKSUM_NOPARITY)
