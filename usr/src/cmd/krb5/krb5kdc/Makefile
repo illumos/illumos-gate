@@ -42,7 +42,7 @@ ROOTMANIFESTDIR=	$(ROOTSVCNETWORKSECURITY)
 CFLAGS += $(CCOPTS) $(DEFS) $(LOCALINCLUDE)
 # The SET macros in network.c will be mis-optimized if GCC believes it
 # may rely on undefined signed overflow behaviour.
-$(__GNUC4)CFLAGS += -_gcc=-fno-strict-overflow
+CFLAGS += -_gcc=-fno-strict-overflow
 
 CPPFLAGS += \
 	-I$(SRC)/lib/gss_mechs/mech_krb5/include \

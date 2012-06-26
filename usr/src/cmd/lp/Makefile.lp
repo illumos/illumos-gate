@@ -84,8 +84,7 @@ LINTREQ	=	$(LPLIB)/requests/llib-llpreq.ln
 LINTSEC	=	$(LPLIB)/secure/llib-llpsec.ln
 LINTUSR	=	$(LPLIB)/users/llib-llpusr.ln
 
-$(__GNUC3)CERRWARN +=	-_gcc=-Wno-sequence-points
-$(__GNUC4)CERRWARN +=	-_gcc=-Wno-sequence-point
+CERRWARN +=	-_gcc=-Wno-sequence-point
 
 all:=		TARGET= all
 install:=	TARGET= install
