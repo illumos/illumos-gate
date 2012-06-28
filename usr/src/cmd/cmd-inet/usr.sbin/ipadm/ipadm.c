@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 #include <arpa/inet.h>
 #include <errno.h>
@@ -85,13 +86,11 @@ static cmd_t	cmds[] = {
 
 	/* address management related sub-commands */
 	{ "create-addr", do_create_addr,
-	    "\tcreate-addr\t[-t] {-T static <static_args> |"
-	    " -T dhcp <dhcp_args> |\n"
-	    "\t\t\t-T addrconf <addrconf_args>} <addrobj>\n"
-	    "\t\t\tstatic_args = <[-d] -a {local|remote}=addr[/prefixlen]>\n"
-	    "\t\t\tdhcp_args = <[-w <seconds> | forever]>\n"
-	    "\t\t\taddrconf_args = <[-i interface-id]\n"
-	    "\t\t\t\t\t[-p {stateful|stateless}={yes|no}]>" 		},
+	    "\tcreate-addr\t[-t] -T static [-d] "
+	    "-a{local|remote}=addr[/prefixlen]\n\t\t\t<addrobj>\n"
+	    "\tcreate-addr\t[-t] -T dhcp [-w <seconds> | forever] <addrobj>\n"
+	    "\tcreate-addr\t[-t] -T addrconf [-i interface-id]\n"
+	    "\t\t\t[-p {stateful|stateless}={yes|no}] <addrobj>" },
 	{ "down-addr",	do_down_addr,	"\tdown-addr\t[-t] <addrobj>"	},
 	{ "up-addr",	do_up_addr,	"\tup-addr\t\t[-t] <addrobj>"	},
 	{ "disable-addr", do_disable_addr, "\tdisable-addr\t-t <addrobj>" },
@@ -1194,6 +1193,8 @@ process_addrconf_addrargs(const char *use, char *addrarg)
 		case P_STATELESS:
 			if (stateless_arg)
 				die("Duplicate option");
+			if (val == NULL)
+				die("Invalid argument");
 			if (strcmp(val, "yes") == 0)
 				stateless = _B_TRUE;
 			else if (strcmp(val, "no") == 0)
@@ -1205,6 +1206,8 @@ process_addrconf_addrargs(const char *use, char *addrarg)
 		case P_STATEFUL:
 			if (stateful_arg)
 				die("Duplicate option");
+			if (val == NULL)
+				die("Invalid argument");
 			if (strcmp(val, "yes") == 0)
 				stateful = _B_TRUE;
 			else if (strcmp(val, "no") == 0)
