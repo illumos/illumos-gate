@@ -26,8 +26,6 @@
 #ifndef	_SYS_FS_HSFS_ISOSPEC_H
 #define	_SYS_FS_HSFS_ISOSPEC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ISO 9660 filesystem specification
  */
@@ -87,6 +85,7 @@ extern "C" {
 
 enum iso_voldesc_type {
 	ISO_VD_BOOT = 0, ISO_VD_PVD = 1, ISO_VD_SVD = 2, ISO_VD_VPD = 3,
+	ISO_VD_UNIX = 4,		/* UNIX extension */
 	ISO_VD_EOV = 255
 };
 #define	ISO_ID_STRING	"CD001"		/* ISO_std_id field */
@@ -138,7 +137,7 @@ enum iso_voldesc_type {
 #define	ISO_file_struct_ver(x)	(&((uchar_t *)x)[881])
 
 /* macros to get the values of each field (strings are returned as ptrs) */
-#define	ISO_DESC_TYPE(x)	((enum hs_voldesc_type)*(ISO_desc_type(x)))
+#define	ISO_DESC_TYPE(x)	((enum iso_voldesc_type)*(ISO_desc_type(x)))
 #define	ISO_STD_ID(x)		ISO_std_id(x)
 #define	ISO_STD_VER(x)		*(ISO_std_ver(x))
 #define	ISO_SYS_ID(x)		ISO_sys_id(x)
