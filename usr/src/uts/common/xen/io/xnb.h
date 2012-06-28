@@ -34,14 +34,15 @@
 #include <sys/stream.h>
 #include <sys/ethernet.h>
 #include <sys/hypervisor.h>
+#include <sys/sysmacros.h>
 #include <xen/public/io/netif.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define	NET_TX_RING_SIZE  __RING_SIZE((netif_tx_sring_t *)0, PAGESIZE)
-#define	NET_RX_RING_SIZE  __RING_SIZE((netif_rx_sring_t *)0, PAGESIZE)
+#define	NET_TX_RING_SIZE  __CONST_RING_SIZE(netif_tx, PAGESIZE)
+#define	NET_RX_RING_SIZE  __CONST_RING_SIZE(netif_rx, PAGESIZE)
 
 #define	XNBMAXPKT	1500		/* MTU size */
 
