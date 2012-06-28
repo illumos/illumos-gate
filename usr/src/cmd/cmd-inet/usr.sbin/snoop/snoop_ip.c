@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <stdio.h>
@@ -1205,7 +1206,7 @@ print_ripso(const uchar_t *opt)
 	 * Display Classification Level
 	 */
 	ripso_class = get_pair_byval(ripso_class_tbl, (int)opt[2]);
-	if (ripso_class != NULL)
+	if (ripso_class == NULL)
 		(void) snprintf(get_line(0, 0), get_line_remain(),
 		    "Classification = Unknown (0x%02x)", opt[2]);
 	else

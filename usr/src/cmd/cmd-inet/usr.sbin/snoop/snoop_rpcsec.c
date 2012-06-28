@@ -22,9 +22,8 @@
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/errno.h>
@@ -105,15 +104,15 @@ print_rpcsec_gss_cred(int xid, int authlen)
 	rpcsec_gss_service    = getxdr_enum();
 
 	(void) sprintf(get_line(pos, getxdr_pos()),
-		"   version = %u",  rpcsec_gss_ver);
+	    "   version = %u",  rpcsec_gss_ver);
 
 	(void) sprintf(get_line(pos, getxdr_pos()),
-		"   gss control procedure = %u (%s)",
-		rpcsec_gss_proc,
-		rpcsec_gss_proc_to_string(rpcsec_gss_proc));
+	    "   gss control procedure = %u (%s)",
+	    rpcsec_gss_proc,
+	    rpcsec_gss_proc_to_string(rpcsec_gss_proc));
 
 	(void) sprintf(get_line(pos, getxdr_pos()),
-		"   sequence num = %u", seq_num);
+	    "   sequence num = %u", seq_num);
 
 	(void) sprintf(get_line(pos, getxdr_pos()),
 	    "   service = %d (%s)", rpcsec_gss_service,
@@ -123,7 +122,7 @@ print_rpcsec_gss_cred(int xid, int authlen)
 	handle = getxdr_hex(handle_len);
 	line = get_line(pos, getxdr_pos());
 	sprintf(line, "   handle: length = %d, data = [%s]",
-			handle_len, handle);
+	    handle_len, handle);
 	x = find_xid(xid);
 	if (x) {
 		x->xid_gss_proc    = rpcsec_gss_proc;
@@ -159,11 +158,11 @@ rpcsec_gss_pre_proto(int type, int flags, int xid,
 		seq = getxdr_u_long();
 		if (flags & F_ALLSUM) {
 			(void) sprintf(get_sum_line(), "%s %c seq_num = %u",
-				"RPC RPCSEC_GSS", type == CALL ? 'C' : 'R',
-				seq);
+			    "RPC RPCSEC_GSS", type == CALL ? 'C' : 'R',
+			    seq);
 		} else if (flags & F_DTAIL) {
 			sprintf(get_line(0, 0),
-				"RPCSEC_GSS data seq_num = %u", seq);
+			    "RPCSEC_GSS data seq_num = %u", seq);
 			show_space();
 		}
 		/* call args follow */
@@ -178,21 +177,21 @@ rpcsec_gss_pre_proto(int type, int flags, int xid,
 		}
 
 		if (flags & F_SUM || flags & F_ALLSUM) {
-		    (void) sprintf(get_sum_line(),
-			"%s %c %s ver(%d) proc(%d) (data encrypted) ",
-			"RPC RPCSEC_GSS", type == CALL ? 'C' : 'R',
-			progname, vers, proc);
+			(void) sprintf(get_sum_line(),
+			    "%s %c %s ver(%d) proc(%d) (data encrypted) ",
+			    "RPC RPCSEC_GSS", type == CALL ? 'C' : 'R',
+			    progname, vers, proc);
 		} else if (flags & F_DTAIL) {
-		    unsigned int args_len;
+			unsigned int args_len;
 
-		    args_len = getxdr_u_long();
-		    sprintf(get_line(0, 0),
-			"RPCSEC_GSS %s ver(%d) proc(%d)",
-			progname, vers, proc);
-		    sprintf(get_line(0, 0),
-			"(%s args encrypted, len = %d bytes)",
-			type == CALL ? "CALL" : "REPLY", args_len);
-		    show_space();
+			args_len = getxdr_u_long();
+			sprintf(get_line(0, 0),
+			    "RPCSEC_GSS %s ver(%d) proc(%d)",
+			    progname, vers, proc);
+			sprintf(get_line(0, 0),
+			    "(%s args encrypted, len = %d bytes)",
+			    type == CALL ? "CALL" : "REPLY", args_len);
+			show_space();
 		}
 		}
 		return (1);
@@ -238,7 +237,7 @@ rpcsec_gss_post_proto(int flags, int xid)
 			checksum_len = getxdr_u_long();
 			checksum = getxdr_hex(checksum_len);
 			sprintf(get_line(0, 0),
-				"checksum: len = %d", checksum_len);
+			    "checksum: len = %d", checksum_len);
 			sprintf(get_line(0, 0), "[%s]", checksum);
 			show_trailer();
 		}
@@ -266,10 +265,10 @@ rpcsec_gss_control_proc(int type, int flags, int xid)
 		if (flags & F_SUM) {
 			if (type == CALL) {
 				(void) sprintf(get_sum_line(), "%s %c %u (%s)",
-				"RPC RPCSEC_GSS",
-				type == CALL ? 'C' : 'R',
-				x->xid_gss_proc,
-				rpcsec_gss_proc_to_string(x->xid_gss_proc));
+				    "RPC RPCSEC_GSS",
+				    type == CALL ? 'C' : 'R',
+				    x->xid_gss_proc,
+				    rpcsec_gss_proc_to_string(x->xid_gss_proc));
 			}
 		} else if (flags & F_DTAIL) {
 			if (x->xid_gss_proc == RPCSEC_GSS_INIT ||
@@ -330,7 +329,7 @@ print_rpc_gss_init_arg(int flags, struct cache_struct *x)
 
 	char *token, *line;
 	unsigned int token_len;
-	int pos;
+	int pos = 0;
 
 	/*
 	 *  see if we need to print out the rpc_gss_init_arg structure
@@ -338,21 +337,21 @@ print_rpc_gss_init_arg(int flags, struct cache_struct *x)
 	 */
 
 	if (x->xid_gss_proc != RPCSEC_GSS_INIT &&
-		x->xid_gss_proc != RPCSEC_GSS_CONTINUE_INIT) {
+	    x->xid_gss_proc != RPCSEC_GSS_CONTINUE_INIT) {
 		return;
 	}
 
 	/* print it */
 
 	(void) sprintf(get_line(pos, getxdr_pos()),
-		"RPCSEC_GSS_INIT args:");
+	    "RPCSEC_GSS_INIT args:");
 
 	pos = getxdr_pos();
 	token_len = getxdr_u_long();
 	token = getxdr_hex(token_len);
 	line = get_line(pos, getxdr_pos());
-		sprintf(line, "   gss token: length = %d, data = [%d bytes]",
-			token_len, token_len);
+	sprintf(line, "   gss token: length = %d, data = [%d bytes]",
+	    token_len, token_len);
 
 	show_trailer();
 }
@@ -368,7 +367,7 @@ print_rpc_gss_init_res(int flags)
 	unsigned int token_len, handle_len;
 	unsigned int major, minor, seq_window;
 
-	int pos;
+	int pos = 0;
 	struct cache_struct *x;
 
 	/* print it */
@@ -380,25 +379,25 @@ print_rpc_gss_init_res(int flags)
 	handle = getxdr_hex(handle_len);
 	line = get_line(pos, getxdr_pos());
 	sprintf(line, "   handle: length = %d, data = [%s]",
-		handle_len, handle);
+	    handle_len, handle);
 	pos = getxdr_pos();
 	major = getxdr_u_long();
 	minor = getxdr_u_long();
 	seq_window = getxdr_u_long();
 
 	(void) sprintf(get_line(pos, getxdr_pos()),
-				"   gss_major status = %u", major);
+	    "   gss_major status = %u", major);
 
 	(void) sprintf(get_line(pos, getxdr_pos()),
-				"   gss_minor status = %u", minor);
+	    "   gss_minor status = %u", minor);
 
 	(void) sprintf(get_line(pos, getxdr_pos()),
-				"   sequence window  = %u", seq_window);
+	    "   sequence window  = %u", seq_window);
 	pos = getxdr_pos();
 	token_len = getxdr_u_long();
 	token = getxdr_hex(token_len);
 	line = get_line(pos, getxdr_pos());
 	sprintf(line, "   gss token: length = %d, data = [%d bytes]",
-		token_len, token_len);
+	    token_len, token_len);
 	show_trailer();
 }

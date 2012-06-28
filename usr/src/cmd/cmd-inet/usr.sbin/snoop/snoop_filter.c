@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <stdio.h>
@@ -1049,10 +1050,8 @@ compare_value_mask(uint_t offset, uint_t len, uint_t val, int mask)
 static void
 compare_value_zone(uint_t offset, uint32_t val)
 {
-	int i;
-
-	load_const(ntohl(((uint32_t *)&val)[i]));
-	load_value(offset + i * 4, 4);
+	load_const(ntohl(val));
+	load_value(offset, 4);
 	emitop(OP_EQ);
 }
 
@@ -1582,6 +1581,9 @@ ipaddr_match(enum direction which, char *hostname, int inet_type)
 		}
 	}
 
+	if (hp == NULL)
+		return;
+
 	switch (which) {
 	case TO:
 		addr4offset = IPV4_DSTADDR_OFFSET;
@@ -1600,7 +1602,7 @@ ipaddr_match(enum direction which, char *hostname, int inet_type)
 	/*
 	 * The code below generates the filter.
 	 */
-	if (hp != NULL && hp->h_addrtype == AF_INET) {
+	if (hp->h_addrtype == AF_INET) {
 		ethertype_match(interface->network_type_ip);
 		emitop(OP_BRFL);
 		n = chain(n);
