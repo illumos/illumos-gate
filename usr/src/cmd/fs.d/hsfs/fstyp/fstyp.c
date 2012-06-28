@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * libfstyp module for hsfs
  */
@@ -42,9 +40,9 @@
 #include <sys/dkio.h>
 #include <libnvpair.h>
 #include <libfstyp_module.h>
-#include "hsfs_spec.h"
-#include "iso_spec.h"
-#include "iso_impl.h"
+
+#include <sys/fs/hsfs_spec.h>
+#include <sys/fs/hsfs_isospec.h>
 
 typedef struct fstyp_hsfs {
 	int		fd;
