@@ -23,38 +23,19 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
-LIBRARY= libzfs.a
+LIBRARY= libzfs_core.a
 VERS= .1
 
-OBJS_SHARED=			\
-	zfeature_common.o	\
-	zfs_comutil.o		\
-	zfs_deleg.o		\
-	zfs_fletcher.o		\
-	zfs_namecheck.o		\
-	zfs_prop.o		\
-	zpool_prop.o		\
-	zprop_common.o
+OBJS_SHARED=
 
 OBJS_COMMON=			\
-	libzfs_changelist.o	\
-	libzfs_config.o		\
-	libzfs_dataset.o	\
-	libzfs_diff.o		\
-	libzfs_fru.o		\
-	libzfs_import.o		\
-	libzfs_iter.o		\
-	libzfs_mount.o		\
-	libzfs_pool.o		\
-	libzfs_sendrecv.o	\
-	libzfs_status.o		\
-	libzfs_util.o
+	libzfs_core.o
 
 OBJECTS= $(OBJS_COMMON) $(OBJS_SHARED)
 
 include ../../Makefile.lib
 
-# libzfs must be installed in the root filesystem for mount(1M)
+# libzfs_core must be installed in the root filesystem for mount(1M)
 include ../../Makefile.rootfs
 
 LIBS=	$(DYNLIB) $(LINTLIB)
@@ -68,8 +49,7 @@ INCS += -I../../libc/inc
 
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
-LDLIBS +=	-lc -lm -ldevid -lgen -lnvpair -luutil -lavl -lefi \
-	-ladm -lidmap -ltsol -lmd -lumem -lzfs_core
+LDLIBS +=	-lc -lnvpair
 CPPFLAGS +=	$(INCS) -D_LARGEFILE64_SOURCE=1 -D_REENTRANT
 
 SRCS=	$(OBJS_COMMON:%.o=$(SRCDIR)/%.c)	\

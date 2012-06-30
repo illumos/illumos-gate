@@ -22,6 +22,7 @@
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2011, Richard Lowe
 # Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+# Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
 #
@@ -1031,6 +1032,8 @@ $(ROOT)/usr/lib/libxnet.so.1:=		REALPATH=../../lib/libxnet.so.1
 $(ROOT)/usr/lib/libxnet.so:=		REALPATH=../../lib/libxnet.so.1
 $(ROOT)/usr/lib/libzfs.so.1:=		REALPATH=../../lib/libzfs.so.1
 $(ROOT)/usr/lib/libzfs.so:=		REALPATH=../../lib/libzfs.so.1
+$(ROOT)/usr/lib/libzfs_core.so.1:=	REALPATH=../../lib/libzfs_core.so.1
+$(ROOT)/usr/lib/libzfs_core.so:=	REALPATH=../../lib/libzfs_core.so.1
 $(ROOT)/usr/lib/llib-ladm.ln:=		REALPATH=../../lib/llib-ladm.ln
 $(ROOT)/usr/lib/llib-ladm:=		REALPATH=../../lib/llib-ladm
 $(ROOT)/usr/lib/llib-laio.ln:=		REALPATH=../../lib/llib-laio.ln
@@ -1131,6 +1134,8 @@ $(ROOT)/usr/lib/llib-lxnet.ln:=		REALPATH=../../lib/llib-lxnet.ln
 $(ROOT)/usr/lib/llib-lxnet:=		REALPATH=../../lib/llib-lxnet
 $(ROOT)/usr/lib/llib-lzfs.ln:=		REALPATH=../../lib/llib-lzfs.ln
 $(ROOT)/usr/lib/llib-lzfs:=		REALPATH=../../lib/llib-lzfs
+$(ROOT)/usr/lib/llib-lzfs_core.ln:=	REALPATH=../../lib/llib-lzfs_core.ln
+$(ROOT)/usr/lib/llib-lzfs_core:=	REALPATH=../../lib/llib-lzfs_core
 $(ROOT)/usr/lib/nss_compat.so.1:=	REALPATH=../../lib/nss_compat.so.1
 $(ROOT)/usr/lib/nss_dns.so.1:=		REALPATH=../../lib/nss_dns.so.1
 $(ROOT)/usr/lib/nss_files.so.1:=	REALPATH=../../lib/nss_files.so.1
@@ -1377,6 +1382,10 @@ $(ROOT)/usr/lib/$(MACH64)/libzfs.so:= \
 	REALPATH=../../../lib/$(MACH64)/libzfs.so.1
 $(ROOT)/usr/lib/$(MACH64)/libzfs.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/libzfs.so.1
+$(ROOT)/usr/lib/$(MACH64)/libzfs_core.so:= \
+	REALPATH=../../../lib/$(MACH64)/libzfs_core.so.1
+$(ROOT)/usr/lib/$(MACH64)/libzfs_core.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libzfs_core.so.1
 $(ROOT)/usr/lib/$(MACH64)/libfdisk.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/libfdisk.so.1
 $(ROOT)/usr/lib/$(MACH64)/libfdisk.so:= \
@@ -1473,6 +1482,8 @@ $(ROOT)/usr/lib/$(MACH64)/llib-lxnet.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-lxnet.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-lzfs.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-lzfs.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lzfs_core.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lzfs_core.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-lfdisk.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-lfdisk.ln
 $(ROOT)/usr/lib/$(MACH64)/nss_compat.so.1:= \
@@ -1627,6 +1638,8 @@ SYM.USRLIB= \
 	/usr/lib/libxnet.so.1 \
 	/usr/lib/libzfs.so \
 	/usr/lib/libzfs.so.1 \
+	/usr/lib/libzfs_core.so \
+	/usr/lib/libzfs_core.so.1 \
 	/usr/lib/llib-ladm \
 	/usr/lib/llib-ladm.ln \
 	/usr/lib/llib-laio \
@@ -1725,6 +1738,8 @@ SYM.USRLIB= \
 	/usr/lib/llib-lxnet.ln \
 	/usr/lib/llib-lzfs \
 	/usr/lib/llib-lzfs.ln \
+	/usr/lib/llib-lzfs_core \
+	/usr/lib/llib-lzfs_core.ln \
 	/usr/lib/nss_compat.so.1 \
 	/usr/lib/nss_dns.so.1 \
 	/usr/lib/nss_files.so.1 \
@@ -1863,6 +1878,8 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/libxnet.so.1 \
 	/usr/lib/$(MACH64)/libzfs.so \
 	/usr/lib/$(MACH64)/libzfs.so.1 \
+	/usr/lib/$(MACH64)/libzfs_core.so \
+	/usr/lib/$(MACH64)/libzfs_core.so.1 \
 	/usr/lib/$(MACH64)/llib-ladm.ln \
 	/usr/lib/$(MACH64)/llib-laio.ln \
 	/usr/lib/$(MACH64)/llib-lavl.ln \
@@ -1909,6 +1926,7 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/llib-luuid.ln \
 	/usr/lib/$(MACH64)/llib-lxnet.ln \
 	/usr/lib/$(MACH64)/llib-lzfs.ln \
+	/usr/lib/$(MACH64)/llib-lzfs_core.ln \
 	/usr/lib/$(MACH64)/nss_compat.so.1 \
 	/usr/lib/$(MACH64)/nss_dns.so.1 \
 	/usr/lib/$(MACH64)/nss_files.so.1 \
