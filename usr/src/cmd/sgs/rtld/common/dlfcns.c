@@ -24,6 +24,7 @@
  *	  All Rights Reserved
  *
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -1390,7 +1391,8 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp,
 		DBG_CALL(Dbg_bind_global(clmp, 0, 0, (Xword)-1, PLT_T_NONE,
 		    *dlmp, addr, sym->st_value, sr.sr_name, binfo));
 
-		if ((lml->lm_tflags | AFLAGS(clmp)) & LML_TFLG_AUD_SYMBIND) {
+		if ((lml->lm_tflags | AFLAGS(clmp) | AFLAGS(*dlmp)) &
+		    LML_TFLG_AUD_SYMBIND) {
 			uint_t	sb_flags = LA_SYMB_DLSYM;
 			/* LINTED */
 			uint_t	symndx = (uint_t)(((Xword)sym -
