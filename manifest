@@ -329,7 +329,6 @@ d etc/init.d 0755 root sys
 f etc/init.d/PRESERVE 0744 root sys
 f etc/init.d/README 0644 root sys
 f etc/init.d/acct 0744 root sys
-f etc/init.d/cachefs.daemon 0744 root sys
 f etc/init.d/devlinks 0744 root sys
 f etc/init.d/dhcp 0744 root sys
 f etc/init.d/dodatadm.udaplt 0744 root sys
@@ -422,7 +421,6 @@ d etc/rc2.d 0755 root sys
 f etc/rc2.d/README 0644 root sys
 f etc/rc2.d/S20sysetup 0744 root sys
 h etc/rc2.d/S47pppd=etc/init.d/pppd
-f etc/rc2.d/S73cachefs.daemon 0744 root sys
 f etc/rc2.d/S81dodatadm.udaplt 0744 root sys
 f etc/rc2.d/S89PRESERVE 0744 root sys
 d etc/rc3.d 0755 root sys
@@ -1828,7 +1826,6 @@ s usr/adm=../var/adm
 d usr/bin 0755 root bin
 h usr/bin/[=usr/bin/alias
 f usr/bin/addbadsec 0555 root bin
-f usr/bin/addbib 0555 root bin
 f usr/bin/alias 0555 root bin
 d usr/bin/amd64 0755 root bin
 f usr/bin/amd64/amt 0555 root bin
@@ -1902,8 +1899,6 @@ f usr/bin/bdiff 0755 root bin
 f usr/bin/bfs 0555 root bin
 h usr/bin/bg=usr/bin/alias
 f usr/bin/busstat 0555 root bin
-s usr/bin/cachefspack=../lib/fs/cachefs/cachefspack
-s usr/bin/cachefsstat=../lib/fs/cachefs/cachefsstat
 f usr/bin/cal 0555 root bin
 f usr/bin/calendar 0555 root bin
 f usr/bin/captoinfo 0555 root bin
@@ -2077,7 +2072,6 @@ h usr/bin/i86pc=usr/bin/sun
 h usr/bin/iAPX286=usr/bin/sun
 f usr/bin/iconv 0555 root bin
 f usr/bin/id 0555 root bin
-f usr/bin/indxbib 0555 root bin
 f usr/bin/infocmp 0555 root bin
 f usr/bin/iostat 0555 root bin
 f usr/bin/isainfo 0555 root bin
@@ -2123,7 +2117,6 @@ f usr/bin/login 4555 root bin
 f usr/bin/logins 0750 root bin
 h usr/bin/logname=usr/bin/alias
 f usr/bin/look 0755 root bin
-f usr/bin/lookbib 0555 root bin
 f usr/bin/lorder 0555 root bin
 f usr/bin/ls 0555 root bin
 f usr/bin/m4 0555 root bin
@@ -2134,11 +2127,6 @@ f usr/bin/mail 2511 root mail
 f usr/bin/mailx 2511 root mail
 f usr/bin/makedev 0555 root bin
 f usr/bin/man 0555 root bin
-h usr/bin/mc68000=usr/bin/sun
-h usr/bin/mc68010=usr/bin/sun
-h usr/bin/mc68020=usr/bin/sun
-h usr/bin/mc68030=usr/bin/sun
-h usr/bin/mc68040=usr/bin/sun
 f usr/bin/mcs 0555 root bin
 h usr/bin/mdb=usr/lib/isaexec
 f usr/bin/mesg 0555 root bin
@@ -2182,7 +2170,6 @@ f usr/bin/pathchk 0555 root bin
 f usr/bin/pax 0555 root bin
 s usr/bin/pcat=unpack
 h usr/bin/pcred=usr/lib/isaexec
-h usr/bin/pdp11=usr/bin/sun
 s usr/bin/perl=/opt/local/bin/perl
 h usr/bin/pfbash=usr/bin/pfexec
 h usr/bin/pfcsh=usr/bin/pfexec
@@ -2253,7 +2240,6 @@ f usr/bin/rm 0555 root bin
 s usr/bin/rmail=mail
 f usr/bin/rmdir 0555 root bin
 f usr/bin/rmformat 0555 root bin
-f usr/bin/roffbib 0555 root bin
 f usr/bin/roles 0555 root bin
 f usr/bin/rpcinfo 0555 root bin
 f usr/bin/rsh 4555 root bin
@@ -2278,7 +2264,6 @@ h usr/bin/sleep=usr/bin/alias
 f usr/bin/smbutil 0555 root bin
 f usr/bin/soelim 0555 root bin
 h usr/bin/sort=usr/lib/isaexec
-f usr/bin/sortbib 0555 root bin
 f usr/bin/sotruss 0755 root bin
 h usr/bin/sparc=usr/bin/sun
 f usr/bin/spell 0555 root bin
@@ -2334,11 +2319,6 @@ f usr/bin/tsort 0555 root bin
 f usr/bin/tty 0555 root bin
 h usr/bin/type=usr/bin/alias
 f usr/bin/tzselect 0555 root bin
-h usr/bin/u370=usr/bin/sun
-h usr/bin/u3b15=usr/bin/sun
-h usr/bin/u3b2=usr/bin/sun
-h usr/bin/u3b5=usr/bin/sun
-h usr/bin/u3b=usr/bin/sun
 f usr/bin/ul 0555 root bin
 h usr/bin/ulimit=usr/bin/alias
 h usr/bin/umask=usr/bin/alias
@@ -2355,7 +2335,6 @@ h usr/bin/uptime=usr/lib/isaexec
 f usr/bin/userattr 0555 root bin
 f usr/bin/uudecode 0555 root uucp
 f usr/bin/uuencode 0555 root uucp
-h usr/bin/vax=usr/bin/sun
 h usr/bin/vedit=usr/bin/edit
 f usr/bin/vfsstat 0555 root bin
 f usr/bin/vgrind 0555 root bin
@@ -5319,21 +5298,6 @@ s usr/lib/fs/autofs/libshare_autofs.so=libshare_autofs.so.1
 f usr/lib/fs/autofs/mount 0555 root bin
 f usr/lib/fs/autofs/share 0555 root bin
 f usr/lib/fs/autofs/unshare 0555 root bin
-d usr/lib/fs/cachefs 0755 root sys
-f usr/lib/fs/cachefs/cachefsd 0555 root bin
-f usr/lib/fs/cachefs/cachefslog 0555 root bin
-f usr/lib/fs/cachefs/cachefspack 0555 root bin
-f usr/lib/fs/cachefs/cachefsstat 0555 root bin
-f usr/lib/fs/cachefs/cachefswssize 0555 root bin
-f usr/lib/fs/cachefs/cfsadmin 0555 root bin
-f usr/lib/fs/cachefs/cfsfstype 0555 root bin
-f usr/lib/fs/cachefs/cfstagchk 0555 root bin
-f usr/lib/fs/cachefs/dfshares 0555 root bin
-f usr/lib/fs/cachefs/fsck 0555 root bin
-f usr/lib/fs/cachefs/mount 0555 root bin
-f usr/lib/fs/cachefs/share 0555 root bin
-f usr/lib/fs/cachefs/umount 0555 root bin
-f usr/lib/fs/cachefs/unshare 0555 root bin
 d usr/lib/fs/ctfs 0755 root sys
 f usr/lib/fs/ctfs/mount 0555 root bin
 d usr/lib/fs/dev 0755 root sys
@@ -10153,10 +10117,7 @@ f usr/sbin/auditstat 0555 root bin
 h usr/sbin/audlinks=usr/sbin/devfsadm
 s usr/sbin/automount=../lib/fs/autofs/automount
 s usr/sbin/autopush=../../sbin/autopush
-s usr/sbin/cachefslog=../lib/fs/cachefs/cachefslog
-s usr/sbin/cachefswssize=../lib/fs/cachefs/cachefswssize
 f usr/sbin/cfgadm 0555 root bin
-s usr/sbin/cfsadmin=../lib/fs/cachefs/cfsadmin
 f usr/sbin/check-hostname 0555 root mail
 f usr/sbin/check-permissions 0555 root mail
 f usr/sbin/chk_encodings 0555 root sys
@@ -10431,7 +10392,6 @@ h usr/sbin/trapstat=usr/lib/platexec
 f usr/sbin/try-from 0555 root bin
 f usr/sbin/ttyadm 0755 root sys
 s usr/sbin/tunefs=../lib/fs/ufs/tunefs
-f usr/sbin/txzonemgr 0555 root sys
 s usr/sbin/tzreload=../../sbin/tzreload
 s usr/sbin/uadmin=../../sbin/uadmin
 f usr/sbin/ucodeadm 0555 root bin
@@ -11314,7 +11274,6 @@ d usr/share/man/cat1 0755 root bin
 d usr/share/man/cat1m 0755 root bin
 d usr/share/man/cat5 0755 root bin
 d usr/share/man/man1 0755 root bin
-f usr/share/man/man1/addbib.1 0444 root bin
 f usr/share/man/man1/alias.1 0444 root bin
 f usr/share/man/man1/allocate.1 0444 root bin
 f usr/share/man/man1/amt.1 0444 root bin
@@ -11462,7 +11421,6 @@ f usr/share/man/man1/i286.1 0444 root bin
 f usr/share/man/man1/i386.1 0444 root bin
 f usr/share/man/man1/i486.1 0444 root bin
 f usr/share/man/man1/iconv.1 0444 root bin
-f usr/share/man/man1/indxbib.1 0444 root bin
 f usr/share/man/man1/isainfo.1 0444 root bin
 f usr/share/man/man1/isalist.1 0444 root bin
 f usr/share/man/man1/jobs.1 0444 root bin
@@ -11505,7 +11463,6 @@ f usr/share/man/man1/logger.1 0444 root bin
 f usr/share/man/man1/login.1 0444 root bin
 f usr/share/man/man1/logname.1 0444 root bin
 f usr/share/man/man1/look.1 0444 root bin
-f usr/share/man/man1/lookbib.1 0444 root bin
 f usr/share/man/man1/lorder.1 0444 root bin
 f usr/share/man/man1/ls.1 0444 root bin
 f usr/share/man/man1/m4.1 0444 root bin
@@ -11606,7 +11563,6 @@ f usr/share/man/man1/rm.1 0444 root bin
 f usr/share/man/man1/rmail.1 0444 root bin
 f usr/share/man/man1/rmdir.1 0444 root bin
 f usr/share/man/man1/rmformat.1 044 root bin
-f usr/share/man/man1/roffbib.1 0444 root bin
 f usr/share/man/man1/roles.1 0444 root bin
 f usr/share/man/man1/rsh.1 0444 root bin
 f usr/share/man/man1/runat.1 0444 root bin
@@ -11628,7 +11584,6 @@ f usr/share/man/man1/sleep.1 0444 root bin
 f usr/share/man/man1/smbutil.1 0444 root bin
 f usr/share/man/man1/soelim.1 0444 root bin
 f usr/share/man/man1/sort.1 0444 root bin
-f usr/share/man/man1/sortbib.1 0444 root bin
 f usr/share/man/man1/sotruss.1 0444 root bin
 f usr/share/man/man1/sparc.1 0444 root bin
 f usr/share/man/man1/spell.1 0444 root bin
@@ -11688,7 +11643,6 @@ f usr/share/man/man1/valstr.1 044 root bin
 f usr/share/man/man1/valtime.1 044 root bin
 f usr/share/man/man1/valuid.1 044 root bin
 f usr/share/man/man1/valyorn.1 044 root bin
-f usr/share/man/man1/vax.1 0444 root bin
 f usr/share/man/man1/vedit.1 0444 root bin
 f usr/share/man/man1/vgrind.1 0444 root bin
 f usr/share/man/man1/w.1 0444 root bin
@@ -11731,14 +11685,9 @@ f usr/share/man/man1m/autopush.1m 0444 root bin
 f usr/share/man/man1m/bart.1m 0444 root bin
 f usr/share/man/man1m/bootadm.1m 0444 root bin
 f usr/share/man/man1m/busstat.1m 0444 root bin
-f usr/share/man/man1m/cachefslog.1m 0444 root bin
-f usr/share/man/man1m/cachefspack.1m 0444 root bin
-f usr/share/man/man1m/cachefsstat.1m 0444 root bin
-f usr/share/man/man1m/cachefswssize.1m 0444 root bin
 f usr/share/man/man1m/captoinfo.1m 0444 root bin
 f usr/share/man/man1m/catman.1m 0444 root bin
 f usr/share/man/man1m/cfgadm.1m 0444 root bin
-f usr/share/man/man1m/cfsadmin.1m 0444 root bin
 f usr/share/man/man1m/chroot.1m 0444 root bin
 f usr/share/man/man1m/clear_locks.1m 0444 root bin
 f usr/share/man/man1m/clinfo.1m 0444 root bin
