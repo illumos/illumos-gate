@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  *
  * Audit interfaces.  Auditing can be enabled in two ways:
  *
@@ -986,19 +987,23 @@ _audit_symbind(APlist *list, Rt_map *rlmp, Rt_map *dlmp, Sym *sym, uint_t ndx,
 
 		if (alp->al_symbind == 0)
 			continue;
-		if ((racp = _audit_client(AUDINFO(rlmp), almp)) == NULL)
+
+		if ((racp = _audit_client(AUDINFO(rlmp), almp)) != NULL &&
+		    (racp->ac_flags & FLG_AC_BINDFROM) == 0)
 			continue;
+
 		if ((dacp = _audit_client(AUDINFO(dlmp), almp)) == NULL)
 			continue;
-		if (((racp->ac_flags & FLG_AC_BINDFROM) == 0) ||
-		    ((dacp->ac_flags & FLG_AC_BINDTO) == 0))
+
+		if ((dacp->ac_flags & FLG_AC_BINDTO) == 0)
 			continue;
 
 		/*
-		 * The la_symbind interface is only called when the calling
-		 * object has been identified as BINDFROM, and the destination
-		 * object has been identified as BINDTO.  Use a local version of
-		 * the flags, so that any user update can be collected.
+		 * The la_symbind interface is only called when the destination
+		 * object has been identified as BINDTO and either the
+		 * destination object is being locally audited or the calling
+		 * object has been identified as BINDFROM.  Use a local version
+		 * of the flags, so that any user update can be collected.
 		 */
 		(*called)++;
 		lflags = (oflags & ~(LA_SYMB_NOPLTENTER | LA_SYMB_NOPLTEXIT));
@@ -1007,8 +1012,8 @@ _audit_symbind(APlist *list, Rt_map *rlmp, Rt_map *dlmp, Sym *sym, uint_t ndx,
 		    alp->al_libname, name, ovalue, oflags));
 
 		leave(alml, thr_flg_reenter);
-		sym->st_value = (*alp->al_symbind)(sym, ndx,
-		    &(racp->ac_cookie), &(dacp->ac_cookie),
+		sym->st_value = (*alp->al_symbind)(sym, ndx, racp == NULL ?
+		    NULL : &(racp->ac_cookie), &(dacp->ac_cookie),
 		/* BEGIN CSTYLED */
 #if	defined(_ELF64)
 		    &lflags, name);
@@ -1065,9 +1070,16 @@ audit_symbind(Rt_map *rlmp, Rt_map *dlmp, Sym *sym, uint_t ndx, Addr value,
 	if (auditors && (auditors->ad_flags & LML_TFLG_AUD_SYMBIND))
 		nsym.st_value = _audit_symbind(auditors->ad_list,
 		    rlmp, dlmp, &nsym, ndx, flags, &called);
+
 	if (AUDITORS(rlmp) && (AUDITORS(rlmp)->ad_flags & LML_TFLG_AUD_SYMBIND))
 		nsym.st_value = _audit_symbind(AUDITORS(rlmp)->ad_list,
 		    rlmp, dlmp, &nsym, ndx, flags, &called);
+
+	if (dlmp != rlmp && AUDITORS(dlmp) &&
+	    (AUDITORS(dlmp)->ad_flags & LML_TFLG_AUD_SYMBIND)) {
+		nsym.st_value = _audit_symbind(AUDITORS(dlmp)->ad_list,
+		    rlmp, dlmp, &nsym, ndx, flags, &called);
+	}
 
 	/*
 	 * If no la_symbind() was called for this interface, fabricate that no

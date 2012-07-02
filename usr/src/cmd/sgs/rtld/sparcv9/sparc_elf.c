@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -589,7 +590,8 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 			rtldexit(lml, 1);
 	}
 
-	if ((lml->lm_tflags | AFLAGS(lmp)) & LML_TFLG_AUD_SYMBIND) {
+	if ((lml->lm_tflags | AFLAGS(lmp) | AFLAGS(nlmp)) &
+	    LML_TFLG_AUD_SYMBIND) {
 		/* LINTED */
 		uint_t	symndx = (uint_t)(((uintptr_t)nsym -
 		    (uintptr_t)SYMTAB(nlmp)) / SYMENT(nlmp));
