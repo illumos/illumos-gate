@@ -963,12 +963,9 @@ vdev_raidz_reconstruct_pq(raidz_map_t *rm, int *tgts, int ntgts)
  *           ~~                               ~~
  *           __                               __
  *           |  1   1   1   1   1   1   1   1  |
- *           | 128  64  32  16  8   4   2   1  |
  *           |  19 205 116  29  64  16  4   1  |
  *           |  1   0   0   0   0   0   0   0  |
- *           |  0   1   0   0   0   0   0   0  |
- *  (V|I)' = |  0   0   1   0   0   0   0   0  |
- *           |  0   0   0   1   0   0   0   0  |
+ *  (V|I)' = |  0   0   0   1   0   0   0   0  |
  *           |  0   0   0   0   1   0   0   0  |
  *           |  0   0   0   0   0   1   0   0  |
  *           |  0   0   0   0   0   0   1   0  |
@@ -1502,42 +1499,63 @@ vdev_raidz_close(vdev_t *vd)
 /*
  * Handle a read or write I/O to a RAID-Z dump device.
  *
- * Unlike the normal RAID-Z codepath in vdev_raidz_io_start() in which the
- * raidz_map_t is allocated based on the I/O size, reads and writes here always
- * use a 128 KB logical I/O size.  The RAID-Z topology is allocated assuming a
- * that I/O size, and if the actual data is less than 128 KB, only the actual
- * portions of data are written.  As a result, an individual I/O may not span
- * all columns in the RAID-Z map; moreover, a small I/O may only span a single
- * column.
+ * The dump device is in a unique situation compared to other ZFS datasets:
+ * writing to this device should be as simple and fast as possible.  In
+ * addition, durability matters much less since the dump will be extracted
+ * once the machine reboots.  For that reason, this function eschews parity for
+ * performance and simplicity.  The dump device uses the checksum setting
+ * ZIO_CHECKSUM_NOPARITY to indicate that parity is not maintained for this
+ * dataset.
  *
- * This example simplifies the allocation of the raidz_map_t with respect to the
- * parity columns but hopefully will still be instructive.  It will show the
- * difference between the normal (vdev_raidz_io_start) case and the dump device
- * case.
+ * Blocks of size 128 KB have been preallocated for this volume.  I/Os less than
+ * 128 KB will not fill an entire block; in addition, they may not be properly
+ * aligned.  In that case, this function uses the preallocated 128 KB block and
+ * omits reading or writing any "empty" portions of that block, as opposed to
+ * allocating a fresh appropriately-sized block.
  *
- * Let's assume a request is made to write data to a single-parity RAID-Z vdev
- * with 5 disks.  In the normal case, the resulting raidz_map_t may look
- * something like:
+ * Looking at an example of a 32 KB I/O to a RAID-Z vdev with 5 child vdevs:
  *
- *   |  XX  |  XX  |  XX  |  XX  |  PP  |
- *   |      |  XX  |  XX  |  XX  |  PP  |
+ *     vdev_raidz_io_start(data, size: 32 KB, offset: 64 KB)
  *
- *   (XX = data, PP = parity bits)
+ * If this were a standard RAID-Z dataset, a block of at least 40 KB would be
+ * allocated which spans all five child vdevs.  8 KB of data would be written to
+ * each of four vdevs, with the fifth containing the parity bits.
  *
- * This example glosses over some complexity in vdev_raidz_map_alloc(), but the
- * idea is that each child vdev contains some portion of either the data or
- * parity bits.
+ *       parity    data     data     data     data
+ *     |   PP   |   XX   |   XX   |   XX   |   XX   |
+ *         ^        ^        ^        ^        ^
+ *         |        |        |        |        |
+ *   8 KB parity    ------8 KB data blocks------
  *
- * However, since vdev_raidz_physio() always allocates a raidz_map_t across a
- * 128 KB block, it may write the same data in the following fashion:
+ * However, when writing to the dump device, the layout is different:
  *
- *   |      |  XX  |      |      |      |
- *   |      |  XX  |  XX  |      |      |
+ *     vdev_raidz_physio(data, size: 32 KB, offset: 64 KB)
  *
+ * Unlike the normal RAID-Z case in which the block is allocated based on the
+ * I/O size, reads and writes here always use a 128 KB logical I/O size.  is
+ * less than 128 KB, only the actual portions of data are written.  In this
+ * example the data is written to the third data vdev since that vdev contains
+ * the offset [64 KB, 96 KB).
+ *
+ *       parity    data     data     data     data
+ *     |        |        |        |   XX   |        |
+ *                                    ^
+ *                                    |
+ *                             32 KB data block
+ *
+ * As a result, an individual I/O may not span all child vdevs; moreover, a
+ * small I/O may only operate on a single child vdev.
  *
  * Note that since there are no parity bits calculated or written, this format
  * remains the same no matter how many parity bits are used in a normal RAID-Z
- * stripe.
+ * stripe.  On a RAID-Z3 configuration with seven child vdevs, the example above
+ * would look like:
+ *
+ *       parity   parity   parity    data     data     data     data
+ *     |        |        |        |        |        |   XX   |        |
+ *                                                      ^
+ *                                                      |
+ *                                               32 KB data block
  */
 int
 vdev_raidz_physio(vdev_t *vd, caddr_t data, size_t size,
@@ -1561,11 +1579,6 @@ vdev_raidz_physio(vdev_t *vd, caddr_t data, size_t size,
 	 */
 	VERIFY3U(offset + size, <=, origoffset + SPA_MAXBLOCKSIZE);
 
-	/*
-	 * Even if this I/O operation doesn't span the full block size, let's
-	 * treat the on-disk format as if the only blocks are the complete 128
-	 * KB size.
-	 */
 	start = offset;
 	end = start + size;
 
@@ -1573,6 +1586,10 @@ vdev_raidz_physio(vdev_t *vd, caddr_t data, size_t size,
 	 * Allocate a RAID-Z map for this block.  Note that this block starts
 	 * from the "original" offset, this is, the offset of the extent which
 	 * contains the requisite offset of the data being read or written.
+	 *
+	 * Even if this I/O operation doesn't span the full block size, let's
+	 * treat the on-disk format as if the only blocks are the complete 128
+	 * KB size.
 	 */
 	rm = vdev_raidz_map_alloc(data - (offset - origoffset),
 	    SPA_MAXBLOCKSIZE, origoffset, tvd->vdev_ashift, vd->vdev_children,
