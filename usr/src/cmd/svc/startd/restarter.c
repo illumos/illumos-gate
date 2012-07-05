@@ -140,6 +140,8 @@ static restarter_instance_list_t instance_list;
 
 static uu_list_pool_t *restarter_queue_pool;
 
+#define	WT_SVC_ERR_THROTTLE	1	/* 1 sec delay for erroring wait svc */
+
 /*
  * Function used to reset the restart times for an instance, when
  * an administrative task comes along and essentially makes the times
@@ -1040,6 +1042,11 @@ stop_instance(scf_handle_t *local_handle, restarter_inst_t *inst,
 		reason = restarter_str_ct_ev_exit;
 		cp = "all processes in service exited";
 		break;
+	case RSTOP_ERR_EXIT:
+		re = RERR_RESTART;
+		reason = restarter_str_ct_ev_exit;
+		cp = "service exited with an error";
+		break;
 	case RSTOP_CORE:
 		re = RERR_FAULT;
 		reason = restarter_str_ct_ev_core;
@@ -1107,7 +1114,8 @@ stop_instance(scf_handle_t *local_handle, restarter_inst_t *inst,
 	log_framework(re == RERR_FAULT ? LOG_INFO : LOG_DEBUG,
 	    "%s: Instance stopping because %s.\n", inst->ri_i.i_fmri, cp);
 
-	if (instance_is_wait_style(inst) && cause == RSTOP_EXIT) {
+	if (instance_is_wait_style(inst) &&
+	    (cause == RSTOP_EXIT || cause == RSTOP_ERR_EXIT)) {
 		/*
 		 * No need to stop instance, as child has exited; remove
 		 * contract and move the instance to the offline state.
@@ -1123,8 +1131,26 @@ stop_instance(scf_handle_t *local_handle, restarter_inst_t *inst,
 			bad_error("restarter_instance_update_states", err);
 		}
 
-		(void) update_fault_count(inst, FAULT_COUNT_RESET);
-		reset_start_times(inst);
+		if (cause == RSTOP_ERR_EXIT) {
+			/*
+			 * The RSTOP_ERR_EXIT cause is set via the
+			 * wait_thread -> wait_remove code path when we have
+			 * a "wait" style svc that exited with an error. If
+			 * the svc is failing too quickly, we throttle it so
+			 * that we don't restart it more than once/second.
+			 * Since we know we're running in the wait thread its
+			 * ok to throttle it right here.
+			 */
+			(void) update_fault_count(inst, FAULT_COUNT_INCR);
+			if (method_rate_critical(inst)) {
+				log_instance(inst, B_TRUE, "Failing too "
+				    "quickly, throttling.");
+				sleep(WT_SVC_ERR_THROTTLE);
+			}
+		} else {
+			(void) update_fault_count(inst, FAULT_COUNT_RESET);
+			reset_start_times(inst);
+		}
 
 		if (inst->ri_i.i_primary_ctid != 0) {
 			inst->ri_m_inst =

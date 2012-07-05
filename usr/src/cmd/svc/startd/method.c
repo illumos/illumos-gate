@@ -121,10 +121,10 @@ method_record_start(restarter_inst_t *inst)
  *    clock time.
  *    Implicit success if insufficient measurements for an average exist.
  */
-static int
+int
 method_rate_critical(restarter_inst_t *inst)
 {
-	hrtime_t critical_failure_period = RINST_FAILURE_RATE_NS;
+	hrtime_t critical_failure_period;
 	uint_t critical_failure_count = RINST_START_TIMES;
 	uint_t n = inst->ri_start_index;
 	hrtime_t avg_ns = 0;
@@ -135,6 +135,11 @@ method_rate_critical(restarter_inst_t *inst)
 		{ "critical_failure_count", NULL, SCF_TYPE_INTEGER, NULL, 0 },
 		{ NULL }
 	};
+
+	if (instance_is_wait_style(inst))
+		critical_failure_period = RINST_WT_SVC_FAILURE_RATE_NS;
+	else
+		critical_failure_period = RINST_FAILURE_RATE_NS;
 
 	restart_critical[0].pv_ptr = &scf_fr;
 	restart_critical[1].pv_ptr = &scf_st;
@@ -805,12 +810,49 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 		    "to root-accessible libraries\n", inst->ri_i.i_fmri);
 
 	/*
+	 * For wait-style svc, sanity check that method exists to prevent an
+	 * infinite loop.
+	 */
+	if (instance_is_wait_style(inst) && type == METHOD_START) {
+		char *pmthd, *pend;
+	        struct stat64	sbuf;
+
+		/*
+		 * We need to handle start method strings that have arguments,
+		 * such as '/lib/svc/method/console-login %i'.
+		 * We also want to handle strings that specify environment
+		 * variables, such as 'LD_PRELOAD=libumem.so /usr/bin/node'.
+		 */
+		pmthd = method;
+		while (*pmthd != NULL) {
+			if ((pend = strchr(pmthd, ' ')) == NULL)
+				break;
+
+			*pend = '\0';
+			if (strchr(pmthd, '=') != NULL) {
+				*pend = ' ';
+				pmthd = pend + 1;
+			}
+		}
+		if (stat64(pmthd, &sbuf) == -1 && errno == ENOENT) {
+			log_instance(inst, B_TRUE, "Missing start method (%s), "
+			    "changing state to maintenance.", pmthd);
+			restarter_free_method_context(mcp);
+			result = ENOENT;
+			goto out;
+		}
+		if (pend != NULL)
+			*pend = ' ';
+	}
+
+	/*
 	 * If the service is restarting too quickly, send it to
 	 * maintenance.
 	 */
 	if (type == METHOD_START) {
 		method_record_start(inst);
-		if (method_rate_critical(inst)) {
+		if (method_rate_critical(inst) &&
+		    !instance_is_wait_style(inst)) {
 			log_instance(inst, B_TRUE, "Restarting too quickly, "
 			    "changing state to maintenance.");
 			result = ELOOP;
