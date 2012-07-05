@@ -140,6 +140,8 @@ static restarter_instance_list_t instance_list;
 
 static uu_list_pool_t *restarter_queue_pool;
 
+#define	WT_SVC_ERR_THROTTLE	1	/* 1 sec delay for erroring wait svc */
+
 /*
  * Function used to reset the restart times for an instance, when
  * an administrative task comes along and essentially makes the times
@@ -1030,6 +1032,7 @@ stop_instance(scf_handle_t *local_handle, restarter_inst_t *inst,
 	int err;
 	restarter_error_t re;
 	restarter_str_t	reason;
+	restarter_instance_state_t new_state;
 
 	assert(MUTEX_HELD(&inst->ri_lock));
 	assert(inst->ri_method_thread == 0);
@@ -1039,6 +1042,16 @@ stop_instance(scf_handle_t *local_handle, restarter_inst_t *inst,
 		re = RERR_RESTART;
 		reason = restarter_str_ct_ev_exit;
 		cp = "all processes in service exited";
+		break;
+	case RSTOP_ERR_CFG:
+		re = RERR_FAULT;
+		reason = restarter_str_method_failed;
+		cp = "service exited with a configuration error";
+		break;
+	case RSTOP_ERR_EXIT:
+		re = RERR_RESTART;
+		reason = restarter_str_ct_ev_exit;
+		cp = "service exited with an error";
 		break;
 	case RSTOP_CORE:
 		re = RERR_FAULT;
@@ -1107,7 +1120,10 @@ stop_instance(scf_handle_t *local_handle, restarter_inst_t *inst,
 	log_framework(re == RERR_FAULT ? LOG_INFO : LOG_DEBUG,
 	    "%s: Instance stopping because %s.\n", inst->ri_i.i_fmri, cp);
 
-	if (instance_is_wait_style(inst) && cause == RSTOP_EXIT) {
+	if (instance_is_wait_style(inst) &&
+	    (cause == RSTOP_EXIT ||
+	    cause == RSTOP_ERR_CFG ||
+	    cause == RSTOP_ERR_EXIT)) {
 		/*
 		 * No need to stop instance, as child has exited; remove
 		 * contract and move the instance to the offline state.
@@ -1123,8 +1139,26 @@ stop_instance(scf_handle_t *local_handle, restarter_inst_t *inst,
 			bad_error("restarter_instance_update_states", err);
 		}
 
-		(void) update_fault_count(inst, FAULT_COUNT_RESET);
-		reset_start_times(inst);
+		if (cause == RSTOP_ERR_EXIT) {
+			/*
+			 * The RSTOP_ERR_EXIT cause is set via the
+			 * wait_thread -> wait_remove code path when we have
+			 * a "wait" style svc that exited with an error. If
+			 * the svc is failing too quickly, we throttle it so
+			 * that we don't restart it more than once/second.
+			 * Since we know we're running in the wait thread its
+			 * ok to throttle it right here.
+			 */
+			(void) update_fault_count(inst, FAULT_COUNT_INCR);
+			if (method_rate_critical(inst)) {
+				log_instance(inst, B_TRUE, "Failing too "
+				    "quickly, throttling.");
+				(void) sleep(WT_SVC_ERR_THROTTLE);
+			}
+		} else {
+			(void) update_fault_count(inst, FAULT_COUNT_RESET);
+			reset_start_times(inst);
+		}
 
 		if (inst->ri_i.i_primary_ctid != 0) {
 			inst->ri_m_inst =
@@ -1149,7 +1183,8 @@ stop_instance(scf_handle_t *local_handle, restarter_inst_t *inst,
 			bad_error("restarter_instance_update_states", err);
 		}
 
-		return (0);
+		if (cause != RSTOP_ERR_CFG)
+			return (0);
 	} else if (instance_is_wait_style(inst) && re == RERR_RESTART) {
 		/*
 		 * Stopping a wait service through means other than the pid
@@ -1161,9 +1196,23 @@ stop_instance(scf_handle_t *local_handle, restarter_inst_t *inst,
 		wait_ignore_by_fmri(inst->ri_i.i_fmri);
 	}
 
+	/*
+	 * There are some configuration errors which we cannot detect until we
+	 * try to run the method.  For example, see exec_method() where the
+	 * restarter_set_method_context() call can return SMF_EXIT_ERR_CONFIG
+	 * in several cases. If this happens for a "wait-style" svc,
+	 * wait_remove() sets the cause as RSTOP_ERR_CFG so that we can detect
+	 * the configuration error and go into maintenance, even though it is
+	 * a "wait-style" svc.
+	 */
+	if (cause == RSTOP_ERR_CFG)
+		new_state = RESTARTER_STATE_MAINT;
+	else
+		new_state = inst->ri_i.i_enabled ?
+		    RESTARTER_STATE_OFFLINE : RESTARTER_STATE_DISABLED;
+
 	switch (err = restarter_instance_update_states(local_handle, inst,
-	    inst->ri_i.i_state, inst->ri_i.i_enabled ? RESTARTER_STATE_OFFLINE :
-	    RESTARTER_STATE_DISABLED, RERR_NONE, reason)) {
+	    inst->ri_i.i_state, new_state, RERR_NONE, reason)) {
 	case 0:
 	case ECONNRESET:
 		break;

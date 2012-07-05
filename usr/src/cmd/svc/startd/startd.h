@@ -379,7 +379,9 @@ typedef enum {
 	RSTOP_HWERR,		/* uncorrectable hardware error */
 	RSTOP_DEPENDENCY,	/* dependency activity caused stop */
 	RSTOP_DISABLE,		/* disabled */
-	RSTOP_RESTART		/* restart requested */
+	RSTOP_RESTART,		/* restart requested */
+	RSTOP_ERR_CFG,		/* wait svc exited with a config. error */
+	RSTOP_ERR_EXIT		/* wait svc exited with an error */
 } stop_cause_t;
 
 /*
@@ -405,6 +407,7 @@ typedef enum {
 
 #define	RINST_START_TIMES	5		/* failures to consider */
 #define	RINST_FAILURE_RATE_NS	600000000000LL	/* 1 failure/10 minutes */
+#define	RINST_WT_SVC_FAILURE_RATE_NS	NANOSEC	/* 1 failure/second */
 
 /* Number of events in the queue when we start dropping ADMIN events. */
 #define	RINST_QUEUE_THRESHOLD	100
@@ -717,6 +720,7 @@ void log_instance_fmri(const char *, const char *, boolean_t,
 /* method.c */
 void *method_thread(void *);
 void method_remove_contract(restarter_inst_t *, boolean_t, boolean_t);
+int method_rate_critical(restarter_inst_t *);
 
 /* misc.c */
 void startd_close(int);
