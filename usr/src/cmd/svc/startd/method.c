@@ -815,7 +815,7 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 	 */
 	if (instance_is_wait_style(inst) && type == METHOD_START) {
 		char *pmthd, *pend;
-	        struct stat64	sbuf;
+		struct stat64 sbuf;
 
 		/*
 		 * We need to handle start method strings that have arguments,

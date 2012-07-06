@@ -380,6 +380,7 @@ typedef enum {
 	RSTOP_DEPENDENCY,	/* dependency activity caused stop */
 	RSTOP_DISABLE,		/* disabled */
 	RSTOP_RESTART,		/* restart requested */
+	RSTOP_ERR_CFG,		/* wait svc exited with a config. error */
 	RSTOP_ERR_EXIT		/* wait svc exited with an error */
 } stop_cause_t;
 

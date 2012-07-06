@@ -101,7 +101,10 @@ wait_remove(wait_info_t *wi, int direct)
 			log_framework(LOG_NOTICE,
 			    "instance %s exited with status %d\n", wi->wi_fmri,
 			    WEXITSTATUS(status));
-			cause = RSTOP_ERR_EXIT;
+			if (WEXITSTATUS(status) == SMF_EXIT_ERR_CONFIG)
+				cause = RSTOP_ERR_CFG;
+			else
+				cause = RSTOP_ERR_EXIT;
 		}
 	}
 
