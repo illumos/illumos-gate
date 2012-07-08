@@ -1783,7 +1783,7 @@ sghsc_rb_put(sghsc_rb_head_t *rb_head, sghsc_event_t *event)
 
 	rb_head->buf[rb_head->put_idx] = *event;
 
-	rb_head->put_idx = ++rb_head->put_idx & (rb_head->size - 1);
+	rb_head->put_idx = (rb_head->put_idx + 1) & (rb_head->size - 1);
 
 	if (rb_head->put_idx == rb_head->get_idx)
 		rb_head->state = SGHSC_RB_FULL;
@@ -1806,7 +1806,7 @@ sghsc_rb_get(sghsc_rb_head_t *rb_head, sghsc_event_t *event)
 
 	*event = rb_head->buf[rb_head->get_idx];
 
-	rb_head->get_idx = ++rb_head->get_idx & (rb_head->size - 1);
+	rb_head->get_idx = (rb_head->get_idx + 1) & (rb_head->size - 1);
 
 	if (rb_head->get_idx == rb_head->put_idx)
 		rb_head->state = SGHSC_RB_EMPTY;

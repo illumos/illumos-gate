@@ -2810,7 +2810,7 @@ fsinit()
 		bcopy(&lost_found_dir[2], &buf[i], DIRSIZ(&lost_found_dir[2]));
 	}
 	node.i_number = LOSTFOUNDINO;
-	node.i_smode = node.i_mode = IFDIR | 0700;
+	node.i_smode = IFDIR | 0700;
 	node.i_nlink = 2;
 	node.i_size = sblock.fs_bsize;
 	node.i_db[0] = alloc((int)node.i_size, node.i_mode);
@@ -2823,7 +2823,7 @@ fsinit()
 	 * create the root directory
 	 */
 	node.i_number = UFSROOTINO;
-	node.i_mode = node.i_smode = IFDIR | UMASK;
+	node.i_mode = IFDIR | UMASK;
 	node.i_nlink = PREDEFDIR;
 	node.i_size = makedir(root_dir, PREDEFDIR);
 	node.i_db[0] = alloc(sblock.fs_fsize, node.i_mode);
