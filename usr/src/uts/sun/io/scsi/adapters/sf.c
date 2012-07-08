@@ -56,9 +56,6 @@ static int sfdebug = 0;
 
 static int sf_bus_config_debug = 0;
 
-/* Why do I have to do this? */
-#define	offsetof(s, m)  (size_t)(&(((s *)0)->m))
-
 #include <sys/scsi/scsi.h>
 #include <sys/fc4/fcal.h>
 #include <sys/fc4/fcp.h>
@@ -77,6 +74,7 @@ static int sf_bus_config_debug = 0;
 #include <sys/devctl.h>
 #include <sys/scsi/targets/ses.h>
 #include <sys/callb.h>
+#include <sys/sysmacros.h>
 
 static int sf_info(dev_info_t *, ddi_info_cmd_t, void *, void **);
 static int sf_attach(dev_info_t *, ddi_attach_cmd_t);

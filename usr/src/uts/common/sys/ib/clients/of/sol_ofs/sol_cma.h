@@ -30,14 +30,12 @@
 extern "C" {
 #endif
 
+#include <sys/sysmacros.h>
 
 #include <sys/ib/clients/of/sol_ofs/sol_ofs_common.h>
 #include <sys/ib/clients/of/rdma/rdma_cm.h>
 #include <sys/ib/clients/of/sol_ofs/sol_ib_cma.h> /* Transport Specific */
 
-#if !defined(offsetof)
-#define	offsetof(s, m)		(size_t)(&(((s *)0)->m))
-#endif
 
 #define	IS_UDP_CMID(idp)	((idp)->ps == RDMA_PS_UDP || \
 	(idp)->ps == RDMA_PS_IPOIB)
