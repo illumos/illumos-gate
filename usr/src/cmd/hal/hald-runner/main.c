@@ -4,6 +4,7 @@
  * main.c - Main dbus interface of the hald runner
  *
  * Copyright (C) 2006 Sjoerd Simons, <sjoerd@luon.net>
+ * Copyright (C) 2007 Codethink Ltd. Author Rob Taylor <rob.taylor@codethink.co.uk>
  *
  * Licensed under the Academic Free License version 2.1
  *
@@ -31,24 +32,46 @@
 #include "utils.h"
 #include "runner.h"
 
+#ifndef __GNUC__
+#define __attribute__(x)
+#endif
+
 static gboolean
-parse_first_part(run_request *r, DBusMessage *msg, DBusMessageIter *iter)
+parse_udi (run_request *r, DBusMessage *msg, DBusMessageIter *iter)
 {
-	DBusMessageIter sub_iter;
 	char *tmpstr;
 
-	/* First should be the device UDI */
+	/* Should be the device UDI */
 	if (dbus_message_iter_get_arg_type(iter) != DBUS_TYPE_STRING) 
 		goto malformed;
 	dbus_message_iter_get_basic(iter, &tmpstr);
 	r->udi = g_strdup(tmpstr);
 
-	/* Then the environment array */
-	if (!dbus_message_iter_next(iter) || dbus_message_iter_get_arg_type(iter) != DBUS_TYPE_ARRAY)
+	if (!dbus_message_iter_next(iter))
+		goto malformed;
+
+	return TRUE;
+
+malformed:
+	return FALSE;
+}
+
+static gboolean
+parse_environment(run_request *r, DBusMessage *msg, DBusMessageIter *iter)
+{
+	DBusMessageIter sub_iter;
+	char *tmpstr;
+
+	/* The environment array */
+	if (dbus_message_iter_get_arg_type(iter) != DBUS_TYPE_ARRAY)
 		goto malformed;
 	dbus_message_iter_recurse(iter, &sub_iter);
 	/* Add default path for the programs we start */
+#if defined(__FreeBSD__)
+	tmpstr = g_strdup_printf("PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/sbin:/usr/X11R6/sbin:/bin:/usr/bin:/usr/local/bin:/usr/X11R6/bin:%s", getenv("PATH"));
+#else
 	tmpstr = g_strdup_printf("PATH=/sbin:/usr/sbin:/bin:/usr/bin:%s", getenv("PATH"));
+#endif
 	r->environment = get_string_array(&sub_iter, tmpstr);
 
 	/* Then argv */
@@ -74,7 +97,10 @@ handle_run(DBusConnection *con, DBusMessage *msg)
 	r = new_run_request();
 	g_assert(dbus_message_iter_init(msg, &iter));
 
-	if (!parse_first_part(r, msg, &iter)) 
+	if (!parse_udi(r, msg, &iter))
+		goto malformed;
+
+	if (!parse_environment(r, msg, &iter))
 		goto malformed;
 
 	/* Next a string of what should be written to stdin */
@@ -106,25 +132,36 @@ malformed:
 }
 
 static void
-handle_start(DBusConnection *con, DBusMessage *msg)
+handle_start(DBusConnection *con, DBusMessage *msg, gboolean is_singleton)
 {
 	DBusMessage *reply;
 	DBusMessageIter iter;
 	run_request *r;
 	GPid pid;
-	dbus_int64_t pid64;
 
 	r = new_run_request();
+	r->is_singleton = is_singleton;
+
 	g_assert(dbus_message_iter_init(msg, &iter));
 
-	if (!dbus_message_iter_init(msg, &iter) || !parse_first_part(r, msg, &iter))
+	if (!dbus_message_iter_init(msg, &iter))
 		goto malformed;
 
+	if (!is_singleton && !parse_udi(r, msg, &iter)) {
+		fprintf(stderr, "error parsing udi");
+		goto malformed;
+	}
+
+	if (!parse_environment(r, msg, &iter)) {
+		fprintf(stderr, "error parsing environment");
+		goto malformed;
+	}
+
 	if (run_request_run(r, con, NULL, &pid)) {
-		pid64 = pid;
+		gint64 ppid = pid;
 		reply = dbus_message_new_method_return(msg);
 		dbus_message_append_args (reply, 
-					  DBUS_TYPE_INT64, &pid64,
+					  DBUS_TYPE_INT64, &ppid,
 					  DBUS_TYPE_INVALID);
 					  
 	} else {
@@ -177,10 +214,17 @@ filter(DBusConnection *con, DBusMessage *msg, void *user_data)
 		handle_run(con, msg);
 		return DBUS_HANDLER_RESULT_HANDLED;
 	} else if (dbus_message_is_method_call(msg, "org.freedesktop.HalRunner", "Start")) {
-		handle_start(con, msg);
+		handle_start(con, msg, FALSE);
+		return DBUS_HANDLER_RESULT_HANDLED;
+	} else if (dbus_message_is_method_call(msg, "org.freedesktop.HalRunner", "StartSingleton")) {
+		handle_start(con, msg, TRUE);
 		return DBUS_HANDLER_RESULT_HANDLED;
 	} else if (dbus_message_is_method_call(msg, "org.freedesktop.HalRunner", "Kill")) {
 		handle_kill(con, msg);
+		return DBUS_HANDLER_RESULT_HANDLED;
+	} else if (dbus_message_is_method_call(msg, "org.freedesktop.HalRunner", "Shutdown")) {
+		run_kill_all ();
+		exit (0);
 		return DBUS_HANDLER_RESULT_HANDLED;
 	} else if (dbus_message_is_method_call(msg, "org.freedesktop.HalRunner", "KillAll")) {
 		run_kill_all();

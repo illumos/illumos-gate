@@ -36,6 +36,7 @@ typedef struct {
 	gchar **argv;
 	gchar *input;
 	gboolean error_on_stderr;
+	gboolean is_singleton;
 	guint32 timeout;
 } run_request;
 
@@ -49,9 +50,9 @@ gboolean run_request_run(run_request *r, DBusConnection *con, DBusMessage *msg, 
 void run_kill_udi(gchar *udi);
 
 /* Kill all running request*/
-void run_kill_all();
+void run_kill_all(void);
 
 /* initialise the actual runner data */
-void run_init();
+void run_init(void);
 
 #endif /*  RUNNER_H */
