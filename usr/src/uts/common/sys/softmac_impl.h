@@ -73,11 +73,6 @@ typedef struct softmac_lower_s {
 } softmac_lower_t;
 
 typedef enum {
-	SOFTMAC_INITIALIZED,
-	SOFTMAC_READY
-} softmac_lower_state_t;
-
-typedef enum {
 	SOFTMAC_UNINIT,
 	SOFTMAC_ATTACH_INPROG,
 	SOFTMAC_ATTACH_DONE,

@@ -23,9 +23,6 @@
  * Use is subject to license terms.
  */
 
-
-
-
 #include "cfga_fp.h"
 
 /*
@@ -70,11 +67,11 @@ cfga_change_state(
 
 	/* Only configure and unconfigure operations are supported */
 	if (state_change_cmd != CFGA_CMD_CONFIGURE &&
-				state_change_cmd != CFGA_CMD_UNCONFIGURE) {
+	    state_change_cmd != CFGA_CMD_UNCONFIGURE) {
 		return (CFGA_OPNOTSUPP);
 	}
 
-	if ((ret = apidt_create(ap_id, &apidt, errstring)) != CFGA_OK) {
+	if ((ret = apidt_create(ap_id, &apidt, errstring)) != FPCFGA_OK) {
 		return (err_cvt(ret));
 	}
 
@@ -84,7 +81,8 @@ cfga_change_state(
 		hw_option_p = hw_option;
 		/* Use getsubopt() if more options get added */
 		while (*hw_option_p != '\0') {
-		    switch (getsubopt(&hw_option_p, fp_cs_hw_opts, &value)) {
+			switch (getsubopt(&hw_option_p, fp_cs_hw_opts,
+			    &value)) {
 			case OPT_DISABLE_RCM :
 				apidt.flags |= FLAG_DISABLE_RCM;
 				break;
@@ -98,7 +96,7 @@ cfga_change_state(
 			case OPT_REMOVE_UNUSABLE_SCSI_LUN:
 				if (state_change_cmd != CFGA_CMD_UNCONFIGURE) {
 					cfga_err(errstring, 0, ERRARG_OPT_INVAL,
-						options, 0);
+					    options, 0);
 					S_FREE(hw_option);
 					apidt_free(&apidt);
 					return (CFGA_ERROR);
@@ -108,11 +106,11 @@ cfga_change_state(
 			default :
 				/* process unknonw option. */
 				cfga_err(errstring, 0, ERRARG_OPT_INVAL,
-					options, 0);
+				    options, 0);
 				S_FREE(hw_option);
 				apidt_free(&apidt);
 				return (CFGA_ERROR);
-		    }
+			}
 		}
 		S_FREE(hw_option);
 	}
@@ -138,15 +136,15 @@ cfga_change_state(
 		if ((ret = findMatchingAdapterPort(apidt.xport_phys,
 		    &handle, &portIndex, &portAttrs, errstring)) ==
 		    FPCFGA_OK) {
-		    ret = dev_change_state(state_change_cmd, &apidt, &pwwn,
-				flags, errstring, handle, portAttrs);
-		    HBA_CloseAdapter(handle);
-		    HBA_FreeLibrary();
+			ret = dev_change_state(state_change_cmd, &apidt, &pwwn,
+			    flags, errstring, handle, portAttrs);
+			HBA_CloseAdapter(handle);
+			HBA_FreeLibrary();
 		}
 	} else {
 		/* Change state of all devices on FCA and the FCA itself */
 		ret = fca_change_state(state_change_cmd, &apidt,
-							flags, errstring);
+		    flags, errstring);
 	}
 
 	apidt_free(&apidt);
@@ -241,7 +239,8 @@ cfga_list_ext(
 		hw_option_p = hw_option;
 		/* Use getsubopt() if more options get added */
 		while (*hw_option_p != '\0') {
-		    switch (getsubopt(&hw_option_p, fp_list_hw_opts, &value)) {
+			switch (getsubopt(&hw_option_p, fp_list_hw_opts,
+			    &value)) {
 			case OPT_DEVINFO_FORCE :
 				fp_flags |= FLAG_DEVINFO_FORCE;
 				break;
@@ -252,17 +251,17 @@ cfga_list_ext(
 			default :
 				/* process unknonw option. */
 				cfga_err(errstring, 0, ERRARG_OPT_INVAL,
-					options, 0);
+				    options, 0);
 				S_FREE(hw_option);
 			return (CFGA_ERROR);
-		    }
+			}
 		}
 		S_FREE(hw_option);
 	}
 
 	/* if force_devinfo is specified check uid = 0 or not. */
 	if (((fp_flags & FLAG_DEVINFO_FORCE) == FLAG_DEVINFO_FORCE) &&
-			(geteuid() != 0)) {
+	    (geteuid() != 0)) {
 		return (CFGA_PRIV);
 	}
 
@@ -294,14 +293,14 @@ cfga_list_ext(
 
 	if ((fp_flags & FLAG_FCP_DEV) == FLAG_FCP_DEV) {
 		ret = do_list_FCP_dev(ap_id, fp_flags, cmd, &ldatalistp, &nelem,
-			errstring);
+		    errstring);
 		if (ret != FPCFGA_OK) {
 			list_free(&ldatalistp);
 			return (err_cvt(ret));
 		}
 	} else {
 		if ((ret = apidt_create(ap_id, &apidt, errstring))
-				!= FPCFGA_OK) {
+		    != FPCFGA_OK) {
 			return (err_cvt(ret));
 		}
 
@@ -371,10 +370,10 @@ cfga_ap_id_cmp(const char *ap_id1, const char *ap_id2)
 		i++;
 
 	if ((ap_id1[i] == '\0') &&
-		!(strncmp(&ap_id2[i], LUN_COMP_SEP, strlen(LUN_COMP_SEP)))) {
+	    !(strncmp(&ap_id2[i], LUN_COMP_SEP, strlen(LUN_COMP_SEP)))) {
 		return (0);
 	} else if ((ap_id2[i] == '\0') &&
-		!(strncmp(&ap_id1[i], LUN_COMP_SEP, strlen(LUN_COMP_SEP)))) {
+	    !(strncmp(&ap_id1[i], LUN_COMP_SEP, strlen(LUN_COMP_SEP)))) {
 		return (0);
 	}
 
@@ -388,7 +387,7 @@ cfga_ap_id_cmp(const char *ap_id1, const char *ap_id2)
 
 		if (isxdigit(ap_id1[i]) && isxdigit(ap_id2[i])) {
 			ret = (strtoll((ap_id1 + i), NULL, 16)) -
-				(strtoll((ap_id2 + i), NULL, 16));
+			    (strtoll((ap_id2 + i), NULL, 16));
 			if (ret > 0) {
 				return (1);
 			} else if (ret < 0) {

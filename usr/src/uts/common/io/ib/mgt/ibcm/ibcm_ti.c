@@ -890,7 +890,7 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 		 * In the case that open_channel() fails because of a
 		 * REJ or timeout, change retval to IBT_CM_FAILURE
 		 */
-		if (statep->open_return_data->rc_status != IBT_CM_ACCEPT) {
+		if (statep->open_return_data->rc_status != IBT_CM_SUCCESS) {
 			status = IBT_CM_FAILURE;
 			ibtl_cm_chan_open_is_aborted(channel);
 		}

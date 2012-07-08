@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Just in case we're not in a build environment, make sure that
  * TEXT_DOMAIN gets set to something.
@@ -55,10 +53,8 @@ meta_trans_replace(mdsetname_t *sp, mdname_t *transnp, mdname_t *oldnp,
     mdname_t *newnp, mdcmdopts_t options, md_error_t *ep)
 {
 	replace_params_t	params;
-	md_dev64_t		old_dev,
-				new_dev;
-	daddr_t			new_start_blk,
-				new_end_blk;
+	md_dev64_t		old_dev, new_dev;
+	daddr_t			new_start_blk, new_end_blk;
 
 	/* should have same set */
 	assert(sp != NULL);
@@ -657,7 +653,7 @@ mt_l_error_to_action(
 		is_mounted = (meta_check_inuse(sp,
 		    p->namep, MDCHK_MOUNTED, ep) != 0);
 
-		if (!mdisok(ep) && mdiserror(ep, MDE_IS_MOUNTED)) {
+		if (!mdisok(ep) && mdisuseerror(ep, MDE_IS_MOUNTED)) {
 			goto out;
 		}
 
@@ -714,7 +710,7 @@ mt_l_error_to_action(
 		is_mounted = (meta_check_inuse(sp,
 		    p->namep, MDCHK_MOUNTED, ep) != 0);
 
-		if (!mdisok(ep) && mdiserror(ep, MDE_IS_MOUNTED)) {
+		if (!mdisok(ep) && mdisuseerror(ep, MDE_IS_MOUNTED)) {
 			goto out;
 		}
 
@@ -771,13 +767,13 @@ mt_l_error_to_action(
 	}
 
 	len = strlen(umnt_msg) + strlen(fsck_msg) + strlen(mnt_msg) +
-							(only_fsck? 1: 0) + 1;
+	    (only_fsck? 1: 0) + 1;
 	if (!(rmsg = Zalloc(len))) {
 		len = 0;
 		goto out;
 	}
 	rc = snprintf(rmsg, len, "%s%s%s%s", umnt_msg, fsck_msg,
-					    !only_fsck? "\n": "", mnt_msg);
+	    !only_fsck? "\n": "", mnt_msg);
 	if (rc == EOF) {
 		goto out;
 	}
@@ -982,22 +978,22 @@ trans_report(
 		    dgettext(TEXT_DOMAIN, "Master Device"),
 		    dgettext(TEXT_DOMAIN, "Start Block"),
 		    dgettext(TEXT_DOMAIN, "Dbase"),
-			dgettext(TEXT_DOMAIN, "Reloc")) == EOF) {
+		    dgettext(TEXT_DOMAIN, "Reloc")) == EOF) {
 			goto out;
 		}
 
 		/* populate the key in the name_p structure */
 		if ((didnp = metadevname(&sp,
-				transp->masternamep->dev, ep)) == NULL) {
+		    transp->masternamep->dev, ep)) == NULL) {
 			return (-1);
 		}
 
 	    /* determine if devid does NOT exist */
 		if (options & PRINT_DEVID)
-		    if ((dtp = meta_getdidbykey(sp->setno, getmyside(sp, ep),
-					didnp->key, ep)) == NULL)
+			if ((dtp = meta_getdidbykey(sp->setno,
+			    getmyside(sp, ep), didnp->key, ep)) == NULL) {
 				devid = dgettext(TEXT_DOMAIN, "No ");
-			else {
+			} else {
 				devid = dgettext(TEXT_DOMAIN, "Yes");
 				free(dtp);
 			}
@@ -1338,7 +1334,7 @@ log_report(
 		    dgettext(TEXT_DOMAIN, "Logging Device"),
 		    dgettext(TEXT_DOMAIN, "Start Block"),
 		    dgettext(TEXT_DOMAIN, "Dbase"),
-			dgettext(TEXT_DOMAIN, "Reloc")) == EOF) {
+		    dgettext(TEXT_DOMAIN, "Reloc")) == EOF) {
 			goto out;
 		}
 		/* get info */
@@ -1361,10 +1357,10 @@ log_report(
 
 	    /* determine if devid does NOT exist */
 		if (options & PRINT_DEVID)
-		    if ((dtp = meta_getdidbykey(sp->setno, getmyside(sp, ep),
-					didnp->key, ep)) == NULL)
+			if ((dtp = meta_getdidbykey(sp->setno,
+			    getmyside(sp, ep), didnp->key, ep)) == NULL) {
 				devid = dgettext(TEXT_DOMAIN, "No ");
-			else {
+			} else {
 				devid = dgettext(TEXT_DOMAIN, "Yes");
 				free(dtp);
 			}
@@ -1504,7 +1500,7 @@ meta_lockfs_common(mdname_t *fs, void **cookie, int lockit)
 	(void) fclose(m);
 
 	switch (pid = fork()) {
-	    case -1:
+	case -1:
 		/*
 		 * We've got some major trouble here and shouldn't
 		 * continue. The user needs to clear up the problems
@@ -1515,7 +1511,7 @@ meta_lockfs_common(mdname_t *fs, void **cookie, int lockit)
 		*cookie = 0;
 		return (1);
 
-	    case 0:
+	case 0:
 		(void) execl("/usr/sbin/lockfs", "lockfs", lockit ? "-w" : "-u",
 		    "-c", "Solaris Volume Manager detach lock",
 		    tab_match.mnt_mountp, 0);
@@ -1527,7 +1523,7 @@ meta_lockfs_common(mdname_t *fs, void **cookie, int lockit)
 		 */
 		exit(1);
 
-	    default:
+	default:
 		if (waitpid(pid, &lock_exit, 0) != pid) {
 			/*
 			 * We couldn't get status regarding the
