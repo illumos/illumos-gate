@@ -1829,6 +1829,7 @@ f usr/bin/addbadsec 0555 root bin
 f usr/bin/alias 0555 root bin
 d usr/bin/amd64 0755 root bin
 f usr/bin/amd64/amt 0555 root bin
+f usr/bin/amd64/cputrack 0555 root bin
 f usr/bin/amd64/crle 0555 root bin
 h usr/bin/amd64/decrypt=usr/bin/amd64/encrypt
 h usr/bin/amd64/digest=usr/bin/amd64/mac
@@ -1932,7 +1933,7 @@ f usr/bin/compress 0555 root bin
 f usr/bin/coreadm 0555 root bin
 f usr/bin/cp 0555 root bin
 f usr/bin/cpio 0555 root bin
-f usr/bin/cputrack 0555 root bin
+h usr/bin/cputrack=usr/lib/isaexec
 f usr/bin/crle 0555 root bin
 f usr/bin/crontab 4555 root bin
 f usr/bin/crypt 0555 root bin
@@ -2025,6 +2026,7 @@ h usr/bin/i386=usr/bin/sun
 h usr/bin/i486=usr/bin/sun
 d usr/bin/i86 0755 root bin
 f usr/bin/i86/amt 0555 root bin
+f usr/bin/i86/cputrack 0555 root bin
 h usr/bin/i86/decrypt=usr/bin/i86/encrypt
 h usr/bin/i86/digest=usr/bin/i86/mac
 f usr/bin/i86/encrypt 0555 root bin
