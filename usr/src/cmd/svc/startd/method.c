@@ -814,29 +814,19 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 	 * infinite loop.
 	 */
 	if (instance_is_wait_style(inst) && type == METHOD_START) {
-		char *pmthd, *pend;
+		char *pend;
 		struct stat64 sbuf;
 
 		/*
 		 * We need to handle start method strings that have arguments,
 		 * such as '/lib/svc/method/console-login %i'.
-		 * We also want to handle strings that specify environment
-		 * variables, such as 'LD_PRELOAD=libumem.so /usr/bin/node'.
 		 */
-		pmthd = method;
-		while (*pmthd != NULL) {
-			if ((pend = strchr(pmthd, ' ')) == NULL)
-				break;
-
+		if ((pend = strchr(method, ' ')) != NULL)
 			*pend = '\0';
-			if (strchr(pmthd, '=') != NULL) {
-				*pend = ' ';
-				pmthd = pend + 1;
-			}
-		}
-		if (stat64(pmthd, &sbuf) == -1 && errno == ENOENT) {
+
+		if (stat64(method, &sbuf) == -1 && errno == ENOENT) {
 			log_instance(inst, B_TRUE, "Missing start method (%s), "
-			    "changing state to maintenance.", pmthd);
+			    "changing state to maintenance.", method);
 			restarter_free_method_context(mcp);
 			result = ENOENT;
 			goto out;
