@@ -2120,6 +2120,9 @@ f usr/bin/logins 0750 root bin
 h usr/bin/logname=usr/bin/alias
 f usr/bin/look 0755 root bin
 f usr/bin/lorder 0555 root bin
+# We want ls to be the 32bit binary (not a link to isaexec) so we don't blow
+# out memory sorting entries - we just die if we need too much memory.  This
+# also matches the setup on a stock solaris box.
 f usr/bin/ls 0555 root bin
 f usr/bin/m4 0555 root bin
 f usr/bin/m68k 0555 root bin
