@@ -2908,6 +2908,7 @@ cmd_printf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			funcs[nfmts] = printf_ipv6;
 			break;
 
+		case 'H':
 		case 'o':
 		case 'r':
 		case 'u':
@@ -3025,8 +3026,9 @@ static char _mdb_printf_help[] =
 "  %a    Prints the member in symbolic form.\n"
 "  %d    Prints the member as a decimal integer. If the member is a signed\n"
 "        integer type, the output will be signed.\n"
-"  %I    Prints the member a IPv4 address (must be a 32-bit integer type).\n"
-"  %N    Prints the member an IPv6 address (must be of type in6_addr_t).\n"
+"  %H    Prints the member as a human-readable size.\n"
+"  %I    Prints the member as an IPv4 address (must be 32-bit integer type).\n"
+"  %N    Prints the member as an IPv6 address (must be of type in6_addr_t).\n"
 "  %o    Prints the member as an unsigned octal integer.\n"
 "  %p    Prints the member as a pointer, in hexadecimal.\n"
 "  %q    Prints the member in signed octal. Honk if you ever use this!\n"

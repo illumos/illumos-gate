@@ -23,7 +23,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ */
 
 /*
  * MDB uses its own enhanced standard i/o mechanism for all input and output.
@@ -686,6 +688,9 @@ fmt_switch:
 		size = SZ_SHORT;
 		goto fmt_switch;
 
+	case 'H':
+		return ("human-readable size");
+
 	case 'I':
 		return ("IPv4 address");
 
@@ -866,6 +871,124 @@ iob_addr2str(uintptr_t addr)
 	}
 
 	return (name);
+}
+
+/*
+ * Produce human-readable size, similar in spirit (and identical in output)
+ * to libzfs's zfs_nicenum() -- but made significantly more complicated by
+ * the constraint that we cannot use snprintf() as an implementation detail.
+ */
+static const char *
+iob_bytes2str(varglist_t *ap, intsize_t size)
+{
+	const int sigfig = 3;
+	uint64_t n, orig;
+	static char buf[68], *c;
+	int index = 0;
+	char u;
+
+	switch (size) {
+	case SZ_LONGLONG:
+		n = (u_longlong_t)VA_ARG(ap, u_longlong_t);
+		break;
+
+	case SZ_LONG:
+		n = (ulong_t)VA_ARG(ap, ulong_t);
+		break;
+
+	default:
+		n = (ushort_t)VA_ARG(ap, uint_t);
+	}
+
+	orig = n;
+
+	while (n >= 1024) {
+		n /= 1024;
+		index++;
+	}
+
+	u = " KMGTPE"[index];
+	buf[0] = '\0';
+
+	if (index == 0) {
+		return (numtostr(n, 10, 0));
+	} else if ((orig & ((1ULL << 10 * index) - 1)) == 0) {
+		/*
+		 * If this is an even multiple of the base, always display
+		 * without any decimal precision.
+		 */
+		(void) strcat(buf, numtostr(n, 10, 0));
+	} else {
+		/*
+		 * We want to choose a precision that results in the specified
+		 * number of significant figures (by default, 3).  This is
+		 * similar to the output that one would get specifying the %.*g
+		 * format specifier (where the asterisk denotes the number of
+		 * significant digits), but (1) we include trailing zeros if
+		 * the there are non-zero digits beyond the number of
+		 * significant digits (that is, 10241 is '10.0K', not the
+		 * '10K' that it would be with %.3g) and (2) we never resort
+		 * to %e notation when the number of digits exceeds the
+		 * number of significant figures (that is, 1043968 is '1020K',
+		 * not '1.02e+03K').  This is also made somewhat complicated
+		 * by the fact that we need to deal with rounding (10239 is
+		 * '10.0K', not '9.99K'), for which we perform nearest-even
+		 * rounding.
+		 */
+		double val = (double)orig / (1ULL << 10 * index);
+		int i, mag = 1, thresh;
+
+		for (i = 0; i < sigfig - 1; i++)
+			mag *= 10;
+
+		for (thresh = mag * 10; mag >= 1; mag /= 10, i--) {
+			double mult = val * (double)mag;
+			uint64_t v;
+
+			if (mult - (double)(uint64_t)mult != 0.5) {
+				v = (uint64_t)(mult + 0.5);
+			} else {
+				/*
+				 * We are exactly between integer multiples
+				 * of units; perform nearest-even rounding
+				 * to be consistent with the behavior of
+				 * printf().
+				 */
+				if ((v = (uint64_t)mult) & 1)
+					v++;
+			}
+
+			if (mag == 1) {
+				(void) strcat(buf, numtostr(v, 10, 0));
+				break;
+			}
+
+			if (v < thresh) {
+				(void) strcat(buf, numtostr(v / mag, 10, 0));
+				(void) strcat(buf, ".");
+
+				c = (char *)numtostr(v % mag, 10, 0);
+				i -= strlen(c);
+
+				/*
+				 * We need to zero-fill from the right of the
+				 * decimal point to the first significant digit
+				 * of the fractional component.
+				 */
+				while (i--)
+					(void) strcat(buf, "0");
+
+				(void) strcat(buf, c);
+				break;
+			}
+		}
+	}
+
+	c = &buf[strlen(buf)];
+	*c++ = u;
+	*c++ = '\0';
+
+	return (buf);
 }
 
 static int
@@ -1172,6 +1295,10 @@ iob_doprnt(mdb_iob_t *iob, const char *format, varglist_t *ap)
 		case 'h':
 			size = SZ_SHORT;
 			goto fmt_switch;
+
+		case 'H':
+			u.str = iob_bytes2str(ap, size);
+			break;
 
 		case 'I':
 			u.ui32 = VA_ARG(ap, uint32_t);
