@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
 #
 
 
@@ -54,6 +55,8 @@ include ../Makefile.smbsrv.defs
 LDLIBS += -L$(ROOT)/usr/lib/smbsrv -lmlsvc -lmlrpc -lsmbns -lsmb \
 	-lzfs -lbsm -lsocket -lnsl -lscf -lumem -lcmdutils
 LDFLAGS += -R/usr/lib/smbsrv
+
+$(ENABLE_SMB_PRINTING) CPPFLAGS += -DHAVE_CUPS
 
 ROOTSMBDDIR = $(ROOTLIB)/smbsrv
 ROOTSMBDFILE = $(PROG:%=$(ROOTSMBDDIR)/%)

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -2156,17 +2156,14 @@ smb_spool_lookup_doc_byfid(smb_server_t *sv, uint16_t fid,
  *
  */
 
-int
-smb_spool_add_fid(uint16_t fid)
+void
+smb_spool_add_fid(smb_server_t *sv, uint16_t fid)
 {
 	smb_llist_t	*fidlist;
-	smb_server_t	*sv;
 	smb_spoolfid_t  *sf;
-	int rc = 0;
 
-	rc = smb_server_lookup(&sv);
-	if (rc)
-		return (rc);
+	if (sv->sv_cfg.skc_print_enable == 0)
+		return;
 
 	sf = kmem_zalloc(sizeof (smb_spoolfid_t), KM_SLEEP);
 	fidlist = &sv->sp_info.sp_fidlist;
@@ -2174,8 +2171,7 @@ smb_spool_add_fid(uint16_t fid)
 	sf->sf_fid = fid;
 	smb_llist_insert_tail(fidlist, sf);
 	smb_llist_exit(fidlist);
-	smb_server_release(sv);
-	return (rc);
+	cv_broadcast(&sv->sp_info.sp_cv);
 }
 
 /*
