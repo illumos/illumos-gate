@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -76,6 +77,7 @@ static int smb_enable_service(void);
 static int range_check_validator(int, char *);
 static int range_check_validator_zero_ok(int, char *);
 static int string_length_check_validator(int, char *);
+static int print_enable_validator(int, char *);
 static int true_false_validator(int, char *);
 static int ipv4_validator(int, char *);
 static int hostname_validator(int, char *);
@@ -912,7 +914,7 @@ struct smb_proto_option_defs {
 	{ SMB_CI_AUTOHOME_MAP, 0, MAX_VALUE_BUFLEN, path_validator, 0 },
 	{ SMB_CI_IPV6_ENABLE, 0, 0, true_false_validator,
 	    SMB_REFRESH_REFRESH },
-	{ SMB_CI_PRINT_ENABLE, 0, 0, true_false_validator,
+	{ SMB_CI_PRINT_ENABLE, 0, 0, print_enable_validator,
 	    SMB_REFRESH_REFRESH },
 	{ SMB_CI_MAP, 0, MAX_VALUE_BUFLEN, cmd_validator, SMB_REFRESH_REFRESH },
 	{ SMB_CI_UNMAP, 0, MAX_VALUE_BUFLEN, cmd_validator,
@@ -995,6 +997,27 @@ true_false_validator(int index, char *value)
 	if ((strcasecmp(value, "true") == 0) ||
 	    (strcasecmp(value, "false") == 0))
 		return (SA_OK);
+	return (SA_BAD_VALUE);
+}
+
+/*
+ * If printing support is compiled in, this is the same as:
+ * true_false_validator.  Otherwise, only allow false.
+ */
+/*ARGSUSED*/
+static int
+print_enable_validator(int index, char *value)
+{
+	if (value == NULL)
+		return (SA_BAD_VALUE);
+
+#ifdef	HAVE_CUPS
+	if (strcasecmp(value, "true") == 0)
+		return (SA_OK);
+#endif
+	if (strcasecmp(value, "false") == 0)
+		return (SA_OK);
+
 	return (SA_BAD_VALUE);
 }
 

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -37,7 +37,6 @@ void smbd_spool_stop(void) { return; }
 
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <cups/cups.h>
 #include <strings.h>
 #include <syslog.h>
 #include <signal.h>
@@ -48,6 +47,8 @@ void smbd_spool_stop(void) { return; }
 #include <smbsrv/smb.h>
 #include <smbsrv/smb_share.h>
 #include "smbd.h"
+
+#include <cups/cups.h>
 
 #define	SMB_SPOOL_WAIT			2
 #define	SMBD_PJOBLEN			256
