@@ -46,6 +46,7 @@ SYMBOL_SCOPE {
 		_mdb_ks_ncpu			{ FLAGS = EXTERN };
 		_mdb_ks_pageshift		{ FLAGS = EXTERN };
 		_mdb_ks_pagesize		{ FLAGS = EXTERN };
+		_mdb_ks_pageoffset		{ FLAGS = EXTERN };
 
 		mdb				{ FLAGS = EXTERN };
 		mdb_add_walker			{ FLAGS = EXTERN };
