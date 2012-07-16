@@ -22,7 +22,10 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2012 Joyent, Inc. All rights reserved.
+ */
+
+/*
+ * Copyright (c) 2012 Joyent, Inc. All rights reserved.
  */
 
 #include <ctype.h>
@@ -151,7 +154,10 @@ static umem_env_item_t umem_options_items[] = {
 		NULL, 0, NULL,	&vmem_sbrk_pagesize
 	},
 #endif
-
+	{ "perthread_cache",	"Evolving",	ITEM_SIZE,
+		"Size (in bytes) of per-thread allocation cache",
+		NULL, 0, NULL, &umem_ptc_size
+	},
 	{ NULL, "-- end of UMEM_OPTIONS --",	ITEM_INVALID }
 };
 

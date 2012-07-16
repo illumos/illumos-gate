@@ -22,6 +22,9 @@
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ */
 
 #ifndef _THR_UBERDATA_H
 #define	_THR_UBERDATA_H
@@ -488,6 +491,28 @@ typedef struct {
 #endif	/* _SYSCALL32 */
 
 /*
+ * As part of per-thread caching libumem (ptcumem), we add a small amount to the
+ * thread's uberdata to facilitate it. The tm_roots are the roots of linked
+ * lists which is used by libumem to chain together allocations. tm_size is used
+ * to track the total amount of data stored across those linked lists.
+ */
+#define	NTMEMBASE	16
+
+typedef struct {
+	size_t		tm_size;
+	void		*tm_roots[NTMEMBASE];
+} tumem_t;
+
+#ifdef _SYSCALL32
+typedef struct {
+	uint32_t	tm_size;
+	caddr32_t	tm_roots[NTMEMBASE];
+} tumem32_t;
+#endif
+
+typedef void (*tmem_func_t)(void *, int);
+
+/*
  * Maximum number of read locks allowed for one thread on one rwlock.
  * This could be as large as INT_MAX, but the SUSV3 test suite would
  * take an inordinately long time to complete.  This is big enough.
@@ -653,6 +678,7 @@ typedef struct ulwp {
 #if defined(sparc)
 	void		*ul_unwind_ret;	/* used only by _ex_clnup_handler() */
 #endif
+	tumem_t		ul_tmem;	/* used only by umem */
 } ulwp_t;
 
 #define	ul_cursig	ul_cp.s.cursig		/* deferred signal number */
@@ -1074,6 +1100,7 @@ typedef struct ulwp32 {
 #if defined(sparc)
 	caddr32_t	ul_unwind_ret;	/* used only by _ex_clnup_handler() */
 #endif
+	tumem32_t	ul_tmem;	/* used only by umem */
 } ulwp32_t;
 
 #define	REPLACEMENT_SIZE32	((size_t)&((ulwp32_t *)NULL)->ul_sigmask)
@@ -1196,6 +1223,7 @@ extern	ulwp_t	*find_lwp(thread_t);
 extern	void	finish_init(void);
 extern	void	update_sched(ulwp_t *);
 extern	void	queue_alloc(void);
+extern	void	tmem_exit(void);
 extern	void	tsd_exit(void);
 extern	void	tsd_free(ulwp_t *);
 extern	void	tls_setup(void);

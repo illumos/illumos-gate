@@ -22,7 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2012 Joyent, Inc. All rights reserved.
 
 MODULE = libumem.so
 MDBTGT = proc
@@ -43,6 +43,7 @@ include ../../../../Makefile.cmd
 include ../../../../Makefile.cmd.64
 
 CPPFLAGS += -I$(SRC)/lib/libumem/common
+CPPFLAGS += -I$(SRC)/lib/libc/inc
 CPPFLAGS += -I$(MODSRCS_DIR)
 
 include ../../Makefile.amd64

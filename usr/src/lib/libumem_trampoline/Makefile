@@ -19,40 +19,32 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright (c) 2012 Joyent, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright (c) 2012 Joyent, Inc. All rights reserved.
 
-MODULE = libumem.so
-MDBTGT = proc
+include ../Makefile.lib
 
-MODSRCS_DIR = ../../../common/modules/genunix
+SUBDIRS=	$(MACH)
+$(BUILD64)SUBDIRS += $(MACH64)
 
-MODSRCS = \
-	dist.c \
-	kgrep.c \
-	leaky.c \
-	leaky_subr.c \
-	libumem.c \
-	misc.c \
-	proc_kludges.c \
-	umem.c
+all	:= TARGET= all
+clean	:= TARGET= clean
+clobber	:= TARGET= clobber
+install	:= TARGET= install
+lint	:= TARGET= lint
 
-include ../../../../Makefile.cmd
+.KEEP_STATE:
 
-CPPFLAGS += -I$(SRC)/lib/libc/inc
-CPPFLAGS += -I$(SRC)/lib/libumem/common
-CPPFLAGS += -I$(MODSRCS_DIR)
+all clean clobber install lint: $(SUBDIRS)
 
-include ../../Makefile.ia32
-include ../../../Makefile.module
+install_h: $(ROOTHDRS)
 
-dmod/$(MODULE) := LDLIBS += -lproc -lm
+check: $(CHECKHDRS)
 
-%.o: $(MODSRCS_DIR)/%.c
-	$(COMPILE.c) $<
-	$(CTFCONVERT_O)
+$(SUBDIRS): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
-%.ln: $(MODSRCS_DIR)/%.c
-	$(LINT.c) -c $<
+FRC:
+
+include ../Makefile.targ

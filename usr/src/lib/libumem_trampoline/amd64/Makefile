@@ -19,40 +19,11 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2012 (c) Joyent, Inc. All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright (c) 2012 Joyent, Inc. All rights reserved.
 
-MODULE = libumem.so
-MDBTGT = proc
+include ../Makefile.com
+include ../../Makefile.lib.64
 
-MODSRCS_DIR = ../../../common/modules/genunix
-
-MODSRCS = \
-	dist.c \
-	kgrep.c \
-	leaky.c \
-	leaky_subr.c \
-	libumem.c \
-	misc.c \
-	proc_kludges.c \
-	umem.c
-
-include ../../../../Makefile.cmd
-
-CPPFLAGS += -I$(SRC)/lib/libc/inc
-CPPFLAGS += -I$(SRC)/lib/libumem/common
-CPPFLAGS += -I$(MODSRCS_DIR)
-
-include ../../Makefile.ia32
-include ../../../Makefile.module
-
-dmod/$(MODULE) := LDLIBS += -lproc -lm
-
-%.o: $(MODSRCS_DIR)/%.c
-	$(COMPILE.c) $<
-	$(CTFCONVERT_O)
-
-%.ln: $(MODSRCS_DIR)/%.c
-	$(LINT.c) -c $<
+install: all $(ROOTLIBS64) $(ROOTLINKS64)

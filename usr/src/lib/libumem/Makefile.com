@@ -22,7 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2012, Joyent, Inc.  All rights reserved.
 #
 
 #
@@ -67,10 +67,12 @@ SRCS_standalone = $(OBJECTS_standalone:%.o=../common/%.c)
 
 # Architecture-dependent files common to both versions of libumem
 OBJECTS_common_isadep = \
-	asm_subr.o
+	asm_subr.o \
+	umem_genasm.o	
 
 SRCS_common_isadep = \
-	$(ISASRCDIR)/asm_subr.s
+	$(ISASRCDIR)/asm_subr.s \
+	$(ISASRCDIR)/umem_genasm.c
 
 # Architecture-independent files common to both versions  of libumem
 OBJECTS_common_common = \
@@ -116,6 +118,8 @@ MAPFILE_SUPPLEMENTAL_standalone = ../common/stand_mapfile
 MAPFILE_SUPPLEMENTAL = $(MAPFILE_SUPPLEMENTAL_$(CURTYPE))
 
 LDLIBS +=	-lc
+
+DYNFLAGS += -Wl,-Plibumem_trampoline.so.1
 
 LDFLAGS_standalone = $(ZNOVERSION) $(BREDUCE) -M../common/mapfile-vers \
 	-M$(MAPFILE_SUPPLEMENTAL) -dy -r

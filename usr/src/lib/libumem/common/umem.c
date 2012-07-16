@@ -21,8 +21,11 @@
 
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Copyright 2012 Joyent, Inc.  All rights reserved.
  * Use is subject to license terms.
+ */
+
+/*
+ * Copyright (c) 2012 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -43,7 +46,7 @@
  *
  * 1. Overview
  * -----------
- * umem is very close to kmem in implementation.  There are four major
+ * umem is very close to kmem in implementation.  There are seven major
  * areas of divergence:
  *
  *	* Initialization
@@ -55,6 +58,10 @@
  *	* KM_SLEEP v.s. UMEM_NOFAIL
  *
  *	* lock ordering
+ *
+ *	* changing UMEM_MAXBUF
+ *
+ *	* Per-thread caching for malloc/free
  *
  * 2. Initialization
  * -----------------
@@ -365,6 +372,237 @@
  *
  * The second place to update, which is not required, is the umem_alloc_sizes.
  * These determine the default cache sizes that we're going to support.
+ *
+ * 8. Per-thread caching for malloc/free
+ * -------------------------------------
+ *
+ * "Time is an illusion. Lunchtime doubly so." -- Douglas Adams
+ *
+ * Time may be an illusion, but CPU cycles aren't.  While libumem is designed
+ * to be a highly scalable allocator, that scalability comes with a fixed cycle
+ * penalty even in the absence of contention: libumem must acquire (and release
+ * a per-CPU lock for each allocation.  When contention is low and malloc(3C)
+ * frequency is high, this overhead can dominate execution time.  To alleviate
+ * this, we allow for per-thread caching, a lock-free means of caching recent
+ * deallocations on a per-thread basis for use in satisfying subsequent calls
+ *
+ * In addition to improving performance, we also want to:
+ *	* Minimize fragmentation
+ *	* Not add additional memory overhead (no larger malloc tags)
+ *
+ * In the ulwp_t of each thread there is a private data structure called a
+ * umem_t that looks like:
+ *
+ * typedef struct {
+ * 	size_t	tm_size;
+ * 	void	*tm_roots[NTMEMBASE];  (Currently 16)
+ * } tmem_t;
+ *
+ * Each of the roots is treated as the head of a linked list. Each entry in the
+ * list can be thought of as a void ** which points to the next entry, until one
+ * of them points to NULL. If the head points to NULL, the list is empty.
+ *
+ * Each head corresponds to a umem_cache. Currently there is a linear mapping
+ * where the first root corresponds to the first cache, second root to the
+ * second cache, etc. This works because every allocation that malloc makes to
+ * umem_alloc that can be satisified by a umem_cache will actually return a
+ * number of bytes equal to the size of that cache. Because of this property and
+ * a one to one mapping between caches and roots we can guarantee that every
+ * entry in a given root's list will be able to satisfy the same requests as the
+ * corresponding cache.
+ *
+ * The maximum amount of memory that can be cached in each thread is determined
+ * by the perthread_cache UMEM_OPTION. It corresponds to the umem_ptc_size
+ * value. The default value for this is currently 1 MB. Once umem_init() has
+ * finished this cannot be directly tuned without directly modifying the
+ * instruction text. If, upon calling free(3C), the amount cached would exceed
+ * this maximum, we instead actually return the buffer to the umem_cache instead
+ * of holding onto it in the thread.
+ *
+ * When a thread calls malloc(3C) it first determines which umem_cache it
+ * would be serviced by. If the allocation is not covered by ptcumem it goes to
+ * the normal malloc instead.  Next, it checks if the tmem_root's list is empty
+ * or not. If it is empty, we instead go and allocate the memory from
+ * umem_alloc. If it is not empty, we remove the head of the list, set the
+ * appropriate malloc tags, and return that buffer.
+ *
+ * When a thread calls free(3C) it first looks at the malloc tag and if it is
+ * invalid or the allocation exceeds the largest cache in ptcumem and sends it
+ * off to the original free() to handle and clean up appropriately. Next, it
+ * checks if the allocation size is covered by one of the per-thread roots and
+ * if it isn't, it passes it off to the original free() to be released. Finally,
+ * before it inserts this buffer as the head, it checks if adding this buffer
+ * would put the thread over its maximum cache size. If it would, it frees the
+ * buffer back to the umem_cache. Otherwise it increments the threads total
+ * cached amount and makes the buffer the new head of the appropriate tm_root.
+ *
+ * When a thread exits, all of the buffers that it has in its per-thread cache
+ * will be passed to umem_free() and returned to the appropriate umem_cache.
+ *
+ * 8.1 Handling addition and removal of umem_caches
+ * ------------------------------------------------
+ *
+ * The set of umem_caches that are used to back calls to umem_alloc() and
+ * ultimately malloc() are determined at program execution time. The default set
+ * of caches is defined below in umem_alloc_sizes[]. Various umem_options exist
+ * that modify the set of caches: size_add, size_clear, and size_remove. Because
+ * the set of caches can only be determined once umem_init() has been called and
+ * we have the additional goals of minimizing additional fragmentation and
+ * metadata space overhead in the malloc tags, this forces our hand to go down a
+ * slightly different path: the one tread by fasttrap and trapstat.
+ *
+ * During umem_init we're going to dynamically construct a new version of
+ * malloc(3C) and free(3C) that utilizes the known cache sizes and then ensure
+ * that ptcmalloc and ptcfree replace malloc and free as entries in the plt. If
+ * ptcmalloc and ptcfree cannot handle a request, they simply jump to the
+ * original libumem implementations.
+ *
+ * After creating all of the umem_caches, but before making them visible,
+ * umem_cache_init checks that umem_genasm_supported is non-zero. This value is
+ * set by each architecture in $ARCH/umem_genasm.c to indicate whether or not
+ * they support this. If the value is zero, then this process is skipped.
+ * Similarly, if the cache size has been tuned to zero by UMEM_OPTIONS, then
+ * this is also skipped.
+ *
+ * In umem_genasm.c, each architecture's implementation implements a single
+ * function called umem_genasm() that is responsible for generating the
+ * appropriate versions of ptcmalloc() and ptcfree(), placing them in the
+ * appropriate memory location, and finally doing the switch from malloc() and
+ * free() to ptcmalloc() and ptcfree().  Once the change has been made, there is
+ * no way to switch back, short of restarting the program or modifying program
+ * text with mdb.
+ *
+ * 8.2 Modifying the Procedure Linkage Table (PLT)
+ * -----------------------------------------------
+ *
+ * The last piece of this puzzle is how we actually jam ptcmalloc() into the
+ * PLT.  The dyanmic linker has support for global and local audit libraries.
+ * For the full explanation of audit libraries consult the Linkers and Libraries
+ * guide or the linker source. A local auditer can attach to a single library
+ * and interpose on all of the relocations that come in from and leave to that
+ * same library. To facilitate our work, we have created a local audit library
+ * for libumem that is called libumem_trampoline and is located in
+ * lib/libumem_trampoline/.
+ *
+ * When any resolution is done to malloc(), the audit library allows us to
+ * replace the address with an address that it specifies. There are two 4k
+ * sections in the libumem_trampoline's bss which we use as the stomping grounds
+ * for ptcmalloc and ptcfree. When the audit library audits the malloc and free
+ * functions from libumem, it encodes their address and sets its buffers to
+ * contain a simple trampoline which consists of a jmp instruction and a four
+ * byte offset to the original malloc and free. libumem_trampoline's mapfile
+ * explicitly makes its bss rwx instead of rw to support this.
+ *
+ * When umem_genasm() is called, it uses a similar mechanism to get the address
+ * and size of the trampoline libraries malloc (mbuf) and free (fbuf) buffers.
+ * After validating that the size will be able to contain all of the
+ * instructions, it starts laying out ptcmalloc and ptcfree at mbuf[4] and
+ * fbuf[4]. Once both have been successfully generated, umem_genasm() stores a
+ * single five byte nop over the original jump.
+ *
+ * 8.3 umem_genasm()
+ * -----------------
+ *
+ * umem_genasm() is currently implemented for i386 and amd64. This section
+ * describes the theory behind the construction. For specific byte code to
+ * assembly instructions and niceish C and asm versions of ptcmalloc and
+ * ptcfree, see the individual umem_genasm.c files. The layout consists of the
+ * following sections:
+ *
+ *	o. function-specfic prologue
+ *	o. function-generic cache-selecting elements
+ *	o. function-specific epilogue
+ *
+ * There are three different generic cache elements that exist:
+ *
+ *	o. the last or only cache
+ *	o. the intermediary caches if more than two
+ *	o. the first one if more than one cache
+ *
+ * The malloc and free prologues and epilogues mimic the necessary portions of
+ * libumem's malloc and free. This includes things like checking for size
+ * overflow, setting and verifying the malloc tags.
+ *
+ * It is an important constraint that these functions do not make use of the
+ * call instruction. The only jmp outside of the individual functions is to the
+ * original libumem malloc and free respectively. Because doing things like
+ * setting errno or raising an internal umem error on improper malloc tags would
+ * require using calls into the PLT, whenever we encounter one of those cases we
+ * just jump to the original malloc and free functions reusing the same stack
+ * frame.
+ *
+ * Each of the above sections, the three caches, and the malloc and free
+ * prologue and epilogue are implemented as blocks of machine code with the
+ * corresponding assembly in comments. There are known offsets into each block
+ * that corresponds to locations of data and addresses that we only know at run
+ * time. These blocks are copied as necessary and the blanks filled in
+ * appropriately.
+ *
+ * As mentioned in section 8.2, the trampoline library uses specifically named
+ * variables to communicate the buffers and size to use. These variables are:
+ *
+ *	o. umem_genasm_mptr: The buffer for ptcmalloc
+ *	o. umem_genasm_msize: The size in bytes of the above buffer
+ *	o. umem_genasm_fptr: The buffer for ptcfree
+ *	o. umem_genasm_fsize: The size in bytes of the above buffer
+ *
+ * Finally, to enable the generated assembly we need to remove the previous jump
+ * to the actual malloc that exists at the start of these buffers. This is a
+ * five byte region. We could zero out the jump offset to be a jmp +0, but
+ * using nops can be faster. We specifically use a single five byte nop which is
+ * faster. The opcode for the five byte nop is 0x 0f 1f 44 00 00. On x86,
+ * remember integers are little endian, so it will be written the other way
+ * around.
+ *
+ * 8.4 Interface with libc.so
+ * --------------------------
+ *
+ * The tmem_t structure as described in the beginning of section 8, is part of a
+ * private interface with libc. There are three functions that exist to cover
+ * this. They are not documented in man pages or header files. They are in the
+ * SUNWprivate part of libc's makefile.
+ *
+ *	o. _tmem_get_base(void)
+ *
+ * 	Returns the offset from the ulwp_t (curthread) to the tmem_t structure.
+ * 	This is a constant for all threads and is effectively a way to to do
+ * 	::offsetof ulwp_t ul_tmem without having to know the specifics of the
+ * 	structure outside of libc.
+ *
+ *	o. _tmem_get_nentries(void)
+ *
+ *	Returns the number of roots that exist in the tmem_t. This is one part
+ *	of the cap on the number of umem_caches that we can back with tmem.
+ *
+ *	o. _tmem_set_cleanup(void (*)(void *, int))
+ *
+ *	This sets a clean up handler that gets called back when a thread exits.
+ *	There is one call per buffer, the void * is a pointer to the buffer on
+ *	the list, the int is the index into the roots array for this buffer.
+ *
+ * 8.5 Tuning and disabling per-thread caching
+ * -------------------------------------------
+ *
+ * There is only one tunable for per-thread caching:  the amount of memory each
+ * thread should be able to cache.  This is specified via the perthread_cache
+ * UMEM_OPTION option.  No attempt is made to to sanity check the specified
+ * value; the limit is simply the maximum value of a size_t.
+ *
+ * If the perthread_cache UMEM_OPTION is set to zero, nomagazines was requested,
+ * or UMEM_DEBUG has been turned on then we will never call into umem_genasm;
+ * however, the trampoline audit library and jump will still be in place.
+ *
+ * 8.6 Observing efficacy of per-thread caching
+ * --------------------------------------------
+ *
+ * To understand the efficacy of per-thread caching, use the ::umastat dcmd
+ * to see the percentage of capacity consumed on a per-thread basis, the
+ * degree to which each umem cache contributes to per-thread cache consumption,
+ * and the number of buffers in per-thread caches on a per-umem cache basis.
+ * If more detail is required, the specific buffers in a per-thread cache can
+ * be iterated over with the umem_ptc_* walkers. (These walkers allow an
+ * optional ulwp_t to be specified to iterate only over a particular thread's
+ * cache.)
  */
 
 #include <umem_impl.h>
@@ -473,14 +711,18 @@ size_t umem_lite_minsize = 0;	/* minimum buffer size for UMF_LITE */
 size_t umem_lite_maxalign = 1024; /* maximum buffer alignment for UMF_LITE */
 size_t umem_maxverify;		/* maximum bytes to inspect in debug routines */
 size_t umem_minfirewall;	/* hardware-enforced redzone threshold */
+size_t umem_ptc_size = 1048576;	/* size of per-thread cache (in bytes) */
 
 uint_t umem_flags = 0;
+uintptr_t umem_tmem_off;
 
 mutex_t			umem_init_lock;		/* locks initialization */
 cond_t			umem_init_cv;		/* initialization CV */
 thread_t		umem_init_thr;		/* thread initializing */
 int			umem_init_env_ready;	/* environ pre-initted */
 int			umem_ready = UMEM_READY_STARTUP;
+
+int			umem_ptc_enabled;	/* per-thread caching enabled */
 
 static umem_nofail_callback_t *nofail_callback;
 static mutex_t		umem_nofail_exit_lock;
@@ -2838,6 +3080,24 @@ umem_alloc_sizes_remove(size_t size)
 	umem_alloc_sizes[i] = 0;
 }
 
+/*
+ * We've been called back from libc to indicate that thread is terminating and
+ * that it needs to release the per-thread memory that it has. We get to know
+ * which entry in the thread's tmem array the allocation came from. Currently
+ * this refers to first n umem_caches which makes this a pretty simple indexing
+ * job.
+ */
+static void
+umem_cache_tmem_cleanup(void *buf, int entry)
+{
+	size_t size;
+	umem_cache_t *cp;
+
+	size = umem_alloc_sizes[entry];
+	cp = umem_alloc_table[(size - 1) >> UMEM_ALIGN_SHIFT];
+	_umem_cache_free(cp, buf);
+}
+
 static int
 umem_cache_init(void)
 {
@@ -2951,6 +3211,16 @@ umem_cache_init(void)
 			return (0);
 
 		umem_alloc_caches[i] = cp;
+	}
+
+	umem_tmem_off = _tmem_get_base();
+	_tmem_set_cleanup(umem_cache_tmem_cleanup);
+
+	if (umem_genasm_supported && !(umem_flags & UMF_DEBUG) &&
+	    !(umem_flags & UMF_NOMAGAZINE) &&
+	    umem_ptc_size > 0) {
+		umem_ptc_enabled = umem_genasm(umem_alloc_sizes,
+		    umem_alloc_caches, i) == 0 ? 1 : 0;
 	}
 
 	/*

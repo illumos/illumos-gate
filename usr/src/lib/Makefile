@@ -161,7 +161,8 @@ SUBDIRS += \
 	librdc		\
 	libinstzones	\
 	libpkg		\
-	libpcidb
+	libpcidb	\
+	libumem_trampoline
 
 SUBDIRS += \
 	passwdutil	\

@@ -19,7 +19,6 @@
 # CDDL HEADER END
 #
 #
-# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012, Joyent, Inc.  All rights reserved.
 #
 
@@ -39,44 +38,25 @@
 
 $mapfile_version 2
 
-SYMBOL_VERSION SUNW_1.1 {
-    global:
-	calloc			{ FLAGS = NODIRECT };
-	free			{ FLAGS = NODIRECT };
-	malloc			{ FLAGS = NODIRECT };
-	memalign		{ FLAGS = NODIRECT };
-	realloc			{ FLAGS = NODIRECT };
-	umem_alloc;
-	umem_cache_alloc;
-	umem_cache_create;
-	umem_cache_destroy;
-	umem_cache_free;
-	umem_free;
-	umem_nofail_callback;
-	umem_zalloc;
-	valloc			{ FLAGS = NODIRECT };
+#
+# The BSS must me executable for ptcumem to work properly. If it is not,
+# programs will get a SEGV. For more information read section of 8 libumem's big
+# theory statement in lib/libumem/common/umem.c.
+#
+LOAD_SEGMENT bss {
+	FLAGS = READ WRITE EXECUTE;
 };
 
 SYMBOL_VERSION SUNWprivate_1.1 {
     global:
-	umem_alloc_align;
-	umem_free_align;
-	umem_reap;
-	vmem_add;
-	vmem_alloc;
-	vmem_contains;
-	vmem_create;
-	vmem_destroy;
-	vmem_free;
-	vmem_heap_arena;
-	vmem_size;
-	vmem_walk;
-	vmem_xalloc;
-	vmem_xfree;
-	umem_genasm_mptr;
-	umem_genasm_fptr;
-	umem_genasm_fsize;
-	umem_genasm_msize;
+	la_version;
+	la_objopen;
+$if _ELF32
+	la_symbind32;	
+$endif
+$if _ELF64
+	la_symbind64;
+$endif
     local:
 	*;
 };
