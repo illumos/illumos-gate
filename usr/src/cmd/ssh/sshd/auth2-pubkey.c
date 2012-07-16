@@ -397,6 +397,9 @@ out:
 		handle = NULL;
 	}
 
+	if (success)
+		verbose("Found matching %s key: %s", key_type(key), fp);
+
 	if (fp != NULL) {
 		xfree(fp);
 		fp = NULL;
