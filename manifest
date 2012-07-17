@@ -2098,9 +2098,7 @@ f usr/bin/i86/strings 0555 root bin
 f usr/bin/i86/truss 0555 root bin
 h usr/bin/i86/uptime=usr/bin/i86/w
 f usr/bin/i86/w 4555 root bin
-h usr/bin/i860=usr/bin/sun
 h usr/bin/i86pc=usr/bin/sun
-h usr/bin/iAPX286=usr/bin/sun
 f usr/bin/iconv 0555 root bin
 f usr/bin/id 0555 root bin
 f usr/bin/infocmp 0555 root bin
@@ -10117,7 +10115,6 @@ f usr/sadm/ugdates 0444 root bin
 d usr/sbin 0755 root bin
 f usr/sbin/6to4relay 0555 root bin
 f usr/sbin/acctadm 0555 root bin
-f usr/sbin/add_allocatable 0555 root bin
 h usr/sbin/add_drv=usr/lib/isaexec
 f usr/sbin/allocate 4555 root bin
 d usr/sbin/amd64 0755 root bin
@@ -10145,7 +10142,6 @@ f usr/sbin/amd64/update_drv 0555 root sys
 f usr/sbin/amd64/whodo 4555 root bin
 f usr/sbin/amd64/zdb 0555 root bin
 f usr/sbin/arp 0555 root bin
-f usr/sbin/atohexlabel 0555 root sys
 f usr/sbin/audit 0555 root bin
 f usr/sbin/auditconfig 0555 root bin
 f usr/sbin/auditd 0555 root bin
@@ -10168,7 +10164,6 @@ f usr/sbin/consadmd 0555 root sys
 f usr/sbin/cpustat 0555 root bin
 f usr/sbin/cron 0555 root sys
 s usr/sbin/cryptoadm=../../sbin/cryptoadm
-f usr/sbin/datadm 0555 root bin
 s usr/sbin/dcopy=clri
 h usr/sbin/deallocate=usr/sbin/allocate
 f usr/sbin/devfsadm 0755 root sys
@@ -10227,7 +10222,6 @@ f usr/sbin/grpck 0555 root bin
 f usr/sbin/grub 0555 root bin
 f usr/sbin/gsscred 0555 root sys
 f usr/sbin/halt 0755 root bin
-f usr/sbin/hextoalabel 0555 root sys
 s usr/sbin/hostconfig=../../sbin/hostconfig
 f usr/sbin/hotplug 0555 root bin
 f usr/sbin/htable 0555 root bin
@@ -10369,7 +10363,6 @@ f usr/sbin/rcapadm 0555 root bin
 f usr/sbin/rctladm 0555 root bin
 h usr/sbin/reboot=usr/sbin/halt
 h usr/sbin/rem_drv=usr/lib/isaexec
-h usr/sbin/remove_allocatable=usr/sbin/add_allocatable
 s usr/sbin/repquota=../lib/fs/ufs/repquota
 f usr/sbin/rmt 0555 root bin
 f usr/sbin/roleadd 0555 root sys
@@ -10385,7 +10378,6 @@ f usr/sbin/rwall 0555 root bin
 f usr/sbin/sacadm 4755 root sys
 f usr/sbin/safe_finger 0555 root bin
 f usr/sbin/sbdadm 0555 root bin
-f usr/sbin/sdpadm 0555 root bin
 s usr/sbin/sendmail=../lib/sendmail
 f usr/sbin/setmnt 0555 root bin
 h usr/sbin/share=usr/sbin/sharemgr
@@ -10422,9 +10414,6 @@ f usr/sbin/tar 0555 root bin
 f usr/sbin/tcpd 0555 root bin
 f usr/sbin/tcpdchk 0555 root bin
 f usr/sbin/tcpdmatch 0555 root bin
-f usr/sbin/tnchkdb 0555 root sys
-f usr/sbin/tnd 0555 root sys
-f usr/sbin/tninfo 0555 root sys
 f usr/sbin/traceroute 4555 root bin
 h usr/sbin/trapstat=usr/lib/platexec
 f usr/sbin/try-from 0555 root bin
@@ -11384,6 +11373,7 @@ f usr/share/man/man1/diffmk.1 0444 root bin
 f usr/share/man/man1/digest.1 0444 root bin
 f usr/share/man/man1/dircmp.1 0444 root bin
 f usr/share/man/man1/dirname.1 0444 root bin
+f usr/share/man/man1/dis.1 0444 root bin
 f usr/share/man/man1/dispgid.1 0444 root bin
 f usr/share/man/man1/dispuid.1 0444 root bin
 f usr/share/man/man1/dos2unix.1 0444 root bin
@@ -11429,6 +11419,8 @@ f usr/share/man/man1/fmt.1 0444 root bin
 f usr/share/man/man1/fmtmsg.1 0444 root bin
 f usr/share/man/man1/fold.1 0444 root bin
 f usr/share/man/man1/ftp.1 0444 root bin
+f usr/share/man/man1/ftpcount.1 0444 root bin
+f usr/share/man/man1/ftpwho.1 0444 root bin
 f usr/share/man/man1/gcore.1 0444 root bin
 f usr/share/man/man1/gencat.1 0444 root bin
 f usr/share/man/man1/genmsg.1 0444 root bin
@@ -11511,6 +11503,7 @@ f usr/share/man/man1/mail.1 0444 root bin
 f usr/share/man/man1/mailx.1 0444 root bin
 f usr/share/man/man1/man.1 0444 root bin
 f usr/share/man/man1/mdb.1 0444 root bin
+f usr/share/man/man1/mcs.1 0444 root bin
 f usr/share/man/man1/mesg.1 0444 root bin
 f usr/share/man/man1/mkdir.1 0444 root bin
 f usr/share/man/man1/mkmsgs.1 0444 root bin
@@ -11647,6 +11640,7 @@ f usr/share/man/man1/tar.1 0444 root bin
 f usr/share/man/man1/tbl.1 0444 root bin
 f usr/share/man/man1/tcopy.1 0444 root bin
 f usr/share/man/man1/tee.1 0444 root bin
+f usr/share/man/man1/telnet.1 0444 root bin
 f usr/share/man/man1/test.1 0444 root bin
 f usr/share/man/man1/time.1 0444 root bin
 f usr/share/man/man1/timex.1 044 root bin
@@ -11726,6 +11720,8 @@ f usr/share/man/man1m/busstat.1m 0444 root bin
 f usr/share/man/man1m/captoinfo.1m 0444 root bin
 f usr/share/man/man1m/catman.1m 0444 root bin
 f usr/share/man/man1m/cfgadm.1m 0444 root bin
+f usr/share/man/man1m/check-hostname.1m 0444 root bin
+f usr/share/man/man1m/check-permissions.1m 0444 root bin
 f usr/share/man/man1m/chroot.1m 0444 root bin
 f usr/share/man/man1m/clear_locks.1m 0444 root bin
 f usr/share/man/man1m/clinfo.1m 0444 root bin
@@ -11761,8 +11757,12 @@ f usr/share/man/man1m/domainname.1m 0444 root bin
 f usr/share/man/man1m/drvconfig.1m 0444 root bin
 f usr/share/man/man1m/dtrace.1m 0444 root bin
 f usr/share/man/man1m/dumpadm.1m 0444 root bin
+f usr/share/man/man1m/editmap.1m 0444 root bin
 f usr/share/man/man1m/edquota.1m 0444 root bin
 f usr/share/man/man1m/eeprom.1m 0444 root bin
+f usr/share/man/man1m/etrn.1m 0444 root bin
+f usr/share/man/man1m/fcadm.1m 0444 root bin
+f usr/share/man/man1m/fcinfo.1m 0444 root bin
 f usr/share/man/man1m/fdetach.1m 0444 root bin
 f usr/share/man/man1m/fdisk.1m 0444 root bin
 f usr/share/man/man1m/ff.1m 0444 root bin
@@ -11779,7 +11779,12 @@ f usr/share/man/man1m/fsirand.1m 0444 root bin
 f usr/share/man/man1m/fssnap.1m 0444 root bin
 f usr/share/man/man1m/fsstat.1m 0444 root bin
 f usr/share/man/man1m/fstyp.1m 0444 root bin
+f usr/share/man/man1m/ftpaddhost.1m 0444 root bin
+f usr/share/man/man1m/ftpconfig.1m 0444 root bin
+f usr/share/man/man1m/ftprestart.1m 0444 root bin
+f usr/share/man/man1m/ftpshut.1m 0444 root bin
 f usr/share/man/man1m/fuser.1m 0444 root bin
+f usr/share/man/man1m/fwflash.1m 0444 root bin
 f usr/share/man/man1m/getdev.1m 0444 root bin
 f usr/share/man/man1m/getdevpolicy.1m 0444 root bin
 f usr/share/man/man1m/getdgrp.1m 0444 root bin
@@ -11817,10 +11822,17 @@ f usr/share/man/man1m/ipaddrsel.1m 0444 root bin
 f usr/share/man/man1m/ipadm.1m 0444 root bin
 f usr/share/man/man1m/ipdadm.1m 0444 root bin
 f usr/share/man/man1m/ipf.1m 0444 root bin
+f usr/share/man/man1m/ipfs.1m 0444 root bin
+f usr/share/man/man1m/ipfstat.1m 0444 root bin
+f usr/share/man/man1m/ipmon.1m 0444 root bin
 f usr/share/man/man1m/ipmpstat.1m 0444 root bin
+f usr/share/man/man1m/ipnat.1m 0444 root bin
+f usr/share/man/man1m/ippool.1m 0444 root bin
 f usr/share/man/man1m/ipsecalgs.1m 0444 root bin
 f usr/share/man/man1m/ipsecconf.1m 0444 root bin
 f usr/share/man/man1m/ipseckey.1m 0444 root bin
+f usr/share/man/man1m/iscsiadm.1m 0444 root bin
+f usr/share/man/man1m/itadm.1m 0444 root bin
 f usr/share/man/man1m/itu.1m 0444 root bin
 f usr/share/man/man1m/keyserv.1m 0444 root bin
 f usr/share/man/man1m/killall.1m 0444 root bin
@@ -11838,6 +11850,7 @@ f usr/share/man/man1m/lofiadm.1m 0444 root bin
 f usr/share/man/man1m/logadm.1m 0444 root bin
 f usr/share/man/man1m/logins.1m 0444 root bin
 f usr/share/man/man1m/makedbm.1m 0444 root bin
+f usr/share/man/man1m/makemap.1m 0444 root bin
 f usr/share/man/man1m/mkbootmedia.1m 0444 root bin
 f usr/share/man/man1m/mkdevalloc.1m 0444 root bin
 f usr/share/man/man1m/mkdevmaps.1m 0444 root bin
@@ -11861,6 +11874,7 @@ f usr/share/man/man1m/mount_udfs.1m 0444 root bin
 f usr/share/man/man1m/mount_ufs.1m 0444 root bin
 f usr/share/man/man1m/mount.1m 0444 root bin
 f usr/share/man/man1m/mountall.1m 0444 root bin
+f usr/share/man/man1m/mpathadm.1m 0444 root bin
 f usr/share/man/man1m/mpstat.1m 0444 root bin
 f usr/share/man/man1m/msgid.1m 0444 root bin
 f usr/share/man/man1m/mvdir.1m 0444 root bin
@@ -11868,6 +11882,7 @@ f usr/share/man/man1m/ncheck.1m 0444 root bin
 f usr/share/man/man1m/ndd.1m 0444 root bin
 f usr/share/man/man1m/netstat.1m 0444 root bin
 f usr/share/man/man1m/netstrategy.1m 0444 root bin
+f usr/share/man/man1m/newaliases.1m 0444 root bin
 f usr/share/man/man1m/newfs.1m 0444 root bin
 f usr/share/man/man1m/newkey.1m 0444 root bin
 f usr/share/man/man1m/nfsstat.1m 0444 root bin
@@ -11878,6 +11893,7 @@ f usr/share/man/man1m/ping.1m 0444 root bin
 f usr/share/man/man1m/pkg2du.1m 0444 root bin
 f usr/share/man/man1m/plockstat.1m 0444 root bin
 f usr/share/man/man1m/pmadm.1m 0444 root bin
+f usr/share/man/man1m/pmconfig.1m 0444 root bin
 f usr/share/man/man1m/pooladm.1m 0444 root bin
 f usr/share/man/man1m/poolbind.1m 0444 root bin
 f usr/share/man/man1m/poolcfg.1m 0444 root bin
@@ -11891,6 +11907,7 @@ f usr/share/man/man1m/projmod.1m 0444 root bin
 f usr/share/man/man1m/prstat.1m 0444 root bin
 f usr/share/man/man1m/prtconf.1m 0444 root bin
 f usr/share/man/man1m/prtdiag.1m 0444 root bin
+f usr/share/man/man1m/prtpicl.1m 0444 root bin
 f usr/share/man/man1m/prtvtoc.1m 0444 root bin
 f usr/share/man/man1m/psradm.1m 0444 root bin
 f usr/share/man/man1m/psrinfo.1m 0444 root bin
@@ -11921,11 +11938,14 @@ f usr/share/man/man1m/routeadm.1m 0444 root bin
 f usr/share/man/man1m/rpc.rexd.1m 0444 root bin
 f usr/share/man/man1m/rpcbind.1m 0444 root bin
 f usr/share/man/man1m/rpcinfo.1m 0444 root bin
+f usr/share/man/man1m/rsh.1m 0444 root bin
 f usr/share/man/man1m/rtc.1m 0444 root bin
 f usr/share/man/man1m/rtquery.1m 0444 root bin
 f usr/share/man/man1m/rwall.1m 0444 root bin
 f usr/share/man/man1m/sacadm.1m 0444 root bin
 f usr/share/man/man1m/savecore.1m 0444 root bin
+f usr/share/man/man1m/sbdadm.1m 0444 root bin
+f usr/share/man/man1m/sendmail.1m 0444 root bin
 f usr/share/man/man1m/setuname.1m 0444 root bin
 f usr/share/man/man1m/share.1m 0444 root bin
 f usr/share/man/man1m/shareall.1m 0444 root bin
@@ -11940,7 +11960,9 @@ f usr/share/man/man1m/smbstat.1m 0444 root bin
 f usr/share/man/man1m/snoop.1m 0444 root bin
 f usr/share/man/man1m/soconfig.1m 0444 root bin
 f usr/share/man/man1m/spray.1m 0444 root bin
+f usr/share/man/man1m/sppptun.1m 0444 root bin
 f usr/share/man/man1m/sshd.1m 0444 root bin
+f usr/share/man/man1m/stmfadm.1m 0444 root bin
 f usr/share/man/man1m/stmsboot.1m 0444 root bin
 f usr/share/man/man1m/strace.1m 0444 root bin
 f usr/share/man/man1m/strclean.1m 0444 root bin
@@ -11960,6 +11982,9 @@ f usr/share/man/man1m/sysdef.1m 0444 root bin
 f usr/share/man/man1m/syseventadm.1m 0444 root bin
 f usr/share/man/man1m/syslogd.1m 0444 root bin
 f usr/share/man/man1m/tapes.1m 0444 root bin
+f usr/share/man/man1m/tcpd.1m 0444 root bin
+f usr/share/man/man1m/tcpdchk.1m 0444 root bin
+f usr/share/man/man1m/tcpdmatch.1m 0444 root bin
 f usr/share/man/man1m/tic.1m 0444 root bin
 f usr/share/man/man1m/traceroute.1m 0444 root bin
 f usr/share/man/man1m/trapstat.1m 0444 root bin
