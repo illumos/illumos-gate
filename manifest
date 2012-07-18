@@ -1447,7 +1447,9 @@ f lib/nss_user.so.1 0755 root bin
 d lib/secure 0755 root bin
 s lib/secure/32=.
 s lib/secure/64=amd64
+s lib/secure/libumem_trampoline.so.1=../../lib/libumem_trampoline.so.1
 d lib/secure/amd64 0755 root bin
+s lib/secure/amd64/libumem_trampoline.so.1=../../../lib/amd64/libumem_trampoline.so.1
 d lib/svc 0755 root bin
 d lib/svc/bin 0755 root bin
 f lib/svc/bin/lsvcrun 0555 root sys
@@ -4973,8 +4975,8 @@ s usr/lib/amd64/libtsol.so=../../../lib/amd64/libtsol.so.2
 s usr/lib/amd64/libtsol.so.2=../../../lib/amd64/libtsol.so.2
 s usr/lib/amd64/libumem.so.1=../../../lib/amd64/libumem.so.1
 s usr/lib/amd64/libumem.so=../../../lib/amd64/libumem.so.1
-s usr/lib/amd64/libumem_trampoline.so.1=../../../lib/amd64/libumem_tramopline.so.1
-s usr/lib/amd64/libumem_trampoline.so=../../../lib/amd64/libumem_tramopline.so.1
+s usr/lib/amd64/libumem_trampoline.so.1=../../../lib/amd64/libumem_trampoline.so.1
+s usr/lib/amd64/libumem_trampoline.so=../../../lib/amd64/libumem_trampoline.so.1
 s usr/lib/amd64/libuuid.so.1=../../../lib/amd64/libuuid.so.1
 s usr/lib/amd64/libuuid.so=../../../lib/amd64/libuuid.so.1
 s usr/lib/amd64/libuutil.so.1=../../../lib/amd64/libuutil.so.1
@@ -6396,8 +6398,8 @@ s usr/lib/libtsol.so=../../lib/libtsol.so.2
 s usr/lib/libtsol.so.2=../../lib/libtsol.so.2
 s usr/lib/libumem.so.1=../../lib/libumem.so.1
 s usr/lib/libumem.so=../../lib/libumem.so.1
-s usr/lib/libumem_trampoline.so.1=../../lib/libumem_tramopline.so.1
-s usr/lib/libumem_trampoline.so=../../lib/libumem_tramopline.so.1
+s usr/lib/libumem_trampoline.so.1=../../lib/libumem_trampoline.so.1
+s usr/lib/libumem_trampoline.so=../../lib/libumem_trampoline.so.1
 f usr/lib/libunistat.so.1 0755 root bin
 s usr/lib/libunistat.so=libunistat.so.1
 s usr/lib/libuuid.so.1=../../lib/libuuid.so.1
@@ -9699,7 +9701,9 @@ f usr/lib/scsi/smp 0555 root bin
 d usr/lib/secure 0755 root bin
 s usr/lib/secure/32=.
 s usr/lib/secure/64=amd64
+s usr/lib/secure/libumem_trampoline.so.1=../../../lib/libumem_trampoline.so.1
 d usr/lib/secure/amd64 0755 root bin
+s usr/lib/secure/amd64/libumem_trampoline.so.1=../../../../lib/amd64/libumem_trampoline.so.1
 d usr/lib/security 0755 root bin
 s usr/lib/security/64=amd64
 d usr/lib/security/amd64 0755 root bin
