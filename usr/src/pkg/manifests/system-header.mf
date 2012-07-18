@@ -22,6 +22,7 @@
 #
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/header@$(PKGVERS)
@@ -505,6 +506,7 @@ file path=usr/include/libtsnet.h
 $(sparc_ONLY)file path=usr/include/libv12n.h
 file path=usr/include/libw.h
 file path=usr/include/libzfs.h
+file path=usr/include/libzfs_core.h
 file path=usr/include/libzoneinfo.h
 file path=usr/include/limits.h
 file path=usr/include/linenum.h
