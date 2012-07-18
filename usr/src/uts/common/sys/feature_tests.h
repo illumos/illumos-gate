@@ -365,7 +365,6 @@ extern "C" {
  */
 #if (defined(__STDC__) && defined(_STDC_C99)) && !defined(__cplusplus)
 #define	_RESTRICT_KYWD	restrict
-#endif
 #else
 #define	_RESTRICT_KYWD
 #endif
