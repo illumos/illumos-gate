@@ -182,6 +182,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zpool_fru_set;
 	zpool_get_config;
 	zpool_get_errlog;
+	zpool_get_features;
 	zpool_get_handle;
 	zpool_get_history;
 	zpool_get_name;
