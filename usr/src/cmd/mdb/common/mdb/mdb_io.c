@@ -943,10 +943,20 @@ iob_bytes2str(varglist_t *ap, intsize_t size)
 
 		for (thresh = mag * 10; mag >= 1; mag /= 10, i--) {
 			double mult = val * (double)mag;
-			uint64_t v;
+			uint32_t v;
 
-			if (mult - (double)(uint64_t)mult != 0.5) {
-				v = (uint64_t)(mult + 0.5);
+			/*
+			 * Note that we cast mult to a 32-bit value.  We know
+			 * that val is less than 1024 due to the logic above,
+			 * and that mag is at most 10^(sigfig - 1).  This means
+			 * that as long as sigfig is 9 or lower, this will not
+			 * overflow.  (We perform this cast because it assures
+			 * that we are never converting a double to a uint64_t,
+			 * which for some compilers requires a call to a
+			 * function not guaranteed to be in libstand.)
+			 */
+			if (mult - (double)(uint32_t)mult != 0.5) {
+				v = (uint32_t)(mult + 0.5);
 			} else {
 				/*
 				 * We are exactly between integer multiples
@@ -954,7 +964,7 @@ iob_bytes2str(varglist_t *ap, intsize_t size)
 				 * to be consistent with the behavior of
 				 * printf().
 				 */
-				if ((v = (uint64_t)mult) & 1)
+				if ((v = (uint32_t)mult) & 1)
 					v++;
 			}
 
