@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY = libc_db.a
 VERS = .1
@@ -46,8 +44,10 @@ $(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
 ASFLAGS +=	-P -D__STDC__ -D_ASM -DPIC
 CPPFLAGS +=	-I../../libc/inc -D_REENTRANT
 CFLAGS +=	$(CCVERBOSE)
-CFLAGS +=	$(CCVERBOSE)
 LDLIBS +=	-lc
+
+CERRWARN +=	-_gcc=-Wno-type-limits
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

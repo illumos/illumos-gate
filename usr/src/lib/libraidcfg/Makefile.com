@@ -39,6 +39,7 @@ SRCDIR =	../common
 $(LINTLIB):=	SRCS = $(LINTSRC:%=$(SRCDIR)/%)
 
 CFLAGS +=	$(CCVERBOSE)
+CERRWARN +=	-_gcc=-Wno-type-limits
 
 .KEEP_STATE:
 

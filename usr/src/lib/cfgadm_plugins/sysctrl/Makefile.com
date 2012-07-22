@@ -52,6 +52,10 @@ LDLIBS +=	-lc
 
 CPPFLAGS +=	-I$(ROOT)/usr/platform/$(PLATFORM)/include
 
+CERRWARN +=	-_gcc=-Wno-switch
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 .KEEP_STATE:
 
 all: $(LIBS)

@@ -30,6 +30,7 @@ include ../../Makefile.cmd
 
 LDLIBS += -ldevinfo
 CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

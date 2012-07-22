@@ -37,6 +37,7 @@ LINTS		= $(SOL_UMAD_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/ib/clients/of/sol_umad
 LDFLAGS		+= -dy -Nmisc/sol_ofs -Nmisc/ibmf -Nmisc/ibtl
+
 #
 #	Include common rules.
 #
@@ -54,6 +55,8 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 #
 INCLUDE_PATH += -I$(UTSBASE)/common/sys/ib/clients/of/sol_umad
+
+CERRWARN += -_gcc=-Wno-uninitialized
 
 #
 #	Default build targets.

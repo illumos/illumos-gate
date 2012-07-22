@@ -33,13 +33,16 @@ ROOTMANIFESTDIR =	$(ROOTSVCSYSTEM)
 
 SRCS =	zonestatd.c
 
-CPPFLAGS			+= -I/usr/include/libxml2
-LDLIBS 				+= -lkstat -lpool -lexacct -lscf \
-				    -lcontract -lcmdutils -lumem
+CPPFLAGS	+= -I/usr/include/libxml2
+LDLIBS 		+= -lkstat -lpool -lexacct -lscf \
+		    -lcontract -lcmdutils -lumem
 
-LINTFLAGS			+= -u
+LINTFLAGS	+= -u
+CERRWARN 	+= -_gcc=-Wno-parentheses
+CERRWARN 	+= -_gcc=-Wno-unused-label
+CERRWARN 	+= -_gcc=-Wno-uninitialized
 
-OBJS =			$(SRCS:%.c=%.o)
+OBJS =		$(SRCS:%.c=%.o)
 
 .KEEP_STATE:
 

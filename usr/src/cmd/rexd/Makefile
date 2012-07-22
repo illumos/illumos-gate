@@ -22,8 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG=		rpc.rexd on
 # where under
@@ -34,6 +32,13 @@ ONPROG	=	on
 MANIFEST=	rex.xml
 
 include ../Makefile.cmd
+
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-unused-variable
+CERRWARN += -_gcc=-Wno-address
+CERRWARN += -_gcc=-Wno-unused-function
+CERRWARN += -_gcc=-Wno-extra
 
 ROOTMANIFESTDIR=	$(ROOTSVCNETWORKRPC)
 

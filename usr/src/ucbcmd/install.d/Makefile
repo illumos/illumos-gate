@@ -19,8 +19,7 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 # Copyright (c) 1989,1996 by Sun Microsystems, Inc.
 # All rights reserved.
@@ -37,6 +36,7 @@ include ../Makefile.ucbcmd
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
 
 FILEMODE=	755
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
 
 # for messaging catalog
 #

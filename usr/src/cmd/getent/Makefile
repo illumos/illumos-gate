@@ -23,12 +23,13 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG=	getent
 
 include ../Makefile.cmd
+
+CERRWARN += -_gcc=-Wno-unused-variable
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
 
 OBJECTS= \
 	dogetethers.o	\

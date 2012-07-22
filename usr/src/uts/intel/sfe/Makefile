@@ -22,7 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of NS/SiS
 #	Fast Ethernet (SFE) driver module in intel systems
@@ -72,6 +72,11 @@ CPPFLAGS	+= $(VFLAGS) $(AFLAGS) $(DFLAGS) $(CFGFLAGS) $(CCVERBOSE) \
 	-I$(UTSBASE)/common/io/sfe
 
 CFLAGS		+= $(CPPFLAGS) -xc99=%all
+
+CERRWARN	+= -_gcc=-Wno-unused-label
+CERRWARN	+= -_gcc=-Wno-switch
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-uninitialized
 
 #
 # Driver depends on MAC & IP

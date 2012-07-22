@@ -83,6 +83,9 @@ ROOTLIBS=       $(LIBS:%=$(ROOTLIBDIR)/%)
 # Following variables define where to find header files
 CPPFLAGS +=	-I$(JAVA_ROOT)/include -I$(JAVA_ROOT)/include/solaris -I.
 
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 LDLIBS +=	-lprint -lnsl -lsocket -lc
 
 CLEANFILES=	*.class $(LINTLIB) $(LINTOUT)

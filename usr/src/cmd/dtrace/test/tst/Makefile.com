@@ -60,6 +60,12 @@ $(ROOT_EXES) := FILEMODE = 0555
 # in an arms race with increasingly belligerent optimizers.
 COPTFLAG=	-xO0
 
+CERRWARN +=	-_gcc=-Wno-switch
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc=-Wno-unused-function
+CERRWARN +=	-_gcc=-Wno-unused-variable
+
 all: $(EXES)
 
 clean lint:

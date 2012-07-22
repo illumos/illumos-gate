@@ -23,13 +23,13 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG =	syseventd
 SRCS =	syseventd.c sysevent_signal.c sysevent_client.c
 
 include ../Makefile.com
+
+CERRWARN += -_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

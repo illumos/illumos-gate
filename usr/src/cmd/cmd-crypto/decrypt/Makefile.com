@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG = decrypt
 
@@ -39,6 +37,9 @@ include ../../../Makefile.cmd
 CFLAGS += $(CCVERBOSE) 
 CFLAGS64 += $(CCVERBOSE)
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
+
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
 
 LDLIBS += -lkmf -lpkcs11 -lcryptoutil
 

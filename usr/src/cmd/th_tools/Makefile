@@ -32,6 +32,8 @@ CFLAGS += -I$(SRC)/uts/common
 LINTFLAGS += -I$(SRC)/uts/common
 C99MODE= $(C99_ENABLE)
 CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
 
 SRCS = $(PROG:%=%.c)
 OBJECTS = $(SRCS:%.c=%.o)

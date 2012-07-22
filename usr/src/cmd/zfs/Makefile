@@ -53,6 +53,12 @@ $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 LINTFLAGS += -xerroff=E_NAME_DEF_NOT_USED2 
 LINTFLAGS64 += -xerroff=E_NAME_DEF_NOT_USED2 
 
+CERRWARN += -_gcc=-Wno-switch
+CERRWARN += -_gcc=-Wno-type-limits
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-old-style-declaration
+
 ROOTUSRSBINLINKS = $(PROG:%=$(ROOTUSRSBIN)/%)
 USRLIBFSTYPELINKS = $(LINKPROGS:%=$(USRLIBFSTYPE)/%)
 ROOTETCFSTYPELINKS = $(LINKPROGS:%=$(ROOTETCFSTYPE)/%)

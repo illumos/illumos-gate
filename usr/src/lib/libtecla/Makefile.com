@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY=	libtecla.a
 VERS=		.1
@@ -45,6 +43,8 @@ CPPFLAGS +=	-I$(SRCDIR) -DSTDC_HEADERS=1 -DHAVE_SYS_TYPES_H=1 \
 	-DHAVE_SYSV_PTY=1 -D__EXTENSIONS__=1 -D_POSIX_C_SOURCE=199506L \
 	-DPREFER_REENTRANT
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
+
+CERRWARN +=	-_gcc=-Wno-type-limits
 
 .KEEP_STATE:
 

@@ -64,6 +64,9 @@ LDLIBS +=	$(LIBLP) -lpapi -lc
 in.lpd:=	CFLAGS +=	-DSOLARIS_PRIVATE_POST_0_9
 in.lpd:=	LDLIBS +=	-lnsl -lsocket
 
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 all:	$(BINPROGS) $(SBINPROGS)
 
 #	each program needs common.o as well

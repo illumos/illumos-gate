@@ -23,7 +23,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 # Makefile definitions for sun4v DR Daemon (drd)
 #
@@ -62,6 +62,8 @@ CPPFLAGS= 	-I$(SRC)/uts/sun4v $(CPPFLAGS.master) -D_REENTRANT
 LINT_FLAGS=	-c -Nlevel=4 -Ncheck 
 
 XGETFLAGS +=	-a -s -x $(PROG).xcl
+
+CERRWARN += -_gcc=-Wno-parentheses
 
 
 #

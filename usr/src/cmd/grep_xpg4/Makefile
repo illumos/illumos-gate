@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -32,6 +30,9 @@ FFILE= fgrep
 EFILE= egrep
 
 include ../Makefile.cmd
+
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
 
 ROOTXPG4LINKS = $(ROOTXPG4BIN)/$(FFILE)	$(ROOTXPG4BIN)/$(EFILE)
 

@@ -33,6 +33,9 @@ CONFIGFILE= logadm.conf
 include ../Makefile.cmd
 
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-clobbered
+CERRWARN += -_gcc=-Wno-uninitialized
 XGETFLAGS += -a -x logadm.xcl
 
 $(ROOTETC)/$(CONFIGFILE):= FILEMODE= 644

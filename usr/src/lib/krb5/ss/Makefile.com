@@ -66,6 +66,8 @@ CPPFLAGS +=     -DHAVE_LIBSOCKET=1 -DHAVE_LIBNSL=1 -DHAS_STRDUP=1 \
 		-I$(SRC)/lib/krb5
 
 CFLAGS +=	$(CCVERBOSE) -I..
+CERRWARN +=	-_gcc=-Wno-switch
+CERRWARN +=	-_gcc=-Wno-unused-variable
 
 DYNFLAGS +=	$(KRUNPATH) $(KMECHLIB) $(ZIGNORE)
 

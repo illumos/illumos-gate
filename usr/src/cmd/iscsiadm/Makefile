@@ -37,6 +37,12 @@ LDLIBS += -lnsl -ldevinfo -lima
 CPPFLAGS += -DSOLARIS
 CPPFLAGS += -I.
 
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-unused-variable
+CERRWARN += -_gcc=-Wno-unused-function
+CERRWARN += -_gcc=-Wno-switch
+CERRWARN += -_gcc=-Wno-uninitialized
+
 FILEMODE= 0555
 
 .KEEP_STATE:

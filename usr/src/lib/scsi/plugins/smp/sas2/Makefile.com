@@ -31,3 +31,5 @@ SRCDIR =        ../common
 PLUGINTYPE =    framework
 
 include ../../Makefile.lib
+
+CERRWARN +=	-_gcc=-Wno-unused-variable

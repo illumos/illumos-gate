@@ -72,6 +72,9 @@ INC_PATH	+= -I$(UTSBASE)/intel/io/dktp/hba/ghd
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 # Depends on scsi
 #

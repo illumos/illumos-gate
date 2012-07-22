@@ -58,6 +58,12 @@ CFLAGS_CPP_COMMENTS = -xCC
 
 CFLAGS += $(CFLAGS_CPP_COMMENTS)
 
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-switch
+CERRWARN	+= -_gcc=-Wno-unused-label
+CERRWARN	+= -_gcc=-Wno-unused-variable
+
 #
 #	Define targets
 #

@@ -40,6 +40,8 @@ POFILES = $(OBJS:%.o=%.po)
 POFILE = $(PROG)_all.po
 
 CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-parentheses
 
 LDLIBS += -lcryptoutil
 

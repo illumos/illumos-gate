@@ -23,8 +23,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -64,6 +62,8 @@ CFLAGS		+= $(CCVERBOSE)
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
+
+CERRWARN	+= -_gcc=-Wno-uninitialized
 
 #
 #	Default build targets.

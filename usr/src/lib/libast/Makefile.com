@@ -723,6 +723,19 @@ CFLAGS += \
 CFLAGS64 += \
 	$(ASTCFLAGS64)
 
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-char-subscripts
+CERRWARN += -_gcc=-Wno-clobbered
+CERRWARN += -_gcc=-Wno-unused-variable
+CERRWARN += -_gcc=-Wno-unused-value
+CERRWARN += -_gcc=-Wno-unused-function
+CERRWARN += -_gcc=-Wno-unused-label
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-empty-body
+CERRWARN += -_gcc=-Wno-type-limits
+CERRWARN += -_gcc=-Wno-address
+
 pics/$(MACH)/src/lib/libast/conftab.o \
 pics/$(MACH64)/src/lib/libast/conftab.o	:= CERRWARN += -erroff=E_INIT_DOES_NOT_FIT
 pics/common/comp/setlocale.o		:= CERRWARN += -erroff=E_INTEGER_OVERFLOW_DETECTED

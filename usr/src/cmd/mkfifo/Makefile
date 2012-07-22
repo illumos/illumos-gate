@@ -20,12 +20,8 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# cmd/mkfifo/Makefile
 #
 
 PROG= mkfifo
@@ -35,6 +31,7 @@ SRCS= mkfifo.c ../chmod/common.c
 include ../Makefile.cmd
 
 CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-parentheses
 
 %.o: ../chmod/%.c
 	$(COMPILE.c) -o $@ $<

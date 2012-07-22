@@ -56,6 +56,9 @@ LINTFLAGS +=	-erroff=E_INCONS_ARG_DECL2 -erroff=E_INCONS_VAL_TYPE_DECL2
 # perfect would require a bigger rewrite.
 LINTFLAGS +=	-erroff=E_BAD_PTR_CAST_ALIGN
 
+CERRWARN += -_gcc=-Wno-switch
+CERRWARN += -_gcc=-Wno-uninitialized
+
 CTFCONVERT_HOOK = && $(CTFCONVERT_O)
 CTFMERGE_HOOK = && $(CTFMERGE) -L VERSION -o $@ $(OBJS)
 $(OBJS) := CFLAGS += $(CTF_FLAGS)

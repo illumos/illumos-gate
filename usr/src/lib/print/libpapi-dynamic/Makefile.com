@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY =		libpapi.a
 VERS =			.0
@@ -47,6 +45,8 @@ CPPFLAGS +=	-I$(SRCDIR)
 CPPFLAGS +=	-I../../libpapi-common/common
 CPPFLAGS +=	-DNSS_SOLARIS
 LDLIBS +=	-lc
+
+CERRWARN +=	-_gcc=-Wno-unused-variable
 
 .KEEP_STATE:
 

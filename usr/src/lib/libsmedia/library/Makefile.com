@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY= libsmedia.a
 VERS=.1
@@ -53,6 +51,8 @@ CLEANFILES +=	$(DERIVED_FILES:%=../common/%)
 CPPFLAGS += -D_REENTRANT -I$(SRC)/cmd/smserverd/
 CFLAGS +=	$(CCVERBOSE) 
 CFLAGS64 +=	$(CCVERBOSE)
+
+CERRWARN +=	-_gcc=-Wno-unused-variable
 
 LDLIBS +=	-lnsl -lc
 

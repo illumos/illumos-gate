@@ -64,6 +64,11 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 MODSTUBS_DIR	 = $(OBJS_DIR)
 CLEANFILES	+= $(MODSTUBS_O)
 
+CERRWARN	+= -_gcc=-Wno-switch
+CERRWARN	+= -_gcc=-Wno-type-limits
+CERRWARN	+= -_gcc=-Wno-unused-label
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 # depends on misc/usba
 #
@@ -122,7 +127,6 @@ warlock: $(WARLOCK_OK)
 $(WARLOCK_OK):	$(WARLOCK_OUT) warlock_ddi.files \
 	warlock_standalone warlock_usba.files warlock_with_usba
 	$(TOUCH) $(WARLOCK_OK)
-	
 
 warlock_with_usba: $(WLCMD_DIR)/usb_ac_with_usba.wlcmd  $(WARLOCK_OUT) \
 	warlock_ddi.files warlock_usba.files warlock_ohci.files \

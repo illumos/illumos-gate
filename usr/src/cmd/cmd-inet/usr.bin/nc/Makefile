@@ -22,8 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG= nc
 OBJS= atomicio.o netcat.o socks.o strtonum.o
@@ -33,6 +31,7 @@ SRCS= $(OBJS:%.o=%.c)
 include		../../../Makefile.cmd
 
 LDLIBS +=	-lresolv -lsocket
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

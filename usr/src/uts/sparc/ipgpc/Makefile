@@ -23,7 +23,6 @@
 # Use is subject to license terms.
 #
 
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the IP generic packet classifier
 #       misc kernel module.
@@ -67,6 +66,8 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 CFLAGS += $(CCVERBOSE)
 
 LDFLAGS += -dy -Ndrv/ip 
+
+CERRWARN	+= -_gcc=-Wno-uninitialized
 
 #
 # For now, disable these lint checks; maintainers should endeavor

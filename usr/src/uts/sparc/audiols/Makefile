@@ -54,6 +54,8 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 LDFLAGS		+= -dy -Ndrv/audio -Nmisc/ac97
 
+CERRWARN	+= -_gcc=-Wno-switch
+
 #
 #	Default build targets.
 #

@@ -50,6 +50,8 @@ LDLIBS += -L$(ROOT)/usr/lib/fm -lnvpair -lfmevent -lfmd_msg -lfmnotify \
 LDFLAGS += -R/usr/lib/fm
 LINTFLAGS += -mnu
 
+CERRWARN += -_gcc=-Wno-parentheses
+
 .NO_PARALLEL:
 .PARALLEL: $(OBJS) $(LINTFILES)
 

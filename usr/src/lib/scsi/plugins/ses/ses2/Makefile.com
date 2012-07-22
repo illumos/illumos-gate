@@ -23,7 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 MODULE =	ses2
 SRCS =		ses2.c			\
@@ -37,3 +36,5 @@ SRCDIR =	../common
 PLUGINTYPE =	framework
 
 include ../../Makefile.lib
+
+CERRWARN += 	-_gcc=-Wno-switch

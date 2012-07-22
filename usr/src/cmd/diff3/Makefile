@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1989 by Sun Microsystems, Inc.
 #
 
@@ -30,6 +28,8 @@ SHFILES= diff3
 CLOBBERFILES = $(SHFILES)
 
 include ../Makefile.cmd
+
+CERRWARN +=	-_gcc=-Wno-parentheses
 
 .KEEP_STATE:
 

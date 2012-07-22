@@ -24,7 +24,6 @@
 # Use is subject to license terms.
 #
 
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the PCIC driver kernel module.
 #
@@ -77,6 +76,11 @@ CPPFLAGS        +=      -DCARDBUS -DHOTPLUG
 
 #	dependency
 LDFLAGS	+=	-dy -Nmisc/busra -Nmisc/pcmcia -Nmisc/cardbus
+
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-unused-variable
+CERRWARN	+= -_gcc=-Wno-unused-function
+CERRWARN	+= -_gcc=-Wno-uninitialized
 
 #
 # For now, disable these lint checks; maintainers should endeavor

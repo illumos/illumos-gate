@@ -20,12 +20,9 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/fs.d/nfs/nfs4cbd/Makefile
 
 FSTYPE=		nfs
 TYPEPROG=	nfs4cbd
@@ -38,6 +35,10 @@ SRCS=	$(TYPEPROG).c ../../fslib.c ../lib/nfs_tbind.c ../lib/thrpool.c
 LDLIBS += -lnsl
 CPPFLAGS += -I. -I../.. -I../lib
 CFLAGS += $(CCVERBOSE) 
+
+CERRWARN += -_gcc=-Wno-unused-variable
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-extra
 
 .KEEP_STATE:
 

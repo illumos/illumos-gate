@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY = libctf.a
 VERS = .1
@@ -55,6 +53,9 @@ SRCDIR = ../common
 
 CPPFLAGS += -I../common -I../../../common/ctf -DCTF_OLD_VERSIONS
 CFLAGS += $(CCVERBOSE)
+
+CERRWARN += -_gcc=-Wno-uninitialized
+
 LDLIBS += -lc
 
 $(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)

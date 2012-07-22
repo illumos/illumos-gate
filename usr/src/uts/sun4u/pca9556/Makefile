@@ -22,7 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #	This makefile drives the pca9556 build.
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -55,6 +55,8 @@ LDFLAGS += -dy -N misc/i2c_svc
 # Please do not carry these forward to new Makefiles.
 #
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
+
+CERRWARN	+= -_gcc=-Wno-uninitialized
 
 #
 #	Define targets

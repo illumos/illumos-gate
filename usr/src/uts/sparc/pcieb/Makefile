@@ -84,6 +84,9 @@ LDFLAGS += -dy -Nmisc/pcie
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 LINTTAGS	+= -erroff=E_STATIC_UNUSED
 
+CERRWARN	+= -_gcc=-Wno-unused-value
+CERRWARN	+= -_gcc=-Wno-unused-variable
+
 #
 #	Default build targets.
 #

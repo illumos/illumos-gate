@@ -24,7 +24,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the swapgeneric `user'
 #	kernel module.
@@ -64,6 +63,8 @@ MODSTUBS_DIR	 = $(OBJS_DIR)
 $(MODSTUBS_O)	:= AS_CPPFLAGS += -DSWAPGENERIC_MODULE
 CLEANFILES	+= $(MODSTUBS_O)
 CFLAGS		+= $(CCVERBOSE)
+
+CERRWARN	+= -_gcc=-Wno-parentheses
 
 #
 #	Default build targets.

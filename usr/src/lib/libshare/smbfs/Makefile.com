@@ -19,8 +19,6 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -43,6 +41,8 @@ LIBS =		$(DYNLIB)
 LDLIBS +=	-lshare -lscf -lumem -luuid -lc -lxml2 -lsmbfs
 
 CFLAGS +=	$(CCVERBOSE)
+CERRWARN +=	-_gcc=-Wno-switch
+CERRWARN +=	-_gcc=-Wno-uninitialized
 CPPFLAGS +=	-D_REENTRANT -I/usr/include/libxml2 -I$(SRCDIR)/../common \
 		-I$(SRC)/lib/libsmbfs -I$(SRC)/uts/common
 

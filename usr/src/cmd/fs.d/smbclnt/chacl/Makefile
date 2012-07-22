@@ -35,6 +35,8 @@ SRCS=	$(LIBPROG).c $(FSLIBSRC)
 LDLIBS += -lsmbfs -lsec
 
 CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-unused-variable
+CERRWARN += -_gcc=-Wno-unused-label
 C99MODE= $(C99_ENABLE)
 
 CLOBBERFILES	+= $(LIBPROG)

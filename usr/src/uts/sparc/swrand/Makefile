@@ -73,6 +73,8 @@ LDFLAGS += -dy -Nmisc/kcf -Nmisc/sha1
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 LINTTAGS	+= -erroff=E_STATIC_UNUSED
 
+CERRWARN	+= -_gcc=-Wno-unused-function
+
 #
 #	Default build targets.
 #

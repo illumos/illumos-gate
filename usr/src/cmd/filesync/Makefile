@@ -32,6 +32,9 @@ include ../Makefile.cmd
 
 LDLIBS += -lgen
 
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
+
 FILEMODE= 0555
 
 .KEEP_STATE:

@@ -18,8 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -57,6 +56,8 @@ LDFLAGS += -dy -N misc/i2c_svc
 # Please do not carry these forward to new Makefiles.
 #
 LINTTAGS	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
+
+CERRWARN	+= -_gcc=-Wno-uninitialized
 
 #
 #	Define targets

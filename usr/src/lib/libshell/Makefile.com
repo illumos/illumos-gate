@@ -107,11 +107,11 @@ OBJDIRS =  \
 PICSDIRS= $(OBJDIRS:%=pics/%)
 mkpicdirs:
 	@mkdir -p $(PICSDIRS)
-	
+
 # Specify the MACH we currently use to build and test ksh
 LIBSHELLMACH= $(TARGETMACH)
 LIBSHELLBASE=..
-	
+
 include ../../Makefile.astmsg
 
 include ../../Makefile.lib
@@ -152,6 +152,14 @@ CFLAGS += \
 	$(ASTCFLAGS)
 CFLAGS64 += \
 	$(ASTCFLAGS64)
+
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-unused-value
+CERRWARN	+= -_gcc=-Wno-unused-variable
+CERRWARN	+= -_gcc=-Wno-unused-function
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-clobbered
+CERRWARN	+= -_gcc=-Wno-char-subscripts
 
 pics/sh/macro.o		:= CERRWARN += -erroff=E_NO_IMPLICIT_DECL_ALLOWED
 pics/sh/nvdisc.o	:= CERRWARN += -erroff=E_END_OF_LOOP_CODE_NOT_REACHED

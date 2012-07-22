@@ -67,6 +67,9 @@ ROOTSUIDPROG=	$(SUIDPROG:%=$(ROOTBIN)/%)
 $(ROOTSUIDPROG)	:=	FILEMODE=	04555
 
 CPPFLAGS +=	-DSYSV -DSTRNET -DBSD_COMP -I$(CMDINETCOMMONDIR)
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-unused-function
 
 # Eventually just plain CFLAGS should be += -v, but not until all in
 # PROGS are lint clean.

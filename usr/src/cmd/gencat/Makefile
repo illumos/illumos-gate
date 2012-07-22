@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1989 by Sun Microsystems, Inc.
 #
 
@@ -31,6 +29,9 @@ OBJS= gencat.o
 SRCS= $(OBJS:%.o=%.c)
 
 include ../Makefile.cmd
+
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-unused-value
 
 .KEEP_STATE:
 

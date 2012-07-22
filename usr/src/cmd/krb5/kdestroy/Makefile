@@ -2,8 +2,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG= kdestroy
 
@@ -13,6 +11,9 @@ SRCS	= kdestroy.c krpc_sys.c
 
 include ../../Makefile.cmd
 include $(SRC)/lib/gss_mechs/mech_krb5/Makefile.mech_krb5
+
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-parentheses
 
 POFILE = kdestroy.po 
 POFILES = generic.po 

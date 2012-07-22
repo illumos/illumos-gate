@@ -23,7 +23,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	kernel statistics driver makefile.
 #
@@ -67,6 +67,8 @@ CFLAGS		+= $(CCVERBOSE)
 # Please do not carry these forward to new Makefiles.
 #
 LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
+
+CERRWARN	+= -_gcc=-Wno-uninitialized
 
 #
 #	Default build targets.

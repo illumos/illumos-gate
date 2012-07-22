@@ -46,6 +46,8 @@ POFILE=		ndmpadm.po
 
 LDLIBS += -lndmp
 
+CERRWARN += -_gcc=-Wno-uninitialized
+
 .KEEP_STATE:
 
 all: $(PROG)

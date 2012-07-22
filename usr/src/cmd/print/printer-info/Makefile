@@ -34,6 +34,8 @@ OBJECTS =	$(PROG).o
 ROOTPROG=	$(PROG:%=$(ROOTLIBLPBIN)/%)
 $(ROOTPROG)	:= FILEMODE=555
 
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+
 .KEEP_STATE:
 
 all:		$(PROG)

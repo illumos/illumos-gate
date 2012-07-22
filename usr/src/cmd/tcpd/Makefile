@@ -9,10 +9,7 @@ PROG=		safe_finger tcpd tcpdchk tcpdmatch try-from
 
 include		../Makefile.cmd
 
-ERROFF=		-erroff=E_FUNC_HAS_NO_RETURN_STMT \
-		-erroff=E_IMPLICIT_DECL_FUNC_RETURN_INT \
-		-_gcc=-Wno-return-type -_gcc=-Wno-implicit
-CFLAGS +=	$(CCVERBOSE) $(ERROFF)
+CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	$(ACCESS) $(PARANOID) $(NETGROUP) $(TLI) \
 		$(UMASK) $(STYLE) $(TABLES) $(KILL_OPT) $(BUGS) \
 		-DRFC931_TIMEOUT=$(RFC931_TIMEOUT) \
@@ -22,6 +19,15 @@ CPPFLAGS +=	$(ACCESS) $(PARANOID) $(NETGROUP) $(TLI) \
 tcpd tcpdmatch try-from := \
 		LDLIBS += -lwrap
 tcpdchk :=	LDLIBS += -lwrap -lnsl
+
+CERRWARN +=	-erroff=E_FUNC_HAS_NO_RETURN_STMT
+CERRWARN +=	-erroff=E_IMPLICIT_DECL_FUNC_RETURN_INT
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc=-Wno-return-type
+CERRWARN +=	-_gcc=-Wno-clobbered
 
 # Various components must export interfaces, but also contain name-space
 # clashes with system libraries.

@@ -22,13 +22,13 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include $(SRC)/lib/Makefile.lib
 include $(SRC)/lib/policykit/Makefile.policykit
 
 CPPFLAGS =	$(POLICYKIT_DBUS_CPPFLAGS) $(POLICYKIT_GLIB_CPPFLAGS) $(CPPFLAGS.master)
+
+CERRWARN +=	-_gcc=-Wno-unused-variable
 
 C99MODE =	$(C99_ENABLE)
 

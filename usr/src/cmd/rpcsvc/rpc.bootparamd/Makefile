@@ -23,9 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/rpcsvc/rpc.bootparamd/Makefile
 
 PROG= rpc.bootparamd
 MANIFEST= bootparams.xml
@@ -36,6 +33,7 @@ OBJS=	bootparam_ip_route.o bootparam_prot_svc.o \
 include ../Makefile.rpc
 
 CPPFLAGS= -I. $(CPPFLAGS.master)
+CERRWARN += -_gcc=-Wno-parentheses
 CFLAGS += -DSYSV
 LDLIBS += -lsocket -lnsl
 

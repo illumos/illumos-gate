@@ -23,8 +23,6 @@
 # Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 FSTYPE=		hsfs
 LIBPROG=	mount
@@ -40,3 +38,5 @@ $(ROOTLIBFSTYPE)/%:   $(ROOTLIBFSTYPE) %
 include		../../Makefile.fstype
 include		../../Makefile.mount
 include		../../Makefile.mount.targ
+
+CERRWARN +=	-_gcc=-Wno-unused-variable

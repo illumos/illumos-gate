@@ -99,6 +99,13 @@ ALLLINTFLAGS = $(LINTFLAGS) \
 	-xerroff=E_INCONS_VAL_TYPE_DECL2 \
 	-xerroff=E_INCONS_VAL_TYPE_USED2
 
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-unused-label
+CERRWARN += -_gcc=-Wno-char-subscripts
+CERRWARN += -_gcc=-Wno-clobbered
+CERRWARN += -_gcc=-Wno-unused-variable
+CERRWARN += -_gcc=-Wno-parentheses
+
 MAPFILE = mapfile
 MAPFILE_INTERMEDIATE = $(MAPFILE).i
 MAPFILE_TEMPLATE = ../../../common/kmdb/mapfile_skel

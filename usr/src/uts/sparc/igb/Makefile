@@ -49,6 +49,9 @@ CONF_SRCDIR	= $(UTSBASE)/common/io/igb
 #
 include $(UTSBASE)/sparc/Makefile.sparc
 
+CERRWARN	+= -_gcc=-Wno-switch
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 #	Define targets
 #

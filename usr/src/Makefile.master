@@ -403,7 +403,20 @@ XSTRCONST=		-xstrconst
 CERRWARN = -errtags=yes -errwarn=%all
 CERRWARN += -erroff=E_EMPTY_TRANSLATION_UNIT
 CERRWARN += -erroff=E_STATEMENT_NOT_REACHED
-CERRWARN += -_gcc=-Wno-address -_gcc=-Wno-array-bounds
+
+CERRWARN += -_gcc=-Wno-missing-braces
+CERRWARN += -_gcc=-Wno-sign-compare
+CERRWARN += -_gcc=-Wno-unknown-pragmas
+CERRWARN += -_gcc=-Wno-unused-parameter
+CERRWARN += -_gcc=-Wno-missing-field-initializers
+
+# Unfortunately, this option can misfire very easily and unfixably.
+CERRWARN +=	-_gcc=-Wno-array-bounds
+
+# DEBUG v. -nd make for frequent unused variables, empty conditions, etc. in
+# -nd builds
+$(RELEASE_BUILD)CERRWARN += -_gcc=-Wno-unused
+$(RELEASE_BUILD)CERRWARN += -_gcc=-Wno-empty-body
 
 #
 # turn warnings into errors (C++)

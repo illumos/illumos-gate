@@ -65,6 +65,9 @@ CPPFLAGS += 	-I$(SRC)/lib/krb5 \
 		-I$(SRC)/uts/common/gssapi/mechs/krb5/include \
 		-I$(SRC)
 
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-unused-function
+
 CFLAGS +=	$(CCVERBOSE) -I..
 DYNFLAGS +=	$(KRUNPATH) $(KMECHLIB) -znodelete
 LDLIBS +=	-L $(ROOTLIBDIR) -lcrypto -lc

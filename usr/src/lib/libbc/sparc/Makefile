@@ -327,6 +327,15 @@ ASFLAGS=  -P -D__STDC__ -DLOCORE -D_SYS_SYS_S -D_ASM $(CPPFLAGS)
 LDLIBS= -t -R/usr/ucblib -L$(ROOT)/usr/ucblib $(LDLIBS.lib) \
 	-lucb -lc -lnsl -lsocket
 
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-char-subscripts
+CERRWARN += -_gcc=-Wno-extra
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-unused
+CERRWARN += -_gcc=-Wno-switch
+CERRWARN += -_gcc=-Wno-address
+
 # SONAME is used by DYNFLAGS
 $(DYNLIB4X) :=	SONAME = $(DYNLIB4X)
 $(DYNLIBS5) :=	SONAME = $(DYNLIBS5)

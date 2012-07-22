@@ -22,8 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY= pkcs11_kernel.a
 VERS= .1
@@ -85,6 +83,9 @@ LIBS	=	$(DYNLIB)
 LDLIBS  +=      -lc -lcryptoutil -lmd
 
 CFLAGS  +=      $(CCVERBOSE)
+
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-unused-label
 
 ROOTLIBDIR=     $(ROOT)/usr/lib/security
 ROOTLIBDIR64=   $(ROOT)/usr/lib/security/$(MACH64)

@@ -22,7 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the gen_drv kernel
 #	driver to testing hotplugging operations
@@ -67,6 +67,8 @@ CFLAGS += $(CCVERBOSE)
 # Please do not carry these forward to new Makefiles.
 #
 LINTTAGS	+= -erroff=E_STATIC_UNUSED
+
+CERRWARN	+= -_gcc=-Wno-unused-variable
 
 #
 #	Default build targets.

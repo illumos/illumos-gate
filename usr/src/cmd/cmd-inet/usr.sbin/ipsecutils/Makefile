@@ -55,6 +55,9 @@ CLOBBERFILES +=	$(PROG) $(POFILES)
 CLEANFILES += $(PROG) $(POFILES)
 
 CPPFLAGS +=     -DSYSV -DBSD_COMP -I$(CMDINETCOMMONDIR) -I.
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-switch
 
 CFLAGS += $(XSTRCONST)
 LDLIBS += -lipsecutil -lnsl

@@ -30,6 +30,11 @@ ROOTFS_PROG=	$(PROG)
 
 include ../Makefile.cmd
 
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-unused-label
+CERRWARN += -_gcc=-Wno-unused-variable
+CERRWARN += -_gcc=-Wno-uninitialized
+
 XGETFLAGS += -a -x $(PROG).xcl
 LDLIBS += -L$(ROOT)/lib
 LDLIBS += -ldladm -linetutil

@@ -44,6 +44,9 @@ INCLIST=	-I../../include -I../../include/i386 \
 		-I$(SRCBASE)/uts/$(ARCH)/sys
 DEFLIST=	-DTARGET=I386 -DI386=1 -D$(ARFORMAT) -DELF
 CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master) -I$(ELFCAP)
+
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(ELFLIBDIR) -lelf
 LINTFLAGS +=	-x $(LDLIBS)
 LINTSRCS=	$(SRCS)

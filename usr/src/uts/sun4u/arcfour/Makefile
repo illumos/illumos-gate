@@ -64,6 +64,8 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 CFLAGS		+= $(CCVERBOSE) -I$(COM_DIR)
 LINTFLAGS	+= -I$(COM_DIR)
 
+CERRWARN	+= -_gcc=-Wno-parentheses
+
 #
 # Turn on doubleword alignment for 64 bit registers
 #

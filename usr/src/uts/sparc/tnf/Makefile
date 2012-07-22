@@ -23,7 +23,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	tnf (kernel trace driver) Makefile
 #
@@ -69,6 +69,9 @@ CFLAGS		+= $(CCVERBOSE)
 #
 LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 LINTTAGS	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
+
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-uninitialized
 
 #
 #	Default build targets.

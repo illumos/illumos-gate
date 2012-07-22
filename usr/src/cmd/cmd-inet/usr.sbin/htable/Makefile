@@ -20,11 +20,8 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1989 by Sun Microsystems, Inc.
 #
-# cmd/cmd-inet/usr.sbin/htable/Makefile
 
 PROG=	htable
 OBJS=	htable.o parse.o scan.o
@@ -35,6 +32,11 @@ include ../../../Makefile.cmd
 CPPFLAGS +=	-DSYSV -DSTRNET -DBSD_COMP
 LDLIBS +=	-lsocket -lnsl
 YFLAGS +=		-d
+
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc=-Wno-unused-label
+CERRWARN +=	-_gcc=-Wno-unused-variable
 
 .KEEP_STATE:
 

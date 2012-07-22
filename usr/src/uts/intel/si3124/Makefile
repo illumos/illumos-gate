@@ -67,6 +67,8 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 DEBUG_FLGS	=
 DEBUG_DEFS	+= $(DEBUG_FLGS)
 
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 # lint pass one enforcement
 #  

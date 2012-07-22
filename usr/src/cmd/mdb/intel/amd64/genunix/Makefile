@@ -24,7 +24,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 MODULE = genunix.so
 MDBTGT = kvm
@@ -67,3 +66,9 @@ CPPFLAGS += -I$(SRC)/uts/common
 
 # Needed to find include file mutex_impl.h
 CPPFLAGS += -I$(SRC)/uts/intel
+
+CERRWARN += -_gcc=-Wno-char-subscripts
+CERRWARN += -_gcc=-Wno-unused-label
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-type-limits

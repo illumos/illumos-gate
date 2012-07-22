@@ -38,6 +38,9 @@ $(ROOTFILE):=	FILEMODE= $(LIBFILEMODE)
 .KEEP_STATE:
 
 LDLIBS +=	-lsecdb -lnsl
+CERRWARN +=	-_gcc=-Wno-type-limits
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 all: $(PROG) $(TXTS)
 

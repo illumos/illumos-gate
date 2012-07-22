@@ -20,12 +20,8 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 2001 by Sun Microsystems, Inc.
 # All rights reserved.
-#
-# cmd/syseventd/modules/devfsadmd_mod/Makefile
 #
 
 LIBRARY =	devfsadmd_mod
@@ -33,6 +29,7 @@ LIBRARY =	devfsadmd_mod
 include ../Makefile.com
 
 CPPFLAGS += -I $(SRC)/cmd/devfsadm
+CERRWARN += -_gcc=-Wno-parentheses
 
 .KEEP_STATE:
 

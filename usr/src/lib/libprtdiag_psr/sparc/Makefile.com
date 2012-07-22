@@ -49,6 +49,12 @@ LIBS = $(DYNLIB)
 MAPFILES =
 
 CFLAGS +=	$(CCVERBOSE)
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-unused-value
+CERRWARN +=	-_gcc=-Wno-unused-function
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-address
 IFLAGS +=	-I $(UTSBASE)/sun4u 
 IFLAGS +=	-I $(UTSCLOSED)/sun4u 
 IFLAGS +=	-I $(UTSCLOSED)/sun4u/sunfire -I $(UTSBASE)/sun4u/sunfire

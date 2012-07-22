@@ -48,6 +48,8 @@ CPPFLAGS += -D_XOPEN_SOURCE=500 -D__EXTENSIONS__
 # when running lint.
 LINTFLAGS += -erroff=E_INCONS_VAL_TYPE_DECL2 -erroff=E_INCONS_ARG_DECL2 
 
+CERRWARN += -_gcc=-Wno-uninitialized
+
 .KEEP_STATE:
 .PARALLEL:
 

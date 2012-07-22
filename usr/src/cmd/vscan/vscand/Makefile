@@ -22,8 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 PROG = vscand
 SRCS =	vs_main.c	\
@@ -45,6 +43,8 @@ CFLAGS += $(DEFS)
 CFLAGS += $(CCVERBOSE)
 CFLAGS += -D_FILE_OFFSET_BITS=64
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
+
+CERRWARN += -_gcc=-Wno-switch
 
 LINTFLAGS += -mu
 C99MODE =       -xc99=%all

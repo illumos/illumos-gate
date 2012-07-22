@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY=	dhcpmgr.a
 VERS= 		.1
@@ -47,6 +45,9 @@ CPPFLAGS += 	-I../com/sun/dhcpmgr/bridge \
 		-I$(JAVA_ROOT)/include/solaris \
 		-I$(SRC)/common/net/dhcp \
 		-I. 
+
+CERRWARN +=	-_gcc=-Wno-type-limits
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 LDLIBS +=	-ldhcpsvc -ldhcputil -linetutil -lscf -lsocket -lresolv -lnsl -lc
 

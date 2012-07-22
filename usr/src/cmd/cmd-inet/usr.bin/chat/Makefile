@@ -2,8 +2,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 #  Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG=		chat
 OBJS=		chat.o
@@ -13,6 +11,8 @@ include		../../../Makefile.cmd
 
 CPPFLAGS +=	-DSOL2
 LDFLAGS +=	$(MAPFILE.NGB:%=-M%)
+CERRWARN +=	-_gcc=-Wno-unused-value
+CERRWARN +=	-_gcc=-Wno-trigraphs
 
 .KEEP_STATE:
 

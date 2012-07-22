@@ -57,6 +57,12 @@ LDFLAGS += $(MAPFILE.NGB:%=-M%)
 LINTFLAGS = -b -x
 FILEMODE= 0755
 
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-unused-variable
+CERRWARN += -_gcc=-Wno-empty-body
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
+
 $(LIBSAFD)/% : %
 	$(INS.file)
 

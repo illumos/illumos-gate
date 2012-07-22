@@ -19,12 +19,9 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/fs.d/ufs/fsck/Makefile
 
 FSTYPE=		ufs
 LIBPROG=	fsck
@@ -49,6 +46,10 @@ SRCS=		$(FSCKSRCS) $(UFSSRCS) $(ROLLSRCS) $(FSLIBSRC)
 
 CPPFLAGS +=	-D_LARGEFILE64_SOURCE -I../../ -I../../../../lib/libadm/inc
 LDLIBS +=	-lefi -lavl
+
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 $(LIBPROG):	$(OBJS)
 		$(LINK.c) -o $@ $(OBJS) $(LDLIBS) $(CTFMERGE_HOOK)

@@ -85,6 +85,10 @@ ASFLAGS=	-P -D_ASM $(CPPFLAGS)
 LDLIB =		-L ../../libld/$(MACH)
 RTLDLIB =	-L ../../librtld/$(MACH)
 
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-switch
+
 # These definitions require that libc be built in the same workspace
 # as the run-time linker and before the run-time linker is built.
 # This is required for the system's self-consistency in any case.

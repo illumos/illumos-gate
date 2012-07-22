@@ -23,7 +23,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"				   
+
 #
 #	This makefile drives the production of the isadma driver kernel module
 #
@@ -73,6 +73,8 @@ CPPFLAGS += -I$(UTSBASE)/sun4u
 #
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
+
+CERRWARN	+= -_gcc=-Wno-switch
 
 #
 #	Default build targets.

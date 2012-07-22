@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 TOPDIR =	../../../../..
 SPARCDIR =	..
@@ -59,6 +57,6 @@ ALL = bootlst
 include ../../common/Makefile.com
 include $(TOPDIR)/psm/Makefile.psm.64
 CFLAGS64 += -xchip=ultra $(CCABS32)
-
+CERRWARN += -_gcc=-Wno-char-subscripts
 .KEEP_STATE:
 

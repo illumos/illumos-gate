@@ -50,6 +50,12 @@ CPPFLAGS += \
 	-I$(SRC)/uts/common/gssapi/mechs/krb5/include \
 	-DHAVE_SYSLOG_H=1 
 
+CERRWARN += -_gcc=-Wno-unused-variable
+CERRWARN += -_gcc=-Wno-unused-function
+CERRWARN += -_gcc=-Wno-type-limits
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-parentheses
+
 LDFLAGS += $(KRUNPATH) $(KERBRUNPATH)
 LDLIBS += -L$(ROOT_KLIBDIR) -L$(KRB5LIB) \
 	  -lmech_krb5 -lkdb -lkadm5srv -lnsl -lsocket -lbsm -lc

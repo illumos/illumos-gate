@@ -65,6 +65,8 @@ CFLAGS += $(CCVERBOSE)
 #
 LDFLAGS         += -dy -N drv/ptc
 
+CERRWARN	+= -_gcc=-Wno-parentheses
+
 #
 # For now, disable these lint checks; maintainers should endeavor
 # to investigate and remove these for maximum lint coverage.

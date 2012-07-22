@@ -19,8 +19,7 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -47,7 +46,9 @@ include $(UTSBASE)/sun4u/Makefile.sun4u
 # 
 # lint pass one enforcement 
 # 
-CFLAGS += $(CCVERBOSE)
+CFLAGS		+= $(CCVERBOSE)
+
+CERRWARN	+= -_gcc=-Wno-unused-label
 
 LDFLAGS += -dy -N misc/i2c_svc
 

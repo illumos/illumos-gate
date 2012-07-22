@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -36,6 +34,10 @@ LIBB= lib.b
 CLOBBERFILES= $(LIBB)
 
 include ../Makefile.cmd
+
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-unused-label
 
 $(XPG6EXOBJS) := CFLAGS += -DXPG6
 ROOTLIBB= $(LIBB:%=$(ROOTLIB)/%)

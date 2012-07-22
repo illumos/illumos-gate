@@ -22,7 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 MODULE = libumem.so
 MDBTGT = proc
@@ -62,6 +61,10 @@ include ../../Makefile.sparcv9
 include ../../../Makefile.module
 
 dmod/$(MODULE) := LDLIBS += -lproc -lm
+
+CERRWARN += -_gcc=-Wno-unused-label
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
 
 %.o: $(MODSRCS_DIR)/%.c
 	$(COMPILE.c) $<

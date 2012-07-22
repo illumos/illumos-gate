@@ -48,6 +48,8 @@ WLCMD_DIR	= $(UTSBASE)/common/io/warlock
 #
 include $(UTSBASE)/sparc/Makefile.sparc
 
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 LDFLAGS         += -dy -Nmisc/usba -Nmisc/usbser
 
 #

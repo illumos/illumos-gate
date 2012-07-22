@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG=		size
 
@@ -34,6 +32,8 @@ include 	$(SRC)/cmd/sgs/Makefile.com
 COMOBJS=	main.o process.o fcns.o
 
 SRCS=		$(COMOBJS:%.o=../common/%.c)
+
+CERRWARN +=	-_gcc=-Wno-unused-variable
 
 OBJS =		$(COMOBJS)
 .PARALLEL:	$(OBJS)

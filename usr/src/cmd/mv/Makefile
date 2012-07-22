@@ -18,8 +18,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -42,6 +40,9 @@ clean $(XPG4)	:= OBJS += values-xpg4.o
 
 CLOBBERFILES += $(CPFILE) $(LNFILE)
 CFLAGS	+=	$(CCVERBOSE)
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-uninitialized
 $(XPG4) := CFLAGS += -DXPG4
 LINTFLAGS += -DXPG4 -u
 XGETFLAGS += -a -x mv.xcl

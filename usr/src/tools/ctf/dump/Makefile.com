@@ -36,6 +36,8 @@ LDLIBS += -lelf -lz
 OBJS = $(SRCS:%.c=%.o)
 LINTFILES = $(SRCS:%.c=%.ln)
 
+CERRWARN += -_gcc=-Wno-uninitialized
+
 .NO_PARALLEL:
 .PARALLEL: $(OBJS) $(LINTFILES)
 

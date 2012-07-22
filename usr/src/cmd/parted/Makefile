@@ -30,6 +30,7 @@ include		../Makefile.cmd
 C99MODE=	$(C99_ENABLE)
 CERRWARN +=	-erroff=E_EXTERN_INLINE_UNDEFINED
 CERRWARN +=	-erroff=E_ARG_INCOMPATIBLE_WITH_ARG
+CERRWARN +=	-_gcc=-Wno-unused-function
 
 srcdir=	.
 

@@ -41,6 +41,7 @@ CPPFLAGS=	-I. -I../../include $(CPPFLAGS.master) -I$(ELFCAP)
 CFLAGS +=	$(CCVERBOSE)
 C99MODE=	$(C99_ENABLE)
 
+CERRWARN +=	-_gcc=-Wno-uninitialized
 LDLIBS +=	-lelf $(CONVLIBDIR) $(CONV_LIB) -lsendfile
 LINTFLAGS=	-x
 LINTFLAGS64=	-x

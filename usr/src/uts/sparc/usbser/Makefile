@@ -73,6 +73,10 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-unused-label
+
 .KEEP_STATE:
 
 all:		$(ALL_DEPS)

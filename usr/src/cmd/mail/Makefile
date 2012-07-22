@@ -19,7 +19,6 @@
 # CDDL HEADER END
 #
 #
-#
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -71,6 +70,11 @@ EDITPATH= \
 	    -e 's!VAR_MAIL!/var/mail!g' < $? > $@
 
 CPPFLAGS =	-DSVR4 -I. $(CPPFLAGS.master)
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-clobbered
+CERRWARN +=	-_gcc=-Wno-extra
 
 LDLIBS +=	-lmail -lsocket
 

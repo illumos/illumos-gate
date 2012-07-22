@@ -41,6 +41,9 @@ $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT -I$(SRCDIR) -I$(SRC)/lib/libldap5/include/ldap
 
+CERRWARN +=	-_gcc=-Wno-type-limits
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 lint := OBJECTS = $(LINT_OBJECTS)
 
 .KEEP_STATE:

@@ -23,7 +23,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the sc_gptwocfg
 #	miscellaneous module.
@@ -60,6 +60,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 # lint pass one enforcement
 #
 CFLAGS += $(CCVERBOSE) -I../sys -I$(UTSBASE)/sun4u/starcat/sys
+CERRWARN += -_gcc=-Wno-uninitialized
 
 #
 # module dependencies

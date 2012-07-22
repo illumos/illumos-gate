@@ -60,6 +60,8 @@ LDFLAGS += -dy -N"sys/doorfs" -N"strmod/rpcmod"
 #
 LINTTAGS += -erroff=E_FUNC_VAR_UNUSED -erroff=E_CONSTANT_CONDITION
 
+CERRWARN	+= -_gcc=-Wno-unused-variable
+
 #
 #	Define targets
 #

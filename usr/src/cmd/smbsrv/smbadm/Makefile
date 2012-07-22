@@ -32,6 +32,10 @@ include ../Makefile.smbsrv.defs
 LDLIBS += -L$(ROOT)/usr/lib/smbsrv -lsmb -lsecdb -lumem
 LDFLAGS += -R/usr/lib/smbsrv
 
+.KEEP_STATE:
+
+CERRWARN += -_gcc=-Wno-uninitialized
+
 all:		$(PROG)
 
 clean:

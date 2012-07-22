@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 # Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -63,6 +61,9 @@ LDFLAGS		+= -dy -Ndrv/dld -Nmisc/mac -Nmisc/strplumb -Nmisc/dls
 # lint coverage.
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
+
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-unused-label
 
 #
 #	Default build targets.

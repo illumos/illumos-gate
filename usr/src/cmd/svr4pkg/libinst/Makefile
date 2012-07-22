@@ -61,6 +61,12 @@ CPPFLAGS +=	-I$(SRC)/cmd/svr4pkg/hdrs \
 #
 LINTFLAGS += -un
 
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-clobbered
+CERRWARN += -_gcc=-Wno-unused-variable
+
 .KEEP_STATE:
 
 all: $(PROG)

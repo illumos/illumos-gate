@@ -49,6 +49,8 @@ CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR)
 CPPFLAGS +=	-I../../libpapi-common/common
 
+CERRWARN +=	-_gcc=-Wno-unused-variable
+
 MAPFILES =	$(SRCDIR)/mapfile
 
 LDLIBS +=	-lc

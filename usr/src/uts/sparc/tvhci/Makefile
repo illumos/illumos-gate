@@ -27,8 +27,6 @@
 # Use is subject to license terms.
 #
 
-#ident	"%Z%%M%	%I%	%E% SMI"
-
 #
 #	This makefile drives the production of a vHCI test driver
 #	for testing MPxIO framework
@@ -71,6 +69,7 @@ CFLAGS		+= $(CCVERBOSE) -dalign
 # Please do not carry these forward to new Makefiles.
 #
 LINTTAGS	+= -erroff=E_STATIC_UNUSED
+CERRWARN	+= -_gcc=-Wno-unused-function
 
 #
 #	Default build targets.

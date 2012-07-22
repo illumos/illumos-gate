@@ -23,7 +23,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the sbdp driver kernel module.
 #
@@ -68,6 +68,11 @@ MACHINE_DEFS	+= -DCHEETAH_PLUS
 #
 CFLAGS += $(CCVERBOSE)
 LDFLAGS	+= -dy -Ndrv/sgsbbc
+
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-unused-function
+CERRWARN += -_gcc=-Wno-unused-variable
 
 #
 # Turn on doubleword alignment for 64 bit registers

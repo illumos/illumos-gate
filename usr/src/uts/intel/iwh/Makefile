@@ -59,6 +59,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 
+CERRWARN	+= -_gcc=-Wno-unused-label
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 CPPFLAGS	+= -I. -D_KERNEL
 
 LDFLAGS         += -dy -Nmisc/mac -Nmisc/net80211 -Ndrv/random -Ndrv/ip 

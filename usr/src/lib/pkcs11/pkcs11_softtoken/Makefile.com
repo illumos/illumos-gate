@@ -125,6 +125,13 @@ LDLIBS  +=      -lc -lmd -lcryptoutil -lsoftcrypto -lgen
 
 CFLAGS 	+=      $(CCVERBOSE)
 
+CERRWARN +=	-_gcc=-Wno-unused-label
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-type-limits
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-empty-body
+
 CPPFLAGS += -I$(AESDIR) -I$(BLOWFISHDIR) -I$(ARCFOURDIR) -I$(DESDIR) \
 	    -I$(DHDIR) -I$(DSADIR) -I$(ECCDIR) -I$(SRC)/common/crypto \
 	    -I$(MPIDIR) -I$(RSADIR) -I$(RNGDIR) \

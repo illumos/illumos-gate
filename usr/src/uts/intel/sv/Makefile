@@ -62,8 +62,10 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 # lint pass one enforcement
 #
-CFLAGS += -v
+CFLAGS += $(CCVERBOSE)
 LDFLAGS += -dy -N"drv/nsctl" -N"drv/nskern" -N"misc/spuni"
+
+CERRWARN += -_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

@@ -69,6 +69,9 @@ INC_PATH += -I$(UTSBASE)/common/inet/sockmods -I$(UTSBASE)/common/io/bpf
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-unused-label
+
 #
 #	Default build targets.
 #

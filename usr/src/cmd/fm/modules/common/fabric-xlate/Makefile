@@ -37,3 +37,7 @@ LINTFLAGS += -I$(INCDIRS)
 
 LDFLAGS += -L$(ROOT)/usr/lib/fm -R/usr/lib/fm
 LDLIBS += -luutil -lxml2 -L$(ROOTLIB)/fm -ltopo
+
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-switch
+CERRWARN += -_gcc=-Wno-uninitialized

@@ -62,6 +62,10 @@ CPPFLAGS +=	-I.. -I$(UFSDIR) -D_REENTRANT -D_TNF_LIBRARY
 
 LINTFLAGS +=	-y
 
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 $(ROOTHDRS) :=	FILEMODE = 644
 
 LDLIBS += -lc

@@ -21,10 +21,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Makefile for Kerberos server-install utility.
-#
 
 PROG=	kdcmgr
 KLPROG=	klookup
@@ -37,6 +33,9 @@ CSRCS=	$(OBJS:.o=.c)
 include ../../../Makefile.cmd
 
 POFILE=		$(SSRCS:%.sh=%.po)
+
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 LDLIBS	+=	-lresolv -lnsl
 

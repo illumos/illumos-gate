@@ -42,6 +42,9 @@ XGETFLAGS += -a -x praudit.xcl
 CPPFLAGS += -D_PRAUDIT -I$(XLATEDIR)
 CPPFLAGS += -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
+
 LDLIBS += -lbsm -lnsl -lpam -ltsol
 
 .KEEP_STATE:

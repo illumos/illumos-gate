@@ -30,7 +30,6 @@ OBJECTS=	devfsinfo.o devinfo.o devinfo_prop_decode.o devinfo_devlink.o \
 		devinfo_devperm.o devfsmap.o devinfo_profile.o \
 		devinfo_finddev.o devinfo_dli.o devinfo_dim.o \
 		devinfo_realpath.o devinfo_retire.o
-		
 
 include ../../Makefile.lib
 include ../../Makefile.rootfs
@@ -41,6 +40,8 @@ $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I..
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

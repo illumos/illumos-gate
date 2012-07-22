@@ -51,6 +51,9 @@ CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT -D_POSIX_PTHREAD_SEMANTICS -I$(SRCDIR)
 LINTFLAGS64 +=  -errchk=longptr64
 
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 all: $(LIBS)
 
 lint: lintcheck

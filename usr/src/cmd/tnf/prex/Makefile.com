@@ -19,8 +19,7 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 # Copyright 1989,2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -65,7 +64,13 @@ LFLAGS=		-v
 # FOR normal makefile, uncomment the next line
 LDLIBS +=	-lgen -ltnfctl -lelf -lc
 # Uncomment the following line for a debug build
-# COPTFLAG =	-g -DDEBUG -v
+# COPTFLAG =	-g -DDEBUG
+
+CFLAGS +=	$(CCVERBOSE)
+CERRWARN +=	-_gcc=-Wno-unused-label
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

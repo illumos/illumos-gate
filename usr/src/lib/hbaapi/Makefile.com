@@ -40,6 +40,11 @@ SRCDIR=		../common
 INCS +=		-I$(SRCDIR)
 CPPFLAGS +=	$(INCS)
 
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-unused-value
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-unused-function
+
 LDLIBS +=	-lc
 
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)

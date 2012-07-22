@@ -55,6 +55,10 @@ SQLITELINT =	$(ROOT)/usr/lib/llib-lsqlite.ln
 
 include ../../Makefile.cmd
 
+CERRWARN +=	-_gcc=-Wno-type-limits
+CERRWARN +=	-_gcc=-Wno-switch
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 TEXT_DOMAIN =	SUNW_OST_OSLIB
 XGETTEXT =	$(GNUXGETTEXT)
 XGETFLAGS =	--foreign-user --strict -n -E --width=72 \
@@ -77,7 +81,7 @@ INCS += -I. -I../../../lib/libidmap/common\
 $(OBJS) := CPPFLAGS += $(INCS) -D_REENTRANT
 $(POFILE) := CPPFLAGS += $(INCS)
 
-CFLAGS += -v
+CFLAGS += $(CCVERBOSE)
 LDLIBS += -lsecdb \
 	-lsocket \
 	-lnsl \

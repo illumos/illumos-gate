@@ -30,6 +30,7 @@ include ../Makefile.tools
 
 CFLAGS += $(CCVERBOSE)
 CPPFLAGS += -I../protocmp
+CERRWARN += -_gcc=-Wno-parentheses
 CLEANFILES += $(OBJS)
 
 .KEEP_STATE:

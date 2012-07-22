@@ -22,8 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY = watchmalloc.a
 VERS = .1
@@ -41,6 +39,8 @@ CFLAGS += $(CCVERBOSE)
 CFLAGS64 += $(CCVERBOSE)
 CPPFLAGS += -I../common -I../../common/inc -D_REENTRANT
 DYNFLAGS += $(ZINTERPOSE)
+
+CERRWARN += -_gcc=-Wno-unused-label
 
 .KEEP_STATE:
 

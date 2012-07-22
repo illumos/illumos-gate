@@ -65,6 +65,11 @@ include $(UTSBASE)/sparc/Makefile.sparc
 # 
 CFLAGS += $(CCVERBOSE)
 
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-unused-label
+CERRWARN	+= -_gcc=-Wno-switch
+
 #
 #	Default build targets.
 #

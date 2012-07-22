@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG:sh=	cd ..; basename `pwd`
 OBJS= $(PROG).o translate.o
@@ -40,6 +38,9 @@ C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
 
 CPPFLAGS += -D_LARGEFILE64_SOURCE=1 -D_REENTRANT $(INCS)
+
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-switch
 
 .KEEP_STATE:
 

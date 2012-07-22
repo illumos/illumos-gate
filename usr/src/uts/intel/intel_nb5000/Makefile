@@ -75,6 +75,9 @@ INSTALL_TARGET  = $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 LDFLAGS         += -dy -N drv/smbios
 
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 #       Default build targets.
 #

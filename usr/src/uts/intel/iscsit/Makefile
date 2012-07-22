@@ -63,6 +63,10 @@ LDFLAGS		+= -dy -Ndrv/stmf -Nmisc/idm -Nfs/sockfs -Nmisc/md5 -Nmisc/ksocket
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
 
+CERRWARN	+= -_gcc=-Wno-switch
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-unused-label
+
 #
 #	Default build targets.
 #

@@ -77,6 +77,11 @@ CLEANLINTFILES	+= $(LINT32_FILES)
 CFLAGS += $(CCVERBOSE) -DCHEETAH
 ASFLAGS +=  -DCHEETAH
 
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-type-limits
+CERRWARN	+= -_gcc=-Wno-clobbered
+
 #
 # cpu-module-specific flags
 #

@@ -20,11 +20,7 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1989 by Sun Microsystems, Inc.
-#
-# cmd/troff/nroff.d/Makefile
 #
 
 include 	../../Makefile.cmd
@@ -42,6 +38,12 @@ SRCS =		$(OBJS:%.o=%.c) $(COMMONOBJS:%.o=../%.c)
 
 
 CPPFLAGS =	-DNROFF -DUSG -DINCORE -DEUC -I. -I.. $(CPPFLAGS.master)
+
+CERRWARN +=	-_gcc=-Wno-unused-value
+CERRWARN +=	-_gcc=-Wno-extra
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-unused-variable
 
 LDLIBS +=	-lmapmalloc
 #

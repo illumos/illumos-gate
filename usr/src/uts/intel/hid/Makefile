@@ -73,6 +73,8 @@ LDFLAGS         += -dy -Nmisc/usba -Nmisc/hidparser -Ndacf/consconfig_dacf
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 
+CERRWARN	+= -_gcc=-Wno-parentheses
+
 #
 #	Default build targets.
 #

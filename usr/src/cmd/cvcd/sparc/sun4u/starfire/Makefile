@@ -42,6 +42,7 @@ FILEMODE= 0700
 ROOTPSMPROG	= $(ROOT_PSM_LIB_DIR)/$(PROG)
 
 CPPFLAGS = -I$(USR_PSM_INCL_DIR) $(CPPFLAGS.master)
+CERRWARN += -_gcc=-Wno-unused-variable
 
 LDLIBS +=	-lsocket -lnsl
 

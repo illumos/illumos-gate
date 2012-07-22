@@ -50,6 +50,8 @@ SGSMSGFLAGS +=	-h $(BLTDEFS) -d $(BLTDATA)
 LINTFLAGS +=	-u -erroff=E_NAME_DECL_NOT_USED_DEF2
 LINTFLAGS64 += 	-u -erroff=E_NAME_DECL_NOT_USED_DEF2
 
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 LINTSRCS=	$(COMOBJS:%.o=../common/%.c) $(BLTDATA)
 
 FILEMODE=	555

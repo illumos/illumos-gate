@@ -42,6 +42,8 @@ CPPFLAGS += -I. -I$(SRC)/uts/sun4v -I$(ROOT)/usr/platform/sun4v/include \
 CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
 CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
 
+CERRWARN += -_gcc=-Wno-parentheses
+
 $(DYNLIB) := LDLIBS += $(MACH_LDLIBS)
 $(DYNLIB) := LDLIBS += -lfmd_agent -lnvpair -lscf -lmdesc -lc -lxml2 -lsocket \
 	-lumem

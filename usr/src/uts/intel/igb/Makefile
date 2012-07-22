@@ -49,6 +49,9 @@ CONF_SRCDIR	= $(UTSBASE)/common/io/igb
 #
 include $(UTSBASE)/intel/Makefile.intel
 
+CERRWARN	+= -_gcc=-Wno-switch
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 #	Define targets
 #

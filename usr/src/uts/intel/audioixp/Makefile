@@ -56,6 +56,8 @@ CFLAGS		+= $(CCVERBOSE)
 #
 LDFLAGS		+= -dy -Ndrv/audio -Nmisc/ac97
 
+CERRWARN	+= -_gcc=-Wno-unused-label
+
 #
 #	Define targets
 #

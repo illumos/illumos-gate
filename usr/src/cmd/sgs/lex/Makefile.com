@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG=		lex
 
@@ -47,13 +45,16 @@ SRCDIR =	../common
 
 C99MODE=	$(C99_ENABLE)
 
+CERRWARN +=	-_gcc=-Wno-unused-label
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-parentheses
+
 # Override default source file derivation rule (in Makefile.lib)
 # from objects
 #
 MACHSRCS=	$(MACHOBJS:%.o=../common/%.c)
 LIBSRCS =	$(LIBOBJS:%.o=../common/%.c)
 SRCS=		$(MACHSRCS) $(LIBSRCS)
-		
 
 LIBS =          $(DYNLIB) $(LINTLIB)
 

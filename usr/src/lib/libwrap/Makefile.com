@@ -48,10 +48,16 @@ CPPFLAGS +=	$(NETGROUP) $(TLI) $(ALWAYS_HOSTNAME) $(AUTH) \
 		$(STYLE) $(TABLES) $(DOT) $(BUGS) \
 		-DRFC931_TIMEOUT=$(RFC931_TIMEOUT) \
 		-I$(SRCDIR) 
-CFLAGS +=	$(CCVERBOSE) -erroff=E_FUNC_EXPECTS_TO_RETURN_VALUE \
-		-erroff=E_IMPLICIT_DECL_FUNC_RETURN_INT \
-		-erroff=E_OLD_STYLE_DECL_HIDES_PROTO \
-		-_gcc=-Wno-return-type
+CFLAGS +=	$(CCVERBOSE)
+
+CERRWARN +=	-erroff=E_FUNC_EXPECTS_TO_RETURN_VALUE
+CERRWARN +=	-erroff=E_IMPLICIT_DECL_FUNC_RETURN_INT
+CERRWARN +=	-erroff=E_OLD_STYLE_DECL_HIDES_PROTO
+
+CERRWARN +=	-_gcc=-Wno-return-type
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

@@ -20,11 +20,7 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1990 by Sun Microsystems, Inc.
-#
-# cmd/logins/Makefile
 #
 
 PROG= 	logins
@@ -33,6 +29,9 @@ TXTS= 	$(PKGINFO)
 
 include ../Makefile.cmd
 TEXT_DOMAIN= SUNW_OST_ADMIN
+
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
 
 FILEMODE= 0750
 

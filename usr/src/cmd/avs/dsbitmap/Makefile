@@ -35,7 +35,8 @@ OBJS=	dsbitmap.o
 SRCS=	$(OBJS:%.o=%.c)
 POFILE=	$(OBJS:%.o=%.po)
 
-CFLAGS += -v
+CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-uninitialized
 LDLIBS += -lunistat -ladm
 LINTFLAGS +=	-Xa -n -s -x -m -u -Dlint -errhdr=%user
 LINTFLAGS +=	-erroff=E_SEC_PRINTF_VAR_FMT

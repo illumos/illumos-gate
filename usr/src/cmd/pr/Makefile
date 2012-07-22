@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1989 by Sun Microsystems, Inc.
 #
 
@@ -32,6 +30,8 @@ include ../Makefile.cmd
 
 SED = sed
 DCFILE = $(PROG).dc
+
+CERRWARN += -_gcc=-Wno-parentheses
 
 $(XPG4):= CPPFLAGS += -DXPG4
 $(POFILE) := XGETFLAGS += -a -x pr.xcl

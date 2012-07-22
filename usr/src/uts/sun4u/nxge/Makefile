@@ -18,17 +18,17 @@
 #
 # CDDL HEADER END
 #
-# uts/sun4u/nxge/Makefile
+
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the Sun
 #	10G/1G Ethernet leaf driver kernel module.
 #
+
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
@@ -87,6 +87,13 @@ LINTFLAGS += -DSOLARIS
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
+
+CERRWARN	+= -_gcc=-Wno-unused-label
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-switch
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-type-limits
+
 #
 #	Driver depends on mac & IP
 #

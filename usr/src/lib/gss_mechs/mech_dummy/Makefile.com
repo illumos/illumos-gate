@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 # The mech_dummy shared object contains all the functionality needed to
@@ -41,6 +39,9 @@ MAPFILES =
 
 CPPFLAGS +=	-I../../libgss -I$(SRC)/uts/common/gssapi/include \
 	    	-I$(ROOT)/usr/include/gssapi
+
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 MAKEFILE_EXPORT = $(CLOSED)/lib/gss_mechs/mech_dummy/Makefile.export
 $(EXPORT_RELEASE_BUILD)include $(MAKEFILE_EXPORT)

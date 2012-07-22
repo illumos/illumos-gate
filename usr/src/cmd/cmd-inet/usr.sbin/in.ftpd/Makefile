@@ -46,6 +46,14 @@ CPPFLAGS +=	-DBSD_COMP -D_FILE_OFFSET_BITS=64 -DINET6 -DSOLARIS_BSM_AUDIT \
 LDLIBS +=	-lsocket -lnsl -lpam -lbsm -lsendfile -lgss
 YFLAGS +=	-d
 
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-unused-label
+CERRWARN +=	-_gcc=-Wno-clobbered
+CERRWARN +=	-_gcc=-Wno-address
+
 in.ftpd :=	LDFLAGS += $(MAPFILE.NGB:%=-M%)
 
 # tcov output relies on atexit(3C) registered functions being called, so stop

@@ -28,8 +28,10 @@ OBJS =		$(SRCS:%.c=%.o)
 
 include ../../Makefile.cmd
 
-LDLIBS 				+= -lscf -lzonestat -lumem
-LINTFLAGS			+= -u
+LDLIBS 		+= -lscf -lzonestat -lumem
+LINTFLAGS	+= -u
+
+CERRWARN	+= -_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

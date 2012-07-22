@@ -52,6 +52,8 @@ CFLAGS		+=	$(CCVERBOSE)
 CPPFLAGS	+=	-D_REENTRANT $(KMFINC) -I$(INCDIR)  -I/usr/include/libxml2 -I$(BIGNUMDIR)
 LINTFLAGS64	+=	-errchk=longptr64
 
+CERRWARN	+=	-_gcc=-Wno-unused-label
+
 PICS=	$(OBJECTS:%=pics/%)
 
 LDLIBS	+=	$(PKCS11LIBS)

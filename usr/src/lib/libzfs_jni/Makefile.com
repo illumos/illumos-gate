@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY= libzfs_jni.a
 VERS= .1
@@ -46,6 +44,8 @@ INCS += -I$(JAVA_ROOT)/include \
 LDLIBS +=	-lc -lnvpair -ldiskmgt -lzfs
 CPPFLAGS +=	$(INCS)
 $(NOT_RELEASE_BUILD) CPPFLAGS += -DDEBUG
+CERRWARN +=	-_gcc=-Wno-switch
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 SRCDIR =	../common
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)

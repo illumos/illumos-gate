@@ -62,6 +62,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 
+CERRWARN	+= -_gcc=-Wno-unused-label
+CERRWARN	+= -_gcc=-Wno-parentheses
+
 #
 # Depends on md & ufs
 #

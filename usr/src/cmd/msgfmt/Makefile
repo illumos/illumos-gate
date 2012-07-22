@@ -26,8 +26,6 @@
 #         All Rights Reserved
 #
 
-#ident	"%Z%%M%	%I%	%E% SMI"
-
 # cmd/msgfmt/Makefile
 
 include ../Makefile.cmd
@@ -63,6 +61,11 @@ CLOBBERFILES += gmsgfmt_rev
 
 ROOTBINPROG= $(BINPROG:%=$(ROOTBIN)/%)
 ROOTLIBPROG= $(LIBPROG:%=$(ROOTLIB)/%)
+
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-unused-label
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-unused-variable
 
 .KEEP_STATE:
 

@@ -23,8 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 .KEEP_STATE:
 
@@ -46,6 +44,7 @@ include ../../common/Makefile.util
 #
 CPPFLAGS = -I../../common -I../common
 CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-uninitialized
 LDFLAGS =
 LDLIBS = -lelf
 

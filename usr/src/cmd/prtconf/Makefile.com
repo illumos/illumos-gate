@@ -30,6 +30,9 @@ SRCS=	$(OBJS:%.o=../%.c)
 include ../../Makefile.cmd
 
 CFLAGS	+=	$(CCVERBOSE)
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-switch
+CERRWARN +=	-_gcc=-Wno-uninitialized
 LDLIBS	+= -ldevinfo -lnvpair
 
 FILEMODE= 02555

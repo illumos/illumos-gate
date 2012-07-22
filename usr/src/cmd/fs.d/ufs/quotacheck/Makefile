@@ -20,12 +20,9 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/fs.d/ufs/quotacheck/Makefile
 
 FSTYPE=		ufs
 LIBPROG=	quotacheck
@@ -41,6 +38,9 @@ OBJS=		quotacheck.o
 FSOBJS=		preenlib.o
 FSSRCS=		../../preenlib.c
 SRCS=		$(OBJS:.o=.c)
+
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc=-Wno-type-limits
 
 lint:		lint_PROG
 

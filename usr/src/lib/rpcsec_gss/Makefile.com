@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY= rpcsec.a
 VERS = .1
@@ -35,9 +33,12 @@ include ../../Makefile.lib
 
 CPPFLAGS +=     -D_REENTRANT -I$(SRC)/uts/common/gssapi/include  \
 		-I$(SRC)/uts/common
- 
+
 CFLAGS +=	$(XFFLAG)
 CFLAGS64 +=	$(XFFLAG)
+
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-parentheses
 
 DYNFLAGS +=	$(ZIGNORE)
 

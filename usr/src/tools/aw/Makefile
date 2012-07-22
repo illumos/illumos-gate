@@ -23,16 +23,13 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# tools/aw/Makefile
-#
 
 PROG	= aw
 
 include ../Makefile.tools
 
 CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-uninitialized
 
 LINTFLAGS += -ux -Xa -errchk=locfmtchk,parentheses
 

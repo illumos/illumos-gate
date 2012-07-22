@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 # Common build rules for efcode shared objects.
@@ -47,6 +45,13 @@ MAPFILES =
 CPPFLAGS += -DDEBUG -DFCODE_INTERNAL
 CPPFLAGS += -I $(SRC)/lib/efcode/include -I $(ROOT)/usr/platform/sun4u/include
 DYNFLAGS += -R\$$ORIGIN
+
+CERRWARN += -_gcc=-Wno-unused-variable
+CERRWARN += -_gcc=-Wno-unused-function
+CERRWARN += -_gcc=-Wno-unused-value
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-type-limits
 
 EFCODE64DIR = /usr/lib/efcode/$(MACH64)
 ROOTLIBDIR = $(ROOT)/usr/lib/efcode

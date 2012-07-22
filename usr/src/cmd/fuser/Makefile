@@ -23,14 +23,12 @@
 # Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/fuser/Makefile
 
 PROG= fuser
 
 include ../Makefile.cmd
 
+CERRWARN += -_gcc=-Wno-parentheses
 LDLIBS += -lkstat -ldevinfo
 
 ROOTSYMLINK= $(ROOTETCPROG)

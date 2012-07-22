@@ -23,8 +23,6 @@
 # Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 DIRREL	= ../
 
@@ -35,3 +33,9 @@ include ../../Makefile.com
 # needs to go finish cleaning them up, at which point this can be removed.
 #
 lint lintcheck := LINTFLAGS += -y
+
+CERRWARN += -_gcc=-Wno-type-limits
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-switch
+CERRWARN += -_gcc=-Wno-char-subscripts

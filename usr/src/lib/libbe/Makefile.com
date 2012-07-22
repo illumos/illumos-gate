@@ -24,7 +24,7 @@
 #
 # Copyright 2011 Nexenta Systems, Inc. All rights reserved.
 #
- 
+
 
 LIBRARY= 	libbe.a
 VERS= 		.1
@@ -51,6 +51,9 @@ C99MODE= 	$(C99_ENABLE)
 
 LDLIBS +=	-lzfs -linstzones -luuid -lnvpair -lc -lgen -ldevinfo
 CPPFLAGS +=	$(INCS)
+CERRWARN +=	-_gcc=-Wno-unused-label
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-address
 
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
 

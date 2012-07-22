@@ -42,6 +42,11 @@ CPPFLAGS += -I. -I$(SRC)/uts/common/gssapi/mechs/krb5/include \
 
 COPTFLAG += $(XESS) #-I$(KINCDIR) 
 
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-unused-variable
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-unused-function
+
 LDFLAGS += $(KRUNPATH) $(KERBRUNPATH)
 LDLIBS += -lgss -L$(KRB5LIB) \
 	-lmech_krb5 -lkadm5srv -lkdb -lnsl -lresolv -lbsm -lpam -lsocket

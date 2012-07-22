@@ -25,7 +25,7 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the pci-ide "drv"
 #	kernel module.
@@ -66,6 +66,8 @@ DEBUG_FLGS	=
 DEBUG_DEFS	+= $(DEBUG_FLGS)
 
 INC_PATH	+= -I$(UTSBASE)/common/io/pci-ide
+
+CERRWARN	+= -_gcc=-Wno-switch
 
 #
 #	Default build targets.

@@ -141,6 +141,16 @@ INIS2LDAPPROG = 	$(NIS2LDAPPROG:%=$(NETYP)/%)
 
 NIS2LDAPINC =		-I$(SRC)/lib/libnisdb/yptol
 
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-switch
+CERRWARN +=	-_gcc=-Wno-extra
+CERRWARN +=	-_gcc=-Wno-unused-label
+CERRWARN +=	-_gcc=-Wno-address
+CERRWARN +=	-_gcc=-Wno-unused-function
+
 #conditional assignments
 ypalias.o :=	CPPFLAGS= -DMAIN $(CPPFLAGS.master)
 makedbm.o :=	CPPFLAGS= $(CPPFLAGS.master)

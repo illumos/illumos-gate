@@ -74,6 +74,9 @@ LDFLAGS += -dy -N drv/sppp
 
 CLEANLINTFILES  += $(LINT64_FILES)
 
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 # For now, disable these lint checks; maintainers should endeavor
 # to investigate and remove these for maximum lint coverage.

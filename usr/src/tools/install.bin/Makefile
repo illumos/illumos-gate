@@ -31,6 +31,7 @@ SRCS=	$(PROG).c ../protocmp/stdusers.c
 include ../Makefile.tools
 
 CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-type-limits
 CPPFLAGS += -I../protocmp
 LDLIBS += -lgen
 CLEANFILES += $(OBJS)

@@ -45,10 +45,11 @@ LDLIBS +=	-ldevinfo
 LDLIBS +=	-lsysevent
 
 CFLAGS +=	-mt
-CFLAGS +=	-v
+CFLAGS +=	$(CCVERBOSE)
+CFLAGS64 +=	-mt
+CFLAGS64 +=	$(CCVERBOSE)
 
-CFLAGS64 +=       -mt
-CFLAGS64 +=       -v
+CERRWARN +=	-_gcc=-Wno-parentheses
 
 CPPFLAGS +=	-DSOLARIS
 

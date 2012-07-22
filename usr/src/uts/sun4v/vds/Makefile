@@ -65,6 +65,8 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 CFLAGS += $(CCVERBOSE)
 CFLAGS += -D_EXTVTOC
 
+CERRWARN += -_gcc=-Wno-uninitialized
+
 #
 # module dependencies
 #

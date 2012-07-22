@@ -47,6 +47,10 @@ CPPFLAGS = \
 CFLAGS += \
 	$(ASTCFLAGS)
 
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-empty-body
+CERRWARN += -_gcc=-Wno-uninitialized
+
 LDLIBS += -last
 msgcpp   := LDLIBS += -lpp
 

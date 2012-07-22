@@ -78,6 +78,10 @@ CFLAGS += -dalign
 #
 LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
 
+CERRWARN	+= -_gcc=-Wno-switch
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-unused-value
+
 #
 #	Dependency
 #
