@@ -31,8 +31,6 @@
 #ifndef _SYS_UTSNAME_H
 #define	_SYS_UTSNAME_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/feature_tests.h>
 
 #ifdef	__cplusplus
@@ -67,13 +65,9 @@ extern struct utsname utsname;
 
 #if defined(__STDC__)
 
-#if !defined(__lint)
-static int uname(struct utsname *);
-static int _uname(struct utsname *);
-#else
 extern int uname(struct utsname *);
 extern int _uname(struct utsname *);
-#endif
+
 #if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
 extern int nuname(struct utsname *);
 #endif /* !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__) */
@@ -81,13 +75,9 @@ extern int _nuname(struct utsname *);
 
 #else	/* defined(__STDC__) */
 
-#if !defined(__lint)
-static int uname();
-static int _uname();
-#else
 extern int uname();
 extern int _uname();
-#endif
+
 #if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
 extern int nuname();
 #endif /* !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__) */
@@ -95,30 +85,20 @@ extern int _nuname();
 
 #endif	/* defined(__STDC__) */
 
-
-#if !defined(__lint)
-static int
-#if defined(__STDC__)
-_uname(struct utsname *_buf)
+/*
+ * On i386 in SVID.2 uname() returns a utsname structure with 8 byte members,
+ * and nuname() returns the real struct utsname.  In SVID.3 uname and nuname
+ * are equivalent.  Anyone who includes this header gets the SVID.3 behaviour.
+ * The SVID.2 behaviour exists solely for compatibility, and is what is
+ * implemented by the libc uname/_uname entrypoints.
+ */
+#ifdef __PRAGMA_REDEFINE_EXTNAME
+#pragma redefine_extname	uname	_nuname
+#pragma redefine_extname	_uname	_nuname
 #else
-_uname(_buf)
-struct utsname *_buf;
+#define	uname	_nuname
+#define	_uname	_nuname
 #endif
-{
-	return (_nuname(_buf));
-}
-
-static int
-#if defined(__STDC__)
-uname(struct utsname *_buf)
-#else
-uname(_buf)
-struct utsname *_buf;
-#endif
-{
-	return (_nuname(_buf));
-}
-#endif /* !defined(__lint) */
 
 #else	/* defined(__i386) */
 
