@@ -86,10 +86,8 @@ v8cfg_canned_readsym(v8_cfg_t *cfgp, const char *name, intptr_t *valp)
 			break;
 	}
 
-	if (v8sym->v8cs_name == NULL) {
-		mdb_warn("no such canned symbol: %s\n", name);
+	if (v8sym->v8cs_name == NULL)
 		return (-1);
-	}
 
 	*valp = v8sym->v8cs_value;
 	return (0);

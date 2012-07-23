@@ -125,6 +125,10 @@ static intptr_t	V8_PROP_IDX_FIRST;
 static intptr_t	V8_PROP_TYPE_FIELD;
 static intptr_t	V8_PROP_FIRST_PHANTOM;
 static intptr_t	V8_PROP_TYPE_MASK;
+static intptr_t	V8_PROP_DESC_KEY;
+static intptr_t	V8_PROP_DESC_DETAILS;
+static intptr_t	V8_PROP_DESC_VALUE;
+static intptr_t	V8_PROP_DESC_SIZE;
 
 static intptr_t V8_TYPE_JSOBJECT = -1;
 static intptr_t V8_TYPE_FIXEDARRAY = -1;
@@ -198,7 +202,6 @@ static v8_constant_t v8_constants[] = {
 	{ &V8_SmiValueShift,		"v8dbg_SmiValueShift"		},
 	{ &V8_PointerSizeLog2,		"v8dbg_PointerSizeLog2"		},
 
-	{ &V8_PROP_IDX_CONTENT,		"v8dbg_prop_idx_content"	},
 	{ &V8_PROP_IDX_FIRST,		"v8dbg_prop_idx_first"		},
 	{ &V8_PROP_TYPE_FIELD,		"v8dbg_prop_type_field"		},
 	{ &V8_PROP_FIRST_PHANTOM,	"v8dbg_prop_type_first_phantom"	},
@@ -206,6 +209,19 @@ static v8_constant_t v8_constants[] = {
 };
 
 static int v8_nconstants = sizeof (v8_constants) / sizeof (v8_constants[0]);
+
+/*
+ * Some constants are -- for a variety of reasons -- optional.
+ */
+static v8_constant_t v8_optionals[] = {
+	{ &V8_PROP_IDX_CONTENT,		"v8dbg_prop_idx_content"	},
+	{ &V8_PROP_DESC_KEY,		"v8dbg_prop_desc_key"		},
+	{ &V8_PROP_DESC_DETAILS,	"v8dbg_prop_desc_details"	},
+	{ &V8_PROP_DESC_VALUE,		"v8dbg_prop_desc_value"		},
+	{ &V8_PROP_DESC_SIZE,		"v8dbg_prop_desc_size"		}
+};
+
+static int v8_noptionals = sizeof (v8_optionals) / sizeof (v8_optionals[0]);
 
 typedef struct v8_offset {
 	ssize_t		*v8o_valp;
@@ -312,6 +328,32 @@ autoconfigure(v8_cfg_t *cfgp)
 			mdb_warn("failed to read \"%s\"", cnp->v8c_symbol);
 			return (-1);
 		}
+	}
+
+	/*
+	 * Load optional constants; if we fail to load an optional constant,
+	 * we'll set its value to be -1.
+	 */
+	for (ii = 0; ii < v8_noptionals; ii++) {
+		cnp = &v8_optionals[ii];
+
+		if (cfgp->v8cfg_readsym(cfgp, cnp->v8c_symbol,
+		    cnp->v8c_valp) == -1) {
+			*cnp->v8c_valp = -1;
+		}
+	}
+
+	/*
+	 * We need to do some cleanup here:  there are versions of node (in
+	 * particular, early v0.8 releases) in which v8dbg_prop_idx_content had
+	 * been removed but the descriptor variables had not yet been added;
+	 * we'll fill those in now with what we know those values to be.
+	 */
+	if (V8_PROP_IDX_CONTENT == -1 && V8_PROP_DESC_SIZE == -1) {
+		V8_PROP_DESC_KEY = 0;
+		V8_PROP_DESC_DETAILS = 1;
+		V8_PROP_DESC_VALUE = 2;
+		V8_PROP_DESC_SIZE = 3;
 	}
 
 	/*
@@ -1228,7 +1270,8 @@ jsobj_properties(uintptr_t addr,
 {
 	uintptr_t ptr, map;
 	uintptr_t *props = NULL, *descs = NULL, *content = NULL;
-	size_t ii, size, nprops, rndescs, ndescs, ncontent;
+	size_t size, nprops, ndescs, ncontent;
+	ssize_t ii, rndescs;
 	uint8_t type, ninprops;
 	int rval = -1;
 	size_t ps = sizeof (uintptr_t);
@@ -1267,26 +1310,58 @@ jsobj_properties(uintptr_t addr,
 	if (mdb_vread(&ninprops, 1, map + V8_OFF_MAP_INOBJECT_PROPERTIES) == -1)
 		goto err;
 
-	if (V8_PROP_IDX_CONTENT < ndescs &&
+	if (V8_PROP_IDX_CONTENT != -1 && V8_PROP_IDX_CONTENT < ndescs &&
 	    read_heap_array(descs[V8_PROP_IDX_CONTENT], &content,
 	    &ncontent, UM_SLEEP) != 0)
-		return (-1);
+		goto err;
 
-	/*
-	 * The first FIRST (2) entries in the descriptors array are special.
-	 */
-	rndescs = ndescs <= V8_PROP_IDX_FIRST ? 0 : ndescs - V8_PROP_IDX_FIRST;
+	if ((V8_PROP_IDX_CONTENT == -1 && V8_PROP_DESC_SIZE == -1) ||
+	    (V8_PROP_IDX_CONTENT != -1 && V8_PROP_DESC_SIZE != -1)) {
+		/*
+		 * Exactly one of these must be set; if they're both unset or
+		 * both set (that is, if the -- ahem -- logical xor of being
+		 * set evaluates to false), we have a misconfiguration.
+		 */
+		mdb_warn("v8dbg_prop_idx_content (%ld) is inconsistent with "
+		    "v8dbg_prop_desc_size (%ld); cannot read properties\n",
+		    V8_PROP_IDX_CONTENT, V8_PROP_DESC_SIZE);
+		goto err;
+	}
+
+	if (V8_PROP_IDX_CONTENT == -1) {
+		/*
+		 * On node v0.8 and later, the content is not stored in an
+		 * orthogonal FixedArray, but rather with the descriptors.
+		 */
+		content = descs;
+		ncontent = ndescs;
+		rndescs = (ndescs - V8_PROP_IDX_FIRST) / V8_PROP_DESC_SIZE;
+	} else {
+		rndescs = ndescs - V8_PROP_IDX_FIRST;
+	}
 
 	for (ii = 0; ii < rndescs; ii++) {
-		uintptr_t keyidx, validx, detidx;
+		uintptr_t keyidx, validx, detidx, baseidx;
 		char buf[1024];
 		intptr_t val;
 		uint_t len = sizeof (buf);
 		char *c = buf;
 
-		keyidx = V8_DESC_KEYIDX(ii);
-		validx = V8_DESC_VALIDX(ii);
-		detidx = V8_DESC_DETIDX(ii);
+		if (V8_PROP_IDX_CONTENT != -1) {
+			/*
+			 * In node versions prior to v0.8, this was hardcoded
+			 * in the V8 implementation, so we hardcode it here
+			 * as well.
+			 */
+			keyidx = ii + V8_PROP_IDX_FIRST;
+			validx = ii << 1;
+			detidx = (ii << 1) + 1;
+		} else {
+			baseidx = V8_PROP_IDX_FIRST + (ii * V8_PROP_DESC_SIZE);
+			keyidx = baseidx + V8_PROP_DESC_KEY;
+			validx = baseidx + V8_PROP_DESC_VALUE;
+			detidx = baseidx + V8_PROP_DESC_DETAILS;
+		}
 
 		if (detidx >= ncontent) {
 			v8_warn("property descriptor %d: detidx (%d) "
@@ -1295,7 +1370,7 @@ jsobj_properties(uintptr_t addr,
 			continue;
 		}
 
-		if (!V8_DESC_ISFIELD(content[detidx]))
+		if (content != descs && !V8_DESC_ISFIELD(content[detidx]))
 			continue;
 
 		if (keyidx >= ndescs) {
@@ -1351,7 +1426,7 @@ err:
 	if (descs != NULL)
 		mdb_free(descs, ndescs * sizeof (uintptr_t));
 
-	if (content != NULL)
+	if (content != NULL && V8_PROP_IDX_CONTENT != -1)
 		mdb_free(content, ncontent * sizeof (uintptr_t));
 
 	return (rval);
