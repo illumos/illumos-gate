@@ -578,8 +578,47 @@ cap_poke_waitq(cpucap_t *cap, int64_t gen)
 
 		cap->cap_below++;
 
-		if (!waitq_isempty(wq))
-			waitq_runone(wq);
+		if (!waitq_isempty(wq)) {
+			int i, ndequeue, p;
+
+			/*
+			 * Since this function is only called once per tick,
+			 * we can hit a situation where we have artificially
+			 * limited the project/zone below its cap.  This would
+			 * happen if we have multiple threads queued up but
+			 * only dequeued one thread/tick. To avoid this we
+			 * dequeue multiple threads, calculated based on the
+			 * usage percentage of the cap. It is possible that we
+			 * could dequeue too many threads and some of them
+			 * might be put back on the wait queue quickly, but
+			 * since we know that threads are on the wait queue
+			 * because we're capping, we know that there is unused
+			 * CPU cycles anyway, so this extra work would not
+			 * hurt. Also, the ndequeue number is only an upper
+			 * bound and we might dequeue less, depending on how
+			 * many threads are actually in the wait queue. The
+			 * ndequeue values are empirically derived and could be
+			 * adjusted or calculated in another way if necessary.
+			 */
+			p = (int)((100 * cap->cap_usage) / cap->cap_chk_value);
+			if (p >= 98)
+				ndequeue = 10;
+			else if (p >= 95)
+				ndequeue = 20;
+			else if (p >= 90)
+				ndequeue = 40;
+			else if (p >= 85)
+				ndequeue = 80;
+			else
+				ndequeue = 160;
+
+			for (i = 0; i < ndequeue; i++) {
+				waitq_runone(wq);
+				if (waitq_isempty(wq))
+					break;
+			}
+			DTRACE_PROBE2(cpucaps__pokeq, int, p, int, i);
+		}
 	}
 }
 
