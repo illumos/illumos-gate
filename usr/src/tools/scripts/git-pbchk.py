@@ -24,6 +24,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 
 from cStringIO import StringIO
 
@@ -62,15 +63,24 @@ def git(command):
 
     command = ["git"] + command
 
-    p = subprocess.Popen(command,
-                         stdout=subprocess.PIPE,
-                         stderr=subprocess.STDOUT)
+    try:
+        tmpfile = tempfile.TemporaryFile(prefix="git-nits")
+    except EnvironmentError, e:
+        raise GitError("Could not create temporary file: %s\n" % e)
+
+    try:
+        p = subprocess.Popen(command,
+                             stdout=tmpfile,
+                             stderr=subprocess.STDOUT)
+    except OSError, e:
+        raise GitError("could not execute %s: %s\n" (command, e))
 
     err = p.wait()
     if err != 0:
         raise GitError(p.stdout.read())
 
-    return p.stdout
+    tmpfile.seek(0)
+    return tmpfile
 
 
 def git_root():

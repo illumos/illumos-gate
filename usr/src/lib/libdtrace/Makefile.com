@@ -20,7 +20,7 @@
 #
 #
 # Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2011 by Delphix. All rights reserved.
+# Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
 LIBRARY = libdtrace.a
@@ -52,6 +52,7 @@ LIBSRCS = \
 	dt_parser.c \
 	dt_pcb.c \
 	dt_pid.c \
+	dt_pq.c \
 	dt_pragma.c \
 	dt_print.c \
 	dt_printf.c \

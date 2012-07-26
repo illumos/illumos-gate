@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/systm.h>
@@ -2021,15 +2022,12 @@ openowner_mkkey(rfs4_entry_t u_entry)
 	return (&oo->ro_owner);
 }
 
+/* ARGSUSED */
 static bool_t
 rfs4_openowner_expiry(rfs4_entry_t u_entry)
 {
-	rfs4_openowner_t *oo = (rfs4_openowner_t *)u_entry;
-
-	if (rfs4_dbe_is_invalid(oo->ro_dbe))
-		return (TRUE);
-	return ((gethrestime_sec() - oo->ro_client->rc_last_access
-	    > rfs4_lease_time));
+	/* openstateid held us and did all needed delay */
+	return (TRUE);
 }
 
 static void
