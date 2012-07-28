@@ -98,7 +98,7 @@ s32 ixgbe_identify_phy_generic(struct ixgbe_hw *hw)
 		for (phy_addr = 0; phy_addr < IXGBE_MAX_PHY_ADDR; phy_addr++) {
 			if (ixgbe_validate_phy_addr(hw, phy_addr)) {
 				hw->phy.addr = phy_addr;
-				ixgbe_get_phy_id(hw);
+				(void) ixgbe_get_phy_id(hw);
 				hw->phy.type =
 					ixgbe_get_phy_type_from_id(hw->phy.id);
 
@@ -470,7 +470,7 @@ s32 ixgbe_write_phy_reg_generic(struct ixgbe_hw *hw, u32 reg_addr,
  **/
 s32 ixgbe_setup_phy_link_generic(struct ixgbe_hw *hw)
 {
-	s32 status = IXGBE_SUCCESS;
+	s32 status;
 	u32 time_out;
 	u32 max_time_out = 10;
 	u16 autoneg_reg = IXGBE_MII_AUTONEG_REG;
@@ -479,7 +479,10 @@ s32 ixgbe_setup_phy_link_generic(struct ixgbe_hw *hw)
 
 	DEBUGFUNC("ixgbe_setup_phy_link_generic");
 
-	ixgbe_get_copper_link_capabilities_generic(hw, &speed, &autoneg);
+	status =
+	    ixgbe_get_copper_link_capabilities_generic(hw, &speed, &autoneg);
+	if (status != IXGBE_SUCCESS)
+		return status;
 
 	if (speed & IXGBE_LINK_SPEED_10GB_FULL) {
 		/* Set or unset auto-negotiation 10G advertisement */
@@ -688,7 +691,7 @@ s32 ixgbe_check_phy_link_tnx(struct ixgbe_hw *hw, ixgbe_link_speed *speed,
  **/
 s32 ixgbe_setup_phy_link_tnx(struct ixgbe_hw *hw)
 {
-	s32 status = IXGBE_SUCCESS;
+	s32 status;
 	u32 time_out;
 	u32 max_time_out = 10;
 	u16 autoneg_reg = IXGBE_MII_AUTONEG_REG;
@@ -697,7 +700,10 @@ s32 ixgbe_setup_phy_link_tnx(struct ixgbe_hw *hw)
 
 	DEBUGFUNC("ixgbe_setup_phy_link_tnx");
 
-	ixgbe_get_copper_link_capabilities_generic(hw, &speed, &autoneg);
+	status =
+	    ixgbe_get_copper_link_capabilities_generic(hw, &speed, &autoneg);
+	if (status != IXGBE_SUCCESS)
+		return status;
 
 	if (speed & IXGBE_LINK_SPEED_10GB_FULL) {
 		/* Set or unset auto-negotiation 10G advertisement */
@@ -1185,7 +1191,7 @@ s32 ixgbe_identify_sfp_module_generic(struct ixgbe_hw *hw)
 			goto out;
 		}
 
-		ixgbe_get_device_caps(hw, &enforce_sfp);
+		(void) ixgbe_get_device_caps(hw, &enforce_sfp);
 		if (!(enforce_sfp & IXGBE_DEVICE_CAPS_ALLOW_ANY_SFP) &&
 		    !((hw->phy.sfp_type == ixgbe_sfp_type_1g_cu_core0) ||
 		      (hw->phy.sfp_type == ixgbe_sfp_type_1g_cu_core1) ||
@@ -1529,13 +1535,13 @@ static void ixgbe_i2c_start(struct ixgbe_hw *hw)
 	DEBUGFUNC("ixgbe_i2c_start");
 
 	/* Start condition must begin with data and clock high */
-	ixgbe_set_i2c_data(hw, &i2cctl, 1);
+	(void) ixgbe_set_i2c_data(hw, &i2cctl, 1);
 	ixgbe_raise_i2c_clk(hw, &i2cctl);
 
 	/* Setup time for start condition (4.7us) */
 	usec_delay(IXGBE_I2C_T_SU_STA);
 
-	ixgbe_set_i2c_data(hw, &i2cctl, 0);
+	(void) ixgbe_set_i2c_data(hw, &i2cctl, 0);
 
 	/* Hold time for start condition (4us) */
 	usec_delay(IXGBE_I2C_T_HD_STA);
@@ -1560,13 +1566,13 @@ static void ixgbe_i2c_stop(struct ixgbe_hw *hw)
 	DEBUGFUNC("ixgbe_i2c_stop");
 
 	/* Stop condition must begin with data low and clock high */
-	ixgbe_set_i2c_data(hw, &i2cctl, 0);
+	(void) ixgbe_set_i2c_data(hw, &i2cctl, 0);
 	ixgbe_raise_i2c_clk(hw, &i2cctl);
 
 	/* Setup time for stop condition (4us) */
 	usec_delay(IXGBE_I2C_T_SU_STO);
 
-	ixgbe_set_i2c_data(hw, &i2cctl, 1);
+	(void) ixgbe_set_i2c_data(hw, &i2cctl, 1);
 
 	/* bus free time between stop and start (4.7us)*/
 	usec_delay(IXGBE_I2C_T_BUF);
@@ -1581,17 +1587,19 @@ static void ixgbe_i2c_stop(struct ixgbe_hw *hw)
  **/
 static s32 ixgbe_clock_in_i2c_byte(struct ixgbe_hw *hw, u8 *data)
 {
-	s32 i;
+	s32 i, status = IXGBE_SUCCESS;
 	bool bit = 0;
 
 	DEBUGFUNC("ixgbe_clock_in_i2c_byte");
 
 	for (i = 7; i >= 0; i--) {
-		ixgbe_clock_in_i2c_bit(hw, &bit);
+		status = ixgbe_clock_in_i2c_bit(hw, &bit);
+		if (status != IXGBE_SUCCESS)
+			break;
 		*data |= bit << i;
 	}
 
-	return IXGBE_SUCCESS;
+	return status;
 }
 
 /**
@@ -1858,7 +1866,7 @@ void ixgbe_i2c_bus_clear(struct ixgbe_hw *hw)
 
 	ixgbe_i2c_start(hw);
 
-	ixgbe_set_i2c_data(hw, &i2cctl, 1);
+	(void) ixgbe_set_i2c_data(hw, &i2cctl, 1);
 
 	for (i = 0; i < 9; i++) {
 		ixgbe_raise_i2c_clk(hw, &i2cctl);

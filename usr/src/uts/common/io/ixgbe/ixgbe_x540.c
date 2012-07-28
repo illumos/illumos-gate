@@ -156,9 +156,7 @@ s32 ixgbe_get_link_capabilities_X540(struct ixgbe_hw *hw,
 				     ixgbe_link_speed *speed,
 				     bool *autoneg)
 {
-	ixgbe_get_copper_link_capabilities_generic(hw, speed, autoneg);
-
-	return IXGBE_SUCCESS;
+	return ixgbe_get_copper_link_capabilities_generic(hw, speed, autoneg);
 }
 
 /**
@@ -572,19 +570,21 @@ s32 ixgbe_validate_eeprom_checksum_X540(struct ixgbe_hw *hw,
 		 * Do not use hw->eeprom.ops.read because we do not want to take
 		 * the synchronization semaphores twice here.
 		*/
-		ixgbe_read_eerd_generic(hw, IXGBE_EEPROM_CHECKSUM,
+		status = ixgbe_read_eerd_generic(hw, IXGBE_EEPROM_CHECKSUM,
 					&read_checksum);
 
-		/*
-		 * Verify read checksum from EEPROM is the same as
-		 * calculated checksum
-		 */
-		if (read_checksum != checksum)
-			status = IXGBE_ERR_EEPROM_CHECKSUM;
+		if (status == IXGBE_SUCCESS) {
+			/*
+			 * Verify read checksum from EEPROM is the same as
+			 * calculated checksum
+			 */
+			if (read_checksum != checksum)
+				status = IXGBE_ERR_EEPROM_CHECKSUM;
 
-		/* If the user cares, return the calculated checksum */
-		if (checksum_val)
-			*checksum_val = checksum;
+			/* If the user cares, return the calculated checksum */
+			if (checksum_val)
+				*checksum_val = checksum;
+		}
 	} else {
 		status = IXGBE_ERR_SWFW_SYNC;
 	}
@@ -812,7 +812,7 @@ void ixgbe_release_swfw_sync_X540(struct ixgbe_hw *hw, u16 mask)
 
 	DEBUGFUNC("ixgbe_release_swfw_sync_X540");
 
-	ixgbe_get_swfw_sync_semaphore(hw);
+	(void) ixgbe_get_swfw_sync_semaphore(hw);
 
 	swfw_sync = IXGBE_READ_REG(hw, IXGBE_SWFW_SYNC);
 	swfw_sync &= ~swmask;

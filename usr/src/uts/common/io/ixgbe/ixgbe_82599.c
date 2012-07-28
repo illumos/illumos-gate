@@ -952,8 +952,11 @@ static s32 ixgbe_setup_copper_link_82599(struct ixgbe_hw *hw,
 	/* Setup the PHY according to input speed */
 	status = hw->phy.ops.setup_link_speed(hw, speed, autoneg,
 					      autoneg_wait_to_complete);
-	/* Set up MAC */
-	ixgbe_start_mac_link_82599(hw, autoneg_wait_to_complete);
+	if (status == IXGBE_SUCCESS) {
+		/* Set up MAC */
+		status =
+		    ixgbe_start_mac_link_82599(hw, autoneg_wait_to_complete);
+	}
 
 	return status;
 }
@@ -1174,11 +1177,11 @@ s32 ixgbe_reinit_fdir_tables_82599(struct ixgbe_hw *hw)
 	}
 
 	/* Clear FDIR statistics registers (read to clear) */
-	IXGBE_READ_REG(hw, IXGBE_FDIRUSTAT);
-	IXGBE_READ_REG(hw, IXGBE_FDIRFSTAT);
-	IXGBE_READ_REG(hw, IXGBE_FDIRMATCH);
-	IXGBE_READ_REG(hw, IXGBE_FDIRMISS);
-	IXGBE_READ_REG(hw, IXGBE_FDIRLEN);
+	(void) IXGBE_READ_REG(hw, IXGBE_FDIRUSTAT);
+	(void) IXGBE_READ_REG(hw, IXGBE_FDIRFSTAT);
+	(void) IXGBE_READ_REG(hw, IXGBE_FDIRMATCH);
+	(void) IXGBE_READ_REG(hw, IXGBE_FDIRMISS);
+	(void) IXGBE_READ_REG(hw, IXGBE_FDIRLEN);
 
 	return IXGBE_SUCCESS;
 }
@@ -1289,6 +1292,9 @@ s32 ixgbe_init_fdir_perfect_82599(struct ixgbe_hw *hw, u32 fdirctrl)
  */
 #define IXGBE_ATR_COMMON_HASH_KEY \
 		(IXGBE_ATR_BUCKET_HASH_KEY & IXGBE_ATR_SIGNATURE_HASH_KEY)
+#if lint
+#define IXGBE_COMPUTE_SIG_HASH_ITERATION(_n)
+#else
 #define IXGBE_COMPUTE_SIG_HASH_ITERATION(_n) \
 do { \
 	u32 n = (_n); \
@@ -1305,6 +1311,7 @@ do { \
 	else if (IXGBE_ATR_SIGNATURE_HASH_KEY & (0x01 << (n + 16))) \
 		sig_hash ^= hi_hash_dword << (16 - n); \
 } while (0);
+#endif
 
 /**
  *  ixgbe_atr_compute_sig_hash_82599 - Compute the signature hash
@@ -1425,6 +1432,9 @@ s32 ixgbe_fdir_add_signature_filter_82599(struct ixgbe_hw *hw,
 	return IXGBE_SUCCESS;
 }
 
+#if lint
+#define IXGBE_COMPUTE_BKT_HASH_ITERATION(_n)
+#else
 #define IXGBE_COMPUTE_BKT_HASH_ITERATION(_n) \
 do { \
 	u32 n = (_n); \
@@ -1433,7 +1443,7 @@ do { \
 	if (IXGBE_ATR_BUCKET_HASH_KEY & (0x01 << (n + 16))) \
 		bucket_hash ^= hi_hash_dword >> n; \
 } while (0);
-
+#endif
 /**
  *  ixgbe_atr_compute_perfect_hash_82599 - Compute the perfect filter hash
  *  @atr_input: input bitstream to compute the hash on
@@ -1584,6 +1594,7 @@ s32 ixgbe_fdir_set_input_mask_82599(struct ixgbe_hw *hw,
 	switch (input_mask->formatted.vm_pool & 0x7F) {
 	case 0x0:
 		fdirm |= IXGBE_FDIRM_POOL;
+		/* FALLTHRU */
 	case 0x7F:
 		break;
 	default:
@@ -1599,6 +1610,7 @@ s32 ixgbe_fdir_set_input_mask_82599(struct ixgbe_hw *hw,
 			DEBUGOUT(" Error on src/dst port mask\n");
 			return IXGBE_ERR_CONFIG;
 		}
+		/* FALLTHRU */
 	case IXGBE_ATR_L4TYPE_MASK:
 		break;
 	default:
@@ -1610,6 +1622,7 @@ s32 ixgbe_fdir_set_input_mask_82599(struct ixgbe_hw *hw,
 	case 0x0000:
 		/* mask VLAN ID, fall through to mask VLAN priority */
 		fdirm |= IXGBE_FDIRM_VLANID;
+		/* FALLTHRU */
 	case 0x0FFF:
 		/* mask VLAN priority */
 		fdirm |= IXGBE_FDIRM_VLANP;
@@ -1617,6 +1630,7 @@ s32 ixgbe_fdir_set_input_mask_82599(struct ixgbe_hw *hw,
 	case 0xE000:
 		/* mask VLAN ID only, fall through */
 		fdirm |= IXGBE_FDIRM_VLANID;
+		/* FALLTHRU */
 	case 0xEFFF:
 		/* no VLAN fields masked */
 		break;
@@ -1629,6 +1643,7 @@ s32 ixgbe_fdir_set_input_mask_82599(struct ixgbe_hw *hw,
 	case 0x0000:
 		/* Mask Flex Bytes, fall through */
 		fdirm |= IXGBE_FDIRM_FLEX;
+		/* FALLTHRU */
 	case 0xFFFF:
 		break;
 	default:
@@ -1794,6 +1809,7 @@ s32 ixgbe_fdir_add_perfect_filter_82599(struct ixgbe_hw *hw,
 			DEBUGOUT(" Error on src/dst port\n");
 			return IXGBE_ERR_CONFIG;
 		}
+		/* FALLTHRU */
 	case IXGBE_ATR_FLOW_TYPE_TCPV4:
 	case IXGBE_ATR_FLOW_TYPE_UDPV4:
 		input_mask->formatted.flow_type = IXGBE_ATR_L4TYPE_IPV6_MASK |

@@ -56,7 +56,9 @@ s32 ixgbe_init_shared_code(struct ixgbe_hw *hw)
 	/*
 	 * Set the mac type
 	 */
-	ixgbe_set_mac_type(hw);
+	status = ixgbe_set_mac_type(hw);
+	if (status != IXGBE_SUCCESS)
+		return (status);
 
 	switch (hw->mac.type) {
 	case ixgbe_mac_82598EB:
@@ -448,11 +450,19 @@ s32 ixgbe_get_phy_firmware_version(struct ixgbe_hw *hw, u16 *firmware_version)
 s32 ixgbe_read_phy_reg(struct ixgbe_hw *hw, u32 reg_addr, u32 device_type,
 		       u16 *phy_data)
 {
-	if (hw->phy.id == 0)
-		ixgbe_identify_phy(hw);
+	s32 status;
 
-	return ixgbe_call_func(hw, hw->phy.ops.read_reg, (hw, reg_addr,
-			       device_type, phy_data), IXGBE_NOT_IMPLEMENTED);
+	if (hw->phy.id == 0)
+		status = ixgbe_identify_phy(hw);
+	else
+		status = IXGBE_SUCCESS;
+
+	if (status == IXGBE_SUCCESS) {
+		status = ixgbe_call_func(hw, hw->phy.ops.read_reg,
+		    (hw, reg_addr, device_type, phy_data),
+		    IXGBE_NOT_IMPLEMENTED);
+	}
+	return (status);
 }
 
 /**
@@ -466,11 +476,20 @@ s32 ixgbe_read_phy_reg(struct ixgbe_hw *hw, u32 reg_addr, u32 device_type,
 s32 ixgbe_write_phy_reg(struct ixgbe_hw *hw, u32 reg_addr, u32 device_type,
 			u16 phy_data)
 {
-	if (hw->phy.id == 0)
-		ixgbe_identify_phy(hw);
+	s32 status;
 
-	return ixgbe_call_func(hw, hw->phy.ops.write_reg, (hw, reg_addr,
-			       device_type, phy_data), IXGBE_NOT_IMPLEMENTED);
+	if (hw->phy.id == 0)
+		status = ixgbe_identify_phy(hw);
+	else
+		status = IXGBE_SUCCESS;
+
+	if (status == IXGBE_SUCCESS) {
+		status = ixgbe_call_func(hw, hw->phy.ops.write_reg,
+		    (hw, reg_addr, device_type, phy_data),
+		    IXGBE_NOT_IMPLEMENTED);
+	}
+
+	return status;
 }
 
 /**

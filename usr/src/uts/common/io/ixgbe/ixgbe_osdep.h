@@ -111,7 +111,12 @@ void ixgbe_write_pci_cfg(struct ixgbe_hw *, uint32_t, uint32_t);
 #define IXGBE_LE32_TO_CPUS 	BSWAP_32
 #else
 #define IXGBE_CPU_TO_LE32(x)	(x)
+#if lint
+/* Use lint-happy operation... */
+#define IXGBE_LE32_TO_CPUS(x)
+#else
 #define IXGBE_LE32_TO_CPUS(x)	(x) 
+#endif /* lint */
 #endif	/* _BIG_ENDIAN */
 
 #define	UNREFERENCED_PARAMETER(x)		_NOTE(ARGUNUSED(x))

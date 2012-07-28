@@ -432,94 +432,94 @@ s32 ixgbe_clear_hw_cntrs_generic(struct ixgbe_hw *hw)
 
 	DEBUGFUNC("ixgbe_clear_hw_cntrs_generic");
 
-	IXGBE_READ_REG(hw, IXGBE_CRCERRS);
-	IXGBE_READ_REG(hw, IXGBE_ILLERRC);
-	IXGBE_READ_REG(hw, IXGBE_ERRBC);
-	IXGBE_READ_REG(hw, IXGBE_MSPDC);
+	(void) IXGBE_READ_REG(hw, IXGBE_CRCERRS);
+	(void) IXGBE_READ_REG(hw, IXGBE_ILLERRC);
+	(void) IXGBE_READ_REG(hw, IXGBE_ERRBC);
+	(void) IXGBE_READ_REG(hw, IXGBE_MSPDC);
 	for (i = 0; i < 8; i++)
-		IXGBE_READ_REG(hw, IXGBE_MPC(i));
+		(void) IXGBE_READ_REG(hw, IXGBE_MPC(i));
 
-	IXGBE_READ_REG(hw, IXGBE_MLFC);
-	IXGBE_READ_REG(hw, IXGBE_MRFC);
-	IXGBE_READ_REG(hw, IXGBE_RLEC);
-	IXGBE_READ_REG(hw, IXGBE_LXONTXC);
-	IXGBE_READ_REG(hw, IXGBE_LXOFFTXC);
+	(void) IXGBE_READ_REG(hw, IXGBE_MLFC);
+	(void) IXGBE_READ_REG(hw, IXGBE_MRFC);
+	(void) IXGBE_READ_REG(hw, IXGBE_RLEC);
+	(void) IXGBE_READ_REG(hw, IXGBE_LXONTXC);
+	(void) IXGBE_READ_REG(hw, IXGBE_LXOFFTXC);
 	if (hw->mac.type >= ixgbe_mac_82599EB) {
-		IXGBE_READ_REG(hw, IXGBE_LXONRXCNT);
-		IXGBE_READ_REG(hw, IXGBE_LXOFFRXCNT);
+		(void) IXGBE_READ_REG(hw, IXGBE_LXONRXCNT);
+		(void) IXGBE_READ_REG(hw, IXGBE_LXOFFRXCNT);
 	} else {
-		IXGBE_READ_REG(hw, IXGBE_LXONRXC);
-		IXGBE_READ_REG(hw, IXGBE_LXOFFRXC);
+		(void) IXGBE_READ_REG(hw, IXGBE_LXONRXC);
+		(void) IXGBE_READ_REG(hw, IXGBE_LXOFFRXC);
 	}
 
 	for (i = 0; i < 8; i++) {
-		IXGBE_READ_REG(hw, IXGBE_PXONTXC(i));
-		IXGBE_READ_REG(hw, IXGBE_PXOFFTXC(i));
+		(void) IXGBE_READ_REG(hw, IXGBE_PXONTXC(i));
+		(void) IXGBE_READ_REG(hw, IXGBE_PXOFFTXC(i));
 		if (hw->mac.type >= ixgbe_mac_82599EB) {
-			IXGBE_READ_REG(hw, IXGBE_PXONRXCNT(i));
-			IXGBE_READ_REG(hw, IXGBE_PXOFFRXCNT(i));
+			(void) IXGBE_READ_REG(hw, IXGBE_PXONRXCNT(i));
+			(void) IXGBE_READ_REG(hw, IXGBE_PXOFFRXCNT(i));
 		} else {
-			IXGBE_READ_REG(hw, IXGBE_PXONRXC(i));
-			IXGBE_READ_REG(hw, IXGBE_PXOFFRXC(i));
+			(void) IXGBE_READ_REG(hw, IXGBE_PXONRXC(i));
+			(void) IXGBE_READ_REG(hw, IXGBE_PXOFFRXC(i));
 		}
 	}
 	if (hw->mac.type >= ixgbe_mac_82599EB)
 		for (i = 0; i < 8; i++)
-			IXGBE_READ_REG(hw, IXGBE_PXON2OFFCNT(i));
-	IXGBE_READ_REG(hw, IXGBE_PRC64);
-	IXGBE_READ_REG(hw, IXGBE_PRC127);
-	IXGBE_READ_REG(hw, IXGBE_PRC255);
-	IXGBE_READ_REG(hw, IXGBE_PRC511);
-	IXGBE_READ_REG(hw, IXGBE_PRC1023);
-	IXGBE_READ_REG(hw, IXGBE_PRC1522);
-	IXGBE_READ_REG(hw, IXGBE_GPRC);
-	IXGBE_READ_REG(hw, IXGBE_BPRC);
-	IXGBE_READ_REG(hw, IXGBE_MPRC);
-	IXGBE_READ_REG(hw, IXGBE_GPTC);
-	IXGBE_READ_REG(hw, IXGBE_GORCL);
-	IXGBE_READ_REG(hw, IXGBE_GORCH);
-	IXGBE_READ_REG(hw, IXGBE_GOTCL);
-	IXGBE_READ_REG(hw, IXGBE_GOTCH);
+			(void) IXGBE_READ_REG(hw, IXGBE_PXON2OFFCNT(i));
+	(void) IXGBE_READ_REG(hw, IXGBE_PRC64);
+	(void) IXGBE_READ_REG(hw, IXGBE_PRC127);
+	(void) IXGBE_READ_REG(hw, IXGBE_PRC255);
+	(void) IXGBE_READ_REG(hw, IXGBE_PRC511);
+	(void) IXGBE_READ_REG(hw, IXGBE_PRC1023);
+	(void) IXGBE_READ_REG(hw, IXGBE_PRC1522);
+	(void) IXGBE_READ_REG(hw, IXGBE_GPRC);
+	(void) IXGBE_READ_REG(hw, IXGBE_BPRC);
+	(void) IXGBE_READ_REG(hw, IXGBE_MPRC);
+	(void) IXGBE_READ_REG(hw, IXGBE_GPTC);
+	(void) IXGBE_READ_REG(hw, IXGBE_GORCL);
+	(void) IXGBE_READ_REG(hw, IXGBE_GORCH);
+	(void) IXGBE_READ_REG(hw, IXGBE_GOTCL);
+	(void) IXGBE_READ_REG(hw, IXGBE_GOTCH);
 	if (hw->mac.type == ixgbe_mac_82598EB)
 		for (i = 0; i < 8; i++)
-			IXGBE_READ_REG(hw, IXGBE_RNBC(i));
-	IXGBE_READ_REG(hw, IXGBE_RUC);
-	IXGBE_READ_REG(hw, IXGBE_RFC);
-	IXGBE_READ_REG(hw, IXGBE_ROC);
-	IXGBE_READ_REG(hw, IXGBE_RJC);
-	IXGBE_READ_REG(hw, IXGBE_MNGPRC);
-	IXGBE_READ_REG(hw, IXGBE_MNGPDC);
-	IXGBE_READ_REG(hw, IXGBE_MNGPTC);
-	IXGBE_READ_REG(hw, IXGBE_TORL);
-	IXGBE_READ_REG(hw, IXGBE_TORH);
-	IXGBE_READ_REG(hw, IXGBE_TPR);
-	IXGBE_READ_REG(hw, IXGBE_TPT);
-	IXGBE_READ_REG(hw, IXGBE_PTC64);
-	IXGBE_READ_REG(hw, IXGBE_PTC127);
-	IXGBE_READ_REG(hw, IXGBE_PTC255);
-	IXGBE_READ_REG(hw, IXGBE_PTC511);
-	IXGBE_READ_REG(hw, IXGBE_PTC1023);
-	IXGBE_READ_REG(hw, IXGBE_PTC1522);
-	IXGBE_READ_REG(hw, IXGBE_MPTC);
-	IXGBE_READ_REG(hw, IXGBE_BPTC);
+			(void) IXGBE_READ_REG(hw, IXGBE_RNBC(i));
+	(void) IXGBE_READ_REG(hw, IXGBE_RUC);
+	(void) IXGBE_READ_REG(hw, IXGBE_RFC);
+	(void) IXGBE_READ_REG(hw, IXGBE_ROC);
+	(void) IXGBE_READ_REG(hw, IXGBE_RJC);
+	(void) IXGBE_READ_REG(hw, IXGBE_MNGPRC);
+	(void) IXGBE_READ_REG(hw, IXGBE_MNGPDC);
+	(void) IXGBE_READ_REG(hw, IXGBE_MNGPTC);
+	(void) IXGBE_READ_REG(hw, IXGBE_TORL);
+	(void) IXGBE_READ_REG(hw, IXGBE_TORH);
+	(void) IXGBE_READ_REG(hw, IXGBE_TPR);
+	(void) IXGBE_READ_REG(hw, IXGBE_TPT);
+	(void) IXGBE_READ_REG(hw, IXGBE_PTC64);
+	(void) IXGBE_READ_REG(hw, IXGBE_PTC127);
+	(void) IXGBE_READ_REG(hw, IXGBE_PTC255);
+	(void) IXGBE_READ_REG(hw, IXGBE_PTC511);
+	(void) IXGBE_READ_REG(hw, IXGBE_PTC1023);
+	(void) IXGBE_READ_REG(hw, IXGBE_PTC1522);
+	(void) IXGBE_READ_REG(hw, IXGBE_MPTC);
+	(void) IXGBE_READ_REG(hw, IXGBE_BPTC);
 	for (i = 0; i < 16; i++) {
-		IXGBE_READ_REG(hw, IXGBE_QPRC(i));
-		IXGBE_READ_REG(hw, IXGBE_QPTC(i));
+		(void) IXGBE_READ_REG(hw, IXGBE_QPRC(i));
+		(void) IXGBE_READ_REG(hw, IXGBE_QPTC(i));
 		if (hw->mac.type >= ixgbe_mac_82599EB) {
-			IXGBE_READ_REG(hw, IXGBE_QBRC_L(i));
-			IXGBE_READ_REG(hw, IXGBE_QBRC_H(i));
-			IXGBE_READ_REG(hw, IXGBE_QBTC_L(i));
-			IXGBE_READ_REG(hw, IXGBE_QBTC_H(i));
-			IXGBE_READ_REG(hw, IXGBE_QPRDC(i));
+			(void) IXGBE_READ_REG(hw, IXGBE_QBRC_L(i));
+			(void) IXGBE_READ_REG(hw, IXGBE_QBRC_H(i));
+			(void) IXGBE_READ_REG(hw, IXGBE_QBTC_L(i));
+			(void) IXGBE_READ_REG(hw, IXGBE_QBTC_H(i));
+			(void) IXGBE_READ_REG(hw, IXGBE_QPRDC(i));
 		} else {
-			IXGBE_READ_REG(hw, IXGBE_QBRC(i));
-			IXGBE_READ_REG(hw, IXGBE_QBTC(i));
+			(void) IXGBE_READ_REG(hw, IXGBE_QBRC(i));
+			(void) IXGBE_READ_REG(hw, IXGBE_QBTC(i));
 		}
 	}
 
 	if (hw->mac.type == ixgbe_mac_X540) {
 		if (hw->phy.id == 0)
-			ixgbe_identify_phy(hw);
+			(void) ixgbe_identify_phy(hw);
 		hw->phy.ops.read_reg(hw, IXGBE_PCRC8ECL,
 				     IXGBE_MDIO_PCS_DEV_TYPE, &i);
 		hw->phy.ops.read_reg(hw, IXGBE_PCRC8ECH,
@@ -816,7 +816,7 @@ s32 ixgbe_stop_adapter_generic(struct ixgbe_hw *hw)
 	IXGBE_WRITE_REG(hw, IXGBE_EIMC, IXGBE_IRQ_CLEAR_MASK);
 
 	/* Clear any pending interrupts, flush previous writes */
-	IXGBE_READ_REG(hw, IXGBE_EICR);
+	(void) IXGBE_READ_REG(hw, IXGBE_EICR);
 
 	/* Disable the transmit unit.  Each queue must be disabled. */
 	for (i = 0; i < hw->mac.max_tx_queues; i++)
@@ -969,7 +969,9 @@ s32 ixgbe_write_eeprom_buffer_bit_bang_generic(struct ixgbe_hw *hw, u16 offset,
 	 */
 	if ((hw->eeprom.word_page_size == 0) &&
 	    (words > IXGBE_EEPROM_PAGE_SIZE_MAX))
-		ixgbe_detect_eeprom_page_size_generic(hw, offset);
+		status = ixgbe_detect_eeprom_page_size_generic(hw, offset);
+	if (status != IXGBE_SUCCESS)
+		goto out;
 
 	/*
 	 * We cannot hold synchronization semaphores for too long
@@ -2136,9 +2138,8 @@ s32 ixgbe_init_rx_addrs_generic(struct ixgbe_hw *hw)
 	for (i = 0; i < hw->mac.mcft_size; i++)
 		IXGBE_WRITE_REG(hw, IXGBE_MTA(i), 0);
 
-	ixgbe_init_uta_tables(hw);
-
-	return IXGBE_SUCCESS;
+	/* Should always be IXGBE_SUCCESS. */
+	return ixgbe_init_uta_tables(hw);
 }
 
 /**
@@ -2350,7 +2351,8 @@ s32 ixgbe_update_mc_addr_list_generic(struct ixgbe_hw *hw, u8 *mc_addr_list,
 	/* Clear mta_shadow */
 	if (clear) {
 		DEBUGOUT(" Clearing MTA\n");
-		memset(&hw->mac.mta_shadow, 0, sizeof(hw->mac.mta_shadow));
+		(void) memset(&hw->mac.mta_shadow, 0,
+		    sizeof(hw->mac.mta_shadow));
 	}
 
 	/* Update mta_shadow */
@@ -2870,7 +2872,7 @@ void ixgbe_release_swfw_sync(struct ixgbe_hw *hw, u16 mask)
 
 	DEBUGFUNC("ixgbe_release_swfw_sync");
 
-	ixgbe_get_eeprom_semaphore(hw);
+	(void) ixgbe_get_eeprom_semaphore(hw);
 
 	gssr = IXGBE_READ_REG(hw, IXGBE_GSSR);
 	gssr &= ~swmask;
@@ -3058,7 +3060,7 @@ s32 ixgbe_get_san_mac_addr_generic(struct ixgbe_hw *hw, u8 *san_mac_addr)
 	 * First read the EEPROM pointer to see if the MAC addresses are
 	 * available.  If they're not, no point in calling set_lan_id() here.
 	 */
-	ixgbe_get_san_mac_addr_offset(hw, &san_mac_offset);
+	(void) ixgbe_get_san_mac_addr_offset(hw, &san_mac_offset);
 
 	if ((san_mac_offset == 0) || (san_mac_offset == 0xFFFF)) {
 		/*
@@ -3103,7 +3105,7 @@ s32 ixgbe_set_san_mac_addr_generic(struct ixgbe_hw *hw, u8 *san_mac_addr)
 	DEBUGFUNC("ixgbe_set_san_mac_addr_generic");
 
 	/* Look for SAN mac address pointer.  If not defined, return */
-	ixgbe_get_san_mac_addr_offset(hw, &san_mac_offset);
+	(void) ixgbe_get_san_mac_addr_offset(hw, &san_mac_offset);
 
 	if ((san_mac_offset == 0) || (san_mac_offset == 0xFFFF)) {
 		status = IXGBE_ERR_NO_SAN_ADDR_PTR;
@@ -3213,14 +3215,14 @@ s32 ixgbe_insert_mac_addr_generic(struct ixgbe_hw *hw, u8 *addr, u32 vmdq)
 
 	if (rar < hw->mac.rar_highwater) {
 		/* already there so just add to the pool bits */
-		ixgbe_set_vmdq(hw, rar, vmdq);
+		(void) ixgbe_set_vmdq(hw, rar, vmdq);
 	} else if (first_empty_rar != NO_EMPTY_RAR_FOUND) {
 		/* stick it into first empty RAR slot we found */
 		rar = first_empty_rar;
-		ixgbe_set_rar(hw, rar, addr, vmdq, IXGBE_RAH_AV);
+		(void) ixgbe_set_rar(hw, rar, addr, vmdq, IXGBE_RAH_AV);
 	} else if (rar == hw->mac.rar_highwater) {
 		/* add it to the top of the list and inc the highwater mark */
-		ixgbe_set_rar(hw, rar, addr, vmdq, IXGBE_RAH_AV);
+		(void) ixgbe_set_rar(hw, rar, addr, vmdq, IXGBE_RAH_AV);
 		hw->mac.rar_highwater++;
 	} else if (rar >= hw->mac.num_rar_entries) {
 		return IXGBE_ERR_INVALID_MAC_ADDR;
@@ -3231,7 +3233,7 @@ s32 ixgbe_insert_mac_addr_generic(struct ixgbe_hw *hw, u8 *addr, u32 vmdq)
 	 * remains cleared to be sure default pool packets will get delivered
 	 */
 	if (rar == 0)
-		ixgbe_clear_vmdq(hw, rar, 0);
+		(void) ixgbe_clear_vmdq(hw, rar, 0);
 
 	return rar;
 }
@@ -4037,6 +4039,7 @@ s32 ixgbe_set_fw_drv_ver_generic(struct ixgbe_hw *hw, u8 maj, u8 min,
 	fw_cmd.pad2 = 0;
 
 	for (i = 0; i <= FW_CEM_MAX_RETRIES; i++) {
+		/* LINTED */
 		ret_val = ixgbe_host_interface_command(hw, (u32 *)&fw_cmd,
 						       sizeof(fw_cmd));
 		if (ret_val != IXGBE_SUCCESS)
@@ -4090,6 +4093,7 @@ void ixgbe_set_rxpba_generic(struct ixgbe_hw *hw, int num_pb, u32 headroom,
 		for (; i < (num_pb / 2); i++)
 			IXGBE_WRITE_REG(hw, IXGBE_RXPBSIZE(i), rxpktsize);
 		/* Fall through to configure remaining packet buffers */
+		/* FALLTHRU */
 	case PBA_STRATEGY_EQUAL:
 		rxpktsize = (pbsize / (num_pb - i)) << IXGBE_RXPBSIZE_SHIFT;
 		for (; i < num_pb; i++)

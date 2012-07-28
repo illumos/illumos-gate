@@ -36,11 +36,16 @@
 #define _IXGBE_COMMON_H_
 
 #include "ixgbe_type.h"
+#if lint
+/* Use "hw" somehow... */
+#define IXGBE_WRITE_REG64(hw, reg, value) hw = hw
+#else
 #define IXGBE_WRITE_REG64(hw, reg, value) \
 	do { \
 		IXGBE_WRITE_REG(hw, reg, (u32) value); \
 		IXGBE_WRITE_REG(hw, reg + 4, (u32) (value >> 32)); \
 	} while (0)
+#endif
 
 u16 ixgbe_get_pcie_msix_count_generic(struct ixgbe_hw *hw);
 

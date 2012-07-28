@@ -429,8 +429,12 @@ static s32 ixgbe_write_mbx_vf(struct ixgbe_hw *hw, u32 *msg, u16 size,
 		goto out_no_write;
 
 	/* flush msg and acks as we are overwriting the message buffer */
-	ixgbe_check_for_msg_vf(hw, 0);
-	ixgbe_check_for_ack_vf(hw, 0);
+	ret_val = ixgbe_check_for_msg_vf(hw, 0);
+	if (ret_val)
+		goto out_no_write;
+	ret_val = ixgbe_check_for_ack_vf(hw, 0);
+	if (ret_val)
+		goto out_no_write;
 
 	/* copy the caller specified message to the mailbox memory buffer */
 	for (i = 0; i < size; i++)
@@ -660,8 +664,12 @@ static s32 ixgbe_write_mbx_pf(struct ixgbe_hw *hw, u32 *msg, u16 size,
 		goto out_no_write;
 
 	/* flush msg and acks as we are overwriting the message buffer */
-	ixgbe_check_for_msg_pf(hw, vf_number);
-	ixgbe_check_for_ack_pf(hw, vf_number);
+	ret_val = ixgbe_check_for_msg_vf(hw, 0);
+	if (ret_val)
+		goto out_no_write;
+	ret_val = ixgbe_check_for_ack_vf(hw, 0);
+	if (ret_val)
+		goto out_no_write;
 
 	/* copy the caller specified message to the mailbox memory buffer */
 	for (i = 0; i < size; i++)

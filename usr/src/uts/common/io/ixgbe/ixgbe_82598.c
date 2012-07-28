@@ -720,7 +720,7 @@ static s32 ixgbe_setup_mac_link_82598(struct ixgbe_hw *hw,
 				      ixgbe_link_speed speed, bool autoneg,
 				      bool autoneg_wait_to_complete)
 {
-	s32 status = IXGBE_SUCCESS;
+	s32 status;
 	ixgbe_link_speed link_capabilities = IXGBE_LINK_SPEED_UNKNOWN;
 	u32 curr_autoc = IXGBE_READ_REG(hw, IXGBE_AUTOC);
 	u32 autoc = curr_autoc;
@@ -729,7 +729,9 @@ static s32 ixgbe_setup_mac_link_82598(struct ixgbe_hw *hw,
 	DEBUGFUNC("ixgbe_setup_mac_link_82598");
 
 	/* Check to see if speed passed in is supported. */
-	ixgbe_get_link_capabilities(hw, &link_capabilities, &autoneg);
+	status = ixgbe_get_link_capabilities(hw, &link_capabilities, &autoneg);
+	if (status != IXGBE_SUCCESS)
+		return (status);
 	speed &= link_capabilities;
 
 	if (speed == IXGBE_LINK_SPEED_UNKNOWN)
@@ -782,8 +784,11 @@ static s32 ixgbe_setup_copper_link_82598(struct ixgbe_hw *hw,
 	/* Setup the PHY according to input speed */
 	status = hw->phy.ops.setup_link_speed(hw, speed, autoneg,
 					      autoneg_wait_to_complete);
-	/* Set up MAC */
-	ixgbe_start_mac_link_82598(hw, autoneg_wait_to_complete);
+	if (status == IXGBE_SUCCESS) {
+		/* Set up MAC */
+		status =
+		    ixgbe_start_mac_link_82598(hw, autoneg_wait_to_complete);
+	}
 
 	return status;
 }
@@ -1357,6 +1362,7 @@ static void ixgbe_set_rxpba_82598(struct ixgbe_hw *hw, int num_pb,
 		/* Setup the last four at 48KB...don't re-init i */
 		rxpktsize = IXGBE_RXPBSIZE_48KB;
 		/* Fall Through */
+		/* FALLTHRU */
 	case PBA_STRATEGY_EQUAL:
 	default:
 		/* Divide the remaining Rx packet buffer evenly among the TCs */
@@ -1368,6 +1374,4 @@ static void ixgbe_set_rxpba_82598(struct ixgbe_hw *hw, int num_pb,
 	/* Setup Tx packet buffer sizes */
 	for (i = 0; i < IXGBE_MAX_PACKET_BUFFERS; i++)
 		IXGBE_WRITE_REG(hw, IXGBE_TXPBSIZE(i), IXGBE_TXPBSIZE_40KB);
-
-	return;
 }
