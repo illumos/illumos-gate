@@ -25,6 +25,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include "ixgbe_sw.h"
@@ -710,13 +711,15 @@ ixgbe_set_priv_prop(ixgbe_t *ixgbe, const char *pr_name,
 			ixgbe->intr_throttling[0] = (uint32_t)result;
 
 			/*
-			 * 82599 requires the interupt throttling rate is
-			 * a multiple of 8. This is enforced by the register
-			 * definiton.
+			 * 82599 and X540 require the interrupt throttling
+			 * rate is a multiple of 8. This is enforced by the
+			 * register definiton.
 			 */
-			if (hw->mac.type == ixgbe_mac_82599EB)
+			if (hw->mac.type == ixgbe_mac_82599EB ||
+			    hw->mac.type == ixgbe_mac_X540) {
 				ixgbe->intr_throttling[0] =
 				    ixgbe->intr_throttling[0] & 0xFF8;
+			}
 
 			for (i = 0; i < MAX_INTR_VECTOR; i++)
 				ixgbe->intr_throttling[i] =
