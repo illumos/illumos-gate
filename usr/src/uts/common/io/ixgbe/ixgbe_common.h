@@ -36,7 +36,7 @@
 #define _IXGBE_COMMON_H_
 
 #include "ixgbe_type.h"
-#if lint
+#ifdef lint
 /* Use "hw" somehow... */
 #define IXGBE_WRITE_REG64(hw, reg, value) hw = hw
 #else

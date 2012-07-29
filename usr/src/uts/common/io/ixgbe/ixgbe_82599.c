@@ -1292,7 +1292,7 @@ s32 ixgbe_init_fdir_perfect_82599(struct ixgbe_hw *hw, u32 fdirctrl)
  */
 #define IXGBE_ATR_COMMON_HASH_KEY \
 		(IXGBE_ATR_BUCKET_HASH_KEY & IXGBE_ATR_SIGNATURE_HASH_KEY)
-#if lint
+#ifdef lint
 #define IXGBE_COMPUTE_SIG_HASH_ITERATION(_n)
 #else
 #define IXGBE_COMPUTE_SIG_HASH_ITERATION(_n) \
@@ -1432,7 +1432,7 @@ s32 ixgbe_fdir_add_signature_filter_82599(struct ixgbe_hw *hw,
 	return IXGBE_SUCCESS;
 }
 
-#if lint
+#ifdef lint
 #define IXGBE_COMPUTE_BKT_HASH_ITERATION(_n)
 #else
 #define IXGBE_COMPUTE_BKT_HASH_ITERATION(_n) \
