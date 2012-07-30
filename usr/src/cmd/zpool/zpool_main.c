@@ -4941,7 +4941,7 @@ get_callback(zpool_handle_t *zhp, void *data)
 			}
 		} else {
 			if (zpool_get_prop(zhp, pl->pl_prop, value,
-			    sizeof (value), &srctype) != 0)
+			    sizeof (value), &srctype, cbp->cb_literal) != 0)
 				continue;
 
 			zprop_print_one_property(zpool_get_name(zhp), cbp,

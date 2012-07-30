@@ -1020,8 +1020,8 @@ extern "C" {
 #define	DTRACEOPT_AGGSORTPOS	25	/* agg. position to sort on */
 #define	DTRACEOPT_AGGSORTKEYPOS	26	/* agg. key position to sort on */
 #define	DTRACEOPT_TEMPORAL	27	/* temporally ordered output */
-#define	DTRACEOPT_MAX		28	/* number of options */
-#define	DTRACEOPT_ZONE		29	/* zone in which to enable probes */
+#define	DTRACEOPT_ZONE		28	/* zone in which to enable probes */
+#define	DTRACEOPT_MAX		29	/* number of options */
 
 #define	DTRACEOPT_UNSET		(dtrace_optval_t)-2	/* unset option */
 
