@@ -18,10 +18,11 @@
 #
 # CDDL HEADER END
 #
-#
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Copyright 2010 Nexenta Systems, Inc. All rights reserved.
 # Use is subject to license terms.
+#
+# Copyright 2010 Nexenta Systems, Inc. All rights reserved.
+# Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
 PROG=		zfs
@@ -38,7 +39,7 @@ LINKPROGS=	mount umount
 ROOTETCFSTYPE=  $(ROOTETC)/fs/$(FSTYPE)
 USRLIBFSTYPE=	$(ROOTLIB)/fs/$(FSTYPE)
 
-LDLIBS += -lzfs -luutil -lumem -lnvpair -lsec -lidmap
+LDLIBS += -lzfs_core -lzfs -luutil -lumem -lnvpair -lsec -lidmap
 
 INCS += -I../../common/zfs
 

@@ -617,3 +617,5 @@
 >8	string	jpx		JPEG 2000 w/ extensions (.JPX) [ISO 15444-2]
 >8	string	mp42		v2 [ISO 14496-14]
 4	string	moov		QuickTime MOV file
+
+0	string		\375\067\172\130\132\000	xz compressed data

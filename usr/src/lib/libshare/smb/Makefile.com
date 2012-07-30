@@ -22,6 +22,8 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+#
 
 LIBRARY =	libshare_smb.a
 VERS =		.1
@@ -49,6 +51,7 @@ all install := LDLIBS += -lxml2
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT -I$(ADJUNCT_PROTO)/usr/include/libxml2 \
 		-I$(SRCDIR)/../common
+$(ENABLE_SMB_PRINTING) CPPFLAGS += -DHAVE_CUPS
 
 .KEEP_STATE:
 

@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 <include SUNWcs.man1.inc>
@@ -785,7 +785,6 @@ file path=usr/bin/infocmp mode=0555
 file path=usr/bin/iostat mode=0555
 file path=usr/bin/isainfo mode=0555
 file path=usr/bin/isalist mode=0555
-file path=usr/bin/itu mode=0555
 file path=usr/bin/kbd mode=0555
 file path=usr/bin/keylogin mode=0555
 file path=usr/bin/keylogout mode=0555
@@ -805,7 +804,6 @@ file path=usr/bin/mail group=mail mode=2511
 file path=usr/bin/mailx group=mail mode=2511
 file path=usr/bin/makedev mode=0555
 file path=usr/bin/mesg mode=0555
-file path=usr/bin/mkbootmedia mode=0555
 file path=usr/bin/mkdir mode=0555
 file path=usr/bin/mkpwdict mode=0555
 file path=usr/bin/mktemp mode=0555
@@ -824,7 +822,6 @@ file path=usr/bin/pax mode=0555
 file path=usr/bin/pfexec mode=0555
 file path=usr/bin/pg mode=0555
 file path=usr/bin/pgrep mode=0555
-file path=usr/bin/pkg2du mode=0555
 file path=usr/bin/pktool mode=0555
 file path=usr/bin/pr mode=0555
 file path=usr/bin/printf mode=0555
@@ -863,7 +860,6 @@ file path=usr/bin/tr mode=0555
 file path=usr/bin/true mode=0555
 file path=usr/bin/tty mode=0555
 file path=usr/bin/tzselect mode=0555
-file path=usr/bin/updatemedia mode=0555
 file path=usr/bin/userattr mode=0555
 file path=usr/bin/vmstat mode=0555
 file path=usr/bin/which mode=0555

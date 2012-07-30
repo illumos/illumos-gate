@@ -1089,16 +1089,16 @@ fcoei_initiate_fcp_cmd(fcoei_exchange_t *xch)
 	frm->frm_payload[offset] = fcp_cmd_iu->fcp_cntl.cntl_qtype & 0x07;
 	offset += 1;
 	frm->frm_payload[offset] =
-	    (fcp_cmd_iu->fcp_cntl.cntl_kill_tsk * BIT_7) |
-	    (fcp_cmd_iu->fcp_cntl.cntl_clr_aca * BIT_6) |
-	    (fcp_cmd_iu->fcp_cntl.cntl_reset_tgt * BIT_5) |
-	    (fcp_cmd_iu->fcp_cntl.cntl_reset_lun * BIT_4) |
-	    (fcp_cmd_iu->fcp_cntl.cntl_clr_tsk * BIT_2) |
-	    (fcp_cmd_iu->fcp_cntl.cntl_abort_tsk * BIT_1);
+	    (fcp_cmd_iu->fcp_cntl.cntl_kill_tsk << 7) |
+	    (fcp_cmd_iu->fcp_cntl.cntl_clr_aca << 6) |
+	    (fcp_cmd_iu->fcp_cntl.cntl_reset_tgt << 5) |
+	    (fcp_cmd_iu->fcp_cntl.cntl_reset_lun << 4) |
+	    (fcp_cmd_iu->fcp_cntl.cntl_clr_tsk << 2) |
+	    (fcp_cmd_iu->fcp_cntl.cntl_abort_tsk << 1);
 	offset += 1;
 	frm->frm_payload[offset] =
-	    (fcp_cmd_iu->fcp_cntl.cntl_read_data * BIT_1) |
-	    (fcp_cmd_iu->fcp_cntl.cntl_write_data * BIT_0);
+	    (fcp_cmd_iu->fcp_cntl.cntl_read_data << 1) |
+	    (fcp_cmd_iu->fcp_cntl.cntl_write_data);
 	/*
 	 * fcp_cdb
 	 */
@@ -1455,9 +1455,10 @@ fcoei_fill_els_prli_cmd(fc_packet_t *fpkt, fcoe_frame_t *frm)
 	 * PRLI flags, only 3 bits are valid
 	 */
 	offset = 6;
-	FCOE_V2B_2((uint8_t)((fcp_spp->orig_process_assoc_valid * BIT_15) |
-	    (fcp_spp->resp_process_assoc_valid * BIT_14) |
-	    (fcp_spp->establish_image_pair * BIT_13)), FPLD + offset);
+
+	FCOE_V2B_2(((fcp_spp->orig_process_assoc_valid << 15) |
+	    (fcp_spp->resp_process_assoc_valid << 14) |
+	    (fcp_spp->establish_image_pair << 13)), FPLD + offset);
 
 	/*
 	 * process associator
@@ -1472,12 +1473,12 @@ fcoei_fill_els_prli_cmd(fc_packet_t *fpkt, fcoe_frame_t *frm)
 	 * FC-4 type
 	 */
 	offset = 16;
-	FCOE_V2B_4((fcp_spp->retry * BIT_8) |
-	    (fcp_spp->confirmed_compl_allowed * BIT_7) |
-	    (fcp_spp->data_overlay_allowed * BIT_6) |
-	    (fcp_spp->initiator_fn * BIT_5) | (fcp_spp->target_fn * BIT_4) |
-	    (fcp_spp->read_xfer_rdy_disabled * BIT_1) |
-	    (fcp_spp->write_xfer_rdy_disabled * BIT_0), FPLD + offset);
+	FCOE_V2B_4((fcp_spp->retry << 8) |
+	    (fcp_spp->confirmed_compl_allowed << 7) |
+	    (fcp_spp->data_overlay_allowed << 6) |
+	    (fcp_spp->initiator_fn << 5) | (fcp_spp->target_fn << 4) |
+	    (fcp_spp->read_xfer_rdy_disabled << 1) |
+	    (fcp_spp->write_xfer_rdy_disabled), FPLD + offset);
 }
 
 /*

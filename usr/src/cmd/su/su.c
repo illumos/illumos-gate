@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
 /*	  All Rights Reserved	*/
@@ -535,6 +536,10 @@ ok:
 					    malloc(strlen(initenv[j])
 					    + strlen(initvar)
 					    + 2);
+					if (var == NULL) {
+						perror("malloc");
+						exit(4);
+					}
 					(void) strcpy(var, initenv[j]);
 					(void) strcat(var, "=");
 					(void) strcat(var, initvar);

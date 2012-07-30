@@ -969,7 +969,7 @@ fcoei_fill_els_fpkt_resp(fcoe_frame_t *frm, fcoei_exchange_t *xch, int size)
 		prli_acc->image_pair_established =
 		    (FCOE_B2V_2(src + offset) & BIT_13) ? 1 : 0;
 		prli_acc->accept_response_code =
-		    (uint16_t)(FCOE_B2V_2(src + offset) & 0x0F00);
+		    (FCOE_B2V_2(src + offset) & 0x0F00) >> 8;
 		/*
 		 * process associator
 		 */

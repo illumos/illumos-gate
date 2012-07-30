@@ -1,6 +1,7 @@
 '\" te
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2012 Milan Jurik. All rights reserved.
 .\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
@@ -9,39 +10,39 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TAR 1 "Oct 26, 2007"
+.TH TAR 1 "May 9, 2012"
 .SH NAME
 tar \- create tape archives and add or extract files
 .SH SYNOPSIS
 .LP
 .nf
-\fBtar\fR c[BDeEFhilnopPqTvw@/[0-7]][bfk][X...] [\fIblocksize\fR]
+\fBtar\fR c[BDeEFhilnopPqTvw@/[0-7]][bfk][X...][a|j|J|z|Z] [\fIblocksize\fR]
      [\fItarfile\fR] [\fIsize\fR] [\fIexclude-file\fR]...
      {\fIfile\fR | \(miI \fIinclude-file\fR | \(miC \fIdirectory\fR \fIfile\fR}...
 .fi
 
 .LP
 .nf
-\fBtar\fR r[BDeEFhilnqTvw@/[0-7]][bfk] [\fIblocksize\fR] [\fItarfile\fR]
+\fBtar\fR r[BDeEFhilnqTvw@/[0-7]][bfk][j|J|z|Z] [\fIblocksize\fR] [\fItarfile\fR]
      [\fIsize\fR]
      {\fIfile\fR | \(miI \fIinclude-file\fR | \(miC \fIdirectory\fR \fIfile\fR}...
 .fi
 
 .LP
 .nf
-\fBtar\fR t[BeFhilnqTv[0-7]][fk][X...] [\fItarfile\fR] [\fIsize\fR]
+\fBtar\fR t[BeFhilnqTv[0-7]][fk][X...][j|J|z|Z] [\fItarfile\fR] [\fIsize\fR]
      [\fIexclude-file\fR]... {\fIfile\fR | \(miI \fIinclude-file\fR}...
 .fi
 
 .LP
 .nf
-\fBtar\fR u[BDeEFhilnqTvw@/[0-7]][bfk] [\fIblocksize\fR] [\fItarfile\fR]
+\fBtar\fR u[BDeEFhilnqTvw@/[0-7]][bfk][j|J|z|Z] [\fIblocksize\fR] [\fItarfile\fR]
      [\fIsize\fR] \fIfile\fR...
 .fi
 
 .LP
 .nf
-\fBtar\fR x[BeFhilmnopqTvw@/[0-7]][fk][X...] [\fItarfile\fR] [\fIsize\fR]
+\fBtar\fR x[BeFhilmnopqTvw@/[0-7]][fk][X...][j|J|z|Z] [\fItarfile\fR] [\fIsize\fR]
      [\fIexclude-file\fR]... [\fIfile\fR]...
 .fi
 
@@ -241,6 +242,17 @@ the desired function.
 .sp
 .ne 2
 .na
+\fB\fBa\fR\fR
+.ad
+.sp .6
+.RS 4n
+During a \fBcreate\fR operation autodetect compression based on the archive
+suffix.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fBb\fR \fIblocksize\fR\fR
 .ad
 .sp .6
@@ -392,6 +404,26 @@ Follow symbolic links as if they were normal files or directories. Normally,
 .sp .6
 .RS 4n
 Ignore directory checksum errors.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBj\fR\fR
+.ad
+.sp .6
+.RS 4n
+Use \fBbzip2\fR for compressing or decompressing the archives.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBJ\fR\fR
+.ad
+.sp .6
+.RS 4n
+Use \fBxz\fR for compressing or decompressing the archives.
 .RE
 
 .sp
@@ -584,6 +616,26 @@ argument. In the case where included files (see \fB\(miI\fR \fIinclude-file\fR
 operand) are also specified, the excluded files take precedence over all
 included files. If a file is specified in both the \fIexclude-file\fR and the
 \fIinclude-file\fR (or on the command line), it is excluded.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBz\fR\fR
+.ad
+.sp .6
+.RS 4n
+Use \fBgzip\fR for compressing or decompressing the archives.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBZ\fR\fR
+.ad
+.sp .6
+.RS 4n
+Use \fBcompress\fR for compressing or decompressing the archives.
 .RE
 
 .sp
@@ -952,42 +1004,6 @@ tar: tape read error
 
 .SH ENVIRONMENT VARIABLES
 .sp
-.ne 2
-.na
-\fB\fBSYSV3\fR\fR
-.ad
-.sp .6
-.RS 4n
-This variable is used to override the default behavior of \fBtar\fR, provide
-compatibility with INTERACTIVE UNIX Systems and SCO UNIX installation scripts,
-and should not be used in new scripts. (It is intended for compatibility
-purposes only.) When set, the following function modifiers behave differently:
-.sp
-.ne 2
-.na
-\fB\fBF\fR \fIfilename\fR\fR
-.ad
-.sp .6
-.RS 4n
-Uses \fIfilename\fR to obtain a list of command line switches and files on
-which to operate.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBe\fR\fR
-.ad
-.sp .6
-.RS 4n
-Prevents files from being split across volumes. If there is insufficient room
-on one volume, \fBtar\fR prompts for a new volume. If the file does not fit on
-the new volume, \fBtar\fR exits with an error.
-.RE
-
-.RE
-
-.sp
 .LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBtar\fR: \fBLC_COLLATE\fR, \fBLC_CTYPE\fR,
@@ -1160,9 +1176,10 @@ Interface Stability	Committed
 .SH SEE ALSO
 .sp
 .LP
-\fBar\fR(1), \fBbasename\fR(1), \fBcd\fR(1), \fBchown\fR(1), \fBcpio\fR(1),
-\fBcsh\fR(1), \fBdirname\fR(1), \fBfind\fR(1), \fBls\fR(1), \fBmt\fR(1),
-\fBpax\fR(1), \fBsetfacl\fR(1), \fBumask\fR(1), \fBmknod\fR(1M),
+\fBar\fR(1), \fBbasename\fR(1), \fBbzip2\fR(1), \fBcd\fR(1), \fBchown\fR(1),
+\fBcompress\fR)(1), \fBcpio\fR(1), \fBcsh\fR(1), \fBdirname\fR(1), 
+\fBfind\fR(1), \fBgzip\fR(1), \fBls\fR(1), \fBmt\fR(1), \fBpax\fR(1),
+\fBsetfacl\fR(1), \fBumask\fR(1), \fBxz\fR(1), \fBmknod\fR(1M),
 \fBarchives.h\fR(3HEAD), \fBattributes\fR(5), \fBenviron\fR(5),
 \fBfsattr\fR(5), \fBlargefile\fR(5), \fBmtio\fR(7I)
 .SH DIAGNOSTICS

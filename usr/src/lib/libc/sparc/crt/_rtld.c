@@ -79,7 +79,7 @@
  * order to maintain the "no bootstrapping" requirement -- it calls only
  * local functions, uses no intrinsics, etc.
  */
-static void * __USED
+void *
 __rtld(Elf32_Boot *ebp, const char *strings[], int (*funcs[])())
 {
 	int i, p;			/* working */

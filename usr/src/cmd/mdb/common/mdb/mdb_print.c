@@ -25,6 +25,11 @@
  * Copyright (c) 2012 Joyent, Inc. All rights reserved.
  */
 
+/*
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012 Joyent, Inc. All rights reserved.
+ */
+
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_target.h>
 #include <mdb/mdb_argvec.h>
@@ -1685,7 +1690,7 @@ pipe_print(mdb_ctf_id_t id, ulong_t off, void *data)
 	} u;
 
 	if (mdb_ctf_type_resolve(id, &base) == -1) {
-		mdb_warn("could not resolve type\n");
+		mdb_warn("could not resolve type");
 		return (-1);
 	}
 
@@ -1908,7 +1913,8 @@ parse_member(printarg_t *pap, const char *str, mdb_ctf_id_t id,
 				return (-1);
 			}
 
-			(void) mdb_snprintf(member, end - start + 1, start);
+			(void) mdb_snprintf(member, end - start + 1, "%s",
+			    start);
 
 			index = mdb_strtoull(member);
 
@@ -1985,7 +1991,7 @@ parse_member(printarg_t *pap, const char *str, mdb_ctf_id_t id,
 		for (end = start + 1; isalnum(*end) || *end == '_'; end++)
 			continue;
 
-		(void) mdb_snprintf(member, end - start + 1, start);
+		(void) mdb_snprintf(member, end - start + 1, "%s", start);
 
 		if (mdb_ctf_member_info(rid, member, &off, &id) != 0) {
 			mdb_warn("failed to find member %s of %s", member,
@@ -2142,6 +2148,7 @@ cmd_print_tab_common(mdb_tab_cookie_t *mcp, uint_t flags, int argc,
 	 * already have in rid.
 	 */
 	return (mdb_tab_complete_member_by_id(mcp, rid, member));
+<<<<<<< HEAD
 
 }
 
@@ -2768,6 +2775,7 @@ enum {
 };
 
 int
+<<<<<<< HEAD
 cmd_printf_tab(mdb_tab_cookie_t *mcp, uint_t flags, int argc,
     const mdb_arg_t *argv)
 {
@@ -2813,6 +2821,8 @@ cmd_printf_tab(mdb_tab_cookie_t *mcp, uint_t flags, int argc,
 }
 
 int
+=======
+>>>>>>> 5ada8a07255938930de285f1d55b0ef0bdba90ff
 cmd_printf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	char type[MDB_SYM_NAMLEN];
@@ -2833,7 +2843,11 @@ cmd_printf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (argc == 0 || argv[0].a_type != MDB_TYPE_STRING) {
 		mdb_warn("expected a format string\n");
+<<<<<<< HEAD
 		return (DCMD_ABORT);
+=======
+		return (DCMD_USAGE);
+>>>>>>> 5ada8a07255938930de285f1d55b0ef0bdba90ff
 	}
 
 	/*
@@ -2842,6 +2856,15 @@ cmd_printf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	 * subset of mdb_printf() format strings that we allow.
 	 */
 	fmt = argv[0].a_un.a_str;
+<<<<<<< HEAD
+=======
+	/*
+	 * 'dest' must be large enough to hold a copy of the format string,
+	 * plus a NUL and up to 2 additional characters for each conversion
+	 * in the format string.  This gives us a bloat factor of 5/2 ~= 3.
+	 *   e.g. "%d" (strlen of 2) --> "%lld\0" (need 5 bytes)
+	 */
+>>>>>>> 5ada8a07255938930de285f1d55b0ef0bdba90ff
 	dest = mdb_zalloc(strlen(fmt) * 3, UM_SLEEP | UM_GC);
 	fmts = mdb_zalloc(strlen(fmt) * sizeof (char *), UM_SLEEP | UM_GC);
 	funcs = mdb_zalloc(strlen(fmt) * sizeof (void *), UM_SLEEP | UM_GC);
@@ -2908,7 +2931,10 @@ cmd_printf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			funcs[nfmts] = printf_ipv6;
 			break;
 
+<<<<<<< HEAD
 		case 'H':
+=======
+>>>>>>> 5ada8a07255938930de285f1d55b0ef0bdba90ff
 		case 'o':
 		case 'r':
 		case 'u':
@@ -3024,6 +3050,7 @@ static char _mdb_printf_help[] =
 "\n"
 "  %%    Prints the '%' symbol.\n"
 "  %a    Prints the member in symbolic form.\n"
+<<<<<<< HEAD
 "  %d    Prints the member as a decimal integer. If the member is a signed\n"
 "        integer type, the output will be signed.\n"
 "  %H    Prints the member as a human-readable size.\n"
@@ -3034,12 +3061,27 @@ static char _mdb_printf_help[] =
 "  %q    Prints the member in signed octal. Honk if you ever use this!\n"
 "  %r    Prints the member as an unsigned value in the current output radix. \n"
 "  %R    Prints the member as a signed value in the current output radix. \n"
+=======
+"  %d    Prints the member as a decimal integer.  If the member is a signed\n"
+"        integer type, the output will be signed.\n"
+"  %I    Prints the member a IPv4 address (must be a 32-bit integer type).\n"
+"  %N    Prints the member an IPv6 address (must be of type in6_addr_t).\n"
+"  %o    Prints the member as an unsigned octal integer.\n"
+"  %p    Prints the member as a pointer, in hexadecimal.\n"
+"  %q    Prints the member in signed octal.  Honk if you ever use this!\n"
+"  %r    Prints the member as an unsigned value in the current output radix.\n"
+"  %R    Prints the member as a signed value in the current output radix.\n"
+>>>>>>> 5ada8a07255938930de285f1d55b0ef0bdba90ff
 "  %s    Prints the member as a string (requires a pointer or an array of\n"
 "        characters).\n"
 "  %u    Prints the member as an unsigned decimal integer.\n"
 "  %x    Prints the member in hexadecimal.\n"
 "  %X    Prints the member in hexadecimal, using the characters A-F as the\n"
+<<<<<<< HEAD
 "        digits for the values 10-15. \n"
+=======
+"        digits for the values 10-15.\n"
+>>>>>>> 5ada8a07255938930de285f1d55b0ef0bdba90ff
 "  %Y    Prints the member as a time_t as the string "
 	    "'year month day HH:MM:SS'.\n"
 "\n"
@@ -3052,6 +3094,7 @@ static char _mdb_printf_help[] =
 "\n"
 "The following flag specifers are recognized by ::printf:\n"
 "\n"
+<<<<<<< HEAD
 "  %-    Left-justify the output within the specified field width. If the\n"
 "        width of the output is less than the specified field width, the\n"
 "        output will be padded with blanks on the right-hand side. Without\n"
@@ -3059,6 +3102,15 @@ static char _mdb_printf_help[] =
 "\n"
 "  %0    Zero-fill the output field if the output is right-justified and the\n"
 "        width of the output is less than the specified field width. Without\n"
+=======
+"  %-    Left-justify the output within the specified field width.  If the\n"
+"        width of the output is less than the specified field width, the\n"
+"        output will be padded with blanks on the right-hand side.  Without\n"
+"        %-, values are right-justified by default.\n"
+"\n"
+"  %0    Zero-fill the output field if the output is right-justified and the\n"
+"        width of the output is less than the specified field width.  Without\n"
+>>>>>>> 5ada8a07255938930de285f1d55b0ef0bdba90ff
 "        %0, right-justified values are prepended with blanks in order to\n"
 "        fill the field.\n"
 "\n"

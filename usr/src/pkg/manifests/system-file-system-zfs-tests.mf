@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/file-system/zfs/tests@$(PKGVERS)
@@ -55,10 +56,13 @@ file path=usr/bin/$(ARCH64)/zlook mode=0555
 file path=usr/bin/$(ARCH64)/ztest mode=0555
 file path=usr/include/sys/fs/zut.h
 file path=usr/lib/devfsadm/linkmod/SUNW_zut_link.so group=sys
+$(i386_ONLY)file path=usr/sbin/$(ARCH32)/zhack mode=0555
 $(i386_ONLY)file path=usr/sbin/$(ARCH32)/zinject mode=0555
+file path=usr/sbin/$(ARCH64)/zhack mode=0555
 file path=usr/sbin/$(ARCH64)/zinject mode=0555
 hardlink path=usr/bin/zlook target=../../usr/lib/isaexec
 hardlink path=usr/bin/ztest target=../../usr/lib/isaexec
+hardlink path=usr/sbin/zhack target=../../usr/lib/isaexec
 hardlink path=usr/sbin/zinject target=../../usr/lib/isaexec
 legacy pkg=SUNWonzfs desc="ZFS test commands" name="ZFS unbundled utilities"
 legacy pkg=SUNWonzfsr desc="ZFS test driver" name="ZFS unbundled driver"

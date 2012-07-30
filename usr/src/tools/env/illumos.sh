@@ -226,3 +226,6 @@ export SPRO_VROOT="$SPRO_ROOT"
 # POST_NIGHTLY can be any command to be run at the end of nightly.  See
 # nightly(1) for interactions between environment variables and this command.
 #POST_NIGHTLY=
+
+# Uncomment this to disable support for SMB printing.
+# export ENABLE_SMB_PRINTING='#'

@@ -1,6 +1,4 @@
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -76,6 +74,8 @@ WARNING:sysmem:gettext("calls deprecated sysmem/asysmem"):libadm.so.1|sysmem|*DI
 WARNING:_lwp_create:gettext("uses lightweight processes directly"):libc.so.1|_lwp_create|*DIRECT*,libc.so.1|_lwp_detach|*DIRECT*,libc.so.1|_lwp_exit|*DIRECT*,libc.so.1|_lwp_getprivate|*DIRECT*,libc.so.1|_lwp_makecontext|*DIRECT*,libc.so.1|_lwp_setprivate|*DIRECT*,libc.so.1|_lwp_wait|*DIRECT*:
 ###############################################################################
 WARNING:libldap.so.3:gettext("calls obsolete LDAP library libldap.so.3"):libldap.so.3|*|*DIRECT*:
+###############################################################################
+WARNING:libldap.so.4:gettext("calls obsolete LDAP library libldap.so.4"):libldap.so.4|*|*DIRECT*:
 ###############################################################################
 WARNING:libxfn:gettext("calls obsolete federated naming library libxfn.so"):libxfn.so.1|*|*DIRECT*,libxfn.so.2|*|*DIRECT*:
 ###############################################################################

@@ -37,10 +37,12 @@ $(__GNUC)sparc_CC=	$(GCC_ROOT)/bin/gcc
 
 CFLAGS += $(CCVERBOSE)
 
-# Override CFLAGS when building with gcc.  This is needed only for bootstrap
-# of cw.
+# Override CFLAGS.  This is needed only for bootstrap of cw.
 $(__GNUC)CFLAGS=	-O -D__sun -Wall -Wno-unknown-pragmas -Werror \
 			-std=gnu89 -nodefaultlibs
+$(__SUNC)CFLAGS=	-xspace -Xa  -xildoff -errtags=yes -errwarn=%all \
+			-xc99=%none    -W0,-xglobalstatic -v
+
 
 $(__GNUC)LDLIBS +=	-lc
 $(__GNUC)LDFLAGS= 	$(MAPFILE.NES:%=-Wl,-M%)

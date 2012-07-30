@@ -38,9 +38,6 @@
  *      bibfile:        bibliographic file identifier   (d-charcters, 37 max)
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 #include <fcntl.h>
 #include <stdio.h>
 #include <sys/param.h>
@@ -49,9 +46,9 @@
 #include <sys/types.h>
 #include <sys/file.h>
 #include <dirent.h>
-#include "hsfs_spec.h"
-#include "iso_spec.h"
-#include "iso_impl.h"
+
+#include <sys/fs/hsfs_isospec.h>
+#include <sys/fs/hsfs_spec.h>
 
 #define	PUTSECTOR(buf, secno, nosec) (putdisk(buf, (secno)*ISO_SECTOR_SIZE, \
 	(nosec)*ISO_SECTOR_SIZE))
@@ -157,7 +154,9 @@ main(int argc, char **argv)
 
 	if ((cdfd = open(argv[c], openopt)) < 0) {
 		if (strchr(argv[c], '=') ||
-			strchr(argv[c], '-')) usage();
+		    strchr(argv[c], '-')) {
+			usage();
+		}
 		sprintf(errstrng, "%s: main: open(): ", callname);
 		perror(errstrng);
 		exit(32);
@@ -185,7 +184,7 @@ static void
 usage(void)
 {
 	fprintf(stderr, "usage: %s [-F ufs] [option=value ...] cdimage\n",
-		callname);
+	    callname);
 	exit(32);
 }
 

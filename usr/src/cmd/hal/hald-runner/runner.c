@@ -4,6 +4,7 @@
  * runner.c - Process running code
  *
  * Copyright (C) 2006 Sjoerd Simons, <sjoerd@luon.net>
+ * Copyright (C) 2007 Codethink Ltd. Author Rob Taylor <rob.taylor@codethink.co.uk>
  *
  * Licensed under the Academic Free License version 2.1
  *
@@ -48,6 +49,7 @@
 #define HALD_RUN_KILLED 0x4
 
 GHashTable *udi_hash = NULL;
+GList *singletons = NULL;
 
 typedef struct {
 	run_request *r;
@@ -128,15 +130,19 @@ send_reply(DBusConnection *con, DBusMessage *msg, guint32 exit_type, gint32 retu
 }
 
 static void
-remove_from_hash_table(run_data *rd)
+remove_run_data(run_data *rd)
 {
 	GList *list;
 
-	/* Remove to the hashtable */
-	list = (GList *)g_hash_table_lookup(udi_hash, rd->r->udi);
-	list = g_list_remove(list, rd);
-	/* The hash table will take care to not leak the dupped string */
-	g_hash_table_insert(udi_hash, g_strdup(rd->r->udi), list);
+	if (rd->r->is_singleton) {
+		singletons = g_list_remove(singletons, rd);
+	} else {
+		/* Remove to the hashtable */
+		list = (GList *)g_hash_table_lookup(udi_hash, rd->r->udi);
+		list = g_list_remove(list, rd);
+		/* The hash table will take care to not leak the dupped string */
+		g_hash_table_insert(udi_hash, g_strdup(rd->r->udi), list);
+	}
 }
 
 static void
@@ -145,7 +151,8 @@ run_exited(GPid pid, gint status, gpointer data)
 	run_data *rd = (run_data *)data;
 	char **error = NULL;
 
-	printf("%s exited\n", rd->r->argv[0]);
+	printf("pid %d: rc=%d signaled=%d: %s\n", 
+               pid, WEXITSTATUS(status), WIFSIGNALED(status), rd->r->argv[0]);
 	rd->watch = 0;
 	if (rd->sent_kill == TRUE) {
 		/* We send it a kill, so ignore */
@@ -170,18 +177,17 @@ run_exited(GPid pid, gint status, gpointer data)
 	free_string_array(error);
 
 out:
-	remove_from_hash_table(rd);
+	remove_run_data (rd);
 		
 	/* emit a signal that this PID exited */
 	if(rd->con != NULL && rd->emit_pid_exited) {
 		DBusMessage *signal;
-		dbus_int64_t pid64;
+		gint64 ppid = rd->pid;
 		signal = dbus_message_new_signal ("/org/freedesktop/HalRunner",
 						  "org.freedesktop.HalRunner",
 						  "StartedProcessExited");
-		pid64 = rd->pid;
 		dbus_message_append_args (signal, 
-					  DBUS_TYPE_INT64, &pid64,
+					  DBUS_TYPE_INT64, &(ppid),
 					  DBUS_TYPE_INVALID);
 		dbus_connection_send(rd->con, signal, NULL);
 	}
@@ -202,7 +208,7 @@ run_timedout(gpointer data) {
 	rd->sent_kill = TRUE;
 
 	send_reply(rd->con, rd->msg, HALD_RUN_TIMEOUT, 0, NULL);
-	remove_from_hash_table(rd);
+	remove_run_data (rd);
 	return FALSE;
 }
 
@@ -246,7 +252,7 @@ run_request_run (run_request *r, DBusConnection *con, DBusMessage *msg, GPid *ou
 	char *program_dir = NULL;
 	GList *list;
 
-	printf("Run started %s (%d) (%d) \n!", r->argv[0], r->timeout,
+	printf("Run started %s (%u) (%d) \n!", r->argv[0], r->timeout,
 		r->error_on_stderr);
 	if (r->input != NULL) {
 		stdin_p = &stdin_v; 
@@ -277,7 +283,7 @@ run_request_run (run_request *r, DBusConnection *con, DBusMessage *msg, GPid *ou
 
 	if (r->input) {
 		if (write(stdin_v, r->input, strlen(r->input)) != (ssize_t) strlen(r->input))
-			printf("Warning: Error while wite r->input (%s) to stdin_v.\n", r->input);
+			printf("Warning: Error while writing r->input (%s) to stdin_v.\n", r->input);
 		close(stdin_v);
 	}
 
@@ -302,12 +308,16 @@ run_request_run (run_request *r, DBusConnection *con, DBusMessage *msg, GPid *ou
 	else
 		rd->timeout = 0;
 
-	/* Add to the hashtable */
-	list = (GList *)g_hash_table_lookup(udi_hash, r->udi);
-	list = g_list_prepend(list, rd);
+	if (r->is_singleton) {
+		singletons = g_list_prepend(singletons, rd);
+	} else {
+		/* Add to the hashtable */
+		list = (GList *)g_hash_table_lookup(udi_hash, r->udi);
+		list = g_list_prepend(list, rd);
 
-	/* The hash table will take care to not leak the dupped string */
-	g_hash_table_insert(udi_hash, g_strdup(r->udi), list);
+		/* The hash table will take care to not leak the dupped string */
+		g_hash_table_insert(udi_hash, g_strdup(r->udi), list);
+	}
 
 	/* send back PID if requested.. and only emit StartedProcessExited in this case */
 	if (out_pid != NULL) {
@@ -365,6 +375,7 @@ void
 run_kill_all()
 {
 	g_hash_table_foreach_remove(udi_hash, hash_kill_udi, NULL);
+	g_list_foreach(singletons, kill_rd, NULL);
 }
 
 void

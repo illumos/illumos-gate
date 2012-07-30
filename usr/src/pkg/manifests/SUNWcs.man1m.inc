@@ -10,6 +10,7 @@
 #
 
 # Copyright 2011, Richard Lowe
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 
 file path=usr/share/man/man1m/6to4relay.1m
 file path=usr/share/man/man1m/Intro.1m
@@ -138,7 +139,6 @@ file path=usr/share/man/man1m/ipmpstat.1m
 file path=usr/share/man/man1m/ipsecalgs.1m
 file path=usr/share/man/man1m/ipsecconf.1m
 file path=usr/share/man/man1m/ipseckey.1m
-file path=usr/share/man/man1m/itu.1m
 file path=usr/share/man/man1m/keyserv.1m
 file path=usr/share/man/man1m/killall.1m
 file path=usr/share/man/man1m/ksslcfg.1m
@@ -155,7 +155,6 @@ file path=usr/share/man/man1m/logadm.1m
 file path=usr/share/man/man1m/logins.1m
 file path=usr/share/man/man1m/mail.local.1m
 file path=usr/share/man/man1m/makedbm.1m
-file path=usr/share/man/man1m/mkbootmedia.1m
 file path=usr/share/man/man1m/mkdevalloc.1m
 file path=usr/share/man/man1m/mkdevmaps.1m
 file path=usr/share/man/man1m/mkfile.1m
@@ -186,7 +185,6 @@ file path=usr/share/man/man1m/nscd.1m
 file path=usr/share/man/man1m/nwamd.1m
 file path=usr/share/man/man1m/passmgmt.1m
 file path=usr/share/man/man1m/pbind.1m
-file path=usr/share/man/man1m/pkg2du.1m
 file path=usr/share/man/man1m/pmadm.1m
 file path=usr/share/man/man1m/ports.1m
 file path=usr/share/man/man1m/poweroff.1m
@@ -278,7 +276,6 @@ file path=usr/share/man/man1m/unshare.1m
 file path=usr/share/man/man1m/unshare_nfs.1m
 file path=usr/share/man/man1m/unshareall.1m
 file path=usr/share/man/man1m/update_drv.1m
-file path=usr/share/man/man1m/updatemedia.1m
 file path=usr/share/man/man1m/useradd.1m
 file path=usr/share/man/man1m/userdel.1m
 file path=usr/share/man/man1m/usermod.1m

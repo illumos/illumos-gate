@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2011 by Delphix. All rights reserved.
+# Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/dtrace/tests@$(PKGVERS)
@@ -52,6 +52,7 @@ dir path=opt/SUNWdtrt/tst/common/begin
 dir path=opt/SUNWdtrt/tst/common/bitfields
 dir path=opt/SUNWdtrt/tst/common/buffering
 dir path=opt/SUNWdtrt/tst/common/builtinvar
+dir path=opt/SUNWdtrt/tst/common/cg
 dir path=opt/SUNWdtrt/tst/common/clauses
 dir path=opt/SUNWdtrt/tst/common/cpc
 dir path=opt/SUNWdtrt/tst/common/decls
@@ -59,6 +60,7 @@ dir path=opt/SUNWdtrt/tst/common/drops
 dir path=opt/SUNWdtrt/tst/common/dtraceUtil
 dir path=opt/SUNWdtrt/tst/common/end
 dir path=opt/SUNWdtrt/tst/common/enum
+dir path=opt/SUNWdtrt/tst/common/env
 dir path=opt/SUNWdtrt/tst/common/error
 dir path=opt/SUNWdtrt/tst/common/exit
 dir path=opt/SUNWdtrt/tst/common/fbtprovider
@@ -333,6 +335,8 @@ file path=opt/SUNWdtrt/tst/common/aggs/tst.signedkeys.d mode=0444
 file path=opt/SUNWdtrt/tst/common/aggs/tst.signedkeys.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/aggs/tst.signedkeyspos.d mode=0444
 file path=opt/SUNWdtrt/tst/common/aggs/tst.signedkeyspos.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.sizedkeys.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.sizedkeys.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/aggs/tst.stddev.d mode=0444
 file path=opt/SUNWdtrt/tst/common/aggs/tst.stddev.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/aggs/tst.subr.d mode=0444
@@ -357,7 +361,14 @@ file path=opt/SUNWdtrt/tst/common/arithmetic/err.D_SYNTAX.divmin.d mode=0444
 file path=opt/SUNWdtrt/tst/common/arithmetic/err.D_SYNTAX.muladd.d mode=0444
 file path=opt/SUNWdtrt/tst/common/arithmetic/err.D_SYNTAX.muldiv.d mode=0444
 file path=opt/SUNWdtrt/tst/common/arithmetic/tst.basics.d mode=0444
-file path=opt/SUNWdtrt/tst/common/arithmetic/tst.complex.d mode=0444
+file path=opt/SUNWdtrt/tst/common/arithmetic/tst.basics.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/arithmetic/tst.compcast.d mode=0444
+file path=opt/SUNWdtrt/tst/common/arithmetic/tst.compcast.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/arithmetic/tst.compnarrowassign.d mode=0444
+file path=opt/SUNWdtrt/tst/common/arithmetic/tst.compnarrowassign.d.out \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/arithmetic/tst.execcast.d mode=0444
+file path=opt/SUNWdtrt/tst/common/arithmetic/tst.execcast.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/arrays/err.D_ARR_BADREF.bad.d mode=0444
 file path=opt/SUNWdtrt/tst/common/arrays/err.D_DECL_ARRBIG.toobig.d mode=0444
 file path=opt/SUNWdtrt/tst/common/arrays/err.D_DECL_ARRNULL.bad.d mode=0444
@@ -474,6 +485,8 @@ file path=opt/SUNWdtrt/tst/common/builtinvar/tst.tid.d mode=0444
 file path=opt/SUNWdtrt/tst/common/builtinvar/tst.tid1.d mode=0444
 file path=opt/SUNWdtrt/tst/common/builtinvar/tst.timestamp.d mode=0444
 file path=opt/SUNWdtrt/tst/common/builtinvar/tst.vtimestamp.d mode=0444
+file path=opt/SUNWdtrt/tst/common/cg/err.D_NOREG.noreg.d mode=0444
+file path=opt/SUNWdtrt/tst/common/cg/err.baddif.d mode=0444
 file path=opt/SUNWdtrt/tst/common/clauses/err.D_IDENT_UNDEF.aggfun.d mode=0444
 file path=opt/SUNWdtrt/tst/common/clauses/err.D_IDENT_UNDEF.aggtup.d mode=0444
 file path=opt/SUNWdtrt/tst/common/clauses/err.D_IDENT_UNDEF.arrtup.d mode=0444
@@ -720,6 +733,20 @@ file path=opt/SUNWdtrt/tst/common/enum/err.D_UNKNOWN.RepeatIdentifiers.d \
 file path=opt/SUNWdtrt/tst/common/enum/tst.EnumEquality.d mode=0444
 file path=opt/SUNWdtrt/tst/common/enum/tst.EnumSameValue.d mode=0444
 file path=opt/SUNWdtrt/tst/common/enum/tst.EnumValAssign.d mode=0444
+file path=opt/SUNWdtrt/tst/common/env/err.D_PRAGMA_OPTSET.setfromscript.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/env/err.D_PRAGMA_OPTSET.unsetfromscript.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/env/tst.ld_nolazyload.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/env/tst.ld_nolazyload.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/env/tst.setenv1.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/env/tst.setenv1.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/env/tst.setenv2.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/env/tst.setenv2.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/env/tst.unsetenv1.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/env/tst.unsetenv1.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/env/tst.unsetenv2.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/env/tst.unsetenv2.ksh.out mode=0444
 file path=opt/SUNWdtrt/tst/common/error/tst.DTRACEFLT_BADADDR.d mode=0444
 file path=opt/SUNWdtrt/tst/common/error/tst.DTRACEFLT_DIVZERO.d mode=0444
 file path=opt/SUNWdtrt/tst/common/error/tst.DTRACEFLT_UNKNOWN.d mode=0444
@@ -1153,6 +1180,8 @@ file path=opt/SUNWdtrt/tst/common/pointers/tst.PointerAssignment.d mode=0444
 file path=opt/SUNWdtrt/tst/common/pointers/tst.ValidPointer1.d mode=0444
 file path=opt/SUNWdtrt/tst/common/pointers/tst.ValidPointer2.d mode=0444
 file path=opt/SUNWdtrt/tst/common/pointers/tst.VoidCast.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pointers/tst.assigncast1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pointers/tst.assigncast2.d mode=0444
 file path=opt/SUNWdtrt/tst/common/pointers/tst.basic1.d mode=0444
 file path=opt/SUNWdtrt/tst/common/pointers/tst.basic2.d mode=0444
 file path=opt/SUNWdtrt/tst/common/pragma/err.D_PRAGERR.d mode=0444
@@ -1168,6 +1197,9 @@ file path=opt/SUNWdtrt/tst/common/pragma/tst.libdep.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/pragma/tst.libdepfullyconnected.ksh \
     mode=0444
 file path=opt/SUNWdtrt/tst/common/pragma/tst.libdepsepdir.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/pragma/tst.temporal.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/pragma/tst.temporal2.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/pragma/tst.temporal3.d mode=0444
 file path=opt/SUNWdtrt/tst/common/predicates/err.D_PRED_SCALAR.NonScalarPred.d \
     mode=0444
 file path=opt/SUNWdtrt/tst/common/predicates/err.D_SYNTAX.invalid.d mode=0444
@@ -1177,7 +1209,6 @@ file path=opt/SUNWdtrt/tst/common/predicates/tst.basics.d mode=0444
 file path=opt/SUNWdtrt/tst/common/predicates/tst.basics.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/predicates/tst.complex.d mode=0444
 file path=opt/SUNWdtrt/tst/common/predicates/tst.complex.d.out mode=0444
-file path=opt/SUNWdtrt/tst/common/predicates/tst.predcache.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/preprocessor/err.D_IDENT_UNDEF.afterprobe.d \
     mode=0444
 file path=opt/SUNWdtrt/tst/common/preprocessor/err.D_PRAGCTL_INVAL.tabdefine.d \
@@ -1222,17 +1253,19 @@ file path=opt/SUNWdtrt/tst/common/preprocessor/tst.preexpifelse.d mode=0444
 file path=opt/SUNWdtrt/tst/common/preprocessor/tst.preexpifelse.d.out \
     mode=0444
 file path=opt/SUNWdtrt/tst/common/preprocessor/tst.withinprobe.d mode=0444
-file path=opt/SUNWdtrt/tst/common/print/err.D_PRINT_DYN.bad.d mode=0444
 file path=opt/SUNWdtrt/tst/common/print/err.D_PRINT_VOID.bad.d mode=0444
 file path=opt/SUNWdtrt/tst/common/print/err.D_PROTO_LEN.bad.d mode=0444
 file path=opt/SUNWdtrt/tst/common/print/tst.array.d mode=0444
 file path=opt/SUNWdtrt/tst/common/print/tst.array.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/print/tst.bitfield.d mode=0444
 file path=opt/SUNWdtrt/tst/common/print/tst.bitfield.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/print/tst.dyn.d mode=0444
 file path=opt/SUNWdtrt/tst/common/print/tst.primitive.d mode=0444
 file path=opt/SUNWdtrt/tst/common/print/tst.primitive.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/print/tst.struct.d mode=0444
 file path=opt/SUNWdtrt/tst/common/print/tst.struct.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/print/tst.xlate.d mode=0444
+file path=opt/SUNWdtrt/tst/common/print/tst.xlate.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/printa/err.D_PRINTA_AGGARG.badagg.d \
     mode=0444
 file path=opt/SUNWdtrt/tst/common/printa/err.D_PRINTA_AGGARG.badfmt.d \
@@ -1313,6 +1346,8 @@ file path=opt/SUNWdtrt/tst/common/printf/tst.printgG.d mode=0444
 file path=opt/SUNWdtrt/tst/common/printf/tst.printgG.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/printf/tst.rawfmt.d mode=0444
 file path=opt/SUNWdtrt/tst/common/printf/tst.rawfmt.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.signs.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.signs.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/printf/tst.str.d mode=0444
 file path=opt/SUNWdtrt/tst/common/printf/tst.str.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/printf/tst.sym.d mode=0444
@@ -1766,8 +1801,8 @@ file path=opt/SUNWdtrt/tst/common/tick-n/tst.tickus.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/tick-n/tst.tickusec.d mode=0444
 file path=opt/SUNWdtrt/tst/common/tick-n/tst.tickusec.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/trace/err.D_PROTO_LEN.bad.d mode=0444
-file path=opt/SUNWdtrt/tst/common/trace/err.D_TRACE_DYN.bad.d mode=0444
 file path=opt/SUNWdtrt/tst/common/trace/err.D_TRACE_VOID.bad.d mode=0444
+file path=opt/SUNWdtrt/tst/common/trace/tst.dyn.d mode=0444
 file path=opt/SUNWdtrt/tst/common/trace/tst.misc.d mode=0444
 file path=opt/SUNWdtrt/tst/common/trace/tst.qstring.d mode=0444
 file path=opt/SUNWdtrt/tst/common/trace/tst.qstring.d.out mode=0444
@@ -1837,6 +1872,14 @@ file path=opt/SUNWdtrt/tst/common/translators/tst.RepeatDeclaration.d \
 file path=opt/SUNWdtrt/tst/common/translators/tst.SimultaneousTranslators.d \
     mode=0444
 file path=opt/SUNWdtrt/tst/common/translators/tst.StructureAssignment.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/translators/tst.TestTransStability1.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/translators/tst.TestTransStability1.ksh.out \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/translators/tst.TestTransStability2.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/translators/tst.TestTransStability2.ksh.out \
     mode=0444
 file path=opt/SUNWdtrt/tst/common/translators/tst.TransNonPointer.d mode=0444
 file path=opt/SUNWdtrt/tst/common/translators/tst.TransOutputPointer.d \

@@ -6,54 +6,55 @@ beadm \- utility for managing zfs boot environments
 .SH SYNOPSIS
 .LP
 .nf
-\fBbeadm\fR create [\fB-a\fR] [\fB-d\fR \fIdescription\fR]
+\fBbeadm\fR \fBcreate\fR [\fB-a\fR] [\fB-d\fR \fIdescription\fR]
      [\fB-e\fR \fInon-activeBeName\fR | \fIbeName@snapshot\fR]
-     [\fB-o\fR \fIproperty=value\fR] ... [\fB-p\fR \fIzpool\FI] \fIbeName\fR
+     [\fB-o\fR \fIproperty=value\fR] ... [\fB-p\fR \fIzpool\fR]
+     [\fB-v\fR] \fIbeName\fR
 .fi
 
 .LP
 .nf
-\fBbeadm\fR \fBcreate\fR \fIbeName@snapshot\fR
+\fBbeadm\fR \fBcreate\fR [\fB-v\fR] \fIbeName@snapshot\fR
 .fi
 
 .LP
 .nf
-\fBbeadm\fR \fBdestroy\fR [\fB-fFs\fR] \fIbeName\fR | \fIbeName@snapshot\fR
+\fBbeadm\fR \fBdestroy\fR [\fB-fFsv\fR] \fIbeName\fR | \fIbeName@snapshot\fR
 .fi
 
 .LP
 .nf
-\fBbeadm\fR \fBlist\fR [\fB-a\fR | \fB-ds\fR] [\fB-H\fR] [\fIbeName\fR]
+\fBbeadm\fR \fBlist\fR [\fB-a\fR | \fB-ds\fR] [\fB-H\fR] [\fB-v\fR] [\fIbeName\fR]
 .fi
 
 .LP
 .nf
-\fBbeadm\fR \fBmount\fR \fIbeName\fR \fImountpoint\fR
+\fBbeadm\fR \fBmount\fR [\fB-v\fR] \fIbeName\fR \fImountpoint\fR
 .fi
 
 .LP
 .nf
-\fBbeadm\fR \fBunmount\fR [\fB-f\fR] \fIbeName\fR | \fImountpoint\fR
+\fBbeadm\fR \fBunmount\fR [\fB-fv\fR] \fIbeName\fR | \fImountpoint\fR
 .fi
 
 .LP
 .nf
-\fBbeadm\fR \fBrename\fR \fIbeName\fR \fInewBeName\fR
+\fBbeadm\fR \fBrename\fR [\fB-v\fR] \fIbeName\fR \fInewBeName\fR
 .fi
 
 .LP
 .nf
-\fBbeadm\fR \fBactivate\fR \fIbeName\fR
+\fBbeadm\fR \fBactivate\fR [\fB-v\fR] \fIbeName\fR
 .fi
 
 .LP
 .nf
-\fBbeadm\fR \fBrollback\fR \fIbeName\fR \fIsnapshot\fR
+\fBbeadm\fR \fBrollback\fR [\fB-v\fR] \fIbeName\fR \fIsnapshot\fR
 .fi
 
 .LP
 .nf
-\fBbeadm\fR \fBrollback\fR \fIbeName@snapshot\fR
+\fBbeadm\fR \fBrollback\fR [\fB-v\fR] \fIbeName@snapshot\fR
 .fi
 
 .SH DESCRIPTION
@@ -160,9 +161,9 @@ Displays command usage.
 .ne 2
 .na
 \fBbeadm\fR \fBcreate\fR [\fB-a\fR] [\fB-d\fR \fIdescription\fR]
-[\fB-e\fR \fInon-activeBeName\fR | \fIbeName@snapshot\fR]
-         [\fB-o\fR
-\fIproperty=value\fR] ... [\fB-p\fR \fIzpool\fR] \fIbeName\fR
+     [\fB-e\fR \fInon-activeBeName\fR | \fIbeName@snapshot\fR]
+     [\fB-o\fR \fIproperty=value\fR] ... [\fB-p\fR \fIzpool\fR]
+     [\fB-v\fR] \fIbeName\fR
 
 .ad
 .sp .6
@@ -239,22 +240,40 @@ Create the new BE in the specified zpool.  If this is not provided, the
 default
 behavior is to create the new BE in the same pool as as the origin BE.
 .RE
+.sp
+.ne 2
+.na
+\fB-v\fR
+.ad
+.sp .6
+.RS 4n
+Verbose mode. Displays verbose error messages from \fBbeadm\fR.
+.RE
 .RE
 
 .sp
 .ne 2
 .na
-\fBbeadm\fR \fBcreate\fR \fIbeName@snapshot\fR
+\fBbeadm\fR \fBcreate\fR [\fB-v\fR] \fIbeName@snapshot\fR
 .ad
 .sp .6
 .RS 4n
 Creates a snapshot of the existing BE named beName.
+.sp
+.ne 2
+.na
+\fB-v\fR
+.ad
+.sp .6
+.RS 4n
+Verbose mode. Displays verbose error messages from \fBbeadm\fR.
+.RE
 .RE
 
 .sp
 .ne 2
 .na
-\fBbeadm\fR \fBdestroy\fR [\fB-fFs\fR] \fIbeName\fR | \fIbeName@snapshot\fR
+\fBbeadm\fR \fBdestroy\fR [\fB-fFsv\fR] \fIbeName\fR | \fIbeName@snapshot\fR
 .ad
 .sp .6
 .RS 4n
@@ -294,12 +313,21 @@ environment.
 Destroy all snapshots of the boot
 environment.
 .RE
+.sp
+.ne 2
+.na
+\fB-v\fR
+.ad
+.sp .6
+.RS 4n
+Verbose mode. Displays verbose error messages from \fBbeadm\fR.
+.RE
 .RE
 
 .sp
 .ne 2
 .na
-\fBbeadm\fR \fBlist\fR [\fB-a\fR | \fB-ds\fR] [\fB-H\fR] [\fIbeName\fR]
+\fBbeadm\fR \fBlist\fR [\fB-a\fR | \fB-ds\fR] [\fB-H\fR] [\fB-v\fR] [\fIbeName\fR]
 .ad
 .sp .6
 .RS 4n
@@ -358,23 +386,41 @@ Lists information about the snapshots of the boot environment.
 Do not list header information.  Each field in the list information is
 separated by a semicolon.
 .RE
+.sp
+.ne 2
+.na
+\fB-v\fR
+.ad
+.sp .6
+.RS 4n
+Verbose mode. Displays verbose error messages from \fBbeadm\fR.
+.RE
 .RE
 
 .sp
 .ne 2
 .na
-\fBbeadm\fR \fBmount\fR \fIbeName\fR \fImountpoint\fR
+\fBbeadm\fR \fBmount\fR [\fB-v\fR] \fIbeName\fR \fImountpoint\fR
 .ad
 .sp .6
 .RS 4n
 Mounts a boot environment named beName at mountpoint.  mountpoint must be an
 already existing empty directory.
+.sp
+.ne 2
+.na
+\fB-v\fR
+.ad
+.sp .6
+.RS 4n
+Verbose mode. Displays verbose error messages from \fBbeadm\fR.
+.RE
 .RE
 
 .sp
 .ne 2
 .na
-\fBbeadm\fR \fBunmount\fR [\fB-f\fR] \fIbeName\fR | \fImountpoint\fR
+\fBbeadm\fR \fBunmount\fR [\fB-fv\fR] \fIbeName\fR | \fImountpoint\fR
 .ad
 .sp .6
 .RS 4n
@@ -389,37 +435,73 @@ beName mount point on the system.
 .RS 4n
 Forcefully unmount the boot environment even if its currently busy.
 .RE
+.sp
+.ne 2
+.na
+\fB-v\fR
+.ad
+.sp .6
+.RS 4n
+Verbose mode. Displays verbose error messages from \fBbeadm\fR.
+.RE
 .RE
 
 .sp
 .ne 2
 .na
-\fBbeadm\fR \fBrename\fR \fIbeName\fR \fInewBeName\fR
+\fBbeadm\fR \fBrename\fR [\fB-v\fR] \fIbeName\fR \fInewBeName\fR
 .ad
 .sp .6
 .RS 4n
 Renames the boot environment named \fIbeName\fR to \fInewBeName\fR.
+.sp
+.ne 2
+.na
+\fB-v\fR
+.ad
+.sp .6
+.RS 4n
+Verbose mode. Displays verbose error messages from \fBbeadm\fR.
+.RE
 .RE
 
 .sp
 .ne 2
 .na
-\fBbeadm\fR \fBrollback\fR \fIbeName\fR \fIsnapshot\fR | \fIbeName@snapshot\fR
+\fBbeadm\fR \fBrollback\fR [\fB-v\fR] \fIbeName\fR \fIsnapshot\fR | \fIbeName@snapshot\fR
 .ad
 .sp .6
 .RS 4n
 Roll back the boot environment named \fIbeName\fR to existing snapshot
 of the boot environment named \fIbeName@snapshot\fR.
+.sp
+.ne 2
+.na
+\fB-v\fR
+.ad
+.sp .6
+.RS 4n
+Verbose mode. Displays verbose error messages from \fBbeadm\fR.
+.RE
 .RE
 
 .sp
 .ne 2
 .na
-\fBbeadm\fR \fBactivate\fR \fIbeName\fR
+\fBbeadm\fR \fBactivate\fR [\fB-v\fR] \fIbeName\fR
 .ad
 .sp .6
 .RS 4n
 Makes beName the active BE on next reboot.
+.sp
+.ne 2
+.na
+\fB-v\fR
+.ad
+.sp .6
+.RS 4n
+Verbose mode. Displays verbose error messages from \fBbeadm\fR.
+.RE
 .RE
 
 .SH ALTERNATE BE LOCATION

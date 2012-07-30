@@ -30,13 +30,5 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/network/arbel@$(PKGVERS)
-set name=pkg.description value="Arbel HCA Driver"
-set name=pkg.summary value="Sun IB Arbel HCA driver"
-set name=info.classification \
-    value="org.opensolaris.category.2008:Drivers/Other Peripherals"
+set name=pkg.obsolete value=true
 set name=variant.arch value=$(ARCH)
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
-legacy pkg=SUNWarbel desc="Arbel HCA Driver" name="Sun IB Arbel HCA driver"
-license cr_Sun license=cr_Sun

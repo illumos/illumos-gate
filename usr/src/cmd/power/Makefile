@@ -67,7 +67,7 @@ i386_LDEVINFO=
 LDEVINFO=	-ldevinfo
 
 DAEMON_LDLIBS =	$(LDLIBS.cmd) -lkstat $(LDEVINFO)
-PMCFG_LDLIBS =	$(LDLIBS.cmd) -lcmd -lsmbios -lkstat $($(MACH)_LDEVINFO)
+PMCFG_LDLIBS =	$(LDLIBS.cmd) -lsmbios -lkstat $($(MACH)_LDEVINFO)
 SUSPEND_LDLIBS = $(LDLIBS.cmd) -lbsm -lpam -lsecdb
 
 ROOTUSRSBINPMCFG= $(PMCFG:%=$(ROOTUSRSBIN)/%)

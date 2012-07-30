@@ -106,6 +106,7 @@
 #include <sys/dsl_scan.h>
 #include <sys/zio_checksum.h>
 #include <sys/refcount.h>
+#include <sys/zfeature.h>
 #include <stdio.h>
 #include <stdio_ext.h>
 #include <stdlib.h>
@@ -2251,7 +2252,7 @@ ztest_spa_create_destroy(ztest_ds_t *zd, uint64_t id)
 	 */
 	nvroot = make_vdev_root("/dev/bogus", NULL, 0, 0, 0, 0, 0, 1);
 	VERIFY3U(ENOENT, ==,
-	    spa_create("ztest_bad_file", nvroot, NULL, NULL, NULL));
+	    spa_create("ztest_bad_file", nvroot, NULL, NULL));
 	nvlist_free(nvroot);
 
 	/*
@@ -2259,7 +2260,7 @@ ztest_spa_create_destroy(ztest_ds_t *zd, uint64_t id)
 	 */
 	nvroot = make_vdev_root("/dev/bogus", NULL, 0, 0, 0, 0, 2, 1);
 	VERIFY3U(ENOENT, ==,
-	    spa_create("ztest_bad_mirror", nvroot, NULL, NULL, NULL));
+	    spa_create("ztest_bad_mirror", nvroot, NULL, NULL));
 	nvlist_free(nvroot);
 
 	/*
@@ -2268,7 +2269,7 @@ ztest_spa_create_destroy(ztest_ds_t *zd, uint64_t id)
 	 */
 	(void) rw_rdlock(&ztest_name_lock);
 	nvroot = make_vdev_root("/dev/bogus", NULL, 0, 0, 0, 0, 0, 1);
-	VERIFY3U(EEXIST, ==, spa_create(zo->zo_pool, nvroot, NULL, NULL, NULL));
+	VERIFY3U(EEXIST, ==, spa_create(zo->zo_pool, nvroot, NULL, NULL));
 	nvlist_free(nvroot);
 	VERIFY3U(0, ==, spa_open(zo->zo_pool, &spa, FTAG));
 	VERIFY3U(EBUSY, ==, spa_destroy(zo->zo_pool));
@@ -3055,8 +3056,7 @@ ztest_snapshot_create(char *osname, uint64_t id)
 	(void) snprintf(snapname, MAXNAMELEN, "%s@%llu", osname,
 	    (u_longlong_t)id);
 
-	error = dmu_objset_snapshot(osname, strchr(snapname, '@') + 1,
-	    NULL, NULL, B_FALSE, B_FALSE, -1);
+	error = dmu_objset_snapshot_one(osname, strchr(snapname, '@') + 1);
 	if (error == ENOSPC) {
 		ztest_record_enospc(FTAG);
 		return (B_FALSE);
@@ -3256,8 +3256,7 @@ ztest_dsl_dataset_promote_busy(ztest_ds_t *zd, uint64_t id)
 	(void) snprintf(clone2name, MAXNAMELEN, "%s/c2_%llu", osname, id);
 	(void) snprintf(snap3name, MAXNAMELEN, "%s@s3_%llu", clone1name, id);
 
-	error = dmu_objset_snapshot(osname, strchr(snap1name, '@')+1,
-	    NULL, NULL, B_FALSE, B_FALSE, -1);
+	error = dmu_objset_snapshot_one(osname, strchr(snap1name, '@') + 1);
 	if (error && error != EEXIST) {
 		if (error == ENOSPC) {
 			ztest_record_enospc(FTAG);
@@ -3280,8 +3279,7 @@ ztest_dsl_dataset_promote_busy(ztest_ds_t *zd, uint64_t id)
 		fatal(0, "dmu_objset_create(%s) = %d", clone1name, error);
 	}
 
-	error = dmu_objset_snapshot(clone1name, strchr(snap2name, '@')+1,
-	    NULL, NULL, B_FALSE, B_FALSE, -1);
+	error = dmu_objset_snapshot_one(clone1name, strchr(snap2name, '@') + 1);
 	if (error && error != EEXIST) {
 		if (error == ENOSPC) {
 			ztest_record_enospc(FTAG);
@@ -3290,8 +3288,7 @@ ztest_dsl_dataset_promote_busy(ztest_ds_t *zd, uint64_t id)
 		fatal(0, "dmu_open_snapshot(%s) = %d", snap2name, error);
 	}
 
-	error = dmu_objset_snapshot(clone1name, strchr(snap3name, '@')+1,
-	    NULL, NULL, B_FALSE, B_FALSE, -1);
+	error = dmu_objset_snapshot_one(clone1name, strchr(snap3name, '@') + 1);
 	if (error && error != EEXIST) {
 		if (error == ENOSPC) {
 			ztest_record_enospc(FTAG);
@@ -4479,8 +4476,7 @@ ztest_dmu_snapshot_hold(ztest_ds_t *zd, uint64_t id)
 	 * Create snapshot, clone it, mark snap for deferred destroy,
 	 * destroy clone, verify snap was also destroyed.
 	 */
-	error = dmu_objset_snapshot(osname, snapname, NULL, NULL, FALSE,
-	    FALSE, -1);
+	error = dmu_objset_snapshot_one(osname, snapname);
 	if (error) {
 		if (error == ENOSPC) {
 			ztest_record_enospc("dmu_objset_snapshot");
@@ -4522,8 +4518,7 @@ ztest_dmu_snapshot_hold(ztest_ds_t *zd, uint64_t id)
 	 * destroy a held snapshot, mark for deferred destroy,
 	 * release hold, verify snapshot was destroyed.
 	 */
-	error = dmu_objset_snapshot(osname, snapname, NULL, NULL, FALSE,
-	    FALSE, -1);
+	error = dmu_objset_snapshot_one(osname, snapname);
 	if (error) {
 		if (error == ENOSPC) {
 			ztest_record_enospc("dmu_objset_snapshot");
@@ -5572,10 +5567,9 @@ make_random_props()
 {
 	nvlist_t *props;
 
-	if (ztest_random(2) == 0)
-		return (NULL);
-
 	VERIFY(nvlist_alloc(&props, NV_UNIQUE_NAME, 0) == 0);
+	if (ztest_random(2) == 0)
+		return (props);
 	VERIFY(nvlist_add_uint64(props, "autoreplace", 1) == 0);
 
 	return (props);
@@ -5606,13 +5600,19 @@ ztest_init(ztest_shared_t *zs)
 	nvroot = make_vdev_root(NULL, NULL, ztest_opts.zo_vdev_size, 0,
 	    0, ztest_opts.zo_raidz, zs->zs_mirrors, 1);
 	props = make_random_props();
-	VERIFY3U(0, ==, spa_create(ztest_opts.zo_pool, nvroot, props,
-	    NULL, NULL));
+	for (int i = 0; i < SPA_FEATURES; i++) {
+		char buf[1024];
+		(void) snprintf(buf, sizeof (buf), "feature@%s",
+		    spa_feature_table[i].fi_uname);
+		VERIFY3U(0, ==, nvlist_add_uint64(props, buf, 0));
+	}
+	VERIFY3U(0, ==, spa_create(ztest_opts.zo_pool, nvroot, props, NULL));
 	nvlist_free(nvroot);
 
 	VERIFY3U(0, ==, spa_open(ztest_opts.zo_pool, &spa, FTAG));
 	zs->zs_metaslab_sz =
 	    1ULL << spa->spa_root_vdev->vdev_child[0]->vdev_ms_shift;
+
 	spa_close(spa, FTAG);
 
 	kernel_fini();
@@ -5642,14 +5642,31 @@ setup_fds(void)
 	ASSERT3U(fd, ==, ZTEST_FD_RAND);
 }
 
+static int
+shared_data_size(ztest_shared_hdr_t *hdr)
+{
+	int size;
+
+	size = hdr->zh_hdr_size;
+	size += hdr->zh_opts_size;
+	size += hdr->zh_size;
+	size += hdr->zh_stats_size * hdr->zh_stats_count;
+	size += hdr->zh_ds_size * hdr->zh_ds_count;
+
+	return (size);
+}
+
 static void
 setup_hdr(void)
 {
+	int size;
 	ztest_shared_hdr_t *hdr;
 
 	hdr = (void *)mmap(0, P2ROUNDUP(sizeof (*hdr), getpagesize()),
 	    PROT_READ | PROT_WRITE, MAP_SHARED, ZTEST_FD_DATA, 0);
 	ASSERT(hdr != MAP_FAILED);
+
+	VERIFY3U(0, ==, ftruncate(ZTEST_FD_DATA, sizeof (ztest_shared_hdr_t)));
 
 	hdr->zh_hdr_size = sizeof (ztest_shared_hdr_t);
 	hdr->zh_opts_size = sizeof (ztest_shared_opts_t);
@@ -5658,6 +5675,9 @@ setup_hdr(void)
 	hdr->zh_stats_count = ZTEST_FUNCS;
 	hdr->zh_ds_size = sizeof (ztest_shared_ds_t);
 	hdr->zh_ds_count = ztest_opts.zo_datasets;
+
+	size = shared_data_size(hdr);
+	VERIFY3U(0, ==, ftruncate(ZTEST_FD_DATA, size));
 
 	(void) munmap((caddr_t)hdr, P2ROUNDUP(sizeof (*hdr), getpagesize()));
 }
@@ -5673,11 +5693,7 @@ setup_data(void)
 	    PROT_READ, MAP_SHARED, ZTEST_FD_DATA, 0);
 	ASSERT(hdr != MAP_FAILED);
 
-	size = hdr->zh_hdr_size;
-	size += hdr->zh_opts_size;
-	size += hdr->zh_size;
-	size += hdr->zh_stats_size * hdr->zh_stats_count;
-	size += hdr->zh_ds_size * hdr->zh_ds_count;
+	size = shared_data_size(hdr);
 
 	(void) munmap((caddr_t)hdr, P2ROUNDUP(sizeof (*hdr), getpagesize()));
 	hdr = ztest_shared_hdr = (void *)mmap(0, P2ROUNDUP(size, getpagesize()),

@@ -23,6 +23,9 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ */
 
 #include "lint.h"
 #include "thr_uberdata.h"
@@ -441,4 +444,20 @@ void
 assfail(const char *assertion, const char *filename, int line_num)
 {
 	__assfail(assertion, filename, line_num);
+}
+
+void
+assfail3(const char *assertion, uintmax_t lv, const char *op, uintmax_t rv,
+    const char *filename, int line_num)
+{
+	char buf[1000];
+	(void) strcpy(buf, assertion);
+	(void) strcat(buf, " (0x");
+	ultos((uint64_t)lv, 16, buf + strlen(buf));
+	(void) strcat(buf, " ");
+	(void) strcat(buf, op);
+	(void) strcat(buf, " 0x");
+	ultos((uint64_t)rv, 16, buf + strlen(buf));
+	(void) strcat(buf, ")");
+	__assfail(buf, filename, line_num);
 }

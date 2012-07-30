@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -183,8 +183,12 @@ smb_com_close_print_file(smb_request_t *sr)
 {
 	smb_sdrc_t rc;
 
-	if (sr->sr_server->sv_cfg.skc_print_enable == 0 ||
-	    !STYPE_ISPRN(sr->tid_tree->t_res_type)) {
+	/*
+	 * If sv_cfg.skc_print_enable somehow went false while
+	 * we have a print FID open, close the FID.  In this
+	 * situation, smb_spool_add_fid() will do nothing.
+	 */
+	if (!STYPE_ISPRN(sr->tid_tree->t_res_type)) {
 		smbsr_error(sr, NT_STATUS_BAD_DEVICE_TYPE,
 		    ERRDOS, ERROR_BAD_DEV_TYPE);
 		cmn_err(CE_WARN, "smb_com_close_print_file: SDRC_ERROR");
@@ -192,8 +196,7 @@ smb_com_close_print_file(smb_request_t *sr)
 	}
 	rc = smb_com_close(sr);
 
-	(void) smb_spool_add_fid(sr->smb_fid);
-	cv_broadcast(&sr->sr_server->sp_info.sp_cv);
+	smb_spool_add_fid(sr->sr_server, sr->smb_fid);
 
 	return (rc);
 }

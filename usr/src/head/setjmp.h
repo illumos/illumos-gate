@@ -31,8 +31,6 @@
 #ifndef _SETJMP_H
 #define	_SETJMP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.9.2.9 */
-
 #include <iso/setjmp_iso.h>
 
 /*
@@ -60,7 +58,7 @@ typedef long sigjmp_buf[_SIGJBLEN];
 typedef int sigjmp_buf[_SIGJBLEN];
 #endif
 
-extern int sigsetjmp(sigjmp_buf, int);
+extern int sigsetjmp(sigjmp_buf, int) __RETURNS_TWICE;
 #pragma unknown_control_flow(sigsetjmp)
 extern void siglongjmp(sigjmp_buf, int) __NORETURN;
 #endif
@@ -73,7 +71,7 @@ typedef long sigjmp_buf[_SIGJBLEN];
 typedef int sigjmp_buf[_SIGJBLEN];
 #endif
 
-extern int sigsetjmp();
+extern int sigsetjmp() __RETURNS_TWICE;
 #pragma unknown_control_flow(sigsetjmp)
 extern void siglongjmp();
 

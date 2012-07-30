@@ -26,6 +26,11 @@
  * Copyright (c) 2012 Joyent, Inc. All rights reserved.
  */
 
+/*
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012 Joyent, Inc. All rights reserved.
+ */
+
 #include <sys/elf.h>
 #include <sys/elf_SPARC.h>
 

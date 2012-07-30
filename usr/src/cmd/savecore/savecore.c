@@ -22,6 +22,9 @@
  * Copyright (c) 1983, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
+/*
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -219,6 +222,13 @@ logprint(uint32_t flags, char *message, ...)
 		break;
 
 	case SC_EXIT_PEND:
+		/*
+		 * Raise an ireport saying why we are exiting.  Do not
+		 * raise if run as savecore -m.  If something in the
+		 * raise_event codepath calls logprint avoid recursion.
+		 */
+		if (!mflag && logprint_raised++ == 0)
+			raise_event(SC_EVENT_SAVECORE_FAILURE, buf);
 		code = 2;
 		break;
 
@@ -228,11 +238,6 @@ logprint(uint32_t flags, char *message, ...)
 
 	case SC_EXIT_ERR:
 	default:
-		/*
-		 * Raise an ireport saying why we are exiting.  Do not
-		 * raise if run as savecore -m.  If something in the
-		 * raise_event codepath calls logprint avoid recursion.
-		 */
 		if (!mflag && logprint_raised++ == 0)
 			raise_event(SC_EVENT_SAVECORE_FAILURE, buf);
 		code = 1;
@@ -357,7 +362,7 @@ read_dumphdr(void)
 	pagesize = dumphdr.dump_pagesize;
 
 	if (dumphdr.dump_magic != DUMP_MAGIC)
-		logprint(SC_SL_NONE | SC_EXIT_OK, "bad magic number %x",
+		logprint(SC_SL_NONE | SC_EXIT_PEND, "bad magic number %x",
 		    dumphdr.dump_magic);
 
 	if ((dumphdr.dump_flags & DF_VALID) == 0 && !disregard_valid_flag)
@@ -365,18 +370,18 @@ read_dumphdr(void)
 		    "dump already processed");
 
 	if (dumphdr.dump_version != DUMP_VERSION)
-		logprint(SC_SL_NONE | SC_IF_VERBOSE | SC_EXIT_OK,
+		logprint(SC_SL_NONE | SC_IF_VERBOSE | SC_EXIT_PEND,
 		    "dump version (%d) != %s version (%d)",
 		    dumphdr.dump_version, progname, DUMP_VERSION);
 
 	if (dumphdr.dump_wordsize != DUMP_WORDSIZE)
-		logprint(SC_SL_NONE | SC_EXIT_OK,
+		logprint(SC_SL_NONE | SC_EXIT_PEND,
 		    "dump is from %u-bit kernel - cannot save on %u-bit kernel",
 		    dumphdr.dump_wordsize, DUMP_WORDSIZE);
 
 	if (datahdr.dump_datahdr_magic == DUMP_DATAHDR_MAGIC) {
 		if (datahdr.dump_datahdr_version != DUMP_DATAHDR_VERSION)
-			logprint(SC_SL_NONE | SC_IF_VERBOSE | SC_EXIT_OK,
+			logprint(SC_SL_NONE | SC_IF_VERBOSE | SC_EXIT_PEND,
 			    "dump data version (%d) != %s data version (%d)",
 			    datahdr.dump_datahdr_version, progname,
 			    DUMP_DATAHDR_VERSION);

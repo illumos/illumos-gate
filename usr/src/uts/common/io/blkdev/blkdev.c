@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2011, 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  */
 
@@ -396,9 +396,12 @@ bd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	bzero(&drive, sizeof (drive));
 	bd->d_ops.o_drive_info(bd->d_private, &drive);
 	bd->d_qsize = drive.d_qsize;
-	bd->d_maxxfer = drive.d_maxxfer;
 	bd->d_removable = drive.d_removable;
 	bd->d_hotpluggable = drive.d_hotpluggable;
+
+	if (drive.d_maxxfer && drive.d_maxxfer < bd->d_maxxfer)
+		bd->d_maxxfer = drive.d_maxxfer;
+
 
 	rv = cmlb_attach(dip, &bd_tg_ops, DTYPE_DIRECT,
 	    bd->d_removable, bd->d_hotpluggable,
@@ -556,7 +559,6 @@ bd_xfer_alloc(bd_t *bd, struct buf *bp, int (*func)(void *, bd_xfer_t *),
 	}
 
 	ASSERT(bp);
-	ASSERT(bp->b_bcount);
 
 	xi->i_bp = bp;
 	xi->i_func = func;
@@ -900,32 +902,51 @@ bd_dump(dev_t dev, caddr_t caddr, daddr_t blkno, int nblk)
 	return (rv);
 }
 
+void
+bd_minphys(struct buf *bp)
+{
+	minor_t inst;
+	bd_t	*bd;
+	inst = BDINST(bp->b_edev);
+
+	bd = ddi_get_soft_state(bd_state, inst);
+
+	/*
+	 * In a non-debug kernel, bd_strategy will catch !bd as
+	 * well, and will fail nicely.
+	 */
+	ASSERT(bd);
+
+	if (bp->b_bcount > bd->d_maxxfer)
+		bp->b_bcount = bd->d_maxxfer;
+}
+
 static int
 bd_read(dev_t dev, struct uio *uio, cred_t *credp)
 {
 	_NOTE(ARGUNUSED(credp));
-	return (physio(bd_strategy, NULL, dev, B_READ, minphys, uio));
+	return (physio(bd_strategy, NULL, dev, B_READ, bd_minphys, uio));
 }
 
 static int
 bd_write(dev_t dev, struct uio *uio, cred_t *credp)
 {
 	_NOTE(ARGUNUSED(credp));
-	return (physio(bd_strategy, NULL, dev, B_WRITE, minphys, uio));
+	return (physio(bd_strategy, NULL, dev, B_WRITE, bd_minphys, uio));
 }
 
 static int
 bd_aread(dev_t dev, struct aio_req *aio, cred_t *credp)
 {
 	_NOTE(ARGUNUSED(credp));
-	return (aphysio(bd_strategy, anocancel, dev, B_READ, minphys, aio));
+	return (aphysio(bd_strategy, anocancel, dev, B_READ, bd_minphys, aio));
 }
 
 static int
 bd_awrite(dev_t dev, struct aio_req *aio, cred_t *credp)
 {
 	_NOTE(ARGUNUSED(credp));
-	return (aphysio(bd_strategy, anocancel, dev, B_WRITE, minphys, aio));
+	return (aphysio(bd_strategy, anocancel, dev, B_WRITE, bd_minphys, aio));
 }
 
 static int
@@ -1095,9 +1116,11 @@ bd_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp, int *rvalp)
 		return (0);
 	}
 	case DKIOCFLUSHWRITECACHE: {
-		struct dk_callback *dkc;
+		struct dk_callback *dkc = NULL;
 
-		dkc = flag & FKIOCTL ? (void *)arg : NULL;
+		if (flag & FKIOCTL)
+			dkc = (void *)arg;
+
 		rv = bd_flush_write_cache(bd, dkc);
 		return (rv);
 	}
@@ -1438,24 +1461,24 @@ bd_flush_write_cache(bd_t *bd, struct dk_callback *dkc)
 		return (rv);
 	}
 
-	if (dkc != NULL) {
+	/* Make an asynchronous flush, but only if there is a callback */
+	if (dkc != NULL && dkc->dkc_callback != NULL) {
 		/* Make a private copy of the callback structure */
 		dc = kmem_alloc(sizeof (*dc), KM_SLEEP);
 		*dc = *dkc;
 		bp->b_private = dc;
 		bp->b_iodone = bd_flush_write_cache_done;
+
+		bd_submit(bd, xi);
+		return (0);
 	}
 
+	/* In case there is no callback, perform a synchronous flush */
 	bd_submit(bd, xi);
-	if (dkc == NULL) {
-		/* wait synchronously */
-		(void) biowait(bp);
-		rv = geterror(bp);
-		freerbuf(bp);
-	} else {
-		/* deferred via callback */
-		rv = 0;
-	}
+	(void) biowait(bp);
+	rv = geterror(bp);
+	freerbuf(bp);
+
 	return (rv);
 }
 
@@ -1593,7 +1616,7 @@ bd_xfer_done(bd_xfer_t *xfer, int err)
 {
 	bd_xfer_impl_t	*xi = (void *)xfer;
 	buf_t		*bp = xi->i_bp;
-	int		rv;
+	int		rv = DDI_SUCCESS;
 	bd_t		*bd = xi->i_bd;
 	size_t		len;
 

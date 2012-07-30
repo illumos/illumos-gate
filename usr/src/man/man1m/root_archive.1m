@@ -3,6 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.\" Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 .TH ROOT_ARCHIVE 1M "Sep 9, 2009"
 .SH NAME
 root_archive \- manage bootable miniroot archives
@@ -17,35 +18,16 @@ root_archive \- manage bootable miniroot archives
 \fB/boot/solaris/bin/root_archive\fR unpack \fIarchive\fR \fIroot\fR
 .fi
 
-.LP
-.nf
-\fB/boot/solaris/bin/root_archive\fR packmedia \fIsolaris_image\fR \fIroot\fR
-.fi
-
-.LP
-.nf
-\fB/boot/solaris/bin/root_archive\fR unpackmedia \fIsolaris_image\fR \fIroot\fR
-.fi
-
 .SH DESCRIPTION
 .sp
 .LP
-The \fBroot_archive\fR utility is used to manipulate boot archives and the
-bootable miniroot(s) in a Solaris install image. The utility can pack and
-unpack boot archives and image miniroots. Both \fBufs\fR and \fBhsfs\fR
+The \fBroot_archive\fR utility is used to manipulate boot archives. 
+The utility can pack and unpack boot archives and image miniroots. Both \fBufs\fR and \fBhsfs\fR
 (\fBiso9660\fR) format archives can be unpacked, although only \fBufs\fR format
 is generated when packing.
 .sp
 .LP
-For normal, boot-related system administration, \fBbootadm\fR(1M) is
-recommended. \fBroot_archive\fR's primary purpose is to enable OEMs to add or
-update a driver or other component on the Solaris install media.
-.sp
-.LP
-A miniroot and a boot archive is closely associated with the release it is
-intended to boot. To ensure that the tools and system services used to
-construct the miniroot match, miniroot manipulation must be performed only on a
-system running the same release for which the miniroot is intended to install.
+For normal, boot-related system administration, \fBbootadm\fR(1M) is recommended.
 .SH SUBCOMMANDS
 .sp
 .LP
@@ -65,78 +47,10 @@ Pack the contents of the root directory into the boot archive \fIarchive\fR.
 \fB\fBunpack\fR \fIarchive\fR \fIroot\fR\fR
 .ad
 .sp .6
-.RS 4n
+.RS 21n
 Unpack the contents of the boot archive named \fIarchive\fR to the directory
 named \fIroot\fR.
 .RE
-
-.sp
-.ne 2
-.na
-\fB\fBpackmedia\fR \fIsolaris_image\fR \fIroot\fR\fR
-.ad
-.sp .6
-.RS 4n
-Create and pack the miniroot(s) in \fIsolaris_image\fR from the contents of the
-directory named \fIroot\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBunpackmedia\fR \fIsolaris_image\fR \fIroot\fR\fR
-.ad
-.sp .6
-.RS 4n
-Unpack the contents of the miniroot(s) in \fIsolaris_image\fR to the directory
-named \fIroot\fR.
-.RE
-
-.sp
-.LP
-The contents of a miniroot are constructed to need the requirements of the
-release. When unpacking a miniroot, all the contents of the miniroot(s) are
-unpacked. When packing a miniroot, the source directory must contain all the
-necessary components with which to construct a miniroot. In general, this can
-only be achieved by first unpacking an existing miniroot.
-.SH EXAMPLES
-.LP
-\fBExample 1 \fRUnpacking the Miniroots in a Solaris x86 Install Image
-.sp
-.LP
-The following command unpacks the miniroots in a Solaris image to the root
-directory in \fB/export/release/latest\fR.
-
-.sp
-.in +2
-.nf
-# \fBroot_archive unpackmedia \e\fR
-\fB/export/nv/solarisdvd.nvx_dvd/latest /export/release/latest/root\fR
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-In the preceding, \fB/export/nv/solarisdvd.nvx_dvd/latest\fR represents a path
-to a Solaris x86 install image and \fB/export/release/latest/root\fR is a
-directory that will be purged or created, as necessary.
-
-.LP
-\fBExample 2 \fRPacking the Miniroots in a Solaris x86 Install Image
-.sp
-.LP
-The following command creates and packs the miniroot(s) in a Solaris image from
-the contents of the directory \fB/export/release/latest/root\fR.
-
-.sp
-.in +2
-.nf
-# \fBroot_archive packmedia \e\fR
-\fB/export/nv/solarisdvd.nvx_dvd/latest /export/release/latest/root\fR
-.fi
-.in -2
-.sp
 
 .SH EXIT STATUS
 .sp

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-#
+# Copyright (c) 2012 by Delphix. All rights reserved.
 #
 # This file defines the current capabilities of GRUB over and above that
 # supported by the standard distribution
@@ -39,7 +39,7 @@
 # This file and the associated version are Solaris specific and are
 # not a part of the open source distribution of GRUB.
 #
-VERSION=20
+VERSION=21
 dboot
 xVM
 zfs

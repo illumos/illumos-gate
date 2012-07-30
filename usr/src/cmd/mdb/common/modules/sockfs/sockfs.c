@@ -66,6 +66,8 @@ static int
 sockparams_prt(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	struct sockparams sp;
+	char strdev[MAXPATHLEN];
+	char sockmod[MODMAXNAMELEN];
 
 	if ((flags & DCMD_ADDRSPEC) == 0) {
 		uint_t opt_e = 0;
@@ -112,12 +114,18 @@ sockparams_prt(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
+	if ((sp.sp_sdev_info.sd_devpath == NULL) ||
+	    (mdb_readstr(strdev, sizeof (strdev),
+	    (uintptr_t)sp.sp_sdev_info.sd_devpath) <= 0))
+		strcpy(strdev, "-");
+	if (mdb_readstr(sockmod, sizeof (sockmod),
+	    (uintptr_t)sp.sp_smod_name) <= 0)
+		strcpy(sockmod, "");
+
 	mdb_printf("%0?p %3u %3u %3u %15s %15s %6u %#6x\n",
 	    addr,
 	    sp.sp_family, sp.sp_type, sp.sp_protocol,
-	    (sp.sp_sdev_info.sd_devpath != 0) ?
-	    sp.sp_sdev_info.sd_devpath : "-",
-	    sp.sp_smod_name, sp.sp_refcnt,
+	    strdev, sockmod, sp.sp_refcnt,
 	    sp.sp_flags);
 
 

@@ -1156,8 +1156,7 @@ hs_findisovol(struct hsfs *fsp, struct vnode *vp,
 	 * To avoid that we read the whole medium in case that someone prepares
 	 * a malicious "fs image", we read at most 32 blocks.
 	 */
-	for (n = 0; n < 32 &&
-	    (enum iso_voldesc_type) ISO_DESC_TYPE(volp) != ISO_VD_EOV; n++) {
+	for (n = 0; n < 32 && ISO_DESC_TYPE(volp) != ISO_VD_EOV; n++) {
 		for (i = 0; i < ISO_ID_STRLEN; i++)
 			if (ISO_STD_ID(volp)[i] != ISO_ID_STRING[i])
 				goto cantfind;

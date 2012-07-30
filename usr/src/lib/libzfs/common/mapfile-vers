@@ -61,6 +61,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	libzfs_mnttab_cache;
 	libzfs_print_on_error;
 	libzfs_set_cachedprops;
+	spa_feature_table;
 	zfs_allocatable_devs;
 	zfs_asprintf;
 	zfs_clone;
@@ -77,7 +78,6 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zfs_get_holds;
 	zfs_get_name;
 	zfs_get_pool_handle;
-	zfs_get_snapused_int;
 	zfs_get_user_props;
 	zfs_get_type;
 	zfs_handle_dup;
@@ -135,6 +135,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zfs_release;
 	zfs_rename;
 	zfs_rollback;
+	zfs_save_arguments;
 	zfs_send;
 	zfs_share;
 	zfs_shareall;
@@ -146,6 +147,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zfs_smb_acl_remove;
 	zfs_smb_acl_rename;
 	zfs_snapshot;
+	zfs_snapshot_nvl;
 	zfs_spa_version;
 	zfs_spa_version_map;
 	zfs_type_to_name;
@@ -183,6 +185,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zpool_fru_set;
 	zpool_get_config;
 	zpool_get_errlog;
+	zpool_get_features;
 	zpool_get_handle;
 	zpool_get_history;
 	zpool_get_name;
@@ -199,15 +202,20 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zpool_is_bootable;
 	zpool_iter;
 	zpool_label_disk;
+	zpool_log_history;
 	zpool_mount_datasets;
 	zpool_name_to_prop;
 	zpool_obj_to_path;
 	zpool_open;
 	zpool_open_canfail;
+	zpool_print_unsup_feat;
 	zpool_prop_align_right;
 	zpool_prop_column_name;
+	zpool_prop_feature;
+	zpool_prop_get_feature;
 	zpool_prop_readonly;
 	zpool_prop_to_name;
+	zpool_prop_unsupported;
 	zpool_prop_values;
 	zpool_read_label;
 	zpool_refresh_stats;
@@ -215,9 +223,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zpool_reopen;
 	zpool_scan;
 	zpool_search_import;
-	zpool_set_history_str;
 	zpool_set_prop;
-	zpool_stage_history;
 	zpool_state_to_name;
 	zpool_unmount_datasets;
 	zpool_upgrade;

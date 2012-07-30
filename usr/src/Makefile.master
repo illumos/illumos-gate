@@ -21,7 +21,9 @@
 
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012 by Delphix. All rights reserved.
 #
+
 #
 # Makefile.master, global definitions for system source
 #
@@ -109,23 +111,37 @@ STRIP_COMMENTS=	$(INTERNAL_RELEASE_BUILD)
 TONICBUILD=     $(POUND_SIGN)
 $(TONICBUILD)CLOSEDROOT= $(ROOT)-closed
 
-# set __GNUC= in the environment to build 32-bit with the gcc compiler.
-# The default is to use the Sun Studio compiler for all processor types.
-__GNUC=		$(POUND_SIGN)
 
-# __SUNC is the default, Sun C compiler, set to $(POUND_SIGN) if __GNUC is
-# primary to facilitate conditional make rules.
+# The variables below control the compilers used during the build.
+# There are a number of permutations.
+#
+# __GNUC and __SUNC control (and indicate) the primary compiler.  Whichever
+# one is not POUND_SIGN is the primary, with the other as the shadow.  They
+# may also be used to control entirely compiler-specific Makefile assignments.
+# __SUNC and Sun Studio are the default.
+#
+# __GNUC64 indicates that the 64bit build should use the GNU C compiler.
+# There is no Sun C analogue.
+#
+# The following version-specific options are operative regardless of which
+# compiler is primary, and control the versions of the given compilers to be
+# used.  They also allow compiler-version specific Makefile fragments.
+#
+# __SSNEXT when set to the empty string enables options specific to the 'next'
+# version of the Sun Studio compiler.
+#
+# __GNUC3 when the empty string uses and refers to GCC 3.x, it is the default.
+# __GNUC4 when the empty string uses and refers to GCC 4.x.
+
+__GNUC=			$(POUND_SIGN)
 $(__GNUC)__SUNC=	$(POUND_SIGN)
+__GNUC64=		$(__GNUC)
 
-# set __GNUC64= in the environment to build 64-bit with the gcc compiler.
-# Inherit the __GNUC value by default, and if that is set to $(POUND_SIGN)
-# then this means use the Sun Studio compiler.
-__GNUC64=	$(__GNUC)
+__SSNEXT=		$(POUND_SIGN)
 
-# set __SSNEXT= in the enviroment to build with the 'next' release of
-# the Sun Studio compiler. This will cause command line options specific
-# to the 'next' version of the Sun Studio compiler to be used.
-__SSNEXT=	$(POUND_SIGN)
+__GNUC3=
+__GNUC4=		$(POUND_SIGN)
+$(__GNUC4)__GNUC3=	$(POUND_SIGN)
 
 # set __GNUC4 in the environment to build with GCC 4.4 These two variables are
 # operative even when __GNUC is not, as they affect flags that will be used by
@@ -212,7 +228,7 @@ WC=		/usr/bin/wc
 XARGS=		/usr/bin/xargs
 ELFEDIT=	/usr/bin/elfedit
 ELFSIGN=	/usr/bin/elfsign
-DTRACE=		/usr/sbin/dtrace
+DTRACE=		/usr/sbin/dtrace -xnolibs
 UNIQ=		/usr/bin/uniq
 TAR=		/usr/bin/tar
 
@@ -339,6 +355,15 @@ CCSTATICSYM=		-Wc,-Qassembler-ounrefsym=0
 #
 # generate 32-bit addresses in the v9 kernel. Saves memory.
 CCABS32=		-Wc,-xcode=abs32
+#
+# generate v9 code which tolerates callers using the v7 ABI, for the sake of
+# system calls.
+$(__GNUC4)CC32BITCALLERS=		-_gcc=-massume-32bit-callers
+
+# GCC, especially, is increasingly beginning to auto-inline functions and
+# sadly does so separately not under the general -fno-inline-functions
+$(__GNUC4)CCNOAUTOINLINE= -_gcc=-fno-inline-small-functions \
+	-_gcc=-fno-inline-functions-called-once
 
 # One optimization the compiler might perform is to turn this:
 #	#pragma weak foo
@@ -404,7 +429,7 @@ CERRWARN += -erroff=E_STATEMENT_NOT_REACHED
 
 # Normally cw(1) would translate -v into a set of options including these
 # but as they're GCC 4.x specific, we can't do that
-$(__GNUC4)CERRWARN +=	-_gcc=-Wno-address
+$(__GNUC4)CERRWARN +=	-_gcc=-Wno-address -_gcc=-Wno-array-bounds
 
 #
 # turn warnings into errors (C++)
@@ -457,10 +482,6 @@ CNOGLOBAL= -W0,-noglobal
 #
 # In the same spirit, this will also remove the date from the N_OPT stab.
 CGLOBALSTATIC= -W0,-xglobalstatic
-
-# Normally, gcc uses indirect DWARF strings to save space.  However,
-# this causes relocations that ctfconvert cannot handle.  Disable this.
-CDWARFSTR=	-_gcc=-fno-dwarf2-indirect-strings
 
 # Sometimes we want all symbols and types in debugging information even
 # if they aren't used.
@@ -527,17 +548,17 @@ XREGSFLAG64		= $($(MACH64)_XREGSFLAG)
 
 CFLAGS=         $(COPTFLAG) $($(MACH)_CFLAGS) $(SPACEFLAG) $(CCMODE) \
 		$(ILDOFF) $(CERRWARN) $(C99MODE) $(CCUNBOUND) $(IROPTFLAG) \
-		$(CGLOBALSTATIC)
+		$(CGLOBALSTATIC) $(CCNOAUTOINLINE)
 CFLAGS64=       $(COPTFLAG64) $($(MACH64)_CFLAGS) $(SPACEFLAG64) $(CCMODE64) \
 		$(ILDOFF) $(CERRWARN) $(C99MODE) $(CCUNBOUND) $(IROPTFLAG64) \
-		$(CGLOBALSTATIC)
+		$(CGLOBALSTATIC) $(CCNOAUTOINLINE)
 #
 # Flags that are used to build parts of the code that are subsequently
 # run on the build machine (also known as the NATIVE_BUILD).
 #
 NATIVE_CFLAGS=	$(COPTFLAG) $($(NATIVE_MACH)_CFLAGS) $(CCMODE) \
 		$(ILDOFF) $(CERRWARN) $(C99MODE) $($(NATIVE_MACH)_CCUNBOUND) \
-		$(IROPTFLAG) $(CGLOBALSTATIC)
+		$(IROPTFLAG) $(CGLOBALSTATIC) $(CCNOAUTOINLINE)
 
 DTEXTDOM=-DTEXT_DOMAIN=\"$(TEXT_DOMAIN)\"	# For messaging.
 DTS_ERRNO=-D_TS_ERRNO
@@ -679,7 +700,9 @@ COMPILE.java=	$(JAVAC) $(JAVAFLAGS) -classpath $(CLASSPATH)
 # Link time macros
 #
 CCNEEDED		= -lC
-$(__GNUC)CCNEEDED	= -L$(GCCLIBDIR) -lstdc++ -lgcc_s
+CCEXTNEEDED		= -lCrun -lCstd
+$(__GNUC)CCNEEDED	= -L$(GCCLIBDIR) -R$(GCCLIBDIR) -lstdc++ -lgcc_s
+$(__GNUC)CCEXTNEEDED	= $(CCNEEDED)
 
 LINK.c=		$(CC) $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 LINK64.c=	$(CC) $(CFLAGS64) $(CPPFLAGS) $(LDFLAGS)

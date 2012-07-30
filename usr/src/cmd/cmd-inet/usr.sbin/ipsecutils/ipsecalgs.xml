@@ -4,6 +4,8 @@
 	Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 	Use is subject to license terms.
 
+	Copyright (c) 2012 DEY Storage Systems, Inc.  All rights reserved.
+
  CDDL HEADER START
 
  The contents of this file are subject to the terms of the
@@ -22,8 +24,6 @@
  information: Portions Copyright [yyyy] [name of copyright owner]
 
  CDDL HEADER END
-
-	ident	"%Z%%M%	%I%	%E% SMI"
 
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
@@ -58,6 +58,22 @@
 		restart_on='none'>
                 <service_fmri value='file://localhost/etc/inet/ipsecalgs' />
         </dependency>
+
+	<dependency
+		name='filesystem'
+		grouping='require_all'
+		type='service'
+		restart_on='error'>
+		<service_fmri value='svc:/system/filesystem/usr' />
+	</dependency>
+
+	<dependency
+		name='devices'
+		grouping='require_all'
+		type='service'
+		restart_on='none'>
+		<service_fmri value='svc:/system/device/local' />
+	</dependency>
 
 	<dependent
 		name='ipsecalgs-network'

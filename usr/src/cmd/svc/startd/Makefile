@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Milan Jurik. All rights reserved.
 #
 
 PROG = svc.startd
@@ -61,6 +62,7 @@ include ../../Makefile.ctf
 
 ROOTCMDDIR=	$(ROOT)/lib/svc/bin
 
+$(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 CFLAGS += -v
 CPPFLAGS += -I. -I../common
 

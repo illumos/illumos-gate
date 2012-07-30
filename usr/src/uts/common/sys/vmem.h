@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 
 #ifndef _SYS_VMEM_H
@@ -142,6 +143,7 @@ extern void *vmem_add(vmem_t *, void *, size_t, int);
 extern int vmem_contains(vmem_t *, void *, size_t);
 extern void vmem_walk(vmem_t *, int, void (*)(void *, void *, size_t), void *);
 extern size_t vmem_size(vmem_t *, int);
+extern void vmem_qcache_reap(vmem_t *vmp);
 
 #ifdef	__cplusplus
 }

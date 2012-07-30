@@ -23,6 +23,7 @@
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -1250,11 +1251,21 @@ const struct ioc {
 		"zfs_cmd_t" },
 	{ (uint_t)ZFS_IOC_SPACE_WRITTEN,	"ZFS_IOC_SPACE_WRITTEN",
 		"zfs_cmd_t" },
-	{ (uint_t)ZFS_IOC_DESTROY_SNAPS_NVL,	"ZFS_IOC_DESTROY_SNAPS_NVL",
+	{ (uint_t)ZFS_IOC_DESTROY_SNAPS,	"ZFS_IOC_DESTROY_SNAPS",
 		"zfs_cmd_t" },
 	{ (uint_t)ZFS_IOC_POOL_REGUID,		"ZFS_IOC_POOL_REGUID",
 		"zfs_cmd_t" },
 	{ (uint_t)ZFS_IOC_POOL_REOPEN,		"ZFS_IOC_POOL_REOPEN",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_SEND_PROGRESS,	"ZFS_IOC_SEND_PROGRESS",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_LOG_HISTORY,		"ZFS_IOC_LOG_HISTORY",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_SEND_NEW,		"ZFS_IOC_SEND_NEW",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_SEND_SPACE,		"ZFS_IOC_SEND_SPACE",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_CLONE,		"ZFS_IOC_CLONE",
 		"zfs_cmd_t" },
 
 	/* kssl ioctls */

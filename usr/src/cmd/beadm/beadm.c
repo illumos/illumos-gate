@@ -123,21 +123,21 @@ usage(void)
 	    "\n"
 	    "\tsubcommands:\n"
 	    "\n"
-	    "\tbeadm activate beName\n"
-	    "\tbeadm create [-d BE_desc]\n"
+	    "\tbeadm activate [-v] beName\n"
+	    "\tbeadm create [-a] [-d BE_desc]\n"
 	    "\t\t[-o property=value] ... [-p zpool] \n"
-	    "\t\t[-e nonActiveBe | beName@snapshot] beName\n"
+	    "\t\t[-e nonActiveBe | beName@snapshot] [-v] beName\n"
 	    "\tbeadm create [-d BE_desc]\n"
-	    "\t\t[-o property=value] ... [-p zpool] beName@snapshot\n"
-	    "\tbeadm destroy [-Ffs] beName \n"
-	    "\tbeadm destroy [-F] beName@snapshot \n"
-	    "\tbeadm list [[-a] | [-d] [-s]] [-H] [beName]\n"
-	    "\tbeadm mount [-s ro|rw] beName [mountpoint]\n"
-	    "\tbeadm unmount [-f] beName | mountpoint\n"
-	    "\tbeadm umount [-f] beName | mountpoint\n"
-	    "\tbeadm rename origBeName newBeName\n"
-	    "\tbeadm rollback beName snapshot\n"
-	    "\tbeadm rollback beName@snapshot\n"));
+	    "\t\t[-o property=value] ... [-p zpool] [-v] beName@snapshot\n"
+	    "\tbeadm destroy [-Ffsv] beName \n"
+	    "\tbeadm destroy [-Fv] beName@snapshot \n"
+	    "\tbeadm list [[-a] | [-d] [-s]] [-H] [-v] [beName]\n"
+	    "\tbeadm mount [-s ro|rw] [-v] beName [mountpoint]\n"
+	    "\tbeadm unmount [-fv] beName | mountpoint\n"
+	    "\tbeadm umount [-fv] beName | mountpoint\n"
+	    "\tbeadm rename [-v] origBeName newBeName\n"
+	    "\tbeadm rollback [-v] beName snapshot\n"
+	    "\tbeadm rollback [-v] beName@snapshot\n"));
 }
 
 static int
@@ -664,7 +664,19 @@ be_do_activate(int argc, char **argv)
 {
 	nvlist_t	*be_attrs;
 	int		err = 1;
+	int		c;
 	char		*obe_name;
+
+	while ((c = getopt(argc, argv, "v")) != -1) {
+		switch (c) {
+		case 'v':
+			libbe_print_errors(B_TRUE);
+			break;
+		default:
+			usage();
+			return (1);
+		}
+	}
 
 	argc -= optind;
 	argv += optind;
@@ -728,7 +740,7 @@ be_do_create(int argc, char **argv)
 	char		*propval = NULL;
 	char		*strval = NULL;
 
-	while ((c = getopt(argc, argv, "ad:e:io:p:")) != -1) {
+	while ((c = getopt(argc, argv, "ad:e:io:p:v")) != -1) {
 		switch (c) {
 		case 'a':
 			activate = B_TRUE;
@@ -765,6 +777,9 @@ be_do_create(int argc, char **argv)
 			break;
 		case 'p':
 			nbe_zpool = optarg;
+			break;
+		case 'v':
+			libbe_print_errors(B_TRUE);
 			break;
 		default:
 			usage();
@@ -939,13 +954,16 @@ be_do_destroy(int argc, char **argv)
 	char		*snap_name;
 	char		*be_name;
 
-	while ((c = getopt(argc, argv, "fFs")) != -1) {
+	while ((c = getopt(argc, argv, "fFsv")) != -1) {
 		switch (c) {
 		case 'f':
 			destroy_flags |= BE_DESTROY_FLAG_FORCE_UNMOUNT;
 			break;
 		case 's':
 			destroy_flags |= BE_DESTROY_FLAG_SNAPSHOTS;
+			break;
+		case 'v':
+			libbe_print_errors(B_TRUE);
 			break;
 		case 'F':
 			suppress_prompt = B_TRUE;
@@ -1061,7 +1079,7 @@ be_do_list(int argc, char **argv)
 	int		c = 0;
 	char		*be_name = NULL;
 
-	while ((c = getopt(argc, argv, "nadsH")) != -1) {
+	while ((c = getopt(argc, argv, "adsvH")) != -1) {
 		switch (c) {
 		case 'a':
 			all = B_TRUE;
@@ -1071,6 +1089,9 @@ be_do_list(int argc, char **argv)
 			break;
 		case 's':
 			snaps = B_TRUE;
+			break;
+		case 'v':
+			libbe_print_errors(B_TRUE);
 			break;
 		case 'H':
 			parsable = B_TRUE;
@@ -1145,7 +1166,7 @@ be_do_mount(int argc, char **argv)
 	char		*mountpoint;
 	char		*tmp_mp = NULL;
 
-	while ((c = getopt(argc, argv, "s:")) != -1) {
+	while ((c = getopt(argc, argv, "s:v")) != -1) {
 		switch (c) {
 		case 's':
 			shared_fs = B_TRUE;
@@ -1161,6 +1182,9 @@ be_do_mount(int argc, char **argv)
 				return (1);
 			}
 
+			break;
+		case 'v':
+			libbe_print_errors(B_TRUE);
 			break;
 		default:
 			usage();
@@ -1223,7 +1247,6 @@ be_do_mount(int argc, char **argv)
 		(void) printf(_("Mounted successfully on: '%s'\n"), mountpoint);
 		break;
 	case BE_ERR_BE_NOENT:
-		err = 1;
 		(void) fprintf(stderr, _("%s does not exist or appear "
 		    "to be a valid BE.\nPlease check that the name of "
 		    "the BE provided is correct.\n"), obe_name);
@@ -1235,13 +1258,11 @@ be_do_mount(int argc, char **argv)
 		break;
 	case BE_ERR_PERM:
 	case BE_ERR_ACCESS:
-		err = 1;
 		(void) fprintf(stderr, _("Unable to mount %s.\n"), obe_name);
 		(void) fprintf(stderr, _("You have insufficient privileges to "
 		    "execute this command.\n"));
 		break;
 	default:
-		err = 1;
 		(void) fprintf(stderr, _("Unable to mount %s.\n"), obe_name);
 		(void) fprintf(stderr, "%s\n", be_err_to_str(err));
 	}
@@ -1262,10 +1283,13 @@ be_do_unmount(int argc, char **argv)
 	int		c;
 	int		unmount_flags = 0;
 
-	while ((c = getopt(argc, argv, "f")) != -1) {
+	while ((c = getopt(argc, argv, "fv")) != -1) {
 		switch (c) {
 		case 'f':
 			unmount_flags |= BE_UNMOUNT_FLAG_FORCE;
+			break;
+		case 'v':
+			libbe_print_errors(B_TRUE);
 			break;
 		default:
 			usage();
@@ -1337,6 +1361,18 @@ be_do_rename(int argc, char **argv)
 	char		*obe_name;
 	char		*nbe_name;
 	int err = 1;
+	int c;
+
+	while ((c = getopt(argc, argv, "v")) != -1) {
+		switch (c) {
+		case 'v':
+			libbe_print_errors(B_TRUE);
+			break;
+		default:
+			usage();
+			return (1);
+		}
+	}
 
 	argc -= optind;
 	argv += optind;
@@ -1394,6 +1430,18 @@ be_do_rollback(int argc, char **argv)
 	char		*obe_name;
 	char		*snap_name;
 	int		err = 1;
+	int		c;
+
+	while ((c = getopt(argc, argv, "v")) != -1) {
+		switch (c) {
+		case 'v':
+			libbe_print_errors(B_TRUE);
+			break;
+		default:
+			usage();
+			return (1);
+		}
+	}
 
 	argc -= optind;
 	argv += optind;

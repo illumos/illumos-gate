@@ -26,6 +26,11 @@
  * Copyright (c) 2012 Joyent, Inc. All rights reserved.
  */
 
+/*
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012 Joyent, Inc. All rights reserved.
+ */
+
 #ifndef	_MDB_MODULE_H
 #define	_MDB_MODULE_H
 

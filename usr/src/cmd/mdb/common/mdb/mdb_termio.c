@@ -27,6 +27,11 @@
  */
 
 /*
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012 Joyent, Inc. All rights reserved.
+ */
+
+/*
  * Terminal I/O Backend
  *
  * Terminal editing backend for standard input.  The terminal i/o backend is
@@ -1639,7 +1644,6 @@ termio_tab(termio_data_t *td, int c)
 	buf = mdb_alloc(td->tio_cmdbuf.cmd_bufidx + 1, UM_SLEEP | UM_GC);
 	(void) strncpy(buf, td->tio_cmdbuf.cmd_buf, td->tio_cmdbuf.cmd_bufidx);
 	buf[td->tio_cmdbuf.cmd_bufidx] = '\0';
-	buf = strndup(td->tio_cmdbuf.cmd_buf, td->tio_cmdbuf.cmd_bufidx);
 	td->tio_flags |= TIO_TAB;
 	mtp = mdb_tab_init();
 	nres = mdb_tab_command(mtp, buf);
@@ -1648,8 +1652,10 @@ termio_tab(termio_data_t *td, int c)
 		result = NULL;
 	} else {
 		result = mdb_tab_match(mtp);
-		if (nres != 1)
+		if (nres != 1) {
+			mdb_printf("\n");
 			mdb_tab_print(mtp);
+		}
 	}
 
 	if (result != NULL) {

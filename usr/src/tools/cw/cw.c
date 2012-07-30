@@ -1140,11 +1140,6 @@ do_gcc(cw_ictx_t *ctx)
 				break;
 			}
 #if defined(__x86)
-			if (strcmp(arg, "-Wu,-no_got_reloc") == 0) {
-				newae(ctx->i_ae, "-fno-jump-tables");
-				newae(ctx->i_ae, "-fno-constant-pools");
-				break;
-			}
 			if (strcmp(arg, "-Wu,-xmodel=kernel") == 0) {
 				newae(ctx->i_ae, "-ffreestanding");
 				newae(ctx->i_ae, "-mno-red-zone");

@@ -20,13 +20,14 @@
 #
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2011 by Delphix. All rights reserved.
+# Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
 LIBRARY= libzfs.a
 VERS= .1
 
 OBJS_SHARED=			\
+	zfeature_common.o	\
 	zfs_comutil.o		\
 	zfs_deleg.o		\
 	zfs_fletcher.o		\
@@ -68,7 +69,7 @@ INCS += -I../../libc/inc
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
 LDLIBS +=	-lc -lm -ldevid -lgen -lnvpair -luutil -lavl -lefi \
-	-ladm -lidmap -ltsol -lmd -lumem
+	-ladm -lidmap -ltsol -lmd -lumem -lzfs_core
 CPPFLAGS +=	$(INCS) -D_LARGEFILE64_SOURCE=1 -D_REENTRANT
 
 SRCS=	$(OBJS_COMMON:%.o=$(SRCDIR)/%.c)	\

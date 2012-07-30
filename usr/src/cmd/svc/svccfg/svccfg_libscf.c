@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 
@@ -3905,8 +3906,8 @@ upgrade_manifestfiles(pgroup_t *pg, const entity_t *ient,
 	pgroup_t *mfst_pgroup;
 	property_t *mfst_prop;
 	property_t *old_prop;
-	char *pname = malloc(MAXPATHLEN);
-	char *fval = NULL;
+	char *pname;
+	char *fval;
 	char *old_pname;
 	char *old_fval;
 	int no_upgrade_pg;
@@ -3976,6 +3977,13 @@ upgrade_manifestfiles(pgroup_t *pg, const entity_t *ient,
 	    SCF_SUCCESS)
 		return (-1);
 
+	if ((pname = malloc(MAXPATHLEN)) == NULL)
+		return (ENOMEM);
+	if ((fval = malloc(MAXPATHLEN)) == NULL) {
+		free(pname);
+		return (ENOMEM);
+	}
+
 	while ((r = scf_iter_next_property(ud_prop_iter, ud_prop)) == 1) {
 		mfst_seen = 0;
 		if (scf_property_get_name(ud_prop, pname, MAXPATHLEN) < 0)
@@ -3995,16 +4003,12 @@ upgrade_manifestfiles(pgroup_t *pg, const entity_t *ient,
 		 * property list to get proccessed into the repo.
 		 */
 		if (mfst_seen == 0) {
-			if (fval == NULL)
-				fval = malloc(MAXPATHLEN);
-
 			/*
 			 * If we cannot get the value then there is no
 			 * reason to attempt to attach the value to
 			 * the property group
 			 */
-			if (fval != NULL &&
-			    prop_get_val(ud_prop, fname_value) == 0 &&
+			if (prop_get_val(ud_prop, fname_value) == 0 &&
 			    scf_value_get_astring(fname_value, fval,
 			    MAXPATHLEN) != -1)  {
 				old_pname = safe_strdup(pname);
@@ -4021,6 +4025,7 @@ upgrade_manifestfiles(pgroup_t *pg, const entity_t *ient,
 			}
 		}
 	}
+	free(pname);
 	free(fval);
 
 	cbdata.sc_handle = g_hndl;

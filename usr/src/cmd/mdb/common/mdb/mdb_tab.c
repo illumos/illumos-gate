@@ -501,6 +501,7 @@ tab_complete_type(mdb_ctf_id_t id, void *arg)
 		return (0);
 
 	if (flags & MDB_TABC_NOARRAY && rkind == CTF_K_ARRAY)
+
 		return (0);
 
 	(void) mdb_ctf_type_name(id, buf, sizeof (buf));

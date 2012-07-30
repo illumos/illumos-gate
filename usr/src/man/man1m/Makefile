@@ -11,8 +11,8 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2011 Nexenta Systems, Inc. All rights reserved.
 # Copyright (c) 2012 Joyent, Inc. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 include ../../Makefile.master
@@ -254,7 +254,6 @@ COMMON_MANFILES = 	6to4relay.1m		\
 	 	 	isns.1m			\
 	 	 	isnsadm.1m		\
 	 	 	itadm.1m		\
-	 	 	itu.1m			\
 	 	 	k5srvutil.1m		\
 	 	 	kadb.1m			\
 	 	 	kadmin.1m		\
@@ -323,7 +322,6 @@ COMMON_MANFILES = 	6to4relay.1m		\
 	 	 	metastat.1m		\
 	 	 	metasync.1m		\
 	 	 	metattach.1m		\
-	 	 	mkbootmedia.1m		\
 	 	 	mkdevalloc.1m		\
 	 	 	mkdevmaps.1m		\
 	 	 	mkfifo.1m		\
@@ -377,7 +375,6 @@ COMMON_MANFILES = 	6to4relay.1m		\
 	 	 	pbind.1m		\
 	 	 	picld.1m		\
 	 	 	ping.1m			\
-	 	 	pkg2du.1m		\
 	 	 	pkgadd.1m		\
 	 	 	pkgadm.1m		\
 	 	 	pkgask.1m		\
@@ -557,7 +554,6 @@ COMMON_MANFILES = 	6to4relay.1m		\
 	 	 	unshare_nfs.1m		\
 	 	 	update_drv.1m		\
 	 	 	updatehome.1m		\
-	 	 	updatemedia.1m		\
 	 	 	useradd.1m		\
 	 	 	userdel.1m		\
 	 	 	usermod.1m		\

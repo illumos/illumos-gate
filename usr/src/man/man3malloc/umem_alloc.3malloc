@@ -188,6 +188,31 @@ the thread exits. The efficacy of the per-thread cache can be determined with
 the \fB::umastat\fR \fBmdb\fR(1) \fIdcmd\fR debugger command.
 .RE
 
+.ne 2
+.na
+\fB\fBallocator\fR=\fBbest\fR\fR
+.ad
+.br
+.na
+\fB\fBallocator\fR=\fBfirst\fR\fR
+.ad
+.br
+.na
+\fB\fBallocator\fR=\fBinstant\fR\fR
+.ad
+.br
+.na
+\fB\fBallocator\fR=\fBnext\fR\fR
+.ad
+.RS 16n
+Set the underlying allocation strategy. The \fBbest\fR fit strategy tells
+libumem to use the smallest free segment possible. The \fBinstant\fR fit
+strategy approximates the best fit strategy in constant cpu time. The
+\fBfirst\fR fit strategy takes the first free segment that can honor the
+allocation. The \fBnext\fR fit strategy uses the next free segment after the
+previously allocated one.
+.RE
+
 .RE
 
 .SH EXAMPLES

@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <stdio.h>
@@ -603,7 +604,8 @@ cap_open_read(const char *name)
 {
 	struct stat st;
 	int cap_vers;
-	int *word, device_mac_type;
+	int *word;
+	int device_mac_type = -1;
 	int capfile_in;
 
 	capfile_in = open(name, O_RDONLY);

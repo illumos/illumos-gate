@@ -23,7 +23,8 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-set name=pkg.fmri value=pkg:/SUNWarbel@0.5.11,5.11-0.133
-set name=pkg.renamed value=true
+# Was renamed to pkg:/driver/network/arbel, both are obsolete.
+# This is made obsolete at $(PKGVERS) to match it.
+set name=pkg.fmri value=pkg:/SUNWarbel@$(PKGVERS)
+set name=pkg.obsolete value=true
 set name=variant.arch value=$(ARCH)
-depend fmri=pkg:/driver/network/arbel@0.5.11,5.11-0.133 type=require

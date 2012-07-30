@@ -83,10 +83,20 @@ extern "C" {
  *
  * Should only be used on 'extern inline' definitions for GCC.
  */
-#if __GNUC_VERSION >= 40300
+#if __GNUC_VERSION >= 40200
 #define	__sun_attr___gnu_inline__	__attribute__((__gnu_inline__))
 #else
 #define	__sun_attr___gnu_inline__
+#endif
+
+/*
+ * The function has control flow such that it may return multiple times (in
+ * the manner of setjmp or vfork)
+ */
+#if __GNUC_VERSION >= 40100
+#define	__sun_attr___returns_twice__	__attribute__((__returns_twice__))
+#else
+#define	__sun_attr___returns_twice__
 #endif
 
 /*
@@ -126,6 +136,7 @@ extern "C" {
 #define	__KVPRINTFLIKE(__n)	__sun_attr__((__KVPRINTFLIKE__(__n)))
 #define	__NORETURN		__sun_attr__((__noreturn__))
 #define	__GNU_INLINE		__inline__ __sun_attr__((__gnu_inline__))
+#define	__RETURNS_TWICE		__sun_attr__((__returns_twice__))
 #define	__CONST			__sun_attr__((__const__))
 #define	__PURE			__sun_attr__((__pure__))
 

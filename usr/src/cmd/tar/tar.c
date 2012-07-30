@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -548,11 +549,14 @@ static void compress_back(void);
 static void decompress_file(void);
 static pid_t uncompress_file(void);
 static void *compress_malloc(size_t);
-static void check_compression();
-static char *bz_suffix();
-static char *gz_suffix();
+static void check_compression(void);
+static char *bz_suffix(void);
+static char *gz_suffix(void);
+static char *xz_suffix(void);
 static char *add_suffix();
 static void wait_pid(pid_t);
+static void verify_compress_opt(const char *t);
+static void detect_compress(void);
 
 static	struct stat stbuf;
 
@@ -572,6 +576,8 @@ static	int	Dflag;			/* Data change flag */
 static	int	jflag;			/* flag to use 'bzip2' */
 static	int	zflag;			/* flag to use 'gzip' */
 static	int	Zflag;			/* flag to use 'compress' */
+static	int	Jflag;			/* flag to use 'xz' */
+static	int	aflag;			/* flag to use autocompression */
 
 /* Trusted Extensions */
 static	int	Tflag;			/* Trusted Extensions attr flags */
@@ -693,17 +699,21 @@ int waitaround = 0;		/* wait for rendezvous with the debugger */
 #define	BZIP		"/usr/bin/bzip2"
 #define	GZIP		"/usr/bin/gzip"
 #define	COMPRESS	"/usr/bin/compress"
+#define	XZ		"/usr/bin/xz"
 #define	BZCAT		"/usr/bin/bzcat"
 #define	GZCAT		"/usr/bin/gzcat"
 #define	ZCAT		"/usr/bin/zcat"
-#define	GS		8		/* number of valid 'gzip' sufixes */
-#define	BS		4		/* number of valid 'bzip2' sufixes */
+#define	XZCAT		"/usr/bin/xzcat"
+#define	GSUF		8	/* number of valid 'gzip' sufixes */
+#define	BSUF		4	/* number of valid 'bzip2' sufixes */
+#define	XSUF		1	/* number of valid 'xz' suffixes */
 
 static	char		*compress_opt; 	/* compression type */
 
 static	char		*gsuffix[] = {".gz", "-gz", ".z", "-z", "_z", ".Z",
 			".tgz", ".taz"};
 static	char		*bsuffix[] = {".bz2", ".bz", ".tbz2", ".tbz"};
+static	char		*xsuffix[] = {".xz"};
 static	char		*suffix;
 
 
@@ -897,13 +907,19 @@ main(int argc, char *argv[])
 			pflag++;	/* also set flag for ACL */
 			break;
 		case 'j':		/* compession "bzip2" */
-			jflag++;
+			jflag = 1;
 			break;
 		case 'z':		/* compression "gzip" */
-			zflag++;
+			zflag = 1;
 			break;
 		case 'Z':		/* compression "compress" */
-			Zflag++;
+			Zflag = 1;
+			break;
+		case 'J':		/* compression "xz" */
+			Jflag = 1;
+			break;
+		case 'a':
+			aflag = 1;	/* autocompression */
 			break;
 		default:
 			(void) fprintf(stderr, gettext(
@@ -919,10 +935,9 @@ main(int argc, char *argv[])
 		usage();
 	}
 	if (cflag) {
-		if ((zflag && jflag) || (zflag && Zflag) ||
-		    (jflag && Zflag)) {
+		if ((jflag + zflag + Zflag + Jflag + aflag) > 1) {
 			(void) fprintf(stderr, gettext(
-			    "tar: specify only one of [jzZ] to "
+			    "tar: specify only one of [ajJzZ] to "
 			    "create a compressed file.\n"));
 			usage();
 		}
@@ -992,6 +1007,9 @@ main(int argc, char *argv[])
 	if (rflag) {
 		if (cflag && usefile != NULL)  {
 			/* Set the compression type */
+			if (aflag)
+				detect_compress();
+
 			if (jflag) {
 				compress_opt = compress_malloc(strlen(BZIP)
 				    + 1);
@@ -1004,6 +1022,9 @@ main(int argc, char *argv[])
 				compress_opt =
 				    compress_malloc(strlen(COMPRESS) + 1);
 				(void) strcpy(compress_opt, COMPRESS);
+			} else if (Jflag) {
+				compress_opt = compress_malloc(strlen(XZ) + 1);
+				(void) strcpy(compress_opt, XZ);
 			}
 		} else {
 			/*
@@ -1167,7 +1188,7 @@ usage(void)
 #else
 	    "Usage: tar {c|r|t|u|x}[BDeEFhilmnopPTvw[0-7]][bf][X...] "
 #endif	/* O_XATTR */
-	    "[j|z|Z] "
+	    "[j|J|z|Z] "
 	    "[blocksize] [tarfile] [size] [exclude-file...] "
 	    "{file | -I include-file | -C directory file}...\n"));
 	done(1);
@@ -9158,6 +9179,7 @@ compress_back()
 		    usefile, compress_opt);
 	}
 	if ((pid = fork()) == 0) {
+		verify_compress_opt(compress_opt);
 		(void) execlp(compress_opt, compress_opt,
 		    usefile, NULL);
 	} else if (pid == -1) {
@@ -9174,18 +9196,16 @@ compress_back()
 #define	GZIP_MAGIC	"\037\213"
 #define	BZIP_MAGIC	"BZh"
 #define	COMP_MAGIC	"\037\235"
+#define	XZ_MAGIC	"\375\067\172\130\132\000"
 
 void
-check_compression()
+check_compression(void)
 {
-	char 	magic[2];
-	char	buf[16];
+	char 	magic[16];
 	FILE	*fp;
 
 	if ((fp = fopen(usefile, "r")) != NULL) {
-		(void) fread(buf, sizeof (char), 6, fp);
-		magic[0] = buf[0];
-		magic[1] = buf[1];
+		(void) fread(magic, sizeof (char), 6, fp);
 		(void) fclose(fp);
 	}
 
@@ -9213,6 +9233,14 @@ check_compression()
 			compress_opt = compress_malloc(strlen(COMPRESS) + 1);
 			(void) strcpy(compress_opt, COMPRESS);
 		}
+	} else if (memcmp(magic, XZ_MAGIC, 6) == 0) {
+		if (xflag || tflag) {
+			compress_opt = compress_malloc(strlen(XZCAT) + 1);
+			(void) strcpy(compress_opt, XZCAT);
+		} else if (uflag || rflag) {
+			compress_opt = compress_malloc(strlen(XZ) + 1);
+			(void) strcpy(compress_opt, XZ);
+		}
 	}
 }
 
@@ -9234,6 +9262,11 @@ add_suffix()
 		if ((suffix = bz_suffix()) == NULL) {
 			strlcat(tfname, bsuffix[0], sizeof (tfname));
 			return (bsuffix[0]);
+		}
+	} else if (strcmp(compress_opt, XZ) == 0) {
+		if ((suffix = xz_suffix()) == NULL) {
+			strlcat(tfname, xsuffix[0], sizeof (tfname));
+			return (xsuffix[0]);
 		}
 	}
 	return (NULL);
@@ -9260,6 +9293,7 @@ decompress_file(void)
 			    gettext("Decompressing '%s' with "
 			    "'%s'...\n"), usefile, compress_opt);
 		}
+		verify_compress_opt(compress_opt);
 		(void) execlp(compress_opt, compress_opt, "-df",
 		    tfname, NULL);
 		vperror(1, gettext("Could not exec %s"), compress_opt);
@@ -9297,6 +9331,7 @@ compress_file(void)
 	(void) dup2(fd[0], STDIN_FILENO);
 	(void) close(fd[1]);
 	(void) dup2(mt, STDOUT_FILENO);
+	verify_compress_opt(compress_opt);
 	(void) execlp(compress_opt, compress_opt, NULL);
 	vperror(1, gettext("Could not exec %s"), compress_opt);
 	return (0);	/*NOTREACHED*/
@@ -9325,45 +9360,49 @@ uncompress_file(void)
 	(void) dup2(fd[1], STDOUT_FILENO);
 	(void) close(fd[0]);
 	(void) dup2(mt, STDIN_FILENO);
+	verify_compress_opt(compress_opt);
 	(void) execlp(compress_opt, compress_opt, NULL);
 	vperror(1, gettext("Could not exec %s"), compress_opt);
 	return (0);	/*NOTREACHED*/
 }
 
-/* Checking valid 'bzip2' suffix */
+/* Checking suffix validity */
 char *
-bz_suffix()
+check_suffix(char **suf, int size)
 {
 	int 	i;
 	int	slen;
 	int	nlen = strlen(usefile);
 
-	for (i = 0; i < BS; i++) {
-		slen = strlen(bsuffix[i]);
+	for (i = 0; i < size; i++) {
+		slen = strlen(suf[i]);
 		if (nlen < slen)
 			return (NULL);
-		if (strcmp(usefile + nlen - slen, bsuffix[i]) == 0)
-			return (bsuffix[i]);
+		if (strcmp(usefile + nlen - slen, suf[i]) == 0)
+			return (suf[i]);
 	}
 	return (NULL);
 }
 
+/* Checking valid 'bzip2' suffix */
+char *
+bz_suffix(void)
+{
+	return (check_suffix(bsuffix, BSUF));
+}
+
 /* Checking valid 'gzip' suffix */
 char *
-gz_suffix()
+gz_suffix(void)
 {
-	int 	i;
-	int	slen;
-	int	nlen = strlen(usefile);
+	return (check_suffix(gsuffix, GSUF));
+}
 
-	for (i = 0; i < GS; i++) {
-		slen = strlen(gsuffix[i]);
-		if (nlen < slen)
-			return (NULL);
-		if (strcmp(usefile + nlen - slen, gsuffix[i]) == 0)
-			return (gsuffix[i]);
-	}
-	return (NULL);
+/* Checking valid 'xz' suffix */
+char *
+xz_suffix(void)
+{
+	return (check_suffix(xsuffix, XSUF));
 }
 
 void *
@@ -9385,4 +9424,31 @@ wait_pid(pid_t pid)
 
 	while (waitpid(pid, &status, 0) == -1 && errno == EINTR)
 		;
+}
+
+static void
+verify_compress_opt(const char *t)
+{
+	struct stat statbuf;
+
+	if (stat(t, &statbuf) == -1)
+		vperror(1, "%s %s: %s\n", gettext("Could not stat"),
+		    t, strerror(errno));
+}
+
+static void
+detect_compress(void)
+{
+	char *zsuf[] = {".Z"};
+	if (check_suffix(zsuf, 1) != NULL) {
+		Zflag = 1;
+	} else if (check_suffix(bsuffix, BSUF) != NULL) {
+		jflag = 1;
+	} else if (check_suffix(gsuffix, GSUF) != NULL) {
+		zflag = 1;
+	} else if (check_suffix(xsuffix, XSUF) != NULL) {
+		Jflag = 1;
+	} else {
+		vperror(1, "%s\n", gettext("No compression method detected"));
+	}
 }

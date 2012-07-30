@@ -172,7 +172,9 @@ UNREF_OBJ	/libm\.so\.2.*\ of\ .*libstdc\+\+\.so\.6	# gcc build
 UNREF_OBJ	/lib.*\ of\ .*/lib/picl/plugins/		# picl
 UNREF_OBJ	/lib.*\ of\ .*kcfd				# interposer
 UNREF_OBJ	/libpkcs11\.so\.1; .*\ of\ .*libkmf\.so\.1	# interposed
-UNREF_OBJ	/libc\.so\.1.*\ of\ .*kldap\.so\.1              # gcc build
+# Referenced by the Studio build, not the GCC build.  GCC eliminates the unused
+# statics which have the dependence.
+UNREF_OBJ	/libc\.so\.1.*\ of\ .*kldap\.so\.1
 
 
 # Objects that used to contain system functionalty that has since

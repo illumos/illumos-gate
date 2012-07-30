@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
 #include <stdio.h>
@@ -688,6 +689,9 @@ pf_ipaddr_match(which, hostname, inet_type)
 		pr_err("unknown token type: %s", hostname);
 	}
 
+	if (hp == NULL)
+		return;
+
 	switch (which) {
 	case TO:
 		addr4offset = IPV4_DSTADDR_OFFSET;
@@ -703,7 +707,7 @@ pf_ipaddr_match(which, hostname, inet_type)
 		break;
 	}
 
-	if (hp != NULL && hp->h_addrtype == AF_INET) {
+	if (hp->h_addrtype == AF_INET) {
 		pf_matchfn("ip");
 		if (dl.dl_type == DL_ETHER)
 			pf_check_vlan_tag(ENCAP_ETHERTYPE_OFF/2);
@@ -809,9 +813,7 @@ pf_ipaddr_match(which, hostname, inet_type)
 		}
 	}
 
-	if (hp != NULL) {
-		freehostent(hp);
-	}
+	freehostent(hp);
 }
 
 

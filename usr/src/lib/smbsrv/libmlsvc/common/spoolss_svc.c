@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -43,6 +44,8 @@
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/nmpipes.h>
 #include <mlsvc.h>
+
+#ifdef	HAVE_CUPS
 
 #define	SPOOLSS_PRINTER		"Postscript"
 
@@ -1194,3 +1197,27 @@ fixup_spoolss_GetPrinter(struct spoolss_GetPrinter *val)
 	FIXUP_PDU_SIZE(spoolss_GetPrinter_result, size2);
 	FIXUP_PDU_SIZE(spoolss_GetPrinter, size3);
 }
+
+#else	/* HAVE_CUPS */
+
+/*
+ * If not HAVE_CUPS, just provide a few "stubs".
+ */
+
+void
+spoolss_initialize(void)
+{
+}
+
+void
+spoolss_finalize(void)
+{
+}
+
+/*ARGSUSED*/
+void
+spoolss_register_copyfile(spoolss_copyfile_t copyfile)
+{
+}
+
+#endif 	/* HAVE_CUPS */
