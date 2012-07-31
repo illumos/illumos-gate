@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -1920,6 +1921,17 @@ zfs_umount(vfs_t *vfsp, int fflag, cred_t *cr)
 	 */
 	if (zfsvfs->z_ctldir != NULL)
 		zfsctl_destroy(zfsvfs);
+
+	/*
+	 * If we're doing a forced unmount on a dataset which still has
+	 * references and is in a zone, then we need to cleanup the zone
+	 * reference at this point or else the zone will never be able to
+	 * shutdown.
+	 */
+	if ((fflag & MS_FORCE) && vfsp->vfs_count > 1 && vfsp->vfs_zone) {
+		zone_rele_ref(&vfsp->vfs_implp->vi_zone_ref, ZONE_REF_VFS);
+		vfsp->vfs_zone = NULL;
+	}
 
 	return (0);
 }
