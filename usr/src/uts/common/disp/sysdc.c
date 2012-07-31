@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 
 /*
@@ -1305,12 +1306,12 @@ sysdc_thread_enter(kthread_t *t, uint_t dc, uint_t flags)
 	sdp.sdp_maxpri = sysdc_maxpri;
 	sdp.sdp_DC = MAX(MIN(dc, sysdc_maxDC), sysdc_minDC);
 
-	VERIFY3U(CL_ALLOC(&buf, sysdccid, KM_SLEEP), ==, 0);
+	VERIFY0(CL_ALLOC(&buf, sysdccid, KM_SLEEP));
 
 	ASSERT(t->t_lwp != NULL);
 	ASSERT(t->t_cid == syscid);
 	ASSERT(t->t_cldata == NULL);
-	VERIFY3U(CL_CANEXIT(t, NULL), ==, 0);
-	VERIFY3U(CL_ENTERCLASS(t, sysdccid, &sdp, kcred, buf), ==, 0);
+	VERIFY0(CL_CANEXIT(t, NULL));
+	VERIFY0(CL_ENTERCLASS(t, sysdccid, &sdp, kcred, buf));
 	CL_EXITCLASS(syscid, NULL);
 }

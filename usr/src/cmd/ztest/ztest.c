@@ -972,7 +972,7 @@ ztest_dsl_prop_set_uint64(char *osname, zfs_prop_t prop, uint64_t value,
 		ztest_record_enospc(FTAG);
 		return (error);
 	}
-	ASSERT3U(error, ==, 0);
+	ASSERT0(error);
 
 	VERIFY3U(dsl_prop_get(osname, propname, sizeof (curval),
 	    1, &curval, setpoint), ==, 0);
@@ -1004,7 +1004,7 @@ ztest_spa_prop_set_uint64(zpool_prop_t prop, uint64_t value)
 		ztest_record_enospc(FTAG);
 		return (error);
 	}
-	ASSERT3U(error, ==, 0);
+	ASSERT0(error);
 
 	return (error);
 }
@@ -1412,16 +1412,16 @@ ztest_replay_create(ztest_ds_t *zd, lr_create_t *lr, boolean_t byteswap)
 	ASSERT(lr->lr_foid != 0);
 
 	if (lr->lrz_type != DMU_OT_ZAP_OTHER)
-		VERIFY3U(0, ==, dmu_object_set_blocksize(os, lr->lr_foid,
+		VERIFY0(dmu_object_set_blocksize(os, lr->lr_foid,
 		    lr->lrz_blocksize, lr->lrz_ibshift, tx));
 
-	VERIFY3U(0, ==, dmu_bonus_hold(os, lr->lr_foid, FTAG, &db));
+	VERIFY0(dmu_bonus_hold(os, lr->lr_foid, FTAG, &db));
 	bbt = ztest_bt_bonus(db);
 	dmu_buf_will_dirty(db, tx);
 	ztest_bt_generate(bbt, os, lr->lr_foid, -1ULL, lr->lr_gen, txg, txg);
 	dmu_buf_rele(db, FTAG);
 
-	VERIFY3U(0, ==, zap_add(os, lr->lr_doid, name, sizeof (uint64_t), 1,
+	VERIFY0(zap_add(os, lr->lr_doid, name, sizeof (uint64_t), 1,
 	    &lr->lr_foid, tx));
 
 	(void) ztest_log_create(zd, tx, lr);
@@ -1446,13 +1446,13 @@ ztest_replay_remove(ztest_ds_t *zd, lr_remove_t *lr, boolean_t byteswap)
 	ASSERT(lr->lr_doid == ZTEST_DIROBJ);
 	ASSERT(name[0] != '\0');
 
-	VERIFY3U(0, ==,
+	VERIFY0(
 	    zap_lookup(os, lr->lr_doid, name, sizeof (object), 1, &object));
 	ASSERT(object != 0);
 
 	ztest_object_lock(zd, object, RL_WRITER);
 
-	VERIFY3U(0, ==, dmu_object_info(os, object, &doi));
+	VERIFY0(dmu_object_info(os, object, &doi));
 
 	tx = dmu_tx_create(os);
 
@@ -1466,12 +1466,12 @@ ztest_replay_remove(ztest_ds_t *zd, lr_remove_t *lr, boolean_t byteswap)
 	}
 
 	if (doi.doi_type == DMU_OT_ZAP_OTHER) {
-		VERIFY3U(0, ==, zap_destroy(os, object, tx));
+		VERIFY0(zap_destroy(os, object, tx));
 	} else {
-		VERIFY3U(0, ==, dmu_object_free(os, object, tx));
+		VERIFY0(dmu_object_free(os, object, tx));
 	}
 
-	VERIFY3U(0, ==, zap_remove(os, lr->lr_doid, name, tx));
+	VERIFY0(zap_remove(os, lr->lr_doid, name, tx));
 
 	(void) ztest_log_remove(zd, tx, lr, object);
 
@@ -1521,7 +1521,7 @@ ztest_replay_write(ztest_ds_t *zd, lr_write_t *lr, boolean_t byteswap)
 	ztest_object_lock(zd, lr->lr_foid, RL_READER);
 	rl = ztest_range_lock(zd, lr->lr_foid, offset, length, RL_WRITER);
 
-	VERIFY3U(0, ==, dmu_bonus_hold(os, lr->lr_foid, FTAG, &db));
+	VERIFY0(dmu_bonus_hold(os, lr->lr_foid, FTAG, &db));
 
 	dmu_object_info_from_db(db, &doi);
 
@@ -1660,7 +1660,7 @@ ztest_replay_setattr(ztest_ds_t *zd, lr_setattr_t *lr, boolean_t byteswap)
 
 	ztest_object_lock(zd, lr->lr_foid, RL_WRITER);
 
-	VERIFY3U(0, ==, dmu_bonus_hold(os, lr->lr_foid, FTAG, &db));
+	VERIFY0(dmu_bonus_hold(os, lr->lr_foid, FTAG, &db));
 
 	tx = dmu_tx_create(os);
 	dmu_tx_hold_bonus(tx, lr->lr_foid);
@@ -1701,7 +1701,7 @@ ztest_replay_setattr(ztest_ds_t *zd, lr_setattr_t *lr, boolean_t byteswap)
 
 	ASSERT3U(lr->lr_size, >=, sizeof (*bbt));
 	ASSERT3U(lr->lr_size, <=, db->db_size);
-	VERIFY3U(dmu_set_bonus(db, lr->lr_size, tx), ==, 0);
+	VERIFY0(dmu_set_bonus(db, lr->lr_size, tx));
 	bbt = ztest_bt_bonus(db);
 
 	ztest_bt_generate(bbt, os, lr->lr_foid, -1ULL, lr->lr_mode, txg, crtxg);
@@ -1893,7 +1893,7 @@ ztest_lookup(ztest_ds_t *zd, ztest_od_t *od, int count)
 			ASSERT(missing == 0);	/* there should be no gaps */
 
 			ztest_object_lock(zd, od->od_object, RL_READER);
-			VERIFY3U(0, ==, dmu_bonus_hold(zd->zd_os,
+			VERIFY0(dmu_bonus_hold(zd->zd_os,
 			    od->od_object, FTAG, &db));
 			dmu_object_info_from_db(db, &doi);
 			bbt = ztest_bt_bonus(db);
@@ -2271,7 +2271,7 @@ ztest_spa_create_destroy(ztest_ds_t *zd, uint64_t id)
 	nvroot = make_vdev_root("/dev/bogus", NULL, 0, 0, 0, 0, 0, 1);
 	VERIFY3U(EEXIST, ==, spa_create(zo->zo_pool, nvroot, NULL, NULL));
 	nvlist_free(nvroot);
-	VERIFY3U(0, ==, spa_open(zo->zo_pool, &spa, FTAG));
+	VERIFY0(spa_open(zo->zo_pool, &spa, FTAG));
 	VERIFY3U(EBUSY, ==, spa_destroy(zo->zo_pool));
 	spa_close(spa, FTAG);
 
@@ -3030,11 +3030,11 @@ ztest_objset_destroy_cb(const char *name, void *arg)
 	/*
 	 * Verify that the dataset contains a directory object.
 	 */
-	VERIFY3U(0, ==, dmu_objset_hold(name, FTAG, &os));
+	VERIFY0(dmu_objset_hold(name, FTAG, &os));
 	error = dmu_object_info(os, ZTEST_DIROBJ, &doi);
 	if (error != ENOENT) {
 		/* We could have crashed in the middle of destroying it */
-		ASSERT3U(error, ==, 0);
+		ASSERT0(error);
 		ASSERT3U(doi.doi_type, ==, DMU_OT_ZAP_OTHER);
 		ASSERT3S(doi.doi_physical_blocks_512, >=, 0);
 	}
@@ -3043,7 +3043,7 @@ ztest_objset_destroy_cb(const char *name, void *arg)
 	/*
 	 * Destroy the dataset.
 	 */
-	VERIFY3U(0, ==, dmu_objset_destroy(name, B_FALSE));
+	VERIFY0(dmu_objset_destroy(name, B_FALSE));
 	return (0);
 }
 
@@ -3136,8 +3136,7 @@ ztest_dmu_objset_create_destroy(ztest_ds_t *zd, uint64_t id)
 		fatal(0, "dmu_objset_create(%s) = %d", name, error);
 	}
 
-	VERIFY3U(0, ==,
-	    dmu_objset_own(name, DMU_OST_OTHER, B_FALSE, FTAG, &os));
+	VERIFY0(dmu_objset_own(name, DMU_OST_OTHER, B_FALSE, FTAG, &os));
 
 	ztest_zd_init(&zdtmp, NULL, os);
 
@@ -3166,7 +3165,7 @@ ztest_dmu_objset_create_destroy(ztest_ds_t *zd, uint64_t id)
 	/*
 	 * Verify that we can hold an objset that is also owned.
 	 */
-	VERIFY3U(0, ==, dmu_objset_hold(name, FTAG, &os2));
+	VERIFY0(dmu_objset_hold(name, FTAG, &os2));
 	dmu_objset_rele(os2, FTAG);
 
 	/*
@@ -3443,10 +3442,10 @@ ztest_dmu_read_write(ztest_ds_t *zd, uint64_t id)
 	 */
 	error = dmu_read(os, packobj, packoff, packsize, packbuf,
 	    DMU_READ_PREFETCH);
-	ASSERT3U(error, ==, 0);
+	ASSERT0(error);
 	error = dmu_read(os, bigobj, bigoff, bigsize, bigbuf,
 	    DMU_READ_PREFETCH);
-	ASSERT3U(error, ==, 0);
+	ASSERT0(error);
 
 	/*
 	 * Get a tx for the mods to both packobj and bigobj.
@@ -3686,7 +3685,7 @@ ztest_dmu_read_write_zcopy(ztest_ds_t *zd, uint64_t id)
 	packbuf = umem_zalloc(packsize, UMEM_NOFAIL);
 	bigbuf = umem_zalloc(bigsize, UMEM_NOFAIL);
 
-	VERIFY3U(0, ==, dmu_bonus_hold(os, bigobj, FTAG, &bonus_db));
+	VERIFY0(dmu_bonus_hold(os, bigobj, FTAG, &bonus_db));
 
 	bigbuf_arcbufs = umem_zalloc(2 * s * sizeof (arc_buf_t *), UMEM_NOFAIL);
 
@@ -3756,10 +3755,10 @@ ztest_dmu_read_write_zcopy(ztest_ds_t *zd, uint64_t id)
 		if (i != 0 || ztest_random(2) != 0) {
 			error = dmu_read(os, packobj, packoff,
 			    packsize, packbuf, DMU_READ_PREFETCH);
-			ASSERT3U(error, ==, 0);
+			ASSERT0(error);
 			error = dmu_read(os, bigobj, bigoff, bigsize,
 			    bigbuf, DMU_READ_PREFETCH);
-			ASSERT3U(error, ==, 0);
+			ASSERT0(error);
 		}
 		compare_and_update_pbbufs(s, packbuf, bigbuf, bigsize,
 		    n, chunksize, txg);
@@ -3938,19 +3937,18 @@ ztest_zap(ztest_ds_t *zd, uint64_t id)
 		return;
 	for (i = 0; i < 2; i++) {
 		value[i] = i;
-		VERIFY3U(0, ==, zap_add(os, object, hc[i], sizeof (uint64_t),
+		VERIFY0(zap_add(os, object, hc[i], sizeof (uint64_t),
 		    1, &value[i], tx));
 	}
 	for (i = 0; i < 2; i++) {
 		VERIFY3U(EEXIST, ==, zap_add(os, object, hc[i],
 		    sizeof (uint64_t), 1, &value[i], tx));
-		VERIFY3U(0, ==,
-		    zap_length(os, object, hc[i], &zl_intsize, &zl_ints));
+		VERIFY0(zap_length(os, object, hc[i], &zl_intsize, &zl_ints));
 		ASSERT3U(zl_intsize, ==, sizeof (uint64_t));
 		ASSERT3U(zl_ints, ==, 1);
 	}
 	for (i = 0; i < 2; i++) {
-		VERIFY3U(0, ==, zap_remove(os, object, hc[i], tx));
+		VERIFY0(zap_remove(os, object, hc[i], tx));
 	}
 	dmu_tx_commit(tx);
 
@@ -4011,9 +4009,9 @@ ztest_zap(ztest_ds_t *zd, uint64_t id)
 	for (i = 0; i < ints; i++)
 		value[i] = txg + object + i;
 
-	VERIFY3U(0, ==, zap_update(os, object, txgname, sizeof (uint64_t),
+	VERIFY0(zap_update(os, object, txgname, sizeof (uint64_t),
 	    1, &txg, tx));
-	VERIFY3U(0, ==, zap_update(os, object, propname, sizeof (uint64_t),
+	VERIFY0(zap_update(os, object, propname, sizeof (uint64_t),
 	    ints, value, tx));
 
 	dmu_tx_commit(tx);
@@ -4030,15 +4028,15 @@ ztest_zap(ztest_ds_t *zd, uint64_t id)
 	if (error == ENOENT)
 		return;
 
-	ASSERT3U(error, ==, 0);
+	ASSERT0(error);
 
 	tx = dmu_tx_create(os);
 	dmu_tx_hold_zap(tx, object, B_TRUE, NULL);
 	txg = ztest_tx_assign(tx, TXG_MIGHTWAIT, FTAG);
 	if (txg == 0)
 		return;
-	VERIFY3U(0, ==, zap_remove(os, object, txgname, tx));
-	VERIFY3U(0, ==, zap_remove(os, object, propname, tx));
+	VERIFY0(zap_remove(os, object, txgname, tx));
+	VERIFY0(zap_remove(os, object, propname, tx));
 	dmu_tx_commit(tx);
 }
 
@@ -4226,7 +4224,7 @@ ztest_commit_callback(void *arg, int error)
 	data->zcd_called = B_TRUE;
 
 	if (error == ECANCELED) {
-		ASSERT3U(data->zcd_txg, ==, 0);
+		ASSERT0(data->zcd_txg);
 		ASSERT(!data->zcd_added);
 
 		/*
@@ -4431,7 +4429,7 @@ ztest_spa_prop_get_set(ztest_ds_t *zd, uint64_t id)
 	(void) ztest_spa_prop_set_uint64(ZPOOL_PROP_DEDUPDITTO,
 	    ZIO_DEDUPDITTO_MIN + ztest_random(ZIO_DEDUPDITTO_MIN));
 
-	VERIFY3U(spa_prop_get(ztest_spa, &props), ==, 0);
+	VERIFY0(spa_prop_get(ztest_spa, &props));
 
 	if (ztest_opts.zo_verbose >= 6)
 		dump_nvlist(props, 4);
@@ -4887,7 +4885,7 @@ ztest_spa_rename(ztest_ds_t *zd, uint64_t id)
 	/*
 	 * Do the rename
 	 */
-	VERIFY3U(0, ==, spa_rename(oldname, newname));
+	VERIFY0(spa_rename(oldname, newname));
 
 	/*
 	 * Try to open it under the old name, which shouldn't exist
@@ -4897,7 +4895,7 @@ ztest_spa_rename(ztest_ds_t *zd, uint64_t id)
 	/*
 	 * Open it under the new name and make sure it's still the same spa_t.
 	 */
-	VERIFY3U(0, ==, spa_open(newname, &spa, FTAG));
+	VERIFY0(spa_open(newname, &spa, FTAG));
 
 	ASSERT(spa == ztest_spa);
 	spa_close(spa, FTAG);
@@ -4905,12 +4903,12 @@ ztest_spa_rename(ztest_ds_t *zd, uint64_t id)
 	/*
 	 * Rename it back to the original
 	 */
-	VERIFY3U(0, ==, spa_rename(newname, oldname));
+	VERIFY0(spa_rename(newname, oldname));
 
 	/*
 	 * Make sure it can still be opened
 	 */
-	VERIFY3U(0, ==, spa_open(oldname, &spa, FTAG));
+	VERIFY0(spa_open(oldname, &spa, FTAG));
 
 	ASSERT(spa == ztest_spa);
 	spa_close(spa, FTAG);
@@ -5010,7 +5008,7 @@ ztest_spa_import_export(char *oldname, char *newname)
 	/*
 	 * Get the pool's configuration and guid.
 	 */
-	VERIFY3U(0, ==, spa_open(oldname, &spa, FTAG));
+	VERIFY0(spa_open(oldname, &spa, FTAG));
 
 	/*
 	 * Kick off a scrub to tickle scrub/export races.
@@ -5026,7 +5024,7 @@ ztest_spa_import_export(char *oldname, char *newname)
 	/*
 	 * Export it.
 	 */
-	VERIFY3U(0, ==, spa_export(oldname, &config, B_FALSE, B_FALSE));
+	VERIFY0(spa_export(oldname, &config, B_FALSE, B_FALSE));
 
 	ztest_walk_pool_directory("pools after export");
 
@@ -5040,7 +5038,7 @@ ztest_spa_import_export(char *oldname, char *newname)
 	/*
 	 * Import it under the new name.
 	 */
-	VERIFY3U(0, ==, spa_import(newname, config, NULL, 0));
+	VERIFY0(spa_import(newname, config, NULL, 0));
 
 	ztest_walk_pool_directory("pools after import");
 
@@ -5062,7 +5060,7 @@ ztest_spa_import_export(char *oldname, char *newname)
 	/*
 	 * Verify that we can open and close the pool using the new name.
 	 */
-	VERIFY3U(0, ==, spa_open(newname, &spa, FTAG));
+	VERIFY0(spa_open(newname, &spa, FTAG));
 	ASSERT(pool_guid == spa_guid(spa));
 	spa_close(spa, FTAG);
 
@@ -5220,7 +5218,7 @@ ztest_dataset_dirobj_verify(ztest_ds_t *zd)
 	 * That's because zap_count() returns the open-context value,
 	 * while dmu_objset_space() returns the rootbp fill count.
 	 */
-	VERIFY3U(0, ==, zap_count(zd->zd_os, ZTEST_DIROBJ, &dirobjs));
+	VERIFY0(zap_count(zd->zd_os, ZTEST_DIROBJ, &dirobjs));
 	dmu_objset_space(zd->zd_os, &scratch, &scratch, &usedobjs, &scratch);
 	ASSERT3U(dirobjs + 1, ==, usedobjs);
 }
@@ -5247,7 +5245,7 @@ ztest_dataset_open(int d)
 	}
 	ASSERT(error == 0 || error == EEXIST);
 
-	VERIFY3U(dmu_objset_hold(name, zd, &os), ==, 0);
+	VERIFY0(dmu_objset_hold(name, zd, &os));
 	(void) rw_unlock(&ztest_name_lock);
 
 	ztest_zd_init(zd, ZTEST_GET_SHARED_DS(d), os);
@@ -5336,7 +5334,7 @@ ztest_run(ztest_shared_t *zs)
 	spa->spa_debug = B_TRUE;
 	ztest_spa = spa;
 
-	VERIFY3U(0, ==, dmu_objset_hold(ztest_opts.zo_pool, FTAG, &os));
+	VERIFY0(dmu_objset_hold(ztest_opts.zo_pool, FTAG, &os));
 	zs->zs_guid = dmu_objset_fsid_guid(os);
 	dmu_objset_rele(os, FTAG);
 
@@ -5478,8 +5476,8 @@ ztest_freeze(void)
 		(void) printf("testing spa_freeze()...\n");
 
 	kernel_init(FREAD | FWRITE);
-	VERIFY3U(0, ==, spa_open(ztest_opts.zo_pool, &spa, FTAG));
-	VERIFY3U(0, ==, ztest_dataset_open(0));
+	VERIFY0(spa_open(ztest_opts.zo_pool, &spa, FTAG));
+	VERIFY0(ztest_dataset_open(0));
 
 	/*
 	 * Force the first log block to be transactionally allocated.
@@ -5530,8 +5528,8 @@ ztest_freeze(void)
 	 * Open and close the pool and dataset to induce log replay.
 	 */
 	kernel_init(FREAD | FWRITE);
-	VERIFY3U(0, ==, spa_open(ztest_opts.zo_pool, &spa, FTAG));
-	VERIFY3U(0, ==, ztest_dataset_open(0));
+	VERIFY0(spa_open(ztest_opts.zo_pool, &spa, FTAG));
+	VERIFY0(ztest_dataset_open(0));
 	ztest_dataset_close(0);
 	spa_close(spa, FTAG);
 	kernel_fini();
@@ -5604,12 +5602,12 @@ ztest_init(ztest_shared_t *zs)
 		char buf[1024];
 		(void) snprintf(buf, sizeof (buf), "feature@%s",
 		    spa_feature_table[i].fi_uname);
-		VERIFY3U(0, ==, nvlist_add_uint64(props, buf, 0));
+		VERIFY0(nvlist_add_uint64(props, buf, 0));
 	}
-	VERIFY3U(0, ==, spa_create(ztest_opts.zo_pool, nvroot, props, NULL));
+	VERIFY0(spa_create(ztest_opts.zo_pool, nvroot, props, NULL));
 	nvlist_free(nvroot);
 
-	VERIFY3U(0, ==, spa_open(ztest_opts.zo_pool, &spa, FTAG));
+	VERIFY0(spa_open(ztest_opts.zo_pool, &spa, FTAG));
 	zs->zs_metaslab_sz =
 	    1ULL << spa->spa_root_vdev->vdev_child[0]->vdev_ms_shift;
 
@@ -5666,7 +5664,7 @@ setup_hdr(void)
 	    PROT_READ | PROT_WRITE, MAP_SHARED, ZTEST_FD_DATA, 0);
 	ASSERT(hdr != MAP_FAILED);
 
-	VERIFY3U(0, ==, ftruncate(ZTEST_FD_DATA, sizeof (ztest_shared_hdr_t)));
+	VERIFY0(ftruncate(ZTEST_FD_DATA, sizeof (ztest_shared_hdr_t)));
 
 	hdr->zh_hdr_size = sizeof (ztest_shared_hdr_t);
 	hdr->zh_opts_size = sizeof (ztest_shared_opts_t);
@@ -5677,7 +5675,7 @@ setup_hdr(void)
 	hdr->zh_ds_count = ztest_opts.zo_datasets;
 
 	size = shared_data_size(hdr);
-	VERIFY3U(0, ==, ftruncate(ZTEST_FD_DATA, size));
+	VERIFY0(ftruncate(ZTEST_FD_DATA, size));
 
 	(void) munmap((caddr_t)hdr, P2ROUNDUP(sizeof (*hdr), getpagesize()));
 }

@@ -2961,7 +2961,7 @@ spa_add_feature_stats(spa_t *spa, nvlist_t *config)
 		    zap_cursor_advance(&zc)) {
 			ASSERT(za.za_integer_length == sizeof (uint64_t) &&
 			    za.za_num_integers == 1);
-			VERIFY3U(0, ==, nvlist_add_uint64(features, za.za_name,
+			VERIFY0(nvlist_add_uint64(features, za.za_name,
 			    za.za_first_integer));
 		}
 		zap_cursor_fini(&zc);
@@ -2974,7 +2974,7 @@ spa_add_feature_stats(spa_t *spa, nvlist_t *config)
 		    zap_cursor_advance(&zc)) {
 			ASSERT(za.za_integer_length == sizeof (uint64_t) &&
 			    za.za_num_integers == 1);
-			VERIFY3U(0, ==, nvlist_add_uint64(features, za.za_name,
+			VERIFY0(nvlist_add_uint64(features, za.za_name,
 			    za.za_first_integer));
 		}
 		zap_cursor_fini(&zc);
@@ -3415,7 +3415,7 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	    sizeof (uint64_t), 1, &obj, tx) != 0) {
 		cmn_err(CE_PANIC, "failed to add bpobj");
 	}
-	VERIFY3U(0, ==, bpobj_open(&spa->spa_deferred_bpobj,
+	VERIFY0(bpobj_open(&spa->spa_deferred_bpobj,
 	    spa->spa_meta_objset, obj));
 
 	/*
@@ -4990,7 +4990,7 @@ spa_vdev_remove_evacuate(spa_t *spa, vdev_t *vd)
 	 * The evacuation succeeded.  Remove any remaining MOS metadata
 	 * associated with this vdev, and wait for these changes to sync.
 	 */
-	ASSERT3U(vd->vdev_stat.vs_alloc, ==, 0);
+	ASSERT0(vd->vdev_stat.vs_alloc);
 	txg = spa_vdev_config_enter(spa);
 	vd->vdev_removing = B_TRUE;
 	vdev_dirty(vd, 0, NULL, txg);
@@ -5737,7 +5737,7 @@ spa_sync_props(void *arg1, void *arg2, dmu_tx_t *tx)
 			ASSERT(zpool_prop_feature(nvpair_name(elem)));
 
 			fname = strchr(nvpair_name(elem), '@') + 1;
-			VERIFY3U(0, ==, zfeature_lookup_name(fname, &feature));
+			VERIFY0(zfeature_lookup_name(fname, &feature));
 
 			spa_feature_enable(spa, feature, tx);
 			spa_history_log_internal(spa, "set", tx,
@@ -5982,7 +5982,7 @@ spa_sync(spa_t *spa, uint64_t txg)
 		zio_t *zio = zio_root(spa, NULL, NULL, 0);
 		VERIFY3U(bpobj_iterate(defer_bpo,
 		    spa_free_sync_cb, zio, tx), ==, 0);
-		VERIFY3U(zio_wait(zio), ==, 0);
+		VERIFY0(zio_wait(zio));
 	}
 
 	/*

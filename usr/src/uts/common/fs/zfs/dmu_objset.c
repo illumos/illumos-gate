@@ -708,7 +708,7 @@ dmu_objset_create_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 	obj = dsl_dataset_create_sync(dd, oa->lastname,
 	    oa->clone_origin, oa->flags, oa->cr, tx);
 
-	VERIFY3U(0, ==, dsl_dataset_hold_obj(dd->dd_pool, obj, FTAG, &ds));
+	VERIFY0(dsl_dataset_hold_obj(dd->dd_pool, obj, FTAG, &ds));
 	bp = dsl_dataset_get_blkptr(ds);
 	if (BP_IS_HOLE(bp)) {
 		objset_t *os =
@@ -1173,7 +1173,7 @@ dmu_objset_sync(objset_t *os, zio_t *pio, dmu_tx_t *tx)
 	SET_BOOKMARK(&zb, os->os_dsl_dataset ?
 	    os->os_dsl_dataset->ds_object : DMU_META_OBJSET,
 	    ZB_ROOT_OBJECT, ZB_ROOT_LEVEL, ZB_ROOT_BLKID);
-	VERIFY3U(0, ==, arc_release_bp(os->os_phys_buf, &os->os_phys_buf,
+	VERIFY0(arc_release_bp(os->os_phys_buf, &os->os_phys_buf,
 	    os->os_rootbp, os->os_spa, &zb));
 
 	dmu_write_policy(os, NULL, 0, 0, &zp);
@@ -1269,9 +1269,9 @@ do_userquota_update(objset_t *os, uint64_t used, uint64_t flags,
 		int64_t delta = DNODE_SIZE + used;
 		if (subtract)
 			delta = -delta;
-		VERIFY3U(0, ==, zap_increment_int(os, DMU_USERUSED_OBJECT,
+		VERIFY0(zap_increment_int(os, DMU_USERUSED_OBJECT,
 		    user, delta, tx));
-		VERIFY3U(0, ==, zap_increment_int(os, DMU_GROUPUSED_OBJECT,
+		VERIFY0(zap_increment_int(os, DMU_GROUPUSED_OBJECT,
 		    group, delta, tx));
 	}
 }

@@ -351,7 +351,7 @@ void
 spa_feature_enable(spa_t *spa, zfeature_info_t *feature, dmu_tx_t *tx)
 {
 	ASSERT3U(spa_version(spa), >=, SPA_VERSION_FEATURES);
-	VERIFY3U(0, ==, feature_do_action(spa->spa_meta_objset,
+	VERIFY0(feature_do_action(spa->spa_meta_objset,
 	    spa->spa_feat_for_read_obj, spa->spa_feat_for_write_obj,
 	    spa->spa_feat_desc_obj, feature, FEATURE_ACTION_ENABLE, tx));
 }
@@ -366,7 +366,7 @@ void
 spa_feature_incr(spa_t *spa, zfeature_info_t *feature, dmu_tx_t *tx)
 {
 	ASSERT3U(spa_version(spa), >=, SPA_VERSION_FEATURES);
-	VERIFY3U(0, ==, feature_do_action(spa->spa_meta_objset,
+	VERIFY0(feature_do_action(spa->spa_meta_objset,
 	    spa->spa_feat_for_read_obj, spa->spa_feat_for_write_obj,
 	    spa->spa_feat_desc_obj, feature, FEATURE_ACTION_INCR, tx));
 }
@@ -381,7 +381,7 @@ void
 spa_feature_decr(spa_t *spa, zfeature_info_t *feature, dmu_tx_t *tx)
 {
 	ASSERT3U(spa_version(spa), >=, SPA_VERSION_FEATURES);
-	VERIFY3U(0, ==, feature_do_action(spa->spa_meta_objset,
+	VERIFY0(feature_do_action(spa->spa_meta_objset,
 	    spa->spa_feat_for_read_obj, spa->spa_feat_for_write_obj,
 	    spa->spa_feat_desc_obj, feature, FEATURE_ACTION_DECR, tx));
 }
