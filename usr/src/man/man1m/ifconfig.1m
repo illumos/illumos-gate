@@ -1,8 +1,9 @@
 '\" te
+.\" Copyright (C) 2012, Darren Reed. All rights reserved 
 .\" Copyright (C) 2009, Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 1983 Regents of the University of California. All rights reserved. The Berkeley software License Agreement specifies the terms and conditions for redistribution.
-.TH IFCONFIG 1M "Aug 13, 2009"
+.TH IFCONFIG 1M "July 23, 2012"
 .SH NAME
 ifconfig \- configure network interface parameters
 .SH SYNOPSIS
@@ -48,7 +49,17 @@ an address family is specified, \fBifconfig\fR reports only the details
 specific to that address family. Only privileged users may modify the
 configuration of a network interface. Options appearing within braces
 (\fB{\|}\fR) indicate that one of the options must be specified.
-.SS "DHCP Configuration"
+.SS Network Interface Observability
+.sp
+.LP
+Network interface observability with \fBifconfig\fR is limited to those
+network interfaces that have been prepared for use with the IP
+protocol suite. The preferred method for configuring a network
+interface for use with TCP/IP is with \fBipadm\fR and alternatively
+with the use of the \fBplumb\fR option as documented below. Network
+interfaces that have not been configured for use with the IP
+protocol suite can only be observed by using the \fBdladm\fR command.
+.SS DHCP Configuration
 .sp
 .LP
 The forms of \fBifconfig\fR that use the \fBauto-dhcp\fR or \fBdhcp\fR
@@ -62,6 +73,10 @@ under \fBDHCP\fR is changed, \fBdhcpagent\fR will remove the interface from its
 control.
 .SH OPTIONS
 .sp
+.LP
+When the \fBifconfig\fR command is executed without any options
+its behavior is the same as when the \fB\-a\fR option is supplied
+with no other options or arguments.
 .LP
 The following options are supported:
 .sp
