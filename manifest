@@ -2107,7 +2107,6 @@ f usr/bin/infocmp 0555 root bin
 f usr/bin/iostat 0555 root bin
 f usr/bin/isainfo 0555 root bin
 f usr/bin/isalist 0555 root bin
-f usr/bin/itu 0555 root bin
 h usr/bin/jobs=usr/bin/alias
 h usr/bin/join=usr/bin/alias
 s usr/bin/jsh=ksh93
@@ -2164,7 +2163,6 @@ f usr/bin/man 0555 root bin
 f usr/bin/mcs 0555 root bin
 h usr/bin/mdb=usr/lib/isaexec
 f usr/bin/mesg 0555 root bin
-f usr/bin/mkbootmedia 0555 root bin
 f usr/bin/mkdir 0555 root bin
 f usr/bin/mkfifo 0555 root bin
 f usr/bin/mkmsgs 0555 root root
@@ -2221,7 +2219,6 @@ f usr/bin/pg 0555 root bin
 f usr/bin/pginfo 0555 root bin
 f usr/bin/pgrep 0555 root bin
 f usr/bin/pgstat 0555 root bin
-f usr/bin/pkg2du 0555 root bin
 f usr/bin/pkgtrans 0555 root bin
 h usr/bin/pkill=usr/bin/pgrep
 f usr/bin/pktool 0555 root bin
@@ -2364,7 +2361,6 @@ h usr/bin/uniq=usr/bin/alias
 f usr/bin/units 0555 root bin
 f usr/bin/unix2dos 0555 root bin
 f usr/bin/unpack 0555 root bin
-f usr/bin/updatemedia 0555 root bin
 h usr/bin/uptime=usr/lib/isaexec
 f usr/bin/userattr 0555 root bin
 f usr/bin/uudecode 0555 root uucp
@@ -4824,7 +4820,6 @@ f usr/lib/amd64/libkvm.so.1 0755 root bin
 s usr/lib/amd64/libkvm.so=libkvm.so.1
 f usr/lib/amd64/libl.so.1 0755 root bin
 s usr/lib/amd64/libl.so=libl.so.1
-f usr/lib/amd64/libldap.so.4 0755 root bin
 f usr/lib/amd64/libldap.so.5 0755 root bin
 s usr/lib/amd64/libldap.so=libldap.so.5
 s usr/lib/amd64/liblddbg.so.4=../../../lib/amd64/liblddbg.so.4
@@ -6209,7 +6204,6 @@ f usr/lib/libkvm.so.1 0755 root bin
 s usr/lib/libkvm.so=libkvm.so.1
 f usr/lib/libl.so.1 0755 root bin
 s usr/lib/libl.so=libl.so.1
-f usr/lib/libldap.so.4 0755 root bin
 f usr/lib/libldap.so.5 0755 root bin
 s usr/lib/libldap.so=libldap.so.5
 s usr/lib/liblddbg.so.4=../../lib/liblddbg.so.4
@@ -11837,7 +11831,6 @@ f usr/share/man/man1m/ipsecconf.1m 0444 root bin
 f usr/share/man/man1m/ipseckey.1m 0444 root bin
 f usr/share/man/man1m/iscsiadm.1m 0444 root bin
 f usr/share/man/man1m/itadm.1m 0444 root bin
-f usr/share/man/man1m/itu.1m 0444 root bin
 f usr/share/man/man1m/keyserv.1m 0444 root bin
 f usr/share/man/man1m/killall.1m 0444 root bin
 f usr/share/man/man1m/ksslcfg.1m 0444 root bin
@@ -11855,7 +11848,6 @@ f usr/share/man/man1m/logadm.1m 0444 root bin
 f usr/share/man/man1m/logins.1m 0444 root bin
 f usr/share/man/man1m/makedbm.1m 0444 root bin
 f usr/share/man/man1m/makemap.1m 0444 root bin
-f usr/share/man/man1m/mkbootmedia.1m 0444 root bin
 f usr/share/man/man1m/mkdevalloc.1m 0444 root bin
 f usr/share/man/man1m/mkdevmaps.1m 0444 root bin
 f usr/share/man/man1m/mkfifo.1m 0444 root bin
@@ -11894,7 +11886,6 @@ f usr/share/man/man1m/nlsadmin.1m 0444 root bin
 f usr/share/man/man1m/nscd.1m 0444 root bin
 f usr/share/man/man1m/pbind.1m 0444 root bin
 f usr/share/man/man1m/ping.1m 0444 root bin
-f usr/share/man/man1m/pkg2du.1m 0444 root bin
 f usr/share/man/man1m/plockstat.1m 0444 root bin
 f usr/share/man/man1m/pmadm.1m 0444 root bin
 f usr/share/man/man1m/pmconfig.1m 0444 root bin
@@ -12006,7 +11997,6 @@ f usr/share/man/man1m/unshare.1m 0444 root bin
 f usr/share/man/man1m/unshareall.1m 0444 root bin
 f usr/share/man/man1m/unshare_nfs.1m 0444 root bin
 f usr/share/man/man1m/update_drv.1m 0444 root bin
-f usr/share/man/man1m/updatemedia.1m 0444 root bin
 f usr/share/man/man1m/useradd.1m 0444 root bin
 f usr/share/man/man1m/userdel.1m 0444 root bin
 f usr/share/man/man1m/usermod.1m 0444 root bin
@@ -16895,3 +16885,19 @@ d var/svc/profile 0755 root sys
 d var/tmp 1777 root sys
 d var/yp 0755 root bin
 d var/yp/binding 0755 root bin
+
+f usr/lib/llib-lzfs_core.ln 644 root bin
+f usr/lib/libzfs_core.so.1 755 root bin
+f usr/lib/amd64/llib-lzfs_core.ln 644 root bin
+f usr/lib/amd64/libzfs_core.so.1 755 root bin
+s usr/lib/amd64/libzfs_core.so=libzfs_core.so.1 
+s usr/lib/libzfs_core.so=libzfs_core.so.1
+f usr/include/libzfs_core.h 0644 root bin
+f usr/lib/llib-lzfs_core 0644 root bin
+s lib/llib-lzfs_core=../usr/lib/llib-lzfs_core.ln
+s lib/libzfs_core.so=../usr/lib/libzfs_core.so
+s lib/llib-lzfs_core.ln=../usr/lib/llib-lzfs_core.ln
+s lib/libzfs_core.so.1=../usr/lib/libzfs_core.so
+s lib/amd64/libzfs_core.so=../usr/lib/amd64/libzfs_core.so
+s lib/amd64/llib-lzfs_core.ln=../usr/lib/amd64/llib-lzfs_core.ln
+s lib/amd64/libzfs_core.so.1=../usr/lib/amd64/libzfs_core.so.1
