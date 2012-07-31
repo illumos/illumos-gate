@@ -550,13 +550,18 @@ hyprlofs_add_entry(vnode_t *vp, char *fspath, char *fsname,
 	vnode_t *realvp, *dvp;
 	vattr_t va;
 
-	/* Get vnode for the real file/dir. */
+	/*
+	 * Get vnode for the real file/dir. We'll have a hold on realvp which
+	 * we won't vn_rele until hyprlofs_inactive.
+	 */
 	if (error = lookupname(fspath, UIO_SYSSPACE, FOLLOW, NULLVPP, &realvp))
 		return (error);
 
 	/* no devices allowed */
-	if (IS_DEVVP(realvp))
+	if (IS_DEVVP(realvp)) {
+		VN_RELE(realvp);
 		return (ENODEV);
+	}
 
 	/*
 	 * realvp may be an AUTOFS node, in which case we perform a VOP_ACCESS
@@ -591,39 +596,54 @@ hyprlofs_add_entry(vnode_t *vp, char *fspath, char *fsname,
 	pnm = p = fsname;
 
 	/* path cannot be absolute */
-	if (*p == '/')
+	if (*p == '/') {
+		VN_RELE(realvp);
 		return (EINVAL);
+	}
 
 	for (p = strchr(pnm, '/'); p != NULL; p = strchr(pnm, '/')) {
 		if (va.va_type == VNON)
 			/* use the top-level dir as the template va for mkdir */
-			if ((error = VOP_GETATTR(vp, &va, 0, cr, NULL)) != 0)
+			if ((error = VOP_GETATTR(vp, &va, 0, cr, NULL)) != 0) {
+				VN_RELE(realvp);
 				return (error);
+			}
 
 		*p = '\0';
 
 		/* Path component cannot be empty or relative */
-		if (pnm[0] == '\0' || (pnm[0] == '.' && pnm[1] == '.'))
+		if (pnm[0] == '\0' || (pnm[0] == '.' && pnm[1] == '.')) {
+			VN_RELE(realvp);
 			return (EINVAL);
+		}
 
 		if ((error = hyprlofs_mkdir(dvp, pnm, &va, &dvp, cr)) != 0 &&
-		    error != EEXIST)
+		    error != EEXIST) {
+			VN_RELE(realvp);
 			return (error);
+		}
 
 		*p = '/';
 		pnm = p + 1;
 	}
 
 	/* The file name is required */
-	if (pnm[0] == '\0')
+	if (pnm[0] == '\0') {
+		VN_RELE(realvp);
 		return (EINVAL);
+	}
 
 	/* Now use the real file's va as the template va */
-	if ((error = VOP_GETATTR(realvp, &va, 0, cr, NULL)) != 0)
+	if ((error = VOP_GETATTR(realvp, &va, 0, cr, NULL)) != 0) {
+		VN_RELE(realvp);
 		return (error);
+	}
 
 	/* Make the vnode */
-	return (hyprlofs_loopback(dvp, realvp, pnm, &va, va.va_mode, cr, ct));
+	error = hyprlofs_loopback(dvp, realvp, pnm, &va, va.va_mode, cr, ct);
+	if (error != 0)
+		VN_RELE(realvp);
+	return (error);
 }
 
 /*
@@ -945,6 +965,11 @@ hyprlofs_remove(vnode_t *dvp, char *nm, cred_t *cr, caller_context_t *ct,
 	rw_exit(&hp->hln_rwlock);
 	rw_exit(&parent->hln_rwlock);
 	vnevent_remove(HLNTOV(hp), dvp, nm, ct);
+
+	/*
+	 * We've now dropped the dir link so by rele-ing our vnode we should
+	 * clean up in hyprlofs_inactive.
+	 */
 	hlnode_rele(hp);
 
 	return (error);
@@ -1030,6 +1055,11 @@ done1:
 	rw_exit(&self->hln_rwlock);
 	rw_exit(&parent->hln_rwlock);
 	vnevent_rmdir(HLNTOV(self), dvp, nm, ct);
+
+	/*
+	 * We've now dropped the dir link so by rele-ing our vnode we should
+	 * clean up in hyprlofs_inactive.
+	 */
 	hlnode_rele(self);
 
 	return (error);
@@ -1173,6 +1203,10 @@ hyprlofs_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 
 	mutex_exit(&vp->v_lock);
 	mutex_exit(&hp->hln_tlock);
+
+	/* release hold on the real vnode now */
+	if (hp->hln_looped == 1 && hp->hln_realvp != NULL)
+		VN_RELE(hp->hln_realvp);
 
 	/* Here's our chance to send invalid event while we're between locks */
 	vn_invalid(HLNTOV(hp));
