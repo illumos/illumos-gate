@@ -21,10 +21,10 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Joyent, Inc. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright (c) 2012 by Frederik Wessels. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 #include <assert.h>
@@ -4973,9 +4973,6 @@ zpool_do_get(int argc, char **argv)
 		}
 	}
 
-	argc -= optind;
-	argv += optind;
-
 	if (argc < 2) {
 		(void) fprintf(stderr, gettext("missing property "
 		    "argument\n"));
@@ -5001,7 +4998,7 @@ zpool_do_get(int argc, char **argv)
 		cb.cb_proplist = &fake_name;
 	}
 
-	ret = for_each_pool(argc - 1, argv + 1, B_TRUE, &cb.cb_proplist,
+	ret = for_each_pool(argc - 2, argv + 2, B_TRUE, &cb.cb_proplist,
 	    get_callback, &cb);
 
 	if (cb.cb_proplist == &fake_name)
