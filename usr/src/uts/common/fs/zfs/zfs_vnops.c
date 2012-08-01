@@ -20,11 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012 by Delphix. All rights reserved.
  */
-
-
-
 
 /* Portions Copyright 2007 Jeremy Teo */
 /* Portions Copyright 2010 Robert Milkowski */
@@ -1645,7 +1641,7 @@ top:
 	    &xattr_obj, sizeof (xattr_obj));
 	if (error == 0 && xattr_obj) {
 		error = zfs_zget(zfsvfs, xattr_obj, &xzp);
-		ASSERT0(error);
+		ASSERT3U(error, ==, 0);
 		dmu_tx_hold_sa(tx, zp->z_sa_hdl, B_TRUE);
 		dmu_tx_hold_sa(tx, xzp->z_sa_hdl, B_FALSE);
 	}
@@ -1723,11 +1719,11 @@ top:
 				error = sa_update(zp->z_sa_hdl,
 				    SA_ZPL_XATTR(zfsvfs), &null_xattr,
 				    sizeof (uint64_t), tx);
-			ASSERT0(error);
+			ASSERT3U(error, ==, 0);
 		}
 		mutex_enter(&vp->v_lock);
 		vp->v_count--;
-		ASSERT0(vp->v_count);
+		ASSERT3U(vp->v_count, ==, 0);
 		mutex_exit(&vp->v_lock);
 		mutex_exit(&zp->z_lock);
 		zfs_znode_delete(zp, tx);
@@ -3100,7 +3096,7 @@ top:
 		zp->z_mode = new_mode;
 		ASSERT3U((uintptr_t)aclp, !=, NULL);
 		err = zfs_aclset_common(zp, aclp, cr, tx);
-		ASSERT0(err);
+		ASSERT3U(err, ==, 0);
 		if (zp->z_acl_cached)
 			zfs_acl_free(zp->z_acl_cached);
 		zp->z_acl_cached = aclp;
@@ -3623,7 +3619,7 @@ top:
 
 			error = sa_update(szp->z_sa_hdl, SA_ZPL_FLAGS(zfsvfs),
 			    (void *)&szp->z_pflags, sizeof (uint64_t), tx);
-			ASSERT0(error);
+			ASSERT3U(error, ==, 0);
 
 			error = zfs_link_destroy(sdl, szp, tx, ZRENAMING, NULL);
 			if (error == 0) {

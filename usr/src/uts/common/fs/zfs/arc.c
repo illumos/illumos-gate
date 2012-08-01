@@ -1010,7 +1010,7 @@ add_reference(arc_buf_hdr_t *ab, kmutex_t *hash_lock, void *tag)
 		ASSERT(list_link_active(&ab->b_arc_node));
 		list_remove(list, ab);
 		if (GHOST_STATE(ab->b_state)) {
-			ASSERT0(ab->b_datacnt);
+			ASSERT3U(ab->b_datacnt, ==, 0);
 			ASSERT3P(ab->b_buf, ==, NULL);
 			delta = ab->b_size;
 		}
@@ -1637,7 +1637,7 @@ arc_evict(arc_state_t *state, uint64_t spa, int64_t bytes, boolean_t recycle,
 		hash_lock = HDR_LOCK(ab);
 		have_lock = MUTEX_HELD(hash_lock);
 		if (have_lock || mutex_tryenter(hash_lock)) {
-			ASSERT0(refcount_count(&ab->b_refcnt));
+			ASSERT3U(refcount_count(&ab->b_refcnt), ==, 0);
 			ASSERT(ab->b_datacnt > 0);
 			while (ab->b_buf) {
 				arc_buf_t *buf = ab->b_buf;
@@ -2465,7 +2465,7 @@ arc_access(arc_buf_hdr_t *buf, kmutex_t *hash_lock)
 			 * This is a prefetch access...
 			 * move this block back to the MRU state.
 			 */
-			ASSERT0(refcount_count(&buf->b_refcnt));
+			ASSERT3U(refcount_count(&buf->b_refcnt), ==, 0);
 			new_state = arc_mru;
 		}
 
@@ -2806,7 +2806,7 @@ top:
 			/* this block is in the ghost cache */
 			ASSERT(GHOST_STATE(hdr->b_state));
 			ASSERT(!HDR_IO_IN_PROGRESS(hdr));
-			ASSERT0(refcount_count(&hdr->b_refcnt));
+			ASSERT3U(refcount_count(&hdr->b_refcnt), ==, 0);
 			ASSERT(hdr->b_buf == NULL);
 
 			/* if this is a prefetch, we don't have a reference */
@@ -4380,7 +4380,7 @@ l2arc_write_buffers(spa_t *spa, l2arc_dev_t *dev, uint64_t target_sz)
 	mutex_exit(&l2arc_buflist_mtx);
 
 	if (pio == NULL) {
-		ASSERT0(write_sz);
+		ASSERT3U(write_sz, ==, 0);
 		kmem_cache_free(hdr_cache, head);
 		return (0);
 	}

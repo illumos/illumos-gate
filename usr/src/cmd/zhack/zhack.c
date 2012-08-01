@@ -344,7 +344,7 @@ zhack_do_feature_enable(int argc, char **argv)
 	if (0 == zap_contains(mos, spa->spa_feat_desc_obj, feature.fi_guid))
 		fatal("feature already enabled: %s", feature.fi_guid);
 
-	VERIFY0(dsl_sync_task_do(spa->spa_dsl_pool, NULL,
+	VERIFY3U(0, ==, dsl_sync_task_do(spa->spa_dsl_pool, NULL,
 	    feature_enable_sync, spa, &feature, 5));
 
 	spa_close(spa, FTAG);
@@ -442,7 +442,7 @@ zhack_do_feature_ref(int argc, char **argv)
 	if (decr && !spa_feature_is_active(spa, &feature))
 		fatal("feature refcount already 0: %s", feature.fi_guid);
 
-	VERIFY0(dsl_sync_task_do(spa->spa_dsl_pool, NULL,
+	VERIFY3U(0, ==, dsl_sync_task_do(spa->spa_dsl_pool, NULL,
 	    decr ? feature_decr_sync : feature_incr_sync, spa, &feature, 5));
 
 	spa_close(spa, FTAG);

@@ -842,7 +842,7 @@ dsl_scan_ds_destroyed(dsl_dataset_t *ds, dmu_tx_t *tx)
 	} else if (zap_lookup_int_key(dp->dp_meta_objset,
 	    scn->scn_phys.scn_queue_obj, ds->ds_object, &mintxg) == 0) {
 		ASSERT3U(ds->ds_phys->ds_num_children, <=, 1);
-		VERIFY0(zap_remove_int(dp->dp_meta_objset,
+		VERIFY3U(0, ==, zap_remove_int(dp->dp_meta_objset,
 		    scn->scn_phys.scn_queue_obj, ds->ds_object, tx));
 		if (dsl_dataset_is_snapshot(ds)) {
 			/*
@@ -894,7 +894,7 @@ dsl_scan_ds_snapshotted(dsl_dataset_t *ds, dmu_tx_t *tx)
 		    (u_longlong_t)ds->ds_phys->ds_prev_snap_obj);
 	} else if (zap_lookup_int_key(dp->dp_meta_objset,
 	    scn->scn_phys.scn_queue_obj, ds->ds_object, &mintxg) == 0) {
-		VERIFY0(zap_remove_int(dp->dp_meta_objset,
+		VERIFY3U(0, ==, zap_remove_int(dp->dp_meta_objset,
 		    scn->scn_phys.scn_queue_obj, ds->ds_object, tx));
 		VERIFY(zap_add_int_key(dp->dp_meta_objset,
 		    scn->scn_phys.scn_queue_obj,
@@ -937,7 +937,7 @@ dsl_scan_ds_clone_swapped(dsl_dataset_t *ds1, dsl_dataset_t *ds2, dmu_tx_t *tx)
 
 		ASSERT3U(mintxg, ==, ds1->ds_phys->ds_prev_snap_txg);
 		ASSERT3U(mintxg, ==, ds2->ds_phys->ds_prev_snap_txg);
-		VERIFY0(zap_remove_int(dp->dp_meta_objset,
+		VERIFY3U(0, ==, zap_remove_int(dp->dp_meta_objset,
 		    scn->scn_phys.scn_queue_obj, ds1->ds_object, tx));
 		err = zap_add_int_key(dp->dp_meta_objset,
 		    scn->scn_phys.scn_queue_obj, ds2->ds_object, mintxg, tx);
@@ -956,7 +956,7 @@ dsl_scan_ds_clone_swapped(dsl_dataset_t *ds1, dsl_dataset_t *ds2, dmu_tx_t *tx)
 	    scn->scn_phys.scn_queue_obj, ds2->ds_object, &mintxg) == 0) {
 		ASSERT3U(mintxg, ==, ds1->ds_phys->ds_prev_snap_txg);
 		ASSERT3U(mintxg, ==, ds2->ds_phys->ds_prev_snap_txg);
-		VERIFY0(zap_remove_int(dp->dp_meta_objset,
+		VERIFY3U(0, ==, zap_remove_int(dp->dp_meta_objset,
 		    scn->scn_phys.scn_queue_obj, ds2->ds_object, tx));
 		VERIFY(0 == zap_add_int_key(dp->dp_meta_objset,
 		    scn->scn_phys.scn_queue_obj, ds1->ds_object, mintxg, tx));
@@ -1014,7 +1014,7 @@ dsl_scan_visitds(dsl_scan_t *scn, uint64_t dsobj, dmu_tx_t *tx)
 	dsl_dataset_t *ds;
 	objset_t *os;
 
-	VERIFY0(dsl_dataset_hold_obj(dp, dsobj, FTAG, &ds));
+	VERIFY3U(0, ==, dsl_dataset_hold_obj(dp, dsobj, FTAG, &ds));
 
 	if (dmu_objset_from_ds(ds, &os))
 		goto out;
@@ -1308,11 +1308,11 @@ dsl_scan_visit(dsl_scan_t *scn, dmu_tx_t *tx)
 		uint64_t dsobj;
 
 		dsobj = strtonum(za.za_name, NULL);
-		VERIFY0(zap_remove_int(dp->dp_meta_objset,
+		VERIFY3U(0, ==, zap_remove_int(dp->dp_meta_objset,
 		    scn->scn_phys.scn_queue_obj, dsobj, tx));
 
 		/* Set up min/max txg */
-		VERIFY0(dsl_dataset_hold_obj(dp, dsobj, FTAG, &ds));
+		VERIFY3U(0, ==, dsl_dataset_hold_obj(dp, dsobj, FTAG, &ds));
 		if (za.za_first_integer != 0) {
 			scn->scn_phys.scn_cur_min_txg =
 			    MAX(scn->scn_phys.scn_min_txg,
@@ -1434,7 +1434,7 @@ dsl_scan_sync(dsl_pool_t *dp, dmu_tx_t *tx)
 		    NULL, ZIO_FLAG_MUSTSUCCEED);
 		err = bpobj_iterate(&dp->dp_free_bpobj,
 		    dsl_scan_free_block_cb, scn, tx);
-		VERIFY0(zio_wait(scn->scn_zio_root));
+		VERIFY3U(0, ==, zio_wait(scn->scn_zio_root));
 
 		if (err == 0 && spa_feature_is_active(spa,
 		    &spa_feature_table[SPA_FEATURE_ASYNC_DESTROY])) {
@@ -1444,7 +1444,7 @@ dsl_scan_sync(dsl_pool_t *dp, dmu_tx_t *tx)
 			err = bptree_iterate(dp->dp_meta_objset,
 			    dp->dp_bptree_obj, B_TRUE, dsl_scan_free_block_cb,
 			    scn, tx);
-			VERIFY0(zio_wait(scn->scn_zio_root));
+			VERIFY3U(0, ==, zio_wait(scn->scn_zio_root));
 			if (err != 0)
 				return;
 
@@ -1453,10 +1453,10 @@ dsl_scan_sync(dsl_pool_t *dp, dmu_tx_t *tx)
 			    &spa_feature_table[SPA_FEATURE_ASYNC_DESTROY], tx);
 			ASSERT(!spa_feature_is_active(spa,
 			    &spa_feature_table[SPA_FEATURE_ASYNC_DESTROY]));
-			VERIFY0(zap_remove(dp->dp_meta_objset,
+			VERIFY3U(0, ==, zap_remove(dp->dp_meta_objset,
 			    DMU_POOL_DIRECTORY_OBJECT,
 			    DMU_POOL_BPTREE_OBJ, tx));
-			VERIFY0(bptree_free(dp->dp_meta_objset,
+			VERIFY3U(0, ==, bptree_free(dp->dp_meta_objset,
 			    dp->dp_bptree_obj, tx));
 			dp->dp_bptree_obj = 0;
 		}

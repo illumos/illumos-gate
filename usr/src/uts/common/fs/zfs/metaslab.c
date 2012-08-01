@@ -769,7 +769,7 @@ metaslab_fini(metaslab_t *msp)
 	for (int t = 0; t < TXG_DEFER_SIZE; t++)
 		space_map_destroy(&msp->ms_defermap[t]);
 
-	ASSERT0(msp->ms_deferspace);
+	ASSERT3S(msp->ms_deferspace, ==, 0);
 
 	mutex_exit(&msp->ms_lock);
 	mutex_destroy(&msp->ms_lock);

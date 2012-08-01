@@ -529,7 +529,7 @@ dump_spacemap(objset_t *os, space_map_obj_t *smo, space_map_t *sm)
 	 */
 	alloc = 0;
 	for (offset = 0; offset < smo->smo_objsize; offset += sizeof (entry)) {
-		VERIFY0(dmu_read(os, smo->smo_object, offset,
+		VERIFY3U(0, ==, dmu_read(os, smo->smo_object, offset,
 		    sizeof (entry), &entry, DMU_READ_PREFETCH));
 		if (SM_DEBUG_DECODE(entry)) {
 			(void) printf("\t    [%6llu] %s: txg %llu, pass %llu\n",
@@ -1188,7 +1188,7 @@ dump_bptree(objset_t *os, uint64_t obj, char *name)
 	if (dump_opt['d'] < 3)
 		return;
 
-	VERIFY0(dmu_bonus_hold(os, obj, FTAG, &db));
+	VERIFY3U(0, ==, dmu_bonus_hold(os, obj, FTAG, &db));
 	bt = db->db_data;
 	zdb_nicenum(bt->bt_bytes, bytes);
 	(void) printf("\n    %s: %llu datasets, %s\n",
@@ -2273,7 +2273,7 @@ dump_block_stats(spa_t *spa)
 	    count_block_cb, &zcb, NULL);
 	if (spa_feature_is_active(spa,
 	    &spa_feature_table[SPA_FEATURE_ASYNC_DESTROY])) {
-		VERIFY0(bptree_iterate(spa->spa_meta_objset,
+		VERIFY3U(0, ==, bptree_iterate(spa->spa_meta_objset,
 		    spa->spa_dsl_pool->dp_bptree_obj, B_FALSE, count_block_cb,
 		    &zcb, NULL));
 	}

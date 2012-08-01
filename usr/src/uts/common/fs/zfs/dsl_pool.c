@@ -170,7 +170,7 @@ dsl_pool_open(dsl_pool_t *dp)
 		    DMU_POOL_FREE_BPOBJ, sizeof (uint64_t), 1, &obj);
 		if (err)
 			goto out;
-		VERIFY0(bpobj_open(&dp->dp_free_bpobj,
+		VERIFY3U(0, ==, bpobj_open(&dp->dp_free_bpobj,
 		    dp->dp_meta_objset, obj));
 	}
 
@@ -256,10 +256,10 @@ dsl_pool_create(spa_t *spa, nvlist_t *zplprops, uint64_t txg)
 	/* create the pool directory */
 	err = zap_create_claim(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
 	    DMU_OT_OBJECT_DIRECTORY, DMU_OT_NONE, 0, tx);
-	ASSERT0(err);
+	ASSERT3U(err, ==, 0);
 
 	/* Initialize scan structures */
-	VERIFY0(dsl_scan_init(dp, txg));
+	VERIFY3U(0, ==, dsl_scan_init(dp, txg));
 
 	/* create and open the root dir */
 	dp->dp_root_dir_obj = dsl_dir_create_sync(dp, NULL, NULL, tx);
@@ -282,7 +282,7 @@ dsl_pool_create(spa_t *spa, nvlist_t *zplprops, uint64_t txg)
 		obj = bpobj_alloc(dp->dp_meta_objset, SPA_MAXBLOCKSIZE, tx);
 		VERIFY(zap_add(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
 		    DMU_POOL_FREE_BPOBJ, sizeof (uint64_t), 1, &obj, tx) == 0);
-		VERIFY0(bpobj_open(&dp->dp_free_bpobj,
+		VERIFY3U(0, ==, bpobj_open(&dp->dp_free_bpobj,
 		    dp->dp_meta_objset, obj));
 	}
 
@@ -674,7 +674,7 @@ dsl_pool_upgrade_clones(dsl_pool_t *dp, dmu_tx_t *tx)
 	ASSERT(dmu_tx_is_syncing(tx));
 	ASSERT(dp->dp_origin_snap != NULL);
 
-	VERIFY0(dmu_objset_find_spa(dp->dp_spa, NULL, upgrade_clones_cb,
+	VERIFY3U(0, ==, dmu_objset_find_spa(dp->dp_spa, NULL, upgrade_clones_cb,
 	    tx, DS_FIND_CHILDREN));
 }
 
@@ -687,12 +687,12 @@ upgrade_dir_clones_cb(spa_t *spa, uint64_t dsobj, const char *dsname, void *arg)
 	dsl_pool_t *dp = spa_get_dsl(spa);
 	objset_t *mos = dp->dp_meta_objset;
 
-	VERIFY0(dsl_dataset_hold_obj(dp, dsobj, FTAG, &ds));
+	VERIFY3U(0, ==, dsl_dataset_hold_obj(dp, dsobj, FTAG, &ds));
 
 	if (ds->ds_dir->dd_phys->dd_origin_obj) {
 		dsl_dataset_t *origin;
 
-		VERIFY0(dsl_dataset_hold_obj(dp,
+		VERIFY3U(0, ==, dsl_dataset_hold_obj(dp,
 		    ds->ds_dir->dd_phys->dd_origin_obj, FTAG, &origin));
 
 		if (origin->ds_dir->dd_phys->dd_clones == 0) {
@@ -701,7 +701,7 @@ upgrade_dir_clones_cb(spa_t *spa, uint64_t dsobj, const char *dsname, void *arg)
 			    DMU_OT_DSL_CLONES, DMU_OT_NONE, 0, tx);
 		}
 
-		VERIFY0(zap_add_int(dp->dp_meta_objset,
+		VERIFY3U(0, ==, zap_add_int(dp->dp_meta_objset,
 		    origin->ds_dir->dd_phys->dd_clones, dsobj, tx));
 
 		dsl_dataset_rele(origin, FTAG);
@@ -728,12 +728,12 @@ dsl_pool_upgrade_dir_clones(dsl_pool_t *dp, dmu_tx_t *tx)
 	 */
 	obj = dmu_object_alloc(dp->dp_meta_objset, DMU_OT_BPOBJ,
 	    SPA_MAXBLOCKSIZE, DMU_OT_BPOBJ_HDR, sizeof (bpobj_phys_t), tx);
-	VERIFY0(zap_add(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
+	VERIFY3U(0, ==, zap_add(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
 	    DMU_POOL_FREE_BPOBJ, sizeof (uint64_t), 1, &obj, tx));
-	VERIFY0(bpobj_open(&dp->dp_free_bpobj,
+	VERIFY3U(0, ==, bpobj_open(&dp->dp_free_bpobj,
 	    dp->dp_meta_objset, obj));
 
-	VERIFY0(dmu_objset_find_spa(dp->dp_spa, NULL,
+	VERIFY3U(0, ==, dmu_objset_find_spa(dp->dp_spa, NULL,
 	    upgrade_dir_clones_cb, tx, DS_FIND_CHILDREN));
 }
 

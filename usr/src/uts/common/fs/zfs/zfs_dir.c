@@ -20,7 +20,6 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -455,8 +454,8 @@ zfs_unlinked_add(znode_t *zp, dmu_tx_t *tx)
 	ASSERT(zp->z_unlinked);
 	ASSERT(zp->z_links == 0);
 
-	VERIFY0(zap_add_int(zfsvfs->z_os, zfsvfs->z_unlinkedobj,
-	    zp->z_id, tx));
+	VERIFY3U(0, ==,
+	    zap_add_int(zfsvfs->z_os, zfsvfs->z_unlinkedobj, zp->z_id, tx));
 }
 
 /*
@@ -672,8 +671,8 @@ zfs_rmnode(znode_t *zp)
 	}
 
 	/* Remove this znode from the unlinked set */
-	VERIFY0(zap_remove_int(zfsvfs->z_os, zfsvfs->z_unlinkedobj,
-	    xzp->z_id, tx));
+	VERIFY3U(0, ==,
+	    zap_remove_int(zfsvfs->z_os, zfsvfs->z_unlinkedobj, zp->z_id, tx));
 
 	zfs_znode_delete(zp, tx);
 

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2011 by Delphix. All rights reserved.
  */
 
 #include <sys/bpobj.h>
@@ -53,14 +53,14 @@ bpobj_free(objset_t *os, uint64_t obj, dmu_tx_t *tx)
 	int epb;
 	dmu_buf_t *dbuf = NULL;
 
-	VERIFY0(bpobj_open(&bpo, os, obj));
+	VERIFY3U(0, ==, bpobj_open(&bpo, os, obj));
 
 	mutex_enter(&bpo.bpo_lock);
 
 	if (!bpo.bpo_havesubobj || bpo.bpo_phys->bpo_subobjs == 0)
 		goto out;
 
-	VERIFY0(dmu_object_info(os, bpo.bpo_phys->bpo_subobjs, &doi));
+	VERIFY3U(0, ==, dmu_object_info(os, bpo.bpo_phys->bpo_subobjs, &doi));
 	epb = doi.doi_data_block_size / sizeof (uint64_t);
 
 	for (i = bpo.bpo_phys->bpo_num_subobjs - 1; i >= 0; i--) {
@@ -73,7 +73,7 @@ bpobj_free(objset_t *os, uint64_t obj, dmu_tx_t *tx)
 		if (dbuf == NULL || dbuf->db_offset > offset) {
 			if (dbuf)
 				dmu_buf_rele(dbuf, FTAG);
-			VERIFY0(dmu_buf_hold(os,
+			VERIFY3U(0, ==, dmu_buf_hold(os,
 			    bpo.bpo_phys->bpo_subobjs, offset, FTAG, &dbuf, 0));
 		}
 
@@ -87,13 +87,13 @@ bpobj_free(objset_t *os, uint64_t obj, dmu_tx_t *tx)
 		dmu_buf_rele(dbuf, FTAG);
 		dbuf = NULL;
 	}
-	VERIFY0(dmu_object_free(os, bpo.bpo_phys->bpo_subobjs, tx));
+	VERIFY3U(0, ==, dmu_object_free(os, bpo.bpo_phys->bpo_subobjs, tx));
 
 out:
 	mutex_exit(&bpo.bpo_lock);
 	bpobj_close(&bpo);
 
-	VERIFY0(dmu_object_free(os, obj, tx));
+	VERIFY3U(0, ==, dmu_object_free(os, obj, tx));
 }
 
 int
@@ -204,7 +204,7 @@ bpobj_iterate_impl(bpobj_t *bpo, bpobj_itor_t func, void *arg, dmu_tx_t *tx,
 	}
 	if (free) {
 		i++;
-		VERIFY0(dmu_free_range(bpo->bpo_os, bpo->bpo_object,
+		VERIFY3U(0, ==, dmu_free_range(bpo->bpo_os, bpo->bpo_object,
 		    i * sizeof (blkptr_t), -1ULL, tx));
 	}
 	if (err || !bpo->bpo_havesubobj || bpo->bpo_phys->bpo_subobjs == 0)
@@ -252,7 +252,7 @@ bpobj_iterate_impl(bpobj_t *bpo, bpobj_itor_t func, void *arg, dmu_tx_t *tx,
 		}
 		err = bpobj_iterate_impl(&sublist, func, arg, tx, free);
 		if (free) {
-			VERIFY0(bpobj_space(&sublist,
+			VERIFY3U(0, ==, bpobj_space(&sublist,
 			    &used_after, &comp_after, &uncomp_after));
 			bpo->bpo_phys->bpo_bytes -= used_before - used_after;
 			ASSERT3S(bpo->bpo_phys->bpo_bytes, >=, 0);
@@ -278,7 +278,7 @@ bpobj_iterate_impl(bpobj_t *bpo, bpobj_itor_t func, void *arg, dmu_tx_t *tx,
 		dbuf = NULL;
 	}
 	if (free) {
-		VERIFY0(dmu_free_range(bpo->bpo_os,
+		VERIFY3U(0, ==, dmu_free_range(bpo->bpo_os,
 		    bpo->bpo_phys->bpo_subobjs,
 		    (i + 1) * sizeof (uint64_t), -1ULL, tx));
 	}
@@ -321,8 +321,8 @@ bpobj_enqueue_subobj(bpobj_t *bpo, uint64_t subobj, dmu_tx_t *tx)
 	ASSERT(bpo->bpo_havesubobj);
 	ASSERT(bpo->bpo_havecomp);
 
-	VERIFY0(bpobj_open(&subbpo, bpo->bpo_os, subobj));
-	VERIFY0(bpobj_space(&subbpo, &used, &comp, &uncomp));
+	VERIFY3U(0, ==, bpobj_open(&subbpo, bpo->bpo_os, subobj));
+	VERIFY3U(0, ==, bpobj_space(&subbpo, &used, &comp, &uncomp));
 
 	if (used == 0) {
 		/* No point in having an empty subobj. */
@@ -352,12 +352,12 @@ bpobj_enqueue_subobj(bpobj_t *bpo, uint64_t subobj, dmu_tx_t *tx)
 	if (subsubobjs != 0) {
 		dmu_object_info_t doi;
 
-		VERIFY0(dmu_object_info(bpo->bpo_os, subsubobjs, &doi));
+		VERIFY3U(0, ==, dmu_object_info(bpo->bpo_os, subsubobjs, &doi));
 		if (doi.doi_max_offset == doi.doi_data_block_size) {
 			dmu_buf_t *subdb;
 			uint64_t numsubsub = subbpo.bpo_phys->bpo_num_subobjs;
 
-			VERIFY0(dmu_buf_hold(bpo->bpo_os, subsubobjs,
+			VERIFY3U(0, ==, dmu_buf_hold(bpo->bpo_os, subsubobjs,
 			    0, FTAG, &subdb, 0));
 			dmu_write(bpo->bpo_os, bpo->bpo_phys->bpo_subobjs,
 			    bpo->bpo_phys->bpo_num_subobjs * sizeof (subobj),
@@ -367,7 +367,7 @@ bpobj_enqueue_subobj(bpobj_t *bpo, uint64_t subobj, dmu_tx_t *tx)
 
 			dmu_buf_will_dirty(subbpo.bpo_dbuf, tx);
 			subbpo.bpo_phys->bpo_subobjs = 0;
-			VERIFY0(dmu_object_free(bpo->bpo_os,
+			VERIFY3U(0, ==, dmu_object_free(bpo->bpo_os,
 			    subsubobjs, tx));
 		}
 	}
@@ -407,7 +407,7 @@ bpobj_enqueue(bpobj_t *bpo, const blkptr_t *bp, dmu_tx_t *tx)
 	    bpo->bpo_cached_dbuf->db_size) {
 		if (bpo->bpo_cached_dbuf)
 			dmu_buf_rele(bpo->bpo_cached_dbuf, bpo);
-		VERIFY0(dmu_buf_hold(bpo->bpo_os, bpo->bpo_object,
+		VERIFY3U(0, ==, dmu_buf_hold(bpo->bpo_os, bpo->bpo_object,
 		    offset, bpo, &bpo->bpo_cached_dbuf, 0));
 	}
 
