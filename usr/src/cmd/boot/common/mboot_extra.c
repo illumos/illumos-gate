@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <stdio.h>
@@ -107,7 +108,7 @@ find_multiboot(char *buffer, uint32_t buf_size, uint32_t *mboot_off)
  * + payload chunks), find the extended information structure.
  */
 bblk_einfo_t *
-find_einfo(char *extra)
+find_einfo(char *extra, uint32_t size)
 {
 	bb_header_ext_t		*ext_header;
 	bblk_einfo_t		*einfo;
@@ -116,6 +117,12 @@ find_einfo(char *extra)
 	assert(extra != NULL);
 
 	ext_header = (bb_header_ext_t *)extra;
+	if (ext_header->size > size) {
+		BOOT_DEBUG("Unable to find extended versioning information, "
+		    "data size too big\n");
+		return (NULL);
+	}
+
 	cksum = compute_checksum(extra + sizeof (bb_header_ext_t),
 	    ext_header->size);
 	BOOT_DEBUG("Extended information header checksum is %x\n", cksum);
