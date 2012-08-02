@@ -440,23 +440,28 @@ print_pciid(di_node_t node, di_prom_handle_t ph, pcidb_hdl_t *pci)
 	    "vendor-id", &i) > 0)
 		(void) printf("%x", i[0]);
 
-	if (pci != NULL) {
+	if (pci != NULL)
 		vend = pcidb_lookup_vendor(pci, i[0]);
-		if (vend != NULL)
-			(void) printf(" [%s]", pcidb_vendor_name(vend));
-	}
 
 	if (LOOKUP_PROP(ints, ph, type, DDI_DEV_T_ANY, node,
 	    "device-id", &i) > 0)
 		(void) printf(",%x", i[0]);
 
-	if (pci != NULL) {
+	if (pci != NULL)
 		dev = pcidb_lookup_device_by_vendor(vend, i[0]);
-		if (dev != NULL)
-			(void) printf(" [%s]", pcidb_device_name(dev));
-	}
 
-	(void) printf(")");
+	(void) printf(") [");
 
+	if (vend != NULL)
+		(void) printf("%s ", pcidb_vendor_name(vend));
+	else
+		(void) printf("unknown vendor, ");
+
+	if (dev != NULL)
+		(void) printf("%s", pcidb_device_name(dev));
+	else
+		(void) printf("unknown device");
+
+	(void) printf("]");
 	return (1);
 }
