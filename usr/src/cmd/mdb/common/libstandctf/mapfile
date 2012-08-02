@@ -70,7 +70,6 @@ SYMBOL_SCOPE {
 		ctf_member_iter;
 		ctf_open;
 		ctf_parent_name;
-		ctf_parent_label;
 		ctf_setmodel;
 		ctf_setspecific;
 		ctf_type_align;

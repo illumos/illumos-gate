@@ -646,17 +646,6 @@ dt_module_getctf(dtrace_hdl_t *dtp, dt_module_t *dmp)
 			goto err;
 		}
 
-		/*
-		 * If the label we claim the parent must have does not match
-		 * its actual topmost label (XXX: Should check all?), ignore
-		 * the CTF entirely rather than acquiring possibly bad type
-		 * references.
-		 */
-		if (strcmp(ctf_label_topmost(pfp), ctf_parent_label(dmp->dm_ctfp)) != 0) {
-			(void) dt_set_errno(dtp, EDT_NOCTF);
-			goto err;
-		}
-
 		if (ctf_import(dmp->dm_ctfp, pfp) == CTF_ERR) {
 			dtp->dt_ctferr = ctf_errno(dmp->dm_ctfp);
 			(void) dt_set_errno(dtp, EDT_CTF);

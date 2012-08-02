@@ -1657,11 +1657,6 @@ fbt_getargdesc(void *arg, dtrace_id_t id, void *parg, dtrace_argdesc_t *desc)
 		if ((pfp = ctf_modopen(mod->mod_mp, &error)) == NULL)
 			goto err;
 
-		if (strcmp(ctf_label_topmost(pfp), ctf_parent_label(fp)) != 0) {
-			ctf_close(pfp);
-			goto err;
-		}
-
 		if (ctf_import(fp, pfp) != 0) {
 			ctf_close(pfp);
 			goto err;
