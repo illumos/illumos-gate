@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ */
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/t_lock.h>
@@ -978,6 +982,8 @@ again:
 	}
 
 	if (error == 0) {	/* name found */
+		boolean_t trunc = B_FALSE;
+
 		ASSERT(oldtp);
 
 		rw_enter(&oldtp->tn_rwlock, RW_WRITER);
@@ -1005,6 +1011,7 @@ again:
 			rw_enter(&oldtp->tn_contents, RW_WRITER);
 			(void) tmpnode_trunc(tm, oldtp, 0);
 			rw_exit(&oldtp->tn_contents);
+			trunc = B_TRUE;
 		}
 		rw_exit(&oldtp->tn_rwlock);
 		if (IS_DEVVP(*vpp)) {
@@ -1019,9 +1026,9 @@ again:
 			*vpp = newvp;
 		}
 
-		if (error == 0) {
+		if (trunc)
 			vnevent_create(*vpp, ct);
-		}
+
 		return (0);
 	}
 

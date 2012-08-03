@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ */
+
 #ifndef	_SYS_PORT_IMPL_H
 #define	_SYS_PORT_IMPL_H
 
@@ -311,6 +315,7 @@ typedef struct portfop_vp {
 #define	FOP_FILE_SETATTR_MTIME	0x00080000
 #define	FOP_FILE_SETATTR_CTIME	0x00100000
 #define	FOP_FILE_LINK_SRC	0x00200000
+#define	FOP_FILE_TRUNC		0x00400000
 
 /*
  * File modification event.
@@ -339,10 +344,15 @@ typedef struct portfop_vp {
 
 
 /*
+ * File trunc event
+ */
+#define	FOP_TRUNC_MASK		(FOP_FILE_TRUNC|FOP_FILE_CREATE)
+
+/*
  * valid watchable events
  */
 #define	FILE_EVENTS_MASK	(FILE_ACCESS|FILE_MODIFIED|FILE_ATTRIB \
-				|FILE_NOFOLLOW)
+				|FILE_NOFOLLOW|FILE_TRUNC)
 /* --- End file events --- */
 
 /*

@@ -28,6 +28,10 @@
  *	All rights reserved.
  */
 
+/*
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ */
+
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -2298,6 +2302,12 @@ top:
 						vattr.va_mask = AT_SIZE;
 						error = nfs3setattr(vp,
 						    &vattr, 0, cr);
+
+						/*
+						 * Existing file was truncated;
+						 * emit a create event.
+						 */
+						vnevent_create(vp, ct);
 					}
 				}
 			}
@@ -2306,12 +2316,9 @@ top:
 		if (error) {
 			VN_RELE(vp);
 		} else {
-			/*
-			 * existing file got truncated, notify.
-			 */
-			vnevent_create(vp, ct);
 			*vpp = vp;
 		}
+
 		return (error);
 	}
 

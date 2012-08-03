@@ -28,6 +28,10 @@
  *	All Rights Reserved
  */
 
+/*
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ */
+
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -6651,16 +6655,20 @@ top:
 	} else {
 		vnode_t *tvp;
 		rnode4_t *trp;
-		/*
-		 * existing file got truncated, notify.
-		 */
 		tvp = vp;
 		if (vp->v_type == VREG) {
 			trp = VTOR4(vp);
 			if (IS_SHADOW(vp, trp))
 				tvp = RTOV4(trp);
 		}
-		vnevent_create(tvp, ct);
+
+		if (must_trunc) {
+			/*
+			 * existing file got truncated, notify.
+			 */
+			vnevent_create(tvp, ct);
+		}
+
 		*vpp = vp;
 	}
 	return (error);

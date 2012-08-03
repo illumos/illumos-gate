@@ -23,6 +23,9 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ */
 
 /*
  * File Events Notification
@@ -1965,7 +1968,9 @@ port_fop(vnode_t *vp, int op, int retval)
 	if (op & FOP_ATTRIB_MASK) {
 		event  |= FILE_ATTRIB;
 	}
-
+	if (op & FOP_TRUNC_MASK) {
+		event  |= FILE_TRUNC;
+	}
 	if (event) {
 		port_fop_sendevent(vp, 	event, NULL, NULL);
 	}
@@ -2147,6 +2152,9 @@ port_fop_setattr(femarg_t *vf, vattr_t *vap, int flags, cred_t *cr,
 	int		events = 0;
 
 	retval = vnext_setattr(vf, vap, flags, cr, ct);
+	if (vap->va_mask & AT_SIZE) {
+		events |= FOP_FILE_TRUNC;
+	}
 	if (vap->va_mask & (AT_SIZE|AT_MTIME)) {
 		events |= FOP_FILE_SETATTR_MTIME;
 	}
@@ -2322,8 +2330,8 @@ port_fop_vnevent(femarg_t *vf, vnevent_t vnevent, vnode_t *dvp, char *name,
 			port_fop_sendevent(vp, FILE_DELETE, dvp, name);
 		break;
 	case	VE_CREATE:
-			port_fop_sendevent(vp, FILE_MODIFIED|FILE_ATTRIB,
-			    NULL, NULL);
+			port_fop_sendevent(vp,
+			    FILE_MODIFIED|FILE_ATTRIB|FILE_TRUNC, NULL, NULL);
 		break;
 	case	VE_LINK:
 			port_fop_sendevent(vp, FILE_ATTRIB, NULL, NULL);
