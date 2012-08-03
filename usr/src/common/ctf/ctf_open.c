@@ -889,16 +889,6 @@ ctf_parent_name(ctf_file_t *fp)
 }
 
 /*
- * Return the label of the parent CTF container, if one exists.  Otherwise
- * return NULL.
- */
-const char *
-ctf_parent_label(ctf_file_t *fp)
-{
-	return (fp->ctf_parlabel);
-}
-
-/*
  * Import the types from the specified parent container by storing a pointer
  * to it in ctf_parent and incrementing its reference count.  Only one parent
  * is allowed: if a parent already exists, it is replaced by the new parent.

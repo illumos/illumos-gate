@@ -68,7 +68,6 @@ SYMBOL_VERSION SUNWprivate_1.2 {
 	ctf_member_info;
 	ctf_parent_file;
 	ctf_parent_name;
-	ctf_parent_label;
 	ctf_set_array;
 	ctf_type_align;
 	ctf_type_cmp;
