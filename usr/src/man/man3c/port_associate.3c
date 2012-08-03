@@ -73,21 +73,21 @@ the port.
 .LP
 Objects of type \fBPORT_SOURCE_FILE\fR are pointer to the structure
 \fBfile_obj\fR defined in \fB<sys/port.h>\fR. This event source provides event
-notification when the specified file/directory is accessed or modified or when
-its status changes. The path name of the file/directory to be watched is passed
-in the \fBstruct file_obj\fR along with the \fBaccess\fR, \fBmodification\fR,
-and \fBchange\fR time stamps acquired from a \fBstat\fR(2) call. If the file
-name is a symbolic links, it is followed by default. The \fBFILE_NOFOLLOW\fR
-needs to be passed in along with the specified events if the symbolic link
-itself needs to be watched and \fBlstat()\fR needs to be used to get the file
-status of the symbolic link file.
+notification when the specified file/directory is accessed, modified,
+truncated or when its status changes. The path name of the file/directory to
+be watched is passed in the \fBstruct file_obj\fR along with the \fBaccess\fR,
+\fBmodification\fR, and \fBchange\fR time stamps acquired from a \fBstat\fR(2)
+call. If the file name is a symbolic link, it is followed by default. The
+\fBFILE_NOFOLLOW\fR needs to be passed in along with the specified events if
+the symbolic link itself needs to be watched and \fBlstat()\fR needs to be
+used to get the file status of the symbolic link file.
 .sp
 .LP
 The \fBstruct file_obj\fR contains the following elements:
 .sp
 .in +2
 .nf
-timestruc_t     fo_atime;  /* Access time got from stat() */
+timestruc_t     fo_atime;  /* Access time from stat() */
 timestruc_t     fo_mtime;  /* Modification time from stat() */
 timestruc_t     fo_ctime;  /* Change time from stat() */
 char            *fo_name;  /* Pointer to a null terminated path name */
@@ -104,11 +104,13 @@ occurs.
 .sp
 .LP
 The event types that can be specified at \fBport_associate()\fR time for
-\fBPORT_SOURCE_FILE\fR are \fBFILE_ACCESS\fR, \fBFILE_MODIFIED\fR, and
-\fBFILE_ATTRIB\fR, corresponding to the three time stamps. An \fBfo_atime\fR
-change results in the \fBFILE_ACCESS\fR event, an \fBfo_mtime\fR change results
-in the \fBFILE_MODIFIED\fR event, and an \fBfo_time\fR change results in the
-\fBFILE_ATTRIB\fR event.
+\fBPORT_SOURCE_FILE\fR are \fBFILE_ACCESS\fR, \fBFILE_MODIFIED\fR,
+\fBFILE_ATTRIB\fR, and \fbFILE_TRUNC\fR. The first three of these correspond
+to the three time stamps: an \fBfo_atime\fR change results in the
+\fBFILE_ACCESS\fR event, an \fBfo_mtime\fR change results in the
+\fBFILE_MODIFIED\fR event, and an \fBfo_ctime\fR change results in the
+\fBFILE_ATTRIB\fR event. If the operation that induced the time stamp update
+also truncated the file, \fBFILE_TRUNC\fR will be set in the resulting event.
 .sp
 .LP
 The following exception events are delivered when they occur. These event types

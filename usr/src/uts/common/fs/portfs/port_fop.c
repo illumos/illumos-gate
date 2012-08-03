@@ -23,6 +23,9 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ */
 
 /*
  * File Events Notification
@@ -1256,7 +1259,7 @@ port_associate_fop(port_t *pp, int source, uintptr_t object, int events,
     void *user)
 {
 	portfop_cache_t	*pfcp;
-	vnode_t		*vp, *dvp, *oldvp = NULL, *olddvp = NULL;
+	vnode_t		*vp, *dvp, *oldvp = NULL, *olddvp = NULL, *orig;
 	portfop_t	*pfp;
 	int		error = 0;
 	file_obj_t	fobj;
@@ -1313,8 +1316,7 @@ port_associate_fop(port_t *pp, int source, uintptr_t object, int events,
 		goto errout;
 	}
 
-	vp = port_resolve_vp(vp);
-
+	vp = port_resolve_vp(orig = vp);
 
 	if (vp != NULL && vnevent_support(vp, NULL)) {
 		error = ENOTSUP;
@@ -1322,10 +1324,14 @@ port_associate_fop(port_t *pp, int source, uintptr_t object, int events,
 	}
 
 	/*
-	 * If dvp belongs to a different filesystem just ignore it.
-	 * Hardlinks cannot exist across filesystems.
+	 * If dvp belongs to a different filesystem just ignore it, as hard
+	 * links cannot exist across filesystems.  We make an exception for
+	 * procfs, however, the magic of which we treat semantically as a hard
+	 * link, allowing one to use /proc/[pid]/fd/[fd] for PORT_SOURCE_FILE
+	 * and avoid spurious FILE_RENAME_FROM/FILE_RENAME_TO events.
 	 */
-	if (dvp != NULL && dvp->v_vfsp != vp->v_vfsp) {
+	if (dvp != NULL && dvp->v_vfsp != vp->v_vfsp &&
+	    !(orig->v_type == VPROC && vp != NULL && vp->v_type != VPROC)) {
 		VN_RELE(dvp);
 		dvp = NULL;
 	}
@@ -1822,12 +1828,19 @@ port_fop_sendevent(vnode_t *vp, int events, vnode_t *dvp, char *cname)
 	if (!removeall) {
 		/*
 		 * All the active ones are in the beginning of the list.
+		 * Note that we process this list in reverse order to assure
+		 * that events are delivered in the order that they were
+		 * associated.
 		 */
-		for (pfp = (portfop_t *)list_head(&pvp->pvp_pfoplist);
-		    pfp && pfp->pfop_flags & PORT_FOP_ACTIVE; pfp = npfp) {
+		for (pfp = (portfop_t *)list_tail(&pvp->pvp_pfoplist);
+		    pfp && !(pfp->pfop_flags & PORT_FOP_ACTIVE); pfp = npfp) {
+			npfp = list_prev(&pvp->pvp_pfoplist, pfp);
+		}
+
+		for (; pfp != NULL; pfp = npfp) {
 			int levents = events;
 
-			npfp = list_next(&pvp->pvp_pfoplist, pfp);
+			npfp = list_prev(&pvp->pvp_pfoplist, pfp);
 			/*
 			 * Hard links case - If the file is being
 			 * removed/renamed, and the name matches
@@ -1965,7 +1978,9 @@ port_fop(vnode_t *vp, int op, int retval)
 	if (op & FOP_ATTRIB_MASK) {
 		event  |= FILE_ATTRIB;
 	}
-
+	if (op & FOP_TRUNC_MASK) {
+		event  |= FILE_TRUNC;
+	}
 	if (event) {
 		port_fop_sendevent(vp, 	event, NULL, NULL);
 	}
@@ -2147,6 +2162,9 @@ port_fop_setattr(femarg_t *vf, vattr_t *vap, int flags, cred_t *cr,
 	int		events = 0;
 
 	retval = vnext_setattr(vf, vap, flags, cr, ct);
+	if (vap->va_mask & AT_SIZE) {
+		events |= FOP_FILE_TRUNC;
+	}
 	if (vap->va_mask & (AT_SIZE|AT_MTIME)) {
 		events |= FOP_FILE_SETATTR_MTIME;
 	}
@@ -2322,8 +2340,8 @@ port_fop_vnevent(femarg_t *vf, vnevent_t vnevent, vnode_t *dvp, char *name,
 			port_fop_sendevent(vp, FILE_DELETE, dvp, name);
 		break;
 	case	VE_CREATE:
-			port_fop_sendevent(vp, FILE_MODIFIED|FILE_ATTRIB,
-			    NULL, NULL);
+			port_fop_sendevent(vp,
+			    FILE_MODIFIED|FILE_ATTRIB|FILE_TRUNC, NULL, NULL);
 		break;
 	case	VE_LINK:
 			port_fop_sendevent(vp, FILE_ATTRIB, NULL, NULL);
@@ -2336,6 +2354,9 @@ port_fop_vnevent(femarg_t *vf, vnevent_t vnevent, vnode_t *dvp, char *name,
 
 	case	VE_MOUNTEDOVER:
 			port_fop_sendevent(vp, MOUNTEDOVER, NULL, NULL);
+		break;
+	case	VE_TRUNCATE:
+			port_fop_sendevent(vp, FILE_TRUNC, NULL, NULL);
 		break;
 	default:
 		break;

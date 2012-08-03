@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ */
+
 #include <sys/param.h>
 #include <sys/t_lock.h>
 #include <sys/systm.h>
@@ -772,8 +776,12 @@ pcfs_setattr(
 			goto out;
 		}
 		error = pc_truncate(pcp, (uint_t)vap->va_size);
+
 		if (error)
 			goto out;
+
+		if (vap->va_size == 0)
+			vnevent_truncate(vp, ct);
 	}
 	/*
 	 * Change file modified times.

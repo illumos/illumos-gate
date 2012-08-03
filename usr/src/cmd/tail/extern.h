@@ -28,6 +28,12 @@
  *
  */
 
+#ifndef	_TAIL_EXTERN_H
+#define	_TAIL_EXTERN_H
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <port.h>
 
 #define	WR(p, size) do { \
 	if (write(STDOUT_FILENO, p, size) != (ssize_t)size) \
@@ -48,6 +54,7 @@ struct file_info {
 	FILE *fp;
 	char *file_name;
 	struct stat st;
+	file_obj_t fobj[2];
 };
 
 typedef struct file_info file_info_t;
@@ -67,3 +74,5 @@ int mapprint(struct mapinfo *, off_t, off_t);
 int maparound(struct mapinfo *, off_t);
 
 extern int Fflag, fflag, qflag, rflag, rval, no_files;
+
+#endif	/* _TAIL_EXTERN_H */

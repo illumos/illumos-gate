@@ -24,10 +24,12 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ */
+
 #ifndef	_SYS_PORT_H
 #define	_SYS_PORT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -106,6 +108,7 @@ typedef	struct	port_notify32 {
 #define	FILE_ACCESS		0x00000001
 #define	FILE_MODIFIED		0x00000002
 #define	FILE_ATTRIB		0x00000004
+#define	FILE_TRUNC		0x00100000
 #define	FILE_NOFOLLOW		0x10000000
 
 /*
