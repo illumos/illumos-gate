@@ -109,6 +109,7 @@ typedef struct disk {
 	int		rpm;
 	int		wide;
 	int		cd_rom;
+	int		solid_state;
 } disk_t;
 
 typedef struct descriptor {

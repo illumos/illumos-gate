@@ -26,6 +26,7 @@
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2011 Bayard G. Bell.  All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  */
 /*
  * Copyright 2011 cyril.galibern@opensvc.com
@@ -22322,6 +22323,7 @@ sdioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p, int *rval_p)
 		case DKIOCINFO:
 		case DKIOCGMEDIAINFO:
 		case DKIOCGMEDIAINFOEXT:
+		case DKIOCSOLIDSTATE:
 		case MHIOCENFAILFAST:
 		case MHIOCSTATUS:
 		case MHIOCTKOWN:
@@ -22507,6 +22509,16 @@ skip_ready_valid:
 	case DKIOCREMOVABLE:
 		SD_TRACE(SD_LOG_IOCTL, un, "DKIOCREMOVABLE\n");
 		i = un->un_f_has_removable_media ? 1 : 0;
+		if (ddi_copyout(&i, (void *)arg, sizeof (int), flag) != 0) {
+			err = EFAULT;
+		} else {
+			err = 0;
+		}
+		break;
+
+	case DKIOCSOLIDSTATE:
+		SD_TRACE(SD_LOG_IOCTL, un, "DKIOCSOLIDSTATE\n");
+		i = un->un_f_is_solid_state ? 1 : 0;
 		if (ddi_copyout(&i, (void *)arg, sizeof (int), flag) != 0) {
 			err = EFAULT;
 		} else {

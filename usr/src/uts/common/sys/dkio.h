@@ -23,6 +23,7 @@
  * Copyright (c) 1982, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SYS_DKIO_H
@@ -236,6 +237,9 @@ struct dk_callback {
 /* ioctl to write extended partition structure into the disk */
 #define	DKIOCSETEXTPART	(DKIOC|46)
 #endif
+
+/* ioctl to report whether the disk is solid state or not - used for ZFS */
+#define	DKIOCSOLIDSTATE		(DKIOC|38)
 
 /*
  * Ioctl to force driver to re-read the alternate partition and rebuild
