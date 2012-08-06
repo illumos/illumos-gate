@@ -382,13 +382,6 @@ rctl_hndl_t rc_zone_shmmax;
 rctl_hndl_t rc_zone_shmmni;
 rctl_hndl_t rc_zone_semmni;
 rctl_hndl_t rc_zone_msgmni;
-/*
- * Synchronization primitives used to synchronize between mounts and zone
- * creation/destruction.
- */
-static int mounts_in_progress;
-static kcondvar_t mount_cv;
-static kmutex_t mount_lock;
 
 const char * const zone_default_initname = "/sbin/init";
 static char * const zone_prefix = "/zone/";
@@ -435,17 +428,20 @@ static const int ZONE_SYSCALL_API_VERSION = 7;
 /*
  * Certain filesystems (such as NFS and autofs) need to know which zone
  * the mount is being placed in.  Because of this, we need to be able to
- * ensure that a zone isn't in the process of being created such that
- * nfs_mount() thinks it is in the global zone, while by the time it
- * gets added the list of mounted zones, it ends up on zoneA's mount
- * list.
+ * ensure that a zone isn't in the process of being created/destroyed such
+ * that nfs_mount() thinks it is in the global/NGZ zone, while by the time
+ * it gets added the list of mounted zones, it ends up on the wrong zone's
+ * mount list. Since a zone can't reside on an NFS file system, we don't
+ * have to worry about the zonepath itself.
  *
  * The following functions: block_mounts()/resume_mounts() and
  * mount_in_progress()/mount_completed() are used by zones and the VFS
- * layer (respectively) to synchronize zone creation and new mounts.
+ * layer (respectively) to synchronize zone state transitions and new
+ * mounts within a zone. This syncronization is on a per-zone basis, so
+ * activity for one zone will not interfere with activity for another zone.
  *
  * The semantics are like a reader-reader lock such that there may
- * either be multiple mounts (or zone creations, if that weren't
+ * either be multiple mounts (or zone state transitions, if that weren't
  * serialized by zonehash_lock) in progress at the same time, but not
  * both.
  *
@@ -453,10 +449,8 @@ static const int ZONE_SYSCALL_API_VERSION = 7;
  * taking too long.
  *
  * The semantics are such that there is unfair bias towards the
- * "current" operation.  This means that zone creations may starve if
- * there is a rapid succession of new mounts coming in to the system, or
- * there is a remote possibility that zones will be created at such a
- * rate that new mounts will not be able to proceed.
+ * "current" operation.  This means that zone halt may starve if
+ * there is a rapid succession of new mounts coming in to the zone.
  */
 /*
  * Prevent new mounts from progressing to the point of calling
@@ -464,7 +458,7 @@ static const int ZONE_SYSCALL_API_VERSION = 7;
  * them to complete.
  */
 static int
-block_mounts(void)
+block_mounts(zone_t *zp)
 {
 	int retval = 0;
 
@@ -473,19 +467,21 @@ block_mounts(void)
 	 * called with zonehash_lock held.
 	 */
 	ASSERT(MUTEX_NOT_HELD(&zonehash_lock));
-	mutex_enter(&mount_lock);
-	while (mounts_in_progress > 0) {
-		if (cv_wait_sig(&mount_cv, &mount_lock) == 0)
+	mutex_enter(&zp->zone_mount_lock);
+	while (zp->zone_mounts_in_progress > 0) {
+		if (cv_wait_sig(&zp->zone_mount_cv, &zp->zone_mount_lock) == 0)
 			goto signaled;
 	}
 	/*
 	 * A negative value of mounts_in_progress indicates that mounts
-	 * have been blocked by (-mounts_in_progress) different callers.
+	 * have been blocked by (-mounts_in_progress) different callers
+	 * (remotely possible if two threads enter zone_shutdown at the same
+	 * time).
 	 */
-	mounts_in_progress--;
+	zp->zone_mounts_in_progress--;
 	retval = 1;
 signaled:
-	mutex_exit(&mount_lock);
+	mutex_exit(&zp->zone_mount_lock);
 	return (retval);
 }
 
@@ -494,26 +490,26 @@ signaled:
  * Allow them to progress if we were the last obstacle.
  */
 static void
-resume_mounts(void)
+resume_mounts(zone_t *zp)
 {
-	mutex_enter(&mount_lock);
-	if (++mounts_in_progress == 0)
-		cv_broadcast(&mount_cv);
-	mutex_exit(&mount_lock);
+	mutex_enter(&zp->zone_mount_lock);
+	if (++zp->zone_mounts_in_progress == 0)
+		cv_broadcast(&zp->zone_mount_cv);
+	mutex_exit(&zp->zone_mount_lock);
 }
 
 /*
- * The VFS layer is busy with a mount; zones should wait until all
- * mounts are completed to progress.
+ * The VFS layer is busy with a mount; this zone should wait until all
+ * of its mounts are completed to progress.
  */
 void
-mount_in_progress(void)
+mount_in_progress(zone_t *zp)
 {
-	mutex_enter(&mount_lock);
-	while (mounts_in_progress < 0)
-		cv_wait(&mount_cv, &mount_lock);
-	mounts_in_progress++;
-	mutex_exit(&mount_lock);
+	mutex_enter(&zp->zone_mount_lock);
+	while (zp->zone_mounts_in_progress < 0)
+		cv_wait(&zp->zone_mount_cv, &zp->zone_mount_lock);
+	zp->zone_mounts_in_progress++;
+	mutex_exit(&zp->zone_mount_lock);
 }
 
 /*
@@ -521,12 +517,12 @@ mount_in_progress(void)
  * callers if this is the last mount.
  */
 void
-mount_completed(void)
+mount_completed(zone_t *zp)
 {
-	mutex_enter(&mount_lock);
-	if (--mounts_in_progress == 0)
-		cv_broadcast(&mount_cv);
-	mutex_exit(&mount_lock);
+	mutex_enter(&zp->zone_mount_lock);
+	if (--zp->zone_mounts_in_progress == 0)
+		cv_broadcast(&zp->zone_mount_cv);
+	mutex_exit(&zp->zone_mount_lock);
 }
 
 /*
@@ -4921,7 +4917,7 @@ zone_create(const char *zone_name, const char *zone_root,
 		return (zone_create_error(error, 0, extended_error));
 	}
 
-	if (block_mounts() == 0) {
+	if (block_mounts(zone) == 0) {
 		mutex_enter(&pp->p_lock);
 		if (curthread != pp->p_agenttp)
 			continuelwps(pp);
@@ -5072,7 +5068,7 @@ zone_create(const char *zone_name, const char *zone_root,
 	/*
 	 * The zone is fully visible, so we can let mounts progress.
 	 */
-	resume_mounts();
+	resume_mounts(zone);
 	if (rctls)
 		nvlist_free(rctls);
 
@@ -5088,7 +5084,7 @@ errout:
 		continuelwps(pp);
 	mutex_exit(&pp->p_lock);
 
-	resume_mounts();
+	resume_mounts(zone);
 	if (rctls)
 		nvlist_free(rctls);
 	/*
@@ -5253,15 +5249,6 @@ zone_shutdown(zoneid_t zoneid)
 	if (zoneid < MIN_USERZONEID || zoneid > MAX_ZONEID)
 		return (set_errno(EINVAL));
 
-	/*
-	 * Block mounts so that VFS_MOUNT() can get an accurate view of
-	 * the zone's status with regards to ZONE_IS_SHUTTING down.
-	 *
-	 * e.g. NFS can fail the mount if it determines that the zone
-	 * has already begun the shutdown sequence.
-	 */
-	if (block_mounts() == 0)
-		return (set_errno(EINTR));
 	mutex_enter(&zonehash_lock);
 	/*
 	 * Look for zone under hash lock to prevent races with other
@@ -5269,9 +5256,30 @@ zone_shutdown(zoneid_t zoneid)
 	 */
 	if ((zone = zone_find_all_by_id(zoneid)) == NULL) {
 		mutex_exit(&zonehash_lock);
-		resume_mounts();
 		return (set_errno(EINVAL));
 	}
+
+	/*
+	 * We have to drop zonehash_lock before calling block_mounts.
+	 * Hold the zone so we can continue to use the zone_t.
+	 */
+	zone_hold(zone);
+	mutex_exit(&zonehash_lock);
+
+	/*
+	 * Block mounts so that VFS_MOUNT() can get an accurate view of
+	 * the zone's status with regards to ZONE_IS_SHUTTING down.
+	 *
+	 * e.g. NFS can fail the mount if it determines that the zone
+	 * has already begun the shutdown sequence.
+	 *
+	 */
+	if (block_mounts(zone) == 0) {
+		zone_rele(zone);
+		return (set_errno(EINTR));
+	}
+
+	mutex_enter(&zonehash_lock);
 	mutex_enter(&zone_status_lock);
 	status = zone_status_get(zone);
 	/*
@@ -5280,7 +5288,8 @@ zone_shutdown(zoneid_t zoneid)
 	if (status < ZONE_IS_READY) {
 		mutex_exit(&zone_status_lock);
 		mutex_exit(&zonehash_lock);
-		resume_mounts();
+		resume_mounts(zone);
+		zone_rele(zone);
 		return (set_errno(EINVAL));
 	}
 	/*
@@ -5290,7 +5299,8 @@ zone_shutdown(zoneid_t zoneid)
 	if (status >= ZONE_IS_DOWN) {
 		mutex_exit(&zone_status_lock);
 		mutex_exit(&zonehash_lock);
-		resume_mounts();
+		resume_mounts(zone);
+		zone_rele(zone);
 		return (0);
 	}
 	/*
@@ -5325,10 +5335,9 @@ zone_shutdown(zoneid_t zoneid)
 			}
 		}
 	}
-	zone_hold(zone);	/* so we can use the zone_t later */
 	mutex_exit(&zone_status_lock);
 	mutex_exit(&zonehash_lock);
-	resume_mounts();
+	resume_mounts(zone);
 
 	if (error = zone_empty(zone)) {
 		zone_rele(zone);
