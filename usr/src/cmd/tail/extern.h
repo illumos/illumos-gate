@@ -28,6 +28,10 @@
  *
  */
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <port.h>
+
 
 #define	WR(p, size) do { \
 	if (write(STDOUT_FILENO, p, size) != (ssize_t)size) \
@@ -48,6 +52,7 @@ struct file_info {
 	FILE *fp;
 	char *file_name;
 	struct stat st;
+	file_obj_t fobj;
 };
 
 typedef struct file_info file_info_t;

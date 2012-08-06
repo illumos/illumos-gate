@@ -22,7 +22,7 @@ checktest()
 	local output=$2
 	local test=$3
 
-	if [[ "$a" != "$o" ]]; then
+	if [[ "$actual" != "$output" ]]; then
 		echo "$CMD: test $test: FAIL"
 		echo -e "$CMD: test $test: expected output:\n$o"
 		echo -e "$CMD: test $test: actual output:\n$a"
@@ -42,21 +42,28 @@ PROG=/usr/bin/tail
 CMD=`basename $0`
 DIR=""
 
-case $1 in 
-    -x)
-    	PROG=/usr/xpg4/bin/tail
-	;;
-    -o)
-    	PROG=$2
-	;;
-    -d)
-	DIR=$2
-	;;
-    -?)
-    	echo "Usage: tailtests.sh [-x][-o <override tail executable>]"
-	exit 1
-	;;
-esac
+while [[ $# -gt 0 ]]; do
+	case $1 in
+	    -x)
+		PROG=/usr/xpg4/bin/tail
+		shift
+		;;
+	    -o)
+		PROG=$2
+		shift 2
+		;;
+	    -d)
+		DIR=$2
+		shift 2
+		;;
+	    *)
+		echo "Usage: tailtests.sh" \
+		    "[-x][-o <override tail executable>]" \
+		    "[-d <override output directory>]"
+		exit 1
+		;;
+	esac
+done
 
 #
 # Shut bash up upon receiving a term so we can drop it on our children
@@ -314,6 +321,45 @@ o=`echo -e "a\nb\nc\nd\ne\nf\n"`
 a=`cat $out`
 checktest "$a" "$o" 26
 rm $moved
+
+#
+# Verify that following two files works.
+#
+echo -e "one" > $follow
+echo -e "two" > $moved
+$PROG -f $follow $moved > $out 2> /dev/null &
+child=$!
+sleep 2
+echo -e "three" >> $follow
+sleep 1
+echo -e "four" >> $moved
+sleep 1
+echo -e "five" >> $follow
+sleep 1
+kill $child
+sleep 1
+
+# There is a bug where the content comes before the header lines,
+# where rlines/mapprint happens before the header.  A pain to fix.
+# In this test, just make sure we see both files change.
+o="one
+
+==> $follow <==
+two
+
+==> $moved <==
+
+==> $follow <==
+three
+
+==> $moved <==
+four
+
+==> $follow <==
+five"
+a=`cat $out`
+checktest "$a" "$o" 27
+rm $follow $moved
 
 echo "$CMD: completed"
 

@@ -265,7 +265,6 @@ static void
 associate(file_info_t *file, boolean_t assoc)
 {
 	char buf[64];
-	file_obj_t fobj;
 
 	if (action != USE_PORT || file->fp == NULL)
 		return;
@@ -285,7 +284,7 @@ associate(file_info_t *file, boolean_t assoc)
 		return;
 	}
 
-	bzero(&fobj, sizeof (fobj));
+	bzero(&file->fobj, sizeof (file->fobj));
 
 	/*
 	 * We pull a bit of a stunt here.  PORT_SOURCE_FILE only allows us to
@@ -302,14 +301,22 @@ associate(file_info_t *file, boolean_t assoc)
 	(void) snprintf(buf,
 	    sizeof (buf), "/proc/self/fd/%d", fileno(file->fp));
 
-	fobj.fo_name = buf;
+	/*
+	 * Note that portfs uses the address of the specified file_obj_t to
+	 * tag an association; if one creates a different association with a
+	 * (different) file_ob_t that happens to be at the same address,
+	 * the first association will be implicitly removed.  To assure that
+	 * each file has a disjoint file_obj_t, we allocate the memory for it
+	 * in the file_info, not on the stack.
+	 */
+	file->fobj.fo_name = buf;
 
 	if (assoc) {
 		(void) port_associate(port, PORT_SOURCE_FILE,
-		    (uintptr_t)&fobj, FILE_MODIFIED | FILE_TRUNC, file);
+		    (uintptr_t)&file->fobj, FILE_MODIFIED | FILE_TRUNC, file);
 	} else {
 		(void) port_dissociate(port, PORT_SOURCE_FILE,
-		    (uintptr_t)&fobj);
+		    (uintptr_t)&file->fobj);
 	}
 }
 
@@ -365,7 +372,9 @@ follow(file_info_t *files, enum STYLE style, off_t off)
 
 	last = --file;
 
-	if (action == USE_PORT && (port = port_create()) == -1)
+	if (action == USE_PORT &&
+	    (stat("/proc/self/fd", &sb2) == -1 || !S_ISDIR(sb2.st_mode) ||
+	    (port = port_create()) == -1))
 		action = USE_SLEEP;
 
 	set_events(files);
