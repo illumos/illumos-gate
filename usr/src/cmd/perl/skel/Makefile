@@ -33,7 +33,7 @@ STAGE = $(SRC)/cmd/perl/$(PERL_VERSION)-$(PERLARCH)/staging
 
 PERL=/bin/env ISALIST=$(PERLARCH) /usr/perl5/$(PERL_VERSION)/bin/$(PERLARCH)/perl
 
-PERL_MM_ARGS = INSTALLDIRS=perl CC='gcc' LD='$(LD)'
+PERL_MM_ARGS = INSTALLDIRS=perl CC='$(GCC_ROOT)/bin/gcc' LD='$(LD)'
 
 # Prefix for Solaris-specific extensions that are maintained by
 # Sun/Oracle.
