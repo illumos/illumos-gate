@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2012 Gary Mills
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -436,7 +438,7 @@ parse_resources_addr64(ACPI_RESOURCE *resource_ptr, struct regspec *io,
 }
 
 static ACPI_STATUS
-parse_resources(ACPI_HANDLE handle, dev_info_t *xdip)
+parse_resources(ACPI_HANDLE handle, dev_info_t *xdip, char *path)
 {
 	ACPI_BUFFER	buf;
 	ACPI_RESOURCE	*resource_ptr;
@@ -448,8 +450,26 @@ parse_resources(ACPI_HANDLE handle, dev_info_t *xdip)
 
 	buf.Length = ACPI_ALLOCATE_BUFFER;
 	status = AcpiGetCurrentResources(handle, &buf);
-	if (status != AE_OK) {
+	switch (status) {
+	case AE_OK:
+		break;
+	case AE_NOT_FOUND:
+		/*
+		 * Workaround for faulty DSDT tables that omit the _CRS
+		 * method for the UAR3 device but have a valid _PRS method
+		 * for that device.
+		 */
+		status = AcpiGetPossibleResources(handle, &buf);
+		if (status != AE_OK) {
+			return (status);
+		}
+		break;
+	default:
+		cmn_err(CE_WARN,
+		    "!AcpiGetCurrentResources failed for %s, exception: %s",
+		    path, AcpiFormatException(status));
 		return (status);
+		break;
 	}
 	io = (struct regspec *)kmem_zalloc(sizeof (struct regspec) *
 	    MAX_PARSED_ACPI_RESOURCES, KM_SLEEP);
@@ -803,6 +823,11 @@ isa_acpi_callback(ACPI_HANDLE ObjHandle, uint32_t NestingLevel, void *a,
 		 * Bit 2 -- device is shown in UI
 		 */
 		if (!((info->CurrentStatus & 0x7) == 7)) {
+			if (acpi_enum_debug & DEVICES_NOT_ENUMED) {
+				cmn_err(CE_NOTE, "parse_resources() "
+				    "Bad status 0x%x for %s",
+				    info->CurrentStatus, path);
+			}
 			goto done;
 		}
 	} else {
@@ -815,6 +840,10 @@ isa_acpi_callback(ACPI_HANDLE ObjHandle, uint32_t NestingLevel, void *a,
 	 */
 	if (!(info->Valid & ACPI_VALID_HID)) {
 		/* No _HID, we skip this node */
+		if (acpi_enum_debug & DEVICES_NOT_ENUMED) {
+			cmn_err(CE_NOTE, "parse_resources() "
+			    "No _HID for %s", path);
+		}
 		goto done;
 	}
 	hidstr = info->HardwareId.String;
@@ -896,7 +925,7 @@ isa_acpi_callback(ACPI_HANDLE ObjHandle, uint32_t NestingLevel, void *a,
 				(void) ndi_prop_update_string(DDI_DEV_T_NONE,
 				    xdip, "model", "PNP0Fxx mouse");
 			} else {
-				(void) parse_resources(ObjHandle, xdip);
+				(void) parse_resources(ObjHandle, xdip, path);
 				goto done;
 			}
 		}
@@ -905,7 +934,7 @@ isa_acpi_callback(ACPI_HANDLE ObjHandle, uint32_t NestingLevel, void *a,
 	(void) ndi_prop_update_string(DDI_DEV_T_NONE, xdip, "acpi-namespace",
 	    path);
 
-	(void) parse_resources(ObjHandle, xdip);
+	(void) parse_resources(ObjHandle, xdip, path);
 
 	/* Special processing for mouse and keyboard devices per IEEE 1275 */
 	/* if master entry doesn't contain "compatible" then we add default */
@@ -1056,9 +1085,12 @@ acpi_isa_device_enum(dev_info_t *isa_dip)
 	process_master_file();
 
 	/*
-	 * Do the actual enumeration
+	 * Do the actual enumeration.  Avoid AcpiGetDevices because it
+	 * has an unnecessary internal callback that duplicates
+	 * determining if the device is present.
 	 */
-	(void) AcpiGetDevices(NULL, isa_acpi_callback, isa_dip, 0);
+	(void) AcpiWalkNamespace(ACPI_TYPE_DEVICE, ACPI_ROOT_OBJECT,
+	    UINT32_MAX, isa_acpi_callback, NULL, isa_dip, NULL);
 
 	free_master_data();
 	used_res_interrupts();

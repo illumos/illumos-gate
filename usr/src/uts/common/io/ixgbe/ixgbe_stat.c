@@ -25,6 +25,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include "ixgbe_sw.h"
@@ -112,6 +113,7 @@ ixgbe_update_stats(kstat_t *ks, int rw)
 			break;
 
 		case ixgbe_mac_82599EB:
+		case ixgbe_mac_X540:
 			ixgbe_ks->qbtc[i].value.ui64 +=
 			    IXGBE_READ_REG(hw, IXGBE_QBTC_L(i));
 			ixgbe_ks->qbtc[i].value.ui64 +=
@@ -165,6 +167,7 @@ ixgbe_update_stats(kstat_t *ks, int rw)
 		break;
 
 	case ixgbe_mac_82599EB:
+	case ixgbe_mac_X540:
 		ixgbe_ks->lxonrxc.value.ui64 += IXGBE_READ_REG(hw,
 		    IXGBE_LXONRXCNT);
 		break;
@@ -180,6 +183,7 @@ ixgbe_update_stats(kstat_t *ks, int rw)
 		break;
 
 	case ixgbe_mac_82599EB:
+	case ixgbe_mac_X540:
 		ixgbe_ks->lxoffrxc.value.ui64 += IXGBE_READ_REG(hw,
 		    IXGBE_LXOFFRXCNT);
 		break;
@@ -556,6 +560,7 @@ ixgbe_m_stat(void *arg, uint_t stat, uint64_t *val)
 				break;
 
 			case ixgbe_mac_82599EB:
+			case ixgbe_mac_X540:
 				ixgbe_ks->qbtc[i].value.ui64 +=
 				    IXGBE_READ_REG(hw, IXGBE_QBTC_L(i));
 				ixgbe_ks->qbtc[i].value.ui64 +=

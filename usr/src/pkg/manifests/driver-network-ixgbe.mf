@@ -21,6 +21,8 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012, Joyent, Inc. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 #
@@ -60,6 +62,7 @@ driver name=ixgbe clone_perms="ixgbe 0666 root sys" perms="* 0666 root sys" \
     alias=pciex8086,1514 \
     alias=pciex8086,1517 \
     alias=pciex8086,151c \
+    alias=pciex8086,1528 \
     alias=pciex8086,154d \
     alias=pciex8086,1557
 file path=kernel/drv/$(ARCH64)/ixgbe group=sys
