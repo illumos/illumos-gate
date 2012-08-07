@@ -1,6 +1,7 @@
 '\" te
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright (c) 2012, Joyent, Inc. All Rights Reserved
 .\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at  http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text
@@ -36,6 +37,9 @@ displayed is controlled by the options.
 Some options accept lists as arguments. Items in a list can be either separated
 by commas or else enclosed in quotes and separated by commas or spaces. Values
 for \fIproclist\fR and \fIgrplist\fR must be numeric.
+.sp
+.LP
+The \fBps\fR command also accepts BSD-style options.  See \fBps\fR(1b).
 .SH OPTIONS
 .sp
 .LP
@@ -1284,7 +1288,8 @@ Standard	See \fBstandards\fR(5).
 .sp
 .LP
 \fBkill\fR(1), \fBlgrpinfo\fR(1), \fBnice\fR(1), \fBpagesize\fR(1),
-\fBpmap\fR(1), \fBpriocntl\fR(1), \fBwho\fR(1), \fBgetty\fR(1M), \fBproc\fR(4),
+\fBpmap\fR(1), \fBpriocntl\fR(1), \fBps\fR(1b), \fBwho\fR(1), \fBgetty\fR(1M),
+\fBproc\fR(4),
 \fBttysrch\fR(4), \fBattributes\fR(5), \fBenviron\fR(5),
 \fBresource_controls\fR(5), \fBstandards\fR(5), \fBzones\fR(5)
 .SH NOTES

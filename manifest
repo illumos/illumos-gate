@@ -11695,6 +11695,8 @@ f usr/share/man/man1/ypwhich.1 0444 root bin
 f usr/share/man/man1/zcat.1 0444 root bin
 f usr/share/man/man1/zlogin.1 0444 root bin
 f usr/share/man/man1/zonename.1 0444 root bin
+d usr/share/man/man1b 0755 root bin
+f usr/share/man/man1b/ps.1b 044 root bin
 d usr/share/man/man1c 0755 root bin
 f usr/share/man/man1c/uudecode.1c 044 root bin
 f usr/share/man/man1c/uuencode.1c 044 root bin
