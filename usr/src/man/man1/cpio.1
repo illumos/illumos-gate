@@ -1,6 +1,7 @@
 '\" te
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright (c) 2012 Gary Mills
 .\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text
@@ -16,19 +17,19 @@ cpio \- copy file archives in and out
 .SH SYNOPSIS
 .LP
 .nf
-\fBcpio\fR \fB-i\fR [\fB-bBcdfkmPrsStuvV6@/\fR] [\fB-C\fR \fIbufsize\fR] [\fB-E\fR \fIfile\fR]
+\fBcpio\fR \fB-i\fR [\fB-bBcdfkmPqrsStuvV6@/\fR] [\fB-C\fR \fIbufsize\fR] [\fB-E\fR \fIfile\fR]
      [\fB-H\fR \fIheader\fR] [\fB-I\fR \fI\fR [\fB-M\fR \fImessage\fR]] [\fB-R\fR \fIid\fR] [\fIpattern\fR]...
 .fi
 
 .LP
 .nf
-\fBcpio\fR \fB-o\fR [\fB-aABcLPvV@/\fR] [\fB-C\fR \fIbufsize\fR] [\fB-H\fR \fIheader\fR]
+\fBcpio\fR \fB-o\fR [\fB-aABcLPqvV@/\fR] [\fB-C\fR \fIbufsize\fR] [\fB-H\fR \fIheader\fR]
      [\fB-O\fR \fIfile\fR [\fB-M\fR \fImessage\fR]]
 .fi
 
 .LP
 .nf
-\fBcpio\fR \fB-p\fR [\fB-adlLmPuvV@/\fR] [\fB-R\fR \fIid\fR] \fIdirectory\fR
+\fBcpio\fR \fB-p\fR [\fB-adlLmPquvV@/\fR] [\fB-R\fR \fIid\fR] \fIdirectory\fR
 .fi
 
 .SH DESCRIPTION
@@ -420,6 +421,16 @@ file type. Notice that errors occurs if a \fBcpio\fR archive with \fBACL\fRs is
 extracted by previous versions of \fBcpio\fR. This option should not be used
 with the \fB-c\fR option, as \fBACL\fR support might not be present on all
 systems, and hence is not portable. Use \fBASCII\fR headers for portability.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-q\fR\fR
+.ad
+.RS 14n
+Quiet. Suppresses the number of blocks message that normally is printed
+after the copy is completed.
 .RE
 
 .sp
