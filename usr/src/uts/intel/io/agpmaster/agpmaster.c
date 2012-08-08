@@ -639,7 +639,7 @@ detect_i8xx_device(agp_master_softc_t *master_softc)
 }
 
 /*
- * If agp master is succssfully detected, 0 is returned.
+ * If agp master is successfully detected, 0 is returned.
  * Otherwise -1 is returned.
  */
 static int

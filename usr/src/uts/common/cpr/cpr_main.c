@@ -166,7 +166,7 @@ cpr_main(int sleeptype)
 			 */
 			rc = i_cpr_power_down(sleeptype);
 			if (rc == 0) {
-				PMD(PMD_SX, ("back from succssful suspend\n"))
+				PMD(PMD_SX, ("back from successful suspend\n"))
 			}
 			/*
 			 * We do care about the return value from cpr_resume
