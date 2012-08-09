@@ -82,6 +82,16 @@ get_smbios_ipmi_info()
 	cmn_err(CE_CONT, "!SMBIOS type 0x%x, addr 0x%llx", ipmi.smbip_type,
 	    (long long unsigned int)(ipmi.smbip_addr));
 
+	/*
+	 * Some systems have a bios that will report an IPMI device even when
+	 * it is not installed. In this case we see 0x0 as the base address.
+	 * If we see this address, assume the device is not really present.
+	 */
+	if (ipmi.smbip_addr == NULL) {
+		cmn_err(CE_WARN, "!SMBIOS: Invalid base address");
+		return;
+	}
+
 	sc->ipmi_io_type = ipmi.smbip_type;
 	switch (ipmi.smbip_type) {
 	case SMB_IPMI_T_KCS:
