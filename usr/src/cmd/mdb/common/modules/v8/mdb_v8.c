@@ -451,24 +451,17 @@ conf_next_part(char *buf, char *start)
 static v8_class_t *
 conf_class_findcreate(const char *name)
 {
-	v8_class_t *clp, *iclp, **ptr;
+	v8_class_t *clp, *iclp, *prev = NULL;
 	int cmp;
 
-	if (v8_classes == NULL || strcmp(v8_classes->v8c_name, name) > 0) {
-		ptr = &v8_classes;
-	} else {
-		for (iclp = v8_classes; iclp->v8c_next != NULL;
-		    iclp = iclp->v8c_next) {
-			cmp = strcmp(iclp->v8c_next->v8c_name, name);
+	for (iclp = v8_classes; iclp != NULL; iclp = iclp->v8c_next) {
+		if ((cmp = strcmp(iclp->v8c_name, name)) == 0)
+			return (iclp);
 
-			if (cmp == 0)
-				return (iclp->v8c_next);
+		if (cmp > 0)
+			break;
 
-			if (cmp > 0)
-				break;
-		}
-
-		ptr = &iclp->v8c_next;
+		prev = iclp;
 	}
 
 	if ((clp = mdb_zalloc(sizeof (*clp), UM_NOSLEEP)) == NULL)
@@ -476,9 +469,14 @@ conf_class_findcreate(const char *name)
 
 	(void) strlcpy(clp->v8c_name, name, sizeof (clp->v8c_name));
 	clp->v8c_end = (size_t)-1;
+	clp->v8c_next = iclp;
 
-	clp->v8c_next = *ptr;
-	*ptr = clp;
+	if (prev != NULL) {
+		prev->v8c_next = clp;
+	} else {
+		v8_classes = clp;
+	}
+
 	return (clp);
 }
 
