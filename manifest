@@ -15235,6 +15235,7 @@ f usr/share/man/man5/term.5 0444 root bin
 f usr/share/man/man5/threads.5 0444 root bin
 f usr/share/man/man5/vgrindefs.5 0444 root bin
 f usr/share/man/man5/zones.5 0444 root bin
+f usr/share/man/man5/zpool-features.5 0444 root bin
 d usr/share/man/man7 0755 root bin
 f usr/share/man/man7/FSS.7 0444 root bin
 d usr/share/man/man7d 0755 root bin
