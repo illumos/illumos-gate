@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2012 Gary Mills
+ *
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -33,6 +35,7 @@
 #include <sys/ethernet.h>
 #include <sys/mac_provider.h>
 #include "atge_l1e_reg.h"
+#include "atge_l1c_reg.h"
 
 #define	ATGE_PCI_REG_NUMBER	1
 
@@ -48,10 +51,20 @@
 #define	ATGE_FLAG_FASTETHER	0x0010
 #define	ATGE_FLAG_JUMBO		0x0020
 #define	ATGE_MII_CHECK		0x0040
+#define	ATGE_FLAG_ASPM_MON	0x0080
+#define	ATGE_FLAG_CMB_BUG	0x0100
+#define	ATGE_FLAG_SMB_BUG	0x0200
+#define	ATGE_FLAG_APS		0x1000
 
 #define	ATGE_CHIP_L1_DEV_ID	0x1048
 #define	ATGE_CHIP_L2_DEV_ID	0x2048
 #define	ATGE_CHIP_L1E_DEV_ID	0x1026
+#define	ATGE_CHIP_L1CG_DEV_ID	0x1063
+#define	ATGE_CHIP_L1CF_DEV_ID	0x1062
+#define	ATGE_CHIP_AR8151V1_DEV_ID	0x1073
+#define	ATGE_CHIP_AR8151V2_DEV_ID	0x1083
+#define	ATGE_CHIP_AR8152V1_DEV_ID	0x2060
+#define	ATGE_CHIP_AR8152V2_DEV_ID	0x2062
 
 #define	ATGE_PROMISC		0x001
 #define	ATGE_ALL_MULTICST	0x002
@@ -142,6 +155,8 @@
  * General purpose macros.
  */
 #define	ATGE_MODEL(atgep)	atgep->atge_model
+#define	ATGE_VID(atgep)		atgep->atge_vid
+#define	ATGE_DID(atgep)		atgep->atge_did
 
 /*
  * Different type of chip models.
@@ -150,6 +165,7 @@ typedef	enum {
 	ATGE_CHIP_L1 = 1,
 	ATGE_CHIP_L2,
 	ATGE_CHIP_L1E,
+	ATGE_CHIP_L1C,
 } atge_model_t;
 
 typedef	struct	atge_cards {
@@ -221,6 +237,20 @@ typedef	struct	atge_l1_data {
 } atge_l1_data_t;
 
 /*
+ * L1C specific private data.
+ */
+typedef	struct	atge_l1c_data {
+	atge_ring_t		*atge_rx_ring;
+	atge_dma_t		*atge_l1c_cmb;
+	atge_dma_t		*atge_l1c_rr;
+	atge_dma_t		*atge_l1c_smb;
+	int			atge_l1c_rr_consumers;
+	uint32_t		atge_l1c_intr_status;
+	uint32_t		atge_l1c_rx_prod_cons;
+	uint32_t		atge_l1c_tx_prod_cons;
+} atge_l1c_data_t;
+
+/*
  * TX descriptor table is same with L1, L1E and L2E chips.
  */
 #pragma pack(1)
@@ -257,6 +287,8 @@ typedef	struct	atge {
 	dev_info_t		*atge_dip;
 	char			atge_name[8];
 	atge_model_t		atge_model;
+	uint16_t		atge_vid;
+	uint16_t		atge_did;
 	int			atge_chip_rev;
 	uint8_t			atge_revid;
 
@@ -300,6 +332,8 @@ typedef	struct	atge {
 	int			atge_tx_resched;
 	int			atge_mtu;
 	int			atge_int_mod;
+	int			atge_int_rx_mod; /* L1C */
+	int			atge_int_tx_mod; /* L1C */
 	int			atge_max_frame_size;
 
 

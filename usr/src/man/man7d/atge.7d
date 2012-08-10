@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright (c) 2012 Gary Mills
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
@@ -9,12 +10,20 @@ atge \- Device driver for Atheros/Attansic Ethernet chipsets
 .SH DESCRIPTION
 .sp
 .LP
-The \fBatge\fR ethernet driver is GLD based supporting the Atheros/Attansic L1E
-Gigabit Ethernet 10/100/1000 Base (AR8121/AR8113) chipsets:
+The \fBatge\fR ethernet driver supports the
+Atheros/Attansic L1, L1E, and L1C Ethernet
+(AR8121/AR8113/8114, AR8131/AR8132, and AR8151/AR8152) chipsets:
 .sp
 .in +2
 .nf
-pciex1969,1026 Atheros/Attansic GigabitE 10/100/1000 Base (AR8121/AR8113)
+pciex1969,1026 Atheros AR8121/8113/8114
+pciex1969,1048 Attansic L1
+pciex1969,1062 Atheros AR8132 Fast Ethernet
+pciex1969,1063 Atheros AR8131 Gigabit Ethernet
+pciex1969,1073 Atheros AR8151 v1.0 Gigabit Ethernet
+pciex1969,1083 Atheros AR8151 v2.0 Gigabit Ethernet
+pciex1969,2060 Atheros AR8152 v1.1 Fast Ethernet
+pciex1969,2062 Atheros AR8152 v2.0 Fast Ethernet
 .fi
 .in -2
 .sp

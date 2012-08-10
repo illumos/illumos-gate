@@ -20,7 +20,35 @@
  */
 
 /*
+ * Copyright (c) 2012 Gary Mills
+ *
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+/*
+ * Copyright (c) 2009, Pyun YongHyeon <yongari@FreeBSD.org>
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice unmodified, this list of conditions, and the following
+ *    disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
  */
 
 #include <sys/types.h>
@@ -53,15 +81,16 @@
 
 #include "atge.h"
 #include "atge_cmn_reg.h"
+#include "atge_l1c_reg.h"
 #include "atge_l1e_reg.h"
 #include "atge_l1_reg.h"
 
 
 /*
- * Atheros/Attansic Ethernet chips are of three types - L1, L2 and L1E.
- * This driver is for L1E/L1 but can be extended to support other chips.
+ * Atheros/Attansic Ethernet chips are of four types - L1, L2, L1E and L1C.
+ * This driver is for L1E/L1/L1C but can be extended to support other chips.
  * L1E comes in 1Gigabit and Fast Ethernet flavors. L1 comes in 1Gigabit
- * flavors only.
+ * flavors only.  L1C comes in both flavours.
  *
  * Atheros/Attansic Ethernet controllers have descriptor based TX and RX
  * with an exception of L1E. L1E's RX side is not descriptor based ring.
@@ -152,6 +181,7 @@ void	atge_l1e_clear_stats(atge_t *);
  * L1 specific functions.
  */
 int	atge_l1_alloc_dma(atge_t *);
+void	atge_l1_free_dma(atge_t *);
 void	atge_l1_init_tx_ring(atge_t *);
 void	atge_l1_init_rx_ring(atge_t *);
 void	atge_l1_init_rr_ring(atge_t *);
@@ -163,14 +193,34 @@ void	atge_l1_stop_rx_mac(atge_t *);
 uint_t	atge_l1_interrupt(caddr_t, caddr_t);
 void	atge_l1_send_packet(atge_ring_t *);
 
+/*
+ * L1C specific functions.
+ */
+int	atge_l1c_alloc_dma(atge_t *);
+void	atge_l1c_free_dma(atge_t *);
+void	atge_l1c_init_tx_ring(atge_t *);
+void	atge_l1c_init_rx_ring(atge_t *);
+void	atge_l1c_init_rr_ring(atge_t *);
+void	atge_l1c_init_cmb(atge_t *);
+void	atge_l1c_init_smb(atge_t *);
+void	atge_l1c_program_dma(atge_t *);
+void	atge_l1c_stop_tx_mac(atge_t *);
+void	atge_l1c_stop_rx_mac(atge_t *);
+uint_t	atge_l1c_interrupt(caddr_t, caddr_t);
+void	atge_l1c_send_packet(atge_ring_t *);
+void	atge_l1c_gather_stats(atge_t *);
+void	atge_l1c_clear_stats(atge_t *);
 
 /*
  * Function prototyps for MII operations.
  */
 uint16_t	atge_mii_read(void *, uint8_t, uint8_t);
 void	atge_mii_write(void *, uint8_t, uint8_t, uint16_t);
+uint16_t	atge_l1c_mii_read(void *, uint8_t, uint8_t);
+void	atge_l1c_mii_write(void *, uint8_t, uint8_t, uint16_t);
 void	atge_l1e_mii_reset(void *);
 void	atge_l1_mii_reset(void *);
+void	atge_l1c_mii_reset(void *);
 static void	atge_mii_notify(void *, link_state_t);
 void	atge_tx_reclaim(atge_t *atgep, int cons);
 
@@ -194,6 +244,17 @@ static	mii_ops_t atge_l1_mii_ops = {
 	atge_mii_write,
 	atge_mii_notify,
 	atge_l1_mii_reset
+};
+
+/*
+ * L1C chip.
+ */
+static	mii_ops_t atge_l1c_mii_ops = {
+	MII_OPS_VERSION,
+	atge_l1c_mii_read,
+	atge_l1c_mii_write,
+	atge_mii_notify,
+	NULL
 };
 
 /*
@@ -272,11 +333,28 @@ static ddi_dma_attr_t atge_dma_attr_buf = {
  * Table of supported devices.
  */
 #define	ATGE_VENDOR_ID	0x1969
+#define	ATGE_L1_STR	"Attansic L1"
+#define	ATGE_L1CG_STR	"Atheros AR8131 Gigabit Ethernet"
+#define	ATGE_L1CF_STR	"Atheros AR8132 Fast Ethernet"
 #define	ATGE_L1E_STR	"Atheros AR8121/8113/8114"
+#define	ATGE_AR8151V1_STR	"Atheros AR8151 v1.0 Gigabit Ethernet"
+#define	ATGE_AR8151V2_STR	"Atheros AR8151 v2.0 Gigabit Ethernet"
+#define	ATGE_AR8152V1_STR	"Atheros AR8152 v1.1 Fast Ethernet"
+#define	ATGE_AR8152V2_STR	"Atheros AR8152 v2.0 Fast Ethernet"
 
 static atge_cards_t atge_cards[] = {
+	{ATGE_VENDOR_ID, ATGE_CHIP_AR8151V2_DEV_ID, ATGE_AR8151V2_STR,
+	    ATGE_CHIP_L1C},
+	{ATGE_VENDOR_ID, ATGE_CHIP_AR8151V1_DEV_ID, ATGE_AR8151V1_STR,
+	    ATGE_CHIP_L1C},
+	{ATGE_VENDOR_ID, ATGE_CHIP_AR8152V2_DEV_ID, ATGE_AR8152V2_STR,
+	    ATGE_CHIP_L1C},
+	{ATGE_VENDOR_ID, ATGE_CHIP_AR8152V1_DEV_ID, ATGE_AR8152V1_STR,
+	    ATGE_CHIP_L1C},
+	{ATGE_VENDOR_ID, ATGE_CHIP_L1CG_DEV_ID, ATGE_L1CG_STR, ATGE_CHIP_L1C},
+	{ATGE_VENDOR_ID, ATGE_CHIP_L1CF_DEV_ID, ATGE_L1CF_STR, ATGE_CHIP_L1C},
 	{ATGE_VENDOR_ID, ATGE_CHIP_L1E_DEV_ID, ATGE_L1E_STR, ATGE_CHIP_L1E},
-	{ATGE_VENDOR_ID, ATGE_CHIP_L1_DEV_ID, "Attansic L1", ATGE_CHIP_L1},
+	{ATGE_VENDOR_ID, ATGE_CHIP_L1_DEV_ID, ATGE_L1_STR, ATGE_CHIP_L1},
 };
 
 /*
@@ -300,22 +378,47 @@ atge_debug_func(char *fmt, ...)
 	DTRACE_PROBE1(atge__debug, char *, buf);
 }
 
+static
+void
+atge_message(dev_info_t *dip, int level, char *fmt, va_list ap)
+{
+	char	buf[256];
+	char	*p = "!%s%d: %s";
+	char	*q = "!atge: %s";
+
+	(void) vsnprintf(buf, sizeof (buf), fmt, ap);
+
+	if (level != CE_NOTE) {
+		p++;
+		q++;
+	}
+
+	if (dip) {
+		cmn_err(level, p,
+		    ddi_driver_name(dip), ddi_get_instance(dip), buf);
+	} else {
+		cmn_err(level, q, buf);
+	}
+}
+
+void
+atge_notice(dev_info_t *dip, char *fmt, ...)
+{
+	va_list	ap;
+
+	va_start(ap, fmt);
+	(void) atge_message(dip, CE_NOTE, fmt, ap);
+	va_end(ap);
+}
+
 void
 atge_error(dev_info_t *dip, char *fmt, ...)
 {
 	va_list	ap;
-	char	buf[256];
 
 	va_start(ap, fmt);
-	(void) vsnprintf(buf, sizeof (buf), fmt, ap);
+	(void) atge_message(dip, CE_WARN, fmt, ap);
 	va_end(ap);
-
-	if (dip) {
-		cmn_err(CE_WARN, "%s%d: %s",
-		    ddi_driver_name(dip), ddi_get_instance(dip), buf);
-	} else {
-		cmn_err(CE_WARN, "atge: %s", buf);
-	}
 }
 
 void
@@ -325,9 +428,22 @@ atge_mac_config(atge_t *atgep)
 	int speed;
 	link_duplex_t ld;
 
+	/* Re-enable TX/RX MACs */
 	reg = INL(atgep, ATGE_MAC_CFG);
 	reg &= ~(ATGE_CFG_FULL_DUPLEX | ATGE_CFG_TX_FC | ATGE_CFG_RX_FC |
 	    ATGE_CFG_SPEED_MASK);
+
+	switch (ATGE_MODEL(atgep)) {
+	case ATGE_CHIP_L1C:
+		switch (ATGE_DID(atgep)) {
+		case ATGE_CHIP_AR8151V2_DEV_ID:
+		case ATGE_CHIP_AR8151V1_DEV_ID:
+		case ATGE_CHIP_AR8152V2_DEV_ID:
+			reg |= ATGE_CFG_HASH_ALG_CRC32 | ATGE_CFG_SPEED_MODE_SW;
+			break;
+		}
+		break;
+	}
 
 	speed = mii_get_speed(atgep->atge_mii);
 	switch (speed) {
@@ -345,19 +461,43 @@ atge_mac_config(atge_t *atgep)
 		reg |= ATGE_CFG_FULL_DUPLEX;
 
 	/* Re-enable TX/RX MACs */
-	if (ATGE_MODEL(atgep) == ATGE_CHIP_L1E) {
+	switch (ATGE_MODEL(atgep)) {
+	case ATGE_CHIP_L1E:
 		reg |= ATGE_CFG_TX_ENB | ATGE_CFG_RX_ENB | ATGE_CFG_RX_FC;
-	} else if (ATGE_MODEL(atgep) == ATGE_CHIP_L1) {
+		break;
+	case ATGE_CHIP_L1:
+	case ATGE_CHIP_L1C:
 		reg |= ATGE_CFG_TX_ENB | ATGE_CFG_RX_ENB;
+		break;
 	}
 
 	OUTL(atgep, ATGE_MAC_CFG, reg);
 
-	if (ATGE_MODEL(atgep) == ATGE_CHIP_L1E) {
+	switch (ATGE_MODEL(atgep)) {
+	case ATGE_CHIP_L1E:
 		reg = ATGE_USECS(ATGE_IM_RX_TIMER_DEFAULT) << IM_TIMER_RX_SHIFT;
 		reg |= ATGE_USECS(ATGE_IM_TX_TIMER_DEFAULT) <<
 		    IM_TIMER_TX_SHIFT;
 		OUTL(atgep, ATGE_IM_TIMER, reg);
+		break;
+	case ATGE_CHIP_L1:
+		break;
+	case ATGE_CHIP_L1C:
+		/* Configure interrupt moderation timer. */
+		reg = ATGE_USECS(atgep->atge_int_rx_mod) << IM_TIMER_RX_SHIFT;
+		reg |= ATGE_USECS(atgep->atge_int_tx_mod) << IM_TIMER_TX_SHIFT;
+		OUTL(atgep, ATGE_IM_TIMER, reg);
+		/*
+		 * We don't want to automatic interrupt clear as task queue
+		 * for the interrupt should know interrupt status.
+		 */
+		reg = 0;
+		if (ATGE_USECS(atgep->atge_int_rx_mod) != 0)
+			reg |= MASTER_IM_RX_TIMER_ENB;
+		if (ATGE_USECS(atgep->atge_int_tx_mod) != 0)
+			reg |= MASTER_IM_TX_TIMER_ENB;
+		OUTL(atgep, ATGE_MASTER_CFG, reg);
+		break;
 	}
 
 	ATGE_DB(("%s: %s() mac_cfg is : %x",
@@ -523,12 +663,19 @@ atge_add_intr_handler(atge_t *atgep, int intr_type)
 	 * Add interrupt handler now.
 	 */
 	for (i = 0; i < atgep->atge_intr_cnt; i++) {
-		if (ATGE_MODEL(atgep) == ATGE_CHIP_L1E) {
+		switch (ATGE_MODEL(atgep)) {
+		case ATGE_CHIP_L1E:
 			err = ddi_intr_add_handler(atgep->atge_intr_handle[i],
 			    atge_l1e_interrupt, atgep, (caddr_t)(uintptr_t)i);
-		} else if (ATGE_MODEL(atgep) == ATGE_CHIP_L1) {
+			break;
+		case ATGE_CHIP_L1:
 			err = ddi_intr_add_handler(atgep->atge_intr_handle[i],
 			    atge_l1_interrupt, atgep, (caddr_t)(uintptr_t)i);
+			break;
+		case ATGE_CHIP_L1C:
+			err = ddi_intr_add_handler(atgep->atge_intr_handle[i],
+			    atge_l1c_interrupt, atgep, (caddr_t)(uintptr_t)i);
+			break;
 		}
 
 		if (err != DDI_SUCCESS) {
@@ -709,9 +856,14 @@ atge_identify_hardware(atge_t *atgep)
 		if (atge_cards[i].vendor_id == vid &&
 		    atge_cards[i].device_id == did) {
 			atgep->atge_model = atge_cards[i].model;
+			atgep->atge_vid = vid;
+			atgep->atge_did = did;
 			atgep->atge_revid =
 			    pci_config_get8(atgep->atge_conf_handle,
 			    PCI_CONF_REVID);
+			atge_notice(atgep->atge_dip, "PCI-ID pci%x,%x,%x: %s",
+			    vid, did, atgep->atge_revid,
+			    atge_cards[i].cardname);
 			ATGE_DB(("%s: %s : PCI-ID pci%x,%x and model : %d",
 			    atgep->atge_name, __func__, vid, did,
 			    atgep->atge_model));
@@ -721,12 +873,14 @@ atge_identify_hardware(atge_t *atgep)
 	}
 
 	atge_error(atgep->atge_dip, "atge driver is attaching to unknown"
-	    " pci%d,%d vendor/device-id card", vid, did);
+	    " pci%x,%x vendor/device-id card", vid, did);
 
 	/*
-	 * Assume it's L1 chip.
+	 * Assume it's L1C chip.
 	 */
-	atgep->atge_model = ATGE_CHIP_L1;
+	atgep->atge_model = ATGE_CHIP_L1C;
+	atgep->atge_vid = vid;
+	atgep->atge_did = did;
 	atgep->atge_revid = pci_config_get8(atgep->atge_conf_handle,
 	    PCI_CONF_REVID);
 
@@ -774,14 +928,18 @@ atge_get_macaddr(atge_t *atgep)
 }
 
 /*
- * Reset functionality for L1 and L1E. It's same.
+ * Reset functionality for L1, L1E, and L1C. It's same.
  */
 static void
 atge_device_reset(atge_t *atgep)
 {
-	if (ATGE_MODEL(atgep) == ATGE_CHIP_L1E ||
-	    ATGE_MODEL(atgep) == ATGE_CHIP_L1)
+	switch (ATGE_MODEL(atgep)) {
+	case ATGE_CHIP_L1E:
+	case ATGE_CHIP_L1:
+	case ATGE_CHIP_L1C:
 		atge_device_reset_l1_l1e(atgep);
+		break;
+	}
 }
 
 void
@@ -789,8 +947,14 @@ atge_device_reset_l1_l1e(atge_t *atgep)
 {
 	uint32_t reg;
 	int t;
-
-	OUTL(atgep, ATGE_MASTER_CFG, MASTER_RESET);
+	switch (ATGE_MODEL(atgep)) {
+	case ATGE_CHIP_L1C:
+		OUTL(atgep, ATGE_MASTER_CFG, MASTER_RESET | 0x40);
+		break;
+	default:
+		OUTL(atgep, ATGE_MASTER_CFG, MASTER_RESET);
+		break;
+	}
 	reg = INL(atgep, ATGE_MASTER_CFG);
 	for (t = ATGE_RESET_TIMEOUT; t > 0; t--) {
 		drv_usecwait(10);
@@ -816,13 +980,20 @@ atge_device_reset_l1_l1e(atge_t *atgep)
 		    reg);
 	}
 
-	/*
-	 * Initialize PCIe module. These values came from FreeBSD and
-	 * we don't know the meaning of it.
-	 */
-	OUTL(atgep, 0x12FC, 0x6500);
-	reg = INL(atgep, 0x1008) | 0x8000;
-	OUTL(atgep, 0x1008, reg);
+	switch (ATGE_MODEL(atgep)) {
+	case ATGE_CHIP_L1E:
+	case ATGE_CHIP_L1:
+		/*
+		 * Initialize PCIe module. These values came from FreeBSD and
+		 * we don't know the meaning of it.
+		 */
+		OUTL(atgep, ATGE_LTSSM_ID_CFG, 0x6500);
+		reg = INL(atgep, 0x1008) | 0x8000;
+		OUTL(atgep, 0x1008, reg);
+		break;
+	case ATGE_CHIP_L1C:
+		break;
+	}
 
 	/*
 	 * Get chip revision.
@@ -843,10 +1014,16 @@ atge_alloc_dma(atge_t *atgep)
 {
 	int err = DDI_FAILURE;
 
-	if (ATGE_MODEL(atgep) == ATGE_CHIP_L1E) {
+	switch (ATGE_MODEL(atgep)) {
+	case ATGE_CHIP_L1E:
 		err = atge_l1e_alloc_dma(atgep);
-	} else if (ATGE_MODEL(atgep) == ATGE_CHIP_L1) {
+		break;
+	case ATGE_CHIP_L1:
 		err = atge_l1_alloc_dma(atgep);
+		break;
+	case ATGE_CHIP_L1C:
+		err = atge_l1c_alloc_dma(atgep);
+		break;
 	}
 
 	return (err);
@@ -855,8 +1032,16 @@ atge_alloc_dma(atge_t *atgep)
 static void
 atge_free_dma(atge_t *atgep)
 {
-	if (ATGE_MODEL(atgep) == ATGE_CHIP_L1E) {
+	switch (ATGE_MODEL(atgep)) {
+	case ATGE_CHIP_L1E:
 		atge_l1e_free_dma(atgep);
+		break;
+	case ATGE_CHIP_L1:
+		atge_l1_free_dma(atgep);
+		break;
+	case ATGE_CHIP_L1C:
+		atge_l1c_free_dma(atgep);
+		break;
 	}
 }
 
@@ -877,15 +1062,15 @@ atge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	instance =  ddi_get_instance(devinfo);
 
 	switch (cmd) {
-	default:
-		return (DDI_FAILURE);
-
 	case DDI_RESUME:
 		return (atge_resume(devinfo));
 
 	case DDI_ATTACH:
 		ddi_set_driver_private(devinfo, NULL);
 		break;
+	default:
+		return (DDI_FAILURE);
+
 	}
 
 	atgep = kmem_zalloc(sizeof (atge_t), KM_SLEEP);
@@ -951,7 +1136,8 @@ atge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	atgep->atge_link_state = LINK_STATE_DOWN;
 	atgep->atge_mtu = ETHERMTU;
 
-	if (ATGE_MODEL(atgep) == ATGE_CHIP_L1E) {
+	switch (ATGE_MODEL(atgep)) {
+	case ATGE_CHIP_L1E:
 		if (atgep->atge_revid > 0xF0) {
 			/* L2E Rev. B. AR8114 */
 			atgep->atge_flags |= ATGE_FLAG_FASTETHER;
@@ -965,6 +1151,45 @@ atge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 				atgep->atge_flags |= ATGE_FLAG_FASTETHER;
 			}
 		}
+		break;
+	case ATGE_CHIP_L1:
+		break;
+	case ATGE_CHIP_L1C:
+		/*
+		 * One odd thing is AR8132 uses the same PHY hardware(F1
+		 * gigabit PHY) of AR8131. So atphy(4) of AR8132 reports
+		 * the PHY supports 1000Mbps but that's not true. The PHY
+		 * used in AR8132 can't establish gigabit link even if it
+		 * shows the same PHY model/revision number of AR8131.
+		 *
+		 * It seems that AR813x/AR815x has silicon bug for SMB. In
+		 * addition, Atheros said that enabling SMB wouldn't improve
+		 * performance. However I think it's bad to access lots of
+		 * registers to extract MAC statistics.
+		 *
+		 * Don't use Tx CMB. It is known to have silicon bug.
+		 */
+		switch (ATGE_DID(atgep)) {
+		case ATGE_CHIP_AR8152V2_DEV_ID:
+		case ATGE_CHIP_AR8152V1_DEV_ID:
+			atgep->atge_flags |= ATGE_FLAG_APS |
+			    ATGE_FLAG_FASTETHER |
+			    ATGE_FLAG_ASPM_MON | ATGE_FLAG_JUMBO |
+			    ATGE_FLAG_SMB_BUG | ATGE_FLAG_CMB_BUG;
+			break;
+		case ATGE_CHIP_AR8151V2_DEV_ID:
+		case ATGE_CHIP_AR8151V1_DEV_ID:
+			atgep->atge_flags |= ATGE_FLAG_APS |
+			    ATGE_FLAG_ASPM_MON | ATGE_FLAG_JUMBO |
+			    ATGE_FLAG_SMB_BUG | ATGE_FLAG_CMB_BUG;
+			break;
+		case ATGE_CHIP_L1CF_DEV_ID:
+			atgep->atge_flags |= ATGE_FLAG_FASTETHER;
+			break;
+		case ATGE_CHIP_L1CG_DEV_ID:
+			break;
+		}
+		break;
 	}
 
 	/*
@@ -999,6 +1224,20 @@ atge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		    (128 << ((burst >> 5) & 0x07))));
 	}
 
+	/* Clear data link and flow-control protocol error. */
+	switch (ATGE_MODEL(atgep)) {
+	case ATGE_CHIP_L1E:
+		break;
+	case ATGE_CHIP_L1:
+		break;
+	case ATGE_CHIP_L1C:
+		OUTL_AND(atgep, ATGE_PEX_UNC_ERR_SEV,
+		    ~(PEX_UNC_ERR_SEV_UC | PEX_UNC_ERR_SEV_FCP));
+		OUTL_AND(atgep, ATGE_LTSSM_ID_CFG, ~LTSSM_ID_WRO_ENB);
+		OUTL_OR(atgep, ATGE_PCIE_PHYMISC, PCIE_PHYMISC_FORCE_RCV_DET);
+		break;
+	}
+
 	/*
 	 * Allocate DMA resources.
 	 */
@@ -1016,10 +1255,16 @@ atge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	/*
 	 * Setup MII.
 	 */
-	if (ATGE_MODEL(atgep) == ATGE_CHIP_L1E) {
+	switch (ATGE_MODEL(atgep)) {
+	case ATGE_CHIP_L1E:
 		mii_ops = &atge_l1e_mii_ops;
-	} else if (ATGE_MODEL(atgep) == ATGE_CHIP_L1) {
+		break;
+	case ATGE_CHIP_L1:
 		mii_ops = &atge_l1_mii_ops;
+		break;
+	case ATGE_CHIP_L1C:
+		mii_ops = &atge_l1c_mii_ops;
+		break;
 	}
 
 	if ((atgep->atge_mii = mii_alloc(atgep, devinfo,
@@ -1072,10 +1317,16 @@ atge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	/*
 	 * Reset the PHY before starting.
 	 */
-	if (ATGE_MODEL(atgep) == ATGE_CHIP_L1E) {
+	switch (ATGE_MODEL(atgep)) {
+	case ATGE_CHIP_L1E:
 		atge_l1e_mii_reset(atgep);
-	} else if (ATGE_MODEL(atgep) == ATGE_CHIP_L1) {
+		break;
+	case ATGE_CHIP_L1:
 		atge_l1_mii_reset(atgep);
+		break;
+	case ATGE_CHIP_L1C:
+		atge_l1c_mii_reset(atgep);
+		break;
 	}
 
 	/*
@@ -1362,8 +1613,14 @@ atge_resume(dev_info_t *dip)
 	/*
 	 * Reset the PHY before resuming MII.
 	 */
-	if (ATGE_MODEL(atgep) == ATGE_CHIP_L1E) {
+	switch (ATGE_MODEL(atgep)) {
+	case ATGE_CHIP_L1E:
 		atge_l1e_mii_reset(atgep);
+		break;
+	case ATGE_CHIP_L1:
+		break;
+	case ATGE_CHIP_L1C:
+		break;
 	}
 
 	mii_resume(atgep->atge_mii);
@@ -1797,16 +2054,45 @@ atge_device_start(atge_t *atgep)
 	 */
 	atge_program_ether(atgep);
 
-	if (ATGE_MODEL(atgep) == ATGE_CHIP_L1E) {
+	switch (ATGE_MODEL(atgep)) {
+	case ATGE_CHIP_L1E:
 		atge_l1e_program_dma(atgep);
-	} else if (ATGE_MODEL(atgep) == ATGE_CHIP_L1) {
+		break;
+	case ATGE_CHIP_L1:
 		atge_l1_program_dma(atgep);
+		break;
+	case ATGE_CHIP_L1C:
+		atge_l1c_program_dma(atgep);
+		break;
 	}
 
 	ATGE_DB(("%s: %s() dma, counters programmed ", atgep->atge_name,
 	    __func__));
 
-	OUTW(atgep, ATGE_INTR_CLR_TIMER, 1*1000/2);
+	switch (ATGE_MODEL(atgep)) {
+	case ATGE_CHIP_L1E:
+	case ATGE_CHIP_L1:
+		OUTW(atgep, ATGE_INTR_CLR_TIMER, 1*1000/2);
+		break;
+	case ATGE_CHIP_L1C:
+		/*
+		 * Disable interrupt re-trigger timer. We don't want automatic
+		 * re-triggering of un-ACKed interrupts.
+		 */
+		OUTL(atgep, ATGE_INTR_RETRIG_TIMER, ATGE_USECS(0));
+		/* Configure CMB. */
+		OUTL(atgep, ATGE_CMB_TX_TIMER, ATGE_USECS(0));
+		/*
+		 * Hardware can be configured to issue SMB interrupt based
+		 * on programmed interval. Since there is a callout that is
+		 * invoked for every hz in driver we use that instead of
+		 * relying on periodic SMB interrupt.
+		 */
+		OUTL(atgep, ATGE_SMB_STAT_TIMER, ATGE_USECS(0));
+		/* Clear MAC statistics. */
+		atge_l1c_clear_stats(atgep);
+		break;
+	}
 
 	/*
 	 * Set Maximum frame size but don't let MTU be less than ETHER_MTU.
@@ -1820,6 +2106,16 @@ atge_device_start(atge_t *atgep)
 	    VLAN_TAGSZ + ETHERFCSL;
 	OUTL(atgep, ATGE_FRAME_SIZE, atgep->atge_max_frame_size);
 
+	switch (ATGE_MODEL(atgep)) {
+	case ATGE_CHIP_L1E:
+		break;
+	case ATGE_CHIP_L1:
+		break;
+	case ATGE_CHIP_L1C:
+		/* Disable header split(?) */
+		OUTL(atgep, ATGE_HDS_CFG, 0);
+		break;
+	}
 
 	/*
 	 * Configure IPG/IFG parameters.
@@ -1846,7 +2142,23 @@ atge_device_start(atge_t *atgep)
 	/*
 	 * Configure jumbo frame.
 	 */
-	if (ATGE_MODEL(atgep) == ATGE_CHIP_L1) {
+	switch (ATGE_MODEL(atgep)) {
+	case ATGE_CHIP_L1E:
+		if (atgep->atge_flags & ATGE_FLAG_JUMBO) {
+
+			if (atgep->atge_mtu < ETHERMTU)
+				reg = atgep->atge_max_frame_size;
+			else if (atgep->atge_mtu < 6 * 1024)
+				reg = (atgep->atge_max_frame_size * 2) / 3;
+			else
+				reg = atgep->atge_max_frame_size / 2;
+
+			OUTL(atgep, L1E_TX_JUMBO_THRESH,
+			    ROUNDUP(reg, TX_JUMBO_THRESH_UNIT) >>
+			    TX_JUMBO_THRESH_UNIT_SHIFT);
+		}
+		break;
+	case ATGE_CHIP_L1:
 		fsize = ROUNDUP(atgep->atge_max_frame_size, sizeof (uint64_t));
 		OUTL(atgep, ATGE_RXQ_JUMBO_CFG,
 		    (((fsize / sizeof (uint64_t)) <<
@@ -1856,37 +2168,46 @@ atge_device_start(atge_t *atgep)
 		    RXQ_JUMBO_CFG_LKAH_SHIFT) & RXQ_JUMBO_CFG_LKAH_MASK) |
 		    ((ATGE_USECS(8) << RXQ_JUMBO_CFG_RRD_TIMER_SHIFT) &
 		    RXQ_JUMBO_CFG_RRD_TIMER_MASK));
-	} else if (ATGE_MODEL(atgep) == ATGE_CHIP_L1E &&
-	    atgep->atge_flags & ATGE_FLAG_JUMBO) {
-
-		if (atgep->atge_mtu < ETHERMTU)
-			reg = atgep->atge_max_frame_size;
-		else if (atgep->atge_mtu < 6 * 1024)
-			reg = (atgep->atge_max_frame_size * 2) / 3;
-		else
-			reg = atgep->atge_max_frame_size / 2;
-
-		OUTL(atgep, L1E_TX_JUMBO_THRESH,
-		    ROUNDUP(reg, TX_JUMBO_THRESH_UNIT) >>
-		    TX_JUMBO_THRESH_UNIT_SHIFT);
+		break;
+	case ATGE_CHIP_L1C:
+		break;
 	}
 
 	/*
 	 * Configure flow-control parameters.
 	 */
-	if ((atgep->atge_flags & ATGE_FLAG_PCIE) != 0) {
+	switch (ATGE_MODEL(atgep)) {
+	case ATGE_CHIP_L1E:
+	case ATGE_CHIP_L1:
+		if ((atgep->atge_flags & ATGE_FLAG_PCIE) != 0) {
 		/*
 		 * Some hardware version require this magic.
 		 */
-		OUTL(atgep, 0x12FC, 0x6500);
+		OUTL(atgep, ATGE_LTSSM_ID_CFG, 0x6500);
 		reg = INL(atgep, 0x1008);
 		OUTL(atgep, 0x1008, reg | 0x8000);
+		}
+		break;
+	case ATGE_CHIP_L1C:
+		break;
 	}
 
 	/*
 	 * These are all magic parameters which came from FreeBSD.
 	 */
-	if (ATGE_MODEL(atgep) == ATGE_CHIP_L1) {
+	switch (ATGE_MODEL(atgep)) {
+	case ATGE_CHIP_L1E:
+		reg = INL(atgep, L1E_SRAM_RX_FIFO_LEN);
+		rxf_hi = (reg * 4) / 5;
+		rxf_lo = reg/ 5;
+
+		OUTL(atgep, ATGE_RXQ_FIFO_PAUSE_THRESH,
+		    ((rxf_lo << RXQ_FIFO_PAUSE_THRESH_LO_SHIFT) &
+		    RXQ_FIFO_PAUSE_THRESH_LO_MASK) |
+		    ((rxf_hi << RXQ_FIFO_PAUSE_THRESH_HI_SHIFT) &
+		    RXQ_FIFO_PAUSE_THRESH_HI_MASK));
+		break;
+	case ATGE_CHIP_L1:
 		switch (atgep->atge_chip_rev) {
 		case 0x8001:
 		case 0x9001:
@@ -1926,54 +2247,46 @@ atge_device_start(atge_t *atgep)
 		    RXQ_RRD_PAUSE_THRESH_LO_MASK) |
 		    ((rrd_hi << RXQ_RRD_PAUSE_THRESH_HI_SHIFT) &
 		    RXQ_RRD_PAUSE_THRESH_HI_MASK));
-	} else if (ATGE_MODEL(atgep) == ATGE_CHIP_L1E) {
-		reg = INL(atgep, L1E_SRAM_RX_FIFO_LEN);
-		rxf_hi = (reg * 4) / 5;
-		rxf_lo = reg/ 5;
+		break;
+	case ATGE_CHIP_L1C:
+		switch (ATGE_DID(atgep)) {
+		case ATGE_CHIP_AR8151V2_DEV_ID:
+		case ATGE_CHIP_AR8152V1_DEV_ID:
+			OUTL(atgep, ATGE_SERDES_LOCK,
+			    INL(atgep, ATGE_SERDES_LOCK) |
+			    SERDES_MAC_CLK_SLOWDOWN |
+			    SERDES_PHY_CLK_SLOWDOWN);
+			break;
+		case ATGE_CHIP_L1CG_DEV_ID:
+		case ATGE_CHIP_L1CF_DEV_ID:
+			/*
+			 * Configure flow control parameters.
+			 * XON	: 80% of Rx FIFO
+			 * XOFF : 30% of Rx FIFO
+			 */
+			reg = INL(atgep, L1C_SRAM_RX_FIFO_LEN);
+			rxf_hi = (reg * 8) / 10;
+			rxf_lo = (reg * 3) / 10;
 
-		OUTL(atgep, ATGE_RXQ_FIFO_PAUSE_THRESH,
-		    ((rxf_lo << RXQ_FIFO_PAUSE_THRESH_LO_SHIFT) &
-		    RXQ_FIFO_PAUSE_THRESH_LO_MASK) |
-		    ((rxf_hi << RXQ_FIFO_PAUSE_THRESH_HI_SHIFT) &
-		    RXQ_FIFO_PAUSE_THRESH_HI_MASK));
+			OUTL(atgep, ATGE_RXQ_FIFO_PAUSE_THRESH,
+			    ((rxf_lo << RXQ_FIFO_PAUSE_THRESH_LO_SHIFT) &
+			    RXQ_FIFO_PAUSE_THRESH_LO_MASK) |
+			    ((rxf_hi << RXQ_FIFO_PAUSE_THRESH_HI_SHIFT) &
+			    RXQ_FIFO_PAUSE_THRESH_HI_MASK));
+			break;
+		}
+		break;
 	}
 
-	/* Configure RxQ. */
-	reg = 0;
-	if (ATGE_MODEL(atgep) == ATGE_CHIP_L1) {
-		reg =
-		    ((RXQ_CFG_RD_BURST_DEFAULT << RXQ_CFG_RD_BURST_SHIFT) &
-		    RXQ_CFG_RD_BURST_MASK) |
-		    ((RXQ_CFG_RRD_BURST_THRESH_DEFAULT <<
-		    RXQ_CFG_RRD_BURST_THRESH_SHIFT) &
-		    RXQ_CFG_RRD_BURST_THRESH_MASK) |
-		    ((RXQ_CFG_RD_PREF_MIN_IPG_DEFAULT <<
-		    RXQ_CFG_RD_PREF_MIN_IPG_SHIFT) &
-		    RXQ_CFG_RD_PREF_MIN_IPG_MASK) |
-		    RXQ_CFG_CUT_THROUGH_ENB | RXQ_CFG_ENB;
-		OUTL(atgep, ATGE_RXQ_CFG, reg);
-	} else if (ATGE_MODEL(atgep) == ATGE_CHIP_L1E) {
+	switch (ATGE_MODEL(atgep)) {
+	case ATGE_CHIP_L1E:
+		/* Configure RxQ. */
 		reg = RXQ_CFG_ALIGN_32 | RXQ_CFG_CUT_THROUGH_ENB |
 		    RXQ_CFG_IPV6_CSUM_VERIFY | RXQ_CFG_ENB;
 		OUTL(atgep, ATGE_RXQ_CFG, reg);
-	}
-
-	/*
-	 * Configure TxQ.
-	 */
-	if (ATGE_MODEL(atgep) == ATGE_CHIP_L1) {
-		reg =
-		    (((TXQ_CFG_TPD_BURST_DEFAULT << TXQ_CFG_TPD_BURST_SHIFT) &
-		    TXQ_CFG_TPD_BURST_MASK) |
-		    ((TXQ_CFG_TX_FIFO_BURST_DEFAULT <<
-		    TXQ_CFG_TX_FIFO_BURST_SHIFT) &
-		    TXQ_CFG_TX_FIFO_BURST_MASK) |
-		    ((TXQ_CFG_TPD_FETCH_DEFAULT <<
-		    TXQ_CFG_TPD_FETCH_THRESH_SHIFT) &
-		    TXQ_CFG_TPD_FETCH_THRESH_MASK) |
-		    TXQ_CFG_ENB);
-		OUTL(atgep, ATGE_TXQ_CFG, reg);
-	} else if (ATGE_MODEL(atgep) == ATGE_CHIP_L1E) {
+		/*
+		 * Configure TxQ.
+		 */
 		reg = (128 <<
 		    (atgep->atge_dma_rd_burst >> DMA_CFG_RD_BURST_SHIFT)) <<
 		    TXQ_CFG_TX_FIFO_BURST_SHIFT;
@@ -1984,38 +2297,12 @@ atge_device_start(atge_t *atgep)
 		reg |= TXQ_CFG_ENHANCED_MODE | TXQ_CFG_ENB;
 
 		OUTL(atgep, ATGE_TXQ_CFG, reg);
-	}
-
-	if (ATGE_MODEL(atgep) == ATGE_CHIP_L1) {
-		OUTL(atgep, L1_TX_JUMBO_TPD_TH_IPG,
-		    (((fsize / sizeof (uint64_t) << TX_JUMBO_TPD_TH_SHIFT)) &
-		    TX_JUMBO_TPD_TH_MASK) |
-		    ((TX_JUMBO_TPD_IPG_DEFAULT << TX_JUMBO_TPD_IPG_SHIFT) &
-		    TX_JUMBO_TPD_IPG_MASK));
-	}
-
-	if (ATGE_MODEL(atgep) == ATGE_CHIP_L1E) {
 		/* Disable RSS. */
 		OUTL(atgep, L1E_RSS_IDT_TABLE0, 0);
 		OUTL(atgep, L1E_RSS_CPU, 0);
-	}
-
-	/*
-	 * Configure DMA parameters.
-	 */
-	if (ATGE_MODEL(atgep) == ATGE_CHIP_L1) {
-		OUTL(atgep, ATGE_DMA_CFG,
-		    DMA_CFG_ENH_ORDER | DMA_CFG_RCB_64 |
-		    atgep->atge_dma_rd_burst | DMA_CFG_RD_ENB |
-		    atgep->atge_dma_wr_burst | DMA_CFG_WR_ENB);
-
-		/* Configure CMB DMA write threshold. */
-		OUTL(atgep, L1_CMB_WR_THRESH,
-		    ((CMB_WR_THRESH_RRD_DEFAULT << CMB_WR_THRESH_RRD_SHIFT) &
-		    CMB_WR_THRESH_RRD_MASK) |
-		    ((CMB_WR_THRESH_TPD_DEFAULT << CMB_WR_THRESH_TPD_SHIFT) &
-		    CMB_WR_THRESH_TPD_MASK));
-	} else if (ATGE_MODEL(atgep) == ATGE_CHIP_L1E) {
+		/*
+		 * Configure DMA parameters.
+		 */
 		/*
 		 * Don't use Tx CMB. It is known to cause RRS update failure
 		 * under certain circumstances. Typical phenomenon of the
@@ -2030,12 +2317,62 @@ atge_device_start(atge_t *atgep)
 		    DMA_CFG_RD_DELAY_CNT_SHIFT) & DMA_CFG_RD_DELAY_CNT_MASK) |
 		    ((DMA_CFG_WR_DELAY_CNT_DEFAULT <<
 		    DMA_CFG_WR_DELAY_CNT_SHIFT) & DMA_CFG_WR_DELAY_CNT_MASK));
-	}
+		/*
+		 * Enable CMB/SMB timer.
+		 */
+		OUTL(atgep, L1E_SMB_STAT_TIMER, 100000);
+		atge_l1e_clear_stats(atgep);
+		break;
+	case ATGE_CHIP_L1:
+		/* Configure RxQ. */
+		reg =
+		    ((RXQ_CFG_RD_BURST_DEFAULT << RXQ_CFG_RD_BURST_SHIFT) &
+		    RXQ_CFG_RD_BURST_MASK) |
+		    ((RXQ_CFG_RRD_BURST_THRESH_DEFAULT <<
+		    RXQ_CFG_RRD_BURST_THRESH_SHIFT) &
+		    RXQ_CFG_RRD_BURST_THRESH_MASK) |
+		    ((RXQ_CFG_RD_PREF_MIN_IPG_DEFAULT <<
+		    RXQ_CFG_RD_PREF_MIN_IPG_SHIFT) &
+		    RXQ_CFG_RD_PREF_MIN_IPG_MASK) |
+		    RXQ_CFG_CUT_THROUGH_ENB | RXQ_CFG_ENB;
+		OUTL(atgep, ATGE_RXQ_CFG, reg);
+		/*
+		 * Configure TxQ.
+		 */
+		reg =
+		    (((TXQ_CFG_TPD_BURST_DEFAULT << TXQ_CFG_TPD_BURST_SHIFT) &
+		    TXQ_CFG_TPD_BURST_MASK) |
+		    ((TXQ_CFG_TX_FIFO_BURST_DEFAULT <<
+		    TXQ_CFG_TX_FIFO_BURST_SHIFT) &
+		    TXQ_CFG_TX_FIFO_BURST_MASK) |
+		    ((TXQ_CFG_TPD_FETCH_DEFAULT <<
+		    TXQ_CFG_TPD_FETCH_THRESH_SHIFT) &
+		    TXQ_CFG_TPD_FETCH_THRESH_MASK) |
+		    TXQ_CFG_ENB);
+		OUTL(atgep, ATGE_TXQ_CFG, reg);
+		/* Jumbo frames */
+		OUTL(atgep, L1_TX_JUMBO_TPD_TH_IPG,
+		    (((fsize / sizeof (uint64_t) << TX_JUMBO_TPD_TH_SHIFT)) &
+		    TX_JUMBO_TPD_TH_MASK) |
+		    ((TX_JUMBO_TPD_IPG_DEFAULT << TX_JUMBO_TPD_IPG_SHIFT) &
+		    TX_JUMBO_TPD_IPG_MASK));
+		/*
+		 * Configure DMA parameters.
+		 */
+		OUTL(atgep, ATGE_DMA_CFG,
+		    DMA_CFG_ENH_ORDER | DMA_CFG_RCB_64 |
+		    atgep->atge_dma_rd_burst | DMA_CFG_RD_ENB |
+		    atgep->atge_dma_wr_burst | DMA_CFG_WR_ENB);
 
-	/*
-	 * Enable CMB/SMB timer.
-	 */
-	if (ATGE_MODEL(atgep) == ATGE_CHIP_L1) {
+		/* Configure CMB DMA write threshold. */
+		OUTL(atgep, L1_CMB_WR_THRESH,
+		    ((CMB_WR_THRESH_RRD_DEFAULT << CMB_WR_THRESH_RRD_SHIFT) &
+		    CMB_WR_THRESH_RRD_MASK) |
+		    ((CMB_WR_THRESH_TPD_DEFAULT << CMB_WR_THRESH_TPD_SHIFT) &
+		    CMB_WR_THRESH_TPD_MASK));
+		/*
+		 * Enable CMB/SMB timer.
+		 */
 		/* Set CMB/SMB timer and enable them. */
 		OUTL(atgep, L1_CMB_WR_TIMER,
 		    ((ATGE_USECS(2) << CMB_WR_TIMER_TX_SHIFT) &
@@ -2047,11 +2384,53 @@ atge_device_start(atge_t *atgep)
 		OUTL(atgep, L1_SMB_TIMER, ATGE_USECS(1000 * 1000));
 		OUTL(atgep, L1_CSMB_CTRL,
 		    CSMB_CTRL_SMB_ENB | CSMB_CTRL_CMB_ENB);
-	} else if (ATGE_MODEL(atgep) == ATGE_CHIP_L1E) {
-		OUTL(atgep, L1E_SMB_STAT_TIMER, 100000);
-		atge_l1e_clear_stats(atgep);
-	}
+		break;
+	case ATGE_CHIP_L1C:
+		/* Configure RxQ. */
+		reg =
+		    RXQ_CFG_RD_BURST_DEFAULT << L1C_RXQ_CFG_RD_BURST_SHIFT |
+		    RXQ_CFG_IPV6_CSUM_VERIFY | RXQ_CFG_ENB;
+		if ((atgep->atge_flags & ATGE_FLAG_ASPM_MON) != 0)
+			reg |= RXQ_CFG_ASPM_THROUGHPUT_LIMIT_1M;
+		OUTL(atgep, ATGE_RXQ_CFG, reg);
+		/*
+		 * Configure TxQ.
+		 */
+		reg = (128 <<
+		    (atgep->atge_dma_rd_burst >> DMA_CFG_RD_BURST_SHIFT)) <<
+		    TXQ_CFG_TX_FIFO_BURST_SHIFT;
 
+		switch (ATGE_DID(atgep)) {
+		case ATGE_CHIP_AR8152V2_DEV_ID:
+		case ATGE_CHIP_AR8152V1_DEV_ID:
+			reg >>= 1;
+			break;
+		}
+
+		reg |= (L1C_TXQ_CFG_TPD_BURST_DEFAULT <<
+		    TXQ_CFG_TPD_BURST_SHIFT) & TXQ_CFG_TPD_BURST_MASK;
+
+		reg |= TXQ_CFG_ENHANCED_MODE | TXQ_CFG_ENB;
+
+		OUTL(atgep, L1C_TXQ_CFG, reg);
+		/* Disable RSS until I understand L1C/L2C's RSS logic. */
+		OUTL(atgep, L1C_RSS_IDT_TABLE0, 0xe4e4e4e4);
+		OUTL(atgep, L1C_RSS_CPU, 0);
+		/*
+		 * Configure DMA parameters.
+		 */
+		OUTL(atgep, ATGE_DMA_CFG,
+		    DMA_CFG_SMB_DIS |
+		    DMA_CFG_OUT_ORDER | DMA_CFG_RD_REQ_PRI | DMA_CFG_RCB_64 |
+		    DMA_CFG_RD_DELAY_CNT_DEFAULT << DMA_CFG_RD_DELAY_CNT_SHIFT |
+		    DMA_CFG_WR_DELAY_CNT_DEFAULT << DMA_CFG_WR_DELAY_CNT_SHIFT |
+
+		    atgep->atge_dma_rd_burst | DMA_CFG_RD_ENB |
+		    atgep->atge_dma_wr_burst | DMA_CFG_WR_ENB);
+		/* Configure CMB DMA write threshold not required. */
+		/* Set CMB/SMB timer and enable them not required. */
+		break;
+	}
 
 	/*
 	 * Disable all WOL bits as WOL can interfere normal Rx
@@ -2072,12 +2451,33 @@ atge_device_start(atge_t *atgep)
 	    ((ATGE_CFG_PREAMBLE_DEFAULT << ATGE_CFG_PREAMBLE_SHIFT) &
 	    ATGE_CFG_PREAMBLE_MASK));
 
+	/*
+	 *  AR813x/AR815x always does checksum computation regardless
+	 *  of MAC_CFG_RXCSUM_ENB bit. Also the controller is known to
+	 *  have bug in protocol field in Rx return structure so
+	 *  these controllers can't handle fragmented frames. Disable
+	 *  Rx checksum offloading until there is a newer controller
+	 *  that has sane implementation.
+	 */
+	switch (ATGE_DID(atgep)) {
+	case ATGE_CHIP_AR8151V2_DEV_ID:
+	case ATGE_CHIP_AR8151V1_DEV_ID:
+	case ATGE_CHIP_AR8152V2_DEV_ID:
+		reg |= ATGE_CFG_HASH_ALG_CRC32 | ATGE_CFG_SPEED_MODE_SW;
+		break;
+	}
+
 	if ((atgep->atge_flags & ATGE_FLAG_FASTETHER) != 0) {
 		reg |= ATGE_CFG_SPEED_10_100;
 		ATGE_DB(("%s: %s() Fast Ethernet", atgep->atge_name, __func__));
 	} else {
 		reg |= ATGE_CFG_SPEED_1000;
 		ATGE_DB(("%s: %s() 1G speed", atgep->atge_name, __func__));
+	}
+	switch (ATGE_MODEL(atgep)) {
+	case ATGE_CHIP_L1C:
+		reg |= L1C_CFG_SINGLE_PAUSE_ENB;
+		break;
 	}
 
 	OUTL(atgep, ATGE_MAC_CFG, reg);
@@ -2092,13 +2492,17 @@ atge_device_start(atge_t *atgep)
 	/*
 	 * Acknowledge all pending interrupts and clear it.
 	 */
-	if (ATGE_MODEL(atgep) == ATGE_CHIP_L1) {
-		OUTL(atgep, ATGE_INTR_STATUS, 0);
-		OUTL(atgep, ATGE_INTR_MASK, atgep->atge_intrs);
-	} else if (ATGE_MODEL(atgep) == ATGE_CHIP_L1E) {
+	switch (ATGE_MODEL(atgep)) {
+	case ATGE_CHIP_L1E:
 		OUTL(atgep, ATGE_INTR_MASK, L1E_INTRS);
 		OUTL(atgep, ATGE_INTR_STATUS, 0xFFFFFFFF);
 		OUTL(atgep, ATGE_INTR_STATUS, 0);
+		break;
+	case ATGE_CHIP_L1:
+	case ATGE_CHIP_L1C:
+		OUTL(atgep, ATGE_INTR_STATUS, 0);
+		OUTL(atgep, ATGE_INTR_MASK, atgep->atge_intrs);
+		break;
 	}
 
 	atge_mac_config(atgep);
@@ -2194,8 +2598,13 @@ atge_device_stop(atge_t *atgep)
 	/*
 	 * Collect stats for L1E. L1 chip's stats are collected by interrupt.
 	 */
-	if (ATGE_MODEL(atgep) == ATGE_CHIP_L1E) {
+	switch (ATGE_MODEL(atgep)) {
+	case ATGE_CHIP_L1E:
 		atge_l1e_gather_stats(atgep);
+		break;
+	case ATGE_CHIP_L1:
+	case ATGE_CHIP_L1C:
+		break;
 	}
 
 	/*
@@ -2203,40 +2612,70 @@ atge_device_stop(atge_t *atgep)
 	 */
 	atge_disable_intrs(atgep);
 
-	if (ATGE_MODEL(atgep) == ATGE_CHIP_L1)
-		OUTL(atgep, L1_CSMB_CTRL, 0);
-
-	/* Stop DMA Engine */
-	if (ATGE_MODEL(atgep) == ATGE_CHIP_L1) {
-		atge_l1_stop_tx_mac(atgep);
-		atge_l1_stop_rx_mac(atgep);
-
-		reg = INL(atgep, ATGE_DMA_CFG);
-		reg &= ~(DMA_CFG_RD_ENB | DMA_CFG_WR_ENB);
-		OUTL(atgep, ATGE_DMA_CFG, reg);
-
-	}
-
-	/*
-	 * Disable queue processing.
-	 */
-	/* Stop TxQ */
-	reg = INL(atgep, ATGE_TXQ_CFG);
-	reg = reg & ~TXQ_CFG_ENB;
-	OUTL(atgep, ATGE_TXQ_CFG, reg);
-
-	/* Stop RxQ */
-	reg = INL(atgep, ATGE_RXQ_CFG);
-	reg = reg & ~RXQ_CFG_ENB;
-	OUTL(atgep, ATGE_RXQ_CFG, reg);
-
-	if (ATGE_MODEL(atgep) == ATGE_CHIP_L1E) {
+	switch (ATGE_MODEL(atgep)) {
+	case ATGE_CHIP_L1E:
+		/* Clear CTRL not required. */
+		/* Stop DMA Engine not required. */
+		/*
+		 * Disable queue processing.
+		 */
+		/* Stop TxQ */
+		reg = INL(atgep, ATGE_TXQ_CFG);
+		reg = reg & ~TXQ_CFG_ENB;
+		OUTL(atgep, ATGE_TXQ_CFG, reg);
+		/* Stop RxQ */
+		reg = INL(atgep, ATGE_RXQ_CFG);
+		reg = reg & ~RXQ_CFG_ENB;
+		OUTL(atgep, ATGE_RXQ_CFG, reg);
+		/* Stop DMA */
 		reg = INL(atgep, ATGE_DMA_CFG);
 		reg = reg & ~(DMA_CFG_TXCMB_ENB | DMA_CFG_RXCMB_ENB);
 		OUTL(atgep, ATGE_DMA_CFG, reg);
 		drv_usecwait(1000);
 		atge_l1e_stop_mac(atgep);
 		OUTL(atgep, ATGE_INTR_STATUS, 0xFFFFFFFF);
+		break;
+	case ATGE_CHIP_L1:
+		/* Clear CTRL. */
+		OUTL(atgep, L1_CSMB_CTRL, 0);
+		/* Stop DMA Engine */
+		atge_l1_stop_tx_mac(atgep);
+		atge_l1_stop_rx_mac(atgep);
+		reg = INL(atgep, ATGE_DMA_CFG);
+		reg &= ~(DMA_CFG_RD_ENB | DMA_CFG_WR_ENB);
+		OUTL(atgep, ATGE_DMA_CFG, reg);
+		/*
+		 * Disable queue processing.
+		 */
+		/* Stop TxQ */
+		reg = INL(atgep, ATGE_TXQ_CFG);
+		reg = reg & ~TXQ_CFG_ENB;
+		OUTL(atgep, ATGE_TXQ_CFG, reg);
+		/* Stop RxQ */
+		reg = INL(atgep, ATGE_RXQ_CFG);
+		reg = reg & ~RXQ_CFG_ENB;
+		OUTL(atgep, ATGE_RXQ_CFG, reg);
+		break;
+	case ATGE_CHIP_L1C:
+		/* Clear CTRL not required. */
+		/* Stop DMA Engine */
+		atge_l1c_stop_tx_mac(atgep);
+		atge_l1c_stop_rx_mac(atgep);
+		reg = INL(atgep, ATGE_DMA_CFG);
+		reg &= ~(DMA_CFG_RD_ENB | DMA_CFG_WR_ENB);
+		OUTL(atgep, ATGE_DMA_CFG, reg);
+		/*
+		 * Disable queue processing.
+		 */
+		/* Stop TxQ */
+		reg = INL(atgep, L1C_TXQ_CFG);
+		reg = reg & ~TXQ_CFG_ENB;
+		OUTL(atgep, L1C_TXQ_CFG, reg);
+		/* Stop RxQ */
+		reg = INL(atgep, ATGE_RXQ_CFG);
+		reg = reg & ~RXQ_CFG_ENB;
+		OUTL(atgep, ATGE_RXQ_CFG, reg);
+		break;
 	}
 
 	for (t = ATGE_RESET_TIMEOUT; t > 0; t--) {
@@ -2261,13 +2700,15 @@ atge_disable_intrs(atge_t *atgep)
 void
 atge_device_init(atge_t *atgep)
 {
-	if (ATGE_MODEL(atgep) == ATGE_CHIP_L1E) {
+	switch (ATGE_MODEL(atgep)) {
+	case ATGE_CHIP_L1E:
 		atgep->atge_intrs = L1E_INTRS;
 		atgep->atge_int_mod = ATGE_IM_TIMER_DEFAULT;
 
 		atge_l1e_init_tx_ring(atgep);
 		atge_l1e_init_rx_pages(atgep);
-	} else if (ATGE_MODEL(atgep) == ATGE_CHIP_L1) {
+		break;
+	case ATGE_CHIP_L1:
 		atgep->atge_intrs = L1_INTRS | INTR_GPHY | INTR_PHY_LINK_DOWN |
 		    INTR_LINK_CHG;
 		atgep->atge_int_mod = ATGE_IM_TIMER_DEFAULT;
@@ -2277,6 +2718,22 @@ atge_device_init(atge_t *atgep)
 		atge_l1_init_rr_ring(atgep);
 		atge_l1_init_cmb(atgep);
 		atge_l1_init_smb(atgep);
+		break;
+	case ATGE_CHIP_L1C:
+		atgep->atge_intrs = L1C_INTRS | L1C_INTR_GPHY |
+		    L1C_INTR_PHY_LINK_DOWN;
+		atgep->atge_int_rx_mod = 400/2;
+		atgep->atge_int_tx_mod = 2000/1;
+
+		atge_l1c_init_tx_ring(atgep);
+		atge_l1c_init_rx_ring(atgep);
+		atge_l1c_init_rr_ring(atgep);
+		atge_l1c_init_cmb(atgep);
+		atge_l1c_init_smb(atgep);
+
+		/* Enable all clocks. */
+		OUTL(atgep, ATGE_CLK_GATING_CFG, 0);
+		break;
 	}
 }
 
@@ -2311,7 +2768,6 @@ atge_device_restart(atge_t *atgep)
 static int
 atge_send_a_packet(atge_t *atgep, mblk_t *mp)
 {
-	atge_tx_desc_t	*txd;
 	uchar_t *c;
 	uint32_t cflags = 0;
 	atge_ring_t *r;
@@ -2361,17 +2817,40 @@ atge_send_a_packet(atge_t *atgep, mblk_t *mp)
 	r->r_avail_desc--;
 
 	c = (uchar_t *)r->r_desc_ring->addr;
-	c += (sizeof (atge_tx_desc_t) * start);
-	txd = (atge_tx_desc_t *)c;
+	switch (ATGE_MODEL(atgep)) {
+	case ATGE_CHIP_L1C:
+		{
+		l1c_tx_desc_t	*txd;
 
-	ATGE_PUT64(r->r_desc_ring, &txd->addr,
-	    r->r_buf_tbl[start]->cookie.dmac_laddress);
+		c += (sizeof (l1c_tx_desc_t) * start);
+		txd = (l1c_tx_desc_t *)c;
 
-	ATGE_PUT32(r->r_desc_ring, &txd->len, ATGE_TX_BYTES(pktlen));
+		ATGE_PUT64(r->r_desc_ring, &txd->addr,
+		    r->r_buf_tbl[start]->cookie.dmac_laddress);
 
-	cflags |= ATGE_TD_EOP;
-	ATGE_PUT32(r->r_desc_ring, &txd->flags, cflags);
+		ATGE_PUT32(r->r_desc_ring, &txd->len, L1C_TX_BYTES(pktlen));
 
+		cflags |= L1C_TD_EOP;
+		ATGE_PUT32(r->r_desc_ring, &txd->flags, cflags);
+		break;
+		}
+	default:
+		{
+		atge_tx_desc_t	*txd;
+
+		c += (sizeof (atge_tx_desc_t) * start);
+		txd = (atge_tx_desc_t *)c;
+
+		ATGE_PUT64(r->r_desc_ring, &txd->addr,
+		    r->r_buf_tbl[start]->cookie.dmac_laddress);
+
+		ATGE_PUT32(r->r_desc_ring, &txd->len, ATGE_TX_BYTES(pktlen));
+
+		cflags |= ATGE_TD_EOP;
+		ATGE_PUT32(r->r_desc_ring, &txd->flags, cflags);
+		break;
+		}
+	}
 	/*
 	 * Sync buffer first.
 	 */
@@ -2390,10 +2869,16 @@ atge_send_a_packet(atge_t *atgep, mblk_t *mp)
 	/*
 	 * Program TX descriptor to send a packet.
 	 */
-	if (ATGE_MODEL(atgep) == ATGE_CHIP_L1E) {
+	switch (ATGE_MODEL(atgep)) {
+	case ATGE_CHIP_L1E:
 		atge_l1e_send_packet(r);
-	} else if (ATGE_MODEL(atgep) == ATGE_CHIP_L1) {
+		break;
+	case ATGE_CHIP_L1:
 		atge_l1_send_packet(r);
+		break;
+	case ATGE_CHIP_L1C:
+		atge_l1c_send_packet(r);
+		break;
 	}
 
 	r->r_atge->atge_opackets++;

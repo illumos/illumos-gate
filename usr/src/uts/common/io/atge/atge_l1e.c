@@ -20,6 +20,8 @@
  */
 
 /*
+ * Copyright (c) 2012 Gary Mills
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -401,10 +403,10 @@ atge_l1e_program_dma(atge_t *atgep)
 	OUTL(atgep, ATGE_IM_TIMER, reg);
 
 	reg = INL(atgep, ATGE_MASTER_CFG);
-	reg &= ~(MASTER_CHIP_REV_MASK | MASTER_CHIP_ID_MASK);
-	reg &= ~(MASTER_IM_RX_TIMER_ENB | MASTER_IM_TX_TIMER_ENB);
-	reg |= MASTER_IM_RX_TIMER_ENB;
-	reg |= MASTER_IM_TX_TIMER_ENB;
+	reg &= ~(L1E_MASTER_CHIP_REV_MASK | L1E_MASTER_CHIP_ID_MASK);
+	reg &= ~(L1E_MASTER_IM_RX_TIMER_ENB | L1E_MASTER_IM_TX_TIMER_ENB);
+	reg |= L1E_MASTER_IM_RX_TIMER_ENB;
+	reg |= L1E_MASTER_IM_TX_TIMER_ENB;
 	OUTL(atgep, ATGE_MASTER_CFG, reg);
 
 	OUTW(atgep, RX_COALSC_PKT_1e, 0);
