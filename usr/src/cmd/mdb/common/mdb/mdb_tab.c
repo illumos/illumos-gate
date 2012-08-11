@@ -300,8 +300,6 @@ mdb_tab_command(mdb_tab_cookie_t *mcp, const char *buf)
 		goto out;
 	}
 
-	mdb_printf("\n");
-
 	/*
 	 * Invoke the command specific tab completion handler or the built in
 	 * dcmd one if there is no dcmd.
