@@ -1,4 +1,7 @@
 /*
+ * Copyright 2012, Daniil Lunev. All rights reserved.
+ */
+/*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
@@ -380,15 +383,16 @@ main(int argc, char *argv[])
 	lifc_flags = LIFC_DEFAULT;
 
 	if (argc < 2) {
-		usage();
-		exit(1);
+		(void) strncpy(name, "-a", sizeof (name));
+	} else {
+		argc--, argv++;
+		if (strlen(*argv) > sizeof (name) - 1) {
+			(void) fprintf(stderr, "%s: interface name too long\n",
+			    *argv);
+			exit(1);
+		}
+		(void) strncpy(name, *argv, sizeof (name));
 	}
-	argc--, argv++;
-	if (strlen(*argv) > sizeof (name) - 1) {
-		(void) fprintf(stderr, "%s: interface name too long\n", *argv);
-		exit(1);
-	}
-	(void) strncpy(name, *argv, sizeof (name));
 	name[sizeof (name) - 1] = '\0';
 	(void) strncpy(origname, name, sizeof (origname));	/* For addif */
 	default_ip_str = NULL;
@@ -452,7 +456,7 @@ main(int argc, char *argv[])
 		int c;
 		char *av[2] = { "ifconfig", name };
 
-		while ((c = getopt(2, av, "audDXZ46v")) != -1) {
+		while ((c = getopt(2, av, "audhDXZ46v")) != -1) {
 			switch ((char)c) {
 			case 'a':
 				all = 1;
@@ -491,6 +495,7 @@ main(int argc, char *argv[])
 			case 'v':
 				verbose = 1;
 				break;
+			case 'h':
 			case '?':
 				usage();
 				exit(1);

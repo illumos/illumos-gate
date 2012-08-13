@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012 Gary Mills
 #
 
 #
@@ -43,7 +44,13 @@ dir path=usr/share/man
 dir path=usr/share/man/man7d
 driver name=atge \
     alias=pciex1969,1026 \
-    alias=pciex1969,1048
+    alias=pciex1969,1048 \
+    alias=pciex1969,1062 \
+    alias=pciex1969,1063 \
+    alias=pciex1969,1073 \
+    alias=pciex1969,1083 \
+    alias=pciex1969,2060 \
+    alias=pciex1969,2062
 file path=kernel/drv/$(ARCH64)/atge group=sys
 file path=kernel/drv/atge group=sys
 file path=usr/share/man/man7d/atge.7d

@@ -1,4 +1,30 @@
 /*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/*
+ * Copyright (c) 2012 Gary Mills
+ *
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+/*
  * Copyright (c) 2008, Pyun YongHyeon <yongari@FreeBSD.org>
  * All rights reserved.
  *
@@ -30,6 +56,7 @@
 
 #include "atge.h"
 #include "atge_cmn_reg.h"
+#include "atge_l1c_reg.h"
 #include "atge_l1e_reg.h"
 #include "atge_l1_reg.h"
 
@@ -90,7 +117,7 @@ atge_mii_write(void *arg, uint8_t phy, uint8_t reg, uint16_t val)
 	    MDIO_SUP_PREAMBLE | MDIO_CLK_25_4 | MDIO_REG_ADDR(reg));
 
 	for (i = PHY_TIMEOUT; i > 0; i--) {
-		drv_usecwait(1);
+		drv_usecwait(5);
 		v = INL(atgep, ATGE_MDIO);
 		if ((v & (MDIO_OP_EXECUTE | MDIO_OP_BUSY)) == 0)
 			break;
@@ -208,5 +235,149 @@ atge_l1_mii_reset(void *arg)
 
 		atge_mii_write(atgep, phyaddr, ATPHY_DBG_ADDR, 0);
 		atge_mii_write(atgep, phyaddr, ATPHY_DBG_DATA, 0x024E);
+	}
+}
+
+void
+atge_l1c_mii_reset(void *arg)
+{
+	atge_t *atgep = arg;
+	uint16_t data;
+	int phyaddr;
+
+	phyaddr = mii_get_addr(atgep->atge_mii);
+
+	/* Reset magic from Linux, via Freebsd */
+	OUTW(atgep, ATGE_GPHY_CTRL,
+	    GPHY_CTRL_HIB_EN | GPHY_CTRL_HIB_PULSE | GPHY_CTRL_SEL_ANA_RESET);
+	(void) INW(atgep, ATGE_GPHY_CTRL);
+	drv_usecwait(10 * 1000);
+
+	OUTW(atgep, ATGE_GPHY_CTRL,
+	    GPHY_CTRL_EXT_RESET | GPHY_CTRL_HIB_EN | GPHY_CTRL_HIB_PULSE |
+	    GPHY_CTRL_SEL_ANA_RESET);
+	(void) INW(atgep, ATGE_GPHY_CTRL);
+	drv_usecwait(10 * 1000);
+
+	/*
+	 * Some fast ethernet chips may not be able to auto-nego with
+	 * switches even though they have 1000T based PHY. Hence we need
+	 * to write 0 to MII_MSCONTROL control register.
+	 */
+	if (atgep->atge_flags & ATGE_FLAG_FASTETHER)
+		atge_mii_write(atgep, phyaddr, MII_MSCONTROL, 0x0);
+
+	/* DSP fixup, Vendor magic. */
+	switch (ATGE_DID(atgep)) {
+		uint16_t reg;
+
+	case ATGE_CHIP_AR8152V1_DEV_ID:
+		atge_mii_write(atgep, phyaddr, ATPHY_DBG_ADDR, 0x000A);
+		reg = atge_mii_read(atgep, phyaddr, ATPHY_DBG_DATA);
+		atge_mii_write(atgep, phyaddr, ATPHY_DBG_DATA, reg & 0xDFFF);
+		/* FALLTHROUGH */
+	case ATGE_CHIP_AR8151V2_DEV_ID:
+	case ATGE_CHIP_AR8151V1_DEV_ID:
+	case ATGE_CHIP_AR8152V2_DEV_ID:
+		atge_mii_write(atgep, phyaddr, ATPHY_DBG_ADDR, 0x003B);
+		reg = atge_mii_read(atgep, phyaddr, ATPHY_DBG_DATA);
+		atge_mii_write(atgep, phyaddr, ATPHY_DBG_DATA, reg & 0xFFF7);
+		drv_usecwait(20 * 1000);
+		break;
+	}
+
+	switch (ATGE_DID(atgep)) {
+	case ATGE_CHIP_AR8151V1_DEV_ID:
+		atge_mii_write(atgep, phyaddr, ATPHY_DBG_ADDR, 0x0029);
+		atge_mii_write(atgep, phyaddr, ATPHY_DBG_DATA, 0x929D);
+		break;
+	case ATGE_CHIP_AR8151V2_DEV_ID:
+	case ATGE_CHIP_AR8152V2_DEV_ID:
+	case ATGE_CHIP_L1CG_DEV_ID:
+	case ATGE_CHIP_L1CF_DEV_ID:
+		atge_mii_write(atgep, phyaddr, ATPHY_DBG_ADDR, 0x0029);
+		atge_mii_write(atgep, phyaddr, ATPHY_DBG_DATA, 0xB6DD);
+		break;
+	}
+
+	/* Load DSP codes, vendor magic. */
+	data = ANA_LOOP_SEL_10BT | ANA_EN_MASK_TB | ANA_EN_10BT_IDLE |
+	    ((1 << ANA_INTERVAL_SEL_TIMER_SHIFT) &
+	    ANA_INTERVAL_SEL_TIMER_MASK);
+	atge_mii_write(atgep, phyaddr,
+	    ATPHY_DBG_ADDR, MII_ANA_CFG18);
+	atge_mii_write(atgep, phyaddr,
+	    ATPHY_DBG_DATA, data);
+
+	data = ((2 << ANA_SERDES_CDR_BW_SHIFT) & ANA_SERDES_CDR_BW_MASK) |
+	    ANA_MS_PAD_DBG | ANA_SERDES_EN_DEEM | ANA_SERDES_SEL_HSP |
+	    ANA_SERDES_EN_PLL | ANA_SERDES_EN_LCKDT;
+	atge_mii_write(atgep, phyaddr,
+	    ATPHY_DBG_ADDR, MII_ANA_CFG5);
+	atge_mii_write(atgep, phyaddr,
+	    ATPHY_DBG_DATA, data);
+
+	data = ((44 << ANA_LONG_CABLE_TH_100_SHIFT) &
+	    ANA_LONG_CABLE_TH_100_MASK) |
+	    ((33 << ANA_SHORT_CABLE_TH_100_SHIFT) &
+	    ANA_SHORT_CABLE_TH_100_SHIFT) |
+	    ANA_BP_BAD_LINK_ACCUM | ANA_BP_SMALL_BW;
+	atge_mii_write(atgep, phyaddr,
+	    ATPHY_DBG_ADDR, MII_ANA_CFG54);
+	atge_mii_write(atgep, phyaddr,
+	    ATPHY_DBG_DATA, data);
+
+	data = ((11 << ANA_IECHO_ADJ_3_SHIFT) & ANA_IECHO_ADJ_3_MASK) |
+	    ((11 << ANA_IECHO_ADJ_2_SHIFT) & ANA_IECHO_ADJ_2_MASK) |
+	    ((8 << ANA_IECHO_ADJ_1_SHIFT) & ANA_IECHO_ADJ_1_MASK) |
+	    ((8 << ANA_IECHO_ADJ_0_SHIFT) & ANA_IECHO_ADJ_0_MASK);
+	atge_mii_write(atgep, phyaddr,
+	    ATPHY_DBG_ADDR, MII_ANA_CFG4);
+	atge_mii_write(atgep, phyaddr,
+	    ATPHY_DBG_DATA, data);
+
+	data = ((7 & ANA_MANUL_SWICH_ON_SHIFT) & ANA_MANUL_SWICH_ON_MASK) |
+	    ANA_RESTART_CAL | ANA_MAN_ENABLE | ANA_SEL_HSP | ANA_EN_HB |
+	    ANA_OEN_125M;
+	atge_mii_write(atgep, phyaddr,
+	    ATPHY_DBG_ADDR, MII_ANA_CFG0);
+	atge_mii_write(atgep, phyaddr,
+	    ATPHY_DBG_DATA, data);
+	drv_usecwait(1000);
+}
+
+uint16_t
+atge_l1c_mii_read(void *arg, uint8_t phy, uint8_t reg)
+{
+
+	if (phy != 0) {
+		/* avoid PHY address alias */
+		return (0xffffU);
+	}
+
+	return (atge_mii_read(arg, phy, reg));
+}
+
+void
+atge_l1c_mii_write(void *arg, uint8_t phy, uint8_t reg, uint16_t val)
+{
+
+	if (phy != 0) {
+		/* avoid PHY address alias */
+		return;
+	}
+
+	if (reg == MII_CONTROL) {
+		/*
+		 * Don't issue a reset if MII_CONTROL_RESET is set.
+		 * Otherwise it occasionally
+		 * advertises incorrect capability.
+		 */
+		if ((val & MII_CONTROL_RESET) == 0) {
+			/* RESET bit is required to set mode */
+			atge_mii_write(arg, phy, reg, val | MII_CONTROL_RESET);
+		}
+	} else {
+		atge_mii_write(arg, phy, reg, val);
 	}
 }

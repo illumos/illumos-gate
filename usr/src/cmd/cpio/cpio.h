@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2012 Gary Mills
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -69,6 +71,7 @@ extern "C" {
 #define	OC6	0x10000000
 #define	BSM	0x20000000
 #define	OCP	0x40000000
+#define	OCq	0x80000000
 
 /* Sparse file support */
 #define	C_ISSPARSE	0200000
