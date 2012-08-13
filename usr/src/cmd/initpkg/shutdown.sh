@@ -41,7 +41,7 @@ usage() {
 }
 
 notify() {
-	/usr/sbin/wall -a <<-!
+	/usr/sbin/wall -Za <<-!
 	$*
 	!
 	if [ -x /usr/sbin/showmount -a -x /usr/sbin/rwall ]
