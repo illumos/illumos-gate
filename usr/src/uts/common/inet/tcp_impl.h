@@ -546,10 +546,6 @@ extern boolean_t	tcp_eager_blowoff(tcp_t *, t_scalar_t);
 extern void	tcp_eager_cleanup(tcp_t *, boolean_t);
 extern void	tcp_eager_kill(void *, mblk_t *, void *, ip_recv_attr_t *);
 extern void	tcp_eager_unlink(tcp_t *);
-extern int	tcp_getpeername(sock_lower_handle_t, struct sockaddr *,
-		    socklen_t *, cred_t *);
-extern int	tcp_getsockname(sock_lower_handle_t, struct sockaddr *,
-		    socklen_t *, cred_t *);
 extern void	tcp_init_values(tcp_t *, tcp_t *);
 extern void	tcp_ipsec_cleanup(tcp_t *);
 extern int	tcp_maxpsz_set(tcp_t *, boolean_t);
@@ -679,7 +675,6 @@ extern void	tcp_do_capability_ack(tcp_t *, struct T_capability_ack *,
 /*
  * TCP option processing related functions in tcp_opt_data.c
  */
-extern int	tcp_opt_default(queue_t *, t_scalar_t, t_scalar_t, uchar_t *);
 extern int	tcp_opt_get(conn_t *, int, int, uchar_t *);
 extern int	tcp_opt_set(conn_t *, uint_t, int, int, uint_t, uchar_t *,
 		    uint_t *, uchar_t *, void *, cred_t *);
