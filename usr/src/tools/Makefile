@@ -105,8 +105,7 @@ ROOTDIRS= \
 	$(ROOTONBLD)/etc/exception_lists \
 	$(ROOTONBLD)/gk \
 	$(ROOTONBLD)/man \
-	$(ROOTONBLD)/man/man1 \
-	$(ROOTONBLD)/man/sman1
+	$(ROOTONBLD)/man/man1
 
 all :=		TARGET= install
 install :=	TARGET= install
