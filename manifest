@@ -2104,6 +2104,8 @@ h usr/bin/i86pc=usr/bin/sun
 f usr/bin/iconv 0555 root bin
 f usr/bin/id 0555 root bin
 f usr/bin/infocmp 0555 root bin
+f usr/bin/ipcs 0555 root bin
+f usr/bin/ipcrm 0555 root bin
 f usr/bin/iostat 0555 root bin
 f usr/bin/isainfo 0555 root bin
 f usr/bin/isalist 0555 root bin
@@ -11449,6 +11451,8 @@ f usr/share/man/man1/i286.1 0444 root bin
 f usr/share/man/man1/i386.1 0444 root bin
 f usr/share/man/man1/i486.1 0444 root bin
 f usr/share/man/man1/iconv.1 0444 root bin
+f usr/share/man/man1/ipcrm.1 0444 root bin
+f usr/share/man/man1/ipcs.1 0444 root bin
 f usr/share/man/man1/isainfo.1 0444 root bin
 f usr/share/man/man1/isalist.1 0444 root bin
 f usr/share/man/man1/jobs.1 0444 root bin
