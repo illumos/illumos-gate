@@ -23,6 +23,10 @@
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ */
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
@@ -2003,9 +2007,19 @@ vrrpd_updateconf(vrrp_vr_conf_t *newconf, uint_t op)
 	    op == VRRP_CONF_UPDATE ? "update" : "delete");
 
 	if ((fp = fopen(vrrpd_conffile, "r+F")) == NULL) {
-		vrrp_log(VRRP_ERR, "vrrpd_updateconf(): open %s failed: %s",
-		    vrrpd_conffile, strerror(errno));
-		return (VRRP_EDB);
+		if (errno != ENOENT) {
+			vrrp_log(VRRP_ERR, "vrrpd_updateconf(): open %s for "
+			    "update failed: %s", vrrpd_conffile,
+			    strerror(errno));
+			return (VRRP_EDB);
+		}
+
+		if ((fp = fopen(vrrpd_conffile, "w+F")) == NULL) {
+			vrrp_log(VRRP_ERR, "vrrpd_updateconf(): open %s for "
+			    "write failed: %s", vrrpd_conffile,
+			    strerror(errno));
+			return (VRRP_EDB);
+		}
 	}
 
 	(void) snprintf(newfile, MAXPATHLEN, "%s.new", vrrpd_conffile);
@@ -2662,7 +2676,8 @@ vrrpd_enable(const char *vn, boolean_t updateconf)
 	if ((strlen(conf->vvc_link) == 0) || dladm_name2info(vrrpd_vh->vh_dh,
 	    conf->vvc_link, NULL, &flags, &class, NULL) != DLADM_STATUS_OK ||
 	    !(flags & DLADM_OPT_ACTIVE) || ((class != DATALINK_CLASS_PHYS) &&
-	    (class != DATALINK_CLASS_VLAN) && (class != DATALINK_CLASS_AGGR))) {
+	    (class != DATALINK_CLASS_VLAN) && (class != DATALINK_CLASS_AGGR) &&
+	    (class != DATALINK_CLASS_VNIC))) {
 		vrrp_log(VRRP_DBG1, "vrrpd_enable(%s): invalid link %s",
 		    vn, conf->vvc_link);
 		return (VRRP_EINVALLINK);
