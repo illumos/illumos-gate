@@ -25,6 +25,7 @@
 #	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
 #	  All Rights Reserved
 #
+# Copyright (c) 2012, Joyent, Inc. All rights reserved.
 #
 
 usage () {
@@ -98,6 +99,9 @@ isremote() {
 # Get list of remote FS types (just once)
 RemoteFSTypes=`while read t junk; do echo $t; done < /etc/dfs/fstypes`
 
+# Ensure nfs/smbfs are remote FS types even if not delivered from fstypes
+isremote "nfs" || set -A RemoteFSTypes "nfs"
+isremote "smbfs" || set -A RemoteFSTypes "smbfs"
 
 #
 # Process command line args
