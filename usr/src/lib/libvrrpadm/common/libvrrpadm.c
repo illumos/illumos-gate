@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ */
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
@@ -692,7 +696,8 @@ lookup_vnic(dladm_handle_t dh, datalink_id_t vnicid, void *arg)
 
 	if (vrrp_is_vrrp_vnic(lva->lva_vh, vnicid, &linkid, &vid, &vrid,
 	    &af) && lva->lva_vrid == vrid && lva->lva_linkid == linkid &&
-	    lva->lva_vid == vid && lva->lva_af == af) {
+	    (lva->lva_vid == VLAN_ID_NONE || lva->lva_vid == vid) &&
+	    lva->lva_af == af) {
 		if (dladm_datalink_id2info(dh, vnicid, NULL, NULL, NULL,
 		    lva->lva_vnic, sizeof (lva->lva_vnic)) == DLADM_STATUS_OK) {
 			return (DLADM_WALK_TERMINATE);
@@ -714,6 +719,7 @@ vrrp_get_vnicname(vrrp_handle_t vh, vrid_t vrid, int af, char *link,
 	uint16_t		vid = VLAN_ID_NONE;
 	datalink_class_t	class;
 	dladm_vlan_attr_t	vlan_attr;
+	dladm_vnic_attr_t	vnic_attr;
 	struct lookup_vnic_arg	lva;
 	uint32_t		media;
 
@@ -736,11 +742,20 @@ vrrp_get_vnicname(vrrp_handle_t vh, vrid_t vrid, int af, char *link,
 		}
 	}
 
+	if (class == DATALINK_CLASS_VNIC) {
+		if (dladm_vnic_info(vh->vh_dh, linkid, &vnic_attr,
+		    DLADM_OPT_ACTIVE) != DLADM_STATUS_OK) {
+			return (VRRP_EINVAL);
+		}
+		linkid = vnic_attr.va_link_id;
+		vid = vnic_attr.va_vid;
+	}
+
 	/*
-	 * For now, Only VRRP over aggr and physical ethernet links is supported
+	 * Only VRRP over vnics, aggrs and physical ethernet links is supported
 	 */
-	if ((class != DATALINK_CLASS_PHYS && class != DATALINK_CLASS_AGGR) ||
-	    media != DL_ETHER) {
+	if ((class != DATALINK_CLASS_PHYS && class != DATALINK_CLASS_AGGR &&
+	    class != DATALINK_CLASS_VNIC) || media != DL_ETHER) {
 		return (VRRP_EINVAL);
 	}
 
