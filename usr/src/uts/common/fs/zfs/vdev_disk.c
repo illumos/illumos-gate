@@ -20,8 +20,8 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, Joyent, Inc. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -373,6 +373,13 @@ vdev_disk_physio(vdev_t *vd, caddr_t data,
     size_t size, uint64_t offset, int flags)
 {
 	vdev_disk_t *dvd = vd->vdev_tsd;
+
+	/*
+	 * If the vdev is closed, it's likely in the REMOVED or FAULTED state.
+	 * Nothing to be done here but return failure.
+	 */
+	if (dvd == NULL)
+		return (EIO);
 
 	ASSERT(vd->vdev_ops == &vdev_disk_ops);
 	return (vdev_disk_ldi_physio(dvd->vd_lh, data, size, offset, flags));
