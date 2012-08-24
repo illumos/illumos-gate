@@ -427,6 +427,8 @@ typedef struct restarter_inst {
 
 	hrtime_t		ri_start_time[RINST_START_TIMES];
 	uint_t			ri_start_index;	/* times started */
+	uint_t			ri_crit_fail_allowed;
+	hrtime_t		ri_crit_fail_period;
 
 	uu_list_node_t		ri_link;
 	pthread_mutex_t		ri_lock;
