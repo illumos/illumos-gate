@@ -126,8 +126,6 @@ dsl_pool_open(dsl_pool_t *dp)
 	dsl_dataset_t *ds;
 	uint64_t obj;
 
-	ASSERT(!dmu_objset_is_dirty_anywhere(dp->dp_meta_objset));
-
 	rw_enter(&dp->dp_config_rwlock, RW_WRITER);
 	err = zap_lookup(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
 	    DMU_POOL_ROOT_DATASET, sizeof (uint64_t), 1,
