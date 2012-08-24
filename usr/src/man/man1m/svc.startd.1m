@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SVC.STARTD 1M "Mar 18, 2011"
+.TH SVC.STARTD 1M "Aug 23, 2012"
 .SH NAME
 svc.startd \- Service Management Facility master restarter
 .SH SYNOPSIS
@@ -372,10 +372,13 @@ properties listed below in the \fBstartd\fR property group.
 .RS 4n
 The \fBcritical_failure_count\fR and \fBcritical_failure_period\fR properties
 together specify the maximum number of service failures allowed in a given
-time interval before \fBsvc.startd\fR transitions the service to maintenance.
+number of seconds before \fBsvc.startd\fR transitions the service to
+maintenance.
 If the number of failures exceeds \fBcritical_failure_count\fR in any period of
 \fBcritical_failure_period\fR seconds, \fBsvc.startd\fR will transition the
-service to maintenance.
+service to maintenance. The \fBcritical_failure_count\fR value is limited
+to the range 1-10 and defaults to 10.  The \fBcritical_failure_period\fR
+defaults to 600 seconds.
 .RE
 
 .sp

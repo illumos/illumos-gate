@@ -405,9 +405,9 @@ typedef enum {
 
 #define	RINST_RETAKE_MASK	0x0f000000
 
-#define	RINST_START_TIMES	5		/* failures to consider */
-#define	RINST_FAILURE_RATE_NS	600000000000LL	/* 1 failure/10 minutes */
-#define	RINST_WT_SVC_FAILURE_RATE_NS	NANOSEC	/* 1 failure/second */
+#define	RINST_START_TIMES	10		/* up to 10 fails to consider */
+#define	RINST_FAILURE_RATE_NS	600000000000LL	/* N failures/10 minutes */
+#define	RINST_WT_SVC_FAILURE_RATE_NS	NANOSEC	/* N failures/second */
 
 /* Number of events in the queue when we start dropping ADMIN events. */
 #define	RINST_QUEUE_THRESHOLD	100
