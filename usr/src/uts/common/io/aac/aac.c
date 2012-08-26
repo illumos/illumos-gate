@@ -3567,7 +3567,8 @@ aac_probe_containers(struct aac_softstate *softs)
 static int
 aac_probe_jbod(struct aac_softstate *softs, int tgt, int event)
 {
-	ASSERT(AAC_MAX_LD <= tgt < AAC_MAX_DEV(softs));
+	ASSERT(AAC_MAX_LD <= tgt);
+	ASSERT(tgt < AAC_MAX_DEV(softs));
 	struct aac_device *dvp;
 	dvp = AAC_DEV(softs, tgt);
 
