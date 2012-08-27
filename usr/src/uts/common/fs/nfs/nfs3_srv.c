@@ -20,6 +20,8 @@
  */
 /*
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -70,12 +72,6 @@
  * Network File System.  See the NFS version 3 protocol specification
  * for a description of this interface.
  */
-
-#ifdef DEBUG
-int rfs3_do_pre_op_attr = 1;
-int rfs3_do_post_op_attr = 1;
-int rfs3_do_post_op_fh3 = 1;
-#endif
 
 static writeverf3 write3verf;
 
@@ -227,12 +223,7 @@ rfs3_setattr(SETATTR3args *args, SETATTR3res *resp, struct exportinfo *exi,
 	if (error)
 		goto out;
 
-#ifdef DEBUG
-	if (rfs3_do_pre_op_attr)
-		bvap = &bva;
-#else
 	bvap = &bva;
-#endif
 
 	if (rdonly(exi, req) || vn_is_readonly(vp)) {
 		resp->status = NFS3ERR_ROFS;
@@ -322,16 +313,8 @@ rfs3_setattr(SETATTR3args *args, SETATTR3res *resp, struct exportinfo *exi,
 		goto out1;
 	}
 
-#ifdef DEBUG
-	if (rfs3_do_post_op_attr) {
-		ava.va_mask = AT_ALL;
-		avap = rfs4_delegated_getattr(vp, &ava, 0, cr) ? NULL : &ava;
-	} else
-		avap = NULL;
-#else
 	ava.va_mask = AT_ALL;
 	avap = rfs4_delegated_getattr(vp, &ava, 0, cr) ? NULL : &ava;
-#endif
 
 	/*
 	 * Force modified metadata out to stable storage.
@@ -421,15 +404,8 @@ rfs3_lookup(LOOKUP3args *args, LOOKUP3res *resp, struct exportinfo *exi,
 		}
 	}
 
-#ifdef DEBUG
-	if (rfs3_do_pre_op_attr) {
-		dva.va_mask = AT_ALL;
-		dvap = VOP_GETATTR(dvp, &dva, 0, cr, NULL) ? NULL : &dva;
-	}
-#else
 	dva.va_mask = AT_ALL;
 	dvap = VOP_GETATTR(dvp, &dva, 0, cr, NULL) ? NULL : &dva;
-#endif
 
 	if (args->what.name == nfs3nametoolong) {
 		resp->status = NFS3ERR_NAMETOOLONG;
@@ -524,16 +500,8 @@ rfs3_lookup(LOOKUP3args *args, LOOKUP3res *resp, struct exportinfo *exi,
 		}
 	}
 
-#ifdef DEBUG
-	if (rfs3_do_post_op_attr) {
-		dva.va_mask = AT_ALL;
-		dvap = VOP_GETATTR(dvp, &dva, 0, cr, NULL) ? NULL : &dva;
-	} else
-		dvap = NULL;
-#else
 	dva.va_mask = AT_ALL;
 	dvap = VOP_GETATTR(dvp, &dva, 0, cr, NULL) ? NULL : &dva;
-#endif
 
 	if (error)
 		goto out;
@@ -560,16 +528,8 @@ rfs3_lookup(LOOKUP3args *args, LOOKUP3res *resp, struct exportinfo *exi,
 	if (publicfh_flag)
 		exi_rele(exi);
 
-#ifdef DEBUG
-	if (rfs3_do_post_op_attr) {
-		va.va_mask = AT_ALL;
-		vap = rfs4_delegated_getattr(vp, &va, 0, cr) ? NULL : &va;
-	} else
-		vap = NULL;
-#else
 	va.va_mask = AT_ALL;
 	vap = rfs4_delegated_getattr(vp, &va, 0, cr) ? NULL : &va;
-#endif
 
 	VN_RELE(vp);
 
@@ -662,12 +622,7 @@ rfs3_access(ACCESS3args *args, ACCESS3res *resp, struct exportinfo *exi,
 	if (error)
 		goto out;
 
-#ifdef DEBUG
-	if (rfs3_do_post_op_attr)
-		vap = &va;
-#else
 	vap = &va;
-#endif
 
 	resp->resok.access = 0;
 
@@ -742,16 +697,8 @@ rfs3_access(ACCESS3args *args, ACCESS3res *resp, struct exportinfo *exi,
 			resp->resok.access |= ACCESS3_EXECUTE;
 	}
 
-#ifdef DEBUG
-	if (rfs3_do_post_op_attr) {
-		va.va_mask = AT_ALL;
-		vap = rfs4_delegated_getattr(vp, &va, 0, cr) ? NULL : &va;
-	} else
-		vap = NULL;
-#else
 	va.va_mask = AT_ALL;
 	vap = rfs4_delegated_getattr(vp, &va, 0, cr) ? NULL : &va;
-#endif
 
 	resp->status = NFS3_OK;
 	vattr_to_post_op_attr(vap, &resp->resok.obj_attributes);
@@ -816,12 +763,7 @@ rfs3_readlink(READLINK3args *args, READLINK3res *resp, struct exportinfo *exi,
 	if (error)
 		goto out;
 
-#ifdef DEBUG
-	if (rfs3_do_post_op_attr)
-		vap = &va;
-#else
 	vap = &va;
-#endif
 
 	/* We lied about the object type for a referral */
 	if (vn_is_nfs_reparse(vp, cr))
@@ -889,16 +831,9 @@ rfs3_readlink(READLINK3args *args, READLINK3res *resp, struct exportinfo *exi,
 			*(data + MAXPATHLEN - uio.uio_resid) = '\0';
 	}
 
-#ifdef DEBUG
-	if (rfs3_do_post_op_attr) {
-		va.va_mask = AT_ALL;
-		vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
-	} else
-		vap = NULL;
-#else
 	va.va_mask = AT_ALL;
 	vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
-#endif
+
 	/* Lie about object type again just to be consistent */
 	if (is_referral && vap != NULL)
 		vap->va_type = VLNK;
@@ -1077,12 +1012,7 @@ rfs3_read(READ3args *args, READ3res *resp, struct exportinfo *exi,
 	if (error)
 		goto out;
 
-#ifdef DEBUG
-	if (rfs3_do_post_op_attr)
-		vap = &va;
-#else
 	vap = &va;
-#endif
 
 	if (vp->v_type != VREG) {
 		resp->status = NFS3ERR_INVAL;
@@ -1232,20 +1162,10 @@ doio_read:
 	va.va_mask = AT_ALL;
 	error = VOP_GETATTR(vp, &va, 0, cr, &ct);
 
-#ifdef DEBUG
-	if (rfs3_do_post_op_attr) {
-		if (error)
-			vap = NULL;
-		else
-			vap = &va;
-	} else
-		vap = NULL;
-#else
 	if (error)
 		vap = NULL;
 	else
 		vap = &va;
-#endif
 
 	VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, &ct);
 
@@ -1419,10 +1339,6 @@ rfs3_write(WRITE3args *args, WRITE3res *resp, struct exportinfo *exi,
 		goto err;
 
 	bvap = &bva;
-#ifdef DEBUG
-	if (!rfs3_do_pre_op_attr)
-		bvap = NULL;
-#endif
 	avap = bvap;
 
 	if (args->count != args->data.data_len) {
@@ -1534,11 +1450,6 @@ rfs3_write(WRITE3args *args, WRITE3res *resp, struct exportinfo *exi,
 	ava.va_mask = AT_ALL;
 	avap = VOP_GETATTR(vp, &ava, 0, cr, &ct) ? NULL : &ava;
 
-#ifdef DEBUG
-	if (!rfs3_do_post_op_attr)
-		avap = NULL;
-#endif
-
 	if (error)
 		goto err;
 
@@ -1627,16 +1538,8 @@ rfs3_create(CREATE3args *args, CREATE3res *resp, struct exportinfo *exi,
 		goto out;
 	}
 
-#ifdef DEBUG
-	if (rfs3_do_pre_op_attr) {
-		dbva.va_mask = AT_ALL;
-		dbvap = VOP_GETATTR(dvp, &dbva, 0, cr, NULL) ? NULL : &dbva;
-	} else
-		dbvap = NULL;
-#else
 	dbva.va_mask = AT_ALL;
 	dbvap = VOP_GETATTR(dvp, &dbva, 0, cr, NULL) ? NULL : &dbva;
-#endif
 	davap = dbvap;
 
 	if (args->where.name == nfs3nametoolong) {
@@ -1799,16 +1702,8 @@ tryagain:
 	error = VOP_CREATE(dvp, name, &va, excl, VWRITE,
 	    &vp, cr, 0, NULL, NULL);
 
-#ifdef DEBUG
-	if (rfs3_do_post_op_attr) {
-		dava.va_mask = AT_ALL;
-		davap = VOP_GETATTR(dvp, &dava, 0, cr, NULL) ? NULL : &dava;
-	} else
-		davap = NULL;
-#else
 	dava.va_mask = AT_ALL;
 	davap = VOP_GETATTR(dvp, &dava, 0, cr, NULL) ? NULL : &dava;
-#endif
 
 	if (error) {
 		/*
@@ -1912,24 +1807,11 @@ tryagain:
 	if (name != args->where.name)
 		kmem_free(name, MAXPATHLEN + 1);
 
-#ifdef DEBUG
-	if (!rfs3_do_post_op_attr)
-		vap = NULL;
-#endif
-
-#ifdef DEBUG
-	if (!rfs3_do_post_op_fh3)
-		resp->resok.obj.handle_follows = FALSE;
-	else {
-#endif
 	error = makefh3(&resp->resok.obj.handle, vp, exi);
 	if (error)
 		resp->resok.obj.handle_follows = FALSE;
 	else
 		resp->resok.obj.handle_follows = TRUE;
-#ifdef DEBUG
-	}
-#endif
 
 	/*
 	 * Force modified data and metadata out to stable storage.
@@ -2013,16 +1895,8 @@ rfs3_mkdir(MKDIR3args *args, MKDIR3res *resp, struct exportinfo *exi,
 		goto out;
 	}
 
-#ifdef DEBUG
-	if (rfs3_do_pre_op_attr) {
-		dbva.va_mask = AT_ALL;
-		dbvap = VOP_GETATTR(dvp, &dbva, 0, cr, NULL) ? NULL : &dbva;
-	} else
-		dbvap = NULL;
-#else
 	dbva.va_mask = AT_ALL;
 	dbvap = VOP_GETATTR(dvp, &dbva, 0, cr, NULL) ? NULL : &dbva;
-#endif
 	davap = dbvap;
 
 	if (args->where.name == nfs3nametoolong) {
@@ -2082,16 +1956,8 @@ rfs3_mkdir(MKDIR3args *args, MKDIR3res *resp, struct exportinfo *exi,
 	if (name != args->where.name)
 		kmem_free(name, MAXPATHLEN + 1);
 
-#ifdef DEBUG
-	if (rfs3_do_post_op_attr) {
-		dava.va_mask = AT_ALL;
-		davap = VOP_GETATTR(dvp, &dava, 0, cr, NULL) ? NULL : &dava;
-	} else
-		davap = NULL;
-#else
 	dava.va_mask = AT_ALL;
 	davap = VOP_GETATTR(dvp, &dava, 0, cr, NULL) ? NULL : &dava;
-#endif
 
 	/*
 	 * Force modified data and metadata out to stable storage.
@@ -2101,30 +1967,14 @@ rfs3_mkdir(MKDIR3args *args, MKDIR3res *resp, struct exportinfo *exi,
 	if (error)
 		goto out;
 
-#ifdef DEBUG
-	if (!rfs3_do_post_op_fh3)
-		resp->resok.obj.handle_follows = FALSE;
-	else {
-#endif
 	error = makefh3(&resp->resok.obj.handle, vp, exi);
 	if (error)
 		resp->resok.obj.handle_follows = FALSE;
 	else
 		resp->resok.obj.handle_follows = TRUE;
-#ifdef DEBUG
-	}
-#endif
 
-#ifdef DEBUG
-	if (rfs3_do_post_op_attr) {
-		va.va_mask = AT_ALL;
-		vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
-	} else
-		vap = NULL;
-#else
 	va.va_mask = AT_ALL;
 	vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
-#endif
 
 	/*
 	 * Force modified data and metadata out to stable storage.
@@ -2194,16 +2044,8 @@ rfs3_symlink(SYMLINK3args *args, SYMLINK3res *resp, struct exportinfo *exi,
 		goto err;
 	}
 
-#ifdef DEBUG
-	if (rfs3_do_pre_op_attr) {
-		dbva.va_mask = AT_ALL;
-		dbvap = VOP_GETATTR(dvp, &dbva, 0, cr, NULL) ? NULL : &dbva;
-	} else
-		dbvap = NULL;
-#else
 	dbva.va_mask = AT_ALL;
 	dbvap = VOP_GETATTR(dvp, &dbva, 0, cr, NULL) ? NULL : &dbva;
-#endif
 	davap = dbvap;
 
 	if (args->where.name == nfs3nametoolong) {
@@ -2275,16 +2117,8 @@ rfs3_symlink(SYMLINK3args *args, SYMLINK3res *resp, struct exportinfo *exi,
 
 	error = VOP_SYMLINK(dvp, name, &va, symdata, cr, NULL, 0);
 
-#ifdef DEBUG
-	if (rfs3_do_post_op_attr) {
-		dava.va_mask = AT_ALL;
-		davap = VOP_GETATTR(dvp, &dava, 0, cr, NULL) ? NULL : &dava;
-	} else
-		davap = NULL;
-#else
 	dava.va_mask = AT_ALL;
 	davap = VOP_GETATTR(dvp, &dava, 0, cr, NULL) ? NULL : &dava;
-#endif
 
 	if (error)
 		goto err;
@@ -2306,30 +2140,14 @@ rfs3_symlink(SYMLINK3args *args, SYMLINK3res *resp, struct exportinfo *exi,
 		goto out;
 	}
 
-#ifdef DEBUG
-	if (!rfs3_do_post_op_fh3)
-		resp->resok.obj.handle_follows = FALSE;
-	else {
-#endif
 	error = makefh3(&resp->resok.obj.handle, vp, exi);
 	if (error)
 		resp->resok.obj.handle_follows = FALSE;
 	else
 		resp->resok.obj.handle_follows = TRUE;
-#ifdef DEBUG
-	}
-#endif
 
-#ifdef DEBUG
-	if (rfs3_do_post_op_attr) {
-		va.va_mask = AT_ALL;
-		vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
-	} else
-		vap = NULL;
-#else
 	va.va_mask = AT_ALL;
 	vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
-#endif
 
 	/*
 	 * Force modified data and metadata out to stable storage.
@@ -2402,16 +2220,8 @@ rfs3_mknod(MKNOD3args *args, MKNOD3res *resp, struct exportinfo *exi,
 		goto out;
 	}
 
-#ifdef DEBUG
-	if (rfs3_do_pre_op_attr) {
-		dbva.va_mask = AT_ALL;
-		dbvap = VOP_GETATTR(dvp, &dbva, 0, cr, NULL) ? NULL : &dbva;
-	} else
-		dbvap = NULL;
-#else
 	dbva.va_mask = AT_ALL;
 	dbvap = VOP_GETATTR(dvp, &dbva, 0, cr, NULL) ? NULL : &dbva;
-#endif
 	davap = dbvap;
 
 	if (args->where.name == nfs3nametoolong) {
@@ -2513,16 +2323,8 @@ rfs3_mknod(MKNOD3args *args, MKNOD3res *resp, struct exportinfo *exi,
 	if (name != args->where.name)
 		kmem_free(name, MAXPATHLEN + 1);
 
-#ifdef DEBUG
-	if (rfs3_do_post_op_attr) {
-		dava.va_mask = AT_ALL;
-		davap = VOP_GETATTR(dvp, &dava, 0, cr, NULL) ? NULL : &dava;
-	} else
-		davap = NULL;
-#else
 	dava.va_mask = AT_ALL;
 	davap = VOP_GETATTR(dvp, &dava, 0, cr, NULL) ? NULL : &dava;
-#endif
 
 	/*
 	 * Force modified data and metadata out to stable storage.
@@ -2534,30 +2336,14 @@ rfs3_mknod(MKNOD3args *args, MKNOD3res *resp, struct exportinfo *exi,
 
 	resp->status = NFS3_OK;
 
-#ifdef DEBUG
-	if (!rfs3_do_post_op_fh3)
-		resp->resok.obj.handle_follows = FALSE;
-	else {
-#endif
 	error = makefh3(&resp->resok.obj.handle, vp, exi);
 	if (error)
 		resp->resok.obj.handle_follows = FALSE;
 	else
 		resp->resok.obj.handle_follows = TRUE;
-#ifdef DEBUG
-	}
-#endif
 
-#ifdef DEBUG
-	if (rfs3_do_post_op_attr) {
-		va.va_mask = AT_ALL;
-		vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
-	} else
-		vap = NULL;
-#else
 	va.va_mask = AT_ALL;
 	vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
-#endif
 
 	/*
 	 * Force modified metadata out to stable storage.
@@ -2626,16 +2412,8 @@ rfs3_remove(REMOVE3args *args, REMOVE3res *resp, struct exportinfo *exi,
 		goto err;
 	}
 
-#ifdef DEBUG
-	if (rfs3_do_pre_op_attr) {
-		bva.va_mask = AT_ALL;
-		bvap = VOP_GETATTR(vp, &bva, 0, cr, NULL) ? NULL : &bva;
-	} else
-		bvap = NULL;
-#else
 	bva.va_mask = AT_ALL;
 	bvap = VOP_GETATTR(vp, &bva, 0, cr, NULL) ? NULL : &bva;
-#endif
 	avap = bvap;
 
 	if (vp->v_type != VDIR) {
@@ -2711,16 +2489,8 @@ rfs3_remove(REMOVE3args *args, REMOVE3res *resp, struct exportinfo *exi,
 	VN_RELE(targvp);
 	targvp = NULL;
 
-#ifdef DEBUG
-	if (rfs3_do_post_op_attr) {
-		ava.va_mask = AT_ALL;
-		avap = VOP_GETATTR(vp, &ava, 0, cr, NULL) ? NULL : &ava;
-	} else
-		avap = NULL;
-#else
 	ava.va_mask = AT_ALL;
 	avap = VOP_GETATTR(vp, &ava, 0, cr, NULL) ? NULL : &ava;
-#endif
 
 	/*
 	 * Force modified data and metadata out to stable storage.
@@ -2786,16 +2556,8 @@ rfs3_rmdir(RMDIR3args *args, RMDIR3res *resp, struct exportinfo *exi,
 		goto err;
 	}
 
-#ifdef DEBUG
-	if (rfs3_do_pre_op_attr) {
-		bva.va_mask = AT_ALL;
-		bvap = VOP_GETATTR(vp, &bva, 0, cr, NULL) ? NULL : &bva;
-	} else
-		bvap = NULL;
-#else
 	bva.va_mask = AT_ALL;
 	bvap = VOP_GETATTR(vp, &bva, 0, cr, NULL) ? NULL : &bva;
-#endif
 	avap = bvap;
 
 	if (vp->v_type != VDIR) {
@@ -2848,16 +2610,8 @@ rfs3_rmdir(RMDIR3args *args, RMDIR3res *resp, struct exportinfo *exi,
 	if (name != args->object.name)
 		kmem_free(name, MAXPATHLEN + 1);
 
-#ifdef DEBUG
-	if (rfs3_do_post_op_attr) {
-		ava.va_mask = AT_ALL;
-		avap = VOP_GETATTR(vp, &ava, 0, cr, NULL) ? NULL : &ava;
-	} else
-		avap = NULL;
-#else
 	ava.va_mask = AT_ALL;
 	avap = VOP_GETATTR(vp, &ava, 0, cr, NULL) ? NULL : &ava;
-#endif
 
 	/*
 	 * Force modified data and metadata out to stable storage.
@@ -2958,16 +2712,8 @@ rfs3_rename(RENAME3args *args, RENAME3res *resp, struct exportinfo *exi,
 		}
 	}
 
-#ifdef DEBUG
-	if (rfs3_do_pre_op_attr) {
-		fbva.va_mask = AT_ALL;
-		fbvap = VOP_GETATTR(fvp, &fbva, 0, cr, NULL) ? NULL : &fbva;
-	} else
-		fbvap = NULL;
-#else
 	fbva.va_mask = AT_ALL;
 	fbvap = VOP_GETATTR(fvp, &fbva, 0, cr, NULL) ? NULL : &fbva;
-#endif
 	favap = fbvap;
 
 	fh3 = &args->to.dir;
@@ -2989,16 +2735,8 @@ rfs3_rename(RENAME3args *args, RENAME3res *resp, struct exportinfo *exi,
 		goto err;
 	}
 
-#ifdef DEBUG
-	if (rfs3_do_pre_op_attr) {
-		tbva.va_mask = AT_ALL;
-		tbvap = VOP_GETATTR(tvp, &tbva, 0, cr, NULL) ? NULL : &tbva;
-	} else
-		tbvap = NULL;
-#else
 	tbva.va_mask = AT_ALL;
 	tbvap = VOP_GETATTR(tvp, &tbva, 0, cr, NULL) ? NULL : &tbva;
-#endif
 	tavap = tbvap;
 
 	if (fvp->v_type != VDIR || tvp->v_type != VDIR) {
@@ -3100,22 +2838,10 @@ rfs3_rename(RENAME3args *args, RENAME3res *resp, struct exportinfo *exi,
 	VN_RELE(srcvp);
 	srcvp = NULL;
 
-#ifdef DEBUG
-	if (rfs3_do_post_op_attr) {
-		fava.va_mask = AT_ALL;
-		favap = VOP_GETATTR(fvp, &fava, 0, cr, NULL) ? NULL : &fava;
-		tava.va_mask = AT_ALL;
-		tavap = VOP_GETATTR(tvp, &tava, 0, cr, NULL) ? NULL : &tava;
-	} else {
-		favap = NULL;
-		tavap = NULL;
-	}
-#else
 	fava.va_mask = AT_ALL;
 	favap = VOP_GETATTR(fvp, &fava, 0, cr, NULL) ? NULL : &fava;
 	tava.va_mask = AT_ALL;
 	tavap = VOP_GETATTR(tvp, &tava, 0, cr, NULL) ? NULL : &tava;
-#endif
 
 	/*
 	 * Force modified data and metadata out to stable storage.
@@ -3197,16 +2923,8 @@ rfs3_link(LINK3args *args, LINK3res *resp, struct exportinfo *exi,
 		goto out;
 	}
 
-#ifdef DEBUG
-	if (rfs3_do_pre_op_attr) {
-		va.va_mask = AT_ALL;
-		vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
-	} else
-		vap = NULL;
-#else
 	va.va_mask = AT_ALL;
 	vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
-#endif
 
 	fh3 = &args->link.dir;
 	to_exi = checkexport(&fh3->fh3_fsid, FH3TOXFIDP(fh3));
@@ -3243,16 +2961,8 @@ rfs3_link(LINK3args *args, LINK3res *resp, struct exportinfo *exi,
 		goto out;
 	}
 
-#ifdef DEBUG
-	if (rfs3_do_pre_op_attr) {
-		bva.va_mask = AT_ALL;
-		bvap = VOP_GETATTR(dvp, &bva, 0, cr, NULL) ? NULL : &bva;
-	} else
-		bvap = NULL;
-#else
 	bva.va_mask = AT_ALL;
 	bvap = VOP_GETATTR(dvp, &bva, 0, cr, NULL) ? NULL : &bva;
-#endif
 
 	if (dvp->v_type != VDIR) {
 		resp->status = NFS3ERR_NOTDIR;
@@ -3298,22 +3008,10 @@ rfs3_link(LINK3args *args, LINK3res *resp, struct exportinfo *exi,
 
 	error = VOP_LINK(dvp, vp, name, cr, NULL, 0);
 
-#ifdef DEBUG
-	if (rfs3_do_post_op_attr) {
-		va.va_mask = AT_ALL;
-		vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
-		ava.va_mask = AT_ALL;
-		avap = VOP_GETATTR(dvp, &ava, 0, cr, NULL) ? NULL : &ava;
-	} else {
-		vap = NULL;
-		avap = NULL;
-	}
-#else
 	va.va_mask = AT_ALL;
 	vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
 	ava.va_mask = AT_ALL;
 	avap = VOP_GETATTR(dvp, &ava, 0, cr, NULL) ? NULL : &ava;
-#endif
 
 	/*
 	 * Force modified data and metadata out to stable storage.
@@ -3442,16 +3140,8 @@ rfs3_readdir(READDIR3args *args, READDIR3res *resp, struct exportinfo *exi,
 
 	(void) VOP_RWLOCK(vp, V_WRITELOCK_FALSE, NULL);
 
-#ifdef DEBUG
-	if (rfs3_do_pre_op_attr) {
-		va.va_mask = AT_ALL;
-		vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
-	} else
-		vap = NULL;
-#else
 	va.va_mask = AT_ALL;
 	vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
-#endif
 
 	if (vp->v_type != VDIR) {
 		resp->status = NFS3ERR_NOTDIR;
@@ -3491,16 +3181,8 @@ rfs3_readdir(READDIR3args *args, READDIR3res *resp, struct exportinfo *exi,
 
 	error = VOP_READDIR(vp, &uio, cr, &iseof, NULL, 0);
 
-#ifdef DEBUG
-	if (rfs3_do_post_op_attr) {
-		va.va_mask = AT_ALL;
-		vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
-	} else
-		vap = NULL;
-#else
 	va.va_mask = AT_ALL;
 	vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
-#endif
 
 	if (error) {
 		kmem_free(data, count);
@@ -3730,16 +3412,8 @@ rfs3_readdirplus(READDIRPLUS3args *args, READDIRPLUS3res *resp,
 
 	(void) VOP_RWLOCK(vp, V_WRITELOCK_FALSE, NULL);
 
-#ifdef DEBUG
-	if (rfs3_do_pre_op_attr) {
-		va.va_mask = AT_ALL;
-		vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
-	} else
-		vap = NULL;
-#else
 	va.va_mask = AT_ALL;
 	vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
-#endif
 
 	if (vp->v_type != VDIR) {
 		error = ENOTDIR;
@@ -3898,19 +3572,9 @@ getmoredents:
 
 		/* else, fall through */
 	}
-
 good:
-
-#ifdef DEBUG
-	if (rfs3_do_post_op_attr) {
-		va.va_mask = AT_ALL;
-		vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
-	} else
-		vap = NULL;
-#else
 	va.va_mask = AT_ALL;
 	vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
-#endif
 
 	VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, NULL);
 
@@ -3938,36 +3602,20 @@ good:
 			continue;
 		}
 
-#ifdef DEBUG
-		if (rfs3_do_post_op_attr) {
-			nva.va_mask = AT_ALL;
-			nvap = rfs4_delegated_getattr(nvp, &nva, 0, cr) ?
-			    NULL : &nva;
-		} else
-			nvap = NULL;
-#else
 		nva.va_mask = AT_ALL;
 		nvap = rfs4_delegated_getattr(nvp, &nva, 0, cr) ? NULL : &nva;
-#endif
+
 		/* Lie about the object type for a referral */
 		if (vn_is_nfs_reparse(nvp, cr))
 			nvap->va_type = VLNK;
 
 		vattr_to_post_op_attr(nvap, &infop[i].attr);
 
-#ifdef DEBUG
-		if (!rfs3_do_post_op_fh3)
-			infop[i].fh.handle_follows = FALSE;
-		else {
-#endif
 		error = makefh3(&infop[i].fh.handle, nvp, exi);
 		if (!error)
 			infop[i].fh.handle_follows = TRUE;
 		else
 			infop[i].fh.handle_follows = FALSE;
-#ifdef DEBUG
-		}
-#endif
 
 		VN_RELE(nvp);
 		dp = nextdp(dp);
@@ -4106,16 +3754,8 @@ rfs3_fsstat(FSSTAT3args *args, FSSTAT3res *resp, struct exportinfo *exi,
 
 	error = VFS_STATVFS(vp->v_vfsp, &sb);
 
-#ifdef DEBUG
-	if (rfs3_do_post_op_attr) {
-		va.va_mask = AT_ALL;
-		vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
-	} else
-		vap = NULL;
-#else
 	va.va_mask = AT_ALL;
 	vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
-#endif
 
 	if (error)
 		goto out;
@@ -4211,16 +3851,8 @@ rfs3_fsinfo(FSINFO3args *args, FSINFO3res *resp, struct exportinfo *exi,
 		}
 	}
 
-#ifdef DEBUG
-	if (rfs3_do_post_op_attr) {
-		va.va_mask = AT_ALL;
-		vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
-	} else
-		vap = NULL;
-#else
 	va.va_mask = AT_ALL;
 	vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
-#endif
 
 	resp->status = NFS3_OK;
 	vattr_to_post_op_attr(vap, &resp->resok.obj_attributes);
@@ -4323,16 +3955,8 @@ rfs3_pathconf(PATHCONF3args *args, PATHCONF3res *resp, struct exportinfo *exi,
 		}
 	}
 
-#ifdef DEBUG
-	if (rfs3_do_post_op_attr) {
-		va.va_mask = AT_ALL;
-		vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
-	} else
-		vap = NULL;
-#else
 	va.va_mask = AT_ALL;
 	vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
-#endif
 
 	error = VOP_PATHCONF(vp, _PC_LINK_MAX, &val, cr, NULL);
 	if (error)
@@ -4424,14 +4048,7 @@ rfs3_commit(COMMIT3args *args, COMMIT3res *resp, struct exportinfo *exi,
 	if (error)
 		goto out;
 
-#ifdef DEBUG
-	if (rfs3_do_pre_op_attr)
-		bvap = &bva;
-	else
-		bvap = NULL;
-#else
 	bvap = &bva;
-#endif
 
 	if (rdonly(exi, req)) {
 		resp->status = NFS3ERR_ROFS;
@@ -4465,16 +4082,8 @@ rfs3_commit(COMMIT3args *args, COMMIT3res *resp, struct exportinfo *exi,
 
 	error = VOP_FSYNC(vp, FSYNC, cr, NULL);
 
-#ifdef DEBUG
-	if (rfs3_do_post_op_attr) {
-		ava.va_mask = AT_ALL;
-		avap = VOP_GETATTR(vp, &ava, 0, cr, NULL) ? NULL : &ava;
-	} else
-		avap = NULL;
-#else
 	ava.va_mask = AT_ALL;
 	avap = VOP_GETATTR(vp, &ava, 0, cr, NULL) ? NULL : &ava;
-#endif
 
 	if (error)
 		goto out;
