@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Service Management Facility (SMF) interfaces.
  */
@@ -184,7 +182,7 @@ meta_smf_getmask()
 
 			if ((sp = metasetnosetname(i, ep)) == NULL) {
 				if (!mdisok(ep) && !mdiserror(ep, MDE_NO_SET) &&
-				    !mdismddberror(ep, MDE_NOTENOUGH_DB) &&
+				    !mdiserror(ep, MDE_NOTENOUGH_DB) &&
 				    !mdiserror(ep, MDE_SMF_NO_SERVICE) &&
 				    ep->info.errclass != MDEC_RPC) {
 					/*
@@ -257,7 +255,7 @@ enabled(char *svc_name)
 	int			rval = 0;
 
 	prop = scf_simple_prop_get(NULL, svc_name, SCF_PG_GENERAL,
-		SCF_PROPERTY_ENABLED);
+	    SCF_PROPERTY_ENABLED);
 
 	if (scf_simple_prop_numvalues(prop) == 1) {
 		if (*scf_simple_prop_next_boolean(prop) != 0)

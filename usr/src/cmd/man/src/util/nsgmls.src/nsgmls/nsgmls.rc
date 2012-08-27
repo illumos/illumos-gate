@@ -1,6 +1,0 @@
-// Copyright (c) 1996 James Clark
-// See the file COPYING for copying permission.
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#include "NsgmlsMessages.rc"
-#include "RastEventHandlerMessages.rc"

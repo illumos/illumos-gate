@@ -208,10 +208,6 @@ NOSYMSORT	opt/SUNWdtrt/tst/common/pid/tst.weak2.exe	# DTrace test
 NOSYMSORT	lib/amd64/libnsl\.so\.1				# C++
 NOSYMSORT	lib/sparcv9/libnsl\.so\.1			# C++
 NOSYMSORT	lib/sparcv9/libfru\.so\.1			# C++
-NOSYMSORT	usr/bin/audioconvert				# C++
-NOSYMSORT	usr/lib/libfru\.so\.1				# C++
-NOSYMSORT	usr/lib/libnisdb\.so\.2				# C++
-NOSYMSORT	usr/lib/sgml/nsgmls				# C++
 NOSYMSORT	usr/lib/lms					# C++
 NOSYMSORT	ld\.so\.1					# libc_pic.a user
 NOSYMSORT	lib/libsun_fc\.so\.1				# C++

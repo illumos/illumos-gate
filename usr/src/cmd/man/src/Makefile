@@ -30,7 +30,6 @@ BINPROG =	man
 LIBPROG =	getNAME
 LIBSHELL =	makewhatis
 LNKPROG =	catman apropos whatis
-SGMLUTILDIR = 	util
 
 PROG =		$(BINPROG) $(LIBPROG)
 
@@ -54,19 +53,13 @@ POFILES= $(SRCS:%.c=%.po)
 
 .KEEP_STATE :
 
-all :		$(PROG) $(LIBSHELL) $(LNKPROG) buildsubs
+all :		$(PROG) $(LIBSHELL) $(LNKPROG)
 
 makewhatis :	$$@.sh
 		cat $@.sh > $@
 
-buildsubs :		
-		cd $(SGMLUTILDIR); pwd; $(MAKE) all
-
 install :	all $(ROOTPROG) $(ROOTLIBPROG)	\
-		$(ROOTLIBSHELL) $(ROOTLNKPROG) installsubs
-
-installsubs :		
-		cd $(SGMLUTILDIR); pwd; $(MAKE) install
+		$(ROOTLIBSHELL) $(ROOTLNKPROG)
 
 $(ROOTLNKPROG) :	$(ROOTBIN)/man
 		-$(RM) $@; $(LN) $(ROOTBIN)/man $@
@@ -81,15 +74,7 @@ $(POFILE):      $(POFILES)
 	cat     $(POFILES)      > $@
 
 
-clean :		sgml_clean
-
-sgml_clean :
-		cd $(SGMLUTILDIR); pwd; $(MAKE) clean
-
-clobber :	sgml_clobber
-
-sgml_clobber :
-		cd $(SGMLUTILDIR); pwd; $(MAKE) clobber
+clean :
 
 strip :
 		$(STRIP) $(PROG)

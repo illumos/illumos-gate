@@ -343,8 +343,8 @@ ilbd_retrieve_rule(ilbd_name_t rl_name, uint32_t *rbuf, size_t *rbufsz)
 			return (rc);
 		if (rinfo->rl_conndrain == 0)
 			rinfo->rl_conndrain = tmp_info.rl_conndrain;
-		if ((rinfo->rl_topo == ILB_TOPO_IMPL_NAT ||
-		    rinfo->rl_topo == ILB_TOPO_IMPL_HALF_NAT) &&
+		if ((rinfo->rl_topo == ILB_TOPO_NAT ||
+		    rinfo->rl_topo == ILB_TOPO_HALF_NAT) &&
 		    rinfo->rl_nat_timeout == 0) {
 			rinfo->rl_nat_timeout = tmp_info.rl_nat_timeout;
 		}

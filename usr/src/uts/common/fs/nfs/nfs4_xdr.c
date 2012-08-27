@@ -903,8 +903,8 @@ xdr_ga_fattr_res(XDR *xdrs, struct nfs4_ga_res *garp, bitmap4 resbmap,
 			if (!XDR_GETINT32(xdrs, (int *)&vap->va_type))
 				return (FALSE);
 
-			if (vap->va_type < NF4REG ||
-			    vap->va_type > NF4NAMEDATTR)
+			if ((nfs_ftype4)vap->va_type < NF4REG ||
+			    (nfs_ftype4)vap->va_type > NF4NAMEDATTR)
 				vap->va_type = VBAD;
 			else
 				vap->va_type = nf4_to_vt[vap->va_type];
@@ -1573,8 +1573,8 @@ xdr_ga_fattr_res_inline(uint32_t *ptr, struct nfs4_ga_res *garp,
 		if (resbmap & FATTR4_TYPE_MASK) {
 			vap->va_type = IXDR_GET_U_INT32(ptr);
 
-			if (vap->va_type < NF4REG ||
-			    vap->va_type > NF4NAMEDATTR)
+			if ((nfs_ftype4)vap->va_type < NF4REG ||
+			    (nfs_ftype4)vap->va_type > NF4NAMEDATTR)
 				vap->va_type = VBAD;
 			else
 				vap->va_type = nf4_to_vt[vap->va_type];
@@ -5043,7 +5043,7 @@ xdr_COMPOUND4res_clnt(XDR *xdrs, COMPOUND4res_clnt *objp)
 		if (objp->array_len > objp->argsp->array_len)
 			return (FALSE);
 
-		if (objp->status == NFS_OK &&
+		if (objp->status == NFS4_OK &&
 		    objp->array_len != objp->argsp->array_len)
 			return (FALSE);
 

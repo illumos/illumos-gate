@@ -11572,11 +11572,11 @@ st_calc_bnum(struct scsi_tape *un, struct buf *bp, struct scsi_pkt *pkt)
 	if (attrib->transfers_data != TRAN_NONE) {
 		if (count == 0) {
 			if (attrib->transfers_data == TRAN_WRTE) {
-				ASSERT(un->un_pos.pmode == ST_EOM);
+				ASSERT(un->un_pos.eof == ST_EOM);
 				nblks = 0;
 				nfiles = 0;
 			} else {
-				ASSERT(un->un_pos.pmode == ST_EOF_PENDING);
+				ASSERT(un->un_pos.eof == ST_EOF_PENDING);
 				nblks = 0;
 				nfiles = 1;
 			}

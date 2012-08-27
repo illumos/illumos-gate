@@ -2338,7 +2338,14 @@ refcount(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_USAGE);
 
 	if (!gotid) {
-		if (mdb_ctf_lookup_by_name("struct refcount", &rc_id) == -1) {
+		/*
+		 * The refcount structure is different when compiled debug
+		 * vs nondebug.  Therefore, we want to make sure we get the
+		 * refcount definition from the ZFS module, in case it has
+		 * been compiled debug but genunix is nondebug.
+		 */
+		if (mdb_ctf_lookup_by_name("struct " ZFS_OBJ_NAME "`refcount",
+		    &rc_id) == -1) {
 			mdb_warn("couldn't find struct refcount");
 			return (DCMD_ERR);
 		}

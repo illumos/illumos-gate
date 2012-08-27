@@ -155,7 +155,7 @@ typedef struct http_s {
 	clock_t		date;		/* Response Date: */
 	clock_t		expire;		/* Response Expire: */
 	clock_t		moddate;	/* Request *Modified-Since date */
-	act_t		modtokid;	/* Request *Modified-Since tokid */
+	enum tokid_e	modtokid;	/* Request *Modified-Since tokid */
 	time_t		lastmod;	/* Response Last-Modified: */
 	str_t		accept;		/* Request Accept: */
 	str_t		acceptchar;	/* Request Accept-Charset: */

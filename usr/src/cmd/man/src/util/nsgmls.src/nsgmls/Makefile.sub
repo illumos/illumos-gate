@@ -1,8 +1,0 @@
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
-PROG=nsgmls
-OBJS=nsgmls.o SgmlsEventHandler.o RastEventHandler.o StringSet.o nsgmls_inst.o
-INCLUDE=
-XLIBS=../lib/libsp.a
-GENSRCS=nsgmls_inst.cxx NsgmlsMessages.h RastEventHandlerMessages.h

@@ -3128,7 +3128,7 @@ get_server_fh(char *hostname, rpcprog_t	prog, rpcvers_t	vers,
 		memset((char *)&res, 0, sizeof (wnl_diropres));
 		arg.name = fspath;
 		if (wnlproc_lookup_2(&arg, &res, cl) !=
-		    RPC_SUCCESS || res.status != NFS_OK)
+		    RPC_SUCCESS || res.status != WNL_OK)
 			goto done;
 		*fhp = malloc(sizeof (wnl_fh));
 
@@ -3153,7 +3153,7 @@ get_server_fh(char *hostname, rpcprog_t	prog, rpcvers_t	vers,
 		memset((char *)&res, 0, sizeof (WNL_LOOKUP3res));
 		arg.what.name = fspath;
 		if (wnlproc3_lookup_3(&arg, &res, cl) !=
-		    RPC_SUCCESS || res.status != NFS3_OK)
+		    RPC_SUCCESS || res.status != WNL3_OK)
 			goto done;
 
 		fh3p = (nfs_fh3 *)malloc(sizeof (*fh3p));
