@@ -6180,6 +6180,8 @@ s usr/lib/libintl.so.1=../../lib/libintl.so.1
 s usr/lib/libintl.so=../../lib/libintl.so.1
 s usr/lib/libipadm.so=../../lib/libipadm.so.1
 s usr/lib/libipadm.so.1=../../lib/libipadm.so.1
+f usr/lib/libipd.so.1 0755 root bin
+s usr/lib/libipd.so=libipd.so.1
 f usr/lib/libipmi.so.1 0755 root bin
 s usr/lib/libipmi.so=libipmi.so.1
 s usr/lib/libipmp.so=../../lib/libipmp.so.1

@@ -26,9 +26,11 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <values.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <string.h>
+#include <strings.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -37,7 +39,7 @@
 #include <libgen.h>
 #include <assert.h>
 
-#include <sys/ipd.h>
+#include <libipd.h>
 
 static char *g_pname;
 static char g_zonename[ZONENAME_MAX];
@@ -63,7 +65,7 @@ static int ipdadm_remove(int, char *[]);
 
 #define	IPDADM_NCMDS	6
 static ipdadm_cmd_t ipdadm_cmds[] = {
-	{ "list", ipdadm_list, "list" },
+	{ "list", ipdadm_list, "list [-v]" },
 	{ "info", ipdadm_info, "info" },
 	{ "corrupt", ipdadm_corrupt, "corrupt <percentage>" },
 	{ "delay", ipdadm_delay, "delay <microseconds>" },
@@ -88,65 +90,55 @@ usage(FILE *fp)
 	return (E_USAGE);
 }
 
-static int
-ipdadm_open(void)
+static void
+ipdadm_list_one(zoneid_t z, const ipd_config_t *icp, void *arg)
 {
-	int fd;
-	fd = open(IPD_DEV_PATH, O_RDWR);
-	if (fd < 0) {
-		(void) fprintf(stderr, "%s: failed to open %s: %s\n", g_pname,
-		    IPD_DEV_PATH, strerror(errno));
-		exit(E_ERROR);
+	char zonename[ZONENAME_MAX];
+	int opt_v = (int)(intptr_t)arg;
+
+	if (getzonenamebyid(z, zonename, sizeof (zonename)) < 0)
+		(void) printf("%ld", z);
+	else
+		(void) printf("%s", zonename);
+
+	if (!opt_v) {
+		(void) printf("\n");
+		return;
 	}
-	return (fd);
+
+	(void) printf("\t%u\t%u\t%u\n", icp->ic_corrupt, icp->ic_drop,
+	    icp->ic_delay);
 }
 
-/*ARGSUSED*/
 static int
 ipdadm_list(int argc, char *argv[])
 {
+	int opt_v = 0;
 	int fd, rval;
-	unsigned int ii;
-	ipd_ioc_list_t ipil;
-	char zonename[ZONENAME_MAX];
+	ipd_stathdl_t hdl;
 
-	if (argc != 0)
+	if (argc > 1)
 		return (usage(stderr));
 
-	fd = ipdadm_open();
-	(void) memset(&ipil, '\0', sizeof (ipd_ioc_list_t));
+	if (argc == 1) {
+		if (strcmp(argv[0], "-v") == 0)
+			++opt_v;
+		else
+			return (usage(stderr));
+	}
 
-	rval = ioctl(fd, IPDIOC_LIST, &ipil);
+	fd = ipd_open(NULL);
+	rval = ipd_status_read(fd, &hdl);
+	(void) ipd_close(fd);
+
 	if (rval != 0) {
 		(void) fprintf(stderr, "%s: failed to get list info: %s\n",
-		    g_pname, strerror(errno));
+		    g_pname, ipd_errmsg);
 		return (E_ERROR);
 	}
 
-	ipil.ipil_list = malloc(sizeof (zoneid_t) * ipil.ipil_nzones);
-	if (ipil.ipil_list == NULL) {
-		(void) fprintf(stderr, "%s: failed to allocate memory: %s\n",
-		    g_pname, strerror(errno));
-		return (E_ERROR);
-	}
-
-	rval = ioctl(fd, IPDIOC_LIST, &ipil);
-	if (rval != 0) {
-		free(ipil.ipil_list);
-		(void) fprintf(stderr, "%s: failed to get list info: %s\n",
-		    g_pname, strerror(errno));
-		return (E_ERROR);
-	}
-
-	for (ii = 0; ii < ipil.ipil_nzones; ii++) {
-		if (getzonenamebyid(ipil.ipil_list[ii], zonename,
-		    sizeof (zonename)) < 0) {
-			(void) fprintf(stderr, "%s: failed to get zonename: "
-			    "%s\n", g_pname, strerror(errno));
-			return (E_ERROR);
-		}
-		(void) printf("%s\n", zonename);
-	}
+	ipd_status_foreach_zone(hdl, ipdadm_list_one, (void *)(intptr_t)opt_v);
+	ipd_status_free(hdl);
 
 	return (E_SUCCESS);
 }
@@ -156,29 +148,42 @@ static int
 ipdadm_info(int argc, char *argv[])
 {
 	int rval, fd;
-	ipd_ioc_info_t ipii;
+	ipd_stathdl_t hdl;
+	ipd_config_t *icp;
 
 	if (argc != 0)
 		return (usage(stderr));
 
-	ipii.ipii_zoneid = g_zid;
-	fd = ipdadm_open();
-	rval = ioctl(fd, IPDIOC_INFO, &ipii);
-	(void) close(fd);
+	fd = ipd_open(NULL);
+	rval = ipd_status_read(fd, &hdl);
+	(void) ipd_close(fd);
 	if (rval != 0) {
 		(void) fprintf(stderr, "%s: failed to get info: %s\n",
-		    g_pname, strerror(errno));
+		    g_pname, ipd_errmsg);
+		return (E_ERROR);
+	}
+
+	if (ipd_status_get_config(hdl, g_zid, &icp) != 0) {
+		if (ipd_errno == EIPD_ZC_NOENT) {
+			(void) printf("zone %s does not exist or has no "
+			    "ipd actions enabled", g_zonename);
+			return (E_SUCCESS);
+		}
+		(void) fprintf(stderr, "%s: failed to get info: %s\n",
+		    g_pname, ipd_errmsg);
 		return (E_ERROR);
 	}
 
 	(void) printf("ipd information for zone %s:\n",
 	    g_zonename);
-	(void) printf("\tcorrupt:\t%d%% chance of packet corruption\n",
-	    ipii.ipii_corrupt);
-	(void) printf("\tdrop:\t\t%d%% chance of packet drop\n",
-	    ipii.ipii_drop);
-	(void) printf("\tdelay:\t\t%d microsecond delay per packet\n",
-	    ipii.ipii_delay);
+	(void) printf("\tcorrupt:\t%u%% chance of packet corruption\n",
+	    icp->ic_corrupt);
+	(void) printf("\tdrop:\t\t%u%% chance of packet drop\n",
+	    icp->ic_drop);
+	(void) printf("\tdelay:\t\t%u microsecond delay per packet\n",
+	    icp->ic_delay);
+
+	ipd_status_free(hdl);
 
 	return (E_SUCCESS);
 }
@@ -221,7 +226,7 @@ ipdadm_corrupt(int argc, char *argv[])
 {
 	int rval, fd;
 	long val;
-	ipd_ioc_perturb_t ipip;
+	ipd_config_t ic;
 
 	if (argc != 1) {
 		(void) fprintf(stderr, "%s: corrupt <percentage>\n",
@@ -230,14 +235,17 @@ ipdadm_corrupt(int argc, char *argv[])
 	}
 
 	val = ipdadm_parse_long(argv[0], "corrupt", 0, 100);
-	fd = ipdadm_open();
-	ipip.ipip_zoneid = g_zid;
-	ipip.ipip_arg = val;
-	rval = ioctl(fd, IPDIOC_CORRUPT, &ipip);
-	(void) close(fd);
-	if (rval == -1) {
+	bzero(&ic, sizeof (ic));
+	ic.ic_mask = IPDM_CORRUPT;
+	ic.ic_corrupt = val;
+
+	fd = ipd_open(NULL);
+	rval = ipd_ctl(fd, g_zid, &ic);
+	(void) ipd_close(fd);
+
+	if (rval != 0) {
 		(void) fprintf(stderr, "%s: failed to change corrupt "
-		    "value: %s\n", g_pname, strerror(errno));
+		    "value: %s\n", g_pname, ipd_errmsg);
 		return (E_ERROR);
 	}
 
@@ -249,7 +257,7 @@ ipdadm_delay(int argc, char *argv[])
 {
 	long val;
 	int fd, rval;
-	ipd_ioc_perturb_t ipip;
+	ipd_config_t ic;
 
 	if (argc != 1) {
 		(void) fprintf(stderr, "%s: delay <microseconds>\n",
@@ -257,15 +265,18 @@ ipdadm_delay(int argc, char *argv[])
 		return (usage(stderr));
 	}
 
-	val = ipdadm_parse_long(argv[0], "delay", 0, IPD_MAX_DELAY);
-	fd = ipdadm_open();
-	ipip.ipip_zoneid = g_zid;
-	ipip.ipip_arg = val;
-	rval = ioctl(fd, IPDIOC_DELAY, &ipip);
-	(void) close(fd);
-	if (rval == -1) {
+	val = ipdadm_parse_long(argv[0], "delay", 0, MAXLONG);
+	bzero(&ic, sizeof (ic));
+	ic.ic_mask = IPDM_DELAY;
+	ic.ic_delay = val;
+
+	fd = ipd_open(NULL);
+	rval = ipd_ctl(fd, g_zid, &ic);
+	(void) ipd_close(fd);
+
+	if (rval != 0) {
 		(void) fprintf(stderr, "%s: failed to change delay value: %s\n",
-		    g_pname, strerror(errno));
+		    g_pname, ipd_errmsg);
 		return (E_ERROR);
 	}
 
@@ -277,7 +288,7 @@ ipdadm_drop(int argc, char *argv[])
 {
 	long val;
 	int fd, rval;
-	ipd_ioc_perturb_t ipip;
+	ipd_config_t ic;
 
 	if (argc != 1) {
 		(void) fprintf(stderr, "%s: drop <percentage>\n",
@@ -286,14 +297,17 @@ ipdadm_drop(int argc, char *argv[])
 	}
 
 	val = ipdadm_parse_long(argv[0], "drop", 0, 100);
-	fd = ipdadm_open();
-	ipip.ipip_zoneid = g_zid;
-	ipip.ipip_arg = val;
-	rval = ioctl(fd, IPDIOC_DROP, &ipip);
-	(void) close(fd);
-	if (rval == -1) {
+	bzero(&ic, sizeof (ic));
+	ic.ic_mask = IPDM_DROP;
+	ic.ic_drop = val;
+
+	fd = ipd_open(NULL);
+	rval = ipd_ctl(fd, g_zid, &ic);
+	(void) ipd_close(fd);
+
+	if (rval != 0) {
 		(void) fprintf(stderr, "%s: failed to change drop value: %s\n",
-		    g_pname, strerror(errno));
+		    g_pname, ipd_errmsg);
 		return (E_ERROR);
 	}
 
@@ -304,11 +318,11 @@ static int
 ipdadm_remove_valid(const char *str)
 {
 	if (strcmp(str, "corrupt") == 0) {
-		return (IPD_CORRUPT);
+		return (IPDM_CORRUPT);
 	} else if (strcmp(str, "drop") == 0) {
-		return (IPD_DROP);
+		return (IPDM_DROP);
 	} else if (strcmp(str, "delay") == 0) {
-		return (IPD_DELAY);
+		return (IPDM_DELAY);
 	}
 
 	return (0);
@@ -317,7 +331,7 @@ ipdadm_remove_valid(const char *str)
 static int
 ipdadm_remove(int argc, char *argv[])
 {
-	ipd_ioc_perturb_t ipi;
+	ipd_config_t ic;
 	char *cur, *res;
 	int rval, fd;
 
@@ -333,8 +347,7 @@ ipdadm_remove(int argc, char *argv[])
 		return (E_ERROR);
 	}
 
-	ipi.ipip_zoneid = g_zid;
-	ipi.ipip_arg = 0;
+	bzero(&ic, sizeof (ic));
 
 	cur = argv[0];
 	while ((res = strchr(cur, ',')) != NULL) {
@@ -344,7 +357,7 @@ ipdadm_remove(int argc, char *argv[])
 			    "argument: %s\n", g_pname, cur);
 			return (E_ERROR);
 		}
-		ipi.ipip_arg |= rval;
+		ic.ic_mask |= rval;
 		cur = res + 1;
 	}
 
@@ -353,14 +366,14 @@ ipdadm_remove(int argc, char *argv[])
 		    g_pname, cur);
 		return (E_ERROR);
 	}
-	ipi.ipip_arg |= rval;
+	ic.ic_mask |= rval;
 
-	fd = ipdadm_open();
-	rval = ioctl(fd, IPDIOC_REMOVE, &ipi);
-	(void) close(fd);
+	fd = ipd_open(NULL);
+	rval = ipd_ctl(fd, g_zid, &ic);
+	(void) ipd_close(fd);
 	if (rval == -1) {
 		(void) fprintf(stderr, "%s: failed to remove instances: %s\n",
-		    g_pname, strerror(errno));
+		    g_pname, ipd_errmsg);
 		return (E_ERROR);
 	}
 

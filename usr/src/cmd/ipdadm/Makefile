@@ -31,15 +31,9 @@ SRCS = $(OBJS:%.o=../%.c)
 include ../Makefile.cmd
 include ../Makefile.ctf
 
-#
-# The ipd.h interface is currently private and not shipped with the system. As
-# such it is only useful for building this command and so we manually set
-# cpppath to include it, just as we do for cpuid_drv.h.
-#
-CPPFLAGS += -I../../uts/common
-
 CLEANFILES += $(OBJS)
 CFLAGS += $(CCVERBOSE)
+LDLIBS += -lipd
 
 .KEEP_STATE:
 

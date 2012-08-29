@@ -113,6 +113,7 @@ SUBDIRS += \
 	libcryptoutil	\
 	libinetutil	\
 	libipadm	\
+	libipd		\
 	libipmp		\
 	libiscsit	\
 	libkmf		\
@@ -409,6 +410,7 @@ HDRSUBDIRS=		\
 	libfstyp	\
 	libgen		\
 	libipadm	\
+	libipd		\
 	libipsecutil	\
 	libinetsvc	\
 	libinetutil	\

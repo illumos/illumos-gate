@@ -53,14 +53,14 @@ typedef struct ipd_ioc_info {
 
 typedef struct ipd_ioc_list32 {
 	uint_t		ipil_nzones;
-	caddr32_t	ipil_list;
+	caddr32_t	ipil_info;
 } ipd_ioc_list32_t;
 
 #endif /* _KERNEL */
 
 typedef struct ipd_ioc_list {
 	uint_t		ipil_nzones;
-	zoneid_t	*ipil_list;
+	ipd_ioc_info_t	*ipil_info;
 } ipd_ioc_list_t;
 
 #define	IPD_CORRUPT	0x1
@@ -72,8 +72,7 @@ typedef struct ipd_ioc_list {
 #define	IPDIOC_DELAY	(IPDIOC | 2)		/* disable ipd */
 #define	IPDIOC_DROP	(IPDIOC | 3)		/* disable ipd */
 #define	IPDIOC_LIST	(IPDIOC | 4)		/* enable ipd */
-#define	IPDIOC_INFO	(IPDIOC | 5)		/* disable ipd */
-#define	IPDIOC_REMOVE	(IPDIOC | 6)		/* disable ipd */
+#define	IPDIOC_REMOVE	(IPDIOC | 5)		/* disable ipd */
 
 #ifdef __cplusplus
 }

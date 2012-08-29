@@ -794,45 +794,6 @@ cleanup:
 	return (rval);
 }
 
-static int
-ipd_ioctl_info(ipd_ioc_info_t *ipi, cred_t *cr)
-{
-	zoneid_t zid;
-	ipd_netstack_t *ins;
-
-	/*
-	 * See ipd_ioctl_perturb for the rational here.
-	 */
-	zid = crgetzoneid(cr);
-	if (zid != GLOBAL_ZONEID)
-		ipi->ipii_zoneid = zid;
-
-	if (zoneid_to_netstackid(ipi->ipii_zoneid) == GLOBAL_NETSTACKID &&
-	    zid != GLOBAL_ZONEID)
-		return (EPERM);
-
-	mutex_enter(&ipd_nsl_lock);
-	for (ins = list_head(&ipd_nsl); ins != NULL;
-	    ins = list_next(&ipd_nsl, ins)) {
-		if (ins->ipdn_zoneid == ipi->ipii_zoneid)
-			break;
-	}
-
-	if (ins == NULL) {
-		mutex_exit(&ipd_nsl_lock);
-		return (EINVAL);
-	}
-
-	mutex_enter(&ins->ipdn_lock);
-	ipi->ipii_corrupt = ins->ipdn_corrupt;
-	ipi->ipii_delay = ins->ipdn_delay;
-	ipi->ipii_drop = ins->ipdn_drop;
-	mutex_exit(&ins->ipdn_lock);
-	mutex_exit(&ipd_nsl_lock);
-
-	return (0);
-}
-
 /*
  * When this function is called, the value of the ipil_nzones argument controls
  * how this function works. When called with a value of zero, then we treat that
@@ -850,9 +811,9 @@ static int
 ipd_ioctl_list(intptr_t arg, cred_t *cr)
 {
 	zoneid_t zid;
-	zoneid_t *zoneids;
+	ipd_ioc_info_t *configs;
 	ipd_netstack_t *ins;
-	uint_t nzoneids, rzids, cur;
+	uint_t azones, rzones, nzones, cur;
 	int rval = 0;
 	STRUCT_DECL(ipd_ioc_list, h);
 
@@ -863,16 +824,16 @@ ipd_ioctl_list(intptr_t arg, cred_t *cr)
 
 	zid = crgetzoneid(cr);
 
-	rzids = STRUCT_FGET(h, ipil_nzones);
-	if (rzids == 0) {
+	rzones = STRUCT_FGET(h, ipil_nzones);
+	if (rzones == 0) {
 		if (zid == GLOBAL_ZONEID) {
 			mutex_enter(&ipd_nactive_lock);
-			rzids = ipd_nactive + ipd_nactive_fudge;
+			rzones = ipd_nactive + ipd_nactive_fudge;
 			mutex_exit(&ipd_nactive_lock);
 		} else {
-			rzids = 1;
+			rzones = 1;
 		}
-		STRUCT_FSET(h, ipil_nzones, rzids);
+		STRUCT_FSET(h, ipil_nzones, rzones);
 		if (ddi_copyout(STRUCT_BUF(h), (void *)arg,
 		    STRUCT_SIZE(h), 0) != 0)
 			return (EFAULT);
@@ -882,36 +843,52 @@ ipd_ioctl_list(intptr_t arg, cred_t *cr)
 
 	mutex_enter(&ipd_nsl_lock);
 	if (zid == GLOBAL_ZONEID) {
-		nzoneids = ipd_nactive;
+		azones = ipd_nactive;
 	} else {
-		nzoneids = 1;
+		azones = 1;
 	}
 
-	zoneids = kmem_alloc(sizeof (zoneid_t) * nzoneids, KM_SLEEP);
+	configs = kmem_alloc(sizeof (ipd_ioc_info_t) * azones, KM_SLEEP);
 	cur = 0;
 	for (ins = list_head(&ipd_nsl); ins != NULL;
 	    ins = list_next(&ipd_nsl, ins)) {
 		if (ins->ipdn_enabled == 0)
 			continue;
 
+		ASSERT(cur < azones);
+
 		if (zid == GLOBAL_ZONEID || zid == ins->ipdn_zoneid) {
-			zoneids[cur++] = ins->ipdn_zoneid;
+			configs[cur].ipii_zoneid = ins->ipdn_zoneid;
+
+			mutex_enter(&ins->ipdn_lock);
+			configs[cur].ipii_corrupt = ins->ipdn_corrupt;
+			configs[cur].ipii_delay = ins->ipdn_delay;
+			configs[cur].ipii_drop = ins->ipdn_drop;
+			mutex_exit(&ins->ipdn_lock);
+
+			++cur;
 		}
 
 		if (zid != GLOBAL_ZONEID && zid == ins->ipdn_zoneid)
 			break;
 	}
-	ASSERT(cur == nzoneids);
 	mutex_exit(&ipd_nsl_lock);
 
-	STRUCT_FSET(h, ipil_nzones, nzoneids);
-	if (nzoneids < rzids)
-		rzids = nzoneids;
-	if (ddi_copyout(zoneids, STRUCT_FGETP(h, ipil_list),
-	    nzoneids * sizeof (zoneid_t), NULL) != 0)
-		rval = EFAULT;
+	ASSERT(zid != GLOBAL_ZONEID || cur == azones);
 
-	kmem_free(zoneids, sizeof (zoneid_t) * nzoneids);
+	if (cur == 0)
+		STRUCT_FSET(h, ipil_nzones, 0);
+	else
+		STRUCT_FSET(h, ipil_nzones, cur);
+
+	nzones = MIN(cur, rzones);
+	if (nzones > 0) {
+		if (ddi_copyout(configs, STRUCT_FGETP(h, ipil_info),
+		    nzones * sizeof (ipd_ioc_info_t), NULL) != 0)
+			rval = EFAULT;
+	}
+
+	kmem_free(configs, sizeof (ipd_ioc_info_t) * azones);
 	if (ddi_copyout(STRUCT_BUF(h), (void *)arg, STRUCT_SIZE(h), 0) != 0)
 		return (EFAULT);
 
@@ -1044,17 +1021,6 @@ ipd_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 		 * copyin logic to the list code.
 		 */
 		return (ipd_ioctl_list(arg, cr));
-	case IPDIOC_INFO:
-		if (ddi_copyin((void *)arg, &ipii, sizeof (ipd_ioc_info_t),
-		    0) != 0)
-			return (EFAULT);
-		rval = ipd_ioctl_info(&ipii, cr);
-		if (rval != 0)
-			return (rval);
-		if (ddi_copyout(&ipii, (void *)arg, sizeof (ipd_ioc_info_t),
-		    0) != 0)
-			return (EFAULT);
-		return (0);
 	default:
 		break;
 	}
