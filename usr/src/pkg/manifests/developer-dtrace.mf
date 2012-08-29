@@ -23,6 +23,10 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
+#
+# Copyright (c) 2012 by Delphix. All rights reserved.
+#
+
 set name=pkg.fmri value=pkg:/developer/dtrace@$(PKGVERS)
 set name=pkg.description value="Dynamic Tracing (DTrace) Clients"
 set name=pkg.summary value="DTrace Clients"
@@ -178,26 +182,28 @@ file path=usr/lib/$(ARCH64)/libdtrace.so.1
 file path=usr/lib/$(ARCH64)/libdtrace_jni.so.1
 file path=usr/lib/$(ARCH64)/llib-ldtrace.ln
 file path=usr/lib/devfsadm/linkmod/SUNW_dtrace_link.so group=sys
-file path=usr/lib/dtrace/64/drti.o
-file path=usr/lib/dtrace/drti.o
-file path=usr/lib/dtrace/errno.d
-file path=usr/lib/dtrace/fc.d
-file path=usr/lib/dtrace/io.d
-file path=usr/lib/dtrace/ip.d
-file path=usr/lib/dtrace/iscsit.d
-file path=usr/lib/dtrace/net.d
-file path=usr/lib/dtrace/nfs.d
-file path=usr/lib/dtrace/nfssrv.d
-file path=usr/lib/dtrace/procfs.d
-file path=usr/lib/dtrace/regs.d
-file path=usr/lib/dtrace/sched.d
-file path=usr/lib/dtrace/scsi.d
-file path=usr/lib/dtrace/signal.d
-file path=usr/lib/dtrace/srp.d
-file path=usr/lib/dtrace/sysevent.d
-file path=usr/lib/dtrace/tcp.d
-file path=usr/lib/dtrace/udp.d
-file path=usr/lib/dtrace/unistd.d
+file path=usr/lib/dtrace/64/drti.o mode=0444
+file path=usr/lib/dtrace/64/libdtrace_forceload.so mode=0555
+file path=usr/lib/dtrace/drti.o mode=0444
+file path=usr/lib/dtrace/errno.d mode=0444
+file path=usr/lib/dtrace/fc.d mode=0444
+file path=usr/lib/dtrace/io.d mode=0444
+file path=usr/lib/dtrace/ip.d mode=0444
+file path=usr/lib/dtrace/iscsit.d mode=0444
+file path=usr/lib/dtrace/libdtrace_forceload.so mode=0555
+file path=usr/lib/dtrace/net.d mode=0444
+file path=usr/lib/dtrace/nfs.d mode=0444
+file path=usr/lib/dtrace/nfssrv.d mode=0444
+file path=usr/lib/dtrace/procfs.d mode=0444
+file path=usr/lib/dtrace/regs.d mode=0444
+file path=usr/lib/dtrace/sched.d mode=0444
+file path=usr/lib/dtrace/scsi.d mode=0444
+file path=usr/lib/dtrace/signal.d mode=0444
+file path=usr/lib/dtrace/srp.d mode=0444
+file path=usr/lib/dtrace/sysevent.d mode=0444
+file path=usr/lib/dtrace/tcp.d mode=0444
+file path=usr/lib/dtrace/udp.d mode=0444
+file path=usr/lib/dtrace/unistd.d mode=0444
 file path=usr/lib/libdtrace.so.1
 file path=usr/lib/libdtrace_jni.so.1
 file path=usr/lib/llib-ldtrace

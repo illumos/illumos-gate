@@ -23,7 +23,9 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+
+#
+# Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
@@ -77,16 +79,16 @@ usdt/args.o: usdt/args.d usdt/tst.args.o
 	$(COMPILE.d) -o usdt/args.o -s usdt/args.d usdt/tst.args.o
 
 usdt/tst.argmap.exe: usdt/tst.argmap.o usdt/argmap.o
-	$(LINK.c) -o usdt/tst.argmap.exe usdt/tst.argmap.o usdt/argmap.o \
-		$(LDLIBS)
+	$(LINK.c) -o usdt/tst.argmap.exe \
+	    usdt/tst.argmap.o usdt/argmap.o $(LDLIBS)
 	$(POST_PROCESS) ; $(STRIP_STABS)
 
 usdt/argmap.o: usdt/argmap.d usdt/tst.argmap.o
 	$(COMPILE.d) -o usdt/argmap.o -s usdt/argmap.d usdt/tst.argmap.o
 
 usdt/tst.forker.exe: usdt/tst.forker.o usdt/forker.o
-	$(LINK.c) -o usdt/tst.forker.exe usdt/tst.forker.o usdt/forker.o \
-		$(LDLIBS)
+	$(LINK.c) -o usdt/tst.forker.exe \
+	    usdt/tst.forker.o usdt/forker.o $(LDLIBS)
 	$(POST_PROCESS) ; $(STRIP_STABS)
 
 usdt/forker.o: usdt/forker.d usdt/tst.forker.o
@@ -96,6 +98,20 @@ usdt/tst.forker.o: usdt/forker.h
 
 usdt/forker.h: usdt/forker.d
 	$(DTRACE) -h -s usdt/forker.d -o usdt/forker.h
+
+usdt/tst.lazyprobe.exe: usdt/tst.lazyprobe.o usdt/lazyprobe.o
+	$(LINK.c) -o usdt/tst.lazyprobe.exe \
+	    usdt/tst.lazyprobe.o usdt/lazyprobe.o $(LDLIBS)
+	$(POST_PROCESS) ; $(STRIP_STABS)
+
+usdt/lazyprobe.o: usdt/lazyprobe.d usdt/tst.lazyprobe.o
+	$(COMPILE.d) -xlazyload -o usdt/lazyprobe.o \
+	    -s usdt/lazyprobe.d usdt/tst.lazyprobe.o
+
+usdt/tst.lazyprobe.o: usdt/lazyprobe.h
+
+usdt/lazyprobe.h: usdt/lazyprobe.d
+	$(DTRACE) -h -s usdt/lazyprobe.d -o usdt/lazyprobe.h
 
 SUBDIRS = java_api
 include ../../Makefile.subdirs
