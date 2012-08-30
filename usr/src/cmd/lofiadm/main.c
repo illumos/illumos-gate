@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -1278,6 +1279,7 @@ lofi_uncompress(int lfd, const char *filename)
 	 * Disallow uncompressing the file if it is
 	 * already mapped.
 	 */
+	li.li_crypto_enabled = B_FALSE;
 	li.li_minor = 0;
 	(void) strlcpy(li.li_filename, filename, sizeof (li.li_filename));
 	if (ioctl(lfd, LOFI_GET_MINOR, &li) != -1)
