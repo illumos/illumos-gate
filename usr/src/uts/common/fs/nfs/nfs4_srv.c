@@ -1340,7 +1340,8 @@ rfs4_op_access(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		    blequal(clabel, slabel)))
 			resp->access |=
 			    (args->access & (ACCESS4_MODIFY | ACCESS4_EXTEND));
-		resp->supported |= (ACCESS4_MODIFY | ACCESS4_EXTEND);
+		resp->supported |=
+		    resp->access & (ACCESS4_MODIFY | ACCESS4_EXTEND);
 	}
 
 	if (checkwriteperm &&
