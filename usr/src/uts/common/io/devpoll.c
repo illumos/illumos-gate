@@ -23,7 +23,9 @@
  * Use is subject to license terms.
  */
 
-/* Copyright (c) 2011 by Delphix. All rights reserved. */
+/*
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/devops.h>
@@ -695,8 +697,14 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 	minor_t		minor;
 	dp_entry_t	*dpep;
 	pollcache_t	*pcp;
+	hrtime_t	now;
 	int		error = 0;
 	STRUCT_DECL(dvpoll, dvpoll);
+
+	if (cmd == DP_POLL) {
+		/* do this now, before we sleep on DP_WRITER_PRESENT */
+		now = gethrtime();
+	}
 
 	minor = getminor(dev);
 	mutex_enter(&devpoll_lock);
@@ -725,9 +733,7 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 		pollstate_t	*ps;
 		nfds_t		nfds;
 		int		fdcnt = 0;
-		int		time_out;
-		clock_t		*deltap = NULL;
-		clock_t		delta;
+		hrtime_t	deadline = 0;
 
 		STRUCT_INIT(dvpoll, mode);
 		error = copyin((caddr_t)arg, STRUCT_BUF(dvpoll),
@@ -737,18 +743,16 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 			return (EFAULT);
 		}
 
-		time_out = STRUCT_FGET(dvpoll, dp_timeout);
-		if (time_out > 0) {
+		deadline = STRUCT_FGET(dvpoll, dp_timeout);
+		if (deadline > 0) {
 			/*
-			 * cv_relwaituntil_sig operates at the tick
-			 * granularity, which by default is 10 ms.
-			 * This results in rounding user specified
-			 * timeouts up but prevents the system
-			 * from being flooded with small high
-			 * resolution timers.
+			 * Convert the deadline from relative milliseconds
+			 * to absolute nanoseconds.  They must wait for at
+			 * least a tick.
 			 */
-			delta = MSEC_TO_TICK_ROUNDUP(time_out);
-			deltap = &delta;
+			deadline = deadline * NANOSEC / MILLISEC;
+			deadline = MAX(deadline, nsec_per_tick);
+			deadline += now;
 		}
 
 		if ((nfds = STRUCT_FGET(dvpoll, dp_nfds)) == 0) {
@@ -758,16 +762,15 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 			 * Do not check for signals if we have a zero timeout.
 			 */
 			DP_REFRELE(dpep);
-			if (time_out == 0)
+			if (deadline == 0)
 				return (0);
 			mutex_enter(&curthread->t_delay_lock);
-			while ((delta = cv_relwaituntil_sig(
-			    &curthread->t_delay_cv, &curthread->t_delay_lock,
-			    deltap, TR_MILLISEC)) > 0) {
+			while ((error =
+			    cv_timedwait_sig_hrtime(&curthread->t_delay_cv,
+			    &curthread->t_delay_lock, deadline)) > 0)
 				continue;
-			}
 			mutex_exit(&curthread->t_delay_lock);
-			return (delta == 0 ? EINTR : 0);
+			return (error == 0 ? EINTR : 0);
 		}
 
 		/*
@@ -814,21 +817,22 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 
 			/*
 			 * Sleep until we are notified, signaled, or timed out.
-			 * Do not check for signals if we have a zero timeout.
 			 */
-			if (time_out == 0)	/* immediate timeout */
+			if (deadline == 0) {
+				/* immediate timeout; do not check signals */
 				break;
-
-			delta = cv_relwaituntil_sig(&pcp->pc_cv, &pcp->pc_lock,
-			    deltap, TR_MILLISEC);
+			}
+			error = cv_timedwait_sig_hrtime(&pcp->pc_cv,
+			    &pcp->pc_lock, deadline);
 			/*
 			 * If we were awakened by a signal or timeout
 			 * then break the loop, else poll again.
 			 */
-			if (delta <= 0) {
-				if (delta == 0)	/* signal */
-					error = EINTR;
+			if (error <= 0) {
+				error = (error == 0) ? EINTR : 0;
 				break;
+			} else {
+				error = 0;
 			}
 		}
 		mutex_exit(&pcp->pc_lock);
