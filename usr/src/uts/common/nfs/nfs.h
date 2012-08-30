@@ -20,6 +20,8 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -2280,11 +2282,7 @@ extern kstat_named_t	*rfsproccnt_v3_ptr;
 extern vfsops_t		*nfs3_vfsops;
 extern struct vnodeops	*nfs3_vnodeops;
 extern const struct fs_operation_def nfs3_vnodeops_template[];
-#ifdef DEBUG
-extern int		rfs3_do_pre_op_attr;
-extern int		rfs3_do_post_op_attr;
-extern int		rfs3_do_post_op_fh3;
-#endif
+
 /*
  * Some servers do not properly update the attributes of the
  * directory when changes are made.  To allow interoperability

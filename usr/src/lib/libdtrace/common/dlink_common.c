@@ -18,22 +18,30 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#include <unistd.h>
-#include <fcntl.h>
-#include <dlfcn.h>
-#include <link.h>
-#include <sys/dtrace.h>
+/*
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ */
 
+/*
+ * Common functions for helper provider loading both compiled into the
+ * executable via drti.o and dtrace(1M) -G, and the libdaudit.so library.
+ */
+
+#include <errno.h>
+#include <fcntl.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
+#include <unistd.h>
+
+#include <dlink.h>
 
 /*
  * In Solaris 10 GA, the only mechanism for communicating helper information
@@ -43,24 +51,13 @@
  * the /dev and having this initialization code use that /dev link. If the
  * /dev link doesn't exist it falls back to looking for the /devices node
  * as this code may be embedded in a binary which runs on Solaris 10 GA.
- *
- * Users may set the following environment variable to affect the way
- * helper initialization takes place:
- *
- *	DTRACE_DOF_INIT_DEBUG		enable debugging output
- *	DTRACE_DOF_INIT_DISABLE		disable helper loading
- *	DTRACE_DOF_INIT_DEVNAME		set the path to the helper node
  */
-
-static const char *devname = "/dev/dtrace/helper";
+const char *devname = "/dev/dtrace/helper";
 static const char *olddevname = "/devices/pseudo/dtrace@0:helper";
 
-static const char *modname;	/* Name of this load object */
-static int gen;			/* DOF helper generation */
-extern dof_hdr_t __SUNW_dof;	/* DOF defined in the .SUNW_dof section */
-static boolean_t dof_init_debug = B_FALSE;	/* From DTRACE_DOF_INIT_DEBUG */
+static boolean_t dof_init_debug = B_FALSE;
 
-static void
+void
 dprintf(int debug, const char *fmt, ...)
 {
 	va_list ap;
@@ -70,10 +67,7 @@ dprintf(int debug, const char *fmt, ...)
 
 	va_start(ap, fmt);
 
-	if (modname == NULL)
-		(void) fprintf(stderr, "dtrace DOF: ");
-	else
-		(void) fprintf(stderr, "dtrace DOF %s: ", modname);
+	(void) fprintf(stderr, "dtrace DOF: ");
 
 	(void) vfprintf(stderr, fmt, ap);
 
@@ -83,40 +77,39 @@ dprintf(int debug, const char *fmt, ...)
 	va_end(ap);
 }
 
-#pragma init(dtrace_dof_init)
-static void
-dtrace_dof_init(void)
+/*
+ * Users may set the following environment variable to affect the way
+ * helper initialization takes place:
+ *
+ *	DTRACE_DOF_INIT_DEBUG		enable debugging output
+ *	DTRACE_DOF_INIT_DISABLE		disable helper loading
+ *	DTRACE_DOF_INIT_DEVNAME		set the path to the helper node
+ */
+void
+dtrace_link_init(void)
 {
-	dof_hdr_t *dof = &__SUNW_dof;
+	if (getenv("DTRACE_DOF_INIT_DEBUG") != NULL)
+		dof_init_debug = B_TRUE;
+}
+
+void
+dtrace_link_dof(dof_hdr_t *dof, Lmid_t lmid, const char *name, uintptr_t addr)
+{
+	const char *modname;
+	const char *p;
 #ifdef _LP64
 	Elf64_Ehdr *elf;
 #else
 	Elf32_Ehdr *elf;
 #endif
 	dof_helper_t dh;
-	Link_map *lmp;
-	Lmid_t lmid;
 	int fd;
-	const char *p;
 
 	if (getenv("DTRACE_DOF_INIT_DISABLE") != NULL)
 		return;
 
-	if (getenv("DTRACE_DOF_INIT_DEBUG") != NULL)
-		dof_init_debug = B_TRUE;
-
-	if (dlinfo(RTLD_SELF, RTLD_DI_LINKMAP, &lmp) == -1 || lmp == NULL) {
-		dprintf(1, "couldn't discover module name or address\n");
-		return;
-	}
-
-	if (dlinfo(RTLD_SELF, RTLD_DI_LMID, &lmid) == -1) {
-		dprintf(1, "couldn't discover link map ID\n");
-		return;
-	}
-
-	if ((modname = strrchr(lmp->l_name, '/')) == NULL)
-		modname = lmp->l_name;
+	if ((modname = strrchr(name, '/')) == NULL)
+		modname = name;
 	else
 		modname++;
 
@@ -124,16 +117,16 @@ dtrace_dof_init(void)
 	    dof->dofh_ident[DOF_ID_MAG1] != DOF_MAG_MAG1 ||
 	    dof->dofh_ident[DOF_ID_MAG2] != DOF_MAG_MAG2 ||
 	    dof->dofh_ident[DOF_ID_MAG3] != DOF_MAG_MAG3) {
-		dprintf(0, ".SUNW_dof section corrupt\n");
+		dprintf(0, ".SUNW_dof section corrupt for %s\n", modname);
 		return;
 	}
 
-	elf = (void *)lmp->l_addr;
+	elf = (void *)addr;
 
 	dh.dofhp_dof = (uintptr_t)dof;
-	dh.dofhp_addr = elf->e_type == ET_DYN ? lmp->l_addr : 0;
+	dh.dofhp_addr = elf->e_type == ET_DYN ? addr : 0;
 
-	if (lmid == 0) {
+	if (lmid == LM_ID_BASE) {
 		(void) snprintf(dh.dofhp_mod, sizeof (dh.dofhp_mod),
 		    "%s", modname);
 	} else {
@@ -162,29 +155,12 @@ dtrace_dof_init(void)
 		}
 	}
 
-	if ((gen = ioctl(fd, DTRACEHIOC_ADDDOF, &dh)) == -1)
-		dprintf(1, "DTrace ioctl failed for DOF at %p", dof);
-	else
-		dprintf(1, "DTrace ioctl succeeded for DOF at %p\n", dof);
-
-	(void) close(fd);
-}
-
-#pragma fini(dtrace_dof_fini)
-static void
-dtrace_dof_fini(void)
-{
-	int fd;
-
-	if ((fd = open64(devname, O_RDWR)) < 0) {
-		dprintf(1, "failed to open helper device %s", devname);
-		return;
+	if (ioctl(fd, DTRACEHIOC_ADDDOF, &dh) == -1) {
+		dprintf(1, "DTrace ioctl failed for DOF at %p in %s", dof,
+		    name);
+	} else {
+		dprintf(1, "DTrace ioctl succeeded for DOF at %p in %s\n", dof,
+		    name);
 	}
-
-	if ((gen = ioctl(fd, DTRACEHIOC_REMOVE, gen)) == -1)
-		dprintf(1, "DTrace ioctl failed to remove DOF (%d)\n", gen);
-	else
-		dprintf(1, "DTrace ioctl removed DOF (%d)\n", gen);
-
 	(void) close(fd);
 }

@@ -1997,6 +1997,9 @@ file path=opt/SUNWdtrt/tst/common/usdt/tst.guess32.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/usdt/tst.guess64.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/usdt/tst.header.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/usdt/tst.include.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.lazyprobe.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/usdt/tst.lazyprobe1.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.lazyprobe2.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/usdt/tst.linkpriv.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/usdt/tst.linkunpriv.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/usdt/tst.multiple.ksh mode=0444

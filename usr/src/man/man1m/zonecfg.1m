@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ZONECFG 1M "Jul 29, 2009"
+.TH ZONECFG 1M "Aug 24, 2012"
 .SH NAME
 zonecfg \- set up zone configuration
 .SH SYNOPSIS
@@ -147,21 +147,6 @@ file-system
 .sp
 .ne 2
 .na
-\fB\fBinherit-pkg-dir\fR\fR
-.ad
-.sp .6
-.RS 4n
-Directory inherited from the global zone. Used for sparse root zones (see the
-discussion of "Sparse and Whole Root Non-Global Zones," below). Software
-packages whose contents have been transferred into that directory are inherited
-in read-only mode by the non-global zone and the non-global zone's packaging
-database is updated to reflect those packages. Such resources are not
-modifiable or removable once a zone has been installed with \fBzoneadm\fR.
-.RE
-
-.sp
-.ne 2
-.na
 \fB\fBnet\fR\fR
 .ad
 .sp .6
@@ -179,135 +164,6 @@ Network interface.
 Resource control.
 .RE
 
-.SS "Sparse and Whole Root Non-Global Zones"
-.sp
-.LP
-In the administration of zones, it is useful to distinguish between the global
-zone and non-global zones. Within non-global zones, there are two zone root
-file system models: sparse and whole root. The sparse root zone model optimizes
-the sharing of objects. The whole root zone model provides the maximum
-configurability. Note that not all brands support the sparse zone model.
-.SS "Sparse Root Zones"
-.sp
-.LP
-Non-global zones that have \fBinherit-pkg-dir\fR resources are called sparse
-root zones.
-.sp
-.LP
-The sparse root zone model optimizes the sharing of objects in the following
-ways:
-.RS +4
-.TP
-.ie t \(bu
-.el o
-Only a subset of the packages installed in the global zone are installed
-directly into the non-global zone.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-Read-only loopback file systems, identified as \fBinherit-pkg-dir\fR resources,
-are used to gain access to other files.
-.RE
-.sp
-.LP
-In this model, all packages appear to be installed in the non-global zone.
-Packages that do not deliver content into read-only loopback mount file systems
-are fully installed. There is no need to install content delivered into
-read-only loopback mounted file systems since that content is inherited (and
-visible) from the global zone.
-.RS +4
-.TP
-.ie t \(bu
-.el o
-As a general guideline, a zone requires about 100 megabytes of free disk space
-per zone when the global zone has been installed with all of the standard
-Solaris packages.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-By default, any additional packages installed in the global zone also populate
-the non-global zones. The amount of disk space required might be increased
-accordingly, depending on whether the additional packages deliver files that
-reside in the \fBinherit-pkg-dir\fR resource space.
-.RE
-.sp
-.LP
-An additional 40 megabytes of RAM per zone are suggested, but not required on a
-machine with sufficient swap space.
-.sp
-.LP
-A sparse zone inherits the following directories:
-.sp
-.in +2
-.nf
-/lib
-/platform
-/sbin
-/usr
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-Although \fBzonecfg\fR allows you to remove one of these as an inherited
-directory, you should not do so. You should either follow the whole-root model
-or the sparse model; a subset of the sparse model is not tested and you might
-encounter unexpected problems.
-.sp
-.LP
-Adding an additional \fBinherit-pkg-dir\fR directory, such as \fB/opt\fR, to a
-sparse root zone is acceptable.
-.SS "Whole Root Zones"
-.sp
-.LP
-The whole root zone model provides the maximum configurability. All of the
-required and any selected optional Solaris packages are installed into the
-private file systems of the zone. The advantages of this model include the
-capability for global administrators to customize their zones file system
-layout. This would be done, for example, to add arbitrary unbundled or
-third-party packages.
-.sp
-.LP
-The disk requirements for this model are determined by the disk space used by
-the packages currently installed in the global zone.
-.LP
-Note -
-.sp
-.RS 2
-If you create a sparse root zone that contains the following
-\fBinherit-pkg-dir\fR directories, you must remove these directories from the
-non-global zone's configuration before the zone is installed to have a whole
-root zone:
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fB/lib\fR
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fB/platform\fR
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fB/sbin\fR
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fB/usr\fR
-.RE
-.RE
 .SS "Properties"
 .sp
 .LP
@@ -475,16 +331,6 @@ The following properties are supported:
 .sp .6
 .RS 4n
 \fBdir\fR, \fBspecial\fR, \fBraw\fR, \fBtype\fR, \fBoptions\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBinherit-pkg-dir\fR\fR
-.ad
-.sp .6
-.RS 4n
-\fBdir\fR
 .RE
 
 .sp
@@ -752,16 +598,6 @@ uppercase and lowercase hexadecimal digits are acceptable.
 .RS 4n
 Values needed to determine how, where, and so forth to mount file systems. See
 \fBmount\fR(1M), \fBmount\fR(2), \fBfsck\fR(1M), and \fBvfstab\fR(4).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBinherit-pkg-dir\fR: dir\fR
-.ad
-.sp .6
-.RS 4n
-The directory path.
 .RE
 
 .sp
@@ -1041,7 +877,6 @@ fs                dir             simple
                    raw             simple
                    type            simple
                    options         list of simple
-inherit-pkg-dir   dir             simple
 net               address         simple
                    physical        simple
 device            match           simple
@@ -1567,9 +1402,6 @@ zonecfg:myzone3:fs> \fBset special=/dev/dsk/c0t0d0s7\fR
 zonecfg:myzone3:fs> \fBset raw=/dev/rdsk/c0t0d0s7\fR
 zonecfg:myzone3:fs> \fBset type=ufs\fR
 zonecfg:myzone3:fs> \fBend\fR
-zonecfg:myzone3> \fBadd inherit-pkg-dir\fR
-zonecfg:myzone3:inherit-pkg-dir> \fBset dir=/opt/sfw\fR
-zonecfg:myzone3:inherit-pkg-dir> \fBend\fR
 zonecfg:myzone3> \fBadd net\fR
 zonecfg:myzone3:net> \fBset address=192.168.0.1/24\fR
 zonecfg:myzone3:net> \fBset physical=eri0\fR

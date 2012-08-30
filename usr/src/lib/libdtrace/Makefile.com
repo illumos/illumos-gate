@@ -70,8 +70,15 @@ LIBISASRCS = \
 
 OBJECTS = dt_lex.o dt_grammar.o $(MACHOBJS) $(LIBSRCS:%.c=%.o) $(LIBISASRCS:%.c=%.o)
 
-DRTISRC = drti.c
-DRTIOBJ = $(DRTISRC:%.c=%.o)
+DRTISRCS = dlink_init.c dlink_common.c
+DRTIOBJS = $(DRTISRCS:%.c=pics/%.o)
+DRTIOBJ = drti.o
+
+LIBDAUDITSRCS = dlink_audit.c dlink_common.c
+LIBDAUDITOBJS = $(LIBDAUDITSRCS:%.c=pics/%.o)
+LIBDAUDIT = libdtrace_forceload.so
+
+DLINKSRCS = dlink_common.c dlink_init.c dlink_audit.c
 
 DLIBSRCS += \
 	errno.d \
@@ -131,17 +138,23 @@ ROOTDLIBDIR = $(ROOT)/usr/lib/dtrace
 ROOTDLIBDIR64 = $(ROOT)/usr/lib/dtrace/64
 
 ROOTDLIBS = $(DLIBSRCS:%=$(ROOTDLIBDIR)/%)
-ROOTDOBJS = $(ROOTDLIBDIR)/$(DRTIOBJ)
-ROOTDOBJS64 = $(ROOTDLIBDIR64)/$(DRTIOBJ)
+ROOTDOBJS = $(ROOTDLIBDIR)/$(DRTIOBJ) $(ROOTDLIBDIR)/$(LIBDAUDIT)
+ROOTDOBJS64 = $(ROOTDLIBDIR64)/$(DRTIOBJ) $(ROOTDLIBDIR64)/$(LIBDAUDIT)
+
+$(ROOTDLIBDIR)/%.d := FILEMODE=444
+$(ROOTDLIBDIR)/%.o := FILEMODE=444
+$(ROOTDLIBDIR64)/%.o :=	FILEMODE=444
+$(ROOTDLIBDIR)/%.so := FILEMODE=555
+$(ROOTDLIBDIR64)/%.so := FILEMODE=555
 
 .KEEP_STATE:
 
-all: $(LIBS) $(DRTIOBJ)
+all: $(LIBS) $(DRTIOBJ) $(LIBDAUDIT)
 
-lint: lintdrti lintcheck
+lint: lintdlink lintcheck
 
-lintdrti: ../common/$(DRTISRC)
-	$(LINT.c) ../common/$(DRTISRC) $(DRTILDLIBS)
+lintdlink: $(DLINKSRCS:%.c=../common/%.c)
+	$(LINT.c) $(DLINKSRCS:%.c=../common/%.c) $(DRTILDLIBS)
 
 dt_lex.c: $(SRCDIR)/dt_lex.l dt_grammar.h
 	$(LEX) $(LFLAGS) $(SRCDIR)/dt_lex.l > $@
@@ -202,9 +215,15 @@ pics/%.o: ../$(MACH)/%.s
 	$(COMPILE.s) -o $@ $<
 	$(POST_PROCESS_O)
 
-%.o: ../common/%.c
-	$(COMPILE.c) -o $@ $<
+$(DRTIOBJ): $(DRTIOBJS)
+	$(LD) -o $@ -r -Blocal -Breduce $(DRTIOBJS)
 	$(POST_PROCESS_O)
+
+$(LIBDAUDIT): $(LIBDAUDITOBJS)
+	$(LINK.c) -o $@ $(GSHARED) -h$(LIBDAUDIT) $(ZTEXT) $(ZDEFS) $(BDIRECT) \
+	    $(MAPFILE.PGA:%=-M%) $(MAPFILE.NED:%=-M%) $(LIBDAUDITOBJS) \
+	    -lmapmalloc -lc -lproc
+	$(POST_PROCESS_SO)
 
 $(ROOTDLIBDIR):
 	$(INS.dir)
@@ -225,6 +244,12 @@ $(ROOTDLIBDIR)/%.o: %.o
 	$(INS.file)
 
 $(ROOTDLIBDIR64)/%.o: %.o
+	$(INS.file)
+
+$(ROOTDLIBDIR)/%.so: %.so
+	$(INS.file)
+
+$(ROOTDLIBDIR64)/%.so: %.so
 	$(INS.file)
 
 $(ROOTDLIBS): $(ROOTDLIBDIR)

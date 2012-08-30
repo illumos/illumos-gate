@@ -893,7 +893,7 @@ hxge_rx_ring_stat(mac_ring_driver_t rdriver, uint_t stat, uint64_t *val)
 	ASSERT(rhp != NULL);
 	ASSERT(hxgep != NULL);
 	ASSERT(hxgep->statsp != NULL);
-	ASSERT(0 <= rhp->index < HXGE_MAX_RDCS);
+	ASSERT((rhp->index >= 0) && (rhp->index < HXGE_MAX_RDCS));
 
 	switch (stat) {
 	case MAC_STAT_IERRORS:
@@ -925,7 +925,7 @@ hxge_tx_ring_stat(mac_ring_driver_t rdriver, uint_t stat, uint64_t *val)
 	ASSERT(rhp != NULL);
 	ASSERT(hxgep != NULL);
 	ASSERT(hxgep->statsp != NULL);
-	ASSERT(0 <= rhp->index < HXGE_MAX_TDCS);
+	ASSERT((rhp->index >= 0) && (rhp->index < HXGE_MAX_TDCS));
 
 	switch (stat) {
 	case MAC_STAT_OERRORS:
