@@ -49,18 +49,6 @@
 static uint32_t saved_s2 = 0, saved_s4 = 0;
 static char saved_s2_set = 0, saved_s4_set = 0;
 
-static float
-int_as_float(uint32_t intval)
-{
-    union intfloat {
-	uint32_t i;
-	float f;
-    } uval;
-
-    uval.i = intval;
-    return uval.f;
-}
-
 static void
 instr_out(uint32_t *data, uint32_t hw_offset, unsigned int index,
 	  const char *fmt, ...)
@@ -465,17 +453,17 @@ decode_3d_1d(uint32_t *data, int count, uint32_t hw_offset, int *failures, int i
 	    if (data[1] & (1 << c)) {
 		if (i + 4 >= count)
 		    BUFFER_FAIL(count, len, "3DSTATE_PIXEL_SHADER_CONSTANTS");
-		instr_out(data, hw_offset, i, "C%d.X = %f\n",
-			  c, int_as_float(data[i]));
+		instr_out(data, hw_offset, i, "C%d.X = %x float\n",
+			  c, data[i]);
 		i++;
-		instr_out(data, hw_offset, i, "C%d.Y = %f\n",
-			  c, int_as_float(data[i]));
+		instr_out(data, hw_offset, i, "C%d.Y = %x float\n",
+			  c, data[i]);
 		i++;
-		instr_out(data, hw_offset, i, "C%d.Z = %f\n",
-			  c, int_as_float(data[i]));
+		instr_out(data, hw_offset, i, "C%d.Z = %x float\n",
+			  c, data[i]);
 		i++;
-		instr_out(data, hw_offset, i, "C%d.W = %f\n",
-			  c, int_as_float(data[i]));
+		instr_out(data, hw_offset, i, "C%d.W = %x float\n",
+			  c, data[i]);
 		i++;
 	    }
 	}
@@ -594,8 +582,8 @@ decode_3d_primitive(uint32_t *data, int count, uint32_t hw_offset,
 	    DRM_ERROR("unknown vertex format\n");
 	    for (i = 1; i < len; i++) {
 		instr_out(data, hw_offset, i,
-			  "           vertex data (%f float)\n",
-			  int_as_float(data[i]));
+			  "           vertex data (%x float)\n",
+			  data[i]);
 	    }
 	} else {
 	    unsigned int vertex = 0;
@@ -610,20 +598,20 @@ decode_3d_primitive(uint32_t *data, int count, uint32_t hw_offset,
     i++;								\
 }
 
-		VERTEX_OUT("X = %f", int_as_float(data[i]));
-		VERTEX_OUT("Y = %f", int_as_float(data[i]));
+		VERTEX_OUT("X = %x float", data[i]);
+		VERTEX_OUT("Y = %x float", data[i]);
 	        switch (saved_s4 >> 6 & 0x7) {
 		case 0x1:
-		    VERTEX_OUT("Z = %f", int_as_float(data[i]));
+		    VERTEX_OUT("Z = %x float", data[i]);
 		    break;
 		case 0x2:
-		    VERTEX_OUT("Z = %f", int_as_float(data[i]));
-		    VERTEX_OUT("W = %f", int_as_float(data[i]));
+		    VERTEX_OUT("Z = %x float", data[i]);
+		    VERTEX_OUT("W = %x float", data[i]);
 		    break;
 		case 0x3:
 		    break;
 		case 0x4:
-		    VERTEX_OUT("W = %f", int_as_float(data[i]));
+		    VERTEX_OUT("W = %x float", data[i]);
 		    break;
 		default:
 		    DRM_ERROR("bad S4 position mask\n");
@@ -651,22 +639,22 @@ decode_3d_primitive(uint32_t *data, int count, uint32_t hw_offset,
 		for (tc = 0; tc <= 7; tc++) {
 		    switch ((saved_s2 >> (tc * 4)) & 0xf) {
 		    case 0x0:
-			VERTEX_OUT("T%d.X = %f", tc, int_as_float(data[i]));
-			VERTEX_OUT("T%d.Y = %f", tc, int_as_float(data[i]));
+			VERTEX_OUT("T%d.X = %x float", tc, data[i]);
+			VERTEX_OUT("T%d.Y = %x float", tc, data[i]);
 			break;
 		    case 0x1:
-			VERTEX_OUT("T%d.X = %f", tc, int_as_float(data[i]));
-			VERTEX_OUT("T%d.Y = %f", tc, int_as_float(data[i]));
-			VERTEX_OUT("T%d.Z = %f", tc, int_as_float(data[i]));
+			VERTEX_OUT("T%d.X = %x float", tc, data[i]);
+			VERTEX_OUT("T%d.Y = %x float", tc, data[i]);
+			VERTEX_OUT("T%d.Z = %x float", tc, data[i]);
 			break;
 		    case 0x2:
-			VERTEX_OUT("T%d.X = %f", tc, int_as_float(data[i]));
-			VERTEX_OUT("T%d.Y = %f", tc, int_as_float(data[i]));
-			VERTEX_OUT("T%d.Z = %f", tc, int_as_float(data[i]));
-			VERTEX_OUT("T%d.W = %f", tc, int_as_float(data[i]));
+			VERTEX_OUT("T%d.X = %x float", tc, data[i]);
+			VERTEX_OUT("T%d.Y = %x float", tc, data[i]);
+			VERTEX_OUT("T%d.Z = %x float", tc, data[i]);
+			VERTEX_OUT("T%d.W = %x float", tc, data[i]);
 			break;
 		    case 0x3:
-			VERTEX_OUT("T%d.X = %f", tc, int_as_float(data[i]));
+			VERTEX_OUT("T%d.X = %x float", tc, data[i]);
 			break;
 		    case 0x4:
 			VERTEX_OUT("T%d.XY = 0x%08x half-float", tc, data[i]);
