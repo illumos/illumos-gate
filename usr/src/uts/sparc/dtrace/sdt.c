@@ -382,8 +382,8 @@ sdt_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 			priv = DTRACE_PRIV_KERNEL;
 			sdt_pops.dtps_mode = NULL;
 		} else {
-			ASSERT(priv == DTRACE_PRIV_USER);
 			priv = prov->sdtp_priv;
+			ASSERT(priv == DTRACE_PRIV_USER);
 			sdt_pops.dtps_mode = sdt_mode;
 		}
 
