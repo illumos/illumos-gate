@@ -384,6 +384,7 @@ file path=opt/SUNWdtrt/tst/common/arithmetic/tst.compnarrowassign.d.out \
     mode=0444
 file path=opt/SUNWdtrt/tst/common/arithmetic/tst.execcast.d mode=0444
 file path=opt/SUNWdtrt/tst/common/arithmetic/tst.execcast.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/arithmetic/tst.nonarrow.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/arrays/err.D_ARR_BADREF.bad.d mode=0444
 file path=opt/SUNWdtrt/tst/common/arrays/err.D_DECL_ARRBIG.toobig.d mode=0444
 file path=opt/SUNWdtrt/tst/common/arrays/err.D_DECL_ARRNULL.bad.d mode=0444
