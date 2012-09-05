@@ -5804,13 +5804,12 @@ rfs4_compound(COMPOUND4args *args, COMPOUND4res *resp, struct exportinfo *exi,
 
 	cs.statusp = &resp->status;
 	cs.req = req;
+	resp->array = NULL;
+	resp->array_len = 0;
 
 	resp->status = utf8_name_verify(&(resp->tag));
-	if (resp->status != NFS4_OK) {
-		resp->array_len = 0;
-		resp->array = NULL;
+	if (resp->status != NFS4_OK)
 		return;
-	}
 
 	/*
 	 * XXX for now, minorversion should be zero
@@ -5818,11 +5817,14 @@ rfs4_compound(COMPOUND4args *args, COMPOUND4res *resp, struct exportinfo *exi,
 	if (args->minorversion != NFS4_MINORVERSION) {
 		DTRACE_NFSV4_2(compound__start, struct compound_state *,
 		    &cs, COMPOUND4args *, args);
-		resp->array_len = 0;
-		resp->array = NULL;
 		resp->status = NFS4ERR_MINOR_VERS_MISMATCH;
 		DTRACE_NFSV4_2(compound__done, struct compound_state *,
 		    &cs, COMPOUND4res *, resp);
+		return;
+	}
+
+	if (args->array_len == 0) {
+		resp->status = NFS4_OK;
 		return;
 	}
 
