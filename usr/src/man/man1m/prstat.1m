@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PRSTAT 1M "Jun 25, 2009"
+.TH PRSTAT 1M "Sep 5, 2012"
 .SH NAME
 prstat \- report active process statistics
 .SH SYNOPSIS
@@ -174,10 +174,10 @@ waiting for user locks and waiting for \fBCPU\fR (latency time).
 .RS 4n
 Restrict number of output lines. The \fIntop\fR argument determines how many
 lines of process or \fBlwp\fR statistics are reported, and the \fInbottom\fR
-argument determines how many lines of user, task, or projects statistics are
-reported if the \fB-a\fR, \fB-t\fR, \fB-T\fR, or \fB-J\fR options are
-specified. By default, \fBprstat\fR displays as many lines of output that fit
-in a window or terminal. When you specify the \fB-c\fR option or direct the
+argument determines how many lines of user, task, project or zone statistics
+are reported if the \fB-a\fR, \fB-t\fR, \fB-T\fR, \fB-J\fR or \fB-Z\fR options
+are specified. By default, \fBprstat\fR displays as many lines of output that
+fit in a window or terminal. When you specify the \fB-c\fR option or direct the
 output to a file, the default values for \fBntop\fR and \fBnbottom\fR are
 \fB15\fR and \fB5\fR.
 .RE
