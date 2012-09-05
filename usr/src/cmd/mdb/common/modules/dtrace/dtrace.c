@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -1273,19 +1274,19 @@ int
 dtrace_helptrace_init(mdb_walk_state_t *wsp)
 {
 	uint32_t next;
-	int enabled;
+	uintptr_t buffer;
 
 	if (wsp->walk_addr != NULL) {
 		mdb_warn("dtrace_helptrace only supports global walks\n");
 		return (WALK_ERR);
 	}
 
-	if (mdb_readvar(&enabled, "dtrace_helptrace_enabled") == -1) {
-		mdb_warn("couldn't read 'dtrace_helptrace_enabled'");
+	if (mdb_readvar(&buffer, "dtrace_helptrace_buffer") == -1) {
+		mdb_warn("couldn't read 'dtrace_helptrace_buffer'");
 		return (WALK_ERR);
 	}
 
-	if (!enabled) {
+	if (buffer == NULL) {
 		mdb_warn("helper tracing is not enabled\n");
 		return (WALK_ERR);
 	}
