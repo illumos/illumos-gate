@@ -7735,6 +7735,11 @@ rfs4_op_open_downgrade(nfs_argop4 *argop, nfs_resop4 *resop,
 		goto out;
 	}
 
+	if (cs->vp->v_type != VREG) {
+		*cs->statusp = resp->status = NFS4ERR_INVAL;
+		return;
+	}
+
 	status = rfs4_get_state(&args->open_stateid, &sp, RFS4_DBS_VALID);
 	if (status != NFS4_OK) {
 		*cs->statusp = resp->status = status;
