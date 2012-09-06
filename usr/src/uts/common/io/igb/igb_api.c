@@ -153,6 +153,7 @@ e1000_set_mac_type(struct e1000_hw *hw)
 		mac->type = e1000_82580;
 		break;
 	case E1000_DEV_ID_I350_COPPER:
+	case E1000_DEV_ID_I350_SERDES:
 		mac->type = e1000_i350;
 		break;
 	default:

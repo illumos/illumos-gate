@@ -23,8 +23,9 @@
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ */
 
 #include <rpc/types.h>
 #include <rpc/xdr.h>
@@ -136,10 +137,10 @@ xdr_sizeof(xdrproc_t func, void *data)
 	x.x_ops = &ops;
 	x.x_handy = 0;
 	x.x_private = (caddr_t)NULL;
+	x.x_base = NULL;
 
 	stat = func(&x, data);
 	if (x.x_private)
 		mem_free(x.x_private, (uintptr_t)x.x_base);
-	x.x_base = (caddr_t)0;
 	return (stat == TRUE ? (unsigned int)x.x_handy: 0);
 }
