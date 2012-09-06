@@ -129,6 +129,7 @@ static intptr_t	V8_PROP_DESC_KEY;
 static intptr_t	V8_PROP_DESC_DETAILS;
 static intptr_t	V8_PROP_DESC_VALUE;
 static intptr_t	V8_PROP_DESC_SIZE;
+static intptr_t	V8_TRANSITIONS_IDX_DESC;
 
 static intptr_t V8_TYPE_JSOBJECT = -1;
 static intptr_t V8_TYPE_FIXEDARRAY = -1;
@@ -154,6 +155,7 @@ static ssize_t V8_OFF_MAP_INOBJECT_PROPERTIES;
 static ssize_t V8_OFF_MAP_INSTANCE_ATTRIBUTES;
 static ssize_t V8_OFF_MAP_INSTANCE_DESCRIPTORS;
 static ssize_t V8_OFF_MAP_INSTANCE_SIZE;
+static ssize_t V8_OFF_MAP_TRANSITIONS;
 static ssize_t V8_OFF_ODDBALL_TO_STRING;
 static ssize_t V8_OFF_SCRIPT_LINE_ENDS;
 static ssize_t V8_OFF_SCRIPT_NAME;
@@ -218,7 +220,8 @@ static v8_constant_t v8_optionals[] = {
 	{ &V8_PROP_DESC_KEY,		"v8dbg_prop_desc_key"		},
 	{ &V8_PROP_DESC_DETAILS,	"v8dbg_prop_desc_details"	},
 	{ &V8_PROP_DESC_VALUE,		"v8dbg_prop_desc_value"		},
-	{ &V8_PROP_DESC_SIZE,		"v8dbg_prop_desc_size"		}
+	{ &V8_PROP_DESC_SIZE,		"v8dbg_prop_desc_size"		},
+	{ &V8_TRANSITIONS_IDX_DESC,	"v8dbg_transitions_idx_descriptors" }
 };
 
 static int v8_noptionals = sizeof (v8_optionals) / sizeof (v8_optionals[0]);
@@ -227,30 +230,54 @@ typedef struct v8_offset {
 	ssize_t		*v8o_valp;
 	const char	*v8o_class;
 	const char	*v8o_member;
+	boolean_t	v8o_optional;
 } v8_offset_t;
 
 static v8_offset_t v8_offsets[] = {
-	{ &V8_OFF_CODE_INSTRUCTION_SIZE,	"Code", "instruction_size" },
-	{ &V8_OFF_CODE_INSTRUCTION_START,	"Code", "instruction_start" },
-	{ &V8_OFF_CONSSTRING_FIRST,		"ConsString", "first" },
-	{ &V8_OFF_CONSSTRING_SECOND,		"ConsString", "second" },
-	{ &V8_OFF_EXTERNALSTRING_RESOURCE,	"ExternalString", "resource" },
-	{ &V8_OFF_FIXEDARRAY_DATA,		"FixedArray", "data" },
-	{ &V8_OFF_FIXEDARRAY_LENGTH,		"FixedArray", "length" },
-	{ &V8_OFF_HEAPNUMBER_VALUE,		"HeapNumber", "value" },
-	{ &V8_OFF_HEAPOBJECT_MAP,		"HeapObject", "map" },
-	{ &V8_OFF_JSFUNCTION_SHARED,		"JSFunction", "shared" },
-	{ &V8_OFF_JSOBJECT_ELEMENTS,		"JSObject", "elements" },
-	{ &V8_OFF_JSOBJECT_PROPERTIES,		"JSObject", "properties" },
-	{ &V8_OFF_MAP_CONSTRUCTOR,		"Map", "constructor" },
-	{ &V8_OFF_MAP_INOBJECT_PROPERTIES,	"Map", "inobject_properties" },
-	{ &V8_OFF_MAP_INSTANCE_ATTRIBUTES,	"Map", "instance_attributes" },
-	{ &V8_OFF_MAP_INSTANCE_DESCRIPTORS,	"Map", "instance_descriptors" },
-	{ &V8_OFF_MAP_INSTANCE_SIZE,		"Map", "instance_size" },
-	{ &V8_OFF_ODDBALL_TO_STRING,		"Oddball", "to_string" },
-	{ &V8_OFF_SCRIPT_LINE_ENDS,		"Script", "line_ends" },
-	{ &V8_OFF_SCRIPT_NAME,			"Script", "name" },
-	{ &V8_OFF_SEQASCIISTR_CHARS,		"SeqAsciiString", "chars" },
+	{ &V8_OFF_CODE_INSTRUCTION_SIZE,
+	    "Code", "instruction_size" },
+	{ &V8_OFF_CODE_INSTRUCTION_START,
+	    "Code", "instruction_start" },
+	{ &V8_OFF_CONSSTRING_FIRST,
+	    "ConsString", "first" },
+	{ &V8_OFF_CONSSTRING_SECOND,
+	    "ConsString", "second" },
+	{ &V8_OFF_EXTERNALSTRING_RESOURCE,
+	    "ExternalString", "resource" },
+	{ &V8_OFF_FIXEDARRAY_DATA,
+	    "FixedArray", "data" },
+	{ &V8_OFF_FIXEDARRAY_LENGTH,
+	    "FixedArray", "length" },
+	{ &V8_OFF_HEAPNUMBER_VALUE,
+	    "HeapNumber", "value" },
+	{ &V8_OFF_HEAPOBJECT_MAP,
+	    "HeapObject", "map" },
+	{ &V8_OFF_JSFUNCTION_SHARED,
+	    "JSFunction", "shared" },
+	{ &V8_OFF_JSOBJECT_ELEMENTS,
+	    "JSObject", "elements" },
+	{ &V8_OFF_JSOBJECT_PROPERTIES,
+	    "JSObject", "properties" },
+	{ &V8_OFF_MAP_CONSTRUCTOR,
+	    "Map", "constructor" },
+	{ &V8_OFF_MAP_INOBJECT_PROPERTIES,
+	    "Map", "inobject_properties" },
+	{ &V8_OFF_MAP_INSTANCE_ATTRIBUTES,
+	    "Map", "instance_attributes" },
+	{ &V8_OFF_MAP_INSTANCE_DESCRIPTORS,
+	    "Map", "instance_descriptors", B_TRUE },
+	{ &V8_OFF_MAP_TRANSITIONS,
+	    "Map", "transitions", B_TRUE },
+	{ &V8_OFF_MAP_INSTANCE_SIZE,
+	    "Map", "instance_size" },
+	{ &V8_OFF_ODDBALL_TO_STRING,
+	    "Oddball", "to_string" },
+	{ &V8_OFF_SCRIPT_LINE_ENDS,
+	    "Script", "line_ends" },
+	{ &V8_OFF_SCRIPT_NAME,
+	    "Script", "name" },
+	{ &V8_OFF_SEQASCIISTR_CHARS,
+	    "SeqAsciiString", "chars" },
 	{ &V8_OFF_SHAREDFUNCTIONINFO_CODE,
 	    "SharedFunctionInfo", "code" },
 	{ &V8_OFF_SHAREDFUNCTIONINFO_FUNCTION_TOKEN_POSITION,
@@ -263,7 +290,8 @@ static v8_offset_t v8_offsets[] = {
 	    "SharedFunctionInfo", "name" },
 	{ &V8_OFF_SHAREDFUNCTIONINFO_SCRIPT,
 	    "SharedFunctionInfo", "script" },
-	{ &V8_OFF_STRING_LENGTH,	"String", "length" },
+	{ &V8_OFF_STRING_LENGTH,
+	    "String", "length" },
 };
 
 static int v8_noffsets = sizeof (v8_offsets) / sizeof (v8_offsets[0]);
@@ -395,6 +423,11 @@ again:
 			 */
 			klass = "FixedArrayBase";
 			goto again;
+		}
+
+		if (offp->v8o_optional) {
+			*offp->v8o_valp = -1;
+			continue;
 		}
 
 		mdb_warn("couldn't find class \"%s\", field \"%s\"\n",
@@ -1268,12 +1301,13 @@ jsobj_properties(uintptr_t addr,
     int (*func)(const char *, uintptr_t, void *), void *arg)
 {
 	uintptr_t ptr, map;
-	uintptr_t *props = NULL, *descs = NULL, *content = NULL;
-	size_t size, nprops, ndescs, ncontent;
+	uintptr_t *props = NULL, *descs = NULL, *content = NULL, *trans;
+	size_t size, nprops, ndescs, ncontent, ntrans;
 	ssize_t ii, rndescs;
 	uint8_t type, ninprops;
 	int rval = -1;
 	size_t ps = sizeof (uintptr_t);
+	ssize_t off;
 
 	/*
 	 * Objects have either "fast" properties represented with a FixedArray
@@ -1294,13 +1328,38 @@ jsobj_properties(uintptr_t addr,
 
 	/*
 	 * To iterate the properties, we need to examine the instance
-	 * descriptors of the associated Map object.  Some properties may be
-	 * stored inside the object itself, in which case we need to know how
-	 * big the object is and how many such properties there are.
+	 * descriptors of the associated Map object.  Depending on the version
+	 * of V8, this might be found directly from the map -- or indirectly
+	 * via the transitions array.
 	 */
-	if (mdb_vread(&map, ps, addr + V8_OFF_HEAPOBJECT_MAP) == -1 ||
-	    mdb_vread(&ptr, ps, map + V8_OFF_MAP_INSTANCE_DESCRIPTORS) == -1 ||
-	    read_heap_array(ptr, &descs, &ndescs, UM_SLEEP) != 0)
+	if (mdb_vread(&map, ps, addr + V8_OFF_HEAPOBJECT_MAP) == -1)
+		goto err;
+
+	if ((off = V8_OFF_MAP_INSTANCE_DESCRIPTORS) == -1) {
+		if (V8_OFF_MAP_TRANSITIONS == -1 ||
+		    V8_TRANSITIONS_IDX_DESC == -1 ||
+		    V8_PROP_IDX_CONTENT != -1) {
+			mdb_warn("missing instance_descriptors, but did "
+			    "not find expected transitions array metadata; "
+			    "cannot read properties\n");
+			goto err;
+		}
+
+		off = V8_OFF_MAP_TRANSITIONS;
+	}
+
+	if (mdb_vread(&ptr, ps, map + off) == -1)
+		goto err;
+
+	if (V8_OFF_MAP_TRANSITIONS != -1) {
+		if (read_heap_array(ptr, &trans, &ntrans, UM_SLEEP) != 0)
+			goto err;
+
+		ptr = trans[V8_TRANSITIONS_IDX_DESC];
+		mdb_free(trans, ntrans * sizeof (uintptr_t));
+	}
+
+	if (read_heap_array(ptr, &descs, &ndescs, UM_SLEEP) != 0)
 		goto err;
 
 	if (read_size(&size, addr) != 0)
@@ -1334,7 +1393,8 @@ jsobj_properties(uintptr_t addr,
 		 */
 		content = descs;
 		ncontent = ndescs;
-		rndescs = (ndescs - V8_PROP_IDX_FIRST) / V8_PROP_DESC_SIZE;
+		rndescs = ndescs > V8_PROP_IDX_FIRST ?
+		    (ndescs - V8_PROP_IDX_FIRST) / V8_PROP_DESC_SIZE : 0;
 	} else {
 		rndescs = ndescs - V8_PROP_IDX_FIRST;
 	}
