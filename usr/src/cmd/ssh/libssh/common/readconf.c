@@ -13,6 +13,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Joyent, Inc.  All rights reserved.
  */
 
 #include "includes.h"
@@ -204,7 +205,8 @@ static struct {
 	{ "stricthostkeychecking", oStrictHostKeyChecking },
 	{ "compression", oCompression },
 	{ "compressionlevel", oCompressionLevel },
-	{ "keepalive", oKeepAlives },
+	{ "tcpkeepalive", oKeepAlives },
+	{ "keepalive", oKeepAlives },				/* obsolete */
 	{ "numberofpasswordprompts", oNumberOfPasswordPrompts },
 	{ "loglevel", oLogLevel },
 	{ "dynamicforward", oDynamicForward },
