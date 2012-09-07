@@ -1997,6 +1997,11 @@ MEGA_SAS_OBJS = megaraid_sas.o
 MR_SAS_OBJS = mr_sas.o
 
 #
+#	DR_SAS module
+#
+DR_SAS_OBJS = dr_sas.o
+
+#
 #	ISCSI_INITIATOR module
 #
 ISCSI_INITIATOR_OBJS =	chap.o iscsi_io.o iscsi_thread.o	\

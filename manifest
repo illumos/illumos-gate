@@ -599,6 +599,7 @@ f kernel/drv/amd64/dlpistub 0755 root sys
 f kernel/drv/amd64/dmfe 0755 root sys
 f kernel/drv/amd64/dnet 0755 root sys
 f kernel/drv/amd64/dprov 0755 root sys
+f kernel/drv/amd64/dr_sas 0755 root sys
 f kernel/drv/amd64/dtrace 0755 root sys
 f kernel/drv/amd64/e1000g 0755 root sys
 f kernel/drv/amd64/ehci 0755 root sys
@@ -747,6 +748,7 @@ f kernel/drv/devinfo.conf 0644 root sys
 f kernel/drv/dld.conf 0644 root sys
 f kernel/drv/dlpistub.conf 0644 root sys
 f kernel/drv/dprov.conf 0644 root sys
+f kernel/drv/dr_sas.conf 0644 root sys
 f kernel/drv/dtrace.conf 0644 root sys
 f kernel/drv/e1000g.conf 0644 root sys
 f kernel/drv/ehci.conf 0644 root sys
