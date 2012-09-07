@@ -33,8 +33,7 @@ SUBDIRS=	arcstat \
 		mpstat \
 		vfsstat \
 		vmstat \
-		ziostat \
-		zschedstat
+		ziostat
 
 all :=		TARGET = all
 install :=	TARGET = install

@@ -949,6 +949,9 @@ fss_newpri(fssproc_t *fssproc, boolean_t quanta_up)
 	} else {
 		/*
 		 * fsspri += shusage * nrunnable * ticks
+		 * If all three values are non-0, this typically calculates to
+		 * a large number (sometimes > 1M, sometimes > 100B) due to
+		 * fssp_shusage which can be > 1T.
 		 */
 		fsspri = fssproc->fss_fsspri;
 		fsspri += fssproj->fssp_shusage * n_runnable * ticks;
@@ -956,6 +959,13 @@ fss_newpri(fssproc_t *fssproc, boolean_t quanta_up)
 
 	fssproc->fss_fsspri = fsspri;
 
+	/*
+	 * fss_maxumdpri is normally 59, since FSS priorities are 0-59.
+	 * If the previous calculation resulted in 0 (e.g. was 0 and added 0
+	 * because ticks == 0), then instead of 0, we use the largest priority,
+	 * which is still small in comparison to the large numbers we typically
+	 * see.
+	 */
 	if (fsspri < fss_maxumdpri)
 		fsspri = fss_maxumdpri;	/* so that maxfsspri is != 0 */
 
@@ -971,7 +981,7 @@ fss_newpri(fssproc_t *fssproc, boolean_t quanta_up)
 	 * thread will be one (the lowest priority assigned to a thread
 	 * that has non-zero shares).
 	 * Note that this formula cannot produce out of bounds priority
-	 * values; if it is changed, additional checks may need  to  be
+	 * values (0-59); if it is changed, additional checks may need to be
 	 * added.
 	 */
 	if (fsspri >= maxfsspri) {
@@ -1040,10 +1050,9 @@ fss_decay_usage()
 			 */
 			if (fsspset->fssps_gen != zp->zone_fss_gen) {
 				zp->zone_fss_gen = fsspset->fssps_gen;
-				zp->zone_fss_pri_hi = 0;
 				zp->zone_runq_cntr = 0;
 				zp->zone_fss_shr_pct = 0;
-				zp->zone_proc_cnt = 0;
+				zp->zone_run_ticks = 0;
 			}
 
 			/*
@@ -1312,27 +1321,15 @@ fss_update_list(int i)
 			 */
 			t->t_trapret = 1;
 			aston(t);
+			if (t->t_state == TS_ONPROC)
+				DTRACE_PROBE1(fss__onproc, fssproc_t *,
+				    fssproc);
 			goto next;
 		}
 		fss_newpri(fssproc, B_FALSE);
 		updated = 1;
 
 		fss_umdpri = fssproc->fss_umdpri;
-
-		/*
-		 * Summarize a zone's process priorities for runnable
-		 * procs.
-		 */
-		zp = fssproj->fssp_fsszone->fssz_zone;
-
-		if (fss_umdpri > zp->zone_fss_pri_hi)
-			zp->zone_fss_pri_hi = fss_umdpri;
-
-		if (zp->zone_proc_cnt++ == 0)
-			zp->zone_fss_pri_avg = fss_umdpri;
-		else
-			zp->zone_fss_pri_avg =
-			    (zp->zone_fss_pri_avg + fss_umdpri) / 2;
 
 		/*
 		 * Only dequeue the thread if it needs to be moved; otherwise

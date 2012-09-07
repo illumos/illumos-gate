@@ -2225,12 +2225,6 @@ zone_misc_kstat_update(kstat_t *ksp, int rw)
 	zmp->zm_avenrun5.value.ui32 = zone->zone_avenrun[1];
 	zmp->zm_avenrun15.value.ui32 = zone->zone_avenrun[2];
 
-	zmp->zm_run_ticks.value.ui64 = zone->zone_run_ticks;
-	zmp->zm_run_wait.value.ui64 = zone->zone_runq_cntr;
-	zmp->zm_fss_shr_pct.value.ui64 = zone->zone_fss_shr_pct;
-	zmp->zm_fss_pri_hi.value.ui64 = zone->zone_fss_pri_hi;
-	zmp->zm_fss_pri_avg.value.ui64 = zone->zone_fss_pri_avg;
-
 	return (0);
 }
 
@@ -2264,13 +2258,6 @@ zone_misc_kstat_create(zone_t *zone)
 	kstat_named_init(&zmp->zm_avenrun5, "avenrun_5min", KSTAT_DATA_UINT32);
 	kstat_named_init(&zmp->zm_avenrun15, "avenrun_15min",
 	    KSTAT_DATA_UINT32);
-	kstat_named_init(&zmp->zm_run_ticks, "run_ticks", KSTAT_DATA_UINT64);
-	kstat_named_init(&zmp->zm_run_wait, "run_queue", KSTAT_DATA_UINT64);
-	kstat_named_init(&zmp->zm_fss_shr_pct, "fss_share_percent",
-	    KSTAT_DATA_UINT32);
-	kstat_named_init(&zmp->zm_fss_pri_hi, "fss_pri_hi", KSTAT_DATA_UINT64);
-	kstat_named_init(&zmp->zm_fss_pri_avg, "fss_pri_avg",
-	    KSTAT_DATA_UINT64);
 
 	ksp->ks_update = zone_misc_kstat_update;
 	ksp->ks_private = zone;

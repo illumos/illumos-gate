@@ -697,12 +697,9 @@ typedef struct zone {
 	 * one second interval.
 	 */
 	uint32_t	zone_fss_gen;		/* FSS generation cntr */
-	uint32_t	zone_proc_cnt;		/* FSS process cntr */
 	uint64_t	zone_run_ticks;		/* tot # of ticks running */
 	uint64_t	zone_runq_cntr;		/* tot # of procs in runq */
 	uint32_t	zone_fss_shr_pct;	/* fss active shr % in intvl */
-	uint64_t	zone_fss_pri_hi;	/* fss high pri this interval */
-	uint64_t	zone_fss_pri_avg;	/* fss avg pri this interval */
 
 	/*
 	 * DTrace-private per-zone state
