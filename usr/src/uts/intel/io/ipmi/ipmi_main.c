@@ -301,7 +301,8 @@ ipmi_ioctl(dev_t dv, int cmd, intptr_t data, int flags, cred_t *cr, int *rvalp)
 		    IPMI_ADDR(req.msg.netfn, 0), req.msg.cmd,
 		    req.msg.data_len, IPMI_MAX_RX);
 		/* This struct is the same for 32/64 */
-		if (copyin(req.msg.data, kreq->ir_request, req.msg.data_len)) {
+		if (req.msg.data_len > 0 &&
+		    copyin(req.msg.data, kreq->ir_request, req.msg.data_len)) {
 			ipmi_free_request(kreq);
 			return (EFAULT);
 		}
