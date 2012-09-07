@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
 LIBRARY= libzpool.a
@@ -57,9 +58,9 @@ C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
 
 CFLAGS +=	-g $(CCVERBOSE) $(CNOGLOBAL)
-CFLAGS64 +=	-g $(CCVERBOSE) $(CNOGLOBAL)
+CFLAGS64 +=	-g $(CCVERBOSE)	$(CNOGLOBAL)
 LDLIBS +=	-lcmdutils -lumem -lavl -lnvpair -lz -lc -lsysevent -lmd
-CPPFLAGS +=	$(INCS)
+CPPFLAGS +=	$(INCS)	-DDEBUG
 
 .KEEP_STATE:
 
