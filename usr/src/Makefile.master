@@ -479,7 +479,16 @@ DEBUGFORMAT=	-xdebugformat=stabs
 #
 CTF_FLAGS_sparc	= -g -Wc,-Qiselect-T1 $(C99MODE) $(CNOGLOBAL) $(CDWARFSTR)
 CTF_FLAGS_i386	= -g $(C99MODE) $(CNOGLOBAL) $(CDWARFSTR)
-CTF_FLAGS	= $(CTF_FLAGS_$(MACH)) $(DEBUGFORMAT)
+
+CTF_FLAGS_sparcv9	= $(CTF_FLAGS_sparc)
+CTF_FLAGS_amd64		= $(CTF_FLAGS_i386)
+
+# Sun Studio produces broken userland code when saving arguments.
+$(__GNUC)CTF_FLAGS_amd64 += $(SAVEARGS)
+
+CTF_FLAGS_32	= $(CTF_FLAGS_$(MACH)) $(DEBUGFORMAT)
+CTF_FLAGS_64	= $(CTF_FLAGS_$(MACH64)) $(DEBUGFORMAT)
+CTF_FLAGS	= $(CTF_FLAGS_32)
 
 #
 # Flags used with genoffsets
