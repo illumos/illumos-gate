@@ -39,18 +39,18 @@
 #include "ipmi_impl.h"
 
 /*
- * IPMI transport for the local BMC at /dev/ipmi.
+ * IPMI transport for the local BMC at /dev/ipmi0.
  */
 
 typedef struct ipmi_bmc {
 	ipmi_handle_t	*ib_ihp;	/* ipmi handle */
-	int		ib_fd;		/* /dev/ipmi filedescriptor */
+	int		ib_fd;		/* /dev/ipmi0 filedescriptor */
 	uint32_t	ib_msgseq;	/* message sequence number */
 	uint8_t		*ib_msg;	/* message buffer */
 	size_t		ib_msglen;	/* size of message buffer */
 } ipmi_bmc_t;
 
-#define	BMC_DEV	"/dev/ipmi"
+#define	BMC_DEV	"/dev/ipmi0"
 
 static void
 ipmi_bmc_close(void *data)
@@ -74,7 +74,7 @@ ipmi_bmc_open(ipmi_handle_t *ihp, nvlist_t *params)
 		return (NULL);
 	ibp->ib_ihp = ihp;
 
-	/* open /dev/ipmi */
+	/* open /dev/ipmi0 */
 	if ((ibp->ib_fd = open(BMC_DEV, O_RDWR)) < 0) {
 		ipmi_free(ihp, ibp);
 		(void) ipmi_set_error(ihp, EIPMI_BMC_OPEN_FAILED, "%s",

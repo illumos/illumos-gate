@@ -9,7 +9,7 @@ ipmi \- OpenIPMI compatible IPMI interface driver
 .SH SYNOPSIS
 .LP
 .nf
-\fB/dev/ipmi\fR
+\fB/dev/ipmi0\fR
 .fi
 
 .SH DESCRIPTION

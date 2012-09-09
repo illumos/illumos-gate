@@ -3400,7 +3400,6 @@ f usr/include/sys/bitmap.h 0644 root bin
 f usr/include/sys/bitset.h 0644 root bin
 f usr/include/sys/bl.h 0644 root bin
 f usr/include/sys/blkdev.h 0644 root bin
-f usr/include/sys/bmc_intf.h 0644 root bin
 f usr/include/sys/bofi.h 0644 root bin
 f usr/include/sys/bofi_impl.h 0644 root bin
 f usr/include/sys/bootconf.h 0644 root bin

@@ -29,7 +29,7 @@
  * /dev/ipmi IPMI monitor
  *
  * The purpose of this module is to monitor the connection between the system
- * and the service processor attached via /dev/ipmi.  The module assumes the SP
+ * and the service processor attached via /dev/ipmi0.  The module assumes the SP
  * supports the Sun OEM uptime IPMI command.  If the BMC connection does not
  * exist, or the uptime function is not implemented, then the module unloads
  * without doing anything.
@@ -149,7 +149,7 @@ _fmd_init(fmd_hdl_t *hdl)
 	if ((smp->sm_hdl = ipmi_open(&error, &msg, IPMI_TRANSPORT_BMC, NULL))
 	    == NULL) {
 		/*
-		 * If /dev/ipmi doesn't exist on the system, then unload the
+		 * If /dev/ipmi0 doesn't exist on the system, then unload the
 		 * module without doing anything.
 		 */
 		if (error != EIPMI_BMC_OPEN_FAILED)

@@ -71,13 +71,13 @@ static id_space_t		*minor_ids;
 /*
  * Use the SMBIOS info to determine if the system has an IPMI.
  */
-static void
-get_smbios_ipmi_info()
+static int
+get_smbios_ipmi_info(void)
 {
 	smbios_ipmi_t ipmi;
 
 	if (ksmbios == NULL || smbios_info_ipmi(ksmbios, &ipmi) == SMB_ERR)
-		return;
+		return (DDI_FAILURE);
 
 	cmn_err(CE_CONT, "!SMBIOS type 0x%x, addr 0x%llx", ipmi.smbip_type,
 	    (long long unsigned int)(ipmi.smbip_addr));
@@ -89,7 +89,7 @@ get_smbios_ipmi_info()
 	 */
 	if (ipmi.smbip_addr == NULL) {
 		cmn_err(CE_WARN, "!SMBIOS: Invalid base address");
-		return;
+		return (DDI_FAILURE);
 	}
 
 	sc->ipmi_io_type = ipmi.smbip_type;
@@ -111,14 +111,17 @@ get_smbios_ipmi_info()
 		}
 		break;
 	default:
-		return;
+		return (DDI_FAILURE);
 	}
 
-	if (ipmi.smbip_intr > 15)
+	if (ipmi.smbip_intr > 15) {
 		cmn_err(CE_WARN, "!SMBIOS: Non-ISA IRQ %d for IPMI",
 		    ipmi.smbip_intr);
-	else
-		sc->ipmi_io_irq = ipmi.smbip_intr;
+		return (DDI_FAILURE);
+	}
+
+	sc->ipmi_io_irq = ipmi.smbip_intr;
+	return (DDI_SUCCESS);
 }
 
 static ipmi_device_t *
@@ -483,7 +486,8 @@ ipmi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (cmd != DDI_ATTACH)
 		return (DDI_FAILURE);
 
-	get_smbios_ipmi_info();
+	if (get_smbios_ipmi_info() == DDI_FAILURE)
+		return (DDI_FAILURE);
 
 	/*
 	 * Support for the other types (SMIC, SSIF) should be added here.

@@ -26,7 +26,6 @@
 #ifndef	_LIBIPMI_H
 #define	_LIBIPMI_H
 
-#include <sys/bmc_intf.h>
 #include <sys/byteorder.h>
 #include <sys/nvpair.h>
 #include <sys/sysmacros.h>
@@ -34,7 +33,7 @@
 /*
  * Private interfaces for communicating with attached services over IPMI.  This
  * library is designed for system software communicating with Illumos-supported
- * service processors over /dev/ipmi.  It is not a generic IPMI library.
+ * service processors over /dev/ipmi0.  It is not a generic IPMI library.
  *
  * Documentation references refer to "Intelligent Platform Management Interface
  * Specification Second Generation v2.0", document revision 1.0 with Februrary
@@ -53,10 +52,12 @@ typedef struct ipmi_handle ipmi_handle_t;
 /*
  * Basic netfn definitions.  See section 5.1.
  */
-#define	IPMI_NETFN_CHASSIS		BMC_NETFN_CHASSIS
-#define	IPMI_NETFN_APP			BMC_NETFN_APP
-#define	IPMI_NETFN_STORAGE		BMC_NETFN_STORAGE
-#define	IPMI_NETFN_SE			BMC_NETFN_SE
+#define	IPMI_NETFN_CHASSIS		0x0
+#define	IPMI_NETFN_BRIDGE		0x2
+#define	IPMI_NETFN_SE			0x4
+#define	IPMI_NETFN_APP			0x6
+#define	IPMI_NETFN_FIRMWARE		0x8
+#define	IPMI_NETFN_STORAGE		0xa
 #define	IPMI_NETFN_TRANSPORT		0x0C
 #define	IPMI_NETFN_OEM			0x2e
 
@@ -67,10 +68,10 @@ typedef struct ipmi_handle ipmi_handle_t;
 
 typedef enum {
 	EIPMI_NOMEM = EIPMI_BASE,	/* memory allocation failure */
-	EIPMI_BMC_OPEN_FAILED,		/* failed to open /dev/ipmi */
-	EIPMI_BMC_PUTMSG,	/* failed to send message to /dev/ipmi */
-	EIPMI_BMC_GETMSG,	/* failed to read response from /dev/ipmi */
-	EIPMI_BMC_RESPONSE,		/* response from /dev/ipmi failed */
+	EIPMI_BMC_OPEN_FAILED,		/* failed to open /dev/ipmi0 */
+	EIPMI_BMC_PUTMSG,	/* failed to send message to /dev/ipmi0 */
+	EIPMI_BMC_GETMSG,	/* failed to read response from /dev/ipmi0 */
+	EIPMI_BMC_RESPONSE,		/* response from /dev/ipmi0 failed */
 	EIPMI_INVALID_COMMAND,		/* invalid command */
 	EIPMI_COMMAND_TIMEOUT,		/* command timeout */
 	EIPMI_DATA_LENGTH_EXCEEDED,	/* maximum data length exceeded */

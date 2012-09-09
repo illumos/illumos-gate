@@ -353,7 +353,11 @@ kdmouse(di_minor_t minor, di_node_t node)
 static int
 ipmi(di_minor_t minor, di_node_t node)
 {
-	(void) devfsadm_mklink("ipmi", node, minor, 0);
+	/*
+	 * Follow convention from other systems, and include an instance#,
+	 * even though there will only be one.
+	 */
+	(void) devfsadm_mklink("ipmi0", node, minor, 0);
 	return (DEVFSADM_CONTINUE);
 }
 
