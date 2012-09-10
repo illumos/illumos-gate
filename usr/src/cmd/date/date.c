@@ -26,7 +26,9 @@
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
-
+/*
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -75,6 +77,7 @@ static int Rflag = 0;
 
 static int get_adj(char *, struct timeval *);
 static int setdate(struct tm *, char *);
+static char *fmt_extensions(const char *, const struct timespec *);
 
 int
 main(int argc, char **argv)
@@ -82,7 +85,9 @@ main(int argc, char **argv)
 	struct tm *tp, tm;
 	struct timeval tv;
 	char *fmt;
+	char *fmtbuf;
 	int c, aflag = 0, illflag = 0;
+	struct timespec ts;
 
 	(void) setlocale(LC_ALL, "");
 
@@ -126,7 +131,11 @@ main(int argc, char **argv)
 		exit(1);
 	}
 
-	(void) time(&clock_val);
+	if (clock_gettime(CLOCK_REALTIME, &ts) != 0) {
+		perror(gettext("data: Failed to obtain system time"));
+		exit(1);
+	}
+	clock_val = ts.tv_sec;
 
 	if (aflag) {
 		if (adjtime(&tv, 0) < 0) {
@@ -151,6 +160,8 @@ main(int argc, char **argv)
 	} else
 		fmt = nl_langinfo(_DATE_FMT);
 
+	fmtbuf = fmt_extensions(fmt, &ts);
+
 	if (uflag) {
 		(void) putenv("TZ=GMT0");
 		tzset();
@@ -158,7 +169,7 @@ main(int argc, char **argv)
 	} else
 		tp = localtime(&clock_val);
 	(void) memcpy(&tm, tp, sizeof (struct tm));
-	(void) strftime(buf, BUFSIZ, fmt, &tm);
+	(void) strftime(buf, BUFSIZ, fmtbuf, &tm);
 
 	(void) puts(buf);
 
@@ -351,4 +362,65 @@ get_adj(char *cp, struct timeval *tp)
 		tp->tv_usec *= sign;
 		return (0);
 	}
+}
+
+/*
+ * Extensions that cannot be interpreted by strftime are interpreted here.
+ */
+char *
+fmt_extensions(const char *fmt, const struct timespec *tsp)
+{
+	size_t len;
+	char *fmt_buf;
+	const char *p;
+	char *q;
+
+	if (strstr(fmt, "%N") == NULL)
+		return ((char *)fmt);
+
+	len = strlen(fmt) + 1;
+
+	for (p = fmt; *p != '\0';) {
+		if (*p == '%') {
+			switch (*(p + 1)) {
+			case 'N':
+				len += 7;	/* 9 digits minus the %N */
+				break;
+			default:
+				break;
+			}
+
+			p += 2;
+			continue;
+		}
+		++p;
+	}
+
+	fmt_buf = malloc(len);
+	if (fmt_buf == NULL) {
+		perror(gettext("date: failed to allocate memory"));
+		exit(1);
+	}
+
+	for (p = fmt, q = fmt_buf; *p != '\0';) {
+		if (*p == '%') {
+			switch (*(p + 1)) {
+			case 'N':
+				q += snprintf(q, len - (q - fmt_buf),
+				    "%09lu", tsp->tv_nsec);
+				break;
+			default:
+				*q = *p;
+				*(q + 1) = *(p + 1);
+				q += 2;
+				break;
+			}
+			p += 2;
+		} else {
+			*q++ = *p++;
+		}
+	}
+	*q = '\0';
+
+	return (fmt_buf);
 }
