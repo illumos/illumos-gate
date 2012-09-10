@@ -9827,10 +9827,6 @@ s usr/lib/security/pkcs11_softtoken.so=pkcs11_softtoken.so.1
 f usr/lib/sendmail 2555 root smmsp
 f usr/lib/servinfo 0555 root bin
 f usr/lib/set_keyboard_layout 0555 root bin
-d usr/lib/sgml 0755 root bin
-f usr/lib/sgml/instant 0755 root bin
-f usr/lib/sgml/nsgmls 0755 root bin
-f usr/lib/sgml/sgml2roff 0755 root bin
 d usr/lib/smbfs 0755 root bin
 f usr/lib/smbfs/smbiod 0555 root bin
 f usr/lib/smbfs/smbiod-svc 0555 root bin
