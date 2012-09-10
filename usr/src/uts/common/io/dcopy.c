@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * dcopy.c
  *    dcopy misc module
@@ -329,7 +327,7 @@ dcopy_free(dcopy_handle_t *channel)
 {
 	dcopy_device_handle_t device;
 	dcopy_list_t *list;
-	boolean_t cleanup;
+	boolean_t cleanup = B_FALSE;
 
 
 	ASSERT(*channel != NULL);
@@ -348,7 +346,6 @@ dcopy_free(dcopy_handle_t *channel)
 	 * removed on the device.
 	 */
 	if ((*channel)->ch_removing && ((*channel)->ch_ref_cnt == 0)) {
-		cleanup = B_FALSE;
 		device = (*channel)->ch_device;
 		mutex_enter(&device->dc_devchan_list.dl_mutex);
 		device->dc_removing_cnt--;

@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/text/doctools@$(PKGVERS)
@@ -38,18 +39,10 @@ dir path=usr/lib/font/devpost group=lp
 dir path=usr/lib/font/devpost/charlib group=lp
 dir path=usr/lib/refer
 dir path=usr/lib/refer/papers
-dir path=usr/lib/sgml
 dir path=usr/share
 dir path=usr/share/lib
 dir path=usr/share/lib/nterm
 dir path=usr/share/lib/pub
-dir path=usr/share/lib/sgml
-dir path=usr/share/lib/sgml/locale
-dir path=usr/share/lib/sgml/locale/C
-dir path=usr/share/lib/sgml/locale/C/dtds
-dir path=usr/share/lib/sgml/locale/C/dtds/solbookv2
-dir path=usr/share/lib/sgml/locale/C/entities
-dir path=usr/share/lib/sgml/locale/C/transpec
 dir path=usr/share/lib/tmac
 dir path=usr/share/man
 dir path=usr/share/man/man1
@@ -83,9 +76,6 @@ file path=usr/lib/refer/mkey mode=0555
 file path=usr/lib/refer/papers/Rbstjissue
 file path=usr/lib/refer/papers/Rv7man
 file path=usr/lib/refer/papers/runinv mode=0755
-file path=usr/lib/sgml/instant mode=0755
-file path=usr/lib/sgml/nsgmls mode=0755
-file path=usr/lib/sgml/sgml2roff mode=0755
 file path=usr/lib/vfontedpr mode=0555
 file path=usr/lib/vgrindefs mode=0444
 file path=usr/share/lib/nterm/tab.2631
@@ -109,50 +99,6 @@ file path=usr/share/lib/pub/ascii
 file path=usr/share/lib/pub/eqnchar
 file path=usr/share/lib/pub/greek
 file path=usr/share/lib/pub/iso
-file path=usr/share/lib/sgml/locale/C/dtds/catalog
-file path=usr/share/lib/sgml/locale/C/dtds/solbookv2/solbook.dcl
-file path=usr/share/lib/sgml/locale/C/dtds/solbookv2/solbook.dtd
-file path=usr/share/lib/sgml/locale/C/entities/aap-shortref.gml
-file path=usr/share/lib/sgml/locale/C/entities/allisoents.gml
-file path=usr/share/lib/sgml/locale/C/entities/ati-dflt.dcl
-file path=usr/share/lib/sgml/locale/C/entities/ati-eqn1.gml
-file path=usr/share/lib/sgml/locale/C/entities/ati-graph.gml
-file path=usr/share/lib/sgml/locale/C/entities/ati-math.elm
-file path=usr/share/lib/sgml/locale/C/entities/ati-num.gml
-file path=usr/share/lib/sgml/locale/C/entities/ati-tbl.elm
-file path=usr/share/lib/sgml/locale/C/entities/atilogo.eps
-file path=usr/share/lib/sgml/locale/C/entities/basic.dcl
-file path=usr/share/lib/sgml/locale/C/entities/cals-tbl.elm
-file path=usr/share/lib/sgml/locale/C/entities/capref.gml
-file path=usr/share/lib/sgml/locale/C/entities/caution.eps
-file path=usr/share/lib/sgml/locale/C/entities/core.gml
-file path=usr/share/lib/sgml/locale/C/entities/ereview.gml
-file path=usr/share/lib/sgml/locale/C/entities/html-latin.sgml
-file path=usr/share/lib/sgml/locale/C/entities/iso-amsa.gml
-file path=usr/share/lib/sgml/locale/C/entities/iso-amsb.gml
-file path=usr/share/lib/sgml/locale/C/entities/iso-amsc.gml
-file path=usr/share/lib/sgml/locale/C/entities/iso-amsn.gml
-file path=usr/share/lib/sgml/locale/C/entities/iso-amso.gml
-file path=usr/share/lib/sgml/locale/C/entities/iso-amsr.gml
-file path=usr/share/lib/sgml/locale/C/entities/iso-box.gml
-file path=usr/share/lib/sgml/locale/C/entities/iso-cyr1.gml
-file path=usr/share/lib/sgml/locale/C/entities/iso-cyr2.gml
-file path=usr/share/lib/sgml/locale/C/entities/iso-dia.gml
-file path=usr/share/lib/sgml/locale/C/entities/iso-grk1.gml
-file path=usr/share/lib/sgml/locale/C/entities/iso-grk2.gml
-file path=usr/share/lib/sgml/locale/C/entities/iso-grk3.gml
-file path=usr/share/lib/sgml/locale/C/entities/iso-grk4.gml
-file path=usr/share/lib/sgml/locale/C/entities/iso-lat1.gml
-file path=usr/share/lib/sgml/locale/C/entities/iso-lat2.gml
-file path=usr/share/lib/sgml/locale/C/entities/iso-num.gml
-file path=usr/share/lib/sgml/locale/C/entities/iso-pub.gml
-file path=usr/share/lib/sgml/locale/C/entities/iso-tech.gml
-file path=usr/share/lib/sgml/locale/C/entities/sun_iso.gml
-file path=usr/share/lib/sgml/locale/C/entities/synref.gml
-file path=usr/share/lib/sgml/locale/C/entities/warn.eps
-file path=usr/share/lib/sgml/locale/C/transpec/docbook-to-man.ts
-file path=usr/share/lib/sgml/locale/C/transpec/roff.cmap
-file path=usr/share/lib/sgml/locale/C/transpec/roff.sdata
 file path=usr/share/lib/tmac/acm.me
 file path=usr/share/lib/tmac/an
 file path=usr/share/lib/tmac/ansun
@@ -238,14 +184,6 @@ license usr/src/cmd/eqn/THIRDPARTYLICENSE \
     license=usr/src/cmd/eqn/THIRDPARTYLICENSE
 license usr/src/cmd/man/src/THIRDPARTYLICENSE \
     license=usr/src/cmd/man/src/THIRDPARTYLICENSE
-license usr/src/cmd/man/src/util/THIRDPARTYLICENSE \
-    license=usr/src/cmd/man/src/util/THIRDPARTYLICENSE
-license usr/src/cmd/man/src/util/instant.src/THIRDPARTYLICENSE \
-    license=usr/src/cmd/man/src/util/instant.src/THIRDPARTYLICENSE
-license usr/src/cmd/man/src/util/nsgmls.src/COPYING \
-    license=usr/src/cmd/man/src/util/nsgmls.src/COPYING
-license usr/src/cmd/man/src/util/solbookv2/THIRDPARTYLICENSE \
-    license=usr/src/cmd/man/src/util/solbookv2/THIRDPARTYLICENSE
 license usr/src/cmd/refer/THIRDPARTYLICENSE \
     license=usr/src/cmd/refer/THIRDPARTYLICENSE
 license usr/src/cmd/soelim/THIRDPARTYLICENSE \

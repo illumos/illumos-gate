@@ -54,12 +54,16 @@ static int	tcp_bind(sock_lower_handle_t, struct sockaddr *,
 static int	tcp_listen(sock_lower_handle_t, int, cred_t *);
 static int	tcp_connect(sock_lower_handle_t, const struct sockaddr *,
 		    socklen_t, sock_connid_t *, cred_t *);
+static int	tcp_getpeername(sock_lower_handle_t, struct sockaddr *,
+		    socklen_t *, cred_t *);
+static int	tcp_getsockname(sock_lower_handle_t, struct sockaddr *,
+		    socklen_t *, cred_t *);
 static int	tcp_getsockopt(sock_lower_handle_t, int, int, void *,
 		    socklen_t *, cred_t *);
 static int	tcp_setsockopt(sock_lower_handle_t, int, int, const void *,
 		    socklen_t, cred_t *);
 static int	tcp_sendmsg(sock_lower_handle_t, mblk_t *, struct nmsghdr *,
-		    cred_t *cr);
+		    cred_t *);
 static int	tcp_shutdown(sock_lower_handle_t, int, cred_t *);
 static void	tcp_clr_flowctrl(sock_lower_handle_t);
 static int	tcp_ioctl(sock_lower_handle_t, int, intptr_t, int, int32_t *,
@@ -334,7 +338,7 @@ done:
 }
 
 /* ARGSUSED3 */
-int
+static int
 tcp_getpeername(sock_lower_handle_t proto_handle, struct sockaddr *addr,
     socklen_t *addrlenp, cred_t *cr)
 {
@@ -352,7 +356,7 @@ tcp_getpeername(sock_lower_handle_t proto_handle, struct sockaddr *addr,
 }
 
 /* ARGSUSED3 */
-int
+static int
 tcp_getsockname(sock_lower_handle_t proto_handle, struct sockaddr *addr,
     socklen_t *addrlenp, cred_t *cr)
 {
@@ -752,6 +756,7 @@ tcp_create(int family, int type, int proto, sock_downcalls_t **sock_downcalls,
 {
 	conn_t		*connp;
 	boolean_t	isv6 = family == AF_INET6;
+
 	if (type != SOCK_STREAM || (family != AF_INET && family != AF_INET6) ||
 	    (proto != 0 && proto != IPPROTO_TCP)) {
 		*errorp = EPROTONOSUPPORT;
@@ -765,7 +770,7 @@ tcp_create(int family, int type, int proto, sock_downcalls_t **sock_downcalls,
 
 	/*
 	 * Put the ref for TCP. Ref for IP was already put
-	 * by ipcl_conn_create. Also Make the conn_t globally
+	 * by ipcl_conn_create. Also make the conn_t globally
 	 * visible to walkers
 	 */
 	mutex_enter(&connp->conn_lock);

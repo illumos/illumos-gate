@@ -2714,7 +2714,7 @@ getAuthMethods(
 	}
 
 	i = 0;
-	if (auth.a_auth_method == IMA_AUTHMETHOD_NONE) {
+	if (auth.a_auth_method == authMethodNone) {
 		pMethodList[i++] = IMA_AUTHMETHOD_NONE;
 	} else if (auth.a_auth_method & authMethodCHAP) {
 		pMethodList[i++] = IMA_AUTHMETHOD_CHAP;

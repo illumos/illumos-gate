@@ -20,11 +20,11 @@
  */
 
 /*
+ * Copyright (c) 2012 Gary Mills
+ *
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <kmdb/kmdb_auxv.h>
 #include <kmdb/kctl/kctl.h>
@@ -78,10 +78,12 @@ kctl_ddi_prop_read(char *pname, char *prop_buf, int buf_len)
  * query and thus have guilty knowledge of the properties that the
  * debugger wants to see.
  *
- * Here actually we only support four console properties:
- *     input-device, output-device, ttya-mode, ttyb-mode.
+ * Here actually we only support six console properties:
+ *     input-device, output-device, tty[a-d]-mode.
  */
-#define	KCTL_PROPNV_NENT		4
+#define	KCTL_PROPNV_NIODEV	2
+#define	KCTL_PROPNV_NTTYMD	4
+#define	KCTL_PROPNV_NENT	(KCTL_PROPNV_NIODEV + KCTL_PROPNV_NTTYMD)
 
 static kmdb_auxv_nv_t *
 kctl_pcache_create(int *nprops)
@@ -89,6 +91,9 @@ kctl_pcache_create(int *nprops)
 	int (*preader)(char *, char *, int);
 	kmdb_auxv_nv_t *pnv;
 	size_t psz = sizeof (kmdb_auxv_nv_t) * KCTL_PROPNV_NENT;
+	char *inputdev, *outputdev;
+	int i;
+	char ttymode[] = "ttyX-mode";
 
 	if (kctl.kctl_boot_loaded) {
 		preader = kctl_boot_prop_read;
@@ -97,37 +102,43 @@ kctl_pcache_create(int *nprops)
 	}
 
 	pnv = kobj_alloc(psz, KM_WAIT);
+	inputdev = (&pnv[0])->kanv_val;
+	outputdev = (&pnv[1])->kanv_val;
 
+	/* Set the property names. */
 	(void) strcpy((&pnv[0])->kanv_name, "input-device");
 	(void) strcpy((&pnv[1])->kanv_name, "output-device");
-	(void) strcpy((&pnv[2])->kanv_name, "ttya-mode");
-	(void) strcpy((&pnv[3])->kanv_name, "ttyb-mode");
+	for (i = 0; i < KCTL_PROPNV_NTTYMD; i++) {
+		ttymode[3] = 'a' + i;
+		(void) strcpy((&pnv[i + KCTL_PROPNV_NIODEV])->kanv_name,
+		    ttymode);
+	}
 
 	/*
 	 * console is defined by "console" property, with
 	 * fallback on the old "input-device" property.
 	 */
-	(void) strcpy((&pnv[0])->kanv_val, "text");	/* default to screen */
-	if (!preader("console", (&pnv[0])->kanv_val,
-	    sizeof ((&pnv[0])->kanv_val)))
-		(void) preader("input-device", (&pnv[0])->kanv_val,
+	(void) strcpy(inputdev, "text");	/* default to screen */
+	if (!preader("console", inputdev, sizeof ((&pnv[0])->kanv_val)))
+		(void) preader("input-device", inputdev,
 		    sizeof ((&pnv[0])->kanv_val));
 
-	if (strcmp((&pnv[0])->kanv_val, "ttya") == 0 ||
-	    strcmp((&pnv[0])->kanv_val, "ttyb") == 0) {
-		(void) strcpy((&pnv[1])->kanv_val, (&pnv[0])->kanv_val);
+	if (strncmp(inputdev, "tty", 3) == 0 &&
+	    inputdev[4] == '\0' &&
+	    inputdev[3] >= 'a' &&
+	    inputdev[3] < 'a' + KCTL_PROPNV_NTTYMD) {
+		(void) strcpy(outputdev, inputdev);
 	} else {
-		(void) strcpy((&pnv[0])->kanv_val, "keyboard");
-		(void) strcpy((&pnv[1])->kanv_val, "screen");
+		(void) strcpy(inputdev, "keyboard");
+		(void) strcpy(outputdev, "screen");
 	}
 
-	if (!preader((&pnv[2])->kanv_name, (&pnv[2])->kanv_val,
-	    sizeof ((&pnv[2])->kanv_val)))
-		(void) strcpy((&pnv[2])->kanv_val, "9600,8,n,1,-");
-
-	if (!preader((&pnv[3])->kanv_name, (&pnv[3])->kanv_val,
-	    sizeof ((&pnv[3])->kanv_val)))
-		(void) strcpy((&pnv[3])->kanv_val, "9600,8,n,1,-");
+	/* Set tty modes or defaults. */
+	for (i = KCTL_PROPNV_NIODEV; i < KCTL_PROPNV_NENT; i++) {
+		if (!preader((&pnv[i])->kanv_name, (&pnv[i])->kanv_val,
+		    sizeof ((&pnv[0])->kanv_val)))
+			(void) strcpy((&pnv[i])->kanv_val, "9600,8,n,1,-");
+	}
 
 	*nprops = KCTL_PROPNV_NENT;
 	return (pnv);

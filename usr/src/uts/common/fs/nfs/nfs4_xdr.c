@@ -22,6 +22,9 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ */
 
 /*
  * A handcoded version based on the original rpcgen code.
@@ -903,8 +906,8 @@ xdr_ga_fattr_res(XDR *xdrs, struct nfs4_ga_res *garp, bitmap4 resbmap,
 			if (!XDR_GETINT32(xdrs, (int *)&vap->va_type))
 				return (FALSE);
 
-			if (vap->va_type < NF4REG ||
-			    vap->va_type > NF4NAMEDATTR)
+			if ((nfs_ftype4)vap->va_type < NF4REG ||
+			    (nfs_ftype4)vap->va_type > NF4NAMEDATTR)
 				vap->va_type = VBAD;
 			else
 				vap->va_type = nf4_to_vt[vap->va_type];
@@ -1573,8 +1576,8 @@ xdr_ga_fattr_res_inline(uint32_t *ptr, struct nfs4_ga_res *garp,
 		if (resbmap & FATTR4_TYPE_MASK) {
 			vap->va_type = IXDR_GET_U_INT32(ptr);
 
-			if (vap->va_type < NF4REG ||
-			    vap->va_type > NF4NAMEDATTR)
+			if ((nfs_ftype4)vap->va_type < NF4REG ||
+			    (nfs_ftype4)vap->va_type > NF4NAMEDATTR)
 				vap->va_type = VBAD;
 			else
 				vap->va_type = nf4_to_vt[vap->va_type];
@@ -3946,15 +3949,14 @@ xdr_snfs_argop4_free(XDR *xdrs, nfs_argop4 **arrayp, int len)
 		 * These should be ordered by frequency of use
 		 */
 		switch (array[i].argop) {
-		case OP_PUTFH:
-			if (array[i].nfs_argop4_u.opputfh.object.nfs_fh4_val !=
-			    NULL) {
-				kmem_free(array[i].nfs_argop4_u.opputfh.object.
-				    nfs_fh4_val,
-				    array[i].nfs_argop4_u.opputfh.object.
-				    nfs_fh4_len);
+		case OP_PUTFH: {
+			nfs_fh4 *objp = &array[i].nfs_argop4_u.opputfh.object;
+
+			if (objp->nfs_fh4_val != NULL) {
+				kmem_free(objp->nfs_fh4_val, objp->nfs_fh4_len);
 			}
 			continue;
+		}
 		case OP_GETATTR:
 		case OP_GETFH:
 			continue;
@@ -5043,7 +5045,7 @@ xdr_COMPOUND4res_clnt(XDR *xdrs, COMPOUND4res_clnt *objp)
 		if (objp->array_len > objp->argsp->array_len)
 			return (FALSE);
 
-		if (objp->status == NFS_OK &&
+		if (objp->status == NFS4_OK &&
 		    objp->array_len != objp->argsp->array_len)
 			return (FALSE);
 

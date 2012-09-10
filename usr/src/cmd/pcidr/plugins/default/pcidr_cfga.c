@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <string.h>
 #include <sys/param.h>
 #include <assert.h>
@@ -65,7 +63,7 @@ pcidr_cfga_stat_name(cfga_stat_t val)
 
 
 static struct {
-	cfga_stat_t cmd;
+	cfga_cmd_t cmd;
 	char *name;
 } pcidr_cfga_cmd_nametab[] = {
 	{CFGA_CMD_NONE, "CFGA_CMD_NONE"},

@@ -38,8 +38,8 @@
 #include <inet/kstatcom.h>
 #include <inet/snmpcom.h>
 
-static int	tcp_kstat_update(kstat_t *kp, int rw);
-static int	tcp_kstat2_update(kstat_t *kp, int rw);
+static int	tcp_kstat_update(kstat_t *, int);
+static int	tcp_kstat2_update(kstat_t *, int);
 static void	tcp_sum_mib(tcp_stack_t *, mib2_tcp_t *);
 
 static void	tcp_add_mib(mib2_tcp_t *, mib2_tcp_t *);
@@ -817,7 +817,7 @@ tcp_kstat2_update(kstat_t *kp, int rw)
  * To add stats from one mib2_tcp_t to another.  Static fields are not added.
  * The caller should set them up propertly.
  */
-void
+static void
 tcp_add_mib(mib2_tcp_t *from, mib2_tcp_t *to)
 {
 	to->tcpActiveOpens += from->tcpActiveOpens;

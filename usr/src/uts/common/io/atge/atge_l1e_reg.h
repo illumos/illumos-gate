@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2012 Gary Mills
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -48,22 +50,28 @@ typedef	struct	rx_cmb {
 } rx_cmb_t;
 #pragma	pack()
 
+/* Master configuration */
+#define	L1E_MASTER_CFG			0x1400
+#define	L1E_MASTER_RESET		0x00000001
+#define	L1E_MASTER_MTIMER_ENB		0x00000002
+#define	L1E_MASTER_IM_TX_TIMER_ENB	0x00000004
+#define	L1E_MASTER_MANUAL_INT_ENB	0x00000008
+#define	L1E_MASTER_IM_RX_TIMER_ENB	0x00000020
+#define	L1E_MASTER_CHIP_REV_MASK	0x00FF0000
+#define	L1E_MASTER_CHIP_ID_MASK		0xFF000000
+#define	L1E_MASTER_CHIP_REV_SHIFT	16
+#define	L1E_MASTER_CHIP_ID_SHIFT	24
+
+
 /*
  * DMA CFG registers (L1E specific).
  */
 #define	DMA_CFG_RD_REQ_PRI		0x00000400
-#define	DMA_CFG_RD_DELAY_CNT_MASK	0x0000F800
-#define	DMA_CFG_WR_DELAY_CNT_MASK	0x000F0000
 #define	DMA_CFG_TXCMB_ENB		0x00100000
-#define	DMA_CFG_RXCMB_ENB		0x00200000
 #define	DMA_CFG_RD_BURST_MASK		0x07
 #define	DMA_CFG_RD_BURST_SHIFT		4
 #define	DMA_CFG_WR_BURST_MASK		0x07
 #define	DMA_CFG_WR_BURST_SHIFT		7
-#define	DMA_CFG_RD_DELAY_CNT_SHIFT	11
-#define	DMA_CFG_WR_DELAY_CNT_SHIFT	16
-#define	DMA_CFG_RD_DELAY_CNT_DEFAULT	15
-#define	DMA_CFG_WR_DELAY_CNT_DEFAULT	4
 
 #define	L1E_TX_RING_CNT_MIN		32
 #define	L1E_TX_RING_CNT_MAX		1020

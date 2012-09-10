@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ZONECFG 1M "Jul 29, 2009"
+.TH ZONECFG 1M "Aug 24, 2012"
 .SH NAME
 zonecfg \- set up zone configuration
 .SH SYNOPSIS
@@ -144,21 +144,6 @@ Device.
 .sp .6
 .RS 4n
 file-system
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBinherit-pkg-dir\fR\fR
-.ad
-.sp .6
-.RS 4n
-Directory inherited from the global zone. Used for sparse root zones (see the
-discussion of "Sparse and Whole Root Non-Global Zones," below). Software
-packages whose contents have been transferred into that directory are inherited
-in read-only mode by the non-global zone and the non-global zone's packaging
-database is updated to reflect those packages. Such resources are not
-modifiable or removable once a zone has been installed with \fBzoneadm\fR.
 .RE
 
 .sp

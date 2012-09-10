@@ -25,6 +25,8 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include "ixgbe_sw.h"
@@ -289,6 +291,36 @@ static adapter_info_t ixgbe_82599eb_cap = {
 	| IXGBE_FLAG_VMDQ_CAPABLE
 	| IXGBE_FLAG_RSC_CAPABLE
 	| IXGBE_FLAG_SFP_PLUG_CAPABLE) /* capability flags */
+};
+
+static adapter_info_t ixgbe_X540_cap = {
+	128,		/* maximum number of rx queues */
+	1,		/* minimum number of rx queues */
+	128,		/* default number of rx queues */
+	64,		/* maximum number of rx groups */
+	1,		/* minimum number of rx groups */
+	1,		/* default number of rx groups */
+	128,		/* maximum number of tx queues */
+	1,		/* minimum number of tx queues */
+	8,		/* default number of tx queues */
+	15500,		/* maximum MTU size */
+	0xFF8,		/* maximum interrupt throttle rate */
+	0,		/* minimum interrupt throttle rate */
+	200,		/* default interrupt throttle rate */
+	64,		/* maximum total msix vectors */
+	16,		/* maximum number of ring vectors */
+	2,		/* maximum number of other vectors */
+	(IXGBE_EICR_LSC
+	| IXGBE_EICR_GPI_SDP1
+	| IXGBE_EICR_GPI_SDP2), /* "other" interrupt types handled */
+
+	(IXGBE_SDP1_GPIEN
+	| IXGBE_SDP2_GPIEN), /* "other" interrupt types enable mask */
+
+	(IXGBE_FLAG_DCA_CAPABLE
+	| IXGBE_FLAG_RSS_CAPABLE
+	| IXGBE_FLAG_VMDQ_CAPABLE
+	| IXGBE_FLAG_RSC_CAPABLE) /* capability flags */
 };
 
 /*
@@ -867,6 +899,15 @@ ixgbe_identify_hardware(ixgbe_t *ixgbe)
 		}
 		break;
 
+	case ixgbe_mac_X540:
+		IXGBE_DEBUGLOG_0(ixgbe, "identify X540 adapter\n");
+		ixgbe->capab = &ixgbe_X540_cap;
+		/*
+		 * For now, X540 is all set in its capab structure.
+		 * As other X540 variants show up, things can change here.
+		 */
+		break;
+
 	default:
 		IXGBE_DEBUGLOG_1(ixgbe,
 		    "adapter not supported in ixgbe_identify_hardware(): %d\n",
@@ -1200,8 +1241,8 @@ ixgbe_init(ixgbe_t *ixgbe)
 	 * Setup default flow control thresholds - enable/disable
 	 * & flow control type is controlled by ixgbe.conf
 	 */
-	hw->fc.high_water = DEFAULT_FCRTH;
-	hw->fc.low_water = DEFAULT_FCRTL;
+	hw->fc.high_water[0] = DEFAULT_FCRTH;
+	hw->fc.low_water[0] = DEFAULT_FCRTL;
 	hw->fc.pause_time = DEFAULT_FCPAUSE;
 	hw->fc.send_xon = B_TRUE;
 
@@ -2090,13 +2131,14 @@ ixgbe_setup_rx_ring(ixgbe_rx_ring_t *rx_ring)
 	reg_val = IXGBE_READ_REG(hw, IXGBE_RXDCTL(rx_ring->hw_index));
 	reg_val |= IXGBE_RXDCTL_ENABLE;	/* enable queue */
 
-	/* Not a valid value for 82599 */
-	if (hw->mac.type < ixgbe_mac_82599EB) {
+	/* Not a valid value for 82599 or X540 */
+	if (hw->mac.type == ixgbe_mac_82598EB) {
 		reg_val |= 0x0020;	/* pthresh */
 	}
 	IXGBE_WRITE_REG(hw, IXGBE_RXDCTL(rx_ring->hw_index), reg_val);
 
-	if (hw->mac.type == ixgbe_mac_82599EB) {
+	if (hw->mac.type == ixgbe_mac_82599EB ||
+	    hw->mac.type == ixgbe_mac_X540) {
 		reg_val = IXGBE_READ_REG(hw, IXGBE_RDRXCTL);
 		reg_val |= (IXGBE_RDRXCTL_CRCSTRIP | IXGBE_RDRXCTL_AGGDIS);
 		IXGBE_WRITE_REG(hw, IXGBE_RDRXCTL, reg_val);
@@ -2333,11 +2375,18 @@ ixgbe_setup_tx_ring(ixgbe_tx_ring_t *tx_ring)
 		 * Turn off relaxed ordering for head write back or it will
 		 * cause problems with the tx recycling
 		 */
-		reg_val = IXGBE_READ_REG(hw,
-		    IXGBE_DCA_TXCTRL(tx_ring->index));
-		reg_val &= ~IXGBE_DCA_TXCTRL_TX_WB_RO_EN;
-		IXGBE_WRITE_REG(hw,
-		    IXGBE_DCA_TXCTRL(tx_ring->index), reg_val);
+
+		reg_val = (hw->mac.type == ixgbe_mac_82598EB) ?
+		    IXGBE_READ_REG(hw, IXGBE_DCA_TXCTRL(tx_ring->index)) :
+		    IXGBE_READ_REG(hw, IXGBE_DCA_TXCTRL_82599(tx_ring->index));
+		reg_val &= ~IXGBE_DCA_TXCTRL_DESC_WRO_EN;
+		if (hw->mac.type == ixgbe_mac_82598EB) {
+			IXGBE_WRITE_REG(hw,
+			    IXGBE_DCA_TXCTRL(tx_ring->index), reg_val);
+		} else {
+			IXGBE_WRITE_REG(hw,
+			    IXGBE_DCA_TXCTRL_82599(tx_ring->index), reg_val);
+		}
 	} else {
 		tx_ring->tbd_head_wb = NULL;
 	}
@@ -2386,6 +2435,7 @@ ixgbe_setup_tx(ixgbe_t *ixgbe)
 				break;
 
 			case ixgbe_mac_82599EB:
+			case ixgbe_mac_X540:
 				IXGBE_WRITE_REG(hw, IXGBE_TQSM(i >> 2),
 				    ring_mapping);
 				break;
@@ -2404,6 +2454,7 @@ ixgbe_setup_tx(ixgbe_t *ixgbe)
 			break;
 
 		case ixgbe_mac_82599EB:
+		case ixgbe_mac_X540:
 			IXGBE_WRITE_REG(hw, IXGBE_TQSM(i >> 2), ring_mapping);
 			break;
 
@@ -2420,13 +2471,22 @@ ixgbe_setup_tx(ixgbe_t *ixgbe)
 	IXGBE_WRITE_REG(hw, IXGBE_HLREG0, reg_val);
 
 	/*
-	 * enable DMA for 82599 parts
+	 * enable DMA for 82599 and X540 parts
 	 */
-	if (hw->mac.type == ixgbe_mac_82599EB) {
-	/* DMATXCTL.TE must be set after all Tx config is complete */
+	if (hw->mac.type == ixgbe_mac_82599EB ||
+	    hw->mac.type == ixgbe_mac_X540) {
+		/* DMATXCTL.TE must be set after all Tx config is complete */
 		reg_val = IXGBE_READ_REG(hw, IXGBE_DMATXCTL);
 		reg_val |= IXGBE_DMATXCTL_TE;
 		IXGBE_WRITE_REG(hw, IXGBE_DMATXCTL, reg_val);
+
+		/* Disable arbiter to set MTQC */
+		reg_val = IXGBE_READ_REG(hw, IXGBE_RTTDCS);
+		reg_val |= IXGBE_RTTDCS_ARBDIS;
+		IXGBE_WRITE_REG(hw, IXGBE_RTTDCS, reg_val);
+		IXGBE_WRITE_REG(hw, IXGBE_MTQC, IXGBE_MTQC_64Q_1PB);
+		reg_val &= ~IXGBE_RTTDCS_ARBDIS;
+		IXGBE_WRITE_REG(hw, IXGBE_RTTDCS, reg_val);
 	}
 
 	/*
@@ -2526,6 +2586,7 @@ ixgbe_setup_vmdq(ixgbe_t *ixgbe)
 		break;
 
 	case ixgbe_mac_82599EB:
+	case ixgbe_mac_X540:
 		/*
 		 * Enable VMDq-only.
 		 */
@@ -2619,6 +2680,7 @@ ixgbe_setup_vmdq_rss(ixgbe_t *ixgbe)
 		break;
 
 	case ixgbe_mac_82599EB:
+	case ixgbe_mac_X540:
 		/*
 		 * Enable RSS & Setup RSS Hash functions
 		 */
@@ -2664,7 +2726,8 @@ ixgbe_setup_vmdq_rss(ixgbe_t *ixgbe)
 	rxcsum &= ~IXGBE_RXCSUM_IPPCSE;
 	IXGBE_WRITE_REG(hw, IXGBE_RXCSUM, rxcsum);
 
-	if (hw->mac.type == ixgbe_mac_82599EB) {
+	if (hw->mac.type == ixgbe_mac_82599EB ||
+	    hw->mac.type == ixgbe_mac_X540) {
 		/*
 		 * Enable Virtualization and Replication.
 		 */
@@ -2839,7 +2902,7 @@ ixgbe_setup_multicst(ixgbe_t *ixgbe)
 	 * Update the multicast addresses to the MTA registers
 	 */
 	(void) ixgbe_update_mc_addr_list(hw, mc_addr_list, mc_addr_count,
-	    ixgbe_mc_table_itr);
+	    ixgbe_mc_table_itr, TRUE);
 }
 
 /*
@@ -2875,6 +2938,7 @@ ixgbe_setup_vmdq_rss_conf(ixgbe_t *ixgbe)
 		break;
 
 	case ixgbe_mac_82599EB:
+	case ixgbe_mac_X540:
 		/*
 		 * 82599 supports the following combination:
 		 * vmdq no. x rss no.
@@ -2883,6 +2947,8 @@ ixgbe_setup_vmdq_rss_conf(ixgbe_t *ixgbe)
 		 * 1 x [1..16]
 		 * However 8 rss queue per pool (vmdq) is sufficient for
 		 * most cases.
+		 *
+		 * For now, treat X540 like the 82599.
 		 */
 		ring_per_group = ixgbe->num_rx_rings / ixgbe->num_rx_groups;
 		if (ixgbe->num_rx_groups == 1) {
@@ -3045,8 +3111,9 @@ ixgbe_get_conf(ixgbe_t *ixgbe)
 	ixgbe->relax_order_enable = ixgbe_get_prop(ixgbe,
 	    PROP_RELAX_ORDER_ENABLE, 0, 1, DEFAULT_RELAX_ORDER_ENABLE);
 
-	/* Head Write Back not recommended for 82599 */
-	if (hw->mac.type >= ixgbe_mac_82599EB) {
+	/* Head Write Back not recommended for 82599 and X540 */
+	if (hw->mac.type == ixgbe_mac_82599EB ||
+	    hw->mac.type == ixgbe_mac_X540) {
 		ixgbe->tx_head_wb_enable = B_FALSE;
 	}
 
@@ -3069,9 +3136,9 @@ ixgbe_get_conf(ixgbe_t *ixgbe)
 	}
 
 	/*
-	 * ixgbe LRO only been supported by 82599 now
+	 * ixgbe LRO only been supported by 82599 and X540 now
 	 */
-	if (hw->mac.type != ixgbe_mac_82599EB) {
+	if (hw->mac.type == ixgbe_mac_82598EB) {
 		ixgbe->lro_enable = B_FALSE;
 	}
 	ixgbe->tx_copy_thresh = ixgbe_get_prop(ixgbe, PROP_TX_COPY_THRESHOLD,
@@ -3099,11 +3166,11 @@ ixgbe_get_conf(ixgbe_t *ixgbe)
 	    ixgbe->capab->max_intr_throttle,
 	    ixgbe->capab->def_intr_throttle);
 	/*
-	 * 82599 requires the interupt throttling rate is
+	 * 82599 and X540 require the interrupt throttling rate is
 	 * a multiple of 8. This is enforced by the register
 	 * definiton.
 	 */
-	if (hw->mac.type == ixgbe_mac_82599EB)
+	if (hw->mac.type == ixgbe_mac_82599EB || hw->mac.type == ixgbe_mac_X540)
 		ixgbe->intr_throttling[0] = ixgbe->intr_throttling[0] & 0xFF8;
 }
 
@@ -3229,7 +3296,7 @@ ixgbe_driver_link_check(ixgbe_t *ixgbe)
 		ixgbe->link_check_complete = B_TRUE;
 
 		/* Link is up, enable flow control settings */
-		(void) ixgbe_fc_enable(hw, 0);
+		(void) ixgbe_fc_enable(hw);
 
 		/*
 		 * The Link is up, check whether it was marked as down earlier
@@ -3732,10 +3799,10 @@ ixgbe_enable_adapter_interrupts(ixgbe_t *ixgbe)
 
 		/*
 		 * General purpose interrupt enable.
-		 * For 82599, extended interrupt automask enable
+		 * For 82599 or X540, extended interrupt automask enable
 		 * only in MSI or MSI-X mode
 		 */
-		if ((hw->mac.type < ixgbe_mac_82599EB) ||
+		if ((hw->mac.type == ixgbe_mac_82598EB) ||
 		    (ixgbe->intr_type == DDI_INTR_TYPE_MSI)) {
 			gpie |= IXGBE_GPIE_EIAME;
 		}
@@ -3748,6 +3815,7 @@ ixgbe_enable_adapter_interrupts(ixgbe_t *ixgbe)
 		break;
 
 	case ixgbe_mac_82599EB:
+	case ixgbe_mac_X540:
 		gpie |= ixgbe->capab->other_gpie;
 
 		/* Enable RSC Delay 8us when LRO enabled  */
@@ -3941,6 +4009,7 @@ ixgbe_set_internal_mac_loopback(ixgbe_t *ixgbe)
 		break;
 
 	case ixgbe_mac_82599EB:
+	case ixgbe_mac_X540:
 		reg = IXGBE_READ_REG(&ixgbe->hw, IXGBE_AUTOC);
 		reg |= (IXGBE_AUTOC_FLU |
 		    IXGBE_AUTOC_10G_KX4);
@@ -4159,6 +4228,7 @@ ixgbe_intr_legacy(void *arg1, void *arg2)
 				break;
 
 			case ixgbe_mac_82599EB:
+			case ixgbe_mac_X540:
 				ixgbe->eimc = IXGBE_82599_OTHER_INTR;
 				IXGBE_WRITE_REG(hw, IXGBE_EIMC, ixgbe->eimc);
 				break;
@@ -4252,6 +4322,7 @@ ixgbe_intr_msi(void *arg1, void *arg2)
 			break;
 
 		case ixgbe_mac_82599EB:
+		case ixgbe_mac_X540:
 			ixgbe->eimc = IXGBE_82599_OTHER_INTR;
 			IXGBE_WRITE_REG(hw, IXGBE_EIMC, ixgbe->eimc);
 			break;
@@ -4331,6 +4402,7 @@ ixgbe_intr_msix(void *arg1, void *arg2)
 				break;
 
 			case ixgbe_mac_82599EB:
+			case ixgbe_mac_X540:
 				ixgbe->eims |= IXGBE_EICR_RTX_QUEUE;
 				ixgbe_intr_other_work(ixgbe, eicr);
 				break;
@@ -4731,6 +4803,7 @@ ixgbe_setup_ivar(ixgbe_t *ixgbe, uint16_t intr_alloc_entry, uint8_t msix_vector,
 		break;
 
 	case ixgbe_mac_82599EB:
+	case ixgbe_mac_X540:
 		if (cause == -1) {
 			/* other causes */
 			msix_vector |= IXGBE_IVAR_ALLOC_VAL;
@@ -4784,6 +4857,7 @@ ixgbe_enable_ivar(ixgbe_t *ixgbe, uint16_t intr_alloc_entry, int8_t cause)
 		break;
 
 	case ixgbe_mac_82599EB:
+	case ixgbe_mac_X540:
 		if (cause == -1) {
 			/* other causes */
 			index = (intr_alloc_entry & 1) * 8;
@@ -4833,6 +4907,7 @@ ixgbe_disable_ivar(ixgbe_t *ixgbe, uint16_t intr_alloc_entry, int8_t cause)
 		break;
 
 	case ixgbe_mac_82599EB:
+	case ixgbe_mac_X540:
 		if (cause == -1) {
 			/* other causes */
 			index = (intr_alloc_entry & 1) * 8;
@@ -4875,6 +4950,7 @@ ixgbe_get_hw_rx_index(ixgbe_t *ixgbe, uint32_t sw_rx_index)
 			return (sw_rx_index);
 
 		case ixgbe_mac_82599EB:
+		case ixgbe_mac_X540:
 			return (sw_rx_index * 2);
 
 		default:
@@ -4890,6 +4966,7 @@ ixgbe_get_hw_rx_index(ixgbe_t *ixgbe, uint32_t sw_rx_index)
 			return (hw_rx_index);
 
 		case ixgbe_mac_82599EB:
+		case ixgbe_mac_X540:
 			if (ixgbe->num_rx_groups > 32) {
 				hw_rx_index = (sw_rx_index /
 				    rx_ring_per_group) * 2 +
@@ -4994,6 +5071,7 @@ ixgbe_setup_adapter_vector(ixgbe_t *ixgbe)
 		break;
 
 	case ixgbe_mac_82599EB:
+	case ixgbe_mac_X540:
 		for (v_idx = 0; v_idx < 64; v_idx++)
 			IXGBE_WRITE_REG(hw, IXGBE_IVAR(v_idx), 0);
 		IXGBE_WRITE_REG(hw, IXGBE_IVAR_MISC, 0);

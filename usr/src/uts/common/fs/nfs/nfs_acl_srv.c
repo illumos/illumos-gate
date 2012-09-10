@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -459,16 +461,8 @@ acl3_getacl(GETACL3args *args, GETACL3res *resp, struct exportinfo *exi,
 		goto out;
 	}
 
-#ifdef DEBUG
-	if (rfs3_do_post_op_attr) {
-		va.va_mask = AT_ALL;
-		vap = rfs4_delegated_getattr(vp, &va, 0, cr) ? NULL : &va;
-	} else
-		vap = NULL;
-#else
 	va.va_mask = AT_ALL;
 	vap = rfs4_delegated_getattr(vp, &va, 0, cr) ? NULL : &va;
-#endif
 
 	bzero((caddr_t)&resp->resok.acl, sizeof (resp->resok.acl));
 
@@ -498,16 +492,8 @@ acl3_getacl(GETACL3args *args, GETACL3res *resp, struct exportinfo *exi,
 	if (error)
 		goto out;
 
-#ifdef DEBUG
-	if (rfs3_do_post_op_attr) {
-		va.va_mask = AT_ALL;
-		vap = rfs4_delegated_getattr(vp, &va, 0, cr) ? NULL : &va;
-	} else
-		vap = NULL;
-#else
 	va.va_mask = AT_ALL;
 	vap = rfs4_delegated_getattr(vp, &va, 0, cr) ? NULL : &va;
-#endif
 
 	VN_RELE(vp);
 
@@ -588,16 +574,8 @@ acl3_setacl(SETACL3args *args, SETACL3res *resp, struct exportinfo *exi,
 
 	(void) VOP_RWLOCK(vp, V_WRITELOCK_TRUE, NULL);
 
-#ifdef DEBUG
-	if (rfs3_do_post_op_attr) {
-		va.va_mask = AT_ALL;
-		vap = rfs4_delegated_getattr(vp, &va, 0, cr) ? NULL : &va;
-	} else
-		vap = NULL;
-#else
 	va.va_mask = AT_ALL;
 	vap = rfs4_delegated_getattr(vp, &va, 0, cr) ? NULL : &va;
-#endif
 
 	if (rdonly(exi, req) || vn_is_readonly(vp)) {
 		resp->status = NFS3ERR_ROFS;
@@ -606,16 +584,8 @@ acl3_setacl(SETACL3args *args, SETACL3res *resp, struct exportinfo *exi,
 
 	error = VOP_SETSECATTR(vp, &args->acl, 0, cr, NULL);
 
-#ifdef DEBUG
-	if (rfs3_do_post_op_attr) {
-		va.va_mask = AT_ALL;
-		vap = rfs4_delegated_getattr(vp, &va, 0, cr) ? NULL : &va;
-	} else
-		vap = NULL;
-#else
 	va.va_mask = AT_ALL;
 	vap = rfs4_delegated_getattr(vp, &va, 0, cr) ? NULL : &va;
-#endif
 
 	if (error)
 		goto out;

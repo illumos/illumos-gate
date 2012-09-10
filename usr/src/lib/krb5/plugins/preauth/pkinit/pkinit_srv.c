@@ -789,8 +789,9 @@ pkinit_server_return_padata(krb5_context context,
     }
 
     /* if this DH, then process finish computing DH key */
-    if (rep != NULL && (rep->choice == choice_pa_pk_as_rep_dhInfo ||
-	    rep->choice == choice_pa_pk_as_rep_draft9_dhSignedData)) {
+    if (((rep != NULL) && (rep->choice == choice_pa_pk_as_rep_dhInfo)) ||
+	((rep9 != NULL) && rep9->choice ==
+	    choice_pa_pk_as_rep_draft9_dhSignedData)) {
 	pkiDebug("received DH key delivery AS REQ\n");
 	retval = server_process_dh(context, plgctx->cryptoctx,
 	    reqctx->cryptoctx, plgctx->idctx, subjectPublicKey,

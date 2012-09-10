@@ -452,11 +452,11 @@ assfail3(const char *assertion, uintmax_t lv, const char *op, uintmax_t rv,
 {
 	char buf[1000];
 	(void) strcpy(buf, assertion);
-	(void) strcat(buf, " (0x");
+	(void) strcat(buf, " (");
 	ultos((uint64_t)lv, 16, buf + strlen(buf));
 	(void) strcat(buf, " ");
 	(void) strcat(buf, op);
-	(void) strcat(buf, " 0x");
+	(void) strcat(buf, " ");
 	ultos((uint64_t)rv, 16, buf + strlen(buf));
 	(void) strcat(buf, ")");
 	__assfail(buf, filename, line_num);

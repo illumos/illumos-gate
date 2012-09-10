@@ -48,7 +48,7 @@ extern "C" {
  *
  * TCP_DBGSTAT(name) does atomic increment of a named stat counter. It is
  * supposed to be used for DEBUG purposes and may be used on a hot path.
- * These counters are only available in a debugged kerel.  They are grouped
+ * These counters are only available in a debugged kernel.  They are grouped
  * under the TCP_DEBUG_COUNTER C pre-processor condition.
  *
  * Both TCP_STAT and TCP_DBGSTAT counters are available using kstat

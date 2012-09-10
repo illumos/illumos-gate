@@ -49,6 +49,7 @@ int     sig;
     exit(0);
 }
 
+int
 main(argc, argv)
 int     argc;
 char  **argv;

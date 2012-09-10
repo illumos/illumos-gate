@@ -143,7 +143,6 @@ softmac_destructor(void *buf, void *arg)
 	ASSERT(softmac->smac_mh == NULL);
 	ASSERT(softmac->smac_softmac[0] == NULL &&
 	    softmac->smac_softmac[1] == NULL);
-	ASSERT(softmac->smac_state == SOFTMAC_INITIALIZED);
 	ASSERT(softmac->smac_lower == NULL);
 	ASSERT(softmac->smac_active == B_FALSE);
 	ASSERT(softmac->smac_nactive == 0);

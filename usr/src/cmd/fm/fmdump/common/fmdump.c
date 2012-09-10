@@ -18,8 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <alloca.h>
@@ -262,35 +264,27 @@ gettimeopt(const char *arg)
 	/*
 	 * First try a variety of strptime() calls.  If these all fail, we'll
 	 * try parsing an integer followed by one of our suffix[] strings.
-	 * NOTE: any form using %y must appear *before* the equivalent %Y form;
-	 * otherwise %Y will accept the two year digits but infer century zero.
-	 * Any form ending in %y must additionally check isdigit(*p) to ensure
-	 * that it does not inadvertently match 2 digits of a 4-digit year.
-	 *
-	 * Beware: Any strptime() sequence containing consecutive %x sequences
-	 * may fall victim to SCCS expanding it as a keyword!  If this happens
-	 * we use separate string constant that ANSI C will concatenate.
 	 */
-	if ((p = strptime(arg, "%m/%d/%y" "%t" "%H:%M:%S", &tm)) == NULL &&
-	    (p = strptime(arg, "%m/%d/%Y" "%t" "%H:%M:%S", &tm)) == NULL &&
-	    (p = strptime(arg, "%m/%d/%y" "%t" "%H:%M", &tm)) == NULL &&
-	    (p = strptime(arg, "%m/%d/%Y" "%t" "%H:%M", &tm)) == NULL &&
-	    ((p = strptime(arg, "%m/%d/%y", &tm)) == NULL || isdigit(*p)) &&
+	if ((p = strptime(arg, "%m/%d/%Y %H:%M:%S", &tm)) == NULL &&
+	    (p = strptime(arg, "%m/%d/%y %H:%M:%S", &tm)) == NULL &&
+	    (p = strptime(arg, "%m/%d/%Y %H:%M", &tm)) == NULL &&
+	    (p = strptime(arg, "%m/%d/%y %H:%M", &tm)) == NULL &&
 	    (p = strptime(arg, "%m/%d/%Y", &tm)) == NULL &&
-	    (p = strptime(arg, "%y-%m-%dT%H:%M:%S", &tm)) == NULL &&
+	    (p = strptime(arg, "%m/%d/%y", &tm)) == NULL &&
 	    (p = strptime(arg, "%Y-%m-%dT%H:%M:%S", &tm)) == NULL &&
-	    (p = strptime(arg, "%y-%m-%dT%H:%M", &tm)) == NULL &&
+	    (p = strptime(arg, "%y-%m-%dT%H:%M:%S", &tm)) == NULL &&
 	    (p = strptime(arg, "%Y-%m-%dT%H:%M", &tm)) == NULL &&
-	    (p = strptime(arg, "%y-%m-%d", &tm)) == NULL &&
+	    (p = strptime(arg, "%y-%m-%dT%H:%M", &tm)) == NULL &&
 	    (p = strptime(arg, "%Y-%m-%d", &tm)) == NULL &&
-	    (p = strptime(arg, "%d%b%y" "%t" "%H:%M:%S", &tm)) == NULL &&
-	    (p = strptime(arg, "%d%b%Y" "%t" "%H:%M:%S", &tm)) == NULL &&
-	    (p = strptime(arg, "%d%b%y" "%t" "%H:%M", &tm)) == NULL &&
-	    (p = strptime(arg, "%d%b%Y" "%t" "%H:%M", &tm)) == NULL &&
-	    ((p = strptime(arg, "%d%b%y", &tm)) == NULL || isdigit(*p)) &&
+	    (p = strptime(arg, "%y-%m-%d", &tm)) == NULL &&
+	    (p = strptime(arg, "%d%b%Y %H:%M:%S", &tm)) == NULL &&
+	    (p = strptime(arg, "%d%b%y %H:%M:%S", &tm)) == NULL &&
+	    (p = strptime(arg, "%d%b%Y %H:%M", &tm)) == NULL &&
+	    (p = strptime(arg, "%d%b%y %H:%M", &tm)) == NULL &&
 	    (p = strptime(arg, "%d%b%Y", &tm)) == NULL &&
-	    (p = strptime(arg, "%b%t%d" "%t" "%H:%M:%S", &tm)) == NULL &&
-	    (p = strptime(arg, "%b%t%d" "%t" "%H:%M:%S", &tm)) == NULL &&
+	    (p = strptime(arg, "%d%b%y", &tm)) == NULL &&
+	    (p = strptime(arg, "%b %d %H:%M:%S", &tm)) == NULL &&
+	    (p = strptime(arg, "%b %d %H:%M:%S", &tm)) == NULL &&
 	    (p = strptime(arg, "%H:%M:%S", &tm)) == NULL &&
 	    (p = strptime(arg, "%H:%M", &tm)) == NULL) {
 

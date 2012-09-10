@@ -24,7 +24,9 @@
  * Use is subject to license terms.
  */
 
-/* Copyright (c) 2011 by Delphix. All rights reserved. */
+/*
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ */
 
 #include <sys/thread.h>
 #include <sys/proc.h>
@@ -481,6 +483,21 @@ cv_timedwait_sig(kcondvar_t *cvp, kmutex_t *mp, clock_t tim)
 }
 
 /*
+ * Wait until the specified time.
+ * If tim == -1, waits without timeout using cv_wait_sig_swap().
+ */
+int
+cv_timedwait_sig_hrtime(kcondvar_t *cvp, kmutex_t *mp, hrtime_t tim)
+{
+	if (tim == -1) {
+		return (cv_wait_sig_swap(cvp, mp));
+	} else {
+		return (cv_timedwait_sig_hires(cvp, mp, tim, 1,
+		    CALLOUT_FLAG_ABSOLUTE | CALLOUT_FLAG_ROUNDUP));
+	}
+}
+
+/*
  * Same as cv_timedwait_sig() except that the third argument is a relative
  * timeout value, as opposed to an absolute one. There is also a fourth
  * argument that specifies how accurately the timeout must be implemented.
@@ -499,30 +516,6 @@ cv_reltimedwait_sig(kcondvar_t *cvp, kmutex_t *mp, clock_t delta,
 	}
 
 	return (cv_timedwait_sig_hires(cvp, mp, exp, time_res[res], 0));
-}
-
-/*
- * Same as cv_reltimedwait_sig() except that the timeout is optional. If
- * there is no timeout then the function will block until woken up
- * or interrupted.
- */
-clock_t
-cv_relwaituntil_sig(kcondvar_t *cvp, kmutex_t *mp, clock_t *delta,
-    time_res_t res)
-{
-	/*
-	 * If there is no timeout specified wait indefinitely for a
-	 * signal or a wakeup.
-	 */
-	if (delta == NULL) {
-		return (cv_wait_sig_swap(cvp, mp));
-	}
-
-	/*
-	 * cv_reltimedwait_sig will wait for the relative timeout
-	 * specified by delta.
-	 */
-	return (cv_reltimedwait_sig(cvp, mp, *delta, res));
 }
 
 /*
@@ -766,6 +759,10 @@ cv_wait_stop(kcondvar_t *cvp, kmutex_t *mp, int wakeup_time)
  * so the caller can return a premature timeout to the calling process
  * so it can reevaluate the situation in light of the new system time.
  * (The system clock has been reset if timecheck != timechanged.)
+ *
+ * Generally, cv_timedwait_sig_hrtime() should be used instead of this
+ * routine.  It waits based on hrtime rather than wall-clock time and therefore
+ * does not need to deal with the time changing.
  */
 int
 cv_waituntil_sig(kcondvar_t *cvp, kmutex_t *mp,

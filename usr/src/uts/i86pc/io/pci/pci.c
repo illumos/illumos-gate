@@ -545,6 +545,7 @@ pci_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	int	totreg;
 	pci_state_t *pcip;
 	struct  attachspec *asp;
+	struct  detachspec *dsp;
 
 	switch (ctlop) {
 	case DDI_CTLOPS_REPORTDEV:
@@ -622,8 +623,8 @@ pci_ctlops(dev_info_t *dip, dev_info_t *rdip,
 		return (ddi_ctlops(dip, rdip, ctlop, arg, result));
 
 	case DDI_CTLOPS_DETACH:
-		asp = (struct attachspec *)arg;
-		if (asp->cmd == DDI_SUSPEND && asp->when == DDI_POST)
+		dsp = (struct detachspec *)arg;
+		if (dsp->cmd == DDI_SUSPEND && dsp->when == DDI_POST)
 			if (pci_post_suspend(rdip) != DDI_SUCCESS)
 				return (DDI_FAILURE);
 		return (ddi_ctlops(dip, rdip, ctlop, arg, result));

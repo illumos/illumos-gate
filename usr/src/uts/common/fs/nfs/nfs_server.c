@@ -1453,11 +1453,11 @@ auth_tooweak(struct svc_req *req, char *res)
 
 	if (req->rq_vers == NFS_VERSION && req->rq_proc == RFS_LOOKUP) {
 		struct nfsdiropres *dr = (struct nfsdiropres *)res;
-		if (dr->dr_status == WNFSERR_CLNT_FLAVOR)
+		if ((enum wnfsstat)dr->dr_status == WNFSERR_CLNT_FLAVOR)
 			return (TRUE);
 	} else if (req->rq_vers == NFS_V3 && req->rq_proc == NFSPROC3_LOOKUP) {
 		LOOKUP3res *resp = (LOOKUP3res *)res;
-		if (resp->status == WNFSERR_CLNT_FLAVOR)
+		if ((enum wnfsstat)resp->status == WNFSERR_CLNT_FLAVOR)
 			return (TRUE);
 	}
 	return (FALSE);

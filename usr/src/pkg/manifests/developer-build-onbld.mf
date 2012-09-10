@@ -59,7 +59,6 @@ dir path=opt/onbld/lib/python2.6/onbld/Scm
 dir path=opt/onbld/lib/python2.6/onbld/hgext
 dir path=opt/onbld/man
 dir path=opt/onbld/man/man1
-dir path=opt/onbld/man/sman1
 $(i386_ONLY)file path=opt/onbld/bin/$(ARCH)/aw mode=0555
 $(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/chk4ubin mode=0555
 file path=opt/onbld/bin/$(ARCH)/codereview mode=0555
@@ -236,6 +235,7 @@ file path=opt/onbld/man/man1/cw.1
 file path=opt/onbld/man/man1/find_elf.1
 file path=opt/onbld/man/man1/findunref.1
 file path=opt/onbld/man/man1/flg.flp.1
+file path=opt/onbld/man/man1/get_depend_info.1
 file path=opt/onbld/man/man1/git-pbchk.1
 file path=opt/onbld/man/man1/hdrchk.1
 file path=opt/onbld/man/man1/hgsetup.1
@@ -243,6 +243,7 @@ file path=opt/onbld/man/man1/interface_check.1
 file path=opt/onbld/man/man1/interface_cmp.1
 file path=opt/onbld/man/man1/jstyle.1
 file path=opt/onbld/man/man1/lintdump.1
+file path=opt/onbld/man/man1/make_pkg_db.1
 file path=opt/onbld/man/man1/mapfilechk.1
 file path=opt/onbld/man/man1/ndrgen.1
 file path=opt/onbld/man/man1/nightly.1
@@ -255,8 +256,6 @@ file path=opt/onbld/man/man1/which_scm.1
 file path=opt/onbld/man/man1/ws.1
 file path=opt/onbld/man/man1/wsdiff.1
 file path=opt/onbld/man/man1/xref.1
-file path=opt/onbld/man/sman1/get_depend_info.1
-file path=opt/onbld/man/sman1/make_pkg_db.1
 hardlink path=opt/onbld/bin/$(ARCH)/install.bin target=./install
 legacy pkg=SUNWonbld desc="tools used to build the OS-Net consolidation" \
     name="OS-Net Build Tools" version=11.11,REV=2009.10.22

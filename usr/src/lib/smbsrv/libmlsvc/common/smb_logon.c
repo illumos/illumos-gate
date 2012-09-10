@@ -308,7 +308,9 @@ smb_token_create_privs(smb_token_t *token)
 	smb_lgrp_iterclose(&gi);
 
 	if (token->tkn_flags & SMB_ATF_ADMIN) {
-		rc = smb_lgrp_getbyname("Administrators", &grp);
+		char admgrp[] = "Administrators";
+
+		rc = smb_lgrp_getbyname(admgrp, &grp);
 		if (rc == SMB_LGRP_SUCCESS) {
 			smb_privset_merge(privs, grp.sg_privs);
 			smb_lgrp_free(&grp);

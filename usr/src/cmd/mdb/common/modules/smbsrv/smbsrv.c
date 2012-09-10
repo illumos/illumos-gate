@@ -1237,7 +1237,7 @@ smb_dcmd_ofile(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		if (opts & SMB_OPT_VERBOSE) {
 			const char	*state;
 
-			if (of->f_state >= SMB_ODIR_STATE_SENTINEL)
+			if (of->f_state >= SMB_OFILE_STATE_SENTINEL)
 				state = "INVALID";
 			else
 				state = smb_ofile_state[of->f_state];

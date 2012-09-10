@@ -591,7 +591,8 @@ xdr_fattr3_to_vattr(XDR *xdrs, fattr3_res *objp)
 		 * Common case
 		 */
 		vap->va_type = IXDR_GET_ENUM(ptr, enum vtype);
-		if (vap->va_type < NF3REG || vap->va_type > NF3FIFO)
+		if ((ftype3)vap->va_type < NF3REG ||
+		    (ftype3)vap->va_type > NF3FIFO)
 			vap->va_type = VBAD;
 		else
 			vap->va_type = nf3_to_vt[vap->va_type];
@@ -745,7 +746,8 @@ xdr_fattr3_to_vattr(XDR *xdrs, fattr3_res *objp)
 		/*
 		 * Fixup as needed
 		 */
-		if (vap->va_type < NF3REG || vap->va_type > NF3FIFO)
+		if ((ftype3)vap->va_type < NF3REG ||
+		    (ftype3)vap->va_type > NF3FIFO)
 			vap->va_type = VBAD;
 		else
 			vap->va_type = nf3_to_vt[vap->va_type];

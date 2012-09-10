@@ -24,9 +24,12 @@
  * Use is subject to license terms.
  */
 
-/* Copyright (c) 2011 by Delphix. All rights reserved. */
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
+
+/*
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ */
 
 /*
  * Portions of this source code were derived from Berkeley 4.3 BSD
@@ -288,9 +291,7 @@ poll_common(pollfd_t *fds, nfds_t nfds, timespec_t *tsp, k_sigset_t *ksetp)
 	proc_t *p = ttoproc(t);
 	int fdcnt = 0;
 	int i;
-	int imm_timeout = 0;
-	clock_t *deltap = NULL;
-	clock_t delta;
+	hrtime_t deadline; /* hrtime value when we want to return */
 	pollfd_t *pollfdp;
 	pollstate_t *ps;
 	pollcache_t *pcp;
@@ -301,24 +302,15 @@ poll_common(pollfd_t *fds, nfds_t nfds, timespec_t *tsp, k_sigset_t *ksetp)
 	/*
 	 * Determine the precise future time of the requested timeout, if any.
 	 */
-	if (tsp != NULL) {
-		if (tsp->tv_sec == 0 && tsp->tv_nsec == 0) {
-			imm_timeout = 1;
-		} else {
-			/*
-			 * cv_relwaituntil_sig operates at
-			 * the tick granularity, which by default is 10 ms.
-			 * Convert the specified timespec to ticks, rounding
-			 * up to at least 1 tick to avoid flooding the
-			 * system with small high resolution timers.
-			 */
-			delta = SEC_TO_TICK(tsp->tv_sec) +
-			    NSEC_TO_TICK(tsp->tv_nsec);
-			if (delta < 1) {
-				delta = 1;
-			}
-			deltap = &delta;
-		}
+	if (tsp == NULL) {
+		deadline = -1;
+	} else if (tsp->tv_sec == 0 && tsp->tv_nsec == 0) {
+		deadline = 0;
+	} else {
+		/* They must wait at least a tick. */
+		deadline = tsp->tv_sec * NANOSEC + tsp->tv_nsec;
+		deadline = MAX(deadline, nsec_per_tick);
+		deadline += gethrtime();
 	}
 
 	/*
@@ -351,16 +343,15 @@ poll_common(pollfd_t *fds, nfds_t nfds, timespec_t *tsp, k_sigset_t *ksetp)
 		/*
 		 * Sleep until we have passed the requested future
 		 * time or until interrupted by a signal.
-		 * Do not check for signals if we have a zero timeout.
+		 * Do not check for signals if we do not want to wait.
 		 */
-		if (!imm_timeout) {
+		if (deadline != 0) {
 			mutex_enter(&t->t_delay_lock);
-			while ((delta = cv_relwaituntil_sig(&t->t_delay_cv,
-			    &t->t_delay_lock, deltap, TR_MILLISEC)) > 0)
+			while ((error = cv_timedwait_sig_hrtime(&t->t_delay_cv,
+			    &t->t_delay_lock, deadline)) > 0)
 				continue;
 			mutex_exit(&t->t_delay_lock);
-			if (delta == 0)
-				error = EINTR;
+			error = (error == 0) ? EINTR : 0;
 		}
 		goto pollout;
 	}
@@ -550,20 +541,19 @@ poll_common(pollfd_t *fds, nfds_t nfds, timespec_t *tsp, k_sigset_t *ksetp)
 		 * Do not check for signals if we have a zero timeout.
 		 */
 		mutex_exit(&ps->ps_lock);
-		if (imm_timeout) {
-			delta = -1;
+		if (deadline == 0) {
+			error = -1;
 		} else {
-			delta = cv_relwaituntil_sig(&pcp->pc_cv, &pcp->pc_lock,
-			    deltap, TR_MILLISEC);
+			error = cv_timedwait_sig_hrtime(&pcp->pc_cv,
+			    &pcp->pc_lock, deadline);
 		}
 		mutex_exit(&pcp->pc_lock);
 		/*
 		 * If we have received a signal or timed out
 		 * then break out and return.
 		 */
-		if (delta <= 0) {
-			if (delta == 0)
-				error = EINTR;
+		if (error <= 0) {
+			error = (error == 0) ? EINTR : 0;
 			break;
 		}
 		/*

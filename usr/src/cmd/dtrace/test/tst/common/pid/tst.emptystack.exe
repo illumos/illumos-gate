@@ -24,6 +24,13 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
-exec find / > /dev/null 2>&1
+#
+# Copyright (c) 2012 by Delphix. All rights reserved.
+#
+
+#
+# For this test we simply require a process that will generate a bunch of
+# activity and run for a little while.
+#
+exec find / -type f -exec sleep 1 \; >/dev/null 2>&1

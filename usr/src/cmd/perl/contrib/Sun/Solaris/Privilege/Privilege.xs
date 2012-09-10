@@ -11,7 +11,7 @@
 #include "perl.h"
 #include "XSUB.h"
 
-#define	IVCONST(s, c)	newCONSTSUB(s, #c, newSViv((int)c));
+#define	IVCONST(s, c)	newCONSTSUB(s, #c, newSViv((int)(intptr_t)c));
 #define	POFF		(sizeof ("PRIV_") - 1)
 
 #define	RETPRIVSET(set)		\

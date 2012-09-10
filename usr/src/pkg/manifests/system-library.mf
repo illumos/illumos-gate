@@ -528,6 +528,9 @@ license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license lic_OSBL license=lic_OSBL
 license lic_OSBL_preamble license=lic_OSBL_preamble
+# libwrap is part of tcp wrappers along with tcpd
+license usr/src/cmd/tcpd/THIRDPARTYLICENSE \
+    license=usr/src/cmd/tcpd/THIRDPARTYLICENSE
 license usr/src/common/crypto/THIRDPARTYLICENSE.cryptogams \
     license=usr/src/common/crypto/THIRDPARTYLICENSE.cryptogams
 license usr/src/common/crypto/aes/amd64/THIRDPARTYLICENSE.gladman \
@@ -566,8 +569,6 @@ license usr/src/lib/libshell/THIRDPARTYLICENSE \
     license=usr/src/lib/libshell/THIRDPARTYLICENSE
 license usr/src/lib/libsum/THIRDPARTYLICENSE \
     license=usr/src/lib/libsum/THIRDPARTYLICENSE
-license usr/src/lib/libwrap/THIRDPARTYLICENSE \
-    license=usr/src/lib/libwrap/THIRDPARTYLICENSE
 license usr/src/lib/pam_modules/authtok_check/THIRDPARTYLICENSE \
     license=usr/src/lib/pam_modules/authtok_check/THIRDPARTYLICENSE
 license usr/src/lib/passwdutil/THIRDPARTYLICENSE \

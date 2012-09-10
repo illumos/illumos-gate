@@ -1695,7 +1695,7 @@ cfga_list_ext(
 
 	} else {
 		/* This is an empty port */
-		if (get_port_num(ap_id, &port) != SATA_CFGA_OK) {
+		if (get_port_num(ap_id, &port) != CFGA_SATA_OK) {
 			goto bailout;
 		}
 

@@ -26,6 +26,9 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ */
 
 #ifndef	_IXGBE_OSDEP_H
 #define	_IXGBE_OSDEP_H
@@ -53,6 +56,9 @@ extern "C" {
 #include <sys/atomic.h>
 #include <sys/note.h>
 #include "ixgbe_debug.h"
+
+/* Cheesy hack for EWARN() */
+#define	EWARN(H, W, S) cmn_err(CE_NOTE, W)
 
 /* function declarations */
 struct ixgbe_hw;
@@ -100,7 +106,21 @@ void ixgbe_write_pci_cfg(struct ixgbe_hw *, uint32_t, uint32_t);
 #define	IXGBE_NTOHL	ntohl
 #define	IXGBE_NTOHS	ntohs
 
-#define	UNREFERENCED_PARAMETER(x)	_NOTE(ARGUNUSED(x))
+#ifdef _BIG_ENDIAN
+#define IXGBE_CPU_TO_LE32	BSWAP_32
+#define IXGBE_LE32_TO_CPUS 	BSWAP_32
+#else
+#define IXGBE_CPU_TO_LE32(x)	(x)
+#define IXGBE_LE32_TO_CPUS(x)	(x)
+#endif	/* _BIG_ENDIAN */
+
+#define	UNREFERENCED_PARAMETER(x)		_NOTE(ARGUNUSED(x))
+#define UNREFERENCED_1PARAMETER(_p)		UNREFERENCED_PARAMETER(_p)
+#define UNREFERENCED_2PARAMETER(_p, _q)		_NOTE(ARGUNUSED(_p, _q))
+#define UNREFERENCED_3PARAMETER(_p, _q, _r)	_NOTE(ARGUNUSED(_p, _q, _r))
+#define UNREFERENCED_4PARAMETER(_p, _q, _r, _s)	_NOTE(ARGUNUSED(_p, _q,_r, _s))
+
+
 
 typedef	int8_t		s8;
 typedef	int16_t		s16;

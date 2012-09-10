@@ -536,6 +536,33 @@ exec_method(const restarter_inst_t *inst, int type, const char *method,
 			exit(SMF_EXIT_ERR_CONFIG);
 		}
 
+		if (errf != NULL && strcmp(errf, "chdir") == 0) {
+			switch (rsmc_errno) {
+			case EACCES:
+			case EFAULT:
+			case EIO:
+			case ELOOP:
+			case ENAMETOOLONG:
+			case ENOENT:
+			case ENOLINK:
+			case ENOTDIR:
+				log_instance(inst, B_FALSE, "%s: %s (\"%s\")",
+				    errf,
+				    strerror(rsmc_errno), mcp->working_dir);
+				break;
+
+			default:
+#ifndef NDEBUG
+				uu_warn("%s:%d: Bad error %d for function %s "
+				    "in restarter_set_method_context().\n",
+				    __FILE__, __LINE__, rsmc_errno, errf);
+#endif
+				abort();
+			}
+
+			exit(SMF_EXIT_ERR_CONFIG);
+		}
+
 		if (errf != NULL) {
 			errno = rsmc_errno;
 			perror(errf);

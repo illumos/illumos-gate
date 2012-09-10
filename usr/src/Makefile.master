@@ -403,8 +403,11 @@ amd64_AS_XARCH=		-xarch=amd64 -P -Ui386 -U__i386
 #
 sparc_STAND_FLAGS=	-_gcc=-ffreestanding
 sparcv9_STAND_FLAGS=	-_gcc=-ffreestanding
-i386_STAND_FLAGS=	-_gcc=-ffreestanding
-amd64_STAND_FLAGS=	-xmodel=kernel
+# Disabling MMX also disables 3DNow, disabling SSE also disables all later
+# additions to SSE (SSE2, AVX ,etc.)
+NO_SIMD=		-_gcc=-mno-mmx -_gcc=-mno-sse
+i386_STAND_FLAGS=	-_gcc=-ffreestanding $(NO_SIMD)
+amd64_STAND_FLAGS=	-xmodel=kernel $(NO_SIMD)
 
 SAVEARGS=		-Wu,-save_args
 amd64_STAND_FLAGS	+= $(SAVEARGS)
