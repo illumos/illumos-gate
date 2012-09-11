@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -230,7 +231,7 @@ smb_com_search(smb_request_t *sr)
 	smb_odir_t		*od;
 	smb_fileinfo_t		fileinfo;
 	smb_odir_resume_t	odir_resume;
-	boolean_t		eos;
+	uint16_t		eos;
 
 	to_upper = B_FALSE;
 	if ((sr->session->dialect <= LANMAN1_0) ||
@@ -328,7 +329,7 @@ smb_com_search(smb_request_t *sr)
 
 	while (count < maxcount) {
 		rc = smb_odir_read_fileinfo(sr, od, &fileinfo, &eos);
-		if ((rc != 0 || (eos == B_TRUE)))
+		if (rc != 0 || eos != 0)
 			break;
 
 		if (*fileinfo.fi_shortname == '\0') {
@@ -407,7 +408,7 @@ smb_com_find(smb_request_t *sr)
 	char			name83[SMB_SHORTNAMELEN];
 	smb_odir_t		*od;
 	smb_fileinfo_t		fileinfo;
-	boolean_t		eos;
+	uint16_t		eos;
 
 	smb_pathname_t		*pn;
 	unsigned char		resume_char;
@@ -474,7 +475,7 @@ smb_com_find(smb_request_t *sr)
 
 	while (count < maxcount) {
 		rc = smb_odir_read_fileinfo(sr, od, &fileinfo, &eos);
-		if ((rc != 0 || (eos == B_TRUE)))
+		if (rc != 0 || eos != 0)
 			break;
 
 		if (*fileinfo.fi_shortname == '\0') {
@@ -618,7 +619,7 @@ smb_com_find_unique(struct smb_request *sr)
 	char			name83[SMB_SHORTNAMELEN];
 	smb_odir_t		*od;
 	smb_fileinfo_t		fileinfo;
-	boolean_t		eos;
+	uint16_t		eos;
 	smb_vdb_t		*vdb;
 
 	if (smbsr_decode_vwv(sr, "ww", &maxcount, &sattr) != 0)
@@ -660,7 +661,7 @@ smb_com_find_unique(struct smb_request *sr)
 
 	while (count < maxcount) {
 		rc = smb_odir_read_fileinfo(sr, od, &fileinfo, &eos);
-		if ((rc != 0 || (eos == B_TRUE)))
+		if (rc != 0 || eos != 0)
 			break;
 
 		if (*fileinfo.fi_shortname == '\0') {

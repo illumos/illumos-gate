@@ -588,11 +588,13 @@ void smb_odir_delete(void *);
 int smb_odir_read(smb_request_t *, smb_odir_t *,
     smb_odirent_t *, boolean_t *);
 int smb_odir_read_fileinfo(smb_request_t *, smb_odir_t *,
-    smb_fileinfo_t *, boolean_t *);
+    smb_fileinfo_t *, uint16_t *);
 int smb_odir_read_streaminfo(smb_request_t *, smb_odir_t *,
     smb_streaminfo_t *, boolean_t *);
 
 void smb_odir_save_cookie(smb_odir_t *, int, uint32_t cookie);
+void smb_odir_save_fname(smb_odir_t *, uint32_t, const char *);
+
 void smb_odir_resume_at(smb_odir_t *, smb_odir_resume_t *);
 
 /*
