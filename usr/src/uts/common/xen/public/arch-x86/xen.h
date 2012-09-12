@@ -49,7 +49,7 @@
 #define get_xen_guest_handle(val, hnd)  do { val = (hnd).p; } while (0)
 #endif
 
-#if defined(__i386__)
+#if defined(__i386)
 #include "xen-x86_32.h"
 #elif defined(__x86_64__)
 #include "xen-x86_64.h"
