@@ -2873,6 +2873,7 @@ f usr/include/libilb.h 0644 root bin
 f usr/include/libinetutil.h 0644 root bin
 f usr/include/libintl.h 0644 root bin
 f usr/include/libipadm.h 0644 root bin
+f usr/include/libipd.h 0644 root bin
 f usr/include/libipmi.h 0644 root bin
 f usr/include/libipp.h 0644 root bin
 f usr/include/libiscsit.h 0644 root bin
@@ -4802,6 +4803,8 @@ s usr/lib/amd64/libinetutil.so.1=../../../lib/amd64/libinetutil.so.1
 s usr/lib/amd64/libinetutil.so=../../../lib/amd64/libinetutil.so.1
 s usr/lib/amd64/libintl.so.1=../../../lib/amd64/libintl.so.1
 s usr/lib/amd64/libintl.so=../../../lib/amd64/libintl.so.1
+f usr/lib/amd64/libipd.so.1 0755 root bin
+s usr/lib/amd64/libipd.so=libipd.so.1
 f usr/lib/amd64/libipmi.so.1 0755 root bin
 s usr/lib/amd64/libipmi.so=libipmi.so.1
 f usr/lib/amd64/libipp.so.1 0755 root bin
