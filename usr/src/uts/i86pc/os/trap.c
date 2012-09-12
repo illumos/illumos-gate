@@ -32,7 +32,7 @@
 /*								*/
 
 /*
- * Copyright 2011 Joyent, Inc. All rights reserved.
+ * Copyright 2012 Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -470,6 +470,7 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 	proc_t *p = ttoproc(ct);
 	klwp_t *lwp = ttolwp(ct);
 	uintptr_t lofault;
+	label_t *onfault;
 	faultcode_t pagefault(), res, errcode;
 	enum fault_type fault_type;
 	k_siginfo_t siginfo;
@@ -624,15 +625,16 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 		}
 
 		/*
-		 * See if we can handle as pagefault. Save lofault
-		 * across this. Here we assume that an address
-		 * less than KERNELBASE is a user fault.
-		 * We can do this as copy.s routines verify that the
-		 * starting address is less than KERNELBASE before
-		 * starting and because we know that we always have
-		 * KERNELBASE mapped as invalid to serve as a "barrier".
+		 * See if we can handle as pagefault. Save lofault and onfault
+		 * across this. Here we assume that an address less than
+		 * KERNELBASE is a user fault.  We can do this as copy.s
+		 * routines verify that the starting address is less than
+		 * KERNELBASE before starting and because we know that we
+		 * always have KERNELBASE mapped as invalid to serve as a
+		 * "barrier".
 		 */
 		lofault = ct->t_lofault;
+		onfault = ct->t_onfault;
 		ct->t_lofault = 0;
 
 		mstate = new_mstate(ct, LMS_KFAULT);
@@ -651,10 +653,11 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 		(void) new_mstate(ct, mstate);
 
 		/*
-		 * Restore lofault. If we resolved the fault, exit.
+		 * Restore lofault and onfault. If we resolved the fault, exit.
 		 * If we didn't and lofault wasn't set, die.
 		 */
 		ct->t_lofault = lofault;
+		ct->t_onfault = onfault;
 		if (res == 0)
 			goto cleanup;
 
