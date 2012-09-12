@@ -22,6 +22,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
 PROG:sh=	cd ..; basename `pwd`
@@ -42,11 +43,11 @@ C99LMODE=	-Xc99=%all
 
 CFLAGS += $(CCVERBOSE)
 CFLAGS64 += $(CCVERBOSE)
-CPPFLAGS += -D_LARGEFILE64_SOURCE=1 -D_REENTRANT $(INCS)
+CPPFLAGS += -D_LARGEFILE64_SOURCE=1 -D_REENTRANT $(INCS) -DDEBUG
 
 # lint complains about unused _umem_* functions
-LINTFLAGS += -xerroff=E_NAME_DEF_NOT_USED2 
-LINTFLAGS64 += -xerroff=E_NAME_DEF_NOT_USED2  
+LINTFLAGS += -xerroff=E_NAME_DEF_NOT_USED2
+LINTFLAGS64 += -xerroff=E_NAME_DEF_NOT_USED2
 
 .KEEP_STATE:
 
