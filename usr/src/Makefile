@@ -125,7 +125,7 @@ mapfiles: bldtools
 
 clean clobber: $(SUBDIRS) head pkg
 
-closedbins: FRC $(ROOTDIRS)
+closedbins: bldtools $(ROOTDIRS) FRC
 	@CLOSED_ROOT="$$ON_CLOSED_BINS/root_$(MACH)$${RELEASE_BUILD+-nd}"; \
 	if [ "$$CLOSED_IS_PRESENT" = no ]; then \
 		if [ ! -d "$$CLOSED_ROOT" ]; then \
@@ -139,6 +139,9 @@ closedbins: FRC $(ROOTDIRS)
 		(cd $$CLOSED_ROOT; \
 		    $(TAR) cfX - $(CODEMGR_WS)/exception_lists/closed-bins .) | \
 		    (cd $(ROOT); $(TAR) xBpf -); \
+		( cd $(ROOT); $(CTFSTRIP) $$(cd $$CLOSED_ROOT; $(FIND) \
+		    ./kernel ./usr/kernel ./platform/*/kernel -type f -a -perm -u+x | \
+		    $(EGREP) -vf $(CODEMGR_WS)/exception_lists/closed-bins) ); \
 	fi
 
 #
