@@ -20,10 +20,9 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- */
-/*
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
+
 
 /*
  *	Copyright (c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
@@ -5804,6 +5803,13 @@ rfs4_compound(COMPOUND4args *args, COMPOUND4res *resp, struct exportinfo *exi,
 
 	cs.statusp = &resp->status;
 	cs.req = req;
+
+	resp->status = utf8_name_verify(&(resp->tag));
+	if (resp->status != NFS4_OK) {
+		resp->array_len = 0;
+		resp->array = NULL;
+		return;
+	}
 
 	/*
 	 * XXX for now, minorversion should be zero
