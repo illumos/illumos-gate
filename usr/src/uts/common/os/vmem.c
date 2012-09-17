@@ -25,6 +25,7 @@
 
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -1064,6 +1065,21 @@ do_alloc:
 			}
 			aneeded = MAX(size + aphase, vmp->vm_min_import);
 			asize = P2ROUNDUP(aneeded, aquantum);
+
+			if (asize < size) {
+				/*
+				 * The rounding induced overflow; return NULL
+				 * if we are permitted to fail the allocation
+				 * (and explicitly panic if we aren't).
+				 */
+				if ((vmflag & VM_NOSLEEP) &&
+				    !(vmflag & VM_PANIC)) {
+					mutex_exit(&vmp->vm_lock);
+					return (NULL);
+				}
+
+				panic("vmem_xalloc(): size overflow");
+			}
 
 			/*
 			 * Determine how many segment structures we'll consume.

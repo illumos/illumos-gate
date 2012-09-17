@@ -24,6 +24,9 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2012 Joyent, Inc.  All rights reserved.
+ */
 
 #include <sys/mmu.h>
 #include <sys/systm.h>
@@ -152,6 +155,7 @@ trap(struct regs *rp, caddr_t addr, uint32_t type, uint32_t mmu_fsr)
 	enum fault_type fault_type;
 	enum seg_rw rw;
 	uintptr_t lofault;
+	label_t *onfault;
 	int instr;
 	int iskernel;
 	int watchcode;
@@ -415,6 +419,7 @@ trap(struct regs *rp, caddr_t addr, uint32_t type, uint32_t mmu_fsr)
 			}
 		}
 		lofault = curthread->t_lofault;
+		onfault = curthread->t_onfault;
 		curthread->t_lofault = 0;
 
 		mstate = new_mstate(curthread, LMS_KFAULT);
@@ -459,10 +464,11 @@ trap(struct regs *rp, caddr_t addr, uint32_t type, uint32_t mmu_fsr)
 		(void) new_mstate(curthread, mstate);
 
 		/*
-		 * Restore lofault.  If we resolved the fault, exit.
+		 * Restore lofault and onfault.  If we resolved the fault, exit.
 		 * If we didn't and lofault wasn't set, die.
 		 */
 		curthread->t_lofault = lofault;
+		curthread->t_onfault = onfault;
 
 		if (res == 0)
 			goto cleanup;

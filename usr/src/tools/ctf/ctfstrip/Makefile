@@ -13,7 +13,7 @@
 
 PROG = ctfstrip
 SRCS = \
-	ctfstrip.c 
+	ctfstrip.c
 
 CFLAGS += $(CCVERBOSE)
 include $(SRC)/tools/Makefile.tools
