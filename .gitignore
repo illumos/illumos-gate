@@ -594,9 +594,11 @@ usr/src/cmd/dtrace/test/tst/common/syscall/tst.args.exe
 usr/src/cmd/dtrace/test/tst/common/sysevent/tst.post.exe
 usr/src/cmd/dtrace/test/tst/common/sysevent/tst.post_chan.exe
 usr/src/cmd/dtrace/test/tst/common/usdt/forker.h
+usr/src/cmd/dtrace/test/tst/common/usdt/lazyprobe.h
 usr/src/cmd/dtrace/test/tst/common/usdt/tst.argmap.exe
 usr/src/cmd/dtrace/test/tst/common/usdt/tst.args.exe
 usr/src/cmd/dtrace/test/tst/common/usdt/tst.forker.exe
+usr/src/cmd/dtrace/test/tst/common/usdt/tst.lazyprobe.exe
 usr/src/cmd/dtrace/test/tst/common/ustack/tst.bigstack.exe
 usr/src/cmd/dtrace/test/tst/common/ustack/tst.spin.exe
 usr/src/cmd/dtrace/test/tst/i386/pid/tst.badinstr.exe
@@ -2319,6 +2321,7 @@ usr/src/cmd/svc/svccfg/svccfg_lex.c
 usr/src/cmd/svc/svcprop/svcprop
 usr/src/cmd/svc/svcs/svcs
 usr/src/cmd/svr4pkg/installf/installf
+usr/src/cmd/svr4pkg/libinst/scriptvfy.c
 usr/src/cmd/svr4pkg/pkgadd/pkgadd
 usr/src/cmd/svr4pkg/pkgadm/pkgadm
 usr/src/cmd/svr4pkg/pkgchk/pkgchk
@@ -3033,6 +3036,8 @@ usr/src/tools/codesign/findcrypto
 usr/src/tools/codesign/signit
 usr/src/tools/codesign/signproto
 usr/src/tools/cscope-fast/cscope-fast
+usr/src/tools/cscope-fast/scanner.c
+usr/src/tools/ctf/ctfstrip/ctfstrip
 usr/src/tools/ctf/cvt/i386/ctfconvert
 usr/src/tools/ctf/cvt/i386/ctfmerge
 usr/src/tools/ctf/dump/i386/ctfdump
