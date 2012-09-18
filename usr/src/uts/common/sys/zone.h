@@ -692,21 +692,16 @@ typedef struct zone {
 
 	/*
 	 * FSS stats updated once per second by fss_decay_usage.
-	 * zone_runq_cntr is an instantaneous accumulation of the number of
-	 * processes in the run queue per project and is not computed over the
-	 * one second interval.
 	 */
 	uint32_t	zone_fss_gen;		/* FSS generation cntr */
 	uint64_t	zone_run_ticks;		/* tot # of ticks running */
-	uint64_t	zone_runq_cntr;		/* tot # of procs in runq */
-	uint32_t	zone_fss_shr_pct;	/* fss active shr % in intvl */
 
 	/*
 	 * DTrace-private per-zone state
 	 */
 	int		zone_dtrace_getf;	/* # of unprivileged getf()s */
 
-	/* 
+	/*
 	 * Synchronization primitives used to synchronize between mounts and
 	 * zone creation/destruction.
 	 */

@@ -103,9 +103,10 @@ typedef struct fssproj {
 					/* protected by fssps_lock	*/
 	uint32_t	fssp_shares;	/* copy of our kpj_shares	*/
 					/* protected by fssps_displock	*/
-	uint32_t	fssp_ticks;	/* total of all ticks		*/
+	uint32_t	fssp_ticks;	/* total of nice tick values	*/
 					/* protected by fssps_displock	*/
-	uint32_t	fssp_zone_ticks; /* unscaled total of all ticks	*/
+	uint32_t	fssp_tick_cnt;	/* cnt of all ticks in this sec	*/
+	uint32_t	fssp_shr_pct;	/* active shr % in this sec	*/
 					/* protected by fssps_displock	*/
 	fssusage_t	fssp_usage;	/* this project's decayed usage */
 	fssusage_t	fssp_shusage;	/* normalized usage		*/
