@@ -1054,6 +1054,7 @@ file path=opt/SUNWdtrt/tst/common/misc/err.D_PRAGMA_OPTSET.d mode=0444
 file path=opt/SUNWdtrt/tst/common/misc/tst.badopt.d mode=0444
 file path=opt/SUNWdtrt/tst/common/misc/tst.boolopt.d mode=0444
 file path=opt/SUNWdtrt/tst/common/misc/tst.boolopt.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/misc/tst.dofmax.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/misc/tst.dynopt.d mode=0444
 file path=opt/SUNWdtrt/tst/common/misc/tst.dynopt.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/misc/tst.enablerace.ksh mode=0444
