@@ -2,8 +2,16 @@
  * mr_sas.h: header for mr_sas
  *
  * Solaris MegaRAID driver for SAS2.0 controllers
- * Copyright (c) 2008-2009, LSI Logic Corporation.
+ * Copyright (c) 2008-2012, LSI Logic Corporation.
  * All rights reserved.
+ *
+ * Version:
+ * Author:
+ *		Swaminathan K S
+ *		Arun Chandrashekhar
+ *		Manju R
+ *		Rasheed
+ *		Shakeel Bukhari
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -36,6 +44,7 @@
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+
 #ifndef	_MR_SAS_H_
 #define	_MR_SAS_H_
 
@@ -45,12 +54,13 @@ extern "C" {
 
 #include <sys/scsi/scsi.h>
 #include "mr_sas_list.h"
+#include "ld_pd_map.h"
 
 /*
  * MegaRAID SAS2.0 Driver meta data
  */
-#define	MRSAS_VERSION				"LSIv2.7"
-#define	MRSAS_RELDATE				"Apr 21, 2010"
+#define	MRSAS_VERSION				"6.503.00.00ILLUMOS"
+#define	MRSAS_RELDATE				"July 30, 2012"
 
 #define	MRSAS_TRUE				1
 #define	MRSAS_FALSE				0
@@ -58,16 +68,32 @@ extern "C" {
 #define	ADAPTER_RESET_NOT_REQUIRED		0
 #define	ADAPTER_RESET_REQUIRED			1
 
+#define	PDSUPPORT	1
+
+#define	SWAP_BYTES(w)	((((w)>>8)&0xFF) | (((w)&0xFF)<<8))
+#define	BIG_ENDIAN(d)	(SWAP_BYTES((d) >> 16) | (SWAP_BYTES(d) << 16))
 /*
  * MegaRAID SAS2.0 device id conversion definitions.
  */
 #define	INST2LSIRDCTL(x)		((x) << INST_MINOR_SHIFT)
+#define	MRSAS_GET_BOUNDARY_ALIGNED_LEN(len, new_len, boundary_len)  { \
+	int rem; \
+	rem = (len / boundary_len); \
+	if ((rem * boundary_len) != len) { \
+		new_len = len + ((rem + 1) * boundary_len - len); \
+	} else { \
+		new_len = len; \
+	} \
+}
+
 
 /*
  * MegaRAID SAS2.0 supported controllers
  */
 #define	PCI_DEVICE_ID_LSI_2108VDE		0x0078
 #define	PCI_DEVICE_ID_LSI_2108V			0x0079
+#define	PCI_DEVICE_ID_LSI_TBOLT			0x005b
+#define	PCI_DEVICE_ID_LSI_INVADER		0x005d
 
 /*
  * Register Index for 2108 Controllers.
@@ -75,6 +101,7 @@ extern "C" {
 #define	REGISTER_SET_IO_2108			(2)
 
 #define	MRSAS_MAX_SGE_CNT			0x50
+#define	MRSAS_APP_RESERVED_CMDS			32
 
 #define	MRSAS_IOCTL_DRIVER			0x12341234
 #define	MRSAS_IOCTL_FIRMWARE			0x12345678
@@ -82,13 +109,50 @@ extern "C" {
 
 #define	MRSAS_1_SECOND				1000000
 
+#ifdef PDSUPPORT
+
+#define	UNCONFIGURED_GOOD			0x0
+#define	PD_SYSTEM				0x40
+#define	MR_EVT_PD_STATE_CHANGE			0x0072
+#define	MR_EVT_PD_REMOVED_EXT		0x00f8
+#define	MR_EVT_PD_INSERTED_EXT		0x00f7
+#define	MR_DCMD_PD_GET_INFO			0x02020000
+#define	MRSAS_TBOLT_PD_LUN		1
+#define	MRSAS_TBOLT_PD_TGT_MAX	255
+#define	MRSAS_TBOLT_GET_PD_MAX(s)	((s)->mr_tbolt_pd_max)
+
+#endif
+
+/* Raid Context Flags */
+#define	MR_RAID_CTX_RAID_FLAGS_IO_SUB_TYPE_SHIFT 0x4
+#define	MR_RAID_CTX_RAID_FLAGS_IO_SUB_TYPE_MASK 0x30
+typedef enum MR_RAID_FLAGS_IO_SUB_TYPE {
+	MR_RAID_FLAGS_IO_SUB_TYPE_NONE = 0,
+	MR_RAID_FLAGS_IO_SUB_TYPE_SYSTEM_PD = 1
+} MR_RAID_FLAGS_IO_SUB_TYPE;
+
 /* Dynamic Enumeration Flags */
-#define	MRSAS_PD_LUN		1
 #define	MRSAS_LD_LUN		0
-#define	MRSAS_PD_TGT_MAX	255
-#define	MRSAS_GET_PD_MAX(s)	((s)->mr_pd_max)
 #define	WWN_STRLEN		17
-#define		APP_RESERVE_CMDS		32
+#define	LD_SYNC_BIT	1
+#define	LD_SYNC_SHIFT	14
+/* ThunderBolt (TB) specific */
+#define	MRSAS_THUNDERBOLT_MSG_SIZE		256
+#define	MRSAS_THUNDERBOLT_MAX_COMMANDS		1024
+#define	MRSAS_THUNDERBOLT_MAX_REPLY_COUNT	1024
+#define	MRSAS_THUNDERBOLT_REPLY_SIZE		8
+#define	MRSAS_THUNDERBOLT_MAX_CHAIN_COUNT	1
+
+#define	MPI2_FUNCTION_PASSTHRU_IO_REQUEST	0xF0
+#define	MPI2_FUNCTION_LD_IO_REQUEST		0xF1
+
+#define	MR_EVT_LD_FAST_PATH_IO_STATUS_CHANGED	(0xFFFF)
+
+#define	MR_INTERNAL_MFI_FRAMES_SMID		1
+#define	MR_CTRL_EVENT_WAIT_SMID			2
+#define	MR_INTERNAL_DRIVER_RESET_SMID		3
+
+
 /*
  * =====================================
  * MegaRAID SAS2.0 MFI firmware definitions
@@ -103,19 +167,18 @@ extern "C" {
 /*
  * FW posts its state in upper 4 bits of outbound_msg_0 register
  */
-#define	MFI_STATE_SHIFT 			28
-#define	MFI_STATE_MASK				((uint32_t)0xF<<MFI_STATE_SHIFT)
-#define	MFI_STATE_UNDEFINED			((uint32_t)0x0<<MFI_STATE_SHIFT)
-#define	MFI_STATE_BB_INIT			((uint32_t)0x1<<MFI_STATE_SHIFT)
-#define	MFI_STATE_FW_INIT			((uint32_t)0x4<<MFI_STATE_SHIFT)
-#define	MFI_STATE_WAIT_HANDSHAKE		((uint32_t)0x6<<MFI_STATE_SHIFT)
-#define	MFI_STATE_FW_INIT_2			((uint32_t)0x7<<MFI_STATE_SHIFT)
-#define	MFI_STATE_DEVICE_SCAN			((uint32_t)0x8<<MFI_STATE_SHIFT)
-#define	MFI_STATE_BOOT_MESSAGE_PENDING		((uint32_t)0x9<<MFI_STATE_SHIFT)
-#define	MFI_STATE_FLUSH_CACHE			((uint32_t)0xA<<MFI_STATE_SHIFT)
-#define	MFI_STATE_READY				((uint32_t)0xB<<MFI_STATE_SHIFT)
-#define	MFI_STATE_OPERATIONAL			((uint32_t)0xC<<MFI_STATE_SHIFT)
-#define	MFI_STATE_FAULT				((uint32_t)0xF<<MFI_STATE_SHIFT)
+#define	MFI_STATE_MASK				0xF0000000
+#define	MFI_STATE_UNDEFINED			0x00000000
+#define	MFI_STATE_BB_INIT			0x10000000
+#define	MFI_STATE_FW_INIT			0x40000000
+#define	MFI_STATE_WAIT_HANDSHAKE		0x60000000
+#define	MFI_STATE_FW_INIT_2			0x70000000
+#define	MFI_STATE_DEVICE_SCAN			0x80000000
+#define	MFI_STATE_BOOT_MESSAGE_PENDING		0x90000000
+#define	MFI_STATE_FLUSH_CACHE			0xA0000000
+#define	MFI_STATE_READY				0xB0000000
+#define	MFI_STATE_OPERATIONAL			0xC0000000
+#define	MFI_STATE_FAULT				0xF0000000
 
 #define	MRMFI_FRAME_SIZE			64
 
@@ -148,7 +211,7 @@ extern "C" {
 #define	MFI_FRAME_DIR_WRITE			0x0008
 #define	MFI_FRAME_DIR_READ			0x0010
 #define	MFI_FRAME_DIR_BOTH			0x0018
-#define		MFI_FRAME_IEEE			0x0020
+#define	MFI_FRAME_IEEE				0x0020
 
 /*
  * Definition for cmd_status
@@ -182,12 +245,12 @@ extern "C" {
 #define	MR_DCMD_CTRL_EVENT_GET			0x01040300
 #define	MR_DCMD_CTRL_EVENT_WAIT			0x01040500
 #define	MR_DCMD_LD_GET_PROPERTIES		0x03030000
-#define	MR_DCMD_PD_GET_INFO			0x02020000
 
 /*
  * Solaris Specific MAX values
  */
 #define	MAX_SGL					24
+
 /*
  * MFI command completion codes
  */
@@ -244,7 +307,6 @@ enum MFI_STAT {
 	MFI_STAT_TIME_NOT_SET			= 0x31,
 	MFI_STAT_WRONG_STATE			= 0x32,
 	MFI_STAT_LD_OFFLINE			= 0x33,
-	/* UNUSED: 0x34 to 0xfe */
 	MFI_STAT_INVALID_STATUS			= 0xFF
 };
 
@@ -270,11 +332,34 @@ enum MR_EVT_LOCALE {
 	MR_EVT_LOCALE_ALL		= 0xffff
 };
 
+enum MR_EVT_ARGS {
+	MR_EVT_ARGS_NONE,
+	MR_EVT_ARGS_CDB_SENSE,
+	MR_EVT_ARGS_LD,
+	MR_EVT_ARGS_LD_COUNT,
+	MR_EVT_ARGS_LD_LBA,
+	MR_EVT_ARGS_LD_OWNER,
+	MR_EVT_ARGS_LD_LBA_PD_LBA,
+	MR_EVT_ARGS_LD_PROG,
+	MR_EVT_ARGS_LD_STATE,
+	MR_EVT_ARGS_LD_STRIP,
+	MR_EVT_ARGS_PD,
+	MR_EVT_ARGS_PD_ERR,
+	MR_EVT_ARGS_PD_LBA,
+	MR_EVT_ARGS_PD_LBA_LD,
+	MR_EVT_ARGS_PD_PROG,
+	MR_EVT_ARGS_PD_STATE,
+	MR_EVT_ARGS_PCI,
+	MR_EVT_ARGS_RATE,
+	MR_EVT_ARGS_STR,
+	MR_EVT_ARGS_TIME,
+	MR_EVT_ARGS_ECC
+};
+
 #define	MR_EVT_CFG_CLEARED		0x0004
 #define	MR_EVT_LD_CREATED		0x008a
 #define	MR_EVT_LD_DELETED		0x008b
-#define	MR_EVT_PD_REMOVED_EXT		0x00f8
-#define	MR_EVT_PD_INSERTED_EXT		0x00f7
+#define	MR_EVT_CFG_FP_CHANGE		0x017B
 
 enum LD_STATE {
 	LD_OFFLINE		= 0,
@@ -302,6 +387,7 @@ enum MRSAS_EVT {
  * @param dma_handle	: dma handle
  * @param dma_cookie	: scatter-gather list
  * @param dma_attr	: dma attributes for this buffer
+ *
  * Our DMA object. The caller must initialize the size and dma attributes
  * (dma_attr) fields before allocating the resources.
  */
@@ -321,23 +407,26 @@ struct mrsas_eventinfo {
 	int 			tgt;
 	int 			lun;
 	int 			event;
+	uint64_t		wwn;
 };
 
 struct mrsas_ld {
 	dev_info_t		*dip;
 	uint8_t 		lun_type;
-	uint8_t 		reserved[3];
+	uint8_t			flag;
+	uint8_t 		reserved[2];
 };
 
-struct mrsas_pd {
+
+#ifdef PDSUPPORT
+struct mrsas_tbolt_pd {
 	dev_info_t		*dip;
 	uint8_t 		lun_type;
 	uint8_t 		dev_id;
-	uint8_t 		flags;
+	uint8_t 		flag;
 	uint8_t 		reserved;
 };
-
-struct mrsas_pd_info {
+struct mrsas_tbolt_pd_info {
 	uint16_t	deviceId;
 	uint16_t	seqNum;
 	uint8_t		inquiryData[96];
@@ -363,6 +452,7 @@ struct mrsas_pd_info {
 		uint8_t	reserved2[16];
 	} pathInfo;
 };
+#endif
 
 typedef struct mrsas_instance {
 	uint32_t	*producer;
@@ -372,6 +462,12 @@ typedef struct mrsas_instance {
 	dma_obj_t	mfi_internal_dma_obj;
 	uint16_t	adapterresetinprogress;
 	uint16_t	deadadapter;
+	/* ThunderBolt (TB) specific */
+	dma_obj_t	mpi2_frame_pool_dma_obj;
+	dma_obj_t	request_desc_dma_obj;
+	dma_obj_t	reply_desc_dma_obj;
+	dma_obj_t	ld_map_obj[2];
+
 	uint8_t		init_id;
 	uint8_t		flag_ieee;
 	uint8_t		disable_online_ctrl_reset;
@@ -382,11 +478,17 @@ typedef struct mrsas_instance {
 	uint32_t	max_sectors_per_req;
 
 	struct mrsas_cmd **cmd_list;
+
 	mlist_t		cmd_pool_list;
 	kmutex_t	cmd_pool_mtx;
+	kmutex_t	sync_map_mtx;
 
 	mlist_t		app_cmd_pool_list;
 	kmutex_t	app_cmd_pool_mtx;
+	mlist_t		cmd_app_pool_list;
+	kmutex_t	cmd_app_pool_mtx;
+
+
 	mlist_t		cmd_pend_list;
 	kmutex_t	cmd_pend_mtx;
 
@@ -407,6 +509,9 @@ typedef struct mrsas_instance {
 	kcondvar_t	abort_cmd_cv;
 	kmutex_t	abort_cmd_mtx;
 
+	kmutex_t	reg_write_mtx;
+	kmutex_t	chip_mtx;
+
 	dev_info_t		*dip;
 	ddi_acc_handle_t	pci_handle;
 
@@ -420,6 +525,7 @@ typedef struct mrsas_instance {
 	ddi_iblock_cookie_t	soft_iblock_cookie;
 	ddi_softintr_t		soft_intr_id;
 	uint8_t		softint_running;
+	uint8_t		tbolt_softint_running;
 	kmutex_t	completed_pool_mtx;
 	mlist_t		completed_pool_list;
 
@@ -436,23 +542,99 @@ typedef struct mrsas_instance {
 	char		iocnode[16];
 
 	int		fm_capabilities;
+	/*
+	 * Driver resources unroll flags.  The flag is set for resources that
+	 * are needed to be free'd at detach() time.
+	 */
+	struct _unroll {
+		uint8_t softs;		// The software state was allocated.
+		uint8_t regs;		// Controller registers mapped.
+		uint8_t intr;		// Interrupt handler added.
+		uint8_t reqs;		// Request structs allocated.
+		uint8_t mutexs;		// Mutex's allocated.
+		uint8_t taskq;		// Task q's created.
+		uint8_t tran;		// Tran struct allocated
+		uint8_t tranSetup;	// Tran attached to the ddi.
+		uint8_t devctl;		// Device nodes for cfgadm created.
+		uint8_t scsictl;	// Device nodes for cfgadm created.
+		uint8_t ioctl;		// Device nodes for ioctl's created.
+		uint8_t timer;		// Timer started.
+		uint8_t aenPend;	// AEN cmd pending f/w.
+		uint8_t mapUpdate_pend; // LD MAP update cmd pending f/w.
+		uint8_t soft_isr;
+		uint8_t ldlist_buff;
+		uint8_t pdlist_buff;
+		uint8_t syncCmd;
+		uint8_t verBuff;
+		uint8_t alloc_space_mfi;
+		uint8_t alloc_space_mpi2;
+	} unroll;
 
-	struct mrsas_func_ptr *func_ptr;
+
+	/* function template pointer */
+	struct mrsas_function_template *func_ptr;
+
+
 	/* MSI interrupts specific */
-	ddi_intr_handle_t *intr_htable;
+	ddi_intr_handle_t *intr_htable;		// Interrupt handle array
+	size_t		intr_htable_size;	// Interrupt handle array size
 	int		intr_type;
 	int		intr_cnt;
-	size_t		intr_size;
 	uint_t		intr_pri;
 	int		intr_cap;
 
 	ddi_taskq_t	*taskq;
 	struct mrsas_ld	*mr_ld_list;
+	kmutex_t	config_dev_mtx;
+	/* ThunderBolt (TB) specific */
+	ddi_softintr_t	tbolt_soft_intr_id;
+
+#ifdef PDSUPPORT
+	uint32_t	mr_tbolt_pd_max;
+	struct mrsas_tbolt_pd *mr_tbolt_pd_list;
+#endif
+
+	uint8_t		fast_path_io;
+
+	uint16_t	tbolt;
+	uint16_t	reply_read_index;
+	uint16_t	reply_size; 		// Single Reply structure size
+	uint16_t	raid_io_msg_size; 	// Single message size
+	uint32_t	io_request_frames_phy;
+	uint8_t 	*io_request_frames;
+	// Virtual address of request desc frame pool
+	MRSAS_REQUEST_DESCRIPTOR_UNION	*request_message_pool;
+	// Physical address of request desc frame pool
+	uint32_t	request_message_pool_phy;
+	// Virtual address of reply Frame
+	MPI2_REPLY_DESCRIPTORS_UNION	*reply_frame_pool;
+	// Physical address of reply Frame
+	uint32_t	reply_frame_pool_phy;
+	uint8_t		*reply_pool_limit;	// Last reply frame address
+	// Physical address of Last reply frame
+	uint32_t	reply_pool_limit_phy;
+	uint32_t	reply_q_depth;		// Reply Queue Depth
+	uint8_t		max_sge_in_main_msg;
+	uint8_t		max_sge_in_chain;
+	uint8_t    	chain_offset_io_req;
+	uint8_t		chain_offset_mpt_msg;
+	MR_FW_RAID_MAP_ALL *ld_map[2];
+	uint32_t 	ld_map_phy[2];
+	uint32_t	size_map_info;
+	uint64_t 	map_id;
+	LD_LOAD_BALANCE_INFO load_balance_info[MAX_LOGICAL_DRIVES];
+	struct mrsas_cmd *map_update_cmd;
+	uint32_t	SyncRequired;
 	kmutex_t	ocr_flags_mtx;
+	dma_obj_t	drv_ver_dma_obj;
 } mrsas_t;
 
-struct mrsas_func_ptr {
-	int (*read_fw_status_reg)(struct mrsas_instance *);
+
+/*
+ * Function templates for various controller specific functions
+ */
+struct mrsas_function_template {
+	uint32_t (*read_fw_status_reg)(struct mrsas_instance *);
 	void (*issue_cmd)(struct mrsas_cmd *, struct mrsas_instance *);
 	int (*issue_cmd_in_sync_mode)(struct mrsas_instance *,
 	    struct mrsas_cmd *);
@@ -461,6 +643,8 @@ struct mrsas_func_ptr {
 	void (*enable_intr)(struct mrsas_instance *);
 	void (*disable_intr)(struct mrsas_instance *);
 	int (*intr_ack)(struct mrsas_instance *);
+	int (*init_adapter)(struct mrsas_instance *);
+//	int (*reset_adapter)(struct mrsas_instance *);
 };
 
 /*
@@ -480,13 +664,11 @@ struct mrsas_func_ptr {
  * console messages debug levels
  */
 #define	CL_NONE		0	/* No debug information */
-#define	CL_TEST_OCR	1
-#define	CL_ANN		2	/* print unconditionally, announcements */
-#define	CL_ANN1		3	/* No o/p  */
-#define	CL_DLEVEL1	4	/* debug level 1, informative */
-#define	CL_DLEVEL2	5	/* debug level 2, verbose */
-#define	CL_DLEVEL3	6	/* debug level 3, very verbose */
-
+#define	CL_ANN		1	/* print unconditionally, announcements */
+#define	CL_ANN1		2	/* No o/p  */
+#define	CL_DLEVEL1	3	/* debug level 1, informative */
+#define	CL_DLEVEL2	4	/* debug level 2, verbose */
+#define	CL_DLEVEL3	5	/* debug level 3, very verbose */
 
 #ifdef __SUNPRO_C
 #define	__func__ ""
@@ -547,9 +729,9 @@ struct mrsas_func_ptr {
 #define	HIGH_LEVEL_INTR			1
 #define	NORMAL_LEVEL_INTR		0
 
+#define		IO_TIMEOUT_VAL		0
 #define		IO_RETRY_COUNT		3
 #define		MAX_FW_RESET_COUNT	3
-
 /*
  * scsa_cmd  - Per-command mr private data
  * @param cmd_dmahandle		:  dma handle
@@ -598,13 +780,20 @@ struct scsa_cmd {
 
 
 struct mrsas_cmd {
+	/*
+	 * ThunderBolt(TB) We would be needing to have a placeholder
+	 * for RAID_MSG_IO_REQUEST inside this structure. We are
+	 * supposed to embed the mr_frame inside the RAID_MSG and post
+	 * it down to the firmware.
+	 */
 	union mrsas_frame	*frame;
 	uint32_t		frame_phys_addr;
 	uint8_t			*sense;
+	uint8_t			*sense1;
 	uint32_t		sense_phys_addr;
+	uint32_t		sense_phys_addr1;
 	dma_obj_t		frame_dma_obj;
 	uint8_t			frame_dma_obj_status;
-
 	uint32_t		index;
 	uint8_t			sync_cmd;
 	uint8_t			cmd_status;
@@ -613,8 +802,16 @@ struct mrsas_cmd {
 	uint32_t		frame_count;
 	struct scsa_cmd		*cmd;
 	struct scsi_pkt		*pkt;
+	Mpi2RaidSCSIIORequest_t *scsi_io_request;
+	Mpi2SGEIOUnion_t	*sgl;
+	uint32_t		sgl_phys_addr;
+	uint32_t		scsi_io_request_phys_addr;
+	MRSAS_REQUEST_DESCRIPTOR_UNION	*request_desc;
+	uint16_t		SMID;
 	uint16_t		retry_count_for_ocr;
 	uint16_t		drv_pkt_time;
+	uint16_t		load_balance_flag;
+
 };
 
 #define	MAX_MGMT_ADAPTERS			1024
@@ -637,8 +834,8 @@ struct mrsas_mgmt_info {
 	int				max_index;
 };
 
-#pragma pack(1)
 
+#pragma pack(1)
 /*
  * SAS controller properties
  */
@@ -662,6 +859,7 @@ struct mrsas_ctrl_prop {
 	uint8_t		cluster_enable;
 	uint8_t		coercion_mode;
 	uint8_t		alarm_enable;
+
 	uint8_t		reserved_1[13];
 	uint32_t	on_off_properties;
 	uint8_t		reserved_4[28];
@@ -867,12 +1065,15 @@ struct mrsas_ctrl_info {
 
 #define	MRSAS_IOCTL_CMD				0
 
+#define	MRDRV_TGT_VALID				1
+
 /*
  * FW can accept both 32 and 64 bit SGLs. We want to allocate 32/64 bit
  * SGLs based on the size of dma_addr_t
  */
 #define	IS_DMA64		(sizeof (dma_addr_t) == 8)
 
+#define	RESERVED0_REGISTER		0x00	/* XScale */
 #define	IB_MSG_0_OFF			0x10	/* XScale */
 #define	OB_MSG_0_OFF			0x18	/* XScale */
 #define	IB_DOORBELL_OFF			0x20	/* XScale & ROC */
@@ -883,13 +1084,18 @@ struct mrsas_ctrl_info {
 #define	OB_SCRATCH_PAD_0_OFF		0xB0	/* ROC */
 #define	OB_INTR_MASK			0xFFFFFFFF
 #define	OB_DOORBELL_CLEAR_MASK		0xFFFFFFFF
-#define		WRITE_SEQ_OFF			0x000000FC
-#define		HOST_DIAG_OFF			0x000000F8
-#define		DIAG_RESET_ADAPTER		0x00000004
-#define		DIAG_WRITE_ENABLE		0x00000080
-/*
- * All MFI register set macros accept mrsas_register_set*
- */
+#define	SYSTOIOP_INTERRUPT_MASK		0x80000000
+#define	OB_SCRATCH_PAD_2_OFF		0xB4
+#define	WRITE_TBOLT_SEQ_OFF		0x00000004
+#define	DIAG_TBOLT_RESET_ADAPTER	0x00000004
+#define	HOST_TBOLT_DIAG_OFF		0x00000008
+#define	RESET_TBOLT_STATUS_OFF		0x000003C3
+#define	WRITE_SEQ_OFF			0x000000FC
+#define	HOST_DIAG_OFF			0x000000F8
+#define	DIAG_RESET_ADAPTER		0x00000004
+#define	DIAG_WRITE_ENABLE		0x00000080
+#define	SYSTOIOP_INTERRUPT_MASK		0x80000000
+
 #define	WR_IB_WRITE_SEQ(v, instance) 	ddi_put32((instance)->regmap_handle, \
 	(uint32_t *)((uintptr_t)(instance)->regmap + WRITE_SEQ_OFF), (v))
 
@@ -899,6 +1105,13 @@ struct mrsas_ctrl_info {
 #define	WR_IB_DRWE(v, instance) 	ddi_put32((instance)->regmap_handle, \
 	(uint32_t *)((uintptr_t)(instance)->regmap + HOST_DIAG_OFF), (v))
 
+#define	IB_LOW_QPORT			0xC0
+#define	IB_HIGH_QPORT			0xC4
+#define	OB_DOORBELL_REGISTER		0x9C	/* 1078 implementation */
+
+/*
+ * All MFI register set macros accept mrsas_register_set*
+ */
 #define	WR_IB_MSG_0(v, instance) 	ddi_put32((instance)->regmap_handle, \
 	(uint32_t *)((uintptr_t)(instance)->regmap + IB_MSG_0_OFF), (v))
 
@@ -933,6 +1146,56 @@ struct mrsas_ctrl_info {
 #define	RD_OB_SCRATCH_PAD_0(instance) 	ddi_get32((instance)->regmap_handle, \
 	(uint32_t *)((uintptr_t)(instance)->regmap + OB_SCRATCH_PAD_0_OFF))
 
+/* Thunderbolt specific registers */
+#define	RD_OB_SCRATCH_PAD_2(instance)	ddi_get32((instance)->regmap_handle, \
+	(uint32_t *)((uintptr_t)(instance)->regmap + OB_SCRATCH_PAD_2_OFF))
+
+#define	WR_TBOLT_IB_WRITE_SEQ(v, instance) \
+	ddi_put32((instance)->regmap_handle, \
+	(uint32_t *)((uintptr_t)(instance)->regmap + WRITE_TBOLT_SEQ_OFF), (v))
+
+#define	RD_TBOLT_HOST_DIAG(instance)	ddi_get32((instance)->regmap_handle, \
+	(uint32_t *)((uintptr_t)(instance)->regmap + HOST_TBOLT_DIAG_OFF))
+
+#define	WR_TBOLT_HOST_DIAG(v, instance)	ddi_put32((instance)->regmap_handle, \
+	(uint32_t *)((uintptr_t)(instance)->regmap + HOST_TBOLT_DIAG_OFF), (v))
+
+#define	RD_TBOLT_RESET_STAT(instance)	ddi_get32((instance)->regmap_handle, \
+	(uint32_t *)((uintptr_t)(instance)->regmap + RESET_TBOLT_STATUS_OFF))
+
+
+#define	WR_MPI2_REPLY_POST_INDEX(v, instance)\
+	ddi_put32((instance)->regmap_handle,\
+	(uint32_t *)\
+	((uintptr_t)(instance)->regmap + MPI2_REPLY_POST_HOST_INDEX_OFFSET),\
+	(v))
+
+
+#define	RD_MPI2_REPLY_POST_INDEX(instance)\
+	ddi_get32((instance)->regmap_handle,\
+	(uint32_t *)\
+	((uintptr_t)(instance)->regmap + MPI2_REPLY_POST_HOST_INDEX_OFFSET))
+
+#define	WR_IB_LOW_QPORT(v, instance) 	ddi_put32((instance)->regmap_handle, \
+	(uint32_t *)((uintptr_t)(instance)->regmap + IB_LOW_QPORT), (v))
+
+#define	WR_IB_HIGH_QPORT(v, instance) 	ddi_put32((instance)->regmap_handle, \
+	(uint32_t *)((uintptr_t)(instance)->regmap + IB_HIGH_QPORT), (v))
+
+#define	WR_OB_DOORBELL_REGISTER_CLEAR(v, instance)\
+	ddi_put32((instance)->regmap_handle,\
+	(uint32_t *)((uintptr_t)(instance)->regmap + OB_DOORBELL_REGISTER), \
+	(v))
+
+#define	WR_RESERVED0_REGISTER(v, instance) ddi_put32((instance)->regmap_handle,\
+	(uint32_t *)((uintptr_t)(instance)->regmap + RESERVED0_REGISTER), \
+	(v))
+
+#define	RD_RESERVED0_REGISTER(instance) ddi_get32((instance)->regmap_handle, \
+	(uint32_t *)((uintptr_t)(instance)->regmap + RESERVED0_REGISTER))
+
+
+
 /*
  * When FW is in MFI_STATE_READY or MFI_STATE_OPERATIONAL, the state data
  * of Outbound Msg Reg 0 indicates max concurrent cmds supported, max SGEs
@@ -947,6 +1210,9 @@ struct mrsas_ctrl_info {
  */
 #define	MFI_REPLY_2108_MESSAGE_INTR		0x00000001
 #define	MFI_REPLY_2108_MESSAGE_INTR_MASK	0x00000005
+
+/* Fusion interrupt mask */
+#define	MFI_FUSION_ENABLE_INTERRUPT_MASK	(0x00000008)
 
 #define	MFI_POLL_TIMEOUT_SECS		60
 
@@ -973,45 +1239,45 @@ struct mrsas_ctrl_info {
  * on_off_property of mrsas_ctrl_prop
  * bit0-9, 11-31 are reserved
  */
-#define	DISABLE_OCR_PROP_FLAG	0x00000400 /* bit 10 */
+#define	DISABLE_OCR_PROP_FLAG   0x00000400 /* bit 10 */
 
 struct mrsas_register_set {
-	uint32_t	reserved_0[4];
+	uint32_t	reserved_0[4];			/* 0000h */
 
-	uint32_t	inbound_msg_0;
-	uint32_t	inbound_msg_1;
-	uint32_t	outbound_msg_0;
-	uint32_t	outbound_msg_1;
+	uint32_t	inbound_msg_0;			/* 0010h */
+	uint32_t	inbound_msg_1;			/* 0014h */
+	uint32_t	outbound_msg_0;			/* 0018h */
+	uint32_t	outbound_msg_1;			/* 001Ch */
 
-	uint32_t	inbound_doorbell;
-	uint32_t	inbound_intr_status;
-	uint32_t	inbound_intr_mask;
+	uint32_t	inbound_doorbell;		/* 0020h */
+	uint32_t	inbound_intr_status;		/* 0024h */
+	uint32_t	inbound_intr_mask;		/* 0028h */
 
-	uint32_t	outbound_doorbell;
-	uint32_t	outbound_intr_status;
-	uint32_t	outbound_intr_mask;
+	uint32_t	outbound_doorbell;		/* 002Ch */
+	uint32_t	outbound_intr_status;		/* 0030h */
+	uint32_t	outbound_intr_mask;		/* 0034h */
 
-	uint32_t	reserved_1[2];
+	uint32_t	reserved_1[2];			/* 0038h */
 
-	uint32_t	inbound_queue_port;
-	uint32_t	outbound_queue_port;
+	uint32_t	inbound_queue_port;		/* 0040h */
+	uint32_t	outbound_queue_port;		/* 0044h */
 
-	uint32_t 	reserved_2[22];
+	uint32_t 	reserved_2[22];			/* 0048h */
 
-	uint32_t 	outbound_doorbell_clear;
+	uint32_t 	outbound_doorbell_clear;	/* 00A0h */
 
-	uint32_t 	reserved_3[3];
+	uint32_t 	reserved_3[3];			/* 00A4h */
 
-	uint32_t 	outbound_scratch_pad;
+	uint32_t 	outbound_scratch_pad;		/* 00B0h */
 
-	uint32_t 	reserved_4[3];
+	uint32_t 	reserved_4[3];			/* 00B4h */
 
-	uint32_t 	inbound_low_queue_port;
+	uint32_t 	inbound_low_queue_port;		/* 00C0h */
 
-	uint32_t 	inbound_high_queue_port;
+	uint32_t 	inbound_high_queue_port;	/* 00C4h */
 
-	uint32_t 	reserved_5;
-	uint32_t 	index_registers[820];
+	uint32_t 	reserved_5;			/* 00C8h */
+	uint32_t 	index_registers[820];		/* 00CCh */
 };
 
 struct mrsas_sge32 {
@@ -1037,24 +1303,24 @@ union mrsas_sgl {
 };
 
 struct mrsas_header {
-	uint8_t		cmd;
-	uint8_t		sense_len;
-	uint8_t		cmd_status;
-	uint8_t		scsi_status;
+	uint8_t		cmd;				/* 00h */
+	uint8_t		sense_len;			/* 01h */
+	uint8_t		cmd_status;			/* 02h */
+	uint8_t		scsi_status;			/* 03h */
 
-	uint8_t		target_id;
-	uint8_t		lun;
-	uint8_t		cdb_len;
-	uint8_t		sge_count;
+	uint8_t		target_id;			/* 04h */
+	uint8_t		lun;				/* 05h */
+	uint8_t		cdb_len;			/* 06h */
+	uint8_t		sge_count;			/* 07h */
 
-	uint32_t	context;
-	uint8_t		req_id;
-	uint8_t		msgvector;
-	uint16_t	pad_0;
+	uint32_t	context;			/* 08h */
+	uint8_t		req_id;				/* 0Ch */
+	uint8_t		msgvector;			/* 0Dh */
+	uint16_t	pad_0;				/* 0Eh */
 
-	uint16_t	flags;
-	uint16_t	timeout;
-	uint32_t	data_xferlen;
+	uint16_t	flags;				/* 10h */
+	uint16_t	timeout;			/* 12h */
+	uint32_t	data_xferlen;			/* 14h */
 };
 
 union mrsas_sgl_frame {
@@ -1063,198 +1329,199 @@ union mrsas_sgl_frame {
 };
 
 struct mrsas_init_frame {
-	uint8_t		cmd;
-	uint8_t		reserved_0;
-	uint8_t		cmd_status;
+	uint8_t		cmd;				/* 00h */
+	uint8_t		reserved_0;			/* 01h */
+	uint8_t		cmd_status;			/* 02h */
 
-	uint8_t		reserved_1;
-	uint32_t	reserved_2;
+	uint8_t		reserved_1;			/* 03h */
+	uint32_t	reserved_2;			/* 04h */
 
-	uint32_t	context;
-	uint8_t		req_id;
-	uint8_t		msgvector;
-	uint16_t	pad_0;
+	uint32_t	context;			/* 08h */
+	uint8_t		req_id;				/* 0Ch */
+	uint8_t		msgvector;			/* 0Dh */
+	uint16_t	pad_0;				/* 0Eh */
 
-	uint16_t	flags;
-	uint16_t	reserved_3;
-	uint32_t	data_xfer_len;
+	uint16_t	flags;				/* 10h */
+	uint16_t	reserved_3;			/* 12h */
+	uint32_t	data_xfer_len;			/* 14h */
 
-	uint32_t	queue_info_new_phys_addr_lo;
-	uint32_t	queue_info_new_phys_addr_hi;
-	uint32_t	queue_info_old_phys_addr_lo;
-	uint32_t	queue_info_old_phys_addr_hi;
-
-	uint32_t	reserved_4[6];
+	uint32_t	queue_info_new_phys_addr_lo;	/* 18h */
+	uint32_t	queue_info_new_phys_addr_hi;	/* 1Ch */
+	uint32_t	queue_info_old_phys_addr_lo;	/* 20h */
+	uint32_t	queue_info_old_phys_addr_hi;	/* 24h */
+	uint64_t 	driverversion;			/* 28h */
+	uint32_t	reserved_4[4];			/* 30h */
 };
 
 struct mrsas_init_queue_info {
-	uint32_t		init_flags;
-	uint32_t		reply_queue_entries;
+	uint32_t		init_flags;			/* 00h */
+	uint32_t		reply_queue_entries;		/* 04h */
 
-	uint32_t		reply_queue_start_phys_addr_lo;
-	uint32_t		reply_queue_start_phys_addr_hi;
-	uint32_t		producer_index_phys_addr_lo;
-	uint32_t		producer_index_phys_addr_hi;
-	uint32_t		consumer_index_phys_addr_lo;
-	uint32_t		consumer_index_phys_addr_hi;
+	uint32_t		reply_queue_start_phys_addr_lo;	/* 08h */
+	uint32_t		reply_queue_start_phys_addr_hi;	/* 0Ch */
+	uint32_t		producer_index_phys_addr_lo;	/* 10h */
+	uint32_t		producer_index_phys_addr_hi;	/* 14h */
+	uint32_t		consumer_index_phys_addr_lo;	/* 18h */
+	uint32_t		consumer_index_phys_addr_hi;	/* 1Ch */
 };
 
 struct mrsas_io_frame {
-	uint8_t			cmd;
-	uint8_t			sense_len;
-	uint8_t			cmd_status;
-	uint8_t			scsi_status;
+	uint8_t			cmd;			/* 00h */
+	uint8_t			sense_len;		/* 01h */
+	uint8_t			cmd_status;		/* 02h */
+	uint8_t			scsi_status;		/* 03h */
 
-	uint8_t			target_id;
-	uint8_t			access_byte;
-	uint8_t			reserved_0;
-	uint8_t			sge_count;
+	uint8_t			target_id;		/* 04h */
+	uint8_t			access_byte;		/* 05h */
+	uint8_t			reserved_0;		/* 06h */
+	uint8_t			sge_count;		/* 07h */
 
-	uint32_t		context;
-	uint8_t			req_id;
-	uint8_t			msgvector;
-	uint16_t		pad_0;
+	uint32_t		context;		/* 08h */
+	uint8_t			req_id;			/* 0Ch */
+	uint8_t			msgvector;		/* 0Dh */
+	uint16_t		pad_0;			/* 0Eh */
 
-	uint16_t		flags;
-	uint16_t		timeout;
-	uint32_t		lba_count;
+	uint16_t		flags;			/* 10h */
+	uint16_t		timeout;		/* 12h */
+	uint32_t		lba_count;		/* 14h */
 
-	uint32_t		sense_buf_phys_addr_lo;
-	uint32_t		sense_buf_phys_addr_hi;
+	uint32_t		sense_buf_phys_addr_lo;	/* 18h */
+	uint32_t		sense_buf_phys_addr_hi;	/* 1Ch */
 
-	uint32_t		start_lba_lo;
-	uint32_t		start_lba_hi;
+	uint32_t		start_lba_lo;		/* 20h */
+	uint32_t		start_lba_hi;		/* 24h */
 
-	union mrsas_sgl		sgl;
+	union mrsas_sgl		sgl;			/* 28h */
 };
 
 struct mrsas_pthru_frame {
-	uint8_t			cmd;
-	uint8_t			sense_len;
-	uint8_t			cmd_status;
-	uint8_t			scsi_status;
+	uint8_t			cmd;			/* 00h */
+	uint8_t			sense_len;		/* 01h */
+	uint8_t			cmd_status;		/* 02h */
+	uint8_t			scsi_status;		/* 03h */
 
-	uint8_t			target_id;
-	uint8_t			lun;
-	uint8_t			cdb_len;
-	uint8_t			sge_count;
+	uint8_t			target_id;		/* 04h */
+	uint8_t			lun;			/* 05h */
+	uint8_t			cdb_len;		/* 06h */
+	uint8_t			sge_count;		/* 07h */
 
-	uint32_t		context;
-	uint8_t			req_id;
-	uint8_t			msgvector;
-	uint16_t		pad_0;
+	uint32_t		context;		/* 08h */
+	uint8_t			req_id;			/* 0Ch */
+	uint8_t			msgvector;		/* 0Dh */
+	uint16_t		pad_0;			/* 0Eh */
 
-	uint16_t		flags;
-	uint16_t		timeout;
-	uint32_t		data_xfer_len;
+	uint16_t		flags;			/* 10h */
+	uint16_t		timeout;		/* 12h */
+	uint32_t		data_xfer_len;		/* 14h */
 
-	uint32_t		sense_buf_phys_addr_lo;
-	uint32_t		sense_buf_phys_addr_hi;
+	uint32_t		sense_buf_phys_addr_lo;	/* 18h */
+	uint32_t		sense_buf_phys_addr_hi;	/* 1Ch */
 
-	uint8_t			cdb[16];
-	union mrsas_sgl		sgl;
+	uint8_t			cdb[16];		/* 20h */
+	union mrsas_sgl		sgl;			/* 30h */
 };
 
 struct mrsas_dcmd_frame {
-	uint8_t			cmd;
-	uint8_t			reserved_0;
-	uint8_t			cmd_status;
-	uint8_t			reserved_1[4];
-	uint8_t			sge_count;
+	uint8_t			cmd;			/* 00h */
+	uint8_t			reserved_0;		/* 01h */
+	uint8_t			cmd_status;		/* 02h */
+	uint8_t			reserved_1[4];		/* 03h */
+	uint8_t			sge_count;		/* 07h */
 
-	uint32_t		context;
-	uint8_t			req_id;
-	uint8_t			msgvector;
-	uint16_t		pad_0;
+	uint32_t		context;		/* 08h */
+	uint8_t			req_id;			/* 0Ch */
+	uint8_t			msgvector;		/* 0Dh */
+	uint16_t		pad_0;			/* 0Eh */
 
-	uint16_t		flags;
-	uint16_t		timeout;
+	uint16_t		flags;			/* 10h */
+	uint16_t		timeout;		/* 12h */
 
-	uint32_t		data_xfer_len;
-	uint32_t		opcode;
+	uint32_t		data_xfer_len;		/* 14h */
+	uint32_t		opcode;			/* 18h */
 
-	union {
+	/* uint8_t		mbox[DCMD_MBOX_SZ]; */	/* 1Ch */
+	union {						/* 1Ch */
 		uint8_t b[DCMD_MBOX_SZ];
 		uint16_t s[6];
 		uint32_t w[3];
 	} mbox;
 
-	union mrsas_sgl		sgl;
+	union mrsas_sgl		sgl;			/* 28h */
 };
 
 struct mrsas_abort_frame {
-	uint8_t		cmd;
-	uint8_t		reserved_0;
-	uint8_t		cmd_status;
+	uint8_t		cmd;				/* 00h */
+	uint8_t		reserved_0;			/* 01h */
+	uint8_t		cmd_status;			/* 02h */
 
-	uint8_t		reserved_1;
-	uint32_t	reserved_2;
+	uint8_t		reserved_1;			/* 03h */
+	uint32_t	reserved_2;			/* 04h */
 
-	uint32_t	context;
-	uint8_t		req_id;
-	uint8_t		msgvector;
-	uint16_t	pad_0;
+	uint32_t	context;			/* 08h */
+	uint8_t		req_id;				/* 0Ch */
+	uint8_t		msgvector;			/* 0Dh */
+	uint16_t	pad_0;				/* 0Eh */
 
-	uint16_t	flags;
-	uint16_t	reserved_3;
-	uint32_t	reserved_4;
+	uint16_t	flags;				/* 10h */
+	uint16_t	reserved_3;			/* 12h */
+	uint32_t	reserved_4;			/* 14h */
 
-	uint32_t	abort_context;
-	uint32_t	pad_1;
+	uint32_t	abort_context;			/* 18h */
+	uint32_t	pad_1;				/* 1Ch */
 
-	uint32_t	abort_mfi_phys_addr_lo;
-	uint32_t	abort_mfi_phys_addr_hi;
+	uint32_t	abort_mfi_phys_addr_lo;		/* 20h */
+	uint32_t	abort_mfi_phys_addr_hi;		/* 24h */
 
-	uint32_t	reserved_5[6];
+	uint32_t	reserved_5[6];			/* 28h */
 };
 
 struct mrsas_smp_frame {
-	uint8_t		cmd;
-	uint8_t		reserved_1;
-	uint8_t		cmd_status;
-	uint8_t		connection_status;
+	uint8_t		cmd;				/* 00h */
+	uint8_t		reserved_1;			/* 01h */
+	uint8_t		cmd_status;			/* 02h */
+	uint8_t		connection_status;		/* 03h */
 
-	uint8_t		reserved_2[3];
-	uint8_t		sge_count;
+	uint8_t		reserved_2[3];			/* 04h */
+	uint8_t		sge_count;			/* 07h */
 
-	uint32_t	context;
-	uint8_t		req_id;
-	uint8_t		msgvector;
-	uint16_t	pad_0;
+	uint32_t	context;			/* 08h */
+	uint8_t		req_id;				/* 0Ch */
+	uint8_t		msgvector;			/* 0Dh */
+	uint16_t	pad_0;				/* 0Eh */
 
-	uint16_t	flags;
-	uint16_t	timeout;
+	uint16_t	flags;				/* 10h */
+	uint16_t	timeout;			/* 12h */
 
-	uint32_t	data_xfer_len;
+	uint32_t	data_xfer_len;			/* 14h */
 
-	uint64_t	sas_addr;
+	uint64_t	sas_addr;			/* 20h */
 
-	union mrsas_sgl	sgl[2];
+	union mrsas_sgl	sgl[2];				/* 28h */
 };
 
 struct mrsas_stp_frame {
-	uint8_t		cmd;
-	uint8_t		reserved_1;
-	uint8_t		cmd_status;
-	uint8_t		connection_status;
+	uint8_t		cmd;				/* 00h */
+	uint8_t		reserved_1;			/* 01h */
+	uint8_t		cmd_status;			/* 02h */
+	uint8_t		connection_status;		/* 03h */
 
-	uint8_t		target_id;
-	uint8_t		reserved_2[2];
-	uint8_t		sge_count;
+	uint8_t		target_id;			/* 04h */
+	uint8_t		reserved_2[2];			/* 04h */
+	uint8_t		sge_count;			/* 07h */
 
-	uint32_t	context;
-	uint8_t		req_id;
-	uint8_t		msgvector;
-	uint16_t	pad_0;
+	uint32_t	context;			/* 08h */
+	uint8_t		req_id;				/* 0Ch */
+	uint8_t		msgvector;			/* 0Dh */
+	uint16_t	pad_0;				/* 0Eh */
 
-	uint16_t	flags;
-	uint16_t	timeout;
+	uint16_t	flags;				/* 10h */
+	uint16_t	timeout;			/* 12h */
 
-	uint32_t	data_xfer_len;
+	uint32_t	data_xfer_len;			/* 14h */
 
-	uint16_t	fis[10];
-	uint32_t	stp_flags;
-	union mrsas_sgl	sgl;
+	uint16_t	fis[10];			/* 28h */
+	uint32_t	stp_flags;			/* 3C */
+	union mrsas_sgl	sgl;				/* 40 */
 };
 
 union mrsas_frame {
@@ -1681,144 +1948,111 @@ struct mrsas_aen {
 	uint32_t	seq_num;
 	uint32_t	class_locale_word;
 };
+
 #pragma pack()
 
 #ifndef	DDI_VENDOR_LSI
 #define	DDI_VENDOR_LSI		"LSI"
 #endif /* DDI_VENDOR_LSI */
 
-#ifndef	KMDB_MODULE
-static int	mrsas_getinfo(dev_info_t *, ddi_info_cmd_t,  void *, void **);
-static int	mrsas_attach(dev_info_t *, ddi_attach_cmd_t);
-#ifdef __sparc
-static int	mrsas_reset(dev_info_t *, ddi_reset_cmd_t);
-#else /* __sparc */
-static int	mrsas_quiesce(dev_info_t *);
-#endif	/* __sparc */
-static int	mrsas_detach(dev_info_t *, ddi_detach_cmd_t);
-static int	mrsas_open(dev_t *, int, int, cred_t *);
-static int	mrsas_close(dev_t, int, int, cred_t *);
-static int	mrsas_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
+int 	mrsas_config_scsi_device(struct mrsas_instance *,
+		    struct scsi_device *, dev_info_t **);
 
-static int	mrsas_tran_tgt_init(dev_info_t *, dev_info_t *,
-		    scsi_hba_tran_t *, struct scsi_device *);
-static struct scsi_pkt *mrsas_tran_init_pkt(struct scsi_address *, register
+#ifdef PDSUPPORT
+int 	mrsas_tbolt_config_pd(struct mrsas_instance *, uint16_t,
+			uint8_t, dev_info_t **);
+#endif
+
+dev_info_t *mrsas_find_child(struct mrsas_instance *, uint16_t,
+			uint8_t);
+int	mrsas_service_evt(struct mrsas_instance *, int, int, int,
+			uint64_t);
+void return_raid_msg_pkt(struct mrsas_instance *, struct mrsas_cmd *);
+struct mrsas_cmd *get_raid_msg_mfi_pkt(struct mrsas_instance *);
+void return_raid_msg_mfi_pkt(struct mrsas_instance *, struct mrsas_cmd *);
+
+int	alloc_space_for_mpi2(struct mrsas_instance *);
+void	fill_up_drv_ver(struct mrsas_drv_ver *dv);
+
+int	mrsas_issue_init_mpi2(struct mrsas_instance *);
+struct scsi_pkt *mrsas_tbolt_tran_init_pkt(struct scsi_address *, register
 		    struct scsi_pkt *, struct buf *, int, int, int, int,
 		    int (*)(), caddr_t);
-static int	mrsas_tran_start(struct scsi_address *,
+int	mrsas_tbolt_tran_start(struct scsi_address *,
 		    register struct scsi_pkt *);
-static int	mrsas_tran_abort(struct scsi_address *, struct scsi_pkt *);
-static int	mrsas_tran_reset(struct scsi_address *, int);
-static int	mrsas_tran_getcap(struct scsi_address *, char *, int);
-static int	mrsas_tran_setcap(struct scsi_address *, char *, int, int);
-static void	mrsas_tran_destroy_pkt(struct scsi_address *,
-		    struct scsi_pkt *);
-static void	mrsas_tran_dmafree(struct scsi_address *, struct scsi_pkt *);
-static void	mrsas_tran_sync_pkt(struct scsi_address *, struct scsi_pkt *);
-static uint_t	mrsas_isr();
-static uint_t	mrsas_softintr();
-
-static int	init_mfi(struct mrsas_instance *);
-static int	mrsas_free_dma_obj(struct mrsas_instance *, dma_obj_t);
-static int	mrsas_alloc_dma_obj(struct mrsas_instance *, dma_obj_t *,
-		    uchar_t);
-static struct mrsas_cmd *get_mfi_pkt(struct mrsas_instance *);
-static void	return_mfi_pkt(struct mrsas_instance *,
+uint32_t tbolt_read_fw_status_reg(struct mrsas_instance *);
+void 	tbolt_issue_cmd(struct mrsas_cmd *, struct mrsas_instance *);
+int	tbolt_issue_cmd_in_poll_mode(struct mrsas_instance *,
 		    struct mrsas_cmd *);
-
-static void	free_space_for_mfi(struct mrsas_instance *);
-static void	free_additional_dma_buffer(struct mrsas_instance *);
-static int	alloc_additional_dma_buffer(struct mrsas_instance *);
-static int	read_fw_status_reg_ppc(struct mrsas_instance *);
-static void	issue_cmd_ppc(struct mrsas_cmd *, struct mrsas_instance *);
-static int	issue_cmd_in_poll_mode_ppc(struct mrsas_instance *,
+int	tbolt_issue_cmd_in_sync_mode(struct mrsas_instance *,
 		    struct mrsas_cmd *);
-static int	issue_cmd_in_sync_mode_ppc(struct mrsas_instance *,
-		    struct mrsas_cmd *);
-static void	enable_intr_ppc(struct mrsas_instance *);
-static void	disable_intr_ppc(struct mrsas_instance *);
-static int	intr_ack_ppc(struct mrsas_instance *);
-static int	mfi_state_transition_to_ready(struct mrsas_instance *);
-static void	destroy_mfi_frame_pool(struct mrsas_instance *);
-static int	create_mfi_frame_pool(struct mrsas_instance *);
-static int	mrsas_dma_alloc(struct mrsas_instance *, struct scsi_pkt *,
+void	tbolt_enable_intr(struct mrsas_instance *);
+void	tbolt_disable_intr(struct mrsas_instance *);
+int	tbolt_intr_ack(struct mrsas_instance *);
+uint_t	mr_sas_tbolt_process_outstanding_cmd(struct mrsas_instance *);
+    uint_t tbolt_softintr();
+int 	mrsas_tbolt_dma(struct mrsas_instance *, uint32_t, int, int (*)());
+int	mrsas_check_dma_handle(ddi_dma_handle_t handle);
+int	mrsas_check_acc_handle(ddi_acc_handle_t handle);
+int	mrsas_dma_alloc(struct mrsas_instance *, struct scsi_pkt *,
 		    struct buf *, int, int (*)());
-static int	mrsas_dma_move(struct mrsas_instance *,
+int	mrsas_dma_move(struct mrsas_instance *,
 			struct scsi_pkt *, struct buf *);
-static void	flush_cache(struct mrsas_instance *instance);
-static void	display_scsi_inquiry(caddr_t);
-static int	start_mfi_aen(struct mrsas_instance *instance);
-static int	handle_drv_ioctl(struct mrsas_instance *instance,
-		    struct mrsas_ioctl *ioctl, int mode);
-static int	handle_mfi_ioctl(struct mrsas_instance *instance,
-		    struct mrsas_ioctl *ioctl, int mode);
-static int	handle_mfi_aen(struct mrsas_instance *instance,
-		    struct mrsas_aen *aen);
-static void	fill_up_drv_ver(struct mrsas_drv_ver *dv);
-static struct mrsas_cmd *build_cmd(struct mrsas_instance *instance,
-		    struct scsi_address *ap, struct scsi_pkt *pkt,
-		    uchar_t *cmd_done);
-#ifndef __sparc
-static int	wait_for_outstanding(struct mrsas_instance *instance);
-#endif  /* __sparc */
-static int	register_mfi_aen(struct mrsas_instance *instance,
-		    uint32_t seq_num, uint32_t class_locale_word);
-static int	issue_mfi_pthru(struct mrsas_instance *instance, struct
-		    mrsas_ioctl *ioctl, struct mrsas_cmd *cmd, int mode);
-static int	issue_mfi_dcmd(struct mrsas_instance *instance, struct
-		    mrsas_ioctl *ioctl, struct mrsas_cmd *cmd, int mode);
-static int	issue_mfi_smp(struct mrsas_instance *instance, struct
-		    mrsas_ioctl *ioctl, struct mrsas_cmd *cmd, int mode);
-static int	issue_mfi_stp(struct mrsas_instance *instance, struct
-		    mrsas_ioctl *ioctl, struct mrsas_cmd *cmd, int mode);
-static int	abort_aen_cmd(struct mrsas_instance *instance,
-		    struct mrsas_cmd *cmd_to_abort);
-
-static int	mrsas_common_check(struct mrsas_instance *instance,
-		    struct  mrsas_cmd *cmd);
-static void	mrsas_fm_init(struct mrsas_instance *instance);
-static void	mrsas_fm_fini(struct mrsas_instance *instance);
-static int	mrsas_fm_error_cb(dev_info_t *, ddi_fm_error_t *,
-		    const void *);
-static void	mrsas_fm_ereport(struct mrsas_instance *instance,
-		    char *detail);
-static int	mrsas_check_dma_handle(ddi_dma_handle_t handle);
-static int	mrsas_check_acc_handle(ddi_acc_handle_t handle);
-
-static void	mrsas_rem_intrs(struct mrsas_instance *instance);
-static int	mrsas_add_intrs(struct mrsas_instance *instance, int intr_type);
-
-static void	mrsas_tran_tgt_free(dev_info_t *, dev_info_t *,
-		    scsi_hba_tran_t *, struct scsi_device *);
-static int	mrsas_tran_bus_config(dev_info_t *, uint_t,
-		    ddi_bus_config_op_t, void *, dev_info_t **);
-static int	mrsas_parse_devname(char *, int *, int *);
-static int	mrsas_config_all_devices(struct mrsas_instance *);
-static int 	mrsas_config_scsi_device(struct mrsas_instance *,
-		    struct scsi_device *, dev_info_t **);
-static int 	mrsas_config_ld(struct mrsas_instance *, uint16_t,
-				uint8_t, dev_info_t **);
-static dev_info_t *mrsas_find_child(struct mrsas_instance *, uint16_t,
-			uint8_t);
-static int	mrsas_name_node(dev_info_t *, char *, int);
-static void	mrsas_issue_evt_taskq(struct mrsas_eventinfo *);
-static int	mrsas_service_evt(struct mrsas_instance *, int, int, int,
-			uint64_t);
-static int	mrsas_mode_sense_build(struct scsi_pkt *);
-static void	push_pending_mfi_pkt(struct mrsas_instance *,
+int	mrsas_alloc_dma_obj(struct mrsas_instance *, dma_obj_t *,
+		    uchar_t);
+void 	mr_sas_tbolt_build_mfi_cmd(struct mrsas_instance *, struct mrsas_cmd *);
+int 	mrsas_dma_alloc_dmd(struct mrsas_instance *, dma_obj_t *);
+void 	tbolt_complete_cmd_in_sync_mode(struct mrsas_instance *,
+	struct mrsas_cmd *);
+int 	alloc_req_rep_desc(struct mrsas_instance *);
+int		mrsas_mode_sense_build(struct scsi_pkt *);
+void		push_pending_mfi_pkt(struct mrsas_instance *,
 			struct mrsas_cmd *);
-static int 	mrsas_issue_init_mfi(struct mrsas_instance *);
-static int 	mrsas_issue_pending_cmds(struct mrsas_instance *);
-static int 	mrsas_print_pending_cmds(struct mrsas_instance *);
-static int  mrsas_complete_pending_cmds(struct mrsas_instance *);
-static int	mrsas_reset_ppc(struct mrsas_instance *);
-static uint32_t mrsas_initiate_ocr_if_fw_is_faulty(struct mrsas_instance *);
-static int  mrsas_kill_adapter(struct mrsas_instance *);
-static void io_timeout_checker(void *instance);
-static void complete_cmd_in_sync_mode(struct mrsas_instance *,
-		struct mrsas_cmd *);
+int	mrsas_issue_pending_cmds(struct mrsas_instance *);
+int 	mrsas_print_pending_cmds(struct mrsas_instance *);
+int  	mrsas_complete_pending_cmds(struct mrsas_instance *);
 
-#endif	/* KMDB_MODULE */
+int	create_mfi_frame_pool(struct mrsas_instance *);
+void	destroy_mfi_frame_pool(struct mrsas_instance *);
+int 	create_mfi_mpi_frame_pool(struct mrsas_instance *);
+void 	destroy_mfi_mpi_frame_pool(struct mrsas_instance *);
+int 	create_mpi2_frame_pool(struct mrsas_instance *);
+void 	destroy_mpi2_frame_pool(struct mrsas_instance *);
+int	mrsas_free_dma_obj(struct mrsas_instance *, dma_obj_t);
+void 	mrsas_tbolt_free_additional_dma_buffer(struct mrsas_instance *);
+void 	free_req_desc_pool(struct mrsas_instance *);
+void 	free_space_for_mpi2(struct mrsas_instance *);
+void 	mrsas_dump_reply_desc(struct mrsas_instance *);
+void 	tbolt_complete_cmd(struct mrsas_instance *, struct mrsas_cmd *);
+void	display_scsi_inquiry(caddr_t);
+void	service_mfi_aen(struct mrsas_instance *, struct mrsas_cmd *);
+int	mrsas_mode_sense_build(struct scsi_pkt *);
+int 	mrsas_tbolt_get_ld_map_info(struct mrsas_instance *);
+struct mrsas_cmd *mrsas_tbolt_build_poll_cmd(struct mrsas_instance *,
+	struct scsi_address *, struct scsi_pkt *, uchar_t *);
+int	mrsas_tbolt_reset_ppc(struct mrsas_instance *instance);
+void	mrsas_tbolt_kill_adapter(struct mrsas_instance *instance);
+int 	abort_syncmap_cmd(struct mrsas_instance *, struct mrsas_cmd *);
+void	mrsas_tbolt_prepare_cdb(struct mrsas_instance *instance, U8 cdb[],
+    struct IO_REQUEST_INFO *, Mpi2RaidSCSIIORequest_t *, U32);
+
+
+int mrsas_init_adapter_ppc(struct mrsas_instance *instance);
+int mrsas_init_adapter_tbolt(struct mrsas_instance *instance);
+int mrsas_init_adapter(struct mrsas_instance *instance);
+
+int mrsas_alloc_cmd_pool(struct mrsas_instance *instance);
+void mrsas_free_cmd_pool(struct mrsas_instance *instance);
+
+void mrsas_print_cmd_details(struct mrsas_instance *, struct mrsas_cmd *, int);
+struct mrsas_cmd *get_raid_msg_pkt(struct mrsas_instance *);
+
+int mfi_state_transition_to_ready(struct mrsas_instance *);
+
+
+/* FMA functions. */
+int mrsas_common_check(struct mrsas_instance *, struct  mrsas_cmd *);
+void mrsas_fm_ereport(struct mrsas_instance *, char *);
 
 
 #ifdef	__cplusplus

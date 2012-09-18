@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 #
@@ -43,9 +44,13 @@ dir path=usr/share/man/man7d
 $(sparc_ONLY)driver name=mr_sas class=scsi-self-identifying \
     alias=pci1000,78 \
     alias=pci1000,79 \
+    alias=pciex1000,5b \
+    alias=pciex1000,5d \
     alias=pciex1000,78 \
     alias=pciex1000,79
 $(i386_ONLY)driver name=mr_sas class=scsi-self-identifying \
+    alias=pciex1000,5b \
+    alias=pciex1000,5d \
     alias=pciex1000,78 \
     alias=pciex1000,79
 file path=kernel/drv/$(ARCH64)/mr_sas group=sys
