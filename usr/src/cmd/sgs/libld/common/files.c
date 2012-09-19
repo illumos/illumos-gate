@@ -24,6 +24,7 @@
  *	  All Rights Reserved
  *
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -1449,21 +1450,32 @@ process_progbits_alloc(const char *name, Ifl_desc *ifl, Shdr *shdr,
 			done = TRUE;
 
 			/*
-			 * Only accept a progbits .eh_frame on a platform
-			 * for which this is the expected type.
+			 * Historically, the section containing the logic to
+			 * unwind stack frames -- the .eh_frame section -- was
+			 * of type SHT_PROGBITS.  Apparently the most
+			 * aesthetically galling aspect of this was not the
+			 * .eh_frame section's dubious purpose or its filthy
+			 * implementation, but rather its section type; with the
+			 * introduction of the AMD64 ABI, a new section header
+			 * type (SHT_AMD64_UNWIND) was introduced for (and
+			 * dedicated to) this section.  When both the Sun
+			 * compilers and the GNU compilers had been modified to
+			 * generate this new section type, the linker became
+			 * much more pedantic about .eh_frame: it refused to
+			 * link an AMD64 object that contained a .eh_frame with
+			 * the legacy SHT_PROGBITS.  That this was too fussy is
+			 * evidenced by searching the net for the error message
+			 * that it generated ("section type is SHT_PROGBITS:
+			 * expected SHT_AMD64_UNWIND"), which reveals a myriad
+			 * of problems, including legacy objects, hand-coded
+			 * assembly and otherwise cross-platform objects
+			 * created on other platforms (the GNU toolchain was
+			 * only modified to create the new section type on
+			 * Solaris and derivatives).  We therefore always accept
+			 * a .eh_frame of SHT_PROGBITS -- regardless of
+			 * m_sht_unwind.
 			 */
-			if (ld_targ.t_m.m_sht_unwind == SHT_PROGBITS)
-				break;
-			ld_eprintf(ofl, ERR_FATAL,
-			    MSG_INTL(MSG_FIL_EXEHFRMTYP), ifl->ifl_name,
-			    EC_WORD(ndx), name,
-			    conv_sec_type(ifl->ifl_ehdr->e_ident[EI_OSABI],
-			    ifl->ifl_ehdr->e_machine, shdr->sh_type,
-			    CONV_FMT_ALT_CF, &inv_buf1),
-			    conv_sec_type(ifl->ifl_ehdr->e_ident[EI_OSABI],
-			    ifl->ifl_ehdr->e_machine, ld_targ.t_m.m_sht_unwind,
-			    CONV_FMT_ALT_CF, &inv_buf2));
-			return (FALSE);
+			break;
 		case 'g':
 			if (is_name_cmp(name, MSG_ORIG(MSG_SCN_GOT),
 			    MSG_SCN_GOT_SIZE)) {

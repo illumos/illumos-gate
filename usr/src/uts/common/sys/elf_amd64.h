@@ -118,7 +118,7 @@ extern "C" {
  * processor specific section types
  */
 #define	SHT_AMD64_UNWIND	0x70000001	/* unwind information */
-
+#define	SHT_X86_64_UNWIND	SHT_AMD64_UNWIND
 
 /*
  * NOTE: PT_SUNW_UNWIND is defined in the OS specific range

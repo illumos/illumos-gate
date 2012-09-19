@@ -24,6 +24,7 @@
  *	  All Rights Reserved
  *
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -978,6 +979,7 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, Place_path_info *path_info,
 		 * Section types are considered to match if any one of
 		 * the following are true:
 		 * -	The type codes are the same
+		 * -	Both are .eh_frame sections (regardless of type code)
 		 * -	The input section is COMDAT, and the output section
 		 *	is SHT_PROGBITS.
 		 */
@@ -987,6 +989,7 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, Place_path_info *path_info,
 		    (shdr->sh_type != SHT_GROUP) &&
 		    (shdr->sh_type != SHT_SUNW_dof) &&
 		    ((shdr->sh_type == os_shdr->sh_type) ||
+		    (is_ehframe && (osp->os_flags & FLG_OS_EHFRAME)) ||
 		    ((shdr->sh_type == SHT_SUNW_COMDAT) &&
 		    (os_shdr->sh_type == SHT_PROGBITS))) &&
 		    ((shflags & ~shflagmask) ==
@@ -1132,9 +1135,19 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, Place_path_info *path_info,
 			return ((Os_desc *)S_ERROR);
 		}
 		ofl->ofl_flags |= FLG_OF_EHFRAME;
+
+		/*
+		 * For .eh_frame sections, we always set the type to be the
+		 * type specified by the ABI.  This allows .eh_frame sections
+		 * of type SHT_PROGBITS to be correctly merged with .eh_frame
+		 * sections of the ABI-defined type (e.g. SHT_AMD64_UNWIND),
+		 * with the output being of the ABI-defined type.
+		 */
+		osp->os_shdr->sh_type = ld_targ.t_m.m_sht_unwind;
+	} else {
+		osp->os_shdr->sh_type = shdr->sh_type;
 	}
 
-	osp->os_shdr->sh_type = shdr->sh_type;
 	osp->os_shdr->sh_flags = shdr->sh_flags;
 	osp->os_shdr->sh_entsize = shdr->sh_entsize;
 	osp->os_name = oname;
