@@ -1493,6 +1493,7 @@ f lib/svc/manifest/network/iscsi/iscsi-initiator.xml 0444 root sys
 f lib/svc/manifest/network/iscsi/iscsi-target.xml 0444 root sys
 f lib/svc/manifest/network/isns_server.xml 0444 root sys
 d lib/svc/manifest/network/ldap 0755 root sys
+f lib/svc/manifest/network/ldap/client.xml 0444 root sys
 f lib/svc/manifest/network/lms.xml 0444 root sys
 d lib/svc/manifest/network/loadbalancer 0755 root sys
 f lib/svc/manifest/network/loadbalancer/ilbd.xml 0444 root sys
@@ -11843,6 +11844,7 @@ f usr/share/man/man1m/killall.1m 0444 root bin
 f usr/share/man/man1m/ksslcfg.1m 0444 root bin
 f usr/share/man/man1m/kstat.1m 0444 root bin
 f usr/share/man/man1m/labelit.1m 0444 root bin
+f usr/share/man/man1m/ldap_cachemgr.1m 0444 root bin
 f usr/share/man/man1m/ldapaddent.1m 0444 root bin
 f usr/share/man/man1m/ldapclient.1m 0444 root bin
 f usr/share/man/man1m/link.1m 0444 root bin
