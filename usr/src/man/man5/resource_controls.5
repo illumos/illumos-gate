@@ -1,16 +1,18 @@
 '\" te
 .\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright (c) 2012, Joyent, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RESOURCE_CONTROLS 5 "Jul 2, 2007"
+.TH RESOURCE_CONTROLS 5 "Sep 16, 2012"
 .SH NAME
-resource_controls \- resource controls available through project database
+resource_controls \- resource controls available through projects and zones
 .SH DESCRIPTION
 .sp
 .LP
-The resource controls facility is configured through the project database. See
-\fBproject\fR(4). You can set and modify resource controls through the
+For projects the resource controls facility is configured through the project
+database.  See \fBproject\fR(4). For zones, resource controls are configured
+through \fBzonecfg\fR(1M).  You can set and modify resource controls through the
 following utilities:
 .RS +4
 .TP
@@ -35,6 +37,12 @@ following utilities:
 .ie t \(bu
 .el o
 \fBrctladm\fR(1M)
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBzonecfg\fR(1M)
 .RE
 .sp
 .LP
@@ -273,6 +281,19 @@ Maximum allowable number of event ports, expressed as an integer.
 .sp
 .ne 2
 .na
+\fB\fBproject.max-processes\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of processes that can be active in a project. This rctl is
+similar to \fBproject.max-lwps\fR, except that zombie processes are included.
+This rctl prevents process-slot exhaustion which can occur due to an excessive
+number of zombies. Expressed as an integer.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fBproject.max-sem-ids\fR\fR
 .ad
 .sp .6
@@ -361,6 +382,33 @@ The following zone-wide resource controls are available:
 .sp
 .ne 2
 .na
+\fB\fBzone.cpu-baseline\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sets a baseline amount of CPU time that a zone can use before it is considered
+to be bursting. The unit used is the percentage of a single CPU that is being
+used by all user threads in a zone. The value should be less than the
+\fBzone.cpu-cap\fR rctl value and is expressed as an integer.
+This resource control does not support the \fBsyslog\fR action.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBzone.cpu-burst-time\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sets the number of seconds that a zone can exceed the \fBzone.cpu-baseline\fR
+rctl value before being cpu-capped down to the \fBzone.cpu-baseline\fR.
+A value of 0 means that \fBzone.cpu-baseline\fR can be exceeded indefinitely.
+This resource control does not support the \fBsyslog\fR action.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fBzone.cpu-cap\fR\fR
 .ad
 .sp .6
@@ -379,7 +427,7 @@ not support the \fBsyslog\fR action.
 .ad
 .sp .6
 .RS 4n
-Sets a limit on the number of fair share scheduler (FSS) CPU shares for a zone.
+Sets a value on the number of fair share scheduler (FSS) CPU shares for a zone.
 CPU shares are first allocated to the zone, and then further subdivided among
 projects within the zone as specified in the \fBproject.cpu-shares\fR entries.
 Expressed as an integer. This resource control does not support the
@@ -399,14 +447,25 @@ Total amount of physical locked memory available to a zone.
 .sp
 .ne 2
 .na
+\fB\fBzone.max-lofi\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sets a limit on the number of \fBLOFI\fR(7D) devices that can be created in a
+zone. Expressed as an integer. This resource control does not support the
+\fBsyslog\fR action.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fBzone.max-lwps\fR\fR
 .ad
 .sp .6
 .RS 4n
-Enhances resource isolation by preventing too many LWPs in one zone from
-affecting other zones. A zone's total LWPs can be further subdivided among
-projects within the zone within the zone by using \fBproject.max-lwps\fR
-entries. Expressed as an integer.
+Sets a limit on how many LWPs can be active in a zone. A zone's total LWPs
+can be further subdivided among projects within the zone within the zone by
+using \fBproject.max-lwps\fR entries. Expressed as an integer.
 .RE
 
 .sp
@@ -418,6 +477,33 @@ entries. Expressed as an integer.
 .RS 4n
 Maximum number of message queue IDs allowed for a zone, expressed as an
 integer.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBzone.max-physical-memory\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sets a limit on the amount of physical memory (RSS) that can be used by a zone
+before resident pages start being forcibly paged out.  The unit used is bytes.
+Expressed as an integer.  This resource control does not support the
+\fBsyslog\fR action.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBzone.max-processes\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of processes that can be active in a zone. This rctl is
+similar to \fBzone.max-lwps\fR, except that zombie processes are included.
+This rctl prevents process-slot exhaustion which can occur due to an excessive
+number of zombies. This rctl can be further subdivided among projects within
+the zone using \fBproject.max-processes\fR. Expressed as an integer.
 .RE
 
 .sp
@@ -461,6 +547,18 @@ bytes.
 .RS 4n
 Total amount of swap that can be consumed by user process address space
 mappings and \fBtmpfs\fR mounts for this zone.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBzone.zfs-io-priority\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sets a value for the \fBzfs\fR(1M) I/O priority for a zone. This is used as
+one of the inputs to determine if a zone's I/O should be throttled.  Expressed
+as an integer. This resource control does not support the \fBsyslog\fR action.
 .RE
 
 .sp
