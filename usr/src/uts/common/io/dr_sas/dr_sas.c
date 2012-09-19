@@ -2,15 +2,15 @@
  * dr_sas.c: source for dr_sas driver
  *
  * MegaRAID device driver for SAS2.0 controllers
- * Copyright (c) 2008-2010, LSI Logic Corporation.
+ * Copyright (c) 2008-2009, LSI Logic Corporation.
  * All rights reserved.
  *
  * Version:
  * Author:
  *		Arun Chandrashekhar
  *		Manju R
- *		Rajesh Prabhakaran
- * 		Seokmann Ju
+ *        	Rajesh Prabhakaran
+ *        	Seokmann Ju
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -41,8 +41,8 @@
  */
 
 /*
- * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #include <sys/types.h>
@@ -64,8 +64,6 @@
 #include <sys/sunddi.h>
 #include <sys/atomic.h>
 #include <sys/signal.h>
-#include <sys/byteorder.h>
-#include <sys/sdt.h>
 #include <sys/fs/dv_node.h>	/* devfs_clean */
 
 #include "dr_sas.h"
@@ -82,20 +80,7 @@
  * Local static data
  */
 static void	*drsas_state = NULL;
-static volatile boolean_t	drsas_relaxed_ordering = B_TRUE;
-static volatile int 	debug_level_g = CL_NONE;
-static volatile int 	msi_enable = 1;
-static volatile int 	ctio_enable = 1;
-
-/* Default Timeout value to issue online controller reset */
-static volatile int  debug_timeout_g  = 0xB4;
-/* Simulate consecutive firmware fault */
-static volatile int  debug_fw_faults_after_ocr_g  = 0;
-
-#ifdef OCRDEBUG
-/* Simulate three consecutive timeout for an IO */
-static volatile int  debug_consecutive_timeout_after_ocr_g  = 0;
-#endif
+static int 	debug_level_g = CL_NONE;
 
 #pragma weak scsi_hba_open
 #pragma weak scsi_hba_close
@@ -153,20 +138,14 @@ static struct dev_ops drsas_ops = {
 	nulldev,		/* probe */
 	drsas_attach,		/* attach */
 	drsas_detach,		/* detach */
-#ifdef  __sparc
 	drsas_reset,		/* reset */
-#else	/* __sparc */
-	nodev,
-#endif  /* __sparc */
 	&drsas_cb_ops,		/* char/block ops */
 	NULL,			/* bus ops */
 	NULL,			/* power */
-#ifdef	__sparc
-	ddi_quiesce_not_needed
-#else	/* __sparc */
-	drsas_quiesce		/* quiesce */
-#endif	/* __sparc */
+	ddi_quiesce_not_supported,		/* quiesce */
 };
+
+char _depends_on[] = "misc/scsi";
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* module type - driver */
@@ -181,10 +160,9 @@ static struct modlinkage modlinkage = {
 };
 
 static struct ddi_device_acc_attr endian_attr = {
-	DDI_DEVICE_ATTR_V1,
+	DDI_DEVICE_ATTR_V0,
 	DDI_STRUCTURE_LE_ACC,
-	DDI_STRICTORDER_ACC,
-	DDI_DEFAULT_ACC
+	DDI_STRICTORDER_ACC
 };
 
 
@@ -282,6 +260,7 @@ drsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	off_t		reglength = 0;
 	int		intr_types = 0;
 	char		*data;
+	int		msi_enable = 0;
 
 	scsi_hba_tran_t		*tran;
 	ddi_dma_attr_t  tran_dma_attr;
@@ -476,12 +455,13 @@ drsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			 */
 			instance->func_ptr->disable_intr(instance);
 
+			msi_enable = 0;
 			if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, 0,
 			    "drsas-enable-msi", &data) == DDI_SUCCESS) {
-				if (strncmp(data, "no", 3) == 0) {
-					msi_enable = 0;
-					con_log(CL_ANN1, (CE_WARN,
-					    "msi_enable = %d disabled",
+				if (strncmp(data, "yes", 3) == 0) {
+					msi_enable = 1;
+					con_log(CL_ANN, (CE_WARN,
+					    "msi_enable = %d ENABLED",
 					    msi_enable));
 				}
 				ddi_prop_free(data);
@@ -538,20 +518,6 @@ drsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 			added_isr_f = 1;
 
-			if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, 0,
-			    "drsas-enable-ctio", &data) == DDI_SUCCESS) {
-				if (strncmp(data, "no", 3) == 0) {
-					ctio_enable = 0;
-					con_log(CL_ANN1, (CE_WARN,
-					    "ctio_enable = %d disabled",
-					    ctio_enable));
-				}
-				ddi_prop_free(data);
-			}
-
-			con_log(CL_DLEVEL1, (CE_WARN, "ctio_enable = %d",
-			    ctio_enable));
-
 			/* setup the mfi based low level driver */
 			if (init_mfi(instance) != DDI_SUCCESS) {
 				con_log(CL_ANN, (CE_WARN, "dr_sas: "
@@ -566,24 +532,12 @@ drsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			    "completed_pool_mtx", MUTEX_DRIVER,
 			    DDI_INTR_PRI(instance->intr_pri));
 
-			mutex_init(&instance->app_cmd_pool_mtx,
-			    "app_cmd_pool_mtx",	MUTEX_DRIVER,
-			    DDI_INTR_PRI(instance->intr_pri));
-
-			mutex_init(&instance->cmd_pend_mtx, "cmd_pend_mtx",
-			    MUTEX_DRIVER, DDI_INTR_PRI(instance->intr_pri));
-
-			mutex_init(&instance->ocr_flags_mtx, "ocr_flags_mtx",
-			    MUTEX_DRIVER, DDI_INTR_PRI(instance->intr_pri));
-
 			mutex_init(&instance->int_cmd_mtx, "int_cmd_mtx",
 			    MUTEX_DRIVER, DDI_INTR_PRI(instance->intr_pri));
 			cv_init(&instance->int_cmd_cv, NULL, CV_DRIVER, NULL);
 
 			mutex_init(&instance->cmd_pool_mtx, "cmd_pool_mtx",
 			    MUTEX_DRIVER, DDI_INTR_PRI(instance->intr_pri));
-
-			instance->timeout_id = (timeout_id_t)-1;
 
 			/* Register our soft-isr for highlevel interrupts. */
 			instance->isr_level = instance->intr_pri;
@@ -628,11 +582,6 @@ drsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			tran->tran_dmafree	= drsas_tran_dmafree;
 			tran->tran_sync_pkt	= drsas_tran_sync_pkt;
 			tran->tran_bus_config	= drsas_tran_bus_config;
-
-			if (drsas_relaxed_ordering)
-				drsas_generic_dma_attr.dma_attr_flags |=
-				    DDI_DMA_RELAXED_ORDERING;
-
 
 			tran_dma_attr = drsas_generic_dma_attr;
 			tran_dma_attr.dma_attr_sgllen = instance->max_num_sge;
@@ -815,8 +764,7 @@ drsas_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd,  void *arg, void **resultp)
 			}
 			break;
 		case DDI_INFO_DEVT2INSTANCE:
-			*resultp = (void *)(intptr_t)
-			    (MINOR2INST(getminor((dev_t)arg)));
+			*resultp = (void *)instance;
 			rval = DDI_SUCCESS;
 			break;
 		default:
@@ -903,10 +851,6 @@ drsas_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		kmem_free(instance->func_ptr,
 		    sizeof (struct drsas_func_ptr));
 
-		if (instance->timeout_id != (timeout_id_t)-1) {
-			(void) untimeout(instance->timeout_id);
-			instance->timeout_id = (timeout_id_t)-1;
-		}
 		ddi_soft_state_free(drsas_state, instance_no);
 		break;
 	case DDI_PM_SUSPEND:
@@ -993,6 +937,7 @@ drsas_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	struct drsas_instance	*instance;
 	struct drsas_ioctl	*ioctl;
 	struct drsas_aen	aen;
+	int i;
 	con_log(CL_ANN1, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
 
 	instance = ddi_get_soft_state(drsas_state, MINOR2INST(getminor(dev)));
@@ -1009,44 +954,56 @@ drsas_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 
 	switch ((uint_t)cmd) {
 		case DRSAS_IOCTL_FIRMWARE:
-			if (ddi_copyin((void *)arg, ioctl,
-			    sizeof (struct drsas_ioctl), mode)) {
-				con_log(CL_ANN, (CE_WARN, "drsas_ioctl: "
-				    "ERROR IOCTL copyin"));
-				kmem_free(ioctl, sizeof (struct drsas_ioctl));
-				return (EFAULT);
+			for (i = 0; i < sizeof (struct drsas_ioctl); i++) {
+				if (ddi_copyin((uint8_t *)arg+i,
+				    (uint8_t *)ioctl+i, 1, mode)) {
+					con_log(CL_ANN, (CE_WARN, "drsas_ioctl "
+					    "ERROR IOCTL copyin"));
+					kmem_free(ioctl,
+					    sizeof (struct drsas_ioctl));
+					return (EFAULT);
+				}
 			}
-
 			if (ioctl->control_code == DRSAS_DRIVER_IOCTL_COMMON) {
 				rval = handle_drv_ioctl(instance, ioctl, mode);
 			} else {
 				rval = handle_mfi_ioctl(instance, ioctl, mode);
 			}
-
-			if (ddi_copyout((void *)ioctl, (void *)arg,
-			    (sizeof (struct drsas_ioctl) - 1), mode)) {
-				con_log(CL_ANN, (CE_WARN,
-				    "drsas_ioctl: copy_to_user failed"));
-				rval = 1;
+			for (i = 0; i < sizeof (struct drsas_ioctl) - 1; i++) {
+				if (ddi_copyout((uint8_t *)ioctl+i,
+				    (uint8_t *)arg+i, 1, mode)) {
+					con_log(CL_ANN, (CE_WARN,
+					    "drsas_ioctl: ddi_copyout "
+					    "failed"));
+					rval = 1;
+					break;
+				}
 			}
 
 			break;
 		case DRSAS_IOCTL_AEN:
-			if (ddi_copyin((void *) arg, &aen,
-			    sizeof (struct drsas_aen), mode)) {
-				con_log(CL_ANN, (CE_WARN,
-				    "drsas_ioctl: ERROR AEN copyin"));
-				kmem_free(ioctl, sizeof (struct drsas_ioctl));
-				return (EFAULT);
+			for (i = 0; i < sizeof (struct drsas_aen); i++) {
+				if (ddi_copyin((uint8_t *)arg+i,
+				    (uint8_t *)&aen+i, 1, mode)) {
+					con_log(CL_ANN, (CE_WARN,
+					    "drsas_ioctl: "
+					    "ERROR AEN copyin"));
+					kmem_free(ioctl,
+					    sizeof (struct drsas_ioctl));
+					return (EFAULT);
+				}
 			}
 
 			rval = handle_mfi_aen(instance, &aen);
-
-			if (ddi_copyout((void *) &aen, (void *)arg,
-			    sizeof (struct drsas_aen), mode)) {
-				con_log(CL_ANN, (CE_WARN,
-				    "drsas_ioctl: copy_to_user failed"));
-				rval = 1;
+			for (i = 0; i < sizeof (struct drsas_aen); i++) {
+				if (ddi_copyout((uint8_t *)&aen + i,
+				    (uint8_t *)arg + i, 1, mode)) {
+					con_log(CL_ANN, (CE_WARN,
+					    "drsas_ioctl: "
+					    "ddi_copyout failed"));
+					rval = 1;
+					break;
+				}
 			}
 
 			break;
@@ -1069,7 +1026,6 @@ drsas_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
  *                                                                            *
  * ************************************************************************** *
  */
-#ifdef	__sparc
 /*ARGSUSED*/
 static int
 drsas_reset(dev_info_t *dip, ddi_reset_cmd_t cmd)
@@ -1099,50 +1055,7 @@ drsas_reset(dev_info_t *dip, ddi_reset_cmd_t cmd)
 
 	return (DDI_SUCCESS);
 }
-#else /* __sparc */
-/*ARGSUSED*/
-static int
-drsas_quiesce(dev_info_t *dip)
-{
-	int	instance_no;
 
-	struct drsas_instance	*instance;
-
-	instance_no = ddi_get_instance(dip);
-	instance = (struct drsas_instance *)ddi_get_soft_state
-	    (drsas_state, instance_no);
-
-	con_log(CL_ANN1, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
-
-	if (!instance) {
-		con_log(CL_ANN1, (CE_WARN, "dr_sas:%d could not get adapter "
-		    "in quiesce", instance_no));
-		return (DDI_FAILURE);
-	}
-	if (instance->deadadapter || instance->adapterresetinprogress) {
-		con_log(CL_ANN1, (CE_WARN, "dr_sas:%d adapter is not in "
-		    "healthy state", instance_no));
-		return (DDI_FAILURE);
-	}
-
-	if (abort_aen_cmd(instance, instance->aen_cmd)) {
-		con_log(CL_ANN1, (CE_WARN, "drsas_quiesce: "
-		    "failed to abort prevous AEN command QUIESCE"));
-	}
-
-	instance->func_ptr->disable_intr(instance);
-
-	con_log(CL_ANN1, (CE_NOTE, "flushing cache for instance %d",
-	    instance_no));
-
-	flush_cache(instance);
-
-	if (wait_for_outstanding(instance)) {
-		return (DDI_FAILURE);
-	}
-	return (DDI_SUCCESS);
-}
-#endif	/* __sparc */
 
 /*
  * ************************************************************************** *
@@ -1335,25 +1248,8 @@ drsas_tran_start(struct scsi_address *ap, register struct scsi_pkt *pkt)
 	struct drsas_instance	*instance = ADDR2MR(ap);
 	struct drsas_cmd	*cmd;
 
-	if (instance->deadadapter == 1) {
-		con_log(CL_ANN1, (CE_WARN,
-		    "drsas_tran_start: return TRAN_FATAL_ERROR "
-		    "for IO, as the HBA doesnt take any more IOs"));
-		if (pkt) {
-			pkt->pkt_reason		= CMD_DEV_GONE;
-			pkt->pkt_statistics	= STAT_DISCON;
-		}
-		return (TRAN_FATAL_ERROR);
-	}
-
-	if (instance->adapterresetinprogress) {
-		con_log(CL_ANN1, (CE_NOTE, "Reset flag set, "
-		    "returning mfi_pkt and setting TRAN_BUSY\n"));
-		return (TRAN_BUSY);
-	}
-
-	con_log(CL_ANN1, (CE_NOTE, "chkpnt:%s:%d:SCSI CDB[0]=0x%x time:%x",
-	    __func__, __LINE__, pkt->pkt_cdbp[0], pkt->pkt_time));
+	con_log(CL_ANN1, (CE_NOTE, "chkpnt:%s:%d:SCSI CDB[0]=0x%x",
+	    __func__, __LINE__, pkt->pkt_cdbp[0]));
 
 	pkt->pkt_reason	= CMD_CMPLT;
 	*pkt->pkt_scbp = STATUS_GOOD; /* clear arq scsi_status */
@@ -1384,9 +1280,6 @@ drsas_tran_start(struct scsi_address *ap, register struct scsi_pkt *pkt)
 	if ((pkt->pkt_flags & FLAG_NOINTR) == 0) {
 		if (instance->fw_outstanding > instance->max_fw_cmds) {
 			con_log(CL_ANN, (CE_CONT, "dr_sas:Firmware busy"));
-			DTRACE_PROBE2(start_tran_err,
-			    uint16_t, instance->fw_outstanding,
-			    uint16_t, instance->max_fw_cmds);
 			return_mfi_pkt(instance, cmd);
 			return (TRAN_BUSY);
 		}
@@ -1394,8 +1287,7 @@ drsas_tran_start(struct scsi_address *ap, register struct scsi_pkt *pkt)
 		/* Synchronize the Cmd frame for the controller */
 		(void) ddi_dma_sync(cmd->frame_dma_obj.dma_handle, 0, 0,
 		    DDI_DMA_SYNC_FORDEV);
-		con_log(CL_ANN1, (CE_NOTE, "Push SCSI CDB[0]=0x%x"
-		    "cmd->index:%x\n", pkt->pkt_cdbp[0], cmd->index));
+
 		instance->func_ptr->issue_cmd(cmd, instance);
 
 	} else {
@@ -1432,10 +1324,8 @@ drsas_tran_start(struct scsi_address *ap, register struct scsi_pkt *pkt)
 			((struct scsi_status *)pkt->pkt_scbp)->sts_busy = 1;
 		}
 
-		(void) drsas_common_check(instance, cmd);
-		DTRACE_PROBE2(start_nointr_done, uint8_t, hdr->cmd,
-		    uint8_t, hdr->cmd_status);
 		return_mfi_pkt(instance, cmd);
+		(void) drsas_common_check(instance, cmd);
 
 		if (pkt->pkt_comp) {
 			(*pkt->pkt_comp)(pkt);
@@ -1656,8 +1546,8 @@ drsas_isr(struct drsas_instance *instance)
 	uint32_t	context;
 
 	struct drsas_cmd	*cmd;
-	struct drsas_header	*hdr;
-	struct scsi_pkt		*pkt;
+
+	con_log(CL_ANN1, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
 
 	ASSERT(instance);
 	if ((instance->intr_type == DDI_INTR_TYPE_FIXED) &&
@@ -1672,56 +1562,26 @@ drsas_isr(struct drsas_instance *instance)
 	    != DDI_SUCCESS) {
 		drsas_fm_ereport(instance, DDI_FM_DEVICE_NO_RESPONSE);
 		ddi_fm_service_impact(instance->dip, DDI_SERVICE_LOST);
-		con_log(CL_ANN1, (CE_WARN,
-		    "dr_sas_isr(): FMA check, returning DDI_INTR_UNCLAIMED"));
-		return (DDI_INTR_CLAIMED);
+		return (DDI_INTR_UNCLAIMED);
 	}
-	con_log(CL_ANN1, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
-
-#ifdef OCRDEBUG
-	if (debug_consecutive_timeout_after_ocr_g == 1) {
-		con_log(CL_ANN1, (CE_NOTE,
-		"simulating consecutive timeout after ocr"));
-		return (DDI_INTR_CLAIMED);
-	}
-#endif
-
-	mutex_enter(&instance->completed_pool_mtx);
-	mutex_enter(&instance->cmd_pend_mtx);
 
 	producer = ddi_get32(instance->mfi_internal_dma_obj.acc_handle,
 	    instance->producer);
 	consumer = ddi_get32(instance->mfi_internal_dma_obj.acc_handle,
 	    instance->consumer);
 
-	con_log(CL_ANN1, (CE_NOTE, " producer %x consumer %x ",
+	con_log(CL_ANN1, (CE_CONT, " producer %x consumer %x ",
 	    producer, consumer));
 	if (producer == consumer) {
-		con_log(CL_ANN1, (CE_WARN, "producer =  consumer case"));
-		DTRACE_PROBE2(isr_pc_err, uint32_t, producer,
-		    uint32_t, consumer);
-		mutex_exit(&instance->cmd_pend_mtx);
-		mutex_exit(&instance->completed_pool_mtx);
-		return (DDI_INTR_CLAIMED);
+		con_log(CL_ANN1, (CE_WARN, "producer = consumer case"));
+		return (DDI_INTR_UNCLAIMED);
 	}
+	mutex_enter(&instance->completed_pool_mtx);
 
 	while (consumer != producer) {
 		context = ddi_get32(instance->mfi_internal_dma_obj.acc_handle,
 		    &instance->reply_queue[consumer]);
 		cmd = instance->cmd_list[context];
-
-		if (cmd->sync_cmd == DRSAS_TRUE) {
-		hdr = (struct drsas_header *)&cmd->frame->hdr;
-		if (hdr) {
-			mlist_del_init(&cmd->list);
-		}
-		} else {
-			pkt = cmd->pkt;
-			if (pkt) {
-				mlist_del_init(&cmd->list);
-			}
-		}
-
 		mlist_add_tail(&cmd->list, &instance->completed_pool_list);
 
 		consumer++;
@@ -1729,11 +1589,11 @@ drsas_isr(struct drsas_instance *instance)
 			consumer = 0;
 		}
 	}
-	ddi_put32(instance->mfi_internal_dma_obj.acc_handle,
-	    instance->consumer, consumer);
-	mutex_exit(&instance->cmd_pend_mtx);
+
 	mutex_exit(&instance->completed_pool_mtx);
 
+	ddi_put32(instance->mfi_internal_dma_obj.acc_handle,
+	    instance->consumer, consumer);
 	(void) ddi_dma_sync(instance->mfi_internal_dma_obj.dma_handle,
 	    0, 0, DDI_DMA_SYNC_FORDEV);
 
@@ -1789,35 +1649,13 @@ get_mfi_pkt(struct drsas_instance *instance)
 		cmd = mlist_entry(head->next, struct drsas_cmd, list);
 		mlist_del_init(head->next);
 	}
-	if (cmd != NULL) {
+	if (cmd != NULL)
 		cmd->pkt = NULL;
-		cmd->retry_count_for_ocr = 0;
-		cmd->drv_pkt_time = 0;
-	}
 	mutex_exit(&instance->cmd_pool_mtx);
 
 	return (cmd);
 }
 
-static struct drsas_cmd *
-get_mfi_app_pkt(struct drsas_instance *instance)
-{
-	mlist_t				*head = &instance->app_cmd_pool_list;
-	struct drsas_cmd	*cmd = NULL;
-
-	mutex_enter(&instance->app_cmd_pool_mtx);
-	ASSERT(mutex_owned(&instance->app_cmd_pool_mtx));
-
-	if (!mlist_empty(head)) {
-		cmd = mlist_entry(head->next, struct drsas_cmd, list);
-		mlist_del_init(head->next);
-	}
-	if (cmd != NULL)
-		cmd->pkt = NULL;
-	mutex_exit(&instance->app_cmd_pool_mtx);
-
-	return (cmd);
-}
 /*
  * return_mfi_pkt : Return a cmd to free command pool
  */
@@ -1826,244 +1664,10 @@ return_mfi_pkt(struct drsas_instance *instance, struct drsas_cmd *cmd)
 {
 	mutex_enter(&instance->cmd_pool_mtx);
 	ASSERT(mutex_owned(&instance->cmd_pool_mtx));
-	/* use mlist_add_tail for debug assistance */
-	mlist_add_tail(&cmd->list, &instance->cmd_pool_list);
+
+	mlist_add(&cmd->list, &instance->cmd_pool_list);
 
 	mutex_exit(&instance->cmd_pool_mtx);
-}
-
-static void
-return_mfi_app_pkt(struct drsas_instance *instance, struct drsas_cmd *cmd)
-{
-	mutex_enter(&instance->app_cmd_pool_mtx);
-	ASSERT(mutex_owned(&instance->app_cmd_pool_mtx));
-
-	mlist_add(&cmd->list, &instance->app_cmd_pool_list);
-
-	mutex_exit(&instance->app_cmd_pool_mtx);
-}
-static void
-push_pending_mfi_pkt(struct drsas_instance *instance, struct drsas_cmd *cmd)
-{
-	struct scsi_pkt *pkt;
-	struct drsas_header	*hdr;
-	con_log(CL_ANN1, (CE_NOTE, "push_pending_pkt(): Called\n"));
-	mutex_enter(&instance->cmd_pend_mtx);
-	ASSERT(mutex_owned(&instance->cmd_pend_mtx));
-	mlist_del_init(&cmd->list);
-	mlist_add_tail(&cmd->list, &instance->cmd_pend_list);
-	if (cmd->sync_cmd == DRSAS_TRUE) {
-		hdr = (struct drsas_header *)&cmd->frame->hdr;
-		if (hdr) {
-			con_log(CL_ANN1, (CE_CONT,
-			    "push_pending_mfi_pkt: "
-			    "cmd %p index %x "
-			    "time %llx",
-			    (void *)cmd, cmd->index,
-			    gethrtime()));
-			/* Wait for specified interval  */
-			cmd->drv_pkt_time = ddi_get16(
-			    cmd->frame_dma_obj.acc_handle, &hdr->timeout);
-			if (cmd->drv_pkt_time < debug_timeout_g)
-				cmd->drv_pkt_time = (uint16_t)debug_timeout_g;
-			con_log(CL_ANN1, (CE_CONT,
-			    "push_pending_pkt(): "
-			    "Called IO Timeout Value %x\n",
-			    cmd->drv_pkt_time));
-		}
-		if (hdr && instance->timeout_id == (timeout_id_t)-1) {
-			instance->timeout_id = timeout(io_timeout_checker,
-			    (void *) instance, drv_usectohz(DRSAS_1_SECOND));
-		}
-	} else {
-		pkt = cmd->pkt;
-		if (pkt) {
-			con_log(CL_ANN1, (CE_CONT,
-			    "push_pending_mfi_pkt: "
-			    "cmd %p index %x pkt %p, "
-			    "time %llx",
-			    (void *)cmd, cmd->index, (void *)pkt,
-			    gethrtime()));
-			cmd->drv_pkt_time = (uint16_t)debug_timeout_g;
-		}
-		if (pkt && instance->timeout_id == (timeout_id_t)-1) {
-			instance->timeout_id = timeout(io_timeout_checker,
-			    (void *) instance, drv_usectohz(DRSAS_1_SECOND));
-		}
-	}
-
-	mutex_exit(&instance->cmd_pend_mtx);
-}
-
-static int
-drsas_print_pending_cmds(struct drsas_instance *instance)
-{
-	mlist_t *head = &instance->cmd_pend_list;
-	mlist_t *tmp = head;
-	struct drsas_cmd *cmd = NULL;
-	struct drsas_header	*hdr;
-	unsigned int		flag = 1;
-
-	struct scsi_pkt *pkt;
-	con_log(CL_ANN1, (CE_NOTE,
-	    "drsas_print_pending_cmds(): Called"));
-	while (flag) {
-		mutex_enter(&instance->cmd_pend_mtx);
-		tmp	=	tmp->next;
-		if (tmp == head) {
-			mutex_exit(&instance->cmd_pend_mtx);
-			flag = 0;
-			break;
-		} else {
-			cmd = mlist_entry(tmp, struct drsas_cmd, list);
-			mutex_exit(&instance->cmd_pend_mtx);
-			if (cmd) {
-				if (cmd->sync_cmd == DRSAS_TRUE) {
-				hdr = (struct drsas_header *)&cmd->frame->hdr;
-					if (hdr) {
-					con_log(CL_ANN1, (CE_CONT,
-					    "print: cmd %p index %x hdr %p",
-					    (void *)cmd, cmd->index,
-					    (void *)hdr));
-					}
-				} else {
-					pkt = cmd->pkt;
-					if (pkt) {
-					con_log(CL_ANN1, (CE_CONT,
-					    "print: cmd %p index %x "
-					    "pkt %p", (void *)cmd, cmd->index,
-					    (void *)pkt));
-					}
-				}
-			}
-		}
-	}
-	con_log(CL_ANN1, (CE_NOTE, "drsas_print_pending_cmds(): Done\n"));
-	return (DDI_SUCCESS);
-}
-
-
-static int
-drsas_complete_pending_cmds(struct drsas_instance *instance)
-{
-
-	struct drsas_cmd *cmd = NULL;
-	struct scsi_pkt *pkt;
-	struct drsas_header *hdr;
-
-	struct mlist_head		*pos, *next;
-
-	con_log(CL_ANN1, (CE_NOTE,
-	    "drsas_complete_pending_cmds(): Called"));
-
-	mutex_enter(&instance->cmd_pend_mtx);
-	mlist_for_each_safe(pos, next, &instance->cmd_pend_list) {
-		cmd = mlist_entry(pos, struct drsas_cmd, list);
-		if (cmd) {
-			pkt = cmd->pkt;
-			if (pkt) { /* for IO */
-				if (((pkt->pkt_flags & FLAG_NOINTR)
-				    == 0) && pkt->pkt_comp) {
-					pkt->pkt_reason
-					    = CMD_DEV_GONE;
-					pkt->pkt_statistics
-					    = STAT_DISCON;
-					con_log(CL_ANN1, (CE_NOTE,
-					    "fail and posting to scsa "
-					    "cmd %p index %x"
-					    " pkt %p "
-					    "time : %llx",
-					    (void *)cmd, cmd->index,
-					    (void *)pkt, gethrtime()));
-					(*pkt->pkt_comp)(pkt);
-				}
-			} else { /* for DCMDS */
-				if (cmd->sync_cmd == DRSAS_TRUE) {
-				hdr = (struct drsas_header *)&cmd->frame->hdr;
-				con_log(CL_ANN1, (CE_NOTE,
-				    "posting invalid status to application "
-				    "cmd %p index %x"
-				    " hdr %p "
-				    "time : %llx",
-				    (void *)cmd, cmd->index,
-				    (void *)hdr, gethrtime()));
-				hdr->cmd_status = MFI_STAT_INVALID_STATUS;
-				complete_cmd_in_sync_mode(instance, cmd);
-				}
-			}
-			mlist_del_init(&cmd->list);
-		} else {
-			con_log(CL_ANN1, (CE_NOTE,
-			    "drsas_complete_pending_cmds:"
-			    "NULL command\n"));
-		}
-		con_log(CL_ANN1, (CE_NOTE,
-		    "drsas_complete_pending_cmds:"
-		    "looping for more commands\n"));
-	}
-	mutex_exit(&instance->cmd_pend_mtx);
-
-	con_log(CL_ANN1, (CE_NOTE, "drsas_complete_pending_cmds(): DONE\n"));
-	return (DDI_SUCCESS);
-}
-
-
-static int
-drsas_issue_pending_cmds(struct drsas_instance *instance)
-{
-	mlist_t *head	=	&instance->cmd_pend_list;
-	mlist_t *tmp	=	head->next;
-	struct drsas_cmd *cmd = NULL;
-	struct scsi_pkt *pkt;
-
-	con_log(CL_ANN1, (CE_NOTE, "drsas_issue_pending_cmds(): Called"));
-	while (tmp != head) {
-		mutex_enter(&instance->cmd_pend_mtx);
-		cmd = mlist_entry(tmp, struct drsas_cmd, list);
-		tmp = tmp->next;
-		mutex_exit(&instance->cmd_pend_mtx);
-		if (cmd) {
-			con_log(CL_ANN1, (CE_NOTE,
-			    "drsas_issue_pending_cmds(): "
-			    "Got a cmd: cmd:%p\n", (void *)cmd));
-			cmd->retry_count_for_ocr++;
-			con_log(CL_ANN1, (CE_NOTE,
-			    "drsas_issue_pending_cmds(): "
-			    "cmd retry count = %d\n",
-			    cmd->retry_count_for_ocr));
-			if (cmd->retry_count_for_ocr > IO_RETRY_COUNT) {
-				con_log(CL_ANN1, (CE_NOTE,
-				    "drsas_issue_pending_cmds():"
-				    "Calling Kill Adapter\n"));
-				(void) drsas_kill_adapter(instance);
-				return (DDI_FAILURE);
-			}
-			pkt = cmd->pkt;
-			if (pkt) {
-				con_log(CL_ANN1, (CE_NOTE,
-				    "PENDING ISSUE: cmd %p index %x "
-				    "pkt %p time %llx",
-				    (void *)cmd, cmd->index,
-				    (void *)pkt,
-				    gethrtime()));
-
-			}
-			if (cmd->sync_cmd == DRSAS_TRUE) {
-				instance->func_ptr->issue_cmd_in_sync_mode(
-				    instance, cmd);
-			} else {
-				instance->func_ptr->issue_cmd(cmd, instance);
-			}
-		} else {
-			con_log(CL_ANN1, (CE_NOTE,
-			    "drsas_issue_pending_cmds: NULL command\n"));
-		}
-		con_log(CL_ANN1, (CE_NOTE,
-		    "drsas_issue_pending_cmds:"
-		    "looping for more commands"));
-	}
-	con_log(CL_ANN1, (CE_NOTE, "drsas_issue_pending_cmds(): DONE\n"));
-	return (DDI_SUCCESS);
 }
 
 /*
@@ -2102,11 +1706,12 @@ create_mfi_frame_pool(struct drsas_instance *instance)
 	uint16_t	sge_sz;
 	uint32_t	sgl_sz;
 	uint32_t	tot_frame_size;
+
 	struct drsas_cmd	*cmd;
 
 	max_cmd = instance->max_fw_cmds;
 
-	sge_sz	= sizeof (struct drsas_sge_ieee);
+	sge_sz	= sizeof (struct drsas_sge64);
 
 	/* calculated the number of 64byte frames required for SGL */
 	sgl_sz		= sge_sz * instance->max_num_sge;
@@ -2287,8 +1892,6 @@ free_space_for_mfi(struct drsas_instance *instance)
 	instance->cmd_list = NULL;
 
 	INIT_LIST_HEAD(&instance->cmd_pool_list);
-	INIT_LIST_HEAD(&instance->app_cmd_pool_list);
-	INIT_LIST_HEAD(&instance->cmd_pend_list);
 }
 
 /*
@@ -2299,7 +1902,6 @@ alloc_space_for_mfi(struct drsas_instance *instance)
 {
 	int		i;
 	uint32_t	max_cmd;
-	uint32_t	reserve_cmd;
 	size_t		sz;
 
 	struct drsas_cmd	*cmd;
@@ -2324,22 +1926,12 @@ alloc_space_for_mfi(struct drsas_instance *instance)
 	}
 
 	INIT_LIST_HEAD(&instance->cmd_pool_list);
-	INIT_LIST_HEAD(&instance->cmd_pend_list);
+
 	/* add all the commands to command pool (instance->cmd_pool) */
-	reserve_cmd	=	APP_RESERVE_CMDS;
-	INIT_LIST_HEAD(&instance->app_cmd_pool_list);
-	for (i = 0; i < reserve_cmd-1; i++) {
-		cmd	= instance->cmd_list[i];
+	for (i = 0; i < max_cmd; i++) {
+		cmd		= instance->cmd_list[i];
 		cmd->index	= i;
-		mlist_add_tail(&cmd->list, &instance->app_cmd_pool_list);
-	}
-	/*
-	 * reserve slot instance->cmd_list[APP_RESERVE_CMDS-1]
-	 * for abort_aen_cmd
-	 */
-	for (i = reserve_cmd; i < max_cmd; i++) {
-		cmd			= instance->cmd_list[i];
-		cmd->index	= i;
+
 		mlist_add_tail(&cmd->list, &instance->cmd_pool_list);
 	}
 
@@ -2362,7 +1954,6 @@ alloc_space_for_mfi(struct drsas_instance *instance)
 	return (DDI_SUCCESS);
 }
 
-
 /*
  * get_ctrl_info
  */
@@ -2381,11 +1972,8 @@ get_ctrl_info(struct drsas_instance *instance,
 	if (!cmd) {
 		con_log(CL_ANN, (CE_WARN,
 		    "Failed to get a cmd for ctrl info"));
-		DTRACE_PROBE2(info_mfi_err, uint16_t, instance->fw_outstanding,
-		    uint16_t, instance->max_fw_cmds);
 		return (DDI_FAILURE);
 	}
-	cmd->retry_count_for_ocr = 0;
 	/* Clear the frame buffer and assign back the context id */
 	(void) memset((char *)&cmd->frame[0], 0, sizeof (union drsas_frame));
 	ddi_put32(cmd->frame_dma_obj.acc_handle, &cmd->frame->hdr.context,
@@ -2426,32 +2014,19 @@ get_ctrl_info(struct drsas_instance *instance,
 	cmd->frame_count = 1;
 
 	if (!instance->func_ptr->issue_cmd_in_poll_mode(instance, cmd)) {
-	ret = 0;
-
-	ctrl_info->max_request_size = ddi_get32(
-	    cmd->frame_dma_obj.acc_handle, &ci->max_request_size);
-
-	ctrl_info->ld_present_count = ddi_get16(
-	    cmd->frame_dma_obj.acc_handle, &ci->ld_present_count);
-
-	ctrl_info->properties.on_off_properties =
-	    ddi_get32(cmd->frame_dma_obj.acc_handle,
-	    &ci->properties.on_off_properties);
-
-	ddi_rep_get8(cmd->frame_dma_obj.acc_handle,
-	    (uint8_t *)(ctrl_info->product_name),
-	    (uint8_t *)(ci->product_name), 80 * sizeof (char),
-	    DDI_DEV_AUTOINCR);
-	/* should get more members of ci with ddi_get when needed */
+		ret = 0;
+		ddi_rep_get8(cmd->frame_dma_obj.acc_handle,
+		    (uint8_t *)ctrl_info, (uint8_t *)ci,
+		    sizeof (struct drsas_ctrl_info), DDI_DEV_AUTOINCR);
 	} else {
 		con_log(CL_ANN, (CE_WARN, "get_ctrl_info: Ctrl info failed"));
 		ret = -1;
 	}
 
+	return_mfi_pkt(instance, cmd);
 	if (drsas_common_check(instance, cmd) != DDI_SUCCESS) {
 		ret = -1;
 	}
-	return_mfi_pkt(instance, cmd);
 
 	return (ret);
 }
@@ -2468,16 +2043,13 @@ abort_aen_cmd(struct drsas_instance *instance,
 	struct drsas_cmd		*cmd;
 	struct drsas_abort_frame	*abort_fr;
 
-	cmd = instance->cmd_list[APP_RESERVE_CMDS-1];
+	cmd = get_mfi_pkt(instance);
 
 	if (!cmd) {
-		con_log(CL_ANN1, (CE_WARN,
-		    "abort_aen_cmd():Failed to get a cmd for abort_aen_cmd"));
-		DTRACE_PROBE2(abort_mfi_err, uint16_t, instance->fw_outstanding,
-		    uint16_t, instance->max_fw_cmds);
+		con_log(CL_ANN, (CE_WARN,
+		    "Failed to get a cmd for ctrl info"));
 		return (DDI_FAILURE);
 	}
-	cmd->retry_count_for_ocr = 0;
 	/* Clear the frame buffer and assign back the context id */
 	(void) memset((char *)&cmd->frame[0], 0, sizeof (union drsas_frame));
 	ddi_put32(cmd->frame_dma_obj.acc_handle, &cmd->frame->hdr.context,
@@ -2503,9 +2075,9 @@ abort_aen_cmd(struct drsas_instance *instance,
 	cmd->sync_cmd = DRSAS_TRUE;
 	cmd->frame_count = 1;
 
-	if (instance->func_ptr->issue_cmd_in_poll_mode(instance, cmd)) {
-		con_log(CL_ANN1, (CE_WARN,
-		    "abort_aen_cmd: issue_cmd_in_poll_mode failed"));
+	if (instance->func_ptr->issue_cmd_in_sync_mode(instance, cmd)) {
+		con_log(CL_ANN, (CE_WARN,
+		    "abort_aen_cmd: issue_cmd_in_sync_mode failed"));
 		ret = -1;
 	} else {
 		ret = 0;
@@ -2514,11 +2086,11 @@ abort_aen_cmd(struct drsas_instance *instance,
 	instance->aen_cmd->abort_aen = 1;
 	instance->aen_cmd = 0;
 
-	atomic_add_16(&instance->fw_outstanding, (-1));
+	return_mfi_pkt(instance, cmd);
+	(void) drsas_common_check(instance, cmd);
 
 	return (ret);
 }
-
 
 /*
  * init_mfi
@@ -2565,8 +2137,6 @@ init_mfi(struct drsas_instance *instance)
 	 * queue info structure
 	 */
 	cmd = get_mfi_pkt(instance);
-	cmd->retry_count_for_ocr = 0;
-
 	/* Clear the frame buffer and assign back the context id */
 	(void) memset((char *)&cmd->frame[0], 0, sizeof (union drsas_frame));
 	ddi_put32(cmd->frame_dma_obj.acc_handle, &cmd->frame->hdr.context,
@@ -2621,38 +2191,27 @@ init_mfi(struct drsas_instance *instance)
 	/* issue the init frame in polled mode */
 	if (instance->func_ptr->issue_cmd_in_poll_mode(instance, cmd)) {
 		con_log(CL_ANN, (CE_WARN, "failed to init firmware"));
-		return_mfi_pkt(instance, cmd);
 		goto fail_fw_init;
 	}
 
-	if (drsas_common_check(instance, cmd) != DDI_SUCCESS) {
-		return_mfi_pkt(instance, cmd);
-		goto fail_fw_init;
-	}
 	return_mfi_pkt(instance, cmd);
-
-	if (ctio_enable &&
-	    (instance->func_ptr->read_fw_status_reg(instance) & 0x04000000)) {
-		con_log(CL_ANN, (CE_NOTE, "dr_sas: IEEE SGL's supported"));
-		instance->flag_ieee = 1;
-	} else {
-		instance->flag_ieee = 0;
+	if (drsas_common_check(instance, cmd) != DDI_SUCCESS) {
+		goto fail_fw_init;
 	}
 
-	instance->disable_online_ctrl_reset = 0;
 	/* gather misc FW related information */
 	if (!get_ctrl_info(instance, &ctrl_info)) {
 		instance->max_sectors_per_req = ctrl_info.max_request_size;
-		con_log(CL_ANN1, (CE_NOTE,
-		    "product name %s ld present %d",
+		con_log(CL_ANN1, (CE_NOTE, "product name %s ld present %d",
 		    ctrl_info.product_name, ctrl_info.ld_present_count));
 	} else {
 		instance->max_sectors_per_req = instance->max_num_sge *
 		    PAGESIZE / 512;
 	}
 
-	if (ctrl_info.properties.on_off_properties & DISABLE_OCR_PROP_FLAG)
-		instance->disable_online_ctrl_reset = 1;
+	if (drsas_check_acc_handle(instance->regmap_handle) != DDI_SUCCESS) {
+		goto fail_fw_init;
+	}
 
 	return (DDI_SUCCESS);
 
@@ -2668,95 +2227,6 @@ fail_mfi_reg_setup:
 	return (DDI_FAILURE);
 }
 
-
-
-
-
-
-static int
-drsas_issue_init_mfi(struct drsas_instance *instance)
-{
-	struct drsas_cmd		*cmd;
-	struct drsas_init_frame		*init_frame;
-	struct drsas_init_queue_info	*initq_info;
-
-/*
- * Prepare a init frame. Note the init frame points to queue info
- * structure. Each frame has SGL allocated after first 64 bytes. For
- * this frame - since we don't need any SGL - we use SGL's space as
- * queue info structure
- */
-	con_log(CL_ANN1, (CE_NOTE,
-	    "drsas_issue_init_mfi: entry\n"));
-	cmd = get_mfi_app_pkt(instance);
-
-	if (!cmd) {
-		con_log(CL_ANN1, (CE_NOTE,
-		    "drsas_issue_init_mfi: get_pkt failed\n"));
-		return (DDI_FAILURE);
-	}
-
-	/* Clear the frame buffer and assign back the context id */
-	(void) memset((char *)&cmd->frame[0], 0, sizeof (union drsas_frame));
-	ddi_put32(cmd->frame_dma_obj.acc_handle, &cmd->frame->hdr.context,
-	    cmd->index);
-
-	init_frame = (struct drsas_init_frame *)cmd->frame;
-	initq_info = (struct drsas_init_queue_info *)
-	    ((unsigned long)init_frame + 64);
-
-	(void) memset(init_frame, 0, MRMFI_FRAME_SIZE);
-	(void) memset(initq_info, 0, sizeof (struct drsas_init_queue_info));
-
-	ddi_put32(cmd->frame_dma_obj.acc_handle, &initq_info->init_flags, 0);
-
-	ddi_put32(cmd->frame_dma_obj.acc_handle,
-	    &initq_info->reply_queue_entries, instance->max_fw_cmds + 1);
-	ddi_put32(cmd->frame_dma_obj.acc_handle,
-	    &initq_info->producer_index_phys_addr_hi, 0);
-	ddi_put32(cmd->frame_dma_obj.acc_handle,
-	    &initq_info->producer_index_phys_addr_lo,
-	    instance->mfi_internal_dma_obj.dma_cookie[0].dmac_address);
-	ddi_put32(cmd->frame_dma_obj.acc_handle,
-	    &initq_info->consumer_index_phys_addr_hi, 0);
-	ddi_put32(cmd->frame_dma_obj.acc_handle,
-	    &initq_info->consumer_index_phys_addr_lo,
-	    instance->mfi_internal_dma_obj.dma_cookie[0].dmac_address + 4);
-
-	ddi_put32(cmd->frame_dma_obj.acc_handle,
-	    &initq_info->reply_queue_start_phys_addr_hi, 0);
-	ddi_put32(cmd->frame_dma_obj.acc_handle,
-	    &initq_info->reply_queue_start_phys_addr_lo,
-	    instance->mfi_internal_dma_obj.dma_cookie[0].dmac_address + 8);
-
-	ddi_put8(cmd->frame_dma_obj.acc_handle,
-	    &init_frame->cmd, MFI_CMD_OP_INIT);
-	ddi_put8(cmd->frame_dma_obj.acc_handle, &init_frame->cmd_status,
-	    MFI_CMD_STATUS_POLL_MODE);
-	ddi_put16(cmd->frame_dma_obj.acc_handle, &init_frame->flags, 0);
-	ddi_put32(cmd->frame_dma_obj.acc_handle,
-	    &init_frame->queue_info_new_phys_addr_lo,
-	    cmd->frame_phys_addr + 64);
-	ddi_put32(cmd->frame_dma_obj.acc_handle,
-	    &init_frame->queue_info_new_phys_addr_hi, 0);
-
-	ddi_put32(cmd->frame_dma_obj.acc_handle, &init_frame->data_xfer_len,
-	    sizeof (struct drsas_init_queue_info));
-
-	cmd->frame_count = 1;
-
-	/* issue the init frame in polled mode */
-	if (instance->func_ptr->issue_cmd_in_poll_mode(instance, cmd)) {
-		con_log(CL_ANN1, (CE_WARN,
-		    "drsas_issue_init_mfi():failed to "
-		    "init firmware"));
-		return_mfi_app_pkt(instance, cmd);
-		return (DDI_FAILURE);
-	}
-	return_mfi_app_pkt(instance, cmd);
-	con_log(CL_ANN1, (CE_NOTE, "drsas_issue_init_mfi: Done"));
-	return (DDI_SUCCESS);
-}
 /*
  * mfi_state_transition_to_ready	: Move the FW to READY state
  *
@@ -2770,13 +2240,9 @@ mfi_state_transition_to_ready(struct drsas_instance *instance)
 	uint32_t	fw_ctrl;
 	uint32_t	fw_state;
 	uint32_t	cur_state;
-	uint32_t	cur_abs_reg_val;
-	uint32_t	prev_abs_reg_val;
 
-	cur_abs_reg_val =
-	    instance->func_ptr->read_fw_status_reg(instance);
 	fw_state =
-	    cur_abs_reg_val & MFI_STATE_MASK;
+	    instance->func_ptr->read_fw_status_reg(instance) & MFI_STATE_MASK;
 	con_log(CL_ANN1, (CE_NOTE,
 	    "mfi_state_transition_to_ready:FW state = 0x%x", fw_state));
 
@@ -2786,13 +2252,13 @@ mfi_state_transition_to_ready(struct drsas_instance *instance)
 
 		switch (fw_state) {
 		case MFI_STATE_FAULT:
-			con_log(CL_ANN1, (CE_NOTE,
+			con_log(CL_ANN, (CE_NOTE,
 			    "dr_sas: FW in FAULT state!!"));
 
 			return (ENODEV);
 		case MFI_STATE_WAIT_HANDSHAKE:
 			/* set the CLR bit in IMR0 */
-			con_log(CL_ANN1, (CE_NOTE,
+			con_log(CL_ANN, (CE_NOTE,
 			    "dr_sas: FW waiting for HANDSHAKE"));
 			/*
 			 * PCI_Hot Plug: MFI F/W requires
@@ -2808,7 +2274,7 @@ mfi_state_transition_to_ready(struct drsas_instance *instance)
 			break;
 		case MFI_STATE_BOOT_MESSAGE_PENDING:
 			/* set the CLR bit in IMR0 */
-			con_log(CL_ANN1, (CE_NOTE,
+			con_log(CL_ANN, (CE_NOTE,
 			    "dr_sas: FW state boot message pending"));
 			/*
 			 * PCI_Hot Plug: MFI F/W requires
@@ -2838,7 +2304,7 @@ mfi_state_transition_to_ready(struct drsas_instance *instance)
 			break;
 		case MFI_STATE_UNDEFINED:
 			/* this state should not last for more than 2 seconds */
-			con_log(CL_ANN1, (CE_NOTE, "FW state undefined"));
+			con_log(CL_ANN, (CE_NOTE, "FW state undefined"));
 
 			max_wait	= 2;
 			cur_state	= MFI_STATE_UNDEFINED;
@@ -2852,14 +2318,11 @@ mfi_state_transition_to_ready(struct drsas_instance *instance)
 			cur_state	= MFI_STATE_FW_INIT;
 			break;
 		case MFI_STATE_DEVICE_SCAN:
-			max_wait	= 180;
+			max_wait	= 10;
 			cur_state	= MFI_STATE_DEVICE_SCAN;
-			prev_abs_reg_val = cur_abs_reg_val;
-			con_log(CL_NONE, (CE_NOTE,
-			    "Device scan in progress ...\n"));
 			break;
 		default:
-			con_log(CL_ANN1, (CE_NOTE,
+			con_log(CL_ANN, (CE_NOTE,
 			    "dr_sas: Unknown state 0x%x", fw_state));
 			return (ENODEV);
 		}
@@ -2867,9 +2330,9 @@ mfi_state_transition_to_ready(struct drsas_instance *instance)
 		/* the cur_state should not last for more than max_wait secs */
 		for (i = 0; i < (max_wait * MILLISEC); i++) {
 			/* fw_state = RD_OB_MSG_0(instance) & MFI_STATE_MASK; */
-			cur_abs_reg_val =
-			    instance->func_ptr->read_fw_status_reg(instance);
-			fw_state = cur_abs_reg_val & MFI_STATE_MASK;
+			fw_state =
+			    instance->func_ptr->read_fw_status_reg(instance) &
+			    MFI_STATE_MASK;
 
 			if (fw_state == cur_state) {
 				delay(1 * drv_usectohz(MILLISEC));
@@ -2877,15 +2340,10 @@ mfi_state_transition_to_ready(struct drsas_instance *instance)
 				break;
 			}
 		}
-		if (fw_state == MFI_STATE_DEVICE_SCAN) {
-			if (prev_abs_reg_val != cur_abs_reg_val) {
-				continue;
-			}
-		}
 
 		/* return error if fw_state hasn't changed after max_wait */
 		if (fw_state == cur_state) {
-			con_log(CL_ANN1, (CE_NOTE,
+			con_log(CL_ANN, (CE_NOTE,
 			    "FW state hasn't changed in %d secs", max_wait));
 			return (ENODEV);
 		}
@@ -2924,16 +2382,13 @@ get_seq_num(struct drsas_instance *instance,
 	dma_obj_t			dcmd_dma_obj;
 	struct drsas_cmd		*cmd;
 	struct drsas_dcmd_frame		*dcmd;
-	struct drsas_evt_log_info *eli_tmp;
+
 	cmd = get_mfi_pkt(instance);
 
 	if (!cmd) {
 		cmn_err(CE_WARN, "dr_sas: failed to get a cmd");
-		DTRACE_PROBE2(seq_num_mfi_err, uint16_t,
-		    instance->fw_outstanding, uint16_t, instance->max_fw_cmds);
 		return (ENOMEM);
 	}
-	cmd->retry_count_for_ocr = 0;
 	/* Clear the frame buffer and assign back the context id */
 	(void) memset((char *)&cmd->frame[0], 0, sizeof (union drsas_frame));
 	ddi_put32(cmd->frame_dma_obj.acc_handle, &cmd->frame->hdr.context,
@@ -2984,21 +2439,20 @@ get_seq_num(struct drsas_instance *instance,
 		    "failed to issue DRSAS_DCMD_CTRL_EVENT_GET_INFO");
 		ret = DDI_FAILURE;
 	} else {
-		eli_tmp = (struct drsas_evt_log_info *)dcmd_dma_obj.buffer;
-		eli->newest_seq_num = ddi_get32(cmd->frame_dma_obj.acc_handle,
-		    &eli_tmp->newest_seq_num);
+		/* copy the data back into callers buffer */
+		ddi_rep_get8(cmd->frame_dma_obj.acc_handle, (uint8_t *)eli,
+		    (uint8_t *)dcmd_dma_obj.buffer,
+		    sizeof (struct drsas_evt_log_info), DDI_DEV_AUTOINCR);
 		ret = DDI_SUCCESS;
 	}
 
 	if (drsas_free_dma_obj(instance, dcmd_dma_obj) != DDI_SUCCESS)
 		ret = DDI_FAILURE;
 
+	return_mfi_pkt(instance, cmd);
 	if (drsas_common_check(instance, cmd) != DDI_SUCCESS) {
 		ret = DDI_FAILURE;
 	}
-
-	return_mfi_pkt(instance, cmd);
-
 	return (ret);
 }
 
@@ -3023,9 +2477,8 @@ start_mfi_aen(struct drsas_instance *instance)
 
 	/* register AEN with FW for latest sequence number plus 1 */
 	class_locale.members.reserved	= 0;
-	class_locale.members.locale	= LE_16(DR_EVT_LOCALE_ALL);
+	class_locale.members.locale	= DR_EVT_LOCALE_ALL;
 	class_locale.members.class	= DR_EVT_CLASS_INFO;
-	class_locale.word	= LE_32(class_locale.word);
 	ret = register_mfi_aen(instance, eli.newest_seq_num + 1,
 	    class_locale.word);
 
@@ -3049,18 +2502,8 @@ flush_cache(struct drsas_instance *instance)
 
 	cmd = instance->cmd_list[max_cmd];
 
-	if (!cmd) {
-		con_log(CL_ANN1, (CE_WARN,
-		    "flush_cache():Failed to get a cmd for flush_cache"));
-		DTRACE_PROBE2(flush_cache_err, uint16_t,
-		    instance->fw_outstanding, uint16_t, instance->max_fw_cmds);
+	if (cmd == NULL)
 		return;
-	}
-	cmd->retry_count_for_ocr = 0;
-	/* Clear the frame buffer and assign back the context id */
-	(void) memset((char *)&cmd->frame[0], 0, sizeof (union drsas_frame));
-	ddi_put32(cmd->frame_dma_obj.acc_handle, &cmd->frame->hdr.context,
-	    cmd->index);
 
 	dcmd = &cmd->frame->dcmd;
 
@@ -3084,7 +2527,7 @@ flush_cache(struct drsas_instance *instance)
 		con_log(CL_ANN1, (CE_WARN,
 	    "flush_cache: failed to issue MFI_DCMD_CTRL_CACHE_FLUSH"));
 	}
-	con_log(CL_ANN1, (CE_NOTE, "flush_cache done"));
+	con_log(CL_DLEVEL1, (CE_NOTE, "done"));
 }
 
 /*
@@ -3208,42 +2651,7 @@ complete_cmd_in_sync_mode(struct drsas_instance *instance,
 		cmd->cmd_status = 0;
 	}
 
-	con_log(CL_ANN1, (CE_NOTE, "complete_cmd_in_sync_mode called %p \n",
-	    (void *)cmd));
-
 	cv_broadcast(&instance->int_cmd_cv);
-}
-
-/*
- * Call this function inside drsas_softintr.
- * drsas_initiate_ocr_if_fw_is_faulty  - Initiates OCR if FW status is faulty
- * @instance:			Adapter soft state
- */
-
-static uint32_t
-drsas_initiate_ocr_if_fw_is_faulty(struct drsas_instance *instance)
-{
-	uint32_t	cur_abs_reg_val;
-	uint32_t	fw_state;
-
-	cur_abs_reg_val =  instance->func_ptr->read_fw_status_reg(instance);
-	fw_state = cur_abs_reg_val & MFI_STATE_MASK;
-	if (fw_state == MFI_STATE_FAULT) {
-
-		if (instance->disable_online_ctrl_reset == 1) {
-		con_log(CL_ANN1, (CE_NOTE,
-		    "drsas_initiate_ocr_if_fw_is_faulty: "
-		    "FW in Fault state, detected in ISR: "
-		    "FW doesn't support ocr "));
-		return (ADAPTER_RESET_NOT_REQUIRED);
-		} else {
-		con_log(CL_ANN1, (CE_NOTE,
-		    "drsas_initiate_ocr_if_fw_is_faulty: "
-		    "FW in Fault state, detected in ISR: FW supports ocr "));
-			return (ADAPTER_RESET_REQUIRED);
-		}
-	}
-	return (ADAPTER_RESET_NOT_REQUIRED);
 }
 
 /*
@@ -3267,12 +2675,11 @@ drsas_softintr(struct drsas_instance *instance)
 	con_log(CL_ANN1, (CE_CONT, "drsas_softintr called"));
 
 	ASSERT(instance);
-
 	mutex_enter(&instance->completed_pool_mtx);
 
 	if (mlist_empty(&instance->completed_pool_list)) {
 		mutex_exit(&instance->completed_pool_mtx);
-		return (DDI_INTR_CLAIMED);
+		return (DDI_INTR_UNCLAIMED);
 	}
 
 	instance->softint_running = 1;
@@ -3295,10 +2702,7 @@ drsas_softintr(struct drsas_instance *instance)
 		    DDI_SUCCESS) {
 			drsas_fm_ereport(instance, DDI_FM_DEVICE_NO_RESPONSE);
 			ddi_fm_service_impact(instance->dip, DDI_SERVICE_LOST);
-			con_log(CL_ANN1, (CE_WARN,
-			    "drsas_softintr: "
-			    "FMA check reports DMA handle failure"));
-			return (DDI_INTR_CLAIMED);
+			return (DDI_INTR_UNCLAIMED);
 		}
 
 		hdr = &cmd->frame->hdr;
@@ -3345,9 +2749,6 @@ drsas_softintr(struct drsas_instance *instance)
 			    "CDB[0] = %x completed for %s: size %lx context %x",
 			    pkt->pkt_cdbp[0], ((acmd->islogical) ? "LD" : "PD"),
 			    acmd->cmd_dmacount, hdr->context));
-			DTRACE_PROBE3(softintr_cdb, uint8_t, pkt->pkt_cdbp[0],
-			    uint_t, acmd->cmd_cdblen, ulong_t,
-			    acmd->cmd_dmacount);
 
 			if (pkt->pkt_cdbp[0] == SCMD_INQUIRY) {
 				struct scsi_inquiry	*inq;
@@ -3375,9 +2776,6 @@ drsas_softintr(struct drsas_instance *instance)
 					}
 				}
 			}
-
-			DTRACE_PROBE2(softintr_done, uint8_t, hdr->cmd,
-			    uint8_t, hdr->cmd_status);
 
 			switch (hdr->cmd_status) {
 			case MFI_STAT_OK:
@@ -3424,12 +2822,12 @@ drsas_softintr(struct drsas_instance *instance)
 					    acmd->cmd_scblen -
 					    offsetof(struct scsi_arq_status,
 					    sts_sensedata), DDI_DEV_AUTOINCR);
-			}
+				}
 				break;
 			case MFI_STAT_LD_OFFLINE:
 			case MFI_STAT_DEVICE_NOT_FOUND:
 				con_log(CL_ANN1, (CE_CONT,
-				"drsas_softintr:device not found error"));
+				    "device not found error"));
 				pkt->pkt_reason	= CMD_DEV_GONE;
 				pkt->pkt_statistics  = STAT_DISCON;
 				break;
@@ -3472,6 +2870,8 @@ drsas_softintr(struct drsas_instance *instance)
 
 			atomic_add_16(&instance->fw_outstanding, (-1));
 
+			return_mfi_pkt(instance, cmd);
+
 			(void) drsas_common_check(instance, cmd);
 
 			if (acmd->cmd_dmahandle) {
@@ -3487,15 +2887,9 @@ drsas_softintr(struct drsas_instance *instance)
 			/* Call the callback routine */
 			if (((pkt->pkt_flags & FLAG_NOINTR) == 0) &&
 			    pkt->pkt_comp) {
-
-				con_log(CL_ANN1, (CE_NOTE, "drsas_softintr: "
-				    "posting to scsa cmd %p index %x pkt %p "
-				    "time %llx", (void *)cmd, cmd->index,
-				    (void *)pkt, gethrtime()));
 				(*pkt->pkt_comp)(pkt);
-
 			}
-			return_mfi_pkt(instance, cmd);
+
 			break;
 		case MFI_CMD_OP_SMP:
 		case MFI_CMD_OP_STP:
@@ -3537,15 +2931,7 @@ drsas_softintr(struct drsas_instance *instance)
 				pkt = cmd->pkt;
 				if (((pkt->pkt_flags & FLAG_NOINTR) == 0) &&
 				    pkt->pkt_comp) {
-
-					con_log(CL_ANN1, (CE_CONT, "posting to "
-					    "scsa cmd %p index %x pkt %p"
-					    "time %llx, default ", (void *)cmd,
-					    cmd->index, (void *)pkt,
-					    gethrtime()));
-
 					(*pkt->pkt_comp)(pkt);
-
 				}
 			}
 			con_log(CL_ANN, (CE_WARN, "Cmd type unknown !"));
@@ -3574,7 +2960,6 @@ drsas_alloc_dma_obj(struct drsas_instance *instance, dma_obj_t *obj,
 
 	tmp_endian_attr = endian_attr;
 	tmp_endian_attr.devacc_attr_endian_flags = endian_flags;
-	tmp_endian_attr.devacc_attr_access = DDI_DEFAULT_ACC;
 
 	i = ddi_dma_alloc_handle(instance->dip, &obj->dma_attr,
 	    DDI_DMA_SLEEP, NULL, &obj->dma_handle);
@@ -3891,7 +3276,6 @@ build_cmd(struct drsas_instance *instance, struct scsi_address *ap,
 	ddi_acc_handle_t acc_handle;
 	struct drsas_cmd		*cmd;
 	struct drsas_sge64		*mfi_sgl;
-	struct drsas_sge_ieee		*mfi_sgl_ieee;
 	struct scsa_cmd			*acmd = PKT2CMD(pkt);
 	struct drsas_pthru_frame 	*pthru;
 	struct drsas_io_frame		*ldio;
@@ -3903,12 +3287,8 @@ build_cmd(struct drsas_instance *instance, struct scsi_address *ap,
 
 	/* get the command packet */
 	if (!(cmd = get_mfi_pkt(instance))) {
-		DTRACE_PROBE2(build_cmd_mfi_err, uint16_t,
-		    instance->fw_outstanding, uint16_t, instance->max_fw_cmds);
 		return (NULL);
 	}
-
-	cmd->retry_count_for_ocr = 0;
 
 	acc_handle = cmd->frame_dma_obj.acc_handle;
 
@@ -3918,8 +3298,6 @@ build_cmd(struct drsas_instance *instance, struct scsi_address *ap,
 
 	cmd->pkt = pkt;
 	cmd->cmd = acmd;
-	DTRACE_PROBE3(build_cmds, uint8_t, pkt->pkt_cdbp[0],
-	    ulong_t, acmd->cmd_dmacount, ulong_t, acmd->cmd_dma_len);
 
 	/* lets get the command directions */
 	if (acmd->cmd_flags & CFLAG_DMASEND) {
@@ -3942,9 +3320,6 @@ build_cmd(struct drsas_instance *instance, struct scsi_address *ap,
 		flags = MFI_FRAME_DIR_NONE;
 	}
 
-	if (instance->flag_ieee) {
-		flags |= MFI_FRAME_IEEE;
-	}
 	flags |= MFI_FRAME_SGL64;
 
 	switch (pkt->pkt_cdbp[0]) {
@@ -3991,12 +3366,7 @@ build_cmd(struct drsas_instance *instance, struct scsi_address *ap,
 			    (acmd->cmd_cdblen != 6) ? pkt->pkt_cdbp[1] : 0);
 			ddi_put8(acc_handle, &ldio->sge_count,
 			    acmd->cmd_cookiecnt);
-			if (instance->flag_ieee) {
-				mfi_sgl_ieee =
-				    (struct drsas_sge_ieee *)&ldio->sgl;
-			} else {
-				mfi_sgl = (struct drsas_sge64	*)&ldio->sgl;
-			}
+			mfi_sgl = (struct drsas_sge64	*)&ldio->sgl;
 
 			context = ddi_get32(acc_handle, &ldio->context);
 
@@ -4093,11 +3463,7 @@ build_cmd(struct drsas_instance *instance, struct scsi_address *ap,
 		ddi_put32(acc_handle, &pthru->data_xfer_len,
 		    acmd->cmd_dmacount);
 		ddi_put8(acc_handle, &pthru->sge_count, acmd->cmd_cookiecnt);
-		if (instance->flag_ieee) {
-			mfi_sgl_ieee = (struct drsas_sge_ieee *)&pthru->sgl;
-		} else {
-			mfi_sgl	= (struct drsas_sge64 *)&pthru->sgl;
-		}
+		mfi_sgl			= (struct drsas_sge64 *)&pthru->sgl;
 
 		bzero(cmd->sense, SENSE_LENGTH);
 		ddi_put8(acc_handle, &pthru->sense_len, SENSE_LENGTH);
@@ -4115,23 +3481,14 @@ build_cmd(struct drsas_instance *instance, struct scsi_address *ap,
 	context = context;
 #endif
 	/* prepare the scatter-gather list for the firmware */
-	if (instance->flag_ieee) {
-		for (i = 0; i < acmd->cmd_cookiecnt; i++, mfi_sgl_ieee++) {
-			ddi_put64(acc_handle, &mfi_sgl_ieee->phys_addr,
-			    acmd->cmd_dmacookies[i].dmac_laddress);
-			ddi_put32(acc_handle, &mfi_sgl_ieee->length,
-			    acmd->cmd_dmacookies[i].dmac_size);
-		}
-		sge_bytes = sizeof (struct drsas_sge_ieee)*acmd->cmd_cookiecnt;
-	} else {
-		for (i = 0; i < acmd->cmd_cookiecnt; i++, mfi_sgl++) {
-			ddi_put64(acc_handle, &mfi_sgl->phys_addr,
-			    acmd->cmd_dmacookies[i].dmac_laddress);
-			ddi_put32(acc_handle, &mfi_sgl->length,
-			    acmd->cmd_dmacookies[i].dmac_size);
-		}
-		sge_bytes = sizeof (struct drsas_sge64)*acmd->cmd_cookiecnt;
+	for (i = 0; i < acmd->cmd_cookiecnt; i++, mfi_sgl++) {
+		ddi_put64(acc_handle, &mfi_sgl->phys_addr,
+		    acmd->cmd_dmacookies[i].dmac_laddress);
+		ddi_put32(acc_handle, &mfi_sgl->length,
+		    acmd->cmd_dmacookies[i].dmac_size);
 	}
+
+	sge_bytes = sizeof (struct drsas_sge64)*acmd->cmd_cookiecnt;
 
 	cmd->frame_count = (sge_bytes / MRMFI_FRAME_SIZE) +
 	    ((sge_bytes % MRMFI_FRAME_SIZE) ? 1 : 0) + 1;
@@ -4142,27 +3499,7 @@ build_cmd(struct drsas_instance *instance, struct scsi_address *ap,
 
 	return (cmd);
 }
-#ifndef __sparc
-static int
-wait_for_outstanding(struct drsas_instance *instance)
-{
-	int		i;
-	uint32_t	wait_time = 90;
 
-	for (i = 0; i < wait_time; i++) {
-		if (!instance->fw_outstanding) {
-			break;
-		}
-		drv_usecwait(MILLISEC); /* wait for 1000 usecs */;
-	}
-
-	if (instance->fw_outstanding) {
-		return (1);
-	}
-
-	return (0);
-}
-#endif  /* __sparc */
 /*
  * issue_mfi_pthru
  */
@@ -4182,11 +3519,6 @@ issue_mfi_pthru(struct drsas_instance *instance, struct drsas_ioctl *ioctl,
 	pthru = &cmd->frame->pthru;
 	kpthru = (struct drsas_pthru_frame *)&ioctl->frame[0];
 
-	if (instance->adapterresetinprogress) {
-		con_log(CL_ANN1, (CE_NOTE, "issue_mfi_pthru: Reset flag set, "
-		"returning mfi_pkt and setting TRAN_BUSY\n"));
-		return (DDI_FAILURE);
-	}
 	model = ddi_model_convert_from(mode & FMODELS);
 	if (model == DDI_MODEL_ILP32) {
 		con_log(CL_ANN1, (CE_NOTE, "issue_mfi_pthru: DDI_MODEL_LP32"));
@@ -4223,7 +3555,6 @@ issue_mfi_pthru(struct drsas_instance *instance, struct drsas_ioctl *ioctl,
 			    "could not allocate data transfer buffer."));
 			return (DDI_FAILURE);
 		}
-		(void) memset(pthru_dma_obj.buffer, 0, xferlen);
 
 		/* If IOCTL requires DMA WRITE, do ddi_copyin IOCTL data copy */
 		if (kpthru->flags & MFI_FRAME_DIR_WRITE) {
@@ -4243,7 +3574,7 @@ issue_mfi_pthru(struct drsas_instance *instance, struct drsas_ioctl *ioctl,
 	}
 
 	ddi_put8(acc_handle, &pthru->cmd, kpthru->cmd);
-	ddi_put8(acc_handle, &pthru->sense_len, 0);
+	ddi_put8(acc_handle, &pthru->sense_len, kpthru->sense_len);
 	ddi_put8(acc_handle, &pthru->cmd_status, 0);
 	ddi_put8(acc_handle, &pthru->scsi_status, 0);
 	ddi_put8(acc_handle, &pthru->target_id, kpthru->target_id);
@@ -4290,8 +3621,6 @@ issue_mfi_pthru(struct drsas_instance *instance, struct drsas_ioctl *ioctl,
 
 	con_log(CL_ANN, (CE_NOTE, "issue_mfi_pthru: cmd_status %x, "
 	    "scsi_status %x", kpthru->cmd_status, kpthru->scsi_status));
-	DTRACE_PROBE3(issue_pthru, uint8_t, kpthru->cmd, uint8_t,
-	    kpthru->cmd_status, uint8_t, kpthru->scsi_status);
 
 	if (xferlen) {
 		/* free kernel buffer */
@@ -4320,11 +3649,7 @@ issue_mfi_dcmd(struct drsas_instance *instance, struct drsas_ioctl *ioctl,
 	int i;
 	dcmd = &cmd->frame->dcmd;
 	kdcmd = (struct drsas_dcmd_frame *)&ioctl->frame[0];
-	if (instance->adapterresetinprogress) {
-		con_log(CL_ANN1, (CE_NOTE, "Reset flag set, "
-		"returning mfi_pkt and setting TRAN_BUSY\n"));
-		return (DDI_FAILURE);
-	}
+
 	model = ddi_model_convert_from(mode & FMODELS);
 	if (model == DDI_MODEL_ILP32) {
 		con_log(CL_ANN1, (CE_NOTE, "issue_mfi_dcmd: DDI_MODEL_ILP32"));
@@ -4360,7 +3685,6 @@ issue_mfi_dcmd(struct drsas_instance *instance, struct drsas_ioctl *ioctl,
 			    "could not allocate data transfer buffer."));
 			return (DDI_FAILURE);
 		}
-		(void) memset(dcmd_dma_obj.buffer, 0, xferlen);
 
 		/* If IOCTL requires DMA WRITE, do ddi_copyin IOCTL data copy */
 		if (kdcmd->flags & MFI_FRAME_DIR_WRITE) {
@@ -4415,8 +3739,6 @@ issue_mfi_dcmd(struct drsas_instance *instance, struct drsas_ioctl *ioctl,
 	}
 
 	kdcmd->cmd_status = ddi_get8(acc_handle, &dcmd->cmd_status);
-	DTRACE_PROBE3(issue_dcmd, uint32_t, kdcmd->opcode, uint8_t,
-	    kdcmd->cmd, uint8_t, kdcmd->cmd_status);
 
 	if (xferlen) {
 		/* free kernel buffer */
@@ -4454,11 +3776,6 @@ issue_mfi_smp(struct drsas_instance *instance, struct drsas_ioctl *ioctl,
 	smp = &cmd->frame->smp;
 	ksmp = (struct drsas_smp_frame *)&ioctl->frame[0];
 
-	if (instance->adapterresetinprogress) {
-		con_log(CL_ANN1, (CE_NOTE, "Reset flag set, "
-		"returning mfi_pkt and setting TRAN_BUSY\n"));
-		return (DDI_FAILURE);
-	}
 	model = ddi_model_convert_from(mode & FMODELS);
 	if (model == DDI_MODEL_ILP32) {
 		con_log(CL_ANN1, (CE_NOTE, "issue_mfi_smp: DDI_MODEL_ILP32"));
@@ -4519,7 +3836,6 @@ issue_mfi_smp(struct drsas_instance *instance, struct drsas_ioctl *ioctl,
 			    "could not allocate data transfer buffer."));
 			return (DDI_FAILURE);
 		}
-		(void) memset(request_dma_obj.buffer, 0, request_xferlen);
 
 		/* If IOCTL requires DMA WRITE, do ddi_copyin IOCTL data copy */
 		for (i = 0; i < request_xferlen; i++) {
@@ -4550,7 +3866,6 @@ issue_mfi_smp(struct drsas_instance *instance, struct drsas_ioctl *ioctl,
 			    "could not allocate data transfer buffer."));
 			return (DDI_FAILURE);
 		}
-		(void) memset(response_dma_obj.buffer, 0, response_xferlen);
 
 		/* If IOCTL requires DMA WRITE, do ddi_copyin IOCTL data copy */
 		for (i = 0; i < response_xferlen; i++) {
@@ -4581,7 +3896,7 @@ issue_mfi_smp(struct drsas_instance *instance, struct drsas_ioctl *ioctl,
 	model = ddi_model_convert_from(mode & FMODELS);
 	if (model == DDI_MODEL_ILP32) {
 		con_log(CL_ANN1, (CE_NOTE,
-		    "issue_mfi_smp: DDI_MODEL_ILP32"));
+		    "handle_drv_ioctl: DDI_MODEL_ILP32"));
 
 		sge32 = &smp->sgl[0].sge32[0];
 		ddi_put32(acc_handle, &sge32[0].length, response_xferlen);
@@ -4593,7 +3908,7 @@ issue_mfi_smp(struct drsas_instance *instance, struct drsas_ioctl *ioctl,
 	} else {
 #ifdef _ILP32
 		con_log(CL_ANN1, (CE_NOTE,
-		    "issue_mfi_smp: DDI_MODEL_ILP32"));
+		    "handle_drv_ioctl: DDI_MODEL_ILP32"));
 		sge32 = &smp->sgl[0].sge32[0];
 		ddi_put32(acc_handle, &sge32[0].length, response_xferlen);
 		ddi_put32(acc_handle, &sge32[0].phys_addr,
@@ -4661,7 +3976,7 @@ issue_mfi_smp(struct drsas_instance *instance, struct drsas_ioctl *ioctl,
 	ksmp->cmd_status = ddi_get8(acc_handle, &smp->cmd_status);
 	con_log(CL_ANN1, (CE_NOTE, "issue_mfi_smp: smp->cmd_status = %d",
 	    ddi_get8(acc_handle, &smp->cmd_status)));
-	DTRACE_PROBE2(issue_smp, uint8_t, ksmp->cmd, uint8_t, ksmp->cmd_status);
+
 
 	if (request_xferlen) {
 		/* free kernel buffer */
@@ -4702,11 +4017,6 @@ issue_mfi_stp(struct drsas_instance *instance, struct drsas_ioctl *ioctl,
 	stp = &cmd->frame->stp;
 	kstp = (struct drsas_stp_frame *)&ioctl->frame[0];
 
-	if (instance->adapterresetinprogress) {
-		con_log(CL_ANN1, (CE_NOTE, "Reset flag set, "
-		"returning mfi_pkt and setting TRAN_BUSY\n"));
-		return (DDI_FAILURE);
-	}
 	model = ddi_model_convert_from(mode & FMODELS);
 	if (model == DDI_MODEL_ILP32) {
 		con_log(CL_ANN1, (CE_NOTE, "issue_mfi_stp: DDI_MODEL_ILP32"));
@@ -4759,7 +4069,6 @@ issue_mfi_stp(struct drsas_instance *instance, struct drsas_ioctl *ioctl,
 			    "could not allocate data transfer buffer."));
 			return (DDI_FAILURE);
 		}
-		(void) memset(fis_dma_obj.buffer, 0, fis_xferlen);
 
 		/* If IOCTL requires DMA WRITE, do ddi_copyin IOCTL data copy */
 		for (i = 0; i < fis_xferlen; i++) {
@@ -4792,7 +4101,6 @@ issue_mfi_stp(struct drsas_instance *instance, struct drsas_ioctl *ioctl,
 			    "could not allocate data transfer buffer."));
 			return (DDI_FAILURE);
 		}
-		(void) memset(data_dma_obj.buffer, 0, data_xferlen);
 
 		/* If IOCTL requires DMA WRITE, do ddi_copyin IOCTL data copy */
 		for (i = 0; i < data_xferlen; i++) {
@@ -4860,7 +4168,6 @@ issue_mfi_stp(struct drsas_instance *instance, struct drsas_ioctl *ioctl,
 	}
 
 	kstp->cmd_status = ddi_get8(acc_handle, &stp->cmd_status);
-	DTRACE_PROBE2(issue_stp, uint8_t, kstp->cmd, uint8_t, kstp->cmd_status);
 
 	if (fis_xferlen) {
 		/* free kernel buffer */
@@ -4945,16 +4252,19 @@ handle_drv_ioctl(struct drsas_instance *instance, struct drsas_ioctl *ioctl,
 		    "DRSAS_DRIVER_IOCTL_DRIVER_VERSION"));
 
 		fill_up_drv_ver(&dv);
-
-		if (ddi_copyout(&dv, ubuf, xferlen, mode)) {
-			con_log(CL_ANN, (CE_WARN, "handle_drv_ioctl: "
-			    "DRSAS_DRIVER_IOCTL_DRIVER_VERSION : "
-			    "copy to user space failed"));
-			kdcmd->cmd_status = 1;
-			rval = 1;
-		} else {
-			kdcmd->cmd_status = 0;
+		for (i = 0; i < xferlen; i++) {
+			if (ddi_copyout((uint8_t *)&dv + i, (uint8_t *)ubuf + i,
+			    1, mode)) {
+				con_log(CL_ANN, (CE_WARN, "handle_drv_ioctl: "
+				    "DRSAS_DRIVER_IOCTL_DRIVER_VERSION"
+				    " : copy to user space failed"));
+				kdcmd->cmd_status = 1;
+				rval = DDI_FAILURE;
+				break;
+			}
 		}
+		if (i == xferlen)
+			kdcmd->cmd_status = 0;
 		break;
 	case DRSAS_DRIVER_IOCTL_PCI_INFORMATION:
 		con_log(CL_ANN1, (CE_NOTE, "handle_drv_ioctl: "
@@ -4982,16 +4292,21 @@ handle_drv_ioctl(struct drsas_instance *instance, struct drsas_ioctl *ioctl,
 			pci_conf_buf[i] =
 			    pci_config_get8(instance->pci_handle, i);
 		}
-
-		if (ddi_copyout(&pi, ubuf, xferlen, mode)) {
-			con_log(CL_ANN, (CE_WARN, "handle_drv_ioctl: "
-			    "DRSAS_DRIVER_IOCTL_PCI_INFORMATION : "
-			    "copy to user space failed"));
-			kdcmd->cmd_status = 1;
-			rval = 1;
-		} else {
-			kdcmd->cmd_status = 0;
+		for (i = 0; i < xferlen; i++) {
+			if (ddi_copyout((uint8_t *)&pi + i, (uint8_t *)ubuf + i,
+			    1, mode)) {
+				con_log(CL_ANN, (CE_WARN, "handle_drv_ioctl: "
+				    "DRSAS_DRIVER_IOCTL_PCI_INFORMATION"
+				    " : copy to user space failed"));
+				kdcmd->cmd_status = 1;
+				rval = DDI_FAILURE;
+				break;
+			}
 		}
+
+		if (i == xferlen)
+			kdcmd->cmd_status = 0;
+
 		break;
 	default:
 		con_log(CL_ANN, (CE_WARN, "handle_drv_ioctl: "
@@ -5022,11 +4337,8 @@ handle_mfi_ioctl(struct drsas_instance *instance, struct drsas_ioctl *ioctl,
 	if (!cmd) {
 		con_log(CL_ANN, (CE_WARN, "dr_sas: "
 		    "failed to get a cmd packet"));
-		DTRACE_PROBE2(mfi_ioctl_err, uint16_t,
-		    instance->fw_outstanding, uint16_t, instance->max_fw_cmds);
 		return (DDI_FAILURE);
 	}
-	cmd->retry_count_for_ocr = 0;
 
 	/* Clear the frame buffer and assign back the context id */
 	(void) memset((char *)&cmd->frame[0], 0, sizeof (union drsas_frame));
@@ -5035,7 +4347,7 @@ handle_mfi_ioctl(struct drsas_instance *instance, struct drsas_ioctl *ioctl,
 
 	hdr = (struct drsas_header *)&ioctl->frame[0];
 
-	switch (ddi_get8(cmd->frame_dma_obj.acc_handle, &hdr->cmd)) {
+	switch (hdr->cmd) {
 	case MFI_CMD_OP_DCMD:
 		rval = issue_mfi_dcmd(instance, ioctl, cmd, mode);
 		break;
@@ -5056,11 +4368,10 @@ handle_mfi_ioctl(struct drsas_instance *instance, struct drsas_ioctl *ioctl,
 		break;
 	}
 
-	if (drsas_common_check(instance, cmd) != DDI_SUCCESS)
-		rval = DDI_FAILURE;
 
 	return_mfi_pkt(instance, cmd);
-
+	if (drsas_common_check(instance, cmd) != DDI_SUCCESS)
+		rval = DDI_FAILURE;
 	return (rval);
 }
 
@@ -5104,14 +4415,12 @@ register_mfi_aen(struct drsas_instance *instance, uint32_t seq_num,
 	 * old and current and re-issue to the FW
 	 */
 
-	curr_aen.word = LE_32(class_locale_word);
-	curr_aen.members.locale = LE_16(curr_aen.members.locale);
+	curr_aen.word = class_locale_word;
 	aen_cmd = instance->aen_cmd;
 	if (aen_cmd) {
 		prev_aen.word = ddi_get32(aen_cmd->frame_dma_obj.acc_handle,
 		    &aen_cmd->frame->dcmd.mbox.w[1]);
-		prev_aen.word = LE_32(prev_aen.word);
-		prev_aen.members.locale = LE_16(prev_aen.members.locale);
+
 		/*
 		 * A class whose enum value is smaller is inclusive of all
 		 * higher values. If a PROGRESS (= -1) was previously
@@ -5147,18 +4456,13 @@ register_mfi_aen(struct drsas_instance *instance, uint32_t seq_num,
 			}
 		}
 	} else {
-		curr_aen.word = LE_32(class_locale_word);
-		curr_aen.members.locale = LE_16(curr_aen.members.locale);
+		curr_aen.word = class_locale_word;
 	}
 
 	cmd = get_mfi_pkt(instance);
 
-	if (!cmd) {
-		DTRACE_PROBE2(mfi_aen_err, uint16_t, instance->fw_outstanding,
-		    uint16_t, instance->max_fw_cmds);
+	if (!cmd)
 		return (ENOMEM);
-	}
-	cmd->retry_count_for_ocr = 0;
 	/* Clear the frame buffer and assign back the context id */
 	(void) memset((char *)&cmd->frame[0], 0, sizeof (union drsas_frame));
 	ddi_put32(cmd->frame_dma_obj.acc_handle, &cmd->frame->hdr.context,
@@ -5184,8 +4488,6 @@ register_mfi_aen(struct drsas_instance *instance, uint32_t seq_num,
 	ddi_put32(cmd->frame_dma_obj.acc_handle, &dcmd->opcode,
 	    DR_DCMD_CTRL_EVENT_WAIT);
 	ddi_put32(cmd->frame_dma_obj.acc_handle, &dcmd->mbox.w[0], seq_num);
-	curr_aen.members.locale = LE_16(curr_aen.members.locale);
-	curr_aen.word = LE_32(curr_aen.word);
 	ddi_put32(cmd->frame_dma_obj.acc_handle, &dcmd->mbox.w[1],
 	    curr_aen.word);
 	ddi_put32(cmd->frame_dma_obj.acc_handle, &dcmd->sgl.sge32[0].phys_addr,
@@ -5281,115 +4583,6 @@ display_scsi_inquiry(caddr_t scsi_inq)
 	con_log(CL_ANN1, (CE_CONT, inquiry_buf));
 }
 
-static void
-io_timeout_checker(void *arg)
-{
-	struct scsi_pkt *pkt;
-	struct drsas_instance *instance = arg;
-	struct drsas_cmd	*cmd = NULL;
-	struct drsas_header	*hdr;
-	int time = 0;
-	int counter = 0;
-	struct mlist_head	*pos, *next;
-	mlist_t			process_list;
-
-	if (instance->adapterresetinprogress == 1) {
-		con_log(CL_ANN1, (CE_NOTE, "io_timeout_checker"
-		    " reset in progress"));
-		instance->timeout_id = timeout(io_timeout_checker,
-		    (void *) instance, drv_usectohz(DRSAS_1_SECOND));
-		return;
-	}
-
-	/* See if this check needs to be in the beginning or last in ISR */
-	if (drsas_initiate_ocr_if_fw_is_faulty(instance) ==  1) {
-		con_log(CL_ANN1, (CE_NOTE,
-		    "Fw Fault state Handling in io_timeout_checker"));
-		if (instance->adapterresetinprogress == 0) {
-			(void) drsas_reset_ppc(instance);
-		}
-		instance->timeout_id = timeout(io_timeout_checker,
-		    (void *) instance, drv_usectohz(DRSAS_1_SECOND));
-		return;
-	}
-
-	INIT_LIST_HEAD(&process_list);
-
-	mutex_enter(&instance->cmd_pend_mtx);
-	mlist_for_each_safe(pos, next, &instance->cmd_pend_list) {
-		cmd = mlist_entry(pos, struct drsas_cmd, list);
-
-		if (cmd == NULL) {
-			continue;
-		}
-
-		if (cmd->sync_cmd == DRSAS_TRUE) {
-			hdr = (struct drsas_header *)&cmd->frame->hdr;
-			if (hdr == NULL) {
-				continue;
-			}
-			time = --cmd->drv_pkt_time;
-		} else {
-			pkt = cmd->pkt;
-			if (pkt == NULL) {
-				continue;
-			}
-			time = --cmd->drv_pkt_time;
-		}
-		if (time <= 0) {
-			con_log(CL_ANN1, (CE_NOTE, "%llx: "
-			    "io_timeout_checker: TIMING OUT: pkt "
-			    ": %p, cmd %p", gethrtime(), (void *)pkt,
-			    (void *)cmd));
-			counter++;
-			break;
-		}
-	}
-	mutex_exit(&instance->cmd_pend_mtx);
-
-	if (counter) {
-		con_log(CL_ANN1, (CE_NOTE,
-		    "io_timeout_checker "
-		    "cmd->retrycount_for_ocr %d, "
-		    "cmd index %d , cmd address %p ",
-		    cmd->retry_count_for_ocr+1, cmd->index, (void *)cmd));
-
-		if (instance->disable_online_ctrl_reset == 1) {
-			con_log(CL_ANN1, (CE_NOTE, "drsas: "
-			    "OCR is not supported by the Firmware "
-			    "Failing all the queued packets \n"));
-
-			(void) drsas_kill_adapter(instance);
-			return;
-		} else {
-			if (cmd->retry_count_for_ocr <=  IO_RETRY_COUNT) {
-				if (instance->adapterresetinprogress == 0) {
-				con_log(CL_ANN1, (CE_NOTE, "drsas: "
-				    "OCR is supported by FW "
-				    "triggering  drsas_reset_ppc"));
-				(void) drsas_reset_ppc(instance);
-				}
-			} else {
-				con_log(CL_ANN1, (CE_NOTE,
-				    "io_timeout_checker:"
-				    " cmdindex: %d,cmd address: %p "
-				    "timed out even after 3 resets: "
-				    "so kill adapter", cmd->index,
-				    (void *)cmd));
-				(void) drsas_kill_adapter(instance);
-				return;
-			}
-		}
-	}
-
-
-	con_log(CL_ANN1, (CE_NOTE, "drsas: "
-	    "schedule next timeout check: "
-	    "do timeout \n"));
-	instance->timeout_id =
-	    timeout(io_timeout_checker, (void *)instance,
-	    drv_usectohz(DRSAS_1_SECOND));
-}
 static int
 read_fw_status_reg_ppc(struct drsas_instance *instance)
 {
@@ -5399,28 +4592,8 @@ read_fw_status_reg_ppc(struct drsas_instance *instance)
 static void
 issue_cmd_ppc(struct drsas_cmd *cmd, struct drsas_instance *instance)
 {
-	struct scsi_pkt *pkt;
 	atomic_add_16(&instance->fw_outstanding, 1);
 
-	pkt = cmd->pkt;
-	if (pkt) {
-		con_log(CL_ANN1, (CE_CONT, "%llx : issue_cmd_ppc:"
-		    "ISSUED CMD TO FW : called : cmd:"
-		    ": %p instance : %p pkt : %p pkt_time : %x\n",
-		    gethrtime(), (void *)cmd, (void *)instance,
-		    (void *)pkt, cmd->drv_pkt_time));
-		if (instance->adapterresetinprogress) {
-			cmd->drv_pkt_time = (uint16_t)debug_timeout_g;
-			con_log(CL_ANN1, (CE_NOTE, "Reset the scsi_pkt timer"));
-		} else {
-			push_pending_mfi_pkt(instance, cmd);
-		}
-
-	} else {
-		con_log(CL_ANN1, (CE_CONT, "%llx : issue_cmd_ppc:"
-		    "ISSUED CMD TO FW : called : cmd : %p, instance: %p"
-		    "(NO PKT)\n", gethrtime(), (void *)cmd, (void *)instance));
-	}
 	/* Issue the command to the FW */
 	WR_IB_QPORT((cmd->frame_phys_addr) |
 	    (((cmd->frame_count - 1) << 1) | 1), instance);
@@ -5431,28 +4604,12 @@ issue_cmd_ppc(struct drsas_cmd *cmd, struct drsas_instance *instance)
  */
 static int
 issue_cmd_in_sync_mode_ppc(struct drsas_instance *instance,
-struct drsas_cmd *cmd)
+    struct drsas_cmd *cmd)
 {
-	int	i;
+	int		i;
 	uint32_t	msecs = MFI_POLL_TIMEOUT_SECS * (10 * MILLISEC);
-	struct drsas_header *hdr = &cmd->frame->hdr;
 
 	con_log(CL_ANN1, (CE_NOTE, "issue_cmd_in_sync_mode_ppc: called"));
-
-	if (instance->adapterresetinprogress) {
-		cmd->drv_pkt_time = ddi_get16(
-		    cmd->frame_dma_obj.acc_handle, &hdr->timeout);
-		if (cmd->drv_pkt_time < debug_timeout_g)
-			cmd->drv_pkt_time = (uint16_t)debug_timeout_g;
-		con_log(CL_ANN1, (CE_NOTE, "sync_mode_ppc: "
-		    "issue and return in reset case\n"));
-		WR_IB_QPORT((cmd->frame_phys_addr) |
-		    (((cmd->frame_count - 1) << 1) | 1), instance);
-		return (DDI_SUCCESS);
-	} else {
-		con_log(CL_ANN1, (CE_NOTE, "sync_mode_ppc: pushing the pkt\n"));
-		push_pending_mfi_pkt(instance, cmd);
-	}
 
 	cmd->cmd_status	= ENODATA;
 
@@ -5511,7 +4668,7 @@ issue_cmd_in_poll_mode_ppc(struct drsas_instance *instance,
 
 	if (ddi_get8(cmd->frame_dma_obj.acc_handle, &frame_hdr->cmd_status)
 	    == MFI_CMD_STATUS_POLL_MODE) {
-		con_log(CL_ANN1, (CE_NOTE, "issue_cmd_in_poll_mode: "
+		con_log(CL_ANN, (CE_NOTE, "issue_cmd_in_poll_mode: "
 		    "cmd polling timed out"));
 		return (DDI_FAILURE);
 	}
@@ -5566,7 +4723,6 @@ static int
 intr_ack_ppc(struct drsas_instance *instance)
 {
 	uint32_t	status;
-	int ret = DDI_INTR_CLAIMED;
 
 	con_log(CL_ANN1, (CE_NOTE, "intr_ack_ppc: called"));
 
@@ -5576,17 +4732,9 @@ intr_ack_ppc(struct drsas_instance *instance)
 	con_log(CL_ANN1, (CE_NOTE, "intr_ack_ppc: status = 0x%x", status));
 
 	if (!(status & MFI_REPLY_2108_MESSAGE_INTR)) {
-		ret = DDI_INTR_UNCLAIMED;
+		return (DDI_INTR_UNCLAIMED);
 	}
 
-	if (drsas_check_acc_handle(instance->regmap_handle) != DDI_SUCCESS) {
-		ddi_fm_service_impact(instance->dip, DDI_SERVICE_LOST);
-		ret = DDI_INTR_UNCLAIMED;
-	}
-
-	if (ret == DDI_INTR_UNCLAIMED) {
-		return (ret);
-	}
 	/* clear the interrupt by writing back the same value */
 	WR_OB_DOORBELL_CLEAR(status, instance);
 
@@ -5595,169 +4743,9 @@ intr_ack_ppc(struct drsas_instance *instance)
 
 	con_log(CL_ANN1, (CE_NOTE, "intr_ack_ppc: interrupt cleared"));
 
-	return (ret);
+	return (DDI_INTR_CLAIMED);
 }
 
-/*
- * Marks HBA as bad. This will be called either when an
- * IO packet times out even after 3 FW resets
- * or FW is found to be fault even after 3 continuous resets.
- */
-
-static int
-drsas_kill_adapter(struct drsas_instance *instance)
-{
-		if (instance->deadadapter == 1)
-			return (DDI_FAILURE);
-
-		con_log(CL_ANN1, (CE_NOTE, "drsas_kill_adapter: "
-		    "Writing to doorbell with MFI_STOP_ADP "));
-		mutex_enter(&instance->ocr_flags_mtx);
-		instance->deadadapter = 1;
-		mutex_exit(&instance->ocr_flags_mtx);
-		instance->func_ptr->disable_intr(instance);
-		WR_IB_DOORBELL(MFI_STOP_ADP, instance);
-		(void) drsas_complete_pending_cmds(instance);
-		return (DDI_SUCCESS);
-}
-
-
-static int
-drsas_reset_ppc(struct drsas_instance *instance)
-{
-	uint32_t status;
-	uint32_t retry = 0;
-	uint32_t cur_abs_reg_val;
-	uint32_t fw_state;
-
-	if (instance->deadadapter == 1) {
-		con_log(CL_ANN1, (CE_NOTE, "drsas_reset_ppc: "
-		    "no more resets as HBA has been marked dead "));
-		return (DDI_FAILURE);
-	}
-	mutex_enter(&instance->ocr_flags_mtx);
-	instance->adapterresetinprogress = 1;
-	mutex_exit(&instance->ocr_flags_mtx);
-	con_log(CL_ANN1, (CE_NOTE, "drsas_reset_ppc: adpterresetinprogress "
-	    "flag set, time %llx", gethrtime()));
-	instance->func_ptr->disable_intr(instance);
-retry_reset:
-	WR_IB_WRITE_SEQ(0, instance);
-	WR_IB_WRITE_SEQ(4, instance);
-	WR_IB_WRITE_SEQ(0xb, instance);
-	WR_IB_WRITE_SEQ(2, instance);
-	WR_IB_WRITE_SEQ(7, instance);
-	WR_IB_WRITE_SEQ(0xd, instance);
-	con_log(CL_ANN1, (CE_NOTE, "drsas_reset_ppc: magic number written "
-	    "to write sequence register\n"));
-	delay(100 * drv_usectohz(MILLISEC));
-	status = RD_OB_DRWE(instance);
-
-	while (!(status & DIAG_WRITE_ENABLE)) {
-		delay(100 * drv_usectohz(MILLISEC));
-		status = RD_OB_DRWE(instance);
-		if (retry++ == 100) {
-			con_log(CL_ANN1, (CE_NOTE, "drsas_reset_ppc: DRWE bit "
-			    "check retry count %d\n", retry));
-			return (DDI_FAILURE);
-		}
-	}
-	WR_IB_DRWE(status | DIAG_RESET_ADAPTER, instance);
-	delay(100 * drv_usectohz(MILLISEC));
-	status = RD_OB_DRWE(instance);
-	while (status & DIAG_RESET_ADAPTER) {
-		delay(100 * drv_usectohz(MILLISEC));
-		status = RD_OB_DRWE(instance);
-		if (retry++ == 100) {
-			(void) drsas_kill_adapter(instance);
-			return (DDI_FAILURE);
-		}
-	}
-	con_log(CL_ANN1, (CE_NOTE, "drsas_reset_ppc: Adapter reset complete"));
-	con_log(CL_ANN1, (CE_NOTE, "drsas_reset_ppc: "
-	    "Calling mfi_state_transition_to_ready"));
-
-	/* Mark HBA as bad, if FW is fault after 3 continuous resets */
-	if (mfi_state_transition_to_ready(instance) ||
-	    debug_fw_faults_after_ocr_g == 1) {
-		cur_abs_reg_val =
-		    instance->func_ptr->read_fw_status_reg(instance);
-		fw_state	= cur_abs_reg_val & MFI_STATE_MASK;
-
-#ifdef OCRDEBUG
-		con_log(CL_ANN1, (CE_NOTE,
-		    "drsas_reset_ppc :before fake: FW is not ready "
-		    "FW state = 0x%x", fw_state));
-		if (debug_fw_faults_after_ocr_g == 1)
-			fw_state = MFI_STATE_FAULT;
-#endif
-
-		con_log(CL_ANN1, (CE_NOTE,  "drsas_reset_ppc : FW is not ready "
-		    "FW state = 0x%x", fw_state));
-
-		if (fw_state == MFI_STATE_FAULT) {
-			/* increment the count */
-			instance->fw_fault_count_after_ocr++;
-			if (instance->fw_fault_count_after_ocr
-			    < MAX_FW_RESET_COUNT) {
-				con_log(CL_ANN1, (CE_WARN, "drsas_reset_ppc: "
-				    "FW is in fault after OCR count %d ",
-				    instance->fw_fault_count_after_ocr));
-				goto retry_reset;
-
-			} else {
-				con_log(CL_ANN1, (CE_WARN, "drsas_reset_ppc: "
-				    "Max Reset Count exceeded "
-				    "Mark HBA as bad"));
-				(void) drsas_kill_adapter(instance);
-				return (DDI_FAILURE);
-			}
-		}
-	}
-	/* reset the counter as FW is up after OCR */
-	instance->fw_fault_count_after_ocr = 0;
-
-
-	ddi_put32(instance->mfi_internal_dma_obj.acc_handle,
-	    instance->producer, 0);
-
-	ddi_put32(instance->mfi_internal_dma_obj.acc_handle,
-	    instance->consumer, 0);
-
-	con_log(CL_ANN1, (CE_NOTE, "drsas_reset_ppc: "
-	    " after resetting produconsumer chck indexs:"
-	    "producer %x consumer %x", *instance->producer,
-	    *instance->consumer));
-
-	con_log(CL_ANN1, (CE_NOTE, "drsas_reset_ppc: "
-	    "Calling drsas_issue_init_mfi"));
-	(void) drsas_issue_init_mfi(instance);
-	con_log(CL_ANN1, (CE_NOTE, "drsas_reset_ppc: "
-	    "drsas_issue_init_mfi Done"));
-	con_log(CL_ANN1, (CE_NOTE, "drsas_reset_ppc: "
-	    "Calling drsas_print_pending_cmd\n"));
-	(void) drsas_print_pending_cmds(instance);
-	con_log(CL_ANN1, (CE_NOTE, "drsas_reset_ppc: "
-	    "drsas_print_pending_cmd done\n"));
-	instance->func_ptr->enable_intr(instance);
-	instance->fw_outstanding = 0;
-	con_log(CL_ANN1, (CE_NOTE, "drsas_reset_ppc: "
-	    "Calling drsas_issue_pending_cmds"));
-	(void) drsas_issue_pending_cmds(instance);
-	con_log(CL_ANN1, (CE_NOTE, "drsas_reset_ppc: "
-	"Complete"));
-	con_log(CL_ANN1, (CE_NOTE, "drsas_reset_ppc: "
-	    "Calling aen registration"));
-	instance->func_ptr->issue_cmd(instance->aen_cmd, instance);
-	con_log(CL_ANN1, (CE_NOTE, "Unsetting adpresetinprogress flag.\n"));
-	mutex_enter(&instance->ocr_flags_mtx);
-	instance->adapterresetinprogress = 0;
-	mutex_exit(&instance->ocr_flags_mtx);
-	con_log(CL_ANN1, (CE_NOTE, "drsas_reset_ppc: "
-	    "adpterresetinprogress flag unset"));
-	con_log(CL_ANN1, (CE_NOTE, "drsas_reset_ppc done\n"));
-	return (DDI_SUCCESS);
-}
 static int
 drsas_common_check(struct drsas_instance *instance,
     struct  drsas_cmd *cmd)
@@ -6388,7 +5376,6 @@ drsas_service_evt(struct drsas_instance *instance, int tgt, int lun, int event,
 		kmem_free(mrevt, sizeof (struct drsas_eventinfo));
 		return (DDI_FAILURE);
 	}
-	DTRACE_PROBE3(service_evt, int, tgt, int, lun, int, event);
 	return (DDI_SUCCESS);
 }
 
