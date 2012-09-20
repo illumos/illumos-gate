@@ -1,6 +1,7 @@
 '\" te
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright (c) 2012, Joyent, Inc. All Rights Reserved
 .\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at  http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text
@@ -1092,6 +1093,16 @@ integer.
 .ad
 .RS 11n
 The home lgroup of the process.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdmodel\fR\fR
+.ad
+.RS 11n
+The data model of the process, printed in the same manner as via
+\fBpflags\fR(1). The currently supported data models are _ILP32 and _LP64.
 .RE
 
 .sp

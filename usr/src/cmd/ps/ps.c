@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -130,7 +134,8 @@ enum fname {	/* enumeration of field names */
 	F_ZONE,		/* zone name */
 	F_ZONEID,	/* zone id */
 	F_CTID,		/* process contract id */
-	F_LGRP		/* process home lgroup */
+	F_LGRP,		/* process home lgroup */
+	F_DMODEL	/* process data model */
 };
 
 struct field {
@@ -204,6 +209,7 @@ static struct def_field fname[] = {
 	{ "zoneid",	"ZONEID",	5,	5	},
 	{ "ctid",	"CTID",		5,	5	},
 	{ "lgrp",	"LGRP",		4,	2 	},
+	{ "dmodel",	"DMODEL",	6,	6 	},
 };
 
 #define	NFIELDS	(sizeof (fname) / sizeof (fname[0]))
@@ -1035,33 +1041,61 @@ retry:
 	return (0);
 }
 
+static int
+field_cmp(const void *l, const void *r)
+{
+	struct def_field *lhs = *((struct def_field **)l);
+	struct def_field *rhs = *((struct def_field **)r);
+
+	return (strcmp(lhs->fname, rhs->fname));
+}
 
 static void
 usage(void)		/* print usage message and quit */
 {
+	struct def_field *df, *sorted[NFIELDS];
+	int pos = 80, i = 0;
+
 	static char usage1[] =
 	    "ps [ -aAdefHlcjLPyZ ] [ -o format ] [ -t termlist ]";
 	static char usage2[] =
 	    "\t[ -u userlist ] [ -U userlist ] [ -G grouplist ]";
 	static char usage3[] =
-	    "\t[ -p proclist ] [ -g pgrplist ] [ -s sidlist ] [ -z zonelist ] "
-	    "[-h lgrplist]";
+	    "\t[ -p proclist ] [ -g pgrplist ] [ -s sidlist ]";
 	static char usage4[] =
-	    "  'format' is one or more of:";
+	    "\t[ -z zonelist ] [-h lgrplist]";
 	static char usage5[] =
-	    "\tuser ruser group rgroup uid ruid gid rgid pid ppid pgid "
-	    "sid taskid ctid";
-	static char usage6[] =
-	    "\tpri opri pcpu pmem vsz rss osz nice class time etime stime zone "
-	    "zoneid";
-	static char usage7[] =
-	    "\tf s c lwp nlwp psr tty addr wchan fname comm args "
-	    "projid project pset lgrp";
+	    "  'format' is one or more of:";
 
 	(void) fprintf(stderr,
-	    gettext("usage: %s\n%s\n%s\n%s\n%s\n%s\n%s\n"),
+	    gettext("usage: %s\n%s\n%s\n%s\n%s"),
 	    gettext(usage1), gettext(usage2), gettext(usage3),
-	    gettext(usage4), gettext(usage5), gettext(usage6), gettext(usage7));
+	    gettext(usage4), gettext(usage5));
+
+	/*
+	 * Now print out the possible output formats such that they neatly fit
+	 * into eighty columns.  Note that the fact that we are determining
+	 * this output programmatically means that a gettext() is impossible --
+	 * but it would be a mistake to localize the output formats anyway as
+	 * they are tokens for input, not output themselves.
+	 */
+	for (df = &fname[0]; df < &fname[NFIELDS]; df++)
+		sorted[i++] = df;
+
+	(void) qsort(sorted, NFIELDS, sizeof (void *), field_cmp);
+
+	for (i = 0; i < NFIELDS; i++) {
+		if (pos + strlen((df = sorted[i])->fname) + 1 >= 80) {
+			(void) fprintf(stderr, "\n\t");
+			pos = 8;
+		}
+
+		(void) fprintf(stderr, "%s%s", pos > 8 ? " " : "", df->fname);
+		pos += strlen(df->fname) + 1;
+	}
+
+	(void) fprintf(stderr, "\n");
+
 	exit(1);
 }
 
@@ -1885,6 +1919,11 @@ print_field(psinfo_t *psinfo, struct field *f, const char *ttyp)
 	case F_LGRP:
 		/* Display home lgroup */
 		(void) printf("%*d", width, (int)psinfo->pr_lwp.pr_lgrp);
+		break;
+
+	case F_DMODEL:
+		(void) printf("%*s", width,
+		    psinfo->pr_dmodel == PR_MODEL_LP64 ? "_LP64" : "_ILP32");
 		break;
 	}
 }
