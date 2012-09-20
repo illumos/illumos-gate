@@ -345,8 +345,12 @@ $(__GNUC4)CC32BITCALLERS=		-_gcc=-massume-32bit-callers
 
 # GCC, especially, is increasingly beginning to auto-inline functions and
 # sadly does so separately not under the general -fno-inline-functions
+# Additionally, we wish to prevent optimisations which cause GCC to clone
+# functions -- in particular, these may cause unhelpful symbols to be
+# emitted instead of function names
 $(__GNUC4)CCNOAUTOINLINE= -_gcc=-fno-inline-small-functions \
-	-_gcc=-fno-inline-functions-called-once
+	-_gcc=-fno-inline-functions-called-once \
+	-_gcc=-fno-ipa-cp
 
 # One optimization the compiler might perform is to turn this:
 #	#pragma weak foo

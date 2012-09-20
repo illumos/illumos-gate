@@ -22,6 +22,9 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ */
 
 /*
  *  	Copyright (c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
@@ -52,6 +55,33 @@
 #include <nfs/nfs4.h>
 #include <nfs/rnode4.h>
 #include <nfs/nfs4_clnt.h>
+
+/* utf8-checking variables */
+#define	UTF8_TAIL_MASK		0xc0
+#define	UTF8_TAIL_SIGNATURE	0x80
+#define	UTF8_TAIL_SHIFT		6
+#define	UTF16_SURROGATE_LOW	0xd800
+#define	UTF16_SURROGATE_HIGH	0xdfff
+#define	UNICODE_INVAL_1		0xfffe
+#define	UNICODE_INVAL_2		0xffff
+
+typedef struct {
+	unsigned char mask;
+	unsigned char signature;
+	unsigned int  min_val;
+	unsigned char tail_bytes;
+} utf8_encoding_table;
+
+static utf8_encoding_table utf8_table[] = {
+	{ 0x80,	0x00,	0x00000000,	0 }, // 1 byte
+	{ 0xe0,	0xc0,	0x00000080,	1 }, // 2 bytes
+	{ 0xf0,	0xe0,	0x00000800,	2 }, // 3 bytes
+	{ 0xf8,	0xf0,	0x00010000,	3 }, // 4 bytes
+	{ 0xfc,	0xf8,	0x00200000, 	4 }, // 5 bytes
+	{ 0xfe,	0xfc,	0x04000000,	5 }, // 6 bytes
+	{ 0,	0,	0,		0 },
+};
+
 
 /*
  * client side statistics
@@ -711,35 +741,103 @@ utf8_compare(const utf8string *a, const utf8string *b)
 }
 
 /*
+ * utf8_name_verify - verify utf8-correctness of the passed string.
+ *
+ * Byte's checking is performed by applying and-mask to byte and checking
+ * result of this operation (signature).
+ * ~mask used to extract valuable bits from byte that will be put in 'symbol'
+ * that represents encoded unicode character.
+ *
+ * Symbols encoded with UTF8 have following format:
+ * 0xxxxxxx						  - 1 byte symbol
+ * 110xxxxx 10xxxxxx					  - 2 bytes
+ * 1110xxxx 10xxxxxx 10xxxxxx				  - 3 bytes
+ * 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx			  - 4 bytes
+ * 111110xx 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx	  - 5 bytes
+ * 1111110x 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx - 6 bytes
+ */
+nfsstat4
+utf8_name_verify(utf8string *str)
+{
+	int len = str->utf8string_len;
+	unsigned char *u8p = (unsigned char *) str->utf8string_val;
+	int pos = 0;
+
+	while (pos < len) {
+		unsigned char c = u8p[pos++];
+		int  i;
+		unsigned int symbol;
+		utf8_encoding_table * encoding = utf8_table;
+
+		/* check leading byte */
+		while (encoding->mask != 0x00) {
+			if ((c & encoding->mask) == encoding->signature)
+				break;
+			++encoding;
+		}
+		if (encoding->mask == 0x00)
+			return (NFS4ERR_INVAL);
+
+		symbol = c & (~encoding->mask);
+
+		/* check tail bytes if leading byte describes so */
+		for (i = 0; i < encoding->tail_bytes; ++i) {
+			if (pos >= len)
+				return (NFS4ERR_INVAL);
+			c = u8p[pos++];
+			if ((c & UTF8_TAIL_MASK) != UTF8_TAIL_SIGNATURE)
+				return (NFS4ERR_INVAL);
+			symbol <<= UTF8_TAIL_SHIFT;
+			symbol |= (c & (~UTF8_TAIL_MASK));
+		}
+
+		/* check UTF-16 surrogate */
+		if ((symbol >= UTF16_SURROGATE_LOW) &&
+		    (symbol <= UTF16_SURROGATE_HIGH))
+			return (NFS4ERR_INVAL);
+
+		/* check wrong Unicode character case */
+		if ((symbol == UNICODE_INVAL_1) || (symbol == UNICODE_INVAL_2))
+			return (NFS4ERR_INVAL);
+
+		/* check overlonging */
+		if (symbol < encoding->min_val)
+			return (NFS4ERR_INVAL);
+	}
+
+	return (NFS4_OK);
+}
+
+/*
  * utf8_dir_verify - checks that the utf8 string is valid
  */
-int
+nfsstat4
 utf8_dir_verify(utf8string *str)
 {
 	char *nm;
 	int len;
 
 	if (str == NULL)
-		return (0);
+		return (NFS4ERR_INVAL);
 
 	nm = str->utf8string_val;
 	len = str->utf8string_len;
 	if (nm == NULL || len == 0) {
-		return (0);
+		return (NFS4ERR_INVAL);
 	}
 
 	if (len == 1 && nm[0] == '.')
-		return (0);
+		return (NFS4ERR_BADNAME);
 	if (len == 2 && nm[0] == '.' && nm[1] == '.')
-		return (0);
+		return (NFS4ERR_BADNAME);
 
 	if (utf8_strchr(str, '/') != NULL)
-		return (0);
+		return (NFS4ERR_BADNAME);
 
 	if (utf8_strchr(str, '\0') != NULL)
-		return (0);
+		return (NFS4ERR_BADNAME);
 
-	return (1);
+	return (utf8_name_verify(str));
 }
 
 /*
