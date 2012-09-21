@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -68,7 +68,7 @@ static  struct  utmpx wtmpx[2] = {
 	{"", "", NTIME_MSG, 0, NEW_TIME, 0, 0, 0}
 	};
 static char *usage =
-	"usage:\tdate [-u] mmddHHMM[[cc]yy][.SS]\n\tdate [-u] [+format]\n"
+	"usage:\tdate [-u] mmddHHMM[[cc]yy][.SS]\n\tdate [-Ru] [+format]\n"
 	"\tdate -a [-]sss[.fff]\n";
 static int uflag = 0;
 static int Rflag = 0;
