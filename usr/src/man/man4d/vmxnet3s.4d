@@ -1,0 +1,36 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+.\" Copyright 2023 RackTop Systems, Inc.
+.\"
+.Dd June 30, 2023
+.Dt VMXNET3S 4D
+.Os
+.Sh NAME
+.Nm vmxnet3s
+.Nd Driver for VMware Vmxnet Generation 3 adapters
+.Sh SYNOPSIS
+.Pa /dev/net/vmxnet3s
+.Sh DESCRIPTION
+The
+.Nm
+driver supports VMware Vmxnet Generation 3 adapters.
+.Sh FILES
+.Bl -tag -width "/kernel/drv/amd64/vmxnet3s"
+.It Pa /dev/net/vmxnet3s
+Special network device
+.It Pa /kernel/drv/amd64/vmxnet3s
+64-bit driver binary (x86)
+.El
+.Sh SEE ALSO
+.Xr dlpi 4P ,
+.Xr dladm 8
