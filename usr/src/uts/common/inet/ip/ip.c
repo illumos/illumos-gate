@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 1990 Mentat Inc.
- * Copyright (c) 2011 Joyent, Inc. All rights reserved.
+ * Copyright (c) 2012 Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -4341,6 +4341,7 @@ static void
 ip_stack_shutdown(netstackid_t stackid, void *arg)
 {
 	ip_stack_t *ipst = (ip_stack_t *)arg;
+	kt_did_t ktid;
 
 #ifdef NS_DEBUG
 	printf("ip_stack_shutdown(%p, stack %d)\n", (void *)ipst, stackid);
@@ -4360,9 +4361,19 @@ ip_stack_shutdown(netstackid_t stackid, void *arg)
 	arp_hook_shutdown(ipst);
 
 	mutex_enter(&ipst->ips_capab_taskq_lock);
+	ktid = ipst->ips_capab_taskq_thread->t_did;
 	ipst->ips_capab_taskq_quit = B_TRUE;
 	cv_signal(&ipst->ips_capab_taskq_cv);
 	mutex_exit(&ipst->ips_capab_taskq_lock);
+
+	/*
+	 * In rare occurrences, particularly on virtual hardware where CPUs can
+	 * be de-scheduled, the thread that we just signaled will not run until
+	 * after we have gotten through parts of ip_stack_fini. If that happens
+	 * then we'll try to grab the ips_capab_taskq_lock as part of returning
+	 * from cv_wait which no longer exists.
+	 */
+	thread_join(ktid);
 }
 
 /*
