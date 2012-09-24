@@ -4446,18 +4446,39 @@ sd_sdconf_id_match(struct sd_lun *un, char *id, int idlen)
 {
 	struct scsi_inquiry	*sd_inq;
 	int 			rval = SD_SUCCESS;
+	char			*p;
+	int			inq_vidlen, inq_pidlen;
+	int			chk_vidlen, chk_pidlen;
 
 	ASSERT(un != NULL);
 	sd_inq = un->un_sd->sd_inq;
 	ASSERT(id != NULL);
 
 	/*
-	 * We use the inq_vid as a pointer to a buffer containing the
-	 * vid and pid and use the entire vid/pid length of the table
-	 * entry for the comparison. This works because the inq_pid
-	 * data member follows inq_vid in the scsi_inquiry structure.
+	 * We would like to use the inq_vid as a pointer to a buffer
+	 * containing the vid and pid and use the entire vid/pid length of
+	 * the table entry for the comparison.  However, this does not work
+	 * because, while the inq_pid data member follows inq_vid in the
+	 * scsi_inquiry structure, we do not control the contents of this
+	 * buffer, and some broken devices violate SPC 4.3.1 and return
+	 * fields with null bytes in them.
 	 */
-	if (strncasecmp(sd_inq->inq_vid, id, idlen) != 0) {
+	for (p = sd_inq->inq_vid; *p != '\0' && p - sd_inq->inq_vid < 8; ++p)
+		;
+	inq_vidlen = p - sd_inq->inq_vid;
+	chk_vidlen = MIN(idlen, inq_vidlen);
+
+	for (p = sd_inq->inq_pid; *p != '\0' && p - sd_inq->inq_pid < 16; ++p)
+		;
+	inq_pidlen = p - sd_inq->inq_pid;
+	if (idlen > 8)
+		chk_pidlen = MIN(idlen - 8, inq_pidlen);
+	else
+		chk_pidlen = 0;
+
+	if (strncasecmp(sd_inq->inq_vid, id, chk_vidlen) != 0 ||
+	    (idlen > 8 &&
+	    strncasecmp(sd_inq->inq_pid, id + 8, chk_pidlen) != 0)) {
 		/*
 		 * The user id string is compared to the inquiry vid/pid
 		 * using a case insensitive comparison and ignoring
