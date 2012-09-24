@@ -547,20 +547,20 @@ typedef struct mrsas_instance {
 	 * are needed to be free'd at detach() time.
 	 */
 	struct _unroll {
-		uint8_t softs;		// The software state was allocated.
-		uint8_t regs;		// Controller registers mapped.
-		uint8_t intr;		// Interrupt handler added.
-		uint8_t reqs;		// Request structs allocated.
-		uint8_t mutexs;		// Mutex's allocated.
-		uint8_t taskq;		// Task q's created.
-		uint8_t tran;		// Tran struct allocated
-		uint8_t tranSetup;	// Tran attached to the ddi.
-		uint8_t devctl;		// Device nodes for cfgadm created.
-		uint8_t scsictl;	// Device nodes for cfgadm created.
-		uint8_t ioctl;		// Device nodes for ioctl's created.
-		uint8_t timer;		// Timer started.
-		uint8_t aenPend;	// AEN cmd pending f/w.
-		uint8_t mapUpdate_pend; // LD MAP update cmd pending f/w.
+		uint8_t softs;		/* The software state was allocated. */
+		uint8_t regs;		/* Controller registers mapped. */
+		uint8_t intr;		/* Interrupt handler added. */
+		uint8_t reqs;		/* Request structs allocated. */
+		uint8_t mutexs;		/* Mutex's allocated. */
+		uint8_t taskq;		/* Task q's created. */
+		uint8_t tran;		/* Tran struct allocated */
+		uint8_t tranSetup;	/* Tran attached to the ddi. */
+		uint8_t devctl;		/* Device nodes for cfgadm created. */
+		uint8_t scsictl;	/* Device nodes for cfgadm created. */
+		uint8_t ioctl;		/* Device nodes for ioctl's created. */
+		uint8_t timer;		/* Timer started. */
+		uint8_t aenPend;	/* AEN cmd pending f/w. */
+		uint8_t mapUpdate_pend; /* LD MAP update cmd pending f/w. */
 		uint8_t soft_isr;
 		uint8_t ldlist_buff;
 		uint8_t pdlist_buff;
@@ -576,8 +576,8 @@ typedef struct mrsas_instance {
 
 
 	/* MSI interrupts specific */
-	ddi_intr_handle_t *intr_htable;		// Interrupt handle array
-	size_t		intr_htable_size;	// Interrupt handle array size
+	ddi_intr_handle_t *intr_htable;		/* Interrupt handle array */
+	size_t		intr_htable_size;	/* Int. handle array size */
 	int		intr_type;
 	int		intr_cnt;
 	uint_t		intr_pri;
@@ -598,22 +598,22 @@ typedef struct mrsas_instance {
 
 	uint16_t	tbolt;
 	uint16_t	reply_read_index;
-	uint16_t	reply_size; 		// Single Reply structure size
-	uint16_t	raid_io_msg_size; 	// Single message size
+	uint16_t	reply_size; 		/* Single Reply struct size */
+	uint16_t	raid_io_msg_size; 	/* Single message size */
 	uint32_t	io_request_frames_phy;
 	uint8_t 	*io_request_frames;
-	// Virtual address of request desc frame pool
+	/* Virtual address of request desc frame pool */
 	MRSAS_REQUEST_DESCRIPTOR_UNION	*request_message_pool;
-	// Physical address of request desc frame pool
+	/* Physical address of request desc frame pool */
 	uint32_t	request_message_pool_phy;
-	// Virtual address of reply Frame
+	/* Virtual address of reply Frame */
 	MPI2_REPLY_DESCRIPTORS_UNION	*reply_frame_pool;
-	// Physical address of reply Frame
+	/* Physical address of reply Frame */
 	uint32_t	reply_frame_pool_phy;
-	uint8_t		*reply_pool_limit;	// Last reply frame address
-	// Physical address of Last reply frame
+	uint8_t		*reply_pool_limit;	/* Last reply frame address */
+	/* Physical address of Last reply frame */
 	uint32_t	reply_pool_limit_phy;
-	uint32_t	reply_q_depth;		// Reply Queue Depth
+	uint32_t	reply_q_depth;		/* Reply Queue Depth */
 	uint8_t		max_sge_in_main_msg;
 	uint8_t		max_sge_in_chain;
 	uint8_t    	chain_offset_io_req;
@@ -644,7 +644,7 @@ struct mrsas_function_template {
 	void (*disable_intr)(struct mrsas_instance *);
 	int (*intr_ack)(struct mrsas_instance *);
 	int (*init_adapter)(struct mrsas_instance *);
-//	int (*reset_adapter)(struct mrsas_instance *);
+/*	int (*reset_adapter)(struct mrsas_instance *); */
 };
 
 /*

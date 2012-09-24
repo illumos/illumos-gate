@@ -90,7 +90,7 @@ static volatile int	msi_enable = 1;
 static volatile int 	ctio_enable = 1;
 
 /* Default Timeout value to issue online controller reset */
-volatile int  debug_timeout_g  = 0xF0;		// 0xB4;
+volatile int  debug_timeout_g  = 0xF0;		/* 0xB4; */
 /* Simulate consecutive firmware fault */
 static volatile int  debug_fw_faults_after_ocr_g  = 0;
 #ifdef OCRDEBUG
@@ -215,7 +215,7 @@ static struct mrsas_function_template mrsas_function_template_ppc = {
 	.disable_intr = disable_intr_ppc,
 	.intr_ack = intr_ack_ppc,
 	.init_adapter = mrsas_init_adapter_ppc
-//	.reset_adapter = mrsas_reset_adapter_ppc
+/*	.reset_adapter = mrsas_reset_adapter_ppc */
 };
 
 
@@ -228,7 +228,7 @@ static struct mrsas_function_template mrsas_function_template_fusion = {
 	.disable_intr = tbolt_disable_intr,
 	.intr_ack = tbolt_intr_ack,
 	.init_adapter = mrsas_init_adapter_tbolt
-//	.reset_adapter = mrsas_reset_adapter_tbolt
+/*	.reset_adapter = mrsas_reset_adapter_tbolt */
 };
 
 

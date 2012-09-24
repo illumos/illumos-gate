@@ -239,15 +239,15 @@ MR_GetPhyParams(struct mrsas_instance *instance, U32 ld, U64 stripRow,
 	if (error_code == 1)
 		return (FALSE);
 
-	// Get the array on which this span is present.
+	/* Get the array on which this span is present. */
 	arRef		= MR_LdSpanArrayGet(ld, span, map);
-	// Get the Pd.
+	/* Get the Pd. */
 	pd		= MR_ArPdGet(arRef, physArm, map);
-	// Get dev handle from Pd.
+	/* Get dev handle from Pd. */
 	if (pd != MR_PD_INVALID) {
 		*pDevHandle	= MR_PdDevHandleGet(pd, map);
 	} else {
-		*pDevHandle = MR_PD_INVALID; // set dev handle as invalid.
+		*pDevHandle = MR_PD_INVALID; /* set dev handle as invalid. */
 		if ((raid->level >= 5) &&
 		    ((instance->device_id != PCI_DEVICE_ID_LSI_INVADER) ||
 		    (instance->device_id == PCI_DEVICE_ID_LSI_INVADER &&
@@ -338,7 +338,7 @@ MR_BuildRaidContext(struct mrsas_instance *instance,
 		return (FALSE);
 	start_row		=  (start_strip / raid->rowDataSize);
 	endRow			=  (endStrip  / raid->rowDataSize);
-	// get the row count
+	/* get the row count */
 	numRows			= (U8)(endRow - start_row + 1);
 
 	/*

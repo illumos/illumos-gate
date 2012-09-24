@@ -35,9 +35,9 @@ struct mrsas_instance;	/* This will be defined in mr_sas.h */
 #define	WRITE_16	0x8A
 #define	WRITE_10	0x2A
 
-// maximum disks per array
+/* maximum disks per array */
 #define	MAX_ROW_SIZE				32
-// maximum spans per logical drive
+/* maximum spans per logical drive */
 #define	MAX_SPAN_DEPTH				8
 #define	MEGASAS_LOAD_BALANCE_FLAG		0x1
 #define	MR_DEFAULT_IO_TIMEOUT	20
@@ -142,10 +142,10 @@ Mpi2RaidSCSIIORequest_t, MPI2_POINTER pMpi2RaidSCSIIORequest_t;
  * define region lock types
  */
 typedef enum	_REGION_TYPE {
-	REGION_TYPE_UNUSED	= 0,	// lock is currently not active
-	REGION_TYPE_SHARED_READ	= 1,	// shared lock (for reads)
+	REGION_TYPE_UNUSED	= 0,	/* lock is currently not active */
+	REGION_TYPE_SHARED_READ	= 1,	/* shared lock (for reads) */
 	REGION_TYPE_SHARED_WRITE = 2,
-	REGION_TYPE_EXCLUSIVE	= 3,	// exclusive lock (for writes)
+	REGION_TYPE_EXCLUSIVE	= 3	/* exclusive lock (for writes) */
 } REGION_TYPE;
 
 
@@ -153,10 +153,10 @@ typedef enum	_REGION_TYPE {
 #define	DM_PATH_FIRSTPATH	0
 #define	DM_PATH_SECONDPATH	1
 
-// declare valid Region locking values
+/* declare valid Region locking values */
 typedef enum _REGION_LOCK {
 	REGION_LOCK_BYPASS		= 0,
-	// for RAID 6 single-drive failure
+	/* for RAID 6 single-drive failure */
 	REGION_LOCK_UNCOND_SHARED_READ	= 1,
 	REGION_LOCK_UNCOND_SHARED_WRITE	= 2,
 	REGION_LOCK_UNCOND_SHARED_OTHER	= 3,
@@ -228,7 +228,7 @@ enum {
 	MRSAS_SCSI_SERVICE_ACTION_WRITE32	= 0xB,
 	MRSAS_SCSI_ADDL_CDB_LEN			= 0x18,
 	MRSAS_RD_WR_PROTECT			= 0x20,
-	MRSAS_EEDPBLOCKSIZE			= 512,
+	MRSAS_EEDPBLOCKSIZE			= 512
 };
 
 

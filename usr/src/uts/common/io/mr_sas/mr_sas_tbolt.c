@@ -34,8 +34,8 @@
 #include <sys/fm/io/ddi.h>
 
 
-// Pre-TB command size and TB command size.
-#define	MR_COMMAND_SIZE (64*20)	// 1280 bytes
+/* Pre-TB command size and TB command size. */
+#define	MR_COMMAND_SIZE (64*20)	/* 1280 bytes */
 MR_LD_RAID *MR_LdRaidGet(U32 ld, MR_FW_RAID_MAP_ALL *map);
 U16 MR_TargetIdToLdGet(U32 ldTgtId, MR_FW_RAID_MAP_ALL *map);
 U16 MR_GetLDTgtId(U32 ld, MR_FW_RAID_MAP_ALL *map);
@@ -180,7 +180,7 @@ create_mpi2_frame_pool(struct mrsas_instance *instance)
 	sgl_sz		= 1024;
 	raid_msg_size	= MRSAS_THUNDERBOLT_MSG_SIZE;
 
-	// Allocating additional 256 bytes to accomodate SMID 0.
+	/* Allocating additional 256 bytes to accomodate SMID 0. */
 	total_size = MRSAS_THUNDERBOLT_MSG_SIZE + (max_cmd * raid_msg_size) +
 	    (max_cmd * sgl_sz) + (max_cmd * SENSE_LENGTH);
 
@@ -440,7 +440,7 @@ alloc_req_rep_desc(struct mrsas_instance *instance)
 	con_log(CL_ANN1, (CE_NOTE, " reply q desc len = %x\n",
 	    (uint_t)sizeof (MPI2_REPLY_DESCRIPTORS_UNION)));
 
-	// reply queue size should be multiple of 16
+	/* reply queue size should be multiple of 16 */
 	max_reply_q_sz = ((instance->max_fw_cmds + 1 + 15)/16)*16;
 
 	reply_q_sz = 8 * max_reply_q_sz;
@@ -466,7 +466,7 @@ alloc_req_rep_desc(struct mrsas_instance *instance)
 	bzero(instance->reply_desc_dma_obj.buffer, reply_q_sz);
 	instance->reply_desc_dma_obj.status |= DMA_OBJ_ALLOCATED;
 
-	// virtual address of  reply queue
+	/* virtual address of  reply queue */
 	instance->reply_frame_pool = (MPI2_REPLY_DESCRIPTORS_UNION *)(
 	    instance->reply_desc_dma_obj.buffer);
 
@@ -989,7 +989,7 @@ mrsas_tbolt_ioc_init(struct mrsas_instance *instance, dma_obj_t *mpi2_dma_obj)
 	con_log(CL_ANN, (CE_CONT,
 	    "mrsas_tbolt_ioc_init: SMID:%x\n", cmd->SMID));
 
-	// Init the MFI Header
+	/* Init the MFI Header */
 	ddi_put8(instance->mpi2_frame_pool_dma_obj.acc_handle,
 	    &mfiFrameInit2->cmd, MFI_CMD_OP_INIT);
 
@@ -1255,7 +1255,7 @@ mr_sas_tbolt_build_sgl(struct mrsas_instance *instance,
 	ddi_put16(acc_handle, &scsi_raid_io->SGLFlags,
 	    MPI2_SGE_FLAGS_64_BIT_ADDRESSING);
 
-	// set data transfer flag.
+	/* set data transfer flag. */
 	if (acmd->cmd_flags & CFLAG_DMASEND) {
 		ddi_put32(acc_handle, &scsi_raid_io->Control,
 		    MPI2_SCSIIO_CONTROL_WRITE);
@@ -1483,7 +1483,7 @@ mrsas_tbolt_build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 	}
 
 
-	// get SCSI_IO raid message frame pointer
+	/* get SCSI_IO raid message frame pointer */
 	scsi_raid_io = (Mpi2RaidSCSIIORequest_t *)cmd->scsi_io_request;
 
 	/* zero out SCSI_IO raid message frame */
@@ -1770,7 +1770,7 @@ mrsas_tbolt_build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 	/* fall through For all non-rd/wr cmds */
 	default:
 		switch (pkt->pkt_cdbp[0]) {
-		case 0x35: { // SCMD_SYNCHRONIZE_CACHE
+		case 0x35: { /* SCMD_SYNCHRONIZE_CACHE */
 			return_raid_msg_pkt(instance, cmd);
 			*cmd_done = 1;
 			return (NULL);
@@ -2170,8 +2170,8 @@ void
 tbolt_enable_intr(struct mrsas_instance *instance)
 {
 	/* TODO: For Thunderbolt/Invader also clear intr on enable */
-	// writel(~0, &regs->outbound_intr_status);
-	// readl(&regs->outbound_intr_status);
+	/* writel(~0, &regs->outbound_intr_status); */
+	/* readl(&regs->outbound_intr_status); */
 
 	WR_OB_INTR_MASK(~(MFI_FUSION_ENABLE_INTERRUPT_MASK), instance);
 
@@ -2354,7 +2354,7 @@ mr_sas_tbolt_build_mfi_cmd(struct mrsas_instance *instance,
 
 	cmd->request_desc = ReqDescUnion;
 
-	// get raid message frame pointer
+	/* get raid message frame pointer */
 	scsi_raid_io = (Mpi2RaidSCSIIORequest_t *)cmd->scsi_io_request;
 
 	if (instance->device_id == PCI_DEVICE_ID_LSI_INVADER) {
@@ -2449,7 +2449,7 @@ tbolt_complete_cmd(struct mrsas_instance *instance,
 		    "FastPath IO Completion Success "));
 		/* FALLTHRU */
 
-	case MPI2_FUNCTION_LD_IO_REQUEST :   { // Regular Path IO.
+	case MPI2_FUNCTION_LD_IO_REQUEST :   { /* Regular Path IO. */
 		acmd =	(struct scsa_cmd *)cmd->cmd;
 		pkt =	(struct scsi_pkt *)CMD2PKT(acmd);
 
@@ -2547,7 +2547,7 @@ tbolt_complete_cmd(struct mrsas_instance *instance,
 			cmn_err(CE_WARN,
 			    "tbolt_complete_cmd: ld offline "
 			    "CDB[0]=0x%x targetId=0x%x devhandle=0x%x\n",
-			    // UNDO:
+			    /* UNDO: */
 			    ddi_get8(acc_handle, &scsi_raid_io->CDB.CDB32[0]),
 
 			    ddi_get16(acc_handle,
@@ -2626,7 +2626,7 @@ tbolt_complete_cmd(struct mrsas_instance *instance,
 		return_raid_msg_pkt(instance, cmd);
 		break;
 	}
-	case MPI2_FUNCTION_PASSTHRU_IO_REQUEST:	 // MFA command.
+	case MPI2_FUNCTION_PASSTHRU_IO_REQUEST:	 /* MFA command. */
 
 		if (cmd->frame->dcmd.opcode == MR_DCMD_LD_MAP_GET_INFO &&
 		    cmd->frame->dcmd.mbox.b[1] == 1) {
@@ -2799,7 +2799,7 @@ mr_sas_tbolt_process_outstanding_cmd(struct mrsas_instance *instance)
 
 			tbolt_complete_cmd(instance, cmd);
 		}
-		// set it back to all 0xfffffffff.
+		/* set it back to all 0xfffffffff. */
 		desc->Words = (uint64_t)~0;
 
 		instance->reply_read_index++;
@@ -2984,7 +2984,7 @@ mrsas_tbolt_prepare_cdb(struct mrsas_instance *instance, U8 cdb[],
 	ddi_acc_handle_t acc_handle =
 	    instance->mpi2_frame_pool_dma_obj.acc_handle;
 
-	// Prepare 32-byte CDB if DIF is supported on this device
+	/* Prepare 32-byte CDB if DIF is supported on this device */
 	con_log(CL_ANN, (CE_NOTE, "Prepare DIF CDB\n"));
 
 	(void) memset(cdb, 0, 32);
@@ -2999,7 +2999,7 @@ mrsas_tbolt_prepare_cdb(struct mrsas_instance *instance, U8 cdb[],
 	else
 		cdb[9] = MRSAS_SCSI_SERVICE_ACTION_WRITE32;
 
-	// Verify with in linux driver, set to MEGASAS_RD_WR_PROTECT_CHECK_ALL
+	/* Verify within linux driver, set to MEGASAS_RD_WR_PROTECT_CHECK_ALL */
 	cdb[10] = MRSAS_RD_WR_PROTECT;
 
 	/* LOGICAL BLOCK ADDRESS */
@@ -3034,21 +3034,25 @@ mrsas_tbolt_prepare_cdb(struct mrsas_instance *instance, U8 cdb[],
 	EEDPFlags = ddi_get16(acc_handle, &scsi_io_request->EEDPFlags);
 	Control = ddi_get32(acc_handle, &scsi_io_request->Control);
 
-	// set SCSI IO EEDPFlags bits
+	/* set SCSI IO EEDPFlags bits */
 	if (io_info->isRead) {
-		// For READ commands, the EEDPFlags shall be set to specify to
-		// Increment the Primary Reference Tag, to Check the Reference
-		// Tag, and to Check and Remove the Protection Information
-		// fields.
+		/*
+		 * For READ commands, the EEDPFlags shall be set to specify to
+		 * Increment the Primary Reference Tag, to Check the Reference
+		 * Tag, and to Check and Remove the Protection Information
+		 * fields.
+		 */
 		EEDPFlags = MPI2_SCSIIO_EEDPFLAGS_INC_PRI_REFTAG	|
 		    MPI2_SCSIIO_EEDPFLAGS_CHECK_REFTAG	|
 		    MPI2_SCSIIO_EEDPFLAGS_CHECK_REMOVE_OP	|
 		    MPI2_SCSIIO_EEDPFLAGS_CHECK_APPTAG	|
 		    MPI2_SCSIIO_EEDPFLAGS_CHECK_GUARD;
 	} else {
-		// For WRITE commands, the EEDPFlags shall be set to specify to
-		// Increment the Primary Reference Tag, and to Insert
-		// Protection Information fields.
+		/*
+		 * For WRITE commands, the EEDPFlags shall be set to specify to
+		 * Increment the Primary Reference Tag, and to Insert
+		 * Protection Information fields.
+		 */
 		EEDPFlags = MPI2_SCSIIO_EEDPFLAGS_INC_PRI_REFTAG	|
 		    MPI2_SCSIIO_EEDPFLAGS_INSERT_OP;
 	}
@@ -3359,7 +3363,7 @@ retry_reset:
 		if (retry++ == 100) {
 			/* Dont call kill adapter here */
 			/* RESET BIT ADAPTER is cleared by firmare */
-			// mrsas_tbolt_kill_adapter(instance);
+			/* mrsas_tbolt_kill_adapter(instance); */
 			cmn_err(CE_WARN,
 			    "mr_sas %d: %s(): RESET FAILED; return failure!!!",
 			    instance->instance, __func__);
@@ -3403,7 +3407,7 @@ retry_reset:
 		    "FW state = 0x%x", fw_state));
 
 		if (fw_state == MFI_STATE_FAULT) {
-			// increment the count
+			/* increment the count */
 			instance->fw_fault_count_after_ocr++;
 			if (instance->fw_fault_count_after_ocr
 			    < MAX_FW_RESET_COUNT) {
@@ -3426,7 +3430,7 @@ retry_reset:
 		}
 	}
 
-	// reset the counter as FW is up after OCR
+	/* reset the counter as FW is up after OCR */
 	instance->fw_fault_count_after_ocr = 0;
 
 	mrsas_reset_reply_desc(instance);
