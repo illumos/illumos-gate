@@ -4447,7 +4447,7 @@ sd_sdconf_id_match(struct sd_lun *un, char *id, int idlen)
 	struct scsi_inquiry	*sd_inq;
 	int 			rval = SD_SUCCESS;
 	char			*p;
-	int			chk_vidlen, chk_pidlen;
+	int			chk_vidlen = 0, chk_pidlen = 0;
 	int			has_tail = 0;
 	static const int	VSZ = sizeof (sd_inq->inq_vid);
 	static const int	PSZ = sizeof (sd_inq->inq_pid);
