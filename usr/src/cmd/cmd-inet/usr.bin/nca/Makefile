@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"	
-#
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # 
@@ -47,6 +45,7 @@ LINTFLAGS +=	$(_EXTN)
 
 INC_PATH +=	../../../../uts/common/inet/nca -I.
 CFLAGS +=	$(CCVERBOSE)
+CERRWARN +=	-_gcc=-Wno-parentheses
 CPPFLAGS +=	-I$(INC_PATH)
 
 .KEEP_STATE:

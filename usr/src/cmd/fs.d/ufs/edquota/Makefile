@@ -20,12 +20,9 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1989,1996 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-# cmd/fs.d/ufs/edquota/Makefile
 
 FSTYPE=		ufs
 LIBPROG=	edquota
@@ -37,6 +34,7 @@ LINKVALUE=	../lib/fs/$(FSTYPE)/$(LIBPROG)
 include		../../Makefile.fstype
 
 CPPFLAGS +=	-D_LARGEFILE64_SOURCE
+CERRWARN +=	-_gcc=-Wno-parentheses
 lint:		lint_PROG
 
 $(ROOTUSRSBIN)/$(LIBPROG):

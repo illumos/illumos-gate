@@ -46,6 +46,8 @@ CONF_SRCDIR	= $(UTSBASE)/common/io/audio/impl
 #
 include $(UTSBASE)/intel/Makefile.intel
 
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 #	Define targets
 #

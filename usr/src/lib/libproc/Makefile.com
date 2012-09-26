@@ -89,6 +89,11 @@ $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR)
 
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-type-limits
+CERRWARN +=	-_gcc=-Wno-unused-label
+
 # All interfaces are interposable, therefore don't allow direct binding to
 # libproc.  Disable libproc from directly binding to itself, but allow libperl
 # to directly bind to its dependencies (ie. map -Bdirect -> -zdirect).  Ensure

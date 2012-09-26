@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY	=	libwanbootutil.a
 VERS =		.1
@@ -65,6 +63,10 @@ $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 LINTFLAGS +=	-erroff=E_FUNC_VAR_UNUSED
 
 CPPFLAGS +=	-I$(CRYPTO_DIR)
+
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-type-limits
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 install:	all
 

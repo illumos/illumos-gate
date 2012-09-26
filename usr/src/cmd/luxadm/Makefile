@@ -23,8 +23,6 @@
 # Use is subject to license terms.
 #
 
-#
-
 PROG = luxadm
 
 COBJS = adm.o fchba.o lux_util.o fabric_conf.o
@@ -38,6 +36,11 @@ POFILES = $(OBJS:%.o=%.po)
 POFILE = luxadm.po
 
 include ../Makefile.cmd
+
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-unused-label
+CERRWARN +=	-_gcc=-Wno-address
 
 sparc_LDLIBS = -la5k -lg_fc -ldevid -lkstat -ldevinfo
 i386_LDLIBS =

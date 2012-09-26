@@ -35,6 +35,10 @@ include ../../Makefile.cmd-inet
 LDLIBS +=	-lcmdutils -lsocket -lnsl -lilb -linetutil -lkstat
 CPPFLAGS +=	-I$(SRC)/lib/libilb/common -I$(SRC)/uts/common
 
+CERRWARN +=	-_gcc=-Wno-switch
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 C99MODE =	$(C99_ENABLE)
 
 POFILES =	$(OBJS:%.o=%.po)

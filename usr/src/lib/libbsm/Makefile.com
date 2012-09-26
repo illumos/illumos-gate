@@ -85,6 +85,9 @@ CLEANFILES +=	$(LINTOUT) $(LINTLIB)
 CFLAGS	+=	$(CCVERBOSE)
 LDLIBS +=	-lsocket -lnsl -lmd -lc -lsecdb -ltsol -linetutil -lscf
 
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 COMDIR=		../common
 AUDITD=		$(SRC)/cmd/auditd
 

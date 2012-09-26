@@ -23,8 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-# 
 
 PROG= devctl
 
@@ -33,6 +31,7 @@ include ../Makefile.cmd
 .KEEP_STATE:
 
 CFLAGS +=	$(CCVERBOSE)
+CERRWARN +=	-_gcc=-Wno-parentheses
 LDLIBS += -ldevice -l devinfo
 
 all: $(PROG)

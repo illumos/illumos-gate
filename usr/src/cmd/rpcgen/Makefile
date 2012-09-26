@@ -29,13 +29,16 @@ PROG= rpcgen
 
 
 OBJS= rpc_clntout.o rpc_cout.o rpc_hout.o rpc_main.o rpc_parse.o \
-  	  rpc_scan.o rpc_svcout.o rpc_tblout.o rpc_util.o rpc_sample.o
+	  rpc_scan.o rpc_svcout.o rpc_tblout.o rpc_util.o rpc_sample.o
 SRCS= $(OBJS:%.o=%.c)
 
 include ../Makefile.cmd
 
 LDLIBS += 
-CFLAGS +=	-v
+CFLAGS +=	$(CCVERBOSE)
+CERRWARN +=	-_gcc=-Wno-switch
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-char-subscripts
 
 .KEEP_STATE:
 

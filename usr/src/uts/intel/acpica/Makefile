@@ -57,6 +57,10 @@ LINTFLAGS += -errhdr=%none
 LINTFLAGS += -erroff=%all
 LINTFLAGS += -errwarn=%none
 
+CERRWARN	+= -_gcc=-Wno-unused-variable
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 #	Default build targets.
 #

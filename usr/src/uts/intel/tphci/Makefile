@@ -23,7 +23,7 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the tphci kernel
 #	driver for testing MPxIO interfaces
@@ -48,6 +48,8 @@ ROOTMODULE	= $(USR_DRV_DIR)/$(MODULE)
 include $(UTSBASE)/intel/Makefile.intel
 
 CLOBBERFILES	+= $(MODULE)
+
+CERRWARN	+= -_gcc=-Wno-parentheses
 
 #
 #	Define targets

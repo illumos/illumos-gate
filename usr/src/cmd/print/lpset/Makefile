@@ -38,6 +38,7 @@ ROOTBINPROG=	$(PROG:%=$(ROOTBIN)/%)
 FILEMODE=	04511
 
 CPPFLAGS +=	-I$(NPRTINC)
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
 LDLIBS +=	$(LIBNPRT) -lsecdb
 
 .KEEP_STATE:

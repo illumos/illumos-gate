@@ -22,8 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG= file
 XPG4PROG= file
@@ -38,6 +36,9 @@ XPG4OBJS= $(OBJS:%.o=xpg4_%.o)
 SRCS=	file.c elf_read.c magicutils.c $(ELFCAP)/elfcap.c
 
 include ../Makefile.cmd
+
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-type-limits
 
 POFILE= file_all.po
 POFILES= $(SRCS:%.c=%.po)

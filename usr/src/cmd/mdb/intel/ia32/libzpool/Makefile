@@ -23,7 +23,6 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 MODULE = libzpool.so
 MDBTGT = proc
@@ -42,6 +41,8 @@ CPPFLAGS += -I../../../../../lib/libzpool/common \
 
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
+
+CERRWARN 	+= -_gcc=-Wno-type-limits
 
 dmod/%.o: $(GENUNIX_DIR)/%.c
 	$(COMPILE.c) -o $@ $<

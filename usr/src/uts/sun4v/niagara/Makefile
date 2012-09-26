@@ -23,8 +23,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 #	This makefile drives the production of the UltraSPARC-H20 cpu module.
@@ -69,6 +67,7 @@ INSTALL_TARGET	= def $(BINARY) $(ROOTMODULE)
 # lint pass one enforcement
 #
 CFLAGS += $(CCVERBOSE) -DNIAGARA_IMPL
+CERRWARN += -_gcc=-Wno-parentheses
 
 #
 # cpu-module-specific flags

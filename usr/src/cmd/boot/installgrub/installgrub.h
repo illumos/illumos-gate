@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef	_INSTALLGRUB_H
@@ -53,6 +54,7 @@ typedef struct _stage2_data {
 	multiboot_header_t	*mboot;
 	uint32_t		mboot_off;
 	uint32_t		file_size;
+	uint32_t		extra_size;
 	uint32_t		buf_size;
 	uint32_t		first_sector;
 	uint32_t		pcfs_first_sectors[2];

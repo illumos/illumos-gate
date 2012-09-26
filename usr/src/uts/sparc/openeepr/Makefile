@@ -23,7 +23,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the openeepr driver
 #
@@ -64,6 +64,9 @@ CPPFLAGS +=	-I$(SRC)/common/net/wanboot/crypt
 CFLAGS +=	$(CCVERBOSE)
 
 LDFLAGS +=	-dy -Ndacf/consconfig_dacf
+
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-uninitialized
 
 #
 # For now, disable these lint checks; maintainers should endeavor

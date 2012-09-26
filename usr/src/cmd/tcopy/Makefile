@@ -20,17 +20,17 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1990 by Sun Microsystems, Inc.
-#
-# Makefile for cmd/tcopy
 #
 
 PROG =		tcopy
 
 include		../Makefile.cmd
 
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-extra
 
 .KEEP_STATE :
 

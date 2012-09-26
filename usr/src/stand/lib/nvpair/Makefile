@@ -23,8 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # 
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY = libnvpair.a
 LOCOBJS = nvpair_alloc_system.o
@@ -36,5 +34,8 @@ include ../Makefile.com
 CMNDIR  = $(TOPDIR)/common/nvpair
 SRCS	= $(LOCOBJS:%.o=$(SRCDIR)/%.c) $(CMNOBJS:%.o=$(CMNDIR)/%.c)
 LDLIBS += -lxdr
+
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
 
 include ../Makefile.targ

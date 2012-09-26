@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.3.3.1 */
-#
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -34,6 +32,7 @@ include ../Makefile.cmd
 
 LDLIBS += -ladm -lefi
 CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

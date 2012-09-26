@@ -39,6 +39,9 @@ ROOTMANIFESTDIR=	$(ROOTSVCNETWORK)
 CPPFLAGS  += -D_FILE_OFFSET_BITS=64 -I$(CMDINETCOMMONDIR) -D_REENTRANT
 $(RELEASE_BUILD)CPPFLAGS +=     -DNDEBUG
 
+CERRWARN += -_gcc=-Wno-switch
+CERRWARN += -_gcc=-Wno-unused-label
+
 LDLIBS    += -lsocket -lnsl -lrestart -lscf -lcontract -linetutil \
 		-lwrap -linetsvc -luutil -lumem -lbsm
 

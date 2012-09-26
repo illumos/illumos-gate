@@ -23,7 +23,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the "sgcn" driver module.
 #
@@ -67,6 +67,9 @@ CLEANLINTFILES	+= $(LINT32_FILES)
 #
 CFLAGS += $(CCVERBOSE) 
 LDFLAGS += -dy -Ndrv/sgsbbc
+
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
 
 #
 #	Default build targets.

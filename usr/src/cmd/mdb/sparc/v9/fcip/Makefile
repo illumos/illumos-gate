@@ -36,3 +36,5 @@ include ../../../Makefile.module
 CPPFLAGS += -I$(SRC)/uts/common
 
 LINTFLAGS64 += -erroff=E_STATIC_UNUSED
+
+CERRWARN += -_gcc=-Wno-unused-function

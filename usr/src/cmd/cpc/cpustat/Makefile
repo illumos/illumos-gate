@@ -36,6 +36,7 @@ STAT_COMMON_SRCS = $(STAT_COMMON_OBJS:%.o=$(STATCOMMONDIR)/%.c)
 SRCS += $(STAT_COMMON_SRCS)
 
 CFLAGS		+= $(CCVERBOSE) $(CTF_FLAGS)
+CERRWARN	+= -_gcc=-Wno-uninitialized
 CPPFLAGS	+= -D_REENTRANT -I$(SRC)/lib/libcpc/common -I$(STATCOMMONDIR)
 LDLIBS +=	-lcpc -lkstat
 

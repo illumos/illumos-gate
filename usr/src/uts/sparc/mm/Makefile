@@ -23,7 +23,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the mm driver
 #
@@ -67,6 +67,9 @@ CFLAGS += $(CCVERBOSE)
 # Please do not carry these forward to new Makefiles.
 #
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
+
+CERRWARN	+= -_gcc=-Wno-unused-function
+CERRWARN	+= -_gcc=-Wno-clobbered
 
 #
 #	Default build targets.

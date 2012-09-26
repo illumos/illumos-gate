@@ -61,6 +61,9 @@ CPPFLAGS	+= -I$(SRC)/common/util
 CLEANFILES	+= $(MCAMD_OFF_H)
 CLOBBERFILES	+= $(MCAMD_OFF_H)
 
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 #       Default build targets.
 #

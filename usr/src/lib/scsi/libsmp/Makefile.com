@@ -40,6 +40,10 @@ C99MODE = $(C99_ENABLE)
 CPPFLAGS += -I../common -I. -D_REENTRANT
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 CFLAGS += $(CCVERBOSE)
+
+CERRWARN += -_gcc=-Wno-type-limits
+CERRWARN += -_gcc=-Wno-uninitialized
+
 LDLIBS += \
 	-lumem \
 	-lc
@@ -49,13 +53,6 @@ ROOTLIBDIR64 =	$(ROOTSCSILIBDIR)/$(MACH64)
 
 CLEANFILES += \
 	../common/smp_errno.c
-
-#
-# On SPARC, gcc 3.4 emits DWARF assembler directives for TLS data that are not
-# understood by the Sun assembler.  Until this problem is fixed, we turn down
-# the amount of generated debugging information, which seems to do the trick.
-#
-$(__GNUC3)$(SPARC_BLD)CTF_FLAGS += -_gcc=-g1
 
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 

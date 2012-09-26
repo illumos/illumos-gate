@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY= libdyn.a
 VERS= .1
@@ -62,6 +60,8 @@ CPPFLAGS +=     -D_REENTRANT -DHAVE_LIBSOCKET=1 -DHAVE_LIBNSL=1 \
 
 CFLAGS +=	$(CCVERBOSE) -I..
 LDLIBS +=	-lc
+
+CERRWARN +=	-_gcc=-Wno-unused-variable
 
 .KEEP_STATE:
 

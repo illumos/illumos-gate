@@ -23,10 +23,6 @@
 # Copyright 1990-2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/lp/lib/filters/Makefile
-#
 
 LIBRARY	=	liblpflt.a
 
@@ -52,6 +48,9 @@ include		../../../../lib/Makefile.lib
 LIBS = $(LIBRARY)
 
 CPPFLAGS =	-I../../include $(CPPFLAGS.master)
+
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-parentheses
 
 POFILE =	lp_lib_filters.po
 

@@ -23,7 +23,6 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 MODULE = unix.so
 MDBTGT = kvm
@@ -46,3 +45,4 @@ CPPFLAGS += -I$(SRC)/uts/sun4v
 CPPFLAGS += -I$(SRC)/uts/sun4u
 CPPFLAGS += -I$(SRC)/uts/sfmmu
 CPPFLAGS += -I$(SRC)/uts/sparc/v9
+CERRWARN += -_gcc=-Wno-uninitialized

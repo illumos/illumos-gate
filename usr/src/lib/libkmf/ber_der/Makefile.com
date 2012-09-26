@@ -47,6 +47,8 @@ CPPFLAGS	+=	-I/usr/include/libxml2 -I$(INCDIR) -I../../include
 CPPFLAGS64	+=	-I/usr/include/libxml2 -I$(INCDIR) -I../../include
 LDLIBS		+=	-lc
 
+CERRWARN	+=	-_gcc=-Wno-unused-label
+
 .KEEP_STATE:
 
 all:    $(LIBS)

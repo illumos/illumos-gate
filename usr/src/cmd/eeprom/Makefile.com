@@ -37,6 +37,10 @@ DIRMODE		= 755
 
 OBJS		= error.o
 
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+
 LINT_OBJS = $(OBJS:%.o=%.ln)
 SOURCES = $(OBJS:%.o=%.c)
 

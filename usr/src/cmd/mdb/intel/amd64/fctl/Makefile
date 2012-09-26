@@ -42,4 +42,8 @@ LINTFLAGS64 +=  -erroff=E_FUNC_SET_NOT_USED
 LINTFLAGS64 +=  -erroff=E_FUNC_ARG_UNUSED
 LINTFLAGS64 +=  -erroff=E_SEC_SPRINTF_UNBOUNDED_COPY
 # if optimization is on, compiler asserts
-COPTFLAG64 = -v
+COPTFLAG64 =	$(CCVERBOSE)
+
+CERRWARN +=	-_gcc=-Wno-unused-function
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-parentheses

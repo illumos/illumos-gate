@@ -41,6 +41,10 @@ POFILES= $(SRCS:%.c=%.po)
 XGETFLAGS += -a -x sh.xcl
 
 CPPFLAGS += -D_FILE_OFFSET_BITS=64 -DACCT
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-extra
+CERRWARN += -_gcc=-Wno-unused-variable
 MAPFILES = $(MAPFILE.INT) $(MAPFILE.NGB)
 LDFLAGS += $(MAPFILES:%=-M%)
 LDLIBS += -lgen

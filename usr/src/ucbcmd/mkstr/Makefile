@@ -19,8 +19,7 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 # Copyright (c) 1989 by Sun Microsystems, Inc.
 #
@@ -31,6 +30,8 @@ include ../Makefile.ucbcmd
 #
 # For messaging
 XGETFLAGS += -a -x mkstr.xcl
+
+CERRWARN += -_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

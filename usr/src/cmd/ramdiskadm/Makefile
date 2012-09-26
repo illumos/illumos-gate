@@ -23,8 +23,6 @@
 # Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG= ramdiskadm
 OBJS= main.o utils.o
@@ -34,6 +32,7 @@ POFILES= $(OBJS:%.o=%.po)
 include ../Makefile.cmd
 
 LDLIBS	+= -ldevinfo
+CERRWARN += -_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

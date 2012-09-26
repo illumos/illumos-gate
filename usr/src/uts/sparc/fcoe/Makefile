@@ -58,6 +58,8 @@ MODSTUBS_DIR	 = $(OBJS_DIR)
 LDFLAGS		+= -dy -Nmisc/mac
 INC_PATH	+= -I$(UTSBASE)/common/io/fcoe
 
+CERRWARN	+= -_gcc=-Wno-parentheses
+
 #
 #	Default build targets.
 #

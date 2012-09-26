@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY= libldap.a
 VERS= .5
@@ -113,6 +111,15 @@ sparcv9_C_PICFLAGS =	$(sparcv9_C_BIGPICFLAGS)
 
 CFLAGS +=	$(CCVERBOSE) $(LOCFLAGS)
 CFLAGS64 +=	$(LOCFLAGS)
+
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-type-limits
+CERRWARN +=	-_gcc=-Wno-unused-function
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-unused-value
+CERRWARN +=	-_gcc=-Wno-address
+
 LDLIBS +=	-lsasl -lsocket -lnsl -lmd -lc
 
 .KEEP_STATE:

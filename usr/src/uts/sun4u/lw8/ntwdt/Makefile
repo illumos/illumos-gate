@@ -23,7 +23,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makes the "ntwdt" driver module, which
 #	provides for an application-level watchdog
@@ -66,6 +66,7 @@ CLEANLINTFILES	+= $(LINT32_FILES)
 # lint pass one enforcement
 #
 CFLAGS		+= $(CCVERBOSE)
+CERRWARN	+= -_gcc=-Wno-uninitialized
 
 LDFLAGS		+= -dy -Ndrv/sgsbbc
 

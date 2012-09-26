@@ -22,10 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# This file is included by Makefile. The idea is to unclutter it (Makefile).
-#
 
 SRCS =		account.c anlwrk.c bnuconvert.c callers.c		\
 		chremdir.c cntrl.c conn.c cpmv.c ct.c			\
@@ -43,7 +39,13 @@ SRCS =		account.c anlwrk.c bnuconvert.c callers.c		\
 		uuglist.c uuname.c uusched.c uustat.c uux.c		\
 		uuxqt.c versys.c xio.c xqt.c				\
 		../chmod/common.c
-		
+
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-char-subscripts
+CERRWARN	+= -_gcc=-Wno-unused-variable
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-extra
+CERRWARN	+= -_gcc=-Wno-implicit-function-declaration
 
 TLILIB =	-lnsl -lsocket
 PAMLIB =        -lpam

@@ -2,8 +2,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG= kadmin kadmin.local
 SHFILES= k5srvutil
@@ -32,6 +30,12 @@ CPPFLAGS += -I$(SRC)/uts/common/gssapi/include/ \
 		-I$(SRC)/cmd/krb5/iprop \
 		-I$(SRC)/lib/krb5 \
 		-I$(SRC)/lib/gss_mechs/mech_krb5/include $(DEFS)
+
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-unused-label
+CERRWARN += -_gcc=-Wno-unused-function
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-unused-variable
 
 COPTFLAG += $(XESS) #-I$(KINCDIR) 
 

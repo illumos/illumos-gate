@@ -56,6 +56,11 @@ LDLIBS += -lnsl
 LDFLAGS += $(MAPFILE.NGB:%=-M%)
 LINTFLAGS += -b -x
 
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-unused-variable
+CERRWARN += -_gcc=-Wno-extra
+
 util1.o := CPPFLAGS += -DSAC
 util2.o := CPPFLAGS += -USAC
 

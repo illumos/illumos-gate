@@ -22,7 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 MODULE = libproc.so
 MDBTGT = proc
@@ -38,6 +37,8 @@ include ../../../Makefile.module
 
 CFLAGS64 += -I../../../../../lib/libproc/common
 LINTFLAGS64 += -I../../../../../lib/libproc/common
+
+CERRWARN += -_gcc=-Wno-uninitialized
 
 %.o: $(MODSRCS_DIR)/%.c
 	$(COMPILE.c) $<

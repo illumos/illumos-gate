@@ -117,21 +117,10 @@ $(TONICBUILD)CLOSEDROOT= $(ROOT)-closed
 # compiler is primary, and control the versions of the given compilers to be
 # used.  They also allow compiler-version specific Makefile fragments.
 #
-# __SSNEXT when set to the empty string enables options specific to the 'next'
-# version of the Sun Studio compiler.
-#
-# __GNUC3 when the empty string uses and refers to GCC 3.x, it is the default.
-# __GNUC4 when the empty string uses and refers to GCC 4.x.
 
 __GNUC=			$(POUND_SIGN)
 $(__GNUC)__SUNC=	$(POUND_SIGN)
 __GNUC64=		$(__GNUC)
-
-__SSNEXT=		$(POUND_SIGN)
-
-__GNUC3=
-__GNUC4=		$(POUND_SIGN)
-$(__GNUC4)__GNUC3=	$(POUND_SIGN)
 
 # CLOSED is the root of the tree that contains source which isn't released
 # as open source
@@ -151,8 +140,7 @@ SFWINCDIR=	/usr/include
 SFWLIBDIR=	/usr/lib
 SFWLIBDIR64=	/usr/lib/$(MACH64)
 
-$(__GNUC3)GCC_ROOT=	$(SFW_ROOT)
-$(__GNUC4)GCC_ROOT=	/opt/gcc/4.4.4
+GCC_ROOT=	/opt/gcc/4.4.4
 GCCLIBDIR=	$(GCC_ROOT)/lib
 GCCLIBDIR64=	$(GCC_ROOT)/lib/$(MACH64)
 
@@ -341,14 +329,14 @@ CCABS32=		-Wc,-xcode=abs32
 #
 # generate v9 code which tolerates callers using the v7 ABI, for the sake of
 # system calls.
-$(__GNUC4)CC32BITCALLERS=		-_gcc=-massume-32bit-callers
+CC32BITCALLERS=		-_gcc=-massume-32bit-callers
 
 # GCC, especially, is increasingly beginning to auto-inline functions and
 # sadly does so separately not under the general -fno-inline-functions
 # Additionally, we wish to prevent optimisations which cause GCC to clone
 # functions -- in particular, these may cause unhelpful symbols to be
 # emitted instead of function names
-$(__GNUC4)CCNOAUTOINLINE= -_gcc=-fno-inline-small-functions \
+CCNOAUTOINLINE= -_gcc=-fno-inline-small-functions \
 	-_gcc=-fno-inline-functions-called-once \
 	-_gcc=-fno-ipa-cp
 
@@ -417,9 +405,19 @@ CERRWARN = -errtags=yes -errwarn=%all
 CERRWARN += -erroff=E_EMPTY_TRANSLATION_UNIT
 CERRWARN += -erroff=E_STATEMENT_NOT_REACHED
 
-# Normally cw(1) would translate -v into a set of options including these
-# but as they're GCC 4.x specific, we can't do that
-$(__GNUC4)CERRWARN +=	-_gcc=-Wno-address -_gcc=-Wno-array-bounds
+CERRWARN += -_gcc=-Wno-missing-braces
+CERRWARN += -_gcc=-Wno-sign-compare
+CERRWARN += -_gcc=-Wno-unknown-pragmas
+CERRWARN += -_gcc=-Wno-unused-parameter
+CERRWARN += -_gcc=-Wno-missing-field-initializers
+
+# Unfortunately, this option can misfire very easily and unfixably.
+CERRWARN +=	-_gcc=-Wno-array-bounds
+
+# DEBUG v. -nd make for frequent unused variables, empty conditions, etc. in
+# -nd builds
+$(RELEASE_BUILD)CERRWARN += -_gcc=-Wno-unused
+$(RELEASE_BUILD)CERRWARN += -_gcc=-Wno-empty-body
 
 #
 # turn warnings into errors (C++)

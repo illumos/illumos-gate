@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <stdio.h>
@@ -403,7 +404,7 @@ handle_getinfo(char *progname, char **argv)
 		goto out_dev;
 	}
 
-	einfo = find_einfo(stage2->extra);
+	einfo = find_einfo(stage2->extra, stage2->extra_size);
 	if (einfo == NULL) {
 		retval = BC_NOEINFO;
 		(void) fprintf(stderr, gettext("No extended information "
@@ -501,7 +502,7 @@ handle_mirror(char *progname, char **argv)
 		goto out_devs;
 	}
 
-	einfo_curr = find_einfo(stage2_curr->extra);
+	einfo_curr = find_einfo(stage2_curr->extra, stage2_curr->extra_size);
 	if (einfo_curr != NULL)
 		updt_str = einfo_get_string(einfo_curr);
 
@@ -1221,6 +1222,7 @@ read_stage2_from_disk(int dev_fd, ig_stage2_t *stage2)
 	stage2->mboot_off = mboot_off;
 	stage2->mboot = (multiboot_header_t *)(stage2->buf + stage2->mboot_off);
 	stage2->extra = stage2->buf + P2ROUNDUP(stage2->file_size, 8);
+	stage2->extra_size = stage2->buf_size - P2ROUNDUP(stage2->file_size, 8);
 
 	return (BC_SUCCESS);
 }
@@ -1251,7 +1253,7 @@ is_update_necessary(ig_data_t *data, char *updt_str)
 	 * Look for the extended information structure in the extra payload
 	 * area.
 	 */
-	einfo = find_einfo(stage2_disk.extra);
+	einfo = find_einfo(stage2_disk.extra, stage2_disk.extra_size);
 	if (einfo == NULL) {
 		BOOT_DEBUG("No extended information available\n");
 		return (B_TRUE);

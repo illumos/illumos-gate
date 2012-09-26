@@ -38,8 +38,9 @@ OBJS =	$(LOCAL_OBJS) $(COMMON_OBJS)
 SRCS = $(LOCAL_SRCS) $(COMMON_SRCS)
 POFILE = stmfadm_all.po
 POFILES = $(LOCAL_OBJS:%.o=%.po) $(COMMON_OBJS:%.o=$(COMMONBASE)/cmdparse/%.po)
- 
+
 CPPFLAGS += -I. -I$(COMMONBASE)/cmdparse
+CERRWARN += -_gcc=-Wno-unused-label
 LDLIBS += -lstmf 
 LINTFLAGS += -xerroff=E_BAD_FORMAT_STR2
 

@@ -23,8 +23,6 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 .KEEP_STATE:
 .SUFFIXES:
@@ -72,6 +70,8 @@ ASFLAGS += -P -D_ASM
 LINTFLAGS += -n -errtags=yes
 CLINTFILES = $(SRCS:%.c=%.ln)
 LINTFILES = $(CLINTFILES:%.s=%.ln)
+
+CERRWARN += -_gcc=-Wno-parentheses
 
 LIB = libstand.a
 COBJS = $(SRCS:%.c=%.o)

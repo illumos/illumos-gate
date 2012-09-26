@@ -48,6 +48,8 @@ ROOTMODULE	= $(ROOT_SOCK_DIR)/$(MODULE)
 #
 include $(UTSBASE)/sparc/Makefile.sparc
 
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 #	Define targets
 #

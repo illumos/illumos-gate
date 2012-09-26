@@ -23,8 +23,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG= chown
 
@@ -33,6 +31,8 @@ include ../Makefile.ucbcmd
 FILEMODE=	755
 
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-parentheses
 LDFLAGS += $(MAPFILE.NGB:%=-M%)
 
 .KEEP_STATE:

@@ -34,6 +34,9 @@ LDLIBS += -lproc -lproject -lsecdb
 CFLAGS += $(CCVERBOSE)
 CFLAGS64 += $(CCVERBOSE)
 
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
+
 CPPFLAGS += -I..
 
 .KEEP_STATE:

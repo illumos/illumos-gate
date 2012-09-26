@@ -22,7 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 MODULE = io-retire
 CLASS = common
@@ -31,3 +30,4 @@ SRCS = rio_main.c
 include ../../Makefile.plugin
 
 LDLIBS += -ldevinfo
+CERRWARN += -_gcc=-Wno-parentheses

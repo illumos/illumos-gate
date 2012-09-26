@@ -70,6 +70,9 @@ LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) -lc
 LINTFLAGS +=	-u -erroff=E_BAD_PTR_CAST_ALIGN
 LINTFLAGS64 +=	-u -erroff=E_CAST_INT_TO_SMALL_INT
 
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 BUILD.AR=	$(RM) $@ ; \
 		$(AR) q $@ `$(LORDER) $(OBJECTS:%=$(DIR)/%)| $(TSORT)`
 		$(POST_PROCESS_A)

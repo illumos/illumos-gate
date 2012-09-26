@@ -56,6 +56,12 @@ CFLAGS +=	$(CCVERBOSE) -Wp,-xc99=%all
 CPPFLAGS +=	-I../inc -I../../common/inc -I$(COMDIR) -I$(ROOTHDRDIR)
 $(NOT_RELEASE_BUILD) CPPFLAGS += -DFASTREBOOT_DEBUG
 
+CERRWARN +=	-_gcc=-Wno-switch
+CERRWARN +=	-_gcc=-Wno-char-subscripts
+CERRWARN +=	-_gcc=-Wno-unused-label
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 #
 # For native builds, we compile and link against the native version
 # of libuutil.

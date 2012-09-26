@@ -31,6 +31,7 @@ VTINFO_SRC= vtinfo.c
 include ../Makefile.cmd
 
 CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-uninitialized
 
 LDLIBS += -lpam -lbsm
 

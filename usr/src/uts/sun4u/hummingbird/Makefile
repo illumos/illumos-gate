@@ -120,3 +120,5 @@ include $(UTSBASE)/sun4u/Makefile.targ
 LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 LINTTAGS	+= -erroff=E_BAD_FORMAT_STR2
+
+CERRWARN	+= -_gcc=-Wno-uninitialized

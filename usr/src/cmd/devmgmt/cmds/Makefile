@@ -20,12 +20,8 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# cmd/devmgmt/cmds/Makefile
 #
 
 include ../../Makefile.cmd
@@ -38,6 +34,9 @@ PROG = devattr devreserv getvol putdgrp devfree getdev listdgrp getdgrp \
     putdev
 
 LDLIBS += -ladm
+
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

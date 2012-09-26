@@ -75,6 +75,8 @@ LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 LINTTAGS	+= -erroff=E_CONSTANT_CONDITION
 
+CERRWARN	+= -_gcc=-Wno-unused-label
+
 #
 #	Default build targets.
 #

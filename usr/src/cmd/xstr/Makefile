@@ -20,17 +20,14 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1989 by Sun Microsystems, Inc.
-#
-# Makefile for cmd/xstr
 #
 
 PROG =		xstr
 
 include		../Makefile.cmd
 
+CERRWARN +=	-_gcc=-Wno-parentheses
 
 .KEEP_STATE :
 

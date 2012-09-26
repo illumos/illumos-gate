@@ -32,6 +32,10 @@ FILEMODE=	755
 LDLIBS =  -L$(ROOT)/usr/ucblib -R /usr/ucblib $(LDLIBS.cmd) -lucb -ltermcap
 
 CPPFLAGS = -I$(SRC)/ucbhead $(CPPFLAGS.master)
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-unused-variable
+CERRWARN += -_gcc=-Wno-uninitialized
 
 ROOTSYMLINK= $(ROOTBIN)/reset
 

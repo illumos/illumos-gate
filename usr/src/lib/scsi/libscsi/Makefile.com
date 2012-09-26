@@ -23,7 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 LIBRARY = libscsi.a
 VERS = .1
@@ -42,6 +41,9 @@ C99MODE = $(C99_ENABLE)
 CPPFLAGS += -I../common -I. -D_REENTRANT
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 CFLAGS += $(CCVERBOSE)
+
+CERRWARN += -_gcc=-Wno-type-limits
+
 LDLIBS += \
 	-lumem \
 	-lc

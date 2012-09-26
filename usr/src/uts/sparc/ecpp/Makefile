@@ -23,7 +23,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This Makefile drives the production of ecpp
 #	kernel module.
@@ -66,6 +66,10 @@ CFLAGS += $(CCVERBOSE)
 
 # Turn this on once compiler understands v9 in it's backend
 #INLINES		+= $(UTSBASE)/sun/io/ecpp.il
+
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-unused-variable
 
 #
 # For now, disable these lint checks; maintainers should endeavor

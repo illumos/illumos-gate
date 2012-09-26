@@ -39,6 +39,7 @@ PROGS= $(PROG) $(RT) $(TS) $(IA) $(FSS) $(FX) $(SDC)
 include ../Makefile.cmd
 
 CFLAGS +=	$(CCVERBOSE)
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 ROOTDIR=	$(ROOT)/usr/lib/class
 ROOTDIRS=	$(ROOTDIR)	\

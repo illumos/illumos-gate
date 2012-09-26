@@ -78,6 +78,10 @@ CPPFLAGS += -xCC -D_POSIX_PTHREAD_SEMANTICS $(TSSINC)
 CPPFLAGS64 += $(CPPFLAGS)
 C99MODE=        $(C99_ENABLE)
 
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-unused-label
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 LINTSRC= $(OBJECTS:%.o=$(SRCDIR)/%.c)
 
 $(LINTLIB):=	SRCS	=	$(SRCDIR)/$(LINTSRC)

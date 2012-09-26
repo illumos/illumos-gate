@@ -19,8 +19,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -35,6 +33,7 @@ SRCS= 		$(RMOBJ1:%.o=%.c) $(SRC)/common/util/getresponse.c
 include ../Makefile.cmd
 
 CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-parentheses
 $(XPG4) := CFLAGS += -DXPG4
 CPPFLAGS += -D_FILE_OFFSET_BITS=64  -I $(SRC)/common/util
 LINTFLAGS += -u

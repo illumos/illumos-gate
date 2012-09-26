@@ -23,7 +23,6 @@
 # Use is subject to license terms.
 #
 
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the IP generic packet classifier
 #       ipp kernel module.
@@ -70,6 +69,8 @@ LDFLAGS += -dy -Ndrv/ip
 #
 LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
+
+CERRWARN	+= -_gcc=-Wno-uninitialized
 
 #
 #	Default build targets.

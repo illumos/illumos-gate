@@ -49,6 +49,8 @@ ROOTLIBDIR64=   $(ROOT)/usr/ucblib/$(MACH64)
 
 CPPFLAGS = -I$(SRC)/ucbhead -I../../../lib/libc/inc $(CPPFLAGS.master)
 
+CERRWARN += -_gcc=-Wno-uninitialized
+
 .KEEP_STATE:
 
 lint: lintcheck

@@ -19,12 +19,9 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/rpcbind/Makefile
 
 PROG=		rpcbind
 MANIFEST=	bind.xml
@@ -44,6 +41,11 @@ ROOTMANIFESTDIR=	$(ROOTSVCNETWORKRPC)
 
 CPPFLAGS= -I. -DPORTMAP $(CPPFLAGS.master)
 CPPFLAGS += -D_REENTRANT
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-unused-variable
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-unused-label
 LDLIBS += -lsocket -lnsl -lwrap -lscf
 
 .KEEP_STATE:

@@ -19,8 +19,6 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -35,6 +33,11 @@ include		../Makefile.roll
 OBJS=		$(LIBPROG).o $(ROLLOBJS) $(FSLIB)
 SRCS=		$(LIBPROG).c $(ROLLSRCS) $(FSLIBSRC)
 MKFSOBJS=	mkfs.o
+
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-empty-body
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 # for messaging catalog
 #

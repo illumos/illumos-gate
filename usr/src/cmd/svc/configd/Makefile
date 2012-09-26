@@ -50,7 +50,13 @@ ROOTCMDDIR=	$(ROOT)/lib/svc/bin
 
 MYCPPFLAGS = -I. -I../common -I../../../common/svc -I$(ROOT)/usr/include/sqlite -D_REENTRANT
 CPPFLAGS += $(MYCPPFLAGS)
-CFLAGS	+= -v
+CFLAGS	+= $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-type-limits
+CERRWARN += -_gcc=-Wno-unused-label
+CERRWARN += -_gcc=-Wno-unused-variable
+CERRWARN += -_gcc=-Wno-unused-function
+CERRWARN += -_gcc=-Wno-uninitialized
 MYLDLIBS = -lumem -luutil -lbsm
 LDLIBS	+= -lsecdb $(MYLDLIBS)
 LINTFLAGS += -errtags -erroff=E_BAD_FORMAT_ARG_TYPE2 -erroff=E_NAME_DEF_NOT_USED2

@@ -23,7 +23,6 @@
 # Use is subject to license terms.
 #
 
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This makefile drives the production of the iwk driver kernel module.
 #
@@ -63,6 +62,9 @@ LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 CPPFLAGS	+= -I. -D_KERNEL -DIWL=4965
 
 LDFLAGS         += -dy -Nmisc/mac -Nmisc/net80211 -Ndrv/random -Ndrv/ip 
+
+CERRWARN	+= -_gcc=-Wno-unused-label
+CERRWARN	+= -_gcc=-Wno-uninitialized
 
 #
 #	Default build targets.

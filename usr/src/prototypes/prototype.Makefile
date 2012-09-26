@@ -10,6 +10,6 @@
 #
 
 #
-# Copyright 2011 <contributor>.  All rights reserved.
+# Copyright 2012 <contributor>.  All rights reserved.
 #
 

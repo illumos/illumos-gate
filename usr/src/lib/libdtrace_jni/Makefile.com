@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY = libdtrace_jni.a
 VERS = .1
@@ -50,6 +48,9 @@ CPPFLAGS += -I$(JAVA_ROOT)/include -I$(JAVA_ROOT)/include/solaris
 CPPFLAGS += -I../java/native
 CFLAGS += $(CCVERBOSE) -K PIC
 CFLAGS64 += $(CCVERBOSE) -K PIC
+
+CERRWARN += -_gcc=-Wno-uninitialized
+
 LDLIBS += -lc -luutil -ldtrace -lproc
 
 LINTLIB =

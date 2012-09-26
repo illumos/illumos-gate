@@ -34,6 +34,8 @@ SRCS=	$(OBJS:%.o=%.c)
 include ../Makefile.tools
 
 CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-unused
 
 CLEANFILES += $(OBJS) y.tab.c y.tab.h
 

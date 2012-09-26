@@ -32,6 +32,8 @@ include ../Makefile.cmd
 
 CPPFLAGS += -D_EXTVTOC
 
+CERRWARN += -_gcc=-Wno-uninitialized
+
 .KEEP_STATE:
 
 all: $(PROG)

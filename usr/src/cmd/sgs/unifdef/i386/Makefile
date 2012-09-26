@@ -19,12 +19,8 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms. 
-#
-# cmd/sgs/unifdef/i386/Makefile
 #
 
 PROG=		unifdef
@@ -42,6 +38,9 @@ C99MODE=	$(C99_ENABLE)
 LINTFLAGS +=	$(LDLIBS)
 
 CLEANFILES +=	$(LINTOUT)
+
+CERRWARN +=	-_gcc=-Wno-char-subscripts
+CERRWARN +=	-_gcc=-Wno-parentheses
 
 %.o:		../common/%.c
 		$(COMPILE.c) $<

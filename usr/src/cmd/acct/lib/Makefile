@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1989 by Sun Microsystems, Inc.
 #
 #
@@ -34,6 +32,9 @@ SRCS=	$(OBJS:%.o=%.c)
 include	../../Makefile.cmd
 
 CPPFLAGS = -D_LTYPES -I.. $(CPPFLAGS.master)
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-extra
 
 .KEEP_STATE:
 

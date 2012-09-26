@@ -23,8 +23,6 @@
 # Copyright 1994, 2002 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG=		tnfxtract
 
@@ -38,6 +36,7 @@ include	../../../Makefile.cmd
 
 LFLAGS=		-v
 LDLIBS +=	-lkvm
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

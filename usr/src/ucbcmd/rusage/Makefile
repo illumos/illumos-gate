@@ -34,6 +34,7 @@ FILEMODE=	755
 LDLIBS +=  -L$(ROOT)/usr/ucblib -R /usr/ucblib -lucb
 
 CPPFLAGS = -I$(INC1) $(CPPFLAGS.master)
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
 
 .KEEP_STATE:
 

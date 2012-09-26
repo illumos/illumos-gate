@@ -35,6 +35,8 @@ SRCS= $(OBJ:%.o=%.c)
 include ../Makefile.cmd
 
 LDLIBS += -lcontract
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
 
 CLASSD = $(ROOTLIB)/class
 RTD = $(CLASSD)/RT

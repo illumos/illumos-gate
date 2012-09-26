@@ -55,6 +55,8 @@ CFLAGS		+= $(CCVERBOSE)
 #
 LDFLAGS		+= -dy -N misc/ac97 -N drv/audio
 
+CERRWARN	+= -_gcc=-Wno-parentheses
+
 #
 #	Define targets
 #

@@ -58,6 +58,8 @@ LDLIBS +=	-lc -lm -lnvpair -lsocket -lnsl
 CPPFLAGS +=	$(INCS)
 C99MODE = $(C99_ENABLE)
 
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
 
 .KEEP_STATE:

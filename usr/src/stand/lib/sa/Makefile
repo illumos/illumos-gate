@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # 
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY		= libsa.a
 LOCOBJS		= assert.o ctype.o errno.o libintl.o malloc.o memlist.o \
@@ -57,6 +55,9 @@ SRCS		= $(LOCOBJS:%.o=$(SRCDIR)/%.c) $(CMNOBJS:%.o=$(CMNDIR)/%.c) \
 
 LDLIBS += -lsock
 CPPFLAGS += $(SOCKCPPFLAGS)
+
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
 
 objs/%.o: $(MACH)/%.s
 	  $(COMPILE.s) -o $@ $<

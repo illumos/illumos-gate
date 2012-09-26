@@ -44,6 +44,8 @@ ROOTMODULE	= $(ROOT_MAC_DIR)/$(MODULE)
 #
 include $(UTSBASE)/intel/Makefile.intel
 
+CERRWARN	+= -_gcc=-Wno-switch
+
 #
 #	Define targets
 #

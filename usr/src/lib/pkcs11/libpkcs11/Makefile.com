@@ -75,6 +75,9 @@ CPPFLAGS +=	-I$(INCDIR) -I$(SRCDIR) -D_REENTRANT
 
 LINTFLAGS64 += -errchk=longptr64
 
+CERRWARN +=	-_gcc=-Wno-unused-label
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 .KEEP_STATE:
 
 all:	$(LIBS)

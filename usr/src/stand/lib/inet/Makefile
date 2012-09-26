@@ -23,8 +23,6 @@
 # Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # 
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY = libinet.a
 LOCOBJS = ipv4.o icmp4.o udp.o mac.o ethernet.o dhcpv4.o ibd.o
@@ -37,5 +35,8 @@ CMNDIR  = $(CMNNETDIR)/dhcp
 SRCS	= $(LOCOBJS:%.o=$(SRCDIR)/%.c) $(CMNOBJS:%.o=$(CMNDIR)/%.c)
 LDLIBS += -lsock
 CPPFLAGS += $(SOCKCPPFLAGS) -I$(TOPDIR)/psm/stand
+
+CERRWARN += -_gcc=-Wno-char-subscripts
+CERRWARN += -_gcc=-Wno-uninitialized
 
 include ../Makefile.targ

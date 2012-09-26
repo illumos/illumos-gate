@@ -17,6 +17,7 @@ SRCS = \
 
 CFLAGS += $(CCVERBOSE)
 include $(SRC)/tools/Makefile.tools
+CERRWARN += -_gcc=-Wno-unused-variable
 
 OBJS = $(SRCS:%.c=%.o)
 LINTFILES = $(SRCS:%.c=%.ln)

@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1989,2001 by Sun Microsystems, Inc.
 # All rights reserved.
 #
@@ -34,6 +32,8 @@ include ../../../Makefile.cmd
 include ../../Makefile.cmd-inet
 
 CPPFLAGS +=	-DSYSV -DSTRNET -DBSD_COMP -I$(CMDINETCOMMONDIR)
+CERRWARN +=	-_gcc=-Wno-clobbered
+CERRWARN +=	-_gcc=-Wno-parentheses
 LDLIBS +=	-lsocket -lnsl
 
 .KEEP_STATE:

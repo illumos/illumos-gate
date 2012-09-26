@@ -22,10 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# usr/src/lib/pam_modules/unix_cred/Makefile.com
-#
 
 LIBRARY=	pam_unix_cred.a
 VERS=		.1
@@ -34,6 +30,8 @@ OBJECTS=	unix_cred.o
 include		../../Makefile.pam_modules
 
 LDLIBS		+= -lbsm -lpam -lsecdb -lproject -lc
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-uninitialized
 
 all:	$(LIBS)
 

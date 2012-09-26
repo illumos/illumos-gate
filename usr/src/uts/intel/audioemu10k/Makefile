@@ -60,6 +60,8 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 LDFLAGS		+= -dy -Ndrv/audio -Nmisc/ac97
 
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 $(OBJS_DIR)/%.o			:= CPPFLAGS += -I$(OBJS_DIR)
 $(OBJS_DIR)/%.ln		:= CPPFLAGS += -I$(OBJS_DIR)
 $(OBJS_DIR)/emu10k_gpr.h	:= ASM10KFLAGS = -v -0 -P gpr

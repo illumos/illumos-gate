@@ -61,6 +61,8 @@ CFLAGS += \
 CFLAGS64 += \
 	$(ASTCFLAGS64)
 
+CERRWARN +=	-_gcc=-Wno-parentheses
+
 ROOTCMDDIR=$(ROOT)/usr/bin
 
 PROG= shcomp

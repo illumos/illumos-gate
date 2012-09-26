@@ -23,7 +23,6 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 PROG =		inetadm
 SRCS =		inetadm.c
@@ -33,6 +32,8 @@ OBJS =		$(SRCS:%.c=%.o)
 include ../../../Makefile.cmd
 
 LDLIBS +=	-lscf -luutil -linetsvc
+CERRWARN +=	-_gcc=-Wno-switch
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 lint := LINTFLAGS = -ux
 

@@ -56,6 +56,11 @@ INC_PATH	+= -I$(UTSBASE)/common/sys/fibre-channel/fca/oce
 
 LDFLAGS		+= -dy -Nmisc/mac
 
+CERRWARN	+= -_gcc=-Wno-switch
+CERRWARN	+= -_gcc=-Wno-unused-label
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-parentheses
+
 #
 #	Default build targets.
 #

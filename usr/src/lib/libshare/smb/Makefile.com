@@ -49,6 +49,8 @@ LDLIBS +=	-lshare -ldlpi -lnsl -lnvpair -lscf -lumem -lc
 all install := LDLIBS += -lxml2
 
 CFLAGS +=	$(CCVERBOSE)
+CERRWARN +=	-_gcc=-Wno-char-subscripts
+CERRWARN +=	-_gcc=-Wno-switch
 CPPFLAGS +=	-D_REENTRANT -I/usr/include/libxml2 \
 		-I$(SRCDIR)/../common
 $(ENABLE_SMB_PRINTING) CPPFLAGS += -DHAVE_CUPS

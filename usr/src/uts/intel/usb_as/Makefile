@@ -72,6 +72,8 @@ LDFLAGS		+= -dy -Nmisc/usba -Ndrv/usb_ac
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 
+CERRWARN	+= -_gcc=-Wno-unused-label
+
 #
 #	Default build targets.
 #

@@ -54,6 +54,13 @@ LINTFLAGS += -erroff=E_FUNC_ARG_UNUSED -erroff=E_NAME_DEF_NOT_USED2 \
 	-erroff=E_NAME_USED_NOT_DEF2 -erroff=E_INCONS_ARG_DECL2
 LINTFLAGS64 += -erroff=E_FUNC_ARG_UNUSED -erroff=E_NAME_DEF_NOT_USED2 \
 	-erroff=E_NAME_USED_NOT_DEF2 -erroff=E_INCONS_ARG_DECL2
+
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-unused-variable
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-unused-label
+CERRWARN += -_gcc=-Wno-unused-function
+
 LINTFILES = $(SRCS:%.c=%.ln)
 CLEANFILES += parser_gram.c parser_gram.h parser_lex.c y.tab.h y.tab.c
 

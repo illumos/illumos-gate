@@ -38,3 +38,7 @@ LDLIBS += -L$(ROOT)/usr/lib/fm -lldom -ltopo
 LDFLAGS += -R/usr/lib/fm
 
 DYNFLAGS += -R/usr/lib
+
+CERRWARN += -_gcc=-Wno-unused-value
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized

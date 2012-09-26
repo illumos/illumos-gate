@@ -56,6 +56,8 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 CFLAGS		+= $(CCVERBOSE)
 
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 INC_PATH	+= -I$(SRC)/common/lzma  
 
 #

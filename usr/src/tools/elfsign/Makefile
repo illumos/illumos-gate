@@ -49,6 +49,8 @@ CPPFLAGS +=	-I$(SRC)/lib/libkmf/include
 CPPFLAGS +=	-I$(SRC)/lib/libcryptoutil/common
 LDFLAGS +=	-lmd -lelf -lkmf -lcryptoutil -lc
 
+CERRWARN += -_gcc=-Wno-unused
+
 .KEEP_STATE:
 
 all:	$(PROG) $(SHFILES)

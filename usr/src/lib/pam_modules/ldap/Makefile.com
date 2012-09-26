@@ -24,8 +24,6 @@
 #
 # usr/src/lib/pam_modules/ldap/Makefile.com
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY=	pam_ldap.a
 VERS=		 .1
@@ -42,6 +40,7 @@ include		../../Makefile.pam_modules
 
 LDLIBS +=	-lpam -lsldap -lc
 CPPFLAGS +=	-I$(SRC)/lib/libsldap/common
+CERRWARN +=	-_gcc=-Wno-parentheses
 
 all:	$(LIBS)
 

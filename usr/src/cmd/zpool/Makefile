@@ -48,6 +48,10 @@ $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 LINTFLAGS += -xerroff=E_NAME_DEF_NOT_USED2 
 LINTFLAGS64 += -xerroff=E_NAME_DEF_NOT_USED2  
 
+CERRWARN += -_gcc=-Wno-unused-function
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-parentheses
+
 ROOTUSRSBINLINKS = $(PROG:%=$(ROOTUSRSBIN)/%)
 
 .KEEP_STATE:

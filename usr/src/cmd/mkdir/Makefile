@@ -20,12 +20,8 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# cmd/mkdir/Makefile
 #
 
 PROG= mkdir
@@ -35,6 +31,8 @@ SRCS= mkdir.c ../chmod/common.c
 include ../Makefile.cmd
 
 CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-parentheses
 LDLIBS += -lgen
 
 %.o: ../chmod/%.c

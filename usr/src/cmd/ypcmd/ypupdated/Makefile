@@ -52,6 +52,9 @@ OBJS =			$(RPCYPUPDATEOBJ)
 
 SRCS =			$(OBJS:%.o=%.c)
 
+CERRWARN +=		-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=		-_gcc=-Wno-unused-variable
+
 #conditional assignments
 $(INETSVC)   := FILEMODE=555
 

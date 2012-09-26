@@ -27,6 +27,7 @@ PROG=	strace strerr strclean
 include ../../Makefile.cmd
 
 CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-unused-variable
 
 FILEMODE= 0555
 

@@ -24,7 +24,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -62,6 +61,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 # Please do not carry these forward to new Makefiles.
 #
 LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
+CERRWARN	+= -_gcc=-Wno-parentheses
 
 .KEEP_STATE:
 

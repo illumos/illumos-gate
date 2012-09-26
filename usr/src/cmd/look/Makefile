@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1989 by Sun Microsystems, Inc.
 #
 
@@ -36,6 +34,8 @@ ROOTDATA=	$(DATA:%=$(ROOTDATADIR)/%)
 # Targetdirs installs /usr/lib.  Don't re-install it
 #DIRS=		$(ROOTLIB) $(ROOTDATADIR)
 DIRS=		$(ROOTDATADIR)
+
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
 
 FILEMODE=	755
 

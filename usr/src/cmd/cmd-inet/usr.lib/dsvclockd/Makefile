@@ -23,8 +23,6 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG	= dsvclockd
 OBJS	= dsvclockd.o container.o datastore.o
@@ -37,6 +35,7 @@ POFILES = $(OBJS:.o=.po)
 
 LDLIBS    += -ldhcputil -ldhcpsvc
 CPPFLAGS  += -D_REENTRANT
+CERRWARN  += -_gcc=-Wno-parentheses
 XGETFLAGS += -a
 
 .KEEP_STATE:

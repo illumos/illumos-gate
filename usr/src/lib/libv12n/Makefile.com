@@ -39,6 +39,8 @@ SRCS = $(MACHCOBJS:%.o=../$(MACH)/%.c)
 CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
 CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
 
+CERRWARN += -_gcc=-Wno-uninitialized
+
 $(LINTLIB) :=	SRCS = ../common/llib-lv12n
 
 .KEEP_STATE:

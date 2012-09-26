@@ -38,6 +38,9 @@ CPPFLAGS +=	-I../../../gss_mechs/mech_krb5/include \
 		-I$(SRC)/lib/gss_mechs/mech_krb5 \
 		-I$(SRC)/lib/krb5
 
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-unused-function
+
 LDLIBS +=	-lpam -lc
 
 all:	$(LIBS)

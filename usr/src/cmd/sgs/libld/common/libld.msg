@@ -419,8 +419,6 @@
 
 @ MSG_FIL_BADORDREF	"file %s: section [%u]%s: contains illegal reference \
 			 to discarded section: [%u]%s"
-@ MSG_FIL_EXEHFRMTYP	"file %s: section [%u]%s: section type is %s: \
-			 expected %s"
 
 
 # Recording name conflicts

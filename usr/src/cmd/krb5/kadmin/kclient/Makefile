@@ -60,6 +60,10 @@ CPPFLAGS += -I$(SRC)/uts/common/gssapi/include \
 	-I$(SRC)/uts/common/gssapi/include  \
 	-I$(SRC)/uts/common/gssapi/mechs/krb5/include
 
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-unused-function
+
 ksetpw:=	LDFLAGS += $(KRUNPATH)
 kdyndns:=	LDFLAGS += -R/usr/lib/smbsrv
 ksmb:=		LDFLAGS += -R/usr/lib/smbsrv

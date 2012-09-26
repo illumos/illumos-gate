@@ -1,10 +1,6 @@
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# cmd/eqn/neqn.d/Makefile
 #
 
 include		../../Makefile.cmd
@@ -30,6 +26,10 @@ YFLAGS =	-d
 CPPFLAGS =	-DNEQN -I. -I.. $(CPPFLAGS.master)
 LDFLAGS +=	$(MAPFILE.NGB:%=-M%)
 
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-unused-label
+
 #
 # for message catalog
 #
@@ -45,7 +45,7 @@ $(PROG) :	$(OBJS) $(MAPFILE.NGB)
 		$(POST_PROCESS)
 
 catalog:        $(POFILE)
- 
+
 $(POFILE):      $(POFILES)
 	 $(RM)	$@
 	 cat     $(POFILES)      > $@

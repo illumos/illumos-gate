@@ -23,8 +23,6 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG= rmformat
 
@@ -35,6 +33,8 @@ include ../Makefile.cmd
 SRCS= $(OBJS:.o=.c)
 
 LDLIBS +=	-lsmedia -lvolmgt -ladm -lefi
+
+CERRWARN += -_gcc=-Wno-uninitialized
 
 LINTFLAGS += -u
 CPPFLAGS += -D_FILE_OFFSET_BITS=64

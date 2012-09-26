@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 # The build process for libumem is sightly different from that used by other
@@ -124,6 +122,9 @@ LDFLAGS = $(LDFLAGS_$(CURTYPE))
 ASFLAGS_standalone = -DUMEM_STANDALONE
 ASFLAGS_library =
 ASFLAGS += -P $(ASFLAGS_$(CURTYPE)) -D_ASM
+
+CERRWARN += -_gcc=-Wno-switch
+CERRWARN += -_gcc=-Wno-uninitialized
 
 $(LINTLIB) := SRCS = ../common/$(LINTSRC)
 

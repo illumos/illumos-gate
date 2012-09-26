@@ -33,6 +33,8 @@ include ../../Makefile.cmd
 CFLAGS += $(CCVERBOSE)
 CFLAGS64 += $(CCVERBOSE)
 
+CERRWARN += -_gcc=-Wno-uninitialized
+
 CPPFLAGS += -DEMBED_CONFIGS -I/usr/include/glib-2.0
 C99MODE = $(C99_ENABLE)
 LDLIBS += -lcurses -ldtrace

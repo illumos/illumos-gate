@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 FSTYP_VERS=1
 FSTYPE=		udfs
@@ -37,6 +35,9 @@ MAPFILES =
 
 CFLAGS +=	$(C_PICFLAGS)
 DYNLIB=		$(LIBPROG)
+
+CERRWARN +=	-_gcc=-Wno-unused-function
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 LDLIBS += -lnvpair -ladm -lc
 

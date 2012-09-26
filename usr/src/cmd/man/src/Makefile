@@ -47,6 +47,10 @@ ROOTLIBPROG =	$(LIBPROG:%=$(ROOTLIB)/%)
 ROOTLIBSHELL =	$(LIBSHELL:%=$(ROOTLIB)/%)
 ROOTLNKPROG =	$(LNKPROG:%=$(ROOTBIN)/%)
 
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-unused-variable
+
 # for messaging catalog files
 POFILE= src.po
 POFILES= $(SRCS:%.c=%.po)

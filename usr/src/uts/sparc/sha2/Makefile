@@ -71,6 +71,9 @@ LDFLAGS += -dy -Nmisc/kcf
 CFLAGS += $(CCVERBOSE) -I$(COM_DIR)
 LINTFLAGS	+= -I$(COM_DIR)
 
+CERRWARN	+= -_gcc=-Wno-switch
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 #	Default build targets.
 #

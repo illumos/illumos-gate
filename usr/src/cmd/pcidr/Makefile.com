@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 # to be included AFTER cmd/Makefile.cmd or lib/Makefile.lib
@@ -47,6 +45,8 @@ ROOTCMDDIR = $(ROOTLIBDIR)
 #############################################################################
 
 CPPFLAGS += -D_REENTRANT -I$(HDRDIR)
+
+CERRWARN += -_gcc=-Wno-type-limits
 
 # Note that LDFLAGS is NOT used in the build rules for shared objects!
 # LDLIBS is limited to -L and -l options; all other options must be added to

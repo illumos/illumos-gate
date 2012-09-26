@@ -50,6 +50,10 @@ LINTFLAGS	+= -erroff=E_BAD_FORMAT_ARG_TYPE2
 LINTOUT=	lint.out
 LINTOUT_INTER=	lintinter.out
 
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-unused-variable
+CERRWARN	+= -_gcc=-Wno-address
+
 LINTSRC=	$(LINTLIB:%.ln=%)
 ROOTLINTDIR=	$(ROOTLIBDIR)
 ROOTLINT=	$(LINTSRC:%=$(ROOTLINTDIR)/%)

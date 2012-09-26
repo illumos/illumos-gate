@@ -23,7 +23,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the serengeti sbbc
 #	kernel module.
@@ -69,6 +69,11 @@ CLEANLINTFILES	+= $(LINT32_FILES)
 # lint pass one enforcement
 #
 CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-unused-label
+CERRWARN += -_gcc=-Wno-unused-function
+CERRWARN += -_gcc=-Wno-unused-variable
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
 
 #
 #	Default build targets.

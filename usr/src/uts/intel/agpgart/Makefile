@@ -4,8 +4,7 @@
 #
 # uts/intel/agpgart/Makefile
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the framework of agp protocol
 #	(agpgart) kernel module.
@@ -35,6 +34,10 @@ include $(UTSBASE)/intel/Makefile.intel
 ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
+
+CERRWARN	+= -_gcc=-Wno-switch
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-uninitialized
 
 #
 # For now, disable these lint checks; maintainers should endeavor

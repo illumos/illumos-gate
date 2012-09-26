@@ -22,9 +22,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-#
+
 #
 #	This makefile drives the production of the ibnex driver
 #
@@ -63,6 +61,8 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 #	Overrides.
 #
+
+CERRWARN	+= -_gcc=-Wno-uninitialized
 
 # 
 # lint pass one enforcement 

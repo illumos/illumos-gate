@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG=	mkpwdict
 
@@ -33,6 +31,8 @@ include ../Makefile.cmd
 CFLAGS += -I$(SRC)/lib/pam_modules/authtok_check
 LINTFLAGS += -erroff=E_NAME_DEF_NOT_USED2 -m 
 LINTFLAGS += -I$(SRC)/lib/pam_modules/authtok_check
+
+CERRWARN += -_gcc=-Wno-parentheses
 
 CRACK_SRCDIR=	$(SRC)/lib/pam_modules/authtok_check/
 CRACK_OBJS=	packer.o packlib.o dict.o stringlib.o

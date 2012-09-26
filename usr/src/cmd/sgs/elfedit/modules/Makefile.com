@@ -96,6 +96,9 @@ LLDFLAGS64 =	'-R$$ORIGIN/../../../../lib/$(MACH64)'
 LDFLAGS +=	$(CC_USE_PROTO) $(LLDFLAGS)
 DYNFLAGS +=	$(VERSREF)
 
+CERRWARN +=	-_gcc=-Wno-switch
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 LINTFLAGS +=	-uaxs $(LDLIBS)
 LINTFLAGS64 +=	-uaxs $(LDLIBS64)
 

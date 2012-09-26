@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef	_INSTALLBOOT_H
@@ -52,6 +53,7 @@ typedef struct _ib_bootblock {
 	uint32_t		mboot_off;
 	uint32_t		buf_size;
 	uint32_t		file_size;
+	uint32_t		extra_size;
 } ib_bootblock_t;
 
 typedef struct _ib_data {

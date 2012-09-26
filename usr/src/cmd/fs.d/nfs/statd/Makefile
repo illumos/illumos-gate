@@ -23,10 +23,6 @@
 # Copyright 1990-2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/fs.d/nfs/statd/Makefile
-#
 
 FSTYPE=		nfs
 TYPEPROG=	statd
@@ -34,6 +30,10 @@ ATTMK=		$(TYPEPROG)
 
 include		../../Makefile.fstype
 CPPFLAGS +=     -D_REENTRANT -DSUN_THREADS
+
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 OBJS= 		sm_svc.o sm_proc.o sm_statd.o selfcheck.o 
 

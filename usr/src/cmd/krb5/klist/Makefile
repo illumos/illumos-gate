@@ -26,6 +26,7 @@ CPPFLAGS += -I$(SRC)/lib/gss_mechs/mech_krb5/include \
 
 LDFLAGS += $(KRUNPATH)
 LDLIBS += $(KMECHLIB)
+CERRWARN += -_gcc=-Wno-unused-function
 
 $(GPROGS) := CPPFLAGS += -DSYSV -DSunOS=50 
 

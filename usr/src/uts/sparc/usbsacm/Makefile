@@ -55,6 +55,8 @@ CFLAGS += $(CCVERBOSE)
 
 LDFLAGS         += -dy -Nmisc/usba -Nmisc/usbser
 
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 #	Define targets
 #

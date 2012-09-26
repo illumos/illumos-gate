@@ -22,7 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the bofi driver 
 #	kernel module.
@@ -66,7 +66,9 @@ MODSTUBS_DIR	 = $(OBJS_DIR)
 $(MODSTUBS_O)	:= AS_CPPFLAGS += -DBOFI_MODULE
 CLEANFILES	+= $(MODSTUBS_O)
 
-CPPFLAGS += -I../../sun4
+CPPFLAGS	+= -I../../sun4
+
+CERRWARN	+= -_gcc=-Wno-uninitialized
 
 #
 # For now, disable these lint checks; maintainers should endeavor

@@ -55,6 +55,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 
+CERRWARN	+= -_gcc=-Wno-switch
 
 #
 #	Overrides

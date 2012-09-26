@@ -23,10 +23,6 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/cmd-inet/usr.sbin/wificonfig/Makefile
-#
 
 PROG=		wificonfig	
 OBJS=		wificonfig.o
@@ -38,6 +34,8 @@ LDLIBS +=	-lsecdb
 
 $(ROOTSBIN)/wificonfig := FILEMODE = 04755
 ROOTUSRSBINLINKS = $(ROOTUSRSBIN)/$(PROG)
+CERRWARN += -_gcc=-Wno-char-subscripts
+CERRWARN += -_gcc=-Wno-parentheses
 
 .KEEP_STATE:
 

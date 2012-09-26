@@ -23,8 +23,6 @@
 # Copyright 1996, 2002 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG = revnetgroup
 
@@ -33,6 +31,10 @@ include ../../Makefile.cmd
 OBJS = revnetgroup.o getgroup.o table.o util.o
 SRCS = $(OBJS:.o=.c)
 HDRS = getgroup.h table.h util.h
+
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

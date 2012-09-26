@@ -48,6 +48,9 @@ CPPFLAGS +=	-I../../../gss_mechs/mech_krb5/include \
 		-I$(SRC)/lib/krb5 \
 		-I.
 
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-unused-function
+
 # module needs to be unloadable because the key destructor might be
 # called after dlclose()
 DYNFLAGS +=	$(ZNODELETE)

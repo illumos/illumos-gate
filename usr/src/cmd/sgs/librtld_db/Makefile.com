@@ -42,6 +42,8 @@ LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) -lc
 LINTFLAGS +=	-u -erroff=E_NAME_DECL_NOT_USED_DEF2
 LINTFLAGS64 +=	-u -erroff=E_NAME_DECL_NOT_USED_DEF2
 
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 BLTDEFS=	msg.h
 BLTDATA=	msg.c
 

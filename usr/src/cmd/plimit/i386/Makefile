@@ -20,12 +20,8 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# cmd/plimit/i386/Makefile
 #
 
 PROG=	plimit
@@ -37,6 +33,7 @@ SRCS=	$(OBJS:%.o=../%.c)
 include ../../Makefile.cmd
 
 CFLAGS	+= $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-uninitialized
 
 LDLIBS	+= -lproc
 

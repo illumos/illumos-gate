@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY=	libkadmin.a
 VERS=		.1
@@ -46,6 +44,10 @@ CPPFLAGS += -I../ -I$(SRC)/lib/krb5 \
 	-I$(SRC)/lib/gss_mechs/mech_krb5/krb5/error_tables \
 	-I$(SRC)/uts/common/gssapi/mechs/krb5/include \
 	-I$(JAVA_ROOT)/include -I$(JAVA_ROOT)/include/solaris
+
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-unused-variable
+CERRWARN += -_gcc=-Wno-unused-function
 
 LDLIBS += $(KMECHLIB) -L$(ROOT)/$(KERBLIBDIR) -lkadm5clnt -lsocket -lc
 DYNFLAGS += $(KRUNPATH) $(KERBRUNPATH)

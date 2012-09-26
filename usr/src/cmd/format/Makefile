@@ -44,6 +44,11 @@ DATA= format.dat
 
 include ../Makefile.cmd
 
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-unused-label
+CERRWARN += -_gcc=-Wno-clobbered
+
 SRCS= $(OBJS:.o=.c)
 
 ROOTSYMLINK= $(ROOTETCPROG)

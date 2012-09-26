@@ -83,6 +83,8 @@ DYNFLAGS +=	$(DYNFLAGS_$(CLASS))
 DYNFLAGS +=	$(BLOCAL) $(ZNOVERSION) -Wl,-e_start
 LDLIBS +=	-lc -lmapmalloc
 
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 $(LIBS):= PICS += $(SHAREDOBJS)
 
 .KEEP_STATE:

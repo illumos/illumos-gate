@@ -67,6 +67,7 @@ INSTALL_TARGET	= def $(BINARY) $(ROOTMODULE)
 # lint pass one enforcement
 #
 CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-uninitialized
 
 CPPFLAGS += -DCPU_MODULE -DSPITFIRE
 AS_CPPFLAGS += -DCPU_MODULE -DSPITFIRE

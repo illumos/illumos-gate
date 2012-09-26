@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY=	audit_syslog.a
 VERS=		.1
@@ -48,6 +46,9 @@ CFLAGS		+= $(CCVERBOSE)
 CPPFLAGS	+= -D_REENTRANT
 CPPFLAGS	+= -I$(PRAUDIT)
 CPPFLAGS	+= -I$(LIBBSM)
+
+CERRWARN	+= -_gcc=-Wno-char-subscripts
+CERRWARN	+= -_gcc=-Wno-uninitialized
 
 ROOTLIBDIR=	$(ROOT)/usr/lib/security
 

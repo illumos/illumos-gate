@@ -105,6 +105,8 @@ $(OBJECTS) $(LINTS)	:= CPPFLAGS += -Dd37A_read_count=$(MODULE)_d37A_read_count
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 
+CERRWARN	+= -_gcc=-Wno-unused-variable
+
 #
 #	Default build targets.
 #

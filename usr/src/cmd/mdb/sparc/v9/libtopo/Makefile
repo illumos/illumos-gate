@@ -23,7 +23,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 MODULE = libtopo.so
 MDBTGT = proc
@@ -36,3 +35,4 @@ include ../../Makefile.sparcv9
 include ../../../Makefile.module
 
 CPPFLAGS += -I$(SRC)/lib/fm/topo/libtopo/common
+CERRWARN += -_gcc=-Wno-parentheses

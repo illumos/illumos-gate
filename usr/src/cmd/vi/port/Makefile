@@ -51,6 +51,16 @@ TXTS = READ_ME makeoptions asfix.c70 ex.news port.mk.370 port.mk.70	\
 	port.mk.c70 port.mk.usg ovdoprnt.s ovprintf.c rofix
 
 include ../../Makefile.cmd
+
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-clobbered
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-unused-variable
+CERRWARN += -_gcc=-Wno-unused-label
+CERRWARN += -_gcc=-Wno-unused-value
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-address
+
 #
 # For message catalogue files
 #

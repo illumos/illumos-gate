@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY =	mpss.a
 VERS =		.1
@@ -41,6 +39,9 @@ LDLIBS +=	-lc -lgen
 CFLAGS +=	$(CCVERBOSE) 
 CPPFLAGS +=	-D_REENTRANT
 DYNFLAGS +=	$(BLOCAL) $(ZNOVERSION)
+
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

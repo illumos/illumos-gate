@@ -22,9 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/fs.d/ufs/mount/Makefile
 
 FSTYPE=		ufs
 PROG=		mount
@@ -41,5 +38,6 @@ include		../../Makefile.fstype
 include		../../Makefile.mount
 
 CPPFLAGS +=	-D_LARGEFILE64_SOURCE
+CERRWARN +=	-_gcc=-Wno-parentheses
 
 include		../../Makefile.mount.targ

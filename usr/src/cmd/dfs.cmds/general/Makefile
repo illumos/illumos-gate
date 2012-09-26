@@ -20,12 +20,8 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# cmd/dfs.cmds/general/Makefile
 #
 # "general" is intended to be a generic way to invoke a filesystem-specific
 # command, but at the moment, only /usr/sbin/unshare uses this facility.
@@ -45,6 +41,8 @@ SRCS=	general.c
 CFLAGS += -s
 
 include ../../Makefile.cmd
+
+CERRWARN += -_gcc=-Wno-parentheses
 
 .KEEP_STATE:
 

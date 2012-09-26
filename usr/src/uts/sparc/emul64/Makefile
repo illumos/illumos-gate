@@ -65,6 +65,9 @@ CFLAGS += $(CCVERBOSE)
 #
 LDFLAGS         += -dy -N misc/scsi
 
+CERRWARN	+= -_gcc=-Wno-unused-label
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 # For now, disable these lint checks; maintainers should endeavor
 # to investigate and remove these for maximum lint coverage.

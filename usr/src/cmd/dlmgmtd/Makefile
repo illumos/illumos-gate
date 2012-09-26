@@ -40,6 +40,9 @@ $(ROOTCFGDIR)/datalink.conf	:= FILEMODE= 644
 
 LDLIBS += -ldladm -ldlpi -lavl -lnvpair -lsysevent -lcontract
 
+CERRWARN += -_gcc=-Wno-unused-label
+CERRWARN += -_gcc=-Wno-uninitialized
+
 #
 # Instrument dlmgmtd with CTF data to ease debugging.
 #

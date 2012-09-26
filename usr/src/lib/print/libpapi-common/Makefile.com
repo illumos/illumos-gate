@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY =		libpapi-common.a
 VERS =			.0
@@ -42,6 +40,8 @@ $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR)
+
+CERRWARN +=	-_gcc=-Wno-switch
 
 MAPFILES =	$(SRCDIR)/mapfile
 

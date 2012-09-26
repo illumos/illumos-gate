@@ -28,8 +28,6 @@
 #	module. SPARC architecture dependent
 #
 
-# ident	"%Z%%M%	%I%	%E% SMI"
-
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
@@ -68,6 +66,14 @@ DEF_BUILDS	= $(DEF_BUILDSONLY64)
 # lint pass one enforcement 
 # 
 CFLAGS += $(CCVERBOSE)
+
+CERRWARN	+= -_gcc=-Wno-switch
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-type-limits
+CERRWARN	+= -_gcc=-Wno-unused-label
+CERRWARN	+= -_gcc=-Wno-unused-function
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-unused-value
 
 #
 #	depends on misc/ibtl and misc/ibmf

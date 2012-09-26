@@ -59,7 +59,7 @@ sd_stats	:= LDLIBS += -lunistat -lcurses
 sd_diag		:= LDLIBS += -lnsctl
 sdbc_dynmem	:= LDLIBS += -lkstat
 
-CFLAGS +=	-v -D_SCM_ -D_SD_8K_BLKSIZE -D_SYSCALL32
+CFLAGS +=	$(CCVERBOSE) -D_SCM_ -D_SD_8K_BLKSIZE -D_SYSCALL32
 CPPFLAGS +=	-DNSC_MULTI_TERABYTE
 LINTFLAGS +=	-Xa -n -s -x -m -u -Dlint -errhdr=%user
 LINTFLAGS +=	-D_SCM_ -D_SD_8K_BLKSIZE -D_SYSCALL32
@@ -68,6 +68,7 @@ LINTFLAGS +=	-erroff=E_SEC_SPRINTF_UNBOUNDED_COPY
 LINTFLAGS +=	-erroff=E_SEC_SCANF_UNBOUNDED_COPY
 LINTFLAGS +=	-erroff=E_SEC_FORBIDDEN_WARN_ASCFTIME
 LINTFLAGS +=	-DDEBUG
+CERRWARN +=	-_gcc=-Wno-uninitialized
 ROOTLINK = $(ROOTUSRSBIN)/scmadm
 
 all	:=	TARGET= all

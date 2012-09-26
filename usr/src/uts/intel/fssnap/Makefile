@@ -24,7 +24,6 @@
 #
 #	intel architecture dependent
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -63,6 +62,8 @@ LDFLAGS		+= -dy -Nmisc/fssnap_if -Nfs/ufs
 # Please do not carry these forward to new Makefiles.
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
+
+CERRWARN	+= -_gcc=-Wno-parentheses
 
 #
 #	Default build targets.

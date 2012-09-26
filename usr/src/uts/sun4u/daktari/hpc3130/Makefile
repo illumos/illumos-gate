@@ -24,7 +24,7 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the hpc3130 driver
 #	for the Texas Instruments hot-plug controller.
@@ -67,6 +67,7 @@ CLEANLINTFILES	+= $(LINT32_FILES)
 # lint pass one enforcement
 #
 CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-char-subscripts
 
 #
 # Turn on doubleword alignment for 64 bit registers
