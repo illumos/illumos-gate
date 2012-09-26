@@ -29,6 +29,7 @@
 #include <sys/vdev_disk.h>
 #include <sys/vdev_impl.h>
 #include <sys/fs/zfs.h>
+#include <sys/zfs_zone.h>
 #include <sys/zio.h>
 #include <sys/sunldi.h>
 #include <sys/efi_partition.h>
