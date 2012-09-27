@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -732,8 +733,8 @@ smb_pathname_preprocess(smb_request_t *sr, smb_pathname_t *pn)
 		return;
 	}
 
-	/* perform unicode wildcard conversion */
-	smb_convert_wildcards(pn->pn_path);
+	if (sr->session->dialect < NT_LM_0_12)
+		smb_convert_wildcards(pn->pn_path);
 
 	/* treat '/' as '\\' */
 	(void) strsubst(pn->pn_path, '/', '\\');

@@ -18,8 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -98,116 +100,34 @@ smb_ascii_or_unicode_null_len(struct smb_request *sr)
 }
 
 /*
- * Return B_TRUE if pattern contains wildcards
- */
-boolean_t
-smb_contains_wildcards(const char *pattern)
-{
-	static const char *wildcards = "*?";
-
-	return (strpbrk(pattern, wildcards) != NULL);
-}
-
-/*
- * When converting wildcards a '.' in a name is treated as a base and
- * extension separator even if the name is longer than 8.3.
  *
- * The '*' character matches an entire part of the name.  For example,
- * "*.abc" matches any name with an extension of "abc".
- *
- * The '?' character matches a single character.
- * If the base contains all ? (8 or more) then it is treated as *.
- * If the extension contains all ? (3 or more) then it is treated as *.
- *
- * Clients convert ASCII wildcards to Unicode wildcards as follows:
+ * Convert old-style (DOS, LanMan) wildcard strings to NT style.
+ * This should ONLY happen to patterns that come from old clients,
+ * meaning dialect LANMAN2_1 etc. (dialect < NT_LM_0_12).
  *
  *	? is converted to >
- *	. is converted to " if it is followed by ? or *
  *	* is converted to < if it is followed by .
+ *	. is converted to " if it is followed by ? or * or end of pattern
  *
- * Note that clients convert "*." to '< and drop the '.' but "*.txt"
- * is sent as "<.TXT", i.e.
- *
- * 	dir *.		->	dir <
- * 	dir *.txt	->	dir <.TXT
- *
- * Since " and < are illegal in Windows file names, we always convert
- * these Unicode wildcards without checking the following character.
+ * Note: modifies pattern in place.
  */
 void
 smb_convert_wildcards(char *pattern)
 {
-	static char *match_all[] = {
-		"*.",
-		"*.*"
-	};
-	char	*extension;
 	char	*p;
-	int	len;
-	int	i;
 
-	/*
-	 * Special case "<" for "dir *.", and fast-track for "*".
-	 */
-	if ((*pattern == '<') || (*pattern == '*')) {
-		if (*(pattern + 1) == '\0') {
-			*pattern = '*';
-			return;
-		}
-	}
-
-	for (p = pattern; *p != '\0'; ++p) {
+	for (p = pattern; *p != '\0'; p++) {
 		switch (*p) {
-		case '<':
-			*p = '*';
+		case '?':
+			*p = '>';
 			break;
-		case '>':
-			*p = '?';
+		case '*':
+			if (p[1] == '.')
+				*p = '<';
 			break;
-		case '\"':
-			*p = '.';
-			break;
-		default:
-			break;
-		}
-	}
-
-	/*
-	 * Replace "????????.ext" with "*.ext".
-	 */
-	p = pattern;
-	p += strspn(p, "?");
-	if (*p == '.') {
-		*p = '\0';
-		len = strlen(pattern);
-		*p = '.';
-		if (len >= SMB_NAME83_BASELEN) {
-			*pattern = '*';
-			(void) strlcpy(pattern + 1, p, MAXPATHLEN - 1);
-		}
-	}
-
-	/*
-	 * Replace "base.???" with 'base.*'.
-	 */
-	if ((extension = strrchr(pattern, '.')) != NULL) {
-		p = ++extension;
-		p += strspn(p, "?");
-		if (*p == '\0') {
-			len = strlen(extension);
-			if (len >= SMB_NAME83_EXTLEN) {
-				*extension = '\0';
-				(void) strlcat(pattern, "*", MAXPATHLEN);
-			}
-		}
-	}
-
-	/*
-	 * Replace anything that matches an entry in match_all with "*".
-	 */
-	for (i = 0; i < sizeof (match_all) / sizeof (match_all[0]); ++i) {
-		if (strcmp(pattern, match_all[i]) == 0) {
-			(void) strlcpy(pattern, "*", MAXPATHLEN);
+		case '.':
+			if (p[1] == '?' || p[1] == '*' || p[1] == '\0')
+				*p = '\"';
 			break;
 		}
 	}
