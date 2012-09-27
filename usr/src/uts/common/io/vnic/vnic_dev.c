@@ -52,6 +52,7 @@
 #include <sys/vlan.h>
 #include <sys/vnic.h>
 #include <sys/vnic_impl.h>
+#include <sys/mac_impl.h>
 #include <sys/mac_flow_impl.h>
 #include <inet/ip_impl.h>
 
@@ -847,7 +848,7 @@ static int
 vnic_m_setprop(void *m_driver, const char *pr_name, mac_prop_id_t pr_num,
     uint_t pr_valsize, const void *pr_val)
 {
-	int 		err = ENOTSUP;
+	int 		err = 0;
 	vnic_t		*vn = m_driver;
 
 	switch (pr_num) {
@@ -855,8 +856,10 @@ vnic_m_setprop(void *m_driver, const char *pr_name, mac_prop_id_t pr_num,
 		uint32_t	mtu;
 
 		/* allow setting MTU only on an etherstub */
-		if (vn->vn_link_id != DATALINK_INVALID_LINKID)
-			return (err);
+		if (vn->vn_link_id != DATALINK_INVALID_LINKID) {
+			err = ENOTSUP;
+			break;
+		}
 
 		if (pr_valsize < sizeof (mtu)) {
 			err = EINVAL;
@@ -879,9 +882,10 @@ vnic_m_setprop(void *m_driver, const char *pr_name, mac_prop_id_t pr_num,
 		}
 
 		bcopy(pr_val, &filtered, sizeof (filtered));
-		err = mac_set_promisc_filtered(vn->vn_mch, filtered);
+		mac_set_promisc_filtered(vn->vn_mch, filtered);
 	}
 	default:
+		err = ENOTSUP;
 		break;
 	}
 	return (err);
