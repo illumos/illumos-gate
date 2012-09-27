@@ -1859,6 +1859,13 @@ d system/object 0555 root root
 d tmp 1777 root root
 d usr 0755 root sys
 s usr/adm=../var/adm
+d usr/ast 0755 root bin
+d usr/ast/bin 0755 root bin
+f usr/ast/bin/msgcc 0555 root bin
+f usr/ast/bin/msggen 0555 root bin
+f usr/ast/bin/msgget 0555 root bin
+f usr/ast/bin/msgcpp 0555 root bin
+f usr/ast/bin/msgcvt 0555 root bin
 d usr/bin 0755 root bin
 h usr/bin/[=usr/bin/alias
 f usr/bin/addbadsec 0555 root bin
