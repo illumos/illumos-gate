@@ -554,7 +554,8 @@ hyprlofs_add_entry(vnode_t *vp, char *fspath, char *fsname,
 	 * Get vnode for the real file/dir. We'll have a hold on realvp which
 	 * we won't vn_rele until hyprlofs_inactive.
 	 */
-	if (error = lookupname(fspath, UIO_SYSSPACE, FOLLOW, NULLVPP, &realvp))
+	if ((error = lookupname(fspath, UIO_SYSSPACE, FOLLOW, NULLVPP,
+	    &realvp)) != 0)
 		return (error);
 
 	/* no devices allowed */
@@ -581,7 +582,7 @@ hyprlofs_add_entry(vnode_t *vp, char *fspath, char *fsname,
 	 * the VOP_ACCESS() call not the AUTOFS node itself.
 	 */
 	if (vn_mountedvfs(realvp) != NULL) {
-		if (error = traverse(&realvp)) {
+		if ((error = traverse(&realvp)) != 0) {
 			VN_RELE(realvp);
 			return (error);
 		}

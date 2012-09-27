@@ -1170,7 +1170,7 @@ mount_one_dev(zlog_t *zlogp, char *devpath, zone_mnt_t mount_cmd)
 	}
 
 	/* Add user-specified devices and directories */
-	if (err = zonecfg_setdevent(snap_hndl)) {
+	if ((err = zonecfg_setdevent(snap_hndl)) != 0) {
 		zerror(zlogp, B_FALSE, "%s: %s", zone_name,
 		    zonecfg_strerror(err));
 		goto cleanup;

@@ -2667,9 +2667,9 @@ lxpr_readdir_common(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp,
 		 * number of bytes being returned to the user.  So we set
 		 * uiop->uio_offset separately, ignoring what uiomove() does.
 		 */
-		if (error = uiomove((caddr_t)dirent, reclen, UIO_READ, uiop)) {
+		if ((error = uiomove((caddr_t)dirent, reclen, UIO_READ,
+		    uiop)) != 0)
 			return (error);
-		}
 
 		uiop->uio_offset = uoffset + LXPR_SDSIZE;
 	}
@@ -2805,7 +2805,8 @@ lxpr_readdir_procdir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 		 * uiop->uio_offset separately, in the increment of this for
 		 * the loop, ignoring what uiomove() does.
 		 */
-		if (error = uiomove((caddr_t)dirent, reclen, UIO_READ, uiop))
+		if ((error = uiomove((caddr_t)dirent, reclen, UIO_READ,
+		    uiop)) != 0)
 			return (error);
 next:
 		uiop->uio_offset = uoffset + LXPR_SDSIZE;
@@ -2937,7 +2938,8 @@ lxpr_readdir_fddir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 			goto out;
 		}
 
-		if (error = uiomove((caddr_t)dirent, reclen, UIO_READ, uiop))
+		if ((error = uiomove((caddr_t)dirent, reclen, UIO_READ,
+		    uiop)) != 0)
 			goto out;
 	}
 

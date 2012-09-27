@@ -307,7 +307,7 @@ hyprlofs_dirdelete(hlnode_t *dir, hlnode_t *hp, char *nm, enum dr_op op,
 			return (EEXIST); /* thus in ufs */
 	}
 
-	if (error = hyprlofs_taccess(dir, VEXEC|VWRITE, cr))
+	if ((error = hyprlofs_taccess(dir, VEXEC|VWRITE, cr)) != 0)
 		return (error);
 
 	if (dir->hln_dir == NULL)

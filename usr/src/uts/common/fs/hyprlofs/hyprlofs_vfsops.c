@@ -274,8 +274,9 @@ hyprlofs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	/* Having the resource be anything but "swap" doesn't make sense. */
 	vfs_setresource(vfsp, "swap", 0);
 
-	if (error = pn_get(uap->dir,
-	    (uap->flags & MS_SYSSPACE) ? UIO_SYSSPACE : UIO_USERSPACE, &dpn))
+	if ((error = pn_get(uap->dir,
+	    (uap->flags & MS_SYSSPACE) ? UIO_SYSSPACE : UIO_USERSPACE,
+	    &dpn)) != 0)
 		goto out;
 
 	if ((hm = hyprlofs_memalloc(sizeof (hlfsmount_t), 0)) == NULL) {
