@@ -1163,12 +1163,12 @@ mount_one_dev(zlog_t *zlogp, char *devpath, zone_mnt_t mount_cmd)
 		zerror(zlogp, B_FALSE, "can't initialize zone handle");
 		goto cleanup;
 	}
-	if (err = zonecfg_get_handle(zone_name, handle)) {
+	if ((err = zonecfg_get_handle(zone_name, handle)) != 0) {
 		zerror(zlogp, B_FALSE, "can't get handle for zone "
 		    "%s: %s", zone_name, zonecfg_strerror(err));
 		goto cleanup;
 	}
-	if (err = zonecfg_setdevent(handle)) {
+	if ((err = zonecfg_setdevent(snap_hndl)) != 0) {
 		zerror(zlogp, B_FALSE, "%s: %s", zone_name,
 		    zonecfg_strerror(err));
 		goto cleanup;
