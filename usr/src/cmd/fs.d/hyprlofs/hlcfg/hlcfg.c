@@ -116,7 +116,7 @@ main(int argc, char **argv)
 	int cnt = 0;
 	int fd;
 	int rv = 0;
-	hyprlofs_entry_t *e;
+	hyprlofs_entry_t *e = NULL;
 	hyprlofs_entries_t ents;
 
 	if (argc < 3) {

@@ -1121,7 +1121,7 @@ mount_one_dev(zlog_t *zlogp, char *devpath, zone_mnt_t mount_cmd)
 	int			err;
 	int			retval = -1;
 	zone_iptype_t		iptype;
-	const char 		*curr_iptype;
+	const char 		*curr_iptype = NULL;
 
 	if (di_prof_init(devpath, &prof)) {
 		zerror(zlogp, B_TRUE, "failed to initialize profile");
@@ -1156,6 +1156,8 @@ mount_one_dev(zlog_t *zlogp, char *devpath, zone_mnt_t mount_cmd)
 		curr_iptype = "exclusive";
 		break;
 	}
+	if (curr_iptype == NULL)
+		abort();
 
 	if (brand_platform_iter_devices(bh, zone_name,
 	    mount_one_dev_device_cb, prof, curr_iptype) != 0) {
@@ -3194,7 +3196,7 @@ get_privset(zlog_t *zlogp, priv_set_t *privs, zone_mnt_t mount_cmd)
 
 	if (ALT_MOUNT(mount_cmd)) {
 		zone_iptype_t	iptype;
-		const char	*curr_iptype;
+		const char	*curr_iptype = NULL;
 
 		if (zonecfg_get_iptype(snap_hndl, &iptype) != Z_OK) {
 			zerror(zlogp, B_TRUE, "unable to determine ip-type");
@@ -4499,7 +4501,7 @@ vplat_create(zlog_t *zlogp, zone_mnt_t mount_cmd, zoneid_t zone_did)
 	tsol_zcent_t *zcent = NULL;
 	int match = 0;
 	int doi = 0;
-	int flags;
+	int flags = -1;
 	zone_iptype_t iptype;
 
 	if (zone_get_rootpath(zone_name, rootpath, sizeof (rootpath)) != Z_OK) {
@@ -4521,6 +4523,8 @@ vplat_create(zlog_t *zlogp, zone_mnt_t mount_cmd, zoneid_t zone_did)
 		flags = ZCF_NET_EXCL;
 		break;
 	}
+	if (flags == -1)
+		abort();
 
 	if ((privs = priv_allocset()) == NULL) {
 		zerror(zlogp, B_TRUE, "%s failed", "priv_allocset");
@@ -4872,6 +4876,8 @@ vplat_bringup(zlog_t *zlogp, zone_mnt_t mount_cmd, zoneid_t zoneid)
 				return (-1);
 			}
 			break;
+		default:
+			abort();
 		}
 	}
 

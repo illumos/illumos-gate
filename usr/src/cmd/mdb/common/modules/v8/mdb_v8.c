@@ -1499,7 +1499,7 @@ err:
 static int
 jsfunc_lineno(uintptr_t lendsp, uintptr_t tokpos, char *buf, size_t buflen)
 {
-	uintptr_t size, bufsz, lower, upper, ii;
+	uintptr_t size, bufsz, lower, upper, ii = 0;
 	uintptr_t *data;
 
 	if (jsobj_is_undefined(lendsp)) {
@@ -2834,7 +2834,7 @@ dcmd_v8field(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	v8_class_t *clp;
 	v8_field_t *flp;
 	const char *klass, *field;
-	uintptr_t offset;
+	uintptr_t offset = 0;
 
 	/*
 	 * We may be invoked with either two arguments (class and field name) or
@@ -2994,7 +2994,7 @@ dcmd_v8load_help(void)
 static int
 dcmd_v8load(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	v8_cfg_t *cfgp, **cfgpp;
+	v8_cfg_t *cfgp = NULL, **cfgpp;
 
 	if (v8_classes != NULL) {
 		mdb_warn("v8 module already configured\n");
@@ -3010,7 +3010,7 @@ dcmd_v8load(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			break;
 	}
 
-	if (cfgp->v8cfg_name == NULL) {
+	if (cfgp == NULL || cfgp->v8cfg_name == NULL) {
 		mdb_warn("unknown configuration: \"%s\"\n", argv->a_un.a_str);
 		return (DCMD_ERR);
 	}

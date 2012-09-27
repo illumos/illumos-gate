@@ -1248,7 +1248,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 	boolean_t debug;
 	zone_cmd_arg_t *zargp;
 
-	boolean_t kernelcall;
+	boolean_t kernelcall = B_TRUE;
 
 	int rval = -1;
 	uint64_t uniqid;
