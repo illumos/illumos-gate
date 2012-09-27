@@ -22,7 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2011 Joyent, Inc.  All rights reserved.
+ * Copyright 2012 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -255,6 +255,8 @@ again:
 			case ZONE_IS_DEAD:
 				/* FALLTHRU */
 				continue;
+			default:
+				break;
 		}
 		if ((res = dlmgmt_zone_init(zids[i])) != 0) {
 			(void) fprintf(stderr, "zone (%ld) init error %s",
