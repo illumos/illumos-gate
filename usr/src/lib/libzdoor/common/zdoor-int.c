@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2011 Joyent, Inc.  All rights reserved.
+ * Copyright 2012 Joyent, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident "%Z%%M% %I% %E% SMI"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -160,7 +158,7 @@ zdoor_fattach(zoneid_t zoneid, const char *service, int door, int detach_only)
 	int pid = 0;
 	int stat = 0;
 	int tmpl_fd = 0;
-	char path[MAXPATHLEN]  = {0};
+	char path[MAXPATHLEN] = {0};
 	ctid_t ct = -1;
 
 	if (zoneid < 0) {
@@ -168,8 +166,8 @@ zdoor_fattach(zoneid_t zoneid, const char *service, int door, int detach_only)
 		return (ZDOOR_ARGS_ERROR);
 	}
 
-	if (path == NULL) {
-		zdoor_debug("zdoor_fattach: NULL PATH");
+	if (service == NULL) {
+		zdoor_debug("zdoor_fattach: NULL service");
 		return (ZDOOR_ARGS_ERROR);
 	}
 
