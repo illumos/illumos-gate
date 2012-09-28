@@ -25,6 +25,9 @@
  *
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ */
 
 /*
  * Library processing
@@ -36,6 +39,7 @@
 #include	<limits.h>
 #include	<errno.h>
 #include	<debug.h>
+#include	<sys/sysmacros.h>
 #include	"msg.h"
 #include	"_libld.h"
 
@@ -171,7 +175,8 @@ ld_add_libdir(Ofl_desc *ofl, const char *path)
  * append either a `.so' or `.a' suffix and try opening the associated pathname.
  */
 static uintptr_t
-find_lib_name(const char *dir, const char *file, Ofl_desc *ofl, Rej_desc *rej)
+find_lib_name(const char *dir, const char *file, Ofl_desc *ofl, Rej_desc *rej,
+    ofl_flag_t flags)
 {
 	int		fd;
 	size_t		dlen;
@@ -209,6 +214,10 @@ find_lib_name(const char *dir, const char *file, Ofl_desc *ofl, Rej_desc *rej)
 			    ofl, FLG_IF_NEEDED, rej, NULL);
 			if (fd != -1)
 				(void) close(fd);
+			if (open_ret != 0 && (flags & FLG_OF_ADEFLIB))
+				ld_eprintf(ofl, ERR_WARNING,
+				    MSG_INTL(MSG_ARG_ASSDEFLIB_FOUND), dir,
+				    file);
 			return (open_ret);
 
 		} else if (errno != ENOENT) {
@@ -266,6 +275,10 @@ find_lib_name(const char *dir, const char *file, Ofl_desc *ofl, Rej_desc *rej)
  * shared object with full name: path/libfoo.so; then [or else] look for an
  * archive with name: path/libfoo.a.  If no file is found, it's a fatal error,
  * otherwise process the file appropriately depending on its type.
+ *
+ * If we end up using the default directories and -z assert-deflib has been
+ * turned on, then we pass that information down into find_lib_name which will
+ * warn appropriately if we find a shared object.
  */
 uintptr_t
 ld_find_library(const char *name, Ofl_desc *ofl)
@@ -274,6 +287,7 @@ ld_find_library(const char *name, Ofl_desc *ofl)
 	char		*path;
 	uintptr_t	open_ret;
 	Rej_desc	rej = { 0 };
+	ofl_flag_t	flags = 0;
 
 	/*
 	 * Search for this file in any user defined directories.
@@ -281,12 +295,25 @@ ld_find_library(const char *name, Ofl_desc *ofl)
 	for (APLIST_TRAVERSE(ofl->ofl_ulibdirs, idx, path)) {
 		Rej_desc	_rej = { 0 };
 
-		if ((open_ret = find_lib_name(path, name, ofl, &_rej)) == 0) {
+		if ((open_ret = find_lib_name(path, name, ofl, &_rej,
+		    flags)) == 0) {
 			if (_rej.rej_type && (rej.rej_type == 0))
 				rej = _rej;
 			continue;
 		}
 		return (open_ret);
+	}
+
+	if (ofl->ofl_flags & FLG_OF_ADEFLIB) {
+		flags |= FLG_OF_ADEFLIB;
+		for (APLIST_TRAVERSE(ofl->ofl_assdeflib, idx, path)) {
+			if (strncmp(name, path + MSG_STR_LIB_SIZE,
+			    MAX(strlen(path + MSG_STR_LIB_SIZE) -
+			    MSG_STR_SOEXT_SIZE, strlen(name))) == 0) {
+				flags &= ~FLG_OF_ADEFLIB;
+				break;
+			}
+		}
 	}
 
 	/*
@@ -295,11 +322,13 @@ ld_find_library(const char *name, Ofl_desc *ofl)
 	for (APLIST_TRAVERSE(ofl->ofl_dlibdirs, idx, path)) {
 		Rej_desc	_rej = { 0 };
 
-		if ((open_ret = find_lib_name(path, name, ofl, &_rej)) == 0) {
+		if ((open_ret = find_lib_name(path, name, ofl, &_rej,
+		    flags)) == 0) {
 			if (_rej.rej_type && (rej.rej_type == 0))
 				rej = _rej;
 			continue;
 		}
+
 		return (open_ret);
 	}
 

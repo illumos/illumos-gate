@@ -27,6 +27,9 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  */
+/*
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ */
 
 /*
  * PATH setup and search directory functions.
@@ -255,9 +258,18 @@ get_dir_list(uchar_t rules, Rt_map *lmp, uint_t flags)
 		}
 		break;
 	case DEFAULT:
+		/*
+		 * If we have been requested to load an audit library through a
+		 * DT_DEPAUDIT entry, then we treat this the same way that we
+		 * handle a library that has been specified via a DT_NEEDED
+		 * entry -- we check the default directories and not the
+		 * secure directories.
+		 */
 		if ((FLAGS1(lmp) & FL1_RT_NODEFLIB) == 0) {
 			if ((rtld_flags & RT_FL_SECURE) &&
-			    (flags & (FLG_RT_PRELOAD | FLG_RT_AUDIT)))
+			    ((flags & FLG_RT_PRELOAD) ||
+			    ((flags & FLG_RT_AUDIT) && !(FLAGS1(lmp) &
+			    FL1_RT_DEPAUD))))
 				dalpp = LM_SECURE_DIRS(lmp)();
 			else
 				dalpp = LM_DEFAULT_DIRS(lmp)();

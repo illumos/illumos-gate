@@ -25,6 +25,9 @@
  *
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ */
 
 /*
  * Object file dependent support for ELF objects.
@@ -1936,8 +1939,10 @@ elf_new_lmp(Lm_list *lml, Aliste lmco, Fdesc *fdp, Addr addr, size_t msize,
 				FLAGS1(lmp) |= FL1_RT_SYMAFLTR;
 				break;
 			case DT_DEPAUDIT:
-				if (!(rtld_flags & RT_FL_NOAUDIT))
+				if (!(rtld_flags & RT_FL_NOAUDIT)) {
 					audit = dyn->d_un.d_val;
+					FLAGS1(lmp) |= FL1_RT_DEPAUD;
+				}
 				break;
 			case DT_CONFIG:
 				cfile = dyn->d_un.d_val;

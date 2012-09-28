@@ -459,6 +459,8 @@ typedef struct {
 #define	AL_CNT_STRMRGSYM	20	/* ld_make_strmerge() sym alist cnt */
 #define	AL_CNT_SEGMENTS		20	/* ofl_segs */
 
+#define	AL_CNT_ASSDEFLIB	4	/* ofl_assdeflib exceptions count */
+
 /*
  * Return codes for {tls|got}_fixups() routines
  */
