@@ -4695,7 +4695,18 @@ ztest_fault_inject(ztest_ds_t *zd, uint64_t id)
 			if (islog)
 				(void) rw_unlock(&ztest_name_lock);
 		} else {
+			/*
+			 * Ideally we would like to be able to randomly
+			 * call vdev_[on|off]line without holding locks
+			 * to force unpredictable failures but the side
+			 * effects of vdev_[on|off]line prevent us from
+			 * doing so. We grab the ztest_vdev_lock here to
+			 * prevent a race between injection testing and
+			 * aux_vdev removal.
+			 */
+			VERIFY(mutex_lock(&ztest_vdev_lock) == 0);
 			(void) vdev_online(spa, guid0, 0, NULL);
+			VERIFY(mutex_unlock(&ztest_vdev_lock) == 0);
 		}
 	}
 

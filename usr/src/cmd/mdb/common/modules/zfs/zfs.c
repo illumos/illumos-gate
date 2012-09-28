@@ -905,7 +905,8 @@ arc_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	const char *suffix;
 
 	static const char *bytestats[] = {
-		"p", "c", "c_min", "c_max", "size", NULL
+		"p", "c", "c_min", "c_max", "size", "duplicate_buffers_size",
+		NULL
 	};
 
 	static const char *extras[] = {
