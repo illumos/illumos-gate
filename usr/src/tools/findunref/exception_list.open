@@ -272,3 +272,8 @@
 # This covers header files that are not delivered.
 #
 ./usr/src/uts/common/xen/public/COPYING
+
+#
+# ld tests which are not currently delivered
+#
+./usr/src/cmd/sgs/test

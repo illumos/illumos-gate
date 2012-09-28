@@ -405,6 +405,7 @@ struct ofl_desc {
 	APlist		*ofl_mapdata;	/* mapfile added data sections */
 	avl_tree_t	*ofl_wrap;	/* -z wrap symbols */
 	ofl_guideflag_t	ofl_guideflags;	/* -z guide flags */
+	APlist		*ofl_assdeflib;	/* -z assert-deflib exceptions */
 };
 
 #define	FLG_OF_DYNAMIC	0x00000001	/* generate dynamic output module */
@@ -463,6 +464,7 @@ struct ofl_desc {
 #define	FLG_OF_CAPSTRS	0x100000000000	/* capability strings are required */
 #define	FLG_OF_EHFRAME	0x200000000000	/* output contains .eh_frame section */
 #define	FLG_OF_FATWARN	0x400000000000	/* make warnings fatal */
+#define	FLG_OF_ADEFLIB	0x800000000000	/* no libraries in default path */
 
 /*
  * In the flags1 arena, establish any options that are applicable to archive

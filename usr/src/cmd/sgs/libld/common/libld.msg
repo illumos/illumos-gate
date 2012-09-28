@@ -23,6 +23,10 @@
 # Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
+#
+# Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+#
+
 @ _START_
 
 # Message file for cmd/sgs/libld.
@@ -139,6 +143,12 @@
 			 \t\t\tarchive members to resolve weak references from \
 			 \n\t\t\t\archive files\n"
 @ MSG_ARG_DETAIL_ZAL	"\t[-z altexec64]\texecute the 64-bit link-editor\n"
+@ MSG_ARG_DETAIL_ZADLIB	"\t[-z assert-deflib]\n\
+			\t\t\tenables warnings for linking with libraries in \
+			the \n\t\t\tdefault search path\n\
+			\t[-z assert-deflib=libname]\n\
+			\t\t\tenables warnings for linking with libraries in \
+			the \n\t\t\tdefault search path, but 'libname' is exempt\n"
 @ MSG_ARG_DETAIL_ZC	"\t[-z combreloc | nocombreloc]\n\
 			 \t\t\tcombine|do not combine multiple relocation \
 			 sections\n"
@@ -419,7 +429,6 @@
 
 @ MSG_FIL_BADORDREF	"file %s: section [%u]%s: contains illegal reference \
 			 to discarded section: [%u]%s"
-
 
 # Recording name conflicts
 
@@ -1300,6 +1309,7 @@
 @ MSG_STR_NOBITS	"nobits"
 @ MSG_STR_HWCAP_1	"hwcap_1"
 @ MSG_STR_SFCAP_1	"sfcap_1"
+@ MSG_STR_SOEXT		".so"
 
 @ MSG_STR_OPTIONS	"3:6:abc:d:e:f:h:il:mo:p:rstu:z:B:CD:F:GI:L:M:N:P:Q:R:\
 			 S:VW:Y:?"
@@ -1414,6 +1424,7 @@
 @ MSG_ARG_SYMBOLCAP	"symbolcap"
 @ MSG_ARG_DEFERRED	"deferred"
 @ MSG_ARG_NODEFERRED	"nodeferred"
+@ MSG_ARG_ASSDEFLIB	"assert-deflib"
 
 @ MSG_ARG_LCOM		"L,"
 @ MSG_ARG_PCOM		"P,"
@@ -1457,6 +1468,11 @@
 @ MSG_ARG_GUIDE_NO_MAPFILE	"nomapfile"
 @ MSG_ARG_GUIDE_NO_TEXT		"notext"
 @ MSG_ARG_GUIDE_NO_UNUSED	"nounused"
+
+# -z assert-deflib strings
+@ MSG_ARG_ASSDEFLIB_MALFORMED	"library name malformed: %s"
+@ MSG_ARG_ASSDEFLIB_FOUND	"dynamic library found on default search path \
+				(%s): lib%s.so"
 
 # Environment variable strings
 

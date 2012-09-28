@@ -1,6 +1,7 @@
 '\" te
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright (c) 2012, Joyent, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
@@ -18,9 +19,11 @@ ld \- link-editor for object files
 [\fB-N\fR \fIstring\fR] [\fB-o\fR \fIoutfile\fR] [\fB-p\fR \fIauditlib\fR] [\fB-P\fR \fIauditlib\fR]
 [\fB-Q\fR y | n] [\fB-R\fR \fIpath\fR] [\fB-s\fR] [\fB-S\fR \fIsupportlib\fR] [\fB-t\fR]
 [\fB-u\fR \fIsymname\fR] [\fB-V\fR] [\fB-Y P\fR\fI,dirlist\fR] [\fB-z\fR absexec]
-[\fB-z\fR allextract | defaultextract | weakextract ]
-[\fB-z\fR altexec64] [\fB-z\fR combreloc | nocombreloc ] [\fB-z\fR defs | nodefs]
-[\fB-z\fR direct | nodirect] [\fB-z\fR endfiltee] [\fB-z\fR finiarray=\fIfunction\fR]
+[\fB-z\fR allextract | defaultextract | weakextract ] [\fB-z\fR altexec64]
+[\fB-z\fR assert-deflib ] [ \fB-z\fR assert-deflib=\fIlibname\fR ]
+[\fB-z\fR combreloc | nocombreloc ] [\fB-z\fR defs | nodefs]
+[\fB-z\fR direct | nodirect] [\fB-z\fR endfiltee]
+[\fB-z\fR fatal-warnings | nofatal-warnings ] [\fB-z\fR finiarray=\fIfunction\fR]
 [\fB-z\fR globalaudit] [\fB-z\fR groupperm | nogroupperm] [\fB-z\fR help ]
 [\fB-z\fR ignore | record] [\fB-z\fR initarray=\fIfunction\fR] [\fB-z\fR initfirst]
 [\fB-z\fR interpose] [\fB-z\fR lazyload | nolazyload]
@@ -870,6 +873,29 @@ option is unnecessary, and has no effect.
 .sp
 .ne 2
 .na
+\fB\fB-z\fR \fBassert-deflib\fR\fR
+.ad
+.br
+.na
+\fB\fB-z\fR \fBassert-deflib=\fR\fIlibname\fR\fR
+.ad
+.sp .6
+.RS 4n
+Enables warnings that check the location of where libraries passed in with
+\fB-l\fR are found. If the link-editor finds a library on its default search
+path it will emit a warning. This warning can be made fatal in conjunction with
+the option \fB-z fatal-warnings\fR. Passing \fIlibname\fR white lists a library
+from this check. The library must be the full name of the library, e.g.
+\fIlibc.so\fR. To white list multiple libraries, the \fB-z
+assert-deflib=\fR\fIlibname\fR option can be repeated multiple times. This
+option is useful when trying to build self-contained objects where a referenced
+library might exist in the default system library path and in alternate paths
+specified by \fB-L\fR, but you only want the alternate paths to be used.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fB-z\fR \fBdefs\fR | \fBnodefs\fR\fR
 .ad
 .br
@@ -919,6 +945,25 @@ Marks a filtee so that when processed by a filter, the filtee terminates any
 further filtee searches by the filter. See \fIReducing Filtee Searches\fR in
 \fILinker and Libraries Guide\fR.
 .RE
+
+.sp
+.ne 2
+.na
+\fB\fB-z\fR \fBfatal-warnings\fR | \fBnofatal-warnings\fR\fR
+.ad
+.br
+.na
+\fB\fB--fatal-warnings\fR | \fB--no-fatal-warnings\fR
+.ad
+.sp .6
+.RS 4n
+Controls the behavior of warnings emitted from the link-editor. Setting \fB-z
+fatal-warnings\fR promotes warnings emitted by the link-editor to fatal errors
+that will cause the link-editor to fail before linking. \fB-z
+nofatal-warnings\fR instead demotes these warnings such that they will not cause
+the link-editor to exit prematurely.
+.RE
+
 
 .sp
 .ne 2
