@@ -136,8 +136,6 @@ uint_t	rdsv3_one_sec_in_hz;
 
 #define	MAX_SCHEDULE_TIMEOUT	(~0UL>>1)
 
-#define	RDMA_CM_EVENT_ADDR_CHANGE	14
-
 /* list */
 /* copied and modified list_remove_node */
 #define	list_remove_node(node)						\
