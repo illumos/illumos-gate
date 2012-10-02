@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * hci1394_extern.c
  *    Central location for externs.  There are two exceptions to this,
@@ -52,7 +50,7 @@ uint32_t hci1394_split_timeout = 800;
 
 
 /*
- * 1394 address map for OpenHCI adpaters.
+ * 1394 address map for OpenHCI adapters.
  *
  * This is what is reported to the services layer.  The hci1394 driver does not
  * modify the HW to reflect this.  This should reflect what the OpenHCI 1.0 HW

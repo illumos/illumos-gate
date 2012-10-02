@@ -137,7 +137,7 @@ msgcvt_t str_tbl[] = {
 {ERR_MATCHING_HBA_PORT,	0, 1,
 			"No match HBA port found"},
 {ERR_NO_ADAPTER_FOUND,	0, 1,
-			"No Fibre Channel adpaters found"},
+			"No Fibre Channel adapters found"},
 
 /* Errors with arguments */
 {ERRARG_OPT_INVAL,	1, 1,	"invalid option: "},
@@ -442,7 +442,7 @@ apidt_create(const char *ap_id, apid_t *apidp, char **errstring)
 	/* Get the path of dynamic attachment point if already configured. */
 	if (dyncomp != NULL) {
 		ret = dyn_apid_to_path(xport_phys, dyncomp,
-				&lunlistp, &l_errno);
+		    &lunlistp, &l_errno);
 		if ((ret != FPCFGA_OK) && (ret != FPCFGA_APID_NOCONFIGURE)) {
 			cfga_err(errstring, l_errno, ERR_OP_FAILED, 0);
 			goto err;
@@ -564,7 +564,7 @@ walk_tree(
 	while (fpnode) {
 		devfs_fp_path = di_devfs_path(fpnode);
 		if ((devfs_fp_path) && !(strncmp(devfs_fp_path,
-				root_path, strlen(root_path)))) {
+		    root_path, strlen(root_path)))) {
 			found = 1;
 			di_devfs_path_free(devfs_fp_path);
 			break;
@@ -587,7 +587,7 @@ walk_tree(
 	} else {
 		assert(cmd == FPCFGA_WALK_MINOR);
 		rv = di_walk_minor(root, up->walkmode.minor_args.nodetype, 0,
-			arg, up->walkmode.minor_args.fcn);
+		    arg, up->walkmode.minor_args.fcn);
 	}
 
 	if (rv != 0) {
@@ -671,7 +671,7 @@ cfga_err(char **errstring, int l_errno, ...)
 	 * So, concatenate the old and new strings
 	 */
 	if ((tmp_str = calloc(1,
-		strlen(*errstring) + strlen(tmp_err_str) + 2)) == NULL) {
+	    strlen(*errstring) + strlen(tmp_err_str) + 2)) == NULL) {
 		/* In case of error, retain only the earlier message */
 		free(tmp_err_str);
 		return;
@@ -928,7 +928,7 @@ known_state(di_node_t node)
 	 * offline.
 	 */
 	if ((state & DI_DEVICE_OFFLINE) == DI_DEVICE_OFFLINE ||
-		(state & DI_DRIVER_DETACHED) != DI_DRIVER_DETACHED) {
+	    (state & DI_DRIVER_DETACHED) != DI_DRIVER_DETACHED) {
 		return (1);
 	}
 
@@ -1118,8 +1118,8 @@ getAdapterAttrs(HBA_HANDLE handle, HBA_ADAPTERATTRIBUTES *attrs)
 
 	/* Loop as long as we have a retryable error */
 	while ((status == HBA_STATUS_ERROR_TRY_AGAIN ||
-		status == HBA_STATUS_ERROR_BUSY) &&
-		count++ < HBA_MAX_RETRIES) {
+	    status == HBA_STATUS_ERROR_BUSY) &&
+	    count++ < HBA_MAX_RETRIES) {
 		status = HBA_GetAdapterAttributes(handle, attrs);
 		if (status == HBA_STATUS_OK) {
 			break;
@@ -1141,11 +1141,11 @@ getPortAttrsByWWN(HBA_HANDLE handle, HBA_WWN wwn, HBA_PORTATTRIBUTES *attrs)
 
 	/* Loop as long as we have a retryable error */
 	while ((status == HBA_STATUS_ERROR_TRY_AGAIN ||
-		status == HBA_STATUS_ERROR_BUSY) &&
-		count++ < HBA_MAX_RETRIES) {
+	    status == HBA_STATUS_ERROR_BUSY) &&
+	    count++ < HBA_MAX_RETRIES) {
 		status = HBA_GetPortAttributesByWWN(handle, wwn, attrs);
 		if (status == HBA_STATUS_OK) {
-		    break;
+			break;
 		}
 
 		/* The odds of this occuring are very slim, but possible. */
@@ -1175,8 +1175,8 @@ getAdapterPortAttrs(HBA_HANDLE handle, int portIndex,
 
 	/* Loop as long as we have a retryable error */
 	while ((status == HBA_STATUS_ERROR_TRY_AGAIN ||
-		status == HBA_STATUS_ERROR_BUSY) &&
-		count++ < HBA_MAX_RETRIES) {
+	    status == HBA_STATUS_ERROR_BUSY) &&
+	    count++ < HBA_MAX_RETRIES) {
 		status = HBA_GetAdapterPortAttributes(handle, portIndex, attrs);
 		if (status == HBA_STATUS_OK) {
 			break;
@@ -1209,10 +1209,10 @@ getDiscPortAttrs(HBA_HANDLE handle, int portIndex, int discIndex,
 
 	/* Loop as long as we have a retryable error */
 	while ((status == HBA_STATUS_ERROR_TRY_AGAIN ||
-		status == HBA_STATUS_ERROR_BUSY) &&
-		count++ < HBA_MAX_RETRIES) {
+	    status == HBA_STATUS_ERROR_BUSY) &&
+	    count++ < HBA_MAX_RETRIES) {
 		status = HBA_GetDiscoveredPortAttributes(handle, portIndex,
-				discIndex, attrs);
+		    discIndex, attrs);
 		if (status == HBA_STATUS_OK) {
 			break;
 		}
@@ -1253,119 +1253,135 @@ findMatchingAdapterPort(char *portPath, HBA_HANDLE *matchingHandle,
 
 	status = HBA_LoadLibrary();
 	if (status != HBA_STATUS_OK) {
-	    cfga_err(errstring, 0, ERR_HBA_LOAD_LIBRARY, 0);
-	    return (FPCFGA_LIB_ERR);
+		cfga_err(errstring, 0, ERR_HBA_LOAD_LIBRARY, 0);
+		return (FPCFGA_LIB_ERR);
 	}
 	count = HBA_GetNumberOfAdapters();
 	if (count == 0) {
-	    cfga_err(errstring, 0, ERR_NO_ADAPTER_FOUND, 0);
-	    HBA_FreeLibrary();
-	    return (FPCFGA_LIB_ERR);
+		cfga_err(errstring, 0, ERR_NO_ADAPTER_FOUND, 0);
+		HBA_FreeLibrary();
+		return (FPCFGA_LIB_ERR);
 	}
 
 	/* Loop over all HBAs */
 	for (adapterIndex = 0; adapterIndex < count; adapterIndex ++) {
-	    status = HBA_GetAdapterName(adapterIndex, (char *)&adapterName);
-	    if (status != HBA_STATUS_OK) {
-		/* May have been DR'd */
-		continue;
-	    }
-	    handle = HBA_OpenAdapter(adapterName);
-	    if (handle == 0) {
-		/* May have been DR'd */
-		continue;
-	    }
-
-	    do {
-		if (getAdapterAttrs(handle, &hbaAttrs)) {
-		/* Should never happen */
-		    HBA_CloseAdapter(handle);
-		    continue;
+		status = HBA_GetAdapterName(adapterIndex, (char *)&adapterName);
+		if (status != HBA_STATUS_OK) {
+			/* May have been DR'd */
+			continue;
+		}
+		handle = HBA_OpenAdapter(adapterName);
+		if (handle == 0) {
+			/* May have been DR'd */
+			continue;
 		}
 
-		/* Loop over all HBA Ports */
-		for (portIndex = 0;
-		    portIndex < hbaAttrs.NumberOfPorts; portIndex++) {
-		    if ((status = getAdapterPortAttrs(handle, portIndex,
-			&portAttrs)) != HBA_STATUS_OK) {
-			/* Need to refresh adapter */
-			if (status == HBA_STATUS_ERROR_STALE_DATA) {
-			    HBA_RefreshInformation(handle);
-			    break;
-			} else {
-			    continue;
+		do {
+			if (getAdapterAttrs(handle, &hbaAttrs)) {
+				/* Should never happen */
+				HBA_CloseAdapter(handle);
+				continue;
 			}
-		    }
 
-			/*
-			 * check to see if OSDeviceName is a /dev/cfg link
-			 * or the physical path
-			 */
-		    if (strncmp(portAttrs.OSDeviceName, CFGA_DEV_DIR,
-			strlen(CFGA_DEV_DIR)) != 0) {
-			tmpPtr = strstr(portAttrs.OSDeviceName, MINOR_SEP);
-			if (tmpPtr != NULL) {
-				if (strncmp(portPath,
+			/* Loop over all HBA Ports */
+			for (portIndex = 0;
+			    portIndex < hbaAttrs.NumberOfPorts; portIndex++) {
+				if ((status = getAdapterPortAttrs(handle,
+				    portIndex,
+				    &portAttrs)) != HBA_STATUS_OK) {
+					/* Need to refresh adapter */
+					if (status ==
+					    HBA_STATUS_ERROR_STALE_DATA) {
+						HBA_RefreshInformation(handle);
+						break;
+					} else {
+						continue;
+					}
+				}
+
+				/*
+				 * check to see if OSDeviceName is a /dev/cfg
+				 * link or the physical path
+				 */
+				if (strncmp(portAttrs.OSDeviceName,
+				    CFGA_DEV_DIR,
+				    strlen(CFGA_DEV_DIR)) != 0) {
+					tmpPtr = strstr(portAttrs.OSDeviceName,
+					    MINOR_SEP);
+					if ((tmpPtr != NULL) &&
+					    strncmp(portPath,
 					    portAttrs.OSDeviceName,
 					    strlen(portAttrs.OSDeviceName) -
 					    strlen(tmpPtr)) == 0) {
-					if (matchingHandle)
-						*matchingHandle = handle;
-					if (matchingPortIndex)
-						*matchingPortIndex = portIndex;
-					if (matchingPortAttrs)
-						*matchingPortAttrs = portAttrs;
-					return (FPCFGA_OK);
+						if (matchingHandle)
+							*matchingHandle =
+							    handle;
+						if (matchingPortIndex)
+							*matchingPortIndex =
+							    portIndex;
+						if (matchingPortAttrs)
+							*matchingPortAttrs =
+							    portAttrs;
+						return (FPCFGA_OK);
+					}
+				} else {
+					/*
+					 * strip off the /dev/cfg/ portion of
+					 * the OSDeviceName make sure that the
+					 * OSDeviceName is at least
+					 * strlen("/dev/cfg") + 1 + 1 long.
+					 * first 1 is for the / after /dev/cfg
+					 * second 1 is to make sure there is
+					 * somthing after
+					 */
+					if (strlen(portAttrs.OSDeviceName) <
+					    (strlen(CFGA_DEV_DIR) + 1 + 1))
+						continue;
+					cfg_ptr = portAttrs.OSDeviceName +
+					    strlen(CFGA_DEV_DIR) + 1;
+					if (logical_apid == NULL) {
+						/*
+						 * get the /dev/cfg link from
+						 * the portPath
+						 */
+						if (make_xport_logid(portPath,
+						    &logical_apid,
+						    &l_errno) != FPCFGA_OK) {
+							cfga_err(errstring,
+							    l_errno,
+							    ERR_LIST, 0);
+							HBA_FreeLibrary();
+							return
+							    (FPCFGA_LIB_ERR);
+						}
+					}
+					/* compare logical ap_id */
+					if (strcmp(logical_apid,
+					    cfg_ptr) == 0) {
+						if (matchingHandle)
+							*matchingHandle =
+							    handle;
+						if (matchingPortIndex)
+							*matchingPortIndex =
+							    portIndex;
+						if (matchingPortAttrs)
+							*matchingPortAttrs =
+							    portAttrs;
+						S_FREE(logical_apid);
+						return (FPCFGA_OK);
+					}
 				}
 			}
-		    } else {
-			/*
-			 * strip off the /dev/cfg/ portion of the
-			 * OSDeviceName
-			 * make sure that the OSDeviceName is at least
-			 * strlen("/dev/cfg") + 1 + 1 long.
-			 *	first 1 is for the / after /dev/cfg
-			 *	second 1 is to make sure there is somthing
-			 *	after
-			 */
-			if (strlen(portAttrs.OSDeviceName) <
-			    (strlen(CFGA_DEV_DIR) + 1 + 1))
-				continue;
-			cfg_ptr = portAttrs.OSDeviceName +
-			    strlen(CFGA_DEV_DIR) + 1;
-			if (logical_apid == NULL) {
-				/* get the /dev/cfg link from the portPath */
-				if (make_xport_logid(portPath, &logical_apid,
-					    &l_errno) != FPCFGA_OK) {
-					cfga_err(errstring, l_errno,
-					    ERR_LIST, 0);
-					HBA_FreeLibrary();
-					return (FPCFGA_LIB_ERR);
-				}
-			}
-			/* compare logical ap_id */
-			if (strcmp(logical_apid, cfg_ptr) == 0) {
-				if (matchingHandle)
-					*matchingHandle = handle;
-				if (matchingPortIndex)
-					*matchingPortIndex = portIndex;
-				if (matchingPortAttrs)
-					*matchingPortAttrs = portAttrs;
+			if (logical_apid != NULL)
 				S_FREE(logical_apid);
-				return (FPCFGA_OK);
-			}
-		    }
-		}
-		if (logical_apid != NULL)
-			S_FREE(logical_apid);
-	    } while ((status == HBA_STATUS_ERROR_STALE_DATA) &&
-		(retry++ < HBA_MAX_RETRIES));
+		} while ((status == HBA_STATUS_ERROR_STALE_DATA) &&
+		    (retry++ < HBA_MAX_RETRIES));
 
-	    HBA_CloseAdapter(handle);
+		HBA_CloseAdapter(handle);
 	}
 	free(logical_apid);
 
-	/* Got here. No mathcing adatper port found. */
+	/* Got here. No matching adapter port found. */
 	cfga_err(errstring, 0, ERR_MATCHING_HBA_PORT, 0);
 	HBA_FreeLibrary();
 	return (FPCFGA_LIB_ERR);

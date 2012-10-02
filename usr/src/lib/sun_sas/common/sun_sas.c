@@ -133,7 +133,7 @@ RetrieveOpenHandle(HBA_HANDLE handle)
 	struct open_handle	*open_handle_ptr = NULL;
 
 	if (global_hba_head == NULL) {
-		log(LOG_DEBUG, ROUTINE, "No adpater is found.");
+		log(LOG_DEBUG, ROUTINE, "No adapter is found.");
 		return (NULL);
 	}
 

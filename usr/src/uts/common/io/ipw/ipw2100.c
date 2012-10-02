@@ -1273,7 +1273,7 @@ ipw2100_chip_reset(struct ipw2100_softc *sc)
 	ipw2100_master_stop(sc);
 
 	/*
-	 * move adatper to DO state
+	 * move adapter to DO state
 	 */
 	tmp = ipw2100_csr_get32(sc, IPW2100_CSR_CTL);
 	ipw2100_csr_put32(sc, IPW2100_CSR_CTL, tmp | IPW2100_CTL_INIT);
