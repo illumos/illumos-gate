@@ -72,7 +72,7 @@ $(ROOTDOCDIRBASE)/%.html: misc/%.docbook
 		--stringparam toc.section.depth 12 \
 		--xinclude \
 		-o "$(@F)" \
-			/usr/share/sgml/docbook/xsl-stylesheets/html/docbook.xsl \
+			$(DOCBOOK_XSL_ROOT)/html/docbook.xsl \
 			"$<" >xsltproc.log 2>&1
 	$(INS) -s -m $(FILEMODE) -f "$(@D)" "$(@F)"
 	$(RM) "$(@F)"

@@ -405,15 +405,6 @@ vnic_dev_create(datalink_id_t vnic_id, datalink_id_t linkid,
 		if (err != 0)
 			goto bail;
 
-		if (mrp != NULL) {
-			if ((mrp->mrp_mask & MRP_RX_RINGS) != 0 ||
-			    (mrp->mrp_mask & MRP_TX_RINGS) != 0) {
-				req_hwgrp_flag = B_TRUE;
-			}
-			err = mac_client_set_resources(vnic->vn_mch, mrp);
-			if (err != 0)
-				goto bail;
-		}
 		/* assign a MAC address to the VNIC */
 
 		err = vnic_unicast_add(vnic, *vnic_addr_type, mac_slot,
@@ -517,8 +508,21 @@ vnic_dev_create(datalink_id_t vnic_id, datalink_id_t linkid,
 	}
 
 	/* Set the VNIC's MAC in the client */
-	if (!is_anchor)
+	if (!is_anchor) {
 		mac_set_upper_mac(vnic->vn_mch, vnic->vn_mh, mrp);
+
+		if (mrp != NULL) {
+			if ((mrp->mrp_mask & MRP_RX_RINGS) != 0 ||
+			    (mrp->mrp_mask & MRP_TX_RINGS) != 0) {
+				req_hwgrp_flag = B_TRUE;
+			}
+			err = mac_client_set_resources(vnic->vn_mch, mrp);
+			if (err != 0) {
+				(void) mac_unregister(vnic->vn_mh);
+				goto bail;
+			}
+		}
+	}
 
 	err = dls_devnet_create(vnic->vn_mh, vnic->vn_id, crgetzoneid(credp));
 	if (err != 0) {

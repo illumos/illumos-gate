@@ -871,6 +871,7 @@ typedef struct rt_map32 {
 #define	FL1_RT_TLSSTAT	0x00020000	/* object requires static TLS */
 #define	FL1_RT_DIRECT	0x00040000	/* object has DIRECT bindings enabled */
 #define	FL1_RT_GLOBAUD	0x00080000	/* establish global auditing */
+#define	FL1_RT_DEPAUD	0x00100000	/* audit library from DT_DEPAUDIT */
 
 /*
  * Flags for the tls_modactivity() routine

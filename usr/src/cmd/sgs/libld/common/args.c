@@ -25,6 +25,9 @@
  *
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ */
 
 /*
  * Publicly available flags are defined in ld(1).   The following flags are
@@ -182,6 +185,7 @@ usage_mesg(Boolean detail)
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZA));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZAE));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZAL));
+	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZADLIB));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZC));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZDEF));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZDFS));
@@ -909,6 +913,56 @@ guidance_parse(Ofl_desc *ofl, char *optarg)
 	return (TRUE);
 }
 
+/*
+ * Parse the -z assert-deflib option. This option can appear in two different
+ * forms:
+ * 	-z assert-deflib
+ * 	-z assert-deflib=libfred.so
+ *
+ * Either form enables this option, the latter form marks libfred.so as an
+ * exempt library from the check. It is valid to have multiple invocations of
+ * the second form. We silently ignore mulitple occurrences of the first form
+ * and multiple invocations of the first form when the second form also occurs.
+ *
+ * We only return false when we have an internal error, such as the failure of
+ * aplist_append. Every other time we return true, but we have the appropriate
+ * fatal flags set beacuse of the ld_eprintf.
+ */
+static int
+assdeflib_parse(Ofl_desc *ofl, char *optarg)
+{
+	size_t olen, mlen;
+	ofl->ofl_flags |= FLG_OF_ADEFLIB;
+
+	olen = strlen(optarg);
+	/* Minimum size of assert-deflib=lib%s.so */
+	mlen = MSG_ARG_ASSDEFLIB_SIZE + 1 + MSG_STR_LIB_SIZE +
+	    MSG_STR_SOEXT_SIZE;
+	if (olen > MSG_ARG_ASSDEFLIB_SIZE) {
+		if (optarg[MSG_ARG_ASSDEFLIB_SIZE] != '=') {
+			ld_eprintf(ofl, ERR_FATAL, "Missing =\n");
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_ARG_ILLEGAL),
+			    MSG_ORIG(MSG_ARG_ASSDEFLIB), optarg);
+			return (TRUE);
+		}
+
+		if (strncmp(optarg + MSG_ARG_ASSDEFLIB_SIZE + 1,
+		    MSG_ORIG(MSG_STR_LIB), MSG_STR_LIB_SIZE) != 0 ||
+		    strcmp(optarg + olen - MSG_STR_SOEXT_SIZE,
+		    MSG_ORIG(MSG_STR_SOEXT)) != 0 || olen <= mlen) {
+			ld_eprintf(ofl, ERR_FATAL,
+			    MSG_INTL(MSG_ARG_ASSDEFLIB_MALFORMED), optarg);
+			return (TRUE);
+		}
+
+		if (aplist_append(&ofl->ofl_assdeflib, optarg +
+		    MSG_ARG_ASSDEFLIB_SIZE + 1, AL_CNT_ASSDEFLIB) == NULL)
+			return (FALSE);
+	}
+
+	return (TRUE);
+}
+
 static int	optitle = 0;
 /*
  * Parsing options pass1 for process_flags().
@@ -1408,6 +1462,15 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *usage)
 				else
 					zfwflag = SET_FALSE;
 
+			/*
+			 * Process everything related to -z assert-deflib. This
+			 * must be done in pass 1 because it gets used in pass
+			 * 2.
+			 */
+			} else if (strncmp(optarg, MSG_ORIG(MSG_ARG_ASSDEFLIB),
+			    MSG_ARG_ASSDEFLIB_SIZE) == 0) {
+				if (assdeflib_parse(ofl, optarg) != TRUE)
+					return (S_ERROR);
 			/*
 			 * The following options just need validation as they
 			 * are interpreted on the second pass through the
