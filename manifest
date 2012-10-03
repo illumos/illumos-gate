@@ -1498,7 +1498,6 @@ f lib/svc/manifest/network/lms.xml 0444 root sys
 d lib/svc/manifest/network/loadbalancer 0755 root sys
 f lib/svc/manifest/network/loadbalancer/ilbd.xml 0444 root sys
 f lib/svc/manifest/network/login.xml 0444 root sys
-f lib/svc/manifest/network/network-discovery.xml 0444 root sys
 f lib/svc/manifest/network/network-initial.xml 0444 root sys
 f lib/svc/manifest/network/network-install.xml 0444 root sys
 f lib/svc/manifest/network/network-ipmgmt.xml 0444 root sys
@@ -1664,7 +1663,6 @@ f lib/svc/method/svc-legacy-routing 0555 root bin
 f lib/svc/method/svc-lms 0555 root sys
 f lib/svc/method/svc-ndmp 0555 root sys
 f lib/svc/method/svc-ndp 0555 root bin
-f lib/svc/method/svc-network-discovery 0555 root sys
 f lib/svc/method/svc-nscd 0555 root bin
 f lib/svc/method/svc-poold 0555 root sys
 f lib/svc/method/svc-pools 0555 root sys

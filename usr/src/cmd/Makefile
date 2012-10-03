@@ -186,7 +186,6 @@ COMMON_SUBDIRS=		\
 	groups		\
 	grpck		\
 	gss		\
-	hal		\
 	halt		\
 	head		\
 	hostid		\
