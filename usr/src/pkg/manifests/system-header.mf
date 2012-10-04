@@ -813,7 +813,6 @@ file path=usr/include/sys/bitmap.h
 file path=usr/include/sys/bitset.h
 file path=usr/include/sys/bl.h
 file path=usr/include/sys/blkdev.h
-file path=usr/include/sys/bmc_intf.h
 file path=usr/include/sys/bofi.h
 file path=usr/include/sys/bofi_impl.h
 file path=usr/include/sys/bootconf.h

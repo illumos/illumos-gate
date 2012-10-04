@@ -330,7 +330,7 @@ void TgtFCHBA::loadAdapters(vector<HBA*> &list)
     if (tgthbaList->numPorts > HBAList::HBA_MAX_PER_LIST) {
 	delete(tgthbaList);
 	throw InternalError(
-	    "Exceeds max number of adatpers that VSL supports.");
+	    "Exceeds max number of adapters that VSL supports.");
     }
     delete (tgthbaList);
 }

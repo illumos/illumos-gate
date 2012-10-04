@@ -216,7 +216,7 @@ extern "C" {
 /* Packet Buffer DWORD (_n) */
 #define	E1000_PBSLAD(_n)	(0x03110 + (0x4 * (_n)))
 #define	E1000_TXPBS	0x03404  /* Tx Packet Buffer Size - RW */
-/* Same as TXPBS, renamed for newer adpaters - RW */
+/* Same as TXPBS, renamed for newer adapters - RW */
 #define	E1000_ITPBS	0x03404
 #define	E1000_TDFH	0x03410  /* Tx Data FIFO Head - RW */
 #define	E1000_TDFT	0x03418  /* Tx Data FIFO Tail - RW */

@@ -308,7 +308,7 @@ poll_common(pollfd_t *fds, nfds_t nfds, timespec_t *tsp, k_sigset_t *ksetp)
 		deadline = 0;
 	} else {
 		/* They must wait at least a tick. */
-		deadline = tsp->tv_sec * NANOSEC + tsp->tv_nsec;
+		deadline = ((hrtime_t)tsp->tv_sec * NANOSEC) + tsp->tv_nsec;
 		deadline = MAX(deadline, nsec_per_tick);
 		deadline += gethrtime();
 	}

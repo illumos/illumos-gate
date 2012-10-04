@@ -86,7 +86,6 @@ CHKHDRS=			\
 	bitset.h		\
 	bl.h			\
 	blkdev.h		\
-	bmc_intf.h		\
 	bofi.h			\
 	bofi_impl.h		\
 	bpp_io.h		\
@@ -278,6 +277,7 @@ CHKHDRS=			\
 	ipc.h			\
 	ipc_impl.h		\
 	ipc_rctl.h		\
+	ipmi.h			\
 	isa_defs.h		\
 	iscsi_authclient.h	\
 	iscsi_authclientglue.h	\

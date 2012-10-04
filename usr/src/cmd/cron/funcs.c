@@ -172,8 +172,8 @@ cron_sendmsg(char action, char *login, char *fname, char etype)
 	}
 	pmsg->etype = etype;
 	pmsg->action = action;
-	(void) strncpy(pmsg->fname, fname, FLEN);
-	(void) strncpy(pmsg->logname, login, LLEN);
+	(void) strlcpy(pmsg->fname, fname, FLEN);
+	(void) strlcpy(pmsg->logname, login, LLEN);
 	if ((i = write(msgfd, pmsg, sizeof (struct message))) < 0)
 		(void) fprintf(stderr, gettext("error in message send\n"));
 	else if (i != sizeof (struct message))
