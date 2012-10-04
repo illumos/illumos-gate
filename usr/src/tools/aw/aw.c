@@ -550,29 +550,6 @@ main(int argc, char *argv[])
 	newae(as, "--traditional-format");
 
 	/*
-	 * This is a support hack to rewrite code for the compiler
-	 * which should probably cause an assembler programmer to recode
-	 * - so, generate a warning in this case.
-	 *
-	 * -K was dropped begining with version 2.18.
-	 */
-	{
-		struct aelist *as_ver = newael();
-		struct aelist *ggrep = newael();
-
-		newae(as_ver, as_pgm);
-		newae(as_ver, "--version");
-		newae(ggrep, "/usr/bin/ggrep");
-		newae(ggrep, "-q");
-		newae(ggrep, "-E");
-		newae(ggrep, "2.1[567]");
-		code = pipeline(aeltoargv(as_ver), aeltoargv(ggrep));
-		if (code == 0) {
-			newae(as, "-K");
-		}
-	}
-
-	/*
 	 * Walk the argument list, translating as we go ..
 	 */
 	while (--argc > 0) {

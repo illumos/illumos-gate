@@ -238,9 +238,6 @@ $(i386_ONLY)dir path=usr/sbin/$(ARCH32)
 dir path=usr/sbin/$(ARCH64)
 dir path=usr/share
 dir path=usr/share/doc group=other
-dir path=usr/share/doc/ksh
-dir path=usr/share/doc/ksh/images
-dir path=usr/share/doc/ksh/images/callouts
 dir path=usr/share/lib
 dir path=usr/share/lib/mailx
 dir path=usr/share/lib/pub
@@ -1426,31 +1423,6 @@ file path=usr/sbin/volcopy mode=0555
 file path=usr/sbin/wall group=tty mode=2555
 file path=usr/sbin/zdump mode=0555
 file path=usr/sbin/zic mode=0555
-file path=usr/share/doc/ksh/COMPATIBILITY
-file path=usr/share/doc/ksh/DESIGN
-file path=usr/share/doc/ksh/OBSOLETE
-file path=usr/share/doc/ksh/README
-file path=usr/share/doc/ksh/RELEASE
-file path=usr/share/doc/ksh/TYPES
-file path=usr/share/doc/ksh/images/callouts/1.png
-file path=usr/share/doc/ksh/images/callouts/10.png
-file path=usr/share/doc/ksh/images/callouts/2.png
-file path=usr/share/doc/ksh/images/callouts/3.png
-file path=usr/share/doc/ksh/images/callouts/4.png
-file path=usr/share/doc/ksh/images/callouts/5.png
-file path=usr/share/doc/ksh/images/callouts/6.png
-file path=usr/share/doc/ksh/images/callouts/7.png
-file path=usr/share/doc/ksh/images/callouts/8.png
-file path=usr/share/doc/ksh/images/callouts/9.png
-file path=usr/share/doc/ksh/images/tag_bourne.png
-file path=usr/share/doc/ksh/images/tag_i18n.png
-file path=usr/share/doc/ksh/images/tag_ksh.png
-file path=usr/share/doc/ksh/images/tag_ksh88.png
-file path=usr/share/doc/ksh/images/tag_ksh93.png
-file path=usr/share/doc/ksh/images/tag_l10n.png
-file path=usr/share/doc/ksh/images/tag_perf.png
-file path=usr/share/doc/ksh/shell_styleguide.docbook
-file path=usr/share/doc/ksh/shell_styleguide.html
 file path=usr/share/lib/mailx/mailx.help
 file path=usr/share/lib/mailx/mailx.help.~
 file path=usr/share/lib/tabset/3101
