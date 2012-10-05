@@ -922,6 +922,8 @@ cap_modify(Xword tag, const char *str)
 		 * Invalid indexes are ignored.
 		 */
 		if (val == 0) {
+			char *end;
+
 			if ((*ptr == '[') && (*(ptr + 2) == ']')) {
 				if (*(ptr + 1) == '1') {
 					ndx = tag;
@@ -942,9 +944,21 @@ cap_modify(Xword tag, const char *str)
 				ndx = tag;
 
 			errno = 0;
-			if (((val = strtol(ptr, NULL, 16)) == 0) && errno)
+			if (((val = strtol(ptr, &end, 16)) == 0) && errno)
 				continue;
+
+			/*
+			 * If the value wasn't an entirely valid hexadecimal
+			 * integer, assume it was intended as a capability
+			 * name and skip it.
+			 */
+			if (*end != '\0') {
+				eprintf(NULL, ERR_WARNING,
+				    MSG_INTL(MSG_CAP_IGN_UNKCAP), ptr);
+				continue;
+			}
 		}
+
 		cap_settings[ndx - 1].cs_val[mode] |= val;
 		cap_settings[ndx - 1].cs_set[mode]++;
 
