@@ -1,9 +1,9 @@
-'\" te
+'\"
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LD.SO.1 1 "Aug 26, 2009"
+.TH LD.SO.1 1 "Oct 5, 2012"
 .SH NAME
 ld.so.1 \- runtime linker for dynamic objects
 .SH SYNOPSIS
@@ -232,6 +232,21 @@ If both \fBLD_BIND_NOW\fR and \fBLD_BIND_LAZY\fR are specified, then
 .sp
 .ne 2
 .na
+\fBLD_CAP_FILES\fR, \fBLD_CAP_FILES_32\fR, and \fBLD_CAP_FILES_64\fR
+.ad
+.sp .6
+.RS 4n
+A comma-separated list of executables and shared libraries to which the
+alternative capabilities specified by \fBLD_MACHCAP\fR, \fBLD_PLATCAP\fR,
+\fBLD_HWCAP\fR and \fBLD_SFCAP\fR should apply.
+.LP
+Executables and libraries may be specified either by their SONAME or their
+full real pathname.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fBLD_CONFIG\fR, \fBLD_CONFIG_32\fR, and \fBLD_CONFIG_64\fR\fR
 .ad
 .sp .6
@@ -280,6 +295,37 @@ Provides an alternative means of supplying environment variable information.
 Any of the \fBLD_\fR\fIXXX\fR environment variables can be specified as a
 \fIxxx\fR token. Multiple tokens can be supplied separated by commas. See
 EXAMPLES.
+.RE
+
+.sp
+.ne 2
+.na
+\fBLD_HWCAP\fR, \fBLD_HWCAP_32\fR, and \fBLD_HWCAP_64\fR
+.ad
+.sp .6
+.RS 4n
+Specify a comma-separated set of alternative hardware capabilities.  A
+leading '+' indicates that the capabilities should be included in addition to
+the default set, a leading '-' indicates that the capabilities should be
+excluded from the default set, and neither indicates that the set should
+replace the default set.
+.LP
+Capabilities may be specified either by name, or as hexadecimal integers with
+an optional leading bracketed index number specifying the capabilities family.
+.nf
+LD_HWCAP=[1]01 # Sets CA_SUN_HW_1 to 0x1
+LD_HWCAP=[2]20 # Sets CA_SUN_HW_2 to 0x20
+.fi
+.RE
+
+.sp
+.ne 2
+.na
+\fBLD_MACHCAP\fR
+.ad
+.sp .6
+.RS 4n
+Specify an alternative machine hardware capability name.
 .RE
 
 .sp
@@ -445,6 +491,16 @@ default thus making this option redundant.
 .sp
 .ne 2
 .na
+\fBLD_PLATCAP\fR
+.ad
+.sp .6
+.RS 4n
+Specify an alternative platform hardware capability name.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fBLD_PRELOAD\fR, \fBLD_PRELOAD_32\fR, and \fBLD_PRELOAD_64\fR\fR
 .ad
 .sp .6
@@ -484,6 +540,22 @@ profiled does not have to be instrumented in any way, and \fBLD_PROFILE\fR
 should not be combined with a profile-instrumented application. See the
 \fILinker and Libraries Guide\fR for more information on profiling shared
 objects.
+.RE
+
+.sp
+.ne 2
+.na
+\fBLD_SFCAP\fR, \fBLD_SFCAP_32\fR, and \fBLD_SFCAP_64\fR
+.ad
+.sp .6
+.RS 4n
+Specify a comma-separated set of alternative software capabilities.  A
+leading '+' indicates that the capabilities should be included in addition to
+the default set, a leading '-' indicates that the capabilities should be
+excluded from the default set, and neither indicates that the set should
+replace the default set.
+.LP
+Capabilities may be specified either by name, or as hexadecimal integers.
 .RE
 
 .sp
