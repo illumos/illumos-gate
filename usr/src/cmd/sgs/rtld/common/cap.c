@@ -858,8 +858,9 @@ cap_modify(Xword tag, const char *str)
 	if ((caps = strdup(str)) == NULL)
 		return (0);
 
-	ptr = strtok_r(caps, MSG_ORIG(MSG_CAP_DELIMIT), &next);
-	do {
+	for (ptr = strtok_r(caps, MSG_ORIG(MSG_CAP_DELIMIT), &next);
+	    ptr != NULL;
+	    ptr = strtok_r(NULL, MSG_ORIG(MSG_CAP_DELIMIT), &next)) {
 		Xword		val = 0;
 
 		/*
@@ -947,8 +948,7 @@ cap_modify(Xword tag, const char *str)
 		cap_settings[ndx - 1].cs_val[mode] |= val;
 		cap_settings[ndx - 1].cs_set[mode]++;
 
-	} while ((ptr = strtok_r(NULL,
-	    MSG_ORIG(MSG_CAP_DELIMIT), &next)) != NULL);
+	}
 
 	/*
 	 * If the "override" token was supplied, set the alternative
@@ -982,8 +982,9 @@ cap_files(const char *str)
 	if ((caps = strdup(str)) == NULL)
 		return (0);
 
-	name = strtok_r(caps, MSG_ORIG(MSG_CAP_DELIMIT), &next);
-	do {
+	for (name = strtok_r(caps, MSG_ORIG(MSG_CAP_DELIMIT), &next);
+	    name != NULL;
+	    name = strtok_r(NULL, MSG_ORIG(MSG_CAP_DELIMIT), &next)) {
 		avl_index_t	where;
 		PathNode	*pnp;
 		uint_t		hash = sgs_str_hash(name);
@@ -999,8 +1000,7 @@ cap_files(const char *str)
 			pnp->pn_hash = hash;
 			avl_insert(capavl, pnp, where);
 		}
-	} while ((name = strtok_r(NULL,
-	    MSG_ORIG(MSG_CAP_DELIMIT), &next)) != NULL);
+	}
 
 	return (1);
 }
