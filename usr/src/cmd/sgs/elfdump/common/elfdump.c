@@ -521,6 +521,7 @@ getphdr(Word phnum, Word *type_arr, Word type_cnt, const char *file, Elf *elf)
  * entry:
  *	cache - Cache of all section headers
  *	shndx - Index of .eh_frame or .eh_frame_hdr section to be displayed
+ *	shnum - Total number of sections which exist
  *	uphdr - NULL, or unwind program header associated with
  *		the .eh_frame_hdr section.
  *	ehdr - ELF header for file
@@ -532,7 +533,7 @@ getphdr(Word phnum, Word *type_arr, Word type_cnt, const char *file, Elf *elf)
  *	flags - Command line option flags
  */
 static void
-unwind_eh_frame(Cache *cache, Word shndx, Phdr *uphdr, Ehdr *ehdr,
+unwind_eh_frame(Cache *cache, Word shndx, Word shnum, Phdr *uphdr, Ehdr *ehdr,
     gnu_eh_state_t *eh_state, uchar_t osabi, const char *file, uint_t flags)
 {
 #if	defined(_ELF64)
@@ -551,7 +552,16 @@ unwind_eh_frame(Cache *cache, Word shndx, Phdr *uphdr, Ehdr *ehdr,
 	uint64_t		ndx, frame_ptr, fde_cnt, tabndx;
 	uint_t			vers, frame_ptr_enc, fde_cnt_enc, table_enc;
 	uint64_t		initloc, initloc0;
+	uint64_t		gotaddr = 0;
+	int			cnt;
 
+	for (cnt = 1; cnt < shnum; cnt++) {
+		if (strncmp(cache[cnt].c_name, MSG_ORIG(MSG_ELF_GOT),
+		    MSG_ELF_GOT_SIZE) == 0) {
+			gotaddr = cache[cnt].c_shdr->sh_addr;
+			break;
+		}
+	}
 
 	/*
 	 * Is this a .eh_frame_hdr?
@@ -578,7 +588,7 @@ unwind_eh_frame(Cache *cache, Word shndx, Phdr *uphdr, Ehdr *ehdr,
 		dbg_print(0, MSG_ORIG(MSG_UNW_FRMVERS), vers);
 
 		frame_ptr = dwarf_ehe_extract(data, &ndx, frame_ptr_enc,
-		    ehdr->e_ident, shdr->sh_addr, ndx);
+		    ehdr->e_ident, B_TRUE, shdr->sh_addr, ndx, gotaddr);
 		if (eh_state->hdr_cnt == 1) {
 			eh_state->hdr_ndx = shndx;
 			eh_state->frame_ptr = frame_ptr;
@@ -589,7 +599,7 @@ unwind_eh_frame(Cache *cache, Word shndx, Phdr *uphdr, Ehdr *ehdr,
 		    EC_XWORD(frame_ptr));
 
 		fde_cnt = dwarf_ehe_extract(data, &ndx, fde_cnt_enc,
-		    ehdr->e_ident, shdr->sh_addr, ndx);
+		    ehdr->e_ident, B_TRUE, shdr->sh_addr, ndx, gotaddr);
 
 		dbg_print(0, MSG_ORIG(MSG_UNW_FDCNENC),
 		    conv_dwarf_ehe(fde_cnt_enc, &dwarf_ehe_buf),
@@ -601,7 +611,7 @@ unwind_eh_frame(Cache *cache, Word shndx, Phdr *uphdr, Ehdr *ehdr,
 
 		for (tabndx = 0; tabndx < fde_cnt; tabndx++) {
 			initloc = dwarf_ehe_extract(data, &ndx, table_enc,
-			    ehdr->e_ident, shdr->sh_addr, ndx);
+			    ehdr->e_ident, B_TRUE, shdr->sh_addr, ndx, gotaddr);
 			/*LINTED:E_VAR_USED_BEFORE_SET*/
 			if ((tabndx != 0) && (initloc0 > initloc))
 				(void) fprintf(stderr,
@@ -610,8 +620,8 @@ unwind_eh_frame(Cache *cache, Word shndx, Phdr *uphdr, Ehdr *ehdr,
 			dbg_print(0, MSG_ORIG(MSG_UNW_BINSRTABENT),
 			    EC_XWORD(initloc),
 			    EC_XWORD(dwarf_ehe_extract(data, &ndx,
-			    table_enc, ehdr->e_ident, shdr->sh_addr,
-			    ndx)));
+			    table_enc, ehdr->e_ident, B_TRUE, shdr->sh_addr,
+			    ndx, gotaddr)));
 			initloc0 = initloc;
 		}
 	} else {		/* Display the .eh_frame section */
@@ -628,7 +638,7 @@ unwind_eh_frame(Cache *cache, Word shndx, Phdr *uphdr, Ehdr *ehdr,
 			    conv_ehdr_type(osabi, ehdr->e_type, 0, &inv_buf));
 		}
 		dump_eh_frame(data, datasize, shdr->sh_addr,
-		    ehdr->e_machine, ehdr->e_ident);
+		    ehdr->e_machine, ehdr->e_ident, gotaddr);
 	}
 
 	/*
@@ -875,8 +885,8 @@ unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, uchar_t osabi,
 			unwind_exception_ranges(_cache, file,
 			    _elf_sys_encoding() != ehdr->e_ident[EI_DATA]);
 		else
-			unwind_eh_frame(cache, cnt, uphdr, ehdr, &eh_state,
-			    osabi, file, flags);
+			unwind_eh_frame(cache, cnt, shnum, uphdr, ehdr,
+			    &eh_state, osabi, file, flags);
 	}
 }
 

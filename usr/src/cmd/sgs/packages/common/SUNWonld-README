@@ -1639,3 +1639,4 @@ Bugid   Risk Synopsis
 3230	ld.so.1 should check default paths for DT_DEPAUDIT
 3260	linker is insufficiently careful with strtok
 3261	linker should ignore unknown hardware capabilities
+3265	link-editor builds bogus .eh_frame_hdr on ia32

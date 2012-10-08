@@ -639,8 +639,8 @@ ld_unwind_populate_hdr(Ofl_desc *ofl)
 					    (void) dwarf_ehe_extract(
 						&data[off + ndx],
 						&ndx, ciePflag,
-						ofl->ofl_dehdr->e_ident,
-						shdr->sh_addr, off + ndx);
+						ofl->ofl_dehdr->e_ident, B_FALSE,
+						shdr->sh_addr, off + ndx, 0);
 					    break;
 					case 'R':
 					    /* code encoding */
@@ -658,10 +658,17 @@ ld_unwind_populate_hdr(Ofl_desc *ofl)
 				uint_t	    bintabndx;
 				uint64_t    initloc;
 				uint64_t    fdeaddr;
+				uint64_t    gotaddr = 0;
+
+				if (ofl->ofl_osgot != NULL)
+					gotaddr =
+					    ofl->ofl_osgot->os_shdr->sh_addr;
 
 				initloc = dwarf_ehe_extract(&data[off],
 				    &ndx, cieRflag, ofl->ofl_dehdr->e_ident,
-				    shdr->sh_addr, off + ndx);
+				    B_FALSE,
+				    shdr->sh_addr, off + ndx,
+				    gotaddr);
 
 				/*
 				 * Ignore FDEs with initloc set to 0.
