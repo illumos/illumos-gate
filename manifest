@@ -6954,6 +6954,19 @@ d usr/lib/locale/de_CH.UTF-8/LC_NUMERIC 0755 root bin
 h usr/lib/locale/de_CH.UTF-8/LC_NUMERIC/LCL_DATA=usr/lib/locale/de_CH.ISO8859-1/LC_NUMERIC/LCL_DATA
 d usr/lib/locale/de_CH.UTF-8/LC_TIME 0755 root bin
 f usr/lib/locale/de_CH.UTF-8/LC_TIME/LCL_DATA 0755 root bin
+d usr/lib/locale/de_DE.ISO8859-1 0755 root bin
+d usr/lib/locale/de_DE.ISO8859-1/LC_COLLATE 0755 root bin
+h usr/lib/locale/de_DE.ISO8859-1/LC_COLLATE/LCL_DATA=usr/lib/locale/de_CH.ISO8859-1/LC_COLLATE/LCL_DATA
+d usr/lib/locale/de_DE.ISO8859-1/LC_CTYPE 0755 root bin
+h usr/lib/locale/de_DE.ISO8859-1/LC_CTYPE/LCL_DATA=usr/lib/locale/da_DK.ISO8859-1/LC_CTYPE/LCL_DATA
+d usr/lib/locale/de_DE.ISO8859-1/LC_MESSAGES 0755 root bin
+h usr/lib/locale/de_DE.ISO8859-1/LC_MESSAGES/LCL_DATA=usr/lib/locale/de_AT.ISO8859-15/LC_MESSAGES/LCL_DATA
+d usr/lib/locale/de_DE.ISO8859-1/LC_MONETARY 0755 root bin
+f usr/lib/locale/de_DE.ISO8859-1/LC_MONETARY/LCL_DATA 0755 root bin
+d usr/lib/locale/de_DE.ISO8859-1/LC_NUMERIC 0755 root bin
+f usr/lib/locale/de_DE.ISO8859-1/LC_NUMERIC/LCL_DATA 0755 root bin
+d usr/lib/locale/de_DE.ISO8859-1/LC_TIME 0755 root bin
+f usr/lib/locale/de_DE.ISO8859-1/LC_TIME/LCL_DATA 0755 root bin
 d usr/lib/locale/de_DE.ISO8859-15 0755 root bin
 d usr/lib/locale/de_DE.ISO8859-15/LC_COLLATE 0755 root bin
 h usr/lib/locale/de_DE.ISO8859-15/LC_COLLATE/LCL_DATA=usr/lib/locale/de_AT.ISO8859-15/LC_COLLATE/LCL_DATA
@@ -7565,6 +7578,19 @@ d usr/lib/locale/es_EC.UTF-8/LC_NUMERIC 0755 root bin
 h usr/lib/locale/es_EC.UTF-8/LC_NUMERIC/LCL_DATA=usr/lib/locale/ar_AE.UTF-8/LC_NUMERIC/LCL_DATA
 d usr/lib/locale/es_EC.UTF-8/LC_TIME 0755 root bin
 f usr/lib/locale/es_EC.UTF-8/LC_TIME/LCL_DATA 0755 root bin
+d usr/lib/locale/es_ES.ISO8859-1 0755 root bin
+d usr/lib/locale/es_ES.ISO8859-1/LC_COLLATE 0755 root bin
+f usr/lib/locale/es_ES.ISO8859-1/LC_COLLATE/LCL_DATA 0755 root bin
+d usr/lib/locale/es_ES.ISO8859-1/LC_CTYPE 0755 root bin
+h usr/lib/locale/es_ES.ISO8859-1/LC_CTYPE/LCL_DATA=usr/lib/locale/da_DK.ISO8859-1/LC_CTYPE/LCL_DATA
+d usr/lib/locale/es_ES.ISO8859-1/LC_MESSAGES 0755 root bin
+h usr/lib/locale/es_ES.ISO8859-1/LC_MESSAGES/LCL_DATA=usr/lib/locale/es_AR.ISO8859-1/LC_MESSAGES/LCL_DATA
+d usr/lib/locale/es_ES.ISO8859-1/LC_MONETARY 0755 root bin
+f usr/lib/locale/es_ES.ISO8859-1/LC_MONETARY/LCL_DATA 0755 root bin
+d usr/lib/locale/es_ES.ISO8859-1/LC_NUMERIC 0755 root bin
+h usr/lib/locale/es_ES.ISO8859-1/LC_NUMERIC/LCL_DATA=usr/lib/locale/ar_AE.UTF-8/LC_NUMERIC/LCL_DATA
+d usr/lib/locale/es_ES.ISO8859-1/LC_TIME 0755 root bin
+f usr/lib/locale/es_ES.ISO8859-1/LC_TIME/LCL_DATA 0755 root bin
 d usr/lib/locale/es_ES.ISO8859-15 0755 root bin
 d usr/lib/locale/es_ES.ISO8859-15/LC_COLLATE 0755 root bin
 f usr/lib/locale/es_ES.ISO8859-15/LC_COLLATE/LCL_DATA 0755 root bin
@@ -7983,7 +8009,7 @@ d usr/lib/locale/fr_CF.UTF-8/LC_TIME 0755 root bin
 f usr/lib/locale/fr_CF.UTF-8/LC_TIME/LCL_DATA 0755 root bin
 d usr/lib/locale/fr_CH.ISO8859-1 0755 root bin
 d usr/lib/locale/fr_CH.ISO8859-1/LC_COLLATE 0755 root bin
-h usr/lib/locale/fr_CH.ISO8859-1/LC_COLLATE/LCL_DATA=usr/lib/locale/fr_CA.ISO8859-1/LC_COLLATE/LCL_DATA
+f usr/lib/locale/fr_CH.ISO8859-1/LC_COLLATE/LCL_DATA 0755 root bin
 d usr/lib/locale/fr_CH.ISO8859-1/LC_CTYPE 0755 root bin
 h usr/lib/locale/fr_CH.ISO8859-1/LC_CTYPE/LCL_DATA=usr/lib/locale/da_DK.ISO8859-1/LC_CTYPE/LCL_DATA
 d usr/lib/locale/fr_CH.ISO8859-1/LC_MESSAGES 0755 root bin
@@ -8007,6 +8033,19 @@ d usr/lib/locale/fr_CH.UTF-8/LC_NUMERIC 0755 root bin
 h usr/lib/locale/fr_CH.UTF-8/LC_NUMERIC/LCL_DATA=usr/lib/locale/de_CH.ISO8859-1/LC_NUMERIC/LCL_DATA
 d usr/lib/locale/fr_CH.UTF-8/LC_TIME 0755 root bin
 f usr/lib/locale/fr_CH.UTF-8/LC_TIME/LCL_DATA 0755 root bin
+d usr/lib/locale/fr_FR.ISO8859-1 0755 root bin
+d usr/lib/locale/fr_FR.ISO8859-1/LC_COLLATE 0755 root bin
+h usr/lib/locale/fr_FR.ISO8859-1/LC_COLLATE/LCL_DATA=usr/lib/locale/fr_CH.ISO8859-1/LC_COLLATE/LCL_DATA
+d usr/lib/locale/fr_FR.ISO8859-1/LC_CTYPE 0755 root bin
+h usr/lib/locale/fr_FR.ISO8859-1/LC_CTYPE/LCL_DATA=usr/lib/locale/da_DK.ISO8859-1/LC_CTYPE/LCL_DATA
+d usr/lib/locale/fr_FR.ISO8859-1/LC_MESSAGES 0755 root bin
+h usr/lib/locale/fr_FR.ISO8859-1/LC_MESSAGES/LCL_DATA=usr/lib/locale/fr_BE.ISO8859-15/LC_MESSAGES/LCL_DATA
+d usr/lib/locale/fr_FR.ISO8859-1/LC_MONETARY 0755 root bin
+f usr/lib/locale/fr_FR.ISO8859-1/LC_MONETARY/LCL_DATA 0755 root bin
+d usr/lib/locale/fr_FR.ISO8859-1/LC_NUMERIC 0755 root bin
+h usr/lib/locale/fr_FR.ISO8859-1/LC_NUMERIC/LCL_DATA=usr/lib/locale/bg_BG.ISO8859-5/LC_NUMERIC/LCL_DATA
+d usr/lib/locale/fr_FR.ISO8859-1/LC_TIME 0755 root bin
+f usr/lib/locale/fr_FR.ISO8859-1/LC_TIME/LCL_DATA 0755 root bin
 d usr/lib/locale/fr_FR.ISO8859-15 0755 root bin
 d usr/lib/locale/fr_FR.ISO8859-15/LC_COLLATE 0755 root bin
 h usr/lib/locale/fr_FR.ISO8859-15/LC_COLLATE/LCL_DATA=usr/lib/locale/fr_BE.ISO8859-15/LC_COLLATE/LCL_DATA
@@ -8319,6 +8358,19 @@ d usr/lib/locale/it_CH.UTF-8/LC_NUMERIC 0755 root bin
 h usr/lib/locale/it_CH.UTF-8/LC_NUMERIC/LCL_DATA=usr/lib/locale/de_CH.ISO8859-1/LC_NUMERIC/LCL_DATA
 d usr/lib/locale/it_CH.UTF-8/LC_TIME 0755 root bin
 f usr/lib/locale/it_CH.UTF-8/LC_TIME/LCL_DATA 0755 root bin
+d usr/lib/locale/it_IT.ISO8859-1 0755 root bin
+d usr/lib/locale/it_IT.ISO8859-1/LC_COLLATE 0755 root bin
+f usr/lib/locale/it_IT.ISO8859-1/LC_COLLATE/LCL_DATA 0755 root bin
+d usr/lib/locale/it_IT.ISO8859-1/LC_CTYPE 0755 root bin
+h usr/lib/locale/it_IT.ISO8859-1/LC_CTYPE/LCL_DATA=usr/lib/locale/da_DK.ISO8859-1/LC_CTYPE/LCL_DATA
+d usr/lib/locale/it_IT.ISO8859-1/LC_MESSAGES 0755 root bin
+h usr/lib/locale/it_IT.ISO8859-1/LC_MESSAGES/LCL_DATA=usr/lib/locale/it_CH.ISO8859-1/LC_MESSAGES/LCL_DATA
+d usr/lib/locale/it_IT.ISO8859-1/LC_MONETARY 0755 root bin
+f usr/lib/locale/it_IT.ISO8859-1/LC_MONETARY/LCL_DATA 0755 root bin
+d usr/lib/locale/it_IT.ISO8859-1/LC_NUMERIC 0755 root bin
+f usr/lib/locale/it_IT.ISO8859-1/LC_NUMERIC/LCL_DATA 0755 root bin
+d usr/lib/locale/it_IT.ISO8859-1/LC_TIME 0755 root bin
+f usr/lib/locale/it_IT.ISO8859-1/LC_TIME/LCL_DATA 0755 root bin
 d usr/lib/locale/it_IT.ISO8859-15 0755 root bin
 d usr/lib/locale/it_IT.ISO8859-15/LC_COLLATE 0755 root bin
 h usr/lib/locale/it_IT.ISO8859-15/LC_COLLATE/LCL_DATA=usr/lib/locale/de_AT.ISO8859-15/LC_COLLATE/LCL_DATA

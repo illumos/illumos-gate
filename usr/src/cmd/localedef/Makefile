@@ -12,6 +12,7 @@
 #
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2011 EveryCity Ltd. All rights reserved.
+# Copyright 2012 Joyent, Inc.  All rights reserved.
 #
 
 PROG=localedef
@@ -38,19 +39,19 @@ CLEANFILES	+= \
 		8859-11.cm 8859-13.cm 8859-14.cm 8859-15.cm \
 		8859-16.cm \
 		KOI8-R.cm
-CLOBBERFILES	= $(PROG) $(POFILE) $(DATA:%=locale/%)
+CLOBBERFILES	= $(PROG) $(POFILE) $(DATA:%=%)
 PIFILES		= $(OBJS:%.o=%.i)
 POFILE		= localedef_cmd.po
 
 ISO8859_1_LOCALES	= \
 		da_DK \
-		de_CH \
+		de_CH de_DE \
 		en_AU en_CA en_GB en_NZ en_US \
-		es_AR es_BO es_CL es_CO es_EC es_GT es_MX es_NI es_PA \
+		es_AR es_BO es_CL es_CO es_EC es_ES es_GT es_MX es_NI es_PA \
 		es_PE es_SV es_UY es_VE \
-		fr_CA fr_CH \
+		fr_CA fr_CH fr_FR \
 		is_IS \
-		it_CH \
+		it_CH it_IT \
 		sv_SE
 
 ISO8859_2_LOCALES	= \
@@ -263,8 +264,11 @@ locale/%.UTF-8/stamp:		data/%.UTF-8.src UTF-8.cm \
 	$(SED) '/^LC_CTYPE/,/^END LC_CTYPE/d;$$r UTF-8.ct' $< | \
 		./$(PROG) -U -f UTF-8.cm $(@D)
 	$(TOUCH) $@
+# Convert EURO_SIGN to CURRENCY_SIGN for the ISO8859-1 locales
 locale/%.ISO8859-1/stamp:	data/%.UTF-8.src 8859-1.cm locale $(PROG)
-	./$(PROG) -U -i $< -f 8859-1.cm $(@D)
+	sed 's/EURO_SIGN/CURRENCY_SIGN/' $< > $<.tmp
+	./$(PROG) -U -i $<.tmp -f 8859-1.cm $(@D)
+	rm -f $<.tmp
 	$(TOUCH) $@
 locale/%.ISO8859-2/stamp:	data/%.UTF-8.src 8859-2.cm locale $(PROG)
 	./$(PROG) -U -i $< -f 8859-2.cm $(@D)
