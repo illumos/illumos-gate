@@ -23,7 +23,6 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Portions Copyright 2011 Martin Matuska
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
@@ -607,9 +606,11 @@ zfs_secpolicy_setprop(const char *dsname, zfs_prop_t prop, nvpair_t *propval,
 	 * Check permissions for special properties.
 	 */
 	switch (prop) {
+	case ZFS_PROP_DEDUP:
+	case ZFS_PROP_COMPRESSION:
 	case ZFS_PROP_ZONED:
 		/*
-		 * Disallow setting of 'zoned' from within a local zone.
+		 * Disallow setting these properties from within a local zone.
 		 */
 		if (!INGLOBALZONE(curproc))
 			return (EPERM);
