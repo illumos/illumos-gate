@@ -2007,9 +2007,19 @@ vrrpd_updateconf(vrrp_vr_conf_t *newconf, uint_t op)
 	    op == VRRP_CONF_UPDATE ? "update" : "delete");
 
 	if ((fp = fopen(vrrpd_conffile, "r+F")) == NULL) {
-		vrrp_log(VRRP_ERR, "vrrpd_updateconf(): open %s failed: %s",
-		    vrrpd_conffile, strerror(errno));
-		return (VRRP_EDB);
+		if (errno != ENOENT) {
+			vrrp_log(VRRP_ERR, "vrrpd_updateconf(): open %s for "
+			    "update failed: %s", vrrpd_conffile,
+			    strerror(errno));
+			return (VRRP_EDB);
+		}
+
+		if ((fp = fopen(vrrpd_conffile, "w+F")) == NULL) {
+			vrrp_log(VRRP_ERR, "vrrpd_updateconf(): open %s for "
+			    "write failed: %s", vrrpd_conffile,
+			    strerror(errno));
+			return (VRRP_EDB);
+		}
 	}
 
 	(void) snprintf(newfile, MAXPATHLEN, "%s.new", vrrpd_conffile);
