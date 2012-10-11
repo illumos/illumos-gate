@@ -1151,14 +1151,18 @@ fss_decay_usage()
 				 * int_shr_pct =  ---------------
 				 *		  zone_int_shares
 				 */
-				VERIFY(pset_shares > 0);
-				zone_shr_pct =
-				    (zone_ext_shares * 1000) / pset_shares;
-				VERIFY(zone_int_shares > 0);
-				int_shr_pct =
-				    (kpj_shares * 1000) / zone_int_shares;
-				fssproj->fssp_shr_pct =
-				    (zone_shr_pct * int_shr_pct) / 1000;
+				if (pset_shares == 0 || zone_int_shares == 0) {
+					fssproj->fssp_shr_pct = 0;
+				} else {
+					zone_shr_pct =
+					    (zone_ext_shares * 1000) /
+					    pset_shares;
+					int_shr_pct = (kpj_shares * 1000) /
+					    zone_int_shares;
+					fssproj->fssp_shr_pct =
+					    (zone_shr_pct * int_shr_pct) /
+					    1000;
+				}
 			} else {
 				DTRACE_PROBE1(fss__prj__norun, fssproj_t *,
 				    fssproj);
