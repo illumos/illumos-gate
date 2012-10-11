@@ -2124,7 +2124,7 @@ function child_wstype {
 	fi
 
 	case "$scm_type" in
-	none|subversion|teamware|mercurial)
+	none|subversion|git|teamware|mercurial)
 		;;
 	*)	scm_type=none
 		;;
