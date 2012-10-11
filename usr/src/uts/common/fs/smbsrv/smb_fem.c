@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -223,7 +224,7 @@ smb_fem_fcn_create(
 	    ct, vsecp);
 
 	if (error == 0)
-		smb_node_notify_change(dnode);
+		smb_node_notify_change(dnode, FILE_ACTION_ADDED, name);
 
 	return (error);
 }
@@ -257,7 +258,7 @@ smb_fem_fcn_remove(
 	error = vnext_remove(arg, name, cr, ct, flags);
 
 	if (error == 0)
-		smb_node_notify_change(dnode);
+		smb_node_notify_change(dnode, FILE_ACTION_REMOVED, name);
 
 	return (error);
 }
@@ -281,10 +282,18 @@ smb_fem_fcn_rename(
 
 	error = vnext_rename(arg, snm, tdvp, tnm, cr, ct, flags);
 
-	if (error == 0)
-		smb_node_notify_change(dnode);
+	if (error != 0)
+		return (error);
 
-	return (error);
+	/*
+	 * Note that renames in the same directory are normally
+	 * delivered in {old,new} pairs, and clients expect them
+	 * in that order, if both events are delivered.
+	 */
+	smb_node_notify_change(dnode, FILE_ACTION_RENAMED_OLD_NAME, snm);
+	smb_node_notify_change(dnode, FILE_ACTION_RENAMED_NEW_NAME, tnm);
+
+	return (0);
 }
 
 static int
@@ -308,7 +317,7 @@ smb_fem_fcn_mkdir(
 	error = vnext_mkdir(arg, name, vap, vpp, cr, ct, flags, vsecp);
 
 	if (error == 0)
-		smb_node_notify_change(dnode);
+		smb_node_notify_change(dnode, FILE_ACTION_ADDED, name);
 
 	return (error);
 }
@@ -332,7 +341,7 @@ smb_fem_fcn_rmdir(
 	error = vnext_rmdir(arg, name, cdir, cr, ct, flags);
 
 	if (error == 0)
-		smb_node_notify_change(dnode);
+		smb_node_notify_change(dnode, FILE_ACTION_REMOVED, name);
 
 	return (error);
 }
@@ -356,7 +365,7 @@ smb_fem_fcn_link(
 	error = vnext_link(arg, svp, tnm, cr, ct, flags);
 
 	if (error == 0)
-		smb_node_notify_change(dnode);
+		smb_node_notify_change(dnode, FILE_ACTION_ADDED, tnm);
 
 	return (error);
 }
@@ -381,7 +390,7 @@ smb_fem_fcn_symlink(
 	error = vnext_symlink(arg, linkname, vap, target, cr, ct, flags);
 
 	if (error == 0)
-		smb_node_notify_change(dnode);
+		smb_node_notify_change(dnode, FILE_ACTION_ADDED, linkname);
 
 	return (error);
 }

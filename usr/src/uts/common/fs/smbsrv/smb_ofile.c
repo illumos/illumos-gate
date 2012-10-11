@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -324,11 +325,11 @@ smb_ofile_close(smb_ofile_t *of, uint32_t last_wtime)
 				    of->f_cr);
 
 			/*
-			 * Cancel any notify change requests related
-			 * to this open instance.
+			 * Cancel any notify change requests that
+			 * may be using this open instance.
 			 */
-			if (of->f_node->flags & NODE_FLAGS_NOTIFY_CHANGE)
-				smb_process_file_notify_change_queue(of);
+			if (of->f_node->n_fcn.fcn_count)
+				smb_notify_file_closed(of);
 			smb_server_dec_files(of->f_server);
 		}
 		atomic_dec_32(&of->f_tree->t_open_files);

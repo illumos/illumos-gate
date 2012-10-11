@@ -19,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 #include <sys/atomic.h>
 #include <sys/strsubr.h>
@@ -392,13 +392,14 @@ smb_request_cancel(smb_request_t *sr)
 		break;
 
 	case SMB_REQ_STATE_WAITING_EVENT:
-	case SMB_REQ_STATE_EVENT_OCCURRED:
 		/*
-		 * Cancellations for these states are handled by the
-		 * notify-change code
+		 * This request is waiting in change notify.
 		 */
+		sr->sr_state = SMB_REQ_STATE_CANCELED;
+		cv_signal(&sr->sr_ncr.nc_cv);
 		break;
 
+	case SMB_REQ_STATE_EVENT_OCCURRED:
 	case SMB_REQ_STATE_COMPLETED:
 	case SMB_REQ_STATE_CANCELED:
 		/*
@@ -785,8 +786,6 @@ smb_session_cancel_requests(
 {
 	smb_request_t	*sr;
 
-	smb_process_session_notify_change_queue(session, tree);
-
 	smb_slist_enter(&session->s_req_list);
 	sr = smb_slist_head(&session->s_req_list);
 
@@ -1076,6 +1075,7 @@ smb_request_alloc(smb_session_t *session, int req_length)
 	bzero(sr, sizeof (smb_request_t));
 
 	mutex_init(&sr->sr_mutex, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&sr->sr_ncr.nc_cv, NULL, CV_DEFAULT, NULL);
 	smb_srm_init(sr);
 	sr->session = session;
 	sr->sr_server = session->s_server;
@@ -1104,6 +1104,7 @@ smb_request_free(smb_request_t *sr)
 	ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
 	ASSERT(sr->session);
 	ASSERT(sr->r_xa == NULL);
+	ASSERT(sr->sr_ncr.nc_fname == NULL);
 
 	if (sr->fid_ofile != NULL) {
 		smb_ofile_request_complete(sr->fid_ofile);
@@ -1132,6 +1133,7 @@ smb_request_free(smb_request_t *sr)
 		m_freem(sr->raw_data.chain);
 
 	sr->sr_magic = 0;
+	cv_destroy(&sr->sr_ncr.nc_cv);
 	mutex_destroy(&sr->sr_mutex);
 	kmem_cache_free(sr->sr_cache, sr);
 }
