@@ -20,8 +20,7 @@
 #
 
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
-
-# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+# Copyright (c) 2012 Nexenta Systems, Inc. All rights reserved.
 
 #
 #	This makefile contains the common definitions for all intel
@@ -405,6 +404,13 @@ DRV_KMODS	+= iprb
 DRV_KMODS	+= ixgbe
 DRV_KMODS	+= vr
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= ixgb
+
+#
+# Virtio drivers
+#
+
+# Virtio core
+DRV_KMODS	+= virtio
 
 #
 #	DTrace and DTrace Providers
