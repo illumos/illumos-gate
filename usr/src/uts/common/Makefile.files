@@ -1950,6 +1950,9 @@ NXGE_HCALL_OBJS =	\
 # Virtio core
 VIRTIO_OBJS = virtio.o
 
+# Virtio block driver
+VIOBLK_OBJS = vioblk.o
+
 #
 #	kiconv modules
 #

@@ -1,4 +1,3 @@
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -411,6 +410,9 @@ $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= ixgb
 
 # Virtio core
 DRV_KMODS	+= virtio
+
+# Virtio block driver
+DRV_KMODS	+= vioblk
 
 #
 #	DTrace and DTrace Providers
