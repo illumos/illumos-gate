@@ -858,8 +858,9 @@ cap_modify(Xword tag, const char *str)
 	if ((caps = strdup(str)) == NULL)
 		return (0);
 
-	ptr = strtok_r(caps, MSG_ORIG(MSG_CAP_DELIMIT), &next);
-	do {
+	for (ptr = strtok_r(caps, MSG_ORIG(MSG_CAP_DELIMIT), &next);
+	    ptr != NULL;
+	    ptr = strtok_r(NULL, MSG_ORIG(MSG_CAP_DELIMIT), &next)) {
 		Xword		val = 0;
 
 		/*
@@ -921,6 +922,8 @@ cap_modify(Xword tag, const char *str)
 		 * Invalid indexes are ignored.
 		 */
 		if (val == 0) {
+			char *end;
+
 			if ((*ptr == '[') && (*(ptr + 2) == ']')) {
 				if (*(ptr + 1) == '1') {
 					ndx = tag;
@@ -941,14 +944,25 @@ cap_modify(Xword tag, const char *str)
 				ndx = tag;
 
 			errno = 0;
-			if (((val = strtol(ptr, NULL, 16)) == 0) && errno)
+			if (((val = strtol(ptr, &end, 16)) == 0) && errno)
 				continue;
+
+			/*
+			 * If the value wasn't an entirely valid hexadecimal
+			 * integer, assume it was intended as a capability
+			 * name and skip it.
+			 */
+			if (*end != '\0') {
+				eprintf(NULL, ERR_WARNING,
+				    MSG_INTL(MSG_CAP_IGN_UNKCAP), ptr);
+				continue;
+			}
 		}
+
 		cap_settings[ndx - 1].cs_val[mode] |= val;
 		cap_settings[ndx - 1].cs_set[mode]++;
 
-	} while ((ptr = strtok_r(NULL,
-	    MSG_ORIG(MSG_CAP_DELIMIT), &next)) != NULL);
+	}
 
 	/*
 	 * If the "override" token was supplied, set the alternative
@@ -982,8 +996,9 @@ cap_files(const char *str)
 	if ((caps = strdup(str)) == NULL)
 		return (0);
 
-	name = strtok_r(caps, MSG_ORIG(MSG_CAP_DELIMIT), &next);
-	do {
+	for (name = strtok_r(caps, MSG_ORIG(MSG_CAP_DELIMIT), &next);
+	    name != NULL;
+	    name = strtok_r(NULL, MSG_ORIG(MSG_CAP_DELIMIT), &next)) {
 		avl_index_t	where;
 		PathNode	*pnp;
 		uint_t		hash = sgs_str_hash(name);
@@ -999,8 +1014,7 @@ cap_files(const char *str)
 			pnp->pn_hash = hash;
 			avl_insert(capavl, pnp, where);
 		}
-	} while ((name = strtok_r(NULL,
-	    MSG_ORIG(MSG_CAP_DELIMIT), &next)) != NULL);
+	}
 
 	return (1);
 }

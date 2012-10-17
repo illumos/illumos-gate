@@ -25,6 +25,7 @@
 
 #include <grp.h>
 #include "ldap_common.h"
+#include <string.h>
 
 /* String which may need to be removed from beginning of group password */
 #define	_CRYPT		"{CRYPT}"
@@ -40,8 +41,21 @@
 #define	_F_GETGRNAM_SSD	"(&(%%s)(cn=%s))"
 #define	_F_GETGRGID	"(&(objectClass=posixGroup)(gidNumber=%u))"
 #define	_F_GETGRGID_SSD	"(&(%%s)(gidNumber=%u))"
-#define	_F_GETGRMEM	"(&(objectClass=posixGroup)(memberUid=%s))"
-#define	_F_GETGRMEM_SSD	"(&(%%s)(memberUid=%s))"
+/*
+ * Group membership can be defined by either username or DN, so when searching
+ * for groups by member we need to consider both. The first parameter in the
+ * filter is replaced by username, the second by DN.
+ */
+#define	_F_GETGRMEM \
+	"(&(objectClass=posixGroup)(|(memberUid=%s)(memberUid=%s)))"
+#define	_F_GETGRMEM_SSD	"(&(%%s)(|(memberUid=%s)(memberUid=%s)))"
+
+/*
+ * Copied from getpwnam.c, needed to look up user DN.
+ * Would it be better to move to ldap_common.h rather than duplicate?
+ */
+#define	_F_GETPWNAM	"(&(objectClass=posixAccount)(uid=%s))"
+#define	_F_GETPWNAM_SSD	"(&(%%s)(uid=%s))"
 
 static const char *gr_attrs[] = {
 	_G_NAME,
@@ -75,6 +89,7 @@ _nss_ldap_group2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 	char		**gname, **passwd, **gid, *password, *end;
 	char		gid_nobody[NOBODY_STR_LEN];
 	char		*gid_nobody_v[1];
+	char		*member_str, *strtok_state;
 	ns_ldap_attr_t	*members;
 
 	(void) snprintf(gid_nobody, sizeof (gid_nobody), "%u", GID_NOBODY);
@@ -140,15 +155,34 @@ _nss_ldap_group2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 			nss_result = NSS_STR_PARSE_PARSE;
 			goto result_grp2str;
 		}
-		if (firstime) {
-			len = snprintf(buffer, buflen, "%s",
-			    members->attrvalue[i]);
-			TEST_AND_ADJUST(len, buffer, buflen, result_grp2str);
-			firstime = 0;
+		/*
+		 * If we find an '=' in the member attribute value, treat it as
+		 * a DN, otherwise as a username.
+		 */
+		if (member_str = strchr(members->attrvalue[i], '=')) {
+			member_str++; /* skip over the '=' */
+			/* Fail if we can't pull a username out of the RDN */
+			if (! (member_str = strtok_r(member_str,
+			    ",", &strtok_state))) {
+				nss_result = NSS_STR_PARSE_PARSE;
+				goto result_grp2str;
+			}
 		} else {
-			len = snprintf(buffer, buflen, ",%s",
-			    members->attrvalue[i]);
-			TEST_AND_ADJUST(len, buffer, buflen, result_grp2str);
+			member_str = members->attrvalue[i];
+		}
+		if (*member_str != '\0') {
+			if (firstime) {
+				len = snprintf(buffer, buflen, "%s",
+				    member_str);
+				TEST_AND_ADJUST(len, buffer, buflen,
+				    result_grp2str);
+				firstime = 0;
+			} else {
+				len = snprintf(buffer, buflen, ",%s",
+				    member_str);
+				TEST_AND_ADJUST(len, buffer, buflen,
+				    result_grp2str);
+			}
 		}
 	}
 nomember:
@@ -250,7 +284,8 @@ getbymember(ldap_backend_ptr be, void *a)
 {
 	int			i, j, k;
 	int			gcnt = (int)0;
-	char			**groupvalue, **membervalue;
+	char			**groupvalue, **membervalue, *member_str;
+	char			*strtok_state;
 	nss_status_t		lstat;
 	struct nss_groupsbymem	*argp = (struct nss_groupsbymem *)a;
 	char			searchfilter[SEARCHFILTERLEN];
@@ -258,7 +293,7 @@ getbymember(ldap_backend_ptr be, void *a)
 	char			name[SEARCHFILTERLEN];
 	ns_ldap_result_t	*result;
 	ns_ldap_entry_t		*curEntry;
-	char			*username;
+	char			*username, **dn_attr, *dn;
 	gid_t			gid;
 	int			ret;
 
@@ -269,13 +304,44 @@ getbymember(ldap_backend_ptr be, void *a)
 	if (_ldap_filter_name(name, argp->username, sizeof (name)) != 0)
 		return ((nss_status_t)NSS_NOTFOUND);
 
-	ret = snprintf(searchfilter, sizeof (searchfilter), _F_GETGRMEM, name);
+	ret = snprintf(searchfilter, sizeof (searchfilter), _F_GETPWNAM, name);
 	if (ret >= sizeof (searchfilter) || ret < 0)
 		return ((nss_status_t)NSS_NOTFOUND);
 
-	ret = snprintf(userdata, sizeof (userdata), _F_GETGRMEM_SSD, name);
+	ret = snprintf(userdata, sizeof (userdata), _F_GETPWNAM_SSD, name);
 	if (ret >= sizeof (userdata) || ret < 0)
 		return ((nss_status_t)NSS_NOTFOUND);
+
+	/*
+	 * Look up the user DN in ldap. If it's not found, search solely by
+	 * username.
+	 */
+	lstat = (nss_status_t)_nss_ldap_nocb_lookup(be, NULL,
+	    _PASSWD, searchfilter, NULL, _merge_SSD_filter, userdata);
+	if (lstat != (nss_status_t)NS_LDAP_SUCCESS)
+		return ((nss_status_t)lstat);
+
+	if (be->result == NULL ||
+	    !(dn_attr = __ns_ldap_getAttr(be->result->entry, "dn")))
+		dn = name;
+	else
+		dn = dn_attr[0];
+
+	ret = snprintf(searchfilter, sizeof (searchfilter), _F_GETGRMEM, name,
+	    dn);
+	if (ret >= sizeof (searchfilter) || ret < 0)
+		return ((nss_status_t)NSS_NOTFOUND);
+
+	ret = snprintf(userdata, sizeof (userdata), _F_GETGRMEM_SSD, name,
+	    dn);
+	if (ret >= sizeof (userdata) || ret < 0)
+		return ((nss_status_t)NSS_NOTFOUND);
+
+	/*
+	 * Free up resources from user DN search before performing group
+	 * search.
+	 */
+	(void) __ns_ldap_freeResult((ns_ldap_result_t **)&be->result);
 
 	gcnt = (int)argp->numgids;
 	lstat = (nss_status_t)_nss_ldap_nocb_lookup(be, NULL,
@@ -291,7 +357,20 @@ getbymember(ldap_backend_ptr be, void *a)
 		membervalue = __ns_ldap_getAttr(curEntry, "memberUid");
 		if (membervalue) {
 			for (j = 0; membervalue[j]; j++) {
-				if (strcmp(membervalue[j], username) == NULL) {
+				/*
+				 * If we find an '=' in the member attribute
+				 * value, treat it as a DN, otherwise as a
+				 * username.
+				 */
+				if (member_str = strchr(membervalue[j], '=')) {
+					member_str++; /* skip over the '=' */
+					member_str = strtok_r(member_str, ",",
+					    &strtok_state);
+				} else {
+					member_str = membervalue[j];
+				}
+				if (member_str &&
+				    strcmp(member_str, username) == NULL) {
 					groupvalue = __ns_ldap_getAttr(curEntry,
 					    "gidnumber");
 					gid = (gid_t)strtol(groupvalue[0],

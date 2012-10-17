@@ -300,6 +300,7 @@
 @ MSG_STR_ONE		"1"
 
 @ MSG_CAP_DELIMIT	","
+@ MSG_CAP_IGN_UNKCAP	"ignoring unknown capability: %s"
 
 @ MSG_SUNW_OST_SGS	"SUNW_OST_SGS"
 @ MSG_SUNW_OST_OSLIB	"SUNW_OST_OSLIB"
