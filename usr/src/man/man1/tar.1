@@ -43,7 +43,7 @@ tar \- create tape archives and add or extract files
 .LP
 .nf
 \fBtar\fR x[BeFhilmnopqTvw@/[0-7]][fk][X...][j|J|z|Z] [\fItarfile\fR] [\fIsize\fR]
-     [\fIexclude-file\fR]... [\fIfile\fR]...
+     [\fIexclude-file\fR]... [\(miC \fIdirectory\fR] [\fIfile\fR]...
 .fi
 
 .SH DESCRIPTION
@@ -81,6 +81,10 @@ performs the \fBc\fR (create) or \fBr\fR (replace) operation on \fIfile\fR. Use
 short relative path names for \fIfile\fR. If \fIfile\fR is "\fB\&.\fR", archive
 all files in \fIdirectory\fR. This operand enables archiving files from
 multiple directories not related by a close common parent.
+.sp
+This option may also be passed once to \fBx\fR (extract).  In this case the
+program will \fBchdir\fR to \fIdirectory\fR after opening the archive, but
+before extracting its contents.
 .RE
 
 .sp
