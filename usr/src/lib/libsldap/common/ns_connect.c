@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <stdlib.h>
@@ -475,10 +476,10 @@ printCred(FILE *fp, const ns_cred_t *cred)
 		return;
 	}
 
-	(void) fprintf(fp, "tid= %d: AuthType=%d", t, cred->auth.type);
-	(void) fprintf(fp, "tid= %d: TlsType=%d", t, cred->auth.tlstype);
-	(void) fprintf(fp, "tid= %d: SaslMech=%d", t, cred->auth.saslmech);
-	(void) fprintf(fp, "tid= %d: SaslOpt=%d", t, cred->auth.saslopt);
+	(void) fprintf(fp, "tid= %d: AuthType=%d\n", t, cred->auth.type);
+	(void) fprintf(fp, "tid= %d: TlsType=%d\n", t, cred->auth.tlstype);
+	(void) fprintf(fp, "tid= %d: SaslMech=%d\n", t, cred->auth.saslmech);
+	(void) fprintf(fp, "tid= %d: SaslOpt=%d\n", t, cred->auth.saslopt);
 	if (cred->hostcertpath)
 		(void) fprintf(fp, "tid= %d: hostCertPath=%s\n",
 		    t, cred->hostcertpath);
@@ -701,7 +702,8 @@ makeConnection(Connection **conp, const char *serverAddr,
 
 	if (conp == NULL || errorp == NULL || auth == NULL)
 		return (NS_LDAP_INVALID_PARAM);
-	*errorp = NULL;
+	if (*errorp)
+		(void) __ns_ldap_freeError(errorp);
 	*conp = NULL;
 	(void) memset(&sinfo, 0, sizeof (sinfo));
 

@@ -22,6 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #define	__STANDALONE_MODULE__
@@ -1450,6 +1451,7 @@ __ns_ldap_getRootDSE(const char *server_addr,
 		}
 
 		__s_api_conn_user_free(cu);
+		DropConnection(sessionId, NS_LDAP_NEW_CONN);
 		return (NS_LDAP_OP_FAILED);
 	}
 	__s_api_conn_user_free(cu);
