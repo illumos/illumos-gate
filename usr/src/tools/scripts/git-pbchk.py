@@ -140,13 +140,13 @@ def git_parent_branch(branch):
 def git_comments(parent):
     """Return a list of any checkin comments on this git branch"""
 
-    p = git('log --pretty=format:%%B %s..' % parent)
+    p = git('log --pretty=tformat:%%B:SEP: %s..' % parent)
 
     if not p:
         sys.stderr.write("Failed getting git comments\n")
         sys.exit(err)
 
-    return map(lambda x: x.strip(), p.readlines())
+    return [x.strip() for x in p.readlines() if x != ':SEP:\n']
 
 
 def git_file_list(parent, paths=None):
