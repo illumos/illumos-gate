@@ -20,8 +20,8 @@
  */
 
 /*
- * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2016 Jason King.
  */
 
@@ -68,7 +68,7 @@ struct secinfo {
 	int32_t		s_refcnt;	/* reference count for tracking */
 					/* how many children (self included) */
 					/* use this flavor. */
-	int 		s_window;	/* window */
+	int		s_window;	/* window */
 	uint_t		s_rootid;	/* UID to use for authorized roots */
 	int		s_rootcnt;	/* count of root names */
 	caddr_t		*s_rootnames;	/* array of root names */
@@ -83,7 +83,7 @@ struct secinfo32 {
 	int32_t		s_refcnt;	/* reference count for tracking */
 					/* how many children (self included) */
 					/* use this flavor. */
-	int32_t 	s_window;	/* window */
+	int32_t		s_window;	/* window */
 	uint32_t	s_rootid;	/* UID to use for authorized roots */
 	int32_t		s_rootcnt;	/* count of root names */
 	caddr32_t	s_rootnames;	/* array of root names */
@@ -189,6 +189,7 @@ struct exportdata32 {
 #define	EX_NOACLFAB	0x2000	/* If set, NFSv2 and v3 servers won't */
 				/* fabricate an aclent_t ACL on file systems */
 				/* that don't support aclent_t ACLs */
+#define	EX_NOHIDE	0x4000	/* traversable from exported parent */
 
 #ifdef	_KERNEL
 

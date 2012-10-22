@@ -382,6 +382,9 @@ rfs3_lookup(LOOKUP3args *args, LOOKUP3res *resp, struct exportinfo *exi,
 
 	dvap = NULL;
 
+	if (exi != NULL)
+		exi_hold(exi);
+
 	/*
 	 * Allow lookups from the root - the default
 	 * location of the public filehandle.
@@ -420,8 +423,19 @@ rfs3_lookup(LOOKUP3args *args, LOOKUP3res *resp, struct exportinfo *exi,
 	fhp = &args->what.dir;
 	if (strcmp(args->what.name, "..") == 0 &&
 	    EQFID(&exi->exi_fid, FH3TOFIDP(fhp))) {
-		resp->status = NFS3ERR_NOENT;
-		goto out1;
+		if ((exi->exi_export.ex_flags & EX_NOHIDE) &&
+		    (dvp->v_flag & VROOT)) {
+			/*
+			 * special case for ".." and 'nohide'exported root
+			 */
+			if (rfs_climb_crossmnt(&dvp, &exi, cr) != 0) {
+				resp->status = NFS3ERR_ACCES;
+				goto out1;
+			}
+		} else {
+			resp->status = NFS3ERR_NOENT;
+			goto out1;
+		}
 	}
 
 	ca = (struct sockaddr *)svc_getrpccaller(req->rq_xprt)->buf;
@@ -439,10 +453,12 @@ rfs3_lookup(LOOKUP3args *args, LOOKUP3res *resp, struct exportinfo *exi,
 	 */
 	if (PUBLIC_FH3(&args->what.dir)) {
 		publicfh_flag = TRUE;
+
+		exi_rele(exi);
+
 		error = rfs_publicfh_mclookup(name, dvp, cr, &vp,
 		    &exi, &sec);
-		if (error && exi != NULL)
-			exi_rele(exi); /* See comment below Re: publicfh_flag */
+
 		/*
 		 * Since WebNFS may bypass MOUNT, we need to ensure this
 		 * request didn't come from an unlabeled admin_low client.
@@ -464,8 +480,6 @@ rfs3_lookup(LOOKUP3args *args, LOOKUP3res *resp, struct exportinfo *exi,
 			if (tp == NULL || tp->tpc_tp.tp_doi !=
 			    l_admin_low->tsl_doi || tp->tpc_tp.host_type !=
 			    SUN_CIPSO) {
-				if (exi != NULL)
-					exi_rele(exi);
 				VN_RELE(vp);
 				error = EACCES;
 			}
@@ -480,6 +494,12 @@ rfs3_lookup(LOOKUP3args *args, LOOKUP3res *resp, struct exportinfo *exi,
 	if (name != args->what.name)
 		kmem_free(name, MAXPATHLEN + 1);
 
+	if (error == 0 && vn_ismntpt(vp)) {
+		error = rfs_cross_mnt(&vp, &exi);
+		if (error)
+			VN_RELE(vp);
+	}
+
 	if (is_system_labeled() && error == 0) {
 		bslabel_t *clabel = req->rq_label;
 
@@ -490,8 +510,6 @@ rfs3_lookup(LOOKUP3args *args, LOOKUP3res *resp, struct exportinfo *exi,
 		if (!blequal(&l_admin_low->tsl_label, clabel)) {
 			if (!do_rfs_label_check(clabel, dvp,
 			    DOMINANCE_CHECK, exi)) {
-				if (publicfh_flag && exi != NULL)
-					exi_rele(exi);
 				VN_RELE(vp);
 				error = EACCES;
 			}
@@ -512,15 +530,6 @@ rfs3_lookup(LOOKUP3args *args, LOOKUP3res *resp, struct exportinfo *exi,
 			auth_weak = TRUE;
 	}
 
-	/*
-	 * If publicfh_flag is true then we have called rfs_publicfh_mclookup
-	 * and have obtained a new exportinfo in exi which needs to be
-	 * released. Note that the original exportinfo pointed to by exi
-	 * will be released by the caller, common_dispatch.
-	 */
-	if (publicfh_flag)
-		exi_rele(exi);
-
 	if (error) {
 		VN_RELE(vp);
 		goto out;
@@ -529,6 +538,7 @@ rfs3_lookup(LOOKUP3args *args, LOOKUP3res *resp, struct exportinfo *exi,
 	va.va_mask = AT_ALL;
 	vap = rfs4_delegated_getattr(vp, &va, 0, cr) ? NULL : &va;
 
+	exi_rele(exi);
 	VN_RELE(vp);
 
 	resp->status = NFS3_OK;
@@ -556,6 +566,9 @@ out:
 	} else
 		resp->status = puterrno3(error);
 out1:
+	if (exi != NULL)
+		exi_rele(exi);
+
 	DTRACE_NFSV3_4(op__lookup__done, struct svc_req *, req,
 	    cred_t *, cr, vnode_t *, dvp, LOOKUP3res *, resp);
 
@@ -3609,13 +3622,18 @@ good:
 		if (vn_is_nfs_reparse(nvp, cr))
 			nvap->va_type = VLNK;
 
-		vattr_to_post_op_attr(nvap, &infop[i].attr);
-
-		error = makefh3(&infop[i].fh.handle, nvp, exi);
-		if (!error)
-			infop[i].fh.handle_follows = TRUE;
-		else
+		if (vn_ismntpt(nvp)) {
+			infop[i].attr.attributes = FALSE;
 			infop[i].fh.handle_follows = FALSE;
+		} else {
+			vattr_to_post_op_attr(nvap, &infop[i].attr);
+
+			error = makefh3(&infop[i].fh.handle, nvp, exi);
+			if (!error)
+				infop[i].fh.handle_follows = TRUE;
+			else
+				infop[i].fh.handle_follows = FALSE;
+		}
 
 		VN_RELE(nvp);
 		dp = nextdp(dp);

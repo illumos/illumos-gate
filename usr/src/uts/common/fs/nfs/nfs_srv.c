@@ -18,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
@@ -329,6 +330,80 @@ rfs_setattr_getfh(struct nfssaargs *args)
 	return (&args->saa_fh);
 }
 
+/* Change and release @exip and @vpp only in success */
+int
+rfs_cross_mnt(vnode_t **vpp, struct exportinfo **exip)
+{
+	struct exportinfo *exi;
+	vnode_t *vp = *vpp;
+	fid_t fid;
+	int error;
+
+	VN_HOLD(vp);
+
+	if ((error = traverse(&vp)) != 0) {
+		VN_RELE(vp);
+		return (error);
+	}
+
+	bzero(&fid, sizeof (fid));
+	fid.fid_len = MAXFIDSZ;
+	error = VOP_FID(vp, &fid, NULL);
+	if (error) {
+		VN_RELE(vp);
+		return (error);
+	}
+
+	exi = checkexport(&vp->v_vfsp->vfs_fsid, &fid);
+	if (exi == NULL ||
+	    (exi->exi_export.ex_flags & EX_NOHIDE) == 0) {
+		/*
+		 * It is not error, just subdir is not exported
+		 * or "nohide" is not set
+		 */
+		if (exi != NULL)
+			exi_rele(exi);
+		VN_RELE(vp);
+	} else {
+		/* go to submount */
+		exi_rele(*exip);
+		*exip = exi;
+
+		VN_RELE(*vpp);
+		*vpp = vp;
+	}
+
+	return (0);
+}
+
+/*
+ * Given mounted "dvp" and "exi", go upper mountpoint
+ * with dvp/exi correction
+ * Return 0 in success
+ */
+int
+rfs_climb_crossmnt(vnode_t **dvpp, struct exportinfo **exip, cred_t *cr)
+{
+	struct exportinfo *exi;
+	vnode_t *dvp = *dvpp;
+
+	ASSERT(dvp->v_flag & VROOT);
+
+	VN_HOLD(dvp);
+	dvp = untraverse(dvp);
+	exi = nfs_vptoexi(NULL, dvp, cr, NULL, NULL, FALSE);
+	if (exi == NULL) {
+		VN_RELE(dvp);
+		return (-1);
+	}
+
+	exi_rele(*exip);
+	*exip = exi;
+	VN_RELE(*dvpp);
+	*dvpp = dvp;
+
+	return (0);
+}
 /*
  * Directory lookup.
  * Returns an fhandle and file attributes for file name in a directory.
@@ -381,6 +456,8 @@ rfs_lookup(struct nfsdiropargs *da, struct nfsdiropres *dr,
 		}
 	}
 
+	exi_hold(exi);
+
 	/*
 	 * Not allow lookup beyond root.
 	 * If the filehandle matches a filehandle of the exi,
@@ -388,9 +465,19 @@ rfs_lookup(struct nfsdiropargs *da, struct nfsdiropres *dr,
 	 */
 	if (strcmp(da->da_name, "..") == 0 &&
 	    EQFID(&exi->exi_fid, (fid_t *)&fhp->fh_len)) {
-		VN_RELE(dvp);
-		dr->dr_status = NFSERR_NOENT;
-		return;
+		if ((exi->exi_export.ex_flags & EX_NOHIDE) &&
+		    (dvp->v_flag & VROOT)) {
+			/*
+			 * special case for ".." and 'nohide'exported root
+			 */
+			if (rfs_climb_crossmnt(&dvp, &exi, cr) != 0) {
+				error = NFSERR_ACCES;
+				goto out;
+			}
+		} else  {
+			error = NFSERR_NOENT;
+			goto out;
+		}
 	}
 
 	ca = (struct sockaddr *)svc_getrpccaller(req->rq_xprt)->buf;
@@ -398,8 +485,8 @@ rfs_lookup(struct nfsdiropargs *da, struct nfsdiropres *dr,
 	    MAXPATHLEN);
 
 	if (name == NULL) {
-		dr->dr_status = NFSERR_ACCES;
-		return;
+		error = NFSERR_ACCES;
+		goto out;
 	}
 
 	/*
@@ -413,6 +500,9 @@ rfs_lookup(struct nfsdiropargs *da, struct nfsdiropres *dr,
 	 */
 	if (PUBLIC_FH2(fhp)) {
 		publicfh_flag = TRUE;
+
+		exi_rele(exi);
+
 		error = rfs_publicfh_mclookup(name, dvp, cr, &vp, &exi,
 		    &sec);
 	} else {
@@ -426,6 +516,11 @@ rfs_lookup(struct nfsdiropargs *da, struct nfsdiropres *dr,
 	if (name != da->da_name)
 		kmem_free(name, MAXPATHLEN);
 
+	if (error == 0 && vn_ismntpt(vp)) {
+		error = rfs_cross_mnt(&vp, &exi);
+		if (error)
+			VN_RELE(vp);
+	}
 
 	if (!error) {
 		va.va_mask = AT_ALL;	/* we want everything */
@@ -452,15 +547,10 @@ rfs_lookup(struct nfsdiropargs *da, struct nfsdiropres *dr,
 		VN_RELE(vp);
 	}
 
+out:
 	VN_RELE(dvp);
 
-	/*
-	 * If publicfh_flag is true then we have called rfs_publicfh_mclookup
-	 * and have obtained a new exportinfo in exi which needs to be
-	 * released. Note the the original exportinfo pointed to by exi
-	 * will be released by the caller, comon_dispatch.
-	 */
-	if (publicfh_flag && exi != NULL)
+	if (exi != NULL)
 		exi_rele(exi);
 
 	/*

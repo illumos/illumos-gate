@@ -172,6 +172,25 @@ is specified, the default values associated with the global tag in
 are used.
 Support of NFS server logging is only available for NFS Version 2 and
 Version 3 requests.
+.It Sy nohide
+By default, if server exports two filesystems, one of which is mounted as a
+child of the other, NFS Version 2 and Version 3 clients must mount both
+filesystems explicitly in order to access them.
+If a client only mounts the parent, it will see an empty directory at the
+location where the other filesystem is mounted.
+.Pp
+Setting the
+.Sy nohide
+option on a filesystem causes it to no longer be hidden in this manner, and the
+client will be able to move from the parent filesystem to this one without
+noticing the change.
+However, some NFS clients or applications may not function correctly when
+this option is used.
+In particular, files on different underlying filesystems may appear to have
+the same inode numbers.
+The
+.Sy nohide
+option only applies to NFS Version 2 and Version 3 requests.
 .It Sy noaclfab
 By default, the NFS server will fabricate POSIX-draft style ACLs in response
 to ACL requests from NFS Version 2 or Version 3 clients accessing shared
@@ -786,3 +805,14 @@ use of
 does not work as it does with NFS Version 2 and Version 3 and the client
 receives an error when attempting to mount
 .Pa /export/foo .
+.Pp
+The
+.Sy nohide
+option violates RFC 1094,
+.%T "Network File System Protocol Specification"
+and RFC 1813,
+.%T "NFS: Network File System Version 3 Protocol Specification"
+.Pp
+The
+.Sy nohide
+option is provided for compatibility with Linux NFS.

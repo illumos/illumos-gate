@@ -31,7 +31,7 @@
 #ifndef	_NFS_NFS_H
 #define	_NFS_NFS_H
 
-/*	nfs.h 2.38 88/08/19 SMI 	*/
+/*	nfs.h 2.38 88/08/19 SMI	*/
 
 #include <sys/isa_defs.h>
 #include <sys/vfs.h>
@@ -2278,6 +2278,8 @@ extern int	rfs_publicfh_mclookup(char *, vnode_t *, cred_t *, vnode_t **,
     struct exportinfo **, struct sec_ol *);
 extern int	rfs_pathname(char *, vnode_t **, vnode_t **, vnode_t *,
     cred_t *, int);
+extern int	rfs_cross_mnt(vnode_t **, struct exportinfo **);
+extern int	rfs_climb_crossmnt(vnode_t **, struct exportinfo **, cred_t *);
 
 extern vtype_t		nf3_to_vt[];
 extern kstat_named_t	*rfsproccnt_v3_ptr;
