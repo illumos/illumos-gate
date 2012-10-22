@@ -23,6 +23,10 @@
  * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 #include "bge_impl.h"
 
 /*
@@ -207,6 +211,7 @@ bge_phy_reset(bge_t *bgep)
 {
 	uint16_t control;
 	uint_t count;
+	boolean_t ret = B_FALSE;
 
 	BGE_TRACE(("bge_phy_reset($%p)", (void *)bgep));
 
@@ -221,22 +226,26 @@ bge_phy_reset(bge_t *bgep)
 	}
 
 	/*
-	 * Set the PHY RESET bit, then wait up to 5 ms for it to self-clear
+	 * Set the PHY RESET bit, then wait up to 50 ms for it to self-clear
 	 */
 	bge_mii_put16(bgep, MII_CONTROL, MII_CONTROL_RESET);
-	for (count = 0; ++count < 1000; ) {
-		drv_usecwait(5);
+	for (count = 0; ++count < 5000; ) {
 		control = bge_mii_get16(bgep, MII_CONTROL);
-		if (BIC(control, MII_CONTROL_RESET))
-			return (B_TRUE);
+		if (BIC(control, MII_CONTROL_RESET)) {
+			drv_usecwait(40);
+			ret = B_TRUE;
+			break;
+		}
+		drv_usecwait(10);
 	}
 
-	if (DEVICE_5906_SERIES_CHIPSETS(bgep))
+	if (ret == B_TRUE && DEVICE_5906_SERIES_CHIPSETS(bgep))
 		(void) bge_adj_volt_5906(bgep);
 
-	BGE_DEBUG(("bge_phy_reset: FAILED, control now 0x%x", control));
+	if (ret == B_FALSE)
+		BGE_DEBUG(("bge_phy_reset: FAILED, control now 0x%x", control));
 
-	return (B_FALSE);
+	return (ret);
 }
 
 /*
@@ -541,34 +550,14 @@ bge_restart_copper(bge_t *bgep, boolean_t powerdown)
 
 	ASSERT(mutex_owned(bgep->genlock));
 
-	switch (MHCR_CHIP_ASIC_REV(bgep->chipid.asic_rev)) {
-	default:
-		/*
-		 * Shouldn't happen; it means we don't recognise this chip.
-		 * It's probably a new one, so we'll try our best anyway ...
-		 */
-	case MHCR_CHIP_ASIC_REV_5703:
-	case MHCR_CHIP_ASIC_REV_5704:
-	case MHCR_CHIP_ASIC_REV_5705:
-	case MHCR_CHIP_ASIC_REV_5752:
-	case MHCR_CHIP_ASIC_REV_5714:
-	case MHCR_CHIP_ASIC_REV_5715:
-		reset_ok = bge_phy_reset_and_check(bgep);
-		break;
-
-	case MHCR_CHIP_ASIC_REV_5906:
-	case MHCR_CHIP_ASIC_REV_5700:
-	case MHCR_CHIP_ASIC_REV_5701:
-	case MHCR_CHIP_ASIC_REV_5723:
-	case MHCR_CHIP_ASIC_REV_5721_5751:
-		/*
-		 * Just a plain reset; the "check" code breaks these chips
-		 */
+	if (bgep->chipid.flags & CHIP_FLAG_NO_CHECK_RESET) {
 		reset_ok = bge_phy_reset(bgep);
 		if (!reset_ok)
 			bge_fm_ereport(bgep, DDI_FM_DEVICE_NO_RESPONSE);
-		break;
+	} else {
+		reset_ok = bge_phy_reset_and_check(bgep);
 	}
+
 	if (!reset_ok) {
 		BGE_REPORT((bgep, "PHY failed to reset correctly"));
 		return (DDI_FAILURE);
@@ -590,7 +579,7 @@ bge_restart_copper(bge_t *bgep, boolean_t powerdown)
 
 	switch (MHCR_CHIP_ASIC_REV(bgep->chipid.asic_rev)) {
 	case MHCR_CHIP_ASIC_REV_5705:
-	case MHCR_CHIP_ASIC_REV_5721_5751:
+	case MHCR_CHIP_ASIC_REV_5750:
 		bge_phy_bit_err_fix(bgep);
 		break;
 	}
@@ -1507,14 +1496,22 @@ bge_phys_init(bge_t *bgep)
 	 */
 	bgep->phy_mii_addr = 1;
 	if (DEVICE_5717_SERIES_CHIPSETS(bgep)) {
-		int regval = bge_reg_get32(bgep, CPMU_STATUS_REG);
-		if (regval & CPMU_STATUS_FUN_NUM)
-			bgep->phy_mii_addr += 1;
+		uint32_t regval = bge_reg_get32(bgep, CPMU_STATUS_REG);
+		if (MHCR_CHIP_ASIC_REV(bgep->chipid.asic_rev) ==
+		    MHCR_CHIP_ASIC_REV_5719 ||
+		    MHCR_CHIP_ASIC_REV(bgep->chipid.asic_rev) ==
+		    MHCR_CHIP_ASIC_REV_5720) {
+			bgep->phy_mii_addr +=
+			    (regval & CPMU_STATUS_FUN_NUM_5719) >>
+			    CPMU_STATUS_FUN_NUM_5719_SHIFT;
+		} else {
+			bgep->phy_mii_addr +=
+			    (regval & CPMU_STATUS_FUN_NUM_5717) ? 1 : 0;
+		}
 		regval = bge_reg_get32(bgep, SGMII_STATUS_REG);
 		if (regval & MEDIA_SELECTION_MODE)
 			bgep->phy_mii_addr += 7;
 	}
-
 	if (bge_phy_probe(bgep)) {
 		bgep->chipid.flags &= ~CHIP_FLAG_SERDES;
 		bgep->physops = &copper_ops;

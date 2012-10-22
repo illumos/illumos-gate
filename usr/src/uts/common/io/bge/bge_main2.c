@@ -23,6 +23,10 @@
  * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 #include "bge_impl.h"
 #include <sys/sdt.h>
 #include <sys/mac_provider.h>
@@ -3211,13 +3215,17 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 */
 	if (DEVICE_5717_SERIES_CHIPSETS(bgep))
 		pci_config_put32(bgep->cfg_handle, PCI_CONF_BGE_MHCR, 0);
+#else
+	mhcrValue = MHCR_ENABLE_INDIRECT_ACCESS |
+	    MHCR_ENABLE_TAGGED_STATUS_MODE |
+	    MHCR_MASK_INTERRUPT_MODE |
+	    MHCR_MASK_PCI_INT_OUTPUT |
+	    MHCR_CLEAR_INTERRUPT_INTA;
+#endif
 	pci_config_put32(bgep->cfg_handle, PCI_CONF_BGE_MHCR, mhcrValue);
 	bge_ind_put32(bgep, MEMORY_ARBITER_MODE_REG,
 	    bge_ind_get32(bgep, MEMORY_ARBITER_MODE_REG) |
 	    MEMORY_ARBITER_ENABLE);
-#else
-	mhcrValue = pci_config_get32(bgep->cfg_handle, PCI_CONF_BGE_MHCR);
-#endif
 	if (mhcrValue & MHCR_ENABLE_ENDIAN_WORD_SWAP) {
 		bgep->asf_wordswapped = B_TRUE;
 	} else {
