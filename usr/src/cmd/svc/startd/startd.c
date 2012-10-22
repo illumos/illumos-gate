@@ -105,14 +105,14 @@
  * scf_handle_t and binding it to configd by calling scf_handle_bind(). This
  * function makes a door call to configd and gets returned a new file
  * descriptor. This file descriptor is itself another door which calls into
- * configd’s client_switcher(). This is the door that is actually used when
+ * configd's client_switcher(). This is the door that is actually used when
  * getting and fetching properties, and many other useful things.
  *
  * svc.startd needs a way to notice the changes that occur to the repository.
- * For example, if you enabled a service that was not previously running, it’s
+ * For example, if you enabled a service that was not previously running, it's
  * up to startd to notice that this has happened, check dependencies, and
  * eventually start up the service. The way it gets these notifications is via
- * a thread who’s sole purpose in life is to call _scf_notify_wait(). This
+ * a thread who's sole purpose in life is to call _scf_notify_wait(). This
  * function acts like poll(2) but for changes that occur in the repository.
  * Once this thread gets the event, it dispatches the event appropriately.
  *
@@ -126,7 +126,7 @@
  * that it can answer the question of what is affected by a change. Internally
  * there are a lot of different queues for events, threads to process these
  * queues, and different paths to have events enter these queues. What follows
- * is a diagram that attempts to explain some of those paths, though it’s
+ * is a diagram that attempts to explain some of those paths, though it's
  * important to note that for some of these pieces, such as the graph and
  * vertex events, there are many additional ways and code paths these threads
  * and functions can take. And yes, restarter_event_enqueue() is not the same
@@ -167,7 +167,7 @@
  *                                                          ||---------------->
  *                                                          |----------------->
  *
- * What’s important to take away is that there is a queue for each instance on
+ * What's important to take away is that there is a queue for each instance on
  * the system that handles events related to dealing directly with that
  * instance and that events can be added to it because of changes to properties
  * that are made to configd and acted upon asynchronously by startd.
