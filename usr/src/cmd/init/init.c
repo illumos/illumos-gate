@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -140,6 +141,8 @@
 #define	FAILURE	-1
 
 #define	UT_LINE_SZ	32	/* Size of a utmpx ut_line field */
+
+#define	CHECK_SVC	SCF_INSTANCE_FS_MINIMAL
 
 /*
  * SLEEPTIME	The number of seconds "init" sleeps between wakeups if
@@ -3502,6 +3505,35 @@ bail:
 }
 
 /*
+ * Attempt to confirm that svc.startd is ready to accept a user-initiated
+ * run-level change. startd is not ready until it has started its
+ * _scf_notify_wait thread to watch for events from svc.configd. This is
+ * inherently racy. As a heuristic, we check the status of a very early svc
+ * (CHECK_SVC) to see if that is online. Since we could be booted to milestone
+ * none, the svc may never be online, so only retry for 5 seconds before
+ * charging ahead.
+ */
+static void
+verify_startd_ready()
+{
+	char *svc_state;
+	int i;
+
+	for (i = 0; i < 5; i++) {
+		svc_state = smf_get_state(CHECK_SVC);
+		if (svc_state != NULL) {
+			if (strcmp(svc_state, SCF_STATE_STRING_ONLINE) == 0) {
+				free(svc_state);
+				return;
+			}
+			free(svc_state);
+		}
+		sleep(1);
+	}
+	console(B_TRUE, "verify startd timeout\n");
+}
+
+/*
  * Function to handle requests from users to main init running as process 1.
  */
 static void
@@ -3587,6 +3619,12 @@ userinit(int argc, char **argv)
 	update_boot_archive(init_signal);
 
 	(void) audit_put_record(ADT_SUCCESS, ADT_SUCCESS, argv[1]);
+
+	/*
+	 * Before we tell init to start a run-level change, we need to be
+	 * sure svc.startd is ready to accept that.
+	 */
+	verify_startd_ready();
 
 	/*
 	 * Signal init; init will take care of telling svc.startd.
