@@ -2582,7 +2582,7 @@ echo | tee -a $build_environ_file >> $LOGFILE
 whence ld | tee -a $build_environ_file >> $LOGFILE
 LDVER=`ld -V 2>&1`
 echo $LDVER | tee -a $build_environ_file >> $LOGFILE
-LDVER=`echo $LDVER | sed -e "s/.*-1\.//" -e "s/:.*//"`
+LDVER=`echo $LDVER | sed -e "s/.*-1\.\([0-9]*\).*/\1/"`
 if [ `expr $LDVER \< 422` -eq 1 ]; then
 	echo "The link-editor needs to be at version 422 or higher to build" | \
 	    tee -a $build_environ_file >> $LOGFILE
