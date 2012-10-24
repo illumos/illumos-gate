@@ -3789,7 +3789,7 @@ again:
 
 	if (opt_mode == 'L') {
 		if ((err = scf_walk_fmri(h, argc, argv, SCF_WALK_MULTIPLE,
-		    print_log, NULL, &exit_status, uu_warn)) != 0) {
+		    print_log, NULL, errarg, errfunc)) != 0) {
 			uu_warn(gettext("failed to iterate over "
 			    "instances: %s\n"), scf_strerror(err));
 			exit_status = UU_EXIT_FATAL;
