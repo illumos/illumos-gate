@@ -22,12 +22,12 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 SRCS =	kvm_amd64dep.c \
 	kvm_isadep.c \
 	mdb_amd64util.c \
-	proc_amd64dep.c
+	proc_amd64dep.c \
+	saveargs.c
 
 %.o: %.c
 	$(COMPILE.c) $<
@@ -37,10 +37,17 @@ SRCS =	kvm_amd64dep.c \
 	$(COMPILE.c) $<
 	$(CTFCONVERT_O)
 
+%.o: $(SRC)/common/saveargs/%.c
+	$(COMPILE.c) $<
+	$(CTFCONVERT_O)
+
 %.ln: %.c
 	$(LINT.c) -c $<
 
 %.ln: ../../mdb/%.c
+	$(LINT.c) -c $<
+
+%.ln: $(SRC)/common/saveargs/%.c
 	$(LINT.c) -c $<
 
 include ../../../../Makefile.cmd
@@ -49,5 +56,6 @@ include ../../Makefile.amd64
 include ../../../Makefile.mdb
 
 CPPFLAGS += -I../../mdb
+CPPFLAGS += -I$(SRC)/common/saveargs
 
 install: all $(ISAEXEC) $(ROOTPROG64) $(ROOTLINK64)

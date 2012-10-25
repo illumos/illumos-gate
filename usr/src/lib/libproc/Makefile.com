@@ -72,7 +72,14 @@ CMNOBJS =	\
 ISAOBJS =	\
 	Pisadep.o
 
-OBJECTS = $(CMNOBJS) $(ISAOBJS)
+amd64_SAVEOBJS = \
+	saveargs.o
+
+amd64_CPPFLAGS = -I$(SRC)/common/saveargs
+
+SAVEOBJS = $($(MACH64)_SAVEOBJS)
+
+OBJECTS = $(CMNOBJS) $(ISAOBJS) $(SAVEOBJS)
 
 # include library definitions
 include ../../Makefile.lib
@@ -82,6 +89,7 @@ SRCS =		$(CMNOBJS:%.o=../common/%.c) $(ISAOBJS:%.o=%.c)
 
 LIBS =		$(DYNLIB) $(LINTLIB)
 LDLIBS +=	-lrtld_db -lelf -lctf -lc
+CPPFLAGS +=	$($(MACH64)_CPPFLAGS)
 
 SRCDIR =	../common
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
@@ -111,5 +119,9 @@ lint: lintcheck
 include ../../Makefile.targ
 
 objs/%.o pics/%.o: %.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+objs/%.o pics/%.o: $(SRC)/common/saveargs/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
