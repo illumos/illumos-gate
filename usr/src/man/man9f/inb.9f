@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH INB 9F "Jan 16, 2006"
+.TH INB 9F "Oct 24, 2012"
 .SH NAME
 inb, inw, inl, repinsb, repinsw, repinsd \- read from an I/O port
 .SH SYNOPSIS
@@ -49,9 +49,9 @@ inb, inw, inl, repinsb, repinsw, repinsd \- read from an I/O port
 .LP
 The functions described here are obsolete. For the \fBinb()\fR, \fBinw()\fR,
 and \fBinl()\fR functions, use, respectively, \fBddi_get8\fR(9F),
-\fBddi_get8\fR(9F), and \fBddi_get8\fR(9F) instead. For \fBrepinsb()\fR,
+\fBddi_get16\fR(9F), and \fBddi_get32\fR(9F) instead. For \fBrepinsb()\fR,
 \fBrepinsw()\fR, and\fBrepinsl()\fR, use, respectively, \fBddi_rep_get8\fR(9F),
-\fBddi_rep_get8\fR(9F), and \fBddi_rep_get8\fR(9F) instead.
+\fBddi_rep_get16\fR(9F), and \fBddi_rep_get32\fR(9F) instead.
 .SH PARAMETERS
 .sp
 .ne 2
@@ -126,9 +126,9 @@ Stability Level	 Obsolete
 .SH SEE ALSO
 .sp
 .LP
-\fBisa\fR(4), \fBattributes\fR(5), \fBddi_get8\fR(9F), \fBddi_get8\fR(9F),
-\fBddi_get8\fR(9F), \fBddi_rep_get8\fR(9F), \fBddi_rep_get8\fR(9F),
-\fBddi_rep_get8\fR(9F), \fBoutb\fR(9F)
+\fBisa\fR(4), \fBattributes\fR(5), \fBddi_get8\fR(9F), \fBddi_get16\fR(9F),
+\fBddi_get32\fR(9F), \fBddi_rep_get8\fR(9F), \fBddi_rep_get16\fR(9F),
+\fBddi_rep_get32\fR(9F), \fBoutb\fR(9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR
