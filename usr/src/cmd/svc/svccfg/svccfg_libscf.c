@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
@@ -7036,6 +7036,7 @@ lscf_service_import(void *v, void *pvt)
 	int fresh = 0;
 	scf_snaplevel_t *running;
 	int have_ge = 0;
+	boolean_t retried = B_FALSE;
 
 	const char * const ts_deleted = gettext("Temporary service svc:/%s "
 	    "was deleted unexpectedly.\n");
@@ -7091,6 +7092,7 @@ lscf_service_import(void *v, void *pvt)
 		return (UU_WALK_ERROR);
 	}
 
+retry:
 	if (scf_scope_add_service(imp_scope, imp_tsname, imp_tsvc) != 0) {
 		switch (scf_error()) {
 		case SCF_ERROR_CONNECTION_BROKEN:
@@ -7100,6 +7102,11 @@ lscf_service_import(void *v, void *pvt)
 			return (stash_scferror(lcbdata));
 
 		case SCF_ERROR_EXISTS:
+			if (!retried) {
+				lscf_delete(imp_tsname, 0);
+				retried = B_TRUE;
+				goto retry;
+			}
 			warn(gettext(
 			    "Temporary service \"%s\" must be deleted before "
 			    "this manifest can be imported.\n"), imp_tsname);
