@@ -953,6 +953,12 @@ usr/include/sys/sockfilter.h
 # ignored for packaging validation.
 #
 licenses
+#
 # Libbe is private
 #
 usr/include/libbe_priv.h
+#
+# ipmi is at present only useful on i386, but for historical reasons is
+# delivered on SPARC and used by the build.
+#
+usr/include/sys/ipmi.h	sparc
