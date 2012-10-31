@@ -32,7 +32,7 @@ clean	:= TARGET = clean
 test	:= TARGET = test
 
 # PERL_LEGACY is versions of Perl still delivered through ON
-PERL_VERSIONS = 5.14.2
+PERL_VERSIONS = 5.16.1
 
 all install test: $(PERL_VERSIONS)-$(MACH) .WAIT $(PERL_VERSIONS)-$(MACH64)
 
