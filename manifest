@@ -1628,7 +1628,6 @@ f lib/svc/method/net-iptun 0555 root bin
 f lib/svc/method/net-loc 0555 root bin
 f lib/svc/method/net-loopback 0555 root bin
 f lib/svc/method/net-netmask 0555 root bin
-f lib/svc/method/net-routing-setup 0555 root bin
 f lib/svc/method/net-svc 0555 root bin
 f lib/svc/method/nfs-client 0555 root bin
 f lib/svc/method/nfs-server 0555 root sys
