@@ -112,6 +112,8 @@ CODE:
 	if (val == NULL || (RETVAL = dupset(val)) == NULL)
 		XSRETURN_UNDEF;
 	RETPRIVSET(RETVAL);
+OUTPUT:
+	RETVAL
 
 Sun::Solaris::Ucred::Ucred *
 getpeerucred(fd)
@@ -121,6 +123,8 @@ CODE:
 	if (getpeerucred(fd, &RETVAL) != 0)
 		XSRETURN_UNDEF;
 	RETUCRED(RETVAL);
+OUTPUT:
+	RETVAL
 
 void
 ucred_getgroups(uc)

@@ -236,6 +236,8 @@ PREINIT:
 	char	buf[PROJECT_BUFSZ];
 CODE:
 	RETVAL = inproj(user, proj, buf, sizeof (buf));
+OUTPUT:
+	RETVAL
 
 
 int
