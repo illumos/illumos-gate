@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
 #
 
 LIBRARY = libproc.a
@@ -30,6 +31,7 @@ CMNOBJS =	\
 	Pcontrol.o	\
 	Pcore.o		\
 	Pexecname.o	\
+	Pfdinfo.o	\
 	Pgcore.o	\
 	Pidle.o		\
 	Pisprocdir.o	\

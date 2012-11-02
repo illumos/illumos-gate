@@ -19,6 +19,9 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
+ */
+/*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -812,7 +815,8 @@ typedef	Elf64_Word	Elf64_Capchain;
 #define	NT_PRPRIVINFO	19	/* priv_impl_info_t <sys/priv.h>	*/
 #define	NT_CONTENT	20	/* core_content_t <sys/corectl.h>	*/
 #define	NT_ZONENAME	21	/* string from getzonenamebyid(3C)	*/
-#define	NT_NUM		21
+#define	NT_FDINFO	22	/* open fd info 			*/
+#define	NT_NUM		22
 
 
 #ifdef _KERNEL

@@ -23,6 +23,9 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
+ */
 
 /*
  * String conversion routines the system structs found in
@@ -52,9 +55,9 @@ conv_cnote_type(Word type, Conv_fmt_flags_t fmt_flags,
 		MSG_NT_UTSNAME,		MSG_NT_LWPSTATUS,
 		MSG_NT_LWPSINFO,	MSG_NT_PRPRIV,
 		MSG_NT_PRPRIVINFO,	MSG_NT_CONTENT,
-		MSG_NT_ZONENAME
+		MSG_NT_ZONENAME,	MSG_NT_FDINFO
 	};
-#if NT_NUM != NT_ZONENAME
+#if NT_NUM != NT_FDINFO
 #error "NT_NUM has grown. Update core note types[]"
 #endif
 	static const conv_ds_msg_t ds_types = {
@@ -2441,4 +2444,139 @@ conv_cnote_sysset(uint32_t *maskarr, int n_mask,
 	    cnote_sysset_buf->buf, CONV_CNOTE_SYSSET_BUFSIZE));
 
 #undef N_MASK
+}
+
+const char *
+conv_cnote_fileflags(uint32_t fileflags, Conv_fmt_flags_t fmt_flags,
+    char *buf, size_t bufsize)
+{
+	CONV_EXPN_FIELD_ARG arg = { 0 };
+
+	Val_desc vda[] = {
+		{ 0x0001,	MSG_PR_O_WRONLY },
+		{ 0x0002,	MSG_PR_O_RDONLY },
+		{ 0x200000,	MSG_PR_O_SEARCH },
+		{ 0x400000,	MSG_PR_O_EXEC },
+		{ 0x0004,	MSG_PR_O_NDELAY },
+		{ 0x0008,	MSG_PR_O_APPEND },
+		{ 0x0010,	MSG_PR_O_SYNC },
+		{ 0x0040,	MSG_PR_O_DSYNC },
+		{ 0x0080,	MSG_PR_O_NONBLOCK },
+		{ 0x0100,	MSG_PR_O_CREAT },
+		{ 0x0200,	MSG_PR_O_TRUNC },
+		{ 0x0400,	MSG_PR_O_EXCL },
+		{ 0x0800,	MSG_PR_O_NOCTTY },
+		{ 0x4000,	MSG_PR_O_XATTR },
+		{ 0x8000,	MSG_PR_O_RSYNC },
+		{ 0x2000,	MSG_PR_O_LARGEFILE },
+		{ 0x20000,	MSG_PR_O_NOFOLLOW },
+		{ 0x40000,	MSG_PR_O_NOLINKS },
+		{ 0, NULL },
+	};
+
+	arg.oflags = arg.rflags = fileflags;
+	arg.buf = buf;
+	arg.bufsize = bufsize;
+
+	switch (fileflags & (0x600003)) {
+	case 0:	/* RDONLY */
+		vda[0].v_msg = MSG_PR_O_RDONLY;
+		arg.oflags |= 1;
+		arg.rflags |= 1;
+		break;
+	case 1:	/* WRONLY */
+	case 2:	/* RDWR */
+	case 0x200000:	/* SEARCH */
+	case 0x400000:
+		/* In isolate, treat these as normal bits */
+		break;
+	default:
+		/* More than one bit set in this group, emit numerically */
+		arg.oflags &= ~(fileflags & 0x600003);
+	}
+
+	if (fileflags == 0)
+		return (MSG_ORIG(MSG_GBL_ZERO));
+
+	(void) conv_expn_field(&arg, vda, fmt_flags);
+	return (buf);
+}
+
+const char *
+conv_cnote_filemode(uint32_t mode, Conv_fmt_flags_t fmt_flags,
+    char *buf, size_t bufsize)
+{
+	CONV_EXPN_FIELD_ARG arg = { 0 };
+	Msg s;
+
+	Val_desc vda[] = {
+		{ 0x1000,	MSG_S_IFIFO },
+		{ 0x800,	MSG_S_ISUID },
+		{ 0x400,	MSG_S_ISGID },
+		{ 0x200,	MSG_S_ISVTX },
+		{ 0400,		MSG_S_IRUSR },
+		{ 0200,		MSG_S_IWUSR },
+		{ 0100,		MSG_S_IXUSR },
+		{ 0040,		MSG_S_IRGRP },
+		{ 0020,		MSG_S_IWGRP },
+		{ 0010,		MSG_S_IXGRP },
+		{ 0004,		MSG_S_IROTH },
+		{ 0002,		MSG_S_IWOTH },
+		{ 0001,		MSG_S_IXOTH },
+		{ 0, NULL },
+	};
+
+	arg.oflags = arg.rflags = mode & ~(0xf000);
+	arg.buf = buf;
+	arg.bufsize = bufsize;
+
+	switch (mode & (0xf000)) {
+	case 0x1000:
+		s = MSG_S_IFIFO;
+		break;
+	case 0x2000:
+		s = MSG_S_IFCHR;
+		break;
+	case 0x4000:
+		s = MSG_S_IFDIR;
+		break;
+	case 0x5000:
+		s = MSG_S_IFNAM;
+		break;
+	case 0x6000:
+		s = MSG_S_IFBLK;
+		break;
+	case 0x8000:
+		s = MSG_S_IFREG;
+		break;
+	case 0xA000:
+		s = MSG_S_IFLNK;
+		break;
+	case 0xc000:
+		s = MSG_S_IFSOCK;
+		break;
+	case 0xd000:
+		s = MSG_S_IFDOOR;
+		break;
+	case 0xe000:
+		s = MSG_S_IFPORT;
+		break;
+	default:
+		s = NULL;
+		break;
+	}
+
+	if (s) {
+		arg.oflags |= 0x1000;
+		arg.rflags |= 0x1000;
+		vda[0].v_msg = s;
+	} else {
+		arg.rflags = mode;
+	}
+
+	if (mode == 0)
+		return (MSG_ORIG(MSG_GBL_ZERO));
+
+	(void) conv_expn_field(&arg, vda, fmt_flags);
+	return (buf);
 }

@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/utsname.h>
@@ -297,6 +300,26 @@ note_lwpsinfo(struct ps_prochandle *P, size_t nbytes)
 err:
 	dprintf("Pgrab_core: failed to read NT_LWPSINFO\n");
 	return (-1);
+}
+
+static int
+note_fdinfo(struct ps_prochandle *P, size_t nbytes)
+{
+	prfdinfo_t prfd;
+	fd_info_t *fip;
+
+	if ((nbytes < sizeof (prfd)) ||
+	    (read(P->asfd, &prfd, sizeof (prfd)) != sizeof (prfd))) {
+		dprintf("Pgrab_core: failed to read NT_FDINFO\n");
+		return (-1);
+	}
+
+	if ((fip = Pfd2info(P, prfd.pr_fd)) == NULL) {
+		dprintf("Pgrab_core: failed to add NT_FDINFO\n");
+		return (-1);
+	}
+	(void) memcpy(&fip->fd_info, &prfd, sizeof (prfd));
+	return (0);
 }
 
 static int
@@ -701,6 +724,7 @@ static int (*nhdlrs[])(struct ps_prochandle *, size_t) = {
 	note_priv_info,		/* 19	NT_PRPRIVINFO		*/
 	note_content,		/* 20	NT_CONTENT		*/
 	note_zonename,		/* 21	NT_ZONENAME		*/
+	note_fdinfo,		/* 22	NT_FDINFO		*/
 };
 
 /*

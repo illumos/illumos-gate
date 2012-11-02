@@ -23,6 +23,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
+ */
 
 #define	_STRUCTURED_PROC	1
 
@@ -83,6 +86,11 @@ typedef struct {
 
 	shstrtab_t	pgc_shstrtab;
 } pgcore_t;
+
+typedef struct {
+	int		fd_fd;
+	off64_t		*fd_doff;
+} fditer_t;
 
 static void
 shstrtab_init(shstrtab_t *s)
@@ -540,6 +548,17 @@ new_per_lwp(void *data, const lwpstatus_t *lsp, const lwpsinfo_t *lip)
 #endif	/* __sparcv9 */
 #endif	/* sparc */
 
+	return (0);
+}
+
+static int
+iter_fd(void *data, prfdinfo_t *fdinfo)
+{
+	fditer_t *iter = data;
+
+	if (write_note(iter->fd_fd, NT_FDINFO, fdinfo,
+	    sizeof (*fdinfo), iter->fd_doff) != 0)
+		return (1);
 	return (0);
 }
 
@@ -1340,6 +1359,15 @@ Pfgcore(struct ps_prochandle *P, int fd, core_content_t content)
 	if (write_note(fd, NT_ZONENAME, zonename, strlen(zonename) + 1,
 	    &doff) != 0)
 		goto err;
+
+	{
+		fditer_t iter;
+		iter.fd_fd = fd;
+		iter.fd_doff = &doff;
+
+		if (Pfdinfo_iter(P, iter_fd, &iter) != 0)
+			goto err;
+	}
 
 #if defined(__i386) || defined(__amd64)
 	/* CSTYLED */

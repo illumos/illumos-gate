@@ -24,6 +24,7 @@
  * Use is subject to license terms.
  *
  * Portions Copyright 2007 Chad Mynhier
+ * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -712,6 +713,12 @@ extern int proc_content2str(core_content_t, char *, size_t);
 extern int proc_initstdio(void);
 extern int proc_flushstdio(void);
 extern int proc_finistdio(void);
+
+/*
+ * Iterate over all open files.
+ */
+typedef int proc_fdinfo_f(void *, prfdinfo_t *);
+extern int Pfdinfo_iter(struct ps_prochandle *, proc_fdinfo_f *, void *);
 
 #ifdef	__cplusplus
 }

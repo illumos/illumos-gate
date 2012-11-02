@@ -24,7 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -34,8 +36,11 @@
 #include <sys/cred.h>
 #include <sys/priv.h>
 #include <sys/user.h>
+#include <sys/file.h>
 #include <sys/errno.h>
 #include <sys/vnode.h>
+#include <sys/mode.h>
+#include <sys/vfs.h>
 #include <sys/mman.h>
 #include <sys/kmem.h>
 #include <sys/proc.h>
@@ -57,6 +62,7 @@
 #include <sys/modctl.h>
 #include <sys/systeminfo.h>
 #include <sys/machelf.h>
+#include <sys/sunddi.h>
 #include "elf_impl.h"
 #if defined(__i386) || defined(__i386_COMPAT)
 #include <sys/sysi86.h>
@@ -67,12 +73,27 @@ setup_note_header(Phdr *v, proc_t *p)
 {
 	int nlwp = p->p_lwpcnt;
 	int nzomb = p->p_zombcnt;
+	int nfd;
 	size_t size;
 	prcred_t *pcrp;
+	uf_info_t *fip;
+	uf_entry_t *ufp;
+	int fd;
+
+	fip = P_FINFO(p);
+	nfd = 0;
+	mutex_enter(&fip->fi_lock);
+	for (fd = 0; fd < fip->fi_nfiles; fd++) {
+		UF_ENTER(ufp, fip, fd);
+		if ((ufp->uf_file != NULL) && (ufp->uf_file->f_count > 0))
+			nfd++;
+		UF_EXIT(ufp);
+	}
+	mutex_exit(&fip->fi_lock);
 
 	v[0].p_type = PT_NOTE;
 	v[0].p_flags = PF_R;
-	v[0].p_filesz = (sizeof (Note) * (9 + 2 * nlwp + nzomb))
+	v[0].p_filesz = (sizeof (Note) * (9 + 2 * nlwp + nzomb + nfd))
 	    + roundup(sizeof (psinfo_t), sizeof (Word))
 	    + roundup(sizeof (pstatus_t), sizeof (Word))
 	    + roundup(prgetprivsize(), sizeof (Word))
@@ -83,7 +104,8 @@ setup_note_header(Phdr *v, proc_t *p)
 	    + roundup(sizeof (utsname), sizeof (Word))
 	    + roundup(sizeof (core_content_t), sizeof (Word))
 	    + (nlwp + nzomb) * roundup(sizeof (lwpsinfo_t), sizeof (Word))
-	    + nlwp * roundup(sizeof (lwpstatus_t), sizeof (Word));
+	    + nlwp * roundup(sizeof (lwpstatus_t), sizeof (Word))
+	    + nfd * roundup(sizeof (prfdinfo_t), sizeof (Word));
 
 	size = sizeof (prcred_t) + sizeof (gid_t) * (ngroups_max - 1);
 	pcrp = kmem_alloc(size, KM_SLEEP);
@@ -96,6 +118,7 @@ setup_note_header(Phdr *v, proc_t *p)
 		    roundup(sizeof (prcred_t), sizeof (Word));
 	}
 	kmem_free(pcrp, size);
+
 
 #if defined(__i386) || defined(__i386_COMPAT)
 	mutex_enter(&p->p_ldtlock);
@@ -159,7 +182,7 @@ write_elfnotes(proc_t *p, int sig, vnode_t *vp, offset_t offset,
 	size_t crsize = sizeof (prcred_t) + sizeof (gid_t) * (ngroups_max - 1);
 	size_t psize = prgetprivsize();
 	size_t bigsize = MAX(psize, MAX(sizeof (*bigwad),
-					MAX(xregsize, crsize)));
+	    MAX(xregsize, crsize)));
 
 	priv_impl_info_t *prii;
 
@@ -173,6 +196,10 @@ write_elfnotes(proc_t *p, int sig, vnode_t *vp, offset_t offset,
 	int nzomb;
 	int error;
 	uchar_t oldsig;
+	uf_info_t *fip;
+	int fd;
+	vnode_t *vroot;
+
 #if defined(__i386) || defined(__i386_COMPAT)
 	struct ssd *ssd;
 	size_t ssdsize;
@@ -292,6 +319,89 @@ write_elfnotes(proc_t *p, int sig, vnode_t *vp, offset_t offset,
 	    rlimit, credp);
 	if (error)
 		goto done;
+
+
+	/* open file table */
+	vroot = PTOU(p)->u_rdir;
+	if (vroot == NULL)
+		vroot = rootdir;
+
+	VN_HOLD(vroot);
+
+	fip = P_FINFO(p);
+
+	for (fd = 0; fd < fip->fi_nfiles; fd++) {
+		uf_entry_t *ufp;
+		vnode_t *fvp;
+		struct file *fp;
+		vattr_t vattr;
+		prfdinfo_t fdinfo;
+
+		bzero(&fdinfo, sizeof (fdinfo));
+
+		mutex_enter(&fip->fi_lock);
+		UF_ENTER(ufp, fip, fd);
+		if (((fp = ufp->uf_file) == NULL) || (fp->f_count < 1)) {
+			UF_EXIT(ufp);
+			mutex_exit(&fip->fi_lock);
+			continue;
+		}
+
+		fdinfo.pr_fd = fd;
+		fdinfo.pr_fdflags = ufp->uf_flag;
+		fdinfo.pr_fileflags = fp->f_flag2;
+		fdinfo.pr_fileflags <<= 16;
+		fdinfo.pr_fileflags |= fp->f_flag;
+		if ((fdinfo.pr_fileflags & (FSEARCH | FEXEC)) == 0)
+			fdinfo.pr_fileflags += FOPEN;
+		fdinfo.pr_offset = fp->f_offset;
+
+
+		fvp = fp->f_vnode;
+		VN_HOLD(fvp);
+		UF_EXIT(ufp);
+		mutex_exit(&fip->fi_lock);
+
+		/*
+		 * There are some vnodes that have no corresponding
+		 * path.  Its reasonable for this to fail, in which
+		 * case the path will remain an empty string.
+		 */
+		(void) vnodetopath(vroot, fvp, fdinfo.pr_path,
+		    sizeof (fdinfo.pr_path), credp);
+
+		error = VOP_GETATTR(fvp, &vattr, 0, credp, NULL);
+		if (error != 0) {
+			VN_RELE(fvp);
+			VN_RELE(vroot);
+			goto done;
+		}
+
+		if (fvp->v_type == VSOCK)
+			fdinfo.pr_fileflags |= sock_getfasync(fvp);
+
+		VN_RELE(fvp);
+
+		/*
+		 * This logic mirrors fstat(), which we cannot use
+		 * directly, as it calls copyout().
+		 */
+		fdinfo.pr_major = getmajor(vattr.va_fsid);
+		fdinfo.pr_minor = getminor(vattr.va_fsid);
+		fdinfo.pr_ino = (ino64_t)vattr.va_nodeid;
+		fdinfo.pr_mode = VTTOIF(vattr.va_type) | vattr.va_mode;
+		fdinfo.pr_uid = vattr.va_uid;
+		fdinfo.pr_gid = vattr.va_gid;
+		fdinfo.pr_rmajor = getmajor(vattr.va_rdev);
+		fdinfo.pr_rminor = getminor(vattr.va_rdev);
+		fdinfo.pr_size = (off64_t)vattr.va_size;
+
+		error = elfnote(vp, &offset, NT_FDINFO,
+		    sizeof (fdinfo), &fdinfo, rlimit, credp);
+		if (error) {
+			goto done;
+		}
+	}
 
 #if defined(__i386) || defined(__i386_COMPAT)
 	mutex_enter(&p->p_ldtlock);

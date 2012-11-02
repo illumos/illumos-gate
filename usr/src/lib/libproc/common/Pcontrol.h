@@ -22,6 +22,9 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
+ */
 
 #ifndef	_PCONTROL_H
 #define	_PCONTROL_H
@@ -136,6 +139,11 @@ typedef struct lwp_info {	/* per-lwp information from core file */
 #endif
 } lwp_info_t;
 
+typedef struct fd_info {
+	plist_t	fd_list;	/* linked list */
+	prfdinfo_t fd_info;	/* fd info */
+} fd_info_t;
+
 typedef struct core_info {	/* information specific to core files */
 	char core_dmodel;	/* data model for core file */
 	int core_errno;		/* error during initialization if != 0 */
@@ -223,6 +231,8 @@ struct ps_prochandle {
 	uintptr_t *ucaddrs;	/* ucontext-list addresses */
 	uint_t	ucnelems;	/* number of elements in the ucaddrs list */
 	char	*zoneroot;	/* cached path to zone root */
+	plist_t	fd_head;	/* head of file desc info list */
+	int	num_fd;		/* number of file descs in list */
 };
 
 /* flags */
@@ -269,6 +279,8 @@ extern	char	*Plofspath(const char *, char *, size_t);
 extern	char	*Pzoneroot(struct ps_prochandle *, char *, size_t);
 extern	char	*Pzonepath(struct ps_prochandle *, const char *, char *,
 	size_t);
+extern	fd_info_t *Pfd2info(struct ps_prochandle *, int);
+
 extern	char	*Pfindmap(struct ps_prochandle *, map_info_t *, char *,
 	size_t);
 
