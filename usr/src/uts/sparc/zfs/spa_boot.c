@@ -24,9 +24,15 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ */
+
 #include <sys/zio.h>
 #include <sys/spa.h>
 #include <sys/bootconf.h>
+
+extern int zfs_deadman_enabled;
 
 char *
 spa_get_bootprop(char *propname)
@@ -51,4 +57,14 @@ void
 spa_free_bootprop(char *propname)
 {
 	kmem_free(propname, strlen(propname) + 1);
+}
+
+void
+spa_arch_init(void)
+{
+	/*
+	 * The deadman is disabled by default on sparc.
+	 */
+	if (zfs_deadman_enabled == -1)
+		zfs_deadman_enabled = 0;
 }
