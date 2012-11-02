@@ -51,18 +51,19 @@ struct lxpr_uiobuf {
 	int error;
 };
 
-#define	BUFSIZE 4000
+int lxpr_bufsize = 4000;
 
 struct lxpr_uiobuf *
 lxpr_uiobuf_new(uio_t *uiop)
 {
 	/* Allocate memory for both lxpr_uiobuf and output buffer */
+	int bufsize = lxpr_bufsize;
 	struct lxpr_uiobuf *uiobuf =
-	    kmem_alloc(sizeof (struct lxpr_uiobuf) + BUFSIZE, KM_SLEEP);
+	    kmem_alloc(sizeof (struct lxpr_uiobuf) + bufsize, KM_SLEEP);
 
 	uiobuf->uiop = uiop;
 	uiobuf->buffer = (char *)&uiobuf[1];
-	uiobuf->buffsize = BUFSIZE;
+	uiobuf->buffsize = bufsize;
 	uiobuf->pos = uiobuf->buffer;
 	uiobuf->beg = 0;
 	uiobuf->error = 0;
@@ -123,7 +124,7 @@ lxpr_uiobuf_write(struct lxpr_uiobuf *uiobuf, const char *buf, size_t size)
 	/* While we can still carry on */
 	while (uiobuf->error == 0 && uiobuf->uiop->uio_resid != 0) {
 		uintptr_t remain = (uintptr_t)uiobuf->buffsize -
-		    (uintptr_t)uiobuf->pos - (uintptr_t)uiobuf->buffer;
+		    ((uintptr_t)uiobuf->pos - (uintptr_t)uiobuf->buffer);
 
 		/* Enough space in buffer? */
 		if (remain >= size) {
