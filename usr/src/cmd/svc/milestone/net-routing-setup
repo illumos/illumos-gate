@@ -21,10 +21,14 @@
 #
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+# Copyright (c) 2012 Joyent, Inc.  All rights reserved.
 
 # This script configures IP routing.
 
 . /lib/svc/share/smf_include.sh
+
+set -o xtrace
 
 #
 # In a shared-IP zone we need this service to be up, but all of the work
@@ -209,6 +213,12 @@ if [ -f /etc/inet/static_routes ]; then
 		/usr/sbin/route add $line
 	done
 fi
+
+#
+# Log the result
+#
+echo "Routing setup complete:"
+/usr/bin/netstat -rn
 
 # Clear exit status.
 exit $SMF_EXIT_OK
