@@ -514,6 +514,23 @@ static uchar_t tlsinstr_ld_le[] = {
 	0x00, 0x00, 0x00, 0x00
 };
 
+#define	REX_B		0x1
+#define	REX_X		0x2
+#define	REX_R		0x4
+#define	REX_W		0x8
+#define	REX_PREFIX	0x40
+
+#define	REX_RW		(REX_PREFIX | REX_R | REX_W)
+#define	REX_BW		(REX_PREFIX | REX_B | REX_W)
+#define	REX_BRW		(REX_PREFIX | REX_B | REX_R | REX_W)
+
+#define	REG_ESP		0x4
+
+#define	INSN_ADDMR	0x03	/* addq mem,reg */
+#define	INSN_ADDIR	0x81	/* addq imm,reg */
+#define	INSN_MOVMR	0x8b	/* movq mem,reg */
+#define	INSN_MOVIR	0xc7	/* movq imm,reg */
+#define	INSN_LEA	0x8d	/* leaq mem,reg */
 
 static Fixupret
 tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
@@ -526,6 +543,10 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 	    (uintptr_t)_elf_getxoff(arsp->rel_isdesc->is_indata) +
 	    (uintptr_t)RELAUX_GET_OSDESC(arsp)->os_outdata->d_buf);
 
+	/*
+	 * Note that in certain of the original insn sequences below, the
+	 * instructions are not necessarily adjacent
+	 */
 	if (sdp->sd_ref == REF_DYN_NEED) {
 		/*
 		 * IE reference model
@@ -605,35 +626,88 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 		(void) memcpy(offset, tlsinstr_gd_le, sizeof (tlsinstr_gd_le));
 		return (FIX_RELOC);
 
-	case R_AMD64_GOTTPOFF:
+	case R_AMD64_GOTTPOFF: {
 		/*
 		 * IE -> LE
 		 *
-		 * Transition:
-		 *	0x00 movq %fs:0, %rax
-		 *	0x09 addq x@gottopoff(%rip), %rax
-		 *	0x10
+		 * Transition 1:
+		 *	movq %fs:0, %reg
+		 *	addq x@gottpoff(%rip), %reg
 		 * To:
-		 *	0x00 movq %fs:0, %rax
-		 *	0x09 leaq x@tpoff(%rax), %rax
-		 *	0x10
+		 *	movq %fs:0, %reg
+		 *	leaq x@tpoff(%reg), %reg
+		 *
+		 * Transition (as a special case):
+		 *	movq %fs:0, %r12/%rsp
+		 *	addq x@gottpoff(%rip), %r12/%rsp
+		 * To:
+		 *	movq %fs:0, %r12/%rsp
+		 *	addq x@tpoff(%rax), %r12/%rsp
+		 *
+		 * Transition 2:
+		 *	movq x@gottpoff(%rip), %reg
+		 *	movq %fs:(%reg), %reg
+		 * To:
+		 *	movq x@tpoff(%reg), %reg
+		 *	movq %fs:(%reg), %reg
 		 */
+		Conv_inv_buf_t	inv_buf;
+		uint8_t reg;		/* Register */
+
+		offset -= 3;
+
+		reg = offset[2] >> 3; /* Encoded dest. reg. operand */
+
 		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
 		    R_AMD64_TPOFF32, arsp, ld_reloc_sym_name));
 		arsp->rel_rtype = R_AMD64_TPOFF32;
 		arsp->rel_raddend = 0;
 
 		/*
-		 * Adjust 'offset' to beginning of instruction sequence.
+		 * This is transition 2, and the special case of form 1 where
+		 * a normal transition would index %rsp or %r12 and need a SIB
+		 * byte in the leaq for which we lack space
 		 */
-		offset -= 12;
+		if ((offset[1] == INSN_MOVMR) ||
+		    ((offset[1] == INSN_ADDMR) && (reg == REG_ESP))) {
+			/*
+			 * If we needed an extra bit of MOD.reg to refer to
+			 * this register as the dest of the original movq we
+			 * need an extra bit of MOD.rm to refer to it in the
+			 * dest of the replacement movq or addq.
+			 */
+			if (offset[0] == REX_RW)
+				offset[0] = REX_BW;
 
-		/*
-		 * Same code sequence used in the GD -> LE transition.
-		 */
-		(void) memcpy(offset, tlsinstr_gd_le, sizeof (tlsinstr_gd_le));
-		return (FIX_RELOC);
+			offset[1] = (offset[1] == INSN_MOVMR) ?
+			    INSN_MOVIR : INSN_ADDIR;
+			offset[2] = 0xc0 | reg;
 
+			return (FIX_RELOC);
+		} else if (offset[1] == INSN_ADDMR) {
+			/*
+			 * If we needed an extra bit of MOD.reg to refer to
+			 * this register in the dest of the addq we need an
+			 * extra bit of both MOD.reg and MOD.rm to refer to it
+			 * in the source and dest of the leaq
+			 */
+			if (offset[0] == REX_RW)
+				offset[0] = REX_BRW;
+
+			offset[1] = INSN_LEA;
+			offset[2] = 0x80 | (reg << 3) | reg;
+
+			return (FIX_RELOC);
+		}
+
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_REL_BADTLSINS),
+		    conv_reloc_amd64_type(arsp->rel_rtype, 0, &inv_buf),
+		    arsp->rel_isdesc->is_file->ifl_name,
+		    ld_reloc_sym_name(arsp),
+		    arsp->rel_isdesc->is_name,
+		    EC_OFF(arsp->rel_roffset));
+		return (FIX_ERROR);
+	}
 	case R_AMD64_TLSLD:
 		/*
 		 * LD -> LE
