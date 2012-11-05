@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
+ */
+
 #ifndef	_STRUCT_LAYOUT_H
 #define	_STRUCT_LAYOUT_H
 
@@ -88,7 +92,7 @@ typedef struct {
 } sl_field_t;
 
 /*
- * This type is used to extract and manipuate data described by
+ * This type is used to extract and manipulate data described by
  * sl_field_t. We rely on the C guarantee that all the fields in
  * a union have offset 0.
  */
@@ -502,6 +506,27 @@ typedef struct {
 } sl_utsname_layout_t;
 
 /*
+ * Layout description of prdinfo_t, from <sys/procfs.h>.
+ */
+typedef struct {
+	sl_field_t		sizeof_struct;
+	sl_field_t		pr_fd;
+	sl_field_t		pr_mode;
+	sl_field_t		pr_uid;
+	sl_field_t		pr_gid;
+	sl_field_t		pr_major;
+	sl_field_t		pr_minor;
+	sl_field_t		pr_rmajor;
+	sl_field_t		pr_rminor;
+	sl_field_t		pr_ino;
+	sl_field_t		pr_offset;
+	sl_field_t		pr_size;
+	sl_field_t		pr_fileflags;
+	sl_field_t		pr_fdflags;
+	sl_field_t		pr_path;
+} sl_prfdinfo_layout_t;
+
+/*
  * This type collects all of the layout definitions for
  * a given architecture.
  */
@@ -525,6 +550,7 @@ typedef struct {
 	const sl_sysset_layout_t	*sysset;	/* sysset_t */
 	const sl_timestruc_layout_t	*timestruc;	/* timestruc_t */
 	const sl_utsname_layout_t	*utsname;	/* struct utsname */
+	const sl_prfdinfo_layout_t	*prfdinfo;	/* prdinfo_t */
 } sl_arch_layout_t;
 
 

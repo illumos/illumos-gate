@@ -49,6 +49,7 @@ typedef struct {
 	uint64_t	ciecalign;	/* CIE code align factor */
 	int64_t		ciedalign;	/* CIE data align factor */
 	uint64_t	fdeinitloc;	/* FDE initial location */
+	uint64_t	gotaddr;	/* Address of the GOT */
 } dump_cfi_state_t;
 
 
@@ -301,8 +302,8 @@ dump_cfi(uchar_t *data, uint64_t off, uint64_t *ndx, uint_t len,
 
 		case 0x01:		/* v2: DW_CFA_set_loc, address */
 			cur_pc = dwarf_ehe_extract(&data[off], ndx,
-			    state->cieRflag, state->e_ident,
-			    state->sh_addr, off + *ndx);
+			    state->cieRflag, state->e_ident, B_FALSE,
+			    state->sh_addr, off + *ndx, state->gotaddr);
 			dbg_print(0, MSG_ORIG(MSG_CFA_CFASET), PREFIX,
 			    EC_XWORD(cur_pc));
 			break;
@@ -465,7 +466,7 @@ dump_cfi(uchar_t *data, uint64_t off, uint64_t *ndx, uint_t len,
 
 void
 dump_eh_frame(uchar_t *data, size_t datasize, uint64_t sh_addr,
-    Half e_machine, uchar_t *e_ident)
+    Half e_machine, uchar_t *e_ident, uint64_t gotaddr)
 {
 	Conv_dwarf_ehe_buf_t	dwarf_ehe_buf;
 	dump_cfi_state_t	cfi_state;
@@ -479,6 +480,7 @@ dump_eh_frame(uchar_t *data, size_t datasize, uint64_t sh_addr,
 	cfi_state.e_ident = e_ident;
 	cfi_state.sh_addr = sh_addr;
 	cfi_state.do_swap = _elf_sys_encoding() != e_ident[EI_DATA];
+	cfi_state.gotaddr = gotaddr;
 
 	off = 0;
 	while (off < datasize) {
@@ -568,8 +570,8 @@ dump_eh_frame(uchar_t *data, size_t datasize, uint64_t sh_addr,
 					ndx += 1;
 
 					persVal = dwarf_ehe_extract(&data[off],
-					    &ndx, ciePflag, e_ident,
-					    sh_addr, off + ndx);
+					    &ndx, ciePflag, e_ident, B_FALSE,
+					    sh_addr, off + ndx, gotaddr);
 					dbg_print(0,
 					    MSG_ORIG(MSG_UNW_CIEAXPERS));
 					dbg_print(0,
@@ -633,11 +635,11 @@ dump_eh_frame(uchar_t *data, size_t datasize, uint64_t sh_addr,
 			    fdelength, fdecieptr);
 
 			cfi_state.fdeinitloc = dwarf_ehe_extract(&data[off],
-			    &ndx, cfi_state.cieRflag, e_ident,
-			    sh_addr, off + ndx);
+			    &ndx, cfi_state.cieRflag, e_ident, B_FALSE,
+			    sh_addr, off + ndx, gotaddr);
 			fdeaddrrange = dwarf_ehe_extract(&data[off], &ndx,
 			    (cfi_state.cieRflag & ~DW_EH_PE_pcrel),
-			    e_ident, sh_addr, off + ndx);
+			    e_ident, B_FALSE, sh_addr, off + ndx, gotaddr);
 
 			dbg_print(0, MSG_ORIG(MSG_UNW_FDEINITLOC),
 			    EC_XWORD(cfi_state.fdeinitloc),
@@ -660,7 +662,8 @@ dump_eh_frame(uchar_t *data, size_t datasize, uint64_t sh_addr,
 
 					lsda = dwarf_ehe_extract(&data[off],
 					    &lndx, cieLflag, e_ident,
-					    sh_addr, off + lndx);
+					    B_FALSE, sh_addr, off + lndx,
+					    gotaddr);
 					dbg_print(0,
 					    MSG_ORIG(MSG_UNW_FDEAXLSDA),
 					    EC_XWORD(lsda));
