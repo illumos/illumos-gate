@@ -205,10 +205,10 @@ extern const char *dump_get_uuid(void);
  */
 extern uint_t dump_plat_mincpu_default;
 
-#define	DUMP_PLAT_SUN4U_MINCPU		51
-#define	DUMP_PLAT_SUN4U_OPL_MINCPU	8
-#define	DUMP_PLAT_SUN4V_MINCPU		128
-#define	DUMP_PLAT_X86_64_MINCPU		11
+#define	DUMP_PLAT_SUN4U_MINCPU		0
+#define	DUMP_PLAT_SUN4U_OPL_MINCPU	0
+#define	DUMP_PLAT_SUN4V_MINCPU		0
+#define	DUMP_PLAT_X86_64_MINCPU		0
 #define	DUMP_PLAT_X86_32_MINCPU		0
 
 /*
