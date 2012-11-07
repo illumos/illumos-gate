@@ -68,6 +68,9 @@ CPPFLAGS	+= $(VFLAGS) $(AFLAGS) $(DFLAGS) $(CFGFLAGS) $(CCVERBOSE) \
 
 CFLAGS		+= $(CPPFLAGS) -xc99=%all
 
+CERRWARN	+= -_gcc=-Wno-switch
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 # Driver depends on MAC & IP
 #

@@ -20,12 +20,8 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# cmd/spell/Makefile
 #
 
 HASHPROG=	hashmk1 spellin1
@@ -55,6 +51,7 @@ TXTS=	compress.sh spell.sh
 include ../Makefile.cmd
 
 CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-parentheses
 
 XGETFLAGS += -a -x spell.xcl
 

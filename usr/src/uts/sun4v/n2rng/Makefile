@@ -66,8 +66,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 # lint pass one enforcement
 #
-CFLAGS += -v -DN2 -I$(COM_DIR)
+CFLAGS += $(CCVERBOSE) -DN2 -I$(COM_DIR)
 LINTFLAGS += -DN2 -I$(COM_DIR)
+CERRWARN += -_gcc=-Wno-uninitialized
 
 #
 # module dependencies

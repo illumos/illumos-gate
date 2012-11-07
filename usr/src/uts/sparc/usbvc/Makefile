@@ -68,6 +68,8 @@ ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 # Disable this because it is necessary for this driver
 # and it is surely safe

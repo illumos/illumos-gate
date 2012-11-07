@@ -42,6 +42,8 @@ FILEMODE= 0755
 ROOTPSMPROG	= $(ROOT_PSM_LIB_DIR)/$(PROG)
 
 CPPFLAGS = -I$(USR_PSM_INCL_DIR) -I$(SRC)/uts/sun4u/starcat $(CPPFLAGS.master)
+CERRWARN += -_gcc=-Wno-unused-variable
+CERRWARN += -_gcc=-Wno-uninitialized
 
 LDLIBS +=	-lsocket
 

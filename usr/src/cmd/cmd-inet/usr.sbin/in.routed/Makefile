@@ -37,6 +37,8 @@ LINTFLAGS += -erroff=E_FUNC_DECL_VAR_ARG2 -erroff=E_INCONS_VAL_TYPE_DECL2 \
 
 CPPFLAGS +=	$(_D_XOPEN_EXTN)
 CFLAGS +=	$(CCVERBOSE)
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
 LDLIBS +=	-lxnet -lmd -lsocket
 CLEAN_FILES +=	$(ROUTEDOBJS) $(RTQUERYOBJS)
 CLOBBERFILES +=	$(ROUTEDPROG) $(RTQUERYPROG)

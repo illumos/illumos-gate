@@ -23,8 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY = libsock.a
 OBJECTS = socket.o sock_test.o
@@ -33,5 +31,5 @@ include ../Makefile.com
 
 LDLIBS += -linet -ltcp
 CPPFLAGS += -I../inet -I../tcp $(SOCKCPPFLAGS)
-
+CERRWARN += -_gcc=-Wno-type-limits
 include ../Makefile.targ

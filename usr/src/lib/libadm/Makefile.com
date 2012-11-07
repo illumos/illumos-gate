@@ -43,6 +43,10 @@ SRCDIR=		../common
 
 CPPFLAGS +=	-I ../inc
 
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-char-subscripts
+
 $(LINTLIB) :=	SRCS=$(SRCDIR)/$(LINTSRC)
 LDLIBS +=	-lc
 

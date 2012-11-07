@@ -22,8 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
+
 #	This makefile drives the production of the blowfish KEF provider.
 #
 #	sparc implementation architecture dependent
@@ -78,6 +77,9 @@ LINTFLAGS	+= -I$(COM_DIR)
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 LINTTAGS	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
+
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-parentheses
 
 #
 #	Default build targets.

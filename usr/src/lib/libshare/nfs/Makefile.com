@@ -48,6 +48,12 @@ LDLIBS +=	-lshare -lnsl -lscf -lumem -lc -lxml2
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT -I$(NFSLIB_DIR) \
 		-I$(ADJUNCT_PROTO)/usr/include/libxml2 -I$(SRCDIR)/../common
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-switch
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CPPFLAGS +=	-D_REENTRANT -I$(NFSLIB_DIR) -I/usr/include/libxml2 \
+			-I$(SRCDIR)/../common
 
 .KEEP_STATE:
 

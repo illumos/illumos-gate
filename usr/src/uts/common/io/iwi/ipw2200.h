@@ -38,7 +38,7 @@ extern "C" {
 #endif
 
 /*
- * Intel Wireless PRO/2200 mini-pci adpater drier
+ * Intel Wireless PRO/2200 mini-pci adapter drier
  * ipw2200.h: common definitions and interface to user land application
  */
 #include <sys/types.h>

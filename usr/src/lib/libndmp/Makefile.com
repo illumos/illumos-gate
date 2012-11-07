@@ -52,6 +52,9 @@ LIBS=	$(DYNLIB) $(LINTLIB)
 LDLIBS +=	-lc -lscf
 CPPFLAGS +=	$(INCS) -D_REENTRANT
 
+CERRWARN +=	-_gcc=-Wno-char-subscripts
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 SRCS=	$(OBJECTS:%.o=$(SRCDIR)/%.c)
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
 

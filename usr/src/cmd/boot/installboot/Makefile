@@ -40,6 +40,7 @@ C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
 
 LINTFLAGS += -erroff=E_BAD_PTR_CAST_ALIGN
+CERRWARN += -_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

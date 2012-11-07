@@ -68,6 +68,9 @@ LDFLAGS += -dy -Nfs/sockfs -Ndrv/ip
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 
+CERRWARN	+= -_gcc=-Wno-unused-label
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 #	Default build targets.
 #

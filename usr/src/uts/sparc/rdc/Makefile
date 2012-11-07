@@ -58,16 +58,21 @@ include $(UTSBASE)/common/avs/Makefile.com
 ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
-	
+
 #
 # lint pass one enforcement
 #
-CFLAGS += -v -D_SD_8K_BLKSIZE -D_SYSCALL32
-LINT_DEFS += -D_SYSCALL32
-LINTTAGS  += -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS  += -erroff=E_INCONS_ARG_DECL2
-LDFLAGS += -dy -N"drv/nsctl" -N"drv/nskern" -N"drv/ncall" -N"misc/spuni" \
-	-N"misc/rdcsrv" -N"strmod/rpcmod"
+CFLAGS		+= $(CCVERBOSE) -D_SD_8K_BLKSIZE -D_SYSCALL32
+LINT_DEFS	+= -D_SYSCALL32
+LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
+LINTTAGS	+= -erroff=E_INCONS_ARG_DECL2
+LDFLAGS		+= -dy -N"drv/nsctl" -N"drv/nskern" -N"drv/ncall" -N"misc/spuni"
+LDFLAGS		+= -N"misc/rdcsrv" -N"strmod/rpcmod"
+
+CERRWARN	+= -_gcc=-Wno-switch
+CERRWARN	+= -_gcc=-Wno-unused-label
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

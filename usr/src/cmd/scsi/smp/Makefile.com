@@ -41,6 +41,8 @@ CFLAGS += $(CTF_FLAGS) $(CCVERBOSE) $(XSTRCONST)
 LDLIBS += -L$(ROOT)/usr/lib/scsi -lsmp
 LDFLAGS += -R/usr/lib/scsi
 
+CERRWARN += -_gcc=-Wno-unused-variable
+
 all: $(PROG)
 
 $(PROG): $(OBJS)

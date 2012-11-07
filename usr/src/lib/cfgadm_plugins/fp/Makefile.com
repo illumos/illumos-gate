@@ -45,6 +45,12 @@ LINTFLAGS64 +=	-DDEBUG
 CFLAGS +=	$(CCVERBOSE)
 CFLAGS64 +=	$(CCVERBOSE)
 
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-char-subscripts
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-switch
+CERRWARN +=	-_gcc=-Wno-address
+
 CPPFLAGS += -D_POSIX_PTHREAD_SEMANTICS
 
 LINTFLAGS += -erroff=E_SEC_SPRINTF_UNBOUNDED_COPY

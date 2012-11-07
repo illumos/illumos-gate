@@ -42,6 +42,8 @@ ROOTUSRLIBPROG = $(PROG:%=$(ROOTLIB)/%)
 .KEEP_STATE:
 
 CFLAGS +=	$(CCVERBOSE)
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-address
 
 LDLIBS += -lkmf -lpkcs11 -lcryptoutil -lnsl -lsocket
 

@@ -37,6 +37,9 @@ POFILES = $(OBJS:%.o=%.po)
 
 LINTFLAGS += -xerroff=E_BAD_FORMAT_STR2
 
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
+
 .KEEP_STATE:
 
 all: $(PROG)

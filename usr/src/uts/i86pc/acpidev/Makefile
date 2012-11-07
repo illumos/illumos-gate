@@ -60,6 +60,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 LDFLAGS		+= -dy -N misc/acpica
 
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-type-limits
+
 #
 #	Default build targets.
 #

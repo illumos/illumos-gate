@@ -67,6 +67,9 @@ LDFLAGS += -dy -Nmisc/md5 -Nmisc/kcf -Ndrv/kssl -Nfs/sockfs
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 
+CERRWARN	+= -_gcc=-Wno-switch
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 #	Default build targets.
 #

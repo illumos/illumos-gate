@@ -447,7 +447,7 @@ void FCHBA::loadAdapters(vector<HBA*> &list) {
     if (pathList->numAdapters > HBAList::HBA_MAX_PER_LIST) {
 	delete(pathList);
 	throw InternalError(
-	    "Exceeds max number of adatpers that VSL supports.");
+	    "Exceeds max number of adapters that VSL supports.");
     }
     delete (pathList);
 }

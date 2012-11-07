@@ -32,6 +32,8 @@ include ../Makefile.cmd
 LDLIBS +=	-lvolmgt
 LINTFLAGS +=    -um
 
+CERRWARN +=	-_gcc=-Wno-parentheses
+
 .KEEP_STATE:
 
 #

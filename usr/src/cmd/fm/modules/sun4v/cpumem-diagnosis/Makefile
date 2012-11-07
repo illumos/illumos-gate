@@ -22,7 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 ARCH = sun4v
 
@@ -36,3 +35,6 @@ include ../../sun4/cpumem-diagnosis/Makefile.cpumem
 
 LDLIBS += -L$(ROOTLIB)/fm -lmdesc -lldom
 LDFLAGS += -R/usr/lib/fm
+
+CERRWARN += -_gcc=-Wno-switch
+CERRWARN += -_gcc=-Wno-parentheses

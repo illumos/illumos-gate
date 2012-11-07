@@ -70,10 +70,14 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 # lint pass one enforcement
 #
-CFLAGS += -v -D_SD_8K_BLKSIZE -D_SDBC_SINGLE_BRD
+CFLAGS += $(CCVERBOSE) -D_SD_8K_BLKSIZE -D_SDBC_SINGLE_BRD
 LDFLAGS += -dy -N"drv/nsctl" -N"drv/ncall" -N"drv/nskern" -N"misc/spuni"
 LINTTAGS += -erroff=E_ASSIGN_NARROW_CONV
 LINTTAGS += -erroff=E_BAD_PTR_CAST_ALIGN
+
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-unused-label
 
 .KEEP_STATE:
 

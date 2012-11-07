@@ -19,12 +19,9 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/sgs/error/i386/Makefile
 
 PROG=		error
 
@@ -40,6 +37,9 @@ DEFLIST=	-DELF
 CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master)
 CFLAGS +=	$(CCVERBOSE)
 C99MODE=	$(C99_ENABLE)
+
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-parentheses
 
 CLEANFILES +=	$(LINTOUT)
 

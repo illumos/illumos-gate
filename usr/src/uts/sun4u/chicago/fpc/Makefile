@@ -103,6 +103,8 @@ CFLAGS += -dalign
 #
 LINTTAGS	+= -erroff=E_STATIC_UNUSED
 
+CERRWARN	+= -_gcc=-Wno-unused-variable
+
 #
 #	Default build targets.
 #

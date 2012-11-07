@@ -19,12 +19,8 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# cmd/syseventd/modules/sysevent_conf_mod/Makefile
 #
 
 LIBRARY =	sysevent_conf_mod
@@ -33,6 +29,8 @@ include ../Makefile.com
 
 LDLIBS +=	-lnvpair
 CPPFLAGS +=	-I ../../daemons/syseventconfd
+
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

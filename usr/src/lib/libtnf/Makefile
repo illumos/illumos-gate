@@ -70,6 +70,8 @@ CPPFLAGS +=	-D_DATUM_MACROS -D_REENTRANT
 
 LINTFLAGS +=	-y
 
+CERRWARN +=	-_gcc=-Wno-unused-variable
+
 .KEEP_STATE:
 
 all: $(LIBS)

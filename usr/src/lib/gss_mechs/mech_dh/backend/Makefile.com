@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 # This make file will build mech_dh.so.1. This shared object
@@ -51,6 +49,10 @@ $(EXPORT_RELEASE_BUILD)include $(MAKEFILE_EXPORT)
 
 
 CPPFLAGS += -I../mech -I../crypto -I$(SRC)/uts/common/gssapi/include
+
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 $(PICS) := 	CFLAGS += $(XFFLAG)
 $(PICS) := 	CCFLAGS += $(XFFLAG)

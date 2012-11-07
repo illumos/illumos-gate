@@ -23,8 +23,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY=	libmilter.a
 VERS=		.1
@@ -49,6 +47,8 @@ INCPATH=        -I$(SENDMAIL)/src -I$(SENDMAIL)/include
 ENVDEF=		-DMILTER -DNETINET6 -DNOT_SENDMAIL -D_REENTRANT \
 	-Dsm_snprintf=snprintf
 CPPFLAGS=	$(INCPATH) $(ENVDEF) $(CPPFLAGS.sm)
+
+CERRWARN +=	-_gcc=-Wno-type-limits
 
 LIBS=		$(DYNLIB) $(LINTLIB)
 LDLIBS +=	-lc -lsocket -lnsl

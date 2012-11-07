@@ -37,6 +37,10 @@ LDLIBS += -L$(ROOT)/lib -lsocket
 LDLIBS += -ldladm -ldlpi -lkstat -lsecdb -lbsm -linetutil -ldevinfo
 LDLIBS += $(ZLAZYLOAD) -lrstp $(ZNOLAZYLOAD)
 
+CERRWARN += -_gcc=-Wno-switch
+CERRWARN += -_gcc=-Wno-unused-label
+CERRWARN += -_gcc=-Wno-uninitialized
+
 # For headers from librstp.
 LINTFLAGS +=	-erroff=E_TRAILING_COMMA_IN_ENUM
 

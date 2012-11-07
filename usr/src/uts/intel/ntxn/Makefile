@@ -69,6 +69,10 @@ LDFLAGS		+=  -dy -N misc/mac -N drv/ip
 LINTFLAGS	+= $(NTXN_DFLAGS) $(NTXN_KFLAGS)
 LINTFLAGS	+= -DSOLARIS11
 
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-unused-label
+CERRWARN	+= -_gcc=-Wno-type-limits
+
 #
 #
 #	Default build targets.

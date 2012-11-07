@@ -23,11 +23,12 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
+ */
 
 #ifndef _SYS_PROCFS_H
 #define	_SYS_PROCFS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -61,6 +62,8 @@ extern "C" {
 #include <sys/pset.h>
 #include <sys/procfs_isa.h>
 #include <sys/priv.h>
+#include <sys/stat.h>
+#include <sys/param.h>
 
 /*
  * System call interfaces for /proc.
@@ -486,6 +489,38 @@ typedef struct prasmap {
 #define	PG_REFERENCED	0x02		/* page referenced since last read */
 #define	PG_MODIFIED	0x01		/* page modified since last read */
 #define	PG_HWMAPPED	0x04		/* page is present and mapped */
+
+/*
+ * Open files.  Only in core files (for now).  Note that we'd like to use
+ * the stat or stat64 structure, but both of these structures are unfortunately
+ * not consistent between 32 and 64 bit modes.  To keep our lives simpler, we
+ * just define our own structure with types that are not sensitive to this
+ * difference.  Also, it turns out that pfiles omits a lot of info from the
+ * struct stat (e.g. times, device sizes, etc.) so we don't bother adding those
+ * here.
+ */
+typedef struct prfdinfo {
+	int		pr_fd;
+	mode_t		pr_mode;
+
+	uid_t		pr_uid;
+	gid_t		pr_gid;
+
+	major_t		pr_major;	/* think stat.st_dev */
+	minor_t		pr_minor;
+
+	major_t		pr_rmajor;	/* think stat.st_rdev */
+	minor_t		pr_rminor;
+
+	ino64_t		pr_ino;
+	off64_t		pr_offset;
+	off64_t		pr_size;
+
+	int		pr_fileflags;	/* fcntl(F_GETXFL), etc */
+	int		pr_fdflags;	/* fcntl(F_GETFD), etc. */
+
+	char		pr_path[MAXPATHLEN];
+} prfdinfo_t;
 
 /*
  * Header for /proc/<pid>/lstatus /proc/<pid>/lpsinfo /proc/<pid>/lusage

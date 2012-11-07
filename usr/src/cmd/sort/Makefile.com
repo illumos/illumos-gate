@@ -23,9 +23,7 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# sort(1) Makefile.com
+
 #
 # Debugging targets
 #   sort provides a number of debugging options to simplify failure analysis.
@@ -85,6 +83,10 @@ CFLAGS +=	$(CCVERBOSE) $(SORT_DEBUG)
 CFLAGS64 +=	$(CCVERBOSE) $(SORT_DEBUG)
 CPPFLAGS +=	-D_FILE_OFFSET_BITS=64
 LINTFLAGS +=	-U_FILE_OFFSET_BITS
+
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-unused-function
 
 $(XPG4)	:=	CFLAGS += -DXPG4
 

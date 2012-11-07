@@ -59,6 +59,10 @@ $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
 CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
 
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-unused-function
+CERRWARN += -_gcc=-Wno-uninitialized
+
 FMLIBDIR=usr/lib/fm
 $(BUILD64)FMLIBDIR64=usr/lib/fm/$(MACH64)
 

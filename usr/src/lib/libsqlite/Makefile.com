@@ -2,8 +2,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 SQLITE_VERSION = 2.8.15-repcached
 
@@ -92,6 +90,11 @@ SRCS = \
 
 MYCPPFLAGS = -D_REENTRANT -DTHREADSAFE=1 -DHAVE_USLEEP=1 -I. -I.. -I$(SRCDIR)
 CPPFLAGS += $(MYCPPFLAGS)
+
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-unused-function
+CERRWARN += -_gcc=-Wno-unused-label
 
 MAPFILES = ../mapfile-sqlite
 

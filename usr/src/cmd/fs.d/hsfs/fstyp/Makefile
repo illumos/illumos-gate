@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 FSTYP_VERS=1
 FSTYPE=		hsfs
@@ -61,6 +59,8 @@ PMAP=
 SRCS=	${LIBPROG:%.so.$(FSTYP_VERS)=%.c}
 
 CPPFLAGS += 	-DFSTYP_VERS=${FSTYP_VERS} -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
+
+CERRWARN +=	-_gcc=-Wno-switch
 
 .KEEP_STATE:
 

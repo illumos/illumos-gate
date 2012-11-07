@@ -24,10 +24,6 @@
 #
 
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-
-#
 # cmd/tsol/updatehome
 #
 PROG= updatehome
@@ -38,6 +34,7 @@ OBJS= setupfiles.o updatehome.o
 SRCS= $(OBJS:%.o=%.c)
 
 LDLIBS += -ltsol -lsecdb
+CERRWARN += -_gcc=-Wno-parentheses
 
 .KEEP_STATE:
 

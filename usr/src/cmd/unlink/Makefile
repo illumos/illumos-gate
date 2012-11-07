@@ -27,6 +27,8 @@ PROG= unlink
 include ../Makefile.cmd
 
 FILEMODE = 0555
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-parentheses
 
 .KEEP_STATE:
 

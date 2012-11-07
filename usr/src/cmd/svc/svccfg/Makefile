@@ -73,6 +73,13 @@ MYCPPFLAGS =	-I ../common -I$(ADJUNCT_PROTO)/usr/include/libxml2
 CPPFLAGS +=	$(MYCPPFLAGS)
 LDFLAGS +=	$(MAPOPTS)
 
+CERRWARN +=	-_gcc=-Wno-unused-label
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc=-Wno-switch
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-parentheses
+
 LFLAGS = -t
 YFLAGS = -d
 

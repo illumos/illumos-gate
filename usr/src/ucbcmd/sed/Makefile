@@ -24,10 +24,6 @@
 # All rights reserved.
 #
 
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-
 PROG= sed
 
 OBJS= sed0.o sed1.o
@@ -36,6 +32,9 @@ SRCS= $(OBJS:%.o=%.c)
 include ../Makefile.ucbcmd
 
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
+CERRWARN += -_gcc=-Wno-char-subscripts
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-parentheses
 
 .KEEP_STATE:
 

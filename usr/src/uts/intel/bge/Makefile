@@ -22,7 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the Broadcom BCM57xx
 #	Gigabit Ethernet (BGE) driver module in intel systems
@@ -64,6 +64,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-switch
+CERRWARN	+= -_gcc=-Wno-parentheses
 
 #
 # Driver depends on MAC

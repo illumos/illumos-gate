@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY= libresolv.a
 VERS= .1
@@ -56,6 +54,13 @@ C99MODE=	$(C99_DISABLE)
 # so we must put -I. ahead of the default include directories:
 CPPFLAGS = -I. -I../common/inc $(CPPFLAGS.master) -DDEBUG -DSYSV -D_REENTRANT
 LDLIBS += -lsocket -lnsl -lc
+
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-unused-variable
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-implicit-int
+CERRWARN += -_gcc=-Wno-extra
 
 ROOTDYNLIBS=	$(DYNLIB:%=$(ROOTLIBDIR)/%)
 

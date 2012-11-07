@@ -20,11 +20,8 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"	/* */
-#
 # Copyright (c) 1989 by Sun Microsystems, Inc.
 #
-# cmd/fs.d/nfs/showmount/Makefile
 
 FSTYPE=		nfs
 LIBPROG=	showmount
@@ -44,6 +41,11 @@ SRCS=		$(OBJS:%.o=%.c)
 POFILE= showmount.po
 
 LDLIBS +=	-lrpcsvc -lnsl
+
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 $(LIBPROG):	$(OBJS)
 		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)

@@ -23,8 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG= link 
 XPG4PROG= link
@@ -35,6 +33,8 @@ include ../Makefile.cmd
 clean $(XPG4) := OBJS += values-xpg4.o
 
 FILEMODE= 0555
+
+CERRWARN += -_gcc=-Wno-parentheses
 
 .KEEP_STATE:
 

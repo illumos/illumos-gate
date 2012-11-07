@@ -27,6 +27,11 @@ ETCTSOLFILES =	devalloc_defaults
 
 include		../Makefile.cmd
 
+CERRWARN +=	-_gcc=-Wno-unused-value
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-clobbered
+
 ROOTSEC =	$(ROOTETC)/security
 ROOTSECDEV =	$(ROOTSEC)/dev
 ROOTSECLIB =	$(ROOTSEC)/lib

@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 #	This makefile drives the production of the 
@@ -72,6 +70,10 @@ DEBUG_DEFS	+= $(DEBUG_FLGS)
 # lint pass one enforcement
 #  
 CFLAGS += $(CCVERBOSE)
+
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-unused-label
+CERRWARN	+= -_gcc=-Wno-uninitialized
 
 #
 #

@@ -79,6 +79,10 @@ CPPFLAGS	+= -D_REENTRANT
 CFLAGS		+= $(CTF_FLAGS)
 LINTFLAGS	+= -mnux
 
+CERRWARN	+= -_gcc=-Wno-unused
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-switch
+
 C99MODE		= $(C99_ENABLE)
 
 ctfconvert	:= LDFLAGS += $(DWARFLDFLAGS)

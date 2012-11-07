@@ -19,8 +19,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -30,6 +28,8 @@ PROG= pack
 include ../Makefile.cmd
 
 CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
 XGETFLAGS += -a -x $(PROG).xcl
 CPPFLAGS +=  -D_FILE_OFFSET_BITS=64
 

@@ -22,6 +22,9 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ */
 
 #ifndef _NFS4_H
 #define	_NFS4_H
@@ -1307,7 +1310,7 @@ extern char	*utf8_to_fn(utf8string *, uint_t *, char *);
 extern utf8string *str_to_utf8(char *, utf8string *);
 extern utf8string *utf8_copy(utf8string *, utf8string *);
 extern int	utf8_compare(const utf8string *, const utf8string *);
-extern int	utf8_dir_verify(utf8string *);
+extern nfsstat4	utf8_dir_verify(utf8string *);
 extern char	*utf8_strchr(utf8string *, const char);
 extern int	ln_ace4_cmp(nfsace4 *, nfsace4 *, int);
 extern int	vs_aent_to_ace4(vsecattr_t *, vsecattr_t *, int, int);

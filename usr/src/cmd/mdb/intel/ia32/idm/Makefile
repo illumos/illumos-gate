@@ -38,3 +38,5 @@ include ../../../Makefile.module
 CPPFLAGS += -I$(ISCSITBASE)
 CPPFLAGS += -I$(ISCSIBASE)
 CPPFLAGS += -I$(ISERBASE)
+
+CERRWARN += -_gcc=-Wno-uninitialized

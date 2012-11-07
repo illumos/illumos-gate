@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1989 by Sun Microsystems, Inc.
 #
 
@@ -30,6 +28,10 @@ LIBPROG=	labelit
 ATTMK= 		$(LIBPROG)
 
 include		../../Makefile.fstype
+
+CERRWARN += -_gcc=-Wno-switch
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-unused-variable
 
 lint := PROG = $(LIBPROG)
 

@@ -42,5 +42,10 @@ CPPFLAGS += -I$(CMNNETDIR)/dhcp -I$(TOPDIR)/common/net/wanboot/crypt \
 #
 CPPFLAGS += -I..
 
+CERRWARN += -_gcc=-Wno-char-subscripts
+CERRWARN += -_gcc=-Wno-switch
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-unused-value
 
 include ../Makefile.targ

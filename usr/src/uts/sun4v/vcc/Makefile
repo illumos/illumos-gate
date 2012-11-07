@@ -25,7 +25,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the vcc driver kernel module.
 #
@@ -68,6 +68,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 # lint pass one enforcement
 #
 CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-type-limits
+CERRWARN += -_gcc=-Wno-unused-function
+CERRWARN += -_gcc=-Wno-uninitialized
 
 #
 # compiler failes with not reached statements

@@ -22,9 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/libsldap/Makefile.com
 
 LIBRARY= libsldap.a
 VERS= .1
@@ -53,6 +50,10 @@ CPPFLAGS +=	-I../common -I$(SRC)/lib/libldap5/include/ldap \
 		-I$(ADJUNCT_PROTO)/usr/include/mps $(LOCFLAGS)
 LINTFLAGS +=	-erroff=E_BAD_PTR_CAST_ALIGN
 LINTFLAGS64 +=	-erroff=E_BAD_PTR_CAST_ALIGN
+
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-switch
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

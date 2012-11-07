@@ -23,7 +23,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the pruction of the Management Network
 #
@@ -59,6 +59,11 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 CFLAGS += $(CCVERBOSE)
 LDFLAGS += -dy -Ndrv/ip -Ndrv/eri -Ndrv/iosram -Nmisc/mboxsc
+
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-unused-label
+CERRWARN += -_gcc=-Wno-type-limits
 
 #
 #	Default build targets.

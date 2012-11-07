@@ -43,6 +43,8 @@ CONF_SRCDIR	= $(UTSBASE)/common/io/ib/clients/iser
 #
 include $(UTSBASE)/sparc/Makefile.sparc
 
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 #	Define targets
 #

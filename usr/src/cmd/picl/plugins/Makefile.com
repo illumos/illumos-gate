@@ -29,6 +29,12 @@ MAPFILES =
 CPPFLAGS	+= -I$(SRC)/lib/libpicl -I$(SRC)/lib/libpicltree
 CPPFLAGS	+= -I$(SRC)/cmd/picl/plugins/inc
 CFLAGS		+= $(CCVERBOSE)
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-char-subscripts
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-switch
+CERRWARN	+= -_gcc=-Wno-unused-function
+CERRWARN	+= -_gcc=-Wno-unused-variable
 
 # Some picl plugins have dependencies to which they make no reference.  These
 # dependencies are expected to be loaded so that their .init's fire and thus

@@ -21,14 +21,16 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG= expr
 
 include ../Makefile.ucbcmd
 
 FILEMODE=	755
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc=-Wno-unused-label
+CERRWARN +=	-_gcc=-Wno-extra
+CERRWARN +=	-_gcc=-Wno-char-subscripts
 
 LDFLAGS +=	$(MAPFILE.NGB:%=-M%)
 

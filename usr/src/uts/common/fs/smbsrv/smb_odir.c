@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -286,7 +287,8 @@ smb_odir_open(smb_request_t *sr, char *path, uint16_t sattr, uint32_t flags)
 
 	tree = sr->tid_tree;
 
-	smb_convert_wildcards(path);
+	if (sr->session->dialect < NT_LM_0_12)
+		smb_convert_wildcards(path);
 
 	rc = smb_pathname_reduce(sr, sr->user_cr, path,
 	    tree->t_snode, tree->t_snode, &dnode, pattern);
@@ -1278,22 +1280,23 @@ smb_odir_lookup_link(smb_request_t *sr, smb_odir_t *od,
  * - If shortnames are supported, generate the shortname from
  *   odirent->od_name and check if it matches od->d_pattern.
  */
-boolean_t
+static boolean_t
 smb_odir_match_name(smb_odir_t *od, smb_odirent_t *odirent)
 {
 	char	*name = odirent->od_name;
 	char	shortname[SMB_SHORTNAMELEN];
 	ino64_t	ino = odirent->od_ino;
+	boolean_t ci = (od->d_flags & SMB_ODIR_FLAG_IGNORE_CASE) != 0;
 
 	if (smb_is_reserved_dos_name(name))
 		return (B_FALSE);
 
-	if (smb_match_ci(od->d_pattern, name))
+	if (smb_match(od->d_pattern, name, ci))
 		return (B_TRUE);
 
 	if (od->d_flags & SMB_ODIR_FLAG_SHORTNAMES) {
 		smb_mangle(name, ino, shortname, SMB_SHORTNAMELEN);
-		if (smb_match_ci(od->d_pattern, shortname))
+		if (smb_match(od->d_pattern, shortname, ci))
 			return (B_TRUE);
 	}
 

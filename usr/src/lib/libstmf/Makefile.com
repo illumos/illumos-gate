@@ -41,6 +41,8 @@ C99LMODE=	-Xc99=%all
 LDLIBS +=	-lc -lnvpair -lscf -lm
 CPPFLAGS +=	$(INCS) -D_REENTRANT
 
+CERRWARN +=	-_gcc=-Wno-unused-label
+
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
 
 .KEEP_STATE:

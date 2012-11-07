@@ -22,7 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 # This Makefile builds the UltraSPARC 2 - 4 Performance Counter BackEnd (PCBE).
 #
@@ -58,6 +58,8 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK)
 #
 LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
+
+CERRWARN	+= -_gcc=-Wno-type-limits
 
 #
 #	Default build targets.

@@ -20,12 +20,8 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 2000 by Sun Microsystems, Inc.
 # All rights reserved.
-#
-# cmd/cmd-inet/usr.lib/ncad/Makefile
 #
 
 PROG = ncaconfd
@@ -39,6 +35,8 @@ include ../Makefile.lib
 
 LDLIBS += -lsocket -lnsl
 CPPFLAGS += -I$(SRC)/uts/common/inet/nca
+
+CERRWARN += -_gcc=-Wno-uninitialized
 
 POFILE = ${PROG}.po
 

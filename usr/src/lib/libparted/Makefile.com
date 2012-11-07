@@ -117,6 +117,10 @@ CPPFLAGS +=	-I$(SRCDIR)/lib -I$(SRCDIR)/include
 DYNFLAGS +=	$(ZINTERPOSE)
 LDLIBS +=	-ldiskmgt -luuid -lc -lnvpair
 
+CERRWARN +=	-_gcc=-Wno-switch
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-type-limits
+
 .KEEP_STATE:
 
 #

@@ -24,7 +24,6 @@
 # Use is subject to license terms.
 #
 
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the PCIC style PCMCIA adapter
 #	It is mostly a standard driver
@@ -73,6 +72,11 @@ LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 LINTTAGS	+= -erroff=E_STATIC_UNUSED
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
+
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-unused-variable
+CERRWARN	+= -_gcc=-Wno-unused-function
+CERRWARN	+= -_gcc=-Wno-uninitialized
 
 #
 #	Default build targets.

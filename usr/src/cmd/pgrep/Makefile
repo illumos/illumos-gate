@@ -37,6 +37,7 @@ include ../Makefile.cmd
 
 CLOBBERFILES += $(PKILLFILE)
 CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-parentheses
 LDLIBS += -luutil -lproject -lcontract
 
 POFILE = ppgrep.po

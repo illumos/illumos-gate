@@ -20,11 +20,7 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1989 by Sun Microsystems, Inc.
-#
-# cmd/soelim/Makefile
 #
 
 include		../Makefile.cmd
@@ -35,13 +31,14 @@ OBJS =		soelim.o
 
 SRCS =		$(OBJS:%.o=%.c)
 
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
 
 all :		$(PROG)
 
 $(PROG) :	soelim.o
 		$(LINK.c) -o $@ $(OBJS) $(LDFLAGS) $(LDLIBS)
 		$(POST_PROCESS)
-	
+
 install :	all $(ROOTPROG)
 
 clean:

@@ -235,6 +235,10 @@ following authentication methods:
 .in -2
 .br
 .in +2
+\fBtls:none\fR
+.in -2
+.br
+.in +2
 \fBtls:simple\fR
 .in -2
 .br
@@ -251,7 +255,9 @@ Note that some directory servers may not support all of these authentication
 methods. For \fBsimple\fR, be aware that the bind password will be sent in the
 clear to the LDAP server. For those authentication methods using TLS (transport
 layer security), the entire session is encrypted. You will need to install the
-appropriate certificate databases to use TLS.
+appropriate certificate databases to use TLS. Note that the \fBtls:none\fR
+authentication method requires a \fBcredentialLevel\fR of \fBproxy\fR to
+take effect.
 .SS "Commands"
 .sp
 .LP
@@ -371,6 +377,25 @@ attributeMap: passwd:uid=employeeNumber
 
 the LDAP client would use the LDAP attribute \fBemployeeNumber\fR rather than
 \fBuid\fR for the \fBpasswd\fR service. This is a multivalued attribute.
+.sp
+To use rfc2307bis style groups (with a DN rather than username as the
+attribute value), map the \fBmemberUid\fR attribute to the group attribute
+being used (typically either \fBuniqueMember\fR or \fBmember\fR), for example:
+.sp
+.in +2
+.nf
+attributeMap: group:memberUid=uniqueMember
+.fi
+.in -2
+.sp
+
+Group membership in a given directory is expected to be maintained with
+either username format member attributes, or DN format member attributes. If
+both are present they must describe identical memberships or unexpected
+results may be obtained. For DN format attributes, the username is required
+to be the RDN of the entry. Note that nested groups are not currently
+supported, and unexpected results may be obtained if they are used.
+
 .RE
 
 .sp

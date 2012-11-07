@@ -35,6 +35,10 @@ BIGNUM_PSM_OBJS = bignum_amd64.o bignum_amd64_asm.o
 include		$(SRC)/lib/Makefile.lib
 include		$(SRC)/lib/Makefile.lib.64
 
+CERRWARN +=	-_gcc=-Wno-type-limits
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 AES_PSM_SRC =	$(AES_DIR)/$(MACH64)/aes_amd64.s \
 		$(AES_DIR)/$(MACH64)/aes_intel.s \
 		$(AES_DIR)/$(MACH64)/aeskey.c

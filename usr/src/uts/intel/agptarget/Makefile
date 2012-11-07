@@ -31,6 +31,8 @@ LDFLAGS += -dy -Nmisc/busra
 #
 include $(UTSBASE)/intel/Makefile.intel
 
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 #	Define targets
 #

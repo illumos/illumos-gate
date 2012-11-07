@@ -70,8 +70,10 @@ ALL_TARGET      = $(BINARY) $(SRC_CONFFILE)
 LINT_TARGET     = $(LINT_MODULE).lint
 INSTALL_TARGET  = $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
-CPPFLAGS +=  -I$(UTSBASE)/i86pc
-LDFLAGS += -dy -N drv/smbios
+CPPFLAGS	+=  -I$(UTSBASE)/i86pc
+LDFLAGS		+= -dy -N drv/smbios
+
+CERRWARN	+= -_gcc=-Wno-uninitialized
 
 #
 #       Default build targets.

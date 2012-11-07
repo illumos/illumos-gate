@@ -20,12 +20,8 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# cmd/oawk/Makefile
 #
 
 include		../Makefile.cmd
@@ -66,6 +62,12 @@ CPPFLAGS =      -I. $(CPPFLAGS.master)
 CPPFLAGS +=	-D_FILE_OFFSET_BITS=64
 
 ROOTLINK =	$(LINKPROG:%=$(ROOTBIN)/%)
+
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc=-Wno-unused-label
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-extra
+CERRWARN +=	-_gcc=-Wno-parentheses
 
 .KEEP_STATE :
 

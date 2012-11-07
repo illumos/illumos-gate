@@ -80,6 +80,12 @@ CPPFLAGS += -I.. -I../.. -I../../.. -I$(SRC)/lib/gss_mechs/mech_krb5/include \
 	-DHAVE_STRFTIME=1 -DHAVE_VSPRINTF=1 -DUSE_KADM5_API_VERSION=2
 
 CFLAGS +=	$(CCVERBOSE) -I..
+
+CERRWARN +=	-_gcc=-Wno-unused-function
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 LDLIBS +=	-lc
 
 .KEEP_STATE:

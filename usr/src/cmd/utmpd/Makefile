@@ -34,6 +34,8 @@ ROOTMANIFESTDIR = $(ROOTSVCSYSTEM)
 
 FILEMODE = 555
 
+CERRWARN += -_gcc=-Wno-extra
+
 .KEEP_STATE:
 
 all: $(PROG)

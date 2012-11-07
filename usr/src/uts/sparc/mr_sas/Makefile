@@ -59,6 +59,10 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 # 
 CFLAGS		+= $(CCVERBOSE)
 
+CERRWARN	+= -_gcc=-Wno-unused-label
+CERRWARN	+= -_gcc=-Wno-switch
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 # Turn on doubleword alignment for 64 bit registers
 #

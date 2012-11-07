@@ -526,17 +526,12 @@ warnings(struct aelist *h)
 	if (warningsonce++)
 		return;
 
+	/*
+	 * Enable as many warnings as exist, then disable those that we never
+	 * ever want.
+	 */
 	newae(h, "-Wall");
-	newae(h, "-Wno-unknown-pragmas");
-	newae(h, "-Wno-missing-braces");
-	newae(h, "-Wno-sign-compare");
-	newae(h, "-Wno-parentheses");
-	newae(h, "-Wno-uninitialized");
-	newae(h, "-Wno-implicit-function-declaration");
-	newae(h, "-Wno-unused");
-	newae(h, "-Wno-trigraphs");
-	newae(h, "-Wno-char-subscripts");
-	newae(h, "-Wno-switch");
+	newae(h, "-Wextra");
 }
 
 static void
@@ -655,6 +650,7 @@ do_gcc(cw_ictx_t *ctx)
 	newae(ctx->i_ae, "-fno-inline-functions");
 	newae(ctx->i_ae, "-fno-builtin");
 	newae(ctx->i_ae, "-fno-asm");
+	newae(ctx->i_ae, "-fdiagnostics-show-option");
 	newae(ctx->i_ae, "-nodefaultlibs");
 
 #if defined(__sparc)

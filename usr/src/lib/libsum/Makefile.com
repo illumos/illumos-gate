@@ -74,6 +74,8 @@ CFLAGS += \
 CFLAGS64 += \
 	$(ASTCFLAGS64)
 
+CERRWARN	+= -_gcc=-Wno-parentheses
+
 # This codepath is performance-critical
 sparc_COPTFLAG=-xO5 -_cc=-xprefetch=auto,explicit
 sparcv9_COPTFLAG=-xO5 -_cc=-xprefetch=auto,explicit

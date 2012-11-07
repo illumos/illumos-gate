@@ -19,8 +19,7 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 # Copyright (c) 1989 by Sun Microsystems, Inc.
 #
@@ -30,6 +29,8 @@ PROG= tr
 include ../Makefile.ucbcmd
 
 FILEMODE=	755
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc=-Wno-parentheses
 
 .KEEP_STATE:
 

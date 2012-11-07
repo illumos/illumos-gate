@@ -23,8 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 # mdb_ks, as used in kmdb, requires some special care and feeding during the
@@ -57,3 +55,4 @@ MAPFILE =
 #
 kmod/mdb_ks.o := CPPFLAGS += -D_mdb_init=mdb_ks_init -D_mdb_fini=mdb_ks_fini
 
+CERRWARN += -_gcc=-Wno-type-limits

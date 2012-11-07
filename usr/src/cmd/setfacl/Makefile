@@ -20,14 +20,16 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1993 by Sun Microsystems, Inc.
 #
 
 PROG= setfacl
 
 include ../Makefile.cmd
+
+CERRWARN += -_gcc=-Wno-unused-variable
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-uninitialized
 
 LDLIBS += -lsec
 

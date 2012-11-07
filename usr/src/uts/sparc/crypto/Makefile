@@ -61,6 +61,8 @@ CFLAGS		+= $(CCVERBOSE)
 
 LDFLAGS		+= -dy -Nmisc/kcf
 
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 #	Default build targets.
 #

@@ -20,8 +20,9 @@
  */
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011, 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ * Copyright 2012 Alexey Zaytsev <alexey.zaytsev@gmail.com> All rights reserved.
  */
 
 #include <sys/types.h>
@@ -503,7 +504,7 @@ bd_xfer_ctor(void *buf, void *arg, int kmflag)
 	bd_t		*bd = arg;
 	int		(*dcb)(caddr_t);
 
-	if (kmflag == KM_SLEEP) {
+	if (kmflag == KM_PUSHPAGE || kmflag == KM_SLEEP) {
 		dcb = DDI_DMA_SLEEP;
 	} else {
 		dcb = DDI_DMA_DONTWAIT;

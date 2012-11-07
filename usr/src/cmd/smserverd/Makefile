@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG =	rpc.smserverd
 OBJS =	smediad.o smediad_err.o myaudit.o smed_svc.o smed_xdr.o
@@ -47,6 +45,8 @@ LDLIBS +=  -lnsl -lbsm
 
 CPPFLAGS += -D_REENTRANT
 CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-unused-variable
 LINTFLAGS += -u
 
 .KEEP_STATE:

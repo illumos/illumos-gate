@@ -44,3 +44,4 @@ LINTFLAGS64 +=  -erroff=E_STATIC_UNUSED -erroff=E_FUNC_ARG_UNUSED
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
 
+CERRWARN +=	-_gcc=-Wno-address

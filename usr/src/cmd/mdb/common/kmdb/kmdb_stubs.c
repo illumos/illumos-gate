@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Stubs for basic system services otherwise unavailable to the debugger.
  */
@@ -33,7 +31,6 @@
 #include <unistd.h>
 #include <libproc.h>
 #include <sys/time.h>
-#include <sys/utsname.h>
 
 #include <kmdb/kmdb_dpi.h>
 #include <kmdb/kmdb_promif.h>
@@ -179,12 +176,3 @@ exit(int status)
 	kmdb_dpi_reboot();
 #endif
 }
-
-#if defined(__i386) && !defined(__amd64)
-/*ARGSUSED*/
-int
-_nuname(struct utsname *buf)
-{
-	return (-1);
-}
-#endif

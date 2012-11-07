@@ -22,7 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 MODULE = disk-monitor
 CLASS = common
@@ -35,3 +34,4 @@ LINTFLAGS += -I. -I$(SRC)/lib/fm/topo/modules/common/disk -L$(ROOT)/usr/lib/fm
 CFLAGS += -I. -I$(SRC)/lib/fm/topo/modules/common/disk
 LDLIBS += -lsysevent -lnvpair -lsmbios -lcfgadm -ltopo -luutil -lipmi
 LDFLAGS += -L$(ROOT)/usr/lib/fm -R/usr/lib/fm
+CERRWARN += -_gcc=-Wno-uninitialized

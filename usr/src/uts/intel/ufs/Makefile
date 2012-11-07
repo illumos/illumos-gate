@@ -24,7 +24,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the ufs file system
 #	kernel module.
@@ -76,6 +76,11 @@ LINTTAGS	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
 LINTTAGS	+= -erroff=E_STATIC_UNUSED
 LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
+
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-type-limits
+CERRWARN	+= -_gcc=-Wno-unused-label
 
 #
 #	Default build targets.

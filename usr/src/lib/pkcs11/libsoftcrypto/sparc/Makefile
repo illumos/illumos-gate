@@ -41,6 +41,11 @@ LIBS =		$(DYNLIB) $(LINTLIB)
 MAPFILEDIR =	../common
 
 CFLAGS +=	$(CCVERBOSE)
+
+CERRWARN +=	-_gcc=-Wno-type-limits
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 CPPFLAGS +=	-I$(CRYPTODIR) -I$(UTSDIR) -D_POSIX_PTHREAD_SEMANTICS
 LDLIBS +=	-lcryptoutil -lc
 LINTFLAGS +=	$(EXTRA_LINT_FLAGS)

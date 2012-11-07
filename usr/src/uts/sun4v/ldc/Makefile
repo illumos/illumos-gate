@@ -23,7 +23,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 # uts/sun4v/ldc/Makefile
 #
@@ -77,6 +77,9 @@ CFLAGS += $(CCVERBOSE)
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 LINTTAGS        += -erroff=E_PTRDIFF_OVERFLOW
+
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-parentheses
 
 #
 #	Default build targets.

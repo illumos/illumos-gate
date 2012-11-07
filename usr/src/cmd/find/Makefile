@@ -19,8 +19,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -36,6 +34,10 @@ include ../Makefile.cmd
 
 $(XPG4)	:= CFLAGS += -DXPG4
 CPPFLAGS += -D_FILE_OFFSET_BITS=64 -I $(SRC)/common/util
+
+CERRWARN += -_gcc=-Wno-switch
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
 
 LINTFLAGS += -u
 LDLIBS += -lsec

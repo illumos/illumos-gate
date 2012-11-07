@@ -23,8 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG= 	setuname
 OBJS=	$(PROG).o
@@ -34,6 +32,8 @@ include ../../Makefile.cmd
 
 CFLAGS +=	$(CCVERBOSE)
 CFLAGS64 +=	$(CCVERBOSE)
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-parentheses
 LDLIBS +=	-lkvm
 
 CLEANFILES	+= $(OBJS)

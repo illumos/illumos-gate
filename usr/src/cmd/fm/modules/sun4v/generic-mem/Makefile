@@ -52,6 +52,8 @@ GMEM_VERSION = "1.0"
 LDLIBS += -L$(ROOTLIB)/fm -ltopo
 LDFLAGS += -R/usr/lib/fm
 CPPFLAGS += $(INCDIRS:%=-I%) -DGMEM_VERSION='$(GMEM_VERSION)' -D$(ARCH)
+CERRWARN += -_gcc=-Wno-switch
+CERRWARN += -_gcc=-Wno-parentheses
 
 %.o: $(GENERIC_MEM)/%.c
 	$(COMPILE.c) -o $@ $<

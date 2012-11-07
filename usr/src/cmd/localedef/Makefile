@@ -27,9 +27,13 @@ HDRS	= localedef.h
 SRCS	= $(OBJS:%.o=%.c)
 
 CPPFLAGS	+= -I $(SRC)/lib/libc/port/locale
+CERRWARN	+= -_gcc=-Wno-char-subscripts
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-unused-label
 LDLIBS		+= -lgen
 LDLIBS 		+= -lavl
 YFLAGS		= -d -b parser
+
 CLEANFILES	= $(OBJS) parser.tab.c parser.tab.h
 CLEANFILES	+= \
 		UTF-8.cm UTF-8.ct \

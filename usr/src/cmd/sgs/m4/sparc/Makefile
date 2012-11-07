@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # cmd/sgs/m4/sparc/Makefile
 #
 
@@ -54,6 +52,9 @@ INCLIST=	-I../common
 DEFLIST=	-DELF
 CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master)
 CFLAGS +=	$(CCVERBOSE)
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-unused-label
+CERRWARN +=	-_gcc=-Wno-uninitialized
 C99MODE=	$(C99_ENABLE)
 
 LINTFLAGS +=	$(LDLIBS)

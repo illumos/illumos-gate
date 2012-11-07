@@ -23,13 +23,13 @@
 # Copyright 1989,2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG= autopush 
 ROOTFS_PROG= $(PROG)
 
 include ../Makefile.cmd
+
+CERRWARN += -_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

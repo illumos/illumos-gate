@@ -23,8 +23,6 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 #	Path to the base of the uts directory tree.
@@ -66,6 +64,9 @@ CFLAGS += $(CCVERBOSE)
 #
 # depends on misc/s1394
 LDFLAGS		+= -dy -Nmisc/s1394
+
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-uninitialized
 
 #	Default build targets.
 #

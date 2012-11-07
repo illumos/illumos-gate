@@ -19,8 +19,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -31,6 +29,11 @@ BINDIFF= diff
 LIBDIFFH= diffh
 
 include ../Makefile.cmd
+
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-address
+
 #
 # for messaging catalog
 #

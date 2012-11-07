@@ -67,6 +67,8 @@ LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 LINTTAGS	+= -erroff=E_STATIC_UNUSED
 
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 # Default build targets.
 #

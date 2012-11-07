@@ -32,6 +32,7 @@ SRCS = $(OBJS:%.o=../%.c)
 include ../../Makefile.cmd
 
 CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-parentheses
 LDLIBS += -lcurses -lproject
 LINTFLAGS += -u
 LINTFLAGS64 += -u

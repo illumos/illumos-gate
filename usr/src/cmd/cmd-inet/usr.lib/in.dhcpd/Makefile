@@ -55,6 +55,10 @@ LDLIBS    += $(NSU_DIR)/rfc2136.so.1 -ldhcpsvc -ldhcputil -linetutil \
 	     -lsocket -lnsl -lmtmalloc -lresolv
 lint := LDLIBS = $(LDLIBS.cmd) -ldhcpsvc -ldhcputil -linetutil -lsocket -lnsl
 
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-unused-label
+CERRWARN += -_gcc=-Wno-parentheses
+
 #
 # Debugging support; toggle on if needed.
 #

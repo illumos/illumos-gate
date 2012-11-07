@@ -73,6 +73,11 @@ LINTFLAGS = -b -x
 CFLAGS += $(CCVERBOSE)
 LDFLAGS += $(MAPFILE.NGB:%=-M%)
 
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-extra
+
 #
 # Message catalog
 #

@@ -41,6 +41,11 @@ CPPFLAGS +=	-I.
 LDFLAGS +=	$(MAPOPTS)
 CLEANFILES +=	zonecfg_lex.c zonecfg_grammar.tab.c zonecfg_grammar.tab.h
 
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-unused-label
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+
 .KEEP_STATE:
 
 all: $(PROG)

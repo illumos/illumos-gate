@@ -26,9 +26,8 @@
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2012 Gary Mills
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2 */
 
 #include "mt.h"
 #include <xti.h>
@@ -42,21 +41,19 @@ int
 _tx_error(const char *s, int api_semantics)
 {
 	const char *c;
-	int n;
+	int errnum = errno;	/* In case a system call fails. */
 
 	c = t_strerror(t_errno);
 	if (s != NULL && *s != '\0') {
-		n = strlen(s);
-		if (n) {
-			(void) write(2, s, (unsigned)n);
-			(void) write(2, ": ", 2);
-		}
-	}
-	(void) write(2, c, (unsigned)strlen(c));
-	if (t_errno == TSYSERR) {
+		(void) write(2, s, strlen(s));
 		(void) write(2, ": ", 2);
-		perror("");
-	} else
-		(void) write(2, "\n", 1);
+	}
+	(void) write(2, c, strlen(c));
+	if (t_errno == TSYSERR) {
+		c = strerror(errnum);
+		(void) write(2, ": ", 2);
+		(void) write(2, c, strlen(c));
+	}
+	(void) write(2, "\n", 1);
 	return (0);
 }

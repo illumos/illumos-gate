@@ -22,7 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 PROG=	dis
 OBJS=	dis_target.o dis_main.o dis_util.o dis_list.o
@@ -31,6 +30,7 @@ SRCS=	$(OBJS:%.o=%.c)
 include 	../Makefile.cmd
 
 LDLIBS += -ldisasm -luutil -lelf
+CERRWARN += -_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

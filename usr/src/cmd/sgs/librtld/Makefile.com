@@ -45,6 +45,11 @@ CPPFLAGS +=	-I../../rtld/common -I$(SRCBASE)/lib/libc/inc \
 DYNFLAGS +=	$(VERSREF) $(CC_USE_PROTO)  '-R$$ORIGIN'
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(ELFLIBDIR) -lelf -lc
 
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-unused-value
+CERRWARN +=	-_gcc=-Wno-type-limits
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 LINTFLAGS +=	-u -erroff=E_NAME_DECL_NOT_USED_DEF2
 LINTFLAGS64 +=	-u -erroff=E_NAME_DECL_NOT_USED_DEF2
 

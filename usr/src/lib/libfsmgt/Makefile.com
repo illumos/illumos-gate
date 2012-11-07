@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY =	libfsmgt.a
 VERS =		.1
@@ -49,10 +47,12 @@ LDLIBS +=	-lc -lnsl -lkstat
 SRCDIR =	../common
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
-#add nfs/lib directory as part of the include path
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT -I$(SRC)/lib/libfsmgt/common \
 		-I$(SRC)/cmd/fs.d/nfs/lib
+
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

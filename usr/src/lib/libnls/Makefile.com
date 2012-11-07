@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY= libnls.a
 VERS= .1
@@ -41,6 +39,8 @@ LINTSRC=	$(LINTLIB:%.ln=%)
 
 CFLAGS +=	$(CCVERBOSE)
 LDLIBS +=	-lnsl -lc
+
+CERRWARN +=	-_gcc=-Wno-unused-variable
 
 .KEEP_STATE:
 

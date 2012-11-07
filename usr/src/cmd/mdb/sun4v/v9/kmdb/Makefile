@@ -72,6 +72,7 @@ ASFLAGS += -xarch=v9v -I$(SRC)/uts/sun4 -I$(SRC)/uts/sun4v $(TRAPCOUNT)
 ASFLAGS += -Dsun4v
 ASFLAGS += -I$(SRC)/cmd/mdb/sparc
 ASFLAGS += -I$(SRC)/cmd/mdb/sparc/v9 -I$(SRC)/cmd/mdb/sparc/v9/kmdb
+CERRWARN += -_gcc=-Wno-unused-function
 
 install: all $(ROOTMISC64) kaif.fth
 

@@ -88,6 +88,11 @@ $(LIBACCTD)/accton :=	FILEMODE=	04755
 $(ETCINITPROG) :=	FILEMODE=	0744
 $(ETCACCTPROG) :=	FILEMODE=	0644
 
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-address
+
 .KEEP_STATE:
 
 .PARALLEL: $(ALL)

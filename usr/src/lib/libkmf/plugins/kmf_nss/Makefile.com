@@ -55,6 +55,10 @@ PICS=	$(OBJECTS:%=pics/%)
 LINTFLAGS	+=	-erroff=E_STATIC_UNUSED
 LINTFLAGS64	+=	-erroff=E_STATIC_UNUSED
 
+CERRWARN	+=	-_gcc=-Wno-unused-label
+CERRWARN	+=	-_gcc=-Wno-unused-value
+CERRWARN	+=	-_gcc=-Wno-uninitialized
+
 lint:=	NSSLIBS =	$(BERLIB)
 lint:=	NSSLIBS64 =	$(BERLIB64)
 

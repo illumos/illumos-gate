@@ -63,6 +63,10 @@ $(NOT_RELEASE_BUILD)DEBUG_DEFS	+= $(DEBUG_FLGS)
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-switch
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 LDFLAGS		+= -dy -Ndrv/audio
 
 #

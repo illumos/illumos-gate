@@ -23,10 +23,6 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Makefile for cmd/refer
-#
 
 include		../Makefile.cmd
 
@@ -48,6 +44,11 @@ OBJS =		addbib.o deliv2.o glue1.o glue2.o glue3.o glue4.o	\
 #
 POFILES= $(OBJS:%.o=%.po)
 POFILE= refer.po
+
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-unused-variable
+CERRWARN += -_gcc=-Wno-uninitialized
 
 addbib.po :=	XGETFLAGS += -a -x addbib.xcl
 

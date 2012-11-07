@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef	_SMBSRV_STRING_H
@@ -123,8 +124,7 @@ int smb_isstrupr(const char *);
 int smb_isstrlwr(const char *);
 int smb_strcasecmp(const char *, const char *, size_t);
 
-boolean_t smb_match(char *, char *);
-boolean_t smb_match_ci(char *, char *);
+boolean_t smb_match(const char *, const char *, boolean_t);
 
 size_t smb_mbstowcs(smb_wchar_t *, const char *, size_t);
 size_t smb_wcstombs(char *, const smb_wchar_t *, size_t);

@@ -31,6 +31,7 @@ PROG=	$(DYNPROG)
 OBJS=	errgen.o
 
 CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-switch
 LINTFLAGS += -erroff=E_SEC_SPRINTF_UNBOUNDED_COPY
 
 .KEEP_STATE:

@@ -60,6 +60,9 @@ LDFLAGS		+=  -dy -N misc/mac -N misc/mii
 #	Lint flag
 #
 
+CERRWARN	+= -_gcc=-Wno-switch
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 #
 #	Default build targets.

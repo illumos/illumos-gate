@@ -24,7 +24,7 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the busra
 #	kernel module.
@@ -49,6 +49,9 @@ ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 #	Include common rules.
 #
 include $(UTSBASE)/sparc/Makefile.sparc
+
+CERRWARN	+= -_gcc=-Wno-unused-label
+CERRWARN	+= -_gcc=-Wno-uninitialized
 
 #
 #	Define targets

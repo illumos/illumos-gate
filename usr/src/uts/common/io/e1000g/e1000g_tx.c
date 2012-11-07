@@ -668,10 +668,12 @@ e1000g_fill_tx_ring(e1000g_tx_ring_t *tx_ring, LIST_DESCRIBER *pending_list,
 	 * drivers do not have this issue because they (harmlessly) set the
 	 * POPTS field on every data descriptor to be the intended options for
 	 * the entire packet.  To circumvent this QEMU bug, we engage in this
-	 * same behavior iff our type matches that which is emulated by QEMU
-	 * (the 82540).
+	 * same behavior iff the subsystem vendor and device IDs indicate that
+	 * this is an emulated QEMU device (1af4,1100).
 	 */
-	if (hw->mac.type == e1000_82540 && cur_context->cksum_flags) {
+	if (hw->subsystem_vendor_id == 0x1af4 &&
+	    hw->subsystem_device_id == 0x1100 &&
+	    cur_context->cksum_flags) {
 		if (cur_context->cksum_flags & HCK_IPV4_HDRCKSUM)
 			zeroed.upper.fields.popts |= E1000_TXD_POPTS_IXSM;
 

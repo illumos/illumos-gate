@@ -23,12 +23,12 @@
 # Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include $(SRC)/cmd/Makefile.cmd
 ROOTCMDDIR = $(ROOT)/usr/lib/inet/wanboot
 
 CMNCRYPTDIR = ../../../../../common/net/wanboot/crypt
+
+CERRWARN += -_gcc=-Wno-uninitialized
 
 .KEEP_STATE:

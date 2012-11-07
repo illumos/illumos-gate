@@ -24,7 +24,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the srn driver
 #
@@ -49,6 +49,8 @@ CONF_SRCDIR	= $(UTSBASE)/common/io
 #	Include common rules.
 #
 include $(UTSBASE)/intel/Makefile.intel
+
+CERRWARN	+= -_gcc=-Wno-uninitialized
 
 #
 #	Define targets

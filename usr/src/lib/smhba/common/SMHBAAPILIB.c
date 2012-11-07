@@ -1403,7 +1403,7 @@ HBA_GetAdapterName(
 	HBA_STATUS		ret = HBA_STATUS_ERROR_ILLEGAL_INDEX;
 
 	if (adaptername == NULL) {
-		DEBUG(1, "HBA_GetAdapterName: NULL pointer adatpername",
+		DEBUG(1, "HBA_GetAdapterName: NULL pointer adaptername",
 		    0, 0, 0);
 		return (HBA_STATUS_ERROR_ARG);
 	}
@@ -1451,7 +1451,7 @@ HBA_OpenAdapter(char *adaptername)
 		return (handle);
 	}
 	if (adaptername == NULL) {
-		DEBUG(1, "HBA_OpenAdapter: NULL pointer adatpername",
+		DEBUG(1, "HBA_OpenAdapter: NULL pointer adaptername",
 		    0, 0, 0);
 		return (handle);
 	}
@@ -4329,7 +4329,7 @@ SMHBA_SendSMPPassThru(
  * Following the similar logic of HBAAPI addaspterevents_callback.
  *
  * Unlike other events Adapter Add Event is not limited to a specific
- * adpater(i.e. no adatper handle is passed for registration) so
+ * adapter(i.e. no adapter handle is passed for registration) so
  * the event should be passed to all registrants.  The routine below
  * is passed to the VSLs as a callback and when Adapter Add event is detected
  * by VSL it will call smhba_adapteraddevents_callback() which in turn check

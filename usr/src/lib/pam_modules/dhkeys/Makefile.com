@@ -25,7 +25,6 @@
 #
 # usr/src/lib/pam_modules/dhkeys/Makefile.com
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 LIBRARY=	pam_dhkeys.a
 VERS=		.1
@@ -36,6 +35,7 @@ include		../../Makefile.pam_modules
 
 LDLIBS		+= -lpam -lnsl -lc
 CPPFLAGS	+= -I$(SRC)/lib/libnsl/include
+CERRWARN	+= -_gcc=-Wno-parentheses
 
 all:	$(LIBS)
 

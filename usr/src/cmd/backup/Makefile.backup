@@ -39,6 +39,11 @@ LINTFLAGS=	-errchk=%all,longptr64 -errhdr=%user -F -m \
 #CSTYLEFLAGS=	-c -h -p -v -P
 CSTYLEFLAGS=	-h -p -P
 
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-clobbered
+
 UFSROOTETC=		$(ROOT)/etc
 UFSROOTUSR=		$(ROOT)/usr
 UFSROOTUSRLIB=		$(UFSROOTUSR)/lib

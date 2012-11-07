@@ -56,6 +56,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #	Overrides
 #
 
+CERRWARN	+= -_gcc=-Wno-unused-label
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 # Driver depends on GLD
 #

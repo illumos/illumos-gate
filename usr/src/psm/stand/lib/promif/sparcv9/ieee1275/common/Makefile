@@ -23,8 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # psm/stand/lib/promif/sparcv9/ieee1275/common/Makefile
 #
 
@@ -37,6 +35,7 @@ include $(TOPDIR)/psm/stand/lib/Makefile.lib
 include $(TOPDIR)/psm/Makefile.psm.64
 
 CFLAGS64	+= -xchip=ultra $(CCABS32)
+CERRWARN	+= -_gcc=-Wno-parentheses
 
 PROMDIR =	$(TOPDIR)/psm/promif/ieee1275/common
 SYSDIR =	$(TOPDIR)/uts

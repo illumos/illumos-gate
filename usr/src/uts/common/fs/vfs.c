@@ -936,29 +936,33 @@ vfs_mountroot(void)
 	}
 #endif /* __sparc */
 
-	/*
-	 * Look up the root device via devfs so that a dv_node is
-	 * created for it. The vnode is never VN_RELE()ed.
-	 * We allocate more than MAXPATHLEN so that the
-	 * buffer passed to i_ddi_prompath_to_devfspath() is
-	 * exactly MAXPATHLEN (the function expects a buffer
-	 * of that length).
-	 */
-	plen = strlen("/devices");
-	path = kmem_alloc(plen + MAXPATHLEN, KM_SLEEP);
-	(void) strcpy(path, "/devices");
+	if (strcmp(rootfs.bo_fstype, "zfs") != 0) {
+		/*
+		 * Look up the root device via devfs so that a dv_node is
+		 * created for it. The vnode is never VN_RELE()ed.
+		 * We allocate more than MAXPATHLEN so that the
+		 * buffer passed to i_ddi_prompath_to_devfspath() is
+		 * exactly MAXPATHLEN (the function expects a buffer
+		 * of that length).
+		 */
+		plen = strlen("/devices");
+		path = kmem_alloc(plen + MAXPATHLEN, KM_SLEEP);
+		(void) strcpy(path, "/devices");
 
-	if (i_ddi_prompath_to_devfspath(rootfs.bo_name, path + plen)
-	    != DDI_SUCCESS ||
-	    lookupname(path, UIO_SYSSPACE, FOLLOW, NULLVPP, &rvp)) {
+		if (i_ddi_prompath_to_devfspath(rootfs.bo_name, path + plen)
+		    != DDI_SUCCESS ||
+		    lookupname(path, UIO_SYSSPACE, FOLLOW, NULLVPP, &rvp)) {
 
-		/* NUL terminate in case "path" has garbage */
-		path[plen + MAXPATHLEN - 1] = '\0';
+			/* NUL terminate in case "path" has garbage */
+			path[plen + MAXPATHLEN - 1] = '\0';
 #ifdef	DEBUG
-		cmn_err(CE_WARN, "!Cannot lookup root device: %s", path);
+			cmn_err(CE_WARN, "!Cannot lookup root device: %s",
+			    path);
 #endif
+		}
+		kmem_free(path, plen + MAXPATHLEN);
 	}
-	kmem_free(path, plen + MAXPATHLEN);
+
 	vfs_mnttabvp_setup();
 }
 

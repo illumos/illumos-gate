@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LDI_EV_REGISTER_CALLBACKS 9F "Aug 21, 2007"
+.TH LDI_EV_REGISTER_CALLBACKS 9F "Oct 24, 2012"
 .SH NAME
 ldi_ev_register_callbacks \- add a notify and/or finalize callback
 .SH SYNOPSIS
@@ -11,8 +11,9 @@ ldi_ev_register_callbacks \- add a notify and/or finalize callback
 .nf
 #include <sys/sunldi.h>
 
-\fBint\fR \fBldi_ev_get_cookie\fR(\fIldi_handle_t lh\fR, \fIldi_ev_cookie_t *cookie\fR,
-      \fIldi_ev_callback_t *callb\fR, \fBvoid\fR \fI*arg\fR, \fIldi_ev_callback_id_t *id\fR);
+\fBint\fR \fBldi_ev_register_callbacks\fR(\fIldi_handle_t lh\fR,
+      \fIldi_ev_cookie_t *cookie\fR, \fIldi_ev_callback_t *callb\fR,
+      \fBvoid\fR \fI*arg\fR, \fIldi_callback_id_t *id\fR);
 .fi
 
 .SH INTERFACE LEVEL
@@ -106,7 +107,7 @@ Event specific data.
 .sp
 .ne 2
 .na
-\fB\fBvoid *arg\fR\fR
+\fB\fBvoid\fR *\fIarg\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -116,7 +117,7 @@ A pointer to opaque caller private data.
 .sp
 .ne 2
 .na
-\fB\fBldi_ev_callback_id_t *id\fR\fR
+\fB\fIldi_callback_id_t *id\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -322,7 +323,7 @@ and \fBldi_ev_finalize\fR(9F)).
 .sp
 .LP
 Once the registration of the callback(s) is successful, an opaque
-\fIldi_ev_callback_id_t\fR structure is returned which may be used to
+\fIldi_callback_id_t\fR structure is returned which may be used to
 unregister the callback(s) later.
 .SH RETURN VALUES
 .sp
@@ -385,7 +386,7 @@ event_register(void)
 }
 
 static void
-event_unregister(ldi_ev_callback_id_t id)
+event_unregister(ldi_callback_id_t id)
 {
         ldi_ev_remove_callbacks(id);
 }
@@ -495,7 +496,7 @@ event_register(void)
 }
 
 static void
-event_unregister(ldi_ev_callback_id_t id)
+event_unregister(ldi_callback_id_t id)
 {
         ldi_ev_remove_callbacks(id);
 }

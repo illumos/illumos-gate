@@ -21,8 +21,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG=		in.rdisc
 MANIFEST=	rdisc.xml
@@ -35,6 +33,7 @@ ROOTMANIFESTDIR=	$(ROOTSVCNETWORKROUTING)
 LDLIBS +=	-lsocket -lnsl
 
 CPPFLAGS +=	-DSYSV -DBSD_COMP
+CERRWARN +=	-_gcc=-Wno-extra
 
 .KEEP_STATE:
 

@@ -19,8 +19,6 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -44,6 +42,11 @@ LDLIBS += -lcurses
 CPPFLAGS += -I../../lib/libcurses/screen
 MAPFILES = $(MAPFILE.INT) $(MAPFILE.NGB)
 LDFLAGS += $(MAPFILES:%=-M%)
+
+CERRWARN += -_gcc=-Wno-char-subscripts
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

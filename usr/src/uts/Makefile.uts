@@ -214,6 +214,17 @@ AS_CPPFLAGS	= $(ALWAYS_DEFS) $(ALL_DEFS) $(CONFIG_DEFS) $(AS_DEFS) \
 CERRWARN = -errtags=yes -errwarn=%all
 $(__GNUC4)CERRWARN += -_gcc=-Wno-address
 
+CERRWARN += -_gcc=-Wno-missing-braces
+CERRWARN += -_gcc=-Wno-sign-compare
+CERRWARN += -_gcc=-Wno-unknown-pragmas
+CERRWARN += -_gcc=-Wno-unused-parameter
+CERRWARN += -_gcc=-Wno-missing-field-initializers
+
+# DEBUG v. -nd make for frequent unused variables, empty conditions, etc. in
+# -nd builds
+$(RELEASE_BUILD)CERRWARN += -_gcc=-Wno-unused
+$(RELEASE_BUILD)CERRWARN += -_gcc=-Wno-empty-body
+
 C99MODE = $(C99_ENABLE)
 
 CFLAGS_uts		=
@@ -221,7 +232,7 @@ CFLAGS_uts		+= $(STAND_FLAGS_$(CLASS))
 CFLAGS_uts		+= $(CCVERBOSE)
 CFLAGS_uts		+= $(ILDOFF)
 CFLAGS_uts		+= $(XAOPT)
-CFLAGS_uts		+= $(CTF_FLAGS)
+CFLAGS_uts		+= $(CTF_FLAGS_$(CLASS))
 CFLAGS_uts		+= $(CERRWARN)
 CFLAGS_uts		+= $(CCNOAUTOINLINE)
 CFLAGS_uts		+= $(CGLOBALSTATIC)

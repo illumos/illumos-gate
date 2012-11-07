@@ -40,6 +40,7 @@ SRCDIR =	../common
 CPPFLAGS += -I../common -I.
 CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
 CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
+CERRWARN += -_gcc=-Wno-uninitialized
 LDLIBS += -lexacct -lnvpair -lgen -lc
 
 LINTFLAGS = -msux

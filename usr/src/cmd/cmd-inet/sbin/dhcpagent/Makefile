@@ -22,8 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG    = dhcpagent
 ROOTFS_PROG = $(PROG)
@@ -38,6 +36,9 @@ include ../../../Makefile.cmd
 SRCS    = $(OBJS:%.o=%.c)
 POFILES = $(OBJS:%.o=%.po)
 XGETFLAGS += -a -x dhcpagent.xcl
+
+CERRWARN += -_gcc=-Wno-switch
+CERRWARN += -_gcc=-Wno-parentheses
 
 #
 # to compile a debug version, do a `make COPTFLAG="-g -XO0"'

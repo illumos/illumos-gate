@@ -23,8 +23,6 @@
 # Copyright 1989,2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 FSTYPE=		ufs
 LIBPROG=	volcopy
@@ -32,14 +30,17 @@ ATTMK=		$(LIBPROG)
 
 include		../../Makefile.fstype
 
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
+LDLIBS += 	-lmapmalloc
+
 # for messaging catalog
 #
-POFILE= volcopy.po
-XGETFLAGS += -a  -x volcopy.xcl
+POFILE= 	volcopy.po
+XGETFLAGS += 	-a  -x volcopy.xcl
 
 catalog:        $(POFILE)
-
-
-LDLIBS += -lmapmalloc
 
 lint:		lint_PROG

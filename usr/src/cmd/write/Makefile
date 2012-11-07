@@ -36,6 +36,7 @@ XGETFLAGS += -a -x write.xcl
 .KEEP_STATE:
 
 CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-unused-variable
 
 all: $(PROG)
 

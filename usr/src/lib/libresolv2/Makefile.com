@@ -109,6 +109,9 @@ LOCFLAGS +=	-D_SYS_STREAM_H -D_REENTRANT -DSVR4 -DSUNW_OPTIONS \
 		$(SOLCOMPAT) -I../include -I../../common/inc
 
 CPPFLAGS +=	$(LOCFLAGS) 
+
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+
 DYNFLAGS +=	$(ZNODELETE)
 
 LDLIBS +=	-lsocket -lnsl -lc -lmd

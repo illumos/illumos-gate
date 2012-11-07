@@ -1,0 +1,9 @@
+testmatch:
+
+   A stub program that tests the saveargs matcher against a variety of
+   function prologues (assembled from data.s)
+
+functional:
+
+   Actually test the full chunk of the (libproc) side of the code, running
+   pstack on the range of test apps.

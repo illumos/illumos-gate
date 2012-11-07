@@ -1806,11 +1806,11 @@ function git_wxfile
 	    chomp;
 	    if (/^R(\d+)\s+([^ ]+)\s+([^ ]+)/) { # rename
 		if ($1 >= 75) {			 # Probably worth treating as a rename
-		    $realfiles{$3} = $2
+		    $realfiles{$3} = $2;
 		} else {
 		    $realfiles{$3} = $3;
 		    $realfiles{$2} = $2;
-		}
+	        }
 	    } else {
 		my $f = (split /\s+/, $_)[1];
 		$realfiles{$f} = $f;
@@ -1826,7 +1826,8 @@ function git_wxfile
 		my $fname = (split /\t/, $_)[1];
 		next if !defined($realfiles{$fname}); # No real change
 		$state = 1;
-		$files{$fname} = $msg;
+		chomp $msg;
+		$files{$fname} .= $msg;
 	    } else {
 		if ($state == 1) {
 		    $state = 0;
@@ -1839,9 +1840,9 @@ function git_wxfile
 	 
 	for (sort keys %files) {
 	    if ($realfiles{$_} ne $_) {
-		print "$_ $realfiles{$_}\n$files{$_}\n";
+		print "$_ $realfiles{$_}\n$files{$_}\n\n";
 	    } else {
-		print "$_\n$files{$_}\n"
+		print "$_\n$files{$_}\n\n"
 	    }
 	}' ${parent} > $TMPFLIST
 

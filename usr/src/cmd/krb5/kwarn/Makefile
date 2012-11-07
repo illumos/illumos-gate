@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 TESTPROG = kwarndtest 
 
@@ -52,6 +50,11 @@ POFILES = generic.po
 
 COPTFLAG +=	$(XESS) #-I$(KINCDIR) 
 CPPFLAGS +=	-D_REENTRANT
+
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-unused-function
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc=-Wno-parentheses
 
 CPPFLAGS += -I../../lib/gss_mechs/mech_krb5/include \
                  -I$(SRC)/lib/gss_mechs/mech_krb5 \

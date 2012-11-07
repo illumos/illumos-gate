@@ -180,21 +180,22 @@ static int
 ipmi_close(dev_t dev, int flag, int otyp, cred_t *cred)
 {
 	ipmi_device_t *dp;
-	struct ipmi_request *req;
+	struct ipmi_request *req, *next;
 
 	if ((dp = lookup_ipmidev_by_dev(dev)) == NULL)
 		return (ENODEV);
 
 	IPMI_LOCK(sc);
 	/* remove any pending requests */
-restart:
-	for (req = TAILQ_FIRST(&sc->ipmi_pending_requests); req != NULL;
-	    req = TAILQ_NEXT(req, ir_link)) {
+	req = TAILQ_FIRST(&sc->ipmi_pending_requests);
+	while (req != NULL) {
+		next = TAILQ_NEXT(req, ir_link);
+
 		if (req->ir_owner == dp) {
 			TAILQ_REMOVE(&sc->ipmi_pending_requests, req, ir_link);
 			ipmi_free_request(req);
-			goto restart;
 		}
+		req = next;
 	}
 	IPMI_UNLOCK(sc);
 

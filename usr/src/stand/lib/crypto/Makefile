@@ -218,6 +218,11 @@ CRYPTO_ULONG_OBJ = \
 $(CRYPTO_ULONG_OBJ:%.o=objs/%.o) := CPPFLAGS += \
 	-erroff=E_CONST_PROMOTED_UNSIGNED_LONG
 
+CERRWARN += -_gcc=-Wno-unused-value
+CERRWARN += -_gcc=-Wno-address
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-unused-variable
+
 objs/md5_dgst.o := CPPFLAGS += -DMD5_ASM
 objs/md5-sparcv9.o := CPPFLAGS += -DMD5_BLOCK_DATA_ORDER
 

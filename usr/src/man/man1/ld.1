@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LD 1 "Sep 18, 2009"
+.TH LD 1 "Oct 24, 2012"
 .SH NAME
 ld \- link-editor for object files
 .SH SYNOPSIS
@@ -25,6 +25,7 @@ ld \- link-editor for object files
 [\fB-z\fR direct | nodirect] [\fB-z\fR endfiltee]
 [\fB-z\fR fatal-warnings | nofatal-warnings ] [\fB-z\fR finiarray=\fIfunction\fR]
 [\fB-z\fR globalaudit] [\fB-z\fR groupperm | nogroupperm] [\fB-z\fR help ]
+[\fB-z\fR guidance[=\fIid1\fR,\fIid2\fR...] [\fB-z\fR help ]
 [\fB-z\fR ignore | record] [\fB-z\fR initarray=\fIfunction\fR] [\fB-z\fR initfirst]
 [\fB-z\fR interpose] [\fB-z\fR lazyload | nolazyload]
 [\fB-z\fR ld32=\fIarg1\fR,\fIarg2\fR,...] [\fB-z\fR ld64=\fIarg1\fR,\fIarg2\fR,...]
@@ -1009,6 +1010,102 @@ Assigns, or deassigns each dependency that follows to a unique group. The
 assignment of a dependency to a group has the same effect as if the dependency
 had been built using the \fB-B\fR \fBgroup\fR option.
 .RE
+
+.sp
+.ne 2
+.na
+\fB-z\fR \fBguidance\fR[=\fIid1\fR,\fIid2\fR...]
+.ad
+.sp .6
+.RS 4n
+Give messages suggesting link-editor features that could improve the resulting
+dynamic object.
+.LP
+Specific classes of suggestion can be silenced by specifying an optional comma separated
+list of guidance identifiers.
+.LP
+The current classes of suggestion provided are:
+
+.sp
+.ne 2
+.na
+Enable use of direct binding
+.ad
+.sp .6
+.RS 4n
+Suggests that \fB-z direct\fR or \fB-B direct\fR be present prior to any
+specified dependency.  This allows predictable symbol binding at runtime.
+
+Can be disabled with \fB-z guidance=nodirect\fR 
+.RE
+
+.sp
+.ne 2
+.na
+Enable lazy dependency loading
+.ad
+.sp .6
+.RS 4n
+Suggests that \fB-z lazyload\fR be present prior to any specified dependency.
+This allows the dynamic object to be loaded more quickly.
+
+Can be disabled with \fB-z guidance=nolazyload\fR.
+.RE
+
+.sp
+.ne 2
+.na
+Shared objects should define all their dependencies.
+.ad
+.sp .6
+.RS 4n
+Suggests that \fB-z defs\fR be specified on the link-editor command line.
+Shared objects that explicitly state all their dependencies behave more
+predictably when used.
+
+Can be be disabled with \fB-z guidance=nodefs\fR
+.RE
+
+.sp
+.ne 2
+.na
+Version 2 mapfile syntax
+.ad
+.sp .6
+.RS 4n
+Suggests that any specified mapfiles use the more readable version 2 syntax.
+
+Can be disabled with \fB-z guidance=nomapfile\fR.
+.RE
+
+.sp
+.ne 2
+.na
+Read-only text segment
+.ad
+.sp .6
+.RS 4n
+Should any runtime relocations within the text segment exist, suggests that
+the object be compiled with position independent code (PIC).  Keeping large
+allocatable sections read-only allows them to be shared between processes
+using a given shared object.
+
+Can be disabled with \fB-z guidance=notext\fR
+.RE
+
+.sp
+.ne 2
+.na
+No unused dependencies
+.ad
+.sp .6
+.RS 4n
+Suggests that any dependency not referenced by the resulting dynamic object be
+removed from the link-editor command line.
+
+Can be disabled with \fB-z guidance=nounused\fR.
+.RE
+.RE 
 
 .sp
 .ne 2

@@ -22,7 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the pcf8574 driver kernel module
 #
@@ -58,6 +58,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 # lint pass one enforcement
 #
 CFLAGS += $(CCVERBOSE) -DNORDICA_CP1500
+CERRWARN += -_gcc=-Wno-uninitialized
 
 #
 # Turn on doubleword alignment for 64 bit registers

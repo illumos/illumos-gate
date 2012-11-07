@@ -24,8 +24,6 @@
 # Use is subject to license terms.
 #
 
-# ident	"%Z%%M%	%I%	%E% SMI"
-
 #
 #	This file makes the atheros driver for an intel system
 #
@@ -66,6 +64,10 @@ LDFLAGS		+= -dy -Nmisc/mac -Nmac/mac_wifi -Ndrv/ip
 # STREAMS API limitations force us to turn off these lint checks.
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
+
+CERRWARN	+= -_gcc=-Wno-switch
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-parentheses
 
 #
 #	Default build targets.

@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY =	libexacct.a
 VERS =		.1
@@ -43,6 +41,7 @@ SRCDIR =	../common
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 CFLAGS += 	$(CCVERBOSE)
+CERRWARN +=	-_gcc=-Wno-uninitialized
 CPPFLAGS +=	-D_FILE_OFFSET_BITS=64
 
 debug :=	CPPFLAGS += -DLIBEXACCT_DEBUG

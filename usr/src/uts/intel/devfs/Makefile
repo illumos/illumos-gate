@@ -22,7 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 # uts/intel/devfs/Makefile
 #	This makefile drives the production of the devfs file system
@@ -48,6 +48,8 @@ ROOTMODULE	= $(ROOT_FS_DIR)/$(MODULE)
 #	Include common rules.
 #
 include $(UTSBASE)/intel/Makefile.intel
+
+CERRWARN	+= -_gcc=-Wno-parentheses
 
 #
 #	Define targets

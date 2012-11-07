@@ -53,6 +53,9 @@ IDMAP_PROT_X =		$(SRC)/uts/common/rpcsvc/idmap_prot.x
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT -I$(SRCDIR)
 
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-switch
+
 CLOBBERFILES +=	idmap_xdr.c
 
 lint := OBJECTS = $(LINT_OBJECTS)

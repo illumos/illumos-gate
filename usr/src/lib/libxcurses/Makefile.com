@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY=	libcurses.a
 VERS=	.1
@@ -114,6 +112,11 @@ ROOTLIBS=	$(LIBS:%=$(ROOTLIBDIR)/%)
 
 $(LINTLIB):= SRCS=../src/libc/llib-lcurses
 $(LINTLIB):= CPPFLAGS += -D_XOPEN_SOURCE_EXTENDED 
+
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-unused-label
+CERRWARN +=	-_gcc=-Wno-unused-function
 
 LINTSRC=	$(LINTLIB:%.ln=%)
 

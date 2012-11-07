@@ -23,8 +23,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 #	This makefile drives the production of the sun4u daktari platmod module
@@ -74,6 +72,7 @@ CLEANLINTFILES	+= $(LINT32_FILES)
 # lint pass one enforcement
 #
 CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-unused-function
 
 #
 #	Default build targets.

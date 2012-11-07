@@ -66,6 +66,11 @@ LDFLAGS		+= -dy -Nmisc/dadk -Nmisc/strategy -Nmisc/cmlb
 # Larger than 1TB VTOC support
 CPPFLAGS	+= -D_EXTVTOC
 
+CERRWARN	+= -_gcc=-Wno-unused-function
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-type-limits
+
 #
 # For now, disable these lint checks; maintainers should endeavor
 # to investigate and remove these for maximum lint coverage.

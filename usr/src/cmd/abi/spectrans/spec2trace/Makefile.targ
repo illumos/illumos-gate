@@ -20,12 +20,9 @@
 # CDDL HEADER END
 #
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1997-1999 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-# cmd/abi/spectrans/spec2trace/Makefile.targ
 
 .KEEP_STATE:
 
@@ -44,6 +41,11 @@ OBJECTS	=	trace.o		\
 		interceptor.o
 
 include		../../Makefile.cmd
+
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-switch
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-unused-label
 
 parseproto := RM = @echo keeping	# do not remove generated C code
 parseproto := COPTFLAG = -g -DDEBUG -DMEM_DEBUG -DTRACE

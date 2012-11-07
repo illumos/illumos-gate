@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG=		sbcp
 
@@ -48,6 +46,8 @@ LDFLAGS=	-R /usr/4lib:/usr/ucblib -e _start -G -t \
 		$(BLOCAL) $(ZNOVERSION) $(ZDEFS) $(ZTEXT) \
 		-I/usr/lib/ld.so.1
 LIBS=		$(LDLIBS.lib) -lmapmalloc $(LIBBC) $(LIBUCB) -lnsl -lc
+
+CERRWARN	+= -_gcc=-Wno-unused-variable
 
 all:	$(PROG)
 

@@ -148,6 +148,10 @@ CFLAGS +=	$(CCVERBOSE)
 LINTFLAGS +=	-DDAPL_DBG
 LINTFLAGS64 +=	-DDAPL_DBG
 
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-switch
+
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDAPL_DBG
 debug := COPTFLAG = -g
 debug := COPTFLAG64 = -g

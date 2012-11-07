@@ -23,8 +23,6 @@
 # Copyright 1994, 2002 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG = mknetid
 
@@ -35,6 +33,9 @@ LDLIBS += -lnsl
 OBJS = mknetid.o getname.o 
 SRCS = $(OBJS:.o=.c)
 
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-unused-function
 
 .KEEP_STATE:
 

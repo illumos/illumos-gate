@@ -23,8 +23,8 @@
  */
 
 /*
- * Multipath driver interface (MDI) implementation; see mdi_impl.h for a more
- * detailed discussion of the overall mpxio architecture.
+ * Multipath driver interface (MDI) implementation; see mdi_impldefs.h for a
+ * more detailed discussion of the overall mpxio architecture.
  *
  * Default locking order:
  *

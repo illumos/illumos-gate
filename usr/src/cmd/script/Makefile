@@ -28,6 +28,8 @@ include ../Makefile.cmd
 
 FILEMODE= 0555
 
+CERRWARN += -_gcc=-Wno-unused-variable
+
 .KEEP_STATE:
 
 all: $(PROG) 

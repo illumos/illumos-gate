@@ -23,7 +23,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 include $(SRC)/cmd/Makefile.cmd
 
@@ -38,6 +37,8 @@ LDLIBS += -ldtrace
 
 SRCS = baddof
 CMDS = $(SRCS:%=$(ROOTBIN)/%)
+
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
 
 $(CMDS) := FILEMODE = 0555
 

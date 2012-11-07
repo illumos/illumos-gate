@@ -39,8 +39,12 @@ OBJS=	dsstat.o ii_stats.o sndr_stats.o sdbc_stats.o \
 	multi_stats.o common.o report.o
 SRCS= $(OBJS:%.o=%.c)
 
-CFLAGS += -v
-LDLIBS += -lkstat
+CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-unused-label
+CERRWARN += -_gcc=-Wno-clobbered
+LDLIBS += -L/usr/lib -lkstat
 LINTFLAGS += -Xa -n -s -x -m -u -Dlint -errhdr=%user
 LINTFLAGS += -erroff=E_SEC_PRINTF_VAR_FMT -erroff=E_SEC_SPRINTF_UNBOUNDED_COPY
 LINTDIR = $(KBASE)/lintdir

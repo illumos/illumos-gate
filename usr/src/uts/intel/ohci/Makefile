@@ -67,6 +67,8 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 #	Default build targets.
 #

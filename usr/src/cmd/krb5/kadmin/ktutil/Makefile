@@ -2,8 +2,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG= ktutil
 
@@ -26,6 +24,9 @@ CPPFLAGS += -I$(SRC)/uts/common/gssapi/include \
 	-DHAVE_SYS_TIMEB_H=1 -DHAVE_ALLOCA_H=1 -DHAVE_FTIME=1 \
 	 -DHAVE_TIMEZONE
 COPTFLAG += $(XESS) #-I$(KINCDIR) 
+
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-unused-function
 
 LDFLAGS += $(KRUNPATH) $(KERBRUNPATH)
 LDLIBS += $(KMECHLIB) $(ROOT)$(KERBLIBDIR)/libss.so

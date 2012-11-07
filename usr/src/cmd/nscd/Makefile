@@ -58,6 +58,11 @@ LINTFLAGS +=	-erroff=E_GLOBAL_COULD_BE_STATIC2
 LINTFLAGS +=	-erroff=E_NAME_USED_NOT_DEF2
 LINTFLAGS +=	-erroff=E_NAME_DEF_NOT_USED2
 
+CERRWARN +=	-_gcc=-Wno-switch
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-type-limits
+
 # nscd interposes on many symbols, and must export others for its own dlsym()
 # use, and dlsym() calls from libc.  Itemizing the interfaces within a mapfile
 # is error-prone, so establish the whole object as an interposer.

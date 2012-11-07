@@ -50,6 +50,9 @@ CLEANFILES=	$(LINTOUT)
 CPPFLAGS +=	-I.. -D_REENTRANT
 CFLAGS +=	$(CCVERBOSE)
 
+CERRWARN +=	-_gcc=-Wno-switch
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 $(LINTLIB) :=	LINTFLAGS = -nvx
 $(LINTLIB) :=	LINTFLAGS64 = -nvx -m64
 

@@ -2,8 +2,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG1=kprop
 PROG2=kpropd
@@ -56,6 +54,14 @@ CPPFLAGS +=	-I. \
 		-I$(SRC)/lib/krb5 \
 		-I$(SRC)/lib/krb5/kadm5 \
 		-I$(SRC)/uts/common/gssapi/mechs/krb5/include
+
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-unused-function
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-unused-value
+CERRWARN +=	-_gcc=-Wno-address
 
 LDFLAGS +=	$(KRUNPATH) $(KERBRUNPATH)
 LDLIBS +=	-lmech_krb5 -lsocket

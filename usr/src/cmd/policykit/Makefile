@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG =	polkit-is-privileged
 
@@ -38,6 +36,8 @@ CPPFLAGS +=	-I$(ROOT)/usr/include/libpolkit
 CPPFLAGS +=	$(POLICYKIT_DBUS_CPPFLAGS) $(POLICYKIT_GLIB_CPPFLAGS)
 CPPFLAGS +=	-DPACKAGE_VERSION=\"$(POLICYKIT_VERSION)\"
 C99MODE =	$(C99_ENABLE)
+
+CERRWARN +=	-_gcc=-Wno-unused-variable
 
 ROOTUSRSBINPROG =	$(PROG:%=$(ROOTUSRSBIN)/%)
 

@@ -52,6 +52,8 @@ CPPFLAGS += -I. -I$(KMFDIR)/include -I$(ADJUNCT_PROTO)/usr/include/libxml2 \
 	-I$(KMFDIR)/ber_der/inc
 
 CFLAGS += $(CCVERBOSE) -DDEBUG
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-unused-label
 
 LDLIBS +=  -lkmf -lpkcs11 -lcryptoutil 
 

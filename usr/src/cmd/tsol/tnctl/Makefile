@@ -37,6 +37,9 @@ $(ROOTMANIFEST) :=	FILEMODE= 444
 
 LDLIBS += -lnsl -ltsnet
 
+CERRWARN += -_gcc=-Wno-unused-variable
+CERRWARN += -_gcc=-Wno-parentheses
+
 .KEEP_STATE:
 
 all:	$(PROG)

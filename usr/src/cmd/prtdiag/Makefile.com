@@ -31,6 +31,8 @@ PROG		= prtdiag
 OBJS		= main.o
 CLASS		= 32
 
+CERRWARN	+= -_gcc=-Wno-parentheses
+
 FILEMODE	= 2755
 DIRMODE		= 755
 

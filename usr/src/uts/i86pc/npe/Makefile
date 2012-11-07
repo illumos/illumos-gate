@@ -78,6 +78,9 @@ LINTFLAGS	+= -D_MODULE_NAME="\"$(MODULE)\""
 LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-parentheses
+
 #
 #	Default build targets.
 #

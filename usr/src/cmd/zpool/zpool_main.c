@@ -239,7 +239,7 @@ get_usage(zpool_help_t idx) {
 	case HELP_REMOVE:
 		return (gettext("\tremove <pool> <device> ...\n"));
 	case HELP_REOPEN:
-		return (""); /* Undocumented command */
+		return (gettext("\treopen <pool>\n"));
 	case HELP_SCRUB:
 		return (gettext("\tscrub [-s] <pool> ...\n"));
 	case HELP_STATUS:
@@ -3277,7 +3277,7 @@ zpool_do_split(int argc, char **argv)
 	if (zpool_get_state(zhp) != POOL_STATE_UNAVAIL &&
 	    zpool_enable_datasets(zhp, mntopts, 0) != 0) {
 		ret = 1;
-		(void) fprintf(stderr, gettext("Split was succssful, but "
+		(void) fprintf(stderr, gettext("Split was successful, but "
 		    "the datasets could not all be mounted\n"));
 		(void) fprintf(stderr, gettext("Try doing '%s' with a "
 		    "different altroot\n"), "zpool import");
@@ -3556,22 +3556,37 @@ zpool_do_reguid(int argc, char **argv)
  * zpool reopen <pool>
  *
  * Reopen the pool so that the kernel can update the sizes of all vdevs.
- *
- * NOTE: This command is currently undocumented.  If the command is ever
- * exposed then the appropriate usage() messages will need to be made.
  */
 int
 zpool_do_reopen(int argc, char **argv)
 {
+	int c;
 	int ret = 0;
 	zpool_handle_t *zhp;
 	char *pool;
 
+	/* check options */
+	while ((c = getopt(argc, argv, "")) != -1) {
+		switch (c) {
+		case '?':
+			(void) fprintf(stderr, gettext("invalid option '%c'\n"),
+			    optopt);
+			usage(B_FALSE);
+		}
+	}
+
 	argc--;
 	argv++;
 
-	if (argc != 1)
-		return (2);
+	if (argc < 1) {
+		(void) fprintf(stderr, gettext("missing pool name\n"));
+		usage(B_FALSE);
+	}
+
+	if (argc > 1) {
+		(void) fprintf(stderr, gettext("too many arguments\n"));
+		usage(B_FALSE);
+	}
 
 	pool = argv[0];
 	if ((zhp = zpool_open_canfail(g_zfs, pool)) == NULL)

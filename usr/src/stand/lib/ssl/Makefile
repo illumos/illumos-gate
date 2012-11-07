@@ -51,6 +51,8 @@ SRCS	= $(LOCOBJS:%.o=$(SRCDIR)/%.c) \
 CPPFLAGS += $(OPENSSL_BUILD_CPPFLAGS) $(SOCKCPPFLAGS)
 $(LINTLIB) :=	SRCS = $(CMNDIR)/$(LINTSRC)
 
+CERRWARN += -_gcc=-Wno-unused-value
+
 objs/%.o: $(TOPDIR)/common/openssl/crypto/comp/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)

@@ -20,11 +20,7 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1989 by Sun Microsystems, Inc.
-#
-# cmd/tbl/Makefile
 #
 
 include		../Makefile.cmd
@@ -39,6 +35,11 @@ OBJS =		$(SRCS:%.c=%.o)
 
 POFILES=        $(OBJS:%.o=%.po)
 POFILE=         tbl.po
+
+CERRWARN	+= -_gcc=-Wno-implicit-function-declaration
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-char-subscripts
 
 .KEEP_STATE :
 

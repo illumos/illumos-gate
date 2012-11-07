@@ -16,26 +16,28 @@ grep \- search a file for a pattern
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/grep\fR [\fB-c\fR | \fB-l\fR | \fB-q\fR] [\fB-bhinsvw\fR] \fIlimited-regular-expression\fR
-     [\fIfilename\fR]...
+\fB/usr/bin/grep\fR [\fB-c\fR | \fB-l\fR |\fB-q\fR] [\fB-r\fR | \fB-R\fR] [\fB-bhinsvw\fR]
+    \fIlimited-regular-expression\fR [\fIfilename\fR]...
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/grep\fR [\fB-E\fR | \fB-F\fR] [\fB-c\fR | \fB-l\fR | \fB-q\fR] [\fB-bhinsvwx\fR] \fB-e\fR \fIpattern_list\fR...
-     [\fB-f\fR \fIpattern_file\fR]... [\fIfile\fR]...
+\fB/usr/xpg4/bin/grep\fR [\fB-E\fR | \fB-F\fR] [\fB-c\fR | \fB-l\fR | \fB-q\fR] [\fB-r\fR | \fB-R\fR]
+    [\fB-bhinsvwx\fR] \fB-e\fR \fIpattern_list\fR... [\fB-f\fR \fIpattern_file\fR]...
+    [\fIfile\fR]...
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/grep\fR [\fB-E\fR | \fB-F\fR] [\fB-c\fR | \fB-l\fR | \fB-q\fR] [\fB-bhinsvwx\fR]
-     [\fB-e\fR \fIpattern_list\fR]... \fB-f\fR \fIpattern_file\fR... [\fIfile\fR]...
+\fB/usr/xpg4/bin/grep\fR [\fB-E\fR | \fB-F\fR] [\fB-c\fR | \fB-l\fR | \fB-q\fR] [\fB-r\fR | \fB-R\fR]
+    [\fB-bhinsvwx\fR] [\fB-e\fR \fIpattern_list\fR]... \fB-f\fR \fIpattern_file\fR...
+    [\fIfile\fR]...
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/grep\fR [\fB-E\fR | \fB-F\fR] [\fB-c\fR | \fB-l\fR | \fB-q\fR] [\fB-bhinsvwx\fR] \fIpattern\fR
-     [\fIfile\fR]...
+\fB/usr/xpg4/bin/grep\fR [\fB-E\fR | \fB-F\fR] [\fB-c\fR | \fB-l\fR | \fB-q\fR] [\fB-r\fR | \fB-R\fR]
+    [\fB-bhinsvwx\fR] \fIpattern\fR [\fIfile\fR]...
 .fi
 
 .SH DESCRIPTION
@@ -130,6 +132,26 @@ than once.
 .ad
 .RS 6n
 Precedes each line by its line number in the file (first line is 1).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-r\fR\fR
+.ad
+.RS 6n
+Read all files under each directory, recursively. Follow symbolic links on
+the command line, but skip symlinks that are encountered recursively. If file
+is a device, FIFO, or socket, skip it.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-R\fR\fR
+.ad
+.RS 6n
+Read all files under each directory, recursively, following all symbolic links.
 .RE
 
 .sp

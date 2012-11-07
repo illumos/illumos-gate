@@ -67,6 +67,10 @@ LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
 
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-type-limits
+CERRWARN	+= -_gcc=-Wno-parentheses
+
 #
 #	Default build targets.
 #

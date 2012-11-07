@@ -36,6 +36,9 @@ SBINLINKS= $(PROG)
 include ../Makefile.com
 
 CPPFLAGS += -I$(SRC)/uts/i86pc -I$(SRC)/uts/intel -I$(SRC)/uts/common
+CERRWARN += -_gcc=-Wno-unused-label
+CERRWARN += -_gcc=-Wno-unused-function
+CERRWARN += -_gcc=-Wno-uninitialized
 
 LDLIBS += -lmd5
 

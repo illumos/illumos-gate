@@ -22,7 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 MODULE = unix.so
 MDBTGT = kvm
@@ -38,3 +37,8 @@ CPPFLAGS += -DMP -D_MACHDEP
 CPPFLAGS += -I../../../../common
 CPPFLAGS += -I$(SRC)/uts/i86pc
 CPPFLAGS += -I$(SRC)/uts/intel
+
+CERRWARN += -_gcc=-Wno-char-subscripts
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-unused-label
+CERRWARN += -_gcc=-Wno-uninitialized

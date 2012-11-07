@@ -33,6 +33,7 @@ include $(SRC)/Makefile.psm
 FRULIBS    = -L$(SRC)/lib/libfru/$(MACH) -lfru
 
 CFLAGS    += $(CCVERBOSE)
+CERRWARN  += -_gcc=-Wno-switch
 CPPFLAGS  += -I$(SRC)/lib/libfru/include
 LINTFLAGS += -u
 LDLIBS    += $(FRULIBS) -lm

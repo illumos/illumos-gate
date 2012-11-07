@@ -22,8 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG=		isainfo
 
@@ -36,6 +34,7 @@ include		../Makefile.cmd
 
 CPPFLAGS +=	-I$(ELFCAP) -I../../uts/common
 CFLAGS +=	$(CCVERBOSE)
+CERRWARN +=	-_gcc=-Wno-type-limits
 
 .KEEP_STATE:
 

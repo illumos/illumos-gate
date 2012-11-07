@@ -64,6 +64,9 @@ LDFLAGS		+= -dy -Nmisc/mac -Nmisc/net80211
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-unused-value
+
 #
 #	Default build targets.
 #

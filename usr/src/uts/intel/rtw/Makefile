@@ -22,7 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the realtek 8180
 #	wifi(rtw) driver module in intel systems
@@ -57,6 +57,10 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 # Driver depends on MAC-WIFI & net80211 misc modules
 #
 LDFLAGS		+= -dy -Nmisc/mac -Nmisc/net80211
+
+CERRWARN	+= -_gcc=-Wno-type-limits
+CERRWARN	+= -_gcc=-Wno-unused-label
+CERRWARN	+= -_gcc=-Wno-switch
 
 #
 #	Default build targets.

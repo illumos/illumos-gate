@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
 #
 
 LIBRARY = libproc.a
@@ -30,6 +31,7 @@ CMNOBJS =	\
 	Pcontrol.o	\
 	Pcore.o		\
 	Pexecname.o	\
+	Pfdinfo.o	\
 	Pgcore.o	\
 	Pidle.o		\
 	Pisprocdir.o	\
@@ -72,7 +74,14 @@ CMNOBJS =	\
 ISAOBJS =	\
 	Pisadep.o
 
-OBJECTS = $(CMNOBJS) $(ISAOBJS)
+amd64_SAVEOBJS = \
+	saveargs.o
+
+amd64_CPPFLAGS = -I$(SRC)/common/saveargs
+
+SAVEOBJS = $($(MACH64)_SAVEOBJS)
+
+OBJECTS = $(CMNOBJS) $(ISAOBJS) $(SAVEOBJS)
 
 # include library definitions
 include ../../Makefile.lib
@@ -82,12 +91,18 @@ SRCS =		$(CMNOBJS:%.o=../common/%.c) $(ISAOBJS:%.o=%.c)
 
 LIBS =		$(DYNLIB) $(LINTLIB)
 LDLIBS +=	-lrtld_db -lelf -lctf -lc
+CPPFLAGS +=	$($(MACH64)_CPPFLAGS)
 
 SRCDIR =	../common
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR)
+
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-type-limits
+CERRWARN +=	-_gcc=-Wno-unused-label
 
 # All interfaces are interposable, therefore don't allow direct binding to
 # libproc.  Disable libproc from directly binding to itself, but allow libperl
@@ -106,5 +121,9 @@ lint: lintcheck
 include ../../Makefile.targ
 
 objs/%.o pics/%.o: %.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+objs/%.o pics/%.o: $(SRC)/common/saveargs/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)

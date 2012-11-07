@@ -22,7 +22,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the Macronix
 #	Fast Ethernet (MXFE) driver module in intel systems
@@ -56,6 +56,8 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 #	Overrides
 #
+
+CERRWARN	+= -_gcc=-Wno-switch
 
 #
 # Driver depends on GLDv3

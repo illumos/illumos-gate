@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG=		yacc
 
@@ -67,6 +65,8 @@ LINTPOUT=	lint.out
 C99MODE= $(C99_ENABLE)
 CFLAGS += $(CCVERBOSE)
 CFLAGS64 += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
 
 $(LINTLIB):=	LINTFLAGS = -nvx
 $(ROOTPROG):= FILEMODE = 0555

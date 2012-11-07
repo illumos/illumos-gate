@@ -20,12 +20,8 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# cmd/amt/Makefile.com
 #
 
 PROG=	amt
@@ -38,6 +34,8 @@ LDLIBS +=	-lelf
 
 LINTFLAGS +=	-erroff=E_NAME_USED_NOT_DEF2
 LINTFLAGS64 +=	-erroff=E_NAME_USED_NOT_DEF2
+
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 CLEANFILES	+= $(PROG) $(OBJS)
 

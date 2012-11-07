@@ -20,16 +20,14 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1990 by Sun Microsystems, Inc.
-#
-# cmd/grpck/Makefile
 #
 
 PROG= grpck
 
 include ../Makefile.cmd
+
+CERRWARN += -_gcc=-Wno-unused-variable
 
 RELUSRSBIN=	../usr/sbin
 ROOTSYMLINK=	$(ROOTETC)/$(PROG)

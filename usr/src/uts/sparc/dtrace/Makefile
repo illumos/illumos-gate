@@ -22,7 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 UTSBASE	= ../..
 
@@ -39,6 +38,10 @@ include $(UTSBASE)/sparc/Makefile.sparc
 #	Redefine	DSF_DIR
 #
 DSF_DIR		= $(UTSBASE)/$(PLATFORM)/genassym
+
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-type-limits
+CERRWARN	+= -_gcc=-Wno-uninitialized
 
 ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
 LINT_TARGET	= $(MODULE).lint

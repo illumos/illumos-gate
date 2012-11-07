@@ -23,8 +23,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 UTSBASE	= ../..
 
@@ -44,6 +42,8 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
 CFLAGS		+= $(CCVERBOSE)
 CPPFLAGS	+= -I$(SRC)/common
 LDFLAGS		+= -dy -Ndrv/dtrace
+
+CERRWARN	+= -_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

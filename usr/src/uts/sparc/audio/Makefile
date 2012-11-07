@@ -46,6 +46,8 @@ CONF_SRCDIR	= $(UTSBASE)/common/io/audio/impl
 #
 include $(UTSBASE)/sparc/Makefile.sparc
 
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 #	Define targets
 #

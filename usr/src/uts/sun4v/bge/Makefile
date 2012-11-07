@@ -22,7 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the Broadcom BCM5704
 #	Gigabit Ethernet (BGE) driver module in sun4v systems
@@ -75,6 +75,10 @@ LDFLAGS		+= -dy -N misc/mac -N drv/ip
 # Please do not carry these forward to new Makefiles.
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
+
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-switch
+CERRWARN	+= -_gcc=-Wno-parentheses
 
 #
 #	Default build targets.

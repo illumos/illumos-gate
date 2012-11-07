@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -43,6 +41,9 @@ include ../Makefile.cmd
 
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
 CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-unused-label
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
 YFLAGS += -d
 LDLIBS += -lm
 CLEANFILES= awk.c y.tab.h

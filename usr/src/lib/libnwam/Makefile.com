@@ -51,6 +51,9 @@ $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
 CFLAGS +=       $(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR) -D_REENTRANT
 
+CERRWARN +=	-_gcc=-Wno-switch
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 .KEEP_STATE:
 
 all:	$(LIBS)

@@ -23,7 +23,6 @@
 # Copyright (c) 1999-2000 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 MODULE = ipc.so
 MDBTGT = kvm
@@ -34,3 +33,5 @@ include ../../../../Makefile.cmd
 include ../../../../Makefile.cmd.64
 include ../../Makefile.sparcv9
 include ../../../Makefile.module
+
+CERRWARN += -_gcc=-Wno-parentheses

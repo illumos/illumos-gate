@@ -24,7 +24,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the vuid2ps2 streams kernel
 #	module.
@@ -49,6 +49,9 @@ ROOTMODULE	= $(ROOT_STRMOD_DIR)/$(MODULE)
 #	Include common rules.
 #
 include $(UTSBASE)/intel/Makefile.intel
+
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-parentheses
 
 #
 #	Define targets

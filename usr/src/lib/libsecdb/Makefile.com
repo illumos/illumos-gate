@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY =	libsecdb.a
 VERS =		.1
@@ -45,6 +43,9 @@ CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT
 LINTFLAGS +=	-DPIC
 LINTFLAGS64 +=	-DPIC
+
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

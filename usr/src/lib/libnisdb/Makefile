@@ -136,6 +136,13 @@ $(LARGEPICS) :=	i386_C_PICFLAGS = $(C_BIGPICFLAGS)
 
 CPPFLAGS +=	-D_REENTRANT
 
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-unused-value
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc=-Wno-switch
+CERRWARN +=	-_gcc=-Wno-parentheses
+
 # Extra includes, from yp, for yptol files.
 CPPFLAGS += -I$(SRC)/cmd/ypcmd
 

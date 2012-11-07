@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG =		rmvolmgr
 OBJS =		rmm_common.o rmvolmgr.o vold.o
@@ -43,6 +41,12 @@ LDLIBS +=	-ldbus-1 -ldbus-glib-1 -lglib-2.0 -lhal -lhal-storage -lcontract -lscf
 CPPFLAGS +=	$(HAL_DBUS_CPPFLAGS) $(HAL_GLIB_CPPFLAGS)
 CPPFLAGS +=	-I$(ROOT)/usr/include/hal
 C99MODE =	$(C99_ENABLE)
+
+CERRWARN += 	-_gcc=-Wno-switch
+CERRWARN += 	-_gcc=-Wno-uninitialized
+CERRWARN += 	-_gcc=-Wno-unused-variable
+CERRWARN += 	-_gcc=-Wno-parentheses
+CERRWARN += 	-_gcc=-Wno-unused-function
 
 ROOTCMDDIR =		$(ROOTLIB)
 ROOTMANIFESTDIR =	$(ROOTSVCSYSTEMFILESYSTEM)

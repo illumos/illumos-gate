@@ -104,8 +104,10 @@ preload(const char *str, Rt_map *mlmp, Rt_map **clmp)
 	lddstub = (lmflags & LML_FLG_TRC_ENABLE) &&
 	    (FLAGS1(*clmp) & FL1_RT_LDDSTUB);
 
-	ptr = strtok_r(objs, MSG_ORIG(MSG_STR_DELIMIT), &next);
-	do {
+
+	for (ptr = strtok_r(objs, MSG_ORIG(MSG_STR_DELIMIT), &next);
+	    ptr != NULL;
+	    ptr = strtok_r(NULL, MSG_ORIG(MSG_STR_DELIMIT), &next)) {
 		Rt_map	*nlmp = NULL;
 		uint_t	flags;
 
@@ -179,8 +181,7 @@ preload(const char *str, Rt_map *mlmp, Rt_map **clmp)
 		if (flags & FLG_RT_OBJINTPO)
 			lml_main.lm_flags |= LML_FLG_INTRPOSE;
 
-	} while ((ptr = strtok_r(NULL,
-	    MSG_ORIG(MSG_STR_DELIMIT), &next)) != NULL);
+	}
 
 	free(palp);
 	free(objs);

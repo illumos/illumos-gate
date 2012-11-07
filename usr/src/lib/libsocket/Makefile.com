@@ -56,6 +56,11 @@ CFLAGS64 +=	$(XSTRCONST)
 CPPFLAGS +=	-DSYSV -D_REENTRANT -I../../common/inc
 %/rcmd.o :=	CPPFLAGS += -DNIS
 
+CERRWARN +=	-_gcc=-Wno-type-limits
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-parentheses
+
 .KEEP_STATE:
 
 all:

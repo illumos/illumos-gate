@@ -49,6 +49,8 @@ WLCMD_DIR	= $(UTSBASE)/common/io/warlock
 #
 include $(UTSBASE)/intel/Makefile.intel
 
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 #	Define targets
 #

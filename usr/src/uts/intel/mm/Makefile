@@ -24,7 +24,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the mm driver
 #
@@ -66,6 +66,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 LINTTAGS	+= -erroff=E_STATIC_UNUSED
+
+CERRWARN	+= -_gcc=-Wno-unused-function
+CERRWARN	+= -_gcc=-Wno-clobbered
 
 #
 #	Default build targets.

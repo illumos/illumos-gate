@@ -31,6 +31,8 @@ include ../Makefile.cmd
 FILEMODE = 02555
 
 LDLIBS += -lzonecfg -lcontract
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

@@ -123,6 +123,13 @@ CLOBBERFILES += drti.o
 CPPFLAGS += -I../common -I.
 CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
 CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
+
+CERRWARN += -_gcc=-Wno-unused-label
+CERRWARN += -_gcc=-Wno-unused-variable
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-switch
+
 YYCFLAGS =
 LDLIBS += -lgen -lproc -lrtld_db -lnsl -lsocket -lctf -lelf -lc -lzonecfg
 DRTILDLIBS = $(LDLIBS.lib) -lc

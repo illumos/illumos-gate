@@ -20,11 +20,8 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1989 by Sun Microsystems, Inc.
 #
-# cmd/rpcinfo/Makefile
 
 PROG= rpcinfo
 
@@ -34,6 +31,7 @@ include ../Makefile.cmd
 
 CPPFLAGS= -DPORTMAP $(CPPFLAGS.master)
 LDLIBS += -lnsl
+CERRWARN += -_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

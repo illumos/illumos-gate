@@ -37,6 +37,9 @@ FILEMODE=	755
 LDLIBS +=  -lsocket -lrpcsvc -lnsl -L$(ROOT)/usr/ucblib -R /usr/ucblib -lucb -lbsm
 
 CPPFLAGS = -I$(INC1) $(CPPFLAGS.master)
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-clobbered
 
 XGETFLAGS += -a -x shutdown.xcl
 

@@ -23,7 +23,6 @@
 # Use is subject to license terms.
 #
 
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile creates the flowacct accounting (ipp) module.
 #	intel architecture dependent
@@ -66,6 +65,8 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 # Please do not carry these forward to new Makefiles.
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
+
+CERRWARN	+= -_gcc=-Wno-uninitialized
 
 #
 #	Default build targets.

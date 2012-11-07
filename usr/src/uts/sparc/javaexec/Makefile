@@ -26,7 +26,7 @@
 # Use is subject to license terms.
 # All right reserved.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the javaexec kernel module
 #
@@ -50,6 +50,8 @@ ROOTMODULE	= $(USR_EXEC_DIR)/$(MODULE)
 #	Include common rules.
 #
 include $(UTSBASE)/sparc/Makefile.sparc
+
+CERRWARN	+= -_gcc=-Wno-parentheses
 
 #
 #	Define targets

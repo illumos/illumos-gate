@@ -45,6 +45,10 @@ CFLAGS +=	-DUSESYSLOG
 CPPFLAGS +=	$(INCS)
 CPPFLAGS +=	-DPOSIX_THREADS
 
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-unused-function
+
 LDLIBS +=	-lc
 
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)

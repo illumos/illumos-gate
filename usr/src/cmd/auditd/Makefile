@@ -37,6 +37,8 @@ AUDITD = $(SRC)/cmd/auditd
 CPPFLAGS += -D_REENTRANT
 CPPFLAGS += -I$(LIBBSM) -I$(AUDITD)
 
+CERRWARN += -_gcc=-Wno-parentheses
+
 LDLIBS += -lbsm -lsecdb
 
 OBJS = auditd.o doorway.o queue.o

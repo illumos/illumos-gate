@@ -90,11 +90,6 @@ ROOTDIRS= \
 	$(ROOTONBLD)/lib \
 	$(ROOTONBLD)/lib/$(MACH) \
 	$(ROOTONBLD)/lib/perl \
-	$(ROOTONBLD)/lib/python2.4 \
-	$(ROOTONBLD)/lib/python2.4/onbld \
-	$(ROOTONBLD)/lib/python2.4/onbld/Checks \
-	$(ROOTONBLD)/lib/python2.4/onbld/hgext \
-	$(ROOTONBLD)/lib/python2.4/onbld/Scm \
 	$(ROOTONBLD)/lib/python2.6 \
 	$(ROOTONBLD)/lib/python2.6/onbld \
 	$(ROOTONBLD)/lib/python2.6/onbld/Checks \
@@ -146,6 +141,6 @@ $(ROOTDIRS):
 	$(INS.dir)
 
 $(ROOTONBLDLIBPY): $(ROOTDIRS)
-	$(RM) -r $@; $(SYMLINK) python2.4 $@
+	$(RM) -r $@; $(SYMLINK) python2.6 $@
 
 FRC:

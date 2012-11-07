@@ -42,6 +42,7 @@ INCLIST=	-I../common -I../../include -I../../include/$(MACH)
 CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master) -I$(ELFCAP)
 CFLAGS +=	$(CCVERBOSE)
 C99MODE=	$(C99_ENABLE)
+CERRWARN +=	-_gcc=-Wno-uninitialized
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(ELFLIBDIR) -lelf
 LINTSRCS =	$(SRCS)
 LINTFLAGS +=	-x

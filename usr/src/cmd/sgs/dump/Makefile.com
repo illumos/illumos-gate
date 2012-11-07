@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG=		dump
 
@@ -42,6 +40,8 @@ CPPFLAGS +=	-D__EXTENSIONS__
 LLDFLAGS =	'$(LDPASS)-R$$ORIGIN/../../lib'
 LLDFLAGS64 =	'$(LDPASS)-R$$ORIGIN/../../../lib/$(MACH64)'
 LDFLAGS +=	$(LLDFLAGS)
+
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(ELFLIBDIR) -lelf
 LINTFLAGS +=	-x

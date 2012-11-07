@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY=	libcurses.a
 VERS=	.2
@@ -98,6 +96,8 @@ LINTSRC=	$(LINTLIB:%.ln=%)
 LDLIBS += -lc
 
 CPPFLAGS = -I../h -I../src/libc/xcurses $(CPPFLAGS.master)
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-unused-value
 
 #
 # If and when somebody gets around to messaging this, CLOBBERFILE should not

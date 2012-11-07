@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1989,1996 by Sun Microsystems, Inc.
 # All rights reserved.
 #
@@ -33,6 +31,9 @@ include ../Makefile.cmd
 LDLIBS += -lgen
 XGETFLAGS += -a -x csplit.xcl
 CPPFLAGS += -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE=1
+
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

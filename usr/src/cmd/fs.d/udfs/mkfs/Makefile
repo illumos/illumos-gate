@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1999,2001 by Sun Microsystems, Inc.
 # All rights reserved.
 #
@@ -46,6 +44,9 @@ MKFSOBJS=	mkfs.o udfslib.o
 UDFSDIR=	../../../../uts/common/fs/ufs
 #UDFSOBJS=	ufs_subr.o ufs_tables.o
 UDFSOBJS=
+
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 OBJS=		$(MKFSOBJS) $(UDFSOBJS)
 SRCS=		$(OBJS:%.o=%.c)

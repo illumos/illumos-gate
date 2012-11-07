@@ -24,13 +24,13 @@
 # Use is subject to license terms.
 #
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 PROG= ctrun
 
 include ../Makefile.cmd
 
-CFLAGS += -v
+CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
 LDLIBS += -lcontract -luutil
 
 .KEEP_STATE:

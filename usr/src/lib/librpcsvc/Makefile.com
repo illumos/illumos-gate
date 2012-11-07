@@ -23,8 +23,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY= librpcsvc.a
 VERS = .1
@@ -49,6 +47,11 @@ pics/%.o: ../common/%.c
 LIBS = $(DYNLIB) $(LINTLIB)
 
 CPPFLAGS += -DYP
+
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-switch
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-parentheses
 
 $(LINTLIB):= SRCS = $(SRCDIR)/$(LINTSRC)
 

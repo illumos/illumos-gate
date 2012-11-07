@@ -52,6 +52,8 @@ CPPFLAGS +=	-I.. \
 CPPFLAGS += 	-D_REENTRANT
 CFLAGS +=	$(CCVERBOSE)
 
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 $(LINTLIB) :=	LINTFLAGS = -nvx -I..
 $(LINTLIB) :=	LINTFLAGS64 = -nvx -m64 -I..
 

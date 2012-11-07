@@ -24,10 +24,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
-#	This makefile drives the production of the consconfig_dacf module.
-#
+
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
@@ -57,6 +54,8 @@ INSTALL_TARGET  = $(BINARY) $(ROOTMODULE)
 #	Overrides
 #
 LDFLAGS		+= -dy -Nmisc/usbser
+
+CERRWARN	+= -_gcc=-Wno-parentheses
 
 .KEEP_STATE:
 

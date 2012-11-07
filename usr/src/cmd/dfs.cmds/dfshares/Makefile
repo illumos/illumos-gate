@@ -20,11 +20,7 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1989 by Sun Microsystems, Inc.
-#
-# cmd/dfs.cmds/dfshares/Makefile
 #
 
 PROG=	dfshares
@@ -36,6 +32,9 @@ ROOTLINK= $(ROOTUSRSBIN)/dfmounts
 CFLAGS += -s
 
 include ../../Makefile.cmd
+
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

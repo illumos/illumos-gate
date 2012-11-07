@@ -23,8 +23,6 @@
 # Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # 
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY = libtcp.a
 OBJECTS = tcp.o tcp_sack.o
@@ -34,5 +32,8 @@ include ../Makefile.com
 CMNDIR  = $(CMNNETDIR)/dhcp
 LDLIBS += -linet
 CPPFLAGS += -I../inet $(SOCKCPPFLAGS)
+
+CERRWARN += -_gcc=-Wno-unused-label
+CERRWARN += -_gcc=-Wno-uninitialized
 
 include ../Makefile.targ

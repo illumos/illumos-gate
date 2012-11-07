@@ -19,8 +19,6 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -41,6 +39,8 @@ SHARECTL_OBJ	= $(SHARECTL_MOD:%=%.o) shareutil.o
 MYCPPFLAGS = 	-I.. -I../../sharemgr
 CPPFLAGS += $(MYCPPFLAGS)
 LDLIBS += -lshare -lumem
+
+CERRWARN += -_gcc=-Wno-uninitialized
 
 SRCS = $(SHARECTL_SRC)
 OBJS = $(SHARECTL_OBJ)

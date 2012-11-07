@@ -68,6 +68,12 @@ LDFLAGS += -N"misc/idm"
 LINTFLAGS += -a -erroff=E_BAD_PTR_CAST_ALIGN -erroff=E_PTRDIFF_OVERFLOW
 LINTFLAGS64 += -a -erroff=E_BAD_PTR_CAST_ALIGN -erroff=E_PTRDIFF_OVERFLOW
 
+CERRWARN	+= -_gcc=-Wno-switch
+CERRWARN	+= -_gcc=-Wno-unused-function
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-type-limits
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 # Default build targets.
 #

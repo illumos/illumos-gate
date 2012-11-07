@@ -58,6 +58,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 CFLAGS += $(CCVERBOSE)
 
+CERRWARN	+= -_gcc=-Wno-unused-label
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 LDFLAGS += -dy -Nfs/sockfs -Ndrv/ip -Ndrv/sdpib
 
 #

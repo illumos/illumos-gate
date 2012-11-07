@@ -6,8 +6,7 @@
 # All rights reserved. The Berkeley software License Agreement
 # specifies the terms and conditions for redistribution.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+
 # make file for tip device drivers
 #
 # Current drivers:
@@ -28,6 +27,8 @@ include ../../Makefile.cmd
 
 LINTFLAGS +=	-u
 CPPFLAGS=	-I../ -DUSG $(CPPFLAGS.master)
+CERRWARN +=	-_gcc=-Wno-clobbered
+CERRWARN +=	-_gcc=-Wno-parentheses
 
 .KEEP_STATE:
 

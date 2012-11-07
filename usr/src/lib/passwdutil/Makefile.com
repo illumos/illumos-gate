@@ -56,6 +56,10 @@ CPPFLAGS	+= -DENABLE_SUNOS_AGING -D_REENTRANT \
 		   -I$(SRC)/lib/libsldap/common -I$(SRC)/lib/libnsl/include
 CFLAGS		+= $(CCVERBOSE)
 
+CERRWARN	+= -_gcc=-Wno-switch
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-unused-label
+
 lint	:=	SRCS= $(OBJ:%.o=$(SRCDIR)/%.c)
 
 .KEEP_STATE:

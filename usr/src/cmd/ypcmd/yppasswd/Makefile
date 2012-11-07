@@ -56,6 +56,10 @@ INETYPPROG=		$(NETYPPROG:%=$(NETYP)/%)
 COMMONOBJ =		yppasswdxdr.o yplckpwdf.o
 RPCYPPASSWDDOBJ =	yppasswdd.o changepasswd.o
 
+CERRWARN +=		-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=		-_gcc=-Wno-parentheses
+CERRWARN +=		-_gcc=-Wno-uninitialized
+
 #
 # Objects shared between all the major components
 #

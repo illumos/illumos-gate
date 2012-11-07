@@ -49,6 +49,8 @@ $(ROOTSVCMANIFESTS)	:=	FILEMODE= 444
 ROOTUSRSBINLINKS=	$(PROG:%=$(ROOTUSRSBIN)/%)
 
 CPPFLAGS +=	-I../../../../common/svc -I$(CMDINETCOMMONDIR)
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
 $(NOT_RELEASE_BUILD)CPPFLAGS +=	-DDEBUG
 
 LDLIBS +=		-lscf -luutil -lsocket

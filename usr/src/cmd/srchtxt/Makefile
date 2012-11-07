@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1989 by Sun Microsystems, Inc.
 #
 
@@ -29,6 +27,7 @@ PROG= srchtxt
 
 include ../Makefile.cmd
 
+CERRWARN += -_gcc=-Wno-parentheses
 LDLIBS += -lgen
 
 .KEEP_STATE:

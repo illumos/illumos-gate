@@ -47,6 +47,14 @@ CPPFLAGS += -I. -I$(CMDINETCOMMONDIR) \
 		-I$(SRC)/lib/gss_mechs/mech_krb5/include \
 		-I$(SRC)/lib/gss_mechs/mech_krb5/include/krb5
 
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-unused-function
+CERRWARN +=	-_gcc=-Wno-unused-label
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-clobbered
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 ROOTSYMLINK=	$(ROOT)/usr/ucb/$(PROG)
 
 # conditional assignments

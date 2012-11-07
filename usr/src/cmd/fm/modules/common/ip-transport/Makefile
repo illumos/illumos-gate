@@ -24,7 +24,6 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 MODULE = ip-transport
 CLASS = common
@@ -33,3 +32,4 @@ SRCS = ip.c
 include ../../Makefile.plugin
 
 LDLIBS += -lsocket -lnsl
+CERRWARN += -_gcc=-Wno-uninitialized

@@ -24,16 +24,14 @@
 # All rights reserved.
 #
 
-#
-#ident	"%Z%%M%	%I%	%E% SMI"        /* SVr4.0
-#
-
 PROG= touch
 
 include ../Makefile.ucbcmd
 
 FILEMODE=	755
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
+CERRWARN += -_gcc=-Wno-unused-variable
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
 
 .KEEP_STATE:
 

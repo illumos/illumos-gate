@@ -54,6 +54,9 @@ LDLIBS	+=	-lresolv -lc -lscf
 CFLAGS	+=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR) -I$(SMF_DIR) -D_REENTRANT
 
+CERRWARN +=	-_gcc=-Wno-switch
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

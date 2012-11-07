@@ -27,6 +27,8 @@ PROG= mkmsgs
 include ../Makefile.cmd
 
 LDLIBS += -lgen
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

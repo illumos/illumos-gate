@@ -50,6 +50,10 @@ C99_DISABLE =	$(C99_ENABLE)
 CFLAGS +=	$(CCVERBOSE) $(DEBUG) $(XFFLAG)
 CFLAGS64 +=	$(CCVERBOSE) $(DEBUG) $(XFFLAG)
 
+CERRWARN +=	-_gcc=-Wno-type-limits
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-unused-value
+
 #
 # Location of the shared elfcap code
 #

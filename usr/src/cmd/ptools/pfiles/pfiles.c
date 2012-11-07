@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  */
 
 #include <stdio.h>
@@ -61,7 +62,7 @@ static int Fflag;
 static boolean_t nflag = B_FALSE;
 
 static	void	intr(int);
-static	void	dofcntl(struct ps_prochandle *, int, int, int);
+static	void	dofcntl(struct ps_prochandle *, prfdinfo_t *, int, int);
 static	void	dosocket(struct ps_prochandle *, int);
 static	void	dofifo(struct ps_prochandle *, int);
 static	void	dotli(struct ps_prochandle *, int);
@@ -102,7 +103,7 @@ main(int argc, char **argv)
 	argv += optind;
 
 	if (errflg || argc <= 0) {
-		(void) fprintf(stderr, "usage:\t%s [-F] pid ...\n",
+		(void) fprintf(stderr, "usage:\t%s [-F] { pid | core } ...\n",
 		    command);
 		(void) fprintf(stderr,
 		    "  (report open files of each process)\n");
@@ -132,12 +133,35 @@ main(int argc, char **argv)
 
 		(void) proc_flushstdio();
 
+		arg = *argv++;
+
 		/* get the specified pid and the psinfo struct */
-		if ((pid = proc_arg_psinfo(arg = *argv++, PR_ARG_PIDS,
+		if ((pid = proc_arg_psinfo(arg, PR_ARG_PIDS,
 		    &psinfo, &gret)) == -1) {
-			(void) fprintf(stderr, "%s: cannot examine %s: %s\n",
-			    command, arg, Pgrab_error(gret));
-			retc++;
+
+			if ((Pr = proc_arg_xgrab(arg, NULL, PR_ARG_CORES,
+			    Fflag, &gret, NULL)) == NULL) {
+				(void) fprintf(stderr,
+				    "%s: cannot examine %s: %s\n",
+				    command, arg, Pgrab_error(gret));
+				retc++;
+				continue;
+			}
+			if (proc_arg_psinfo(arg, PR_ARG_ANY, &psinfo,
+			    &gret) < 0) {
+				(void) fprintf(stderr,
+				    "%s: cannot examine %s: %s\n",
+				    command, arg, Pgrab_error(gret));
+				retc++;
+				Prelease(Pr, 0);
+				continue;
+			}
+			(void) printf("core '%s' of %d:\t%.70s\n",
+			    arg, (int)psinfo.pr_pid, psinfo.pr_psargs);
+
+			show_files(Pr);
+			Prelease(Pr, 0);
+
 		} else if ((Pr = Pgrab(pid, Fflag, &gret)) != NULL) {
 			if (Pcreate_agent(Pr) == 0) {
 				proc_unctrl_psinfo(&psinfo);
@@ -190,20 +214,109 @@ intr(int sig)
 
 /* ------ begin specific code ------ */
 
+static int
+show_file(void *data, prfdinfo_t *info)
+{
+	struct ps_prochandle *Pr = data;
+	char unknown[12];
+	char *s;
+	mode_t mode;
+
+	if (interrupt)
+		return (1);
+
+	mode = info->pr_mode;
+
+	switch (mode & S_IFMT) {
+	case S_IFCHR: s = "S_IFCHR"; break;
+	case S_IFBLK: s = "S_IFBLK"; break;
+	case S_IFIFO: s = "S_IFIFO"; break;
+	case S_IFDIR: s = "S_IFDIR"; break;
+	case S_IFREG: s = "S_IFREG"; break;
+	case S_IFLNK: s = "S_IFLNK"; break;
+	case S_IFSOCK: s = "S_IFSOCK"; break;
+	case S_IFDOOR: s = "S_IFDOOR"; break;
+	case S_IFPORT: s = "S_IFPORT"; break;
+	default:
+		s = unknown;
+		(void) sprintf(s, "0x%.4x ", (int)mode & S_IFMT);
+		break;
+	}
+
+	(void) printf("%4d: %s mode:0%.3o", info->pr_fd, s,
+	    (int)mode & ~S_IFMT);
+
+	(void) printf(" dev:%u,%u",
+	    (unsigned)info->pr_major, (unsigned)info->pr_minor);
+
+	if ((mode & S_IFMT) == S_IFPORT) {
+		(void) printf(" uid:%d gid:%d",
+		    (int)info->pr_uid, (int)info->pr_gid);
+		(void) printf(" size:%lld\n", (longlong_t)info->pr_size);
+		return (0);
+	}
+
+	(void) printf(" ino:%llu uid:%d gid:%d",
+	    (u_longlong_t)info->pr_ino, (int)info->pr_uid, (int)info->pr_gid);
+
+	if ((info->pr_rmajor == (major_t)NODEV) &&
+	    (info->pr_rminor == (minor_t)NODEV))
+		(void) printf(" size:%lld\n", (longlong_t)info->pr_size);
+	else
+		(void) printf(" rdev:%u,%u\n",
+		    (unsigned)info->pr_rmajor, (unsigned)info->pr_rminor);
+
+	if (!nflag) {
+		dofcntl(Pr, info,
+		    (mode & (S_IFMT|S_ENFMT|S_IXGRP)) == (S_IFREG|S_ENFMT),
+		    (mode & S_IFMT) == S_IFDOOR);
+
+		if (Pstate(Pr) != PS_DEAD) {
+			char *dev;
+
+			if ((mode & S_IFMT) == S_IFSOCK)
+				dosocket(Pr, info->pr_fd);
+			else if ((mode & S_IFMT) == S_IFIFO)
+				dofifo(Pr, info->pr_fd);
+
+			if ((mode & S_IFMT) == S_IFCHR &&
+			    (dev = strrchr(info->pr_path, ':')) != NULL) {
+				/*
+				 * There's no elegant way to determine
+				 * if a character device supports TLI,
+				 * so we lame out and just check a
+				 * hardcoded list of known TLI devices.
+				 */
+				int i;
+				const char *tlidevs[] = {
+				    "tcp", "tcp6", "udp", "udp6", NULL
+				};
+
+				dev++; /* skip past the `:' */
+				for (i = 0; tlidevs[i] != NULL; i++) {
+					if (strcmp(dev, tlidevs[i]) == 0) {
+						dotli(Pr, info->pr_fd);
+						break;
+					}
+				}
+			}
+		}
+
+		if (info->pr_path[0] != '\0')
+			(void) printf("      %s\n", info->pr_path);
+
+		if (info->pr_offset != -1) {
+			(void) printf("      offset:%lld\n",
+			    (long long)info->pr_offset);
+		}
+	}
+	return (0);
+}
+
 static void
 show_files(struct ps_prochandle *Pr)
 {
-	DIR *dirp;
-	struct dirent *dentp;
-	const char *dev;
-	char pname[100];
-	char fname[PATH_MAX];
-	struct stat64 statb;
 	struct rlimit rlim;
-	pid_t pid;
-	int fd;
-	char *s;
-	int ret;
 
 	if (pr_getrlimit(Pr, RLIMIT_NOFILE, &rlim) == 0) {
 		ulong_t nfd = rlim.rlim_cur;
@@ -215,135 +328,7 @@ show_files(struct ps_prochandle *Pr)
 			    "  Current rlimit: %lu file descriptors\n", nfd);
 	}
 
-	/* in case we are doing this to ourself */
-	pid = (Pr == NULL)? getpid() : Pstatus(Pr)->pr_pid;
-
-	(void) sprintf(pname, "/proc/%d/fd", (int)pid);
-	if ((dirp = opendir(pname)) == NULL) {
-		(void) fprintf(stderr, "%s: cannot open directory %s\n",
-		    command, pname);
-		return;
-	}
-
-	/* for each open file --- */
-	while ((dentp = readdir(dirp)) != NULL && !interrupt) {
-		char unknown[12];
-		dev_t rdev;
-
-		/* skip '.' and '..' */
-		if (!isdigit(dentp->d_name[0]))
-			continue;
-
-		fd = atoi(dentp->d_name);
-		if (pr_fstat64(Pr, fd, &statb) == -1) {
-			s = unknown;
-			(void) sprintf(s, "%4d", fd);
-			perror(s);
-			continue;
-		}
-
-		rdev = NODEV;
-		switch (statb.st_mode & S_IFMT) {
-		case S_IFCHR: s = "S_IFCHR"; rdev = statb.st_rdev; break;
-		case S_IFBLK: s = "S_IFBLK"; rdev = statb.st_rdev; break;
-		case S_IFIFO: s = "S_IFIFO"; break;
-		case S_IFDIR: s = "S_IFDIR"; break;
-		case S_IFREG: s = "S_IFREG"; break;
-		case S_IFLNK: s = "S_IFLNK"; break;
-		case S_IFSOCK: s = "S_IFSOCK"; break;
-		case S_IFDOOR: s = "S_IFDOOR"; break;
-		case S_IFPORT: s = "S_IFPORT"; break;
-		default:
-			s = unknown;
-			(void) sprintf(s, "0x%.4x ",
-			    (int)statb.st_mode & S_IFMT);
-			break;
-		}
-
-		(void) printf("%4d: %s mode:0%.3o", fd, s,
-		    (int)statb.st_mode & ~S_IFMT);
-
-		if (major(statb.st_dev) != (major_t)NODEV &&
-		    minor(statb.st_dev) != (minor_t)NODEV)
-			(void) printf(" dev:%lu,%lu",
-			    (ulong_t)major(statb.st_dev),
-			    (ulong_t)minor(statb.st_dev));
-		else
-			(void) printf(" dev:0x%.8lX", (long)statb.st_dev);
-
-		if ((statb.st_mode & S_IFMT) == S_IFPORT) {
-			(void) printf(" uid:%d gid:%d",
-			    (int)statb.st_uid,
-			    (int)statb.st_gid);
-			(void) printf(" size:%lld\n",
-			    (longlong_t)statb.st_size);
-			continue;
-		}
-
-		(void) printf(" ino:%llu uid:%d gid:%d",
-		    (u_longlong_t)statb.st_ino,
-		    (int)statb.st_uid, (int)statb.st_gid);
-
-		if (rdev == NODEV)
-			(void) printf(" size:%lld\n",
-			    (longlong_t)statb.st_size);
-		else if (major(rdev) != (major_t)NODEV &&
-		    minor(rdev) != (minor_t)NODEV)
-			(void) printf(" rdev:%lu,%lu\n",
-			    (ulong_t)major(rdev), (ulong_t)minor(rdev));
-		else
-			(void) printf(" rdev:0x%.8lX\n", (long)rdev);
-
-		if (!nflag) {
-			off_t offset;
-
-			dofcntl(Pr, fd,
-			    (statb.st_mode & (S_IFMT|S_ENFMT|S_IXGRP))
-			    == (S_IFREG|S_ENFMT),
-			    (statb.st_mode & S_IFMT) == S_IFDOOR);
-
-			if ((statb.st_mode & S_IFMT) == S_IFSOCK)
-				dosocket(Pr, fd);
-			else if ((statb.st_mode & S_IFMT) == S_IFIFO)
-				dofifo(Pr, fd);
-
-			(void) sprintf(pname, "/proc/%d/path/%d", (int)pid, fd);
-
-			if ((ret = readlink(pname, fname, PATH_MAX - 1)) <= 0)
-				continue;
-
-			fname[ret] = '\0';
-
-			if ((statb.st_mode & S_IFMT) == S_IFCHR &&
-			    (dev = strrchr(fname, ':')) != NULL) {
-				/*
-				 * There's no elegant way to determine if a
-				 * character device supports TLI, so we lame
-				 * out and just check a hardcoded list of
-				 * known TLI devices.
-				 */
-				int i;
-				const char *tlidevs[] =
-				    { "tcp", "tcp6", "udp", "udp6", NULL };
-
-				dev++; /* skip past the `:' */
-				for (i = 0; tlidevs[i] != NULL; i++) {
-					if (strcmp(dev, tlidevs[i]) == 0) {
-						dotli(Pr, fd);
-						break;
-					}
-				}
-			}
-			(void) printf("      %s\n", fname);
-
-			offset = pr_lseek(Pr, fd, 0, SEEK_CUR);
-			if (offset != -1) {
-				(void) printf("      offset:%ld\n", offset);
-			}
-
-		}
-	}
-	(void) closedir(dirp);
+	(void) Pfdinfo_iter(Pr, show_file, Pr);
 }
 
 
@@ -371,14 +356,17 @@ getflock(struct ps_prochandle *Pr, int fd, struct flock *flock_native)
 
 /* examine open file with fcntl() */
 static void
-dofcntl(struct ps_prochandle *Pr, int fd, int mandatory, int isdoor)
+dofcntl(struct ps_prochandle *Pr, prfdinfo_t *info, int mandatory, int isdoor)
 {
 	struct flock flock;
 	int fileflags;
 	int fdflags;
+	int fd;
 
-	fileflags = pr_fcntl(Pr, fd, F_GETXFL, 0);
-	fdflags = pr_fcntl(Pr, fd, F_GETFD, 0);
+	fd = info->pr_fd;
+
+	fileflags = info->pr_fileflags;
+	fdflags = info->pr_fdflags;
 
 	if (fileflags != -1 || fdflags != -1) {
 		(void) printf("      ");
@@ -386,10 +374,10 @@ dofcntl(struct ps_prochandle *Pr, int fd, int mandatory, int isdoor)
 			show_fileflags(fileflags);
 		if (fdflags != -1 && (fdflags & FD_CLOEXEC))
 			(void) printf(" FD_CLOEXEC");
-		if (isdoor)
+		if (isdoor && (Pstate(Pr) != PS_DEAD))
 			show_door(Pr, fd);
 		(void) fputc('\n', stdout);
-	} else if (isdoor) {
+	} else if (isdoor && (Pstate(Pr) != PS_DEAD)) {
 		(void) printf("    ");
 		show_door(Pr, fd);
 		(void) fputc('\n', stdout);
@@ -401,7 +389,7 @@ dofcntl(struct ps_prochandle *Pr, int fd, int mandatory, int isdoor)
 	flock.l_len = 0;
 	flock.l_sysid = 0;
 	flock.l_pid = 0;
-	if (getflock(Pr, fd, &flock) != -1) {
+	if ((Pstate(Pr) != PS_DEAD) && (getflock(Pr, fd, &flock) != -1)) {
 		if (flock.l_type != F_UNLCK && (flock.l_sysid || flock.l_pid)) {
 			unsigned long sysid = flock.l_sysid;
 

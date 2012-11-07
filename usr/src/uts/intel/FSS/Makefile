@@ -24,7 +24,7 @@
 #
 # uts/intel/FSS/Makefile
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the FSS scheduling class
 #	kernel module.
@@ -63,6 +63,8 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 # Please do not carry these forward to new Makefiles.
 #
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
+
+CERRWARN	+= -_gcc=-Wno-uninitialized
 
 #
 #	Default build targets.

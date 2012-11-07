@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
 #
 
 @ _START_
@@ -457,6 +458,7 @@
 @ MSG_CNOTE_DESC_PSINFO_T		"desc: (psinfo_t)"
 @ MSG_CNOTE_DESC_PSTATUS_T		"desc: (pstatus_t)"
 @ MSG_CNOTE_DESC_STRUCT_UTSNAME		"desc: (struct utsname)"
+@ MSG_CNOTE_DESC_PRFDINFO_T		"desc: (prfdinfo_t)"
 
 
 @ MSG_CNOTE_FMT_LINE		"%*s%-*s%s"
@@ -615,6 +617,17 @@
 @ MSG_CNOTE_T_UTS_RELEASE		"release:"
 @ MSG_CNOTE_T_UTS_SYSNAME		"sysname:"
 @ MSG_CNOTE_T_UTS_VERSION		"version:"
+@ MSG_CNOTE_T_PR_FD			"pr_fd:"
+@ MSG_CNOTE_T_PR_MODE			"pr_mode:"
+@ MSG_CNOTE_T_PR_PATH			"pr_path:"
+@ MSG_CNOTE_T_PR_MAJOR			"pr_major:"
+@ MSG_CNOTE_T_PR_MINOR			"pr_minor:"
+@ MSG_CNOTE_T_PR_RMAJOR			"pr_rmajor:"
+@ MSG_CNOTE_T_PR_RMINOR			"pr_rminor:"
+@ MSG_CNOTE_T_PR_OFFSET			"pr_offset:"
+@ MSG_CNOTE_T_PR_INO			"pr_ino:"
+@ MSG_CNOTE_T_PR_FILEFLAGS		"pr_fileflags:"
+@ MSG_CNOTE_T_PR_FDFLAGS		"pr_fdflags:"
 
 
 # Names of fake sections generated from program header data

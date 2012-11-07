@@ -23,7 +23,7 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the idn driver module.
 #
@@ -63,6 +63,10 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 # lint pass one enforcement
 #
 CFLAGS += $(CCVERBOSE) -DIPV6
+CERRWARN += -_gcc=-Wno-unused-function
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-type-limits
 
 #
 #	Default build targets.

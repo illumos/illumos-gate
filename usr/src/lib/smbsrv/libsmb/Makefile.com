@@ -77,6 +77,9 @@ LDLIBS +=	$(MACH_LDLIBS)
 LDLIBS +=	-lscf -lmd -luuid -lnsl -lpkcs11 -lsec -lsocket -lresolv
 LDLIBS +=	-lidmap -lreparse -lnvpair -lcmdutils -lavl -lc
 CPPFLAGS +=	$(INCS) -D_REENTRANT
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-char-subscripts
+CERRWARN +=	-_gcc=-Wno-switch
 
 SRCS=   $(OBJS_COMMON:%.o=$(SRCDIR)/%.c)	\
 	$(OBJS_SHARED:%.o=$(SRC)/common/smbsrv/%.c)

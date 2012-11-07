@@ -22,6 +22,9 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ */
 
 #include <sys/systm.h>
 #include <sys/cmn_err.h>
@@ -1585,7 +1588,8 @@ rfs4_fattr4_fs_locations(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 	case NFS4ATTR_GETIT:
 		fsl = fetch_referral(sarg->cs->vp, sarg->cs->cr);
 		if (fsl == NULL)
-			error = EINVAL;
+			(void) memset(&(na->fs_locations), 0,
+			    sizeof (fs_locations4));
 		else {
 			na->fs_locations = *fsl;
 			kmem_free(fsl, sizeof (fs_locations4));

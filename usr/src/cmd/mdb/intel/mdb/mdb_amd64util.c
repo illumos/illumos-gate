@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/reg.h>
 #include <sys/privregs.h>
@@ -40,6 +38,8 @@
 #include <mdb/mdb_ctf.h>
 #include <mdb/mdb_err.h>
 #include <mdb/mdb.h>
+
+#include <saveargs.h>
 
 /*
  * This array is used by the getareg and putareg entry points, and also by our
@@ -138,170 +138,6 @@ mdb_amd64_printregs(const mdb_tgt_gregset_t *gregs)
 }
 
 /*
- * Sun Studio 10 patch compiler and gcc 3.4.3 Sun branch implemented a
- * "-save_args" option on amd64.  When the option is specified, INTEGER
- * type function arguments passed via registers will be saved on the stack
- * immediately after %rbp, and will not be modified through out the life
- * of the routine.
- *
- *				+--------+
- *		%rbp	-->     |  %rbp  |
- *				+--------+
- *		-0x8(%rbp)	|  %rdi  |
- *				+--------+
- *		-0x10(%rbp)	|  %rsi  |
- *				+--------+
- *		-0x18(%rbp)	|  %rdx  |
- *				+--------+
- *		-0x20(%rbp)	|  %rcx  |
- *				+--------+
- *		-0x28(%rbp)	|  %r8   |
- *				+--------+
- *		-0x30(%rbp)	|  %r9   |
- *				+--------+
- *
- *
- * For example, for the following function,
- *
- * void
- * foo(int a1, int a2, int a3, int a4, int a5, int a6, int a7)
- * {
- * ...
- * }
- *
- * Disassembled code will look something like the following:
- *
- *     pushq	%rbp
- *     movq	%rsp, %rbp
- *     subq	$imm8, %rsp			**
- *     movq	%rdi, -0x8(%rbp)
- *     movq	%rsi, -0x10(%rbp)
- *     movq	%rdx, -0x18(%rbp)
- *     movq	%rcx, -0x20(%rbp)
- *     movq	%r8, -0x28(%rbp)
- *     movq	%r9, -0x30(%rbp)
- *     ...
- * or
- *     pushq	%rbp
- *     movq	%rsp, %rbp
- *     subq	$imm8, %rsp			**
- *     movq	%r9, -0x30(%rbp)
- *     movq	%r8, -0x28(%rbp)
- *     movq	%rcx, -0x20(%rbp)
- *     movq	%rdx, -0x18(%rbp)
- *     movq	%rsi, -0x10(%rbp)
- *     movq	%rdi, -0x8(%rbp)
- *     ...
- *
- * **: The space being reserved is in addition to what the current
- *     function prolog already reserves.
- *
- * If there are odd number of arguments to a function, additional space is
- * reserved on the stack to maintain 16-byte alignment.  For example,
- *
- *     argc == 0: no argument saving.
- *     argc == 3: save 3, but space for 4 is reserved
- *     argc == 7: save 6.
- */
-
-/*
- * The longest instruction sequence in bytes before all 6 arguments are
- * saved on the stack.  This value depends on compiler implementation,
- * therefore it should be examined periodically to guarantee accuracy.
- */
-#define	SEQ_LEN		80
-
-/*
- * Size of the instruction sequence arrays.  It should correspond to
- * the maximum number of arguments passed via registers.
- */
-#define	INSTR_ARRAY_SIZE	6
-
-#define	INSTR4(ins, off)	\
-	(ins[(off)] + (ins[(off) + 1] << 8) + (ins[(off + 2)] << 16) + \
-	(ins[(off) + 3] << 24))
-
-/*
- * Sun Studio 10 patch implementation saves %rdi first;
- * GCC 3.4.3 Sun branch implementation saves them in reverse order.
- */
-static const uint32_t save_instr[INSTR_ARRAY_SIZE] = {
-	0xf87d8948,	/* movq %rdi, -0x8(%rbp) */
-	0xf0758948,	/* movq %rsi, -0x10(%rbp) */
-	0xe8558948,	/* movq %rdx, -0x18(%rbp) */
-	0xe04d8948,	/* movq %rcx, -0x20(%rbp) */
-	0xd845894c,	/* movq %r8, -0x28(%rbp) */
-	0xd04d894c	/* movq %r9, -0x30(%rbp) */
-};
-
-static const uint32_t save_fp_instr[] = {
-	0xe5894855,	/* pushq %rbp; movq %rsp,%rbp, encoding 1 */
-	0xec8b4855,	/* pushq %rbp; movq %rsp,%rbp, encoding 2 */
-	0xe58948cc,	/* int $0x3; movq %rsp,%rbp, encoding 1 */
-	0xec8b48cc,	/* int $0x3; movq %rsp,%rbp, encoding 2 */
-	NULL
-};
-
-/*
- * Look for the above instruction sequences as indicators for register
- * arguments being available on the stack.
- */
-static int
-is_argsaved(mdb_tgt_t *t, uintptr_t fstart, uint64_t size, uint_t argc,
-    int start_index)
-{
-	uint8_t		ins[SEQ_LEN];
-	int		i, j;
-	uint32_t	n;
-
-	size = MIN(size, SEQ_LEN);
-	argc = MIN((start_index + argc), INSTR_ARRAY_SIZE);
-
-	if (mdb_tgt_vread(t, ins, size, fstart) != size)
-		return (0);
-
-	/*
-	 * Make sure framepointer has been saved.
-	 */
-	n = INSTR4(ins, 0);
-	for (i = 0; save_fp_instr[i] != NULL; i++) {
-		if (n == save_fp_instr[i])
-			break;
-	}
-
-	if (save_fp_instr[i] == NULL)
-		return (0);
-
-	/*
-	 * Compare against Sun Studio implementation
-	 */
-	for (i = 8, j = start_index; i < size - 4; i++) {
-		n = INSTR4(ins, i);
-
-		if (n == save_instr[j]) {
-			i += 3;
-			if (++j >= argc)
-				return (1);
-		}
-	}
-
-	/*
-	 * Compare against GCC implementation
-	 */
-	for (i = 8, j = argc - 1; i < size - 4; i++) {
-		n = INSTR4(ins, i);
-
-		if (n == save_instr[j]) {
-			i += 3;
-			if (--j < start_index)
-				return (1);
-		}
-	}
-
-	return (0);
-}
-
-/*
  * We expect all proper Solaris core files to have STACK_ALIGN-aligned stacks.
  * Hence the name.  However, if the core file resulted from a
  * hypervisor-initiated panic, the hypervisor's frames may only be 64-bit
@@ -339,6 +175,8 @@ mdb_amd64_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 	uintptr_t lastfp, curpc;
 
 	ssize_t size;
+	ssize_t insnsize;
+	uint8_t ins[SAVEARGS_INSN_SEQ_LEN];
 
 	GElf_Sym s;
 	mdb_syminfo_t sip;
@@ -354,6 +192,7 @@ mdb_amd64_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 	bcopy(gsp, &gregs, sizeof (gregs));
 
 	while (fp != 0) {
+		int args_style = 0;
 
 		curpc = pc;
 
@@ -367,27 +206,74 @@ mdb_amd64_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 		    NULL, 0, &s, &sip) == 0) &&
 		    (mdb_ctf_func_info(&s, &sip, &mfp) == 0)) {
 			int return_type = mdb_ctf_type_kind(mfp.mtf_return);
+			mdb_ctf_id_t args_types[5];
+
 			argc = mfp.mtf_argc;
+
 			/*
-			 * If the function returns a structure or union,
-			 * %rdi contains the address in which to store the
-			 * return value rather than for an argument.
+			 * If the function returns a structure or union
+			 * greater than 16 bytes in size %rdi contains the
+			 * address in which to store the return value rather
+			 * than for an argument.
 			 */
-			if (return_type == CTF_K_STRUCT ||
-			    return_type == CTF_K_UNION)
+			if ((return_type == CTF_K_STRUCT ||
+			    return_type == CTF_K_UNION) &&
+			    mdb_ctf_type_size(mfp.mtf_return) > 16)
 				start_index = 1;
 			else
 				start_index = 0;
+
+			/*
+			 * If any of the first 5 arguments are a structure
+			 * less than 16 bytes in size, it will be passed
+			 * spread across two argument registers, and we will
+			 * not cope.
+			 */
+			if (mdb_ctf_func_args(&mfp, 5, args_types) == CTF_ERR)
+				argc = 0;
+
+			for (i = 0; i < MIN(5, argc); i++) {
+				int t = mdb_ctf_type_kind(args_types[i]);
+
+				if (((t == CTF_K_STRUCT) ||
+				    (t == CTF_K_UNION)) &&
+				    mdb_ctf_type_size(args_types[i]) <= 16) {
+					argc = 0;
+					break;
+				}
+			}
 		} else {
 			argc = 0;
 		}
 
-		if (argc != 0 && is_argsaved(t, s.st_value, s.st_size,
-		    argc, start_index)) {
+		/*
+		 * The number of instructions to search for argument saving is
+		 * limited such that only instructions prior to %pc are
+		 * considered such that we never read arguments from a
+		 * function where the saving code has not in fact yet
+		 * executed.
+		 */
+		insnsize = MIN(MIN(s.st_size, SAVEARGS_INSN_SEQ_LEN),
+		    pc - s.st_value);
 
-			/* Upto to 6 arguments are passed via registers */
-			reg_argc = MIN(6, mfp.mtf_argc);
+		if (mdb_tgt_vread(t, ins, insnsize, s.st_value) != insnsize)
+			argc = 0;
+
+		if ((argc != 0) &&
+		    ((args_style = saveargs_has_args(ins, insnsize, argc,
+		    start_index)) != SAVEARGS_NO_ARGS)) {
+			/* Up to 6 arguments are passed via registers */
+			reg_argc = MIN((6 - start_index), mfp.mtf_argc);
 			size = reg_argc * sizeof (long);
+
+			/*
+			 * If Studio pushed a structure return address as an
+			 * argument, we need to read one more argument than
+			 * actually exists (the addr) to make everything line
+			 * up.
+			 */
+			if (args_style == SAVEARGS_STRUCT_ARGS)
+				size += sizeof (long);
 
 			if (mdb_tgt_vread(t, fr_argv, size, (fp - size))
 			    != size)
@@ -397,21 +283,25 @@ mdb_amd64_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 			 * Arrange the arguments in the right order for
 			 * printing.
 			 */
-			for (i = 0; i < (reg_argc >> 1); i++) {
+			for (i = 0; i < (reg_argc / 2); i++) {
 				long t = fr_argv[i];
 
 				fr_argv[i] = fr_argv[reg_argc - i - 1];
 				fr_argv[reg_argc - i - 1] = t;
 			}
 
-			if (argc > 6) {
-				size = (argc - 6) * sizeof (long);
-				if (mdb_tgt_vread(t, &fr_argv[6], size,
+			if (argc > reg_argc) {
+				size = MIN((argc - reg_argc) * sizeof (long),
+				    sizeof (fr_argv) -
+				    (reg_argc * sizeof (long)));
+
+				if (mdb_tgt_vread(t, &fr_argv[reg_argc], size,
 				    fp + sizeof (fr)) != size)
 					return (-1); /* errno has been set */
 			}
-		} else
+		} else {
 			argc = 0;
+		}
 
 		if (got_pc && func(arg, pc, argc, fr_argv, &gregs) != 0)
 			break;

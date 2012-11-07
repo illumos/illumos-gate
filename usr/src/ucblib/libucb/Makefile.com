@@ -93,6 +93,11 @@ LDLIBS +=	-lelf -lc
 CPPFLAGS = -D$(MACH) -I$(SRC)/ucbhead -I../inc \
 		-I../../../lib/libc/inc $(CPPFLAGS.master)
 
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-char-subscripts
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 ASFLAGS= -P -D__STDC__ -DLOCORE -D_SYS_SYS_S -D_ASM $(CPPFLAGS)
 
 pics/%.o:= ASFLAGS += $(AS_PICFLAGS)

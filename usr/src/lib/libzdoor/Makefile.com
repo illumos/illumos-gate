@@ -22,6 +22,10 @@
 # Use is subject to license terms.
 #
 
+LIBRARY =		libpapi-common.a
+VERS =			.0
+OBJECTS = attribute.o common.o library.o list.o misc.o status.o uri.o
+
 LIBRARY=	libzdoor.a
 VERS=		.1
 OBJECTS=	zdoor.o		\
@@ -35,9 +39,16 @@ include	../../Makefile.rootfs
 SRCDIR =	../common
 SRCS =	$(OBJECTS:%.o=$(SRCDIR)/%.c)
 
-CPPFLAGS +=	-I$(SRCDIR) -D_REENTRANT -D_FILE_OFFSET_BITS=64
-LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-lc -lzonecfg -lcontract
+LIBS =			$(DYNLIB)
+
+$(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
+
+CFLAGS +=	$(CCVERBOSE)
+CPPFLAGS +=	-I$(SRCDIR)
+
+CERRWARN +=	-_gcc=-Wno-switch
+
+MAPFILES =	$(SRCDIR)/mapfile
 
 $(LINTLIB) :=	SRCS=	$(SRCDIR)/$(LINTSRC)
 

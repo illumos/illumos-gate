@@ -24,7 +24,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the dcopy
 #	kernel module.
@@ -49,6 +49,8 @@ ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 #	Include common rules.
 #
 include $(UTSBASE)/intel/Makefile.intel
+
+CERRWARN	+= -_gcc=-Wno-unused-label
 
 #
 #	Define targets

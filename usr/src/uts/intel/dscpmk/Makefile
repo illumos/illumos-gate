@@ -23,7 +23,6 @@
 # Use is subject to license terms.
 #
 
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile creates the marker (ipp) module.
 #	intel architecture dependent
@@ -68,6 +67,8 @@ LDFLAGS += -dy -Ndrv/ip
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
+
+CERRWARN	+= -_gcc=-Wno-uninitialized
 
 #
 #	Default build targets.

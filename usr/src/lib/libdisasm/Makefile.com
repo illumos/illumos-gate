@@ -22,8 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 # The build process for libdisasm is sightly different from that used by other
@@ -99,6 +97,9 @@ ASFLAGS_library =
 ASFLAGS += -P $(ASFLAGS_$(CURTYPE)) -D_ASM
 
 $(LINTLIB) := SRCS = $(COMDIR)/$(LINTSRC)
+
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 # We want the thread-specific errno in the library, but we don't want it in
 # the standalone.  $(DTS_ERRNO) is designed to add -D_TS_ERRNO to $(CPPFLAGS),

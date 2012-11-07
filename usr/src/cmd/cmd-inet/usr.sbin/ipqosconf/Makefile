@@ -51,6 +51,9 @@ $(ROOTLIBIPQOSCONFTYPES)	:=	FILEMODE= 0444
 
 #pull in prototype for strtok_r
 CPPFLAGS +=	-D__EXTENSIONS__
+CERRWARN +=	-_gcc=-Wno-switch
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 LDLIBS +=	-lsocket -lnsl -lnvpair -lipp
 

@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY =	apptrace.a
 VERS =		.1
@@ -33,6 +31,8 @@ include ../../Makefile.abi
 
 LIBS =		$(DYNLIB)
 CPPFLAGS =      -I. $(CPPFLAGS.master)
+
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 # No mapfile here
 MAPFILES =

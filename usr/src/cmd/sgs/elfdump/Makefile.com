@@ -58,6 +58,9 @@ LDLIBS +=	$(ELFLIBDIR) -lelf $(LDDBGLIBDIR) $(LDDBG_LIB) \
 LINTFLAGS +=	-x
 LINTFLAGS64 +=	-x
 
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-switch
+
 BLTDEFS =	msg.h
 BLTDATA =	msg.c
 BLTMESG =	$(SGSMSGDIR)/elfdump

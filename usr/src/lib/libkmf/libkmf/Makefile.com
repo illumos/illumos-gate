@@ -66,6 +66,11 @@ $(DYNLIB64) :=  LDLIBS64 += -lxml2
 CPPFLAGS	+=	-I$(INCDIR) -I$(ADJUNCT_PROTO)/usr/include/libxml2 \
 			-I../../ber_der/inc -I$(SRCDIR)
 
+CERRWARN	+=	-_gcc=-Wno-parentheses
+CERRWARN	+=	-_gcc=-Wno-switch
+CERRWARN	+=	-_gcc=-Wno-type-limits
+CERRWARN	+=	-_gcc=-Wno-uninitialized
+
 .KEEP_STATE:
 
 all:    $(LIBS)

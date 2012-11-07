@@ -22,12 +22,12 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG= regcmp 
 
 include		../Makefile.cmd
+
+CERRWARN += -_gcc=-Wno-parentheses
 
 .KEEP_STATE:
 

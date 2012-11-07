@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1993,2001 by Sun Microsystems, Inc.
 # All rights reserved.
 #
@@ -29,6 +27,9 @@
 PROG= getfacl
 
 include ../Makefile.cmd
+
+CERRWARN += -_gcc=-Wno-unused-variable
+CERRWARN += -_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

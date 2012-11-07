@@ -19,13 +19,12 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ucbcmd/ls/Makefile
+
 
 PROG= ls
 
@@ -33,6 +32,7 @@ include ../Makefile.ucbcmd
 
 CFLAGS += $(CCVERBOSE)
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
+CERRWARN += -_gcc=-Wno-parentheses
 
 FILEMODE=	755
 

@@ -41,6 +41,11 @@ CONF_SRCDIR	= $(UTSBASE)/intel/io/scsi/adapters/arcmsr
 #
 include $(UTSBASE)/intel/Makefile.intel
 
+CERRWARN	+= -_gcc=-Wno-switch
+CERRWARN	+= -_gcc=-Wno-unused-label
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 # Define targets.
 #
@@ -52,6 +57,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 # Note dependancy on misc/scsi.
 #
 LDFLAGS += -dy -N"misc/scsi"
+
 #
 # Default build targets.
 #

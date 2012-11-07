@@ -51,6 +51,10 @@ CPPFLAGS += 	-D_REENTRANT -DSUN_THREADS \
 		-I$(SRC)/lib/libldap5/include/ldap \
 		-I$(SRC)/lib/libc/port/gen
 
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-switch
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 # Message files
 POFILE=		ldap_cachemgr.po
 POFILES=	${OBJS:%.o=%.po}

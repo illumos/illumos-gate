@@ -45,6 +45,8 @@ ROOTMANIFESTDIR = $(ROOTSVCPLATFORMSUN4U)
 CPPFLAGS += -I$(SRC)/uts/sun4u/opl
 LDLIBS64 += -lsysevent -lnvpair -lcfgadm -ldevinfo
 
+CERRWARN += -_gcc=-Wno-unused-variable
+
 PSMPROG = $(USR_PSM_LIB64_DIR)/$(PROG)
 
 $(PSMPROG) :=	FILEMODE = 0755

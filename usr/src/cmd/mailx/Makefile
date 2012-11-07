@@ -62,6 +62,10 @@ $(ROOTMAILXRC) :=	FILEMODE =	0644
 $(ROOTUCBMAILRC) :=	FILEMODE =	0644
 
 CPPFLAGS=	-Ihdr -DUSG -DOPTIM $(CPPFLAGS.master)
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-clobbered
 LINTFLAGS= 	-hb
 LDLIBS +=	-lmail
 LDFLAGS +=	$(MAPFILE.NGB:%=-M%)

@@ -54,6 +54,8 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #	Overrides
 #
 
+CERRWARN	+= -_gcc=-Wno-switch
+
 #
 # Driver depends on GLD
 #

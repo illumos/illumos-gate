@@ -22,7 +22,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the pseudo device
 #	to access the sun4v PRI
@@ -66,7 +66,8 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 # lint pass one enforcement
 #
-CFLAGS += -v
+CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-uninitialized
 
 #
 # Module Dependencies

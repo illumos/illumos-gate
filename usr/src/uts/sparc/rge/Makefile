@@ -22,7 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the Realtek
 #	Gigabit Ethernet (RGE) driver module in sparc systems
@@ -67,6 +67,9 @@ CFLAGS		+= -dalign
 # Driver depends on MAC & IP
 #
 LDFLAGS		+= -dy -N misc/mac -N drv/ip
+
+CERRWARN	+= -_gcc=-Wno-switch
+CERRWARN	+= -_gcc=-Wno-uninitialized
 
 #
 # For now, disable these lint checks; maintainers should endeavor

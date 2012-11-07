@@ -23,7 +23,9 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
+ */
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -1545,6 +1547,45 @@ dump_prpriv(note_state_t *state, const char *title)
 	indent_exit(state);
 }
 
+static void
+dump_prfdinfo(note_state_t *state, const char *title)
+{
+	const sl_prfdinfo_layout_t *layout = state->ns_arch->prfdinfo;
+	char buf[1024];
+	uint32_t fileflags, mode;
+
+	indent_enter(state, title, &layout->pr_fd);
+
+	PRINT_DEC(MSG_ORIG(MSG_CNOTE_T_PR_FD), pr_fd);
+	mode = extract_as_word(state, &layout->pr_mode);
+
+	print_str(state, MSG_ORIG(MSG_CNOTE_T_PR_MODE),
+	    conv_cnote_filemode(mode, 0, buf, sizeof (buf)));
+
+	PRINT_DEC_2UP(MSG_ORIG(MSG_CNOTE_T_PR_UID), pr_uid,
+	    MSG_ORIG(MSG_CNOTE_T_PR_GID), pr_gid);
+
+	PRINT_DEC_2UP(MSG_ORIG(MSG_CNOTE_T_PR_MAJOR), pr_major,
+	    MSG_ORIG(MSG_CNOTE_T_PR_MINOR), pr_minor);
+	PRINT_DEC_2UP(MSG_ORIG(MSG_CNOTE_T_PR_RMAJOR), pr_rmajor,
+	    MSG_ORIG(MSG_CNOTE_T_PR_RMINOR), pr_rminor);
+
+	PRINT_DEC(MSG_ORIG(MSG_CNOTE_T_PR_INO), pr_ino);
+
+	PRINT_DEC_2UP(MSG_ORIG(MSG_CNOTE_T_PR_SIZE), pr_size,
+	    MSG_ORIG(MSG_CNOTE_T_PR_OFFSET), pr_offset);
+
+	fileflags = extract_as_word(state, &layout->pr_fileflags);
+
+	print_str(state, MSG_ORIG(MSG_CNOTE_T_PR_FILEFLAGS),
+	    conv_cnote_fileflags(fileflags, 0, buf, sizeof (buf)));
+
+	PRINT_DEC(MSG_ORIG(MSG_CNOTE_T_PR_FDFLAGS), pr_fdflags);
+
+	PRINT_STRBUF(MSG_ORIG(MSG_CNOTE_T_PR_PATH), pr_path);
+
+	indent_exit(state);
+}
 
 /*
  * Output information from priv_impl_info_t structure.
@@ -1776,6 +1817,14 @@ corenote(Half mach, int do_swap, Word type,
 	case NT_ZONENAME:		/* string from getzonenamebyid(3C) */
 		dbg_print(0, MSG_ORIG(MSG_NOTE_DESC));
 		dbg_print(0, MSG_ORIG(MSG_FMT_INDENT), safe_str(desc, descsz));
+		return (CORENOTE_R_OK);
+
+
+	case NT_FDINFO:
+		state.ns_vcol = 22;
+		state.ns_t2col = 41;
+		state.ns_v2col = 54;
+		dump_prfdinfo(&state, MSG_ORIG(MSG_CNOTE_DESC_PRFDINFO_T));
 		return (CORENOTE_R_OK);
 	}
 

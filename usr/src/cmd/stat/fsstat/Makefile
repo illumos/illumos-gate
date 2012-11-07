@@ -35,6 +35,7 @@ COMMON_SRCS = $(COMMON_OBJS:%.o=$(STATCOMMONDIR)/%.c)
 
 LDLIBS += -lkstat
 CFLAGS += $(CCVERBOSE) -I${STATCOMMONDIR}
+CERRWARN += -_gcc=-Wno-parentheses
 FILEMODE= 0555
 
 lint := LINTFLAGS = -muxs -I$(STATCOMMONDIR)

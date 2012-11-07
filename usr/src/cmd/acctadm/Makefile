@@ -35,6 +35,8 @@ include ../Makefile.cmd
 ROOTMANIFESTDIR = $(ROOTSVCSYSTEM)
 
 CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-parentheses
 LDLIBS += -lexacct -lscf -lsecdb -ldladm
 POFILE = acctadm.po
 XGETFLAGS = -a -x acctadm.xcl

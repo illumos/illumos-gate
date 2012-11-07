@@ -83,6 +83,12 @@ ROOTVAR_LDAP=	$(ROOT)/var/ldap
 LINTFLAGS += -erroff=E_INCONS_ARG_DECL2
 LINTFLAGS += -erroff=E_INCONS_VAL_TYPE_DECL2
 
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-unused-function
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 all:=           TARGET= all
 install:=       TARGET= install
 clean:=         TARGET= clean

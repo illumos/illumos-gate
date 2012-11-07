@@ -78,6 +78,13 @@ SYMUSRBIN2USRSBIN=	$(USRBIN2USRSBIN:%=$(ROOTBIN)/%)
 SYMDEVNM=		$(ROOTUSRSBIN)/devnm
 
 CPPFLAGS += -D_LARGEFILE64_SOURCE
+
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-unused-variable
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-unused-function
+
 %.xpg4.o := CPPFLAGS += -DXPG4
 $(SPPROG) :=	LDLIBS += -lkstat
 

@@ -55,6 +55,9 @@ LINTFLAGS	+= -erroff=E_FUNC_RET_ALWAYS_IGNOR2
 LINTOUT=	lint.out
 LINTOUT_INTER=	lintinter.out
 
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-unused-variable
+
 LINTSRC=	$(LINTLIB:%.ln=%)
 ROOTLINTDIR=	$(ROOTLIBDIR)
 ROOTLINT=	$(LINTSRC:%=$(ROOTLINTDIR)/%)
@@ -90,10 +93,10 @@ DFLAGS =	-DISSTATIC=static
 # development (debug) - cstyle prohibits use of "STATIC"
 DFLAGS =	-g -DISSTATIC=" "
 
-CFLAGS +=	-v $(DFLAGS) -I. -DLIBSPCS_CLIENT\
+CFLAGS +=	$(CCVERBOSE) $(DFLAGS) -I. -DLIBSPCS_CLIENT\
 		-I$(JAVAINC) -I$(JAVAINCSOL)\
 		-DLIBUNISTAT_LOCALE=\"/usr/install/unistat/locale\"
-CFLAGS64 +=	-v $(DFLAGS) -I. -DLIBSPCS_CLIENT\
+CFLAGS64 +=	$(CCVERBOSE) $(DFLAGS) -I. -DLIBSPCS_CLIENT\
 		-I$(JAVAINC) -I$(JAVAINCSOL)\
 		-DLIBUNISTAT_LOCALE=\"/usr/install/unistat/locale\"
 LDLIBS +=	-lc

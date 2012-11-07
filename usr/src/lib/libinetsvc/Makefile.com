@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY =	libinetsvc.a
 VERS =		.1
@@ -40,6 +38,10 @@ $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 CFLAGS +=			$(CCVERBOSE) -Wp,-xc99=%all
 CPPFLAGS +=			-I../common -D_REENTRANT
 $(RELEASE_BUILD)CPPFLAGS +=     -DNDEBUG
+
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-switch
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

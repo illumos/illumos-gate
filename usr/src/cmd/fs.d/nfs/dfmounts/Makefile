@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.12	*/
-#
 # Copyright (c) 1989 by Sun Microsystems, Inc.
 #
 
@@ -41,6 +39,9 @@ POFILES= $(OBJS:%.o=%.po)
 POFILE= dfmounts.po
 
 LDLIBS +=	-lrpcsvc -lnsl
+
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc=-Wno-parentheses
 
 $(LIBPROG):	$(OBJS)
 		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)

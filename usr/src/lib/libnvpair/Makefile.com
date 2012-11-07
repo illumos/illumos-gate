@@ -56,6 +56,10 @@ LINTFLAGS64 +=	-erroff=E_BAD_PTR_CAST_ALIGN
 LINTFLAGS +=	-erroff=E_BAD_FORMAT_STR2
 LINTFLAGS64 +=	-erroff=E_BAD_FORMAT_STR2
 
+CERRWARN +=	-_gcc=-Wno-type-limits
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT
 

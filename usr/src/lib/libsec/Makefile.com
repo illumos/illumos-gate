@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY= libsec.a
 VERS= .1
@@ -47,6 +45,11 @@ LIBS =		$(DYNLIB) $(LINTLIB)
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR) -I. -I../../../common/acl
 LDLIBS += -lc -lavl -lidmap
+
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-unused-label
+CERRWARN +=	-_gcc=-Wno-unused-variable
 
 # install this library in the root filesystem
 include ../../Makefile.rootfs

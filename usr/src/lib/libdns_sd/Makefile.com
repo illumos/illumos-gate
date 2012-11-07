@@ -21,8 +21,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY =	libdns_sd.a
 VERS =		.1
@@ -38,8 +36,11 @@ SRCDIR =	../common
 LDLIBS +=	-lsocket -lc
 
 C99MODE =	$(C99_ENABLE)
-CFLAGS +=	-erroff=E_ASSIGNMENT_TYPE_MISMATCH
 CPPFLAGS +=	-I$(SRCDIR) -DNOT_HAVE_SA_LEN 
+
+CERRWARN +=	-erroff=E_ASSIGNMENT_TYPE_MISMATCH
+
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
 
 .PARALLEL =     $(OBJECTS)
 .KEEP_STATE:

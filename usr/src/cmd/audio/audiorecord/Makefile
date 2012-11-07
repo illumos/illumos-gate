@@ -23,9 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Makefile for cmd/audio/audiorecord
 
 PROG=	audiorecord
 
@@ -40,6 +37,7 @@ LDLIBS += -laudio -lm
 LDFLAGS += -L../utilities
 
 CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-parentheses
 
 LINTFLAGS += -m -v -u $(LDFLAGS)
 

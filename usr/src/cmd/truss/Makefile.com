@@ -38,6 +38,9 @@ include ../../Makefile.cmd
 CFLAGS		+= $(CCVERBOSE)
 CFLAGS64	+= $(CCVERBOSE)
 
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-switch
+
 C99MODE=	$(C99_ENABLE)
 
 LDLIBS	+= -lproc -lrtld_db -lc_db -lnsl -lsocket -ltsol -lnvpair

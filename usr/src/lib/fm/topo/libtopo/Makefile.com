@@ -78,6 +78,9 @@ CPPFLAGS += -I../common -I$(ADJUNCT_PROTO)/usr/include/libxml2 -I.
 CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
 CFLAGS += -D_POSIX_PTHREAD_SEMANTICS
 CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-switch
+CERRWARN += -_gcc=-Wno-parentheses
 
 LINTFLAGS = -msux
 LINTFLAGS64 = -msux -m64

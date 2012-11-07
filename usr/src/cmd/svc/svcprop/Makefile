@@ -35,6 +35,8 @@ LDLIBS +=	-lscf -luutil
 
 lint := LINTFLAGS = -ux
 
+CERRWARN += -_gcc=-Wno-uninitialized
+
 .KEEP_STATE:
 
 all: $(PROG)

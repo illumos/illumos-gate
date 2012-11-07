@@ -30,8 +30,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ELF files can exceed 2GB in size. A standard 32-bit program
  * like 'file' cannot read past 2GB, and will be unable to see
@@ -458,6 +456,8 @@ process_shdr(Elf_Info *EI)
 
 		cap_off = shdr->sh_offset;
 		if (shdr->sh_type == SHT_SUNW_cap) {
+			char capstr[128];
+
 			if (shdr->sh_size == 0 || shdr->sh_entsize == 0) {
 				(void) fprintf(stderr, ELF_ERR_ELFCAP1,
 				    File, EI->file);
@@ -477,14 +477,28 @@ process_shdr(Elf_Info *EI)
 					return (ELF_READ_FAIL);
 				}
 
-				if (Chdr.c_tag != CA_SUNW_NULL) {
-					(void) elfcap_tag_to_str(
-					    ELFCAP_STYLE_UC, Chdr.c_tag,
-					    Chdr.c_un.c_val, EI->cap_str,
-					    sizeof (EI->cap_str),
-					    ELFCAP_FMT_SNGSPACE, mac);
-				}
 				cap_off += csize;
+
+				/*
+				 * Each capatibility group is terminated with
+				 * CA_SUNW_NULL.  Groups other than the first
+				 * represent symbol capabilities, and aren't
+				 * interesting here.
+				 */
+				if (Chdr.c_tag == CA_SUNW_NULL)
+					break;
+
+				(void) elfcap_tag_to_str(ELFCAP_STYLE_UC,
+				    Chdr.c_tag, Chdr.c_un.c_val, capstr,
+				    sizeof (capstr), ELFCAP_FMT_SNGSPACE,
+				    mac);
+
+				if ((*EI->cap_str != '\0') && (*capstr != '\0'))
+					(void) strlcat(EI->cap_str, " ",
+					    sizeof (EI->cap_str));
+
+				(void) strlcat(EI->cap_str, capstr,
+				    sizeof (EI->cap_str));
 			}
 		}
 

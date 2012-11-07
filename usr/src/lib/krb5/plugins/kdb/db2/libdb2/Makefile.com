@@ -22,8 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY= libdb2.a
 VERS= .1
@@ -103,6 +101,7 @@ CPPFLAGS += 	-DHAVE_CONFIG_H \
 		-I$(SRC)/lib/gss_mechs/mech_krb5/include  #for db-ndbm.h
 
 CFLAGS +=	$(CCVERBOSE) -I..
+CERRWARN +=	-_gcc=-Wno-uninitialized
 LDLIBS +=	-lc
 
 # Identify that this library is an interposer (on dbm_ routines from libc.so.1).

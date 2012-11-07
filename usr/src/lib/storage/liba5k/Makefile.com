@@ -44,6 +44,9 @@ COMMON_LINTFLAGS += -erroff=E_SEC_PRINTF_VAR_FMT
 LINTFLAGS += $(COMMON_LINTFLAGS) 
 LINTFLAGS64 +=  $(COMMON_LINTFLAGS)
 
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
+
 LDLIBS += -lc -ldevice -lg_fc
 
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)

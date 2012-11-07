@@ -64,6 +64,11 @@ CFLAGS += $(CCVERBOSE)
 #
 LDFLAGS         += -dy -N misc/kgssapi -N crypto/md5
 
+CERRWARN	+= -_gcc=-Wno-unused-function
+CERRWARN	+= -_gcc=-Wno-unused-label
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-parentheses
+
 #
 # For now, disable these lint checks; maintainers should endeavor
 # to investigate and remove these for maximum lint coverage.

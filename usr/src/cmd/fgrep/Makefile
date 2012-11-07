@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1989,1996 by Sun Microsystems, Inc.
 # All rights reserved.
 #
@@ -31,7 +29,7 @@ PROG= fgrep
 include ../Makefile.cmd
 
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
-
+CERRWARN += -_gcc=-Wno-parentheses
 
 .KEEP_STATE:
 

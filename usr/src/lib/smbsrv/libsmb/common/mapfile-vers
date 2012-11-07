@@ -19,7 +19,7 @@
 #
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -269,7 +269,6 @@ SYMBOL_VERSION SUNWprivate {
 	smb_mac_init;
 	smb_mac_sign;
 	smb_match;
-	smb_match_ci;
 	smb_match_netlogon_seqnum;
 	smb_mbstos;
 	smb_mbstowcs;

@@ -49,6 +49,9 @@ include		../../Makefile.fstype
 $(ROOTINIT_SCRIPT) :=	FILEMODE = 0744
 
 CPPFLAGS +=	-D_LARGEFILE64_SOURCE
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-unused-function
+
 lint:		lint_PROG
 
 $(ROOTLIBFSTYPE)/$(QUOTAOFF):	$(ROOTLIBFSTYPE)/$(LIBPROG) 

@@ -34,6 +34,8 @@ CFLAGS += -g $(CCVERBOSE)
 CFLAGS64 += -g $(CCVERBOSE)
 CPPFLAGS += -D_LARGEFILE64_SOURCE=1 -D_REENTRANT $(INCS)
 
+CERRWARN += -_gcc=-Wno-uninitialized
+
 .KEEP_STATE:
 
 all: $(PROG)

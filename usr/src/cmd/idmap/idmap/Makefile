@@ -33,6 +33,14 @@ IDMAP_PROT_DIR =        $(SRC)/head/rpcsvc
 
 include ../../Makefile.cmd
 
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-switch
+CERRWARN +=	-_gcc=-Wno-unused-label
+CERRWARN +=	-_gcc=-Wno-char-subscripts
+CERRWARN +=	-_gcc=-Wno-unused-function
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-address
+
 POFILE = 	$(PROG)_all.po
 LDLIBS +=	-lidmap -ladutils -lsldap -lldap
 FILEMODE =	0555

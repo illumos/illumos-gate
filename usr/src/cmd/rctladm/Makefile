@@ -34,6 +34,8 @@ lint := LINTFLAGS = -mx
 include ../Makefile.cmd
 
 CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
 POFILE = rctladm_msg.po
 XGETFLAGS = -a
 FILEMODE = 0555

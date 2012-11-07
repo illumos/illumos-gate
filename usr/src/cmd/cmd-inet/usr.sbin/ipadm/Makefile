@@ -39,6 +39,8 @@ COMMONSRCS=	$(CMDINETCOMMONDIR)/$(COMMONOBJS:%.o=%.c)
 SRCS=		$(LOCALSRCS) $(COMMONSRCS)
 
 CPPFLAGS +=	-I$(CMDINETCOMMONDIR)
+CERRWARN +=	-_gcc=-Wno-unused-label
+CERRWARN +=	-_gcc=-Wno-uninitialized
 LDLIBS +=       -linetutil -lipadm -lnvpair
 LINTFLAGS +=	-m
 

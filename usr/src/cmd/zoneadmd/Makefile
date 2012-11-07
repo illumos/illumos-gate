@@ -36,6 +36,14 @@ clean	:=	TARGET = clean
 clobber	:=	TARGET = clobber
 lint	:=	TARGET = lint
 
+CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-switch
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
+
+LDLIBS += -lsocket -lzonecfg -lnsl -ldevinfo -ldevice -lnvpair \
+	-lgen -lbsm -lcontract -lzfs -luuid -lbrand -ldladm -ltsnet -ltsol \
+	-linetutil
 XGETFLAGS += -a -x zoneadmd.xcl
 
 ROOTUSRLIBZONES			= $(ROOT)/usr/lib/zones

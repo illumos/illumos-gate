@@ -19,8 +19,6 @@
 # CDDL HEADER END
 #
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -43,6 +41,13 @@ YFLAGS =	"-d"
 
 LINTFLAGS +=	-erroff=E_STATIC_UNUSED
 LINTFLAGS64 +=	-erroff=E_STATIC_UNUSED
+
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc=-Wno-unused-label
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-unused-value
+CERRWARN +=	-_gcc=-Wno-unused-function
 
 SRCS=	fsdb.c ud_lib.c
 

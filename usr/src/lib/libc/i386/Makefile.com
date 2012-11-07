@@ -1016,6 +1016,18 @@ CFLAGS += $(CCVERBOSE) $(CTF_FLAGS)
 XINLINE = -xinline=
 CFLAGS += $(XINLINE)
 
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-switch
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-unused-value
+CERRWARN += -_gcc=-Wno-unused-label
+CERRWARN += -_gcc=-Wno-unused-variable
+CERRWARN += -_gcc=-Wno-type-limits
+CERRWARN += -_gcc=-Wno-char-subscripts
+CERRWARN += -_gcc=-Wno-clobbered
+CERRWARN += -_gcc=-Wno-unused-function
+CERRWARN += -_gcc=-Wno-address
+
 # Setting THREAD_DEBUG = -DTHREAD_DEBUG (make THREAD_DEBUG=-DTHREAD_DEBUG ...)
 # enables ASSERT() checking in the threads portion of the library.
 # This is automatically enabled for DEBUG builds, not for non-debug builds.

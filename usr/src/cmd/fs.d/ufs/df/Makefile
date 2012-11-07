@@ -23,8 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 FSTYPE=		ufs
 LIBPROG=	df
@@ -36,6 +34,11 @@ OBJS=	df.o
 
 CPPFLAGS +=	-D_LARGEFILE64_SOURCE
 LDLIBS += -ladm
+
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-unused-label
+CERRWARN +=	-_gcc=-Wno-unused-function
 
 # for messaging catalogue file
 #

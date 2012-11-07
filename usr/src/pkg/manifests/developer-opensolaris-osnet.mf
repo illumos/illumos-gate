@@ -34,7 +34,7 @@ depend fmri=data/docbook@0.5.11-0.133 type=require
 depend fmri=developer/astdev@0.5.11-0.133 type=require
 depend fmri=developer/build/make@0.5.11-0.133 type=require
 depend fmri=developer/build/onbld@0.5.11-0.133 type=require
-depend fmri=developer/gcc-3@3.4.3-0.133 type=require
+$(i386_ONLY)depend fmri=developer/gnu-binutils@2.19-0.133 type=require
 depend fmri=developer/java/jdk@0.5.11-0.133 type=require
 depend fmri=developer/lexer/flex@2.5.35-0.133 type=require
 depend fmri=developer/object-file@0.5.11-0.133 type=require

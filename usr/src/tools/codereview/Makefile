@@ -22,7 +22,6 @@
 # Copyright 1999 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#	ident	"%Z%%M%	%I%	%E% SMI"
 
 PROG= codereview
 
@@ -32,6 +31,8 @@ CLEANFILES += $(OBJS)
 TMPDIR= /tmp
 
 include ../Makefile.tools
+
+CERRWARN += -_gcc=-Wno-parentheses
 
 MAN1FILES= codereview.1
 

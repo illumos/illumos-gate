@@ -49,11 +49,6 @@ SYMBOL_SCOPE {
 		/* There should be only one - ours */
 		errno;		/* variable */
 
-		/* <sys/utsname.h> implictly references this on x86 */
-#if defined(__i386) && !defined(__amd64)
-		_nuname;
-#endif
-
 		mdb_tgt_aread;
 		mdb_dis_create;
 		mdb_dis_destroy;

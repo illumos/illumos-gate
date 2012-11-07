@@ -31,6 +31,7 @@
  */
 
 #include <sys/param.h>
+#include <sys/disp.h>
 #include <sys/systm.h>
 #include <sys/condvar.h>
 #include <sys/cmn_err.h>

@@ -56,6 +56,8 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 CFLAGS += $(CCVERBOSE)
 
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 # extra link arguments
 #

@@ -23,7 +23,6 @@
 # Copyright 2001-2002 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 MODULE = ipp.so
 MDBTGT = kvm
@@ -33,3 +32,5 @@ MODSRCS = ipp.c
 include ../../../../Makefile.cmd
 include ../../Makefile.ia32
 include ../../../Makefile.module
+
+CERRWARN += -_gcc=-Wno-uninitialized

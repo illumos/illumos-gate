@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY=	audit_binfile.a
 VERS=		.1
@@ -39,6 +37,8 @@ LDLIBS		+= -lbsm -lsecdb -lc
 CFLAGS		+= $(CCVERBOSE)
 CPPFLAGS	+= -D_REENTRANT -I$(LIBBSM)
 CPPFLAGS	+= -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
+
+CERRWARN	+= -_gcc=-Wno-parentheses
 
 ROOTLIBDIR=	$(ROOT)/usr/lib/security
 

@@ -24,7 +24,7 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	ksyms (kernel symbols) driver makefile.
 #
@@ -49,6 +49,8 @@ CONF_SRCDIR	= $(UTSBASE)/common/io
 #	Include common rules.
 #
 include $(UTSBASE)/sparc/Makefile.sparc
+
+CERRWARN	+= -_gcc=-Wno-parentheses
 
 #
 #	Define targets

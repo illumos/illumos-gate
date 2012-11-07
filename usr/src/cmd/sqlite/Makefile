@@ -22,8 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG=		sqlite
 
@@ -40,6 +38,8 @@ ROOTSQLITE=	$(PROG:%=$(ROOTLIBSVCBIN)/%)
 OBJS=		shell.o
 $(OBJS) :=	CFLAGS += $(CTF_FLAGS)
 $(OBJS) :=	CTFCONVERT_POST = $(CTFCONVERT_O)
+
+CERRWARN +=	-_gcc=-Wno-empty-body
 
 .KEEP_STATE:
 

@@ -200,6 +200,15 @@ CFLAGS64 +=	$(XSTRCONST)
 CCFLAGS +=	-_CC=-features=conststrings
 CCFLAGS64 +=	-_CC=-features=conststrings
 
+CERRWARN +=	-_gcc=-Wno-char-subscripts
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-switch
+CERRWARN +=	-_gcc=-Wno-char-subscripts
+CERRWARN +=	-_gcc=-Wno-empty-body
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-clobbered
+
 LIBMP =		-lmp
 lint :=		LIBMP =
 LDLIBS +=	$(LIBMP) -lmd -lc

@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1998 by Sun Microsystems, Inc.
 # All rights reserved.
 #
@@ -42,6 +40,7 @@ POFILE= mkfs.po
 catalog:        $(POFILE)
 
 CPPFLAGS +=	-D_LARGEFILE64_SOURCE
+CERRWARN +=	-_gcc=-Wno-parentheses
 
 $(LIBPROG):	$(OBJS)
 		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)

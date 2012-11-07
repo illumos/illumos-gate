@@ -63,6 +63,7 @@ LDFLAGS += -dy -Nmisc/kcf
 CFLAGS		+= $(CCVERBOSE) -I$(CRYPTODIR) -I$(COM1_DIR)
 CFLAGS		+= -DUMUL64 -DUSE_FLOATING_POINT
 LINTFLAGS	+= -I$(CRYPTODIR) -I$(COM1_DIR)
+CERRWARN	+= -_gcc=-Wno-unused-function
 
 #
 #	Default build targets.

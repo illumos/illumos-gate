@@ -26,6 +26,8 @@
 #ifndef	_CRON_H
 #define	_CRON_H
 
+#include <unistd.h>
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -53,8 +55,11 @@ extern "C" {
 #define	RCODE(x)	(((x)>>8)&0377)
 #define	TSTAT(x)	((x)&0377)
 
-#define	FLEN	15
-#define	LLEN	9
+/* This constant must be at least sysconf(_SC_LOGIN_NAME_MAX) in size */
+#define	UNAMESIZE	32	/* max chars in a user name */
+
+#define	FLEN	UNAMESIZE
+#define	LLEN	UNAMESIZE
 
 /*
  * structure used for passing messages from the at and crontab commands to cron
@@ -88,7 +93,6 @@ struct	message {
 #define	ENV_HOME	"HOME="
 
 #define	CTLINESIZE	1000	/* max chars in a crontab line */
-#define	UNAMESIZE	20	/* max chars in a user name */
 
 extern int	allowed(char *, char *, char *);
 extern int	days_in_mon(int, int);

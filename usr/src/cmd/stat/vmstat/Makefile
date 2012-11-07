@@ -32,6 +32,9 @@ include $(SRC)/cmd/stat/Makefile.stat
 
 LDLIBS += -ldevinfo -lkstat -lavl
 CFLAGS += $(CCVERBOSE) -I${STATCOMMONDIR}
+CERRWARN += -_gcc=-Wno-switch
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-parentheses
 FILEMODE= 0555
 
 lint := LINTFLAGS = -muxs -I$(STATCOMMONDIR)

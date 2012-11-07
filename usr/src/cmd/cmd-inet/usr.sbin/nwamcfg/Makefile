@@ -36,6 +36,12 @@ LDLIBS +=	-ll -ltecla -lnwam -lumem
 YFLAGS +=	-d -b nwamcfg_grammar
 CLEANFILES +=	nwamcfg_lex.c nwamcfg_grammar.tab.c nwamcfg_grammar.tab.h
 
+CERRWARN +=	-_gcc=-Wno-switch
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-unused-label
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+
 .KEEP_STATE:
 
 all: $(PROG) 

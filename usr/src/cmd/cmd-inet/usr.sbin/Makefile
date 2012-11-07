@@ -104,6 +104,15 @@ COMMONOBJS=	addr_match.o kcmd.o store_forw_creds.o
 COMMONSRCS=	$(COMMONOBJS:%.o=$(CMDINETCOMMONDIR)/%.c)
 SRCS+=		$(COMMONSRCS)
 
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-unused-variable
+CERRWARN += -_gcc=-Wno-unused-function
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-char-subscripts
+CERRWARN += -_gcc=-Wno-extra
+CERRWARN += -_gcc=-Wno-address
+
 #
 # Message catalog
 #

@@ -31,7 +31,7 @@ COMOBJS =	args.o		audit.o		basic.o		debug.o \
 
 COMOBJS32 =	bindings32.o	cap32.o		dlfcns32.o	dynamic32.o \
 		elf32.o		entry32.o	files32.o	got32.o \
- 		libs32.o	map32.o		move32.o	phdr32.o \
+		libs32.o	map32.o		move32.o	phdr32.o \
 		relocate32.o	sections32.o	segments32.o	shdr32.o \
 		statistics32.o	support32.o	syms32.o	unused32.o \
 		util32.o	version32.o
@@ -57,6 +57,10 @@ SRCDIR =	../common
 
 LINTFLAGS +=	-u -D_REENTRANT
 LINTFLAGS64 +=	-u -D_REENTRANT
+
+CERRWARN +=	-_gcc=-Wno-unused-value
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-parentheses
 
 CPPFLAGS +=	-I$(SRCBASE)/lib/libc/inc
 DYNFLAGS +=	$(VERSREF) $(CC_USE_PROTO) '-R$$ORIGIN'

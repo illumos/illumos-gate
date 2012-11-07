@@ -41,6 +41,9 @@ ROOTMODULE      = $(ROOT_PSM_CPU_DIR)/$(MODULE)
 #
 include ../cpu/Makefile.cpu
 
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 #	Our lint library has a different name from that of the module we build.
 #

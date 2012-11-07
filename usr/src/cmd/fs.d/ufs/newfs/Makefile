@@ -20,12 +20,9 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/fs.d/ufs/newfs/Makefile
 
 FSTYPE=		ufs
 LIBPROG=	newfs
@@ -37,6 +34,9 @@ include		../../Makefile.fstype
 
 CPPFLAGS +=	-I../../ -D_LARGEFILE64_SOURCE
 LDLIBS += -ladm -lefi
+
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 OBJS=		$(LIBPROG).o $(FSLIB)
 SRCS=		$(LIBPROG).c $(FSLIBSRC)

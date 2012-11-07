@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY	=	rfc2136.a
 VERS =		.1
@@ -43,6 +41,9 @@ SRCDIR =	../common
 #
 LINTFLAGS +=	-erroff=E_CONSTANT_CONDITION
 CPPFLAGS += 	-D_REENTRANT -I../../libresolv2/include
+
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 MAPFILES =	../common/mapfile
 

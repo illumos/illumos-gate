@@ -59,6 +59,8 @@ CPPFLAGS +=	-D_REENTRANT -I$(SRCDIR) -I$(COMMONDIR)
 
 LINTFLAGS64 +=	-m64
 
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 .KEEP_STATE:
 
 all: $(LIBS)

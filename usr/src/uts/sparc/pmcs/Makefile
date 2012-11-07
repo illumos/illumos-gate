@@ -69,6 +69,12 @@ CPPFLAGS	+= $(PMCS_DRV_FLGS) \
 	-DPMCS_FIRMWARE_VERSION=${PMCS_FW_VERSION} \
 	-DPMCS_FIRMWARE_VERSION_STRING=\"${PMCS_FW_VERSION_STRING}\"
 
+CERRWARN	+= -_gcc=-Wno-switch
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-unused-value
+CERRWARN	+= -_gcc=-Wno-unused-label
+CERRWARN	+= -_gcc=-Wno-parentheses
+
 
 #
 #	Default build targets.

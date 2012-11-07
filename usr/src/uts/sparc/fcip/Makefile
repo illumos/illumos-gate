@@ -71,6 +71,9 @@ LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 LINTTAGS	+= -erroff=E_INCONS_ARG_USED2
 LINTTAGS	+= -erroff=E_INCONS_VAL_TYPE_USED2
 
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-type-limits
+
 #
 #	Default build targets.
 #

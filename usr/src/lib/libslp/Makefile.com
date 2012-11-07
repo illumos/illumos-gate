@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY =	libslp.a
 VERS =		.1
@@ -46,6 +44,9 @@ SRCDIR =	../clib
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT -I../clib -I$(JAVA_ROOT)/include \
 		-I$(JAVA_ROOT)/include/solaris
+
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-parentheses
 
 .KEEP_STATE:
 

@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -553,7 +554,7 @@ smb_delete_check_path(smb_request_t *sr)
 	/* fname component is, or resolves to, '.' (dot) */
 	if ((strcmp(pn->pn_fname, ".") == 0) ||
 	    (SMB_SEARCH_DIRECTORY(fqi->fq_sattr) &&
-	    (smb_match(pn->pn_fname, ".")))) {
+	    (smb_match(pn->pn_fname, ".", B_FALSE)))) {
 		smbsr_error(sr, NT_STATUS_OBJECT_NAME_INVALID,
 		    ERRDOS, ERROR_INVALID_NAME);
 		return (-1);

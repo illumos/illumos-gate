@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY= libkdb_ldap.a
 VERS= .1
@@ -76,6 +74,8 @@ CPPFLAGS += 	-DHAVE_CONFIG_H \
 		-DUSE_KADM5_API_VERSION=2
 
 CFLAGS +=	$(CCVERBOSE) -I..
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-unused-function
 DYNFLAGS +=	$(KRUNPATH) $(KERBRUNPATH) $(KMECHLIB)
 LDLIBS +=	-L $(ROOTLIBDIR) -lkadm5srv -lc -lnsl -lldap
 

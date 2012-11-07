@@ -20,10 +20,9 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1989,2001 by Sun Microsystems, Inc.
 # All rights reserved.
+#
 
 FSTYPE=		ufs
 LIBPROG=	fsdb
@@ -31,6 +30,12 @@ LIBPROG=	fsdb
 include		../../Makefile.fstype
 
 CPPFLAGS +=     -D_LARGEFILE64_SOURCE
+
+CERRWARN +=	-_gcc=-Wno-char-subscripts
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 SRCS=	$(LIBPROG).c
 

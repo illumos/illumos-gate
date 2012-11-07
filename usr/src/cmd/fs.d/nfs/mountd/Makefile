@@ -39,6 +39,15 @@ DOBJ	  =	$(DSRC:%.d=%.o)
 LDLIBS	 +=	-lrpcsvc -lnsl -lbsm -lsocket -ltsnet -ltsol -lnvpair -lscf
 CPPFLAGS +=	-D_REENTRANT -I../lib
 
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc=-Wno-unused-label
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-switch
+CERRWARN +=	-_gcc=-Wno-address
+CERRWARN +=	-_gcc=-Wno-unused-function
+
 $(TYPEPROG):	$(OBJS)
 		$(COMPILE.d) -s $(DSRC) -o $(DOBJ) $(OBJS)
 		$(LINK.c) -o $@ $(DOBJ) $(OBJS) $(LDLIBS)

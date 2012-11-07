@@ -71,6 +71,9 @@ LDFLAGS		+= -dy -N misc/mac
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 
+CERRWARN	+= -_gcc=-Wno-switch
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 #	Default build targets.
 #

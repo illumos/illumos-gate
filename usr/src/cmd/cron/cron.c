@@ -3111,7 +3111,7 @@ logit(int cc, struct runinfo *rp, int rc)
 	if (cc == BCHAR)
 		(void) printf("%c  CMD: %s\n", cc, next_event->cmd);
 	(void) strftime(timebuf, sizeof (timebuf), FORMAT, localtime(&t));
-	(void) printf("%c  %.8s %u %c %s",
+	(void) printf("%c  %s %u %c %s",
 	    cc, (rp->rusr)->name, rp->pid, QUE(rp->que), timebuf);
 	if ((ret = TSTAT(rc)) != 0)
 		(void) printf(" ts=%d", ret);

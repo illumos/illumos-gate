@@ -32,6 +32,8 @@ DEFAULTFILES= init.dfl
 include ../Makefile.cmd
 
 LDLIBS += -lpam -lbsm -lcontract -lscf
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
 LINTFLAGS += -erroff=E_NAME_USED_NOT_DEF2
 CLOBBERFILES= $(STATIC)
 

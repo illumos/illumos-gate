@@ -132,6 +132,12 @@ CFLAGS += \
 CFLAGS64 += \
 	$(ASTCFLAGS64)
 
+CERRWARN	+= -_gcc=-Wno-unused-value
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-unused-variable
+CERRWARN	+= -_gcc=-Wno-implicit-function-declaration
+
 pics/cut.o	:= CERRWARN += -erroff=E_END_OF_LOOP_CODE_NOT_REACHED
 pics/sync.o	:= CERRWARN += -erroff=E_END_OF_LOOP_CODE_NOT_REACHED
 pics/vmstate.o	:= CERRWARN += -erroff=E_NO_IMPLICIT_DECL_ALLOWED

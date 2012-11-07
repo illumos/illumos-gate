@@ -235,7 +235,8 @@ ipmi_startup(struct ipmi_softc *sc)
 	req = ipmi_alloc_driver_request(IPMI_ADDR(IPMI_APP_REQUEST, 0),
 	    IPMI_CLEAR_FLAGS, 1, 0);
 
-	(void) ipmi_submit_driver_request(sc, req, 0);
+	if ((error = ipmi_submit_driver_request(sc, req, 0)) != 0)
+		cmn_err(CE_WARN, "Failed to clear IPMI flags: %d\n", error);
 
 	/* Magic numbers */
 	if (req->ir_compcode == 0xc0) {
@@ -251,7 +252,10 @@ ipmi_startup(struct ipmi_softc *sc)
 		    IPMI_GET_CHANNEL_INFO, 1, 0);
 		req->ir_request[0] = (uchar_t)i;
 
-		(void) ipmi_submit_driver_request(sc, req, 0);
+		if (ipmi_submit_driver_request(sc, req, 0) != 0) {
+			ipmi_free_request(req);
+			break;
+		}
 
 		if (req->ir_compcode != 0) {
 			ipmi_free_request(req);
@@ -265,7 +269,11 @@ ipmi_startup(struct ipmi_softc *sc)
 	req = ipmi_alloc_driver_request(IPMI_ADDR(IPMI_APP_REQUEST, 0),
 	    IPMI_GET_WDOG, 0, 0);
 
-	(void) ipmi_submit_driver_request(sc, req, 0);
+	if ((error = ipmi_submit_driver_request(sc, req, 0)) != 0) {
+		cmn_err(CE_WARN, "Failed to check IPMI watchdog: %d\n", error);
+		ipmi_free_request(req);
+		return;
+	}
 
 	if (req->ir_compcode == 0x00) {
 		cmn_err(CE_CONT, "!watchdog supported");

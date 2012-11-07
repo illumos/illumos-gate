@@ -41,6 +41,8 @@ POFILE = $(PROG).po
 LDLIBS += -lbsm
 CPPFLAGS += -I$(STATCOMMONDIR)
 
+CERRWARN += -_gcc=-Wno-extra
+
 .KEEP_STATE:
 
 all: $(PROG)

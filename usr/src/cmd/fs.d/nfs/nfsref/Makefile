@@ -34,6 +34,8 @@ CFLAGS +=	$(CCVERBOSE) -I../lib
 OBJS=	nfsref.o ref_subr.o
 SRCS=	nfsref.c
 
+CERRWARN += -_gcc=-Wno-unused-variable
+
 LDLIBS += -lreparse -lnvpair -lnsl -lumem
 
 $(PROG):	$(OBJS)

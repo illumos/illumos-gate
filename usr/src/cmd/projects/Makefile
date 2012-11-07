@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -37,6 +35,7 @@ LDLIBS += -lproject
 .KEEP_STATE:
 
 CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-uninitialized
 
 all: $(PROG)
 

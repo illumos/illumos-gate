@@ -19,8 +19,6 @@
 # CDDL HEADER END
 #
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -37,6 +35,9 @@ CPPFLAGS += -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 
 LINTFLAGS += -xerroff=E_STATIC_UNUSED
 LINTFLAGS64 += -xerroff=E_STATIC_UNUSED
+
+CERRWARN += -_gcc=-Wno-unused-function
+CERRWARN += -_gcc=-Wno-uninitialized
 
 labelit : labelit.o  ud_lib.o
 	$(LINK.c) -o $@ labelit.o ud_lib.o $(LDLIBS)

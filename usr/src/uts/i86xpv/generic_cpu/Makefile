@@ -44,6 +44,10 @@ ROOTMODULE      = $(ROOT_PSM_CPU_DIR)/$(MODULE)
 include $(UTSBASE)/i86xpv/Makefile.i86xpv
 include $(UTSBASE)/i86pc/cpu/Makefile.files
 
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-unused-variable
+
 #
 #	Our lint library has a different name from that of the module we build.
 #

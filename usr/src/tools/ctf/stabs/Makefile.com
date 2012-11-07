@@ -44,6 +44,8 @@ OBJS = $(SRCS:%.c=%.o)
 LINTFILES = $(SRCS:%.c=%.ln)
 
 LINTFLAGS = -mnux -L$(ROOT)/usr/lib
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-unused
 
 .NO_PARALLEL:
 .PARALLEL: $(OBJS) $(LINTFILES)

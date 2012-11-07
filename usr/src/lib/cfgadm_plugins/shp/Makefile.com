@@ -47,6 +47,11 @@ CPPFLAGS +=	-D_POSIX_PTHREAD_SEMANTICS
 CFLAGS +=	$(CCVERBOSE)
 LDLIBS +=	-lc -ldevinfo -lhotplug
 
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-char-subscripts
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-unused-variable
+
 .KEEP_STATE:
 
 all: $(LIBS)

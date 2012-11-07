@@ -22,9 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-#
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -44,6 +41,9 @@ CONF_SRCDIR	= $(UTSBASE)/common/io/ib/clients/rds
 #	Include common rules.
 #
 include $(UTSBASE)/intel/Makefile.intel
+
+CERRWARN	+= -_gcc=-Wno-switch
+CERRWARN	+= -_gcc=-Wno-uninitialized
 
 #
 #	Define targets

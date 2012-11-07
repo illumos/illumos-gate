@@ -54,6 +54,8 @@ LINTFLAGS += -DDYNAMIC_SU
 
 CLOBBERFILES	+= $(ROOTFS_PROG) $(EMB_PROG)
 
+CERRWARN +=	-_gcc=-Wno-parentheses
+
 lint :=		LDLIBS += -lbsm -lpam -lsecdb
 
 .KEEP_STATE:

@@ -35,3 +35,5 @@ CPPFLAGS += -I../../../../common
 CPPFLAGS += -I$(SRC)/uts/i86pc/cpu
 CPPFLAGS += -I$(SRC)/uts/intel
 CPPFLAGS += -I$(SRC)/uts/i86pc
+
+CERRWARN += -_gcc=-Wno-uninitialized

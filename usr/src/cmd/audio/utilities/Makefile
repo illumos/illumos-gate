@@ -33,6 +33,9 @@ INCLUDES += -I../include
 CPPFLAGS += $(INCLUDES)
 
 CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-unused-variable
+CERRWARN += -_gcc=-Wno-parentheses
 
 LINTFLAGS += -m -v -u
 

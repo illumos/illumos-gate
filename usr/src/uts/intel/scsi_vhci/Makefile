@@ -25,8 +25,6 @@
 #
 
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 # This makefile drives the production of SCSI vHCI Driver
 # intel architecture dependent
 #
@@ -49,6 +47,10 @@ CONF_SRCDIR	= $(UTSBASE)/common/io/scsi/adapters/scsi_vhci
 # Include common rules.
 #
 include $(UTSBASE)/intel/Makefile.intel
+
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-unused-label
 
 #
 # Define targets.

@@ -23,8 +23,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include ../../Makefile.com
 
@@ -33,6 +31,8 @@ SRCS = cpu.c
 LDLIBS += -lkstat \
 	-L$(ROOTLIB)/fm -ltopo
 LDFLAGS += -R/usr/lib/fm
+
+CERRWARN += -_gcc=-Wno-parentheses
 
 include ../../Makefile.targ
 

@@ -22,9 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/fs.d/nfs/nfslog/Makefile
 
 FSTYPE=		nfs
 TYPEPROG=	nfslogd
@@ -41,6 +38,10 @@ OBJS=		$(LOCAL) $(COMMON)
 SRCS=		$(LOCAL:%.o=%.c) $(COMMON:%.o=../lib/%.c)
 LDLIBS +=	-lsocket -lnsl
 CFLAGS += 	$(CCVERBOSE)
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-switch
+CERRWARN +=	-_gcc=-Wno-type-limits
 CPPFLAGS += 	-D_FILE_OFFSET_BITS=64
 
 #

@@ -21,6 +21,9 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ */
 
 /*
  *	Copyright (c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
@@ -1131,6 +1134,7 @@ rfs4_op_secinfo(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	char *nm;
 	struct sockaddr *ca;
 	char *name = NULL;
+	nfsstat4 status = NFS4_OK;
 
 	DTRACE_NFSV4_2(op__secinfo__start, struct compound_state *, cs,
 	    SECINFO4args *, args);
@@ -1154,11 +1158,12 @@ rfs4_op_secinfo(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	 * do not error out if the component name is a "..".
 	 * SECINFO will return its parents secinfo data for SECINFO "..".
 	 */
-	if (!utf8_dir_verify(utfnm)) {
+	status = utf8_dir_verify(utfnm);
+	if (status != NFS4_OK) {
 		if (utfnm->utf8string_len != 2 ||
 		    utfnm->utf8string_val[0] != '.' ||
 		    utfnm->utf8string_val[1] != '.') {
-			*cs->statusp = resp->status = NFS4ERR_INVAL;
+			*cs->statusp = resp->status = status;
 			goto out;
 		}
 	}
@@ -1336,7 +1341,8 @@ rfs4_op_access(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		    blequal(clabel, slabel)))
 			resp->access |=
 			    (args->access & (ACCESS4_MODIFY | ACCESS4_EXTEND));
-		resp->supported |= (ACCESS4_MODIFY | ACCESS4_EXTEND);
+		resp->supported |=
+		    resp->access & (ACCESS4_MODIFY | ACCESS4_EXTEND);
 	}
 
 	if (checkwriteperm &&
@@ -1570,8 +1576,9 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		*cs->statusp = resp->status = NFS4ERR_NOTDIR;
 		goto out;
 	}
-	if (!utf8_dir_verify(&args->objname)) {
-		*cs->statusp = resp->status = NFS4ERR_INVAL;
+	status = utf8_dir_verify(&args->objname);
+	if (status != NFS4_OK) {
+		*cs->statusp = resp->status = status;
 		goto out;
 	}
 
@@ -2446,6 +2453,7 @@ rfs4_op_link(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	uint_t  len;
 	struct sockaddr *ca;
 	char *name = NULL;
+	nfsstat4 status;
 
 	DTRACE_NFSV4_2(op__link__start, struct compound_state *, cs,
 	    LINK4args *, args);
@@ -2495,8 +2503,9 @@ rfs4_op_link(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		goto out;
 	}
 
-	if (!utf8_dir_verify(&args->newname)) {
-		*cs->statusp = resp->status = NFS4ERR_INVAL;
+	status = utf8_dir_verify(&args->newname);
+	if (status != NFS4_OK) {
+		*cs->statusp = resp->status = status;
 		goto out;
 	}
 
@@ -2886,6 +2895,7 @@ rfs4_op_lookup(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	uint_t len;
 	struct sockaddr *ca;
 	char *name = NULL;
+	nfsstat4 status;
 
 	DTRACE_NFSV4_2(op__lookup__start, struct compound_state *, cs,
 	    LOOKUP4args *, args);
@@ -2905,8 +2915,9 @@ rfs4_op_lookup(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		goto out;
 	}
 
-	if (!utf8_dir_verify(&args->objname)) {
-		*cs->statusp = resp->status = NFS4ERR_INVAL;
+	status = utf8_dir_verify(&args->objname);
+	if (status != NFS4_OK) {
+		*cs->statusp = resp->status = status;
 		goto out;
 	}
 
@@ -3655,30 +3666,6 @@ out:
 }
 
 /*
- * A directory entry is a valid nfsv4 entry if
- * - it has a non-zero ino
- * - it is not a dot or dotdot name
- * - it is visible in a pseudo export or in a real export that can
- *   only have a limited view.
- */
-static bool_t
-valid_nfs4_entry(struct exportinfo *exi, struct dirent64 *dp,
-    int *expseudo, int check_visible)
-{
-	if (dp->d_ino == 0 || NFS_IS_DOTNAME(dp->d_name)) {
-		*expseudo = 0;
-		return (FALSE);
-	}
-
-	if (! check_visible) {
-		*expseudo = 0;
-		return (TRUE);
-	}
-
-	return (nfs_visible_inode(exi, dp->d_ino, expseudo));
-}
-
-/*
  * set_rdattr_params sets up the variables used to manage what information
  * to get for each directory entry.
  */
@@ -4101,6 +4088,7 @@ rfs4_op_remove(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	bslabel_t *clabel;
 	struct sockaddr *ca;
 	char *name = NULL;
+	nfsstat4 status;
 
 	DTRACE_NFSV4_2(op__remove__start, struct compound_state *, cs,
 	    REMOVE4args *, args);
@@ -4131,8 +4119,9 @@ rfs4_op_remove(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		goto out;
 	}
 
-	if (!utf8_dir_verify(&args->target)) {
-		*cs->statusp = resp->status = NFS4ERR_INVAL;
+	status = utf8_dir_verify(&args->target);
+	if (status != NFS4_OK) {
+		*cs->statusp = resp->status = status;
 		goto out;
 	}
 
@@ -4398,6 +4387,7 @@ rfs4_op_rename(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	struct sockaddr *ca;
 	char *converted_onm = NULL;
 	char *converted_nnm = NULL;
+	nfsstat4 status;
 
 	DTRACE_NFSV4_2(op__rename__start, struct compound_state *, cs,
 	    RENAME4args *, args);
@@ -4454,13 +4444,15 @@ rfs4_op_rename(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		goto out;
 	}
 
-	if (!utf8_dir_verify(&args->oldname)) {
-		*cs->statusp = resp->status = NFS4ERR_INVAL;
+	status = utf8_dir_verify(&args->oldname);
+	if (status != NFS4_OK) {
+		*cs->statusp = resp->status = status;
 		goto out;
 	}
 
-	if (!utf8_dir_verify(&args->newname)) {
-		*cs->statusp = resp->status = NFS4ERR_INVAL;
+	status = utf8_dir_verify(&args->newname);
+	if (status != NFS4_OK) {
+		*cs->statusp = resp->status = status;
 		goto out;
 	}
 
@@ -5789,6 +5781,8 @@ rfs4_compound(COMPOUND4args *args, COMPOUND4res *resp, struct exportinfo *exi,
 
 	cs.statusp = &resp->status;
 	cs.req = req;
+	resp->array = NULL;
+	resp->array_len = 0;
 
 	/*
 	 * XXX for now, minorversion should be zero
@@ -5796,11 +5790,14 @@ rfs4_compound(COMPOUND4args *args, COMPOUND4res *resp, struct exportinfo *exi,
 	if (args->minorversion != NFS4_MINORVERSION) {
 		DTRACE_NFSV4_2(compound__start, struct compound_state *,
 		    &cs, COMPOUND4args *, args);
-		resp->array_len = 0;
-		resp->array = NULL;
 		resp->status = NFS4ERR_MINOR_VERS_MISMATCH;
 		DTRACE_NFSV4_2(compound__done, struct compound_state *,
 		    &cs, COMPOUND4res *, resp);
+		return;
+	}
+
+	if (args->array_len == 0) {
+		resp->status = NFS4_OK;
 		return;
 	}
 
@@ -6079,8 +6076,9 @@ rfs4_lookup(component4 *component, struct svc_req *req,
 		return (NFS4ERR_NOTDIR);
 	}
 
-	if (!utf8_dir_verify(component))
-		return (NFS4ERR_INVAL);
+	status = utf8_dir_verify(component);
+	if (status != NFS4_OK)
+		return (status);
 
 	nm = utf8_to_fn(component, &len, NULL);
 	if (nm == NULL) {
@@ -6372,8 +6370,9 @@ rfs4_createfile(OPEN4args *args, struct svc_req *req, struct compound_state *cs,
 	 * the including directory on success.
 	 */
 	component = &args->open_claim4_u.file;
-	if (!utf8_dir_verify(component))
-		return (NFS4ERR_INVAL);
+	status = utf8_dir_verify(component);
+	if (status != NFS4_OK)
+		return (status);
 
 	nm = utf8_to_fn(component, &buflen, NULL);
 
@@ -7594,6 +7593,12 @@ rfs4_op_open_confirm(nfs_argop4 *argop, nfs_resop4 *resop,
 		goto out;
 	}
 
+	if (cs->vp->v_type != VREG) {
+		*cs->statusp = resp->status =
+		    cs->vp->v_type == VDIR ? NFS4ERR_ISDIR : NFS4ERR_INVAL;
+		return;
+	}
+
 	status = rfs4_get_state(&args->open_stateid, &sp, RFS4_DBS_VALID);
 	if (status != NFS4_OK) {
 		*cs->statusp = resp->status = status;
@@ -7707,6 +7712,11 @@ rfs4_op_open_downgrade(nfs_argop4 *argop, nfs_resop4 *resop,
 	if (cs->vp == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_NOFILEHANDLE;
 		goto out;
+	}
+
+	if (cs->vp->v_type != VREG) {
+		*cs->statusp = resp->status = NFS4ERR_INVAL;
+		return;
 	}
 
 	status = rfs4_get_state(&args->open_stateid, &sp, RFS4_DBS_VALID);

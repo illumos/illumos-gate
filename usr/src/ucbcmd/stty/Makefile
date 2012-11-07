@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG= stty
 
@@ -33,6 +31,8 @@ OBJS=	$(PROGSRC:%.c=%.o)
 include ../Makefile.ucbcmd
 
 FILEMODE=	755
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-parentheses
 
 .KEEP_STATE:
 

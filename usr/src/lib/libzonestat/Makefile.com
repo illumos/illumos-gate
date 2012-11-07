@@ -35,6 +35,8 @@ SRCDIR =	../common
 CPPFLAGS +=	-I../common -mt -D_POSIX_PTHREAD_SEMANTICS
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
 
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 .KEEP_STATE:
 
 all:	$(LIBS)

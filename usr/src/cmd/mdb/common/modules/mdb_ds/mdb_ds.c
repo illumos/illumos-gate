@@ -24,22 +24,11 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * MDB developer support module.  This module is loaded automatically when the
  * proc target is initialized and the target is mdb itself.  In the future, we
  * should document these facilities in the answerbook to aid module developers.
  */
-
-/*
- * The mere inclusion of sys/utsname.h causes _uname() and uname() to be
- * defined on Intel, along with an external reference to _nuname().  Since we
- * don't actually use uname (or utsname, for that matter) in this dmod, we'll
- * prevent its inclusion.
- */
-#define	_SYS_UTSNAME_H
-struct utsname;
 
 #define	_MDB
 #include <mdb/mdb_modapi.h>

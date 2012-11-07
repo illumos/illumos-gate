@@ -126,7 +126,8 @@ fix_file(const char *filename, mode_t mode)
 	}
 
 	cmd[4] = filename;
-	if ((rc = posix_spawn(&pid, MCS, NULL, &attr, (char *const *)cmd, environ)) != 0) {
+	if ((rc = posix_spawn(&pid, MCS, NULL, &attr,
+	    (char *const *)cmd, environ)) != 0) {
 		warnx("could not exec mcs: %s", strerror(rc));
 		return (B_FALSE);
 	}

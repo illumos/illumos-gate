@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1989 by Sun Microsystems, Inc.
 #
 
@@ -36,6 +34,8 @@ SRCS=	$(OBJS:%.o=%.c)
 XFILE=	$(ROOT)/usr/include/rpcsvc/rquota.x
 
 CPPFLAGS += -D_LARGEFILE64_SOURCE
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
+CERRWARN += -_gcc=-Wno-unused-variable
 LDLIBS += -lnsl
 
 $(TYPEPROG):	$(OBJS)

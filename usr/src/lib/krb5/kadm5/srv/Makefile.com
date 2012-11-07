@@ -87,6 +87,12 @@ CPPFLAGS += -I.. -I../.. -I../../.. \
 
 CFLAGS +=	$(CCVERBOSE) -I..
 
+CERRWARN +=	-_gcc=-Wno-unused-function
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-type-limits
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 .KEEP_STATE:
 
 all:	$(LIBS)

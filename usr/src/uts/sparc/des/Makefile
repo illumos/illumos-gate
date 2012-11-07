@@ -24,7 +24,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the des crypto kernel module.
 #
@@ -81,6 +81,9 @@ LDFLAGS += -dy -Nmisc/kcf
 #
 CFLAGS		+= $(CCVERBOSE) -I$(COM_DIR)
 LINTFLAGS	+= -I$(COM_DIR)
+
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-uninitialized
 
 #
 # For now, disable these lint checks; maintainers should endeavor

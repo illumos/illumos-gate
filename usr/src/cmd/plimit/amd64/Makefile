@@ -23,8 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG=	plimit
 
@@ -36,6 +34,7 @@ include ../../Makefile.cmd
 include ../../Makefile.cmd.64
 
 CFLAGS64	+= $(CCVERBOSE)
+CERRWARN	+= -_gcc=-Wno-uninitialized
 
 LDLIBS	+= -lproc
 

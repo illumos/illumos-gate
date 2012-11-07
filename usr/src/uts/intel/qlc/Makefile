@@ -78,6 +78,10 @@ FWIMAGES        += 8100
 FWMODULES        = $(FWIMAGES:%=$(MODULE)_fw_%)
 FWMODULES_SRC    = $(FWIMAGES:%=$(SRC)/uts/common/io/fibre-channel/fca/qlc/ql_fw_%.c)
 
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-type-limits
+CERRWARN	+= -_gcc=-Wno-parentheses
+
 #
 #	Default build targets.
 #

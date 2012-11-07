@@ -49,6 +49,8 @@ ROOTMODULE	= $(ROOT_SYS_DIR)/$(MODULE)
 #
 include $(UTSBASE)/intel/Makefile.intel
 
+CERRWARN	+= -_gcc=-Wno-parentheses
+
 #
 #	Define targets
 #

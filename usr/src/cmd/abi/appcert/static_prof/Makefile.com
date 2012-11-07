@@ -23,8 +23,6 @@
 # Copyright (c) 1997-2000 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # cmd/abi/appcert/static_prof/Makefile.com
 #
 
@@ -35,6 +33,8 @@ SRCS = $(PROG:%=../%.c)
 
 # CPPFLAGS =	-I.. 
 CFLAGS	+=	$(LDLIBS)
+CERRWARN +=	-_gcc=-Wno-unused-value
+CERRWARN +=	-_gcc=-Wno-parentheses
 LDLIBS	=	-lelf
 
 LINTFLAGS =	-nmxsuF -errtags=yes

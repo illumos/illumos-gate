@@ -89,6 +89,9 @@ LDLIBS += -lmlrpc -lsmb -lsmbns -lshare -lsmbfs -lresolv -lnsl -lpkcs11 \
 CPPFLAGS += $(INCS) -D_REENTRANT
 $(ENABLE_SMB_PRINTING) CPPFLAGS += -DHAVE_CUPS
 
+CERRWARN += -_gcc=-Wno-unused-function
+CERRWARN += -_gcc=-Wno-uninitialized
+
 SRCS=   $(OBJS_COMMON:%.o=$(SRCDIR)/%.c)
 
 include ../../Makefile.targ

@@ -90,8 +90,8 @@ ROOTALIASPROG= $(ALIASPROG:%=$(ROOTBIN)/%)
 include ../../Makefile.cmd
 $(SPARC_BLD)include ../../Makefile.cmd.64
 
-
 FILEMODE= 555
+CERRWARN += -_gcc=-Wno-parentheses
 
 .KEEP_STATE:
 

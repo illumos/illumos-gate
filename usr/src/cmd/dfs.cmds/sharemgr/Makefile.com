@@ -43,6 +43,8 @@ LDLIBS += -lshare -lscf -lsecdb -lumem
 all install := LDLIBS += -lxml2
 LINTFLAGS	+= -u
 
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 POFILES = $(SRCS:.c=.po)
 POFILE  = sharemgr.po
 

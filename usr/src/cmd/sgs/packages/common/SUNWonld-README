@@ -1631,3 +1631,12 @@ Bugid   Risk Synopsis
 ================================================================================
 
 308     ld may misalign sections only preceded by empty sections
+1301	ld crashes with '-z ignore' due to a null data descriptor
+1626	libld may accidentally return success while failing
+2413	%ymm* need to be preserved on way through PLT
+3210	ld should tolerate SHT_PROGBITS for .eh_frame sections on amd64
+3228	Want -zassert-deflib for ld
+3230	ld.so.1 should check default paths for DT_DEPAUDIT
+3260	linker is insufficiently careful with strtok
+3261	linker should ignore unknown hardware capabilities
+3265	link-editor builds bogus .eh_frame_hdr on ia32

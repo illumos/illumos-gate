@@ -19,8 +19,7 @@
 #
 # CDDL HEADER END
 #
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -46,7 +45,7 @@ pad_notestring()
 
 build_sparcnote()
 {
-	notestring="Solaris Link Editors: $release-$revision\0"
+	notestring="Solaris Link Editors: $release-$revision (illumos)\0"
 	#
 	# The 'adjustment' is for the '\0'
 	#
@@ -69,14 +68,14 @@ cat > $notefile <<EOF
 	.global		link_ver_string
 link_ver_string:
 	.type		link_ver_string, #object
-	.ascii	"${release}-${revision}\0"
+	.ascii	"${release}-${revision} (illumos)\0"
 	.size	link_ver_string, .-link_ver_string
 EOF
 }
 
 build_i386note()
 {
-	notestring="Solaris Link Editors: $release-$revision"
+	notestring="Solaris Link Editors: $release-$revision (illumos)"
 	#
 	# The 'adjustment' is for the the fact that the x86/amd64
 	# assembler automatically append a '\0' at the end of a string.
@@ -99,7 +98,7 @@ cat > $notefile <<EOF
 	.globl		link_ver_string
 link_ver_string:
 	.type	link_ver_string,@object
-	.string	"${release}-${revision}\0"
+	.string	"${release}-${revision} (illumos)\0"
 	.size	link_ver_string, .-link_ver_string
 EOF
 }

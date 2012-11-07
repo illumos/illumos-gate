@@ -23,8 +23,6 @@
 # Copyright 1995-1999,2002-2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 TOPDIR =	../../../../..
 
@@ -51,6 +49,7 @@ ALL = cprboot
 include ../../common/Makefile.com
 include $(TOPDIR)/psm/Makefile.psm.64
 CFLAGS64 += -xchip=ultra $(CCABS32)
+CERRWARN += -_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

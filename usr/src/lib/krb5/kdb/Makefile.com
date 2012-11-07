@@ -22,8 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY= libkdb.a
 VERS= .1
@@ -82,6 +80,12 @@ CPPFLAGS +=	-DHAVE_CONFIG_H -DHAVE_BT_RSEQ \
 		-I$(SRC)/uts/common/gssapi/mechs/krb5/include
 
 CFLAGS +=	$(CCVERBOSE) -I..
+
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-unused-function
+CERRWARN +=	-_gcc=-Wno-type-limits
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-parentheses
 
 DYNFLAGS +=	$(KRUNPATH) $(KMECHLIB)
 LDLIBS +=	-lc -lnsl

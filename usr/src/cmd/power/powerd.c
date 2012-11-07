@@ -399,7 +399,6 @@ autos3_monitor(void)
 		logerror("Unable to open %s: %s", SRN, strerror(errno));
 		thr_exit((void *) errno);
 	}
-	logerror("Able to open %s", SRN);
 
 	/*
 	 * Tell device we want the special sauce

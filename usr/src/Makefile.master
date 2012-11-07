@@ -127,28 +127,10 @@ $(TONICBUILD)CLOSEDROOT= $(ROOT)-closed
 # compiler is primary, and control the versions of the given compilers to be
 # used.  They also allow compiler-version specific Makefile fragments.
 #
-# __SSNEXT when set to the empty string enables options specific to the 'next'
-# version of the Sun Studio compiler.
-#
-# __GNUC3 when the empty string uses and refers to GCC 3.x, it is the default.
-# __GNUC4 when the empty string uses and refers to GCC 4.x.
 
 __GNUC=			$(POUND_SIGN)
 $(__GNUC)__SUNC=	$(POUND_SIGN)
 __GNUC64=		$(__GNUC)
-
-__SSNEXT=		$(POUND_SIGN)
-
-__GNUC3=
-__GNUC4=		$(POUND_SIGN)
-$(__GNUC4)__GNUC3=	$(POUND_SIGN)
-
-# set __GNUC4 in the environment to build with GCC 4.4 These two variables are
-# operative even when __GNUC is not, as they affect flags that will be used by
-# the shadow compile.
-__GNUC3=
-__GNUC4=		$(POUND_SIGN)
-$(__GNUC4)__GNUC3=	$(POUND_SIGN)
 
 # CLOSED is the root of the tree that contains source which isn't released
 # as open source
@@ -167,10 +149,11 @@ SFWINCDIR=	$(SFW_ROOT)/include
 SFWLIBDIR=	$(SFW_ROOT)/lib
 SFWLIBDIR64=	$(SFW_ROOT)/lib/$(MACH64)
 
-$(__GNUC3)GCC_ROOT=	$(SFW_ROOT)
-$(__GNUC4)GCC_ROOT=	/opt/gcc/4.4.4
+GCC_ROOT=	/opt/gcc/4.4.4
 GCCLIBDIR=	$(GCC_ROOT)/lib
 GCCLIBDIR64=	$(GCC_ROOT)/lib/$(MACH64)
+
+DOCBOOK_XSL_ROOT=	/usr/share/sgml/docbook/xsl-stylesheets
 
 RPCGEN=		/usr/bin/rpcgen
 STABS=		$(ONBLD_TOOLS)/bin/$(MACH)/stabs
@@ -219,9 +202,8 @@ CTFFINDMOD=	$(ONBLD_TOOLS)/bin/ctffindmod
 XREF=		$(ONBLD_TOOLS)/bin/xref
 FIND=		/usr/bin/find
 PERL=		/usr/bin/perl
-PYTHON_24=	/usr/bin/python2.4
 PYTHON_26=	/usr/bin/python2.6
-PYTHON=		$(PYTHON_24)
+PYTHON=		$(PYTHON_26)
 SORT=		/usr/bin/sort
 TOUCH=		/usr/bin/touch
 WC=		/usr/bin/wc
@@ -358,12 +340,16 @@ CCABS32=		-Wc,-xcode=abs32
 #
 # generate v9 code which tolerates callers using the v7 ABI, for the sake of
 # system calls.
-$(__GNUC4)CC32BITCALLERS=		-_gcc=-massume-32bit-callers
+CC32BITCALLERS=		-_gcc=-massume-32bit-callers
 
 # GCC, especially, is increasingly beginning to auto-inline functions and
 # sadly does so separately not under the general -fno-inline-functions
-$(__GNUC4)CCNOAUTOINLINE= -_gcc=-fno-inline-small-functions \
-	-_gcc=-fno-inline-functions-called-once
+# Additionally, we wish to prevent optimisations which cause GCC to clone
+# functions -- in particular, these may cause unhelpful symbols to be
+# emitted instead of function names
+CCNOAUTOINLINE= -_gcc=-fno-inline-small-functions \
+	-_gcc=-fno-inline-functions-called-once \
+	-_gcc=-fno-ipa-cp
 
 # One optimization the compiler might perform is to turn this:
 #	#pragma weak foo
@@ -430,9 +416,19 @@ CERRWARN = -errtags=yes -errwarn=%all
 CERRWARN += -erroff=E_EMPTY_TRANSLATION_UNIT
 CERRWARN += -erroff=E_STATEMENT_NOT_REACHED
 
-# Normally cw(1) would translate -v into a set of options including these
-# but as they're GCC 4.x specific, we can't do that
-$(__GNUC4)CERRWARN +=	-_gcc=-Wno-address -_gcc=-Wno-array-bounds
+CERRWARN += -_gcc=-Wno-missing-braces
+CERRWARN += -_gcc=-Wno-sign-compare
+CERRWARN += -_gcc=-Wno-unknown-pragmas
+CERRWARN += -_gcc=-Wno-unused-parameter
+CERRWARN += -_gcc=-Wno-missing-field-initializers
+
+# Unfortunately, this option can misfire very easily and unfixably.
+CERRWARN +=	-_gcc=-Wno-array-bounds
+
+# DEBUG v. -nd make for frequent unused variables, empty conditions, etc. in
+# -nd builds
+$(RELEASE_BUILD)CERRWARN += -_gcc=-Wno-unused
+$(RELEASE_BUILD)CERRWARN += -_gcc=-Wno-empty-body
 
 #
 # turn warnings into errors (C++)
@@ -502,7 +498,16 @@ DEBUGFORMAT=	-xdebugformat=stabs
 #
 CTF_FLAGS_sparc	= -g -Wc,-Qiselect-T1 $(C99MODE) $(CNOGLOBAL) $(CDWARFSTR)
 CTF_FLAGS_i386	= -g $(C99MODE) $(CNOGLOBAL) $(CDWARFSTR)
-CTF_FLAGS	= $(CTF_FLAGS_$(MACH)) $(DEBUGFORMAT)
+
+CTF_FLAGS_sparcv9	= $(CTF_FLAGS_sparc)
+CTF_FLAGS_amd64		= $(CTF_FLAGS_i386)
+
+# Sun Studio produces broken userland code when saving arguments.
+$(__GNUC)CTF_FLAGS_amd64 += $(SAVEARGS)
+
+CTF_FLAGS_32	= $(CTF_FLAGS_$(MACH)) $(DEBUGFORMAT)
+CTF_FLAGS_64	= $(CTF_FLAGS_$(MACH64)) $(DEBUGFORMAT)
+CTF_FLAGS	= $(CTF_FLAGS_32)
 
 #
 # Flags used with genoffsets

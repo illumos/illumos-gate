@@ -24,6 +24,7 @@
  * Use is subject to license terms.
  *
  * Portions Copyright 2007 Chad Mynhier
+ * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  */
 
 #include <assert.h>
@@ -985,6 +986,13 @@ Pfree(struct ps_prochandle *P)
 				Lfree_internal(P, L);
 		}
 		free(P->hashtab);
+	}
+
+	while (P->num_fd > 0) {
+		fd_info_t *fip = list_next(&P->fd_head);
+		list_unlink(fip);
+		free(fip);
+		P->num_fd--;
 	}
 	(void) mutex_unlock(&P->proc_lock);
 	(void) mutex_destroy(&P->proc_lock);

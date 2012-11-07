@@ -36,6 +36,8 @@ SRCDIR =	../common
 CPPFLAGS +=	-I$(SRCDIR) -D_REENTRANT
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
 
+CERRWARN +=	-_gcc=-Wno-parentheses
+
 .KEEP_STATE:
 
 all:	$(LIBS)

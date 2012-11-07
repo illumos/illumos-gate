@@ -22,7 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 ARCH = sun4u
 
@@ -43,3 +42,7 @@ INCDIRS += $(SRC)/lib/fm/libfmd_adm/sparcv9
 include ../../sun4/cpumem-diagnosis/Makefile.cpumem
 LDLIBS += -L$(ROOT)/usr/lib/fm -lfmd_adm
 LDFLAGS += -R/usr/lib/fm
+
+CERRWARN += -_gcc=-Wno-switch
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-char-subscripts

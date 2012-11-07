@@ -23,7 +23,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the ufs file system
 #	kernel module.
@@ -76,6 +76,11 @@ $(MODSTUBS_O)	:= AS_CPPFLAGS += -DUFS_MODULE
 CLEANFILES	+= $(MODSTUBS_O)
 CFLAGS		+= $(CCVERBOSE)
 LDFLAGS		+= -dy -Nfs/specfs -Nmisc/fssnap_if
+
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-type-limits
+CERRWARN	+= -_gcc=-Wno-unused-label
 
 #
 #	Default build targets.

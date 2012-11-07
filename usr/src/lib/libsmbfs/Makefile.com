@@ -97,6 +97,9 @@ LDLIBS += -lsocket -lnsl -lc -lmd -lpkcs11 -lkrb5 -lsec -lidmap
 # normal warnings...
 CFLAGS	+=	$(CCVERBOSE) 
 
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-unused-variable
+
 CPPFLAGS += -D__EXTENSIONS__ -D_REENTRANT -DMIA \
 	-I$(SRCDIR) -I.. \
 	-I$(SRC)/uts/common \

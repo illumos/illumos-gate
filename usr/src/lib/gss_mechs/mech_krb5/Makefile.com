@@ -251,6 +251,16 @@ CPPFLAGS += -I$(REL_PATH)/libgss -I../include  \
 
 CPPFLAGS += $(KRB5_DEFS)
 
+CERRWARN +=	-_gcc=-Wno-unused-function
+CERRWARN +=	-_gcc=-Wno-type-limits
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-unused-label
+CERRWARN +=	-_gcc=-Wno-unused-value
+CERRWARN +=	-_gcc=-Wno-empty-body
+CERRWARN +=	-_gcc=-Wno-address
+
 MAPFILE_EXPORT = ../mapfile-vers-clean
 $(EXPORT_RELEASE_BUILD)MAPFILE_EXPORT = \
 		$(CLOSED)/lib/gss_mechs/mech_krb5/mapfile-vers-export

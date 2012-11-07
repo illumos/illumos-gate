@@ -67,6 +67,9 @@ CFLAGS += $(CCVERBOSE)
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 
+CERRWARN	+= -_gcc=-Wno-unused-label
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 # Depends on scsi
 #

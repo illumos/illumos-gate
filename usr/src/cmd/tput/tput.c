@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2012 Gary Mills
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -174,10 +175,12 @@ main(int argc, char **argv)
 		for (i = 0; i < 10; i++)
 			v[i] = (char *)malloc(32 * sizeof (char));
 
-		while (gets(buff) != NULL) {
+		while (fgets(buff, sizeof (buff), stdin) != NULL) {
 			/* read standard input line; skip over empty lines */
 			if ((std_argc =
-			    sscanf(buff, "%s %s %s %s %s %s %s %s %s %s",
+			    sscanf(buff,
+			    "%31s %31s %31s %31s %31s %31s %31s %31s "
+			    "%31s %31s",
 			    v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7],
 			    v[8], v[9])) < 1) {
 				continue;

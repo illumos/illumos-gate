@@ -41,7 +41,7 @@ COMOBJS64 =	args64.o	entry64.o	exit64.o	groups64.o \
 		ldentry64.o	ldlibs64.o	ldmachdep64.o	ldmain64.o \
 		libs64.o	files64.o	map64.o		map_core64.o \
 		map_support64.o	map_v264.o	order64.o	outfile64.o \
- 		place64.o	relocate64.o	resolve64.o	sections64.o \
+		place64.o	relocate64.o	resolve64.o	sections64.o \
 		sunwmove64.o	support64.o	syms64.o	update64.o \
 		unwind64.o	version64.o	wrap64.o
 
@@ -87,6 +87,12 @@ include 	$(SRC)/cmd/sgs/Makefile.com
 
 SRCDIR =	../common
 
+CERRWARN += -_gcc=-Wno-unused-value
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-switch
+CERRWARN += -_gcc=-Wno-char-subscripts
+CERRWARN += -_gcc=-Wno-type-limits
 
 # Location of the shared relocation engines maintained under usr/src/uts.
 #

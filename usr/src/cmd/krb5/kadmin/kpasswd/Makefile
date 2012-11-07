@@ -2,8 +2,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG= kpasswd
 
@@ -32,6 +30,10 @@ CPPFLAGS += -I$(SRC)/lib/gss_mechs/mech_krb5/include \
 	-DHAVE_TIMEZONE -DUSE_KADM5_API_VERSION=2
 
 COPTFLAG += $(XESS) #-I$(KINCDIR) 
+
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-unused-variable
+CERRWARN += -_gcc=-Wno-unused-function
 
 LDFLAGS += $(KRUNPATH) $(KERBRUNPATH)
 LDLIBS += -L $(KRB5LIBDIR)

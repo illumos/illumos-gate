@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY=	libcrypt.a
 VERS=		.1
@@ -47,6 +45,9 @@ $(LINTLIB):=	SRCS=$(SRCDIR)/$(LINTSRC)
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT -I../inc -I../../common/inc -I../../libgen/inc
 LDLIBS +=       -lgen -lc
+
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

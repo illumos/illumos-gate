@@ -1429,6 +1429,7 @@ is_name_cmp(const char *is_name, const char *match_name, size_t match_len)
  *	are updated as necessary to reflect the changes. Returns TRUE
  *	for success, FALSE for failure.
  */
+/*ARGSUSED*/
 inline static Boolean
 process_progbits_alloc(const char *name, Ifl_desc *ifl, Shdr *shdr,
     Word ndx, int *ident, Ofl_desc *ofl, Boolean is_stab_index,
@@ -1437,8 +1438,6 @@ process_progbits_alloc(const char *name, Ifl_desc *ifl, Shdr *shdr,
 	Boolean done = FALSE;
 
 	if (name[0] == '.') {
-		Conv_inv_buf_t inv_buf1, inv_buf2;
-
 		switch (name[1]) {
 		case 'e':
 			if (!is_name_cmp(name, MSG_ORIG(MSG_SCN_EHFRAME),

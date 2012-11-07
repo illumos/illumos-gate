@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY=	libkvm.a
 VERS=		.1
@@ -47,6 +45,8 @@ DYNFLAGS64 +=	-Wl,-f,/usr/platform/\$$PLATFORM/lib/$(MACH64)/$(DYNLIBPSR)
 LDLIBS +=	-lelf -lc
 
 CPPFLAGS = -D_KMEMUSER -D_LARGEFILE64_SOURCE=1 -I.. $(CPPFLAGS.master)
+
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 CLOBBERFILES += test test.o
 

@@ -22,10 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/sgs/m4/i386/Makefile
-#
 
 PROG=		m4
 XPG4PROG=	m4
@@ -55,6 +51,10 @@ DEFLIST=	-DELF
 CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master)
 CFLAGS +=	$(CCVERBOSE)
 C99MODE=	$(C99_ENABLE)
+
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-unused-label
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 LINTFLAGS +=	$(LDLIBS)
 CLEANFILES +=	$(LINTOUT) $(BLTSRCS)

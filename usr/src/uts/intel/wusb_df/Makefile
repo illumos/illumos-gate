@@ -73,6 +73,8 @@ LDFLAGS		+= -dy -Nmisc/usba
 #
 LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 #	Default build targets.
 #

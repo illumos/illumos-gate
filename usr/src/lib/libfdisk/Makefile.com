@@ -52,6 +52,8 @@ CFLAGS64 += -D_FILE_OFFSET_BITS=64
 LINTFLAGS +=    -erroff=E_BAD_PTR_CAST_ALIGN
 LINTFLAGS64 +=    -erroff=E_BAD_PTR_CAST_ALIGN
 
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 .KEEP_STATE:
 
 all: $(LIBS)

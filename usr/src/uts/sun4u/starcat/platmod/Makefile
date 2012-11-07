@@ -23,8 +23,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 #	This makefile drives the production of the sun4u starcat platform
@@ -68,6 +66,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 # lint pass one enforcement
 #
 CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-unused-variable
 
 #
 #	Default build targets.

@@ -41,6 +41,8 @@ CLOBBERFILES	+= $(LIBPROG)
 $(ROOTLIBFSTYPE)/mount := FILEMODE= 04555
 
 CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-unused-label
 C99MODE= $(C99_ENABLE)
 
 LDLIBS += -lsmbfs

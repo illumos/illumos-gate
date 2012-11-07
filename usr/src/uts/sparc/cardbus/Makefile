@@ -24,7 +24,7 @@
 #
 # uts/sparc/cardbus/Makefile
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the cardbus kernel module.
 #
@@ -77,6 +77,11 @@ CPPFLAGS        +=      -DHOTPLUG
 
 #	dependency
 LDFLAGS	+=	-dy -Nmisc/busra -Nmisc/pcmcia -Nmisc/hpcsvc
+
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-unused-function
+CERRWARN	+= -_gcc=-Wno-unused-variable
 
 #
 # For now, disable these lint checks; maintainers should endeavor

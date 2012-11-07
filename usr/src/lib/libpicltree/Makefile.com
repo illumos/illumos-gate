@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY=	libpicltree.a
 VERS=		.1
@@ -37,6 +35,8 @@ $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 CPPFLAGS +=	-D_REENTRANT -I.. -I../../libpicl -I$(SRC)/cmd/picl/plugins/inc
 CFLAGS +=	$(CCVERBOSE)
+
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 

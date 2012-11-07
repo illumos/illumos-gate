@@ -24,10 +24,6 @@
 # Use is subject to license terms.
 #
 
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-
 #	This makefile drives the pic16f747 build.
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -57,7 +53,8 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # lint pass one enforcement
 #
-CFLAGS += $(CCVERBOSE)
+CFLAGS		+= $(CCVERBOSE)
+CERRWARN	+= -_gcc=-Wno-parentheses
 
 #
 #	Default build targets.

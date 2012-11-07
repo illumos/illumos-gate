@@ -49,6 +49,10 @@ CONF_SRCDIR	= $(UTSBASE)/common/io/ixgbe
 #
 include $(UTSBASE)/intel/Makefile.intel
 
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-switch
+CERRWARN	+= -_gcc=-Wno-uninitialized
+
 #
 #	Define targets
 #

@@ -52,6 +52,9 @@ ROOTSOFTLINKS	= $(SOFTLINKS:%=$(ROOT_PSM_PCBE_DIR)/%)
 #
 include $(UTSBASE)/intel/Makefile.intel
 
+CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_gcc=-Wno-unused-variable
+
 #
 #	Define targets.
 #

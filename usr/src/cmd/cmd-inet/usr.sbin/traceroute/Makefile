@@ -52,6 +52,9 @@ CPPFLAGS += -D_XOPEN_SOURCE=500 -D__EXTENSIONS__
 LINTFLAGS +=	-erroff=E_FUNC_DECL_VAR_ARG2 -erroff=E_INCONS_ARG_DECL2 \
 		-erroff=E_INCONS_ARG_USED2 -erroff=E_INCONS_VAL_TYPE_DECL2
 
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-clobbered
+
 .KEEP_STATE:
 
 all:	$(PROG)

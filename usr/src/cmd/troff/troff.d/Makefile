@@ -43,6 +43,13 @@ SRCS =		$(TAOBJS:%.o=%.c) $(MAKEDEVOBJS:%.o=%.c)	\
 TXTS =		README maketables troff.sh
 
 CPPFLAGS =	-DUSG -DINCORE -I. -I.. $(CPPFLAGS.master)
+
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-extra
+
 #
 # For message catalog
 #
@@ -93,7 +100,7 @@ $(POFILE):      $(POFILES)
 
 strip :
 		$(STRIP $(PROG)
-	
+
 lint :		lint_SRCS
 
 include		../../Makefile.targ

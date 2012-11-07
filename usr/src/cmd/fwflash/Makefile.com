@@ -28,6 +28,10 @@
 
 CLOSED=			$(SRC)/../closed
 
+CERRWARN +=		-_gcc=-Wno-parentheses
+CERRWARN +=		-_gcc=-Wno-uninitialized
+CERRWARN +=		-_gcc=-Wno-address
+
 ROOTUSR=                $(ROOT)/usr
 ROOTUSRINCLD=		$(ROOTUSR)/include
 ROOTUSRINCLDFWFLASH=	$(ROOTUSRINCLD)/fwflash

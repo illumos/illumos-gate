@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <stdio.h>
@@ -252,6 +253,8 @@ read_bootblock_from_disk(int dev_fd, ib_bootblock_t *bblock)
 	bblock->mboot = (multiboot_header_t *)(bblock->buf + bblock->mboot_off
 	    + BBLK_DATA_RSVD_SIZE);
 	bblock->extra = (char *)bblock->mboot + sizeof (multiboot_header_t);
+	bblock->extra_size = bblock->buf_size - bblock->mboot_off
+	    - BBLK_DATA_RSVD_SIZE - sizeof (multiboot_header_t);
 	return (BC_SUCCESS);
 }
 
@@ -279,7 +282,7 @@ is_update_necessary(ib_data_t *data, char *updt_str)
 		return (B_TRUE);
 	}
 
-	einfo = find_einfo(bblock_disk.extra);
+	einfo = find_einfo(bblock_disk.extra, bblock_disk.extra_size);
 	if (einfo == NULL) {
 		BOOT_DEBUG("No extended information available\n");
 		return (B_TRUE);
@@ -716,7 +719,7 @@ handle_getinfo(char *progname, char **argv)
 		goto out_dev;
 	}
 
-	einfo = find_einfo(bblock->extra);
+	einfo = find_einfo(bblock->extra, bblock->extra_size);
 	if (einfo == NULL) {
 		retval = BC_NOEINFO;
 		(void) fprintf(stderr, gettext("No extended information "
@@ -817,7 +820,7 @@ handle_mirror(char *progname, char **argv)
 		goto out_devs;
 	}
 
-	einfo_curr = find_einfo(bblock_curr->extra);
+	einfo_curr = find_einfo(bblock_curr->extra, bblock_curr->extra_size);
 	if (einfo_curr != NULL)
 		updt_str = einfo_get_string(einfo_curr);
 

@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY = libproject.a
 VERS = .1
@@ -50,6 +48,8 @@ CLEANFILES +=	$(LINTOUT) $(LINTLIB)
 
 CPPFLAGS +=	-D_REENTRANT
 CFLAGS +=	$(CCVERBOSE)
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
 LDLIBS +=	-lc -lsecdb -lproc -lpool
 
 $(LINTLIB) :=	SRCS = ../common/llib-lproject

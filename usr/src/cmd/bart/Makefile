@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+#
 
 PROG=	bart
 SRCS=	rules.c create.c compare.c main.c lutbl.c
@@ -30,7 +29,10 @@ OBJS=	rules.o create.o compare.o main.o lutbl.o
 BART=	bart
 
 include ../Makefile.cmd
+
 LDLIBS +=	-lsec -lmd
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
 #
 # for messaging catalog

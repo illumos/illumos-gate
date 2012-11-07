@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY= scsi.a
 VERS= .1
@@ -40,6 +38,10 @@ ROOTLIBDIR64=	$(ROOTLIBDIR)/$(MACH64)
 LIBS=	$(DYNLIB)
 
 CFLAGS +=	$(CCVERBOSE)
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-char-subscripts
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-address
 
 LDLIBS +=	-lc -ldevice -ldevinfo -lrcm
 

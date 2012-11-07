@@ -211,6 +211,7 @@ dump_ctype(void)
 	_FileRuneEntry	*ct = NULL;
 	_FileRuneEntry	*lo = NULL;
 	_FileRuneEntry	*up = NULL;
+	wchar_t		wc;
 
 	(void) memset(&rl, 0, sizeof (rl));
 	last_ct = NULL;
@@ -223,10 +224,18 @@ dump_ctype(void)
 	(void) memcpy(rl.magic, _FILE_RUNE_MAGIC_1, 8);
 	(void) strncpy(rl.encoding, get_wide_encoding(), sizeof (rl.encoding));
 
-	for (ctn = avl_first(&ctypes); ctn; ctn = AVL_NEXT(&ctypes, ctn)) {
+	/*
+	 * Initialize the identity map.
+	 */
+	for (wc = 0; (unsigned)wc < _CACHED_RUNES; wc++) {
+		rl.maplower[wc] = wc;
+		rl.mapupper[wc] = wc;
+	}
 
-		wchar_t	wc = ctn->wc;
+	for (ctn = avl_first(&ctypes); ctn; ctn = AVL_NEXT(&ctypes, ctn)) {
 		int conflict = 0;
+
+		wc = ctn->wc;
 
 		/*
 		 * POSIX requires certain portable characters have
@@ -305,8 +314,10 @@ dump_ctype(void)
 		 */
 		if ((unsigned)wc < _CACHED_RUNES) {
 			rl.runetype[wc] = ctn->ctype;
-			rl.maplower[wc] = ctn->tolower ? ctn->tolower : wc;
-			rl.mapupper[wc] = ctn->toupper ? ctn->toupper : wc;
+			if (ctn->tolower)
+				rl.maplower[wc] = ctn->tolower;
+			if (ctn->toupper)
+				rl.mapupper[wc] = ctn->toupper;
 			continue;
 		}
 

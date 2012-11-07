@@ -20,12 +20,9 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1997-1999 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-# cmd/abi/spectrans/spec2map/Makefile.targ
 
 .KEEP_STATE:
 
@@ -37,3 +34,5 @@ OBJECTS	=	xlator.o	\
 		util.o
 
 include ../../Makefile.cmd
+
+CERRWARN +=	-_gcc=-Wno-switch

@@ -63,3 +63,7 @@ DIRMODE		= 755
 #
 LINTFLAGS = -nmsF -erroff=E_BAD_PTR_CAST_ALIGN \
 	    -erroff=E_NAME_DECL_NOT_USED_DEF2 -erroff=E_NAME_DEF_NOT_USED2
+
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-char-subscripts

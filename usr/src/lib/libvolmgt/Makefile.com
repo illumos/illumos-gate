@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY= libvolmgt.a
 VERS=.1
@@ -43,6 +41,8 @@ LINTSRC=	$(LINTLIB:%.ln=%)
 
 CPPFLAGS =	-I.. $(CPPFLAGS.master)
 CFLAGS +=	$(CCVERBOSE)
+
+CERRWARN +=	-_gcc=-Wno-unused-variable
 
 LDLIBS +=       -ladm -lc
 

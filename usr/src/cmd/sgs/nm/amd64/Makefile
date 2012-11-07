@@ -40,6 +40,9 @@ LDFLAGS +=	'-R$$ORIGIN/../../../lib/$(MACH64)'
 INCLIST=	-I../../include -I../../include/i386 \
 		-I$(SRCBASE)/uts/$(ARCH)/sys
 CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master) -I$(ELFCAP)
+
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
 LDLIBS +=	$(CONVLIBDIR64) $(CONV_LIB) $(ELFLIBDIR) -lelf
 LINTFLAGS64 +=	-x $(LDLIBS) -m64
 LINTSRCS=	$(SRCS)

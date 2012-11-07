@@ -22,9 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/genmsg/Makefile
 
 include ../Makefile.cmd
 
@@ -36,6 +33,10 @@ LEXARGS=
 LEXSRCS=	genmsg.l
 LEXINTSRCS=	lex.yy.c
 LEXOBJS=	lex.yy.o
+
+CERRWARN +=	-_gcc=-Wno-unused-label
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-unused-variable
 
 LDLIBS += -ll
 YFLAGS = -d

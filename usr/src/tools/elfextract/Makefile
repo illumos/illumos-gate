@@ -23,7 +23,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 include		../Makefile.tools
 
@@ -31,6 +30,8 @@ PROG	= elfextract
 
 include ../Makefile.tools
 
+CERRWARN += -_gcc=-Wno-unused-variable
+CERRWARN += -_gcc=-Wno-implicit-function-declaration
 
 .KEEP_STATE:
 
