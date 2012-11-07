@@ -22,85 +22,22 @@
 # Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-RELEASECERTS =		SUNW_SunOS_5.10
-RELEASECRYPTO =		SUNW_SunOS_5.10
-
 ETCCRYPTOFILES = \
 	kcf.conf \
 	pkcs11.conf \
-	kmf.conf \
-	$(RELEASECRYPTO:%=certs/%) \
-	certs/CA \
-	certs/SUNWObjectCA
-
-ETCCERTSFILES = \
-	$(RELEASECERTS) \
-	SUNWSolarisCA \
-	SUNWObjectCA
-
-ANNOTATEDFILES = \
-	certs/SUNWObjectCA.annot
+	kmf.conf
 
 include ../../Makefile.cmd
 .KEEP_STATE:
 
 ROOTETC=		$(ROOT)/etc
 ROOTCRYPTODIR=		$(ROOTETC)/crypto
-ROOTCRYPTOCERTSDIR=	$(ROOTCRYPTODIR)/certs
-
-ROOTETCCERTSDIR=	$(ROOTETC)/certs
-
-CADIR=			certs/CA
-ROOTETCCADIR=		$(ROOTETC)/$(CADIR)
-
-ROOTETCCALINKDIR=	$(ROOTETC)/openssl/certs
-CATARGDIR=		../../$(CADIR)
 
 IETCCRYPTOFILES=	$(ETCCRYPTOFILES:%=$(ROOTCRYPTODIR)/%)
-IETCCERTSFILES=		$(ETCCERTSFILES:%=$(ROOTETCCERTSDIR)/%)
 
-include Makefile.ca-links
-
-$(ROOTCRYPTOCERTSDIR)/SUNWObjectCA: \
-			$(ROOTETCCERTSDIR)/SUNWObjectCA
-			$(RM) $@
-			$(LN) $(ROOTETCCERTSDIR)/SUNWObjectCA $@
 $(ROOTCRYPTODIR)/%:	%
 			$(INS.file)
-$(RELEASECRYPTO:%=$(ROOTCRYPTODIR)/certs/%): \
-			certs/$(@F:SUNW_SunOS_5.%=SUNWCryptographic%)
-			$(RM) $@
-			$(INS) -s -m $(FILEMODE) -f $(@D) \
-				certs/$(@F:SUNW_SunOS_5.%=SUNWCryptographic%)
-			$(MV) $(@D)/$(@F:SUNW_SunOS_5.%=SUNWCryptographic%) $@
-
-$(ROOTETCCERTSDIR)/SUNWObjectCA: \
-			certs/$$(@F)
-			$(RM) $@
-			$(INS) -s -m $(FILEMODE) -f $(@D) certs/$(@F)
-$(ROOTETCCERTSDIR)/%:	certs/%
-			$(INS.file)
-$(RELEASECERTS:%=$(ROOTETCCERTSDIR)/%): \
-			certs/$(@F:SUNW_SunOS_5.%=SUNWSolaris%)
-			$(RM) $@
-			$(INS) -s -m $(FILEMODE) -f $(@D) \
-				certs/$(@F:SUNW_SunOS_5.%=SUNWSolaris%)
-			$(MV) $(@D)/$(@F:SUNW_SunOS_5.%=SUNWSolaris%) $@
-
-ANNOT_DEL =	SOURCE ANNOTATION DELETE
-$(ANNOTATEDFILES:%.annot=%): \
-			$$(@:%=%.annot)
-			$(RM) $@
-			$(SED) -e '/${ANNOT_DEL} START/,/${ANNOT_DEL} END/d' \
-				$(@:%=%.annot) > $@
 
 $(IETCCRYPTOFILES):=	FILEMODE= 644
-$(IETCCERTSFILES):=	FILEMODE= 644
-$(IETCCAFILES):=	FILEMODE= 644
 
-.PARALLEL:	$(IETCCAFILES)
-
-install:	$(IETCCAFILES) $(IETCCRYPTOFILES) $(IETCCERTSFILES)
-
-clean clobber:
-		$(RM) $(ANNOTATEDFILES:%.annot=%)
+install:	$(IETCCRYPTOFILES)
