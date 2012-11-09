@@ -27,7 +27,6 @@
 
 #include <sys/vdev.h>
 #include <sys/semaphore.h>
-#include <sys/buf.h>
 #ifdef _KERNEL
 #include <sys/ddi.h>
 #include <sys/sunldi.h>
