@@ -33,7 +33,7 @@ CFLAGS	+=	$(CCVERBOSE)
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-switch
 CERRWARN +=	-_gcc=-Wno-uninitialized
-LDLIBS	+= -ldevinfo -lnvpair
+LDLIBS	+= -ldevinfo -lnvpair -lpcidb
 
 FILEMODE= 02555
 
