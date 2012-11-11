@@ -21,9 +21,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_ks.h>
@@ -118,6 +117,33 @@ netstack(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	mdb_printf("%0?p %6d    %06x\n",
 	    addr, nss.netstack_stackid, nss.netstack_flags);
+
+	return (DCMD_OK);
+}
+
+static int
+netstackid_lookup_cb(uintptr_t addr, const netstack_t *ns, void *arg)
+{
+	netstackid_t nid = *(uintptr_t *)arg;
+	if (ns->netstack_stackid == nid)
+		mdb_printf("%p\n", addr);
+
+	return (WALK_NEXT);
+}
+
+/*ARGSUSED*/
+int
+netstackid2netstack(uintptr_t addr, uint_t flags, int argc,
+    const mdb_arg_t *argv)
+{
+	if (!(flags & DCMD_ADDRSPEC) || argc != 0)
+		return (DCMD_USAGE);
+
+	if (mdb_walk("netstack", (mdb_walk_cb_t)netstackid_lookup_cb, &addr) ==
+	    -1) {
+		mdb_warn("failed to walk zone");
+		return (DCMD_ERR);
+	}
 
 	return (DCMD_OK);
 }

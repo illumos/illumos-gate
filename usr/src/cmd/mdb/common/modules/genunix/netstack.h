@@ -26,8 +26,6 @@
 #ifndef	_NETSTACK_H
 #define	_NETSTACK_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_modapi.h>
 
 #ifdef	__cplusplus
@@ -38,6 +36,7 @@ int netstack_walk_init(mdb_walk_state_t *);
 int netstack_walk_step(mdb_walk_state_t *);
 
 int netstack(uintptr_t, uint_t, int, const mdb_arg_t *);
+int netstackid2netstack(uintptr_t, uint_t, int, const mdb_arg_t *);
 
 #ifdef	__cplusplus
 }
