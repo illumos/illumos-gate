@@ -4096,6 +4096,9 @@ static const mdb_dcmd_t dcmds[] = {
 
 	/* from netstack.c */
 	{ "netstack", "", "show stack instances", netstack },
+	{ "netstackid2netstack", ":",
+		"translate a netstack id to its netstack_t",
+		netstackid2netstack },
 
 	/* from nvpair.c */
 	{ NVPAIR_DCMD_NAME, NVPAIR_DCMD_USAGE, NVPAIR_DCMD_DESCR,
@@ -4186,6 +4189,8 @@ static const mdb_dcmd_t dcmds[] = {
 		pfiles_help },
 
 	/* from zone.c */
+	{ "zid2zone", ":", "find the zone_t with the given zone id",
+		zid2zone },
 	{ "zone", "?[-r [-v]]", "display kernel zone(s)", zoneprt },
 	{ "zsd", ":[-v] [zsd_key]", "display zone-specific-data entries for "
 	    "selected zones", zsd },
