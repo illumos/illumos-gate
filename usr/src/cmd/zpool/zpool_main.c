@@ -4322,11 +4322,12 @@ upgrade_version(zpool_handle_t *zhp, uint64_t version)
 	if (version >= SPA_VERSION_FEATURES) {
 		(void) printf(gettext("Successfully upgraded "
 		    "'%s' from version %llu to feature flags.\n"),
-		    zpool_get_name(zhp), oldversion);
+		    zpool_get_name(zhp), (u_longlong_t)oldversion);
 	} else {
 		(void) printf(gettext("Successfully upgraded "
 		    "'%s' from version %llu to version %llu.\n"),
-		    zpool_get_name(zhp), oldversion, version);
+		    zpool_get_name(zhp), (u_longlong_t)oldversion,
+		    (u_longlong_t)version);
 	}
 
 	return (0);
@@ -4525,14 +4526,14 @@ upgrade_one(zpool_handle_t *zhp, void *data)
 	if (cur_version > cbp->cb_version) {
 		(void) printf(gettext("Pool '%s' is already formatted "
 		    "using more current version '%llu'.\n\n"),
-		    zpool_get_name(zhp), cur_version);
+		    zpool_get_name(zhp), (u_longlong_t)cur_version);
 		return (0);
 	}
 
 	if (cbp->cb_version != SPA_VERSION && cur_version == cbp->cb_version) {
 		(void) printf(gettext("Pool '%s' is already formatted "
 		    "using version %llu.\n\n"), zpool_get_name(zhp),
-		    cbp->cb_version);
+		    (u_longlong_t)cbp->cb_version);
 		return (0);
 	}
 
@@ -4718,7 +4719,7 @@ zpool_do_upgrade(int argc, char **argv)
 			} else {
 				(void) printf(gettext("All pools are already "
 				    "formatted with version %llu or higher.\n"),
-				    cb.cb_version);
+				    (u_longlong_t)cb.cb_version);
 			}
 		}
 	} else if (argc == 0) {
@@ -4807,21 +4808,23 @@ get_history_one(zpool_handle_t *zhp, void *data)
 				dump_nvlist(rec, 4);
 				continue;
 			}
-			(void) printf("%s [internal %s txg:%lld] %s", tbuf,
+			(void) printf("%s [internal %s txg:%llu] %s", tbuf,
 			    zfs_history_event_names[ievent],
-			    fnvlist_lookup_uint64(rec, ZPOOL_HIST_TXG),
+			    (u_longlong_t)fnvlist_lookup_uint64(rec,
+			    ZPOOL_HIST_TXG),
 			    fnvlist_lookup_string(rec, ZPOOL_HIST_INT_STR));
 		} else if (nvlist_exists(rec, ZPOOL_HIST_INT_NAME)) {
 			if (!cb->internal)
 				continue;
-			(void) printf("%s [txg:%lld] %s", tbuf,
-			    fnvlist_lookup_uint64(rec, ZPOOL_HIST_TXG),
+			(void) printf("%s [txg:%llu] %s", tbuf,
+			    (u_longlong_t)fnvlist_lookup_uint64(rec,
+			    ZPOOL_HIST_TXG),
 			    fnvlist_lookup_string(rec, ZPOOL_HIST_INT_NAME));
 			if (nvlist_exists(rec, ZPOOL_HIST_DSNAME)) {
 				(void) printf(" %s (%llu)",
 				    fnvlist_lookup_string(rec,
 				    ZPOOL_HIST_DSNAME),
-				    fnvlist_lookup_uint64(rec,
+				    (u_longlong_t)fnvlist_lookup_uint64(rec,
 				    ZPOOL_HIST_DSID));
 			}
 			(void) printf(" %s", fnvlist_lookup_string(rec,
