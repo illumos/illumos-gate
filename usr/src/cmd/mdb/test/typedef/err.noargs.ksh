@@ -1,0 +1,1 @@
+$MDB -e '::typedef'

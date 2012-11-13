@@ -1,0 +1,5 @@
+sizeof (list_t) = 0x10
+0 list_t {
+    0 struct list *prev 
+    8 struct list *next 
+}

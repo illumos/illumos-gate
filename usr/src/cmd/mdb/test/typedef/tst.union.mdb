@@ -1,0 +1,6 @@
+::typedef -c lp64
+::typedef "union ringbearer { int frodo; char sam; long gandalf; }" ringbearer_t;
+::sizeof ringbearer_t
+::print -at ringbearer_t
+::sizeof union ringbearer
+::print -at union ringbearer

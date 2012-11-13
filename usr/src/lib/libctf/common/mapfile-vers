@@ -60,6 +60,7 @@ SYMBOL_VERSION SUNWprivate_1.2 {
 	ctf_add_union;
 	ctf_add_volatile;
 	ctf_create;
+	ctf_delete_type;
 	ctf_discard;
 	ctf_enum_value;
 	ctf_label_info;

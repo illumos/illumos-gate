@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ */
 
 #include <mdb/mdb_ctf.h>
 #include <mdb/mdb_ctf_impl.h>
@@ -67,6 +70,125 @@ typedef struct mbr_info {
 	ulong_t *mbr_offp;
 	mdb_ctf_id_t *mbr_typep;
 } mbr_info_t;
+
+typedef struct synth_intrinsic {
+	const char *syn_name;
+	ctf_encoding_t syn_enc;
+	uint_t syn_kind;
+} synth_intrinsic_t;
+
+typedef struct synth_typedef {
+	const char *syt_src;
+	const char *syt_targ;
+} synth_typedef_t;
+
+/*
+ * As part of our support for synthetic types via ::typedef, we define a core
+ * set of types.
+ */
+static const synth_intrinsic_t synth_builtins32[] = {
+{ "void", { CTF_INT_SIGNED, 0, 0 }, CTF_K_INTEGER },
+{ "signed", { CTF_INT_SIGNED, 0, 32 }, CTF_K_INTEGER },
+{ "unsigned", { 0, 0, 32 }, CTF_K_INTEGER },
+{ "char", { CTF_INT_SIGNED | CTF_INT_CHAR, 0, 8 }, CTF_K_INTEGER },
+{ "short", { CTF_INT_SIGNED, 0, 16 }, CTF_K_INTEGER },
+{ "int", { CTF_INT_SIGNED, 0, 32 }, CTF_K_INTEGER },
+{ "long", { CTF_INT_SIGNED, 0, 32 }, CTF_K_INTEGER },
+{ "long long", { CTF_INT_SIGNED, 0, 64 }, CTF_K_INTEGER },
+{ "signed char", { CTF_INT_SIGNED | CTF_INT_CHAR, 0, 8 }, CTF_K_INTEGER },
+{ "signed short", { CTF_INT_SIGNED, 0, 16 }, CTF_K_INTEGER },
+{ "signed int", { CTF_INT_SIGNED, 0, 32 }, CTF_K_INTEGER },
+{ "signed long", { CTF_INT_SIGNED, 0, 32 }, CTF_K_INTEGER },
+{ "signed long long", { CTF_INT_SIGNED, 0, 64 }, CTF_K_INTEGER },
+{ "unsigned char", { CTF_INT_CHAR, 0, 8 }, CTF_K_INTEGER },
+{ "unsigned short", { 0, 0, 16 }, CTF_K_INTEGER },
+{ "unsigned int", { 0, 0, 32 }, CTF_K_INTEGER },
+{ "unsigned long", { 0, 0, 32 }, CTF_K_INTEGER },
+{ "unsigned long long", { 0, 0, 64 }, CTF_K_INTEGER },
+{ "_Bool", { CTF_INT_BOOL, 0, 8 }, CTF_K_INTEGER },
+{ "float", { CTF_FP_SINGLE, 0, 32 }, CTF_K_FLOAT },
+{ "double", { CTF_FP_DOUBLE, 0, 64 }, CTF_K_FLOAT },
+{ "long double", { CTF_FP_LDOUBLE, 0, 128 }, CTF_K_FLOAT },
+{ "float imaginary", { CTF_FP_IMAGRY, 0, 32 }, CTF_K_FLOAT },
+{ "double imaginary", { CTF_FP_DIMAGRY, 0, 64 }, CTF_K_FLOAT },
+{ "long double imaginary", { CTF_FP_LDIMAGRY, 0, 128 }, CTF_K_FLOAT },
+{ "float complex", { CTF_FP_CPLX, 0, 64 }, CTF_K_FLOAT },
+{ "double complex", { CTF_FP_DCPLX, 0, 128 }, CTF_K_FLOAT },
+{ "long double complex", { CTF_FP_LDCPLX, 0, 256 }, CTF_K_FLOAT },
+{ NULL, { 0, 0, 0}, 0 }
+};
+
+static const synth_intrinsic_t synth_builtins64[] = {
+{ "void", { CTF_INT_SIGNED, 0, 0 }, CTF_K_INTEGER },
+{ "signed", { CTF_INT_SIGNED, 0, 32 }, CTF_K_INTEGER },
+{ "unsigned", { 0, 0, 32 }, CTF_K_INTEGER },
+{ "char", { CTF_INT_SIGNED | CTF_INT_CHAR, 0, 8 }, CTF_K_INTEGER },
+{ "short", { CTF_INT_SIGNED, 0, 16 }, CTF_K_INTEGER },
+{ "int", { CTF_INT_SIGNED, 0, 32 }, CTF_K_INTEGER },
+{ "long", { CTF_INT_SIGNED, 0, 64 }, CTF_K_INTEGER },
+{ "long long", { CTF_INT_SIGNED, 0, 64 }, CTF_K_INTEGER },
+{ "signed char", { CTF_INT_SIGNED | CTF_INT_CHAR, 0, 8 }, CTF_K_INTEGER },
+{ "signed short", { CTF_INT_SIGNED, 0, 16 }, CTF_K_INTEGER },
+{ "signed int", { CTF_INT_SIGNED, 0, 32 }, CTF_K_INTEGER },
+{ "signed long", { CTF_INT_SIGNED, 0, 64 }, CTF_K_INTEGER },
+{ "signed long long", { CTF_INT_SIGNED, 0, 64 }, CTF_K_INTEGER },
+{ "unsigned char", { CTF_INT_CHAR, 0, 8 }, CTF_K_INTEGER },
+{ "unsigned short", { 0, 0, 16 }, CTF_K_INTEGER },
+{ "unsigned int", { 0, 0, 32 }, CTF_K_INTEGER },
+{ "unsigned long", { 0, 0, 64 }, CTF_K_INTEGER },
+{ "unsigned long long", { 0, 0, 64 }, CTF_K_INTEGER },
+{ "_Bool", { CTF_INT_BOOL, 0, 8 }, CTF_K_INTEGER },
+{ "float", { CTF_FP_SINGLE, 0, 32 }, CTF_K_FLOAT },
+{ "double", { CTF_FP_DOUBLE, 0, 64 }, CTF_K_FLOAT },
+{ "long double", { CTF_FP_LDOUBLE, 0, 128 }, CTF_K_FLOAT },
+{ "float imaginary", { CTF_FP_IMAGRY, 0, 32 }, CTF_K_FLOAT },
+{ "double imaginary", { CTF_FP_DIMAGRY, 0, 64 }, CTF_K_FLOAT },
+{ "long double imaginary", { CTF_FP_LDIMAGRY, 0, 128 }, CTF_K_FLOAT },
+{ "float complex", { CTF_FP_CPLX, 0, 64 }, CTF_K_FLOAT },
+{ "double complex", { CTF_FP_DCPLX, 0, 128 }, CTF_K_FLOAT },
+{ "long double complex", { CTF_FP_LDCPLX, 0, 256 }, CTF_K_FLOAT },
+{ NULL, { 0, 0, 0 }, 0 }
+};
+
+static const synth_typedef_t synth_typedefs32[] = {
+{ "char", "int8_t" },
+{ "short", "int16_t" },
+{ "int", "int32_t" },
+{ "long long", "int64_t" },
+{ "int", "intptr_t" },
+{ "unsigned char", "uint8_t" },
+{ "unsigned short", "uint16_t" },
+{ "unsigned", "uint32_t" },
+{ "unsigned long long", "uint64_t" },
+{ "unsigned char", "uchar_t" },
+{ "unsigned short", "ushort_t" },
+{ "unsigned", "uint_t" },
+{ "unsigned long", "ulong_t" },
+{ "unsigned long long", "u_longlong_t" },
+{ "int", "ptrdiff_t" },
+{ "unsigned", "uintptr_t" },
+{ NULL, NULL }
+};
+
+static const synth_typedef_t synth_typedefs64[] = {
+{ "char", "int8_t" },
+{ "short", "int16_t" },
+{ "int", "int32_t" },
+{ "long", "int64_t" },
+{ "long", "intptr_t" },
+{ "unsigned char", "uint8_t" },
+{ "unsigned short", "uint16_t" },
+{ "unsigned", "uint32_t" },
+{ "unsigned long", "uint64_t" },
+{ "unsigned char", "uchar_t" },
+{ "unsigned short", "ushort_t" },
+{ "unsigned", "uint_t" },
+{ "unsigned long", "ulong_t" },
+{ "unsigned long long", "u_longlong_t" },
+{ "long", "ptrdiff_t" },
+{ "unsigned long", "uintptr_t" },
+{ NULL, NULL }
+};
 
 static void
 set_ctf_id(mdb_ctf_id_t *p, ctf_file_t *fp, ctf_id_t id)
@@ -143,6 +265,7 @@ name_to_type(mdb_tgt_t *t, const char *cname, ctf_id_t *idp)
 	/*
 	 * Attempt to look up the name in the primary object file.  If this
 	 * fails and the name was unscoped, search all remaining object files.
+	 * Finally, search the synthetic types.
 	 */
 	if (((fp = mdb_tgt_name_to_ctf(t, object)) == NULL ||
 	    (id = ctf_lookup_by_name(fp, name)) == CTF_ERR ||
@@ -159,6 +282,10 @@ name_to_type(mdb_tgt_t *t, const char *cname, ctf_id_t *idp)
 		if (arg.tn_id != CTF_ERR) {
 			fp = arg.tn_fp;
 			id = arg.tn_id;
+		} else if (mdb.m_synth != NULL) {
+			if ((id = ctf_lookup_by_name(mdb.m_synth,
+			    name)) != CTF_ERR)
+				fp = mdb.m_synth;
 		}
 	}
 
@@ -672,7 +799,12 @@ mdb_ctf_type_iter(const char *object, mdb_ctf_type_f *cb, void *data)
 	int ret;
 	type_iter_t ti;
 
-	if ((fp = mdb_tgt_name_to_ctf(t, object)) == NULL)
+	if (object == MDB_CTF_SYNTHETIC_ITER)
+		fp = mdb.m_synth;
+	else
+		fp = mdb_tgt_name_to_ctf(t, object);
+
+	if (fp == NULL)
 		return (-1);
 
 	ti.ti_cb = cb;
@@ -1250,4 +1382,412 @@ mdb_ctf_bufopen(const void *ctf_va, size_t ctf_size, const void *sym_va,
 	strtab.cts_offset = strhdr->sh_offset;
 
 	return (ctf_bufopen(&ctdata, &symtab, &strtab, errp));
+}
+
+int
+mdb_ctf_synthetics_init(void)
+{
+	int err;
+
+	if ((mdb.m_synth = ctf_create(&err)) == NULL)
+		return (set_errno(ctf_to_errno(err)));
+
+	return (0);
+}
+
+void
+mdb_ctf_synthetics_fini(void)
+{
+	if (mdb.m_synth == NULL)
+		return;
+
+	ctf_close(mdb.m_synth);
+	mdb.m_synth = NULL;
+}
+
+int
+mdb_ctf_synthetics_create_base(int kind)
+{
+	const synth_intrinsic_t *synp;
+	const synth_typedef_t *sytp;
+	int err;
+	ctf_id_t id;
+	ctf_file_t *cp = mdb.m_synth;
+
+	if (mdb.m_synth == NULL) {
+		mdb_printf("synthetic types disabled: ctf create failed\n");
+		return (DCMD_ERR);
+	}
+
+	switch (kind) {
+	case SYNTHETIC_ILP32:
+		synp = synth_builtins32;
+		sytp = synth_typedefs32;
+		break;
+	case SYNTHETIC_LP64:
+		synp = synth_builtins64;
+		sytp = synth_typedefs64;
+		break;
+	default:
+		mdb_dprintf(MDB_DBG_CTF, "invalid type of intrinsic: %d\n",
+		    kind);
+		return (1);
+	}
+
+	err = 0;
+	for (; synp->syn_name != NULL; synp++) {
+		if (synp->syn_kind == CTF_K_INTEGER) {
+			err = ctf_add_integer(cp, CTF_ADD_ROOT, synp->syn_name,
+			    &synp->syn_enc);
+		} else {
+			err = ctf_add_float(cp, CTF_ADD_ROOT, synp->syn_name,
+			    &synp->syn_enc);
+		}
+
+		if (err == CTF_ERR) {
+			mdb_dprintf(MDB_DBG_CTF, "couldn't add synthetic "
+			    "type: %s\n", synp->syn_name);
+			err = set_errno(ctf_to_errno(ctf_errno(cp)));
+			goto discard;
+		}
+	}
+
+	if (ctf_update(cp) == CTF_ERR) {
+		mdb_dprintf(MDB_DBG_CTF, "failed to update synthetic types\n");
+		err = set_errno(ctf_to_errno(ctf_errno(cp)));
+		goto discard;
+	}
+
+	for (; sytp->syt_src != NULL; sytp++) {
+		id = ctf_lookup_by_name(cp, sytp->syt_src);
+		if (id == CTF_ERR) {
+			mdb_dprintf(MDB_DBG_CTF, "cailed to lookup %s: %s\n",
+			    sytp->syt_src, ctf_errmsg(ctf_errno(cp)));
+			err = set_errno(ctf_to_errno(ctf_errno(cp)));
+			goto discard;
+		}
+		if (ctf_add_typedef(cp, CTF_ADD_ROOT, sytp->syt_targ, id) ==
+		    CTF_ERR) {
+			mdb_dprintf(MDB_DBG_CTF, "couldn't add typedef %s "
+			    "%s: %s\n", sytp->syt_targ, sytp->syt_src,
+			    ctf_errmsg(ctf_errno(cp)));
+			err = set_errno(ctf_to_errno(ctf_errno(cp)));
+			goto discard;
+		}
+	}
+
+	if (ctf_update(cp) == CTF_ERR) {
+		mdb_dprintf(MDB_DBG_CTF, "failed to update synthetic types\n");
+		err = set_errno(ctf_to_errno(ctf_errno(cp)));
+		goto discard;
+	}
+
+	return (0);
+
+discard:
+	(void) ctf_discard(cp);
+	return (err);
+}
+
+int
+mdb_ctf_synthetics_reset(void)
+{
+	mdb_ctf_synthetics_fini();
+	return (mdb_ctf_synthetics_init());
+}
+
+int
+mdb_ctf_add_typedef(const char *name, const mdb_ctf_id_t *p, mdb_ctf_id_t *new)
+{
+	ctf_id_t rid;
+	mdb_ctf_id_t tid;
+	mdb_ctf_impl_t *mcip = (mdb_ctf_impl_t *)p;
+
+	if (mdb.m_synth == NULL) {
+		mdb_printf("synthetic types disabled: ctf create failed\n");
+		return (DCMD_ERR);
+	}
+
+	if (mdb_ctf_lookup_by_name(name, &tid) == 0) {
+		mdb_dprintf(MDB_DBG_CTF, "failed to add type %s: a type "
+		    "with that name already exists\n", name);
+		return (set_errno(EEXIST));
+	}
+
+	rid = ctf_add_type(mdb.m_synth, mcip->mci_fp, mcip->mci_id);
+	if (rid == CTF_ERR) {
+		mdb_dprintf(MDB_DBG_CTF, "failed to add reference type: %s\n",
+		    ctf_errmsg(ctf_errno(mdb.m_synth)));
+		return (set_errno(ctf_to_errno(ctf_errno(mdb.m_synth))));
+	}
+	rid = ctf_add_typedef(mdb.m_synth, CTF_ADD_ROOT, name, rid);
+	if (rid == CTF_ERR) {
+		mdb_dprintf(MDB_DBG_CTF, "failed to add typedef: %s",
+		    ctf_errmsg(ctf_errno(mdb.m_synth)));
+		return (set_errno(ctf_to_errno(ctf_errno(mdb.m_synth))));
+	}
+
+	if (ctf_update(mdb.m_synth) == CTF_ERR) {
+		mdb_dprintf(MDB_DBG_CTF, "failed to update synthetic types: %s",
+		    ctf_errmsg(ctf_errno(mdb.m_synth)));
+		return (set_errno(ctf_to_errno(ctf_errno(mdb.m_synth))));
+	}
+
+	if (new != NULL)
+		set_ctf_id(new, mdb.m_synth, rid);
+
+	return (0);
+}
+
+int
+mdb_ctf_add_struct(const char *name, mdb_ctf_id_t *rid)
+{
+	mdb_ctf_id_t tid;
+	ctf_id_t id;
+
+	if (mdb.m_synth == NULL) {
+		mdb_printf("synthetic types disabled: ctf create failed\n");
+		return (DCMD_ERR);
+	}
+
+	if (name != NULL && mdb_ctf_lookup_by_name(name, &tid) == 0) {
+		mdb_dprintf(MDB_DBG_CTF, "failed to add type %s: a type "
+		    "with that name already exists\n", name);
+		return (set_errno(EEXIST));
+	}
+
+	if ((id = ctf_add_struct(mdb.m_synth, CTF_ADD_ROOT, name)) ==
+	    CTF_ERR) {
+		mdb_dprintf(MDB_DBG_CTF, "failed to add struct: %s\n",
+		    ctf_errmsg(ctf_errno(mdb.m_synth)));
+		return (set_errno(ctf_to_errno(ctf_errno(mdb.m_synth))));
+	}
+
+	if (ctf_update(mdb.m_synth) == CTF_ERR) {
+		mdb_dprintf(MDB_DBG_CTF, "failed to update synthetic types: %s",
+		    ctf_errmsg(ctf_errno(mdb.m_synth)));
+		return (set_errno(ctf_to_errno(ctf_errno(mdb.m_synth))));
+	}
+
+	if (rid != NULL)
+		set_ctf_id(rid, mdb.m_synth, id);
+
+	return (0);
+}
+
+int
+mdb_ctf_add_union(const char *name, mdb_ctf_id_t *rid)
+{
+	mdb_ctf_id_t tid;
+	ctf_id_t id;
+
+	if (mdb.m_synth == NULL) {
+		mdb_printf("synthetic types disabled: ctf create failed\n");
+		return (DCMD_ERR);
+	}
+
+	if (name != NULL && mdb_ctf_lookup_by_name(name, &tid) == 0) {
+		mdb_dprintf(MDB_DBG_CTF, "failed to add type %s: a type "
+		    "with that name already exists\n", name);
+		return (set_errno(EEXIST));
+	}
+
+	if ((id = ctf_add_union(mdb.m_synth, CTF_ADD_ROOT, name)) ==
+	    CTF_ERR) {
+		mdb_dprintf(MDB_DBG_CTF, "failed to add union: %s\n",
+		    ctf_errmsg(ctf_errno(mdb.m_synth)));
+		return (set_errno(ctf_to_errno(ctf_errno(mdb.m_synth))));
+	}
+
+	if (ctf_update(mdb.m_synth) == CTF_ERR) {
+		mdb_dprintf(MDB_DBG_CTF, "failed to update synthetic types: %s",
+		    ctf_errmsg(ctf_errno(mdb.m_synth)));
+		return (set_errno(ctf_to_errno(ctf_errno(mdb.m_synth))));
+	}
+
+	if (rid != NULL)
+		set_ctf_id(rid, mdb.m_synth, id);
+
+	return (0);
+}
+
+int
+mdb_ctf_add_member(const mdb_ctf_id_t *p, const char *name,
+    const mdb_ctf_id_t *mtype, mdb_ctf_id_t *rid)
+{
+	ctf_id_t id, mtid;
+	mdb_ctf_impl_t *mcip = (mdb_ctf_impl_t *)p;
+	mdb_ctf_impl_t *mcim = (mdb_ctf_impl_t *)mtype;
+
+	if (mdb.m_synth == NULL) {
+		mdb_printf("synthetic types disabled: ctf create failed\n");
+		return (DCMD_ERR);
+	}
+
+	if (mcip->mci_fp != mdb.m_synth) {
+		mdb_dprintf(MDB_DBG_CTF, "requested to add member to a type "
+		    "that wasn't created from a synthetic\n");
+		return (set_errno(EINVAL));
+	}
+
+	mtid = ctf_add_type(mdb.m_synth, mcim->mci_fp, mcim->mci_id);
+	if (mtid == CTF_ERR) {
+		mdb_dprintf(MDB_DBG_CTF, "failed to add member type: %s\n",
+		    ctf_errmsg(ctf_errno(mdb.m_synth)));
+		return (set_errno(ctf_to_errno(ctf_errno(mdb.m_synth))));
+	}
+
+	if (ctf_update(mdb.m_synth) == CTF_ERR) {
+		mdb_dprintf(MDB_DBG_CTF, "failed to update synthetic types: %s",
+		    ctf_errmsg(ctf_errno(mdb.m_synth)));
+		return (set_errno(ctf_to_errno(ctf_errno(mdb.m_synth))));
+	}
+
+	id = ctf_add_member(mdb.m_synth, mcip->mci_id, name, mtid);
+	if (id == CTF_ERR) {
+		mdb_dprintf(MDB_DBG_CTF, "failed to add member %s: %s\n",
+		    name, ctf_errmsg(ctf_errno(mdb.m_synth)));
+		return (set_errno(ctf_to_errno(ctf_errno(mdb.m_synth))));
+	}
+
+	if (ctf_update(mdb.m_synth) == CTF_ERR) {
+		mdb_dprintf(MDB_DBG_CTF, "failed to update synthetic types: %s",
+		    ctf_errmsg(ctf_errno(mdb.m_synth)));
+		return (set_errno(ctf_to_errno(ctf_errno(mdb.m_synth))));
+	}
+
+	if (rid != NULL)
+		set_ctf_id(rid, mdb.m_synth, id);
+
+	return (0);
+}
+
+int
+mdb_ctf_add_array(const mdb_ctf_arinfo_t *marp, mdb_ctf_id_t *rid)
+{
+	mdb_ctf_impl_t *mcip;
+	ctf_arinfo_t car;
+	ctf_id_t id;
+
+	if (mdb.m_synth == NULL) {
+		mdb_printf("synthetic types disabled: ctf create failed\n");
+		return (DCMD_ERR);
+	}
+
+	car.ctr_nelems = marp->mta_nelems;
+
+	mcip = (mdb_ctf_impl_t *)&marp->mta_contents;
+	id = ctf_add_type(mdb.m_synth, mcip->mci_fp, mcip->mci_id);
+	if (id == CTF_ERR) {
+		mdb_dprintf(MDB_DBG_CTF, "failed to add member type: %s\n",
+		    ctf_errmsg(ctf_errno(mdb.m_synth)));
+		return (set_errno(ctf_to_errno(ctf_errno(mdb.m_synth))));
+	}
+	car.ctr_contents = id;
+
+	mcip = (mdb_ctf_impl_t *)&marp->mta_index;
+	id = ctf_add_type(mdb.m_synth, mcip->mci_fp, mcip->mci_id);
+	if (id == CTF_ERR) {
+		mdb_dprintf(MDB_DBG_CTF, "failed to add member type: %s\n",
+		    ctf_errmsg(ctf_errno(mdb.m_synth)));
+		return (set_errno(ctf_to_errno(ctf_errno(mdb.m_synth))));
+	}
+	car.ctr_index = id;
+
+	if (ctf_update(mdb.m_synth) == CTF_ERR) {
+		mdb_dprintf(MDB_DBG_CTF, "failed to update synthetic types: %s",
+		    ctf_errmsg(ctf_errno(mdb.m_synth)));
+		return (set_errno(ctf_to_errno(ctf_errno(mdb.m_synth))));
+	}
+
+	id = ctf_add_array(mdb.m_synth, CTF_ADD_ROOT, &car);
+	if (id == CTF_ERR) {
+		mdb_dprintf(MDB_DBG_CTF, "failed to update synthetic types: %s",
+		    ctf_errmsg(ctf_errno(mdb.m_synth)));
+		return (set_errno(ctf_to_errno(ctf_errno(mdb.m_synth))));
+	}
+
+	if (ctf_update(mdb.m_synth) == CTF_ERR) {
+		mdb_dprintf(MDB_DBG_CTF, "failed to update synthetic types: %s",
+		    ctf_errmsg(ctf_errno(mdb.m_synth)));
+		return (set_errno(ctf_to_errno(ctf_errno(mdb.m_synth))));
+	}
+
+	if (rid != NULL)
+		set_ctf_id(rid, mdb.m_synth, id);
+
+	return (0);
+}
+
+int
+mdb_ctf_add_pointer(const mdb_ctf_id_t *p, mdb_ctf_id_t *rid)
+{
+	ctf_id_t id;
+	mdb_ctf_impl_t *mcip = (mdb_ctf_impl_t *)p;
+
+	if (mdb.m_synth == NULL) {
+		mdb_printf("synthetic types disabled: ctf create failed\n");
+		return (DCMD_ERR);
+	}
+
+	id = ctf_add_type(mdb.m_synth, mcip->mci_fp, mcip->mci_id);
+	if (id == CTF_ERR) {
+		mdb_dprintf(MDB_DBG_CTF, "failed to add pointer type: %s\n",
+		    ctf_errmsg(ctf_errno(mdb.m_synth)));
+		return (set_errno(ctf_to_errno(ctf_errno(mdb.m_synth))));
+	}
+
+	if (ctf_update(mdb.m_synth) == CTF_ERR) {
+		mdb_dprintf(MDB_DBG_CTF, "failed to update synthetic types: %s",
+		    ctf_errmsg(ctf_errno(mdb.m_synth)));
+		return (set_errno(ctf_to_errno(ctf_errno(mdb.m_synth))));
+	}
+
+
+	id = ctf_add_pointer(mdb.m_synth, CTF_ADD_ROOT, id);
+	if (id == CTF_ERR) {
+		mdb_dprintf(MDB_DBG_CTF, "failed to add pointer: %s\n",
+		    ctf_errmsg(ctf_errno(mdb.m_synth)));
+		return (set_errno(ctf_to_errno(ctf_errno(mdb.m_synth))));
+	}
+
+	if (ctf_update(mdb.m_synth) == CTF_ERR) {
+		mdb_dprintf(MDB_DBG_CTF, "failed to update synthetic types: %s",
+		    ctf_errmsg(ctf_errno(mdb.m_synth)));
+		return (set_errno(ctf_to_errno(ctf_errno(mdb.m_synth))));
+	}
+
+
+	if (rid != NULL)
+		set_ctf_id(rid, mdb.m_synth, id);
+
+	return (0);
+}
+
+int
+mdb_ctf_type_delete(const mdb_ctf_id_t *id)
+{
+	int ret;
+
+	mdb_ctf_impl_t *mcip = (mdb_ctf_impl_t *)id;
+
+	if (mcip->mci_fp != mdb.m_synth) {
+		mdb_warn("bad ctf_file_t, expected synth container\n");
+		return (DCMD_ERR);
+	}
+
+	ret = ctf_delete_type(mcip->mci_fp, mcip->mci_id);
+	if (ret != 0) {
+		mdb_dprintf(MDB_DBG_CTF, "failed to delete synthetic type: %s",
+		    ctf_errmsg(ctf_errno(mdb.m_synth)));
+		return (set_errno(ctf_to_errno(ctf_errno(mdb.m_synth))));
+	}
+
+	if (ctf_update(mdb.m_synth) == CTF_ERR) {
+		mdb_dprintf(MDB_DBG_CTF, "failed to update synthetic types: %s",
+		    ctf_errmsg(ctf_errno(mdb.m_synth)));
+		return (set_errno(ctf_to_errno(ctf_errno(mdb.m_synth))));
+	}
+
+	return (0);
 }

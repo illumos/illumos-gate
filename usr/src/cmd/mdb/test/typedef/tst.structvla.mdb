@@ -1,0 +1,4 @@
+::typedef -c lp32
+::typedef "struct gift { uintptr_t stone[7]; void **white; char owner[]; }" gift_t
+::sizeof gift_t
+::print -at gift_t
