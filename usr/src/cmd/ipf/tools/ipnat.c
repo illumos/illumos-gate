@@ -7,6 +7,8 @@
  *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
  */
 
 #include <stdio.h>
@@ -56,6 +58,10 @@
 #include "netinet/ipl.h"
 #include "kmem.h"
 
+#if SOLARIS
+#include "ipfzone.h"
+#endif
+
 #ifdef	__hpux
 # define	nlist	nlist64
 #endif
@@ -95,7 +101,12 @@ int	opts;
 void usage(name)
 char *name;
 {
-	fprintf(stderr, "Usage: %s [-CdFhlnrRsv] [-f filename]\n", name);
+	fprintf(stderr, "Usage: %s [-CdFhlnrRsv] [-f filename]", name);
+#if SOLARIS
+	fprintf(stderr, " [-z zonename]\n");
+#else
+	fprintf(stderr, "\n");
+#endif
 	exit(1);
 }
 
@@ -117,7 +128,7 @@ char *argv[];
 	kernel = NULL;
 	mode = O_RDWR;
 
-	while ((c = getopt(argc, argv, "CdFf:hlM:N:nrRsv")) != -1)
+	while ((c = getopt(argc, argv, "CdFf:hlM:N:nrRsvz:")) != -1)
 		switch (c)
 		{
 		case 'C' :
@@ -162,6 +173,11 @@ char *argv[];
 		case 'v' :
 			opts |= OPT_VERBOSE;
 			break;
+#if SOLARIS
+		case 'z' :
+			setzonename(optarg);
+			break;
+#endif
 		default :
 			usage(argv[0]);
 		}
@@ -194,6 +210,12 @@ char *argv[];
 				STRERROR(errno));
 			exit(1);
 		}
+#if SOLARIS
+		if (setzone(fd) != 0) {
+			close(fd);
+			exit(1);
+		}
+#endif
 
 		bzero((char *)&obj, sizeof(obj));
 		obj.ipfo_rev = IPFILTER_VERSION;

@@ -4,6 +4,8 @@
  * See the IPFILTER.LICENCE file for details on licencing.
  *
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
  */
 
 #if defined(KERNEL) || defined(_KERNEL)
@@ -5693,6 +5695,39 @@ static	int	fr_objbytes[NUM_OBJ_TYPES][2] = {
 	{ 0,	sizeof(struct ipftable) },
 	{ 0,	sizeof(struct ipflookupiter) }
 };
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    fr_getzoneid                                                */
+/* Returns:     int     - 0 = success, else failure                         */
+/* Parameters:  idsp(I) - pointer to ipf_devstate_t                         */
+/*              data(I) - pointer to ioctl data                             */
+/*                                                                          */
+/* Set the zone ID in idsp based on the zone name in ipfzoneobj.  Further   */
+/* ioctls will act on the IPF stack for that zone ID.                       */
+/* ------------------------------------------------------------------------ */
+#if defined(SOLARIS) && defined(_KERNEL)
+int fr_setzoneid(idsp, data)
+ipf_devstate_t *idsp;
+void *data;
+{
+	int error = 0;
+	ipfzoneobj_t ipfzo;
+	zone_t *zone;
+
+	error = BCOPYIN(data, &ipfzo, sizeof(ipfzo));
+	if (error != 0)
+		return EFAULT;
+
+	if ((zone = zone_find_by_name(ipfzo.ipfz_zonename)) == NULL)
+		return ENODEV;
+
+	idsp->ipfs_zoneid = zone->zone_id;
+	zone_rele(zone);
+
+	return error;
+}
+#endif
 
 
 /* ------------------------------------------------------------------------ */

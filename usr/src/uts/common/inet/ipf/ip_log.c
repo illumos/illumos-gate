@@ -7,6 +7,8 @@
  *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -572,10 +574,15 @@ ipf_stack_t *ifs;
 
 	while (ifs->ifs_iplt[unit] == NULL) {
 # if SOLARIS && defined(_KERNEL)
+		/*
+		 * Prevent a deadlock with ipldetach()
+		 */
+		RWLOCK_EXIT(&ifs->ifs_ipf_global);
 		if (!cv_wait_sig(&ifs->ifs_iplwait, &ifs->ifs_ipl_mutex.ipf_lk)) {
 			MUTEX_EXIT(&ifs->ifs_ipl_mutex);
 			return EINTR;
 		}
+		READ_ENTER(&ifs->ifs_ipf_global);
 # else
 #  if defined(__hpux) && defined(_KERNEL)
 		lock_t *l;

@@ -2,7 +2,8 @@
 .\" To view license terms, attribution, and copyright for IP Filter, the default path is /usr/lib/ipf/IPFILTER.LICENCE. If the Solaris operating environment has been installed anywhere other than the default, modify the given path to access the file at the installed
 .\" location.
 .\" Portions Copyright (c) 2008, Sun Microsystems Inc. All Rights Reserved.
-.TH IPFSTAT 1M "Apr 3, 2008"
+.\" Portions Copyright (c) 2012, Joyent, Inc. All Rights Reserved.
+.TH IPFSTAT 1M "Nov 26, 2012"
 .SH NAME
 ipfstat \- reports on packet filter statistics and filter list
 .SH SYNOPSIS
@@ -14,7 +15,7 @@ ipfstat \- reports on packet filter statistics and filter list
 .LP
 .nf
 \fBipfstat\fR [\fB-C\fR] [\fB-D\fR \fIaddrport\fR] [\fB-P\fR \fIprotocol\fR] [\fB-S\fR \fIaddrport\fR]
-     [\fB-T\fR \fIrefreshtime\fR]
+     [\fB-T\fR \fIrefreshtime\fR] [\fB-z\fR \fIzonename\fR]
 .fi
 
 .SH DESCRIPTION
@@ -351,6 +352,16 @@ shows the process table. States can be sorted in a number of different ways.
 Turn verbose mode on. Displays additional debugging information.
 .RE
 
+.sp
+.ne 2
+.na
+\fB\fB-z\fR\fR
+.ad
+.RS 18n
+Report statistics for the specified zone. If this option is not specified,
+the current zone is used. This command is only available in the Global Zone.
+.RE
+
 .SH FILES
 .RS +4
 .TP
@@ -396,7 +407,7 @@ Interface Stability	Committed
 .sp
 .LP
 \fBipf\fR(1M), \fBkstat\fR(1M), \fBkstat\fR(3KSTAT), \fBattributes\fR(5),
-\fBipfilter\fR(5)
+\fBipfilter\fR(5), \fBzones(5)\fR
 .sp
 .LP
 \fI\fR
