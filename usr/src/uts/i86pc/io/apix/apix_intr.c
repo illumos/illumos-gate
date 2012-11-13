@@ -862,6 +862,9 @@ apix_dispatch_lowlevel(uint_t vector, uint_t oldipl)
 	apix_intr_thread_epilog(cpu, oldipl);
 }
 
+/*
+ * Interrupt service routine, called with interrupts disabled.
+ */
 void
 apix_do_interrupt(struct regs *rp, trap_trace_rec_t *ttp)
 {
@@ -904,7 +907,7 @@ apix_do_interrupt(struct regs *rp, trap_trace_rec_t *ttp)
 	}
 
 	/*
-	 * Raise the interrupt priority. Send EOI to local APIC
+	 * Send EOI to local APIC
 	 */
 	newipl = (*setlvl)(oldipl, (int *)&rp->r_trapno);
 #ifdef TRAPTRACE
