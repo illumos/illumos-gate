@@ -635,10 +635,10 @@ apix_send_eoi(void)
 /*
  * platform_intr_enter
  *
- *	Called at the beginning of the interrupt service routine to
- *	mask all level equal to and below the interrupt priority
- *	of the interrupting vector.  An EOI should be given to
- *	the interrupt controller to enable other HW interrupts.
+ *	Called at the beginning of the interrupt service routine, but unlike
+ *	pcplusmp, does not mask interrupts. An EOI is given to the interrupt
+ *	controller to enable other HW interrupts but interrupts are still
+ * 	masked by the IF flag.
  *
  *	Return -1 for spurious interrupts
  *
@@ -750,58 +750,30 @@ apix_intr_exit(int prev_ipl, int arg2)
 }
 
 /*
- * Mask all interrupts below or equal to the given IPL.
- * Any changes made to this function must also change X2APIC
- * version of setspl.
+ * The pcplusmp setspl code uses the TPR to mask all interrupts at or below the
+ * given ipl, but apix never uses the TPR and we never mask a subset of the
+ * interrupts. They are either all blocked by the IF flag or all can come in.
+ *
+ * For setspl, we mask all interrupts for XC_HI_PIL, otherwise, interrupts can
+ * come in if currently enabled by the IF flag. This table shows the state of
+ * the IF flag when we leave this function.
+ *
+ *    curr IF |	ipl == 15	ipl != 15
+ *    --------+---------------------------
+ *       0    |    0		    0
+ *       1    |    0		    1
  */
 static void
 apix_setspl(int ipl)
 {
-	/* interrupts at ipl above this cannot be in progress */
+	/*
+	 * Interrupts at ipl above this cannot be in progress, so the following
+	 * mask is ok.
+	 */
 	apic_cpus[psm_get_cpu_id()].aci_ISR_in_progress &= (2 << ipl) - 1;
 
-	/*
-	 * Mask all interrupts for XC_HI_PIL (i.e set TPR to 0xf).
-	 * Otherwise, enable all interrupts (i.e. set TPR to 0).
-	 */
-	if (ipl != XC_HI_PIL)
-		ipl = 0;
-
-#if defined(__amd64)
-	setcr8((ulong_t)ipl);
-#else
-	if (apic_have_32bit_cr8)
-		setcr8((ulong_t)ipl);
-	else
-		apicadr[APIC_TASK_REG] = ipl << APIC_IPL_SHIFT;
-#endif
-
-	/*
-	 * this is a patch fix for the ALR QSMP P5 machine, so that interrupts
-	 * have enough time to come in before the priority is raised again
-	 * during the idle() loop.
-	 */
-	if (apic_setspl_delay)
-		(void) apic_reg_ops->apic_get_pri();
-}
-
-/*
- * X2APIC version of setspl.
- */
-static void
-x2apix_setspl(int ipl)
-{
-	/* interrupts at ipl above this cannot be in progress */
-	apic_cpus[psm_get_cpu_id()].aci_ISR_in_progress &= (2 << ipl) - 1;
-
-	/*
-	 * Mask all interrupts for XC_HI_PIL (i.e set TPR to 0xf).
-	 * Otherwise, enable all interrupts (i.e. set TPR to 0).
-	 */
-	if (ipl != XC_HI_PIL)
-		ipl = 0;
-
-	X2APIC_WRITE(APIC_TASK_REG, ipl << APIC_IPL_SHIFT);
+	if (ipl == XC_HI_PIL)
+		cli();
 }
 
 int
@@ -1112,6 +1084,10 @@ apix_post_cyclic_setup(void *arg)
 	    apic_redistribute_sample_interval, DDI_IPL_2);
 }
 
+/*
+ * Called the first time we enable x2apic mode on this cpu.
+ * Update some of the function pointers to use x2apic routines.
+ */
 void
 x2apic_update_psm()
 {
@@ -1120,14 +1096,17 @@ x2apic_update_psm()
 	ASSERT(pops != NULL);
 
 	/*
-	 * The xxx_intr_exit() sets TPR and sends back EOI. The
-	 * xxx_setspl() sets TPR. These two routines are not
-	 * needed in new design.
+	 * The pcplusmp module x2apic_update_psm function does this:
 	 *
-	 * pops->psm_intr_exit = x2apic_intr_exit;
-	 * pops->psm_setspl = x2apic_setspl;
+	 *	pops->psm_intr_exit = x2apic_intr_exit;
+	 *	pops->psm_setspl = x2apic_setspl;
+	 *	pops->psm_send_ipi =  x2apic_send_ipi;
+	 *
+	 * Note the x2apic prefix vs. our apix prefix for setspl.
+	 * The x2apic_intr_exit() sets TPR and sends back EOI. The
+	 * x2apic_setspl() sets TPR.  This functionality is not
+	 * used in new design.
 	 */
-	pops->psm_setspl = x2apix_setspl;
 	pops->psm_send_ipi = x2apic_send_ipi;
 
 	send_dirintf = pops->psm_send_ipi;
@@ -2077,6 +2056,9 @@ apix_intx_get_pending(int irqno)
 	return (pending);
 }
 
+/*
+ * This function will mask the interrupt on the I/O APIC
+ */
 static void
 apix_intx_set_mask(int irqno)
 {
@@ -2106,6 +2088,9 @@ apix_intx_set_mask(int irqno)
 	intr_restore(iflag);
 }
 
+/*
+ * This function will clear the mask for the interrupt on the I/O APIC
+ */
 static void
 apix_intx_clear_mask(int irqno)
 {
