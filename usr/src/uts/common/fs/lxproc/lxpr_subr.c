@@ -216,6 +216,14 @@ lxpr_lock(pid_t pid)
 
 		mutex_exit(&pidlock);
 
+		if (p->p_flag & SEXITING) {
+			/*
+			 * This process is exiting -- let it go.
+			 */
+			mutex_exit(mp);
+			return (NULL);
+		}
+
 		if (!(p->p_proc_flag & P_PR_LOCK))
 			break;
 
