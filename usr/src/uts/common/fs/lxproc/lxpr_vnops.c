@@ -2418,15 +2418,16 @@ lxpr_lookup_fddir(vnode_t *dp, char *comp)
 	lxpnp = lxpr_getnode(dp, LXPR_PID_FD_FD, p, fd);
 
 	/*
+	 * Drop p_lock, but keep the process P_PR_LOCK'd to prevent it from
+	 * going away while we dereference into fi_list.
+	 */
+	mutex_exit(&p->p_lock);
+
+	/*
 	 * get open file info
 	 */
 	fip = (&(p)->p_user.u_finfo);
 	mutex_enter(&fip->fi_lock);
-
-	/*
-	 * got the fd data so now done with this proc
-	 */
-	lxpr_unlock(p);
 
 	if (fd < fip->fi_nfiles) {
 		UF_ENTER(ufp, fip, fd);
@@ -2438,6 +2439,8 @@ lxpr_lookup_fddir(vnode_t *dp, char *comp)
 		if (fip->fi_list[fd].uf_file == NULL) {
 			mutex_exit(&fip->fi_lock);
 			UF_EXIT(ufp);
+			mutex_enter(&p->p_lock);
+			lxpr_unlock(p);
 			lxpr_freenode(lxpnp);
 			return (NULL);
 		}
@@ -2449,6 +2452,8 @@ lxpr_lookup_fddir(vnode_t *dp, char *comp)
 	mutex_exit(&fip->fi_lock);
 
 	if (vp == NULL) {
+		mutex_enter(&p->p_lock);
+		lxpr_unlock(p);
 		lxpr_freenode(lxpnp);
 		return (NULL);
 	} else {
@@ -2460,6 +2465,8 @@ lxpr_lookup_fddir(vnode_t *dp, char *comp)
 		VN_HOLD(lxpnp->lxpr_realvp);
 	}
 
+	mutex_enter(&p->p_lock);
+	lxpr_unlock(p);
 	dp = LXPTOV(lxpnp);
 	ASSERT(dp != NULL);
 
@@ -2861,7 +2868,7 @@ lxpr_readdir_fddir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 	int error;
 	int ceof;
 	proc_t *p;
-	int fddirsize;
+	int fddirsize = -1;
 	uf_info_t *fip;
 
 	ASSERT(lxpnp->lxpr_type == LXPR_PID_FDDIR);
@@ -2873,24 +2880,28 @@ lxpr_readdir_fddir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 	if (p == NULL)
 		return (ENOENT);
 
+	if ((p->p_stat == SZOMB) || (p->p_flag & SSYS) || (p->p_as == &kas))
+		fddirsize = 0;
+
+	/*
+	 * Drop p_lock, but keep the process P_PR_LOCK'd to prevent it from
+	 * going away while we iterate over its fi_list.
+	 */
+	mutex_exit(&p->p_lock);
+
 	/* Get open file info */
 	fip = (&(p)->p_user.u_finfo);
-
-	if ((p->p_stat == SZOMB) || (p->p_flag & SSYS) || (p->p_as == &kas)) {
-		fddirsize = 0;
-	} else {
-		fddirsize = fip->fi_nfiles;
-	}
-
 	mutex_enter(&fip->fi_lock);
-	lxpr_unlock(p);
+
+	if (fddirsize == -1)
+		fddirsize = fip->fi_nfiles;
 
 	/* Do the fixed entries (in this case just "." & "..") */
 	error = lxpr_readdir_common(lxpnp, uiop, &ceof, 0, 0);
 
 	/* Finished if we got an error or if we couldn't do all the table */
 	if (error != 0 || ceof == 0)
-		return (error);
+		goto out;
 
 	/* clear out the dirent buffer */
 	bzero(bp, sizeof (bp));
@@ -2950,6 +2961,8 @@ lxpr_readdir_fddir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 
 out:
 	mutex_exit(&fip->fi_lock);
+	mutex_enter(&p->p_lock);
+	lxpr_unlock(p);
 	return (error);
 }
 
