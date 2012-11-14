@@ -137,6 +137,9 @@
 
 #define	ALT_MOUNT(mount_cmd) 	((mount_cmd) != Z_MNT_BOOT)
 
+/* Number of times to retry unmounting if it fails */
+#define	UMOUNT_RETRIES	30
+
 /* a reasonable estimate for the number of lwps per process */
 #define	LWPS_PER_PROCESS	10
 
@@ -744,16 +747,16 @@ unmount_filesystems(zlog_t *zlogp, zoneid_t zoneid, boolean_t unmount_cmd)
 					 * a few times before we give up.
 					 */
 					fail++;
-					if (fail < 16) {
+					if (fail < (UMOUNT_RETRIES - 1)) {
 						zerror(zlogp, B_FALSE,
 						    "unable to unmount '%s', "
-						    "retrying in 1 second",
+						    "retrying in 2 seconds",
 						    path);
-						(void) sleep(1);
-					} else if (fail > 17) {
+						(void) sleep(2);
+					} else if (fail > UMOUNT_RETRIES) {
 						error++;
 						zerror(zlogp, B_FALSE,
-						    "unable to unmount '%s'",
+						    "unmount of '%s' failed",
 						    path);
 						free_mnttable(mnts, nmnt);
 						goto out;
