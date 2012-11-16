@@ -607,7 +607,6 @@ zfs_secpolicy_setprop(const char *dsname, zfs_prop_t prop, nvpair_t *propval,
 	 */
 	switch (prop) {
 	case ZFS_PROP_DEDUP:
-	case ZFS_PROP_COMPRESSION:
 	case ZFS_PROP_ZONED:
 		/*
 		 * Disallow setting these properties from within a local zone.
