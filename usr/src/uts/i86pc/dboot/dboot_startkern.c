@@ -22,6 +22,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2012 Joyent, Inc.  All rights reserved.
  */
 
 
@@ -54,6 +56,15 @@ extern int have_cpuid(void);
 #include "dboot_printf.h"
 #include "dboot_xboot.h"
 #include "dboot_elfload.h"
+
+/*
+ * Region of memory that may be corrupted by external actors.  This can go away
+ * once the firmware bug RICHMOND-16 is fixed and all systems with the bug are
+ * upgraded.
+ */
+#define	CORRUPT_REGION_START	0xc700000
+#define	CORRUPT_REGION_SIZE	0x100000
+#define	CORRUPT_REGION_END	(CORRUPT_REGION_START + CORRUPT_REGION_SIZE)
 
 /*
  * This file contains code that runs to transition us from either a multiboot
@@ -874,6 +885,38 @@ init_mem_alloc(void)
 			case 1:
 				if (end > max_mem)
 					max_mem = end;
+
+				/*
+				 * Well, this is sad.  One some systems, there
+				 * is a region of memory that can be corrupted
+				 * until some number of seconds after we have
+				 * booted.  And the BIOS doesn't tell us that
+				 * this memory is unsafe to use.  And we don't
+				 * know how long it's dangerous.  So we'll
+				 * chop out this range from any memory list
+				 * that would otherwise be usable.  Note that
+				 * any system of this type will give us the
+				 * new-style (0x40) memlist, so we need not
+				 * fix up the other path below.
+				 */
+				if (start < CORRUPT_REGION_START &&
+				    end > CORRUPT_REGION_START) {
+					memlists[memlists_used].addr = start;
+					memlists[memlists_used].size =
+					   CORRUPT_REGION_START - start;
+					++memlists_used;
+					if (end > CORRUPT_REGION_END)
+						start = CORRUPT_REGION_END;
+					else
+						continue;
+				}
+				if (start >= CORRUPT_REGION_START &&
+				    start < CORRUPT_REGION_END) {
+					if (end <= CORRUPT_REGION_END)
+						continue;
+					start = CORRUPT_REGION_END;
+				}
+
 				memlists[memlists_used].addr = start;
 				memlists[memlists_used].size = end - start;
 				++memlists_used;
