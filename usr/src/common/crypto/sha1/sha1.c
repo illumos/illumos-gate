@@ -32,13 +32,13 @@
  * and appreciated.
  */
 
-#ifndef _KERNEL
+#if !defined(_KERNEL) && !defined(_BOOT)
 #include <stdint.h>
 #include <strings.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <sys/systeminfo.h>
-#endif  /* !_KERNEL */
+#endif  /* !_KERNEL && !_BOOT */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -50,6 +50,11 @@
 #ifdef _LITTLE_ENDIAN
 #include <sys/byteorder.h>
 #define	HAVE_HTONL
+#endif
+
+#ifdef	_BOOT
+#define	bcopy(_s, _d, _l)	((void) memcpy((_d), (_s), (_l)))
+#define	bzero(_m, _l)		((void) memset((_m), 0, (_l)))
 #endif
 
 static void Encode(uint8_t *, const uint32_t *, size_t);

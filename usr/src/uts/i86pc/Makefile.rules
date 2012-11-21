@@ -242,6 +242,9 @@ $(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/dboot/%.c
 $(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/intel/ia32/%.s
 	$(DBOOT_AS) -P -D_ASM $(DBOOT_DEFS) $(DBOOT_AS_INCL) -o $@ $<
 
+$(DBOOT_OBJS_DIR)/%.o:		$(COMMONBASE)/crypto/sha1/%.c
+	$(i386_CC) $(CERRWARN) -O $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
+
 $(DBOOT_OBJS_DIR)/%.o:		$(COMMONBASE)/util/%.c
 	$(i386_CC) $(DBOOT_FLAGS) -O $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
 
