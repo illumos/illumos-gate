@@ -24,9 +24,8 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-/*
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
- */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <ctf_impl.h>
 #include <sys/mman.h>
@@ -811,12 +810,8 @@ ctf_close(ctf_file_t *fp)
 	if (fp->ctf_parent != NULL)
 		ctf_close(fp->ctf_parent);
 
-	/*
-	 * Note, to work properly with reference counting on the dynamic
-	 * section, we must delete the list in reverse.
-	 */
-	for (dtd = ctf_list_prev(&fp->ctf_dtdefs); dtd != NULL; dtd = ntd) {
-		ntd = ctf_list_prev(dtd);
+	for (dtd = ctf_list_next(&fp->ctf_dtdefs); dtd != NULL; dtd = ntd) {
+		ntd = ctf_list_next(dtd);
 		ctf_dtd_delete(fp, dtd);
 	}
 

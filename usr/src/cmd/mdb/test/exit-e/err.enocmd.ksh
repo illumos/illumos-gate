@@ -1,2 +1,0 @@
-$MDB -e '::commandthatdoesnotexist'
-exit $?
