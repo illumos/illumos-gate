@@ -1,0 +1,18 @@
+MDB Test suite
+
+This provides a primordial version of a test suite for mdb. To run the tests,
+run mtest. Tests exist in various subdirectories. The name of the test is
+important.
+
+A test must start with either:
+
+ o tst - Indicating that it should exit zero
+ o err - Indicating that it should exit non-zero
+
+A test must end with either:
+
+ o mdb - Indicating that the file should be passed as standard input to mdb
+ o ksh - Indicating that it should be run with ksh
+
+A test may have an optional .out file which if present indicates that the test
+should pass if and only if its standard ouput matches its standar error.

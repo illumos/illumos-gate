@@ -1,0 +1,6 @@
+sizeof (ringbearer_t) = 8
+0 ringbearer_t {
+    0 int frodo 
+    0 char sam 
+    0 long gandalf 
+}

@@ -1,0 +1,4 @@
+::typedef -c lp32
+::typedef "struct list { struct list *prev; struct list *next; }" list_t
+::sizeof list_t
+::print -at list_t

@@ -26,11 +26,6 @@
  */
 
 /*
- * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright (c) 2012 Joyent, Inc. All rights reserved.
- */
-
-/*
  * Modular Debugger (MDB)
  *
  * Refer to the white paper "A Modular Debugger for Solaris" for information
@@ -74,6 +69,7 @@
 #include <mdb/mdb_err.h>
 #include <mdb/mdb_lex.h>
 #include <mdb/mdb_io.h>
+#include <mdb/mdb_ctf.h>
 #ifdef _KMDB
 #include <kmdb/kmdb_module.h>
 #endif
@@ -557,6 +553,13 @@ mdb_create(const char *execname, const char *arg0)
 	(void) mdb_callb_add(NULL, MDB_CALLB_PROMPT, (mdb_callb_f)prompt_update,
 	    NULL);
 
+	/*
+	 * The call to ctf_create that this does can in fact fail, but that's
+	 * okay. All of the ctf functions that might use the synthetic types
+	 * make sure that this is safe.
+	 */
+	(void) mdb_ctf_synthetics_init();
+
 #ifdef _KMDB
 	(void) mdb_nv_create(&mdb.m_dmodctl, UM_SLEEP);
 #endif
@@ -578,6 +581,8 @@ mdb_destroy(void)
 #endif
 
 	mdb_intr_disable();
+
+	mdb_ctf_synthetics_fini();
 
 	mdb_macalias_destroy();
 
@@ -901,6 +906,8 @@ mdb_call(uintmax_t addr, uintmax_t count, uint_t flags)
 				    flags | DCMD_PIPE_OUT, &cp->c_argv,
 				    &cp->c_addrv, cp->c_vcbs);
 
+				mdb.m_lastret = status;
+
 				ASSERT(mdb.m_in == iobs[MDB_IOB_RDIOB]);
 				ASSERT(mdb.m_out == iobs[MDB_IOB_WRIOB]);
 			} else {
@@ -945,8 +952,9 @@ mdb_call(uintmax_t addr, uintmax_t count, uint_t flags)
 
 		} else {
 			mdb_intr_enable();
-			(void) mdb_call_idcmd(cp->c_dcmd, addr, count, flags,
+			status = mdb_call_idcmd(cp->c_dcmd, addr, count, flags,
 			    &cp->c_argv, &cp->c_addrv, cp->c_vcbs);
+			mdb.m_lastret = status;
 			mdb_intr_disable();
 		}
 

@@ -22,8 +22,9 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/reg.h>
@@ -48,13 +49,29 @@ const mdb_tgt_regdesc_t mdb_ia32_kregs[] = {
 	{ "savfp", KREG_SAVFP, MDB_TGT_R_EXPORT },
 	{ "savpc", KREG_SAVPC, MDB_TGT_R_EXPORT },
 	{ "eax", KREG_EAX, MDB_TGT_R_EXPORT },
+	{ "ax", KREG_EAX, MDB_TGT_R_EXPORT | MDB_TGT_R_16 },
+	{ "ah", KREG_EAX, MDB_TGT_R_EXPORT | MDB_TGT_R_8H },
+	{ "al", KREG_EAX, MDB_TGT_R_EXPORT | MDB_TGT_R_8L },
 	{ "ebx", KREG_EBX, MDB_TGT_R_EXPORT },
+	{ "bx", KREG_EBX, MDB_TGT_R_EXPORT | MDB_TGT_R_16 },
+	{ "bh", KREG_EBX, MDB_TGT_R_EXPORT | MDB_TGT_R_8H },
+	{ "bl", KREG_EBX, MDB_TGT_R_EXPORT | MDB_TGT_R_8L },
 	{ "ecx", KREG_ECX, MDB_TGT_R_EXPORT },
+	{ "cx", KREG_ECX, MDB_TGT_R_EXPORT | MDB_TGT_R_16 },
+	{ "ch", KREG_ECX, MDB_TGT_R_EXPORT | MDB_TGT_R_8H },
+	{ "cl", KREG_ECX, MDB_TGT_R_EXPORT | MDB_TGT_R_8L },
 	{ "edx", KREG_EDX, MDB_TGT_R_EXPORT },
+	{ "dx", KREG_EDX, MDB_TGT_R_EXPORT | MDB_TGT_R_16 },
+	{ "dh", KREG_EDX, MDB_TGT_R_EXPORT | MDB_TGT_R_8H },
+	{ "dl", KREG_EDX, MDB_TGT_R_EXPORT | MDB_TGT_R_8L },
 	{ "esi", KREG_ESI, MDB_TGT_R_EXPORT },
+	{ "si", KREG_ESI, MDB_TGT_R_EXPORT | MDB_TGT_R_16 },
 	{ "edi", KREG_EDI, MDB_TGT_R_EXPORT },
+	{ "di",	EDI, MDB_TGT_R_EXPORT | MDB_TGT_R_16 },
 	{ "ebp", KREG_EBP, MDB_TGT_R_EXPORT },
+	{ "bp", KREG_EBP, MDB_TGT_R_EXPORT | MDB_TGT_R_16 },
 	{ "esp", KREG_ESP, MDB_TGT_R_EXPORT },
+	{ "sp", KREG_ESP, MDB_TGT_R_EXPORT | MDB_TGT_R_16 },
 	{ "cs", KREG_CS, MDB_TGT_R_EXPORT },
 	{ "ds", KREG_DS, MDB_TGT_R_EXPORT },
 	{ "ss", KREG_SS, MDB_TGT_R_EXPORT },
@@ -64,6 +81,7 @@ const mdb_tgt_regdesc_t mdb_ia32_kregs[] = {
 	{ "eflags", KREG_EFLAGS, MDB_TGT_R_EXPORT },
 	{ "eip", KREG_EIP, MDB_TGT_R_EXPORT },
 	{ "uesp", KREG_UESP, MDB_TGT_R_EXPORT | MDB_TGT_R_PRIV },
+	{ "usp", KREG_UESP, MDB_TGT_R_EXPORT | MDB_TGT_R_16 },
 	{ "trapno", KREG_TRAPNO, MDB_TGT_R_EXPORT | MDB_TGT_R_PRIV },
 	{ "err", KREG_ERR, MDB_TGT_R_EXPORT | MDB_TGT_R_PRIV },
 	{ NULL, 0, 0 }
