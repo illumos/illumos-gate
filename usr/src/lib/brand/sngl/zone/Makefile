@@ -18,35 +18,36 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
-#
-# lib/brand/Makefile
-#
-# include global definitions
-include ../../Makefile.master
 
 #
-# Build everything in parallel; use .WAIT for dependencies
-.PARALLEL:
+# Copyright 2012 Joyent, Inc.  All rights reserved.
+#
 
-SUBDIRS= shared .WAIT sn1 sngl solaris10 ipkg labeled $($(MACH)_SUBDIRS)
-MSGSUBDIRS= solaris10 shared $($(MACH)_MSGSUBDIRS)
+PROGS =		sinstall
+XMLDOCS=	config.xml platform.xml
+CLOBBERFILES=	$(ROOTPROGS) $(ROOTXMLDOCS)
 
-all :=		TARGET= all
-install :=	TARGET= install
-clean :=	TARGET= clean
-clobber :=	TARGET= clobber
-lint :=		TARGET= lint
-_msg :=		TARGET= _msg
+include $(SRC)/cmd/Makefile.cmd
+include ../Makefile.sngl
 
 .KEEP_STATE:
 
-all install clean clobber lint: $(SUBDIRS)
+all:	$(PROGS)
 
-_msg: $(MSGSUBDIRS)
+POFILES =
+POFILE =
 
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+install: $(PROGS) $(ROOTPROGS) $(ROOTXMLDOCS)
+	crle -c $(ROOTBRANDDIR)/ld.sys.config \
+		-l /lib:/system/usr/lib \
+		-s /lib/secure:/system/usr/lib/secure
+	crle -64 -c $(ROOTBRANDDIR)/ld.sys64.config \
+		-l /lib/64:/system/usr/lib/64 \
+		-s /lib/secure/64:/system/usr/lib/secure/64
 
-FRC:
+lint:
+
+clean:
+	-$(RM) $(PROGS)
+
+include $(SRC)/cmd/Makefile.targ

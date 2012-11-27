@@ -519,7 +519,7 @@ MISC_KMODS	+= md_sp
 #
 #	Brand modules
 #
-BRAND_KMODS	+= sn1_brand s10_brand
+BRAND_KMODS	+= sn1_brand sngl_brand s10_brand
 
 #
 #	Exec Class Modules (/kernel/exec):

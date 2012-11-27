@@ -250,6 +250,7 @@ DIRS= \
 	/usr/lib/brand/labeled \
 	/usr/lib/brand/shared \
 	/usr/lib/brand/sn1 \
+	/usr/lib/brand/sngl \
 	/usr/lib/brand/solaris10 \
 	/usr/lib/class \
 	/usr/lib/class/FSS \
@@ -535,6 +536,7 @@ DIRS64= \
 	/usr/lib/$(MACH64) \
 	/usr/lib/$(MACH64)/gss \
 	/usr/lib/brand/sn1/$(MACH64) \
+	/usr/lib/brand/sngl/$(MACH64) \
 	/usr/lib/brand/solaris10/$(MACH64) \
 	/usr/lib/elfedit/$(MACH64) \
 	/usr/lib/fm/$(MACH64) \
@@ -606,6 +608,7 @@ SYM.DIRS64= \
 	/lib/secure/64 \
 	/usr/lib/64 \
 	/usr/lib/brand/sn1/64 \
+	/usr/lib/brand/sngl/64 \
 	/usr/lib/brand/solaris10/64 \
 	/usr/lib/elfedit/64 \
 	/usr/lib/libp/64 \
@@ -714,6 +717,7 @@ $(BUILD64) $(ROOT)/lib/secure/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/64:=		LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/elfedit/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/brand/sn1/64:=	LINKDEST=$(MACH64)
+$(BUILD64) $(ROOT)/usr/lib/brand/sngl/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/brand/solaris10/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/libp/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/lwp/64:=	LINKDEST=$(MACH64)

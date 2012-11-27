@@ -19,34 +19,30 @@
 # CDDL HEADER END
 #
 #
-# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012, Joyent, Inc. All rights reserved.
 #
-# lib/brand/Makefile
-#
-# include global definitions
-include ../../Makefile.master
+
+ISAOBJDIR =	$(BRAND_SHARED)/brand/amd64/pics/
+
+include ../Makefile.com
+include $(SRC)/lib/Makefile.lib.64
+
+CPPFLAGS +=     -I$(BRAND_SHARED)/brand/amd64
 
 #
-# Build everything in parallel; use .WAIT for dependencies
-.PARALLEL:
+# see ../Makefile.com for why we MUST explicity make ld.so.1 our interpreter
+#
+DYNFLAGS +=		-Wl,-I/lib/64/ld.so.1
+CPPFLAGS += 		-D_SYSCALL32
 
-SUBDIRS= shared .WAIT sn1 sngl solaris10 ipkg labeled $($(MACH)_SUBDIRS)
-MSGSUBDIRS= solaris10 shared $($(MACH)_MSGSUBDIRS)
+# Note that we also set the runtime path for the emulation library to point
+# into /system. This is an attempt to ensure that our brand library get's the
+# native version of libmapmallc.
+#
+DYNFLAGS +=	-R/lib/64 -R/system/usr/lib/64
 
-all :=		TARGET= all
-install :=	TARGET= install
-clean :=	TARGET= clean
-clobber :=	TARGET= clobber
-lint :=		TARGET= lint
-_msg :=		TARGET= _msg
+CLEANFILES +=		$(DYNLIB)
+CLOBBERFILES +=		$(ROOTLIBS64)
 
-.KEEP_STATE:
-
-all install clean clobber lint: $(SUBDIRS)
-
-_msg: $(MSGSUBDIRS)
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
+install: all $(ROOTLIBS64)

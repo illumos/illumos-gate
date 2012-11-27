@@ -19,19 +19,18 @@
 # CDDL HEADER END
 #
 #
-# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012, Joyent, Inc. All rights reserved.
 #
-# lib/brand/Makefile
-#
-# include global definitions
-include ../../Makefile.master
 
-#
+default: all
+
+include Makefile.sngl
+
 # Build everything in parallel; use .WAIT for dependencies
 .PARALLEL:
 
-SUBDIRS= shared .WAIT sn1 sngl solaris10 ipkg labeled $($(MACH)_SUBDIRS)
-MSGSUBDIRS= solaris10 shared $($(MACH)_MSGSUBDIRS)
+SUBDIRS =	sngl_brand zone
+MSGSUBDIRS =	zone
 
 all :=		TARGET= all
 install :=	TARGET= install
