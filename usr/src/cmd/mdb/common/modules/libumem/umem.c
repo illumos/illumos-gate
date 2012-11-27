@@ -132,8 +132,10 @@ umem_ptc_walk_step(mdb_walk_state_t *wsp)
 	}
 
 	for (;;) {
-		if (mdb_vread(&this, sizeof (void *), this) == -1)
+		if (mdb_vread(&this, sizeof (void *), this) == -1) {
 			mdb_warn("couldn't read ptc buffer at %p", this);
+			return (WALK_ERR);
+		}
 
 		if (this == NULL)
 			break;
@@ -1027,7 +1029,7 @@ umem_read_ptc_walk_buf(uintptr_t addr,
 }
 
 static int
-umem_read_ptc(umem_cache_t *cp, uintptr_t addr,
+umem_read_ptc(umem_cache_t *cp,
     void ***buflistp, size_t *bufcntp, size_t *bufmaxp)
 {
 	umem_read_ptc_walk_t urpw;
@@ -1043,8 +1045,8 @@ umem_read_ptc(umem_cache_t *cp, uintptr_t addr,
 	urpw.urpw_cnt = *bufcntp;
 	urpw.urpw_max = *bufmaxp;
 
-	if ((rval = mdb_pwalk(walk,
-	    (mdb_walk_cb_t)umem_read_ptc_walk_buf, &urpw, addr)) == -1) {
+	if ((rval = mdb_walk(walk,
+	    (mdb_walk_cb_t)umem_read_ptc_walk_buf, &urpw)) == -1) {
 		mdb_warn("couldn't walk %s", walk);
 	}
 
@@ -1189,7 +1191,7 @@ umem_walk_init_common(mdb_walk_state_t *wsp, int type)
 	/*
 	 * Read in the contents of the per-thread caches, if any
 	 */
-	if (umem_read_ptc(cp, addr, &maglist, &magcnt, &magmax) != 0)
+	if (umem_read_ptc(cp, &maglist, &magcnt, &magmax) != 0)
 		goto out2;
 
 	/*
