@@ -71,6 +71,7 @@ dir path=opt/SUNWdtrt/tst/common/inline
 dir path=opt/SUNWdtrt/tst/common/io
 dir path=opt/SUNWdtrt/tst/common/ip
 dir path=opt/SUNWdtrt/tst/common/java_api
+dir path=opt/SUNWdtrt/tst/common/json
 dir path=opt/SUNWdtrt/tst/common/lexer
 dir path=opt/SUNWdtrt/tst/common/llquantize
 dir path=opt/SUNWdtrt/tst/common/mdb
@@ -108,6 +109,7 @@ dir path=opt/SUNWdtrt/tst/common/stack
 dir path=opt/SUNWdtrt/tst/common/stackdepth
 dir path=opt/SUNWdtrt/tst/common/stop
 dir path=opt/SUNWdtrt/tst/common/strlen
+dir path=opt/SUNWdtrt/tst/common/strtoll
 dir path=opt/SUNWdtrt/tst/common/struct
 dir path=opt/SUNWdtrt/tst/common/syscall
 dir path=opt/SUNWdtrt/tst/common/sysevent
@@ -957,6 +959,13 @@ file path=opt/SUNWdtrt/tst/common/java_api/tst.StopLock.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/java_api/tst.StopLock.ksh.out mode=0444
 file path=opt/SUNWdtrt/tst/common/java_api/tst.printa.d mode=0444
 file path=opt/SUNWdtrt/tst/common/java_api/tst.printa.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/json/tst.general.d mode=0444
+file path=opt/SUNWdtrt/tst/common/json/tst.general.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/json/tst.strsize.d mode=0444
+file path=opt/SUNWdtrt/tst/common/json/tst.strsize.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/json/tst.usdt.d mode=0444
+file path=opt/SUNWdtrt/tst/common/json/tst.usdt.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/json/tst.usdt.exe mode=0555
 file path=opt/SUNWdtrt/tst/common/lexer/err.D_CHR_NL.char.d mode=0444
 file path=opt/SUNWdtrt/tst/common/lexer/err.D_CHR_NULL.char.d mode=0444
 file path=opt/SUNWdtrt/tst/common/lexer/err.D_INT_DIGIT.InvalidDigit.d \
@@ -1757,6 +1766,10 @@ file path=opt/SUNWdtrt/tst/common/stop/tst.stop1.exe mode=0555
 file path=opt/SUNWdtrt/tst/common/stop/tst.stop2.d mode=0444
 file path=opt/SUNWdtrt/tst/common/stop/tst.stop2.exe mode=0555
 file path=opt/SUNWdtrt/tst/common/strlen/tst.strlen1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/strtoll/err.BaseTooLarge.d mode=0444
+file path=opt/SUNWdtrt/tst/common/strtoll/err.BaseTooSmall.d mode=0444
+file path=opt/SUNWdtrt/tst/common/strtoll/tst.strtoll.d mode=0444
+file path=opt/SUNWdtrt/tst/common/strtoll/tst.strtoll.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/struct/err.D_ADDROF_VAR.StructPointer.d \
     mode=0444
 file path=opt/SUNWdtrt/tst/common/struct/err.D_DECL_COMBO.StructWithoutColon.d \

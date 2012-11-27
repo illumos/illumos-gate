@@ -38,6 +38,10 @@ extern "C" {
  * This header file contains a collection of macros that the strtou?ll?
  * functions in common/util use to test characters.  What we need is a kernel
  * version of ctype.h.
+ *
+ * NOTE: These macros are used within several DTrace probe context functions.
+ * They must not be altered to make function calls or perform actions not
+ * safe in probe context.
  */
 
 #if	defined(_KERNEL) && !defined(_BOOT)

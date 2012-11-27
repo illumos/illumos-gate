@@ -49,6 +49,8 @@ CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-type-limits
 CERRWARN	+= -_gcc=-Wno-uninitialized
 
+CPPFLAGS	+= -I$(SRC)/common/util
+
 ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
