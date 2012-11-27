@@ -26,6 +26,7 @@
 
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, Joyent, Inc. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
@@ -69,6 +70,18 @@ nfs/tst.call3.exe: nfs/tst.call3.o nfs/$(RPCSVCOBJS)
 
 pid/tst.gcc.exe: pid/tst.gcc.c
 	$(GCC) -o pid/tst.gcc.exe pid/tst.gcc.c $(LDFLAGS)
+	$(POST_PROCESS) ; $(STRIP_STABS)
+
+json/tst.usdt.o: json/usdt.h
+
+json/usdt.h: json/usdt.d
+	$(DTRACE) -h -s json/usdt.d -o json/usdt.h
+
+json/usdt.o: json/usdt.d json/tst.usdt.o
+	$(COMPILE.d) -o json/usdt.o -s json/usdt.d json/tst.usdt.o
+
+json/tst.usdt.exe: json/tst.usdt.o json/usdt.o
+	$(LINK.c) -o json/tst.usdt.exe json/tst.usdt.o json/usdt.o $(LDLIBS)
 	$(POST_PROCESS) ; $(STRIP_STABS)
 
 usdt/tst.args.exe: usdt/tst.args.o usdt/args.o
