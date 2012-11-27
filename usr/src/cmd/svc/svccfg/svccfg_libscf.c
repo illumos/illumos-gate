@@ -6777,7 +6777,13 @@ connaborted:
  * checking the state of the EMI instance. If it is online it bails out
  * and makes sure that it doesn't run again. In this case, we're going
  * to do something similar, only if the state is online, then we're
- * going to actually verify.
+ * going to actually verify. EMI always has to be present, but it
+ * can be explicitly disabled to reduce the amount of damage it can cause. If
+ * EMI has been disabled then we no longer have to worry about the implicit race
+ * condition and can go ahead and check things. If EMI is in some tate that
+ * isn't online or disabled and isn't runinng, then we assume that things are
+ * rather bad and we're not going to get in your way, even if the rest of SMF
+ * does.
  *
  * Returns 0 on success or returns an errno.
  */
@@ -6798,7 +6804,10 @@ lscf_instance_verify(scf_scope_t *scope, entity_t *svc, entity_t *inst)
 	/*
 	 * As per the block comment for this function check the state of EMI
 	 */
-	if (strcmp(emi_state, SCF_STATE_STRING_ONLINE) != 0) {
+	if (strcmp(emi_state, SCF_STATE_STRING_ONLINE) != 0 &&
+	    strcmp(emi_state, SCF_STATE_STRING_DISABLED) != 0) {
+		warn(gettext("Not validating instance %s:%s because EMI's "
+		    "state is %s\n"), svc->sc_name, inst->sc_name, emi_state);
 		free(emi_state);
 		return (0);
 	}
@@ -8338,6 +8347,8 @@ lscf_bundle_import(bundle_t *bndl, const char *filename, uint_t flags)
 		for (svc = uu_list_first(bndl->sc_bundle_services);
 		    svc != NULL;
 		    svc = uu_list_next(bndl->sc_bundle_services, svc)) {
+
+			insts = svc->sc_u.sc_service.sc_service_instances;
 
 			for (inst = uu_list_first(insts);
 			    inst != NULL;
