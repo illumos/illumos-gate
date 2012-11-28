@@ -14,6 +14,7 @@
 
 void getzonearg(int, char *[], const char *);
 void getzoneopt(int, char *[], const char *);
+int setzone(int);
 void setzonename(const char *);
 
 extern zoneid_t	zoneid;
