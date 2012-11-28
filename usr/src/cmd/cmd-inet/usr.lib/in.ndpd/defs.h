@@ -71,7 +71,6 @@ extern "C" {
 
 #define	CURHOP_UNSPECIFIED 0
 #define	PATH_NDPD_CONF	"/etc/inet/ndpd.conf"
-#define	PATH_PID	"/var/run/in.ndpd.pid"
 
 extern int debug, no_loopback;
 
