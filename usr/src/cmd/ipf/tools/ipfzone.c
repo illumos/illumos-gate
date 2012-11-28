@@ -6,10 +6,14 @@
  */
 
 
-#include <zone.h>
+#include <errno.h>
+#include <net/if.h>
 #include <stdio.h>
-#include <sys/ioctl.h>
+#include <string.h>
+#include <unistd.h>
+#include <zone.h>
 
+#include "netinet/ip_fil.h"
 #include "ipfzone.h"
 
 static ipfzoneobj_t	ipzo;
