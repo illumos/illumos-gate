@@ -451,12 +451,6 @@ smb_enable_share(sa_share_t share)
 		if (err != SA_OK) {
 			(void) printf(dgettext(TEXT_DOMAIN,
 			    "SMB: Unable to enable service\n"));
-			/*
-			 * For now, it is OK to not be able to enable
-			 * the service.
-			 */
-			if (err == SA_BUSY || err == SA_SYSTEM_ERR)
-				err = SA_OK;
 		} else {
 			online = B_TRUE;
 		}
@@ -1483,10 +1477,6 @@ smb_enable_service(void)
 			} else if (smb_ismaint()) {
 				/* maintenance requires help */
 				ret = SA_SYSTEM_ERR;
-				break;
-			} else if (smb_isdisabled()) {
-				/* disabled is ok */
-				ret = SA_OK;
 				break;
 			} else {
 				/* try another time */
