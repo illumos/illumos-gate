@@ -16,14 +16,14 @@ df \- displays number of free disk blocks and free files
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/df\fR [\fB-F\fR \fIFSType\fR] [\fB-abeghklntVvZ\fR]
+\fB/usr/bin/df\fR [\fB-F\fR \fIFSType\fR] [\fB-abeghklmntVvZ\fR]
      [\fB-o\fR \fIFSType-specific_options\fR]
      [\fIblock_device\fR | \fIdirectory\fR | \fIfile\fR | \fIresource\fR ...]
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/df\fR [\fB-F\fR \fIFSType\fR] [\fB-abeghklnPtVZ\fR]
+\fB/usr/xpg4/bin/df\fR [\fB-F\fR \fIFSType\fR] [\fB-abeghklmnPtVZ\fR]
      [\fB-o\fR \fIFSType-specific_options\fR]
      [\fIblock_device\fR | \fIdirectory\fR | \fIfile\fR | \fIresource\fR ...]
 .fi
@@ -156,6 +156,16 @@ overrides the \fB-b\fR, \fB-e\fR, \fB-n\fR, and \fB-t\fR options.
 .RS 4n
 Reports on local file systems only. This option is used only for mounted file
 systems. It can not be used with the \fB-o\fR option.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-m\fR\fR
+.ad
+.sp .6
+.RS 4n
+Like -k, except prints the allocation in mbytes.
 .RE
 
 .sp
