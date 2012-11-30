@@ -32,7 +32,6 @@
 DFPROG=		df
 PROG=		$(DFPROG) fsck volcopy ff
 ROOTFS_PROG=	mount umount
-XPG4PROG=	df
 SPPROG=		clri
 MNTTAB=		mnttab
 DEFAULTFILES=	fs.dfl
@@ -45,7 +44,6 @@ SUBDIR2= dev fd pcfs nfs hsfs proc ctfs udfs ufs tmpfs cachefs \
 SUBDIRS= $(SUBDIR1) $(SUBDIR2)
 I18NDIRS= $(SUBDIR2)
 
-CLOBBERFILES += $(POFILES_XPG4)
 
 all:=		TARGET= all
 install:=	TARGET= install
@@ -61,6 +59,7 @@ USRSBINFF=	ncheck
 ETC2SBIN=	mount umount
 ETC2USRSBIN=	clri fsdb mkfs fsck labelit dcopy volcopy ff ncheck
 USRBIN2USRSBIN=	df
+USRXPG4BIN2USRSBIN= df
 
 FSLIB=		fslib.o
 
@@ -74,6 +73,7 @@ ROOTETCMNTTAB=		$(MNTTAB:%=$(ROOTETC)/%)
 SYMETC2SBIN	=	$(ETC2SBIN:%=$(ROOTETC)/%)
 SYMETC2USRSBIN	=	$(ETC2USRSBIN:%=$(ROOTETC)/%)
 SYMUSRBIN2USRSBIN=	$(USRBIN2USRSBIN:%=$(ROOTBIN)/%)
+SYMUSRXPG4BIN2USRSBIN=	$(USRXPG4BIN2USRSBIN:%=$(ROOTXPG4BIN)/%)
 SYMDEVNM=		$(ROOTUSRSBIN)/devnm
 
 CPPFLAGS += -D_LARGEFILE64_SOURCE
@@ -84,7 +84,6 @@ CERRWARN += -_gcc=-Wno-unused-variable
 CERRWARN += -_gcc=-Wno-uninitialized
 CERRWARN += -_gcc=-Wno-unused-function
 
-%.xpg4.o := CPPFLAGS += -DXPG4
 $(SPPROG) :=	LDLIBS += -lkstat
 
 $(ROOTETCMNTTAB) := FILEMODE = 444
@@ -94,20 +93,9 @@ $(ROOTETCMNTTAB) := FILEMODE = 444
 POFILE= fs.d.po
 POFILES1= $(PROG:%=%.po) $(ROOTFS_PROG:%=%.po) switchout.po fssnapsup.po
 POFILES2= $(I18NDIRS:%=%/%.po)
-POFILES_XPG4 = df.po.xpg4
-POFILES=  $(POFILES1) $(POFILES2) $(POFILES_XPG4)
-$(POFILES_XPG4) := CFLAGS += -DXPG4
+POFILES=  $(POFILES1) $(POFILES2)
 volcopy.po :=   XGETFLAGS += -a -x volcopy.xcl
-$(POFILES_XPG4) :=	XGETFLAGS += -a -x df.xcl
 $(DFPROG).po := XGETFLAGS += -a -x df.xcl
-
-%.po.xpg4:	%.c
-	$(COMPILE.cpp) $< > $<.i
-	$(BUILD.po)
-
-# build rule for xpg4 objects
-%.xpg4.o: %.c
-	$(COMPILE.c) -o $@ $<
 
 .KEEP_STATE:
 
@@ -116,22 +104,22 @@ $(DFPROG).po := XGETFLAGS += -a -x df.xcl
 
 all:		$(FSLIB) .WAIT $(SUBDIRS) .WAIT all_local
 
-_msg: $(I18NDIRS) $(POFILES1) $(POFILES_XPG4)
+_msg: $(I18NDIRS) $(POFILES1)
 	$(RM) $(POFILE)
 	cat $(POFILES) > $(POFILE)
 	$(RM) $(MSGDOMAIN)/$(POFILE)
 	cp $(POFILE) $(MSGDOMAIN)
 
-all_local:	$(PROG) $(ROOTFS_PROG) $(XPG4PROG) $(SPPROG) $(MNTTAB) \
+all_local:	$(PROG) $(ROOTFS_PROG) $(SPPROG) $(MNTTAB) \
 		$(DEFAULTFILES)
 
 ff volcopy: deffs.o $$(@F).o
 		$(LINK.c) -o $@ $@.o deffs.o $(LDLIBS)
 		$(POST_PROCESS)
 
-df df.xpg4: deffs.o $(FSLIB) $$(@F).o
-		$(LINK.c) -o $@ $@.o deffs.o $(FSLIB) $(LDLIBS)
-		$(POST_PROCESS)
+df: deffs.o $(FSLIB) $$(@F).o
+	$(LINK.c) -o $@ $@.o deffs.o $(FSLIB) $(LDLIBS)
+	$(POST_PROCESS)
 
 fsck: fsck.o deffs.o preenlib.o
 	$(LINK.c) -o $@ fsck.o deffs.o preenlib.o $(LDLIBS)
@@ -153,8 +141,9 @@ install: $(FSLIB) .WAIT $(SUBDIRS) .WAIT install_local
 
 install_local:	all_local $(ROOTSBINPROG) $(ROOTUSRSBINF) $(ROOTUSRSBINCLRI) \
 		$(ROOTUSRSBINFF) $(ROOTETCMNTTAB) $(ROOTETCDEFAULTFILES) \
-		$(ROOTXPG4PROG) $(SYMETC2SBIN) $(SYMETC2USRSBIN) \
-		$(SYMUSRBIN2USRSBIN) $(SYMDEVNM) $(ROOTUSRSBINLINKS)
+		$(SYMETC2SBIN) $(SYMETC2USRSBIN) \
+		$(SYMUSRBIN2USRSBIN) $(SYMUSRXPG4BIN2USRSBIN) $(SYMDEVNM) \
+		$(ROOTUSRSBINLINKS)
 
 # Links from /etc to /sbin such as /etc/mount -> ../sbin/mount
 $(SYMETC2SBIN):
@@ -167,6 +156,10 @@ $(SYMETC2USRSBIN):
 # Links from /usr/bin to /usr/sbin such as /usr/bin/df -> ../sbin/df
 $(SYMUSRBIN2USRSBIN):
 	-$(RM) $@; $(SYMLINK) ../sbin/$(@F) $@
+
+# Links from /usr/xpg4/bin to /usr/sbin such as /usr/xpg4/bin/df -> ../sbin/df
+$(SYMUSRXPG4BIN2USRSBIN):
+	-$(RM) $@; $(SYMLINK) ../../sbin/$(@F) $@
 
 # Links from /usr/sbin to /sbin such as /usr/sbin/mount -> ../../sbin/mount
 $(ROOTUSRSBINLINKS):

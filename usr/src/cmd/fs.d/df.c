@@ -109,13 +109,8 @@ extern char *default_fstype(char *);
 #define	FSTYPE_WIDTH		8
 #define	BLOCK_WIDTH		8
 #define	NFILES_WIDTH		8
-#ifdef XPG4
 #define	KBYTE_WIDTH		11
 #define	AVAILABLE_WIDTH		10
-#else
-#define	KBYTE_WIDTH		7
-#define	AVAILABLE_WIDTH		6
-#endif
 #define	SCALED_WIDTH		6
 #define	CAPACITY_WIDTH		9
 #define	BSIZE_WIDTH		6
@@ -341,17 +336,10 @@ errmsg(int flags, char *fmt, ...)
 static void
 usage(void)
 {
-#ifdef  XPG4
 	errmsg(ERR_NONAME,
-	    "Usage: %s [-F FSType] [-abeghklmntPVZ]"
+	    "Usage: %s [-F FSType] [-abeghklmntPVvZ]"
 	    " [-o FSType-specific_options]"
 	    " [directory | block_device | resource]", program_name);
-#else
-	errmsg(ERR_NONAME,
-	    "Usage: %s [-F FSType] [-abeghklmntVvZ]"
-	    " [-o FSType-specific_options]"
-	    " [directory | block_device | resource]", program_name);
-#endif
 	exit(1);
 	/* NOTREACHED */
 }
@@ -580,11 +568,7 @@ parse_options(int argc, char *argv[])
 
 	opterr = 0;	/* getopt shouldn't complain about unknown options */
 
-#ifdef XPG4
-	while ((arg = getopt(argc, argv, "F:o:abehkVtgnlmPZ")) != EOF) {
-#else
-	while ((arg = getopt(argc, argv, "F:o:abehkVtgnlmvZ")) != EOF) {
-#endif
+	while ((arg = getopt(argc, argv, "F:o:abehkVtgnlmPvZ")) != EOF) {
 		if (arg == 'F') {
 			if (F_option)
 				errmsg(ERR_FATAL + ERR_USAGE,
@@ -595,10 +579,8 @@ parse_options(int argc, char *argv[])
 			V_option = TRUE;
 		} else if (arg == 'v' && ! v_option) {
 			v_option = TRUE;
-#ifdef XPG4
 		} else if (arg == 'P' && ! P_option) {
 			SET_OPTION(P);
-#endif
 		} else if (arg == 'a' && ! a_option) {
 			SET_OPTION(a);
 		} else if (arg == 'b' && ! b_option) {
@@ -1077,17 +1059,10 @@ print_header(void)
 
 		(void) printf("%-*s %*s %*s %*s %-*s %s\n",
 		    FILESYSTEM_WIDTH, TRANSLATE("Filesystem"),
-#ifdef XPG4
 		    SCALED_WIDTH, TRANSLATE("Size"),
 		    SCALED_WIDTH, TRANSLATE("Used"),
 		    AVAILABLE_WIDTH, TRANSLATE("Available"),
 		    CAPACITY_WIDTH, TRANSLATE("Capacity"),
-#else
-		    SCALED_WIDTH, TRANSLATE("size"),
-		    SCALED_WIDTH, TRANSLATE("used"),
-		    AVAILABLE_WIDTH, TRANSLATE("avail"),
-		    CAPACITY_WIDTH, TRANSLATE("capacity"),
-#endif
 		    TRANSLATE("Mounted on"));
 		SET_OPTION(h);
 		return;
@@ -1097,17 +1072,10 @@ print_header(void)
 
 		(void) printf(gettext("%-*s %*s %*s %*s %-*s %s\n"),
 		    FILESYSTEM_WIDTH, TRANSLATE("Filesystem"),
-#ifdef XPG4
 		    KBYTE_WIDTH, TRANSLATE("1024-blocks"),
 		    KBYTE_WIDTH, TRANSLATE("Used"),
 		    KBYTE_WIDTH, TRANSLATE("Available"),
 		    CAPACITY_WIDTH, TRANSLATE("Capacity"),
-#else
-		    KBYTE_WIDTH, TRANSLATE("kbytes"),
-		    KBYTE_WIDTH, TRANSLATE("used"),
-		    KBYTE_WIDTH, TRANSLATE("avail"),
-		    CAPACITY_WIDTH, TRANSLATE("capacity"),
-#endif
 		    TRANSLATE("Mounted on"));
 		SET_OPTION(h);
 		return;
@@ -1117,10 +1085,10 @@ print_header(void)
 
 		(void) printf(gettext("%-*s %*s %*s %*s %-*s %s\n"),
 		    FILESYSTEM_WIDTH, TRANSLATE("Filesystem"),
-		    KBYTE_WIDTH, TRANSLATE("mbytes"),
-		    KBYTE_WIDTH, TRANSLATE("used"),
-		    KBYTE_WIDTH, TRANSLATE("avail"),
-		    CAPACITY_WIDTH, TRANSLATE("capacity"),
+		    KBYTE_WIDTH, TRANSLATE("1M-blocks"),
+		    KBYTE_WIDTH, TRANSLATE("Used"),
+		    KBYTE_WIDTH, TRANSLATE("Available"),
+		    CAPACITY_WIDTH, TRANSLATE("Capacity"),
 		    TRANSLATE("Mounted on"));
 		SET_OPTION(h);
 		return;
