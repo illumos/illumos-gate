@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -56,6 +56,15 @@
 static int tmpfsfstype;
 
 /*
+ * tmpfs_mountcount is used to prevent module unloads while there is still
+ * state from a former mount hanging around. With forced umount support, the
+ * filesystem module must not be allowed to go away before the last
+ * VFS_FREEVFS() call has been made. Since this is just an atomic counter,
+ * there's no need for locking.
+ */
+static uint32_t	tmpfs_mountcount;
+
+/*
  * tmpfs vfs operations.
  */
 static int tmpfsinit(int, char *);
@@ -65,6 +74,7 @@ static int tmp_unmount(struct vfs *, int, struct cred *);
 static int tmp_root(struct vfs *, struct vnode **);
 static int tmp_statvfs(struct vfs *, struct statvfs64 *);
 static int tmp_vget(struct vfs *, struct vnode **, struct fid *);
+static void tmp_freevfs(vfs_t *vfsp);
 
 /*
  * Loadable module wrapper
@@ -122,6 +132,14 @@ _fini()
 {
 	int error;
 
+	/*
+	 * If a forceably unmounted instance is still hanging around, we cannot
+	 * allow the module to be unloaded because that would cause panics once
+	 * the VFS framework decides it's time to call into VFS_FREEVFS().
+	 */
+	if (tmpfs_mountcount)
+		return (EBUSY);
+
 	error = mod_remove(&modlinkage);
 	if (error)
 		return (error);
@@ -177,6 +195,7 @@ tmpfsinit(int fstype, char *name)
 		VFSNAME_ROOT,		{ .vfs_root = tmp_root },
 		VFSNAME_STATVFS,	{ .vfs_statvfs = tmp_statvfs },
 		VFSNAME_VGET,		{ .vfs_vget = tmp_vget },
+		VFSNAME_FREEVFS,	{ .vfs_freevfs = tmp_freevfs },
 		NULL,			NULL
 	};
 	int error;
@@ -223,6 +242,7 @@ tmpfsinit(int fstype, char *name)
 		tmpfs_major = 0;
 	}
 	mutex_init(&tmpfs_minor_lock, NULL, MUTEX_DEFAULT, NULL);
+	tmpfs_mountcount = 0;
 	return (0);
 }
 
@@ -382,6 +402,7 @@ tmp_mount(
 
 	pn_free(&dpn);
 	error = 0;
+	atomic_inc_32(&tmpfs_mountcount);
 
 out:
 	if (error == 0)
@@ -397,16 +418,11 @@ tmp_unmount(struct vfs *vfsp, int flag, struct cred *cr)
 	struct tmpnode *tnp, *cancel;
 	struct vnode	*vp;
 	int error;
+	uint_t cnt;
+	int i;
 
 	if ((error = secpolicy_fs_unmount(cr, vfsp)) != 0)
 		return (error);
-
-	/*
-	 * forced unmount is not supported by this file system
-	 * and thus, ENOTSUP, is being returned.
-	 */
-	if (flag & MS_FORCE)
-		return (ENOTSUP);
 
 	mutex_enter(&tm->tm_contents);
 
@@ -418,32 +434,111 @@ tmp_unmount(struct vfs *vfsp, int flag, struct cred *cr)
 	 * disrupting the unmount, put a hold on each node while scanning.
 	 * If we find a previously referenced node, undo the holds we have
 	 * placed and fail EBUSY.
+	 *
+	 * However, in the case of a forced umount things are a bit different.
+	 * An additional VFS_HOLD is added for each outstanding VN_HOLD to
+	 * ensure that the file system is not cleaned up (tmp_freevfs) until
+	 * the last vfs hold is dropped. This happens in tmp_inactive as the
+	 * vnodes are released. Also, we can't add an additional VN_HOLD in
+	 * this case since that would prevent tmp_inactive from ever being
+	 * called. Finally, we do need to drop the zone ref now (zone_rele_ref)
+	 * so that the zone is not blocked waiting for the final file system
+	 * cleanup.
 	 */
 	tnp = tm->tm_rootnode;
-	if (TNTOV(tnp)->v_count > 1) {
+
+	vp = TNTOV(tnp);
+	mutex_enter(&vp->v_lock);
+	cnt = vp->v_count;
+	if (flag & MS_FORCE) {
+		vfsp->vfs_flag |= VFS_UNMOUNTED;
+		/* Extra hold which we rele below when we drop the zone ref */
+		VFS_HOLD(vfsp);
+		for (i = 1; i < cnt; i++)
+			VFS_HOLD(vfsp);
+	} else if (cnt > 1) {
+		mutex_exit(&vp->v_lock);
 		mutex_exit(&tm->tm_contents);
 		return (EBUSY);
 	}
+	mutex_exit(&vp->v_lock);
 
+	/*
+	 * Check for open files. An open file causes everything to unwind
+	 * unless this is a forced umount.
+	 */
 	for (tnp = tnp->tn_forw; tnp; tnp = tnp->tn_forw) {
-		if ((vp = TNTOV(tnp))->v_count > 0) {
-			cancel = tm->tm_rootnode->tn_forw;
-			while (cancel != tnp) {
-				vp = TNTOV(cancel);
-				ASSERT(vp->v_count > 0);
-				VN_RELE(vp);
-				cancel = cancel->tn_forw;
+		vp = TNTOV(tnp);
+		mutex_enter(&vp->v_lock);
+		cnt = vp->v_count;
+		if (cnt > 0) {
+			if (flag & MS_FORCE) {
+				for (i = 0; i < cnt; i++)
+					VFS_HOLD(vfsp);
+				/*
+				 * In the case of a forced umount don't add an
+				 * additional VN_HOLD on the vnode. It already
+				 * has at least one hold and we need
+				 * tmp_inactive to get called when the last
+				 * hold on the node is released.
+				 */
+			} else {
+				/*
+				 * An open file, unwind everything.
+				 */
+				mutex_exit(&vp->v_lock);
+				cancel = tm->tm_rootnode->tn_forw;
+				while (cancel != tnp) {
+					vp = TNTOV(cancel);
+					ASSERT(vp->v_count > 0);
+					VN_RELE(vp);
+					cancel = cancel->tn_forw;
+				}
+				mutex_exit(&tm->tm_contents);
+				return (EBUSY);
 			}
-			mutex_exit(&tm->tm_contents);
-			return (EBUSY);
+		} else {
+			/* directly add a VN_HOLD but since we have the lock */
+			vp->v_count++;
 		}
-		VN_HOLD(vp);
+		mutex_exit(&vp->v_lock);
+	}
+
+	if (flag & MS_FORCE) {
+		/*
+		 * Drop the zone ref now since we don't know how long it will
+		 * be until the final vfs_rele is called by tmp_inactive.
+		 */
+		if (vfsp->vfs_zone) {
+			zone_rele_ref(&vfsp->vfs_implp->vi_zone_ref,
+			    ZONE_REF_VFS);
+			vfsp->vfs_zone = 0;
+		}
+		/* We can now drop the extra hold we added above. */
+		VFS_RELE(vfsp);
 	}
 
 	/*
 	 * We can drop the mutex now because no one can find this mount
 	 */
 	mutex_exit(&tm->tm_contents);
+
+	return (0);
+}
+
+/*
+ * Implementation of VFS_FREEVFS() to support forced umounts. This is called by
+ * the vfs framework after umount and the last VFS_RELE, to trigger the release
+ * of any resources still associated with the given vfs_t. We only add
+ * additional VFS_HOLDs during the forced umount case, so this is normally
+ * called immediately after tmp_umount.
+ */
+void
+tmp_freevfs(vfs_t *vfsp)
+{
+	struct tmount *tm = (struct tmount *)VFSTOTM(vfsp);
+	struct tmpnode *tnp;
+	struct vnode	*vp;
 
 	/*
 	 * Free all kmemalloc'd and anonalloc'd memory associated with
@@ -527,7 +622,8 @@ tmp_unmount(struct vfs *vfsp, int flag, struct cred *cr)
 	mutex_destroy(&tm->tm_renamelck);
 	tmp_memfree(tm, sizeof (struct tmount));
 
-	return (0);
+	/* Allow _fini() to succeed now */
+	atomic_dec_32(&tmpfs_mountcount);
 }
 
 /*
