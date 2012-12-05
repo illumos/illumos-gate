@@ -10,20 +10,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DF 1M "Jul 26, 2009"
+.TH DF 1M "Nov 15, 2012"
 .SH NAME
 df \- displays number of free disk blocks and free files
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/df\fR [\fB-F\fR \fIFSType\fR] [\fB-abeghklntVvZ\fR]
-     [\fB-o\fR \fIFSType-specific_options\fR]
-     [\fIblock_device\fR | \fIdirectory\fR | \fIfile\fR | \fIresource\fR ...]
-.fi
-
-.LP
-.nf
-\fB/usr/xpg4/bin/df\fR [\fB-F\fR \fIFSType\fR] [\fB-abeghklnPtVZ\fR]
+\fB/usr/bin/df\fR [\fB-F\fR \fIFSType\fR] [\fB-abeghklmnPtVvZ\fR]
      [\fB-o\fR \fIFSType-specific_options\fR]
      [\fIblock_device\fR | \fIdirectory\fR | \fIfile\fR | \fIresource\fR ...]
 .fi
@@ -47,10 +40,6 @@ If \fBdf\fR is run on a networked mount point that the automounter has not yet
 mounted, the file system size will be reported as zero. As soon as the
 automounter mounts the file system, the sizes will be reported correctly.
 .SH OPTIONS
-.sp
-.LP
-The following options are supported for both \fB/usr/bin/df\fR and
-\fB/usr/xpg4/bin/df\fR:
 .sp
 .ne 2
 .na
@@ -161,6 +150,16 @@ systems. It can not be used with the \fB-o\fR option.
 .sp
 .ne 2
 .na
+\fB\fB-m\fR\fR
+.ad
+.sp .6
+.RS 4n
+Like -k, except prints the allocation in mbytes.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fB-n\fR\fR
 .ad
 .sp .6
@@ -219,10 +218,6 @@ located within the current zone. This option has no effect in a non-global
 zone.
 .RE
 
-.SS "/usr/bin/df"
-.sp
-.LP
-The following option is supported for \fB/usr/bin/df\fR only:
 .sp
 .ne 2
 .na
@@ -274,10 +269,6 @@ the percentage of blocks in use by files
 .RE
 .RE
 
-.SS "/usr/xpg4/bin/df"
-.sp
-.LP
-The following option is supported for \fB/usr/xpg4/bin/df\fR only:
 .sp
 .ne 2
 .na
@@ -387,7 +378,7 @@ system:
 .sp
 .in +2
 .nf
-example% \fB/usr/xpg4/bin/df -P /usr\fR
+example% \fB/usr/bin/df -P /usr\fR
 .fi
 .in -2
 .sp
@@ -403,7 +394,7 @@ following example writes portable information :
 .sp
 .in +2
 .nf
-example% \fB/usr/xpg4/bin/df -P /usr/src\fR
+example% \fB/usr/bin/df -P /usr/src\fR
 .fi
 .in -2
 .sp
@@ -513,10 +504,7 @@ List of default parameters for each file system
 .sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
-.SS "/usr/xpg4/bin/df"
-.sp
 
-.sp
 .TS
 box;
 c | c

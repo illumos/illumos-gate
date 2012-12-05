@@ -109,13 +109,8 @@ extern char *default_fstype(char *);
 #define	FSTYPE_WIDTH		8
 #define	BLOCK_WIDTH		8
 #define	NFILES_WIDTH		8
-#ifdef XPG4
 #define	KBYTE_WIDTH		11
 #define	AVAILABLE_WIDTH		10
-#else
-#define	KBYTE_WIDTH		7
-#define	AVAILABLE_WIDTH		6
-#endif
 #define	SCALED_WIDTH		6
 #define	CAPACITY_WIDTH		9
 #define	BSIZE_WIDTH		6
@@ -217,6 +212,7 @@ static bool_int		g_option;
 static bool_int		h_option;
 static bool_int		k_option;
 static bool_int		l_option;
+static bool_int		m_option;
 static bool_int		n_option;
 static bool_int		t_option;
 static bool_int		o_option;
@@ -340,15 +336,10 @@ errmsg(int flags, char *fmt, ...)
 static void
 usage(void)
 {
-#ifdef  XPG4
 	errmsg(ERR_NONAME,
-	    "Usage: %s [-F FSType] [-abeghklntPVZ] [-o FSType-specific_options]"
+	    "Usage: %s [-F FSType] [-abeghklmntPVvZ]"
+	    " [-o FSType-specific_options]"
 	    " [directory | block_device | resource]", program_name);
-#else
-	errmsg(ERR_NONAME,
-	    "Usage: %s [-F FSType] [-abeghklntVvZ] [-o FSType-specific_options]"
-	    " [directory | block_device | resource]", program_name);
-#endif
 	exit(1);
 	/* NOTREACHED */
 }
@@ -577,11 +568,7 @@ parse_options(int argc, char *argv[])
 
 	opterr = 0;	/* getopt shouldn't complain about unknown options */
 
-#ifdef XPG4
-	while ((arg = getopt(argc, argv, "F:o:abehkVtgnlPZ")) != EOF) {
-#else
-	while ((arg = getopt(argc, argv, "F:o:abehkVtgnlvZ")) != EOF) {
-#endif
+	while ((arg = getopt(argc, argv, "F:o:abehkVtgnlmPvZ")) != EOF) {
 		if (arg == 'F') {
 			if (F_option)
 				errmsg(ERR_FATAL + ERR_USAGE,
@@ -592,10 +579,8 @@ parse_options(int argc, char *argv[])
 			V_option = TRUE;
 		} else if (arg == 'v' && ! v_option) {
 			v_option = TRUE;
-#ifdef XPG4
 		} else if (arg == 'P' && ! P_option) {
 			SET_OPTION(P);
-#endif
 		} else if (arg == 'a' && ! a_option) {
 			SET_OPTION(a);
 		} else if (arg == 'b' && ! b_option) {
@@ -611,6 +596,8 @@ parse_options(int argc, char *argv[])
 			SET_OPTION(k);
 		} else if (arg == 'l' && ! l_option) {
 			SET_OPTION(l);
+		} else if (arg == 'm' && ! m_option) {
+			SET_OPTION(m);
 		} else if (arg == 'n' && ! n_option) {
 			SET_OPTION(n);
 		} else if (arg == 't' && ! t_option) {
@@ -1072,17 +1059,10 @@ print_header(void)
 
 		(void) printf("%-*s %*s %*s %*s %-*s %s\n",
 		    FILESYSTEM_WIDTH, TRANSLATE("Filesystem"),
-#ifdef XPG4
 		    SCALED_WIDTH, TRANSLATE("Size"),
 		    SCALED_WIDTH, TRANSLATE("Used"),
 		    AVAILABLE_WIDTH, TRANSLATE("Available"),
 		    CAPACITY_WIDTH, TRANSLATE("Capacity"),
-#else
-		    SCALED_WIDTH, TRANSLATE("size"),
-		    SCALED_WIDTH, TRANSLATE("used"),
-		    AVAILABLE_WIDTH, TRANSLATE("avail"),
-		    CAPACITY_WIDTH, TRANSLATE("capacity"),
-#endif
 		    TRANSLATE("Mounted on"));
 		SET_OPTION(h);
 		return;
@@ -1092,17 +1072,23 @@ print_header(void)
 
 		(void) printf(gettext("%-*s %*s %*s %*s %-*s %s\n"),
 		    FILESYSTEM_WIDTH, TRANSLATE("Filesystem"),
-#ifdef XPG4
 		    KBYTE_WIDTH, TRANSLATE("1024-blocks"),
 		    KBYTE_WIDTH, TRANSLATE("Used"),
 		    KBYTE_WIDTH, TRANSLATE("Available"),
 		    CAPACITY_WIDTH, TRANSLATE("Capacity"),
-#else
-		    KBYTE_WIDTH, TRANSLATE("kbytes"),
-		    KBYTE_WIDTH, TRANSLATE("used"),
-		    KBYTE_WIDTH, TRANSLATE("avail"),
-		    CAPACITY_WIDTH, TRANSLATE("capacity"),
-#endif
+		    TRANSLATE("Mounted on"));
+		SET_OPTION(h);
+		return;
+	}
+	if (m_option) {
+		int arg = 'h';
+
+		(void) printf(gettext("%-*s %*s %*s %*s %-*s %s\n"),
+		    FILESYSTEM_WIDTH, TRANSLATE("Filesystem"),
+		    KBYTE_WIDTH, TRANSLATE("1M-blocks"),
+		    KBYTE_WIDTH, TRANSLATE("Used"),
+		    KBYTE_WIDTH, TRANSLATE("Available"),
+		    CAPACITY_WIDTH, TRANSLATE("Capacity"),
 		    TRANSLATE("Mounted on"));
 		SET_OPTION(h);
 		return;
@@ -1527,7 +1513,7 @@ k_output(struct df_request *dfrp, struct statvfs64 *fsp)
 		return;
 	}
 
-	if (P_option && !k_option) {
+	if (P_option && !k_option && !m_option) {
 	(void) printf("%-*s %*s %*s %*s %-*s %-s\n",
 	    FILESYSTEM_WIDTH, file_system,
 	    KBYTE_WIDTH, number_to_string(total_blocks_buf,
@@ -1537,6 +1523,17 @@ k_output(struct df_request *dfrp, struct statvfs64 *fsp)
 	    KBYTE_WIDTH, number_to_string(available_blocks_buf,
 	    available_blocks, fsp->f_frsize, 512),
 	    CAPACITY_WIDTH, capacity_buf,
+	    DFR_MOUNT_POINT(dfrp));
+	} else if (m_option) {
+	(void) printf("%-*s %*s %*s %*s %-*s %-s\n",
+	    FILESYSTEM_WIDTH, file_system,
+	    KBYTE_WIDTH, number_to_string(total_blocks_buf,
+	    total_blocks, fsp->f_frsize, 1024*1024),
+	    KBYTE_WIDTH, number_to_string(used_blocks_buf,
+	    used_blocks, fsp->f_frsize, 1024*1024),
+	    KBYTE_WIDTH, number_to_string(available_blocks_buf,
+	    available_blocks, fsp->f_frsize, 1024*1024),
+	    CAPACITY_WIDTH,	capacity_buf,
 	    DFR_MOUNT_POINT(dfrp));
 	} else {
 	(void) printf("%-*s %*s %*s %*s %-*s %-s\n",
@@ -1955,7 +1952,7 @@ select_output(void)
 	} else if (g_option) {
 		dfo.dfo_func = g_output;
 		dfo.dfo_flags = DFO_STATVFS;
-	} else if (k_option || P_option || v_option) {
+	} else if (k_option || m_option || P_option || v_option) {
 		dfo.dfo_func = k_output;
 		dfo.dfo_flags = DFO_HEADER + DFO_STATVFS;
 	} else if (t_option) {

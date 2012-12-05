@@ -1,9 +1,10 @@
 '\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All rights reserved.
+.\" Copyright 2012 Marcel Telka <marcel@telka.sk>
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CDRW 1 "Jul 10, 2008"
+.TH CDRW 1 "Dec 1, 2012"
 .SH NAME
 cdrw \- CD read and write
 .SH SYNOPSIS
@@ -87,7 +88,7 @@ input.
 .sp
 .LP
 In either case, the data is typically prepared by using the \fBmkisofs\fR
-command to convert the file and file information into the High Sierra format
+command to convert the file and file information into the ISO 9660 format
 used on CDs. See the examples that include use of this command.
 .SS "Creating Data DVDs"
 .sp
@@ -282,7 +283,7 @@ blank media into the drive for the copy operation to proceed.
 .RS 6n
 This option is obsolete.
 .sp
-This option used to cause\fBcdrw\fR to query the drive to determine media
+This option used to cause \fBcdrw\fR to query the drive to determine media
 capacity.  This is now the default behavior.
 .RE
 
