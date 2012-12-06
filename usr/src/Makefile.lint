@@ -469,6 +469,7 @@ COMMON_SUBDIRS = \
 	lib/udapl \
 	lib/watchmalloc \
 	psm \
+	test \
 	ucbcmd/basename \
 	ucbcmd/biff \
 	ucbcmd/echo \

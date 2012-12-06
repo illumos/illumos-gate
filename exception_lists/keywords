@@ -23,8 +23,6 @@
 #
 
 syntax: glob
-#exception_lists/cstyle
-#exception_lists/hdrchk
 usr/src/cmd/localedef/data/zh_CN.UTF-8.src
 usr/src/cmd/localedef/data/zh_HK.UTF-8.src
 usr/src/cmd/localedef/data/zh_MO.UTF-8.src
@@ -33,3 +31,5 @@ usr/src/cmd/localedef/data/zh_TW.UTF-8.src
 usr/src/cmd/terminfo/termcap.src
 usr/src/cmd/terminfo/terminfo.src
 usr/src/cmd/zonestat/zonestat/zonestat.c
+usr/src/test/zfs-tests/tests/functional/cli_root/zpool_upgrade/blockfiles/zfs-pool-v15.dat.bz2
+usr/src/test/test-runner/cmd/run.py
