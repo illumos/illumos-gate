@@ -21,6 +21,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2012 by Delphix. All rights reserved.
+#
 
 LIBRARY =	libwanboot.a
 VERS =		.1
@@ -74,7 +76,8 @@ SRCDIR =	$(LOC_DIR)
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 # OpenSSL requires us to turn this off
-LINTFLAGS +=    -erroff=E_BAD_PTR_CAST_ALIGN
+LINTFLAGS   +=    -erroff=E_BAD_PTR_CAST_ALIGN
+LINTFLAGS64 +=    -erroff=E_BAD_PTR_CAST_ALIGN
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(LOC_DIR) -I$(COM_DIR) -I$(DHCP_DIR)

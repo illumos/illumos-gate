@@ -22,6 +22,7 @@
 #
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 #
 
 <include system-library.man3.inc>
@@ -179,6 +180,7 @@ file path=lib/$(ARCH64)/libcurses.so.1
 file path=lib/$(ARCH64)/libdevice.so.1
 file path=lib/$(ARCH64)/libdevid.so.1
 file path=lib/$(ARCH64)/libdevinfo.so.1
+file path=lib/$(ARCH64)/libdhcputil.so.1
 file path=lib/$(ARCH64)/libdl.so.1
 file path=lib/$(ARCH64)/libdladm.so.1
 file path=lib/$(ARCH64)/libdlpi.so.1
@@ -326,6 +328,7 @@ file path=usr/lib/$(ARCH64)/libdisasm.so.1
 file path=usr/lib/$(ARCH64)/libdll.so.1
 file path=usr/lib/$(ARCH64)/libexacct.so.1
 file path=usr/lib/$(ARCH64)/libform.so.1
+file path=usr/lib/$(ARCH64)/libfstyp.so.1
 file path=usr/lib/$(ARCH64)/libhotplug.so.1
 file path=usr/lib/$(ARCH64)/libidmap.so.1
 file path=usr/lib/$(ARCH64)/libike.so.1
@@ -359,6 +362,7 @@ file path=usr/lib/$(ARCH64)/libsum.so.1
 $(sparc_ONLY)file path=usr/lib/$(ARCH64)/libv12n.so.1
 file path=usr/lib/$(ARCH64)/libvolmgt.so.1
 file path=usr/lib/$(ARCH64)/liby.so.1
+file path=usr/lib/$(ARCH64)/libzoneinfo.so.1
 file path=usr/lib/$(ARCH64)/nss_ad.so.1
 file path=usr/lib/$(ARCH64)/nss_ldap.so.1
 file path=usr/lib/$(ARCH64)/passwdutil.so.1
@@ -787,6 +791,8 @@ link path=usr/lib/$(ARCH64)/libdevinfo.so \
     target=../../../lib/$(ARCH64)/libdevinfo.so.1
 link path=usr/lib/$(ARCH64)/libdevinfo.so.1 \
     target=../../../lib/$(ARCH64)/libdevinfo.so.1
+link path=usr/lib/$(ARCH64)/libdhcputil.so.1 \
+    target=../../../lib/$(ARCH64)/libdhcputil.so.1
 link path=usr/lib/$(ARCH64)/libdisasm.so target=libdisasm.so.1
 link path=usr/lib/$(ARCH64)/libdl.so target=../../../lib/$(ARCH64)/libdl.so.1
 link path=usr/lib/$(ARCH64)/libdl.so.1 \
@@ -813,6 +819,7 @@ $(i386_ONLY)link path=usr/lib/$(ARCH64)/libfdisk.so \
 $(i386_ONLY)link path=usr/lib/$(ARCH64)/libfdisk.so.1 \
     target=../../../lib/$(ARCH64)/libfdisk.so.1
 link path=usr/lib/$(ARCH64)/libform.so target=libform.so.1
+link path=usr/lib/$(ARCH64)/libfstyp.so target=./libfstyp.so.1
 link path=usr/lib/$(ARCH64)/libgen.so \
     target=../../../lib/$(ARCH64)/libgen.so.1
 link path=usr/lib/$(ARCH64)/libgen.so.1 \
@@ -982,6 +989,7 @@ link path=usr/lib/$(ARCH64)/libxnet.so \
 link path=usr/lib/$(ARCH64)/libxnet.so.1 \
     target=../../../lib/$(ARCH64)/libxnet.so.1
 link path=usr/lib/$(ARCH64)/liby.so target=liby.so.1
+link path=usr/lib/$(ARCH64)/libzoneinfo.so target=./libzoneinfo.so.1
 link path=usr/lib/$(ARCH64)/nss_compat.so.1 \
     target=../../../lib/$(ARCH64)/nss_compat.so.1
 link path=usr/lib/$(ARCH64)/nss_dns.so.1 \

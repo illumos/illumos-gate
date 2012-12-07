@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
  */
 
 #include <Python.h>
@@ -168,7 +169,7 @@ beCopy(PyObject *self, PyObject *args)
 	char	*trgtSnapName = NULL;
 	char	*rpool = NULL;
 	char	*beDescription = NULL;
-	int		pos = 0;
+	Py_ssize_t	pos = 0;
 	int		ret = BE_PY_SUCCESS;
 	nvlist_t	*beAttrs = NULL;
 	nvlist_t	*beProps = NULL;

@@ -18,50 +18,11 @@
 #
 # CDDL HEADER END
 #
-
 #
-# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-#
-# Copyright 2011 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 #
 
+include ../Makefile.com
+include ../../Makefile.lib.64
 
-LIBRARY= 	libbe.a
-VERS= 		.1
-
-OBJECTS= 	\
-		be_activate.o \
-		be_create.o \
-		be_list.o \
-		be_mount.o \
-		be_rename.o \
-		be_snapshot.o \
-		be_utils.o \
-		be_zones.o
-
-include ../../Makefile.lib
-
-LIBS=		$(DYNLIB) $(LINTLIB)
-
-SRCDIR= 	../common
-
-INCS += -I$(SRCDIR)
-
-C99MODE= 	$(C99_ENABLE)
-
-LDLIBS +=	-lzfs -linstzones -luuid -lnvpair -lc -lgen -ldevinfo
-CPPFLAGS +=	$(INCS)
-CERRWARN +=	-_gcc=-Wno-unused-label
-CERRWARN +=	-_gcc=-Wno-uninitialized
-CERRWARN +=	-_gcc=-Wno-address
-
-$(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
-
-.KEEP_STATE:
-
-all: $(LIBS) $(LIBRARY)
-
-lint: lintcheck
-
-include ../../Makefile.targ
+install: all $(ROOTLIBS64) $(ROOTLINKS64)

@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 #
 
 LIBRARY =	libbe_py.a
@@ -33,6 +34,7 @@ PYTHON = 	$(PYTHON_26)
 LIBLINKS = 
 SRCDIR =	../common
 ROOTLIBDIR=	$(ROOT)/usr/lib/python2.6/vendor-packages
+ROOTLIBDIR64=	$(ROOT)/usr/lib/python2.6/vendor-packages/64
 PYOBJS=		$(PYSRCS:%.py=$(SRCDIR)/%.pyc)
 PYFILES=	$(PYSRCS) $(PYSRCS:%.py=%.pyc)
 ROOTPYBEFILES=  $(PYFILES:%=$(ROOTLIBDIR)/%)
