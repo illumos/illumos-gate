@@ -2259,9 +2259,17 @@ pr_szoneid(proc_t *p, zoneid_t zoneid, cred_t *cr)
 		return (EPERM);
 	if (zoneid != GLOBAL_ZONEID && zoneid != p->p_zone->zone_id)
 		return (EINVAL);
-	if ((zptr = zone_find_by_id(zoneid)) == NULL)
-		return (EINVAL);
+	/*
+	 * We cannot hold p_lock when we call zone_find_by_id since that can
+	 * lead to a deadlock. zone_find_by_id() takes zonehash_lock.
+	 * zone_enter() can hold the zonehash_lock and needs p_lock when it
+	 * calls task_join.
+	 */
 	mutex_exit(&p->p_lock);
+	if ((zptr = zone_find_by_id(zoneid)) == NULL) {
+		mutex_enter(&p->p_lock);
+		return (EINVAL);
+	}
 	mutex_enter(&p->p_crlock);
 	oldcred = p->p_cred;
 	crhold(oldcred);
