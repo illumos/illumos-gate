@@ -22,13 +22,8 @@
 #
 # Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include ../Makefile.com
 include ../../Makefile.lib.64
 
 install: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64)
-
-
-

@@ -23,8 +23,6 @@
 # Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include $(SRC)/lib/Makefile.lib
 

@@ -22,9 +22,6 @@
 #
 # Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/libdhcputil/amd64/Makefile
 
 include ../Makefile.com
 include ../../Makefile.lib.64

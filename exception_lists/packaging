@@ -261,7 +261,8 @@ usr/lib/sparcv9/llib-ldhcputil.ln	sparc
 #
 usr/lib/llib-linstzones
 usr/lib/llib-linstzones.ln
-usr/lib/amd64/llib-linstzones.ln
+usr/lib/amd64/llib-linstzones.ln	i386
+usr/lib/sparcv9/llib-linstzones.ln	sparc
 usr/lib/llib-lpkg
 usr/lib/llib-lpkg.ln
 #
