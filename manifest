@@ -1932,7 +1932,7 @@ f usr/bin/at 4755 root sys
 f usr/bin/atq 4755 root sys
 f usr/bin/atrm 4755 root sys
 f usr/bin/auths 0555 root bin
-f usr/bin/awk 0555 root bin
+h usr/bin/awk=usr/bin/nawk
 f usr/bin/banner 0555 root bin
 f usr/bin/bart 0555 root bin
 f usr/bin/basename 0555 root bin
@@ -2202,7 +2202,6 @@ f usr/bin/nl 0555 root bin
 f usr/bin/nm 0555 root bin
 h usr/bin/nohup=usr/lib/isaexec
 f usr/bin/nroff 0555 root bin
-h usr/bin/oawk=usr/bin/awk
 f usr/bin/od 0555 root bin
 f usr/bin/on 0555 root bin
 f usr/bin/optisa 0555 root bin
@@ -11383,7 +11382,7 @@ f usr/share/man/man1/at.1 0444 root bin
 f usr/share/man/man1/atq.1 0444 root bin
 f usr/share/man/man1/atrm.1 0444 root bin
 f usr/share/man/man1/auths.1 0444 root bin
-f usr/share/man/man1/awk.1 0444 root bin
+s usr/share/man/man1/awk.1=nawk.1
 f usr/share/man/man1/banner.1 0444 root bin
 f usr/share/man/man1/basename.1 0444 root bin
 f usr/share/man/man1/batch.1 0444 root bin
