@@ -883,11 +883,6 @@ setup_xfem(void)
 	if (is_x86_feature(x86_featureset, X86FSET_AVX))
 		flags |= XFEATURE_AVX;
 
-	if (is_x86_feature(x86_featureset, X86FSET_F16C)) {
-		VERIFY(is_x86_feature(x86_featureset, X86FSET_AVX));
-		flags |= XFEATURE_F16C;
-	}
-
 	set_xcr(XFEATURE_ENABLED_MASK, flags);
 
 	xsave_bv_all = flags;
