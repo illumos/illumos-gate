@@ -23,11 +23,12 @@
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ */
 
 #ifndef	_SYS_CPUID_DRV_H
 #define	_SYS_CPUID_DRV_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 
@@ -66,7 +67,7 @@ extern "C" {
 
 struct cpuid_get_hwcap {
 	char *cgh_archname;
-	uint_t cgh_hwcap;
+	uint_t cgh_hwcap[2];
 };
 
 #if defined(_SYSCALL32_IMPL)
@@ -75,7 +76,7 @@ struct cpuid_get_hwcap {
 
 struct cpuid_get_hwcap32 {
 	caddr32_t cgh_archname;
-	uint32_t cgh_hwcap;
+	uint32_t cgh_hwcap[2];
 };
 
 #endif	/* _SYSCALL32_IMPL */

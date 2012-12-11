@@ -25,6 +25,9 @@
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
+/*
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -87,8 +90,10 @@ static int execsetid(struct vnode *, struct vattr *, uid_t *, uid_t *,
 static int hold_execsw(struct execsw *);
 
 uint_t auxv_hwcap = 0;	/* auxv AT_SUN_HWCAP value; determined on the fly */
+uint_t auxv_hwcap_2 = 0;	/* AT_SUN_HWCAP2 */
 #if defined(_SYSCALL32_IMPL)
 uint_t auxv_hwcap32 = 0;	/* 32-bit version of auxv_hwcap */
+uint_t auxv_hwcap32_2 = 0;	/* 32-bit version of auxv_hwcap2 */
 #endif
 
 #define	PSUIDFLAGS		(SNOCD|SUGID)

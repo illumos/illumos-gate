@@ -25,6 +25,9 @@
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
+/*
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -415,11 +418,12 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		 *	AT_PAGESZ
 		 *	AT_SUN_LDSECURE
 		 *	AT_SUN_HWCAP
+		 *	AT_SUN_HWCAP2
 		 *	AT_SUN_PLATFORM
 		 *	AT_SUN_EXECNAME
 		 *	AT_NULL
 		 *
-		 * total == 8
+		 * total == 9
 		 */
 		if (hasdy && hasu) {
 			/*
@@ -434,7 +438,7 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 			 *
 			 * total = 5
 			 */
-			args->auxsize = (8 + 5) * sizeof (aux_entry_t);
+			args->auxsize = (9 + 5) * sizeof (aux_entry_t);
 		} else if (hasdy) {
 			/*
 			 * Has PT_INTERP but no PT_PHDR
@@ -444,9 +448,9 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 			 *
 			 * total = 2
 			 */
-			args->auxsize = (8 + 2) * sizeof (aux_entry_t);
+			args->auxsize = (9 + 2) * sizeof (aux_entry_t);
 		} else {
-			args->auxsize = 8 * sizeof (aux_entry_t);
+			args->auxsize = 9 * sizeof (aux_entry_t);
 		}
 	} else {
 		args->auxsize = 0;
@@ -759,12 +763,16 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		 * (Potentially different between 32-bit and 64-bit ABIs)
 		 */
 #if defined(_LP64)
-		if (args->to_model == DATAMODEL_NATIVE)
+		if (args->to_model == DATAMODEL_NATIVE) {
 			ADDAUX(aux, AT_SUN_HWCAP, auxv_hwcap)
-		else
+			ADDAUX(aux, AT_SUN_HWCAP2, auxv_hwcap_2)
+		} else {
 			ADDAUX(aux, AT_SUN_HWCAP, auxv_hwcap32)
+			ADDAUX(aux, AT_SUN_HWCAP2, auxv_hwcap32_2)
+		}
 #else
 		ADDAUX(aux, AT_SUN_HWCAP, auxv_hwcap)
+		ADDAUX(aux, AT_SUN_HWCAP2, auxv_hwcap_2)
 #endif
 		if (branded) {
 			/*
