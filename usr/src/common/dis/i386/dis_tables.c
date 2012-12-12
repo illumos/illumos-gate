@@ -32,7 +32,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 #include	"dis_tables.h"
 
 /* BEGIN CSTYLED */
@@ -538,6 +537,16 @@ const instable_t dis_op0FC7[8] = {
 
 /*  [0]  */	INVALID,		TNS("cmpxchg8b",M),	INVALID,		INVALID,
 /*  [4]  */	INVALID,		INVALID,		TNS("vmptrld",MG9),	TNS("vmptrst",MG9),
+};
+
+/*
+ * 	Decode table for 0x0FC7 opcode (group 9) mode 3
+ */
+
+const instable_t dis_op0FC7m3[8] = {
+
+/*  [0]  */	INVALID,		INVALID,	INVALID,		INVALID,
+/*  [4]  */	INVALID,		INVALID,	TNS("rdrand",MG9),	INVALID,
 };
 
 /*
@@ -1215,7 +1224,7 @@ const instable_t dis_opAVX660F38[256] = {
 /*  [08]  */	TNSZ("vpsignb",VEX_RMrX,16),TNSZ("vpsignw",VEX_RMrX,16),TNSZ("vpsignd",VEX_RMrX,16),TNSZ("vpmulhrsw",VEX_RMrX,16),
 /*  [0C]  */	TNSZ("vpermilps",VEX_RMrX,8),TNSZ("vpermilpd",VEX_RMrX,16),TNSZ("vtestps",VEX_RRI,8),	TNSZ("vtestpd",VEX_RRI,16),
 
-/*  [10]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [10]  */	INVALID,		INVALID,		INVALID,		TNSZ("vcvtph2ps",VEX_MX,16),
 /*  [14]  */	INVALID,		INVALID,		INVALID,		TNSZ("vptest",VEX_RRI,16),
 /*  [18]  */	TNSZ("vbroadcastss",VEX_MX,4),TNSZ("vbroadcastsd",VEX_MX,8),TNSZ("vbroadcastf128",VEX_MX,16),INVALID,
 /*  [1C]  */	TNSZ("vpabsb",VEX_MX,16),TNSZ("vpabsw",VEX_MX,16),TNSZ("vpabsd",VEX_MX,16),INVALID,
@@ -1381,7 +1390,7 @@ const instable_t dis_opAVX660F3A[256] = {
 /*  [10]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [14]  */	TNSZ("vpextrb",VEX_RRi,8),TNSZ("vpextrw",VEX_RRi,16),TNSZ("vpextrd",VEX_RRi,16),TNSZ("vextractps",VEX_RM,16),
 /*  [18]  */	TNSZ("vinsertf128",VEX_RMRX,16),TNSZ("vextractf128",VEX_RX,16),INVALID,		INVALID,
-/*  [1C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [1C]  */	INVALID,		TNSZ("vcvtps2ph",VEX_RX,16),		INVALID,		INVALID,
 
 /*  [20]  */	TNSZ("vpinsrb",VEX_RMRX,8),TNSZ("vinsertps",VEX_RMRX,16),TNSZ("vpinsrd",VEX_RMRX,16),INVALID,
 /*  [24]  */	INVALID,		INVALID,		INVALID,		INVALID,
@@ -3084,6 +3093,14 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 		 * to the SIMD business described above, but with a different
 		 * addressing mode (and an indirect table), so we deal with it
 		 * separately (if similarly).
+		 *
+		 * Intel further complicated this with the release of Ivy Bridge
+		 * where they overloaded these instructions based on the ModR/M
+		 * bytes. The VMX instructions have a mode of 0 since they are
+		 * memory instructions but rdrand instructions have a mode of
+		 * 0b11 (REG_ONLY) because they only operate on registers. While
+		 * there are different prefix formats, for now it is sufficient
+		 * to use a single different table.
 		 */
 
 		/*
@@ -3094,6 +3111,15 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 
 		off = ((uintptr_t)dp - (uintptr_t)dis_op0FC7) /
 		    sizeof (instable_t);
+
+		/*
+		 * If we have a mode of 0b11 then we have to rewrite this.
+		 */
+		dtrace_get_modrm(x, &mode, &reg, &r_m);
+		if (mode == REG_ONLY) {
+			dp = (instable_t *)&dis_op0FC7m3[off];
+			break;
+		}
 
 		/*
 		 * Rewrite if this instruction used one of the magic prefixes.
@@ -4438,7 +4464,8 @@ L_VEX_MX:
 			dtrace_get_operand(x, REG_ONLY, reg, XMM_OPND, 1);
 			dtrace_get_operand(x, mode, r_m, wbit, 0);
 		} else if ((dp == &dis_opAVXF30F[0xE6]) ||
-		    (dp == &dis_opAVX0F[0x5][0xA])) {
+		    (dp == &dis_opAVX0F[0x5][0xA]) ||
+		    (dp == &dis_opAVX660F38[0x13])) {
 			/* vcvtdq2pd <xmm>, <ymm> */
 			/* or vcvtps2pd <xmm>, <ymm> */
 			dtrace_get_operand(x, REG_ONLY, reg, wbit, 1);
@@ -4523,7 +4550,9 @@ L_VEX_MX:
 
 	case VEX_RX:
 		/* ModR/M.rm := op(ModR/M.reg) */
-		if (dp == &dis_opAVX660F3A[0x19]) {	/* vextractf128 */
+		/* vextractf128 || vcvtps2ph */
+		if (dp == &dis_opAVX660F3A[0x19] ||
+		    dp == &dis_opAVX660F3A[0x1d]) {
 			x->d86_numopnds = 3;
 
 			dtrace_get_modrm(x, &mode, &reg, &r_m);
