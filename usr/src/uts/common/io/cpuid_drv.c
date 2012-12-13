@@ -21,6 +21,9 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ */
 
 
 #include <sys/types.h>
@@ -162,14 +165,18 @@ cpuid_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval)
 			return (EFAULT);
 		areq[sizeof (areq) - 1] = '\0';
 
-		if (strcmp(areq, architecture) == 0)
-			STRUCT_FSET(h, cgh_hwcap, auxv_hwcap);
+		if (strcmp(areq, architecture) == 0) {
+			STRUCT_FSET(h, cgh_hwcap[0], auxv_hwcap);
+			STRUCT_FSET(h, cgh_hwcap[1], auxv_hwcap_2);
 #if defined(_SYSCALL32_IMPL)
-		else if (strcmp(areq, architecture_32) == 0)
-			STRUCT_FSET(h, cgh_hwcap, auxv_hwcap32);
+		} else if (strcmp(areq, architecture_32) == 0) {
+			STRUCT_FSET(h, cgh_hwcap[0], auxv_hwcap32);
+			STRUCT_FSET(h, cgh_hwcap[1], auxv_hwcap32_2);
 #endif
-		else
-			STRUCT_FSET(h, cgh_hwcap, 0);
+		} else {
+			STRUCT_FSET(h, cgh_hwcap[0], 0);
+			STRUCT_FSET(h, cgh_hwcap[1], 0);
+		}
 		if (ddi_copyout(STRUCT_BUF(h),
 		    (void *)arg, STRUCT_SIZE(h), mode))
 			return (EFAULT);

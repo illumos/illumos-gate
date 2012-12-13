@@ -24,6 +24,9 @@
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
+/*
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -922,10 +925,14 @@ elfheadcheck(
 }
 
 uint_t auxv_hwcap_include = 0;	/* patch to enable unrecognized features */
+uint_t auxv_hwcap_include_2 = 0;	/* second word */
 uint_t auxv_hwcap_exclude = 0;	/* patch for broken cpus, debugging */
+uint_t auxv_hwcap_exclude_2 = 0;	/* second word */
 #if defined(_SYSCALL32_IMPL)
 uint_t auxv_hwcap32_include = 0;	/* ditto for 32-bit apps */
+uint_t auxv_hwcap32_include_2 = 0;	/* ditto for 32-bit apps */
 uint_t auxv_hwcap32_exclude = 0;	/* ditto for 32-bit apps */
+uint_t auxv_hwcap32_exclude_2 = 0;	/* ditto for 32-bit apps */
 #endif
 
 /*
@@ -939,10 +946,13 @@ uint_t auxv_hwcap32_exclude = 0;	/* ditto for 32-bit apps */
 void
 bind_hwcap(void)
 {
-	uint_t cpu_hwcap_flags = cpuid_pass4(NULL);
+	uint_t cpu_hwcap_flags[2];
+	cpuid_pass4(NULL, cpu_hwcap_flags);
 
-	auxv_hwcap = (auxv_hwcap_include | cpu_hwcap_flags) &
+	auxv_hwcap = (auxv_hwcap_include | cpu_hwcap_flags[0]) &
 	    ~auxv_hwcap_exclude;
+	auxv_hwcap_2 = (auxv_hwcap_include_2 | cpu_hwcap_flags[1]) &
+	    ~auxv_hwcap_exclude_2;
 
 #if defined(__amd64)
 	/*
@@ -962,7 +972,8 @@ bind_hwcap(void)
 	auxv_hwcap |= AV_386_AHF;
 #endif
 
-	if (auxv_hwcap_include || auxv_hwcap_exclude) {
+	if (auxv_hwcap_include || auxv_hwcap_exclude || auxv_hwcap_include_2 ||
+	    auxv_hwcap_exclude_2) {
 		/*
 		 * The below assignment is regrettably required to get lint
 		 * to accept the validity of our format string.  The format
@@ -977,13 +988,17 @@ bind_hwcap(void)
 		 * and as soon as the format string is programmatic, it
 		 * knows enough to shut up.
 		 */
-		const char *fmt = "?user ABI extensions: %b\n";
+		char *fmt = "?user ABI extensions: %b\n";
 		cmn_err(CE_CONT, fmt, auxv_hwcap, FMT_AV_386);
+		fmt = "?user ABI extensions (word 2): %b\n";
+		cmn_err(CE_CONT, fmt, auxv_hwcap_2, FMT_AV_386_2);
 	}
 
 #if defined(_SYSCALL32_IMPL)
-	auxv_hwcap32 = (auxv_hwcap32_include | cpu_hwcap_flags) &
+	auxv_hwcap32 = (auxv_hwcap32_include | cpu_hwcap_flags[0]) &
 	    ~auxv_hwcap32_exclude;
+	auxv_hwcap32_2 = (auxv_hwcap32_include_2 | cpu_hwcap_flags[1]) &
+	    ~auxv_hwcap32_exclude_2;
 
 #if defined(__amd64)
 	/*
@@ -1001,12 +1016,15 @@ bind_hwcap(void)
 	auxv_hwcap32 |= AV_386_AHF;
 #endif
 
-	if (auxv_hwcap32_include || auxv_hwcap32_exclude) {
+	if (auxv_hwcap32_include || auxv_hwcap32_exclude ||
+	    auxv_hwcap32_include_2 || auxv_hwcap32_exclude_2) {
 		/*
 		 * See the block comment in the cmn_err() of auxv_hwcap, above.
 		 */
-		const char *fmt = "?32-bit user ABI extensions: %b\n";
+		char *fmt = "?32-bit user ABI extensions: %b\n";
 		cmn_err(CE_CONT, fmt, auxv_hwcap32, FMT_AV_386);
+		fmt = "?32-bit user ABI extensions (word 2): %b\n";
+		cmn_err(CE_CONT, fmt, auxv_hwcap32_2, FMT_AV_386_2);
 	}
 #endif
 }

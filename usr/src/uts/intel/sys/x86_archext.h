@@ -27,7 +27,7 @@
  * All rights reserved.
  */
 /*
- * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 #ifndef _SYS_X86_ARCHEXT_H
@@ -119,10 +119,12 @@ extern "C" {
 #define	CPUID_INTC_ECX_XSAVE	0x04000000	/* XSAVE/XRESTOR insns */
 #define	CPUID_INTC_ECX_OSXSAVE	0x08000000	/* OS supports XSAVE insns */
 #define	CPUID_INTC_ECX_AVX	0x10000000	/* AVX supported */
+#define	CPUID_INTC_ECX_F16C	0x20000000	/* F16C supported */
+#define	CPUID_INTC_ECX_RDRAND	0x40000000	/* RDRAND supported */
 
 #define	FMT_CPUID_INTC_ECX					\
 	"\20"							\
-	"\35avx\34osxsav\33xsave"				\
+	"\37rdrand\36f16c\35avx\34osxsav\33xsave"		\
 	"\32aes"						\
 	"\30popcnt\27movbe\25sse4.2\24sse4.1\23dca"		\
 	"\20\17etprd\16cx16\13cid\12ssse3\11tm2"		\
@@ -371,6 +373,8 @@ extern "C" {
 #define	X86FSET_VMX		35
 #define	X86FSET_SVM		36
 #define	X86FSET_TOPOEXT		37
+#define	X86FSET_F16C		38
+#define	X86FSET_RDRAND		39
 
 /*
  * flags to patch tsc_read routine.
@@ -588,13 +592,14 @@ extern "C" {
 #define	XFEATURE_SSE		0x2
 #define	XFEATURE_AVX		0x4
 #define	XFEATURE_MAX		XFEATURE_AVX
-#define	XFEATURE_FP_ALL		(XFEATURE_LEGACY_FP|XFEATURE_SSE|XFEATURE_AVX)
+#define	XFEATURE_FP_ALL	\
+	(XFEATURE_LEGACY_FP|XFEATURE_SSE|XFEATURE_AVX)
 
 #if !defined(_ASM)
 
 #if defined(_KERNEL) || defined(_KMEMUSER)
 
-#define	NUM_X86_FEATURES	38
+#define	NUM_X86_FEATURES	40
 extern uchar_t x86_featureset[];
 
 extern void free_x86_featureset(void *featureset);
@@ -702,7 +707,7 @@ extern void cpuid_free_space(struct cpu *);
 extern void cpuid_pass1(struct cpu *, uchar_t *);
 extern void cpuid_pass2(struct cpu *);
 extern void cpuid_pass3(struct cpu *);
-extern uint_t cpuid_pass4(struct cpu *);
+extern void cpuid_pass4(struct cpu *, uint_t *);
 extern void cpuid_set_cpu_properties(void *, processorid_t,
     struct cpuid_info *);
 
