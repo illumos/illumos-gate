@@ -21,7 +21,7 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -106,7 +106,7 @@ enum {
 	Mb,		/* register or memory, always byte sized */
 	MO,		/* memory only (no registers) */
 	PREF,
-	SWAPGS,
+	SWAPGS_RDTSCP,
 	MONITOR_MWAIT,
 	R,
 	RA,
@@ -500,7 +500,7 @@ const instable_t dis_op0F00[8] = {
 const instable_t dis_op0F01[8] = {
 
 /*  [0]  */	TNSZ("sgdt",VMx,6),	TNSZ("sidt",MONITOR_MWAIT,6),	TNSZ("lgdt",XGETBV_XSETBV,6),	TNSZ("lidt",SVM,6),
-/*  [4]  */	TNSZ("smsw",M,2),	INVALID, 		TNSZ("lmsw",M,2),	TNS("invlpg",SWAPGS),
+/*  [4]  */	TNSZ("smsw",M,2),	INVALID, 		TNSZ("lmsw",M,2),	TNS("invlpg",SWAPGS_RDTSCP),
 };
 
 /*
@@ -3493,14 +3493,21 @@ just_mem:
 		dtrace_get_operand(x, mode, r_m, wbit, 0);
 		break;
 
-	case SWAPGS:
+	case SWAPGS_RDTSCP:
 		if (cpu_mode == SIZE64 && mode == 3 && r_m == 0) {
 #ifdef DIS_TEXT
 			(void) strncpy(x->d86_mnem, "swapgs", OPLEN);
 #endif
 			NOMEM;
 			break;
+		} else if (mode == 3 && r_m == 1) {
+#ifdef DIS_TEXT
+			(void) strncpy(x->d86_mnem, "rdtscp", OPLEN);
+#endif
+			NOMEM;
+			break;
 		}
+
 		/*FALLTHROUGH*/
 
 	/* prefetch instruction - memory operand, but no memory acess */
