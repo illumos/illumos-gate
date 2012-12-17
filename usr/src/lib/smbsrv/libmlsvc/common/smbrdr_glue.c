@@ -20,8 +20,8 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -43,6 +43,12 @@
 #include <mlsvc.h>
 
 #include <assert.h>
+
+void
+smbrdr_initialize(void)
+{
+	(void) smb_lib_init();
+}
 
 /*
  * mlsvc_disconnect
@@ -79,11 +85,9 @@ smbrdr_logon(char *srv, char *dom, char *user)
 	int err;
 
 	err = smbrdr_ctx_new(&ctx, srv, dom, user);
-	if (err) {
-		return (-1);
-	}
-	smb_ctx_free(ctx);
-	return (AUTH_USER_GRANT);
+	if (err == 0)
+		smb_ctx_free(ctx);
+	return (err);
 }
 
 void
@@ -111,12 +115,8 @@ smbrdr_ctx_new(struct smb_ctx **ctx_p, char *server,
 	assert(domain != NULL);
 	assert(user != NULL);
 
-	/* Some callers pass this when they want a NULL session. */
-	if (strcmp(user, "IPC$") == 0)
-		user = "";
-
 	if ((err = smb_ctx_alloc(&ctx)) != 0)
-		return (err);
+		return (NT_STATUS_NO_MEMORY);
 
 	/*
 	 * Set server, share, domain, user
@@ -150,12 +150,18 @@ smbrdr_ctx_new(struct smb_ctx **ctx_p, char *server,
 	 * Do lookup, connect, session setup, tree connect.
 	 * Or find and reuse a session/tree, if one exists.
 	 */
-	if ((err = smb_ctx_resolve(ctx)) != 0)
+	if ((err = smb_ctx_resolve(ctx)) != 0) {
+		err = NT_STATUS_BAD_NETWORK_PATH;
 		goto errout;
-	if ((err = smb_ctx_get_ssn(ctx)) != 0)
+	}
+	if ((err = smb_ctx_get_ssn(ctx)) != 0) {
+		err = NT_STATUS_NETWORK_ACCESS_DENIED;
 		goto errout;
-	if ((err = smb_ctx_get_tree(ctx)) != 0)
+	}
+	if ((err = smb_ctx_get_tree(ctx)) != 0) {
+		err = NT_STATUS_BAD_NETWORK_NAME;
 		goto errout;
+	}
 
 	/* Success! */
 	*ctx_p = ctx;

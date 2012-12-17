@@ -18,8 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _MLSVC_SAM_NDL_
@@ -89,10 +91,10 @@
 #define	SAMR_OPNUM_AddMultipleAliasMembers	0x34
 #define	SAMR_OPNUM_RemoveMultipleAliasMembers	0x35
 #define	SAMR_OPNUM_ChangeUserOemPassword	0x36
-#define SAMR_OPNUM_ChangeUserPasswd		0x37	/* UnicodePasswd */
+#define SAMR_OPNUM_ChangePasswordUser2		0x37	/* UnicodePasswd */
 #define SAMR_OPNUM_GetDomainPwInfo		0x38
 #define SAMR_OPNUM_Connect2                     0x39    /* SamrConnect2 */
-#define SAMR_OPNUM_SetUserInfo			0x3a
+#define SAMR_OPNUM_SetUserInfo			0x3a	/* SetInfoUser2 */
 #define	SAMR_OPNUM_SetBootKeyInformation	0x3b
 #define	SAMR_OPNUM_GetBootKeyInformation	0x3c
 #define	SAMR_OPNUM_Connect3			0x3d	/* NotUsedOnWire */
@@ -108,15 +110,6 @@
 /* Windows Vista */
 #define SAMR_OPNUM_QueryLocalizableAccountsInDomain     0x44
 #define SAMR_OPNUM_PerformGenericOperation              0x45
-
-
-/*
- * UNION_INFO_ENT is intended to simplify adding new entries to a union.
- * If the entry structures are named using the form samr_QueryUserInfoX,
- * where X is the sitch_value, you can just add a single line. Note
- * that you must also update the fixup function in mlsvc_sam.c.
- */
-#define UNION_INFO_ENT(N,NAME) CASE(N) struct NAME##N info##N
 
 
 /*
@@ -181,6 +174,7 @@
 #define	SAMR_USER_ALL_PRIVATEDATA		0x04000000
 #define	SAMR_USER_ALL_PASSWORDEXPIRED		0x08000000
 #define	SAMR_USER_ALL_SECURITYDESCRIPTOR	0x10000000
+#define	SAMR_USER_ALL_OWF_PASSWORD		0x20000000
 #define	SAMR_USER_ALL_UNDEFINED_MASK		0xC0000000
 
 /*
@@ -204,6 +198,7 @@
 /*
  * Definition for a SID. The ndl compiler does not allow a typedef of
  * a structure containing variable size members.
+ * Note: cast compatible with smb_sid_t, and code depends on that.
  */
 struct samr_sid {
 	BYTE		Revision;
@@ -235,6 +230,7 @@ struct samr_sd {
 typedef struct samr_sd samr_sd_t;
 
 /*
+ * See RPC_STRING in the MS IDL.
  * Definition for a string. The length and allosize should be set to
  * twice the string length (i.e. strlen(str) * 2). The runtime code
  * will perform the appropriate string to a wide-char conversions,
@@ -355,9 +351,33 @@ struct samr_logon_hours_all {
 	BYTE	*hours;
 };
 
-struct samr_oem_password {
-	BYTE password[512];
-	DWORD length;
+/*
+ * SAMPR_USER_PASSWORD (in the MS Net API) or
+ * struct samr_user_password (internal use) is
+ * the "clear" form of struct samr_encr_passwd
+ * (SAMPR_ENCRYPTED_USER_PASSWORD in MS Net).
+ * It's not used by ndrgen, but is declared here
+ * to help clarify the relationship between these,
+ * and for the benefit of our client-side code.
+ */
+#ifndef	NDRGEN
+#define SAMR_USER_PWLEN	256
+struct samr_user_password {
+	smb_wchar_t	Buffer[SAMR_USER_PWLEN];
+	DWORD Length;
+};
+#endif	/* NDRGEN */
+
+/* SAMPR_ENCRYPTED_USER_PASSWORD */
+#define	SAMR_ENCR_PWLEN 516	/* sizeof samr_user_password */
+struct samr_encr_passwd {
+	BYTE data[SAMR_ENCR_PWLEN];
+};
+
+/* ENCRYPTED_NT_OWF_PASSWORD */
+#define	SAMR_PWHASH_LEN	16
+struct samr_encr_hash {
+	BYTE data[SAMR_PWHASH_LEN];
 };
 
 /*
@@ -437,10 +457,16 @@ OPERATION(SAMR_OPNUM_Connect5)
 struct samr_Connect5 {
 	IN		LPTSTR servername;
 	IN		DWORD access_mask;
-	INOUT	DWORD unknown2_00000001;
-	INOUT	DWORD unknown3_00000001;
-	INOUT	DWORD unknown4_00000003;
-	INOUT	DWORD unknown5_00000000;
+	/*
+	 * This should be a union, but instead this is
+	 * done this way because unions are hard to
+	 * express in this RPC implementation.
+	 */
+	INOUT	DWORD unknown2_00000001;	/* V1 */
+	INOUT	DWORD unknown3_00000001;	/* V1 */
+	/* SAMPR_REVISION_INFO_V1 */
+	INOUT	DWORD unknown4_00000003;	/* Revision */
+	INOUT	DWORD unknown5_00000000;	/* SupportedFeatures */
 	OUT		samr_handle_t handle;
 	OUT		DWORD status;
 };
@@ -895,7 +921,7 @@ struct samr_QueryUserInfo9 {
 
 
 struct samr_QueryUserInfo16 {
-	DWORD unknown;
+	DWORD UserAccountControl;
 };
 
 /*
@@ -937,6 +963,7 @@ struct samr_QueryUserInfo21 {
 	BYTE			PrivateDataSensitive;
 };
 
+/* See also: fixup_samr_QueryUserInfo() */
 union QueryUserInfo_result_u {
 	UNION_INFO_ENT(1,samr_QueryUserInfo);
 	UNION_INFO_ENT(6,samr_QueryUserInfo);
@@ -1204,27 +1231,20 @@ struct samr_CreateUser {
 
 /*
  ***********************************************************************
- * ChangeUserPasswd
+ * ChangePasswordUser2 - See:
+ * SamrUnicodeChangePasswordUser2 [MS-SAMR 3.1.5.10.3]
  ***********************************************************************
  */
-struct samr_newpasswd {
-	BYTE data[516];
-};
 
-
-struct samr_oldpasswd {
-	BYTE data[16];
-};
-
-
-OPERATION(SAMR_OPNUM_ChangeUserPasswd)
-struct samr_ChangeUserPasswd {
-	IN	LPTSTR servername;
-	IN	LPTSTR username;
-	IN	struct samr_newpasswd *nt_newpasswd;
-	IN	struct samr_oldpasswd *nt_oldpasswd;
-	IN	struct samr_newpasswd *lm_newpasswd;
-	IN	struct samr_oldpasswd *lm_oldpasswd;
+OPERATION(SAMR_OPNUM_ChangePasswordUser2)
+struct samr_ChangePasswordUser2 {
+	IN	samr_string_t *servername;
+	IN REF	samr_string_t *username;
+	IN	struct samr_encr_passwd *nt_newpw;
+	IN	struct samr_encr_hash *nt_oldpw;
+	IN	BYTE lm_present;
+	IN	struct samr_encr_passwd *lm_newpw;
+	IN	struct samr_encr_hash *lm_oldpw;
 	OUT	DWORD status;
 };
 
@@ -1245,172 +1265,112 @@ struct samr_GetDomainPwInfo {
 /*
  ***********************************************************************
  * SetUserInfo
- *
- *	+++ 20 byte user handle and the union switch_value +++
- *	00 00 00 00 77 F2 DD D5 66 48 D4 11 AD 5F D1 CD
- *	18 43 7A DF 17 00 17 00
- *
- *	+++ 14 dwords (56 bytes) of zeros +++
- *	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
- *	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
- *	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
- *	00 00 00 00 00 00 00 00
- *
- *	+++ 9 sets of something - 72 bytes +++
- *	00 00 02 00 D0 04 8A 77
- *	00 00 02 00 D0 04 8A 77
- *	00 00 02 00 D0 04 8A 77
- *	00 00 02 00 D0 04 8A 77
- *	00 00 02 00 D0 04 8A 77
- *	00 00 02 00 D0 04 8A 77
- *	00 00 02 00 D0 04 8A 77
- *	00 00 02 00 D0 04 8A 77
- *	00 00 02 00 D0 04 8A 77
- *
- *	+++ 9 DWORD zeros +++
- *	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
- *	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
- *	00 00 00 00
- *
- *	+++ miscellaneous +++
- *	01 02 00 00
- *	80 00 00 00
- *	FA 27 F8 09
- *	A8 00 00 00 70 F1 14 00
- *	00 00 00 00 00 00 00 00 00 00 00 00
- *
- *	+++ encrypted password buffer - 512 bytes +++
- *	76 68 E8 AA 23 4F 62 C4 81 4E 30 B8 92 29 66 B9
- *	12 FF 3A 84 82 3A 55 0F C7 18 EA 56 86 50 D7 C5
- *	43 BA 9C F8 32 D4 E0 15 74 A1 6F E1 59 C2 F2 95
- *	53 A9 F2 68 9F 7F 29 B9 88 4C 65 A5 C1 DC 0B 44
- *	B8 3C ED 74 D1 6A F7 09 66 97 94 6B 2C 3A A5 88
- *	39 34 C6 FE 24 59 30 2D CF 6D 7F D5 EC B1 9A 84
- *	E6 57 96 29 40 32 FB 62 9D 93 E2 BE D8 A3 74 88
- *	8B 85 BC A0 76 D6 C9 DB 8C AF 81 BD 8A F0 08 8D
- *	23 B0 52 FD 69 DE EF A1 36 E5 30 19 BD DA 67 A3
- *	81 BD 3F D0 2A A2 8F 60 62 B0 8D 34 9E A4 4F 20
- *	4E 79 93 82 58 A8 E5 6F 7A DC 12 13 33 E6 74 02
- *	4C 32 F9 FC 1A E1 C5 0D E2 CC 36 8D FC 72 87 DD
- *	6C 44 E3 6F 4B FD 46 10 08 89 E5 64 B8 27 14 83
- *	E7 08 DE CF 69 C7 E1 40 63 DF CB 67 95 73 03 1B
- *	CA 99 E1 1B 53 2A 89 6B 30 39 CD 5C DF A0 8A 1C
- *	4E 50 74 7C 6D 3D E7 EA E9 B2 97 DD 38 7B DA EC
- *	1A AD DA CE C4 58 9B 29 F3 6D 30 70 4E 63 6D 84
- *	DB DC 5B CD 9A 4E 57 9C E4 65 5D 4F 76 E3 C7 52
- *	8B 3B 20 0A 3B 4C 4B B1 2E 5B 4D AB BA 2F 45 6A
- *	CA 17 AD 9F C0 B2 07 FB 56 7F E4 3F 9F D4 C6 8C
- *	A1 05 BF 53 42 1E 67 F4 57 54 E3 2C 38 CF E1 94
- *	75 69 F7 4E 5C 74 CC B3 FD EF 73 3F D5 28 22 EC
- *	9B 40 E1 1D 65 44 7C BB 69 88 57 10 05 3A C5 48
- *	8E 4F 77 DB 1A 5C 49 9C D5 06 00 AC 79 BC 7E 89
- *	B0 01 66 70 88 A2 E5 DF 96 DC 75 98 10 12 45 02
- *	33 35 6C DF 74 8B 14 2F 26 C6 FD 7A B4 D0 A6 7D
- *	DE 2B 13 44 EF 34 46 4D 9D 3E C3 75 BC 11 B4 41
- *	27 58 25 1E AF AA F0 BB DA 27 7A 1E AE 81 1A 78
- *	44 19 DE FC C4 7C 4E 32 44 F7 57 2A 41 A2 85 DC
- *	C0 AD 5D 6B 58 FD 2E 75 25 B9 F2 B6 19 82 E5 0E
- *	B6 69 0D C1 27 A9 B6 40 A6 50 49 E5 CB 17 98 65
- *	88 18 CA E4 1D 2E 20 F7 DE 8E 7D F2 9D A5 6B CD
- *
- *	D6 79 45 71
- *
- *	+++ table of 9 things +++
- *	01 00 00 00 00 00 00 00 00 00 00 00
- *	01 00 00 00 00 00 00 00 00 00 00 00
- *	01 00 00 00 00 00 00 00 00 00 00 00
- *	01 00 00 00 00 00 00 00 00 00 00 00
- *	01 00 00 00 00 00 00 00 00 00 00 00
- *	01 00 00 00 00 00 00 00 00 00 00 00
- *	01 00 00 00 00 00 00 00 00 00 00 00
- *	01 00 00 00 00 00 00 00 00 00 00 00
- *	01 00 00 00 00 00 00 00 00 00 00 00
- *
- *	+++ miscellaneous +++
- *	EC 04 00 00 00 00 00 00 15 00 00 00
- *	FF FF FF FF FF FF FF FF FF FF FF FF
- *	FF FF FF FF FF FF FF FF FF
- *
+ * [MS-SAMR] SamrSetInformationUser2
  ***********************************************************************
  */
 
-#define SAMR_SET_USER_INFO_23		23
-#define SAMR_SET_USER_DATA_SZ		516
+/* USER_CONTROL_INFORMATION */
+struct samr_SetUserInfo16 {
+	DWORD UserAccountControl;
+};
 
-struct samr_SetUserInfo23 {
-	samr_quad_t logon_time;			/* 00 00 00 00 00 00 00 00 */
-	samr_quad_t logoff_time;		/* 00 00 00 00 00 00 00 00 */
-	samr_quad_t kickoff_time;		/* 00 00 00 00 00 00 00 00 */
-	samr_quad_t passwd_last_set_time;	/* 00 00 00 00 00 00 00 00 */
-	samr_quad_t passwd_can_change_time;	/* 00 00 00 00 00 00 00 00 */
-	samr_quad_t passwd_must_change_time;	/* 00 00 00 00 00 00 00 00 */
 
-	samr_vcbuf_t user_name;			/* 00 00 00 00 00 00 00 00 */
-	samr_vcbuf_t full_name;			/* 00 00 02 00 D0 04 8A 77 */
-	samr_vcbuf_t home_dir;			/* 00 00 02 00 D0 04 8A 77 */
-	samr_vcbuf_t home_drive;		/* 00 00 02 00 D0 04 8A 77 */
-	samr_vcbuf_t logon_script;		/* 00 00 02 00 D0 04 8A 77 */
-	samr_vcbuf_t profile_path;		/* 00 00 02 00 D0 04 8A 77 */
-	samr_vcbuf_t acct_desc;			/* 00 00 02 00 D0 04 8A 77 */
-	samr_vcbuf_t workstations;		/* 00 00 02 00 D0 04 8A 77 */
-	samr_vcbuf_t unknown1;			/* 00 00 02 00 D0 04 8A 77 */
-	samr_vcbuf_t unknown2;			/* 00 00 02 00 D0 04 8A 77 */
-	samr_vcbuf_t lm_password;		/* 00 00 00 00 00 00 00 00 */
-	samr_vcbuf_t nt_password;		/* 00 00 00 00 00 00 00 00 */
-	samr_vcbuf_t unknown3;			/* 00 00 00 00 00 00 00 00 */
+/*
+ * samr_SetUserInfo21, a.k.a
+ * SAMR_USER_ALL_INFORMATION
+ *
+ * We now know this is the same as samr_QueryUserInfo21
+ * Could merge, except for the samr_vcbuf_t mess.
+ */
 
-	struct samr_sd sd;			/* 00 00 00 00 00 00 00 00 */
-	DWORD user_rid;				/* 00 00 00 00 */
-	DWORD group_rid;			/* 01 02 00 00 */
-	DWORD acct_info;			/* 80 00 00 00 */
-	DWORD flags;				/* FA 27 F8 09 */
-	struct samr_logon_info logon_info;  /* A8 00 00 00 70 F1 14 00->0xFF */
+#define SAMR_SET_USER_INFO_21		21
+
+struct samr_SetUserInfo21 {
+	samr_quad_t		LastLogon;
+	samr_quad_t		LastLogoff;
+	samr_quad_t		PasswordLastSet;
+	samr_quad_t		AccountExpires;
+	samr_quad_t		PasswordCanChange;
+	samr_quad_t		PasswordMustChange;
+
+	samr_vcbuf_t		UserName;
+	samr_vcbuf_t		FullName;
+	samr_vcbuf_t		HomeDirectory;
+	samr_vcbuf_t		HomeDirectoryDrive;
+	samr_vcbuf_t		ScriptPath;
+	samr_vcbuf_t		ProfilePath;
+	samr_vcbuf_t		AdminComment;
+	samr_vcbuf_t		WorkStations;
+	samr_vcbuf_t		UserComment;
+	samr_vcbuf_t		Parameters;
+
+	struct samr_short_blob	LmOwfPassword;
+	struct samr_short_blob	NtOwfPassword;
+	samr_vcbuf_t		PrivateData;
+	samr_sd_t		SecurityDescriptor;
+
+	DWORD			UserId;	/* RID */
+	DWORD			PrimaryGroupId;
+	DWORD			UserAccountControl;
+	DWORD			WhichFields;
+
 	/*
-	 * The following 12 bytes are encoded in Ethereal as:
-	 *
-	 *	WORD bad_pwd_count;
-	 *	WORD logon_count;
-	 *
-	 *	WORD country;			(default 0)
-	 *	WORD codepage;
-	 *
-	 *	BYTE nt_pwd_set;
-	 *	BYTE lm_pwd_set;
-	 *	BYTE expired_flag;
-	 *	BYTE unknown_char;
+	 * This should be samr_logon_hours_all, but apparently
+	 * ndrgen doesn't get that quite right, so instead, the
+	 * client-side code patches this up.
 	 */
-	DWORD unknown4_zero;			/* 00 00 00 00 */
-	DWORD unknown5_zero;			/* 00 00 00 00 */
-	DWORD unknown6_zero;			/* 00 00 00 00 */
-	BYTE password[SAMR_SET_USER_DATA_SZ];
+	struct samr_logon_info	LogonHours;
+
+	WORD			BadPasswordCount;
+	WORD			LogonCount;
+	WORD			CountryCode;
+	WORD			CodePage;
+	BYTE			LmPasswordPresent;
+	BYTE			NtPasswordPresent;
+	BYTE			PasswordExpired;
+	BYTE			PrivateDataSensitive;
+};
+
+/*
+ *	SAMPR_USER_INTERNAL4_INFORMATION
+ *	UserInternal4Information (23)
+ */
+#define SAMR_SET_USER_INFO_23		23
+struct samr_SetUserInfo23 {
+	struct samr_SetUserInfo21 info21;
+	struct samr_encr_passwd encr_pw;
+};
+
+/*
+ *	SAMPR_USER_INTERNAL5_INFORMATION
+ *	UserInternal5Information (24)
+ */
+#define SAMR_SET_USER_INFO_24		24
+struct samr_SetUserInfo24 {
+	struct samr_encr_passwd encr_pw;
+	BYTE password_expired;
 };
 
 
 union samr_SetUserInfo_u {
+	UNION_INFO_ENT(16,samr_SetUserInfo);
+	UNION_INFO_ENT(21,samr_SetUserInfo);
 	UNION_INFO_ENT(23,samr_SetUserInfo);
-	DEFAULT	char *nullptr;
+	UNION_INFO_ENT(24,samr_SetUserInfo);
+	DEFAULT  DWORD nothing;
 };
 
-
 struct samr_SetUserInfo_s {
-	WORD index;
+	WORD info_level;
 	WORD switch_value;
   SWITCH(switch_value)
 	union samr_SetUserInfo_u ru;
 };
 
-
-/*
-	IN	DWORD unknown_04EC;
-	IN	DWORD unknown_zero;
-	IN	DWORD logon_bitmap_size;
-	IN	BYTE logon_bitmap[SAMR_SET_USER_HOURS_SZ];
-*/
 OPERATION(SAMR_OPNUM_SetUserInfo)
 struct samr_SetUserInfo {
 	IN	samr_handle_t user_handle;
 	IN	struct samr_SetUserInfo_s info;
-	IN	struct samr_logon_hours logon_hours;
 	OUT	DWORD status;
 };
 
@@ -1458,8 +1418,8 @@ union samr_interface {
 		struct samr_GetUserPwInfo	GetUserPwInfo;
 	CASE(SAMR_OPNUM_CreateUser)
 		struct samr_CreateUser		CreateUser;
-	CASE(SAMR_OPNUM_ChangeUserPasswd)
-		struct samr_ChangeUserPasswd	ChangeUserPasswd;
+	CASE(SAMR_OPNUM_ChangePasswordUser2)
+		struct samr_ChangePasswordUser2	ChangePasswordUser2;
 	CASE(SAMR_OPNUM_GetDomainPwInfo)
 		struct samr_GetDomainPwInfo	GetDomainPwInfo;
 	CASE(SAMR_OPNUM_Connect2)

@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SMBSRV_MLSVC_H
@@ -33,6 +34,7 @@ extern "C" {
 #endif
 
 int smb_dclocator_init(void);
+void smbrdr_initialize(void);
 void dssetup_initialize(void);
 void srvsvc_initialize(void);
 void wkssvc_initialize(void);
