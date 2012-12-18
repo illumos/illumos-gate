@@ -173,6 +173,7 @@ DBOOT_OBJS +=			\
 	memcpy.o		\
 	memset.o		\
 	muldiv.o		\
+	sha1.o			\
 	string.o		\
 	$(BOOT_DRIVER_OBJS)	\
 	$(DBOOT_OBJS_$(CLASS))
