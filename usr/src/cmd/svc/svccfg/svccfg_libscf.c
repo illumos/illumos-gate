@@ -9319,7 +9319,7 @@ export_dependency(scf_propertygroup_t *pg, struct entity_elts *eelts)
 	if (err) {
 		xmlFreeNode(n);
 
-		export_pg(pg, eelts, 0);
+		export_pg(pg, eelts, SCE_ALL_VALUES);
 
 		return;
 	}
@@ -9354,7 +9354,7 @@ export_dependency(scf_propertygroup_t *pg, struct entity_elts *eelts)
 			xmlFreeNode(m);
 		}
 
-		export_property(exp_prop, exp_str, &elts, 0);
+		export_property(exp_prop, exp_str, &elts, SCE_ALL_VALUES);
 	}
 	if (ret == -1)
 		scfdie();
@@ -9482,7 +9482,7 @@ export_method(scf_propertygroup_t *pg, struct entity_elts *eelts)
 	if (err) {
 		xmlFreeNode(n);
 
-		export_pg(pg, eelts, 0);
+		export_pg(pg, eelts, SCE_ALL_VALUES);
 
 		return;
 	}
@@ -9659,7 +9659,7 @@ export_method(scf_propertygroup_t *pg, struct entity_elts *eelts)
 				continue;
 		}
 
-		export_property(exp_prop, exp_str, &elts, 0);
+		export_property(exp_prop, exp_str, &elts, SCE_ALL_VALUES);
 	}
 	if (ret == -1)
 		scfdie();
@@ -9775,7 +9775,7 @@ export_svc_general(scf_propertygroup_t *pg, struct entity_elts *selts)
 			xmlFreeNode(s);
 		}
 
-		export_property(exp_prop, exp_str, &elts, 0);
+		export_property(exp_prop, exp_str, &elts, SCE_ALL_VALUES);
 	}
 	if (ret == -1)
 		scfdie();
@@ -9871,7 +9871,7 @@ export_method_context(scf_propertygroup_t *pg, struct entity_elts *elts)
 
 	if (err && env == NULL) {
 		xmlFreeNode(n);
-		export_pg(pg, elts, 0);
+		export_pg(pg, elts, SCE_ALL_VALUES);
 		return;
 	}
 
@@ -9985,7 +9985,7 @@ export_dependent(scf_propertygroup_t *pg, const char *name, const char *tfmri)
 			xmlFreeNode(s);
 		}
 
-		export_property(exp_prop, exp_str, &pgelts, 0);
+		export_property(exp_prop, exp_str, &pgelts, SCE_ALL_VALUES);
 	}
 	if (ret == -1)
 		scfdie();
@@ -10034,7 +10034,8 @@ export_dependents(scf_propertygroup_t *pg, struct entity_elts *eelts)
 		if ((ty != SCF_TYPE_ASTRING &&
 		    prop_check_type(exp_prop, SCF_TYPE_FMRI) != 0) ||
 		    prop_get_val(exp_prop, exp_val) != 0) {
-			export_property(exp_prop, NULL, &pgelts, 0);
+			export_property(exp_prop, NULL, &pgelts,
+			    SCE_ALL_VALUES);
 			continue;
 		}
 
@@ -10065,7 +10066,8 @@ export_dependents(scf_propertygroup_t *pg, struct entity_elts *eelts)
 				    "FMRI.\n"), fmri);
 			}
 
-			export_property(exp_prop, exp_str, &pgelts, 0);
+			export_property(exp_prop, exp_str, &pgelts,
+			    SCE_ALL_VALUES);
 			continue;
 
 		case SCF_ERROR_CONSTRAINT_VIOLATED:
@@ -10078,7 +10080,8 @@ export_dependents(scf_propertygroup_t *pg, struct entity_elts *eelts)
 				    "a service or an instance.\n"), fmri);
 			}
 
-			export_property(exp_prop, exp_str, &pgelts, 0);
+			export_property(exp_prop, exp_str, &pgelts,
+			    SCE_ALL_VALUES);
 			continue;
 
 		case SCF_ERROR_NOT_FOUND:
@@ -10091,7 +10094,8 @@ export_dependents(scf_propertygroup_t *pg, struct entity_elts *eelts)
 				    "not exist.\n"), fmri);
 			}
 
-			export_property(exp_prop, exp_str, &pgelts, 0);
+			export_property(exp_prop, exp_str, &pgelts,
+			    SCE_ALL_VALUES);
 			continue;
 
 		default:
@@ -10110,7 +10114,8 @@ export_dependents(scf_propertygroup_t *pg, struct entity_elts *eelts)
 			warn(gettext("Entity %s is missing dependency property "
 			    "group %s.\n"), fmri, exp_str);
 
-			export_property(exp_prop, NULL, &pgelts, 0);
+			export_property(exp_prop, NULL, &pgelts,
+			    SCE_ALL_VALUES);
 			continue;
 		}
 
@@ -10124,14 +10129,16 @@ export_dependents(scf_propertygroup_t *pg, struct entity_elts *eelts)
 			warn(gettext("Property group %s is not of "
 			    "expected type %s.\n"), fmri, SCF_GROUP_DEPENDENCY);
 
-			export_property(exp_prop, NULL, &pgelts, 0);
+			export_property(exp_prop, NULL, &pgelts,
+			    SCE_ALL_VALUES);
 			continue;
 		}
 
 		n = export_dependent(opg, exp_str, fmri);
-		if (n == NULL)
-			export_property(exp_prop, exp_str, &pgelts, 0);
-		else {
+		if (n == NULL) {
+			export_property(exp_prop, exp_str, &pgelts,
+			    SCE_ALL_VALUES);
+		} else {
 			if (eelts->dependents == NULL)
 				eelts->dependents = n;
 			else
@@ -10255,12 +10262,12 @@ export_template(scf_propertygroup_t *pg, struct entity_elts *elts,
 	if (strcmp(exp_str, SCF_PG_TM_COMMON_NAME) == 0) {
 		telts->common_name = export_tm_loctext(pg, "common_name");
 		if (telts->common_name == NULL)
-			export_pg(pg, elts, 0);
+			export_pg(pg, elts, SCE_ALL_VALUES);
 		return;
 	} else if (strcmp(exp_str, SCF_PG_TM_DESCRIPTION) == 0) {
 		telts->description = export_tm_loctext(pg, "description");
 		if (telts->description == NULL)
-			export_pg(pg, elts, 0);
+			export_pg(pg, elts, SCE_ALL_VALUES);
 		return;
 	}
 
@@ -10274,7 +10281,7 @@ export_template(scf_propertygroup_t *pg, struct entity_elts *elts,
 		make_node(&telts->documentation, "documentation");
 		(void) xmlAddChild(telts->documentation, child);
 	} else {
-		export_pg(pg, elts, 0);
+		export_pg(pg, elts, SCE_ALL_VALUES);
 	}
 }
 
@@ -10427,7 +10434,7 @@ export_notify_params(scf_propertygroup_t *pg, struct entity_elts *elts)
 			xmlFree(type[i]);
 		free(type);
 
-		export_pg(pg, elts, 0);
+		export_pg(pg, elts, SCE_ALL_VALUES);
 
 		return;
 	} else {
@@ -10503,7 +10510,7 @@ export_inst_general(scf_propertygroup_t *pg, xmlNodePtr inode,
 			xmlFreeNode(rnode);
 		}
 
-		export_property(exp_prop, exp_str, &pgelts, 0);
+		export_property(exp_prop, exp_str, &pgelts, SCE_ALL_VALUES);
 	}
 	if (ret == -1)
 		scfdie();
