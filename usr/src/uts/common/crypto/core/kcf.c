@@ -92,8 +92,6 @@ _init()
 	/* initialize the RNG support structures */
 	kcf_rnd_init();
 
-	kcf_rnd_schedule_timeout(B_TRUE);
-
 	return (mod_install(&modlinkage));
 }
 
