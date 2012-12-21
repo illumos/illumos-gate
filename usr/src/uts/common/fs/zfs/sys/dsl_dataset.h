@@ -218,7 +218,8 @@ int dsl_dataset_destroy(dsl_dataset_t *ds, void *tag, boolean_t defer);
 dsl_checkfunc_t dsl_dataset_destroy_check;
 dsl_syncfunc_t dsl_dataset_destroy_sync;
 dsl_syncfunc_t dsl_dataset_user_hold_sync;
-int dsl_dataset_snapshot_check(dsl_dataset_t *ds, const char *, dmu_tx_t *tx);
+int dsl_dataset_snapshot_check(dsl_dataset_t *ds, const char *, uint64_t,
+    dmu_tx_t *tx, cred_t *);
 void dsl_dataset_snapshot_sync(dsl_dataset_t *ds, const char *, dmu_tx_t *tx);
 int dsl_dataset_rename(char *name, const char *newname, boolean_t recursive);
 int dsl_dataset_promote(const char *name, char *conflsnap);

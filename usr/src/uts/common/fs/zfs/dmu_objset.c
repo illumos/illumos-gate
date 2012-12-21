@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -690,7 +691,7 @@ dmu_objset_create_check(void *arg1, void *arg2, dmu_tx_t *tx)
 			return (EINVAL);
 	}
 
-	return (0);
+	return (dsl_dir_fscount_check(dd, 1, NULL, oa->cr));
 }
 
 static void
@@ -704,6 +705,8 @@ dmu_objset_create_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 	blkptr_t *bp;
 
 	ASSERT(dmu_tx_is_syncing(tx));
+
+	dsl_dir_fscount_adjust(dd, tx, 1, B_TRUE);
 
 	obj = dsl_dataset_create_sync(dd, oa->lastname,
 	    oa->clone_origin, oa->flags, oa->cr, tx);
@@ -807,6 +810,7 @@ typedef struct snapallarg {
 	dsl_sync_task_group_t *saa_dstg;
 	boolean_t saa_needsuspend;
 	nvlist_t *saa_props;
+	cred_t *saa_cr;
 
 	/* the following are used only if 'temporary' is set: */
 	boolean_t saa_temporary;
@@ -818,6 +822,7 @@ typedef struct snapallarg {
 typedef struct snaponearg {
 	const char *soa_longname; /* long snap name */
 	const char *soa_snapname; /* short snap name */
+	uint64_t soa_tot_cnt;
 	snapallarg_t *soa_saa;
 } snaponearg_t;
 
@@ -832,7 +837,7 @@ snapshot_check(void *arg1, void *arg2, dmu_tx_t *tx)
 	/* The props have already been checked by zfs_check_userprops(). */
 
 	error = dsl_dataset_snapshot_check(os->os_dsl_dataset,
-	    soa->soa_snapname, tx);
+	    soa->soa_snapname, soa->soa_tot_cnt, tx, saa->saa_cr);
 	if (error)
 		return (error);
 
@@ -897,7 +902,7 @@ snapshot_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 }
 
 static int
-snapshot_one_impl(const char *snapname, void *arg)
+snapshot_one_impl(const char *snapname, void *arg, uint64_t cnt)
 {
 	char fsname[MAXPATHLEN];
 	snapallarg_t *saa = arg;
@@ -933,6 +938,7 @@ snapshot_one_impl(const char *snapname, void *arg)
 	soa->soa_saa = saa;
 	soa->soa_longname = snapname;
 	soa->soa_snapname = strchr(snapname, '@') + 1;
+	soa->soa_tot_cnt = cnt;
 
 	dsl_sync_task_create(saa->saa_dstg, snapshot_check, snapshot_sync,
 	    os, soa, 3);
@@ -952,6 +958,10 @@ dmu_objset_snapshot(nvlist_t *snaps, nvlist_t *props, nvlist_t *errors)
 	int rv = 0;
 	int err;
 	nvpair_t *pair;
+	nvlist_t *cnt_track = NULL;
+	char *pdelim;
+	uint64_t val;
+	char nm[MAXPATHLEN];
 
 	pair = nvlist_next_nvpair(snaps, NULL);
 	if (pair == NULL)
@@ -963,10 +973,60 @@ dmu_objset_snapshot(nvlist_t *snaps, nvlist_t *props, nvlist_t *errors)
 	saa.saa_dstg = dsl_sync_task_group_create(spa_get_dsl(spa));
 	saa.saa_props = props;
 	saa.saa_needsuspend = (spa_version(spa) < SPA_VERSION_FAST_SNAP);
+	saa.saa_cr = CRED();
+
+	/*
+	 * Pre-compute how many total new snapshots will be created for each
+	 * level in the tree and below. This is needed for validating the
+	 * snapshot limit when taking a recursive snapshot.
+	 *
+	 * The problem is that the counts are not actually adjusted when
+	 * we are checking, only when we finally sync. For a single snapshot,
+	 * this is easy, the count will increase by 1 at each node up the tree,
+	 * but its more complicated for recursive snapshots. Since we are
+	 * validating each snapshot independently we need to be sure that we
+	 * are validating the complete count for the entire set of snapshots.
+	 * We do this by rolling up the counts for each component of the name
+	 * into an nvlist then we'll use that count in the validation of each
+	 * individual snapshot.
+	 *
+	 * We validated the snapshot names in zfs_ioc_snapshot so we know they
+	 * have a '@'.
+	 */
+	cnt_track = fnvlist_alloc();
 
 	for (pair = nvlist_next_nvpair(snaps, NULL); pair != NULL;
 	    pair = nvlist_next_nvpair(snaps, pair)) {
-		err = snapshot_one_impl(nvpair_name(pair), &saa);
+		(void) strlcpy(nm, nvpair_name(pair), sizeof (nm));
+		pdelim = strchr(nm, '@');
+		*pdelim = '\0';
+
+		do {
+			if (nvlist_lookup_uint64(cnt_track, nm, &val) == 0) {
+				/* update existing entry */
+				fnvlist_add_uint64(cnt_track, nm, val + 1);
+			} else {
+				/* add to list */
+				fnvlist_add_uint64(cnt_track, nm, 1);
+			}
+
+			pdelim = strrchr(nm, '/');
+			if (pdelim != NULL)
+				*pdelim = '\0';
+		} while (pdelim != NULL);
+	}
+
+	/*
+	 * We've calculated the counts, now validate.
+	 */
+	for (pair = nvlist_next_nvpair(snaps, NULL); pair != NULL;
+	    pair = nvlist_next_nvpair(snaps, pair)) {
+		(void) strlcpy(nm, nvpair_name(pair), sizeof (nm));
+		pdelim = strchr(nm, '@');
+		*pdelim = '\0';
+
+		val = fnvlist_lookup_uint64(cnt_track, nm);
+		err = snapshot_one_impl(nvpair_name(pair), &saa, val);
 		if (err != 0) {
 			if (errors != NULL) {
 				fnvlist_add_int32(errors,
@@ -975,6 +1035,8 @@ dmu_objset_snapshot(nvlist_t *snaps, nvlist_t *props, nvlist_t *errors)
 			rv = err;
 		}
 	}
+
+	nvlist_free(cnt_track);
 
 	/*
 	 * If any call to snapshot_one_impl() failed, don't execute the
@@ -1050,7 +1112,7 @@ dmu_objset_snapshot_tmp(const char *snapname, const char *tag, int cleanup_fd)
 		return (err);
 	}
 
-	err = snapshot_one_impl(snapname, &saa);
+	err = snapshot_one_impl(snapname, &saa, 1);
 
 	if (err == 0)
 		err = dsl_sync_task_group_wait(saa.saa_dstg);

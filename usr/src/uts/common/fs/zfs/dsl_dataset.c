@@ -45,6 +45,7 @@
 #include <sys/zvol.h>
 #include <sys/dsl_scan.h>
 #include <sys/dsl_deadlist.h>
+#include "zfs_prop.h"
 
 static char *dsl_reaper = "the grim reaper";
 
@@ -331,7 +332,8 @@ dsl_dataset_snap_lookup(dsl_dataset_t *ds, const char *name, uint64_t *value)
 }
 
 static int
-dsl_dataset_snap_remove(dsl_dataset_t *ds, char *name, dmu_tx_t *tx)
+dsl_dataset_snap_remove(dsl_dataset_t *ds, char *name, dmu_tx_t *tx,
+    boolean_t adj_cnt)
 {
 	objset_t *mos = ds->ds_dir->dd_pool->dp_meta_objset;
 	uint64_t snapobj = ds->ds_phys->ds_snapnames_zapobj;
@@ -348,6 +350,10 @@ dsl_dataset_snap_remove(dsl_dataset_t *ds, char *name, dmu_tx_t *tx)
 	err = zap_remove_norm(mos, snapobj, name, mt, tx);
 	if (err == ENOTSUP && mt == MT_FIRST)
 		err = zap_remove(mos, snapobj, name, tx);
+
+	if (err == 0 && adj_cnt)
+		dsl_snapcount_adjust(ds->ds_dir, tx, -1, B_TRUE);
+
 	return (err);
 }
 
@@ -1947,7 +1953,8 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, dmu_tx_t *tx)
 			ASSERT3U(val, ==, obj);
 		}
 #endif
-		err = dsl_dataset_snap_remove(ds_head, ds->ds_snapname, tx);
+		err = dsl_dataset_snap_remove(ds_head, ds->ds_snapname, tx,
+		    B_TRUE);
 		ASSERT(err == 0);
 		dsl_dataset_rele(ds_head, FTAG);
 	}
@@ -2012,9 +2019,124 @@ dsl_dataset_snapshot_reserve_space(dsl_dataset_t *ds, dmu_tx_t *tx)
 	return (0);
 }
 
+/*
+ * Check if adding additional snapshot(s) would exceed any snapshot limits.
+ * Note that all snapshot limits up to the root dataset (i.e. the pool itself)
+ * or the given ancestor must be satisfied. Note that it is valid for the
+ * count to exceed the limit. This can happen if a snapshot is taken by an
+ * administrative user in the global zone (e.g. a recursive snapshot by root).
+ */
+int
+dsl_snapcount_check(dsl_dir_t *dd, uint64_t cnt, dsl_dir_t *ancestor,
+    cred_t *cr)
+{
+	uint64_t limit;
+	int err = 0;
+
+	VERIFY(RW_LOCK_HELD(&dd->dd_pool->dp_config_rwlock));
+
+	/* If we're allowed to change the limit, don't enforce the limit. */
+	if (dsl_secpolicy_write_prop(dd, ZFS_PROP_SNAPSHOT_LIMIT, cr) == 0)
+		return (0);
+
+	/*
+	 * If renaming a dataset with no snapshots, count adjustment is 0.
+	 */
+	if (cnt == 0)
+		return (0);
+
+	/*
+	 * If an ancestor has been provided, stop checking the limit once we
+	 * hit that dir. We need this during rename so that we don't overcount
+	 * the check once we recurse up to the common ancestor.
+	 */
+	if (ancestor == dd)
+		return (0);
+
+	/*
+	 * If we hit an uninitialized node while recursing up the tree, we can
+	 * stop since we know the counts are not valid on this node and we
+	 * know we won't touch this node's counts. We also know that the counts
+	 * on the nodes above this one are uninitialized and that there cannot
+	 * be a limit set on any of those nodes.
+	 */
+	if (dd->dd_phys->dd_filesystem_count == 0)
+		return (0);
+
+	err = dsl_prop_get_dd(dd, zfs_prop_to_name(ZFS_PROP_SNAPSHOT_LIMIT),
+	    8, 1, &limit, NULL, B_FALSE);
+	if (err != 0)
+		return (err);
+
+	/* Is there a snapshot limit which we've hit? */
+	if ((dd->dd_phys->dd_snapshot_count + cnt) > limit)
+		return (EDQUOT);
+
+	if (dd->dd_parent != NULL)
+		err = dsl_snapcount_check(dd->dd_parent, cnt, ancestor, cr);
+
+	return (err);
+}
+
+/*
+ * Adjust the snapshot count for the specified dsl_dir_t and all parents.
+ * When a new snapshot is created, increment the count on all parents, and when
+ * a snapshot is destroyed, decrement the count.
+ */
+void
+dsl_snapcount_adjust(dsl_dir_t *dd, dmu_tx_t *tx, int64_t delta,
+    boolean_t first)
+{
+	if (first) {
+		VERIFY(RW_LOCK_HELD(&dd->dd_pool->dp_config_rwlock));
+		VERIFY(dmu_tx_is_syncing(tx));
+	}
+
+	/*
+	 * If we hit an uninitialized node while recursing up the tree, we can
+	 * stop since we know the counts are not valid on this node and we
+	 * know we shouldn't touch this node's counts. An uninitialized count
+	 * on the node indicates that either the feature has not yet been
+	 * activated or there are no limits on this part of the tree.
+	 */
+	if (dd->dd_phys->dd_filesystem_count == 0)
+		return;
+
+	/* if renaming a dataset with no snapshots, count adjustment is 0 */
+	if (delta == 0)
+		return;
+
+	/*
+	 * On initial entry we need to check if this feature is active, but
+	 * we don't want to re-check this on each recursive call. Note: the
+	 * feature cannot be active if it's not enabled. If the feature is not
+	 * active, don't touch the on-disk count fields.
+	 */
+	if (first) {
+		zfeature_info_t *quota_feat =
+		    &spa_feature_table[SPA_FEATURE_FS_SS_LIMIT];
+
+		if (!spa_feature_is_active(dd->dd_pool->dp_spa, quota_feat))
+			return;
+	}
+
+	dmu_buf_will_dirty(dd->dd_dbuf, tx);
+
+	mutex_enter(&dd->dd_lock);
+
+	dd->dd_phys->dd_snapshot_count += delta;
+	VERIFY(dd->dd_phys->dd_snapshot_count >= 0);
+
+	/* Roll up this additional count into our ancestors */
+	if (dd->dd_parent != NULL)
+		dsl_snapcount_adjust(dd->dd_parent, tx, delta, B_FALSE);
+
+	mutex_exit(&dd->dd_lock);
+}
+
 int
 dsl_dataset_snapshot_check(dsl_dataset_t *ds, const char *snapname,
-    dmu_tx_t *tx)
+    uint64_t cnt, dmu_tx_t *tx, cred_t *cr)
 {
 	int err;
 	uint64_t value;
@@ -2042,6 +2164,10 @@ dsl_dataset_snapshot_check(dsl_dataset_t *ds, const char *snapname,
 	if (dsl_dataset_namelen(ds) + 1 + strlen(snapname) >= MAXNAMELEN)
 		return (ENAMETOOLONG);
 
+	err = dsl_snapcount_check(ds->ds_dir, cnt, NULL, cr);
+	if (err)
+		return (err);
+
 	err = dsl_dataset_snapshot_reserve_space(ds, tx);
 	if (err)
 		return (err);
@@ -2062,6 +2188,8 @@ dsl_dataset_snapshot_sync(dsl_dataset_t *ds, const char *snapname,
 	int err;
 
 	ASSERT(RW_WRITE_HELD(&dp->dp_config_rwlock));
+
+	dsl_snapcount_adjust(ds->ds_dir, tx, 1, B_TRUE);
 
 	/*
 	 * The origin's ds_creation_txg has to be < TXG_INITIAL
@@ -2436,7 +2564,7 @@ dsl_dataset_snapshot_rename_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 	    dd->dd_phys->dd_head_dataset_obj, FTAG, &hds));
 
 	VERIFY(0 == dsl_dataset_get_snapname(ds));
-	err = dsl_dataset_snap_remove(hds, ds->ds_snapname, tx);
+	err = dsl_dataset_snap_remove(hds, ds->ds_snapname, tx, B_FALSE);
 	ASSERT0(err);
 	mutex_enter(&ds->ds_lock);
 	(void) strcpy(ds->ds_snapname, newsnapname);
@@ -2631,6 +2759,7 @@ struct promotearg {
 	dsl_dataset_t *origin_origin;
 	uint64_t used, comp, uncomp, unique, cloneusedsnap, originusedsnap;
 	char *err_ds;
+	cred_t *cr;
 };
 
 static int snaplist_space(list_t *l, uint64_t mintxg, uint64_t *spacep);
@@ -2718,9 +2847,9 @@ dsl_dataset_promote_check(void *arg1, void *arg2, dmu_tx_t *tx)
 		pa->uncomp -= pa->origin_origin->ds_phys->ds_uncompressed_bytes;
 	}
 
-	/* Check that there is enough space here */
+	/* Check that there is enough space and limit headroom here */
 	err = dsl_dir_transfer_possible(origin_ds->ds_dir, hds->ds_dir,
-	    pa->used);
+	    origin_ds->ds_dir, pa->used, pa->cr);
 	if (err)
 		return (err);
 
@@ -2849,10 +2978,11 @@ dsl_dataset_promote_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 		/* move snap name entry */
 		VERIFY(0 == dsl_dataset_get_snapname(ds));
 		VERIFY(0 == dsl_dataset_snap_remove(origin_head,
-		    ds->ds_snapname, tx));
+		    ds->ds_snapname, tx, B_TRUE));
 		VERIFY(0 == zap_add(dp->dp_meta_objset,
 		    hds->ds_phys->ds_snapnames_zapobj, ds->ds_snapname,
 		    8, 1, &ds->ds_object, tx));
+		dsl_snapcount_adjust(hds->ds_dir, tx, 1, B_TRUE);
 
 		/* change containing dsl_dir */
 		dmu_buf_will_dirty(ds->ds_dbuf, tx);
@@ -3090,6 +3220,7 @@ dsl_dataset_promote(const char *name, char *conflsnap)
 
 out:
 	rw_exit(&dp->dp_config_rwlock);
+	pa.cr = CRED();
 
 	/*
 	 * Add in 128x the snapnames zapobj size, since we will be moving

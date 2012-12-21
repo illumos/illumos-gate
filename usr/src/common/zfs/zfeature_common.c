@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012 Joyent, Inc. All rights reserved.
  */
 
 #ifdef _KERNEL
@@ -156,4 +157,7 @@ zpool_feature_init(void)
 	zfeature_register(SPA_FEATURE_EMPTY_BPOBJ,
 	    "com.delphix:empty_bpobj", "empty_bpobj",
 	    "Snapshots use less space.", B_TRUE, B_FALSE, NULL);
+	zfeature_register(SPA_FEATURE_FS_SS_LIMIT,
+	    "com.joyent:filesystem_limits", "filesystem_limits",
+	    "Filesystem and snapshot limits.", B_TRUE, B_FALSE, NULL);
 }
