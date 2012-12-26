@@ -10630,6 +10630,10 @@ int
 lscf_service_export(char *fmri, const char *filename, int flags)
 {
 	struct export_args args;
+	char *fmridup;
+	const char *scope, *svc, *inst;
+	size_t cblen = 3 * max_scf_name_len;
+	char *canonbuf = alloca(cblen);
 	int ret, err;
 
 	lscf_prep_hndl();
@@ -10637,6 +10641,29 @@ lscf_service_export(char *fmri, const char *filename, int flags)
 	bzero(&args, sizeof (args));
 	args.filename = filename;
 	args.flags = flags;
+
+	/*
+	 * If some poor user has passed an exact instance FMRI, of the sort
+	 * one might cut and paste from svcs(1) or an error message, warn
+	 * and chop off the instance instead of failing.
+	 */
+	fmridup = alloca(strlen(fmri) + 1);
+	(void) strcpy(fmridup, fmri);
+	if (strncmp(fmridup, SCF_FMRI_SVC_PREFIX,
+	    sizeof (SCF_FMRI_SVC_PREFIX) -1) == 0 &&
+	    scf_parse_svc_fmri(fmridup, &scope, &svc, &inst, NULL, NULL) == 0 &&
+	    inst != NULL) {
+		(void) strlcpy(canonbuf, "svc:/", cblen);
+		if (strcmp(scope, SCF_FMRI_LOCAL_SCOPE) != 0) {
+			(void) strlcat(canonbuf, "/", cblen);
+			(void) strlcat(canonbuf, scope, cblen);
+		}
+		(void) strlcat(canonbuf, svc, cblen);
+		fmri = canonbuf;
+
+		warn(gettext("Only services may be exported; ignoring "
+		    "instance portion of argument.\n"));
+	}
 
 	err = 0;
 	if ((ret = scf_walk_fmri(g_hndl, 1, (char **)&fmri,

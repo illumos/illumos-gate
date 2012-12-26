@@ -1,5 +1,6 @@
 '\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2012, Joyent, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
@@ -23,7 +24,6 @@ svccfg \- import, export, and modify service configurations
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBsvccfg\fR command manipulates data in the service configuration
 repository. \fBsvccfg\fR can be invoked interactively, with an individual
@@ -36,7 +36,6 @@ effect for that service until the next time the service instance is refreshed.
 See the \fBrefresh\fR subcommand on the \fBsvcadm\fR(1M) man page for more
 details.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -71,7 +70,6 @@ Verbose.
 .RE
 
 .SH SUBCOMMANDS
-.sp
 .LP
 Subcommands are divided into the categories specified in the subsections that
 follow.
@@ -123,7 +121,6 @@ Abbreviated forms of \fIFMRI\fRs are unstable, and should not be used in
 scripts or other permanent tools. If a pattern matches more than one instance
 or service, an error message is printed and no action is taken.
 .SS "General Subcommands"
-.sp
 .ne 2
 .na
 \fB\fBend\fR\fR
@@ -188,7 +185,6 @@ Turns off verbose mode.
 .RE
 
 .SS "Service Profile Subcommands"
-.sp
 .ne 2
 .na
 \fB\fBapply\fR [\fB-n\fR] \fIfile\fR\fR
@@ -224,7 +220,6 @@ a file.
 .RE
 
 .SS "Service Manifest Subcommands"
-.sp
 .ne 2
 .na
 \fB\fBarchive\fR [\fB-a\fR]\fR
@@ -261,9 +256,11 @@ Without the \fB-a\fR option, property groups containing protected information
 \fB-a\fR option is specified, all values will be archived. An error results if
 there are insufficient privileges to read these values.
 .sp
-Note that \fBexport\fR requires a service FMRI. If you specify an instance
-(including an abbreviation, such as \fBapache2\fR or \fBsendmail\fR, that
-specifies an instance), the command fails.
+Note that \fBexport\fR requires a service FMRI. To ease the use of arguments
+cut and pasted from other command output, if you specify a complete
+instance FMRI, the entire corresponding service including all instances
+is exported and a warning is issued.  If you specify an abbreviation, such as
+\fBapache2\fR or \fBsendmail\fR, that specifies an instance, the command fails.
 .RE
 
 .sp
@@ -357,7 +354,6 @@ See \fBsmf_template\fR(5) for a description of templates.
 .RE
 
 .SS "Entity Selection, Modification, and Navigation Subcommands"
-.sp
 .LP
 An "entity" refers to a scope, service, or service instance.
 .sp
@@ -425,7 +421,6 @@ The parent of the current selection becomes the current selection.
 .RE
 
 .SS "Property Inspection and Modification Subcommands"
-.sp
 .ne 2
 .na
 \fB\fBaddpg\fR \fIname\fR \fItype\fR [\fIflags\fR]\fR
@@ -636,7 +631,6 @@ modify properties.
 .RE
 
 .SS "Snapshot Navigation and Selection Subcommands"
-.sp
 .ne 2
 .na
 \fB\fBlistsnap\fR\fR
@@ -673,7 +667,6 @@ read-only.
 .RE
 
 .SS "Instance Subcommands"
-.sp
 .ne 2
 .na
 \fB\fBrefresh\fR\fR
@@ -794,7 +787,6 @@ ttymon/label                astring  console
 .sp
 
 .SH ENVIRONMENTAL VARIABLES
-.sp
 .ne 2
 .na
 \fBEDITOR\fR
@@ -806,7 +798,6 @@ editor is \fBvi\fR(1).
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -841,7 +832,6 @@ Invalid command line options were specified.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -861,7 +851,6 @@ Interface Stability	See below.
 The interactive output is Uncommitted. The invocation and non-interactive
 output are Committed.
 .SH SEE ALSO
-.sp
 .LP
 \fBsvcprop\fR(1), \fBsvcs\fR(1), \fBsvcadm\fR(1M), \fBsvc.configd\fR(1M),
 \fBlibscf\fR(3LIB), \fBlibumem\fR(3LIB), \fBscf_service_add_pg\fR(3SCF),
