@@ -22,6 +22,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2012 Joyent, Inc.  All rights reserved.
  */
 
 
@@ -31,6 +33,7 @@
 #include <sys/systm.h>
 #include <sys/mach_mmu.h>
 #include <sys/multiboot.h>
+#include <sys/sha1.h>
 
 #if defined(__xpv)
 
@@ -54,6 +57,8 @@ extern int have_cpuid(void);
 #include "dboot_printf.h"
 #include "dboot_xboot.h"
 #include "dboot_elfload.h"
+
+#define	SHA1_ASCII_LENGTH	(SHA1_DIGEST_LENGTH * 2)
 
 /*
  * This file contains code that runs to transition us from either a multiboot
@@ -767,6 +772,129 @@ init_mem_alloc(void)
 
 #else	/* !__xpv */
 
+static uint8_t
+dboot_a2h(char v)
+{
+	if (v >= 'a')
+		return (v - 'a' + 0xa);
+	else if (v >= 'A')
+		return (v - 'A' + 0xa);
+	else if (v >= '0')
+		return (v - '0');
+	else
+		dboot_panic("bad ASCII hex character %c\n", v);
+
+	return (0);
+}
+
+static void
+digest_a2h(const char *ascii, uint8_t *digest)
+{
+	unsigned int i;
+
+	for (i = 0; i < SHA1_DIGEST_LENGTH; i++) {
+		digest[i] = dboot_a2h(ascii[i * 2]) << 4;
+		digest[i] |= dboot_a2h(ascii[i * 2 + 1]);
+	}
+}
+
+/*
+ * Generate a SHA-1 hash of the first len bytes of image, and compare it with
+ * the ASCII-format hash found in the 40-byte buffer at ascii.  If they
+ * match, return 0, otherwise -1.  This works only for images smaller than
+ * 4 GB, which should not be a problem.
+ */
+static int
+check_image_hash(const char *ascii, const void *image, size_t len)
+{
+	SHA1_CTX ctx;
+	uint8_t digest[SHA1_DIGEST_LENGTH];
+	uint8_t baseline[SHA1_DIGEST_LENGTH];
+	unsigned int i;
+
+	digest_a2h(ascii, baseline);
+
+	SHA1Init(&ctx);
+	SHA1Update(&ctx, image, len);
+	SHA1Final(digest, &ctx);
+
+	for (i = 0; i < SHA1_DIGEST_LENGTH; i++) {
+		if (digest[i] != baseline[i])
+			return (-1);
+	}
+
+	return (0);
+}
+
+static void
+check_images(void)
+{
+	int i;
+	char *hashes;
+	mb_module_t *mod, *hashmod;
+	char *hash;
+	char displayhash[SHA1_ASCII_LENGTH + 1];
+	size_t hashlen;
+	size_t len;
+
+	/*
+	 * A brief note on lengths and sizes: GRUB, for reasons unknown, passes
+	 * the address of the last valid byte in a module plus 1 as mod_end.
+	 * This is of course a bug; the multiboot specification simply states
+	 * that mod_start and mod_end "contain the start and end addresses of
+	 * the boot module itself" which is pretty obviously not what GRUB is
+	 * doing.  However, fixing it requires that not only this code be
+	 * changed but also that other code consuming this value and values
+	 * derived from it be fixed, and that the kernel and GRUB must either
+	 * both have the bug or neither.  While there are a lot of combinations
+	 * that will work, there are also some that won't, so for simplicity
+	 * we'll just cope with the bug.  That means we won't actually hash the
+	 * byte at mod_end, and we will expect that mod_end for the hash file
+	 * itself is one greater than some multiple of 41 (40 bytes of ASCII
+	 * hash plus a newline for each module).
+	 */
+
+	if (mb_info->mods_count > 1) {
+		mod = (mb_module_t *)mb_info->mods_addr;
+		hashmod = mod + (mb_info->mods_count - 1);
+		hashes = (char *)hashmod->mod_start;
+		hashlen = (size_t)(hashmod->mod_end - hashmod->mod_start);
+		hash = hashes;
+		if (prom_debug) {
+			dboot_printf("Hash module found at %lx size %lx\n",
+			    (ulong_t)hashes, (ulong_t)hashlen);
+		}
+	} else {
+		DBG_MSG("Skipping hash check; no hash module found.\n");
+		return;
+	}
+
+	for (mod = (mb_module_t *)(mb_info->mods_addr), i = 0;
+	    i < mb_info->mods_count - 1; ++mod, ++i) {
+		if ((hash - hashes) + SHA1_ASCII_LENGTH + 1 > hashlen) {
+			dboot_printf("Short hash module of length 0x%lx bytes; "
+			    "skipping hash checks\n", (ulong_t)hashlen);
+			break;
+		}
+
+		(void) memcpy(displayhash, hash, SHA1_ASCII_LENGTH);
+		displayhash[SHA1_ASCII_LENGTH] = '\0';
+		if (prom_debug) {
+			dboot_printf("Checking hash for module %d [%s]: ",
+			    i, displayhash);
+		}
+
+		len = mod->mod_end - mod->mod_start;	/* see above */
+		if (check_image_hash(hash, (void *)mod->mod_start, len) != 0) {
+			dboot_panic("SHA-1 hash mismatch on %s; expected %s\n",
+			    (char *)mod->mod_name, displayhash);
+		} else {
+			DBG_MSG("OK\n");
+		}
+		hash += SHA1_ASCII_LENGTH + 1;
+	}
+}
+
 /*
  * During memory allocation, find the highest address not used yet.
  */
@@ -813,7 +941,7 @@ init_mem_alloc(void)
 	    i < mb_info->mods_count;
 	    ++mod, ++i) {
 		if (prom_debug) {
-			dboot_printf("\tmodule #%d: %s at: 0x%lx, len 0x%lx\n",
+			dboot_printf("\tmodule #%d: %s at: 0x%lx, end 0x%lx\n",
 			    i, (char *)(mod->mod_name),
 			    (ulong_t)mod->mod_start, (ulong_t)mod->mod_end);
 		}
@@ -830,6 +958,8 @@ init_mem_alloc(void)
 	DBG(bi->bi_modules);
 	bi->bi_module_cnt = mb_info->mods_count;
 	DBG(bi->bi_module_cnt);
+
+	check_images();
 
 	/*
 	 * Walk through the memory map from multiboot and build our memlist

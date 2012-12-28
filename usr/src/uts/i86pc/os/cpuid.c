@@ -161,7 +161,9 @@ static char *x86_feature_names[NUM_X86_FEATURES] = {
 	"avx",
 	"vmx",
 	"svm",
-	"topoext"
+	"topoext",
+	"f16c",
+	"rdrand"
 };
 
 boolean_t
@@ -1155,6 +1157,7 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 	if (xsave_force_disable) {
 		mask_ecx &= ~CPUID_INTC_ECX_XSAVE;
 		mask_ecx &= ~CPUID_INTC_ECX_AVX;
+		mask_ecx &= ~CPUID_INTC_ECX_F16C;
 	}
 
 	/*
@@ -1255,10 +1258,15 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 
 		if (cp->cp_ecx & CPUID_INTC_ECX_XSAVE) {
 			add_x86_feature(featureset, X86FSET_XSAVE);
+
 			/* We only test AVX when there is XSAVE */
 			if (cp->cp_ecx & CPUID_INTC_ECX_AVX) {
 				add_x86_feature(featureset,
 				    X86FSET_AVX);
+
+				if (cp->cp_ecx & CPUID_INTC_ECX_F16C)
+					add_x86_feature(featureset,
+					    X86FSET_F16C);
 			}
 		}
 	}
@@ -1293,6 +1301,9 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 	if (cp->cp_ecx & CPUID_INTC_ECX_VMX) {
 		add_x86_feature(featureset, X86FSET_VMX);
 	}
+
+	if (cp->cp_ecx & CPUID_INTC_ECX_RDRAND)
+		add_x86_feature(featureset, X86FSET_RDRAND);
 
 	/*
 	 * Only need it first time, rest of the cpus would follow suit.
@@ -1897,6 +1908,7 @@ cpuid_pass2(cpu_t *cpu)
 				remove_x86_feature(x86_featureset, X86FSET_AVX);
 				CPI_FEATURES_ECX(cpi) &= ~CPUID_INTC_ECX_XSAVE;
 				CPI_FEATURES_ECX(cpi) &= ~CPUID_INTC_ECX_AVX;
+				CPI_FEATURES_ECX(cpi) &= ~CPUID_INTC_ECX_F16C;
 				xsave_force_disable = B_TRUE;
 			}
 		}
@@ -2518,11 +2530,11 @@ cpuid_pass3(cpu_t *cpu)
  * the hardware feature support and kernel support for those features into
  * what we're actually going to tell applications via the aux vector.
  */
-uint_t
-cpuid_pass4(cpu_t *cpu)
+void
+cpuid_pass4(cpu_t *cpu, uint_t *hwcap_out)
 {
 	struct cpuid_info *cpi;
-	uint_t hwcap_flags = 0;
+	uint_t hwcap_flags = 0, hwcap_flags_2 = 0;
 
 	if (cpu == NULL)
 		cpu = CPU;
@@ -2569,6 +2581,8 @@ cpuid_pass4(cpu_t *cpu)
 			    CPUID_INTC_ECX_OSXSAVE);
 		if (!is_x86_feature(x86_featureset, X86FSET_AVX))
 			*ecx &= ~CPUID_INTC_ECX_AVX;
+		if (!is_x86_feature(x86_featureset, X86FSET_F16C))
+			*ecx &= ~CPUID_INTC_ECX_F16C;
 
 		/*
 		 * [no explicit support required beyond x87 fp context]
@@ -2604,8 +2618,11 @@ cpuid_pass4(cpu_t *cpu)
 		    (*ecx & CPUID_INTC_ECX_OSXSAVE)) {
 			hwcap_flags |= AV_386_XSAVE;
 
-			if (*ecx & CPUID_INTC_ECX_AVX)
+			if (*ecx & CPUID_INTC_ECX_AVX) {
 				hwcap_flags |= AV_386_AVX;
+				if (*ecx & CPUID_INTC_ECX_F16C)
+					hwcap_flags_2 |= AV_386_2_F16C;
+			}
 		}
 		if (*ecx & CPUID_INTC_ECX_VMX)
 			hwcap_flags |= AV_386_VMX;
@@ -2624,6 +2641,9 @@ cpuid_pass4(cpu_t *cpu)
 			hwcap_flags |= AV_386_CMOV;
 		if (*ecx & CPUID_INTC_ECX_CX16)
 			hwcap_flags |= AV_386_CX16;
+
+		if (*ecx & CPUID_INTC_ECX_RDRAND)
+			hwcap_flags_2 |= AV_386_2_RDRAND;
 	}
 
 	if (cpi->cpi_xmaxeax < 0x80000001)
@@ -2739,7 +2759,10 @@ cpuid_pass4(cpu_t *cpu)
 
 pass4_done:
 	cpi->cpi_pass = 4;
-	return (hwcap_flags);
+	if (hwcap_out != NULL) {
+		hwcap_out[0] = hwcap_flags;
+		hwcap_out[1] = hwcap_flags_2;
+	}
 }
 
 

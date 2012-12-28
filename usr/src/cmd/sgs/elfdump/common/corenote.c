@@ -432,6 +432,7 @@ dump_auxv(note_state_t *state, const char *title)
 	const sl_auxv_layout_t	*layout = state->ns_arch->auxv;
 	union {
 		Conv_cap_val_hw1_buf_t		hw1;
+		Conv_cap_val_hw2_buf_t		hw2;
 		Conv_cnote_auxv_af_buf_t	auxv_af;
 		Conv_ehdr_flags_buf_t		ehdr_flags;
 		Conv_inv_buf_t			inv;
@@ -524,6 +525,28 @@ dump_auxv(note_state_t *state, const char *title)
 				vstr = NULL;
 			num_fmt = SL_FMT_NUM_HEX;
 			break;
+		case AT_SUN_HWCAP2:
+			w = extract_as_word(state, &layout->a_val);
+			vstr = conv_cap_val_hw2(w, state->ns_mach,
+			    0, &conv_buf.hw2);
+			/*
+			 * conv_cap_val_hw2() produces output like:
+			 *
+			 *	0xfff [ flg1 flg2 0xff]
+			 *
+			 * where the first hex value is the complete value,
+			 * and the second is the leftover bits. We only
+			 * want the part in brackets, and failing that,
+			 * would rather fall back to formatting the full
+			 * value ourselves.
+			 */
+			while ((*vstr != '\0') && (*vstr != '['))
+				vstr++;
+			if (*vstr != '[')
+				vstr = NULL;
+			num_fmt = SL_FMT_NUM_HEX;
+			break;
+
 
 
 		case AT_SUN_AUXFLAGS:

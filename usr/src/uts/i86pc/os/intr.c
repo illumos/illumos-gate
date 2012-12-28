@@ -77,7 +77,7 @@
  * as well as new features. The goal of the x2apic is to solve a few problems
  * with the previous generation of lapic and the x2apic is backwards compatible
  * with the previous programming and model. The only downsides to using the
- * backward compatibility is that you not able to take advantage of the new
+ * backwards compatibility is that you are not able to take advantage of the new
  * x2apic features.
  *
  *    o The APIC ID is increased from an 8-bit value to a 32-bit value. This
@@ -124,10 +124,10 @@
  * PSM Drivers
  * -----------
  *
- * We currently have three sets of PSM drivers available. uppc, pcplusmp, and
- * apix. uppc (uni-processor PC) is the original driver that interacts with the
- * 8259A and 8254. In general, it is not used anymore given the prevalence of
- * the apic.
+ * We currently have three sets of PSM (platform specific module) drivers
+ * available. uppc, pcplusmp, and apix. uppc (uni-processor PC) is the original
+ * driver that interacts with the 8259A and 8254. In general, it is not used
+ * anymore given the prevalence of the apic.
  *
  * The system prefers to use the apix driver over the pcplusmp driver. The apix
  * driver requires HW support for an x2apic. If there is no x2apic HW, apix
@@ -169,7 +169,7 @@
  * highest unmasked interrupt will be the one delivered.
  *
  * The PPR register is based upon the max of the following two registers in the
- * lapic, The TPR register (also known as CR8 on amd64) that can be used to
+ * lapic, the TPR register (also known as CR8 on amd64) that can be used to
  * mask interrupt levels, and the current vector. Because the pcplusmp module
  * always sets TPR appropriately early in the do_interrupt path, we can usually
  * just think that the PPR is the TPR. The pcplusmp module also issues an EOI
@@ -205,7 +205,7 @@
  * Low level hardware interrupts start off like their high-level cousins. The
  * current CPU contains a number of kernel threads (kthread_t) that can be used
  * to process low level interrupts. These are shared between both low level
- * hardware and software interrupts. Note that we while we run with our
+ * hardware and software interrupts. Note that while we run with our
  * kthread_t, we borrow the pinned threads lwp_t until such a time as we hit a
  * synchronization object. If we hit one and need to sleep, then the scheduler
  * will instead create the rest of what we need.
@@ -216,7 +216,7 @@
  * interrupts, but the notification vector is different. Each CPU has a bitmask
  * of pending software interrupts. We can notify a CPU to process software
  * interrupts through a specific trap vector as well as through several
- * checks that are performed throughout the code. Thse checks will look at
+ * checks that are performed throughout the code. These checks will look at
  * processing software interrupts as we lower our spl.
  *
  * We attempt to process the highest pending software interrupt that we can
@@ -231,7 +231,7 @@
  * interrupt handlers. The apix driver has its own version of do_interrupt().
  * We come into the interrupt handler with all interrupts masked by the IF
  * flag. This is because we set up the handler using an interrupt-gate, which
- * is defined architectuarlly to have cleared the IF flag for us.
+ * is defined architecturally to have cleared the IF flag for us.
  *
  * +--------------+    +----------------+    +-----------+
  * | _interrupt() |--->| do_interrupt() |--->| *setlvl() |
@@ -332,9 +332,9 @@
  * The design is such that when interrupts are allowed to come in, if we are
  * currently servicing a higher priority interupt, the new interrupt is treated
  * as pending and serviced later. Specifically, in the pcplusmp module's
- * apic_intr_enter function the code masks interrupts at or below the current
+ * apic_intr_enter() the code masks interrupts at or below the current
  * IPL using the TPR before sending EOI, whereas the apix module's
- * apix_intr_enter function simply sends EOI.
+ * apix_intr_enter() simply sends EOI.
  *
  * The one special case where the apix code uses the TPR is when it calls
  * through the apic_reg_ops function pointer apic_write_task_reg in
@@ -343,7 +343,7 @@
  *
  * Recall that we come into the interrupt handler with all interrupts masked
  * by the IF flag. This is because we set up the handler using an
- * interrupt-gate which is defined architectuarlly to have cleared the IF flag
+ * interrupt-gate which is defined architecturally to have cleared the IF flag
  * for us.
  *
  * +--------------+    +---------------------+

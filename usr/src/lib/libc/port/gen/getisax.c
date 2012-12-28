@@ -23,8 +23,9 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ */
 
 #pragma weak _getisax = getisax
 
@@ -35,11 +36,8 @@
 extern long ___getauxval(int type);
 
 /*
- * Return the 'hwcap' vector of bits in the AT_SUN_HWCAP aux vector entry.
- *
- * At this time, the worst-case implementation only uses 13 bits, but for
- * future-proofing, we allow the interface to describe an arbitrary length
- * array of 32-bit words.
+ * Return the 'hwcap' vector of bits in the AT_SUN_HWCAP and AT_SUN_HWCAP2 aux
+ * vector entries. Therefore there are two words of bits here.
  *
  * As a convenience, the routine returns the maximum number of array alements
  * that may contain non-zero values.
@@ -49,15 +47,21 @@ getisax(uint32_t *array, uint_t n)
 {
 	int i;
 	static uint32_t auxv_hwcap;
+	static uint32_t auxv_hwcap_2;
 
-	if (auxv_hwcap == 0)
+	if (auxv_hwcap == 0) {
 		auxv_hwcap = (uint32_t)___getauxval(AT_SUN_HWCAP);
+		auxv_hwcap_2 = (uint32_t)___getauxval(AT_SUN_HWCAP2);
+	}
 
 	if (n > 0) {
 		if (n >= 1)
 			array[0] = auxv_hwcap;
-		for (i = 1; i < n; i++)
+		if (n >= 2)
+			array[1] = auxv_hwcap_2;
+		for (i = 2; i < n; i++)
 			array[i] = 0;
 	}
-	return (auxv_hwcap == 0 ? 0 : 1);
+
+	return (auxv_hwcap == 0 ? 0 : n >= 2 ? 2 : 1);
 }

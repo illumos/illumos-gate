@@ -26,11 +26,12 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ */
 
 #ifndef	_SYS_AUXV_H
 #define	_SYS_AUXV_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2	*/
 
 #include <sys/types.h>
 
@@ -141,6 +142,7 @@ typedef struct {
  * hardware capabilities that might be useful to library implementations.
  */
 #define	AT_SUN_HWCAP	2009
+#define	AT_SUN_HWCAP2	2023
 
 #if defined(_KERNEL)
 /*
@@ -148,8 +150,10 @@ typedef struct {
  * non-native user apps.
  */
 extern uint_t auxv_hwcap;
+extern uint_t auxv_hwcap_2;
 #if defined(_SYSCALL32)
 extern uint_t auxv_hwcap32;
+extern uint_t auxv_hwcap32_2;
 #endif /* _SYSCALL32 */
 #else
 extern uint_t getisax(uint32_t *, uint_t);
@@ -184,6 +188,10 @@ extern uint_t getisax(uint32_t *, uint_t);
 #define	AT_SUN_BRAND_AUX1	2020
 #define	AT_SUN_BRAND_AUX2	2021
 #define	AT_SUN_BRAND_AUX3	2022
+
+/*
+ * Note that 2023 is reserved for the AT_SUN_HWCAP2 word defined above.
+ */
 
 /*
  * The kernel is in a better position to determine whether a process needs to

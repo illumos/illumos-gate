@@ -25,12 +25,13 @@
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
+/*
+ * Copyright (c) 2012 Joyent, Inc.  All rights reserved.
+ */
 
 
 #ifndef _SYS_USER_H
 #define	_SYS_USER_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/signal.h>
@@ -184,9 +185,9 @@ typedef struct {		/* kernel syscall set type */
  * This value should not be changed in a patch.
  */
 #if defined(__sparc)
-#define	__KERN_NAUXV_IMPL 19
+#define	__KERN_NAUXV_IMPL 20
 #elif defined(__i386) || defined(__amd64)
-#define	__KERN_NAUXV_IMPL 21
+#define	__KERN_NAUXV_IMPL 22
 #endif
 
 struct execsw;

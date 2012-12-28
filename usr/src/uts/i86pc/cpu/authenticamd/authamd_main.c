@@ -137,7 +137,7 @@ int authamd_ms_support_disable = 0;
  * Families/revisions that support x8 ChipKill ECC
  */
 #define	AUTHAMD_SUPPORTS_X8ECC(rev) \
-	(X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_10_REV_D))
+	(X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_10_REV_D0))
 
 /*
  * We recognise main memory ECC errors for AUTHAMD_MEMECC_RECOGNISED

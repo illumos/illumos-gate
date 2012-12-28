@@ -28,6 +28,8 @@
  */
 /*
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2012 Jens Elkner <jel+illumos@cs.uni-magdeburg.de>
+ * Copyright 2012 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
  */
 
 #ifndef _SYS_X86_ARCHEXT_H
@@ -121,14 +123,16 @@ extern "C" {
 #define	CPUID_INTC_ECX_XSAVE	0x04000000	/* XSAVE/XRESTOR insns */
 #define	CPUID_INTC_ECX_OSXSAVE	0x08000000	/* OS supports XSAVE insns */
 #define	CPUID_INTC_ECX_AVX	0x10000000	/* AVX supported */
+#define	CPUID_INTC_ECX_F16C	0x20000000	/* F16C supported */
+#define	CPUID_INTC_ECX_RDRAND	0x40000000	/* RDRAND supported */
 
 #define	FMT_CPUID_INTC_ECX					\
 	"\20"							\
-	"\35avx\34osxsav\33xsave"				\
-	"\32aes\31tscdl"					\
-	"\30popcnt\27movbe\26x2apic\25sse4.2\24sse4.1\23dca"	\
-	"\20\18pdcm\17etprd\16cx16\13cid\12ssse3\11tm2"		\
-	"\10est\7smx\6vmx\5dscpl\4mon\3dtes64\2pclmulqdq\1sse3"
+	"\37rdrand\36f16c\35avx\34osxsav\33xsave"		\
+	"\32aes"						\
+	"\30popcnt\27movbe\25sse4.2\24sse4.1\23dca"		\
+	"\20\17etprd\16cx16\13cid\12ssse3\11tm2"		\
+	"\10est\7smx\6vmx\5dscpl\4mon\2pclmulqdq\1sse3"
 
 /*
  * cpuid instruction feature flags in %edx (extended function 0x80000001)
@@ -381,6 +385,8 @@ extern "C" {
 #define	X86FSET_VMX		35
 #define	X86FSET_SVM		36
 #define	X86FSET_TOPOEXT		37
+#define	X86FSET_F16C		38
+#define	X86FSET_RDRAND		39
 
 /*
  * flags to patch tsc_read routine.
@@ -537,17 +543,45 @@ extern "C" {
 	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x10, 0x0001)
 #define	X86_CHIPREV_AMD_10_REV_B \
 	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x10, 0x0002)
-#define	X86_CHIPREV_AMD_10_REV_C \
+#define	X86_CHIPREV_AMD_10_REV_C2 \
 	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x10, 0x0004)
-#define	X86_CHIPREV_AMD_10_REV_D \
+#define	X86_CHIPREV_AMD_10_REV_C3 \
 	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x10, 0x0008)
+#define	X86_CHIPREV_AMD_10_REV_D0 \
+	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x10, 0x0010)
+#define	X86_CHIPREV_AMD_10_REV_D1 \
+	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x10, 0x0020)
+#define	X86_CHIPREV_AMD_10_REV_E \
+	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x10, 0x0040)
 
 /*
  * Definitions for AMD Family 0x11.
  */
-#define	X86_CHIPREV_AMD_11 \
-	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x11, 0x0001)
+#define	X86_CHIPREV_AMD_11_REV_B \
+	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x11, 0x0002)
 
+/*
+ * Definitions for AMD Family 0x12.
+ */
+#define	X86_CHIPREV_AMD_12_REV_B \
+	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x12, 0x0002)
+
+/*
+ * Definitions for AMD Family 0x14.
+ */
+#define	X86_CHIPREV_AMD_14_REV_B \
+	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x14, 0x0002)
+#define	X86_CHIPREV_AMD_14_REV_C \
+	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x14, 0x0004)
+
+/*
+ * Definitions for AMD Family 0x15
+ */
+#define	X86_CHIPREV_AMD_15OR_REV_B2 \
+	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x15, 0x0001)
+
+#define	X86_CHIPREV_AMD_15TN_REV_A1 \
+	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x15, 0x0002)
 
 /*
  * Various socket/package types, extended as the need to distinguish
@@ -585,6 +619,14 @@ extern "C" {
 #define	X86_SOCKET_G34		_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x000800)
 #define	X86_SOCKET_ASB2		_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x001000)
 #define	X86_SOCKET_C32		_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x002000)
+#define	X86_SOCKET_S1g4		_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x004000)
+#define	X86_SOCKET_FT1		_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x008000)
+#define	X86_SOCKET_FM1		_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x010000)
+#define	X86_SOCKET_FS1		_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x020000)
+#define	X86_SOCKET_AM3R2	_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x040000)
+#define	X86_SOCKET_FP2		_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x080000)
+#define	X86_SOCKET_FS1R2	_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x100000)
+#define	X86_SOCKET_FM2		_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x200000)
 
 /*
  * xgetbv/xsetbv support
@@ -598,13 +640,14 @@ extern "C" {
 #define	XFEATURE_SSE		0x2
 #define	XFEATURE_AVX		0x4
 #define	XFEATURE_MAX		XFEATURE_AVX
-#define	XFEATURE_FP_ALL		(XFEATURE_LEGACY_FP|XFEATURE_SSE|XFEATURE_AVX)
+#define	XFEATURE_FP_ALL	\
+	(XFEATURE_LEGACY_FP|XFEATURE_SSE|XFEATURE_AVX)
 
 #if !defined(_ASM)
 
 #if defined(_KERNEL) || defined(_KMEMUSER)
 
-#define	NUM_X86_FEATURES	38
+#define	NUM_X86_FEATURES	40
 extern uchar_t x86_featureset[];
 
 extern void free_x86_featureset(void *featureset);
@@ -712,7 +755,7 @@ extern void cpuid_free_space(struct cpu *);
 extern void cpuid_pass1(struct cpu *, uchar_t *);
 extern void cpuid_pass2(struct cpu *);
 extern void cpuid_pass3(struct cpu *);
-extern uint_t cpuid_pass4(struct cpu *);
+extern void cpuid_pass4(struct cpu *, uint_t *);
 extern void cpuid_set_cpu_properties(void *, processorid_t,
     struct cpuid_info *);
 

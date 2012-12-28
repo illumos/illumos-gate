@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/asm_linkage.h>
 #include <sys/asm_misc.h>
 
@@ -87,6 +85,12 @@ inb(int port)
 	ret
 	SET_SIZE(inb)
 
+	ENTRY(htonl)
+	movl    %edi, %eax
+	bswap   %eax
+	ret
+	SET_SIZE(htonl)
+
 #elif defined(__i386)
 
 	.code32
@@ -127,6 +131,12 @@ inb(int port)
 	andl	$0xff, %eax
 	ret
 	SET_SIZE(inb)
+
+	ENTRY(htonl)
+	movl    4(%esp), %eax
+	bswap   %eax
+	ret
+	SET_SIZE(htonl)
 
 #endif	/* __i386 */
 
