@@ -23,7 +23,7 @@
  */
 
 /*
- * Copyright 2011 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2012 Joyent, Inc.  All rights reserved.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -40,6 +40,8 @@
 #include <sys/mutex_impl.h>
 #include "i86mmu.h"
 #include <sys/apix.h>
+#include <sys/x86_archext.h>
+#include <sys/bitmap.h>
 
 #define	TT_HDLR_WIDTH	17
 
@@ -818,6 +820,68 @@ scalehrtime_cmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+/*
+ * The x86 feature set is implemented as a bitmap array. That bitmap array is
+ * stored across a number of uchars based on the BT_SIZEOFMAP(NUM_X86_FEATURES)
+ * macro. We have the names for each of these features in unix's text segment
+ * so we do not have to duplicate them and instead just look them up.
+ */
+/*ARGSUSED*/
+static int
+x86_featureset_cmd(uintptr_t addr, uint_t flags, int argc,
+    const mdb_arg_t *argv)
+{
+	void *fset;
+	GElf_Sym sym;
+	uintptr_t nptr;
+	char name[128];
+	int ii;
+
+	size_t sz = sizeof (uchar_t) * BT_SIZEOFMAP(NUM_X86_FEATURES);
+
+	if (argc != 0)
+		return (DCMD_USAGE);
+
+	if (mdb_lookup_by_name("x86_feature_names", &sym) == -1) {
+		mdb_warn("couldn't find x86_feature_names");
+		return (DCMD_ERR);
+	}
+
+	fset = mdb_zalloc(sz, UM_NOSLEEP);
+	if (fset == NULL) {
+		mdb_warn("failed to allocate memory for x86_featureset");
+		return (DCMD_ERR);
+	}
+
+	if (mdb_readvar(fset, "x86_featureset") != sz) {
+		mdb_warn("failed to read x86_featureset");
+		mdb_free(fset, sz);
+		return (DCMD_ERR);
+	}
+
+	for (ii = 0; ii < NUM_X86_FEATURES; ii++) {
+		if (!BT_TEST((ulong_t *)fset, ii))
+			continue;
+
+		if (mdb_vread(&nptr, sizeof (char *), sym.st_value +
+		    sizeof (void *) * ii) != sizeof (char *)) {
+			mdb_warn("failed to read feature array %d", ii);
+			mdb_free(fset, sz);
+			return (DCMD_ERR);
+		}
+
+		if (mdb_readstr(name, sizeof (name), nptr) == -1) {
+			mdb_warn("failed to read feature %d", ii);
+			mdb_free(fset, sz);
+			return (DCMD_ERR);
+		}
+		mdb_printf("%s\n", name);
+	}
+
+	mdb_free(fset, sz);
+	return (DCMD_OK);
+}
+
 static const mdb_dcmd_t dcmds[] = {
 	{ "gate_desc", ":", "dump a gate descriptor", gate_desc },
 	{ "idt", ":[-v]", "dump an IDT", idt },
@@ -840,6 +904,8 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "memseg_list", ":", "show memseg list", memseg_list },
 	{ "scalehrtime", ":",
 	    "scale an unscaled high-res time", scalehrtime_cmd },
+	{ "x86_featureset", NULL, "dump the x86_featureset vector",
+		x86_featureset_cmd },
 	{ NULL }
 };
 
