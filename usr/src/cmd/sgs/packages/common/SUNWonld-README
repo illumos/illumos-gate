@@ -1641,3 +1641,4 @@ Bugid   Risk Synopsis
 3261	linker should ignore unknown hardware capabilities
 3265	link-editor builds bogus .eh_frame_hdr on ia32
 3453	GNU comdat redirection does exactly the wrong thing
+3439	discarded sections shouldn't end up on output lists

@@ -1199,6 +1199,7 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, Place_path_info *path_info,
 	 * so that they can be updated as a group later.
 	 */
 	if ((shdr->sh_type == SHT_GROUP) &&
+	    ((isp->is_flags & FLG_IS_DISCARD) == 0) &&
 	    (aplist_append(&ofl->ofl_osgroups, osp,
 	    AL_CNT_OFL_OSGROUPS) == NULL))
 		return ((Os_desc *)S_ERROR);
