@@ -59,6 +59,7 @@ MANSOFILES =	getaddrinfo.3xnet	\
 		getservbyname.3xnet	\
 		getservbyport.3xnet	\
 		getservent.3xnet	\
+		htonll.3xnet		\
 		htons.3xnet		\
 		if_freenameindex.3xnet	\
 		if_indextoname.3xnet	\
@@ -70,6 +71,7 @@ MANSOFILES =	getaddrinfo.3xnet	\
 		inet_ntoa.3xnet		\
 		inet_pton.3xnet		\
 		ntohl.3xnet		\
+		ntohll.3xnet		\
 		ntohs.3xnet		\
 		sethostent.3xnet	\
 		setnetent.3xnet		\
@@ -96,6 +98,7 @@ getservbyname.3xnet	:= SOSRC = man3xnet/endservent.3xnet
 getservbyport.3xnet	:= SOSRC = man3xnet/endservent.3xnet
 getservent.3xnet	:= SOSRC = man3xnet/endservent.3xnet
 
+htonll.3xnet		:= SOSRC = man3xnet/htonl.3xnet
 htons.3xnet		:= SOSRC = man3xnet/htonl.3xnet
 
 if_freenameindex.3xnet	:= SOSRC = man3xnet/if_nametoindex.3xnet
@@ -111,6 +114,7 @@ inet_ntoa.3xnet		:= SOSRC = man3xnet/inet_addr.3xnet
 inet_pton.3xnet		:= SOSRC = man3xnet/inet_ntop.3xnet
 
 ntohl.3xnet		:= SOSRC = man3xnet/htonl.3xnet
+ntohll.3xnet		:= SOSRC = man3xnet/htonl.3xnet
 ntohs.3xnet		:= SOSRC = man3xnet/htonl.3xnet
 
 sethostent.3xnet	:= SOSRC = man3xnet/endhostent.3xnet
