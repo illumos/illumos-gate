@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012, Josef 'Jeff' Sipek <jeffpc@31bits.net>. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989  AT&T.	*/
@@ -530,10 +531,14 @@ doargs:
 	freev(pathv);
 
 	/*
-	 * Since we can't make use of GNU troff, set the path to ensure we
-	 * find the one in /usr/bin first.
+	 * If the TROFF environment variable hasn't been set, set PATH to
+	 * ensure that we find nroff in /usr/bin, regardless of the user's
+	 * PATH.  (If the TROFF environment variable has been set, we
+	 * assume that the environment has been constructed to execute the
+	 * the nroff/troff found in the PATH with any options that may be
+	 * specific to that implementation -- e.g., groff.)
 	 */
-	if (putenv("PATH=/usr/bin") != 0) {
+	if (getenv("TROFF") == NULL && putenv("PATH=/usr/bin") != 0) {
 		perror("putenv");
 		exit(1);
 	}
