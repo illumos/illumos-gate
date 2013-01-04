@@ -1,0 +1,2 @@
+$MDB -e '::typegraph'
+exit $?

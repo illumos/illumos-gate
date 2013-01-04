@@ -23,6 +23,9 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ */
 
 /*
  * User Process Target
@@ -4495,6 +4498,14 @@ pt_getareg(mdb_tgt_t *t, mdb_tgt_tid_t tid,
 			 */
 			if (PTL_GETREGS(t, tid, grs) == 0) {
 				*rp = r | (ulong_t)grs[rd_num];
+				if (rd_flags & MDB_TGT_R_32)
+					*rp &= 0xffffffffULL;
+				else if (rd_flags & MDB_TGT_R_16)
+					*rp &= 0xffffULL;
+				else if (rd_flags & MDB_TGT_R_8H)
+					*rp = (*rp & 0xff00ULL) >> 8;
+				else if (rd_flags & MDB_TGT_R_8L)
+					*rp &= 0xffULL;
 				return (0);
 			}
 			return (-1);
@@ -4521,6 +4532,16 @@ pt_putareg(mdb_tgt_t *t, mdb_tgt_tid_t tid, const char *rname, mdb_tgt_reg_t r)
 		ushort_t rd_flags = MDB_TGT_R_FLAGS(rd_nval);
 
 		if (!MDB_TGT_R_IS_FP(rd_flags)) {
+
+			if (rd_flags & MDB_TGT_R_32)
+				r &= 0xffffffffULL;
+			else if (rd_flags & MDB_TGT_R_16)
+				r &= 0xffffULL;
+			else if (rd_flags & MDB_TGT_R_8H)
+				r = (r & 0xffULL) << 8;
+			else if (rd_flags & MDB_TGT_R_8L)
+				r &= 0xffULL;
+
 #if defined(__sparc) && defined(_ILP32)
 			/*
 			 * If we are debugging on 32-bit SPARC, the globals and

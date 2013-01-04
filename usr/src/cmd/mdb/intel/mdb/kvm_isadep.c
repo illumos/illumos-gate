@@ -22,8 +22,9 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ */
 
 /*
  * Libkvm Kernel Target Intel component
@@ -57,6 +58,14 @@ kt_getareg(mdb_tgt_t *t, mdb_tgt_tid_t tid,
 	for (rdp = kt->k_rds; rdp->rd_name != NULL; rdp++) {
 		if (strcmp(rname, rdp->rd_name) == 0) {
 			*rp = kt->k_regs->kregs[rdp->rd_num];
+			if (rdp->rd_flags & MDB_TGT_R_32)
+				*rp &= 0xffffffffULL;
+			else if (rdp->rd_flags & MDB_TGT_R_16)
+				*rp &= 0xffffULL;
+			else if (rdp->rd_flags & MDB_TGT_R_8H)
+				*rp = (*rp & 0xff00ULL) >> 8;
+			else if (rdp->rd_flags & MDB_TGT_R_8L)
+				*rp &= 0xffULL;
 			return (0);
 		}
 	}
@@ -75,6 +84,15 @@ kt_putareg(mdb_tgt_t *t, mdb_tgt_tid_t tid, const char *rname, mdb_tgt_reg_t r)
 
 	for (rdp = kt->k_rds; rdp->rd_name != NULL; rdp++) {
 		if (strcmp(rname, rdp->rd_name) == 0) {
+			if (rdp->rd_flags & MDB_TGT_R_32)
+				r &= 0xffffffffULL;
+			else if (rdp->rd_flags & MDB_TGT_R_16)
+				r &= 0xffffULL;
+			else if (rdp->rd_flags & MDB_TGT_R_8H)
+				r = (r & 0xffULL) << 8;
+			else if (rdp->rd_flags & MDB_TGT_R_8L)
+				r &= 0xffULL;
+
 			kt->k_regs->kregs[rdp->rd_num] = (kreg_t)r;
 			return (0);
 		}

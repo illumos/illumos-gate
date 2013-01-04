@@ -22,11 +22,12 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ */
 
 #ifndef	_MDB_TARGET_IMPL_H
 #define	_MDB_TARGET_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <mdb/mdb_target.h>
 #include <mdb/mdb_module.h>
@@ -250,6 +251,10 @@ extern long mdb_tgt_nop();		/* Return 0 for success */
 #define	MDB_TGT_R_FPQ		0x040	/* Quad-precision floating-point */
 #define	MDB_TGT_R_FPU		0x080	/* FPU control/status register */
 #define	MDB_TGT_R_RDONLY	0x100	/* Register is read-only */
+#define	MDB_TGT_R_32		0x200	/* 32-bit version of register */
+#define	MDB_TGT_R_16		0x400	/* 16-bit version of register */
+#define	MDB_TGT_R_8H		0x800	/* upper half of a 16-bit reg */
+#define	MDB_TGT_R_8L		0x1000	/* lower half of a 16-bit reg */
 
 #define	MDB_TGT_R_IS_FP(f)	((f) & 0xf0) /* Test MDB_TGT_R_FP* bits */
 

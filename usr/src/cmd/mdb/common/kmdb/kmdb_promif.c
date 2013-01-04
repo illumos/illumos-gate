@@ -754,6 +754,12 @@ kmdb_prom_assfail(const char *assertion, const char *file, int line)
 	/*NOTREACHED*/
 	return (0);
 }
+
+int
+assfail(const char *assertion, const char *file, int line)
+{
+    return kmdb_prom_assfail(assertion, file, line);
+}
 #endif
 
 /*

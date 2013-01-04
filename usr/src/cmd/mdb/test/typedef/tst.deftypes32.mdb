@@ -1,0 +1,27 @@
+::typedef -c LP32
+::sizeof int8_t
+::sizeof int16_t
+::sizeof int32_t
+::sizeof int64_t
+::sizeof uint8_t
+::sizeof uint16_t
+::sizeof uint32_t
+::sizeof uint64_t
+::sizeof intptr_t
+::sizeof uintptr_t
+::sizeof uchar_t
+::sizeof ushort_t
+::sizeof uint_t
+::sizeof ulong_t
+::sizeof u_longlong_t
+::sizeof ptrdiff_t
+::sizeof signed
+::sizeof unsigned
+::sizeof void
+::sizeof char
+::sizeof short
+::sizeof int
+::sizeof long
+::sizeof _Bool
+::sizeof float
+::sizeof double

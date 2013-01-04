@@ -84,6 +84,7 @@ KMDBSRCS += \
 	mdb_target.c \
 	kmdb_terminfo.c \
 	mdb_termio.c \
+	mdb_typedef.c \
 	mdb_umem.c \
 	kmdb_umemglue.c \
 	mdb_value.c \
