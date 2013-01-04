@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2012 Joyent, Inc.  All rights reserved.
+ */
+
 #ifndef _UMEM_IMPL_H
 #define	_UMEM_IMPL_H
 
@@ -64,6 +68,7 @@ extern "C" {
 
 #define	UMF_HASH	0x00000200	/* cache has hash table */
 #define	UMF_RANDOMIZE	0x00000400	/* randomize other umem_flags */
+#define	UMF_PTC		0x00000800	/* cache has per-thread caching */
 
 #define	UMF_BUFTAG	(UMF_DEADBEEF | UMF_REDZONE)
 #define	UMF_TOUCH	(UMF_BUFTAG | UMF_LITE | UMF_CONTENTS)
@@ -395,6 +400,13 @@ typedef struct umem_cpu {
 extern void umem_startup(caddr_t, size_t, size_t, caddr_t, caddr_t);
 extern int umem_add(caddr_t, size_t);
 #endif
+
+/*
+ * Private interface with libc for tcumem.
+ */
+extern uintptr_t _tmem_get_base(void);
+extern int _tmem_get_nentries(void);
+extern void _tmem_set_cleanup(void(*)(void *, int));
 
 #ifdef	__cplusplus
 }

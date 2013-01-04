@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012, Joyent, Inc.  All rights reserved.
 #
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -873,6 +874,7 @@ THREADSOBJS=			\
 	assfail.o		\
 	cancel.o		\
 	door_calls.o		\
+	tmem.o			\
 	pthr_attr.o		\
 	pthr_barrier.o		\
 	pthr_cond.o		\

@@ -19,44 +19,31 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright (c) 2012 Joyent, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright (c) 2012 Joyent, Inc. All rights reserved.
 
-MODULE = libumem.so
-MDBTGT = proc
+LIBRARY = libumem_trampoline.a
+VERS    = .1
+OBJECTS = trampoline.o
 
-MODSRCS_DIR = ../../../common/modules/genunix
+include ../../Makefile.lib
 
-MODSRCS = \
-	dist.c \
-	kgrep.c \
-	leaky.c \
-	leaky_subr.c \
-	libumem.c \
-	misc.c \
-	proc_kludges.c \
-	umem.c
+# install this library in the root filesystem
+include ../../Makefile.rootfs
 
-include ../../../../Makefile.cmd
+LIBS =		$(DYNLIB) $(LINTLIB)
 
-CPPFLAGS += -I$(SRC)/lib/libumem/common
-CPPFLAGS += -I$(SRC)/lib/libc/inc
-CPPFLAGS += -I$(MODSRCS_DIR)
+SRCDIR =	../common
 
-include ../../Makefile.sparcv7
-include ../../../Makefile.module
+$(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
 
-dmod/$(MODULE) := LDLIBS += -lproc -lm
+CFLAGS +=	$(CCVERBOSE)
 
-CERRWARN += -_gcc=-Wno-unused-label
-CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += -_gcc=-Wno-uninitialized
+.KEEP_STATE:
 
-%.o: $(MODSRCS_DIR)/%.c
-	$(COMPILE.c) $<
-	$(CTFCONVERT_O)
+all:		$(LIBS)
 
-%.ln: $(MODSRCS_DIR)/%.c
-	$(LINT.c) -c $<
+lint:		lintcheck
+
+include ../../Makefile.targ
