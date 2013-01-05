@@ -169,6 +169,7 @@ LEX=		/usr/ccs/bin/lex
 FLEX=		/usr/bin/flex
 YACC=		/usr/ccs/bin/yacc
 CPP=		/usr/lib/cpp
+ANSI_CPP=	$(GCC_ROOT)/bin/cpp
 JAVAC=		$(JAVA_ROOT)/bin/javac
 JAVAH=		$(JAVA_ROOT)/bin/javah
 JAVADOC=	$(JAVA_ROOT)/bin/javadoc

@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -46,9 +48,8 @@
 #include <strings.h>
 #include <sys/uio.h>
 
-#include <smbsrv/libsmb.h>
-#include <smbsrv/libmlrpc.h>
-#include <smbsrv/smb_sid.h>
+#include <libmlrpc.h>
+#include <ndr_wchar.h>
 
 /*
  * Allocate a heap structure and the first heap block.  For many RPC
@@ -154,6 +155,23 @@ ndr_heap_malloc(ndr_heap_t *heap, unsigned size)
 }
 
 /*
+ * Convenience function to copy some memory into the heap.
+ */
+void *
+ndr_heap_dupmem(ndr_heap_t *heap, const void *mem, size_t len)
+{
+	void *p;
+
+	if (mem == NULL)
+		return (NULL);
+
+	if ((p = ndr_heap_malloc(heap, len)) != NULL)
+		(void) memcpy(p, mem, len);
+
+	return (p);
+}
+
+/*
  * Convenience function to do heap strdup.
  */
 void *
@@ -171,8 +189,7 @@ ndr_heap_strdup(ndr_heap_t *heap, const char *s)
 	if ((len = strlen(s)) == 0)
 		return ("");
 
-	if ((p = ndr_heap_malloc(heap, len+1)) != NULL)
-		(void) strcpy((char *)p, s);
+	p = ndr_heap_dupmem(heap, s, len+1);
 
 	return (p);
 }
@@ -183,11 +200,21 @@ ndr_heap_strdup(ndr_heap_t *heap, const char *s)
 int
 ndr_heap_mstring(ndr_heap_t *heap, const char *s, ndr_mstring_t *out)
 {
+	size_t slen;
+
 	if (s == NULL || out == NULL)
 		return (-1);
 
-	out->length = smb_wcequiv_strlen(s);
-	out->allosize = out->length + sizeof (smb_wchar_t);
+	/*
+	 * Determine the WC strlen of s
+	 * Was ndr__wcequiv_strlen(s)
+	 */
+	slen = ndr__mbstowcs(NULL, s, NDR_STRING_MAX);
+	if (slen == (size_t)-1)
+		return (-1);
+
+	out->length = slen * sizeof (ndr_wchar_t);
+	out->allosize = out->length + sizeof (ndr_wchar_t);
 
 	if ((out->str = ndr_heap_strdup(heap, s)) == NULL)
 		return (-1);
@@ -207,20 +234,31 @@ ndr_heap_mstring(ndr_heap_t *heap, const char *s, ndr_mstring_t *out)
 void
 ndr_heap_mkvcs(ndr_heap_t *heap, char *s, ndr_vcstr_t *vc)
 {
+	size_t slen;
 	int mlen;
 
-	vc->wclen = smb_wcequiv_strlen(s);
+	/*
+	 * Determine the WC strlen of s
+	 * Was ndr__wcequiv_strlen(s)
+	 */
+	slen = ndr__mbstowcs(NULL, s, NDR_STRING_MAX);
+	if (slen == (size_t)-1)
+		slen = 0;
+
+	vc->wclen = slen * sizeof (ndr_wchar_t);
 	vc->wcsize = vc->wclen;
 
-	mlen = sizeof (ndr_vcs_t) + vc->wcsize + sizeof (smb_wchar_t);
-
+	/*
+	 * alloc one extra wchar for a null
+	 * See slen + 1 arg for mbstowcs
+	 */
+	mlen = sizeof (ndr_vcs_t) + vc->wcsize + sizeof (ndr_wchar_t);
 	vc->vcs = ndr_heap_malloc(heap, mlen);
 
 	if (vc->vcs) {
 		vc->vcs->vc_first_is = 0;
-		vc->vcs->vc_length_is = vc->wclen / sizeof (smb_wchar_t);
-		(void) smb_mbstowcs((smb_wchar_t *)vc->vcs->buffer, s,
-		    vc->vcs->vc_length_is);
+		vc->vcs->vc_length_is = slen;
+		(void) ndr__mbstowcs(vc->vcs->buffer, s, slen + 1);
 	}
 }
 
@@ -250,25 +288,8 @@ ndr_heap_mkvcb(ndr_heap_t *heap, uint8_t *data, uint32_t datalen,
 }
 
 /*
- * Duplcate a SID in the heap.
+ * Removed ndr_heap_siddup(), now using ndr_heap_dupmem().
  */
-smb_sid_t *
-ndr_heap_siddup(ndr_heap_t *heap, smb_sid_t *sid)
-{
-	smb_sid_t *new_sid;
-	unsigned size;
-
-	if (sid == NULL)
-		return (NULL);
-
-	size = smb_sid_len(sid);
-
-	if ((new_sid = ndr_heap_malloc(heap, size)) == NULL)
-		return (NULL);
-
-	bcopy(sid, new_sid, size);
-	return (new_sid);
-}
 
 int
 ndr_heap_used(ndr_heap_t *heap)

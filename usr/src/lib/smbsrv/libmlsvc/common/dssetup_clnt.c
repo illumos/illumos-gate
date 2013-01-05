@@ -29,7 +29,7 @@
 
 #include <string.h>
 #include <strings.h>
-#include <smbsrv/wintypes.h>
+#include <smb/wintypes.h>
 #include <smbsrv/libsmb.h>
 #include <smbsrv/ndl/dssetup.ndl>
 #include <smbsrv/libmlsvc.h>

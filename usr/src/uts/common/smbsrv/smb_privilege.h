@@ -28,7 +28,7 @@
 #ifndef _SMB_PRIVILEGE_H
 #define	_SMB_PRIVILEGE_H
 
-#include <smbsrv/wintypes.h>
+#include <smb/wintypes.h>
 
 #ifdef __cplusplus
 extern "C" {

@@ -33,8 +33,8 @@
 #include <pwd.h>
 #include <grp.h>
 
+#include <libmlrpc/libmlrpc.h>
 #include <smbsrv/libsmb.h>
-#include <smbsrv/libmlrpc.h>
 #include <smbsrv/libmlsvc.h>
 #include <smbsrv/ndl/lsarpc.ndl>
 #include <lsalib.h>

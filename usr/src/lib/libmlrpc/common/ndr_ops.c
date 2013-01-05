@@ -49,8 +49,7 @@
 #include <string.h>
 #include <assert.h>
 
-#include <smbsrv/libsmb.h>
-#include <smbsrv/libmlrpc.h>
+#include <libmlrpc.h>
 
 #define	NDOBUFSZ		128
 

@@ -31,7 +31,7 @@
  * Security Accounts Manager RPC (SAMR) interface definition.
  */
 
-#include "ndrtypes.ndl"
+#include <libmlrpc/ndrtypes.ndl>
 
 /* Windows NT */
 #define SAMR_OPNUM_Connect			0x00	/* SamrConnect */
@@ -363,7 +363,7 @@ struct samr_logon_hours_all {
 #ifndef	NDRGEN
 #define SAMR_USER_PWLEN	256
 struct samr_user_password {
-	smb_wchar_t	Buffer[SAMR_USER_PWLEN];
+	ndr_wchar_t	Buffer[SAMR_USER_PWLEN];
 	DWORD Length;
 };
 #endif	/* NDRGEN */

@@ -21,10 +21,17 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
-#ifndef _NDR_TYPES_NDL_
-#define _NDR_TYPES_NDL_
+#ifndef _NDRTYPES_NDL_
+#define _NDRTYPES_NDL_
+
+/*
+ * Type definitions (and related) used in NDL files and the
+ * NDL run-time support libraries.  See also: libmlrpc.h
+ */
 
 #define TYPEINFO(TYPE)  ndt__##TYPE
 
@@ -69,20 +76,6 @@
 #define LPWORD  ushort *
 #define LPDWORD ulong *
 
-/*
- * Opaque context handle.
- */
-#ifndef CONTEXT_HANDLE
-#define CONTEXT_HANDLE(NAME)	\
-	struct NAME {		\
-		DWORD data1;    \
-		DWORD data2;    \
-		WORD  data3[2]; \
-		BYTE  data4[8];	\
-	};			\
-	typedef struct NAME
-#endif /* CONTEXT_HANDLE */
-
 #define EXTERNTYPEINFO(TYPE)
 
 #else /* NDRGEN */
@@ -116,7 +109,7 @@
 /*
  * When not using ndrgen, get BYTE, WORD, DWORD definitions from wintypes.h.
  */
-#include <smbsrv/wintypes.h>
+#include <smb/wintypes.h>
 
 #define EXTERNTYPEINFO(TYPE)	extern struct ndr_typeinfo TYPEINFO(TYPE);
 
@@ -167,4 +160,18 @@
 #define UNION_INFO_ENT(N,NAME) CASE(N) struct NAME##N info##N
 #define UNION_INFO_PTR(N,NAME) CASE(N) struct NAME##N *info##N
 
-#endif /* _NDR_TYPES_NDL_ */
+/*
+ * Opaque context handle.
+ */
+#ifndef CONTEXT_HANDLE
+#define CONTEXT_HANDLE(NAME)	\
+	struct NAME {		\
+		DWORD data1;    \
+		DWORD data2;    \
+		WORD  data3[2]; \
+		BYTE  data4[8];	\
+	};			\
+	typedef struct NAME
+#endif /* CONTEXT_HANDLE */
+
+#endif /* _NDRTYPES_NDL_ */

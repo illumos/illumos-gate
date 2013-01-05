@@ -425,3 +425,43 @@ mlsvc_disconnect(const char *server)
 {
 	smbrdr_disconnect(server);
 }
+
+/*
+ * A few more helper functions for RPC services.
+ */
+
+/*
+ * Check whether or not the specified user has administrator privileges,
+ * i.e. is a member of Domain Admins or Administrators.
+ * Returns true if the user is an administrator, otherwise returns false.
+ */
+boolean_t
+ndr_is_admin(ndr_xa_t *xa)
+{
+	smb_netuserinfo_t *ctx = xa->pipe->np_user;
+
+	return (ctx->ui_flags & SMB_ATF_ADMIN);
+}
+
+/*
+ * Check whether or not the specified user has power-user privileges,
+ * i.e. is a member of Domain Admins, Administrators or Power Users.
+ * This is typically required for operations such as managing shares.
+ * Returns true if the user is a power user, otherwise returns false.
+ */
+boolean_t
+ndr_is_poweruser(ndr_xa_t *xa)
+{
+	smb_netuserinfo_t *ctx = xa->pipe->np_user;
+
+	return ((ctx->ui_flags & SMB_ATF_ADMIN) ||
+	    (ctx->ui_flags & SMB_ATF_POWERUSER));
+}
+
+int32_t
+ndr_native_os(ndr_xa_t *xa)
+{
+	smb_netuserinfo_t *ctx = xa->pipe->np_user;
+
+	return (ctx->ui_native_os);
+}

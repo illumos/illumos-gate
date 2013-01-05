@@ -740,10 +740,11 @@ usr/lib/smbsrv/bind-helper
 usr/lib/smbsrv/fksmbd
 usr/lib/smbsrv/libfksmbsrv.so
 usr/lib/smbsrv/libfksmbsrv.so.1
+usr/lib/smbsrv/libmlsvc.so
+usr/lib/smbsrv/libsmb.so
+usr/lib/smbsrv/libsmbns.so
 usr/lib/smbsrv/llib-lfksmbsrv
 usr/lib/smbsrv/llib-lfksmbsrv.ln
-usr/lib/smbsrv/llib-lmlrpc
-usr/lib/smbsrv/llib-lmlrpc.ln
 usr/lib/smbsrv/llib-lmlsvc
 usr/lib/smbsrv/llib-lmlsvc.ln
 usr/lib/smbsrv/llib-lsmb
@@ -788,7 +789,20 @@ usr/platform/i86hvm						i386
 #
 usr/include/sys/sdcard
 #
-# libsmbfs is private
+# libmlrpc is private (SMB client and server)
+#
+usr/include/libmlrpc
+usr/lib/libmlrpc.so
+usr/lib/amd64/libmlrpc.so		i386
+usr/lib/amd64/libmlrpc.so.2		i386
+usr/lib/sparcv9/libmlrpc.so		sparc
+usr/lib/sparcv9/libmlrpc.so.2		sparc
+usr/lib/llib-lmlrpc
+usr/lib/llib-lmlrpc.ln
+usr/lib/amd64/llib-lmlrpc.ln		i386
+usr/lib/sparcv9/llib-lmlrpc.ln		sparc
+#
+# libsmbfs is private (SMB client and server)
 #
 usr/include/netsmb
 usr/lib/libsmbfs.so

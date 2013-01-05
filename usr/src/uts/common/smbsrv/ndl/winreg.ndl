@@ -21,6 +21,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _MLSVC_WINREG_NDL_
@@ -43,7 +45,7 @@
  * HKEY_PERFORMANCE_NLS  (HKPN)	Runtime performance information.
  */
 
-#include "ndrtypes.ndl"
+#include <libmlrpc/ndrtypes.ndl>
 
 /* Windows NT */
 #define WINREG_OPNUM_OpenHKCR		0x00

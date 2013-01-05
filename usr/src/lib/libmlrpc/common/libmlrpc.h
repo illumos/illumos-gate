@@ -28,10 +28,9 @@
 
 #include <sys/types.h>
 #include <sys/uio.h>
-#include <smbsrv/wintypes.h>
-#include <smbsrv/ndr.h>
-#include <smbsrv/smb_sid.h>
-#include <smbsrv/smb_xdr.h>
+
+#include <smb/wintypes.h>
+#include <libmlrpc/ndr.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -247,9 +246,9 @@ typedef struct ndr_binding {
 #define	NDR_N_BINDING_POOL	2
 
 typedef struct ndr_pipe {
-	void 			*np_listener;
+	void			*np_listener;
 	const char		*np_endpoint;
-	smb_netuserinfo_t	*np_user;
+	struct smb_netuserinfo	*np_user;
 	int			(*np_send)(struct ndr_pipe *, void *, size_t);
 	int			(*np_recv)(struct ndr_pipe *, void *, size_t);
 	int			np_fid;
@@ -402,12 +401,12 @@ typedef struct ndr_vcbuf {
 
 ndr_heap_t *ndr_heap_create(void);
 void ndr_heap_destroy(ndr_heap_t *);
+void *ndr_heap_dupmem(ndr_heap_t *, const void *, size_t);
 void *ndr_heap_malloc(ndr_heap_t *, unsigned);
 void *ndr_heap_strdup(ndr_heap_t *, const char *);
 int ndr_heap_mstring(ndr_heap_t *, const char *, ndr_mstring_t *);
 void ndr_heap_mkvcs(ndr_heap_t *, char *, ndr_vcstr_t *);
 void ndr_heap_mkvcb(ndr_heap_t *, uint8_t *, uint32_t, ndr_vcbuf_t *);
-smb_sid_t *ndr_heap_siddup(ndr_heap_t *, smb_sid_t *);
 int ndr_heap_used(ndr_heap_t *);
 int ndr_heap_avail(ndr_heap_t *);
 
@@ -416,7 +415,7 @@ int ndr_heap_avail(ndr_heap_t *);
 #define	NDR_NEWN(XA, T, N)	ndr_heap_malloc((XA)->heap, sizeof (T)*(N))
 #define	NDR_STRDUP(XA, S)	ndr_heap_strdup((XA)->heap, (S))
 #define	NDR_MSTRING(XA, S, OUT)	ndr_heap_mstring((XA)->heap, (S), (OUT))
-#define	NDR_SIDDUP(XA, S)	ndr_heap_siddup((XA)->heap, (S))
+#define	NDR_SIDDUP(XA, S)	ndr_heap_dupmem((XA)->heap, (S), smb_sid_len(S))
 
 typedef struct ndr_xa {
 	unsigned short		ptype;		/* high bits special */
@@ -488,7 +487,7 @@ void nds_destruct(ndr_stream_t *);
 void nds_show_state(ndr_stream_t *);
 
 /* ndr_client.c */
-int ndr_clnt_bind(ndr_client_t *, const char *, ndr_binding_t **);
+int ndr_clnt_bind(ndr_client_t *, ndr_service_t *, ndr_binding_t **);
 int ndr_clnt_call(ndr_binding_t *, int, void *);
 void ndr_clnt_free_heap(ndr_client_t *);
 
@@ -514,10 +513,6 @@ void ndr_pipe_worker(ndr_pipe_t *);
 
 int ndr_generic_call_stub(ndr_xa_t *);
 
-boolean_t ndr_is_admin(ndr_xa_t *);
-boolean_t ndr_is_poweruser(ndr_xa_t *);
-int32_t ndr_native_os(ndr_xa_t *);
-
 /* ndr_svc.c */
 ndr_stub_table_t *ndr_svc_find_stub(ndr_service_t *, int);
 ndr_service_t *ndr_svc_lookup_name(const char *);
@@ -537,6 +532,38 @@ ndr_handle_t *ndr_hdlookup(const ndr_xa_t *, const ndr_hdid_t *);
 void ndr_hdclose(ndr_pipe_t *);
 
 ssize_t ndr_uiomove(caddr_t, size_t, enum uio_rw, struct uio *);
+
+/*
+ * An ndr_client_t is created while binding a client connection to hold
+ * the context for calls made using that connection.
+ *
+ * Handles are RPC call specific and we use an inheritance mechanism to
+ * ensure that each handle has a pointer to the client_t.  When the top
+ * level (bind) handle is released, we close the connection.
+ *
+ * There are some places in libmlsvc where the code assumes that the
+ * handle member is first in this struct.  careful
+ */
+typedef struct mlrpc_handle {
+	ndr_hdid_t	handle;		/* keep first */
+	ndr_client_t	*clnt;
+} mlrpc_handle_t;
+
+int mlrpc_clh_create(mlrpc_handle_t *, void *);
+uint32_t mlrpc_clh_bind(mlrpc_handle_t *, ndr_service_t *);
+void mlrpc_clh_unbind(mlrpc_handle_t *);
+void *mlrpc_clh_free(mlrpc_handle_t *);
+
+int ndr_rpc_call(mlrpc_handle_t *, int, void *);
+int ndr_rpc_get_ssnkey(mlrpc_handle_t *, unsigned char *, size_t);
+void *ndr_rpc_malloc(mlrpc_handle_t *, size_t);
+ndr_heap_t *ndr_rpc_get_heap(mlrpc_handle_t *);
+void ndr_rpc_release(mlrpc_handle_t *);
+void ndr_rpc_set_nonull(mlrpc_handle_t *);
+
+boolean_t ndr_is_null_handle(mlrpc_handle_t *);
+boolean_t ndr_is_bind_handle(mlrpc_handle_t *);
+void ndr_inherit_handle(mlrpc_handle_t *, mlrpc_handle_t *);
 
 #ifdef	__cplusplus
 }

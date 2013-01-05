@@ -44,17 +44,18 @@ extern "C" {
 #include <synch.h>
 #include <stdarg.h>
 
+#include <smb/nterror.h>
+#include <smb/ntstatus.h>
+#include <smb/wintypes.h>
+
 #include <smbsrv/string.h>
 #include <smbsrv/smb_idmap.h>
 #include <smbsrv/netbios.h>
 #include <smbsrv/smb_share.h>
-#include <smb/nterror.h>
-#include <smb/ntstatus.h>
 #include <smbsrv/smb_door.h>
 #include <smbsrv/alloc.h>
 #include <smbsrv/hash_table.h>
 #include <smbsrv/msgbuf.h>
-#include <smbsrv/wintypes.h>
 #include <smbsrv/smb_xdr.h>
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/ntifs.h>

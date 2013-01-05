@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -32,8 +33,8 @@
 #include <stdlib.h>
 #include <netdb.h>
 
+#include <libmlrpc/libmlrpc.h>
 #include <smbsrv/libsmb.h>
-#include <smbsrv/libmlrpc.h>
 #include <smbsrv/libmlsvc.h>
 #include <smbsrv/ndl/dssetup.ndl>
 #include <smbsrv/smbinfo.h>

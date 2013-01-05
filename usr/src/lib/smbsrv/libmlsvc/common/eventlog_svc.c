@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -29,8 +30,8 @@
 #include <sys/utsname.h>
 #include <unistd.h>
 #include <strings.h>
+#include <libmlrpc/libmlrpc.h>
 #include <smbsrv/libsmb.h>
-#include <smbsrv/libmlrpc.h>
 #include <smbsrv/nmpipes.h>
 #include <smbsrv/libmlsvc.h>
 #include <smbsrv/ndl/eventlog.ndl>

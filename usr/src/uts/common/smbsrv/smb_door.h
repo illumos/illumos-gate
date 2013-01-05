@@ -27,7 +27,7 @@
 #define	_SMBSRV_SMB_DOOR_H
 
 #include <sys/door.h>
-#include <smbsrv/wintypes.h>
+#include <smb/wintypes.h>
 #include <smbsrv/smb_xdr.h>
 #include <smbsrv/smb_token.h>
 

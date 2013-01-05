@@ -20,14 +20,14 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <assert.h>
 #include <strings.h>
 #include <sys/param.h>
 
-#include <smbsrv/libsmb.h>
-#include <smbsrv/libmlrpc.h>
+#include <libmlrpc.h>
 
 #ifdef _BIG_ENDIAN
 static const int ndr_native_byte_order = NDR_REPLAB_INTG_BIG_ENDIAN;

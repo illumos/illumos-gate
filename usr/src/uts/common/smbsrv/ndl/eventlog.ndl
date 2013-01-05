@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _MLSVC_LOGR_NDL_
@@ -34,7 +36,7 @@
  ***********************************************************************
  */
 
-#include "ndrtypes.ndl"
+#include <libmlrpc/ndrtypes.ndl>
 
 #define LOGR_OPNUM_EventLogClose		0x02
 #define LOGR_OPNUM_EventLogQueryCount		0x04

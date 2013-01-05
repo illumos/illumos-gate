@@ -32,7 +32,7 @@
 #if !defined(_KERNEL) && !defined(_FAKE_KERNEL)
 #include <stdlib.h>
 #endif /* !_KERNEL */
-#include <smbsrv/wintypes.h>
+#include <smb/wintypes.h>
 #include <smbsrv/smb_sid.h>
 #include <smbsrv/smb_xdr.h>
 #include <smbsrv/smb_token.h>

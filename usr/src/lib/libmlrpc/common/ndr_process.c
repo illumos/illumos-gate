@@ -22,6 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -34,13 +35,11 @@
 #include <strings.h>
 #include <assert.h>
 #include <string.h>
+#include <stdio.h>
 #include <stdlib.h>
 
-#include <smbsrv/libsmb.h>
-#include <smbsrv/string.h>
-#include <smbsrv/libmlrpc.h>
-
-#define	NDR_STRING_MAX		4096
+#include <libmlrpc.h>
+#include <ndr_wchar.h>
 
 #define	NDR_IS_UNION(T)	\
 	(((T)->type_flags & NDR_F_TYPEOP_MASK) == NDR_F_UNION)
@@ -1210,17 +1209,22 @@ ndr_outer_string(ndr_ref_t *outer_ref)
 			/*
 			 * size_is is the number of characters in the
 			 * (multibyte) string, including the null.
+			 * In other words, symbols, not bytes.
 			 */
-			size_is = smb_wcequiv_strlen(valp) /
-			    sizeof (smb_wchar_t);
-
-			if (!(nds->flags & NDS_F_NONULL))
-				++size_is;
-
-			if (size_is > NDR_STRING_MAX) {
+			size_t wlen;
+			wlen = ndr__mbstowcs(NULL, valp, NDR_STRING_MAX);
+			if (wlen == (size_t)-1) {
+				/* illegal sequence error? */
 				NDR_SET_ERROR(outer_ref, NDR_ERR_STRLEN);
 				return (0);
 			}
+			if ((nds->flags & NDS_F_NONULL) == 0)
+				wlen++;
+			if (wlen > NDR_STRING_MAX) {
+				NDR_SET_ERROR(outer_ref, NDR_ERR_STRLEN);
+				return (0);
+			}
+			size_is = wlen;
 		} else {
 			valp = outer_ref->datum;
 			n_zeroes = 0;
@@ -1288,7 +1292,7 @@ ndr_outer_string(ndr_ref_t *outer_ref)
 			 * be nice to use mbequiv_strlen but the string
 			 * may not be null terminated.
 			 */
-			n_alloc = (size_is + 1) * MTS_MB_CHAR_MAX;
+			n_alloc = (size_is + 1) * NDR_MB_CHAR_MAX;
 		} else {
 			n_alloc = (size_is + 1) * is_varlen;
 		}
@@ -1741,7 +1745,7 @@ ndr_inner_array(ndr_ref_t *encl_ref)
 	myref.inner_flags = NDR_F_NONE;
 
 	for (i = 0; i < n_elem; i++) {
-		(void) sprintf(name, "[%lu]", i);
+		(void) snprintf(name, sizeof (name), "[%lu]", i);
 		myref.name = name;
 		myref.pdu_offset = pdu_offset + i * ti->pdu_size_fixed_part;
 		myref.datum = encl_ref->datum + i * ti->c_size_fixed_part;
@@ -1796,20 +1800,20 @@ ndr_inner_array(ndr_ref_t *encl_ref)
 int ndr_basic_integer(ndr_ref_t *, unsigned);
 int ndr_string_basic_integer(ndr_ref_t *, ndr_typeinfo_t *);
 
+/* Comments to be nice to those searching for these types. */
+MAKE_BASIC_TYPE(_char, 1)	/* ndt__char,  ndt_s_char */
+MAKE_BASIC_TYPE(_uchar, 1)	/* ndt__uchar, ndt_s_uchar */
+MAKE_BASIC_TYPE(_short, 2)	/* ndt__short, ndt_s_short */
+MAKE_BASIC_TYPE(_ushort, 2)	/* ndt__ushort, ndt_s_ushort */
+MAKE_BASIC_TYPE(_long, 4)	/* ndt__long,  ndt_s_long */
+MAKE_BASIC_TYPE(_ulong, 4)	/* ndt__ulong, ndt_s_ulong */
 
-MAKE_BASIC_TYPE(_char, 1)
-MAKE_BASIC_TYPE(_uchar, 1)
-MAKE_BASIC_TYPE(_short, 2)
-MAKE_BASIC_TYPE(_ushort, 2)
-MAKE_BASIC_TYPE(_long, 4)
-MAKE_BASIC_TYPE(_ulong, 4)
-
-MAKE_BASIC_TYPE_BASE(_wchar, 2)
+MAKE_BASIC_TYPE_BASE(_wchar, 2)	/* ndt__wchar, ndt_s_wchar */
 
 int
 ndr_basic_integer(ndr_ref_t *ref, unsigned size)
 {
-	ndr_stream_t 	*nds = ref->stream;
+	ndr_stream_t	*nds = ref->stream;
 	char 		*valp = (char *)ref->datum;
 	int		rc;
 
@@ -1854,7 +1858,7 @@ ndr_string_basic_integer(ndr_ref_t *encl_ref, ndr_typeinfo_t *type_under)
 	myref.name = name;
 
 	for (i = 0; i < NDR_STRING_MAX; i++) {
-		(void) sprintf(name, "[%lu]", i);
+		(void) snprintf(name, sizeof (name), "[%lu]", i);
 		myref.pdu_offset = pdu_offset + i * size;
 		valp = encl_ref->datum + i * size;
 		myref.datum = valp;
@@ -1897,27 +1901,27 @@ ndr_typeinfo_t ndt_s_wchar = {
  * multi-byte to wide characters. During NDR_M_OP_UNMARSHALL, we
  * convert from wide characters to multi-byte.
  *
- * It appeared that NT would sometimes leave a spurious character
- * in the data stream before the null wide_char, which would get
- * included in the string decode because we processed until the
- * null character. It now looks like NT does not always terminate
- * RPC Unicode strings and the terminating null is a side effect
- * of field alignment. So now we rely on the strlen_is (set up in
- * ndr_outer_string) of the enclosing reference. This may or may
- * not include the null but it doesn't matter, the algorithm will
- * get it right.
+ * The most critical thing to get right in this function is to
+ * marshall or unmarshall _exactly_ the number of elements the
+ * OtW length specifies, as saved by the caller in: strlen_is.
+ * Doing otherwise would leave us positioned at the wrong place
+ * in the data stream for whatever follows this.  Note that the
+ * string data covered by strlen_is may or may not include any
+ * null termination, but the converted string provided by the
+ * caller or returned always has a null terminator.
  */
 int
 ndr_s_wchar(ndr_ref_t *encl_ref)
 {
 	ndr_stream_t		*nds = encl_ref->stream;
-	unsigned short		wide_char;
-	char 			*valp;
+	char			*valp = encl_ref->datum;
 	ndr_ref_t		myref;
-	unsigned long		i;
 	char			name[30];
-	int			count;
-	int			char_count = 0;
+	ndr_wchar_t		wcs[NDR_STRING_MAX+1];
+	size_t			i, slen, wlen;
+
+	/* This is enforced in ndr_outer_string() */
+	assert(encl_ref->strlen_is <= NDR_STRING_MAX);
 
 	if (nds->m_op == NDR_M_OP_UNMARSHALL) {
 		/*
@@ -1930,59 +1934,60 @@ ndr_s_wchar(ndr_ref_t *encl_ref)
 		}
 	}
 
+	/*
+	 * If we're marshalling, convert the given string
+	 * from UTF-8 into a local UCS-2 string.
+	 */
+	if (nds->m_op == NDR_M_OP_MARSHALL) {
+		wlen = ndr__mbstowcs(wcs, valp, NDR_STRING_MAX);
+		if (wlen == (size_t)-1)
+			return (0);
+		/*
+		 * Add a nulls to make strlen_is.
+		 * (always zero or one of them)
+		 * Then null terminate at wlen,
+		 * just for debug convenience.
+		 */
+		while (wlen < encl_ref->strlen_is)
+			wcs[wlen++] = 0;
+		wcs[wlen] = 0;
+	}
+
+	/*
+	 * Copy wire data to or from the local wc string.
+	 * Always exactly strlen_is elements.
+	 */
 	bzero(&myref, sizeof (myref));
 	myref.enclosing = encl_ref;
 	myref.stream = encl_ref->stream;
 	myref.packed_alignment = 0;
 	myref.ti = &ndt__wchar;
 	myref.inner_flags = NDR_F_NONE;
-	myref.datum = (char *)&wide_char;
 	myref.name = name;
 	myref.pdu_offset = encl_ref->pdu_offset;
+	myref.datum = (char *)wcs;
+	wlen = encl_ref->strlen_is;
 
-	valp = encl_ref->datum;
-	count = 0;
-
-	for (i = 0; i < NDR_STRING_MAX; i++) {
-		(void) sprintf(name, "[%lu]", i);
-
-		if (nds->m_op == NDR_M_OP_MARSHALL) {
-			count = smb_mbtowc((smb_wchar_t *)&wide_char, valp,
-			    MTS_MB_CHAR_MAX);
-			if (count < 0) {
-				return (0);
-			} else if (count == 0) {
-				if (encl_ref->strlen_is != encl_ref->size_is)
-					break;
-
-				/*
-				 * If the input char is 0, mbtowc
-				 * returns 0 without setting wide_char.
-				 * Set wide_char to 0 and a count of 1.
-				 */
-				wide_char = *valp;
-				count = 1;
-			}
-		}
-
+	for (i = 0; i < wlen; i++) {
+		(void) snprintf(name, sizeof (name), "[%lu]", i);
 		if (!ndr_inner(&myref))
 			return (0);
+		myref.pdu_offset += sizeof (ndr_wchar_t);
+		myref.datum	 += sizeof (ndr_wchar_t);
+	}
 
-		if (nds->m_op == NDR_M_OP_UNMARSHALL) {
-			count = smb_wctomb(valp, wide_char);
-
-			if ((++char_count) == encl_ref->strlen_is) {
-				valp += count;
-				*valp = '\0';
-				break;
-			}
-		}
-
-		if (!wide_char)
-			break;
-
-		myref.pdu_offset += sizeof (wide_char);
-		valp += count;
+	/*
+	 * If this is unmarshall, convert the local UCS-2 string
+	 * into a UTF-8 string in the caller's buffer.  The caller
+	 * previously determined the space required and provides a
+	 * buffer of sufficient size.
+	 */
+	if (nds->m_op == NDR_M_OP_UNMARSHALL) {
+		wcs[wlen] = 0;
+		slen = ndr__wcstombs(valp, wcs, wlen);
+		if (slen == (size_t)-1)
+			return (0);
+		valp[slen] = '\0';
 	}
 
 	return (1);
@@ -1997,51 +2002,20 @@ ndr_s_wchar(ndr_ref_t *encl_ref)
  * any terminating null wide character.  Returns -1 if an invalid
  * multibyte character is encountered.
  */
+/* ARGSUSED */
 size_t
-ndr_mbstowcs(ndr_stream_t *nds, smb_wchar_t *wcs, const char *mbs,
+ndr_mbstowcs(ndr_stream_t *nds, ndr_wchar_t *wcs, const char *mbs,
     size_t nwchars)
 {
-	smb_wchar_t *start = wcs;
-	int nbytes;
-
-	while (nwchars--) {
-		nbytes = ndr_mbtowc(nds, wcs, mbs, MTS_MB_CHAR_MAX);
-		if (nbytes < 0) {
-			*wcs = 0;
-			return ((size_t)-1);
-		}
-
-		if (*mbs == 0)
-			break;
-
-		++wcs;
-		mbs += nbytes;
-	}
-
-	return (wcs - start);
-}
-
-/*
- * Converts a multibyte character to a little-endian, wide-char, which
- * is stored in wcharp.  Up to nbytes bytes are examined.
- *
- * If mbchar is valid, returns the number of bytes processed in mbchar.
- * If mbchar is invalid, returns -1.  See also smb_mbtowc().
- */
-/*ARGSUSED*/
-int
-ndr_mbtowc(ndr_stream_t *nds, smb_wchar_t *wcharp, const char *mbchar,
-    size_t nbytes)
-{
-	int rc;
-
-	if ((rc = smb_mbtowc(wcharp, mbchar, nbytes)) < 0)
-		return (rc);
+	size_t len;
 
 #ifdef _BIG_ENDIAN
-	if (nds == NULL || NDR_MODE_MATCH(nds, NDR_MODE_RETURN_SEND))
-		*wcharp = BSWAP_16(*wcharp);
+	if (nds == NULL || NDR_MODE_MATCH(nds, NDR_MODE_RETURN_SEND)) {
+		/* Make WC string in LE order. */
+		len = ndr__mbstowcs_le(wcs, mbs, nwchars);
+	} else
 #endif
+		len = ndr__mbstowcs(wcs, mbs, nwchars);
 
-	return (rc);
+	return (len);
 }

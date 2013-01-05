@@ -29,11 +29,11 @@
 #define	_SMB_SHARE_H
 
 #include <sys/param.h>
+#include <smb/lmerr.h>
+#include <smb/wintypes.h>
 #include <smbsrv/string.h>
 #include <smbsrv/smb_inet.h>
 #include <smbsrv/hash_table.h>
-#include <smbsrv/wintypes.h>
-#include <smb/lmerr.h>
 
 #if !defined(_KERNEL) && !defined(_FAKE_KERNEL)
 #include <libshare.h>

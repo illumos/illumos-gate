@@ -73,6 +73,7 @@ file path=usr/kernel/drv/smbsrv.conf group=sys
 file path=usr/kernel/kmdb/$(ARCH64)/smbsrv group=sys mode=0555
 file path=usr/lib/fs/smb/$(ARCH64)/libshare_smb.so.1
 file path=usr/lib/fs/smb/libshare_smb.so.1
+file path=usr/lib/libmlrpc.so.2
 file path=usr/lib/mdb/kvm/$(ARCH64)/smbsrv.so group=sys mode=0555
 file path=usr/lib/reparse/libreparse_smb.so.1
 file path=usr/lib/security/pam_smb_passwd.so.1
@@ -83,7 +84,6 @@ file path=usr/lib/smbsrv/dtrace/smbd-pipesvc.d mode=0555
 file path=usr/lib/smbsrv/dtrace/smbnode.d mode=0555
 file path=usr/lib/smbsrv/dtrace/smbsrv.d mode=0555
 file path=usr/lib/smbsrv/dtrace/smbvfs.d mode=0555
-file path=usr/lib/smbsrv/libmlrpc.so.1
 file path=usr/lib/smbsrv/libmlsvc.so.1
 file path=usr/lib/smbsrv/libsmb.so.1
 file path=usr/lib/smbsrv/libsmbns.so.1
@@ -109,7 +109,3 @@ license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/reparse/libreparse_smb.so target=libreparse_smb.so.1
 link path=usr/lib/security/pam_smb_passwd.so target=pam_smb_passwd.so.1
-link path=usr/lib/smbsrv/libmlrpc.so target=libmlrpc.so.1
-link path=usr/lib/smbsrv/libmlsvc.so target=libmlsvc.so.1
-link path=usr/lib/smbsrv/libsmb.so target=libsmb.so.1
-link path=usr/lib/smbsrv/libsmbns.so target=libsmbns.so.1

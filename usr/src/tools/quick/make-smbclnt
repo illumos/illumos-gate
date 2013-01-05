@@ -11,7 +11,7 @@
 #
 
 #
-# Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
 
 # Use distributed make (dmake) by default.
@@ -90,35 +90,20 @@ then
   test -f $ROOT/usr/include/rpcsvc/daemon_utils.h ||
     (cd $SRC/head && $make install_h)
 
-  # always update the smbsrv headers to be safe
-  (cd $SRC/uts/common/gssapi && $make -k install_h)
-  (cd $SRC/uts/common/sys && $make -k install_h)
+  # always update the smb headers to be safe
   (cd $SRC/uts/common/smb && $make -k install_h)
-  (cd $SRC/uts/common/smbsrv && $make -k install_h)
 
 fi
 
 # Need some library headers too...
 for lib in \
-  libads \
-  libbsm \
-  libcmdutils \
   libcryptoutil \
-  libdevid \
-  libfakekernel	\
-  libgss \
-  libidmap \
-  libkrb5 \
   libmlrpc \
   libpam \
   libsec \
-  libscf \
   libshare \
   libsmbfs \
-  libsqlite \
-  libuutil \
-  passwdutil \
-  smbsrv
+  passwdutil
 do
   (cd $SRC/lib/$lib && $make $targ)
 done
@@ -133,8 +118,7 @@ do_kern() {
   esac
   ( unset SOURCEDEBUG ;
   (cd $SRC/uts/$x/nsmb && $make $targ) ;
-  (cd $SRC/uts/$x/smbfs && $make $targ) ;
-  (cd $SRC/uts/$x/smbsrv && $make $targ) )
+  (cd $SRC/uts/$x/smbfs && $make $targ) )
 }
 
 ################################################################
@@ -144,17 +128,7 @@ do_kern() {
 # skip these on clean (but still nuke them for clobber)
 
 do_lib1() {
-
-for lib in \
-  libavl \
-  libgss \
-  libkrb5 \
-  libcmdutils \
-  libsqlite \
-  libuutil
-do
-  (cd $SRC/lib/$lib && $make $1)
-done
+  :
 }
 
 # lib2 builds stuff we include in the tar file,
@@ -162,19 +136,13 @@ done
 
 do_lib2() {
 
-for lib in \
-  libfakekernel \
-  libads \
-  libsmbfs \
-  libmlrpc
-do
-  (cd $SRC/lib/$lib && $make $1)
-done
-
-(cd $SRC/lib/libshare && $make $1 PLUGINS=smb)
-(cd $SRC/lib/smbsrv && $make $1)
+(cd $SRC/lib/libsmbfs && $make $1)
+[ "$1" = install ] &&
+  (cd $SRC/lib/libsmbfs && $make _msg)
+(cd $SRC/lib/libmlrpc && $make $1)
+(cd $SRC/lib/libshare && $make $1 PLUGINS=smbfs)
 (cd $SRC/lib/passwdutil && $make $1)
-(cd $SRC/lib/pam_modules/smb && $make $1)
+(cd $SRC/lib/pam_modules/smbfs && $make $1)
 
 }
 
@@ -194,9 +162,6 @@ clean|clobber)
   ;;
 esac
 
-(cd $SRC/cmd/devfsadm && $make $1)
-(cd $SRC/cmd/smbsrv && $make $1)
-
 # Build the MDB modules, WITH the linktest
 (cd $SRC/cmd/mdb/tools && $make $1)
 
@@ -213,36 +178,12 @@ do
 	$make -k $1 )
     ;;
   esac
+
   (cd $SRC/cmd/mdb/$x/$a/nsmb &&
 	$make $1 KMDB_LINKTEST_ENABLE= )
   (cd $SRC/cmd/mdb/$x/$a/smbfs &&
 	$make $1 KMDB_LINKTEST_ENABLE= )
-  (cd $SRC/cmd/mdb/$x/$a/smbsrv &&
-	$make $1 KMDB_LINKTEST_ENABLE= )
 done
-
-# mdb_arch is both 32-bit & 64-bit
-for a in $mdb_arch
-do
-  (cd $SRC/cmd/mdb/$x/$a/libfksmbsrv &&
-	$make $1 )
-
-# We build these libraries (to the proto area), so we need to
-# build the mdb modules too so mdb will load them.
-  (cd $SRC/cmd/mdb/$x/$a/libcmdutils &&
-	$make $1 )
-  (cd $SRC/cmd/mdb/$x/$a/libavl &&
-	$make $1 )
-
-done
-
-(cd $SRC/cmd/Adm/sun && $make $1)
-
-# Deal with mode 0400 file annoyance...
-# See usr/src/cmd/Adm/sun/Makefile
-if [ $1 = install ]; then
-  chmod a+r $ROOT/var/smb/smbpasswd
-fi
 }
 
 
@@ -255,17 +196,12 @@ do_tags() {
 	find uts/common/net -name '*.[ch]' -print |sort
 	find uts/common/netinet -name '*.[ch]' -print |sort
 	find uts/common/smb -name '*.[ch]' -print |sort
-	find uts/common/smbsrv -name '*.ndl' -print |sort
-	find uts/common/smbsrv -name '*.[ch]' -print |sort
-	find uts/common/fs/smbsrv -name '*.[ch]' -print |sort
-	find uts/common/gssapi -name '*.[ch]' -print |sort
+	find uts/common/netsmb -name '*.[ch]' -print |sort
+	find uts/common/fs/smbclnt -name '*.[ch]' -print |sort
 	find head -name '*.h' -print |sort
-	find lib/smbsrv -name '*.[ch]' -print |sort
 	find lib/libsmbfs -name '*.[ch]' -print |sort
-	find lib/libads -name '*.[ch]' -print |sort
-	find lib/libgss -name '*.[ch]' -print |sort
-	find cmd/smbsrv -name '*.[ch]' -print |sort
-	find common/smbsrv -name '*.[ch]' -print |sort
+	find cmd/fs.d/smbclnt -name '*.[ch]' -print |sort
+	find common/smbclnt -name '*.[ch]' -print |sort
 	) > $SRC/cscope.files
 
 	(cd $SRC ;
@@ -279,27 +215,39 @@ do_tags() {
 do_tar() {
 	git_rev=`git rev-parse --short=8 HEAD`
 	files="
-lib/svc/manifest/network/smb/server.xml
-usr/kernel/drv/$arch64/smbsrv
-usr/kernel/kmdb/$arch64/smbsrv
-usr/lib/fs/smb/$arch64/libshare_smb.so.1
-usr/lib/fs/smb/libshare_smb.so.1
-usr/lib/libsmbfs.so.1
-usr/lib/mdb/kvm/$arch64/smbsrv.so
-usr/lib/reparse/libreparse_smb.so.1
-usr/lib/security/pam_smb_passwd.so.1
-usr/lib/smbsrv/dtrace
+lib/svc/manifest/network/smb/client.xml
+lib/svc/method/smb-client
+opt/smbcl-tests/tests/srvenum
+opt/smbcl-tests/tests/srvinfo
+opt/smbcl-tests/tests/tconn
+usr/bin/smbutil
+usr/kernel/drv/$arch64/nsmb
+usr/kernel/fs/$arch64/smbfs
+usr/kernel/kmdb/$arch64/nsmb
+usr/kernel/kmdb/$arch64/smbfs
+usr/lib/$arch64/libsmbfs.so.1
+usr/lib/fs/smbfs/$arch64/libshare_smbfs.so.1
+usr/lib/fs/smbfs/chacl
+usr/lib/fs/smbfs/dfshares
+usr/lib/fs/smbfs/libshare_smbfs.so.1
+usr/lib/fs/smbfs/lsacl
+usr/lib/fs/smbfs/mount
+usr/lib/fs/smbfs/share
+usr/lib/fs/smbfs/umount
+usr/lib/fs/smbfs/unshare
 usr/lib/libmlrpc.so.2
-usr/lib/smbsrv/libmlsvc.so.1
-usr/lib/smbsrv/libsmb.so.1
-usr/lib/smbsrv/libsmbns.so.1
-usr/lib/smbsrv/smbd
-usr/sbin/devfsadm
-usr/sbin/smbadm
-usr/sbin/smbstat
+usr/lib/libsmbfs.so.1
+usr/lib/mdb/kvm/$arch64/nsmb.so
+usr/lib/mdb/kvm/$arch64/smbfs.so
+usr/lib/mdb/kvm/nsmb.so
+usr/lib/mdb/kvm/smbfs.so
+usr/lib/security/$arch64/pam_smbfs_login.so.1
+usr/lib/security/pam_smbfs_login.so.1
+usr/lib/smbfs/smbiod
+usr/lib/smbfs/smbiod-svc
 "
 
-	(cd $ROOT && tar cfj ../../smbsrv-${git_rev}.tar.bz2 $files)
+	(cd $ROOT && tar cfj ../../smbclnt-${git_rev}.tar.bz2 $files)
 }
 
 ################################################################
