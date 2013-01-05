@@ -1643,3 +1643,4 @@ Bugid   Risk Synopsis
 3453	GNU comdat redirection does exactly the wrong thing
 3439	discarded sections shouldn't end up on output lists
 3436	relocatable objects also need sloppy relocation
+3451	archive libraries with no symbols shouldn't require a string table
