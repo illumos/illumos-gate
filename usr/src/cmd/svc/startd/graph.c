@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -4874,6 +4875,20 @@ vertex_subgraph_dependencies_shutdown(scf_handle_t *h, graph_vertex_t *v,
 
 	was_up = up_state(old_state);
 	now_up = up_state(v->gv_state);
+
+	if (halting != -1 && old_state == RESTARTER_STATE_DISABLED &&
+	    v->gv_state != RESTARTER_STATE_DISABLED) {
+		/*
+		 * We're halting and we have a svc which is transitioning to
+		 * offline in parallel. This leads to a race condition where
+		 * gt_enter_offline might re-enable the svc after we disabled
+		 * it. Since we're halting, we want to ensure no svc ever
+		 * transitions out of the disabled state. In this case, modify
+		 * the flags to keep us on the halting path.
+		 */
+		was_up = 0;
+		now_up = 0;
+	}
 
 	if (!was_up && now_up) {
 		++non_subgraph_svcs;
