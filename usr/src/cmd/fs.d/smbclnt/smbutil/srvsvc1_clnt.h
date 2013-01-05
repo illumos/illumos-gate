@@ -26,14 +26,21 @@
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
-/*LINTLIBRARY*/
-/*PROTOLIB1*/
+#ifndef _SRVSVC1_CLNT_H
+#define	_SRVSVC1_CLNT_H
 
-#include <netsmb/smbfs_api.h>
-#include <netsmb/smbfs_acl.h>
+/*
+ * Excerpts from lib/smbsrv/libmlsvc
+ * Just enough for share enumeration.
+ */
 
-#include <netsmb/smb_lib.h>
-#include <netsmb/smb_keychain.h>
-#include <netsmb/smb_rap.h>
-#include <netsmb/spnego.h>
+#include <libmlrpc/libmlrpc.h>
+#include "srvsvc1.ndl"
 
+void srvsvc1_initialize(void);
+int srvsvc_net_share_enum(mlrpc_handle_t *handle, char *server,
+	int level, union mslm_NetShareEnum_ru *resp);
+int srvsvc_net_server_getinfo(mlrpc_handle_t *handle, char *server,
+	int level, union mslm_NetServerGetInfo_ru *resp);
+
+#endif	/* _SRVSVC1_CLNT_H */
