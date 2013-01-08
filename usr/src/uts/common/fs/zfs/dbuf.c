@@ -22,6 +22,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -532,8 +533,19 @@ dbuf_read_impl(dmu_buf_impl_t *db, zio_t *zio, uint32_t *flags)
 		arc_space_consume(DN_MAX_BONUSLEN, ARC_SPACE_OTHER);
 		if (bonuslen < DN_MAX_BONUSLEN)
 			bzero(db->db.db_data, DN_MAX_BONUSLEN);
-		if (bonuslen)
-			bcopy(DN_BONUS(dn->dn_phys), db->db.db_data, bonuslen);
+
+		if (bonuslen) {
+			/*
+			 * Absent byzantine on-disk corruption, we fully expect
+			 * our bonuslen to be no more than DN_MAX_BONUSLEN --
+			 * but we nonetheless explicitly clamp it on the bcopy()
+			 * to prevent any on-disk corruption from becoming
+			 * rampant in-kernel corruption.
+			 */
+			bcopy(DN_BONUS(dn->dn_phys), db->db.db_data,
+			    MIN(bonuslen, DN_MAX_BONUSLEN));
+		}
+
 		DB_DNODE_EXIT(db);
 		dbuf_update_data(db);
 		db->db_state = DB_CACHED;
