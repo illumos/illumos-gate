@@ -23,6 +23,7 @@
 # Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2011 Joyent, Inc.  All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2013 DEY Storage Systems, Inc. All rights reserved.
 
 include ../Makefile.master
 
@@ -221,7 +222,6 @@ COMMON_SUBDIRS=		\
 	killall		\
 	krb5		\
 	ksh		\
-	kstat		\
 	kvmstat		\
 	last		\
 	lastcomm	\
@@ -617,7 +617,6 @@ MSGSUBDIRS=		\
 	kbd		\
 	krb5		\
 	ksh		\
-	kstat		\
 	last		\
 	ldap		\
 	ldapcachemgr	\
