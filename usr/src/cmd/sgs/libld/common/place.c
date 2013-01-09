@@ -325,7 +325,7 @@ gnu_comdat_sym(Ifl_desc *ifl, Is_desc *gisp)
 		 * link-edits.  For now, size the section name dynamically.
 		 */
 		ssize = strlen(isp->is_name);
-		if ((strncmp(isp->is_name, gisp->is_name, ssize) != 0) &&
+		if ((strncmp(isp->is_name, gisp->is_name, ssize) == 0) &&
 		    (gisp->is_name[ssize] == '.'))
 			return ((char *)&gisp->is_name[ssize]);
 	}
