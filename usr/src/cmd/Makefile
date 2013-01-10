@@ -21,7 +21,7 @@
 
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
-# Copyright (c) 2012 Joyent, Inc.  All rights reserved.
+# Copyright (c) 2013 Joyent, Inc.  All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
 
 include ../Makefile.master
@@ -93,6 +93,7 @@ COMMON_SUBDIRS=		\
 	cmd-crypto	\
 	cmd-inet	\
 	col		\
+	column		\
 	compress	\
 	consadm		\
 	coreadm		\

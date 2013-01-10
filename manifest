@@ -1969,6 +1969,7 @@ f usr/bin/ckyorn 0555 root bin
 f usr/bin/clear 0555 root bin
 h usr/bin/cmp=usr/bin/alias
 f usr/bin/col 0555 root bin
+f usr/bin/column 0555 root bin
 h usr/bin/comm=usr/bin/alias
 h usr/bin/command=usr/bin/alias
 f usr/bin/compress 0555 root bin
@@ -11415,6 +11416,7 @@ f usr/share/man/man1/ckyorn.1 0444 root bin
 f usr/share/man/man1/clear.1 0444 root bin
 f usr/share/man/man1/cmp.1 0444 root bin
 f usr/share/man/man1/col.1 0444 root bin
+f usr/share/man/man1/column.1 0444 root bin
 f usr/share/man/man1/comm.1 0444 root bin
 f usr/share/man/man1/command.1 0444 root bin
 f usr/share/man/man1/compress.1 0444 root bin
