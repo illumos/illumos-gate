@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2013, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -142,6 +142,8 @@
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <fm/libfmevent.h>
 #include <libscf.h>
 #include <libscf_priv.h>
@@ -6842,6 +6844,7 @@ repository_event_thread(void *unused)
 	char *fmri = startd_alloc(max_scf_fmri_size);
 	char *pg_name = startd_alloc(max_scf_value_size);
 	int r;
+	int fd;
 
 	h = libscf_handle_create_bound_loop();
 
@@ -6862,6 +6865,14 @@ retry:
 		}
 
 		goto retry;
+	}
+
+	if ((fd = open("/etc/svc/volatile/startd.ready", O_RDONLY | O_CREAT,
+	    S_IRUSR)) < 0) {
+		log_error(LOG_WARNING, "Couldn't create startd.ready file\n",
+		    SCF_GROUP_FRAMEWORK, scf_strerror(scf_error()));
+	} else {
+		(void) close(fd);
 	}
 
 	/*CONSTCOND*/
