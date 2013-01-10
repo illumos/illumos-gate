@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2012 Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013 Joyent, Inc. All rights reserved.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -514,6 +514,17 @@ destroy:
 	return (mdb_ctf_type_delete(&id));
 }
 
+static int
+typedef_readfile(const char *file)
+{
+	int ret;
+
+	ret = mdb_ctf_synthetics_from_file(file);
+	if (ret != DCMD_OK)
+		mdb_warn("failed to create synthetics from file\n");
+	return (ret);
+}
+
 /* ARGSUSED */
 int
 cmd_typedef(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
@@ -521,7 +532,7 @@ cmd_typedef(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_ctf_id_t id;
 	int i;
 	int destroy = 0, list = 0;
-	const char *cmode = NULL;
+	const char *cmode = NULL, *rfile = NULL;
 	const char *dst, *src;
 	char *dup;
 	parse_root_t *pr;
@@ -532,7 +543,8 @@ cmd_typedef(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	i = mdb_getopts(argc, argv,
 	    'd', MDB_OPT_SETBITS, TRUE, &destroy,
 	    'l', MDB_OPT_SETBITS, TRUE, &list,
-	    'c', MDB_OPT_STR, &cmode, NULL);
+	    'c', MDB_OPT_STR, &cmode,
+	    'r', MDB_OPT_STR, &rfile, NULL);
 
 	argc -= i;
 	argv += i;
@@ -540,12 +552,19 @@ cmd_typedef(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	/*
 	 * All our options are mutually exclusive currently.
 	 */
-	if ((destroy && (cmode != NULL || list)) ||
-	    (cmode != NULL && (list || destroy)) ||
-	    (list && (destroy || cmode != NULL)))
+	i = 0;
+	if (destroy)
+		i++;
+	if (cmode != NULL)
+		i++;
+	if (list)
+		i++;
+	if (rfile != NULL)
+		i++;
+	if (i > 1)
 		return (DCMD_USAGE);
 
-	if ((destroy || cmode != NULL || list) && argc != 0)
+	if ((destroy || cmode != NULL || list || rfile != NULL) && argc != 0)
 		return (DCMD_USAGE);
 
 	if (destroy)
@@ -556,6 +575,9 @@ cmd_typedef(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (list)
 		return (typedef_list());
+
+	if (rfile)
+		return (typedef_readfile(rfile));
 
 	if (argc < 2)
 		return (DCMD_USAGE);
@@ -616,7 +638,6 @@ static char typedef_desc[] =
 "::typedef operates like the C typedef keyword and creates a synthetic type\n"
 "that is usable across mdb just like a type that is embedded in CTF data.\n"
 "This includes familiar dcmds like ::print as well as mdb's tab completion\n"
-
 "engine. The \"type\" argument can either be a named structure or union\n"
 "declaration, like \"struct proc { int p_id; }\" declartion, an anonymous\n"
 "structure or union declaration, like \"struct { int count; }\", or simply\n"
@@ -644,6 +665,12 @@ static char typedef_desc[] =
 "  o function pointers (use a void * instead)\n"
 "  o bitfields (use an integer of the appropriate size instead)\n"
 "  o packed structures (all structures currently use their natural alignment)\n"
+"\n"
+"::typedef also allows you to read type definitions from a file. Definitions\n"
+"can be read from any ELF file that has a CTF section that libctf can parse.\n"
+"You can check if a file has such a section with elfdump(1). If a binary or\n"
+"core dump does not have any type information, but you do have it elsewhere,\n"
+"then you can use ::typedef -r to read in that type information.\n"
 "\n";
 
 static char typedef_opts[] =
@@ -655,6 +682,7 @@ static char typedef_opts[] =
 "                 o ILP32 - An alternate name for LP32.\n"
 "  -d         delete all synthetic types\n"
 "  -l         list all synthetic types\n"
+"  -r file    import type definitions (CTF) from another ELF file\n"
 "\n";
 
 static char typedef_examps[] =
@@ -665,6 +693,7 @@ static char typedef_examps[] =
 "  ::typedef \"struct { uintptr_t stone[7]; void **white; }\" gift_t\n"
 "  ::typedef \"struct list { struct list *l_next; struct list *l_prev; }\" "
 "list_t\n"
+"  ::typedef -r /var/tmp/qemu-system-x86_64\n"
 "\n";
 
 static char typedef_intrins[] =

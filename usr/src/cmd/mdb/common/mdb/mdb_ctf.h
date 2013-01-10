@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
  */
 
 #ifndef	_MDB_CTF_H
@@ -155,6 +155,7 @@ extern ctf_file_t *mdb_ctf_bufopen(const void *, size_t,	/* Internal */
 extern void mdb_ctf_close(ctf_file_t *fp);			/* Internal */
 extern int mdb_ctf_synthetics_init(void);			/* Internal */
 extern void mdb_ctf_synthetics_fini(void);			/* Internal */
+extern int mdb_ctf_synthetics_from_file(const char *);		/* Internal */
 
 #endif
 

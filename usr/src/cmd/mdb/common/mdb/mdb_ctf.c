@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
  */
 
 #include <mdb/mdb_ctf.h>
@@ -1790,4 +1790,58 @@ mdb_ctf_type_delete(const mdb_ctf_id_t *id)
 	}
 
 	return (0);
+}
+
+static int
+mdb_ctf_synthetics_file_cb(mdb_ctf_id_t id, void *arg)
+{
+	ctf_file_t *targ = arg;
+	mdb_ctf_impl_t *mcip = (mdb_ctf_impl_t *)&id;
+
+	if (ctf_add_type(targ, mcip->mci_fp, mcip->mci_id) == CTF_ERR) {
+		mdb_dprintf(MDB_DBG_CTF, "failed to add type %d: %s\n",
+		    mcip->mci_id, ctf_errmsg(ctf_errno(mcip->mci_fp)));
+		return (set_errno(ctf_to_errno(ctf_errno(mcip->mci_fp))));
+	}
+
+	return (0);
+}
+
+int
+mdb_ctf_synthetics_from_file(const char *file)
+{
+	ctf_file_t *fp, *syn = mdb.m_synth;
+	int ret;
+	type_iter_t ti;
+
+	if (syn == NULL) {
+		mdb_warn("synthetic types disabled: ctf create failed\n");
+		return (DCMD_ERR);
+	}
+
+	if ((fp = mdb_ctf_open(file, &ret)) == NULL) {
+		mdb_warn("failed to parse ctf data in %s", file);
+		return (DCMD_ERR);
+	}
+
+	ret = DCMD_OK;
+	ti.ti_fp = fp;
+	ti.ti_arg = syn;
+	ti.ti_cb = mdb_ctf_synthetics_file_cb;
+	if (ctf_type_iter(fp, type_iter_cb, &ti) == CTF_ERR) {
+		ret = set_errno(ctf_to_errno(ctf_errno(fp)));
+		mdb_warn("failed to add types");
+		goto cleanup;
+	}
+
+	if (ctf_update(syn) == CTF_ERR) {
+		mdb_dprintf(MDB_DBG_CTF, "failed to update synthetic types\n");
+		ret = set_errno(ctf_to_errno(ctf_errno(fp)));
+	}
+
+cleanup:
+	ctf_close(fp);
+	if (ret != DCMD_OK)
+		(void) ctf_discard(syn);
+	return (ret);
 }
