@@ -27,7 +27,7 @@
 /* Portions Copyright 2010 Robert Milkowski */
 
 /*
- * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -625,6 +625,17 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 	if (limit == RLIM64_INFINITY || limit > MAXOFFSET_T)
 		limit = MAXOFFSET_T;
 
+	/*
+	 * Pre-fault the pages to ensure slow (eg NFS) pages
+	 * don't hold up txg.
+	 * Skip this if uio contains loaned arc_buf.
+	 */
+	if ((uio->uio_extflg == UIO_XUIO) &&
+	    (((xuio_t *)uio)->xu_type == UIOTYPE_ZEROCOPY))
+		xuio = (xuio_t *)uio;
+	else
+		uio_prefaultpages(n, uio);
+
 	ZFS_ENTER(zfsvfs);
 	ZFS_VERIFY_ZP(zp);
 
@@ -665,17 +676,6 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 		ZFS_EXIT(zfsvfs);
 		return (error);
 	}
-
-	/*
-	 * Pre-fault the pages to ensure slow (eg NFS) pages
-	 * don't hold up txg.
-	 * Skip this if uio contains loaned arc_buf.
-	 */
-	if ((uio->uio_extflg == UIO_XUIO) &&
-	    (((xuio_t *)uio)->xu_type == UIOTYPE_ZEROCOPY))
-		xuio = (xuio_t *)uio;
-	else
-		uio_prefaultpages(MIN(n, max_blksz), uio);
 
 	/*
 	 * If in append mode, set the io offset pointer to eof.
@@ -917,9 +917,6 @@ again:
 			break;
 		ASSERT(tx_bytes == nbytes);
 		n -= nbytes;
-
-		if (!xuio && n > 0)
-			uio_prefaultpages(MIN(n, max_blksz), uio);
 	}
 
 	zfs_range_unlock(rl);
