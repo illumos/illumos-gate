@@ -21,8 +21,7 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 #
 
 include		../Makefile.lib
@@ -30,6 +29,7 @@ include		../Makefile.lib
 HDRS=		libzoneinfo.h
 HDRDIR=		common
 SUBDIRS=	$(MACH)
+$(BUILD64)SUBDIRS += $(MACH64)
 
 all :=		TARGET = all
 clean :=	TARGET = clean

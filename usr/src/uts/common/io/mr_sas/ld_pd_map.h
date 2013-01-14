@@ -67,7 +67,7 @@ typedef struct _MR_FW_RAID_MAP_ALL {
 } MR_FW_RAID_MAP_ALL;
 
 /*
- * Raid Context structure which describes MegaRAID specific IO Paramenters
+ * Raid Context structure which describes MegaRAID specific IO Parameters
  * This resides at offset 0x60 where the SGL normally starts in MPT IO Frames
  */
 typedef struct _MPI2_SCSI_IO_VENDOR_UNIQUE {

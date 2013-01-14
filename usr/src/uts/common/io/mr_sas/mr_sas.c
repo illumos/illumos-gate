@@ -128,9 +128,6 @@ static int	mrsas_tran_start(struct scsi_address *,
 		    register struct scsi_pkt *);
 static int	mrsas_tran_abort(struct scsi_address *, struct scsi_pkt *);
 static int	mrsas_tran_reset(struct scsi_address *, int);
-#if 0
-static int	mrsas_tran_bus_reset(dev_info_t *, int);
-#endif
 static int	mrsas_tran_getcap(struct scsi_address *, char *, int);
 static int	mrsas_tran_setcap(struct scsi_address *, char *, int, int);
 static void	mrsas_tran_destroy_pkt(struct scsi_address *,
@@ -215,7 +212,6 @@ static struct mrsas_function_template mrsas_function_template_ppc = {
 	.disable_intr = disable_intr_ppc,
 	.intr_ack = intr_ack_ppc,
 	.init_adapter = mrsas_init_adapter_ppc
-/*	.reset_adapter = mrsas_reset_adapter_ppc */
 };
 
 
@@ -228,7 +224,6 @@ static struct mrsas_function_template mrsas_function_template_fusion = {
 	.disable_intr = tbolt_disable_intr,
 	.intr_ack = tbolt_intr_ack,
 	.init_adapter = mrsas_init_adapter_tbolt
-/*	.reset_adapter = mrsas_reset_adapter_tbolt */
 };
 
 
@@ -324,6 +319,9 @@ static struct ddi_device_acc_attr endian_attr = {
 	DDI_STRICTORDER_ACC,
 	DDI_DEFAULT_ACC
 };
+
+/* Use the LSI Fast Path for the 2208 (tbolt) commands. */
+unsigned int enable_fp = 1;
 
 
 unsigned int enable_fp = 1;
@@ -513,8 +511,6 @@ mrsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			return (DDI_FAILURE);
 		}
 
-		bzero(instance, sizeof (struct mrsas_instance));
-
 		instance->unroll.softs	= 1;
 
 		/* Setup the PCI configuration space handles */
@@ -527,15 +523,6 @@ mrsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			ddi_soft_state_free(mrsas_state, instance_no);
 			return (DDI_FAILURE);
 		}
-		if (instance->pci_handle == NULL) {
-			cmn_err(CE_WARN,
-			    "mr_sas%d: pci config setup failed ",
-			    instance_no);
-			ddi_soft_state_free(mrsas_state, instance_no);
-			return (DDI_FAILURE);
-		}
-
-
 
 		if (ddi_dev_nregs(dip, &nregs) != DDI_SUCCESS) {
 			cmn_err(CE_WARN,
@@ -654,11 +641,6 @@ mrsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			    "mr_sas: couldn't map control registers");
 			goto fail_attach;
 		}
-		if (instance->regmap_handle == NULL) {
-			cmn_err(CE_WARN,
-			    "mr_sas: couldn't map control registers");
-			goto fail_attach;
-		}
 
 		instance->unroll.regs = 1;
 
@@ -688,11 +670,13 @@ mrsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 				    "enable_fp = %d, Fast-Path disabled.\n",
 				    enable_fp);
 			}
+			ddi_prop_free(data);
+		}
 
 			ddi_prop_free(data);
 		}
 
-		cmn_err(CE_NOTE, "enable_fp = %d\n", enable_fp);
+		con_log(CL_DLEVEL1, (CE_NOTE, "enable_fp = %d\n", enable_fp));
 
 		/* Check for all supported interrupt types */
 		if (ddi_intr_get_supported_types(
@@ -762,45 +746,40 @@ mrsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		/* Initialize all Mutex */
 		INIT_LIST_HEAD(&instance->completed_pool_list);
-		mutex_init(&instance->completed_pool_mtx,
-		    "completed_pool_mtx", MUTEX_DRIVER,
-		    DDI_INTR_PRI(instance->intr_pri));
-
-		mutex_init(&instance->sync_map_mtx,
-		    "sync_map_mtx", MUTEX_DRIVER,
-		    DDI_INTR_PRI(instance->intr_pri));
-
-		mutex_init(&instance->app_cmd_pool_mtx,
-		    "app_cmd_pool_mtx",	MUTEX_DRIVER,
-		    DDI_INTR_PRI(instance->intr_pri));
-
-		mutex_init(&instance->config_dev_mtx, "config_dev_mtx",
+		mutex_init(&instance->completed_pool_mtx, NULL,
 		    MUTEX_DRIVER, DDI_INTR_PRI(instance->intr_pri));
 
-		mutex_init(&instance->cmd_pend_mtx, "cmd_pend_mtx",
+		mutex_init(&instance->sync_map_mtx, NULL,
 		    MUTEX_DRIVER, DDI_INTR_PRI(instance->intr_pri));
 
-		mutex_init(&instance->ocr_flags_mtx, "ocr_flags_mtx",
+		mutex_init(&instance->app_cmd_pool_mtx, NULL,
 		    MUTEX_DRIVER, DDI_INTR_PRI(instance->intr_pri));
 
-		mutex_init(&instance->int_cmd_mtx, "int_cmd_mtx",
+		mutex_init(&instance->config_dev_mtx, NULL,
+		    MUTEX_DRIVER, DDI_INTR_PRI(instance->intr_pri));
+
+		mutex_init(&instance->cmd_pend_mtx, NULL,
+		    MUTEX_DRIVER, DDI_INTR_PRI(instance->intr_pri));
+
+		mutex_init(&instance->ocr_flags_mtx, NULL,
+		    MUTEX_DRIVER, DDI_INTR_PRI(instance->intr_pri));
+
+		mutex_init(&instance->int_cmd_mtx, NULL,
 		    MUTEX_DRIVER, DDI_INTR_PRI(instance->intr_pri));
 		cv_init(&instance->int_cmd_cv, NULL, CV_DRIVER, NULL);
 
-		mutex_init(&instance->cmd_pool_mtx, "cmd_pool_mtx",
+		mutex_init(&instance->cmd_pool_mtx, NULL,
 		    MUTEX_DRIVER, DDI_INTR_PRI(instance->intr_pri));
 
-		mutex_init(&instance->reg_write_mtx, "reg_write_mtx",
+		mutex_init(&instance->reg_write_mtx, NULL,
 		    MUTEX_DRIVER, DDI_INTR_PRI(instance->intr_pri));
 
 		if (instance->tbolt) {
-			mutex_init(&instance->cmd_app_pool_mtx,
-			    "cmd_app_pool_mtx", MUTEX_DRIVER,
-			    DDI_INTR_PRI(instance->intr_pri));
+			mutex_init(&instance->cmd_app_pool_mtx, NULL,
+			    MUTEX_DRIVER, DDI_INTR_PRI(instance->intr_pri));
 
-			mutex_init(&instance->chip_mtx,
-			    "chip_mtx", MUTEX_DRIVER,
-			    DDI_INTR_PRI(instance->intr_pri));
+			mutex_init(&instance->chip_mtx, NULL,
+			    MUTEX_DRIVER, DDI_INTR_PRI(instance->intr_pri));
 
 		}
 
@@ -968,11 +947,6 @@ mrsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		instance->mr_ld_list =
 		    kmem_zalloc(MRDRV_MAX_LD * sizeof (struct mrsas_ld),
 		    KM_SLEEP);
-		if (instance->mr_ld_list == NULL) {
-			cmn_err(CE_WARN, "mr_sas attach(): "
-			    "failed to allocate ld_list array");
-			goto fail_attach;
-		}
 		instance->unroll.ldlist_buff = 1;
 
 #ifdef PDSUPPORT
@@ -1006,8 +980,9 @@ mrsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 
-	cmn_err(CE_NOTE, "mrsas_attach() return SUCCESS instance_num %d",
-	    instance_no);
+	con_log(CL_DLEVEL1,
+	    (CE_NOTE, "mrsas_attach() return SUCCESS instance_num %d",
+	    instance_no));
 	return (DDI_SUCCESS);
 
 fail_attach:
@@ -1194,22 +1169,22 @@ mrsas_undo_resources(dev_info_t *dip, struct mrsas_instance *instance)
 	instance_no = ddi_get_instance(dip);
 
 
-	if (instance->unroll.ioctl == 1)  {
+	if (instance->unroll.ioctl == 1) {
 		ddi_remove_minor_node(dip, instance->iocnode);
 		instance->unroll.ioctl = 0;
 	}
 
-	if (instance->unroll.scsictl == 1)  {
+	if (instance->unroll.scsictl == 1) {
 		ddi_remove_minor_node(dip, "scsi");
 		instance->unroll.scsictl = 0;
 	}
 
-	if (instance->unroll.devctl == 1)  {
+	if (instance->unroll.devctl == 1) {
 		ddi_remove_minor_node(dip, "devctl");
 		instance->unroll.devctl = 0;
 	}
 
-	if (instance->unroll.tranSetup == 1)  {
+	if (instance->unroll.tranSetup == 1) {
 		if (scsi_hba_detach(dip) != DDI_SUCCESS) {
 			cmn_err(CE_WARN,
 			    "mr_sas2%d: failed to detach", instance_no);
@@ -1225,7 +1200,7 @@ mrsas_undo_resources(dev_info_t *dip, struct mrsas_instance *instance)
 		con_log(CL_ANN1, (CE_CONT, "scsi_hba_tran_free()  done."));
 	}
 
-	if (instance->unroll.syncCmd == 1)  {
+	if (instance->unroll.syncCmd == 1) {
 		if (instance->tbolt) {
 			if (abort_syncmap_cmd(instance,
 			    instance->map_update_cmd)) {
@@ -1238,21 +1213,21 @@ mrsas_undo_resources(dev_info_t *dip, struct mrsas_instance *instance)
 		}
 	}
 
-	if (instance->unroll.aenPend == 1)  {
+	if (instance->unroll.aenPend == 1) {
 		if (abort_aen_cmd(instance, instance->aen_cmd))
 			cmn_err(CE_WARN, "mrsas_detach: "
 			    "failed to abort prevous AEN command");
 
 		instance->unroll.aenPend = 0;
 		con_log(CL_ANN1, (CE_CONT, "aen cmd aborted, done."));
-		/* This means the controller is fully initialzed and running */
+		/* This means the controller is fully initialized and running */
 		/* Shutdown should be a last command to controller. */
 		/* shutdown_controller(); */
 	}
 
 
 	if (instance->unroll.timer == 1)	 {
-		if (instance->timeout_id != (timeout_id_t)-1)  {
+		if (instance->timeout_id != (timeout_id_t)-1) {
 			(void) untimeout(instance->timeout_id);
 			instance->timeout_id = (timeout_id_t)-1;
 
@@ -1263,7 +1238,7 @@ mrsas_undo_resources(dev_info_t *dip, struct mrsas_instance *instance)
 	instance->func_ptr->disable_intr(instance);
 
 
-	if (instance->unroll.mutexs == 1)  {
+	if (instance->unroll.mutexs == 1) {
 		mutex_destroy(&instance->cmd_pool_mtx);
 		mutex_destroy(&instance->app_cmd_pool_mtx);
 		mutex_destroy(&instance->cmd_pend_mtx);
@@ -1766,7 +1741,6 @@ mrsas_find_child(struct mrsas_instance *instance, uint16_t tgt, uint8_t lun)
 	for (child = ddi_get_child(instance->dip); child;
 	    child = ddi_get_next_sibling(child)) {
 
-		/* XXX KEBE ASKS - why was this added?! */
 		if (ndi_dev_is_persistent_node(child) == 0) {
 			continue;
 		}
@@ -1996,8 +1970,6 @@ mrsas_tran_start(struct scsi_address *ap, register struct scsi_pkt *pkt)
 	} else {
 		struct mrsas_header *hdr = &cmd->frame->hdr;
 
-		/* cmd->sync_cmd = MRSAS_TRUE; */  /* KEBE asks, inherit? */
-
 		instance->func_ptr->issue_cmd_in_poll_mode(instance, cmd);
 
 		pkt->pkt_reason		= CMD_CMPLT;
@@ -2084,39 +2056,6 @@ static int
 mrsas_tran_reset(struct scsi_address *ap, int level)
 {
 	struct mrsas_instance *instance = ADDR2MR(ap);
-
-	con_log(CL_ANN1, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
-
-	if (wait_for_outstanding(instance)) {
-		con_log(CL_ANN1,
-		    (CE_CONT, "wait_for_outstanding: return FAIL.\n"));
-		return (DDI_FAILURE);
-	} else {
-		return (DDI_SUCCESS);
-	}
-}
-
-#if 0
-/*
- * tran_bus_reset - reset the SCSI bus
- * @dip:
- * @level:
- *
- * The tran_bus_reset() vector in the scsi_hba_tran structure should be
- * initialized during the HBA driver's attach(). The vector should point to
- * an HBA entry point that is to be called when a user initiates a bus reset.
- * Implementation is hardware specific. If the HBA driver cannot reset the
- * SCSI bus without affecting the targets, the driver should fail RESET_BUS
- * or not initialize this vector.
- */
-/*ARGSUSED*/
-static int
-mrsas_tran_bus_reset(dev_info_t *dip, int level)
-{
-	int	instance_no = ddi_get_instance(dip);
-
-	struct mrsas_instance	*instance = ddi_get_soft_state(mrsas_state,
-	    instance_no);
 
 	con_log(CL_ANN1, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
 
@@ -2548,7 +2487,6 @@ get_mfi_pkt(struct mrsas_instance *instance)
 	struct mrsas_cmd	*cmd = NULL;
 
 	mutex_enter(&instance->cmd_pool_mtx);
-	ASSERT(mutex_owned(&instance->cmd_pool_mtx));
 
 	if (!mlist_empty(head)) {
 		cmd = mlist_entry(head->next, struct mrsas_cmd, list);
@@ -2572,7 +2510,6 @@ get_mfi_app_pkt(struct mrsas_instance *instance)
 	struct mrsas_cmd	*cmd = NULL;
 
 	mutex_enter(&instance->app_cmd_pool_mtx);
-	ASSERT(mutex_owned(&instance->app_cmd_pool_mtx));
 
 	if (!mlist_empty(head)) {
 		cmd = mlist_entry(head->next, struct mrsas_cmd, list);
@@ -2595,7 +2532,6 @@ static void
 return_mfi_pkt(struct mrsas_instance *instance, struct mrsas_cmd *cmd)
 {
 	mutex_enter(&instance->cmd_pool_mtx);
-	ASSERT(mutex_owned(&instance->cmd_pool_mtx));
 	/* use mlist_add_tail for debug assistance */
 	mlist_add_tail(&cmd->list, &instance->cmd_pool_list);
 
@@ -2606,7 +2542,6 @@ static void
 return_mfi_app_pkt(struct mrsas_instance *instance, struct mrsas_cmd *cmd)
 {
 	mutex_enter(&instance->app_cmd_pool_mtx);
-	ASSERT(mutex_owned(&instance->app_cmd_pool_mtx));
 
 	mlist_add(&cmd->list, &instance->app_cmd_pool_list);
 
@@ -2619,7 +2554,6 @@ push_pending_mfi_pkt(struct mrsas_instance *instance, struct mrsas_cmd *cmd)
 	struct mrsas_header	*hdr;
 	con_log(CL_DLEVEL2, (CE_NOTE, "push_pending_pkt(): Called\n"));
 	mutex_enter(&instance->cmd_pend_mtx);
-	ASSERT(mutex_owned(&instance->cmd_pend_mtx));
 	mlist_del_init(&cmd->list);
 	mlist_add_tail(&cmd->list, &instance->cmd_pend_list);
 	if (cmd->sync_cmd == MRSAS_TRUE) {
@@ -2677,7 +2611,6 @@ mrsas_print_pending_cmds(struct mrsas_instance *instance)
 	struct scsi_pkt *pkt;
 	int saved_level;
 	int cmd_count = 0;
-
 
 	saved_level = debug_level_g;
 	debug_level_g = CL_ANN1;
@@ -3233,21 +3166,13 @@ mrsas_alloc_cmd_pool(struct mrsas_instance *instance)
 	 * commands.
 	 */
 	instance->cmd_list = kmem_zalloc(sz, KM_SLEEP);
-	if (instance->cmd_list == NULL) {
-		con_log(CL_NONE, (CE_WARN,
-		    "Failed to allocate memory for cmd_list"));
-		return (DDI_FAILURE);
-	}
+	ASSERT(instance->cmd_list);
 
 	/* create a frame pool and assign one frame to each cmd */
 	for (count = 0; count < max_cmd; count++) {
 		instance->cmd_list[count] =
 		    kmem_zalloc(sizeof (struct mrsas_cmd), KM_SLEEP);
-		if (instance->cmd_list[count] == NULL) {
-			con_log(CL_NONE, (CE_WARN,
-			    "Failed to allocate memory for mrsas_cmd"));
-			goto mrsas_undo_cmds;
-		}
+		ASSERT(instance->cmd_list[count]);
 	}
 
 	/* add all the commands to command pool */
@@ -3317,12 +3242,14 @@ free_space_for_mfi(struct mrsas_instance *instance)
 	mrsas_free_cmd_pool(instance);
 }
 
+
 /*
- * alloc_space_for_mfi
+ * mrsas_alloc_cmd_pool
  */
-static int
-alloc_space_for_mfi(struct mrsas_instance *instance)
+int
+mrsas_alloc_cmd_pool(struct mrsas_instance *instance)
 {
+
 	/* Allocate command pool (memory for cmd_list & individual commands) */
 	if (mrsas_alloc_cmd_pool(instance)) {
 		cmn_err(CE_WARN, "error creating cmd pool");
@@ -3508,7 +3435,6 @@ abort_aen_cmd(struct mrsas_instance *instance,
 
 	instance->aen_cmd->abort_aen = 1;
 
-	/* cmd->sync_cmd = MRSAS_TRUE; */ /* KEBE ASKS, inherit? */
 	cmd->frame_count = 1;
 
 	if (instance->tbolt) {
@@ -3684,7 +3610,7 @@ mrsas_init_adapter_ppc(struct mrsas_instance *instance)
 
 	if (mrsas_common_check(instance, cmd) != DDI_SUCCESS)
 		goto fail_fw_init;
-	/* return_mfi_pkt(instance, cmd); */ /* XXX KEBE ASKS, inherit? */
+	return_mfi_pkt(instance, cmd);
 
 	if (ctio_enable &&
 	    (instance->func_ptr->read_fw_status_reg(instance) & 0x04000000)) {
@@ -4042,23 +3968,20 @@ mfi_state_transition_to_ready(struct mrsas_instance *instance)
 		fw_ctrl = RD_IB_DOORBELL(instance);
 		con_log(CL_ANN1, (CE_CONT,
 		    "mfi_state_transition_to_ready:FW ctrl = 0x%x", fw_ctrl));
-	}
 
-#if 0	/* XXX KEBE ASKS, remove and use like pre-2208? */
-	/*
-	 * Write 0xF to the doorbell register to do the following.
-	 * - Abort all outstanding commands (bit 0).
-	 * - Transition from OPERATIONAL to READY state (bit 1).
-	 * - Discard (possible) low MFA posted in 64-bit mode (bit-2).
-	 * - Set to release FW to continue running (i.e. BIOS handshake
-	 *   (bit 3).
-	 */
-	if (!instance->tbolt) {
+		/*
+		 * Write 0xF to the doorbell register to do the following.
+		 * - Abort all outstanding commands (bit 0).
+		 * - Transition from OPERATIONAL to READY state (bit 1).
+		 * - Discard (possible) low MFA posted in 64-bit mode (bit-2).
+		 * - Set to release FW to continue running (i.e. BIOS handshake
+		 *   (bit 3).
+		 */
 		WR_IB_DOORBELL(0xF, instance);
 	}
-#endif
+
 	if (mrsas_check_acc_handle(instance->regmap_handle) != DDI_SUCCESS) {
-		return (ENODEV);
+		return (EIO);
 	}
 
 	return (DDI_SUCCESS);
@@ -4929,7 +4852,6 @@ mrsas_alloc_dma_obj(struct mrsas_instance *instance, dma_obj_t *obj,
  * De-allocate the memory and other resources for an dma object, which must
  * have been alloated by a previous call to mrsas_alloc_dma_obj()
  */
-/* ARGSUSED */
 int
 mrsas_free_dma_obj(struct mrsas_instance *instance, dma_obj_t obj)
 {
@@ -5457,7 +5379,6 @@ build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 	return (cmd);
 }
 
-#ifndef __sparc
 /*
  * wait_for_outstanding -	Wait for all outstanding cmds
  * @instance:				Adapter soft state
@@ -5486,7 +5407,6 @@ wait_for_outstanding(struct mrsas_instance *instance)
 
 	return (0);
 }
-#endif	/* __sparc */
 
 /*
  * issue_mfi_pthru
@@ -5498,7 +5418,7 @@ issue_mfi_pthru(struct mrsas_instance *instance, struct mrsas_ioctl *ioctl,
 	void		*ubuf;
 	uint32_t	kphys_addr = 0;
 	uint32_t	xferlen = 0;
-	uint32_t new_xfer_length = 0;
+	uint32_t	new_xfer_length = 0;
 	uint_t		model;
 	ddi_acc_handle_t	acc_handle = cmd->frame_dma_obj.acc_handle;
 	dma_obj_t			pthru_dma_obj;
@@ -5643,7 +5563,7 @@ issue_mfi_pthru(struct mrsas_instance *instance, struct mrsas_ioctl *ioctl,
 				    "copy to user space failed"));
 			}
 			con_log(CL_DLEVEL1, (CE_WARN,
-			    "Copying Sense info sense_buff[%d] = 0x%X\n",
+			    "Copying Sense info sense_buff[%d] = 0x%X",
 			    i, *((uint8_t *)cmd->sense + i)));
 		}
 	}
@@ -5680,8 +5600,8 @@ issue_mfi_dcmd(struct mrsas_instance *instance, struct mrsas_ioctl *ioctl,
 	kdcmd = (struct mrsas_dcmd_frame *)&ioctl->frame[0];
 
 	if (instance->adapterresetinprogress) {
-		con_log(CL_ANN1, (CE_WARN, "Reset flag set, "
-		"returning mfi_pkt and setting TRAN_BUSY\n"));
+		con_log(CL_ANN1, (CE_NOTE, "Reset flag set, "
+		"returning mfi_pkt and setting TRAN_BUSY"));
 		return (DDI_FAILURE);
 	}
 	model = ddi_model_convert_from(mode & FMODELS);
@@ -6847,7 +6767,6 @@ issue_cmd_ppc(struct mrsas_cmd *cmd, struct mrsas_instance *instance)
 	}
 
 	mutex_enter(&instance->reg_write_mtx);
-	ASSERT(mutex_owned(&instance->reg_write_mtx));
 	/* Issue the command to the FW */
 	WR_IB_QPORT((cmd->frame_phys_addr) |
 	    (((cmd->frame_count - 1) << 1) | 1), instance);
@@ -6888,7 +6807,6 @@ struct mrsas_cmd *cmd)
 	cmd->cmd_status	= ENODATA;
 
 	mutex_enter(&instance->reg_write_mtx);
-	ASSERT(mutex_owned(&instance->reg_write_mtx));
 	/* Issue the command to the FW */
 	WR_IB_QPORT((cmd->frame_phys_addr) |
 	    (((cmd->frame_count - 1) << 1) | 1), instance);
@@ -7094,7 +7012,7 @@ retry_reset:
 		status = RD_OB_DRWE(instance);
 		if (retry++ == 100) {
 			cmn_err(CE_WARN, "mrsas_reset_ppc: DRWE bit "
-			    "check retry count %d\n", retry);
+			    "check retry count %d", retry);
 			return (DDI_FAILURE);
 		}
 	}
@@ -7106,7 +7024,7 @@ retry_reset:
 		status = RD_OB_DRWE(instance);
 		if (retry++ == 100) {
 			cmn_err(CE_WARN, "mrsas_reset_ppc: "
-			    "RESET FAILED. KILL adapter called\n.");
+			    "RESET FAILED. KILL adapter called.");
 
 			(void) mrsas_kill_adapter(instance);
 			return (DDI_FAILURE);
@@ -7190,7 +7108,7 @@ retry_reset:
 	    "Calling mrsas_issue_pending_cmds"));
 	(void) mrsas_issue_pending_cmds(instance);
 	con_log(CL_ANN1, (CE_NOTE, "mrsas_reset_ppc: "
-	"issue_pending_cmds done.\n"));
+	    "issue_pending_cmds done.\n"));
 
 	con_log(CL_ANN1, (CE_NOTE, "mrsas_reset_ppc: "
 	    "Calling aen registration"));
@@ -7433,12 +7351,7 @@ mrsas_add_intrs(struct mrsas_instance *instance, int intr_type)
 	instance->intr_htable_size = count * sizeof (ddi_intr_handle_t);
 	instance->intr_htable = kmem_zalloc(instance->intr_htable_size,
 	    KM_SLEEP);
-	if (instance->intr_htable == NULL) {
-		con_log(CL_ANN, (CE_WARN, "mrsas_add_intrs: "
-		    "failed to allocate memory for intr-handle table"));
-		instance->intr_htable_size = 0;
-		return (DDI_FAILURE);
-	}
+	ASSERT(instance->intr_htable);
 
 	flag = ((intr_type == DDI_INTR_TYPE_MSI) ||
 	    (intr_type == DDI_INTR_TYPE_MSIX)) ?

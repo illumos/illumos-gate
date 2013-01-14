@@ -2,7 +2,7 @@
  * mr_sas_list.h: header for mr_sas
  *
  * Solaris MegaRAID driver for SAS2.0 controllers
- * Copyright (c) 2008-20012, LSI Logic Corporation.
+ * Copyright (c) 2008-2012, LSI Logic Corporation.
  * All rights reserved.
  */
 
@@ -73,22 +73,6 @@ __list_del(struct mlist_head *prev, struct mlist_head *next)
 	next->prev = prev;
 	prev->next = next;
 }
-
-#if 0
-/*
- * mlist_del - deletes entry from list.
- * @entry:	the element to delete from the list.
- * Note:	list_empty on entry does not return true after this, the entry
- * is in an undefined state.
- */
-
-void
-mlist_del(struct mlist_head *entry)
-{
-	__list_del(entry->prev, entry->next);
-	entry->next = entry->prev = 0;
-}
-#endif
 
 /*
  * mlist_del_init - deletes entry from list and reinitialize it.

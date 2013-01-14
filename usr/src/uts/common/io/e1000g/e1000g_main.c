@@ -24,6 +24,7 @@
 
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -2443,6 +2444,10 @@ e1000g_init_unicst(struct e1000g *Adapter)
 		if ((hw->mac.type == e1000_82571) &&
 		    (e1000_get_laa_state_82571(hw) == B_TRUE))
 			Adapter->unicst_total--;
+
+		/* VMware doesn't support multiple mac addresses properly */
+		if (hw->subsystem_vendor_id == 0x15ad)
+			Adapter->unicst_total = 1;
 
 		Adapter->unicst_avail = Adapter->unicst_total;
 

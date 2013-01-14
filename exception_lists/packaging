@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 #
 
 #
@@ -228,10 +229,14 @@ usr/include/sys/kmdb.h
 #
 lib/libdhcpagent.so
 lib/libdhcputil.so
+lib/amd64/libdhcputil.so		i386
+lib/sparcv9/libdhcputil.so		sparc
 lib/llib-ldhcpagent
 lib/llib-ldhcpagent.ln
 lib/llib-ldhcputil
 lib/llib-ldhcputil.ln
+lib/amd64/llib-ldhcputil.ln		i386
+lib/sparcv9/llib-ldhcputil.ln		sparc
 usr/include/dhcp_hostconf.h
 usr/include/dhcp_impl.h
 usr/include/dhcp_inittab.h
@@ -242,16 +247,22 @@ usr/include/dhcpagent_util.h
 usr/include/dhcpmsg.h
 usr/lib/libdhcpagent.so
 usr/lib/libdhcputil.so
+usr/lib/amd64/libdhcputil.so		i386
+usr/lib/sparcv9/libdhcputil.so		sparc
 usr/lib/llib-ldhcpagent
 usr/lib/llib-ldhcpagent.ln
 usr/lib/llib-ldhcputil
 usr/lib/llib-ldhcputil.ln
+usr/lib/amd64/llib-ldhcputil.ln		i386
+usr/lib/sparcv9/llib-ldhcputil.ln	sparc
 #
 # These files are installed in the proto area by the build of libinstzones
 # and libpkg
 #
 usr/lib/llib-linstzones
 usr/lib/llib-linstzones.ln
+usr/lib/amd64/llib-linstzones.ln	i386
+usr/lib/sparcv9/llib-linstzones.ln	sparc
 usr/lib/llib-lpkg
 usr/lib/llib-lpkg.ln
 #
@@ -953,6 +964,12 @@ usr/include/sys/sockfilter.h
 # ignored for packaging validation.
 #
 licenses
+#
 # Libbe is private
 #
 usr/include/libbe_priv.h
+#
+# ipmi is at present only useful on i386, but for historical reasons is
+# delivered on SPARC and used by the build.
+#
+usr/include/sys/ipmi.h	sparc

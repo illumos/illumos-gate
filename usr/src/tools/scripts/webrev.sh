@@ -25,6 +25,7 @@
 #
 
 # Copyright 2008, 2010, Richard Lowe
+# Copyright 2012 Marcel Telka <marcel@telka.sk>
 
 #
 # This script takes a file list and a workspace and builds a set of html files
@@ -3733,7 +3734,7 @@ print "<p style=\"font-size: small\">"
 print "This code review page was prepared using <b>$0</b>."
 print "Webrev is maintained by the <a href=\"http://www.illumos.org\">"
 print "illumos</a> project.  The latest version may be obtained"
-print "<a href=\"http://src.illumos.org/source/xref/illumos-opengrok/usr/src/tools/scripts/webrev.sh\">here</a>.</p>"
+print "<a href=\"http://src.illumos.org/source/xref/illumos-gate/usr/src/tools/scripts/webrev.sh\">here</a>.</p>"
 print "</body>"
 print "</html>"
 

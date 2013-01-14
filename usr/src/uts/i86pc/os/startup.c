@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -1586,23 +1587,6 @@ startup_modules(void)
 
 	dispinit();
 
-	/*
-	 * This is needed here to initialize hw_serial[] for cluster booting.
-	 */
-	if ((h = set_soft_hostid()) == HW_INVALID_HOSTID) {
-		cmn_err(CE_WARN, "Unable to set hostid");
-	} else {
-		for (v = h, cnt = 0; cnt < 10; cnt++) {
-			d[cnt] = (char)(v % 10);
-			v /= 10;
-			if (v == 0)
-				break;
-		}
-		for (cp = hw_serial; cnt >= 0; cnt--)
-			*cp++ = d[cnt] + '0';
-		*cp = 0;
-	}
-
 	/* Read cluster configuration data. */
 	clconf_init();
 
@@ -1629,6 +1613,26 @@ startup_modules(void)
 		ksmbios = smbios_open(NULL, SMB_VERSION, ksmbios_flags, NULL);
 	}
 
+
+	/*
+	 * Originally clconf_init() apparently needed the hostid.  But
+	 * this no longer appears to be true - it uses its own nodeid.
+	 * By placing the hostid logic here, we are able to make use of
+	 * the SMBIOS UUID.
+	 */
+	if ((h = set_soft_hostid()) == HW_INVALID_HOSTID) {
+		cmn_err(CE_WARN, "Unable to set hostid");
+	} else {
+		for (v = h, cnt = 0; cnt < 10; cnt++) {
+			d[cnt] = (char)(v % 10);
+			v /= 10;
+			if (v == 0)
+				break;
+		}
+		for (cp = hw_serial; cnt >= 0; cnt--)
+			*cp++ = d[cnt] + '0';
+		*cp = 0;
+	}
 
 	/*
 	 * Set up the CPU module subsystem for the boot cpu in the native
@@ -2721,12 +2725,78 @@ pat_sync(void)
  * /etc/hostid does not exist, we will attempt to get a serial number
  * using the legacy method (/kernel/misc/sysinit).
  *
+ * If that isn't present, we attempt to use an SMBIOS UUID, which is
+ * a hardware serial number.  Note that we don't automatically trust
+ * all SMBIOS UUIDs (some older platforms are defective and ship duplicate
+ * UUIDs in violation of the standard), we check against a blacklist.
+ *
  * In an attempt to make the hostid less prone to abuse
  * (for license circumvention, etc), we store it in /etc/hostid
  * in rot47 format.
  */
 extern volatile unsigned long tenmicrodata;
 static int atoi(char *);
+
+/*
+ * Set this to non-zero in /etc/system if you think your SMBIOS returns a
+ * UUID that is not unique. (Also report it so that the smbios_uuid_blacklist
+ * array can be updated.)
+ */
+int smbios_broken_uuid = 0;
+
+/*
+ * List of known bad UUIDs.  This is just the lower 32-bit values, since
+ * that's what we use for the host id.  If your hostid falls here, you need
+ * to contact your hardware OEM for a fix for your BIOS.
+ */
+static unsigned char
+smbios_uuid_blacklist[][16] = {
+
+	{	/* Reported bad UUID (Google search) */
+		0x00, 0x02, 0x00, 0x03, 0x00, 0x04, 0x00, 0x05,
+		0x00, 0x06, 0x00, 0x07, 0x00, 0x08, 0x00, 0x09,
+	},
+	{	/* Known bad DELL UUID */
+		0x4C, 0x4C, 0x45, 0x44, 0x00, 0x00, 0x20, 0x10,
+		0x80, 0x20, 0x80, 0xC0, 0x4F, 0x20, 0x20, 0x20,
+	},
+	{	/* Uninitialized flash */
+		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
+	},
+	{	/* All zeros */
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+	},
+};
+
+static int32_t
+uuid_to_hostid(const uint8_t *uuid)
+{
+	/*
+	 * Although the UUIDs are 128-bits, they may not distribute entropy
+	 * evenly.  We would like to use SHA or MD5, but those are located
+	 * in loadable modules and not available this early in boot.  As we
+	 * don't need the values to be cryptographically strong, we just
+	 * generate 32-bit vaue by xor'ing the various sequences together,
+	 * which ensures that the enire UUID contributes to the hostid.
+	 */
+	int32_t	id = 0;
+
+	/* first check against the blacklist */
+	for (int i = 0; i < (sizeof (smbios_uuid_blacklist) / 16); i++) {
+		if (bcmp(smbios_uuid_blacklist[0], uuid, 16) == 0) {
+			cmn_err(CE_CONT, "?Broken SMBIOS UUID. "
+			    "Contact BIOS manufacturer for repair.\n");
+			return ((int32_t)HW_INVALID_HOSTID);
+		}
+	}
+
+	for (int i = 0; i < 16; i++)
+		id ^= ((uuid[i]) << (8 * (i % sizeof (id))));
+
+	return (id);
+}
 
 static int32_t
 set_soft_hostid(void)
@@ -2740,6 +2810,7 @@ set_soft_hostid(void)
 	int32_t hostid = (int32_t)HW_INVALID_HOSTID;
 	unsigned char *c;
 	hrtime_t tsc;
+	smbios_system_t smsys;
 
 	/*
 	 * If /etc/hostid file not found, we'd like to get a pseudo
@@ -2763,6 +2834,24 @@ set_soft_hostid(void)
 				hostid = (int32_t)atoi(hw_serial);
 			(void) modunload(i);
 		}
+
+		/*
+		 * We try to use the SMBIOS UUID. But not if it is blacklisted
+		 * in /etc/system.
+		 */
+		if ((hostid == HW_INVALID_HOSTID) &&
+		    (smbios_broken_uuid == 0) &&
+		    (ksmbios != NULL) &&
+		    (smbios_info_system(ksmbios, &smsys) != SMB_ERR) &&
+		    (smsys.smbs_uuidlen >= 16)) {
+			hostid = uuid_to_hostid(smsys.smbs_uuid);
+		}
+
+		/*
+		 * Generate a "random" hostid using the clock.  These
+		 * hostids will change on each boot if the value is not
+		 * saved to a persistent /etc/hostid file.
+		 */
 		if (hostid == HW_INVALID_HOSTID) {
 			tsc = tsc_read();
 			if (tsc == 0)	/* tsc_read can return zero sometimes */

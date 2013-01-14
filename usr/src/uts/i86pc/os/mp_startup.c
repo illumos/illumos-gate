@@ -26,6 +26,9 @@
  * Copyright (c) 2010, Intel Corporation.
  * All rights reserved.
  */
+/*
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/thread.h>
@@ -1737,7 +1740,7 @@ mp_startup_common(boolean_t boot)
 
 	cpuid_pass2(cp);
 	cpuid_pass3(cp);
-	(void) cpuid_pass4(cp);
+	cpuid_pass4(cp, NULL);
 
 	/*
 	 * Correct cpu_idstr and cpu_brandstr on target CPU after

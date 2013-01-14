@@ -22,8 +22,9 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2012 Marcel Telka <marcel@telka.sk>
+ */
 
 #include <fcntl.h>
 #include <string.h>
@@ -297,42 +298,44 @@ open_iso_read_stream(char *fname)
 		return (NULL);
 
 	if (debug)
-		(void) printf("Checking the ISO 9660 file header\n");
+		(void) printf("Checking the ISO file header\n");
 
 	/* Check to see if we have a valid sized ISO image */
 	h->bstr_size(h, &iso_size);
 	if (iso_size < ISO9660_HEADER_SIZE) {
 		if (debug)
-			(void) printf("ISO 9660 header size not sane.\n");
+			(void) printf("ISO header size not sane.\n");
 		h->bstr_close(h);
 		str_errno = STR_ERR_ISO_BAD_HEADER;
 		return (NULL);
 	}
 
 	if (debug)
-		(void) printf("ISO 9660 header size is sane.\n");
+		(void) printf("ISO header size is sane.\n");
 
 	/* Skip over the boot block sector of the ISO. */
 	(void) lseek(h->bstr_fd, ISO9660_BOOT_BLOCK_SIZE, SEEK_SET);
 
 	/*
 	 * Try to read in the ISO Descriptor and validate this
-	 * is in fact an ISO 9660 image.
+	 * is in fact an ISO image.
 	 */
 	if (read(h->bstr_fd, iso_desc, ISO9660_PRIMARY_DESC_SIZE) ==
 	    ISO9660_PRIMARY_DESC_SIZE) {
 		/*
-		 * Bytes one through five of a valid ISO 9660 cd image
-		 * should contain the string CD001. High Sierra format,
-		 * the ISO 9660 predecessor, fills this field with the
-		 * string CDROM. If neither is the case then we should
-		 * close the stream, set str_errno, and return NULL.
+		 * Bytes one through five of a valid image should contain:
+		 * - BEA01 (ISO 13490 image)
+		 * - CD001 (ISO 9660 or ISO 13490 image)
+		 * - CDROM (High Sierra format, the ISO 9660 predecessor)
+		 * If neither is the case then we should close the stream,
+		 * set str_errno, and return NULL.
 		 */
-		if (strncmp(iso_desc + ISO9660_STD_IDENT_OFFSET, "CD001",
+		if (strncmp(iso_desc + ISO9660_STD_IDENT_OFFSET, "BEA01",
 		    5) != 0 && strncmp(iso_desc + ISO9660_STD_IDENT_OFFSET,
-		    "CDROM", 5) != 0) {
+		    "CD001", 5) != 0 && strncmp(iso_desc +
+		    ISO9660_STD_IDENT_OFFSET, "CDROM", 5) != 0) {
 			if (debug)
-				(void) printf("Invalid ISO 9660 identifier.\n");
+				(void) printf("Invalid ISO identifier.\n");
 			h->bstr_close(h);
 			str_errno = STR_ERR_ISO_BAD_HEADER;
 			return (NULL);
@@ -348,7 +351,7 @@ open_iso_read_stream(char *fname)
 	 * and return the handle.
 	 */
 	if (debug)
-		(void) printf("ISO 9660 header is sane.\n");
+		(void) printf("ISO header is sane.\n");
 	h->bstr_rewind(h);
 	return (h);
 }
@@ -488,7 +491,7 @@ open_wav_read_stream(char *fname)
 		goto wav_open_failed;
 	}
 	if ((strncmp(wav->riff, "RIFF", 4) != 0) ||
-		(strncmp(wav->wave, "WAVE", 4) != 0)) {
+	    (strncmp(wav->wave, "WAVE", 4) != 0)) {
 		str_errno = STR_ERR_WAV_BAD_HEADER;
 		goto wav_open_failed;
 	}

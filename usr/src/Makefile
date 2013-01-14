@@ -18,9 +18,12 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012 by Delphix. All rights reserved.
 #
+
 #
 # Makefile for system source
 #
@@ -31,7 +34,7 @@ include Makefile.master
 # it defines TARGETDIRS and ROOTDIRS.
 include Targetdirs
 
-COMMON_SUBDIRS=	uts lib cmd ucblib ucbcmd psm man
+COMMON_SUBDIRS=	uts lib cmd ucblib ucbcmd psm man test
 sparc_SUBDIRS= stand
 i386_SUBDIRS= grub
 

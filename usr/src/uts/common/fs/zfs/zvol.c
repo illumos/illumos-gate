@@ -82,6 +82,7 @@
 #include <sys/dumphdr.h>
 #include <sys/zil_impl.h>
 #include <sys/sdt.h>
+#include <sys/dbuf.h>
 
 #include "zfs_namecheck.h"
 
@@ -974,6 +975,12 @@ zvol_get_data(void *arg, lr_write_t *lr, char *buf, zio_t *zio)
 		error = dmu_buf_hold(os, object, offset, zgd, &db,
 		    DMU_READ_NO_PREFETCH);
 		if (error == 0) {
+			blkptr_t *obp = dmu_buf_get_blkptr(db);
+			if (obp) {
+				ASSERT(BP_IS_HOLE(bp));
+				*bp = *obp;
+			}
+
 			zgd->zgd_db = db;
 			zgd->zgd_bp = bp;
 

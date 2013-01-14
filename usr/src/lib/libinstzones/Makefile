@@ -20,6 +20,7 @@
 #
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -32,6 +33,7 @@ HDRDIR =        hdrs
 
 
 SUBDIRS	=	$(MACH) 
+$(BUILD64)SUBDIRS += $(MACH64)
 
 all :=		TARGET = all
 install :=	TARGET = install

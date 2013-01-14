@@ -20,9 +20,7 @@
  */
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- */
-/*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -125,8 +123,14 @@ static boolean_t rngprov_task_idle = B_TRUE;
 static void rndc_addbytes(uint8_t *, size_t);
 static void rndc_getbytes(uint8_t *ptr, size_t len);
 static void rnd_handler(void *);
-static void rnd_alloc_magazines();
+static void rnd_alloc_magazines(void);
+static void rnd_fips_discard_initial(void);
+static void rnd_init2(void *);
+static void rnd_schedule_timeout(void);
 
+/*
+ * Called from kcf:_init()
+ */
 void
 kcf_rnd_init()
 {
@@ -152,9 +156,37 @@ kcf_rnd_init()
 	rnbyte_cnt = 0;
 	findex = rindex = 0;
 	num_waiters = 0;
-	rngmech_type = KCF_MECHID(KCF_MISC_CLASS, 0);
 
 	rnd_alloc_magazines();
+
+	(void) taskq_dispatch(system_taskq, rnd_init2, NULL, TQ_SLEEP);
+}
+
+/*
+ * This is called via the system taskq, so that we can do further
+ * initializations that have to wait until the kcf module itself is
+ * done loading.  (After kcf:_init returns.)
+ */
+static void
+rnd_init2(void *unused)
+{
+
+	_NOTE(ARGUNUSED(unused));
+
+	/*
+	 * This will load a randomness provider; typically "swrand",
+	 * but could be another provider if so configured.
+	 */
+	rngmech_type = crypto_mech2id(SUN_RANDOM);
+
+	/* Update rng_prov_found etc. */
+	(void) kcf_rngprov_check();
+
+	/* FIPS 140-2 init. */
+	rnd_fips_discard_initial();
+
+	/* Start rnd_handler calls. */
+	rnd_schedule_timeout();
 }
 
 /*
@@ -787,7 +819,6 @@ rnd_alloc_magazines()
 {
 	rndmag_pad_t *rmp;
 	int i;
-	uint8_t discard_buf[HASHSIZE];
 
 	rndbuf_len = roundup(rndbuf_len, HASHSIZE);
 	if (rndmag_size < rndbuf_len)
@@ -813,13 +844,26 @@ rnd_alloc_magazines()
 		rmp->rm_mag.rm_eptr = buf + rndbuf_len;
 		rmp->rm_mag.rm_rptr = buf + rndbuf_len;
 		rmp->rm_mag.rm_oblocks = 1;
+	}
+}
 
+/*
+ * FIPS 140-2: the first n-bit (n > 15) block generated
+ * after power-up, initialization, or reset shall not
+ * be used, but shall be saved for comparison.
+ */
+static void
+rnd_fips_discard_initial(void)
+{
+	uint8_t discard_buf[HASHSIZE];
+	rndmag_pad_t *rmp;
+	int i;
+
+	for (i = 0; i < random_max_ncpus; i++) {
+		rmp = &rndmag[i];
+
+		/* rnd_get_bytes() will call mutex_exit(&rndpool_lock) */
 		mutex_enter(&rndpool_lock);
-		/*
-		 * FIPS 140-2: the first n-bit (n > 15) block generated
-		 * after power-up, initialization, or reset shall not
-		 * be used, but shall be saved for comparison.
-		 */
 		(void) rnd_get_bytes(discard_buf,
 		    HMAC_KEYSIZE, ALWAYS_EXTRACT);
 		bcopy(discard_buf, rmp->rm_mag.rm_previous,
@@ -836,21 +880,9 @@ rnd_alloc_magazines()
 }
 
 static void
-rnd_mechid(void *notused)
-{
-	_NOTE(ARGUNUSED(notused));
-	rngmech_type = crypto_mech2id(SUN_RANDOM);
-}
-
-void
-kcf_rnd_schedule_timeout(boolean_t do_mech2id)
+rnd_schedule_timeout(void)
 {
 	clock_t ut;	/* time in microseconds */
-
-	if (do_mech2id) {
-		/* This should never fail due to TQ_SLEEP. */
-		(void) taskq_dispatch(system_taskq, rnd_mechid, NULL, TQ_SLEEP);
-	}
 
 	/*
 	 * The new timeout value is taken from the buffer of random bytes.
@@ -959,7 +991,7 @@ rnd_handler(void *arg)
 		cv_broadcast(&rndpool_read_cv);
 	mutex_exit(&rndpool_lock);
 
-	kcf_rnd_schedule_timeout(B_FALSE);
+	rnd_schedule_timeout();
 }
 
 static void

@@ -908,8 +908,6 @@ check_to_solicit(struct phyint *pi, enum solicit_events event)
 static void
 daemonize_ndpd(void)
 {
-	FILE *pidfp;
-	mode_t pidmode = (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH); /* 0644 */
 	struct itimerval it;
 	boolean_t timerval = _B_TRUE;
 
@@ -926,37 +924,10 @@ daemonize_ndpd(void)
 	}
 
 	/* Daemonize. */
-	switch (fork()) {
-	case 0:
-		/* Child */
-		break;
-	case -1:
+	if (daemon(0, 0) == -1) {
 		logperror("fork");
 		exit(1);
-	default:
-		/* Parent */
-		_exit(0);
 	}
-
-	/* Store our process id, blow away any existing file if it exists. */
-	if ((pidfp = fopen(PATH_PID, "w")) == NULL) {
-		(void) fprintf(stderr, "%s: unable to open " PATH_PID ": %s\n",
-		    argv0[0], strerror(errno));
-	} else {
-		(void) fprintf(pidfp, "%ld\n", getpid());
-		(void) fclose(pidfp);
-		(void) chmod(PATH_PID, pidmode);
-	}
-
-	(void) close(0);
-	(void) close(1);
-	(void) close(2);
-
-	(void) chdir("/");
-	(void) open("/dev/null", O_RDWR);
-	(void) dup2(0, 1);
-	(void) dup2(0, 2);
-	(void) setsid();
 
 	already_daemonized = _B_TRUE;
 
@@ -1415,7 +1386,6 @@ in_signal(int fd)
 
 		logmsg(LOG_ERR, "SIGHUP: restart and reread config file\n");
 		(void) execv(argv0[0], argv0);
-		(void) unlink(PATH_PID);
 		_exit(0177);
 		/* NOTREACHED */
 	case SIGUSR1:
@@ -1433,7 +1403,6 @@ in_signal(int fd)
 			phyint_delete(pi);
 		}
 		(void) unlink(NDPD_SNMP_SOCKET);
-		(void) unlink(PATH_PID);
 		exit(0);
 		/* NOTREACHED */
 	case 255:

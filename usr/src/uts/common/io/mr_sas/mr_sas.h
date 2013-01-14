@@ -70,8 +70,6 @@ extern "C" {
 
 #define	PDSUPPORT	1
 
-#define	SWAP_BYTES(w)	((((w)>>8)&0xFF) | (((w)&0xFF)<<8))
-#define	BIG_ENDIAN(d)	(SWAP_BYTES((d) >> 16) | (SWAP_BYTES(d) << 16))
 /*
  * MegaRAID SAS2.0 device id conversion definitions.
  */
@@ -561,13 +559,13 @@ typedef struct mrsas_instance {
 		uint8_t timer;		/* Timer started. */
 		uint8_t aenPend;	/* AEN cmd pending f/w. */
 		uint8_t mapUpdate_pend; /* LD MAP update cmd pending f/w. */
-		uint8_t soft_isr;
-		uint8_t ldlist_buff;
-		uint8_t pdlist_buff;
-		uint8_t syncCmd;
-		uint8_t verBuff;
-		uint8_t alloc_space_mfi;
-		uint8_t alloc_space_mpi2;
+		uint8_t soft_isr;	/* Soft interrupt handler allocated. */
+		uint8_t ldlist_buff;	/* Logical disk list allocated. */
+		uint8_t pdlist_buff;	/* Physical disk list allocated. */
+		uint8_t syncCmd;	/* Sync map command allocated. */
+		uint8_t verBuff;	/* 2108 MFI buffer allocated. */
+		uint8_t alloc_space_mfi;  /* Allocated space for 2108 MFI. */
+		uint8_t alloc_space_mpi2; /* Allocated space for 2208 MPI2. */
 	} unroll;
 
 
@@ -665,7 +663,7 @@ struct mrsas_function_template {
  */
 #define	CL_NONE		0	/* No debug information */
 #define	CL_ANN		1	/* print unconditionally, announcements */
-#define	CL_ANN1		2	/* No o/p  */
+#define	CL_ANN1		2	/* No-op  */
 #define	CL_DLEVEL1	3	/* debug level 1, informative */
 #define	CL_DLEVEL2	4	/* debug level 2, verbose */
 #define	CL_DLEVEL3	5	/* debug level 3, very verbose */
@@ -1955,18 +1953,16 @@ struct mrsas_aen {
 #define	DDI_VENDOR_LSI		"LSI"
 #endif /* DDI_VENDOR_LSI */
 
-int 	mrsas_config_scsi_device(struct mrsas_instance *,
-		    struct scsi_device *, dev_info_t **);
+int mrsas_config_scsi_device(struct mrsas_instance *,
+    struct scsi_device *, dev_info_t **);
 
 #ifdef PDSUPPORT
-int 	mrsas_tbolt_config_pd(struct mrsas_instance *, uint16_t,
-			uint8_t, dev_info_t **);
+int mrsas_tbolt_config_pd(struct mrsas_instance *, uint16_t,
+    uint8_t, dev_info_t **);
 #endif
 
-dev_info_t *mrsas_find_child(struct mrsas_instance *, uint16_t,
-			uint8_t);
-int	mrsas_service_evt(struct mrsas_instance *, int, int, int,
-			uint64_t);
+dev_info_t *mrsas_find_child(struct mrsas_instance *, uint16_t, uint8_t);
+int mrsas_service_evt(struct mrsas_instance *, int, int, int, uint64_t);
 void return_raid_msg_pkt(struct mrsas_instance *, struct mrsas_cmd *);
 struct mrsas_cmd *get_raid_msg_mfi_pkt(struct mrsas_instance *);
 void return_raid_msg_mfi_pkt(struct mrsas_instance *, struct mrsas_cmd *);

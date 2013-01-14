@@ -524,7 +524,7 @@ typedef struct _MR_FW_RAID_MAP {
 	 * FW Ld Tgt Id to LD, but will purge. For example: if tgt Id is 4
 	 * and FW LD is 2, and there is only one LD, FW will populate the
 	 * array like this. [0xFF, 0xFF, 0xFF, 0xFF, 0x0.....]. This is to
-	 * help reduce the entire strcture size if there are few LDs or
+	 * help reduce the entire structure size if there are few LDs or
 	 * driver is looking info for 1 LD only.
 	 */
 	U8			ldTgtIdToLd[MAX_RAIDMAP_LOGICAL_DRIVES+ \

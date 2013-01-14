@@ -1263,6 +1263,11 @@
 @ MSG_DBG_AOUT_FMT	"debug: a.out: "
 @ MSG_DBG_NAME_FMT	"debug: %s: "
 
+# -z assert-deflib strings
+
+@ MSG_ARG_ASSDEFLIB_MALFORMED	"library name malformed: %s"
+@ MSG_ARG_ASSDEFLIB_FOUND	"dynamic library found on default search path \
+				(%s): lib%s.so"
 
 @ _END_
 
@@ -1468,11 +1473,6 @@
 @ MSG_ARG_GUIDE_NO_MAPFILE	"nomapfile"
 @ MSG_ARG_GUIDE_NO_TEXT		"notext"
 @ MSG_ARG_GUIDE_NO_UNUSED	"nounused"
-
-# -z assert-deflib strings
-@ MSG_ARG_ASSDEFLIB_MALFORMED	"library name malformed: %s"
-@ MSG_ARG_ASSDEFLIB_FOUND	"dynamic library found on default search path \
-				(%s): lib%s.so"
 
 # Environment variable strings
 

@@ -21,11 +21,13 @@
 
 #
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 #
 
 include	../Makefile.lib
 
 SUBDIRS=	$(MACH)
+$(BUILD64)SUBDIRS += $(MACH64)
 XGETTEXT=	$(GNUXGETTEXT)
 XGETFLAGS=	$(GNUXGETFLAGS)
 

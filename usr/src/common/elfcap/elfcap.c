@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 /* LINTLIBRARY */
@@ -307,6 +307,17 @@ static const elfcap_desc_t hw1_386[ELFCAP_NUM_HW1_386] = {
 	}
 };
 
+static const elfcap_desc_t hw2_386[ELFCAP_NUM_HW2_386] = {
+	{						/* 0x00000001 */
+		AV_386_2_F16C, STRDESC("AV_386_2_F16C"),
+		STRDESC("F16C"), STRDESC("f16c"),
+	},
+	{						/* 0x00000002 */
+		AV_386_2_RDRAND, STRDESC("AV_386_2_RDRAND"),
+		STRDESC("RDRAND"), STRDESC("rdrand"),
+	}
+};
+
 /*
  * Concatenate a token to the string buffer.  This can be a capabilities token
  * or a separator token.
@@ -419,11 +430,9 @@ elfcap_hw1_to_str(elfcap_style_t style, elfcap_mask_t val, char *str,
 }
 
 /*
- * Expand a CA_SUNW_HW_2 value.  Presently, there are no values, this routine
- * is simply a place holder for future development.
+ * Expand a CA_SUNW_HW_2 value.
  */
 elfcap_err_t
-/* ARGSUSED0 */
 elfcap_hw2_to_str(elfcap_style_t style, elfcap_mask_t val, char *str,
     size_t len, elfcap_fmt_t fmt, ushort_t mach)
 {
@@ -433,6 +442,10 @@ elfcap_hw2_to_str(elfcap_style_t style, elfcap_mask_t val, char *str,
 	*str = '\0';
 	if ((fmt < 0) || (fmt >= FORMAT_NELTS))
 		return (ELFCAP_ERR_INVFMT);
+
+	if ((mach == EM_386) || (mach == EM_IA_64) || (mach == EM_AMD64))
+		return (expand(style, val, &hw2_386[0], ELFCAP_NUM_HW2_386,
+		    str, len, fmt));
 
 	return (expand(style, val, NULL, 0, str, len, fmt));
 }
@@ -532,9 +545,11 @@ elfcap_hw1_from_str(elfcap_style_t style, const char *str, ushort_t mach)
 	return (0);
 }
 elfcap_mask_t
-/* ARGSUSED0 */
 elfcap_hw2_from_str(elfcap_style_t style, const char *str, ushort_t mach)
 {
+	if ((mach == EM_386) || (mach == EM_IA_64) || (mach == EM_AMD64))
+		return (value(style, str, &hw2_386[0], ELFCAP_NUM_HW2_386));
+
 	return (0);
 }
 

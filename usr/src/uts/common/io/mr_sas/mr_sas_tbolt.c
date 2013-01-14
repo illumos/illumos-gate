@@ -185,7 +185,7 @@ create_mpi2_frame_pool(struct mrsas_instance *instance)
 	    (max_cmd * sgl_sz) + (max_cmd * SENSE_LENGTH);
 
 	con_log(CL_ANN1, (CE_NOTE, "create_mpi2_frame_pool: "
-	    "max_cmd %x ", max_cmd));
+	    "max_cmd %x", max_cmd));
 
 	con_log(CL_DLEVEL3, (CE_NOTE, "create_mpi2_frame_pool: "
 	    "request message frame pool size %x", total_size));
@@ -368,8 +368,7 @@ mrsas_tbolt_alloc_additional_dma_buffer(struct mrsas_instance *instance)
 
 		instance->ld_map_obj[i].status |= DMA_OBJ_ALLOCATED;
 
-		(void) memset(instance->ld_map_obj[i].buffer, 0,
-		    instance->size_map_info);
+		bzero(instance->ld_map_obj[i].buffer, instance->size_map_info);
 
 		instance->ld_map[i] =
 		    (MR_FW_RAID_MAP_ALL *)instance->ld_map_obj[i].buffer;
@@ -400,7 +399,7 @@ mr_sas_get_request_descriptor(struct mrsas_instance *instance, uint16_t index)
 		con_log(CL_ANN1, (CE_NOTE,
 		    "Invalid SMID 0x%x request for descriptor", index));
 		con_log(CL_ANN1, (CE_NOTE,
-		    "max_fw_cmds : 0x%x\n", instance->max_fw_cmds));
+		    "max_fw_cmds : 0x%x", instance->max_fw_cmds));
 		return (NULL);
 	}
 
@@ -409,10 +408,10 @@ mr_sas_get_request_descriptor(struct mrsas_instance *instance, uint16_t index)
 	    (sizeof (MRSAS_REQUEST_DESCRIPTOR_UNION) * index));
 
 	con_log(CL_ANN1, (CE_NOTE,
-	    "request descriptor : 0x%08lx\n", (unsigned long)req_desc));
+	    "request descriptor : 0x%08lx", (unsigned long)req_desc));
 
 	con_log(CL_ANN1, (CE_NOTE,
-	    "request descriptor base phy : 0x%08lx\n",
+	    "request descriptor base phy : 0x%08lx",
 	    (unsigned long)instance->request_message_pool_phy));
 
 	return ((MRSAS_REQUEST_DESCRIPTOR_UNION *)req_desc);
@@ -437,7 +436,7 @@ alloc_req_rep_desc(struct mrsas_instance *instance)
 	 */
 
 	/* Allocate Reply Descriptors */
-	con_log(CL_ANN1, (CE_NOTE, " reply q desc len = %x\n",
+	con_log(CL_ANN1, (CE_NOTE, " reply q desc len = %x",
 	    (uint_t)sizeof (MPI2_REPLY_DESCRIPTORS_UNION)));
 
 	/* reply queue size should be multiple of 16 */
@@ -446,7 +445,7 @@ alloc_req_rep_desc(struct mrsas_instance *instance)
 	reply_q_sz = 8 * max_reply_q_sz;
 
 
-	con_log(CL_ANN1, (CE_NOTE, " reply q desc len = %x\n",
+	con_log(CL_ANN1, (CE_NOTE, " reply q desc len = %x",
 	    (uint_t)sizeof (MPI2_REPLY_DESCRIPTORS_UNION)));
 
 	instance->reply_desc_dma_obj.size = reply_q_sz;
@@ -501,11 +500,11 @@ alloc_req_rep_desc(struct mrsas_instance *instance)
 	    instance->reply_pool_limit_phy));
 
 
-	con_log(CL_ANN1, (CE_NOTE, " request q desc len = %x\n",
+	con_log(CL_ANN1, (CE_NOTE, " request q desc len = %x",
 	    (int)sizeof (MRSAS_REQUEST_DESCRIPTOR_UNION)));
 
 	/* Allocate Request Descriptors */
-	con_log(CL_ANN1, (CE_NOTE, " request q desc len = %x\n",
+	con_log(CL_ANN1, (CE_NOTE, " request q desc len = %x",
 	    (int)sizeof (MRSAS_REQUEST_DESCRIPTOR_UNION)));
 
 	request_q_sz = 8 *
@@ -551,7 +550,7 @@ fail_undo_reply_queue:
 /*
  * mrsas_alloc_cmd_pool_tbolt
  *
- * TODO: merge tbolt-specific codee into mrsas_alloc_cmd_pool() to have single
+ * TODO: merge tbolt-specific code into mrsas_alloc_cmd_pool() to have single
  * routine
  */
 int
@@ -578,21 +577,11 @@ mrsas_alloc_cmd_pool_tbolt(struct mrsas_instance *instance)
 	 * commands.
 	 */
 	instance->cmd_list = kmem_zalloc(sz, KM_SLEEP);
-	if (instance->cmd_list == NULL) {
-		con_log(CL_NONE, (CE_WARN,
-		    "Failed to allocate memory for cmd_list"));
-		return (DDI_FAILURE);
-	}
 
 	/* create a frame pool and assign one frame to each cmd */
 	for (count = 0; count < max_cmd; count++) {
 		instance->cmd_list[count] =
 		    kmem_zalloc(sizeof (struct mrsas_cmd), KM_SLEEP);
-		if (instance->cmd_list[count] == NULL) {
-			con_log(CL_NONE, (CE_WARN,
-			    "Failed to allocate memory for mrsas_cmd"));
-			goto mrsas_undo_cmds;
-		}
 	}
 
 	/* add all the commands to command pool */
@@ -813,7 +802,7 @@ mrsas_init_adapter_tbolt(struct mrsas_instance *instance)
 	instance->unroll.alloc_space_mpi2 = 1;
 
 	con_log(CL_ANN, (CE_NOTE,
-	    "mrsas_init_adapter_tbolt: SUCCESSFULL\n"));
+	    "mrsas_init_adapter_tbolt: SUCCESSFUL"));
 
 	return (DDI_SUCCESS);
 
@@ -848,11 +837,10 @@ mrsas_issue_init_mpi2(struct mrsas_instance *instance)
 		    "could not allocate data transfer buffer.");
 		return (DDI_FAILURE);
 	}
-	(void) memset(init2_dma_obj.buffer, 2,
-	    sizeof (Mpi2IOCInitRequest_t));
+	(void) memset(init2_dma_obj.buffer, 2, sizeof (Mpi2IOCInitRequest_t));
 
 	con_log(CL_ANN1, (CE_NOTE,
-	    "mrsas_issue_init_mpi2 _phys adr: %x \n",
+	    "mrsas_issue_init_mpi2 _phys adr: %x",
 	    init2_dma_obj.dma_cookie[0].dmac_address));
 
 
@@ -860,7 +848,7 @@ mrsas_issue_init_mpi2(struct mrsas_instance *instance)
 	ret_val = mrsas_tbolt_ioc_init(instance, &init2_dma_obj);
 	if (ret_val == DDI_FAILURE) {
 		con_log(CL_ANN1, (CE_WARN,
-		    "mrsas_issue_init_mpi2: Failed\n"));
+		    "mrsas_issue_init_mpi2: Failed"));
 		goto fail_init_mpi2;
 	}
 
@@ -868,7 +856,7 @@ mrsas_issue_init_mpi2(struct mrsas_instance *instance)
 	if (mrsas_free_dma_obj(instance, init2_dma_obj)
 	    != DDI_SUCCESS) {
 		con_log(CL_ANN1, (CE_WARN,
-		    "mrsas_issue_init_mpi2: Free Failed\n"));
+		    "mrsas_issue_init_mpi2: Free Failed"));
 		return (DDI_FAILURE);
 	}
 
@@ -883,7 +871,7 @@ mrsas_issue_init_mpi2(struct mrsas_instance *instance)
 		goto fail_init_mpi2;
 
 	con_log(CL_ANN, (CE_NOTE,
-	    "mrsas_issue_init_mpi2: SUCCESSFULL\n"));
+	    "mrsas_issue_init_mpi2: SUCCESSFUL"));
 
 	return (DDI_SUCCESS);
 
@@ -1030,8 +1018,7 @@ mrsas_tbolt_ioc_init(struct mrsas_instance *instance, dma_obj_t *mpi2_dma_obj)
 		return (DDI_FAILURE);
 	}
 	/* copy driver version to dma buffer */
-	(void) memset(instance->drv_ver_dma_obj.buffer, 0,
-	    sizeof (drv_ver_info.drv_ver));
+	bzero(instance->drv_ver_dma_obj.buffer, sizeof (drv_ver_info.drv_ver));
 	ddi_rep_put8(cmd->frame_dma_obj.acc_handle,
 	    (uint8_t *)drv_ver_info.drv_ver,
 	    (uint8_t *)instance->drv_ver_dma_obj.buffer,
@@ -1082,7 +1069,7 @@ mrsas_tbolt_ioc_init(struct mrsas_instance *instance, dma_obj_t *mpi2_dma_obj)
 
 	instance->unroll.verBuff = 1;
 
-	con_log(CL_ANN, (CE_NOTE, "mrsas_tbolt_ioc_init: SUCCESSFULL\n"));
+	con_log(CL_ANN, (CE_NOTE, "mrsas_tbolt_ioc_init: SUCCESSFUL"));
 
 	return (DDI_SUCCESS);
 
@@ -1175,7 +1162,7 @@ mrsas_tbolt_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	if ((pkt->pkt_flags & FLAG_NOINTR) == 0) {
 		if (instance->fw_outstanding > instance->max_fw_cmds) {
 			cmn_err(CE_WARN,
-			    "Command Queue Full... Returning BUSY \n");
+			    "Command Queue Full... Returning BUSY");
 			return_raid_msg_pkt(instance, cmd);
 			return (TRAN_BUSY);
 		}
@@ -1479,7 +1466,7 @@ mrsas_tbolt_build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 			    DDI_DMA_SYNC_FORCPU);
 		}
 	} else {
-		con_log(CL_ANN, (CE_NOTE, "NO DMA\n"));
+		con_log(CL_ANN, (CE_NOTE, "NO DMA"));
 	}
 
 
@@ -1487,7 +1474,7 @@ mrsas_tbolt_build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 	scsi_raid_io = (Mpi2RaidSCSIIORequest_t *)cmd->scsi_io_request;
 
 	/* zero out SCSI_IO raid message frame */
-	(void) memset(scsi_raid_io, 0, sizeof (Mpi2RaidSCSIIORequest_t));
+	bzero(scsi_raid_io, sizeof (Mpi2RaidSCSIIORequest_t));
 
 	/* Set the ldTargetId set by BuildRaidContext() */
 	ddi_put16(acc_handle, &scsi_raid_io->RaidContext.ldTargetId,
@@ -1520,7 +1507,7 @@ mrsas_tbolt_build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 			/* Initialize sense Information */
 			if (cmd->sense1 == NULL) {
 				con_log(CL_ANN, (CE_NOTE, "tbolt_build_cmd: "
-				    "Sense buffer ptr NULL \n"));
+				    "Sense buffer ptr NULL "));
 			}
 			bzero(cmd->sense1, SENSE_LENGTH);
 			con_log(CL_DLEVEL2, (CE_NOTE, "tbolt_build_cmd "
@@ -1583,12 +1570,11 @@ mrsas_tbolt_build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 			if (instance->tbolt &&
 			    ((lba_count * 512) > mrsas_tbolt_max_cap_maxxfer)) {
 				cmn_err(CE_WARN, " IO SECTOR COUNT exceeds "
-				    "controller limit 0x%x sectors\n",
+				    "controller limit 0x%x sectors",
 				    lba_count);
 			}
 
-			(void) memset(&io_info, 0,
-			    sizeof (struct IO_REQUEST_INFO));
+			bzero(&io_info, sizeof (struct IO_REQUEST_INFO));
 			io_info.ldStartBlock = ((uint64_t)start_lba_hi << 32) |
 			    start_lba_lo;
 			io_info.numBlocks = lba_count;
@@ -1611,7 +1597,7 @@ mrsas_tbolt_build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 			    MAX_LOGICAL_DRIVES) || !instance->fast_path_io) {
 				cmn_err(CE_NOTE, "Fast Path NOT Possible, "
 				    "targetId >= MAX_LOGICAL_DRIVES || "
-				    "!instance->fast_path_io\n");
+				    "!instance->fast_path_io");
 				fp_possible = 0;
 				/* Set Regionlock flags to BYPASS */
 				/* io_request->RaidContext.regLockFlags  = 0; */
@@ -1627,7 +1613,7 @@ mrsas_tbolt_build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 				fp_possible = 0;
 
 			con_log(CL_ANN1, (CE_NOTE, "enable_fp %d  "
-			    "instance->fast_path_io %d fp_possible %d \n",
+			    "instance->fast_path_io %d fp_possible %d",
 			    enable_fp, instance->fast_path_io, fp_possible));
 
 		if (fp_possible) {
@@ -2064,7 +2050,7 @@ tbolt_issue_cmd_in_sync_mode(struct mrsas_instance *instance,
 		if (cmd->drv_pkt_time < debug_timeout_g)
 			cmd->drv_pkt_time = (uint16_t)debug_timeout_g;
 		con_log(CL_ANN, (CE_NOTE, "tbolt_issue_cmd_in_sync_mode:"
-		    "RESET-IN-PROGRESS, issue cmd & return.\n"));
+		    "RESET-IN-PROGRESS, issue cmd & return."));
 
 		mutex_enter(&instance->reg_write_mtx);
 		WR_IB_LOW_QPORT((uint32_t)(req_desc->Words), instance);
@@ -2074,7 +2060,7 @@ tbolt_issue_cmd_in_sync_mode(struct mrsas_instance *instance,
 		return (DDI_SUCCESS);
 	} else {
 		con_log(CL_ANN1, (CE_NOTE,
-		    "tbolt_issue_cmd_in_sync_mode: pushing the pkt\n"));
+		    "tbolt_issue_cmd_in_sync_mode: pushing the pkt"));
 		push_pending_mfi_pkt(instance, cmd);
 	}
 
@@ -2095,8 +2081,8 @@ tbolt_issue_cmd_in_sync_mode(struct mrsas_instance *instance,
 	mutex_exit(&instance->reg_write_mtx);
 
 	con_log(CL_ANN1, (CE_NOTE,
-	    " req desc high part %x \n", (uint_t)(req_desc->Words >> 32)));
-	con_log(CL_ANN1, (CE_NOTE, " req desc low part %x \n",
+	    " req desc high part %x", (uint_t)(req_desc->Words >> 32)));
+	con_log(CL_ANN1, (CE_NOTE, " req desc low part %x",
 	    (uint_t)(req_desc->Words & 0xffffffff)));
 
 	mutex_enter(&instance->int_cmd_mtx);
@@ -2138,10 +2124,10 @@ tbolt_issue_cmd_in_poll_mode(struct mrsas_instance *instance,
 	flags	|= MFI_FRAME_DONT_POST_IN_REPLY_QUEUE;
 	ddi_put16(cmd->frame_dma_obj.acc_handle, &frame_hdr->flags, flags);
 
-	con_log(CL_ANN1, (CE_NOTE, " req desc low part %x \n",
+	con_log(CL_ANN1, (CE_NOTE, " req desc low part %x",
 	    (uint_t)(req_desc->Words & 0xffffffff)));
 	con_log(CL_ANN1, (CE_NOTE,
-	    " req desc high part %x \n", (uint_t)(req_desc->Words >> 32)));
+	    " req desc high part %x", (uint_t)(req_desc->Words >> 32)));
 
 	/* issue the frame using inbound queue port */
 	mutex_enter(&instance->reg_write_mtx);
@@ -2159,7 +2145,7 @@ tbolt_issue_cmd_in_poll_mode(struct mrsas_instance *instance,
 	if (ddi_get8(cmd->frame_dma_obj.acc_handle,
 	    &frame_hdr->cmd_status) == MFI_CMD_STATUS_POLL_MODE) {
 		con_log(CL_ANN1, (CE_NOTE,
-		    " cmd failed %" PRIx64 " \n", (req_desc->Words)));
+		    " cmd failed %" PRIx64, (req_desc->Words)));
 		return (DDI_FAILURE);
 	}
 
@@ -2201,7 +2187,7 @@ tbolt_intr_ack(struct mrsas_instance *instance)
 	/* check if it is our interrupt */
 	status = RD_OB_INTR_STATUS(instance);
 	con_log(CL_ANN1, (CE_NOTE,
-	    "chkpnt: Entered tbolt_intr_ack status = %d \n", status));
+	    "chkpnt: Entered tbolt_intr_ack status = %d", status));
 
 	if (!(status & MFI_FUSION_ENABLE_INTERRUPT_MASK)) {
 		return (DDI_INTR_UNCLAIMED);
@@ -2329,7 +2315,7 @@ mr_sas_tbolt_build_mfi_cmd(struct mrsas_instance *instance,
 	    instance->mpi2_frame_pool_dma_obj.acc_handle;
 
 	if (!instance->tbolt) {
-		con_log(CL_ANN, (CE_NOTE, "Not MFA enabled.\n"));
+		con_log(CL_ANN, (CE_NOTE, "Not MFA enabled."));
 		return;
 	}
 
@@ -2546,7 +2532,7 @@ tbolt_complete_cmd(struct mrsas_instance *instance,
 		case MFI_STAT_LD_OFFLINE:
 			cmn_err(CE_WARN,
 			    "tbolt_complete_cmd: ld offline "
-			    "CDB[0]=0x%x targetId=0x%x devhandle=0x%x\n",
+			    "CDB[0]=0x%x targetId=0x%x devhandle=0x%x",
 			    /* UNDO: */
 			    ddi_get8(acc_handle, &scsi_raid_io->CDB.CDB32[0]),
 
@@ -2638,7 +2624,7 @@ tbolt_complete_cmd(struct mrsas_instance *instance,
 			    cmd->SMID));
 			if (cmd->frame->hdr.cmd_status != 0) {
 				cmn_err(CE_WARN,
-				    "map sync failed, status = 0x%x.\n",
+				    "map sync failed, status = 0x%x.",
 				    cmd->frame->hdr.cmd_status);
 			} else {
 				instance->map_id++;
@@ -2656,7 +2642,7 @@ tbolt_complete_cmd(struct mrsas_instance *instance,
 			}
 
 			con_log(CL_ANN, (CE_NOTE,
-			    "instance->fast_path_io %d \n",
+			    "instance->fast_path_io %d",
 			    instance->fast_path_io));
 
 			instance->unroll.syncCmd = 0;
@@ -2667,7 +2653,7 @@ tbolt_complete_cmd(struct mrsas_instance *instance,
 				(void) mrsas_tbolt_sync_map_info(instance);
 			}
 
-			cmn_err(CE_NOTE, "LDMAP sync completed.\n");
+			cmn_err(CE_NOTE, "LDMAP sync completed.");
 			mutex_exit(&instance->sync_map_mtx);
 			break;
 		}
@@ -2748,7 +2734,7 @@ mr_sas_tbolt_process_outstanding_cmd(struct mrsas_instance *instance)
 		return (DDI_INTR_CLAIMED);
 	}
 
-	con_log(CL_ANN1, (CE_NOTE, "Reply Desc	= %p  Words = %" PRIx64 " \n",
+	con_log(CL_ANN1, (CE_NOTE, "Reply Desc	= %p  Words = %" PRIx64,
 	    (void *)desc, desc->Words));
 
 	d_val.word = desc->Words;
@@ -2765,7 +2751,7 @@ mr_sas_tbolt_process_outstanding_cmd(struct mrsas_instance *instance)
 
 		if (!smid || smid > instance->max_fw_cmds + 1) {
 			con_log(CL_ANN1, (CE_NOTE,
-			    "Reply Desc at Break  = %p	Words = %" PRIx64 " \n",
+			    "Reply Desc at Break  = %p	Words = %" PRIx64,
 			    (void *)desc, desc->Words));
 			break;
 		}
@@ -2774,7 +2760,7 @@ mr_sas_tbolt_process_outstanding_cmd(struct mrsas_instance *instance)
 		if (!cmd) {
 			con_log(CL_ANN1, (CE_NOTE, "mr_sas_tbolt_process_"
 			    "outstanding_cmd: Invalid command "
-			    " or Poll commad Received in completion path\n"));
+			    " or Poll commad Received in completion path"));
 		} else {
 			mutex_enter(&instance->cmd_pend_mtx);
 			if (cmd->sync_cmd == MRSAS_TRUE) {
@@ -2782,7 +2768,7 @@ mr_sas_tbolt_process_outstanding_cmd(struct mrsas_instance *instance)
 				if (hdr) {
 					con_log(CL_ANN1, (CE_NOTE, "mr_sas_"
 					    "tbolt_process_outstanding_cmd:"
-					    " mlist_del_init(&cmd->list).\n"));
+					    " mlist_del_init(&cmd->list)."));
 					mlist_del_init(&cmd->list);
 				}
 			} else {
@@ -2790,7 +2776,7 @@ mr_sas_tbolt_process_outstanding_cmd(struct mrsas_instance *instance)
 				if (pkt) {
 					con_log(CL_ANN1, (CE_NOTE, "mr_sas_"
 					    "tbolt_process_outstanding_cmd:"
-					    "mlist_del_init(&cmd->list).\n"));
+					    "mlist_del_init(&cmd->list)."));
 					mlist_del_init(&cmd->list);
 				}
 			}
@@ -2799,8 +2785,8 @@ mr_sas_tbolt_process_outstanding_cmd(struct mrsas_instance *instance)
 
 			tbolt_complete_cmd(instance, cmd);
 		}
-		/* set it back to all 0xfffffffff. */
-		desc->Words = (uint64_t)~0;
+		/* set it back to all 1s. */
+		desc->Words = -1LL;
 
 		instance->reply_read_index++;
 
@@ -2820,7 +2806,7 @@ mr_sas_tbolt_process_outstanding_cmd(struct mrsas_instance *instance)
 		d_val.word = desc->Words;
 
 		con_log(CL_ANN1, (CE_NOTE,
-		    "Next Reply Desc  = %p Words = %" PRIx64 "\n",
+		    "Next Reply Desc  = %p Words = %" PRIx64,
 		    (void *)desc, desc->Words));
 
 		replyType = replyDesc->ReplyFlags &
@@ -2918,8 +2904,8 @@ mrsas_tbolt_get_ld_map_info(struct mrsas_instance *instance)
 		return (-1);
 	}
 
-	(void) memset(ci, 0, sizeof (*ci));
-	(void) memset(dcmd->mbox.b, 0, DCMD_MBOX_SZ);
+	bzero(ci, sizeof (*ci));
+	bzero(dcmd->mbox.b, DCMD_MBOX_SZ);
 
 	dcmd->cmd = MFI_CMD_OP_DCMD;
 	dcmd->cmd_status = 0xFF;
@@ -2937,11 +2923,9 @@ mrsas_tbolt_get_ld_map_info(struct mrsas_instance *instance)
 
 	if (!instance->func_ptr->issue_cmd_in_poll_mode(instance, cmd)) {
 		ret = 0;
-		con_log(CL_ANN1, (CE_NOTE,
-		    "Get LD Map Info success\n"));
+		con_log(CL_ANN1, (CE_NOTE, "Get LD Map Info success"));
 	} else {
-		cmn_err(CE_WARN,
-		    "Get LD Map Info failed\n");
+		cmn_err(CE_WARN, "Get LD Map Info failed");
 		ret = -1;
 	}
 
@@ -2985,9 +2969,9 @@ mrsas_tbolt_prepare_cdb(struct mrsas_instance *instance, U8 cdb[],
 	    instance->mpi2_frame_pool_dma_obj.acc_handle;
 
 	/* Prepare 32-byte CDB if DIF is supported on this device */
-	con_log(CL_ANN, (CE_NOTE, "Prepare DIF CDB\n"));
+	con_log(CL_ANN, (CE_NOTE, "Prepare DIF CDB"));
 
-	(void) memset(cdb, 0, 32);
+	bzero(cdb, 32);
 
 	cdb[0] =  MRSAS_SCSI_VARIABLE_LENGTH_CMD;
 
@@ -3014,7 +2998,7 @@ mrsas_tbolt_prepare_cdb(struct mrsas_instance *instance, U8 cdb[],
 
 	/* Logical block reference tag */
 	ddi_put32(acc_handle, &scsi_io_request->CDB.EEDP32.PrimaryReferenceTag,
-	    BIG_ENDIAN(ref_tag));
+	    BE_32(ref_tag));
 
 	ddi_put16(acc_handle,
 	    &scsi_io_request->CDB.EEDP32.PrimaryApplicationTagMask, 0xffff);
@@ -3085,21 +3069,21 @@ mrsas_tbolt_set_pd_lba(U8 cdb[], uint8_t *cdb_len_ptr, U64 start_blk,
 	    (start_blk <= 0xffffffff)) {
 		if (cdb_len == 16) {
 			con_log(CL_ANN,
-			    (CE_NOTE, "Converting READ/WRITE(16) to READ10\n"));
+			    (CE_NOTE, "Converting READ/WRITE(16) to READ10"));
 			opcode = cdb[0] == READ_16 ? READ_10 : WRITE_10;
 			flagvals = cdb[1];
 			groupnum = cdb[14];
 			control = cdb[15];
 		} else {
 			con_log(CL_ANN,
-			    (CE_NOTE, "Converting READ/WRITE(12) to READ10\n"));
+			    (CE_NOTE, "Converting READ/WRITE(12) to READ10"));
 			opcode = cdb[0] == READ_12 ? READ_10 : WRITE_10;
 			flagvals = cdb[1];
 			groupnum = cdb[10];
 			control = cdb[11];
 		}
 
-		(void) memset(cdb, 0, sizeof (cdb));
+		bzero(cdb, sizeof (cdb));
 
 		cdb[0] = opcode;
 		cdb[1] = flagvals;
@@ -3112,7 +3096,7 @@ mrsas_tbolt_set_pd_lba(U8 cdb[], uint8_t *cdb_len_ptr, U64 start_blk,
 	} else if ((cdb_len < 16) && (start_blk > 0xffffffff)) {
 		/* Convert to 16 byte CDB for large LBA's */
 		con_log(CL_ANN,
-		    (CE_NOTE, "Converting 6/10/12 CDB to 16 byte CDB\n"));
+		    (CE_NOTE, "Converting 6/10/12 CDB to 16 byte CDB"));
 		switch (cdb_len) {
 		case 6:
 			opcode = cdb[0] == READ_6 ? READ_16 : WRITE_16;
@@ -3132,7 +3116,7 @@ mrsas_tbolt_set_pd_lba(U8 cdb[], uint8_t *cdb_len_ptr, U64 start_blk,
 			break;
 		}
 
-		(void) memset(cdb, 0, sizeof (cdb));
+		bzero(cdb, sizeof (cdb));
 
 		cdb[0] = opcode;
 		cdb[1] = flagvals;
@@ -3152,7 +3136,7 @@ mrsas_tbolt_set_pd_lba(U8 cdb[], uint8_t *cdb_len_ptr, U64 start_blk,
 		opcode = cdb[0] == READ_6 ? READ_10 : WRITE_10;
 		control = cdb[5];
 
-		(void) memset(cdb, 0, sizeof (cdb));
+		bzero(cdb, sizeof (cdb));
 		cdb[0] = opcode;
 		cdb[9] = control;
 
@@ -3213,7 +3197,7 @@ mrsas_tbolt_check_map_info(struct mrsas_instance *instance)
 
 		ld_map = instance->ld_map[(instance->map_id & 1)];
 
-		con_log(CL_ANN1, (CE_NOTE, "ldCount=%d, map size=%d\n",
+		con_log(CL_ANN1, (CE_NOTE, "ldCount=%d, map size=%d",
 		    ld_map->raidMap.ldCount, ld_map->raidMap.totalSize));
 
 		if (MR_ValidateMapInfo(instance->ld_map[
@@ -3223,7 +3207,7 @@ mrsas_tbolt_check_map_info(struct mrsas_instance *instance)
 
 			instance->fast_path_io = 1;
 			con_log(CL_ANN,
-			    (CE_NOTE, "instance->fast_path_io %d \n",
+			    (CE_NOTE, "instance->fast_path_io %d",
 			    instance->fast_path_io));
 
 			return (DDI_SUCCESS);
@@ -3234,7 +3218,7 @@ mrsas_tbolt_check_map_info(struct mrsas_instance *instance)
 	instance->fast_path_io = 0;
 	cmn_err(CE_WARN, "MR_ValidateMapInfo failed");
 	con_log(CL_ANN, (CE_NOTE,
-	    "instance->fast_path_io %d \n", instance->fast_path_io));
+	    "instance->fast_path_io %d", instance->fast_path_io));
 
 	return (DDI_FAILURE);
 }
@@ -3248,7 +3232,7 @@ mrsas_tbolt_check_map_info(struct mrsas_instance *instance)
 void
 mrsas_tbolt_kill_adapter(struct mrsas_instance *instance)
 {
-	cmn_err(CE_WARN, "TBOLT Kill adapter called\n");
+	cmn_err(CE_NOTE, "TBOLT Kill adapter called");
 
 	if (instance->deadadapter == 1)
 		return;
@@ -3294,7 +3278,7 @@ mrsas_tbolt_reset_ppc(struct mrsas_instance *instance)
 	uint32_t i;
 
 	con_log(CL_ANN, (CE_NOTE,
-	    "mrsas_tbolt_reset_ppc entered\n "));
+	    "mrsas_tbolt_reset_ppc entered"));
 
 	if (instance->deadadapter == 1) {
 		cmn_err(CE_WARN, "mrsas_tbolt_reset_ppc: "
@@ -3329,12 +3313,12 @@ retry_reset:
 	WR_TBOLT_IB_WRITE_SEQ(0xd, instance);
 	con_log(CL_ANN1, (CE_NOTE,
 	    "mrsas_tbolt_reset_ppc: magic number written "
-	    "to write sequence register\n"));
+	    "to write sequence register"));
 	delay(100 * drv_usectohz(MILLISEC));
 	status = RD_TBOLT_HOST_DIAG(instance);
 	con_log(CL_ANN1, (CE_NOTE,
 	    "mrsas_tbolt_reset_ppc: READ HOSTDIAG SUCCESS "
-	    "to write sequence register\n"));
+	    "to write sequence register"));
 
 	while (status & DIAG_TBOLT_RESET_ADAPTER) {
 		delay(100 * drv_usectohz(MILLISEC));
@@ -3343,7 +3327,7 @@ retry_reset:
 			cmn_err(CE_WARN,
 			    "mrsas_tbolt_reset_ppc:"
 			    "resetadapter bit is set already "
-			    "check retry count %d\n", retry);
+			    "check retry count %d", retry);
 			return (DDI_FAILURE);
 		}
 	}
@@ -3385,7 +3369,7 @@ retry_reset:
 	if (abs_state <= MFI_STATE_FW_INIT) {
 		cmn_err(CE_WARN,
 		    "mrsas_tbolt_reset_ppc: firmware state < MFI_STATE_FW_INIT"
-		    "state = 0x%x, RETRY RESET.\n", abs_state);
+		    "state = 0x%x, RETRY RESET.", abs_state);
 		goto retry_reset;
 	}
 
@@ -3448,10 +3432,10 @@ retry_reset:
 	    "mrsas_issue_init_mpi2 Done"));
 
 	con_log(CL_ANN, (CE_NOTE, "mrsas_tbolt_reset_ppc: "
-	    "Calling mrsas_print_pending_cmd\n"));
+	    "Calling mrsas_print_pending_cmd"));
 	(void) mrsas_print_pending_cmds(instance);
 	con_log(CL_ANN, (CE_NOTE, "mrsas_tbolt_reset_ppc: "
-	    "mrsas_print_pending_cmd done\n"));
+	    "mrsas_print_pending_cmd done"));
 
 	instance->func_ptr->enable_intr(instance);
 	instance->fw_outstanding = 0;
@@ -3460,7 +3444,7 @@ retry_reset:
 	    "Calling mrsas_issue_pending_cmds"));
 	(void) mrsas_issue_pending_cmds(instance);
 	con_log(CL_ANN1, (CE_NOTE, "mrsas_tbolt_reset_ppc: "
-	"issue_pending_cmds done.\n"));
+	"issue_pending_cmds done."));
 
 	con_log(CL_ANN1, (CE_NOTE, "mrsas_tbolt_reset_ppc: "
 	    "Calling aen registration"));
@@ -3470,14 +3454,14 @@ retry_reset:
 
 	instance->func_ptr->issue_cmd(instance->aen_cmd, instance);
 
-	con_log(CL_ANN1, (CE_NOTE, "Unsetting adpresetinprogress flag.\n"));
+	con_log(CL_ANN1, (CE_NOTE, "Unsetting adpresetinprogress flag."));
 	mutex_enter(&instance->ocr_flags_mtx);
 	instance->adapterresetinprogress = 0;
 	mutex_exit(&instance->ocr_flags_mtx);
 	con_log(CL_ANN1, (CE_NOTE, "mrsas_tbolt_reset_ppc: "
 	    "adpterresetinprogress flag unset"));
 
-	con_log(CL_ANN, (CE_NOTE, "mrsas_tbolt_reset_ppc done\n"));
+	con_log(CL_ANN, (CE_NOTE, "mrsas_tbolt_reset_ppc done"));
 	return (DDI_SUCCESS);
 
 }
@@ -3515,7 +3499,7 @@ mrsas_tbolt_sync_map_info(struct mrsas_instance *instance)
 	}
 
 	/* Clear the frame buffer and assign back the context id */
-	(void) memset((char *)&cmd->frame[0], 0, sizeof (union mrsas_frame));
+	bzero((char *)&cmd->frame[0], sizeof (union mrsas_frame));
 	ddi_put32(cmd->frame_dma_obj.acc_handle, &cmd->frame->hdr.context,
 	    cmd->index);
 	bzero(cmd->scsi_io_request, sizeof (Mpi2RaidSCSIIORequest_t));
@@ -3529,15 +3513,15 @@ mrsas_tbolt_sync_map_info(struct mrsas_instance *instance)
 
 	size_sync_info = sizeof (LD_TARGET_SYNC) * num_lds;
 
-	con_log(CL_ANN, (CE_NOTE, "size_sync_info =0x%x ; ld count = 0x%x \n ",
+	con_log(CL_ANN, (CE_NOTE, "size_sync_info =0x%x ; ld count = 0x%x",
 	    size_sync_info, num_lds));
 
 	ci = (LD_TARGET_SYNC *)instance->ld_map[(instance->map_id - 1) & 1];
 
-	(void) memset(ci, 0, sizeof (MR_FW_RAID_MAP_ALL));
+	bzero(ci, sizeof (MR_FW_RAID_MAP_ALL));
 	ci_h = instance->ld_map_phy[(instance->map_id - 1) & 1];
 
-	(void) memset(dcmd->mbox.b, 0, DCMD_MBOX_SZ);
+	bzero(dcmd->mbox.b, DCMD_MBOX_SZ);
 
 	ld_sync = (LD_TARGET_SYNC *)ci;
 
@@ -3545,12 +3529,12 @@ mrsas_tbolt_sync_map_info(struct mrsas_instance *instance)
 		raid = MR_LdRaidGet(i, map);
 
 		con_log(CL_ANN1,
-		    (CE_NOTE, "i : 0x%x, Seq Num : 0x%x, Sync Reqd : 0x%x\n",
+		    (CE_NOTE, "i : 0x%x, Seq Num : 0x%x, Sync Reqd : 0x%x",
 		    i, raid->seqNum, raid->flags.ldSyncRequired));
 
 		ld_sync->ldTargetId = MR_GetLDTgtId(i, map);
 
-		con_log(CL_ANN1, (CE_NOTE, "i : 0x%x, tgt : 0x%x \n",
+		con_log(CL_ANN1, (CE_NOTE, "i : 0x%x, tgt : 0x%x",
 		    i, ld_sync->ldTargetId));
 
 		ld_sync->seqNum = raid->seqNum;
@@ -3608,7 +3592,7 @@ abort_syncmap_cmd(struct mrsas_instance *instance,
 		return (DDI_FAILURE);
 	}
 	/* Clear the frame buffer and assign back the context id */
-	(void) memset((char *)&cmd->frame[0], 0, sizeof (union mrsas_frame));
+	bzero((char *)&cmd->frame[0], sizeof (union mrsas_frame));
 	ddi_put32(cmd->frame_dma_obj.acc_handle, &cmd->frame->hdr.context,
 	    cmd->index);
 
@@ -3669,7 +3653,7 @@ mrsas_tbolt_config_pd(struct mrsas_instance *instance, uint16_t tgt,
 			    MRSAS_EVT_UNCONFIG_TGT, NULL);
 			con_log(CL_ANN1, (CE_WARN,
 			    "mr_sas:DELETING STALE ENTRY  rval = %d "
-			    "tgt id = %d ", rval, tgt));
+			    "tgt id = %d", rval, tgt));
 			return (NDI_FAILURE);
 		}
 		return (NDI_SUCCESS);
@@ -3741,7 +3725,7 @@ mrsas_tbolt_get_pd_info(struct mrsas_instance *instance,
 	}
 
 	/* Clear the frame buffer and assign back the context id */
-	(void) memset((char *)&cmd->frame[0], 0, sizeof (union mrsas_frame));
+	bzero((char *)&cmd->frame[0], sizeof (union mrsas_frame));
 	ddi_put32(cmd->frame_dma_obj.acc_handle, &cmd->frame->hdr.context,
 	    cmd->index);
 
@@ -3756,9 +3740,8 @@ mrsas_tbolt_get_pd_info(struct mrsas_instance *instance,
 
 	(void) mrsas_alloc_dma_obj(instance, &dcmd_dma_obj,
 	    DDI_STRUCTURE_LE_ACC);
-	(void) memset(dcmd_dma_obj.buffer, 0,
-	    sizeof (struct mrsas_tbolt_pd_info));
-	(void) memset(dcmd->mbox.b, 0, 12);
+	bzero(dcmd_dma_obj.buffer, sizeof (struct mrsas_tbolt_pd_info));
+	bzero(dcmd->mbox.b, 12);
 	ddi_put8(cmd->frame_dma_obj.acc_handle, &dcmd->cmd, MFI_CMD_OP_DCMD);
 	ddi_put8(cmd->frame_dma_obj.acc_handle, &dcmd->cmd_status, 0);
 	ddi_put8(cmd->frame_dma_obj.acc_handle, &dcmd->sge_count, 1);

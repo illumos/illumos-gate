@@ -38,7 +38,6 @@ set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
 dir path=dev group=sys
 dir path=etc group=sys
-dir path=etc/certs group=sys
 dir path=etc/cron.d group=sys
 dir path=etc/crypto group=sys
 dir path=etc/crypto/certs group=sys
@@ -326,15 +325,10 @@ driver name=ptm clone_perms="ptmx 0666 root sys"
 driver name=pts perms="* 0644 root sys" perms="0 0620 root tty" \
     perms="1 0620 root tty" perms="2 0620 root tty" perms="3 0620 root tty"
 file path=etc/.login group=sys preserve=renamenew
-file path=etc/certs/SUNWObjectCA group=sys
-file path=etc/certs/SUNWSolarisCA group=sys
-file path=etc/certs/SUNW_SunOS_5.10 group=sys
 file path=etc/cron.d/.proto group=sys mode=0744
 file path=etc/cron.d/at.deny group=sys preserve=true
 file path=etc/cron.d/cron.deny group=sys preserve=true
 file path=etc/cron.d/queuedefs group=sys
-file path=etc/crypto/certs/CA group=sys
-file path=etc/crypto/certs/SUNW_SunOS_5.10 group=sys
 file path=etc/crypto/kmf.conf group=sys preserve=true
 file path=etc/crypto/pkcs11.conf group=sys preserve=true
 file path=etc/datemsk group=sys mode=0444
@@ -1451,8 +1445,6 @@ file path=var/sadm/system/admin/default_java group=sys mode=0444
 file path=var/saf/zsmon/log group=sys preserve=true
 file path=var/spool/cron/crontabs/adm group=sys mode=0600 preserve=true
 file path=var/spool/cron/crontabs/root group=sys mode=0600 preserve=true
-hardlink path=etc/crypto/certs/SUNWObjectCA \
-    target=../../../etc/certs/SUNWObjectCA
 hardlink path=etc/rc2.d/S20sysetup target=../../etc/init.d/sysetup
 hardlink path=etc/rc2.d/S73cachefs.daemon \
     target=../../etc/init.d/cachefs.daemon

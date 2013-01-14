@@ -76,8 +76,8 @@ typedef struct {
 	chdirscm_func_t	*chdirfunc;
 } scm_t;
 
-static checkscm_func_t check_tw, check_hg;
-static chdirscm_func_t chdir_hg;
+static checkscm_func_t check_tw, check_hg, check_git;
+static chdirscm_func_t chdir_hg, chdir_git;
 static int	pnset_add(pnset_t *, const char *);
 static int	pnset_check(const pnset_t *, const char *);
 static void	pnset_empty(pnset_t *);
@@ -92,11 +92,13 @@ static const scm_t scms[] = {
 	{ "teamware",	check_tw,	NULL		},
 	{ "hg",		check_hg,	chdir_hg 	},
 	{ "mercurial",	check_hg,	chdir_hg	},
+	{ "git",	check_git,	chdir_git	},
 	{ NULL,		NULL, 		NULL		}
 };
 
 static const scm_t	*scm;
 static hgdata_t		hgdata;
+static pnset_t		*gitmanifest = NULL;
 static time_t		tstamp;		/* timestamp to compare files to */
 static pnset_t		*exsetp;	/* pathname globs to ignore */
 static const char	*progname;
@@ -150,7 +152,7 @@ main(int argc, char *argv[])
 
 	if (argc != 2) {
 usage:		(void) fprintf(stderr, "usage: %s [-s <subtree>] "
-		    "[-t <tstampfile>] [-S hg|tw] <srcroot> <exceptfile>\n",
+		    "[-t <tstampfile>] [-S hg|tw|git] <srcroot> <exceptfile>\n",
 		    progname);
 		return (EXIT_FAILURE);
 	}
@@ -201,7 +203,7 @@ load_manifest(const char *hgroot)
 
 	pnsetp = calloc(sizeof (pnset_t), 1);
 	if (pnsetp == NULL ||
-	    asprintf(&hgcmd, "/usr/bin/hg manifest -R %s", hgroot) == -1)
+	    asprintf(&hgcmd, "hg manifest -R %s", hgroot) == -1)
 		goto fail;
 
 	fp = popen(hgcmd, "r");
@@ -227,6 +229,45 @@ fail:
 	free(hgcmd);
 	pnset_free(pnsetp);
 	return (NULL);
+}
+
+static void
+chdir_git(const char *path)
+{
+	FILE *fp = NULL;
+	char *gitcmd = NULL;
+	char *newline;
+	char fn[MAXPATHLEN];
+	pnset_t *pnsetp;
+
+	pnsetp = calloc(sizeof (pnset_t), 1);
+	if ((pnsetp == NULL) ||
+	    (asprintf(&gitcmd, "git ls-files %s", path) == -1))
+		goto fail;
+
+	if ((fp = popen(gitcmd, "r")) == NULL)
+		goto fail;
+
+	while (fgets(fn, sizeof (fn), fp) != NULL) {
+		if ((newline = strrchr(fn, '\n')) != NULL)
+			*newline = '\0';
+
+		if (pnset_add(pnsetp, fn) == 0)
+			goto fail;
+	}
+
+	(void) pclose(fp);
+	free(gitcmd);
+	gitmanifest = pnsetp;
+	return;
+fail:
+	warn("cannot load git manifest");
+	if (fp != NULL)
+		(void) pclose(fp);
+	if (pnsetp != NULL)
+		free(pnsetp);
+	if (gitcmd != NULL)
+		free(gitcmd);
 }
 
 /*
@@ -307,6 +348,13 @@ check_hg(const char *path, const struct FTW *ftwp)
 	path += hgdata.rootlen;
 
 	return (hgdata.manifest != NULL && pnset_check(hgdata.manifest, path));
+}
+/* ARGSUSED */
+static int
+check_git(const char *path, const struct FTW *ftwp)
+{
+	path += 2;		/* Skip "./" */
+	return (gitmanifest != NULL && pnset_check(gitmanifest, path));
 }
 
 /*

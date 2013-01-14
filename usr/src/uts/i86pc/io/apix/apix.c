@@ -26,6 +26,14 @@
  * Copyright (c) 2010, Intel Corporation.
  * All rights reserved.
  */
+/*
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ */
+
+/*
+ * To understand how the apix module interacts with the interrupt subsystem read
+ * the theory statement in uts/i86pc/os/intr.c.
+ */
 
 /*
  * PSMI 1.1 extensions are supported only in 2.6 and later versions.
@@ -754,9 +762,9 @@ apix_intr_exit(int prev_ipl, int arg2)
  * given ipl, but apix never uses the TPR and we never mask a subset of the
  * interrupts. They are either all blocked by the IF flag or all can come in.
  *
- * For setspl, we mask all interrupts for XC_HI_PIL, otherwise, interrupts can
- * come in if currently enabled by the IF flag. This table shows the state of
- * the IF flag when we leave this function.
+ * For setspl, we mask all interrupts for XC_HI_PIL (15), otherwise, interrupts
+ * can come in if currently enabled by the IF flag. This table shows the state
+ * of the IF flag when we leave this function.
  *
  *    curr IF |	ipl == 15	ipl != 15
  *    --------+---------------------------
@@ -1096,16 +1104,12 @@ x2apic_update_psm()
 	ASSERT(pops != NULL);
 
 	/*
-	 * The pcplusmp module x2apic_update_psm function does this:
-	 *
-	 *	pops->psm_intr_exit = x2apic_intr_exit;
-	 *	pops->psm_setspl = x2apic_setspl;
-	 *	pops->psm_send_ipi =  x2apic_send_ipi;
-	 *
-	 * Note the x2apic prefix vs. our apix prefix for setspl.
-	 * The x2apic_intr_exit() sets TPR and sends back EOI. The
-	 * x2apic_setspl() sets TPR.  This functionality is not
-	 * used in new design.
+	 * The pcplusmp module's version of x2apic_update_psm makes additional
+	 * changes that we do not have to make here. It needs to make those
+	 * changes because pcplusmp relies on the TPR register and the means of
+	 * addressing that changes when using the local apic versus the x2apic.
+	 * It's also worth noting that the apix driver specific function end up
+	 * being apix_foo as opposed to apic_foo and x2apic_foo.
 	 */
 	pops->psm_send_ipi = x2apic_send_ipi;
 

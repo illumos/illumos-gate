@@ -27,6 +27,10 @@
  * All rights reserved.
  */
 
+/*
+ * To understand how the pcplusmp module interacts with the interrupt subsystem
+ * read the theory statement in uts/i86pc/os/intr.c.
+ */
 
 /*
  * PSMI 1.1 extensions are supported only in 2.6 and later versions.

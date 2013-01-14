@@ -28,7 +28,7 @@
 
 /*
  * This function will check if FAST IO is possible on this logical drive
- * by checking the EVENT information availabe in the driver
+ * by checking the EVENT information available in the driver
  */
 #define	MR_LD_STATE_OPTIMAL 3
 #define	ABS_DIFF(a, b)   (((a) > (b)) ? ((a) - (b)) : ((b) - (a)))
@@ -210,6 +210,8 @@ MR_GetPhyParams(struct mrsas_instance *instance, U32 ld, U64 stripRow,
 	U32		armQ;
 	U32		arm;
 
+	ASSERT(raid->rowDataSize != 0);
+
 	row = (stripRow / raid->rowDataSize);
 
 	if (raid->level == 6) {
@@ -220,7 +222,7 @@ MR_GetPhyParams(struct mrsas_instance *instance, U32 ld, U64 stripRow,
 		}
 		rowMod = (row % (raid->rowSize));
 		armQ = raid->rowSize-1-rowMod;
-		arm = armQ+1+logArm;
+		arm = armQ + 1 + logArm;
 		if (arm >= raid->rowSize)
 			arm -= raid->rowSize;
 		physArm = (U8)arm;
@@ -333,7 +335,7 @@ MR_BuildRaidContext(struct mrsas_instance *instance,
 	ref_in_end_stripe	= (U16)(endLba & stripe_mask);
 	endStrip		= endLba >> raid->stripeShift;
 	num_strips		= (U8)(endStrip - start_strip + 1);
-	/* Check to make sure is not deviding by zero */
+	/* Check to make sure is not dividing by zero */
 	if (raid->rowDataSize == 0)
 		return (FALSE);
 	start_row		=  (start_strip / raid->rowDataSize);
@@ -349,15 +351,16 @@ MR_BuildRaidContext(struct mrsas_instance *instance,
 
 	/* Check if we can send this I/O via FastPath */
 	if (raid->capability.fpCapable) {
-		if (isRead)
+		if (isRead) {
 			io_info->fpOkForIo = (raid->capability.fpReadCapable &&
 			    ((num_strips == 1) ||
 			    raid->capability.fpReadAcrossStripe));
-		else
+		} else {
 			io_info->fpOkForIo =
 			    (raid->capability.fpWriteCapable &&
 			    ((num_strips == 1) ||
 			    raid->capability.fpWriteAcrossStripe));
+		}
 	} else
 		io_info->fpOkForIo = FALSE;
 
@@ -383,11 +386,11 @@ MR_BuildRaidContext(struct mrsas_instance *instance,
 		}
 
 		if (numRows > 2) {
-			regSize += (numRows-2) << raid->stripeShift;
+			regSize += (numRows - 2) << raid->stripeShift;
 		}
 
-		if (endStrip == endRow*raid->rowDataSize) {
-			regSize += ref_in_end_stripe+1;
+		if (endStrip == endRow * raid->rowDataSize) {
+			regSize += ref_in_end_stripe + 1;
 		} else {
 			regSize += stripSize;
 		}

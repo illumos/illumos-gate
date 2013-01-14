@@ -136,6 +136,8 @@ $(MSGDIR):	$(MSGSUBDIRS) FRC
 
 chkmsg:		libconv $(MSGSUBDIRS) FRC
 
+check:		chkmsg
+
 # built from lib/Makefile
 install_lib:	FRC
 		@ cd lex; pwd; $(MAKE) $@

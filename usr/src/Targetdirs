@@ -23,6 +23,7 @@
 # Copyright 2011, Richard Lowe
 # Copyright 2011 Nexenta Systems, Inc. All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 #
 
 #
@@ -87,9 +88,6 @@ DIRS= \
 	/etc \
 	/etc/brand  \
 	/etc/brand/solaris10  \
-	/etc/certs	\
-	/etc/certs/CA	\
-	/etc/openssl/certs/	\
 	/etc/cron.d \
 	/etc/crypto \
 	/etc/crypto/certs \
@@ -291,6 +289,7 @@ DIRS= \
 	/usr/lib/pool \
 	/usr/lib/python2.6 \
 	/usr/lib/python2.6/vendor-packages \
+	/usr/lib/python2.6/vendor-packages/64 \
 	/usr/lib/python2.6/vendor-packages/solaris \
 	/usr/lib/python2.6/vendor-packages/zfs \
 	/usr/lib/python2.6/vendor-packages/beadm \
@@ -1210,6 +1209,10 @@ $(ROOT)/usr/lib/$(MACH64)/libdevinfo.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/libdevinfo.so.1
 $(ROOT)/usr/lib/$(MACH64)/libdevinfo.so:= \
 	REALPATH=../../../lib/$(MACH64)/libdevinfo.so.1
+$(ROOT)/usr/lib/$(MACH64)/libdhcputil.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libdhcputil.so.1
+$(ROOT)/usr/lib/$(MACH64)/libdhcputil.so:= \
+	REALPATH=../../../lib/$(MACH64)/libdhcputil.so.1
 $(ROOT)/usr/lib/$(MACH64)/libdl.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/libdl.so.1
 $(ROOT)/usr/lib/$(MACH64)/libdl.so:= \
@@ -1414,6 +1417,8 @@ $(ROOT)/usr/lib/$(MACH64)/llib-ldevid.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-ldevid.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-ldevinfo.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-ldevinfo.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-ldhcputil.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-ldhcputil.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-ldl.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-ldl.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-ldoor.ln:= \
@@ -1792,6 +1797,8 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/libdevid.so.1 \
 	/usr/lib/$(MACH64)/libdevinfo.so \
 	/usr/lib/$(MACH64)/libdevinfo.so.1 \
+	/usr/lib/$(MACH64)/libdhcputil.so \
+	/usr/lib/$(MACH64)/libdhcputil.so.1 \
 	/usr/lib/$(MACH64)/libdl.so \
 	/usr/lib/$(MACH64)/libdl.so.1 \
 	/usr/lib/$(MACH64)/libdlpi.so \
@@ -1892,6 +1899,7 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/llib-ldevice.ln \
 	/usr/lib/$(MACH64)/llib-ldevid.ln \
 	/usr/lib/$(MACH64)/llib-ldevinfo.ln \
+	/usr/lib/$(MACH64)/llib-ldhcputil.ln \
 	/usr/lib/$(MACH64)/llib-ldl.ln \
 	/usr/lib/$(MACH64)/llib-ldoor.ln \
 	/usr/lib/$(MACH64)/llib-lefi.ln \

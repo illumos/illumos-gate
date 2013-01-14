@@ -24,7 +24,9 @@
  * Use is subject to license terms.
  */
 
-
+/*
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ */
 
 /*
  * Module:	zones_locks.c
@@ -208,9 +210,9 @@ _z_acquire_lock(char **r_lockKey, char *a_zoneName, char *a_lockObject,
 
 	if (a_pid > 0) {
 		(void) _z_add_arg(args, "-p");	/* lock valid process i.d. */
-		(void) _z_add_arg(args, "%ld", getpid());
+		(void) _z_add_arg(args, "%lld", (long long)getpid());
 		(void) _z_add_arg(args, "-z");	/* lock valid zone i.d. */
-		(void) _z_add_arg(args, "%ld", getzoneid());
+		(void) _z_add_arg(args, "%lld", (long long)getzoneid());
 	}
 
 	/* execute command */

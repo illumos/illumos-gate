@@ -29,6 +29,11 @@
  */
 
 /*
+ * Copyright 2012 Jens Elkner <jel+illumos@cs.uni-magdeburg.de>
+ * Copyright 2012 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
+ */
+
+/*
  * Support functions that interpret CPUID and similar information.
  * These should not be used from anywhere other than cpuid.c and
  * cmi_hw.c - as such we will not list them in any header file
@@ -64,10 +69,14 @@
  *		1 for family 0xf, revs F and G
  *		2 for family 0x10
  *		3 for family 0x11
- * Second index by (model & 0x3) for family 0fh
- * or CPUID bits for later families
+ *		4 for family 0x12
+ *		5 for family 0x14
+ *		6 for family 0x15, models 00 - 0f
+ *		7 for family 0x15, models 10 - 1f
+ * Second index by (model & 0x3) for family 0fh,
+ * CPUID pkg bits (Fn8000_0001_EBX[31:28]) for later families.
  */
-static uint32_t amd_skts[4][8] = {
+static uint32_t amd_skts[8][8] = {
 	/*
 	 * Family 0xf revisions B through E
 	 */
@@ -102,7 +111,7 @@ static uint32_t amd_skts[4][8] = {
 #define	A_SKTS_2			2
 	{
 		X86_SOCKET_F1207,	/* 0b000 */
-		X86_SOCKET_AM,		/* 0b001 */
+		X86_SOCKET_AM2R2,	/* 0b001 */
 		X86_SOCKET_S1g3,	/* 0b010 */
 		X86_SOCKET_G34,		/* 0b011 */
 		X86_SOCKET_ASB2,	/* 0b100 */
@@ -124,14 +133,75 @@ static uint32_t amd_skts[4][8] = {
 		X86_SOCKET_UNKNOWN,	/* 0b101 */
 		X86_SOCKET_UNKNOWN,	/* 0b110 */
 		X86_SOCKET_UNKNOWN	/* 0b111 */
-	}
+	},
+
+	/*
+	 * Family 0x12
+	 */
+#define	A_SKTS_4			4
+	{
+		X86_SOCKET_UNKNOWN,	/* 0b000 */
+		X86_SOCKET_FS1,		/* 0b001 */
+		X86_SOCKET_FM1,		/* 0b010 */
+		X86_SOCKET_UNKNOWN,	/* 0b011 */
+		X86_SOCKET_UNKNOWN,	/* 0b100 */
+		X86_SOCKET_UNKNOWN,	/* 0b101 */
+		X86_SOCKET_UNKNOWN,	/* 0b110 */
+		X86_SOCKET_UNKNOWN	/* 0b111 */
+	},
+
+	/*
+	 * Family 0x14
+	 */
+#define	A_SKTS_5			5
+	{
+		X86_SOCKET_FT1,		/* 0b000 */
+		X86_SOCKET_UNKNOWN,	/* 0b001 */
+		X86_SOCKET_UNKNOWN,	/* 0b010 */
+		X86_SOCKET_UNKNOWN,	/* 0b011 */
+		X86_SOCKET_UNKNOWN,	/* 0b100 */
+		X86_SOCKET_UNKNOWN,	/* 0b101 */
+		X86_SOCKET_UNKNOWN,	/* 0b110 */
+		X86_SOCKET_UNKNOWN	/* 0b111 */
+	},
+
+	/*
+	 * Family 0x15 models 00 - 0f
+	 */
+#define	A_SKTS_6			6
+	{
+		X86_SOCKET_UNKNOWN,	/* 0b000 */
+		X86_SOCKET_AM3R2,	/* 0b001 */
+		X86_SOCKET_UNKNOWN,	/* 0b010 */
+		X86_SOCKET_G34,		/* 0b011 */
+		X86_SOCKET_UNKNOWN,	/* 0b100 */
+		X86_SOCKET_C32,		/* 0b101 */
+		X86_SOCKET_UNKNOWN,	/* 0b110 */
+		X86_SOCKET_UNKNOWN	/* 0b111 */
+	},
+
+	/*
+	 * Family 0x15 models 10 - 1f
+	 */
+#define	A_SKTS_7			7
+	{
+		X86_SOCKET_FP2,		/* 0b000 */
+		X86_SOCKET_FS1R2,	/* 0b001 */
+		X86_SOCKET_FM2,		/* 0b010 */
+		X86_SOCKET_UNKNOWN,	/* 0b011 */
+		X86_SOCKET_UNKNOWN,	/* 0b100 */
+		X86_SOCKET_UNKNOWN,	/* 0b101 */
+		X86_SOCKET_UNKNOWN,	/* 0b110 */
+		X86_SOCKET_UNKNOWN	/* 0b111 */
+	},
+
 };
 
 struct amd_sktmap_s {
 	uint32_t	skt_code;
 	char		sktstr[16];
 };
-static struct amd_sktmap_s amd_sktmap[15] = {
+static struct amd_sktmap_s amd_sktmap[23] = {
 	{ X86_SOCKET_754,	"754" },
 	{ X86_SOCKET_939,	"939" },
 	{ X86_SOCKET_940,	"940" },
@@ -146,6 +216,13 @@ static struct amd_sktmap_s amd_sktmap[15] = {
 	{ X86_SOCKET_G34,	"G34" },
 	{ X86_SOCKET_ASB2,	"ASB2" },
 	{ X86_SOCKET_C32,	"C32" },
+	{ X86_SOCKET_FT1,	"FT1" },
+	{ X86_SOCKET_FM1,	"FM1" },
+	{ X86_SOCKET_FS1,	"FS1" },
+	{ X86_SOCKET_AM3R2,	"AM3r2" },
+	{ X86_SOCKET_FP2,	"FP2" },
+	{ X86_SOCKET_FS1R2,	"FS1r2" },
+	{ X86_SOCKET_FM2,	"FM2" },
 	{ X86_SOCKET_UNKNOWN,	"Unknown" }
 };
 
@@ -220,20 +297,57 @@ static const struct amd_rev_mapent {
 
 	/*
 	 * Rev C has models 4-6 (depending on L3 cache configuration)
-	 * Give all of models 4-6 stepping range to rev C.
+	 * Give all of models 4-6 stepping range 0-2 to rev C2.
 	 */
-	{ 0x10, 0x04, 0x06, 0x0, 0xf, X86_CHIPREV_AMD_10_REV_C, "C", A_SKTS_2 },
+	{ 0x10, 0x4, 0x6, 0x0, 0x2, X86_CHIPREV_AMD_10_REV_C2, "C2", A_SKTS_2 },
+
+	/*
+	 * Rev C has models 4-6 (depending on L3 cache configuration)
+	 * Give all of models 4-6 stepping range >= 3 to rev C3.
+	 */
+	{ 0x10, 0x4, 0x6, 0x3, 0xf, X86_CHIPREV_AMD_10_REV_C3, "C3", A_SKTS_2 },
 
 	/*
 	 * Rev D has models 8 and 9
-	 * Give all of model 8 and 9 stepping range to rev D.
+	 * Give all of model 8 and 9 stepping 0 to rev D0.
 	 */
-	{ 0x10, 0x08, 0x09, 0x0, 0xf, X86_CHIPREV_AMD_10_REV_D, "D", A_SKTS_2 },
+	{ 0x10, 0x8, 0x9, 0x0, 0x0, X86_CHIPREV_AMD_10_REV_D0, "D0", A_SKTS_2 },
+
+	/*
+	 * Rev D has models 8 and 9
+	 * Give all of model 8 and 9 stepping range >= 1 to rev D1.
+	 */
+	{ 0x10, 0x8, 0x9, 0x1, 0xf, X86_CHIPREV_AMD_10_REV_D1, "D1", A_SKTS_2 },
+
+	/*
+	 * Rev E has models A and stepping 0
+	 * Give all of model A stepping range to rev E.
+	 */
+	{ 0x10, 0xA, 0xA, 0x0, 0xf, X86_CHIPREV_AMD_10_REV_E, "E", A_SKTS_2 },
 
 	/*
 	 * =============== AuthenticAMD Family 0x11 ===============
 	 */
-	{ 0x11, 0x03, 0x3, 0x0, 0xf, X86_CHIPREV_AMD_11, "B", A_SKTS_3 },
+	{ 0x11, 0x03, 0x03, 0x0, 0xf, X86_CHIPREV_AMD_11_REV_B, "B", A_SKTS_3 },
+
+	/*
+	 * =============== AuthenticAMD Family 0x12 ===============
+	 */
+	{ 0x12, 0x01, 0x01, 0x0, 0xf, X86_CHIPREV_AMD_12_REV_B, "B", A_SKTS_4 },
+
+	/*
+	 * =============== AuthenticAMD Family 0x14 ===============
+	 */
+	{ 0x14, 0x01, 0x01, 0x0, 0xf, X86_CHIPREV_AMD_14_REV_B, "B", A_SKTS_5 },
+	{ 0x14, 0x02, 0x02, 0x0, 0xf, X86_CHIPREV_AMD_14_REV_C, "C", A_SKTS_5 },
+
+	/*
+	 * =============== AuthenticAMD Family 0x15 ===============
+	 */
+	{ 0x15, 0x01, 0x01, 0x2, 0x2, X86_CHIPREV_AMD_15OR_REV_B2, "B2",
+	    A_SKTS_6 },
+	{ 0x15, 0x10, 0x10, 0x1, 0x1, X86_CHIPREV_AMD_15TN_REV_A1, "A1",
+	    A_SKTS_7 },
 };
 
 static void
@@ -298,23 +412,24 @@ synth_amd_info(uint_t family, uint_t model, uint_t step,
 			if (idx > 7) {
 				/* Reserved bits */
 				*skt_p = X86_SOCKET_UNKNOWN;
-			} else if (family == 0x10 &&
-			    amd_skts[rmp->rm_sktidx][idx] ==
-			    X86_SOCKET_AM) {
+			} else {
+				*skt_p = amd_skts[rmp->rm_sktidx][idx];
+			}
+			if (family == 0x10) {
 				/*
 				 * Look at Ddr3Mode bit of DRAM Configuration
 				 * High Register to decide whether this is
-				 * AM2r2 (aka AM2+) or AM3.
+				 * actually AM3 or S1g4.
 				 */
 				uint32_t val;
 
 				val = pci_getl_func(0, 24, 2, 0x94);
-				if (BITX(val, 8, 8))
-					*skt_p = X86_SOCKET_AM3;
-				else
-					*skt_p = X86_SOCKET_AM2R2;
-			} else {
-				*skt_p = amd_skts[rmp->rm_sktidx][idx];
+				if (BITX(val, 8, 8)) {
+					if (*skt_p == X86_SOCKET_AM2R2)
+						*skt_p = X86_SOCKET_AM3;
+					else if (*skt_p == X86_SOCKET_S1g3)
+						*skt_p = X86_SOCKET_S1g4;
+				}
 			}
 		}
 	}

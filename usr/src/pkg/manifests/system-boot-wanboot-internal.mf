@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/boot/wanboot/internal@$(PKGVERS)
@@ -40,6 +41,8 @@ file path=usr/include/p12aux.h
 file path=usr/include/p12err.h
 file path=usr/include/parseURL.h
 file path=usr/include/wanboot_conf.h
+file path=usr/lib/$(ARCH64)/llib-lwanboot.ln
+file path=usr/lib/$(ARCH64)/llib-lwanbootutil.ln
 file path=usr/lib/llib-lwanboot
 file path=usr/lib/llib-lwanboot.ln
 file path=usr/lib/llib-lwanbootutil
@@ -47,5 +50,7 @@ file path=usr/lib/llib-lwanbootutil.ln
 legacy pkg=SUNWwbint desc="Solaris WAN boot internal" name="WAN boot internal"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+link path=usr/lib/$(ARCH64)/libwanboot.so target=./libwanboot.so.1
+link path=usr/lib/$(ARCH64)/libwanbootutil.so target=./libwanbootutil.so.1
 link path=usr/lib/libwanboot.so target=./libwanboot.so.1
 link path=usr/lib/libwanbootutil.so target=./libwanbootutil.so.1

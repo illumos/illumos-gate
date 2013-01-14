@@ -130,6 +130,7 @@ boolean_t	zio_taskq_sysdc = B_TRUE;	/* use SDC scheduling class */
 uint_t		zio_taskq_basedc = 80;		/* base duty cycle */
 
 boolean_t	spa_create_process = B_TRUE;	/* no process ==> no sysdc */
+extern int	zfs_sync_pass_deferred_free;
 
 /*
  * This (illegal) pool name is used when temporarily importing a spa_t in order
@@ -5717,6 +5718,14 @@ spa_sync_config_object(spa_t *spa, dmu_tx_t *tx)
 	config = spa_config_generate(spa, spa->spa_root_vdev,
 	    dmu_tx_get_txg(tx), B_FALSE);
 
+	/*
+	 * If we're upgrading the spa version then make sure that
+	 * the config object gets updated with the correct version.
+	 */
+	if (spa->spa_ubsync.ub_version < spa->spa_uberblock.ub_version)
+		fnvlist_add_uint64(config, ZPOOL_CONFIG_VERSION,
+		    spa->spa_uberblock.ub_version);
+
 	spa_config_exit(spa, SCL_STATE, FTAG);
 
 	if (spa->spa_config_syncing)
@@ -6040,7 +6049,7 @@ spa_sync(spa_t *spa, uint64_t txg)
 		spa_errlog_sync(spa, txg);
 		dsl_pool_sync(dp, txg);
 
-		if (pass <= SYNC_PASS_DEFERRED_FREE) {
+		if (pass < zfs_sync_pass_deferred_free) {
 			zio_t *zio = zio_root(spa, NULL, NULL, 0);
 			bplist_iterate(free_bpl, spa_free_sync_cb,
 			    zio, tx);
