@@ -105,36 +105,43 @@ arsym(Byte *off, size_t sz, size_t *e, int is64)
 		if (is64) {
 			if (sz < 8 || (sz - 8) / 8 < (n = get8(off))) {
 				_elf_seterr(EFMT_ARSYMSZ, 0);
-				return (0);
+				return (NULL);
 			}
 		} else {
 			if (sz < 4 || (sz - 4) / 4 < (n = get4(off))) {
 				_elf_seterr(EFMT_ARSYMSZ, 0);
-				return (0);
+				return (NULL);
 			}
 		}
 		off += eltsize;
 		endoff = off + n * eltsize;
 
 		/*
-		 * string table must be present, null terminated
+		 * If there are symbols in the symbol table, a
+		 * string table must be present and NULL terminated.
+		 *
+		 * The format dictates that the string table must always be
+		 * present, however in the case of an archive containing no
+		 * symbols GNU ar will not create one.  We are permissive for
+		 * the sake of compatibility.
 		 */
-
-		if (((str = (char *)endoff) >= endstr) ||
-		    (*(endstr - 1) != '\0')) {
+		if ((n > 0) && (((str = (char *)endoff) >= endstr) ||
+		    (*(endstr - 1) != '\0'))) {
 			_elf_seterr(EFMT_ARSYM, 0);
-			return (0);
+			return (NULL);
 		}
 
 		/*
+		 * There is always at least one entry returned if a symtab
+		 * exists since the table's last entry is an artificial one
+		 * with a NULL as_name, but is included in the count.
+		 *
 		 * overflow can occur here, but not likely
 		 */
-
 		*e = n + 1;
-		n = sizeof (Elf_Arsym) * (n + 1);
-		if ((oas = malloc(n)) == 0) {
+		if ((oas = calloc(n + 1, sizeof (Elf_Arsym))) == NULL) {
 			_elf_seterr(EMEM_ARSYM, errno);
-			return (0);
+			return (NULL);
 		}
 	}
 	{
@@ -144,7 +151,7 @@ arsym(Byte *off, size_t sz, size_t *e, int is64)
 			if (str >= endstr) {
 				_elf_seterr(EFMT_ARSYMSTR, 0);
 				free(oas);
-				return (0);
+				return (NULL);
 			}
 			if (is64)
 				as->as_off = get8(off);
@@ -158,7 +165,7 @@ arsym(Byte *off, size_t sz, size_t *e, int is64)
 				/* LINTED */
 				;
 		}
-		as->as_name = 0;
+		as->as_name = NULL;
 		as->as_off = 0;
 		as->as_hash = ~(unsigned long)0L;
 	}

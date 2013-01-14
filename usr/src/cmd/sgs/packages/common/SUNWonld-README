@@ -1640,3 +1640,7 @@ Bugid   Risk Synopsis
 3260	linker is insufficiently careful with strtok
 3261	linker should ignore unknown hardware capabilities
 3265	link-editor builds bogus .eh_frame_hdr on ia32
+3453	GNU comdat redirection does exactly the wrong thing
+3439	discarded sections shouldn't end up on output lists
+3436	relocatable objects also need sloppy relocation
+3451	archive libraries with no symbols shouldn't require a string table

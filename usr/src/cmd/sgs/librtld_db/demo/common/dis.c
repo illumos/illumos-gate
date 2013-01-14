@@ -79,7 +79,7 @@ print_address_ps(struct ps_prochandle *ph, ulong_t address, unsigned flags)
 			/*
 			 * Embed SOName in symbol name
 			 */
-			if (mip = addr_to_map(ph, address)) {
+			if ((mip = addr_to_map(ph, address)) != 0) {
 				(void) strcpy(buf, mip->mi_name);
 				(void) strcat(buf, ":");
 			} else

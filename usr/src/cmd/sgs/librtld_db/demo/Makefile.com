@@ -66,6 +66,10 @@ LINTERRS =	-erroff=E_NAME_DEF_NOT_USED2 \
 LINTFLAGS +=	$(LDLIBS) -L../../$(MACH) $(LINTERRS)
 LINTFLAGS64 +=	$(LDLIBS) -L../../$(MACH) $(LINTERRS)
 CLEANFILES +=	$(LINTOUT)
+
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-unused-label
+CERRWARN +=	-_gcc=-Wno-unused-variable
 # DEMO DELETE END
 
 test-sparc=	test-sparc-regs

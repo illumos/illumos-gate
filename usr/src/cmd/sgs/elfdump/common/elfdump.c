@@ -2225,7 +2225,6 @@ versions(Cache *cache, Word shnum, const char *file, uint_t flags,
 
 
 	/* Gather information about the version sections */
-	bzero(versym, sizeof (*versym));
 	versym->max_verndx = 1;
 	for (cnt = 1; cnt < shnum; cnt++) {
 		Cache		*_cache = &cache[cnt];
@@ -4739,7 +4738,7 @@ regular(const char *file, int fd, Elf *elf, uint_t flags,
 	size_t		ndx, shstrndx, shnum, phnum;
 	Shdr		*shdr;
 	Cache		*cache;
-	VERSYM_STATE	versym;
+	VERSYM_STATE	versym = { 0 };
 	int		ret = 0;
 	int		addr_align;
 
