@@ -242,7 +242,6 @@ SUBDIRS += \
 	libzfs_core	\
 	libzfs		\
 	libbe		\
-	pylibbe		\
 	libzfs_jni	\
 	libmapid	\
 	brand		\

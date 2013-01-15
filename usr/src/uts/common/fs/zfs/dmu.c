@@ -1629,12 +1629,6 @@ dmu_write_policy(objset_t *os, dnode_t *dn, int level, int wp, zio_prop_t *zp)
 			if (!zio_checksum_table[checksum].ci_dedup)
 				dedup_verify = B_TRUE;
 		}
-
-	if (wp & WP_NOFILL) {
-		ASSERT(!ismd && level == 0);
-		checksum = ZIO_CHECKSUM_NOPARITY;
-		compress = ZIO_COMPRESS_OFF;
-		dedup = B_FALSE;
 		/*
 		 * Enable nopwrite if we have a cryptographically secure
 		 * checksum that has no known collisions (i.e. SHA-256)
