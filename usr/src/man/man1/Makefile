@@ -70,6 +70,7 @@ MANFILES=	acctcom.1			\
 	 	clear.1				\
 	 	cmp.1				\
 	 	col.1				\
+	 	column.1			\
 	 	comm.1				\
 	 	command.1			\
 	 	compress.1			\

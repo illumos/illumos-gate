@@ -1,0 +1,129 @@
+.\" Copyright (c) 1989, 1990, 1993
+.\"	The Regents of the University of California.  All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 4. Neither the name of the University nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\"     @(#)column.1	8.1 (Berkeley) 6/6/93
+.\" $FreeBSD$
+.\"
+.\" Portions Copyright (c) 2013 Joyent, Inc.  All rights reserved.
+.\"
+.TH COLUMN 1 "Jan 10, 2013"
+.SH NAME
+column \- columnate lists
+.SH SYNOPSIS
+.LP
+.nf
+\fBcolumn\fR [\fB-tx\fR] [\fB-c\fR \fIcolumns\fR] [\fB-s\fR \fIsep\fR] [\fIfile\fR ... ]
+.fi
+
+.Sh DESCRIPTION
+.sp
+.LP
+The \fBcolumn\fR
+utility formats its input into multiple columns.
+Rows are filled before columns.
+Input is taken from
+\fIfile\fR
+operands, or, by default, from the standard input.
+Empty lines are ignored.
+.SH OPTIONS
+.sp
+.LP
+The options are as follows:
+.sp
+.ne 2
+.na
+\fB\fB-c\fR \fIcolumns\fR\fR
+.ad
+.RS 17n
+Output is formatted for a display \fIcolumns\fR
+wide.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-s\fR \fIsep\fR\fR
+.ad
+.RS 17n
+Specify a set of characters to be used to delimit columns for the
+\fB-t\fR option.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-t\fR\fR
+.ad
+.RS 17n
+Determine the number of columns the input contains and create a table.
+Columns are delimited with whitespace, by default, or with the characters
+supplied using the \fBs\fR
+option.
+Useful for pretty-printing displays.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-x\fR
+.ad
+.RS 17n
+Fill columns before filling rows.
+.RE
+
+.SH ENVIRONMENT
+The COLUMNS , LANG , LC_ALL
+and
+LC_CTYPE
+environment variables affect the execution of
+\fBcolumn\fR
+as described in
+\fBenviron\fR(5).
+
+.SH EXIT STATUS
+The \fBcolumn\fR utility exits 0 on success and >0 if an error occurs.
+
+.SH EXAMPLES
+.sp
+.in +2
+.nf
+(printf \&"PERM LINKS OWNER GROUP SIZE MONTH DAY \&"\ \&;\ \&\e
+printf \&"HH:MM/YEAR NAME\en\&"\ \&;\ \&\e
+ls -l \&| sed 1d) \&| column -t
+.fi
+.in -2
+.sp
+
+
+.SH SEE ALSO
+\fBls\fR(1), \fBpaste\fR(1), \fBsort\fR(1)
+
+.SH HISTORY
+The \fBcolumn\fR command appeared in 4.3BSD-Reno.
+
+.SH BUGS
+Input lines are limited to LINE_MAX bytes in length.

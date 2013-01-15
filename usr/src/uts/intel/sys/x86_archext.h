@@ -128,7 +128,7 @@ extern "C" {
 
 #define	FMT_CPUID_INTC_ECX					\
 	"\20"							\
-	"\37rdrand\36f16c\35avx\34osxsav\33xsave"				\
+	"\37rdrand\36f16c\35avx\34osxsav\33xsave"		\
 	"\32aes\31tscdl"					\
 	"\30popcnt\27movbe\26x2apic\25sse4.2\24sse4.1\23dca"	\
 	"\20\18pdcm\17etprd\16cx16\13cid\12ssse3\11tm2"		\

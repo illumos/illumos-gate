@@ -583,6 +583,10 @@ tmp_read(struct vnode *vp, struct uio *uiop, int ioflag, cred_t *cred,
 	struct tmount *tm = (struct tmount *)VTOTM(vp);
 	int error;
 
+	/* If the filesystem was umounted by force, return immediately. */
+	if (vp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
+		return (EIO);
+
 	/*
 	 * We don't currently support reading non-regular files
 	 */
@@ -611,6 +615,10 @@ tmp_write(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cred,
 	struct tmpnode *tp = (struct tmpnode *)VTOTN(vp);
 	struct tmount *tm = (struct tmount *)VTOTM(vp);
 	int error;
+
+	/* If the filesystem was umounted by force, return immediately. */
+	if (vp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
+		return (EIO);
 
 	/*
 	 * We don't currently support writing to non-regular files
@@ -828,6 +836,9 @@ tmp_lookup(
 	struct tmpnode *ntp = NULL;
 	int error;
 
+	/* If the filesystem was umounted by force, return immediately. */
+	if (dvp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
+		return (EIO);
 
 	/* allow cd into @ dir */
 	if (flags & LOOKUP_XATTR) {
@@ -1454,6 +1465,10 @@ tmp_readdir(
 	int reclen;
 	caddr_t outbuf;
 
+	/* If the filesystem was umounted by force, return immediately. */
+	if (vp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
+		return (EIO);
+
 	if (uiop->uio_loffset >= MAXOFF_T) {
 		if (eofp)
 			*eofp = 1;
@@ -1657,10 +1672,27 @@ top:
 	 * there's little to do -- just drop our hold.
 	 */
 	if (vp->v_count > 1 || tp->tn_nlink != 0) {
-		vp->v_count--;
+		if (vp->v_vfsp->vfs_flag & VFS_UNMOUNTED) {
+			/*
+			 * Since the file system was forcibly unmounted, we can
+			 * have a case (v_count == 1, tn_nlink != 0) where this
+			 * file was open so we didn't add an extra hold on the
+			 * file in tmp_unmount. We are counting on the
+			 * interaction of the hold made in tmp_unmount and
+			 * rele-ed in tmp_vfsfree so we need to be sure we
+			 * don't decrement in this case.
+			 */
+			if (vp->v_count > 1)
+				vp->v_count--;
+		} else {
+			vp->v_count--;
+		}
 		mutex_exit(&vp->v_lock);
 		mutex_exit(&tp->tn_tlock);
 		rw_exit(&tp->tn_rwlock);
+		/* If the filesystem was umounted by force, rele the vfs ref */
+		if (vp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
+			VFS_RELE(tm->tm_vfsp);
 		return;
 	}
 
@@ -1720,6 +1752,10 @@ top:
 	mutex_destroy(&tp->tn_tlock);
 	vn_free(TNTOV(tp));
 	tmp_memfree(tp, sizeof (struct tmpnode));
+
+	/* If the filesystem was umounted by force, rele the vfs ref */
+	if (vp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
+		VFS_RELE(tm->tm_vfsp);
 }
 
 /* ARGSUSED2 */
@@ -1844,6 +1880,10 @@ tmp_getapage(
 	int err = 0;
 	struct vnode *pvp;
 	u_offset_t poff;
+
+	/* If the filesystem was umounted by force, return immediately. */
+	if (vp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
+		return (EIO);
 
 	if (protp != NULL)
 		*protp = PROT_ALL;
@@ -2065,6 +2105,10 @@ tmp_putapage(
 	u_offset_t pstart;
 	u_offset_t offset;
 	u_offset_t tmpoff;
+
+	/* If the filesystem was umounted by force, return immediately. */
+	if (vp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
+		return (EIO);
 
 	ASSERT(PAGE_LOCKED(pp));
 

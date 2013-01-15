@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -3508,26 +3508,19 @@ bail:
  * Attempt to confirm that svc.startd is ready to accept a user-initiated
  * run-level change. startd is not ready until it has started its
  * _scf_notify_wait thread to watch for events from svc.configd. This is
- * inherently racy. As a heuristic, we check the status of a very early svc
- * (CHECK_SVC) to see if that is online. Since we could be booted to milestone
- * none, the svc may never be online, so only retry for 5 seconds before
- * charging ahead.
+ * inherently racy. To workaround this, we check the status of a file that
+ * startd will create once it has started the _scf_notify_wait thread.
+ * If we don't see this file after one minute, then charge ahead.
  */
 static void
 verify_startd_ready()
 {
-	char *svc_state;
+	struct stat64 buf;
 	int i;
 
-	for (i = 0; i < 5; i++) {
-		svc_state = smf_get_state(CHECK_SVC);
-		if (svc_state != NULL) {
-			if (strcmp(svc_state, SCF_STATE_STRING_ONLINE) == 0) {
-				free(svc_state);
-				return;
-			}
-			free(svc_state);
-		}
+	for (i = 0; i < 60; i++) {
+		if (stat64("/etc/svc/volatile/startd.ready", &buf) == 0)
+			return;
 		sleep(1);
 	}
 	console(B_TRUE, "verify startd timeout\n");

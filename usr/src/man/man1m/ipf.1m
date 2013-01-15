@@ -2,7 +2,8 @@
 .\" To view license terms, attribution, and copyright for IP Filter, the default path is /usr/lib/ipf/IPFILTER.LICENCE. If the Solaris operating environment has been installed anywhere other than the default, modify the given path to access the file at the installed
 .\" location.
 .\" Portions Copyright (c) 2009, Sun Microsystems Inc. All Rights Reserved.
-.TH IPF 1M "Feb 25, 2009"
+.\" Portions Copyright (c) 2012, Joyent, Inc. All Rights Reserved.
+.TH IPF 1M "Nov 26, 2012"
 .SH NAME
 ipf \- alter packet filtering lists for IP packet input and output
 .SH SYNOPSIS
@@ -10,7 +11,7 @@ ipf \- alter packet filtering lists for IP packet input and output
 .nf
 \fBipf\fR [\fB-6AdDEInoPRrsvVyzZ\fR] [\fB-l\fR block | pass | nomatch]
      [\fB-T\fR \fIoptionlist\fR] [\fB-F\fR i | o | a | s | S] \fB-f\fR \fIfilename\fR
-     [\fB-f\fR \fIfilename\fR...]
+     [\fB-f\fR \fIfilename\fR...] [\fIzonename\fR]
 .fi
 
 .SH DESCRIPTION
@@ -459,6 +460,14 @@ Zero global statistics held in the kernel for filtering only. This does not
 affect fragment or state statistics.
 .RE
 
+.SH ZONES
+.sp
+.LP
+ipf optionally takes a zone name as an argument, which will change the
+ipfilter settings for that zone, rather than the current one. The zonename
+option is only available in the Global Zone. Using it in any other zone will
+return an error.
+
 .SH FILES
 .sp
 .ne 2
@@ -519,7 +528,7 @@ Interface Stability	Committed
 .LP
 \fBipfstat\fR(1M), \fBipmon\fR(1M), \fBipnat\fR(1M), \fBippool\fR(1M),
 \fBsvcadm\fR(1M), \fBsvc.ipfd\fR(1M), \fBipf\fR(4), \fBipnat.conf\fR(4),
-\fBippool\fR(4), \fBattributes\fR(5), \fBipfilter\fR(5)
+\fBippool\fR(4), \fBattributes\fR(5), \fBipfilter\fR(5), \fBzones(5)\fR
 .sp
 .LP
 \fI\fR

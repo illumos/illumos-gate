@@ -5,6 +5,8 @@
  *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
  */
 
 #ifdef	__FreeBSD__
@@ -20,6 +22,10 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include "netinet/ipl.h"
+
+#ifdef SOLARIS
+#include "ipfzone.h"
+#endif
 
 #if !defined(lint)
 static const char sccsid[] = "@(#)ipf.c	1.23 6/5/96 (C) 1993-2000 Darren Reed";
@@ -62,9 +68,14 @@ static	ioctlfunc_t	iocfunctions[IPL_LOGSIZE] = { ioctl, ioctl, ioctl,
 
 static void usage()
 {
-	fprintf(stderr, "usage: ipf [-6AdDEInoPrRsvVyzZ] %s %s %s\n",
+	fprintf(stderr, "usage: ipf [-6AdDEInoPrRsvVyzZ] %s %s %s",
 		"[-l block|pass|nomatch|state|nat]", "[-cc] [-F i|o|a|s|S|u]",
 		"[-f filename] [-T <tuneopts>]");
+#if SOLARIS
+	fprintf(stderr, " [zonename]\n");
+#else
+	fprintf(stderr, "\n");
+#endif
 	exit(1);
 }
 
@@ -74,11 +85,20 @@ int argc;
 char *argv[];
 {
 	int c;
+	const char *optstr = "6Ac:dDEf:F:Il:noPrRsT:vVyzZ";
 
 	if (argc < 2)
 		usage();
 
-	while ((c = getopt(argc, argv, "6Ac:dDEf:F:Il:noPrRsT:vVyzZ")) != -1) {
+#if SOLARIS
+	/*
+	 * We need to set the zone name before calling the functions
+	 * in the switch statement below
+	 */
+	getzonearg(argc, argv, optstr);
+#endif
+
+	while ((c = getopt(argc, argv, optstr)) != -1) {
 		switch (c)
 		{
 		case '?' :
@@ -187,6 +207,14 @@ int check;
 		if ((fd = open(ipfdev, O_RDWR)) == -1)
 			if ((fd = open(ipfdev, O_RDONLY)) == -1)
 				perror("open device");
+
+#if SOLARIS
+	if (setzone(fd) != 0) {
+		close(fd);
+		return -1;
+	}
+#endif
+
 	return fd;
 }
 
@@ -307,6 +335,13 @@ char	*opt;
 		if (opts & OPT_VERBOSE)
 			printf("set state log flag\n");
 		xfd = open(IPSTATE_NAME, O_RDWR);
+#if SOLARIS
+		if (xfd >= 0 && setzone(xfd) != 0) {
+			close(xfd);
+			xfd = -1;
+		}
+#endif
+
 		if (xfd >= 0) {
 			logopt = 0;
 			if (ioctl(xfd, SIOCGETLG, &logopt))
@@ -324,6 +359,13 @@ char	*opt;
 		if (opts & OPT_VERBOSE)
 			printf("set nat log flag\n");
 		xfd = open(IPNAT_NAME, O_RDWR);
+#if SOLARIS
+		if (xfd >= 0 && setzone(xfd) != 0) {
+			close(xfd);
+			xfd = -1;
+		}
+#endif
+
 		if (xfd >= 0) {
 			logopt = 0;
 			if (ioctl(xfd, SIOCGETLG, &logopt))
@@ -515,6 +557,14 @@ static int showversion()
 		perror("open device");
 		return 1;
 	}
+
+#if SOLARIS
+	if (setzone(vfd) != 0) {
+		close(vfd);
+		return 1;
+	}
+#endif
+
 
 	if (ioctl(vfd, SIOCGETFS, &ipfo)) {
 		perror("ioctl(SIOCGETFS)");

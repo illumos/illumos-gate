@@ -25,6 +25,8 @@
 #include "imgact_aout.h"
 #include "i386-elf.h"
 
+#define	SAFE_LOAD_BASE	0xc800000
+
 static int cur_addr;
 entry_func entry_addr;
 static struct mod_list mll[99];
@@ -772,6 +774,17 @@ int
 load_module (char *module, char *arg)
 {
   int len;
+
+  /*
+   * XXX Workaround for RICHMOND-16: on some systems, the region
+   * [c700000, c800000) is corrupted by an unknown external (off-CPU) actor(s)
+   * during boot.  To be on the safe side, we will simply ensure that every
+   * module is loaded above this region.  Note that this means this particular
+   * boot loader supports only systems with at least 200 MB of DRAM plus the
+   * amount of space used by any modules.
+   */
+  if (cur_addr < SAFE_LOAD_BASE)
+    cur_addr = SAFE_LOAD_BASE;
 
   /* if we are supposed to load on 4K boundaries */
   cur_addr = (cur_addr + 0xFFF) & 0xFFFFF000;

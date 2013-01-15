@@ -2760,11 +2760,17 @@ zone_free(zone_t *zone)
 static void
 zone_status_set(zone_t *zone, zone_status_t status)
 {
+	timestruc_t now;
+	uint64_t t;
 
 	nvlist_t *nvl = NULL;
 	ASSERT(MUTEX_HELD(&zone_status_lock));
 	ASSERT(status > ZONE_MIN_STATE && status <= ZONE_MAX_STATE &&
 	    status >= zone_status_get(zone));
+
+	/* Current time since Jan 1 1970 but consumers expect NS */
+	gethrestime(&now);
+	t = (now.tv_sec * NANOSEC) + now.tv_nsec;
 
 	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, KM_SLEEP) ||
 	    nvlist_add_string(nvl, ZONE_CB_NAME, zone->zone_name) ||
@@ -2773,7 +2779,7 @@ zone_status_set(zone_t *zone, zone_status_t status)
 	    nvlist_add_string(nvl, ZONE_CB_OLDSTATE,
 	    zone_status_table[zone->zone_status]) ||
 	    nvlist_add_int32(nvl, ZONE_CB_ZONEID, zone->zone_id) ||
-	    nvlist_add_uint64(nvl, ZONE_CB_TIMESTAMP, (uint64_t)gethrtime()) ||
+	    nvlist_add_uint64(nvl, ZONE_CB_TIMESTAMP, t) ||
 	    sysevent_evc_publish(zone_event_chan, ZONE_EVENT_STATUS_CLASS,
 	    ZONE_EVENT_STATUS_SUBCLASS, "sun.com", "kernel", nvl, EVCH_SLEEP)) {
 #ifdef DEBUG

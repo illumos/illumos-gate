@@ -85,6 +85,7 @@ SRCS += \
 	mdb_target.c \
 	mdb_tdb.c \
 	mdb_termio.c \
+	mdb_typedef.c \
 	mdb_umem.c \
 	mdb_value.c \
 	mdb_vcb.c \

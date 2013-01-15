@@ -15,6 +15,12 @@ nawk \- pattern scanning and processing language
 .SH SYNOPSIS
 .LP
 .nf
+\fB/usr/bin/awk\fR [\fB-F\fR \fIERE\fR] [\fB-v\fR \fIassignment\fR] \fI\&'program'\fR | \fB-f\fR \fIprogfile\fR...
+     [\fIargument\fR]...
+.fi
+
+.LP
+.nf
 \fB/usr/bin/nawk\fR [\fB-F\fR \fIERE\fR] [\fB-v\fR \fIassignment\fR] \fI\&'program'\fR | \fB-f\fR \fIprogfile\fR...
      [\fIargument\fR]...
 .fi
@@ -28,7 +34,8 @@ nawk \- pattern scanning and processing language
 .SH DESCRIPTION
 .sp
 .LP
-The \fB/usr/bin/nawk\fR and \fB/usr/xpg4/bin/awk\fR utilities execute
+The \fB/usr/bin/awk\fR, \fB/usr/bin/nawk\fR and \fB/usr/xpg4/bin/awk\fR
+utilities execute
 \fIprogram\fRs written in the \fBnawk\fR programming language, which is
 specialized for textual data manipulation. A \fBnawk\fR \fIprogram\fR is a
 sequence of patterns and corresponding actions. The string specifying

@@ -2,13 +2,14 @@
 .\" To view license terms, attribution, and copyright for IP Filter, the default path is /usr/lib/ipf/IPFILTER.LICENCE. If the Solaris operating environment has been installed anywhere other than the default, modify the given path to access the file at the installed
 .\" location.
 .\" Portions Copyright (c) 2008, Sun Microsystems Inc. All Rights Reserved.
-.TH IPNAT 1M "Apr 3, 2008"
+.\" Portions Copyright (c) 2012, Joyent, Inc. All Rights Reserved.
+.TH IPNAT 1M "Nov 26, 2012"
 .SH NAME
 ipnat \- user interface to the NAT subsystem
 .SH SYNOPSIS
 .LP
 .nf
-\fBipnat\fR [\fB-CdFhlnRrsv\fR] \fB-f\fR \fIfilename\fR
+\fBipnat\fR [\fB-CdFhlnRrsv\fR] [\fB-z\fR \fIzonename\fR] \fB-f\fR \fIfilename\fR
 .fi
 
 .SH DESCRIPTION
@@ -140,6 +141,17 @@ Turn verbose mode on. Displays information relating to rule processing and
 active rules/table entries.
 .RE
 
+.sp
+.ne 2
+.na
+\fB\fB-z\fR\fR
+.ad
+.RS 15n
+Operate on the IP NAT for the specified zone. If this option is not
+specified, the current zone is used. This command is only available in the
+Global Zone.
+.RE
+
 .SH FILES
 .sp
 .ne 2
@@ -200,4 +212,5 @@ Interface Stability	Committed
 .SH SEE ALSO
 .sp
 .LP
-\fBipf\fR(1M), \fBipfstat\fR(1M), \fBipnat\fR(4), \fBattributes\fR(5)
+\fBipf\fR(1M), \fBipfstat\fR(1M), \fBipnat\fR(4), \fBattributes\fR(5),
+\fBzones(5)\fR

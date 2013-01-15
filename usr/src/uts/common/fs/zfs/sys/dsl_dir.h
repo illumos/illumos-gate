@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 #ifndef	_SYS_DSL_DIR_H
@@ -70,7 +71,11 @@ typedef struct dsl_dir_phys {
 	uint64_t dd_flags;
 	uint64_t dd_used_breakdown[DD_USED_NUM];
 	uint64_t dd_clones; /* dsl_dir objects */
-	uint64_t dd_pad[13]; /* pad out to 256 bytes for good measure */
+
+	uint64_t dd_filesystem_count;
+	uint64_t dd_snapshot_count;
+
+	uint64_t dd_pad[11]; /* pad out to 256 bytes for good measure */
 } dsl_dir_phys_t;
 
 struct dsl_dir {
@@ -131,8 +136,15 @@ int dsl_dir_set_quota(const char *ddname, zprop_source_t source,
     uint64_t quota);
 int dsl_dir_set_reservation(const char *ddname, zprop_source_t source,
     uint64_t reservation);
+int dsl_dir_validate_fs_ss_limit(const char *, uint64_t, zfs_prop_t);
+int dsl_secpolicy_write_prop(dsl_dir_t *, zfs_prop_t, cred_t *);
+int dsl_dir_fscount_check(dsl_dir_t *, uint64_t, dsl_dir_t *, cred_t *);
+void dsl_dir_fscount_adjust(dsl_dir_t *, dmu_tx_t *, int64_t, boolean_t);
+int dsl_snapcount_check(dsl_dir_t *, uint64_t, dsl_dir_t *, cred_t *);
+void dsl_snapcount_adjust(dsl_dir_t *, dmu_tx_t *, int64_t, boolean_t);
 int dsl_dir_rename(dsl_dir_t *dd, const char *newname);
-int dsl_dir_transfer_possible(dsl_dir_t *sdd, dsl_dir_t *tdd, uint64_t space);
+int dsl_dir_transfer_possible(dsl_dir_t *sdd, dsl_dir_t *tdd,
+    dsl_dir_t *moving_dd, uint64_t space, cred_t *);
 int dsl_dir_set_reservation_check(void *arg1, void *arg2, dmu_tx_t *tx);
 boolean_t dsl_dir_is_clone(dsl_dir_t *dd);
 void dsl_dir_new_refreservation(dsl_dir_t *dd, struct dsl_dataset *ds,

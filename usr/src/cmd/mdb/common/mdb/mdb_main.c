@@ -319,10 +319,12 @@ usage(int status)
 {
 	mdb_iob_printf(mdb.m_err, "Usage: %s [-fkmuwyAFKMSUW] [+/-o option] "
 	    "[-p pid] [-s dist] [-I path] [-L path]\n\t[-P prompt] "
-	    "[-R root] [-V dis-version] [object [core] | core | suffix]\n\n",
+	    "[-R root] [-V dis-version] [-e expr] "
+	    "[object [core] | core | suffix]\n\n",
 	    mdb.m_pname);
 
 	mdb_iob_puts(mdb.m_err,
+	    "\t-e evaluate expr and return status\n"
 	    "\t-f force raw file debugging mode\n"
 	    "\t-k force kernel debugging mode\n"
 	    "\t-m disable demand-loading of module symbols\n"
@@ -415,6 +417,7 @@ main(int argc, char *argv[], char *envp[])
 	char *p;
 
 	const char *Iflag = NULL, *Lflag = NULL, *Vflag = NULL, *pidarg = NULL;
+	const char *eflag = NULL;
 	int fflag = 0, Kflag = 0, Rflag = 0, Sflag = 0, Oflag = 0, Uflag = 0;
 
 	int ttylike;
@@ -503,8 +506,15 @@ main(int argc, char *argv[], char *envp[])
 
 	while (optind < argc) {
 		while ((c = getopt(argc, argv,
-		    "fkmo:p:s:uwyACD:FI:KL:MOP:R:SUV:W")) != (int)EOF) {
+		    "e:fkmo:p:s:uwyACD:FI:KL:MOP:R:SUV:W")) != (int)EOF) {
 			switch (c) {
+			case 'e':
+				if (eflag != NULL) {
+					warn("-e already specified\n");
+					terminate(2);
+				}
+				eflag = optarg;
+				break;
 			case 'f':
 				fflag++;
 				tgt_ctor = mdb_rawfile_tgt_create;
@@ -684,6 +694,12 @@ main(int argc, char *argv[], char *envp[])
 		control_kmdb(Kflag);
 		terminate(0);
 		/*NOTREACHED*/
+	}
+
+	if (eflag != NULL) {
+		IOP_CLOSE(in_io);
+		in_io = mdb_strio_create(eflag);
+		mdb.m_lastret = 0;
 	}
 
 	/*
@@ -1058,7 +1074,8 @@ tcreate:
 		continue;
 	}
 
-	terminate((status == MDB_ERR_QUIT || status == 0) ? 0 : 1);
+	terminate((status == MDB_ERR_QUIT || status == 0) ?
+	    (eflag != NULL && mdb.m_lastret != 0 ? 1 : 0) : 1);
 	/*NOTREACHED*/
 	return (0);
 

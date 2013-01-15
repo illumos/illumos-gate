@@ -5,6 +5,50 @@
  *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ */
+
+/*
+ * ipfilter kernel module mutexes and locking:
+ *
+ * Enabling ipfilter creates a per-netstack ipf_stack_t object that is
+ * stored in the ipf_stacks list, which is protected by ipf_stack_lock.
+ * ipf_stack_t objects are accessed in three contexts:
+ *
+ * 1) administering that filter (eg: ioctls handled with iplioctl())
+ * 2) reading log data (eg: iplread() / iplwrite())
+ * 3) filtering packets (eg: ipf_hook4_* and ipf_hook6_* pfhooks
+ *    functions)
+ *
+ * Each ipf_stack_t has a RW lock, ifs_ipf_global, protecting access to the
+ * whole structure. The structure also has locks protecting the various
+ * data structures used for filtering. The following guidelines should be
+ * followed for ipf_stack_t locks:
+ *
+ * - ipf_stack_lock must be held when accessing the ipf_stacks list
+ * - ipf_stack_lock should be held before acquiring ifs_ipf_global for
+ *   a stack (the exception to this is ipf_stack_destroy(), which removes
+ *   the ipf_stack_t from the list, then drops ipf_stack_lock before
+ *   acquiring ifs_ipf_global)
+ * - ifs_ipf_global must be held when accessing an ipf_stack_t in that list:
+ *   - The write lock is held only during stack creation / destruction
+ *   - The read lock should be held for all other accesses
+ * - To alter the filtering data in the administrative context, one must:
+ *   - acquire the read lock for ifs_ipf_global
+ *   - then acquire the write lock for the data in question
+ * - In the filtering path, the read lock needs to be held for each type of
+ *   filtering data used
+ * - ifs_ipf_global does not need to be held in the filtering path:
+ *   - The filtering hooks don't need to modify the stack itself
+ *   - The ipf_stack_t will not be destroyed until the hooks are unregistered.
+ *     This requires a write lock on the hook, ensuring that no active hooks
+ *     (eg: the filtering path) are running, and that the hooks won't be run
+ *     afterward.
+ *
+ * Note that there is a deadlock possible when calling net_hook_register()
+ * or net_hook_unregister() with ifs_ipf_global held: see the comments in
+ * iplattach() and ipldetach() for details.
  */
 
 #include <sys/systm.h>
@@ -73,7 +117,8 @@ static	int	ipf_property_g_update __P((dev_info_t *));
 static	char	*ipf_devfiles[] = { IPL_NAME, IPNAT_NAME, IPSTATE_NAME,
 				    IPAUTH_NAME, IPSYNC_NAME, IPSCAN_NAME,
 				    IPLOOKUP_NAME, NULL };
-
+extern void 	*ipf_state;	/* DDI state */
+extern vmem_t	*ipf_minor;	/* minor number arena */
 
 static struct cb_ops ipf_cb_ops = {
 	iplopen,
@@ -429,13 +474,8 @@ ipf_stack_create(const netid_t id)
 
 
 /*
- * This function should only ever be used to find the pointer to the
- * ipfilter stack structure for the zone that is currently being
- * executed... so if you're running in the context of zone 1, you
- * should not attempt to find the ipf_stack_t for zone 0 or 2 or
- * anything else but 1.  In that way, the returned pointer is safe
- * as it will only be nuked when the instance is destroyed as part
- * of the final shutdown of a zone.
+ * This function returns with the ipf_stack_t's ifs_ipf_global
+ * read lock held (if the stack is found).
  */
 ipf_stack_t *
 ipf_find_stack(const zoneid_t zone)
@@ -446,6 +486,10 @@ ipf_find_stack(const zoneid_t zone)
 	for (ifs = ipf_stacks; ifs != NULL; ifs = ifs->ifs_next) {
 		if (ifs->ifs_zone == zone)
 			break;
+	}
+
+	if (ifs != NULL) {
+		READ_ENTER(&ifs->ifs_ipf_global);
 	}
 	mutex_exit(&ipf_stack_lock);
 	return (ifs);
@@ -586,27 +630,39 @@ ddi_attach_cmd_t cmd;
 
 		(void) ipf_property_g_update(dip);
 
+		if (ddi_soft_state_init(&ipf_state, sizeof (ipf_devstate_t), 1)
+		    != 0) {
+			ddi_prop_remove_all(dip);
+			return (DDI_FAILURE);
+		}
+
 		for (i = 0; ((s = ipf_devfiles[i]) != NULL); i++) {
 			s = strrchr(s, '/');
 			if (s == NULL)
 				continue;
 			s++;
 			if (ddi_create_minor_node(dip, s, S_IFCHR, i,
-			    DDI_PSEUDO, 0) ==
-			    DDI_FAILURE) {
-				ddi_remove_minor_node(dip, NULL);
+			    DDI_PSEUDO, 0) == DDI_FAILURE)
 				goto attach_failed;
-			}
 		}
 
 		ipf_dev_info = dip;
 
 		ipfncb = net_instance_alloc(NETINFO_VERSION);
+		if (ipfncb == NULL)
+			goto attach_failed;
+
 		ipfncb->nin_name = "ipf";
 		ipfncb->nin_create = ipf_stack_create;
 		ipfncb->nin_destroy = ipf_stack_destroy;
 		ipfncb->nin_shutdown = ipf_stack_shutdown;
-		i = net_instance_register(ipfncb);
+		if (net_instance_register(ipfncb) == DDI_FAILURE) {
+			net_instance_free(ipfncb);
+			goto attach_failed;
+		}
+
+		ipf_minor = vmem_create("ipf_minor", (void *)1, UINT32_MAX - 1,
+		    1, NULL, NULL, NULL, 0, VM_SLEEP | VMC_IDENTIFIER);
 
 #ifdef IPFDEBUG
 		cmn_err(CE_CONT, "IP Filter:stack_create callback_reg=%d", i);
@@ -619,7 +675,9 @@ ddi_attach_cmd_t cmd;
 	}
 
 attach_failed:
+	ddi_remove_minor_node(dip, NULL);
 	ddi_prop_remove_all(dip);
+	ddi_soft_state_fini(&ipf_state);
 	return (DDI_FAILURE);
 }
 
@@ -651,6 +709,9 @@ ddi_detach_cmd_t cmd;
 			cmn_err(CE_CONT, "IP Filter: still attached (%d)\n", i);
 			return (DDI_FAILURE);
 		}
+
+		vmem_destroy(ipf_minor);
+		ddi_soft_state_fini(&ipf_state);
 
 		(void) net_instance_unregister(ipfncb);
 		net_instance_free(ipfncb);

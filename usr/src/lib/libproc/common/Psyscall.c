@@ -22,8 +22,9 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2013, Joyent Inc. All rights reserved.
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -352,6 +353,16 @@ Psyscall(struct ps_prochandle *P,
 #ifdef _LP64
 	if (model == PR_MODEL_LP64) {
 		sp = P->status.pr_lwp.pr_reg[R_SP] + STACK_BIAS;
+#if defined(__amd64)
+		/*
+		 * To offset the expense of computerised subtraction, the AMD64
+		 * ABI allows a process the use of a 128-byte area beyond the
+		 * location pointed to by %rsp.  We must advance the agent's
+		 * stack pointer by at least the size of this region or else it
+		 * may corrupt this temporary storage.
+		 */
+		sp -= STACK_RESERVE64;
+#endif
 		sp = PSTACK_ALIGN64(sp);
 	} else {
 #endif

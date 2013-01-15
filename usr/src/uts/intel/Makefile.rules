@@ -61,6 +61,9 @@ $(OBJS_DIR)/%.o:		$(SRC)/common/util/i386/%.s
 $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/brand/sn1/%.s
 	$(COMPILE.s) -o $@ $<
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/brand/sngl/%.s
+	$(COMPILE.s) -o $@ $<
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/brand/solaris10/%.s
 	$(COMPILE.s) -o $@ $<
 
@@ -321,6 +324,9 @@ $(LINTS_DIR)/%.ln:		$(SRC)/common/util/i386/%.s
 	@($(LHEAD) $(LINT.s) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/brand/sn1/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/brand/sngl/%.s
 	@($(LHEAD) $(LINT.s) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/brand/solaris10/%.s

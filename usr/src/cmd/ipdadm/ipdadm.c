@@ -166,7 +166,7 @@ ipdadm_info(int argc, char *argv[])
 	if (ipd_status_get_config(hdl, g_zid, &icp) != 0) {
 		if (ipd_errno == EIPD_ZC_NOENT) {
 			(void) printf("zone %s does not exist or has no "
-			    "ipd actions enabled", g_zonename);
+			    "ipd actions enabled\n", g_zonename);
 			return (E_SUCCESS);
 		}
 		(void) fprintf(stderr, "%s: failed to get info: %s\n",

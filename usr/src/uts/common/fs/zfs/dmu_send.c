@@ -643,6 +643,19 @@ recv_new_check(void *arg1, void *arg2, dmu_tx_t *tx)
 			return (ENODEV);
 	}
 
+	/*
+	 * Check filesystem and snapshot limits before receiving. We'll recheck
+	 * again at the end, but might as well abort before receiving if we're
+	 * already over the limit.
+	 */
+	err = dsl_dir_fscount_check(dd, 1, NULL, rbsa->cr);
+	if (err != 0)
+		return (err);
+
+	err = dsl_snapcount_check(dd, 1, NULL, rbsa->cr);
+	if (err != 0)
+		return (err);
+
 	return (0);
 }
 
@@ -668,6 +681,10 @@ recv_new_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 	spa_history_log_internal_ds(rbsa->ds, "receive new", tx, "");
 }
 
+/*
+ * Note that we do not check the file system limit with dsl_dir_fscount_check
+ * because the temporary %clones don't count against that limit.
+ */
 /* ARGSUSED */
 static int
 recv_existing_check(void *arg1, void *arg2, dmu_tx_t *tx)
@@ -725,6 +742,11 @@ recv_existing_check(void *arg1, void *arg2, dmu_tx_t *tx)
 		/* if full, most recent snapshot must be $ORIGIN */
 		if (ds->ds_phys->ds_prev_snap_txg >= TXG_INITIAL)
 			return (ENODEV);
+
+		/* Check snapshot limit before receiving */
+		err = dsl_snapcount_check(ds->ds_dir, 1, NULL, rbsa->cr);
+		if (err != 0)
+			return (err);
 	}
 
 	/* temporary clone name must not exist */
@@ -1547,6 +1569,8 @@ struct recvendsyncarg {
 	char *tosnap;
 	uint64_t creation_time;
 	uint64_t toguid;
+	boolean_t is_new;
+	cred_t *cr;
 };
 
 static int
@@ -1555,7 +1579,16 @@ recv_end_check(void *arg1, void *arg2, dmu_tx_t *tx)
 	dsl_dataset_t *ds = arg1;
 	struct recvendsyncarg *resa = arg2;
 
-	return (dsl_dataset_snapshot_check(ds, resa->tosnap, tx));
+	if (resa->is_new) {
+		/* re-check the filesystem limit now that recv is complete */
+		int err;
+
+		err = dsl_dir_fscount_check(ds->ds_dir, 1, NULL, resa->cr);
+		if (err != 0)
+			return (err);
+	}
+
+	return (dsl_dataset_snapshot_check(ds, resa->tosnap, 1, tx, resa->cr));
 }
 
 static void
@@ -1563,6 +1596,11 @@ recv_end_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 {
 	dsl_dataset_t *ds = arg1;
 	struct recvendsyncarg *resa = arg2;
+
+	if (resa->is_new) {
+		/* update the filesystem counts */
+		dsl_dir_fscount_adjust(ds->ds_dir->dd_parent, tx, 1, B_TRUE);
+	}
 
 	dsl_dataset_snapshot_sync(ds, resa->tosnap, tx);
 
@@ -1624,6 +1662,8 @@ dmu_recv_existing_end(dmu_recv_cookie_t *drc)
 	resa.creation_time = drc->drc_drrb->drr_creation_time;
 	resa.toguid = drc->drc_drrb->drr_toguid;
 	resa.tosnap = drc->drc_tosnap;
+	resa.is_new = B_FALSE;
+	resa.cr = CRED();
 
 	err = dsl_sync_task_do(ds->ds_dir->dd_pool,
 	    recv_end_check, recv_end_sync, ds, &resa, 3);
@@ -1659,6 +1699,8 @@ dmu_recv_new_end(dmu_recv_cookie_t *drc)
 	resa.creation_time = drc->drc_drrb->drr_creation_time;
 	resa.toguid = drc->drc_drrb->drr_toguid;
 	resa.tosnap = drc->drc_tosnap;
+	resa.is_new = B_TRUE;
+	resa.cr = CRED();
 
 	err = dsl_sync_task_do(ds->ds_dir->dd_pool,
 	    recv_end_check, recv_end_sync, ds, &resa, 3);

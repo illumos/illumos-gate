@@ -1,0 +1,10 @@
+sizeof (gift_t) = 0x28
+0 gift_t {
+    0 uintptr_t [7] stone 
+    20 void **white 
+}
+sizeof (struct gift) = 0x28
+0 struct gift {
+    0 uintptr_t [7] stone 
+    20 void **white 
+}

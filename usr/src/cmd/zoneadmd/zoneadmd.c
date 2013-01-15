@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, Joyent Inc. All rights reserved.
+ * Copyright (c) 2013, Joyent Inc. All rights reserved.
  */
 
 /*
@@ -775,6 +775,10 @@ setup_subproc_env(boolean_t debug)
 	struct zone_devtab dtab;
 	char net_resources[MAXNAMELEN * 2];
 	char dev_resources[MAXNAMELEN * 2];
+
+	/* snap_hndl is null when called through the set_brand_env code path */
+	if (snap_hndl == NULL)
+		return (Z_OK);
 
 	net_resources[0] = '\0';
 	if ((res = zonecfg_setnwifent(snap_hndl)) != Z_OK)
@@ -1857,13 +1861,17 @@ out:
  *
  * Because the env_vars string values become part of the environment, the
  * string is static and we don't free it.
+ *
+ * This function is always called before zoneadmd forks and makes itself
+ * exclusive, so it is possible there could more than one instance of zoneadmd
+ * running in parallel at this point. Thus, we have no zonecfg snapshot and
+ * shouldn't take one yet (i.e. snap_hndl is NULL). Thats ok, since we don't
+ * need any zonecfg info to query for a brand-specific env value.
  */
 static int
 set_brand_env(zlog_t *zlogp)
 {
 	int ret = 0;
-	int err;
-	boolean_t snapped = B_FALSE;
 	static char *env_vars = NULL;
 	char buf[2 * MAXPATHLEN];
 
@@ -1873,32 +1881,8 @@ set_brand_env(zlog_t *zlogp)
 	if (snprintf(buf, sizeof (buf), "%s env", query_hook) > sizeof (buf))
 		return (-1);
 
-	if (snap_hndl == NULL) {
-		if ((snap_hndl = zonecfg_init_handle()) == NULL) {
-			zerror(zlogp, B_TRUE,
-			    "getting zone configuration handle");
-			return (-1);
-		}
-		snapped = B_TRUE;
-		if ((err = zonecfg_create_snapshot(zone_name)) != Z_OK) {
-			zerror(zlogp, B_FALSE, "unable to create snapshot: %s",
-			    zonecfg_strerror(err));
-			ret = -1;
-			goto done;
-		}
-		if ((err = zonecfg_get_snapshot_handle(zone_name, snap_hndl))
-		    != Z_OK) {
-			zerror(zlogp, B_FALSE, "unable to get snapshot: %s",
-			    zonecfg_strerror(err));
-			ret = -1;
-			goto done;
-		}
-	}
-
-	if (do_subproc(zlogp, buf, &env_vars, B_FALSE) != 0) {
-		ret = -1;
-		goto done;
-	}
+	if (do_subproc(zlogp, buf, &env_vars, B_FALSE) != 0)
+		return (-1);
 
 	if (env_vars != NULL) {
 		char *sp;
@@ -1911,16 +1895,6 @@ set_brand_env(zlog_t *zlogp)
 			}
 			sp = strtok(NULL, "\t");
 		}
-	}
-
-done:
-	if (snapped) {
-		if ((err = zonecfg_destroy_snapshot(zone_name)) != Z_OK)
-			zerror(zlogp, B_FALSE, "destroying snapshot: %s",
-			    zonecfg_strerror(err));
-
-		zonecfg_fini_handle(snap_hndl);
-		snap_hndl = NULL;
 	}
 
 	return (ret);

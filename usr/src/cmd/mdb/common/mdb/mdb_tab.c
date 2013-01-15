@@ -499,7 +499,6 @@ tab_complete_type(mdb_ctf_id_t id, void *arg)
 		return (0);
 
 	if (flags & MDB_TABC_NOARRAY && rkind == CTF_K_ARRAY)
-
 		return (0);
 
 	(void) mdb_ctf_type_name(id, buf, sizeof (buf));
@@ -526,6 +525,8 @@ mdb_tab_complete_type(mdb_tab_cookie_t *mcp, const char *name, uint_t flags)
 		mdb_tab_setmbase(mcp, name);
 
 	(void) mdb_tgt_object_iter(t, mdb_tab_complete_module, mcp);
+	(void) mdb_ctf_type_iter(MDB_CTF_SYNTHETIC_ITER, tab_complete_type,
+	    mcp);
 	return (0);
 }
 

@@ -340,6 +340,7 @@ COMMON_SUBDIRS = \
 	lib/libbe \
 	lib/pylibbe \
 	lib/brand/sn1 \
+	lib/brand/sngl \
 	lib/brand/solaris10 \
 	lib/crypt_modules \
 	lib/extendedFILE \

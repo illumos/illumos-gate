@@ -5,6 +5,8 @@
  *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
  */
 
 #ifdef __FreeBSD__
@@ -162,6 +164,10 @@ static	int	sort_dstip __P((const void *, const void *));
 static	int	sort_dstpt __P((const void *, const void *));
 #endif
 
+#if SOLARIS
+#include "ipfzone.h"
+#endif
+
 
 static void usage(name)
 char *name;
@@ -176,6 +182,9 @@ char *name;
 	fprintf(stderr, "       %s -t [-6C] ", name);
 #else
 	fprintf(stderr, "       %s -t [-C] ", name);
+#endif
+#ifdef	SOLARIS
+	fprintf(stderr, "[-z zonename] ");
 #endif
 	fprintf(stderr, "[-D destination address] [-P protocol] [-S source address] [-T refresh time]\n");
 	exit(1);
@@ -207,9 +216,9 @@ char *argv[];
 	u_32_t frf;
 
 #ifdef	USE_INET6
-	options = "6aACdfghIilnostvD:M:N:P:RS:T:";
+	options = "6aACdfghIilnostvD:M:N:P:RS:T:z:";
 #else
-	options = "aACdfghIilnostvD:M:N:P:RS:T:";
+	options = "aACdfghIilnostvD:M:N:P:RS:T:z:";
 #endif
 
 	saddr.in4.s_addr = INADDR_ANY; 	/* default any v4 source addr */
@@ -223,7 +232,7 @@ char *argv[];
 	opterr = 0;
 
 	/*
-	 * Parse these two arguments now lest there be any buffer overflows
+	 * Parse these three arguments now lest there be any buffer overflows
 	 * in the parsing of the rest.
 	 */
 	myoptind = optind;
@@ -238,6 +247,14 @@ char *argv[];
 			kern = optarg;
 			live_kernel = 0;
 			break;
+		case 'z' :
+#if SOLARIS
+			setzonename(optarg);
+#else
+			usage(argv[0]);
+			break;
+#endif
+			break;
 		}
 	}
 	optind = myoptind;
@@ -247,11 +264,23 @@ char *argv[];
 			perror("open(IPSTATE_NAME)");
 			exit(-1);
 		}
+#if SOLARIS
+		if (setzone(state_fd) != 0) {
+			close(state_fd);
+			exit(-1);
+		}
+#endif
 		if ((ipf_fd = open(device, O_RDONLY)) == -1) {
 			fprintf(stderr, "open(%s)", device);
 			perror("");
 			exit(-1);
 		}
+#if SOLARIS
+		if (setzone(ipf_fd) != 0) {
+			close(ipf_fd);
+			exit(-1);
+		}
+#endif
 	}
 
 	if (kern != NULL || memf != NULL) {
@@ -359,6 +388,8 @@ char *argv[];
 		case 'v' :
 			opts |= OPT_VERBOSE;
 			opts |= OPT_UNDEF;
+			break;
+		case 'z' :
 			break;
 		default :
 			usage(argv[0]);
@@ -481,6 +512,13 @@ u_32_t *frfp;
 			perror("open");
 			exit(-1);
 		}
+
+#if SOLARIS
+		if (setzone(ipf_fd) != 0) {
+			close(ipf_fd);
+			exit(-1);
+		}
+#endif
 
 		bzero((caddr_t)&ipfo, sizeof(ipfo));
 		ipfo.ipfo_rev = IPFILTER_VERSION;

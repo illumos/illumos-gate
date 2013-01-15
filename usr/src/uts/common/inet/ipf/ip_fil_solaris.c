@@ -4,6 +4,8 @@
  * See the IPFILTER.LICENCE file for details on licencing.
  *
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
  */
 
 #if !defined(lint)
@@ -101,6 +103,8 @@ u_long		*ip_forwarding = NULL;
 #endif
 #endif
 
+vmem_t	*ipf_minor;	/* minor number arena */
+void 	*ipf_state;	/* DDI state */
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipldetach                                                   */
@@ -520,35 +524,52 @@ int *rp;
 	minor_t unit;
 	u_int enable;
 	ipf_stack_t *ifs;
+	zoneid_t zid;
+	ipf_devstate_t *isp;
 
 #ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "iplioctl(%x,%x,%x,%d,%x,%d)\n",
 		dev, cmd, data, mode, cp, rp);
 #endif
 	unit = getminor(dev);
-	if (IPL_LOGMAX < unit)
+
+	isp = ddi_get_soft_state(ipf_state, unit);
+	if (isp == NULL) {
 		return ENXIO;
+	}
+	unit = isp->ipfs_minor;
+
+	zid = crgetzoneid(cp);
+	if (cmd == SIOCIPFZONESET) {
+		if (zid == GLOBAL_ZONEID)
+			return fr_setzoneid(isp, (caddr_t) data);
+		return EACCES;
+	}
+
+	if (zid == GLOBAL_ZONEID)
+		zid = isp->ipfs_zoneid;
 
         /*
-	 * As we're calling ipf_find_stack in user space, from a given zone
-	 * to find the stack pointer for this zone, there is no need to have
-	 * a hold/refence count here.
+	 * ipf_find_stack returns with a read lock on ifs_ipf_global
 	 */
-	ifs = ipf_find_stack(crgetzoneid(cp));
-	ASSERT(ifs != NULL);
+	ifs = ipf_find_stack(zid);
+	if (ifs == NULL) {
+		return ENXIO;
+	}
 
 	if (ifs->ifs_fr_running <= 0) {
 		if (unit != IPL_LOGIPF) {
+			RWLOCK_EXIT(&ifs->ifs_ipf_global);
 			return EIO;
 		}
 		if (cmd != SIOCIPFGETNEXT && cmd != SIOCIPFGET &&
 		    cmd != SIOCIPFSET && cmd != SIOCFRENB &&
 		    cmd != SIOCGETFS && cmd != SIOCGETFF) {
+			RWLOCK_EXIT(&ifs->ifs_ipf_global);
 			return EIO;
 		}
 	}
 
-	READ_ENTER(&ifs->ifs_ipf_global);
 	if (ifs->ifs_fr_enable_active != 0) {
 		RWLOCK_EXIT(&ifs->ifs_ipf_global);
 		return EBUSY;
@@ -849,7 +870,9 @@ dev_t *devp;
 int flags, otype;
 cred_t *cred;
 {
+	ipf_devstate_t *isp;
 	minor_t min = getminor(*devp);
+	minor_t minor;
 
 #ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "iplopen(%x,%x,%x,%x)\n", devp, flags, otype, cred);
@@ -857,8 +880,25 @@ cred_t *cred;
 	if (!(otype & OTYP_CHR))
 		return ENXIO;
 
-	min = (IPL_LOGMAX < min) ? ENXIO : 0;
-	return min;
+	if (IPL_LOGMAX < min)
+		return ENXIO;
+
+	minor = (minor_t)(uintptr_t)vmem_alloc(ipf_minor, 1,
+	    VM_BESTFIT | VM_SLEEP);
+
+	if (ddi_soft_state_zalloc(ipf_state, minor) != 0) {
+		vmem_free(ipf_minor, (void *)(uintptr_t)minor, 1);
+		return ENXIO;
+	}
+
+	*devp = makedevice(getmajor(*devp), minor);
+	isp = ddi_get_soft_state(ipf_state, minor);
+	VERIFY(isp != NULL);
+
+	isp->ipfs_minor = min;
+	isp->ipfs_zoneid = GLOBAL_ZONEID;
+
+	return 0;
 }
 
 
@@ -874,8 +914,13 @@ cred_t *cred;
 	cmn_err(CE_CONT, "iplclose(%x,%x,%x,%x)\n", dev, flags, otype, cred);
 #endif
 
-	min = (IPL_LOGMAX < min) ? ENXIO : 0;
-	return min;
+	if (IPL_LOGMAX < min)
+		return ENXIO;
+
+	ddi_soft_state_free(ipf_state, min);
+	vmem_free(ipf_minor, (void *)(uintptr_t)min, 1);
+
+	return 0;
 }
 
 #ifdef	IPFILTER_LOG
@@ -893,30 +938,48 @@ cred_t *cp;
 {
 	ipf_stack_t *ifs;
 	int ret;
+	minor_t unit;
+	zoneid_t zid;
+	ipf_devstate_t *isp;
+
+	unit = getminor(dev);
+	isp = ddi_get_soft_state(ipf_state, unit);
+	if (isp == NULL) {
+		return ENXIO;
+	}
+	unit = isp->ipfs_minor;
+
+	zid = crgetzoneid(cp);
+	if (zid == GLOBAL_ZONEID) {
+		zid = isp->ipfs_zoneid;
+	}
 
         /*
-	 * As we're calling ipf_find_stack in user space, from a given zone
-	 * to find the stack pointer for this zone, there is no need to have
-	 * a hold/refence count here.
+	 * ipf_find_stack returns with a read lock on ifs_ipf_global
 	 */
-	ifs = ipf_find_stack(crgetzoneid(cp));
-	ASSERT(ifs != NULL);
+	ifs = ipf_find_stack(zid);
+	if (ifs == NULL) {
+		return ENXIO;
+	}
 
 # ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "iplread(%x,%x,%x)\n", dev, uio, cp);
 # endif
 
 	if (ifs->ifs_fr_running < 1) {
+		RWLOCK_EXIT(&ifs->ifs_ipf_global);
 		return EIO;
 	}
 
 # ifdef	IPFILTER_SYNC
-	if (getminor(dev) == IPL_LOGSYNC) {
+	if (unit == IPL_LOGSYNC) {
+		RWLOCK_EXIT(&ifs->ifs_ipf_global);
 		return ipfsync_read(uio);
 	}
 # endif
 
-	ret = ipflog_read(getminor(dev), uio, ifs);
+	ret = ipflog_read(unit, uio, ifs);
+	RWLOCK_EXIT(&ifs->ifs_ipf_global);
 	return ret;
 }
 #endif /* IPFILTER_LOG */
@@ -934,20 +997,36 @@ register struct uio *uio;
 cred_t *cp;
 {
 	ipf_stack_t *ifs;
+	minor_t unit;
+	zoneid_t zid;
+	ipf_devstate_t *isp;
+
+	unit = getminor(dev);
+	isp = ddi_get_soft_state(ipf_state, unit);
+	if (isp == NULL) {
+		return ENXIO;
+	}
+	unit = isp->ipfs_minor;
 
         /*
-	 * As we're calling ipf_find_stack in user space, from a given zone
-	 * to find the stack pointer for this zone, there is no need to have
-	 * a hold/refence count here.
+	 * ipf_find_stack returns with a read lock on ifs_ipf_global
 	 */
-	ifs = ipf_find_stack(crgetzoneid(cp));
-	ASSERT(ifs != NULL);
+	zid = crgetzoneid(cp);
+	if (zid == GLOBAL_ZONEID) {
+		zid = isp->ipfs_zoneid;
+	}
+
+	ifs = ipf_find_stack(zid);
+	if (ifs == NULL) {
+		return ENXIO;
+	}
 
 #ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "iplwrite(%x,%x,%x)\n", dev, uio, cp);
 #endif
 
 	if (ifs->ifs_fr_running < 1) {
+		RWLOCK_EXIT(&ifs->ifs_ipf_global);
 		return EIO;
 	}
 
@@ -958,6 +1037,7 @@ cred_t *cp;
 	dev = dev;	/* LINT */
 	uio = uio;	/* LINT */
 	cp = cp;	/* LINT */
+	RWLOCK_EXIT(&ifs->ifs_ipf_global);
 	return ENXIO;
 }
 
