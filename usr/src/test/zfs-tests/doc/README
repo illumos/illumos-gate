@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2013 by Delphix. All rights reserved.
 #
 
 ZFS Test Suite README
@@ -60,7 +60,7 @@ Once the pre-requisites are satisfied, simply run the zfstest script:
 
 When the '-q' option is specified, it is passed to run(1) which causes output
 to be written to the console only for tests that do not pass and the results
-summary. 
+summary.
 
 The ZFS Test Suite allows the user to specify a subset of the tests via a
 runfile. The format of the runfile is explained in run(1), and the files that
