@@ -98,10 +98,6 @@ static volatile int  debug_fw_faults_after_ocr_g  = 0;
 static volatile int  debug_consecutive_timeout_after_ocr_g  = 0;
 #endif
 
-#if 0
-/* Enable OCR on firmware fault */
-static volatile int  debug_support_ocr_isr_g  = 0;
-#endif
 #pragma weak scsi_hba_open
 #pragma weak scsi_hba_close
 #pragma weak scsi_hba_ioctl
@@ -298,7 +294,6 @@ static struct dev_ops mrsas_ops = {
 #else	/* __sparc */
 	mrsas_quiesce	/* quiesce */
 #endif	/* __sparc */
-
 };
 
 static struct modldrv modldrv = {
@@ -321,9 +316,6 @@ static struct ddi_device_acc_attr endian_attr = {
 };
 
 /* Use the LSI Fast Path for the 2208 (tbolt) commands. */
-unsigned int enable_fp = 1;
-
-
 unsigned int enable_fp = 1;
 
 
@@ -670,8 +662,6 @@ mrsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 				    "enable_fp = %d, Fast-Path disabled.\n",
 				    enable_fp);
 			}
-			ddi_prop_free(data);
-		}
 
 			ddi_prop_free(data);
 		}
@@ -1445,12 +1435,7 @@ mrsas_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 
 	ioctl = (struct mrsas_ioctl *)kmem_zalloc(sizeof (struct mrsas_ioctl),
 	    KM_SLEEP);
-	if (ioctl == NULL) {
-		/* Failed to allocate memory for ioctl	*/
-		con_log(CL_ANN, (CE_WARN, "mr_sas_ioctl: "
-		    "failed to allocate memory for ioctl"));
-		return (ENXIO);
-	}
+	ASSERT(ioctl);
 
 	switch ((uint_t)cmd) {
 		case MRSAS_IOCTL_FIRMWARE:
@@ -1477,9 +1462,6 @@ mrsas_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 
 			break;
 		case MRSAS_IOCTL_AEN:
-			con_log(CL_ANN,
-			    (CE_NOTE, "mrsas_ioctl: IOCTL Register AEN.\n"));
-
 			if (ddi_copyin((void *) arg, &aen,
 			    sizeof (struct mrsas_aen), mode)) {
 				con_log(CL_ANN, (CE_WARN,
@@ -2067,7 +2049,6 @@ mrsas_tran_reset(struct scsi_address *ap, int level)
 		return (DDI_SUCCESS);
 	}
 }
-#endif
 
 /*
  * tran_getcap - get one of a set of SCSA-defined capabilities
@@ -3242,14 +3223,12 @@ free_space_for_mfi(struct mrsas_instance *instance)
 	mrsas_free_cmd_pool(instance);
 }
 
-
 /*
- * mrsas_alloc_cmd_pool
+ * alloc_space_for_mfi
  */
-int
-mrsas_alloc_cmd_pool(struct mrsas_instance *instance)
+static int
+alloc_space_for_mfi(struct mrsas_instance *instance)
 {
-
 	/* Allocate command pool (memory for cmd_list & individual commands) */
 	if (mrsas_alloc_cmd_pool(instance)) {
 		cmn_err(CE_WARN, "error creating cmd pool");
@@ -3691,14 +3670,8 @@ mrsas_init_adapter(struct mrsas_instance *instance)
 		    PAGESIZE / 512;
 	}
 
-	if (ctrl_info.properties.on_off_properties & DISABLE_OCR_PROP_FLAG) {
+	if (ctrl_info.properties.on_off_properties & DISABLE_OCR_PROP_FLAG)
 		instance->disable_online_ctrl_reset = 1;
-		con_log(CL_ANN1,
-		    (CE_NOTE, "Disable online control Flag is set\n"));
-	} else {
-		con_log(CL_ANN1,
-		    (CE_NOTE, "Disable online control Flag is not set\n"));
-	}
 
 	return (DDI_SUCCESS);
 
@@ -4807,11 +4780,6 @@ mrsas_alloc_dma_obj(struct mrsas_instance *instance, dma_obj_t *obj,
 
 		return (-1);
 	}
-	if (obj->dma_handle == NULL) {
-		/* XXX KEBE ASKS --> fm_service_impact()? */
-		con_log(CL_ANN, (CE_WARN, "Failed : ddi_dma_mem_alloc"));
-		return (-1);
-	}
 
 	if (ddi_dma_addr_bind_handle(obj->dma_handle, NULL, obj->buffer,
 	    obj->size, DDI_DMA_RDWR | DDI_DMA_STREAMING, DDI_DMA_SLEEP,
@@ -4822,14 +4790,6 @@ mrsas_alloc_dma_obj(struct mrsas_instance *instance, dma_obj_t *obj,
 
 		con_log(CL_ANN, (CE_WARN, "Failed : ddi_dma_addr_bind_handle"));
 
-		return (-1);
-	}
-	if (obj->acc_handle == NULL) {
-		/* XXX KEBE ASKS --> fm_service_impact()? */
-		ddi_dma_mem_free(&obj->acc_handle);
-		ddi_dma_free_handle(&obj->dma_handle);
-
-		con_log(CL_ANN, (CE_WARN, "Failed : ddi_dma_addr_bind_handle"));
 		return (-1);
 	}
 
@@ -7650,11 +7610,6 @@ mrsas_config_ld(struct mrsas_instance *instance, uint16_t tgt,
 	}
 
 	sd = kmem_zalloc(sizeof (struct scsi_device), KM_SLEEP);
-	if (sd == NULL) {
-		con_log(CL_ANN1, (CE_WARN, "mrsas_config_ld: "
-		    "failed to allocate mem for scsi_device"));
-		return (NDI_FAILURE);
-	}
 	sd->sd_address.a_hba_tran = instance->tran;
 	sd->sd_address.a_target = (uint16_t)tgt;
 	sd->sd_address.a_lun = (uint8_t)lun;

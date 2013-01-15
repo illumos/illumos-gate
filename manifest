@@ -247,9 +247,6 @@ f etc/auto_master 0644 root bin
 f etc/bootrc 0755 root sys
 d etc/brand 0755 root sys
 d etc/certs 0755 root sys
-f etc/certs/SUNWObjectCA 0644 root sys
-f etc/certs/SUNWSolarisCA 0644 root sys
-f etc/certs/SUNW_SunOS_5.10 0644 root sys
 d etc/cron.d 0755 root sys
 f etc/cron.d/.proto 0744 root sys
 f etc/cron.d/at.deny 0644 root sys
@@ -257,9 +254,6 @@ f etc/cron.d/cron.deny 0644 root sys
 f etc/cron.d/queuedefs 0644 root sys
 d etc/crypto 0755 root sys
 d etc/crypto/certs 0755 root sys
-f etc/crypto/certs/CA 0644 root sys
-f etc/crypto/certs/SUNWObjectCA 0644 root sys
-f etc/crypto/certs/SUNW_SunOS_5.10 0644 root sys
 d etc/crypto/crls 0755 root sys
 f etc/crypto/kcf.conf 0644 root sys
 f etc/crypto/kmf.conf 0644 root sys
