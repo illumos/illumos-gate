@@ -143,7 +143,7 @@ lofi_compress_info_t lofi_compress_table[LOFI_COMPRESS_FUNCTIONS] = {
 #define	KILOBYTE		1024
 #define	MEGABYTE		(KILOBYTE * KILOBYTE)
 #define	GIGABYTE		(KILOBYTE * MEGABYTE)
-#define	LIBZ			"libz.so"
+#define	LIBZ			"libz.so.1"
 
 static void
 usage(const char *pname)
