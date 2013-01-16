@@ -684,6 +684,8 @@ mount_early_fs(void *data, const char *spec, const char *dir,
 		char opt_buf[MAX_MNTOPT_STR];
 		int optlen = 0;
 		int mflag = MS_DATA;
+		int i;
+		int ret;
 
 		(void) ct_tmpl_clear(tmpl_fd);
 		/*
@@ -711,9 +713,26 @@ mount_early_fs(void *data, const char *spec, const char *dir,
 			optlen = MAX_MNTOPT_STR;
 			mflag = MS_OPTIONSTR;
 		}
-		if (mount(spec, dir, mflag, fstype, NULL, 0, opt, optlen) != 0)
-			_exit(errno);
-		_exit(0);
+
+		/*
+		 * There is an obscure race condition which can cause mount
+		 * to return EBUSY. This happens for example on the mount
+		 * of the zone's /etc/svc/volatile file system if there is
+		 * a GZ process running svcs -Z, which will touch the
+		 * mountpoint, just as we're trying to do the mount. To cope
+		 * with this, we retry up to 3 times to let this transient
+		 * process get out of the way.
+		 */
+		for (i = 0; i < 3; i++) {
+			ret = 0;
+			if (mount(spec, dir, mflag, fstype, NULL, 0, opt,
+			    optlen) != 0)
+				ret = errno;
+			if (ret != EBUSY)
+				break;
+			(void) sleep(1);
+		}
+		_exit(ret);
 	}
 
 	/* parent */
