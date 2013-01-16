@@ -24,6 +24,7 @@
 
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
  */
 
 /*
@@ -74,7 +75,18 @@ decomp_entry_t decomp_table[ZIO_COMPRESS_FUNCTIONS] =
 	{"on", lzjb_decompress}, 	/* ZIO_COMPRESS_ON */
 	{"off", 0},			/* ZIO_COMPRESS_OFF */
 	{"lzjb", lzjb_decompress},	/* ZIO_COMPRESS_LZJB */
-	{"empty", 0}			/* ZIO_COMPRESS_EMPTY */
+	{"empty", 0},			/* ZIO_COMPRESS_EMPTY */
+	{"gzip-1", 0},			/* ZIO_COMPRESS_GZIP_1 */
+	{"gzip-2", 0},			/* ZIO_COMPRESS_GZIP_2 */
+	{"gzip-3", 0},			/* ZIO_COMPRESS_GZIP_3 */
+	{"gzip-4", 0},			/* ZIO_COMPRESS_GZIP_4 */
+	{"gzip-5", 0},			/* ZIO_COMPRESS_GZIP_5 */
+	{"gzip-6", 0},			/* ZIO_COMPRESS_GZIP_6 */
+	{"gzip-7", 0},			/* ZIO_COMPRESS_GZIP_7 */
+	{"gzip-8", 0},			/* ZIO_COMPRESS_GZIP_8 */
+	{"gzip-9", 0},			/* ZIO_COMPRESS_GZIP_9 */
+	{"zle", 0},			/* ZIO_COMPRESS_ZLE */
+	{"lz4", lz4_decompress}		/* ZIO_COMPRESS_LZ4 */
 };
 
 static int zio_read_data(blkptr_t *bp, void *buf, char *stack);
@@ -412,8 +424,13 @@ zio_read(blkptr_t *bp, void *buf, char *stack)
 		return (ERR_FSYS_CORRUPT);
 	}
 
-	if (comp != ZIO_COMPRESS_OFF)
-		decomp_table[comp].decomp_func(buf, retbuf, psize, lsize);
+	if (comp != ZIO_COMPRESS_OFF) {
+		if (decomp_table[comp].decomp_func(buf, retbuf, psize,
+		    lsize) != 0) {
+			grub_printf("zio_read decompression failed\n");
+			return (ERR_FSYS_CORRUPT);
+		}
+	}
 
 	return (0);
 }
@@ -945,6 +962,7 @@ get_default_bootfsobj(dnode_phys_t *mosmdn, uint64_t *obj, char *stack)
  * to be listed here since grub opens pools in read-only mode.
  */
 static const char *spa_feature_names[] = {
+	"org.illumos:lz4_compress",
 	NULL
 };
 
