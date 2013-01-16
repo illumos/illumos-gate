@@ -24,6 +24,7 @@
 
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
  */
 
 #ifndef _FSYS_ZFS_H
@@ -213,6 +214,7 @@ extern void fletcher_4_native(const void *, uint64_t, zio_cksum_t *);
 extern void fletcher_4_byteswap(const void *, uint64_t, zio_cksum_t *);
 extern void zio_checksum_SHA256(const void *, uint64_t, zio_cksum_t *);
 extern int lzjb_decompress(void *, void *, size_t, size_t);
+extern int lz4_decompress(void *, void *, size_t, size_t);
 
 #endif	/* FSYS_ZFS */
 

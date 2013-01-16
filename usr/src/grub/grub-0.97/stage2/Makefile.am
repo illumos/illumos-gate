@@ -19,7 +19,7 @@ noinst_LIBRARIES = libgrub.a
 libgrub_a_SOURCES = boot.c builtins.c char_io.c cmdline.c common.c \
 	disk_io.c fsys_ext2fs.c fsys_fat.c fsys_ffs.c fsys_iso9660.c \
 	fsys_jfs.c fsys_minix.c fsys_reiserfs.c fsys_ufs.c fsys_ufs2.c \
-	fsys_zfs.c zfs_fletcher.c zfs_lzjb.c zfs_sha256.c \
+	fsys_zfs.c zfs_fletcher.c zfs_lzjb.c zfs_lz4.c zfs_sha256.c \
 	fsys_vstafs.c fsys_xfs.c gunzip.c md5.c serial.c stage2.c \
 	terminfo.c tparm.c graphics.c
 libgrub_a_CFLAGS = $(GRUB_CFLAGS) -I$(top_srcdir)/lib \
@@ -101,7 +101,7 @@ pre_stage2_exec_SOURCES = asm.S bios.c boot.c builtins.c char_io.c \
 	cmdline.c common.c console.c disk_io.c fsys_ext2fs.c \
 	fsys_fat.c fsys_ffs.c fsys_iso9660.c fsys_jfs.c fsys_minix.c \
 	fsys_reiserfs.c fsys_ufs.c fsys_ufs2.c fsys_vstafs.c fsys_xfs.c \
-	fsys_zfs.c zfs_fletcher.c zfs_lzjb.c zfs_sha256.c \
+	fsys_zfs.c zfs_fletcher.c zfs_lzjb.c zfs_lz4.c zfs_sha256.c \
 	gunzip.c hercules.c md5.c serial.c smp-imps.c stage2.c terminfo.c \
 	tparm.c graphics.c
 pre_stage2_exec_CFLAGS = $(STAGE2_COMPILE) $(FSYS_CFLAGS)
@@ -196,7 +196,8 @@ ufs2_stage1_5_exec_LDFLAGS = $(STAGE1_5_LINK)
 
 # For zfs_stage1_5 target.
 zfs_stage1_5_exec_SOURCES = start.S asm.S common.c char_io.c disk_io.c \
-	stage1_5.c fsys_zfs.c zfs_fletcher.c zfs_lzjb.c zfs_sha256.c bios.c
+	stage1_5.c fsys_zfs.c zfs_fletcher.c zfs_lzjb.c zfs_lz4.c \
+	zfs_sha256.c bios.c
 zfs_stage1_5_exec_CFLAGS = $(STAGE1_5_COMPILE) -DFSYS_ZFS=1 \
 	-DNO_BLOCK_FILES=1
 zfs_stage1_5_exec_CCASFLAGS = $(STAGE1_5_COMPILE) -DFSYS_ZFS=1 \

@@ -25,6 +25,7 @@
 
 syntax: glob
 exception_lists/closed-bins
+exception_lists/copyright
 exception_lists/cstyle
 exception_lists/hdrchk
 usr/src/cmd/dtrace/test/tst/common/*/*.out
@@ -66,6 +67,7 @@ usr/src/common/bzip2/bzlib_private.h
 usr/src/common/bzip2/huffman.c
 usr/src/common/openssl/crypto/krb5/krb5_asn.c
 usr/src/common/openssl/crypto/krb5/krb5_asn.h
+usr/src/grub/grub-0.97/stage2/Makefile.am
 usr/src/lib/gss_mechs/mech_krb5/crypto/cksumtype_to_string.c
 usr/src/lib/gss_mechs/mech_krb5/crypto/coll_proof_cksum.c
 usr/src/lib/gss_mechs/mech_krb5/crypto/enctype_compare.c
@@ -369,4 +371,5 @@ usr/src/uts/common/io/ixgbe/ixgbe_osdep.h
 usr/src/uts/common/io/ixgbe/ixgbe_phy.c
 usr/src/uts/common/io/ixgbe/ixgbe_phy.h
 usr/src/uts/common/io/ixgbe/ixgbe_type.h
+usr/src/uts/common/fs/zfs/THIRDPARTYLICENSE.lz4.descrip
 usr/src/uts/sparc/nsmb/ioc_check.ref

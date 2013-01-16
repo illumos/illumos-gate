@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
 #
 
 set name=pkg.fmri \
@@ -277,6 +278,7 @@ file path=usr/share/src/grub/stage2/zfs-include/zil.h
 file path=usr/share/src/grub/stage2/zfs-include/zio.h
 file path=usr/share/src/grub/stage2/zfs-include/zio_checksum.h
 file path=usr/share/src/grub/stage2/zfs_fletcher.c
+file path=usr/share/src/grub/stage2/zfs_lz4.c
 file path=usr/share/src/grub/stage2/zfs_lzjb.c
 file path=usr/share/src/grub/stage2/zfs_sha256.c
 file path=usr/share/src/grub/stamp-h.in
