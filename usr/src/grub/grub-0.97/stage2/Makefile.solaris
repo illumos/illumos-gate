@@ -1,8 +1,7 @@
 #
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
 #
 include ../../Makefile.grub
 include ../Makefile.solaris.defs
@@ -75,6 +74,7 @@ LIBGRUB_OBJS	= libgrub_a-boot.o		\
 		  libgrub_a-fsys_reiserfs.o	\
 		  libgrub_a-zfs_sha256.o	\
 		  libgrub_a-zfs_lzjb.o		\
+		  libgrub_a-zfs_lz4.o		\
 		  libgrub_a-zfs_fletcher.o	\
 		  libgrub_a-fsys_zfs.o		\
 		  libgrub_a-fsys_ufs.o		\
@@ -164,6 +164,7 @@ DISKLESS_OBJS		= diskless_exec-bios.o		\
 			  diskless_exec-fsys_reiserfs.o	\
 			  diskless_exec-zfs_sha256.o	\
 			  diskless_exec-zfs_lzjb.o	\
+			  diskless_exec-zfs_lz4.o	\
 			  diskless_exec-zfs_fletcher.o	\
 			  diskless_exec-fsys_zfs.o	\
 			  diskless_exec-fsys_ufs.o	\
@@ -375,6 +376,7 @@ PRE_STAGE2_OBJS		= pre_stage2_exec-bios.o \
 			  pre_stage2_exec-fsys_reiserfs.o \
 			  pre_stage2_exec-zfs_sha256.o \
 			  pre_stage2_exec-zfs_lzjb.o \
+			  pre_stage2_exec-zfs_lz4.o \
 			  pre_stage2_exec-zfs_fletcher.o \
 			  pre_stage2_exec-fsys_zfs.o \
 			  pre_stage2_exec-fsys_ufs.o \
@@ -533,6 +535,7 @@ ZFS_STAGE1_5_OBJS	= zfs_stage1_5_exec-bios.o \
 			  zfs_stage1_5_exec-disk_io.o \
 			  zfs_stage1_5_exec-zfs_sha256.o \
 			  zfs_stage1_5_exec-zfs_lzjb.o \
+			  zfs_stage1_5_exec-zfs_lz4.o \
 			  zfs_stage1_5_exec-zfs_fletcher.o \
 			  zfs_stage1_5_exec-fsys_zfs.o \
 			  zfs_stage1_5_exec-stage1_5.o
@@ -607,7 +610,7 @@ SRC_FILES	= Makefile.am Makefile.in apic.h apm.S asm.S bios.c boot.c \
 		  dir.h disk_inode.h disk_inode_ffs.h disk_io.c fat.h \
 		  filesys.h freebsd.h fs.h fsys_ext2fs.c fsys_fat.c \
 		  fsys_ffs.c fsys_iso9660.c fsys_jfs.c fsys_minix.c \
-		  zfs_sha256.c zfs_lzjb.c zfs_fletcher.c fsys_zfs.c \
+		  zfs_sha256.c zfs_lzjb.c zfs_lz4.c zfs_fletcher.c fsys_zfs.c \
 		  fsys_reiserfs.c fsys_ufs.c fsys_ufs2.c fsys_vstafs.c \
 		  fsys_xfs.c graphics.c graphics.h gunzip.c hercules.c \
 		  hercules.h i386-elf.h imgact_aout.h iso9660.h jfs.h \

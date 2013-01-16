@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/file-system/zfs@$(PKGVERS)
@@ -148,6 +149,8 @@ legacy pkg=SUNWzfsr desc="ZFS root components" name="ZFS (Root)"
 legacy pkg=SUNWzfsu desc="ZFS libraries and commands" name="ZFS (Usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+license usr/src/uts/common/fs/zfs/THIRDPARTYLICENSE.lz4 \
+    license=usr/src/uts/common/fs/zfs/THIRDPARTYLICENSE.lz4
 link path=etc/fs/zfs/mount target=../../../sbin/zfs
 link path=etc/fs/zfs/umount target=../../../sbin/zfs
 link path=lib/$(ARCH64)/libzfs.so target=libzfs.so.1
