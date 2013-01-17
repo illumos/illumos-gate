@@ -23,6 +23,7 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2010, Richard Lowe
 # Copyright 2012, Piotr Jasiukajtis
+# Copyright (c) 2013, Joyent, Inc.  All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/developer/build/onbld@$(PKGVERS)
@@ -171,6 +172,8 @@ file path=opt/onbld/lib/python2.6/onbld/Checks/__init__.py mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Checks/__init__.pyc mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Scm/Backup.py mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Scm/Backup.pyc mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Scm/Ignore.py mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Scm/Ignore.pyc mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Scm/Version.py mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Scm/Version.pyc mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Scm/WorkSpace.py mode=0444
