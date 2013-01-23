@@ -790,6 +790,7 @@ adt_get_hostIP(const char *hostname, au_tid_addr_t *p_term)
 	}
 
 	/* No mapping, default to loopback. */
+	errno = ENETDOWN;
 	adt_write_syslog("adt_get_local_address failed, no Audit IP address "
 	    "available, faking loopback and error", errno);
 	IN_SET_LOOPBACK_ADDR((struct sockaddr_in *)&(al.addr.addr));
