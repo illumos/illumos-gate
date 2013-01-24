@@ -31,17 +31,6 @@ dupset(const priv_set_t *s)
 	return (new);
 }
 
-#define	RETPRIVSET(set)		\
-	ST(0) = sv_newmortal();						\
-	sv_setref_pv(ST(0), "Sun::Solaris::Privilege::PrivsetPtr",	\
-	    (void*)(set));						\
-	SvREADONLY_on(SvRV(ST(0)))
-
-#define	RETUCRED(uc)		\
-	ST(0) = sv_newmortal();						\
-	sv_setref_pv(ST(0), "Sun::Solaris::Ucred::UcredPtr",		\
-	    (void*)(uc));						\
-	SvREADONLY_on(SvRV(ST(0)))
 /*
  * The XS code exported to perl is below here.  Note that the XS preprocessor
  * has its own commenting syntax, so all comments from this point on are in
@@ -111,9 +100,10 @@ CODE:
 	val = ucred_getprivset(uc, which);
 	if (val == NULL || (RETVAL = dupset(val)) == NULL)
 		XSRETURN_UNDEF;
-	RETPRIVSET(RETVAL);
 OUTPUT:
 	RETVAL
+CLEANUP:
+	SvREADONLY_on(SvRV(ST(0)));
 
 Sun::Solaris::Ucred::Ucred *
 getpeerucred(fd)
@@ -122,9 +112,10 @@ CODE:
 	RETVAL = NULL;
 	if (getpeerucred(fd, &RETVAL) != 0)
 		XSRETURN_UNDEF;
-	RETUCRED(RETVAL);
 OUTPUT:
 	RETVAL
+CLEANUP:
+	SvREADONLY_on(SvRV(ST(0)));
 
 void
 ucred_getgroups(uc)

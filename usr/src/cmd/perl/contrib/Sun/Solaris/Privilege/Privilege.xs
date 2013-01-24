@@ -14,12 +14,6 @@
 #define	IVCONST(s, c)	newCONSTSUB(s, #c, newSViv((int)(intptr_t)c));
 #define	POFF		(sizeof ("PRIV_") - 1)
 
-#define	RETPRIVSET(set)		\
-	ST(0) = sv_newmortal();						\
-	sv_setref_pv(ST(0), "Sun::Solaris::Privilege::PrivsetPtr",	\
-	    (void*)(set));						\
-	SvREADONLY_on(SvRV(ST(0)))
-
 typedef int sysret;
 
 typedef priv_set_t Sun__Solaris__Privilege__Privset;
@@ -125,11 +119,11 @@ CODE:
 	if (getppriv(which, RETVAL) != 0) {
 		priv_freeset(RETVAL);
 		XSRETURN_UNDEF;
-	} else {
-		RETPRIVSET(RETVAL);
 	}
 OUTPUT:
 	RETVAL
+CLEANUP:
+	SvREADONLY_on(SvRV(ST(0)));
 
 sysret
 setppriv(op, which, set)
@@ -145,9 +139,10 @@ CODE:
 		XSRETURN_UNDEF;
 	}
 	priv_emptyset(RETVAL);
-	RETPRIVSET(RETVAL);
 OUTPUT:
 	RETVAL
+CLEANUP:
+	SvREADONLY_on(SvRV(ST(0)));
 
 Sun::Solaris::Privilege::Privset *
 priv_fillset()
@@ -157,9 +152,10 @@ CODE:
 		XSRETURN_UNDEF;
 	}
 	priv_fillset(RETVAL);
-	RETPRIVSET(RETVAL);
 OUTPUT:
 	RETVAL
+CLEANUP:
+	SvREADONLY_on(SvRV(ST(0)));
 
 boolean_t
 priv_isemptyset(set)
@@ -198,9 +194,10 @@ CODE:
 		XSRETURN_UNDEF;
 	}
 	priv_intersect(set1, RETVAL);
-	RETPRIVSET(RETVAL);
 OUTPUT:
 	RETVAL
+CLEANUP:
+	SvREADONLY_on(SvRV(ST(0)));
 
 Sun::Solaris::Privilege::Privset *
 priv_union(set1, set2)
@@ -212,9 +209,10 @@ CODE:
 		XSRETURN_UNDEF;
 	}
 	priv_union(set1, RETVAL);
-	RETPRIVSET(RETVAL);
 OUTPUT:
 	RETVAL
+CLEANUP:
+	SvREADONLY_on(SvRV(ST(0)));
 
 Sun::Solaris::Privilege::Privset *
 priv_inverse(set1)
@@ -225,9 +223,10 @@ CODE:
 		XSRETURN_UNDEF;
 	}
 	priv_inverse(RETVAL);
-	RETPRIVSET(RETVAL);
 OUTPUT:
 	RETVAL
+CLEANUP:
+	SvREADONLY_on(SvRV(ST(0)));
 
 
 sysret
@@ -243,9 +242,10 @@ CODE:
 	if (RETVAL == NULL) {
 		XSRETURN_UNDEF;
 	}
-	RETPRIVSET(RETVAL);
 OUTPUT:
 	RETVAL
+CLEANUP:
+	SvREADONLY_on(SvRV(ST(0)));
 
 
 sysret
@@ -278,9 +278,10 @@ CODE:
 	if (RETVAL == NULL) {
 		XSRETURN_UNDEF;
 	}
-	RETPRIVSET(RETVAL);
 OUTPUT:
 	RETVAL
+CLEANUP:
+	SvREADONLY_on(SvRV(ST(0)));
 
 char *
 priv_gettext(priv)
@@ -303,5 +304,6 @@ void
 Privilege_DESTROY(ps)
 	Sun::Solaris::Privilege::Privset *ps;
 CODE:
-	priv_freeset(ps);
+	if (ps != NULL)
+		priv_freeset(ps);
 
