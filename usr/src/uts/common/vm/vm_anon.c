@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1986, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 1986, 2010, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -788,14 +788,21 @@ anon_resvmem(size_t size, boolean_t takemem, zone_t *zone, int tryhard)
 	pgcnt_t pswap_pages = 0;
 	proc_t *p = curproc;
 
-	if (zone != NULL && takemem) {
+	if (zone != NULL) {
 		/* test zone.max-swap resource control */
 		mutex_enter(&p->p_lock);
 		if (rctl_incr_swap(p, zone, ptob(npages)) != 0) {
 			mutex_exit(&p->p_lock);
-			atomic_add_64(&zone->zone_anon_alloc_fail, 1);
+
+			if (takemem)
+				atomic_add_64(&zone->zone_anon_alloc_fail, 1);
+
 			return (0);
 		}
+
+		if (!takemem)
+			rctl_decr_swap(zone, ptob(npages));
+
 		mutex_exit(&p->p_lock);
 	}
 	mutex_enter(&anoninfo_lock);
