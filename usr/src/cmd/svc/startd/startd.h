@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 #ifndef	_STARTD_H
@@ -775,6 +775,8 @@ void utmpx_mark_dead(pid_t, int, boolean_t);
 char utmpx_get_runlevel(void);
 void utmpx_set_runlevel(char, char, boolean_t);
 void utmpx_write_boottime(void);
+void utmpx_prefork(void);
+void utmpx_postfork(void);
 
 /* wait.c */
 void wait_init(void);

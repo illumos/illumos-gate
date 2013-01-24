@@ -24,7 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ */
 
 /*
  * utmpx.c - utmpx utility routines
@@ -417,4 +419,21 @@ void
 utmpx_init()
 {
 	(void) pthread_mutex_init(&utmpx_lock, &mutex_attrs);
+}
+
+void
+utmpx_prefork()
+{
+	/*
+	 * The libc utmpx routines are entirely MT-unsafe; we must assure
+	 * that no other thread is in these routines when we fork lest we
+	 * leave the child with inconsistent library state.
+	 */
+	MUTEX_LOCK(&utmpx_lock);
+}
+
+void
+utmpx_postfork()
+{
+	MUTEX_UNLOCK(&utmpx_lock);
 }
