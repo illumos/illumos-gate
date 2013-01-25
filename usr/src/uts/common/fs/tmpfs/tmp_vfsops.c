@@ -427,15 +427,16 @@ tmp_unmount(struct vfs *vfsp, int flag, struct cred *cr)
 	mutex_enter(&tm->tm_contents);
 
 	/*
-	 * If there are no open files, only the root node should have
-	 * a reference count.
+	 * In the normal unmount case (non-forced unmount), if there are no
+	 * open files, only the root node should have a reference count.
+	 *
 	 * With tm_contents held, nothing can be added or removed.
 	 * There may be some dirty pages.  To prevent fsflush from
 	 * disrupting the unmount, put a hold on each node while scanning.
 	 * If we find a previously referenced node, undo the holds we have
 	 * placed and fail EBUSY.
 	 *
-	 * However, in the case of a forced umount things are a bit different.
+	 * However, in the case of a forced umount, things are a bit different.
 	 * An additional VFS_HOLD is added for each outstanding VN_HOLD to
 	 * ensure that the file system is not cleaned up (tmp_freevfs) until
 	 * the last vfs hold is dropped. This happens in tmp_inactive as the
@@ -454,8 +455,12 @@ tmp_unmount(struct vfs *vfsp, int flag, struct cred *cr)
 		vfsp->vfs_flag |= VFS_UNMOUNTED;
 		/* Extra hold which we rele below when we drop the zone ref */
 		VFS_HOLD(vfsp);
+
 		for (i = 1; i < cnt; i++)
 			VFS_HOLD(vfsp);
+
+		/* drop the mutex now because no one can find this mount */
+		mutex_exit(&tm->tm_contents);
 	} else if (cnt > 1) {
 		mutex_exit(&vp->v_lock);
 		mutex_exit(&tm->tm_contents);
@@ -471,37 +476,63 @@ tmp_unmount(struct vfs *vfsp, int flag, struct cred *cr)
 		vp = TNTOV(tnp);
 		mutex_enter(&vp->v_lock);
 		cnt = vp->v_count;
-		if (cnt > 0) {
-			if (flag & MS_FORCE) {
-				for (i = 0; i < cnt; i++)
-					VFS_HOLD(vfsp);
-				/*
-				 * In the case of a forced umount don't add an
-				 * additional VN_HOLD on the vnode. It already
-				 * has at least one hold and we need
-				 * tmp_inactive to get called when the last
-				 * hold on the node is released.
-				 */
-			} else {
-				/*
-				 * An open file, unwind everything.
-				 */
-				mutex_exit(&vp->v_lock);
-				cancel = tm->tm_rootnode->tn_forw;
-				while (cancel != tnp) {
-					vp = TNTOV(cancel);
-					ASSERT(vp->v_count > 0);
-					VN_RELE(vp);
-					cancel = cancel->tn_forw;
-				}
-				mutex_exit(&tm->tm_contents);
-				return (EBUSY);
+		if (flag & MS_FORCE) {
+			for (i = 0; i < cnt; i++)
+				VFS_HOLD(vfsp);
+
+			/*
+			 * In the case of a forced umount don't add an
+			 * additional VN_HOLD on the already held vnodes, like
+			 * we do in the non-forced unmount case. If the
+			 * cnt > 0, then the vnode already has at least one
+			 * hold and we need tmp_inactive to get called when the
+			 * last pre-existing hold on the node is released so
+			 * that we can VFS_RELE the VFS holds we just added.
+			 */
+			if (cnt == 0) {
+				/* directly add VN_HOLD since have the lock */
+				vp->v_count++;
 			}
+
+			mutex_exit(&vp->v_lock);
+
+			/*
+			 * If the tmpnode has any pages associated with it
+			 * (i.e. if it's a normal file with non-zero size), the
+			 * tmpnode could still be discovered by pageout or
+			 * fsflush via the page vnode pointers. To prevent this
+			 * from interfering with the tmp_freevfs, truncate the
+			 * tmpnode now.
+			 */
+			if (tnp->tn_size != 0 && tnp->tn_type == VREG) {
+				rw_enter(&tnp->tn_rwlock, RW_WRITER);
+				rw_enter(&tnp->tn_contents, RW_WRITER);
+
+				(void) tmpnode_trunc(tm, tnp, 0);
+
+				rw_exit(&tnp->tn_contents);
+				rw_exit(&tnp->tn_rwlock);
+
+				ASSERT(tnp->tn_size == 0);
+				ASSERT(tnp->tn_nblocks == 0);
+			}
+		} else if (cnt > 0) {
+			/* An open file; unwind the holds we've been adding. */
+			mutex_exit(&vp->v_lock);
+			cancel = tm->tm_rootnode->tn_forw;
+			while (cancel != tnp) {
+				vp = TNTOV(cancel);
+				ASSERT(vp->v_count > 0);
+				VN_RELE(vp);
+				cancel = cancel->tn_forw;
+			}
+			mutex_exit(&tm->tm_contents);
+			return (EBUSY);
 		} else {
-			/* directly add a VN_HOLD but since we have the lock */
+			/* directly add a VN_HOLD since we have the lock */
 			vp->v_count++;
+			mutex_exit(&vp->v_lock);
 		}
-		mutex_exit(&vp->v_lock);
 	}
 
 	if (flag & MS_FORCE) {
@@ -516,12 +547,14 @@ tmp_unmount(struct vfs *vfsp, int flag, struct cred *cr)
 		}
 		/* We can now drop the extra hold we added above. */
 		VFS_RELE(vfsp);
+	} else {
+		/*
+		 * For the non-forced case, we can drop the mutex now because
+		 * no one can find this mount anymore
+		 */
+		vfsp->vfs_flag |= VFS_UNMOUNTED;
+		mutex_exit(&tm->tm_contents);
 	}
-
-	/*
-	 * We can drop the mutex now because no one can find this mount
-	 */
-	mutex_exit(&tm->tm_contents);
 
 	return (0);
 }
