@@ -150,7 +150,7 @@ typedef union ks_value {
 #define	SAVE_CHAR_X(I, N, V)				\
 {							\
 	ks_value_t v;					\
-	asprintf(&v.str.addr.ptr, "%c", V);		\
+	(void) asprintf(&v.str.addr.ptr, "%c", V);	\
 	v.str.len = 1;					\
 	nvpair_insert(I, N, &v, KSTAT_DATA_STRING);	\
 }

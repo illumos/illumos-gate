@@ -35,6 +35,11 @@ CFLAGS += $(CCVERBOSE) -I${STATCOMMONDIR}
 CERRWARN += -_gcc=-Wno-uninitialized
 CERRWARN += -_gcc=-Wno-switch
 CERRWARN += -_gcc=-Wno-parentheses
+
+CPPFLAGS_sparc += -I$(SRC)/uts/sfmmu
+CPPFLAGS_sparc += -I$(SRC)/uts/sun4u/sunfire
+CPPFLAGS += $(CPPFLAGS_$(MACH))
+
 FILEMODE= 0555
 
 lint := LINTFLAGS = -muxs -I$(STATCOMMONDIR)

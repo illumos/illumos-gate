@@ -1261,15 +1261,15 @@ short_array_to_string(short *shortp, int len)
 
 	for (; len > 1; len--, shortp++) {
 		if (list == NULL) {
-			(void) asprintf(&list_buf, "%d,", *shortp);
+			(void) asprintf(&list_buf, "%hd,", *shortp);
 		} else {
-			(void) asprintf(&list_buf, "%s%d,", list, *shortp);
+			(void) asprintf(&list_buf, "%s%hd,", list, *shortp);
 			free(list);
 		}
 		list = list_buf;
 	}
 
-	(void) asprintf(&list_buf, "%s%s", list, *shortp);
+	(void) asprintf(&list_buf, "%s%hd", list, *shortp);
 	free(list);
 	return (list_buf);
 }
@@ -1279,7 +1279,6 @@ save_temperature(kstat_t *kp, ks_instance_t *ksi)
 {
 	struct temp_stats *temps = (struct temp_stats *)(kp->ks_data);
 	char	*buf;
-	int	n = 1;
 
 	assert(kp->ks_data_size == sizeof (struct temp_stats));
 
@@ -1381,7 +1380,7 @@ save_fault_list(kstat_t *kp, ks_instance_t *ksi)
 		(void) snprintf(name, sizeof (name), "create_time_%d", i);
 		SAVE_HRTIME_X(ksi, name, fault->create_time);
 		(void) snprintf(name, sizeof (name), "msg_%d", i);
-		SAVE_STRING_X(ksi, name, faultp->msg);
+		SAVE_STRING_X(ksi, name, fault->msg);
 	}
 }
 #endif
