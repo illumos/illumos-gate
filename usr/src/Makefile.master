@@ -277,7 +277,8 @@ INS.symlink=	$(RM) $@; $(SYMLINK) $(INSLINKTARGET) $@
 # rebuilds if the baked-in mtime != the mtime of the source file
 # (rather than only if it's less than), thus when installing python
 # files we must make certain to not adjust the mtime of the source
-# (.py) file.
+# (.py) file. As a part of this we also go through and change the #!
+# line in the python script to that of the actual python we are using.
 #
 INS.pyfile=	$(INS.file); $(TOUCH) -r $< $@
 
@@ -1114,9 +1115,16 @@ PKGPUBLISHER_NONREDIST=	on-extra
 	$(RM) $@;
 	$(SED) -e "s@TEXT_DOMAIN@\"$(TEXT_DOMAIN)\"@" $< > $@;
 	$(CHMOD) +x $@
+#
+# You might ask why we aren't using -i for sed here. That's because illumos
+# 1815 hasn't been fixed and sadly we didn't back out something that broke a lot
+# of working code in favor of GNU compatibility.
+#
+SED.py=	$(SED) -e 's?^$(POUND_SIGN)!ON_PYTHON_26$$?$(POUND_SIGN)!$(PYTHON_26)?' \
+	    -e 's?^$(POUND_SIGN)!ON_PYTHON$$?$(POUND_SIGN)!$(PYTHON)?'
 
 .py:
-	$(RM) $@; $(CAT) $< > $@; $(CHMOD) +x $@
+	$(RM) $@; $(SED.py) $< > $@; $(CHMOD) +x $@
 
 .py.pyc:
 	$(RM) $@

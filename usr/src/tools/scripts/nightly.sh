@@ -654,6 +654,9 @@ function build {
 			rm -rf $PKGARCHIVE >> "$LOGFILE" 2>&1
 			mkdir -p $PKGARCHIVE >> "$LOGFILE" 2>&1
 
+			/bin/time $MAKE -e stage-licenses 2>&1 | \
+				tee -a $SRC/$d/${INSTALLOG}.out >> $LOGFILE
+
 			for d in pkg pkgdefs; do
 				if [ ! -f "$SRC/$d/Makefile" ]; then
 					continue

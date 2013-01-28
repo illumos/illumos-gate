@@ -107,7 +107,7 @@ all: mapfiles closedbins sgs .WAIT $(SUBDIRS) pkg
 # packaging to be pulled from $(SRC) and $(CLOSED) and staged in
 # $(ROOT)/licenses.
 #
-install: install1 install2 _msg stage-licenses
+install: install1 install2 _msg
 	@cd msg; pwd; $(MAKE) _msg
 	@rm -rf "$(ROOT)/catalog"
 
