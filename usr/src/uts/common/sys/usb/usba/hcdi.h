@@ -325,18 +325,6 @@ typedef struct hcdi_error_stats {
 	struct kstat_named	cc_pipe_reset;
 	struct kstat_named	cc_not_supported;
 	struct kstat_named	cc_flushed;
-
-#ifdef	NOTYETNEEDED
-	/* USBA function return values */
-	struct kstat_named	hcdi_usb_failure;
-	struct kstat_named	hcdi_usb_no_resources;
-	struct kstat_named	hcdi_usb_no_bandwidth;
-	struct kstat_named	hcdi_usb_pipe_reserved;
-	struct kstat_named	hcdi_usb_pipe_unshareable;
-	struct kstat_named	hcdi_usb_not_supported;
-	struct kstat_named	hcdi_usb_pipe_error;
-	struct kstat_named	hcdi_usb_pipe_busy;
-#endif
 } hcdi_error_stats_t;
 
 /*
