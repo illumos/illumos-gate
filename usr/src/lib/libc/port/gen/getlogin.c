@@ -27,7 +27,9 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2013 Joyent, Inc.  All rights reserved.
+ */
 
 #pragma weak _getlogin = getlogin
 #pragma weak _getlogin_r = getlogin_r
@@ -35,6 +37,7 @@
 #include "lint.h"
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/sysmacros.h>
 #include <fcntl.h>
 #include <string.h>
 #include <stdlib.h>
@@ -51,7 +54,37 @@
  * XXX - _POSIX_LOGIN_NAME_MAX limits the length of a login name.  The utmpx
  * interface provides for a 32 character login name, but for the sake of
  * compatibility, we are still using the old utmp-imposed limit.
+ *
+ * If you want the full name, use the Consolidation Private getxlogin().
  */
+
+static int
+generic_getlogin(char *answer, int namelen, boolean_t truncate)
+{
+	int		uf;
+	off64_t		me;
+	struct futmpx	ubuf;
+
+	if ((me = (off64_t)ttyslot()) < 0)
+		return (-1);
+	if ((uf = open64(UTMPX_FILE, 0)) < 0)
+		return (-1);
+	(void) lseek64(uf, me * sizeof (ubuf), SEEK_SET);
+	if (read(uf, &ubuf, sizeof (ubuf)) != sizeof (ubuf)) {
+		(void) close(uf);
+		return (-1);
+	}
+	(void) close(uf);
+	if (ubuf.ut_user[0] == '\0')
+		return (-1);
+	if (strlen(ubuf.ut_user) >= namelen && !truncate) {
+		errno = ERANGE;
+		return (-1);
+	}
+	(void) strlcpy(answer, ubuf.ut_user, namelen);
+
+	return (0);
+}
 
 /*
  * POSIX.1c Draft-6 version of the function getlogin_r.
@@ -60,31 +93,15 @@
 char *
 getlogin_r(char *answer, int namelen)
 {
-	int		uf;
-	off64_t		me;
-	struct futmpx	ubuf;
-
 	if (namelen < _POSIX_LOGIN_NAME_MAX) {
 		errno = ERANGE;
 		return (NULL);
 	}
 
-	if ((me = (off64_t)ttyslot()) < 0)
-		return (NULL);
-	if ((uf = open64(UTMPX_FILE, 0)) < 0)
-		return (NULL);
-	(void) lseek64(uf, me * sizeof (ubuf), SEEK_SET);
-	if (read(uf, &ubuf, sizeof (ubuf)) != sizeof (ubuf)) {
-		(void) close(uf);
-		return (NULL);
-	}
-	(void) close(uf);
-	if (ubuf.ut_user[0] == '\0')
-		return (NULL);
-	(void) strncpy(&answer[0], &ubuf.ut_user[0],
-	    _POSIX_LOGIN_NAME_MAX - 1);
-	answer[_POSIX_LOGIN_NAME_MAX - 1] = '\0';
-	return (&answer[0]);
+	if (generic_getlogin(answer, _POSIX_LOGIN_NAME_MAX, B_TRUE) == 0)
+		return (answer);
+
+	return (NULL);
 }
 
 /*
@@ -98,7 +115,7 @@ __posix_getlogin_r(char *name, int namelen)
 	int oerrno = errno;
 
 	errno = 0;
-	if (getlogin_r(name, namelen) == NULL) {
+	if (getlogin_r(name, namelen) != 0) {
 		if (errno == 0)
 			nerrno = EINVAL;
 		else
@@ -111,9 +128,28 @@ __posix_getlogin_r(char *name, int namelen)
 char *
 getlogin(void)
 {
-	char *answer = tsdalloc(_T_LOGIN, _POSIX_LOGIN_NAME_MAX, NULL);
+	struct futmpx fu;
+	char *answer = tsdalloc(_T_LOGIN,
+	    MAX(sizeof (fu.ut_user), _POSIX_LOGIN_NAME_MAX), NULL);
 
 	if (answer == NULL)
 		return (NULL);
 	return (getlogin_r(answer, _POSIX_LOGIN_NAME_MAX));
+}
+
+char *
+getxlogin(void)
+{
+	struct futmpx fu;
+	char *answer = tsdalloc(_T_LOGIN,
+	    MAX(sizeof (fu.ut_user), _POSIX_LOGIN_NAME_MAX), NULL);
+
+	if (answer == NULL)
+		return (NULL);
+
+	if (generic_getlogin(answer,
+	    MAX(sizeof (fu.ut_user), _POSIX_LOGIN_NAME_MAX), B_FALSE) != 0)
+		return (NULL);
+
+	return (answer);
 }

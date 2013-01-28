@@ -348,6 +348,9 @@ extern int gethostname(char *, size_t);
 extern int gethostname(char *, int);
 #endif
 extern char *getlogin(void);
+#if defined(__EXTENSIONS__)
+extern char *getxlogin(void);
+#endif
 #if defined(_XPG4) || defined(__EXTENSIONS__)
 extern int  getopt(int, char *const *, const char *);
 extern char *optarg;

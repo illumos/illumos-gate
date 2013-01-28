@@ -236,7 +236,7 @@ main(int argc, char *argv[])
 	int	updated_reps;
 
 
-	if (prognamep = strrchr(argv[0], '/'))
+	if ((prognamep = strrchr(argv[0], '/')) != NULL)
 		++prognamep;
 	else
 		prognamep = argv[0];
@@ -273,7 +273,7 @@ main(int argc, char *argv[])
 	argc -= optind;
 
 	if (argc < 1) {
-		if ((usrname = getlogin()) == NULL) {
+		if ((usrname = getxlogin()) == NULL) {
 			struct passwd *pass = getpwuid(uid);
 			if (pass != NULL)
 				usrname = pass->pw_name;
@@ -1240,10 +1240,10 @@ get_attr(char *username, pwu_repository_t *repository, attrlist **attributes)
 void
 display_attr(char *usrname, attrlist *attributes)
 {
-	char	*status;
+	char	*status = NULL;
 	char	*passwd;
 	long	lstchg;
-	int	min, max, warn;
+	int	min = 0, max = 0, warn = 0;
 
 	while (attributes) {
 		switch (attributes->type) {
@@ -1274,6 +1274,8 @@ display_attr(char *usrname, attrlist *attributes)
 			break;
 		case ATTR_WARN:
 			warn = attributes->data.val_i;
+			break;
+		default:
 			break;
 		}
 		attributes = attributes->next;

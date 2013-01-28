@@ -33,9 +33,7 @@ lint := LDLIBS += -lpasswdutil
 LDFLAGS += $(ZIGNORE)
 LDLIBS += -lbsm -lpam -lnsl
 
-CERRWARN += -_gcc=-Wno-switch
-CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += -_gcc=-Wno-uninitialized
+CPPFLAGS += -D__EXTENSIONS__
 
 FILEMODE = 06555
 XGETFLAGS += -a -x $(PROG).xcl
