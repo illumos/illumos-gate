@@ -10,6 +10,7 @@
  */
 /*
  * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Joyent, Inc.  All rights reserved.
  */
 
 #include "includes.h"
@@ -501,7 +502,8 @@ static struct {
 	{ "permituserenvironment", sPermitUserEnvironment, SSHCFG_GLOBAL },
 	{ "uselogin", sUseLogin, SSHCFG_GLOBAL },
 	{ "compression", sCompression, SSHCFG_GLOBAL },
-	{ "keepalive", sKeepAlives, SSHCFG_GLOBAL },
+	{ "tcpkeepalive", sKeepAlives, SSHCFG_GLOBAL },
+	{ "keepalive", sKeepAlives, SSHCFG_GLOBAL },		/* obsolete */
 	{ "allowtcpforwarding", sAllowTcpForwarding, SSHCFG_ALL },
 	{ "allowusers", sAllowUsers, SSHCFG_GLOBAL },
 	{ "denyusers", sDenyUsers, SSHCFG_GLOBAL },

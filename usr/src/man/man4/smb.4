@@ -1,5 +1,6 @@
 '\" te
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2011, Nexenta Systems, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
@@ -396,6 +397,20 @@ the server. The \fBsigning_required\fR setting is only taken into account when
 Specifies an optional description for the system, which is a text string. This
 property value might appear in various places, such as Network Neighborhood or
 Network Places on Windows clients. By default, no value is set.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBtraverse_mounts\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fBtraverse_mounts\fR setting determines how the SMB server
+presents sub-mounts underneath an SMB share.  When \fBtraverse_mounts\fR
+is \fBtrue\fR (the default), sub-mounts are presented to SMB clients
+like any other subdirectory.   When \fBtraverse_mounts\fR is \fBfalse\fR,
+sub-mounts are not shown to SMB clients.
 .RE
 
 .sp

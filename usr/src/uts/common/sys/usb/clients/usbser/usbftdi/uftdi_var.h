@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2013 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
+ */
 
 #ifndef _USBSER_USBFTDI_UFTDI_VAR_H
 #define	_USBSER_USBFTDI_UFTDI_VAR_H
@@ -84,7 +87,8 @@ typedef struct uftdi_state {
 	int			uf_bulkout_state;	/* out pipe state */
 	usb_log_handle_t	uf_lh;			/* USBA log handle */
 	int			uf_dev_state;		/* USB device state */
-	size_t			uf_xfer_sz;		/* HCI bulk xfer size */
+	size_t			uf_ibuf_sz;		/* input buffer size */
+	size_t			uf_obuf_sz;		/* output buffer size */
 
 	uftdi_pm_t		*uf_pm;			/* PM support */
 
@@ -112,7 +116,8 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(uftdi_state::{
 	uf_usb_events
 	uf_def_ph
 	uf_lh
-	uf_xfer_sz
+	uf_ibuf_sz
+	uf_obuf_sz
 	uf_pm
 	uf_port_state
 	uf_cb

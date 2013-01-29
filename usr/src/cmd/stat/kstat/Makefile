@@ -19,29 +19,48 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-include ../Makefile.cmd
+PROG = kstat
+OBJS = kstat.o
+SRCS =$(OBJS:%.o=%.c) $(COMMON_SRCS)
 
-PROG=	kstat
+include $(SRC)/cmd/Makefile.cmd
+include $(SRC)/cmd/stat/Makefile.stat
+
+LDLIBS += -lavl -lcmdutils -ldevinfo -lgen -lkstat
+CFLAGS += $(CCVERBOSE) -I${STATCOMMONDIR}
+CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-switch
+CERRWARN += -_gcc=-Wno-parentheses
+
+CPPFLAGS_sparc += -I$(SRC)/uts/sfmmu
+CPPFLAGS_sparc += -I$(SRC)/uts/sun4u/sunfire
+CPPFLAGS += $(CPPFLAGS_$(MACH))
+
+FILEMODE= 0555
+
+lint := LINTFLAGS = -muxs -I$(STATCOMMONDIR)
 
 .KEEP_STATE:
 
 all: $(PROG)
 
-install: all .WAIT $(ROOTPROG)
+install: all $(ROOTPROG)
 
-_msg: $(PROG).po
+$(PROG): $(OBJS) $(COMMON_OBJS)
+	$(LINK.c) -o $(PROG) $(OBJS) $(COMMON_OBJS) $(LDLIBS)
+	$(POST_PROCESS)
+
+%.o : $(STATCOMMONDIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
 
 clean:
+	-$(RM) $(OBJS) $(COMMON_OBJS)
 
-$(ROOTBINPROG): $(PROG)
-	$(INS.file)
+lint: lint_SRCS
 
-lint:
-
-include ../Makefile.targ
+include $(SRC)/cmd/Makefile.targ

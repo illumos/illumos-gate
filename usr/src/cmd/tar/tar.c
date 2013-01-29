@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -561,6 +562,7 @@ static void detect_compress(void);
 static	struct stat stbuf;
 
 static	char	*myname;
+static	char	*xtract_chdir = NULL;
 static	int	checkflag = 0;
 static	int	Xflag, Fflag, iflag, hflag, Bflag, Iflag;
 static	int	rflag, xflag, vflag, tflag, mt, svmt, cflag, mflag, pflag;
@@ -1138,6 +1140,20 @@ main(int argc, char *argv[])
 					argv[argc] = argv[argc+2];
 					build_table(include_tbl, argv[++argc]);
 				}
+			} else if (strcmp(argv[argc], "-C") == 0) {
+				if (!argv[argc+1]) {
+					(void) fprintf(stderr, gettext("tar: "
+					    "missing argument for -C flag\n"));
+					done(2);
+				} else if (xtract_chdir != NULL) {
+					(void) fprintf(stderr, gettext("tar: "
+					    "extract should have only one -C "
+					    "flag\n"));
+					done(2);
+				} else {
+					argv[argc] = argv[argc+2];
+					xtract_chdir = argv[++argc];
+				}
 			}
 		}
 		if (strcmp(usefile, "-") == 0) {
@@ -1158,6 +1174,12 @@ main(int argc, char *argv[])
 			}
 		}
 		if (xflag) {
+			if (xtract_chdir != NULL) {
+				if (tar_chdir(xtract_chdir) < 0) {
+					vperror(1, gettext("can't change "
+					    "directories to %s"), xtract_chdir);
+				}
+			}
 			if (Aflag && vflag)
 				(void) printf(gettext(
 				    "Suppressing absolute pathnames.\n"));
