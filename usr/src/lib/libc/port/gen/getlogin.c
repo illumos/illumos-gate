@@ -77,7 +77,8 @@ generic_getlogin(char *answer, int namelen, boolean_t truncate)
 	(void) close(uf);
 	if (ubuf.ut_user[0] == '\0')
 		return (-1);
-	if (strlen(ubuf.ut_user) >= namelen && !truncate) {
+	if (strnlen(ubuf.ut_user, sizeof (ubuf.ut_user)) >= namelen &&
+	    !truncate) {
 		errno = ERANGE;
 		return (-1);
 	}
