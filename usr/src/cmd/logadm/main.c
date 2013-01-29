@@ -830,7 +830,7 @@ rotateto(struct fn *fnp, struct opts *opts, int n, struct fn *recentlog,
 	fn_free(dirname);
 
 	/* do the rename */
-	if (opts_count(opts, "c") != NULL) {
+	if (n == 0 && opts_count(opts, "c") != NULL) {
 		docopytruncate(opts, fn_s(fnp), fn_s(newfile));
 	} else if (n == 0 && opts_count(opts, "M")) {
 		struct fn *rawcmd = fn_new(opts_optarg(opts, "M"));
