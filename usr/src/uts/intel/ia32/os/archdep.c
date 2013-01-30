@@ -26,6 +26,7 @@
 /*	  All Rights Reserved  	*/
 /*
  * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -1077,7 +1078,6 @@ panic_saveregs(panic_data_t *pdp, struct regs *rp)
 	PANICNVADD(pnv, "rax", rp->r_rax);
 	PANICNVADD(pnv, "rbx", rp->r_rbx);
 	PANICNVADD(pnv, "rbp", rp->r_rbp);
-	PANICNVADD(pnv, "r10", rp->r_r10);
 	PANICNVADD(pnv, "r10", rp->r_r10);
 	PANICNVADD(pnv, "r11", rp->r_r11);
 	PANICNVADD(pnv, "r12", rp->r_r12);
