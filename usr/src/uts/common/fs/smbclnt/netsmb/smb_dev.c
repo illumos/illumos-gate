@@ -31,7 +31,7 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -491,7 +491,6 @@ nsmb_close(dev_t dev, int flags, int otyp, cred_t *cr)
 	smb_dev_t *sdp;
 	int err;
 
-	mutex_enter(&dev_lck);
 	/*
 	 * 1. Check the validity of the minor number.
 	 * 2. Release any shares/vc associated  with the connection.
@@ -508,6 +507,7 @@ nsmb_close(dev_t dev, int flags, int otyp, cred_t *cr)
 	/*
 	 * Free the instance
 	 */
+	mutex_enter(&dev_lck);
 	ddi_soft_state_free(statep, inst);
 	mutex_exit(&dev_lck);
 	return (err);
