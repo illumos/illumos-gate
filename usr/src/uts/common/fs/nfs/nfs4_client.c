@@ -1783,8 +1783,7 @@ nfs4_async_putapage(vnode_t *vp, page_t *pp, u_offset_t off, size_t len,
 
 noasync:
 
-	if (curproc == proc_pageout || curproc == proc_fsflush ||
-	    nfs_zone() == mi->mi_zone) {
+	if (curproc == proc_pageout || curproc == proc_fsflush) {
 		/*
 		 * If we get here in the context of the pageout/fsflush,
 		 * or we have run out of memory or we're attempting to
@@ -1804,18 +1803,20 @@ noasync:
 		return (0);
 	}
 
-	/*
-	 * We'll get here only if (nfs_zone() != mi->mi_zone)
-	 * which means that this was a cross-zone sync putpage.
-	 *
-	 * We pass in B_ERROR to pvn_write_done() to re-mark the pages
-	 * as dirty and unlock them.
-	 *
-	 * We don't want to clear B_FORCE here as the caller presumably
-	 * knows what they're doing if they set it.
-	 */
-	pvn_write_done(pp, flags | B_ERROR);
-	return (EPERM);
+	if (nfs_zone() != mi->mi_zone) {
+		/*
+		 * So this was a cross-zone sync putpage.
+		 *
+		 * We pass in B_ERROR to pvn_write_done() to re-mark the pages
+		 * as dirty and unlock them.
+		 *
+		 * We don't want to clear B_FORCE here as the caller presumably
+		 * knows what they're doing if they set it.
+		 */
+		pvn_write_done(pp, flags | B_ERROR);
+		return (EPERM);
+	}
+	return ((*putapage)(vp, pp, off, len, flags, cr));
 }
 
 int
