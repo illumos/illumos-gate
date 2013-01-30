@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 #include <fmdump.h>
@@ -144,5 +145,8 @@ const fmdump_ops_t fmdump_asru_ops = {
 (fmd_log_rec_f *)asru_pretty
 }, {
 NULL, NULL
+}, {
+NULL,
+(fmd_log_rec_f *)fmdump_print_json
 } }
 };
