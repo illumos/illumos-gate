@@ -510,16 +510,44 @@ done:
 	return (rval);
 }
 
+typedef struct pwalk_step {
+	mdb_walk_cb_t ps_cb;
+	void *ps_private;
+} pwalk_step_t;
+
+static int
+pwalk_step(uintptr_t addr, const void *data, void *private)
+{
+	pwalk_step_t *psp = private;
+	int ret;
+
+	mdb.m_frame->f_cbactive = B_TRUE;
+	ret = psp->ps_cb(addr, data, psp->ps_private);
+	mdb.m_frame->f_cbactive = B_FALSE;
+
+	return (ret);
+}
+
 int
-mdb_pwalk(const char *name, mdb_walk_cb_t func, void *data, uintptr_t addr)
+mdb_pwalk(const char *name, mdb_walk_cb_t func, void *private, uintptr_t addr)
 {
 	mdb_iwalker_t *iwp = mdb_walker_lookup(name);
+	pwalk_step_t p;
 
 	if (func == NULL)
 		return (set_errno(EINVAL));
 
-	if (iwp != NULL)
-		return (walk_common(mdb_wcb_create(iwp, func, data, addr)));
+	p.ps_cb = func;
+	p.ps_private = private;
+
+	if (iwp != NULL) {
+		int ret;
+		int cbactive = mdb.m_frame->f_cbactive;
+		mdb.m_frame->f_cbactive = B_FALSE;
+		ret = walk_common(mdb_wcb_create(iwp, pwalk_step, &p, addr));
+		mdb.m_frame->f_cbactive = cbactive;
+		return (ret);
+	}
 
 	return (-1); /* errno is set for us */
 }

@@ -21,10 +21,12 @@
 
 /*
  * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 
 #include <sys/mdb_modapi.h>
 #include <mdb/mdb_whatis.h>
+#include <mdb/mdb_ctf.h>
 #include <procfs.h>
 #include <ucontext.h>
 #include <siginfo.h>
@@ -1019,17 +1021,13 @@ tid2ulwp_walk(uintptr_t addr, ulwp_t *ulwp, tid2ulwp_walk_t *t2u)
 	return (WALK_NEXT);
 }
 
-/*ARGSUSED*/
 static int
-tid2ulwp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+tid2ulwp_impl(uintptr_t tid_addr, uintptr_t *ulwp_addrp)
 {
 	tid2ulwp_walk_t t2u;
 
-	if (argc != 0)
-		return (DCMD_USAGE);
-
 	bzero(&t2u, sizeof (t2u));
-	t2u.t2u_tid = (lwpid_t)addr;
+	t2u.t2u_tid = (lwpid_t)tid_addr;
 
 	if (mdb_walk("ulwp", (mdb_walk_cb_t)tid2ulwp_walk, &t2u) != 0) {
 		mdb_warn("can't walk 'ulwp'");
@@ -1040,9 +1038,78 @@ tid2ulwp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_warn("thread ID %d not found", t2u.t2u_tid);
 		return (DCMD_ERR);
 	}
+	*ulwp_addrp = t2u.t2u_lwp;
+	return (DCMD_OK);
+}
 
-	mdb_printf("%p\n", t2u.t2u_lwp);
+/*ARGSUSED*/
+static int
+tid2ulwp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	uintptr_t ulwp_addr;
+	int error;
 
+	if (argc != 0)
+		return (DCMD_USAGE);
+
+	error = tid2ulwp_impl(addr, &ulwp_addr);
+	if (error == DCMD_OK)
+		mdb_printf("%p\n", ulwp_addr);
+	return (error);
+}
+
+typedef struct mdb_libc_ulwp {
+	void *ul_ftsd[TSD_NFAST];
+	tsd_t *ul_stsd;
+} mdb_libc_ulwp_t;
+
+/*
+ * Map from thread pointer to tsd for given key
+ */
+static int
+d_tsd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	mdb_libc_ulwp_t u;
+	uintptr_t ulwp_addr;
+	uintptr_t key = NULL;
+	void *element = NULL;
+
+	if (mdb_getopts(argc, argv, 'k', MDB_OPT_UINTPTR, &key, NULL) != argc)
+		return (DCMD_USAGE);
+
+	if (!(flags & DCMD_ADDRSPEC) || key == NULL)
+		return (DCMD_USAGE);
+
+	if (tid2ulwp_impl(addr, &ulwp_addr) != DCMD_OK)
+		return (DCMD_ERR);
+
+	if (mdb_ctf_vread(&u, "ulwp_t", "mdb_libc_ulwp_t", ulwp_addr, 0) == -1)
+		return (DCMD_ERR);
+
+	if (key < TSD_NFAST) {
+		element = u.ul_ftsd[key];
+	} else if (u.ul_stsd != NULL) {
+		uint_t nalloc;
+		/* tsd_t is a union, so we can't use ctf_vread() on it. */
+		if (mdb_vread(&nalloc, sizeof (nalloc),
+		    (uintptr_t)&u.ul_stsd->tsd_nalloc) == -1) {
+			mdb_warn("failed to read tsd_t at %p", u.ul_stsd);
+			return (DCMD_ERR);
+		}
+		if (key < nalloc) {
+			if (mdb_vread(&element, sizeof (element),
+			    (uintptr_t)&u.ul_stsd->tsd_data[key]) == -1) {
+				mdb_warn("failed to read tsd_t at %p",
+				    u.ul_stsd);
+				return (DCMD_ERR);
+			}
+		}
+	}
+
+	if (element == NULL && (flags & DCMD_PIPE))
+		return (DCMD_OK);
+
+	mdb_printf("%p\n", element);
 	return (DCMD_OK);
 }
 
@@ -1056,6 +1123,7 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "ucontext", ":", "print ucontext_t structure", d_ucontext, NULL },
 	{ "ulwp", ":", "print ulwp_t structure", d_ulwp, NULL },
 	{ "uberdata", ":", "print uberdata_t structure", d_uberdata, NULL },
+	{ "tsd", ":-k key", "print tsd for this thread", d_tsd, NULL },
 	{ NULL }
 };
 

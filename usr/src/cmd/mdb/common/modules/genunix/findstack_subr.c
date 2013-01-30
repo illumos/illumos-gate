@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -126,11 +127,21 @@ crawl(uintptr_t frame, uintptr_t kbase, uintptr_t ktop, uintptr_t ubase,
 	return (levels);
 }
 
+typedef struct mdb_findstack_kthread {
+	struct _sobj_ops *t_sobj_ops;
+	uint_t	t_state;
+	ushort_t t_flag;
+	ushort_t t_schedflag;
+	caddr_t	t_stk;
+	caddr_t	t_stkbase;
+	label_t	t_pcb;
+} mdb_findstack_kthread_t;
+
 /*ARGSUSED*/
 int
 stacks_findstack(uintptr_t addr, findstack_info_t *fsip, uint_t print_warnings)
 {
-	kthread_t thr;
+	mdb_findstack_kthread_t thr;
 	size_t stksz;
 	uintptr_t ubase, utop;
 	uintptr_t kbase, ktop;
@@ -142,11 +153,8 @@ stacks_findstack(uintptr_t addr, findstack_info_t *fsip, uint_t print_warnings)
 	fsip->fsi_depth = 0;
 	fsip->fsi_overflow = 0;
 
-	bzero(&thr, sizeof (thr));
-	if (mdb_ctf_vread(&thr, "kthread_t", addr,
-	    MDB_CTF_VREAD_IGNORE_ALL) == -1) {
-		if (print_warnings)
-			mdb_warn("couldn't read thread at %p\n", addr);
+	if (mdb_ctf_vread(&thr, "kthread_t", "mdb_findstack_kthread_t",
+	    addr, print_warnings ? 0 : MDB_CTF_VREAD_QUIET) == -1) {
 		fsip->fsi_failed = FSI_FAIL_BADTHREAD;
 		return (DCMD_ERR);
 	}

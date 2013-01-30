@@ -696,8 +696,7 @@ setup_vcb(const char *name, uintptr_t addr)
 int
 cmd_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	mdb_ctf_id_t id;
-	ulong_t offset;
+	int offset;
 	uintptr_t a, tmp;
 	int ret;
 
@@ -730,34 +729,21 @@ cmd_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		if (ret != 0)
 			return (ret);
 
-		if (mdb_ctf_lookup_by_name(buf, &id) != 0) {
-			mdb_warn("failed to look up type %s", buf);
-			return (DCMD_ABORT);
-		}
-
 		argv++;
 		argc--;
-
-		if (argc < 1 || argv->a_type != MDB_TYPE_STRING)
-			return (DCMD_USAGE);
 
 		member = argv->a_un.a_str;
+		offset = mdb_ctf_offsetof_by_name(buf, member);
+		if (offset == -1)
+			return (DCMD_ABORT);
 
 		argv++;
 		argc--;
 
-		if (mdb_ctf_offsetof(id, member, &offset) != 0) {
-			mdb_warn("failed to find member %s of type %s",
-			    member, buf);
-			return (DCMD_ABORT);
-		}
-
-		if (offset % (sizeof (uintptr_t) * NBBY) != 0) {
+		if (offset % (sizeof (uintptr_t)) != 0) {
 			mdb_warn("%s is not a word-aligned member\n", member);
 			return (DCMD_ABORT);
 		}
-
-		offset /= NBBY;
 	}
 
 	/*

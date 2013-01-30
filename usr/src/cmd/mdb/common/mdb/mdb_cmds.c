@@ -2080,7 +2080,7 @@ cmd_dis(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 static int
 walk_step(uintptr_t addr, const void *data, void *private)
 {
-	mdb_printf("%lr\n", addr);
+	mdb_printf("%#lr\n", addr);
 	return (WALK_NEXT);
 }
 

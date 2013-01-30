@@ -22,8 +22,9 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2013 by Delphix. All rights reserved.
+ */
 
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_ks.h>
@@ -32,7 +33,12 @@
 
 #include "intr_common.h"
 
-static shared_info_t	shared_info;
+typedef struct mdb_shared_info {
+	unsigned long evtchn_pending[sizeof (unsigned long) * NBBY];
+	unsigned long evtchn_mask[sizeof (unsigned long) * NBBY];
+} mdb_shared_info_t;
+
+static mdb_shared_info_t	shared_info;
 static struct av_head	avec_tbl[NR_IRQS];
 static uint16_t		shared_tbl[MAX_ISA_IRQ + 1];
 static irq_info_t	irq_tbl[NR_IRQS];
@@ -74,11 +80,9 @@ update_tables(void)
 		return (0);
 	}
 
-	if (mdb_ctf_vread(&shared_info, "shared_info_t",
-	    shared_info_addr, 0) == -1) {
-		mdb_warn("failed to read shared_info");
+	if (mdb_ctf_vread(&shared_info, "shared_info_t", "mdb_shared_info_t",
+	    shared_info_addr, 0) == -1)
 		return (0);
-	}
 
 	return (1);
 }
