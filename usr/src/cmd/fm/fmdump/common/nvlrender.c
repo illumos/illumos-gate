@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -71,4 +72,20 @@ fmdump_render_nvlist(nvlist_prtctl_t pctl, void *private, nvlist_t *nvl,
 	topo_hdl_strfree(thp, fmristr);
 
 	return (1);
+}
+
+/*
+ * Thin wrapper around libnvpair's inbuilt JSON routine.  Simply dumps the
+ * entire log record nvlist without any reformatting.
+ */
+
+/*ARGSUSED*/
+int
+fmdump_print_json(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
+{
+	if (nvlist_print_json(fp, rp->rec_nvl) != 0 || fprintf(fp, "\n") < 0 ||
+	    fflush(fp) != 0)
+		return (-1);
+
+	return (0);
 }

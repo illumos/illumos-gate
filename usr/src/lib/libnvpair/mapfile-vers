@@ -21,6 +21,7 @@
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2013, Joyent, Inc. All rights reserved.
 #
 
 #
@@ -244,6 +245,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	nvlist_add_hrtime;
 	nvlist_lookup_hrtime;
 	nvlist_print;
+	nvlist_print_json;
 	nvlist_prt;
 	nvlist_prtctl_alloc;
 	nvlist_prtctl_free;
