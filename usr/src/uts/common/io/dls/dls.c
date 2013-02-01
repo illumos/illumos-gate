@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2011 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2013 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -248,10 +248,18 @@ dls_promisc(dld_str_t *dsp, uint32_t new_flags)
 {
 	int err = 0;
 	uint32_t old_flags = dsp->ds_promisc;
+	mac_client_promisc_type_t mptype = MAC_CLIENT_PROMISC_ALL;
 
 	ASSERT(MAC_PERIM_HELD(dsp->ds_mh));
 	ASSERT(!(new_flags & ~(DLS_PROMISC_SAP | DLS_PROMISC_MULTI |
 	    DLS_PROMISC_PHYS)));
+
+	/*
+	 * If the user has only requested DLS_PROMISC_MULTI then we need to make
+	 * sure that they don't see all packets.
+	 */
+	if (new_flags == DLS_PROMISC_MULTI)
+		mptype = MAC_CLIENT_PROMISC_MULTI;
 
 	if (dsp->ds_promisc == 0 && new_flags != 0) {
 		/*
@@ -259,7 +267,7 @@ dls_promisc(dld_str_t *dsp, uint32_t new_flags)
 		 * physical promisc mode
 		 */
 		dsp->ds_promisc = new_flags;
-		err = mac_promisc_add(dsp->ds_mch, MAC_CLIENT_PROMISC_ALL,
+		err = mac_promisc_add(dsp->ds_mch, mptype,
 		    dls_rx_promisc, dsp, &dsp->ds_mph,
 		    (new_flags != DLS_PROMISC_SAP) ? 0 :
 		    MAC_PROMISC_FLAGS_NO_PHYS);
@@ -299,7 +307,7 @@ dls_promisc(dld_str_t *dsp, uint32_t new_flags)
 		mac_promisc_remove(dsp->ds_mph);
 		/* Honors both after-remove and before-add semantics! */
 		dsp->ds_promisc = new_flags;
-		err = mac_promisc_add(dsp->ds_mch, MAC_CLIENT_PROMISC_ALL,
+		err = mac_promisc_add(dsp->ds_mch, mptype,
 		    dls_rx_promisc, dsp, &dsp->ds_mph, 0);
 		if (err != 0)
 			dsp->ds_promisc = old_flags;
@@ -535,9 +543,16 @@ dls_accept_common(dld_str_t *dsp, mac_header_info_t *mhip, dls_rx_t *ds_rx,
 	if (dsp->ds_promisc != 0) {
 		/*
 		 * Filter out packets that arrived from the data path
-		 * (i_dls_link_rx) when promisc mode is on.
+		 * (i_dls_link_rx) when promisc mode is on. We need to correlate
+		 * the ds_promisc flags with the mac header destination type. If
+		 * only DLS_PROMISC_MULTI is enabled, we need to only reject
+		 * multicast packets as those are the only ones which filter up
+		 * the promiscuous path. If we have DLS_PROMISC_PHYS or
+		 * DLS_PROMISC_SAP set, then we know that we'll be seeing
+		 * everything, so we should drop it now.
 		 */
-		if (!promisc)
+		if (!promisc && !(dsp->ds_promisc == DLS_PROMISC_MULTI &&
+		    mhip->mhi_dsttype != MAC_ADDRTYPE_MULTICAST))
 			goto refuse;
 		/*
 		 * If the dls_impl_t is in 'all physical' mode then
