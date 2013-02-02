@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -121,11 +121,11 @@ static intptr_t	V8_SmiTagMask;
 static intptr_t	V8_SmiValueShift;
 static intptr_t	V8_PointerSizeLog2;
 
+static intptr_t	V8_ISSHARED_SHIFT;
 static intptr_t	V8_DICT_SHIFT;
 static intptr_t	V8_DICT_PREFIX_SIZE;
 static intptr_t	V8_DICT_ENTRY_SIZE;
 static intptr_t	V8_DICT_START_INDEX;
-
 static intptr_t	V8_PROP_IDX_CONTENT;
 static intptr_t	V8_PROP_IDX_FIRST;
 static intptr_t	V8_PROP_TYPE_FIELD;
@@ -234,12 +234,13 @@ static v8_constant_t v8_constants[] = {
 	{ &V8_DICT_SHIFT,		"v8dbg_dict_shift",
 	    V8_CONSTANT_FALLBACK(3, 13), 24 },
 	{ &V8_DICT_PREFIX_SIZE,		"v8dbg_dict_prefix_size",
-	    V8_CONSTANT_FALLBACK(3, 13), 2 },
+	    V8_CONSTANT_FALLBACK(3, 11), 2 },
 	{ &V8_DICT_ENTRY_SIZE,		"v8dbg_dict_entry_size",
-	    V8_CONSTANT_FALLBACK(3, 13), 3 },
+	    V8_CONSTANT_FALLBACK(3, 11), 3 },
 	{ &V8_DICT_START_INDEX,		"v8dbg_dict_start_index",
-	    V8_CONSTANT_FALLBACK(3, 13), 3 },
-
+	    V8_CONSTANT_FALLBACK(3, 11), 3 },
+	{ &V8_ISSHARED_SHIFT,		"v8dbg_isshared_shift",
+	    V8_CONSTANT_FALLBACK(3, 11), 0 },
 	{ &V8_PROP_IDX_FIRST,		"v8dbg_prop_idx_first"		},
 	{ &V8_PROP_TYPE_FIELD,		"v8dbg_prop_type_field"		},
 	{ &V8_PROP_FIRST_PHANTOM,	"v8dbg_prop_type_first_phantom"	},
@@ -1032,6 +1033,7 @@ read_heap_dict(uintptr_t addr,
 	char *bufp;
 	int rval = -1;
 	uintptr_t *dict, ndict, i;
+	const char *typename;
 
 	if (read_heap_array(addr, &dict, &ndict, UM_SLEEP) != 0)
 		return (-1);
@@ -1053,6 +1055,17 @@ read_heap_dict(uintptr_t addr,
 
 		if (read_typebyte(&type, dict[i]) != 0)
 			goto out;
+
+		typename = enum_lookup_str(v8_types, type, NULL);
+
+		if (typename != NULL && strcmp(typename, "Oddball") == 0) {
+			/*
+			 * In some cases, the key can (apparently) be a hole;
+			 * assume that any Oddball in the key field falls into
+			 * this case and skip over it.
+			 */
+			continue;
+		}
 
 		if (!V8_TYPE_STRING(type))
 			goto out;
@@ -1473,6 +1486,27 @@ jsobj_properties(uintptr_t addr,
 
 		if (V8_SMI_VALUE(bit_field3) & (1 << V8_DICT_SHIFT))
 			return (read_heap_dict(ptr, func, arg));
+	} else if (V8_OFF_MAP_INSTANCE_DESCRIPTORS != -1) {
+		uintptr_t bit_field3;
+
+		if (mdb_vread(&bit_field3, sizeof (bit_field3),
+		    map + V8_OFF_MAP_INSTANCE_DESCRIPTORS) == -1)
+			goto err;
+
+		if (V8_SMI_VALUE(bit_field3) == (1 << V8_ISSHARED_SHIFT)) {
+			/*
+			 * On versions of V8 prior to that used in 0.10,
+			 * the instance descriptors were overloaded to also
+			 * be bit_field3 -- and there was no way from that
+			 * field to infer a dictionary type.  Because we
+			 * can't determine if the map is actually the
+			 * hash_table_map, we assume that if it's an object
+			 * that has kIsShared set, that it is in fact a
+			 * dictionary -- an assumption that is assuredly in
+			 * error in some cases.
+			 */
+			return (read_heap_dict(ptr, func, arg));
+		}
 	}
 
 	if (read_heap_array(ptr, &props, &nprops, UM_SLEEP) != 0)
