@@ -1772,6 +1772,8 @@ typedef struct jsobj_print {
 	uint64_t jsop_depth;
 	boolean_t jsop_printaddr;
 	int jsop_nprops;
+	const char *jsop_member;
+	boolean_t jsop_found;
 } jsobj_print_t;
 
 static int jsobj_print_number(uintptr_t, jsobj_print_t *);
@@ -1802,7 +1804,7 @@ jsobj_print(uintptr_t addr, jsobj_print_t *jsop)
 		{ NULL }
 	}, *ent;
 
-	if (jsop->jsop_printaddr)
+	if (jsop->jsop_printaddr && jsop->jsop_member == NULL)
 		(void) bsnprintf(bufp, lenp, "%p: ", addr);
 
 	if (V8_IS_SMI(addr)) {
@@ -1890,10 +1892,49 @@ jsobj_print_prop(const char *desc, uintptr_t val, void *arg)
 }
 
 static int
+jsobj_print_prop_member(const char *desc, uintptr_t val, void *arg)
+{
+	jsobj_print_t *jsop = arg, descend;
+	const char *member = jsop->jsop_member, *next = member;
+	int rv;
+
+	for (; *next != '\0' && *next != '.' && *next != '['; next++)
+		continue;
+
+	if (*member == '[') {
+		mdb_warn("cannot use array indexing on an object\n");
+		return (-1);
+	}
+
+	if (strncmp(member, desc, next - member) != 0)
+		return (0);
+
+	/*
+	 * This property matches the desired member; descend.
+	 */
+	descend = *jsop;
+
+	if (*next == '\0') {
+		descend.jsop_member = NULL;
+		descend.jsop_found = B_TRUE;
+	} else {
+		descend.jsop_member = *next == '.' ? next + 1 : next;
+	}
+
+	rv = jsobj_print(val, &descend);
+	jsop->jsop_found = descend.jsop_found;
+
+	return (rv);
+}
+
+static int
 jsobj_print_jsobject(uintptr_t addr, jsobj_print_t *jsop)
 {
 	char **bufp = jsop->jsop_bufp;
 	size_t *lenp = jsop->jsop_lenp;
+
+	if (jsop->jsop_member != NULL)
+		return (jsobj_properties(addr, jsobj_print_prop_member, jsop));
 
 	if (jsop->jsop_depth == 0) {
 		(void) bsnprintf(bufp, lenp, "[...]");
@@ -1919,6 +1960,82 @@ jsobj_print_jsobject(uintptr_t addr, jsobj_print_t *jsop)
 }
 
 static int
+jsobj_print_jsarray_member(uintptr_t addr, jsobj_print_t *jsop)
+{
+	uintptr_t *elts;
+	jsobj_print_t descend;
+	uintptr_t ptr;
+	const char *member = jsop->jsop_member, *end, *p;
+	size_t elt = 0, place = 1, len, rv;
+
+	if (read_heap_ptr(&ptr, addr, V8_OFF_JSOBJECT_ELEMENTS) != 0 ||
+	    read_heap_array(ptr, &elts, &len, UM_GC) != 0)
+		return (-1);
+
+	if (*member != '[') {
+		mdb_warn("expected bracketed array index; "
+		    "found '%s'\n", member);
+		return (-1);
+	}
+
+	if ((end = strchr(member, ']')) == NULL) {
+		mdb_warn("missing array index terminator\n");
+		return (-1);
+	}
+
+	/*
+	 * We know where our array index ends; convert it to an integer
+	 * by stepping through it from least significant digit to most.
+	 */
+	for (p = end - 1; p > member; p--) {
+		if (*p < '0' || *p > '9') {
+			mdb_warn("illegal array index at '%c'\n", *p);
+			return (-1);
+		}
+
+		elt += (*p - '0') * place;
+		place *= 10;
+	}
+
+	if (place == 1) {
+		mdb_warn("missing array index\n");
+		return (-1);
+	}
+
+	if (elt >= len) {
+		mdb_warn("array index %d exceeds size of %d\n", elt, len);
+		return (-1);
+	}
+
+	descend = *jsop;
+
+	switch (*(++end)) {
+	case '\0':
+		descend.jsop_member = NULL;
+		descend.jsop_found = B_TRUE;
+		break;
+
+	case '.':
+		descend.jsop_member = end + 1;
+		break;
+
+	case '[':
+		descend.jsop_member = end;
+		break;
+
+	default:
+		mdb_warn("illegal character '%c' following "
+		    "array index terminator\n", *end);
+		return (-1);
+	}
+
+	rv = jsobj_print(elts[elt], &descend);
+	jsop->jsop_found = descend.jsop_found;
+
+	return (rv);
+}
+
+static int
 jsobj_print_jsarray(uintptr_t addr, jsobj_print_t *jsop)
 {
 	char **bufp = jsop->jsop_bufp;
@@ -1928,6 +2045,9 @@ jsobj_print_jsarray(uintptr_t addr, jsobj_print_t *jsop)
 	uintptr_t ptr;
 	uintptr_t *elts;
 	size_t ii, len;
+
+	if (jsop->jsop_member != NULL)
+		return (jsobj_print_jsarray_member(addr, jsop));
 
 	if (jsop->jsop_depth == 0) {
 		(void) bsnprintf(bufp, lenp, "[...]");
@@ -3031,16 +3151,27 @@ dcmd_jsprint(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	char *buf, *bufp;
 	size_t bufsz = 262144, len = bufsz;
 	jsobj_print_t jsop;
-	int rv;
+	int rv, i;
 
 	bzero(&jsop, sizeof (jsop));
 	jsop.jsop_depth = 2;
 	jsop.jsop_printaddr = B_FALSE;
 
-	if (mdb_getopts(argc, argv,
+	i = mdb_getopts(argc, argv,
 	    'a', MDB_OPT_SETBITS, B_TRUE, &jsop.jsop_printaddr,
-	    'd', MDB_OPT_UINT64, &jsop.jsop_depth, NULL) != argc)
+	    'd', MDB_OPT_UINT64, &jsop.jsop_depth, NULL);
+
+	if (i < argc - 1)
 		return (DCMD_USAGE);
+
+	if (i != argc) {
+		const mdb_arg_t *member = &argv[argc - 1];
+
+		if (member->a_type != MDB_TYPE_STRING)
+			return (DCMD_USAGE);
+
+		jsop.jsop_member = member->a_un.a_str;
+	}
 
 	for (;;) {
 		if ((buf = bufp = mdb_zalloc(bufsz, UM_NOSLEEP)) == NULL)
@@ -3057,6 +3188,15 @@ dcmd_jsprint(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_free(buf, bufsz);
 		bufsz <<= 1;
 		len = bufsz;
+	}
+
+	if (jsop.jsop_member && !jsop.jsop_found) {
+		if (rv != 0)
+			return (DCMD_ERR);
+
+		mdb_warn("'%s' not found in %p\n", jsop.jsop_member, addr);
+		mdb_free(buf, bufsz);
+		return (DCMD_ERR);
 	}
 
 	(void) mdb_printf("%s\n", buf);
@@ -3307,7 +3447,7 @@ static const mdb_dcmd_t v8_mdb_dcmds[] = {
 	 */
 	{ "jsframe", ":[-v]", "summarize a JavaScript stack frame",
 		dcmd_jsframe },
-	{ "jsprint", ":[-a] [-d depth]", "print a JavaScript object",
+	{ "jsprint", ":[-a] [-d depth] [member]", "print a JavaScript object",
 		dcmd_jsprint },
 	{ "jsstack", "[-v]", "print a JavaScript stacktrace",
 		dcmd_jsstack },
