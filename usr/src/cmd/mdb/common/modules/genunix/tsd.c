@@ -23,8 +23,9 @@
  * Copyright (c) 2000-2001 by Sun Microsystems, Inc.
  * All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ */
 
 #include <sys/thread.h>
 #include "tsd.h"
@@ -84,7 +85,7 @@ ttotsd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	struct tsd_thread tsdata, *ts = &tsdata;
 	uintptr_t key = NULL;
 	uintptr_t eladdr;
-	void *element;
+	void *element = NULL;
 
 	if (mdb_getopts(argc, argv, 'k', MDB_OPT_UINTPTR, &key, NULL) != argc)
 		return (DCMD_USAGE);
@@ -97,28 +98,26 @@ ttotsd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	if (t->t_tsd == NULL) {
-		if (flags & DCMD_PIPE)
-			return (DCMD_OK);
-		mdb_warn("no tsd on thread\n");
-		return (DCMD_ERR);
-	}
+	if (t->t_tsd == NULL)
+		goto out;
 
 	if (mdb_vread(ts, sizeof (*ts), (uintptr_t)t->t_tsd) == -1) {
 		mdb_warn("failed to read tsd at %p", t->t_tsd);
 		return (DCMD_ERR);
 	}
 
-	if (key > ts->ts_nkeys) {
-		mdb_warn("key out of range\n");
-		return (DCMD_ERR);
-	}
+	if (key > ts->ts_nkeys)
+		goto out;
 
 	eladdr = (uintptr_t)(ts->ts_value + key - 1);
 	if (mdb_vread(&element, sizeof (element), eladdr) == -1) {
 		mdb_warn("failed to read t->t_tsd[%d] at %p", key - 1, eladdr);
 		return (DCMD_ERR);
 	}
+
+out:
+	if (element == NULL && (flags & DCMD_PIPE))
+		return (DCMD_OK);
 
 	mdb_printf("%p\n", element);
 	return (DCMD_OK);

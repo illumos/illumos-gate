@@ -333,6 +333,13 @@ e1000_check_alt_mac_addr_generic(struct e1000_hw *hw)
 
 	DEBUGFUNC("e1000_check_alt_mac_addr_generic");
 
+	/*
+	 * On newer models, the alternate mac address is supposed to be handled
+	 * by hardware and software should just get out of the way.
+	 */
+	if (hw->mac.type >= e1000_82580)
+		return (E1000_SUCCESS);
+
 	ret_val = hw->nvm.ops.read(hw, NVM_ALT_MAC_ADDR_PTR, 1,
 	    &nvm_alt_mac_addr_offset);
 	if (ret_val) {

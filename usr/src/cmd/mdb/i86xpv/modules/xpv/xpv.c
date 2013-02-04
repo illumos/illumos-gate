@@ -22,8 +22,9 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ */
 
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_ks.h>
@@ -51,7 +52,7 @@ static mdb_ctf_id_t domain_type;
  * interesting bits from the binary, and stash them in the structure
  * defined below.
  */
-typedef struct domain {
+typedef struct mdb_xpv_domain {
 	short		domain_id;
 	int		tot_pages;
 	int		max_pages;
@@ -59,9 +60,9 @@ typedef struct domain {
 	ulong_t		domain_flags;
 	char		is_hvm;
 	struct vcpu	*vcpu[MAX_VIRT_CPUS];
-	struct evtchn   *evtchn[NR_EVTCHN_BUCKETS];
-	struct domain 	*next_in_list;
-} domain_t;
+	struct evtchn	*evtchn[NR_EVTCHN_BUCKETS];
+	struct domain	*next_in_list;
+} mdb_xpv_domain_t;
 
 static uintptr_t
 get_dom0_addr()
@@ -110,7 +111,7 @@ int
 domain_walk_step(mdb_walk_state_t *wsp)
 {
 	domain_walk_t *dwp = (domain_walk_t *)wsp->walk_data;
-	struct domain dom;
+	mdb_xpv_domain_t dom;
 	int status;
 
 	if (wsp->walk_addr == NULL)
@@ -119,11 +120,9 @@ domain_walk_step(mdb_walk_state_t *wsp)
 	status = wsp->walk_callback(wsp->walk_addr, (void *)wsp->walk_addr,
 	    wsp->walk_cbdata);
 
-	if (mdb_ctf_vread(&dom, "struct domain", wsp->walk_addr,
-	    MDB_CTF_VREAD_IGNORE_ABSENT) != 0) {
-		mdb_warn("can't find next domain");
+	if (mdb_ctf_vread(&dom, "struct domain", "mdb_xpv_domain_t",
+	    wsp->walk_addr, 0) != 0)
 		return (WALK_ERR);
-	}
 	wsp->walk_addr = (uintptr_t)dom.next_in_list;
 
 	dwp->dw_step = TRUE;
@@ -199,7 +198,7 @@ vcpu_walk_fini(mdb_walk_state_t *wsp)
 int
 domain(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	domain_t dom;
+	mdb_xpv_domain_t dom;
 	uintptr_t off, vcpu_addr, evtchn_addr;
 
 	if (!mdb_ctf_type_valid(domain_type)) {
@@ -220,11 +219,9 @@ domain(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		    "ADDR", "ID", "TPAGES", "MPAGES", "FLAGS", "HVM",
 		    "VCPU", "EVTCHN");
 
-	if (mdb_ctf_vread(&dom, "struct domain", addr,
-	    MDB_CTF_VREAD_IGNORE_ABSENT) != 0) {
-		mdb_warn("can't read domain information");
+	if (mdb_ctf_vread(&dom, "struct domain", "mdb_xpv_domain_t", addr,
+	    0) != 0)
 		return (DCMD_ERR);
-	}
 
 	if (mdb_ctf_offsetof(domain_type, "vcpu", &off)) {
 		mdb_warn("can't find per-domain vcpu information");
@@ -258,24 +255,23 @@ static const mdb_walker_t walkers[] = {
 
 static const mdb_modinfo_t modinfo = { MDB_API_VERSION, dcmds, walkers };
 
+typedef struct mdb_xpv_panic_info {
+	int pi_version;
+} mdb_xpv_panic_info_t;
+
 const mdb_modinfo_t *
 _mdb_init(void)
 {
-	GElf_Sym sym;
 	uintptr_t pip;
-	struct panic_info pi;
+	mdb_xpv_panic_info_t pi;
 
-	if (mdb_lookup_by_name("xpv_panic_info", &sym) < 0)
-		return (NULL);
-
-	if (mdb_ctf_vread(&pip, "uintptr_t", sym.st_value, 0) == -1) {
+	if (mdb_readsym(&pip, sizeof (pip), "xpv_panic_info") == -1) {
 		mdb_warn("failed to read xpv panic_info pointer");
 		return (NULL);
 	}
-	if (mdb_ctf_vread(&pi, "struct panic_info", pip, 0) == -1) {
-		mdb_warn("failed to read xpv panic_info");
+	if (mdb_ctf_vread(&pi, "struct panic_info", "mdb_xpv_panic_info_t",
+	    pip, 0) == -1)
 		return (NULL);
-	}
 
 	if (pi.pi_version != PANIC_INFO_VERSION) {
 		mdb_warn("unrecognized hypervisor panic format");

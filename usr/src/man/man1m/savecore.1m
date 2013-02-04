@@ -1,7 +1,8 @@
 '\" te
 .\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright (c) 1983 Regents of the University of California. All rights reserved. The Berkeley software License Agreement specifies the terms and conditions for redistribution.
-.TH SAVECORE 1M "Sep 25, 2004"
+.\" Copyright 2013 Nexenta Systems, Inc.  All Rights Reserved.
+.TH SAVECORE 1M "Jan 30, 2013"
 .SH NAME
 savecore \- save a crash dump of the operating system
 .SH SYNOPSIS
@@ -14,13 +15,16 @@ savecore \- save a crash dump of the operating system
 .sp
 .LP
 The \fBsavecore\fR utility saves a crash dump of the kernel (assuming that one
-was made) and writes a reboot message in the shutdown log. It is invoked by the
-\fBdumpadm\fR service each time the system boots.
+was made) and writes a reboot message in the shutdown log. By default, it is
+invoked by the \fBdumpadm\fR service each time the system boots.
 .sp
 .LP
-\fBsavecore\fR saves the crash dump data in the file
+Depending on the \fBdumpadm\fR(1M) configuration \fBsavecore\fR saves either
+the compressed or uncompressed crash dump. The compressed crash dump is saved in
+the file \fIdirectory\fR\fB/vmdump.\fR\fIn\fR.
+\fBsavecore\fR saves the uncompressed crash dump data in the file
 \fIdirectory\fR\fB/vmcore.\fR\fIn\fR and the kernel's namelist in
-\fIdirectory\fR\fB/unix.\fR\fIn.\fR The trailing \fB\&.\fR\fIn\fR in the
+\fIdirectory\fR\fB/unix.\fR\fIn.\fR The trailing \fIn\fR in the
 pathnames is replaced by a number which grows every time \fBsavecore\fR is run
 in that directory.
 .sp
@@ -111,6 +115,15 @@ specified, \fBsavecore\fR saves the crash dump files to the default
 .sp
 .ne 2
 .na
+\fB\fIdirectory\fR\fB/vmdump.\fR\fIn\fR\fR
+.ad
+.RS 29n
+
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fIdirectory\fR\fB/vmcore.\fR\fIn\fR\fR
 .ad
 .RS 29n
@@ -147,7 +160,7 @@ specified, \fBsavecore\fR saves the crash dump files to the default
 .sp
 .ne 2
 .na
-\fB\fB/var/crash/\&'uname \fR\fB-n\fR\fB\&'\fR\fR
+\fB\fB/var/crash/\&`uname \fR\fB-n\fR\fB\&`\fR\fR
 .ad
 .RS 29n
 default crash dump directory

@@ -20,6 +20,8 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -39,7 +41,7 @@ SRCDIR		= ../../i86pc/cpu/amd_opteron
 
 AO_MCA_DISP_C	= $(OBJS_DIR)/ao_mca_disp.c
 AO_MCA_DISP_SRC = $(SRCDIR)/ao_mca_disp.in
-AO_GENDISP	= ../../i86pc/cpu/scripts/ao_gendisp
+AO_GENDISP	= ../cpu/scripts/ao_gendisp
 
 #
 #       Include common rules.

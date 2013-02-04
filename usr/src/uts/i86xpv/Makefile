@@ -22,7 +22,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
 #	This makefile drives the production of all implementation architecture
 #	dependent modules for the i86xpv architecture.
@@ -71,7 +71,8 @@ check		:=	TARGET= check
 
 INITIAL_TARGETS = \
 	genassym \
-	unix
+	unix \
+	cpu/scripts
 
 def all clean clobber clean.lint: setup genassym unix .WAIT \
 	$(KMODS) $(CLOSED_KMODS) $(XMODS) $(CLOSED_XMODS)
@@ -96,6 +97,7 @@ genassym unix $(KMODS):	FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
 setup: FRC
+	@cd cpu/scripts; pwd; $(MAKE) $(TARGET)
 
 $(XMODS):	FRC
 	@if [ -f $@/Makefile  ]; then \
