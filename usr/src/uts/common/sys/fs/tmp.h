@@ -67,16 +67,22 @@ enum de_op	{ DE_CREATE, DE_MKDIR, DE_LINK, DE_RENAME }; /* direnter ops */
 enum dr_op	{ DR_REMOVE, DR_RMDIR, DR_RENAME };	/* dirremove ops */
 
 /*
- * tmpfs_minfree is the amount (in pages) of anonymous memory that tmpfs
- * leaves free for the rest of the system.  E.g. in a system with 32MB of
- * configured swap space, if 16MB were reserved (leaving 16MB free),
- * tmpfs could allocate up to 16MB - tmpfs_minfree.  The default value
- * for tmpfs_minfree is btopr(TMPMINFREE) but it can cautiously patched
- * to a different number of pages.
- * NB: If tmpfs allocates too much swap space, other processes will be
- * unable to execute.
+ * tmpfs_minfree is the amount (in pages) of anonymous memory that tmpfs leaves
+ * free for the rest of the system.  In antiquity, this number could be
+ * relevant on a system-wide basis, as physical DRAM was routinely exhausted;
+ * however, in more modern times, the relative growth of DRAM with respect to
+ * application footprint means that this number is only likely to become factor
+ * in a virtualized OS environment (e.g., a zone) -- and even then only when
+ * DRAM and swap have both been capped low to allow for maximum tenancy.  In
+ * general, this number should be configured to be the largest value that is
+ * still smaller than the smallest practical value for memory + swap for a
+ * zone.  (As of this writing, that's about 128MB.)  This can be tuned up with
+ * little consequence (other than generating ENOSPC for tmpfs writes) -- but
+ * caution should be used if tuning this value too low (e.g., less than a
+ * megabyte), as it increases the likelihood that tmpfs consumption alone will
+ * be able to induce application-level memory allocation failure.
  */
-#define	TMPMINFREE	2 * 1024 * 1024	/* 2 Megabytes */
+#define	TMPMINFREE	128 * 1024 * 1024	/* 128 Megabytes */
 
 extern size_t	tmpfs_minfree;		/* Anonymous memory in pages */
 
