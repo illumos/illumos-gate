@@ -1771,6 +1771,7 @@ typedef struct jsobj_print {
 	int jsop_indent;
 	uint64_t jsop_depth;
 	boolean_t jsop_printaddr;
+	uintptr_t jsop_baseaddr;
 	int jsop_nprops;
 	const char *jsop_member;
 	boolean_t jsop_found;
@@ -1803,6 +1804,9 @@ jsobj_print(uintptr_t addr, jsobj_print_t *jsop)
 		{ "JSDate", jsobj_print_jsdate },
 		{ NULL }
 	}, *ent;
+
+	if (jsop->jsop_baseaddr != NULL && jsop->jsop_member == NULL)
+		(void) bsnprintf(bufp, lenp, "%p: ", jsop->jsop_baseaddr);
 
 	if (jsop->jsop_printaddr && jsop->jsop_member == NULL)
 		(void) bsnprintf(bufp, lenp, "%p: ", addr);
@@ -2378,7 +2382,7 @@ load_current_context(uintptr_t *fpp, uintptr_t *raddrp)
 }
 
 static int
-do_jsframe_special(uintptr_t fptr, uintptr_t raddr)
+do_jsframe_special(uintptr_t fptr, uintptr_t raddr, char *prop)
 {
 	uintptr_t ftype;
 	const char *ftypename;
@@ -2390,6 +2394,9 @@ do_jsframe_special(uintptr_t fptr, uintptr_t raddr)
 	 * since those are never in the symbol table.
 	 */
 	if (mdb_snprintf(NULL, 0, "%A", raddr) > 1) {
+		if (prop != NULL)
+			return (0);
+
 		mdb_printf("%p %a\n", fptr, raddr);
 		return (0);
 	}
@@ -2402,6 +2409,9 @@ do_jsframe_special(uintptr_t fptr, uintptr_t raddr)
 	    V8_IS_SMI(ftype) &&
 	    (ftypename = enum_lookup_str(v8_frametypes, V8_SMI_VALUE(ftype),
 	    NULL)) != NULL && strstr(ftypename, "ArgumentsAdaptor") != NULL) {
+		if (prop != NULL)
+			return (0);
+
 		mdb_printf("%p %a <%s>\n", fptr, raddr, ftypename);
 		return (0);
 	}
@@ -2411,6 +2421,9 @@ do_jsframe_special(uintptr_t fptr, uintptr_t raddr)
 	 */
 	if (mdb_vread(&ftype, sizeof (ftype), fptr + V8_OFF_FP_MARKER) != -1 &&
 	    V8_IS_SMI(ftype)) {
+		if (prop != NULL)
+			return (0);
+
 		ftypename = enum_lookup_str(v8_frametypes, V8_SMI_VALUE(ftype),
 		    NULL);
 
@@ -2426,7 +2439,8 @@ do_jsframe_special(uintptr_t fptr, uintptr_t raddr)
 }
 
 static int
-do_jsframe(uintptr_t fptr, uintptr_t raddr, boolean_t verbose)
+do_jsframe(uintptr_t fptr, uintptr_t raddr, boolean_t verbose,
+    char *func, char *prop)
 {
 	uintptr_t funcp, funcinfop, tokpos, scriptp, lendsp, ptrp;
 	uintptr_t ii, nargs;
@@ -2439,7 +2453,7 @@ do_jsframe(uintptr_t fptr, uintptr_t raddr, boolean_t verbose)
 	/*
 	 * Check for non-JavaScript frames first.
 	 */
-	if (do_jsframe_special(fptr, raddr) == 0)
+	if (func == NULL && do_jsframe_special(fptr, raddr, prop) == 0)
 		return (DCMD_OK);
 
 	/*
@@ -2462,6 +2476,10 @@ do_jsframe(uintptr_t fptr, uintptr_t raddr, boolean_t verbose)
 	if (read_typebyte(&type, funcp) != 0 ||
 	    (typename = enum_lookup_str(v8_types, type, NULL)) == NULL) {
 		v8_silent--;
+
+		if (func != NULL || prop != NULL)
+			return (DCMD_OK);
+
 		mdb_printf("%p %a\n", fptr, raddr);
 		return (DCMD_OK);
 	}
@@ -2469,11 +2487,17 @@ do_jsframe(uintptr_t fptr, uintptr_t raddr, boolean_t verbose)
 	v8_silent--;
 
 	if (strcmp("Code", typename) == 0) {
+		if (func != NULL || prop != NULL)
+			return (DCMD_OK);
+
 		mdb_printf("%p %a internal (Code: %p)\n", fptr, raddr, funcp);
 		return (DCMD_OK);
 	}
 
 	if (strcmp("JSFunction", typename) != 0) {
+		if (func != NULL || prop != NULL)
+			return (DCMD_OK);
+
 		mdb_printf("%p %a unknown (%s: %p)", fptr, raddr, typename,
 		    funcp);
 		return (DCMD_OK);
@@ -2487,9 +2511,13 @@ do_jsframe(uintptr_t fptr, uintptr_t raddr, boolean_t verbose)
 	if (jsfunc_name(funcinfop, &bufp, &len) != 0)
 		return (DCMD_ERR);
 
-	mdb_printf("%p %a %s (%p)\n", fptr, raddr, buf, funcp);
+	if (func != NULL && strcmp(buf, func) != 0)
+		return (DCMD_OK);
 
-	if (!verbose)
+	if (prop == NULL)
+		mdb_printf("%p %a %s (%p)\n", fptr, raddr, buf, funcp);
+
+	if (!verbose && prop == NULL)
 		return (DCMD_OK);
 
 	/*
@@ -2511,25 +2539,49 @@ do_jsframe(uintptr_t fptr, uintptr_t raddr, boolean_t verbose)
 	len = sizeof (buf);
 	(void) jsstr_print(ptrp, JSSTR_NUDE, &bufp, &len);
 
-	(void) mdb_inc_indent(4);
-	mdb_printf("file: %s\n", buf);
+	if (prop != NULL && strcmp(prop, "file") == 0) {
+		mdb_printf("%s\n", buf);
+		return (DCMD_OK);
+	}
+
+	if (prop == NULL) {
+		(void) mdb_inc_indent(4);
+		mdb_printf("file: %s\n", buf);
+	}
 
 	if (read_heap_ptr(&lendsp, scriptp, V8_OFF_SCRIPT_LINE_ENDS) != 0)
 		return (DCMD_ERR);
 
 	(void) jsfunc_lineno(lendsp, tokpos, buf, sizeof (buf));
 
-	mdb_printf("posn: %s\n", buf);
+	if (prop != NULL && strcmp(prop, "posn") == 0) {
+		mdb_printf("%s\n", buf);
+		return (DCMD_OK);
+	}
+
+	if (prop == NULL)
+		mdb_printf("posn: %s\n", buf);
 
 	if (read_heap_smi(&nargs, funcinfop,
 	    V8_OFF_SHAREDFUNCTIONINFO_LENGTH) == 0) {
 		for (ii = 0; ii < nargs; ii++) {
 			uintptr_t argptr;
+			char arg[10];
 
 			if (mdb_vread(&argptr, sizeof (argptr),
 			    fptr + V8_OFF_FP_ARGS + (nargs - ii - 1) *
 			    sizeof (uintptr_t)) == -1)
 				continue;
+
+			(void) snprintf(arg, sizeof (arg), "arg%d", ii + 1);
+
+			if (prop != NULL) {
+				if (strcmp(arg, prop) != 0)
+					continue;
+
+				mdb_printf("%p\n", argptr);
+				return (DCMD_OK);
+			}
 
 			bufp = buf;
 			len = sizeof (buf);
@@ -2537,6 +2589,11 @@ do_jsframe(uintptr_t fptr, uintptr_t raddr, boolean_t verbose)
 
 			mdb_printf("arg%d: %p (%s)\n", (ii + 1), argptr, buf);
 		}
+	}
+
+	if (prop != NULL) {
+		mdb_warn("unknown frame property '%s'\n", prop);
+		return (DCMD_ERR);
 	}
 
 	(void) mdb_dec_indent(4);
@@ -3111,9 +3168,13 @@ dcmd_jsframe(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	uintptr_t fptr, raddr;
 	boolean_t opt_v = B_FALSE, opt_i = B_FALSE;
+	char *opt_f = NULL, *opt_p = NULL;
 
-	if (mdb_getopts(argc, argv, 'v', MDB_OPT_SETBITS, B_TRUE, &opt_v,
-	    'i', MDB_OPT_SETBITS, B_TRUE, &opt_i, NULL) != argc)
+	if (mdb_getopts(argc, argv,
+	    'v', MDB_OPT_SETBITS, B_TRUE, &opt_v,
+	    'i', MDB_OPT_SETBITS, B_TRUE, &opt_i,
+	    'f', MDB_OPT_STR, &opt_f,
+	    'p', MDB_OPT_STR, &opt_p, NULL) != argc)
 		return (DCMD_USAGE);
 
 	/*
@@ -3124,7 +3185,7 @@ dcmd_jsframe(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	 * overridden with the "-i" option (for "immediate").
 	 */
 	if (opt_i)
-		return (do_jsframe(addr, 0, opt_v));
+		return (do_jsframe(addr, 0, opt_v, opt_f, opt_p));
 
 	if (mdb_vread(&raddr, sizeof (raddr),
 	    addr + sizeof (uintptr_t)) == -1) {
@@ -3141,7 +3202,7 @@ dcmd_jsframe(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (fptr == NULL)
 		return (DCMD_OK);
 
-	return (do_jsframe(fptr, raddr, opt_v));
+	return (do_jsframe(fptr, raddr, opt_v, opt_f, opt_p));
 }
 
 /* ARGSUSED */
@@ -3151,6 +3212,7 @@ dcmd_jsprint(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	char *buf, *bufp;
 	size_t bufsz = 262144, len = bufsz;
 	jsobj_print_t jsop;
+	boolean_t opt_b = B_FALSE;
 	int rv, i;
 
 	bzero(&jsop, sizeof (jsop));
@@ -3159,7 +3221,11 @@ dcmd_jsprint(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	i = mdb_getopts(argc, argv,
 	    'a', MDB_OPT_SETBITS, B_TRUE, &jsop.jsop_printaddr,
+	    'b', MDB_OPT_SETBITS, B_TRUE, &opt_b,
 	    'd', MDB_OPT_UINT64, &jsop.jsop_depth, NULL);
+
+	if (opt_b)
+		jsop.jsop_baseaddr = addr;
 
 	if (i < argc - 1)
 		return (DCMD_USAGE);
@@ -3299,8 +3365,12 @@ dcmd_jsstack(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	uintptr_t raddr;
 	boolean_t opt_v;
+	char *opt_f = NULL, *opt_p = NULL;
 
-	if (mdb_getopts(argc, argv, 'v', MDB_OPT_SETBITS, B_TRUE, &opt_v,
+	if (mdb_getopts(argc, argv,
+	    'v', MDB_OPT_SETBITS, B_TRUE, &opt_v,
+	    'f', MDB_OPT_STR, &opt_f,
+	    'p', MDB_OPT_STR, &opt_p,
 	    NULL) != argc)
 		return (DCMD_USAGE);
 
@@ -3311,7 +3381,7 @@ dcmd_jsstack(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	 */
 	if (!(flags & DCMD_ADDRSPEC)) {
 		if (load_current_context(&addr, &raddr) != 0 ||
-		    do_jsframe(addr, raddr, opt_v) != 0)
+		    do_jsframe(addr, raddr, opt_v, opt_f, opt_p) != 0)
 			return (DCMD_ERR);
 	}
 
@@ -3445,12 +3515,12 @@ static const mdb_dcmd_t v8_mdb_dcmds[] = {
 	/*
 	 * Commands to inspect JavaScript-level state
 	 */
-	{ "jsframe", ":[-v]", "summarize a JavaScript stack frame",
-		dcmd_jsframe },
-	{ "jsprint", ":[-a] [-d depth] [member]", "print a JavaScript object",
+	{ "jsframe", ":[-iv] [-f function] [-p property]",
+		"summarize a JavaScript stack frame", dcmd_jsframe },
+	{ "jsprint", ":[-ab] [-d depth] [member]", "print a JavaScript object",
 		dcmd_jsprint },
-	{ "jsstack", "[-v]", "print a JavaScript stacktrace",
-		dcmd_jsstack },
+	{ "jsstack", "[-v] [-f function] [-p property]",
+		"print a JavaScript stacktrace", dcmd_jsstack },
 	{ "findjsobjects", "?[-vb] [-r | -c cons | -p prop]", "find JavaScript "
 		"objects", dcmd_findjsobjects, dcmd_findjsobjects_help },
 
