@@ -119,6 +119,14 @@ int serial_getxy (void);
 void serial_gotoxy (int x, int y);
 void serial_cls (void);
 void serial_setcolorstate (color_state state);
+
+void composite_putchar (int c);
+int composite_checkkey (void);
+int composite_getkey (void);
+int composite_getxy (void);
+void composite_gotoxy (int x, int y);
+void composite_cls (void);
+void composite_setcolorstate (color_state state);
 #endif
 
 #ifdef SUPPORT_HERCULES
