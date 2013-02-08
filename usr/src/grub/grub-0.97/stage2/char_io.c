@@ -71,6 +71,22 @@ struct term_entry term_table[] =
       0,
       0
     },
+    {
+      "composite",
+      TERM_NEED_INIT,
+      24,
+      composite_putchar,
+      composite_checkkey,
+      composite_getkey,
+      serial_getxy,
+      composite_gotoxy,
+      composite_cls,
+      composite_setcolorstate,
+      console_setcolor,
+      console_setcursor,
+      0,
+      0
+    },
 #endif /* SUPPORT_SERIAL */
 #ifdef SUPPORT_HERCULES
     {

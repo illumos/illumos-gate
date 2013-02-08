@@ -5289,11 +5289,14 @@ static struct builtin builtin_terminal =
   "terminal",
   terminal_func,
   BUILTIN_MENU | BUILTIN_CMDLINE | BUILTIN_HELP_LIST,
-  "terminal [--dumb] [--no-echo] [--no-edit] [--timeout=SECS] [--lines=LINES] [--silent] [console] [serial] [hercules] [graphics]",
+  "terminal [--dumb] [--no-echo] [--no-edit] [--timeout=SECS] [--lines=LINES] [--silent] [console] [serial] [hercules] [graphics] [composite]",
   "Select a terminal. When multiple terminals are specified, wait until"
   " you push any key to continue. If both console and serial are specified,"
   " the terminal to which you input a key first will be selected. If no"
-  " argument is specified, print current setting. The option --dumb"
+  " argument is specified, print current setting. To accomodate systems"
+  " where console redirection may or may not be present, the composite"
+  " console will direct output to the serial and BIOS consoles, and accept"
+  " input from either one, without requiring selection. The option --dumb"
   " specifies that your terminal is dumb, otherwise, vt100-compatibility"
   " is assumed. If you specify --no-echo, input characters won't be echoed."
   " If you specify --no-edit, the BASH-like editing feature will be disabled."
