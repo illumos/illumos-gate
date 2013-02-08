@@ -36,7 +36,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <stdio.h>
@@ -162,6 +162,7 @@ struct mnttab mnt;
  * to an "ro" by option processing.
  */
 char optbuf[MAX_MNTOPT_STR] = "rw";
+char special[MAXPATHLEN];
 
 int
 main(int argc, char *argv[])
@@ -298,7 +299,10 @@ main(int argc, char *argv[])
 	if (optind + 2 != argc)
 		usage();
 
-	mnt.mnt_special = argv[optind];
+	(void) snprintf(special, sizeof (special), "//%s/%s",
+	    ctx->ct_fullserver, ctx->ct_origshare);
+
+	mnt.mnt_special = special;
 	mnt.mnt_mountp = argv[optind+1];
 
 	if ((realpath(argv[optind+1], mount_point) == NULL) ||

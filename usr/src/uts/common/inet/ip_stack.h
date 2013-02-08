@@ -113,11 +113,6 @@ typedef struct ip6_stat {
 	kstat_named_t	ip6_udp_in_full_hw_cksum_err;
 	kstat_named_t	ip6_udp_in_part_hw_cksum_err;
 	kstat_named_t	ip6_udp_in_sw_cksum_err;
-	kstat_named_t	ip6_frag_mdt_pkt_out;
-	kstat_named_t	ip6_frag_mdt_discarded;
-	kstat_named_t	ip6_frag_mdt_allocfail;
-	kstat_named_t	ip6_frag_mdt_addpdescfail;
-	kstat_named_t	ip6_frag_mdt_allocd;
 } ip6_stat_t;
 
 typedef struct ire_stats {
