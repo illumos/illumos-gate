@@ -19,17 +19,16 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-
-# This is a 64-bit build, and as such needs 64-bit ELF support
-CMNOBJS64 =	Psymtab_machelf64.o
 
 include ../Makefile.com
 include ../../Makefile.lib.64
 
-CPPFLAGS += -D_SYSCALL32
-LDLIBS += -lsaveargs
+TYPES=library standalone
 
-install: all $(ROOTLIBS64) $(ROOTLINKS64)
+INSTALL_DEPS_library = $(ROOTLINKS64) $(ROOTLINT64) $(ROOTLIBS64)
+INSTALL_DEPS_standalone = $(ROOTLIBS64)
+
+include ../Makefile.targ

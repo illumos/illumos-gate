@@ -29,9 +29,6 @@
  * Use is subject to license terms.
  */
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The sparc disassembler is mostly straightforward, each instruction is
  * represented by an inst_t structure.  The inst_t definitions are organized
@@ -227,6 +224,13 @@ dis_previnstr(dis_handle_t *dhp, uint64_t pc, int n)
 		return (pc);
 
 	return (pc - n*4);
+}
+
+/* ARGSUSED */
+int
+dis_instrlen(dis_handle_t *dhp, uint64_t pc)
+{
+	return (4);
 }
 
 int

@@ -74,13 +74,6 @@ CMNOBJS =	\
 ISAOBJS =	\
 	Pisadep.o
 
-amd64_SAVEOBJS = \
-	saveargs.o
-
-amd64_CPPFLAGS = -I$(SRC)/common/saveargs
-
-SAVEOBJS = $($(MACH64)_SAVEOBJS)
-
 OBJECTS = $(CMNOBJS) $(ISAOBJS) $(SAVEOBJS)
 
 # include library definitions
