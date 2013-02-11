@@ -1,8 +1,27 @@
 '\" te
+.\"
+.\" CDDL HEADER START
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\" CDDL HEADER END
+.\"
 .\" Copyright (c) 2003, Sun Microsystems, Inc.  All Rights reserved
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
-.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
-.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.\" Copyright (c) 2012 by Delphix. All rights reserved.
+.\"
 .TH IOSTAT 1M "Mar 23, 2009"
 .SH NAME
 iostat \- report I/O statistics
@@ -194,16 +213,6 @@ average service time in wait queue, in milliseconds
 average service time of active transactions, in milliseconds
 .RE
 
-.sp
-.ne 2
-.na
-\fB\fBwt\fR\fR
-.ad
-.RS 10n
-the I/O wait time is no longer calculated as a percentage of \fBCPU\fR time,
-and this statistic will always return zero.
-.RE
-
 .SH OPTIONS
 .sp
 .LP
@@ -215,8 +224,8 @@ The following options are supported:
 .ad
 .RS 12n
 Report the percentage of time the system has spent in user mode, in system
-mode, waiting for \fBI/O,\fR and idling. See the NOTES section for more
-information.
+mode, in dtrace probes, and idling. See the NOTES section and
+\fBmpstat\fR(1m) for more information.
 .RE
 
 .sp
@@ -510,7 +519,7 @@ example% \fBiostat\fR \fB-xcnCXTdz\fR \fB5\fR
 
 Mon Nov 24 14:58:36 2003
     cpu
- us sy wt id
+ us sy dt id
  14 31  0 20
                     extended device statistics
   r/s    w/s    kr/s      kw wait  actv wsvc_t asvc_t  %w  %b device
@@ -520,8 +529,8 @@ Mon Nov 24 14:58:36 2003
 
 Mon Nov 24 14:58:41 2003
     cpu
- us sy wt id
- 11 31  0 22
+ us sy dt id
+ 11 31  1 22
                     extended device statistics
   r/s    w/s    kr/s      kw wait  actv wsvc_t asvc_t  %w  %b device
   0.8   41.0     5.2    20.5 0.0    0.2    0.2    4.4   0   6     c0
@@ -546,14 +555,14 @@ example% \fBiostat\fR \fB-x\fR \fBtc 5 2\fR
 
 
                   extended device statistics        tty         cpu
-device r/s  w/s kr/s  kw/s wait actv svc_t %w  %b  tin tout  us sy wt id
+device r/s  w/s kr/s  kw/s wait actv svc_t %w  %b  tin tout  us sy dt id
 sd0    0.4  0.3 10.4   8.0  0.0  0.0  36.9  0   1    0   10   0  0  0 99
 sd1    0.0  0.0  0.3   0.4  0.0  0.0  35.0  0   0
 sd6    0.0  0.0  0.0   0.0  0.0  0.0   0.0  0   0
 nfs1   0.0  0.0  0.0   0.0  0.0  0.0   0.0  0   0
 nfs2   0.0  0.0  0.0   0.1  0.0  0.0  35.6  0   0
             extended device statistics              tty         cpu
-device r/s  w/s  kr/s  kw/s wait actv svc_t %w  %b tin tout  us sy wt id
+device r/s  w/s  kr/s  kw/s wait actv svc_t %w  %b tin tout  us sy dt id
 sd0    0.0  0.0  0.0   0.0  0.0  0.0  0.0   0   0   0  155   0  0  0 100
 sd1    0.0  0.0  0.0   0.0  0.0  0.0  0.0   0   0
 sd6    0.0  0.0  0.0   0.0  0.0  0.0  0.0   0   0
@@ -664,7 +673,7 @@ The \fBsvc_t\fR response time is not particularly significant when the
 are fairly normal in such cases.
 .sp
 .LP
-The \fBmpstat\fR utility reports the same \fBwt\fR, \fBusr\fR, and \fBsys\fR
+The \fBmpstat\fR utility reports the same \fBdt\fR, \fBusr\fR, and \fBsys\fR
 statistics. See \fBmpstat\fR(1M) for more information.
 .sp
 .LP
