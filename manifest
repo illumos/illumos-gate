@@ -4964,8 +4964,8 @@ s usr/lib/amd64/libsysevent.so.1=../../../lib/amd64/libsysevent.so.1
 s usr/lib/amd64/libsysevent.so=../../../lib/amd64/libsysevent.so.1
 f usr/lib/amd64/libtecla.so.1 0755 root bin
 s usr/lib/amd64/libtecla.so=libtecla.so.1
-s usr/lib/amd64/libtermcap.so.1=../../../lib/amd64/libcurses.so.1
-s usr/lib/amd64/libtermcap.so=../../../lib/amd64/libcurses.so.1
+s usr/lib/amd64/libtermcap.so.1=../../../lib/amd64/libtermcap.so.1
+s usr/lib/amd64/libtermcap.so=../../../lib/amd64/libtermcap.so.1
 s usr/lib/amd64/libtermlib.so.1=../../../lib/amd64/libcurses.so.1
 s usr/lib/amd64/libtermlib.so=../../../lib/amd64/libcurses.so.1
 s usr/lib/amd64/libthread.so.1=../../../lib/amd64/libthread.so.1
@@ -6393,8 +6393,8 @@ s usr/lib/libsysevent.so.1=../../lib/libsysevent.so.1
 s usr/lib/libsysevent.so=../../lib/libsysevent.so.1
 f usr/lib/libtecla.so.1 0755 root bin
 s usr/lib/libtecla.so=libtecla.so.1
-s usr/lib/libtermcap.so.1=../../lib/libcurses.so.1
-s usr/lib/libtermcap.so=../../lib/libcurses.so.1
+s usr/lib/libtermcap.so.1=../../lib/libtermcap.so.1
+s usr/lib/libtermcap.so=../../lib/libtermcap.so.1
 s usr/lib/libtermlib.so.1=../../lib/libcurses.so.1
 s usr/lib/libtermlib.so=../../lib/libcurses.so.1
 s usr/lib/libthread.so.1=../../lib/libthread.so.1
