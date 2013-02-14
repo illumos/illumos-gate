@@ -3227,48 +3227,56 @@ dcmd_jsprint(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (opt_b)
 		jsop.jsop_baseaddr = addr;
 
-	if (i < argc - 1)
-		return (DCMD_USAGE);
+	do {
+		if (i != argc) {
+			const mdb_arg_t *member = &argv[i++];
 
-	if (i != argc) {
-		const mdb_arg_t *member = &argv[argc - 1];
+			if (member->a_type != MDB_TYPE_STRING)
+				return (DCMD_USAGE);
 
-		if (member->a_type != MDB_TYPE_STRING)
-			return (DCMD_USAGE);
+			jsop.jsop_member = member->a_un.a_str;
+		}
 
-		jsop.jsop_member = member->a_un.a_str;
-	}
+		for (;;) {
+			if ((buf = bufp =
+			    mdb_zalloc(bufsz, UM_NOSLEEP)) == NULL)
+				return (DCMD_ERR);
 
-	for (;;) {
-		if ((buf = bufp = mdb_zalloc(bufsz, UM_NOSLEEP)) == NULL)
+			jsop.jsop_bufp = &bufp;
+			jsop.jsop_lenp = &len;
+
+			rv = jsobj_print(addr, &jsop);
+
+			if (len > 0)
+				break;
+
+			mdb_free(buf, bufsz);
+			bufsz <<= 1;
+			len = bufsz;
+		}
+
+		if (jsop.jsop_member == NULL && rv != 0)
 			return (DCMD_ERR);
 
-		jsop.jsop_bufp = &bufp;
-		jsop.jsop_lenp = &len;
+		if (jsop.jsop_member && !jsop.jsop_found) {
+			if (jsop.jsop_baseaddr)
+				(void) mdb_printf("%p: ", jsop.jsop_baseaddr);
 
-		rv = jsobj_print(addr, &jsop);
-
-		if (len > 0)
-			break;
+			(void) mdb_printf("undefined%s",
+			    i < argc ? " " : "");
+		} else {
+			(void) mdb_printf("%s%s", buf, i < argc &&
+			    !isspace(buf[strlen(buf) - 1]) ? " " : "");
+		}
 
 		mdb_free(buf, bufsz);
-		bufsz <<= 1;
-		len = bufsz;
-	}
+		jsop.jsop_found = B_FALSE;
+		jsop.jsop_baseaddr = NULL;
+	} while (i < argc);
 
-	if (jsop.jsop_member && !jsop.jsop_found) {
-		if (rv != 0)
-			return (DCMD_ERR);
+	mdb_printf("\n");
 
-		mdb_warn("'%s' not found in %p\n", jsop.jsop_member, addr);
-		mdb_free(buf, bufsz);
-		return (DCMD_ERR);
-	}
-
-	(void) mdb_printf("%s\n", buf);
-	mdb_free(buf, bufsz);
-
-	return (rv == 0 ? DCMD_OK : DCMD_ERR);
+	return (DCMD_OK);
 }
 
 /* ARGSUSED */
@@ -3507,6 +3515,87 @@ walk_jsframes_step(mdb_walk_state_t *wsp)
 	return (WALK_NEXT);
 }
 
+typedef struct jsprop_walk_data {
+	int jspw_nprops;
+	int jspw_current;
+	uintptr_t *jspw_props;
+} jsprop_walk_data_t;
+
+/*ARGSUSED*/
+static int
+walk_jsprop_nprops(const char *desc, uintptr_t val, void *arg)
+{
+	jsprop_walk_data_t *jspw = arg;
+	jspw->jspw_nprops++;
+
+	return (0);
+}
+
+/*ARGSUSED*/
+static int
+walk_jsprop_props(const char *desc, uintptr_t val, void *arg)
+{
+	jsprop_walk_data_t *jspw = arg;
+	jspw->jspw_props[jspw->jspw_current++] = val;
+
+	return (0);
+}
+
+static int
+walk_jsprop_init(mdb_walk_state_t *wsp)
+{
+	jsprop_walk_data_t *jspw;
+	uintptr_t addr;
+	uint8_t type;
+
+	if ((addr = wsp->walk_addr) == NULL) {
+		mdb_warn("'jsprop' does not support global walks\n");
+		return (WALK_ERR);
+	}
+
+	if (!V8_IS_HEAPOBJECT(addr) || read_typebyte(&type, addr) != 0 ||
+	    type != V8_TYPE_JSOBJECT) {
+		mdb_warn("%p is not a JSObject\n", addr);
+		return (WALK_ERR);
+	}
+
+	jspw = mdb_zalloc(sizeof (jsprop_walk_data_t), UM_GC);
+
+	if (jsobj_properties(addr, walk_jsprop_nprops, jspw) == -1) {
+		mdb_warn("couldn't iterate over properties for %p\n", addr);
+		return (WALK_ERR);
+	}
+
+	jspw->jspw_props =
+	    mdb_zalloc(jspw->jspw_nprops * sizeof (uintptr_t), UM_GC);
+
+	if (jsobj_properties(addr, walk_jsprop_props, jspw) == -1) {
+		mdb_warn("couldn't iterate over properties for %p\n", addr);
+		return (WALK_ERR);
+	}
+
+	jspw->jspw_current = 0;
+	wsp->walk_data = jspw;
+
+	return (WALK_NEXT);
+}
+
+static int
+walk_jsprop_step(mdb_walk_state_t *wsp)
+{
+	jsprop_walk_data_t *jspw = wsp->walk_data;
+	int rv;
+
+	if (jspw->jspw_current >= jspw->jspw_nprops)
+		return (WALK_DONE);
+
+	if ((rv = wsp->walk_callback(jspw->jspw_props[jspw->jspw_current++],
+	    NULL, wsp->walk_cbdata)) != WALK_NEXT)
+		return (rv);
+
+	return (WALK_NEXT);
+}
+
 /*
  * MDB linkage
  */
@@ -3556,6 +3645,8 @@ static const mdb_dcmd_t v8_mdb_dcmds[] = {
 static const mdb_walker_t v8_mdb_walkers[] = {
 	{ "jsframe", "walk V8 JavaScript stack frames",
 		walk_jsframes_init, walk_jsframes_step },
+	{ "jsprop", "walk property values for an object",
+		walk_jsprop_init, walk_jsprop_step },
 	{ NULL }
 };
 
