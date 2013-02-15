@@ -249,7 +249,7 @@ restart:
      invariant for TERM_DUMB: first_entry == 0  */
   if (! (current_term->flags & TERM_DUMB))
     {
-      while (entryno > 11)
+      while (entryno > MENU_ROWS - 1)
 	{
 	  first_entry++;
 	  entryno--;
@@ -439,7 +439,7 @@ restart:
 		entryno++;
 	      else
 		{
-		  if (entryno < 11)
+		  if (entryno < MENU_ROWS - 1)
 		    {
 		      print_entry (4 + entryno, 0,
 				   get_entry (menu_entries,
@@ -505,7 +505,8 @@ restart:
 		    {
 		      /* But `o' differs from `O', since it may causes
 			 the menu screen to scroll up.  */
-		      if (entryno < 11 || (current_term->flags & TERM_DUMB))
+		      if (entryno < MENU_ROWS - 1 ||
+			  (current_term->flags & TERM_DUMB))
 			entryno++;
 		      else
 			first_entry++;
