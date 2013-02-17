@@ -886,12 +886,12 @@ arc_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	static const char *bytestats[] = {
 		"p", "c", "c_min", "c_max", "size", "duplicate_buffers_size",
+		"arc_meta_used", "arc_meta_limit", "arc_meta_max",
 		NULL
 	};
 
 	static const char *extras[] = {
 		"arc_no_grow", "arc_tempreserve",
-		"arc_meta_used", "arc_meta_limit", "arc_meta_max",
 		NULL
 	};
 
