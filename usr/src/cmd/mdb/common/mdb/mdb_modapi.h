@@ -126,10 +126,11 @@ typedef struct mdb_arg {
 #define	DCMD_TAB_SPACE	0x01	/* Tab cb invoked with trailing space */
 
 typedef struct mdb_tab_cookie mdb_tab_cookie_t;
-typedef int mdb_dcmd_f(uintptr_t, uint_t, int, const mdb_arg_t *);
 typedef int mdb_dcmd_tab_f(mdb_tab_cookie_t *, uint_t, int,
     const mdb_arg_t *);
 #endif /* MDB_API_VERSION >= 4 */
+
+typedef int mdb_dcmd_f(uintptr_t, uint_t, int, const mdb_arg_t *);
 
 typedef struct mdb_dcmd {
 	const char *dc_name;		/* Command name */
