@@ -29,6 +29,16 @@
  * that predate this metadata.  See mdb_v8_cfg.c for details.
  */
 
+/*
+ * We hard-code our MDB_API_VERSION to be 3 to allow this module to be
+ * compiled on systems with higher version numbers, but still allow the
+ * resulting binary object to be used on older systems.  (We do not make use
+ * of functionality present in versions later than 3.)  This is particularly
+ * important for mdb_v8 because (1) it's used in particular to debug
+ * application-level software and (2) it has a history of rapid evolution.
+ */
+#define	MDB_API_VERSION		3
+
 #include <sys/mdb_modapi.h>
 #include <assert.h>
 #include <ctype.h>
@@ -138,6 +148,7 @@ static intptr_t	V8_PROP_DESC_SIZE;
 static intptr_t	V8_TRANSITIONS_IDX_DESC;
 
 static intptr_t V8_TYPE_JSOBJECT = -1;
+static intptr_t V8_TYPE_JSARRAY = -1;
 static intptr_t V8_TYPE_FIXEDARRAY = -1;
 
 /*
@@ -153,6 +164,7 @@ static ssize_t V8_OFF_FIXEDARRAY_DATA;
 static ssize_t V8_OFF_FIXEDARRAY_LENGTH;
 static ssize_t V8_OFF_HEAPNUMBER_VALUE;
 static ssize_t V8_OFF_HEAPOBJECT_MAP;
+static ssize_t V8_OFF_JSARRAY_LENGTH;
 static ssize_t V8_OFF_JSDATE_VALUE;
 static ssize_t V8_OFF_JSFUNCTION_SHARED;
 static ssize_t V8_OFF_JSOBJECT_ELEMENTS;
@@ -287,6 +299,8 @@ static v8_offset_t v8_offsets[] = {
 	    "HeapNumber", "value" },
 	{ &V8_OFF_HEAPOBJECT_MAP,
 	    "HeapObject", "map" },
+	{ &V8_OFF_JSARRAY_LENGTH,
+	    "JSArray", "length" },
 	{ &V8_OFF_JSDATE_VALUE,
 	    "JSDate", "value", B_TRUE },
 	{ &V8_OFF_JSFUNCTION_SHARED,
@@ -429,13 +443,25 @@ autoconfigure(v8_cfg_t *cfgp)
 		if (strcmp(ep->v8e_name, "JSObject") == 0)
 			V8_TYPE_JSOBJECT = ep->v8e_value;
 
+		if (strcmp(ep->v8e_name, "JSArray") == 0)
+			V8_TYPE_JSARRAY = ep->v8e_value;
+
 		if (strcmp(ep->v8e_name, "FixedArray") == 0)
 			V8_TYPE_FIXEDARRAY = ep->v8e_value;
 	}
 
-	if (V8_TYPE_JSOBJECT == -1 || V8_TYPE_FIXEDARRAY == -1) {
-		mdb_warn("couldn't find %s type\n",
-		    V8_TYPE_JSOBJECT == -1 ? "JSObject" : "FixedArray");
+	if (V8_TYPE_JSOBJECT == -1) {
+		mdb_warn("couldn't find JSObject type\n");
+		failed++;
+	}
+
+	if (V8_TYPE_JSARRAY == -1) {
+		mdb_warn("couldn't find JSArray type\n");
+		failed++;
+	}
+
+	if (V8_TYPE_FIXEDARRAY == -1) {
+		mdb_warn("couldn't find FixedArray type\n");
 		failed++;
 	}
 
@@ -946,7 +972,7 @@ read_heap_array(uintptr_t addr, uintptr_t **retp, size_t *lenp, int flags)
 
 	if (mdb_vread(*retp, len * sizeof (uintptr_t),
 	    addr + V8_OFF_FIXEDARRAY_DATA) == -1) {
-		if (flags != UM_GC)
+		if (!(flags & UM_GC))
 			mdb_free(*retp, len * sizeof (uintptr_t));
 
 		return (-1);
@@ -1291,11 +1317,11 @@ jsstr_print_seq(uintptr_t addr, uint_t flags, char **bufp, size_t *lenp)
 {
 	/*
 	 * To allow the caller to allocate a very large buffer for strings,
-	 * we'll allocate a buffer sized based on our input -- and at a
-	 * minimum, enough space for our ellipsis.
+	 * we'll allocate a buffer sized based on our input, making it at
+	 * least enough space for our ellipsis and at most 256K.
 	 */
 	uintptr_t len, rlen, blen = *lenp + sizeof ("[...]") + 1;
-	char *buf = alloca(blen);
+	char *buf = alloca(MIN(blen, 256 * 1024));
 	boolean_t verbose = flags & JSSTR_VERBOSE ? B_TRUE : B_FALSE;
 	boolean_t quoted = flags & JSSTR_QUOTED ? B_TRUE : B_FALSE;
 
@@ -1913,6 +1939,9 @@ jsobj_print_prop_member(const char *desc, uintptr_t val, void *arg)
 	if (strncmp(member, desc, next - member) != 0)
 		return (0);
 
+	if (desc[next - member] != '\0')
+		return (0);
+
 	/*
 	 * This property matches the desired member; descend.
 	 */
@@ -1973,7 +2002,7 @@ jsobj_print_jsarray_member(uintptr_t addr, jsobj_print_t *jsop)
 	size_t elt = 0, place = 1, len, rv;
 
 	if (read_heap_ptr(&ptr, addr, V8_OFF_JSOBJECT_ELEMENTS) != 0 ||
-	    read_heap_array(ptr, &elts, &len, UM_GC) != 0)
+	    read_heap_array(ptr, &elts, &len, UM_SLEEP | UM_GC) != 0)
 		return (-1);
 
 	if (*member != '[') {
@@ -2059,7 +2088,7 @@ jsobj_print_jsarray(uintptr_t addr, jsobj_print_t *jsop)
 	}
 
 	if (read_heap_ptr(&ptr, addr, V8_OFF_JSOBJECT_ELEMENTS) != 0 ||
-	    read_heap_array(ptr, &elts, &len, UM_GC) != 0)
+	    read_heap_array(ptr, &elts, &len, UM_SLEEP | UM_GC) != 0)
 		return (-1);
 
 	if (len == 0) {
@@ -2614,7 +2643,7 @@ typedef struct findjsobjects_instance {
 typedef struct findjsobjects_obj {
 	findjsobjects_prop_t *fjso_props;
 	findjsobjects_prop_t *fjso_last;
-	int fjso_nprops;
+	size_t fjso_nprops;
 	findjsobjects_instance_t fjso_instances;
 	int fjso_ninstances;
 	avl_node_t fjso_node;
@@ -2628,8 +2657,24 @@ typedef struct findjsobjects_stats {
 	int fjss_typereads;
 	int fjss_jsobjs;
 	int fjss_objects;
+	int fjss_arrays;
 	int fjss_uniques;
 } findjsobjects_stats_t;
+
+typedef struct findjsobjects_reference {
+	uintptr_t fjsrf_addr;
+	char *fjsrf_desc;
+	size_t fjsrf_index;
+	struct findjsobjects_reference *fjsrf_next;
+} findjsobjects_reference_t;
+
+typedef struct findjsobjects_referent {
+	avl_node_t fjsr_node;
+	uintptr_t fjsr_addr;
+	findjsobjects_reference_t *fjsr_head;
+	findjsobjects_reference_t *fjsr_tail;
+	struct findjsobjects_referent *fjsr_next;
+} findjsobjects_referent_t;
 
 typedef struct findjsobjects_state {
 	uintptr_t fjs_addr;
@@ -2637,9 +2682,12 @@ typedef struct findjsobjects_state {
 	boolean_t fjs_verbose;
 	boolean_t fjs_brk;
 	boolean_t fjs_initialized;
-	uintptr_t fjs_referent;
+	boolean_t fjs_marking;
 	boolean_t fjs_referred;
 	avl_tree_t fjs_tree;
+	avl_tree_t fjs_referents;
+	findjsobjects_referent_t *fjs_head;
+	findjsobjects_referent_t *fjs_tail;
 	findjsobjects_obj_t *fjs_current;
 	findjsobjects_obj_t *fjs_objects;
 	findjsobjects_stats_t fjs_stats;
@@ -2694,9 +2742,28 @@ findjsobjects_cmp(findjsobjects_obj_t *lhs, findjsobjects_obj_t *rhs)
 	if (rprop != NULL)
 		return (-1);
 
+	if (lhs->fjso_nprops > rhs->fjso_nprops)
+		return (1);
+
+	if (lhs->fjso_nprops < rhs->fjso_nprops)
+		return (-1);
+
 	rv = strcmp(lhs->fjso_constructor, rhs->fjso_constructor);
 
 	return (rv < 0 ? -1 : rv > 0 ? 1 : 0);
+}
+
+int
+findjsobjects_cmp_referents(findjsobjects_referent_t *lhs,
+    findjsobjects_referent_t *rhs)
+{
+	if (lhs->fjsr_addr < rhs->fjsr_addr)
+		return (-1);
+
+	if (lhs->fjsr_addr > rhs->fjsr_addr)
+		return (1);
+
+	return (0);
 }
 
 int
@@ -2784,7 +2851,7 @@ findjsobjects_range(findjsobjects_state_t *fjs, uintptr_t addr, uintptr_t size)
 	uintptr_t limit;
 	findjsobjects_stats_t *stats = &fjs->fjs_stats;
 	uint8_t type;
-	int jsobject = V8_TYPE_JSOBJECT;
+	int jsobject = V8_TYPE_JSOBJECT, jsarray = V8_TYPE_JSARRAY;
 	caddr_t range = mdb_alloc(size, UM_SLEEP);
 	uintptr_t base = addr, mapaddr;
 
@@ -2823,20 +2890,43 @@ findjsobjects_range(findjsobjects_state_t *fjs, uintptr_t addr, uintptr_t size)
 				continue;
 		}
 
-		if (type != jsobject)
+		if (type != jsobject && type != jsarray)
 			continue;
 
 		stats->fjss_jsobjs++;
 
 		fjs->fjs_current = findjsobjects_alloc(addr);
 
-		if (jsobj_properties(addr, findjsobjects_prop, fjs) != 0) {
-			findjsobjects_free(fjs->fjs_current);
-			fjs->fjs_current = NULL;
-			continue;
-		}
+		if (type == jsobject) {
+			if (jsobj_properties(addr,
+			    findjsobjects_prop, fjs) != 0) {
+				findjsobjects_free(fjs->fjs_current);
+				fjs->fjs_current = NULL;
+				continue;
+			}
 
-		findjsobjects_constructor(fjs->fjs_current);
+			findjsobjects_constructor(fjs->fjs_current);
+			stats->fjss_objects++;
+		} else {
+			uintptr_t ptr;
+			size_t *nprops = &fjs->fjs_current->fjso_nprops;
+			ssize_t len = V8_OFF_JSARRAY_LENGTH;
+			ssize_t elems = V8_OFF_JSOBJECT_ELEMENTS;
+			uint8_t t;
+
+			if (read_heap_smi(nprops, addr, len) != 0 ||
+			    read_heap_ptr(&ptr, addr, elems) != 0 ||
+			    !V8_IS_HEAPOBJECT(ptr) ||
+			    read_typebyte(&t, ptr) != 0 ||
+			    t != V8_TYPE_FIXEDARRAY) {
+				findjsobjects_free(fjs->fjs_current);
+				fjs->fjs_current = NULL;
+				continue;
+			}
+
+			strcpy(fjs->fjs_current->fjso_constructor, "Array");
+			stats->fjss_arrays++;
+		}
 
 		/*
 		 * Now determine if we already have an object matching our
@@ -2844,7 +2934,6 @@ findjsobjects_range(findjsobjects_state_t *fjs, uintptr_t addr, uintptr_t size)
 		 * do we'll merely enqueue our instance.
 		 */
 		obj = avl_find(&fjs->fjs_tree, fjs->fjs_current, &where);
-		stats->fjss_objects++;
 
 		if (obj == NULL) {
 			avl_add(&fjs->fjs_tree, fjs->fjs_current);
@@ -2884,47 +2973,191 @@ findjsobjects_mapping(findjsobjects_state_t *fjs, const prmap_t *pmp,
 	return (findjsobjects_range(fjs, pmp->pr_vaddr, pmp->pr_size));
 }
 
+static void
+findjsobjects_references_add(findjsobjects_state_t *fjs, uintptr_t val,
+    const char *desc, size_t index)
+{
+	findjsobjects_referent_t search, *referent;
+	findjsobjects_reference_t *reference;
+
+	search.fjsr_addr = val;
+
+	if ((referent = avl_find(&fjs->fjs_referents, &search, NULL)) == NULL)
+		return;
+
+	reference = mdb_zalloc(sizeof (*reference), UM_SLEEP | UM_GC);
+	reference->fjsrf_addr = fjs->fjs_addr;
+
+	if (desc != NULL) {
+		reference->fjsrf_desc =
+		    mdb_alloc(strlen(desc) + 1, UM_SLEEP | UM_GC);
+		(void) strcpy(reference->fjsrf_desc, desc);
+	} else {
+		reference->fjsrf_index = index;
+	}
+
+	if (referent->fjsr_head == NULL) {
+		referent->fjsr_head = reference;
+	} else {
+		referent->fjsr_tail->fjsrf_next = reference;
+	}
+
+	referent->fjsr_tail = reference;
+}
+
 static int
 findjsobjects_references_prop(const char *desc, uintptr_t val, void *arg)
 {
-	findjsobjects_state_t *fjs = arg;
-
-	if (val == fjs->fjs_referent) {
-		mdb_printf("%p referred to by %p.%s\n", fjs->fjs_referent,
-		    fjs->fjs_addr, desc);
-		fjs->fjs_referred = B_TRUE;
-		return (0);
-	}
+	findjsobjects_references_add(arg, val, desc, -1);
 
 	return (0);
 }
 
 static void
-findjsobjects_references(findjsobjects_state_t *fjs, uintptr_t addr)
+findjsobjects_references_array(findjsobjects_state_t *fjs,
+    findjsobjects_obj_t *obj)
 {
-	findjsobjects_instance_t *inst;
-	findjsobjects_obj_t *obj;
+	findjsobjects_instance_t *inst = &obj->fjso_instances;
+	uintptr_t *elts;
+	size_t i, len;
 
-	fjs->fjs_referent = addr;
+	for (; inst != NULL; inst = inst->fjsi_next) {
+		uintptr_t addr = inst->fjsi_addr, ptr;
+
+		if (read_heap_ptr(&ptr, addr, V8_OFF_JSOBJECT_ELEMENTS) != 0 ||
+		    read_heap_array(ptr, &elts, &len, UM_SLEEP) != 0)
+			continue;
+
+		fjs->fjs_addr = addr;
+
+		for (i = 0; i < len; i++)
+			findjsobjects_references_add(fjs, elts[i], NULL, i);
+
+		mdb_free(elts, len * sizeof (uintptr_t));
+	}
+}
+
+static void
+findjsobjects_referent(findjsobjects_state_t *fjs, uintptr_t addr)
+{
+	findjsobjects_referent_t search, *referent;
+
+	search.fjsr_addr = addr;
+
+	if (avl_find(&fjs->fjs_referents, &search, NULL) != NULL) {
+		assert(fjs->fjs_marking);
+		mdb_warn("%p is already marked; ignoring\n", addr);
+		return;
+	}
+
+	referent = mdb_zalloc(sizeof (findjsobjects_referent_t), UM_SLEEP);
+	referent->fjsr_addr = addr;
+
+	avl_add(&fjs->fjs_referents, referent);
+
+	if (fjs->fjs_tail != NULL) {
+		fjs->fjs_tail->fjsr_next = referent;
+	} else {
+		fjs->fjs_head = referent;
+	}
+
+	fjs->fjs_tail = referent;
+
+	if (fjs->fjs_marking)
+		mdb_printf("findjsobjects: marked %p\n", addr);
+}
+
+static void
+findjsobjects_references(findjsobjects_state_t *fjs)
+{
+	findjsobjects_reference_t *reference;
+	findjsobjects_referent_t *referent;
+	avl_tree_t *referents = &fjs->fjs_referents;
+	findjsobjects_obj_t *obj;
+	void *cookie = NULL;
+	uintptr_t addr;
+
 	fjs->fjs_referred = B_FALSE;
 
 	v8_silent++;
 
+	/*
+	 * First traverse over all objects and arrays, looking for references
+	 * to our designated referent(s).
+	 */
 	for (obj = fjs->fjs_objects; obj != NULL; obj = obj->fjso_next) {
-		for (inst = &obj->fjso_instances;
-		    inst != NULL; inst = inst->fjsi_next) {
+		findjsobjects_instance_t *head = &obj->fjso_instances, *inst;
+
+		if (obj->fjso_nprops != 0 && obj->fjso_props == NULL) {
+			findjsobjects_references_array(fjs, obj);
+			continue;
+		}
+
+		for (inst = head; inst != NULL; inst = inst->fjsi_next) {
 			fjs->fjs_addr = inst->fjsi_addr;
+
 			(void) jsobj_properties(inst->fjsi_addr,
 			    findjsobjects_references_prop, fjs);
 		}
 	}
 
 	v8_silent--;
-
-	if (!fjs->fjs_referred)
-		mdb_printf("%p is not referred to by a known object.\n", addr);
-
 	fjs->fjs_addr = NULL;
+
+	/*
+	 * Now go over our referent(s), reporting any references that we have
+	 * accumulated.
+	 */
+	for (referent = fjs->fjs_head; referent != NULL;
+	    referent = referent->fjsr_next) {
+		addr = referent->fjsr_addr;
+
+		if ((reference = referent->fjsr_head) == NULL) {
+			mdb_printf("%p is not referred to by a "
+			    "known object.\n", addr);
+			continue;
+		}
+
+		for (; reference != NULL; reference = reference->fjsrf_next) {
+			mdb_printf("%p referred to by %p",
+			    addr, reference->fjsrf_addr);
+
+			if (reference->fjsrf_desc == NULL) {
+				mdb_printf("[%d]\n", reference->fjsrf_index);
+			} else {
+				mdb_printf(".%s\n", reference->fjsrf_desc);
+			}
+		}
+	}
+
+	/*
+	 * Finally, destroy our referent nodes.
+	 */
+	while ((referent = avl_destroy_nodes(referents, &cookie)) != NULL)
+		mdb_free(referent, sizeof (findjsobjects_referent_t));
+
+	fjs->fjs_head = NULL;
+	fjs->fjs_tail = NULL;
+}
+
+static findjsobjects_instance_t *
+findjsobjects_instance(findjsobjects_state_t *fjs, uintptr_t addr,
+    findjsobjects_instance_t **headp)
+{
+	findjsobjects_obj_t *obj;
+
+	for (obj = fjs->fjs_objects; obj != NULL; obj = obj->fjso_next) {
+		findjsobjects_instance_t *head = &obj->fjso_instances, *inst;
+
+		for (inst = head; inst != NULL; inst = inst->fjsi_next) {
+			if (inst->fjsi_addr == addr) {
+				*headp = head;
+				return (inst);
+			}
+		}
+	}
+
+	return (NULL);
 }
 
 static void
@@ -2967,7 +3200,7 @@ dcmd_findjsobjects_help(void)
 "followed by the constructor and first few properties of the objects.  Once\n"
 "run, subsequent calls to ::findjsobjects use cached data.  If provided an\n"
 "address (and in the absence of -r, described below), ::findjsobjects treats\n"
-"the address as that of a representative object, and emits all instances of\n"
+"the address as that of a representative object, and lists all instances of\n"
 "that object (that is, all objects that have a matching property signature).");
 
 	mdb_dec_indent(2);
@@ -2978,7 +3211,9 @@ dcmd_findjsobjects_help(void)
 "  -b       Include the heap denoted by the brk(2) (normally excluded)\n"
 "  -c cons  Display representative objects with the specified constructor\n"
 "  -p prop  Display representative objects that have the specified property\n"
-"  -r       Find references to the specified object\n"
+"  -l       List all objects that match the representative object\n"
+"  -m       Mark specified object for later reference determination via -r\n"
+"  -r       Find references to the specified and/or marked object(s)\n"
 "  -v       Provide verbose statistics\n");
 }
 
@@ -2991,16 +3226,19 @@ dcmd_findjsobjects(uintptr_t addr,
 	findjsobjects_obj_t *obj;
 	findjsobjects_prop_t *prop;
 	struct ps_prochandle *Pr;
-	boolean_t references = B_FALSE;
+	boolean_t references = B_FALSE, listlike = B_FALSE;
 	const char *propname = NULL;
 	const char *constructor = NULL;
 
 	fjs.fjs_verbose = B_FALSE;
 	fjs.fjs_brk = B_FALSE;
+	fjs.fjs_marking = B_FALSE;
 
 	if (mdb_getopts(argc, argv,
 	    'b', MDB_OPT_SETBITS, B_TRUE, &fjs.fjs_brk,
 	    'c', MDB_OPT_STR, &constructor,
+	    'l', MDB_OPT_SETBITS, B_TRUE, &listlike,
+	    'm', MDB_OPT_SETBITS, B_TRUE, &fjs.fjs_marking,
 	    'p', MDB_OPT_STR, &propname,
 	    'r', MDB_OPT_SETBITS, B_TRUE, &references,
 	    'v', MDB_OPT_SETBITS, B_TRUE, &fjs.fjs_verbose,
@@ -3012,6 +3250,13 @@ dcmd_findjsobjects(uintptr_t addr,
 		    (int(*)(const void *, const void *))findjsobjects_cmp,
 		    sizeof (findjsobjects_obj_t),
 		    offsetof(findjsobjects_obj_t, fjso_node));
+
+		avl_create(&fjs.fjs_referents,
+		    (int(*)(const void *, const void *))
+		    findjsobjects_cmp_referents,
+		    sizeof (findjsobjects_referent_t),
+		    offsetof(findjsobjects_referent_t, fjsr_node));
+
 		fjs.fjs_initialized = B_TRUE;
 	}
 
@@ -3037,7 +3282,8 @@ dcmd_findjsobjects(uintptr_t addr,
 			/*
 			 * We have the objects -- now sort them.
 			 */
-			sorted = mdb_alloc(nobjs * sizeof (void *), UM_GC);
+			sorted = mdb_alloc(nobjs * sizeof (void *),
+			    UM_SLEEP | UM_GC);
 
 			for (obj = fjs.fjs_objects, i = 0; obj != NULL;
 			    obj = obj->fjso_next, i++) {
@@ -3065,6 +3311,7 @@ dcmd_findjsobjects(uintptr_t addr,
 			mdb_printf(f, "cached reads", stats->fjss_cached);
 			mdb_printf(f, "JavaScript objects", stats->fjss_jsobjs);
 			mdb_printf(f, "processed objects", stats->fjss_objects);
+			mdb_printf(f, "processed arrays", stats->fjss_arrays);
 			mdb_printf(f, "unique objects", stats->fjss_uniques);
 		}
 	}
@@ -3115,43 +3362,58 @@ dcmd_findjsobjects(uintptr_t addr,
 		return (DCMD_OK);
 	}
 
-	if (references && !(flags & DCMD_ADDRSPEC)) {
-		mdb_warn("must specify an object to find references\n");
+	if (references && !(flags & DCMD_ADDRSPEC) &&
+	    avl_is_empty(&fjs.fjs_referents)) {
+		mdb_warn("must specify or mark an object to find references\n");
+		return (DCMD_ERR);
+	}
+
+	if (fjs.fjs_marking && !(flags & DCMD_ADDRSPEC)) {
+		mdb_warn("must specify an object to mark\n");
+		return (DCMD_ERR);
+	}
+
+	if (references && fjs.fjs_marking) {
+		mdb_warn("can't both mark an object and find its references\n");
 		return (DCMD_ERR);
 	}
 
 	if (flags & DCMD_ADDRSPEC) {
+		findjsobjects_instance_t *inst, *head;
+
 		/*
-		 * If we've been passed an address, we're either looking for
-		 * similar objects or for references (if -r has been set).
+		 * If we've been passed an address, it's to either list like
+		 * objects (-l), mark an object (-m) or find references to the
+		 * specified/marked objects (-r).  (Note that the absence of
+		 * any of these options implies -l.)
 		 */
-		if (references) {
-			findjsobjects_references(&fjs, addr);
-			return (DCMD_OK);
+		inst = findjsobjects_instance(&fjs, addr, &head);
+
+		if (inst == NULL) {
+			mdb_warn("%p is not a valid object\n", addr);
+			return (DCMD_ERR);
 		}
 
-		for (obj = fjs.fjs_objects; obj != NULL; obj = obj->fjso_next) {
-			findjsobjects_instance_t *inst, *h;
-
-			h = &obj->fjso_instances;
-
-			for (inst = h; inst != NULL; inst = inst->fjsi_next) {
-				if (inst->fjsi_addr == addr)
-					break;
-			}
-
-			if (inst == NULL)
-				continue;
-
-			for (inst = h; inst != NULL; inst = inst->fjsi_next)
+		if (!references && !fjs.fjs_marking) {
+			for (inst = head; inst != NULL; inst = inst->fjsi_next)
 				mdb_printf("%p\n", inst->fjsi_addr);
 
 			return (DCMD_OK);
 		}
 
-		mdb_warn("%p is not a valid object\n", addr);
-		return (DCMD_ERR);
+		if (!listlike) {
+			findjsobjects_referent(&fjs, inst->fjsi_addr);
+		} else {
+			for (inst = head; inst != NULL; inst = inst->fjsi_next)
+				findjsobjects_referent(&fjs, inst->fjsi_addr);
+		}
 	}
+
+	if (references)
+		findjsobjects_references(&fjs);
+
+	if (references || fjs.fjs_marking)
+		return (DCMD_OK);
 
 	mdb_printf("%-?s %8s %6s %s\n", "OBJECT",
 	    "#OBJECTS", "#PROPS", "CONSTRUCTOR: PROPS");
@@ -3358,7 +3620,7 @@ dcmd_v8array(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	if (read_heap_array(addr, &array, &len, UM_GC) != 0)
+	if (read_heap_array(addr, &array, &len, UM_SLEEP | UM_GC) != 0)
 		return (DCMD_ERR);
 
 	for (ii = 0; ii < len; ii++)
@@ -3559,15 +3821,15 @@ walk_jsprop_init(mdb_walk_state_t *wsp)
 		return (WALK_ERR);
 	}
 
-	jspw = mdb_zalloc(sizeof (jsprop_walk_data_t), UM_GC);
+	jspw = mdb_zalloc(sizeof (jsprop_walk_data_t), UM_SLEEP | UM_GC);
 
 	if (jsobj_properties(addr, walk_jsprop_nprops, jspw) == -1) {
 		mdb_warn("couldn't iterate over properties for %p\n", addr);
 		return (WALK_ERR);
 	}
 
-	jspw->jspw_props =
-	    mdb_zalloc(jspw->jspw_nprops * sizeof (uintptr_t), UM_GC);
+	jspw->jspw_props = mdb_zalloc(jspw->jspw_nprops *
+	    sizeof (uintptr_t), UM_SLEEP | UM_GC);
 
 	if (jsobj_properties(addr, walk_jsprop_props, jspw) == -1) {
 		mdb_warn("couldn't iterate over properties for %p\n", addr);
