@@ -579,7 +579,7 @@ typedef enum
   ERR_NOTXPM,
   ERR_TOOMANYCOLORS,
   ERR_CORRUPTXPM,
-
+  ERR_NOVAR,
   MAX_ERR_NUM
 } grub_error_t;
 
@@ -638,6 +638,8 @@ extern int fallback_entries[MAX_FALLBACK_ENTRIES];
 extern int fallback_entryno;
 extern int default_entry;
 extern int current_entryno;
+
+extern unsigned int min_mem64;
 
 /* The constants for password types.  */
 typedef enum

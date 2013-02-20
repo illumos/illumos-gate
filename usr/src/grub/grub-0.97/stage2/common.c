@@ -99,7 +99,8 @@ char *err_list[] =
   [ERR_NEWER_VERSION] = "Newer on-disk pool version",
   [ERR_NOTXPM] = "Image not in XPM graphics format",
   [ERR_TOOMANYCOLORS] = "Image cannot use more than 14 colors",
-  [ERR_CORRUPTXPM] = "File contains corrupt XPM image data"
+  [ERR_CORRUPTXPM] = "File contains corrupt XPM image data",
+  [ERR_NOVAR] = "Unknown variable reference",
 };
 
 

@@ -19,6 +19,7 @@
 
 #include <shared.h>
 #include <term.h>
+#include <expand.h>
 
 #define MENU_ROWS 7
 
@@ -239,6 +240,7 @@ run_menu (char *menu_entries, char *config_entries, int num_entries,
   int c, time1, time2 = -1, first_entry = 0;
   char *cur_entry = 0;
   struct term_entry *prev_term = NULL;
+  const char *console = NULL;
 
   /*
    *  Main loop for menu UI.
@@ -333,6 +335,14 @@ restart:
       after (\'O\' for before) the selected line, \'d\' to remove the\n\
       selected line, or escape to go back to the main menu.");
 	}
+
+      /* The selected OS console is special; if it's in use, tell the user. */
+      console = get_variable("os_console");
+      if (console != NULL) {
+	printf("\n\n      Selected OS console device is '%s'."
+	    "\n      Use 'variable' command to change OS console device.",
+	    console);
+      }
 
       if (current_term->flags & TERM_DUMB)
 	grub_printf ("\n\nThe selected entry is %d ", entryno);

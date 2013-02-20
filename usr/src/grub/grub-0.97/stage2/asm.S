@@ -2664,8 +2664,8 @@ ENTRY(get_target_operating_mode)
 	movw	$0xec00, %ax
 	movw	$0x03, %bx
 	int	$0x15
-/* XXX still need to pass back return */
 
+	setc	%al
 	movw	%ax, %cx
 
 	DATA32	call	EXT_C(real_to_prot)
@@ -2673,6 +2673,7 @@ ENTRY(get_target_operating_mode)
 
 	xorl	%eax, %eax
 	movw	%cx, %ax
+	movl	%eax, 0x1c(%esp)
 
 	popa
 	ret
