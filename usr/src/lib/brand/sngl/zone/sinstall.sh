@@ -30,17 +30,10 @@ export PATH
 . /usr/lib/brand/shared/common.ksh
 . /usr/lib/brand/joyent/common.ksh
 
-SNGL_BASE=/zones/sngl_base.tar.gz
-
 ZONENAME=""
 ZONEPATH=""
 # Default to 10GB diskset quota
 ZQUOTA=10
-
-if [[ ! -f $SNGL_BASE ]]; then
-	print -u2 "Brand error: missing the SNGL install tar file"
-	exit $ZONE_SUBPROC_FATAL
-fi
 
 while getopts "R:t:U:q:z:" opt
 do
@@ -103,23 +96,11 @@ zfs snapshot $PDS_NAME/${TMPLZONE}@${bname}
 zfs clone -F ${QUOTA_ARG} $PDS_NAME/${TMPLZONE}@${bname} \
     $PDS_NAME/$bname || fatal "failed to clone zone dataset"
 
-# Make sure zoneinit is setup to use -o xtrace, this handles old datasets where
-# is not yet enabled by default.
-if [[ -f ${ZROOT}/root/zoneinit && -z $(grep "^set -o xtrace" ${ZROOT}/root/zoneinit) ]]; then
-    sed -i "" -e "s/^#set -o xtrace/set -o xtrace/" ${ZROOT}/root/zoneinit
-fi
-
 if [ ! -d ${ZONEPATH}/config ]; then
     mkdir -p ${ZONEPATH}/config
     chmod 755 ${ZONEPATH}/config
 fi
 
 final_setup
-
-# Modify to make it a SNGL zone
-rm -f $ZROOT/bin
-ln -s /system/usr/bin $ZROOT/bin
-
-(cd $ZROOT; rm -rf usr; gzcat $SNGL_BASE | tar xbf 512 -)
 
 exit $ZONE_SUBPROC_OK
