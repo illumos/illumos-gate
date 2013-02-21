@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 /*
  * SMB Node State Machine
@@ -784,15 +785,51 @@ smb_node_share_check(smb_node_t *node)
 	return (status);
 }
 
+/*
+ * SMB Change Notification
+ */
+
 void
-smb_node_notify_change(smb_node_t *node)
+smb_node_fcn_subscribe(smb_node_t *node, smb_request_t *sr)
+{
+	smb_node_fcn_t		*fcn = &node->n_fcn;
+
+	mutex_enter(&fcn->fcn_mutex);
+	if (fcn->fcn_count == 0)
+		smb_fem_fcn_install(node);
+	fcn->fcn_count++;
+	list_insert_tail(&fcn->fcn_watchers, sr);
+	mutex_exit(&fcn->fcn_mutex);
+}
+
+void
+smb_node_fcn_unsubscribe(smb_node_t *node, smb_request_t *sr)
+{
+	smb_node_fcn_t		*fcn = &node->n_fcn;
+
+	mutex_enter(&fcn->fcn_mutex);
+	list_remove(&fcn->fcn_watchers, sr);
+	fcn->fcn_count--;
+	if (fcn->fcn_count == 0)
+		smb_fem_fcn_uninstall(node);
+	mutex_exit(&fcn->fcn_mutex);
+}
+
+void
+smb_node_notify_change(smb_node_t *node, uint_t action, const char *name)
 {
 	SMB_NODE_VALID(node);
 
-	if (node->flags & NODE_FLAGS_NOTIFY_CHANGE) {
-		node->flags |= NODE_FLAGS_CHANGED;
-		smb_process_node_notify_change_queue(node);
-	}
+	smb_notify_event(node, action, name);
+
+	/*
+	 * These two events come as a pair:
+	 *   FILE_ACTION_RENAMED_OLD_NAME
+	 *   FILE_ACTION_RENAMED_NEW_NAME
+	 * Only do the parent notify for "new".
+	 */
+	if (action == FILE_ACTION_RENAMED_OLD_NAME)
+		return;
 
 	smb_node_notify_parents(node);
 }
@@ -808,17 +845,17 @@ smb_node_notify_change(smb_node_t *node)
 void
 smb_node_notify_parents(smb_node_t *dnode)
 {
-	smb_node_t *pnode = dnode;
+	smb_node_t *pnode;	/* parent */
 
 	SMB_NODE_VALID(dnode);
+	pnode = dnode->n_dnode;
 
-	while ((pnode = pnode->n_dnode) != NULL) {
+	while (pnode != NULL) {
 		SMB_NODE_VALID(pnode);
-		if ((pnode->flags & NODE_FLAGS_NOTIFY_CHANGE) &&
-		    (pnode->flags & NODE_FLAGS_WATCH_TREE)) {
-			pnode->flags |= NODE_FLAGS_CHANGED;
-			smb_process_node_notify_change_queue(pnode);
-		}
+		smb_notify_event(pnode, 0, dnode->od_name);
+		/* cd .. */
+		dnode = pnode;
+		pnode = dnode->n_dnode;
 	}
 }
 
@@ -1140,6 +1177,9 @@ smb_node_constructor(void *buf, void *un, int kmflags)
 	    offsetof(smb_ofile_t, f_nnd));
 	smb_llist_constructor(&node->n_lock_list, sizeof (smb_lock_t),
 	    offsetof(smb_lock_t, l_lnd));
+	mutex_init(&node->n_fcn.fcn_mutex, NULL, MUTEX_DEFAULT, NULL);
+	list_create(&node->n_fcn.fcn_watchers, sizeof (smb_request_t),
+	    offsetof(smb_request_t, sr_ncr.nc_lnd));
 	cv_init(&node->n_oplock.ol_cv, NULL, CV_DEFAULT, NULL);
 	mutex_init(&node->n_oplock.ol_mutex, NULL, MUTEX_DEFAULT, NULL);
 	list_create(&node->n_oplock.ol_grants, sizeof (smb_oplock_grant_t),
@@ -1165,6 +1205,8 @@ smb_node_destructor(void *buf, void *un)
 	rw_destroy(&node->n_lock);
 	cv_destroy(&node->n_oplock.ol_cv);
 	mutex_destroy(&node->n_oplock.ol_mutex);
+	list_destroy(&node->n_fcn.fcn_watchers);
+	mutex_destroy(&node->n_fcn.fcn_mutex);
 	smb_llist_destructor(&node->n_lock_list);
 	smb_llist_destructor(&node->n_ofile_list);
 	list_destroy(&node->n_oplock.ol_grants);
@@ -1416,9 +1458,12 @@ smb_node_setattr(smb_request_t *sr, smb_node_t *node,
 	if (tmp_attr.sa_mask)
 		smb_node_set_cached_timestamps(node, &tmp_attr);
 
-	if (tmp_attr.sa_mask & SMB_AT_MTIME || explicit_times & SMB_AT_MTIME) {
-		if (node->n_dnode != NULL)
-			smb_node_notify_change(node->n_dnode);
+	if ((tmp_attr.sa_mask & SMB_AT_MTIME) ||
+	    (explicit_times & SMB_AT_MTIME)) {
+		if (node->n_dnode != NULL) {
+			smb_node_notify_change(node->n_dnode,
+			    FILE_ACTION_MODIFIED, node->od_name);
+		}
 	}
 
 	return (0);

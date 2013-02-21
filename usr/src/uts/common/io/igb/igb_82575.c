@@ -25,6 +25,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013, Nexenta Systems, Inc. All rights reserved.
  */
 
 /* IntelVersion: 1.146.2.2 v3_3_14_3_BHSW1 */
@@ -307,8 +308,8 @@ e1000_init_mac_params_82575(struct e1000_hw *hw)
 		mac->rar_entry_count = E1000_RAR_ENTRIES_82580;
 	if (mac->type == e1000_i350) {
 		mac->rar_entry_count = E1000_RAR_ENTRIES_I350;
-		/* Enable EEE default settings for i350 */
-		dev_spec->eee_disable = B_FALSE;
+		/* Disable EEE default settings for i350 */
+		dev_spec->eee_disable = B_TRUE;
 	}
 	/* Set if part includes ASF firmware */
 	mac->asf_firmware_present = true;

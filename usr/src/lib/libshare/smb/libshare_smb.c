@@ -916,6 +916,8 @@ struct smb_proto_option_defs {
 	    SMB_REFRESH_REFRESH },
 	{ SMB_CI_PRINT_ENABLE, 0, 0, print_enable_validator,
 	    SMB_REFRESH_REFRESH },
+	{ SMB_CI_TRAVERSE_MOUNTS, 0, 0, true_false_validator,
+	    SMB_REFRESH_REFRESH },
 	{ SMB_CI_MAP, 0, MAX_VALUE_BUFLEN, cmd_validator, SMB_REFRESH_REFRESH },
 	{ SMB_CI_UNMAP, 0, MAX_VALUE_BUFLEN, cmd_validator,
 	    SMB_REFRESH_REFRESH },

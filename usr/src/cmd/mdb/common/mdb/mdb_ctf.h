@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  */
 /*
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
  */
 
@@ -134,17 +135,15 @@ extern int mdb_ctf_member_info(mdb_ctf_id_t, const char *,
     ulong_t *, mdb_ctf_id_t *);
 extern int mdb_ctf_offsetof(mdb_ctf_id_t, const char *, ulong_t *);
 extern int mdb_ctf_num_members(mdb_ctf_id_t);
+extern int mdb_ctf_offsetof_by_name(const char *, const char *);
 
 extern ssize_t mdb_ctf_offset_to_name(mdb_ctf_id_t, ulong_t, char *, size_t,
     int, mdb_ctf_id_t *, ulong_t *);
 
-#define	MDB_CTF_VREAD_IGNORE_GROW	0x01
-#define	MDB_CTF_VREAD_IGNORE_ABSENT	0x02
-#define	MDB_CTF_VREAD_IGNORE_UNIONS	0x04
+#define	MDB_CTF_VREAD_QUIET		0x100
 
-#define	MDB_CTF_VREAD_IGNORE_ALL	0x07
-
-extern int mdb_ctf_vread(void *, const char *, uintptr_t, uint_t);
+extern int mdb_ctf_vread(void *, const char *, const char *,
+    uintptr_t, uint_t);
 extern int mdb_ctf_readsym(void *, const char *, const char *, uint_t);
 
 #ifdef _MDB

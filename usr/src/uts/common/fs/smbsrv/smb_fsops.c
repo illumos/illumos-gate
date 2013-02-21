@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/sid.h>
@@ -423,7 +424,8 @@ smb_fsop_create_stream(smb_request_t *sr, cred_t *cr,
 
 	/* notify change to the unnamed stream */
 	if (rc == 0)
-		smb_node_notify_change(dnode);
+		smb_node_notify_change(dnode,
+		    FILE_ACTION_ADDED_STREAM, fname);
 
 	return (rc);
 }
@@ -679,9 +681,10 @@ smb_fsop_remove(
 		rc = smb_vop_stream_remove(fnode->vp, name, flags, cr);
 
 		/* notify change to the unnamed stream */
-		if ((rc == 0) && fnode->n_dnode)
-			smb_node_notify_change(fnode->n_dnode);
-
+		if ((rc == 0) && fnode->n_dnode) {
+			smb_node_notify_change(fnode->n_dnode,
+			    FILE_ACTION_REMOVED_STREAM, fnode->od_name);
+		}
 	} else if (smb_is_stream_name(name)) {
 		smb_stream_parse_name(name, fname, sname);
 
@@ -710,8 +713,10 @@ smb_fsop_remove(
 		smb_node_release(fnode);
 
 		/* notify change to the unnamed stream */
-		if (rc == 0)
-			smb_node_notify_change(dnode);
+		if (rc == 0) {
+			smb_node_notify_change(dnode,
+			    FILE_ACTION_REMOVED_STREAM, fname);
+		}
 	} else {
 		rc = smb_vop_remove(dnode->vp, name, flags, cr);
 

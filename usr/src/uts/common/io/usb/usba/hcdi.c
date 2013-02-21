@@ -343,26 +343,20 @@ usba_hcdi_create_stats(usba_hcdi_t *hcdi, int instance)
 		    "Command Timed Out", KSTAT_DATA_UINT64);
 		kstat_named_init(&esp->cc_not_accessed,
 		    "Not Accessed By Hardware", KSTAT_DATA_UINT64);
+		kstat_named_init(&esp->cc_no_resources,
+		    "No Resources", KSTAT_DATA_UINT64);
 		kstat_named_init(&esp->cc_unspecified_err,
 		    "Unspecified Error", KSTAT_DATA_UINT64);
-#ifdef	NOTYETNEEDED
-		kstat_named_init(&esp->hcdi_usb_failure,
-		    "USB Failure", KSTAT_DATA_UINT64);
-		kstat_named_init(&esp->hcdi_usb_no_resources,
-		    "No Resources", KSTAT_DATA_UINT64);
-		kstat_named_init(&esp->hcdi_usb_no_bandwidth,
-		    "No Bandwidth", KSTAT_DATA_UINT64);
-		kstat_named_init(&esp->hcdi_usb_pipe_reserved,
-		    "Pipe Reserved", KSTAT_DATA_UINT64);
-		kstat_named_init(&esp->hcdi_usb_pipe_unshareable,
-		    "Pipe Unshareable", KSTAT_DATA_UINT64);
-		kstat_named_init(&esp->hcdi_usb_not_supported,
-		    "Function Not Supported", KSTAT_DATA_UINT64);
-		kstat_named_init(&esp->hcdi_usb_pipe_error,
-		    "Pipe Error", KSTAT_DATA_UINT64);
-		kstat_named_init(&esp->hcdi_usb_pipe_busy,
-		    "Pipe Busy", KSTAT_DATA_UINT64);
-#endif
+		kstat_named_init(&esp->cc_stopped_polling,
+		    "Stopped Polling", KSTAT_DATA_UINT64);
+		kstat_named_init(&esp->cc_pipe_closing,
+		    "Pipe Closing", KSTAT_DATA_UINT64);
+		kstat_named_init(&esp->cc_pipe_reset,
+		    "Pipe Reset", KSTAT_DATA_UINT64);
+		kstat_named_init(&esp->cc_not_supported,
+		    "Command Not Supported", KSTAT_DATA_UINT64);
+		kstat_named_init(&esp->cc_flushed,
+		    "Request Flushed", KSTAT_DATA_UINT64);
 
 		HCDI_ERROR_STATS(hcdi)->ks_private = hcdi;
 		HCDI_ERROR_STATS(hcdi)->ks_update = nulldev;

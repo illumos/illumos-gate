@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
- * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -49,6 +49,8 @@
 #else
 #define	ZFS_OBJ_NAME	"libzpool.so.1"
 #endif
+
+#define	ZFS_STRUCT	"struct " ZFS_OBJ_NAME "`"
 
 #ifndef _KERNEL
 int aok;
@@ -94,38 +96,12 @@ getmember(uintptr_t addr, const char *type, mdb_ctf_id_t *idp,
 	return (0);
 }
 
-#define	GETMEMB(addr, type, member, dest) \
-	getmember(addr, #type, NULL, #member, sizeof (dest), &(dest))
+#define	GETMEMB(addr, structname, member, dest) \
+	getmember(addr, ZFS_STRUCT structname, NULL, #member, \
+	sizeof (dest), &(dest))
 
 #define	GETMEMBID(addr, ctfid, member, dest) \
 	getmember(addr, NULL, ctfid, #member, sizeof (dest), &(dest))
-
-static int
-getrefcount(uintptr_t addr, mdb_ctf_id_t *id,
-    const char *member, uint64_t *rc)
-{
-	static int gotid;
-	static mdb_ctf_id_t rc_id;
-	ulong_t off;
-
-	if (!gotid) {
-		if (mdb_ctf_lookup_by_name("struct refcount", &rc_id) == -1) {
-			mdb_warn("couldn't find struct refcount");
-			return (DCMD_ERR);
-		}
-		gotid = TRUE;
-	}
-
-	if (mdb_ctf_offsetof(*id, member, &off) == -1) {
-		char name[64];
-		mdb_ctf_type_name(*id, name, sizeof (name));
-		mdb_warn("couldn't find member %s of type %s\n", member, name);
-		return (DCMD_ERR);
-	}
-	off /= 8;
-
-	return (GETMEMBID(addr + off, &rc_id, rc_count, *rc));
-}
 
 static boolean_t
 strisprint(const char *cp)
@@ -188,9 +164,8 @@ freelist_walk_step(mdb_walk_state_t *wsp)
 	return (WALK_NEXT);
 }
 
-
 static int
-dataset_name(uintptr_t addr, char *buf)
+mdb_dsl_dir_name(uintptr_t addr, char *buf)
 {
 	static int gotid;
 	static mdb_ctf_id_t dd_id;
@@ -198,7 +173,7 @@ dataset_name(uintptr_t addr, char *buf)
 	char dd_myname[MAXNAMELEN];
 
 	if (!gotid) {
-		if (mdb_ctf_lookup_by_name("struct dsl_dir",
+		if (mdb_ctf_lookup_by_name(ZFS_STRUCT "dsl_dir",
 		    &dd_id) == -1) {
 			mdb_warn("couldn't find struct dsl_dir");
 			return (DCMD_ERR);
@@ -211,7 +186,7 @@ dataset_name(uintptr_t addr, char *buf)
 	}
 
 	if (dd_parent) {
-		if (dataset_name(dd_parent, buf))
+		if (mdb_dsl_dir_name(dd_parent, buf))
 			return (DCMD_ERR);
 		strcat(buf, "/");
 	}
@@ -236,12 +211,12 @@ objset_name(uintptr_t addr, char *buf)
 	buf[0] = '\0';
 
 	if (!gotid) {
-		if (mdb_ctf_lookup_by_name("struct objset",
+		if (mdb_ctf_lookup_by_name(ZFS_STRUCT "objset",
 		    &os_id) == -1) {
 			mdb_warn("couldn't find struct objset");
 			return (DCMD_ERR);
 		}
-		if (mdb_ctf_lookup_by_name("struct dsl_dataset",
+		if (mdb_ctf_lookup_by_name(ZFS_STRUCT "dsl_dataset",
 		    &ds_id) == -1) {
 			mdb_warn("couldn't find struct dsl_dataset");
 			return (DCMD_ERR);
@@ -263,7 +238,7 @@ objset_name(uintptr_t addr, char *buf)
 		return (DCMD_ERR);
 	}
 
-	if (ds_dir && dataset_name(ds_dir, buf))
+	if (ds_dir && mdb_dsl_dir_name(ds_dir, buf))
 		return (DCMD_ERR);
 
 	if (ds_snapname[0]) {
@@ -400,58 +375,53 @@ blkptr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+typedef struct mdb_dmu_buf_impl {
+	struct {
+		uint64_t db_object;
+	} db;
+	void *db_objset;
+	uint64_t db_level;
+	uint64_t db_blkid;
+	struct {
+		uint64_t rc_count;
+	} db_holds;
+} mdb_dmu_buf_impl_t;
+
 /* ARGSUSED */
 static int
 dbuf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	mdb_ctf_id_t id;
-	dmu_buf_t db;
-	uintptr_t objset;
-	uint8_t level;
-	uint64_t blkid;
-	uint64_t holds;
+	mdb_dmu_buf_impl_t db;
 	char objectname[32];
 	char blkidname[32];
 	char path[MAXNAMELEN];
 
-	if (DCMD_HDRSPEC(flags)) {
+	if (DCMD_HDRSPEC(flags))
 		mdb_printf("        addr object lvl blkid holds os\n");
-	}
 
-	if (mdb_ctf_lookup_by_name("struct dmu_buf_impl", &id) == -1) {
-		mdb_warn("couldn't find struct dmu_buf_impl_t");
+	if (mdb_ctf_vread(&db, ZFS_STRUCT "dmu_buf_impl", "mdb_dmu_buf_impl_t",
+	    addr, 0) == -1)
 		return (DCMD_ERR);
-	}
 
-	if (GETMEMBID(addr, &id, db_objset, objset) ||
-	    GETMEMBID(addr, &id, db, db) ||
-	    GETMEMBID(addr, &id, db_level, level) ||
-	    GETMEMBID(addr, &id, db_blkid, blkid)) {
-		return (WALK_ERR);
-	}
-
-	if (getrefcount(addr, &id, "db_holds", &holds)) {
-		return (WALK_ERR);
-	}
-
-	if (db.db_object == DMU_META_DNODE_OBJECT)
+	if (db.db.db_object == DMU_META_DNODE_OBJECT)
 		(void) strcpy(objectname, "mdn");
 	else
 		(void) mdb_snprintf(objectname, sizeof (objectname), "%llx",
-		    (u_longlong_t)db.db_object);
+		    (u_longlong_t)db.db.db_object);
 
-	if (blkid == DMU_BONUS_BLKID)
+	if (db.db_blkid == DMU_BONUS_BLKID)
 		(void) strcpy(blkidname, "bonus");
 	else
 		(void) mdb_snprintf(blkidname, sizeof (blkidname), "%llx",
-		    (u_longlong_t)blkid);
+		    (u_longlong_t)db.db_blkid);
 
-	if (objset_name(objset, path)) {
-		return (WALK_ERR);
+	if (objset_name((uintptr_t)db.db_objset, path)) {
+		return (DCMD_ERR);
 	}
 
-	mdb_printf("%p %8s %1u %9s %2llu %s\n",
-	    addr, objectname, level, blkidname, holds, path);
+	mdb_printf("%p %8s %1u %9s %2llu %s\n", addr,
+	    objectname, (int)db.db_level, blkidname,
+	    db.db_holds.rc_count, path);
 
 	return (DCMD_OK);
 }
@@ -735,7 +705,7 @@ dbufs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		}
 	}
 
-	if (mdb_ctf_lookup_by_name("struct dmu_buf_impl", &data.id) == -1) {
+	if (mdb_ctf_lookup_by_name(ZFS_STRUCT "dmu_buf_impl", &data.id) == -1) {
 		mdb_warn("couldn't find struct dmu_buf_impl_t");
 		return (DCMD_ERR);
 	}
@@ -801,7 +771,7 @@ abuf_find(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		}
 	}
 
-	if (mdb_ctf_lookup_by_name("struct arc_buf_hdr", &data.id) == -1) {
+	if (mdb_ctf_lookup_by_name(ZFS_STRUCT "arc_buf_hdr", &data.id) == -1) {
 		mdb_warn("couldn't find struct arc_buf_hdr");
 		return (DCMD_ERR);
 	}
@@ -821,6 +791,12 @@ abuf_find(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+
+typedef struct dbgmsg_arg {
+	boolean_t da_verbose;
+	boolean_t da_address;
+} dbgmsg_arg_t;
+
 /* ARGSUSED */
 static int
 dbgmsg_cb(uintptr_t addr, const void *unknown, void *arg)
@@ -829,12 +805,13 @@ dbgmsg_cb(uintptr_t addr, const void *unknown, void *arg)
 	static boolean_t gotid;
 	static ulong_t off;
 
-	int *verbosep = arg;
+	dbgmsg_arg_t *da = arg;
 	time_t timestamp;
 	char buf[1024];
 
 	if (!gotid) {
-		if (mdb_ctf_lookup_by_name("struct zfs_dbgmsg", &id) == -1) {
+		if (mdb_ctf_lookup_by_name(ZFS_STRUCT "zfs_dbgmsg", &id) ==
+		    -1) {
 			mdb_warn("couldn't find struct zfs_dbgmsg");
 			return (WALK_ERR);
 		}
@@ -856,12 +833,14 @@ dbgmsg_cb(uintptr_t addr, const void *unknown, void *arg)
 		return (DCMD_ERR);
 	}
 
-	if (*verbosep)
+	if (da->da_address)
+		mdb_printf("%p ", addr);
+	if (da->da_verbose)
 		mdb_printf("%Y ", timestamp);
 
 	mdb_printf("%s\n", buf);
 
-	if (*verbosep)
+	if (da->da_verbose)
 		(void) mdb_call_dcmd("whatis", addr, DCMD_ADDRSPEC, 0, NULL);
 
 	return (WALK_NEXT);
@@ -872,10 +851,11 @@ static int
 dbgmsg(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	GElf_Sym sym;
-	int verbose = FALSE;
+	dbgmsg_arg_t da = { 0 };
 
 	if (mdb_getopts(argc, argv,
-	    'v', MDB_OPT_SETBITS, TRUE, &verbose,
+	    'v', MDB_OPT_SETBITS, B_TRUE, &da.da_verbose,
+	    'a', MDB_OPT_SETBITS, B_TRUE, &da.da_address,
 	    NULL) != argc)
 		return (DCMD_USAGE);
 
@@ -884,7 +864,7 @@ dbgmsg(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	if (mdb_pwalk("list", dbgmsg_cb, &verbose, sym.st_value) != 0) {
+	if (mdb_pwalk("list", dbgmsg_cb, &da, sym.st_value) != 0) {
 		mdb_warn("can't walk zfs_dbgmsgs");
 		return (DCMD_ERR);
 	}
@@ -906,12 +886,12 @@ arc_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	static const char *bytestats[] = {
 		"p", "c", "c_min", "c_max", "size", "duplicate_buffers_size",
+		"arc_meta_used", "arc_meta_limit", "arc_meta_max",
 		NULL
 	};
 
 	static const char *extras[] = {
 		"arc_no_grow", "arc_tempreserve",
-		"arc_meta_used", "arc_meta_limit", "arc_meta_max",
 		NULL
 	};
 
@@ -1096,6 +1076,10 @@ spa_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+typedef struct mdb_spa_config_spa {
+	nvlist_t *spa_config;
+} mdb_spa_config_spa_t;
+
 /*
  * ::spa_config
  *
@@ -1107,15 +1091,14 @@ spa_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 static int
 spa_print_config(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	spa_t spa;
+	mdb_spa_config_spa_t spa;
 
 	if (argc != 0 || !(flags & DCMD_ADDRSPEC))
 		return (DCMD_USAGE);
 
-	if (mdb_vread(&spa, sizeof (spa), addr) == -1) {
-		mdb_warn("failed to read spa_t at %p", addr);
+	if (mdb_ctf_vread(&spa, ZFS_STRUCT "spa", "mdb_spa_config_spa_t",
+	    addr, 0) == -1)
 		return (DCMD_ERR);
-	}
 
 	if (spa.spa_config == NULL) {
 		mdb_printf("(none)\n");
@@ -1369,8 +1352,8 @@ metaslab_walk_step(mdb_walk_state_t *wsp)
 		ASSERT(mw->mw_nummss == 0);
 
 		vdevp = mw->mw_vdevs[mw->mw_curvdev];
-		if (GETMEMB(vdevp, struct vdev, vdev_ms, mssp) ||
-		    GETMEMB(vdevp, struct vdev, vdev_ms_count, mw->mw_nummss)) {
+		if (GETMEMB(vdevp, "vdev", vdev_ms, mssp) ||
+		    GETMEMB(vdevp, "vdev", vdev_ms_count, mw->mw_nummss)) {
 			return (WALK_ERR);
 		}
 
@@ -1417,9 +1400,9 @@ metaslab_walk_init(mdb_walk_state_t *wsp)
 
 	mw = mdb_zalloc(sizeof (metaslab_walk_data_t), UM_SLEEP | UM_GC);
 
-	if (GETMEMB(wsp->walk_addr, struct spa, spa_root_vdev, root_vdevp) ||
-	    GETMEMB(root_vdevp, struct vdev, vdev_children, mw->mw_numvdevs) ||
-	    GETMEMB(root_vdevp, struct vdev, vdev_child, childp)) {
+	if (GETMEMB(wsp->walk_addr, "spa", spa_root_vdev, root_vdevp) ||
+	    GETMEMB(root_vdevp, "vdev", vdev_children, mw->mw_numvdevs) ||
+	    GETMEMB(root_vdevp, "vdev", vdev_child, childp)) {
 		return (DCMD_ERR);
 	}
 
@@ -1482,11 +1465,11 @@ space_cb(uintptr_t addr, const void *unknown, void *arg)
 	space_data_t *sd = arg;
 	mdb_metaslab_t ms;
 
-	if (GETMEMB(addr, struct metaslab, ms_allocmap, ms.ms_allocmap) ||
-	    GETMEMB(addr, struct metaslab, ms_freemap, ms.ms_freemap) ||
-	    GETMEMB(addr, struct metaslab, ms_map, ms.ms_map) ||
-	    GETMEMB(addr, struct metaslab, ms_smo, ms.ms_smo) ||
-	    GETMEMB(addr, struct metaslab, ms_smo_syncing, ms.ms_smo_syncing)) {
+	if (GETMEMB(addr, "metaslab", ms_allocmap, ms.ms_allocmap) ||
+	    GETMEMB(addr, "metaslab", ms_freemap, ms.ms_freemap) ||
+	    GETMEMB(addr, "metaslab", ms_map, ms.ms_map) ||
+	    GETMEMB(addr, "metaslab", ms_smo, ms.ms_smo) ||
+	    GETMEMB(addr, "metaslab", ms_smo_syncing, ms.ms_smo_syncing)) {
 		return (WALK_ERR);
 	}
 
@@ -1525,33 +1508,33 @@ spa_space(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	space_data_t sd;
 	int shift = 20;
 	char *suffix = "M";
-	int bits = FALSE;
+	int bytes = B_FALSE;
 
-	if (mdb_getopts(argc, argv, 'b', MDB_OPT_SETBITS, TRUE, &bits, NULL) !=
+	if (mdb_getopts(argc, argv, 'b', MDB_OPT_SETBITS, TRUE, &bytes, NULL) !=
 	    argc)
 		return (DCMD_USAGE);
 	if (!(flags & DCMD_ADDRSPEC))
 		return (DCMD_USAGE);
 
-	if (bits) {
+	if (bytes) {
 		shift = 0;
 		suffix = "";
 	}
 
-	if (GETMEMB(addr, struct spa, spa_dsl_pool, spa.spa_dsl_pool) ||
-	    GETMEMB(addr, struct spa, spa_root_vdev, spa.spa_root_vdev) ||
-	    GETMEMB(spa.spa_root_vdev, struct vdev, vdev_children, children) ||
-	    GETMEMB(spa.spa_root_vdev, struct vdev, vdev_child, childaddr) ||
-	    GETMEMB(spa.spa_dsl_pool, struct dsl_pool,
+	if (GETMEMB(addr, "spa", spa_dsl_pool, spa.spa_dsl_pool) ||
+	    GETMEMB(addr, "spa", spa_root_vdev, spa.spa_root_vdev) ||
+	    GETMEMB(spa.spa_root_vdev, "vdev", vdev_children, children) ||
+	    GETMEMB(spa.spa_root_vdev, "vdev", vdev_child, childaddr) ||
+	    GETMEMB(spa.spa_dsl_pool, "dsl_pool",
 	    dp_root_dir, dp_root_dir) ||
-	    GETMEMB(dp_root_dir, struct dsl_dir, dd_phys, dd.dd_phys) ||
-	    GETMEMB(dp_root_dir, struct dsl_dir,
+	    GETMEMB(dp_root_dir, "dsl_dir", dd_phys, dd.dd_phys) ||
+	    GETMEMB(dp_root_dir, "dsl_dir",
 	    dd_space_towrite, dd.dd_space_towrite) ||
-	    GETMEMB(dd.dd_phys, struct dsl_dir_phys,
+	    GETMEMB(dd.dd_phys, "dsl_dir_phys",
 	    dd_used_bytes, dsp.dd_used_bytes) ||
-	    GETMEMB(dd.dd_phys, struct dsl_dir_phys,
+	    GETMEMB(dd.dd_phys, "dsl_dir_phys",
 	    dd_compressed_bytes, dsp.dd_compressed_bytes) ||
-	    GETMEMB(dd.dd_phys, struct dsl_dir_phys,
+	    GETMEMB(dd.dd_phys, "dsl_dir_phys",
 	    dd_uncompressed_bytes, dsp.dd_uncompressed_bytes)) {
 		return (DCMD_ERR);
 	}
@@ -1749,13 +1732,25 @@ typedef struct zio_print_args {
 	uint_t	zpa_flags;
 } zio_print_args_t;
 
+typedef struct mdb_zio {
+	enum zio_type io_type;
+	enum zio_stage io_stage;
+	void *io_waiter;
+	uint64_t io_timestamp;
+	void *io_spa;
+	struct {
+		struct {
+			void *list_next;
+		} list_head;
+	} io_parent_list;
+	int io_error;
+} mdb_zio_t;
+
 static int zio_child_cb(uintptr_t addr, const void *unknown, void *arg);
 
 static int
-zio_print_cb(uintptr_t addr, const void *data, void *priv)
+zio_print_cb(uintptr_t addr, const mdb_zio_t *zio, zio_print_args_t *zpa)
 {
-	const zio_t *zio = data;
-	zio_print_args_t *zpa = priv;
 	mdb_ctf_id_t type_enum, stage_enum;
 	int indent = zpa->zpa_current_depth;
 	const char *type, *stage;
@@ -1775,10 +1770,15 @@ zio_print_cb(uintptr_t addr, const void *data, void *priv)
 	else
 		type = "?";
 
-	if ((stage = mdb_ctf_enum_name(stage_enum, zio->io_stage)) != NULL)
-		stage += sizeof ("ZIO_STAGE_") - 1;
-	else
-		stage = "?";
+	if (zio->io_error == 0) {
+		stage = mdb_ctf_enum_name(stage_enum, zio->io_stage);
+		if (stage != NULL)
+			stage += sizeof ("ZIO_STAGE_") - 1;
+		else
+			stage = "?";
+	} else {
+		stage = "FAILED";
+	}
 
 	if (zpa->zpa_current_depth >= zpa->zpa_min_depth) {
 		if (zpa->zpa_flags & DCMD_PIPE_OUT) {
@@ -1797,9 +1797,11 @@ zio_print_cb(uintptr_t addr, const void *data, void *priv)
 		return (WALK_NEXT);
 
 	if (zpa->zpa_type == ZIO_WALK_PARENT)
-		laddr = addr + OFFSETOF(zio_t, io_parent_list);
+		laddr = addr + mdb_ctf_offsetof_by_name(ZFS_STRUCT "zio",
+		    "io_parent_list");
 	else
-		laddr = addr + OFFSETOF(zio_t, io_child_list);
+		laddr = addr + mdb_ctf_offsetof_by_name(ZFS_STRUCT "zio",
+		    "io_child_list");
 
 	zpa->zpa_current_depth++;
 	if (mdb_pwalk("list", zio_child_cb, zpa, laddr) != 0) {
@@ -1816,7 +1818,7 @@ static int
 zio_child_cb(uintptr_t addr, const void *unknown, void *arg)
 {
 	zio_link_t zl;
-	zio_t zio;
+	mdb_zio_t zio;
 	uintptr_t ziop;
 	zio_print_args_t *zpa = arg;
 
@@ -1830,10 +1832,8 @@ zio_child_cb(uintptr_t addr, const void *unknown, void *arg)
 	else
 		ziop = (uintptr_t)zl.zl_child;
 
-	if (mdb_vread(&zio, sizeof (zio_t), ziop) == -1) {
-		mdb_warn("failed to read zio_t at %p", ziop);
+	if (mdb_ctf_vread(&zio, ZFS_STRUCT "zio", "mdb_zio_t", ziop, 0) == -1)
 		return (WALK_ERR);
-	}
 
 	return (zio_print_cb(ziop, &zio, arg));
 }
@@ -1842,7 +1842,7 @@ zio_child_cb(uintptr_t addr, const void *unknown, void *arg)
 static int
 zio_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	zio_t zio;
+	mdb_zio_t zio;
 	zio_print_args_t zpa = { 0 };
 
 	if (!(flags & DCMD_ADDRSPEC))
@@ -1864,10 +1864,8 @@ zio_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		zpa.zpa_max_depth = 1;
 	}
 
-	if (mdb_vread(&zio, sizeof (zio_t), addr) == -1) {
-		mdb_warn("failed to read zio_t at %p", addr);
+	if (mdb_ctf_vread(&zio, ZFS_STRUCT "zio", "mdb_zio_t", addr, 0) == -1)
 		return (DCMD_ERR);
-	}
 
 	if (!(flags & DCMD_PIPE_OUT) && DCMD_HDRSPEC(flags))
 		mdb_printf("%<u>%-*s %-5s %-16s %-?s%</u>\n", ZIO_MAXWIDTH,
@@ -2063,12 +2061,11 @@ zio_walk_init(mdb_walk_state_t *wsp)
 static int
 zio_walk_step(mdb_walk_state_t *wsp)
 {
-	zio_t zio;
+	mdb_zio_t zio;
 
-	if (mdb_vread(&zio, sizeof (zio), wsp->walk_addr) == -1) {
-		mdb_warn("failed to read zio_t at %p", wsp->walk_addr);
+	if (mdb_ctf_vread(&zio, ZFS_STRUCT "zio", "mdb_zio_t",
+	    wsp->walk_addr, 0) == -1)
 		return (WALK_ERR);
-	}
 
 	if (wsp->walk_data != NULL && wsp->walk_data != zio.io_spa)
 		return (WALK_NEXT);
@@ -2084,19 +2081,20 @@ zio_walk_step(mdb_walk_state_t *wsp)
 static int
 zio_walk_root_step(mdb_walk_state_t *wsp)
 {
-	zio_t zio;
+	mdb_zio_t zio;
 
-	if (mdb_vread(&zio, sizeof (zio), wsp->walk_addr) == -1) {
-		mdb_warn("failed to read zio_t at %p", wsp->walk_addr);
+	if (mdb_ctf_vread(&zio, ZFS_STRUCT "zio", "mdb_zio_t",
+	    wsp->walk_addr, 0) == -1)
 		return (WALK_ERR);
-	}
 
 	if (wsp->walk_data != NULL && wsp->walk_data != zio.io_spa)
 		return (WALK_NEXT);
 
 	/* If the parent list is not empty, ignore */
-	if (zio.io_parent_list.list_head.list_next !=
-	    &((zio_t *)wsp->walk_addr)->io_parent_list.list_head)
+	if ((uintptr_t)zio.io_parent_list.list_head.list_next !=
+	    wsp->walk_addr +
+	    mdb_ctf_offsetof_by_name(ZFS_STRUCT "zio", "io_parent_list") +
+	    mdb_ctf_offsetof_by_name("struct list", "list_head"))
 		return (WALK_NEXT);
 
 	return (wsp->walk_callback(wsp->walk_addr, &zio, wsp->walk_cbdata));
@@ -2179,8 +2177,8 @@ zfs_blkstats(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (!(flags & DCMD_ADDRSPEC))
 		return (DCMD_USAGE);
 
-	if (GETMEMB(addr, struct spa, spa_dsl_pool, addr) ||
-	    GETMEMB(addr, struct dsl_pool, dp_blkstats, addr) ||
+	if (GETMEMB(addr, "spa", spa_dsl_pool, addr) ||
+	    GETMEMB(addr, "dsl_pool", dp_blkstats, addr) ||
 	    mdb_vread(&stats, sizeof (zfs_all_blkstats_t), addr) == -1) {
 		mdb_warn("failed to read data at %p;", addr);
 		mdb_printf("maybe no stats? run \"zpool scrub\" first.");
@@ -2334,8 +2332,14 @@ refcount(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	static int gotid;
 	static mdb_ctf_id_t rc_id;
 	ulong_t off;
+	boolean_t released = B_FALSE;
 
 	if (!(flags & DCMD_ADDRSPEC))
+		return (DCMD_USAGE);
+
+	if (mdb_getopts(argc, argv,
+	    'r', MDB_OPT_SETBITS, B_TRUE, &released,
+	    NULL) != argc)
 		return (DCMD_USAGE);
 
 	if (!gotid) {
@@ -2345,7 +2349,7 @@ refcount(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		 * refcount definition from the ZFS module, in case it has
 		 * been compiled debug but genunix is nondebug.
 		 */
-		if (mdb_ctf_lookup_by_name("struct " ZFS_OBJ_NAME "`refcount",
+		if (mdb_ctf_lookup_by_name(ZFS_STRUCT "refcount",
 		    &rc_id) == -1) {
 			mdb_warn("couldn't find struct refcount");
 			return (DCMD_ERR);
@@ -2353,9 +2357,14 @@ refcount(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		gotid = TRUE;
 	}
 
-	if (GETMEMBID(addr, &rc_id, rc_count, rc_count) ||
-	    GETMEMBID(addr, &rc_id, rc_removed_count, rc_removed_count))
+	if (GETMEMBID(addr, &rc_id, rc_count, rc_count))
 		return (DCMD_ERR);
+
+	if (GETMEMBID(addr, &rc_id, rc_removed_count, rc_removed_count)) {
+		mdb_printf("refcount_t at %p has %llu current holds\n",
+		    addr, (longlong_t)rc_count);
+		return (DCMD_OK);
+	}
 
 	mdb_printf("refcount_t at %p has %llu current holds, "
 	    "%llu recently released holds\n",
@@ -2368,12 +2377,14 @@ refcount(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	rc_list = addr + off/NBBY;
 	mdb_pwalk("list", reference_cb, (void*)B_FALSE, rc_list);
 
-	if (rc_removed_count > 0)
-		mdb_printf("released holds:\n");
-	if (mdb_ctf_offsetof(rc_id, "rc_removed", &off) == -1)
-		return (DCMD_ERR);
-	rc_removed = addr + off/NBBY;
-	mdb_pwalk("list", reference_cb, (void*)B_TRUE, rc_removed);
+	if (released) {
+		if (rc_removed_count > 0)
+			mdb_printf("released holds:\n");
+		if (mdb_ctf_offsetof(rc_id, "rc_removed", &off) == -1)
+			return (DCMD_ERR);
+		rc_removed = addr + off/NBBY;
+		mdb_pwalk("list", reference_cb, (void*)B_TRUE, rc_removed);
+	}
 
 	return (DCMD_OK);
 }
@@ -2419,7 +2430,7 @@ sa_get_off_table(uintptr_t addr, uint32_t **off_tab, int attr_count)
 {
 	uintptr_t idx_table;
 
-	if (GETMEMB(addr, struct sa_idx_tab, sa_idx_tab, idx_table)) {
+	if (GETMEMB(addr, "sa_idx_tab", sa_idx_tab, idx_table)) {
 		mdb_printf("can't find offset table in sa_idx_tab\n");
 		return (-1);
 	}
@@ -2457,22 +2468,22 @@ sa_attr_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	else
 		return (DCMD_USAGE);
 
-	if (GETMEMB(addr, struct sa_handle, sa_bonus_tab, bonus_tab) ||
-	    GETMEMB(addr, struct sa_handle, sa_spill_tab, spill_tab) ||
-	    GETMEMB(addr, struct sa_handle, sa_os, os) ||
-	    GETMEMB(addr, struct sa_handle, sa_bonus, db_bonus) ||
-	    GETMEMB(addr, struct sa_handle, sa_spill, db_spill)) {
+	if (GETMEMB(addr, "sa_handle", sa_bonus_tab, bonus_tab) ||
+	    GETMEMB(addr, "sa_handle", sa_spill_tab, spill_tab) ||
+	    GETMEMB(addr, "sa_handle", sa_os, os) ||
+	    GETMEMB(addr, "sa_handle", sa_bonus, db_bonus) ||
+	    GETMEMB(addr, "sa_handle", sa_spill, db_spill)) {
 		mdb_printf("Can't find necessary information in sa_handle "
 		    "in sa_handle\n");
 		return (DCMD_ERR);
 	}
 
-	if (GETMEMB(os, struct objset, os_sa, os_sa)) {
+	if (GETMEMB(os, "objset", os_sa, os_sa)) {
 		mdb_printf("Can't find os_sa in objset\n");
 		return (DCMD_ERR);
 	}
 
-	if (GETMEMB(os_sa, struct sa_os, sa_num_attrs, attr_count)) {
+	if (GETMEMB(os_sa, "sa_os", sa_num_attrs, attr_count)) {
 		mdb_printf("Can't find sa_num_attrs\n");
 		return (DCMD_ERR);
 	}
@@ -2488,7 +2499,7 @@ sa_attr_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			return (DCMD_ERR);
 		}
 
-		if (GETMEMB(db_bonus, struct dmu_buf, db_data, db_data)) {
+		if (GETMEMB(db_bonus, "dmu_buf", db_data, db_data)) {
 			mdb_printf("can't find db_data in bonus dbuf\n");
 			return (DCMD_ERR);
 		}
@@ -2503,7 +2514,7 @@ sa_attr_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		    attr_count) == -1) {
 			return (DCMD_ERR);
 		}
-		if (GETMEMB(db_spill, struct dmu_buf, db_data, db_data)) {
+		if (GETMEMB(db_spill, "dmu_buf", db_data, db_data)) {
 			mdb_printf("can't find db_data in spill dbuf\n");
 			return (DCMD_ERR);
 		}
@@ -2814,7 +2825,8 @@ zfs_acl_node_walk_init(mdb_walk_state_t *wsp)
 		return (WALK_ERR);
 	}
 
-	wsp->walk_addr += OFFSETOF(zfs_acl_t, z_acl);
+	wsp->walk_addr +=
+	    mdb_ctf_offsetof_by_name(ZFS_STRUCT "zfs_acl", "z_acl");
 
 	if (mdb_layered_walk("list", wsp) == -1) {
 		mdb_warn("failed to walk 'list'\n");
@@ -2974,6 +2986,58 @@ zfs_aces_walk_step(mdb_walk_state_t *wsp)
 	return (status);
 }
 
+typedef struct mdb_zfs_rrwlock {
+	kthread_t	*rr_writer;
+	boolean_t	rr_writer_wanted;
+} mdb_zfs_rrwlock_t;
+
+static uint_t rrw_key;
+
+/* ARGSUSED */
+static int
+rrwlock(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	mdb_zfs_rrwlock_t rrw;
+
+	if (rrw_key == 0) {
+		if (mdb_ctf_readsym(&rrw_key, "uint_t", "rrw_tsd_key", 0) == -1)
+			return (DCMD_ERR);
+	}
+
+	if (mdb_ctf_vread(&rrw, "rrwlock_t", "mdb_zfs_rrwlock_t", addr,
+	    0) == -1)
+		return (DCMD_ERR);
+
+	if (rrw.rr_writer != NULL) {
+		mdb_printf("write lock held by thread %p\n", rrw.rr_writer);
+		return (DCMD_OK);
+	}
+
+	if (rrw.rr_writer_wanted) {
+		mdb_printf("writer wanted\n");
+	}
+
+	mdb_printf("anonymous references:\n");
+	(void) mdb_call_dcmd("refcount", addr +
+	    mdb_ctf_offsetof_by_name(ZFS_STRUCT "rrwlock", "rr_anon_rcount"),
+	    DCMD_ADDRSPEC, 0, NULL);
+
+	mdb_printf("linked references:\n");
+	(void) mdb_call_dcmd("refcount", addr +
+	    mdb_ctf_offsetof_by_name(ZFS_STRUCT "rrwlock", "rr_linked_rcount"),
+	    DCMD_ADDRSPEC, 0, NULL);
+
+	/*
+	 * XXX This should find references from
+	 * "::walk thread | ::tsd -v <rrw_key>", but there is no support
+	 * for programmatic consumption of dcmds, so this would be
+	 * difficult, potentially requiring reimplementing ::tsd (both
+	 * user and kernel versions) in this MDB module.
+	 */
+
+	return (DCMD_OK);
+}
+
 /*
  * MDB module linkage information:
  *
@@ -3014,7 +3078,9 @@ static const mdb_dcmd_t dcmds[] = {
 	    "given a spa_t, print block type stats from last scrub",
 	    zfs_blkstats },
 	{ "zfs_params", "", "print zfs tunable parameters", zfs_params },
-	{ "refcount", "", "print refcount_t holders", refcount },
+	{ "refcount", ":[-r]\n"
+	    "\t-r display recently removed references",
+	    "print refcount_t holders", refcount },
 	{ "zap_leaf", "", "print zap_leaf_phys_t", zap_leaf },
 	{ "zfs_aces", ":[-v]", "print all ACEs from a zfs_acl_t",
 	    zfs_acl_dump },
@@ -3024,33 +3090,35 @@ static const mdb_dcmd_t dcmds[] = {
 	    sa_attr_table},
 	{ "sa_attr", ": attr_id",
 	    "print SA attribute address when given sa_handle_t", sa_attr_print},
-	{ "zfs_dbgmsg", ":[-v]",
+	{ "zfs_dbgmsg", ":[-va]",
 	    "print zfs debug log", dbgmsg},
+	{ "rrwlock", ":",
+	    "print rrwlock_t, including readers", rrwlock},
 	{ NULL }
 };
 
 static const mdb_walker_t walkers[] = {
 	{ "zms_freelist", "walk ZFS metaslab freelist",
-		freelist_walk_init, freelist_walk_step, NULL },
+	    freelist_walk_init, freelist_walk_step, NULL },
 	{ "txg_list", "given any txg_list_t *, walk all entries in all txgs",
-		txg_list_walk_init, txg_list_walk_step, NULL },
+	    txg_list_walk_init, txg_list_walk_step, NULL },
 	{ "txg_list0", "given any txg_list_t *, walk all entries in txg 0",
-		txg_list0_walk_init, txg_list_walk_step, NULL },
+	    txg_list0_walk_init, txg_list_walk_step, NULL },
 	{ "txg_list1", "given any txg_list_t *, walk all entries in txg 1",
-		txg_list1_walk_init, txg_list_walk_step, NULL },
+	    txg_list1_walk_init, txg_list_walk_step, NULL },
 	{ "txg_list2", "given any txg_list_t *, walk all entries in txg 2",
-		txg_list2_walk_init, txg_list_walk_step, NULL },
+	    txg_list2_walk_init, txg_list_walk_step, NULL },
 	{ "txg_list3", "given any txg_list_t *, walk all entries in txg 3",
-		txg_list3_walk_init, txg_list_walk_step, NULL },
+	    txg_list3_walk_init, txg_list_walk_step, NULL },
 	{ "zio", "walk all zio structures, optionally for a particular spa_t",
-		zio_walk_init, zio_walk_step, NULL },
-	{ "zio_root", "walk all root zio_t structures, optionally for a "
-	    "particular spa_t",
-		zio_walk_init, zio_walk_root_step, NULL },
+	    zio_walk_init, zio_walk_step, NULL },
+	{ "zio_root",
+	    "walk all root zio_t structures, optionally for a particular spa_t",
+	    zio_walk_init, zio_walk_root_step, NULL },
 	{ "spa", "walk all spa_t entries in the namespace",
-		spa_walk_init, spa_walk_step, NULL },
+	    spa_walk_init, spa_walk_step, NULL },
 	{ "metaslab", "given a spa_t *, walk all metaslab_t structures",
-		metaslab_walk_init, metaslab_walk_step, NULL },
+	    metaslab_walk_init, metaslab_walk_step, NULL },
 	{ "zfs_acl_node", "given a zfs_acl_t, walk all zfs_acl_nodes",
 	    zfs_acl_node_walk_init, zfs_acl_node_walk_step, NULL },
 	{ "zfs_acl_node_aces", "given a zfs_acl_node_t, walk all ACEs",

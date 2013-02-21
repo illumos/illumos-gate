@@ -1,9 +1,11 @@
 '\" te
-.\"  Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2013 Nexenta Systems, Inc.  All Rights Reserved.
+.\" Copyright (c) 2013 by Delphix. All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DUMPADM 1M "Apr 10, 2008"
+.TH DUMPADM 1M "Feb 15, 2013"
 .SH NAME
 dumpadm \- configure operating system crash dump
 .SH SYNOPSIS
@@ -11,7 +13,7 @@ dumpadm \- configure operating system crash dump
 .nf
 \fB/usr/sbin/dumpadm\fR [\fB-nuy\fR] [\fB-c\fR \fIcontent-type\fR] [\fB-d\fR \fIdump-device\fR]
      [\fB-m\fR \fImin\fRk | \fImin\fRm | \fImin\fR%] [\fB-s\fR \fIsavecore-dir\fR]
-     [\fB-r\fR \fIroot-dir\fR]
+     [\fB-r\fR \fIroot-dir\fR] [\fB-z\fR on | off]
 .fi
 
 .SH DESCRIPTION
@@ -35,10 +37,17 @@ your support engineer to aid in diagnosing the problem. As such, it is vital
 that the crash dump be retrieved and given to your support provider. Following
 an operating system crash, the \fBsavecore\fR(1M) utility is executed
 automatically during boot to retrieve the crash dump from the dump device, and
-write it to a pair of files in your file system named \fIunix.X\fR and
-\fIvmcore.X\fR, where X is an integer identifying the dump. Together, these
-data files form the \fIsaved crash dump\fR. The directory in which the crash
+write it to the file system. The directory in which the crash
 dump is saved on reboot can also be configured using \fBdumpadm\fR.
+.sp
+.LP
+When the operating system takes a crash dump the default behavior is to
+compress the crash dump. This behavior is controlled by the \fB-z\fR option.
+When compression is turned on, the \fBsavecore\fR(1M) utility writes one file
+to the file system named \fIvmdump.X\fR. If compression is disabled, it instead
+writes two files named \fIunix.X\fR and \fIvmcore.X\fR. In the uncompressed
+case, both data files form the \fIsaved crash dump\fR. In both cases X is an
+integer identifying the dump.
 .sp
 .LP
 For systems with a UFS root file system, the default dump device is  configured
@@ -58,6 +67,7 @@ example# \fBdumpadm\fR
        Dump device: /dev/dsk/c0t0d0s1 (swap)
 Savecore directory: /var/crash/saturn
   Savecore enabled: yes
+   Save compressed: on
 .fi
 .in -2
 .sp
@@ -68,8 +78,8 @@ When no options are specified, \fBdumpadm\fR prints the current crash dump
 configuration. The example shows the set of default values: the dump content is
 set to kernel memory pages only, the dump device is a swap disk partition, the
 directory for \fBsavecore\fR files is set to
-\fB/var/crash/\fR\fBhostname\fR\fB,\fR and \fBsavecore\fR is set to run
-automatically on reboot.
+\fB/var/crash/\fR\fIhostname\fR\fB,\fR \fBsavecore\fR is set to run
+automatically on reboot, and compression is turned on.
 .sp
 .LP
 When one or more options are specified, \fBdumpadm\fR verifies that your
@@ -132,7 +142,7 @@ process, only kernel pages will be dumped.
 .sp .6
 .RS 4n
 Modify the dump configuration to use the specified dump device. The dump device
-may one of the following:
+may be one of the following:
 .sp
 .ne 2
 .na
@@ -161,6 +171,17 @@ When the system is first installed with a UFS root file system, \fBdumpadm\fR
 uses the value for \fBswap\fR to determine the initial dump device setting. A
 given ZFS volume cannot be configured for both the swap area and the dump
 device.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnone\fR\fR
+.ad
+.sp .6
+.RS 4n
+If the special token \fBnone\fR is specified, the active dump device is removed
+and crash dumps are disabled.
 .RE
 
 .RE
@@ -288,6 +309,16 @@ Modify the dump configuration to automatically run \fBsavecore\fR on reboot.
 This is the default for this dump setting.
 .RE
 
+.sp
+.ne 2
+.na
+\fB\fB-z on | off\fR\fR
+.ad
+.sp .6
+.RS 4n
+Turns crash dump compression \fBon\fR or \fBoff\fR.
+.RE
+
 .SH EXAMPLES
 .LP
 \fBExample 1 \fRReconfiguring The Dump Device To A Dedicated Dump Device:
@@ -304,6 +335,7 @@ example# dumpadm -d /dev/dsk/c0t2d0s2
             Dump device: /dev/dsk/c0t2d0s2 (dedicated)
      Savecore directory: /var/crash/saturn
        Savecore enabled: yes
+        Save compressed: on
 .fi
 .in -2
 .sp

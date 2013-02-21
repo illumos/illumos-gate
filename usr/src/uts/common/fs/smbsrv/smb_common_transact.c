@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -127,7 +128,7 @@ smb_com_transaction(smb_request_t *sr)
 
 	if (smb_xa_open(xa)) {
 		smb_xa_rele(sr->session, xa);
-		smbsr_error(sr, 0, ERRDOS, ERRsrverror);
+		smbsr_error(sr, 0, ERRSRV, ERRsrverror);
 		return (SDRC_ERROR);
 	}
 	sr->r_xa = xa;
@@ -314,7 +315,7 @@ smb_com_transaction2(struct smb_request *sr)
 
 	if (smb_xa_open(xa)) {
 		smb_xa_rele(sr->session, xa);
-		smbsr_error(sr, 0, ERRDOS, ERRsrverror);
+		smbsr_error(sr, 0, ERRSRV, ERRsrverror);
 		return (SDRC_ERROR);
 	}
 	sr->r_xa = xa;
@@ -586,7 +587,7 @@ smb_com_nt_transact(struct smb_request *sr)
 
 	if (smb_xa_open(xa)) {
 		smb_xa_rele(sr->session, xa);
-		smbsr_error(sr, 0, ERRDOS, ERRsrverror);
+		smbsr_error(sr, 0, ERRSRV, ERRsrverror);
 		return (SDRC_ERROR);
 	}
 	sr->r_xa = xa;

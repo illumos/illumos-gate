@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2013 by Delphix. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/test/zfstest@$(PKGVERS)
@@ -111,6 +111,9 @@ file path=opt/zfs-tests/tests/functional/acl/cifs/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/acl/cifs/setup mode=0555
 file path=opt/zfs-tests/tests/functional/acl/nontrivial/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/acl/nontrivial/setup mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/acl/nontrivial/zfs_acl_aclmode_restricted_001_neg \
+    mode=0555
 file path=opt/zfs-tests/tests/functional/acl/nontrivial/zfs_acl_chmod_001_neg \
     mode=0555
 file path=opt/zfs-tests/tests/functional/acl/nontrivial/zfs_acl_chmod_002_pos \
@@ -183,6 +186,9 @@ file path=opt/zfs-tests/tests/functional/acl/nontrivial/zfs_acl_tar_002_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/acl/trivial/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/acl/trivial/setup mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/acl/trivial/zfs_acl_aclmode_restricted_001_pos \
+    mode=0555
 file path=opt/zfs-tests/tests/functional/acl/trivial/zfs_acl_chmod_001_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/acl/trivial/zfs_acl_compress_001_pos \

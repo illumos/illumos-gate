@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2013 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
@@ -20,6 +20,7 @@ TESTDIR = $(ROOTOPTPKG)/tests/functional/acl/trivial
 
 PROGS = cleanup \
 	setup \
+	zfs_acl_aclmode_restricted_001_pos \
 	zfs_acl_chmod_001_pos \
 	zfs_acl_compress_001_pos \
 	zfs_acl_cp_001_pos \

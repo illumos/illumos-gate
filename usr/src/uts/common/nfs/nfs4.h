@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef _NFS4_H
@@ -390,12 +390,12 @@ nvlist_t *rfs4_dss_paths, *rfs4_dss_oldpaths;
 /*
  * The following ascii art represents each of these data structs and
  * their references to each other.  Note: "<-(x)->" represents the
- * doubly link lists defined above.
+ * doubly link lists (list_t).
  *
  *                          ____________________
  *                         |                    |
  *                         |    rfs4_client_t   |
- *                       ->|         (1),(2)    |<-
+ *                       ->|         (1)        |<-
  *                      /  |____________________|  \
  *                     /              ^             \
  *                    /               |              \
@@ -409,7 +409,7 @@ nvlist_t *rfs4_dss_paths, *rfs4_dss_oldpaths;
  *  ____________________    ____________________    ____________________
  * |                    |  |                    |  |                    |
  * |  rfs4_lo_state_t   |->|    rfs4_state_t    |->|     rfs4_file_t    |
- * |            <-(4)-> |  |     (4)    <-(3)-> |  |                    |
+ * |            <-(4)-> |  |     (4)    <-(3)-> |  |        (2)         |
  * |____________________|  |____________________|  |____________________|
  */
 /*

@@ -25,6 +25,7 @@
 
 /*
  * Copyright 2011 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 
 #include <mdb/mdb_param.h>
@@ -2161,8 +2162,10 @@ whatis_print_kmf_lite(uintptr_t btaddr, size_t count)
 	/* validate the buffer state and read in the callers */
 	stat = (intptr_t)bt.bt_bufctl ^ bt.bt_bxstat;
 
-	if (stat != KMEM_BUFTAG_ALLOC || stat != KMEM_BUFTAG_FREE ||
-	    mdb_vread(callers, count * sizeof (pc_t),
+	if (stat != KMEM_BUFTAG_ALLOC && stat != KMEM_BUFTAG_FREE)
+		return;
+
+	if (mdb_vread(callers, count * sizeof (pc_t),
 	    btaddr + offsetof(kmem_buftag_lite_t, bt_history)) == -1)
 		return;
 

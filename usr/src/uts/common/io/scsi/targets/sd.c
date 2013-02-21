@@ -23,9 +23,9 @@
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2011 Bayard G. Bell.  All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  */
 /*
@@ -12711,16 +12711,17 @@ sd_mapblockaddr_iostart(int index, struct sd_lun *un, struct buf *bp)
 		if (is_aligned) {
 			xp->xb_blkno = SD_SYS2TGTBLOCK(un, xp->xb_blkno);
 		} else {
-			switch (un->un_f_rmw_type) {
-			case SD_RMW_TYPE_RETURN_ERROR:
-				if (un->un_f_enable_rmw)
-					break;
-				else {
-					bp->b_flags |= B_ERROR;
-					goto error_exit;
-				}
-
-			case SD_RMW_TYPE_DEFAULT:
+			/*
+			 * There is no RMW if we're just reading, so don't
+			 * warn or error out because of it.
+			 */
+			if (bp->b_flags & B_READ) {
+				/*EMPTY*/
+			} else if (!un->un_f_enable_rmw &&
+			    un->un_f_rmw_type == SD_RMW_TYPE_RETURN_ERROR) {
+				bp->b_flags |= B_ERROR;
+				goto error_exit;
+			} else if (un->un_f_rmw_type == SD_RMW_TYPE_DEFAULT) {
 				mutex_enter(SD_MUTEX(un));
 				if (!un->un_f_enable_rmw &&
 				    un->un_rmw_msg_timeid == NULL) {
@@ -12738,11 +12739,6 @@ sd_mapblockaddr_iostart(int index, struct sd_lun *un, struct buf *bp)
 					un->un_rmw_incre_count ++;
 				}
 				mutex_exit(SD_MUTEX(un));
-				break;
-
-			case SD_RMW_TYPE_NO_WARNING:
-			default:
-				break;
 			}
 
 			nblocks = SD_TGT2SYSBLOCK(un, nblocks);

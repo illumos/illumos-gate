@@ -30,6 +30,7 @@ include ../Makefile.cmd
 SUBDIRS=	arcstat \
 		fsstat \
 		iostat \
+		kstat \
 		mpstat \
 		vfsstat \
 		vmstat \

@@ -1401,7 +1401,8 @@ mdb_get_module(void)
 		return (NULL);
 
 	if (mdb.m_frame->f_wcbs && mdb.m_frame->f_wcbs->w_walker &&
-	    mdb.m_frame->f_wcbs->w_walker->iwlk_modp)
+	    mdb.m_frame->f_wcbs->w_walker->iwlk_modp &&
+	    !mdb.m_frame->f_cbactive)
 		return (mdb.m_frame->f_wcbs->w_walker->iwlk_modp);
 
 	if (mdb.m_frame->f_cp && mdb.m_frame->f_cp->c_dcmd)

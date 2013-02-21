@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -206,15 +207,23 @@
 #include <smbsrv/msgbuf.h>
 #include <smbsrv/smb_fsops.h>
 
+/*
+ * Args (and other state) that we carry around among the
+ * various functions involved in FindFirst, FindNext.
+ */
 typedef struct smb_find_args {
+	uint32_t fa_maxdata;
 	uint16_t fa_infolev;
 	uint16_t fa_maxcount;
 	uint16_t fa_fflag;
-	uint32_t fa_maxdata;
+	uint16_t fa_eos;	/* End Of Search */
+	uint16_t fa_lno;	/* Last Name Offset */
+	uint32_t fa_lastkey;	/* Last resume key */
+	char fa_lastname[MAXNAMELEN]; /* and name */
 } smb_find_args_t;
 
 static int smb_trans2_find_entries(smb_request_t *, smb_xa_t *,
-    smb_odir_t *, smb_find_args_t *, boolean_t *);
+    smb_odir_t *, smb_find_args_t *);
 static int smb_trans2_find_get_maxdata(smb_request_t *, uint16_t, uint16_t);
 static int smb_trans2_find_mbc_encode(smb_request_t *, smb_xa_t *,
     smb_fileinfo_t *, smb_find_args_t *);
@@ -276,7 +285,6 @@ smb_com_trans2_find_first2(smb_request_t *sr, smb_xa_t *xa)
 	smb_pathname_t	*pn;
 	smb_odir_t	*od;
 	smb_find_args_t	args;
-	boolean_t	eos;
 	uint32_t	odir_flags = 0;
 
 	bzero(&args, sizeof (smb_find_args_t));
@@ -327,7 +335,8 @@ smb_com_trans2_find_first2(smb_request_t *sr, smb_xa_t *xa)
 	od = smb_tree_lookup_odir(sr->tid_tree, odid);
 	if (od == NULL)
 		return (SDRC_ERROR);
-	count = smb_trans2_find_entries(sr, xa, od, &args, &eos);
+
+	count = smb_trans2_find_entries(sr, xa, od, &args);
 
 	if (count == -1) {
 		smb_odir_close(od);
@@ -343,14 +352,18 @@ smb_com_trans2_find_first2(smb_request_t *sr, smb_xa_t *xa)
 	}
 
 	if ((args.fa_fflag & SMB_FIND_CLOSE_AFTER_REQUEST) ||
-	    (eos && (args.fa_fflag & SMB_FIND_CLOSE_AT_EOS))) {
+	    (args.fa_eos && (args.fa_fflag & SMB_FIND_CLOSE_AT_EOS))) {
 		smb_odir_close(od);
 	} /* else leave odir open for trans2_find_next2 */
 
 	smb_odir_release(od);
 
 	(void) smb_mbc_encodef(&xa->rep_param_mb, "wwwww",
-	    odid, count, (eos) ? 1 : 0, 0, 0);
+	    odid,	/* Search ID */
+	    count,	/* Search Count */
+	    args.fa_eos, /* End Of Search */
+	    0,		/* EA Error Offset */
+	    args.fa_lno); /* Last Name Offset */
 
 	return (SDRC_SUCCESS);
 }
@@ -422,27 +435,24 @@ smb_com_trans2_find_next2(smb_request_t *sr, smb_xa_t *xa)
 {
 	int			count;
 	uint16_t		odid;
-	uint32_t		cookie;
 	smb_odir_t		*od;
 	smb_find_args_t		args;
-	boolean_t		eos;
 	smb_odir_resume_t	odir_resume;
 
-	bzero(&args, sizeof (smb_find_args_t));
+	bzero(&args, sizeof (args));
+	bzero(&odir_resume, sizeof (odir_resume));
 
-	if (smb_mbc_decodef(&xa->req_param_mb, "%wwwlw", sr, &odid,
-	    &args.fa_maxcount, &args.fa_infolev, &cookie, &args.fa_fflag)
-	    != 0) {
+	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
+		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
+		    ERRDOS, ERROR_ACCESS_DENIED);
 		return (SDRC_ERROR);
 	}
 
-	/* continuation by filename not supported */
-	if ((args.fa_fflag & SMB_FIND_CONTINUE_FROM_LAST) || (cookie == 0)) {
-		odir_resume.or_type = SMB_ODIR_RESUME_IDX;
-		odir_resume.or_idx = 0;
-	} else {
-		odir_resume.or_type = SMB_ODIR_RESUME_COOKIE;
-		odir_resume.or_cookie = cookie;
+	if (smb_mbc_decodef(&xa->req_param_mb, "%wwwlwu", sr,
+	    &odid, &args.fa_maxcount, &args.fa_infolev,
+	    &odir_resume.or_cookie, &args.fa_fflag,
+	    &odir_resume.or_fname) != 0) {
+		return (SDRC_ERROR);
 	}
 
 	if (args.fa_fflag & SMB_FIND_WITH_BACKUP_INTENT)
@@ -459,9 +469,34 @@ smb_com_trans2_find_next2(smb_request_t *sr, smb_xa_t *xa)
 		    ERRDOS, ERROR_INVALID_HANDLE);
 		return (SDRC_ERROR);
 	}
-	smb_odir_resume_at(od, &odir_resume);
-	count = smb_trans2_find_entries(sr, xa, od, &args, &eos);
 
+	/*
+	 * Set the correct position in the directory.
+	 *
+	 * "Continue from last" is easy, but due to a history of
+	 * buggy server implementations, most clients don't use
+	 * that method.  The most widely used (and reliable) is
+	 * resume by file name.  Unfortunately, that can't really
+	 * be fully supported unless your file system stores all
+	 * directory entries in some sorted order (like NTFS).
+	 * We can partially support resume by name, where the only
+	 * name we're ever asked to resume on is the same as the
+	 * most recent we returned.  That's always what the client
+	 * gives us as the resume name, so we can simply remember
+	 * the last name/offset pair and use that to position on
+	 * the following FindNext call.  In the unlikely event
+	 * that the client asks to resume somewhere else, we'll
+	 * use the numeric resume key, and hope the client gives
+	 * correctly uses one of the resume keys we provided.
+	 */
+	if (args.fa_fflag & SMB_FIND_CONTINUE_FROM_LAST) {
+		odir_resume.or_type = SMB_ODIR_RESUME_CONT;
+	} else {
+		odir_resume.or_type = SMB_ODIR_RESUME_FNAME;
+	}
+	smb_odir_resume_at(od, &odir_resume);
+
+	count = smb_trans2_find_entries(sr, xa, od, &args);
 	if (count == -1) {
 		smb_odir_close(od);
 		smb_odir_release(od);
@@ -469,13 +504,17 @@ smb_com_trans2_find_next2(smb_request_t *sr, smb_xa_t *xa)
 	}
 
 	if ((args.fa_fflag & SMB_FIND_CLOSE_AFTER_REQUEST) ||
-	    (eos && (args.fa_fflag & SMB_FIND_CLOSE_AT_EOS))) {
+	    (args.fa_eos && (args.fa_fflag & SMB_FIND_CLOSE_AT_EOS))) {
 		smb_odir_close(od);
 	} /* else leave odir open for trans2_find_next2 */
 
 	smb_odir_release(od);
+
 	(void) smb_mbc_encodef(&xa->rep_param_mb, "wwww",
-	    count, (eos) ? 1 : 0, 0, 0);
+	    count,	/* Search Count */
+	    args.fa_eos, /* End Of Search */
+	    0,		/* EA Error Offset */
+	    args.fa_lno); /* Last Name Offset */
 
 	return (SDRC_SUCCESS);
 }
@@ -494,12 +533,12 @@ smb_com_trans2_find_next2(smb_request_t *sr, smb_xa_t *xa)
  */
 static int
 smb_trans2_find_entries(smb_request_t *sr, smb_xa_t *xa, smb_odir_t *od,
-    smb_find_args_t *args, boolean_t *eos)
+    smb_find_args_t *args)
 {
 	int		rc;
 	uint16_t	count, maxcount;
-	uint32_t	cookie;
 	smb_fileinfo_t	fileinfo;
+	smb_odir_resume_t odir_resume;
 
 	if ((maxcount = args->fa_maxcount) == 0)
 		maxcount = 1;
@@ -509,9 +548,10 @@ smb_trans2_find_entries(smb_request_t *sr, smb_xa_t *xa, smb_odir_t *od,
 
 	count = 0;
 	while (count < maxcount) {
-		if (smb_odir_read_fileinfo(sr, od, &fileinfo, eos) != 0)
+		if (smb_odir_read_fileinfo(sr, od, &fileinfo, &args->fa_eos)
+		    != 0)
 			return (-1);
-		if (*eos == B_TRUE)
+		if (args->fa_eos != 0)
 			break;
 
 		rc = smb_trans2_find_mbc_encode(sr, xa, &fileinfo, args);
@@ -520,21 +560,38 @@ smb_trans2_find_entries(smb_request_t *sr, smb_xa_t *xa, smb_odir_t *od,
 		if (rc == 1)
 			break;
 
-		cookie = fileinfo.fi_cookie;
+		/*
+		 * Save the info about the last file returned.
+		 */
+		args->fa_lastkey = fileinfo.fi_cookie;
+		bcopy(fileinfo.fi_name, args->fa_lastname, MAXNAMELEN);
+
 		++count;
 	}
 
 	/* save the last cookie returned to client */
 	if (count != 0)
-		smb_odir_save_cookie(od, 0, cookie);
+		smb_odir_save_fname(od, args->fa_lastkey, args->fa_lastname);
 
 	/*
 	 * If all retrieved entries have been successfully encoded
 	 * and eos has not already been detected, check if there are
 	 * any more entries. eos will be set if there are no more.
 	 */
-	if ((rc == 0) && (!*eos))
-		(void) smb_odir_read_fileinfo(sr, od, &fileinfo, eos);
+	if ((rc == 0) && (args->fa_eos == 0))
+		(void) smb_odir_read_fileinfo(sr, od, &fileinfo, &args->fa_eos);
+
+	/*
+	 * When the last entry we read from the directory did not
+	 * fit in the return buffer, we will have read one entry
+	 * that will not be returned in this call.  That, and the
+	 * check for EOS just above both can leave the directory
+	 * position incorrect for the next call.  Fix that now.
+	 */
+	bzero(&odir_resume, sizeof (odir_resume));
+	odir_resume.or_type = SMB_ODIR_RESUME_COOKIE;
+	odir_resume.or_cookie = args->fa_lastkey;
+	smb_odir_resume_at(od, &odir_resume);
 
 	return (count);
 }
@@ -608,6 +665,21 @@ smb_trans2_find_get_maxdata(smb_request_t *sr, uint16_t infolev, uint16_t fflag)
 }
 
 /*
+ * This is an experimental feature that allows us to return zero
+ * for all numeric resume keys, to match Windows behavior with an
+ * NTFS share.  Setting this variable to zero does that.
+ *
+ * It's possible we could remove this variable and always set
+ * numeric resume keys to zero, but that would leave us unable
+ * to handle a FindNext call with an arbitrary start position.
+ * In practice we never see these, but in theory we could.
+ *
+ * See the long comment above smb_com_trans2_find_next2() for
+ * more details about resume key / resume name handling.
+ */
+int smbd_use_resume_keys = 1;
+
+/*
  * smb_trans2_mbc_encode
  *
  * This function encodes the mbc for one directory entry.
@@ -632,22 +704,17 @@ static int
 smb_trans2_find_mbc_encode(smb_request_t *sr, smb_xa_t *xa,
     smb_fileinfo_t *fileinfo, smb_find_args_t *args)
 {
-	int		namelen, shortlen, buflen;
+	int		namelen, shortlen;
 	uint32_t	next_entry_offset;
 	uint32_t	dsize32, asize32;
 	uint32_t	mb_flags = 0;
+	uint32_t	resume_key;
 	char		buf83[26];
-	char		*tmpbuf;
 	smb_msgbuf_t	mb;
 
 	namelen = smb_ascii_or_unicode_strlen(sr, fileinfo->fi_name);
 	if (namelen == -1)
 		return (-1);
-
-	next_entry_offset = args->fa_maxdata + namelen;
-
-	if (MBC_ROOM_FOR(&xa->rep_data_mb, (args->fa_maxdata + namelen)) == 0)
-		return (1);
 
 	/*
 	 * If ascii the filename length returned to the client should
@@ -660,52 +727,49 @@ smb_trans2_find_mbc_encode(smb_request_t *sr, smb_xa_t *xa,
 			namelen += 1;
 	}
 
+	next_entry_offset = args->fa_maxdata + namelen;
+
+	if (MBC_ROOM_FOR(&xa->rep_data_mb, (args->fa_maxdata + namelen)) == 0)
+		return (1);
+
 	mb_flags = (sr->smb_flg2 & SMB_FLAGS2_UNICODE) ? SMB_MSGBUF_UNICODE : 0;
 	dsize32 = (fileinfo->fi_size > UINT_MAX) ?
 	    UINT_MAX : (uint32_t)fileinfo->fi_size;
 	asize32 = (fileinfo->fi_alloc_size > UINT_MAX) ?
 	    UINT_MAX : (uint32_t)fileinfo->fi_alloc_size;
 
+	resume_key = fileinfo->fi_cookie;
+	if (smbd_use_resume_keys == 0)
+		resume_key = 0;
+
+	/*
+	 * This switch handles all the "information levels" (formats)
+	 * that we support.  Note that all formats have the file name
+	 * placed after some fixed-size data, and the code to write
+	 * the file name is factored out at the end of this switch.
+	 */
 	switch (args->fa_infolev) {
 	case SMB_INFO_STANDARD:
 		if (args->fa_fflag & SMB_FIND_RETURN_RESUME_KEYS)
 			(void) smb_mbc_encodef(&xa->rep_data_mb, "l",
-			    fileinfo->fi_cookie);
+			    resume_key);
 
-		(void) smb_mbc_encodef(&xa->rep_data_mb, "%yyyllwbu", sr,
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "%yyyllwb", sr,
 		    smb_time_gmt_to_local(sr, fileinfo->fi_crtime.tv_sec),
 		    smb_time_gmt_to_local(sr, fileinfo->fi_atime.tv_sec),
 		    smb_time_gmt_to_local(sr, fileinfo->fi_mtime.tv_sec),
 		    dsize32,
 		    asize32,
 		    fileinfo->fi_dosattr,
-		    namelen,
-		    fileinfo->fi_name);
+		    namelen);
 		break;
 
 	case SMB_INFO_QUERY_EA_SIZE:
 		if (args->fa_fflag & SMB_FIND_RETURN_RESUME_KEYS)
 			(void) smb_mbc_encodef(&xa->rep_data_mb, "l",
-			    fileinfo->fi_cookie);
+			    resume_key);
 
-		/*
-		 * Unicode filename should NOT be aligned. Encode ('u')
-		 * into a temporary buffer, then encode buffer as a
-		 * byte stream ('#c').
-		 * Regardless of whether unicode or ascii, a single
-		 * termination byte is used.
-		 */
-		buflen = namelen + sizeof (smb_wchar_t);
-		tmpbuf = kmem_zalloc(buflen, KM_SLEEP);
-		smb_msgbuf_init(&mb, (uint8_t *)tmpbuf, buflen, mb_flags);
-		if (smb_msgbuf_encode(&mb, "u", fileinfo->fi_name) < 0) {
-			smb_msgbuf_term(&mb);
-			kmem_free(tmpbuf, buflen);
-			return (-1);
-		}
-		tmpbuf[namelen] = '\0';
-
-		(void) smb_mbc_encodef(&xa->rep_data_mb, "%yyyllwlb#c", sr,
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "%yyyllwlb", sr,
 		    smb_time_gmt_to_local(sr, fileinfo->fi_crtime.tv_sec),
 		    smb_time_gmt_to_local(sr, fileinfo->fi_atime.tv_sec),
 		    smb_time_gmt_to_local(sr, fileinfo->fi_mtime.tv_sec),
@@ -713,18 +777,13 @@ smb_trans2_find_mbc_encode(smb_request_t *sr, smb_xa_t *xa,
 		    asize32,
 		    fileinfo->fi_dosattr,
 		    0L,		/* EA Size */
-		    namelen,
-		    namelen + 1,
-		    tmpbuf);
-
-		smb_msgbuf_term(&mb);
-		kmem_free(tmpbuf, buflen);
+		    namelen);
 		break;
 
 	case SMB_FIND_FILE_DIRECTORY_INFO:
-		(void) smb_mbc_encodef(&xa->rep_data_mb, "%llTTTTqqllu", sr,
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "%llTTTTqqll", sr,
 		    next_entry_offset,
-		    fileinfo->fi_cookie,
+		    resume_key,
 		    &fileinfo->fi_crtime,
 		    &fileinfo->fi_atime,
 		    &fileinfo->fi_mtime,
@@ -732,14 +791,13 @@ smb_trans2_find_mbc_encode(smb_request_t *sr, smb_xa_t *xa,
 		    fileinfo->fi_size,
 		    fileinfo->fi_alloc_size,
 		    fileinfo->fi_dosattr,
-		    namelen,
-		    fileinfo->fi_name);
+		    namelen);
 		break;
 
 	case SMB_FIND_FILE_FULL_DIRECTORY_INFO:
-		(void) smb_mbc_encodef(&xa->rep_data_mb, "%llTTTTqqlllu", sr,
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "%llTTTTqqlll", sr,
 		    next_entry_offset,
-		    fileinfo->fi_cookie,
+		    resume_key,
 		    &fileinfo->fi_crtime,
 		    &fileinfo->fi_atime,
 		    &fileinfo->fi_mtime,
@@ -748,14 +806,13 @@ smb_trans2_find_mbc_encode(smb_request_t *sr, smb_xa_t *xa,
 		    fileinfo->fi_alloc_size,
 		    fileinfo->fi_dosattr,
 		    namelen,
-		    0L,
-		    fileinfo->fi_name);
+		    0L);
 		break;
 
 	case SMB_FIND_FILE_ID_FULL_DIRECTORY_INFO:
-		(void) smb_mbc_encodef(&xa->rep_data_mb, "%llTTTTqqlll4.qu", sr,
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "%llTTTTqqlll4.q", sr,
 		    next_entry_offset,
-		    fileinfo->fi_cookie,
+		    resume_key,
 		    &fileinfo->fi_crtime,
 		    &fileinfo->fi_atime,
 		    &fileinfo->fi_mtime,
@@ -765,8 +822,7 @@ smb_trans2_find_mbc_encode(smb_request_t *sr, smb_xa_t *xa,
 		    fileinfo->fi_dosattr,
 		    namelen,
 		    0L,
-		    fileinfo->fi_nodeid,
-		    fileinfo->fi_name);
+		    fileinfo->fi_nodeid);
 		break;
 
 	case SMB_FIND_FILE_BOTH_DIRECTORY_INFO:
@@ -779,10 +835,10 @@ smb_trans2_find_mbc_encode(smb_request_t *sr, smb_xa_t *xa,
 		}
 		shortlen = smb_wcequiv_strlen(fileinfo->fi_shortname);
 
-		(void) smb_mbc_encodef(&xa->rep_data_mb, "%llTTTTqqlllb.24cu",
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "%llTTTTqqlllb.24c",
 		    sr,
 		    next_entry_offset,
-		    fileinfo->fi_cookie,
+		    resume_key,
 		    &fileinfo->fi_crtime,
 		    &fileinfo->fi_atime,
 		    &fileinfo->fi_mtime,
@@ -793,8 +849,7 @@ smb_trans2_find_mbc_encode(smb_request_t *sr, smb_xa_t *xa,
 		    namelen,
 		    0L,
 		    shortlen,
-		    buf83,
-		    fileinfo->fi_name);
+		    buf83);
 
 		smb_msgbuf_term(&mb);
 		break;
@@ -811,10 +866,10 @@ smb_trans2_find_mbc_encode(smb_request_t *sr, smb_xa_t *xa,
 		    fileinfo->fi_shortname);
 
 		(void) smb_mbc_encodef(&xa->rep_data_mb,
-		    "%llTTTTqqlllb.24c2.qu",
+		    "%llTTTTqqlllb.24c2.q",
 		    sr,
 		    next_entry_offset,
-		    fileinfo->fi_cookie,
+		    resume_key,
 		    &fileinfo->fi_crtime,
 		    &fileinfo->fi_atime,
 		    &fileinfo->fi_mtime,
@@ -826,20 +881,39 @@ smb_trans2_find_mbc_encode(smb_request_t *sr, smb_xa_t *xa,
 		    0L,
 		    shortlen,
 		    buf83,
-		    fileinfo->fi_nodeid,
-		    fileinfo->fi_name);
+		    fileinfo->fi_nodeid);
 
 		smb_msgbuf_term(&mb);
 		break;
 
 	case SMB_FIND_FILE_NAMES_INFO:
-		(void) smb_mbc_encodef(&xa->rep_data_mb, "%lllu", sr,
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "%lll", sr,
 		    next_entry_offset,
-		    fileinfo->fi_cookie,
-		    namelen,
-		    fileinfo->fi_name);
+		    resume_key,
+		    namelen);
 		break;
+
+	default:
+		/* invalid info. level */
+		return (-1);
 	}
+
+	/*
+	 * At this point we have written all the fixed-size data
+	 * for the specified info. level, and we're about to put
+	 * the file name string in the message.  We may later
+	 * need the offset in the trans2 data where this string
+	 * is placed, so save the message position now.  Note:
+	 * We also need to account for the alignment padding
+	 * that may precede the unicode string.
+	 */
+	args->fa_lno = xa->rep_data_mb.chain_offset;
+	if ((sr->smb_flg2 & SMB_FLAGS2_UNICODE) != 0 &&
+	    (args->fa_lno & 1) != 0)
+		args->fa_lno++;
+
+	(void) smb_mbc_encodef(&xa->rep_data_mb, "%u", sr,
+	    fileinfo->fi_name);
 
 	return (0);
 }

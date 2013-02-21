@@ -23,8 +23,8 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -2438,7 +2438,8 @@ e1000g_init_unicst(struct e1000g *Adapter)
 
 	if (Adapter->init_count == 0) {
 		/* Initialize the multiple unicast addresses */
-		Adapter->unicst_total = MAX_NUM_UNICAST_ADDRESSES;
+		Adapter->unicst_total = min(hw->mac.rar_entry_count,
+		    MAX_NUM_UNICAST_ADDRESSES);
 
 		/* Workaround for an erratum of 82571 chipst */
 		if ((hw->mac.type == e1000_82571) &&

@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -78,10 +79,6 @@ smb_com_nt_cancel(smb_request_t *sr)
 		req = smb_slist_next(&session->s_req_list, req);
 	}
 	smb_slist_exit(&session->s_req_list);
-
-	/* Now, search the notify change queue to find the request */
-
-	smb_reply_specific_cancel_request(sr);
 
 	return (SDRC_NO_REPLY);
 }

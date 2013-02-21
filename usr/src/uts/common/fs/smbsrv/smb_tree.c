@@ -20,8 +20,8 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -1107,6 +1107,8 @@ smb_tree_get_volname(vfs_t *vfsp, smb_tree_t *tree)
 static void
 smb_tree_get_flags(const smb_kshare_t *si, vfs_t *vfsp, smb_tree_t *tree)
 {
+	smb_session_t *ssn = tree->t_session;
+
 	typedef struct smb_mtype {
 		char		*mt_name;
 		size_t		mt_namelen;
@@ -1134,10 +1136,14 @@ smb_tree_get_flags(const smb_kshare_t *si, vfs_t *vfsp, smb_tree_t *tree)
 	if (si->shr_flags & SMB_SHRF_ABE)
 		flags |= SMB_TREE_ABE;
 
-	if (smb_session_oplocks_enable(tree->t_session)) {
+	if (ssn->s_cfg.skc_oplock_enable) {
 		/* if 'smb' zfs property: oplocks=enabled */
 		flags |= SMB_TREE_OPLOCKS;
 	}
+
+	/* Global config option for now.  Later make per-share. */
+	if (ssn->s_cfg.skc_traverse_mounts)
+		flags |= SMB_TREE_TRAVERSE_MOUNTS;
 
 	/* if 'smb' zfs property: shortnames=enabled */
 	if (smb_shortnames)

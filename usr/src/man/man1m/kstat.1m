@@ -3,20 +3,20 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KSTAT 1M "Mar 23, 2009"
+.TH KSTAT 1M "Jan 9, 2013"
 .SH NAME
 kstat \- display kernel statistics
 .SH SYNOPSIS
 .LP
 .nf
-\fBkstat\fR [\fB-lpq\fR] [\fB-T\fR u | d ] [\fB-c\fR \fIclass\fR] [\fB-m\fR \fImodule\fR]
+\fBkstat\fR [\fB-Cjlpq\fR] [\fB-T\fR u | d ] [\fB-c\fR \fIclass\fR] [\fB-m\fR \fImodule\fR]
      [\fB-i\fR \fIinstance\fR] [\fB-n\fR \fIname\fR] [\fB-s\fR \fIstatistic\fR]
      [interval [count]]
 .fi
 
 .LP
 .nf
-\fBkstat\fR [\fB-lpq\fR] [\fB-T\fR u | d ] [\fB-c\fR \fIclass\fR]
+\fBkstat\fR [\fB-Cjlpq\fR] [\fB-T\fR u | d ] [\fB-c\fR \fIclass\fR]
      [\fImodule\fR:\fIinstance\fR:\fIname\fR:\fIstatistic\fR]...
      [interval [count]]
 .fi
@@ -59,8 +59,17 @@ appropriate quotes.
 .sp
 .LP
 The argument for the \fB-c\fR, \fB-i\fR, \fB-m\fR, \fB-n\fR, and \fB-s\fR
-options may be specified as a shell glob pattern, or a Perl regular expression
+options may be specified as a shell glob pattern, or a regular expression
 enclosed in '/' characters.
+.sp
+.ne 2
+.na
+\fB\fB-C\fR\fR
+.ad
+.RS 16n
+Displays output in parseable format with a colon as separator.
+.RE
+
 .sp
 .ne 2
 .na
@@ -78,6 +87,15 @@ kernel-defined string which classifies the "type" of the kstat.
 .ad
 .RS 16n
 Displays only kstats that match the specified instance.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-j\fR\fR
+.ad
+.RS 16n
+Displays output in JSON format.
 .RE
 
 .sp
@@ -161,7 +179,7 @@ The following operands are supported:
 .RS 4n
 Alternate method of specifying module, instance, name, and statistic as
 described above. Each of the module, instance, name, or statistic specifiers
-may be a shell glob pattern or a Perl regular expression enclosed by '/'
+may be a shell glob pattern or a regular expression enclosed by '/'
 characters. It is possible to use both specifier types within a single operand.
 Leaving a specifier empty is equivalent to using the '*' glob pattern for that
 specifier.
@@ -202,7 +220,7 @@ example$ \fBkstat -p -m unix -i 0 -n system_misc -s 'avenrun*'\fR
 example$ \fBkstat -p -s 'avenrun*'\fR
 example$ \fBkstat -p 'unix:0:system_misc:avenrun*'\fR
 example$ \fBkstat -p ':::avenrun*'\fR
-example$ \fBkstat -p ':::/^avenrun_\ed+min$/'\fR
+example$ \fBkstat -p ':::/^avenrun_[0-9]+min$/'\fR
 
 unix:0:system_misc:avenrun_15min        3
 unix:0:system_misc:avenrun_1min 4
@@ -362,11 +380,11 @@ kernel statistics driver
 .sp
 .LP
 \fBdate\fR(1), \fBsh\fR(1), \fBtime\fR(2), \fBgmatch\fR(3GEN),
-\fBkstat\fR(3KSTAT), \fBattributes\fR(5), \fBkstat\fR(7D), \fBsd\fR(7D),
-\fBkstat\fR(9S)
+\fBkstat\fR(3KSTAT), \fBattributes\fR(5), \fBregex\fR(5), \fBkstat\fR(7D),
+\fBsd\fR(7D), \fBkstat\fR(9S)
 .SH NOTES
 .sp
 .LP
-If the pattern argument contains glob or Perl RE metacharacters which are also
+If the pattern argument contains glob or RE metacharacters which are also
 shell metacharacters, it will be necessary to enclose the pattern with
 appropriate shell quotes.

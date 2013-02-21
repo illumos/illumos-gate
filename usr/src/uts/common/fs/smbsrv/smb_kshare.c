@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_door.h>
@@ -59,6 +60,9 @@ static smb_avl_nops_t smb_kshare_avlops = {
 	smb_kshare_rele,
 	smb_kshare_destroy
 };
+
+extern int smb_server_lookup(smb_server_t **);
+extern void smb_server_release(smb_server_t *);
 
 /*
  * This function is not MultiThread safe. The caller has to make sure only one
@@ -347,22 +351,35 @@ smb_kshare_fini(void)
 int
 smb_kshare_export_list(smb_ioc_share_t *ioc)
 {
-	nvlist_t	*shrlist;
+	nvlist_t	*shrlist = NULL;
 	nvlist_t	 *share;
 	nvpair_t	 *nvp;
 	smb_kshare_t	 *shr;
 	char		*shrname;
-	int		rc;
+	int		rc = 0;
+	smb_server_t	*sv = NULL;
 
 	if (!smb_export_isready())
 		return (ENOTACTIVE);
 
+	if ((rc = smb_server_lookup(&sv)) != 0)
+		return (rc);
+
 	if ((rc = nvlist_unpack(ioc->shr, ioc->shrlen, &shrlist, KM_SLEEP))
 	    != 0)
-		return (rc);
+		goto out;
 
 	for (nvp = nvlist_next_nvpair(shrlist, NULL); nvp != NULL;
 	    nvp = nvlist_next_nvpair(shrlist, nvp)) {
+
+		/*
+		 * Since this loop can run for a while we want to exit
+		 * as soon as the server state is anything but RUNNING
+		 * to allow shutdown to proceed.
+		 */
+		if (sv->sv_state != SMB_SERVER_STATE_RUNNING)
+			goto out;
+
 		if (nvpair_type(nvp) != DATA_TYPE_NVLIST)
 			continue;
 
@@ -381,14 +398,19 @@ smb_kshare_export_list(smb_ioc_share_t *ioc)
 			continue;
 		}
 
+		/* smb_kshare_export consumes shr so it's not leaked */
 		if ((rc = smb_kshare_export(shr)) != 0) {
 			smb_kshare_destroy(shr);
 			continue;
 		}
 	}
+	rc = 0;
 
-	nvlist_free(shrlist);
-	return (0);
+out:
+	if (shrlist != NULL)
+		nvlist_free(shrlist);
+	smb_server_release(sv);
+	return (rc);
 }
 
 /*

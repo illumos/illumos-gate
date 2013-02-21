@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -281,23 +282,35 @@ iod_newvc(smb_iod_ssn_t *clnt_ssn)
 	bcopy(clnt_ssn, &ctx->ct_iod_ssn, sizeof (ctx->ct_iod_ssn));
 
 	/*
+	 * Create the driver session first, so that any subsequent
+	 * requests for the same session will find this one and
+	 * wait, the same as when a reconnect is triggered.
+	 *
+	 * There is still an inherent race here, where two callers
+	 * both find no VC in the driver, and both come here trying
+	 * to create the VC.  In this case, we want the first one
+	 * to actually do the VC setup, and the second to proceed
+	 * as if the VC had been found in the driver.  The second
+	 * caller gets an EEXIST error from the ioctl in this case,
+	 * which we therefore ignore here so that the caller will
+	 * go ahead and look again in the driver for the new VC.
+	 */
+	if ((err = smb_ctx_gethandle(ctx)) != 0)
+		goto out;
+	if (ioctl(ctx->ct_dev_fd, SMBIOC_SSN_CREATE, &ctx->ct_ssn) < 0) {
+		err = errno;
+		if (err == EEXIST)
+			err = 0; /* see above */
+		goto out;
+	}
+
+	/*
 	 * Do the initial connection setup here, so we can
 	 * report the outcome to the door client.
 	 */
 	err = smb_iod_connect(ctx);
 	if (err != 0)
 		goto out;
-
-	/*
-	 * Create the driver session now, so we don't
-	 * race with the door client findvc call.
-	 */
-	if ((err = smb_ctx_gethandle(ctx)) != 0)
-		goto out;
-	if (ioctl(ctx->ct_dev_fd, SMBIOC_SSN_CREATE, &ctx->ct_ssn) < 0) {
-		err = errno;
-		goto out;
-	}
 
 	/* The rest happens in the iod_work thread. */
 	err = thr_create(NULL, 0, iod_work, ctx, THR_DETACHED, &tid);

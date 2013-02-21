@@ -24,7 +24,7 @@
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 /*
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -2798,7 +2798,7 @@ restart_service(uint32_t svcs)
 				(void) fprintf(stderr,
 				    dgettext(TEXT_DOMAIN,
 				    "%s failed to restart: %s\n"),
-				    scf_strerror(scf_error()));
+				    service, scf_strerror(scf_error()));
 			} else {
 				/*
 				 * Check whether it has gone to "maintenance"

@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright 2013 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
+ */
+
+/*
  * FTDI FT232R USB UART device-specific driver
  *
  * May work on the (many) devices based on earlier versions of the chip.
@@ -220,6 +224,7 @@ uftdi_attach(ds_attach_info_t *aip)
 	switch (dd->idVendor) {
 	case USB_VENDOR_FTDI:
 		switch (dd->idProduct) {
+		case USB_PRODUCT_FTDI_SERIAL_2232C:
 		case USB_PRODUCT_FTDI_SERIAL_8U232AM:
 		case USB_PRODUCT_FTDI_SEMC_DSS20:
 		case USB_PRODUCT_FTDI_CFA_631:
@@ -327,23 +332,6 @@ uftdi_attach(ds_attach_info_t *aip)
 		uftdi_cleanup(uf, 4);
 		return (USB_FAILURE);
 	}
-
-	if (usb_pipe_get_max_bulk_transfer_size(uf->uf_dip,
-	    &uf->uf_xfer_sz) != USB_SUCCESS) {
-		uftdi_cleanup(uf, 5);
-		return (USB_FAILURE);
-	}
-
-	/*
-	 * TODO: modern ftdi devices have deeper (and asymmetric)
-	 * fifos than this minimal 64 bytes .. but how to tell
-	 * -safely- ?
-	 */
-
-#define	FTDI_MAX_XFERSIZE	64
-
-	if (uf->uf_xfer_sz > FTDI_MAX_XFERSIZE)
-		uf->uf_xfer_sz = FTDI_MAX_XFERSIZE;
 
 	if (uftdi_dev_attach(uf) != USB_SUCCESS) {
 		uftdi_cleanup(uf, 5);
@@ -1501,6 +1489,12 @@ uftdi_open_pipes(uftdi_state_t *uf)
 	int ifc, alt;
 	usb_pipe_policy_t policy;
 	usb_ep_data_t *in_data, *out_data;
+	size_t max_xfer_sz;
+
+	/* get max transfer size */
+	if (usb_pipe_get_max_bulk_transfer_size(uf->uf_dip, &max_xfer_sz)
+	    != USB_SUCCESS)
+		return (USB_FAILURE);
 
 	/* get ep data */
 	ifc = uf->uf_dev_data->dev_curr_if;
@@ -1517,6 +1511,21 @@ uftdi_open_pipes(uftdi_state_t *uf)
 		    "uftdi_open_pipes: can't get ep data");
 		return (USB_FAILURE);
 	}
+
+	/*
+	 * Set buffer sizes. Default to UFTDI_XFER_SZ_MAX.
+	 * Use wMaxPacketSize from endpoint descriptor if it is nonzero.
+	 * Cap at a max transfer size of host controller.
+	 */
+	uf->uf_ibuf_sz = uf->uf_obuf_sz = UFTDI_XFER_SZ_MAX;
+
+	if (in_data->ep_descr.wMaxPacketSize)
+		uf->uf_ibuf_sz = in_data->ep_descr.wMaxPacketSize;
+	uf->uf_ibuf_sz = min(uf->uf_ibuf_sz, max_xfer_sz);
+
+	if (out_data->ep_descr.wMaxPacketSize)
+		uf->uf_obuf_sz = out_data->ep_descr.wMaxPacketSize;
+	uf->uf_obuf_sz = min(uf->uf_obuf_sz, max_xfer_sz);
 
 	/* open pipes */
 	policy.pp_max_async_reqs = 2;
@@ -1806,8 +1815,8 @@ uftdi_rx_start(uftdi_state_t *uf)
 	uf->uf_bulkin_state = UFTDI_PIPE_BUSY;
 	mutex_exit(&uf->uf_lock);
 
-	br = usb_alloc_bulk_req(uf->uf_dip, uf->uf_xfer_sz, USB_FLAGS_SLEEP);
-	br->bulk_len = uf->uf_xfer_sz;
+	br = usb_alloc_bulk_req(uf->uf_dip, uf->uf_ibuf_sz, USB_FLAGS_SLEEP);
+	br->bulk_len = uf->uf_ibuf_sz;
 	br->bulk_timeout = UFTDI_BULKIN_TIMEOUT;
 	br->bulk_cb = uftdi_bulkin_cb;
 	br->bulk_exc_cb = uftdi_bulkin_cb;
@@ -1861,7 +1870,7 @@ uftdi_tx_start(uftdi_state_t *uf, int *xferd)
 	ASSERT(MBLKL(uf->uf_tx_mp) > 0);
 
 	/* send as much data as port can receive */
-	len = min(msgdsize(uf->uf_tx_mp), uf->uf_xfer_sz);
+	len = min(msgdsize(uf->uf_tx_mp), uf->uf_obuf_sz);
 
 	if (len <= 0)
 		return;

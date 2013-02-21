@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 
 #include "statcommon.h"
@@ -289,6 +290,7 @@ acquire_sys(struct snapshot *ss, kstat_ctl_t *kc)
 			return (errno);
 		if (kstat_add(&ss->s_cpus[i].cs_vm, &ss->s_sys.ss_agg_vm))
 			return (errno);
+		ss->s_nr_active_cpus++;
 	}
 
 	return (0);

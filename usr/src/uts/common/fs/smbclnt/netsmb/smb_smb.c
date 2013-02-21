@@ -33,7 +33,7 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -500,8 +500,8 @@ smb_smb_close(struct smb_share *ssp, uint16_t fid, struct timespec *mtime,
 	smb_rq_bstart(rqp);
 	smb_rq_bend(rqp);
 
-	/* Make sure we send it... */
-	rqp->sr_flags |= SMBR_NOINTR_SEND;
+	/* Make sure we send, but only if already connected */
+	rqp->sr_flags |= (SMBR_NOINTR_SEND | SMBR_NORECONNECT);
 	error = smb_rq_simple(rqp);
 	smb_rq_done(rqp);
 	return (error);
@@ -593,8 +593,8 @@ smb_smb_close_prjob(struct smb_share *ssp, uint16_t fid,
 	smb_rq_bstart(rqp);
 	smb_rq_bend(rqp);
 
-	/* Make sure we send it... */
-	rqp->sr_flags |= SMBR_NOINTR_SEND;
+	/* Make sure we send but only if already connected */
+	rqp->sr_flags |= (SMBR_NOINTR_SEND | SMBR_NORECONNECT);
 	error = smb_rq_simple(rqp);
 	smb_rq_done(rqp);
 	return (error);
