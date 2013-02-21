@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 
 #ifndef	_SYS_DUMPADM_H
@@ -42,6 +43,7 @@ extern "C" {
 #define	DIOCDUMP	(DDIOC | 0x16)
 #define	DIOCSETUUID	(DDIOC | 0x17)
 #define	DIOCGETUUID	(DDIOC | 0x18)
+#define	DIOCRMDEV	(DDIOC | 0x19)
 
 /*
  * Kernel-controlled dump state flags for dump_conflags

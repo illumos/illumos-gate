@@ -158,6 +158,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zfs_unshareall_nfs;
 	zfs_unshareall_smb;
 	zfs_userspace;
+	zfs_valid_proplist;
 	zfs_get_fsacl;
 	zfs_set_fsacl;
 	zfs_userquota_prop_prefixes;
