@@ -2771,6 +2771,14 @@ findjsobjects_cmp_ninstances(const void *l, const void *r)
 {
 	findjsobjects_obj_t *lhs = *((findjsobjects_obj_t **)l);
 	findjsobjects_obj_t *rhs = *((findjsobjects_obj_t **)r);
+	size_t lprod = lhs->fjso_ninstances * lhs->fjso_nprops;
+	size_t rprod = rhs->fjso_ninstances * rhs->fjso_nprops;
+
+	if (lprod < rprod)
+		return (-1);
+
+	if (lprod > rprod)
+		return (1);
 
 	if (lhs->fjso_ninstances < rhs->fjso_ninstances)
 		return (-1);
@@ -2912,13 +2920,17 @@ findjsobjects_range(findjsobjects_state_t *fjs, uintptr_t addr, uintptr_t size)
 			size_t *nprops = &fjs->fjs_current->fjso_nprops;
 			ssize_t len = V8_OFF_JSARRAY_LENGTH;
 			ssize_t elems = V8_OFF_JSOBJECT_ELEMENTS;
+			ssize_t flen = V8_OFF_FIXEDARRAY_LENGTH;
+			uintptr_t nelems;
 			uint8_t t;
 
 			if (read_heap_smi(nprops, addr, len) != 0 ||
 			    read_heap_ptr(&ptr, addr, elems) != 0 ||
 			    !V8_IS_HEAPOBJECT(ptr) ||
 			    read_typebyte(&t, ptr) != 0 ||
-			    t != V8_TYPE_FIXEDARRAY) {
+			    t != V8_TYPE_FIXEDARRAY ||
+			    read_heap_smi(&nelems, ptr, flen) != 0 ||
+			    nelems < *nprops) {
 				findjsobjects_free(fjs->fjs_current);
 				fjs->fjs_current = NULL;
 				continue;
@@ -3161,17 +3173,83 @@ findjsobjects_instance(findjsobjects_state_t *fjs, uintptr_t addr,
 }
 
 static void
+findjsobjects_match_propname(findjsobjects_obj_t *obj, const char *propname)
+{
+	findjsobjects_prop_t *prop;
+
+	for (prop = obj->fjso_props; prop != NULL; prop = prop->fjsp_next) {
+		if (strcmp(prop->fjsp_desc, propname) == 0) {
+			mdb_printf("%p\n", obj->fjso_instances.fjsi_addr);
+			return;
+		}
+	}
+}
+
+static void
+findjsobjects_match_constructor(findjsobjects_obj_t *obj,
+    const char *constructor)
+{
+	if (strcmp(constructor, obj->fjso_constructor) == 0)
+		mdb_printf("%p\n", obj->fjso_instances.fjsi_addr);
+}
+
+static int
+findjsobjects_match(findjsobjects_state_t *fjs, uintptr_t addr,
+    uint_t flags, void (*func)(findjsobjects_obj_t *, const char *),
+    const char *match)
+{
+	findjsobjects_obj_t *obj;
+
+	if (!(flags & DCMD_ADDRSPEC)) {
+		for (obj = fjs->fjs_objects; obj != NULL; obj = obj->fjso_next)
+			func(obj, match);
+
+		return (DCMD_OK);
+	}
+
+	/*
+	 * First, look for the specified address among the representative
+	 * objects.
+	 */
+	for (obj = fjs->fjs_objects; obj != NULL; obj = obj->fjso_next) {
+		if (obj->fjso_instances.fjsi_addr == addr) {
+			func(obj, match);
+			return (DCMD_OK);
+		}
+	}
+
+	/*
+	 * We didn't find it among the representative objects; iterate over
+	 * all objects.
+	 */
+	for (obj = fjs->fjs_objects; obj != NULL; obj = obj->fjso_next) {
+		findjsobjects_instance_t *head = &obj->fjso_instances, *inst;
+
+		for (inst = head; inst != NULL; inst = inst->fjsi_next) {
+			if (inst->fjsi_addr == addr) {
+				func(obj, match);
+				return (DCMD_OK);
+			}
+		}
+	}
+
+	mdb_warn("%p does not correspond to a known object\n", addr);
+	return (DCMD_ERR);
+}
+
+static void
 findjsobjects_print(findjsobjects_obj_t *obj)
 {
-	int col = 17 + (sizeof (uintptr_t) * 2) + strlen("..."), len;
+	int col = 19 + (sizeof (uintptr_t) * 2) + strlen("..."), len;
 	uintptr_t addr = obj->fjso_instances.fjsi_addr;
 	findjsobjects_prop_t *prop;
 
-	mdb_printf("%?p %8d %6d ",
+	mdb_printf("%?p %8d %8d ",
 	    addr, obj->fjso_ninstances, obj->fjso_nprops);
 
 	if (obj->fjso_constructor[0] != '\0') {
-		mdb_printf("%s: ", obj->fjso_constructor);
+		mdb_printf("%s%s", obj->fjso_constructor,
+		    obj->fjso_props != NULL ? ": " : "");
 		col += strlen(obj->fjso_constructor) + 2;
 	}
 
@@ -3224,7 +3302,6 @@ dcmd_findjsobjects(uintptr_t addr,
 	static findjsobjects_state_t fjs;
 	static findjsobjects_stats_t *stats = &fjs.fjs_stats;
 	findjsobjects_obj_t *obj;
-	findjsobjects_prop_t *prop;
 	struct ps_prochandle *Pr;
 	boolean_t references = B_FALSE, listlike = B_FALSE;
 	const char *propname = NULL;
@@ -3317,49 +3394,19 @@ dcmd_findjsobjects(uintptr_t addr,
 	}
 
 	if (propname != NULL) {
-		if (flags & DCMD_ADDRSPEC) {
-			mdb_warn("cannot specify an object when "
-			    "specifying a property name\n");
-			return (DCMD_ERR);
-		}
-
 		if (constructor != NULL) {
 			mdb_warn("cannot specify both a property name "
 			    "and a constructor\n");
 			return (DCMD_ERR);
 		}
 
-		for (obj = fjs.fjs_objects; obj != NULL; obj = obj->fjso_next) {
-			for (prop = obj->fjso_props; prop != NULL;
-			    prop = prop->fjsp_next) {
-				if (strcmp(prop->fjsp_desc, propname) == 0)
-					break;
-			}
-
-			if (prop == NULL)
-				continue;
-
-			mdb_printf("%p\n", obj->fjso_instances.fjsi_addr);
-		}
-
-		return (DCMD_OK);
+		return (findjsobjects_match(&fjs, addr, flags,
+		    findjsobjects_match_propname, propname));
 	}
 
 	if (constructor != NULL) {
-		if (flags & DCMD_ADDRSPEC) {
-			mdb_warn("cannot specify an object when "
-			    "specifying a constructor\n");
-			return (DCMD_ERR);
-		}
-
-		for (obj = fjs.fjs_objects; obj != NULL; obj = obj->fjso_next) {
-			if (strcmp(constructor, obj->fjso_constructor) != 0)
-				continue;
-
-			mdb_printf("%p\n", obj->fjso_instances.fjsi_addr);
-		}
-
-		return (DCMD_OK);
+		return (findjsobjects_match(&fjs, addr, flags,
+		    findjsobjects_match_constructor, constructor));
 	}
 
 	if (references && !(flags & DCMD_ADDRSPEC) &&
@@ -3415,7 +3462,7 @@ dcmd_findjsobjects(uintptr_t addr,
 	if (references || fjs.fjs_marking)
 		return (DCMD_OK);
 
-	mdb_printf("%-?s %8s %6s %s\n", "OBJECT",
+	mdb_printf("%-?s %8s %8s %s\n", "OBJECT",
 	    "#OBJECTS", "#PROPS", "CONSTRUCTOR: PROPS");
 
 	for (obj = fjs.fjs_objects; obj != NULL; obj = obj->fjso_next)
