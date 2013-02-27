@@ -72,6 +72,7 @@ typedef struct v8_field {
 	ssize_t		v8f_offset;	/* field offset */
 	char 		v8f_name[64];	/* field name */
 	boolean_t	v8f_isbyte;	/* 1-byte int field */
+	boolean_t	v8f_isstr;	/* NUL-terminated string */
 } v8_field_t;
 
 /*
@@ -180,6 +181,7 @@ static ssize_t V8_OFF_ODDBALL_TO_STRING;
 static ssize_t V8_OFF_SCRIPT_LINE_ENDS;
 static ssize_t V8_OFF_SCRIPT_NAME;
 static ssize_t V8_OFF_SEQASCIISTR_CHARS;
+static ssize_t V8_OFF_SEQONEBYTESTR_CHARS;
 static ssize_t V8_OFF_SHAREDFUNCTIONINFO_CODE;
 static ssize_t V8_OFF_SHAREDFUNCTIONINFO_FUNCTION_TOKEN_POSITION;
 static ssize_t V8_OFF_SHAREDFUNCTIONINFO_INFERRED_NAME;
@@ -330,7 +332,9 @@ static v8_offset_t v8_offsets[] = {
 	{ &V8_OFF_SCRIPT_NAME,
 	    "Script", "name" },
 	{ &V8_OFF_SEQASCIISTR_CHARS,
-	    "SeqAsciiString", "chars" },
+	    "SeqAsciiString", "chars", B_TRUE },
+	{ &V8_OFF_SEQONEBYTESTR_CHARS,
+	    "SeqOneByteString", "chars", B_TRUE },
 	{ &V8_OFF_SHAREDFUNCTIONINFO_CODE,
 	    "SharedFunctionInfo", "code" },
 	{ &V8_OFF_SHAREDFUNCTIONINFO_FUNCTION_TOKEN_POSITION,
@@ -497,6 +501,16 @@ again:
 		    offp->v8o_class, offp->v8o_member);
 		failed++;
 	}
+
+	if (!((V8_OFF_SEQASCIISTR_CHARS != -1) ^
+	    (V8_OFF_SEQONEBYTESTR_CHARS != -1))) {
+		mdb_warn("expected exactly one of SeqAsciiString and "
+		    "SeqOneByteString to be defined\n");
+		failed++;
+	}
+
+	if (V8_OFF_SEQONEBYTESTR_CHARS != -1)
+		V8_OFF_SEQASCIISTR_CHARS = V8_OFF_SEQONEBYTESTR_CHARS;
 
 	return (failed ? -1 : 0);
 }
@@ -667,6 +681,9 @@ conf_update_field(v8_cfg_t *cfgp, const char *symbol)
 
 	if (strcmp(tt, "int") == 0)
 		flp->v8f_isbyte = B_TRUE;
+
+	if (strcmp(tt, "char") == 0)
+		flp->v8f_isstr = B_TRUE;
 
 	return (0);
 }
@@ -1178,6 +1195,18 @@ obj_print_fields(uintptr_t baddr, v8_class_t *clp)
 		len = sizeof (buf);
 
 		addr = baddr + V8_OFF_HEAP(flp->v8f_offset);
+
+		if (flp->v8f_isstr) {
+			if (mdb_readstr(buf, sizeof (buf), addr) == -1) {
+				mdb_printf("%p %s (unreadable)\n",
+				    addr, flp->v8f_name);
+				continue;
+			}
+
+			mdb_printf("%p %s = \"%s\"\n",
+			    addr, flp->v8f_name, buf);
+			continue;
+		}
 
 		if (flp->v8f_isbyte) {
 			uint8_t sv;
@@ -2648,6 +2677,7 @@ typedef struct findjsobjects_obj {
 	int fjso_ninstances;
 	avl_node_t fjso_node;
 	struct findjsobjects_obj *fjso_next;
+	boolean_t fjso_malformed;
 	char fjso_constructor[80];
 } findjsobjects_obj_t;
 
@@ -2681,6 +2711,7 @@ typedef struct findjsobjects_state {
 	uintptr_t fjs_size;
 	boolean_t fjs_verbose;
 	boolean_t fjs_brk;
+	boolean_t fjs_allobjs;
 	boolean_t fjs_initialized;
 	boolean_t fjs_marking;
 	boolean_t fjs_referred;
@@ -2819,6 +2850,8 @@ findjsobjects_prop(const char *desc, uintptr_t val, void *arg)
 
 	current->fjso_last = prop;
 	current->fjso_nprops++;
+	current->fjso_malformed =
+	    val == NULL && current->fjso_nprops == 1 && desc[0] == '<';
 
 	return (0);
 }
@@ -3172,6 +3205,13 @@ findjsobjects_instance(findjsobjects_state_t *fjs, uintptr_t addr,
 	return (NULL);
 }
 
+/*ARGSUSED*/
+static void
+findjsobjects_match_all(findjsobjects_obj_t *obj, const char *ignored)
+{
+	mdb_printf("%p\n", obj->fjso_instances.fjsi_addr);
+}
+
 static void
 findjsobjects_match_propname(findjsobjects_obj_t *obj, const char *propname)
 {
@@ -3201,8 +3241,13 @@ findjsobjects_match(findjsobjects_state_t *fjs, uintptr_t addr,
 	findjsobjects_obj_t *obj;
 
 	if (!(flags & DCMD_ADDRSPEC)) {
-		for (obj = fjs->fjs_objects; obj != NULL; obj = obj->fjso_next)
+		for (obj = fjs->fjs_objects; obj != NULL;
+		    obj = obj->fjso_next) {
+			if (obj->fjso_malformed && !fjs->fjs_allobjs)
+				continue;
+
 			func(obj, match);
+		}
 
 		return (DCMD_OK);
 	}
@@ -3310,8 +3355,10 @@ dcmd_findjsobjects(uintptr_t addr,
 	fjs.fjs_verbose = B_FALSE;
 	fjs.fjs_brk = B_FALSE;
 	fjs.fjs_marking = B_FALSE;
+	fjs.fjs_allobjs = B_FALSE;
 
 	if (mdb_getopts(argc, argv,
+	    'a', MDB_OPT_SETBITS, B_TRUE, &fjs.fjs_allobjs,
 	    'b', MDB_OPT_SETBITS, B_TRUE, &fjs.fjs_brk,
 	    'c', MDB_OPT_STR, &constructor,
 	    'l', MDB_OPT_SETBITS, B_TRUE, &listlike,
@@ -3393,6 +3440,20 @@ dcmd_findjsobjects(uintptr_t addr,
 		}
 	}
 
+	if (listlike && !(flags & DCMD_ADDRSPEC)) {
+		if (propname != NULL || constructor != NULL) {
+			char opt = propname != NULL ? 'p' : 'c';
+
+			mdb_warn("cannot specify -l with -%c; instead, pipe "
+			    "output of ::findjsobjects -%c to "
+			    "::findjsobjects -l\n", opt, opt);
+			return (DCMD_ERR);
+		}
+
+		return (findjsobjects_match(&fjs, addr, flags,
+		    findjsobjects_match_all, NULL));
+	}
+
 	if (propname != NULL) {
 		if (constructor != NULL) {
 			mdb_warn("cannot specify both a property name "
@@ -3465,8 +3526,12 @@ dcmd_findjsobjects(uintptr_t addr,
 	mdb_printf("%-?s %8s %8s %s\n", "OBJECT",
 	    "#OBJECTS", "#PROPS", "CONSTRUCTOR: PROPS");
 
-	for (obj = fjs.fjs_objects; obj != NULL; obj = obj->fjso_next)
+	for (obj = fjs.fjs_objects; obj != NULL; obj = obj->fjso_next) {
+		if (obj->fjso_malformed && !fjs.fjs_allobjs)
+			continue;
+
 		findjsobjects_print(obj);
+	}
 
 	return (DCMD_OK);
 }
