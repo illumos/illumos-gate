@@ -49,6 +49,7 @@ SYMBOL_VERSION ILLUMOS_0.1 {	# Illumos additions
     fnvlist_unpack;
     fnvlist_dup;
     fnvlist_merge;
+    fnvlist_num_pairs;
     fnvlist_add_boolean;
     fnvlist_add_boolean_value;
     fnvlist_add_byte;

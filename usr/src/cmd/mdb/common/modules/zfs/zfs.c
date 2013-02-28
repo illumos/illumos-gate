@@ -859,7 +859,7 @@ dbgmsg(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    NULL) != argc)
 		return (DCMD_USAGE);
 
-	if (mdb_lookup_by_name("zfs_dbgmsgs", &sym)) {
+	if (mdb_lookup_by_obj(ZFS_OBJ_NAME, "zfs_dbgmsgs", &sym)) {
 		mdb_warn("can't find zfs_dbgmsgs");
 		return (DCMD_ERR);
 	}

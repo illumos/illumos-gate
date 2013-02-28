@@ -22,6 +22,7 @@
 /*
  * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -4876,9 +4877,7 @@ show_zfs_ioc(private_t *pri, long addr)
 	if (zc.zc_value[0])
 		(void) printf("    zc_value=%s\n", zc.zc_value);
 	if (zc.zc_string[0])
-		(void) printf("    zc_strign=%s\n", zc.zc_string);
-	if (zc.zc_top_ds[0])
-		(void) printf("    zc_top_ds=%s\n", zc.zc_top_ds);
+		(void) printf("    zc_string=%s\n", zc.zc_string);
 	if (zc.zc_guid != 0) {
 		(void) printf("    zc_guid=%llu\n",
 		    (u_longlong_t)zc.zc_guid);
