@@ -37,10 +37,12 @@ ipf_cb_ops
 ipf_dev_info
 ipf_devfiles
 ipf_kstat_tmp
+ipf_minor
 ipf_ops
 ipf_proxy_debug
 ipf_stack_lock
 ipf_stacks
+ipf_state
 ipfilter_version
 ipfncb
 ipl_magic

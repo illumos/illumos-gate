@@ -307,7 +307,6 @@ static void
 _ztree_door_visitor(const void *nodep, const VISIT which, const int depth)
 {
 	dtree_entry_t *entry = *(dtree_entry_t **)nodep;
-	boolean_t visit = B_FALSE;
 
 	if (entry == NULL)
 		return;

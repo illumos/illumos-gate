@@ -22,8 +22,8 @@
  * Copyright 2012, Joyent, Inc. All rights reserved.
  */
 
-#ifndef	_SYS_FS_HLOFS_INFO_H
-#define	_SYS_FS_HLOFS_INFO_H
+#ifndef	_SYS_FS_HYPRLOFS_INFO_H
+#define	_SYS_FS_HYPRLOFS_INFO_H
 
 #include <sys/t_lock.h>
 #include <vm/seg.h>
@@ -186,4 +186,4 @@ extern const struct fs_operation_def hyprlofs_vnodeops_template[];
 }
 #endif
 
-#endif	/* _SYS_FS_HLOFS_INFO_H */
+#endif	/* _SYS_FS_HYPRLOFS_INFO_H */

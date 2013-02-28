@@ -75,7 +75,6 @@ _callback(void *cookie, char *argp, size_t arg_size, door_desc_t *dp,
 	void *door_response = NULL;
 	int size = 0;
 	dtree_entry_t *entry = (dtree_entry_t *)cookie;
-	zoneid_t did = -1;
 
 	if (entry == NULL) {
 		zdoor_warn("_callback: NULL cookie? door_returning");
@@ -314,7 +313,6 @@ zdoor_open(zdoor_handle_t handle, const char *zonename, const char *service,
 	void *biscuit, zdoor_callback callback)
 {
 	zdoor_cookie_t *zdoor_cookie = NULL;
-	int door = -1;
 	int rc = -1;
 	int status = ZDOOR_OK;
 	zoneid_t zid = -1;
@@ -405,7 +403,6 @@ out:
 void *
 zdoor_close(zdoor_handle_t handle, const char *zonename, const char *service)
 {
-	int rc = 0;
 	dtree_entry_t *entry = NULL;
 	zdoor_cookie_t *cookie = NULL;
 	void *biscuit = NULL;

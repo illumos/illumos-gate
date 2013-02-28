@@ -997,7 +997,6 @@ ipd_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 {
 	int rval;
 	ipd_ioc_perturb_t ipip;
-	ipd_ioc_info_t ipii;
 
 	switch (cmd) {
 	case IPDIOC_CORRUPT:

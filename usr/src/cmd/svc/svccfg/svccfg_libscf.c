@@ -6787,6 +6787,7 @@ connaborted:
  *
  * Returns 0 on success or returns an errno.
  */
+#ifndef NATIVE_BUILD
 static int
 lscf_instance_verify(scf_scope_t *scope, entity_t *svc, entity_t *inst)
 {
@@ -6951,6 +6952,7 @@ lscf_instance_verify(scf_scope_t *scope, entity_t *svc, entity_t *inst)
 	 */
 	return (0);
 }
+#endif
 
 /*
  * If the service is missing, create it, import its properties, and import the
