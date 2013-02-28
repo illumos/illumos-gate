@@ -23,6 +23,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ */
 
 #include <assert.h>
 #include <dlfcn.h>
@@ -792,9 +795,10 @@ Pfindmap(struct ps_prochandle *P, map_info_t *mptr, char *s, size_t n)
 	    (strcmp(mptr->map_pmap.pr_mapname, "a.out") == 0) ||
 	    ((fptr != NULL) && (fptr->file_lname != NULL) &&
 	    (strcmp(fptr->file_lname, "a.out") == 0))) {
-		(void) Pexecname(P, buf, sizeof (buf));
-		(void) strlcpy(s, buf, n);
-		return (s);
+		if (Pexecname(P, buf, sizeof (buf)) != NULL) {
+			(void) strlcpy(s, buf, n);
+			return (s);
+		}
 	}
 
 	/* Try /proc first to get the real object name */
