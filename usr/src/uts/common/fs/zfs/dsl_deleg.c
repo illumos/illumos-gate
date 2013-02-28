@@ -21,7 +21,6 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright (c) 2012 Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -522,8 +521,7 @@ dsl_load_user_sets(objset_t *mos, uint64_t zapobj, avl_tree_t *avl,
  * Check if user has requested permission.
  */
 int
-dsl_deleg_access_impl(dsl_dataset_t *ds, const char *perm, cred_t *cr,
-    boolean_t do_lock)
+dsl_deleg_access_impl(dsl_dataset_t *ds, const char *perm, cred_t *cr)
 {
 	dsl_dir_t *dd;
 	dsl_pool_t *dp;
@@ -557,8 +555,7 @@ dsl_deleg_access_impl(dsl_dataset_t *ds, const char *perm, cred_t *cr,
 	avl_create(&permsets, perm_set_compare, sizeof (perm_set_t),
 	    offsetof(perm_set_t, p_node));
 
-	if (do_lock)
-		rw_enter(&dp->dp_config_rwlock, RW_READER);
+	rw_enter(&dp->dp_config_rwlock, RW_READER);
 	for (dd = ds->ds_dir; dd != NULL; dd = dd->dd_parent,
 	    checkflag = ZFS_DELEG_DESCENDENT) {
 		uint64_t zapobj;
@@ -619,8 +616,7 @@ again:
 	}
 	error = EPERM;
 success:
-	if (do_lock)
-		rw_exit(&dp->dp_config_rwlock);
+	rw_exit(&dp->dp_config_rwlock);
 
 	cookie = NULL;
 	while ((setnode = avl_destroy_nodes(&permsets, &cookie)) != NULL)
@@ -639,7 +635,7 @@ dsl_deleg_access(const char *dsname, const char *perm, cred_t *cr)
 	if (error)
 		return (error);
 
-	error = dsl_deleg_access_impl(ds, perm, cr, B_TRUE);
+	error = dsl_deleg_access_impl(ds, perm, cr);
 	dsl_dataset_rele(ds, FTAG);
 
 	return (error);

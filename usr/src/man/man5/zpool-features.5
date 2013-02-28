@@ -1,7 +1,6 @@
 '\" te
 .\" Copyright (c) 2012 by Delphix. All rights reserved.
 .\" Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
-.\" Copyright (c) 2012 Joyent, Inc. All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development
 .\" and Distribution License (the "License").  You may not use this file except
 .\" in compliance with the License. You can obtain a copy of the license at
@@ -14,7 +13,7 @@
 .\" CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your
 .\" own identifying information:
 .\" Portions Copyright [yyyy] [name of copyright owner]
-.TH ZPOOL-FEATURES 5 "Oct 24, 2012"
+.TH ZPOOL-FEATURES 5 "Mar 16, 2012"
 .SH NAME
 zpool\-features \- ZFS pool feature descriptions
 .SH DESCRIPTION
@@ -229,27 +228,6 @@ read-only compatible, this operation will render the pool unimportable
 on systems without support for the \fBlz4_compress\fR feature. At the
 moment, this operation cannot be reversed. Booting off of
 \fBlz4\fR-compressed root pools is supported.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBfilesystem_limits\fR\fR
-.ad
-.RS 4n
-.TS
-l l .
-GUID	com.joyent:filesystem_limits
-READ\-ONLY COMPATIBLE	yes
-DEPENDENCIES	none
-.TE
-
-This feature enables filesystem and snapshot limits. These limits can be used
-to control how many filesystems and/or snapshots can be created at the point in
-the tree on which the limits are set.
-
-This feature is \fBactive\fR once either of the limit properties has been
-set on a dataset and is deactivated when the last limit is removed.
 .RE
 
 .SH "SEE ALSO"

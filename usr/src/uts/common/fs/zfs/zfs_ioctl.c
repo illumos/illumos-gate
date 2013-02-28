@@ -485,7 +485,7 @@ zfs_secpolicy_write_perms(const char *name, const char *perm, cred_t *cr)
 	if (error == 0) {
 		error = secpolicy_zfs(cr);
 		if (error)
-			error = dsl_deleg_access_impl(ds, perm, cr, B_TRUE);
+			error = dsl_deleg_access_impl(ds, perm, cr);
 	}
 
 	dsl_dataset_rele(ds, FTAG);
@@ -502,7 +502,7 @@ zfs_secpolicy_write_perms_ds(const char *name, dsl_dataset_t *ds,
 	if (error == 0) {
 		error = secpolicy_zfs(cr);
 		if (error)
-			error = dsl_deleg_access_impl(ds, perm, cr, B_TRUE);
+			error = dsl_deleg_access_impl(ds, perm, cr);
 	}
 	return (error);
 }
@@ -624,14 +624,12 @@ zfs_secpolicy_setprop(const char *dsname, zfs_prop_t prop, nvpair_t *propval,
 		break;
 
 	case ZFS_PROP_QUOTA:
-	case ZFS_PROP_FILESYSTEM_LIMIT:
-	case ZFS_PROP_SNAPSHOT_LIMIT:
 		if (!INGLOBALZONE(curproc)) {
 			uint64_t zoned;
 			char setpoint[MAXNAMELEN];
 			/*
 			 * Unprivileged users are allowed to modify the
-			 * limit on things *under* (ie. contained by)
+			 * quota on things *under* (ie. contained by)
 			 * the thing they own.
 			 */
 			if (dsl_prop_get_integer(dsname, "zoned", &zoned,
@@ -2392,14 +2390,6 @@ zfs_prop_set_special(const char *dsname, zprop_source_t source,
 		break;
 	case ZFS_PROP_REFQUOTA:
 		err = dsl_dataset_set_quota(dsname, source, intval);
-		break;
-	case ZFS_PROP_FILESYSTEM_LIMIT:
-		err = dsl_dir_validate_fs_ss_limit(dsname, intval,
-		    ZFS_PROP_FILESYSTEM_LIMIT);
-		break;
-	case ZFS_PROP_SNAPSHOT_LIMIT:
-		err = dsl_dir_validate_fs_ss_limit(dsname, intval,
-		    ZFS_PROP_SNAPSHOT_LIMIT);
 		break;
 	case ZFS_PROP_RESERVATION:
 		err = dsl_dir_set_reservation(dsname, source, intval);
