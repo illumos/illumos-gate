@@ -84,6 +84,7 @@ file path=sbin/flowstat mode=0555
 file path=sbin/ipadm mode=0555
 file path=usr/share/man/man1m/dladm.1m
 file path=usr/share/man/man1m/flowadm.1m
+file path=usr/share/man/man1m/ipadm.1m
 group groupname=netadm gid=65
 legacy pkg=SUNWcnetr \
     desc="core software for network infrastructure configuration" \
