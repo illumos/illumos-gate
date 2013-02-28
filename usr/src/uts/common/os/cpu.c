@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 
 /*
@@ -182,9 +183,11 @@ static struct cpu_sys_stats_ks_data {
 	kstat_named_t cpu_nsec_idle;
 	kstat_named_t cpu_nsec_user;
 	kstat_named_t cpu_nsec_kernel;
+	kstat_named_t cpu_nsec_dtrace;
 	kstat_named_t cpu_nsec_intr;
 	kstat_named_t cpu_load_intr;
 	kstat_named_t wait_ticks_io;
+	kstat_named_t dtrace_probes;
 	kstat_named_t bread;
 	kstat_named_t bwrite;
 	kstat_named_t lread;
@@ -232,61 +235,63 @@ static struct cpu_sys_stats_ks_data {
 	kstat_named_t bawrite;
 	kstat_named_t iowait;
 } cpu_sys_stats_ks_data_template = {
-	{ "cpu_ticks_idle", 	KSTAT_DATA_UINT64 },
-	{ "cpu_ticks_user", 	KSTAT_DATA_UINT64 },
-	{ "cpu_ticks_kernel", 	KSTAT_DATA_UINT64 },
-	{ "cpu_ticks_wait", 	KSTAT_DATA_UINT64 },
+	{ "cpu_ticks_idle",	KSTAT_DATA_UINT64 },
+	{ "cpu_ticks_user",	KSTAT_DATA_UINT64 },
+	{ "cpu_ticks_kernel",	KSTAT_DATA_UINT64 },
+	{ "cpu_ticks_wait",	KSTAT_DATA_UINT64 },
 	{ "cpu_nsec_idle",	KSTAT_DATA_UINT64 },
 	{ "cpu_nsec_user",	KSTAT_DATA_UINT64 },
 	{ "cpu_nsec_kernel",	KSTAT_DATA_UINT64 },
+	{ "cpu_nsec_dtrace",	KSTAT_DATA_UINT64 },
 	{ "cpu_nsec_intr",	KSTAT_DATA_UINT64 },
 	{ "cpu_load_intr",	KSTAT_DATA_UINT64 },
-	{ "wait_ticks_io", 	KSTAT_DATA_UINT64 },
-	{ "bread", 		KSTAT_DATA_UINT64 },
-	{ "bwrite", 		KSTAT_DATA_UINT64 },
-	{ "lread", 		KSTAT_DATA_UINT64 },
-	{ "lwrite", 		KSTAT_DATA_UINT64 },
-	{ "phread", 		KSTAT_DATA_UINT64 },
-	{ "phwrite", 		KSTAT_DATA_UINT64 },
-	{ "pswitch", 		KSTAT_DATA_UINT64 },
-	{ "trap", 		KSTAT_DATA_UINT64 },
-	{ "intr", 		KSTAT_DATA_UINT64 },
-	{ "syscall", 		KSTAT_DATA_UINT64 },
-	{ "sysread", 		KSTAT_DATA_UINT64 },
-	{ "syswrite", 		KSTAT_DATA_UINT64 },
-	{ "sysfork", 		KSTAT_DATA_UINT64 },
-	{ "sysvfork", 		KSTAT_DATA_UINT64 },
-	{ "sysexec", 		KSTAT_DATA_UINT64 },
-	{ "readch", 		KSTAT_DATA_UINT64 },
-	{ "writech", 		KSTAT_DATA_UINT64 },
-	{ "rcvint", 		KSTAT_DATA_UINT64 },
-	{ "xmtint", 		KSTAT_DATA_UINT64 },
-	{ "mdmint", 		KSTAT_DATA_UINT64 },
-	{ "rawch", 		KSTAT_DATA_UINT64 },
-	{ "canch", 		KSTAT_DATA_UINT64 },
-	{ "outch", 		KSTAT_DATA_UINT64 },
-	{ "msg", 		KSTAT_DATA_UINT64 },
-	{ "sema", 		KSTAT_DATA_UINT64 },
-	{ "namei", 		KSTAT_DATA_UINT64 },
-	{ "ufsiget", 		KSTAT_DATA_UINT64 },
-	{ "ufsdirblk", 		KSTAT_DATA_UINT64 },
-	{ "ufsipage", 		KSTAT_DATA_UINT64 },
-	{ "ufsinopage", 	KSTAT_DATA_UINT64 },
-	{ "procovf", 		KSTAT_DATA_UINT64 },
-	{ "intrthread", 	KSTAT_DATA_UINT64 },
-	{ "intrblk", 		KSTAT_DATA_UINT64 },
+	{ "wait_ticks_io",	KSTAT_DATA_UINT64 },
+	{ "dtrace_probes",	KSTAT_DATA_UINT64 },
+	{ "bread",		KSTAT_DATA_UINT64 },
+	{ "bwrite",		KSTAT_DATA_UINT64 },
+	{ "lread",		KSTAT_DATA_UINT64 },
+	{ "lwrite",		KSTAT_DATA_UINT64 },
+	{ "phread",		KSTAT_DATA_UINT64 },
+	{ "phwrite",		KSTAT_DATA_UINT64 },
+	{ "pswitch",		KSTAT_DATA_UINT64 },
+	{ "trap",		KSTAT_DATA_UINT64 },
+	{ "intr",		KSTAT_DATA_UINT64 },
+	{ "syscall",		KSTAT_DATA_UINT64 },
+	{ "sysread",		KSTAT_DATA_UINT64 },
+	{ "syswrite",		KSTAT_DATA_UINT64 },
+	{ "sysfork",		KSTAT_DATA_UINT64 },
+	{ "sysvfork",		KSTAT_DATA_UINT64 },
+	{ "sysexec",		KSTAT_DATA_UINT64 },
+	{ "readch",		KSTAT_DATA_UINT64 },
+	{ "writech",		KSTAT_DATA_UINT64 },
+	{ "rcvint",		KSTAT_DATA_UINT64 },
+	{ "xmtint",		KSTAT_DATA_UINT64 },
+	{ "mdmint",		KSTAT_DATA_UINT64 },
+	{ "rawch",		KSTAT_DATA_UINT64 },
+	{ "canch",		KSTAT_DATA_UINT64 },
+	{ "outch",		KSTAT_DATA_UINT64 },
+	{ "msg",		KSTAT_DATA_UINT64 },
+	{ "sema",		KSTAT_DATA_UINT64 },
+	{ "namei",		KSTAT_DATA_UINT64 },
+	{ "ufsiget",		KSTAT_DATA_UINT64 },
+	{ "ufsdirblk",		KSTAT_DATA_UINT64 },
+	{ "ufsipage",		KSTAT_DATA_UINT64 },
+	{ "ufsinopage",		KSTAT_DATA_UINT64 },
+	{ "procovf",		KSTAT_DATA_UINT64 },
+	{ "intrthread",		KSTAT_DATA_UINT64 },
+	{ "intrblk",		KSTAT_DATA_UINT64 },
 	{ "intrunpin",		KSTAT_DATA_UINT64 },
-	{ "idlethread", 	KSTAT_DATA_UINT64 },
-	{ "inv_swtch", 		KSTAT_DATA_UINT64 },
-	{ "nthreads", 		KSTAT_DATA_UINT64 },
-	{ "cpumigrate", 	KSTAT_DATA_UINT64 },
-	{ "xcalls", 		KSTAT_DATA_UINT64 },
-	{ "mutex_adenters", 	KSTAT_DATA_UINT64 },
-	{ "rw_rdfails", 	KSTAT_DATA_UINT64 },
-	{ "rw_wrfails", 	KSTAT_DATA_UINT64 },
-	{ "modload", 		KSTAT_DATA_UINT64 },
-	{ "modunload", 		KSTAT_DATA_UINT64 },
-	{ "bawrite", 		KSTAT_DATA_UINT64 },
+	{ "idlethread",		KSTAT_DATA_UINT64 },
+	{ "inv_swtch",		KSTAT_DATA_UINT64 },
+	{ "nthreads",		KSTAT_DATA_UINT64 },
+	{ "cpumigrate",		KSTAT_DATA_UINT64 },
+	{ "xcalls",		KSTAT_DATA_UINT64 },
+	{ "mutex_adenters",	KSTAT_DATA_UINT64 },
+	{ "rw_rdfails",		KSTAT_DATA_UINT64 },
+	{ "rw_wrfails",		KSTAT_DATA_UINT64 },
+	{ "modload",		KSTAT_DATA_UINT64 },
+	{ "modunload",		KSTAT_DATA_UINT64 },
+	{ "bawrite",		KSTAT_DATA_UINT64 },
 	{ "iowait",		KSTAT_DATA_UINT64 },
 };
 
@@ -3206,6 +3211,8 @@ cpu_sys_stats_ks_update(kstat_t *ksp, int rw)
 	    NSEC_TO_TICK(csskd->cpu_nsec_user.value.ui64);
 	csskd->cpu_ticks_kernel.value.ui64 =
 	    NSEC_TO_TICK(csskd->cpu_nsec_kernel.value.ui64);
+	csskd->cpu_nsec_dtrace.value.ui64 = cp->cpu_dtrace_nsec;
+	csskd->dtrace_probes.value.ui64 = cp->cpu_dtrace_probes;
 	csskd->cpu_nsec_intr.value.ui64 = cp->cpu_intrlast;
 	csskd->cpu_load_intr.value.ui64 = cp->cpu_intrload;
 	csskd->bread.value.ui64 = css->bread;

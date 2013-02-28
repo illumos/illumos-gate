@@ -859,7 +859,7 @@ dbgmsg(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    NULL) != argc)
 		return (DCMD_USAGE);
 
-	if (mdb_lookup_by_name("zfs_dbgmsgs", &sym)) {
+	if (mdb_lookup_by_obj(ZFS_OBJ_NAME, "zfs_dbgmsgs", &sym)) {
 		mdb_warn("can't find zfs_dbgmsgs");
 		return (DCMD_ERR);
 	}
@@ -886,12 +886,12 @@ arc_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	static const char *bytestats[] = {
 		"p", "c", "c_min", "c_max", "size", "duplicate_buffers_size",
+		"arc_meta_used", "arc_meta_limit", "arc_meta_max",
 		NULL
 	};
 
 	static const char *extras[] = {
 		"arc_no_grow", "arc_tempreserve",
-		"arc_meta_used", "arc_meta_limit", "arc_meta_max",
 		NULL
 	};
 

@@ -22,9 +22,13 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 
 #include <mdb/mdb_modapi.h>
+#include <mdb/mdb_ks.h>
 #include <sys/types.h>
 #include <sys/thread.h>
 #include <sys/lwp.h>
@@ -466,8 +470,8 @@ thread(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 		if (oflags & TF_DISP) {
 			SPACER();
-			mdb_printf("%<u> %?s %5s %2s%</u>",
-			    "DISPTIME", "BOUND", "PR");
+			mdb_printf("%<u> %?s %5s %2s %-6s%</u>",
+			    "DISPTIME", "BOUND", "PR", "SWITCH");
 		}
 		mdb_printf("\n");
 	}
@@ -523,8 +527,13 @@ thread(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	/* dispatcher stuff */
 	if (oflags & TF_DISP) {
 		SPACER();
-		mdb_printf(" %?lx %5d %2d",
+		mdb_printf(" %?lx %5d %2d ",
 		    t.t_disp_time, t.t_bind_cpu, t.t_preempt);
+		if (t.t_disp_time != 0)
+			mdb_printf("t-%-4d",
+			    (clock_t)mdb_get_lbolt() - t.t_disp_time);
+		else
+			mdb_printf("%-6s", "-");
 	}
 
 	mdb_printf("\n");

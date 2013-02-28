@@ -535,6 +535,40 @@ by using the \fBzfs destroy\fR \fB-d\fR command. Otherwise, the property is
 .sp
 .ne 2
 .na
+\fB\fBlogicalreferenced\fR\fR
+.ad
+.sp .6
+.RS 4n
+The amount of space that is "logically" accessible by this dataset.  See
+the \fBreferenced\fR property.  The logical space ignores the effect of
+the \fBcompression\fR and \fBcopies\fR properties, giving a quantity
+closer to the amount of data that applications see.  However, it does
+include space consumed by metadata.
+.sp
+This property can also be referred to by its shortened column name,
+\fBlrefer\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBlogicalused\fR\fR
+.ad
+.sp .6
+.RS 4n
+The amount of space that is "logically" consumed by this dataset and all
+its descendents.  See the \fBused\fR property.  The logical space
+ignores the effect of the \fBcompression\fR and \fBcopies\fR properties,
+giving a quantity closer to the amount of data that applications see.
+However, it does include space consumed by metadata.
+.sp
+This property can also be referred to by its shortened column name,
+\fBlused\fR.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fBmounted\fR\fR
 .ad
 .sp .6
@@ -1834,7 +1868,9 @@ descendent file systems.
 .ad
 .sp .6
 .RS 4n
-Recursively destroy all dependents.
+Recursively destroy all clones of these snapshots, including the clones,
+snapshots, and children.  If this flag is specified, the \fB-d\fR flag will
+have no effect.
 .RE
 
 .sp
@@ -1870,7 +1906,7 @@ Print verbose information about the deleted data.
 .RE
 
 .sp
-Extreme care should be taken when applying either the \fB-r\fR or the \fB-f\fR
+Extreme care should be taken when applying either the \fB-r\fR or the \fB-R\fR
 options, as they can destroy large portions of a pool and cause unexpected
 behavior for mounted file systems in use.
 .RE

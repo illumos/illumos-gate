@@ -173,9 +173,6 @@ SMB_COM_DECL(write_raw);
 
 SMB_NT_TRANSACT_DECL(nt_transact_create);
 
-int smb_notify_init(void);
-void smb_notify_fini(void);
-
 smb_sdrc_t smb_nt_transact_notify_change(smb_request_t *, smb_xa_t *);
 smb_sdrc_t smb_nt_transact_query_security_info(smb_request_t *, smb_xa_t *);
 smb_sdrc_t smb_nt_transact_set_security_info(smb_request_t *, smb_xa_t *);
@@ -207,8 +204,6 @@ void smb_correct_keep_alive_values(uint32_t new_keep_alive);
 void smb_close_all_connections(void);
 
 int smb_net_id(uint32_t);
-
-void smb_process_file_notify_change_queue(smb_ofile_t *of);
 
 /*
  * oplock functions - node operations
@@ -446,7 +441,10 @@ uint32_t smb_node_open_check(smb_node_t *, uint32_t, uint32_t);
 DWORD smb_node_rename_check(smb_node_t *);
 DWORD smb_node_delete_check(smb_node_t *);
 boolean_t smb_node_share_check(smb_node_t *);
-void smb_node_notify_change(smb_node_t *);
+
+void smb_node_fcn_subscribe(smb_node_t *, smb_request_t *);
+void smb_node_fcn_unsubscribe(smb_node_t *, smb_request_t *);
+void smb_node_notify_change(smb_node_t *, uint_t, const char *);
 void smb_node_notify_parents(smb_node_t *);
 int smb_node_getattr(smb_request_t *, smb_node_t *, smb_attr_t *);
 int smb_node_setattr(smb_request_t *, smb_node_t *, cred_t *,
@@ -477,9 +475,9 @@ void smb_vfs_rele(smb_export_t *, vfs_t *);
 void smb_vfs_rele_all(smb_export_t *);
 
 /* NOTIFY CHANGE */
-void smb_process_session_notify_change_queue(smb_session_t *, smb_tree_t *);
-void smb_process_node_notify_change_queue(smb_node_t *);
-void smb_reply_specific_cancel_request(smb_request_t *);
+
+void smb_notify_event(smb_node_t *, uint_t, const char *);
+void smb_notify_file_closed(smb_ofile_t *of);
 
 void smb_fem_fcn_install(smb_node_t *);
 void smb_fem_fcn_uninstall(smb_node_t *);
@@ -588,11 +586,13 @@ void smb_odir_delete(void *);
 int smb_odir_read(smb_request_t *, smb_odir_t *,
     smb_odirent_t *, boolean_t *);
 int smb_odir_read_fileinfo(smb_request_t *, smb_odir_t *,
-    smb_fileinfo_t *, boolean_t *);
+    smb_fileinfo_t *, uint16_t *);
 int smb_odir_read_streaminfo(smb_request_t *, smb_odir_t *,
     smb_streaminfo_t *, boolean_t *);
 
 void smb_odir_save_cookie(smb_odir_t *, int, uint32_t cookie);
+void smb_odir_save_fname(smb_odir_t *, uint32_t, const char *);
+
 void smb_odir_resume_at(smb_odir_t *, smb_odir_resume_t *);
 
 /*

@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -95,10 +96,10 @@ int logevent_max_q_sz = 5000;
 
 
 static int log_event_delivery = LOGEVENT_DELIVERY_HOLD;
-static char *logevent_door_upcall_filename = NULL;
-static int logevent_door_upcall_filename_size;
+static char logevent_door_upcall_filename[MAXPATHLEN];
 
 static door_handle_t event_door = NULL;		/* Door for upcalls */
+static kmutex_t event_door_mutex;		/* To protect event_door */
 
 /*
  * async thread-related variables
@@ -145,33 +146,6 @@ int sysevent_daemon_init = 0;
 static kmutex_t	event_pause_mutex;
 static kcondvar_t event_pause_cv;
 static int event_pause_state = 0;
-
-/*
- * log_event_upcall_lookup - Establish door connection with user event
- *				daemon (syseventd)
- */
-static int
-log_event_upcall_lookup()
-{
-	int	error;
-
-	if (event_door) {	/* Release our previous hold (if any) */
-		door_ki_rele(event_door);
-	}
-
-	event_door = NULL;
-
-	/*
-	 * Locate the door used for upcalls
-	 */
-	if ((error =
-	    door_ki_open(logevent_door_upcall_filename, &event_door)) != 0) {
-		return (error);
-	}
-
-	return (0);
-}
-
 
 /*ARGSUSED*/
 static void
@@ -234,23 +208,44 @@ log_event_upcall(log_event_upcall_arg_t *arg)
 	darg.desc_ptr = NULL;
 	darg.desc_num = 0;
 
-	if ((event_door == NULL) &&
-	    ((error = log_event_upcall_lookup()) != 0)) {
-		LOG_DEBUG((CE_CONT,
-		    "log_event_upcall: event_door error (%d)\n", error));
-
-		return (error);
-	}
-
 	LOG_DEBUG1((CE_CONT, "log_event_upcall: 0x%llx\n",
 	    (longlong_t)SE_SEQ((sysevent_t *)&arg->buf)));
 
 	save_arg = darg;
 	for (retry = 0; ; retry++) {
+
+		mutex_enter(&event_door_mutex);
+		if (event_door == NULL) {
+			mutex_exit(&event_door_mutex);
+
+			return (EBADF);
+		}
+
 		if ((error = door_ki_upcall_limited(event_door, &darg, NULL,
 		    SIZE_MAX, 0)) == 0) {
+			mutex_exit(&event_door_mutex);
 			break;
 		}
+
+		/*
+		 * EBADF is handled outside the switch below because we need to
+		 * hold event_door_mutex a bit longer
+		 */
+		if (error == EBADF) {
+			/* Server died */
+			door_ki_rele(event_door);
+			event_door = NULL;
+
+			mutex_exit(&event_door_mutex);
+			return (error);
+		}
+
+		mutex_exit(&event_door_mutex);
+
+		/*
+		 * The EBADF case is already handled above with event_door_mutex
+		 * held
+		 */
 		switch (error) {
 		case EINTR:
 			neintr++;
@@ -264,24 +259,6 @@ log_event_upcall(log_event_upcall_arg_t *arg)
 			nticks <<= 1;
 			if (nticks > LOG_EVENT_MAX_PAUSE)
 				nticks = LOG_EVENT_MAX_PAUSE;
-			darg = save_arg;
-			break;
-		case EBADF:
-			LOG_DEBUG((CE_CONT, "log_event_upcall: rebinding\n"));
-			/* Server may have died. Try rebinding */
-			if ((error = log_event_upcall_lookup()) != 0) {
-				LOG_DEBUG((CE_CONT,
-				    "log_event_upcall: lookup error %d\n",
-				    error));
-				return (EBADF);
-			}
-			if (retry > 4) {
-				LOG_DEBUG((CE_CONT,
-				    "log_event_upcall: ebadf\n"));
-				return (EBADF);
-			}
-			LOG_DEBUG((CE_CONT, "log_event_upcall: "
-			    "retrying upcall after lookup\n"));
 			darg = save_arg;
 			break;
 		default:
@@ -347,17 +324,17 @@ log_event_deliver()
 		q = log_eventq_head;
 
 		while (q) {
-			log_eventq_t *next;
-
-			/*
-			 * Release event queue lock during upcall to
-			 * syseventd
-			 */
 			if (log_event_delivery == LOGEVENT_DELIVERY_HOLD) {
 				upcall_err = EAGAIN;
 				break;
 			}
 
+			log_event_delivery = LOGEVENT_DELIVERY_OK;
+
+			/*
+			 * Release event queue lock during upcall to
+			 * syseventd
+			 */
 			mutex_exit(&eventq_head_mutex);
 			if ((upcall_err = log_event_upcall(&q->arg)) != 0) {
 				mutex_enter(&eventq_head_mutex);
@@ -390,6 +367,8 @@ log_event_deliver()
 				LOG_DEBUG((CE_CONT, "log_event_deliver: "
 				    "door upcall/daemon restart race\n"));
 			} else {
+				log_eventq_t *next;
+
 				/*
 				 * Move the event to the sent queue when a
 				 * successful delivery has been made.
@@ -426,12 +405,9 @@ log_event_deliver()
 			 * resumption, continue.  Otherwise, we wait until
 			 * we are signaled to continue.
 			 */
-			if (log_event_delivery == LOGEVENT_DELIVERY_CONT) {
-				log_event_delivery = LOGEVENT_DELIVERY_OK;
+			if (log_event_delivery == LOGEVENT_DELIVERY_CONT)
 				continue;
-			} else {
-				log_event_delivery = LOGEVENT_DELIVERY_HOLD;
-			}
+			log_event_delivery = LOGEVENT_DELIVERY_HOLD;
 
 			LOG_DEBUG1((CE_CONT, "log_event_deliver: EAGAIN\n"));
 			break;
@@ -465,6 +441,8 @@ log_event_deliver()
 void
 log_event_init()
 {
+	mutex_init(&event_door_mutex, NULL, MUTEX_DEFAULT, NULL);
+
 	mutex_init(&eventq_head_mutex, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&eventq_sent_mutex, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&log_event_cv, NULL, CV_DEFAULT, NULL);
@@ -1601,23 +1579,19 @@ log_sysevent_flushq(int cmd, uint_t flag)
 int
 log_sysevent_filename(char *file)
 {
-	/*
-	 * Called serially by syseventd init code, no need to protect door
-	 * data.
-	 */
+	mutex_enter(&event_door_mutex);
+
+	(void) strlcpy(logevent_door_upcall_filename, file,
+	    sizeof (logevent_door_upcall_filename));
+
 	/* Unbind old event door */
-	if (logevent_door_upcall_filename) {
-		kmem_free(logevent_door_upcall_filename,
-		    logevent_door_upcall_filename_size);
-		if (event_door) {
-			door_ki_rele(event_door);
-			event_door = NULL;
-		}
-	}
-	logevent_door_upcall_filename_size = strlen(file) + 1;
-	logevent_door_upcall_filename = kmem_alloc(
-	    logevent_door_upcall_filename_size, KM_SLEEP);
-	(void) strcpy(logevent_door_upcall_filename, file);
+	if (event_door != NULL)
+		door_ki_rele(event_door);
+	/* Establish door connection with user event daemon (syseventd) */
+	if (door_ki_open(logevent_door_upcall_filename, &event_door) != 0)
+		event_door = NULL;
+
+	mutex_exit(&event_door_mutex);
 
 	/*
 	 * We are called when syseventd restarts. Move all sent, but

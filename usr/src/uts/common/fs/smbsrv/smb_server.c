@@ -294,8 +294,6 @@ smb_server_svc_init(void)
 			continue;
 		if (rc = smb_fem_init())
 			continue;
-		if (rc = smb_notify_init())
-			continue;
 		if (rc = smb_net_init())
 			continue;
 		smb_llist_init();
@@ -306,7 +304,6 @@ smb_server_svc_init(void)
 
 	smb_llist_fini();
 	smb_net_fini();
-	smb_notify_fini();
 	smb_fem_fini();
 	smb_node_fini();
 	smb_vop_fini();
@@ -328,7 +325,6 @@ smb_server_svc_fini(void)
 	if (smb_llist_get_count(&smb_servers) == 0) {
 		smb_llist_fini();
 		smb_net_fini();
-		smb_notify_fini();
 		smb_fem_fini();
 		smb_node_fini();
 		smb_oplock_fini();

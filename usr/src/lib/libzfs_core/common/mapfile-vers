@@ -45,7 +45,10 @@ SYMBOL_VERSION ILLUMOS_0.1 {
 	lzc_create;
 	lzc_destroy_snaps;
 	lzc_exists;
+	lzc_get_holds;
+	lzc_hold;
 	lzc_receive;
+	lzc_release;
 	lzc_send;
 	lzc_send_space;
 	lzc_snaprange_space;

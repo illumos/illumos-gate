@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
@@ -1059,7 +1062,7 @@ spec_size_invalidate(dev_t dev, vtype_t type)
 	if ((csp = sfind(dev, type, NULL)) != NULL) {
 		mutex_enter(&csp->s_lock);
 		csp->s_flag &= ~SSIZEVALID;
-		VN_RELE(STOV(csp));
+		VN_RELE_ASYNC(STOV(csp), system_taskq);
 		mutex_exit(&csp->s_lock);
 	}
 	mutex_exit(&stable_lock);

@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/synch.h>
@@ -480,10 +481,25 @@ smb_common_rename(smb_request_t *sr, smb_fqi_t *src_fqi, smb_fqi_t *dst_fqi)
 	    src_dnode, src_fnode->od_name,
 	    dst_dnode, new_name);
 
-	smb_rename_release_src(sr);
+	if (rc == 0) {
+		/*
+		 * Note that renames in the same directory are normally
+		 * delivered in {old,new} pairs, and clients expect them
+		 * in that order, if both events are delivered.
+		 */
+		int a_src, a_dst; /* action codes */
+		if (src_dnode == dst_dnode) {
+			a_src = FILE_ACTION_RENAMED_OLD_NAME;
+			a_dst = FILE_ACTION_RENAMED_NEW_NAME;
+		} else {
+			a_src = FILE_ACTION_REMOVED;
+			a_dst = FILE_ACTION_ADDED;
+		}
+		smb_node_notify_change(src_dnode, a_src, src_fnode->od_name);
+		smb_node_notify_change(dst_dnode, a_dst, new_name);
+	}
 
-	if (rc == 0)
-		smb_node_notify_change(dst_dnode);
+	smb_rename_release_src(sr);
 
 	if (dst_fqi->fq_fnode) {
 		smb_node_end_crit(dst_fnode);
@@ -617,9 +633,12 @@ smb_make_link(smb_request_t *sr, smb_fqi_t *src_fqi, smb_fqi_t *dst_fqi)
 	rc = smb_fsop_link(sr, sr->user_cr, src_fqi->fq_fnode,
 	    dst_fqi->fq_dnode, dst_fqi->fq_last_comp);
 
+	if (rc == 0) {
+		smb_node_notify_change(dst_fqi->fq_dnode,
+		    FILE_ACTION_ADDED, dst_fqi->fq_last_comp);
+	}
+
 	smb_rename_release_src(sr);
-	if (rc == 0)
-		smb_node_notify_change(dst_fqi->fq_dnode);
 	smb_node_release(dst_fqi->fq_dnode);
 	return (rc);
 }

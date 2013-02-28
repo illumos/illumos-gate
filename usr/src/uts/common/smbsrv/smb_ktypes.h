@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -452,12 +452,18 @@ typedef struct {
 } smb_rwx_t;
 
 /* NOTIFY CHANGE */
+typedef struct smb_node_fcn {
+	kmutex_t	fcn_mutex;
+	uint32_t	fcn_count;
+	list_t		fcn_watchers;	/* smb_request_t, sr_ncr.nc_lnd */
+} smb_node_fcn_t;
 
 typedef struct smb_notify_change_req {
-	list_node_t		nc_lnd;
-	struct smb_node		*nc_node;
-	uint32_t		nc_reply_type;
+	list_node_t		nc_lnd;	/* n_fcn.fcn_watchers */
+	kcondvar_t		nc_cv;	/* prot: sr_mutex */
 	uint32_t		nc_flags;
+	uint32_t		nc_action;
+	char			*nc_fname;
 } smb_notify_change_req_t;
 
 /*
@@ -638,6 +644,7 @@ typedef struct smb_node {
 	volatile int		waiting_event;
 	smb_times_t		n_timestamps;
 	u_offset_t		n_allocsz;
+	smb_node_fcn_t		n_fcn;
 	smb_oplock_t		n_oplock;
 	struct smb_node		*n_dnode;
 	struct smb_node		*n_unode;
@@ -652,10 +659,6 @@ typedef struct smb_node {
 #define	NODE_FLAGS_DFSLINK		0x00002000
 #define	NODE_FLAGS_VFSROOT		0x00004000
 #define	NODE_FLAGS_SYSTEM		0x00008000
-#define	NODE_FLAGS_WATCH_TREE		0x10000000
-#define	NODE_FLAGS_NOTIFY_CHANGE	\
-	(NODE_FLAGS_WATCH_TREE | FILE_NOTIFY_VALID_MASK)
-#define	NODE_FLAGS_CHANGED		0x08000000
 #define	NODE_FLAGS_WRITE_THROUGH	0x00100000
 #define	NODE_XATTR_DIR			0x01000000
 #define	NODE_FLAGS_DELETE_ON_CLOSE	0x40000000
@@ -1267,6 +1270,7 @@ typedef enum {
 } smb_odir_state_t;
 
 typedef enum {
+	SMB_ODIR_RESUME_CONT,
 	SMB_ODIR_RESUME_IDX,
 	SMB_ODIR_RESUME_COOKIE,
 	SMB_ODIR_RESUME_FNAME
@@ -1306,9 +1310,11 @@ typedef struct smb_odir {
 		edirent_t	*u_edp;
 		dirent64_t	*u_dp;
 	} d_u;
+	uint32_t		d_last_cookie;
 	uint32_t		d_cookies[SMB_MAX_SEARCH];
 	char			d_pattern[MAXNAMELEN];
 	char			d_buf[SMB_ODIR_BUFSIZE];
+	char			d_last_name[MAXNAMELEN];
 } smb_odir_t;
 #define	d_bufptr	d_u.u_bufptr
 #define	d_edp		d_u.u_edp
@@ -1323,7 +1329,7 @@ typedef struct smb_odirent {
 typedef struct smb_fileinfo {
 	char		fi_name[MAXNAMELEN];
 	char		fi_shortname[SMB_SHORTNAMELEN];
-	uint32_t	fi_cookie;
+	uint32_t	fi_cookie;	/* Dir offset (of next entry) */
 	uint32_t	fi_dosattr;	/* DOS attributes */
 	uint64_t	fi_nodeid;	/* file system node id */
 	uint64_t	fi_size;	/* file size in bytes */
@@ -1599,7 +1605,6 @@ typedef struct smb_request {
 	kmutex_t		sr_mutex;
 	list_node_t		sr_session_lnd;
 	smb_req_state_t		sr_state;
-	boolean_t		sr_keep;
 	kmem_cache_t		*sr_cache;
 	struct smb_server	*sr_server;
 	pid_t			*sr_pid;

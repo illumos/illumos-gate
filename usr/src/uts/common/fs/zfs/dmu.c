@@ -405,8 +405,7 @@ dmu_buf_hold_array_by_dnode(dnode_t *dn, uint64_t offset, uint64_t length,
 
 	if (dn->dn_objset->os_dsl_dataset)
 		dp = dn->dn_objset->os_dsl_dataset->ds_dir->dd_pool;
-	if (dp && dsl_pool_sync_context(dp))
-		start = gethrtime();
+	start = gethrtime();
 	zio = zio_root(dn->dn_objset->os_spa, NULL, NULL, ZIO_FLAG_CANFAIL);
 	blkid = dbuf_whichblock(dn, offset);
 	for (i = 0; i < nblks; i++) {
@@ -1196,7 +1195,7 @@ void
 dmu_return_arcbuf(arc_buf_t *buf)
 {
 	arc_return_buf(buf, FTAG);
-	VERIFY(arc_buf_remove_ref(buf, FTAG) == 1);
+	VERIFY(arc_buf_remove_ref(buf, FTAG));
 }
 
 /*

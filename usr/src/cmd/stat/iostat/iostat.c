@@ -26,6 +26,9 @@
  * rewritten from UCB 4.13 83/09/25
  * rewritten from SunOS 4.1 SID 1.18 89/10/06
  */
+/*
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -422,14 +425,14 @@ show_disk_header(void *v1, void *v2, void *data)
  *
  * 0---------1--------2---------3---------4---------5---------6---------7-------
  *    tty        sd0           sd1           sd2           sd3           cpu
- *  tin tout kps tps serv  kps tps serv  kps tps serv  kps tps serv  us sy wt id
+ *  tin tout kps tps serv  kps tps serv  kps tps serv  kps tps serv  us sy dt id
  *  NNN NNNN NNN NNN NNNN  NNN NNN NNNN  NNN NNN NNNN  NNN NNN NNNN  NN NN NN NN
  *
  * When -D is specified, the disk header looks as follows (worst case):
  *
  * 0---------1--------2---------3---------4---------5---------6---------7-------
  *     tty        sd0           sd1             sd2          sd3          cpu
- *   tin tout rps wps util  rps wps util  rps wps util  rps wps util us sy wt id
+ *   tin tout rps wps util  rps wps util  rps wps util  rps wps util us sy dt id
  *   NNN NNNN NNN NNN NNNN  NNN NNN NNNN  NNN NNN NNNN  NNN NNN NNNN NN NN NN NN
  */
 static void
@@ -940,7 +943,7 @@ usage(void)
 	    "Usage: iostat [-cCdDeEiImMnpPrstxXYz] "
 	    " [-l n] [-T d|u] [disk ...] [interval [count]]\n"
 	    "\t\t-c: 	report percentage of time system has spent\n"
-	    "\t\t\tin user/system/wait/idle mode\n"
+	    "\t\t\tin user/system/dtrace/idle mode\n"
 	    "\t\t-C: 	report disk statistics by controller\n"
 	    "\t\t-d: 	display disk Kb/sec, transfers/sec, avg. \n"
 	    "\t\t\tservice time in milliseconds  \n"
@@ -1489,9 +1492,9 @@ print_cpu_hdr2(void)
 	char *dstr;
 
 	if (do_raw == 0)
-		dstr = " us sy wt id";
+		dstr = " us sy dt id";
 	else
-		dstr = "us,sy,wt,id";
+		dstr = "us,sy,dt,id";
 	push_out(dstr);
 }
 
@@ -1534,7 +1537,8 @@ print_cpu_data(void)
 	uint64_t idle;
 	uint64_t user;
 	uint64_t kern;
-	uint64_t wait;
+	uint64_t dtrace;
+	uint64_t nsec_elapsed;
 	kstat_t *oldks = NULL;
 
 	if (oldss)
@@ -1548,9 +1552,13 @@ print_cpu_data(void)
 	idle = kstat_delta(oldks, &newss->s_sys.ss_agg_sys, "cpu_ticks_idle");
 	user = kstat_delta(oldks, &newss->s_sys.ss_agg_sys, "cpu_ticks_user");
 	kern = kstat_delta(oldks, &newss->s_sys.ss_agg_sys, "cpu_ticks_kernel");
-	wait = kstat_delta(oldks, &newss->s_sys.ss_agg_sys, "cpu_ticks_wait");
+	dtrace = kstat_delta(oldks, &newss->s_sys.ss_agg_sys,
+	    "cpu_nsec_dtrace");
+	nsec_elapsed = newss->s_sys.ss_agg_sys.ks_snaptime -
+	    (oldks == NULL ? 0 : oldks->ks_snaptime);
 	push_out(fstr, user * percent, kern * percent,
-	    wait * percent, idle * percent);
+	    dtrace * 100.0 / nsec_elapsed / newss->s_nr_active_cpus,
+	    idle * percent);
 }
 
 /*

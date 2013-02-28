@@ -775,10 +775,12 @@ zfs_do_create(int argc, char **argv)
 
 	if (type == ZFS_TYPE_VOLUME && !noreserve) {
 		zpool_handle_t *zpool_handle;
+		nvlist_t *real_props;
 		uint64_t spa_version;
 		char *p;
 		zfs_prop_t resv_prop;
 		char *strval;
+		char msg[1024];
 
 		if (p = strchr(argv[0], '/'))
 			*p = '\0';
@@ -794,7 +796,15 @@ zfs_do_create(int argc, char **argv)
 			resv_prop = ZFS_PROP_REFRESERVATION;
 		else
 			resv_prop = ZFS_PROP_RESERVATION;
-		volsize = zvol_volsize_to_reservation(volsize, props);
+
+		(void) snprintf(msg, sizeof (msg),
+		    gettext("cannot create '%s'"), argv[0]);
+		if (props && (real_props = zfs_valid_proplist(g_zfs, type,
+		    props, 0, NULL, msg)) == NULL)
+			goto error;
+
+		volsize = zvol_volsize_to_reservation(volsize, real_props);
+		nvlist_free(real_props);
 
 		if (nvlist_lookup_string(props, zfs_prop_to_name(resv_prop),
 		    &strval) != 0) {
@@ -888,6 +898,7 @@ typedef struct destroy_cbdata {
 	boolean_t	cb_parsable;
 	boolean_t	cb_dryrun;
 	nvlist_t	*cb_nvl;
+	nvlist_t	*cb_batchedsnaps;
 
 	/* first snap in contiguous run */
 	char		*cb_firstsnap;
@@ -984,9 +995,27 @@ destroy_callback(zfs_handle_t *zhp, void *data)
 		zfs_close(zhp);
 		return (0);
 	}
+	if (cb->cb_dryrun) {
+		zfs_close(zhp);
+		return (0);
+	}
 
-	if (!cb->cb_dryrun) {
-		if (zfs_unmount(zhp, NULL, cb->cb_force ? MS_FORCE : 0) != 0 ||
+	/*
+	 * We batch up all contiguous snapshots (even of different
+	 * filesystems) and destroy them with one ioctl.  We can't
+	 * simply do all snap deletions and then all fs deletions,
+	 * because we must delete a clone before its origin.
+	 */
+	if (zfs_get_type(zhp) == ZFS_TYPE_SNAPSHOT) {
+		fnvlist_add_boolean(cb->cb_batchedsnaps, name);
+	} else {
+		int error = zfs_destroy_snaps_nvl(g_zfs,
+		    cb->cb_batchedsnaps, B_FALSE);
+		fnvlist_free(cb->cb_batchedsnaps);
+		cb->cb_batchedsnaps = fnvlist_alloc();
+
+		if (error != 0 ||
+		    zfs_unmount(zhp, NULL, cb->cb_force ? MS_FORCE : 0) != 0 ||
 		    zfs_destroy(zhp, cb->cb_defer_destroy) != 0) {
 			zfs_close(zhp);
 			return (-1);
@@ -1142,8 +1171,10 @@ static int
 zfs_do_destroy(int argc, char **argv)
 {
 	destroy_cbdata_t cb = { 0 };
+	int rv = 0;
+	int err = 0;
 	int c;
-	zfs_handle_t *zhp;
+	zfs_handle_t *zhp = NULL;
 	char *at;
 	zfs_type_t type = ZFS_TYPE_DATASET;
 
@@ -1197,11 +1228,9 @@ zfs_do_destroy(int argc, char **argv)
 
 	at = strchr(argv[0], '@');
 	if (at != NULL) {
-		int err = 0;
 
 		/* Build the list of snaps to destroy in cb_nvl. */
-		if (nvlist_alloc(&cb.cb_nvl, NV_UNIQUE_NAME, 0) != 0)
-			nomem();
+		cb.cb_nvl = fnvlist_alloc();
 
 		*at = '\0';
 		zhp = zfs_open(g_zfs, argv[0],
@@ -1212,17 +1241,15 @@ zfs_do_destroy(int argc, char **argv)
 		cb.cb_snapspec = at + 1;
 		if (gather_snapshots(zfs_handle_dup(zhp), &cb) != 0 ||
 		    cb.cb_error) {
-			zfs_close(zhp);
-			nvlist_free(cb.cb_nvl);
-			return (1);
+			rv = 1;
+			goto out;
 		}
 
 		if (nvlist_empty(cb.cb_nvl)) {
 			(void) fprintf(stderr, gettext("could not find any "
 			    "snapshots to destroy; check snapshot names.\n"));
-			zfs_close(zhp);
-			nvlist_free(cb.cb_nvl);
-			return (1);
+			rv = 1;
+			goto out;
 		}
 
 		if (cb.cb_verbose) {
@@ -1241,18 +1268,26 @@ zfs_do_destroy(int argc, char **argv)
 		}
 
 		if (!cb.cb_dryrun) {
-			if (cb.cb_doclones)
+			if (cb.cb_doclones) {
+				cb.cb_batchedsnaps = fnvlist_alloc();
 				err = destroy_clones(&cb);
+				if (err == 0) {
+					err = zfs_destroy_snaps_nvl(g_zfs,
+					    cb.cb_batchedsnaps, B_FALSE);
+				}
+				if (err != 0) {
+					rv = 1;
+					goto out;
+				}
+			}
 			if (err == 0) {
-				err = zfs_destroy_snaps_nvl(zhp, cb.cb_nvl,
+				err = zfs_destroy_snaps_nvl(g_zfs, cb.cb_nvl,
 				    cb.cb_defer_destroy);
 			}
 		}
 
-		zfs_close(zhp);
-		nvlist_free(cb.cb_nvl);
 		if (err != 0)
-			return (1);
+			rv = 1;
 	} else {
 		/* Open the given dataset */
 		if ((zhp = zfs_open(g_zfs, argv[0], type)) == NULL)
@@ -1273,8 +1308,8 @@ zfs_do_destroy(int argc, char **argv)
 			    zfs_get_name(zhp));
 			(void) fprintf(stderr, gettext("use 'zpool destroy %s' "
 			    "to destroy the pool itself\n"), zfs_get_name(zhp));
-			zfs_close(zhp);
-			return (1);
+			rv = 1;
+			goto out;
 		}
 
 		/*
@@ -1284,30 +1319,42 @@ zfs_do_destroy(int argc, char **argv)
 		if (!cb.cb_doclones &&
 		    zfs_iter_dependents(zhp, B_TRUE, destroy_check_dependent,
 		    &cb) != 0) {
-			zfs_close(zhp);
-			return (1);
+			rv = 1;
+			goto out;
 		}
 
 		if (cb.cb_error) {
-			zfs_close(zhp);
-			return (1);
+			rv = 1;
+			goto out;
 		}
 
+		cb.cb_batchedsnaps = fnvlist_alloc();
 		if (zfs_iter_dependents(zhp, B_FALSE, destroy_callback,
 		    &cb) != 0) {
-			zfs_close(zhp);
-			return (1);
+			rv = 1;
+			goto out;
 		}
 
 		/*
 		 * Do the real thing.  The callback will close the
 		 * handle regardless of whether it succeeds or not.
 		 */
-		if (destroy_callback(zhp, &cb) != 0)
-			return (1);
+		err = destroy_callback(zhp, &cb);
+		zhp = NULL;
+		if (err == 0) {
+			err = zfs_destroy_snaps_nvl(g_zfs,
+			    cb.cb_batchedsnaps, cb.cb_defer_destroy);
+		}
+		if (err != 0)
+			rv = 1;
 	}
 
-	return (0);
+out:
+	fnvlist_free(cb.cb_batchedsnaps);
+	fnvlist_free(cb.cb_nvl);
+	if (zhp != NULL)
+		zfs_close(zhp);
+	return (rv);
 }
 
 static boolean_t
@@ -5042,28 +5089,12 @@ cleanup2:
 	return (error);
 }
 
-/*
- * zfs allow [-r] [-t] <tag> <snap> ...
- *
- *	-r	Recursively hold
- *	-t	Temporary hold (hidden option)
- *
- * Apply a user-hold with the given tag to the list of snapshots.
- */
 static int
 zfs_do_allow(int argc, char **argv)
 {
 	return (zfs_do_allow_unallow_impl(argc, argv, B_FALSE));
 }
 
-/*
- * zfs unallow [-r] [-t] <tag> <snap> ...
- *
- *	-r	Recursively hold
- *	-t	Temporary hold (hidden option)
- *
- * Apply a user-hold with the given tag to the list of snapshots.
- */
 static int
 zfs_do_unallow(int argc, char **argv)
 {
@@ -5077,7 +5108,6 @@ zfs_do_hold_rele_impl(int argc, char **argv, boolean_t holding)
 	int i;
 	const char *tag;
 	boolean_t recursive = B_FALSE;
-	boolean_t temphold = B_FALSE;
 	const char *opts = holding ? "rt" : "r";
 	int c;
 
@@ -5086,9 +5116,6 @@ zfs_do_hold_rele_impl(int argc, char **argv, boolean_t holding)
 		switch (c) {
 		case 'r':
 			recursive = B_TRUE;
-			break;
-		case 't':
-			temphold = B_TRUE;
 			break;
 		case '?':
 			(void) fprintf(stderr, gettext("invalid option '%c'\n"),
@@ -5138,7 +5165,7 @@ zfs_do_hold_rele_impl(int argc, char **argv, boolean_t holding)
 		}
 		if (holding) {
 			if (zfs_hold(zhp, delim+1, tag, recursive,
-			    temphold, B_FALSE, -1, 0, 0) != 0)
+			    B_FALSE, -1) != 0)
 				++errors;
 		} else {
 			if (zfs_release(zhp, delim+1, tag, recursive) != 0)
@@ -5154,7 +5181,6 @@ zfs_do_hold_rele_impl(int argc, char **argv, boolean_t holding)
  * zfs hold [-r] [-t] <tag> <snap> ...
  *
  *	-r	Recursively hold
- *	-t	Temporary hold (hidden option)
  *
  * Apply a user-hold with the given tag to the list of snapshots.
  */

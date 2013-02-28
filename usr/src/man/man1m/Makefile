@@ -236,6 +236,7 @@ COMMON_MANFILES = 	6to4relay.1m		\
 	 	 	intrstat.1m		\
 	 	 	iostat.1m		\
 	 	 	ipaddrsel.1m		\
+			ipadm.1m		\
 	 	 	ipf.1m			\
 	 	 	ipfs.1m			\
 	 	 	ipfstat.1m		\

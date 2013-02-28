@@ -20,8 +20,8 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -113,86 +113,50 @@
 #include <smbsrv/smb_kproto.h>
 #include <sys/sdt.h>
 
-static void smb_notify_change_daemon(smb_thread_t *, void *);
-
-static boolean_t	smb_notify_initialized = B_FALSE;
-static smb_slist_t	smb_ncr_list;
-static smb_slist_t	smb_nce_list;
-static smb_thread_t	smb_thread_notify_daemon;
-
 /*
- * smb_notify_init
- *
- * This function is not multi-thread safe. The caller must make sure only one
- * thread makes the call.
+ * We add this flag to the CompletionFilter (see above) when the
+ * client sets WatchTree.  Must not overlap FILE_NOTIFY_VALID_MASK.
  */
-int
-smb_notify_init(void)
-{
-	int	rc;
+#define	NODE_FLAGS_WATCH_TREE		0x10000000
+#if (NODE_FLAGS_WATCH_TREE & FILE_NOTIFY_VALID_MASK)
+#error "NODE_FLAGS_WATCH_TREE"
+#endif
 
-	if (smb_notify_initialized)
-		return (0);
+static void smb_notify_sr(smb_request_t *, uint_t, const char *);
 
-	smb_slist_constructor(&smb_ncr_list, sizeof (smb_request_t),
-	    offsetof(smb_request_t, sr_ncr.nc_lnd));
-
-	smb_slist_constructor(&smb_nce_list, sizeof (smb_request_t),
-	    offsetof(smb_request_t, sr_ncr.nc_lnd));
-
-	smb_thread_init(&smb_thread_notify_daemon,
-	    "smb_notify_change_daemon", smb_notify_change_daemon, NULL);
-
-	rc = smb_thread_start(&smb_thread_notify_daemon);
-	if (rc) {
-		smb_thread_destroy(&smb_thread_notify_daemon);
-		smb_slist_destructor(&smb_ncr_list);
-		smb_slist_destructor(&smb_nce_list);
-		return (rc);
-	}
-
-	smb_notify_initialized = B_TRUE;
-
-	return (0);
-}
-
-/*
- * smb_notify_fini
- *
- * This function is not multi-thread safe. The caller must make sure only one
- * thread makes the call.
- */
-void
-smb_notify_fini(void)
-{
-	if (!smb_notify_initialized)
-		return;
-
-	smb_thread_stop(&smb_thread_notify_daemon);
-	smb_thread_destroy(&smb_thread_notify_daemon);
-	smb_slist_destructor(&smb_ncr_list);
-	smb_slist_destructor(&smb_nce_list);
-	smb_notify_initialized = B_FALSE;
-}
+static int smb_notify_encode_action(struct smb_request *, struct smb_xa *,
+	uint32_t, char *);
 
 /*
  * smb_nt_transact_notify_change
  *
- * This function is responsible for processing NOTIFY CHANGE requests.
- * Requests are stored in a global queue. This queue is processed when
- * a monitored directory is changed or client cancels one of its already
- * sent requests.
+ * Handle and SMB NT transact NOTIFY CHANGE request.
+ * Basically, wait until "something has changed", and either
+ * return information about what changed, or return a special
+ * error telling the client "many things changed".
+ *
+ * The implementation uses a per-node list of waiting notify
+ * requests like this one, each with a blocked worker thead.
+ * Later, FEM and/or smbsrv events wake these threads, which
+ * then send the reply to the client.
  */
 smb_sdrc_t
-smb_nt_transact_notify_change(struct smb_request *sr, struct smb_xa *xa)
+smb_nt_transact_notify_change(smb_request_t *sr, struct smb_xa *xa)
 {
 	uint32_t		CompletionFilter;
 	unsigned char		WatchTree;
+	smb_error_t		err;
+	int			rc;
 	smb_node_t		*node;
 
 	if (smb_mbc_decodef(&xa->req_setup_mb, "lwb",
-	    &CompletionFilter, &sr->smb_fid, &WatchTree) != 0)
-		return (SDRC_NOT_IMPLEMENTED);
+	    &CompletionFilter, &sr->smb_fid, &WatchTree) != 0) {
+		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER, 0, 0);
+		return (SDRC_ERROR);
+	}
+	CompletionFilter &= FILE_NOTIFY_VALID_MASK;
+	if (WatchTree)
+		CompletionFilter |= NODE_FLAGS_WATCH_TREE;
 
 	smbsr_lookup_file(sr);
 	if (sr->fid_ofile == NULL) {
@@ -201,7 +165,6 @@ smb_nt_transact_notify_change(struct smb_request *sr, struct smb_xa *xa)
 	}
 
 	node = sr->fid_ofile->f_node;
-
 	if (node == NULL || !smb_node_is_dir(node)) {
 		/*
 		 * Notify change requests are only valid on directories.
@@ -210,133 +173,70 @@ smb_nt_transact_notify_change(struct smb_request *sr, struct smb_xa *xa)
 		return (SDRC_ERROR);
 	}
 
+	/*
+	 * Prepare to receive event data.
+	 */
+	sr->sr_ncr.nc_flags = CompletionFilter;
+	ASSERT(sr->sr_ncr.nc_action == 0);
+	ASSERT(sr->sr_ncr.nc_fname == NULL);
+	sr->sr_ncr.nc_fname = kmem_zalloc(MAXNAMELEN, KM_SLEEP);
+
+	/*
+	 * Subscribe to events on this node.
+	 */
+	smb_node_fcn_subscribe(node, sr);
+
+	/*
+	 * Wait for subscribed events to arrive.
+	 * Expect SMB_REQ_STATE_EVENT_OCCURRED
+	 * or SMB_REQ_STATE_CANCELED when signaled.
+	 * Note it's possible (though rare) to already
+	 * have SMB_REQ_STATE_CANCELED here.
+	 */
 	mutex_enter(&sr->sr_mutex);
-	switch (sr->sr_state) {
-	case SMB_REQ_STATE_ACTIVE:
-		node->waiting_event++;
-		node->flags |= NODE_FLAGS_NOTIFY_CHANGE;
-		if ((node->flags & NODE_FLAGS_CHANGED) == 0) {
-			sr->sr_ncr.nc_node = node;
-			sr->sr_ncr.nc_flags = CompletionFilter;
-			if (WatchTree)
-				sr->sr_ncr.nc_flags |= NODE_FLAGS_WATCH_TREE;
-
-			sr->sr_keep = B_TRUE;
-			sr->sr_state = SMB_REQ_STATE_WAITING_EVENT;
-
-			smb_slist_insert_tail(&smb_ncr_list, sr);
-
-			/*
-			 * Monitor events system-wide.
-			 *
-			 * XXX: smb_node_ref() and smb_node_release()
-			 * take &node->n_lock.  May need alternate forms
-			 * of these routines if node->n_lock is taken
-			 * around calls to smb_fem_fcn_install() and
-			 * smb_fem_fcn_uninstall().
-			 */
-
-			smb_fem_fcn_install(node);
-
-			mutex_exit(&sr->sr_mutex);
-			return (SDRC_SR_KEPT);
-		} else {
-			/* node already changed, reply immediately */
-			if (--node->waiting_event == 0)
-				node->flags &=
-				    ~(NODE_FLAGS_NOTIFY_CHANGE |
-				    NODE_FLAGS_CHANGED);
-			mutex_exit(&sr->sr_mutex);
-			return (SDRC_SUCCESS);
-		}
-
-	case SMB_REQ_STATE_CANCELED:
-		mutex_exit(&sr->sr_mutex);
-		smbsr_error(sr, NT_STATUS_CANCELLED, 0, 0);
-		return (SDRC_ERROR);
-
-	default:
-		ASSERT(0);
-		mutex_exit(&sr->sr_mutex);
-		return (SDRC_SUCCESS);
+	if (sr->sr_state == SMB_REQ_STATE_ACTIVE)
+		sr->sr_state = SMB_REQ_STATE_WAITING_EVENT;
+	while (sr->sr_state == SMB_REQ_STATE_WAITING_EVENT) {
+		cv_wait(&sr->sr_ncr.nc_cv, &sr->sr_mutex);
 	}
-}
-
-/*
- * smb_reply_notify_change_request
- *
- * This function sends appropriate response to an already queued NOTIFY CHANGE
- * request. If node is changed (reply == NODE_FLAGS_CHANGED), a normal reply is
- * sent.
- * If client cancels the request or session dropped, an NT_STATUS_CANCELED
- * is sent in reply.
- */
-
-void
-smb_reply_notify_change_request(smb_request_t *sr)
-{
-	smb_node_t	*node;
-	smb_srqueue_t	*srq;
-	int		total_bytes, n_setup, n_param, n_data;
-	int		param_off, param_pad, data_off, data_pad;
-	struct		smb_xa *xa;
-	smb_error_t	err;
-
-	SMB_REQ_VALID(sr);
-	srq = sr->session->s_srqueue;
-	smb_srqueue_waitq_to_runq(srq);
-
-	xa = sr->r_xa;
-	node = sr->sr_ncr.nc_node;
-
-	if (--node->waiting_event == 0) {
-		node->flags &= ~(NODE_FLAGS_NOTIFY_CHANGE | NODE_FLAGS_CHANGED);
-		smb_fem_fcn_uninstall(node);
-	}
-
-	mutex_enter(&sr->sr_mutex);
-	switch (sr->sr_state) {
-
-	case SMB_REQ_STATE_EVENT_OCCURRED:
+	if (sr->sr_state == SMB_REQ_STATE_EVENT_OCCURRED)
 		sr->sr_state = SMB_REQ_STATE_ACTIVE;
+	mutex_exit(&sr->sr_mutex);
 
-		/* many things changed */
+	/*
+	 * Unsubscribe from events on this node.
+	 */
+	smb_node_fcn_unsubscribe(node, sr);
 
-		(void) smb_mbc_encodef(&xa->rep_data_mb, "l", 0L);
+	/*
+	 * Build the reply
+	 */
 
-		/* setup the NT transact reply */
+	switch (sr->sr_state) {
 
-		n_setup = MBC_LENGTH(&xa->rep_setup_mb);
-		n_param = MBC_LENGTH(&xa->rep_param_mb);
-		n_data  = MBC_LENGTH(&xa->rep_data_mb);
-
-		n_setup = (n_setup + 1) / 2; /* Convert to setup words */
-		param_pad = 1; /* must be one */
-		param_off = param_pad + 32 + 37 + (n_setup << 1) + 2;
-		/* Pad to 4 bytes */
-		data_pad = (4 - ((param_off + n_param) & 3)) % 4;
-		/* Param off from hdr */
-		data_off = param_off + n_param + data_pad;
-		total_bytes = param_pad + n_param + data_pad + n_data;
-
-		(void) smbsr_encode_result(sr, 18+n_setup, total_bytes,
-		    "b3.llllllllbCw#.C#.C",
-		    18 + n_setup,	/* wct */
-		    n_param,		/* Total Parameter Bytes */
-		    n_data,		/* Total Data Bytes */
-		    n_param,		/* Total Parameter Bytes this buffer */
-		    param_off,		/* Param offset from header start */
-		    0,			/* Param displacement */
-		    n_data,		/* Total Data Bytes this buffer */
-		    data_off,		/* Data offset from header start */
-		    0,			/* Data displacement */
-		    n_setup,		/* suwcnt */
-		    &xa->rep_setup_mb,	/* setup[] */
-		    total_bytes,	/* Total data bytes */
-		    param_pad,
-		    &xa->rep_param_mb,
-		    data_pad,
-		    &xa->rep_data_mb);
+	case SMB_REQ_STATE_ACTIVE:
+		/*
+		 * If we have event data, marshall it now, else just
+		 * say "many things changed". Note that when we are
+		 * woken by a WatchTree event (action == 0) then we
+		 * don't have true event details, and only know the
+		 * directory under which something changed.  In that
+		 * case we just say "many things changed".
+		 */
+		if (sr->sr_ncr.nc_action != 0 && 0 ==
+		    smb_notify_encode_action(sr, xa,
+		    sr->sr_ncr.nc_action, sr->sr_ncr.nc_fname)) {
+			rc = SDRC_SUCCESS;
+			break;
+		}
+		/*
+		 * This error says "many things changed".
+		 */
+		err.status = NT_STATUS_NOTIFY_ENUM_DIR;
+		err.errcls   = ERRDOS;
+		err.errcode  = ERROR_NOTIFY_ENUM_DIR;
+		smbsr_set_error(sr, &err);
+		rc = SDRC_ERROR;
 		break;
 
 	case SMB_REQ_STATE_CANCELED:
@@ -344,284 +244,226 @@ smb_reply_notify_change_request(smb_request_t *sr)
 		err.errcls   = ERRDOS;
 		err.errcode  = ERROR_OPERATION_ABORTED;
 		smbsr_set_error(sr, &err);
-
-		(void) smb_mbc_encodef(&sr->reply, "bwbw",
-		    (short)0, 0L, (short)0, 0L);
-		sr->smb_wct = 0;
-		sr->smb_bcc = 0;
+		rc = SDRC_ERROR;
 		break;
+
 	default:
 		ASSERT(0);
+		err.status   = NT_STATUS_INTERNAL_ERROR;
+		err.errcls   = ERRDOS;
+		err.errcode  = ERROR_INTERNAL_ERROR;
+		smbsr_set_error(sr, &err);
+		rc = SDRC_ERROR;
+		break;
 	}
-	mutex_exit(&sr->sr_mutex);
 
-	/* Setup the header */
-	(void) smb_mbc_poke(&sr->reply, 0, SMB_HEADER_ED_FMT,
-	    sr->first_smb_com,
-	    sr->smb_rcls,
-	    sr->smb_reh,
-	    sr->smb_err,
-	    sr->smb_flg | SMB_FLAGS_REPLY,
-	    sr->smb_flg2,
-	    sr->smb_pid_high,
-	    sr->smb_sig,
-	    sr->smb_tid,
-	    sr->smb_pid,
-	    sr->smb_uid,
-	    sr->smb_mid);
+	if (sr->sr_ncr.nc_fname != NULL) {
+		kmem_free(sr->sr_ncr.nc_fname, MAXNAMELEN);
+		sr->sr_ncr.nc_fname = NULL;
+	}
 
-	if (sr->session->signing.flags & SMB_SIGNING_ENABLED)
-		smb_sign_reply(sr, NULL);
-
-	/* send the reply */
-	DTRACE_PROBE1(ncr__reply, struct smb_request *, sr)
-	(void) smb_session_send(sr->session, 0, &sr->reply);
-	smbsr_cleanup(sr);
-
-	mutex_enter(&sr->sr_mutex);
-	sr->sr_state = SMB_REQ_STATE_COMPLETED;
-	mutex_exit(&sr->sr_mutex);
-	smb_srqueue_runq_exit(srq);
-	smb_request_free(sr);
+	return (rc);
 }
 
 /*
- * smb_process_session_notify_change_queue
+ * Encode a FILE_NOTIFY_INFORMATION struct.
  *
- * This function traverses notify change request queue and sends
- * cancel replies to all of requests that are related to a specific
- * session.
+ * We only ever put one of these in a response, so this
+ * does not bother handling appending additional ones.
+ */
+static int
+smb_notify_encode_action(struct smb_request *sr, struct smb_xa *xa,
+	uint32_t action, char *fname)
+{
+	uint32_t namelen;
+	int rc;
+
+	if (action < FILE_ACTION_ADDED ||
+	    action > FILE_ACTION_MODIFIED_STREAM)
+		return (-1);
+
+	namelen = smb_ascii_or_unicode_strlen(sr, fname);
+	if (namelen == 0)
+		return (-1);
+
+	rc = smb_mbc_encodef(&xa->rep_data_mb, "%lllu", sr,
+	    0, /* NextEntryOffset */
+	    action, namelen, fname);
+	return (rc);
+}
+
+/*
+ * smb_notify_file_closed
+ *
+ * Cancel any change-notify calls on this open file.
  */
 void
-smb_process_session_notify_change_queue(
-    smb_session_t	*session,
-    smb_tree_t		*tree)
+smb_notify_file_closed(struct smb_ofile *of)
 {
+	smb_session_t	*ses;
 	smb_request_t	*sr;
-	smb_request_t	*tmp;
-	boolean_t	sig = B_FALSE;
+	smb_slist_t	*list;
 
-	smb_slist_enter(&smb_ncr_list);
-	smb_slist_enter(&smb_nce_list);
-	sr = smb_slist_head(&smb_ncr_list);
+	SMB_OFILE_VALID(of);
+	ses = of->f_session;
+	SMB_SESSION_VALID(ses);
+	list = &ses->s_req_list;
+
+	smb_slist_enter(list);
+
+	sr = smb_slist_head(list);
 	while (sr) {
-		ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
-		tmp = smb_slist_next(&smb_ncr_list, sr);
-		if ((sr->session == session) &&
-		    (tree == NULL || sr->tid_tree == tree)) {
-			mutex_enter(&sr->sr_mutex);
-			switch (sr->sr_state) {
-			case SMB_REQ_STATE_WAITING_EVENT:
-				smb_slist_obj_move(
-				    &smb_nce_list,
-				    &smb_ncr_list,
-				    sr);
-				smb_srqueue_waitq_enter(
-				    sr->session->s_srqueue);
-				sr->sr_state = SMB_REQ_STATE_CANCELED;
-				sig = B_TRUE;
-				break;
-			default:
-				ASSERT(0);
-				break;
-			}
-			mutex_exit(&sr->sr_mutex);
+		SMB_REQ_VALID(sr);
+		if (sr->sr_state == SMB_REQ_STATE_WAITING_EVENT &&
+		    sr->fid_ofile == of) {
+			smb_request_cancel(sr);
 		}
-		sr = tmp;
+		sr = smb_slist_next(list, sr);
 	}
-	smb_slist_exit(&smb_nce_list);
-	smb_slist_exit(&smb_ncr_list);
-	if (sig)
-		smb_thread_signal(&smb_thread_notify_daemon);
+
+	smb_slist_exit(list);
 }
 
+
 /*
- * smb_process_file_notify_change_queue
+ * smb_notify_event
  *
- * This function traverses notify change request queue and sends
- * cancel replies to all of requests that are related to the
- * specified file.
+ * Post an event to the watchers on a given node.
+ *
+ * This makes one exception for RENAME, where we expect a
+ * pair of events for the {old,new} directory element names.
+ * This only delivers an event for the "new" name.
+ *
+ * The event delivery mechanism does not implement delivery of
+ * multiple events for one "NT Notify" call.  One could do that,
+ * but modern clients don't actually use the event data.  They
+ * set a max. received data size of zero, which means we discard
+ * the data and send the special "lots changed" error instead.
+ * Given that, there's not really any point in implementing the
+ * delivery of multiple events.  In fact, we don't even need to
+ * implement single event delivery, but do so for completeness,
+ * for debug convenience, and to be nice to older clients that
+ * may actually want some event data instead of the error.
+ *
+ * Given that we only deliver a single event for an "NT Notify"
+ * caller, we want to deliver the "new" name event.  (The "old"
+ * name event is less important, even ignored by some clients.)
+ * Since we know these are delivered in pairs, we can simply
+ * discard the "old" name event, knowing that the "new" name
+ * event will be delivered immediately afterwards.
+ *
+ * So, why do event sources post the "old name" event at all?
+ * (1) For debugging, so we see both {old,new} names here.
+ * (2) If in the future someone decides to implement the
+ * delivery of both {old,new} events, the changes can be
+ * mostly isolated to this file.
  */
 void
-smb_process_file_notify_change_queue(struct smb_ofile *of)
+smb_notify_event(smb_node_t *node, uint_t action, const char *name)
 {
 	smb_request_t	*sr;
-	smb_request_t	*tmp;
-	boolean_t	sig = B_FALSE;
+	smb_node_fcn_t	*fcn;
 
-	smb_slist_enter(&smb_ncr_list);
-	smb_slist_enter(&smb_nce_list);
-	sr = smb_slist_head(&smb_ncr_list);
+	SMB_NODE_VALID(node);
+	fcn = &node->n_fcn;
+
+	if (action == FILE_ACTION_RENAMED_OLD_NAME)
+		return; /* see above */
+
+	mutex_enter(&fcn->fcn_mutex);
+
+	sr = list_head(&fcn->fcn_watchers);
 	while (sr) {
-		ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
-		tmp = smb_slist_next(&smb_ncr_list, sr);
-		if (sr->fid_ofile == of) {
-			mutex_enter(&sr->sr_mutex);
-			switch (sr->sr_state) {
-			case SMB_REQ_STATE_WAITING_EVENT:
-				smb_slist_obj_move(&smb_nce_list,
-				    &smb_ncr_list, sr);
-				smb_srqueue_waitq_enter(
-				    sr->session->s_srqueue);
-				sr->sr_state = SMB_REQ_STATE_CANCELED;
-				sig = B_TRUE;
-				break;
-			default:
-				ASSERT(0);
-				break;
-			}
-			mutex_exit(&sr->sr_mutex);
-		}
-		sr = tmp;
+		smb_notify_sr(sr, action, name);
+		sr = list_next(&fcn->fcn_watchers, sr);
 	}
-	smb_slist_exit(&smb_nce_list);
-	smb_slist_exit(&smb_ncr_list);
-	if (sig)
-		smb_thread_signal(&smb_thread_notify_daemon);
+
+	mutex_exit(&fcn->fcn_mutex);
 }
 
 /*
- * smb_reply_specific_cancel_request
- *
- * This function searches global request list for a specific request. If found,
- * moves the request to event queue and kicks the notify change daemon.
+ * What completion filter (masks) apply to each of the
+ * FILE_ACTION_... events.
  */
+static const uint32_t
+smb_notify_action_mask[] = {
+	/* 0: Special, used by smb_node_notify_parents() */
+	NODE_FLAGS_WATCH_TREE,
 
-void
-smb_reply_specific_cancel_request(struct smb_request *zsr)
-{
-	smb_request_t	*sr;
-	smb_request_t	*tmp;
-	boolean_t	sig = B_FALSE;
+	/* FILE_ACTION_ADDED	 */
+	FILE_NOTIFY_CHANGE_NAME,
 
-	smb_slist_enter(&smb_ncr_list);
-	smb_slist_enter(&smb_nce_list);
-	sr = smb_slist_head(&smb_ncr_list);
-	while (sr) {
-		ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
-		tmp = smb_slist_next(&smb_ncr_list, sr);
-		if ((sr->session == zsr->session) &&
-		    (sr->smb_uid == zsr->smb_uid) &&
-		    (sr->smb_pid == zsr->smb_pid) &&
-		    (sr->smb_tid == zsr->smb_tid) &&
-		    (sr->smb_mid == zsr->smb_mid)) {
-			mutex_enter(&sr->sr_mutex);
-			switch (sr->sr_state) {
-			case SMB_REQ_STATE_WAITING_EVENT:
-				smb_slist_obj_move(&smb_nce_list,
-				    &smb_ncr_list, sr);
-				smb_srqueue_waitq_enter(
-				    sr->session->s_srqueue);
-				sr->sr_state = SMB_REQ_STATE_CANCELED;
-				sig = B_TRUE;
-				break;
-			default:
-				ASSERT(0);
-				break;
-			}
-			mutex_exit(&sr->sr_mutex);
-		}
-		sr = tmp;
-	}
-	smb_slist_exit(&smb_nce_list);
-	smb_slist_exit(&smb_ncr_list);
-	if (sig)
-		smb_thread_signal(&smb_thread_notify_daemon);
-}
+	/* FILE_ACTION_REMOVED	 */
+	FILE_NOTIFY_CHANGE_NAME,
+
+	/* FILE_ACTION_MODIFIED	 */
+	FILE_NOTIFY_CHANGE_ATTRIBUTES |
+	FILE_NOTIFY_CHANGE_SIZE |
+	FILE_NOTIFY_CHANGE_LAST_WRITE |
+	FILE_NOTIFY_CHANGE_LAST_ACCESS |
+	FILE_NOTIFY_CHANGE_CREATION |
+	FILE_NOTIFY_CHANGE_EA |
+	FILE_NOTIFY_CHANGE_SECURITY,
+
+	/* FILE_ACTION_RENAMED_OLD_NAME */
+	FILE_NOTIFY_CHANGE_NAME,
+
+	/* FILE_ACTION_RENAMED_NEW_NAME */
+	FILE_NOTIFY_CHANGE_NAME,
+
+	/* FILE_ACTION_ADDED_STREAM */
+	FILE_NOTIFY_CHANGE_STREAM_NAME,
+
+	/* FILE_ACTION_REMOVED_STREAM */
+	FILE_NOTIFY_CHANGE_STREAM_NAME,
+
+	/* FILE_ACTION_MODIFIED_STREAM */
+	FILE_NOTIFY_CHANGE_STREAM_SIZE |
+	FILE_NOTIFY_CHANGE_STREAM_WRITE,
+};
+static const int smb_notify_action_nelm =
+	sizeof (smb_notify_action_mask) /
+	sizeof (smb_notify_action_mask[0]);
 
 /*
- * smb_process_node_notify_change_queue
+ * smb_notify_sr
  *
- * This function searches notify change request queue and sends
- * 'NODE MODIFIED' reply to all requests which are related to a
- * specific node.
- * WatchTree flag: We handle this flag in a special manner just
- * for DAVE clients. When something is changed, we notify all
- * requests which came from DAVE clients on the same volume which
- * has been modified. We don't care about the tree that they wanted
- * us to monitor. any change in any part of the volume will lead
- * to notifying all notify change requests from DAVE clients on the
- * different parts of the volume hierarchy.
- */
-void
-smb_process_node_notify_change_queue(smb_node_t *node)
-{
-	smb_request_t	*sr;
-	smb_request_t	*tmp;
-	smb_node_t	*nc_node;
-	boolean_t	sig = B_FALSE;
-
-	ASSERT(node->n_magic == SMB_NODE_MAGIC);
-
-	if (!(node->flags & NODE_FLAGS_NOTIFY_CHANGE))
-		return;
-
-	node->flags |= NODE_FLAGS_CHANGED;
-
-	smb_slist_enter(&smb_ncr_list);
-	smb_slist_enter(&smb_nce_list);
-	sr = smb_slist_head(&smb_ncr_list);
-	while (sr) {
-		ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
-		tmp = smb_slist_next(&smb_ncr_list, sr);
-
-		nc_node = sr->sr_ncr.nc_node;
-		if (nc_node == node) {
-			mutex_enter(&sr->sr_mutex);
-			switch (sr->sr_state) {
-			case SMB_REQ_STATE_WAITING_EVENT:
-				smb_slist_obj_move(&smb_nce_list,
-				    &smb_ncr_list, sr);
-				smb_srqueue_waitq_enter(
-				    sr->session->s_srqueue);
-				sr->sr_state = SMB_REQ_STATE_EVENT_OCCURRED;
-				sig = B_TRUE;
-				break;
-			default:
-				ASSERT(0);
-				break;
-			}
-			mutex_exit(&sr->sr_mutex);
-		}
-		sr = tmp;
-	}
-	smb_slist_exit(&smb_nce_list);
-	smb_slist_exit(&smb_ncr_list);
-	if (sig)
-		smb_thread_signal(&smb_thread_notify_daemon);
-}
-
-/*
- * smb_notify_change_daemon
+ * Post an event to an smb request waiting on some node.
  *
- * This function processes notify change event list and send appropriate
- * responses to the requests. This function executes in the system as an
- * indivdual thread.
+ * Note that node->fcn.mutex is held.  This implies a
+ * lock order: node->fcn.mutex, then sr_mutex
  */
 static void
-smb_notify_change_daemon(smb_thread_t *thread, void *arg)
+smb_notify_sr(smb_request_t *sr, uint_t action, const char *name)
 {
-	_NOTE(ARGUNUSED(arg))
+	smb_notify_change_req_t	*ncr;
+	uint32_t	mask;
 
-	smb_request_t	*sr;
-	smb_request_t	*tmp;
-	list_t		sr_list;
+	SMB_REQ_VALID(sr);
+	ncr = &sr->sr_ncr;
 
-	list_create(&sr_list, sizeof (smb_request_t),
-	    offsetof(smb_request_t, sr_ncr.nc_lnd));
-
-	while (smb_thread_continue(thread)) {
-
-		while (smb_slist_move_tail(&sr_list, &smb_nce_list)) {
-			sr = list_head(&sr_list);
-			while (sr) {
-				ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
-				tmp = list_next(&sr_list, sr);
-				list_remove(&sr_list, sr);
-				smb_reply_notify_change_request(sr);
-				sr = tmp;
-			}
-		}
+	/*
+	 * Compute the completion filter mask bits for which
+	 * we will signal waiting notify requests.
+	 */
+	if (action >= smb_notify_action_nelm) {
+		ASSERT(0);
+		return;
 	}
-	list_destroy(&sr_list);
+	mask = smb_notify_action_mask[action];
+
+	mutex_enter(&sr->sr_mutex);
+	if (sr->sr_state == SMB_REQ_STATE_WAITING_EVENT &&
+	    (ncr->nc_flags & mask) != 0) {
+		sr->sr_state = SMB_REQ_STATE_EVENT_OCCURRED;
+		/*
+		 * Save event data in the sr_ncr field so the
+		 * reply handler can return it.
+		 */
+		ncr->nc_action = action;
+		if (name != NULL)
+			(void) strlcpy(ncr->nc_fname, name, MAXNAMELEN);
+		cv_signal(&ncr->nc_cv);
+	}
+	mutex_exit(&sr->sr_mutex);
 }

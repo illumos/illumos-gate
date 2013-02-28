@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Delphix (c) 2012 by Delphix. All rights reserved.
  */
 
 
@@ -206,6 +207,13 @@ dump_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 
 	case DIOCGETUUID:
 		error = copyoutstr(dump_get_uuid(), (void *)arg, 37, NULL);
+		break;
+
+	case DIOCRMDEV:
+		mutex_enter(&dump_lock);
+		if (dumpvp != NULL)
+			dumpfini();
+		mutex_exit(&dump_lock);
 		break;
 
 	default:
