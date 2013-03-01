@@ -36,16 +36,16 @@
 extern "C" {
 #endif
 
-	/*
-	 * DTrace Dynamic Tracing Software: Kernel Interfaces
-	 *
-	 * Note: The contents of this file are private to the implementation of the
-	 * Solaris system and DTrace subsystem and are subject to change at any time
-	 * without notice.  Applications and drivers using these interfaces will fail
-	 * to run on future releases.  These interfaces should not be used for any
-	 * purpose except those expressly outlined in dtrace(7D) and libdtrace(3LIB).
-	 * Please refer to the "Solaris Dynamic Tracing Guide" for more information.
-	 */
+/*
+ * DTrace Dynamic Tracing Software: Kernel Interfaces
+ *
+ * Note: The contents of this file are private to the implementation of the
+ * Solaris system and DTrace subsystem and are subject to change at any time
+ * without notice.  Applications and drivers using these interfaces will fail
+ * to run on future releases.  These interfaces should not be used for any
+ * purpose except those expressly outlined in dtrace(7D) and libdtrace(3LIB).
+ * Please refer to the "Solaris Dynamic Tracing Guide" for more information.
+ */
 
 #ifndef _ASM
 
@@ -57,9 +57,9 @@ extern "C" {
 #include <sys/cyclic.h>
 #include <sys/int_limits.h>
 
-	/*
-	 * DTrace Universal Constants and Typedefs
-	 */
+/*
+ * DTrace Universal Constants and Typedefs
+ */
 #define	DTRACE_CPUALL		-1	/* all CPUs */
 #define	DTRACE_IDNONE		0	/* invalid probe identifier */
 #define	DTRACE_EPIDNONE		0	/* invalid enabled probe identifier */
@@ -75,35 +75,35 @@ extern "C" {
 #define	DTRACE_FUNCNAMELEN	128
 #define	DTRACE_NAMELEN		64
 #define	DTRACE_FULLNAMELEN	(DTRACE_PROVNAMELEN + DTRACE_MODNAMELEN + \
-		DTRACE_FUNCNAMELEN + DTRACE_NAMELEN + 4)
+				DTRACE_FUNCNAMELEN + DTRACE_NAMELEN + 4)
 #define	DTRACE_ARGTYPELEN	128
 
-	typedef uint32_t dtrace_id_t;		/* probe identifier */
-	typedef uint32_t dtrace_epid_t;		/* enabled probe identifier */
-	typedef uint32_t dtrace_aggid_t;	/* aggregation identifier */
-	typedef int64_t dtrace_aggvarid_t;	/* aggregation variable identifier */
-	typedef uint16_t dtrace_actkind_t;	/* action kind */
-	typedef int64_t dtrace_optval_t;	/* option value */
-	typedef uint32_t dtrace_cacheid_t;	/* predicate cache identifier */
+typedef uint32_t dtrace_id_t;		/* probe identifier */
+typedef uint32_t dtrace_epid_t;		/* enabled probe identifier */
+typedef uint32_t dtrace_aggid_t;	/* aggregation identifier */
+typedef int64_t dtrace_aggvarid_t;	/* aggregation variable identifier */
+typedef uint16_t dtrace_actkind_t;	/* action kind */
+typedef int64_t dtrace_optval_t;	/* option value */
+typedef uint32_t dtrace_cacheid_t;	/* predicate cache identifier */
 
-	typedef enum dtrace_probespec {
-		DTRACE_PROBESPEC_NONE = -1,
-		DTRACE_PROBESPEC_PROVIDER = 0,
-		DTRACE_PROBESPEC_MOD,
-		DTRACE_PROBESPEC_FUNC,
-		DTRACE_PROBESPEC_NAME
-	} dtrace_probespec_t;
+typedef enum dtrace_probespec {
+	DTRACE_PROBESPEC_NONE = -1,
+	DTRACE_PROBESPEC_PROVIDER = 0,
+	DTRACE_PROBESPEC_MOD,
+	DTRACE_PROBESPEC_FUNC,
+	DTRACE_PROBESPEC_NAME
+} dtrace_probespec_t;
 
-	/*
-	 * DTrace Intermediate Format (DIF)
-	 *
-	 * The following definitions describe the DTrace Intermediate Format (DIF), a
-	 * a RISC-like instruction set and program encoding used to represent
-	 * predicates and actions that can be bound to DTrace probes.  The constants
-	 * below defining the number of available registers are suggested minimums; the
-	 * compiler should use DTRACEIOC_CONF to dynamically obtain the number of
-	 * registers provided by the current DTrace implementation.
-	 */
+/*
+ * DTrace Intermediate Format (DIF)
+ *
+ * The following definitions describe the DTrace Intermediate Format (DIF), a
+ * a RISC-like instruction set and program encoding used to represent
+ * predicates and actions that can be bound to DTrace probes.  The constants
+ * below defining the number of available registers are suggested minimums; the
+ * compiler should use DTRACEIOC_CONF to dynamically obtain the number of
+ * registers provided by the current DTrace implementation.
+ */
 #define	DIF_VERSION_1	1		/* DIF version 1: Solaris 10 Beta */
 #define	DIF_VERSION_2	2		/* DIF version 2: Solaris 10 FCS */
 #define	DIF_VERSION	DIF_VERSION_2	/* latest DIF instruction set version */
@@ -294,7 +294,7 @@ extern "C" {
 
 #define	DIF_SUBR_MAX			48	/* max subroutine value */
 
-	typedef uint32_t dif_instr_t;
+typedef uint32_t dif_instr_t;
 
 #define	DIF_INSTR_OP(i)			(((i) >> 24) & 0xff)
 #define	DIF_INSTR_R1(i)			(((i) >> 16) & 0xff)
@@ -336,39 +336,39 @@ extern "C" {
 
 #define	DIF_REG_R0	0		/* %r0 is always set to zero */
 
-	/*
-	 * A DTrace Intermediate Format Type (DIF Type) is used to represent the types
-	 * of variables, function and associative array arguments, and the return type
-	 * for each DIF object (shown below).  It contains a description of the type,
-	 * its size in bytes, and a module identifier.
-	 */
-	typedef struct dtrace_diftype {
-		uint8_t dtdt_kind;		/* type kind (see below) */
-		uint8_t dtdt_ckind;		/* type kind in CTF */
-		uint8_t dtdt_flags;		/* type flags (see below) */
-		uint8_t dtdt_pad;		/* reserved for future use */
-		uint32_t dtdt_size;		/* type size in bytes (unless string) */
-	} dtrace_diftype_t;
+/*
+ * A DTrace Intermediate Format Type (DIF Type) is used to represent the types
+ * of variables, function and associative array arguments, and the return type
+ * for each DIF object (shown below).  It contains a description of the type,
+ * its size in bytes, and a module identifier.
+ */
+typedef struct dtrace_diftype {
+	uint8_t dtdt_kind;		/* type kind (see below) */
+	uint8_t dtdt_ckind;		/* type kind in CTF */
+	uint8_t dtdt_flags;		/* type flags (see below) */
+	uint8_t dtdt_pad;		/* reserved for future use */
+	uint32_t dtdt_size;		/* type size in bytes (unless string) */
+} dtrace_diftype_t;
 
 #define	DIF_TYPE_CTF		0	/* type is a CTF type */
 #define	DIF_TYPE_STRING		1	/* type is a D string */
 
 #define	DIF_TF_BYREF		0x1	/* type is passed by reference */
 
-	/*
-	 * A DTrace Intermediate Format variable record is used to describe each of the
-	 * variables referenced by a given DIF object.  It contains an integer variable
-	 * identifier along with variable scope and properties, as shown below.  The
-	 * size of this structure must be sizeof (int) aligned.
-	 */
-	typedef struct dtrace_difv {
-		uint32_t dtdv_name;		/* variable name index in dtdo_strtab */
-		uint32_t dtdv_id;		/* variable reference identifier */
-		uint8_t dtdv_kind;		/* variable kind (see below) */
-		uint8_t dtdv_scope;		/* variable scope (see below) */
-		uint16_t dtdv_flags;		/* variable flags (see below) */
-		dtrace_diftype_t dtdv_type;	/* variable type (see above) */
-	} dtrace_difv_t;
+/*
+ * A DTrace Intermediate Format variable record is used to describe each of the
+ * variables referenced by a given DIF object.  It contains an integer variable
+ * identifier along with variable scope and properties, as shown below.  The
+ * size of this structure must be sizeof (int) aligned.
+ */
+typedef struct dtrace_difv {
+	uint32_t dtdv_name;		/* variable name index in dtdo_strtab */
+	uint32_t dtdv_id;		/* variable reference identifier */
+	uint8_t dtdv_kind;		/* variable kind (see below) */
+	uint8_t dtdv_scope;		/* variable scope (see below) */
+	uint16_t dtdv_flags;		/* variable flags (see below) */
+	dtrace_diftype_t dtdv_type;	/* variable type (see above) */
+} dtrace_difv_t;
 
 #define	DIFV_KIND_ARRAY		0	/* variable is an array of quantities */
 #define	DIFV_KIND_SCALAR	1	/* variable is a scalar quantity */
@@ -380,21 +380,21 @@ extern "C" {
 #define	DIFV_F_REF		0x1	/* variable is referenced by DIFO */
 #define	DIFV_F_MOD		0x2	/* variable is written by DIFO */
 
-	/*
-	 * DTrace Actions
-	 *
-	 * The upper byte determines the class of the action; the low bytes determines
-	 * the specific action within that class.  The classes of actions are as
-	 * follows:
-	 *
-	 *   [ no class ]                  <= May record process- or kernel-related data
-	 *   DTRACEACT_PROC                <= Only records process-related data
-	 *   DTRACEACT_PROC_DESTRUCTIVE    <= Potentially destructive to processes
-	 *   DTRACEACT_KERNEL              <= Only records kernel-related data
-	 *   DTRACEACT_KERNEL_DESTRUCTIVE  <= Potentially destructive to the kernel
-	 *   DTRACEACT_SPECULATIVE         <= Speculation-related action
-	 *   DTRACEACT_AGGREGATION         <= Aggregating action
-	 */
+/*
+ * DTrace Actions
+ *
+ * The upper byte determines the class of the action; the low bytes determines
+ * the specific action within that class.  The classes of actions are as
+ * follows:
+ *
+ *   [ no class ]                  <= May record process- or kernel-related data
+ *   DTRACEACT_PROC                <= Only records process-related data
+ *   DTRACEACT_PROC_DESTRUCTIVE    <= Potentially destructive to processes
+ *   DTRACEACT_KERNEL              <= Only records kernel-related data
+ *   DTRACEACT_KERNEL_DESTRUCTIVE  <= Potentially destructive to the kernel
+ *   DTRACEACT_SPECULATIVE         <= Speculation-related action
+ *   DTRACEACT_AGGREGATION         <= Aggregating action
+ */
 #define	DTRACEACT_NONE			0	/* no action */
 #define	DTRACEACT_DIFEXPR		1	/* action is DIF expression */
 #define	DTRACEACT_EXIT			2	/* exit() action */
@@ -438,27 +438,27 @@ extern "C" {
 
 #define	DTRACEACT_ISDESTRUCTIVE(x)	\
 	(DTRACEACT_CLASS(x) == DTRACEACT_PROC_DESTRUCTIVE || \
-	 DTRACEACT_CLASS(x) == DTRACEACT_KERNEL_DESTRUCTIVE)
+	DTRACEACT_CLASS(x) == DTRACEACT_KERNEL_DESTRUCTIVE)
 
 #define	DTRACEACT_ISSPECULATIVE(x)	\
 	(DTRACEACT_CLASS(x) == DTRACEACT_SPECULATIVE)
 
 #define	DTRACEACT_ISPRINTFLIKE(x)	\
 	((x) == DTRACEACT_PRINTF || (x) == DTRACEACT_PRINTA || \
-	 (x) == DTRACEACT_SYSTEM || (x) == DTRACEACT_FREOPEN)
+	(x) == DTRACEACT_SYSTEM || (x) == DTRACEACT_FREOPEN)
 
-	/*
-	 * DTrace Aggregating Actions
-	 *
-	 * These are functions f(x) for which the following is true:
-	 *
-	 *    f(f(x_0) U f(x_1) U ... U f(x_n)) = f(x_0 U x_1 U ... U x_n)
-	 *
-	 * where x_n is a set of arbitrary data.  Aggregating actions are in their own
-	 * DTrace action class, DTTRACEACT_AGGREGATION.  The macros provided here allow
-	 * for easier processing of the aggregation argument and data payload for a few
-	 * aggregating actions (notably:  quantize(), lquantize(), and ustack()).
-	 */
+/*
+ * DTrace Aggregating Actions
+ *
+ * These are functions f(x) for which the following is true:
+ *
+ *    f(f(x_0) U f(x_1) U ... U f(x_n)) = f(x_0 U x_1 U ... U x_n)
+ *
+ * where x_n is a set of arbitrary data.  Aggregating actions are in their own
+ * DTrace action class, DTTRACEACT_AGGREGATION.  The macros provided here allow
+ * for easier processing of the aggregation argument and data payload for a few
+ * aggregating actions (notably:  quantize(), lquantize(), and ustack()).
+ */
 #define	DTRACEACT_AGGREGATION		0x0700
 #define	DTRACEAGG_COUNT			(DTRACEACT_AGGREGATION + 1)
 #define	DTRACEAGG_MIN			(DTRACEACT_AGGREGATION + 2)
@@ -480,9 +480,9 @@ extern "C" {
 
 #define	DTRACE_QUANTIZE_BUCKETVAL(buck)					\
 	(int64_t)((buck) < DTRACE_QUANTIZE_ZEROBUCKET ?			\
-			-(1LL << (DTRACE_QUANTIZE_ZEROBUCKET - 1 - (buck))) :		\
-			(buck) == DTRACE_QUANTIZE_ZEROBUCKET ? 0 :			\
-			1LL << ((buck) - DTRACE_QUANTIZE_ZEROBUCKET - 1))
+	-(1LL << (DTRACE_QUANTIZE_ZEROBUCKET - 1 - (buck))) :		\
+	(buck) == DTRACE_QUANTIZE_ZEROBUCKET ? 0 :			\
+	1LL << ((buck) - DTRACE_QUANTIZE_ZEROBUCKET - 1))
 
 #define	DTRACE_LQUANTIZE_STEPSHIFT		48
 #define	DTRACE_LQUANTIZE_STEPMASK		((uint64_t)UINT16_MAX << 48)
@@ -493,15 +493,15 @@ extern "C" {
 
 #define	DTRACE_LQUANTIZE_STEP(x)		\
 	(uint16_t)(((x) & DTRACE_LQUANTIZE_STEPMASK) >> \
-			DTRACE_LQUANTIZE_STEPSHIFT)
+	DTRACE_LQUANTIZE_STEPSHIFT)
 
 #define	DTRACE_LQUANTIZE_LEVELS(x)		\
 	(uint16_t)(((x) & DTRACE_LQUANTIZE_LEVELMASK) >> \
-			DTRACE_LQUANTIZE_LEVELSHIFT)
+	DTRACE_LQUANTIZE_LEVELSHIFT)
 
 #define	DTRACE_LQUANTIZE_BASE(x)		\
 	(int32_t)(((x) & DTRACE_LQUANTIZE_BASEMASK) >> \
-			DTRACE_LQUANTIZE_BASESHIFT)
+	DTRACE_LQUANTIZE_BASESHIFT)
 
 #define	DTRACE_LLQUANTIZE_FACTORSHIFT		48
 #define	DTRACE_LLQUANTIZE_FACTORMASK		((uint64_t)UINT16_MAX << 48)
@@ -514,19 +514,19 @@ extern "C" {
 
 #define	DTRACE_LLQUANTIZE_FACTOR(x)		\
 	(uint16_t)(((x) & DTRACE_LLQUANTIZE_FACTORMASK) >> \
-			DTRACE_LLQUANTIZE_FACTORSHIFT)
+	DTRACE_LLQUANTIZE_FACTORSHIFT)
 
 #define	DTRACE_LLQUANTIZE_LOW(x)		\
 	(uint16_t)(((x) & DTRACE_LLQUANTIZE_LOWMASK) >> \
-			DTRACE_LLQUANTIZE_LOWSHIFT)
+	DTRACE_LLQUANTIZE_LOWSHIFT)
 
 #define	DTRACE_LLQUANTIZE_HIGH(x)		\
 	(uint16_t)(((x) & DTRACE_LLQUANTIZE_HIGHMASK) >> \
-			DTRACE_LLQUANTIZE_HIGHSHIFT)
+	DTRACE_LLQUANTIZE_HIGHSHIFT)
 
 #define	DTRACE_LLQUANTIZE_NSTEP(x)		\
 	(uint16_t)(((x) & DTRACE_LLQUANTIZE_NSTEPMASK) >> \
-			DTRACE_LLQUANTIZE_NSTEPSHIFT)
+	DTRACE_LLQUANTIZE_NSTEPSHIFT)
 
 #define	DTRACE_USTACK_NFRAMES(x)	(uint32_t)((x) & UINT32_MAX)
 #define	DTRACE_USTACK_STRSIZE(x)	(uint32_t)((x) >> 32)
@@ -543,72 +543,72 @@ extern "C" {
 #define	DTRACE_PTR(type, name)	type *name
 #endif
 
-	/*
-	 * DTrace Object Format (DOF)
-	 *
-	 * DTrace programs can be persistently encoded in the DOF format so that they
-	 * may be embedded in other programs (for example, in an ELF file) or in the
-	 * dtrace driver configuration file for use in anonymous tracing.  The DOF
-	 * format is versioned and extensible so that it can be revised and so that
-	 * internal data structures can be modified or extended compatibly.  All DOF
-	 * structures use fixed-size types, so the 32-bit and 64-bit representations
-	 * are identical and consumers can use either data model transparently.
-	 *
-	 * The file layout is structured as follows:
-	 *
-	 * +---------------+-------------------+----- ... ----+---- ... ------+
-	 * |   dof_hdr_t   |  dof_sec_t[ ... ] |   loadable   | non-loadable  |
-	 * | (file header) | (section headers) | section data | section data  |
-	 * +---------------+-------------------+----- ... ----+---- ... ------+
-	 * |<------------ dof_hdr.dofh_loadsz --------------->|               |
-	 * |<------------ dof_hdr.dofh_filesz ------------------------------->|
-	 *
-	 * The file header stores meta-data including a magic number, data model for
-	 * the instrumentation, data encoding, and properties of the DIF code within.
-	 * The header describes its own size and the size of the section headers.  By
-	 * convention, an array of section headers follows the file header, and then
-	 * the data for all loadable sections and unloadable sections.  This permits
-	 * consumer code to easily download the headers and all loadable data into the
-	 * DTrace driver in one contiguous chunk, omitting other extraneous sections.
-	 *
-	 * The section headers describe the size, offset, alignment, and section type
-	 * for each section.  Sections are described using a set of #defines that tell
-	 * the consumer what kind of data is expected.  Sections can contain links to
-	 * other sections by storing a dof_secidx_t, an index into the section header
-	 * array, inside of the section data structures.  The section header includes
-	 * an entry size so that sections with data arrays can grow their structures.
-	 *
-	 * The DOF data itself can contain many snippets of DIF (i.e. >1 DIFOs), which
-	 * are represented themselves as a collection of related DOF sections.  This
-	 * permits us to change the set of sections associated with a DIFO over time,
-	 * and also permits us to encode DIFOs that contain different sets of sections.
-	 * When a DOF section wants to refer to a DIFO, it stores the dof_secidx_t of a
-	 * section of type DOF_SECT_DIFOHDR.  This section's data is then an array of
-	 * dof_secidx_t's which in turn denote the sections associated with this DIFO.
-	 *
-	 * This loose coupling of the file structure (header and sections) to the
-	 * structure of the DTrace program itself (ECB descriptions, action
-	 * descriptions, and DIFOs) permits activities such as relocation processing
-	 * to occur in a single pass without having to understand D program structure.
-	 *
-	 * Finally, strings are always stored in ELF-style string tables along with a
-	 * string table section index and string table offset.  Therefore strings in
-	 * DOF are always arbitrary-length and not bound to the current implementation.
-	 */
+/*
+ * DTrace Object Format (DOF)
+ *
+ * DTrace programs can be persistently encoded in the DOF format so that they
+ * may be embedded in other programs (for example, in an ELF file) or in the
+ * dtrace driver configuration file for use in anonymous tracing.  The DOF
+ * format is versioned and extensible so that it can be revised and so that
+ * internal data structures can be modified or extended compatibly.  All DOF
+ * structures use fixed-size types, so the 32-bit and 64-bit representations
+ * are identical and consumers can use either data model transparently.
+ *
+ * The file layout is structured as follows:
+ *
+ * +---------------+-------------------+----- ... ----+---- ... ------+
+ * |   dof_hdr_t   |  dof_sec_t[ ... ] |   loadable   | non-loadable  |
+ * | (file header) | (section headers) | section data | section data  |
+ * +---------------+-------------------+----- ... ----+---- ... ------+
+ * |<------------ dof_hdr.dofh_loadsz --------------->|               |
+ * |<------------ dof_hdr.dofh_filesz ------------------------------->|
+ *
+ * The file header stores meta-data including a magic number, data model for
+ * the instrumentation, data encoding, and properties of the DIF code within.
+ * The header describes its own size and the size of the section headers.  By
+ * convention, an array of section headers follows the file header, and then
+ * the data for all loadable sections and unloadable sections.  This permits
+ * consumer code to easily download the headers and all loadable data into the
+ * DTrace driver in one contiguous chunk, omitting other extraneous sections.
+ *
+ * The section headers describe the size, offset, alignment, and section type
+ * for each section.  Sections are described using a set of #defines that tell
+ * the consumer what kind of data is expected.  Sections can contain links to
+ * other sections by storing a dof_secidx_t, an index into the section header
+ * array, inside of the section data structures.  The section header includes
+ * an entry size so that sections with data arrays can grow their structures.
+ *
+ * The DOF data itself can contain many snippets of DIF (i.e. >1 DIFOs), which
+ * are represented themselves as a collection of related DOF sections.  This
+ * permits us to change the set of sections associated with a DIFO over time,
+ * and also permits us to encode DIFOs that contain different sets of sections.
+ * When a DOF section wants to refer to a DIFO, it stores the dof_secidx_t of a
+ * section of type DOF_SECT_DIFOHDR.  This section's data is then an array of
+ * dof_secidx_t's which in turn denote the sections associated with this DIFO.
+ *
+ * This loose coupling of the file structure (header and sections) to the
+ * structure of the DTrace program itself (ECB descriptions, action
+ * descriptions, and DIFOs) permits activities such as relocation processing
+ * to occur in a single pass without having to understand D program structure.
+ *
+ * Finally, strings are always stored in ELF-style string tables along with a
+ * string table section index and string table offset.  Therefore strings in
+ * DOF are always arbitrary-length and not bound to the current implementation.
+ */
 
 #define	DOF_ID_SIZE	16	/* total size of dofh_ident[] in bytes */
 
-	typedef struct dof_hdr {
-		uint8_t dofh_ident[DOF_ID_SIZE]; /* identification bytes (see below) */
-		uint32_t dofh_flags;		/* file attribute flags (if any) */
-		uint32_t dofh_hdrsize;		/* size of file header in bytes */
-		uint32_t dofh_secsize;		/* size of section header in bytes */
-		uint32_t dofh_secnum;		/* number of section headers */
-		uint64_t dofh_secoff;		/* file offset of section headers */
-		uint64_t dofh_loadsz;		/* file size of loadable portion */
-		uint64_t dofh_filesz;		/* file size of entire DOF file */
-		uint64_t dofh_pad;		/* reserved for future use */
-	} dof_hdr_t;
+typedef struct dof_hdr {
+	uint8_t dofh_ident[DOF_ID_SIZE]; /* identification bytes (see below) */
+	uint32_t dofh_flags;		/* file attribute flags (if any) */
+	uint32_t dofh_hdrsize;		/* size of file header in bytes */
+	uint32_t dofh_secsize;		/* size of section header in bytes */
+	uint32_t dofh_secnum;		/* number of section headers */
+	uint64_t dofh_secoff;		/* file offset of section headers */
+	uint64_t dofh_loadsz;		/* file size of loadable portion */
+	uint64_t dofh_filesz;		/* file size of entire DOF file */
+	uint64_t dofh_pad;		/* reserved for future use */
+} dof_hdr_t;
 
 #define	DOF_ID_MAG0	0	/* first byte of magic number */
 #define	DOF_ID_MAG1	1	/* second byte of magic number */
@@ -656,20 +656,20 @@ extern "C" {
 
 #define	DOF_FL_VALID	0	/* mask of all valid dofh_flags bits */
 
-	typedef uint32_t dof_secidx_t;	/* section header table index type */
-	typedef uint32_t dof_stridx_t;	/* string table index type */
+typedef uint32_t dof_secidx_t;	/* section header table index type */
+typedef uint32_t dof_stridx_t;	/* string table index type */
 
 #define	DOF_SECIDX_NONE	(-1U)	/* null value for section indices */
 #define	DOF_STRIDX_NONE	(-1U)	/* null value for string indices */
 
-	typedef struct dof_sec {
-		uint32_t dofs_type;	/* section type (see below) */
-		uint32_t dofs_align;	/* section data memory alignment */
-		uint32_t dofs_flags;	/* section flags (if any) */
-		uint32_t dofs_entsize;	/* size of section entry (if table) */
-		uint64_t dofs_offset;	/* offset of section data within file */
-		uint64_t dofs_size;	/* size of section data in bytes */
-	} dof_sec_t;
+typedef struct dof_sec {
+	uint32_t dofs_type;	/* section type (see below) */
+	uint32_t dofs_align;	/* section data memory alignment */
+	uint32_t dofs_flags;	/* section flags (if any) */
+	uint32_t dofs_entsize;	/* size of section entry (if table) */
+	uint64_t dofs_offset;	/* offset of section data within file */
+	uint64_t dofs_size;	/* size of section data in bytes */
+} dof_sec_t;
 
 #define	DOF_SECT_NONE		0	/* null section */
 #define	DOF_SECT_COMMENTS	1	/* compiler comments */
@@ -703,297 +703,297 @@ extern "C" {
 
 #define	DOF_SEC_ISLOADABLE(x)						\
 	(((x) == DOF_SECT_ECBDESC) || ((x) == DOF_SECT_PROBEDESC) ||	\
-	 ((x) == DOF_SECT_ACTDESC) || ((x) == DOF_SECT_DIFOHDR) ||	\
-	 ((x) == DOF_SECT_DIF) || ((x) == DOF_SECT_STRTAB) ||		\
-	 ((x) == DOF_SECT_VARTAB) || ((x) == DOF_SECT_RELTAB) ||		\
-	 ((x) == DOF_SECT_TYPTAB) || ((x) == DOF_SECT_URELHDR) ||	\
-	 ((x) == DOF_SECT_KRELHDR) || ((x) == DOF_SECT_OPTDESC) ||	\
-	 ((x) == DOF_SECT_PROVIDER) || ((x) == DOF_SECT_PROBES) ||	\
-	 ((x) == DOF_SECT_PRARGS) || ((x) == DOF_SECT_PROFFS) ||		\
-	 ((x) == DOF_SECT_INTTAB) || ((x) == DOF_SECT_XLTAB) ||		\
-	 ((x) == DOF_SECT_XLMEMBERS) || ((x) == DOF_SECT_XLIMPORT) ||	\
-	 ((x) == DOF_SECT_XLIMPORT) || ((x) == DOF_SECT_XLEXPORT) ||	\
-	 ((x) == DOF_SECT_PREXPORT) || ((x) == DOF_SECT_PRENOFFS))
+	((x) == DOF_SECT_ACTDESC) || ((x) == DOF_SECT_DIFOHDR) ||	\
+	((x) == DOF_SECT_DIF) || ((x) == DOF_SECT_STRTAB) ||		\
+	((x) == DOF_SECT_VARTAB) || ((x) == DOF_SECT_RELTAB) ||		\
+	((x) == DOF_SECT_TYPTAB) || ((x) == DOF_SECT_URELHDR) ||	\
+	((x) == DOF_SECT_KRELHDR) || ((x) == DOF_SECT_OPTDESC) ||	\
+	((x) == DOF_SECT_PROVIDER) || ((x) == DOF_SECT_PROBES) ||	\
+	((x) == DOF_SECT_PRARGS) || ((x) == DOF_SECT_PROFFS) ||		\
+	((x) == DOF_SECT_INTTAB) || ((x) == DOF_SECT_XLTAB) ||		\
+	((x) == DOF_SECT_XLMEMBERS) || ((x) == DOF_SECT_XLIMPORT) ||	\
+	((x) == DOF_SECT_XLIMPORT) || ((x) == DOF_SECT_XLEXPORT) ||	\
+	((x) == DOF_SECT_PREXPORT) || ((x) == DOF_SECT_PRENOFFS))
 
-	typedef struct dof_ecbdesc {
-		dof_secidx_t dofe_probes;	/* link to DOF_SECT_PROBEDESC */
-		dof_secidx_t dofe_pred;		/* link to DOF_SECT_DIFOHDR */
-		dof_secidx_t dofe_actions;	/* link to DOF_SECT_ACTDESC */
-		uint32_t dofe_pad;		/* reserved for future use */
-		uint64_t dofe_uarg;		/* user-supplied library argument */
-	} dof_ecbdesc_t;
+typedef struct dof_ecbdesc {
+	dof_secidx_t dofe_probes;	/* link to DOF_SECT_PROBEDESC */
+	dof_secidx_t dofe_pred;		/* link to DOF_SECT_DIFOHDR */
+	dof_secidx_t dofe_actions;	/* link to DOF_SECT_ACTDESC */
+	uint32_t dofe_pad;		/* reserved for future use */
+	uint64_t dofe_uarg;		/* user-supplied library argument */
+} dof_ecbdesc_t;
 
-	typedef struct dof_probedesc {
-		dof_secidx_t dofp_strtab;	/* link to DOF_SECT_STRTAB section */
-		dof_stridx_t dofp_provider;	/* provider string */
-		dof_stridx_t dofp_mod;		/* module string */
-		dof_stridx_t dofp_func;		/* function string */
-		dof_stridx_t dofp_name;		/* name string */
-		uint32_t dofp_id;		/* probe identifier (or zero) */
-	} dof_probedesc_t;
+typedef struct dof_probedesc {
+	dof_secidx_t dofp_strtab;	/* link to DOF_SECT_STRTAB section */
+	dof_stridx_t dofp_provider;	/* provider string */
+	dof_stridx_t dofp_mod;		/* module string */
+	dof_stridx_t dofp_func;		/* function string */
+	dof_stridx_t dofp_name;		/* name string */
+	uint32_t dofp_id;		/* probe identifier (or zero) */
+} dof_probedesc_t;
 
-	typedef struct dof_actdesc {
-		dof_secidx_t dofa_difo;		/* link to DOF_SECT_DIFOHDR */
-		dof_secidx_t dofa_strtab;	/* link to DOF_SECT_STRTAB section */
-		uint32_t dofa_kind;		/* action kind (DTRACEACT_* constant) */
-		uint32_t dofa_ntuple;		/* number of subsequent tuple actions */
-		uint64_t dofa_arg;		/* kind-specific argument */
-		uint64_t dofa_uarg;		/* user-supplied argument */
-	} dof_actdesc_t;
+typedef struct dof_actdesc {
+	dof_secidx_t dofa_difo;		/* link to DOF_SECT_DIFOHDR */
+	dof_secidx_t dofa_strtab;	/* link to DOF_SECT_STRTAB section */
+	uint32_t dofa_kind;		/* action kind (DTRACEACT_* constant) */
+	uint32_t dofa_ntuple;		/* number of subsequent tuple actions */
+	uint64_t dofa_arg;		/* kind-specific argument */
+	uint64_t dofa_uarg;		/* user-supplied argument */
+} dof_actdesc_t;
 
-	typedef struct dof_difohdr {
-		dtrace_diftype_t dofd_rtype;	/* return type for this fragment */
-		dof_secidx_t dofd_links[1];	/* variable length array of indices */
-	} dof_difohdr_t;
+typedef struct dof_difohdr {
+	dtrace_diftype_t dofd_rtype;	/* return type for this fragment */
+	dof_secidx_t dofd_links[1];	/* variable length array of indices */
+} dof_difohdr_t;
 
-	typedef struct dof_relohdr {
-		dof_secidx_t dofr_strtab;	/* link to DOF_SECT_STRTAB for names */
-		dof_secidx_t dofr_relsec;	/* link to DOF_SECT_RELTAB for relos */
-		dof_secidx_t dofr_tgtsec;	/* link to section we are relocating */
-	} dof_relohdr_t;
+typedef struct dof_relohdr {
+	dof_secidx_t dofr_strtab;	/* link to DOF_SECT_STRTAB for names */
+	dof_secidx_t dofr_relsec;	/* link to DOF_SECT_RELTAB for relos */
+	dof_secidx_t dofr_tgtsec;	/* link to section we are relocating */
+} dof_relohdr_t;
 
-	typedef struct dof_relodesc {
-		dof_stridx_t dofr_name;		/* string name of relocation symbol */
-		uint32_t dofr_type;		/* relo type (DOF_RELO_* constant) */
-		uint64_t dofr_offset;		/* byte offset for relocation */
-		uint64_t dofr_data;		/* additional type-specific data */
-	} dof_relodesc_t;
+typedef struct dof_relodesc {
+	dof_stridx_t dofr_name;		/* string name of relocation symbol */
+	uint32_t dofr_type;		/* relo type (DOF_RELO_* constant) */
+	uint64_t dofr_offset;		/* byte offset for relocation */
+	uint64_t dofr_data;		/* additional type-specific data */
+} dof_relodesc_t;
 
 #define	DOF_RELO_NONE	0		/* empty relocation entry */
 #define	DOF_RELO_SETX	1		/* relocate setx value */
 
-	typedef struct dof_optdesc {
-		uint32_t dofo_option;		/* option identifier */
-		dof_secidx_t dofo_strtab;	/* string table, if string option */
-		uint64_t dofo_value;		/* option value or string index */
-	} dof_optdesc_t;
+typedef struct dof_optdesc {
+	uint32_t dofo_option;		/* option identifier */
+	dof_secidx_t dofo_strtab;	/* string table, if string option */
+	uint64_t dofo_value;		/* option value or string index */
+} dof_optdesc_t;
 
-	typedef uint32_t dof_attr_t;		/* encoded stability attributes */
+typedef uint32_t dof_attr_t;		/* encoded stability attributes */
 
 #define	DOF_ATTR(n, d, c)	(((n) << 24) | ((d) << 16) | ((c) << 8))
 #define	DOF_ATTR_NAME(a)	(((a) >> 24) & 0xff)
 #define	DOF_ATTR_DATA(a)	(((a) >> 16) & 0xff)
 #define	DOF_ATTR_CLASS(a)	(((a) >>  8) & 0xff)
 
-	typedef struct dof_provider {
-		dof_secidx_t dofpv_strtab;	/* link to DOF_SECT_STRTAB section */
-		dof_secidx_t dofpv_probes;	/* link to DOF_SECT_PROBES section */
-		dof_secidx_t dofpv_prargs;	/* link to DOF_SECT_PRARGS section */
-		dof_secidx_t dofpv_proffs;	/* link to DOF_SECT_PROFFS section */
-		dof_stridx_t dofpv_name;	/* provider name string */
-		dof_attr_t dofpv_provattr;	/* provider attributes */
-		dof_attr_t dofpv_modattr;	/* module attributes */
-		dof_attr_t dofpv_funcattr;	/* function attributes */
-		dof_attr_t dofpv_nameattr;	/* name attributes */
-		dof_attr_t dofpv_argsattr;	/* args attributes */
-		dof_secidx_t dofpv_prenoffs;	/* link to DOF_SECT_PRENOFFS section */
-	} dof_provider_t;
+typedef struct dof_provider {
+	dof_secidx_t dofpv_strtab;	/* link to DOF_SECT_STRTAB section */
+	dof_secidx_t dofpv_probes;	/* link to DOF_SECT_PROBES section */
+	dof_secidx_t dofpv_prargs;	/* link to DOF_SECT_PRARGS section */
+	dof_secidx_t dofpv_proffs;	/* link to DOF_SECT_PROFFS section */
+	dof_stridx_t dofpv_name;	/* provider name string */
+	dof_attr_t dofpv_provattr;	/* provider attributes */
+	dof_attr_t dofpv_modattr;	/* module attributes */
+	dof_attr_t dofpv_funcattr;	/* function attributes */
+	dof_attr_t dofpv_nameattr;	/* name attributes */
+	dof_attr_t dofpv_argsattr;	/* args attributes */
+	dof_secidx_t dofpv_prenoffs;	/* link to DOF_SECT_PRENOFFS section */
+} dof_provider_t;
 
-	typedef struct dof_probe {
-		uint64_t dofpr_addr;		/* probe base address or offset */
-		dof_stridx_t dofpr_func;	/* probe function string */
-		dof_stridx_t dofpr_name;	/* probe name string */
-		dof_stridx_t dofpr_nargv;	/* native argument type strings */
-		dof_stridx_t dofpr_xargv;	/* translated argument type strings */
-		uint32_t dofpr_argidx;		/* index of first argument mapping */
-		uint32_t dofpr_offidx;		/* index of first offset entry */
-		uint8_t dofpr_nargc;		/* native argument count */
-		uint8_t dofpr_xargc;		/* translated argument count */
-		uint16_t dofpr_noffs;		/* number of offset entries for probe */
-		uint32_t dofpr_enoffidx;	/* index of first is-enabled offset */
-		uint16_t dofpr_nenoffs;		/* number of is-enabled offsets */
-		uint16_t dofpr_pad1;		/* reserved for future use */
-		uint32_t dofpr_pad2;		/* reserved for future use */
-	} dof_probe_t;
+typedef struct dof_probe {
+	uint64_t dofpr_addr;		/* probe base address or offset */
+	dof_stridx_t dofpr_func;	/* probe function string */
+	dof_stridx_t dofpr_name;	/* probe name string */
+	dof_stridx_t dofpr_nargv;	/* native argument type strings */
+	dof_stridx_t dofpr_xargv;	/* translated argument type strings */
+	uint32_t dofpr_argidx;		/* index of first argument mapping */
+	uint32_t dofpr_offidx;		/* index of first offset entry */
+	uint8_t dofpr_nargc;		/* native argument count */
+	uint8_t dofpr_xargc;		/* translated argument count */
+	uint16_t dofpr_noffs;		/* number of offset entries for probe */
+	uint32_t dofpr_enoffidx;	/* index of first is-enabled offset */
+	uint16_t dofpr_nenoffs;		/* number of is-enabled offsets */
+	uint16_t dofpr_pad1;		/* reserved for future use */
+	uint32_t dofpr_pad2;		/* reserved for future use */
+} dof_probe_t;
 
-	typedef struct dof_xlator {
-		dof_secidx_t dofxl_members;	/* link to DOF_SECT_XLMEMBERS section */
-		dof_secidx_t dofxl_strtab;	/* link to DOF_SECT_STRTAB section */
-		dof_stridx_t dofxl_argv;	/* input parameter type strings */
-		uint32_t dofxl_argc;		/* input parameter list length */
-		dof_stridx_t dofxl_type;	/* output type string name */
-		dof_attr_t dofxl_attr;		/* output stability attributes */
-	} dof_xlator_t;
+typedef struct dof_xlator {
+	dof_secidx_t dofxl_members;	/* link to DOF_SECT_XLMEMBERS section */
+	dof_secidx_t dofxl_strtab;	/* link to DOF_SECT_STRTAB section */
+	dof_stridx_t dofxl_argv;	/* input parameter type strings */
+	uint32_t dofxl_argc;		/* input parameter list length */
+	dof_stridx_t dofxl_type;	/* output type string name */
+	dof_attr_t dofxl_attr;		/* output stability attributes */
+} dof_xlator_t;
 
-	typedef struct dof_xlmember {
-		dof_secidx_t dofxm_difo;	/* member link to DOF_SECT_DIFOHDR */
-		dof_stridx_t dofxm_name;	/* member name */
-		dtrace_diftype_t dofxm_type;	/* member type */
-	} dof_xlmember_t;
+typedef struct dof_xlmember {
+	dof_secidx_t dofxm_difo;	/* member link to DOF_SECT_DIFOHDR */
+	dof_stridx_t dofxm_name;	/* member name */
+	dtrace_diftype_t dofxm_type;	/* member type */
+} dof_xlmember_t;
 
-	typedef struct dof_xlref {
-		dof_secidx_t dofxr_xlator;	/* link to DOF_SECT_XLATORS section */
-		uint32_t dofxr_member;		/* index of referenced dof_xlmember */
-		uint32_t dofxr_argn;		/* index of argument for DIF_OP_XLARG */
-	} dof_xlref_t;
+typedef struct dof_xlref {
+	dof_secidx_t dofxr_xlator;	/* link to DOF_SECT_XLATORS section */
+	uint32_t dofxr_member;		/* index of referenced dof_xlmember */
+	uint32_t dofxr_argn;		/* index of argument for DIF_OP_XLARG */
+} dof_xlref_t;
 
-	/*
-	 * DTrace Intermediate Format Object (DIFO)
-	 *
-	 * A DIFO is used to store the compiled DIF for a D expression, its return
-	 * type, and its string and variable tables.  The string table is a single
-	 * buffer of character data into which sets instructions and variable
-	 * references can reference strings using a byte offset.  The variable table
-	 * is an array of dtrace_difv_t structures that describe the name and type of
-	 * each variable and the id used in the DIF code.  This structure is described
-	 * above in the DIF section of this header file.  The DIFO is used at both
-	 * user-level (in the library) and in the kernel, but the structure is never
-	 * passed between the two: the DOF structures form the only interface.  As a
-	 * result, the definition can change depending on the presence of _KERNEL.
-	 */
-	typedef struct dtrace_difo {
-		dif_instr_t *dtdo_buf;		/* instruction buffer */
-		uint64_t *dtdo_inttab;		/* integer table (optional) */
-		char *dtdo_strtab;		/* string table (optional) */
-		dtrace_difv_t *dtdo_vartab;	/* variable table (optional) */
-		uint_t dtdo_len;		/* length of instruction buffer */
-		uint_t dtdo_intlen;		/* length of integer table */
-		uint_t dtdo_strlen;		/* length of string table */
-		uint_t dtdo_varlen;		/* length of variable table */
-		dtrace_diftype_t dtdo_rtype;	/* return type */
-		uint_t dtdo_refcnt;		/* owner reference count */
-		uint_t dtdo_destructive;	/* invokes destructive subroutines */
+/*
+ * DTrace Intermediate Format Object (DIFO)
+ *
+ * A DIFO is used to store the compiled DIF for a D expression, its return
+ * type, and its string and variable tables.  The string table is a single
+ * buffer of character data into which sets instructions and variable
+ * references can reference strings using a byte offset.  The variable table
+ * is an array of dtrace_difv_t structures that describe the name and type of
+ * each variable and the id used in the DIF code.  This structure is described
+ * above in the DIF section of this header file.  The DIFO is used at both
+ * user-level (in the library) and in the kernel, but the structure is never
+ * passed between the two: the DOF structures form the only interface.  As a
+ * result, the definition can change depending on the presence of _KERNEL.
+ */
+typedef struct dtrace_difo {
+	dif_instr_t *dtdo_buf;		/* instruction buffer */
+	uint64_t *dtdo_inttab;		/* integer table (optional) */
+	char *dtdo_strtab;		/* string table (optional) */
+	dtrace_difv_t *dtdo_vartab;	/* variable table (optional) */
+	uint_t dtdo_len;		/* length of instruction buffer */
+	uint_t dtdo_intlen;		/* length of integer table */
+	uint_t dtdo_strlen;		/* length of string table */
+	uint_t dtdo_varlen;		/* length of variable table */
+	dtrace_diftype_t dtdo_rtype;	/* return type */
+	uint_t dtdo_refcnt;		/* owner reference count */
+	uint_t dtdo_destructive;	/* invokes destructive subroutines */
 #ifndef _KERNEL
-		dof_relodesc_t *dtdo_kreltab;	/* kernel relocations */
-		dof_relodesc_t *dtdo_ureltab;	/* user relocations */
-		struct dt_node **dtdo_xlmtab;	/* translator references */
-		uint_t dtdo_krelen;		/* length of krelo table */
-		uint_t dtdo_urelen;		/* length of urelo table */
-		uint_t dtdo_xlmlen;		/* length of translator table */
+	dof_relodesc_t *dtdo_kreltab;	/* kernel relocations */
+	dof_relodesc_t *dtdo_ureltab;	/* user relocations */
+	struct dt_node **dtdo_xlmtab;	/* translator references */
+	uint_t dtdo_krelen;		/* length of krelo table */
+	uint_t dtdo_urelen;		/* length of urelo table */
+	uint_t dtdo_xlmlen;		/* length of translator table */
 #endif
-	} dtrace_difo_t;
+} dtrace_difo_t;
 
-	/*
-	 * DTrace Enabling Description Structures
-	 *
-	 * When DTrace is tracking the description of a DTrace enabling entity (probe,
-	 * predicate, action, ECB, record, etc.), it does so in a description
-	 * structure.  These structures all end in "desc", and are used at both
-	 * user-level and in the kernel -- but (with the exception of
-	 * dtrace_probedesc_t) they are never passed between them.  Typically,
-	 * user-level will use the description structures when assembling an enabling.
-	 * It will then distill those description structures into a DOF object (see
-	 * above), and send it into the kernel.  The kernel will again use the
-	 * description structures to create a description of the enabling as it reads
-	 * the DOF.  When the description is complete, the enabling will be actually
-	 * created -- turning it into the structures that represent the enabling
-	 * instead of merely describing it.  Not surprisingly, the description
-	 * structures bear a strong resemblance to the DOF structures that act as their
-	 * conduit.
-	 */
-	struct dtrace_predicate;
+/*
+ * DTrace Enabling Description Structures
+ *
+ * When DTrace is tracking the description of a DTrace enabling entity (probe,
+ * predicate, action, ECB, record, etc.), it does so in a description
+ * structure.  These structures all end in "desc", and are used at both
+ * user-level and in the kernel -- but (with the exception of
+ * dtrace_probedesc_t) they are never passed between them.  Typically,
+ * user-level will use the description structures when assembling an enabling.
+ * It will then distill those description structures into a DOF object (see
+ * above), and send it into the kernel.  The kernel will again use the
+ * description structures to create a description of the enabling as it reads
+ * the DOF.  When the description is complete, the enabling will be actually
+ * created -- turning it into the structures that represent the enabling
+ * instead of merely describing it.  Not surprisingly, the description
+ * structures bear a strong resemblance to the DOF structures that act as their
+ * conduit.
+ */
+struct dtrace_predicate;
 
-	typedef struct dtrace_probedesc {
-		dtrace_id_t dtpd_id;			/* probe identifier */
-		char dtpd_provider[DTRACE_PROVNAMELEN]; /* probe provider name */
-		char dtpd_mod[DTRACE_MODNAMELEN];	/* probe module name */
-		char dtpd_func[DTRACE_FUNCNAMELEN];	/* probe function name */
-		char dtpd_name[DTRACE_NAMELEN];		/* probe name */
-	} dtrace_probedesc_t;
+typedef struct dtrace_probedesc {
+	dtrace_id_t dtpd_id;			/* probe identifier */
+	char dtpd_provider[DTRACE_PROVNAMELEN]; /* probe provider name */
+	char dtpd_mod[DTRACE_MODNAMELEN];	/* probe module name */
+	char dtpd_func[DTRACE_FUNCNAMELEN];	/* probe function name */
+	char dtpd_name[DTRACE_NAMELEN];		/* probe name */
+} dtrace_probedesc_t;
 
-	typedef struct dtrace_repldesc {
-		dtrace_probedesc_t dtrpd_match;		/* probe descr. to match */
-		dtrace_probedesc_t dtrpd_create;	/* probe descr. to create */
-	} dtrace_repldesc_t;
+typedef struct dtrace_repldesc {
+	dtrace_probedesc_t dtrpd_match;		/* probe descr. to match */
+	dtrace_probedesc_t dtrpd_create;	/* probe descr. to create */
+} dtrace_repldesc_t;
 
-	typedef struct dtrace_preddesc {
-		dtrace_difo_t *dtpdd_difo;		/* pointer to DIF object */
-		struct dtrace_predicate *dtpdd_predicate; /* pointer to predicate */
-	} dtrace_preddesc_t;
+typedef struct dtrace_preddesc {
+	dtrace_difo_t *dtpdd_difo;		/* pointer to DIF object */
+	struct dtrace_predicate *dtpdd_predicate; /* pointer to predicate */
+} dtrace_preddesc_t;
 
-	typedef struct dtrace_actdesc {
-		dtrace_difo_t *dtad_difo;		/* pointer to DIF object */
-		struct dtrace_actdesc *dtad_next;	/* next action */
-		dtrace_actkind_t dtad_kind;		/* kind of action */
-		uint32_t dtad_ntuple;			/* number in tuple */
-		uint64_t dtad_arg;			/* action argument */
-		uint64_t dtad_uarg;			/* user argument */
-		int dtad_refcnt;			/* reference count */
-	} dtrace_actdesc_t;
+typedef struct dtrace_actdesc {
+	dtrace_difo_t *dtad_difo;		/* pointer to DIF object */
+	struct dtrace_actdesc *dtad_next;	/* next action */
+	dtrace_actkind_t dtad_kind;		/* kind of action */
+	uint32_t dtad_ntuple;			/* number in tuple */
+	uint64_t dtad_arg;			/* action argument */
+	uint64_t dtad_uarg;			/* user argument */
+	int dtad_refcnt;			/* reference count */
+} dtrace_actdesc_t;
 
-	typedef struct dtrace_ecbdesc {
-		dtrace_actdesc_t *dted_action;		/* action description(s) */
-		dtrace_preddesc_t dted_pred;		/* predicate description */
-		dtrace_probedesc_t dted_probe;		/* probe description */
-		uint64_t dted_uarg;			/* library argument */
-		int dted_refcnt;			/* reference count */
-	} dtrace_ecbdesc_t;
+typedef struct dtrace_ecbdesc {
+	dtrace_actdesc_t *dted_action;		/* action description(s) */
+	dtrace_preddesc_t dted_pred;		/* predicate description */
+	dtrace_probedesc_t dted_probe;		/* probe description */
+	uint64_t dted_uarg;			/* library argument */
+	int dted_refcnt;			/* reference count */
+} dtrace_ecbdesc_t;
 
-	/*
-	 * DTrace Metadata Description Structures
-	 *
-	 * DTrace separates the trace data stream from the metadata stream.  The only
-	 * metadata tokens placed in the data stream are the dtrace_rechdr_t (EPID +
-	 * timestamp) or (in the case of aggregations) aggregation identifiers.  To
-	 * determine the structure of the data, DTrace consumers pass the token to the
-	 * kernel, and receive in return a corresponding description of the enabled
-	 * probe (via the dtrace_eprobedesc structure) or the aggregation (via the
-	 * dtrace_aggdesc structure).  Both of these structures are expressed in terms
-	 * of record descriptions (via the dtrace_recdesc structure) that describe the
-	 * exact structure of the data.  Some record descriptions may also contain a
-	 * format identifier; this additional bit of metadata can be retrieved from the
-	 * kernel, for which a format description is returned via the dtrace_fmtdesc
-	 * structure.  Note that all four of these structures must be bitness-neutral
-	 * to allow for a 32-bit DTrace consumer on a 64-bit kernel.
-	 */
-	typedef struct dtrace_recdesc {
-		dtrace_actkind_t dtrd_action;		/* kind of action */
-		uint32_t dtrd_size;			/* size of record */
-		uint32_t dtrd_offset;			/* offset in ECB's data */
-		uint16_t dtrd_alignment;		/* required alignment */
-		uint16_t dtrd_format;			/* format, if any */
-		uint64_t dtrd_arg;			/* action argument */
-		uint64_t dtrd_uarg;			/* user argument */
-	} dtrace_recdesc_t;
+/*
+ * DTrace Metadata Description Structures
+ *
+ * DTrace separates the trace data stream from the metadata stream.  The only
+ * metadata tokens placed in the data stream are the dtrace_rechdr_t (EPID +
+ * timestamp) or (in the case of aggregations) aggregation identifiers.  To
+ * determine the structure of the data, DTrace consumers pass the token to the
+ * kernel, and receive in return a corresponding description of the enabled
+ * probe (via the dtrace_eprobedesc structure) or the aggregation (via the
+ * dtrace_aggdesc structure).  Both of these structures are expressed in terms
+ * of record descriptions (via the dtrace_recdesc structure) that describe the
+ * exact structure of the data.  Some record descriptions may also contain a
+ * format identifier; this additional bit of metadata can be retrieved from the
+ * kernel, for which a format description is returned via the dtrace_fmtdesc
+ * structure.  Note that all four of these structures must be bitness-neutral
+ * to allow for a 32-bit DTrace consumer on a 64-bit kernel.
+ */
+typedef struct dtrace_recdesc {
+	dtrace_actkind_t dtrd_action;		/* kind of action */
+	uint32_t dtrd_size;			/* size of record */
+	uint32_t dtrd_offset;			/* offset in ECB's data */
+	uint16_t dtrd_alignment;		/* required alignment */
+	uint16_t dtrd_format;			/* format, if any */
+	uint64_t dtrd_arg;			/* action argument */
+	uint64_t dtrd_uarg;			/* user argument */
+} dtrace_recdesc_t;
 
-	typedef struct dtrace_eprobedesc {
-		dtrace_epid_t dtepd_epid;		/* enabled probe ID */
-		dtrace_id_t dtepd_probeid;		/* probe ID */
-		uint64_t dtepd_uarg;			/* library argument */
-		uint32_t dtepd_size;			/* total size */
-		int dtepd_nrecs;			/* number of records */
-		dtrace_recdesc_t dtepd_rec[1];		/* records themselves */
-	} dtrace_eprobedesc_t;
+typedef struct dtrace_eprobedesc {
+	dtrace_epid_t dtepd_epid;		/* enabled probe ID */
+	dtrace_id_t dtepd_probeid;		/* probe ID */
+	uint64_t dtepd_uarg;			/* library argument */
+	uint32_t dtepd_size;			/* total size */
+	int dtepd_nrecs;			/* number of records */
+	dtrace_recdesc_t dtepd_rec[1];		/* records themselves */
+} dtrace_eprobedesc_t;
 
-	typedef struct dtrace_aggdesc {
-		DTRACE_PTR(char, dtagd_name);		/* not filled in by kernel */
-		dtrace_aggvarid_t dtagd_varid;		/* not filled in by kernel */
-		int dtagd_flags;			/* not filled in by kernel */
-		dtrace_aggid_t dtagd_id;		/* aggregation ID */
-		dtrace_epid_t dtagd_epid;		/* enabled probe ID */
-		uint32_t dtagd_size;			/* size in bytes */
-		int dtagd_nrecs;			/* number of records */
-		uint32_t dtagd_pad;			/* explicit padding */
-		dtrace_recdesc_t dtagd_rec[1];		/* record descriptions */
-	} dtrace_aggdesc_t;
+typedef struct dtrace_aggdesc {
+	DTRACE_PTR(char, dtagd_name);		/* not filled in by kernel */
+	dtrace_aggvarid_t dtagd_varid;		/* not filled in by kernel */
+	int dtagd_flags;			/* not filled in by kernel */
+	dtrace_aggid_t dtagd_id;		/* aggregation ID */
+	dtrace_epid_t dtagd_epid;		/* enabled probe ID */
+	uint32_t dtagd_size;			/* size in bytes */
+	int dtagd_nrecs;			/* number of records */
+	uint32_t dtagd_pad;			/* explicit padding */
+	dtrace_recdesc_t dtagd_rec[1];		/* record descriptions */
+} dtrace_aggdesc_t;
 
-	typedef struct dtrace_fmtdesc {
-		DTRACE_PTR(char, dtfd_string);		/* format string */
-		int dtfd_length;			/* length of format string */
-		uint16_t dtfd_format;			/* format identifier */
-	} dtrace_fmtdesc_t;
+typedef struct dtrace_fmtdesc {
+	DTRACE_PTR(char, dtfd_string);		/* format string */
+	int dtfd_length;			/* length of format string */
+	uint16_t dtfd_format;			/* format identifier */
+} dtrace_fmtdesc_t;
 
 #define	DTRACE_SIZEOF_EPROBEDESC(desc)				\
 	(sizeof (dtrace_eprobedesc_t) + ((desc)->dtepd_nrecs ?	\
-																	 (((desc)->dtepd_nrecs - 1) * sizeof (dtrace_recdesc_t)) : 0))
+	(((desc)->dtepd_nrecs - 1) * sizeof (dtrace_recdesc_t)) : 0))
 
 #define	DTRACE_SIZEOF_AGGDESC(desc)				\
 	(sizeof (dtrace_aggdesc_t) + ((desc)->dtagd_nrecs ?	\
-																(((desc)->dtagd_nrecs - 1) * sizeof (dtrace_recdesc_t)) : 0))
+	(((desc)->dtagd_nrecs - 1) * sizeof (dtrace_recdesc_t)) : 0))
 
-	/*
-	 * DTrace Option Interface
-	 *
-	 * Run-time DTrace options are set and retrieved via DOF_SECT_OPTDESC sections
-	 * in a DOF image.  The dof_optdesc structure contains an option identifier and
-	 * an option value.  The valid option identifiers are found below; the mapping
-	 * between option identifiers and option identifying strings is maintained at
-	 * user-level.  Note that the value of DTRACEOPT_UNSET is such that all of the
-	 * following are potentially valid option values:  all positive integers, zero
-	 * and negative one.  Some options (notably "bufpolicy" and "bufresize") take
-	 * predefined tokens as their values; these are defined with
-	 * DTRACEOPT_{option}_{token}.
-	 */
+/*
+ * DTrace Option Interface
+ *
+ * Run-time DTrace options are set and retrieved via DOF_SECT_OPTDESC sections
+ * in a DOF image.  The dof_optdesc structure contains an option identifier and
+ * an option value.  The valid option identifiers are found below; the mapping
+ * between option identifiers and option identifying strings is maintained at
+ * user-level.  Note that the value of DTRACEOPT_UNSET is such that all of the
+ * following are potentially valid option values:  all positive integers, zero
+ * and negative one.  Some options (notably "bufpolicy" and "bufresize") take
+ * predefined tokens as their values; these are defined with
+ * DTRACEOPT_{option}_{token}.
+ */
 #define	DTRACEOPT_BUFSIZE	0	/* buffer size */
 #define	DTRACEOPT_BUFPOLICY	1	/* buffer policy */
 #define	DTRACEOPT_DYNVARSIZE	2	/* dynamic variable size */
@@ -1667,7 +1667,7 @@ typedef struct dof_helper {
  *   DTRACE_MODE_NOPRIV_RESTRICT are mutually exclusive (and one of these
  *   two policies must be specified), but either may be combined (or not)
  *   with DTRACE_MODE_LIMITEDPRIV_RESTRICT.
- *   
+ *
  * 1.10.4  Caller's context
  *
  *   This is called from within dtrace_probe() meaning that interrupts
