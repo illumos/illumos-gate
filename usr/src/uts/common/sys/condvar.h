@@ -94,6 +94,8 @@ extern  void	cv_destroy(kcondvar_t *);
 extern	void	cv_wait(kcondvar_t *, kmutex_t *);
 extern	void	cv_wait_stop(kcondvar_t *, kmutex_t *, int);
 extern	clock_t	cv_timedwait(kcondvar_t *, kmutex_t *, clock_t);
+extern	clock_t	cv_timedwait_hires(kcondvar_t *, kmutex_t *, hrtime_t, hrtime_t,
+    int);
 extern	clock_t	cv_reltimedwait(kcondvar_t *, kmutex_t *, clock_t, time_res_t);
 extern	int	cv_wait_sig(kcondvar_t *, kmutex_t *);
 extern	clock_t	cv_timedwait_sig(kcondvar_t *, kmutex_t *, clock_t);

@@ -35,8 +35,6 @@
 
 #define	IPADDRL		sizeof (struct in_addr)
 #define	RARPRETRIES	5
-#define	MSEC2NSEC(msec)	((msec) * 1000000)
-#define	NSEC2MSEC(nsec)	((nsec) / 1000000)
 
 /*
  * The following value (8) is determined to work reliably in switched 10/100MB
