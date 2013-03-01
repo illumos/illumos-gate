@@ -23,6 +23,9 @@
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  */
+/*
+ * Copyright (c) 2013 Joyent, Inc.  All Rights reserved.
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -180,14 +183,10 @@ main(int argc, char **argv)
 		} else {
 			switch (gret) {
 			case G_SYS:
-			case G_SELF:
 				proc_unctrl_psinfo(&psinfo);
 				(void) printf("%d:\t%.70s\n", (int)pid,
 				    psinfo.pr_psargs);
-				if (gret == G_SYS)
-					(void) printf("  [system process]\n");
-				else
-					show_files(NULL);
+				(void) printf("  [system process]\n");
 				break;
 			default:
 				(void) fprintf(stderr, "%s: %s: %d\n",
