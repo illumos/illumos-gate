@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 #ifndef	_SYS_DSL_DIR_H
@@ -71,7 +72,11 @@ typedef struct dsl_dir_phys {
 	uint64_t dd_flags;
 	uint64_t dd_used_breakdown[DD_USED_NUM];
 	uint64_t dd_clones; /* dsl_dir objects */
-	uint64_t dd_pad[13]; /* pad out to 256 bytes for good measure */
+
+	uint64_t dd_filesystem_count;
+	uint64_t dd_snapshot_count;
+
+	uint64_t dd_pad[11]; /* pad out to 256 bytes for good measure */
 } dsl_dir_phys_t;
 
 struct dsl_dir {

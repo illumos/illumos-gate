@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
+ * Copyright (c) 2013 Joyent, Inc. All rights reserved.
  */
 
 #ifdef _KERNEL
@@ -160,4 +161,7 @@ zpool_feature_init(void)
 	zfeature_register(SPA_FEATURE_LZ4_COMPRESS,
 	    "org.illumos:lz4_compress", "lz4_compress",
 	    "LZ4 compression algorithm support.", B_FALSE, B_FALSE, NULL);
+	zfeature_register(SPA_FEATURE_FS_SS_LIMIT,
+	    "com.joyent:filesystem_limits", "filesystem_limits",
+	    "Filesystem and snapshot limits.", B_TRUE, B_FALSE, NULL);
 }
