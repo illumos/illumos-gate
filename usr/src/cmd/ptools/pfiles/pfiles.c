@@ -504,6 +504,9 @@ show_sockaddr(const char *str, struct sockaddr *sa, socklen_t len)
 	char  abuf[INET6_ADDRSTRLEN];
 	const char *p;
 
+	if (len == 0)
+		return;
+
 	switch (sa->sa_family) {
 	default:
 		return;
