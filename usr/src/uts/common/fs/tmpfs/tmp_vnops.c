@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1691,7 +1691,7 @@ top:
 		mutex_exit(&tp->tn_tlock);
 		rw_exit(&tp->tn_rwlock);
 		/* If the filesystem was umounted by force, rele the vfs ref */
-		if (vp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
+		if (tm->tm_vfsp->vfs_flag & VFS_UNMOUNTED)
 			VFS_RELE(tm->tm_vfsp);
 		return;
 	}
@@ -1754,7 +1754,7 @@ top:
 	tmp_memfree(tp, sizeof (struct tmpnode));
 
 	/* If the filesystem was umounted by force, rele the vfs ref */
-	if (vp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
+	if (tm->tm_vfsp->vfs_flag & VFS_UNMOUNTED)
 		VFS_RELE(tm->tm_vfsp);
 }
 
