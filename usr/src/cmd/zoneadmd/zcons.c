@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2012 Joyent, Inc.  All rights reserved.
+ * Copyright 2013 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -321,7 +321,7 @@ destroy_console_devs(zlog_t *zlogp)
  * interfaces to instantiate a new zone console node.  We do a lot of
  * sanity checking, and are careful to reuse a console if one exists.
  *
- * Once the device is in the device tree, we kick devfsadm via di_init_devs()
+ * Once the device is in the device tree, we kick devfsadm via di_devlink_init()
  * to ensure that the appropriate symlinks (to the master and slave console
  * devices) are placed in /dev in the global zone.
  */
@@ -407,17 +407,34 @@ devlinks:
 	 * Open the master side of the console and issue the ZC_HOLDSLAVE ioctl,
 	 * which will cause the master to retain a reference to the slave.
 	 * This prevents ttymon from blowing through the slave's STREAMS anchor.
+	 *
+	 * In very rare cases the open returns ENOENT if devfs doesn't have
+	 * everything setup yet due to heavy zone startup load. Wait for
+	 * 1 sec. and retry a few times before we fail to boot the zone.
 	 */
 	(void) snprintf(conspath, sizeof (conspath), "/dev/zcons/%s/%s",
 	    zone_name, ZCONS_MASTER_NAME);
-	if ((masterfd = open(conspath, O_RDWR | O_NOCTTY)) == -1) {
+	for (i = 0; i < 5; i++) {
+		masterfd = open(conspath, O_RDWR | O_NOCTTY);
+		if (masterfd >= 0 || errno != ENOENT)
+			break;
+		(void) sleep(1);
+	}
+	if (masterfd == -1) {
 		zerror(zlogp, B_TRUE, "ERROR: could not open master side of "
 		    "zone console for %s to acquire slave handle", zone_name);
 		goto error;
 	}
+
 	(void) snprintf(conspath, sizeof (conspath), "/dev/zcons/%s/%s",
 	    zone_name, ZCONS_SLAVE_NAME);
-	if ((slavefd = open(conspath, O_RDWR | O_NOCTTY)) == -1) {
+	for (i = 0; i < 5; i++) {
+		slavefd = open(conspath, O_RDWR | O_NOCTTY);
+		if (slavefd >= 0 || errno != ENOENT)
+			break;
+		(void) sleep(1);
+	}
+	if (slavefd == -1) {
 		zerror(zlogp, B_TRUE, "ERROR: could not open slave side of zone"
 		    " console for %s to acquire slave handle", zone_name);
 		(void) close(masterfd);
