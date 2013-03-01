@@ -1383,6 +1383,13 @@ metaslab_group_alloc(metaslab_group_t *mg, uint64_t psize, uint64_t asize,
 				mutex_exit(&mg->mg_lock);
 				return (-1ULL);
 			}
+
+			/*
+			 * If the selected metaslab is condensing, skip it.
+			 */
+			if (msp->ms_map->sm_condensing)
+				continue;
+
 			was_active = msp->ms_weight & METASLAB_ACTIVE_MASK;
 			if (activation_weight == METASLAB_WEIGHT_PRIMARY)
 				break;
@@ -1423,16 +1430,6 @@ metaslab_group_alloc(metaslab_group_t *mg, uint64_t psize, uint64_t asize,
 		mutex_enter(&msp->ms_lock);
 
 		/*
-		 * If this metaslab is currently condensing then pick again as
-		 * we can't manipulate this metaslab until it's committed
-		 * to disk.
-		 */
-		if (msp->ms_map->sm_condensing) {
-			mutex_exit(&msp->ms_lock);
-			continue;
-		}
-
-		/*
 		 * Ensure that the metaslab we have selected is still
 		 * capable of handling our request. It's possible that
 		 * another thread may have changed the weight while we
@@ -1454,6 +1451,16 @@ metaslab_group_alloc(metaslab_group_t *mg, uint64_t psize, uint64_t asize,
 		}
 
 		if (metaslab_activate(msp, activation_weight) != 0) {
+			mutex_exit(&msp->ms_lock);
+			continue;
+		}
+
+		/*
+		 * If this metaslab is currently condensing then pick again as
+		 * we can't manipulate this metaslab until it's committed
+		 * to disk.
+		 */
+		if (msp->ms_map->sm_condensing) {
 			mutex_exit(&msp->ms_lock);
 			continue;
 		}
@@ -1858,4 +1865,42 @@ metaslab_claim(spa_t *spa, const blkptr_t *bp, uint64_t txg)
 	ASSERT(error == 0 || txg == 0);
 
 	return (error);
+}
+
+static void
+checkmap(space_map_t *sm, uint64_t off, uint64_t size)
+{
+	space_seg_t *ss;
+	avl_index_t where;
+
+	mutex_enter(sm->sm_lock);
+	ss = space_map_find(sm, off, size, &where);
+	if (ss != NULL)
+		panic("freeing free block; ss=%p", (void *)ss);
+	mutex_exit(sm->sm_lock);
+}
+
+void
+metaslab_check_free(spa_t *spa, const blkptr_t *bp)
+{
+	if ((zfs_flags & ZFS_DEBUG_ZIO_FREE) == 0)
+		return;
+
+	spa_config_enter(spa, SCL_VDEV, FTAG, RW_READER);
+	for (int i = 0; i < BP_GET_NDVAS(bp); i++) {
+		uint64_t vdid = DVA_GET_VDEV(&bp->blk_dva[i]);
+		vdev_t *vd = vdev_lookup_top(spa, vdid);
+		uint64_t off = DVA_GET_OFFSET(&bp->blk_dva[i]);
+		uint64_t size = DVA_GET_ASIZE(&bp->blk_dva[i]);
+		metaslab_t *ms = vd->vdev_ms[off >> vd->vdev_ms_shift];
+
+		if (ms->ms_map->sm_loaded)
+			checkmap(ms->ms_map, off, size);
+
+		for (int j = 0; j < TXG_SIZE; j++)
+			checkmap(ms->ms_freemap[j], off, size);
+		for (int j = 0; j < TXG_DEFER_SIZE; j++)
+			checkmap(ms->ms_defermap[j], off, size);
+	}
+	spa_config_exit(spa, SCL_VDEV, FTAG);
 }

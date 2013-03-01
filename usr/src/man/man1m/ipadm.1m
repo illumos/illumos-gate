@@ -14,12 +14,12 @@ ipadm \- configure IP network interfaces and protocol properties.
 
 .LP
 .nf
-\fBipadm\fR disable-if \fB-t\fR \fIinterface\fR
+\fBipadm\fR disable-if [\fB-t\fR] \fIinterface\fR
 .fi
 
 .LP
 .nf
-\fBipadm\fR enable-if \fB-t\fR \fIinterface\fR
+\fBipadm\fR enable-if [\fB-t\fR] \fIinterface\fR
 .fi
 
 .LP
@@ -77,12 +77,12 @@ ipadm \- configure IP network interfaces and protocol properties.
 
 .LP
 .nf
-\fBipadm\fR disable-addr \fB-t\fR \fIaddrobj\fR
+\fBipadm\fR disable-addr [\fB-t\fR] \fIaddrobj\fR
 .fi
 
 .LP
 .nf
-\fBipadm\fR enable-addr \fB-t\fR \fIaddrobj\fR
+\fBipadm\fR enable-addr [\fB-t\fR] \fIaddrobj\fR
 .fi
 
 .LP
@@ -173,7 +173,7 @@ that the creation is temporary and will not be persistent across reboots.
 .sp
 .ne 2
 .na
-\fB\fBdisable-if\fR \fB-t\fR \fIinterface\fR\fR
+\fB\fBdisable-if\fR [\fB-t\fR] \fIinterface\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -188,7 +188,7 @@ that the disable is temporary and will not be persistent across reboots.
 .sp
 .ne 2
 .na
-\fB\fBenable-if\fR \fB-t\fR \fIinterface\fR\fR
+\fB\fBenable-if\fR [\fB-t\fR] \fIinterface\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -620,7 +620,7 @@ auto-configuration should be used.
 .ad
 .sp .6
 .RS 4n
-The \fBdown-addr\fR subcommand is used to down the address. This will 
+The \fBdown-addr\fR subcommand is used to down the address. This will
 stop packets from being sent or received.
 .sp
 The \fB-t\fR option (also \fB--temporary\fR) means
@@ -636,7 +636,7 @@ that the down is temporary and will not be persistent across reboots.
 .ad
 .sp .6
 .RS 4n
-The \fBup-addr\fR subcommand is used to up the address. This will 
+The \fBup-addr\fR subcommand is used to up the address. This will
 enable packets to be sent and received.
 .sp
 The \fB-t\fR option (also \fB--temporary\fR) means
@@ -648,7 +648,7 @@ that the up is temporary and will not be persistent across reboots.
 .sp
 .ne 2
 .na
-\fB\fBdisable-addr\fR \fB-t\fR \fIaddrobj\fR\fR
+\fB\fBdisable-addr\fR [\fB-t\fR] \fIaddrobj\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -663,14 +663,14 @@ that the disable is temporary and will not be persistent across reboots.
 .sp
 .ne 2
 .na
-\fB\fBenable-addr\fR \fB-t\fR \fIaddrobj\fR\fR
+\fB\fBenable-addr\fR [\fB-t\fR] \fIaddrobj\fR\fR
 .ad
 .sp .6
 .RS 4n
 The \fBenable-addr\fR subcommand is used to enable the address.
 .sp
 The \fB-t\fR option (also \fB--temporary\fR) means
-that the disable is temporary and will not be persistent across reboots.
+that the enable is temporary and will not be persistent across reboots.
 .sp
 
 .RE
@@ -875,7 +875,7 @@ Can be "on" or "off".
 .RS 4n
 The number of bits in the IPv4 netmask or IPv6 prefix.
 .RE
- 
+
 .sp
 .ne 2
 .na
@@ -885,7 +885,7 @@ The number of bits in the IPv4 netmask or IPv6 prefix.
 The address is not advertised to routing.
 Can be "on" or "off".
 .RE
- 
+
 .sp
 .ne 2
 .na
@@ -895,7 +895,7 @@ Can be "on" or "off".
 Packets can be transmitted.
 Can be "on" or "off".
 .RE
- 
+
 .sp
 .ne 2
 .na
@@ -904,7 +904,7 @@ Can be "on" or "off".
 .RS 4n
 The zone the addrobj is in.
 .RE
- 
+
 .RE
 .RE
 
@@ -1237,7 +1237,7 @@ subcommand for the list of property names.
 
 .RE
 
-.SH SEE ALSO                                                                        
+.SH SEE ALSO
 .sp
 .LP
 \fBifconfig\fR(1M), \fBdladm\fR(1M), \fBndd\fR(1M), \fBzonecfg\fR(1M),
