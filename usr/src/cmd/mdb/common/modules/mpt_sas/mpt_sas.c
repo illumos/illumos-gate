@@ -286,8 +286,10 @@ display_targets(struct mptsas_slots *s)
 		mdb_printf("devhdl %x, sasaddress %"PRIx64", phymask %x,"
 		    "devinfo %x\n", ptgt->m_devhdl, ptgt->m_sas_wwn,
 		    ptgt->m_phymask, ptgt->m_deviceinfo);
-		mdb_printf("throttle %x, dr_flag %x, m_t_ncmds %x\n",
-		    ptgt->m_t_throttle, ptgt->m_dr_flag, ptgt->m_t_ncmds);
+		mdb_printf("throttle %x, dr_flag %x, m_t_ncmds %x, "
+		    "enclosure %x, slot_num %x\n", ptgt->m_t_throttle,
+		    ptgt->m_dr_flag, ptgt->m_t_ncmds, ptgt->m_enclosure,
+		    ptgt->m_slot_num);
 
 		mdb_free(ptgt, sizeof (mptsas_target_t));
 		ptgt = (mptsas_target_t *)hash_traverse(
