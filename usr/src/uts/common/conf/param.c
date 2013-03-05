@@ -697,10 +697,10 @@ param_init(void)
 	 * should re-evaluate their usage and specify the appropriate
 	 * resolution.
 	 */
-	time_res[TR_NANOSEC] = SEC;
-	time_res[TR_MICROSEC] = MILLISEC;
-	time_res[TR_MILLISEC] = MICROSEC;
-	time_res[TR_SEC] = NANOSEC;
+	time_res[TR_NANOSEC] = NANOSEC / NANOSEC;
+	time_res[TR_MICROSEC] = NANOSEC / MICROSEC;
+	time_res[TR_MILLISEC] = NANOSEC / MILLISEC;
+	time_res[TR_SEC] = NANOSEC / SEC;
 	time_res[TR_CLOCK_TICK] = nsec_per_tick;
 }
 

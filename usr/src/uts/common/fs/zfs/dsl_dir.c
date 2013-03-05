@@ -740,7 +740,7 @@ dsl_dir_tempreserve_space(dsl_dir_t *dd, uint64_t lsize, uint64_t asize,
 	} else {
 		if (err == EAGAIN) {
 			txg_delay(dd->dd_pool, tx->tx_txg,
-			    zfs_zone_txg_delay());
+			    zfs_zone_txg_delay(), MSEC2NSEC(10));
 			err = ERESTART;
 		}
 		dsl_pool_memory_pressure(dd->dd_pool);

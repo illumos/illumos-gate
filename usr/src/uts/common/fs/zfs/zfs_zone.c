@@ -68,10 +68,10 @@ zfs_zone_report_txg_sync(void *dp)
 {
 }
 
-int
+hrtime_t
 zfs_zone_txg_delay()
 {
-	return (1);
+	return (MSEC2NSEC(10));
 }
 
 #else
@@ -195,7 +195,7 @@ int		zfs_zone_schedule_thresh = 5;
  * Tunables for delay throttling when TxG flush is occurring.
  */
 int		zfs_zone_txg_throttle_scale = 2;
-int		zfs_zone_txg_delay_ticks = 2;
+hrtime_t	zfs_zone_txg_delay_nsec = MSEC2NSEC(20);
 
 typedef struct {
 	int	zq_qdepth;
@@ -970,19 +970,19 @@ zfs_zone_report_txg_sync(void *dp)
 	}
 }
 
-int
+hrtime_t
 zfs_zone_txg_delay()
 {
 	zone_t	*zonep = curzone;
-	int delay = 1;
+	hrtime_t delay = MSEC2NSEC(10);
 
 	if (zonep->zone_io_util_above_avg)
-		delay = zfs_zone_txg_delay_ticks;
+		delay = zfs_zone_txg_delay_nsec;
 
-	extern void __dtrace_probe_zfs__zone__txg__delay(uintptr_t, uintptr_t);
+	extern void __dtrace_probe_zfs__zone__txg__delay(uintptr_t, hrtime_t);
 
 	__dtrace_probe_zfs__zone__txg__delay((uintptr_t)(zonep->zone_id),
-	    (uintptr_t)delay);
+	    (hrtime_t)delay);
 
 	return (delay);
 }
