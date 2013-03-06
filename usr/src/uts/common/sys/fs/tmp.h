@@ -67,22 +67,26 @@ enum de_op	{ DE_CREATE, DE_MKDIR, DE_LINK, DE_RENAME }; /* direnter ops */
 enum dr_op	{ DR_REMOVE, DR_RMDIR, DR_RENAME };	/* dirremove ops */
 
 /*
- * tmpfs_minfree is the amount (in pages) of anonymous memory that tmpfs leaves
- * free for the rest of the system.  In antiquity, this number could be
+ * tmpfs_minfree is the amount (in pages) of anonymous memory that tmpfs
+ * leaves free for the rest of the system.  In antiquity, this number could be
  * relevant on a system-wide basis, as physical DRAM was routinely exhausted;
  * however, in more modern times, the relative growth of DRAM with respect to
- * application footprint means that this number is only likely to become factor
- * in a virtualized OS environment (e.g., a zone) -- and even then only when
- * DRAM and swap have both been capped low to allow for maximum tenancy.  In
- * general, this number should be configured to be the largest value that is
- * still smaller than the smallest practical value for memory + swap for a
- * zone.  (As of this writing, that's about 128MB.)  This can be tuned up with
- * little consequence (other than generating ENOSPC for tmpfs writes) -- but
- * caution should be used if tuning this value too low (e.g., less than a
- * megabyte), as it increases the likelihood that tmpfs consumption alone will
- * be able to induce application-level memory allocation failure.
+ * application footprint means that this number is only likely to become
+ * factor in a virtualized OS environment (e.g., a zone) -- and even then only
+ * when DRAM and swap have both been capped low to allow for maximum tenancy.
+ * TMPMINFREE -- the value from which tmpfs_minfree is derived -- should
+ * therefore be configured to a value that is roughly the smallest practical
+ * value for memory + swap minus the largest reasonable size for tmpfs in such
+ * a configuration.  As of this writing, the smallest practical memory + swap
+ * configuration is 128MB, and it seems reasonable to allow tmpfs to consume
+ * no more than seven-eighths of this, yielding a TMPMINFREE of 16MB.  Care
+ * should be exercised in changing this:  tuning this value too high will
+ * result in spurious ENOSPC errors in tmpfs in small zones (a problem that
+ * can induce cascading failure surprisingly often); tuning this value too low
+ * will result in tmpfs consumption alone to alone induce application-level
+ * memory allocation failure.
  */
-#define	TMPMINFREE	128 * 1024 * 1024	/* 128 Megabytes */
+#define	TMPMINFREE	16 * 1024 * 1024	/* 16 Megabytes */
 
 extern size_t	tmpfs_minfree;		/* Anonymous memory in pages */
 
