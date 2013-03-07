@@ -23,6 +23,9 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ */
 
 /*
  * Copyright (c) 2000 to 2010, LSI Corporation.
@@ -71,6 +74,8 @@ extern "C" {
 #define	MPTIOCTL_GET_PCI_INFO		(MPTIOCTL | 8)
 #define	MPTIOCTL_DIAG_ACTION		(MPTIOCTL | 9)
 #define	MPTIOCTL_REG_ACCESS		(MPTIOCTL | 10)
+#define	MPTIOCTL_GET_DISK_INFO		(MPTIOCTL | 11)
+#define	MPTIOCTL_LED_CONTROL		(MPTIOCTL | 12)
 
 /*
  *  The following are our ioctl() return status values.  If everything went
@@ -295,6 +300,58 @@ typedef struct mptsas_reg_access
 	uint32_t	RegOffset;
 	uint32_t	RegData;
 } mptsas_reg_access_t;
+
+/*
+ * Disk Toplogy Information
+ */
+typedef struct mptsas_disk_info
+{
+	uint64_t	SasAddress;
+	uint16_t	Instance;
+	uint16_t	Enclosure;
+	uint16_t	Slot;
+} mptsas_disk_info_t;
+
+typedef struct mptsas_get_disk_info
+{
+	uint16_t		DiskCount;
+	mptsas_disk_info_t	*PtrDiskInfoArray;
+	uint64_t		DiskInfoArraySize;
+} mptsas_get_disk_info_t;
+
+#ifdef _KERNEL
+
+typedef struct mptsas_get_disk_info32
+{
+	uint16_t		DiskCount;
+	caddr32_t		PtrDiskInfoArray;
+	uint64_t		DiskInfoArraySize;
+} mptsas_get_disk_info32_t;
+
+#endif /* _KERNEL */
+
+/*
+ * LED Control
+ */
+
+typedef struct mptsas_led_control
+{
+	uint8_t		Command;
+	uint16_t	Enclosure;
+	uint16_t	Slot;
+	uint8_t		Led;
+	uint8_t		LedStatus;
+} mptsas_led_control_t;
+
+#define	MPTSAS_LEDCTL_FLAG_SET		1
+#define	MPTSAS_LEDCTL_FLAG_GET		2
+
+#define	MPTSAS_LEDCTL_LED_IDENT		1
+#define	MPTSAS_LEDCTL_LED_FAIL		2
+#define	MPTSAS_LEDCTL_LED_OK2RM		3
+
+#define	MPTSAS_LEDCTL_LED_MIN		MPTSAS_LEDCTL_LED_IDENT
+#define	MPTSAS_LEDCTL_LED_MAX		MPTSAS_LEDCTL_LED_OK2RM
 
 #ifdef  __cplusplus
 }

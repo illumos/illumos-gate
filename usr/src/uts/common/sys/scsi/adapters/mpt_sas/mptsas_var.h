@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -208,6 +209,7 @@ typedef	struct mptsas_target {
 		uint16_t		m_enclosure;
 		uint16_t		m_slot_num;
 		uint32_t		m_tgt_unconfigured;
+		uint8_t			m_led_status;
 
 } mptsas_target_t;
 

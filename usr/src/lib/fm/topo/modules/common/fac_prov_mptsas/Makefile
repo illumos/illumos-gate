@@ -21,16 +21,14 @@
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright (c) 2013, Joyent, Inc. All rights reserved.
 #
 
-MODULE = disk
+MODULE = fac_prov_mptsas
 CLASS = common
 
-MODULESRCS = disk.c disk_common.c disk_mptsas.c
+MODULESRCS = fac_prov_mptsas.c
 
 include ../../Makefile.plugin
 
 CPPFLAGS += -I$(SRC)/uts/common
-
-LDLIBS += -ldevinfo -ldevid -lcfgadm -ldiskstatus
-
