@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -518,7 +519,8 @@ zfs_deliver_check(nvlist_t *nvl)
 	if (nvlist_lookup_uint64(nvl, ZFS_EV_POOL_GUID,
 	    &data.dd_pool_guid) != 0 ||
 	    nvlist_lookup_uint64(nvl, ZFS_EV_VDEV_GUID,
-	    &data.dd_vdev_guid) != 0)
+	    &data.dd_vdev_guid) != 0 ||
+	    data.dd_vdev_guid == 0)
 		return (0);
 
 	data.dd_isdisk = B_TRUE;
