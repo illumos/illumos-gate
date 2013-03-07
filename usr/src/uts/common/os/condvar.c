@@ -43,8 +43,6 @@
 #include <sys/sdt.h>
 #include <sys/callo.h>
 
-clock_t cv_timedwait_hires(kcondvar_t *, kmutex_t *, hrtime_t, hrtime_t, int);
-
 /*
  * CV_MAX_WAITERS is the maximum number of waiters we track; once
  * the number becomes higher than that, we look at the sleepq to

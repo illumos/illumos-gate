@@ -18,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -713,7 +714,6 @@ smb_dcmd_session_help(void)
  *
  * smbsess dcmd - Print out the smb_session structure.
  */
-/*ARGSUSED*/
 static int
 smb_dcmd_session(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
@@ -749,8 +749,23 @@ smb_dcmd_session(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		if (opts & SMB_OPT_VERBOSE) {
 			mdb_printf("%<b>%<u>SMB session information "
 			    "(%p): %</u>%</b>\n", addr);
-			mdb_printf("Client IP address: %I\n", se->ipaddr);
-			mdb_printf("Local IP Address: %I\n", se->local_ipaddr);
+			switch (se->ipaddr.a_family) {
+			case AF_INET:
+				mdb_printf("Client IP address: %I\n",
+				    se->ipaddr.a_ipv4);
+				mdb_printf("Local IP Address: %I\n",
+				    se->local_ipaddr.a_ipv4);
+				break;
+			case AF_INET6:
+				mdb_printf("Client IP address: %N\n",
+				    &(se->ipaddr.a_ipv6));
+				mdb_printf("Local IP Address: %N\n",
+				    &(se->local_ipaddr.a_ipv6));
+				break;
+			default:
+				mdb_printf("Client IP address: unknown\n");
+				mdb_printf("Local IP Address: unknown\n");
+			}
 			mdb_printf("Session KID: %u\n", se->s_kid);
 			mdb_printf("Workstation Name: %s\n",
 			    se->workstation);
@@ -764,17 +779,41 @@ smb_dcmd_session(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			mdb_printf("Number of active Transact.: %u\n\n",
 			    se->s_xa_list.ll_count);
 		} else {
-			if (DCMD_HDRSPEC(flags))
-				mdb_printf(
-				    "%<b>%<u>%-?s "
-				    "%-16s "
-				    "%-16s %-16s%</u>%</b>\n",
-				    "SESSION", "CLIENT_IP_ADDR",
-				    "LOCAL_IP_ADDR", "STATE");
+			char	cipaddr[INET6_ADDRSTRLEN];
+			char	lipaddr[INET6_ADDRSTRLEN];
+			int	ipaddrstrlen;
 
-			mdb_printf(
-			    "%-?p %-16I %-16I %s\n", addr, se->ipaddr.a_ipv4,
-			    se->local_ipaddr.a_ipv4, state);
+			switch (se->ipaddr.a_family) {
+			case AF_INET:
+				ipaddrstrlen = INET_ADDRSTRLEN;
+				(void) mdb_snprintf(cipaddr, sizeof (cipaddr),
+				    "%I", se->ipaddr.a_ipv4);
+				(void) mdb_snprintf(lipaddr, sizeof (lipaddr),
+				    "%I", se->local_ipaddr.a_ipv4);
+				break;
+			case AF_INET6:
+				ipaddrstrlen = INET6_ADDRSTRLEN;
+				(void) mdb_snprintf(cipaddr, sizeof (cipaddr),
+				    "%N", &(se->ipaddr.a_ipv6));
+				(void) mdb_snprintf(lipaddr, sizeof (lipaddr),
+				    "%N", &(se->local_ipaddr.a_ipv6));
+				break;
+			default:
+				ipaddrstrlen = INET_ADDRSTRLEN;
+				(void) mdb_snprintf(cipaddr, sizeof (cipaddr),
+				    "unknown");
+				(void) mdb_snprintf(lipaddr, sizeof (lipaddr),
+				    "unknown");
+			}
+
+			if (DCMD_HDRSPEC(flags)) {
+				mdb_printf(
+				    "%<b>%<u>%-?s %-*s %-*s %-16s%</u>%</b>\n",
+				    "SESSION", ipaddrstrlen, "CLIENT_IP_ADDR",
+				    ipaddrstrlen, "LOCAL_IP_ADDR", "STATE");
+			}
+			mdb_printf("%-?p %-*s %-*s %s\n", addr, ipaddrstrlen,
+			    cipaddr, ipaddrstrlen, lipaddr, state);
 		}
 	}
 	if (smb_obj_expand(addr, opts, smb_session_exp, indent))

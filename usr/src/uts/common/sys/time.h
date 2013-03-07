@@ -236,6 +236,9 @@ struct itimerval32 {
 #define	MICROSEC	1000000
 #define	NANOSEC		1000000000
 
+#define	MSEC2NSEC(m)	((hrtime_t)(m) * (NANOSEC / MILLISEC))
+#define	NSEC2MSEC(n)	((n) / (NANOSEC / MILLISEC))
+
 #endif /* !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__) */
 
 #ifndef	_ASM
