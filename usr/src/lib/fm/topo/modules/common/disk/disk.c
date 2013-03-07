@@ -21,6 +21,9 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ */
 
 #include <strings.h>
 #include <devid.h>
@@ -33,6 +36,7 @@
 #include <fm/libdiskstatus.h>
 #include <sys/fm/protocol.h>
 #include "disk.h"
+#include "disk_drivers.h"
 
 static int disk_enum(topo_mod_t *, tnode_t *, const char *,
 	topo_instance_t, topo_instance_t, void *, void *);
@@ -43,13 +47,38 @@ static const topo_modops_t disk_ops =
 static const topo_modinfo_t disk_info =
 	{DISK, FM_FMRI_SCHEME_HC, DISK_VERSION, &disk_ops};
 
+static int
+disk_declare_driver(topo_mod_t *mod, tnode_t *baynode, topo_list_t *dlistp,
+    char *driver)
+{
+	int err;
+
+	if (strcmp("mpt_sas", driver) == 0) {
+		char *sas_address = NULL;
+		tnode_t *child = NULL;
+
+		if ((err = disk_mptsas_find_disk(mod, baynode,
+		    &sas_address)) != 0)
+			return (err);
+
+		err = disk_declare_addr(mod, baynode, dlistp,
+		    sas_address, &child);
+		topo_mod_strfree(mod, sas_address);
+
+		return (err);
+	}
+
+	topo_mod_dprintf(mod, "unknown disk driver '%s'\n", driver);
+	return (-1);
+}
+
 /*ARGSUSED*/
 static int
 disk_enum(topo_mod_t *mod, tnode_t *baynode,
     const char *name, topo_instance_t min, topo_instance_t max,
     void *arg, void *notused)
 {
-	char		*device;
+	char		*device, *driver;
 	int		err;
 	nvlist_t	*fmri;
 	topo_list_t	*dlistp = topo_mod_getspecific(mod);
@@ -73,6 +102,22 @@ disk_enum(topo_mod_t *mod, tnode_t *baynode,
 		return (-1);
 	}
 	nvlist_free(fmri);
+
+	/*
+	 * For internal storage, first check to see if we need to
+	 * request more detail from an HBA driver.
+	 */
+	if (topo_prop_get_string(baynode, TOPO_PGROUP_BINDING,
+	    TOPO_BINDING_DRIVER, &driver, &err) == 0) {
+		err = disk_declare_driver(mod, baynode, dlistp, driver);
+
+		topo_mod_strfree(mod, driver);
+		return (err);
+	} else if (err != ETOPO_PROP_NOENT) {
+		topo_mod_dprintf(mod, "disk_enum: "
+		    "binding error %s\n", topo_strerror(err));
+		return (-1);
+	}
 
 	/*
 	 * For internal storage, get the path to the occupant from the

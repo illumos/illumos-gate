@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -69,6 +70,7 @@
 #include <sys/file.h>
 #include <sys/cpuvar.h>
 #include <sys/policy.h>
+#include <sys/model.h>
 #include <sys/sysevent.h>
 #include <sys/sysevent/eventdefs.h>
 #include <sys/sysevent/dr.h>
@@ -11951,6 +11953,96 @@ mptsas_reg_access(mptsas_t *mpt, mptsas_reg_access_t *data, int mode)
 }
 
 static int
+get_disk_info(mptsas_t *mpt, intptr_t data, int mode)
+{
+	int i = 0;
+	int count = 0;
+	int ret = 0;
+	mptsas_target_t *ptgt;
+	mptsas_disk_info_t *di;
+	STRUCT_DECL(mptsas_get_disk_info, gdi);
+
+	STRUCT_INIT(gdi, get_udatamodel());
+
+	if (ddi_copyin((void *)data, STRUCT_BUF(gdi), STRUCT_SIZE(gdi),
+	    mode) != 0) {
+		return (EFAULT);
+	}
+
+	/* Find out how many targets there are. */
+	mutex_enter(&mpt->m_mutex);
+	ptgt = (mptsas_target_t *)mptsas_hash_traverse(&mpt->m_active->m_tgttbl,
+	    MPTSAS_HASH_FIRST);
+	while (ptgt != NULL) {
+		count++;
+		ptgt = (mptsas_target_t *)mptsas_hash_traverse(
+		    &mpt->m_active->m_tgttbl, MPTSAS_HASH_NEXT);
+	}
+	mutex_exit(&mpt->m_mutex);
+
+	/*
+	 * If we haven't been asked to copy out information on each target,
+	 * then just return the count.
+	 */
+	STRUCT_FSET(gdi, DiskCount, count);
+	if (STRUCT_FGETP(gdi, PtrDiskInfoArray) == NULL)
+		goto copy_out;
+
+	/*
+	 * If we haven't been given a large enough buffer to copy out into,
+	 * let the caller know.
+	 */
+	if (STRUCT_FGET(gdi, DiskInfoArraySize) <
+	    count * sizeof (mptsas_disk_info_t)) {
+		ret = ENOSPC;
+		goto copy_out;
+	}
+
+	di = kmem_zalloc(count * sizeof (mptsas_disk_info_t), KM_SLEEP);
+
+	mutex_enter(&mpt->m_mutex);
+	ptgt = (mptsas_target_t *)mptsas_hash_traverse(&mpt->m_active->m_tgttbl,
+	    MPTSAS_HASH_FIRST);
+	while (ptgt != NULL) {
+		if (i >= count) {
+			/*
+			 * The number of targets changed while we weren't
+			 * looking, so give up.
+			 */
+			mutex_exit(&mpt->m_mutex);
+			kmem_free(di, count * sizeof (mptsas_disk_info_t));
+			return (EAGAIN);
+		}
+		di[i].Instance = mpt->m_instance;
+		di[i].Enclosure = ptgt->m_enclosure;
+		di[i].Slot = ptgt->m_slot_num;
+		di[i].SasAddress = ptgt->m_sas_wwn;
+
+		ptgt = (mptsas_target_t *)mptsas_hash_traverse(
+		    &mpt->m_active->m_tgttbl, MPTSAS_HASH_NEXT);
+		i++;
+	}
+	mutex_exit(&mpt->m_mutex);
+	STRUCT_FSET(gdi, DiskCount, i);
+
+	/* Copy out the disk information to the caller. */
+	if (ddi_copyout((void *)di, STRUCT_FGETP(gdi, PtrDiskInfoArray),
+	    i * sizeof (mptsas_disk_info_t), mode) != 0) {
+		ret = EFAULT;
+	}
+
+	kmem_free(di, count * sizeof (mptsas_disk_info_t));
+
+copy_out:
+	if (ddi_copyout(STRUCT_BUF(gdi), (void *)data, STRUCT_SIZE(gdi),
+	    mode) != 0) {
+		ret = EFAULT;
+	}
+
+	return (ret);
+}
+
+static int
 mptsas_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *credp,
     int *rval)
 {
@@ -12071,6 +12163,9 @@ mptsas_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *credp,
 		goto out;
 	}
 	switch (cmd) {
+		case MPTIOCTL_GET_DISK_INFO:
+			status = get_disk_info(mpt, data, mode);
+			break;
 		case MPTIOCTL_UPDATE_FLASH:
 			if (ddi_copyin((void *)data, &flashdata,
 				sizeof (struct mptsas_update_flash), mode)) {

@@ -23,6 +23,9 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ */
 
 /*
  * Copyright (c) 2000 to 2010, LSI Corporation.
@@ -71,6 +74,7 @@ extern "C" {
 #define	MPTIOCTL_GET_PCI_INFO		(MPTIOCTL | 8)
 #define	MPTIOCTL_DIAG_ACTION		(MPTIOCTL | 9)
 #define	MPTIOCTL_REG_ACCESS		(MPTIOCTL | 10)
+#define	MPTIOCTL_GET_DISK_INFO		(MPTIOCTL | 11)
 
 /*
  *  The following are our ioctl() return status values.  If everything went
@@ -295,6 +299,35 @@ typedef struct mptsas_reg_access
 	uint32_t	RegOffset;
 	uint32_t	RegData;
 } mptsas_reg_access_t;
+
+/*
+ * Disk Toplogy Information
+ */
+typedef struct mptsas_disk_info
+{
+	uint64_t	SasAddress;
+	uint16_t	Instance;
+	uint16_t	Enclosure;
+	uint16_t	Slot;
+} mptsas_disk_info_t;
+
+typedef struct mptsas_get_disk_info
+{
+	uint16_t		DiskCount;
+	mptsas_disk_info_t	*PtrDiskInfoArray;
+	uint64_t		DiskInfoArraySize;
+} mptsas_get_disk_info_t;
+
+#ifdef _KERNEL
+
+typedef struct mptsas_get_disk_info32
+{
+	uint16_t		DiskCount;
+	caddr32_t		PtrDiskInfoArray;
+	uint64_t		DiskInfoArraySize;
+} mptsas_get_disk_info32_t;
+
+#endif /* _KERNEL */
 
 #ifdef  __cplusplus
 }
