@@ -1,9 +1,10 @@
 '\" te
+.\"  Copyright (c) 2013, Joyent, Inc. All Rights Reserved
 .\"  Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PSRSET 1M "Feb 25, 2008"
+.TH PSRSET 1M "Mar 11, 2013"
 .SH NAME
 psrset \- creation and management of processor sets
 .SH SYNOPSIS
@@ -15,6 +16,11 @@ psrset \- creation and management of processor sets
 .LP
 .nf
 \fBpsrset\fR \fB-b\fR \fIprocessor_set_id\fR \fIpid\fR [\fI/lwpid\fR]...
+.fi
+
+.LP
+.nf
+\fBpsrset\fR \fB-b\fR \fB-z\fR \fIzone name\fR \fIprocessor_set_id\fR
 .fi
 
 .LP
@@ -78,7 +84,6 @@ psrset \- creation and management of processor sets
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBpsrset\fR utility controls the management of processor sets. Processor
 sets allow the binding of processes or LWPs to groups of processors, rather
@@ -90,7 +95,6 @@ This command cannot be used to modify processor disposition when pools are
 enabled. Use \fBpooladm\fR(1M) and \fBpoolcfg\fR(1M) to modify processor set
 configuration through the resource pools facility.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -110,11 +114,12 @@ privilege.
 .sp
 .ne 2
 .na
-\fB\fB-b\fR\fR
+\fB\fB-b\fR [\fB-z\fr \fIzonename\fR]\fR
 .ad
 .RS 6n
 Bind all or a subset of the \fBLWP\fRs of the specified processes to the
-specified processor set.
+specified processor set. If \fB-z\fR is specified, all processes and threads
+inside the specified zone are bound to the processor set.
 .sp
 LWPs bound to a processor set are restricted to run only on the processors in
 that set. Processes can only be bound to non-empty processor sets, that is,
@@ -325,7 +330,6 @@ or to any processor set if no argument is specified.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -379,7 +383,6 @@ Specify \fIprocessor_set_id\fR as a processor set \fBID\fR.
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -401,7 +404,6 @@ An error occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -417,7 +419,6 @@ Stability Level	Stable
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBpbind\fR(1M), \fBpooladm\fR(1M), \fBpoolcfg\fR(1M), \fBpsradm\fR(1M),
 \fBpsrinfo\fR(1M), \fBprocessor_bind\fR(2), \fBprocessor_info\fR(2),
@@ -425,7 +426,6 @@ Stability Level	Stable
 \fBsysconf\fR(3C), \fBlibpool\fR(3LIB), \fBattributes\fR(5),
 \fBprivileges\fR(5)
 .SH DIAGNOSTICS
-.sp
 .LP
 The following output indicates that the specified process did not exist or has
 exited:
