@@ -355,7 +355,7 @@ hyprlofs_dirdelete(hlnode_t *dir, hlnode_t *hp, char *nm, enum dr_op op,
 	/* hpdp points to the correct directory entry */
 	namelen = strlen(hpdp->hld_name) + 1;
 
-	hyprlofs_memfree(hpdp, sizeof (hldirent_t) + namelen);
+	kmem_free(hpdp, sizeof (hldirent_t) + namelen);
 	dir->hln_size -= (sizeof (hldirent_t) + namelen);
 	dir->hln_dirents--;
 
@@ -388,8 +388,8 @@ hyprlofs_dirinit(
 	ASSERT(RW_WRITE_HELD(&parent->hln_rwlock));
 	ASSERT(dir->hln_type == VDIR);
 
-	dot = hyprlofs_memalloc(sizeof (hldirent_t) + 2, HL_MUSTHAVE);
-	dotdot = hyprlofs_memalloc(sizeof (hldirent_t) + 3, HL_MUSTHAVE);
+	dot = kmem_zalloc(sizeof (hldirent_t) + 2, KM_SLEEP);
+	dotdot = kmem_zalloc(sizeof (hldirent_t) + 3, KM_SLEEP);
 
 	/* Initialize the entries */
 	dot->hld_hlnode = dir;
@@ -467,7 +467,7 @@ hyprlofs_dirtrunc(hlnode_t *dir)
 
 		hyprlofs_hash_out(hdp);
 
-		hyprlofs_memfree(hdp, sizeof (hldirent_t) + namelen);
+		kmem_free(hdp, sizeof (hldirent_t) + namelen);
 		dir->hln_size -= (sizeof (hldirent_t) + namelen);
 		dir->hln_dirents--;
 	}
@@ -504,7 +504,7 @@ hldiraddentry(
 	/* Alloc and init dir entry */
 	namelen = strlen(name) + 1;
 	alloc_size = namelen + sizeof (hldirent_t);
-	hdp = hyprlofs_memalloc(alloc_size, 0);
+	hdp = kmem_zalloc(alloc_size, KM_NORMALPRI | KM_NOSLEEP);
 	if (hdp == NULL)
 		return (ENOSPC);
 
@@ -591,7 +591,7 @@ hldir_make_hlnode(hlnode_t *dir, hlfsmount_t *hm, vattr_t *va, enum de_op op,
 	    ((va->va_mask & AT_MTIME) && TIMESPEC_OVERFLOW(&va->va_mtime)))
 		return (EOVERFLOW);
 	type = va->va_type;
-	hp = hyprlofs_memalloc(sizeof (hlnode_t), HL_MUSTHAVE);
+	hp = kmem_zalloc(sizeof (hlnode_t), KM_SLEEP);
 	hyprlofs_node_init(hm, hp, va, cr);
 
 	hp->hln_vnode->v_rdev = hp->hln_rdev = NODEV;

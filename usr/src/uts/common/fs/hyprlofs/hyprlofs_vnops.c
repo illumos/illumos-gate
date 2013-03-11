@@ -1223,7 +1223,7 @@ hyprlofs_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 	rw_destroy(&hp->hln_rwlock);
 	mutex_destroy(&hp->hln_tlock);
 	vn_free(HLNTOV(hp));
-	hyprlofs_memfree(hp, sizeof (hlnode_t));
+	kmem_free(hp, sizeof (hlnode_t));
 }
 
 static int

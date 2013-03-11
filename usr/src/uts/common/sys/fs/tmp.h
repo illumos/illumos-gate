@@ -90,17 +90,6 @@ enum dr_op	{ DR_REMOVE, DR_RMDIR, DR_RENAME };	/* dirremove ops */
 
 extern size_t	tmpfs_minfree;		/* Anonymous memory in pages */
 
-/*
- * tmpfs can allocate only a certain percentage of kernel memory,
- * which is used for tmpnodes, directories, file names, etc.
- * This is statically set as TMPMAXFRACKMEM of physical memory.
- * The actual number of allocatable bytes can be patched in tmpfs_maxkmem.
- */
-#define	TMPMAXFRACKMEM	25	/* 1/25 of physical memory */
-
-extern size_t 	tmp_kmemspace;
-extern size_t	tmpfs_maxkmem;	/* Allocatable kernel memory in bytes */
-
 extern	void	tmpnode_init(struct tmount *, struct tmpnode *,
 	struct vattr *, struct cred *);
 extern	int	tmpnode_trunc(struct tmount *, struct tmpnode *, ulong_t);
@@ -111,8 +100,6 @@ extern	int	tdirdelete(struct tmpnode *, struct tmpnode *, char *,
 	enum dr_op, struct cred *);
 extern	void	tdirinit(struct tmpnode *, struct tmpnode *);
 extern	void	tdirtrunc(struct tmpnode *);
-extern	void	*tmp_memalloc(size_t, int);
-extern	void	tmp_memfree(void *, size_t);
 extern	int	tmp_resv(struct tmount *, struct tmpnode *, size_t, int);
 extern	int	tmp_taccess(void *, int, struct cred *);
 extern	int	tmp_sticky_remove_access(struct tmpnode *, struct tmpnode *,

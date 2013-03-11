@@ -136,8 +136,6 @@ typedef struct {
 #define	hln_nblocks	hln_attr.va_nblocks
 #define	hln_seq		hln_attr.va_seq
 
-#define	HL_MUSTHAVE	1
-
 /*
  * enums
  */
@@ -151,20 +149,9 @@ enum dr_op	{ DR_REMOVE, DR_RMDIR }; /* dirremove ops */
  * different number of pages.  Since hyprlofs doesn't actually use much
  * memory, its unlikely this ever needs to be patched.
  */
-#define	HYPRLOFSMINFREE	8 * 1024 * 1024	/* 8 Megabytes */
+#define		HYPRLOFSMINFREE 8 * 1024 * 1024 /* 8 Megabytes */
 
-extern size_t	hyprlofs_minfree;		/* Anonymous memory in pages */
-
-/*
- * hyprlofs can allocate only a certain percentage of kernel memory,
- * which is used for hlnodes, directories, file names, etc.
- * This is statically set as HYPRLOFSMAXFRACKMEM of physical memory.
- * The actual number of allocatable bytes can be patched in hyprlofs_maxkmem.
- */
-#define	HYPRLOFSMAXFRACKMEM	25	/* 1/25 of physical memory */
-
-extern size_t 	hyprlofs_kmemspace;
-extern size_t	hyprlofs_maxkmem; /* Allocatable kernel memory in bytes */
+extern size_t  hyprlofs_minfree;		/* Anonymous memory in pages */
 
 extern	void	hyprlofs_node_init(hlfsmount_t *, hlnode_t *, vattr_t *,
 		    cred_t *);
@@ -173,8 +160,6 @@ extern	int	hyprlofs_dirdelete(hlnode_t *, hlnode_t *, char *, enum dr_op,
 		    cred_t *);
 extern	void	hyprlofs_dirinit(hlnode_t *, hlnode_t *);
 extern	void	hyprlofs_dirtrunc(hlnode_t *);
-extern	void	*hyprlofs_memalloc(size_t, int);
-extern	void	hyprlofs_memfree(void *, size_t);
 extern	int	hyprlofs_taccess(void *, int, cred_t *);
 extern	int	hyprlofs_direnter(hlfsmount_t *, hlnode_t *, char *, enum de_op,
 		    vnode_t *, vattr_t *, hlnode_t **, cred_t *);

@@ -158,14 +158,6 @@ _info(struct modinfo *modinfop)
 }
 
 /*
- * The following are patchable variables limiting the amount of system
- * resources tmpfs can use.
- *
- * tmpfs_maxkmem limits the amount of kernel kmem_alloc memory
- * tmpfs can use for it's data structures (e.g. tmpnodes, directory entries)
- * It is not determined by setting a hard limit but rather as a percentage of
- * physical memory which is determined when tmpfs is first used in the system.
- *
  * tmpfs_minfree is the minimum amount of swap space that tmpfs leaves for
  * the rest of the system.  In other words, if the amount of free swap space
  * in the system (i.e. anoninfo.ani_free) drops below tmpfs_minfree, tmpfs
@@ -174,9 +166,7 @@ _info(struct modinfo *modinfop)
  * There is also a per mount limit on the amount of swap space
  * (tmount.tm_anonmax) settable via a mount option.
  */
-size_t tmpfs_maxkmem = 0;
 size_t tmpfs_minfree = 0;
-size_t tmp_kmemspace;		/* bytes of kernel heap used by all tmpfs */
 
 static major_t tmpfs_major;
 static minor_t tmpfs_minor;
@@ -229,13 +219,6 @@ tmpfsinit(int fstype, char *name)
 		 */
 		tmpfs_minfree = btopr(TMPMINFREE);
 	}
-
-	/*
-	 * The maximum amount of space tmpfs can allocate is
-	 * TMPMAXPROCKMEM percent of kernel memory
-	 */
-	if (tmpfs_maxkmem == 0)
-		tmpfs_maxkmem = MAX(PAGESIZE, kmem_maxavail() / TMPMAXFRACKMEM);
 
 	if ((tmpfs_major = getudev()) == (major_t)-1) {
 		cmn_err(CE_WARN, "tmpfsinit: Can't get unique device number.");
@@ -322,7 +305,8 @@ tmp_mount(
 		goto out;
 	}
 
-	if ((tm = tmp_memalloc(sizeof (struct tmount), 0)) == NULL) {
+	if ((tm = kmem_zalloc(sizeof (struct tmount),
+	    KM_NOSLEEP | KM_NORMALPRI)) == NULL) {
 		pn_free(&dpn);
 		error = ENOMEM;
 		goto out;
@@ -354,7 +338,7 @@ tmp_mount(
 	vfsp->vfs_bsize = PAGESIZE;
 	vfsp->vfs_flag |= VFS_NOTRUNC;
 	vfs_make_fsid(&vfsp->vfs_fsid, tm->tm_dev, tmpfsfstype);
-	tm->tm_mntpath = tmp_memalloc(dpn.pn_pathlen + 1, TMP_MUSTHAVE);
+	tm->tm_mntpath = kmem_zalloc(dpn.pn_pathlen + 1, KM_SLEEP);
 	(void) strcpy(tm->tm_mntpath, dpn.pn_path);
 
 	/*
@@ -364,7 +348,7 @@ tmp_mount(
 	rattr.va_mode = (mode_t)(S_IFDIR | 0777);	/* XXX modes */
 	rattr.va_type = VDIR;
 	rattr.va_rdev = 0;
-	tp = tmp_memalloc(sizeof (struct tmpnode), TMP_MUSTHAVE);
+	tp = kmem_zalloc(sizeof (struct tmpnode), KM_SLEEP);
 	tmpnode_init(tm, tp, &rattr, cr);
 
 	/*
@@ -647,13 +631,13 @@ tmp_freevfs(vfs_t *vfsp)
 
 	ASSERT(tm->tm_mntpath);
 
-	tmp_memfree(tm->tm_mntpath, strlen(tm->tm_mntpath) + 1);
+	kmem_free(tm->tm_mntpath, strlen(tm->tm_mntpath) + 1);
 
 	ASSERT(tm->tm_anonmem == 0);
 
 	mutex_destroy(&tm->tm_contents);
 	mutex_destroy(&tm->tm_renamelck);
-	tmp_memfree(tm, sizeof (struct tmount));
+	kmem_free(tm, sizeof (struct tmount));
 
 	/* Allow _fini() to succeed now */
 	atomic_dec_32(&tmpfs_mountcount);
@@ -759,13 +743,7 @@ tmp_statvfs(struct vfs *vfsp, struct statvfs64 *sbp)
 	 * available to tmpfs.  This is fairly inaccurate since it doesn't
 	 * take into account the names stored in the directory entries.
 	 */
-	if (tmpfs_maxkmem > tmp_kmemspace)
-		sbp->f_ffree = (tmpfs_maxkmem - tmp_kmemspace) /
-		    (sizeof (struct tmpnode) + sizeof (struct tdirent));
-	else
-		sbp->f_ffree = 0;
-
-	sbp->f_files = tmpfs_maxkmem /
+	sbp->f_ffree = sbp->f_files = ptob(availrmem) /
 	    (sizeof (struct tmpnode) + sizeof (struct tdirent));
 	sbp->f_favail = (fsfilcnt64_t)(sbp->f_ffree);
 	(void) cmpldev(&d32, vfsp->vfs_dev);

@@ -225,14 +225,6 @@ hyprlofsinit(int fstype, char *name)
 	if (hyprlofs_minfree == 0)
 		hyprlofs_minfree = btopr(HYPRLOFSMINFREE);
 
-	/*
-	 * The maximum amount of space hyprlofs can allocate is
-	 * HYPRLOFSMAXPROCKMEM percent of kernel memory
-	 */
-	if (hyprlofs_maxkmem == 0)
-		hyprlofs_maxkmem =
-		    MAX(PAGESIZE, kmem_maxavail() / HYPRLOFSMAXFRACKMEM);
-
 	if ((hyprlofs_major = getudev()) == (major_t)-1) {
 		cmn_err(CE_WARN,
 		    "hyprlofsinit: Can't get unique device number.");
@@ -279,7 +271,8 @@ hyprlofs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	    &dpn)) != 0)
 		goto out;
 
-	if ((hm = hyprlofs_memalloc(sizeof (hlfsmount_t), 0)) == NULL) {
+	if ((hm = kmem_zalloc(sizeof (hlfsmount_t),
+	    KM_NORMALPRI | KM_NOSLEEP)) == NULL) {
 		pn_free(&dpn);
 		error = ENOMEM;
 		goto out;
@@ -307,7 +300,7 @@ hyprlofs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	vfsp->vfs_bsize = PAGESIZE;
 	vfsp->vfs_flag |= VFS_NOTRUNC;
 	vfs_make_fsid(&vfsp->vfs_fsid, hm->hlm_dev, hyprlofsfstype);
-	hm->hlm_mntpath = hyprlofs_memalloc(dpn.pn_pathlen + 1, HL_MUSTHAVE);
+	hm->hlm_mntpath = kmem_zalloc(dpn.pn_pathlen + 1, KM_SLEEP);
 	(void) strcpy(hm->hlm_mntpath, dpn.pn_path);
 
 	/* allocate and initialize root hlnode structure */
@@ -315,7 +308,7 @@ hyprlofs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	rattr.va_mode = (mode_t)(S_IFDIR | 0777);
 	rattr.va_type = VDIR;
 	rattr.va_rdev = 0;
-	hp = hyprlofs_memalloc(sizeof (hlnode_t), HL_MUSTHAVE);
+	hp = kmem_zalloc(sizeof (hlnode_t), KM_SLEEP);
 	hyprlofs_node_init(hm, hp, &rattr, cr);
 
 	/* Get the mode, uid, and gid from the underlying mount point. */
@@ -460,10 +453,10 @@ hyprlofs_unmount(vfs_t *vfsp, int flag, cred_t *cr)
 
 	ASSERT(hm->hlm_mntpath);
 
-	hyprlofs_memfree(hm->hlm_mntpath, strlen(hm->hlm_mntpath) + 1);
+	kmem_free(hm->hlm_mntpath, strlen(hm->hlm_mntpath) + 1);
 
 	mutex_destroy(&hm->hlm_contents);
-	hyprlofs_memfree(hm, sizeof (hlfsmount_t));
+	kmem_free(hm, sizeof (hlfsmount_t));
 
 	return (0);
 }
@@ -558,14 +551,9 @@ hyprlofs_statvfs(vfs_t *vfsp, struct statvfs64 *sbp)
 	 * This is fairly inaccurate since it doesn't take into account the
 	 * names stored in the directory entries.
 	 */
-	if (hyprlofs_maxkmem > hyprlofs_kmemspace)
-		sbp->f_ffree = (hyprlofs_maxkmem - hyprlofs_kmemspace) /
-		    (sizeof (hlnode_t) + sizeof (hldirent_t));
-	else
-		sbp->f_ffree = 0;
-
-	sbp->f_files = hyprlofs_maxkmem /
+	sbp->f_ffree = sbp->f_files = ptob(availrmem) /
 	    (sizeof (hlnode_t) + sizeof (hldirent_t));
+
 	sbp->f_favail = (fsfilcnt64_t)(sbp->f_ffree);
 	(void) cmpldev(&d32, vfsp->vfs_dev);
 	sbp->f_fsid = d32;

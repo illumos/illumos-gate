@@ -89,40 +89,6 @@ tmp_sticky_remove_access(struct tmpnode *dir, struct tmpnode *entry,
 }
 
 /*
- * Allocate zeroed memory if tmpfs_maxkmem has not been exceeded
- * or the 'musthave' flag is set.  'musthave' allocations should
- * always be subordinate to normal allocations so that tmpfs_maxkmem
- * can't be exceeded by more than a few KB.  Example: when creating
- * a new directory, the tmpnode is a normal allocation; if that
- * succeeds, the dirents for "." and ".." are 'musthave' allocations.
- */
-void *
-tmp_memalloc(size_t size, int musthave)
-{
-	static time_t last_warning;
-	time_t now;
-
-	if (atomic_add_long_nv(&tmp_kmemspace, size) < tmpfs_maxkmem ||
-	    musthave)
-		return (kmem_zalloc(size, KM_SLEEP));
-
-	atomic_add_long(&tmp_kmemspace, -size);
-	now = gethrestime_sec();
-	if (last_warning != now) {
-		last_warning = now;
-		cmn_err(CE_WARN, "tmp_memalloc: tmpfs over memory limit");
-	}
-	return (NULL);
-}
-
-void
-tmp_memfree(void *cp, size_t size)
-{
-	kmem_free(cp, size);
-	atomic_add_long(&tmp_kmemspace, -size);
-}
-
-/*
  * Convert a string containing a number (number of bytes) to a pgcnt_t,
  * containing the corresponding number of pages. On 32-bit kernels, the
  * maximum value encoded in 'str' is PAGESIZE * ULONG_MAX, while the value

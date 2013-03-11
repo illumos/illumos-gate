@@ -125,30 +125,3 @@ hyprlofs_taccess(void *vtp, int mode, cred_t *cr)
 	return (secpolicy_vnode_access2(cr, HLNTOV(hp), hp->hln_uid,
 	    hp->hln_mode << shift, mode));
 }
-
-/*
- * Allocate zeroed memory if hyprlofs_maxkmem has not been exceeded or the
- * 'musthave' flag is set. 'musthave' allocations should always be subordinate
- * to normal allocations so that hyprlofs_maxkmem can't be exceeded by more
- * than a few KB.  E.g. when creating a new dir, the hlnode is a normal
- * allocation; if that succeeds, the dirents for "." and ".." are 'musthave'
- * allocations.
- */
-void *
-hyprlofs_memalloc(size_t size, int musthave)
-{
-	if (atomic_add_long_nv(&hyprlofs_kmemspace, size) < hyprlofs_maxkmem ||
-	    musthave)
-		return (kmem_zalloc(size, KM_SLEEP));
-
-	atomic_add_long(&hyprlofs_kmemspace, -size);
-	cmn_err(CE_WARN, "hyprlofs over memory limit");
-	return (NULL);
-}
-
-void
-hyprlofs_memfree(void *cp, size_t size)
-{
-	kmem_free(cp, size);
-	atomic_add_long(&hyprlofs_kmemspace, -size);
-}

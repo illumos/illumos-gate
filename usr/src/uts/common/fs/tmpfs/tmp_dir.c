@@ -516,7 +516,7 @@ tdirdelete(
 	 */
 	namelen = strlen(tpdp->td_name) + 1;
 
-	tmp_memfree(tpdp, sizeof (struct tdirent) + namelen);
+	kmem_free(tpdp, sizeof (struct tdirent) + namelen);
 	dir->tn_size -= (sizeof (struct tdirent) + namelen);
 	dir->tn_dirents--;
 
@@ -549,8 +549,8 @@ tdirinit(
 	ASSERT(RW_WRITE_HELD(&parent->tn_rwlock));
 	ASSERT(dir->tn_type == VDIR);
 
-	dot = tmp_memalloc(sizeof (struct tdirent) + 2, TMP_MUSTHAVE);
-	dotdot = tmp_memalloc(sizeof (struct tdirent) + 3, TMP_MUSTHAVE);
+	dot = kmem_zalloc(sizeof (struct tdirent) + 2, KM_SLEEP);
+	dotdot = kmem_zalloc(sizeof (struct tdirent) + 3, KM_SLEEP);
 
 	/*
 	 * Initialize the entries
@@ -650,7 +650,7 @@ tdirtrunc(struct tmpnode *dir)
 
 		tmpfs_hash_out(tdp);
 
-		tmp_memfree(tdp, sizeof (struct tdirent) + namelen);
+		kmem_free(tdp, sizeof (struct tdirent) + namelen);
 		dir->tn_size -= (sizeof (struct tdirent) + namelen);
 		dir->tn_dirents--;
 	}
@@ -925,7 +925,7 @@ tdiraddentry(
 	 */
 	namelen = strlen(name) + 1;
 	alloc_size = namelen + sizeof (struct tdirent);
-	tdp = tmp_memalloc(alloc_size, 0);
+	tdp = kmem_zalloc(alloc_size, KM_NOSLEEP | KM_NORMALPRI);
 	if (tdp == NULL)
 		return (ENOSPC);
 
@@ -1025,7 +1025,7 @@ tdirmaketnode(
 	    ((va->va_mask & AT_MTIME) && TIMESPEC_OVERFLOW(&va->va_mtime)))
 		return (EOVERFLOW);
 	type = va->va_type;
-	tp = tmp_memalloc(sizeof (struct tmpnode), TMP_MUSTHAVE);
+	tp = kmem_zalloc(sizeof (struct tmpnode), KM_SLEEP);
 	tmpnode_init(tm, tp, va, cred);
 
 	/* setup normal file/dir's extended attribute directory */
