@@ -770,7 +770,12 @@ set_zonecfg_env(char *rsrc, char *attr, char *name, char *val)
 	char *p;
 	char nm[MAXNAMELEN];
 
-	(void) snprintf(nm, sizeof (nm), "_ZONECFG_%s_%s_%s", rsrc, attr, name);
+	if (attr == NULL)
+		(void) snprintf(nm, sizeof (nm), "_ZONECFG_%s_%s", rsrc,
+		    name);
+	else
+		(void) snprintf(nm, sizeof (nm), "_ZONECFG_%s_%s_%s", rsrc,
+		    attr, name);
 
 	p = nm;
 	while ((p = strchr(p, '-')) != NULL)
@@ -792,6 +797,7 @@ setup_subproc_env(boolean_t debug)
 	int res;
 	struct zone_nwiftab ntab;
 	struct zone_devtab dtab;
+	struct zone_attrtab atab;
 	char net_resources[MAXNAMELEN * 2];
 	char dev_resources[MAXNAMELEN * 2];
 
@@ -856,6 +862,16 @@ setup_subproc_env(boolean_t debug)
 	}
 
 	(void) zonecfg_enddevent(snap_hndl);
+
+	if ((res = zonecfg_setattrent(snap_hndl)) != Z_OK)
+		goto done;
+
+	while (zonecfg_getattrent(snap_hndl, &atab) == Z_OK) {
+		set_zonecfg_env("attr", NULL, atab.zone_attr_name,
+		    atab.zone_attr_value);
+	}
+
+	(void) zonecfg_endattrent(snap_hndl);
 
 	if (debug)
 		(void) setenv("_ZONEADMD_brand_debug", "1", 1);

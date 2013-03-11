@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ */
 
 /*
  * psrset - create and manage processor sets
@@ -41,6 +44,7 @@
 #include <procfs.h>
 #include <libproc.h>
 #include <stdarg.h>
+#include <zone.h>
 
 #if !defined(TEXT_DOMAIN)		/* should be defined by cc -D */
 #define	TEXT_DOMAIN 	"SYS_TEST"	/* Use this only if it wasn't */
@@ -69,6 +73,8 @@ static char nflag;
 static char fflag;
 static char Fflag;
 static char eflag;
+static char zflag;
+static const char *zname;
 
 extern int pset_assign_forced(psetid_t, processorid_t, psetid_t *);
 
@@ -128,7 +134,7 @@ rele_proc(struct ps_prochandle *Pr)
 }
 
 static void
-bind_err(psetid_t pset, id_t pid, id_t lwpid, int err)
+bind_err(psetid_t pset, const char *zname, id_t pid, id_t lwpid, int err)
 {
 	char    *msg;
 
@@ -145,7 +151,9 @@ bind_err(psetid_t pset, id_t pid, id_t lwpid, int err)
 	}
 
 	errno = err;
-	if (lwpid == -1)
+	if (zname != NULL)
+		warn(gettext("cannot %s zone %s"), msg, zname);
+	else if (lwpid == -1)
 		warn(gettext("cannot %s pid %d"), msg, pid);
 	else
 		warn(gettext("cannot %s lwpid %d/%d"), msg, pid, lwpid);
@@ -281,7 +289,7 @@ bind_lwp(id_t pid, id_t lwpid, psetid_t pset)
 	psetid_t old_pset;
 
 	if (pset_bind_lwp(pset, lwpid, pid, &old_pset) != 0) {
-		bind_err(pset, pid, lwpid, errno);
+		bind_err(pset, NULL, pid, lwpid, errno);
 		errors = ERR_FAIL;
 	}
 	if (errors != ERR_FAIL) {
@@ -491,7 +499,7 @@ query_all_proc(psinfo_t *psinfo, lwpsinfo_t *lwpsinfo, void *arg)
 		 */
 		if (errno == ESRCH)
 			return (0);
-		bind_err(PS_QUERY, pid, -1, errno);
+		bind_err(PS_QUERY, NULL, pid, -1, errno);
 		errors = ERR_FAIL;
 		return (0);
 	}
@@ -542,6 +550,7 @@ usage(void)
 	    "\t%1$s -r [-F] processor_id ...\n"
 	    "\t%1$s -p [processorid ...]\n"
 	    "\t%1$s -b processor_set_id pid[/lwpids] ...\n"
+	    "\t%1$s -b -z zonename processor_set_id\n"
 	    "\t%1$s -u pid[/lwpids] ...\n"
 	    "\t%1$s -q [pid[/lwpids] ...]\n"
 	    "\t%1$s -U [processor_set_id] ...\n"
@@ -574,23 +583,23 @@ do_lwps(id_t pid, const char *range, psetid_t pset)
 	if ((fd = open(procfile, O_RDONLY)) < 0) {
 		if (errno == ENOENT)
 			errno = ESRCH;
-		bind_err(pset, pid, -1, errno);
+		bind_err(pset, NULL, pid, -1, errno);
 		return (ERR_FAIL);
 	}
 	if (pread(fd, &header, sizeof (header), 0) != sizeof (header)) {
 		(void) close(fd);
-		bind_err(pset, pid, -1, errno);
+		bind_err(pset, NULL, pid, -1, errno);
 		return (ERR_FAIL);
 	}
 	nent = header.pr_nent;
 	size = header.pr_entsize * nent;
 	ptr = lpsinfo = malloc(size);
 	if (lpsinfo == NULL) {
-		bind_err(pset, pid, -1, errno);
+		bind_err(pset, NULL, pid, -1, errno);
 		return (ERR_FAIL);
 	}
 	if (pread(fd, lpsinfo, size, sizeof (header)) != size) {
-		bind_err(pset, pid, -1, errno);
+		bind_err(pset, NULL, pid, -1, errno);
 		free(lpsinfo);
 		(void) close(fd);
 		return (ERR_FAIL);
@@ -635,6 +644,7 @@ main(int argc, char *argv[])
 	id_t	pid;
 	processorid_t	cpu;
 	psetid_t	pset, old_pset;
+	zoneid_t	zid;
 	char	*errptr;
 
 	progname = argv[0];	/* put actual command name in messages */
@@ -642,7 +652,7 @@ main(int argc, char *argv[])
 	(void) setlocale(LC_ALL, "");	/* setup localization */
 	(void) textdomain(TEXT_DOMAIN);
 
-	while ((c = getopt(argc, argv, "cdFarpibqQuUnfe")) != EOF) {
+	while ((c = getopt(argc, argv, "cdFarpibqQuUnfez:")) != EOF) {
 		switch (c) {
 		case 'c':
 			cflag = 1;
@@ -692,6 +702,19 @@ main(int argc, char *argv[])
 			break;
 		case 'n':
 			nflag = 1;
+			break;
+		case 'z':
+			if (!bflag) {
+				warn(gettext("-z can only be used after -b\n"));
+				return (usage());
+			}
+			if (zflag) {
+				warn(gettext("-z can only be specified "
+				    "once\n"));
+				return (usage());
+			}
+			zflag = 1;
+			zname = optarg;
 			break;
 		default:
 			return (usage());
@@ -859,9 +882,28 @@ main(int argc, char *argv[])
 		/*
 		 * Perform function for each pid/lwpid specified.
 		 */
-		if (argc == 0) {
+		if (argc == 0 && !zflag) {
 			warn(gettext("must specify at least one pid\n"));
 			return (usage());
+		} else if (argc > 0 && zflag) {
+			warn(gettext("cannot specify extra pids with -z\n"));
+			return (usage());
+		}
+
+		if (zflag) {
+			zid = getzoneidbyname(zname);
+			if (zid < 0) {
+				warn(gettext("invalid zone name: %s\n"),
+				    zname);
+				errors = ERR_FAIL;
+			} else if (pset_bind(pset, P_ZONEID, zid,
+			    &old_pset) < 0) {
+				bind_err(pset, zname, -1, -1, errno);
+				errors = ERR_FAIL;
+			} else {
+				(void) printf(gettext("zone %s: bound to %d\n"),
+				    zname, pset);
+			}
 		}
 
 		/*
@@ -902,7 +944,7 @@ main(int argc, char *argv[])
 				 */
 				if (pset_bind(pset, P_PID, pid,
 				    &old_pset) < 0) {
-					bind_err(pset, pid, -1, errno);
+					bind_err(pset, NULL, pid, -1, errno);
 					errors = ERR_FAIL;
 					continue;
 				}
