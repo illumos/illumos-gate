@@ -29,6 +29,7 @@
 #include <sys/types.h>
 #include <sys/utsname.h>
 #include <sys/sysmacros.h>
+#include <sys/proc.h>
 
 #include <alloca.h>
 #include <rtld_db.h>
@@ -40,6 +41,7 @@
 #include <errno.h>
 #include <gelf.h>
 #include <stddef.h>
+#include <signal.h>
 
 #include "libproc.h"
 #include "Pcontrol.h"
@@ -727,6 +729,69 @@ static int (*nhdlrs[])(struct ps_prochandle *, size_t) = {
 	note_fdinfo,		/* 22	NT_FDINFO		*/
 };
 
+static void
+core_report_mapping(struct ps_prochandle *P, GElf_Phdr *php)
+{
+	prkillinfo_t killinfo;
+	siginfo_t *si = &killinfo.prk_info;
+	char signame[SIG2STR_MAX], sig[64], info[64];
+	void *addr = (void *)(uintptr_t)php->p_vaddr;
+
+	const char *errfmt = "core file data for mapping at %p not saved: %s\n";
+	const char *incfmt = "core file incomplete due to %s%s\n";
+	const char *msgfmt = "mappings at and above %p are missing\n";
+
+	if (!(php->p_flags & PF_SUNW_KILLED)) {
+		int err = 0;
+
+		(void) pread64(P->asfd, &err,
+		    sizeof (err), (off64_t)php->p_offset);
+
+		Perror_printf(P, errfmt, addr, strerror(err));
+		dprintf(errfmt, addr, strerror(err));
+		return;
+	}
+
+	if (!(php->p_flags & PF_SUNW_SIGINFO))
+		return;
+
+	(void) memset(&killinfo, 0, sizeof (killinfo));
+
+	(void) pread64(P->asfd, &killinfo,
+	    sizeof (killinfo), (off64_t)php->p_offset);
+
+	/*
+	 * While there is (or at least should be) only one segment that has
+	 * PF_SUNW_SIGINFO set, the signal information there is globally
+	 * useful (even if only to those debugging libproc consumers); we hang
+	 * the signal information gleaned here off of the ps_prochandle.
+	 */
+	P->map_missing = php->p_vaddr;
+	P->killinfo = killinfo.prk_info;
+
+	if (sig2str(si->si_signo, signame) == -1) {
+		(void) snprintf(sig, sizeof (sig),
+		    "<Unknown signal: 0x%x>, ", si->si_signo);
+	} else {
+		(void) snprintf(sig, sizeof (sig), "SIG%s, ", signame);
+	}
+
+	if (si->si_code == SI_USER || si->si_code == SI_QUEUE) {
+		(void) snprintf(info, sizeof (info),
+		    "pid=%d uid=%d zone=%d ctid=%d",
+		    si->si_pid, si->si_uid, si->si_zoneid, si->si_ctid);
+	} else {
+		(void) snprintf(info, sizeof (info),
+		    "code=%d", si->si_code);
+	}
+
+	Perror_printf(P, incfmt, sig, info);
+	Perror_printf(P, msgfmt, addr);
+
+	dprintf(incfmt, sig, info);
+	dprintf(msgfmt, addr);
+}
+
 /*
  * Add information on the address space mapping described by the given
  * PT_LOAD program header.  We fill in more information on the mapping later.
@@ -734,7 +799,6 @@ static int (*nhdlrs[])(struct ps_prochandle *, size_t) = {
 static int
 core_add_mapping(struct ps_prochandle *P, GElf_Phdr *php)
 {
-	int err = 0;
 	prmap_t pmap;
 
 	dprintf("mapping base %llx filesz %llu memsz %llu offset %llu\n",
@@ -749,14 +813,7 @@ core_add_mapping(struct ps_prochandle *P, GElf_Phdr *php)
 	 * PF_SUNW_FAILURE in the Phdr and try to stash away the errno for us.
 	 */
 	if (php->p_flags & PF_SUNW_FAILURE) {
-		(void) pread64(P->asfd, &err,
-		    sizeof (err), (off64_t)php->p_offset);
-
-		Perror_printf(P, "core file data for mapping at %p not saved: "
-		    "%s\n", (void *)(uintptr_t)php->p_vaddr, strerror(err));
-		dprintf("core file data for mapping at %p not saved: %s\n",
-		    (void *)(uintptr_t)php->p_vaddr, strerror(err));
-
+		core_report_mapping(P, php);
 	} else if (php->p_filesz != 0 && php->p_offset >= P->core->core_size) {
 		Perror_printf(P, "core file may be corrupt -- data for mapping "
 		    "at %p is missing\n", (void *)(uintptr_t)php->p_vaddr);

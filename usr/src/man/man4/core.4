@@ -130,9 +130,13 @@ represent mappings whose data is included in the core file have their
 .sp
 .LP
 A mapping's data can be excluded due to the core file content settings (see
-\fBcoreadm\fR(1M)), or due to some failure. If the data is excluded because of
-a failure, the program header entry will have the \fBPF_SUNW_FAILURE\fR flag
-set in its \fBp_flags\fR field.
+\fBcoreadm\fR(1M)), due to a failure, or due to a signal received after
+core dump initiation but before its completion. If the data is excluded
+because of a failure, the program header entry will have the
+\fBPF_SUNW_FAILURE\fR flag
+set in its \fBp_flags\fR field; if the data is excluded because of a signal,
+the segment's \fBp_flags\fR field will have the \fBPF_SUNW_KILLED\fR
+flag set.
 .sp
 .LP
 The program headers of an \fBELF\fR core file also contain entries for two

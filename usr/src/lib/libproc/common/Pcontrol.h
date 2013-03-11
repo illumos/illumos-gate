@@ -233,6 +233,8 @@ struct ps_prochandle {
 	char	*zoneroot;	/* cached path to zone root */
 	plist_t	fd_head;	/* head of file desc info list */
 	int	num_fd;		/* number of file descs in list */
+	uintptr_t map_missing;	/* first missing mapping in core due to sig */
+	siginfo_t killinfo;	/* signal that interrupted core dump */
 };
 
 /* flags */

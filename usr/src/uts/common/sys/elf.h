@@ -366,6 +366,8 @@ typedef struct {
 #define	PF_MASKPROC	0xf0000000	/* processor specific values */
 
 #define	PF_SUNW_FAILURE	0x00100000	/* mapping absent due to failure */
+#define	PF_SUNW_KILLED	0x00200000	/* signal received during dump */
+#define	PF_SUNW_SIGINFO	0x00400000	/* segment has killing sig's siginfo */
 
 #define	PN_XNUM		0xffff		/* extended program header index */
 
