@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2012 Joyent, Inc.  All rights reserved.
+ * Copyright 2013 Joyent, Inc.  All rights reserved.
  */
 
 /* vnode ops for the /dev/zvol directory */
@@ -608,6 +608,19 @@ devzvol_lookup(struct vnode *dvp, char *nm, struct vnode **vpp,
 		int res;
 
 		rw_exit(&parent->sdev_contents);
+
+		/*
+		 * If we're in the global zone and reach down into a non-global
+		 * zone's /dev/zvol then this action could trigger the creation
+		 * of all of the zvol devices for every zone into the non-global
+		 * zone's /dev tree. This could be a big security hole. To
+		 * prevent this, disallow the global zone from looking inside
+		 * a non-global zones /dev/zvol. This behavior is similar to
+		 * delegated datasets, which cannot be used by the global zone.
+		 */
+		if (getzoneid() == GLOBAL_ZONEID)
+			return (EPERM);
+
 		res = prof_lookup(dvp, nm, vpp, cred);
 
 		/*
