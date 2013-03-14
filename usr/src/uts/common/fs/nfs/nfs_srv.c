@@ -20,7 +20,6 @@
  */
 /*
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -400,8 +399,6 @@ rfs_lookup(struct nfsdiropargs *da, struct nfsdiropres *dr,
 		return;
 	}
 
-	exi_hold(exi);
-
 	/*
 	 * If the public filehandle is used then allow
 	 * a multi-component lookup, i.e. evaluate
@@ -412,16 +409,9 @@ rfs_lookup(struct nfsdiropargs *da, struct nfsdiropres *dr,
 	 * which is OK as long as the filesystem is exported.
 	 */
 	if (PUBLIC_FH2(fhp)) {
-		struct exportinfo *new;
-
 		publicfh_flag = TRUE;
-		error = rfs_publicfh_mclookup(name, dvp, cr, &vp, &new,
+		error = rfs_publicfh_mclookup(name, dvp, cr, &vp, &exi,
 		    &sec);
-
-		if (error == 0) {
-			exi_rele(exi);
-			exi = new;
-		}
 	} else {
 		/*
 		 * Do a normal single component lookup.
@@ -462,10 +452,13 @@ rfs_lookup(struct nfsdiropargs *da, struct nfsdiropres *dr,
 	VN_RELE(dvp);
 
 	/*
-	 * The passed argument exportinfo is released by the
-	 * caller, comon_dispatch
+	 * If publicfh_flag is true then we have called rfs_publicfh_mclookup
+	 * and have obtained a new exportinfo in exi which needs to be
+	 * released. Note the the original exportinfo pointed to by exi
+	 * will be released by the caller, comon_dispatch.
 	 */
-	exi_rele(exi);
+	if (publicfh_flag && exi != NULL)
+		exi_rele(exi);
 
 	/*
 	 * If it's public fh, no 0x81, and client's flavor is
