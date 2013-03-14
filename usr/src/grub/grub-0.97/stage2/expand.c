@@ -413,18 +413,20 @@ expand_string(const char *s, char *d, unsigned int len)
 		if (*p == '$' && *(p + 1) == '{') {
 			start = p + 2;
 			for (p = start; *p != '\0' && *p != '}' &&
-			    p - start < sizeof (name); p++) {
+			    p - start < sizeof (name) - 1; p++) {
 				name[p - start] = *p;
 			}
 			/*
 			 * Unterminated reference.  Copy verbatim.
 			 */
-			if (p - start == sizeof (name) || *p != '}') {
+			if (p - start >= sizeof (name) - 1 || *p != '}') {
 				p = start;
 				*q++ = '$';
 				*q++ = '{';
+				continue;
 			}
 
+			name[p - start] = '\0';
 			val = get_variable(name);
 			if (val == NULL)
 				return (ERR_NOVAR);
