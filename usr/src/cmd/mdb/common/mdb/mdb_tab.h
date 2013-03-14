@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright (c) 2012 Joyent, Inc. All rights reserved.
  */
 /*
@@ -55,7 +55,7 @@ extern size_t mdb_tab_size(mdb_tab_cookie_t *);
 extern const char *mdb_tab_match(mdb_tab_cookie_t *);
 extern void mdb_tab_print(mdb_tab_cookie_t *);
 extern void mdb_tab_fini(mdb_tab_cookie_t *);
-
+extern int mdb_tab_complete_global(mdb_tab_cookie_t *, const char *);
 extern int mdb_tab_complete_dcmd(mdb_tab_cookie_t *, const char *);
 extern int mdb_tab_complete_walker(mdb_tab_cookie_t *, const char *);
 extern int mdb_tab_complete_member_by_id(mdb_tab_cookie_t *, mdb_ctf_id_t,

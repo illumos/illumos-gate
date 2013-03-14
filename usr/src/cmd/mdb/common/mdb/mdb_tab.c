@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright (c) 2012 Joyent, Inc. All rights reserved.
  */
 /*
@@ -43,6 +43,7 @@
 #include <mdb/mdb_print.h>
 #include <mdb/mdb_nv.h>
 #include <mdb/mdb_tab.h>
+#include <mdb/mdb_target.h>
 #include <mdb/mdb.h>
 
 #include <ctype.h>
@@ -282,7 +283,11 @@ mdb_tab_command(mdb_tab_cookie_t *mcp, const char *buf)
 	 */
 	ret = tab_parse_buf(data, &dcmd, &argc, &argv, &flags);
 
+	/*
+	 * Match against global symbols if the input is not a dcmd
+	 */
 	if (ret != 0) {
+		(void) mdb_tab_complete_global(mcp, buf);
 		goto out;
 	}
 
@@ -292,9 +297,10 @@ mdb_tab_command(mdb_tab_cookie_t *mcp, const char *buf)
 	cp = mdb_dcmd_lookup(dcmd);
 
 	/*
-	 * When argc is zero, that indicates that we are trying to tab complete
-	 * a dcmd. Note, that if there isn't the start of a dcmd, i.e. ::, then
-	 * we will have already bailed in the call to parse_path.
+	 * When argc is zero it indicates that we are trying to tab complete
+	 * a dcmd or a global symbol. Note, that if there isn't the start of
+	 * a dcmd, i.e. ::, then we will have already bailed in the call to
+	 * tab_parse_buf.
 	 */
 	if (cp == NULL && argc != 0) {
 		goto out;
@@ -478,6 +484,37 @@ mdb_tab_fini(mdb_tab_cookie_t *mcp)
 {
 }
 
+/*ARGSUSED*/
+static int
+tab_complete_global(void *arg, const GElf_Sym *sym, const char *name,
+    const mdb_syminfo_t *sip, const char *obj)
+{
+	mdb_tab_cookie_t *mcp = arg;
+	mdb_tab_insert(mcp, name);
+	return (0);
+}
+
+/*
+ * This function tab completes against all loaded global symbols.
+ */
+int
+mdb_tab_complete_global(mdb_tab_cookie_t *mcp, const char *name)
+{
+	mdb_tab_setmbase(mcp, name);
+	(void) mdb_tgt_symbol_iter(mdb.m_target, MDB_TGT_OBJ_EVERY,
+	    MDB_TGT_SYMTAB, MDB_TGT_BIND_GLOBAL | MDB_TGT_TYPE_OBJECT |
+	    MDB_TGT_TYPE_FUNC, tab_complete_global, mcp);
+	return (0);
+}
+
+/*
+ * This function takes a ctf id and determines whether or not the associated
+ * type should be considered as a potential match for the given tab
+ * completion command. We verify that the type itself is valid
+ * for completion given the current context of the command, resolve
+ * its actual name, and then pass it off to mdb_tab_insert to determine
+ * if it's an actual match.
+ */
 static int
 tab_complete_type(mdb_ctf_id_t id, void *arg)
 {

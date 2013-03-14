@@ -20,7 +20,7 @@
 #
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2013 by Delphix. All rights reserved.
 #
 
 LIBRARY= libzpool.a
@@ -29,6 +29,7 @@ VERS= .1
 # include the list of ZFS sources
 include ../../../uts/common/Makefile.files
 KERNEL_OBJS = kernel.o taskq.o util.o
+DTRACE_OBJS = zfs.o
 
 OBJECTS=$(ZFS_COMMON_OBJS) $(ZFS_SHARED_OBJS) $(KERNEL_OBJS)
 
@@ -52,7 +53,10 @@ INCS += -I../../../uts/common/fs/zfs
 INCS += -I../../../common/zfs
 INCS += -I../../../common
 
+CLEANFILES += ../common/zfs.h
+
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
+$(LINTLIB): ../common/zfs.h
 
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
@@ -79,10 +83,19 @@ lint: $(LINTLIB)
 
 include ../../Makefile.targ
 
-pics/%.o: ../../../uts/common/fs/zfs/%.c
+EXTPICS= $(DTRACE_OBJS:%=pics/%)
+
+pics/%.o: ../../../uts/common/fs/zfs/%.c ../common/zfs.h
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-pics/%.o: ../../../common/zfs/%.c
+pics/%.o: ../../../common/zfs/%.c ../common/zfs.h
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
+
+pics/%.o: ../common/%.d $(PICS)
+	$(COMPILE.d) -C -s $< -o $@ $(PICS)
+	$(POST_PROCESS_O)
+
+../common/%.h: ../common/%.d
+	$(DTRACE) -xnolibs -h -s $< -o $@

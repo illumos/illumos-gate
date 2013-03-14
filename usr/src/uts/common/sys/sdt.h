@@ -20,10 +20,13 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 #ifndef _SYS_SDT_H
 #define	_SYS_SDT_H
+
+#include <sys/stdint.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -94,7 +97,7 @@ extern "C" {
 	    (uintptr_t)(arg3));						\
 }
 
-#define	DTRACE_PROBE4(name, type1, arg1, type2, arg2, 			\
+#define	DTRACE_PROBE4(name, type1, arg1, type2, arg2,			\
     type3, arg3, type4, arg4) {						\
 	extern void __dtrace_probe_##name(uintptr_t, uintptr_t,		\
 	    uintptr_t, uintptr_t);					\
@@ -102,7 +105,7 @@ extern "C" {
 	    (uintptr_t)(arg3), (uintptr_t)(arg4));			\
 }
 
-#define	DTRACE_PROBE5(name, type1, arg1, type2, arg2, 			\
+#define	DTRACE_PROBE5(name, type1, arg1, type2, arg2,			\
     type3, arg3, type4, arg4, type5, arg5) {				\
 	extern void __dtrace_probe_##name(uintptr_t, uintptr_t,		\
 	    uintptr_t, uintptr_t, uintptr_t);				\
@@ -110,7 +113,7 @@ extern "C" {
 	    (uintptr_t)(arg3), (uintptr_t)(arg4), (uintptr_t)(arg5));	\
 }
 
-#define	DTRACE_PROBE6(name, type1, arg1, type2, arg2, 			\
+#define	DTRACE_PROBE6(name, type1, arg1, type2, arg2,			\
     type3, arg3, type4, arg4, type5, arg5, type6, arg6) {		\
 	extern void __dtrace_probe_##name(uintptr_t, uintptr_t,		\
 	    uintptr_t, uintptr_t, uintptr_t, uintptr_t);		\
@@ -150,9 +153,9 @@ extern "C" {
 #define	DTRACE_SCHED3(name, type1, arg1, type2, arg2, type3, arg3)	\
 	DTRACE_PROBE3(__sched_##name, type1, arg1, type2, arg2, type3, arg3);
 
-#define	DTRACE_SCHED4(name, type1, arg1, type2, arg2, 			\
+#define	DTRACE_SCHED4(name, type1, arg1, type2, arg2,			\
     type3, arg3, type4, arg4)						\
-	DTRACE_PROBE4(__sched_##name, type1, arg1, type2, arg2, 	\
+	DTRACE_PROBE4(__sched_##name, type1, arg1, type2, arg2,		\
 	    type3, arg3, type4, arg4);
 
 #define	DTRACE_PROC(name)						\
@@ -167,9 +170,9 @@ extern "C" {
 #define	DTRACE_PROC3(name, type1, arg1, type2, arg2, type3, arg3)	\
 	DTRACE_PROBE3(__proc_##name, type1, arg1, type2, arg2, type3, arg3);
 
-#define	DTRACE_PROC4(name, type1, arg1, type2, arg2, 			\
+#define	DTRACE_PROC4(name, type1, arg1, type2, arg2,			\
     type3, arg3, type4, arg4)						\
-	DTRACE_PROBE4(__proc_##name, type1, arg1, type2, arg2, 		\
+	DTRACE_PROBE4(__proc_##name, type1, arg1, type2, arg2,		\
 	    type3, arg3, type4, arg4);
 
 #define	DTRACE_IO(name)							\
@@ -184,9 +187,9 @@ extern "C" {
 #define	DTRACE_IO3(name, type1, arg1, type2, arg2, type3, arg3)	\
 	DTRACE_PROBE3(__io_##name, type1, arg1, type2, arg2, type3, arg3);
 
-#define	DTRACE_IO4(name, type1, arg1, type2, arg2, 			\
+#define	DTRACE_IO4(name, type1, arg1, type2, arg2,			\
     type3, arg3, type4, arg4)						\
-	DTRACE_PROBE4(__io_##name, type1, arg1, type2, arg2, 		\
+	DTRACE_PROBE4(__io_##name, type1, arg1, type2, arg2,		\
 	    type3, arg3, type4, arg4);
 
 #define	DTRACE_ISCSI_2(name, type1, arg1, type2, arg2)			\
@@ -223,11 +226,11 @@ extern "C" {
 	    type3, arg3, type4, arg4, type5, arg5, type6, arg6,		\
 	    type7, arg7, type8, arg8);
 
-#define	DTRACE_NFSV3_3(name, type1, arg1, type2, arg2, 			\
+#define	DTRACE_NFSV3_3(name, type1, arg1, type2, arg2,			\
     type3, arg3)							\
 	DTRACE_PROBE3(__nfsv3_##name, type1, arg1, type2, arg2,		\
 	    type3, arg3);
-#define	DTRACE_NFSV3_4(name, type1, arg1, type2, arg2, 			\
+#define	DTRACE_NFSV3_4(name, type1, arg1, type2, arg2,			\
     type3, arg3, type4, arg4)						\
 	DTRACE_PROBE4(__nfsv3_##name, type1, arg1, type2, arg2,		\
 	    type3, arg3, type4, arg4);
@@ -259,24 +262,24 @@ extern "C" {
 #define	DTRACE_IP3(name, type1, arg1, type2, arg2, type3, arg3)	\
 	DTRACE_PROBE3(__ip_##name, type1, arg1, type2, arg2, type3, arg3);
 
-#define	DTRACE_IP4(name, type1, arg1, type2, arg2, 			\
+#define	DTRACE_IP4(name, type1, arg1, type2, arg2,			\
     type3, arg3, type4, arg4)						\
-	DTRACE_PROBE4(__ip_##name, type1, arg1, type2, arg2, 		\
+	DTRACE_PROBE4(__ip_##name, type1, arg1, type2, arg2,		\
 	    type3, arg3, type4, arg4);
 
-#define	DTRACE_IP5(name, type1, arg1, type2, arg2, 			\
+#define	DTRACE_IP5(name, type1, arg1, type2, arg2,			\
     type3, arg3, type4, arg4, type5, arg5)				\
-	DTRACE_PROBE5(__ip_##name, type1, arg1, type2, arg2, 		\
+	DTRACE_PROBE5(__ip_##name, type1, arg1, type2, arg2,		\
 	    type3, arg3, type4, arg4, type5, arg5);
 
-#define	DTRACE_IP6(name, type1, arg1, type2, arg2, 			\
+#define	DTRACE_IP6(name, type1, arg1, type2, arg2,			\
     type3, arg3, type4, arg4, type5, arg5, type6, arg6)			\
-	DTRACE_PROBE6(__ip_##name, type1, arg1, type2, arg2, 		\
+	DTRACE_PROBE6(__ip_##name, type1, arg1, type2, arg2,		\
 	    type3, arg3, type4, arg4, type5, arg5, type6, arg6);
 
 #define	DTRACE_IP7(name, type1, arg1, type2, arg2, type3, arg3,		\
     type4, arg4, type5, arg5, type6, arg6, type7, arg7)			\
-	DTRACE_PROBE7(__ip_##name, type1, arg1, type2, arg2, 		\
+	DTRACE_PROBE7(__ip_##name, type1, arg1, type2, arg2,		\
 	    type3, arg3, type4, arg4, type5, arg5, type6, arg6,		\
 	    type7, arg7);
 
@@ -347,7 +350,7 @@ extern "C" {
 
 #define	DTRACE_XPV4(name, type1, arg1, type2, arg2, type3, arg3,	\
 	    type4, arg4)						\
-	DTRACE_PROBE4(__xpv_##name, type1, arg1, type2, arg2, 		\
+	DTRACE_PROBE4(__xpv_##name, type1, arg1, type2, arg2,		\
 	    type3, arg3, type4, arg4);
 
 #define	DTRACE_FC_1(name, type1, arg1) \
@@ -363,7 +366,7 @@ extern "C" {
 	DTRACE_PROBE4(__fc_##name, type1, arg1, type2, arg2, type3, arg3, \
 	    type4, arg4);
 
-#define	DTRACE_FC_5(name, type1, arg1, type2, arg2, type3, arg3, 	\
+#define	DTRACE_FC_5(name, type1, arg1, type2, arg2, type3, arg3,	\
 	    type4, arg4, type5, arg5)					\
 	DTRACE_PROBE5(__fc_##name, type1, arg1, type2, arg2, type3, arg3, \
 	    type4, arg4, type5, arg5);
@@ -379,29 +382,45 @@ extern "C" {
 
 #define	DTRACE_SRP_4(name, type1, arg1, type2, arg2, type3, arg3,	\
 	    type4, arg4)						\
-	DTRACE_PROBE4(__srp_##name, type1, arg1, type2, arg2, 		\
+	DTRACE_PROBE4(__srp_##name, type1, arg1, type2, arg2,		\
 	    type3, arg3, type4, arg4);
 
 #define	DTRACE_SRP_5(name, type1, arg1, type2, arg2, type3, arg3,	\
 	    type4, arg4, type5, arg5)					\
-	DTRACE_PROBE5(__srp_##name, type1, arg1, type2, arg2, 		\
+	DTRACE_PROBE5(__srp_##name, type1, arg1, type2, arg2,		\
 	    type3, arg3, type4, arg4, type5, arg5);
 
 #define	DTRACE_SRP_6(name, type1, arg1, type2, arg2, type3, arg3,	\
 	    type4, arg4, type5, arg5, type6, arg6)			\
-	DTRACE_PROBE6(__srp_##name, type1, arg1, type2, arg2, 		\
+	DTRACE_PROBE6(__srp_##name, type1, arg1, type2, arg2,		\
 	    type3, arg3, type4, arg4, type5, arg5, type6, arg6);
 
 #define	DTRACE_SRP_7(name, type1, arg1, type2, arg2, type3, arg3,	\
 	    type4, arg4, type5, arg5, type6, arg6, type7, arg7)		\
-	DTRACE_PROBE7(__srp_##name, type1, arg1, type2, arg2, 		\
+	DTRACE_PROBE7(__srp_##name, type1, arg1, type2, arg2,		\
 	    type3, arg3, type4, arg4, type5, arg5, type6, arg6, type7, arg7);
 
 #define	DTRACE_SRP_8(name, type1, arg1, type2, arg2, type3, arg3,	\
 	    type4, arg4, type5, arg5, type6, arg6, type7, arg7, type8, arg8) \
-	DTRACE_PROBE8(__srp_##name, type1, arg1, type2, arg2, 		\
+	DTRACE_PROBE8(__srp_##name, type1, arg1, type2, arg2,		\
 	    type3, arg3, type4, arg4, type5, arg5, type6, arg6,		\
 	    type7, arg7, type8, arg8);
+
+/*
+ * the set-error SDT probe is extra static, in that we declare its fake
+ * function literally, rather than with the DTRACE_PROBE1() macro.  This is
+ * necessary so that SET_ERROR() can evaluate to a value, which wouldn't
+ * be possible if it required multiple statements (to declare the function
+ * and then call it).
+ *
+ * SET_ERROR() uses the comma operator so that it can be used without much
+ * additional code.  For example, "return (EINVAL);" becomes
+ * "return (SET_ERROR(EINVAL));".  Note that the argument will be evaluated
+ * twice, so it should not have side effects (e.g. something like:
+ * "return (SET_ERROR(log_error(EINVAL, info)));" would log the error twice).
+ */
+extern void __dtrace_probe_set__error(uintptr_t);
+#define	SET_ERROR(err) (__dtrace_probe_set__error(err), err)
 
 #endif /* _KERNEL */
 
