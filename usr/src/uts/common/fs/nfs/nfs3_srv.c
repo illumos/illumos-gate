@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  *
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -514,19 +514,19 @@ rfs3_lookup(LOOKUP3args *args, LOOKUP3res *resp, struct exportinfo *exi,
 			auth_weak = TRUE;
 	}
 
-	if (error) {
-		VN_RELE(vp);
-		goto out;
-	}
-
 	/*
 	 * If publicfh_flag is true then we have called rfs_publicfh_mclookup
 	 * and have obtained a new exportinfo in exi which needs to be
-	 * released. Note the the original exportinfo pointed to by exi
+	 * released. Note that the original exportinfo pointed to by exi
 	 * will be released by the caller, common_dispatch.
 	 */
 	if (publicfh_flag)
 		exi_rele(exi);
+
+	if (error) {
+		VN_RELE(vp);
+		goto out;
+	}
 
 	va.va_mask = AT_ALL;
 	vap = rfs4_delegated_getattr(vp, &va, 0, cr) ? NULL : &va;
