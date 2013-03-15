@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 /*
@@ -43,6 +44,8 @@
 #include <ctype.h>
 #include <errno.h>
 #include <math.h>
+#include <stdio.h>
+#include <unistd.h>
 
 /*ARGSUSED*/
 int
@@ -871,7 +874,40 @@ typedef struct dtrace_dcmddata {
 	int dtdd_quiet;
 	int dtdd_flowindent;
 	int dtdd_heading;
+	FILE *dtdd_output;
 } dtrace_dcmddata_t;
+
+/*
+ * Helper to grab all the content from a file, spit it into a string, and erase
+ * and reset the file.
+ */
+static void
+print_and_truncate_file(FILE *fp)
+{
+	long len;
+	char *out;
+
+	/* flush, find length of file, seek to beginning, initialize buffer */
+	if (fflush(fp) || (len = ftell(fp)) < 0 ||
+	    fseek(fp, 0, SEEK_SET) < 0) {
+		mdb_warn("couldn't prepare DTrace output file: %d\n", errno);
+		return;
+	}
+
+	out = mdb_alloc(len + 1, UM_SLEEP);
+	out[len] = '\0';
+
+	/* read file into buffer, truncate file, and seek to beginning */
+	if ((fread(out, len + 1, sizeof (char), fp) == 0 && ferror(fp)) ||
+	    ftruncate(fileno(fp), 0) < 0 || fseek(fp, 0, SEEK_SET) < 0) {
+		mdb_warn("couldn't read DTrace output file: %d\n", errno);
+		mdb_free(out, len + 1);
+		return;
+	}
+
+	mdb_printf("%s", out);
+	mdb_free(out, len + 1);
+}
 
 /*ARGSUSED*/
 static int
@@ -879,6 +915,8 @@ dtrace_dcmdrec(const dtrace_probedata_t *data,
     const dtrace_recdesc_t *rec, void *arg)
 {
 	dtrace_dcmddata_t *dd = arg;
+
+	print_and_truncate_file(dd->dtdd_output);
 
 	if (rec == NULL) {
 		/*
@@ -1083,7 +1121,12 @@ dtrace(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		goto err;
 	}
 
-	if (dtrace_consume(dtp, NULL,
+	if ((dd.dtdd_output = tmpfile()) == NULL) {
+		mdb_warn("couldn't open DTrace output file: %d\n", errno);
+		goto err;
+	}
+
+	if (dtrace_consume(dtp, dd.dtdd_output,
 	    dtrace_dcmdprobe, dtrace_dcmdrec, &dd) == -1) {
 		mdb_warn("couldn't consume DTrace buffers: %s\n",
 		    dtrace_errmsg(dtp, dtrace_errno(dtp)));
@@ -1098,6 +1141,7 @@ dtrace(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	rval = DCMD_OK;
 err:
 	dtrace_close(dtp);
+	fclose(dd.dtdd_output);
 	return (rval);
 }
 
