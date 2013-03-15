@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, Joyent Inc. All rights reserved.
+ * Copyright (c) 2013, Joyent Inc. All rights reserved.
  */
 
 #include <libsysevent.h>
@@ -2075,6 +2075,32 @@ zonecfg_ifname_exists(sa_family_t af, char *ifname)
 }
 
 /*
+ * Turn an addr that looks like f:2:0:44:5:6C into 0f:02:00:44:05:6c
+ * We're expecting a dst of at least MAXMACADDRLEN size here.
+ */
+static void
+normalize_mac_addr(char *dst, const char *src, int len)
+{
+	char *p, *e, *sep = "";
+	long n;
+	char buf[MAXMACADDRLEN], tmp[4];
+
+	*dst = '\0';
+	(void) strlcpy(buf, src, sizeof (buf));
+	p = strtok(buf, ":");
+	while (p != NULL) {
+		n = strtol(p, &e, 16);
+		if (*e != NULL || n > 0xff)
+			return;
+		(void) snprintf(tmp, sizeof (tmp), "%s%02x", sep, n);
+		(void) strlcat(dst, tmp, len);
+
+		sep = ":";
+		p = strtok(NULL, ":");
+	}
+}
+
+/*
  * Determines whether there is a net resource with the physical interface, IP
  * address, and default router specified by 'tabptr' in the zone configuration
  * to which 'handle' refers.  'tabptr' must have an interface, an address, a
@@ -2099,6 +2125,7 @@ zonecfg_lookup_nwif(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 	char address[INET6_ADDRSTRLEN];
 	char physical[LIFNAMSIZ];
 	char mac[MAXMACADDRLEN];
+	char norm_mac[MAXMACADDRLEN];
 	char gnic[LIFNAMSIZ];
 	size_t addrspec;		/* nonzero if tabptr has IP addr */
 	size_t physspec;		/* nonzero if tabptr has interface */
@@ -2155,10 +2182,14 @@ zonecfg_lookup_nwif(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 		    physical, sizeof (physical)) != Z_OK ||
 		    strcmp(tabptr->zone_nwif_physical, physical) != 0))
 			continue;
-		if (iptype == ZS_EXCLUSIVE && macspec != 0 &&
-		    (fetchprop(cur, DTD_ATTR_MAC, mac, sizeof (mac)) != Z_OK ||
-		    strcmp(tabptr->zone_nwif_mac, mac) != 0))
-			continue;
+		if (iptype == ZS_EXCLUSIVE && macspec != 0) {
+			if (fetchprop(cur, DTD_ATTR_MAC, mac, sizeof (mac)) !=
+			    Z_OK)
+				continue;
+			normalize_mac_addr(norm_mac, mac, sizeof (norm_mac));
+			if (strcmp(tabptr->zone_nwif_mac, norm_mac) != 0)
+				continue;
+		}
 		if (iptype == ZS_EXCLUSIVE && gnicspec != 0 &&
 		    (fetchprop(cur, DTD_ATTR_GNIC, gnic,
 		    sizeof (gnic)) != Z_OK ||
