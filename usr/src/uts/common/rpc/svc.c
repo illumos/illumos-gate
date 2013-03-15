@@ -23,6 +23,9 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved.
@@ -987,20 +990,14 @@ svc_xprt_qget(SVCPOOL *pool)
 static void
 svc_xprt_qdelete(SVCPOOL *pool, SVCMASTERXPRT *xprt)
 {
-	__SVCXPRT_QNODE *q = pool->p_qend;
-	__SVCXPRT_QNODE *qtop = pool->p_qtop;
+	__SVCXPRT_QNODE *q;
 
-	/*
-	 * Delete all the references to xprt between the current
-	 * position of pool->p_qend and current pool->p_qtop.
-	 */
-	for (;;) {
+	mutex_enter(&pool->p_req_lock);
+	for (q = pool->p_qend; q != pool->p_qtop; q = q->q_next) {
 		if (q->q_xprt == xprt)
 			q->q_xprt = NULL;
-		if (q == qtop)
-			return;
-		q = q->q_next;
 	}
+	mutex_exit(&pool->p_req_lock);
 }
 
 /*
