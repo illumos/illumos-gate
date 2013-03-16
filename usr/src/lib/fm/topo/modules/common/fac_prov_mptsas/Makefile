@@ -18,22 +18,17 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright (c) 2013, Joyent, Inc. All rights reserved.
 #
 
-SUBDIRS =		\
-	disk		\
-	fac_prov_ipmi	\
-	fac_prov_mptsas	\
-	ipmi		\
-	ses		\
-	xfp
+MODULE = fac_prov_mptsas
+CLASS = common
 
-ses:	disk
+MODULESRCS = fac_prov_mptsas.c
 
-.PARALLEL: $(SUBDIRS)
+include ../../Makefile.plugin
 
-include ../../../Makefile.subdirs
+CPPFLAGS += -I$(SRC)/uts/common

@@ -371,8 +371,7 @@ static dev_info_t *mptsas_get_dip_from_dev(dev_t dev,
     mptsas_phymask_t *phymask);
 static mptsas_target_t *mptsas_addr_to_ptgt(mptsas_t *mpt, char *addr,
     mptsas_phymask_t phymask);
-static int mptsas_set_led_status(mptsas_t *mpt, mptsas_target_t *ptgt,
-    uint32_t slotstatus);
+static int mptsas_flush_led_status(mptsas_t *mpt, mptsas_target_t *ptgt);
 
 
 /*
@@ -6453,7 +6452,8 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 		}
 
 		mutex_enter(&mpt->m_mutex);
-		if (mptsas_set_led_status(mpt, ptgt, 0) != DDI_SUCCESS) {
+		ptgt->m_led_status = 0;
+		if (mptsas_flush_led_status(mpt, ptgt) != DDI_SUCCESS) {
 			NDBG14(("mptsas: clear LED for tgt %x failed",
 			    ptgt->m_slot_num));
 		}
@@ -11953,6 +11953,70 @@ mptsas_reg_access(mptsas_t *mpt, mptsas_reg_access_t *data, int mode)
 }
 
 static int
+led_control(mptsas_t *mpt, intptr_t data, int mode)
+{
+	int ret = 0;
+	mptsas_led_control_t lc;
+	mptsas_target_t *ptgt;
+
+	if (ddi_copyin((void *)data, &lc, sizeof (lc), mode) != 0) {
+		return (EFAULT);
+	}
+
+	if ((lc.Command != MPTSAS_LEDCTL_FLAG_SET &&
+	    lc.Command != MPTSAS_LEDCTL_FLAG_GET) ||
+	    lc.Led < MPTSAS_LEDCTL_LED_MIN ||
+	    lc.Led > MPTSAS_LEDCTL_LED_MAX ||
+	    (lc.Command == MPTSAS_LEDCTL_FLAG_SET && lc.LedStatus != 0 &&
+	    lc.LedStatus != 1)) {
+		return (EINVAL);
+	}
+
+	if ((lc.Command == MPTSAS_LEDCTL_FLAG_SET && (mode & FWRITE) == 0) ||
+	    (lc.Command == MPTSAS_LEDCTL_FLAG_GET && (mode & FREAD) == 0))
+		return (EACCES);
+
+	/* Locate the target we're interrogating... */
+	mutex_enter(&mpt->m_mutex);
+	ptgt = (mptsas_target_t *)mptsas_hash_traverse(&mpt->m_active->m_tgttbl,
+	    MPTSAS_HASH_FIRST);
+	while (ptgt != NULL) {
+		if (ptgt->m_enclosure == lc.Enclosure &&
+		    ptgt->m_slot_num == lc.Slot) {
+			break;
+		}
+		ptgt = (mptsas_target_t *)mptsas_hash_traverse(
+		    &mpt->m_active->m_tgttbl, MPTSAS_HASH_NEXT);
+	}
+	if (ptgt == NULL) {
+		/* We could not find a target for that enclosure/slot. */
+		mutex_exit(&mpt->m_mutex);
+		return (ENOENT);
+	}
+
+	if (lc.Command == MPTSAS_LEDCTL_FLAG_SET) {
+		/* Update our internal LED state. */
+		ptgt->m_led_status &= ~(1 << (lc.Led - 1));
+		ptgt->m_led_status |= lc.LedStatus << (lc.Led - 1);
+
+		/* Flush it to the controller. */
+		ret = mptsas_flush_led_status(mpt, ptgt);
+		mutex_exit(&mpt->m_mutex);
+		return (ret);
+	}
+
+	/* Return our internal LED state. */
+	lc.LedStatus = (ptgt->m_led_status >> (lc.Led - 1)) & 1;
+	mutex_exit(&mpt->m_mutex);
+
+	if (ddi_copyout(&lc, (void *)data, sizeof (lc), mode) != 0) {
+		return (EFAULT);
+	}
+
+	return (0);
+}
+
+static int
 get_disk_info(mptsas_t *mpt, intptr_t data, int mode)
 {
 	int i = 0;
@@ -11961,6 +12025,9 @@ get_disk_info(mptsas_t *mpt, intptr_t data, int mode)
 	mptsas_target_t *ptgt;
 	mptsas_disk_info_t *di;
 	STRUCT_DECL(mptsas_get_disk_info, gdi);
+
+	if ((mode & FREAD) == 0)
+		return (EACCES);
 
 	STRUCT_INIT(gdi, get_udatamodel());
 
@@ -12129,31 +12196,14 @@ mptsas_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *credp,
 			} else if (cmd == DEVCTL_DEVICE_OFFLINE) {
 				ptgt->m_tgt_unconfigured = 1;
 			}
-			slotstatus = 0;
-#ifdef MPTSAS_GET_LED
-			/*
-			 * The get led status can't get a valid/reasonable
-			 * state, so ignore the get led status, and write the
-			 * required value directly
-			 */
-			if (mptsas_get_led_status(mpt, ptgt, &slotstatus) !=
-			    DDI_SUCCESS) {
-				NDBG14(("mptsas_ioctl: get LED for tgt %s "
-				    "failed %x", addr, slotstatus));
-				slotstatus = 0;
-			}
-			NDBG14(("mptsas_ioctl: LED status %x for %s",
-			    slotstatus, addr));
-#endif
 			if (cmd == DEVCTL_DEVICE_OFFLINE) {
-				slotstatus |=
-				    MPI2_SEP_REQ_SLOTSTATUS_REQUEST_REMOVE;
+				ptgt->m_led_status |=
+				    (1 << (MPTSAS_LEDCTL_LED_OK2RM - 1));
 			} else {
-				slotstatus &=
-				    ~MPI2_SEP_REQ_SLOTSTATUS_REQUEST_REMOVE;
+				ptgt->m_led_status &=
+				    ~(1 << (MPTSAS_LEDCTL_LED_OK2RM - 1));
 			}
-			if (mptsas_set_led_status(mpt, ptgt, slotstatus) !=
-			    DDI_SUCCESS) {
+			if (mptsas_flush_led_status(mpt, ptgt) != DDI_SUCCESS) {
 				NDBG14(("mptsas_ioctl: set LED for tgt %s "
 				    "failed %x", addr, slotstatus));
 			}
@@ -12165,6 +12215,9 @@ mptsas_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *credp,
 	switch (cmd) {
 		case MPTIOCTL_GET_DISK_INFO:
 			status = get_disk_info(mpt, data, mode);
+			break;
+		case MPTIOCTL_LED_CONTROL:
+			status = led_control(mpt, data, mode);
 			break;
 		case MPTIOCTL_UPDATE_FLASH:
 			if (ddi_copyin((void *)data, &flashdata,
@@ -14626,8 +14679,9 @@ mptsas_create_virt_lun(dev_info_t *pdip, struct scsi_inquiry *inq, char *guid,
 				    (ptgt->m_tgt_unconfigured == 0)) {
 					rval = mdi_pi_online(*pip, 0);
 					mutex_enter(&mpt->m_mutex);
-					(void) mptsas_set_led_status(mpt, ptgt,
-					    0);
+					ptgt->m_led_status = 0;
+					(void) mptsas_flush_led_status(mpt,
+					    ptgt);
 					mutex_exit(&mpt->m_mutex);
 				} else {
 					rval = DDI_SUCCESS;
@@ -14884,8 +14938,8 @@ mptsas_create_virt_lun(dev_info_t *pdip, struct scsi_inquiry *inq, char *guid,
 		mdi_rtn = mdi_pi_online(*pip, 0);
 		if (mdi_rtn == MDI_SUCCESS) {
 			mutex_enter(&mpt->m_mutex);
-			if (mptsas_set_led_status(mpt, ptgt, 0) !=
-			    DDI_SUCCESS) {
+			ptgt->m_led_status = 0;
+			if (mptsas_flush_led_status(mpt, ptgt) != DDI_SUCCESS) {
 				NDBG14(("mptsas: clear LED for slot %x "
 				    "failed", ptgt->m_slot_num));
 			}
@@ -15246,8 +15300,8 @@ phys_create_done:
 		}
 		if (ndi_rtn == NDI_SUCCESS) {
 			mutex_enter(&mpt->m_mutex);
-			if (mptsas_set_led_status(mpt, ptgt, 0) !=
-			    DDI_SUCCESS) {
+			ptgt->m_led_status = 0;
+			if (mptsas_flush_led_status(mpt, ptgt) != DDI_SUCCESS) {
 				NDBG14(("mptsas: clear LED for tgt %x "
 				    "failed", ptgt->m_slot_num));
 			}
@@ -16148,23 +16202,26 @@ mptsas_addr_to_ptgt(mptsas_t *mpt, char *addr, mptsas_phymask_t phymask)
 	return (ptgt);
 }
 
-#ifdef MPTSAS_GET_LED
 static int
-mptsas_get_led_status(mptsas_t *mpt, mptsas_target_t *ptgt,
-    uint32_t *slotstatus)
+mptsas_flush_led_status(mptsas_t *mpt, mptsas_target_t *ptgt)
 {
-	return (mptsas_send_sep(mpt, ptgt, slotstatus,
-	    MPI2_SEP_REQ_ACTION_READ_STATUS));
-}
-#endif
-static int
-mptsas_set_led_status(mptsas_t *mpt, mptsas_target_t *ptgt, uint32_t slotstatus)
-{
+	uint32_t slotstatus = 0;
+
+	/* Build an MPI2 Slot Status based on our view of the world */
+	if (ptgt->m_led_status & (1 << (MPTSAS_LEDCTL_LED_IDENT - 1)))
+		slotstatus |= MPI2_SEP_REQ_SLOTSTATUS_IDENTIFY_REQUEST;
+	if (ptgt->m_led_status & (1 << (MPTSAS_LEDCTL_LED_FAIL - 1)))
+		slotstatus |= MPI2_SEP_REQ_SLOTSTATUS_PREDICTED_FAULT;
+	if (ptgt->m_led_status & (1 << (MPTSAS_LEDCTL_LED_OK2RM - 1)))
+		slotstatus |= MPI2_SEP_REQ_SLOTSTATUS_REQUEST_REMOVE;
+
+	/* Write it to the controller */
 	NDBG14(("mptsas_ioctl: set LED status %x for slot %x",
 	    slotstatus, ptgt->m_slot_num));
 	return (mptsas_send_sep(mpt, ptgt, &slotstatus,
 	    MPI2_SEP_REQ_ACTION_WRITE_STATUS));
 }
+
 /*
  *  send sep request, use enclosure/slot addressing
  */

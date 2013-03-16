@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright (c) 2012, Joyent, Inc. All rights reserved.
+# Copyright (c) 2013, Joyent, Inc. All rights reserved.
 #
 # This lists all the files that illumos-joyent delivers as part of a build.
 #
@@ -5333,6 +5333,7 @@ f usr/lib/fm/topo/maps/xfp-hc-topology.xml 0444 root bin
 d usr/lib/fm/topo/plugins 0755 root bin
 f usr/lib/fm/topo/plugins/disk.so 0555 root bin
 f usr/lib/fm/topo/plugins/fac_prov_ipmi.so 0555 root bin
+f usr/lib/fm/topo/plugins/fac_prov_mptsas.so 0555 root bin
 f usr/lib/fm/topo/plugins/ipmi.so 0555 root bin
 f usr/lib/fm/topo/plugins/ses.so 0555 root bin
 f usr/lib/fm/topo/plugins/xfp.so 0555 root bin
