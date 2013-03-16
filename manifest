@@ -10097,6 +10097,7 @@ f usr/platform/i86pc/lib/fm/topo/maps/fan-hc-topology.xml 0444 root sys
 f usr/platform/i86pc/lib/fm/topo/maps/i86pc-hc-topology.xml 0444 root sys
 f usr/platform/i86pc/lib/fm/topo/maps/i86pc-legacy-hc-topology.xml 0444 root sys
 f usr/platform/i86pc/lib/fm/topo/maps/psu-hc-topology.xml 0444 root sys
+f usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-1101-disk-hc-topology.xml 0444 root sys
 d usr/platform/i86pc/lib/fm/topo/plugins 0755 root sys
 f usr/platform/i86pc/lib/fm/topo/plugins/chip.so 0555 root sys
 f usr/platform/i86pc/lib/fm/topo/plugins/hostbridge.so 0555 root sys
