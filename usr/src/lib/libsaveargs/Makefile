@@ -19,17 +19,47 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+#
 
-# This is a 64-bit build, and as such needs 64-bit ELF support
-CMNOBJS64 =	Psymtab_machelf64.o
+include ../Makefile.lib
 
-include ../Makefile.com
-include ../../Makefile.lib.64
+$(BUILD64)SUBDIRS += $(MACH64)
 
-CPPFLAGS += -D_SYSCALL32
-LDLIBS += -lsaveargs
+all :=		TARGET= all
+clean :=	TARGET= clean
+clobber :=	TARGET= clobber
+delete :=	TARGET= delete
+install :=	TARGET= install
+lint :=		TARGET= lint
+_msg :=		TARGET= _msg
+package :=	TARGET= package
 
-install: all $(ROOTLIBS64) $(ROOTLINKS64)
+LIBRARY= 	libsaveargs.a
+
+# definitions for install_h target
+HDRS=		saveargs.h
+ROOTHDRDIR=	$(ROOT)/usr/include
+ROOTHDRS=	$(HDRS:%=$(ROOTHDRDIR)/%)
+CHECKHDRS=	$(HDRS:%.h=common/%.check)
+
+$(ROOTHDRS) :=  FILEMODE= 644
+
+# install rule for install_h target
+$(ROOTHDRDIR)/%: common/%
+	$(INS.file)
+
+.KEEP_STATE:
+
+all clean clobber delete install lint package: $(SUBDIRS)
+
+install_h: $(ROOTHDRS)
+
+check: $(CHECKHDRS)
+
+$(SUBDIRS):	FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
+
+FRC:

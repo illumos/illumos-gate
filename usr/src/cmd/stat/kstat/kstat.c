@@ -33,7 +33,6 @@
  *
  * Incompatibilities:
  *	- perl regular expressions replaced with extended REs bracketed by '/'
- *	- options checking is stricter
  *
  * Flags added:
  *	-C	similar to the -p option but value is separated by a colon
@@ -255,12 +254,6 @@ main(int argc, char **argv)
 				}
 			}
 
-			if (m < 4) {
-				free(uselector);
-				usage();
-				exit(2);
-			}
-
 			uselflg = B_TRUE;
 			list_insert_tail(&selector_list, uselector);
 		} else {
@@ -297,7 +290,7 @@ main(int argc, char **argv)
 	if (uselflg) {
 		if (nselflg) {
 			(void) fprintf(stderr, gettext(
-			    "module:instance:name:statistic and "
+			    "[module[:instance[:name[:statistic]]]] and "
 			    "-m -i -n -s are mutually exclusive"));
 			usage();
 			exit(2);
@@ -362,7 +355,7 @@ usage(void)
 	    "      [ -m module ] [ -i instance ] [ -n name ] [ -s statistic ]\n"
 	    "      [ interval [ count ] ]\n"
 	    "kstat [ -Cjlpq ] [ -T d|u ] [ -c class ]\n"
-	    "      [ module:instance:name:statistic ... ]\n"
+	    "      [ module[:instance[:name[:statistic]]] ... ]\n"
 	    "      [ interval [ count ] ]\n"));
 }
 

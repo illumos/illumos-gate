@@ -1,3 +1,4 @@
+
 #
 # This file and its contents are supplied under the terms of the
 # Common Development and Distribution License ("CDDL"), version 1.0.
@@ -18,18 +19,16 @@ include $(SRC)/Makefile.master.64
 
 .KEEP_STATE:
 
-OBJECTS = testmatch.o saveargs.o data.o
+OBJECTS = testmatch.o data.o
 PROG = testmatch
 
-CPPFLAGS += -I$(SRC)/common/saveargs
+LDLIBS64 += -lsaveargs
+
 ASFLAGS += -P
 AS_CPPFLAGS += -D_ASM
 
-%.o: $(SRC)/common/saveargs/%.c
-	$(COMPILE.c) -o $@ $<
-
 $(PROG): $(OBJECTS)
-	$(LINK.c) -o $@ $(OBJECTS) -lc
+	$(LINK.c) -o $@ $(OBJECTS) $(LDLIBS64)
 
 clean:
 	$(RM) $(OBJECTS) $(PROG)

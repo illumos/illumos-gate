@@ -132,7 +132,7 @@
 ./usr/src/lib/crypt_modules/sha256/test.c
 ./usr/src/lib/efcode/fcode_test
 ./usr/src/lib/libkvm/common/test.c
-./usr/src/common/saveargs/tests/
+./usr/src/lib/libsaveargs/tests/
 
 #
 # Ignore debugging code.
