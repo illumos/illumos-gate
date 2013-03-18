@@ -64,6 +64,17 @@ movq    %rdi,-0x8(%rbp)
 subq    $0x50,%rsp
 SET_SIZE(gcc_mov_basic, gcc_mov_basic_end)
 
+FUNC(gcc_mov_noorder)
+pushq	%rbp
+movq	%rsp, %rbp
+movq    %rcx,-0x20(%rbp)
+movq	%rbx,-0x28(%rbp)
+movq    %rdi,-0x8(%rbp)
+movq    %rdx,-0x18(%rbp)
+movq    %rsi,-0x10(%rbp)
+subq    $0x50,%rsp
+SET_SIZE(gcc_mov_noorder, gcc_mov_noorder_end)
+        
 FUNC(gcc_mov_big_struct_ret)
 pushq   %rbp
 movq    %rsp,%rbp
@@ -74,6 +85,17 @@ movq    %rdx,-0x10(%rbp)
 movq    %rsi,-0x8(%rbp)
 subq    $0x50,%rsp
 SET_SIZE(gcc_mov_big_struct_ret, gcc_mov_big_struct_ret_end)
+
+FUNC(gcc_mov_struct_noorder)
+pushq   %rbp
+movq    %rsp,%rbp
+movq    %rcx,-0x18(%rbp)
+movq    %r8,-0x20(%rbp)
+movq    %rsi,-0x8(%rbp)
+movq    %rdx,-0x10(%rbp)
+movq    %rbx,-0x28(%rbp)
+subq    $0x50,%rsp
+SET_SIZE(gcc_mov_struct_noorder, gcc_mov_struct_noorder_end)
 
 FUNC(gcc_mov_big_struct_ret_and_spill)
 pushq   %rbp
@@ -146,6 +168,16 @@ pushq   %rcx
 subq    $0x20,%rsp
 SET_SIZE(gcc_push_basic, gcc_push_basic_end)
 
+FUNC(gcc_push_noorder)
+pushq   %rbp
+movq    %rsp,%rbp
+pushq   %rsi
+pushq   %rdi
+pushq   %rcx
+pushq   %rdx
+subq    $0x20,%rsp
+SET_SIZE(gcc_push_noorder, gcc_push_noorder_end)
+
 FUNC(gcc_push_big_struct_ret)
 pushq   %rbp
 movq    %rsp,%rbp
@@ -156,6 +188,16 @@ pushq   %r8
 subq    $0x30,%rsp
 SET_SIZE(gcc_push_big_struct_ret, gcc_push_big_struct_ret_end)
 
+FUNC(gcc_push_struct_noorder)
+pushq   %rbp
+movq    %rsp,%rbp
+pushq   %rdx
+pushq   %rsi
+pushq   %r8
+pushq   %rcx
+subq    $0x30,%rsp
+SET_SIZE(gcc_push_struct_noorder, gcc_push_struct_noorder_end)
+        
 FUNC(gcc_push_big_struct_ret_and_spill)
 pushq   %rbp
 movq    %rsp,%rbp
@@ -394,3 +436,33 @@ movq    %rsi,-0x10(%rbp)
 movq    %rdi,-0x8(%rbp)
 subq    $0x50,%rsp
 SET_SIZE(small_struct_arg_by_value, small_struct_arg_by_value_end)
+
+FUNC(interleaved_argument_saves)
+pushq	%rbp
+movq	%rdi,%rax
+shlq	$0x21,%rax
+movq	%rsp,%rbp
+shrq	$0x29,%rax
+subq	$0x30,%rsp
+movq	%rdi,-0x8(%rbp)
+movq	%rbx,-0x28(%rbp)
+movzbl	%dil,%edi
+movq	%rcx,-0x20(%rbp)
+movq	%rdx,-0x18(%rbp)
+movq	%rsi,-0x10(%rbp)
+movq	0x0(,%rax,8),%rax
+SET_SIZE(interleaved_argument_saves, interleaved_argument_saves_end)
+
+FUNC(jmp_table)
+pushq	%rbp
+movq	%rsp,%rbp
+.word	0x9afe
+.word	0xffff
+.word	0xffff
+.word	0xa8ff
+.word	0xffff
+.word	0xffff
+.word	0x7cff
+.word	0xffff
+.word	0xffff
+SET_SIZE(jmp_table, jmp_table_end)        

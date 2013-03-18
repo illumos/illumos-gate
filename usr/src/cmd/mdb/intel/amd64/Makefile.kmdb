@@ -29,15 +29,6 @@ KMDBML += \
 
 KMDBSRCS += \
 	kmdb_makecontext.c \
-	mdb_amd64util.c \
-	saveargs.c
-
-%.o: $(SRC)/common/saveargs/%.c
-	$(COMPILE.c) $<
-	$(CTFCONVERT_O)
-
-%.ln: $(SRC)/common/saveargs/%.c
-	$(LINT.c) -c $<
+	mdb_amd64util.c
 
 SACPPFLAGS = -D__$(MACH64) -U__$(MACH)
-CPPFLAGS += -I$(SRC)/common/saveargs

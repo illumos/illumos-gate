@@ -62,6 +62,7 @@ include ../../Makefile.amd64
 include ../../../Makefile.kmdb
 
 STANDLIBS += $(ROOT)/usr/lib/amd64/libstanddisasm.so
+STANDLIBS += $(ROOT)/usr/lib/amd64/libstandsaveargs.so
 
 INCDIRS += $(SRC)/uts/i86pc $(SRC)/common/dis/i386
 

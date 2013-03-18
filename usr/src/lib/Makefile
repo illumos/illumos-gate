@@ -272,7 +272,8 @@ SUBDIRS += \
 i386_SUBDIRS=		\
 	libntfs		\
 	libparted	\
-	libfdisk
+	libfdisk	\
+	libsaveargs
 
 sparc_SUBDIRS= .WAIT	\
 	efcode		\
@@ -509,7 +510,8 @@ $(CLOSED_BUILD)HDRSUBDIRS += \
 
 i386_HDRSUBDIRS=	\
 	libparted	\
-	libfdisk
+	libfdisk	\
+	libsaveargs
 
 sparc_HDRSUBDIRS=	\
 	libds		\
@@ -623,7 +625,7 @@ libzonecfg:	libc libsocket libnsl libuuid libnvpair libsysevent libsec \
 		libbrand libpool libscf
 libzdoor:	libc libzonecfg libcontract
 libsmartsshd:	libc libcontract
-libproc:	../cmd/sgs/librtld_db ../cmd/sgs/libelf libctf
+libproc:	../cmd/sgs/librtld_db ../cmd/sgs/libelf libctf libsaveargs
 libproject:	libpool libproc libsecdb
 libtermcap:	libcurses
 libtsnet:	libnsl libtsol libsecdb
@@ -635,6 +637,7 @@ pam_modules:	libproject passwdutil smbsrv
 libscf:		libuutil libmd libgen libsmbios libnsl
 libinetsvc:	libscf
 librestart:	libuutil libscf
+libsaveargs:	libdisasm
 ../cmd/sgs/libdl:	../cmd/sgs/libconv
 ../cmd/sgs/libelf:	../cmd/sgs/libconv
 udapl/udapl_tavor:	udapl/libdat

@@ -1,0 +1,80 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#
+# We build each flavor in a separate make invocation to improve clarity(!) in
+# Makefile.com.  The subordinate makes have $(CURTYPE) set to indicate the
+# flavor they're supposed to build.  This causes the correct set of source
+# files and compiler and linker flags to be selected.
+#
+
+install: $(TYPES:%=install.%)
+
+all: $(TYPES:%=all.%)
+
+$(TYPES:%=all.%):
+	@CURTYPE=$(@:all.%=%) $(MAKE) $@.targ
+
+$(TYPES:%=install.%):
+	@CURTYPE=$(@:install.%=%) $(MAKE) $@.targ
+
+install.library.targ: all.library $(INSTALL_DEPS_library)
+install.standalone.targ: all.standalone $(INSTALL_DEPS_standalone)
+
+all.library.targ: $(LIBS)
+all.standalone.targ: $(STANDLIBRARY)
+
+lint: $(TYPES:%=lint.%)
+
+$(TYPES:%=lint.%):
+	@CURTYPE=$(@:lint.%=%) $(MAKE) lintcheck
+
+$(STANDLIBRARY): $(OBJS) $(LINKTEST_OBJ)
+	$(LD) $(BREDUCE) $(ZDEFS) $(LDFLAGS) -o $@.linktest $(OBJS) $(LINKTEST_OBJ)
+	rm $@.linktest
+	$(LD) $(LDFLAGS) -o $@ $(OBJS)
+
+clobber: $(TYPES:%=clobber.%)
+
+$(TYPES:%=clobber.%):
+	@CURTYPE=$(@:clobber.%=%) $(MAKE) clobber.targ
+
+clobber.targ: clean
+	-$(RM) $(CLOBBERTARGFILES)
+
+# include library targets
+include $(SRC)/lib/Makefile.targ
+
+$(PICS): pics
+$(OBJS): objs
+
+objs/%.o pics/%.o: $(COMDIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+# install rule for lint library target
+$(ROOTLINTDIR)/%: $(COMDIR)/%
+	$(INS.file)
+

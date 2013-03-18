@@ -7,3 +7,8 @@ functional:
 
    Actually test the full chunk of the (libproc) side of the code, running
    pstack on the range of test apps.
+
+dump:
+
+    Display each function in a given object we believe to have saved
+    arguments.

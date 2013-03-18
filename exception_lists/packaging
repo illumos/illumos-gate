@@ -973,3 +973,11 @@ usr/include/libbe_priv.h
 # delivered on SPARC and used by the build.
 #
 usr/include/sys/ipmi.h	sparc
+
+#
+# libsaveargs is private
+#
+usr/include/saveargs.h            	i386
+usr/lib/amd64/libsaveargs.so      	i386
+usr/lib/amd64/libstandsaveargs.so	i386
+usr/lib/amd64/llib-lsaveargs.ln   	i386

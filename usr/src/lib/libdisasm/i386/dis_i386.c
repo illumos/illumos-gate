@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libdisasm.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -244,4 +242,13 @@ dis_previnstr(dis_handle_t *dhp, uint64_t pc, int n)
 done:
 	dis_free(hist, sizeof (uint64_t) * n);
 	return (res);
+}
+
+int
+dis_instrlen(dis_handle_t *dhp, uint64_t pc)
+{
+	if (dis_disassemble(dhp, pc, NULL, 0) != 0)
+		return (-1);
+
+	return (dhp->dh_addr - pc);
 }

@@ -93,10 +93,7 @@
  *     function prolog already reserves.
  *
  * We loop through the first SAVEARGS_INSN_SEQ_LEN bytes of the function
- * looking for each argument saving instruction we would expect to see.  We
- * loop byte-by-byte, rather than doing anything smart about insn lengths,
- * only deviating from this when we know we have our insn, and can skip the
- * rest of it.
+ * looking for each argument saving instruction we would expect to see.
  *
  * If there are odd number of arguments to a function, additional space is
  * reserved on the stack to maintain 16-byte alignment.  For example,
@@ -108,6 +105,9 @@
 
 #include <sys/sysmacros.h>
 #include <sys/types.h>
+#include <libdisasm.h>
+#include <string.h>
+
 #include <saveargs.h>
 
 /*
@@ -162,8 +162,8 @@ static const uint32_t save_instr_sr[INSTR_ARRAY_SIZE-1] = {
 };
 
 static const uint8_t save_fp_pushes[] = {
-    0x55,	/* pushq %rbp */
-    0xcc	/* int $0x3 */
+	0x55,	/* pushq %rbp */
+	0xcc	/* int $0x3 */
 };
 #define	NUM_FP_PUSHES (sizeof (save_fp_pushes) / sizeof (save_fp_pushes[0]))
 
@@ -173,30 +173,80 @@ static const uint32_t save_fp_movs[] = {
 };
 #define	NUM_FP_MOVS (sizeof (save_fp_movs) / sizeof (save_fp_movs[0]))
 
-static int
-has_saved_fp(uint8_t *ins, int size)
-{
-	int i, j;
-	uint32_t n;
-	int found_push = 0;
+typedef struct {
+	uint8_t *data;
+	size_t size;
+} text_t;
 
-	for (i = 0; i < size; i++) {
-		if (found_push == 0) {
+static int
+do_read(void *data, uint64_t addr, void *buf, size_t len)
+{
+	text_t	*t = data;
+
+	if (addr >= t->size)
+		return (-1);
+
+	len = MIN(len, t->size - addr);
+
+	(void) memcpy(buf, (char *)t->data + addr, len);
+
+	return (len);
+}
+
+/* ARGSUSED */
+int
+do_lookup(void *data, uint64_t addr, char *buf, size_t buflen, uint64_t *start,
+    size_t *symlen)
+{
+	/* We don't actually need lookup info */
+	return (-1);
+}
+
+static int
+instr_size(dis_handle_t *dhp, uint8_t *ins, unsigned int i, size_t size)
+{
+	text_t	t;
+
+	t.data = ins;
+	t.size = size;
+
+	dis_set_data(dhp, &t);
+	return (dis_instrlen(dhp, i));
+}
+
+static boolean_t
+has_saved_fp(dis_handle_t *dhp, uint8_t *ins, int size)
+{
+	int 		i, j;
+	uint32_t	n;
+	boolean_t	found_push = B_FALSE;
+	ssize_t		sz = 0;
+
+	for (i = 0; i < size; i += sz) {
+		if ((sz = instr_size(dhp, ins, i, size)) < 1)
+			return (B_FALSE);
+
+		if (found_push == B_FALSE) {
+			if (sz != 1)
+				continue;
+
 			n = INSTR1(ins, i);
 			for (j = 0; j <= NUM_FP_PUSHES; j++)
 				if (save_fp_pushes[j] == n) {
-					found_push = 1;
+					found_push = B_TRUE;
 					break;
 				}
 		} else {
+			if (sz != 3)
+				continue;
 			n = INSTR3(ins, i);
 			for (j = 0; j <= NUM_FP_MOVS; j++)
 				if (save_fp_movs[j] == n)
-					return (1);
+					return (B_TRUE);
 		}
 	}
 
-	return (0);
+	return (B_FALSE);
 }
 
 int
@@ -204,65 +254,121 @@ saveargs_has_args(uint8_t *ins, size_t size, uint_t argc, int start_index)
 {
 	int		i, j;
 	uint32_t	n;
+	uint8_t		found = 0;
+	ssize_t		sz = 0;
+	dis_handle_t	*dhp = NULL;
+	int		ret = SAVEARGS_NO_ARGS;
 
 	argc = MIN((start_index + argc), INSTR_ARRAY_SIZE);
 
-	if (!has_saved_fp(ins, size))
+	if ((dhp = dis_handle_create(DIS_X86_SIZE64, NULL, do_lookup,
+	    do_read)) == NULL)
 		return (SAVEARGS_NO_ARGS);
 
-	/*
-	 * Compare against Sun Studio implementation
-	 */
-	for (i = 4, j = 0; i <= size - 4; i++) {
-		n = INSTR4(ins, i);
-
-		if (n == save_instr[j]) {
-			i += 3;
-			if (++j >= argc)
-				return (start_index ? SAVEARGS_STRUCT_ARGS :
-				    SAVEARGS_TRAD_ARGS);
-		}
+	if (!has_saved_fp(dhp, ins, size)) {
+		dis_handle_destroy(dhp);
+		return (SAVEARGS_NO_ARGS);
 	}
 
 	/*
-	 * Compare against GCC implementation
+	 * For each possible style of argument saving, walk the insn stream as
+	 * we've been given it, and set bit N in 'found' if we find the
+	 * instruction saving the Nth argument.
 	 */
-	for (i = 4, j = argc - 1; i <= size - 4; i++) {
+
+	/*
+	 * Compare against regular implementation
+	 */
+	found = 0;
+	for (i = 0; i < size; i += sz) {
+		sz = instr_size(dhp, ins, i, size);
+
+		if (sz < 1)
+			break;
+		else if (sz != 4)
+			continue;
+
 		n = INSTR4(ins, i);
 
-		if (n == save_instr[j]) {
-			i += 3;
-			if (--j < start_index)
-				return (SAVEARGS_TRAD_ARGS);
+		for (j = 0; j < argc; j++) {
+			if (n == save_instr[j]) {
+				found |= (1 << j);
+
+				if (found == ((1 << argc) - 1)) {
+					ret = start_index ?
+					    SAVEARGS_STRUCT_ARGS :
+					    SAVEARGS_TRAD_ARGS;
+					goto done;
+				}
+
+				break;
+			}
 		}
 	}
 
 	/*
 	 * Compare against GCC push-based implementation
 	 */
-	for (i = 4, j = start_index; i <= size - 2; i += 1) {
-		n = (i >= (8 - start_index)) ? INSTR2(ins, i) : INSTR1(ins, i);
+	found = 0;
+	for (i = 0; i < size; i += sz) {
+		if ((sz = instr_size(dhp, ins, i, size)) < 1)
+			break;
 
-		if (n == save_instr_push[j]) {
-			if (i >= (8 - start_index))
-				i += 1;
-			if (++j >= argc)
-				return (SAVEARGS_TRAD_ARGS);
-		}
-	}
+		for (j = start_index; j < argc; j++) {
+			if (sz == 2) /* Two byte */
+				n = INSTR2(ins, i);
+			else if (sz == 1)
+				n = INSTR1(ins, i);
+			else
+				continue;
 
-	/* Look for a GCC-style returned structure */
-	if (start_index != 0) {
-		for (i = 4, j = argc - 2; i <= size - 4; i++) {
-			n = INSTR4(ins, i);
+			if (n == save_instr_push[j]) {
+				found |= (1 << (j - start_index));
 
-			if (n == save_instr_sr[j]) {
-				i += 3;
-				if (--j >= (argc - 1))
-					return (SAVEARGS_TRAD_ARGS);
+				if (found ==
+				    ((1 << (argc - start_index)) - 1)) {
+					ret = SAVEARGS_TRAD_ARGS;
+					goto done;
+				}
+
+				break;
 			}
 		}
 	}
 
-	return (SAVEARGS_NO_ARGS);
+	/*
+	 * Look for a GCC-style returned structure.
+	 */
+	found = 0;
+	if (start_index != 0) {
+		for (i = 0; i < size; i += sz) {
+			sz = instr_size(dhp, ins, i, size);
+
+			if (sz < 1)
+				break;
+			else if (sz != 4)
+				continue;
+
+			n = INSTR4(ins, i);
+
+			/* argc is inclusive of start_index, allow for that */
+			for (j = 0; j < (argc - start_index); j++) {
+				if (n == save_instr_sr[j]) {
+					found |= (1 << j);
+
+					if (found ==
+					    ((1 << (argc - start_index)) - 1)) {
+						ret = SAVEARGS_TRAD_ARGS;
+						goto done;
+					}
+
+					break;
+				}
+			}
+		}
+	}
+
+done:
+	dis_handle_destroy(dhp);
+	return (ret);
 }
