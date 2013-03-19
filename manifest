@@ -4911,6 +4911,8 @@ s usr/lib/amd64/librtld_db.so.1=../../../lib/amd64/librtld_db.so.1
 s usr/lib/amd64/librtld_db.so=../../../lib/amd64/librtld_db.so.1
 f usr/lib/amd64/libsasl.so.1 0755 root bin
 s usr/lib/amd64/libsasl.so=libsasl.so.1
+f usr/lib/amd64/libsaveargs.so.1 0755 root bin
+s usr/lib/amd64/libsaveargs.so=libsaveargs.so.1
 s usr/lib/amd64/libscf.so.1=../../../lib/amd64/libscf.so.1
 s usr/lib/amd64/libscf.so=../../../lib/amd64/libscf.so.1
 f usr/lib/amd64/libsched.so.1 0755 root bin
