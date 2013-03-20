@@ -58,7 +58,8 @@ driver name=arcmsr class=scsi perms="* 0600 root sys" \
     alias=pci17d3,1381 \
     alias=pci17d3,1680 \
     alias=pci17d3,1681 \
-    alias=pci17d3,1880
+    alias=pci17d3,1880 \
+    alias=pci17d3,1882
 file path=kernel/drv/$(ARCH64)/arcmsr group=sys
 file path=kernel/drv/arcmsr group=sys
 file path=kernel/drv/arcmsr.conf group=sys

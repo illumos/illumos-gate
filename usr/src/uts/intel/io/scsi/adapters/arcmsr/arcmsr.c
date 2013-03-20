@@ -2532,6 +2532,7 @@ arcmsr_initialize(struct ACB *acb)
 	realccb_size = P2ROUNDUP(sizeof (struct CCB), 32);
 	switch (wval) {
 	case PCI_DEVICE_ID_ARECA_1880:
+	case PCI_DEVICE_ID_ARECA_1882:
 	{
 		uint32_t *iop_mu_regs_map0;
 
