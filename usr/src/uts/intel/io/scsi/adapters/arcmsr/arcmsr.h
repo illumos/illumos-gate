@@ -145,6 +145,7 @@ typedef	struct	ACB		*PACB;
 #define	PCI_DEVICE_ID_ARECA_1681 0x1681 /* Device ID	*/
 #define	PCI_DEVICE_ID_ARECA_1201 0x1201 /* Device ID	*/
 #define	PCI_DEVICE_ID_ARECA_1880 0x1880 /* Device ID	*/
+#define	PCI_DEVICE_ID_ARECA_1882 0x1882 /* Device ID	*/
 
 #define	dma_addr_hi32(addr)	(uint32_t)((addr>>16)>>16)
 #define	dma_addr_lo32(addr)	(uint32_t)(addr & 0xffffffff)
