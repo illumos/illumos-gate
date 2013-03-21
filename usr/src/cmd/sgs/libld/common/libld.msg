@@ -471,6 +471,9 @@
 @ MSG_SCN_NONALLOC	"%s: non-allocatable section '%s' directed to a \
 			 loadable segment: %s"
 
+@ MSG_SCN_MULTICOMDAT	"file %s: section [%u]%s: cannot be susceptible to multiple \
+			 COMDAT mechanisms: %s"
+
 # Symbol processing errors
 
 @ MSG_SYM_NOSECDEF	"symbol '%s' in file %s has no section definition"
@@ -748,6 +751,8 @@
 @ MSG_STR_CDIR_ELSE	"$else"
 @ MSG_STR_CDIR_ENDIF	"$endif"
 
+@ MSG_STR_GROUP		"GROUP"
+@ MSG_STR_SUNW_COMDAT	"SUNW_COMDAT"
 
 @ MSG_FMT_ARMEM		"%s(%s)"
 @ MSG_FMT_COLPATH	"%s:%s"

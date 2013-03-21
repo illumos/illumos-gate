@@ -1644,3 +1644,5 @@ Bugid   Risk Synopsis
 3439	discarded sections shouldn't end up on output lists
 3436	relocatable objects also need sloppy relocation
 3451	archive libraries with no symbols shouldn't require a string table
+3616	SHF_GROUP sections should not be discarded via other COMDAT mechanisms
+3709	need sloppy relocation for GNU .debug_macro
