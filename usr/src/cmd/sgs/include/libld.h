@@ -891,6 +891,7 @@ struct ifl_desc {			/* input file descriptor */
 					/*	symbol capabilities */
 #define	FLG_IF_DEFERRED	0x00080000	/* dependency is deferred */
 #define	FLG_IF_RTLDINF	0x00100000	/* dependency has DT_SUNW_RTLTINF set */
+#define	FLG_IF_GROUPS	0x00200000	/* input file has groups to process */
 
 /*
  * Symbol states that require the generation of a DT_POSFLAG_1 .dynamic entry.
@@ -934,7 +935,7 @@ struct is_desc {			/* input section descriptor */
 #define	FLG_IS_EXTERNAL	0x0040		/* isp from a user file */
 #define	FLG_IS_INSTRMRG	0x0080		/* Usable SHF_MERGE|SHF_STRINGS sec */
 #define	FLG_IS_GNSTRMRG	0x0100		/* Generated mergeable string section */
-#define	FLG_IS_GROUPS	0x0200		/* section has groups to process */
+
 #define	FLG_IS_PLACE	0x0400		/* section requires to be placed */
 #define	FLG_IS_COMDAT	0x0800		/* section is COMDAT */
 #define	FLG_IS_EHFRAME	0x1000		/* section is .eh_frame */
