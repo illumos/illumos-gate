@@ -31,7 +31,7 @@ KEEP_STATE_OFF = unset KEEP_STATE SUNPRO_DEPENDENCIES
 # staging area to postprocess and install the result to $(ROOT)
 STAGE = $(SRC)/cmd/perl/$(PERL_VERSION)/staging
 
-PERL=/usr/perl5/$(PERL_VERSION)/bin/perl
+PERL=$(ADJUNCT_PROTO)/usr/perl5/$(PERL_VERSION)/bin/perl
 
 PERL_MM_ARGS = INSTALLDIRS=perl CC='$(CC)' LD='$(CC)'
 
