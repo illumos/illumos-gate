@@ -478,7 +478,30 @@ dt_print_enum(ctf_id_t base, ulong_t off, dt_printarg_t *pap)
 	FILE *fp = pap->pa_file;
 	ctf_file_t *ctfp = pap->pa_ctfp;
 	const char *ename;
+	ssize_t size;
+	caddr_t addr = pap->pa_addr + off / NBBY;
 	int value = 0;
+
+	/*
+	 * The C standard says that an enum will be at most the sizeof (int).
+	 * But if all the values are less than that, the compiler can use a
+	 * smaller size. Thanks standards.
+	 */
+	size = ctf_type_size(ctfp, base);
+	switch (size) {
+	case sizeof (uint8_t):
+		value = *(uint8_t *)addr;
+		break;
+	case sizeof (uint16_t):
+		value = *(uint16_t *)addr;
+		break;
+	case sizeof (int32_t):
+		value = *(int32_t *)addr;
+		break;
+	default:
+		(void) fprintf(fp, "<invalid enum size %u>", (uint_t)size);
+		return;
+	}
 
 	if ((ename = ctf_enum_name(ctfp, base, value)) != NULL)
 		(void) fprintf(fp, "%s", ename);
