@@ -576,6 +576,7 @@ mac_unregister(mac_handle_t mh)
 
 	bzero(mip->mi_addr, MAXMACADDRLEN);
 	bzero(mip->mi_dstaddr, MAXMACADDRLEN);
+	mip->mi_dstaddr_set = B_FALSE;
 
 	/* and the flows */
 	mac_flow_tab_destroy(mip->mi_flow_tab);
