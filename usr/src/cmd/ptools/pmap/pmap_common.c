@@ -23,6 +23,9 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ */
 
 #include <fcntl.h>
 #include <libproc.h>
@@ -68,7 +71,7 @@ make_name(struct ps_prochandle *Pr, int lflag, uintptr_t addr,
 	char			path[PATH_MAX];
 	int			len;
 
-	if (lflag) {
+	if (lflag || Pstate(Pr) == PS_DEAD) {
 		if (Pobjname(Pr, addr, buf, bufsz) != NULL)
 			return (buf);
 	} else {
