@@ -1868,6 +1868,7 @@ f usr/bin/amd64/cputrack 0555 root bin
 f usr/bin/amd64/crle 0555 root bin
 h usr/bin/amd64/decrypt=usr/bin/amd64/encrypt
 h usr/bin/amd64/digest=usr/bin/amd64/mac
+f usr/bin/amd64/elfdump 0555 root bin
 f usr/bin/amd64/elfedit 0555 root bin
 f usr/bin/amd64/elfwrap 0555 root bin
 f usr/bin/amd64/encrypt 0555 root bin
@@ -2013,7 +2014,7 @@ f usr/bin/ed 0555 root bin
 f usr/bin/edit 0555 root bin
 f usr/bin/egrep 0555 root bin
 f usr/bin/eject 0555 root bin
-f usr/bin/elfdump 0555 root bin
+h usr/bin/elfdump=usr/lib/isaexec
 f usr/bin/elfedit 0555 root bin
 f usr/bin/elfsign 0555 root bin
 f usr/bin/elfwrap 0555 root bin
@@ -2067,6 +2068,7 @@ f usr/bin/i86/amt 0555 root bin
 f usr/bin/i86/cputrack 0555 root bin
 h usr/bin/i86/decrypt=usr/bin/i86/encrypt
 h usr/bin/i86/digest=usr/bin/i86/mac
+f usr/bin/i86/elfdump 0555 root bin
 f usr/bin/i86/encrypt 0555 root bin
 f usr/bin/i86/gcore 0555 root bin
 f usr/bin/i86/ksh93 0555 root bin

@@ -60,6 +60,8 @@ delete:
 
 package \
 install:        all $(VAR_SGSBINPROG) $(VAR_SGSCCSLINK)
+		-$(RM) $(ROOTPROG)
+		-$(LN) $(ISAEXEC) $(ROOTPROG)
 
 .PARALLEL:	$(LINTOUT32) $(LINTOUT64)
 

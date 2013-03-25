@@ -39,6 +39,8 @@ LINTFLAGS64 +=	$(VAR_LINTFLAGS64)
 VAR_SGSBINPROG= $(VAR_SGSBINPROG64)
 VAR_SGSCCSLINK= $(VAR_SGSCCSLINK64)
 
+install:	all $(ROOTPROG64)
+
 include		../Makefile.targ
 include		../../Makefile.sub.64
 
