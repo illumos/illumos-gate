@@ -1063,10 +1063,10 @@ grub_strncat (char *s1, const char *s2, int n)
 
   while (i < n && (s1[i++] = *(s2++)) != 0);
 
-  s1[n - 1] = 0;
-
-  if (i >= n)
+  if (i >= n) {
+    s1[n - 1] = 0;
     return 0;
+  }
 
   s1[i] = 0;
 

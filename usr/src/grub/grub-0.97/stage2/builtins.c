@@ -4457,15 +4457,15 @@ setup_func (char *arg, int flags)
 	{
 	  char tmp[16];
 	  grub_sprintf (tmp, ",%d", (partition >> 16) & 0xFF);
-	  grub_strncat (device, tmp, 256);
+	  grub_strncat (device, tmp, sizeof (device));
 	}
       if ((partition & 0x00FF00) != 0x00FF00)
 	{
 	  char tmp[16];
 	  grub_sprintf (tmp, ",%c", 'a' + ((partition >> 8) & 0xFF));
-	  grub_strncat (device, tmp, 256);
+	  grub_strncat (device, tmp, sizeof (device));
 	}
-      grub_strncat (device, ")", 256);
+      grub_strncat (device, ")", sizeof (device));
     }
   
   int embed_stage1_5 (char *stage1_5, int drive, int partition)
