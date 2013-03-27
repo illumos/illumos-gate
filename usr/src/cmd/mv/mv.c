@@ -20,6 +20,10 @@
  */
 
 /*
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ */
+
+/*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -1348,7 +1352,8 @@ chg_time(char *to, struct stat ss)
 	times[0] = ss.st_atim;
 	times[1] = ss.st_mtim;
 
-	rc = utimensat(AT_FDCWD, to, times, 0);
+	rc = utimensat(AT_FDCWD, to, times,
+	    ISLNK(s1) ? AT_SYMLINK_NOFOLLOW : 0);
 #ifdef XPG4
 	if ((pflg || mve) && rc != 0) {
 		(void) fprintf(stderr,
@@ -1383,6 +1388,11 @@ static int
 chg_mode(char *target, uid_t uid, gid_t gid, mode_t mode)
 {
 	int clearflg = 0; /* controls message printed upon chown() error */
+	struct stat st;
+
+	/* Don't change mode if target is symlink */
+	if (lstat(target, &st) == 0 && ISLNK(st))
+		return (0);
 
 	if (chown(target, uid, gid) != 0) {
 #ifdef XPG4
