@@ -340,7 +340,9 @@ restart:
       console = get_variable("os_console");
       if (console != NULL) {
 	printf("\n\n      Selected OS console device is '%s'."
-	    "\n      Use 'variable' command to change OS console device.",
+	    "\n      To change OS console device, enter command-line mode"
+	    "\n      and use 'variable os_console <dev>', then Esc to return."
+	    "\n      Valid <dev> values are: ttya, ttyb, ttyc, ttyd, vga",
 	    console);
       }
 
