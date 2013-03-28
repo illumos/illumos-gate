@@ -269,9 +269,6 @@ optdb_obj_t tcp_opt_obj = {
 	tcp_valid_levels_arr	/* TCP valid level array */
 };
 
-/* Maximum TCP initial cwin (start/restart). */
-#define	TCP_MAX_INIT_CWND	16
-
 static int tcp_max_init_cwnd = TCP_MAX_INIT_CWND;
 
 /*

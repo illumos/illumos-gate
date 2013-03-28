@@ -379,11 +379,11 @@ mod_prop_info_t tcp_propinfo_tbl[] = {
 
 	{ "_slow_start_after_idle", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
-	    {1, 16384, 4}, {4} },
+	    {0, 16384, 0}, {0} },
 
 	{ "_slow_start_initial", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
-	    {1, 4, 4}, {4} },
+	    {0, 16, 0}, {0} },
 
 	{ "sack", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
