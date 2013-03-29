@@ -39,13 +39,13 @@
 all: $(NDMP_DIR)/ndmp.h $(NDMP_DIR)/ndmp_xdr.c $(NDMP_DIR)/ndmp_xdr.h
 
 $(NDMP_DIR)/ndmp.h: $(NDMP_DIR)/ndmp.x
-	rpcgen -C -h -o $(NDMP_DIR)/ndmp.h $(NDMP_DIR)/ndmp.x
+	$(RPCGEN) -C -h -o $(NDMP_DIR)/ndmp.h $(NDMP_DIR)/ndmp.x
 
 $(NDMP_DIR)/ndmp_xdr.c: $(NDMP_DIR)/ndmp.x
-	rpcgen -c -o $(NDMP_DIR)/ndmp_xdr.c $(NDMP_DIR)/ndmp.x
+	$(RPCGEN) -c -o $(NDMP_DIR)/ndmp_xdr.c $(NDMP_DIR)/ndmp.x
 
 $(NDMP_DIR)/ndmp_xdr.h: $(NDMP_DIR)/ndmp.x
-	rpcgen -C -h -o $(NDMP_DIR)/ndmp_xdr.h $(NDMP_DIR)/ndmp.x
+	$(RPCGEN) -C -h -o $(NDMP_DIR)/ndmp_xdr.h $(NDMP_DIR)/ndmp.x
 
 rpcclean:
 	rm -f $(NDMP_DIR)/ndmp.h $(NDMP_DIR)/ndmp_xdr.h $(NDMP_DIR)/ndmp_xdr.c

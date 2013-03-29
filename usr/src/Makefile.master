@@ -186,6 +186,8 @@ ELFSIGN=	/usr/bin/elfsign
 DTRACE=		/usr/sbin/dtrace -xnolibs
 UNIQ=		/usr/bin/uniq
 TAR=		/usr/bin/tar
+ASTBINDIR=	/usr/ast/bin
+MSGCC=		$(ASTBINDIR)/msgcc
 
 FILEMODE=	644
 DIRMODE=	755
