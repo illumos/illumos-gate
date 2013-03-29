@@ -26,7 +26,9 @@
 /* Copyright (c) 1988 AT&T */
 /* All Rights Reserved */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ */
 
 #include "dextern.h"
 #include "sgs.h"
@@ -60,7 +62,8 @@ char *infile;				/* input file name 		*/
 static int numbval;			/* value of an input number 	*/
 static int toksize = NAMESIZE;
 static wchar_t *tokname;	/* input token name		*/
-char *parser = PARSER;		/* location of common parser 	*/
+char *parser = NULL;		/* location of common parser 	*/
+char pbuf[PBUFSIZE];
 
 static void finact(void);
 static wchar_t *cstash(wchar_t *);

@@ -1508,7 +1508,9 @@ DEV_CM="\"@(#)SunOS Internal Development: $LOGNAME $BUILD_DATE [$BASEWSDIR]\""
 export o_FLAG X_FLAG POUND_SIGN RELEASE_DATE DEV_CM
 
 maketype="distributed"
-MAKE=dmake
+if [ -z "$MAKE" ]; then
+	MAKE=dmake
+fi
 # get the dmake version string alone
 DMAKE_VERSION=$( $MAKE -v )
 DMAKE_VERSION=${DMAKE_VERSION#*: }

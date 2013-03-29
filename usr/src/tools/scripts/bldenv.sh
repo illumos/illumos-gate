@@ -345,6 +345,10 @@ if [[ "${SUNWSPRO}" != "" ]]; then
 	export PATH="${SUNWSPRO}/bin:$PATH" 
 fi 
 
+if [[ -n "${MAKE}" ]]; then
+	export PATH="$(dirname ${MAKE}):$PATH"
+fi
+
 if [[ -z "$CLOSED_IS_PRESENT" ]]; then
 	if [[ -d $SRC/../closed ]]; then
 		export CLOSED_IS_PRESENT="yes"

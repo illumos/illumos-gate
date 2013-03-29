@@ -26,10 +26,10 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	All Rights Reserved	*/
 
+/* Copyright (c) 2013, joyent, Inc.  All rights reserved. */
+
 #ifndef	_ONCE_H
 #define	_ONCE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ldefs.h"
 
@@ -73,9 +73,11 @@ int	peek = '\n';	/* next input character */
 CHR	*pushptr = pushc;
 CHR	*slptr = slist;
 
-#define	CNAME "/usr/share/lib/ccs/ncform"
-#define	RATNAME "/usr/share/lib/ccs/nrform"
-#define	EUCNAME "/usr/share/lib/ccs/nceucform"
+#define	NPREFIX	"/usr"
+#define	NBASE "/share/lib/ccs/"
+#define	CNAME "ncform"
+#define	RATNAME "nrform"
+#define	EUCNAME "nceucform"
 
 int ccount = 1;
 int casecount = 1;

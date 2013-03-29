@@ -28,13 +28,15 @@
 
 /* Copyright 1976, Bell Telephone Laboratories, Inc. */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/* Copyright (c) 2013, joyent, Inc.  All rights reserved. */
 
 #include <string.h>
 #include "once.h"
 #include "sgs.h"
 #include <locale.h>
 #include <limits.h>
+#include <unistd.h>
+#include <libgen.h>
 
 static wchar_t  L_INITIAL[] = {'I', 'N', 'I', 'T', 'I', 'A', 'L', 0};
 static void get1core(void);
@@ -46,12 +48,32 @@ static void get3core(void);
 static void free3core(void);
 #endif
 
+static int
+lex_construct_path(char *buf, size_t size, const char *file, int type)
+{
+	int ret;
+	char origin[PATH_MAX];
+
+	if (type != 0) {
+		ret = readlink("/proc/self/path/a.out", origin, PATH_MAX - 1);
+		if (ret < 0)
+			error(
+			    "lex: failed to read origin from /proc\n");
+		origin[ret] = '\0';
+		return (snprintf(buf, size, "%s/../%s/%s", dirname(origin),
+		    NBASE, file));
+	}
+
+	return (snprintf(buf, size, "%s/%s/%s", NPREFIX, NBASE, file));
+}
+
 int
 main(int argc, char **argv)
 {
 	int i;
 	int c;
-	char *path = NULL;
+	char *path = NULL, *bpath = NULL;
+	char pathbuf[PATH_MAX];
 	Boolean eoption = 0, woption = 0;
 
 	sargv = argv;
@@ -218,15 +240,31 @@ main(int argc, char **argv)
 	free3core();
 #endif
 
+	/*
+	 * Try to find the file relative to $ORIGIN. Note that we don't touch
+	 * antyhing related to -Y. In fact, unfortunately it's always been
+	 * ignored it seems.
+	 */
 	if (handleeuc) {
 		if (ratfor)
 			error("Ratfor is not supported by -w or -e option.");
-		path = EUCNAME;
+		bpath = EUCNAME;
 	}
 	else
-		path = ratfor ? RATNAME : CNAME;
+		bpath = ratfor ? RATNAME : CNAME;
 
-	fother = fopen(path, "r");
+	if (path == NULL) {
+		path = pathbuf;
+		(void) lex_construct_path(pathbuf, sizeof (pathbuf), bpath, 1);
+		fother = fopen(path, "r");
+		if (fother == NULL) {
+			(void) lex_construct_path(pathbuf, sizeof (pathbuf),
+			    bpath, 0);
+			fother = fopen(path, "r");
+		}
+	} else {
+		fother = fopen(path, "r");
+	}
 	if (fother == NULL)
 		error("Lex driver missing, file %s", path);
 	while ((i = getc(fother)) != EOF)
