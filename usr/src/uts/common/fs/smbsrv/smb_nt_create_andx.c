@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -230,10 +231,10 @@ smb_sdrc_t
 smb_com_nt_create_andx(struct smb_request *sr)
 {
 	struct open_param	*op = &sr->arg.open;
+	smb_attr_t		*ap = &op->fqi.fq_fattr;
+	smb_ofile_t		*of;
+	int			rc;
 	unsigned char		DirFlag;
-	smb_attr_t		attr;
-	smb_node_t		*node;
-	int rc;
 
 	if ((op->create_options & FILE_DELETE_ON_CLOSE) &&
 	    !(op->desired_access & DELETE)) {
@@ -278,20 +279,20 @@ smb_com_nt_create_andx(struct smb_request *sr)
 	if (smb_common_open(sr) != NT_STATUS_SUCCESS)
 		return (SDRC_ERROR);
 
+	/*
+	 * NB: after the above smb_common_open() success,
+	 * we have a handle allocated (sr->fid_ofile).
+	 * If we don't return success, we must close it.
+	 */
+	of = sr->fid_ofile;
+
 	switch (sr->tid_tree->t_res_type & STYPE_MASK) {
 	case STYPE_DISKTREE:
 	case STYPE_PRINTQ:
 		if (op->create_options & FILE_DELETE_ON_CLOSE)
-			smb_ofile_set_delete_on_close(sr->fid_ofile);
+			smb_ofile_set_delete_on_close(of);
 
-		node = sr->fid_ofile->f_node;
-		DirFlag = smb_node_is_dir(node) ? 1 : 0;
-		if (smb_node_getattr(sr, node, &attr) != 0) {
-			smbsr_error(sr, NT_STATUS_INTERNAL_ERROR,
-			    ERRDOS, ERROR_INTERNAL_ERROR);
-			return (SDRC_ERROR);
-		}
-
+		DirFlag = smb_node_is_dir(of->f_node) ? 1 : 0;
 		rc = smbsr_encode_result(sr, 34, 0, "bb.wbwlTTTTlqqwwbw",
 		    34,
 		    sr->andx_com,
@@ -299,13 +300,13 @@ smb_com_nt_create_andx(struct smb_request *sr)
 		    op->op_oplock_level,
 		    sr->smb_fid,
 		    op->action_taken,
-		    &attr.sa_crtime,
-		    &attr.sa_vattr.va_atime,
-		    &attr.sa_vattr.va_mtime,
-		    &attr.sa_vattr.va_ctime,
+		    &ap->sa_crtime,
+		    &ap->sa_vattr.va_atime,
+		    &ap->sa_vattr.va_mtime,
+		    &ap->sa_vattr.va_ctime,
 		    op->dattr & FILE_ATTRIBUTE_MASK,
-		    attr.sa_allocsz,
-		    attr.sa_vattr.va_size,
+		    ap->sa_allocsz,
+		    ap->sa_vattr.va_size,
 		    op->ftype,
 		    op->devstate,
 		    DirFlag,
@@ -336,8 +337,12 @@ smb_com_nt_create_andx(struct smb_request *sr)
 	default:
 		smbsr_error(sr, NT_STATUS_INVALID_DEVICE_REQUEST,
 		    ERRDOS, ERROR_INVALID_FUNCTION);
-		return (SDRC_ERROR);
+		goto errout;
 	}
+	if (rc == 0)
+		return (SDRC_SUCCESS);
 
-	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
+errout:
+	smb_ofile_close(of, 0);
+	return (SDRC_ERROR);
 }

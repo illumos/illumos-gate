@@ -21,7 +21,8 @@
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+#
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
 
 MODULE = smbsrv.so
@@ -35,6 +36,8 @@ include ../../Makefile.ia32
 ROOTKMOD = $(ROOT)/usr/kernel/kmdb
 
 include ../../../Makefile.module
+
+C99MODE=	$(C99_ENABLE)
 
 $(ROOTKMOD):
 	$(INS.dir)

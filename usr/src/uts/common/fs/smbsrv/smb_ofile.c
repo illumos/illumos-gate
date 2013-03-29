@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -165,7 +165,6 @@
 
 static boolean_t smb_ofile_is_open_locked(smb_ofile_t *);
 static smb_ofile_t *smb_ofile_close_and_next(smb_ofile_t *);
-static void smb_ofile_set_close_attrs(smb_ofile_t *, uint32_t);
 static int smb_ofile_netinfo_encode(smb_ofile_t *, uint8_t *, size_t,
     uint32_t *);
 static int smb_ofile_netinfo_init(smb_ofile_t *, smb_netfileinfo_t *);
@@ -187,6 +186,7 @@ smb_ofile_open(
 	smb_ofile_t	*of;
 	uint16_t	fid;
 	smb_attr_t	attr;
+	int		rc;
 
 	if (smb_idpool_alloc(&tree->t_fid_pool, &fid)) {
 		err->status = NT_STATUS_TOO_MANY_OPENED_FILES;
@@ -214,7 +214,7 @@ smb_ofile_open(
 	of->f_user = tree->t_user;
 	of->f_tree = tree;
 	of->f_node = node;
-	of->f_explicit_times = 0;
+
 	mutex_init(&of->f_mutex, NULL, MUTEX_DEFAULT, NULL);
 	of->f_state = SMB_OFILE_STATE_OPEN;
 
@@ -229,8 +229,9 @@ smb_ofile_open(
 			of->f_flags |= SMB_OFLAGS_EXECONLY;
 
 		bzero(&attr, sizeof (smb_attr_t));
-		attr.sa_mask |= SMB_AT_UID;
-		if (smb_fsop_getattr(NULL, kcred, node, &attr) != 0) {
+		attr.sa_mask = SMB_AT_UID | SMB_AT_DOSATTR;
+		rc = smb_node_getattr(NULL, node, of->f_cr, NULL, &attr);
+		if (rc != 0) {
 			of->f_magic = 0;
 			mutex_destroy(&of->f_mutex);
 			crfree(of->f_cr);
@@ -269,8 +270,14 @@ smb_ofile_open(
 		if (tree->t_flags & SMB_TREE_READONLY)
 			of->f_flags |= SMB_OFLAGS_READONLY;
 
-		if (op->created_readonly)
-			node->readonly_creator = of;
+		/*
+		 * Note that if we created_readonly, that
+		 * will _not_ yet show in attr.sa_dosattr
+		 * so creating a readonly file gives the
+		 * caller a writable handle as it should.
+		 */
+		if (attr.sa_dosattr & FILE_ATTRIBUTE_READONLY)
+			of->f_flags |= SMB_OFLAGS_READONLY;
 
 		smb_node_inc_open_ofiles(node);
 		smb_node_add_ofile(node, of);
@@ -289,11 +296,12 @@ smb_ofile_open(
  * smb_ofile_close
  */
 void
-smb_ofile_close(smb_ofile_t *of, uint32_t last_wtime)
+smb_ofile_close(smb_ofile_t *of, int32_t mtime_sec)
 {
-	ASSERT(of);
-	ASSERT(of->f_magic == SMB_OFILE_MAGIC);
+	timestruc_t now;
 	uint32_t flags = 0;
+
+	SMB_OFILE_VALID(of);
 
 	mutex_enter(&of->f_mutex);
 	ASSERT(of->f_refcnt);
@@ -307,7 +315,32 @@ smb_ofile_close(smb_ofile_t *of, uint32_t last_wtime)
 			smb_opipe_close(of);
 			smb_server_dec_pipes(of->f_server);
 		} else {
-			smb_ofile_set_close_attrs(of, last_wtime);
+			smb_attr_t *pa = &of->f_pending_attr;
+
+			/*
+			 * In here we make changes to of->f_pending_attr
+			 * while not holding of->f_mutex.  This is OK
+			 * because we've changed f_state to CLOSING,
+			 * so no more threads will take this path.
+			 */
+			if (mtime_sec != 0) {
+				pa->sa_vattr.va_mtime.tv_sec = mtime_sec;
+				pa->sa_mask |= SMB_AT_MTIME;
+			}
+
+			/*
+			 * If we have ever modified data via this handle
+			 * (write or truncate) and if the mtime was not
+			 * set via this handle, update the mtime again
+			 * during the close.  Windows expects this.
+			 * [ MS-FSA 2.1.5.4 "Update Timestamps" ]
+			 */
+			if (of->f_written &&
+			    (pa->sa_mask & SMB_AT_MTIME) == 0) {
+				pa->sa_mask |= SMB_AT_MTIME;
+				gethrestime(&now);
+				pa->sa_vattr.va_mtime = now;
+			}
 
 			if (of->f_flags & SMB_OFLAGS_SET_DELETE_ON_CLOSE) {
 				if (smb_tree_has_feature(of->f_tree,
@@ -320,9 +353,39 @@ smb_ofile_close(smb_ofile_t *of, uint32_t last_wtime)
 			smb_fsop_unshrlock(of->f_cr, of->f_node, of->f_uniqid);
 			smb_node_destroy_lock_by_ofile(of->f_node, of);
 
-			if (smb_node_is_file(of->f_node))
+			if (smb_node_is_file(of->f_node)) {
 				(void) smb_fsop_close(of->f_node, of->f_mode,
 				    of->f_cr);
+				smb_oplock_release(of->f_node, of);
+			}
+			if (smb_node_dec_open_ofiles(of->f_node) == 0) {
+				/*
+				 * Last close. The f_pending_attr has
+				 * only times (atime,ctime,mtime) so
+				 * we can borrow it to commit the
+				 * n_pending_dosattr from the node.
+				 */
+				pa->sa_dosattr =
+				    of->f_node->n_pending_dosattr;
+				if (pa->sa_dosattr != 0)
+					pa->sa_mask |= SMB_AT_DOSATTR;
+				/* Let's leave this zero when not in use. */
+				of->f_node->n_allocsz = 0;
+			}
+			if (pa->sa_mask != 0) {
+				/*
+				 * Commit any pending attributes from
+				 * the ofile we're closing.  Note that
+				 * we pass NULL as the ofile to setattr
+				 * so it will write to the file system
+				 * and not keep anything on the ofile.
+				 * This clears n_pending_dosattr if
+				 * there are no opens, otherwise the
+				 * dosattr will be pending again.
+				 */
+				(void) smb_node_setattr(NULL, of->f_node,
+				    of->f_cr, NULL, pa);
+			}
 
 			/*
 			 * Cancel any notify change requests that
@@ -330,6 +393,7 @@ smb_ofile_close(smb_ofile_t *of, uint32_t last_wtime)
 			 */
 			if (of->f_node->n_fcn.fcn_count)
 				smb_notify_file_closed(of);
+
 			smb_server_dec_files(of->f_server);
 		}
 		atomic_dec_32(&of->f_tree->t_open_files);
@@ -338,10 +402,6 @@ smb_ofile_close(smb_ofile_t *of, uint32_t last_wtime)
 		ASSERT(of->f_refcnt);
 		ASSERT(of->f_state == SMB_OFILE_STATE_CLOSING);
 		of->f_state = SMB_OFILE_STATE_CLOSED;
-		if (of->f_node != NULL) {
-			smb_node_dec_open_ofiles(of->f_node);
-			smb_oplock_release(of->f_node, of);
-		}
 		break;
 	}
 	case SMB_OFILE_STATE_CLOSED:
@@ -751,70 +811,6 @@ smb_ofile_is_open(smb_ofile_t *of)
 	return (rc);
 }
 
-/*
- * smb_ofile_pending_write_time
- *
- * Flag write times as pending - to be set on close, setattr
- * or delayed write timer.
- */
-void
-smb_ofile_set_write_time_pending(smb_ofile_t *of)
-{
-	SMB_OFILE_VALID(of);
-	mutex_enter(&of->f_mutex);
-	of->f_flags |= SMB_OFLAGS_TIMESTAMPS_PENDING;
-	mutex_exit(&of->f_mutex);
-}
-
-/*
- * smb_ofile_write_time_pending
- *
- * Get and reset the write times pending flag.
- */
-boolean_t
-smb_ofile_write_time_pending(smb_ofile_t *of)
-{
-	boolean_t rc = B_FALSE;
-
-	SMB_OFILE_VALID(of);
-	mutex_enter(&of->f_mutex);
-	if (of->f_flags & SMB_OFLAGS_TIMESTAMPS_PENDING) {
-		rc = B_TRUE;
-		of->f_flags &= ~SMB_OFLAGS_TIMESTAMPS_PENDING;
-	}
-	mutex_exit(&of->f_mutex);
-
-	return (rc);
-}
-
-/*
- * smb_ofile_set_explicit_time_flag
- *
- * Note the timestamps specified in "what", as having been
- * explicity set for the ofile.
- */
-void
-smb_ofile_set_explicit_times(smb_ofile_t *of, uint32_t what)
-{
-	SMB_OFILE_VALID(of);
-	mutex_enter(&of->f_mutex);
-	of->f_explicit_times |= (what & SMB_AT_TIMES);
-	mutex_exit(&of->f_mutex);
-}
-
-uint32_t
-smb_ofile_explicit_times(smb_ofile_t *of)
-{
-	uint32_t rc;
-
-	SMB_OFILE_VALID(of);
-	mutex_enter(&of->f_mutex);
-	rc = of->f_explicit_times;
-	mutex_exit(&of->f_mutex);
-
-	return (rc);
-}
-
 /* *************************** Static Functions ***************************** */
 
 /*
@@ -836,50 +832,6 @@ smb_ofile_is_open_locked(smb_ofile_t *of)
 		ASSERT(0);
 		return (B_FALSE);
 	}
-}
-
-/*
- * smb_ofile_set_close_attrs
- *
- * Updates timestamps, size and readonly bit.
- * The last_wtime is specified in the request received
- * from the client. If it is neither 0 nor -1, this time
- * should be used as the file's mtime. It must first be
- * converted from the server's localtime (as received in
- * the client's request) to GMT.
- *
- * Call smb_node_setattr even if no attributes are being
- * explicitly set, to set any pending attributes.
- */
-static void
-smb_ofile_set_close_attrs(smb_ofile_t *of, uint32_t last_wtime)
-{
-	smb_node_t *node = of->f_node;
-	smb_attr_t attr;
-
-	bzero(&attr, sizeof (smb_attr_t));
-
-	/* For files created readonly, propagate readonly bit */
-	if (node->readonly_creator == of) {
-		attr.sa_mask |= SMB_AT_DOSATTR;
-		if (smb_fsop_getattr(NULL, kcred, node, &attr) &&
-		    (attr.sa_dosattr & FILE_ATTRIBUTE_READONLY)) {
-			attr.sa_mask = 0;
-		} else {
-			attr.sa_dosattr |= FILE_ATTRIBUTE_READONLY;
-		}
-
-		node->readonly_creator = NULL;
-	}
-
-	/* apply last_wtime if specified */
-	if (last_wtime != 0 && last_wtime != 0xFFFFFFFF) {
-		attr.sa_vattr.va_mtime.tv_sec =
-		    last_wtime + of->f_server->si_gmtoff;
-		attr.sa_mask |= SMB_AT_MTIME;
-	}
-
-	(void) smb_node_setattr(NULL, node, of->f_cr, of, &attr);
 }
 
 /*

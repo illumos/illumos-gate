@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/synch.h>
@@ -761,8 +761,10 @@ smb_rename_check_attr(smb_request_t *sr, smb_node_t *node, uint16_t sattr)
 {
 	smb_attr_t attr;
 
-	if (smb_node_getattr(sr, node, &attr) != 0)
-		return (EIO);
+	bzero(&attr, sizeof (attr));
+	attr.sa_mask = SMB_AT_DOSATTR;
+	if (smb_node_getattr(sr, node, kcred, NULL, &attr) != 0)
+		return (EACCES);
 
 	if ((attr.sa_dosattr & FILE_ATTRIBUTE_HIDDEN) &&
 	    !(SMB_SEARCH_HIDDEN(sattr)))

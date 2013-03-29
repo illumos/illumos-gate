@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -411,7 +411,9 @@ smb_delete_check_dosattr(smb_request_t *sr, smb_error_t *err)
 	sattr = fqi->fq_sattr;
 	node = fqi->fq_fnode;
 
-	if (smb_node_getattr(sr, node, &attr) != 0) {
+	bzero(&attr, sizeof (attr));
+	attr.sa_mask = SMB_AT_DOSATTR;
+	if (smb_node_getattr(sr, node, kcred, NULL, &attr) != 0) {
 		smb_delete_error(err, NT_STATUS_INTERNAL_ERROR,
 		    ERRDOS, ERROR_INTERNAL_ERROR);
 		return (-1);
