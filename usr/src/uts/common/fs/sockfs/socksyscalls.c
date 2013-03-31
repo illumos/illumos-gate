@@ -23,6 +23,8 @@
  * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/* Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved. */
+
 #include <sys/types.h>
 #include <sys/t_lock.h>
 #include <sys/param.h>
@@ -96,14 +98,17 @@ extern int	sockfs_defer_nl7c_init;
  * devpath for the kernel to use.
  */
 int
-so_socket(int family, int type, int protocol, char *devpath, int version)
+so_socket(int family, int type_w_flags, int protocol, char *devpath,
+    int version)
 {
 	struct sonode *so;
 	vnode_t *vp;
 	struct file *fp;
 	int fd;
 	int error;
+	int type;
 
+	type = type_w_flags & SOCK_TYPE_MASK;
 	if (devpath != NULL) {
 		char *buf;
 		size_t kdevpathlen = 0;
@@ -137,6 +142,9 @@ so_socket(int family, int type, int protocol, char *devpath, int version)
 	 */
 	mutex_exit(&fp->f_tlock);
 	setf(fd, fp);
+	if ((type_w_flags & SOCK_CLOEXEC) != 0) {
+		f_setfd(fd, FD_CLOEXEC);
+	}
 
 	return (fd);
 }
