@@ -22,8 +22,9 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 /*
- * Copyright (c) 2013, Joyent Inc. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 #include <stdio.h>
@@ -61,7 +62,7 @@ Pabort_agent(struct ps_prochandle *P)
 	int sysnum = P->status.pr_lwp.pr_syscall;
 	int stop;
 
-	dprintf("agent LWP is asleep in syscall %d\n", sysnum);
+	dprintf("agent LWP is stopped or asleep in syscall %d\n", sysnum);
 	(void) Pstop(P, 0);
 	stop = Psysexit(P, sysnum, TRUE);
 
@@ -147,11 +148,16 @@ Pcreate_agent(struct ps_prochandle *P)
 	P->agentctlfd = fd;
 
 	/*
-	 * If the agent is currently asleep in a system call, attempt
-	 * to abort the system call so it's ready to serve.
+	 * If the agent is currently asleep in a system call or stopped on
+	 * system call entry, attempt to abort the system call so it's ready to
+	 * serve.
 	 */
-	if (P->status.pr_lwp.pr_flags & PR_ASLEEP) {
-		dprintf("Pcreate_agent: aborting agent syscall\n");
+	if ((P->status.pr_lwp.pr_flags & PR_ASLEEP) ||
+	    ((P->status.pr_lwp.pr_flags & PR_STOPPED) &&
+	    P->status.pr_lwp.pr_why == PR_SYSENTRY)) {
+		dprintf("Pcreate_agent: aborting agent syscall; lwp is %s\n",
+		    (P->status.pr_lwp.pr_flags & PR_ASLEEP) ?
+		    "asleep" : "stopped");
 		Pabort_agent(P);
 	}
 
