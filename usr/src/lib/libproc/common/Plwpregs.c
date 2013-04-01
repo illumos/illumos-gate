@@ -23,7 +23,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/uio.h>
@@ -344,6 +346,39 @@ Plwp_getpsinfo(struct ps_prochandle *P, lwpid_t lwpid, lwpsinfo_t *lps)
 		(void) memcpy(lps, &lwp->lwp_psinfo, sizeof (lwpsinfo_t));
 		return (0);
 	}
+
+	return (-1);
+}
+
+int
+Plwp_getspymaster(struct ps_prochandle *P, lwpid_t lwpid, psinfo_t *ps)
+{
+	lwpstatus_t lps;
+
+	if (P->state == PS_IDLE) {
+		errno = ENODATA;
+		return (-1);
+	}
+
+	if (getlwpstatus(P, lwpid, &lps) != 0)
+		return (-1);
+
+	if (!(lps.pr_flags & PR_AGENT)) {
+		errno = EINVAL;
+		return (-1);
+	}
+
+	if (P->state != PS_DEAD) {
+		return (getlwpfile(P, lwpid, "spymaster",
+		    ps, sizeof (psinfo_t)));
+	}
+
+	if (P->spymaster.pr_nlwp != 0) {
+		(void) memcpy(ps, &P->spymaster, sizeof (psinfo_t));
+		return (0);
+	}
+
+	errno = ENODATA;
 
 	return (-1);
 }

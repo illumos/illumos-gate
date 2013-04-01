@@ -25,6 +25,7 @@
  *
  * Portions Copyright 2007 Chad Mynhier
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -389,6 +390,7 @@ extern	int	proc_get_ldt(pid_t, struct ssd *, int);
 #endif	/* __i386 || __amd64 */
 
 extern int Plwp_getpsinfo(struct ps_prochandle *, lwpid_t, lwpsinfo_t *);
+extern int Plwp_getspymaster(struct ps_prochandle *, lwpid_t, psinfo_t *);
 
 extern int Plwp_stack(struct ps_prochandle *, lwpid_t, stack_t *);
 extern int Plwp_main_stack(struct ps_prochandle *, lwpid_t, stack_t *);

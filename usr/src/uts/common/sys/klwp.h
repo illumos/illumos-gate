@@ -23,10 +23,12 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ */
+
 #ifndef	_SYS_KLWP_H
 #define	_SYS_KLWP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/condvar.h>
@@ -190,6 +192,7 @@ typedef struct _klwp {
 	struct contract	*lwp_ct_latest[CTT_MAXTYPE]; /* last created contract */
 
 	void	*lwp_brand;		/* per-lwp brand data */
+	struct psinfo *lwp_spymaster;	/* if an agent LWP, our spymaster */
 } klwp_t;
 
 /* lwp states */

@@ -20,6 +20,7 @@
  */
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
@@ -818,7 +819,8 @@ typedef	Elf64_Word	Elf64_Capchain;
 #define	NT_CONTENT	20	/* core_content_t <sys/corectl.h>	*/
 #define	NT_ZONENAME	21	/* string from getzonenamebyid(3C)	*/
 #define	NT_FDINFO	22	/* open fd info 			*/
-#define	NT_NUM		22
+#define	NT_SPYMASTER	23	/* psinfo_t for agent LWP spymaster	*/
+#define	NT_NUM		23
 
 
 #ifdef _KERNEL

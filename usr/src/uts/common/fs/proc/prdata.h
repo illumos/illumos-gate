@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -33,8 +33,6 @@
 
 #ifndef _SYS_PROC_PRDATA_H
 #define	_SYS_PROC_PRDATA_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/isa_defs.h>
 #include <sys/proc.h>
@@ -145,6 +143,7 @@ typedef enum prnodetype {
 	PR_XREGS,		/* /proc/<pid>/lwp/<lwpid>/xregs	*/
 	PR_TMPLDIR,		/* /proc/<pid>/lwp/<lwpid>/templates	*/
 	PR_TMPL,		/* /proc/<pid>/lwp/<lwpid>/templates/<id> */
+	PR_SPYMASTER,		/* /proc/<pid>/lwp/<lwpid>/spymaster	*/
 #if defined(__sparc)
 	PR_GWINDOWS,		/* /proc/<pid>/lwp/<lwpid>/gwindows	*/
 	PR_ASRS,		/* /proc/<pid>/lwp/<lwpid>/asrs		*/

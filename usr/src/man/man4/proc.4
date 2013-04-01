@@ -1,10 +1,11 @@
 '\" te
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright (c) 2013, Joyent, Inc. All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PROC 4 "Nov 29, 2006"
+.TH PROC 4 "Mar 31, 2013"
 .SH NAME
 proc \- /proc, the process file system
 .SH DESCRIPTION
@@ -1481,7 +1482,7 @@ A directory containing entries each of which names an active or zombie lwp
 within the process. These entries are themselves directories containing
 additional files as described below. Only the \fBlwpsinfo\fR file exists in the
 directory of a zombie lwp.
-.SH STRUCTURE OF \fB/proc/\fR\fIpid\fR\fB/lwp/\fR \fIlwpid\fR
+.SH STRUCTURE OF \fB/proc/\fR\fIpid\fR\fB/lwp/\fR\fIlwpid\fR
 .sp
 .LP
 A given directory \fB/proc/\fR\fIpid\fR\fB/lwp/\fR\fIlwpid\fR contains the
@@ -1538,6 +1539,15 @@ This file exists only for 64-bit SPARC V9 processes. It contains an
 values of the lwp's platform-dependent ancillary state registers. If the lwp is
 not stopped, all register values are undefined. See also the \fBPCSASRS\fR
 control operation, below.
+.SS "spymaster"
+.sp
+.LP
+For an agent lwp (see \fBPCAGENT\fR), this file contains a \fBpsinfo_t\fR
+structure that corresponds to the process that created the agent lwp at the
+time the agent was created. This structure is identical to that retrieved via
+the \fBpsinfo\fR file, with one modification: the \fBpr_time\fR field does not
+correspond to the CPU time for the process, but rather to the creation time of
+the agent lwp.
 .SS "templates"
 .sp
 .LP
@@ -2263,6 +2273,16 @@ register values given to the agent lwp on creation are typically the registers
 of the representative lwp, so that the agent lwp can use its stack.
 .sp
 .LP
+If the controlling process neglects to force the agent lwp to execute the
+\fBSYS_lwp_exit\fR system call (due to either logic error or fatal failure on
+the part of the controlling process), the agent lwp will remain in the target
+process.  For purposes of being able to debug these otherwise rogue agents,
+information as to the creator of the agent lwp is reflected in that lwp's
+\fBspymaster\fR file in \fB/proc\fR. Should the target process generate a core
+dump with the agent lwp in place, this information will be available via the
+\fBNT_SPYMASTER\fR note in the core file (see \fBcore\fR(4)).
+.sp
+.LP
 The agent lwp is not allowed to execute any variation of the \fBSYS_fork\fR or
 \fBSYS_exec\fR system call traps. Attempts to do so yield \fBENOTSUP\fR to the
 agent lwp.
@@ -2789,6 +2809,16 @@ extra state registers
 ancillary state registers (SPARC V9 only)
 .RE
 
+.sp
+.ne 2
+.na
+\fB\fB/proc/\fIpid\fR/lwp/\fIlwpid\fR/spymaster\fR\fR
+.ad
+.sp .6
+.RS 4n
+For an agent LWP, the controlling process
+.RE
+
 .SH SEE ALSO
 .sp
 .LP
@@ -2803,8 +2833,8 @@ ancillary state registers (SPARC V9 only)
 \fBreaddir\fR(3C), \fBpthread_create\fR(3C), \fBpthread_join\fR(3C),
 \fBsiginfo.h\fR(3HEAD), \fBsignal.h\fR(3HEAD), \fBthr_create\fR(3C),
 \fBthr_join\fR(3C), \fBtypes32.h\fR(3HEAD), \fBucontext.h\fR(3HEAD),
-\fBwait\fR(3C), \fBcontract\fR(4), \fBprocess\fR(4), \fBlfcompile\fR(5),
-\fBprivileges\fR(5)
+\fBwait\fR(3C), \fBcontract\fR(4), \fBcore\fR(4), \fBprocess\fR(4),
+\fBlfcompile\fR(5), \fBprivileges\fR(5)
 .SH DIAGNOSTICS
 .sp
 .LP

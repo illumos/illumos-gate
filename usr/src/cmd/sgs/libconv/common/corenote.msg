@@ -24,6 +24,7 @@
 # Use is subject to license terms.
 #
 # Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
+# Copyright (c) 2013, Joyent, Inc. All rights reserved.
 #
 
 @ MSG_NT_PRSTATUS		"[ NT_PRSTATUS ]"
@@ -46,6 +47,7 @@
 @ MSG_NT_CONTENT		"[ NT_CONTENT ]"
 @ MSG_NT_ZONENAME		"[ NT_ZONENAME ]"
 @ MSG_NT_FDINFO			"[ NT_FDINFO ]"
+@ MSG_NT_SPYMASTER		"[ NT_SPYMASTER ]"
 
 
 @ MSG_AUXV_AF_SUN_SETUGID		"AF_SUN_SETUGID"

@@ -24,6 +24,7 @@
  */
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -674,6 +675,35 @@ note_asrs(struct ps_prochandle *P, size_t nbytes)
 #endif	/* __sparcv9 */
 #endif	/* __sparc */
 
+static int
+note_spymaster(struct ps_prochandle *P, size_t nbytes)
+{
+#ifdef _LP64
+	if (P->core->core_dmodel == PR_MODEL_ILP32) {
+		psinfo32_t ps32;
+
+		if (nbytes < sizeof (psinfo32_t) ||
+		    read(P->asfd, &ps32, sizeof (ps32)) != sizeof (ps32))
+			goto err;
+
+		psinfo_32_to_n(&ps32, &P->spymaster);
+	} else
+#endif
+	if (nbytes < sizeof (psinfo_t) || read(P->asfd,
+	    &P->spymaster, sizeof (psinfo_t)) != sizeof (psinfo_t))
+		goto err;
+
+	dprintf("spymaster pr_fname = <%s>\n", P->psinfo.pr_fname);
+	dprintf("spymaster pr_psargs = <%s>\n", P->psinfo.pr_psargs);
+	dprintf("spymaster pr_wstat = 0x%x\n", P->psinfo.pr_wstat);
+
+	return (0);
+
+err:
+	dprintf("Pgrab_core: failed to read NT_SPYMASTER\n");
+	return (-1);
+}
+
 /*ARGSUSED*/
 static int
 note_notsup(struct ps_prochandle *P, size_t nbytes)
@@ -727,6 +757,7 @@ static int (*nhdlrs[])(struct ps_prochandle *, size_t) = {
 	note_content,		/* 20	NT_CONTENT		*/
 	note_zonename,		/* 21	NT_ZONENAME		*/
 	note_fdinfo,		/* 22	NT_FDINFO		*/
+	note_spymaster,		/* 23	NT_SPYMASTER		*/
 };
 
 static void
