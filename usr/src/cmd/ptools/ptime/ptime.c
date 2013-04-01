@@ -24,6 +24,9 @@
  *
  * Portions Copyright 2008 Chad Mynhier
  */
+/*
+ * Copyright 2016 Joyent, Inc.
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -55,11 +58,34 @@ static	char	procname[64];
 static	int	Fflag;
 static	int	mflag;
 static	int	errflg;
+static	int	pflag;
+static	int	pfirst;
+
+static int
+ptime_pid(const char *pidstr)
+{
+	struct ps_prochandle *Pr;
+	pid_t pid;
+	int gret;
+
+	if ((Pr = proc_arg_grab(pidstr, PR_ARG_PIDS,
+	    Fflag | PGRAB_RDONLY, &gret)) == NULL) {
+		(void) fprintf(stderr, "%s: cannot examine %s: %s\n",
+		    command, pidstr, Pgrab_error(gret));
+		return (1);
+	}
+
+	pid = Pstatus(Pr)->pr_pid;
+	(void) sprintf(procname, "%d", (int)pid);	/* for perr() */
+	(void) look(pid);
+	Prelease(Pr, 0);
+	return (0);
+}
 
 int
 main(int argc, char **argv)
 {
-	int opt;
+	int opt, exit;
 	pid_t pid;
 	struct siginfo info;
 	int status;
@@ -80,6 +106,7 @@ main(int argc, char **argv)
 			mflag = 1;
 			break;
 		case 'p':
+			pflag = 1;
 			pidarg = optarg;
 			break;
 		default:
@@ -93,63 +120,70 @@ main(int argc, char **argv)
 
 	if (((pidarg != NULL) ^ (argc < 1)) || errflg) {
 		(void) fprintf(stderr,
-		    "usage:\t%s [-mh] [-p pid | command [ args ... ]]\n",
+		    "usage:\t%s [-mh] [-p pidlist | command [ args ... ]]\n",
 		    command);
 		(void) fprintf(stderr,
 		    "  (time a command using microstate accounting)\n");
 		return (1);
 	}
 
-	if (pidarg != NULL) {
-		if ((Pr = proc_arg_grab(pidarg, PR_ARG_PIDS,
-		    Fflag | PGRAB_RDONLY, &gret)) == NULL) {
-			(void) fprintf(stderr, "%s: cannot examine %s: %s\n",
-			    command, pidarg, Pgrab_error(gret));
+	if (pflag) {
+		char *pp;
+
+		exit = 0;
+		(void) signal(SIGINT, SIG_IGN);
+		(void) signal(SIGQUIT, SIG_IGN);
+
+		pp = strtok(pidarg, ", ");
+		if (pp == NULL) {
+			(void) fprintf(stderr, "%s: invalid argument for -p\n",
+			    command);
 			return (1);
 		}
-	} else {
-		if ((Pr = Pcreate(argv[0], &argv[0], &gret, NULL, 0)) == NULL) {
-			(void) fprintf(stderr, "%s: failed to exec %s: %s\n",
-			    command, argv[0], Pcreate_error(gret));
-			return (1);
+		exit = ptime_pid(pp);
+		while ((pp = strtok(NULL, ", ")) != NULL) {
+			exit |= ptime_pid(pp);
 		}
-		if (Psetrun(Pr, 0, 0) == -1) {
-			(void) fprintf(stderr, "%s: failed to set running %s: "
-			    "%s\n", command, argv[0], strerror(errno));
-			return (1);
-		}
+		return (exit);
+	}
+
+
+	if ((Pr = Pcreate(argv[0], &argv[0], &gret, NULL, 0)) == NULL) {
+		(void) fprintf(stderr, "%s: failed to exec %s: %s\n",
+		    command, argv[0], Pcreate_error(gret));
+		return (1);
+	}
+	if (Psetrun(Pr, 0, 0) == -1) {
+		(void) fprintf(stderr, "%s: failed to set running %s: "
+		    "%s\n", command, argv[0], strerror(errno));
+		return (1);
 	}
 
 	pid = Pstatus(Pr)->pr_pid;
+
 	(void) sprintf(procname, "%d", (int)pid);	/* for perr() */
 	(void) signal(SIGINT, SIG_IGN);
 	(void) signal(SIGQUIT, SIG_IGN);
 
-	if (pidarg == NULL)
-		(void) waitid(P_PID, pid, &info, WEXITED | WNOWAIT);
+	(void) waitid(P_PID, pid, &info, WEXITED | WNOWAIT);
 
 	(void) look(pid);
 
-	if (pidarg != NULL) {
-		Prelease(Pr, 0);
-		return (0);
-	} else {
-		(void) waitpid(pid, &status, 0);
+	(void) waitpid(pid, &status, 0);
 
-		if (WIFEXITED(status))
-			return (WEXITSTATUS(status));
+	if (WIFEXITED(status))
+		return (WEXITSTATUS(status));
 
-		if (WIFSIGNALED(status)) {
-			int sig = WTERMSIG(status);
-			char name[SIG2STR_MAX];
+	if (WIFSIGNALED(status)) {
+		int sig = WTERMSIG(status);
+		char name[SIG2STR_MAX];
 
-			(void) fprintf(stderr, "%s: command terminated "
-			    "abnormally by %s\n", command,
-			    proc_signame(sig, name, sizeof (name)));
-		}
-
-		return (status | WCOREFLG); /* see time(1) */
+		(void) fprintf(stderr, "%s: command terminated "
+		    "abnormally by %s\n", command,
+		    proc_signame(sig, name, sizeof (name)));
 	}
+
+	return (status | WCOREFLG); /* see time(1) */
 }
 
 static int
@@ -163,6 +197,8 @@ look(pid_t pid)
 	timestruc_t real, user, sys;
 	hrtime_t hrtime;
 	prusage_t *pup = &prusage;
+
+	pfirst++;
 
 	if (proc_get_psinfo(pid, &psinfo) < 0)
 		return (perr("read psinfo"));
@@ -186,7 +222,11 @@ look(pid_t pid)
 		if (!mflag)
 			tsadd(&sys, &sys, &pup->pr_ttime);
 
-		(void) fprintf(stderr, "\n");
+		if (!pflag || pfirst > 1)
+			(void) fprintf(stderr, "\n");
+		if (pflag)
+			(void) fprintf(stderr, "%d:\t%.70s\n",
+			    (int)psinfo.pr_pid, psinfo.pr_psargs);
 		prtime("real", &real);
 		prtime("user", &user);
 		prtime("sys", &sys);

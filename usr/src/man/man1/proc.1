@@ -2,10 +2,11 @@
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
 .\" Portions Copyright 2008 Chad Mynhier
 .\" Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
+.\" Copyright 2016 Joyent, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PROC 1 "Oct 23, 2012"
+.TH PROC 1 "Apr 01, 2013"
 .SH NAME
 proc, pflags, pcred, pldd, psig, pstack, pfiles, pwdx, pstop, prun, pwait,
 ptime \- proc tools
@@ -72,7 +73,7 @@ ptime \- proc tools
 
 .LP
 .nf
-\fB/usr/bin/ptime\fR [\fB-Fm\fR] [\fB-p\fR] \fIpid\fR...
+\fB/usr/bin/ptime\fR [\fB-Fm\fR] \fB-p pidlist\fR
 .fi
 
 .LP
@@ -81,7 +82,6 @@ ptime \- proc tools
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The proc tools are utilities that exercise features of \fB/proc\fR (see
 \fBproc\fR(4)). Most of them take a list of process-ids (\fIpid\fR). The tools
@@ -215,12 +215,14 @@ Time the \fIcommand\fR, like \fBtime\fR(1), but using microstate accounting for
 reproducible precision. Unlike \fBtime\fR(1), children of the command are not
 timed.
 .sp
-If the \fB-p\fR \fIpid\fR version is used, display a snapshot of timing
-statistics for the specified \fIpid\fR.
+If the \fB-p\fR \fIpidlist\fR version is used, display a snapshot of timing
+statistics for the specified processes. The \fIpidlist\fR may have a single
+process or be a comma or space delineated list. If a space delineated list is
+used, callers will need to ensure that it is properly quoted or escaped for
+their shell.
 .RE
 
 .SH OPTIONS
-.sp
 .LP
 The following general options are supported:
 .sp
@@ -452,7 +454,6 @@ privilege to change its user and group ids to those specified according to the
 rules laid out in \fBsetuid\fR(2) and it must have sufficient privilege to
 control the target process.
 .SH USAGE
-.sp
 .LP
 These proc tools stop their target processes while inspecting them and
 reporting the results: \fBpfiles\fR, \fBpldd\fR, and \fBpstack\fR. A process
@@ -488,7 +489,6 @@ release, the run-time link-editor debugging interface (\fBlibrtld_db\fR) cannot
 be able to initialize. In this case, symbol information for shared libraries is
 not available.
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -510,7 +510,6 @@ An error has occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/proc/*\fR\fR
@@ -520,7 +519,6 @@ process files
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -539,7 +537,6 @@ Interface Stability	See below.
 .LP
 The human readable output is Uncommitted. The options are Committed.
 .SH SEE ALSO
-.sp
 .LP
 \fBgcore\fR(1), \fBldd\fR(1), \fBpargs\fR(1), \fBpgrep\fR(1), \fBpkill\fR(1),
 \fBplimit\fR(1), \fBpmap\fR(1), \fBpreap\fR(1), \fBps\fR(1), \fBptree\fR(1),
@@ -548,7 +545,6 @@ The human readable output is Uncommitted. The options are Committed.
 \fBdlopen\fR(3C), \fBsignal.h\fR(3HEAD), \fBcore\fR(4), \fBproc\fR(4),
 \fBprocess\fR(4), \fBattributes\fR(5), \fBzones\fR(5)
 .SH WARNINGS
-.sp
 .LP
 The following \fBproc\fR tools stop their target processes while inspecting
 them and reporting the results: \fBpfiles\fR, \fBpldd\fR, and \fBpstack\fR.
