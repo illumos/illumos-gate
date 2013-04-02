@@ -25,6 +25,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013 Saso Kiselkov. All rights reserved.
  */
 
 #ifndef	_IXGBE_SW_H
@@ -166,6 +167,7 @@ extern "C" {
 #define	DEFAULT_MR_ENABLE		B_TRUE
 #define	DEFAULT_TX_HEAD_WB_ENABLE	B_TRUE
 #define	DEFAULT_RELAX_ORDER_ENABLE	B_TRUE
+#define	DEFAULT_ALLOW_UNSUPPORTED_SFP	B_FALSE
 
 #define	IXGBE_LSO_MAXLEN		65535
 
@@ -232,6 +234,7 @@ extern "C" {
 #define	PROP_RX_LIMIT_PER_INTR		"rx_limit_per_intr"
 #define	PROP_INTR_THROTTLING		"intr_throttling"
 #define	PROP_FM_CAPABLE			"fm_capable"
+#define	PROP_ALLOW_UNSUPPORTED_SFP	"allow_unsupported_sfp"
 
 #define	IXGBE_LB_NONE			0
 #define	IXGBE_LB_EXTERNAL		1
