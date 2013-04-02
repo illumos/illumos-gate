@@ -27,6 +27,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright (c) 2013 Saso Kiselkov. All rights reserved.
  */
 
 #include "ixgbe_sw.h"
@@ -3172,6 +3173,9 @@ ixgbe_get_conf(ixgbe_t *ixgbe)
 	 */
 	if (hw->mac.type == ixgbe_mac_82599EB || hw->mac.type == ixgbe_mac_X540)
 		ixgbe->intr_throttling[0] = ixgbe->intr_throttling[0] & 0xFF8;
+
+	hw->allow_unsupported_sfp = ixgbe_get_prop(ixgbe,
+	    PROP_ALLOW_UNSUPPORTED_SFP, 0, 1, DEFAULT_ALLOW_UNSUPPORTED_SFP);
 }
 
 static void
