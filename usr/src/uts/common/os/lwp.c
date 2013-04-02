@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ */
+
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -993,6 +997,15 @@ lwp_exit(void)
 	if (lwp->lwp_curinfo != NULL) {
 		siginfofree(lwp->lwp_curinfo);
 		lwp->lwp_curinfo = NULL;
+	}
+
+	/*
+	 * If we have spymaster information (that is, if we're an agent LWP),
+	 * free that now.
+	 */
+	if (lwp->lwp_spymaster != NULL) {
+		kmem_free(lwp->lwp_spymaster, sizeof (psinfo_t));
+		lwp->lwp_spymaster = NULL;
 	}
 
 	thread_rele(t);

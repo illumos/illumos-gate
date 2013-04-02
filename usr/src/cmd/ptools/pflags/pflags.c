@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ */
+
 #include <stdio.h>
 #include <stdio_ext.h>
 #include <stdlib.h>
@@ -258,6 +262,7 @@ lwplook(look_arg_t *arg, const lwpstatus_t *psp, const lwpsinfo_t *pip)
 	int flags;
 	uint32_t sighold, sighold1, sighold2;
 	uint32_t sigpend, sigpend1, sigpend2;
+	psinfo_t ps;
 	int cursig;
 	char buf[32];
 
@@ -330,6 +335,17 @@ lwplook(look_arg_t *arg, const lwpstatus_t *psp, const lwpsinfo_t *pip)
 	if (cursig)
 		(void) printf("\tcursig = %s\n",
 		    proc_signame(cursig, buf, sizeof (buf)));
+
+	if ((flags & PR_AGENT) &&
+	    Plwp_getspymaster(Pr, pip->pr_lwpid, &ps) == 0) {
+		time_t time = ps.pr_time.tv_sec;
+		char t[64];
+
+		(void) strftime(t, sizeof (t), "%F:%H.%M.%S", localtime(&time));
+
+		(void) printf("\tspymaster = pid %d, \"%s\" at %s\n",
+		    (int)ps.pr_pid, ps.pr_psargs, t);
+	}
 
 	if (rflag) {
 		if (Pstate(Pr) == PS_DEAD || (arg->pflags & PR_STOPPED)) {

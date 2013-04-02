@@ -25,6 +25,7 @@
  */
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -55,9 +56,10 @@ conv_cnote_type(Word type, Conv_fmt_flags_t fmt_flags,
 		MSG_NT_UTSNAME,		MSG_NT_LWPSTATUS,
 		MSG_NT_LWPSINFO,	MSG_NT_PRPRIV,
 		MSG_NT_PRPRIVINFO,	MSG_NT_CONTENT,
-		MSG_NT_ZONENAME,	MSG_NT_FDINFO
+		MSG_NT_ZONENAME,	MSG_NT_FDINFO,
+		MSG_NT_SPYMASTER
 	};
-#if NT_NUM != NT_FDINFO
+#if NT_NUM != NT_SPYMASTER
 #error "NT_NUM has grown. Update core note types[]"
 #endif
 	static const conv_ds_msg_t ds_types = {

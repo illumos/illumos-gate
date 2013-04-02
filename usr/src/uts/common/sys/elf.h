@@ -20,6 +20,7 @@
  */
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
@@ -366,6 +367,8 @@ typedef struct {
 #define	PF_MASKPROC	0xf0000000	/* processor specific values */
 
 #define	PF_SUNW_FAILURE	0x00100000	/* mapping absent due to failure */
+#define	PF_SUNW_KILLED	0x00200000	/* signal received during dump */
+#define	PF_SUNW_SIGINFO	0x00400000	/* segment has killing sig's siginfo */
 
 #define	PN_XNUM		0xffff		/* extended program header index */
 
@@ -816,7 +819,8 @@ typedef	Elf64_Word	Elf64_Capchain;
 #define	NT_CONTENT	20	/* core_content_t <sys/corectl.h>	*/
 #define	NT_ZONENAME	21	/* string from getzonenamebyid(3C)	*/
 #define	NT_FDINFO	22	/* open fd info 			*/
-#define	NT_NUM		22
+#define	NT_SPYMASTER	23	/* psinfo_t for agent LWP spymaster	*/
+#define	NT_NUM		23
 
 
 #ifdef _KERNEL

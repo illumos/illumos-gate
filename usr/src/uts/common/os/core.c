@@ -651,11 +651,11 @@ core(int sig, int ext)
 	}
 
 	/*
-	 * Block all signals except SIGHUP, SIGINT, SIGKILL, and SIGTERM.
-	 * These signals are allowed to interrupt the core dump.
-	 * SIGQUIT is not allowed because it is supposed to make a core.
-	 * Additionally, get current limit on core file size for handling later
-	 * error reporting.
+	 * Block all signals except SIGHUP, SIGINT, SIGKILL, and SIGTERM; no
+	 * other signal may interrupt a core dump.  For each signal, we
+	 * explicitly unblock it and set it in p_siginfo to allow for some
+	 * minimal error reporting.  Additionally, we get the current limit on
+	 * core file size for handling later error reporting.
 	 */
 	mutex_enter(&p->p_lock);
 
@@ -671,6 +671,12 @@ core(int sig, int ext)
 		sigdelset(&sighold, SIGKILL);
 	if (!sigismember(&sigmask, SIGTERM))
 		sigdelset(&sighold, SIGTERM);
+
+	sigaddset(&p->p_siginfo, SIGHUP);
+	sigaddset(&p->p_siginfo, SIGINT);
+	sigaddset(&p->p_siginfo, SIGKILL);
+	sigaddset(&p->p_siginfo, SIGTERM);
+
 	curthread->t_hold = sighold;
 
 	rlimit = rctl_enforced_value(rctlproc_legacy[RLIMIT_CORE], p->p_rctls,
@@ -789,6 +795,7 @@ core_seg(proc_t *p, vnode_t *vp, offset_t offset, caddr_t addr, size_t size,
 		len = eaddr - base;
 		if (as_memory(p->p_as, &base, &len) != 0)
 			return (0);
+
 		/*
 		 * Reduce len to a reasonable value so that we don't
 		 * overwhelm the VM system with a monstrously large
@@ -800,16 +807,17 @@ core_seg(proc_t *p, vnode_t *vp, offset_t offset, caddr_t addr, size_t size,
 		err = core_write(vp, UIO_USERSPACE,
 		    offset + (size_t)(base - addr), base, len, rlimit, credp);
 
-		if (err == 0) {
-			/*
-			 * Give pageout a chance to run.
-			 * Also allow core dumping to be interruptible.
-			 */
-			err = delay_sig(drv_usectohz(core_delay_usec));
-		}
 		if (err)
 			return (err);
+
+		/*
+		 * If we have taken a signal, return EINTR to allow the dump
+		 * to be aborted.
+		 */
+		if (issig(JUSTLOOKING) && issig(FORREAL))
+			return (EINTR);
 	}
+
 	return (0);
 }
 

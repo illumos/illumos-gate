@@ -26,6 +26,7 @@
 
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -106,6 +107,11 @@ setup_note_header(Phdr *v, proc_t *p)
 	    + (nlwp + nzomb) * roundup(sizeof (lwpsinfo_t), sizeof (Word))
 	    + nlwp * roundup(sizeof (lwpstatus_t), sizeof (Word))
 	    + nfd * roundup(sizeof (prfdinfo_t), sizeof (Word));
+
+	if (curproc->p_agenttp != NULL) {
+		v[0].p_filesz += sizeof (Note) +
+		    roundup(sizeof (psinfo_t), sizeof (Word));
+	}
 
 	size = sizeof (prcred_t) + sizeof (gid_t) * (ngroups_max - 1);
 	pcrp = kmem_alloc(size, KM_SLEEP);
@@ -516,6 +522,31 @@ write_elfnotes(proc_t *p, int sig, vnode_t *vp, offset_t offset,
 			prgetprxregs(lwp, bigwad->xregs);
 			error = elfnote(vp, &offset, NT_PRXREG,
 			    xregsize, bigwad->xregs, rlimit, credp);
+			if (error)
+				goto done;
+		}
+
+		if (t->t_lwp->lwp_spymaster != NULL) {
+			void *psaddr = t->t_lwp->lwp_spymaster;
+#ifdef _ELF32_COMPAT
+			/*
+			 * On a 64-bit kernel with 32-bit ELF compatibility,
+			 * this file is compiled into two different objects:
+			 * one is compiled normally, and the other is compiled
+			 * with _ELF32_COMPAT set -- and therefore with a
+			 * psinfo_t defined to be a psinfo32_t.  However, the
+			 * psinfo_t denoting our spymaster is always of the
+			 * native type; if we are in the _ELF32_COMPAT case,
+			 * we need to explicitly convert it.
+			 */
+			if (p->p_model == DATAMODEL_ILP32) {
+				psinfo_kto32(psaddr, &bigwad->psinfo);
+				psaddr = &bigwad->psinfo;
+			}
+#endif
+
+			error = elfnote(vp, &offset, NT_SPYMASTER,
+			    sizeof (psinfo_t), psaddr, rlimit, credp);
 			if (error)
 				goto done;
 		}

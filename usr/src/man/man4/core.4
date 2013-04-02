@@ -1,11 +1,12 @@
 '\" te
 .\" Copyright (C) 2008, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
+.\" Copyright (c) 2013, Joyent, Inc. All rights reserved.
 .\" Copyright 1989 AT&T
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CORE 4 "Oct 23, 2012"
+.TH CORE 4 "Mar 31, 2013"
 .SH NAME
 core \- process core file
 .SH DESCRIPTION
@@ -130,9 +131,13 @@ represent mappings whose data is included in the core file have their
 .sp
 .LP
 A mapping's data can be excluded due to the core file content settings (see
-\fBcoreadm\fR(1M)), or due to some failure. If the data is excluded because of
-a failure, the program header entry will have the \fBPF_SUNW_FAILURE\fR flag
-set in its \fBp_flags\fR field.
+\fBcoreadm\fR(1M)), due to a failure, or due to a signal received after
+core dump initiation but before its completion. If the data is excluded
+because of a failure, the program header entry will have the
+\fBPF_SUNW_FAILURE\fR flag
+set in its \fBp_flags\fR field; if the data is excluded because of a signal,
+the segment's \fBp_flags\fR field will have the \fBPF_SUNW_KILLED\fR
+flag set.
 .sp
 .LP
 The program headers of an \fBELF\fR core file also contain entries for two
@@ -431,6 +436,18 @@ The \fBprxregset_t\fR structure is defined in \fB<sys/procfs_isa.h>\fR\&.
 and only if the process is a 64-bit process. It contains the ancillary state
 registers for the \fBLWP.\fR The \fBasrset_t\fR structure is defined in
 \fB<sys/regset.h>\fR\&.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpsinfo_t\fR\fR
+.ad
+.RS 15n
+\fBn_type\fR: \fBNT_SPYMASTER\fR. This entry is present only for an agent
+LWP and contains the \fBpsinfo_t\fR of the process that created the agent
+LWP. See the \fBproc\fR(4) description of the \fBspymaster\fR entry for
+more details.
 .RE
 
 .sp

@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1984,	 1986, 1987, 1988, 1989 AT&T	*/
@@ -189,10 +190,12 @@ static prdirent_t lwpiddir[] = {
 		"xregs" },
 	{ PR_TMPLDIR,	 8 * sizeof (prdirent_t), sizeof (prdirent_t),
 		"templates" },
+	{ PR_SPYMASTER,	 9 * sizeof (prdirent_t), sizeof (prdirent_t),
+		"spymaster" },
 #if defined(__sparc)
-	{ PR_GWINDOWS,	 9 * sizeof (prdirent_t), sizeof (prdirent_t),
+	{ PR_GWINDOWS,	10 * sizeof (prdirent_t), sizeof (prdirent_t),
 		"gwindows" },
-	{ PR_ASRS,	10 * sizeof (prdirent_t), sizeof (prdirent_t),
+	{ PR_ASRS,	11 * sizeof (prdirent_t), sizeof (prdirent_t),
 		"asrs" },
 #endif
 };
@@ -573,6 +576,7 @@ static int pr_read_inval(), pr_read_as(), pr_read_status(),
 	pr_read_usage(), pr_read_lusage(), pr_read_pagedata(),
 	pr_read_watch(), pr_read_lwpstatus(), pr_read_lwpsinfo(),
 	pr_read_lwpusage(), pr_read_xregs(), pr_read_priv(),
+	pr_read_spymaster(),
 #if defined(__sparc)
 	pr_read_gwindows(), pr_read_asrs(),
 #endif
@@ -616,6 +620,7 @@ static int (*pr_read_function[PR_NFILES])() = {
 	pr_read_xregs,		/* /proc/<pid>/lwp/<lwpid>/xregs	*/
 	pr_read_inval,		/* /proc/<pid>/lwp/<lwpid>/templates	*/
 	pr_read_inval,		/* /proc/<pid>/lwp/<lwpid>/templates/<id> */
+	pr_read_spymaster,	/* /proc/<pid>/lwp/<lwpid>/spymaster	*/
 #if defined(__sparc)
 	pr_read_gwindows,	/* /proc/<pid>/lwp/<lwpid>/gwindows	*/
 	pr_read_asrs,		/* /proc/<pid>/lwp/<lwpid>/asrs		*/
@@ -1562,6 +1567,31 @@ out:
 #endif
 }
 
+static int
+pr_read_spymaster(prnode_t *pnp, uio_t *uiop)
+{
+	psinfo_t psinfo;
+	int error;
+	klwp_t *lwp;
+
+	ASSERT(pnp->pr_type == PR_SPYMASTER);
+
+	if ((error = prlock(pnp, ZNO)) != 0)
+		return (error);
+
+	lwp = pnp->pr_common->prc_thread->t_lwp;
+
+	if (lwp->lwp_spymaster == NULL) {
+		prunlock(pnp);
+		return (0);
+	}
+
+	bcopy(lwp->lwp_spymaster, &psinfo, sizeof (psinfo_t));
+	prunlock(pnp);
+
+	return (pr_uioread(&psinfo, sizeof (psinfo), uiop));
+}
+
 #if defined(__sparc)
 
 static int
@@ -1703,7 +1733,7 @@ static int pr_read_status_32(),
 	pr_read_sigact_32(), pr_read_auxv_32(),
 	pr_read_usage_32(), pr_read_lusage_32(), pr_read_pagedata_32(),
 	pr_read_watch_32(), pr_read_lwpstatus_32(), pr_read_lwpsinfo_32(),
-	pr_read_lwpusage_32(),
+	pr_read_lwpusage_32(), pr_read_spymaster_32(),
 #if defined(__sparc)
 	pr_read_gwindows_32(),
 #endif
@@ -1747,6 +1777,7 @@ static int (*pr_read_function_32[PR_NFILES])() = {
 	pr_read_xregs,		/* /proc/<pid>/lwp/<lwpid>/xregs	*/
 	pr_read_inval,		/* /proc/<pid>/lwp/<lwpid>/templates	*/
 	pr_read_inval,		/* /proc/<pid>/lwp/<lwpid>/templates/<id> */
+	pr_read_spymaster_32,	/* /proc/<pid>/lwp/<lwpid>/spymaster	*/
 #if defined(__sparc)
 	pr_read_gwindows_32,	/* /proc/<pid>/lwp/<lwpid>/gwindows	*/
 	pr_read_asrs,		/* /proc/<pid>/lwp/<lwpid>/asrs		*/
@@ -2545,6 +2576,31 @@ out:
 	return (error);
 }
 
+static int
+pr_read_spymaster_32(prnode_t *pnp, uio_t *uiop)
+{
+	psinfo32_t psinfo;
+	int error;
+	klwp_t *lwp;
+
+	ASSERT(pnp->pr_type == PR_SPYMASTER);
+
+	if ((error = prlock(pnp, ZNO)) != 0)
+		return (error);
+
+	lwp = pnp->pr_common->prc_thread->t_lwp;
+
+	if (lwp->lwp_spymaster == NULL) {
+		prunlock(pnp);
+		return (0);
+	}
+
+	psinfo_kto32(lwp->lwp_spymaster, &psinfo);
+	prunlock(pnp);
+
+	return (pr_uioread(&psinfo, sizeof (psinfo), uiop));
+}
+
 #if defined(__sparc)
 static int
 pr_read_gwindows_32(prnode_t *pnp, uio_t *uiop)
@@ -3054,6 +3110,13 @@ prgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 		else
 			vap->va_size = 0;
 		break;
+	case PR_SPYMASTER:
+		if (pnp->pr_common->prc_thread->t_lwp->lwp_spymaster != NULL) {
+			vap->va_size = PR_OBJSIZE(psinfo32_t, psinfo_t);
+		} else {
+			vap->va_size = 0;
+		}
+		break;
 #if defined(__sparc)
 	case PR_GWINDOWS:
 	{
@@ -3254,6 +3317,7 @@ static vnode_t *(*pr_lookup_function[PR_NFILES])() = {
 	pr_lookup_notdir,	/* /proc/<pid>/lwp/<lwpid>/xregs	*/
 	pr_lookup_tmpldir,	/* /proc/<pid>/lwp/<lwpid>/templates	*/
 	pr_lookup_notdir,	/* /proc/<pid>/lwp/<lwpid>/templates/<id> */
+	pr_lookup_notdir,	/* /proc/<pid>/lwp/<lwpid>/spymaster	*/
 #if defined(__sparc)
 	pr_lookup_notdir,	/* /proc/<pid>/lwp/<lwpid>/gwindows	*/
 	pr_lookup_notdir,	/* /proc/<pid>/lwp/<lwpid>/asrs		*/
@@ -4602,6 +4666,7 @@ static int (*pr_readdir_function[PR_NFILES])() = {
 	pr_readdir_notdir,	/* /proc/<pid>/lwp/<lwpid>/xregs	*/
 	pr_readdir_tmpldir,	/* /proc/<pid>/lwp/<lwpid>/templates	*/
 	pr_readdir_notdir,	/* /proc/<pid>/lwp/<lwpid>/templates/<id> */
+	pr_readdir_notdir,	/* /proc/<pid>/lwp/<lwpid>/spymaster	*/
 #if defined(__sparc)
 	pr_readdir_notdir,	/* /proc/<pid>/lwp/<lwpid>/gwindows	*/
 	pr_readdir_notdir,	/* /proc/<pid>/lwp/<lwpid>/asrs		*/

@@ -25,6 +25,7 @@
  */
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 #include <stdlib.h>
@@ -1437,7 +1438,6 @@ dump_psinfo(note_state_t *state, const char *title)
 	indent_exit(state);
 }
 
-
 /*
  * Output information from prpsinfo_t structure.
  */
@@ -1848,6 +1848,13 @@ corenote(Half mach, int do_swap, Word type,
 		state.ns_t2col = 41;
 		state.ns_v2col = 54;
 		dump_prfdinfo(&state, MSG_ORIG(MSG_CNOTE_DESC_PRFDINFO_T));
+		return (CORENOTE_R_OK);
+
+	case NT_SPYMASTER:
+		state.ns_vcol = 25;
+		state.ns_t2col = 45;
+		state.ns_v2col = 58;
+		dump_psinfo(&state, MSG_ORIG(MSG_CNOTE_DESC_PSINFO_T));
 		return (CORENOTE_R_OK);
 	}
 
