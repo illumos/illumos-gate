@@ -21,9 +21,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- */
-/*
  * Copyright 2011 Joyent, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -530,10 +529,10 @@ enum pkt_type {
 
 /*
  * In general we do port based hashing to spread traffic over different
- * softrings. The below tunables allows to override that behavior. Setting it
- * to B_TRUE allows to do a fanout based on src ipv6/ipv4 address. This behavior
- * is also applicable to ipv6 packets carrying multiple optional headers
- * and other uncommon packet types.
+ * softrings. The below tunables allow to override that behavior. Setting one
+ * (depending on IPv6 or IPv4) to B_TRUE allows a fanout based on src
+ * IPv6 or IPv4 address. This behavior is also applicable to IPv6 packets
+ * carrying multiple optional headers and other uncommon packet types.
  */
 boolean_t mac_src_ipv6_fanout = B_FALSE;
 boolean_t mac_src_ipv4_fanout = B_FALSE;
@@ -761,231 +760,168 @@ mac_rx_srs_proto_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 	}
 }
 
-int	fanout_unalligned = 0;
+int	fanout_unaligned = 0;
 
 /*
  * mac_rx_srs_long_fanout
  *
- * The fanout routine for IPv6 (and IPv4 when VLANs are in use).
+ * The fanout routine for VLANs, and for anything else that isn't performing
+ * explicit dls bypass.  Returns -1 on an error (drop the packet due to a
+ * malformed packet), 0 on success, with values written in *indx and *type.
  */
 static int
 mac_rx_srs_long_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *mp,
     uint32_t sap, size_t hdrsize, enum pkt_type *type, uint_t *indx)
 {
 	ip6_t		*ip6h;
-	struct ip	*ip4h;
+	ipha_t		*ipha;
 	uint8_t		*whereptr;
 	uint_t		hash;
 	uint16_t	remlen;
 	uint8_t		nexthdr;
 	uint16_t	hdr_len;
+	uint32_t	src_val;
+	boolean_t	modifiable = B_TRUE;
+	boolean_t	v6;
+
+	ASSERT(MBLKL(mp) >= hdrsize);
 
 	if (sap == ETHERTYPE_IPV6) {
-		boolean_t	modifiable = B_TRUE;
+		v6 = B_TRUE;
+		hdr_len = IPV6_HDR_LEN;
+	} else if (sap == ETHERTYPE_IP) {
+		v6 = B_FALSE;
+		hdr_len = IP_SIMPLE_HDR_LENGTH;
+	} else {
+		*indx = 0;
+		*type = OTH;
+		return (0);
+	}
 
-		ASSERT(MBLKL(mp) >= hdrsize);
+	ip6h = (ip6_t *)(mp->b_rptr + hdrsize);
+	ipha = (ipha_t *)ip6h;
 
-		ip6h = (ip6_t *)(mp->b_rptr + hdrsize);
-		if ((unsigned char *)ip6h == mp->b_wptr) {
-			/*
-			 * The first mblk_t only includes the mac header.
-			 * Note that it is safe to change the mp pointer here,
-			 * as the subsequent operation does not assume mp
-			 * points to the start of the mac header.
-			 */
-			mp = mp->b_cont;
+	if ((uint8_t *)ip6h == mp->b_wptr) {
+		/*
+		 * The first mblk_t only includes the mac header.
+		 * Note that it is safe to change the mp pointer here,
+		 * as the subsequent operation does not assume mp
+		 * points to the start of the mac header.
+		 */
+		mp = mp->b_cont;
 
-			/*
-			 * Make sure ip6h holds the full ip6_t structure.
-			 */
-			if (mp == NULL)
+		/*
+		 * Make sure the IP header points to an entire one.
+		 */
+		if (mp == NULL)
+			return (-1);
+
+		if (MBLKL(mp) < hdr_len) {
+			modifiable = (DB_REF(mp) == 1);
+
+			if (modifiable && !pullupmsg(mp, hdr_len))
 				return (-1);
-
-			if (MBLKL(mp) < IPV6_HDR_LEN) {
-				modifiable = (DB_REF(mp) == 1);
-
-				if (modifiable &&
-				    !pullupmsg(mp, IPV6_HDR_LEN)) {
-					return (-1);
-				}
-			}
-
-			ip6h = (ip6_t *)mp->b_rptr;
 		}
 
-		if (!modifiable || !(OK_32PTR((char *)ip6h)) ||
-		    ((unsigned char *)ip6h + IPV6_HDR_LEN > mp->b_wptr)) {
-			/*
-			 * If either ip6h is not alligned, or ip6h does not
-			 * hold the complete ip6_t structure (a pullupmsg()
-			 * is not an option since it would result in an
-			 * unalligned ip6h), fanout to the default ring. Note
-			 * that this may cause packets reordering.
-			 */
-			*indx = 0;
-			*type = OTH;
-			fanout_unalligned++;
-			return (0);
-		}
+		ip6h = (ip6_t *)mp->b_rptr;
+		ipha = (ipha_t *)ip6h;
+	}
 
+	if (!modifiable || !(OK_32PTR((char *)ip6h)) ||
+	    ((uint8_t *)ip6h + hdr_len > mp->b_wptr)) {
+		/*
+		 * If either the IP header is not aligned, or it does not hold
+		 * the complete simple structure (a pullupmsg() is not an
+		 * option since it would result in an unaligned IP header),
+		 * fanout to the default ring.
+		 *
+		 * Note that this may cause packet reordering.
+		 */
+		*indx = 0;
+		*type = OTH;
+		fanout_unaligned++;
+		return (0);
+	}
+
+	/*
+	 * Extract next-header, full header length, and source-hash value
+	 * using v4/v6 specific fields.
+	 */
+	if (v6) {
 		remlen = ntohs(ip6h->ip6_plen);
 		nexthdr = ip6h->ip6_nxt;
-
-		if (remlen < MIN_EHDR_LEN)
-			return (-1);
+		src_val = V4_PART_OF_V6(ip6h->ip6_src);
 		/*
 		 * Do src based fanout if below tunable is set to B_TRUE or
 		 * when mac_ip_hdr_length_v6() fails because of malformed
-		 * packets or because mblk's need to be concatenated using
+		 * packets or because mblks need to be concatenated using
 		 * pullupmsg().
 		 */
 		if (mac_src_ipv6_fanout || !mac_ip_hdr_length_v6(ip6h,
 		    mp->b_wptr, &hdr_len, &nexthdr, NULL)) {
-			goto ipv6_src_based_fanout;
-		}
-		whereptr = (uint8_t *)ip6h + hdr_len;
-
-		/* If the transport is one of below, we do port based fanout */
-		switch (nexthdr) {
-		case IPPROTO_TCP:
-		case IPPROTO_UDP:
-		case IPPROTO_SCTP:
-		case IPPROTO_ESP:
-			/*
-			 * If the ports in the transport header is not part of
-			 * the mblk, do src_based_fanout, instead of calling
-			 * pullupmsg().
-			 */
-			if (mp->b_cont != NULL &&
-			    whereptr + PORTS_SIZE > mp->b_wptr) {
-				goto ipv6_src_based_fanout;
-			}
-			break;
-		default:
-			break;
-		}
-
-		switch (nexthdr) {
-		case IPPROTO_TCP:
-			hash = HASH_ADDR(V4_PART_OF_V6(ip6h->ip6_src),
-			    *(uint32_t *)whereptr);
-			*indx = COMPUTE_INDEX(hash,
-			    mac_srs->srs_tcp_ring_count);
-			*type = OTH;
-			break;
-
-		case IPPROTO_UDP:
-		case IPPROTO_SCTP:
-		case IPPROTO_ESP:
-			if (mac_fanout_type == MAC_FANOUT_DEFAULT) {
-				hash = HASH_ADDR(V4_PART_OF_V6(ip6h->ip6_src),
-				    *(uint32_t *)whereptr);
-				*indx = COMPUTE_INDEX(hash,
-				    mac_srs->srs_udp_ring_count);
-			} else {
-				*indx = mac_srs->srs_ind %
-				    mac_srs->srs_udp_ring_count;
-				mac_srs->srs_ind++;
-			}
-			*type = OTH;
-			break;
-
-			/* For all other protocol, do source based fanout */
-		default:
-			goto ipv6_src_based_fanout;
-		}
-	} else if (sap == ETHERTYPE_IP) {
-		boolean_t	modifiable = B_TRUE;
-
-		ASSERT(MBLKL(mp) >= hdrsize);
-
-		ip4h = (struct ip *)(mp->b_rptr + hdrsize);
-
-		if ((unsigned char *)ip4h == mp->b_wptr) {
-			/*
-			 * The first mblk_t only includes the mac header.
-			 * Note that it is safe to change the mp pointer here,
-			 * as the subsequent operation does not assume mp
-			 * points to the start of the mac header.
-			 */
-			mp = mp->b_cont;
-
-			/*
-			 * Make sure ip4h holds the full base ip structure
-			 * up through the destination address.  It might not
-			 * hold any of the options though.
-			 */
-			if (mp == NULL)
-				return (-1);
-
-			if (MBLKL(mp) < IP_SIMPLE_HDR_LENGTH) {
-				modifiable = (DB_REF(mp) == 1);
-
-				if (modifiable &&
-				    !pullupmsg(mp, IP_SIMPLE_HDR_LENGTH))
-					return (-1);
-			}
-
-			ip4h = (struct ip *)mp->b_rptr;
-		}
-
-		if (!modifiable || !(OK_32PTR((char *)ip4h))) {
-			/*
-			 * If ip4h is not aligned fanout to the default ring.
-			 * Note that this may cause packets reordering.
-			 */
-			*indx = 0;
-			*type = OTH;
-			fanout_unalligned++;
-			return (0);
-		}
-
-		/* Do src based fanout if below tunable is set to B_TRUE. */
-		if (mac_src_ipv4_fanout)
-			goto ipv4_src_based_fanout;
-
-		/* If the transport is TCP, we try to do port based fanout */
-		if (ip4h->ip_p == IPPROTO_TCP) {
-			int	hdr_len;
-
-			hdr_len = ip4h->ip_hl << 2;
-			/* set whereptr to point to tcphdr */
-			whereptr = (uint8_t *)ip4h + hdr_len;
-
-			/*
-			 * If ip4h does not hold the complete ip header
-			 * including options, or if both ports in the TCP
-			 * header are not part of the mblk, do src_based_fanout
-			 * (the second case covers the first one so we only
-			 * need one test).
-			 */
-			if (mp->b_cont != NULL &&
-			    whereptr + PORTS_SIZE > mp->b_wptr)
-				goto ipv4_src_based_fanout;
-
-			hash = HASH_ADDR(ip4h->ip_src.s_addr,
-			    *(uint32_t *)whereptr);
-			*indx = COMPUTE_INDEX(hash,
-			    mac_srs->srs_tcp_ring_count);
-			*type = OTH;
-		} else {
-			/* For all other protocols, do source based fanout */
-			goto ipv4_src_based_fanout;
+			goto src_based_fanout;
 		}
 	} else {
-		*indx = 0;
+		hdr_len = IPH_HDR_LENGTH(ipha);
+		remlen = ntohs(ipha->ipha_length) - hdr_len;
+		nexthdr = ipha->ipha_protocol;
+		src_val = (uint32_t)ipha->ipha_src;
+		/*
+		 * Catch IPv4 fragment case here.  IPv6 has nexthdr == FRAG
+		 * for its equivalent case.
+		 */
+		if (mac_src_ipv4_fanout ||
+		    (ntohs(ipha->ipha_fragment_offset_and_flags) &
+		    (IPH_MF | IPH_OFFSET)) != 0) {
+			goto src_based_fanout;
+		}
+	}
+	if (remlen < MIN_EHDR_LEN)
+		return (-1);
+	whereptr = (uint8_t *)ip6h + hdr_len;
+
+	/* If the transport is one of below, we do port/SPI based fanout */
+	switch (nexthdr) {
+	case IPPROTO_TCP:
+	case IPPROTO_UDP:
+	case IPPROTO_SCTP:
+	case IPPROTO_ESP:
+		/*
+		 * If the ports or SPI in the transport header is not part of
+		 * the mblk, do src_based_fanout, instead of calling
+		 * pullupmsg().
+		 */
+		if (mp->b_cont == NULL || whereptr + PORTS_SIZE <= mp->b_wptr)
+			break;	/* out of switch... */
+		/* FALLTHRU */
+	default:
+		goto src_based_fanout;
+	}
+
+	switch (nexthdr) {
+	case IPPROTO_TCP:
+		hash = HASH_ADDR(src_val, *(uint32_t *)whereptr);
+		*indx = COMPUTE_INDEX(hash, mac_srs->srs_tcp_ring_count);
 		*type = OTH;
+		break;
+	case IPPROTO_UDP:
+	case IPPROTO_SCTP:
+	case IPPROTO_ESP:
+		if (mac_fanout_type == MAC_FANOUT_DEFAULT) {
+			hash = HASH_ADDR(src_val, *(uint32_t *)whereptr);
+			*indx = COMPUTE_INDEX(hash,
+			    mac_srs->srs_udp_ring_count);
+		} else {
+			*indx = mac_srs->srs_ind % mac_srs->srs_udp_ring_count;
+			mac_srs->srs_ind++;
+		}
+		*type = OTH;
+		break;
 	}
 	return (0);
 
-ipv6_src_based_fanout:
-	hash = HASH_ADDR(V4_PART_OF_V6(ip6h->ip6_src), (uint32_t)0);
-	*indx = COMPUTE_INDEX(hash, mac_srs->srs_oth_ring_count);
-	*type = OTH;
-	return (0);
-
-ipv4_src_based_fanout:
-	hash = HASH_ADDR(ip4h->ip_src.s_addr, (uint32_t)0);
+src_based_fanout:
+	hash = HASH_ADDR(src_val, (uint32_t)0);
 	*indx = COMPUTE_INDEX(hash, mac_srs->srs_oth_ring_count);
 	*type = OTH;
 	return (0);
