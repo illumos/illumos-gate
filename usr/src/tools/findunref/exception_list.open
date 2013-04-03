@@ -264,3 +264,4 @@
 # ld tests which are not currently delivered
 #
 ./usr/src/cmd/sgs/test
+./usr/src/cmd/mdb/test

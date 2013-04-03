@@ -26,7 +26,7 @@
 
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright (c) 2012 Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013 Joyent, Inc. All rights reserved.
  */
 
 #include <sys/elf.h>
@@ -67,6 +67,7 @@
 #include <mdb/mdb_whatis_impl.h>
 #include <mdb/mdb_macalias.h>
 #include <mdb/mdb_tab.h>
+#include <mdb/mdb_typedef.h>
 #ifdef _KMDB
 #include <kmdb/kmdb_kdi.h>
 #endif
@@ -2978,6 +2979,8 @@ const mdb_dcmd_t mdb_dcmd_builtins[] = {
 	{ "status", NULL, "print summary of current target", cmd_notsup },
 	{ "term", NULL, "display current terminal type", cmd_term },
 	{ "typeset", "[+/-t] var ...", "set variable attributes", cmd_typeset },
+	{ "typedef", "[-c model | -d | -l | -r file ] [type] [name]",
+		"create synthetic types", cmd_typedef, cmd_typedef_help },
 	{ "unset", "[name ...]", "unset variables", cmd_unset },
 	{ "vars", "[-npt]", "print listing of variables", cmd_vars },
 	{ "version", NULL, "print debugger version string", cmd_version },

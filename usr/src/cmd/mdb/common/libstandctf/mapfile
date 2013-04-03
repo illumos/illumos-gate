@@ -20,6 +20,9 @@
 #
 # CDDL HEADER END
 #
+#
+# Copyright (c) 2012, Joyent, Inc.
+#
 
 #
 # MAPFILE HEADER START
@@ -40,15 +43,19 @@ $mapfile_version 2
 SYMBOL_SCOPE {
 	global:
 		ctf_add_array;
+		ctf_add_float;
+		ctf_add_integer;
 		ctf_add_member;
 		ctf_add_pointer;
 		ctf_add_struct;
+		ctf_add_type;
 		ctf_add_typedef;
 		ctf_add_union;
 		ctf_array_info;
 		ctf_bufopen;
 		ctf_close;
 		ctf_create;
+		ctf_delete_type;
 		ctf_discard;
 		ctf_enum_iter;
 		ctf_enum_name;

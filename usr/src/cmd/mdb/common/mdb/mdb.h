@@ -43,6 +43,7 @@
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_list.h>
 #include <mdb/mdb_vcb.h>
+#include <mdb/mdb_ctf.h>
 #include <mdb/mdb_tab.h>
 #ifdef _KMDB
 #include <kmdb/kmdb_wr.h>
@@ -181,6 +182,8 @@ typedef struct mdb {
 	char **m_env;		/* Current environment */
 	mdb_list_t m_cblist;	/* List of callbacks */
 	mdb_nv_t m_macaliases;	/* Name/value hash of ADB macro aliases */
+	ctf_file_t *m_synth;	/* Container for synthetic types */
+	int m_lastret;		/* Result of running the last command */
 #ifdef _KMDB
 	struct dpi_ops *m_dpi;	/* DPI ops vector */
 	struct kdi *m_kdi;	/* KDI ops vector */

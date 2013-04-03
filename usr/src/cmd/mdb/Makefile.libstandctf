@@ -43,7 +43,7 @@ MAPFILE = ../../../common/libstandctf/mapfile
 
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 CPPFLAGS += -I$(SRC)/common/ctf -I../../../common -DCTF_OLD_VERSIONS -D_MDB \
-    -Dvsnprintf=ctf_vsnprintf
+    -Dvsnprintf=ctf_vsnprintf -Dassfail=kmdb_prom_assfail
 
 #
 # kmdb is a kernel module, so we'll use the kernel's build flags.

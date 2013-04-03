@@ -1,9 +1,10 @@
 '\" te
 .\" Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright (c) 2012, Joyent, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MDB 1 "Nov 30, 2005"
+.TH MDB 1 "Oct 05, 2012"
 .SH NAME
 mdb \- modular debugger
 .SH SYNOPSIS
@@ -11,7 +12,7 @@ mdb \- modular debugger
 .nf
 \fBmdb\fR [\fB-fkmuwyAFKMSUW\fR] [\(+-o \fIoption\fR] [\fB-p\fR \fIpid\fR] [\fB-s\fR \fIdistance\fR]
      [\fB-I\fR \fIpath\fR] [\fB-L\fR \fIpath\fR] [\fB-P\fR \fIprompt\fR] [\fB-R\fR \fIroot\fR]
-     [\fB-V\fR \fIdis-version\fR] [object [core] | core | suffix]
+     [\fB-V\fR \fIdis-version\fR] [\fB-e\fR \fIexpr\fR] [object [core] | core | suffix]
 .fi
 
 .SH DESCRIPTION
@@ -3711,6 +3712,18 @@ Disables automatic loading of \fBmdb\fR modules. By default, \fBmdb\fR attempts
 to load debugger modules corresponding to the active shared libraries in a user
 process or core file, or to the loaded kernel modules in the live operating
 system or an operating system crash dump.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-e\fR \fIexpr\fR\fR
+.ad
+.RS 15n
+Causes \fBmdb\fR to ignore standard input and instead evaluate the \fBmdb\fR
+expression \fIexpr\fR. Upon completing evaluation, \fBmdb\fR terminates and
+returns a status code. A non-zero return code from \fBmdb\fR indicates that
+either \fBmdb\fR or the evaluation of \fIexpr\fR failed.
 .RE
 
 .sp
