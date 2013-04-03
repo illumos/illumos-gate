@@ -36,6 +36,8 @@
  * contributors.
  */
 
+/* Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved. */
+
 #ifndef	_SYS_FCNTL_H
 #define	_SYS_FCNTL_H
 
@@ -82,6 +84,7 @@ extern "C" {
 #define	O_XATTR		0x4000	/* extended attribute */
 #define	O_NOFOLLOW	0x20000	/* don't follow symlinks */
 #define	O_NOLINKS	0x40000	/* don't allow multiple hard links */
+#define	O_CLOEXEC	0x800000	/* set the close-on-exec flag */
 
 /*
  * fcntl(2) requests

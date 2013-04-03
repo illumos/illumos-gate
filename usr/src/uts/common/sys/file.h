@@ -26,6 +26,8 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+/* Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved. */
+
 #ifndef _SYS_FILE_H
 #define	_SYS_FILE_H
 
@@ -112,6 +114,8 @@ typedef struct fpollinfo {
 
 #define	FSEARCH		0x200000	/* O_SEARCH = 0x200000 */
 #define	FEXEC		0x400000	/* O_EXEC = 0x400000 */
+
+#define	FCLOEXEC	0x800000	/* O_CLOEXEC = 0x800000 */
 
 #ifdef _KERNEL
 
