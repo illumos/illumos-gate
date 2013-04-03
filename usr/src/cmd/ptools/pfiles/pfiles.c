@@ -23,6 +23,9 @@
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  */
+/*
+ * Copyright (c) 2013 Joyent, Inc.  All Rights reserved.
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -180,14 +183,10 @@ main(int argc, char **argv)
 		} else {
 			switch (gret) {
 			case G_SYS:
-			case G_SELF:
 				proc_unctrl_psinfo(&psinfo);
 				(void) printf("%d:\t%.70s\n", (int)pid,
 				    psinfo.pr_psargs);
-				if (gret == G_SYS)
-					(void) printf("  [system process]\n");
-				else
-					show_files(NULL);
+				(void) printf("  [system process]\n");
 				break;
 			default:
 				(void) fprintf(stderr, "%s: %s: %d\n",
@@ -339,11 +338,7 @@ getflock(struct ps_prochandle *Pr, int fd, struct flock *flock_native)
 #ifdef _LP64
 	struct flock64_32 flock_target;
 
-	/*
-	 * Pr may be NULL when pfiles is inspecting itself, but in that case
-	 * we already know the data model of the two processes must match.
-	 */
-	if ((Pr != NULL) && (Pstatus(Pr)->pr_dmodel == PR_MODEL_ILP32)) {
+	if (Pstatus(Pr)->pr_dmodel == PR_MODEL_ILP32) {
 		copyflock(flock_target, *flock_native);
 		ret = pr_fcntl(Pr, fd, F_GETLK, &flock_target);
 		copyflock(*flock_native, flock_target);
@@ -504,6 +499,9 @@ show_sockaddr(const char *str, struct sockaddr *sa, socklen_t len)
 	struct sockaddr_un *so_un = (struct sockaddr_un *)sa;
 	char  abuf[INET6_ADDRSTRLEN];
 	const char *p;
+
+	if (len == 0)
+		return;
 
 	switch (sa->sa_family) {
 	default:

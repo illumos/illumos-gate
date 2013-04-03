@@ -12,6 +12,9 @@
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  */
+/*
+ * Copyright (c) 2013 Joyent, Inc.  All Rights reserved.
+ */
 
 #include <limits.h>
 #include <stdio.h>
@@ -159,7 +162,7 @@ Pfdinfo_iter(struct ps_prochandle *P, proc_fdinfo_f *func, void *cd)
 	/* NB: We walk the list backwards. */
 
 	for (fip = list_prev(&P->fd_head);
-	    fip != (void *)&P->fd_head;
+	    fip != (void *)&P->fd_head && fip != NULL;
 	    fip = list_prev(fip)) {
 		if ((rv = func(cd, &fip->fd_info)) != 0)
 			return (rv);
