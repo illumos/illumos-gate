@@ -21,6 +21,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 #include <stdio.h>
@@ -418,8 +420,10 @@ dump_priv_data(int ilev, di_node_t node)
  * Print vendor ID and device ID for PCI devices
  */
 int
-print_pciid(di_node_t node, di_prom_handle_t ph)
+print_pciid(di_node_t node, di_prom_handle_t ph, pcidb_hdl_t *pci)
 {
+	pcidb_vendor_t *vend;
+	pcidb_device_t *dev;
 	di_node_t pnode = di_parent_node(node);
 	char *s = NULL;
 	int *i, type = di_nodeid(node);
@@ -436,10 +440,28 @@ print_pciid(di_node_t node, di_prom_handle_t ph)
 	    "vendor-id", &i) > 0)
 		(void) printf("%x", i[0]);
 
+	if (pci != NULL)
+		vend = pcidb_lookup_vendor(pci, i[0]);
+
 	if (LOOKUP_PROP(ints, ph, type, DDI_DEV_T_ANY, node,
 	    "device-id", &i) > 0)
 		(void) printf(",%x", i[0]);
-	(void) printf(")");
 
+	if (pci != NULL)
+		dev = pcidb_lookup_device_by_vendor(vend, i[0]);
+
+	(void) printf(") [");
+
+	if (vend != NULL)
+		(void) printf("%s ", pcidb_vendor_name(vend));
+	else
+		(void) printf("unknown vendor, ");
+
+	if (dev != NULL)
+		(void) printf("%s", pcidb_device_name(dev));
+	else
+		(void) printf("unknown device");
+
+	(void) printf("]");
 	return (1);
 }

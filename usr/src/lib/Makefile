@@ -22,6 +22,7 @@
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, Joyent, Inc. All rights reserved.
 
 include ../Makefile.master
 
@@ -157,7 +158,8 @@ SUBDIRS += \
 	libdscfg	\
 	librdc		\
 	libinstzones	\
-	libpkg
+	libpkg		\
+	libpcidb
 
 SUBDIRS += \
 	passwdutil	\
@@ -432,6 +434,7 @@ HDRSUBDIRS=		\
 	libnsl		\
 	libnwam		\
 	libpam		\
+	libpcidb	\
 	libpctx		\
 	libpicl		\
 	libpicltree	\

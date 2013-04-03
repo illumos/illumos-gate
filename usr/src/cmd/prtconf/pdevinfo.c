@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ */
 
 /*
  * For machines that support the openprom, fetch and print the list
@@ -44,6 +47,7 @@
 #include <sys/stat.h>
 #include <zone.h>
 #include <libnvpair.h>
+#include <pcidb.h>
 #include "prtconf.h"
 
 
@@ -95,6 +99,7 @@ typedef struct dumpops {
 typedef struct di_args {
 	di_prom_handle_t	prom_hdl;
 	di_devlink_handle_t	devlink_hdl;
+	pcidb_hdl_t 		*pcidb_hdl;
 } di_arg_t;
 
 static const dumpops_t sysprop_dumpops = {
@@ -155,6 +160,7 @@ static int promopen(int);
 static void promclose();
 static di_node_t find_target_node(di_node_t);
 static void node_display_set(di_node_t);
+static int dump_pciid(char *, int, di_node_t, pcidb_hdl_t *);
 
 void
 prtconf_devinfo(void)
@@ -163,6 +169,7 @@ prtconf_devinfo(void)
 	di_arg_t		di_arg;
 	di_prom_handle_t	prom_hdl = DI_PROM_HANDLE_NIL;
 	di_devlink_handle_t	devlink_hdl = NULL;
+	pcidb_hdl_t		*pcidb_hdl = NULL;
 	di_node_t		root_node;
 	uint_t			flag;
 	char			*rootpath;
@@ -219,8 +226,16 @@ prtconf_devinfo(void)
 			exit(0);
 	}
 
+	if (opts.o_verbose || opts.o_pciid) {
+		pcidb_hdl = pcidb_open(PCIDB_VERSION);
+		if (pcidb_hdl == NULL)
+			(void) _error(NULL, "pcidb facility not available, "
+			    "continuing anyways");
+	}
+
 	di_arg.prom_hdl = prom_hdl;
 	di_arg.devlink_hdl = devlink_hdl;
+	di_arg.pcidb_hdl = pcidb_hdl;
 
 	/*
 	 * ...and walk all nodes to report them out...
@@ -293,6 +308,8 @@ prtconf_devinfo(void)
 		di_prom_fini(prom_hdl);
 	if (devlink_hdl != NULL)
 		(void) di_devlink_fini(&devlink_hdl);
+	if (pcidb_hdl != NULL)
+		pcidb_close(pcidb_hdl);
 	di_fini(root_node);
 }
 
@@ -750,7 +767,7 @@ dump_devs(di_node_t node, void *arg)
 
 	(void) printf("%s", di_node_name(node));
 	if (opts.o_pciid)
-		(void) print_pciid(node, di_arg->prom_hdl);
+		(void) print_pciid(node, di_arg->prom_hdl, di_arg->pcidb_hdl);
 
 	/*
 	 * if this node does not have an instance number or is the
@@ -790,8 +807,12 @@ dump_devs(di_node_t node, void *arg)
 
 		/* Ensure that 'compatible' is printed under Hardware header */
 		if (!compat_printed)
-			(void) dump_compatible(printed ? NULL : "Hardware",
+			printed |= dump_compatible(printed ? NULL : "Hardware",
 			    ilev + 1, node);
+
+		/* Ensure that pci id information is printed under Hardware */
+		(void) dump_pciid(printed ? NULL : "Hardware",
+		    ilev + 1, node, di_arg->pcidb_hdl);
 
 		dump_priv_data(ilev + 1, node);
 		dump_pathing_data(ilev + 1, node);
@@ -1923,4 +1944,105 @@ dump_compatible(char *name, int ilev, di_node_t node)
 	(void) printf("'%s'", p);
 	(void) putchar('\n');
 	return (1);
+}
+
+static int
+dump_pciid(char *name, int ilev, di_node_t node, pcidb_hdl_t *pci)
+{
+	char *t = NULL;
+	int *vid, *did, *svid, *sdid;
+	const char *vname, *dname, *sname;
+	pcidb_vendor_t *pciv;
+	pcidb_device_t *pcid;
+	pcidb_subvd_t *pcis;
+	di_node_t pnode = di_parent_node(node);
+
+	const char *unov = "unknown vendor";
+	const char *unod = "unknown device";
+	const char *unos = "unknown subsystem";
+
+	if (pci == NULL)
+		return (0);
+
+	vname = unov;
+	dname = unod;
+	sname = unos;
+
+	if (di_prop_lookup_strings(DDI_DEV_T_ANY, pnode,
+	    "device_type", &t) <= 0)
+		return (0);
+
+	if (t == NULL || (strcmp(t, "pci") != 0 &&
+	    strcmp(t, "pciex") != 0))
+		return (0);
+
+	/*
+	 * All devices should have a vendor and device id, if we fail to find
+	 * one, then we're going to return right here and not print anything.
+	 *
+	 * We're going to also check for the subsystem-vendor-id and
+	 * subsystem-id. If we don't find one of them, we're going to assume
+	 * that this device does not have one. In that case, we will never
+	 * attempt to try and print anything related to that. If it does have
+	 * both, then we are going to look them up and print the appropriate
+	 * string if we find it or not.
+	 */
+	if (di_prop_lookup_ints(DDI_DEV_T_ANY, node, "vendor-id", &vid) <= 0)
+		return (0);
+
+	if (di_prop_lookup_ints(DDI_DEV_T_ANY, node, "device-id", &did) <= 0)
+		return (0);
+
+	if (di_prop_lookup_ints(DDI_DEV_T_ANY, node, "subsystem-vendor-id",
+	    &svid) <= 0 || di_prop_lookup_ints(DDI_DEV_T_ANY, node,
+	    "subsystem-id", &sdid) <= 0) {
+		svid = NULL;
+		sdid = NULL;
+		sname = NULL;
+	}
+
+	pciv = pcidb_lookup_vendor(pci, vid[0]);
+	if (pciv == NULL)
+		goto print;
+	vname = pcidb_vendor_name(pciv);
+
+	pcid = pcidb_lookup_device_by_vendor(pciv, did[0]);
+	if (pcid == NULL)
+		goto print;
+	dname = pcidb_device_name(pcid);
+
+	if (svid != NULL) {
+		pcis = pcidb_lookup_subvd_by_device(pcid, svid[0], sdid[0]);
+		if (pcis == NULL)
+			goto print;
+		sname = pcidb_subvd_name(pcis);
+	}
+
+print:
+	/* If name is non-NULL, produce header */
+	if (name) {
+		indent_to_level(ilev);
+		(void) printf("%s properties:\n", name);
+	}
+	ilev++;
+
+	/* These are all going to be single string properties */
+	indent_to_level(ilev);
+	(void) printf("name='vendor-name' type=string items=1\n");
+	indent_to_level(ilev);
+	(void) printf("    value='%s'\n", vname);
+
+	indent_to_level(ilev);
+	(void) printf("name='device-name' type=string items=1\n");
+	indent_to_level(ilev);
+	(void) printf("    value='%s'\n", dname);
+
+	if (sname != NULL) {
+		indent_to_level(ilev);
+		(void) printf("name='subsystem-name' type=string items=1\n");
+		indent_to_level(ilev);
+		(void) printf("    value='%s'\n", sname);
+	}
+
+	return (0);
 }

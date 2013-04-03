@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2012 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef	_PRT_CONF_H
@@ -31,11 +32,12 @@ extern "C" {
 #endif
 
 #include <libdevinfo.h>
+#include <pcidb.h>
 #include <sys/utsname.h>
 
 extern void init_priv_data(struct di_priv_data *);
 extern void dump_priv_data(int, di_node_t);
-extern int print_pciid(di_node_t, di_prom_handle_t);
+extern int print_pciid(di_node_t, di_prom_handle_t, pcidb_hdl_t *);
 extern void indent_to_level(int);
 extern void prtconf_devinfo();
 extern int do_fbname();
