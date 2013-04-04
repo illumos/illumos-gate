@@ -44,7 +44,7 @@
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
- * Copyright 2012 Nexenta System, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -79,6 +79,15 @@
 #include <sys/fm/protocol.h>
 #include <sys/fm/util.h>
 #include <sys/fm/io/ddi.h>
+
+/* Macros to help Skinny and stock 2108/MFI live together. */
+#define	WR_IB_PICK_QPORT(addr, instance) \
+	if ((instance)->skinny) { \
+		WR_IB_LOW_QPORT((addr), (instance)); \
+		WR_IB_HIGH_QPORT(0, (instance)); \
+	} else { \
+		WR_IB_QPORT((addr), (instance)); \
+	}
 
 /*
  * Local static data
@@ -135,9 +144,6 @@ static int	mrsas_tran_unquiesce(dev_info_t *dip);
 static uint_t	mrsas_isr();
 static uint_t	mrsas_softintr();
 static void	mrsas_undo_resources(dev_info_t *, struct mrsas_instance *);
-static struct mrsas_cmd *get_mfi_pkt(struct mrsas_instance *);
-static void	return_mfi_pkt(struct mrsas_instance *,
-		    struct mrsas_cmd *);
 
 static void	free_space_for_mfi(struct mrsas_instance *);
 static uint32_t	read_fw_status_reg_ppc(struct mrsas_instance *);
@@ -575,6 +581,18 @@ mrsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			instance->tbolt = 1;
 			break;
 
+		case PCI_DEVICE_ID_LSI_SKINNY:
+		case PCI_DEVICE_ID_LSI_SKINNY_NEW:
+			/*
+			 * FALLTHRU to PPC-style functions, but mark this
+			 * instance as Skinny, because the register set is
+			 * slightly different (See WR_IB_PICK_QPORT), and
+			 * certain other features are available to a Skinny
+			 * HBA.
+			 */
+			instance->skinny = 1;
+			/* FALLTHRU */
+
 		case PCI_DEVICE_ID_LSI_2108VDE:
 		case PCI_DEVICE_ID_LSI_2108V:
 			con_log(CL_ANN, (CE_NOTE,
@@ -815,15 +833,11 @@ mrsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		tran->tran_tgt_init	= mrsas_tran_tgt_init;
 		tran->tran_tgt_probe	= scsi_hba_probe;
 		tran->tran_tgt_free	= mrsas_tran_tgt_free;
-		if (instance->tbolt) {
-			tran->tran_init_pkt	=
-			    mrsas_tbolt_tran_init_pkt;
-			tran->tran_start	=
-			    mrsas_tbolt_tran_start;
-		} else {
-			tran->tran_init_pkt	= mrsas_tran_init_pkt;
-			tran->tran_start	= mrsas_tran_start;
-		}
+		tran->tran_init_pkt	= mrsas_tran_init_pkt;
+		if (instance->tbolt)
+			tran->tran_start = mrsas_tbolt_tran_start;
+		else
+			tran->tran_start = mrsas_tran_start;
 		tran->tran_abort	= mrsas_tran_abort;
 		tran->tran_reset	= mrsas_tran_reset;
 		tran->tran_getcap	= mrsas_tran_getcap;
@@ -940,7 +954,7 @@ mrsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		instance->unroll.ldlist_buff = 1;
 
 #ifdef PDSUPPORT
-		if (instance->tbolt) {
+		if (instance->tbolt || instance->skinny) {
 			instance->mr_tbolt_pd_max = MRSAS_TBOLT_PD_TGT_MAX;
 			instance->mr_tbolt_pd_list =
 			    kmem_zalloc(MRSAS_TBOLT_GET_PD_MAX(instance) *
@@ -1663,7 +1677,7 @@ mrsas_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	}
 
 #ifdef PDSUPPORT
-	else if (instance->tbolt) {
+	else if (instance->tbolt || instance->skinny) {
 		if (instance->mr_tbolt_pd_list[tgt].dip == NULL) {
 			mutex_enter(&instance->config_dev_mtx);
 			instance->mr_tbolt_pd_list[tgt].dip = tgt_dip;
@@ -1701,7 +1715,7 @@ mrsas_tran_tgt_free(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	}
 
 #ifdef PDSUPPORT
-	else if (instance->tbolt) {
+	else if (instance->tbolt || instance->skinny) {
 		mutex_enter(&instance->config_dev_mtx);
 		instance->mr_tbolt_pd_list[tgt].dip = NULL;
 		mutex_exit(&instance->config_dev_mtx);
@@ -1938,7 +1952,7 @@ mrsas_tran_start(struct scsi_address *ap, register struct scsi_pkt *pkt)
 			DTRACE_PROBE2(start_tran_err,
 			    uint16_t, instance->fw_outstanding,
 			    uint16_t, instance->max_fw_cmds);
-			return_mfi_pkt(instance, cmd);
+			mrsas_return_mfi_pkt(instance, cmd);
 			return (TRAN_BUSY);
 		}
 
@@ -1987,7 +2001,7 @@ mrsas_tran_start(struct scsi_address *ap, register struct scsi_pkt *pkt)
 		(void) mrsas_common_check(instance, cmd);
 		DTRACE_PROBE2(start_nointr_done, uint8_t, hdr->cmd,
 		    uint8_t, hdr->cmd_status);
-		return_mfi_pkt(instance, cmd);
+		mrsas_return_mfi_pkt(instance, cmd);
 
 		if (pkt->pkt_comp) {
 			(*pkt->pkt_comp)(pkt);
@@ -2461,8 +2475,8 @@ mrsas_isr(struct mrsas_instance *instance)
  * After clearing the frame buffer the context id of the
  * frame buffer SHOULD be restored back.
  */
-static struct mrsas_cmd *
-get_mfi_pkt(struct mrsas_instance *instance)
+struct mrsas_cmd *
+mrsas_get_mfi_pkt(struct mrsas_instance *instance)
 {
 	mlist_t			*head = &instance->cmd_pool_list;
 	struct mrsas_cmd	*cmd = NULL;
@@ -2509,8 +2523,8 @@ get_mfi_app_pkt(struct mrsas_instance *instance)
 /*
  * return_mfi_pkt : Return a cmd to free command pool
  */
-static void
-return_mfi_pkt(struct mrsas_instance *instance, struct mrsas_cmd *cmd)
+void
+mrsas_return_mfi_pkt(struct mrsas_instance *instance, struct mrsas_cmd *cmd)
 {
 	mutex_enter(&instance->cmd_pool_mtx);
 	/* use mlist_add_tail for debug assistance */
@@ -3162,7 +3176,13 @@ mrsas_alloc_cmd_pool(struct mrsas_instance *instance)
 	INIT_LIST_HEAD(&instance->cmd_pend_list);
 	INIT_LIST_HEAD(&instance->app_cmd_pool_list);
 
-	reserve_cmd = MRSAS_APP_RESERVED_CMDS;
+	/*
+	 * When max_cmd is lower than MRSAS_APP_RESERVED_CMDS, how do I split
+	 * into app_cmd and regular cmd?  For now, just take
+	 * max(1/8th of max, 4);
+	 */
+	reserve_cmd = min(MRSAS_APP_RESERVED_CMDS,
+	    max(max_cmd >> 3, MRSAS_APP_MIN_RESERVED_CMDS));
 
 	for (i = 0; i < reserve_cmd; i++) {
 		cmd = instance->cmd_list[i];
@@ -3276,7 +3296,7 @@ get_ctrl_info(struct mrsas_instance *instance,
 	if (instance->tbolt) {
 		cmd = get_raid_msg_mfi_pkt(instance);
 	} else {
-		cmd = get_mfi_pkt(instance);
+		cmd = mrsas_get_mfi_pkt(instance);
 	}
 
 	if (!cmd) {
@@ -3299,7 +3319,7 @@ get_ctrl_info(struct mrsas_instance *instance,
 	if (!ci) {
 		cmn_err(CE_WARN,
 		    "Failed to alloc mem for ctrl info");
-		return_mfi_pkt(instance, cmd);
+		mrsas_return_mfi_pkt(instance, cmd);
 		return (DDI_FAILURE);
 	}
 
@@ -3358,7 +3378,7 @@ get_ctrl_info(struct mrsas_instance *instance,
 	if (instance->tbolt) {
 		return_raid_msg_mfi_pkt(instance, cmd);
 	} else {
-		return_mfi_pkt(instance, cmd);
+		mrsas_return_mfi_pkt(instance, cmd);
 	}
 
 	return (ret);
@@ -3381,7 +3401,7 @@ abort_aen_cmd(struct mrsas_instance *instance,
 	if (instance->tbolt) {
 		cmd = get_raid_msg_mfi_pkt(instance);
 	} else {
-		cmd = get_mfi_pkt(instance);
+		cmd = mrsas_get_mfi_pkt(instance);
 	}
 
 	if (!cmd) {
@@ -3434,7 +3454,7 @@ abort_aen_cmd(struct mrsas_instance *instance,
 	if (instance->tbolt) {
 		return_raid_msg_mfi_pkt(instance, cmd);
 	} else {
-		return_mfi_pkt(instance, cmd);
+		mrsas_return_mfi_pkt(instance, cmd);
 	}
 
 	atomic_add_16(&instance->fw_outstanding, (-1));
@@ -3569,7 +3589,12 @@ mrsas_init_adapter_ppc(struct mrsas_instance *instance)
 	}
 
 	/* Build INIT command */
-	cmd = get_mfi_pkt(instance);
+	cmd = mrsas_get_mfi_pkt(instance);
+	if (cmd == NULL) {
+		DTRACE_PROBE2(init_adapter_mfi_err, uint16_t,
+		    instance->fw_outstanding, uint16_t, instance->max_fw_cmds);
+		return (DDI_FAILURE);
+	}
 
 	if (mrsas_build_init_cmd(instance, &cmd) != DDI_SUCCESS) {
 		con_log(CL_ANN,
@@ -3589,7 +3614,7 @@ mrsas_init_adapter_ppc(struct mrsas_instance *instance)
 
 	if (mrsas_common_check(instance, cmd) != DDI_SUCCESS)
 		goto fail_fw_init;
-	return_mfi_pkt(instance, cmd);
+	mrsas_return_mfi_pkt(instance, cmd);
 
 	if (ctio_enable &&
 	    (instance->func_ptr->read_fw_status_reg(instance) & 0x04000000)) {
@@ -3598,6 +3623,8 @@ mrsas_init_adapter_ppc(struct mrsas_instance *instance)
 	} else {
 		instance->flag_ieee = 0;
 	}
+
+	ASSERT(!instance->skinny || instance->flag_ieee);
 
 	instance->unroll.alloc_space_mfi = 1;
 	instance->unroll.verBuff = 1;
@@ -3609,7 +3636,7 @@ fail_fw_init:
 	(void) mrsas_free_dma_obj(instance, instance->drv_ver_dma_obj);
 
 fail_undo_alloc_mfi_space:
-	return_mfi_pkt(instance, cmd);
+	mrsas_return_mfi_pkt(instance, cmd);
 	free_space_for_mfi(instance);
 
 	return (DDI_FAILURE);
@@ -3761,7 +3788,7 @@ mrsas_issue_init_mfi(struct mrsas_instance *instance)
 	}
 
 	if (mrsas_common_check(instance, cmd) != DDI_SUCCESS) {
-		return_mfi_pkt(instance, cmd);
+		return_mfi_app_pkt(instance, cmd);
 		return (DDI_FAILURE);
 	}
 
@@ -3814,7 +3841,7 @@ mfi_state_transition_to_ready(struct mrsas_instance *instance)
 			 * to be set
 			 */
 			/* WR_IB_MSG_0(MFI_INIT_CLEAR_HANDSHAKE, instance); */
-			if (!instance->tbolt) {
+			if (!instance->tbolt && !instance->skinny) {
 				WR_IB_DOORBELL(MFI_INIT_CLEAR_HANDSHAKE |
 				    MFI_INIT_HOTPLUG, instance);
 			} else {
@@ -3833,7 +3860,7 @@ mfi_state_transition_to_ready(struct mrsas_instance *instance)
 			 * (MFI_INIT_CLEAR_HANDSHAKE|MFI_INIT_HOTPLUG)
 			 * to be set
 			 */
-			if (!instance->tbolt) {
+			if (!instance->tbolt && !instance->skinny) {
 				WR_IB_DOORBELL(MFI_INIT_HOTPLUG, instance);
 			} else {
 				WR_RESERVED0_REGISTER(MFI_INIT_HOTPLUG,
@@ -3853,7 +3880,7 @@ mfi_state_transition_to_ready(struct mrsas_instance *instance)
 			 * to be set
 			 */
 			/* WR_IB_DOORBELL(MFI_INIT_READY, instance); */
-			if (!instance->tbolt) {
+			if (!instance->tbolt && !instance->skinny) {
 				WR_IB_DOORBELL(MFI_RESET_FLAGS, instance);
 			} else {
 				WR_RESERVED0_REGISTER(MFI_RESET_FLAGS,
@@ -3937,7 +3964,8 @@ mfi_state_transition_to_ready(struct mrsas_instance *instance)
 		}
 	};
 
-	if (!instance->tbolt) {
+	/* This may also need to apply to Skinny, but for now, don't worry. */
+	if (!instance->tbolt && !instance->skinny) {
 		fw_ctrl = RD_IB_DOORBELL(instance);
 		con_log(CL_ANN1, (CE_CONT,
 		    "mfi_state_transition_to_ready:FW ctrl = 0x%x", fw_ctrl));
@@ -3976,7 +4004,7 @@ get_seq_num(struct mrsas_instance *instance,
 	if (instance->tbolt) {
 		cmd = get_raid_msg_mfi_pkt(instance);
 	} else {
-		cmd = get_mfi_pkt(instance);
+		cmd = mrsas_get_mfi_pkt(instance);
 	}
 
 	if (!cmd) {
@@ -4052,7 +4080,7 @@ get_seq_num(struct mrsas_instance *instance,
 	if (instance->tbolt) {
 		return_raid_msg_mfi_pkt(instance, cmd);
 	} else {
-		return_mfi_pkt(instance, cmd);
+		mrsas_return_mfi_pkt(instance, cmd);
 	}
 
 	return (ret);
@@ -4105,7 +4133,7 @@ flush_cache(struct mrsas_instance *instance)
 	if (instance->tbolt) {
 		cmd = get_raid_msg_mfi_pkt(instance);
 	} else {
-		cmd = get_mfi_pkt(instance);
+		cmd = mrsas_get_mfi_pkt(instance);
 	}
 
 	if (!cmd) {
@@ -4151,7 +4179,7 @@ flush_cache(struct mrsas_instance *instance)
 	if (instance->tbolt) {
 		return_raid_msg_mfi_pkt(instance, cmd);
 	} else {
-		return_mfi_pkt(instance, cmd);
+		mrsas_return_mfi_pkt(instance, cmd);
 	}
 
 }
@@ -4251,7 +4279,7 @@ service_mfi_aen(struct mrsas_instance *instance, struct mrsas_cmd *cmd)
 
 #ifdef PDSUPPORT
 	case MR_EVT_PD_REMOVED_EXT: {
-		if (instance->tbolt) {
+		if (instance->tbolt || instance->skinny) {
 			pd_addr = &evt_detail->args.pd_addr;
 			dtype = pd_addr->scsi_dev_type;
 			con_log(CL_DLEVEL1, (CE_NOTE,
@@ -4275,7 +4303,7 @@ service_mfi_aen(struct mrsas_instance *instance, struct mrsas_cmd *cmd)
 	} /* End of MR_EVT_PD_REMOVED_EXT */
 
 	case MR_EVT_PD_INSERTED_EXT: {
-		if (instance->tbolt) {
+		if (instance->tbolt || instance->skinny) {
 			rval = mrsas_service_evt(instance,
 			    ddi_get16(acc_handle,
 			    &evt_detail->args.pd.device_id),
@@ -4289,7 +4317,7 @@ service_mfi_aen(struct mrsas_instance *instance, struct mrsas_cmd *cmd)
 	} /* End of MR_EVT_PD_INSERTED_EXT */
 
 	case MR_EVT_PD_STATE_CHANGE: {
-		if (instance->tbolt) {
+		if (instance->tbolt || instance->skinny) {
 			tgt = ddi_get16(acc_handle,
 			    &evt_detail->args.pd.device_id);
 			if ((evt_detail->args.pd_state.prevState ==
@@ -4525,6 +4553,12 @@ mrsas_softintr(struct mrsas_instance *instance)
 					inq = (struct scsi_inquiry *)
 					    acmd->cmd_buf->b_un.b_addr;
 
+#ifdef PDSUPPORT
+					if (hdr->cmd_status == MFI_STAT_OK) {
+						display_scsi_inquiry(
+						    (caddr_t)inq);
+					}
+#else
 					/* don't expose physical drives to OS */
 					if (acmd->islogical &&
 					    (hdr->cmd_status == MFI_STAT_OK)) {
@@ -4541,6 +4575,7 @@ mrsas_softintr(struct mrsas_instance *instance)
 						hdr->cmd_status =
 						    MFI_STAT_DEVICE_NOT_FOUND;
 					}
+#endif /* PDSUPPORT */
 				}
 			}
 
@@ -4649,19 +4684,14 @@ mrsas_softintr(struct mrsas_instance *instance)
 				}
 			}
 
+			mrsas_return_mfi_pkt(instance, cmd);
+
 			/* Call the callback routine */
 			if (((pkt->pkt_flags & FLAG_NOINTR) == 0) &&
 			    pkt->pkt_comp) {
-
-				con_log(CL_DLEVEL1, (CE_NOTE, "mrsas_softintr: "
-				    "posting to scsa cmd %p index %x pkt %p "
-				    "time %llx", (void *)cmd, cmd->index,
-				    (void *)pkt, gethrtime()));
 				(*pkt->pkt_comp)(pkt);
-
 			}
 
-			return_mfi_pkt(instance, cmd);
 			break;
 
 		case MFI_CMD_OP_SMP:
@@ -5088,7 +5118,7 @@ build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 	*cmd_done = 0;
 
 	/* get the command packet */
-	if (!(cmd = get_mfi_pkt(instance))) {
+	if (!(cmd = mrsas_get_mfi_pkt(instance))) {
 		DTRACE_PROBE2(build_cmd_mfi_err, uint16_t,
 		    instance->fw_outstanding, uint16_t, instance->max_fw_cmds);
 		return (NULL);
@@ -5136,7 +5166,7 @@ build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 	/*
 	 * case SCMD_SYNCHRONIZE_CACHE:
 	 *	flush_cache(instance);
-	 *	return_mfi_pkt(instance, cmd);
+	 *	mrsas_return_mfi_pkt(instance, cmd);
 	 *	*cmd_done = 1;
 	 *
 	 *	return (NULL);
@@ -5245,7 +5275,7 @@ build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 
 			break;
 		}
-		/* fall through For all non-rd/wr cmds */
+		/* fall through For all non-rd/wr and physical disk cmds */
 	default:
 
 		switch (pkt->pkt_cdbp[0]) {
@@ -5260,7 +5290,7 @@ build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 			case 0x3:
 			case 0x4:
 				(void) mrsas_mode_sense_build(pkt);
-				return_mfi_pkt(instance, cmd);
+				mrsas_return_mfi_pkt(instance, cmd);
 				*cmd_done = 1;
 				return (NULL);
 			}
@@ -6294,7 +6324,7 @@ handle_mfi_ioctl(struct mrsas_instance *instance, struct mrsas_ioctl *ioctl,
 	if (instance->tbolt) {
 		cmd = get_raid_msg_mfi_pkt(instance);
 	} else {
-		cmd = get_mfi_pkt(instance);
+		cmd = mrsas_get_mfi_pkt(instance);
 	}
 	if (!cmd) {
 		con_log(CL_ANN, (CE_WARN, "mr_sas: "
@@ -6338,7 +6368,7 @@ handle_mfi_ioctl(struct mrsas_instance *instance, struct mrsas_ioctl *ioctl,
 	if (instance->tbolt) {
 		return_raid_msg_mfi_pkt(instance, cmd);
 	} else {
-		return_mfi_pkt(instance, cmd);
+		mrsas_return_mfi_pkt(instance, cmd);
 	}
 
 	return (rval);
@@ -6435,7 +6465,7 @@ register_mfi_aen(struct mrsas_instance *instance, uint32_t seq_num,
 	if (instance->tbolt) {
 		cmd = get_raid_msg_mfi_pkt(instance);
 	} else {
-		cmd = get_mfi_pkt(instance);
+		cmd = mrsas_get_mfi_pkt(instance);
 	}
 
 	if (!cmd) {
@@ -6728,7 +6758,7 @@ issue_cmd_ppc(struct mrsas_cmd *cmd, struct mrsas_instance *instance)
 
 	mutex_enter(&instance->reg_write_mtx);
 	/* Issue the command to the FW */
-	WR_IB_QPORT((cmd->frame_phys_addr) |
+	WR_IB_PICK_QPORT((cmd->frame_phys_addr) |
 	    (((cmd->frame_count - 1) << 1) | 1), instance);
 	mutex_exit(&instance->reg_write_mtx);
 
@@ -6739,10 +6769,10 @@ issue_cmd_ppc(struct mrsas_cmd *cmd, struct mrsas_instance *instance)
  */
 static int
 issue_cmd_in_sync_mode_ppc(struct mrsas_instance *instance,
-struct mrsas_cmd *cmd)
+    struct mrsas_cmd *cmd)
 {
 	int	i;
-	uint32_t	msecs = MFI_POLL_TIMEOUT_SECS * (10 * MILLISEC);
+	uint32_t	msecs = MFI_POLL_TIMEOUT_SECS * MILLISEC;
 	struct mrsas_header *hdr = &cmd->frame->hdr;
 
 	con_log(CL_ANN1, (CE_NOTE, "issue_cmd_in_sync_mode_ppc: called"));
@@ -6755,7 +6785,7 @@ struct mrsas_cmd *cmd)
 
 		con_log(CL_ANN1, (CE_NOTE, "sync_mode_ppc: "
 		    "issue and return in reset case\n"));
-		WR_IB_QPORT((cmd->frame_phys_addr) |
+		WR_IB_PICK_QPORT((cmd->frame_phys_addr) |
 		    (((cmd->frame_count - 1) << 1) | 1), instance);
 
 		return (DDI_SUCCESS);
@@ -6768,7 +6798,7 @@ struct mrsas_cmd *cmd)
 
 	mutex_enter(&instance->reg_write_mtx);
 	/* Issue the command to the FW */
-	WR_IB_QPORT((cmd->frame_phys_addr) |
+	WR_IB_PICK_QPORT((cmd->frame_phys_addr) |
 	    (((cmd->frame_count - 1) << 1) | 1), instance);
 	mutex_exit(&instance->reg_write_mtx);
 
@@ -6810,7 +6840,7 @@ issue_cmd_in_poll_mode_ppc(struct mrsas_instance *instance,
 	ddi_put16(cmd->frame_dma_obj.acc_handle, &frame_hdr->flags, flags);
 
 	/* issue the frame using inbound queue port */
-	WR_IB_QPORT((cmd->frame_phys_addr) |
+	WR_IB_PICK_QPORT((cmd->frame_phys_addr) |
 	    (((cmd->frame_count - 1) << 1) | 1), instance);
 
 	/* wait for cmd_status to change from 0xFF */
@@ -6837,11 +6867,16 @@ enable_intr_ppc(struct mrsas_instance *instance)
 
 	con_log(CL_ANN1, (CE_NOTE, "enable_intr_ppc: called"));
 
-	/* WR_OB_DOORBELL_CLEAR(0xFFFFFFFF, instance); */
-	WR_OB_DOORBELL_CLEAR(OB_DOORBELL_CLEAR_MASK, instance);
+	if (instance->skinny) {
+		/* For SKINNY, write ~0x1, from BSD's mfi driver. */
+		WR_OB_INTR_MASK(0xfffffffe, instance);
+	} else {
+		/* WR_OB_DOORBELL_CLEAR(0xFFFFFFFF, instance); */
+		WR_OB_DOORBELL_CLEAR(OB_DOORBELL_CLEAR_MASK, instance);
 
-	/* WR_OB_INTR_MASK(~0x80000000, instance); */
-	WR_OB_INTR_MASK(~(MFI_REPLY_2108_MESSAGE_INTR_MASK), instance);
+		/* WR_OB_INTR_MASK(~0x80000000, instance); */
+		WR_OB_INTR_MASK(~(MFI_REPLY_2108_MESSAGE_INTR_MASK), instance);
+	}
 
 	/* dummy read to force PCI flush */
 	mask = RD_OB_INTR_MASK(instance);
@@ -6860,7 +6895,8 @@ disable_intr_ppc(struct mrsas_instance *instance)
 	con_log(CL_ANN1, (CE_NOTE, "disable_intr_ppc: before : "
 	    "outbound_intr_mask = 0x%x", RD_OB_INTR_MASK(instance)));
 
-	/* WR_OB_INTR_MASK(0xFFFFFFFF, instance); */
+	/* For now, assume there are no extras needed for Skinny support. */
+
 	WR_OB_INTR_MASK(OB_INTR_MASK, instance);
 
 	con_log(CL_ANN1, (CE_NOTE, "disable_intr_ppc: after : "
@@ -6886,6 +6922,10 @@ intr_ack_ppc(struct mrsas_instance *instance)
 
 	con_log(CL_ANN1, (CE_NOTE, "intr_ack_ppc: status = 0x%x", status));
 
+	/*
+	 * NOTE:  Some drivers call out SKINNY here, but the return is the same
+	 * for SKINNY and 2108.
+	 */
 	if (!(status & MFI_REPLY_2108_MESSAGE_INTR)) {
 		ret = DDI_INTR_UNCLAIMED;
 	}
@@ -6898,8 +6938,16 @@ intr_ack_ppc(struct mrsas_instance *instance)
 	if (ret == DDI_INTR_UNCLAIMED) {
 		return (ret);
 	}
-	/* clear the interrupt by writing back the same value */
-	WR_OB_DOORBELL_CLEAR(status, instance);
+
+	/*
+	 * Clear the interrupt by writing back the same value.
+	 * Another case where SKINNY is slightly different.
+	 */
+	if (instance->skinny) {
+		WR_OB_INTR_STATUS(status, instance);
+	} else {
+		WR_OB_DOORBELL_CLEAR(status, instance);
+	}
 
 	/* dummy READ */
 	status = RD_OB_INTR_STATUS(instance);
@@ -7485,7 +7533,7 @@ mrsas_tran_bus_config(dev_info_t *parent, uint_t flags,
 		if (lun == 0) {
 			rval = mrsas_config_ld(instance, tgt, lun, childp);
 #ifdef PDSUPPORT
-		} else if (instance->tbolt == 1 && lun != 0) {
+		} else if ((instance->tbolt || instance->skinny) && lun != 0) {
 			rval = mrsas_tbolt_config_pd(instance,
 			    tgt, lun, childp);
 #endif
@@ -7528,7 +7576,7 @@ mrsas_config_all_devices(struct mrsas_instance *instance)
 
 #ifdef PDSUPPORT
 	/* Config PD devices connected to the card */
-	if (instance->tbolt) {
+	if (instance->tbolt || instance->skinny) {
 		for (tgt = 0; tgt < instance->mr_tbolt_pd_max; tgt++) {
 			(void) mrsas_tbolt_config_pd(instance, tgt, 1, NULL);
 		}
@@ -7782,7 +7830,7 @@ mrsas_issue_evt_taskq(struct mrsas_eventinfo *mrevt)
 				(void) mrsas_config_ld(instance, mrevt->tgt,
 				    0, NULL);
 #ifdef PDSUPPORT
-			} else if (instance->tbolt) {
+			} else if (instance->tbolt || instance->skinny) {
 				(void) mrsas_tbolt_config_pd(instance,
 				    mrevt->tgt,
 				    1, NULL);
