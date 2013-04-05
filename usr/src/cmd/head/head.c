@@ -106,8 +106,9 @@ main(int argc, char **argv)
 		case 'c':
 			if ((strcmp(optarg, "--") == 0) || (optind > argc)) {
 				(void) fprintf(stderr, gettext(
-				    "%s: Missing -n argument\n"), argv[0]),
-				    Usage();
+				    "%s: Missing -%c argument\n"), argv[0],
+				    optopt);
+				Usage();
 			}
 			linecnt = (off_t)strtoll(optarg, (char **)NULL, 10);
 			if (linecnt <= 0) {

@@ -43,6 +43,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_MR_SAS_H_
@@ -90,6 +91,8 @@ extern "C" {
  */
 #define	PCI_DEVICE_ID_LSI_2108VDE		0x0078
 #define	PCI_DEVICE_ID_LSI_2108V			0x0079
+#define	PCI_DEVICE_ID_LSI_SKINNY		0x0071
+#define	PCI_DEVICE_ID_LSI_SKINNY_NEW		0x0073
 #define	PCI_DEVICE_ID_LSI_TBOLT			0x005b
 #define	PCI_DEVICE_ID_LSI_INVADER		0x005d
 
@@ -100,6 +103,7 @@ extern "C" {
 
 #define	MRSAS_MAX_SGE_CNT			0x50
 #define	MRSAS_APP_RESERVED_CMDS			32
+#define	MRSAS_APP_MIN_RESERVED_CMDS		4
 
 #define	MRSAS_IOCTL_DRIVER			0x12341234
 #define	MRSAS_IOCTL_FIRMWARE			0x12345678
@@ -594,7 +598,8 @@ typedef struct mrsas_instance {
 
 	uint8_t		fast_path_io;
 
-	uint16_t	tbolt;
+	uint8_t		skinny;
+	uint8_t		tbolt;
 	uint16_t	reply_read_index;
 	uint16_t	reply_size; 		/* Single Reply struct size */
 	uint16_t	raid_io_msg_size; 	/* Single message size */
@@ -2044,6 +2049,9 @@ void mrsas_print_cmd_details(struct mrsas_instance *, struct mrsas_cmd *, int);
 struct mrsas_cmd *get_raid_msg_pkt(struct mrsas_instance *);
 
 int mfi_state_transition_to_ready(struct mrsas_instance *);
+
+struct mrsas_cmd *mrsas_get_mfi_pkt(struct mrsas_instance *);
+void mrsas_return_mfi_pkt(struct mrsas_instance *, struct mrsas_cmd *);
 
 
 /* FMA functions. */

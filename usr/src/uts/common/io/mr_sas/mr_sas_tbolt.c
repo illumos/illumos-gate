@@ -15,6 +15,10 @@
  *		Shakeel Bukhari
  */
 
+/*
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 
 #include <sys/types.h>
 #include <sys/file.h>
@@ -46,8 +50,6 @@ extern struct ddi_device_acc_attr endian_attr;
 extern int	debug_level_g;
 extern unsigned int	enable_fp;
 volatile int dump_io_wait_time = 90;
-extern void
-io_timeout_checker(void *arg);
 extern volatile int  debug_timeout_g;
 extern int	mrsas_issue_pending_cmds(struct mrsas_instance *);
 extern int mrsas_complete_pending_cmds(struct mrsas_instance *instance);
@@ -1882,96 +1884,6 @@ mrsas_tbolt_build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 	return (cmd);
 }
 
-/*
- * mrsas_tbolt_tran_init_pkt - allocate & initialize a scsi_pkt structure
- * @ap:
- * @pkt:
- * @bp:
- * @cmdlen:
- * @statuslen:
- * @tgtlen:
- * @flags:
- * @callback:
- *
- * The tran_init_pkt() entry point allocates and initializes a scsi_pkt
- * structure and DMA resources for a target driver request. The
- * tran_init_pkt() entry point is called when the target driver calls the
- * SCSA function scsi_init_pkt(). Each call of the tran_init_pkt() entry point
- * is a request to perform one or more of three possible services:
- *  - allocation and initialization of a scsi_pkt structure
- *  - allocation of DMA resources for data transfer
- *  - reallocation of DMA resources for the next portion of the data transfer
- */
-struct scsi_pkt *
-mrsas_tbolt_tran_init_pkt(struct scsi_address *ap,
-	register struct scsi_pkt *pkt,
-	struct buf *bp, int cmdlen, int statuslen, int tgtlen,
-	int flags, int (*callback)(), caddr_t arg)
-{
-	struct scsa_cmd	*acmd;
-	struct mrsas_instance	*instance;
-	struct scsi_pkt	*new_pkt;
-
-	instance = ADDR2MR(ap);
-
-	/* step #1 : pkt allocation */
-	if (pkt == NULL) {
-		pkt = scsi_hba_pkt_alloc(instance->dip, ap, cmdlen, statuslen,
-		    tgtlen, sizeof (struct scsa_cmd), callback, arg);
-		if (pkt == NULL) {
-			return (NULL);
-		}
-
-		acmd = PKT2CMD(pkt);
-
-		/*
-		 * Initialize the new pkt - we redundantly initialize
-		 * all the fields for illustrative purposes.
-		 */
-		acmd->cmd_pkt		= pkt;
-		acmd->cmd_flags		= 0;
-		acmd->cmd_scblen	= statuslen;
-		acmd->cmd_cdblen	= cmdlen;
-		acmd->cmd_dmahandle	= NULL;
-		acmd->cmd_ncookies	= 0;
-		acmd->cmd_cookie	= 0;
-		acmd->cmd_cookiecnt	= 0;
-		acmd->cmd_nwin		= 0;
-
-		pkt->pkt_address	= *ap;
-		pkt->pkt_comp		= (void (*)())NULL;
-		pkt->pkt_flags		= 0;
-		pkt->pkt_time		= 0;
-		pkt->pkt_resid		= 0;
-		pkt->pkt_state		= 0;
-		pkt->pkt_statistics	= 0;
-		pkt->pkt_reason		= 0;
-		new_pkt			= pkt;
-	} else {
-		acmd = PKT2CMD(pkt);
-		new_pkt = NULL;
-	}
-
-	/* step #2 : dma allocation/move */
-	if (bp && bp->b_bcount != 0) {
-		if (acmd->cmd_dmahandle == NULL) {
-			if (mrsas_dma_alloc(instance, pkt, bp, flags,
-			    callback) == DDI_FAILURE) {
-				if (new_pkt) {
-					scsi_hba_pkt_free(ap, new_pkt);
-				}
-				return ((struct scsi_pkt *)NULL);
-			}
-		} else {
-			if (mrsas_dma_move(instance, pkt, bp) == DDI_FAILURE) {
-				return ((struct scsi_pkt *)NULL);
-			}
-		}
-	}
-	return (pkt);
-}
-
-
 uint32_t
 tbolt_read_fw_status_reg(struct mrsas_instance *instance)
 {
@@ -3632,6 +3544,14 @@ abort_syncmap_cmd(struct mrsas_instance *instance,
 
 
 #ifdef PDSUPPORT
+/*
+ * Even though these functions were originally intended for 2208 only, it
+ * turns out they're useful for "Skinny" support as well.  In a perfect world,
+ * these two functions would be either in mr_sas.c, or in their own new source
+ * file.  Since this driver needs some cleanup anyway, keep this portion in
+ * mind as well.
+ */
+
 int
 mrsas_tbolt_config_pd(struct mrsas_instance *instance, uint16_t tgt,
     uint8_t lun, dev_info_t **ldip)
@@ -3694,7 +3614,6 @@ mrsas_tbolt_config_pd(struct mrsas_instance *instance, uint16_t tgt,
 			sd->sd_inq = (struct scsi_inquiry *)NULL;
 		}
 		kmem_free(sd, sizeof (struct scsi_device));
-		rval = NDI_SUCCESS;
 	} else {
 		con_log(CL_ANN1, (CE_NOTE,
 		    "Device not supported: tgt %d lun %d dtype %d",
@@ -3716,7 +3635,12 @@ mrsas_tbolt_get_pd_info(struct mrsas_instance *instance,
 	struct mrsas_dcmd_frame	*dcmd;
 	dma_obj_t		dcmd_dma_obj;
 
-	cmd = get_raid_msg_pkt(instance);
+	ASSERT(instance->tbolt || instance->skinny);
+
+	if (instance->tbolt)
+		cmd = get_raid_msg_pkt(instance);
+	else
+		cmd = mrsas_get_mfi_pkt(instance);
 
 	if (!cmd) {
 		con_log(CL_ANN1,
@@ -3761,9 +3685,8 @@ mrsas_tbolt_get_pd_info(struct mrsas_instance *instance,
 	cmd->sync_cmd = MRSAS_TRUE;
 	cmd->frame_count = 1;
 
-	if (instance->tbolt) {
+	if (instance->tbolt)
 		mr_sas_tbolt_build_mfi_cmd(instance, cmd);
-	}
 
 	instance->func_ptr->issue_cmd_in_sync_mode(instance, cmd);
 
@@ -3771,6 +3694,10 @@ mrsas_tbolt_get_pd_info(struct mrsas_instance *instance,
 	    (uint8_t *)dcmd_dma_obj.buffer, sizeof (struct mrsas_tbolt_pd_info),
 	    DDI_DEV_AUTOINCR);
 	(void) mrsas_free_dma_obj(instance, dcmd_dma_obj);
-	return_raid_msg_pkt(instance, cmd);
+
+	if (instance->tbolt)
+		return_raid_msg_pkt(instance, cmd);
+	else
+		mrsas_return_mfi_pkt(instance, cmd);
 }
 #endif

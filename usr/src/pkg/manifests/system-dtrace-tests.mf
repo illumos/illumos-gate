@@ -1261,6 +1261,8 @@ file path=opt/SUNWdtrt/tst/common/print/tst.array.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/print/tst.bitfield.d mode=0444
 file path=opt/SUNWdtrt/tst/common/print/tst.bitfield.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/print/tst.dyn.d mode=0444
+file path=opt/SUNWdtrt/tst/common/print/tst.enum.d mode=0444
+file path=opt/SUNWdtrt/tst/common/print/tst.enum.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/print/tst.primitive.d mode=0444
 file path=opt/SUNWdtrt/tst/common/print/tst.primitive.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/print/tst.struct.d mode=0444
