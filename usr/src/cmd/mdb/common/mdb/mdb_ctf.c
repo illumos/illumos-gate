@@ -1513,7 +1513,7 @@ mdb_ctf_readsym(void *buf, const char *typename, const char *name, uint_t flags)
 {
 	GElf_Sym sym;
 
-	if (mdb_lookup_by_name(name, &sym) != 0) {
+	if (mdb_lookup_by_obj(MDB_TGT_OBJ_EVERY, name, &sym) != 0) {
 		mdb_ctf_warn(flags, "couldn't find symbol %s\n", name);
 		return (-1); /* errno is set for us */
 	}

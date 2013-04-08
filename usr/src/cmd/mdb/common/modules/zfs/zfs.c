@@ -36,7 +36,6 @@
 #include <sys/metaslab_impl.h>
 #include <sys/space_map.h>
 #include <sys/list.h>
-#include <sys/spa_impl.h>
 #include <sys/vdev_impl.h>
 #include <sys/zap_leaf.h>
 #include <sys/zap_impl.h>
@@ -778,7 +777,7 @@ abuf_find(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	for (i = 0; i < sizeof (syms) / sizeof (syms[0]); i++) {
-		if (mdb_lookup_by_name(syms[i], &sym)) {
+		if (mdb_lookup_by_obj(ZFS_OBJ_NAME, syms[i], &sym)) {
 			mdb_warn("can't find symbol %s", syms[i]);
 			return (DCMD_ERR);
 		}
@@ -896,7 +895,7 @@ arc_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		NULL
 	};
 
-	if (mdb_lookup_by_name("arc_stats", &sym) == -1) {
+	if (mdb_lookup_by_obj(ZFS_OBJ_NAME, "arc_stats", &sym) == -1) {
 		mdb_warn("failed to find 'arc_stats'");
 		return (DCMD_ERR);
 	}
@@ -963,7 +962,7 @@ arc_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	for (i = 0; extras[i]; i++) {
 		uint64_t buf;
 
-		if (mdb_lookup_by_name(extras[i], &sym) == -1) {
+		if (mdb_lookup_by_obj(ZFS_OBJ_NAME, extras[i], &sym) == -1) {
 			mdb_warn("failed to find '%s'", extras[i]);
 			return (DCMD_ERR);
 		}
@@ -992,12 +991,17 @@ arc_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+typedef struct mdb_spa_print {
+	pool_state_t spa_state;
+	char spa_name[MAXNAMELEN];
+} mdb_spa_print_t;
+
 /*
  * ::spa
  *
- * 	-c	Print configuration information as well
- * 	-v	Print vdev state
- * 	-e	Print vdev error stats
+ *	-c	Print configuration information as well
+ *	-v	Print vdev state
+ *	-e	Print vdev error stats
  *
  * Print a summarized spa_t.  When given no arguments, prints out a table of all
  * active pools on the system.
@@ -1006,7 +1010,6 @@ arc_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 static int
 spa_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	spa_t spa;
 	const char *statetab[] = { "ACTIVE", "EXPORTED", "DESTROYED",
 		"SPARE", "L2CACHE", "UNINIT", "UNAVAIL", "POTENTIAL" };
 	const char *state;
@@ -1039,10 +1042,9 @@ spa_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf("%<u>%-?s %9s %-*s%</u>\n", "ADDR", "STATE",
 		    sizeof (uintptr_t) == 4 ? 60 : 52, "NAME");
 
-	if (mdb_vread(&spa, sizeof (spa), addr) == -1) {
-		mdb_warn("failed to read spa_t at %p", addr);
+	mdb_spa_print_t spa;
+	if (mdb_ctf_vread(&spa, "spa_t", "mdb_spa_print_t", addr, 0) == -1)
 		return (DCMD_ERR);
-	}
 
 	if (spa.spa_state < 0 || spa.spa_state > POOL_STATE_UNAVAIL)
 		state = "UNKNOWN";
@@ -1577,36 +1579,19 @@ spa_space(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
-/*
- * ::spa_verify
- *
- * Given a spa_t, verify that that the pool is self-consistent.
- * Currently, it only checks to make sure that the vdev tree exists.
- */
-/* ARGSUSED */
-static int
-spa_verify(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
-{
-	spa_t spa;
+typedef struct mdb_spa_aux_vdev {
+	int sav_count;
+	uintptr_t sav_vdevs;
+} mdb_spa_aux_vdev_t;
 
-	if (argc != 0 || !(flags & DCMD_ADDRSPEC))
-		return (DCMD_USAGE);
-
-	if (mdb_vread(&spa, sizeof (spa), addr) == -1) {
-		mdb_warn("failed to read spa_t at %p", addr);
-		return (DCMD_ERR);
-	}
-
-	if (spa.spa_root_vdev == NULL) {
-		mdb_printf("no vdev tree present\n");
-		return (DCMD_OK);
-	}
-
-	return (DCMD_OK);
-}
+typedef struct mdb_spa_vdevs {
+	uintptr_t spa_root_vdev;
+	mdb_spa_aux_vdev_t spa_l2cache;
+	mdb_spa_aux_vdev_t spa_spares;
+} mdb_spa_vdevs_t;
 
 static int
-spa_print_aux(spa_aux_vdev_t *sav, uint_t flags, mdb_arg_t *v,
+spa_print_aux(mdb_spa_aux_vdev_t *sav, uint_t flags, mdb_arg_t *v,
     const char *name)
 {
 	uintptr_t *aux;
@@ -1627,8 +1612,7 @@ spa_print_aux(spa_aux_vdev_t *sav, uint_t flags, mdb_arg_t *v,
 
 		len = sav->sav_count * sizeof (uintptr_t);
 		aux = mdb_alloc(len, UM_SLEEP);
-		if (mdb_vread(aux, len,
-		    (uintptr_t)sav->sav_vdevs) == -1) {
+		if (mdb_vread(aux, len, sav->sav_vdevs) == -1) {
 			mdb_free(aux, len);
 			mdb_warn("failed to read l2cache vdevs at %p",
 			    sav->sav_vdevs);
@@ -1664,7 +1648,6 @@ spa_print_aux(spa_aux_vdev_t *sav, uint_t flags, mdb_arg_t *v,
 static int
 spa_vdevs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	spa_t spa;
 	mdb_arg_t v[3];
 	int errors = FALSE;
 	int ret;
@@ -1677,10 +1660,9 @@ spa_vdevs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (!(flags & DCMD_ADDRSPEC))
 		return (DCMD_USAGE);
 
-	if (mdb_vread(&spa, sizeof (spa), addr) == -1) {
-		mdb_warn("failed to read spa_t at %p", addr);
+	mdb_spa_vdevs_t spa;
+	if (mdb_ctf_vread(&spa, "spa_t", "mdb_spa_vdevs_t", addr, 0) == -1)
 		return (DCMD_ERR);
-	}
 
 	/*
 	 * Unitialized spa_t structures can have a NULL root vdev.
@@ -2045,14 +2027,7 @@ spa_walk_init(mdb_walk_state_t *wsp)
 static int
 spa_walk_step(mdb_walk_state_t *wsp)
 {
-	spa_t	spa;
-
-	if (mdb_vread(&spa, sizeof (spa), wsp->walk_addr) == -1) {
-		mdb_warn("failed to read spa_t at %p", wsp->walk_addr);
-		return (WALK_ERR);
-	}
-
-	return (wsp->walk_callback(wsp->walk_addr, &spa, wsp->walk_cbdata));
+	return (wsp->walk_callback(wsp->walk_addr, NULL, wsp->walk_cbdata));
 }
 
 /*
@@ -3077,7 +3052,6 @@ static const mdb_dcmd_t dcmds[] = {
 	    abuf_find },
 	{ "spa", "?[-cv]", "spa_t summary", spa_print },
 	{ "spa_config", ":", "print spa_t configuration", spa_print_config },
-	{ "spa_verify", ":", "verify spa_t consistency", spa_verify },
 	{ "spa_space", ":[-b]", "print spa_t on-disk space usage", spa_space },
 	{ "spa_vdevs", ":", "given a spa_t, print vdev summary", spa_vdevs },
 	{ "vdev", ":[-re]\n"

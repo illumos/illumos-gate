@@ -25,6 +25,7 @@
 
 /*
  * Copyright 2011 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 #include "umem.h"
@@ -2102,7 +2103,7 @@ whatis_run_umem(mdb_whatis_t *w, void *ignored)
 	wi.wi_w = w;
 
 	/* umem's metadata is allocated from the umem_internal_arena */
-	if (mdb_readvar(&wi.wi_msb_arena, "umem_internal_arena") == -1)
+	if (umem_readvar(&wi.wi_msb_arena, "umem_internal_arena") == -1)
 		mdb_warn("unable to readvar \"umem_internal_arena\"");
 
 	/*
