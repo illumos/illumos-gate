@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ */
+
 #include <limits.h>
 #include <sys/mdb_modapi.h>
 #include <sys/sysinfo.h>
@@ -57,15 +61,16 @@ construct_path(uintptr_t addr, char *result)
 }
 
 void
-display_targets(struct mrsas_instance m, int verbose)
+display_targets(struct mrsas_instance *m, int verbose)
 {
 	int	tgt;
-	struct mrsas_ld *mr_ldp;
+	struct mrsas_ld mr_ldp[MRDRV_MAX_LD];
+	struct mrsas_tbolt_pd mr_pdp[MRSAS_TBOLT_PD_TGT_MAX];
 	char	device_path[PATH_MAX];
 
 	if (verbose) {
 		*device_path = 0;
-		if (construct_path((uintptr_t)m.dip, device_path) != DCMD_OK) {
+		if (construct_path((uintptr_t)m->dip, device_path) != DCMD_OK) {
 			strcpy(device_path, "couldn't determine device path");
 		}
 	}
@@ -73,29 +78,41 @@ display_targets(struct mrsas_instance m, int verbose)
 	mdb_printf("\n");
 	if (verbose)
 		mdb_printf("%s\n", device_path);
-	mdb_printf("dev_type target\n");
-	mdb_printf("----------");
-	mdb_printf("\n");
+	mdb_printf("Physical/Logical Target\n");
+	mdb_printf("-----------------------\n");
+
+	if (mdb_vread(&mr_ldp, sizeof (mr_ldp), (uintptr_t)m->mr_ld_list)
+	    == -1 ||
+	    mdb_vread(&mr_pdp, sizeof (mr_pdp), (uintptr_t)m->mr_tbolt_pd_list)
+	    == -1) {
+		mdb_warn("can't read list of disks");
+		return;
+	}
+
 	for (tgt = 0; tgt < MRDRV_MAX_LD; tgt++) {
-		mr_ldp = (struct mrsas_ld *)&m.mr_ld_list[tgt];
-		if ((mr_ldp != NULL) && (mr_ldp->dip != NULL) &&
-		    (mr_ldp->lun_type == MRSAS_LD_LUN)) {
-			mdb_printf("sd %d", tgt);
-			mdb_printf("\n");
+		if (mr_ldp[tgt].dip != NULL &&
+		    mr_ldp[tgt].lun_type == MRSAS_LD_LUN) {
+			mdb_printf("Logical          sd %d\n", tgt);
+		}
+	}
+	for (tgt = 0; tgt < MRSAS_TBOLT_PD_TGT_MAX; tgt++) {
+		if (mr_pdp[tgt].dip != NULL &&
+		    mr_pdp[tgt].lun_type == MRSAS_TBOLT_PD_LUN) {
+			mdb_printf("Physical         sd %d\n", tgt);
 		}
 	}
 	mdb_printf("\n");
 }
 
 void
-display_deviceinfo(struct mrsas_instance m)
+display_deviceinfo(struct mrsas_instance *m)
 {
 	uint16_t vid, did, svid, sid;
 
-	vid = m.vendor_id;
-	did = m.device_id;
-	svid = m.subsysvid;
-	sid = m.subsysid;
+	vid = m->vendor_id;
+	did = m->device_id;
+	svid = m->subsysvid;
+	sid = m->subsysid;
 
 	mdb_printf("\n");
 	mdb_printf("vendor_id device_id subsysvid subsysid");
@@ -178,10 +195,10 @@ mr_sas_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_printf("\n");
 
 	if (target_info)
-		display_targets(m, verbose);
+		display_targets(&m, verbose);
 
 	if (device_info)
-		display_deviceinfo(m);
+		display_deviceinfo(&m);
 
 	return (rv);
 }

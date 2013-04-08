@@ -506,7 +506,7 @@ mdb_tab_complete_global(mdb_tab_cookie_t *mcp, const char *name)
 {
 	mdb_tab_setmbase(mcp, name);
 	(void) mdb_tgt_symbol_iter(mdb.m_target, MDB_TGT_OBJ_EVERY,
-	    MDB_TGT_SYMTAB, MDB_TGT_BIND_GLOBAL | MDB_TGT_TYPE_OBJECT |
+	    MDB_TGT_SYMTAB, MDB_TGT_BIND_ANY | MDB_TGT_TYPE_OBJECT |
 	    MDB_TGT_TYPE_FUNC, tab_complete_global, mcp);
 	return (0);
 }

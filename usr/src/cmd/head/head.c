@@ -36,8 +36,9 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ */
 
 
 #include <stdio.h>
@@ -49,13 +50,13 @@
 
 #define	DEF_LINE_COUNT	10
 
-static	void	copyout(off_t);
+static	void	copyout(off_t, int);
 static	void	Usage();
 
 
 /*
- * head - give the first few lines of a stream or of each of a set of files
- *
+ * head - give the first few lines of a stream or of each of a set of files.
+ * Optionally shows a specific number of bytes instead.
  */
 int
 main(int argc, char **argv)
@@ -65,7 +66,9 @@ main(int argc, char **argv)
 	int	i;
 	int	opt;
 	off_t	linecnt	= DEF_LINE_COUNT;
+	int	isline = 1;
 	int	error = 0;
+	int	quiet = 0;
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)	/* Should be defined by cc -D */
@@ -86,7 +89,7 @@ main(int argc, char **argv)
 				Usage();
 			}
 
-			linecnt = (off_t) strtoll(&argv[i][1], (char **)NULL,
+			linecnt = (off_t)strtoll(&argv[i][1], (char **)NULL,
 			    10);
 			while (i < argc) {
 				argv[i] = argv[i + 1];
@@ -97,23 +100,31 @@ main(int argc, char **argv)
 	}
 
 	/* get options */
-	while ((opt = getopt(argc, argv, "n:")) != EOF) {
+	while ((opt = getopt(argc, argv, "qvn:c:")) != EOF) {
 		switch (opt) {
 		case 'n':
+		case 'c':
 			if ((strcmp(optarg, "--") == 0) || (optind > argc)) {
 				(void) fprintf(stderr, gettext(
-				    "%s: Missing -n argument\n"), argv[0]),
+				    "%s: Missing -%c argument\n"), argv[0],
+				    optopt);
 				Usage();
 			}
-			linecnt = (off_t) strtoll(optarg, (char **)NULL, 10);
+			linecnt = (off_t)strtoll(optarg, (char **)NULL, 10);
 			if (linecnt <= 0) {
 				(void) fprintf(stderr, gettext(
-				    "%s: Invalid \"-n %s\" option\n"),
-				    argv[0], optarg);
+				    "%s: Invalid \"-%c %s\" option\n"),
+				    argv[0], optopt, optarg);
 				Usage();
 			}
+			isline = optopt != 'c';
 			break;
-
+		case 'q':
+			quiet = 1;
+			break;
+		case 'v':
+			quiet = 0;
+			break;
 		default:
 			Usage();
 		}
@@ -135,16 +146,18 @@ main(int argc, char **argv)
 			}
 		}
 
-		if (around)
-			(void) putchar('\n');
+		if (quiet == 0) {
+			if (around)
+				(void) putchar('\n');
 
-		if (fileCount > 1)
-			(void) printf("==> %s <==\n", argv[optind]);
+			if (fileCount > 1)
+				(void) printf("==> %s <==\n", argv[optind]);
+		}
 
 		if (argv[optind] != NULL)
 			optind++;
 
-		copyout(linecnt);
+		copyout(linecnt, isline);
 		(void) fflush(stdout);
 		around++;
 
@@ -154,20 +167,32 @@ main(int argc, char **argv)
 }
 
 static void
-copyout(cnt)
-	register off_t cnt;
+copyout(off_t cnt, int isline)
 {
 	char lbuf[BUFSIZ];
 	size_t len;
 
 	while (cnt > 0 && fgets(lbuf, sizeof (lbuf), stdin) != 0) {
-		(void) printf("%s", lbuf);
-		/* only count as a line if buffer read ends with newline */
-		if ((len = strlen(lbuf)) > 0) {
-			if (lbuf[len - 1] == '\n') {
-			(void) fflush(stdout);
-			cnt--;
+		len = strlen(lbuf);
+		if (isline) {
+			(void) printf("%s", lbuf);
+			/*
+			 * only count as a line if buffer read ends with newline
+			 */
+			if (len > 0) {
+				if (lbuf[len - 1] == '\n') {
+					(void) fflush(stdout);
+					cnt--;
+				}
 			}
+		} else {
+			if (len > cnt) {
+				lbuf[cnt] = '\0';
+				len = cnt;
+			}
+			(void) printf("%s", lbuf);
+			cnt -= len;
+			(void) fflush(stdout);
 		}
 	}
 }
@@ -175,6 +200,7 @@ copyout(cnt)
 static void
 Usage()
 {
-	(void) printf(gettext("usage: head [-n #] [-#] [filename...]\n"));
+	(void) printf(gettext("usage: head [-q] [-v] [-n #] [-c #] [-#] "
+	    "[filename...]\n"));
 	exit(1);
 }

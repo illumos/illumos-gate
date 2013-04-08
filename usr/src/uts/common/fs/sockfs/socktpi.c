@@ -22,6 +22,9 @@
 /*
  * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/t_lock.h>
@@ -4978,9 +4981,17 @@ sotpi_getsockname(struct sonode *so, struct sockaddr *name, socklen_t *namelen,
 	}
 
 	if (so->so_family == AF_UNIX) {
-		/* Transport has different name space - return local info */
+		/*
+		 * Transport has different name space - return local info. If we
+		 * have enough space, let consumers know the family.
+		 */
+		if (*namelen >= sizeof (sa_family_t)) {
+			name->sa_family = AF_UNIX;
+			*namelen = sizeof (sa_family_t);
+		} else {
+			*namelen = 0;
+		}
 		error = 0;
-		*namelen = 0;
 		goto done;
 	}
 	if (!(so->so_state & SS_ISBOUND)) {

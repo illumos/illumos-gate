@@ -1,4 +1,5 @@
 '\" te
+.\" Portions Copyright (c) 2013, Joyent, Inc. All Rights Reserved
 .\" Copyright (c) 1992, X/Open Company Limited All Rights Reserved Portions
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
@@ -10,20 +11,20 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH HEAD 1 "Nov 2, 2007"
+.TH HEAD 1 "Mar	4, 2013"
 .SH NAME
 head \- display first few lines of files
 .SH SYNOPSIS
 .SS "/usr/bin/head"
 .LP
 .nf
-\fB/usr/bin/head\fR [\fB-number\fR | \fB-n\fR \fInumber\fR] [\fIfilename\fR]...
+\fB/usr/bin/head\fR [\fB-q\fR] [\fB-v\fR] [\fB-number\fR ] [ \fB-n\fR \fInumber\fR ] [ \fB-c\fR \fInumber\fR] [\fIfilename\fR]...
 .fi
 
 .SS "ksh93"
 .LP
 .nf
-\fBhead\fR [\fB-qv\fR] [\fB-n\fR \fIlines\fR] [\fB-c\fR \fIchars\fR] [\fB-s\fR \fIskip\fR][\fIfilename\fR]...
+\fBhead\fR [\fB-qv\fR] [\fB-n\fR \fIlines\fR] [\fB-c\fR \fIchars\fR] [\fB-s\fR \fIskip\fR] [\fIfilename\fR]...
 .fi
 
 .SH DESCRIPTION
@@ -33,7 +34,8 @@ head \- display first few lines of files
 The \fBhead\fR utility copies the first \fInumber\fR of lines of each
 \fIfilename\fR to the standard output. If no \fIfilename\fR is given,
 \fBhead\fR copies lines from the standard input. The default value of
-\fInumber\fR is \fB10\fR lines.
+\fInumber\fR is \fB10\fR lines. If \fB-c\fR is specified, \fBhead\fR
+copies the first \fInumber\fR of bytes of each filename.
 .sp
 .LP
 When more than one file is specified, the start of each file looks like:
@@ -124,11 +126,41 @@ The \fInumber\fR option-argument must be a positive decimal integer.
 .sp
 .ne 2
 .na
+\fB\fB-c\fR \fInumber\fR\fR
+.ad
+.RS 13n
+The first \fInumber\fR bytes of each input file is copied to standard output.
+The \fInumber\fR option-argument must be a positive decimal integer. Note,
+output may end in the middle of a character if a file contains multi-byte
+characters.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fB-\fR\fInumber\fR\fR
 .ad
 .RS 13n
 The \fInumber\fR argument is a positive decimal integer with the same effect as
 the \fB-n\fR \fInumber\fR option.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\FB-q\fR\fR
+.ad
+.RS 13n
+\fBhead\fR will not print a header in between each specified file.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\FB-v\fR\fR
+.ad
+.RS 13n
+\fBhead\fR will always print a header in between each specified file.
 .RE
 
 .sp
