@@ -1159,12 +1159,6 @@ vread_helper(mdb_ctf_id_t modid, char *modbuf,
 		return (-1); /* errno is set for us */
 	}
 
-	if (tgtkind != modkind) {
-		mdb_ctf_warn(flags, "unexpected kind for type %s (%s)\n",
-		    typename, tgtname);
-		return (set_errno(EMDB_INCOMPAT));
-	}
-
 	if ((modsz = mdb_ctf_type_size(modid)) == -1UL) {
 		mdb_ctf_warn(flags, "couldn't determine type size of "
 		    "mdb module type %s\n", mdbtypename);
@@ -1176,7 +1170,17 @@ vread_helper(mdb_ctf_id_t modid, char *modbuf,
 		return (-1); /* errno is set for us */
 	}
 
-	switch (modkind) {
+	if (tgtkind == CTF_K_POINTER && modkind == CTF_K_INTEGER &&
+	    strcmp(mdbtypename, "uintptr_t") == 0) {
+		/* allow them to convert a pointer to a uintptr_t */
+		ASSERT(modsz == tgtsz);
+	} else if (tgtkind != modkind) {
+		mdb_ctf_warn(flags, "unexpected kind for type %s (%s)\n",
+		    typename, tgtname);
+		return (set_errno(EMDB_INCOMPAT));
+	}
+
+	switch (tgtkind) {
 	case CTF_K_INTEGER:
 	case CTF_K_FLOAT:
 		/*
