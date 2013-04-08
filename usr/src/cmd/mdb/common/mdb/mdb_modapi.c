@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -120,7 +121,7 @@ ssize_t
 mdb_readsym(void *buf, size_t nbytes, const char *name)
 {
 	ssize_t rbytes = mdb_tgt_readsym(mdb.m_target, MDB_TGT_AS_VIRT,
-	    buf, nbytes, MDB_TGT_OBJ_EXEC, name);
+	    buf, nbytes, MDB_TGT_OBJ_EVERY, name);
 
 	if (rbytes > 0 && rbytes < nbytes)
 		return (set_errbytes(rbytes, nbytes));
@@ -132,7 +133,7 @@ ssize_t
 mdb_writesym(const void *buf, size_t nbytes, const char *name)
 {
 	return (mdb_tgt_writesym(mdb.m_target, MDB_TGT_AS_VIRT,
-	    buf, nbytes, MDB_TGT_OBJ_EXEC, name));
+	    buf, nbytes, MDB_TGT_OBJ_EVERY, name));
 }
 
 ssize_t
@@ -140,7 +141,7 @@ mdb_readvar(void *buf, const char *name)
 {
 	GElf_Sym sym;
 
-	if (mdb_tgt_lookup_by_name(mdb.m_target, MDB_TGT_OBJ_EXEC,
+	if (mdb_tgt_lookup_by_name(mdb.m_target, MDB_TGT_OBJ_EVERY,
 	    name, &sym, NULL))
 		return (-1);
 
@@ -156,7 +157,7 @@ mdb_writevar(const void *buf, const char *name)
 {
 	GElf_Sym sym;
 
-	if (mdb_tgt_lookup_by_name(mdb.m_target, MDB_TGT_OBJ_EXEC,
+	if (mdb_tgt_lookup_by_name(mdb.m_target, MDB_TGT_OBJ_EVERY,
 	    name, &sym, NULL))
 		return (-1);
 
@@ -170,7 +171,7 @@ mdb_writevar(const void *buf, const char *name)
 int
 mdb_lookup_by_name(const char *name, GElf_Sym *sym)
 {
-	return (mdb_lookup_by_obj(MDB_TGT_OBJ_EXEC, name, sym));
+	return (mdb_lookup_by_obj(MDB_TGT_OBJ_EVERY, name, sym));
 }
 
 int

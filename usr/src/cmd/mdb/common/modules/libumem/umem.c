@@ -25,6 +25,7 @@
 
 /*
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 #include "umem.h"
