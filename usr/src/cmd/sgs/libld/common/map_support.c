@@ -28,6 +28,10 @@
  */
 
 /*
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ */
+
+/*
  * Map file parsing (Shared Support Code).
  */
 #include	<stdio.h>
@@ -1075,34 +1079,33 @@ ld_map_sym_enter(Mapfile *mf, ld_map_ver_t *mv, ld_map_sym_t *ms)
 	hash = (Word)elf_hash(ms->ms_name);
 	DBG_CALL(Dbg_map_version(ofl->ofl_lml, mv->mv_name, ms->ms_name,
 	    mv->mv_scope));
+
+	/*
+	 * Make sure that any parent or external declarations fall back to
+	 * references.
+	 */
+	if (ms->ms_sdflags & (FLG_SY_PARENT | FLG_SY_EXTERN)) {
+		/*
+		 * Turn it into a reference by setting the section index
+		 * to UNDEF.
+		 */
+		ms->ms_shndx = SHN_UNDEF;
+
+		/*
+		 * It is wrong to specify size or value for an external symbol.
+		 */
+		if (ms->ms_value_set || (ms->ms_size != 0)) {
+			mf_fatal0(mf, MSG_INTL(MSG_MAP_NOEXVLSZ));
+			mv->mv_errcnt++;
+			return (TRUE);
+		}
+	}
+
 	if ((sdp = ld_sym_find(ms->ms_name, hash, &where, ofl)) == NULL) {
 		if ((sym = libld_calloc(sizeof (Sym), 1)) == NULL)
 			return (FALSE);
 
-		/*
-		 * Make sure any parent or external declarations
-		 * fall back to references.
-		 */
-		if (ms->ms_sdflags & (FLG_SY_PARENT | FLG_SY_EXTERN)) {
-			/*
-			 * Turn it into a reference by setting
-			 * the section index to UNDEF.
-			 */
-			sym->st_shndx = ms->ms_shndx = SHN_UNDEF;
-
-			/*
-			 * It is wrong to specify size or value for an
-			 * external symbol.
-			 */
-			if (ms->ms_value_set || (ms->ms_size != 0)) {
-				mf_fatal0(mf, MSG_INTL(MSG_MAP_NOEXVLSZ));
-				mv->mv_errcnt++;
-				return (TRUE);
-			}
-		} else {
-			sym->st_shndx = (Half)ms->ms_shndx;
-		}
-
+		sym->st_shndx = (Half)ms->ms_shndx;
 		sym->st_value = ms->ms_value;
 		sym->st_size = ms->ms_size;
 		sym->st_info = ELF_ST_INFO(STB_GLOBAL, ms->ms_type);
@@ -1135,7 +1138,6 @@ ld_map_sym_enter(Mapfile *mf, ld_map_ver_t *mv, ld_map_sym_t *ms)
 		 * from different mapfiles can augment each
 		 * other.
 		 */
-		/* BEGIN CSTYLED */
 		if (sym->st_value) {
 			if (ms->ms_value && (sym->st_value != ms->ms_value))
 				conflict = MSG_INTL(MSG_MAP_DIFF_SYMVAL);
@@ -1162,7 +1164,6 @@ ld_map_sym_enter(Mapfile *mf, ld_map_ver_t *mv, ld_map_sym_t *ms)
 		} else {
 			sym->st_shndx = sdp->sd_shndx = ms->ms_shndx;
 		}
-		/* END CSTYLED */
 
 		if ((sdp->sd_flags & MSK_SY_GLOBAL) &&
 		    (sdp->sd_aux->sa_overndx != VER_NDX_GLOBAL) &&
