@@ -3235,3 +3235,12 @@ usr/src/uts/intel/rts/rts.symbols.debug64.tmp.new
 usr/src/uts/intel/spdsock/spdsock.symbols.debug64.diff
 usr/src/uts/intel/spdsock/spdsock.symbols.debug64.tmp
 usr/src/uts/intel/spdsock/spdsock.symbols.debug64.tmp.new
+usr/src/cmd/stat/kstat/kstat
+usr/src/lib/libzpool/common/zfs.h
+usr/src/tools/etc/SampleLinks
+usr/src/tools/etc/SamplePkgLinks
+usr/src/tools/etc/hgstyle
+usr/src/tools/etc/its.conf
+usr/src/tools/etc/its.reg
+usr/src/uts/i86xpv/cpu/scripts/ao_gendisp
+usr/src/uts/i86xpv/cpu/scripts/ao_gendisp.pl
