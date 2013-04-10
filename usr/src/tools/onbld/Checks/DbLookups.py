@@ -62,9 +62,9 @@ class BugDB(object):
 	print r["6505625"]["synopsis"]
 	"""
 
- 	VALID_DBS = ["bugster", "illumos"]
+	VALID_DBS = ["illumos"]
 
-	def __init__(self, priority = ("illumos", "bugster")):
+	def __init__(self, priority = ["illumos"]):
 		"""Create a BugDB object.
 
 		Keyword argument:
@@ -96,48 +96,6 @@ class BugDB(object):
 		}
 
 
-	def __boobug(self, cr):
-		cr = str(cr)
-		url = "http://bugs.opensolaris.org/view_bug.do"
-   		req = urllib2.Request(url, urllib.urlencode({"bug_id": cr}))
-		results = {}
-		try:
-			data = urllib2.urlopen(req).readlines()
-		except urllib2.HTTPError, e:
-			if e.code != 404:
-				print "ERROR: HTTP error at " + \
-					req.get_full_url() + \
-					" got error: " + str(e.code)
-				raise e
-			else:
-				raise NonExistentBug(cr)
-		except urllib2.URLError, e:
-			print "ERROR: could not connect to " + \
-				req.get_full_url() + \
-				' got error: "' + e.reason[1] + '"'
-			raise e
-		htmlParser = htmllib.HTMLParser(None)
-		metaHtmlRe = re.compile(r'^<meta name="([^"]+)" content="([^"]*)">$')
-		for line in data:
-			m = metaHtmlRe.search(line)
-			if not m:
-				continue
-			val = urllib.unquote(m.group(2))
-			htmlParser.save_bgn()
-			htmlParser.feed(val)
-			results[m.group(1)] = htmlParser.save_end()
-		htmlParser.close()
-
-		if "synopsis" not in results:
-			raise NonExistentBug(cr)
-
-		results["cr_number"] = cr
-		results["sub_category"] = results.pop("subcategory")
-		results["status"] = results.pop("state")
-		results["date_submitted"] = results.pop("submit_date")
-
-		return results
-
 	def lookup(self, crs):
 		"""Return all info for requested change reports.
 
@@ -153,14 +111,7 @@ class BugDB(object):
 		if not isinstance(crs, list):
 			crs = [str(crs)]
 		for database in self.__priority:
-			if database == "bugster":
-				for cr in crs:
-					cr = str(cr)
-					try:
-						results[cr] = self.__boobug(cr)
-					except NonExistentBug:
-						continue
-			elif database == "illumos":
+			if database == "illumos":
 				for cr in crs:
 					try:
 						results[str(cr)] = self.__illbug(cr)
