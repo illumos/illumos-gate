@@ -1191,6 +1191,7 @@ f lib/amd64/librcm.so.1 0755 root bin
 s lib/amd64/librcm.so=librcm.so.1
 f lib/amd64/libresolv.so.2 0755 root bin
 s lib/amd64/libresolv.so=libresolv.so.2
+f lib/amd64/libresolv_joy.so.2 0755 root bin
 f lib/amd64/librestart.so.1 0755 root bin
 s lib/amd64/librestart.so=librestart.so.1
 f lib/amd64/librpcsvc.so.1 0755 root bin
@@ -1384,6 +1385,7 @@ s lib/librcm.so=librcm.so.1
 f lib/libresolv.so.1 0755 root bin
 f lib/libresolv.so.2 0755 root bin
 s lib/libresolv.so=libresolv.so.2
+f lib/libresolv_joy.so.2 0755 root bin
 f lib/librestart.so.1 0755 root bin
 s lib/librestart.so=librestart.so.1
 f lib/librpcsvc.so.1 0755 root bin
@@ -4893,6 +4895,7 @@ f usr/lib/amd64/libreparse.so.1 0755 root bin
 s usr/lib/amd64/libreparse.so=libreparse.so.1
 s usr/lib/amd64/libresolv.so.2=../../../lib/amd64/libresolv.so.2
 s usr/lib/amd64/libresolv.so=../../../lib/amd64/libresolv.so.2
+s usr/lib/amd64/libresolv_joy.so.2=../../../lib/amd64/libresolv_joy.so.2
 s usr/lib/amd64/librestart.so.1=../../../lib/amd64/librestart.so.1
 s usr/lib/amd64/librestart.so=../../../lib/amd64/librestart.so.1
 s usr/lib/amd64/librpcsvc.so.1=../../../lib/amd64/librpcsvc.so.1
@@ -6316,6 +6319,7 @@ s usr/lib/libreparse.so=libreparse.so.1
 s usr/lib/libresolv.so.1=../../lib/libresolv.so.1
 s usr/lib/libresolv.so.2=../../lib/libresolv.so.2
 s usr/lib/libresolv.so=../../lib/libresolv.so.2
+s usr/lib/libresolv_joy.so.2=../../lib/libresolv_joy.so.2
 s usr/lib/librestart.so.1=../../lib/librestart.so.1
 s usr/lib/librestart.so=../../lib/librestart.so.1
 s usr/lib/librpcsvc.so.1=../../lib/librpcsvc.so.1

@@ -23,8 +23,9 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ */
 
 /*
  * dns_mt.c
@@ -49,39 +50,30 @@
 static void	_nss_dns_init(void);
 
 extern struct hostent *res_gethostbyname(const char *);
-#pragma weak	res_gethostbyname
 
-#define		RES_SET_NO_HOSTS_FALLBACK	"__res_set_no_hosts_fallback"
-extern void	__res_set_no_hosts_fallback(void);
-#pragma weak	__res_set_no_hosts_fallback
+#define	RES_SET_NO_HOSTS_FALLBACK	"__joy_res_set_no_hosts_fallback"
+extern void	__joy_res_set_no_hosts_fallback(void);
 
-#define		RES_UNSET_NO_HOSTS_FALLBACK	"__res_unset_no_hosts_fallback"
-extern void	__res_unset_no_hosts_fallback(void);
-#pragma weak	__res_unset_no_hosts_fallback
+#define	RES_UNSET_NO_HOSTS_FALLBACK	"__joy_res_unset_no_hosts_fallback"
+extern void	__joy_res_unset_no_hosts_fallback(void);
 
 #define		RES_GET_RES	"__res_get_res"
 extern struct __res_state	*__res_get_res(void);
-#pragma weak	__res_get_res
 
 #define		RES_ENABLE_MT			"__res_enable_mt"
 extern int	__res_enable_mt(void);
-#pragma weak	__res_enable_mt
 
 #define		RES_DISABLE_MT			"__res_disable_mt"
 extern int	__res_disable_mt(void);
-#pragma weak	__res_disable_mt
 
 #define		RES_GET_H_ERRNO			"__res_get_h_errno"
 extern int	*__res_get_h_errno();
-#pragma weak	__res_get_h_errno
 
-#define		__H_ERRNO			"__h_errno"
-extern int	*__h_errno(void);
-#pragma weak	__h_errno
+#define		__H_ERRNO			"__joy_h_errno"
+extern int	*__joy_h_errno(void);
 
-#define		RES_OVERRIDE_RETRY		"__res_override_retry"
-extern int	__res_override_retry(int);
-#pragma weak	__res_override_retry
+#define		RES_OVERRIDE_RETRY		"__joy_res_override_retry"
+extern int	__joy_res_override_retry(int);
 
 static void	__fallback_set_no_hosts(void);
 static int	*__fallback_h_errno(void);
@@ -91,10 +83,10 @@ static int	__is_mt_safe(void);
 void	(*set_no_hosts_fallback)(void) = __fallback_set_no_hosts;
 void	(*unset_no_hosts_fallback)(void) = __fallback_set_no_hosts;
 struct __res_state	*(*set_res_retry)() = 0;
-int	(*enable_mt)() = 0;
-int	(*disable_mt)() = 0;
-int	*(*get_h_errno)(void) = 0;
-int	(*override_retry)(int) = 0;
+int	(*enable_mt)() = __is_mt_safe;
+int	(*disable_mt)() = __is_mt_safe;
+int	*(*get_h_errno)(void) = __joy_h_errno;
+int	(*override_retry)(int) = __joy_res_override_retry;
 
 /* Usually set from the Makefile */
 #ifndef	NSS_DNS_LIBRESOLV
@@ -106,91 +98,12 @@ extern	int	h_errno;
 
 mutex_t	one_lane = DEFAULTMUTEX;
 
+/* Because we link against libresolv_joy.so.2, this is relatively easy. */
 void
 _nss_dns_init(void)
 {
-	void		*reslib, (*f_void_ptr)();
-
-	/* If no libresolv library, then load one */
-	if (res_gethostbyname == 0) {
-		if ((reslib =
-		    dlopen(NSS_DNS_LIBRESOLV, RTLD_LAZY|RTLD_GLOBAL)) != 0) {
-			/* Turn off /etc/hosts fall back in libresolv */
-			if ((f_void_ptr = (void (*)(void))dlsym(reslib,
-			    RES_SET_NO_HOSTS_FALLBACK)) != 0) {
-				set_no_hosts_fallback = f_void_ptr;
-			}
-			if ((f_void_ptr = (void (*)(void))dlsym(reslib,
-			    RES_SET_NO_HOSTS_FALLBACK)) != 0) {
-				unset_no_hosts_fallback = f_void_ptr;
-			}
-			/* Set number of resolver retries */
-			if ((override_retry = (int (*)(int))dlsym(reslib,
-			    RES_OVERRIDE_RETRY)) == 0) {
-				set_res_retry =
-				    (struct __res_state *(*)(void))dlsym(reslib,
-				    RES_GET_RES);
-				override_retry = __fallback_override_retry;
-			}
-			/*
-			 * Select h_errno retrieval function. A BIND 8.2.2
-			 * libresolv.so.2 will have __h_errno, a BIND 8.1.2
-			 * one will have __res_get_h_errno, and other
-			 * versions may have nothing at all.
-			 *
-			 * Also try to bind to the relevant MT enable/disable
-			 * functions which are also dependent on the version
-			 * of the BIND libresolv.so.2 being used.
-			 */
-			if ((get_h_errno = (int *(*)(void))dlsym(reslib,
-			    __H_ERRNO)) != 0) {
-				/* BIND 8.2.2 libresolv.so.2 is MT safe. */
-				enable_mt = __is_mt_safe;
-				disable_mt = __is_mt_safe;
-			} else {
-				if ((get_h_errno =
-				    (int *(*)(void))dlsym(reslib,
-				    RES_GET_H_ERRNO)) == 0) {
-					get_h_errno = __fallback_h_errno;
-				}
-				/*
-				 * Pre-BIND 8.2.2 was not MT safe.  Try to
-				 * bind the MT enable/disable functions.
-				 */
-				if ((enable_mt = (int (*)(void))dlsym(reslib,
-				    RES_ENABLE_MT)) != 0 &&
-				    (disable_mt = (int (*)(void))dlsym(reslib,
-				    RES_DISABLE_MT)) == 0) {
-					enable_mt = 0;
-				}
-			}
-		}
-	} else {
-		/* Libresolv already loaded */
-		if ((f_void_ptr = __res_set_no_hosts_fallback) != 0) {
-			set_no_hosts_fallback = f_void_ptr;
-		}
-		if ((f_void_ptr = __res_unset_no_hosts_fallback) != 0) {
-			unset_no_hosts_fallback = f_void_ptr;
-		}
-		if ((override_retry = __res_override_retry) == 0) {
-			set_res_retry = __res_get_res;
-			override_retry = __fallback_override_retry;
-		}
-		if ((get_h_errno = __h_errno) == 0 &&
-		    (get_h_errno = __res_get_h_errno) == 0) {
-			get_h_errno = __fallback_h_errno;
-		}
-		if (get_h_errno == __h_errno) {
-			enable_mt = __is_mt_safe;
-			disable_mt = __is_mt_safe;
-		} else {
-			if ((enable_mt = __res_enable_mt) != 0 &&
-			    (disable_mt = __res_disable_mt) == 0) {
-				enable_mt = 0;
-			}
-		}
-	}
+	enable_mt = __is_mt_safe;
+	disable_mt = __is_mt_safe;
 }
 
 
@@ -233,7 +146,7 @@ __is_mt_safe(void) {
  */
 static int *
 __fallback_h_errno(void) {
-	return (&h_errno);
+	return (NULL);
 }
 
 

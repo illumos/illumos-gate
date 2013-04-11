@@ -146,6 +146,7 @@ HDRS=   $($(MACH)_HDRS)  $(ATTRDB_HDRS) \
 	regex.h		\
 	regexp.h	\
 	resolv.h	\
+	resolv_joy.h	\
 	rje.h		\
 	rtld_db.h	\
 	sac.h		\

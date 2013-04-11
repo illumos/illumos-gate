@@ -73,6 +73,7 @@ SUBDIRS += \
 	libcommputil		\
 	libresolv			\
 	libresolv2		.WAIT	\
+	libresolv2_joy		.WAIT	\
 	libw			.WAIT	\
 	libintl			.WAIT	\
 	../cmd/sgs/librtld_db	\
@@ -569,7 +570,7 @@ gss_mechs/mech_krb5:	libgss libnsl libsocket libresolv pkcs11
 libadt_jni:	libbsm
 libast: 	libsocket
 libadutils: 	libldap5 libresolv libsocket libnsl
-nsswitch:	libadutils libidmap
+nsswitch:	libadutils libidmap libresolv2_joy
 libbe: 		libzfs
 libbsm:		libtsol
 libcmd: 	libsum libast libsocket libnsl

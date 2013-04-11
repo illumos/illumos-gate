@@ -31,8 +31,6 @@
 #ifndef _DNS_COMMON_H
 #define	_DNS_COMMON_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <ctype.h>
 #include <sys/types.h>
@@ -43,7 +41,7 @@
 #include <thread.h>
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
-#include <resolv.h>
+#include <resolv_joy.h>
 #include <syslog.h>
 #include <nsswitch.h>
 #include <nss_common.h>
