@@ -877,12 +877,17 @@ iob_addr2str(uintptr_t addr)
  * Produce human-readable size, similar in spirit (and identical in output)
  * to libzfs's zfs_nicenum() -- but made significantly more complicated by
  * the constraint that we cannot use snprintf() as an implementation detail.
+ * Recall, floating point is verboten in kmdb.
  */
 static const char *
 iob_bytes2str(varglist_t *ap, intsize_t size)
 {
+#ifndef _KMDB
 	const int sigfig = 3;
-	uint64_t n, orig;
+	uint64_t orig;
+#endif
+	uint64_t n;
+
 	static char buf[68], *c;
 	int index = 0;
 	char u;
@@ -903,7 +908,9 @@ iob_bytes2str(varglist_t *ap, intsize_t size)
 		n = (uint_t)VA_ARG(ap, uint_t);
 	}
 
+#ifndef _KMDB
 	orig = n;
+#endif
 
 	while (n >= 1024) {
 		n /= 1024;
@@ -915,12 +922,18 @@ iob_bytes2str(varglist_t *ap, intsize_t size)
 
 	if (index == 0) {
 		return (numtostr(n, 10, 0));
+#ifndef _KMDB
 	} else if ((orig & ((1ULL << 10 * index) - 1)) == 0) {
+#else
+	} else {
+#endif
 		/*
-		 * If this is an even multiple of the base, always display
-		 * without any decimal precision.
+		 * If this is an even multiple of the base or we are in an
+		 * environment where floating point is verboten (i.e., kmdb),
+		 * always display without any decimal precision.
 		 */
 		(void) strcat(buf, numtostr(n, 10, 0));
+#ifndef _KMDB
 	} else {
 		/*
 		 * We want to choose a precision that results in the specified
@@ -995,6 +1008,7 @@ iob_bytes2str(varglist_t *ap, intsize_t size)
 				break;
 			}
 		}
+#endif
 	}
 
 	c = &buf[strlen(buf)];
