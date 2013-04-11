@@ -27,10 +27,15 @@
  * Use is subject to license terms.
  */
 
+/* Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved. */
+
 	.file	"_so_accept.s"
 
 /* C library -- __so_accept						*/
-/* int __so_accept(int sock, struct sockaddr *addr, int *addrlen, int vers) */
+/*
+ * int __so_accept(int sock, struct sockaddr *addr, int *addrlen, int vers,
+ *     int flags)
+ */
 
 #include "SYS.h"
 

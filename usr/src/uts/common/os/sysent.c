@@ -24,6 +24,7 @@
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -742,7 +743,7 @@ struct sysent sysent[NSYSCALL] =
 	/* 231 */ SYSENT_CI("so_socketpair",	so_socketpair,	1),
 	/* 232 */ SYSENT_CI("bind",		bind,		4),
 	/* 233 */ SYSENT_CI("listen",		listen,		3),
-	/* 234 */ SYSENT_CI("accept",		accept,		4),
+	/* 234 */ SYSENT_CI("accept",		accept,		5),
 	/* 235 */ SYSENT_CI("connect",		connect,	4),
 	/* 236 */ SYSENT_CI("shutdown",		shutdown,	3),
 	/* 237 */ SYSENT_CL("recv",		recv,		4),
@@ -1073,7 +1074,7 @@ struct sysent sysent32[NSYSCALL] =
 	/* 231 */ SYSENT_CI("so_socketpair",	so_socketpair,	1),
 	/* 232 */ SYSENT_CI("bind",		bind,		4),
 	/* 233 */ SYSENT_CI("listen",		listen,		3),
-	/* 234 */ SYSENT_CI("accept",		accept,		4),
+	/* 234 */ SYSENT_CI("accept",		accept,		5),
 	/* 235 */ SYSENT_CI("connect",		connect,	4),
 	/* 236 */ SYSENT_CI("shutdown",		shutdown,	3),
 	/* 237 */ SYSENT_CI("recv",		recv32,		4),

@@ -10,6 +10,7 @@
 #
 
 # Copyright 2011, Richard Lowe
+# Copyright 2013, OmniTI Computer Consulting, Inc.
 
 file path=usr/share/man/man2/Intro.2
 file path=usr/share/man/man2/_Exit.2
@@ -137,6 +138,7 @@ file path=usr/share/man/man2/pathconf.2
 file path=usr/share/man/man2/pause.2
 file path=usr/share/man/man2/pcsample.2
 file path=usr/share/man/man2/pipe.2
+file path=usr/share/man/man2/pipe2.2
 file path=usr/share/man/man2/poll.2
 file path=usr/share/man/man2/pread.2
 file path=usr/share/man/man2/priocntl.2

@@ -120,6 +120,9 @@ extern "C" {
 
 #define	F_CHKFL		8	/* Unused */
 #define	F_DUP2FD	9	/* Duplicate fildes at third arg */
+#define	F_DUP2FD_CLOEXEC	36	/* Like F_DUP2FD with O_CLOEXEC set */
+					/* EINVAL is fildes matches arg1 */
+#define	F_DUPFD_CLOEXEC	37	/* Like F_DUPFD with O_CLOEXEC set */
 
 #define	F_ISSTREAM	13	/* Is the file desc. a stream ? */
 #define	F_PRIV		15	/* Turn on private access to file */

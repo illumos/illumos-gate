@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,34 +18,15 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved	*/
 
+/* Copyright 2013 OmniTI Computer Consulting, Inc. All rights reserved. */
 
-/*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-	.ident	"%Z%%M%	%I%	%E% SMI"
-
-/* C library -- pipe						*/
-/* int pipe (int fildes[2]);					*/
-
-	.file	"pipe.s"
-
-#include <sys/asm_linkage.h>
-
-	ANSI_PRAGMA_WEAK(pipe,function)
+/* int pipe2 (int *fds, int flags)                              */
 
 #include "SYS.h"
 
-	ENTRY(pipe)
-	mov	%o0, %o2		/* save ptr to array	*/
-	SYSTRAP_2RVALS(pipe)
-	SYSCERROR
-	st	%o0, [%o2]
-	st	%o1, [%o2 + 4]
-	RETC
+	.file   "pipe2.s"
 
-	SET_SIZE(pipe)
+	SYSCALL2(pipe2,pipe);
+	RET
+	SET_SIZE(pipe2)
