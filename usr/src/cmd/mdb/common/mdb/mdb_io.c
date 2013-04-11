@@ -877,12 +877,17 @@ iob_addr2str(uintptr_t addr)
  * Produce human-readable size, similar in spirit (and identical in output)
  * to libzfs's zfs_nicenum() -- but made significantly more complicated by
  * the constraint that we cannot use snprintf() as an implementation detail.
+ * Recall, floating point is verboten in kmdb.
  */
 static const char *
 iob_bytes2str(varglist_t *ap, intsize_t size)
 {
+#ifndef _KMDB
 	const int sigfig = 3;
-	uint64_t n, orig;
+	uint64_t orig;
+#endif
+	uint64_t n;
+
 	static char buf[68], *c;
 	int index = 0;
 	char u;
@@ -903,7 +908,9 @@ iob_bytes2str(varglist_t *ap, intsize_t size)
 		n = (uint_t)VA_ARG(ap, uint_t);
 	}
 
+#ifndef _KMDB
 	orig = n;
+#endif
 
 	while (n >= 1024) {
 		n /= 1024;
