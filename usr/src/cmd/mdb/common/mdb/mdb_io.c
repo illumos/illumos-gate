@@ -915,12 +915,18 @@ iob_bytes2str(varglist_t *ap, intsize_t size)
 
 	if (index == 0) {
 		return (numtostr(n, 10, 0));
+#ifndef _KMDB
 	} else if ((orig & ((1ULL << 10 * index) - 1)) == 0) {
+#else
+	} else {
+#endif
 		/*
-		 * If this is an even multiple of the base, always display
-		 * without any decimal precision.
+		 * If this is an even multiple of the base or we are in an
+		 * environment where floating point is verboten (i.e., kmdb),
+		 * always display without any decimal precision.
 		 */
 		(void) strcat(buf, numtostr(n, 10, 0));
+#ifndef _KMDB
 	} else {
 		/*
 		 * We want to choose a precision that results in the specified
@@ -995,6 +1001,7 @@ iob_bytes2str(varglist_t *ap, intsize_t size)
 				break;
 			}
 		}
+#endif
 	}
 
 	c = &buf[strlen(buf)];
