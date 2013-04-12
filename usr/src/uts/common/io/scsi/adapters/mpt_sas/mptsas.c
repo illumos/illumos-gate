@@ -9966,6 +9966,7 @@ mptsas_watchsubr(mptsas_t *mpt)
 	int		i;
 	mptsas_cmd_t	*cmd;
 	mptsas_target_t	*ptgt = NULL;
+	int		restart_needed = 0;
 
 	NDBG30(("mptsas_watchsubr: mpt=0x%p", (void *)mpt));
 
@@ -10035,9 +10036,20 @@ mptsas_watchsubr(mptsas_t *mpt)
 		    (ptgt->m_t_throttle > HOLD_THROTTLE) &&
 		    (ptgt->m_t_ncmds < ptgt->m_t_throttle)) {
 			mptsas_set_throttle(mpt, ptgt, MAX_THROTTLE);
-			mptsas_restart_hba(mpt);
+			++restart_needed;
 		}
+		mutex_exit(&ptgt->m_tgt_intr_mutex);
+		ptgt = (mptsas_target_t *)mptsas_hash_traverse(
+		    &mpt->m_active->m_tgttbl, MPTSAS_HASH_NEXT);
+	}
 
+	if (restart_needed != 0)
+		mptsas_restart_hba(mpt);
+
+	ptgt = (mptsas_target_t *)mptsas_hash_traverse(&mpt->m_active->m_tgttbl,
+	    MPTSAS_HASH_FIRST);
+	while (ptgt != NULL) {
+		mutex_enter(&ptgt->m_tgt_intr_mutex);
 		if ((ptgt->m_t_ncmds > 0) &&
 		    (ptgt->m_timebase)) {
 
