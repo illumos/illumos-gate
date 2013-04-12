@@ -35,6 +35,8 @@
  * contributors.
  */
 
+/* Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved. */
+
 #ifndef	_SYS_SOCKET_H
 #define	_SYS_SOCKET_H
 
@@ -101,6 +103,12 @@ typedef	void		*_RESTRICT_KYWD Psocklen_t;
 #endif	/* !defined(_XPG4_2) || defined(__EXTENSIONS__) */
 #define	SOCK_RDM	5		/* reliably-delivered message */
 #define	SOCK_SEQPACKET	6		/* sequenced packet stream */
+#define	SOCK_TYPE_MASK	0xffff		/* type reside in these bits only */
+
+/*
+ * Flags for socket()
+ */
+#define	SOCK_CLOEXEC	0x80000		/* like open(2) O_CLOEXEC for socket */
 
 /*
  * Option flags per-socket.
