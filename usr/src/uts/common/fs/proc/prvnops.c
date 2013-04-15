@@ -24,10 +24,6 @@
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
-/*
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
- */
-
 /*	Copyright (c) 1984,	 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 

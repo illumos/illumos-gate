@@ -27,6 +27,8 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+/* Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved. */
+
 #define	_SYSCALL32	/* make 32-bit compat headers visible */
 
 #include <stdio.h>
@@ -1690,11 +1692,17 @@ void
 prt_skt(private_t *pri, int raw, long val)
 {
 	const char *s;
+	long type = val & SOCK_TYPE_MASK;
 
-	if ((ulong_t)val <= MAX_SOCKTYPES && (s = socktype_codes[val]) != NULL)
+	if ((ulong_t)type <= MAX_SOCKTYPES &&
+	    (s = socktype_codes[type]) != NULL) {
 		outstring(pri, s);
-	else
+		if ((val & SOCK_CLOEXEC) != 0) {
+			outstring(pri, "|SOCK_CLOEXEC");
+		}
+	} else {
 		prt_dec(pri, 0, val);
+	}
 }
 
 

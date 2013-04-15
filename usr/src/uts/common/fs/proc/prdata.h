@@ -30,6 +30,9 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+/*
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ */
 
 #ifndef _SYS_PROC_PRDATA_H
 #define	_SYS_PROC_PRDATA_H

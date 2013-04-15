@@ -344,7 +344,7 @@ lwplook(look_arg_t *arg, const lwpstatus_t *psp, const lwpsinfo_t *pip)
 		(void) strftime(t, sizeof (t), "%F:%H.%M.%S", localtime(&time));
 
 		(void) printf("\tspymaster = pid %d, \"%s\" at %s\n",
-		    ps.pr_pid, ps.pr_psargs, t);
+		    (int)ps.pr_pid, ps.pr_psargs, t);
 	}
 
 	if (rflag) {

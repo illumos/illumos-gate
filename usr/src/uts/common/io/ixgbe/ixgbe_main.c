@@ -28,6 +28,7 @@
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2013 Saso Kiselkov. All rights reserved.
+ * Copyright (c) 2013 OSN Online Service Nuernberg GmbH. All rights reserved.
  */
 
 #include "ixgbe_sw.h"
@@ -116,6 +117,7 @@ static int ixgbe_attach(dev_info_t *, ddi_attach_cmd_t);
 static int ixgbe_detach(dev_info_t *, ddi_detach_cmd_t);
 static int ixgbe_resume(dev_info_t *);
 static int ixgbe_suspend(dev_info_t *);
+static int ixgbe_quiesce(dev_info_t *);
 static void ixgbe_unconfigure(dev_info_t *, ixgbe_t *);
 static uint8_t *ixgbe_mc_table_itr(struct ixgbe_hw *, uint8_t **, uint32_t *);
 static int ixgbe_cbfunc(dev_info_t *, ddi_cb_action_t, void *, void *, void *);
@@ -176,7 +178,7 @@ static struct dev_ops ixgbe_dev_ops = {
 	&ixgbe_cb_ops,		/* devo_cb_ops */
 	NULL,			/* devo_bus_ops */
 	ddi_power,		/* devo_power */
-	ddi_quiesce_not_supported,	/* devo_quiesce */
+	ixgbe_quiesce,		/* devo_quiesce */
 };
 
 static struct modldrv ixgbe_modldrv = {
@@ -680,6 +682,52 @@ ixgbe_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 	 * Do the remaining unconfigure routines
 	 */
 	ixgbe_unconfigure(devinfo, ixgbe);
+
+	return (DDI_SUCCESS);
+}
+
+/*
+ * quiesce(9E) entry point.
+ *
+ * This function is called when the system is single-threaded at high
+ * PIL with preemption disabled. Therefore, this function must not be
+ * blocked.
+ *
+ * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
+ * DDI_FAILURE indicates an error condition and should almost never happen.
+ */
+static int
+ixgbe_quiesce(dev_info_t *devinfo)
+{
+	ixgbe_t *ixgbe;
+	struct ixgbe_hw *hw;
+
+	ixgbe = (ixgbe_t *)ddi_get_driver_private(devinfo);
+
+	if (ixgbe == NULL)
+		return (DDI_FAILURE);
+
+	hw = &ixgbe->hw;
+
+	/*
+	 * Disable the adapter interrupts
+	 */
+	ixgbe_disable_adapter_interrupts(ixgbe);
+
+	/*
+	 * Tell firmware driver is no longer in control
+	 */
+	ixgbe_release_driver_control(hw);
+
+	/*
+	 * Reset the chipset
+	 */
+	(void) ixgbe_reset_hw(hw);
+
+	/*
+	 * Reset PHY
+	 */
+	(void) ixgbe_reset_phy(hw);
 
 	return (DDI_SUCCESS);
 }
