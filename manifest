@@ -5132,7 +5132,9 @@ f usr/lib/diffh 0555 root bin
 f usr/lib/dscfglockd 0555 root bin
 d usr/lib/dtrace 0755 root bin
 d usr/lib/dtrace/64 0755 root bin
+f usr/lib/dtrace/64/libdtrace_forceload.so 0644 root bin
 f usr/lib/dtrace/64/drti.o 0644 root bin
+f usr/lib/dtrace/libdtrace_forceload.so 0644 root bin
 f usr/lib/dtrace/drti.o 0644 root bin
 f usr/lib/dtrace/errno.d 0644 root bin
 f usr/lib/dtrace/fc.d 0644 root bin
