@@ -27,7 +27,7 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/* Copyright (c) 2013 OmniTI Computer Consulting, Inc. All rights reserved. */
 
 /*
  *	This routine is a special case, in that it is aware of
@@ -55,8 +55,8 @@
 FILE *
 _endopen(const char *name, const char *type, FILE *iop, int largefile)
 {
-	int oflag, fd, fflag;
-	char plus;
+	int oflag, fd, fflag, eflag, plusflag;
+	const char *echr;
 
 	if (iop == NULL)
 		return (NULL);
@@ -77,10 +77,27 @@ _endopen(const char *name, const char *type, FILE *iop, int largefile)
 		fflag = _IOWRT;
 		break;
 	}
-	/* UNIX ignores 'b' and treats text and binary the same */
-	if ((plus = type[1]) == 'b')
-		plus = type[2];
-	if (plus == '+') {
+
+	plusflag = 0;
+	eflag = 0;
+	for (echr = type + 1; *echr != '\0'; echr++) {
+		switch (*echr) {
+		/* UNIX ignores 'b' and treats text and binary the same */
+		default:
+			break;
+		case '+':
+			plusflag = 1;
+			break;
+		case 'e':
+			eflag = 1;
+			break;
+		}
+	}
+	if (eflag) {
+		/* Subsequent to a mode flag, 'e' indicates O_CLOEXEC */
+		oflag = oflag | O_CLOEXEC;
+	}
+	if (plusflag) {
 		oflag = (oflag & ~(O_RDONLY | O_WRONLY)) | O_RDWR;
 		fflag = _IORW;
 	}
