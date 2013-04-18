@@ -21,6 +21,7 @@ MANFILES = 	accept.3socket		\
 		connect.3socket		\
 		ethers.3socket		\
 		getaddrinfo.3socket	\
+		getifaddrs.3socket	\
 		getipnodebyname.3socket \
 		getnetbyname.3socket	\
 		getpeername.3socket	\
@@ -62,6 +63,7 @@ MANSOFILES =	endnetent.3socket		\
 		ether_ntohost.3socket		\
 		freeaddrinfo.3socket		\
 		freehostent.3socket		\
+		freeifaddrs.3socket		\
 		gai_strerror.3socket		\
 		getipnodebyaddr.3socket		\
 		getipv4sourcefilter.3socket	\
@@ -149,6 +151,8 @@ ether_ntohost.3socket		:= SOSRC = man3socket/ethers.3socket
 freeaddrinfo.3socket		:= SOSRC = man3socket/getaddrinfo.3socket
 gai_strerror.3socket		:= SOSRC = man3socket/getaddrinfo.3socket
 getnameinfo.3socket		:= SOSRC = man3socket/getaddrinfo.3socket
+
+freeifaddrs.3socket		:= SOSRC = man3socket/getifaddrs.3socket
 
 freehostent.3socket		:= SOSRC = man3socket/getipnodebyname.3socket
 getipnodebyaddr.3socket		:= SOSRC = man3socket/getipnodebyname.3socket

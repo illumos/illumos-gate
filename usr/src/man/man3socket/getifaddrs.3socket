@@ -1,0 +1,152 @@
+'\" t
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2013, Joyent, Inc. All rights reserved.
+.\"
+.TH GETIFADDRS 3SOCKET "Apr 18, 2013"
+.SH NAME
+getifaddrs, freeifaddrs \- get interface addresses
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lsocket\fR \fB-lnsl\fR \
+[ \fIlibrary\fR ... ]
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <ifaddrs.h>
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgetifaddrs\fR(\fBstruct ifaddrs **\fR\fIifap\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBfreeifaddrs\fR(\fBstruct ifaddrs *\fR\fIifp\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgetifaddrs\fR() function is used to obtain the list of network
+interfaces on the local machine.  A reference to a linked list of \fBifaddrs\fR
+structures, as defined in \fB<ifaddrs.h>\fR, is stored in the memory referenced
+by \fIifap\fR.  Each structure in the list describes one network interface
+address, and is of the form:
+
+.sp
+.in +2
+.nf
+struct ifaddrs {
+    struct ifaddrs      *ifa_next;
+    char                *ifa_name;
+    uint64_t            ifa_flags;
+    struct sockaddr     *ifa_addr;
+    struct sockaddr     *ifa_netmask;
+    union {
+        struct sockaddr *ifu_broadaddr;
+        struct sockaddr *ifu_dstaddr;
+    } ifa_ifu;
+    void                *ifa_data;
+};
+#define ifa_broadaddr   ifa_ifu.ifu_broadaddr
+#define ifa_dstaddr     ifa_ifu.ifu_dstaddr
+.fi
+.in -2
+
+.sp
+.LP
+The list is traversed by following the \fIifa_next\fR pointer.  This member is
+\fBNULL\fR on the last structure in the list.
+
+.sp
+.LP
+The \fIifa_name\fR member contains the interface name.
+
+.sp
+.LP
+The \fIifa_flags\fR member contains the interface flags.
+
+.sp
+.LP
+The \fIifa_addr\fR member references the address of the interface.  Use the
+\fIsa_family\fR member of this structure to determine the format of the
+address, as described in \fBsocket.h\fR(3HEAD).
+
+.sp
+.LP
+The \fIifa_netmask\fR member references the netmask associated with ifa_addr,
+or \fBNULL\fR if one is not set.
+
+.sp
+.LP
+If the \fBIFF_BROADCAST\fR bit is set in \fIifa_flags\fR, then
+\fIifa_broadaddr\fR is valid, or \fBNULL\fR if not present.  If the
+\fBIFF_POINTOPOINT\fR bit is set, then \fIifa_dstaddr\fR is valid, or \fBNULL\fR
+if not present.  These two flags are mutually exclusive; see \fBif_tcp\fR(7P)
+for more information.
+
+.sp
+.LP
+The \fIifa_data\fR member is presently unused.
+
+.sp
+.LP
+The memory used by \fBgetifaddrs\fR() to back the list is dynamically allocated.
+It should be freed using \fBfreeifaddrs\fR().
+
+.SH RETURN VALUES
+.sp
+.LP
+If successful, \fBgetifaddrs\fR() returns the value \fB0\fR; otherwise it
+returns \fB\(mi1\fR and sets \fIerrno\fR to indicate the error.
+
+.SH ERRORS
+.sp
+.LP
+The \fBgetifaddrs\fR() function may fail and set \fIerrno\fR for any of the
+errors specified for the library routines \fBioctl\fR(2),
+\fBsocket\fR(3SOCKET), and \fBmalloc\fR(3C).
+
+.SH ATTRIBUTES
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Committed
+_
+MT-Level	MT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBipadm\fR(1M), \fBifconfig\fR(1M), \fBioctl\fR(2), \fBmalloc\fR(3C),
+\fBsocket\fR(3SOCKET), \fBsocket.h\fR(3HEAD), \fBif_tcp\fR(7P),
+\fBattributes\fR(5)
+
+.SH NOTES
+.sp
+.LP
+On an illumos system, this function lists only interfaces with the \fBIFF_UP\fR
+flag set; see \fBif_tcp\fR(7P) and \fBifconfig\fR(1M) for more information.
+
+.SH BUGS
+.sp
+.LP
+At present, this function only lists addresses from the \fBAF_INET\fR and
+\fBAF_INET6\fR families.  Other families, such as \fBAF_LINK\fR, are not
+included.

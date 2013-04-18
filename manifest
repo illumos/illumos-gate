@@ -15232,7 +15232,9 @@ f usr/share/man/man3socket/bind.3socket 0444 root bin
 f usr/share/man/man3socket/byteorder.3socket 0444 root bin
 f usr/share/man/man3socket/connect.3socket 0444 root bin
 f usr/share/man/man3socket/ethers.3socket 0444 root bin
+f usr/share/man/man3socket/freeifaddrs.3socket 0444 root bin
 f usr/share/man/man3socket/getaddrinfo.3socket 0444 root bin
+f usr/share/man/man3socket/getifaddrs.3socket 0444 root bin
 f usr/share/man/man3socket/getipnodebyname.3socket 0444 root bin
 f usr/share/man/man3socket/getnetbyname.3socket 0444 root bin
 f usr/share/man/man3socket/getpeername.3socket 0444 root bin
