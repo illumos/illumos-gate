@@ -22,6 +22,9 @@
  * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ */
 
 /*
  * System calls for creating and inquiring about tasks and projects
@@ -146,6 +149,7 @@ tasksys_settaskid(projid_t projid, uint_t flags)
 		if (curthread != p->p_agenttp)
 			continuelwps(p);
 		mutex_exit(&p->p_lock);
+		project_rele(kpj);
 		return (set_errno(EAGAIN));
 	}
 	kpj->kpj_data.kpd_crypto_mem += p->p_crypto_mem;
