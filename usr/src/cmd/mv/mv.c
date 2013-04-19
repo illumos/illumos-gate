@@ -182,8 +182,8 @@ main(int argc, char *argv[])
 
 	/*
 	 * Check for options:
-	 * 	cp  -r|-R [-H|-L|-P] [-fip@/] file1 [file2 ...] target
-	 * 	cp [-fiprR@/] file1 [file2 ...] target
+	 * 	cp [ -r|-R [-H|-L|-P]] [-afip@/] file1 [file2 ...] target
+	 * 	cp [-afiprR@/] file1 [file2 ...] target
 	 *	ln [-f] [-n] [-s] file1 [file2 ...] target
 	 *	ln [-f] [-n] [-s] file1 [file2 ...]
 	 *	mv [-f|i] file1 [file2 ...] target
@@ -191,7 +191,7 @@ main(int argc, char *argv[])
 	 */
 
 	if (cpy) {
-		while ((c = getopt(argc, argv, "fHiLpPrR@/")) != EOF)
+		while ((c = getopt(argc, argv, "afHiLpPrR@/")) != EOF)
 			switch (c) {
 			case 'f':
 				fflg++;
@@ -236,6 +236,13 @@ main(int argc, char *argv[])
 				Rflg++;
 				/*FALLTHROUGH*/
 			case 'r':
+				rflg++;
+				break;
+			case 'a':
+				Lflg = Hflg = 0;
+				pflg++;
+				Pflg++;
+				Rflg++;
 				rflg++;
 				break;
 			case '@':
@@ -1323,10 +1330,10 @@ usage(void)
 #endif
 	} else if (cpy) {
 		(void) fprintf(stderr, gettext(
-		    "Usage: cp [-f] [-i] [-p] [-@] [-/] f1 f2\n"
-		    "       cp [-f] [-i] [-p] [-@] [-/] f1 ... fn d1\n"
-		    "       cp -r|-R [-H|-L|-P] [-f] [-i] [-p] [-@] [-/] "
-		    "d1 ... dn-1 dn\n"));
+		    "Usage: cp [-a] [-f] [-i] [-p] [-@] [-/] f1 f2\n"
+		    "       cp [-a] [-f] [-i] [-p] [-@] [-/] f1 ... fn d1\n"
+		    "       cp [-r|-R [-H|-L|-P]] [-a] [-f] [-i] [-p] [-@] "
+		    "[-/] d1 ... dn-1 dn\n"));
 	}
 	exit(2);
 }
