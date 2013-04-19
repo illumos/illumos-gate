@@ -1646,3 +1646,4 @@ Bugid   Risk Synopsis
 3451	archive libraries with no symbols shouldn't require a string table
 3616	SHF_GROUP sections should not be discarded via other COMDAT mechanisms
 3709	need sloppy relocation for GNU .debug_macro
+3722	link-editor is over restrictive of R_AMD64_32 addends

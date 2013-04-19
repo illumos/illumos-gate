@@ -175,7 +175,13 @@ const Rel_entry	reloc_table[R_AMD64_NUM] = {
  *		entry
  */
 
-#define	HIBITS	0xffffffff80000000ULL
+
+/*
+ * Bits that must be cleared or identical for a value to act as if extended in
+ * the given way.
+ */
+#define	ZEROEXBITS	0xffffffff00000000ULL
+#define	SIGNEXBITS	0xffffffff80000000ULL
 
 #if defined(_KERNEL)
 #define	lml	0		/* Needed by arglist of REL_ERR_* macros */
@@ -244,10 +250,11 @@ do_reloc_rtld(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
 		 */
 		if (rtype == R_AMD64_32) {
 			/*
-			 * Verify that this value will 'zero-extend', this
-			 * requires that the upper 33bits all be 'zero'.
+			 * Verify that this value will act as a zero-extended
+			 * unsigned 32 bit value.  That is, that the upper
+			 * 32 bits are zero.
 			 */
-			if ((*value & HIBITS) != 0) {
+			if ((*value & ZEROEXBITS) != 0) {
 				/*
 				 * To keep chkmsg() happy:
 				 *  MSG_INTL(MSG_REL_NOFIT)
@@ -258,12 +265,12 @@ do_reloc_rtld(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
 		} else if ((rtype == R_AMD64_32S) || (rtype == R_AMD64_PC32) ||
 		    (rtype == R_AMD64_GOTPCREL) || (rtype == R_AMD64_GOTPC32)) {
 			/*
-			 * Verify that this value will properly sign extend.
-			 * This is true of the upper 33bits are all either
-			 * 'zero' or all 'one'.
+			 * Verify that this value will act as a sign-extended
+			 * signed 32 bit value, that is that the upper 33 bits
+			 * are either all zero or all one.
 			 */
-			if (((*value & HIBITS) != HIBITS) &&
-			    ((*value & HIBITS) != 0)) {
+			if (((*value & SIGNEXBITS) != SIGNEXBITS) &&
+			    ((*value & SIGNEXBITS) != 0)) {
 				/*
 				 * To keep chkmsg() happy:
 				 *  MSG_INTL(MSG_REL_NOFIT)
