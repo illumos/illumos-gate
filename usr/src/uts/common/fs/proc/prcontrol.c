@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ */
+
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <sys/param.h>
@@ -2008,6 +2012,23 @@ pr_agent(prnode_t *pnp, prgregset_t prgregset, int *unlocked)
 		return (ENOMEM);
 	}
 	prsetprregs(clwp, prgregset, 1);
+
+	/*
+	 * Because abandoning the agent inside the target process leads to
+	 * a state that is essentially undebuggable, we record the psinfo of
+	 * the process creating the agent and hang that off of the lwp.
+	 */
+	clwp->lwp_spymaster = kmem_zalloc(sizeof (psinfo_t), KM_SLEEP);
+	mutex_enter(&curproc->p_lock);
+	prgetpsinfo(curproc, clwp->lwp_spymaster);
+	mutex_exit(&curproc->p_lock);
+
+	/*
+	 * We overload pr_time in the spymaster to denote the time at which the
+	 * agent was created.
+	 */
+	gethrestime(&clwp->lwp_spymaster->pr_time);
+
 retry:
 	cid = t->t_cid;
 	(void) CL_ALLOC(&bufp, cid, KM_SLEEP);

@@ -25,6 +25,7 @@
  */
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 #define	_STRUCTURED_PROC	1
@@ -481,6 +482,7 @@ new_per_lwp(void *data, const lwpstatus_t *lsp, const lwpsinfo_t *lip)
 {
 	pgcore_t *pgc = data;
 	struct ps_prochandle *P = pgc->P;
+	psinfo_t ps;
 
 	/*
 	 * If lsp is NULL this indicates that this is a zombie LWP in
@@ -547,6 +549,27 @@ new_per_lwp(void *data, const lwpstatus_t *lsp, const lwpsinfo_t *lip)
 	}
 #endif	/* __sparcv9 */
 #endif	/* sparc */
+
+	if (!(lsp->pr_flags & PR_AGENT))
+		return (0);
+
+	if (Plwp_getspymaster(P, lsp->pr_lwpid, &ps) != 0)
+		return (0);
+
+	if (P->status.pr_dmodel == PR_MODEL_NATIVE) {
+		if (write_note(pgc->pgc_fd, NT_SPYMASTER, &ps,
+		    sizeof (psinfo_t), pgc->pgc_doff) != 0)
+			return (1);
+#ifdef _LP64
+	} else {
+		psinfo32_t ps32;
+		psinfo_n_to_32(&ps, &ps32);
+		if (write_note(pgc->pgc_fd, NT_SPYMASTER, &ps32,
+		    sizeof (psinfo32_t), pgc->pgc_doff) != 0)
+			return (1);
+#endif	/* _LP64 */
+	}
+
 
 	return (0);
 }

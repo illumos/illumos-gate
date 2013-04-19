@@ -215,6 +215,8 @@ conv_phdr_flags_strings(Conv_fmt_flags_t fmt_flags)
 		MSG_PF_W_CF_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_PF_R_CF_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_PF_SUNW_FAILURE_CF_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_PF_SUNW_KILLED_CF_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_PF_SUNW_SIGINFO_CF_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		CONV_INV_BUFSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
 
 	/*
@@ -241,6 +243,8 @@ conv_phdr_flags_strings(Conv_fmt_flags_t fmt_flags)
 		{ PF_W,			ALL,	MSG_PF_W_CF },
 		{ PF_R,			ALL,	MSG_PF_R_CF },
 		{ PF_SUNW_FAILURE,	SOL,	MSG_PF_SUNW_FAILURE_CF },
+		{ PF_SUNW_KILLED,	SOL,	MSG_PF_SUNW_KILLED_CF },
+		{ PF_SUNW_SIGINFO,	SOL,	MSG_PF_SUNW_SIGINFO_CF },
 		{ 0 }
 	};
 	static const Val_desc2 vda_nf[] = {
@@ -248,6 +252,8 @@ conv_phdr_flags_strings(Conv_fmt_flags_t fmt_flags)
 		{ PF_W,			ALL,	MSG_PF_W_NF },
 		{ PF_R,			ALL,	MSG_PF_R_NF },
 		{ PF_SUNW_FAILURE,	SOL,	MSG_PF_SUNW_FAILURE_NF },
+		{ PF_SUNW_KILLED,	SOL,	MSG_PF_SUNW_KILLED_NF },
+		{ PF_SUNW_SIGINFO,	SOL,	MSG_PF_SUNW_SIGINFO_NF },
 		{ 0 }
 	};
 

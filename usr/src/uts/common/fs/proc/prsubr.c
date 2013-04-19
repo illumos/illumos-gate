@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -2490,6 +2491,7 @@ prgetpsinfo32(proc_t *p, psinfo32_t *psp)
 		psp->pr_envp = 0;
 	}
 }
+
 #endif	/* _SYSCALL32_IMPL */
 
 void
@@ -2626,6 +2628,100 @@ prgetlwpsinfo32(kthread_t *t, lwpsinfo32_t *psp)
 	psp->pr_bindpset = t->t_bind_pset;
 	psp->pr_lgrp = t->t_lpl->lpl_lgrpid;
 }
+#endif	/* _SYSCALL32_IMPL */
+
+#ifdef _SYSCALL32_IMPL
+
+#define	PR_COPY_FIELD(s, d, field)	 d->field = s->field
+
+#define	PR_COPY_FIELD_ILP32(s, d, field)				\
+	if (s->pr_dmodel == PR_MODEL_ILP32) {			\
+		d->field = s->field;				\
+	}
+
+#define	PR_COPY_TIMESPEC(s, d, field)				\
+	TIMESPEC_TO_TIMESPEC32(&d->field, &s->field);
+
+#define	PR_COPY_BUF(s, d, field)	 			\
+	bcopy(s->field, d->field, sizeof (d->field));
+
+#define	PR_IGNORE_FIELD(s, d, field)
+
+void
+lwpsinfo_kto32(const struct lwpsinfo *src, struct lwpsinfo32 *dest)
+{
+	bzero(dest, sizeof (*dest));
+
+	PR_COPY_FIELD(src, dest, pr_flag);
+	PR_COPY_FIELD(src, dest, pr_lwpid);
+	PR_IGNORE_FIELD(src, dest, pr_addr);
+	PR_IGNORE_FIELD(src, dest, pr_wchan);
+	PR_COPY_FIELD(src, dest, pr_stype);
+	PR_COPY_FIELD(src, dest, pr_state);
+	PR_COPY_FIELD(src, dest, pr_sname);
+	PR_COPY_FIELD(src, dest, pr_nice);
+	PR_COPY_FIELD(src, dest, pr_syscall);
+	PR_COPY_FIELD(src, dest, pr_oldpri);
+	PR_COPY_FIELD(src, dest, pr_cpu);
+	PR_COPY_FIELD(src, dest, pr_pri);
+	PR_COPY_FIELD(src, dest, pr_pctcpu);
+	PR_COPY_TIMESPEC(src, dest, pr_start);
+	PR_COPY_BUF(src, dest, pr_clname);
+	PR_COPY_BUF(src, dest, pr_name);
+	PR_COPY_FIELD(src, dest, pr_onpro);
+	PR_COPY_FIELD(src, dest, pr_bindpro);
+	PR_COPY_FIELD(src, dest, pr_bindpset);
+	PR_COPY_FIELD(src, dest, pr_lgrp);
+}
+
+void
+psinfo_kto32(const struct psinfo *src, struct psinfo32 *dest)
+{
+	bzero(dest, sizeof (*dest));
+
+	PR_COPY_FIELD(src, dest, pr_flag);
+	PR_COPY_FIELD(src, dest, pr_nlwp);
+	PR_COPY_FIELD(src, dest, pr_pid);
+	PR_COPY_FIELD(src, dest, pr_ppid);
+	PR_COPY_FIELD(src, dest, pr_pgid);
+	PR_COPY_FIELD(src, dest, pr_sid);
+	PR_COPY_FIELD(src, dest, pr_uid);
+	PR_COPY_FIELD(src, dest, pr_euid);
+	PR_COPY_FIELD(src, dest, pr_gid);
+	PR_COPY_FIELD(src, dest, pr_egid);
+	PR_IGNORE_FIELD(src, dest, pr_addr);
+	PR_COPY_FIELD_ILP32(src, dest, pr_size);
+	PR_COPY_FIELD_ILP32(src, dest, pr_rssize);
+	PR_COPY_FIELD(src, dest, pr_ttydev);
+	PR_COPY_FIELD(src, dest, pr_pctcpu);
+	PR_COPY_FIELD(src, dest, pr_pctmem);
+	PR_COPY_TIMESPEC(src, dest, pr_start);
+	PR_COPY_TIMESPEC(src, dest, pr_time);
+	PR_COPY_TIMESPEC(src, dest, pr_ctime);
+	PR_COPY_BUF(src, dest, pr_fname);
+	PR_COPY_BUF(src, dest, pr_psargs);
+	PR_COPY_FIELD(src, dest, pr_wstat);
+	PR_COPY_FIELD(src, dest, pr_argc);
+	PR_COPY_FIELD_ILP32(src, dest, pr_argv);
+	PR_COPY_FIELD_ILP32(src, dest, pr_envp);
+	PR_COPY_FIELD(src, dest, pr_dmodel);
+	PR_COPY_FIELD(src, dest, pr_taskid);
+	PR_COPY_FIELD(src, dest, pr_projid);
+	PR_COPY_FIELD(src, dest, pr_nzomb);
+	PR_COPY_FIELD(src, dest, pr_poolid);
+	PR_COPY_FIELD(src, dest, pr_contract);
+	PR_COPY_FIELD(src, dest, pr_poolid);
+	PR_COPY_FIELD(src, dest, pr_poolid);
+
+	lwpsinfo_kto32(&src->pr_lwp, &dest->pr_lwp);
+}
+
+#undef	PR_COPY_FIELD
+#undef	PR_COPY_FIELD_ILP32
+#undef	PR_COPY_TIMESPEC
+#undef	PR_COPY_BUF
+#undef	PR_IGNORE_FIELD
+
 #endif	/* _SYSCALL32_IMPL */
 
 /*

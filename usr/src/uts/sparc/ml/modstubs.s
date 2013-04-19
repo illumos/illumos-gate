@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 #if !defined(lint)
@@ -582,6 +583,8 @@ stubs_base:
 	NO_UNLOAD_STUB(procfs, prgetlwpsinfo32,	nomod_zero);
 	NO_UNLOAD_STUB(procfs, oprgetstatus32,	nomod_zero);
 	NO_UNLOAD_STUB(procfs, oprgetpsinfo32,	nomod_zero);
+	NO_UNLOAD_STUB(procfs, psinfo_kto32,	nomod_zero);
+	NO_UNLOAD_STUB(procfs, lwpsinfo_kto32,	nomod_zero);
 #endif	/* _SYSCALL32_IMPL */
 	NO_UNLOAD_STUB(procfs, prnotify,	nomod_zero);
 	NO_UNLOAD_STUB(procfs, prexecstart,	nomod_zero);

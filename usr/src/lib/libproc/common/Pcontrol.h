@@ -24,6 +24,7 @@
  */
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 #ifndef	_PCONTROL_H
@@ -233,6 +234,9 @@ struct ps_prochandle {
 	char	*zoneroot;	/* cached path to zone root */
 	plist_t	fd_head;	/* head of file desc info list */
 	int	num_fd;		/* number of file descs in list */
+	uintptr_t map_missing;	/* first missing mapping in core due to sig */
+	siginfo_t killinfo;	/* signal that interrupted core dump */
+	psinfo_t spymaster;	/* agent LWP's spymaster, if any */
 };
 
 /* flags */

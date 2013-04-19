@@ -21,6 +21,7 @@
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
+# Copyright (c) 2013, Joyent, Inc. All rights reserved.
 #
 
 #
@@ -133,6 +134,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	Plwp_getfpregs;
 	Plwp_getpsinfo;
 	Plwp_getregs;
+	Plwp_getspymaster;
 	Plwp_iter;
 	Plwp_iter_all;
 	Plwp_main_stack;

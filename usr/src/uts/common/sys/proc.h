@@ -574,6 +574,12 @@ typedef enum {
 	LWP_STAT_MSGSND
 } lwp_stat_id_t;
 
+typedef struct prkillinfo {
+	int32_t prk_error;		/* errno */
+	int32_t prk_pad;		/* pad */
+	siginfo_t prk_info;		/* siginfo of killing signal */
+} prkillinfo_t;
+
 #ifdef _KERNEL
 
 /* user profiling functions */

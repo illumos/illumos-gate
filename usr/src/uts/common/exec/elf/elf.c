@@ -64,6 +64,7 @@
 #include <sys/brand.h>
 #include "elf_impl.h"
 #include <sys/sdt.h>
+#include <sys/siginfo.h>
 
 extern int at_flags;
 
@@ -1726,6 +1727,7 @@ elfcore(vnode_t *vp, proc_t *p, cred_t *credp, rlim64_t rlimit, int sig,
 	caddr_t stkbase;
 	size_t stksize;
 	int ntries = 0;
+	klwp_t *lwp = ttolwp(curthread);
 
 top:
 	/*
@@ -1989,6 +1991,10 @@ exclude:
 		goto done;
 
 	for (i = 2; i < nphdrs; i++) {
+		prkillinfo_t killinfo;
+		sigqueue_t *sq;
+		int sig, j;
+
 		if (v[i].p_filesz == 0)
 			continue;
 
@@ -2002,9 +2008,13 @@ exclude:
 		 */
 		if ((error = core_seg(p, vp, v[i].p_offset,
 		    (caddr_t)(uintptr_t)v[i].p_vaddr, v[i].p_filesz,
-		    rlimit, credp)) != 0) {
+		    rlimit, credp)) == 0) {
+			continue;
+		}
 
+		if ((sig = lwp->lwp_cursig) == 0) {
 			/*
+			 * We failed due to something other than a signal.
 			 * Since the space reserved for the segment is now
 			 * unused, we stash the errno in the first four
 			 * bytes. This undocumented interface will let us
@@ -2019,7 +2029,75 @@ exclude:
 			    poffset + sizeof (v[i]) * i, &v[i], sizeof (v[i]),
 			    rlimit, credp)) != 0)
 				goto done;
+
+			continue;
 		}
+
+		/*
+		 * We took a signal.  We want to abort the dump entirely, but
+		 * we also want to indicate what failed and why.  We therefore
+		 * use the space reserved for the first failing segment to
+		 * write our error (which, for purposes of compatability with
+		 * older core dump readers, we set to EINTR) followed by any
+		 * siginfo associated with the signal.
+		 */
+		bzero(&killinfo, sizeof (killinfo));
+		killinfo.prk_error = EINTR;
+
+		sq = sig == SIGKILL ? curproc->p_killsqp : lwp->lwp_curinfo;
+
+		if (sq != NULL) {
+			bcopy(&sq->sq_info, &killinfo.prk_info,
+			    sizeof (killinfo.prk_info));
+		} else {
+			killinfo.prk_info.si_signo = lwp->lwp_cursig;
+			killinfo.prk_info.si_code = SI_NOINFO;
+		}
+
+#if (defined(_SYSCALL32_IMPL) || defined(_LP64))
+		/*
+		 * If this is a 32-bit process, we need to translate from the
+		 * native siginfo to the 32-bit variant.  (Core readers must
+		 * always have the same data model as their target or must
+		 * be aware of -- and compensate for -- data model differences.)
+		 */
+		if (curproc->p_model == DATAMODEL_ILP32) {
+			siginfo32_t si32;
+
+			siginfo_kto32((k_siginfo_t *)&killinfo.prk_info, &si32);
+			bcopy(&si32, &killinfo.prk_info, sizeof (si32));
+		}
+#endif
+
+		(void) core_write(vp, UIO_SYSSPACE, v[i].p_offset,
+		    &killinfo, sizeof (killinfo), rlimit, credp);
+
+		/*
+		 * For the segment on which we took the signal, indicate that
+		 * its data now refers to a siginfo.
+		 */
+		v[i].p_filesz = 0;
+		v[i].p_flags |= PF_SUNW_FAILURE | PF_SUNW_KILLED |
+		    PF_SUNW_SIGINFO;
+
+		/*
+		 * And for every other segment, indicate that its absence
+		 * is due to a signal.
+		 */
+		for (j = i + 1; j < nphdrs; j++) {
+			v[j].p_filesz = 0;
+			v[j].p_flags |= PF_SUNW_FAILURE | PF_SUNW_KILLED;
+		}
+
+		/*
+		 * Finally, write out our modified program headers.
+		 */
+		if ((error = core_write(vp, UIO_SYSSPACE,
+		    poffset + sizeof (v[i]) * i, &v[i],
+		    sizeof (v[i]) * (nphdrs - i), rlimit, credp)) != 0)
+			goto done;
+
+		break;
 	}
 
 	if (nshdrs > 0) {

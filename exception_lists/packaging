@@ -981,3 +981,13 @@ usr/include/saveargs.h            	i386
 usr/lib/amd64/libsaveargs.so      	i386
 usr/lib/amd64/libstandsaveargs.so	i386
 usr/lib/amd64/llib-lsaveargs.ln   	i386
+
+#
+# libpcidb is private
+#
+usr/include/pcidb.h
+usr/lib/amd64/libpcidb.so
+usr/lib/amd64/llib-lpcidb.ln
+usr/lib/libpcidb.so
+usr/lib/llib-lpcidb
+usr/lib/llib-lpcidb.ln
