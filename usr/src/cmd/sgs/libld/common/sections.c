@@ -3463,3 +3463,49 @@ ld_make_text(Ofl_desc *ofl, size_t size)
 
 	return (isec);
 }
+
+void
+ld_comdat_validate(Ofl_desc *ofl, Ifl_desc *ifl)
+{
+	int i;
+
+	for (i = 0; i < ifl->ifl_shnum; i++) {
+		Is_desc *isp = ifl->ifl_isdesc[i];
+		int types = 0;
+		char buf[1024] = "";
+		Group_desc *gr = NULL;
+
+		if ((isp == NULL) || (isp->is_flags & FLG_IS_COMDAT) == 0)
+			continue;
+
+		if (isp->is_shdr->sh_type == SHT_SUNW_COMDAT) {
+			types++;
+			(void) strlcpy(buf, MSG_ORIG(MSG_STR_SUNW_COMDAT),
+			    sizeof (buf));
+		}
+
+		if (strncmp(MSG_ORIG(MSG_SCN_GNU_LINKONCE), isp->is_name,
+		    MSG_SCN_GNU_LINKONCE_SIZE) == 0) {
+			types++;
+			if (types > 1)
+				(void) strlcat(buf, ", ", sizeof (buf));
+			(void) strlcat(buf, MSG_ORIG(MSG_SCN_GNU_LINKONCE),
+			    sizeof (buf));
+		}
+
+		if ((isp->is_shdr->sh_flags & SHF_GROUP) &&
+		    ((gr = ld_get_group(ofl, isp)) != NULL) &&
+		    (gr->gd_data[0] & GRP_COMDAT)) {
+			types++;
+			if (types > 1)
+				(void) strlcat(buf, ", ", sizeof (buf));
+			(void) strlcat(buf, MSG_ORIG(MSG_STR_GROUP),
+			    sizeof (buf));
+		}
+
+		if (types > 1)
+			ld_eprintf(ofl, ERR_FATAL,
+			    MSG_INTL(MSG_SCN_MULTICOMDAT), ifl->ifl_name,
+			    EC_WORD(isp->is_scnndx), isp->is_name, buf);
+	}
+}

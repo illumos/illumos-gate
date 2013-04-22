@@ -2821,6 +2821,14 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 	}
 
 	/*
+	 * Now group information has been processed, we can safely validate
+	 * that nothing is fishy about the section COMDAT description.  We
+	 * need to do this prior to placing the section (where any
+	 * SHT_SUNW_COMDAT sections will be restored to being PROGBITS)
+	 */
+	ld_comdat_validate(ofl, ifl);
+
+	/*
 	 * Now that all of the input sections have been processed, place
 	 * them in the appropriate output sections.
 	 */
