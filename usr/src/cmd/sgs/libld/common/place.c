@@ -238,6 +238,17 @@ add_comdat(Ofl_desc *ofl, Os_desc *osp, Is_desc *isp)
 	Isd_node	isd, *isdp;
 	avl_tree_t	*avlt;
 	avl_index_t	where;
+	Group_desc	*gr;
+
+	/*
+	 * Sections to which COMDAT groups apply are FLG_IS_COMDAT but are
+	 * discarded separately by the group logic so should never be
+	 * discarded here.
+	 */
+	if ((isp->is_shdr->sh_flags & SHF_GROUP) &&
+	    ((gr = ld_get_group(ofl, isp)) != NULL) &&
+	    (gr->gd_data[0] & GRP_COMDAT))
+		return (1);
 
 	/*
 	 * Create a COMDAT avl tree for this output section if required.

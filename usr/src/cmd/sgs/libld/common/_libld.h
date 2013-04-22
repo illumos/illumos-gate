@@ -688,6 +688,7 @@ extern Sdf_desc		*sdf_find(const char *, APlist *);
 #define	ld_bswap_Xword		ld64_bswap_Xword
 #define	ld_cap_add_family	ld64_cap_add_family
 #define	ld_cap_move_symtoobj	ld64_cap_move_symtoobj
+#define	ld_comdat_validate	ld64_comdat_validate
 #define	ld_disp_errmsg		ld64_disp_errmsg
 #define	ld_ent_check		ld64_ent_check
 #define	ld_ent_lookup		ld64_ent_lookup
@@ -785,6 +786,7 @@ extern Sdf_desc		*sdf_find(const char *, APlist *);
 #define	ld_bswap_Xword		ld32_bswap_Xword
 #define	ld_cap_add_family	ld32_cap_add_family
 #define	ld_cap_move_symtoobj	ld32_cap_move_symtoobj
+#define	ld_comdat_validate	ld32_comdat_validate
 #define	ld_disp_errmsg		ld32_disp_errmsg
 #define	ld_ent_check		ld32_ent_check
 #define	ld_ent_lookup		ld32_ent_lookup
@@ -891,6 +893,8 @@ extern Xword		ld_bswap_Xword(Xword);
 extern uintptr_t	ld_cap_add_family(Ofl_desc *, Sym_desc *, Sym_desc *,
 			    Cap_group *, APlist **);
 extern void		ld_cap_move_symtoobj(Ofl_desc *);
+
+extern void		ld_comdat_validate(Ofl_desc *, Ifl_desc *);
 
 extern void		ld_disp_errmsg(const char *, Rel_desc *, Ofl_desc *);
 

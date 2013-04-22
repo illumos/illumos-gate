@@ -918,9 +918,9 @@ save_cpu_stat(kstat_t *kp, ks_instance_t *ksi)
 	SAVE_UINT32_X(ksi, "user", sysinfo->cpu[CPU_USER]);
 	SAVE_UINT32_X(ksi, "kernel", sysinfo->cpu[CPU_KERNEL]);
 	SAVE_UINT32_X(ksi, "wait", sysinfo->cpu[CPU_WAIT]);
-	SAVE_UINT32_X(ksi, "wait_io", sysinfo->cpu[W_IO]);
-	SAVE_UINT32_X(ksi, "wait_swap", sysinfo->cpu[W_SWAP]);
-	SAVE_UINT32_X(ksi, "wait_pio", sysinfo->cpu[W_PIO]);
+	SAVE_UINT32_X(ksi, "wait_io", sysinfo->wait[W_IO]);
+	SAVE_UINT32_X(ksi, "wait_swap", sysinfo->wait[W_SWAP]);
+	SAVE_UINT32_X(ksi, "wait_pio", sysinfo->wait[W_PIO]);
 	SAVE_UINT32(ksi, sysinfo, bread);
 	SAVE_UINT32(ksi, sysinfo, bwrite);
 	SAVE_UINT32(ksi, sysinfo, lread);
