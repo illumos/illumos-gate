@@ -46,7 +46,7 @@ provider doogle {
 };
 EOF
 
-cc -c test.c
+gcc -c test.c
 $dtrace -G -32 -s doogle.d test.o -o doogle.d.o
 
 if [ $? -eq 0 ]; then
