@@ -23,6 +23,10 @@
 #
 
 #
+# Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+#
+
+#
 # MAPFILE HEADER START
 #
 # WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
@@ -62,6 +66,7 @@ SYMBOL_VERSION SUNWprivate_1.2 {
 	ctf_create;
 	ctf_delete_type;
 	ctf_discard;
+	ctf_dup;
 	ctf_enum_value;
 	ctf_label_info;
 	ctf_label_iter;
@@ -104,6 +109,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	ctf_type_kind;
 	ctf_type_lname;
 	ctf_type_name;
+	ctf_type_qname;
 	ctf_type_reference;
 	ctf_type_resolve;
 	ctf_type_size;

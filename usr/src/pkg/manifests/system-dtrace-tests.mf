@@ -119,6 +119,7 @@ dir path=opt/SUNWdtrt/tst/common/tracemem
 dir path=opt/SUNWdtrt/tst/common/translators
 dir path=opt/SUNWdtrt/tst/common/typedef
 dir path=opt/SUNWdtrt/tst/common/types
+dir path=opt/SUNWdtrt/tst/common/uctf
 dir path=opt/SUNWdtrt/tst/common/union
 dir path=opt/SUNWdtrt/tst/common/usdt
 dir path=opt/SUNWdtrt/tst/common/ustack
@@ -1977,6 +1978,30 @@ file path=opt/SUNWdtrt/tst/common/types/tst.stringconstants.d mode=0444
 file path=opt/SUNWdtrt/tst/common/types/tst.struct.d mode=0444
 file path=opt/SUNWdtrt/tst/common/types/tst.typedef.d mode=0444
 file path=opt/SUNWdtrt/tst/common/types/tst.unaryop.d mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/err.invalidpid.d mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/err.invalidpid2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/err.invalidpid3.d mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/err.invalidtype.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/err.invalidtype2.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/err.user64mode.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/tst.aouttype.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/uctf/tst.aouttype.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/tst.chasestrings.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/uctf/tst.chasestrings.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/tst.chasestrings.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/tst.libtype.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/uctf/tst.libtype.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/tst.linkmap.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/tst.pidprint.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/tst.pidprinttarg.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/tst.printtype.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/uctf/tst.printtype.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/tst.printtype.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/tst.printtypetarg.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/tst.userlandkey.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/tst.userlandkey.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/tst.userstrings.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/tst.userstrings.ksh.out mode=0444
 file path=opt/SUNWdtrt/tst/common/union/err.D_ADDROF_VAR.UnionPointer.d \
     mode=0444
 file path=opt/SUNWdtrt/tst/common/union/err.D_DECL_COMBO.UnionWithoutColon.d \
