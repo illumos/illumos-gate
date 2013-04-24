@@ -332,7 +332,7 @@ smb_com_trans2_find_first2(smb_request_t *sr, smb_xa_t *xa)
 		return (SDRC_ERROR);
 	}
 
-	od = smb_tree_lookup_odir(sr->tid_tree, odid);
+	od = smb_tree_lookup_odir(sr, odid);
 	if (od == NULL)
 		return (SDRC_ERROR);
 
@@ -463,7 +463,7 @@ smb_com_trans2_find_next2(smb_request_t *sr, smb_xa_t *xa)
 	if (args.fa_maxdata == 0)
 		return (SDRC_ERROR);
 
-	od = smb_tree_lookup_odir(sr->tid_tree, odid);
+	od = smb_tree_lookup_odir(sr, odid);
 	if (od == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
 		    ERRDOS, ERROR_INVALID_HANDLE);
@@ -943,7 +943,7 @@ smb_com_find_close2(smb_request_t *sr)
 	if (smbsr_decode_vwv(sr, "w", &odid) != 0)
 		return (SDRC_ERROR);
 
-	od = smb_tree_lookup_odir(sr->tid_tree, odid);
+	od = smb_tree_lookup_odir(sr, odid);
 	if (od == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
 		    ERRDOS, ERROR_INVALID_HANDLE);

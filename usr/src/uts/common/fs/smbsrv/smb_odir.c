@@ -39,15 +39,15 @@
  * +-------------------+       +-------------------+      +-------------------+
  * |     SESSION       |<----->|     SESSION       |......|      SESSION      |
  * +-------------------+       +-------------------+      +-------------------+
- *          |
- *          |
- *          v
- * +-------------------+       +-------------------+      +-------------------+
- * |       USER        |<----->|       USER        |......|       USER        |
- * +-------------------+       +-------------------+      +-------------------+
- *          |
- *          |
- *          v
+ *   |          |
+ *   |          |
+ *   |          v
+ *   |  +-------------------+     +-------------------+   +-------------------+
+ *   |  |       USER        |<--->|       USER        |...|       USER        |
+ *   |  +-------------------+     +-------------------+   +-------------------+
+ *   |
+ *   |
+ *   v
  * +-------------------+       +-------------------+      +-------------------+
  * |       TREE        |<----->|       TREE        |......|       TREE        |
  * +-------------------+       +-------------------+      +-------------------+
@@ -153,7 +153,7 @@
  *	and add it into the tree's list of odirs.
  *	Return an identifier (odid) uniquely identifying the created odir.
  *
- * smb_odir_t *odir = smb_tree_lookup_odir(odid)
+ * smb_odir_t *odir = smb_tree_lookup_odir(..., odid)
  *	Find the odir corresponding to the specified odid in the tree's
  *	list of odirs. Place a hold on the odir.
  *
@@ -312,9 +312,9 @@ smb_odir_open(smb_request_t *sr, char *path, uint16_t sattr, uint32_t flags)
 	}
 
 	if (flags & SMB_ODIR_OPENF_BACKUP_INTENT)
-		cr = smb_user_getprivcred(tree->t_user);
+		cr = smb_user_getprivcred(sr->uid_user);
 	else
-		cr = tree->t_user->u_cred;
+		cr = sr->uid_user->u_cred;
 
 	odid = smb_odir_create(sr, dnode, pattern, sattr, cr);
 	smb_node_release(dnode);
@@ -888,6 +888,12 @@ smb_odir_create(smb_request_t *sr, smb_node_t *dnode,
 	od->d_opened_by_pid = sr->smb_pid;
 	od->d_session = tree->t_session;
 	od->d_cred = cr;
+	/*
+	 * grab a ref for od->d_user
+	 * released in  smb_odir_delete()
+	 */
+	smb_user_hold_internal(sr->uid_user);
+	od->d_user = sr->uid_user;
 	od->d_tree = tree;
 	od->d_dnode = dnode;
 	smb_node_ref(dnode);
@@ -947,6 +953,7 @@ smb_odir_delete(void *arg)
 
 	od->d_magic = 0;
 	smb_node_release(od->d_dnode);
+	smb_user_release(od->d_user);
 	mutex_destroy(&od->d_mutex);
 	kmem_cache_free(od->d_tree->t_server->si_cache_odir, od);
 }

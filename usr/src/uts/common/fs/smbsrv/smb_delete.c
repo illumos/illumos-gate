@@ -297,7 +297,7 @@ smb_delete_multiple_files(smb_request_t *sr, smb_error_t *err)
 	if (odid == 0)
 		return (-1);
 
-	if ((od = smb_tree_lookup_odir(sr->tid_tree, odid)) == NULL)
+	if ((od = smb_tree_lookup_odir(sr, odid)) == NULL)
 		return (-1);
 
 	for (;;) {

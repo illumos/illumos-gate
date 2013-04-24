@@ -688,9 +688,12 @@ static const smb_exp_t smb_session_exp[] =
 	{ SMB_OPT_REQUEST,
 	    offsetof(smb_session_t, s_req_list.sl_list),
 	    "smbreq", "smb_request"},
-	{ SMB_OPT_USER | SMB_OPT_TREE | SMB_OPT_OFILE | SMB_OPT_ODIR,
+	{ SMB_OPT_USER,
 	    offsetof(smb_session_t, s_user_list.ll_list),
 	    "smbuser", "smb_user"},
+	{ SMB_OPT_TREE | SMB_OPT_OFILE | SMB_OPT_ODIR,
+	    offsetof(smb_session_t, s_tree_list.ll_list),
+	    "smbtree", "smb_tree"},
 	{ 0, 0, NULL, NULL}
 };
 
@@ -963,17 +966,6 @@ static const char *smb_user_state[SMB_USER_STATE_SENTINEL] =
 	"LOGGED_OFF"
 };
 
-/*
- * List of objects that can be expanded under a user structure.
- */
-static const smb_exp_t smb_user_exp[] =
-{
-	{ SMB_OPT_TREE | SMB_OPT_OFILE | SMB_OPT_ODIR,
-	    offsetof(smb_user_t, u_tree_list.ll_list),
-	    "smbtree", "smb_tree"},
-	{ 0, 0, NULL, NULL}
-};
-
 static void
 smb_dcmd_user_help(void)
 {
@@ -983,17 +975,13 @@ smb_dcmd_user_help(void)
 	mdb_printf("%<b>OPTIONS%</b>\n");
 	(void) mdb_inc_indent(2);
 	mdb_printf(
-	    "-v\tDisplay verbose smb_user information\n"
-	    "-d\tDisplay the list of smb_odirs attached\n"
-	    "-f\tDisplay the list of smb_ofiles attached\n"
-	    "-t\tDisplay the list of smb_trees attached\n");
+	    "-v\tDisplay verbose smb_user information\n");
 }
 
 static int
 smb_dcmd_user(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	uint_t		opts;
-	ulong_t		indent = 0;
 
 	if (smb_dcmd_getopt(&opts, argc, argv))
 		return (DCMD_USAGE);
@@ -1008,8 +996,6 @@ smb_dcmd_user(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    !(opts & SMB_OPT_WALK)) {
 		smb_user_t	*user;
 		char		*account;
-
-		indent = SMB_DCMD_INDENT;
 
 		user = mdb_alloc(sizeof (*user), UM_SLEEP | UM_GC);
 		if (mdb_vread(user, sizeof (*user), addr) == -1) {
@@ -1058,8 +1044,6 @@ smb_dcmd_user(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			    account);
 		}
 	}
-	if (smb_obj_expand(addr, opts, smb_user_exp, indent))
-		return (DCMD_ERR);
 	return (DCMD_OK);
 }
 
@@ -1217,6 +1201,8 @@ smb_dcmd_odir(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			    addr);
 			mdb_printf("State: %d (%s)\n", od->d_state, state);
 			mdb_printf("SID: %u\n", od->d_odid);
+			mdb_printf("User: %p\n", od->d_user);
+			mdb_printf("Tree: %p\n", od->d_tree);
 			mdb_printf("Reference Count: %d\n", od->d_refcnt);
 			mdb_printf("Pattern: %s\n", od->d_pattern);
 			mdb_printf("SMB Node: %p\n\n", od->d_dnode);
@@ -1292,6 +1278,8 @@ smb_dcmd_ofile(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			    ((of->f_flags & SMB_OFLAGS_LLF_POS_VALID) ?
 			    "Valid" : "Invalid"));
 			mdb_printf("Flags: 0x%08x\n", of->f_flags);
+			mdb_printf("User: %p\n", of->f_user);
+			mdb_printf("Tree: %p\n", of->f_tree);
 			mdb_printf("Credential: %p\n\n", of->f_cr);
 		} else {
 			if (DCMD_HDRSPEC(flags))

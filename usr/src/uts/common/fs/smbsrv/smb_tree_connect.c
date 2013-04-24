@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -362,8 +363,7 @@ smb_sdrc_t
 smb_pre_tree_disconnect(smb_request_t *sr)
 {
 	sr->uid_user = smb_session_lookup_uid(sr->session, sr->smb_uid);
-	if (sr->uid_user != NULL)
-		sr->tid_tree = smb_user_lookup_tree(sr->uid_user, sr->smb_tid);
+	sr->tid_tree = smb_session_lookup_tree(sr->session, sr->smb_tid);
 
 	DTRACE_SMB_1(op__TreeDisconnect__start, smb_request_t *, sr);
 	return (SDRC_SUCCESS);

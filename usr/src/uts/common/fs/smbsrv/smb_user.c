@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -38,15 +39,15 @@
  * +-------------------+       +-------------------+      +-------------------+
  * |     SESSION       |<----->|     SESSION       |......|      SESSION      |
  * +-------------------+       +-------------------+      +-------------------+
- *          |
- *          |
- *          v
- * +-------------------+       +-------------------+      +-------------------+
- * |       USER        |<----->|       USER        |......|       USER        |
- * +-------------------+       +-------------------+      +-------------------+
- *          |
- *          |
- *          v
+ *   |          |
+ *   |          |
+ *   |          v
+ *   |  +-------------------+     +-------------------+   +-------------------+
+ *   |  |       USER        |<--->|       USER        |...|       USER        |
+ *   |  +-------------------+     +-------------------+   +-------------------+
+ *   |
+ *   |
+ *   v
  * +-------------------+       +-------------------+      +-------------------+
  * |       TREE        |<----->|       TREE        |......|       TREE        |
  * +-------------------+       +-------------------+      +-------------------+
@@ -170,7 +171,6 @@
 
 static boolean_t smb_user_is_logged_in(smb_user_t *);
 static int smb_user_enum_private(smb_user_t *, smb_svcenum_t *);
-static smb_tree_t *smb_user_get_tree(smb_llist_t *, smb_tree_t *);
 static void smb_user_setcred(smb_user_t *, cred_t *, uint32_t);
 static void smb_user_nonauth_logon(uint32_t);
 static void smb_user_auth_logoff(uint32_t);
@@ -210,20 +210,15 @@ smb_user_login(
 	user->u_audit_sid = audit_sid;
 
 	if (!smb_idpool_alloc(&session->s_uid_pool, &user->u_uid)) {
-		if (!smb_idpool_constructor(&user->u_tid_pool)) {
-			smb_llist_constructor(&user->u_tree_list,
-			    sizeof (smb_tree_t), offsetof(smb_tree_t, t_lnd));
-			mutex_init(&user->u_mutex, NULL, MUTEX_DEFAULT, NULL);
-			smb_user_setcred(user, cr, privileges);
-			user->u_state = SMB_USER_STATE_LOGGED_IN;
-			user->u_magic = SMB_USER_MAGIC;
-			smb_llist_enter(&session->s_user_list, RW_WRITER);
-			smb_llist_insert_tail(&session->s_user_list, user);
-			smb_llist_exit(&session->s_user_list);
-			smb_server_inc_users(session->s_server);
-			return (user);
-		}
-		smb_idpool_free(&session->s_uid_pool, user->u_uid);
+		mutex_init(&user->u_mutex, NULL, MUTEX_DEFAULT, NULL);
+		smb_user_setcred(user, cr, privileges);
+		user->u_state = SMB_USER_STATE_LOGGED_IN;
+		user->u_magic = SMB_USER_MAGIC;
+		smb_llist_enter(&session->s_user_list, RW_WRITER);
+		smb_llist_insert_tail(&session->s_user_list, user);
+		smb_llist_exit(&session->s_user_list);
+		smb_server_inc_users(session->s_server);
+		return (user);
 	}
 	smb_mem_free(user->u_name);
 	smb_mem_free(user->u_domain);
@@ -279,10 +274,7 @@ smb_user_logoff(
 		 */
 		user->u_state = SMB_USER_STATE_LOGGING_OFF;
 		mutex_exit(&user->u_mutex);
-		/*
-		 * All the trees hanging off of this user are disconnected.
-		 */
-		smb_user_disconnect_trees(user);
+		smb_session_disconnect_owned_trees(user->u_session, user);
 		smb_user_auth_logoff(user->u_audit_sid);
 		mutex_enter(&user->u_mutex);
 		user->u_state = SMB_USER_STATE_LOGGED_OFF;
@@ -301,13 +293,13 @@ smb_user_logoff(
 }
 
 /*
- * Take a reference on a user.
+ * Take a reference on a user.  Do not return a reference unless the user is in
+ * the logged-in state.
  */
 boolean_t
 smb_user_hold(smb_user_t *user)
 {
-	ASSERT(user);
-	ASSERT(user->u_magic == SMB_USER_MAGIC);
+	SMB_USER_VALID(user);
 
 	mutex_enter(&user->u_mutex);
 
@@ -319,6 +311,19 @@ smb_user_hold(smb_user_t *user)
 
 	mutex_exit(&user->u_mutex);
 	return (B_FALSE);
+}
+
+/*
+ * Unconditionally take a reference on a user.
+ */
+void
+smb_user_hold_internal(smb_user_t *user)
+{
+	SMB_USER_VALID(user);
+
+	mutex_enter(&user->u_mutex);
+	user->u_refcnt++;
+	mutex_exit(&user->u_mutex);
 }
 
 /*
@@ -337,9 +342,6 @@ smb_user_release(
 	ASSERT(user->u_refcnt);
 	user->u_refcnt--;
 
-	/* flush the tree list's delete queue */
-	smb_llist_flush(&user->u_tree_list);
-
 	switch (user->u_state) {
 	case SMB_USER_STATE_LOGGED_OFF:
 		if (user->u_refcnt == 0)
@@ -355,248 +357,6 @@ smb_user_release(
 		break;
 	}
 	mutex_exit(&user->u_mutex);
-}
-
-void
-smb_user_post_tree(smb_user_t *user, smb_tree_t *tree)
-{
-	SMB_USER_VALID(user);
-	SMB_TREE_VALID(tree);
-	ASSERT(tree->t_refcnt == 0);
-	ASSERT(tree->t_state == SMB_TREE_STATE_DISCONNECTED);
-	ASSERT(tree->t_user == user);
-
-	smb_llist_post(&user->u_tree_list, tree, smb_tree_dealloc);
-}
-
-
-/*
- * Find a tree by tree-id.
- */
-smb_tree_t *
-smb_user_lookup_tree(
-    smb_user_t		*user,
-    uint16_t		tid)
-
-{
-	smb_tree_t	*tree;
-
-	ASSERT(user);
-	ASSERT(user->u_magic == SMB_USER_MAGIC);
-
-	smb_llist_enter(&user->u_tree_list, RW_READER);
-	tree = smb_llist_head(&user->u_tree_list);
-
-	while (tree) {
-		ASSERT(tree->t_magic == SMB_TREE_MAGIC);
-		ASSERT(tree->t_user == user);
-
-		if (tree->t_tid == tid) {
-			if (smb_tree_hold(tree)) {
-				smb_llist_exit(&user->u_tree_list);
-				return (tree);
-			} else {
-				smb_llist_exit(&user->u_tree_list);
-				return (NULL);
-			}
-		}
-
-		tree = smb_llist_next(&user->u_tree_list, tree);
-	}
-
-	smb_llist_exit(&user->u_tree_list);
-	return (NULL);
-}
-
-/*
- * Find the first connected tree that matches the specified sharename.
- * If the specified tree is NULL the search starts from the beginning of
- * the user's tree list.  If a tree is provided the search starts just
- * after that tree.
- */
-smb_tree_t *
-smb_user_lookup_share(
-    smb_user_t		*user,
-    const char		*sharename,
-    smb_tree_t		*tree)
-{
-	ASSERT(user);
-	ASSERT(user->u_magic == SMB_USER_MAGIC);
-	ASSERT(sharename);
-
-	smb_llist_enter(&user->u_tree_list, RW_READER);
-
-	if (tree) {
-		ASSERT(tree->t_magic == SMB_TREE_MAGIC);
-		ASSERT(tree->t_user == user);
-		tree = smb_llist_next(&user->u_tree_list, tree);
-	} else {
-		tree = smb_llist_head(&user->u_tree_list);
-	}
-
-	while (tree) {
-		ASSERT(tree->t_magic == SMB_TREE_MAGIC);
-		ASSERT(tree->t_user == user);
-		if (smb_strcasecmp(tree->t_sharename, sharename, 0) == 0) {
-			if (smb_tree_hold(tree)) {
-				smb_llist_exit(&user->u_tree_list);
-				return (tree);
-			}
-		}
-		tree = smb_llist_next(&user->u_tree_list, tree);
-	}
-
-	smb_llist_exit(&user->u_tree_list);
-	return (NULL);
-}
-
-/*
- * Find the first connected tree that matches the specified volume name.
- * If the specified tree is NULL the search starts from the beginning of
- * the user's tree list.  If a tree is provided the search starts just
- * after that tree.
- */
-smb_tree_t *
-smb_user_lookup_volume(
-    smb_user_t		*user,
-    const char		*name,
-    smb_tree_t		*tree)
-{
-	ASSERT(user);
-	ASSERT(user->u_magic == SMB_USER_MAGIC);
-	ASSERT(name);
-
-	smb_llist_enter(&user->u_tree_list, RW_READER);
-
-	if (tree) {
-		ASSERT(tree->t_magic == SMB_TREE_MAGIC);
-		ASSERT(tree->t_user == user);
-		tree = smb_llist_next(&user->u_tree_list, tree);
-	} else {
-		tree = smb_llist_head(&user->u_tree_list);
-	}
-
-	while (tree) {
-		ASSERT(tree->t_magic == SMB_TREE_MAGIC);
-		ASSERT(tree->t_user == user);
-
-		if (smb_strcasecmp(tree->t_volume, name, 0) == 0) {
-			if (smb_tree_hold(tree)) {
-				smb_llist_exit(&user->u_tree_list);
-				return (tree);
-			}
-		}
-
-		tree = smb_llist_next(&user->u_tree_list, tree);
-	}
-
-	smb_llist_exit(&user->u_tree_list);
-	return (NULL);
-}
-
-/*
- * Disconnect all trees that match the specified client process-id.
- */
-void
-smb_user_close_pid(
-    smb_user_t		*user,
-    uint16_t		pid)
-{
-	smb_tree_t	*tree;
-
-	ASSERT(user);
-	ASSERT(user->u_magic == SMB_USER_MAGIC);
-
-	tree = smb_user_get_tree(&user->u_tree_list, NULL);
-	while (tree) {
-		smb_tree_t *next;
-		ASSERT(tree->t_user == user);
-		smb_tree_close_pid(tree, pid);
-		next = smb_user_get_tree(&user->u_tree_list, tree);
-		smb_tree_release(tree);
-		tree = next;
-	}
-}
-
-/*
- * Disconnect all trees that this user has connected.
- */
-void
-smb_user_disconnect_trees(
-    smb_user_t		*user)
-{
-	smb_tree_t	*tree;
-
-	ASSERT(user);
-	ASSERT(user->u_magic == SMB_USER_MAGIC);
-
-	tree = smb_user_get_tree(&user->u_tree_list, NULL);
-	while (tree) {
-		ASSERT(tree->t_user == user);
-		smb_tree_disconnect(tree, B_TRUE);
-		smb_tree_release(tree);
-		tree = smb_user_get_tree(&user->u_tree_list, NULL);
-	}
-}
-
-/*
- * Disconnect all trees that match the specified share name.
- */
-void
-smb_user_disconnect_share(
-    smb_user_t		*user,
-    const char		*sharename)
-{
-	smb_tree_t	*tree;
-	smb_tree_t	*next;
-
-	ASSERT(user);
-	ASSERT(user->u_magic == SMB_USER_MAGIC);
-	ASSERT(user->u_refcnt);
-
-	tree = smb_user_lookup_share(user, sharename, NULL);
-	while (tree) {
-		ASSERT(tree->t_magic == SMB_TREE_MAGIC);
-		smb_session_cancel_requests(user->u_session, tree, NULL);
-		smb_tree_disconnect(tree, B_TRUE);
-		next = smb_user_lookup_share(user, sharename, tree);
-		smb_tree_release(tree);
-		tree = next;
-	}
-}
-
-/*
- * Close a file by its unique id.
- */
-int
-smb_user_fclose(smb_user_t *user, uint32_t uniqid)
-{
-	smb_llist_t	*tree_list;
-	smb_tree_t	*tree;
-	int		rc = ENOENT;
-
-	ASSERT(user);
-	ASSERT(user->u_magic == SMB_USER_MAGIC);
-
-	tree_list = &user->u_tree_list;
-	ASSERT(tree_list);
-
-	smb_llist_enter(tree_list, RW_READER);
-	tree = smb_llist_head(tree_list);
-
-	while ((tree != NULL) && (rc == ENOENT)) {
-		ASSERT(tree->t_user == user);
-
-		if (smb_tree_hold(tree)) {
-			rc = smb_tree_fclose(tree, uniqid);
-			smb_tree_release(tree);
-		}
-
-		tree = smb_llist_next(tree_list, tree);
-	}
-
-	smb_llist_exit(tree_list);
-	return (rc);
 }
 
 /*
@@ -688,30 +448,13 @@ smb_user_namecmp(smb_user_t *user, const char *name)
 int
 smb_user_enum(smb_user_t *user, smb_svcenum_t *svcenum)
 {
-	smb_tree_t	*tree;
-	smb_tree_t	*next;
-	int		rc;
+	int		rc = 0;
 
 	ASSERT(user);
 	ASSERT(user->u_magic == SMB_USER_MAGIC);
 
 	if (svcenum->se_type == SMB_SVCENUM_TYPE_USER)
 		return (smb_user_enum_private(user, svcenum));
-
-	tree = smb_user_get_tree(&user->u_tree_list, NULL);
-	while (tree) {
-		ASSERT(tree->t_user == user);
-
-		rc = smb_tree_enum(tree, svcenum);
-		if (rc != 0) {
-			smb_tree_release(tree);
-			break;
-		}
-
-		next = smb_user_get_tree(&user->u_tree_list, tree);
-		smb_tree_release(tree);
-		tree = next;
-	}
 
 	return (rc);
 }
@@ -769,8 +512,6 @@ smb_user_delete(void *arg)
 
 	user->u_magic = (uint32_t)~SMB_USER_MAGIC;
 	mutex_destroy(&user->u_mutex);
-	smb_llist_destructor(&user->u_tree_list);
-	smb_idpool_destructor(&user->u_tid_pool);
 	if (user->u_cred)
 		crfree(user->u_cred);
 	if (user->u_privcred)
@@ -778,43 +519,6 @@ smb_user_delete(void *arg)
 	smb_mem_free(user->u_name);
 	smb_mem_free(user->u_domain);
 	kmem_cache_free(user->u_server->si_cache_user, user);
-}
-
-/*
- * Get the next connected tree in the list.  A reference is taken on
- * the tree, which can be released later with smb_tree_release().
- *
- * If the specified tree is NULL the search starts from the beginning of
- * the tree list.  If a tree is provided the search starts just after
- * that tree.
- *
- * Returns NULL if there are no connected trees in the list.
- */
-static smb_tree_t *
-smb_user_get_tree(
-    smb_llist_t		*tree_list,
-    smb_tree_t		*tree)
-{
-	ASSERT(tree_list);
-
-	smb_llist_enter(tree_list, RW_READER);
-
-	if (tree) {
-		ASSERT(tree->t_magic == SMB_TREE_MAGIC);
-		tree = smb_llist_next(tree_list, tree);
-	} else {
-		tree = smb_llist_head(tree_list);
-	}
-
-	while (tree) {
-		if (smb_tree_hold(tree))
-			break;
-
-		tree = smb_llist_next(tree_list, tree);
-	}
-
-	smb_llist_exit(tree_list);
-	return (tree);
 }
 
 cred_t *
