@@ -149,6 +149,7 @@ MANFILES = 	__fbufsize.3c					\
 	 	gethostid.3c					\
 	 	gethostname.3c					\
 	 	gethrtime.3c					\
+		getline.3c					\
 	 	getloadavg.3c					\
 	 	getlogin.3c					\
 	 	getmntent.3c					\
@@ -747,6 +748,7 @@ MANSOFILES =	FD_CLR.3c				\
 	 	getc_unlocked.3c			\
 	 	getchar.3c				\
 	 	getchar_unlocked.3c			\
+		getdelim.3c				\
 	 	getextmntent.3c				\
 	 	getgrent.3c				\
 	 	getgrent_r.3c				\
@@ -1506,6 +1508,8 @@ setgrent.3c				:= SOSRC = man3c/getgrnam.3c
 sethostname.3c				:= SOSRC = man3c/gethostname.3c
 
 gethrvtime.3c				:= SOSRC = man3c/gethrtime.3c
+
+getdelim.3c				:= SOSRC = man3c/getline.3c
 
 getlogin_r.3c				:= SOSRC = man3c/getlogin.3c
 

@@ -12705,6 +12705,7 @@ f usr/share/man/man3c/getchar_unlocked.3c 0444 root bin
 f usr/share/man/man3c/getcpuid.3c 0444 root bin
 f usr/share/man/man3c/getcwd.3c 0444 root bin
 f usr/share/man/man3c/getdate.3c 0444 root bin
+f usr/share/man/man3c/getdelim.3c 0444 root bin
 f usr/share/man/man3c/getdtablesize.3c 0444 root bin
 f usr/share/man/man3c/getenv.3c 0444 root bin
 f usr/share/man/man3c/getexecname.3c 0444 root bin
@@ -12720,6 +12721,7 @@ f usr/share/man/man3c/gethostid.3c 0444 root bin
 f usr/share/man/man3c/gethostname.3c 0444 root bin
 f usr/share/man/man3c/gethrtime.3c 0444 root bin
 f usr/share/man/man3c/gethrvtime.3c 0444 root bin
+f usr/share/man/man3c/getline.3c 0444 root bin
 f usr/share/man/man3c/getloadavg.3c 0444 root bin
 f usr/share/man/man3c/getlogin.3c 0444 root bin
 f usr/share/man/man3c/getlogin_r.3c 0444 root bin
