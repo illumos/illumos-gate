@@ -137,6 +137,8 @@ extern boolean_t topo_method_supported(tnode_t *, const char *,
     topo_version_t);
 extern int topo_node_facility(topo_hdl_t *, tnode_t *, const char *,
     uint32_t, topo_faclist_t *, int *);
+extern int topo_node_child_walk(topo_hdl_t *, tnode_t *, topo_walk_cb_t,
+    void *, int *);
 
 /*
  * Node flags: denotes type of node

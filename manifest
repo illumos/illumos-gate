@@ -5252,6 +5252,8 @@ f usr/lib/fm/fmd/ipmitopo 0555 root bin
 d usr/lib/fm/fmd/plugins 0755 root bin
 f usr/lib/fm/fmd/plugins/cpumem-retire.conf 0644 root bin
 f usr/lib/fm/fmd/plugins/cpumem-retire.so 0555 root bin
+f usr/lib/fm/fmd/plugins/disk-lights.conf 0644 root bin
+f usr/lib/fm/fmd/plugins/disk-lights.so 0555 root bin
 f usr/lib/fm/fmd/plugins/disk-monitor.conf 0644 root bin
 f usr/lib/fm/fmd/plugins/disk-monitor.so 0555 root bin
 f usr/lib/fm/fmd/plugins/disk-transport.conf 0644 root bin

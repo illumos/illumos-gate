@@ -126,6 +126,7 @@ SYMBOL_VERSION SUNWprivate {
 	topo_node_asru;
 	topo_node_asru_set;
 	topo_node_bind;
+	topo_node_child_walk;
 	topo_node_facility;
 	topo_node_facbind;
 	topo_node_flags;
