@@ -152,7 +152,7 @@ Copyright (c) 2013, Joyent, Inc. All rights reserved.
        </range>
     </set>
 
-    <set type='product' setlist='Joyent-Compute-Platform-1101'>
+    <set type='product' setlist='Joyent-Compute-Platform-1101|Joyent-Compute-Platform-1102'>
        <range name='psu' min='0' max='1'>
           <enum-method name='ipmi' version='1' />
        </range>
