@@ -76,8 +76,6 @@ extern int	*__joy_h_errno(void);
 extern int	__joy_res_override_retry(int);
 
 static void	__fallback_set_no_hosts(void);
-static int	*__fallback_h_errno(void);
-static int	__fallback_override_retry(int);
 static int	__is_mt_safe(void);
 
 void	(*set_no_hosts_fallback)(void) = __fallback_set_no_hosts;
@@ -138,36 +136,6 @@ _nss_dns_init(void)
 static int
 __is_mt_safe(void) {
 	return (0);
-}
-
-
-/*
- * Return pointer to the global h_errno variable
- */
-static int *
-__fallback_h_errno(void) {
-	return (NULL);
-}
-
-
-/*
- * This function is called when the resolver library doesn't provide its
- * own function to establish an override retry. If we can get a pointer
- * to the per-thread _res (i.e., set_res_retry != 0), we set the retries
- * directly, and return the previous number of retries. Otherwise, there's
- * nothing to do.
- */
-static int
-__fallback_override_retry(int retry) {
-	struct __res_state	*res;
-	int			old_retry = 0;
-
-	if (set_res_retry != 0) {
-		res = set_res_retry();
-		old_retry = res->retry;
-		res->retry = retry;
-	}
-	return (old_retry);
 }
 
 

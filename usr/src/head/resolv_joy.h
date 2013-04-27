@@ -92,8 +92,12 @@
  *	$Id: resolv.h,v 8.52 2003/04/29 02:27:03 marka Exp $
  */
 
-#ifndef _RESOLV_H_
-#define	_RESOLV_H_
+#ifndef _RESOLV_JOY_H
+#define	_RESOLV_JOY_H
+
+#ifdef	_RESOLV_H_
+#error	"resolv.h and resolv_joy.h should not be used together"
+#endif
 
 #include <sys/param.h>
 
@@ -465,4 +469,4 @@ int		res_getservers __P((res_state,
 }
 #endif
 
-#endif /* !_RESOLV_H_ */
+#endif /* !_RESOLV_JOY_H */

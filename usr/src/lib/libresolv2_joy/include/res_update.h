@@ -33,7 +33,7 @@
 #include <sys/types.h>
 #include <arpa/nameser.h>
 #include <isc/list.h>
-#include <resolv.h>
+#include <resolv_joy.h>
 
 #ifndef	ORIGINAL_ISC_CODE
 /* definition of u_int32_t needed on Solaris */

@@ -4,7 +4,7 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <arpa/nameser.h>
-#include <resolv.h>
+#include <resolv_joy.h>
 
 /* Access functions for the libresolv private interface */
 

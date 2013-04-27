@@ -30,9 +30,9 @@ void endnetgrent(void);
  * from those currently in OpenSolaris.
  */
 
-#ifdef _RESOLV_H_
+#ifdef _RESOLV_JOY_H
 #include <port_resolv.h>
-#endif /* _RESOLV_H_ */
+#endif /* _RESOLV_JOY_H */
 
 #ifdef _NETDB_H
 #include <port_netdb.h>
