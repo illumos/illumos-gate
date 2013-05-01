@@ -10405,6 +10405,7 @@ f usr/sbin/nscd 0555 root bin
 f usr/sbin/nwamadm 0555 root bin
 f usr/sbin/nwamcfg 0555 root bin
 h usr/sbin/pbind=usr/lib/isaexec
+f usr/sbin/pcitool 0555 root bin
 f usr/sbin/ping 4555 root bin
 h usr/sbin/plockstat=usr/lib/isaexec
 f usr/sbin/pmadm 0555 root sys

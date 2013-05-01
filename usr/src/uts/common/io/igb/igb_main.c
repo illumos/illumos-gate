@@ -1254,6 +1254,10 @@ igb_init_adapter(igb_t *igb)
 	struct e1000_hw *hw = &igb->hw;
 	uint32_t pba;
 	uint32_t high_water;
+	int oemid[2];
+	uint16_t nvmword;
+	u8 pbanum[E1000_PBANUM_LENGTH];
+	char eepromver[5];	/* f.ff */
 	int i;
 
 	ASSERT(mutex_owned(&igb->gen_lock));
@@ -1395,6 +1399,33 @@ igb_init_adapter(igb_t *igb)
 	 */
 	for (i = 0; i < igb->intr_cnt; i++)
 		E1000_WRITE_REG(hw, E1000_EITR(i), igb->intr_throttling[i]);
+
+	/*
+	 * Read identifying information and place in devinfo.
+	 */
+	nvmword = 0xffff;
+	(void) e1000_read_nvm(&igb->hw, NVM_OEM_OFFSET_0, 1, &nvmword);
+	oemid[0] = (int)nvmword;
+	(void) e1000_read_nvm(&igb->hw, NVM_OEM_OFFSET_1, 1, &nvmword);
+	oemid[1] = (int)nvmword;
+	(void) ddi_prop_update_int_array(DDI_DEV_T_NONE, igb->dip,
+	    "oem-identifier", oemid, 2);
+
+	pbanum[0] = '\0';
+	(void) e1000_read_pba_string(&igb->hw, pbanum, sizeof (pbanum));
+	if (*pbanum != '\0') {
+		(void) ddi_prop_update_string(DDI_DEV_T_NONE, igb->dip,
+		    "printed-board-assembly", (char *)pbanum);
+	}
+
+	nvmword = 0xffff;
+	(void) e1000_read_nvm(&igb->hw, NVM_VERSION, 1, &nvmword);
+	if ((nvmword & 0xf00) == 0) {
+		(void) snprintf(eepromver, sizeof (eepromver), "%x.%x",
+		    (nvmword & 0xf000) >> 12, (nvmword & 0xff));
+		(void) ddi_prop_update_string(DDI_DEV_T_NONE, igb->dip,
+		    "nvm-version", eepromver);
+	}
 
 	/*
 	 * Save the state of the phy
