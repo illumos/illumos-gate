@@ -53,9 +53,9 @@ shift OPTIND-1
 if [[ -n $(zonecfg -z "${ZONENAME}" info attr name=transition \
     | grep "value: receiving:") ]]; then
 
-    # Here we're doing an install for a received zone, the dataset should have
-    # already been created.
-    exit $ZONE_SUBPROC_OK
+	# Here we're doing an install for a received zone, the dataset should have
+	# already been created.
+	exit $ZONE_SUBPROC_OK
 fi
 
 if [[ -z $ZONEPATH || -z $ZONENAME ]]; then
@@ -89,16 +89,28 @@ PDS_NAME=`mount | nawk -v p=$dname '{if ($1 == p) print $3}'`
 
 QUOTA_ARG=
 if [[ ${ZQUOTA} != "0" ]]; then
-    QUOTA_ARG="-o quota=${ZQUOTA}g"
+	QUOTA_ARG="-o quota=${ZQUOTA}g"
 fi
 
-zfs snapshot $PDS_NAME/${TMPLZONE}@${bname}
-zfs clone -F ${QUOTA_ARG} $PDS_NAME/${TMPLZONE}@${bname} \
-    $PDS_NAME/$bname || fatal "failed to clone zone dataset"
+# New imgadm renames the dataset's snapshot at import to @final for us
+# and when it exists, we use that. However, when it does not exist we
+# still use the old method of creating a zones/<uuid>@<uuid> snapshot
+# so we can support old datasets.
+exists=$(zfs list -Ho name ${PDS_NAME}/${TMPLZONE}@final 2>&1)
+if [[ $? == 0 && ${exists} == "${PDS_NAME}/${TMPLZONE}@final" ]]; then
+	zfs clone -F ${QUOTA_ARG} ${PDS_NAME}/${TMPLZONE}@final \
+	    ${PDS_NAME}/${bname} || fatal "failed to clone zone dataset"
+elif [[ ${exists} =~ "dataset does not exist" ]]; then
+	zfs snapshot ${PDS_NAME}/${TMPLZONE}@${bname}
+	zfs clone -F ${QUOTA_ARG} ${PDS_NAME}/${TMPLZONE}@${bname} \
+	    ${PDS_NAME}/${bname} || fatal "failed to clone zone dataset"
+else
+	fatal "Unable to determine snapshot for ${PDS_NAME}/${TMPLZONE}"
+fi
 
 if [ ! -d ${ZONEPATH}/config ]; then
-    mkdir -p ${ZONEPATH}/config
-    chmod 755 ${ZONEPATH}/config
+	mkdir -p ${ZONEPATH}/config
+	chmod 755 ${ZONEPATH}/config
 fi
 
 final_setup
