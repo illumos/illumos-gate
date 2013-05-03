@@ -492,10 +492,10 @@ mac_srs_fire(void *arg)
 
 
 /*
- * hash based on the src address and the port information.
+ * hash based on the src address, dst address and the port information.
  */
-#define	HASH_ADDR(src, ports)					\
-	(ntohl((src)) ^ ((ports) >> 24) ^ ((ports) >> 16) ^	\
+#define	HASH_ADDR(src, dst, ports)					\
+	(ntohl((src) + (dst)) ^ ((ports) >> 24) ^ ((ports) >> 16) ^	\
 	((ports) >> 8) ^ (ports))
 
 #define	COMPUTE_INDEX(key, sz)	(key % sz)
@@ -526,16 +526,6 @@ enum pkt_type {
 	OTH,
 	UNDEF
 };
-
-/*
- * In general we do port based hashing to spread traffic over different
- * softrings. The below tunables allow to override that behavior. Setting one
- * (depending on IPv6 or IPv4) to B_TRUE allows a fanout based on src
- * IPv6 or IPv4 address. This behavior is also applicable to IPv6 packets
- * carrying multiple optional headers and other uncommon packet types.
- */
-boolean_t mac_src_ipv6_fanout = B_FALSE;
-boolean_t mac_src_ipv4_fanout = B_FALSE;
 
 /*
  * Pair of local and remote ports in the transport header
@@ -780,7 +770,7 @@ mac_rx_srs_long_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *mp,
 	uint16_t	remlen;
 	uint8_t		nexthdr;
 	uint16_t	hdr_len;
-	uint32_t	src_val;
+	uint32_t	src_val, dst_val;
 	boolean_t	modifiable = B_TRUE;
 	boolean_t	v6;
 
@@ -851,29 +841,30 @@ mac_rx_srs_long_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *mp,
 		remlen = ntohs(ip6h->ip6_plen);
 		nexthdr = ip6h->ip6_nxt;
 		src_val = V4_PART_OF_V6(ip6h->ip6_src);
+		dst_val = V4_PART_OF_V6(ip6h->ip6_dst);
 		/*
 		 * Do src based fanout if below tunable is set to B_TRUE or
 		 * when mac_ip_hdr_length_v6() fails because of malformed
 		 * packets or because mblks need to be concatenated using
 		 * pullupmsg().
 		 */
-		if (mac_src_ipv6_fanout || !mac_ip_hdr_length_v6(ip6h,
-		    mp->b_wptr, &hdr_len, &nexthdr, NULL)) {
-			goto src_based_fanout;
+		if (!mac_ip_hdr_length_v6(ip6h, mp->b_wptr, &hdr_len, &nexthdr,
+		    NULL)) {
+			goto src_dst_based_fanout;
 		}
 	} else {
 		hdr_len = IPH_HDR_LENGTH(ipha);
 		remlen = ntohs(ipha->ipha_length) - hdr_len;
 		nexthdr = ipha->ipha_protocol;
 		src_val = (uint32_t)ipha->ipha_src;
+		dst_val = (uint32_t)ipha->ipha_dst;
 		/*
 		 * Catch IPv4 fragment case here.  IPv6 has nexthdr == FRAG
 		 * for its equivalent case.
 		 */
-		if (mac_src_ipv4_fanout ||
-		    (ntohs(ipha->ipha_fragment_offset_and_flags) &
+		if ((ntohs(ipha->ipha_fragment_offset_and_flags) &
 		    (IPH_MF | IPH_OFFSET)) != 0) {
-			goto src_based_fanout;
+			goto src_dst_based_fanout;
 		}
 	}
 	if (remlen < MIN_EHDR_LEN)
@@ -895,12 +886,12 @@ mac_rx_srs_long_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *mp,
 			break;	/* out of switch... */
 		/* FALLTHRU */
 	default:
-		goto src_based_fanout;
+		goto src_dst_based_fanout;
 	}
 
 	switch (nexthdr) {
 	case IPPROTO_TCP:
-		hash = HASH_ADDR(src_val, *(uint32_t *)whereptr);
+		hash = HASH_ADDR(src_val, dst_val, *(uint32_t *)whereptr);
 		*indx = COMPUTE_INDEX(hash, mac_srs->srs_tcp_ring_count);
 		*type = OTH;
 		break;
@@ -908,7 +899,8 @@ mac_rx_srs_long_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *mp,
 	case IPPROTO_SCTP:
 	case IPPROTO_ESP:
 		if (mac_fanout_type == MAC_FANOUT_DEFAULT) {
-			hash = HASH_ADDR(src_val, *(uint32_t *)whereptr);
+			hash = HASH_ADDR(src_val, dst_val,
+			    *(uint32_t *)whereptr);
 			*indx = COMPUTE_INDEX(hash,
 			    mac_srs->srs_udp_ring_count);
 		} else {
@@ -920,8 +912,8 @@ mac_rx_srs_long_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *mp,
 	}
 	return (0);
 
-src_based_fanout:
-	hash = HASH_ADDR(src_val, (uint32_t)0);
+src_dst_based_fanout:
+	hash = HASH_ADDR(src_val, dst_val, (uint32_t)0);
 	*indx = COMPUTE_INDEX(hash, mac_srs->srs_oth_ring_count);
 	*type = OTH;
 	return (0);
@@ -1192,7 +1184,7 @@ mac_rx_srs_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 			 * same offset as the 2x16-bit ports. So it is clumped
 			 * along with TCP, UDP and SCTP.
 			 */
-			hash = HASH_ADDR(ipha->ipha_src,
+			hash = HASH_ADDR(ipha->ipha_src, ipha->ipha_dst,
 			    *(uint32_t *)(mp->b_rptr + ports_offset));
 			indx = COMPUTE_INDEX(hash, mac_srs->srs_tcp_ring_count);
 			type = V4_TCP;
@@ -1202,7 +1194,7 @@ mac_rx_srs_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 		case IPPROTO_SCTP:
 		case IPPROTO_ESP:
 			if (mac_fanout_type == MAC_FANOUT_DEFAULT) {
-				hash = HASH_ADDR(ipha->ipha_src,
+				hash = HASH_ADDR(ipha->ipha_src, ipha->ipha_dst,
 				    *(uint32_t *)(mp->b_rptr + ports_offset));
 				indx = COMPUTE_INDEX(hash,
 				    mac_srs->srs_udp_ring_count);
