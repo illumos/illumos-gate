@@ -10,6 +10,7 @@
 #
 
 # Copyright 2011, Richard Lowe
+# Copyright 2013, OmniTI Computer Consulting, Inc
 
 include ../../Makefile.master
 
@@ -207,6 +208,7 @@ MANSOFILES =	_Exit.2				\
 	 	lstat.2				\
 	 	openat.2			\
 	 	pathconf.2			\
+	 	pipe2.2			\
 	 	pread.2				\
 	 	pset_assign.2			\
 	 	pset_destroy.2			\
@@ -327,6 +329,8 @@ getgid.2			:= SOSRC = man2/getuid.2
 setustack.2			:= SOSRC = man2/getustack.2
 
 openat.2			:= SOSRC = man2/open.2
+
+pipe2.2				:= SOSRC = man2/pipe.2
 
 pset_assign.2			:= SOSRC = man2/pset_create.2
 pset_destroy.2			:= SOSRC = man2/pset_create.2

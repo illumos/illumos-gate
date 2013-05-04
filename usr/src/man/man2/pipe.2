@@ -2,6 +2,7 @@
 .\" Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Portions Copyright (c) 2013, OmniTI Computer Consulting, Inc. All Rights Reserved
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
@@ -9,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PIPE 2 "Apr 23, 2002"
+.TH PIPE 2 "Apr 19, 2013"
 .SH NAME
 pipe \- create an interprocess channel
 .SH SYNOPSIS
@@ -18,17 +19,50 @@ pipe \- create an interprocess channel
 #include <unistd.h>
 
 \fBint\fR \fBpipe\fR(\fBint\fR \fIfildes\fR[2]);
+
+\fBint\fR \fBpipe2\fR(\fBint\fR \fIfildes\fR[2], \fBint\fR \fIflags\fR);
 .fi
 
 .SH DESCRIPTION
 .sp
 .LP
-The \fBpipe()\fR function creates an I/O mechanism called a pipe and returns
-two file descriptors, \fIfildes\fR[\fB0\fR] and \fIfildes\fR[\fB1\fR]. The
-files associated with \fIfildes\fR[\fB0\fR] and \fIfildes\fR[\fB1\fR] are
-streams and are both opened for reading and writing.  The \fBO_NDELAY\fR,
-\fBO_NONBLOCK\fR, and \fBFD_CLOEXEC\fR flags are cleared on both file
-descriptors. The \fBfcntl\fR(2) function can be used to set these flags.
+The \fBpipe()\fR and pipe2() functions create an I/O mechanism called a
+pipe and returns two file descriptors, \fIfildes\fR[\fB0\fR] and
+\fIfildes\fR[\fB1\fR]. The files associated with \fIfildes\fR[\fB0\fR]
+and \fIfildes\fR[\fB1\fR] are streams and are both opened for reading and
+writing.  The \fBpipe()\fR call will clear the \fBO_NDELAY\fR,
+\fBO_NONBLOCK\fR, and \fBFD_CLOEXEC\fR flags on both file descriptors. The
+\fBfcntl\fR(2) function can be used to set these flags.
+.sp
+.LP
+The \fBpipe2()\fR call will clear the \fBO_NDELAY\fR on both filedescriptors.
+The \fIflags\fR argument may be used to specify attributes on both file
+descriptors.  \fBpipe2()\fR called with a \fIflags\fR value of 0 will
+behave identically to \fBpipe()\fR.  Values for \fIflags\fR are constructed
+by a bitwise-inclusive-OR of flags from the following list, defined in
+<\fBfcntl.h\fR>.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBO_NONBLOCK\fR\fR
+.ad
+.RS 12n
+Both file descriptors will be placed in non-blocking mode. This corresponds
+to the \fBO_NONBLOCK\fR flag to \fBfcntl\fR(2).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBO_CLOEXEC\fR\fR
+.ad
+.RS 12n
+Both file descriptors will be opened with the FD_CLOEXEC flag set. Both file
+descriptors will be closed prior to any future exec() calls.
+.RE
+
 .sp
 .LP
 A read from \fIfildes\fR[\fB0\fR] accesses the data written to
@@ -47,7 +81,7 @@ returned and \fBerrno\fR is set to indicate the error.
 .SH ERRORS
 .sp
 .LP
-The \fBpipe()\fR function will fail if:
+The \fBpipe()\fR and \fBpipe2()\fR functions will fail if:
 .sp
 .ne 2
 .na
@@ -66,6 +100,29 @@ More than {\fBOPEN_MAX\fR} file descriptors are already in use by this process.
 The number of simultaneously open files in the system would exceed a
 system-imposed limit.
 .RE
+
+.sp
+.ne 2
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+The \fIfildes[2]\fR argument points to an illegal address.
+.RE
+
+.sp
+.LP
+The \fBpipe2()\fR function will also fail if:
+.sp
+.ne 2
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+The \fIflags\fR argument is illegal. Valid \fIflags\fR are zero or a
+bitwise inclusive-OR of \fBO_CLOEXEC\fR and \fBO_NONBLOCK\fR.
+.RE
+
 
 .SH ATTRIBUTES
 .sp
@@ -89,8 +146,8 @@ MT-Level	Async-Signal-Safe
 .sp
 .LP
 \fBsh\fR(1), \fBfcntl\fR(2), \fBfstat\fR(2), \fBgetmsg\fR(2), \fBpoll\fR(2),
-\fBputmsg\fR(2), \fBread\fR(2), \fBwrite\fR(2), \fBattributes\fR(5),
-\fBstandards\fR(5), \fBstreamio\fR(7I)
+\fBputmsg\fR(2), \fBread\fR(2), \fBwrite\fR(2), \fBopen\fR(2),
+\fBattributes\fR(5), \fBstandards\fR(5), \fBstreamio\fR(7I)
 .SH NOTES
 .sp
 .LP

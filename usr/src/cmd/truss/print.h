@@ -26,6 +26,7 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+/* Copyright (c) 2013, OmniTI Computer Consulting, Inc. All right reserved. */
 
 #ifndef	_TRUSS_PRINT_H
 #define	_TRUSS_PRINT_H
@@ -61,7 +62,7 @@ extern "C" {
 #define	RST	21		/* print string returned by sys call */
 #define	SMF	22		/* print streams message flags */
 #define	IOA	23		/* print ioctl argument */
-/* Number 24 now available for reuse */
+#define	PIP	24		/* print pipe flags */
 #define	MTF	25		/* print mount flags */
 #define	MFT	26		/* print mount file system type */
 #define	IOB	27		/* print contents of I/O buffer */
@@ -136,7 +137,9 @@ extern "C" {
 #define	MOB	96		/* print mmapobj() flags */
 #define	SNF	97		/* print AT_SYMLINK_[NO]FOLLOW flag */
 #define	SKC	98		/* print sockconfig subcode */
-#define	HID	99		/* hidden argument, don't print */
+#define	ACF	99		/* accept4 flags */
+#define	PFD	100		/* pipe fds[2] */
+#define	HID	101		/* hidden argument, don't print */
 				/* make sure HID is always the last member */
 
 /*

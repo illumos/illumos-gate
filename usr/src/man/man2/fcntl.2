@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
 .\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
@@ -9,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FCNTL 2 "Jan 17, 2007"
+.TH FCNTL 2 "Apr 19, 2013"
 .SH NAME
 fcntl \- file control
 .SH SYNOPSIS
@@ -59,6 +60,27 @@ descriptor is cleared to keep the file open across calls to one of the
 Similar to \fBF_DUPFD\fR, but always returns \fIarg\fR. \fBF_DUP2FD\fR closes
 \fIarg\fR if it is open and not equal to \fIfildes.\fR \fBF_DUP2FD\fR is
 equivalent to \fBdup2\fR(\fIfildes\fR, \fIarg\fR).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBF_DUPFD_CLOEXEC\fR\fR
+.ad
+.RS 15n
+Similar to \fBF_DUPFD\fR except that instead of clearing \fBFD_CLOEXEC\fR
+it is explicitly set on the returned file descriptor.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBF_DUP2FD_CLOEXEC\fR\fR
+.ad
+.RS 15n
+Similar to \fBF_DUP2FD\fR with two exceptions. The \fBFD_CLOEXEC\fR flag is
+explicitly set on the returned file descriptor.  If \fIfiledes\fR equals
+\fIarg\fR, the call will fail setting \fBerrno\fR to \fBEINVAL\fR.
 .RE
 
 .sp
@@ -762,6 +784,9 @@ or equal to \fBOPEN_MAX\fR; or the \fIcmd\fR argument is \fBF_GETLK\fR,
 .sp
 The \fIcmd\fR argument is \fBF_UNSHARE\fR and a reservation with this
 \fBf_id\fR for this process does not exist.
+.sp
+The \fIcmd\fR argument is \fBF_DUP2FD_CLOEXEC\fR and \fIfildes\fR is equal
+to \fBarg\fR.
 .RE
 
 .sp

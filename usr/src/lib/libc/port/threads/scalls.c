@@ -24,6 +24,8 @@
  * Use is subject to license terms.
  */
 
+/* Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved. */
+
 #include "lint.h"
 #include "thr_uberdata.h"
 #include <stdarg.h>
@@ -1022,12 +1024,13 @@ sigqueue(pid_t pid, int signo, const union sigval value)
 }
 
 int
-_so_accept(int sock, struct sockaddr *addr, uint_t *addrlen, int version)
+_so_accept(int sock, struct sockaddr *addr, uint_t *addrlen, int version,
+    int flags)
 {
-	extern int __so_accept(int, struct sockaddr *, uint_t *, int);
+	extern int __so_accept(int, struct sockaddr *, uint_t *, int, int);
 	int rv;
 
-	PERFORM(__so_accept(sock, addr, addrlen, version))
+	PERFORM(__so_accept(sock, addr, addrlen, version, flags))
 }
 
 int

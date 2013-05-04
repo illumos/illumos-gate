@@ -146,8 +146,8 @@ const char *const FCNTLname[] = {
 	"F_GETLK64",
 	"F_SETLK64",
 	"F_SETLKW64",
-	NULL,		/* 36 */
-	NULL,		/* 37 */
+	"F_DUP2FD_CLOEXEC",
+	"F_DUPFD_CLOEXEC",
 	NULL,		/* 38 */
 	NULL,		/* 39 */
 	"F_SHARE",

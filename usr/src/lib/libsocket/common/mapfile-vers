@@ -21,6 +21,7 @@
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
 
 #
 # MAPFILE HEADER START
@@ -37,6 +38,11 @@
 #
 
 $mapfile_version 2
+
+SYMBOL_VERSION ILLUMOS_0.1 {    # Illumos additions
+    global:
+        accept4;
+} SUNW_1.7;
 
 SYMBOL_VERSION SUNW_1.7 {
     global:
@@ -191,6 +197,7 @@ $endif
 
 SYMBOL_VERSION SUNWprivate_1.3 {
     global:
+        _accept4;
 	_link_aton;
 	_link_ntoa;
 	_nss_initf_ethers;

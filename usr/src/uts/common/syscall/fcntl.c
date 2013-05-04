@@ -22,6 +22,7 @@
 /* ONC_PLUS EXTRACT START */
 /*
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -31,6 +32,7 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
+
 
 /* ONC_PLUS EXTRACT END */
 
@@ -151,6 +153,7 @@ fcntl(int fdes, int cmd, intptr_t arg)
 /* ONC_PLUS EXTRACT END */
 
 	case F_DUPFD:
+	case F_DUPFD_CLOEXEC:
 		p = curproc;
 		if ((uint_t)iarg >= p->p_fno_ctl) {
 			if (iarg >= 0)
@@ -178,8 +181,20 @@ fcntl(int fdes, int cmd, intptr_t arg)
 			fp->f_count--;
 			mutex_exit(&fp->f_tlock);
 			error = EMFILE;
+		} else {
+			if (cmd == F_DUPFD_CLOEXEC) {
+				f_setfd(retval, FD_CLOEXEC);
+			}
 		}
 		goto done;
+
+	case F_DUP2FD_CLOEXEC:
+		if (fdes == iarg) {
+			error = EINVAL;
+			goto done;
+		}
+
+		/* lint -fallthrough */
 
 	case F_DUP2FD:
 		p = curproc;
@@ -208,6 +223,9 @@ fcntl(int fdes, int cmd, intptr_t arg)
 			mutex_exit(&fp->f_tlock);
 			releasef(fdes);
 			if ((error = closeandsetf(iarg, fp)) == 0) {
+				if (cmd == F_DUP2FD_CLOEXEC) {
+					f_setfd(iarg, FD_CLOEXEC);
+				}
 				retval = iarg;
 			} else {
 				mutex_enter(&fp->f_tlock);
