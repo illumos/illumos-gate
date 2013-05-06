@@ -374,13 +374,6 @@ _nss_has_interfaces(int *v4, int *v6)
  * Additionally in the extended results a nssuint_t ttl is placed.
  * This ttl is the lessor of the ttl's extracted from the result.
  *
- * ***Currently the first version of this API only performs simple
- *    single res_nsearch lookups for with T_A or T_AAAA results.
- *    Other searches are deferred to the generic API w/t ttls.
- *
- *    This function is not a generic res_* operation.  It only performs
- *    a single T_A or T_AAAA lookups***
- *
  * RETURNS:  NSS_SUCCESS or NSS_ERROR
  *	If an NSS_ERROR result is returned, nscd is expected
  *	to resubmit the gethosts request using the old style
@@ -554,6 +547,15 @@ searchagain:
 			res_ndestroy(statp);
 			return (NSS_ERROR);
 		}
+
+		/*
+		 * We found something on our first pass. Make sure that we do
+		 * not clobber this information. This ultimately means that we
+		 * were successful.
+		 */
+		if (pass2 == 2)
+			goto out;
+
 		if (pass2 == 1 || flags == 0 || family == AF_INET ||
 		    (family == AF_INET6 && !(flags & AI_V4MAPPED))) {
 			pbuf->p_herrno = HOST_NOT_FOUND;
@@ -727,7 +729,7 @@ searchagain:
 	if (qtype == T_AAAA && family == AF_INET6 &&
 	    ((flags & AI_V4MAPPED) != 0) && ((flags & AI_ALL) != 0) && has_v4) {
 		qtype = T_A;
-		pass2 = 1;
+		pass2 = 2; /* Indicate that we found data this pass */
 		goto searchagain;
 	}
 
@@ -739,6 +741,7 @@ searchagain:
 		res_ndestroy(statp);
 		return (NSS_ERROR);
 	}
+out:
 	pbuf->ext_off = pbuf->data_off + len;
 	pbuf->ext_len = sizeof (nssuint_t);
 	pbuf->data_len = blen;
