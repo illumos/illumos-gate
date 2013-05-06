@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -565,6 +565,16 @@ tmp_freevfs(vfs_t *vfsp)
 	 * tmpnode_free which assumes that the directory entry has been
 	 * removed before the file.
 	 */
+
+	/*
+	 * Now that we are tearing ourselves down we need to remove the
+	 * UNMOUNTED flag. If we don't, we'll later hit a VN_RELE when we remove
+	 * files from the system causing us to have a negative value. Doing this
+	 * seems a bit better than trying to set a flag on the tmount that says
+	 * we're tearing down.
+	 */
+	vfsp->vfs_flag &= ~VFS_UNMOUNTED;
+
 	/*
 	 * Remove all directory entries
 	 */
