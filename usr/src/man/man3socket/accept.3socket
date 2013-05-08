@@ -1,10 +1,11 @@
 '\" te
 .\" Copyright 1989 AT&T
 .\" Copyright (C) 2002, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ACCEPT 3SOCKET "Jan 24, 2002"
+.TH ACCEPT 3SOCKET "Apr 19, 2013"
 .SH NAME
 accept \- accept a connection on a socket
 .SH SYNOPSIS
@@ -15,6 +16,9 @@ accept \- accept a connection on a socket
 #include <sys/socket.h>
 
 \fBint\fR \fBaccept\fR(\fBint\fR \fIs\fR, \fBstruct sockaddr *\fR\fIaddr\fR, \fBsocklen_t *\fR\fIaddrlen\fR);
+
+\fBint\fR \fBaccept4\fR(\fBint\fR \fIs\fR, \fBstruct sockaddr *\fR\fIaddr\fR, \fBsocklen_t *\fR\fIaddrlen\fR,
+    \fBint\fR \fIflags\fR);
 .fi
 
 .SH DESCRIPTION
@@ -53,6 +57,47 @@ The \fBaccept()\fR function is used with connection-based socket types,
 currently with \fBSOCK_STREAM\fR.
 .sp
 .LP
+The \fBaccept4()\fR function allows flags that control the behavior of a
+successfully accepted socket.  If \fIflags\fR is 0, \fBaccept4()\fR acts
+identically to \fBaccept()\fR. Values for \fIflags\fR are constructed by
+a bitwise-inclusive-OR of flags from the following list, defined in
+<sys/socketvar.h>.
+.sp
+.ne 2
+.na
+\fB\fBSOCK_CLOEXEC\fR\fR
+.ad
+.RS 12n
+The accepted socket will have the FD_CLOEXEC flag set as if \fBfcntl()\fR
+was called on it.  This flag is set before the socket is passed to the
+caller thus avoiding the race condition between \fBaccept()\fR and
+\fBfcntl()\fR.  See, \fBO_CLOEXEC\fR in \fBopen(2)\fR for more details.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBSOCK_NDELAY\fR\fR
+.ad
+.RS 12n
+The accepted socket will have the \fBO_NDELAY\fR flag set as if \fBfcntl()\fR
+was called on it.  This sets the socket into non-blocking mode.  See
+\fBO_NDELAY\fR in \fBfcntl.h(3HEAD)\fR for more details.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBSOCK_NONBLOCK\fR\fR
+.ad
+.RS 12n
+The accepted socket will have the \fBO_NONBLOCK\fR flag set as if
+\fBfcntl()\fR was called on it.  This sets the socket into non-blocking mode
+(POSIX; see \fBstandards(5)\fR).  See \fBO_NONBLOCK\fR in \fBfcntl.h(3HEAD)\fR
+for more details.
+.RE
+.sp
+.LP
 It is possible to \fBselect\fR(3C) or \fBpoll\fR(2) a socket for the purpose of
 an \fBaccept()\fR by selecting or polling it for a read. However, this will
 only indicate when a connect indication is pending; it is still necessary to
@@ -65,7 +110,7 @@ returns a non-negative integer that is a descriptor for the accepted socket.
 .SH ERRORS
 .sp
 .LP
-\fBaccept()\fR will fail if:
+\fBaccept()\fR and \fBaccept4()\fR will fail if:
 .sp
 .ne 2
 .na
@@ -179,6 +224,20 @@ The socket is marked as non-blocking and no connections are present to be
 accepted.
 .RE
 
+.sp
+.LP
+\fBAdditionally, \fBaccept4()\fR will fail if:
+.sp
+.ne 2
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 16n
+The \fIflags\fR value is invalid. The \fIflags\fR argument can only be the
+bitwise inclusive-OR of \fBSOCK_CLOEXEC\fR, \fBSOCK_NONBLOCK\fR, and
+\fBSOCK_NDELAY\fR.
+.RE
+
 .SH ATTRIBUTES
 .sp
 .LP
@@ -200,4 +259,5 @@ MT-Level	Safe
 .LP
 \fBpoll\fR(2), \fBbind\fR(3SOCKET), \fBconnect\fR(3SOCKET),
 \fBlisten\fR(3SOCKET), \fBselect\fR(3C), \fBsocket.h\fR(3HEAD),
-\fBsocket\fR(3SOCKET), \fBnetconfig\fR(4), \fBattributes\fR(5)
+\fBsocket\fR(3SOCKET), \fBnetconfig\fR(4), \fBattributes\fR(5),
+\fBfcntl.h(3HEAD)\fR, \fBfcntl(2)\fR, \fBstandards(5)\fR

@@ -338,6 +338,7 @@ so_socketpair(int sv[2])
 	int svs[2];
 	struct sonode *so1, *so2;
 	int error;
+	int orig_flags;
 	struct sockaddr_ux *name;
 	size_t namelen;
 	sotpi_info_t *sti1;
@@ -494,13 +495,23 @@ so_socketpair(int sv[2])
 
 		releasef(svs[0]);
 		releasef(svs[1]);
-		svs[0] = nfd;
+
+		/*
+		 * If FD_CLOEXEC was set on the filedescriptor we're
+		 * swapping out, we should set it on the new one too.
+		 */
+		VERIFY(f_getfd_error(svs[0], &orig_flags) == 0);
+		if (orig_flags & FD_CLOEXEC) {
+			f_setfd(nfd, FD_CLOEXEC);
+		}
 
 		/*
 		 * The socketpair library routine will close the original
 		 * svs[0] when this code passes out a different file
 		 * descriptor.
 		 */
+		svs[0] = nfd;
+
 		if (copyout(svs, sv, sizeof (svs))) {
 			(void) closeandsetf(nfd, NULL);
 			eprintline(EFAULT);
@@ -586,9 +597,10 @@ listen(int sock, int backlog, int version)
 	return (0);
 }
 
-/*ARGSUSED3*/
+/*ARGSUSED4*/
 int
-accept(int sock, struct sockaddr *name, socklen_t *namelenp, int version)
+accept(int sock, struct sockaddr *name, socklen_t *namelenp, int version,
+    int flags)
 {
 	struct sonode *so;
 	file_t *fp;
@@ -598,11 +610,23 @@ accept(int sock, struct sockaddr *name, socklen_t *namelenp, int version)
 	struct vnode *nvp;
 	struct file *nfp;
 	int nfd;
+	int ssflags;
 	struct sockaddr *addrp;
 	socklen_t addrlen;
 
 	dprint(1, ("accept(%d, %p, %p)\n",
 	    sock, (void *)name, (void *)namelenp));
+
+	if (flags & ~(SOCK_CLOEXEC|SOCK_NONBLOCK|SOCK_NDELAY)) {
+		return (set_errno(EINVAL));
+	}
+
+	/* Translate SOCK_ flags to their SS_ variant */
+	ssflags = 0;
+	if (flags & SOCK_NONBLOCK)
+		ssflags |= SS_NONBLOCK;
+	if (flags & SOCK_NDELAY)
+		ssflags |= SS_NDELAY;
 
 	if ((so = getsonode(sock, &error, &fp)) == NULL)
 		return (set_errno(error));
@@ -682,15 +706,23 @@ accept(int sock, struct sockaddr *name, socklen_t *namelenp, int version)
 	setf(nfd, nfp);
 
 	/*
-	 * Copy FNDELAY and FNONBLOCK from listener to acceptor
+	 * Act on SOCK_CLOEXEC from flags
 	 */
-	if (so->so_state & (SS_NDELAY|SS_NONBLOCK)) {
+	if (flags & SOCK_CLOEXEC) {
+		f_setfd(nfd, FD_CLOEXEC);
+	}
+
+	/*
+	 * Copy FNDELAY and FNONBLOCK from listener to acceptor
+	 * and from ssflags
+	 */
+	if ((ssflags | so->so_state) & (SS_NDELAY|SS_NONBLOCK)) {
 		uint_t oflag = nfp->f_flag;
 		int arg = 0;
 
-		if (so->so_state & SS_NONBLOCK)
+		if ((ssflags | so->so_state) & SS_NONBLOCK)
 			arg |= FNONBLOCK;
-		else if (so->so_state & SS_NDELAY)
+		else if ((ssflags | so->so_state) & SS_NDELAY)
 			arg |= FNDELAY;
 
 		/*

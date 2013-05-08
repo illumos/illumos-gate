@@ -10,8 +10,10 @@
 #
 
 # Copyright 2011, Richard Lowe
+# Copyright 2013, OmniTI Computer Consulting, Inc.
 
 file path=usr/share/man/man3socket/accept.3socket
+file path=usr/share/man/man3socket/accept4.3socket
 file path=usr/share/man/man3socket/bind.3socket
 file path=usr/share/man/man3socket/byteorder.3socket
 file path=usr/share/man/man3socket/connect.3socket

@@ -26,7 +26,7 @@
 #
 # Copyright (c) 2012, Joyent, Inc. All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
-#
+# Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
 
 #
 # MAPFILE HEADER START
@@ -90,6 +90,19 @@ $endif
 $if _x86 && _ELF64
 $add amd64
 $endif
+
+SYMBOL_VERSION ILLUMOS_0.4 {	# Illumos additions
+    protected:
+        pipe2;
+        dup3;
+        mkostemp;
+        mkostemps;
+
+$if lf64
+        mkostemp64;
+        mkostemps64;
+$endif
+} ILLUMOS_0.3;
 
 SYMBOL_VERSION ILLUMOS_0.3 {	# Illumos additions
     protected:

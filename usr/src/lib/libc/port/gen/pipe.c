@@ -18,24 +18,18 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright 2013 OmniTI Computer Consulting, Inc.  All rights reserved.
  */
 
-	.file	"pipe.s"
+#pragma weak _pipe	= pipe
 
-#include <sys/asm_linkage.h>
+#include "lint.h"
+#include <unistd.h>
 
-	ANSI_PRAGMA_WEAK(pipe,function)
-
-#include "SYS.h"
-
-	ENTRY(pipe)
-	SYSTRAP_2RVALS(pipe)
-	SYSCERROR
-	movl	4(%esp), %ecx
-	movl	%eax, (%ecx)
-	movl	%edx, 4(%ecx)
-	RETC
-	SET_SIZE(pipe)
+int
+pipe(int *fds)
+{
+	return (pipe2(fds, 0));
+}

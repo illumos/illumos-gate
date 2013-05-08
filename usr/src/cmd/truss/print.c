@@ -372,6 +372,48 @@ prt_ioa(private_t *pri, int raw, long val)	/* print ioctl argument */
 }
 
 void
+prt_pip(private_t *pri, int raw, long val)	/* print pipe code */
+{
+	const char *s = NULL;
+
+	if (!raw) {
+		switch (val) {
+		case O_CLOEXEC:
+			s = "O_CLOEXEC";
+			break;
+		case O_NONBLOCK:
+			s = "O_NONBLOCK";
+			break;
+		case O_CLOEXEC|O_NONBLOCK:
+			s = "O_CLOEXEC|O_NONBLOCK";
+			break;
+		}
+	}
+
+	if (s == NULL)
+		prt_dex(pri, 0, val);
+	else
+		outstring(pri, s);
+}
+
+void
+prt_pfd(private_t *pri, int raw, long val)	/* print pipe code */
+{
+	int fds[2];
+	char str[32];
+
+	/* the fds only have meaning if the return value is 0 */
+	if (!raw &&
+	    pri->Rval1 >= 0 &&
+	    Pread(Proc, fds, sizeof (fds), (long)val) == sizeof (fds)) {
+		snprintf(str, sizeof (str), "[%d,%d]", fds[0], fds[1]);
+		outstring(pri, str);
+	} else {
+		prt_hex(pri, 0, val);
+	}
+}
+
+void
 prt_fcn(private_t *pri, int raw, long val)	/* print fcntl code */
 {
 	const char *s = raw? NULL : fcntlname(val);
@@ -1747,6 +1789,32 @@ prt_skv(private_t *pri, int raw, long val)
 	}
 }
 
+/*
+ * Print accept4() flags argument.
+ */
+void
+prt_acf(private_t *pri, int raw, long val)
+{
+	int first = 1;
+	if (raw || !val ||
+	    (val & ~(SOCK_CLOEXEC|SOCK_NDELAY|SOCK_NONBLOCK))) {
+		prt_dex(pri, 0, val);
+		return;
+	}
+
+	if (val & SOCK_CLOEXEC) {
+		outstring(pri, "|SOCK_CLOEXEC" + first);
+		first = 0;
+	}
+	if (val & SOCK_NDELAY) {
+		outstring(pri, "|SOCK_NDELAY" + first);
+		first = 0;
+	}
+	if (val & SOCK_NONBLOCK) {
+		outstring(pri, "|SOCK_NONBLOCK" + first);
+	}
+}
+
 
 /*
  * Print setsockopt()/getsockopt() 2nd argument.
@@ -2708,7 +2776,7 @@ void (* const Print[])() = {
 	prt_rst,	/* RST -- print string returned by syscall */
 	prt_smf,	/* SMF -- print streams message flags */
 	prt_ioa,	/* IOA -- print ioctl argument */
-	prt_nov,	/* Was SIX, now available for reuse */
+	prt_pip,	/* PIP -- print pipe flags */
 	prt_mtf,	/* MTF -- print mount flags */
 	prt_mft,	/* MFT -- print mount file system type */
 	prt_iob,	/* IOB -- print contents of I/O buffer */
@@ -2783,5 +2851,7 @@ void (* const Print[])() = {
 	prt_mob,	/* MOB -- print mmapobj() flags */
 	prt_snf,	/* SNF -- print AT_SYMLINK_[NO]FOLLOW flag */
 	prt_skc,	/* SKC -- print sockconfig() subcode */
+	prt_acf,	/* ACF -- print accept4 flags */
+	prt_pfd,	/* PFD -- print pipe fds */
 	prt_dec,	/* HID -- hidden argument, make this the last one */
 };

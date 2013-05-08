@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/* Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved. */
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -44,6 +44,7 @@
 #pragma weak bind = _bind
 #pragma weak listen = _listen
 #pragma weak accept = _accept
+#pragma weak accept4 = _accept4
 #pragma weak connect = _connect
 #pragma weak shutdown = _shutdown
 #pragma weak recv = _recv
@@ -92,7 +93,13 @@ _listen(int sock, int backlog)
 int
 _accept(int sock, struct sockaddr *addr, int *addrlen)
 {
-	return (_so_accept(sock, addr, addrlen, SOV_DEFAULT));
+	return (_so_accept(sock, addr, addrlen, SOV_DEFAULT, 0));
+}
+
+int
+_accept4(int sock, struct sockaddr *addr, int *addrlen, int flags)
+{
+	return (_so_accept(sock, addr, addrlen, SOV_DEFAULT, flags));
 }
 
 int

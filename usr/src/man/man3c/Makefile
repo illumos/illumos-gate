@@ -10,6 +10,7 @@
 #
 
 # Copyright 2011, Richard Lowe
+# Copyright 2013, OmniTI Computer Consulting, Inc. All rights reserved.
 
 include ../../Makefile.master
 
@@ -671,6 +672,7 @@ MANSOFILES =	FD_CLR.3c				\
 	 	csetno.3c				\
 	 	ctermid_r.3c				\
 	 	ctime_r.3c				\
+		dup3.3c					\
 	 	dbm_clearerr.3c				\
 	 	dbm_close.3c				\
 	 	dbm_delete.3c				\
@@ -848,6 +850,8 @@ MANSOFILES =	FD_CLR.3c				\
 	 	memset.3c				\
 	 	minor.3c				\
 	 	mkdtemp.3c				\
+	 	mkostemp.3c				\
+	 	mkostemps.3c				\
 	 	mkstemps.3c				\
 	 	mq_reltimedreceive_np.3c		\
 	 	mq_reltimedsend_np.3c			\
@@ -1651,6 +1655,8 @@ memset.3c				:= SOSRC = man3c/memory.3c
 
 mkdtemp.3c				:= SOSRC = man3c/mkstemp.3c
 mkstemps.3c				:= SOSRC = man3c/mkstemp.3c
+mkostemp.3c				:= SOSRC = man3c/mkstemp.3c
+mkostemps.3c				:= SOSRC = man3c/mkstemp.3c
 
 munlock.3c				:= SOSRC = man3c/mlock.3c
 
@@ -1677,6 +1683,8 @@ dbm_firstkey.3c				:= SOSRC = man3c/ndbm.3c
 dbm_nextkey.3c				:= SOSRC = man3c/ndbm.3c
 dbm_open.3c				:= SOSRC = man3c/ndbm.3c
 dbm_store.3c				:= SOSRC = man3c/ndbm.3c
+
+dup3.3c					:= SOSRC = man3c/dup2.3c
 
 fdopendir.3c				:= SOSRC = man3c/opendir.3c
 

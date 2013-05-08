@@ -23,6 +23,8 @@
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/* Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved. */
+
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -216,6 +218,7 @@ extern int clearenv(void);
 extern void closefrom(int);
 extern int daemon(int, int);
 extern int dup2(int, int);
+extern int dup3(int, int, int);
 extern int fdwalk(int (*)(void *, int), void *);
 extern char *qecvt(long double, int, int *, int *);
 extern char *qfcvt(long double, int, int *, int *);
@@ -323,6 +326,7 @@ extern int clearenv();
 extern void closefrom();
 extern int daemon();
 extern int dup2();
+extern int dup3();
 extern int fdwalk();
 extern char *qecvt();
 extern char *qfcvt();

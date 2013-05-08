@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
 /* LINTLIBRARY */
@@ -379,8 +380,10 @@ void lcong48(unsigned short param[7]);
 long nrand48(unsigned short *xsubi);
 long jrand48(unsigned short *xsubi);
 
-/* dup2.c */
+/* dup.c */
+int dup(int fildes);
 int dup2(int fildes, int fildes2);
+int dup3(int fildes, int fildes2, int flags);
 
 /* ecvt.c */
 char *ecvt(double value, int ndigit, int *_RESTRICT_KYWD decpt,
@@ -740,6 +743,9 @@ DIR *opendir(const char *filename);
 
 /* perror.c */
 void perror(const char *s);
+
+/* pipe.c */
+int pipe(int *fds);
 
 /* psiginfo.c */
 void psiginfo(siginfo_t *sip, char *s);

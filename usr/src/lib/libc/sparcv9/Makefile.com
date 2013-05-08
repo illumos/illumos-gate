@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright (c) 2012, Joyent, Inc.  All rights reserved.
 #
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
@@ -251,6 +252,7 @@ COMSYSOBJS=			\
 	pathconf.o		\
 	pause.o			\
 	pcsample.o		\
+	pipe2.o			\
 	pollsys.o		\
 	pread.o			\
 	priocntlset.o		\
@@ -304,7 +306,6 @@ SYSOBJS=			\
 	forkx.o			\
 	forkallx.o		\
 	gettimeofday.o		\
-	pipe.o			\
 	sparc_utrap_install.o	\
 	syscall.o		\
 	tls_get_addr.o		\
@@ -494,6 +495,7 @@ PORTGEN=			\
 	pfmt.o			\
 	pfmt_data.o		\
 	pfmt_print.o		\
+	pipe.o			\
 	plock.o			\
 	poll.o			\
 	posix_fadvise.o		\

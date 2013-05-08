@@ -26,6 +26,8 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+/* Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved. */
+
 #ifndef _UNISTD_H
 #define	_UNISTD_H
 
@@ -274,6 +276,7 @@ extern char *cuserid(char *);
 #endif
 extern int dup(int);
 extern int dup2(int, int);
+extern int dup3(int, int, int);
 #if defined(_XPG4) || defined(__EXTENSIONS__)
 extern void encrypt(char *, int);
 #endif /* defined(XPG4) || defined(__EXTENSIONS__) */
@@ -418,6 +421,7 @@ extern int mincore(caddr_t, size_t, char *);
 extern long pathconf(const char *, int);
 extern int pause(void);
 extern int pipe(int *);
+extern int pipe2(int *, int);
 #if !defined(_POSIX_C_SOURCE) || defined(_XPG5) || \
 	(defined(_LARGEFILE_SOURCE) && _FILE_OFFSET_BITS == 64) || \
 	defined(__EXTENSIONS__)
@@ -611,6 +615,7 @@ extern char *cuserid();
 #endif
 extern int dup();
 extern int dup2();
+extern int dup3();
 #if defined(_XPG4) || defined(__EXTENSIONS__)
 extern void encrypt();
 #endif /* defined(_XPG4) || defined(__EXTENSIONS__) */

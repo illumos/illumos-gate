@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 
+/* Copyright (c) 2013 OmniTI Computer Consulting, Inc. All rights reserved. */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -33,13 +35,13 @@
  * California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/feature_tests.h>
 
 #if !defined(_LP64) && _FILE_OFFSET_BITS == 64
 #define	mkstemp		mkstemp64
 #define	mkstemps	mkstemps64
+#define	mkostemp	mkostemp64
+#define	mkostemps	mkostemps64
 #define	libc_mkstemps	libc_mkstemps64		/* prefer unique statics */
 #pragma weak _mkstemp64 = mkstemp64
 #else
@@ -59,7 +61,7 @@
 extern char *libc_mktemps(char *, int);
 
 static int
-libc_mkstemps(char *as, int slen)
+libc_mkstemps(char *as, int slen, int flags)
 {
 	int	fd;
 	int	len;
@@ -91,11 +93,13 @@ libc_mkstemps(char *as, int slen)
 			}
 		}
 #if _FILE_OFFSET_BITS == 64
-		if ((fd = open64(as, O_CREAT|O_EXCL|O_RDWR, 0600)) != -1) {
+		if ((fd = open64(as, O_CREAT|O_EXCL|O_RDWR|flags,
+		    0600)) != -1) {
 			return (fd);
 		}
 #else
-		if ((fd = open(as, O_CREAT|O_EXCL|O_RDWR, 0600)) != -1) {
+		if ((fd = open(as, O_CREAT|O_EXCL|O_RDWR|flags,
+		    0600)) != -1) {
 			return (fd);
 		}
 #endif  /* _FILE_OFFSET_BITS == 64 */
@@ -116,11 +120,23 @@ libc_mkstemps(char *as, int slen)
 int
 mkstemp(char *as)
 {
-	return (libc_mkstemps(as, 0));
+	return (libc_mkstemps(as, 0, 0));
 }
 
 int
 mkstemps(char *as, int slen)
 {
-	return (libc_mkstemps(as, slen));
+	return (libc_mkstemps(as, slen, 0));
+}
+
+int
+mkostemp(char *as, int flags)
+{
+	return (libc_mkstemps(as, 0, flags));
+}
+
+int
+mkostemps(char *as, int slen, int flags)
+{
+	return (libc_mkstemps(as, slen, flags));
 }

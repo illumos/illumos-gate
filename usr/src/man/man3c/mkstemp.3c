@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
 .\" Copyright (c) 1992, X/Open Company Limited. All Rights Reserved.  Portions Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
@@ -7,9 +8,9 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MKSTEMP 3C "Feb 22, 2006"
+.TH MKSTEMP 3C "Apr 19, 2013"
 .SH NAME
-mkstemp, mkstemps, mkdtemp \- make a unique file name from a template and open
+mkstemp, mkstemps, mkostemp, mkostemps, mkdtemp \- make a unique file name from a template and open
 the file
 .SH SYNOPSIS
 .LP
@@ -21,7 +22,17 @@ the file
 
 .LP
 .nf
+\fBint\fR \fBmkostemp\fR(\fBchar *\fR\fItemplate\fR, \fBint\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
 \fBint\fR \fBmkstemps\fR(\fBchar *\fR\fItemplate\fR, \fBint\fR \fIslen\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmkostemps\fR(\fBchar *\fR\fItemplate\fR, \fBint\fR \fIslen\fR, \fBint\fR \fIflags\fR);
 .fi
 
 .LP
@@ -46,6 +57,12 @@ The \fBmkstemps()\fR function behaves the same as \fBmkstemp()\fR, except it
 permits a suffix to exist in the template. The template should be of the form
 /\fBtmp\fR/\fBtmp\fR\fIXXXXXX\fR\fIsuffix\fR. The \fIslen\fR parameter
 specifies the length of the suffix string.
+.sp
+.LP
+The \fBmkostemp()\fR and \fBmkostemps\fR are like their \fBmkstemp()\fR and
+\fBmkstemps()\fR couterparts except that the \fIflags\fR argument is present
+and used to supplement (as a bitwise inclusive-OR) flags to internal
+\fBopen()\fR calls.  (e.g. \fBO_SYNC\fR, \fBO_APPEND\fR, and \fBO_CLOEXEC\fR).
 .sp
 .LP
 The \fBmkdtemp()\fR function makes the same replacement to the template as in

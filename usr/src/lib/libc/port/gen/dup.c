@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 
+/* Copyright 2013, OmniTI Computer Consulting, Inc. All rights reserved. */
+
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -30,6 +32,7 @@
 #include 	"lint.h"
 #include 	<sys/types.h>
 #include	<fcntl.h>
+#include	<errno.h>
 
 #pragma weak _dup = dup
 int
@@ -43,4 +46,28 @@ int
 dup2(int fildes, int fildes2)
 {
 	return (fcntl(fildes, F_DUP2FD, fildes2));
+}
+
+int
+dup3(int fildes, int fildes2, int flags)
+{
+	/*
+	 * The only valid flag is O_CLOEXEC.
+	 */
+	if (flags & ~O_CLOEXEC) {
+		errno = EINVAL;
+		return (-1);
+	}
+
+	/*
+	 * This call differs from dup2 such that it is an error when
+	 * fildes == fildes2
+	 */
+	if (fildes == fildes2) {
+		errno = EINVAL;
+		return (-1);
+	}
+
+	return (fcntl(fildes, (flags == 0) ? F_DUP2FD : F_DUP2FD_CLOEXEC,
+	    fildes2));
 }

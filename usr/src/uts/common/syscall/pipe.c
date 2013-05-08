@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2013 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
@@ -41,6 +42,7 @@
 #include <sys/errno.h>
 #include <sys/debug.h>
 #include <sys/fs/fifonode.h>
+#include <sys/fcntl.h>
 
 /*
  * This is the loadable module wrapper.
@@ -48,11 +50,11 @@
 #include <sys/modctl.h>
 #include <sys/syscall.h>
 
-longlong_t pipe();
+int pipe(intptr_t fds, int);
 
 static struct sysent pipe_sysent = {
-	0,
-	SE_32RVAL1 | SE_32RVAL2 | SE_NOUNLOAD | SE_ARGC,
+	2,
+	SE_ARGC | SE_32RVAL1 | SE_NOUNLOAD,
 	(int (*)())pipe
 };
 
@@ -102,15 +104,21 @@ _info(struct modinfo *modinfop)
  * each end of the pipe with a vnode, a file descriptor and
  * one of the streams.
  */
-longlong_t
-pipe()
+int
+pipe(intptr_t arg, int flags)
 {
 	vnode_t *vp1, *vp2;
 	struct file *fp1, *fp2;
 	int error = 0;
+	int flag1, flag2, iflags;
 	int fd1, fd2;
-	rval_t	r;
 
+	/*
+	 * Validate allowed flags.
+	 */
+	if (flags & ~(FCLOEXEC|FNONBLOCK) != 0) {
+		return (set_errno(EINVAL));
+	}
 	/*
 	 * Allocate and initialize two vnodes.
 	 */
@@ -124,7 +132,7 @@ pipe()
 	if (error = falloc(vp1, FWRITE|FREAD, &fp1, &fd1)) {
 		VN_RELE(vp1);
 		VN_RELE(vp2);
-		return ((longlong_t)set_errno(error));
+		return (set_errno(error));
 	}
 
 	if (error = falloc(vp2, FWRITE|FREAD, &fp2, &fd2))
@@ -147,6 +155,36 @@ pipe()
 	VTOF(vp1)->fn_ino = VTOF(vp2)->fn_ino = fifogetid();
 
 	/*
+	 * Set the O_NONBLOCK flag if requested.
+	 */
+	if (flags & FNONBLOCK) {
+		flag1 = fp1->f_flag;
+		flag2 = fp2->f_flag;
+		iflags = flags & FNONBLOCK;
+
+		if (error = VOP_SETFL(vp1, flag1, iflags, fp1->f_cred, NULL)) {
+			goto out_vop_close;
+		}
+		fp1->f_flag |= iflags;
+
+		if (error = VOP_SETFL(vp2, flag2, iflags, fp2->f_cred, NULL)) {
+			goto out_vop_close;
+		}
+		fp2->f_flag |= iflags;
+	}
+
+	/*
+	 * Return the file descriptors to the user. They now
+	 * point to two different vnodes which have different
+	 * stream heads.
+	 */
+	if (copyout(&fd1, &((int *)arg)[0], sizeof (int)) ||
+	    copyout(&fd2, &((int *)arg)[1], sizeof (int))) {
+		error = EFAULT;
+		goto out_vop_close;
+	}
+
+	/*
 	 * Now fill in the entries that falloc reserved
 	 */
 	mutex_exit(&fp1->f_tlock);
@@ -155,20 +193,24 @@ pipe()
 	setf(fd2, fp2);
 
 	/*
-	 * Return the file descriptors to the user. They now
-	 * point to two different vnodes which have different
-	 * stream heads.
+	 * Optionally set the FCLOEXEC flag
 	 */
-	r.r_val1 = fd1;
-	r.r_val2 = fd2;
-	return (r.r_vals);
+	if ((flags & FCLOEXEC) != 0) {
+		f_setfd(fd1, FD_CLOEXEC);
+		f_setfd(fd2, FD_CLOEXEC);
+	}
+
+	return (0);
+out_vop_close:
+	(void) VOP_CLOSE(vp1, FWRITE|FREAD, 1, (offset_t)0, fp1->f_cred, NULL);
+	(void) VOP_CLOSE(vp2, FWRITE|FREAD, 1, (offset_t)0, fp2->f_cred, NULL);
 out:
-	unfalloc(fp2);
 	setf(fd2, NULL);
+	unfalloc(fp2);
 out2:
-	unfalloc(fp1);
 	setf(fd1, NULL);
+	unfalloc(fp1);
 	VN_RELE(vp1);
 	VN_RELE(vp2);
-	return ((longlong_t)set_errno(error));
+	return (set_errno(error));
 }

@@ -10,6 +10,7 @@
 #
 
 # Copyright 2011, Richard Lowe
+# Copyright 2013, OmniTI Computer Consulting, Inc.
 
 include ../../Makefile.master
 
@@ -53,7 +54,8 @@ MANFILES = 	accept.3socket		\
 		socketpair.3socket	\
 		spray.3socket
 
-MANSOFILES =	endnetent.3socket		\
+MANSOFILES =	accept4.3socket			\
+		endnetent.3socket		\
 		endprotoent.3socket		\
 		endservent.3socket		\
 		ether_aton.3socket		\
@@ -134,6 +136,8 @@ MANSOFILES =	endnetent.3socket		\
 		setsourcefilter.3socket
 
 MANFILES +=	$(MANSOFILES)
+
+accept4.3socket			:= SOSRC = man3socket/accept.3socket
 
 htonl.3socket			:= SOSRC = man3socket/byteorder.3socket
 htonll.3socket			:= SOSRC = man3socket/byteorder.3socket
