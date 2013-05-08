@@ -58,7 +58,6 @@ devnet_validate(struct sdev_node *dv)
 	datalink_id_t linkid;
 	zoneid_t zoneid;
 
-	ASSERT(!(dv->sdev_flags & SDEV_STALE));
 	ASSERT(dv->sdev_state == SDEV_READY);
 
 	if (dls_mgmt_get_linkid(dv->sdev_name, &linkid) != 0)
@@ -149,13 +148,9 @@ devnet_lookup(struct vnode *dvp, char *nm, struct vnode **vpp,
 	 * directory cache lookup:
 	 */
 	if ((dv = sdev_cache_lookup(ddv, nm)) != NULL) {
-		if (dv->sdev_state == SDEV_READY) {
-			if (!(dv->sdev_flags & SDEV_ATTR_INVALID))
-				goto found;
-		} else {
-			ASSERT(dv->sdev_state == SDEV_ZOMBIE);
-			goto failed;
-		}
+		ASSERT(dv->sdev_state == SDEV_READY);
+		if (!(dv->sdev_flags & SDEV_ATTR_INVALID))
+			goto found;
 	}
 
 	/*
@@ -170,7 +165,6 @@ devnet_lookup(struct vnode *dvp, char *nm, struct vnode **vpp,
 
 	error = sdev_mknode(ddv, nm, &dv, &vattr, NULL, NULL, cred, SDEV_READY);
 	if (error != 0) {
-		ASSERT(dv == NULL);
 		dls_devnet_close(ddh);
 		goto failed;
 	}
@@ -286,6 +280,7 @@ devnet_filldir(struct sdev_node *ddv)
 		/* remove the cache node */
 		(void) sdev_cache_update(ddv, &dv, dv->sdev_name,
 		    SDEV_CACHE_DELETE);
+		SDEV_RELE(dv);
 	}
 
 	if (((ddv->sdev_flags & SDEV_BUILD) == 0) && !dls_devnet_rebuild())

@@ -107,7 +107,6 @@ devpts_validate(struct sdev_node *dv)
 	timestruc_t now;
 	char *nm = dv->sdev_name;
 
-	ASSERT(!(dv->sdev_flags & SDEV_STALE));
 	ASSERT(dv->sdev_state == SDEV_READY);
 
 	/* validate only READY nodes */
@@ -258,6 +257,7 @@ devpts_prunedir(struct sdev_node *ddv)
 		/* remove the cache node */
 		(void) sdev_cache_update(ddv, &dv, dv->sdev_name,
 		    SDEV_CACHE_DELETE);
+		SDEV_RELE(dv);
 	}
 	rw_downgrade(&ddv->sdev_contents);
 }

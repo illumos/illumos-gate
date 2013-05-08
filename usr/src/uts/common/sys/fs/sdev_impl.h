@@ -181,35 +181,8 @@ typedef struct sdev_node {
 #define	SDEV_NEXT_ENTRY(ddv, dv)	AVL_NEXT(&(ddv)->sdev_entries, (dv))
 
 /*
- * sdev_state
- *
- * A sdev_node may go through 3 states:
- *	SDEV_INIT: When a new /dev file is first looked up, a sdev_node
- *		   is allocated, initialized and added to the directory's
- *		   sdev_node cache. A node at this state will also
- *		   have the SDEV_LOOKUP flag set.
- *
- *		   Other threads that are trying to look up a node at
- *		   this state will be blocked until the SDEV_LOOKUP flag
- *		   is cleared.
- *
- *		   When the SDEV_LOOKUP flag is cleared, the node may
- *		   transition into the SDEV_READY state for a successful
- *		   lookup or the node is removed from the directory cache
- *		   and destroyed if the named node can not be found.
- *		   An ENOENT error is returned for the second case.
- *
- *	SDEV_READY: A /dev file has been successfully looked up and
- *		    associated with a vnode. The /dev file is available
- *		    for the supported /dev filesystem operations.
- *
- *	SDEV_ZOMBIE: Deletion of a /dev file has been explicitely issued
- *		    to an SDEV_READY node. The node is transitioned into
- *		    the SDEV_ZOMBIE state if the vnode reference count
- *		    is still held. A SDEV_ZOMBIE node does not support
- *		    any of the /dev filesystem operations. A SDEV_ZOMBIE
- *		    node is removed from the directory cache and destroyed
- *		    once the reference count reaches "zero".
+ * See the big theory statement in sdev_vnops.c for an explanation of these
+ * states.
  */
 typedef enum {
 	SDEV_ZOMBIE = -1,
@@ -219,17 +192,16 @@ typedef enum {
 
 /* sdev_flags */
 #define	SDEV_BUILD		0x0001	/* directory cache out-of-date */
-#define	SDEV_STALE		0x0002	/* stale sdev nodes */
-#define	SDEV_GLOBAL		0x0004	/* global /dev nodes */
-#define	SDEV_PERSIST		0x0008	/* backing store persisted node */
-#define	SDEV_NO_NCACHE		0x0010	/* do not include in neg. cache */
-#define	SDEV_DYNAMIC		0x0020	/* special-purpose vnode ops */
+#define	SDEV_GLOBAL		0x0002	/* global /dev nodes */
+#define	SDEV_PERSIST		0x0004	/* backing store persisted node */
+#define	SDEV_NO_NCACHE		0x0008	/* do not include in neg. cache */
+#define	SDEV_DYNAMIC		0x0010	/* special-purpose vnode ops */
 					/* (ex: pts) */
-#define	SDEV_VTOR		0x0040	/* validate sdev_nodes during search */
-#define	SDEV_ATTR_INVALID	0x0080	/* invalid node attributes, */
+#define	SDEV_VTOR		0x0020	/* validate sdev_nodes during search */
+#define	SDEV_ATTR_INVALID	0x0040	/* invalid node attributes, */
 					/* need update */
-#define	SDEV_SUBDIR		0x0100	/* match all subdirs under here */
-#define	SDEV_ZONED		0x0200  /* zoned subdir */
+#define	SDEV_SUBDIR		0x0080	/* match all subdirs under here */
+#define	SDEV_ZONED		0x0100  /* zoned subdir */
 
 /* sdev_lookup_flags */
 #define	SDEV_LOOKUP	0x0001	/* node creation in progress */
@@ -471,7 +443,7 @@ typedef enum {
 } sdev_cache_ops_t;
 
 extern struct sdev_node *sdev_cache_lookup(struct sdev_node *, char *);
-extern int sdev_cache_update(struct sdev_node *, struct sdev_node **, char *,
+extern void sdev_cache_update(struct sdev_node *, struct sdev_node **, char *,
     sdev_cache_ops_t);
 extern void sdev_node_cache_init(void);
 extern void sdev_node_cache_fini(void);
