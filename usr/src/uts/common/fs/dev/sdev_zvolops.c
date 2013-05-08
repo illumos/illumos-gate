@@ -464,12 +464,6 @@ devzvol_prunedir(struct sdev_node *ddv)
 	dv = SDEV_FIRST_ENTRY(ddv);
 	while (dv) {
 		sdcmn_err13(("sdev_name '%s'", dv->sdev_name));
-		/* skip stale nodes */
-		if (dv->sdev_flags & SDEV_STALE) {
-			sdcmn_err13(("  stale"));
-			dv = SDEV_NEXT_ENTRY(ddv, dv);
-			continue;
-		}
 
 		switch (devzvol_validate(dv)) {
 		case SDEV_VTOR_VALID:
@@ -489,11 +483,10 @@ devzvol_prunedir(struct sdev_node *ddv)
 		}
 		SDEV_HOLD(dv);
 		/* remove the cache node */
-		if (sdev_cache_update(ddv, &dv, dv->sdev_name,
-		    SDEV_CACHE_DELETE) == 0)
-			dv = SDEV_FIRST_ENTRY(ddv);
-		else
-			dv = SDEV_NEXT_ENTRY(ddv, dv);
+		sdev_cache_update(ddv, &dv, dv->sdev_name,
+		    SDEV_CACHE_DELETE);
+		SDEV_RELE(dv);
+		dv = SDEV_FIRST_ENTRY(ddv);
 	}
 	rw_downgrade(&ddv->sdev_contents);
 }

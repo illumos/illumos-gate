@@ -161,7 +161,7 @@ prof_mknode(struct sdev_node *dir, char *name, struct sdev_node **newdv,
 		return (rv);
 	}
 
-	rv = sdev_cache_update(dir, &dv, name, SDEV_CACHE_ADD);
+	sdev_cache_update(dir, &dv, name, SDEV_CACHE_ADD);
 	*newdv = dv;
 
 	/* put it in ready state */
@@ -675,6 +675,10 @@ check_build:
 	    (gdir == NULL || ddv->sdev_ldir_gen
 	    == gdir->sdev_gdir_gen))
 		return;		/* already up to date */
+
+	/* We may have become a zombie (across a try) */
+	if (ddv->sdev_state == SDEV_ZOMBIE)
+		return;
 
 	if (firsttime && rw_tryupgrade(&ddv->sdev_contents) == 0) {
 		rw_exit(&ddv->sdev_contents);

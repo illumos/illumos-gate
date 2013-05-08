@@ -101,7 +101,6 @@ devvt_validate(struct sdev_node *dv)
 	char *nm = dv->sdev_name;
 	int rval;
 
-	ASSERT(!(dv->sdev_flags & SDEV_STALE));
 	ASSERT(dv->sdev_state == SDEV_READY);
 	ASSERT(RW_LOCK_HELD(&(dv->sdev_dotdot)->sdev_contents));
 
@@ -337,6 +336,7 @@ devvt_prunedir(struct sdev_node *ddv)
 			SDEV_HOLD(dv);
 			(void) sdev_cache_update(ddv, &dv,
 			    dv->sdev_name, SDEV_CACHE_DELETE);
+			SDEV_RELE(dv);
 			break;
 		case SDEV_VTOR_STALE:
 			devvt_rebuild_stale_link(ddv, dv);
@@ -382,9 +382,6 @@ devvt_cleandir(struct vnode *dvp, struct cred *cred)
 		for (dv = SDEV_FIRST_ENTRY(sdvp); dv; dv = next) {
 			next = SDEV_NEXT_ENTRY(sdvp, dv);
 
-			/* skip stale nodes */
-			if (dv->sdev_flags & SDEV_STALE)
-				continue;
 			/* validate only ready nodes */
 			if (dv->sdev_state != SDEV_READY)
 				continue;
@@ -403,9 +400,6 @@ devvt_cleandir(struct vnode *dvp, struct cred *cred)
 	for (dv = SDEV_FIRST_ENTRY(sdvp); dv; dv = next) {
 		next = SDEV_NEXT_ENTRY(sdvp, dv);
 
-		/* skip stale nodes */
-		if (dv->sdev_flags & SDEV_STALE)
-			continue;
 		/* validate only ready nodes */
 		if (dv->sdev_state != SDEV_READY)
 			continue;
