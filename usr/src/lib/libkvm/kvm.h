@@ -24,10 +24,12 @@
  * All rights reserved.
  */
 
+/*
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ */
+
 #ifndef	_KVM_H
 #define	_KVM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <nlist.h>
@@ -67,6 +69,7 @@ extern proc_t	*kvm_nextproc(kvm_t *);
 extern int	kvm_setproc(kvm_t *);
 extern user_t	*kvm_getu(kvm_t *, struct proc *);
 extern int	kvm_getcmd(kvm_t *, proc_t *, user_t *, char ***, char ***);
+extern const char *kvm_namelist(kvm_t *);
 
 #else
 

@@ -24,6 +24,10 @@
  * Copyright 2012, Josef 'Jeff' Sipek <jeffpc@31bits.net>. All rights reserved.
  */
 
+/*
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ */
+
 #include <sys/types.h>
 #include <sys/mman.h>
 #include <sys/priocntl.h>
@@ -403,8 +407,9 @@ int
 main(int argc, char *argv[], char *envp[])
 {
 	extern int mdb_kvm_is_compressed_dump(mdb_io_t *);
+	extern int mdb_kvm_is_dump(mdb_io_t *);
 	mdb_tgt_ctor_f *tgt_ctor = NULL;
-	const char **tgt_argv = alloca(argc * sizeof (char *));
+	const char **tgt_argv = alloca((argc + 2) * sizeof (char *));
 	int tgt_argc = 0;
 	mdb_tgt_t *tgt;
 
@@ -818,8 +823,8 @@ main(int argc, char *argv[], char *envp[])
 			size_t len = strlen(tgt_argv[0]) + 8;
 			const char *object = tgt_argv[0];
 
-			tgt_argv[0] = mdb_alloc(len, UM_SLEEP);
-			tgt_argv[1] = mdb_alloc(len, UM_SLEEP);
+			tgt_argv[0] = alloca(len);
+			tgt_argv[1] = alloca(len);
 
 			(void) strcpy((char *)tgt_argv[0], "unix.");
 			(void) strcat((char *)tgt_argv[0], object);
@@ -827,6 +832,14 @@ main(int argc, char *argv[], char *envp[])
 			(void) strcat((char *)tgt_argv[1], object);
 
 			if (access(tgt_argv[0], F_OK) == -1 &&
+			    access(tgt_argv[1], F_OK) != -1) {
+				/*
+				 * If we have a vmcore but not a unix file,
+				 * set the symbol table to be the vmcore to
+				 * force libkvm to extract it out of the dump.
+				 */
+				tgt_argv[0] = tgt_argv[1];
+			} else if (access(tgt_argv[0], F_OK) == -1 &&
 			    access(tgt_argv[1], F_OK) == -1) {
 				(void) strcpy((char *)tgt_argv[1], "vmdump.");
 				(void) strcat((char *)tgt_argv[1], object);
@@ -850,17 +863,25 @@ main(int argc, char *argv[], char *envp[])
 		    O_RDONLY, 0)) == NULL)
 			die("failed to open %s", tgt_argv[0]);
 
-		/*
-		 * Check for a single vmdump.N compressed dump file,
-		 * and give a helpful message.
-		 */
 		if (tgt_argc == 1) {
 			if (mdb_kvm_is_compressed_dump(io)) {
+				/*
+				 * We have a single vmdump.N compressed dump
+				 * file; give a helpful message.
+				 */
 				mdb_iob_printf(mdb.m_err,
 				    "cannot open compressed dump; "
 				    "decompress using savecore -f %s\n",
 				    tgt_argv[0]);
 				terminate(0);
+			} else if (mdb_kvm_is_dump(io)) {
+				/*
+				 * We have an uncompressed dump as our only
+				 * argument; specify the dump as the symbol
+				 * table to force libkvm to dig it out of the
+				 * dump.
+				 */
+				tgt_argv[tgt_argc++] = tgt_argv[0];
 			}
 		}
 

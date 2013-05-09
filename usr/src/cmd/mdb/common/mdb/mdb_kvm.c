@@ -23,6 +23,10 @@
  */
 
 /*
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ */
+
+/*
  * Libkvm Kernel Target
  *
  * The libkvm kernel target provides access to both crash dumps and live
@@ -1571,9 +1575,22 @@ err:
 }
 
 int
+mdb_kvm_is_dump(mdb_io_t *io)
+{
+	dumphdr_t h;
+
+	(void) IOP_SEEK(io, (off64_t)0L, SEEK_SET);
+
+	return (IOP_READ(io, &h, sizeof (dumphdr_t)) == sizeof (dumphdr_t) &&
+	    h.dump_magic == DUMP_MAGIC);
+}
+
+int
 mdb_kvm_is_compressed_dump(mdb_io_t *io)
 {
 	dumphdr_t h;
+
+	(void) IOP_SEEK(io, (off64_t)0L, SEEK_SET);
 
 	return (IOP_READ(io, &h, sizeof (dumphdr_t)) == sizeof (dumphdr_t) &&
 	    h.dump_magic == DUMP_MAGIC &&

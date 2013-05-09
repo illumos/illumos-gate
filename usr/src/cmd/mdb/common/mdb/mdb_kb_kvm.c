@@ -23,7 +23,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ */
 
 /*
  * The default KVM backend, which simply calls directly into libkvm for all
@@ -39,9 +41,10 @@
 
 /*ARGSUSED*/
 static mdb_io_t *
-libkvm_sym_io(void *kvm, const char *symfile)
+libkvm_sym_io(void *kvm, const char *ignored)
 {
 	mdb_io_t *io;
+	const char *symfile = kvm_namelist(kvm);
 
 	if ((io = mdb_fdio_create_path(NULL, symfile, O_RDONLY, 0)) == NULL)
 		mdb_warn("failed to open %s", symfile);
