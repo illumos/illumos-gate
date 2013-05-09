@@ -24,7 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ */
 
 #include <kvm.h>
 #include <stdio.h>
@@ -34,6 +36,7 @@
 #include <limits.h>
 #include <fcntl.h>
 #include <strings.h>
+#include <errno.h>
 #include <sys/mem.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
@@ -55,11 +58,14 @@ struct _kvmd {
 	proc_t		*kvm_practive;
 	pid_t		kvm_pid;
 	char		kvm_namelist[MAXNAMELEN + 1];
+	boolean_t	kvm_namelist_core;
 	proc_t		kvm_proc;
 };
 
 #define	PREAD	(ssize_t (*)(int, void *, size_t, offset_t))pread64
 #define	PWRITE	(ssize_t (*)(int, void *, size_t, offset_t))pwrite64
+
+static int kvm_nlist_core(kvm_t *kd, struct nlist nl[], const char *err);
 
 static kvm_t *
 fail(kvm_t *kd, const char *err, const char *message, ...)
@@ -164,9 +170,15 @@ kvm_open(const char *namelist, const char *corefile, const char *swapfile,
 
 	(void) strncpy(kd->kvm_namelist, namelist, MAXNAMELEN);
 
-	if (kvm_nlist(kd, nl) == -1)
-		return (fail(kd, err, "%s is not a %d-bit kernel namelist",
-		    namelist, DUMP_WORDSIZE));
+	if (kvm_nlist(kd, nl) == -1) {
+		if (kd->kvm_corefd == -1) {
+			return (fail(kd, err, "%s is not a %d-bit "
+			    "kernel namelist", namelist, DUMP_WORDSIZE));
+		}
+
+		if (kvm_nlist_core(kd, nl, err) == -1)
+			return (NULL);		/* fail() already called */
+	}
 
 	kd->kvm_kas = (struct as *)nl[0].n_value;
 	kd->kvm_practive = (proc_t *)nl[1].n_value;
@@ -186,14 +198,83 @@ kvm_close(kvm_t *kd)
 		(void) close(kd->kvm_kmemfd);
 	if (kd->kvm_memfd != -1)
 		(void) close(kd->kvm_memfd);
+	if (kd->kvm_namelist_core)
+		(void) unlink(kd->kvm_namelist);
 	free(kd);
 	return (0);
+}
+
+const char *
+kvm_namelist(kvm_t *kd)
+{
+	return (kd->kvm_namelist);
 }
 
 int
 kvm_nlist(kvm_t *kd, struct nlist nl[])
 {
 	return (nlist(kd->kvm_namelist, nl));
+}
+
+/*
+ * If we don't have a name list, try to dig it out of the kernel crash dump.
+ * (The symbols have been present in the dump, uncompressed, for nearly a
+ * decade as of this writing -- and it is frankly surprising that the archaic
+ * notion of a disjoint symbol table managed to survive that change.)
+ */
+static int
+kvm_nlist_core(kvm_t *kd, struct nlist nl[], const char *err)
+{
+	dumphdr_t *dump = &kd->kvm_dump;
+	char *msg = "couldn't extract symbols from dump";
+	char *template = "/tmp/.libkvm.kvm_nlist_core.pid%d.XXXXXX";
+	int fd, rval;
+
+	if (dump->dump_ksyms_size != dump->dump_ksyms_csize) {
+		(void) fail(kd, err, "%s: kernel symbols are compressed", msg);
+		return (-1);
+	}
+
+	if (dump->dump_ksyms + dump->dump_ksyms_size > kd->kvm_coremapsize) {
+		(void) fail(kd, err, "%s: kernel symbols not mapped", msg);
+		return (-1);
+	}
+
+	/*
+	 * Beause this temporary file may be left as a turd if the caller
+	 * does not properly call kvm_close(), we make sure that it clearly
+	 * indicates its origins.
+	 */
+	(void) snprintf(kd->kvm_namelist, MAXNAMELEN, template, getpid());
+
+	if ((fd = mkstemp(kd->kvm_namelist)) == -1) {
+		(void) fail(kd, err, "%s: couldn't create temporary "
+		    "symbols file: %s", msg, strerror(errno));
+		return (-1);
+	}
+
+	kd->kvm_namelist_core = B_TRUE;
+
+	do {
+		rval = write(fd, (caddr_t)((uintptr_t)kd->kvm_core +
+		    (uintptr_t)dump->dump_ksyms), dump->dump_ksyms_size);
+	} while (rval < dump->dump_ksyms_size && errno == EINTR);
+
+	if (rval < dump->dump_ksyms_size) {
+		(void) fail(kd, err, "%s: couldn't write to temporary "
+		    "symbols file: %s", msg, strerror(errno));
+		(void) close(fd);
+		return (-1);
+	}
+
+	(void) close(fd);
+
+	if (kvm_nlist(kd, nl) == -1) {
+		(void) fail(kd, err, "%s: symbols not valid", msg);
+		return (-1);
+	}
+
+	return (0);
 }
 
 static offset_t
