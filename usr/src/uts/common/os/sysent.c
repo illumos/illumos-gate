@@ -316,7 +316,7 @@ int	so_socket(int, int, int, char *, int);
 int	so_socketpair(int[2]);
 int	bind(int, struct sockaddr *, socklen_t, int);
 int	listen(int, int, int);
-int	accept(int, struct sockaddr *, socklen_t *, int);
+int	accept(int, struct sockaddr *, socklen_t *, int, int);
 int	connect(int, struct sockaddr *, socklen_t, int);
 int	shutdown(int, int, int);
 ssize_t	recv(int, void *, size_t, int);
