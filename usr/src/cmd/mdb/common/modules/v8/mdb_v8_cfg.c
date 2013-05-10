@@ -45,7 +45,12 @@ v8cfg_target_iter(v8_cfg_t *cfgp, int (*func)(mdb_symbol_t *, void *),
 static int
 v8cfg_target_readsym(v8_cfg_t *cfgp, const char *name, intptr_t *valp)
 {
-	return (mdb_readsym(valp, sizeof (valp), name));
+	int val, rval;
+
+	if ((rval = mdb_readsym(&val, sizeof (val), name)) != -1)
+		*valp = (intptr_t)val;
+
+	return (rval);
 }
 
 /*

@@ -9537,6 +9537,7 @@ f usr/lib/mdb/proc/amd64/libuutil.so 0555 root sys
 f usr/lib/mdb/proc/amd64/libzpool.so 0555 root sys
 f usr/lib/mdb/proc/amd64/mdb_ds.so 0555 root sys
 f usr/lib/mdb/proc/amd64/mdb_test.so 0555 root sys
+f usr/lib/mdb/proc/amd64/v8.so 0555 root sys
 f usr/lib/mdb/proc/eft.so 0555 root sys
 f usr/lib/mdb/proc/fmd.so 0555 root sys
 f usr/lib/mdb/proc/ld.so 0555 root sys

@@ -38,15 +38,15 @@ COMMON_MODULES_PROC = \
 	libuutil \
 	libzpool \
 	mdb_ds \
-	mdb_test
+	mdb_test \
+	v8
 
 #
 # MDB modules used for debugging user processes which are only 32-bit
 #
 COMMON_MODULES_PROC_32BIT = \
 	svc.configd \
-	svc.startd  \
-	v8
+	svc.startd
 
 #
 # MDB modules used for debugging kernels.

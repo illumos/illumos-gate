@@ -130,6 +130,7 @@ static intptr_t	V8_HeapObjectTagMask;
 static intptr_t	V8_SmiTag;
 static intptr_t	V8_SmiTagMask;
 static intptr_t	V8_SmiValueShift;
+static intptr_t	V8_SmiShiftSize;
 static intptr_t	V8_PointerSizeLog2;
 
 static intptr_t	V8_ISSHARED_SHIFT;
@@ -243,6 +244,12 @@ static v8_constant_t v8_constants[] = {
 	{ &V8_SmiTag,			"v8dbg_SmiTag"			},
 	{ &V8_SmiTagMask,		"v8dbg_SmiTagMask"		},
 	{ &V8_SmiValueShift,		"v8dbg_SmiValueShift"		},
+	{ &V8_SmiShiftSize,		"v8dbg_SmiShiftSize",
+#ifdef _LP64
+	    V8_CONSTANT_FALLBACK(0, 0), 31 },
+#else
+	    V8_CONSTANT_FALLBACK(0, 0), 0 },
+#endif
 	{ &V8_PointerSizeLog2,		"v8dbg_PointerSizeLog2"		},
 
 	{ &V8_DICT_SHIFT,		"v8dbg_dict_shift",
@@ -1622,7 +1629,7 @@ jsobj_properties(uintptr_t addr,
 		uintptr_t keyidx, validx, detidx, baseidx;
 		char buf[1024];
 		intptr_t val;
-		uint_t len = sizeof (buf);
+		size_t len = sizeof (buf);
 		char *c = buf;
 
 		if (V8_PROP_IDX_CONTENT != -1) {
@@ -2276,7 +2283,7 @@ dcmd_v8function(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	uint8_t type;
 	uintptr_t funcinfop, scriptp, lendsp, tokpos, namep, codep;
 	char *bufp;
-	uint_t len;
+	size_t len;
 	boolean_t opt_d = B_FALSE;
 	char buf[512];
 
@@ -2424,8 +2431,17 @@ load_current_context(uintptr_t *fpp, uintptr_t *raddrp)
 {
 	mdb_reg_t regfp, regip;
 
+#ifdef __amd64
+	if (mdb_getareg(1, "rbp", &regfp) != 0 ||
+	    mdb_getareg(1, "rip", &regip) != 0) {
+#else
+#ifdef __i386
 	if (mdb_getareg(1, "ebp", &regfp) != 0 ||
 	    mdb_getareg(1, "eip", &regip) != 0) {
+#else
+#error Unrecognized microprocessor
+#endif
+#endif
 		v8_warn("failed to load current context");
 		return (-1);
 	}
@@ -2860,7 +2876,7 @@ static void
 findjsobjects_constructor(findjsobjects_obj_t *obj)
 {
 	char *bufp = obj->fjso_constructor;
-	unsigned int len = sizeof (obj->fjso_constructor);
+	size_t len = sizeof (obj->fjso_constructor);
 	uintptr_t map, funcinfop;
 	uintptr_t addr = obj->fjso_instances.fjsi_addr;
 	uint8_t type;
@@ -3523,7 +3539,7 @@ dcmd_findjsobjects(uintptr_t addr,
 	if (references || fjs.fjs_marking)
 		return (DCMD_OK);
 
-	mdb_printf("%-?s %8s %8s %s\n", "OBJECT",
+	mdb_printf("%?s %8s %8s %s\n", "OBJECT",
 	    "#OBJECTS", "#PROPS", "CONSTRUCTOR: PROPS");
 
 	for (obj = fjs.fjs_objects; obj != NULL; obj = obj->fjso_next) {
