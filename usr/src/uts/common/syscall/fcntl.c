@@ -194,7 +194,7 @@ fcntl(int fdes, int cmd, intptr_t arg)
 			goto done;
 		}
 
-		/* lint -fallthrough */
+		/*FALLTHROUGH*/
 
 	case F_DUP2FD:
 		p = curproc;
