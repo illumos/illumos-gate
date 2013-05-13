@@ -109,6 +109,10 @@ so_socket(int family, int type_w_flags, int protocol, char *devpath,
 	int type;
 
 	type = type_w_flags & SOCK_TYPE_MASK;
+	type_w_flags &= ~SOCK_TYPE_MASK;
+	if (type_w_flags & ~(SOCK_CLOEXEC|SOCK_NDELAY|SOCK_NONBLOCK))
+		return (set_errno(EINVAL));
+
 	if (devpath != NULL) {
 		char *buf;
 		size_t kdevpathlen = 0;
@@ -140,6 +144,14 @@ so_socket(int family, int type_w_flags, int protocol, char *devpath,
 	/*
 	 * Now fill in the entries that falloc reserved
 	 */
+	if (type_w_flags & SOCK_NDELAY) {
+		so->so_state |= SS_NDELAY;
+		fp->f_flag |= FNDELAY;
+	}
+	if (type_w_flags & SOCK_NONBLOCK) {
+		so->so_state |= SS_NONBLOCK;
+		fp->f_flag |= FNONBLOCK;
+	}
 	mutex_exit(&fp->f_tlock);
 	setf(fd, fp);
 	if ((type_w_flags & SOCK_CLOEXEC) != 0) {
@@ -488,10 +500,23 @@ so_socketpair(int sv[2])
 			goto done;
 		}
 		/*
+		 * copy over FNONBLOCK and FNDELAY flags should they exist
+		 */
+		if (so1->so_state & SS_NONBLOCK)
+			nfp->f_flag |= FNONBLOCK;
+		if (so1->so_state & SS_NDELAY)
+			nfp->f_flag |= FNDELAY;
+
+		/*
 		 * fill in the entries that falloc reserved
 		 */
 		mutex_exit(&nfp->f_tlock);
 		setf(nfd, nfp);
+
+		/*
+		 * get the original flags before we release
+		 */
+		VERIFY(f_getfd_error(svs[0], &orig_flags) == 0);
 
 		releasef(svs[0]);
 		releasef(svs[1]);
@@ -500,7 +525,6 @@ so_socketpair(int sv[2])
 		 * If FD_CLOEXEC was set on the filedescriptor we're
 		 * swapping out, we should set it on the new one too.
 		 */
-		VERIFY(f_getfd_error(svs[0], &orig_flags) == 0);
 		if (orig_flags & FD_CLOEXEC) {
 			f_setfd(nfd, FD_CLOEXEC);
 		}
