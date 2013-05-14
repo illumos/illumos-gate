@@ -9,40 +9,40 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FGREP 1 "Mar 24, 2006"
+.TH FGREP 1 "May 3, 2013"
 .SH NAME
 fgrep \- search a file for a fixed-character string
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/fgrep\fR [\fB-bchilnsvx\fR] \fB-e\fR \fIpattern_list\fR [\fIfile...\fR]
+\fB/usr/bin/fgrep\fR [\fB-bcHhilnqsvx\fR] \fB-e\fR \fIpattern_list\fR [\fIfile...\fR]
 .fi
 
 .LP
 .nf
-\fB/usr/bin/fgrep\fR [\fB-bchilnsvx\fR] \fB-f\fR \fIfile\fR [\fIfile...\fR]
+\fB/usr/bin/fgrep\fR [\fB-bcHhilnqsvx\fR] \fB-f\fR \fIfile\fR [\fIfile...\fR]
 .fi
 
 .LP
 .nf
-\fB/usr/bin/fgrep\fR [\fB-bchilnsvx\fR] \fIpattern\fR [\fIfile...\fR]
+\fB/usr/bin/fgrep\fR [\fB-bcHhilnqsvx\fR] \fIpattern\fR [\fIfile...\fR]
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/fgrep\fR [\fB-bchilnqsvx\fR] \fB-e\fR \fIpattern_list\fR [\fB-f\fR \fIfile\fR]
+\fB/usr/xpg4/bin/fgrep\fR [\fB-bcHhilnqsvx\fR] \fB-e\fR \fIpattern_list\fR [\fB-f\fR \fIfile\fR]
      [\fIfile...\fR]
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/fgrep\fR [\fB-bchilnqsvx\fR] [\fB-e\fR \fIpattern_list\fR] \fB-f\fR \fIfile\fR
+\fB/usr/xpg4/bin/fgrep\fR [\fB-bcHhilnqsvx\fR] [\fB-e\fR \fIpattern_list\fR] \fB-f\fR \fIfile\fR
      [\fIfile...\fR]
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/fgrep\fR [\fB-bchilnqsvx\fR] \fIpattern\fR [\fIfile...\fR]
+\fB/usr/xpg4/bin/fgrep\fR [\fB-bcHhilnqsvx\fR] \fIpattern\fR [\fIfile...\fR]
 .fi
 
 .SH DESCRIPTION
@@ -111,6 +111,15 @@ Takes the list of patterns from \fIpattern-file\fR.
 .sp
 .ne 2
 .na
+\fB\fB-H\fR\fR
+.ad
+.RS 19n
+Precedes each line by the name of the file containing the matching line.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fB-h\fR\fR
 .ad
 .RS 19n
@@ -148,11 +157,20 @@ Precedes each line by its line number in the file. The first line is 1.
 .sp
 .ne 2
 .na
+\fB\fB-q\fR\fR
+.ad
+.RS 19n
+Quiet. Does not write anything to the standard output, regardless of matching
+lines. Exits with zero status if an input line is selected.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fB-s\fR\fR
 .ad
 .RS 19n
-Works silently, that is, displays nothing except error messages. This is useful
-for checking the error status.
+Legacy equivalent of \fB-q\fR.
 .RE
 
 .sp
@@ -171,20 +189,6 @@ Prints all lines except those that contain the pattern.
 .ad
 .RS 19n
 Prints only lines that are matched entirely.
-.RE
-
-.SS "/usr/xpg4/bin/fgrep"
-.sp
-.LP
-The following options are supported for \fB/usr/xpg4/bin/fgrep\fR only:
-.sp
-.ne 2
-.na
-\fB\fB-q\fR\fR
-.ad
-.RS 6n
-Quiet. Does not write anything to the standard output, regardless of matching
-lines. Exits with zero status if an input line is selected.
 .RE
 
 .SH OPERANDS

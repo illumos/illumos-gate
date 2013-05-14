@@ -33,6 +33,10 @@
 /* Copyright 2012 Nexenta Systems, Inc.  All rights reserved. */
 
 /*
+ * Copyright 2013 Damian Bogel. All rights reserved.
+ */
+
+/*
  * grep -- print lines matching (or not matching) a pattern
  *
  *	status returns:
@@ -73,6 +77,8 @@ static const char *errstr[] = {
 	NULL
 };
 
+#define	STDIN_FILENAME	gettext("(standard input)")
+
 #define	errmsg(msg, arg)	(void) fprintf(stderr, gettext(msg), arg)
 #define	BLKSIZE	512
 #define	GBUFSIZ	8192
@@ -94,6 +100,7 @@ static int	sflag;
 static int	iflag;
 static int	wflag;
 static int	hflag;
+static int 	Hflag;
 static int	qflag;
 static int	errflg;
 static int	nfile;
@@ -123,10 +130,17 @@ main(int argc, char **argv)
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
-	while ((c = getopt(argc, argv, "hqblcnRrsviyw")) != -1)
+	while ((c = getopt(argc, argv, "hHqblcnRrsviyw")) != -1)
 		switch (c) {
+		/* based on options order h or H is set as in GNU grep */
 		case 'h':
 			hflag++;
+			Hflag = 0; /* h excludes H */
+			break;
+		case 'H':
+			if (!lflag) /* H is excluded by l */
+				Hflag++;
+			hflag = 0; /* H excludes h */
 			break;
 		case 'q':	/* POSIX: quiet: status only */
 			qflag++;
@@ -154,6 +168,7 @@ main(int argc, char **argv)
 			break;
 		case 'l':
 			lflag++;
+			Hflag = 0; /* l excludes H */
 			break;
 		case 'y':
 		case 'i':
@@ -167,7 +182,7 @@ main(int argc, char **argv)
 		}
 
 	if (errflg || (optind >= argc)) {
-		errmsg("Usage: grep [-c|-l|-q] [-r|-R] -hbnsviw "
+		errmsg("Usage: grep [-c|-l|-q] [-r|-R] -hHbnsviw "
 		    "pattern file . . .\n",
 		    (char *)NULL);
 		exit(2);
@@ -299,9 +314,10 @@ execute(const char *file, int base)
 		}
 	}
 
-	if (file == NULL)
+	if (file == NULL) {
 		temp = 0;
-	else if ((temp = open(file + base, O_RDONLY)) == -1) {
+		file = STDIN_FILENAME;
+	} else if ((temp = open(file + base, O_RDONLY)) == -1) {
 		if (!sflag)
 			errmsg("grep: can't open %s\n", file);
 		nsucc = 2;
@@ -313,7 +329,7 @@ execute(const char *file, int base)
 		(void) close(temp);
 
 		if (cflag && !qflag) {
-			if (nfile > 1 && !hflag && file)
+			if (Hflag || (nfile > 1 && !hflag))
 				(void) fprintf(stdout, "%s:", file);
 			if (!rflag)
 			(void) fprintf(stdout, "%lld\n", tln);
@@ -410,8 +426,8 @@ execute(const char *file, int base)
 	(void) close(temp);
 
 	if (cflag && !qflag) {
-		if (!hflag && file && (nfile > 1 ||
-		    (rflag && outfn)))
+		if (Hflag || (!hflag && ((nfile > 1) ||
+		    (rflag && outfn))))
 			(void) fprintf(stdout, "%s:", file);
 		(void) fprintf(stdout, "%lld\n", tln);
 	}
@@ -422,9 +438,6 @@ succeed(const char *f)
 {
 	int nchars;
 	nsucc = (nsucc == 2) ? 2 : 1;
-
-	if (f == NULL)
-		f = "<stdin>";
 
 	if (qflag) {
 		/* no need to continue */
@@ -441,7 +454,7 @@ succeed(const char *f)
 		return (1);
 	}
 
-	if (!hflag && (nfile > 1 || (rflag && outfn))) {
+	if (Hflag || (!hflag && (nfile > 1 || (rflag && outfn)))) {
 		/* print filename */
 		(void) fprintf(stdout, "%s:", f);
 	}
