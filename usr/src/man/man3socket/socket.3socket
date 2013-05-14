@@ -100,6 +100,28 @@ is similar in purpose to the \fBO_CLOEXEC\fR flag to \fBopen\fR(2).
 .RE
 
 .sp
+.ne 2
+.na
+\fB\fBSOCK_NDELAY\fR\fR
+.ad
+.RS 12n
+Creates the socket with the \fBO_NDELAY\fR flag set, causing the socket to
+provide nonblocking semantics as described for \fBO_NDELAY\fR in \fBopen\fR(2).
+\fBSOCK_NONBLOCK\fR should normally be used in preference to \fBSOCK_NDELAY\fR,
+and takes precedence if both are set.  See \fBopen\fR(2) for further details.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBSOCK_NONBLOCK\fR\fR
+.ad
+.RS 12n
+Creates the socket with the \fBO_NONBLOCK\fR flag set, causing the socket to
+provide nonblocking semantics as described for \fBO_NONBLOCK\fR in \fBopen\fR(2).
+.RE
+
+.sp
 .LP
 There must be an entry in the \fBnetconfig\fR(4) file for at least each
 protocol family and type required. If  a non-zero protocol has been specified
@@ -262,6 +284,15 @@ The protocol type is not supported by the address family.
 .ad
 .RS 19n
 The socket type is not supported by the protocol.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 19n
+One or more of the specified flags is not supported.
 .RE
 
 .SH ATTRIBUTES
