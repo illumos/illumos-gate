@@ -52,13 +52,11 @@ $(sparc_ONLY)depend fmri=driver/storage/sf type=require
 depend fmri=driver/storage/smp type=require
 $(sparc_ONLY)depend fmri=driver/storage/ssd type=require
 depend fmri=driver/storage/sv type=require
-depend fmri=library/samba/libsmbclient type=require
 depend fmri=network/iscsi/initiator type=require
 depend fmri=network/iscsi/iser type=require
 depend fmri=network/iscsi/target type=require
 depend fmri=service/file-system/nfs type=require
 depend fmri=service/file-system/smb type=require
-depend fmri=service/network/samba type=require
 depend fmri=service/storage/avs/cache-management type=require
 depend fmri=service/storage/fibre-channel/fc-fabric type=require
 depend fmri=service/storage/isns type=require
