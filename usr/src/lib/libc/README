@@ -23,6 +23,8 @@
 # Use is subject to license terms.
 #
 
+# Process Model Unification
+
 The Solaris Process Model Unification project:
 	PSARC/2002/117 Solaris Process Model Unification
 	4470917 Solaris Process Model Unification
@@ -183,7 +185,7 @@ many of these rules are enforced by ASSERT() statements scattered about
 in the libc sources.  This is the default mode for building libc when
 a DEBUG nightly build is performed.
 
------
+# libaio/librt Implementation In libc
 
 The putback of the project:
 	6416832 libaio and librt can and should be folded into libc
@@ -219,3 +221,59 @@ long-term waits.)  Just follow a few rules to be self-consistent:
  - The sig_*() interfaces are not in themselves fork-safe.
    You have to employ other logic to make your code fork-safe.
    See the tail of postfork1_child() for examples.
+
+# Removal Of Synonym Symbols
+
+The following project:
+    PSARC 2008/309 expunge synonyms.h
+    6700179 expunge synonyms.h
+
+Removed the historical "synonym" symbols from the C Library.
+
+Historically, for every public function symbol in the C library a second,
+private, symbol of the same value was defined to be used internally by libc
+(generally, one or the other will be a weak symbol, precisely which is
+inconsistent).
+
+These synonym symbols existed such that an application which provided
+otherwise conflicting symbols could interpose on the version in libc without
+compromising libc itself, that is if libc defines fopen() which needs open() it
+would call _open() and an application defined open() would not cause fopen()
+to break.  This was made transparent to code within libc via a header,
+synonyms.h, which would #define open _open, for all such symbols. 
+
+Since ON now uses direct bindings extensively all symbols not explicitly
+marked "NODIRECT" are directly bound within libc anyway, and none of this is
+actually necessary.  Thus synonyms.h was removed, and no new synonym symbols
+need be added.  However, unfortunately, certain of the private symbols were
+inadvertently exposed to applications, and several are known to have been
+used, thus these existing synonyms must continue to exist to maintain
+compatibility.  A preloadable library, /lib/c_synonyms.so.1 is provided which
+also provides the historical names with underscore prefixes to allow any other
+incorrect application to continue to function.
+
+It should never be necessary to add additional synonym symbols to libc nor to
+add underscore prefixed aliases to c_synonyms.so.1.
+
+# libc Internals Scoped Protected
+
+The integration of the fix for:
+	6689238 libc needs global protection against ld.so.1
+
+Scopes all function symbols within libc protected, excepting those that need
+to be accepting of interposition and to have a consistent version called both
+within and without libc (basically, the malloc() family).
+
+This causes references by libc to itself to be permanently and unavoidably
+bound, and thus to never enter ld.so (and potentially from there audit
+libraries or other such support libraries).  This maintains an otherwise
+complicated to verify invariant: within critical sections (with any internal
+lock held, etc) execution can never leave the context of libc.  Previously
+this was done with a selection of known-to-be-problematic functions having
+weak synonyms scoped private, but this was both difficult to verify, difficult
+to remember, and thus always at least somewhat incomplete.
+
+In summary, any new function symbol in libc must be scoped protected unless it
+is one of a very small group of functions that must allow interposed versions
+to be bound to from the C library itself -- it is grossly unlikely that more
+of these will occur.
