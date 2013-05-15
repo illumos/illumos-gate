@@ -246,6 +246,7 @@ man2/lchown.2
 man2/lstat.2
 man2/openat.2
 man2/pathconf.2
+man2/pipe2.2
 man2/pread.2
 man2/pset_assign.2
 man2/pset_destroy.2
@@ -521,6 +522,7 @@ man3c/dngettext.3c
 man3c/door_setparam.3c
 man3c/door_unbind.3c
 man3c/double_to_decimal.3c
+man3c/dup3.3c
 man3c/edata.3c
 man3c/endgrent.3c
 man3c/endnetgrent.3c
@@ -675,6 +677,8 @@ man3c/memmove.3c
 man3c/memset.3c
 man3c/minor.3c
 man3c/mkdtemp.3c
+man3c/mkostemp.3c
+man3c/mkostemps.3c
 man3c/mkstemps.3c
 man3c/mq_reltimedreceive_np.3c
 man3c/mq_reltimedsend_np.3c
@@ -3251,6 +3255,7 @@ man3sip/sip_sent_by_to_str.3sip
 man3sip/sip_unregister_all_sent_by.3sip
 man3sip/sip_unregister_sent_by.3sip
 man3sip/sip_uri_errflags_to_str.3sip
+man3socket/accept4.3socket
 man3socket/endnetent.3socket
 man3socket/endprotoent.3socket
 man3socket/endservent.3socket
