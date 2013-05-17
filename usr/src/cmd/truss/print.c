@@ -406,7 +406,7 @@ prt_pfd(private_t *pri, int raw, long val)	/* print pipe code */
 	if (!raw &&
 	    pri->Rval1 >= 0 &&
 	    Pread(Proc, fds, sizeof (fds), (long)val) == sizeof (fds)) {
-		snprintf(str, sizeof (str), "[%d,%d]", fds[0], fds[1]);
+		(void) snprintf(str, sizeof (str), "[%d,%d]", fds[0], fds[1]);
 		outstring(pri, str);
 	} else {
 		prt_hex(pri, 0, val);

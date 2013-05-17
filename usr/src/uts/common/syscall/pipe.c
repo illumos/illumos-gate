@@ -116,7 +116,7 @@ pipe(intptr_t arg, int flags)
 	/*
 	 * Validate allowed flags.
 	 */
-	if (flags & ~(FCLOEXEC|FNONBLOCK) != 0) {
+	if ((flags & ~(FCLOEXEC|FNONBLOCK)) != 0) {
 		return (set_errno(EINVAL));
 	}
 	/*

@@ -621,7 +621,7 @@ listen(int sock, int backlog, int version)
 	return (0);
 }
 
-/*ARGSUSED4*/
+/*ARGSUSED3*/
 int
 accept(int sock, struct sockaddr *name, socklen_t *namelenp, int version,
     int flags)
