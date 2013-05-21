@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
@@ -106,6 +107,7 @@ typedef enum kmem_cbrc {
 
 extern int kmem_ready;
 extern pgcnt_t kmem_reapahead;
+extern size_t kmem_max_cached;
 
 extern void kmem_init(void);
 extern void kmem_thread_init(void);

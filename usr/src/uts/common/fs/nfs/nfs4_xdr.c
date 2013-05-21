@@ -24,6 +24,7 @@
  */
 /*
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 /*
@@ -3379,12 +3380,24 @@ xdr_READ4res(XDR *xdrs, READ4res *objp)
 		return (FALSE);
 
 	mp = objp->mblk;
-	if (mp != NULL && xdrs->x_ops == &xdrmblk_ops) {
-		if (xdrmblk_putmblk(xdrs, mp, objp->data_len) == TRUE) {
-			objp->mblk = NULL;
-			return (TRUE);
+	if (mp != NULL) {
+		if (xdrs->x_ops == &xdrmblk_ops) {
+			if (xdrmblk_putmblk(xdrs, mp, objp->data_len)) {
+				objp->mblk = NULL;
+				return (TRUE);
+			} else {
+				return (FALSE);
+			}
+		} else if (mp->b_cont != NULL) {
+			/*
+			 * See xdr_READ3res() for an explanation of why we need
+			 * to do a pullup here.
+			 */
+			if (pullupmsg(mp, -1) == 0)
+				return (FALSE);
+			objp->data_val = (caddr_t)mp->b_rptr;
 		}
-	} else if (mp == NULL) {
+	} else {
 		if (xdr_u_int(xdrs, &objp->data_len) == FALSE) {
 			return (FALSE);
 		}
