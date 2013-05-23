@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright (c) 2012 Joyent, Inc. All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
@@ -51,6 +52,7 @@
 #include <sys/tiuser.h>
 #include <sys/statvfs.h>
 #include <sys/stream.h>
+#include <sys/strsun.h>
 #include <sys/strsubr.h>
 #include <sys/stropts.h>
 #include <sys/timod.h>
@@ -3313,45 +3315,109 @@ uio_to_mblk(uio_t *uiop)
 	return (mp);
 }
 
+/*
+ * Allocate memory to hold data for a read request of len bytes.
+ *
+ * We don't allocate buffers greater than kmem_max_cached in size to avoid
+ * allocating memory from the kmem_oversized arena.  If we allocate oversized
+ * buffers, we incur heavy cross-call activity when freeing these large buffers
+ * in the TCP receive path. Note that we can't set b_wptr here since the
+ * length of the data returned may differ from the length requested when
+ * reading the end of a file; we set b_wptr in rfs_rndup_mblks() once the
+ * length of the read is known.
+ */
+mblk_t *
+rfs_read_alloc(uint_t len, struct iovec **iov, int *iovcnt)
+{
+	struct iovec *iovarr;
+	mblk_t *mp, **mpp = &mp;
+	size_t mpsize;
+	uint_t remain = len;
+	int i, err = 0;
+
+	*iovcnt = howmany(len, kmem_max_cached);
+
+	iovarr = kmem_alloc(*iovcnt * sizeof (struct iovec), KM_SLEEP);
+	*iov = iovarr;
+
+	for (i = 0; i < *iovcnt; remain -= mpsize, i++) {
+		ASSERT(remain <= len);
+		/*
+		 * We roundup the size we allocate to a multiple of
+		 * BYTES_PER_XDR_UNIT (4 bytes) so that the call to
+		 * xdrmblk_putmblk() never fails.
+		 */
+		ASSERT(kmem_max_cached % BYTES_PER_XDR_UNIT == 0);
+		mpsize = MIN(kmem_max_cached, remain);
+		*mpp = allocb_wait(RNDUP(mpsize), BPRI_MED, STR_NOSIG, &err);
+		ASSERT(*mpp != NULL);
+		ASSERT(err == 0);
+
+		iovarr[i].iov_base = (caddr_t)(*mpp)->b_rptr;
+		iovarr[i].iov_len = mpsize;
+		mpp = &(*mpp)->b_cont;
+	}
+	return (mp);
+}
+
 void
 rfs_rndup_mblks(mblk_t *mp, uint_t len, int buf_loaned)
 {
-	int i, rndup;
+	int i;
 	int alloc_err = 0;
 	mblk_t *rmp;
+	uint_t mpsize, remainder;
 
-	rndup = BYTES_PER_XDR_UNIT - (len % BYTES_PER_XDR_UNIT);
+	remainder = P2NPHASE(len, BYTES_PER_XDR_UNIT);
 
-	/* single mblk_t non copy-reduction case */
+	/*
+	 * Non copy-reduction case.  This function assumes that blocks were
+	 * allocated in multiples of BYTES_PER_XDR_UNIT bytes, which makes this
+	 * padding safe without bounds checking.
+	 */
 	if (!buf_loaned) {
-		mp->b_wptr += len;
-		if (rndup != BYTES_PER_XDR_UNIT) {
-			for (i = 0; i < rndup; i++)
-				*mp->b_wptr++ = '\0';
+		/*
+		 * Set the size of each mblk in the chain until we've consumed
+		 * the specified length for all but the last one.
+		 */
+		while ((mpsize = MBLKSIZE(mp)) < len) {
+			ASSERT(mpsize % BYTES_PER_XDR_UNIT == 0);
+			mp->b_wptr += mpsize;
+			len -= mpsize;
+			mp = mp->b_cont;
+			ASSERT(mp != NULL);
 		}
+
+		ASSERT(len + remainder <= mpsize);
+		mp->b_wptr += len;
+		for (i = 0; i < remainder; i++)
+			*mp->b_wptr++ = '\0';
 		return;
 	}
 
-	/* no need for extra rndup */
-	if (rndup == BYTES_PER_XDR_UNIT)
+	/*
+	 * No remainder mblk required.
+	 */
+	if (remainder == 0)
 		return;
 
-	while (mp->b_cont)
+	/*
+	 * Get to the last mblk in the chain.
+	 */
+	while (mp->b_cont != NULL)
 		mp = mp->b_cont;
 
 	/*
-	 * In case of copy-reduction mblks, the size of the mblks
-	 * are fixed and are of the size of the loaned buffers.
-	 * Allocate a roundup mblk and chain it to the data
-	 * buffers. This is sub-optimal, but not expected to
-	 * happen in regular common workloads.
+	 * In case of copy-reduction mblks, the size of the mblks are fixed
+	 * and are of the size of the loaned buffers.  Allocate a remainder
+	 * mblk and chain it to the data buffers. This is sub-optimal, but not
+	 * expected to happen commonly.
 	 */
-
-	rmp = allocb_wait(rndup, BPRI_MED, STR_NOSIG, &alloc_err);
+	rmp = allocb_wait(remainder, BPRI_MED, STR_NOSIG, &alloc_err);
 	ASSERT(rmp != NULL);
 	ASSERT(alloc_err == 0);
 
-	for (i = 0; i < rndup; i++)
+	for (i = 0; i < remainder; i++)
 		*rmp->b_wptr++ = '\0';
 
 	rmp->b_datap->db_type = M_DATA;

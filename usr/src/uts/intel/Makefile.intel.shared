@@ -217,6 +217,7 @@ DRV_KMODS	+= bridge
 DRV_KMODS	+= bscbus
 DRV_KMODS	+= bscv
 DRV_KMODS	+= chxge
+DRV_KMODS	+= cxgbe
 DRV_KMODS	+= ntxn
 DRV_KMODS	+= myri10ge
 DRV_KMODS	+= clone

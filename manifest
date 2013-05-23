@@ -586,6 +586,7 @@ f kernel/drv/amd64/cpuid 0755 root sys
 f kernel/drv/amd64/cpunex 0755 root sys
 f kernel/drv/amd64/crypto 0755 root sys
 f kernel/drv/amd64/cryptoadm 0755 root sys
+f kernel/drv/amd64/cxgbe 0755 root sys
 f kernel/drv/amd64/dcpc 0755 root sys
 f kernel/drv/amd64/devinfo 0755 root sys
 f kernel/drv/amd64/dld 0755 root sys
@@ -694,6 +695,7 @@ f kernel/drv/amd64/sy 0755 root sys
 f kernel/drv/amd64/sysevent 0755 root sys
 f kernel/drv/amd64/sysmsg 0755 root sys
 f kernel/drv/amd64/systrace 0755 root sys
+f kernel/drv/amd64/t4nex 0755 root sys
 f kernel/drv/amd64/tcp 0755 root sys
 f kernel/drv/amd64/tcp6 0755 root sys
 f kernel/drv/amd64/tl 0755 root sys

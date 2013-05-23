@@ -23,6 +23,8 @@
  */
 /*
  * Copyright 2012, Nexenta Systems, Inc. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
  */
 
 #include <sys/conf.h>
@@ -65,6 +67,15 @@ static uint64_t stmf_proxy_msg_id = 1;
 #define	MSG_ID_TM_BIT	0x8000000000000000
 #define	ALIGNED_TO_8BYTE_BOUNDARY(i)	(((i) + 7) & ~7)
 
+/*
+ * When stmf_io_deadman_enabled is set to B_TRUE, we check that finishing up
+ * I/O operations on an offlining LU doesn't take longer than stmf_io_deadman
+ * seconds. If it does, we trigger a panic to inform the user of hung I/O
+ * blocking us for too long.
+ */
+boolean_t stmf_io_deadman_enabled = B_TRUE;
+int stmf_io_deadman = 1000;			/* seconds */
+
 struct stmf_svc_clocks;
 
 static int stmf_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
@@ -91,6 +102,7 @@ stmf_xfer_data_t *stmf_prepare_tpgs_data(uint8_t ilu_alua);
 void stmf_svc_init();
 stmf_status_t stmf_svc_fini();
 void stmf_svc(void *arg);
+static void stmf_wait_ilu_tasks_finish(stmf_i_lu_t *ilu);
 void stmf_svc_queue(int cmd, void *obj, stmf_state_change_info_t *info);
 static void stmf_svc_kill_obj_requests(void *obj);
 static void stmf_svc_timeout(struct stmf_svc_clocks *);
@@ -3059,6 +3071,7 @@ stmf_register_lu(stmf_lu_t *lu)
 	}
 	ilu->ilu_cur_task_cntr = &ilu->ilu_task_cntr1;
 	STMF_EVENT_ALLOC_HANDLE(ilu->ilu_event_hdl);
+	cv_init(&ilu->ilu_offline_pending_cv, NULL, CV_DRIVER, NULL);
 	stmf_create_kstat_lu(ilu);
 	/*
 	 * register with proxy module if available and logical unit
@@ -3197,6 +3210,7 @@ stmf_deregister_lu(stmf_lu_t *lu)
 		mutex_destroy(&ilu->ilu_kstat_lock);
 	}
 	stmf_delete_itl_kstat_by_guid(ilu->ilu_ascii_hex_guid);
+	cv_destroy(&ilu->ilu_offline_pending_cv);
 	mutex_exit(&stmf_state.stmf_lock);
 	return (STMF_SUCCESS);
 }
@@ -4447,6 +4461,8 @@ stmf_task_alloc(struct stmf_local_port *lport, stmf_scsi_session_t *ss,
 		rw_exit(iss->iss_lockp);
 		return (NULL);
 	}
+	ASSERT(lu == dlun0 || (ilu->ilu_state != STMF_STATE_OFFLINING &&
+	    ilu->ilu_state != STMF_STATE_OFFLINE));
 	do {
 		if (ilu->ilu_free_tasks == NULL) {
 			new_task = 1;
@@ -4575,6 +4591,8 @@ stmf_task_lu_free(scsi_task_t *task, stmf_i_scsi_session_t *iss)
 	itask->itask_lu_free_next = ilu->ilu_free_tasks;
 	ilu->ilu_free_tasks = itask;
 	ilu->ilu_ntasks_free++;
+	if (ilu->ilu_ntasks == ilu->ilu_ntasks_free)
+		cv_signal(&ilu->ilu_offline_pending_cv);
 	mutex_exit(&ilu->ilu_task_lock);
 	atomic_add_32(itask->itask_ilu_task_cntr, -1);
 }
@@ -7838,8 +7856,7 @@ stmf_svc(void *arg)
 			    STMF_ABORTED);
 			lu = (stmf_lu_t *)req->svc_obj;
 			ilu = (stmf_i_lu_t *)lu->lu_stmf_private;
-			if (ilu->ilu_ntasks != ilu->ilu_ntasks_free)
-				break;
+			stmf_wait_ilu_tasks_finish(ilu);
 			lu->lu_ctl(lu, req->svc_cmd, &req->svc_info);
 			break;
 		default:
@@ -7989,6 +8006,40 @@ stmf_svc_timeout(struct stmf_svc_clocks *clks)
 	(void) cv_reltimedwait(&stmf_state.stmf_cv,
 	    &stmf_state.stmf_lock, td, TR_CLOCK_TICK);
 	stmf_state.stmf_svc_flags |= STMF_SVC_ACTIVE;
+}
+
+/*
+ * Waits for ongoing I/O tasks to finish on an LU in preparation for
+ * the LU's offlining. The LU should already be in an Offlining state
+ * (otherwise I/O to the LU might never end). There is an additional
+ * enforcement of this via a deadman timer check.
+ */
+static void
+stmf_wait_ilu_tasks_finish(stmf_i_lu_t *ilu)
+{
+	clock_t start, now, deadline;
+
+	start = now = ddi_get_lbolt();
+	deadline = start + drv_usectohz(stmf_io_deadman * 1000000llu);
+	mutex_enter(&ilu->ilu_task_lock);
+	while (ilu->ilu_ntasks != ilu->ilu_ntasks_free) {
+		(void) cv_timedwait(&ilu->ilu_offline_pending_cv,
+		    &ilu->ilu_task_lock, deadline);
+		now = ddi_get_lbolt();
+		if (now > deadline) {
+			if (stmf_io_deadman_enabled) {
+				cmn_err(CE_PANIC, "stmf_svc: I/O deadman hit "
+				    "on STMF_CMD_LU_OFFLINE after %d seconds",
+				    stmf_io_deadman);
+			} else {
+				/* keep on spinning */
+				deadline = now + drv_usectohz(stmf_io_deadman *
+				    1000000llu);
+			}
+		}
+	}
+	mutex_exit(&ilu->ilu_task_lock);
+	DTRACE_PROBE1(deadman__timeout__wait, clock_t, now - start);
 }
 
 void
