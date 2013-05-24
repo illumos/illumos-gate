@@ -25,6 +25,7 @@
 # Copyright 2008, 2010, Richard Lowe
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
+# Copyright 2013 (c) Joyent, Inc.  All rights reserved.
 #
 # Based on the nightly script from the integration folks,
 # Mostly modified and owned by mike_s.
@@ -1513,38 +1514,16 @@ if [ -z "$MAKE" ]; then
 fi
 # get the dmake version string alone
 DMAKE_VERSION=$( $MAKE -v )
-DMAKE_VERSION=${DMAKE_VERSION#*: }
-# focus in on just the dotted version number alone
-DMAKE_MAJOR=$( echo $DMAKE_VERSION | \
-	sed -e 's/.*\<\([^.]*\.[^   ]*\).*$/\1/' )
-# extract the second (or final) integer
-DMAKE_MINOR=${DMAKE_MAJOR#*.}
-DMAKE_MINOR=${DMAKE_MINOR%%.*}
-# extract the first integer
-DMAKE_MAJOR=${DMAKE_MAJOR%%.*}
-CHECK_DMAKE=${CHECK_DMAKE:-y}
-# x86 was built on the 12th, sparc on the 13th.
-if [ "$CHECK_DMAKE" = "y" -a \
-     "$DMAKE_VERSION" != "Sun Distributed Make 7.3 2003/03/12" -a \
-     "$DMAKE_VERSION" != "Sun Distributed Make 7.3 2003/03/13" -a \( \
-     "$DMAKE_MAJOR" -lt 7 -o \
-     "$DMAKE_MAJOR" -eq 7 -a "$DMAKE_MINOR" -lt 4 \) ]; then
-	if [ -z "$DMAKE_VERSION" ]; then
-		echo "$MAKE is missing."
-		exit 1
-	fi
-	echo `whence $MAKE`" version is:"
-	echo "  ${DMAKE_VERSION}"
+# Admittedly not the best check, but better than the old one.
+if ! echo $DMAKE_VERSION | grep -q rm; then
 	cat <<EOF
-
-This version may not be safe for use.  Either set TEAMWARE to a better
-path or (if you really want to use this version of dmake anyway), add
-the following to your environment to disable this check:
-
-  CHECK_DMAKE=n
+The version of dmake you are using ($DMAKE_VERSION) is not the current open
+source version for building illumos. Please ensure that you are building
+illumos-joyent with the latest version of dmake in illumos-extra.
 EOF
 	exit 1
 fi
+
 export PATH
 export MAKE
 
