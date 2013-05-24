@@ -28,6 +28,7 @@
 
 /*
  * Copyright 2012, Joyent, Inc.  All rights reserved.
+ * Copyright 2013, Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/devops.h>
@@ -178,6 +179,18 @@ ipmi_polled_enqueue_request(struct ipmi_softc *sc, struct ipmi_request *req)
 }
 
 void
+ipmi_shutdown(struct ipmi_softc *sc)
+{
+	taskq_destroy(sc->ipmi_kthread);
+
+	cv_destroy(&sc->ipmi_request_added);
+	mutex_destroy(&sc->ipmi_lock);
+
+	cv_destroy(&slplock);
+	mutex_destroy(&slpmutex);
+}
+
+boolean_t
 ipmi_startup(struct ipmi_softc *sc)
 {
 	struct ipmi_request *req;
@@ -195,7 +208,7 @@ ipmi_startup(struct ipmi_softc *sc)
 	error = sc->ipmi_startup(sc);
 	if (error) {
 		cmn_err(CE_WARN, "Failed to initialize interface: %d", error);
-		return;
+		return (B_FALSE);
 	}
 
 	/* Send a GET_DEVICE_ID request. */
@@ -206,22 +219,22 @@ ipmi_startup(struct ipmi_softc *sc)
 	if (error == EWOULDBLOCK) {
 		cmn_err(CE_WARN, "Timed out waiting for GET_DEVICE_ID");
 		ipmi_free_request(req);
-		return;
+		return (B_FALSE);
 	} else if (error) {
 		cmn_err(CE_WARN, "Failed GET_DEVICE_ID: %d", error);
 		ipmi_free_request(req);
-		return;
+		return (B_FALSE);
 	} else if (req->ir_compcode != 0) {
 		cmn_err(CE_WARN,
 		    "Bad completion code for GET_DEVICE_ID: %d",
 		    req->ir_compcode);
 		ipmi_free_request(req);
-		return;
+		return (B_FALSE);
 	} else if (req->ir_replylen < 5) {
 		cmn_err(CE_WARN, "Short reply for GET_DEVICE_ID: %d",
 		    req->ir_replylen);
 		ipmi_free_request(req);
-		return;
+		return (B_FALSE);
 	}
 
 	cmn_err(CE_CONT, "!device rev. %d, firmware rev. %d.%d%d, "
@@ -235,8 +248,11 @@ ipmi_startup(struct ipmi_softc *sc)
 	req = ipmi_alloc_driver_request(IPMI_ADDR(IPMI_APP_REQUEST, 0),
 	    IPMI_CLEAR_FLAGS, 1, 0);
 
-	if ((error = ipmi_submit_driver_request(sc, req, 0)) != 0)
+	if ((error = ipmi_submit_driver_request(sc, req, 0)) != 0) {
 		cmn_err(CE_WARN, "Failed to clear IPMI flags: %d\n", error);
+		ipmi_free_request(req);
+		return (B_FALSE);
+	}
 
 	/* Magic numbers */
 	if (req->ir_compcode == 0xc0) {
@@ -272,7 +288,7 @@ ipmi_startup(struct ipmi_softc *sc)
 	if ((error = ipmi_submit_driver_request(sc, req, 0)) != 0) {
 		cmn_err(CE_WARN, "Failed to check IPMI watchdog: %d\n", error);
 		ipmi_free_request(req);
-		return;
+		return (B_FALSE);
 	}
 
 	if (req->ir_compcode == 0x00) {
@@ -284,4 +300,6 @@ ipmi_startup(struct ipmi_softc *sc)
 		 */
 	}
 	ipmi_free_request(req);
+
+	return (B_TRUE);
 }
