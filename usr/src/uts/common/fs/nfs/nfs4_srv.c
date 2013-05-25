@@ -20,9 +20,8 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- */
-/*
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 
 /*
@@ -3141,7 +3140,8 @@ rfs4_op_read(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	int verror;
 	vnode_t *vp;
 	struct vattr va;
-	struct iovec iov;
+	struct iovec iov, *iovp = NULL;
+	int iovcnt;
 	struct uio uio;
 	u_offset_t offset;
 	bool_t *deleg = &cs->deleg;
@@ -3305,32 +3305,20 @@ rfs4_op_read(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	if (rdma_used) {
 		mp = NULL;
 		(void) rdma_get_wchunk(req, &iov, args->wlist);
+		uio.uio_iov = &iov;
+		uio.uio_iovcnt = 1;
 	} else {
 		/*
 		 * mp will contain the data to be sent out in the read reply.
-		 * It will be freed after the reply has been sent. Let's
-		 * roundup the data to a BYTES_PER_XDR_UNIT multiple, so that
-		 * the call to xdrmblk_putmblk() never fails. If the first
-		 * alloc of the requested size fails, then decrease the size to
-		 * something more reasonable and wait for the allocation to
-		 * occur.
+		 * It will be freed after the reply has been sent.
 		 */
-		mp = allocb(RNDUP(args->count), BPRI_MED);
-		if (mp == NULL) {
-			if (args->count > MAXBSIZE)
-				args->count = MAXBSIZE;
-			mp = allocb_wait(RNDUP(args->count), BPRI_MED,
-			    STR_NOSIG, &alloc_err);
-		}
+		mp = rfs_read_alloc(args->count, &iovp, &iovcnt);
 		ASSERT(mp != NULL);
 		ASSERT(alloc_err == 0);
-
-		iov.iov_base = (caddr_t)mp->b_datap->db_base;
-		iov.iov_len = args->count;
+		uio.uio_iov = iovp;
+		uio.uio_iovcnt = iovcnt;
 	}
 
-	uio.uio_iov = &iov;
-	uio.uio_iovcnt = 1;
 	uio.uio_segflg = UIO_SYSSPACE;
 	uio.uio_extflg = UIO_COPY_CACHED;
 	uio.uio_loffset = args->offset;
@@ -3385,6 +3373,9 @@ doio_read:
 out:
 	if (in_crit)
 		nbl_end_crit(vp);
+
+	if (iovp != NULL)
+		kmem_free(iovp, iovcnt * sizeof (struct iovec));
 
 	DTRACE_NFSV4_2(op__read__done, struct compound_state *, cs,
 	    READ4res *, resp);

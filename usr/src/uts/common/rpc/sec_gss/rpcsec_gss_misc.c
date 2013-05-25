@@ -24,14 +24,16 @@
  * All rights reserved.  Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved.
  *
  * $Header:
  * /afs/gza.com/product/secure/rel-eng/src/1.1/rpc/RCS/auth_gssapi_misc.c,v 1.10
  * 1994/10/27 12:39:23 jik Exp $
+ */
+
+/*
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -142,7 +144,7 @@ __rpc_gss_wrap_data(service, qop, context, seq_num, out_xdrs,
 	OM_uint32		major, minor;
 	gss_buffer_desc		in_buf, out_buf;
 	XDR			temp_xdrs;
-	char			*mp;
+	char			*temp_data;
 /* EXPORT DELETE START */
 	bool_t			conf_state;
 /* EXPORT DELETE END */
@@ -154,10 +156,10 @@ __rpc_gss_wrap_data(service, qop, context, seq_num, out_xdrs,
 	 * We need an extra bit for the sequence number serialized first.
 	 */
 	size = xdr_sizeof(xdr_func, xdr_ptr) + BYTES_PER_XDR_UNIT;
-	mp = kmem_alloc(size, KM_SLEEP);
+	temp_data = kmem_alloc(size, KM_SLEEP);
 	out_buf.length = 0;
 
-	xdrmem_create(&temp_xdrs, mp, size, XDR_ENCODE);
+	xdrmem_create(&temp_xdrs, temp_data, size, XDR_ENCODE);
 
 	/*
 	 * serialize the sequence number into tmp memory
@@ -221,7 +223,7 @@ __rpc_gss_wrap_data(service, qop, context, seq_num, out_xdrs,
 		goto fail;
 	ret = TRUE;
 fail:
-	kmem_free(mp, size);
+	kmem_free(temp_data, size);
 	if (out_buf.length != 0)
 		(void) gss_release_buffer(&minor, &out_buf);
 	return (ret);

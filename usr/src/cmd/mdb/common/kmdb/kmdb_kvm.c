@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 #include <kmdb/kmdb_kvm.h>
@@ -137,7 +138,12 @@ ssize_t
 kmt_rw(mdb_tgt_t *t, void *buf, size_t nbytes, uint64_t addr,
     ssize_t (*rw)(void *, size_t, uint64_t))
 {
-	size_t n, ndone, chunksz;
+	/*
+	 * chunksz needs to be volatile because of the use of setjmp() in this
+	 * function.
+	 */
+	volatile size_t chunksz;
+	size_t n, ndone;
 	jmp_buf *oldpcb = NULL;
 	jmp_buf pcb;
 	ssize_t res;
