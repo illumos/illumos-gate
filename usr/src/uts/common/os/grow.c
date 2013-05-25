@@ -511,14 +511,15 @@ choose_addr(struct as *as, caddr_t *addrp, size_t len, offset_t off,
 	 * treat the hint as a strong desire to be "nearby" the provided
 	 * address.  If we can't satisfy the hint, as_gap() will walk forward.
 	 */
+	if (flags & _MAP_LOW32)
+		lenp = (caddr_t)USERLIMIT32 - basep;
 #if defined(__amd64)
-	if (p->p_model == DATAMODEL_NATIVE)
+	else if (p->p_model == DATAMODEL_NATIVE)
 		lenp = p->p_usrstack - basep -
 		    ((p->p_stk_ctl + PAGEOFFSET) & PAGEMASK);
-	else
 #endif
-		lenp = ((flags & _MAP_LOW32) ?
-		    (caddr_t)USERLIMIT32 : as->a_userlimit) - basep;
+	else
+		lenp = as->a_userlimit - basep;
 
 	if (flags & MAP_FIXED) {
 		(void) as_unmap(as, *addrp, len);
