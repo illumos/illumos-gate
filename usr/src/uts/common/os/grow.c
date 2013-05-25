@@ -499,10 +499,27 @@ int
 choose_addr(struct as *as, caddr_t *addrp, size_t len, offset_t off,
     int vacalign, uint_t flags)
 {
+	proc_t *p = curproc;
 	caddr_t basep = (caddr_t)(uintptr_t)((uintptr_t)*addrp & PAGEMASK);
-	size_t lenp = len;
+	size_t lenp;
 
 	ASSERT(AS_ISCLAIMGAP(as));	/* searches should be serialized */
+
+	/*
+	 * If we have been provided a hint, we should still expand the lenp
+	 * to be the rest of the address space.  This will allow us to
+	 * treat the hint as a strong desire to be "nearby" the provided
+	 * address.  If we can't satisfy the hint, as_gap() will walk forward.
+	 */
+#if defined(__amd64)
+	if (p->p_model == DATAMODEL_NATIVE)
+		lenp = p->p_usrstack - basep -
+		    ((p->p_stk_ctl + PAGEOFFSET) & PAGEMASK);
+	else
+#endif
+		lenp = ((flags & _MAP_LOW32) ?
+		    (caddr_t)USERLIMIT32 : as->a_userlimit) - basep;
+
 	if (flags & MAP_FIXED) {
 		(void) as_unmap(as, *addrp, len);
 		return (0);
