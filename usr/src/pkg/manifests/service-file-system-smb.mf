@@ -82,7 +82,6 @@ file path=usr/lib/smbsrv/libmlrpc.so.1
 file path=usr/lib/smbsrv/libmlsvc.so.1
 file path=usr/lib/smbsrv/libsmb.so.1
 file path=usr/lib/smbsrv/libsmbns.so.1
-file path=usr/lib/smbsrv/libsqlite.so.1
 file path=usr/lib/smbsrv/smbd mode=0555
 file path=usr/sbin/smbadm mode=0555
 file path=usr/sbin/smbstat mode=0555

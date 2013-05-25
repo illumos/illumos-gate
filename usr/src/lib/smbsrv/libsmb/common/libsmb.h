@@ -42,7 +42,6 @@ extern "C" {
 #include <stdlib.h>
 #include <libscf.h>
 #include <libshare.h>
-#include <sqlite/sqlite.h>
 #include <uuid/uuid.h>
 #include <synch.h>
 
@@ -679,10 +678,13 @@ typedef struct smb_gsid {
 	uint16_t gs_type;
 } smb_gsid_t;
 
+struct sqlite_vm;
+struct sqlite;
+
 typedef struct smb_giter {
-	sqlite_vm	*sgi_vm;
-	sqlite		*sgi_db;
-	uint32_t	sgi_nerr;
+	struct sqlite_vm	*sgi_vm;
+	struct sqlite		*sgi_db;
+	uint32_t		sgi_nerr;
 } smb_giter_t;
 
 typedef struct smb_group {

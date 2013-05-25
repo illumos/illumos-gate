@@ -2,8 +2,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 SUBDIRS	=	$(MACH)
 
@@ -18,10 +16,10 @@ ENCODING  = ISO8859
 SRCDIR=	src
 
 HDRS=           sqlite.h sqlite-misc.h
-ROOTHDRDIR=     $(ROOT)/usr/include/sqlite
+ROOTHDRDIR=     $(ROOT)/usr/include/sqlite-sys
 ROOTHDRS=       $(HDRS:%=$(ROOTHDRDIR)/%)
 CHECKHDRS=      $(HDRS:%.h=%.check)
-CLEANFILES +=	sqlite.h
+CLOBBERFILES +=	sqlite.h
 
 .KEEP_STATE:
 
@@ -35,7 +33,8 @@ lint	:= TARGET= lint
 # This is the default Makefile target.  The objects listed here
 # are what get build when you type just "make" with no arguments.
 #
-all clobber install lint:		$(SUBDIRS)
+all install:	sqlite.h $(SUBDIRS)
+clobber lint:	$(SUBDIRS)
 
 $(ROOTHDRDIR):
 	$(INS.dir)
@@ -52,7 +51,7 @@ check:
 #
 sqlite.h: $(SRCDIR)/sqlite.h.in
 	@echo "Generating $@"; \
-	 sed -e 's"--VERS--"$(SQLITE_VERSION)-$(VERSION)"' \
+	 sed -e 's"--VERS--"$(SQLITE_VERSION)"' \
 	    -e s/--ENCODING--/$(ENCODING)/ \
 	    $(SRCDIR)/sqlite.h.in > $@
 
