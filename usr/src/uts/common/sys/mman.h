@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 
+/* Copyright 2013 OmniTI Computer Consulting, Inc. All rights reserved. */
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -104,8 +105,10 @@ extern "C" {
 #if	(_POSIX_C_SOURCE <= 2) || defined(_XPG4_2)
 #ifdef	_KERNEL
 #define	PROT_EXCL	0x20
-#define	_MAP_LOW32	0x80	/* force mapping in lower 4G of address space */
 #endif	/* _KERNEL */
+
+#define	_MAP_LOW32	0x80	/* force mapping in lower 4G of address space */
+#define	MAP_32BIT	_MAP_LOW32
 
 /*
  * For the sake of backward object compatibility, we use the _MAP_NEW flag.
