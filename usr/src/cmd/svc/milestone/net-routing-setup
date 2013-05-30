@@ -160,7 +160,8 @@ fi
 # however, as persistent daemon state is now controlled by SMF.
 #
 ipv4_routing_set=`/usr/bin/svcprop -p routeadm/ipv4-routing-set $SMF_FMRI`
-if [ -z "$defrouters" ]; then
+if [ -z "$defrouters" ] && \
+    [ `/usr/bin/bootparams | grep "^smartos"` != "" ]; then
 	#
 	# Set default value for ipv4-routing to enabled.  If routeadm -e/-d
 	# has not yet been run by the administrator, we apply this default.
