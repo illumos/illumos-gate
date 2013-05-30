@@ -171,7 +171,7 @@ enableAluaFunc(int operandLen, char *operands[], cmdOptions_t *options,
     void *args)
 {
 	uint8_t node_id = 0;
-	if (operands[0][1] == '1') {
+	if (operands[0][0] == '1') {
 		node_id = 1;
 	}
 	return (stmfSetAluaState(B_TRUE, node_id));

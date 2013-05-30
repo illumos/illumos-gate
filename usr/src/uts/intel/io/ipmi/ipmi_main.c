@@ -21,6 +21,7 @@
 
 /*
  * Copyright 2012, Joyent, Inc.  All rights reserved.
+ * Copyright 2013, Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -487,6 +488,14 @@ ipmi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (cmd != DDI_ATTACH)
 		return (DDI_FAILURE);
 
+	/* this driver only supports one device instance */
+	if (ddi_get_instance(dip) != 0) {
+		cmn_err(CE_WARN,
+		    "!not attaching to non-zero device instance %d",
+		    ddi_get_instance(dip));
+		return (DDI_FAILURE);
+	}
+
 	if (get_smbios_ipmi_info() == DDI_FAILURE)
 		return (DDI_FAILURE);
 
@@ -518,7 +527,11 @@ ipmi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* Create ID space for open devs.  ID 0 is reserved. */
 	minor_ids = id_space_create("ipmi_id_space", 1, 128);
 
-	ipmi_startup(sc);
+	if (ipmi_startup(sc) != B_TRUE) {
+		ipmi_shutdown(sc);
+		return (DDI_FAILURE);
+	}
+
 	ipmi_attached = B_TRUE;
 
 	return (DDI_SUCCESS);
@@ -540,13 +553,14 @@ ipmi_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	sc->ipmi_detaching = 1;
 	cv_signal(&sc->ipmi_request_added);
 
+	ipmi_shutdown(sc);
 	ddi_remove_minor_node(dip, NULL);
 	ipmi_dip = NULL;
 
-	taskq_destroy(sc->ipmi_kthread);
 	list_destroy(&dev_list);
 	id_space_destroy(minor_ids);
 
+	sc->ipmi_detaching = 0;
 	ipmi_attached = B_FALSE;
 	return (DDI_SUCCESS);
 }
@@ -566,7 +580,10 @@ static struct cb_ops ipmi_cb_ops = {
 	ipmi_poll,
 	ddi_prop_op,
 	NULL,			/* streamtab */
-	D_NEW | D_MP		/* flags */
+	D_NEW | D_MP,		/* flags */
+	CB_REV,
+	nodev,			/* awread */
+	nodev			/* awrite */
 };
 
 static struct dev_ops ipmi_ops = {

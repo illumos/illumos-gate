@@ -464,7 +464,7 @@ typedef enum nfs4_tag_type {
 			{0x6c6f7374, 0x206f7065, 0x6e202020}},	\
 		{TAG_OPENATTR,		"openattr",		\
 			{0x6f70656e, 0x61747472, 0x20202020}},	\
-		{TAG_PATHCONF,		"pathhconf",		\
+		{TAG_PATHCONF,		"pathconf",		\
 			{0x70617468, 0x636f6e66, 0x20202020}},	\
 		{TAG_PUTROOTFH,		"putrootfh",		\
 			{0x70757472, 0x6f6f7466, 0x68202020}},	\

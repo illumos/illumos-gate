@@ -986,8 +986,10 @@ usr/lib/amd64/llib-lsaveargs.ln   	i386
 # libpcidb is private
 #
 usr/include/pcidb.h
-usr/lib/amd64/libpcidb.so
-usr/lib/amd64/llib-lpcidb.ln
+usr/lib/amd64/libpcidb.so		i386
+usr/lib/amd64/llib-lpcidb.ln		i386
+usr/lib/sparcv9/libpcidb.so		sparc
+usr/lib/sparcv9/llib-lpcidb.ln		sparc
 usr/lib/libpcidb.so
 usr/lib/llib-lpcidb
 usr/lib/llib-lpcidb.ln
