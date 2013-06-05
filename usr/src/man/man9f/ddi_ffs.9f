@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_FFS 9F "Jan 16, 2006"
+.TH DDI_FFS 9F "Jun 5, 2013"
 .SH NAME
 ddi_ffs, ddi_fls \- find first (last) bit set in a long integer
 .SH SYNOPSIS
@@ -15,7 +15,7 @@ ddi_ffs, ddi_fls \- find first (last) bit set in a long integer
 
 
 
-\fBint\fR\fBddi_ffs\fR(\fBlong\fR \fImask\fR);
+\fBint\fR \fBddi_ffs\fR(\fBlong\fR \fImask\fR);
 .fi
 
 .LP
