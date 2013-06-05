@@ -2,6 +2,7 @@
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+.\" Copyright (c) 2013 Andrew Stormont.  All rights reserved.
 .\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
 .\"
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for
@@ -312,6 +313,15 @@ True if the file has inode number \fIn\fR.
 .sp
 .ne 2
 .na
+\fB\fB-ipath\fR \fIpattern\fR\fR
+.ad
+.RS 17n
+Like \fB-path\fR, but the match is case insensitive.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fB-iregex\fR \fIpattern\fR\fR
 .ad
 .RS 17n
@@ -523,6 +533,15 @@ True if the file belongs to non-existing user.
 .RS 17n
 Like \fB-exec\fR, except that the generated command line is printed with a
 question mark first, and is executed only if the response is affirmative.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-path\fR\fR
+.ad
+.RS 17n
+Like \fB-name\fR, but matches the entire file path and not just basename.
 .RE
 
 .sp
