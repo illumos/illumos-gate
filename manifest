@@ -1482,6 +1482,7 @@ d lib/svc/manifest/network/dns 0755 root sys
 f lib/svc/manifest/network/dns/client.xml 0444 root sys
 f lib/svc/manifest/network/dns/install.xml 0444 root sys
 f lib/svc/manifest/network/dns/multicast.xml 0444 root sys
+f lib/svc/manifest/network/forwarding.xml 0444 root sys
 f lib/svc/manifest/network/ibd-post-upgrade.xml 0444 root sys
 f lib/svc/manifest/network/inetd-upgrade.xml 0444 root sys
 f lib/svc/manifest/network/inetd.xml 0444 root sys
