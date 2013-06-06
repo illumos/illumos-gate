@@ -20,7 +20,7 @@
  */
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Copyright 2011, 2012, Joyent, Inc.  All rights reserved.
+ * Copyright 2013, Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -950,6 +950,53 @@ done:
 	zonecfg_fini_handle(handle);
 }
 
+/* ARGSUSED */
+static int
+chk_proc_fs(void *data, const char *spec, const char *dir,
+    const char *fstype, const char *opt)
+{
+	if (spec != NULL && strcmp(spec, "/proc") == 0)
+		*((boolean_t *)data) = B_TRUE;
+
+	return (0);
+}
+
+static boolean_t
+has_proc()
+{
+	brand_handle_t bh;
+	boolean_t fnd = B_FALSE;
+
+	if ((bh = brand_open(brand_name)) != NULL) {
+		(void) brand_platform_iter_mounts(bh, chk_proc_fs, &fnd);
+	}
+
+	brand_close(bh);
+	return (fnd);
+}
+
+/*
+ * We run this loop for brands with no /proc to simply update the RSS, using the
+ * expensive sycall, every 5 minutes.
+ */
+static void
+no_procfs()
+{
+	uint64_t		n;
+	zsd_vmusage64_t		buf;
+
+	(void) sleep_shutdown(30);
+	while (!shutting_down) {
+		buf.vmu_id = zid;
+		n = 1;
+
+		(void) syscall(SYS_rusagesys, _RUSAGESYS_GETVMUSAGE,
+		    VMUSAGE_A_ZONE, 60, (uintptr_t)&buf, (uintptr_t)&n);
+
+		(void) sleep_shutdown(300);
+	}
+}
+
 /*
  * Thread that checks zone's memory usage and when over the cap, goes through
  * the zone's process list trying to pageout processes to get under the cap.
@@ -964,6 +1011,17 @@ mcap_zone()
 	debug("thread startup\n");
 
 	get_mcap_tunables();
+
+	/*
+	 * If the zone has no /proc filesystem, we can't use the fast algorithm
+	 * to check RSS or pageout any processes. All we can do is periodically
+	 * update it's RSS kstat using the expensive sycall.
+	 */
+	if (!has_proc()) {
+		no_procfs();
+		debug("thread shutdown\n");
+		return;
+	}
 
 	/*
 	 * When first starting it is likely lots of other zones are starting
