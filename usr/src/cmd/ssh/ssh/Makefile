@@ -40,7 +40,7 @@ include ../Makefile.ssh-common
 LDLIBS += $(SSH_COMMON_LDLIBS) -lsocket \
 	-lnsl \
 	-lz \
-	-lcrypto \
+	-lsunw_crypto \
 	-lgss
 
 POFILE_DIR= ..

@@ -32,7 +32,7 @@ include ../Makefile.com
 
 CMNDIR  = $(CMNNETDIR)/wanboot
 SRCS	= $(LOCOBJS:%.o=$(SRCDIR)/%.c) $(CMNOBJS:%.o=$(CMNDIR)/%.c)
-LDLIBS += -lcrypto -lsock -linet -lssl -lnvpair
+LDLIBS += -lsunw_crypto -lsock -linet -lsunw_ssl -lnvpair
 
 CPPFLAGS += -I$(CMNNETDIR)/dhcp -I$(TOPDIR)/common/net/wanboot/crypt \
 	-I../inet $(DHCPCPPFLAGS) $(SOCKCPPFLAGS)

@@ -94,7 +94,7 @@ LIBS =		$(LIBRARY) $(LINTLIB)
 # Define LDLIBS conditionally for lintcheck, rather than in general, since
 # we're building an archive library which itself links to nothing, we just
 # want lint to know about these libraries.
-lintcheck  :=	LDLIBS += -lcrypto -lz -lsocket -lnsl -lc
+lintcheck  :=	LDLIBS += -lsunw_crypto -lz -lsocket -lnsl -lc
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 POFILE_DIR =	../..

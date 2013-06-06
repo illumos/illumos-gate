@@ -70,7 +70,7 @@ CERRWARN	+= -_gcc=-Wno-unused-function
 
 CFLAGS +=	$(CCVERBOSE) -I..
 DYNFLAGS +=	$(KRUNPATH) $(KMECHLIB) -znodelete
-LDLIBS +=	-L $(ROOTLIBDIR) -lcrypto -lc
+LDLIBS +=	-L $(ROOTLIBDIR) -lsunw_crypto -lc
 
 ROOTLIBDIR= $(ROOT)/usr/lib/krb5/plugins/preauth
 

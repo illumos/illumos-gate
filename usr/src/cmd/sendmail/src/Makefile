@@ -45,7 +45,7 @@ MAPFILES =	$(MAPFILE.INT) $(MAPFILE.NGB)
 LDFLAGS +=	$(MAPFILES:%=-M%)
 
 # EXPORT DELETE START
-CRYPTOLIBS=	-lssl -lcrypto -lsasl
+CRYPTOLIBS=	-lsunw_ssl -lsunw_crypto -lsasl
 # EXPORT DELETE END
 LDLIBS += 	../libsmutil/libsmutil.a ../libsm/libsm.a -lresolv -lsocket \
 		-lnsl ../db/libdb.a -lldap -lsldap -lwrap -lumem \

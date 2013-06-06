@@ -60,7 +60,7 @@ include ../../Makefile.lib
 
 LIBS +=		$(LINTLIB)
 LDLIBS +=	-lnvpair -lresolv -lnsl -lsocket -ldevinfo -ldhcputil \
-		-linetutil -lc -lcrypto -lssl
+		-linetutil -lc -lsunw_crypto -lsunw_ssl
 CPPFLAGS =	-I$(SRC)/common/net/wanboot/crypt $(CPPFLAGS.master)
 CERRWARN +=	-_gcc=-Wno-switch
 CERRWARN +=	-_gcc=-Wno-parentheses

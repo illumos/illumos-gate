@@ -25,7 +25,7 @@
 include ../Makefile.com
 
 PROG=		p12split
-LDLIBS +=	-lwanboot -linetutil -lwanbootutil -lcrypto
+LDLIBS +=	-lwanboot -linetutil -lwanbootutil -lsunw_crypto
 CPPFLAGS +=	-I$(CMNCRYPTDIR)
 
 all:		$(PROG)

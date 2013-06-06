@@ -511,7 +511,6 @@ d etc/sysevent 0755 root sys
 d etc/sysevent/config 0755 root sys
 d etc/sysevent/devfsadm_event_channel 0755 root root
 f etc/syslog.conf 0644 root sys
-s etc/syslog.pid=../var/run/syslog.pid
 s etc/termcap=../usr/share/lib/termcap
 d etc/tm 0755 root sys
 f etc/ttydefs 0644 root sys
@@ -1245,8 +1244,8 @@ f lib/amd64/libzdoor.so.1 0755 root bin
 s lib/amd64/libzdoor.so=libzdoor.so.1
 f lib/amd64/libzfs.so.1 0755 root bin
 s lib/amd64/libzfs.so=libzfs.so.1
-s lib/amd64/libzfs_core.so=../usr/lib/amd64/libzfs_core.so
-s lib/amd64/libzfs_core.so.1=../usr/lib/amd64/libzfs_core.so.1
+s lib/amd64/libzfs_core.so=../../usr/lib/amd64/libzfs_core.so
+s lib/amd64/libzfs_core.so.1=../../usr/lib/amd64/libzfs_core.so.1
 f lib/amd64/nss_compat.so.1 0755 root bin
 f lib/amd64/nss_dns.so.1 0755 root bin
 f lib/amd64/nss_files.so.1 0755 root bin
@@ -1811,6 +1810,7 @@ f sbin/dladm 0555 root bin
 f sbin/dlmgmtd 0555 root bin
 f sbin/dlstat 0555 root bin
 f sbin/fdisk 0555 root bin
+f sbin/fiocompress 0555 root bin
 f sbin/flowadm 0555 root bin
 f sbin/flowstat 0555 root bin
 f sbin/hostconfig 0555 root bin
@@ -6439,7 +6439,7 @@ s usr/lib/libvrrpadm.so=libvrrpadm.so.1
 s usr/lib/libw.so.1=../../lib/libw.so.1
 s usr/lib/libw.so=../../lib/libw.so.1
 f usr/lib/libwanboot.so.1 0755 root bin
-s usr/lib/libwanboot.so=../../lib/libwanboot.so.1
+s usr/lib/libwanboot.so=libwanboot.so.1
 f usr/lib/libwrap.so.1.0 0755 root bin
 s usr/lib/libwrap.so.1=libwrap.so.1.0
 s usr/lib/libwrap.so=libwrap.so.1.0
@@ -10535,8 +10535,6 @@ f usr/sbin/zstreamdump 0555 root bin
 d usr/sfw 0755 root bin
 d usr/sfw/bin 0755 root bin
 d usr/sfw/bin/amd64 0755 root bin
-s usr/sfw/man=share/man
-d usr/sfw/share 0755 root bin
 d usr/share 0755 root sys
 d usr/share/hwdata 0755 root sys
 f usr/share/hwdata/pci.ids 0444 root bin
