@@ -1590,7 +1590,7 @@ jsobj_properties(uintptr_t addr,
 	if (mdb_vread(&ptr, ps, map + off) == -1)
 		goto err;
 
-	if (V8_OFF_MAP_TRANSITIONS != -1) {
+	if (V8_OFF_MAP_INSTANCE_DESCRIPTORS == -1) {
 		if (read_heap_array(ptr, &trans, &ntrans, UM_SLEEP) != 0)
 			goto err;
 
