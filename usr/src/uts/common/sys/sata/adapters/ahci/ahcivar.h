@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 
@@ -133,9 +134,6 @@ typedef struct ahci_pmult_info ahci_pmult_info_t;
 /*
  * flags for ahciport_flags
  *
- * AHCI_PORT_FLAG_SPINUP: this flag will be set when a HBA which supports
- * staggered spin-up needs to do a spin-up.
- *
  * AHCI_PORT_FLAG_MOPPING: this flag will be set when the HBA is stopped,
  * and all the outstanding commands need to be aborted and sent to upper
  * layers.
@@ -173,7 +171,6 @@ typedef struct ahci_pmult_info ahci_pmult_info_t;
  * will be printed. Note that, for INDENTIFY DEVICE command sent to ATAPI
  * device or ATAPI PACKET command, this flag won't be set.
  */
-#define	AHCI_PORT_FLAG_SPINUP		0x01
 #define	AHCI_PORT_FLAG_MOPPING		0x02
 #define	AHCI_PORT_FLAG_POLLING		0x04
 #define	AHCI_PORT_FLAG_RQSENSE		0x08
@@ -199,7 +196,6 @@ typedef struct ahci_port {
 	ahci_pmult_info_t	*ahciport_pmult_info;
 
 	/*
-	 * AHCI_PORT_FLAG_SPINUP
 	 * AHCI_PORT_FLAG_MOPPING
 	 * AHCI_PORT_FLAG_POLLING
 	 * AHCI_PORT_FLAG_RQSENSE
@@ -552,6 +548,7 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_ctl_t::ahcictl_mutex,
 #define	AHCI_POLLRATE_PORT_IDLE		50
 #define	AHCI_POLLRATE_PORT_SOFTRESET	100
 #define	AHCI_POLLRATE_GET_SPKT		100
+#define	AHCI_POLLRATE_PORT_IDLE_FR	500
 
 
 /* Clearing & setting the n'th bit in a given tag */
