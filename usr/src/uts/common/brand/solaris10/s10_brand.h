@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -119,6 +120,7 @@ enum s10_emulated_features {
 #define	S10_SYS_utime		30
 #define	S10_SYS_access		33
 #define	S10_SYS_dup		41
+#define	S10_SYS_pipe		42
 #define	S10_SYS_issetugid	75
 #define	S10_SYS_fsat		76
 #define	S10_SYS_rmdir		79
@@ -144,6 +146,8 @@ enum s10_emulated_features {
 #define	S10_SYS_fstat64		217
 #define	S10_SYS_creat64		224
 #define	S10_SYS_open64		225
+#define	S10_SYS_so_socket	230
+#define	S10_SYS_accept		234
 
 /*
  * solaris10-brand-specific attributes
