@@ -195,8 +195,7 @@ mlsetup(struct regs *rp)
 	cpuid_pass1(cpu[0], x86_featureset);
 
 #if !defined(__xpv)
-
-	if (get_hwenv() == HW_XEN_HVM)
+	if ((get_hwenv() & HW_XEN_HVM) != 0)
 		xen_hvm_init();
 
 	/*
@@ -218,7 +217,7 @@ mlsetup(struct regs *rp)
 	 * The Xen hypervisor does not correctly report whether rdtscp is
 	 * supported or not, so we must assume that it is not.
 	 */
-	if (get_hwenv() != HW_XEN_HVM &&
+	if ((get_hwenv() & HW_XEN_HVM) == 0 &&
 	    is_x86_feature(x86_featureset, X86FSET_TSCP))
 		patch_tsc_read(X86_HAVE_TSCP);
 	else if (cpuid_getvendor(CPU) == X86_VENDOR_AMD &&

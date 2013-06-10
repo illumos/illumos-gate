@@ -22,6 +22,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -432,8 +434,7 @@ tsc_sync_master(processorid_t slave)
 	int hwtype;
 
 	hwtype = get_hwenv();
-	if (!tsc_master_slave_sync_needed || hwtype == HW_XEN_HVM ||
-	    hwtype == HW_VMWARE)
+	if (!tsc_master_slave_sync_needed || (hwtype & HW_VIRTUAL) != 0)
 		return;
 
 	flags = clear_int_flag();
@@ -512,8 +513,7 @@ tsc_sync_slave(void)
 	int hwtype;
 
 	hwtype = get_hwenv();
-	if (!tsc_master_slave_sync_needed || hwtype == HW_XEN_HVM ||
-	    hwtype == HW_VMWARE)
+	if (!tsc_master_slave_sync_needed || (hwtype & HW_VIRTUAL) != 0)
 		return;
 
 	flags = clear_int_flag();

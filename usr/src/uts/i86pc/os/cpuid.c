@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 by Delphix. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -220,7 +221,7 @@ uint64_t xsave_bv_all = (XFEATURE_LEGACY_FP | XFEATURE_SSE);
 boolean_t xsave_force_disable = B_FALSE;
 
 /*
- * This is set to platform type Solaris is running on.
+ * This is set to platform type we are running on.
  */
 static int platform_type = -1;
 
@@ -597,20 +598,20 @@ cpuid_free_space(cpu_t *cpu)
 }
 
 #if !defined(__xpv)
-
 /*
  * Determine the type of the underlying platform. This is used to customize
  * initialization of various subsystems (e.g. TSC). determine_platform() must
  * only ever be called once to prevent two processors from seeing different
- * values of platform_type, it must be called before cpuid_pass1(), the
- * earliest consumer to execute.
+ * values of platform_type. Must be called before cpuid_pass1(), the earliest
+ * consumer to execute (uses _cpuid_chiprev --> synth_amd_info --> get_hwenv).
  */
 void
 determine_platform(void)
 {
 	struct cpuid_regs cp;
-	char *xen_str;
-	uint32_t xen_signature[4], base;
+	uint32_t base;
+	uint32_t regs[4];
+	char *hvstr = (char *)regs;
 
 	ASSERT(platform_type == -1);
 
@@ -620,31 +621,75 @@ determine_platform(void)
 		return;
 
 	/*
-	 * In a fully virtualized domain, Xen's pseudo-cpuid function
-	 * returns a string representing the Xen signature in %ebx, %ecx,
-	 * and %edx. %eax contains the maximum supported cpuid function.
-	 * We need at least a (base + 2) leaf value to do what we want
-	 * to do. Try different base values, since the hypervisor might
-	 * use a different one depending on whether hyper-v emulation
-	 * is switched on by default or not.
+	 * If Hypervisor CPUID bit is set, try to determine hypervisor
+	 * vendor signature, and set platform type accordingly.
+	 *
+	 * References:
+	 * http://lkml.org/lkml/2008/10/1/246
+	 * http://kb.vmware.com/kb/1009458
 	 */
-	for (base = 0x40000000; base < 0x40010000; base += 0x100) {
-		cp.cp_eax = base;
+	cp.cp_eax = 0x1;
+	(void) __cpuid_insn(&cp);
+	if ((cp.cp_ecx & CPUID_INTC_ECX_HV) != 0) {
+		cp.cp_eax = 0x40000000;
 		(void) __cpuid_insn(&cp);
-		xen_signature[0] = cp.cp_ebx;
-		xen_signature[1] = cp.cp_ecx;
-		xen_signature[2] = cp.cp_edx;
-		xen_signature[3] = 0;
-		xen_str = (char *)xen_signature;
-		if (strcmp("XenVMMXenVMM", xen_str) == 0 &&
-		    cp.cp_eax >= (base + 2)) {
+		regs[0] = cp.cp_ebx;
+		regs[1] = cp.cp_ecx;
+		regs[2] = cp.cp_edx;
+		regs[3] = 0;
+		if (strcmp(hvstr, HVSIG_XEN_HVM) == 0) {
 			platform_type = HW_XEN_HVM;
+			return;
+		}
+		if (strcmp(hvstr, HVSIG_VMWARE) == 0) {
+			platform_type = HW_VMWARE;
+			return;
+		}
+		if (strcmp(hvstr, HVSIG_KVM) == 0) {
+			platform_type = HW_KVM;
+			return;
+		}
+		if (strcmp(hvstr, HVSIG_MICROSOFT) == 0)
+			platform_type = HW_MICROSOFT;
+	} else {
+		/*
+		 * Check older VMware hardware versions. VMware hypervisor is
+		 * detected by performing an IN operation to VMware hypervisor
+		 * port and checking that value returned in %ebx is VMware
+		 * hypervisor magic value.
+		 *
+		 * References: http://kb.vmware.com/kb/1009458
+		 */
+		vmware_port(VMWARE_HVCMD_GETVERSION, regs);
+		if (regs[1] == VMWARE_HVMAGIC) {
+			platform_type = HW_VMWARE;
 			return;
 		}
 	}
 
-	if (vmware_platform()) /* running under vmware hypervisor? */
-		platform_type = HW_VMWARE;
+	/*
+	 * Check Xen hypervisor. In a fully virtualized domain,
+	 * Xen's pseudo-cpuid function returns a string representing the
+	 * Xen signature in %ebx, %ecx, and %edx. %eax contains the maximum
+	 * supported cpuid function. We need at least a (base + 2) leaf value
+	 * to do what we want to do. Try different base values, since the
+	 * hypervisor might use a different one depending on whether Hyper-V
+	 * emulation is switched on by default or not.
+	 */
+	for (base = 0x40000000; base < 0x40010000; base += 0x100) {
+		cp.cp_eax = base;
+		(void) __cpuid_insn(&cp);
+		regs[0] = cp.cp_ebx;
+		regs[1] = cp.cp_ecx;
+		regs[2] = cp.cp_edx;
+		regs[3] = 0;
+		if (strcmp(hvstr, HVSIG_XEN_HVM) == 0 &&
+		    cp.cp_eax >= (base + 2)) {
+			platform_type &= ~HW_NATIVE;
+			platform_type |= HW_XEN_HVM;
+			return;
+		}
+	}
 }
 
 int
@@ -2366,7 +2411,7 @@ fabricate_brandstr(struct cpuid_info *cpi)
  * the other cpus.
  *
  * Fixup the brand string, and collect any information from cpuid
- * that requires dynamicically allocated storage to represent.
+ * that requires dynamically allocated storage to represent.
  */
 /*ARGSUSED*/
 void

@@ -18,10 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- *
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/conf.h>
@@ -1719,7 +1719,6 @@ sbd_create_register_lu(sbd_create_and_reg_lu_t *slu, int struct_sz,
 	char *namebuf;
 	sbd_lu_t *sl;
 	stmf_lu_t *lu;
-	sbd_status_t sret;
 	char *p;
 	int sz;
 	int alloc_sz;
@@ -1835,11 +1834,6 @@ sbd_create_register_lu(sbd_create_and_reg_lu_t *slu, int struct_sz,
 	if (slu->slu_write_protected) {
 		sl->sl_flags |= SL_WRITE_PROTECTED;
 	}
-	if (slu->slu_writeback_cache_disable) {
-		sl->sl_flags |= SL_WRITEBACK_CACHE_DISABLE |
-		    SL_SAVED_WRITE_CACHE_DISABLE;
-	}
-
 	if (slu->slu_blksize_valid) {
 		if ((slu->slu_blksize & (slu->slu_blksize - 1)) ||
 		    (slu->slu_blksize > (32 * 1024)) ||
@@ -1876,27 +1870,30 @@ sbd_create_register_lu(sbd_create_and_reg_lu_t *slu, int struct_sz,
 	}
 
 	/*
-	 * set write cache disable on the device
-	 * if it fails, we'll support it using sync/flush
+	 * Check if we were explicitly asked to disable/enable write
+	 * cache on the device, otherwise get current device setting.
 	 */
-	if (slu->slu_writeback_cache_disable) {
-		(void) sbd_wcd_set(1, sl);
-		wcd = 1;
-	/*
-	 * Attempt to set it to enable, if that fails and it was explicitly set
-	 * return an error, otherwise get the current setting and use that
-	 */
+	if (slu->slu_writeback_cache_disable_valid) {
+		if (slu->slu_writeback_cache_disable) {
+			/*
+			 * Set write cache disable on the device. If it fails,
+			 * we'll support it using sync/flush.
+			 */
+			(void) sbd_wcd_set(1, sl);
+			wcd = 1;
+		} else {
+			/*
+			 * Set write cache enable on the device. If it fails,
+			 * return an error.
+			 */
+			if (sbd_wcd_set(0, sl) != SBD_SUCCESS) {
+				*err_ret = SBD_RET_WRITE_CACHE_SET_FAILED;
+				ret = EFAULT;
+				goto scm_err_out;
+			}
+		}
 	} else {
-		sret = sbd_wcd_set(0, sl);
-		if (slu->slu_writeback_cache_disable_valid &&
-		    sret != SBD_SUCCESS) {
-			*err_ret = SBD_RET_WRITE_CACHE_SET_FAILED;
-			ret = EFAULT;
-			goto scm_err_out;
-		}
-		if (sret != SBD_SUCCESS) {
-			sbd_wcd_get(&wcd, sl);
-		}
+		sbd_wcd_get(&wcd, sl);
 	}
 
 	if (wcd) {
