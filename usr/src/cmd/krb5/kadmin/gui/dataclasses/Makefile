@@ -29,7 +29,6 @@
 include ../../../../../Makefile.master
 include ../../../../Makefile.cmd
 
-JAVAFLAGS= -nowarn -O
 
 GUIDIR=$(SRC)/cmd/krb5/kadmin/gui
 

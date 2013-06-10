@@ -256,7 +256,7 @@ public class EncListDialog extends Dialog {
 				}
 			} else if (e.getSource() == help) {
 				if (hd != null)
-					hd.show();
+					hd.setVisible(true);
 				else {
 					hd = new HelpDialog(
 					    EncListDialog.this.parent,

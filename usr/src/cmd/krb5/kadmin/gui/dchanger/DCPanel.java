@@ -90,7 +90,7 @@
      * of going to a text field.
      * @return false always.
      */
-    public boolean isFocusTraversable() {
+    public boolean isFocusable() {
     return false;
     }
 
@@ -301,7 +301,7 @@
      * Make the button non-focus traversable so that it cannot be
      * tabbed in to.
      */
-    public boolean isFocusTraversable() {
+    public boolean isFocusable() {
         return false;
     }
 

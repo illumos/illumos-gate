@@ -29,7 +29,6 @@
 include $(SRC)/Makefile.master
 include $(SRC)/cmd/Makefile.cmd
 
-JAVAFLAGS= -nowarn -O
 GUIDIR=$(SRC)/cmd/krb5/kadmin/gui
 
 TOGETHER= KdcGui KdcGuiMain KdcGuiOps KdcGuiRoot

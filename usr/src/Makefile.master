@@ -558,7 +558,7 @@ CPPFLAGS.master=$(DTEXTDOM) $(DTS_ERRNO) \
 CPPFLAGS.native=$(ENVCPPFLAGS1) $(ENVCPPFLAGS2) $(ENVCPPFLAGS3) $(ENVCPPFLAGS4)
 CPPFLAGS=	$(CPPFLAGS.master)
 AS_CPPFLAGS=	$(CPPFLAGS.master)
-JAVAFLAGS=	-deprecation
+JAVAFLAGS=	-source 1.6 -target 1.6 -Xlint:deprecation,-options
 
 #
 # For source message catalogue

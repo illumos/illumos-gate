@@ -30,7 +30,6 @@
 include $(SRC)/cmd/Makefile.cmd
 
 CLASSPATH =	$(SRC)/cmd/pools/poold
-JAVAFLAGS +=	-source 1.4
 
 SOURCE =	Kstat.java \
 		KstatChainUpdateException.java \

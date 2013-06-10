@@ -624,7 +624,12 @@ file \
     group=other
 file path=usr/share/lib/java/javadoc/dtrace/api/overview-tree.html group=other
 file path=usr/share/lib/java/javadoc/dtrace/api/package-list group=other
-file path=usr/share/lib/java/javadoc/dtrace/api/resources/inherit.gif \
+file path=usr/share/lib/java/javadoc/dtrace/api/resources/background.gif \
+    group=other
+file path=usr/share/lib/java/javadoc/dtrace/api/resources/tab.gif group=other
+file path=usr/share/lib/java/javadoc/dtrace/api/resources/titlebar.gif \
+    group=other
+file path=usr/share/lib/java/javadoc/dtrace/api/resources/titlebar_end.gif \
     group=other
 file path=usr/share/lib/java/javadoc/dtrace/api/serialized-form.html \
     group=other
