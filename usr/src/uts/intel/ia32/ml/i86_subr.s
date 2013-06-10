@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -4339,62 +4340,58 @@ mfence_insn(void)
 #endif /* __lint */
 
 /*
- * This is how VMware lets the guests figure that they are running
- * on top of VMWare platform :
- * Write 0xA in the ECX register and put the I/O port address value of
- * 0x564D5868 in the EAX register. Then read a word from port 0x5658.
- * If VMWare is installed than this code will be executed correctly and
- * the EBX register will contain the same I/O port address value of 0x564D5868.
- * If VMWare is not installed then OS will return an exception on port access. 
+ * VMware implements an I/O port that programs can query to detect if software
+ * is running in a VMware hypervisor. This hypervisor port behaves differently
+ * depending on magic values in certain registers and modifies some registers
+ * as a side effect.
+ *
+ * References: http://kb.vmware.com/kb/1009458 
  */
+
 #if defined(__lint)
 
-int
-vmware_platform(void) { return (1); }
+/* ARGSUSED */
+void
+vmware_port(int cmd, uint32_t *regs) { return; }
 
 #else
 
 #if defined(__amd64)
 
-	ENTRY(vmware_platform)
+	ENTRY(vmware_port)
 	pushq	%rbx
-	xorl	%ebx, %ebx
-	movl	$0x564d5868, %eax
-	movl	$0xa, %ecx
-	movl	$0x5658, %edx
+	movl	$VMWARE_HVMAGIC, %eax
+	movl	$0xffffffff, %ebx
+	movl	%edi, %ecx
+	movl	$VMWARE_HVPORT, %edx
 	inl	(%dx)
-	movl	$0x564d5868, %ecx
-	xorl	%eax, %eax
-	cmpl	%ecx, %ebx
-	jne	1f
-	incl	%eax
-1:
+	movl	%eax, (%rsi)
+	movl	%ebx, 4(%rsi)
+	movl	%ecx, 8(%rsi)
+	movl	%edx, 12(%rsi)
 	popq	%rbx
 	ret
-	SET_SIZE(vmware_platform)
+	SET_SIZE(vmware_port)
 
 #elif defined(__i386)
 
-	ENTRY(vmware_platform)
+	ENTRY(vmware_port)
 	pushl	%ebx
-	pushl	%ecx
-	pushl	%edx
-	xorl	%ebx, %ebx
-	movl	$0x564d5868, %eax
-	movl	$0xa, %ecx
-	movl	$0x5658, %edx
+	pushl	%esi
+	movl	$VMWARE_HVMAGIC, %eax
+	movl	$0xffffffff, %ebx
+	movl	12(%esp), %ecx
+	movl	$VMWARE_HVPORT, %edx
 	inl	(%dx)
-	movl	$0x564d5868, %ecx
-	xorl	%eax, %eax
-	cmpl	%ecx, %ebx
-	jne	1f
-	incl	%eax
-1:
-	popl	%edx
-	popl	%ecx
+	movl	16(%esp), %esi
+	movl	%eax, (%esi)
+	movl	%ebx, 4(%esi)
+	movl	%ecx, 8(%esi)
+	movl	%edx, 12(%esi)
+	popl	%esi
 	popl	%ebx
 	ret
-	SET_SIZE(vmware_platform)
+	SET_SIZE(vmware_port)
 
 #endif /* __i386 */
 #endif /* __lint */

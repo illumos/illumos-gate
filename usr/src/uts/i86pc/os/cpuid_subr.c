@@ -22,6 +22,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -391,7 +393,7 @@ synth_amd_info(uint_t family, uint_t model, uint_t step,
 #endif
 		platform = get_hwenv();
 
-		if ((platform == HW_XEN_HVM) || (platform == HW_VMWARE)) {
+		if ((platform & HW_VIRTUAL) != 0) {
 			*skt_p = X86_SOCKET_UNKNOWN;
 		} else if (family == 0xf) {
 			*skt_p = amd_skts[rmp->rm_sktidx][model & 0x3];

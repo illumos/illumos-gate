@@ -22,6 +22,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/asm_linkage.h>
@@ -202,17 +204,21 @@ ucode_free(processorid_t id, void* buf, size_t size)
  * We also assume that we don't support a mix of Intel and
  * AMD processors in the same box.
  *
- * An i86xpv guest domain can't update the microcode.
+ * An i86xpv guest domain or VM can't update the microcode.
  */
+
+#define	XPVDOMU_OR_HVM	\
+	((hwenv == HW_XEN_PV && !is_controldom()) || (hwenv & HW_VIRTUAL) != 0)
+
 /*ARGSUSED*/
 static int
 ucode_capable_amd(cpu_t *cp)
 {
 	int hwenv = get_hwenv();
 
-	if (hwenv == HW_XEN_HVM || (hwenv == HW_XEN_PV && !is_controldom())) {
+	if (XPVDOMU_OR_HVM)
 		return (0);
-	}
+
 	return (cpuid_getfamily(cp) >= 0x10);
 }
 
@@ -221,9 +227,9 @@ ucode_capable_intel(cpu_t *cp)
 {
 	int hwenv = get_hwenv();
 
-	if (hwenv == HW_XEN_HVM || (hwenv == HW_XEN_PV && !is_controldom())) {
+	if (XPVDOMU_OR_HVM)
 		return (0);
-	}
+
 	return (cpuid_getfamily(cp) >= 6);
 }
 

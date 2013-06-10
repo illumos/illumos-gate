@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 by Delphix. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -123,6 +124,7 @@ extern "C" {
 #define	CPUID_INTC_ECX_AVX	0x10000000	/* AVX supported */
 #define	CPUID_INTC_ECX_F16C	0x20000000	/* F16C supported */
 #define	CPUID_INTC_ECX_RDRAND	0x40000000	/* RDRAND supported */
+#define	CPUID_INTC_ECX_HV	0x80000000	/* Hypervisor */
 
 #define	FMT_CPUID_INTC_ECX					\
 	"\20"							\
@@ -759,7 +761,7 @@ extern int cpuid_deep_cstates_supported(void);
 extern int cpuid_arat_supported(void);
 extern int cpuid_iepb_supported(struct cpu *);
 extern int cpuid_deadline_tsc_supported(void);
-extern int vmware_platform(void);
+extern void vmware_port(int, uint32_t *);
 #endif
 
 struct cpu_ucode_info;
@@ -820,16 +822,37 @@ extern int is_controldom(void);
 extern void xsave_setup_msr(struct cpu *);
 
 /*
+ * Hypervisor signatures
+ */
+#define	HVSIG_XEN_HVM	"XenVMMXenVMM"
+#define	HVSIG_VMWARE	"VMwareVMware"
+#define	HVSIG_KVM	"KVMKVMKVM"
+#define	HVSIG_MICROSOFT	"Microsoft Hv"
+
+/*
  * Defined hardware environments
  */
-#define	HW_NATIVE	0x00	/* Running on bare metal */
-#define	HW_XEN_PV	0x01	/* Running on Xen Hypervisor paravirutualized */
-#define	HW_XEN_HVM	0x02	/* Running on Xen hypervisor HVM */
-#define	HW_VMWARE	0x03	/* Running on VMware hypervisor */
+#define	HW_NATIVE	(1 << 0)	/* Running on bare metal */
+#define	HW_XEN_PV	(1 << 1)	/* Running on Xen PVM */
+
+#define	HW_XEN_HVM	(1 << 2)	/* Running on Xen HVM */
+#define	HW_VMWARE	(1 << 3)	/* Running on VMware hypervisor */
+#define	HW_KVM		(1 << 4)	/* Running on KVM hypervisor */
+#define	HW_MICROSOFT	(1 << 5)	/* Running on Microsoft hypervisor */
+
+#define	HW_VIRTUAL	(HW_XEN_HVM | HW_VMWARE | HW_KVM | HW_MICROSOFT)
 
 #endif	/* _KERNEL */
 
-#endif
+#endif	/* !_ASM */
+
+/*
+ * VMware hypervisor related defines
+ */
+#define	VMWARE_HVMAGIC		0x564d5868
+#define	VMWARE_HVPORT		0x5658
+#define	VMWARE_HVCMD_GETVERSION	0x0a
+#define	VMWARE_HVCMD_GETTSCFREQ	0x2d
 
 #ifdef	__cplusplus
 }
