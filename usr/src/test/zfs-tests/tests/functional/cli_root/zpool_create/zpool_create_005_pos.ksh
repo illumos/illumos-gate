@@ -103,12 +103,16 @@ do
 		[[ "$mpt" != "$mpt_val" ]] && \
 			log_fail "The value of mountpoint property is different\
 				from the output of zfs mount"
-		if [[ "$opt" == "-R $TESTDIR1" ]] || [[ "$opt" == "-m $TESTDIR1" ]];
-		then
+		if [[ "$opt" == "-m $TESTDIR1" ]]; then
 			[[ ! -d $TESTDIR1 ]] && \
 				log_fail "$TESTDIR1 is not created auotmatically."
 			[[ "$mpt" != "$TESTDIR1" ]] && \
 				log_fail "$TESTPOOL is not mounted on $TESTDIR1."
+		elif [[ "$opt" == "-R $TESTDIR1" ]]; then
+			[[ ! -d $TESTDIR1/$TESTPOOL ]] && \
+				log_fail "$TESTDIR1/$TESTPOOL is not created auotmatically."
+			[[ "$mpt" != "$TESTDIR1/$TESTPOOL" ]] && \
+				log_fail "$TESTPOOL is not mounted on $TESTDIR1/$TESTPOOL."
 		else
 			[[ ! -d ${TESTDIR1}$TESTDIR1 ]] && \
 				log_fail "${TESTDIR1}$TESTDIR1 is not created automatically."
