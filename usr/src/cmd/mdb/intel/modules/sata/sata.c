@@ -22,7 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
+/*
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #include <sys/mdb_modapi.h>
 #include <mdb/mdb_ks.h>
@@ -168,7 +170,7 @@ sata_dmsg_dump(sata_trace_dmsg_t *addr, int print_pathname, uint_t *printed)
 					(void) mdb_ddi_pathname(
 					    (uintptr_t)dmsg.dip, pathname,
 					    sizeof (pathname));
-					mdb_printf("\n[%s]", pathname);
+					mdb_printf("[%s]", pathname);
 				}
 			}
 		} else {
@@ -181,7 +183,7 @@ sata_dmsg_dump(sata_trace_dmsg_t *addr, int print_pathname, uint_t *printed)
 			    dmsg.buf);
 		}
 
-		mdb_printf("%s", merge);
+		mdb_printf("%s\n", merge);
 
 		if (printed != NULL) {
 			(*printed)++;

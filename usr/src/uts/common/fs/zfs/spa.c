@@ -26,6 +26,8 @@
  */
 
 /*
+ * SPA: Storage Pool Allocator
+ *
  * This file contains all the routines used when modifying on-disk SPA state.
  * This includes opening, importing, destroying, exporting a pool, and syncing a
  * pool.
@@ -76,6 +78,12 @@
 
 #include "zfs_prop.h"
 #include "zfs_comutil.h"
+
+/*
+ * The interval, in seconds, at which failed configuration cache file writes
+ * should be retried.
+ */
+static int zfs_ccw_retry_interval = 300;
 
 typedef enum zti_modes {
 	ZTI_MODE_FIXED,			/* value is # of threads (min 1) */
@@ -4514,6 +4522,7 @@ spa_vdev_attach(spa_t *spa, uint64_t guid, nvlist_t *nvroot, int replacing)
 
 /*
  * Detach a device from a mirror or replacing vdev.
+ *
  * If 'replace_done' is specified, only detach if the parent
  * is a replacing vdev.
  */
@@ -5168,11 +5177,9 @@ spa_vdev_remove_from_namespace(spa_t *spa, vdev_t *vd)
  * the spa_vdev_config_[enter/exit] functions which allow us to
  * grab and release the spa_config_lock while still holding the namespace
  * lock.  During each step the configuration is synced out.
- */
-
-/*
- * Remove a device from the pool.  Currently, this supports removing only hot
- * spares, slogs, and level 2 ARC devices.
+ *
+ * Currently, this supports removing only hot spares, slogs, and level 2 ARC
+ * devices.
  */
 int
 spa_vdev_remove(spa_t *spa, uint64_t guid, boolean_t unspare)
@@ -5282,7 +5289,7 @@ spa_vdev_remove(spa_t *spa, uint64_t guid, boolean_t unspare)
 
 /*
  * Find any device that's done replacing, or a vdev marked 'unspare' that's
- * current spared, so we can detach it.
+ * currently spared, so we can detach it.
  */
 static vdev_t *
 spa_vdev_resilver_done_hunt(vdev_t *vd)
@@ -5661,13 +5668,34 @@ spa_async_resume(spa_t *spa)
 	mutex_exit(&spa->spa_async_lock);
 }
 
+static boolean_t
+spa_async_tasks_pending(spa_t *spa)
+{
+	uint_t non_config_tasks;
+	uint_t config_task;
+	boolean_t config_task_suspended;
+
+	non_config_tasks = spa->spa_async_tasks & ~SPA_ASYNC_CONFIG_UPDATE;
+	config_task = spa->spa_async_tasks & SPA_ASYNC_CONFIG_UPDATE;
+	if (spa->spa_ccw_fail_time == 0) {
+		config_task_suspended = B_FALSE;
+	} else {
+		config_task_suspended =
+		    (gethrtime() - spa->spa_ccw_fail_time) <
+		    (zfs_ccw_retry_interval * NANOSEC);
+	}
+
+	return (non_config_tasks || (config_task && !config_task_suspended));
+}
+
 static void
 spa_async_dispatch(spa_t *spa)
 {
 	mutex_enter(&spa->spa_async_lock);
-	if (spa->spa_async_tasks && !spa->spa_async_suspended &&
+	if (spa_async_tasks_pending(spa) &&
+	    !spa->spa_async_suspended &&
 	    spa->spa_async_thread == NULL &&
-	    rootdir != NULL && !vn_is_readonly(rootdir))
+	    rootdir != NULL)
 		spa->spa_async_thread = thread_create(NULL, 0,
 		    spa_async_thread, spa, 0, &p0, TS_RUN, maxclsyspri);
 	mutex_exit(&spa->spa_async_lock);

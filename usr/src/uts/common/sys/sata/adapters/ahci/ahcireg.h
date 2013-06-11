@@ -23,7 +23,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
+/*
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #ifndef _AHCIREG_H
 #define	_AHCIREG_H
@@ -134,6 +136,10 @@ extern "C" {
 #define	AHCI_GLOBAL_EM_LOC(ahci_ctlp)	(AHCI_GLOBAL_OFFSET(ahci_ctlp) + 0x1c)
 	/* Enclosure Management Control */
 #define	AHCI_GLOBAL_EM_CTL(ahci_ctlp)	(AHCI_GLOBAL_OFFSET(ahci_ctlp) + 0x20)
+	/* HBA Capabilities Extended (AHCI spec 1.2) */
+#define	AHCI_GLOBAL_CAP2(ahci_ctlp)	(AHCI_GLOBAL_OFFSET(ahci_ctlp) + 0x24)
+	/* BIOS/OS Handoff Control and Status (AHCI spec 1.2) */
+#define	AHCI_GLOBAL_BOHC(ahci_ctlp)	(AHCI_GLOBAL_OFFSET(ahci_ctlp) + 0x28)
 
 #define	AHCI_PORT_IMPLEMENTED(ahci_ctlp, port)	\
 	((0x1 << port) & ahci_ctlp->ahcictl_ports_implemented)
