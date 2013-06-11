@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -1534,7 +1535,7 @@ startup_modules(void)
 	 */
 	microfind();
 
-	if (get_hwenv() == HW_XEN_HVM)
+	if ((get_hwenv() & HW_XEN_HVM) != 0)
 		update_default_path();
 #endif
 
@@ -1663,7 +1664,7 @@ startup_modules(void)
 	 * Initialize a handle for the boot cpu - others will initialize
 	 * as they startup.  Do not do this if we know we are in an HVM domU.
 	 */
-	if ((get_hwenv() != HW_XEN_HVM) &&
+	if ((get_hwenv() & HW_XEN_HVM) == 0 &&
 	    (hdl = cmi_init(CMI_HDL_NATIVE, cmi_ntv_hwchipid(CPU),
 	    cmi_ntv_hwcoreid(CPU), cmi_ntv_hwstrandid(CPU))) != NULL &&
 	    is_x86_feature(x86_featureset, X86FSET_MCA)) {
@@ -2298,7 +2299,7 @@ post_startup(void)
 		 * Startup the memory scrubber.
 		 * XXPV	This should be running somewhere ..
 		 */
-		if (get_hwenv() != HW_XEN_HVM)
+		if ((get_hwenv() & HW_VIRTUAL) == 0)
 			memscrub_init();
 #endif
 	}
