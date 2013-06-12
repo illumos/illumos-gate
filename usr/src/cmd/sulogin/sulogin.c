@@ -18,6 +18,11 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -75,6 +80,7 @@
 #include <nss_dbdefs.h>
 #include <user_attr.h>
 #include <sys/vt.h>
+#include <sys/kd.h>
 
 /*
  * Intervals to sleep after failed login
@@ -442,7 +448,7 @@ setupsigs()
 static void
 main_loop(char *devname, boolean_t cttyflag)
 {
-	int		fd, i;
+	int		fd, fb, i;
 	char		*user = NULL;		/* authorized user */
 	char		*pass;			/* password from user */
 	char		*cpass;			/* crypted password */
@@ -477,6 +483,12 @@ main_loop(char *devname, boolean_t cttyflag)
 		(void) dup2(fd, STDERR_FILENO);
 	if (fd > 2)
 		(void) close(fd);
+
+	/* Stop progress bar and reset console mode to text */
+	if ((fb = open("/dev/fb", O_RDONLY)) >= 0) {
+		(void) ioctl(fb, KDSETMODE, KD_RESETTEXT);
+		(void) close(fb);
+	}
 
 	sysmsgfd = fopen("/dev/sysmsg", "w");
 
