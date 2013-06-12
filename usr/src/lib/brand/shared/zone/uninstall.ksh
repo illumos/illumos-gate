@@ -35,31 +35,31 @@ bname=`basename $0`
 #
 # error messages
 #
-m_usage=$(gettext "Usage: %s: [-hFn]")
+m_usage="Usage: %s: [-hFn]"
 
-m_1_zfs_promote=$(gettext "promoting '%s'.")
-m_1_zfs_destroy=$(gettext "destroying '%s'.")
-m_2_zfs_rename=$(gettext "renaming '%s' to '%s'.")
-m_3_zfs_set=$(gettext "setting property %s='%s' for '%s'.")
-m_rm_r=$(gettext "recursively deleting '%s'.")
-m_rm=$(gettext "deleting '%s'.")
+m_1_zfs_promote="promoting '%s'."
+m_1_zfs_destroy="destroying '%s'."
+m_2_zfs_rename="renaming '%s' to '%s'."
+m_3_zfs_set="setting property %s='%s' for '%s'."
+m_rm_r="recursively deleting '%s'."
+m_rm="deleting '%s'."
 
-w_no_ds=$(gettext "Warning: no zonepath dataset found.")
+w_no_ds="Warning: no zonepath dataset found."
 
-f_usage_err=$(gettext "Error: invalid usage")
-f_abort=$(gettext "Error: internal error detected, aborting.")
-f_1_zfs_promote=$(gettext "Error: promoting ZFS dataset '%s'.")
-f_2_zfs_rename=$(gettext "Error: renaming ZFS dataset '%s' to '%s'.")
-f_3_zfs_set=$(gettext "Error: setting ZFS propery %s='%s' for '%s'.")
-f_1_zfs_destroy=$(gettext "Error: destroying ZFS dataset.")
-f_2_zfs_get=$(gettext "Error: reading ZFS dataset property '%s' from '%s'.")
-f_user_snap=$(gettext "Error: user snapshot(s) detected.")
-f_stray_snap=$(gettext "Error: uncloned snapshot(s) detected.")
-f_stray_clone=$(gettext "Error: cloned zone datasets found outsize of zone.")
-f_rm_snap=$(gettext "Error: please delete snapshot(s) and retry uninstall.")
-f_rm_clone=$(gettext "Error: please delete clone(s) and retry uninstall.")
-f_iu_clone=$(gettext "Error: cloned zone dataset(s) in use.")
-f_dis_clone=$(gettext "Error: please stop using clone(s) and retry uninstall.")
+f_usage_err="Error: invalid usage"
+f_abort="Error: internal error detected, aborting."
+f_1_zfs_promote="Error: promoting ZFS dataset '%s'."
+f_2_zfs_rename="Error: renaming ZFS dataset '%s' to '%s'."
+f_3_zfs_set="Error: setting ZFS propery %s='%s' for '%s'."
+f_1_zfs_destroy="Error: destroying ZFS dataset."
+f_2_zfs_get="Error: reading ZFS dataset property '%s' from '%s'."
+f_user_snap="Error: user snapshot(s) detected."
+f_stray_snap="Error: uncloned snapshot(s) detected."
+f_stray_clone="Error: cloned zone datasets found outsize of zone."
+f_rm_snap="Error: please delete snapshot(s) and retry uninstall."
+f_rm_clone="Error: please delete clone(s) and retry uninstall."
+f_iu_clone="Error: cloned zone dataset(s) in use."
+f_dis_clone="Error: please stop using clone(s) and retry uninstall."
 
 #
 # functions

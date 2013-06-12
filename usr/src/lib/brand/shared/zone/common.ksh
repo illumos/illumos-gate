@@ -1003,41 +1003,36 @@ install_image()
 	return 0
 }
 
-# Setup i18n output
-TEXTDOMAIN="SUNW_OST_OSCMD"
-export TEXTDOMAIN
-
-e_cannot_wrap=$(gettext "%s: error: wrapper file already exists")
-e_baddir=$(gettext "Invalid '%s' directory within the zone")
-e_badfile=$(gettext "Invalid '%s' file within the zone")
-e_path_abs=$(gettext "Pathname specified to -a '%s' must be absolute.")
-e_not_found=$(gettext "%s: error: file or directory not found.")
-e_install_abort=$(gettext "Installation aborted.")
-e_not_readable=$(gettext "Cannot read directory '%s'")
-e_not_dir=$(gettext "Error: must be a directory")
-e_unknown_archive=$(gettext "Error: Unknown archive format. Must be a flash archive, a cpio archive (can also be gzipped or bzipped), a pax XUSTAR archive, or a level 0 ufsdump archive.")
-e_absolute_archive=$(gettext "Error: archive contains absolute paths instead of relative paths.")
-e_mismatch_archive=$(gettext "Error: the archive top-level directory (%s) does not match the zonepath (%s).")
-e_tmpfile=$(gettext "Unable to create temporary file")
-e_root_full=$(gettext "Zonepath root %s exists and contains data; remove or move aside prior to install.")
-f_mkdir=$(gettext "Unable to create directory %s.")
-f_chmod=$(gettext "Unable to chmod directory %s.")
-f_chown=$(gettext "Unable to chown directory %s.")
-f_hwcap_info=$(gettext "HWCAP: %s\n")
-f_sanity_hwcap=$(gettext \
-"The image was created with an incompatible libc.so.1 hwcap lofs mount.\n"\
+e_cannot_wrap="%s: error: wrapper file already exists"
+e_baddir="Invalid '%s' directory within the zone"
+e_badfile="Invalid '%s' file within the zone"
+e_path_abs="Pathname specified to -a '%s' must be absolute."
+e_not_found="%s: error: file or directory not found."
+e_install_abort="Installation aborted."
+e_not_readable="Cannot read directory '%s'"
+e_not_dir="Error: must be a directory"
+e_unknown_archive="Error: Unknown archive format. Must be a flash archive, a cpio archive (can also be gzipped or bzipped), a pax XUSTAR archive, or a level 0 ufsdump archive."
+e_absolute_archive="Error: archive contains absolute paths instead of relative paths."
+e_mismatch_archive="Error: the archive top-level directory (%s) does not match the zonepath (%s)."
+e_tmpfile="Unable to create temporary file"
+e_root_full="Zonepath root %s exists and contains data; remove or move aside prior to install."
+f_mkdir="Unable to create directory %s."
+f_chmod="Unable to chmod directory %s."
+f_chown="Unable to chown directory %s."
+f_hwcap_info="HWCAP: %s\n"
+f_sanity_hwcap= "The image was created with an incompatible libc.so.1 hwcap lofs mount.\n"\
 "       The zone will not boot on this platform.  See the zone's\n"\
-"       documentation for the recommended way to create the archive.")
+"       documentation for the recommended way to create the archive."
 
-m_analyse_archive=$(gettext "Analysing the archive")
+m_analyse_archive="Analysing the archive"
 
-not_readable=$(gettext "Cannot read file '%s'")
-not_flar=$(gettext "Input is not a flash archive")
-bad_flar=$(gettext "Flash archive is a corrupt")
-bad_zfs_flar=$(gettext "Flash archive contains a ZFS send stream.\n\tRecreate the flar using the -L option with cpio or pax.")
-f_unpack_failed=$(gettext "Unpacking the archive failed")
-unknown_archiver=$(gettext "Archiver %s is not supported")
-cmd_not_exec=$(gettext "Required command '%s' not executable!")
+not_readable="Cannot read file '%s'"
+not_flar="Input is not a flash archive"
+bad_flar="Flash archive is a corrupt"
+bad_zfs_flar="Flash archive contains a ZFS send stream.\n\tRecreate the flar using the -L option with cpio or pax."
+f_unpack_failed="Unpacking the archive failed"
+unknown_archiver="Archiver %s is not supported"
+cmd_not_exec="Required command '%s' not executable!"
 
 #
 # Exit values used by the script, as #defined in <sys/zone.h>
