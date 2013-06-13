@@ -23,6 +23,7 @@
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 David Hoeppner. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -621,7 +622,7 @@ ks_instances_read(kstat_ctl_t *kc)
 		skip = B_TRUE;
 		selector = list_head(&selector_list);
 		while (selector != NULL) {
-			if (ks_match(kp->ks_module, &selector->ks_module) ||
+			if (ks_match(kp->ks_module, &selector->ks_module) &&
 			    ks_match(kp->ks_name, &selector->ks_name)) {
 				skip = B_FALSE;
 				break;
