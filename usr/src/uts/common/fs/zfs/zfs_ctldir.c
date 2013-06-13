@@ -505,6 +505,11 @@ static const fs_operation_def_t zfsctl_tops_root[] = {
 	{ NULL }
 };
 
+/*
+ * Gets the full dataset name that corresponds to the given snapshot name
+ * Example:
+ * 	zfsctl_snapshot_zname("snap1") -> "mypool/myfs@snap1"
+ */
 static int
 zfsctl_snapshot_zname(vnode_t *vp, const char *name, int len, char *zname)
 {
@@ -1046,6 +1051,7 @@ zfsctl_shares_readdir(vnode_t *vp, uio_t *uiop, cred_t *cr, int *eofp,
 
 /*
  * pvp is the '.zfs' directory (zfsctl_node_t).
+ *
  * Creates vp, which is '.zfs/snapshot' (zfsctl_snapdir_t).
  *
  * This function is the callback to create a GFS vnode for '.zfs/snapshot'

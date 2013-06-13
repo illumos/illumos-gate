@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright (c) 2013 Steven Hartland. All rights reserved.
  */
 
 /*
@@ -203,7 +204,7 @@ snapshot_hold(char *volname, char *snapname, char *jname, boolean_t recursive)
 	}
 
 	p = strchr(snapname, '@') + 1;
-	if (zfs_hold(zhp, p, jname, recursive, B_FALSE, cleanup_fd) != 0) {
+	if (zfs_hold(zhp, p, jname, recursive, cleanup_fd) != 0) {
 		NDMP_LOG(LOG_ERR, "Cannot hold snapshot %s", p);
 		zfs_close(zhp);
 		return (-1);

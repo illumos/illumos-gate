@@ -238,8 +238,9 @@ struct spa {
 	uint64_t	spa_deadman_synctime;	/* deadman expiration timer */
 	kmutex_t	spa_iokstat_lock;	/* protects spa_iokstat_* */
 	struct kstat	*spa_iokstat;		/* kstat of io to this pool */
+	hrtime_t	spa_ccw_fail_time;	/* Conf cache write fail time */
 	/*
-	 * spa_refcnt & spa_config_lock must be the last elements
+	 * spa_refcount & spa_config_lock must be the last elements
 	 * because refcount_t changes size based on compilation options.
 	 * In order for the MDB module to function correctly, the other
 	 * fields must remain in the same location.
