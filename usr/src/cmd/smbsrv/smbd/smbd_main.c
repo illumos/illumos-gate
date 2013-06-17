@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -476,7 +476,9 @@ smbd_service_init(void)
 	smbd_dyndns_init();
 	smb_ipc_init();
 
-	if (smb_netbios_start() != 0)
+	if (smb_config_getbool(SMB_CI_NETBIOS_ENABLE) == 0)
+		smbd_report("NetBIOS services disabled");
+	else if (smb_netbios_start() != 0)
 		smbd_report("NetBIOS services failed to start");
 	else
 		smbd_report("NetBIOS services started");

@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_LIBSMB_H
@@ -130,6 +130,7 @@ typedef enum {
 	SMB_CI_SYNC_ENABLE,
 
 	SMB_CI_SECURITY,
+	SMB_CI_NETBIOS_ENABLE,
 	SMB_CI_NBSCOPE,
 	SMB_CI_SYS_CMNT,
 	SMB_CI_LM_LEVEL,
@@ -150,6 +151,7 @@ typedef enum {
 	SMB_CI_DISPOSITION,
 	SMB_CI_DFS_STDROOT_NUM,
 	SMB_CI_TRAVERSE_MOUNTS,
+
 	SMB_CI_MAX
 } smb_cfg_id_t;
 

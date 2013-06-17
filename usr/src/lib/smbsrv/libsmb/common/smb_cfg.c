@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -108,6 +108,7 @@ static smb_cfg_param_t smb_cfg_table[] =
 
 	/* SMBd configuration */
 	{SMB_CI_SECURITY, "security", SCF_TYPE_ASTRING, 0},
+	{SMB_CI_NETBIOS_ENABLE, "netbios_enable", SCF_TYPE_BOOLEAN, 0},
 	{SMB_CI_NBSCOPE, "netbios_scope", SCF_TYPE_ASTRING, 0},
 	{SMB_CI_SYS_CMNT, "system_comment", SCF_TYPE_ASTRING, 0},
 	{SMB_CI_LM_LEVEL, "lmauth_level", SCF_TYPE_INTEGER, 0},

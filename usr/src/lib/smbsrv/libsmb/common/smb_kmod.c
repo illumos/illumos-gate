@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -85,6 +85,7 @@ smb_kmod_setcfg(smb_kmod_cfg_t *cfg)
 	ioc.sync_enable = cfg->skc_sync_enable;
 	ioc.secmode = cfg->skc_secmode;
 	ioc.ipv6_enable = cfg->skc_ipv6_enable;
+	ioc.netbios_enable = cfg->skc_netbios_enable;
 	ioc.print_enable = cfg->skc_print_enable;
 	ioc.traverse_mounts = cfg->skc_traverse_mounts;
 	ioc.exec_flags = cfg->skc_execflags;

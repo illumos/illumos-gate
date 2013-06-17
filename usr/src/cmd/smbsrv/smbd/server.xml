@@ -22,7 +22,7 @@ information: Portions Copyright [yyyy] [name of copyright owner]
 CDDL HEADER END
 
 Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
-Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 
 NOTE:  This service manifest is not editable; its contents will
 be overwritten by package or patch operations, including
@@ -188,6 +188,8 @@ file.
 			value='false' override='true'/>
 		<propval name='security' type='astring'
 			value='workgroup' override='true'/>
+		<propval name='netbios_enable' type='boolean'
+			value='false' override='true'/>
 		<propval name='netbios_scope' type='astring'
 			value='' override='true'/>
 		<propval name='system_comment' type='astring'

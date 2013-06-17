@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -631,12 +631,11 @@ smb_server_start(smb_ioc_start_t *ioc)
 			family = AF_INET6;
 		smb_server_listener_init(sv, &sv->sv_tcp_daemon,
 		    "smb_tcp_listener", IPPORT_SMB, family);
-		rc = smb_server_listener_start(&sv->sv_nbt_daemon);
-		if (rc != 0)
-			break;
 		rc = smb_server_listener_start(&sv->sv_tcp_daemon);
 		if (rc != 0)
 			break;
+		if (sv->sv_cfg.skc_netbios_enable)
+			(void) smb_server_listener_start(&sv->sv_nbt_daemon);
 
 		sv->sv_state = SMB_SERVER_STATE_RUNNING;
 		sv->sv_start_time = gethrtime();
@@ -1481,6 +1480,13 @@ smb_server_listener_init(
 static void
 smb_server_listener_destroy(smb_listener_daemon_t *ld)
 {
+	/*
+	 * Note that if startup fails early, we can legitimately
+	 * get here with an all-zeros object.
+	 */
+	if (ld->ld_magic == 0)
+		return;
+
 	SMB_LISTENER_VALID(ld);
 	ASSERT(ld->ld_so == NULL);
 	smb_thread_destroy(&ld->ld_thread);
@@ -1902,6 +1908,7 @@ smb_server_store_cfg(smb_server_t *sv, smb_ioc_cfg_t *ioc)
 	sv->sv_cfg.skc_ipv6_enable = ioc->ipv6_enable;
 	sv->sv_cfg.skc_print_enable = ioc->print_enable;
 	sv->sv_cfg.skc_traverse_mounts = ioc->traverse_mounts;
+	sv->sv_cfg.skc_netbios_enable = ioc->netbios_enable;
 	sv->sv_cfg.skc_execflags = ioc->exec_flags;
 	sv->sv_cfg.skc_version = ioc->version;
 	(void) strlcpy(sv->sv_cfg.skc_nbdomain, ioc->nbdomain,

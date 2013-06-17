@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SMB_IOCTL_H_
@@ -160,6 +160,7 @@ typedef struct smb_ioc_cfg {
 	int32_t		ipv6_enable;
 	int32_t		print_enable;
 	int32_t		traverse_mounts;
+	int32_t		netbios_enable;
 	uint32_t	exec_flags;
 	smb_version_t	version;
 	char		nbdomain[NETBIOS_NAME_SZ];
