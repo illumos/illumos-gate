@@ -320,8 +320,9 @@ smb_trans2_rename(smb_request_t *sr, smb_node_t *node, char *fname, int flags)
 static int
 smb_common_rename(smb_request_t *sr, smb_fqi_t *src_fqi, smb_fqi_t *dst_fqi)
 {
-	smb_node_t *src_fnode, *src_dnode, *dst_fnode, *dst_dnode;
-	smb_node_t *tnode;
+	smb_node_t *src_fnode, *src_dnode, *dst_dnode;
+	smb_node_t *dst_fnode = 0;
+	smb_node_t *tnode = 0;
 	int rc, count;
 	DWORD status;
 	char *new_name, *path;

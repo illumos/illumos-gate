@@ -1,0 +1,26 @@
+
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
+
+# set -o emacs
+
+setenv SMBD_DOOR_NAME /tmp/fksmbd_door
+setenv SMB_SHARE_DNAME /tmp/fksmbshare_door
+
+# fksmbd is always 32-bit
+setenv LD_LIBRARY_PATH ${ROOT}/usr/lib/smbsrv:${ROOT}/usr/lib:${ROOT}/lib
+
+echo 'Do one of: attach ${PID}'
+echo 'or: debug ${ROOT}/usr/lib/smbsrv/fksmbd'

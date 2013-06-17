@@ -1,0 +1,69 @@
+
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
+
+This directory builds a program linking all of the SMB server code
+into a user-level process.  The result is not a fully functional
+SMB server but is very useful for some kinds of development work.
+
+The architecture of this roughly parallels the in-kernel version,
+where the fksmbd program corresponds to the real smbd, the library
+libfksmbsrv corresponds to the smbsrv kernel module, and all the
+required kernel interfaces are simulated in libfakekernel.
+
+Just as with the kernel code, there are mdb modules that know
+how to walk data structures in libfksmbsrv, etc.
+
+For debugging, etc. it's easiest to run this as a normal user,
+i.e. yourself (not root); but before you can do that, there are
+some prerequisites to take care of:
+
+  a: Install ../bind-helper in /usr/lib/smbsrv/.
+     It needs to be either setuid root (easiest) or added to
+     the exec_attr as described in the top of bind-helper.c
+     (This must be in /usr/lib/smbsrv, not the proto area.)
+
+  b: Setup an SMB account for guest, i.e.
+     Add pam_smb_passwd.so.1 to pam.conf if not already there
+     (other password required pam_smb_passwd.so.1 nowarn)
+     % useradd guest
+     % smbadm enable-user guest
+     % passwd guest    (sets the SMB p/w hash too)
+     Make sure guest shows in /var/smb/smbpasswd
+
+  c: chown/chmod the directories: /var/smb /var/run/smb
+     to yourself, mode 755.  Reboot will chown these
+     back to root, so repeat this after a reboot.
+
+Now you can run fksmbd from the proto area using this script:
+  ./Run.sh -df
+
+You can also run it under dbx (see the .dbxrc file).
+To run it under mdb (with mdb modules build here):
+  mdb -L $ROOT/usr/lib/mdb/proc:/usr/lib/mdb/proc ...
+where ... is one of: fksmbd, core.nnn, -p $PID
+
+There are also a couple dtrace scripts in here for watching
+either all activity or only selected areas.  (see *.d)
+Run these like:  dtrace -s Watch-all.d -p $PID -o output
+
+
+Here are a couple simple, handy tests you can try:
+
+smbclient -L localhost -U guest%guest
+
+smbclient //localhost/test -U guest%guest -c dir
+
+smbtorture //localhost/test -U guest%guest base

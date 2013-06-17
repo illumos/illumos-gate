@@ -38,13 +38,14 @@ extern "C" {
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/debug.h>
+#include <sys/kmem.h>
 #include <sys/socket.h>
-#include <sys/strsubr.h>
-#include <sys/socketvar.h>
 #include <sys/ksocket.h>
 #include <sys/cred.h>
 #include <sys/nbmlock.h>
 #include <sys/sunddi.h>
+#include <sys/atomic.h>
 #include <smbsrv/smb.h>
 #include <smbsrv/string.h>
 #include <smbsrv/smb_vops.h>
@@ -52,6 +53,24 @@ extern "C" {
 #include <smbsrv/smb_token.h>
 #include <smbsrv/smb_ktypes.h>
 #include <smbsrv/smb_ioctl.h>
+
+/*
+ * DTrace SDT probes have different signatures in userland than they do in
+ * kernel.  If they're being used in kernel code, re-define them out of
+ * existence for their counterparts in libfksmbsrv
+ */
+#ifndef	_KERNEL
+#undef	DTRACE_SMB_1
+#define	DTRACE_SMB_1(a, b, c)			((void)c)
+#undef	DTRACE_SMB_2
+#define	DTRACE_SMB_2(a, b, c, d, e)		((void)c, (void)e)
+#undef	DTRACE_PROBE1
+#define	DTRACE_PROBE1(a, b, c)			((void)c)
+#undef	DTRACE_PROBE2
+#define	DTRACE_PROBE2(a, b, c, d, e)		((void)c, (void)e)
+#undef	DTRACE_PROBE3
+#define	DTRACE_PROBE3(a, b, c, d, e, f, g)	((void)c, (void)e, (void)g)
+#endif	/* _KERNEL */
 
 extern	int smb_maxbufsize;
 extern	int smb_flush_required;
@@ -368,6 +387,8 @@ void smb_opipe_door_init(smb_server_t *);
 void smb_opipe_door_fini(smb_server_t *);
 int smb_opipe_door_open(smb_server_t *, int);
 void smb_opipe_door_close(smb_server_t *);
+int smb_opipe_door_call(smb_opipe_t *);
+void fksmb_opipe_door_open(smb_server_t *, void *);
 
 void smb_kdoor_init(smb_server_t *);
 void smb_kdoor_fini(smb_server_t *);
@@ -375,6 +396,7 @@ int smb_kdoor_open(smb_server_t *, int);
 void smb_kdoor_close(smb_server_t *);
 int smb_kdoor_upcall(smb_server_t *, uint32_t,
 	void *, xdrproc_t, void *, xdrproc_t);
+void fksmb_kdoor_open(smb_server_t *, void *);
 
 /*
  * SMB server functions (file smb_server.c)
@@ -521,8 +543,7 @@ int smb_try_grow(smb_request_t *sr, int64_t new_size);
 unsigned short smb_worker_getnum();
 
 /* SMB signing routines smb_signing.c */
-void smb_sign_g_init(void);
-void smb_sign_init(smb_request_t *, smb_session_key_t *, char *, int);
+int smb_sign_begin(smb_request_t *, smb_token_t *);
 int smb_sign_check_request(smb_request_t *);
 int smb_sign_check_secondary(smb_request_t *, unsigned int);
 void smb_sign_reply(smb_request_t *, mbuf_chain_t *);
@@ -650,6 +671,8 @@ void smb_user_netinfo_init(smb_user_t *, smb_netuserinfo_t *);
 void smb_user_netinfo_fini(smb_netuserinfo_t *);
 int smb_user_netinfo_encode(smb_user_t *, uint8_t *, size_t, uint32_t *);
 smb_token_t *smb_get_token(smb_session_t *, smb_logon_t *);
+cred_t *smb_cred_create(smb_token_t *);
+void smb_user_setcred(smb_user_t *, cred_t *, uint32_t);
 
 /*
  * SMB tree functions (file smb_tree.c)
@@ -824,9 +847,12 @@ char *smb_srm_strdup(smb_request_t *, const char *);
 void smb_export_start(smb_server_t *);
 void smb_export_stop(smb_server_t *);
 
-door_handle_t smb_kshare_door_init(int);
-void smb_kshare_door_fini(door_handle_t);
-int smb_kshare_upcall(door_handle_t, void *, boolean_t);
+#ifdef	_KERNEL
+struct __door_handle;
+struct __door_handle *smb_kshare_door_init(int);
+void smb_kshare_door_fini(struct __door_handle *);
+int smb_kshare_upcall(struct __door_handle *, void *, boolean_t);
+#endif	/* _KERNEL */
 
 void smb_kshare_g_init(void);
 void smb_kshare_g_fini(void);

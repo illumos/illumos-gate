@@ -403,7 +403,7 @@ C99MODE=	$(C99_DISABLE)
 C99LMODE=	$(C99MODE:-xc99%=-Xc99%)
 
 # In most places, assignments to these macros should be appended with +=
-# (CPPFLAGS.master allows values to be prepended to CPPFLAGS).
+# (CPPFLAGS.first allows values to be prepended to CPPFLAGS).
 sparc_CFLAGS=	$(sparc_XARCH) $(CCSTATICSYM)
 sparcv9_CFLAGS=	$(sparcv9_XARCH) -dalign $(CCVERBOSE) $(V9ABIWARN) $(CCREGSYM) \
 		$(CCSTATICSYM)
@@ -551,13 +551,14 @@ NATIVE_CFLAGS=	$(COPTFLAG) $($(NATIVE_MACH)_CFLAGS) $(CCMODE) \
 
 DTEXTDOM=-DTEXT_DOMAIN=\"$(TEXT_DOMAIN)\"	# For messaging.
 DTS_ERRNO=-D_TS_ERRNO
+CPPFLAGS.first=	# Please keep empty.  Only lower makefiles should set this.
 CPPFLAGS.master=$(DTEXTDOM) $(DTS_ERRNO) \
 	$(ENVCPPFLAGS1) $(ENVCPPFLAGS2) $(ENVCPPFLAGS3) $(ENVCPPFLAGS4) \
 	$(ADJUNCT_PROTO:%=-I%/usr/include)
 CPPFLAGS.native=$(ENVCPPFLAGS1) $(ENVCPPFLAGS2) $(ENVCPPFLAGS3) \
 		$(ENVCPPFLAGS4) -I$(NATIVE_ADJUNCT)/include
-CPPFLAGS=	$(CPPFLAGS.master)
-AS_CPPFLAGS=	$(CPPFLAGS.master)
+CPPFLAGS=	$(CPPFLAGS.first) $(CPPFLAGS.master)
+AS_CPPFLAGS=	$(CPPFLAGS.first) $(CPPFLAGS.master)
 JAVAFLAGS=	-source 1.6 -target 1.6 -Xlint:deprecation,-options
 
 #

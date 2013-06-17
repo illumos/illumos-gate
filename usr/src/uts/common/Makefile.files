@@ -1195,10 +1195,11 @@ SMBSRV_OBJS +=	$(SMBSRV_SHARED_OBJS)			\
 		smb_flush.o				\
 		smb_fsinfo.o				\
 		smb_fsops.o				\
+		smb_idmap.o				\
 		smb_init.o				\
 		smb_kdoor.o				\
 		smb_kshare.o				\
-                smb_kutil.o				\
+		smb_kutil.o				\
 		smb_lock.o				\
 		smb_lock_byte_range.o			\
 		smb_locking_andx.o			\
@@ -1209,17 +1210,18 @@ SMBSRV_OBJS +=	$(SMBSRV_SHARED_OBJS)			\
 		smb_negotiate.o				\
 		smb_net.o				\
 		smb_node.o				\
-                smb_nt_cancel.o				\
+		smb_nt_cancel.o				\
 		smb_nt_create_andx.o			\
-                smb_nt_transact_create.o		\
+		smb_nt_transact_create.o		\
 		smb_nt_transact_ioctl.o			\
 		smb_nt_transact_notify_change.o		\
 		smb_nt_transact_quota.o			\
 		smb_nt_transact_security.o		\
-                smb_odir.o				\
+		smb_odir.o				\
 		smb_ofile.o				\
 		smb_open_andx.o				\
 		smb_opipe.o				\
+		smb_opipe_door.o			\
 		smb_oplock.o				\
 		smb_pathname.o				\
 		smb_print.o				\
@@ -1233,8 +1235,10 @@ SMBSRV_OBJS +=	$(SMBSRV_SHARED_OBJS)			\
 		smb_session.o				\
 		smb_session_setup_andx.o		\
 		smb_set_fileinfo.o			\
+		smb_sign_kcf.o				\
 		smb_signing.o				\
-                smb_tree.o				\
+		smb_thread.o				\
+		smb_tree.o				\
 		smb_trans2_create_directory.o		\
 		smb_trans2_dfs.o			\
 		smb_trans2_find.o			\

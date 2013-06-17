@@ -19,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -31,6 +31,10 @@
 #include <sys/door.h>
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_door.h>
+
+#ifdef	_FAKE_KERNEL
+#error	"See libfksmbsrv"
+#endif	/* _FAKE_KERNEL */
 
 static int smb_kdoor_send(smb_server_t *, smb_doorarg_t *);
 static int smb_kdoor_receive(smb_server_t *, smb_doorarg_t *);

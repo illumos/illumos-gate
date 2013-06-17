@@ -40,10 +40,11 @@ static int smb_fsop_create_stream(smb_request_t *, cred_t *, smb_node_t *,
 static int smb_fsop_create_file(smb_request_t *, cred_t *, smb_node_t *,
     char *, int, smb_attr_t *, smb_node_t **);
 
+#ifdef	_KERNEL
 static int smb_fsop_create_with_sd(smb_request_t *, cred_t *, smb_node_t *,
     char *, smb_attr_t *, smb_node_t **, smb_fssd_t *);
-
 static int smb_fsop_sdinherit(smb_request_t *, smb_node_t *, smb_fssd_t *);
+#endif	/* _KERNEL */
 
 /*
  * The smb_fsop_* functions have knowledge of CIFS semantics.
@@ -116,6 +117,7 @@ smb_fsop_close(smb_node_t *node, int mode, cred_t *cred)
 	smb_vop_close(node->vp, mode, cred);
 }
 
+#ifdef	_KERNEL
 static int
 smb_fsop_create_with_sd(smb_request_t *sr, cred_t *cr,
     smb_node_t *dnode, char *name,
@@ -262,6 +264,7 @@ smb_fsop_create_with_sd(smb_request_t *sr, cred_t *cr,
 
 	return (rc);
 }
+#endif	/* _KERNEL */
 
 /*
  * smb_fsop_create
@@ -442,10 +445,12 @@ smb_fsop_create_file(smb_request_t *sr, cred_t *cr,
 {
 	smb_arg_open_t	*op = &sr->sr_open;
 	vnode_t		*vp;
+	int		rc;
+
+#ifdef	_KERNEL
 	smb_fssd_t	fs_sd;
 	uint32_t	secinfo;
 	uint32_t	status;
-	int		rc = 0;
 
 	if (op->sd) {
 		/*
@@ -477,7 +482,9 @@ smb_fsop_create_file(smb_request_t *sr, cred_t *cr,
 		}
 
 		smb_fssd_term(&fs_sd);
-	} else {
+	} else
+#endif	/* _KERNEL */
+	{
 		/*
 		 * No incoming SD and filesystem is not ZFS
 		 * let the filesystem handles the inheritance.
@@ -498,7 +505,7 @@ smb_fsop_create_file(smb_request_t *sr, cred_t *cr,
 	}
 
 	if (rc == 0)
-		smb_node_notify_parents(dnode);
+		smb_node_notify_change(dnode, FILE_ACTION_ADDED, name);
 
 	return (rc);
 }
@@ -529,10 +536,14 @@ smb_fsop_mkdir(
 	char *longname;
 	vnode_t *vp;
 	int flags = 0;
+	int rc;
+
+#ifdef	_KERNEL
 	smb_fssd_t fs_sd;
 	uint32_t secinfo;
 	uint32_t status;
-	int rc;
+#endif	/* _KERNEL */
+
 	ASSERT(cr);
 	ASSERT(dnode);
 	ASSERT(dnode->n_magic == SMB_NODE_MAGIC);
@@ -581,6 +592,7 @@ smb_fsop_mkdir(
 	if (SMB_TREE_IS_CASEINSENSITIVE(sr))
 		flags = SMB_IGNORE_CASE;
 
+#ifdef	_KERNEL
 	if (op->sd) {
 		/*
 		 * SD sent by client in Windows format. Needs to be
@@ -612,7 +624,9 @@ smb_fsop_mkdir(
 
 		smb_fssd_term(&fs_sd);
 
-	} else {
+	} else
+#endif	/* _KERNEL */
+	{
 		rc = smb_vop_mkdir(dnode->vp, name, attr, &vp, flags, cr,
 		    NULL);
 
@@ -628,7 +642,7 @@ smb_fsop_mkdir(
 	}
 
 	if (rc == 0)
-		smb_node_notify_parents(dnode);
+		smb_node_notify_change(dnode, FILE_ACTION_ADDED, name);
 
 	return (rc);
 }
@@ -749,11 +763,11 @@ smb_fsop_remove(
 				rc = smb_vop_remove(dnode->vp, longname,
 				    flags, cr);
 			}
-
-			if (rc == 0)
-				smb_node_notify_parents(dnode);
-
 			kmem_free(longname, MAXNAMELEN);
+		}
+		if (rc == 0) {
+			smb_node_notify_change(dnode,
+			    FILE_ACTION_REMOVED, name);
 		}
 	}
 
@@ -894,7 +908,7 @@ smb_fsop_rmdir(
 	}
 
 	if (rc == 0)
-		smb_node_notify_parents(dnode);
+		smb_node_notify_change(dnode, FILE_ACTION_REMOVED, name);
 
 	return (rc);
 }
@@ -1025,8 +1039,8 @@ smb_fsop_link(smb_request_t *sr, cred_t *cr, smb_node_t *from_fnode,
 
 	rc = smb_vop_link(to_dnode->vp, from_fnode->vp, to_name, flags, cr);
 
-	if ((rc == 0) && from_fnode->n_dnode)
-		smb_node_notify_parents(from_fnode->n_dnode);
+	if (rc == 0)
+		smb_node_notify_change(to_dnode, FILE_ACTION_ADDED, to_name);
 
 	return (rc);
 }
@@ -1161,8 +1175,19 @@ smb_fsop_rename(
 	}
 	VN_RELE(from_vp);
 
-	if (rc == 0)
-		smb_node_notify_parents(from_dnode);
+	if (rc == 0) {
+		if (from_dnode == to_dnode) {
+			smb_node_notify_change(from_dnode,
+			    FILE_ACTION_RENAMED_OLD_NAME, from_name);
+			smb_node_notify_change(to_dnode,
+			    FILE_ACTION_RENAMED_NEW_NAME, to_name);
+		} else {
+			smb_node_notify_change(from_dnode,
+			    FILE_ACTION_REMOVED, from_name);
+			smb_node_notify_change(to_dnode,
+			    FILE_ACTION_ADDED, to_name);
+		}
+	}
 
 	/* XXX: unlock */
 
@@ -2337,6 +2362,7 @@ smb_fsop_sdwrite(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	return (error);
 }
 
+#ifdef	_KERNEL
 /*
  * smb_fsop_sdinherit
  *
@@ -2404,6 +2430,7 @@ smb_fsop_sdinherit(smb_request_t *sr, smb_node_t *dnode, smb_fssd_t *fs_sd)
 
 	return (0);
 }
+#endif	/* _KERNEL */
 
 /*
  * smb_fsop_eaccess

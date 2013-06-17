@@ -39,13 +39,12 @@
 #include <smbsrv/smb_xdr.h>
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/smb_ioctl.h>
-#include <smbsrv/smb_ioctl.h>
 #include <smbsrv/libsmb.h>
 
 #define	SMBDRV_DEVICE_PATH		"/dev/smbsrv"
 #define	SMB_IOC_DATA_SIZE		(256 * 1024)
 
-static int smb_kmod_ioctl(int, smb_ioc_header_t *, uint32_t);
+int smb_kmod_ioctl(int, smb_ioc_header_t *, uint32_t);
 
 
 int	smbdrv_fd = -1;
@@ -444,7 +443,11 @@ smb_kmod_unbind(void)
 	}
 }
 
-static int
+/*
+ * Note: The user-space smbd-d provides it own version of this function
+ * which directly calls the "kernel" module code (in user space).
+ */
+int
 smb_kmod_ioctl(int cmd, smb_ioc_header_t *ioc, uint32_t len)
 {
 	int rc = EINVAL;

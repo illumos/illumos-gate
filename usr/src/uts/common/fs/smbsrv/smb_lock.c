@@ -595,7 +595,7 @@ smb_lock_range_lckrules(
 static clock_t
 smb_lock_wait(smb_request_t *sr, smb_lock_t *b_lock, smb_lock_t *c_lock)
 {
-	clock_t		rc;
+	clock_t		rc = 0;
 
 	ASSERT(sr->sr_awaiting == NULL);
 

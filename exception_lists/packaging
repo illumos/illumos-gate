@@ -752,14 +752,37 @@ usr/include/sys/srn.h
 usr/include/smb
 usr/include/smbsrv
 #
+# Private/Internal libraries for smbsrv in user space
+#
+usr/include/libfakekernel
+usr/lib/libfakekernel.so
+usr/lib/libfakekernel.so.1
+usr/lib/llib-lfakekernel
+usr/lib/llib-lfakekernel.ln
+usr/lib/amd64/llib-lfakekernel.ln		i386
+usr/lib/sparcv9/llib-lfakekernel.ln		sparc
+usr/lib/amd64/libfakekernel.so			i386
+usr/lib/amd64/libfakekernel.so.1		i386
+usr/lib/sparcv9/libfakekernel.so		sparc
+usr/lib/sparcv9/libfakekernel.so.1		sparc
+#
 # Private/Internal dtrace scripts of smbsrv. Do not ship.
 #
 usr/lib/smbsrv/dtrace
 #
-# Private/Internal (lint) libraries of smbsrv. Do not ship.
+# Private/Internal libraries of smbsrv. Do not ship.
 #
+usr/lib/mdb/proc/libfksmbsrv.so
+usr/lib/mdb/proc/amd64/libfksmbsrv.so		i386
+usr/lib/mdb/proc/sparcv9/libfksmbsrv.so		sparc
 usr/lib/reparse/llib-lreparse_smb
 usr/lib/reparse/llib-lreparse_smb.ln
+usr/lib/smbsrv/bind-helper
+usr/lib/smbsrv/fksmbd
+usr/lib/smbsrv/libfksmbsrv.so
+usr/lib/smbsrv/libfksmbsrv.so.1
+usr/lib/smbsrv/llib-lfksmbsrv
+usr/lib/smbsrv/llib-lfksmbsrv.ln
 usr/lib/smbsrv/llib-lmlrpc
 usr/lib/smbsrv/llib-lmlrpc.ln
 usr/lib/smbsrv/llib-lmlsvc

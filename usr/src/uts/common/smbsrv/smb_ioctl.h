@@ -89,6 +89,10 @@ typedef	struct smb_ioc_start {
 	int		opipe;
 	int		lmshrd;
 	int		udoor;
+	/* These are used only by libfksmbsrv */
+	void		*opipe_func;
+	void		*lmshr_func;
+	void		*udoor_func;
 } smb_ioc_start_t;
 
 typedef	struct smb_ioc_event {
@@ -185,6 +189,12 @@ typedef union smb_ioc {
 } smb_ioc_t;
 
 uint32_t smb_crc_gen(uint8_t *, size_t);
+
+/* fksmbd (init,open,close,ioctl) calls into libfksmbsrv */
+int fksmbsrv_drv_open(void);
+int fksmbsrv_drv_close(void);
+int fksmbsrv_drv_ioctl(int cmd, void *arg);
+void fksmbsrv_drv_load(void);
 
 #ifdef __cplusplus
 }

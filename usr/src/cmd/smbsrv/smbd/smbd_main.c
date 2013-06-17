@@ -58,6 +58,7 @@
 #include <smbsrv/libmlsvc.h>
 #include "smbd.h"
 
+#define	SECSPERMIN			60
 #define	SMBD_ONLINE_WAIT_INTERVAL	10
 #define	SMBD_REFRESH_INTERVAL		10
 #define	SMB_DBDIR "/var/smb"
@@ -75,9 +76,6 @@ static void smbd_service_fini(void);
 
 static int smbd_setup_options(int argc, char *argv[]);
 static void smbd_usage(FILE *fp);
-static void smbd_report(const char *fmt, ...);
-
-static void smbd_sig_handler(int sig);
 
 static int32_t smbd_gmtoff(void);
 static void smbd_localtime_init(void);
@@ -85,24 +83,11 @@ static void *smbd_localtime_monitor(void *arg);
 
 static void smbd_dyndns_init(void);
 static void smbd_load_shares(void);
+static void *smbd_share_loader(void *);
 
-static int smbd_refresh_init(void);
-static void smbd_refresh_fini(void);
-static void *smbd_refresh_monitor(void *);
+static void smbd_refresh_handler(void);
 
 static int smbd_kernel_start(void);
-
-static pthread_cond_t refresh_cond;
-static pthread_mutex_t refresh_mutex;
-
-/*
- * Mutex to ensure that smbd_service_fini() and smbd_service_init()
- * are atomic w.r.t. one another.  Otherwise, if a shutdown begins
- * before initialization is complete, resources can get deallocated
- * while initialization threads are still using them.
- */
-static mutex_t smbd_service_mutex;
-static cond_t smbd_service_cv;
 
 smbd_t smbd;
 
@@ -112,14 +97,16 @@ smbd_t smbd;
 int
 main(int argc, char *argv[])
 {
-	struct sigaction	act;
 	sigset_t		set;
 	uid_t			uid;
 	int			pfd = -1;
-	uint_t			sigval;
+	int			sigval;
 	struct rlimit		rl;
 	int			orig_limit;
 
+#ifdef	FKSMBD
+	fksmbd_init();
+#endif
 	smbd.s_pname = basename(argv[0]);
 	openlog(smbd.s_pname, LOG_PID | LOG_NOWAIT, LOG_DAEMON);
 
@@ -127,8 +114,16 @@ main(int argc, char *argv[])
 		return (SMF_EXIT_ERR_FATAL);
 
 	if ((uid = getuid()) != smbd.s_uid) {
+#ifdef	FKSMBD
+		/* Can't manipulate privileges in daemonize. */
+		if (smbd.s_fg == 0) {
+			smbd.s_fg = 1;
+			smbd_report("user %d (forced -f)", uid);
+		}
+#else	/* FKSMBD */
 		smbd_report("user %d: %s", uid, strerror(EPERM));
 		return (SMF_EXIT_ERR_FATAL);
+#endif	/* FKSMBD */
 	}
 
 	if (is_system_labeled()) {
@@ -152,31 +147,22 @@ main(int argc, char *argv[])
 			    " from %d to %d", orig_limit, rl.rlim_cur);
 	}
 
-	(void) sigfillset(&set);
-	(void) sigdelset(&set, SIGABRT);
+	/*
+	 * Block async signals in all threads.
+	 */
+	(void) sigemptyset(&set);
 
-	(void) sigfillset(&act.sa_mask);
-	act.sa_handler = smbd_sig_handler;
-	act.sa_flags = 0;
+	(void) sigaddset(&set, SIGHUP);
+	(void) sigaddset(&set, SIGINT);
+	(void) sigaddset(&set, SIGQUIT);
+	(void) sigaddset(&set, SIGPIPE);
+	(void) sigaddset(&set, SIGTERM);
+	(void) sigaddset(&set, SIGUSR1);
+	(void) sigaddset(&set, SIGUSR2);
 
-	(void) sigaction(SIGABRT, &act, NULL);
-	(void) sigaction(SIGTERM, &act, NULL);
-	(void) sigaction(SIGHUP, &act, NULL);
-	(void) sigaction(SIGINT, &act, NULL);
-	(void) sigaction(SIGPIPE, &act, NULL);
-	(void) sigaction(SIGUSR1, &act, NULL);
-
-	(void) sigdelset(&set, SIGTERM);
-	(void) sigdelset(&set, SIGHUP);
-	(void) sigdelset(&set, SIGINT);
-	(void) sigdelset(&set, SIGPIPE);
-	(void) sigdelset(&set, SIGUSR1);
+	(void) sigprocmask(SIG_SETMASK, &set, NULL);
 
 	if (smbd.s_fg) {
-		(void) sigdelset(&set, SIGTSTP);
-		(void) sigdelset(&set, SIGTTIN);
-		(void) sigdelset(&set, SIGTTOU);
-
 		if (smbd_service_init() != 0) {
 			smbd_report("service initialization failed");
 			exit(SMF_EXIT_ERR_FATAL);
@@ -198,27 +184,24 @@ main(int argc, char *argv[])
 		smbd_daemonize_fini(pfd, SMF_EXIT_OK);
 	}
 
-	(void) atexit(smb_kmod_stop);
-
 	while (!smbd.s_shutting_down) {
-		if (smbd.s_sigval == 0 && smbd.s_refreshes == 0)
-			(void) sigsuspend(&set);
-
-		sigval = atomic_swap_uint(&smbd.s_sigval, 0);
+		sigval = sigwait(&set);
 
 		switch (sigval) {
-		case 0:
+		case -1:
+			syslog(LOG_DEBUG, "sigwait failed: %s",
+			    strerror(errno));
+			break;
 		case SIGPIPE:
-		case SIGABRT:
 			break;
 
 		case SIGHUP:
 			syslog(LOG_DEBUG, "refresh requested");
-			(void) pthread_cond_signal(&refresh_cond);
+			smbd_refresh_handler();
 			break;
 
 		case SIGUSR1:
-			smb_log_dumpall();
+			syslog(LOG_DEBUG, "SIGUSR1 ignored");
 			break;
 
 		default:
@@ -230,8 +213,20 @@ main(int argc, char *argv[])
 		}
 	}
 
+	/*
+	 * Allow termination signals while shutting down.
+	 */
+	(void) sigemptyset(&set);
+
+	if (smbd.s_fg) {
+		(void) sigaddset(&set, SIGHUP);
+		(void) sigaddset(&set, SIGINT);
+	}
+	(void) sigaddset(&set, SIGTERM);
+
+	(void) sigprocmask(SIG_UNBLOCK, &set, NULL);
+
 	smbd_service_fini();
-	closelog();
 	return ((smbd.s_fatal_error) ? SMF_EXIT_ERR_FATAL : SMF_EXIT_OK);
 }
 
@@ -440,15 +435,23 @@ smbd_service_init(void)
 	};
 	int	rc, i;
 
-	(void) mutex_lock(&smbd_service_mutex);
-
 	smbd.s_pid = getpid();
+
+	/*
+	 * Stop for a debugger attach here, which is after the
+	 * fork() etc. in smb_daemonize_init()
+	 */
+	if (smbd.s_dbg_stop) {
+		smbd_report("pid %d stop for debugger attach", smbd.s_pid);
+		(void) kill(smbd.s_pid, SIGSTOP);
+	}
+	smbd_report("smbd starting, pid %d", smbd.s_pid);
+
 	for (i = 0; i < sizeof (dir)/sizeof (dir[0]); ++i) {
 		if ((mkdir(dir[i].name, dir[i].perm) < 0) &&
 		    (errno != EEXIST)) {
 			smbd_report("mkdir %s: %s", dir[i].name,
 			    strerror(errno));
-			(void) mutex_unlock(&smbd_service_mutex);
 			return (-1);
 		}
 	}
@@ -459,11 +462,9 @@ smbd_service_init(void)
 			    strerror(errno));
 		else
 			smbd_report("unable to set KRB5CCNAME");
-		(void) mutex_unlock(&smbd_service_mutex);
 		return (-1);
 	}
 
-	smbd.s_loghd = smb_log_create(SMBD_LOGSIZE, SMBD_LOGNAME);
 	smb_codepage_init();
 
 	rc = smbd_cups_init();
@@ -488,7 +489,6 @@ smbd_service_init(void)
 		if (rc == SMB_DOMAIN_NOMACHINE_SID) {
 			smbd_report(
 			    "no machine SID: check idmap configuration");
-			(void) mutex_unlock(&smbd_service_mutex);
 			return (-1);
 		}
 	}
@@ -499,7 +499,6 @@ smbd_service_init(void)
 
 	if (mlsvc_init() != 0) {
 		smbd_report("msrpc initialization failed");
-		(void) mutex_unlock(&smbd_service_mutex);
 		return (-1);
 	}
 
@@ -507,12 +506,6 @@ smbd_service_init(void)
 	smbd.s_door_opipe = smbd_opipe_start();
 	if (smbd.s_door_srv < 0 || smbd.s_door_opipe < 0) {
 		smbd_report("door initialization failed %s", strerror(errno));
-		(void) mutex_unlock(&smbd_service_mutex);
-		return (-1);
-	}
-
-	if (smbd_refresh_init() != 0) {
-		(void) mutex_unlock(&smbd_service_mutex);
 		return (-1);
 	}
 
@@ -523,7 +516,6 @@ smbd_service_init(void)
 
 	if (smb_shr_start() != 0) {
 		smbd_report("share initialization failed: %s", strerror(errno));
-		(void) mutex_unlock(&smbd_service_mutex);
 		return (-1);
 	}
 
@@ -531,9 +523,8 @@ smbd_service_init(void)
 	if (smbd.s_door_lmshr < 0)
 		smbd_report("share initialization failed");
 
-	/* This reloads the kernel config info. */
+	/* Open the driver, load the kernel config. */
 	if (smbd_kernel_bind() != 0) {
-		(void) mutex_unlock(&smbd_service_mutex);
 		return (-1);
 	}
 
@@ -543,34 +534,18 @@ smbd_service_init(void)
 
 	smbd.s_initialized = B_TRUE;
 	smbd_report("service initialized");
-	(void) cond_signal(&smbd_service_cv);
-	(void) mutex_unlock(&smbd_service_mutex);
+
 	return (0);
 }
 
 /*
  * Shutdown smbd and smbsrv kernel services.
  *
- * Shutdown will not begin until initialization has completed.
- * Only one thread is allowed to perform the shutdown.  Other
- * threads will be blocked on fini_in_progress until the process
- * has exited.
+ * Called only by the main thread.
  */
 static void
 smbd_service_fini(void)
 {
-	static uint_t	fini_in_progress;
-
-	(void) mutex_lock(&smbd_service_mutex);
-
-	while (!smbd.s_initialized)
-		(void) cond_wait(&smbd_service_cv, &smbd_service_mutex);
-
-	if (atomic_swap_uint(&fini_in_progress, 1) != 0) {
-		while (fini_in_progress)
-			(void) cond_wait(&smbd_service_cv, &smbd_service_mutex);
-		/*NOTREACHED*/
-	}
 
 	smbd.s_shutting_down = B_TRUE;
 	smbd_report("service shutting down");
@@ -581,7 +556,6 @@ smbd_service_fini(void)
 	smbd_opipe_stop();
 	smbd_door_stop();
 	smbd_spool_stop();
-	smbd_refresh_fini();
 	smbd_kernel_unbind();
 	smbd_share_stop();
 	smb_shr_stop();
@@ -596,112 +570,51 @@ smbd_service_fini(void)
 
 	smbd.s_initialized = B_FALSE;
 	smbd_report("service terminated");
-	(void) mutex_unlock(&smbd_service_mutex);
-	exit((smbd.s_fatal_error) ? SMF_EXIT_ERR_FATAL : SMF_EXIT_OK);
+	closelog();
 }
 
 /*
- * smbd_refresh_init()
- *
- * SMB service refresh thread initialization.  This thread waits for a
- * refresh event and updates the daemon's view of the configuration
- * before going back to sleep.
- */
-static int
-smbd_refresh_init()
-{
-	pthread_attr_t		tattr;
-	pthread_condattr_t	cattr;
-	int			rc;
-
-	(void) pthread_condattr_init(&cattr);
-	(void) pthread_cond_init(&refresh_cond, &cattr);
-	(void) pthread_condattr_destroy(&cattr);
-
-	(void) pthread_mutex_init(&refresh_mutex, NULL);
-
-	(void) pthread_attr_init(&tattr);
-	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
-	rc = pthread_create(&smbd.s_refresh_tid, &tattr, smbd_refresh_monitor,
-	    NULL);
-	(void) pthread_attr_destroy(&tattr);
-
-	if (rc != 0)
-		smbd_report("unable to start refresh monitor: %s",
-		    strerror(errno));
-	return (rc);
-}
-
-/*
- * smbd_refresh_fini()
- *
- * Stop the refresh thread.
+ * Called when SMF sends us a SIGHUP.  Update the smbd configuration
+ * from SMF and check for changes that require service reconfiguration.
  */
 static void
-smbd_refresh_fini()
+smbd_refresh_handler()
 {
-	if ((pthread_self() != smbd.s_refresh_tid) &&
-	    (smbd.s_refresh_tid != 0)) {
-		(void) pthread_cancel(smbd.s_refresh_tid);
-		(void) pthread_cond_destroy(&refresh_cond);
-		(void) pthread_mutex_destroy(&refresh_mutex);
-	}
-}
+	int new_debug;
 
-/*
- * Wait for refresh events.  When woken up, update the smbd configuration
- * from SMF and check for changes that require service reconfiguration.
- * Throttling is applied to coallesce multiple refresh events when the
- * service is being refreshed repeatedly.
- */
-/*ARGSUSED*/
-static void *
-smbd_refresh_monitor(void *arg)
-{
-	smbd_online_wait("smbd_refresh_monitor");
+	if (smbd.s_shutting_down)
+		return;
 
-	while (!smbd.s_shutting_down) {
-		(void) sleep(SMBD_REFRESH_INTERVAL);
+	smbd.s_refreshes++;
 
-		(void) pthread_mutex_lock(&refresh_mutex);
-		while ((atomic_swap_uint(&smbd.s_refreshes, 0) == 0) &&
-		    (!smbd.s_shutting_down))
-			(void) pthread_cond_wait(&refresh_cond, &refresh_mutex);
-		(void) pthread_mutex_unlock(&refresh_mutex);
+	new_debug = smb_config_get_debug();
+	if (smbd.s_debug || new_debug)
+		smbd_report("debug=%d", new_debug);
+	smbd.s_debug = new_debug;
 
-		if (smbd.s_shutting_down) {
-			smbd_service_fini();
-			/*NOTREACHED*/
-		}
+	smbd_spool_stop();
+	smbd_dc_monitor_refresh();
+	smb_ccache_remove(SMB_CCACHE_PATH);
 
-		(void) mutex_lock(&smbd_service_mutex);
+	/*
+	 * Clear the DNS zones for the existing interfaces
+	 * before updating the NIC interface list.
+	 */
+	dyndns_clear_zones();
 
-		smbd_spool_stop();
-		smbd_dc_monitor_refresh();
-		smb_ccache_remove(SMB_CCACHE_PATH);
+	if (smbd_nicmon_refresh() != 0)
+		smbd_report("NIC monitor refresh failed");
 
-		/*
-		 * Clear the DNS zones for the existing interfaces
-		 * before updating the NIC interface list.
-		 */
-		dyndns_clear_zones();
+	smb_netbios_name_reconfig();
+	smb_browser_reconfig();
+	dyndns_update_zones();
 
-		if (smbd_nicmon_refresh() != 0)
-			smbd_report("NIC monitor refresh failed");
+	/* This reloads the in-kernel config. */
+	(void) smbd_kernel_bind();
 
-		smb_netbios_name_reconfig();
-		smb_browser_reconfig();
-		dyndns_update_zones();
-		(void) smbd_kernel_bind();
-		smbd_load_shares();
-		smbd_load_printers();
-		smbd_spool_start();
-
-		(void) mutex_unlock(&smbd_service_mutex);
-	}
-
-	smbd.s_refresh_tid = 0;
-	return (NULL);
+	smbd_load_shares();
+	smbd_load_printers();
+	smbd_spool_start();
 }
 
 void
@@ -743,7 +656,7 @@ smbd_online_wait(const char *text)
 		(void) sleep(SMBD_ONLINE_WAIT_INTERVAL);
 
 	if (text != NULL) {
-		smb_log(smbd.s_loghd, LOG_DEBUG, "%s: online", text);
+		syslog(LOG_DEBUG, "%s: online", text);
 		(void) fprintf(stderr, "%s: online\n", text);
 	}
 }
@@ -757,10 +670,15 @@ smbd_online_wait(const char *text)
 static int
 smbd_already_running(void)
 {
-	door_info_t info;
-	int door;
+	door_info_t	info;
+	char 		*door_name;
+	int		door;
 
-	if ((door = open(SMBD_DOOR_NAME, O_RDONLY)) < 0)
+	door_name = getenv("SMBD_DOOR_NAME");
+	if (door_name == NULL)
+		door_name = SMBD_DOOR_NAME;
+
+	if ((door = open(door_name, O_RDONLY)) < 0)
 		return (0);
 
 	if (door_info(door, &info) < 0)
@@ -793,7 +711,7 @@ smbd_kernel_bind(void)
 		rc = smb_kmod_setcfg(&cfg);
 		if (rc < 0)
 			smbd_report("kernel configuration update failed: %s",
-			    strerror(errno));
+			    strerror(rc));
 		return (rc);
 	}
 
@@ -806,10 +724,10 @@ smbd_kernel_bind(void)
 			smb_kmod_unbind();
 		else
 			smbd.s_kbound = B_TRUE;
+	} else {
+		smbd_report("kernel bind error: %s", strerror(rc));
 	}
 
-	if (rc != 0)
-		smbd_report("kernel bind error: %s", strerror(errno));
 	return (rc);
 }
 
@@ -821,18 +739,24 @@ smbd_kernel_start(void)
 
 	smb_load_kconfig(&cfg);
 	rc = smb_kmod_setcfg(&cfg);
-	if (rc != 0)
+	if (rc != 0) {
+		smbd_report("kernel config ioctl error: %s", strerror(rc));
 		return (rc);
+	}
 
 	rc = smb_kmod_setgmtoff(smbd_gmtoff());
-	if (rc != 0)
+	if (rc != 0) {
+		smbd_report("kernel gmtoff ioctl error: %s", strerror(rc));
 		return (rc);
+	}
 
 	rc = smb_kmod_start(smbd.s_door_opipe, smbd.s_door_lmshr,
 	    smbd.s_door_srv);
 
-	if (rc != 0)
+	if (rc != 0) {
+		smbd_report("kernel start ioctl error: %s", strerror(rc));
 		return (rc);
+	}
 
 	return (0);
 }
@@ -882,11 +806,18 @@ smbd_load_shares(void)
 
 	(void) pthread_attr_init(&attr);
 	(void) pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-	rc = pthread_create(&tid, &attr, smb_shr_load, NULL);
+	rc = pthread_create(&tid, &attr, smbd_share_loader, NULL);
 	(void) pthread_attr_destroy(&attr);
 
 	if (rc != 0)
 		smbd_report("unable to load disk shares: %s", strerror(errno));
+}
+
+static void *
+smbd_share_loader(void *args)
+{
+	(void) smb_shr_load(args);
+	return (NULL);
 }
 
 /*
@@ -974,23 +905,6 @@ smbd_gmtoff(void)
 	return (gmtoff);
 }
 
-static void
-smbd_sig_handler(int sigval)
-{
-	if (smbd.s_sigval == 0)
-		(void) atomic_swap_uint(&smbd.s_sigval, sigval);
-
-	if (sigval == SIGHUP) {
-		atomic_inc_uint(&smbd.s_refreshes);
-		(void) pthread_cond_signal(&refresh_cond);
-	}
-
-	if (sigval == SIGINT || sigval == SIGTERM) {
-		smbd.s_shutting_down = B_TRUE;
-		(void) pthread_cond_signal(&refresh_cond);
-	}
-}
-
 /*
  * Set up configuration options and parse the command line.
  * This function will determine if we will run as a daemon
@@ -1011,14 +925,20 @@ smbd_setup_options(int argc, char *argv[])
 	if ((grp = getgrnam("sys")) != NULL)
 		smbd.s_gid = grp->gr_gid;
 
+	smbd.s_debug = smb_config_get_debug();
 	smbd.s_fg = smb_config_get_fg_flag();
 
-	while ((c = getopt(argc, argv, ":f")) != -1) {
+	while ((c = getopt(argc, argv, ":dfs")) != -1) {
 		switch (c) {
+		case 'd':
+			smbd.s_debug++;
+			break;
 		case 'f':
 			smbd.s_fg = 1;
 			break;
-
+		case 's':
+			smbd.s_dbg_stop = 1;
+			break;
 		case ':':
 		case '?':
 		default:
@@ -1034,6 +954,7 @@ static void
 smbd_usage(FILE *fp)
 {
 	static char *help[] = {
+		"-d  enable debug messages"
 		"-f  run program in foreground"
 	};
 
@@ -1045,7 +966,7 @@ smbd_usage(FILE *fp)
 		(void) fprintf(fp, "    %s\n", help[i]);
 }
 
-static void
+void
 smbd_report(const char *fmt, ...)
 {
 	char buf[128];

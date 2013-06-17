@@ -19,6 +19,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 # 
 
 LIBRARY= libsmbns.a
@@ -50,6 +51,7 @@ SRCS=   $(OBJS_COMMON:%.o=$(SRCDIR)/%.c)	\
 LDLIBS +=	$(MACH_LDLIBS)
 LDLIBS +=	-lsmb -lgss -lcmdutils -lldap -lresolv -lnsl -lsocket -lc
 CPPFLAGS +=	-D_REENTRANT
+CPPFLAGS +=	-Dsyslog=smb_syslog
 CERRWARN +=	-_gcc=-Wno-unused-function
 CERRWARN +=	-_gcc=-Wno-uninitialized
 

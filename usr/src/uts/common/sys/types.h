@@ -25,6 +25,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SYS_TYPES_H
@@ -558,7 +560,7 @@ typedef	unsigned int	uint;
 typedef	unsigned long	ulong;
 /* END CSTYLED */
 
-#if defined(_KERNEL)
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 #define	SHRT_MIN	(-32768)	/* min value of a "short int" */
 #define	SHRT_MAX	32767		/* max value of a "short int" */

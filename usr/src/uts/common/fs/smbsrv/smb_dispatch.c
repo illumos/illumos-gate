@@ -583,12 +583,9 @@ smb_dispatch_request(struct smb_request *sr)
 	    sr->smb_mid);
 	sr->first_smb_com = sr->smb_com;
 
-	/*
-	 * Verify SMB signature if signing is enabled, dialect is NT LM 0.12,
-	 * signing was negotiated and authentication has occurred.
-	 */
-	if (session->signing.flags & SMB_SIGNING_ENABLED) {
-		if (smb_sign_check_request(sr) != 0) {
+	if ((session->signing.flags & SMB_SIGNING_CHECK) != 0) {
+		if ((sr->smb_flg2 & SMB_FLAGS2_SMB_SECURITY_SIGNATURE) == 0 ||
+		    smb_sign_check_request(sr) != 0) {
 			smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 			    ERRDOS, ERROR_ACCESS_DENIED);
 			disconnect = B_TRUE;

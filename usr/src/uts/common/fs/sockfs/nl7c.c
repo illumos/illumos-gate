@@ -287,21 +287,6 @@ atou(const char *p)
 }
 
 /*
- * strdup(), yet another strdup() in the kernel.
- */
-
-static char *
-strdup(char *s)
-{
-	int	len = strlen(s) + 1;
-	char	*ret = kmem_alloc(len, KM_SLEEP);
-
-	bcopy(s, ret, len);
-
-	return (ret);
-}
-
-/*
  * Inet ASCII to binary.
  *
  * Note, it's assumed that *s is a valid zero byte terminated string, and

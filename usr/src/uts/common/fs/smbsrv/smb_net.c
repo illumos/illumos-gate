@@ -19,23 +19,22 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
 #include <sys/param.h>
-#include <sys/cpuvar.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/time.h>
 #include <sys/varargs.h>
 #include <sys/modctl.h>
 #include <sys/pathname.h>
-#include <sys/fs/snode.h>
-#include <sys/fs/dv_node.h>
 #include <sys/vnode.h>
+#include <sys/socket.h>
 #include <sys/ksocket.h>
 #undef mem_free /* XXX Remove this after we convert everything to kmem_alloc */
 

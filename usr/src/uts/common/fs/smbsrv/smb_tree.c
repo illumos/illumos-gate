@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -538,7 +538,7 @@ smb_tree_acl_access(smb_request_t *sr, const smb_kshare_t *si, vnode_t *pathvp)
 
 	size = sizeof (SHARES_DIR) + strlen(si->shr_name) + 1;
 	sharepath = smb_srm_alloc(sr, size);
-	(void) sprintf(sharepath, "%s%s", SHARES_DIR, si->shr_name);
+	(void) snprintf(sharepath, size, "%s%s", SHARES_DIR, si->shr_name);
 
 	pn_alloc(&pnp);
 	(void) pn_set(&pnp, sharepath);
@@ -1094,7 +1094,7 @@ smb_tree_get_volname(vfs_t *vfsp, smb_tree_t *tree)
 
 	vfs_mntpoint = vfs_getmntpoint(vfsp);
 
-	s = vfs_mntpoint->rs_string;
+	s = refstr_value(vfs_mntpoint);
 	s += strspn(s, "/");
 	(void) strlcpy(tree->t_volume, s, SMB_VOLNAMELEN);
 
@@ -1115,6 +1115,7 @@ static void
 smb_tree_get_flags(const smb_kshare_t *si, vfs_t *vfsp, smb_tree_t *tree)
 {
 	smb_session_t *ssn = tree->t_session;
+	struct vfssw	*vswp;
 
 	typedef struct smb_mtype {
 		char		*mt_name;
@@ -1162,7 +1163,13 @@ smb_tree_get_flags(const smb_kshare_t *si, vfs_t *vfsp, smb_tree_t *tree)
 	if (vfsp->vfs_flag & VFS_XATTR)
 		flags |= SMB_TREE_STREAMS;
 
-	name = vfssw[vfsp->vfs_fstype].vsw_name;
+	vswp = vfs_getvfsswbyvfsops(vfs_getops(vfsp));
+	if (vswp != NULL) {
+		name = vswp->vsw_name;
+		vfs_unrefvfssw(vswp);
+	} else {
+		name = "?";
+	}
 
 	for (i = 0; i < sizeof (smb_mtype) / sizeof (smb_mtype[0]); ++i) {
 		mtype = &smb_mtype[i];

@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SMBSRV_SMB_H
@@ -30,9 +31,7 @@
 /*
  * SMB definitions and interfaces, mostly defined in the SMB and CIFS specs.
  */
-#ifdef _KERNEL
 #include <sys/types.h>
-#endif
 #include <smbsrv/string.h>
 #include <smbsrv/msgbuf.h>
 

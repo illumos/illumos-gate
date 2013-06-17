@@ -135,7 +135,7 @@ static smb_cfg_param_t smb_cfg_table[] =
 	{SMB_CI_UNMAP, "unmap", SCF_TYPE_ASTRING, SMB_CF_EXEC},
 	{SMB_CI_DISPOSITION, "disposition", SCF_TYPE_ASTRING, SMB_CF_EXEC},
 	{SMB_CI_DFS_STDROOT_NUM, "dfs_stdroot_num", SCF_TYPE_INTEGER, 0},
-	{SMB_CI_TRAVERSE_MOUNTS, "traverse_mounts", SCF_TYPE_BOOLEAN, 0}
+	{SMB_CI_TRAVERSE_MOUNTS, "traverse_mounts", SCF_TYPE_BOOLEAN, 0},
 	/* SMB_CI_MAX */
 };
 
@@ -712,6 +712,36 @@ smb_config_set(smb_cfg_id_t id, char *value)
 
 	return (SMBD_SMF_INVALID_ARG);
 }
+
+int
+smb_config_get_debug()
+{
+	int64_t val64;
+	int val = 0;	/* default */
+	smb_scfhandle_t *handle = NULL;
+
+	handle = smb_smf_scf_init(SMBD_FMRI_PREFIX);
+	if (handle == NULL) {
+		return (val);
+	}
+
+	if (smb_smf_create_service_pgroup(handle,
+	    SMBD_PG_NAME) != SMBD_SMF_OK) {
+		smb_smf_scf_fini(handle);
+		return (val);
+	}
+
+	if (smb_smf_get_integer_property(handle, "debug", &val64) != 0) {
+		smb_smf_scf_fini(handle);
+		return (val);
+	}
+	val = (int)val64;
+
+	smb_smf_scf_fini(handle);
+
+	return (val);
+}
+
 uint8_t
 smb_config_get_fg_flag()
 {

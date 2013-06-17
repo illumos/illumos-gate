@@ -28,7 +28,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SYS_FLOCK_H
@@ -201,7 +201,7 @@ typedef enum {
     FLK_LOCKMGR_DOWN
 } flk_lockmgr_status_t;
 
-#if defined(_KERNEL)
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 /*
  * The following structure is used to hold a list of locks returned

@@ -19,9 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -211,7 +212,7 @@ static dfs_reftype_t
 smb_dfs_get_reftype(const char *path)
 {
 	smb_unc_t unc;
-	dfs_reftype_t reftype;
+	dfs_reftype_t reftype = 0;
 
 	if (*path == '\0')
 		return (DFS_REFERRAL_DOMAIN);

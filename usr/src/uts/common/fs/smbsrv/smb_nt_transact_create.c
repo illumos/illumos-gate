@@ -250,8 +250,7 @@ smb_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 		    ERRDOS, ERROR_INVALID_FUNCTION);
 		goto errout;
 	}
-	if (rc == 0)
-		return (SDRC_SUCCESS);
+	return (SDRC_SUCCESS);
 
 errout:
 	smb_ofile_close(of, 0);

@@ -29,6 +29,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/utsname.h>
+#include <sys/atomic.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <strings.h>

@@ -150,6 +150,8 @@ file.
 			value='true' override='true'/>
 		<propval name='autohome_map' type='astring'
 			value='/etc' override='true'/>
+		<propval name='debug' type='integer'
+			value='0' override='true'/>
 		<propval name='domain_sid' type='astring'
 			value='' override='true'/>
 		<propval name='domain_member' type='boolean'

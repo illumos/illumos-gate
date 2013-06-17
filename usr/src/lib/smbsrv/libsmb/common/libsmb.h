@@ -35,15 +35,14 @@ extern "C" {
 #include <sys/list.h>
 #include <sys/avl.h>
 #include <arpa/inet.h>
-#include <net/if.h>
-#include <inet/tcp.h>
-#include <uuid/uuid.h>
+#include <net/if.h>	/* LIFNAMSIZ */
 #include <netdb.h>
 #include <stdlib.h>
 #include <libscf.h>
 #include <libshare.h>
 #include <uuid/uuid.h>
 #include <synch.h>
+#include <stdarg.h>
 
 #include <smbsrv/string.h>
 #include <smbsrv/smb_idmap.h>
@@ -191,6 +190,7 @@ extern int smb_config_setnum(smb_cfg_id_t, int64_t);
 extern int smb_config_setbool(smb_cfg_id_t, boolean_t);
 
 extern boolean_t smb_config_get_ads_enable(void);
+extern int smb_config_get_debug(void);
 extern uint8_t smb_config_get_fg_flag(void);
 extern char *smb_config_get_localsid(void);
 extern int smb_config_secmode_fromstr(char *);
@@ -291,6 +291,8 @@ void smb_trace(const char *s);
 void smb_tracef(const char *fmt, ...);
 
 const char *xlate_nt_status(unsigned int);
+
+void libsmb_redirect_syslog(__FILE_TAG *fp, int priority);
 
 /*
  * Authentication
@@ -995,37 +997,9 @@ int smb_reparse_svcget(const char *, const char *, char **);
 
 uint32_t smb_get_txid(void);
 
-#define	SMB_LOG_LINE_SZ		256
-
-typedef uint32_t	smb_log_hdl_t;
-
-typedef struct smb_log_item {
-	list_node_t	li_lnd;
-	char		li_msg[SMB_LOG_LINE_SZ];
-} smb_log_item_t;
-
-typedef struct smb_log {
-	smb_log_hdl_t	l_handle;
-	int		l_cnt;
-	int		l_max_cnt;
-	mutex_t		l_mtx;
-	list_t		l_list;
-	char		l_file[MAXPATHLEN];
-} smb_log_t;
-
-typedef struct smb_loglist_item {
-	list_node_t	lli_lnd;
-	smb_log_t	lli_log;
-} smb_loglist_item_t;
-
-typedef struct smb_loglist {
-	mutex_t		ll_mtx;
-	list_t		ll_list;
-} smb_loglist_t;
-
-smb_log_hdl_t smb_log_create(int, char *);
-void smb_log(smb_log_hdl_t, int, const char *, ...);
-void smb_log_dumpall(void);
+void smb_syslog(int, const char *, ...);
+void smb_vsyslog(int, const char *, va_list ap);
+char *smb_syslog_fmt_m(char *, int, const char *, int);
 
 #ifdef	__cplusplus
 }

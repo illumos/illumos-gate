@@ -19,14 +19,15 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/sunddi.h>
 #include <sys/errno.h>
+#include <sys/extdirent.h>
 #include <smbsrv/string.h>
 #include <smbsrv/smb_vops.h>
 #include <smbsrv/smb_kproto.h>
@@ -375,13 +376,13 @@ smb_unmangle(smb_node_t *dnode, char *name, char *namebuf,
 	char		shortname[SMB_SHORTNAMELEN];
 	vnode_t		*vp;
 	union {
-		char		*bufptr;
-		edirent_t	*edp;
-		dirent64_t	*dp;
+		char		*u_bufptr;
+		edirent_t	*u_edp;
+		dirent64_t	*u_dp;
 	} u;
-#define	bufptr	u.bufptr
-#define	edp		u.edp
-#define	dp		u.dp
+#define	bufptr		u.u_bufptr
+#define	edp		u.u_edp
+#define	dp		u.u_dp
 
 	if (dnode == NULL || name == NULL || namebuf == NULL || buflen == 0)
 		return (EINVAL);

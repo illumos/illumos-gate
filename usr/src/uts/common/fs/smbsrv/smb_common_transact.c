@@ -1569,7 +1569,8 @@ smb_trans2_dispatch(smb_request_t *sr, smb_xa_t *xa)
 {
 	int		rc, pos;
 	int		total_bytes, n_setup, n_param, n_data;
-	int		param_off, param_pad, data_off, data_pad;
+	int		param_off, param_pad, data_off;
+	uint16_t	data_pad;
 	uint16_t	opcode;
 	uint16_t  nt_unknown_secret = 0x0100;
 	char *fmt;
@@ -1730,7 +1731,6 @@ smb_trans2_dispatch(smb_request_t *sr, smb_xa_t *xa)
 		/* Param off from hdr start */
 		data_off = param_off + n_param + data_pad;
 		fmt = "bww2.wwwwwwb.Cw#.C#.C";
-		/*LINTED E_ASSIGN_NARROW_CONV*/
 		nt_unknown_secret = data_pad;
 	}
 

@@ -22,10 +22,10 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
 
-SUBDIRS = smbadm smbd smbstat dtrace
+SUBDIRS = smbadm smbd smbstat dtrace fksmbd bind-helper
 MSGSUBDIRS = smbadm smbstat
 
 include ../Makefile.cmd

@@ -19,11 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
+#include <sys/conf.h>
 #include <sys/ddi.h>
 #include <sys/modctl.h>
 #include <sys/cred.h>
@@ -33,6 +34,10 @@
 #include <sys/cmn_err.h>
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_ioctl.h>
+
+#ifdef	_FAKE_KERNEL
+#error	"See libfksmbsrv"
+#endif	/* _FAKE_KERNEL */
 
 static int smb_drv_open(dev_t *, int, int, cred_t *);
 static int smb_drv_close(dev_t, int, int, cred_t *);

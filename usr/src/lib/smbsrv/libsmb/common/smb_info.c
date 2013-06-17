@@ -516,11 +516,17 @@ smb_tracef(const char *fmt, ...)
 
 /*
  * Temporary fbt for dtrace until user space sdt enabled.
+ *
+ * This function is designed to be used with dtrace, i.e. see:
+ * usr/src/cmd/smbsrv/dtrace/smbd-all.d
+ *
+ * Outside of dtrace, the messages passed to this function usually
+ * lack sufficient context to be useful, so we don't log them.
  */
+/* ARGSUSED */
 void
 smb_trace(const char *s)
 {
-	syslog(LOG_DEBUG, "%s", s);
 }
 
 /*
@@ -577,14 +583,14 @@ smb_get_nameservers(smb_inaddr_t *ips, int sz)
 		if (i >= sz)
 			break;
 		ips[i].a_family = AF_INET;
-		bcopy(&set[i].sin.sin_addr, &ips[i].a_ipv4, INADDRSZ);
+		bcopy(&set[i].sin.sin_addr, &ips[i].a_ipv4, NS_INADDRSZ);
 		if (inet_ntop(AF_INET, &ips[i].a_ipv4, ipstr,
 		    INET_ADDRSTRLEN)) {
 			syslog(LOG_DEBUG, "Found %s name server\n", ipstr);
 			continue;
 		}
 		ips[i].a_family = AF_INET6;
-		bcopy(&set[i].sin.sin_addr, &ips[i].a_ipv6, IPV6_ADDR_LEN);
+		bcopy(&set[i].sin.sin_addr, &ips[i].a_ipv6, NS_IN6ADDRSZ);
 		if (inet_ntop(AF_INET6, &ips[i].a_ipv6, ipstr,
 		    INET6_ADDRSTRLEN)) {
 			syslog(LOG_DEBUG, "Found %s name server\n", ipstr);

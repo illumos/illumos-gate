@@ -1,0 +1,193 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNWprivate_1.1 {
+    global:
+
+	_curcred;
+	_curproc;
+	_curthread;
+	_curzone;
+
+	aok		{ FLAGS = NODIRECT };
+	boot_time;
+	cmn_err;
+	copyinstr;
+	copystr;
+
+	crfree;
+	crgetuid;
+	crhold;
+
+	cv_broadcast;
+	cv_destroy;
+	cv_init;
+	cv_reltimedwait;
+	cv_reltimedwait_sig;
+	cv_signal;
+	cv_timedwait;
+	cv_timedwait_sig;
+	cv_wait;
+	cv_wait_sig;
+
+	ddi_get_lbolt64;
+	ddi_get_lbolt;
+	ddi_get_pid;
+	ddi_strtoul;
+
+	delay;
+
+	fakekernel_cprintf	{ FLAGS = NODIRECT };
+	fakekernel_init;
+	fakekernel_putlog	{ FLAGS = NODIRECT };
+
+	gethrestime;
+	gethrestime_sec;
+	gethrtime_unscaled;
+
+	hz;
+
+	kcred;
+	kiconv;
+	kiconv_close;
+	kiconv_open;
+
+	kmem_alloc;
+	kmem_cache_alloc;
+	kmem_cache_create;
+	kmem_cache_destroy;
+	kmem_cache_free;
+	kmem_cache_reap_now;
+	kmem_cache_set_move;
+	kmem_debugging;
+	kmem_free;
+	kmem_zalloc;
+
+	kmutex_destroy;
+	kmutex_init;
+
+	ksema_destroy;
+	ksema_init;
+
+	ksocket_accept;
+	ksocket_bind;
+	ksocket_bind_helper	{ FLAGS = NODIRECT };
+	ksocket_close;
+	ksocket_connect;
+	ksocket_getpeername;
+	ksocket_getsockname;
+	ksocket_hold;
+	ksocket_listen;
+	ksocket_recv;
+	ksocket_recvfrom;
+	ksocket_recvmsg;
+	ksocket_rele;
+	ksocket_send;
+	ksocket_sendmsg;
+	ksocket_sendto;
+	ksocket_setsockopt;
+	ksocket_shutdown;
+	ksocket_socket;
+
+	kstat_create;
+	kstat_create_zone;
+	kstat_delete;
+	kstat_install;
+
+	msec_per_tick;
+
+	mutex_enter;
+	mutex_exit;
+	mutex_owned;
+	mutex_owner;
+	mutex_tryenter;
+
+	nsec_per_tick;
+
+	ovbcopy;
+	p0;
+	panic;
+	panicargs;
+	panicstr;
+
+	random_get_bytes;
+	random_get_pseudo_bytes;
+
+	rw_destroy;
+	rw_downgrade;
+	rw_enter;
+	rw_exit;
+	rw_init;
+	#rw_iswriter;	# missing, but not currently needed
+	rw_lock_held;
+	rw_owner;
+	rw_read_held;
+	rw_tryenter;
+	rw_tryupgrade;
+	rw_write_held;
+
+	scalehrtime;
+
+	#sema_held;	# call the libc version directly
+	sema_p;
+	sema_p_sig;
+	sema_tryp;
+	sema_v;
+
+	strfree;
+
+	system_taskq_fini;	
+	system_taskq_init;
+	taskq_create;
+	taskq_create_proc;
+	taskq_destroy;
+	taskq_dispatch;
+	taskq_dispatch_ent;
+	taskq_member;
+	taskq_wait;
+
+	thread_join;
+
+	tick_per_msec;
+	tsignal;
+	uiomove;
+	usec_per_tick;
+	vcmn_err;
+	vmem_qcache_reap;
+	vpanic;
+	zone0;
+	zone_kcred;
+	zthread_create;
+	zthread_exit;
+
+    local:
+	*;
+};

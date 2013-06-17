@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _FS_REPARSE_H
@@ -32,7 +34,7 @@ extern "C" {
 
 #include <sys/types.h>
 #include <sys/param.h>
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 #include <sys/time.h>
 #include <sys/nvpair.h>
 #else
