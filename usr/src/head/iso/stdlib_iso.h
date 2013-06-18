@@ -43,8 +43,6 @@
 #ifndef _ISO_STDLIB_ISO_H
 #define	_ISO_STDLIB_ISO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/feature_tests.h>
 
 #ifdef	__cplusplus
@@ -128,12 +126,12 @@ extern int atoi(const char *);
 extern long int atol(const char *);
 extern void *bsearch(const void *, const void *, size_t, size_t,
 	int (*)(const void *, const void *));
-#if __cplusplus >= 199711L
+#if __cplusplus >= 199711L && defined(__SUNPRO_CC)
 extern "C++" {
 	void *bsearch(const void *, const void *, size_t, size_t,
 		int (*)(const void *, const void *));
 }
-#endif /* __cplusplus >= 199711L */
+#endif /* __cplusplus >= 199711L && defined(__SUNPRO_CC) */
 extern void *calloc(size_t, size_t);
 extern div_t div(int, int);
 extern void exit(int)
@@ -148,11 +146,11 @@ extern size_t mbstowcs(wchar_t *_RESTRICT_KYWD, const char *_RESTRICT_KYWD,
 	size_t);
 extern int mbtowc(wchar_t *_RESTRICT_KYWD, const char *_RESTRICT_KYWD, size_t);
 extern void qsort(void *, size_t, size_t, int (*)(const void *, const void *));
-#if __cplusplus >= 199711L
+#if __cplusplus >= 199711L && defined(__SUNPRO_CC)
 extern "C++" {
 	void qsort(void *, size_t, size_t, int (*)(const void *, const void *));
 }
-#endif /* __cplusplus >= 199711L */
+#endif /* __cplusplus >= 199711L && defined(__SUNPRO_CC) */
 extern int rand(void);
 extern void *realloc(void *, size_t);
 extern void srand(unsigned int);

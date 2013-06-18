@@ -46,8 +46,6 @@
 #ifndef _ISO_STDIO_ISO_H
 #define	_ISO_STDIO_ISO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/feature_tests.h>
 #include <sys/va_list.h>
 #include <stdio_tag.h>
@@ -331,7 +329,7 @@ extern int	_flsbuf();
 
 #if !defined(__lint)
 
-#if	!defined(_REENTRANT) && !defined(_LP64) && !defined(_STRICT_STDC)
+#if	!defined(_REENTRANT) && !defined(_LP64)
 
 #ifdef	__STDC__
 #if __cplusplus >= 199711L
@@ -353,7 +351,7 @@ inline int putc(int _x, FILE *_p) {
 				(int)(*(p)->_ptr++ = (unsigned char) (x)))
 #endif	/* __STDC__ */
 
-#endif /* !defined(_REENTRANT) && !defined(_LP64) && !defined(_STRICT_STDC) */
+#endif /* !defined(_REENTRANT) && !defined(_LP64) */
 
 #ifndef	_REENTRANT
 
