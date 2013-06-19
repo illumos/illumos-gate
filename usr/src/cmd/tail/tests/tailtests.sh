@@ -13,7 +13,7 @@
 
 #
 # Copyright 2010 Chris Love.  All rights reserved.
-# Copyright (c) 2012, Joyent, Inc. All rights reserved.
+# Copyright (c) 2013, Joyent, Inc. All rights reserved.
 #
 
 checktest()
@@ -312,8 +312,14 @@ sleep 2
 mv $follow $moved
 
 echo -e "x\ny\nz" >> $moved
+
+#
+# At this point, tail is polling on stat'ing the missing file; we need to
+# be sure to sleep long enough after recreating it to know that it will pick
+# it up.
+#
 echo -e "d\ne\nf" > $follow
-sleep 1
+sleep 5
 kill $child
 sleep 1
 
@@ -360,6 +366,75 @@ five"
 a=`cat $out`
 checktest "$a" "$o" 27
 rm $follow $moved
+
+if [[ `uname -s` == "SunOS" ]]; then
+	#
+	# Use DTrace to truncate the file between the return from port_get()
+	# and the reassociation of the file object with the port, exposing
+	# any race conditions whereby FILE_TRUNC events are lost.
+	#
+	cat /dev/null > $follow
+	dtrace -c "$PROG -f $follow" -s /dev/stdin > $out <<EOF
+		#pragma D option destructive
+		#pragma D option quiet 
+
+		pid\$target::port_get:return
+		/++i == 5/
+		{
+			stop();
+			system("cat /dev/null > $follow");
+			system("prun %d", pid);
+		}
+
+		tick-1sec
+		{
+			system("echo %d >> $follow", j++);
+		}
+
+		tick-1sec
+		/j == 10/
+		{
+			exit(0);
+		}
+EOF
+
+	o=`echo -e "0\n1\n2\n3\n5\n6\n7\n8\n9\n"`
+	a=`cat $out`
+	checktest "$a" "$o" 27a
+	rm $follow
+
+	cat /dev/null > $follow
+	dtrace -c "$PROG -f $follow" -s /dev/stdin > $out <<EOF
+		#pragma D option destructive
+		#pragma D option quiet 
+
+		pid\$target::port_get:return
+		/++i == 5/
+		{
+			stop();
+			system("mv $follow $moved");
+			system("cat /dev/null > $moved");
+			system("prun %d", pid);
+		}
+
+		tick-1sec
+		{
+			system("echo %d >> %s", j++,
+			    i < 5 ? "$follow" : "$moved");
+		}
+
+		tick-1sec
+		/j == 10/
+		{
+			exit(0);
+		}
+EOF
+
+	o=`echo -e "0\n1\n2\n3\n5\n6\n7\n8\n9\n"`
+	a=`cat $out`
+	checktest "$a" "$o" 27b
+	rm $moved
+fi
 
 echo "$CMD: completed"
 

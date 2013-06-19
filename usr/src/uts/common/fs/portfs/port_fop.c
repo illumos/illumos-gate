@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -1259,7 +1259,7 @@ port_associate_fop(port_t *pp, int source, uintptr_t object, int events,
     void *user)
 {
 	portfop_cache_t	*pfcp;
-	vnode_t		*vp, *dvp, *oldvp = NULL, *olddvp = NULL;
+	vnode_t		*vp, *dvp, *oldvp = NULL, *olddvp = NULL, *orig;
 	portfop_t	*pfp;
 	int		error = 0;
 	file_obj_t	fobj;
@@ -1316,8 +1316,7 @@ port_associate_fop(port_t *pp, int source, uintptr_t object, int events,
 		goto errout;
 	}
 
-	vp = port_resolve_vp(vp);
-
+	vp = port_resolve_vp(orig = vp);
 
 	if (vp != NULL && vnevent_support(vp, NULL)) {
 		error = ENOTSUP;
@@ -1325,10 +1324,14 @@ port_associate_fop(port_t *pp, int source, uintptr_t object, int events,
 	}
 
 	/*
-	 * If dvp belongs to a different filesystem just ignore it.
-	 * Hardlinks cannot exist across filesystems.
+	 * If dvp belongs to a different filesystem just ignore it, as hard
+	 * links cannot exist across filesystems.  We make an exception for
+	 * procfs, however, the magic of which we treat semantically as a hard
+	 * link, allowing one to use /proc/[pid]/fd/[fd] for PORT_SOURCE_FILE
+	 * and avoid spurious FILE_RENAME_FROM/FILE_RENAME_TO events.
 	 */
-	if (dvp != NULL && dvp->v_vfsp != vp->v_vfsp) {
+	if (dvp != NULL && dvp->v_vfsp != vp->v_vfsp &&
+	    !(orig->v_type == VPROC && vp != NULL && vp->v_type != VPROC)) {
 		VN_RELE(dvp);
 		dvp = NULL;
 	}
