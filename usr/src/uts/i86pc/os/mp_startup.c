@@ -28,6 +28,7 @@
  */
 /*
  * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -77,6 +78,7 @@
 #include <sys/hypervisor.h>
 #endif
 #include <sys/cpu_module.h>
+#include <sys/ontrap.h>
 
 struct cpu	cpus[1];			/* CPU data */
 struct cpu	*cpu[NCPU] = {&cpus[0]};	/* pointers to all CPUs */
@@ -1186,7 +1188,13 @@ workaround_errata(struct cpu *cpu)
 
 	if (cpuid_opteron_erratum(cpu, 721) > 0) {
 #if defined(OPTERON_ERRATUM_721)
-		wrmsr(MSR_AMD_DE_CFG, rdmsr(MSR_AMD_DE_CFG) | AMD_DE_CFG_E721);
+		on_trap_data_t otd;
+
+		if (!on_trap(&otd, OT_DATA_ACCESS))
+			wrmsr(MSR_AMD_DE_CFG,
+			    rdmsr(MSR_AMD_DE_CFG) | AMD_DE_CFG_E721);
+		no_trap();
+
 		opteron_erratum_721++;
 #else
 		workaround_warning(cpu, 721);
