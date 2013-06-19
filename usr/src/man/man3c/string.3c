@@ -11,7 +11,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH STRING 3C "Aug 1, 2008"
+.TH STRING 3C "Jun 19, 2013"
 .SH NAME
 string, strcasecmp, strncasecmp, strcat, strncat, strlcat, strchr, strrchr,
 strcmp, strncmp, strcpy, strncpy, strlcpy, strcspn, strspn, strdup, strlen,
@@ -128,7 +128,8 @@ strnlen, strpbrk, strsep, strstr, strtok, strtok_r \- string operations
 
 .LP
 .nf
-\fBchar *\fR\fBstrtok_r\fR(\fBchar *\fR\fIs1\fR, \fBconst char *\fR\fIs2\fR, \fBchar **\fR\fIlasts\fR);
+\fBchar *\fR\fBstrtok_r\fR(\fBchar *restrict\fR \fIs1\fR, \fBconst char *restrict\fR \fIs2\fR,
+     \fBchar **restrict\fR \fIlasts\fR);
 .fi
 
 .SS "ISO C++"
