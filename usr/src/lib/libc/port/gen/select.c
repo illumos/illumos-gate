@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Emulation of select() system call using poll() system call.
  *
@@ -47,6 +45,7 @@
 #include <values.h>
 #include <pthread.h>
 #include <errno.h>
+#include <stdlib.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/select.h>
@@ -54,9 +53,58 @@
 #include <alloca.h>
 #include "libc.h"
 
+/*
+ * STACK_PFD_LIM
+ *
+ *   The limit at which pselect allocates pollfd structures in the heap,
+ *   rather than on the stack.  These limits match the historical behaviour
+ *   with the * _large_fdset implementations.
+ *
+ * BULK_ALLOC_LIM
+ *
+ *   The limit below which we'll just allocate nfds pollfds, rather than
+ *   counting how many we actually need.
+ */
+#if defined(_LP64)
+#define	STACK_PFD_LIM	FD_SETSIZE
+#define	BULK_ALLOC_LIM	8192
+#else
+#define	STACK_PFD_LIM	1024
+#define	BULK_ALLOC_LIM	1024
+#endif
+
+/*
+ * The previous _large_fdset implementations are, unfortunately, baked into
+ * the ABI.
+ */
+#pragma weak select_large_fdset = select
+#pragma weak pselect_large_fdset = pselect
+
+#define	fd_set_size(nfds)	(((nfds) + (NFDBITS - 1)) / NFDBITS)
+
+static nfds_t
+fd_sets_count(int limit, fd_set *in, fd_set *out, fd_set *ex)
+{
+	nfds_t total = 0;
+
+	if (limit <= 0)
+		return (0);
+
+	for (int i = 0; i < fd_set_size(limit); i++) {
+		long v = (in->fds_bits[i] | out->fds_bits[i] | ex->fds_bits[i]);
+
+		while (v != 0) {
+			v &= v - 1;
+			total++;
+		}
+	}
+
+	return (total);
+}
+
 int
 pselect(int nfds, fd_set *in0, fd_set *out0, fd_set *ex0,
-	const timespec_t *tsp, const sigset_t *sigmask)
+    const timespec_t *tsp, const sigset_t *sigmask)
 {
 	long *in, *out, *ex;
 	ulong_t m;	/* bit mask */
@@ -66,6 +114,8 @@ pselect(int nfds, fd_set *in0, fd_set *out0, fd_set *ex0,
 	struct pollfd *pfd;
 	struct pollfd *p;
 	int lastj = -1;
+	nfds_t npfds = 0;
+	boolean_t heap_pfds = B_FALSE;
 
 	/* "zero" is read-only, it could go in the text segment */
 	static fd_set zero = { 0 };
@@ -80,7 +130,6 @@ pselect(int nfds, fd_set *in0, fd_set *out0, fd_set *ex0,
 		errno = EINVAL;
 		return (-1);
 	}
-	p = pfd = (struct pollfd *)alloca(nfds * sizeof (struct pollfd));
 
 	if (tsp != NULL) {
 		/* check timespec validity */
@@ -101,6 +150,21 @@ pselect(int nfds, fd_set *in0, fd_set *out0, fd_set *ex0,
 		out0 = &zero;
 	if (ex0 == NULL)
 		ex0 = &zero;
+
+	if (nfds <= BULK_ALLOC_LIM) {
+		p = pfd = alloca(nfds * sizeof (struct pollfd));
+	} else {
+		npfds = fd_sets_count(nfds, in0, out0, ex0);
+
+		if (npfds > STACK_PFD_LIM) {
+			p = pfd = malloc(npfds * sizeof (struct pollfd));
+			if (p == NULL)
+				return (-1);
+			heap_pfds = B_TRUE;
+		} else {
+			p = pfd = alloca(npfds * sizeof (struct pollfd));
+		}
+	}
 
 	/*
 	 * For each fd, if any bits are set convert them into
@@ -134,13 +198,13 @@ done:
 	/*
 	 * Now do the poll.
 	 */
-	n = (int)(p - pfd);		/* number of pollfd's */
+	npfds = (int)(p - pfd);
 	do {
-		rv = _pollsys(pfd, (nfds_t)n, tsp, sigmask);
+		rv = _pollsys(pfd, npfds, tsp, sigmask);
 	} while (rv < 0 && errno == EAGAIN);
 
 	if (rv < 0)		/* no need to set bit masks */
-		return (rv);
+		goto out;
 
 	if (rv == 0) {
 		/*
@@ -163,14 +227,15 @@ done:
 			for (n = 0; n < nfds; n += NFDBITS)
 				*ex++ = 0;
 		}
-		return (0);
+		rv = 0;
+		goto out;
 	}
 
 	/*
 	 * Check for EINVAL error case first to avoid changing any bits
 	 * if we're going to return an error.
 	 */
-	for (p = pfd, j = n; j-- > 0; p++) {
+	for (p = pfd, n = npfds; n-- > 0; p++) {
 		/*
 		 * select will return EBADF immediately if any fd's
 		 * are bad.  poll will complete the poll on the
@@ -181,7 +246,8 @@ done:
 		 */
 		if (p->revents & POLLNVAL) {
 			errno = EBADF;
-			return (-1);
+			rv = -1;
+			goto out;
 		}
 		/*
 		 * We would like to make POLLHUP available to select,
@@ -194,7 +260,8 @@ done:
 		 * if ((p->revents & POLLHUP) &&
 		 *	!(p->revents & (POLLRDNORM|POLLRDBAND))) {
 		 *	errno = EINTR;
-		 *	return (-1);
+		 *	rv = -1;
+		 *	goto out;
 		 * }
 		 */
 	}
@@ -212,7 +279,7 @@ done:
 	 * (as the man page says, and as poll() does).
 	 */
 	rv = 0;
-	for (p = pfd; n-- > 0; p++) {
+	for (p = pfd, n = npfds; n-- > 0; p++) {
 		j = (int)(p->fd / NFDBITS);
 		/* have we moved into another word of the bit mask yet? */
 		if (j != lastj) {
@@ -278,6 +345,9 @@ done:
 			}
 		}
 	}
+out:
+	if (heap_pfds)
+		free(pfd);
 	return (rv);
 }
 

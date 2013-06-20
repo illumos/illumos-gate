@@ -404,10 +404,10 @@ int nexectype = sizeof (execsw) / sizeof (execsw[0]);	/* # of exec types */
 kmutex_t execsw_lock;	/* Used for allocation of execsw entries */
 
 /*
- * symbols added to make changing max-file-descriptors
+ * symbols added to make changing proc.max-file-descriptor
  * simple via /etc/system
  */
-#define	RLIM_FD_CUR 0x100
+#define	RLIM_FD_CUR 0x10000
 #define	RLIM_FD_MAX 0x10000
 
 uint_t rlim_fd_cur = RLIM_FD_CUR;

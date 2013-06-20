@@ -852,14 +852,6 @@ extern void	rpc_gss_cleanup(SVCXPRT *);
 extern pollfd_t	*svc_pollfd;
 extern int	svc_max_pollfd;
 extern fd_set	svc_fdset;
-#if !defined(_LP64) && FD_SETSIZE > 1024
-extern fd_set	_new_svc_fdset;
-#ifdef __PRAGMA_REDEFINE_EXTNAME
-#pragma redefine_extname	svc_fdset	_new_svc_fdset
-#else   /* __PRAGMA_REDEFINE_EXTNAME */
-#define	svc_fdset	_new_svc_fdset
-#endif  /* __PRAGMA_REDEFINE_EXTNAME */
-#endif	/* LP64 && FD_SETSIZE > 1024 */
 #define	svc_fds svc_fdset.fds_bits[0]	/* compatibility */
 
 /*
