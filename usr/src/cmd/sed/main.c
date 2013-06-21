@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2013 Johann 'Myrkraverk' Oskarsson <johann@myrkraverk.com>
  * Copyright (c) 2011 Gary Mills
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 1992 Diomidis Spinellis.
@@ -114,7 +115,6 @@ static const struct option lopts[] = {
 static void add_compunit(enum e_cut, char *);
 static void add_file(char *);
 static void usage(void);
-static char *getln(FILE *, size_t *);
 
 
 int
@@ -318,8 +318,9 @@ int
 mf_fgets(SPACE *sp, enum e_spflag spflag)
 {
 	struct stat sb, nsb;
-	size_t len;
-	char *p;
+	ssize_t len;
+	static char *p = NULL;
+	static size_t plen = 0;
 	int c;
 	static int firstfile;
 
@@ -454,13 +455,13 @@ mf_fgets(SPACE *sp, enum e_spflag spflag)
 	 * We are here only when infile is open and we still have something
 	 * to read from it.
 	 *
-	 * Use fgetln so that we can handle essentially infinite input data.
-	 * Can't use the pointer into the stdio buffer as the process space
-	 * because the ungetc() can cause it to move.
+	 * Use getline() so that we can handle essentially infinite
+	 * input data.  The p and plen are static so each invocation gives
+	 * getline() the same buffer which is expanded as needed.
 	 */
-	p = getln(infile, &len);
-	if (ferror(infile))
-		errx(1, "%s: %s", fname, strerror(errno ? errno : EIO));
+	len = getline(&p, &plen, infile);
+	if (len == -1)
+		err(1, "%s", fname);
 	if (len != 0 && p[len - 1] == '\n')
 		len--;
 	cspace(sp, p, len, spflag);
@@ -514,42 +515,4 @@ lastline(void)
 		return (1);
 	(void) ungetc(ch, infile);
 	return (0);
-}
-
-char *
-getln(FILE *in, size_t *lenp)
-{
-	static char	*buffer = NULL;
-	static size_t	sz = 0;
-
-	size_t		len = 0;
-
-	for (;;) {
-		if (sz <= (len + 1)) {
-			char *nb;
-			if ((nb = realloc(buffer, sz + LINE_MAX)) == NULL) {
-				err(1, "realloc");
-			}
-			buffer = nb;
-			sz += LINE_MAX;
-		}
-
-		buffer[len] = 0;
-
-		if (fgets(buffer + len, sz - len, in) == NULL) {
-			/* END OF FILE */
-			*lenp = len;
-			break;
-		}
-
-		len += strlen(buffer + len);
-
-		if (buffer[len - 1] == '\n') {
-			/* got the new line */
-			*lenp = len;
-			break;
-		}
-	}
-
-	return (buffer);
 }
