@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <stdio.h>
@@ -49,9 +50,17 @@ static smb_krb5_pn_t smb_krb5_pn_tab[] = {
 	 */
 	{SMB_KRB5_PN_ID_SALT,		SMB_PN_SVC_HOST,	SMB_PN_SALT},
 
-	/* HOST */
+	/* CIFS SPNs. (HOST, CIFS, ...) */
 	{SMB_KRB5_PN_ID_HOST_FQHN,	SMB_PN_SVC_HOST,
 	    SMB_PN_KEYTAB_ENTRY | SMB_PN_SPN_ATTR | SMB_PN_UPN_ATTR},
+	{SMB_KRB5_PN_ID_HOST_SHORT,	SMB_PN_SVC_HOST,
+	    SMB_PN_KEYTAB_ENTRY | SMB_PN_SPN_ATTR},
+	{SMB_KRB5_PN_ID_CIFS_FQHN,	SMB_PN_SVC_CIFS,
+	    SMB_PN_KEYTAB_ENTRY | SMB_PN_SPN_ATTR},
+	{SMB_KRB5_PN_ID_CIFS_SHORT,	SMB_PN_SVC_CIFS,
+	    SMB_PN_KEYTAB_ENTRY | SMB_PN_SPN_ATTR},
+	{SMB_KRB5_PN_ID_MACHINE,	NULL,
+	    SMB_PN_KEYTAB_ENTRY},
 
 	/* NFS */
 	{SMB_KRB5_PN_ID_NFS_FQHN,	SMB_PN_SVC_NFS,
@@ -529,12 +538,30 @@ smb_krb5_get_pn_by_id(smb_krb5_pn_id_t id, uint32_t type,
 		break;
 
 	case SMB_KRB5_PN_ID_HOST_FQHN:
+	case SMB_KRB5_PN_ID_CIFS_FQHN:
 	case SMB_KRB5_PN_ID_NFS_FQHN:
 	case SMB_KRB5_PN_ID_HTTP_FQHN:
 	case SMB_KRB5_PN_ID_ROOT_FQHN:
 		(void) asprintf(&buf, "%s/%s.%s",
 		    pn->p_svc, hostname, fqdn);
 		break;
+
+	case SMB_KRB5_PN_ID_HOST_SHORT:
+	case SMB_KRB5_PN_ID_CIFS_SHORT:
+		(void) asprintf(&buf, "%s/%s",
+		    pn->p_svc, nbname);
+		break;
+
+	/*
+	 * SPN for the machine account, which is simply the
+	 * (short) machine name with a dollar sign appended.
+	 */
+	case SMB_KRB5_PN_ID_MACHINE:
+		(void) asprintf(&buf, "%s$", nbname);
+		break;
+
+	default:
+		return (NULL);
 	}
 
 	/*

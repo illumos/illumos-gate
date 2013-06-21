@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -1889,6 +1889,7 @@ smb_server_fclose(smb_llist_t *ll, uint32_t uniqid)
 	return (rc);
 }
 
+/* See also: libsmb smb_kmod_setcfg */
 static void
 smb_server_store_cfg(smb_server_t *sv, smb_ioc_cfg_t *ioc)
 {
@@ -1909,12 +1910,22 @@ smb_server_store_cfg(smb_server_t *sv, smb_ioc_cfg_t *ioc)
 	sv->sv_cfg.skc_oplock_enable = ioc->oplock_enable;
 	sv->sv_cfg.skc_sync_enable = ioc->sync_enable;
 	sv->sv_cfg.skc_secmode = ioc->secmode;
+	sv->sv_cfg.skc_netbios_enable = ioc->netbios_enable;
 	sv->sv_cfg.skc_ipv6_enable = ioc->ipv6_enable;
 	sv->sv_cfg.skc_print_enable = ioc->print_enable;
 	sv->sv_cfg.skc_traverse_mounts = ioc->traverse_mounts;
-	sv->sv_cfg.skc_netbios_enable = ioc->netbios_enable;
 	sv->sv_cfg.skc_execflags = ioc->exec_flags;
+	sv->sv_cfg.skc_negtok_len = ioc->negtok_len;
 	sv->sv_cfg.skc_version = ioc->version;
+	(void) memcpy(sv->sv_cfg.skc_machine_uuid, ioc->machine_uuid,
+	    sizeof (uuid_t));
+	(void) memcpy(sv->sv_cfg.skc_negtok, ioc->negtok,
+	    sizeof (sv->sv_cfg.skc_negtok));
+	(void) memcpy(sv->sv_cfg.skc_native_os, ioc->native_os,
+	    sizeof (sv->sv_cfg.skc_native_os));
+	(void) memcpy(sv->sv_cfg.skc_native_lm, ioc->native_lm,
+	    sizeof (sv->sv_cfg.skc_native_lm));
+
 	(void) strlcpy(sv->sv_cfg.skc_nbdomain, ioc->nbdomain,
 	    sizeof (sv->sv_cfg.skc_nbdomain));
 	(void) strlcpy(sv->sv_cfg.skc_fqdn, ioc->fqdn,

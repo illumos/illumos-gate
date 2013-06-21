@@ -608,6 +608,11 @@ usr/src/lib/librstp/common/transmit.h
 usr/src/lib/librstp/common/uid_stp.h
 usr/src/lib/librstp/common/vector.c
 usr/src/lib/librstp/common/vector.h
+usr/src/lib/libsmbfs/smb/derparse.c
+usr/src/lib/libsmbfs/smb/derparse.h
+usr/src/lib/libsmbfs/smb/spnego.c
+usr/src/lib/libsmbfs/smb/spnegoparse.c
+usr/src/lib/libsmbfs/smb/spnegoparse.h
 usr/src/uts/common/gssapi/gssapi.h
 usr/src/uts/common/gssapi/mechs/krb5/crypto/block_size.c
 usr/src/uts/common/gssapi/mechs/krb5/crypto/checksum_length.c

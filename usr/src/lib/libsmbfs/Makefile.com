@@ -23,6 +23,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
 #
 # lib/libsmbfs/Makefile.com
@@ -101,7 +103,7 @@ CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-unused-variable
 
 CPPFLAGS += -D__EXTENSIONS__ -D_REENTRANT -DMIA \
-	-I$(SRCDIR) -I.. \
+	-I$(SRCDIR) -I.. -I../netsmb \
 	-I$(SRC)/uts/common \
 	-I$(SRC)/common/smbclnt
 

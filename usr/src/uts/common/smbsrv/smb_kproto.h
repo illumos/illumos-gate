@@ -553,6 +553,13 @@ void smb_request_cancel(smb_request_t *);
 void smb_request_wait(smb_request_t *);
 
 /*
+ * authentication support (smb_authenticate.c)
+ */
+int smb_authenticate_ext(smb_request_t *);
+int smb_authenticate_old(smb_request_t *);
+void smb_authsock_close(smb_user_t *);
+
+/*
  * session functions (file smb_session.c)
  */
 smb_session_t *smb_session_create(ksocket_t, uint16_t, smb_server_t *, int);
@@ -566,6 +573,8 @@ void smb_session_config(smb_session_t *session);
 void smb_session_disconnect_from_share(smb_llist_t *, char *);
 smb_user_t *smb_session_dup_user(smb_session_t *, char *, char *);
 smb_user_t *smb_session_lookup_uid(smb_session_t *, uint16_t);
+smb_user_t *smb_session_lookup_uid_st(smb_session_t *session,
+    uint16_t uid, smb_user_state_t st);
 void smb_session_post_user(smb_session_t *, smb_user_t *);
 void smb_session_post_tree(smb_session_t *, smb_tree_t *);
 smb_tree_t *smb_session_lookup_tree(smb_session_t *, uint16_t);
@@ -653,7 +662,8 @@ void smb_odir_resume_at(smb_odir_t *, smb_odir_resume_t *);
 /*
  * SMB user functions (file smb_user.c)
  */
-smb_user_t *smb_user_login(smb_session_t *, cred_t *,
+smb_user_t *smb_user_new(smb_session_t *);
+int smb_user_logon(smb_user_t *, cred_t *,
     char *, char *, uint32_t, uint32_t, uint32_t);
 smb_user_t *smb_user_dup(smb_user_t *);
 void smb_user_logoff(smb_user_t *);

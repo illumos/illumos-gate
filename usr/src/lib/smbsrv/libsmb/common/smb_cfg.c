@@ -58,6 +58,7 @@ typedef struct smb_cfg_param {
 /* idmap SMF fmri and Property Group */
 #define	IDMAP_FMRI_PREFIX		"system/idmap"
 #define	MACHINE_SID			"machine_sid"
+#define	MACHINE_UUID			"machine_uuid"
 #define	IDMAP_DOMAIN			"domain_name"
 #define	IDMAP_PG_NAME			"config"
 
@@ -121,14 +122,12 @@ static smb_cfg_param_t smb_cfg_table[] =
 
 	{SMB_CI_MACHINE_PASSWD, "machine_passwd", SCF_TYPE_ASTRING,
 	    SMB_CF_PROTECTED},
-	{SMB_CI_KPASSWD_SRV, "kpasswd_server", SCF_TYPE_ASTRING,
-	    0},
-	{SMB_CI_KPASSWD_DOMAIN, "kpasswd_domain", SCF_TYPE_ASTRING,
-	    0},
-	{SMB_CI_KPASSWD_SEQNUM, "kpasswd_seqnum", SCF_TYPE_INTEGER,
-	    0},
-	{SMB_CI_NETLOGON_SEQNUM, "netlogon_seqnum", SCF_TYPE_INTEGER,
-	    0},
+
+	{SMB_CI_MACHINE_UUID, "machine_uuid", SCF_TYPE_ASTRING, 0},
+	{SMB_CI_KPASSWD_SRV, "kpasswd_server", SCF_TYPE_ASTRING, 0},
+	{SMB_CI_KPASSWD_DOMAIN, "kpasswd_domain", SCF_TYPE_ASTRING, 0},
+	{SMB_CI_KPASSWD_SEQNUM, "kpasswd_seqnum", SCF_TYPE_INTEGER, 0},
+	{SMB_CI_NETLOGON_SEQNUM, "netlogon_seqnum", SCF_TYPE_INTEGER, 0},
 	{SMB_CI_IPV6_ENABLE, "ipv6_enable", SCF_TYPE_BOOLEAN, 0},
 	{SMB_CI_PRINT_ENABLE, "print_enable", SCF_TYPE_BOOLEAN, 0},
 	{SMB_CI_MAP, "map", SCF_TYPE_ASTRING, SMB_CF_EXEC},
@@ -136,6 +135,7 @@ static smb_cfg_param_t smb_cfg_table[] =
 	{SMB_CI_DISPOSITION, "disposition", SCF_TYPE_ASTRING, SMB_CF_EXEC},
 	{SMB_CI_DFS_STDROOT_NUM, "dfs_stdroot_num", SCF_TYPE_INTEGER, 0},
 	{SMB_CI_TRAVERSE_MOUNTS, "traverse_mounts", SCF_TYPE_BOOLEAN, 0},
+
 	/* SMB_CI_MAX */
 };
 
@@ -800,13 +800,39 @@ smb_config_get_ads_enable(void)
  *
  * Returns value of the "config/machine_sid" parameter
  * from the IDMAP SMF configuration repository.
- *
+ * Result is allocated; caller should free.
  */
 char *
 smb_config_get_localsid(void)
 {
 	return (smb_config_getenv_generic(MACHINE_SID, IDMAP_FMRI_PREFIX,
 	    IDMAP_PG_NAME));
+}
+
+/*
+ * smb_config_get_localuuid
+ *
+ * Returns value of the "config/machine_uuid" parameter
+ * from the IDMAP SMF configuration repository.
+ *
+ */
+int
+smb_config_get_localuuid(uuid_t uu)
+{
+	char *s;
+
+	uuid_clear(uu);
+	s = smb_config_getenv_generic(MACHINE_UUID, IDMAP_FMRI_PREFIX,
+	    IDMAP_PG_NAME);
+	if (s == NULL)
+		return (-1);
+
+	if (uuid_parse(s, uu) < 0) {
+		free(s);
+		return (-1);
+	}
+
+	return (0);
 }
 
 /*

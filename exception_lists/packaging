@@ -344,6 +344,7 @@ etc/sfw
 # Entries for the libmech_krb5 symlink, which has been included
 # for build purposes only, not delivered to customers.
 #
+usr/include/gssapi/gssapi_krb5.h
 usr/lib/gss/libmech_krb5.so
 usr/lib/amd64/gss/libmech_krb5.so	i386
 usr/lib/sparcv9/gss/libmech_krb5.so	sparc

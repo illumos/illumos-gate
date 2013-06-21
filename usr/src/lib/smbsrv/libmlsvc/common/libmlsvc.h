@@ -70,6 +70,10 @@ extern void mlsvc_fini(void);
 extern DWORD mlsvc_netlogon(char *, char *);
 extern DWORD mlsvc_join(smb_domainex_t *, char *, char *);
 
+extern void smb_logon_domain(smb_logon_t *, smb_token_t *);
+extern uint32_t smb_decode_krb5_pac(smb_token_t *, char *, uint_t);
+extern boolean_t smb_token_setup_common(smb_token_t *);
+
 
 /*
  * The maximum number of domains (NT limit).

@@ -21,6 +21,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -157,8 +159,10 @@ smb_mbc_vdecodef(mbuf_chain_t *mbc, char *fmt, va_list ap)
 	uint32_t	lval;
 	int		unicode = 0;
 	int		repc;
+	boolean_t	repc_specified;
 
 	while ((c = *fmt++) != 0) {
+		repc_specified = B_FALSE;
 		repc = 1;
 
 		if ('0' <= c && c <= '9') {
@@ -167,9 +171,11 @@ smb_mbc_vdecodef(mbuf_chain_t *mbc, char *fmt, va_list ap)
 				repc = repc * 10 + c - '0';
 				c = *fmt++;
 			} while ('0' <= c && c <= '9');
+			repc_specified = B_TRUE;
 		} else if (c == '#') {
 			repc = va_arg(ap, int);
 			c = *fmt++;
+			repc_specified = B_TRUE;
 		}
 
 		switch (c) {
@@ -296,7 +302,7 @@ smb_mbc_vdecodef(mbuf_chain_t *mbc, char *fmt, va_list ap)
 ascii_conversion:
 			ASSERT(sr != NULL);
 			cvalpp = va_arg(ap, uint8_t **);
-			if (repc <= 1)
+			if (!repc_specified)
 				repc = 0;
 			if (mbc_marshal_get_ascii_string(sr,
 			    mbc, cvalpp, repc) != 0)
@@ -307,7 +313,7 @@ ascii_conversion:
 unicode_translation:
 			ASSERT(sr != 0);
 			cvalpp = va_arg(ap, uint8_t **);
-			if (repc <= 1)
+			if (!repc_specified)
 				repc = 0;
 			if (mbc->chain_offset & 1)
 				mbc->chain_offset++;
@@ -508,12 +514,14 @@ smb_mbc_vencodef(mbuf_chain_t *mbc, char *fmt, va_list ap)
 	uint32_t	lval;
 	uint_t		tag;
 	int		unicode = 0;
-	int		repc = 1;
+	int		repc;
+	boolean_t	repc_specified;
 	uint16_t	wval;
 	uint8_t		cval;
 	uint8_t		c;
 
 	while ((c = *fmt++) != 0) {
+		repc_specified = B_FALSE;
 		repc = 1;
 
 		if ('0' <= c && c <= '9') {
@@ -522,9 +530,12 @@ smb_mbc_vencodef(mbuf_chain_t *mbc, char *fmt, va_list ap)
 				repc = repc * 10 + c - '0';
 				c = *fmt++;
 			} while ('0' <= c && c <= '9');
+			repc_specified = B_TRUE;
 		} else if (c == '#') {
 			repc = va_arg(ap, int);
 			c = *fmt++;
+			repc_specified = B_TRUE;
+
 		}
 
 		switch (c) {
@@ -647,6 +658,8 @@ smb_mbc_vencodef(mbuf_chain_t *mbc, char *fmt, va_list ap)
 
 		case 's':	/* ASCII/multibyte string */
 ascii_conversion:	cvalp = va_arg(ap, uint8_t *);
+			if (!repc_specified)
+				repc = 0;
 			if (mbc_marshal_put_ascii_string(mbc,
 			    (char *)cvalp, repc) != 0)
 				return (DECODE_NO_MORE_DATA);
@@ -696,6 +709,8 @@ unicode_translation:
 			if (mbc->chain_offset & 1)
 				mbc->chain_offset++;
 			cvalp = va_arg(ap, uint8_t *);
+			if (!repc_specified)
+				repc = 0;
 			if (mbc_marshal_put_unicode_string(mbc,
 			    (char *)cvalp, repc) != 0)
 				return (DECODE_NO_MORE_DATA);
@@ -1040,7 +1055,7 @@ mbc_marshal_put_ascii_string(mbuf_chain_t *mbc, char *mbs, int repc)
 
 	length += sizeof (char);
 
-	if ((repc > 1) && (repc < length))
+	if ((repc > 0) && (repc < length))
 		length = repc;
 	if (mbc_marshal_make_room(mbc, length))
 		return (DECODE_NO_MORE_DATA);
@@ -1077,7 +1092,7 @@ mbc_marshal_put_unicode_string(mbuf_chain_t *mbc, char *ascii, int repc)
 
 	length += sizeof (smb_wchar_t);
 
-	if ((repc > 1) && (repc < length))
+	if ((repc > 0) && (repc < length))
 		length = repc;
 
 	if (mbc_marshal_make_room(mbc, length))

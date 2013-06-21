@@ -88,10 +88,10 @@ then
     (cd $SRC/head && $make install_h)
 
   # always update the smbsrv headers to be safe
-  # test -f $ROOT/usr/include/smbsrv/wintypes.h ||
-    (cd $SRC/uts/common/sys && $make -k install_h)
-    (cd $SRC/uts/common/smb && $make -k install_h)
-    (cd $SRC/uts/common/smbsrv && $make -k install_h)
+  (cd $SRC/uts/common/gssapi && $make -k install_h)
+  (cd $SRC/uts/common/sys && $make -k install_h)
+  (cd $SRC/uts/common/smb && $make -k install_h)
+  (cd $SRC/uts/common/smbsrv && $make -k install_h)
 
 fi
 
@@ -102,6 +102,8 @@ for lib in \
   libcryptoutil \
   libdevid \
   libfakekernel	\
+  libgss \
+  libkrb5 \
   libidmap \
   libpam \
   libsec \
@@ -140,6 +142,8 @@ do_lib1() {
 
 for lib in \
   libavl \
+  libgss \
+  libkrb5 \
   libcmdutils \
   libsqlite \
   libuutil
@@ -241,8 +245,12 @@ do_tags() {
 	find uts/common/smbsrv -name '*.ndl' -print |sort
 	find uts/common/smbsrv -name '*.[ch]' -print |sort
 	find uts/common/fs/smbsrv -name '*.[ch]' -print |sort
-	find lib/libsmbfs -name '*.[ch]' -print |sort
+	find uts/common/gssapi -name '*.[ch]' -print |sort
+	find head -name '*.h' -print |sort
 	find lib/smbsrv -name '*.[ch]' -print |sort
+	find lib/libsmbfs -name '*.[ch]' -print |sort
+	find lib/libads -name '*.[ch]' -print |sort
+	find lib/libgss -name '*.[ch]' -print |sort
 	find cmd/smbsrv -name '*.[ch]' -print |sort
 	find common/smbsrv -name '*.[ch]' -print |sort
 	) > $SRC/cscope.files

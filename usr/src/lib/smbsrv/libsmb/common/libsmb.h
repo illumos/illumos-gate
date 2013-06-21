@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_LIBSMB_H
@@ -139,6 +139,7 @@ typedef enum {
 	SMB_CI_DYNDNS_ENABLE,
 
 	SMB_CI_MACHINE_PASSWD,
+	SMB_CI_MACHINE_UUID,
 	SMB_CI_KPASSWD_SRV,
 	SMB_CI_KPASSWD_DOMAIN,
 	SMB_CI_KPASSWD_SEQNUM,
@@ -193,6 +194,7 @@ extern boolean_t smb_config_get_ads_enable(void);
 extern int smb_config_get_debug(void);
 extern uint8_t smb_config_get_fg_flag(void);
 extern char *smb_config_get_localsid(void);
+extern int smb_config_get_localuuid(uuid_t);
 extern int smb_config_secmode_fromstr(char *);
 extern char *smb_config_secmode_tostr(int);
 extern int smb_config_get_secmode(void);
@@ -202,7 +204,7 @@ extern int smb_config_refresh_idmap(void);
 extern int smb_config_getip(smb_cfg_id_t, smb_inaddr_t *);
 extern void smb_config_get_version(smb_version_t *);
 uint32_t smb_config_get_execinfo(char *, char *, size_t);
-
+extern void smb_config_get_negtok(uchar_t *, uint32_t *);
 
 extern void smb_load_kconfig(smb_kmod_cfg_t *kcfg);
 extern uint32_t smb_crc_gen(uint8_t *, size_t);
@@ -303,7 +305,7 @@ void libsmb_redirect_syslog(__FILE_TAG *fp, int priority);
 #define	SMBAUTH_HASH_SZ		16	/* also LM/NTLM/NTLMv2 Hash size */
 #define	SMBAUTH_LM_RESP_SZ	24	/* also NTLM Response size */
 #define	SMBAUTH_LM_PWD_SZ	14	/* LM password size */
-#define	SMBAUTH_V2_CLNT_CHALLENGE_SZ 8	/* both LMv2 and NTLMv2 */
+#define	SMBAUTH_CHAL_SZ		 8	/* both LMv2 and NTLMv2 */
 #define	SMBAUTH_SESSION_KEY_SZ	SMBAUTH_HASH_SZ
 #define	SMBAUTH_HEXHASH_SZ	(SMBAUTH_HASH_SZ * 2)
 
@@ -364,7 +366,7 @@ typedef struct smb_auth_data_blob {
 	unsigned char ndb_signature[4];
 	unsigned char ndb_reserved[4];
 	uint64_t ndb_timestamp;
-	unsigned char ndb_clnt_challenge[SMBAUTH_V2_CLNT_CHALLENGE_SZ];
+	unsigned char ndb_clnt_challenge[SMBAUTH_CHAL_SZ];
 	unsigned char ndb_unknown[4];
 	smb_auth_name_entry_t ndb_names[2];
 	unsigned char ndb_unknown2[4];
@@ -488,6 +490,9 @@ extern int smb_auth_RC4(unsigned char *, int, unsigned char *, int,
 extern int smb_auth_md4(unsigned char *, unsigned char *, int);
 extern int smb_auth_lm_hash(const char *, unsigned char *);
 extern int smb_auth_ntlm_hash(const char *, unsigned char *);
+extern void smb_auth_ntlm2_mkchallenge(char *, const char *, const char *);
+extern void smb_auth_ntlm2_kxkey(unsigned char *, const char *, const char *,
+    unsigned char *);
 
 extern int smb_auth_set_info(char *, char *,
     unsigned char *, char *, unsigned char *,
@@ -496,12 +501,8 @@ extern int smb_auth_set_info(char *, char *,
 extern int smb_auth_ntlmv2_hash(unsigned char *,
 	char *, char *, unsigned char *);
 
-extern int smb_auth_gen_session_key(smb_auth_info_t *, unsigned char *);
-
-boolean_t smb_auth_validate_lm(unsigned char *, uint32_t, smb_passwd_t *,
-    unsigned char *, int, char *, char *);
-boolean_t smb_auth_validate_nt(unsigned char *, uint32_t, smb_passwd_t *,
-    unsigned char *, int, char *, char *, uchar_t *);
+boolean_t smb_auth_validate(smb_passwd_t *, char *, char *,
+    uchar_t *, uint_t, uchar_t *, uint_t, uchar_t *, uint_t, uchar_t *);
 
 int smb_gen_random_passwd(char *passwd, size_t bufsz);
 
@@ -514,14 +515,6 @@ extern void smb_ipc_get_passwd(uint8_t *, size_t);
 extern void smb_ipc_init(void);
 extern void smb_ipc_rollback(void);
 extern void smb_ipc_set(char *, uint8_t *);
-
-/*
- * SMB MAC Signing
- */
-
-#define	SMB_MAC_KEY_SZ	(SMBAUTH_SESSION_KEY_SZ + SMBAUTH_CS_MAXLEN)
-#define	SMB_SIG_OFFS	14	/* signature field offset within header */
-#define	SMB_SIG_SIZE	8	/* SMB signature size */
 
 /*
  * Signing flags:
@@ -545,38 +538,6 @@ extern void smb_ipc_set(char *, uint8_t *);
 #define	SMB_SCF_REQUIRED	0x02
 #define	SMB_SCF_STARTED		0x04
 #define	SMB_SCF_KEY_ISSET_THIS_LOGON	0x08
-
-/*
- * smb_sign_ctx
- *
- * SMB signing context.
- *
- *	ssc_seqnum				sequence number
- *	ssc_keylen				mac key length
- *	ssc_mid					multiplex id - reserved
- *	ssc_flags				flags
- *	ssc_mackey				mac key
- *	ssc_sign				mac signature
- *
- */
-typedef struct smb_sign_ctx {
-	unsigned int ssc_seqnum;
-	unsigned short ssc_keylen;
-	unsigned short ssc_mid;
-	unsigned int ssc_flags;
-	unsigned char ssc_mackey[SMB_MAC_KEY_SZ];
-	unsigned char ssc_sign[SMB_SIG_SIZE];
-} smb_sign_ctx_t;
-
-extern int smb_mac_init(smb_sign_ctx_t *sign_ctx, smb_auth_info_t *auth);
-extern int smb_mac_calc(smb_sign_ctx_t *sign_ctx,
-    const unsigned char *buf, size_t buf_len, unsigned char *mac_sign);
-extern int smb_mac_chk(smb_sign_ctx_t *sign_ctx,
-    const unsigned char *buf, size_t buf_len);
-extern int smb_mac_sign(smb_sign_ctx_t *sign_ctx,
-    unsigned char *buf, size_t buf_len);
-extern void smb_mac_inc_seqnum(smb_sign_ctx_t *sign_ctx);
-extern void smb_mac_dec_seqnum(smb_sign_ctx_t *sign_ctx);
 
 /*
  * Each domain is categorized using the enum values below.

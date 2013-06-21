@@ -75,13 +75,13 @@ SYMBOL_VERSION SUNWprivate {
 	smb_acl_to_zfs;
 	smb_auth_DES;
 	smb_auth_RC4;
-	smb_auth_gen_session_key;
 	smb_auth_hmac_md5;
 	smb_auth_ntlm_hash;
+	smb_auth_ntlm2_kxkey;
+	smb_auth_ntlm2_mkchallenge;
 	smb_auth_ntlmv2_hash;
 	smb_auth_qnd_unicode;
-	smb_auth_validate_lm;
-	smb_auth_validate_nt;
+	smb_auth_validate;
 	smb_buf32_xdr;
 	smb_cache_add;
 	smb_cache_create;
@@ -265,11 +265,6 @@ SYMBOL_VERSION SUNWprivate {
 	smb_logon_xdr;
 	smb_lookup_name;
 	smb_lookup_sid;
-	smb_mac_chk;
-	smb_mac_dec_seqnum;
-	smb_mac_inc_seqnum;
-	smb_mac_init;
-	smb_mac_sign;
 	smb_match_netlogon_seqnum;
 	smb_mbstos;
 	smb_mbstowcs;

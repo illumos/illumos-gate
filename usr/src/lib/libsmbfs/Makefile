@@ -19,9 +19,10 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+#
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -30,7 +31,7 @@
 
 include $(SRC)/lib/Makefile.lib
 
-HDRS=		smbfs_acl.h smbfs_api.h smb_keychain.h
+HDRS=		ntlmssp.h smbfs_acl.h smbfs_api.h smb_keychain.h spnego.h
 HDRDIR=		netsmb
 
 ROOTHDRDIR=	$(ROOT)/usr/include/netsmb

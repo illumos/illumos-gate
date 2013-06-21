@@ -23,6 +23,10 @@
 #include <security/pkcs11.h>
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define	MD5_DIGEST_LENGTH	16	/* MD5 digest length in bytes */
 
 #ifdef	_KERNEL
@@ -46,5 +50,9 @@ int smb_md5_getmech(smb_sign_mech_t *);
 int smb_md5_init(smb_sign_ctx_t *, smb_sign_mech_t *);
 int smb_md5_update(smb_sign_ctx_t, void *, size_t);
 int smb_md5_final(smb_sign_ctx_t, uint8_t *);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _SMB_SIGNING_H_ */

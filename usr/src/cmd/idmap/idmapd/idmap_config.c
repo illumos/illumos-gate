@@ -89,46 +89,52 @@ struct enum_lookup_map trust_dir_map[] = {
 };
 
 static int
-generate_machine_sid(char **machine_sid)
+generate_machine_uuid(char **machine_uuid)
 {
-	char *p;
 	uuid_t uu;
-	int i, j, len, rlen;
-	uint32_t rid;
 
-	/*
-	 * Generate and split 128-bit UUID into three 32-bit RIDs The
-	 * machine_sid will be of the form S-1-5-21-N1-N2-N3 (that's
-	 * four RIDs altogether).
-	 *
-	 * Technically we could use up to 14 random RIDs here, but it
-	 * turns out that with some versions of Windows using SIDs with
-	 * more than  five RIDs in security descriptors causes problems.
-	 */
-
-	*machine_sid = calloc(1, MACHINE_SID_LEN);
-	if (*machine_sid == NULL) {
+	*machine_uuid = calloc(1, UUID_PRINTABLE_STRING_LENGTH + 1);
+	if (*machine_uuid == NULL) {
 		idmapdlog(LOG_ERR, "Out of memory");
 		return (-1);
 	}
-	(void) strcpy(*machine_sid, "S-1-5-21");
-	p = *machine_sid + strlen("S-1-5-21");
-	len = MACHINE_SID_LEN - strlen("S-1-5-21");
 
 	uuid_clear(uu);
-	uuid_generate_random(uu);
+	uuid_generate_time(uu);
+	uuid_unparse(uu, *machine_uuid);
 
-#if UUID_LEN != 16
-#error UUID size is not 16!
-#endif
+	return (0);
+}
 
-	for (i = 0; i < 3; i++) {
-		j = i * 4;
-		rid = (uu[j] << 24) | (uu[j + 1] << 16) |
-		    (uu[j + 2] << 8) | (uu[j + 3]);
-		rlen = snprintf(p, len, "-%u", rid);
-		p += rlen;
-		len -= rlen;
+static int
+generate_machine_sid(char **machine_sid, char *machine_uuid)
+{
+	union {
+		uuid_t uu;
+		uint32_t v[4];
+	} uv;
+	int len;
+
+	/*
+	 * Split the 128-bit machine UUID into three 32-bit values
+	 * we'll use as the "sub-authorities" of the machine SID.
+	 * The machine_sid will have the form S-1-5-21-J-K-L
+	 * (that's four sub-authorities altogether) where:
+	 *	J = last 4 bytes of node_addr,
+	 *	K = time_mid, time_hi_and_version
+	 *	L = time_low
+	 * (see struct uuid)
+	 */
+
+	(void) memset(&uv, 0, sizeof (uv));
+	(void) uuid_parse(machine_uuid, uv.uu);
+
+	len = asprintf(machine_sid, "S-1-5-21-%u-%u-%u",
+	    uv.v[3], uv.v[0], uv.v[1]);
+
+	if (len == -1 || *machine_sid == NULL) {
+		idmapdlog(LOG_ERR, "Out of memory");
+		return (-1);
 	}
 
 	return (0);
@@ -1537,12 +1543,29 @@ idmap_cfg_load_smf(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 		pgcfg->default_domain = strdup(pgcfg->domain_name);
 	}
 
+	rc = get_val_astring(handles, "machine_uuid", &pgcfg->machine_uuid);
+	if (rc != 0)
+		(*errors)++;
+	if (pgcfg->machine_uuid == NULL) {
+		/* If machine_uuid not configured, generate one */
+		if (generate_machine_uuid(&pgcfg->machine_uuid) < 0)
+			return (-2);
+		rc = set_val_astring(handles, handles->config_pg,
+		    "machine_uuid", pgcfg->machine_uuid);
+		if (rc != 0)
+			(*errors)++;
+	}
+
 	rc = get_val_astring(handles, "machine_sid", &pgcfg->machine_sid);
 	if (rc != 0)
 		(*errors)++;
 	if (pgcfg->machine_sid == NULL) {
-		/* If machine_sid not configured, generate one */
-		if (generate_machine_sid(&pgcfg->machine_sid) < 0)
+		/*
+		 * If machine_sid not configured, generate one
+		 * from the machine UUID.
+		 */
+		if (generate_machine_sid(&pgcfg->machine_sid,
+		    pgcfg->machine_uuid) < 0)
 			return (-2);
 		rc = set_val_astring(handles, handles->config_pg,
 		    "machine_sid", pgcfg->machine_sid);

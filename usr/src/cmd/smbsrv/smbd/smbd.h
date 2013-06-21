@@ -56,6 +56,7 @@ uint32_t smbd_join(smb_joininfo_t *);
 void smbd_set_secmode(int);
 boolean_t smbd_online(void);
 void smbd_online_wait(const char *);
+void smbd_get_authconf(smb_kmod_cfg_t *);
 
 void smbd_spool_start(void);
 void smbd_spool_stop(void);
@@ -81,6 +82,7 @@ typedef struct smbd {
 	boolean_t	s_shutting_down; /* shutdown control */
 	volatile uint_t	s_refreshes;
 	boolean_t	s_kbound;	/* B_TRUE if bound to kernel */
+	int		s_authsvc_sock;
 	int		s_door_lmshr;
 	int		s_door_srv;
 	int		s_door_opipe;
@@ -89,6 +91,7 @@ typedef struct smbd {
 	smb_inaddr_t	s_pdc;
 	boolean_t	s_pdc_changed;
 	pthread_t	s_refresh_tid;
+	pthread_t	s_authsvc_tid;
 	pthread_t	s_localtime_tid;
 	pthread_t	s_spool_tid;
 	pthread_t	s_dc_monitor_tid;
@@ -139,6 +142,9 @@ void smbd_door_enter(smbd_door_t *);
 void smbd_door_return(smbd_door_t *, char *, size_t, door_desc_t *, uint_t);
 
 void *smbd_door_dispatch_op(void *);
+
+int smbd_authsvc_start(void);
+void smbd_authsvc_stop(void);
 
 /* For fksmbd */
 void fksmbd_init(void);

@@ -57,15 +57,24 @@
  */
 
 static const gss_OID_desc oids[] = {
+	/* GSS_C_NT_USER_NAME */
 	{10, "\052\206\110\206\367\022\001\002\001\001"},
+	/* GSS_C_NT_MACHINE_UID_NAME */
 	{10, "\052\206\110\206\367\022\001\002\001\002"},
+	/* GSS_C_NT_STRING_UID_NAME */
 	{10, "\052\206\110\206\367\022\001\002\001\003"},
+	/* gss_nt_service_name */
 	{10, "\052\206\110\206\367\022\001\002\001\004"},
-	{6, "\053\006\001\005\006\002"},
-	{6, "\053\006\001\005\006\003"},
-	{6, "\053\006\001\005\006\004"},
-	{11, "\x2a\x86\x48\x86\xf7\x12\x01\x02\x02\x05\x05"},
 
+	/* GSS_C_NT_HOSTBASED_SERVICE */
+	{6, "\053\006\001\005\006\002"},
+	/* GSS_C_NT_ANONYMOUS */
+	{6, "\053\006\001\005\006\003"},
+	/* GSS_C_NT_EXPORT_NAME */
+	{6, "\053\006\001\005\006\004"},
+
+	/* GSS_C_INQ_SSPI_SESSION_KEY */
+	{11, "\x2a\x86\x48\x86\xf7\x12\x01\x02\x02\x05\x05"},
 };
 
 const gss_OID_desc * const gss_nt_user_name = oids+0;
@@ -93,4 +102,4 @@ const gss_OID GSS_C_NT_STRING_UID_NAME = (gss_OID)oids+2;
 const gss_OID GSS_C_NT_HOSTBASED_SERVICE = (gss_OID)oids+4;
 const gss_OID GSS_C_NT_ANONYMOUS = (gss_OID)oids+5;
 const gss_OID GSS_C_NT_EXPORT_NAME = (gss_OID)oids+6;
-const gss_OID GSS_C_INQ_SSPI_SESSION_KEY   = (gss_OID)oids+7;
+const gss_OID GSS_C_INQ_SSPI_SESSION_KEY = (gss_OID)oids+7;

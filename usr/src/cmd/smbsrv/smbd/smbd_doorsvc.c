@@ -38,6 +38,7 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <strings.h>
+#include <note.h>
 #include <smbsrv/smb_door.h>
 #include <smbsrv/smb_xdr.h>
 #include <smbsrv/smb_token.h>
@@ -572,27 +573,10 @@ smbd_dop_user_auth_logoff(smbd_arg_t *arg)
 static int
 smbd_dop_user_auth_logon(smbd_arg_t *arg)
 {
-	smb_logon_t	*user_info;
-	smb_token_t	*token;
+	_NOTE(ARGUNUSED(arg))
 
-	user_info = smb_logon_decode((uint8_t *)arg->data,
-	    arg->datalen);
-	if (user_info == NULL)
-		return (SMB_DOP_DECODE_ERROR);
-
-	token = smbd_user_auth_logon(user_info);
-
-	smb_logon_free(user_info);
-
-	if (token == NULL)
-		return (SMB_DOP_EMPTYBUF);
-
-	arg->rbuf = (char *)smb_token_encode(token, &arg->rsize);
-	smb_token_destroy(token);
-
-	if (arg->rbuf == NULL)
-		return (SMB_DOP_ENCODE_ERROR);
-	return (SMB_DOP_SUCCESS);
+	/* No longer used */
+	return (SMB_DOP_EMPTYBUF);
 }
 
 static int

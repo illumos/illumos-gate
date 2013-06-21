@@ -77,6 +77,7 @@ typedef struct idmap_pg_config {
 	uint64_t	list_size_limit;
 	uint64_t	id_cache_timeout;
 	uint64_t	name_cache_timeout;
+	char		*machine_uuid;		/* machine uuid */
 	char		*machine_sid;		/* machine sid */
 	char		*default_domain;	/* default domain name */
 	char		*domain_name;		/* AD domain name */
