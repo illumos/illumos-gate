@@ -19,6 +19,9 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2013, Ira Cooper.  All rights reserved.
+ */
+/*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -1440,6 +1443,7 @@ crgrpcopyin(int n, gid_t *gidset)
 	}
 	mem->crg_ref = 1;
 	mem->crg_ngroups = n;
+	qsort(mem->crg_groups, n, sizeof (gid_t), gidcmp);
 	return (mem);
 }
 

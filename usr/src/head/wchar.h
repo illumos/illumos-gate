@@ -122,6 +122,9 @@ typedef __va_list va_list;
 #ifdef __STDC__
 
 #if !defined(_STRICT_STDC) || defined(_XOPEN_SOURCE) || defined(__EXTENSIONS__)
+#if __cplusplus >= 199711L
+namespace std {
+#endif
 extern int iswalpha(wint_t);
 extern int iswupper(wint_t);
 extern int iswlower(wint_t);
@@ -140,6 +143,28 @@ extern wchar_t *wcswcs(const wchar_t *, const wchar_t *);
 extern int wcswidth(const wchar_t *, size_t);
 extern int wcwidth(wchar_t);
 extern wctype_t wctype(const char *);
+#if __cplusplus >= 199711L
+} /* namespace std */
+
+using std::iswalpha;
+using std::iswupper;
+using std::iswlower;
+using std::iswdigit;
+using std::iswxdigit;
+using std::iswalnum;
+using std::iswspace;
+using std::iswpunct;
+using std::iswprint;
+using std::iswgraph;
+using std::iswcntrl;
+using std::iswctype;
+using std::towlower;
+using std::towupper;
+using std::wcswcs;
+using std::wcswidth;
+using std::wcwidth;
+using std::wctype;
+#endif
 #endif /* !defined(_STRICT_STDC) || defined(_XOPEN_SOURCE)... */
 
 #if defined(__EXTENSIONS__) || \

@@ -1,0 +1,136 @@
+'\" t
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2013, Joyent, Inc. All rights reserved.
+.\"
+.TH GETLINE 3C "Apr 24, 2013"
+.SH NAME
+getline, getdelim \- read delimited input from streams
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdio.h>
+.fi
+
+.LP
+.nf
+\fBssize_t\fR \fBgetline\fR(\fBchar **restrict\fR \fIptr\fR, \
+\fBsize_t *restrict\fR \fIcap\fR,
+    \fBFILE *restrict\fR \fIstream\fR);
+.fi
+
+.LP
+.nf
+\fBssize_t\fR \fBgetdelim\fR(\fBchar **restrict\fR \fIptr\fR, \
+\fBsize_t *restrict\fR \fIcap\fR,
+    \fBint\fR \fIdelimiter\fR, \fBFILE *restrict\fR \fIstream\fR);
+.fi
+
+.SH DESCRIPTION
+The \fBgetdelim\fR() function reads bytes from the \fIstream\fR into the the
+array pointed to by \fIptr\fR, until the \fIdelimiter\fR byte or an end-of-file
+condition is encountered.  The \fBgetline\fR() function is identical in
+behaviour, but uses the newline character as the delimiter.  The delimiter
+character is included in the string (unless end-of-file was reached first) and
+the string is terminated with a null byte.
+
+The caller may pass a pre-allocated \fBmalloc\fR(3C) buffer as \fI*ptr\fR,
+along with the capacity of that buffer as \fI*cap\fR.  It is also valid to pass
+\fBNULL\fR for \fI*ptr\fR and \fB0\fR for \fI*cap\fR, at which point memory
+will be allocated automatically.  If the buffer provided is not large enough to
+hold the string it will be expanded, as if via \fBrealloc(3C)\fR.  The caller
+must \fBfree(3C)\fR the buffer when it is no longer required.
+
+.SH RETURN VALUES
+.sp
+.LP
+If successful, \fBgetdelim\fR() and \fBgetline\fR() return the number of bytes
+written into the buffer, excluding the terminating null byte.  If an error
+occurs, or if end-of-file is reached prior to reading any bytes, the value
+\fB\(mi1\fR is returned and \fIerrno\fR is set to indicate the error.
+
+.SH ERRORS
+.sp
+.LP
+The \fBgetline\fR() and \fBgetdelim\fR() functions may fail due to the
+following errors:
+
+.sp
+.ne 2
+.na
+\fBEINVAL\fR
+.ad
+.RS 13n
+Either \fIptr\fR or \fIcap\fR are \fBNULL\fR, or the \fIdelimiter\fR is
+not a valid character.
+.RE
+
+.sp
+.ne 2
+.na
+\fBEOVERFLOW\fR
+.ad
+.RS 13n
+More than \fBSSIZE_MAX\fR characters were read from the stream without
+encountering the \fIdelimiter\fR.
+.RE
+
+.sp
+.LP
+The \fBgetline\fR() and \fBgetdelim\fR() functions may also fail and set
+\fIerrno\fR for any of the errors specified for the library routines
+\fBrealloc\fR(3C) or \fBfgetc\fR(3C).
+
+.SH EXAMPLES
+.LP
+\fBExample 1\fR Read a line from \fBstdin\fR.
+.sp
+.LP
+The following example uses \fBgetline\fR to read a line from stdin.
+
+.sp
+.in +2
+.nf
+#include <stdio.h>
+\&...
+char *ptr = NULL;
+size_t cap = 0;
+
+if (getline(&ptr, &cap, stdin) == -1) {
+    perror("getline");
+    exit(1);
+}
+fprintf(stdout, "input line: %s", ptr);
+
+free(ptr);
+.
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Committed
+_
+MT-Level	MT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfgetc\fR(3C), \fBfgets\fR(3C), \fBfree\fR(3C), \fBmalloc\fR(3C),
+\fBrealloc\fR(3C), \fBattributes\fR(5)
