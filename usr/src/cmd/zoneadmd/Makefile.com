@@ -26,6 +26,7 @@
 PROG= zoneadmd
 
 include ../../Makefile.cmd
+include ../../Makefile.ctf
 
 ROOTCMDDIR=	$(ROOTLIB)/zones
 
@@ -40,6 +41,7 @@ LDLIBS += -lsocket -lzonecfg -lnsl -ldevinfo -ldevice -lnvpair \
 
 %.o:    ../%.c
 	$(COMPILE.c) $<
+	$(POST_PROCESS_O)
 
 ROOTUSRLIBZONES			= $(ROOT)/usr/lib/zones
 ROOTUSRLIBZONES32		= $(ROOTUSRLIBZONES)/$(MACH32)
