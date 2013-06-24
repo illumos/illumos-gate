@@ -2371,13 +2371,9 @@ sigwillqueue(int sig, int code)
 	return (0);
 }
 
-#ifndef	UCHAR_MAX
-#define	UCHAR_MAX	255
-#endif
-
 /*
- * The entire pool (with maxcount entries) is pre-allocated at
- * the first sigqueue/signotify call.
+ * The pre-allocated pool (with _SIGQUEUE_PREALLOC entries) is
+ * allocated at the first sigqueue/signotify call.
  */
 sigqhdr_t *
 sigqhdralloc(size_t size, uint_t maxcount)
@@ -2386,16 +2382,22 @@ sigqhdralloc(size_t size, uint_t maxcount)
 	sigqueue_t *sq, *next;
 	sigqhdr_t *sqh;
 
-	i = (maxcount * size) + sizeof (sigqhdr_t);
-	ASSERT(maxcount <= UCHAR_MAX && i <= USHRT_MAX);
+	/*
+	 * Before the introduction of process.max-sigqueue-size
+	 * _SC_SIGQUEUE_MAX had this static value.
+	 */
+#define	_SIGQUEUE_PREALLOC	32
+
+	i = (_SIGQUEUE_PREALLOC * size) + sizeof (sigqhdr_t);
+	ASSERT(maxcount <= INT_MAX);
 	sqh = kmem_alloc(i, KM_SLEEP);
-	sqh->sqb_count = (uchar_t)maxcount;
-	sqh->sqb_maxcount = (uchar_t)maxcount;
-	sqh->sqb_size = (ushort_t)i;
+	sqh->sqb_count = maxcount;
+	sqh->sqb_maxcount = maxcount;
+	sqh->sqb_size = i;
 	sqh->sqb_pexited = 0;
 	sqh->sqb_sent = 0;
 	sqh->sqb_free = sq = (sigqueue_t *)(sqh + 1);
-	for (i = maxcount - 1; i != 0; i--) {
+	for (i = _SIGQUEUE_PREALLOC - 1; i != 0; i--) {
 		next = (sigqueue_t *)((uintptr_t)sq + size);
 		sq->sq_next = next;
 		sq = next;
@@ -2409,8 +2411,9 @@ sigqhdralloc(size_t size, uint_t maxcount)
 static void sigqrel(sigqueue_t *);
 
 /*
- * allocate a sigqueue/signotify structure from the per process
- * pre-allocated pool.
+ * Allocate a sigqueue/signotify structure from the per process
+ * pre-allocated pool or allocate a new sigqueue/signotify structure
+ * if the pre-allocated pool is exhausted.
  */
 sigqueue_t *
 sigqalloc(sigqhdr_t *sqh)
@@ -2423,12 +2426,20 @@ sigqalloc(sigqhdr_t *sqh)
 		mutex_enter(&sqh->sqb_lock);
 		if (sqh->sqb_count > 0) {
 			sqh->sqb_count--;
-			sq = sqh->sqb_free;
-			sqh->sqb_free = sq->sq_next;
+			if (sqh->sqb_free == NULL) {
+				/*
+				 * The pre-allocated pool is exhausted.
+				 */
+				sq = kmem_alloc(sizeof (sigqueue_t), KM_SLEEP);
+				sq->sq_func = NULL;
+			} else {
+				sq = sqh->sqb_free;
+				sq->sq_func = sigqrel;
+				sqh->sqb_free = sq->sq_next;
+			}
 			mutex_exit(&sqh->sqb_lock);
 			bzero(&sq->sq_info, sizeof (k_siginfo_t));
 			sq->sq_backptr = sqh;
-			sq->sq_func = sigqrel;
 			sq->sq_next = NULL;
 			sq->sq_external = 0;
 		} else {

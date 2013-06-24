@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RESOURCE_CONTROLS 5 "Jul 2, 2007"
+.TH RESOURCE_CONTROLS 5 "Jul 19, 2013"
 .SH NAME
 resource_controls \- resource controls available through project database
 .SH DESCRIPTION
@@ -166,6 +166,16 @@ integer.
 Maximum number of semaphore operations allowed per \fBsemop\fR call (value
 copied from the resource control at \fBsemget()\fR time). Expressed as an
 integer, specifying the number of operations.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBprocess.max-sigqueue-size\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of outstanding queued signals.
 .RE
 
 .sp

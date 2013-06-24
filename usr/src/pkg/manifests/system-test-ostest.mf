@@ -23,11 +23,13 @@ dir path=opt/os-tests
 dir path=opt/os-tests/bin
 dir path=opt/os-tests/runfiles
 dir path=opt/os-tests/tests
+dir path=opt/os-tests/tests/sigqueue
 file path=opt/os-tests/README mode=0444
 file path=opt/os-tests/bin/ostest mode=0555
 file path=opt/os-tests/runfiles/delphix.run mode=0444
 file path=opt/os-tests/runfiles/openindiana.run mode=0444
 file path=opt/os-tests/tests/poll_test mode=0555
+file path=opt/os-tests/tests/sigqueue/sigqueue_queue_size mode=0555
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 depend fmri=system/test/testrunner type=require
