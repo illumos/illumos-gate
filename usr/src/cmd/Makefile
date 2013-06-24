@@ -277,6 +277,7 @@ COMMON_SUBDIRS=		\
 	news		\
 	newtask		\
 	nice		\
+	nicstat		\
 	nl		\
 	nlsadmin	\
 	nohup		\

@@ -2197,6 +2197,7 @@ f usr/bin/news 0555 root bin
 h usr/bin/newtask=usr/lib/isaexec
 f usr/bin/nfsstat 0555 root bin
 f usr/bin/nice 0555 root bin
+f usr/bin/nicstat 0555 root bin
 f usr/bin/nl 0555 root bin
 f usr/bin/nm 0555 root bin
 h usr/bin/nohup=usr/lib/isaexec
