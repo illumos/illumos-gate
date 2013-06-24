@@ -518,6 +518,9 @@ nfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	if ((error = secpolicy_fs_mount(cr, mvp, vfsp)) != 0)
 		return (error);
 
+	if (secpolicy_nfs(cr) != 0)
+		return (EPERM);
+
 	if (mvp->v_type != VDIR)
 		return (ENOTDIR);
 
