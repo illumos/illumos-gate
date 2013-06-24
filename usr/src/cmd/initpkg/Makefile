@@ -38,9 +38,7 @@ SBINF=		rcS mountall rc0 rc1 rc2 rc3 swapadd umountall
 SBINL=		rc5 rc6
 USRSBINF=	mountall shutdown umountall
 
-sparc_ETCTABS=
-i386_ETCTABS=	bootrc
-ETCTABS=	vfstab inittab nscd.conf security/crypt.conf $($(MACH)_ETCTABS)
+ETCTABS=	vfstab inittab nscd.conf security/crypt.conf
 
 DFSTAB=		dfstab
 SBINETC=	rcS mountall rc0 rc1 rc2 rc3 rc5 rc6 swapadd umountall
@@ -60,7 +58,6 @@ $(ROOTETC)/inittab		:= FILEMODE =	0644
 $(ROOTETC)/vfstab		:= FILEMODE =	0644
 $(ROOTETC)/nscd.conf		:= FILEMODE =	0644
 $(ROOTETC)/security/crypt.conf	:= FILEMODE =	0644
-$(ROOTETC)/bootrc		:= FILEMODE =	0755
 $(ROOTDFSTAB)			:= FILEMODE =	0644
 $(ROOTSBIN)/mountall		:= FILEMODE =	0555
 $(ROOTUSRSBIN)/mountall		:= FILEMODE =	0555

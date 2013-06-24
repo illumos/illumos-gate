@@ -61,10 +61,7 @@ bootflags(struct bootops *ops)
 
 #if defined(_OBP)
 	/*
-	 * x86: The boot scripts (i.e., /etc/bootrc) don't prepend the kernel
-	 * name to the boot arguments.  (And beware making it do so: if the
-	 * run-kernel command returns, it will loop, and you will end up with
-	 * multiple copies of the kernel name.)
+	 * Sparc only, _OBP isn't defined on x86 any more.
 	 */
 	if (cp[0] != '-') {
 		/* if user booted kadb or kmdb, load kmdb */
@@ -105,7 +102,7 @@ bootflags(struct bootops *ops)
 		case 'F':
 			break;
 		case 'f':
-			(void)prom_setprop(prom_optionsnode(), "diag-level",
+			(void) prom_setprop(prom_optionsnode(), "diag-level",
 			    (char *)params.gos_optargp,
 			    params.gos_optarglen + 1);
 			break;
