@@ -5192,8 +5192,8 @@ ahci_port_reset(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 {
 	ahci_addr_t pmult_addr;
 	uint32_t port_cmd_status;
-	uint32_t port_scontrol, port_sstatus, port_serror;
-	uint32_t port_intr_status, port_task_file;
+	uint32_t port_scontrol, port_sstatus;
+	uint32_t port_task_file;
 	uint32_t port_state;
 	uint8_t port = addrp->aa_port;
 
@@ -5237,6 +5237,10 @@ ahci_port_reset(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 	    port_cmd_status|AHCI_CMD_STATUS_FRE);
 
 	/*
+	 * The port enters P:StartComm state, and the HBA tells the link layer
+	 * to start communication, which involves sending COMRESET to the
+	 * device. And the HBA resets PxTFD.STS to 7Fh.
+	 *
 	 * Give time for COMRESET to percolate, according to the AHCI
 	 * spec, software shall wait at least 1 millisecond before
 	 * clearing PxSCTL.DET
@@ -5252,10 +5256,6 @@ ahci_port_reset(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 	    port_scontrol);
 
 	/*
-	 * The port enters P:StartComm state, and HBA tells link layer to
-	 * start communication, which involves sending COMRESET to device.
-	 * And the HBA resets PxTFD.STS to 7Fh.
-	 *
 	 * When a COMINIT is received from the device, then the port enters
 	 * P:ComInit state. And HBA sets PxTFD.STS to FFh or 80h. HBA sets
 	 * PxSSTS.DET to 1h to indicate a device is detected but communication
@@ -5267,7 +5267,7 @@ ahci_port_reset(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 	 * that the interface is in active state.
 	 */
 	loop_count = 0;
-	do {
+	for (;;) {
 		port_sstatus = ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
 		    (uint32_t *)AHCI_PORT_PxSSTS(ahci_ctlp, port));
 
@@ -5280,6 +5280,9 @@ ahci_port_reset(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 			SSTATUS_SET_DET(port_sstatus, SSTATUS_DET_NODEV);
 		}
 
+		if (SSTATUS_GET_DET(port_sstatus) == SSTATUS_DET_DEVPRE_PHYCOM)
+			break;
+
 		if (loop_count++ > AHCI_POLLRATE_PORT_SSTATUS) {
 			/*
 			 * We are effectively timing out after 0.1 sec.
@@ -5289,15 +5292,14 @@ ahci_port_reset(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 
 		/* Wait for 10 millisec */
 		drv_usecwait(AHCI_10MS_USECS);
-	} while (SSTATUS_GET_DET(port_sstatus) != SSTATUS_DET_DEVPRE_PHYCOM);
+	}
 
 	AHCIDBG(AHCIDBG_INIT|AHCIDBG_POLL_LOOP, ahci_ctlp,
 	    "ahci_port_reset: 1st loop count: %d, "
 	    "port_sstatus = 0x%x port %d",
 	    loop_count, port_sstatus, port);
 
-	if ((SSTATUS_GET_IPM(port_sstatus) != SSTATUS_IPM_ACTIVE) ||
-	    (SSTATUS_GET_DET(port_sstatus) != SSTATUS_DET_DEVPRE_PHYCOM)) {
+	if (SSTATUS_GET_DET(port_sstatus) != SSTATUS_DET_DEVPRE_PHYCOM) {
 		/*
 		 * Either the port is not active or there
 		 * is no device present.
@@ -5306,60 +5308,25 @@ ahci_port_reset(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 		return (AHCI_SUCCESS);
 	}
 
-	/* Now we can make sure there is a device connected to the port */
-	port_intr_status = ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
-	    (uint32_t *)AHCI_PORT_PxIS(ahci_ctlp, port));
-	port_serror = ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
-	    (uint32_t *)AHCI_PORT_PxSERR(ahci_ctlp, port));
-
-	/*
-	 * A COMINIT signal is supposed to be received
-	 * PxSERR.DIAG.X or PxIS.PCS should be set
-	 */
-	if (!(port_intr_status & AHCI_INTR_STATUS_PCS) &&
-	    !(port_serror & SERROR_EXCHANGED_ERR)) {
-		cmn_err(CE_WARN, "!ahci%d: ahci_port_reset port %d "
-		    "COMINIT signal from the device not received",
-		    instance, port);
-		AHCIPORT_SET_STATE(ahci_portp, addrp, SATA_PSTATE_FAILED);
-		return (AHCI_FAILURE);
-	}
-
-	/*
-	 * According to the spec, when PxSCTL.DET is set to 0h, upon
-	 * receiving a COMINIT from the attached device, PxTFD.STS.BSY
-	 * shall be set to '1' by the HBA.
-	 *
-	 * However, we found JMicron JMB363 doesn't follow this, so
-	 * remove this check, and just print a debug message.
-	 */
-#if AHCI_DEBUG
-	port_task_file = ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
-	    (uint32_t *)AHCI_PORT_PxTFD(ahci_ctlp, port));
-	if (!(port_task_file & AHCI_TFD_STS_BSY)) {
-		AHCIDBG(AHCIDBG_ERRS, ahci_ctlp, "ahci_port_reset: "
-		    "port %d BSY bit is not set after COMINIT signal "
-		    "is received", port);
-	}
-#endif
-
-	/*
-	 * PxSERR.DIAG.X has to be cleared in order to update PxTFD with
-	 * the D2H FIS received by HBA.
-	 */
+	/* Clear port serror register for the port */
 	ddi_put32(ahci_ctlp->ahcictl_ahci_acc_handle,
 	    (uint32_t *)AHCI_PORT_PxSERR(ahci_ctlp, port),
-	    SERROR_EXCHANGED_ERR);
+	    AHCI_SERROR_CLEAR_ALL);
 
 	/*
 	 * Devices should return a FIS contains its signature to HBA after
-	 * COMINIT signal. Check whether a D2H FIS is received by polling
-	 * PxTFD.STS.ERR bit.
+	 * COMINIT signal. Check whether a D2H Register FIS is received by
+	 * polling PxTFD.STS.
 	 */
 	loop_count = 0;
-	do {
-		/* Wait for 10 millisec */
-		drv_usecwait(AHCI_10MS_USECS);
+	for (;;) {
+		port_task_file =
+		    ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
+		    (uint32_t *)AHCI_PORT_PxTFD(ahci_ctlp, port));
+
+		if ((port_task_file & (AHCI_TFD_STS_BSY | AHCI_TFD_STS_DRQ |
+		    AHCI_TFD_STS_ERR)) == 0)
+			break;
 
 		if (loop_count++ > AHCI_POLLRATE_PORT_TFD_ERROR) {
 			/*
@@ -5371,7 +5338,8 @@ ahci_port_reset(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 			    instance, port);
 
 			AHCIDBG(AHCIDBG_ERRS, ahci_ctlp, "ahci_port_reset: "
-			    "port %d PxTFD.STS.ERR is not set, we need another "
+			    "port %d: some or all of BSY, DRQ and ERR in "
+			    "PxTFD.STS are not clear. We need another "
 			    "software reset.", port);
 
 			/* Clear port serror register for the port */
@@ -5393,19 +5361,7 @@ ahci_port_reset(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 
 		/* Wait for 10 millisec */
 		drv_usecwait(AHCI_10MS_USECS);
-
-		/*
-		 * The Error bit '1' means COMRESET is finished successfully
-		 * The device hardware has been initialized and the power-up
-		 * diagnostics successfully completed. The device requests
-		 * that the Transport layer transmit a Register - D2H FIS to
-		 * the host. (SATA spec 11.5, v2.6)
-		 */
-		port_task_file =
-		    ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
-		    (uint32_t *)AHCI_PORT_PxTFD(ahci_ctlp, port));
-	} while (((port_task_file & AHCI_TFD_ERR_MASK)
-	    >> AHCI_TFD_ERR_SHIFT) != AHCI_TFD_ERR_SGS);
+	}
 
 	AHCIDBG(AHCIDBG_INIT|AHCIDBG_POLL_LOOP, ahci_ctlp,
 	    "ahci_port_reset: 2nd loop count: %d, "

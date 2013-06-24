@@ -23,7 +23,7 @@
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -12603,6 +12603,9 @@ sata_identify_device(sata_hba_inst_t *sata_hba_inst,
 		case SATA_ATAPI_DIRACC_DEV:
 			sdinfo->satadrv_type = SATA_DTYPE_ATAPIDISK;
 			break;
+		case SATA_ATAPI_PROC_DEV:
+			sdinfo->satadrv_type = SATA_DTYPE_ATAPIPROC;
+			break;
 		default:
 			sdinfo->satadrv_type = SATA_DTYPE_UNKNOWN;
 		}
@@ -12704,6 +12707,10 @@ sata_show_drive_info(sata_hba_inst_t *sata_hba_inst,
 
 	case SATA_DTYPE_ATAPIDISK:
 		(void) sprintf(msg_buf, "SATA disk (ATAPI) device at");
+		break;
+
+	case SATA_DTYPE_ATAPIPROC:
+		(void) sprintf(msg_buf, "SATA processor (ATAPI) device at");
 		break;
 
 	case SATA_DTYPE_UNKNOWN:
@@ -15991,6 +15998,11 @@ sata_cfgadm_state(sata_hba_inst_t *sata_hba_inst, int32_t port,
 		}
 		break;
 	}
+	case SATA_DTYPE_ATAPIPROC:
+		ap_state->ap_rstate = AP_RSTATE_CONNECTED;
+		ap_state->ap_ostate = AP_OSTATE_UNCONFIGURED;
+		ap_state->ap_condition = AP_COND_OK;
+		break;
 	default:
 		ap_state->ap_rstate = AP_RSTATE_CONNECTED;
 		ap_state->ap_ostate = AP_OSTATE_UNCONFIGURED;
@@ -16091,6 +16103,10 @@ sata_ioctl_get_ap_type(sata_hba_inst_t *sata_hba_inst,
 
 	case SATA_DTYPE_ATAPITAPE:
 		ap_type = "tape";
+		break;
+
+	case SATA_DTYPE_ATAPIPROC:
+		ap_type = "processor";
 		break;
 
 	case SATA_DTYPE_PMULT:

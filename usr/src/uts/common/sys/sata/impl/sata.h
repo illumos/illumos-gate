@@ -23,6 +23,9 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #ifndef _SATA_H
 #define	_SATA_H
@@ -157,6 +160,7 @@ struct sata_cport_info {
 						 * SATA_DTYPE_ATAPIDISK
 						 * SATA_DTYPE_PMULT
 						 * SATA_DTYPE_UNKNOWN
+						 * SATA_DTYPE_ATAPIPROC
 						 */
 	uint32_t		cport_dev_type;
 	union {
@@ -212,6 +216,7 @@ struct sata_drive_info {
 						 * SATA_DTYPE_ATAPICD
 						 * SATA_DTYPE_ATAPITAPE
 						 * SATA_DTYPE_ATAPIDISK
+						 * SATA_DTYPE_ATAPIPROC
 						 */
 	uint32_t	satadrv_type;
 
@@ -304,6 +309,7 @@ struct sata_pmport_info {
 						 * SATA_DTYPE_ATAPITAPE
 						 * SATA_DTYPE_ATAPIDISK
 						 * SATA_DTYPE_UNKNOWN
+						 * SATA_DTYPE_ATAPIPROC
 						 */
 	uint32_t	pmport_dev_type;
 

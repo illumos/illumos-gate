@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SATA_DEFS_H
@@ -367,10 +368,11 @@ typedef struct sata_id {
 #define	SATA_ATAPI_ID_DRQ_TYPE	0x0060	/* DRQ asserted in 3ms after pkt */
 #define	SATA_ATAPI_ID_DRQ_INTR	0x0020  /* Obsolete in ATA/ATAPI 7 */
 
-#define	SATA_ATAPI_ID_DEV_TYPE	0x0f00	/* device type/command set mask */
+#define	SATA_ATAPI_ID_DEV_TYPE	0x1f00	/* device type/command set mask */
 #define	SATA_ATAPI_ID_DEV_SHFT	8
 #define	SATA_ATAPI_DIRACC_DEV	0x0000	/* Direct Access device */
 #define	SATA_ATAPI_SQACC_DEV	0x0100  /* Sequential access dev (tape ?) */
+#define	SATA_ATAPI_PROC_DEV	0x0300	/* Processor device */
 #define	SATA_ATAPI_CDROM_DEV	0x0500  /* CD_ROM device */
 
 /*
