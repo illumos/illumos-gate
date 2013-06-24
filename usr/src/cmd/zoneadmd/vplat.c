@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, Joyent Inc. All rights reserved.
  */
 
 /*
@@ -156,6 +157,8 @@ static void tsol_unmounts(zlog_t *, char *);
 static m_label_t *zlabel = NULL;
 static m_label_t *zid_label = NULL;
 static priv_set_t *zprivs = NULL;
+
+static const char *DFLT_FS_ALLOWED = "hsfs,smbfs,nfs,nfs3,nfs4,nfsdyn";
 
 /* from libsocket, not in any header file */
 extern int getnetmaskbyaddr(struct in_addr, struct in_addr *);
@@ -4589,26 +4592,42 @@ setup_zone_hostid(zone_dochandle_t handle, zlog_t *zlogp, zoneid_t zoneid)
 static int
 setup_zone_fs_allowed(zone_dochandle_t handle, zlog_t *zlogp, zoneid_t zoneid)
 {
-	char fsallowedp[ZONE_FS_ALLOWED_MAX];
+	char fsallowed[ZONE_FS_ALLOWED_MAX];
+	char *fsallowedp = fsallowed;
+	int len = sizeof (fsallowed);
 	int res;
 
-	res = zonecfg_get_fs_allowed(handle, fsallowedp, sizeof (fsallowedp));
+	res = zonecfg_get_fs_allowed(handle, fsallowed, len);
 
 	if (res == Z_BAD_PROPERTY) {
-		return (Z_OK);
+		/* No value, set the defaults */
+		(void) strlcpy(fsallowed, DFLT_FS_ALLOWED, len);
 	} else if (res != Z_OK) {
-		report_prop_err(zlogp, "fs-allowed", fsallowedp, res);
+		report_prop_err(zlogp, "fs-allowed", fsallowed, res);
 		return (res);
+	} else if (fsallowed[0] == '-') {
+		/* dropping default privs - use remaining list */
+		if (fsallowed[1] != ',')
+			return (Z_OK);
+		fsallowedp += 2;
+		len -= 2;
+	} else {
+		/* Has a value, append the defaults */
+		if (strlcat(fsallowed, ",", len) >= len ||
+		    strlcat(fsallowed, DFLT_FS_ALLOWED, len) >= len) {
+			report_prop_err(zlogp, "fs-allowed", fsallowed,
+			    Z_TOO_BIG);
+			return (Z_TOO_BIG);
+		}
 	}
 
-	if (zone_setattr(zoneid, ZONE_ATTR_FS_ALLOWED, &fsallowedp,
-	    sizeof (fsallowedp)) != 0) {
+	if (zone_setattr(zoneid, ZONE_ATTR_FS_ALLOWED, fsallowedp, len) != 0) {
 		zerror(zlogp, B_TRUE,
 		    "fs-allowed couldn't be set: %s: %d", fsallowedp, res);
 		return (Z_SYSTEM);
 	}
 
-	return (res);
+	return (Z_OK);
 }
 
 static int

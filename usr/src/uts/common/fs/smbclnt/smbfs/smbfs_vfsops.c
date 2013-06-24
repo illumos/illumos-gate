@@ -34,6 +34,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/systm.h>
@@ -115,7 +116,7 @@ static vfsdef_t vfw = {
 	VFSDEF_VERSION,
 	(char *)fs_type_name,
 	smbfsinit,		/* init routine */
-	VSW_HASPROTO|VSW_NOTZONESAFE|VSW_ZMOUNT,	/* flags */
+	VSW_HASPROTO|VSW_NOTZONESAFE,	/* flags */
 	&smbfs_mntopts			/* mount options table prototype */
 };
 
