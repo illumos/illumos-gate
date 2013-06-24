@@ -12803,7 +12803,9 @@ sata_show_drive_info(sata_hba_inst_t *sata_hba_inst,
 	    (sdinfo->satadrv_id.ai_features87 & SATA_SMART_SELF_TEST_SUPPORTED))
 		(void) strlcat(msg_buf, ", SMART self-test", MAXPATHLEN);
 	cmn_err(CE_CONT, "?\t %s\n", msg_buf);
-	if (sdinfo->satadrv_features_support & SATA_DEV_F_SATA2)
+	if (sdinfo->satadrv_features_support & SATA_DEV_F_SATA3)
+		cmn_err(CE_CONT, "?\tSATA Gen3 signaling speed (6.0Gbps)\n");
+	else if (sdinfo->satadrv_features_support & SATA_DEV_F_SATA2)
 		cmn_err(CE_CONT, "?\tSATA Gen2 signaling speed (3.0Gbps)\n");
 	else if (sdinfo->satadrv_features_support & SATA_DEV_F_SATA1)
 		cmn_err(CE_CONT, "?\tSATA Gen1 signaling speed (1.5Gbps)\n");
@@ -13764,7 +13766,11 @@ sata_fetch_device_identify_data(sata_hba_inst_t *sata_hba_inst,
 				sdinfo->satadrv_features_support |=
 				    SATA_DEV_F_NCQ;
 			if (sdinfo->satadrv_id.ai_satacap &
-			    (SATA_1_SPEED | SATA_2_SPEED)) {
+			    (SATA_1_SPEED | SATA_2_SPEED | SATA_3_SPEED)) {
+				if (sdinfo->satadrv_id.ai_satacap &
+				    SATA_3_SPEED)
+					sdinfo->satadrv_features_support |=
+					    SATA_DEV_F_SATA3;
 				if (sdinfo->satadrv_id.ai_satacap &
 				    SATA_2_SPEED)
 					sdinfo->satadrv_features_support |=
