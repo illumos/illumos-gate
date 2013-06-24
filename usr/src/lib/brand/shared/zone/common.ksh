@@ -333,10 +333,12 @@ post_unpack()
 	#
 	# Check if the image was created with a valid libc.so.1.
 	#
-	hwcap=`moe -v -32 $ZONEROOT/lib/libc.so.1 2>&1`
-	if (( $? != 0 )); then
-		vlog "$f_hwcap_info" "$hwcap"
-		fail_fatal "$f_sanity_hwcap"
+	if [[ -f $ZONEROOT/lib/libc.so.1 ]]; then
+		hwcap=`moe -v -32 $ZONEROOT/lib/libc.so.1 2>&1`
+		if (( $? != 0 )); then
+			vlog "$f_hwcap_info" "$hwcap"
+			fail_fatal "$f_sanity_hwcap"
+		fi
 	fi
 
 	( cd "$ZONEROOT" && \
@@ -1020,7 +1022,7 @@ f_mkdir="Unable to create directory %s."
 f_chmod="Unable to chmod directory %s."
 f_chown="Unable to chown directory %s."
 f_hwcap_info="HWCAP: %s\n"
-f_sanity_hwcap= "The image was created with an incompatible libc.so.1 hwcap lofs mount.\n"\
+f_sanity_hwcap="The image was created with an incompatible libc.so.1 hwcap lofs mount.\n"\
 "       The zone will not boot on this platform.  See the zone's\n"\
 "       documentation for the recommended way to create the archive."
 
