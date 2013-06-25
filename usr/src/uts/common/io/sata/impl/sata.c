@@ -23,7 +23,7 @@
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -12603,6 +12603,9 @@ sata_identify_device(sata_hba_inst_t *sata_hba_inst,
 		case SATA_ATAPI_DIRACC_DEV:
 			sdinfo->satadrv_type = SATA_DTYPE_ATAPIDISK;
 			break;
+		case SATA_ATAPI_PROC_DEV:
+			sdinfo->satadrv_type = SATA_DTYPE_ATAPIPROC;
+			break;
 		default:
 			sdinfo->satadrv_type = SATA_DTYPE_UNKNOWN;
 		}
@@ -12706,6 +12709,10 @@ sata_show_drive_info(sata_hba_inst_t *sata_hba_inst,
 		(void) sprintf(msg_buf, "SATA disk (ATAPI) device at");
 		break;
 
+	case SATA_DTYPE_ATAPIPROC:
+		(void) sprintf(msg_buf, "SATA processor (ATAPI) device at");
+		break;
+
 	case SATA_DTYPE_UNKNOWN:
 		(void) sprintf(msg_buf,
 		    "Unsupported SATA device type (cfg 0x%x) at ",
@@ -12796,7 +12803,9 @@ sata_show_drive_info(sata_hba_inst_t *sata_hba_inst,
 	    (sdinfo->satadrv_id.ai_features87 & SATA_SMART_SELF_TEST_SUPPORTED))
 		(void) strlcat(msg_buf, ", SMART self-test", MAXPATHLEN);
 	cmn_err(CE_CONT, "?\t %s\n", msg_buf);
-	if (sdinfo->satadrv_features_support & SATA_DEV_F_SATA2)
+	if (sdinfo->satadrv_features_support & SATA_DEV_F_SATA3)
+		cmn_err(CE_CONT, "?\tSATA Gen3 signaling speed (6.0Gbps)\n");
+	else if (sdinfo->satadrv_features_support & SATA_DEV_F_SATA2)
 		cmn_err(CE_CONT, "?\tSATA Gen2 signaling speed (3.0Gbps)\n");
 	else if (sdinfo->satadrv_features_support & SATA_DEV_F_SATA1)
 		cmn_err(CE_CONT, "?\tSATA Gen1 signaling speed (1.5Gbps)\n");
@@ -13757,7 +13766,11 @@ sata_fetch_device_identify_data(sata_hba_inst_t *sata_hba_inst,
 				sdinfo->satadrv_features_support |=
 				    SATA_DEV_F_NCQ;
 			if (sdinfo->satadrv_id.ai_satacap &
-			    (SATA_1_SPEED | SATA_2_SPEED)) {
+			    (SATA_1_SPEED | SATA_2_SPEED | SATA_3_SPEED)) {
+				if (sdinfo->satadrv_id.ai_satacap &
+				    SATA_3_SPEED)
+					sdinfo->satadrv_features_support |=
+					    SATA_DEV_F_SATA3;
 				if (sdinfo->satadrv_id.ai_satacap &
 				    SATA_2_SPEED)
 					sdinfo->satadrv_features_support |=
@@ -15991,6 +16004,11 @@ sata_cfgadm_state(sata_hba_inst_t *sata_hba_inst, int32_t port,
 		}
 		break;
 	}
+	case SATA_DTYPE_ATAPIPROC:
+		ap_state->ap_rstate = AP_RSTATE_CONNECTED;
+		ap_state->ap_ostate = AP_OSTATE_UNCONFIGURED;
+		ap_state->ap_condition = AP_COND_OK;
+		break;
 	default:
 		ap_state->ap_rstate = AP_RSTATE_CONNECTED;
 		ap_state->ap_ostate = AP_OSTATE_UNCONFIGURED;
@@ -16091,6 +16109,10 @@ sata_ioctl_get_ap_type(sata_hba_inst_t *sata_hba_inst,
 
 	case SATA_DTYPE_ATAPITAPE:
 		ap_type = "tape";
+		break;
+
+	case SATA_DTYPE_ATAPIPROC:
+		ap_type = "processor";
 		break;
 
 	case SATA_DTYPE_PMULT:

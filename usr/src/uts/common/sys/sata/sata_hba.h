@@ -23,6 +23,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #ifndef _SATA_HBA_H
 #define	_SATA_HBA_H
@@ -224,6 +227,8 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", sata_device))
 	(SATA_DTYPE_ATAPI|0x08)			/* ATAPI disk */
 #define	SATA_DTYPE_PMULT		0x10	/* Port Multiplier */
 #define	SATA_DTYPE_UNKNOWN		0x20	/* Device attached, unkown */
+#define	SATA_DTYPE_ATAPIPROC	\
+	(SATA_DTYPE_ATAPI|0x80)			/* ATAPI processor */
 
 
 /*

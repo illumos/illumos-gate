@@ -23,8 +23,9 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -42,7 +43,7 @@ const pci_class_strings_t class_pci[] = {
 	1, 5, 0x20,	"ATA controller with single DMA",	"ata",
 	1, 5, 0x30,	"ATA controller with chained DMA",	"ata",
 	1, 6, 0,	"Serial ATA Direct Port Access (DPA)",	"sata",
-	1, 6, 1,	"SATA AHCI 1.0 Interface",		"sata",
+	1, 6, 1,	"SATA AHCI Interface",			"sata",
 	1, 6, 2,	"Serial Storage Bus Interface",		"sata",
 	1, 7, 0,	"Serial Attached SCSI Controller",	"sas",
 	1, 7, 1,	"Serial Storage Bus Interface",		"sas",

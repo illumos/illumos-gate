@@ -244,7 +244,6 @@ f etc/acct/holidays 0644 root bin
 d etc/amd64 0755 root sys
 f etc/auto_home 0644 root bin
 f etc/auto_master 0644 root bin
-f etc/bootrc 0755 root sys
 d etc/brand 0755 root sys
 d etc/certs 0755 root sys
 d etc/cron.d 0755 root sys
