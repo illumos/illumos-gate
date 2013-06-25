@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2012 Joyent, Inc.  All rights reserved.
+ * Copyright 2013 Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -110,6 +110,8 @@ static int
 hyprlofs_read(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
     caller_context_t *ct)
 {
+	if (vp->v_type == VDIR)
+		return (EISDIR);
 	return (VOP_READ(REALVP(vp), uiop, ioflag, cr, ct));
 }
 
