@@ -25,7 +25,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/sysmacros.h>
@@ -1267,6 +1267,9 @@ ctf_add_type(ctf_file_t *dst_fp, ctf_file_t *src_fp, ctf_id_t src_type)
 
 	ctf_hash_t *hp;
 	ctf_helem_t *hep;
+
+	if (dst_fp == src_fp)
+		return (src_type);
 
 	if (!(dst_fp->ctf_flags & LCTF_RDWR))
 		return (ctf_set_errno(dst_fp, ECTF_RDONLY));

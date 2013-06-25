@@ -87,8 +87,20 @@ typedef_list_cb(mdb_ctf_id_t id, void *arg)
 {
 	char buf[MDB_SYM_NAMLEN];
 
+	/*
+	 * The user may have created an anonymous structure or union as part of
+	 * running ::typedef. If this is the case, we passed a NULL pointer for
+	 * the name into the ctf routines. When we go back and ask for the name
+	 * of that, ctf goes through and loops through all the declarations.
+	 * This, however correctly, gives us back something undesirable to the
+	 * user, eg. the name is simply 'struct' and 'union'. Because a typedef
+	 * will always have a non-anonymous name for that, we instead opt to
+	 * not include these anonymous names. ctf usefully includes a space as
+	 * part of that name.
+	 */
 	(void) mdb_ctf_type_name(id, buf, sizeof (buf));
-	mdb_printf("%s\n", buf);
+	if (strcmp("struct ", buf) != 0 && strcmp("union ", buf) != 0)
+		mdb_printf("%s\n", buf);
 	return (0);
 }
 
@@ -432,7 +444,7 @@ static int
 typedef_add(parse_root_t *pr)
 {
 	parse_node_t *pn;
-	mdb_ctf_id_t id, aid, tid;
+	mdb_ctf_id_t id, aid, tid, pid;
 	mdb_ctf_arinfo_t ar;
 	int ii;
 
@@ -466,12 +478,13 @@ typedef_add(parse_root_t *pr)
 		if (pn->pn_flags & PN_F_POINTER) {
 			for (ii = 0; ii < pn->pn_nptrs; ii++) {
 				if (mdb_ctf_add_pointer(&tid,
-				    &tid) != 0) {
+				    &pid) != 0) {
 					mdb_printf("failed to add a pointer "
 					    "type as part of member: %s\n",
 					    pn->pn_name);
 					goto destroy;
 				}
+				tid = pid;
 			}
 		}
 
