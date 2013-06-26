@@ -14681,12 +14681,14 @@ f usr/share/man/man3ldap/ldap_url.3ldap 0444 root bin
 f usr/share/man/man3ldap/ldap_version.3ldap 0444 root bin
 d usr/share/man/man3lgrp 0755 root bin
 f usr/share/man/man3lgrp/lgrp_affinity_get.3lgrp 0444 root bin
+f usr/share/man/man3lgrp/lgrp_affinity_set.3lgrp 0444 root bin
 f usr/share/man/man3lgrp/lgrp_children.3lgrp 0444 root bin
 f usr/share/man/man3lgrp/lgrp_cookie_stale.3lgrp 0444 root bin
 f usr/share/man/man3lgrp/lgrp_cpus.3lgrp 0444 root bin
 f usr/share/man/man3lgrp/lgrp_fini.3lgrp 0444 root bin
 f usr/share/man/man3lgrp/lgrp_home.3lgrp 0444 root bin
 f usr/share/man/man3lgrp/lgrp_init.3lgrp 0444 root bin
+f usr/share/man/man3lgrp/lgrp_latency_cookie.3lgrp 0444 root bin
 f usr/share/man/man3lgrp/lgrp_latency.3lgrp 0444 root bin
 f usr/share/man/man3lgrp/lgrp_mem_size.3lgrp 0444 root bin
 f usr/share/man/man3lgrp/lgrp_nlgrps.3lgrp 0444 root bin
