@@ -27,7 +27,7 @@
 /* $FreeBSD: src/sys/dev/ipmi/ipmi_kcs.c,v 1.3 2008/08/28 02:11:04 jhb */
 
 /*
- * Copyright 2012, Joyent, Inc.  All rights reserved.
+ * Copyright 2013, Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -194,7 +194,7 @@ kcs_start_write(struct ipmi_softc *sc)
 		status = kcs_wait_for_ibf(sc, 0);
 		if (KCS_STATUS_STATE(status) == KCS_STATUS_STATE_WRITE)
 			break;
-		delay(1000000);
+		delay(drv_usectohz(1000000));
 	}
 
 	if (KCS_STATUS_STATE(status) != KCS_STATUS_STATE_WRITE)
@@ -452,6 +452,7 @@ kcs_loop(void *arg)
 
 	IPMI_LOCK(sc);
 	while ((req = ipmi_dequeue_request(sc)) != NULL) {
+		IPMI_UNLOCK(sc);
 		ok = 0;
 		for (i = 0; i < 3 && !ok; i++)
 			ok = kcs_polled_request(sc, req);
@@ -459,6 +460,7 @@ kcs_loop(void *arg)
 			req->ir_error = 0;
 		else
 			req->ir_error = EIO;
+		IPMI_LOCK(sc);
 		ipmi_complete_request(sc, req);
 	}
 	IPMI_UNLOCK(sc);
