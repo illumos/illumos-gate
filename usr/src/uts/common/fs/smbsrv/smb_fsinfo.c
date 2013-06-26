@@ -20,44 +20,13 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/smbinfo.h>
 
-/*
- * smb_fssize_t
- * volume_units and volume avail are the total allocated and
- * available units on the volume.
- * caller_units and caller_avail are the allocated and available
- * units on the volume for the user associated with the calling
- * thread.
- */
-typedef struct smb_fssize {
-	uint64_t	fs_volume_units;
-	uint64_t	fs_volume_avail;
-	uint64_t	fs_caller_units;
-	uint64_t	fs_caller_avail;
-	uint32_t	fs_sectors_per_unit;
-	uint32_t	fs_bytes_per_sector;
-} smb_fssize_t;
-
-/*
- * File System Control Flags for smb_com_trans2_query|set_fs_information
- * level SMB_FILE_FS_CONTROL_INFORMATION
- */
-#define	FILE_VC_QUOTA_TRACK		0x00000001
-#define	FILE_VC_QUOTA_ENFORCE		0x00000002
-#define	FILE_VC_CONTENT_INDEX_DISABLED	0x00000008
-#define	FILE_VC_LOG_QUOTA_THRESHOLD	0x00000010
-#define	FILE_VC_LOG_QUOTA_LIMIT		0x00000020
-#define	FILE_VC_LOG_VOLUME_THRESHOLD	0x00000040
-#define	FILE_VC_LOG_VOLUME_LIMIT	0x00000080
-#define	FILE_VC_QUOTAS_INCOMPLETE	0x00000100
-#define	FILE_VC_QUOTAS_REBUILDING	0x00000200
-
-static int smb_fssize(smb_request_t *, smb_fssize_t *);
 static int smb_trans2_set_fs_ctrl_info(smb_request_t *, smb_xa_t *);
 
 /*
@@ -409,36 +378,39 @@ smb_com_trans2_query_fs_information(smb_request_t *sr, smb_xa_t *xa)
  * is specfied as unlimited. A quota limit of 0 means there is no
  * quota specified for the user.
  *
- * Returns: 0 - success
- *         -1 - error. Error status set in sr.
+ * Returns: 0 (success) or an errno value
  */
-static int
+int
 smb_fssize(smb_request_t *sr, smb_fssize_t *fssize)
 {
 	smb_node_t *node;
 	struct statvfs64 df;
 	uid_t uid;
 	smb_quota_t quota;
-	int rc, bytes_per_unit;
+	int spu;	/* sectors per unit */
+	int rc;
 
 	bzero(fssize, sizeof (smb_fssize_t));
 	node = sr->tid_tree->t_snode;
-	if ((rc = smb_fsop_statfs(sr->user_cr, node, &df)) != 0) {
-		smbsr_errno(sr, rc);
-		return (-1);
-	}
+	if ((rc = smb_fsop_statfs(sr->user_cr, node, &df)) != 0)
+		return (rc);
 
-	fssize->fs_bytes_per_sector = 512;
-	fssize->fs_sectors_per_unit = df.f_frsize >> 9;
+	if (df.f_frsize < DEV_BSIZE)
+		df.f_frsize = DEV_BSIZE;
+	if (df.f_bsize < df.f_frsize)
+		df.f_bsize = df.f_frsize;
+	spu = df.f_bsize / df.f_frsize;
+
+	fssize->fs_bytes_per_sector = (uint16_t)df.f_frsize;
+	fssize->fs_sectors_per_unit = spu;
+
 	if (df.f_bavail > df.f_blocks)
 		df.f_bavail = 0;
 
-	fssize->fs_volume_units = df.f_blocks;
-	fssize->fs_volume_avail = df.f_bavail;
-	fssize->fs_caller_units = df.f_blocks;
-	fssize->fs_caller_avail = df.f_bavail;
-	bytes_per_unit =
-	    fssize->fs_bytes_per_sector * fssize->fs_sectors_per_unit;
+	fssize->fs_volume_units = df.f_blocks / spu;
+	fssize->fs_volume_avail = df.f_bavail / spu;
+	fssize->fs_caller_units = df.f_blocks / spu;
+	fssize->fs_caller_avail = df.f_bavail / spu;
 
 	if (!smb_tree_has_feature(sr->tid_tree, SMB_TREE_QUOTA))
 		return (0);
@@ -448,12 +420,12 @@ smb_fssize(smb_request_t *sr, smb_fssize_t *fssize)
 		return (0);
 
 	if ((quota.q_limit != SMB_QUOTA_UNLIMITED) && (quota.q_limit != 0)) {
-		fssize->fs_caller_units = quota.q_limit / bytes_per_unit;
+		fssize->fs_caller_units = quota.q_limit / df.f_bsize;
 		if (quota.q_limit <= quota.q_used)
 			fssize->fs_caller_avail = 0;
 		else
 			fssize->fs_caller_avail =
-			    (quota.q_limit - quota.q_used) / bytes_per_unit;
+			    (quota.q_limit - quota.q_used) / df.f_bsize;
 	}
 
 	return (0);

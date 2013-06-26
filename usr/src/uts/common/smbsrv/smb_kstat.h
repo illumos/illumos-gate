@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -29,6 +30,7 @@
 #define	_SMBSRV_SMB_KSTAT_H
 
 #include	<smbsrv/smb.h>
+#include	<smbsrv/smb2.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -80,7 +82,8 @@ typedef struct smbsrv_kstats {
 	uint64_t		ks_rxb;		/* Bytes received */
 	uint64_t		ks_nreq;	/* Requests treated */
 	smb_kstat_utilization_t	ks_utilization;
-	smb_kstat_req_t		ks_reqs[SMB_COM_NUM];
+	smb_kstat_req_t		ks_reqs1[SMB_COM_NUM];
+	smb_kstat_req_t		ks_reqs2[SMB2__NCMDS];
 	uint32_t		ks_nbt_sess;	/* NBT sessions */
 	uint32_t		ks_tcp_sess;	/* TCP sessions */
 	uint32_t		ks_users;	/* Users logged in */

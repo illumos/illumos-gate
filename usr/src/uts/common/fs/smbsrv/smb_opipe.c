@@ -35,6 +35,9 @@
 #include <sys/filio.h>
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_xdr.h>
+#include <smbsrv/winioctl.h>
+
+static uint32_t smb_opipe_transceive(smb_request_t *, smb_fsctl_t *);
 
 /*
  * Allocate a new opipe and return it, or NULL, in which case
@@ -397,12 +400,12 @@ out:
 }
 
 int
-smb_opipe_get_nread(smb_request_t *sr, int *nread)
+smb_opipe_ioctl(smb_request_t *sr, int cmd, void *arg, int *rvalp)
 {
 	smb_ofile_t *ofile;
 	smb_opipe_t *opipe;
 	ksocket_t sock;
-	int rc, trval;
+	int rc;
 
 	ofile = sr->fid_ofile;
 	ASSERT(ofile->f_ftype == SMB_FTYPE_MESG_PIPE);
@@ -417,10 +420,138 @@ smb_opipe_get_nread(smb_request_t *sr, int *nread)
 	if (sock == NULL)
 		return (EBADF);
 
-	rc = ksocket_ioctl(sock, FIONREAD, (intptr_t)nread, &trval,
-	    ofile->f_cr);
+	rc = ksocket_ioctl(sock, cmd, (intptr_t)arg, rvalp, ofile->f_cr);
 
 	ksocket_rele(sock);
 
 	return (rc);
+}
+
+/*
+ * Get the smb_attr_t for a named pipe.
+ * Caller has already cleared to zero.
+ */
+int
+smb_opipe_getattr(smb_ofile_t *of, smb_attr_t *ap)
+{
+
+	if (of->f_pipe == NULL)
+		return (EINVAL);
+
+	ap->sa_vattr.va_type = VFIFO;
+	ap->sa_vattr.va_nlink = 1;
+	ap->sa_dosattr = FILE_ATTRIBUTE_NORMAL;
+	ap->sa_allocsz = 0x1000LL;
+
+	return (0);
+}
+
+int
+smb_opipe_getname(smb_ofile_t *of, char *buf, size_t buflen)
+{
+	smb_opipe_t *opipe;
+
+	if ((opipe = of->f_pipe) == NULL)
+		return (EINVAL);
+
+	(void) snprintf(buf, buflen, "\\%s", opipe->p_name);
+	return (0);
+}
+
+/*
+ * Handler for smb2_ioctl
+ */
+/* ARGSUSED */
+uint32_t
+smb_opipe_fsctl(smb_request_t *sr, smb_fsctl_t *fsctl)
+{
+	uint32_t status;
+
+	switch (fsctl->CtlCode) {
+	case FSCTL_PIPE_TRANSCEIVE:
+		status = smb_opipe_transceive(sr, fsctl);
+		break;
+
+	case FSCTL_PIPE_PEEK:
+	case FSCTL_PIPE_WAIT:
+		/* XXX todo */
+		status = NT_STATUS_NOT_SUPPORTED;
+		break;
+
+	default:
+		ASSERT(!"CtlCode");
+		status = NT_STATUS_INTERNAL_ERROR;
+		break;
+	}
+
+	return (status);
+}
+
+static uint32_t
+smb_opipe_transceive(smb_request_t *sr, smb_fsctl_t *fsctl)
+{
+	smb_vdb_t	vdb;
+	smb_ofile_t	*ofile;
+	struct mbuf	*mb;
+	uint32_t	status;
+	int		len, rc;
+
+	/*
+	 * Caller checked that this is the IPC$ share,
+	 * and that this call has a valid open handle.
+	 * Just check the type.
+	 */
+	ofile = sr->fid_ofile;
+	if (ofile->f_ftype != SMB_FTYPE_MESG_PIPE)
+		return (NT_STATUS_INVALID_HANDLE);
+
+	rc = smb_mbc_decodef(fsctl->in_mbc, "#B",
+	    fsctl->InputCount, &vdb);
+	if (rc != 0) {
+		/* Not enough data sent. */
+		return (NT_STATUS_INVALID_PARAMETER);
+	}
+
+	rc = smb_opipe_write(sr, &vdb.vdb_uio);
+	if (rc != 0)
+		return (smb_errno2status(rc));
+
+	vdb.vdb_tag = 0;
+	vdb.vdb_uio.uio_iov = &vdb.vdb_iovec[0];
+	vdb.vdb_uio.uio_iovcnt = MAX_IOVEC;
+	vdb.vdb_uio.uio_segflg = UIO_SYSSPACE;
+	vdb.vdb_uio.uio_extflg = UIO_COPY_DEFAULT;
+	vdb.vdb_uio.uio_loffset = (offset_t)0;
+	vdb.vdb_uio.uio_resid = fsctl->MaxOutputResp;
+	mb = smb_mbuf_allocate(&vdb.vdb_uio);
+
+	rc = smb_opipe_read(sr, &vdb.vdb_uio);
+	if (rc != 0) {
+		m_freem(mb);
+		return (smb_errno2status(rc));
+	}
+
+	len = fsctl->MaxOutputResp - vdb.vdb_uio.uio_resid;
+	smb_mbuf_trim(mb, len);
+	MBC_ATTACH_MBUF(fsctl->out_mbc, mb);
+
+	/*
+	 * If the output buffer holds a partial pipe message,
+	 * we're supposed to return NT_STATUS_BUFFER_OVERFLOW.
+	 * As we don't have message boundary markers, the best
+	 * we can do is return that status when we have ALL of:
+	 *	Output buffer was < SMB_PIPE_MAX_MSGSIZE
+	 *	We filled the output buffer (resid==0)
+	 *	There's more data (ioctl FIONREAD)
+	 */
+	status = NT_STATUS_SUCCESS;
+	if (fsctl->MaxOutputResp < SMB_PIPE_MAX_MSGSIZE &&
+	    vdb.vdb_uio.uio_resid == 0) {
+		int nread = 0, trval;
+		rc = smb_opipe_ioctl(sr, FIONREAD, &nread, &trval);
+		if (rc == 0 && nread != 0)
+			status = NT_STATUS_BUFFER_OVERFLOW;
+	}
+
+	return (status);
 }

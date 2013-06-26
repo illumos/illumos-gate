@@ -183,7 +183,7 @@ _init(void)
 	}
 
 	if ((rc = mod_install(&modlinkage)) != 0) {
-		(void) smb_server_g_fini();
+		smb_server_g_fini();
 	}
 
 	return (rc);
@@ -200,8 +200,11 @@ _fini(void)
 {
 	int	rc;
 
+	if (smb_server_get_count() != 0)
+		return (EBUSY);
+
 	if ((rc = mod_remove(&modlinkage)) == 0) {
-		rc = smb_server_g_fini();
+		smb_server_g_fini();
 	}
 
 	return (rc);

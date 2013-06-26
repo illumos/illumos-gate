@@ -66,27 +66,17 @@
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_fsops.h>
 
-typedef struct smb_setinfo {
-	uint16_t si_infolev;
-	smb_xa_t *si_xa;
-	smb_node_t *si_node;
-} smb_setinfo_t;
-
-/*
- * These functions all return 0 (success)  or -1 (error).
- * They set error details in the sr when appropriate.
- */
 static int smb_set_by_fid(smb_request_t *, smb_xa_t *, uint16_t);
 static int smb_set_by_path(smb_request_t *, smb_xa_t *, uint16_t);
-static int smb_set_fileinfo(smb_request_t *, smb_setinfo_t *);
-static int smb_set_information(smb_request_t *, smb_setinfo_t *);
-static int smb_set_information2(smb_request_t *, smb_setinfo_t *);
-static int smb_set_standard_info(smb_request_t *, smb_setinfo_t *);
-static int smb_set_basic_info(smb_request_t *, smb_setinfo_t *);
-static int smb_set_disposition_info(smb_request_t *, smb_setinfo_t *);
-static int smb_set_eof_info(smb_request_t *sr, smb_setinfo_t *);
-static int smb_set_alloc_info(smb_request_t *sr, smb_setinfo_t *);
-static int smb_set_rename_info(smb_request_t *sr, smb_setinfo_t *);
+
+/*
+ * These functions all return and NT status code.
+ */
+static uint32_t smb_set_fileinfo(smb_request_t *, smb_setinfo_t *, int);
+static uint32_t smb_set_information(smb_request_t *, smb_setinfo_t *);
+static uint32_t smb_set_information2(smb_request_t *, smb_setinfo_t *);
+static uint32_t smb_set_standard_info(smb_request_t *, smb_setinfo_t *);
+static uint32_t smb_set_rename_info(smb_request_t *sr, smb_setinfo_t *);
 
 /*
  * smb_com_trans2_set_file_information
@@ -217,8 +207,9 @@ smb_com_set_information2(smb_request_t *sr)
 static int
 smb_set_by_fid(smb_request_t *sr, smb_xa_t *xa, uint16_t infolev)
 {
-	int rc;
 	smb_setinfo_t sinfo;
+	uint32_t status;
+	int rc = 0;
 
 	if (SMB_TREE_IS_READONLY(sr)) {
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
@@ -242,10 +233,15 @@ smb_set_by_fid(smb_request_t *sr, smb_xa_t *xa, uint16_t infolev)
 
 	sr->user_cr = smb_ofile_getcred(sr->fid_ofile);
 
-	sinfo.si_xa = xa;
-	sinfo.si_infolev = infolev;
+	bzero(&sinfo, sizeof (sinfo));
 	sinfo.si_node = sr->fid_ofile->f_node;
-	rc = smb_set_fileinfo(sr, &sinfo);
+	if (xa != NULL)
+		sinfo.si_data = xa->req_data_mb;
+	status = smb_set_fileinfo(sr, &sinfo, infolev);
+	if (status != 0) {
+		smbsr_error(sr, status, 0, 0);
+		rc = -1;
+	}
 
 	smbsr_release_file(sr);
 	return (rc);
@@ -269,6 +265,7 @@ static int
 smb_set_by_path(smb_request_t *sr, smb_xa_t *xa, uint16_t infolev)
 {
 	int rc;
+	uint32_t status;
 	smb_setinfo_t sinfo;
 	smb_node_t *node, *dnode;
 	char *name;
@@ -305,10 +302,15 @@ smb_set_by_path(smb_request_t *sr, smb_xa_t *xa, uint16_t infolev)
 		return (-1);
 	}
 
-	sinfo.si_xa = xa;
-	sinfo.si_infolev = infolev;
+	bzero(&sinfo, sizeof (sinfo));
 	sinfo.si_node = node;
-	rc = smb_set_fileinfo(sr, &sinfo);
+	if (xa != NULL)
+		sinfo.si_data = xa->req_data_mb;
+	status = smb_set_fileinfo(sr, &sinfo, infolev);
+	if (status != 0) {
+		smbsr_error(sr, status, 0, 0);
+		rc = -1;
+	}
 
 	smb_node_release(node);
 	return (rc);
@@ -320,53 +322,63 @@ smb_set_by_path(smb_request_t *sr, smb_xa_t *xa, uint16_t infolev)
  * For compatibility with windows servers, SMB_FILE_LINK_INFORMATION
  * is handled by returning NT_STATUS_NOT_SUPPORTED.
  */
-static int
-smb_set_fileinfo(smb_request_t *sr, smb_setinfo_t *sinfo)
+static uint32_t
+smb_set_fileinfo(smb_request_t *sr, smb_setinfo_t *sinfo, int infolev)
 {
-	switch (sinfo->si_infolev) {
+	uint32_t status;
+
+	switch (infolev) {
 	case SMB_SET_INFORMATION:
-		return (smb_set_information(sr, sinfo));
+		status = smb_set_information(sr, sinfo);
+		break;
 
 	case SMB_SET_INFORMATION2:
-		return (smb_set_information2(sr, sinfo));
+		status = smb_set_information2(sr, sinfo);
+		break;
 
 	case SMB_INFO_STANDARD:
-		return (smb_set_standard_info(sr, sinfo));
+		status = smb_set_standard_info(sr, sinfo);
+		break;
 
 	case SMB_INFO_SET_EAS:
 		/* EAs not supported */
-		return (0);
+		status = 0;
+		break;
 
 	case SMB_SET_FILE_BASIC_INFO:
 	case SMB_FILE_BASIC_INFORMATION:
-		return (smb_set_basic_info(sr, sinfo));
+		status = smb_set_basic_info(sr, sinfo);
+		break;
 
 	case SMB_SET_FILE_DISPOSITION_INFO:
 	case SMB_FILE_DISPOSITION_INFORMATION:
-		return (smb_set_disposition_info(sr, sinfo));
+		status = smb_set_disposition_info(sr, sinfo);
+		break;
 
 	case SMB_SET_FILE_END_OF_FILE_INFO:
 	case SMB_FILE_END_OF_FILE_INFORMATION:
-		return (smb_set_eof_info(sr, sinfo));
+		status = smb_set_eof_info(sr, sinfo);
+		break;
 
 	case SMB_SET_FILE_ALLOCATION_INFO:
 	case SMB_FILE_ALLOCATION_INFORMATION:
-		return (smb_set_alloc_info(sr, sinfo));
+		status = smb_set_alloc_info(sr, sinfo);
+		break;
 
 	case SMB_FILE_RENAME_INFORMATION:
-		return (smb_set_rename_info(sr, sinfo));
+		status = smb_set_rename_info(sr, sinfo);
+		break;
 
 	case SMB_FILE_LINK_INFORMATION:
-		smbsr_error(sr, NT_STATUS_NOT_SUPPORTED,
-		    ERRDOS, ERROR_NOT_SUPPORTED);
-		return (-1);
+		status = NT_STATUS_NOT_SUPPORTED;
+		break;
+
 	default:
+		status = NT_STATUS_INVALID_INFO_CLASS;
 		break;
 	}
 
-	smbsr_error(sr, NT_STATUS_INVALID_INFO_CLASS,
-	    ERRDOS, ERROR_INVALID_PARAMETER);
-	return (-1);
+	return (status);
 }
 
 /*
@@ -379,23 +391,22 @@ smb_set_fileinfo(smb_request_t *sr, smb_setinfo_t *sinfo)
  * attributes have ONLY FILE_ATTRIBUTE_NORMAL set do NOT change
  * the file's attributes.
  */
-static int
+static uint32_t
 smb_set_information(smb_request_t *sr, smb_setinfo_t *sinfo)
 {
-	int rc;
-	uint16_t attributes;
-	smb_node_t *node = sinfo->si_node;
 	smb_attr_t attr;
+	smb_node_t *node = sinfo->si_node;
+	uint32_t status = 0;
 	uint32_t mtime;
+	uint16_t attributes;
+	int rc;
 
 	if (smbsr_decode_vwv(sr, "wl10.", &attributes, &mtime) != 0)
-		return (-1);
+		return (NT_STATUS_INFO_LENGTH_MISMATCH);
 
 	if ((attributes & FILE_ATTRIBUTE_DIRECTORY) &&
 	    (!smb_node_is_dir(node))) {
-		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER,
-		    ERRDOS, ERROR_INVALID_PARAMETER);
-		return (-1);
+		return (NT_STATUS_INVALID_PARAMETER);
 	}
 
 	bzero(&attr, sizeof (smb_attr_t));
@@ -411,26 +422,25 @@ smb_set_information(smb_request_t *sr, smb_setinfo_t *sinfo)
 	}
 
 	rc = smb_node_setattr(sr, node, sr->user_cr, NULL, &attr);
-	if (rc != 0) {
-		smbsr_errno(sr, rc);
-		return (-1);
-	}
+	if (rc != 0)
+		status = smb_errno2status(rc);
 
-	return (0);
+	return (status);
 }
 
 /*
  * smb_set_information2
  */
-static int
+static uint32_t
 smb_set_information2(smb_request_t *sr, smb_setinfo_t *sinfo)
 {
-	int rc;
-	uint32_t crtime, atime, mtime;
 	smb_attr_t attr;
+	uint32_t crtime, atime, mtime;
+	uint32_t status = 0;
+	int rc;
 
 	if (smbsr_decode_vwv(sr, "yyy", &crtime, &atime, &mtime) != 0)
-		return (-1);
+		return (NT_STATUS_INFO_LENGTH_MISMATCH);
 
 	bzero(&attr, sizeof (smb_attr_t));
 	if (mtime != 0 && mtime != UINT_MAX) {
@@ -452,12 +462,10 @@ smb_set_information2(smb_request_t *sr, smb_setinfo_t *sinfo)
 
 	rc = smb_node_setattr(sr, sinfo->si_node, sr->user_cr,
 	    sr->fid_ofile, &attr);
-	if (rc != 0) {
-		smbsr_errno(sr, rc);
-		return (-1);
-	}
+	if (rc != 0)
+		status = smb_errno2status(rc);
 
-	return (0);
+	return (status);
 }
 
 /*
@@ -465,18 +473,18 @@ smb_set_information2(smb_request_t *sr, smb_setinfo_t *sinfo)
  *
  * Sets standard file/path information.
  */
-static int
+static uint32_t
 smb_set_standard_info(smb_request_t *sr, smb_setinfo_t *sinfo)
 {
 	smb_attr_t attr;
-	uint32_t crtime, atime, mtime;
 	smb_node_t *node = sinfo->si_node;
+	uint32_t crtime, atime, mtime;
+	uint32_t status = 0;
 	int rc;
 
-	if (smb_mbc_decodef(&sinfo->si_xa->req_data_mb, "yyy",
-	    &crtime, &atime, &mtime) != 0) {
-		return (-1);
-	}
+	if (smb_mbc_decodef(&sinfo->si_data, "yyy",
+	    &crtime, &atime, &mtime) != 0)
+		return (NT_STATUS_INFO_LENGTH_MISMATCH);
 
 	bzero(&attr, sizeof (smb_attr_t));
 	if (mtime != 0 && mtime != (uint32_t)-1) {
@@ -497,239 +505,17 @@ smb_set_standard_info(smb_request_t *sr, smb_setinfo_t *sinfo)
 	}
 
 	rc = smb_node_setattr(sr, node, sr->user_cr, sr->fid_ofile, &attr);
-	if (rc != 0) {
-		smbsr_errno(sr, rc);
-		return (-1);
-	}
+	if (rc != 0)
+		status = smb_errno2status(rc);
 
-	return (0);
-}
-
-/*
- * smb_set_basic_info
- *
- * Sets basic file/path information.
- *
- * It is not valid to set FILE_ATTRIBUTE_DIRECTORY if the
- * target is not a directory.
- *
- * For compatibility with windows servers:
- * - if the specified attributes have ONLY FILE_ATTRIBUTE_NORMAL set
- *   clear (0) the file's attributes.
- * - if the specified attributes are 0 do NOT change the file's attributes.
- */
-static int
-smb_set_basic_info(smb_request_t *sr, smb_setinfo_t *sinfo)
-{
-	int rc;
-	uint64_t crtime, atime, mtime, ctime;
-	uint16_t attributes;
-	smb_attr_t attr;
-	smb_node_t *node = sinfo->si_node;
-
-	if (smb_mbc_decodef(&sinfo->si_xa->req_data_mb, "qqqqw",
-	    &crtime, &atime, &mtime, &ctime, &attributes) != 0) {
-		return (-1);
-	}
-
-	if ((attributes & FILE_ATTRIBUTE_DIRECTORY) &&
-	    (!smb_node_is_dir(node))) {
-		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER,
-		    ERRDOS, ERROR_INVALID_PARAMETER);
-		return (-1);
-	}
-
-	bzero(&attr, sizeof (smb_attr_t));
-	if (ctime != 0 && ctime != (uint64_t)-1) {
-		smb_time_nt_to_unix(ctime, &attr.sa_vattr.va_ctime);
-		attr.sa_mask |= SMB_AT_CTIME;
-	}
-
-	if (crtime != 0 && crtime != (uint64_t)-1) {
-		smb_time_nt_to_unix(crtime, &attr.sa_crtime);
-		attr.sa_mask |= SMB_AT_CRTIME;
-	}
-
-	if (mtime != 0 && mtime != (uint64_t)-1) {
-		smb_time_nt_to_unix(mtime, &attr.sa_vattr.va_mtime);
-		attr.sa_mask |= SMB_AT_MTIME;
-	}
-
-	if (atime != 0 && atime != (uint64_t)-1) {
-		smb_time_nt_to_unix(atime, &attr.sa_vattr.va_atime);
-		attr.sa_mask |= SMB_AT_ATIME;
-	}
-
-	if (attributes != 0) {
-		attr.sa_dosattr = attributes;
-		attr.sa_mask |= SMB_AT_DOSATTR;
-	}
-
-	rc = smb_node_setattr(sr, node, sr->user_cr, sr->fid_ofile, &attr);
-	if (rc != 0) {
-		smbsr_errno(sr, rc);
-		return (-1);
-	}
-
-	return (0);
-}
-
-/*
- * smb_set_eof_info
- */
-static int
-smb_set_eof_info(smb_request_t *sr, smb_setinfo_t *sinfo)
-{
-	int rc;
-	smb_attr_t attr;
-	uint64_t eof;
-	smb_node_t *node = sinfo->si_node;
-
-	if (smb_mbc_decodef(&sinfo->si_xa->req_data_mb, "q", &eof) != 0)
-		return (-1);
-
-	if (smb_node_is_dir(node)) {
-		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER,
-		    ERRDOS, ERROR_INVALID_PARAMETER);
-		return (-1);
-	}
-
-	/* If opened by path, break exclusive oplock */
-	if (sr->fid_ofile == NULL)
-		(void) smb_oplock_break(sr, node,
-		    SMB_OPLOCK_BREAK_EXCLUSIVE | SMB_OPLOCK_BREAK_TO_NONE);
-
-	bzero(&attr, sizeof (smb_attr_t));
-	attr.sa_mask = SMB_AT_SIZE;
-	attr.sa_vattr.va_size = (u_offset_t)eof;
-	rc = smb_node_setattr(sr, node, sr->user_cr, sr->fid_ofile, &attr);
-	if (rc != 0) {
-		smbsr_errno(sr, rc);
-		return (-1);
-	}
-
-	smb_oplock_break_levelII(node);
-	return (0);
-}
-
-/*
- * smb_set_alloc_info
- */
-static int
-smb_set_alloc_info(smb_request_t *sr, smb_setinfo_t *sinfo)
-{
-	int rc;
-	smb_attr_t attr;
-	uint64_t allocsz;
-	smb_node_t *node = sinfo->si_node;
-
-	if (smb_mbc_decodef(&sinfo->si_xa->req_data_mb, "q", &allocsz) != 0)
-		return (-1);
-
-	if (smb_node_is_dir(node)) {
-		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER,
-		    ERRDOS, ERROR_INVALID_PARAMETER);
-		return (-1);
-	}
-
-	/* If opened by path, break exclusive oplock */
-	if (sr->fid_ofile == NULL)
-		(void) smb_oplock_break(sr, node,
-		    SMB_OPLOCK_BREAK_EXCLUSIVE | SMB_OPLOCK_BREAK_TO_NONE);
-
-	bzero(&attr, sizeof (smb_attr_t));
-	attr.sa_mask = SMB_AT_ALLOCSZ;
-	attr.sa_allocsz = (u_offset_t)allocsz;
-	rc = smb_node_setattr(sr, node, sr->user_cr, sr->fid_ofile, &attr);
-	if (rc != 0) {
-		smbsr_errno(sr, rc);
-		return (-1);
-	}
-
-	smb_oplock_break_levelII(node);
-	return (0);
-}
-
-/*
- * smb_set_disposition_info
- *
- * Set/Clear DELETE_ON_CLOSE flag for an open file.
- * File should have been opened with DELETE access otherwise
- * the operation is not permitted.
- *
- * NOTE: The node should be marked delete-on-close upon the receipt
- * of the Trans2SetFileInfo(SetDispositionInfo) if mark_delete is set.
- * It is different than both SmbNtCreateAndX and SmbNtTransact, which
- * set delete-on-close on the ofile and defer setting the flag on the
- * node until the file is closed.
- *
- * Observation of Windows 2000 indicates the following:
- *
- * 1) If a file is not opened with delete-on-close create options and
- * the delete-on-close is set via Trans2SetFileInfo(SetDispositionInfo)
- * using that open file handle, any subsequent open requests will fail
- * with DELETE_PENDING.
- *
- * 2) If a file is opened with delete-on-close create options and the
- * client attempts to unset delete-on-close via Trans2SetFileInfo
- * (SetDispositionInfo) prior to the file close, any subsequent open
- * requests will still fail with DELETE_PENDING after the file is closed.
- *
- * 3) If a file is opened with delete-on-close create options and that
- * file handle (not the last open handle and the only file handle
- * with delete-on-close set) is closed. Any subsequent open requests
- * will fail with DELETE_PENDING. Unsetting delete-on-close via
- * Trans2SetFileInfo(SetDispositionInfo) at this time will unset the
- * node delete-on-close flag, which will result in the file not being
- * removed even after the last file handle is closed.
- */
-static int
-smb_set_disposition_info(smb_request_t *sr, smb_setinfo_t *sinfo)
-{
-	unsigned char	mark_delete;
-	uint32_t	flags = 0;
-	int		doserr;
-	uint32_t	status;
-
-	if (smb_mbc_decodef(&sinfo->si_xa->req_data_mb, "b", &mark_delete) != 0)
-		return (-1);
-
-	if ((sr->fid_ofile == NULL) ||
-	    !(smb_ofile_granted_access(sr->fid_ofile) & DELETE)) {
-		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
-		    ERRDOS, ERROR_ACCESS_DENIED);
-		return (-1);
-	}
-
-	if (mark_delete) {
-		if (SMB_TREE_SUPPORTS_CATIA(sr))
-			flags |= SMB_CATIA;
-
-		status = smb_node_set_delete_on_close(sinfo->si_node,
-		    sr->user_cr, flags);
-		if (status != NT_STATUS_SUCCESS) {
-			switch (status) {
-			case NT_STATUS_CANNOT_DELETE:
-				doserr = ERROR_ACCESS_DENIED;
-				break;
-			case NT_STATUS_DIRECTORY_NOT_EMPTY:
-				doserr = ERROR_DIR_NOT_EMPTY;
-				break;
-			default:
-				doserr = ERROR_GEN_FAILURE;
-				break;
-			}
-			smbsr_error(sr, status, ERRDOS, doserr);
-			return (-1);
-		}
-	} else {
-		smb_node_reset_delete_on_close(sinfo->si_node);
-	}
-	return (0);
+	return (status);
 }
 
 /*
  * smb_set_rename_info
+ *
+ * This call only allows a rename in the same directory, and the
+ * directory name is not part of the new name provided.
  *
  * Explicitly specified parameter validation rules:
  * - If rootdir is not NULL respond with NT_STATUS_INVALID_PARAMETER.
@@ -740,35 +526,64 @@ smb_set_disposition_info(smb_request_t *sr, smb_setinfo_t *sinfo)
  * Some Windows servers break BATCH oplocks prior to the rename.
  * W2K3 does not. We behave as W2K3; we do not send an oplock break.
  */
-static int
+static uint32_t
 smb_set_rename_info(smb_request_t *sr, smb_setinfo_t *sinfo)
 {
-	int rc;
-	uint32_t flags, rootdir, namelen;
+	smb_fqi_t *src_fqi = &sr->arg.dirop.fqi;
+	smb_fqi_t *dst_fqi = &sr->arg.dirop.dst_fqi;
 	char *fname;
+	char *path;
+	uint8_t flags;
+	uint32_t rootdir, namelen;
+	uint32_t status = 0;
+	int rc;
 
-	rc = smb_mbc_decodef(&sinfo->si_xa->req_data_mb, "lll",
+	rc = smb_mbc_decodef(&sinfo->si_data, "b...ll",
 	    &flags, &rootdir, &namelen);
 	if (rc == 0) {
-		rc = smb_mbc_decodef(&sinfo->si_xa->req_data_mb, "%#U",
+		rc = smb_mbc_decodef(&sinfo->si_data, "%#U",
 		    sr, namelen, &fname);
 	}
 	if (rc != 0)
-		return (-1);
+		return (NT_STATUS_INFO_LENGTH_MISMATCH);
 
 	if ((rootdir != 0) || (namelen == 0) || (namelen >= MAXNAMELEN)) {
-		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER,
-		    ERRDOS, ERROR_INVALID_PARAMETER);
-		return (-1);
+		return (NT_STATUS_INVALID_PARAMETER);
 	}
 
 	if (strchr(fname, '\\') != NULL) {
-		smbsr_error(sr, NT_STATUS_NOT_SUPPORTED,
-		    ERRDOS, ERROR_NOT_SUPPORTED);
-		return (-1);
+		return (NT_STATUS_NOT_SUPPORTED);
 	}
 
-	rc = smb_trans2_rename(sr, sinfo->si_node, fname, flags);
+	/*
+	 * Construct the full dst. path relative to the share root.
+	 * Allocated path is free'd in smb_request_free.
+	 */
+	path = smb_srm_zalloc(sr, SMB_MAXPATHLEN);
+	if (src_fqi->fq_path.pn_pname) {
+		/* Got here via: smb_set_by_path */
+		(void) snprintf(path, SMB_MAXPATHLEN, "%s\\%s",
+		    src_fqi->fq_path.pn_pname, fname);
+	} else {
+		/* Got here via: smb_set_by_fid */
+		rc = smb_node_getshrpath(sinfo->si_node->n_dnode,
+		    sr->tid_tree, path, SMB_MAXPATHLEN);
+		if (rc != 0) {
+			status = smb_errno2status(rc);
+			return (status);
+		}
+		(void) strlcat(path, "\\", SMB_MAXPATHLEN);
+		(void) strlcat(path, fname, SMB_MAXPATHLEN);
+	}
 
-	return ((rc == 0) ? 0 : -1);
+	/*
+	 * The common rename code can slightly optimize a
+	 * rename in the same directory when we set the
+	 * dst_fqi->fq_dnode, dst_fqi->fq_last_comp
+	 */
+	dst_fqi->fq_dnode = sinfo->si_node->n_dnode;
+	(void) strlcpy(dst_fqi->fq_last_comp, fname, MAXNAMELEN);
+
+	status = smb_setinfo_rename(sr, sinfo->si_node, path, flags);
+	return (status);
 }

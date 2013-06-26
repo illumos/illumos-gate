@@ -141,7 +141,7 @@ fksmbsrv_drv_close(void)
 	rc = smb_server_delete();
 
 	if (g_init_done != 0) {
-		(void) smb_server_g_fini();
+		smb_server_g_fini();
 		g_init_done = 0;
 	}
 

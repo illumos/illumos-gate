@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <synch.h>
@@ -88,7 +89,7 @@ typedef struct smbd_vss_get_uint64_date {
 } smbd_vss_get_uint64_date_t;
 
 typedef struct smbd_vss_map_gmttoken {
-	char *mg_gmttoken;
+	time_t mg_snaptime;
 	char *mg_snapname;
 } smbd_vss_map_gmttoken_t;
 
@@ -214,10 +215,14 @@ smbd_vss_get_snapshots(const char *path, uint32_t count,
 	libzfs_fini(libhd);
 }
 
+static const char
+smbd_vss_gmttoken_fmt[] = "@GMT-%Y.%m.%d-%H.%M.%S";
+
 /*
  * path - path of the dataset for the operation
  * gmttoken - the @GMT token to be looked up
- * snapname - the snapshot name to be returned
+ * toktime - time_t used if gmttoken == NULL
+ * snapname - the snapshot name to be returned [MAXPATHLEN]
  *
  * Here we are going to get the snapshot name from the @GMT token
  * The snapname returned by ZFS is : <dataset name>@<snapshot name>
@@ -225,7 +230,8 @@ smbd_vss_get_snapshots(const char *path, uint32_t count,
  * the right place and then just return the snapshot name
  */
 int
-smbd_vss_map_gmttoken(const char *path, char *gmttoken, char *snapname)
+smbd_vss_map_gmttoken(const char *path, char *gmttoken, time_t toktime,
+	char *snapname)
 {
 	char dataset[MAXPATHLEN];
 	libzfs_handle_t *libhd;
@@ -233,8 +239,14 @@ smbd_vss_map_gmttoken(const char *path, char *gmttoken, char *snapname)
 	smbd_vss_map_gmttoken_t vss_map_gmttoken;
 	char *zsnap;
 	const char *lsnap;
+	struct tm tm;
 
-	vss_map_gmttoken.mg_gmttoken = gmttoken;
+	if (gmttoken != NULL && *gmttoken == '@' &&
+	    strptime(gmttoken, smbd_vss_gmttoken_fmt, &tm) != NULL) {
+		toktime = timegm(&tm);
+	}
+
+	vss_map_gmttoken.mg_snaptime = toktime;
 	vss_map_gmttoken.mg_snapname = snapname;
 	*snapname = '\0';
 
@@ -281,7 +293,7 @@ smbd_vss_time2gmttoken(time_t time, char *gmttoken)
 	(void) gmtime_r(&time, &t);
 
 	(void) strftime(gmttoken, SMB_VSS_GMT_SIZE,
-	    "@GMT-%Y.%m.%d-%H.%M.%S", &t);
+	    smbd_vss_gmttoken_fmt, &t);
 }
 
 static int
@@ -349,12 +361,9 @@ smbd_vss_iterate_map_gmttoken(zfs_handle_t *zhp, void *data)
 {
 	smbd_vss_map_gmttoken_t *vss_data = data;
 	time_t time;
-	char gmttoken[SMB_VSS_GMT_SIZE];
 
 	time = (time_t)zfs_prop_get_int(zhp, ZFS_PROP_CREATION);
-	smbd_vss_time2gmttoken(time, gmttoken);
-
-	if (strncmp(gmttoken, vss_data->mg_gmttoken, SMB_VSS_GMT_SIZE) == 0) {
+	if (time == vss_data->mg_snaptime) {
 		(void) strlcpy(vss_data->mg_snapname, zfs_get_name(zhp),
 		    MAXPATHLEN);
 

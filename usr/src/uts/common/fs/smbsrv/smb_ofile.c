@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -236,7 +236,12 @@ smb_ofile_open(
 		ASSERT(ftype == SMB_FTYPE_DISK); /* Regular file, not a pipe */
 		ASSERT(node);
 
-		if (of->f_granted_access == FILE_EXECUTE)
+		/*
+		 * Note that the common open path often adds bits like
+		 * READ_CONTROL, so the logic "is this open exec-only"
+		 * needs to look at only the FILE_DATA_ALL bits.
+		 */
+		if ((of->f_granted_access & FILE_DATA_ALL) == FILE_EXECUTE)
 			of->f_flags |= SMB_OFLAGS_EXECONLY;
 
 		bzero(&attr, sizeof (smb_attr_t));
@@ -317,6 +322,7 @@ errout:
 void
 smb_ofile_close(smb_ofile_t *of, int32_t mtime_sec)
 {
+	smb_attr_t *pa;
 	timestruc_t now;
 	uint32_t flags = 0;
 
@@ -331,18 +337,22 @@ smb_ofile_close(smb_ofile_t *of, int32_t mtime_sec)
 	of->f_state = SMB_OFILE_STATE_CLOSING;
 	mutex_exit(&of->f_mutex);
 
-	if (of->f_ftype == SMB_FTYPE_MESG_PIPE) {
+	switch (of->f_ftype) {
+	case SMB_FTYPE_BYTE_PIPE:
+	case SMB_FTYPE_MESG_PIPE:
 		smb_opipe_close(of);
 		smb_server_dec_pipes(of->f_server);
-	} else {
-		smb_attr_t *pa = &of->f_pending_attr;
+		break;
 
+	case SMB_FTYPE_DISK:
+	case SMB_FTYPE_PRINTER:
 		/*
 		 * In here we make changes to of->f_pending_attr
 		 * while not holding of->f_mutex.  This is OK
 		 * because we've changed f_state to CLOSING,
 		 * so no more threads will take this path.
 		 */
+		pa = &of->f_pending_attr;
 		if (mtime_sec != 0) {
 			pa->sa_vattr.va_mtime.tv_sec = mtime_sec;
 			pa->sa_mask |= SMB_AT_MTIME;
@@ -377,6 +387,12 @@ smb_ofile_close(smb_ofile_t *of, int32_t mtime_sec)
 			(void) smb_fsop_close(of->f_node, of->f_mode,
 			    of->f_cr);
 			smb_oplock_release(of->f_node, of);
+		} else {
+			/*
+			 * If there was an odir, close it.
+			 */
+			if (of->f_odir != NULL)
+				smb_odir_close(of->f_odir);
 		}
 		if (smb_node_dec_open_ofiles(of->f_node) == 0) {
 			/*
@@ -415,6 +431,7 @@ smb_ofile_close(smb_ofile_t *of, int32_t mtime_sec)
 			smb_notify_file_closed(of);
 
 		smb_server_dec_files(of->f_server);
+		break;
 	}
 	atomic_dec_32(&of->f_tree->t_open_files);
 
@@ -932,14 +949,21 @@ smb_ofile_delete(void *arg)
 	mutex_enter(&of->f_mutex);
 	mutex_exit(&of->f_mutex);
 
-	if (of->f_ftype == SMB_FTYPE_MESG_PIPE) {
+	switch (of->f_ftype) {
+	case SMB_FTYPE_BYTE_PIPE:
+	case SMB_FTYPE_MESG_PIPE:
 		smb_opipe_dealloc(of->f_pipe);
 		of->f_pipe = NULL;
-	} else {
-		ASSERT(of->f_ftype == SMB_FTYPE_DISK);
-		ASSERT(of->f_node != NULL);
+		break;
+	case SMB_FTYPE_DISK:
+		if (of->f_odir != NULL)
+			smb_odir_release(of->f_odir);
 		smb_node_rem_ofile(of->f_node, of);
 		smb_node_release(of->f_node);
+		break;
+	default:
+		ASSERT(!"f_ftype");
+		break;
 	}
 
 	of->f_magic = (uint32_t)~SMB_OFILE_MAGIC;

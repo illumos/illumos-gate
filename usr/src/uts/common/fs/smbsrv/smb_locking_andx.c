@@ -234,7 +234,7 @@ smb_com_locking_andx(smb_request_t *sr)
 	uint32_t	timeout;	/* Milliseconds to wait for lock */
 	unsigned short	unlock_num;	/* # unlock range structs */
 	unsigned short	lock_num;	/* # lock range structs */
-	unsigned short	pid;		/* Process Id of owner */
+	uint32_t	save_pid;	/* Process Id of owner */
 	uint32_t	offset32, length32;
 	uint64_t	offset64;
 	uint64_t	length64;
@@ -242,6 +242,7 @@ smb_com_locking_andx(smb_request_t *sr)
 	int 		rc;
 	uint32_t	ltype;
 	smb_ofile_t	*ofile;
+	uint16_t	tmp_pid;	/* locking uses 16-bit pids */
 	uint8_t		brk;
 
 	rc = smbsr_decode_vwv(sr, "4.wbblww", &sr->smb_fid, &lock_type,
@@ -266,7 +267,7 @@ smb_com_locking_andx(smb_request_t *sr)
 	else
 		ltype = SMB_LOCK_TYPE_READWRITE;
 
-	pid = sr->smb_pid;	/* Save the original pid */
+	save_pid = sr->smb_pid;	/* Save the original pid */
 
 	if (lock_type & LOCKING_ANDX_OPLOCK_RELEASE) {
 		if (oplock_level == 0)
@@ -309,7 +310,7 @@ smb_com_locking_andx(smb_request_t *sr)
 
 		for (i = 0; i < unlock_num; i++) {
 			rc = smb_mbc_decodef(&sr->smb_data, "w2.QQ",
-			    &sr->smb_pid, &offset64, &length64);
+			    &tmp_pid, &offset64, &length64);
 			if (rc) {
 				/*
 				 * This is the error returned by Windows 2000
@@ -318,6 +319,7 @@ smb_com_locking_andx(smb_request_t *sr)
 				smbsr_error(sr, 0, ERRSRV, ERRerror);
 				return (SDRC_ERROR);
 			}
+			sr->smb_pid = tmp_pid;	/* NB: 16-bit */
 
 			result = smb_unlock_range(sr, sr->fid_ofile->f_node,
 			    offset64, length64);
@@ -330,11 +332,12 @@ smb_com_locking_andx(smb_request_t *sr)
 
 		for (i = 0; i < lock_num; i++) {
 			rc = smb_mbc_decodef(&sr->smb_data, "w2.QQ",
-			    &sr->smb_pid, &offset64, &length64);
+			    &tmp_pid, &offset64, &length64);
 			if (rc) {
 				smbsr_error(sr, 0, ERRSRV, ERRerror);
 				return (SDRC_ERROR);
 			}
+			sr->smb_pid = tmp_pid;	/* NB: 16-bit */
 
 			result = smb_lock_range(sr, offset64, length64, timeout,
 			    ltype);
@@ -345,12 +348,13 @@ smb_com_locking_andx(smb_request_t *sr)
 		}
 	} else {
 		for (i = 0; i < unlock_num; i++) {
-			rc = smb_mbc_decodef(&sr->smb_data, "wll", &sr->smb_pid,
+			rc = smb_mbc_decodef(&sr->smb_data, "wll", &tmp_pid,
 			    &offset32, &length32);
 			if (rc) {
 				smbsr_error(sr, 0, ERRSRV, ERRerror);
 				return (SDRC_ERROR);
 			}
+			sr->smb_pid = tmp_pid;	/* NB: 16-bit */
 
 			result = smb_unlock_range(sr, sr->fid_ofile->f_node,
 			    (uint64_t)offset32, (uint64_t)length32);
@@ -362,12 +366,13 @@ smb_com_locking_andx(smb_request_t *sr)
 		}
 
 		for (i = 0; i < lock_num; i++) {
-			rc = smb_mbc_decodef(&sr->smb_data, "wll", &sr->smb_pid,
+			rc = smb_mbc_decodef(&sr->smb_data, "wll", &tmp_pid,
 			    &offset32, &length32);
 			if (rc) {
 				smbsr_error(sr, 0, ERRSRV, ERRerror);
 				return (SDRC_ERROR);
 			}
+			sr->smb_pid = tmp_pid;	/* NB: 16-bit */
 
 			result = smb_lock_range(sr, (uint64_t)offset32,
 			    (uint64_t)length32, timeout, ltype);
@@ -378,8 +383,58 @@ smb_com_locking_andx(smb_request_t *sr)
 		}
 	}
 
-	sr->smb_pid = pid;
+	sr->smb_pid = save_pid;
 	if (smbsr_encode_result(sr, 2, 0, "bb.ww", 2, sr->andx_com, 7, 0))
 		return (SDRC_ERROR);
 	return (SDRC_SUCCESS);
+}
+
+/*
+ * Compose an SMB1 Oplock Break Notification packet, including
+ * the SMB1 header and everything, in sr->reply.
+ * The caller will send it and free the request.
+ */
+void
+smb1_oplock_break_notification(smb_request_t *sr, uint8_t brk)
+{
+	smb_ofile_t *ofile = sr->fid_ofile;
+	uint16_t fid;
+	uint8_t lock_type;
+	uint8_t oplock_level;
+
+	switch (brk) {
+	default:
+		ASSERT(0);
+		/* FALLTHROUGH */
+	case SMB_OPLOCK_BREAK_TO_NONE:
+		oplock_level = 0;
+		break;
+	case SMB_OPLOCK_BREAK_TO_LEVEL_II:
+		oplock_level = 1;
+		break;
+	}
+
+	sr->smb_com = SMB_COM_LOCKING_ANDX;
+	sr->smb_tid = ofile->f_tree->t_tid;
+	sr->smb_pid = 0xFFFF;
+	sr->smb_uid = 0;
+	sr->smb_mid = 0xFFFF;
+	fid = ofile->f_fid;
+	lock_type = LOCKING_ANDX_OPLOCK_RELEASE;
+
+	(void) smb_mbc_encodef(
+	    &sr->reply, "Mb19.wwwwbb3.wbb10.",
+	    /*  "\xffSMB"		   M */
+	    sr->smb_com,		/* b */
+	    /* status, flags, signature	 19. */
+	    sr->smb_tid,		/* w */
+	    sr->smb_pid,		/* w */
+	    sr->smb_uid,		/* w */
+	    sr->smb_mid,		/* w */
+	    8,		/* word count	   b */
+	    0xFF,	/* AndX cmd	   b */
+	    /*  AndX reserved, offset	  3. */
+	    fid,
+	    lock_type,
+	    oplock_level);
 }

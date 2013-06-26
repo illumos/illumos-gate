@@ -235,6 +235,7 @@ smb_com_nt_create_andx(struct smb_request *sr)
 	smb_ofile_t		*of;
 	int			rc;
 	unsigned char		DirFlag;
+	uint32_t		status;
 
 	if ((op->create_options & FILE_DELETE_ON_CLOSE) &&
 	    !(op->desired_access & DELETE)) {
@@ -275,8 +276,11 @@ smb_com_nt_create_andx(struct smb_request *sr)
 
 	op->op_oplock_levelII = B_TRUE;
 
-	if (smb_common_open(sr) != NT_STATUS_SUCCESS)
+	status = smb_common_open(sr);
+	if (status != NT_STATUS_SUCCESS) {
+		smbsr_status(sr, status, 0, 0);
 		return (SDRC_ERROR);
+	}
 
 	/*
 	 * NB: after the above smb_common_open() success,
