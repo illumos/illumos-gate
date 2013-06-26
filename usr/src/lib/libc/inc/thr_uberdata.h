@@ -832,16 +832,25 @@ typedef struct {
  * atexit() data structures.
  * See port/gen/atexit.c for details.
  */
-typedef void (*_exithdlr_func_t) (void);
+typedef void (*_exithdlr_func_t) (void*);
 
 typedef struct _exthdlr {
 	struct _exthdlr 	*next;	/* next in handler list */
 	_exithdlr_func_t	hdlr;	/* handler itself */
+	void			*arg;	/* argument to handler */
+	void			*dso;	/* DSO associated with handler */
 } _exthdlr_t;
 
 typedef struct {
 	mutex_t		exitfns_lock;
 	_exthdlr_t	*head;
+	/*
+	 * exit_frame_monitor is part of a private contract between libc and
+	 * the Sun C++ runtime.
+	 *
+	 * It should be NULL until exit() is called, and thereafter hold the
+	 * frame pointer of the function implementing our exit processing.
+	 */
 	void		*exit_frame_monitor;
 	char		exit_pad[64 -	/* pad out to 64 bytes */
 		(sizeof (mutex_t) + sizeof (_exthdlr_t *) + sizeof (void *))];
