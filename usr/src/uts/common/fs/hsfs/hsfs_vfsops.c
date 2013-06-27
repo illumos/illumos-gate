@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
+ * Copyright 2013 Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -149,7 +150,7 @@ static vfsdef_t vfw = {
 	"hsfs",
 	hsfsinit,
 	/* We don't suppport remounting */
-	VSW_HASPROTO|VSW_STATS|VSW_CANLOFI|VSW_ZMOUNT,
+	VSW_HASPROTO|VSW_STATS|VSW_CANLOFI,
 	&hsfs_proto_opttbl
 };
 

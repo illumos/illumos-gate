@@ -1,10 +1,10 @@
 '\" te
 .\" Copyright (c) 2004, 2009 Sun Microsystems, Inc. All Rights Reserved.
-.\" Copyright (c) 2011 Joyent, Inc. All Rights Reserved.
+.\" Copyright 2013 Joyent, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ZONECFG 1M "Aug 24, 2012"
+.TH ZONECFG 1M "Jun 27, 2013"
 .SH NAME
 zonecfg \- set up zone configuration
 .SH SYNOPSIS
@@ -897,7 +897,9 @@ control and is related to the \fBzone.cpu-cap\fR resource control. See
 .RS 4n
 A comma-separated list of additional filesystems that may be mounted within
 the zone; for example "ufs,pcfs". By default, only hsfs(7fs) and network
-filesystems can be mounted.
+filesystems can be mounted. If the first entry in the list is "-" then
+that disables all of the default filesystems. If any filesystems are listed
+after "-" then only those filesystems can be mounted.
 
 This property does not apply to filesystems mounted into the zone via "add fs"
 or "add dataset".
