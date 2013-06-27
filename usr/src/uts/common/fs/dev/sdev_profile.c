@@ -198,8 +198,8 @@ prof_make_dir(char *name, struct sdev_node **gdirp, struct sdev_node **dirp)
 	if (newdv = sdev_cache_lookup(dir, name)) {
 		*dirp = newdv;
 		*gdirp = newdv->sdev_origin;
-		SDEV_RELE(dir);
 		rw_exit(&dir->sdev_contents);
+		SDEV_RELE(dir);
 		return (0);
 	}
 	rw_exit(&dir->sdev_contents);
