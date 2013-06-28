@@ -1,30 +1,33 @@
 /*
- * This file is provided under a CDDLv1 license.  When using or
- * redistributing this file, you may do so under this license.
- * In redistributing this file this license must be included
- * and no other modification of this header file is permitted.
+ * CDDL HEADER START
  *
- * CDDL LICENSE SUMMARY
+ * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
- * Copyright(c) 1999 - 2009 Intel Corporation. All rights reserved.
- *
- * The contents of this file are subject to the terms of Version
- * 1.0 of the Common Development and Distribution License (the "License").
- *
- * You should have received a copy of the License with this software.
- * You can obtain a copy of the License at
+ * You can obtain a copy of the license at:
  *	http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
+ *
+ * When using or redistributing this file, you may do so under the
+ * License only. No other modification of this header is permitted.
+ *
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDLv1.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms of the CDDL.
  */
 
-#ifndef _E1000_OSDEP_H
-#define	_E1000_OSDEP_H
+#ifndef	_IGB_OSDEP_H
+#define	_IGB_OSDEP_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,54 +45,52 @@ extern "C" {
 #include <sys/modctl.h>
 #include <sys/errno.h>
 #include <sys/ddi.h>
+#include <sys/dditypes.h>
 #include <sys/sunddi.h>
 #include <sys/pci.h>
+#include <sys/pci_cap.h>
 #include <sys/atomic.h>
 #include <sys/note.h>
-#include <sys/mutex.h>
-#include <sys/pci_cap.h>
-#include "e1000g_debug.h"
+#include "igb_debug.h"
 
 #define	usec_delay(x)		drv_usecwait(x)
 #define	msec_delay(x)		drv_usecwait(x * 1000)
 #define	msec_delay_irq		msec_delay
 
-#ifdef E1000G_DEBUG
-#define	DEBUGOUT(S)		\
-	E1000G_DEBUGLOG_0(NULL, E1000G_INFO_LEVEL, S)
-#define	DEBUGOUT1(S, A)		\
-	E1000G_DEBUGLOG_1(NULL, E1000G_INFO_LEVEL, S, A)
-#define	DEBUGOUT2(S, A, B)	\
-	E1000G_DEBUGLOG_2(NULL, E1000G_INFO_LEVEL, S, A, B)
-#define	DEBUGOUT3(S, A, B, C)	\
-	E1000G_DEBUGLOG_3(NULL, E1000G_INFO_LEVEL, S, A, B, C)
-#define	DEBUGFUNC(F)		\
-	E1000G_DEBUGLOG_0(NULL, E1000G_TRACE_LEVEL, F)
+#ifdef IGB_DEBUG
+#define	DEBUGOUT(S)		IGB_DEBUGLOG_0(NULL, S)
+#define	DEBUGOUT1(S, A)		IGB_DEBUGLOG_1(NULL, S, A)
+#define	DEBUGOUT2(S, A, B)	IGB_DEBUGLOG_2(NULL, S, A, B)
+#define	DEBUGOUT3(S, A, B, C)	IGB_DEBUGLOG_3(NULL, S, A, B, C)
 #else
 #define	DEBUGOUT(S)
 #define	DEBUGOUT1(S, A)
 #define	DEBUGOUT2(S, A, B)
 #define	DEBUGOUT3(S, A, B, C)
-#define	DEBUGFUNC(F)
 #endif
 
-#define	OS_DEP(hw)		((struct e1000g_osdep *)((hw)->back))
+#define	DEBUGFUNC(f)
 
-#define	false		0
-#define	true		1
-#define	FALSE		false
-#define	TRUE		true
+#define	OS_DEP(hw)		((struct igb_osdep *)((hw)->back))
+
+#define	false			B_FALSE
+#define	true			B_TRUE
+#define	FALSE			false
+#define	TRUE			true
 
 #define	CMD_MEM_WRT_INVALIDATE	0x0010	/* BIT_4 */
 #define	PCI_COMMAND_REGISTER	0x04
 #define	PCI_EX_CONF_CAP		0xE0
-#define	ADAPTER_REG_SET		1 /* solaris mapping of adapter registers */
-#define	ICH_FLASH_REG_SET	2	/* solaris mapping of flash memory */
 
-#define	RECEIVE_BUFFER_ALIGN_SIZE	256
-#define	E1000_MDALIGN			4096
-#define	E1000_MDALIGN_82546		65536
-#define	E1000_ERT_2048			0x100
+
+/*
+ * Constants used in setting flow control thresholds
+ */
+#define	E1000_PBA_MASK		0xffff
+#define	E1000_PBA_SHIFT		10
+#define	E1000_FC_HIGH_DIFF	0x1638 /* High: 5688 bytes below Rx FIFO size */
+#define	E1000_FC_LOW_DIFF	0x1640 /* Low: 5696 bytes below Rx FIFO size */
+#define	E1000_FC_PAUSE_TIME	0x0680 /* 858 usec */
 
 /* PHY Extended Status Register */
 #define	IEEE_ESR_1000T_HD_CAPS	0x1000	/* 1000T HD capable */
@@ -97,56 +98,36 @@ extern "C" {
 #define	IEEE_ESR_1000X_HD_CAPS	0x4000	/* 1000X HD capable */
 #define	IEEE_ESR_1000X_FD_CAPS	0x8000	/* 1000X FD capable */
 
-/*
- * required by shared code
- */
-#define	E1000_WRITE_FLUSH(a)	(void)E1000_READ_REG(a, E1000_STATUS)
+/* VMDq MODE supported by hardware */
+#define	E1000_VMDQ_OFF		0
+#define	E1000_VMDQ_MAC		1
+#define	E1000_VMDQ_MAC_RSS	2
+
+/* VMDq based on packet destination MAC address */
+#define	E1000_MRQC_ENABLE_VMDQ_MAC_GROUP	0x00000003
+/* VMDq based on packet destination MAC address and RSS */
+#define	E1000_MRQC_ENABLE_VMDQ_MAC_RSS_GROUP	0x00000005
+/* The default queue in each VMDqs */
+#define	E1000_VMDQ_MAC_GROUP_DEFAULT_QUEUE	0x100
+
+#define	E1000_WRITE_FLUSH(a)	(void) E1000_READ_REG(a, E1000_STATUS)
 
 #define	E1000_WRITE_REG(hw, reg, value)	\
-{\
-	if ((hw)->mac.type != e1000_82542) \
-		ddi_put32((OS_DEP(hw))->reg_handle, \
-		    (uint32_t *)((uintptr_t)(hw)->hw_addr + reg), \
-		    value); \
-	else \
-		ddi_put32((OS_DEP(hw))->reg_handle, \
-		    (uint32_t *)((uintptr_t)(hw)->hw_addr + \
-		    e1000_translate_register_82542(reg)), \
-		    value); \
-}
+	ddi_put32((OS_DEP(hw))->reg_handle, \
+	    (uint32_t *)((uintptr_t)(hw)->hw_addr + reg), (value))
 
-#define	E1000_READ_REG(hw, reg) (\
-	((hw)->mac.type != e1000_82542) ? \
-	    ddi_get32((OS_DEP(hw))->reg_handle, \
-		(uint32_t *)((uintptr_t)(hw)->hw_addr + reg)) : \
-	    ddi_get32((OS_DEP(hw))->reg_handle, \
-		(uint32_t *)((uintptr_t)(hw)->hw_addr + \
-		e1000_translate_register_82542(reg))))
+#define	E1000_READ_REG(hw, reg)	\
+	ddi_get32((OS_DEP(hw))->reg_handle, \
+	    (uint32_t *)((uintptr_t)(hw)->hw_addr + reg))
 
-#define	E1000_WRITE_REG_ARRAY(hw, reg, offset, value) \
-{\
-	if ((hw)->mac.type != e1000_82542) \
-		ddi_put32((OS_DEP(hw))->reg_handle, \
-		    (uint32_t *)((uintptr_t)(hw)->hw_addr + \
-		    reg + ((offset) << 2)),\
-		    value); \
-	else \
-		ddi_put32((OS_DEP(hw))->reg_handle, \
-		    (uint32_t *)((uintptr_t)(hw)->hw_addr + \
-		    e1000_translate_register_82542(reg) + \
-		    ((offset) << 2)), value); \
-}
+#define	E1000_WRITE_REG_ARRAY(hw, reg, offset, value)	\
+	ddi_put32((OS_DEP(hw))->reg_handle, \
+	    (uint32_t *)((uintptr_t)(hw)->hw_addr + reg + ((offset) << 2)), \
+	    (value))
 
-#define	E1000_READ_REG_ARRAY(hw, reg, offset) (\
-	((hw)->mac.type != e1000_82542) ? \
-	    ddi_get32((OS_DEP(hw))->reg_handle, \
-		(uint32_t *)((uintptr_t)(hw)->hw_addr + reg + \
-		((offset) << 2))) : \
-	    ddi_get32((OS_DEP(hw))->reg_handle, \
-		(uint32_t *)((uintptr_t)(hw)->hw_addr + \
-		e1000_translate_register_82542(reg) + \
-		((offset) << 2))))
-
+#define	E1000_READ_REG_ARRAY(hw, reg, offset)	\
+	ddi_get32((OS_DEP(hw))->reg_handle, \
+	    (uint32_t *)((uintptr_t)(hw)->hw_addr + reg + ((offset) << 2)))
 
 #define	E1000_WRITE_REG_ARRAY_DWORD(a, reg, offset, value)	\
 	E1000_WRITE_REG_ARRAY(a, reg, offset, value)
@@ -177,26 +158,32 @@ extern "C" {
 #define	UNREFERENCED_5PARAMETER(_p, _q, _r, _s, _t)	\
 	_NOTE(ARGUNUSED(_p, _q, _r, _s, _t))
 
+#define	__le16		u16
+#define	__le32		u32
+#define	__le64		u64
+
 typedef	int8_t		s8;
 typedef	int16_t		s16;
 typedef	int32_t		s32;
 typedef	int64_t		s64;
-typedef	uint8_t		u8;
-typedef	uint16_t	u16;
+typedef uint8_t		u8;
+typedef	uint16_t 	u16;
 typedef	uint32_t	u32;
 typedef	uint64_t	u64;
-typedef boolean_t	bool;
+typedef	boolean_t	bool;
 
-#define	__le16 u16
-#define	__le32 u32
-#define	__le64 u64
-
-struct e1000g_osdep {
+/*
+ * igb only uses the first two of the ddi_acc_handle_t, the latter end up coming
+ * from the common code for devices that igb doesn't support. For now, we end up
+ * bringing in those other two handles just for making life easier for sharin
+ * code.
+ */
+struct igb_osdep {
 	ddi_acc_handle_t reg_handle;
 	ddi_acc_handle_t cfg_handle;
-	ddi_acc_handle_t ich_flash_handle;
-	ddi_acc_handle_t io_reg_handle;
-	struct e1000g *adapter;
+	ddi_acc_handle_t ich_flash_handle; /* UNUSED */
+	ddi_acc_handle_t io_reg_handle; /* UNUSED */
+	struct igb *igb;
 };
 
 /* Shared Code Mutex Defines */
@@ -226,4 +213,4 @@ struct e1000g_osdep {
 }
 #endif
 
-#endif	/* _E1000_OSDEP_H */
+#endif	/* _IGB_OSDEP_H */
