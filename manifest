@@ -427,7 +427,6 @@ f etc/ppp/pap-secrets 0600 root sys
 d etc/ppp/peers 0755 root sys
 f etc/ppp/peers/myisp.tmpl 0644 root sys
 d etc/ppp/plugins 0755 root sys
-f etc/profile 0644 root sys
 f etc/project 0644 root sys
 s etc/protocols=inet/protocols
 f etc/publickey 0644 root bin
