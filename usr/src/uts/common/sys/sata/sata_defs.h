@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SATA_DEFS_H
@@ -367,10 +368,11 @@ typedef struct sata_id {
 #define	SATA_ATAPI_ID_DRQ_TYPE	0x0060	/* DRQ asserted in 3ms after pkt */
 #define	SATA_ATAPI_ID_DRQ_INTR	0x0020  /* Obsolete in ATA/ATAPI 7 */
 
-#define	SATA_ATAPI_ID_DEV_TYPE	0x0f00	/* device type/command set mask */
+#define	SATA_ATAPI_ID_DEV_TYPE	0x1f00	/* device type/command set mask */
 #define	SATA_ATAPI_ID_DEV_SHFT	8
 #define	SATA_ATAPI_DIRACC_DEV	0x0000	/* Direct Access device */
 #define	SATA_ATAPI_SQACC_DEV	0x0100  /* Sequential access dev (tape ?) */
+#define	SATA_ATAPI_PROC_DEV	0x0300	/* Processor device */
 #define	SATA_ATAPI_CDROM_DEV	0x0500  /* CD_ROM device */
 
 /*
@@ -416,6 +418,7 @@ typedef struct sata_id {
 /* SATA Capabilites bits (word 76) */
 
 #define	SATA_NCQ		0x100
+#define	SATA_3_SPEED		0x008
 #define	SATA_2_SPEED		0x004
 #define	SATA_1_SPEED		0x002
 
@@ -743,9 +746,10 @@ struct mode_acoustic_management {
 #define	SSTATUS_SET_DET(x, new_val) \
 	(x = (x & ~SSTATUS_DET) | (new_val & SSTATUS_DET))
 
-#define	SSTATUS_SPD_NOLIMIT	0 /* No speed limit */
-#define	SSTATUS_SPD_GEN1	1 /* Limit Gen 1 rate */
-#define	SSTATUS_SPD_GEN2	2 /* Limit Gen 2 rate */
+#define	SSTATUS_SPD_NODEV	0 /* No device present */
+#define	SSTATUS_SPD_GEN1	1 /* Gen 1 rate negotiated */
+#define	SSTATUS_SPD_GEN2	2 /* Gen 2 rate negotiated */
+#define	SSTATUS_SPD_GEN3	3 /* Gen 3 rate negotiated */
 
 /*
  * sstatus IPM values
@@ -792,10 +796,10 @@ struct mode_acoustic_management {
 #define	SCONTROL_IPM_SHIFT	8
 #define	SCONTROL_SPM_SHIFT	12
 
-#define	SCONTROL_DET		(0xf << SSTATUS_DET_SHIFT)
-#define	SCONTROL_SPD		(0xf << SSTATUS_SPD_SHIFT)
-#define	SCONTROL_IPM		(0xf << SSTATUS_IPM_SHIFT)
-#define	SCONTROL_SPM		(0xf << SSTATUS_SPM_SHIFT)
+#define	SCONTROL_DET		(0xf << SCONTROL_DET_SHIFT)
+#define	SCONTROL_SPD		(0xf << SCONTROL_SPD_SHIFT)
+#define	SCONTROL_IPM		(0xf << SCONTROL_IPM_SHIFT)
+#define	SCONTROL_SPM		(0xf << SCONTROL_SPM_SHIFT)
 
 #define	SCONTROL_GET_DET(x)	\
 	(x & SCONTROL_DET)
@@ -810,6 +814,7 @@ struct mode_acoustic_management {
 #define	SCONTROL_SPD_NOLIMIT	0 /* No speed limit */
 #define	SCONTROL_SPD_GEN1	1 /* Limit Gen 1 rate */
 #define	SCONTROL_SPD_GEN2	2 /* Limit Gen 2 rate */
+#define	SCONTROL_SPD_GEN3	3 /* Limit Gen 3 rate */
 
 #define	SCONTROL_GET_IPM(x)	\
 	((x & SCONTROL_IPM) >> SCONTROL_IPM_SHIFT)

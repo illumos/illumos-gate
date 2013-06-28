@@ -4,6 +4,8 @@
  *
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  *
+ * Copyright (c) 2013 Johann 'Myrkraverk' Oskarsson <johann@myrkraverk.com>
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -79,7 +81,6 @@ static struct addrinfo *gethostinfo(char const *host, int exit_on_error);
 static void s_asprintf(char **ret, const char *format, ...);
 static void usage(void);
 static void whois(const char *, const char *, int);
-static char *getln(FILE *in, size_t *lenp);
 
 int
 main(int argc, char *argv[])
@@ -256,9 +257,15 @@ whois(const char *query, const char *hostname, int flags)
 {
 	FILE *sfi, *sfo;
 	struct addrinfo *hostres, *res;
-	char *buf, *host, *nhost, *p;
+	/*
+	 * The variables buf and buflen are static so the buffer for
+	 * getline() is retained across calls.
+	 */
+	static char *buf = NULL;
+	static size_t buflen = 0;
+	char *host, *nhost, *p;
 	int i, s;
-	size_t c, len;
+	ssize_t c, len;
 
 	s = -1;
 	hostres = gethostinfo(hostname, 1);
@@ -287,7 +294,7 @@ whois(const char *query, const char *hostname, int flags)
 	}
 	(void) fflush(sfo);
 	nhost = NULL;
-	while ((buf = getln(sfi, &len)) != NULL) {
+	while ((len = getline(&buf, &buflen, sfi)) != -1) {
 		while (len > 0 && isspace((unsigned char)buf[len - 1]))
 			buf[--len] = '\0';
 		(void) printf("%.*s\n", (int)len, buf);
@@ -342,44 +349,4 @@ usage(void)
 	    "usage: whois [-aAbfgiIklmQr] [-c country-code | -h hostname] "
 	    "[-p port] name ...\n");
 	exit(EX_USAGE);
-}
-
-static char *
-getln(FILE *in, size_t *lenp)
-{
-	static char	*buffer = NULL;
-	static size_t	sz = 0;
-
-	size_t		len = 0;
-
-	for (;;) {
-		if (sz <= (len + 1)) {
-			char *nb;
-			if ((nb = realloc(buffer, sz + LINE_MAX)) == NULL) {
-				err(1, "realloc");
-			}
-			buffer = nb;
-			sz += LINE_MAX;
-		}
-
-		buffer[len] = 0;
-
-		if (fgets(buffer + len, sz - len, in) == NULL) {
-			/* END OF FILE */
-			*lenp = len;
-			if (len == 0)
-				return (NULL);
-			break;
-		}
-
-		len += strlen(buffer + len);
-
-		if (buffer[len - 1] == '\n') {
-			/* got the new line */
-			*lenp = len;
-			break;
-		}
-	}
-
-	return (buffer);
 }

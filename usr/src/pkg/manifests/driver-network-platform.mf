@@ -50,7 +50,6 @@ driver name=dnet clone_perms="dnet 0666 root sys" perms="* 0666 root sys" \
     alias=pci1109,1400 \
     alias=pci1109,2400 \
     alias=pci2646,1
-file path=etc/bootrc group=sys mode=0755
 file path=etc/mach group=sys original_name=SUNWos86r:etc/mach preserve=true
 file path=kernel/drv/$(ARCH64)/dnet group=sys
 file path=kernel/drv/dnet group=sys

@@ -341,8 +341,7 @@ main(int argc, char *argv[])
 	ret = sysinfo(SI_HW_PROVIDER, hw_provider, sizeof (hw_provider));
 	/*
 	 * If 0 bytes are returned (the system returns '1', for the \0),
-	 * we're probably on x86, and there has been no si-hw-provider
-	 * set in /etc/bootrc, default to Oracle.
+	 * we're probably on x86, default to Oracle.
 	 */
 	if (ret <= 1) {
 		(void) strncpy(hw_provider, "Oracle Corporation",

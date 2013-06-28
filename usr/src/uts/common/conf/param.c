@@ -534,20 +534,12 @@ char hw_provider[] = "Oracle Corporation";
 
 #elif defined(__i386)
 
-/*
- * On x86 machines, read hw_serial, hw_provider and srpc_domain from
- * /etc/bootrc at boot time.
- */
 char architecture[] = "i386";
 char architecture_32[] = "i386";
 char hw_provider[SYS_NMLN] = "";
 
 #elif defined(__amd64)
 
-/*
- * On amd64 machines, read hw_serial, hw_provider and srpc_domain from
- * /etc/bootrc at boot time.
- */
 char architecture[] = "amd64";
 char architecture_32[] = "i386";
 char hw_provider[SYS_NMLN] = "";
