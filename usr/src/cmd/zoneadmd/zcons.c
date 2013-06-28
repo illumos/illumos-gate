@@ -117,6 +117,8 @@
 
 #define	CONSOLE_SOCKPATH	ZONES_TMPDIR "/%s.console_sock"
 
+#define	ZCONS_RETRY		10
+
 static int	serverfd = -1;	/* console server unix domain socket fd */
 char boot_args[BOOTARGS_MAX];
 char bad_boot_arg[BOOTARGS_MAX];
@@ -414,7 +416,7 @@ devlinks:
 	 */
 	(void) snprintf(conspath, sizeof (conspath), "/dev/zcons/%s/%s",
 	    zone_name, ZCONS_MASTER_NAME);
-	for (i = 0; i < 5; i++) {
+	for (i = 0; i < ZCONS_RETRY; i++) {
 		masterfd = open(conspath, O_RDWR | O_NOCTTY);
 		if (masterfd >= 0 || errno != ENOENT)
 			break;
@@ -428,7 +430,7 @@ devlinks:
 
 	(void) snprintf(conspath, sizeof (conspath), "/dev/zcons/%s/%s",
 	    zone_name, ZCONS_SLAVE_NAME);
-	for (i = 0; i < 5; i++) {
+	for (i = 0; i < ZCONS_RETRY; i++) {
 		slavefd = open(conspath, O_RDWR | O_NOCTTY);
 		if (slavefd >= 0 || errno != ENOENT)
 			break;
@@ -445,7 +447,7 @@ devlinks:
 	 * everything plumbed up yet due to heavy zone startup load. Wait for
 	 * 1 sec. and retry a few times before we fail to boot the zone.
 	 */
-	for (i = 0; i < 5; i++) {
+	for (i = 0; i < ZCONS_RETRY; i++) {
 		if (ioctl(masterfd, ZC_HOLDSLAVE, (caddr_t)(intptr_t)slavefd)
 		    == 0) {
 			rv = 0;
