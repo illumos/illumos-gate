@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, Joyent Inc. All rights reserved.
+ * Copyright 2013, Joyent Inc. All rights reserved.
  */
 
 /*
@@ -1013,8 +1013,12 @@ validate_zonepath(char *path, int cmd_num)
 		(void) printf(gettext("WARNING: %s is on a temporary "
 		    "file system.\n"), rpath);
 	}
-	if (crosscheck_zonepaths(rpath) != Z_OK)
-		return (Z_ERR);
+	if (cmd_num != CMD_BOOT && cmd_num != CMD_REBOOT &&
+	    cmd_num != CMD_READY) {
+		/* we checked when we installed, no need to check each boot */
+		if (crosscheck_zonepaths(rpath) != Z_OK)
+			return (Z_ERR);
+	}
 	/*
 	 * Try to collect and report as many minor errors as possible
 	 * before returning, so the user can learn everything that needs
