@@ -22,13 +22,11 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright (c) 2012 Joyent, Inc. All rights reserved.
  */
 
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright (c) 2012 Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013 Joyent, Inc. All rights reserved.
  */
 
 #ifndef	_MDB_MODULE_H
@@ -112,6 +110,7 @@ extern int mdb_module_remove_walker(mdb_module_t *, const char *);
 extern int mdb_module_create(const char *, const char *, int, mdb_module_t **);
 
 extern int mdb_module_validate_name(const char *, const char **);
+extern int mdb_module_dumpfd(int, uintptr_t, uintptr_t);
 
 #endif	/* _MDB */
 
