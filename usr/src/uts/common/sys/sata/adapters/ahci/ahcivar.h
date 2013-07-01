@@ -462,6 +462,7 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_ctl_t::ahcictl_mutex,
 #define	AHCI_ATTACH		0x1
 #define	AHCI_DETACH		0x2
 #define	AHCI_SUSPEND		0x4
+#define	AHCI_QUIESCE		0x8
 
 /* Values for ahcictl_cap */
 /* PIO Multiple DRQ Block */
