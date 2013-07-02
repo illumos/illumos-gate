@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013, Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/cpuvar.h>
@@ -130,8 +131,6 @@ static void pppt_sess_destroy_task(void *ps_void);
 static void pppt_task_sent_status(pppt_task_t *ptask);
 
 static pppt_status_t pppt_task_try_abort(pppt_task_t *ptask);
-
-static pppt_status_t pppt_task_hold(pppt_task_t *ptask);
 
 static void pppt_task_rele(pppt_task_t *ptask);
 
@@ -801,7 +800,7 @@ pppt_lport_task_free(scsi_task_t *task)
 	pppt_task_t *ptask = task->task_port_private;
 	pppt_sess_t *ps = ptask->pt_sess;
 
-	pppt_task_free(ptask);
+	pppt_task_rele(ptask);
 	pppt_sess_rele(ps);
 }
 
@@ -1209,7 +1208,7 @@ pppt_task_alloc(void)
 		ptask->pt_state = PTS_INIT;
 		ptask->pt_read_buf = NULL;
 		ptask->pt_read_xfer_msgid = 0;
-		cv_init(&ptask->pt_cv, NULL, CV_DRIVER, NULL);
+		ptask->pt_refcnt = 0;
 		mutex_init(&ptask->pt_mutex, NULL, MUTEX_DRIVER, NULL);
 		immed_pbuf = (pppt_buf_t *)(ptask + 1);
 		bzero(immed_pbuf, sizeof (*immed_pbuf));
@@ -1232,8 +1231,8 @@ void
 pppt_task_free(pppt_task_t *ptask)
 {
 	mutex_enter(&ptask->pt_mutex);
+	ASSERT(ptask->pt_refcnt == 0);
 	mutex_destroy(&ptask->pt_mutex);
-	cv_destroy(&ptask->pt_cv);
 	kmem_free(ptask, sizeof (pppt_task_t) + sizeof (pppt_buf_t) +
 	    sizeof (stmf_data_buf_t));
 }
@@ -1249,6 +1248,8 @@ pppt_task_start(pppt_task_t *ptask)
 	mutex_enter(&ptask->pt_mutex);
 	if (avl_find(&ptask->pt_sess->ps_task_list, ptask, &where) == NULL) {
 		pppt_task_update_state(ptask, PTS_ACTIVE);
+		/* Manually increment refcnt, sincd we hold the mutex... */
+		ptask->pt_refcnt++;
 		avl_insert(&ptask->pt_sess->ps_task_list, ptask, where);
 		mutex_exit(&ptask->pt_mutex);
 		mutex_exit(&ptask->pt_sess->ps_mutex);
@@ -1289,6 +1290,8 @@ pppt_task_done(pppt_task_t *ptask)
 		mutex_enter(&ptask->pt_sess->ps_mutex);
 		avl_remove(&ptask->pt_sess->ps_task_list, ptask);
 		mutex_exit(&ptask->pt_sess->ps_mutex);
+		/* Out of the AVL tree, so drop a reference. */
+		pppt_task_rele(ptask);
 	}
 
 	return (pppt_status);
@@ -1401,12 +1404,14 @@ pppt_task_try_abort(pppt_task_t *ptask)
 		mutex_enter(&ptask->pt_sess->ps_mutex);
 		avl_remove(&ptask->pt_sess->ps_task_list, ptask);
 		mutex_exit(&ptask->pt_sess->ps_mutex);
+		/* Out of the AVL tree, so drop a reference. */
+		pppt_task_rele(ptask);
 	}
 
 	return (pppt_status);
 }
 
-static pppt_status_t
+pppt_status_t
 pppt_task_hold(pppt_task_t *ptask)
 {
 	pppt_status_t	pppt_status = PPPT_STATUS_SUCCESS;
@@ -1425,10 +1430,14 @@ pppt_task_hold(pppt_task_t *ptask)
 static void
 pppt_task_rele(pppt_task_t *ptask)
 {
+	boolean_t freeit;
+
 	mutex_enter(&ptask->pt_mutex);
 	ptask->pt_refcnt--;
-	cv_signal(&ptask->pt_cv);
+	freeit = (ptask->pt_refcnt == 0);
 	mutex_exit(&ptask->pt_mutex);
+	if (freeit)
+		pppt_task_free(ptask);
 }
 
 static void
@@ -1440,5 +1449,4 @@ pppt_task_update_state(pppt_task_t *ptask,
 
 	ASSERT(mutex_owned(&ptask->pt_mutex));
 	ptask->pt_state = new_state;
-	cv_signal(&ptask->pt_cv);
 }

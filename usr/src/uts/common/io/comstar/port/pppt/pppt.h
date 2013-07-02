@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013, Nexenta Systems, Inc. All rights reserved.
  */
 #ifndef _PPPT_H
 #define	_PPPT_H
@@ -168,7 +169,6 @@ typedef struct {
 	avl_node_t		pt_sess_ln;
 	int			pt_refcnt;
 	kmutex_t		pt_mutex;
-	kcondvar_t		pt_cv;
 	stmf_ic_msgid_t		pt_task_id;
 	uint8_t			pt_lun_id[16];
 	pppt_task_state_t	pt_state;
@@ -295,6 +295,8 @@ void pppt_tgt_destroy(pppt_tgt_t *tgt);
 int pppt_tgt_avl_compare(const void *void_tgt1, const void *void_tgt2);
 
 void pppt_tgt_sm_ctl(stmf_local_port_t *lport, int cmd, void *arg);
+
+pppt_status_t pppt_task_hold(pppt_task_t *);
 
 #ifdef	__cplusplus
 }
