@@ -1027,7 +1027,7 @@ dsl_dataset_snapshot_check(void *arg, dmu_tx_t *tx)
 			error = dsl_dataset_hold(dp, dsname, FTAG, &ds);
 		if (error == 0) {
 			error = dsl_dataset_snapshot_check_impl(ds,
-			    atp + 2, tx, B_FALSE);
+			    atp + 1, tx, B_FALSE);
 			dsl_dataset_rele(ds, FTAG);
 		}
 
