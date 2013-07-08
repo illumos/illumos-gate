@@ -5700,6 +5700,7 @@ stmf_scsilib_uniq_lu_id2(uint32_t company_id, uint32_t host_id,
 	struct ether_addr mac;
 	uint8_t *e = (uint8_t *)&mac;
 	int hid = (int)host_id;
+	uint16_t gen_number;
 
 	if (company_id == COMPANY_ID_NONE)
 		company_id = COMPANY_ID_SUN;
@@ -5709,7 +5710,7 @@ stmf_scsilib_uniq_lu_id2(uint32_t company_id, uint32_t host_id,
 
 	p = (uint8_t *)lu_id;
 
-	atomic_add_16(&stmf_lu_id_gen_number, 1);
+	gen_number = atomic_add_16_nv(&stmf_lu_id_gen_number, 1);
 
 	p[0] = 0xf1; p[1] = 3; p[2] = 0; p[3] = 0x10;
 	p[4] = ((company_id >> 20) & 0xf) | 0x60;
@@ -5730,8 +5731,8 @@ stmf_scsilib_uniq_lu_id2(uint32_t company_id, uint32_t host_id,
 	uniqtime32(&timestamp32);
 	*t = BE_32(*t);
 	bcopy(t, p+14, 4);
-	p[18] = (stmf_lu_id_gen_number >> 8) & 0xff;
-	p[19] = stmf_lu_id_gen_number & 0xff;
+	p[18] = (gen_number >> 8) & 0xff;
+	p[19] = gen_number & 0xff;
 
 	return (STMF_SUCCESS);
 }
