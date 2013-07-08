@@ -901,6 +901,11 @@ startup(void)
 		log_framework(LOG_DEBUG, "Existing configd contract %ld; not "
 		    "starting svc.configd\n", configd_ctid);
 
+	/*
+	 * Call utmpx_init() before creating the fork_configd() thread.
+	 */
+	utmpx_init();
+
 	(void) startd_thread_create(fork_configd_thread, (void *)configd_ctid);
 
 	/*
@@ -916,7 +921,6 @@ startup(void)
 	}
 	MUTEX_UNLOCK(&st->st_configd_live_lock);
 
-	utmpx_init();
 	wait_init();
 
 	if (read_startd_config())
