@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2013 Joshua M. Clulow <josh@sysmgr.org>
- * Copyright 2012 Joyent, Inc.  All rights reserved.
+ * Copyright 2013 Joyent, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -420,7 +420,7 @@ extern void el_delete(void);
 
 static int valid_entry(char *, int);
 static struct usr *create_ulist(char *, int);
-static void init_cronevent(char *, char *, int);
+static void init_cronevent(char *, char *);
 static void init_atevent(char *, time_t, int, int);
 static void update_atevent(struct usr *, char *, time_t, int);
 
@@ -765,7 +765,7 @@ read_dirs(int first)
 			while ((dp = readdir(dir)) != NULL) {
 				if (!valid_entry(dp->d_name, CRONEVENT))
 					continue;
-				init_cronevent(SYSCRONDIR, dp->d_name, first);
+				init_cronevent(SYSCRONDIR, dp->d_name);
 			}
 			(void) closedir(dir);
 		}
@@ -779,7 +779,7 @@ read_dirs(int first)
 	while ((dp = readdir(dir)) != NULL) {
 		if (!valid_entry(dp->d_name, CRONEVENT))
 			continue;
-		init_cronevent(CRONDIR, dp->d_name, !first);
+		init_cronevent(CRONDIR, dp->d_name);
 	}
 	(void) closedir(dir);
 
@@ -865,23 +865,18 @@ create_ulist(char *name, int type)
 }
 
 void
-init_cronevent(char *basedir, char *name, int first)
+init_cronevent(char *basedir, char *name)
 {
 	struct usr	*u;
 
-	if (first) {
+	if ((u = find_usr(name)) == NULL) {
 		u = create_ulist(name, CRONEVENT);
 		readcron(basedir, u, 0);
 	} else {
-		if ((u = find_usr(name)) == NULL) {
-			u = create_ulist(name, CRONEVENT);
-			readcron(basedir, u, 0);
-		} else {
-			u->ctexists = TRUE;
-			rm_ctevents(u);
-			el_remove(u->ctid, 0);
-			readcron(basedir, u, 0);
-		}
+		u->ctexists = TRUE;
+		rm_ctevents(u);
+		el_remove(u->ctid, 0);
+		readcron(basedir, u, 0);
 	}
 }
 
