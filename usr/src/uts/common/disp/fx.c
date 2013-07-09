@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1046,7 +1047,7 @@ fx_parmsset(kthread_t *tx, void *parmsp, id_t reqpcid, cred_t *reqpcredp)
 	if ((reqpcredp != NULL) &&
 	    (reqfxuprilim > fxpp->fx_uprilim ||
 	    ((fxkparmsp->fx_cflags & FX_DOTQ) != 0)) &&
-	    secpolicy_setpriority(reqpcredp) != 0) {
+	    secpolicy_raisepriority(reqpcredp) != 0) {
 		thread_unlock(tx);
 		return (EPERM);
 	}
@@ -1498,7 +1499,7 @@ fx_donice(kthread_t *t, cred_t *cr, int incr, int *retvalp)
 	}
 
 	if ((incr < 0 || incr > 2 * NZERO) &&
-	    secpolicy_setpriority(cr) != 0)
+	    secpolicy_raisepriority(cr) != 0)
 		return (EPERM);
 
 	/*
