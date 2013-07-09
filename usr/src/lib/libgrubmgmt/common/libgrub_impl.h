@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #ifndef	_GRBMIMPL_H
 #define	_GRBMIMPL_H
@@ -34,6 +37,7 @@ extern "C" {
 #include <sys/param.h>
 #include <sys/mntent.h>
 #include <sys/uadmin.h>
+#include <sys/dktp/fdisk.h>
 #include <libzfs.h>
 #include <libdevinfo.h>
 #include "libgrubmgmt.h"
@@ -55,7 +59,7 @@ extern "C" {
 #define	SLCNUM_WHOLE_DISK	'q'
 
 #define	IS_SLCNUM_VALID(x)	((x) >= SLCNUM_FIRST && (x) < SLCNUM_WHOLE_DISK)
-#define	IS_PRTNUM_VALID(x)	((uint_t)(x) < FD_NUMPART)
+#define	IS_PRTNUM_VALID(x)	((uint_t)(x) < FD_NUMPART + MAX_EXT_PARTS)
 
 #define	GRBM_VALID_FLAG		((uint_t)1 << 31)
 #define	GRBM_MAXLINE		8192
