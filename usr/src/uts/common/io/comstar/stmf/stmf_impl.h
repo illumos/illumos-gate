@@ -166,19 +166,6 @@ typedef struct stmf_i_remote_port {
 	avl_node_t		irport_ln;
 } stmf_i_remote_port_t;
 
-typedef struct stmf_i_itl_kstat {
-	char			iitl_kstat_nm[KSTAT_STRLEN];
-	char			iitl_kstat_lport[STMF_TGT_NAME_LEN];
-	char			iitl_kstat_guid[STMF_GUID_INPUT + 1];
-	char			*iitl_kstat_strbuf;
-	int			iitl_kstat_strbuflen;
-	kstat_t			*iitl_kstat_info;
-	kstat_t			*iitl_kstat_taskq;
-	kstat_t			*iitl_kstat_lu_xfer;
-	kstat_t			*iitl_kstat_lport_xfer;
-	avl_node_t		iitl_kstat_ln;
-} stmf_i_itl_kstat_t;
-
 /*
  * ilport flags
  */
@@ -327,12 +314,6 @@ typedef struct stmf_itl_data {
 	uint8_t				itl_flags;
 	uint8_t				itl_hdlrm_reason;
 	uint16_t			itl_lun;
-	char				*itl_kstat_strbuf;
-	int				itl_kstat_strbuflen;
-	kstat_t				*itl_kstat_info;
-	kstat_t				*itl_kstat_taskq;
-	kstat_t				*itl_kstat_lu_xfer;
-	kstat_t				*itl_kstat_lport_xfer;
 	void				*itl_handle;
 	struct stmf_i_lu		*itl_ilu;
 	struct stmf_i_scsi_session	*itl_session;

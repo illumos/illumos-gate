@@ -719,9 +719,9 @@ idm_set_postconnect_options(ksocket_t ks)
 
 	/* Set connect options */
 	(void) ksocket_setsockopt(ks, SOL_SOCKET, SO_RCVBUF,
-	    (char *)&idm_so_rcvbuf, sizeof (int), CRED());
+	    (char *)&idm_so_rcvbuf, sizeof (idm_so_rcvbuf), CRED());
 	(void) ksocket_setsockopt(ks, SOL_SOCKET, SO_SNDBUF,
-	    (char *)&idm_so_sndbuf, sizeof (int), CRED());
+	    (char *)&idm_so_sndbuf, sizeof (idm_so_sndbuf), CRED());
 	(void) ksocket_setsockopt(ks, IPPROTO_TCP, TCP_NODELAY,
 	    (char *)&on, sizeof (on), CRED());
 }
@@ -1249,10 +1249,15 @@ idm_so_svc_port_watcher(void *arg)
 		    (struct sockaddr *)&t_addr, &t_addrlen,
 		    &new_so, CRED())) != 0) {
 			mutex_enter(&svc->is_mutex);
-			if (rc == ECONNABORTED)
-				continue;
-			/* Connection problem */
-			break;
+			if (rc != ECONNABORTED && rc != EINTR) {
+				IDM_SVC_LOG(CE_NOTE, "idm_so_svc_port_watcher:"
+				    " ksocket_accept failed %d", rc);
+			}
+			/*
+			 * Unclean shutdown of this thread is not handled
+			 * wait for !is_thread_running.
+			 */
+			continue;
 		}
 		/*
 		 * Turn off SO_MAC_EXEMPT so future sobinds succeed

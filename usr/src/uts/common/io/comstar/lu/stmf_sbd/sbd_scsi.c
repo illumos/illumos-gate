@@ -20,8 +20,8 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- *
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 #include <sys/conf.h>
@@ -218,7 +218,6 @@ sbd_do_sgl_read_xfer(struct scsi_task *task, sbd_cmd_t *scmd, int first_xfer)
 	uint_t nblks;
 	uint64_t blksize = sl->sl_blksize;
 	size_t db_private_sz;
-	hrtime_t xfer_start, xfer_elapsed;
 	uintptr_t pad;
 
 	ASSERT(rw_read_held(&sl->sl_access_state_lock));
@@ -334,18 +333,12 @@ sbd_do_sgl_read_xfer(struct scsi_task *task, sbd_cmd_t *scmd, int first_xfer)
 		 * Accounting for start of read.
 		 * Note there is no buffer address for the probe yet.
 		 */
-		stmf_lu_xfer_start(task);
 		DTRACE_PROBE5(backing__store__read__start, sbd_lu_t *, sl,
 		    uint8_t *, NULL, uint64_t, xfer_len,
 		    uint64_t, offset, scsi_task_t *, task);
-		xfer_start = gethrtime();
 
 		ret = sbd_zvol_alloc_read_bufs(sl, dbuf);
 
-		xfer_elapsed = gethrtime() - xfer_start;
-
-		stmf_lu_xfer_done(task, B_TRUE /* read */, (uint64_t)xfer_len,
-		    xfer_elapsed);
 		DTRACE_PROBE6(backing__store__read__end, sbd_lu_t *, sl,
 		    uint8_t *, NULL, uint64_t, xfer_len,
 		    uint64_t, offset, int, ret, scsi_task_t *, task);
@@ -607,7 +600,6 @@ sbd_handle_sgl_write_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
 	int scmd_err, scmd_xfer_done;
 	stmf_status_t xfer_status = dbuf->db_xfer_status;
 	uint32_t data_size = dbuf->db_data_size;
-	hrtime_t xfer_start;
 
 	ASSERT(zvio);
 
@@ -627,12 +619,9 @@ sbd_handle_sgl_write_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
 	    (scmd->flags & SBD_SCSI_CMD_XFER_FAIL) ||
 	    (xfer_status != STMF_SUCCESS));
 
-	/* start the accounting clock */
-	stmf_lu_xfer_start(task);
 	DTRACE_PROBE5(backing__store__write__start, sbd_lu_t *, sl,
 	    uint8_t *, NULL, uint64_t, data_size,
 	    uint64_t, zvio->zvio_offset, scsi_task_t *, task);
-	xfer_start = gethrtime();
 
 	if (scmd_err) {
 		/* just return the write buffers */
@@ -647,9 +636,6 @@ sbd_handle_sgl_write_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
 		ret = sbd_zvol_rele_write_bufs(sl, dbuf);
 	}
 
-	/* finalize accounting */
-	stmf_lu_xfer_done(task, B_FALSE /* not read */, data_size,
-	    (gethrtime() - xfer_start));
 	DTRACE_PROBE6(backing__store__write__end, sbd_lu_t *, sl,
 	    uint8_t *, NULL, uint64_t, data_size,
 	    uint64_t, zvio->zvio_offset, int, ret,  scsi_task_t *, task);
@@ -739,7 +725,6 @@ sbd_copy_rdwr(scsi_task_t *task, uint64_t laddr, stmf_data_buf_t *dbuf,
 	struct iovec		*iov, *tiov, iov1[8];
 	uint32_t		len, resid;
 	int			ret, i, iovcnt, flags;
-	hrtime_t		xfer_start;
 	boolean_t		is_read;
 
 	ASSERT(cmd == SBD_CMD_SCSI_READ || cmd == SBD_CMD_SCSI_WRITE);
@@ -777,9 +762,6 @@ sbd_copy_rdwr(scsi_task_t *task, uint64_t laddr, stmf_data_buf_t *dbuf,
 	uio.uio_resid = (uint64_t)len;
 	uio.uio_llimit = RLIM64_INFINITY;
 
-	/* start the accounting clock */
-	stmf_lu_xfer_start(task);
-	xfer_start = gethrtime();
 	if (is_read == B_TRUE) {
 		uio.uio_fmode = FREAD;
 		uio.uio_extflg = UIO_COPY_CACHED;
@@ -808,9 +790,6 @@ sbd_copy_rdwr(scsi_task_t *task, uint64_t laddr, stmf_data_buf_t *dbuf,
 		    uint8_t *, NULL, uint64_t, len, uint64_t, laddr, int, ret,
 		    scsi_task_t *, task);
 	}
-	/* finalize accounting */
-	stmf_lu_xfer_done(task, is_read, (uint64_t)len,
-	    (gethrtime() - xfer_start));
 
 	if (iov != &iov1[0])
 		kmem_free(iov, iovcnt * sizeof (*iov));

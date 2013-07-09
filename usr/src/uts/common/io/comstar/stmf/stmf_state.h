@@ -23,6 +23,7 @@
  */
 /*
  * Copyright 2011, Nexenta Systems, Inc. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 #ifndef	_STMF_STATE_H
 #define	_STMF_STATE_H
@@ -42,7 +43,6 @@ typedef struct stmf_state {
 	id_space_t		*stmf_ilport_inst_space;
 	avl_tree_t		stmf_irportlist;
 	id_space_t		*stmf_irport_inst_space;
-	avl_tree_t		stmf_itl_kstat_list;
 	int			stmf_nlps;
 	int			stmf_npps;
 	int			stmf_nlus;
