@@ -272,6 +272,11 @@ devvt_create_snode(struct sdev_node *ddv, char *nm, struct cred *cred, int type)
 		kmem_free(link, MAXPATHLEN);
 	}
 
+	if (error != 0) {
+		SDEV_RELE(sdv);
+		return;
+	}
+
 	mutex_enter(&sdv->sdev_lookup_lock);
 	SDEV_UNBLOCK_OTHERS(sdv, SDEV_LOOKUP);
 	mutex_exit(&sdv->sdev_lookup_lock);

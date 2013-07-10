@@ -370,7 +370,8 @@ sdev_nodeinit(struct sdev_node *ddv, char *nm, struct sdev_node **newdv,
 }
 
 /*
- * transition a sdev_node into SDEV_READY state
+ * Transition a sdev_node into SDEV_READY state. If this fails, it is up to the
+ * caller to transition the node to the SDEV_ZOMBIE state.
  */
 int
 sdev_nodeready(struct sdev_node *dv, struct vattr *vap, struct vnode *avp,
@@ -433,8 +434,6 @@ sdev_nodeready(struct sdev_node *dv, struct vattr *vap, struct vnode *avp,
 		/* transition to READY state */
 		sdev_set_nodestate(dv, SDEV_READY);
 		sdev_nc_node_exists(dv);
-	} else {
-		sdev_set_nodestate(dv, SDEV_ZOMBIE);
 	}
 	rw_exit(&dv->sdev_contents);
 	return (error);
@@ -874,7 +873,13 @@ sdev_mknode(struct sdev_node *ddv, char *nm, struct sdev_node **newdv,
 		*newdv = dv;
 		ASSERT((*newdv)->sdev_state != SDEV_ZOMBIE);
 	} else {
-		SDEV_SIMPLE_RELE(dv);
+		sdev_cache_update(ddv, &dv, nm, SDEV_CACHE_DELETE);
+		/*
+		 * We created this node, it wasn't passed into us. Therefore it
+		 * is up to us to delete it.
+		 */
+		if (*newdv == NULL)
+			SDEV_SIMPLE_RELE(dv);
 		*newdv = NULL;
 	}
 
@@ -1632,6 +1637,8 @@ lookup:
 		error = VOP_MKDIR(rdvp, nm, vap, rvp, cred, NULL, 0, NULL);
 		sdcmn_err9(("sdev_shadow_node: mkdir vp %p error %d\n",
 		    (void *)(*rvp), error));
+		if (!error)
+			VN_RELE(*rvp);
 		break;
 	case VCHR:
 	case VBLK:

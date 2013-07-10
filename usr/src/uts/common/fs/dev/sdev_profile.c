@@ -173,6 +173,9 @@ prof_mknode(struct sdev_node *dir, char *name, struct sdev_node **newdv,
 			sdcmn_err10(("sdev_origin for %s set to 0x%p\n",
 			    name, arg));
 		apply_glob_pattern(dir, *newdv);
+	} else {
+		sdev_cache_update(dir, &dv, name, SDEV_CACHE_DELETE);
+		SDEV_RELE(dv);
 	}
 	return (rv);
 }

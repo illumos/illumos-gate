@@ -148,13 +148,9 @@ devnet_lookup(struct vnode *dvp, char *nm, struct vnode **vpp,
 	 * directory cache lookup:
 	 */
 	if ((dv = sdev_cache_lookup(ddv, nm)) != NULL) {
-		if (dv->sdev_state == SDEV_READY) {
-			if (!(dv->sdev_flags & SDEV_ATTR_INVALID))
-				goto found;
-		} else {
-			ASSERT(dv->sdev_state == SDEV_ZOMBIE);
-			goto failed;
-		}
+		ASSERT(dv->sdev_state == SDEV_READY);
+		if (!(dv->sdev_flags & SDEV_ATTR_INVALID))
+			goto found;
 	}
 
 	/*
@@ -169,7 +165,6 @@ devnet_lookup(struct vnode *dvp, char *nm, struct vnode **vpp,
 
 	error = sdev_mknode(ddv, nm, &dv, &vattr, NULL, NULL, cred, SDEV_READY);
 	if (error != 0) {
-		ASSERT(dv == NULL);
 		dls_devnet_close(ddh);
 		goto failed;
 	}
