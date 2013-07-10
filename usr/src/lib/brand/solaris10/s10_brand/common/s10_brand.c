@@ -1389,7 +1389,7 @@ s10_issetugid(sysret_t *rval)
 }
 
 /*
- * S10's socket() syscall does not spilt type and flags
+ * S10's socket() syscall does not split type and flags
  */
 static int
 s10_so_socket(sysret_t *rval, int domain, int type, int protocol,

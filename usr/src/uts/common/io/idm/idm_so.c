@@ -22,6 +22,9 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2013 by Delphix. All rights reserved.
+ */
 
 #include <sys/conf.h>
 #include <sys/stat.h>
@@ -70,8 +73,7 @@ static void idm_so_conn_connect_common(idm_conn_t *ic);
 
 static void idm_set_ini_preconnect_options(idm_so_conn_t *sc,
     boolean_t boot_conn);
-static void idm_set_ini_postconnect_options(idm_so_conn_t *sc);
-static void idm_set_tgt_connect_options(ksocket_t so);
+static void idm_set_postconnect_options(ksocket_t so);
 static idm_status_t idm_i_so_tx(idm_pdu_t *pdu);
 
 static idm_status_t idm_sorecvdata(idm_conn_t *ic, idm_pdu_t *pdu);
@@ -162,6 +164,10 @@ idm_transport_ops_t idm_so_transport_ops = {
 };
 
 kmutex_t	idm_so_timed_socket_mutex;
+
+int32_t idm_so_sndbuf = IDM_SNDBUF_SIZE;
+int32_t idm_so_rcvbuf = IDM_RCVBUF_SIZE;
+
 /*
  * idm_so_init()
  * Sockets transport initialization
@@ -707,33 +713,15 @@ idm_set_ini_preconnect_options(idm_so_conn_t *sc, boolean_t boot_conn)
 }
 
 static void
-idm_set_ini_postconnect_options(idm_so_conn_t *sc)
+idm_set_postconnect_options(ksocket_t ks)
 {
-	int32_t		rcvbuf = IDM_RCVBUF_SIZE;
-	int32_t		sndbuf = IDM_SNDBUF_SIZE;
-	const int	on = 1;
-
-	/* Set postconnect options */
-	(void) ksocket_setsockopt(sc->ic_so, IPPROTO_TCP, TCP_NODELAY,
-	    (char *)&on, sizeof (int), CRED());
-	(void) ksocket_setsockopt(sc->ic_so, SOL_SOCKET, SO_RCVBUF,
-	    (char *)&rcvbuf, sizeof (int), CRED());
-	(void) ksocket_setsockopt(sc->ic_so, SOL_SOCKET, SO_SNDBUF,
-	    (char *)&sndbuf, sizeof (int), CRED());
-}
-
-static void
-idm_set_tgt_connect_options(ksocket_t ks)
-{
-	int32_t		rcvbuf = IDM_RCVBUF_SIZE;
-	int32_t		sndbuf = IDM_SNDBUF_SIZE;
 	const int	on = 1;
 
 	/* Set connect options */
 	(void) ksocket_setsockopt(ks, SOL_SOCKET, SO_RCVBUF,
-	    (char *)&rcvbuf, sizeof (int), CRED());
+	    (char *)&idm_so_rcvbuf, sizeof (idm_so_rcvbuf), CRED());
 	(void) ksocket_setsockopt(ks, SOL_SOCKET, SO_SNDBUF,
-	    (char *)&sndbuf, sizeof (int), CRED());
+	    (char *)&idm_so_sndbuf, sizeof (idm_so_sndbuf), CRED());
 	(void) ksocket_setsockopt(ks, IPPROTO_TCP, TCP_NODELAY,
 	    (char *)&on, sizeof (on), CRED());
 }
@@ -960,7 +948,7 @@ idm_so_ini_conn_connect(idm_conn_t *ic)
 
 	idm_so_conn_connect_common(ic);
 
-	idm_set_ini_postconnect_options(so_conn);
+	idm_set_postconnect_options(so_conn->ic_so);
 
 	return (IDM_STATUS_SUCCESS);
 }
@@ -970,6 +958,7 @@ idm_so_tgt_conn_create(idm_conn_t *ic, ksocket_t new_so)
 {
 	idm_status_t	idmrc;
 
+	idm_set_postconnect_options(new_so);
 	idmrc = idm_so_conn_create_common(ic, new_so);
 
 	return (idmrc);
@@ -1170,7 +1159,7 @@ idm_so_tgt_svc_online(idm_svc_t *is)
 		}
 	}
 
-	idm_set_tgt_connect_options(so_svc->is_so);
+	idm_set_postconnect_options(so_svc->is_so);
 
 	if (ksocket_listen(so_svc->is_so, 5, CRED()) != 0) {
 		mutex_exit(&is->is_mutex);
@@ -1260,10 +1249,15 @@ idm_so_svc_port_watcher(void *arg)
 		    (struct sockaddr *)&t_addr, &t_addrlen,
 		    &new_so, CRED())) != 0) {
 			mutex_enter(&svc->is_mutex);
-			if (rc == ECONNABORTED)
-				continue;
-			/* Connection problem */
-			break;
+			if (rc != ECONNABORTED && rc != EINTR) {
+				IDM_SVC_LOG(CE_NOTE, "idm_so_svc_port_watcher:"
+				    " ksocket_accept failed %d", rc);
+			}
+			/*
+			 * Unclean shutdown of this thread is not handled
+			 * wait for !is_thread_running.
+			 */
+			continue;
 		}
 		/*
 		 * Turn off SO_MAC_EXEMPT so future sobinds succeed

@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 #include <sys/cpuvar.h>
@@ -609,6 +610,7 @@ idm_state_s4_in_login(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 		 * connections are shut down by a CE_LOGOUT_SESSION_SUCCESS
 		 * event sent from the session to the IDM layer.
 		 */
+		(void) untimeout(ic->ic_state_timeout);
 		if (IDM_CONN_ISTGT(ic)) {
 			ic->ic_transport_ops->it_tgt_conn_disconnect(ic);
 		} else {
