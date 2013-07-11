@@ -31,7 +31,7 @@
  */
 
 /*
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -262,9 +262,10 @@ show(file_info_t *file)
 }
 
 static void
-associate(file_info_t *file, boolean_t assoc)
+associate(file_info_t *file, boolean_t assoc, port_event_t *ev)
 {
-	char buf[64];
+	char buf[64], *name;
+	int i;
 
 	if (action != USE_PORT || file->fp == NULL)
 		return;
@@ -286,37 +287,72 @@ associate(file_info_t *file, boolean_t assoc)
 
 	bzero(&file->fobj, sizeof (file->fobj));
 
-	/*
-	 * We pull a bit of a stunt here.  PORT_SOURCE_FILE only allows us to
-	 * specify a file name -- not a file descriptor.  If we were to specify
-	 * the name of the file to port_associate() and that file were moved
-	 * aside, we would not be able to reassociate an event because we would
-	 * not know a name that would resolve to the new file (indeed, there
-	 * might not be such a name -- the file may have been unlinked).  But
-	 * there _is_ a name that we know maps to the file and doesn't change:
-	 * the name of the representation of the open file descriptor in /proc.
-	 * We therefore associate with this name (and the underlying file),
-	 * not the name of the file as specified at the command line.
-	 */
-	(void) snprintf(buf,
-	    sizeof (buf), "/proc/self/fd/%d", fileno(file->fp));
+	if (!Fflag) {
+		/*
+		 * PORT_SOURCE_FILE only allows us to specify a file name, not
+		 * a file descriptor.  If we are following a specific file (as
+		 * opposed to a file name) and we were to specify the name of
+		 * the file to port_associate() and that file were moved
+		 * aside, we would not be able to reassociate an event because
+		 * we would not know a name that would resolve to the new file
+		 * (indeed, there might not be such a name -- the file may
+		 * have been unlinked).  But there _is_ a name that we know
+		 * maps to the file and doesn't change: the name of the
+		 * representation of the open file descriptor in /proc.  We
+		 * therefore associate with this name (and the underlying
+		 * file), not the name of the file as specified at the command
+		 * line.  This also has the (desirable) side-effect of
+		 * insulating against FILE_RENAME_FROM and FILE_RENAME_TO
+		 * events that we need to ignore to assure that we don't lose
+		 * FILE_TRUNC events.
+		 */
+		(void) snprintf(buf,
+		    sizeof (buf), "/proc/self/fd/%d", fileno(file->fp));
+		name = buf;
+	} else {
+		name = file->file_name;
+	}
 
 	/*
 	 * Note that portfs uses the address of the specified file_obj_t to
 	 * tag an association; if one creates a different association with a
-	 * (different) file_ob_t that happens to be at the same address,
+	 * (different) file_obj_t that happens to be at the same address,
 	 * the first association will be implicitly removed.  To assure that
-	 * each file has a disjoint file_obj_t, we allocate the memory for it
-	 * in the file_info, not on the stack.
+	 * each association has a disjoint file_obj_t, we allocate the memory
+	 * for each in the file_info, not on the stack.
 	 */
-	file->fobj.fo_name = buf;
+	file->fobj[0].fo_name = name;
+	file->fobj[1].fo_name = name;
 
 	if (assoc) {
-		(void) port_associate(port, PORT_SOURCE_FILE,
-		    (uintptr_t)&file->fobj, FILE_MODIFIED | FILE_TRUNC, file);
+		/*
+		 * To assure that we cannot possibly drop a FILE_TRUNC event,
+		 * we have two different PORT_SOURCE_FILE associations with the
+		 * port:  one to get either FILE_MODIFIED or FILE_TRUNC events,
+		 * and another to get only FILE_TRUNC events.  This assures that
+		 * we always have an active association for FILE_TRUNC events.
+		 * (Without the second association, there is a window where a
+		 * file truncation could occur after a port_get() but before
+		 * the port_associate() call to re-associate the object --
+		 * resulting in loss of the truncation event.)
+		 */
+		if (ev == NULL || (ev->portev_events & FILE_MODIFIED) ||
+		    !(ev->portev_events & (FILE_MODIFIED | FILE_TRUNC))) {
+			(void) port_associate(port, PORT_SOURCE_FILE,
+			    (uintptr_t)&file->fobj[0],
+			    FILE_MODIFIED | FILE_TRUNC, file);
+		}
+
+		if (ev == NULL || (ev->portev_events & FILE_TRUNC) ||
+		    !(ev->portev_events & (FILE_MODIFIED | FILE_TRUNC))) {
+			(void) port_associate(port, PORT_SOURCE_FILE,
+			    (uintptr_t)&file->fobj[1], FILE_TRUNC, file);
+		}
 	} else {
-		(void) port_dissociate(port, PORT_SOURCE_FILE,
-		    (uintptr_t)&file->fobj);
+		for (i = 0; i <= 1; i++) {
+			(void) port_dissociate(port, PORT_SOURCE_FILE,
+			    (uintptr_t)&file->fobj[i]);
+		}
 	}
 }
 
@@ -332,7 +368,7 @@ set_events(file_info_t *files)
 
 		(void) fstat(fileno(file->fp), &file->st);
 
-		associate(file, B_TRUE);
+		associate(file, B_TRUE, NULL);
 	}
 }
 
@@ -411,7 +447,7 @@ follow(file_info_t *files, enum STYLE style, off_t off)
 				    sb2.st_dev != file->st.st_dev ||
 				    sb2.st_nlink == 0) {
 					(void) show(file);
-					associate(file, B_FALSE);
+					associate(file, B_FALSE, NULL);
 					file->fp = freopen(file->file_name, "r",
 					    file->fp);
 					if (file->fp != NULL) {
@@ -444,7 +480,7 @@ follow(file_info_t *files, enum STYLE style, off_t off)
 
 			if (n == 0) {
 				file = (file_info_t *)ev.portev_user;
-				associate(file, B_TRUE);
+				associate(file, B_TRUE, &ev);
 
 				if (ev.portev_events & FILE_TRUNC)
 					(void) fseek(file->fp, 0, SEEK_SET);

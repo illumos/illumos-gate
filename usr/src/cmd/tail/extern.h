@@ -52,7 +52,7 @@ struct file_info {
 	FILE *fp;
 	char *file_name;
 	struct stat st;
-	file_obj_t fobj;
+	file_obj_t fobj[2];
 };
 
 typedef struct file_info file_info_t;
