@@ -51,7 +51,11 @@
 #include <cryptoutil.h>
 #include <kmfapi.h>
 
-#define	BUFFERSIZE	(4096)		/* Buffer size for reading file */
+/*
+ * Buffer size for reading file. This is given a rather high value
+ * to get better performance when a hardware provider is present.
+ */
+#define	BUFFERSIZE	(1024 * 64)
 
 /*
  * RESULTLEN - large enough size in bytes to hold result for
