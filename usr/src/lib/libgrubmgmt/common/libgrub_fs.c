@@ -22,9 +22,12 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 /*
- * This file contains all the functions that manipualte the file
+ * This file contains all the functions that manipulate the file
  * system where the GRUB menu resides.
  */
 #include <stdio.h>
@@ -42,6 +45,9 @@
 #include <sys/fs/ufs_mount.h>
 #include <sys/dktp/fdisk.h>
 #include <libfstyp.h>
+#if defined(i386) || defined(__amd64)
+#include <libfdisk.h>
+#endif
 
 #include "libgrub_impl.h"
 
@@ -84,6 +90,10 @@ get_sol_prtnum(const char *physpath)
 	struct ipart *ipart;
 	char boot_sect[512];
 	char rdev[MAXNAMELEN];
+#if defined(i386) || defined(__amd64)
+	ext_part_t *epp;
+	int ext_part_found = 0;
+#endif
 
 	(void) snprintf(rdev, sizeof (rdev), "/devices%s,raw", physpath);
 
@@ -105,6 +115,28 @@ get_sol_prtnum(const char *physpath)
 	for (i = 0; i < FD_NUMPART; ++i) {
 		if (ipart[i].systid == SUNIXOS || ipart[i].systid == SUNIXOS2)
 			return (i);
+
+#if defined(i386) || defined(__amd64)
+		if (!fdisk_is_dos_extended(ipart[i].systid) ||
+		    (ext_part_found == 1))
+			continue;
+
+		ext_part_found = 1;
+
+		if (libfdisk_init(&epp, rdev, NULL, FDISK_READ_DISK) ==
+		    FDISK_SUCCESS) {
+			uint32_t begs, nums;
+			int pno;
+			int rval;
+
+			rval = fdisk_get_solaris_part(epp, &pno, &begs, &nums);
+
+			libfdisk_fini(&epp);
+
+			if (rval == FDISK_SUCCESS)
+				return (pno - 1);
+		}
+#endif
 	}
 	return (PRTNUM_INVALID);
 }
@@ -146,7 +178,7 @@ get_zfs_root(zfs_handle_t *zfh, grub_fs_t *fs, grub_root_t *root)
 /*
  * On entry physpath parameter supposed to contain:
  * <disk_physpath>[<space><disk_physpath>]*.
- * Retireives first <disk_physpath> that matches both partition and slice.
+ * Retrieves first <disk_physpath> that matches both partition and slice.
  * If any partition and slice is acceptable, first <disk_physpath> is returned.
  */
 static int

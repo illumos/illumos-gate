@@ -20,9 +20,9 @@
  */
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  * Copyright 2012 Alexey Zaytsev <alexey.zaytsev@gmail.com> All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1051,7 +1051,22 @@ bd_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp, int *rvalp)
 		minfo.dki_media_type = DK_FIXED_DISK;
 		minfo.dki_lbsize = (1U << bd->d_blkshift);
 		minfo.dki_capacity = bd->d_numblks;
-		if (ddi_copyout(&minfo, ptr, sizeof (minfo), flag))  {
+		if (ddi_copyout(&minfo, ptr, sizeof (minfo), flag)) {
+			return (EFAULT);
+		}
+		return (0);
+	}
+	case DKIOCGMEDIAINFOEXT: {
+		struct dk_minfo_ext miext;
+
+		/* make sure our state information is current */
+		bd_update_state(bd);
+		bzero(&miext, sizeof (miext));
+		miext.dki_media_type = DK_FIXED_DISK;
+		miext.dki_lbsize = (1U << bd->d_blkshift);
+		miext.dki_pbsize = miext.dki_lbsize;
+		miext.dki_capacity = bd->d_numblks;
+		if (ddi_copyout(&miext, ptr, sizeof (miext), flag)) {
 			return (EFAULT);
 		}
 		return (0);
@@ -1074,7 +1089,7 @@ bd_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp, int *rvalp)
 		cinfo.dki_space = 0;
 		cinfo.dki_prio = 0;
 		cinfo.dki_vec = 0;
-		if (ddi_copyout(&cinfo, ptr, sizeof (cinfo), flag))  {
+		if (ddi_copyout(&cinfo, ptr, sizeof (cinfo), flag)) {
 			return (EFAULT);
 		}
 		return (0);
