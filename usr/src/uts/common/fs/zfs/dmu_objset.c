@@ -547,7 +547,7 @@ dmu_objset_refresh_ownership(objset_t *os, void *tag)
 	dmu_objset_disown(os, tag);
 	VERIFY0(dsl_dataset_own(dp, name, tag, &newds));
 	VERIFY3P(newds, ==, os->os_dsl_dataset);
-	dsl_pool_rele(dp, FTAG);
+	dsl_pool_config_exit(dp, FTAG);
 }
 
 void

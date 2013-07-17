@@ -982,14 +982,8 @@ dsl_dataset_snapshot_check_impl(dsl_dataset_t *ds, const char *snapname,
 	 * case we ignore this, knowing it will be fixed up for us shortly in
 	 * dmu_recv_end_sync().
 	 */
-	if (!recv) {
-		mutex_enter(&ds->ds_lock);
-		if (DS_IS_INCONSISTENT(ds)) {
-			mutex_exit(&ds->ds_lock);
-			return (SET_ERROR(EBUSY));
-		}
-		mutex_exit(&ds->ds_lock);
-	}
+	if (!recv && DS_IS_INCONSISTENT(ds))
+		return (SET_ERROR(EBUSY));
 
 	error = dsl_dataset_snapshot_reserve_space(ds, tx);
 	if (error != 0)
