@@ -4015,7 +4015,7 @@ mirror_write_strategy(buf_t *pb, int flag, void *private)
 		 * completed this resync region
 		 */
 		if ((MD_MNSET_SETNO(MD_UN2SET(un))) &&
-		    (!flag & MD_STR_DIRTY_RD)) {
+		    (!(flag & MD_STR_DIRTY_RD))) {
 			if (!IN_RESYNC_REGION(un, ps))
 				abort_write = 1;
 		}
