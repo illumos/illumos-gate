@@ -20,8 +20,8 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -93,9 +93,9 @@ static char *server;
 static int pipetest(struct smb_ctx *);
 
 static void
-testnp_usage(void)
+srvinfo_usage(void)
 {
-	printf("usage: testnp [-d domain][-u user][-p passwd] server\n");
+	printf("usage: srvinfo [-d domain][-u user][-p passwd] server\n");
 	exit(1);
 }
 
@@ -124,18 +124,18 @@ main(int argc, char *argv[])
 			pw = optarg;
 			break;
 		case '?':
-			testnp_usage();
+			srvinfo_usage();
 			break;
 		}
 	}
 	if (optind >= argc)
-		testnp_usage();
+		srvinfo_usage();
 	server = argv[optind];
 
 	if (pw != NULL && (dom == NULL || usr == NULL)) {
-		fprintf(stderr, "%0: -p arg requires -d dom -u usr\n",
+		fprintf(stderr, "%s: -p arg requires -d dom -u usr\n",
 		    argv[0]);
-		testnp_usage();
+		srvinfo_usage();
 	}
 
 	/*
@@ -236,7 +236,6 @@ static int
 put_uncserver(const char *s, uchar_t *buf)
 {
 	uchar_t *p = buf;
-	int slashcnt = 0;
 	char c;
 
 	*p++ = '\\'; *p++ = '\0';
