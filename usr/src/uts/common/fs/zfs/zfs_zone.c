@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/spa.h>
@@ -891,6 +891,13 @@ zfs_zone_io_throttle(zfs_zone_iop_type_t type)
 	}
 
 	if (!zfs_zone_delay_enable)
+		return;
+
+	/*
+	 * If the zone's I/O priority is set to zero, don't throttle that zone's
+	 * operations at all.
+	 */
+	if (zonep->zone_zfs_io_pri == 0)
 		return;
 
 	/*
