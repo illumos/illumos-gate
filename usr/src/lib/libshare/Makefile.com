@@ -45,7 +45,8 @@ CFLAGS +=	$(CCVERBOSE)
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-switch
-CPPFLAGS +=	-D_REENTRANT -I$(NFSLIB_DIR) -I/usr/include/libxml2
+CPPFLAGS +=	-D_REENTRANT -I$(NFSLIB_DIR) \
+		-I$(ADJUNCT_PROTO)/usr/include/libxml2
 
 .KEEP_STATE:
 

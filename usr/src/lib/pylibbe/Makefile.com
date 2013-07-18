@@ -44,7 +44,8 @@ C99MODE=        $(C99_ENABLE)
 LIBS =		$(DYNLIB)
 LDLIBS +=	-lbe -lnvpair -lc
 CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS +=	-I/usr/include/python2.6 -D_FILE_OFFSET_BITS=64 -I../../libbe/common
+CPPFLAGS +=	-I$(ADJUNCT_PROTO)/usr/include/python2.6 \
+		-D_FILE_OFFSET_BITS=64 -I../../libbe/common
 
 .KEEP_STATE:
 

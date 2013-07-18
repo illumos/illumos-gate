@@ -53,10 +53,13 @@ HAL_CONFIG_CPPFLAGS =	-DPACKAGE_DATA_DIR=\"/usr/lib\" \
 			-DHAL_USER=\"$(HAL_USER)\" \
 			-DHAL_GROUP=\"$(HAL_GROUP)\"
 
-HAL_DBUS_CPPFLAGS =	-DDBUS_API_SUBJECT_TO_CHANGE -DDBUS_SYSTEMD_DIR=\"/etc/dbus-1/system.d\" \
-			 -I/usr/include/dbus-1.0 -I/usr/lib/dbus-1.0/include
+HAL_DBUS_CPPFLAGS =	-DDBUS_API_SUBJECT_TO_CHANGE \
+			-DDBUS_SYSTEMD_DIR=\"/etc/dbus-1/system.d\" \
+			-I$(ADJUNCT_PROTO)/usr/include/dbus-1.0 \
+			-I$(ADJUNCT_PROTO)/usr/lib/dbus-1.0/include
 
-HAL_GLIB_CPPFLAGS = 	-I/usr/include/glib-2.0 -I/usr/lib/glib-2.0/include
+HAL_GLIB_CPPFLAGS = 	-I$(ADJUNCT_PROTO)/usr/include/glib-2.0 \
+			-I$(ADJUNCT_PROTO)/usr/lib/glib-2.0/include
 
 HAL_GETTEXT_PACKAGE =	$(TEXT_DOMAIN)
 

@@ -57,7 +57,7 @@ OBJECTS=	$(BEROBJS) $(LDAPOBJS) $(SSLDAPOBJS) $(PRLDAPOBJS) \
 include ../../Makefile.lib
 
 NSS_LIBS=	-lnspr4 -lplc4 -lnss3 -lssl3
-NSS_HDRS=	/usr/include/mps
+NSS_HDRS=	$(ADJUNCT_PROTO)/usr/include/mps
 NSS_LDPATH=	/usr/lib/mps
 NSS_LDPATH64=	$(NSS_LDPATH)/64	
 

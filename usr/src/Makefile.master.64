@@ -49,6 +49,7 @@ LDLIBS1=	$(ENVLDLIBS1:%=%/$(MACH64))
 LDLIBS2=	$(ENVLDLIBS2:%=%/$(MACH64))
 LDLIBS3=	$(ENVLDLIBS3:%=%/$(MACH64))
 LDLIBS64 = 	$(LDLIBS1) $(LDLIBS2) $(LDLIBS3)
+LDLIBS64 +=	$(ADJUNCT_PROTO:%=-L%/usr/lib/$(MACH64) -L%/lib/$(MACH64))
 #
 # Moved these up to the top level here, so they can be overridden
 #
@@ -83,7 +84,7 @@ BUILD.SO=	$(CC) $(CFLAGS) -o $@ $(GSHARED) $(DYNFLAGS) \
 MAPFILECLASS=	-64
 
 CCNEEDED =		-lCrun
-$(__GNUC64)CCNEEDED =	-L$(GCCLIBDIR) -R$(GCCLIBDIR) -lstdc++
+$(__GNUC64)CCNEEDED =	-L$(GCCLIBDIR) -lstdc++
 $(__GNUC64)CCNEEDED +=	-lgcc_s
 
 BUILDCCC.SO=    $(CCC) $(CCFLAGS) -o $@ $(GSHARED) $(DYNFLAGS) \

@@ -43,8 +43,10 @@ $(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
 
 CFLAGS		+=	$(CCVERBOSE) -xCC
 CFLAGS64	+=	$(CCVERBOSE) -xCC
-CPPFLAGS	+=	-I/usr/include/libxml2 -I$(INCDIR) -I../../include
-CPPFLAGS64	+=	-I/usr/include/libxml2 -I$(INCDIR) -I../../include
+CPPFLAGS	+=	-I$(ADJUNCT_PROTO)/usr/include/libxml2 \
+			-I$(INCDIR) -I../../include
+CPPFLAGS64	+=	-I$(ADJUNCT_PROTO)/usr/include/libxml2 \
+			-I$(INCDIR) -I../../include
 LDLIBS		+=	-lc
 
 CERRWARN	+=	-_gcc=-Wno-unused-label

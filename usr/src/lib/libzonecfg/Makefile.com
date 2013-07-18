@@ -35,7 +35,7 @@ LDLIBS +=	-lc -lsocket -lnsl -luuid -lnvpair -lsysevent -lsec -lbrand \
 $(DYNLIB) :=	LDLIBS += -lxml2
 
 SRCDIR =	../common
-CPPFLAGS +=	-I/usr/include/libxml2 -I$(SRCDIR) -D_REENTRANT
+CPPFLAGS +=	-I$(ADJUNCT_PROTO)/usr/include/libxml2 -I$(SRCDIR) -D_REENTRANT
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-parentheses
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)

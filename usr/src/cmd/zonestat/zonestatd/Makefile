@@ -33,7 +33,7 @@ ROOTMANIFESTDIR =	$(ROOTSVCSYSTEM)
 
 SRCS =	zonestatd.c
 
-CPPFLAGS	+= -I/usr/include/libxml2
+CPPFLAGS	+= -I$(ADJUNCT_PROTO)/usr/include/libxml2
 LDLIBS 		+= -lkstat -lpool -lexacct -lscf \
 		    -lcontract -lcmdutils -lumem
 
