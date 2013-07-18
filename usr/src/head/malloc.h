@@ -26,8 +26,6 @@
 #ifndef _MALLOC_H
 #define	_MALLOC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.7	*/
-
 #include <sys/types.h>
 
 #ifdef	__cplusplus
@@ -61,21 +59,38 @@ struct mallinfo  {
 
 #if defined(__STDC__)
 
+#if (!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX)) || \
+	defined(_XPG3)
+#if __cplusplus >= 199711L
+namespace std {
+#endif
+
 void *malloc(size_t);
 void free(void *);
 void *realloc(void *, size_t);
+void *calloc(size_t, size_t);
+
+#if __cplusplus >= 199711L
+} /* end of namespace std */
+
+using std::malloc;
+using std::free;
+using std::realloc;
+using std::calloc;
+#endif /* __cplusplus >= 199711L */
+#endif /* (!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX)) || ... */
+
 int mallopt(int, int);
 struct mallinfo mallinfo(void);
-void *calloc(size_t, size_t);
 
 #else
 
 void *malloc();
 void free();
 void *realloc();
+void *calloc();
 int mallopt();
 struct mallinfo mallinfo();
-void *calloc();
 
 #endif	/* __STDC__ */
 
