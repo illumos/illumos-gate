@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013, Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -227,7 +228,8 @@ tcp_update_next_port(in_port_t port, const tcp_t *tcp, boolean_t random)
 		 * port to get the random port.  It should fall into the
 		 * valid anon port range.
 		 */
-		if (port < tcps->tcps_smallest_anon_port) {
+		if ((port < tcps->tcps_smallest_anon_port) ||
+		    (port > tcps->tcps_largest_anon_port)) {
 			port = tcps->tcps_smallest_anon_port +
 			    port % (tcps->tcps_largest_anon_port -
 			    tcps->tcps_smallest_anon_port);
