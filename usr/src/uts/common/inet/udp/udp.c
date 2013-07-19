@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013, Nexenta Systems, Inc. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -2538,7 +2539,8 @@ udp_update_next_port(udp_t *udp, in_port_t port, boolean_t random)
 		 * port to get the random port.  It should fall into the
 		 * valid anon port range.
 		 */
-		if (port < us->us_smallest_anon_port) {
+		if ((port < us->us_smallest_anon_port) ||
+		    (port > us->us_largest_anon_port)) {
 			port = us->us_smallest_anon_port +
 			    port % (us->us_largest_anon_port -
 			    us->us_smallest_anon_port);
