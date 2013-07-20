@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -27,6 +28,46 @@
 #include <inet/ip6.h>
 #include <inet/udp_impl.h>
 #include <sys/sunddi.h>
+
+/*
+ * Special checkers for smallest/largest anonymous port so they don't
+ * ever happen to be (largest < smallest).
+ */
+/* ARGSUSED */
+static int
+udp_smallest_anon_set(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
+    const char *ifname, const void *pval, uint_t flags)
+{
+	unsigned long new_value;
+	udp_stack_t *us = (udp_stack_t *)cbarg;
+	int err;
+
+	if ((err = mod_uint32_value(pval, pinfo, flags, &new_value)) != 0)
+		return (err);
+	/* mod_uint32_value() + pinfo guarantees we're in UDP port range. */
+	if (new_value > us->us_largest_anon_port)
+		return (ERANGE);
+	pinfo->prop_cur_uval = (uint32_t)new_value;
+	return (0);
+}
+
+/* ARGSUSED */
+static int
+udp_largest_anon_set(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
+    const char *ifname, const void *pval, uint_t flags)
+{
+	unsigned long new_value;
+	udp_stack_t *us = (udp_stack_t *)cbarg;
+	int err;
+
+	if ((err = mod_uint32_value(pval, pinfo, flags, &new_value)) != 0)
+		return (err);
+	/* mod_uint32_value() + pinfo guarantees we're in UDP port range. */
+	if (new_value < us->us_smallest_anon_port)
+		return (ERANGE);
+	pinfo->prop_cur_uval = (uint32_t)new_value;
+	return (0);
+}
 
 /*
  * All of these are alterable, within the min/max values given, at run time.
@@ -57,11 +98,11 @@ mod_prop_info_t udp_propinfo_tbl[] = {
 	    {B_TRUE}, {B_TRUE} },
 
 	{ "smallest_anon_port", MOD_PROTO_UDP,
-	    mod_set_uint32, mod_get_uint32,
+	    udp_smallest_anon_set, mod_get_uint32,
 	    {1024, ULP_MAX_PORT, (32 * 1024)}, {(32 * 1024)} },
 
 	{ "largest_anon_port", MOD_PROTO_UDP,
-	    mod_set_uint32, mod_get_uint32,
+	    udp_largest_anon_set, mod_get_uint32,
 	    {1024, ULP_MAX_PORT, ULP_MAX_PORT}, {ULP_MAX_PORT} },
 
 	{ "send_maxbuf", MOD_PROTO_UDP,

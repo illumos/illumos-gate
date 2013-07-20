@@ -461,7 +461,15 @@ extern ssize_t readlink(const char *_RESTRICT_KYWD, char *_RESTRICT_KYWD,
 #endif
 #if (!defined(__XOPEN_OR_POSIX) || (defined(_XPG3) && !defined(_XPG4))) || \
 	defined(__EXTENSIONS__)
+#if __cplusplus >= 199711L
+namespace std {
+#endif
 extern int rename(const char *, const char *);
+#if __cplusplus >= 199711L
+} /* end of namespace std */
+
+using std::rename;
+#endif /* __cplusplus >= 199711L */
 #endif /* (!defined(__XOPEN_OR_POSIX) || (defined(_XPG3)... */
 #if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
 extern int resolvepath(const char *, char *, size_t);
