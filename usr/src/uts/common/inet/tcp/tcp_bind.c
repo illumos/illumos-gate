@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013, Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -212,7 +212,7 @@ tcp_bind_hash_remove(tcp_t *tcp)
 in_port_t
 tcp_update_next_port(in_port_t port, const tcp_t *tcp, boolean_t random)
 {
-	int i;
+	int i, bump;
 	boolean_t restart = B_FALSE;
 	tcp_stack_t *tcps = tcp->tcp_tcps;
 
@@ -230,9 +230,14 @@ tcp_update_next_port(in_port_t port, const tcp_t *tcp, boolean_t random)
 		 */
 		if ((port < tcps->tcps_smallest_anon_port) ||
 		    (port > tcps->tcps_largest_anon_port)) {
-			port = tcps->tcps_smallest_anon_port +
-			    port % (tcps->tcps_largest_anon_port -
-			    tcps->tcps_smallest_anon_port);
+			if (tcps->tcps_smallest_anon_port ==
+			    tcps->tcps_largest_anon_port) {
+				bump = 0;
+			} else {
+				bump = port % (tcps->tcps_largest_anon_port -
+				    tcps->tcps_smallest_anon_port);
+			}
+			port = tcps->tcps_smallest_anon_port + bump;
 		}
 	}
 
