@@ -101,7 +101,7 @@ extern "C" {
 #define	DEFAULT_MAXPID	999999
 #define	DEFAULT_JUMPPID	100000
 #else
-#define	DEFAULT_MAXPID	30000
+#define	DEFAULT_MAXPID	99999
 #define	DEFAULT_JUMPPID	0
 #endif
 
