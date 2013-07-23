@@ -23,6 +23,9 @@
  * Copyright (c) 2001 by Sun Microsystems, Inc.
  * All rights reserved.
  */
+/*
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ */
 
 /*
  * These crt*.o modules are provided as the bare minimum required
@@ -34,8 +37,17 @@
  * For further details - see bug#4433015
  */
 
-	.ident	"%Z%%M%	%I%	%E% SMI"
 	.file	"crti.s"
+
+/*
+ * Note that when _init and _fini are called we have 16-byte alignment per the
+ * ABI. We need to make sure that our asm leaves it such that subsequent calls
+ * will be aligned. Between the two pushls we do ourselves, that leaves us
+ * having pushed 8 bytes onto the stack. The call that will follow this prologue
+ * which have us push eip onto the stack. To make sure that when that function
+ * is called it is 16-byte aligned we must subtract another four bytes from the
+ * stack.
+ */
 
 /*
  * _init function prologue
@@ -51,6 +63,7 @@ _init:
 	call	.L1
 .L1:	popl	%ebx
 	addl	$_GLOBAL_OFFSET_TABLE_+[.-.L1], %ebx
+	subl	$4, %esp	/ See above comments on alignment
 
 /*
  * _fini function prologue
@@ -66,3 +79,4 @@ _fini:
 	call	.L2
 .L2:	popl	%ebx
 	addl	$_GLOBAL_OFFSET_TABLE_+[.-.L2], %ebx
+	subl	$4, %esp	/ See above comments on alignment
