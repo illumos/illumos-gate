@@ -1263,8 +1263,6 @@ do_archives_update(int do_fast_reboot)
 int
 main(int argc, char *argv[])
 {
-	char *ttyn = ttyname(STDERR_FILENO);
-
 	int qflag = 0, needlog = 1, nosync = 0;
 	int fast_reboot = 0;
 	int prom_reboot = 0;
@@ -1336,7 +1334,9 @@ main(int argc, char *argv[])
 			qflag = 1;
 			break;
 		case 'y':
-			ttyn = NULL;
+			/*
+			 * Option ignored for backwards compatibility.
+			 */
 			break;
 		case 'f':
 			fast_reboot = 1;
@@ -1459,19 +1459,6 @@ main(int argc, char *argv[])
 	if (mdep != NULL)
 		(void) fprintf(stderr, "mdep = %s\n", (char *)mdep);
 #endif
-
-	if (fcn != AD_BOOT && ttyn != NULL &&
-	    strncmp(ttyn, "/dev/term/", strlen("/dev/term/")) == 0) {
-		/*
-		 * TRANSLATION_NOTE
-		 * Don't translate ``halt -y''
-		 */
-		(void) fprintf(stderr,
-		    gettext("%s: dangerous on a dialup;"), cmdname);
-		(void) fprintf(stderr,
-		    gettext("use ``%s -y'' if you are really sure\n"), cmdname);
-		goto fail;
-	}
 
 	if (needlog) {
 		char *user = getlogin();
