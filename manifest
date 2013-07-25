@@ -1509,6 +1509,12 @@ f lib/svc/manifest/network/network-netmask.xml 0444 root sys
 f lib/svc/manifest/network/network-routing-setup.xml 0444 root sys
 f lib/svc/manifest/network/network-service.xml 0444 root sys
 f lib/svc/manifest/network/npiv_config.xml 0444 root sys
+d lib/svc/manifest/network/nfs 0755 root sys
+f lib/svc/manifest/network/nfs/client.xml 0444 root sys
+f lib/svc/manifest/network/nfs/mapid.xml 0444 root sys
+f lib/svc/manifest/network/nfs/nlockmgr.xml 0444 root sys
+f lib/svc/manifest/network/nfs/server.xml 0444 root sys
+f lib/svc/manifest/network/nfs/status.xml 0444 root sys
 f lib/svc/manifest/network/rarp.xml 0444 root sys
 f lib/svc/manifest/network/rexec.xml 0444 root sys
 d lib/svc/manifest/network/routing 0755 root sys
