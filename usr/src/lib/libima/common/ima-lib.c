@@ -36,20 +36,21 @@
 #ifdef WIN32
 #include <windows.h>
 #else
-#define	_XOPEN_SOURCE /* glibc2 needs this */
 #include <sys/sem.h>
 #include <dlfcn.h>
 #include <stdarg.h>
 #endif
 
 #include <string.h>
+#include <strings.h>
 #include <stdlib.h>
 // #include <sys/sem.h>
-// #include <unistd.h>
+#include <unistd.h>
 #include <time.h>
 #include <stdio.h>
 #include <sys/types.h>
 // #include <sys/ipc.h>
+#include <netdb.h>
 
 #include "libsun_ima.h"
 #include "ima.h"
@@ -277,11 +278,11 @@ static IMA_STATUS setSolarisSharedNodeAlias(const IMA_NODE_ALIAS alias) {
  * "__attribute__ ((constructor))" and "__attribute__ ((destructor))"
  * are used with gcc
  */
-__attribute__ ((constructor)) void init() {
+__attribute__((constructor)) void init() {
 	InitLibrary();
 }
 
-__attribute__ ((destructor)) void fini() {
+__attribute__((destructor)) void fini() {
 	ExitLibrary();
 }
 
@@ -1021,8 +1022,11 @@ IMA_API IMA_STATUS IMA_GetNodeProperties(
 	IMA_UINT i;
 	IMA_STATUS status;
 	char fullline[512]; /* Full line read in from IMA.conf */
-	char nodename[256];
+	char nodename[MAXHOSTNAMELEN];
+
+#if defined(_WINDOWS)
 	IMA_UINT dwStrLength;
+#endif
 
 	if (number_of_plugins == -1)
 		InitLibrary();
@@ -1050,13 +1054,14 @@ IMA_API IMA_STATUS IMA_GetNodeProperties(
 
 			if (getSolarisSharedNodeName(sharedNodeName) !=
 			    IMA_STATUS_SUCCESS) {
-				gethostname((char *)fullline, &dwStrLength);
+				gethostname((char *)fullline,
+				    sizeof (fullline));
 				sprintf(nodename,
 				    DEFAULT_NODE_NAME_FORMAT, fullline);
 				mbstowcs(sharedNodeName, nodename, 256);
 			}
 #else
-			gethostname((char *)fullline, &dwStrLength);
+			gethostname((char *)fullline, sizeof (fullline));
 			sprintf(nodename, DEFAULT_NODE_NAME_FORMAT, fullline);
 			mbstowcs(sharedNodeName, nodename, 256);
 #endif
@@ -1222,15 +1227,17 @@ IMA_API IMA_STATUS IMA_SetNodeName(
 IMA_API IMA_STATUS IMA_GenerateNodeName(
     IMA_NODE_NAME generatedname) {
 	char computername[256];
-	char nodename[256];
-	IMA_UINT dwStrLength;
+	char nodename[MAXHOSTNAMELEN];
+
+#if defined(_WINDOWS)
+	IMA_UINT dwStrLength = 255;
+#endif
+
 #ifndef _WINDOWS
 #ifndef SOLARIS
 	int i;
 #endif
 #endif
-
-	dwStrLength = 255;
 
 	if (generatedname == NULL)
 		return (IMA_ERROR_INVALID_PARAMETER);
@@ -1243,12 +1250,12 @@ IMA_API IMA_STATUS IMA_GenerateNodeName(
 	generatedname, 256);
 #elif defined(SOLARIS)
 	if (getSolarisSharedNodeName(generatedname) != IMA_STATUS_SUCCESS) {
-		gethostname(computername, &dwStrLength);
+		gethostname(computername, sizeof (computername));
 		sprintf(nodename, DEFAULT_NODE_NAME_FORMAT, generatedname);
 		mbstowcs(generatedname, nodename, 256);
 	}
 #else
-	gethostname((char *)computername, &dwStrLength);
+	gethostname((char *)computername, sizeof (computername));
 	i = 0;
 	while (computername[i] != '\0') {
 		computername[i] = tolower(computername[i]);
