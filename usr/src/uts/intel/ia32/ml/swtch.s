@@ -23,7 +23,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ */
 
 /*
  * Process switching routines.
@@ -355,6 +357,7 @@ resume(kthread_t *t)
 #endif	/* __xpv */
 
 	movq	%r12, CPU_THREAD(%r13)	/* set CPU's thread pointer */
+	mfence				/* synchronize with mutex_exit() */
 	xorl	%ebp, %ebp		/* make $<threadlist behave better */
 	movq	T_LWP(%r12), %rax 	/* set associated lwp to  */
 	movq	%rax, CPU_LWP(%r13) 	/* CPU's lwp ptr */
@@ -519,6 +522,7 @@ resume_return:
 #endif	/* __xpv */
 
 	movl	%edi, CPU_THREAD(%esi)	/* set CPU's thread pointer */
+	mfence				/* synchronize with mutex_exit() */
 	xorl	%ebp, %ebp		/* make $<threadlist behave better */
 	movl	T_LWP(%edi), %eax 	/* set associated lwp to  */
 	movl	%eax, CPU_LWP(%esi) 	/* CPU's lwp ptr */
@@ -768,6 +772,7 @@ resume_from_intr(kthread_t *t)
 
 	movq	%gs:CPU_THREAD, %r13	/* %r13 = curthread */
 	movq	%r12, %gs:CPU_THREAD	/* set CPU's thread pointer */
+	mfence				/* synchronize with mutex_exit() */
 	movq	T_SP(%r12), %rsp	/* restore resuming thread's sp */
 	xorl	%ebp, %ebp		/* make $<threadlist behave better */
 
@@ -817,6 +822,7 @@ resume_from_intr_return:
 #endif
 	movl	%gs:CPU_THREAD, %esi	/* %esi = curthread */
 	movl	%edi, %gs:CPU_THREAD	/* set CPU's thread pointer */
+	mfence				/* synchronize with mutex_exit() */
 	movl	T_SP(%edi), %esp	/* restore resuming thread's sp */
 	xorl	%ebp, %ebp		/* make $<threadlist behave better */
 
