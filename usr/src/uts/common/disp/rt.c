@@ -22,12 +22,11 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2013 Joyent, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -870,7 +869,7 @@ rt_parmsset(kthread_t *tx, void *prmsp, id_t reqpcid, cred_t *reqpcredp)
 	 * we check it here.
 	 */
 	if (reqpcredp != NULL && reqpcid != rt_cid &&
-	    secpolicy_setpriority(reqpcredp) != 0)
+	    secpolicy_raisepriority(reqpcredp) != 0)
 		return (EPERM);
 
 	thread_lock(tx);

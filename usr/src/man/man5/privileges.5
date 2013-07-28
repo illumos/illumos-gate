@@ -1,5 +1,6 @@
 '\" te
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2013, Joyent, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
@@ -489,13 +490,23 @@ arbitrary processes to CPUs.
 .sp
 .ne 2
 .na
+\fB\fBPRIV_PROC_PRIOUP\fR\fR
+.ad
+.sp .6
+.RS 4n
+Allow a process to elevate its priority above its current level.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fBPRIV_PROC_PRIOCNTL\fR\fR
 .ad
 .sp .6
 .RS 4n
-Allow a process to elevate its priority above its current level. Allow a
-process to change its scheduling class to any scheduling class, including the
-RT class.
+Allows all that PRIV_PROC_PRIOUP allows.
+Allow a process to change its scheduling class to any scheduling class,
+including the RT class.
 .RE
 
 .sp
@@ -698,10 +709,21 @@ This privilege is granted by default to exclusive IP stack instance zones.
 .sp
 .ne 2
 .na
+\fB\fBPRIV_SYS_RES_BIND\fR\fR
+.ad
+.sp .6
+.RS 4n
+Allows a process to bind processes to processor sets.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fBPRIV_SYS_RES_CONFIG\fR\fR
 .ad
 .sp .6
 .RS 4n
+Allows all that PRIV_SYS_RES_BIND allows.
 Allow a process to create and delete processor sets, assign CPUs to processor
 sets and override the \fBPSET_NOESCAPE\fR property. Allow a process to change
 the operational status of CPUs in the system using \fBp_online\fR(2). Allow a
