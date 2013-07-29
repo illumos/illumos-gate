@@ -230,5 +230,26 @@ moment, this operation cannot be reversed. Booting off of
 \fBlz4\fR-compressed root pools is supported.
 .RE
 
+.sp
+.ne 2
+.na
+\fB\fBmulti_vdev_crash_dump\fR\fR
+.ad
+.RS 4n
+.TS
+l l .
+GUID	com.joyent:multi_vdev_crash_dump
+READ\-ONLY COMPATIBLE	yes
+DEPENDENCIES	none
+.TE
+
+This feature allows a dump device to be configured with a pool comprised
+of multiple vdevs.  Those vdevs may be arranged in any mirrored or raidz
+configuration.
+
+When the \fBmulti_vdev_crash_dump\fR feature is set to \fBenabled\fR,
+the administrator can use the \fBdumpadm\fR(1M) command to configure a
+dump device.
+
 .SH "SEE ALSO"
 \fBzpool\fR(1M)

@@ -1586,7 +1586,7 @@ vdev_raidz_close(vdev_t *vd)
  */
 int
 vdev_raidz_physio(vdev_t *vd, caddr_t data, size_t size,
-    uint64_t offset, uint64_t origoffset, boolean_t doread)
+    uint64_t offset, uint64_t origoffset, boolean_t doread, boolean_t isdump)
 {
 	vdev_t *tvd = vd->vdev_top;
 	vdev_t *cvd;
@@ -1659,7 +1659,7 @@ vdev_raidz_physio(vdev_t *vd, caddr_t data, size_t size,
 		if ((err = vdev_disk_physio(cvd,
 		    ((char *)rc->rc_data) + colskip, colsize,
 		    VDEV_LABEL_OFFSET(rc->rc_offset) + colskip,
-		    flags)) != 0)
+		    flags, isdump)) != 0)
 			break;
 	}
 

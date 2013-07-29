@@ -591,7 +591,7 @@ vdev_disk_close(vdev_t *vd)
 
 int
 vdev_disk_physio(vdev_t *vd, caddr_t data,
-    size_t size, uint64_t offset, int flags)
+    size_t size, uint64_t offset, int flags, boolean_t isdump)
 {
 	vdev_disk_t *dvd = vd->vdev_tsd;
 
@@ -603,6 +603,17 @@ vdev_disk_physio(vdev_t *vd, caddr_t data,
 		return (EIO);
 
 	ASSERT(vd->vdev_ops == &vdev_disk_ops);
+
+	/*
+	 * If in the context of an active crash dump, use the ldi_dump(9F)
+	 * call instead of ldi_strategy(9F) as usual.
+	 */
+	if (isdump) {
+		ASSERT3P(dvd, !=, NULL);
+		return (ldi_dump(dvd->vd_lh, data, lbtodb(offset),
+		    lbtodb(size)));
+	}
+
 	return (vdev_disk_ldi_physio(dvd->vd_lh, data, size, offset, flags));
 }
 

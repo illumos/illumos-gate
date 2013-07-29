@@ -54,6 +54,7 @@
 #include <sys/stat.h>
 #include <sys/zap.h>
 #include <sys/spa.h>
+#include <sys/spa_impl.h>
 #include <sys/zio.h>
 #include <sys/dmu_traverse.h>
 #include <sys/dnode.h>
@@ -83,6 +84,7 @@
 #include <sys/zil_impl.h>
 #include <sys/sdt.h>
 #include <sys/dbuf.h>
+#include <sys/zfeature.h>
 
 #include "zfs_namecheck.h"
 
@@ -1134,7 +1136,7 @@ zvol_dumpio_vdev(vdev_t *vd, void *addr, uint64_t offset, uint64_t origoffset,
 
 	if (vd->vdev_ops == &vdev_raidz_ops) {
 		return (vdev_raidz_physio(vd,
-		    addr, size, offset, origoffset, doread));
+		    addr, size, offset, origoffset, doread, isdump));
 	}
 
 	offset += VDEV_LABEL_START_SIZE;
@@ -1208,7 +1210,7 @@ zvol_strategy(buf_t *bp)
 	rl_t *rl;
 	int error = 0;
 	boolean_t doread = bp->b_flags & B_READ;
-	boolean_t is_dump;
+	boolean_t is_dumpified;
 	boolean_t sync;
 
 	if (getminor(bp->b_edev) == 0) {
@@ -1251,11 +1253,11 @@ zvol_strategy(buf_t *bp)
 		return (0);
 	}
 
-	is_dump = zv->zv_flags & ZVOL_DUMPIFIED;
+	is_dumpified = zv->zv_flags & ZVOL_DUMPIFIED;
 	sync = ((!(bp->b_flags & B_ASYNC) &&
 	    !(zv->zv_flags & ZVOL_WCE)) ||
 	    (zv->zv_objset->os_sync == ZFS_SYNC_ALWAYS)) &&
-	    !doread && !is_dump;
+	    !doread && !is_dumpified;
 
 	/*
 	 * There must be no buffer changes when doing a dmu_sync() because
@@ -1266,7 +1268,7 @@ zvol_strategy(buf_t *bp)
 
 	while (resid != 0 && off < volsize) {
 		size_t size = MIN(resid, zvol_maxphys);
-		if (is_dump) {
+		if (is_dumpified) {
 			size = MIN(size, P2END(off, zv->zv_volblocksize) - off);
 			error = zvol_dumpio(zv, addr, off, size,
 			    doread, B_FALSE);
@@ -1840,11 +1842,14 @@ zvol_fini(void)
 static int
 zvol_dump_init(zvol_state_t *zv, boolean_t resize)
 {
-	dmu_tx_t *tx;
-	int error = 0;
 	objset_t *os = zv->zv_objset;
+	spa_t *spa = dmu_objset_spa(os);
+	vdev_t *vd = spa->spa_root_vdev;
+	uint64_t version = spa_version(spa);
+
+	dmu_tx_t *tx;
 	nvlist_t *nv = NULL;
-	uint64_t version = spa_version(dmu_objset_spa(zv->zv_objset));
+	int error;
 
 	ASSERT(MUTEX_HELD(&zfsdev_state_lock));
 	error = dmu_free_long_range(zv->zv_objset, ZVOL_OBJ, 0,
@@ -1859,6 +1864,24 @@ zvol_dump_init(zvol_state_t *zv, boolean_t resize)
 	if (error) {
 		dmu_tx_abort(tx);
 		return (error);
+	}
+
+	/*
+	 * If the pool on which the dump device is being initialized has more
+	 * than one child vdev, check that the MULTI_VDEV_CRASH_DUMP feature is
+	 * enabled.  If so, bump that feature's counter to indicate that the
+	 * feature is active.  Only bump the counter if the feature was
+	 * previously inactive.
+	 */
+	ASSERT(vd->vdev_ops == &vdev_root_ops);
+	if (vd->vdev_children > 1) {
+		zfeature_info_t *feature =
+		    &spa_feature_table[SPA_FEATURE_MULTI_VDEV_CRASH_DUMP];
+
+		if (!spa_feature_is_enabled(spa, feature))
+			return (SET_ERROR(ENOTSUP));
+		if (!spa_feature_is_active(spa, feature))
+			spa_feature_incr(spa, feature, tx);
 	}
 
 	/*
@@ -2002,6 +2025,9 @@ zvol_dump_fini(zvol_state_t *zv)
 {
 	dmu_tx_t *tx;
 	objset_t *os = zv->zv_objset;
+	spa_t *spa = dmu_objset_spa(os);
+	vdev_t *vd = spa->spa_root_vdev;
+
 	nvlist_t *nv;
 	int error = 0;
 	uint64_t checksum, compress, refresrv, vbs, dedup;
@@ -2021,6 +2047,19 @@ zvol_dump_fini(zvol_state_t *zv)
 		dmu_tx_abort(tx);
 		return (error);
 	}
+
+	/*
+	 * As in zvol_dump_init(), decrement the MULTI_VDEV_CRASH_DUMP feature's
+	 * refcount if this vdev has more than one child.
+	 */
+	if (vd->vdev_children > 1) {
+		zfeature_info_t *feature =
+		    &spa_feature_table[SPA_FEATURE_MULTI_VDEV_CRASH_DUMP];
+
+		if (spa_feature_is_active(spa, feature))
+			spa_feature_decr(spa, feature, tx);
+	}
+
 	(void) zap_remove(os, ZVOL_ZAP_OBJ, ZVOL_DUMPSIZE, tx);
 	dmu_tx_commit(tx);
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2011 Joyent, Inc.  All rights reserved.
+ * Copyright 2013 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef _SYS_VDEV_RAIDZ_H
@@ -39,7 +39,7 @@ extern "C" {
 
 #ifdef _KERNEL
 extern int vdev_raidz_physio(vdev_t *,
-    caddr_t, size_t, uint64_t, uint64_t, boolean_t);
+    caddr_t, size_t, uint64_t, uint64_t, boolean_t, boolean_t);
 #endif
 #ifdef	__cplusplus
 }

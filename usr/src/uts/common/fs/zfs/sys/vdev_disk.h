@@ -50,7 +50,8 @@ typedef struct vdev_disk {
 } vdev_disk_t;
 #endif
 
-extern int vdev_disk_physio(vdev_t *, caddr_t, size_t, uint64_t, int);
+extern int vdev_disk_physio(vdev_t *,
+    caddr_t, size_t, uint64_t, int, boolean_t);
 
 /*
  * Since vdev_disk.c is not compiled into libzpool, this function should only be

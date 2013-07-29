@@ -68,13 +68,6 @@ zio_checksum_off(const void *buf, uint64_t size, zio_cksum_t *zcp)
 	ZIO_SET_CHECKSUM(zcp, 0, 0, 0, 0);
 }
 
-/*
- * The sha256_mac checksum algorithm was added to try to maintain on-disk
- * compatibility with ZFS on other platforms.  That effort didn't work for other
- * reasons.  As a result, the sha256_mac algorithm is unused except in the rare
- * case of an older platform interpreting noparity as sha256_mac -- which is why
- * they both are no-ops.
- */
 zio_checksum_info_t zio_checksum_table[ZIO_CHECKSUM_FUNCTIONS] = {
 	{{NULL,			NULL},			0, 0, 0, "inherit"},
 	{{NULL,			NULL},			0, 0, 0, "on"},
@@ -86,7 +79,6 @@ zio_checksum_info_t zio_checksum_table[ZIO_CHECKSUM_FUNCTIONS] = {
 	{{fletcher_4_native,	fletcher_4_byteswap},	1, 0, 0, "fletcher4"},
 	{{zio_checksum_SHA256,	zio_checksum_SHA256},	1, 0, 1, "sha256"},
 	{{fletcher_4_native,	fletcher_4_byteswap},	0, 1, 0, "zilog2"},
-	{{zio_checksum_off,	zio_checksum_off},	0, 0, 0, "sha256_mac"},
 	{{zio_checksum_off,	zio_checksum_off},	0, 0, 0, "noparity"},
 };
 
