@@ -1246,6 +1246,7 @@ static int
 ixgbe_init(ixgbe_t *ixgbe)
 {
 	struct ixgbe_hw *hw = &ixgbe->hw;
+	u8 pbanum[IXGBE_PBANUM_LENGTH];
 
 	mutex_enter(&ixgbe->gen_lock);
 
@@ -1306,6 +1307,16 @@ ixgbe_init(ixgbe_t *ixgbe)
 	if (ixgbe_chip_start(ixgbe) != IXGBE_SUCCESS) {
 		ixgbe_fm_ereport(ixgbe, DDI_FM_DEVICE_INVAL_STATE);
 		goto init_fail;
+	}
+
+	/*
+	 * Read identifying information and place in devinfo.
+	 */
+	pbanum[0] = '\0';
+	(void) ixgbe_read_pba_string(hw, pbanum, sizeof (pbanum));
+	if (*pbanum != '\0') {
+		(void) ddi_prop_update_string(DDI_DEV_T_NONE, ixgbe->dip,
+		    "printed-board-assembly", (char *)pbanum);
 	}
 
 	if (ixgbe_check_acc_handle(ixgbe->osdep.reg_handle) != DDI_FM_OK) {
