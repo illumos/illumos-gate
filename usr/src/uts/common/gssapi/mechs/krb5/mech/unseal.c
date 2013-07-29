@@ -1,5 +1,3 @@
-/* EXPORT DELETE START */
-
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -84,5 +82,3 @@ krb5_gss_unwrap(minor_status, context_handle,
     return(rstat);
 #endif
 }
-
-/* EXPORT DELETE END */

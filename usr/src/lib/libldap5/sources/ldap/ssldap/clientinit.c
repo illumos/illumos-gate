@@ -156,16 +156,7 @@ splitpath(char *string, char *dir, char *prefix, char *key) {
 
 static PRStatus local_SSLPLCY_Install(void)
 {
-	SECStatus s;
-
-#ifdef NS_DOMESTIC
-	s = NSS_SetDomesticPolicy(); 
-#elif NS_EXPORT
-	s = NSS_SetExportPolicy(); 
-#else
-	s = PR_FAILURE;
-#endif
-	return s?PR_FAILURE:PR_SUCCESS;
+	return NSS_SetDomesticPolicy() ? PR_FAILURE : PR_SUCCESS;
 }
 
 
@@ -472,20 +463,10 @@ ldapssl_clientauth_init( const char *certdbpath, void *certdbhandle,
 
 
 
-#if defined(NS_DOMESTIC)
     if (local_SSLPLCY_Install() == PR_FAILURE) {
       mutex_unlock(&inited_mutex);
       return( -1 );
     }
-#elif(NS_EXPORT)
-    if (local_SSLPLCY_Install() == PR_FAILURE) {
-      mutex_unlock(&inited_mutex);
-      return( -1 );
-    }
-#else
-    mutex_unlock(&inited_mutex);
-    return( -1 );
-#endif
 
     inited = 1;
     mutex_unlock(&inited_mutex);
@@ -576,20 +557,10 @@ ldapssl_advclientauth_init(
 	return (rc);
     }
 
-#if defined(NS_DOMESTIC)
     if (local_SSLPLCY_Install() == PR_FAILURE) {
       mutex_unlock(&inited_mutex);
       return( -1 );
     }
-#elif(NS_EXPORT)
-    if (local_SSLPLCY_Install() == PR_FAILURE) {
-      mutex_unlock(&inited_mutex);
-      return( -1 );
-    }
-#else
-    mutex_unlock(&inited_mutex);
-    return( -1 );
-#endif
 
     inited = 1;
     mutex_unlock(&inited_mutex);
@@ -711,20 +682,10 @@ ldapssl_pkcs_init( const struct ldapssl_pkcs_fns *pfns )
 	return( rc );
     }
     
-#if defined(NS_DOMESTIC)
     if (local_SSLPLCY_Install() == PR_FAILURE) {
       mutex_unlock(&inited_mutex);
       return( -1 );
     }
-#elif(NS_EXPORT)
-    if (local_SSLPLCY_Install() == PR_FAILURE) {
-      mutex_unlock(&inited_mutex);
-      return( -1 );
-    }
-#else
-    mutex_unlock(&inited_mutex);
-    return( -1 );
-#endif
 
     inited = 1;
 

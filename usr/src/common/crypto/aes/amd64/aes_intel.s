@@ -83,8 +83,8 @@
  * This OpenSolaris version has these major changes from the original source:
  *
  * 1. Added OpenSolaris ENTRY_NP/SET_SIZE macros from
- * /usr/include/sys/asm_linkage.h, lint(1B) guards, EXPORT DELETE START
- * and EXPORT DELETE END markers, and dummy C function definitions for lint.
+ * /usr/include/sys/asm_linkage.h, lint(1B) guards, and dummy C function
+ * definitions for lint.
  *
  * 2. Formatted code, added comments, and added #includes and #defines.
  *
@@ -305,7 +305,6 @@ rijndael_key_setup_dec_intel(uint32_t rk[], const uint32_t cipherKey[],
  * (%rcx)	AES key
  */
 
-	/* EXPORT DELETE START */
 .align	16
 _key_expansion_128:
 _key_expansion_256a:
@@ -378,7 +377,6 @@ _key_expansion_256b:
 	add	$0x10, %rcx
 	ret
 	SET_SIZE(_key_expansion_256b)
-	/* EXPORT DELETE END */
 
 
 /*
@@ -424,7 +422,6 @@ _key_expansion_256b:
 
 
 ENTRY_NP(rijndael_key_setup_enc_intel)
-	/* EXPORT DELETE START */
 	CLEAR_TS_OR_PUSH_XMM0_TO_XMM6(%r10)
 
 	/ NULL pointer sanity check
@@ -580,7 +577,6 @@ ENTRY_NP(rijndael_key_setup_enc_intel)
 	xor	%rax, %rax	/ a key pointer is NULL or invalid keysize
 #endif	/* OPENSSL_INTERFACE */
 
-	/* EXPORT DELETE END */
 	ret
 	SET_SIZE(rijndael_key_setup_enc_intel)
 
@@ -607,7 +603,6 @@ ENTRY_NP(rijndael_key_setup_enc_intel)
  * Return value is non-zero on error, 0 on success.
  */
 ENTRY_NP(rijndael_key_setup_dec_intel)
-	/* EXPORT DELETE START */
 	/ Generate round keys used for encryption
 	call	rijndael_key_setup_enc_intel
 	test	%rax, %rax
@@ -660,7 +655,6 @@ ENTRY_NP(rijndael_key_setup_dec_intel)
 .Ldec_key_exit:
 	/ OpenSolaris: rax = # rounds (10, 12, or 14) or 0 for error
 	/ OpenSSL: rax = 0 for OK, or non-zero for error
-	/* EXPORT DELETE END */
 	ret
 	SET_SIZE(rijndael_key_setup_dec_intel)
 
@@ -711,7 +705,6 @@ ENTRY_NP(rijndael_key_setup_dec_intel)
 #define	KEY		xmm1	/* temporary, 128 bits */
 
 ENTRY_NP(aes_encrypt_intel)
-	/* EXPORT DELETE START */
 	CLEAR_TS_OR_PUSH_XMM0_XMM1(%r10)
 
 	movups	(%INP), %STATE			/ input
@@ -770,7 +763,6 @@ ENTRY_NP(aes_encrypt_intel)
 	movups	%STATE, (%OUTP)			/ output
 
 	SET_TS_OR_POP_XMM0_XMM1(%r10)
-	/* EXPORT DELETE END */
 	ret
 	SET_SIZE(aes_encrypt_intel)
 
@@ -798,7 +790,6 @@ ENTRY_NP(aes_encrypt_intel)
  *	const AES_KEY *key);
  */
 ENTRY_NP(aes_decrypt_intel)
-	/* EXPORT DELETE START */
 	CLEAR_TS_OR_PUSH_XMM0_XMM1(%r10)
 
 	movups	(%INP), %STATE			/ input
@@ -858,7 +849,6 @@ ENTRY_NP(aes_decrypt_intel)
 
 	SET_TS_OR_POP_XMM0_XMM1(%r10)
 	ret
-	/* EXPORT DELETE END */
 	SET_SIZE(aes_decrypt_intel)
 
 #endif	/* lint || __lint */

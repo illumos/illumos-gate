@@ -55,8 +55,6 @@
 #define	UNALIGNED_POINTERS_PERMITTED
 #endif
 
-/* EXPORT DELETE START */
-
 /*
  * Blowfish initial P box and S boxes, derived from the hex digits of PI.
  *
@@ -367,8 +365,6 @@ typedef struct keysched_s {
 	(left) = (right); \
 	(right) = tmp;
 
-/* EXPORT DELETE END */
-
 /*
  * Encrypt a block of data.  Because of addition operations, convert blocks
  * to their big-endian representation, even on Intel boxen.
@@ -378,7 +374,6 @@ int
 blowfish_encrypt_block(const void *cookie, const uint8_t *block,
     uint8_t *out_block)
 {
-/* EXPORT DELETE START */
 	keysched_t *ksch = (keysched_t *)cookie;
 
 	uint32_t left, right, tmp;
@@ -460,7 +455,6 @@ blowfish_encrypt_block(const void *cookie, const uint8_t *block,
 		out_block[7] = right;
 #endif	/* UNALIGNED_POINTERS_PERMITTED */
 	}
-/* EXPORT DELETE END */
 	return (CRYPTO_SUCCESS);
 }
 
@@ -475,7 +469,6 @@ int
 blowfish_decrypt_block(const void *cookie, const uint8_t *block,
     uint8_t *out_block)
 {
-/* EXPORT DELETE START */
 	keysched_t *ksch = (keysched_t *)cookie;
 
 	uint32_t left, right, tmp;
@@ -557,7 +550,6 @@ blowfish_decrypt_block(const void *cookie, const uint8_t *block,
 		out_block[7] = right;
 #endif	/* UNALIGNED_POINTERS_PERMITTED */
 	}
-/* EXPORT DELETE END */
 	return (CRYPTO_SUCCESS);
 }
 
@@ -565,7 +557,6 @@ static void
 bitrepeat(uint8_t *pattern, uint_t len_bytes, uint_t len_bits, uint8_t *dst,
     uint_t dst_len_bytes)
 {
-/* EXPORT DELETE START */
 	uint8_t *current = dst;
 	uint_t bitsleft = CRYPTO_BYTES2BITS(dst_len_bytes);
 	uint_t bitoffset = 0;
@@ -617,7 +608,6 @@ bitrepeat(uint8_t *pattern, uint_t len_bytes, uint_t len_bits, uint8_t *dst,
 			bitsleft = 0;
 		}
 	}
-/* EXPORT DELETE END */
 }
 
 /*
@@ -626,7 +616,6 @@ bitrepeat(uint8_t *pattern, uint_t len_bytes, uint_t len_bits, uint8_t *dst,
 void
 blowfish_init_keysched(uint8_t *key, uint_t bits, void *keysched)
 {
-/* EXPORT DELETE START */
 	keysched_t *newbie = keysched;
 	uint32_t *P = newbie->ksch_P;
 	uint32_t *S = newbie->ksch_S;
@@ -685,7 +674,6 @@ blowfish_init_keysched(uint8_t *key, uint_t bits, void *keysched)
 		*initp++ = ntohl(tmpblock[0]);
 		*initp++ = ntohl(tmpblock[1]);
 	}
-/* EXPORT DELETE END */
 }
 
 /*
@@ -695,7 +683,6 @@ blowfish_init_keysched(uint8_t *key, uint_t bits, void *keysched)
 void *
 blowfish_alloc_keysched(size_t *size, int kmflag)
 {
-/* EXPORT DELETE START */
 	keysched_t *keysched;
 
 #ifdef _KERNEL
@@ -707,7 +694,6 @@ blowfish_alloc_keysched(size_t *size, int kmflag)
 		*size = sizeof (keysched_t);
 		return (keysched);
 	}
-/* EXPORT DELETE END */
 
 	return (NULL);
 }

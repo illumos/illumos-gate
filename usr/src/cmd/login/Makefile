@@ -26,7 +26,6 @@
 PROG= login
 OBJS= login.o login_audit.o
 SRCS= $(OBJS:%.o=%.c)
-ONC_SRCS=$(SRCS:%.c=%.c_onc_plus)
 
 DEFAULTFILES= login.dfl
 
@@ -39,7 +38,7 @@ ROOTLOGINDEVPERM= $(LOGINDEVPERM:%=$(ROOTETC)/%)
 $(ROOTLOGINDEVPERM) := FILEMODE = 644
 FILEMODE= 4555
 
-CLOBBERFILES +=	$(LOGINDEVPERM) $(ONC_SRCS)
+CLOBBERFILES +=	$(LOGINDEVPERM)
 
 CPPFLAGS +=	-DSYSV -DCONSOLE='"/dev/console"' -DSECURITY \
 		-D_FILE_OFFSET_BITS=64 -I$(SRC)/lib/pam_modules/krb5
@@ -68,8 +67,3 @@ clean:
 lint:	lint_SRCS
 
 include ../Makefile.targ
-
-# make ONC_PLUS using suffix rule
-#
-
-ONC_PLUS: $(ONC_SRCS)

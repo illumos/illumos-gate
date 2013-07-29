@@ -28,7 +28,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*LINTLIBRARY*/
 
 #include <sys/types.h>
@@ -36,7 +35,6 @@
 void
 _des_decrypt1(char *block, char *L, char *IP, char *R, char *preS, char *E, char KS[][48], char S[][64], char *f, char *tempL, char *P, char *FP)
 {
-/* EXPORT DELETE START */
 	int	i, ii;
 	int	t, j, k;
 	char	t2;
@@ -115,5 +113,4 @@ _des_decrypt1(char *block, char *L, char *IP, char *R, char *preS, char *E, char
 	 */
 	for (j = 0; j < 64; j++)
 		block[j] = L[FP[j]-1];
-/* EXPORT DELETE END */
 }

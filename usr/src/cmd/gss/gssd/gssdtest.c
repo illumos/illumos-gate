@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Test client for gssd.  This program is not shipped on the binary
  * release.
@@ -104,10 +102,8 @@ static void _gss_process_context_token(int, char **);
 static void _gss_delete_sec_context(int, char **);
 static void _gss_context_time(int, char **);
 static void _gss_verify(int, char **);
-/* EXPORT DELETE START */
 static void _gss_seal(int, char **);
 static void _gss_unseal(int, char **);
-/* EXPORT DELETE END */
 static void _gss_display_status(int, char **);
 static void _gss_indicate_mechs(int, char **);
 static void _gss_inquire_cred(int, char **);
@@ -220,7 +216,7 @@ do_gssdtest(char *buf)
 			_gss_init_sec_context(argc, argv);
 			_gss_accept_sec_context(0, argv);
 			_gss_init_sec_context(argc, argv);
-/* EXPORT DELETE START */
+
 			seal_argc = 2;
 			_gss_seal(seal_argc, seal_ini_array);
 			seal_argc = 1;
@@ -229,7 +225,6 @@ do_gssdtest(char *buf)
 			_gss_seal(seal_argc, seal_acc_array);
 			seal_argc = 1;
 			_gss_unseal(seal_argc, unseal_ini_array);
-/* EXPORT DELETE END */
 			seal_argc = 2;
 			_gss_sign(seal_argc, seal_ini_array);
 			seal_argc = 1;
@@ -248,7 +243,7 @@ do_gssdtest(char *buf)
 		_gss_init_sec_context(argc, argv);
 		_gss_accept_sec_context(0, argv);
 		_gss_init_sec_context(argc, argv);
-/* EXPORT DELETE START */
+
 		seal_argc = 2;
 		_gss_seal(seal_argc, seal_acc_array);
 		seal_argc = 1;
@@ -257,7 +252,6 @@ do_gssdtest(char *buf)
 		_gss_seal(seal_argc, seal_ini_array);
 		seal_argc = 1;
 		_gss_unseal(seal_argc, unseal_acc_array);
-/* EXPORT DELETE END */
 		seal_argc = 2;
 		_gss_sign(seal_argc, seal_ini_array);
 		seal_argc = 1;
@@ -299,14 +293,12 @@ do_gssdtest(char *buf)
 	else if (strcmp(cmd, "gss_verify") == 0 ||
 		strcmp(cmd, "verify") == 0)
 		_gss_verify(argc, argv);
-/* EXPORT DELETE START */
 	else if (strcmp(cmd, "gss_seal") == 0 ||
 		strcmp(cmd, "seal") == 0)
 		_gss_seal(argc, argv);
 	else if (strcmp(cmd, "gss_unseal") == 0 ||
 		strcmp(cmd, "unseal") == 0)
 		_gss_unseal(argc, argv);
-/* EXPORT DELETE END */
 	else if (strcmp(cmd, "gss_display_status") == 0||
 		strcmp(cmd, "status") == 0)
 		_gss_display_status(argc, argv);
@@ -1520,7 +1512,6 @@ char **argv;
 	}
 }
 
-/* EXPORT DELETE START */
 static void
 _gss_seal(argc, argv)
 int argc;
@@ -1688,7 +1679,6 @@ char **argv;
 
 	gss_release_buffer(&minor_status, &message_buffer);
 }
-/* EXPORT DELETE END */
 
 static void
 _gss_display_status(argc, argv)

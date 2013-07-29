@@ -65,8 +65,6 @@ LIBS = $(DYNLIB)
 LIBNAME = $(LIBRARY:%.a=%)
 
 MAPFILES =	../mapfile-vers
-$(EXPORT_RELEASE_BUILD)MAPFILES = \
-	$(CLOSED)/lib/gss_mechs/mech_dh/backend/mapfile-vers-export
 
 LDLIBS +=  -lgss -lnsl -lc 
 

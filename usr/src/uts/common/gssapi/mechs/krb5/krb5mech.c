@@ -61,7 +61,6 @@ static OM_uint32 k5glue_verify
 	int *,	/* qop_state */
 	OM_uint32);
 
-/* EXPORT DELETE START */
 static OM_uint32 k5glue_seal
 	(void *, OM_uint32 *,	/* minor_status */
 	gss_ctx_id_t,		/* context_handle */
@@ -80,7 +79,6 @@ static OM_uint32 k5glue_unseal
 	int *,			/* conf_state */
 	int *,			/* qop_state */
 	OM_uint32);
-/* EXPORT DELETE END */
 
 static OM_uint32 k5glue_import_sec_context
 	(void *, OM_uint32 *,		/* minor_status */
@@ -94,24 +92,10 @@ static	struct	gss_config krb5_mechanism =
 	NULL,	/* context */
 	NULL,	/* next */
 	TRUE,	/* uses_kmod */
-/* EXPORT DELETE START */ /* CRYPT DELETE START */
 	k5glue_unseal,
-/* EXPORT DELETE END */ /* CRYPT DELETE END */
 	k5glue_delete_sec_context,
-/* EXPORT DELETE START */ /* CRYPT DELETE START */
 	k5glue_seal,
-/* EXPORT DELETE END */ /* CRYPT DELETE END */
 	k5glue_import_sec_context,
-/* EXPORT DELETE START */
-/* CRYPT DELETE START */
-#if 0
-/* CRYPT DELETE END */
-	k5glue_seal,
-	k5glue_unseal,
-/* CRYPT DELETE START */
-#endif
-/* CRYPT DELETE END */
-/* EXPORT DELETE END */
 	k5glue_sign,
 	k5glue_verify,
 	};
@@ -223,7 +207,6 @@ k5glue_import_sec_context(ctx, minor_status, interprocess_token, context_handle)
 			context_handle));
 }
 
-/* EXPORT DELETE START */
 /* V1 only */
 /* ARGSUSED */
 static OM_uint32
@@ -244,7 +227,6 @@ k5glue_seal(ctx, minor_status, context_handle, conf_req_flag, qop_req,
 			conf_req_flag, qop_req, input_message_buffer,
 			conf_state, output_message_buffer, gssd_ctx_verifier));
 }
-/* EXPORT DELETE END */
 
 /* ARGSUSED */
 static OM_uint32
@@ -263,7 +245,6 @@ k5glue_sign(ctx, minor_status, context_handle,
 		qop_req, message_buffer, message_token, gssd_ctx_verifier));
 }
 
-/* EXPORT DELETE START */
 /* ARGSUSED */
 static OM_uint32
 k5glue_unseal(ctx, minor_status, context_handle, input_message_buffer,
@@ -281,7 +262,6 @@ k5glue_unseal(ctx, minor_status, context_handle, input_message_buffer,
 				input_message_buffer, output_message_buffer,
 				conf_state, qop_state, gssd_ctx_verifier));
 }
-/* EXPORT DELETE END */
 
 /* V1 only */
 /* ARGSUSED */

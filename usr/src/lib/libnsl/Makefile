@@ -132,38 +132,6 @@ nis/gen/nis_clnt.h: $(PROTOCOL_DIR)/nis.x $(PROTOCOL_DIR)/nis_object.x
 # include library targets
 include ../Makefile.targ
 
-# EXPORT DELETE START
-# CRYPT DELETE START
-# Special target to clean up the source tree for export distribution
-# Warning: This target changes the source tree
-EXPORT_SRC:
-	$(RM) Makefile+ des/des_crypt.c+ des/des_soft.c+ key/xcrypt.c+
-	$(SED) -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
-		< des/des_crypt.c > des/des_crypt.c+
-	$(MV) des/des_crypt.c+ des/des_crypt.c
-	$(SED) -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
-		< des/des_soft.c > des/des_soft.c+
-	$(MV) des/des_soft.c+ des/des_soft.c
-	$(SED) -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
-		< key/xcrypt.c > key/xcrypt.c+
-	$(MV) key/xcrypt.c+ key/xcrypt.c
-	$(SED) -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-		< Makefile > Makefile+
-	$(MV) Makefile+ Makefile
-	$(CHMOD) 444 Makefile des/des_crypt.c des/des_soft.c key/xcrypt.c
-
-CRYPT_SRC:
-	$(RM) Makefile+
-	$(SED) -e "/^# CRYPT DELETE START/,/^# CRYPT DELETE END/d"	\
-			< Makefile 				\
-	   | $(SED) -e "/EXPORT DELETE/d"				\
-			> Makefile+
-	$(MV) Makefile+ Makefile
-	$(CHMOD) 444 Makefile
-
-# CRYPT DELETE END
-# EXPORT DELETE END
-
 _msg: $(MSGDOMAIN) $(POFILE)
 	$(RM) $(MSGDOMAIN)/$(POFILE)
 	$(CP) $(POFILE) $(MSGDOMAIN)

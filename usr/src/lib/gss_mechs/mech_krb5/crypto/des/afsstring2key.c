@@ -81,7 +81,6 @@ mit_afs_string_to_key (krb5_context context,
 {
     /* Solaris Kerberos */
     krb5_error_code retval = KRB5_PROG_ETYPE_NOSUPP;
-/* EXPORT DELETE START */
   /* totally different approach from MIT string2key. */
   /* much of the work has already been done by the only caller 
      which is mit_des_string_to_key; in particular, *keyblock is already 
@@ -185,7 +184,6 @@ mit_afs_string_to_key (krb5_context context,
     krb5_xfree(salt->data);
 #endif
 
-/* EXPORT DELETE END */
     return retval;
 }
 
@@ -215,8 +213,6 @@ mit_afs_string_to_key (krb5_context context,
  *	+1-313-936-2652
  *	netatalk@terminator.cc.umich.edu
  */
-
-/* EXPORT DELETE START */
 
 static void krb5_afs_crypt_setkey (char*, char*, char(*)[48]);
 static void krb5_afs_encrypt (char*,char*,char (*)[48]);
@@ -602,4 +598,3 @@ static void krb5_afs_encrypt(char *block, char *E, char (*KS)[48])
 	for (j=0; j<64; j++)
 		block[j] = L[FP[j]-1];
 }
-/* EXPORT DELETE END */

@@ -1906,8 +1906,6 @@ struct svc_req *rqstp;
 	return (TRUE);
 }
 
-/* EXPORT DELETE START */
-
 bool_t
 gss_seal_1_svc(argp, res, rqstp)
 gss_seal_arg *argp;
@@ -2071,8 +2069,6 @@ struct svc_req *rqstp;
 
 	return (TRUE);
 }
-
-/* EXPORT DELETE END */
 
 bool_t
 gss_display_status_1_svc(argp, res, rqstp)

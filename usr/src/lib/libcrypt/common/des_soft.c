@@ -32,8 +32,6 @@
  * under license from the Regents of the University of California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Warning!  Things are arranged very carefully in this file to
  * allow read-only data to be moved to the text segment.  The
@@ -126,7 +124,6 @@ des_setparity(char *p)
 int
 __des_crypt(char *buf, unsigned int len, struct desparams *desp)
 {
-/* EXPORT DELETE START */
 	short i;
 	unsigned mode;
 	unsigned dir;
@@ -165,7 +162,6 @@ __des_crypt(char *buf, unsigned int len, struct desparams *desp)
 		buf += 8;
 		len -= 8;
 	}
-/* EXPORT DELETE END */
 	return (1);
 }
 
@@ -177,7 +173,6 @@ __des_crypt(char *buf, unsigned int len, struct desparams *desp)
 static void
 des_setkey(uchar_t userkey[8], struct deskeydata *kd, unsigned int dir)
 {
-/* EXPORT DELETE START */
 	long C, D;
 	short i;
 
@@ -257,7 +252,6 @@ des_setkey(uchar_t userkey[8], struct deskeydata *kd, unsigned int dir)
 		}
 
 	}
-/* EXPORT DELETE END */
 }
 
 
@@ -272,7 +266,6 @@ des_setkey(uchar_t userkey[8], struct deskeydata *kd, unsigned int dir)
 static void
 des_encrypt(uchar_t *data, struct deskeydata *kd)
 {
-/* EXPORT DELETE START */
 	chunk_t work1, work2;
 
 	/*
@@ -440,7 +433,5 @@ des_encrypt(uchar_t *data, struct deskeydata *kd)
 	data[5] = work2.byte5;
 	data[6] = work2.byte6;
 	data[7] = work2.byte7;
-
-/* EXPORT DELETE END */
 }
 #endif /* def CRYPT */

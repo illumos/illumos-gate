@@ -30,7 +30,6 @@ mit_des_cbc_cksum(krb5_context context,
 	const krb5_octet  *ivec)
 {
 	krb5_error_code ret = 0;
-/* EXPORT DELETE START */
 	krb5_data input;
 	krb5_data output;
 	krb5_data ivecdata;
@@ -45,6 +44,5 @@ mit_des_cbc_cksum(krb5_context context,
 	ret = k5_ef_mac(context, key, &ivecdata,
 		(const krb5_data *)&input, &output);
 
-/* EXPORT DELETE END */
 	return (ret);
 }

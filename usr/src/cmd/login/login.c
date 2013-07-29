@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-/* ONC_PLUS EXTRACT START */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -40,8 +39,6 @@
 
 /*	Copyright (c) 1987, 1988 Microsoft Corporation	*/
 /*	  All Rights Reserved	*/
-
-/* ONC_PLUS EXTRACT END */
 
 /*
  * For a complete reference to login(1), see the manual page.  However,
@@ -166,12 +163,10 @@ static int	retry = MAXTRYS;
 #define	PROG_NAME	"login"
 #define	HUSHLOGIN	".hushlogin"
 
-/* ONC_PLUS EXTRACT START */
 /*
  * Array and Buffer sizes
  */
 #define	PBUFSIZE 8	/* max significant characters in a password */
-/* ONC_PLUS EXTRACT END */
 #define	MAXARGS 63	/* change value below if changing this */
 #define	MAXARGSWIDTH 2	/* log10(MAXARGS) */
 #define	MAXENV 1024
@@ -202,9 +197,7 @@ static int	audit_error = 0;
 /*
  * Externs a plenty
  */
-/* ONC_PLUS EXTRACT START */
 extern	int	getsecretkey();
-/* ONC_PLUS EXTRACT START */
 
 /*
  * The current user name
@@ -264,7 +257,6 @@ static	char	loginmsg[] = "login: ";
 static	char	passwdmsg[] = "Password:";
 static	char	incorrectmsg[] = "Login incorrect\n";
 
-/* ONC_PLUS EXTRACT START */
 /*
  * Password file support
  */
@@ -276,7 +268,6 @@ static	char	zone_name[ZONENAME_MAX];
  * Illegal passwd entries.
  */
 static	struct	passwd nouser = { "", "no:password", (uid_t)-1 };
-/* ONC_PLUS EXTRACT END */
 
 /*
  * Log file support
@@ -343,7 +334,6 @@ static  boolean_t zflag = B_FALSE;
 static	char	rusername[NMAX+1], lusername[NMAX+1];
 static	char	terminal[MAXPATHLEN];
 
-/* ONC_PLUS EXTRACT START */
 /*
  * Pre-authentication flag support
  */
@@ -356,7 +346,6 @@ static int login_conv(int, struct pam_message **,
 
 static struct pam_conv pam_conv = {login_conv, NULL};
 static pam_handle_t *pamh;	/* Authentication handle */
-/* ONC_PLUS EXTRACT END */
 
 /*
  * Function declarations
@@ -365,10 +354,8 @@ static	void	turn_on_logging(void);
 static	void	defaults(void);
 static	void	usage(void);
 static	void	process_rlogin(void);
-/* ONC_PLUS EXTRACT START */
 static	void	login_authenticate();
 static	void	setup_credentials(void);
-/* ONC_PLUS EXTRACT END */
 static	void	adjust_nice(void);
 static	void	update_utmpx_entry(int);
 static	void	establish_user_environment(char **);
@@ -392,7 +379,6 @@ static	int	logins_disabled(char *);
 static	void	log_bad_attempts(void);
 static	int	is_number(char *);
 
-/* ONC_PLUS EXTRACT START */
 /*
  *			*** main ***
  *
@@ -407,7 +393,6 @@ static	int	is_number(char *);
 int
 main(int argc, char *argv[], char **renvp)
 {
-/* ONC_PLUS EXTRACT END */
 	int sublogin;
 	int pam_rc;
 
@@ -469,7 +454,6 @@ main(int argc, char *argv[], char **renvp)
 			ttyn = "/dev/???";
 	}
 
-/* ONC_PLUS EXTRACT START */
 	/*
 	 * Call pam_start to initiate a PAM authentication operation
 	 */
@@ -508,7 +492,6 @@ main(int argc, char *argv[], char **renvp)
 		(void) pam_set_item(pamh, PAM_REPOSITORY,
 		    (void *)&pam_rep_data);
 	}
-/* ONC_PLUS EXTRACT END */
 
 	/*
 	 * Open the log file which contains a record of successful and failed
@@ -527,13 +510,11 @@ main(int argc, char *argv[], char **renvp)
 	if (rflag)
 		process_rlogin();
 
-/* ONC_PLUS EXTRACT START */
 	/*
 	 * validate user
 	 */
 	/* we are already authenticated. fill in what we must, then continue */
 	if (fflag) {
-/* ONC_PLUS EXTRACT END */
 		if ((pwd = getpwnam(user_name)) == NULL) {
 			audit_error = ADT_FAIL_VALUE_USERNAME;
 
@@ -542,14 +523,12 @@ main(int argc, char *argv[], char **renvp)
 			    user_name);
 			login_exit(1);
 		}
-/* ONC_PLUS EXTRACT START */
 	} else {
 		/*
 		 * Perform the primary login authentication activity.
 		 */
 		login_authenticate();
 	}
-/* ONC_PLUS EXTRACT END */
 
 	/* change root login, then we exec another login and try again */
 	if (process_chroot_logins() != OK)
@@ -602,7 +581,6 @@ main(int argc, char *argv[], char **renvp)
 
 	adjust_nice();		/* passwd file can specify nice value */
 
-/* ONC_PLUS EXTRACT START */
 	setup_credentials();	/* Set user credentials  - exits on failure */
 
 	/*
@@ -628,7 +606,6 @@ main(int argc, char *argv[], char **renvp)
 
 	(void) pam_end(pamh, PAM_SUCCESS);	/* Done using PAM */
 	pamh = NULL;
-/* ONC_PLUS EXTRACT END */
 
 	if (pwd->pw_uid == 0) {
 		if (dosyslog) {
@@ -682,7 +659,6 @@ main(int argc, char *argv[], char **renvp)
 
 
 
-/* ONC_PLUS EXTRACT START */
 /*
  * donothing & catch	- Signal catching functions
  */
@@ -694,7 +670,6 @@ donothing(int sig)
 	if (pamh)
 		(void) pam_end(pamh, PAM_ABORT);
 }
-/* ONC_PLUS EXTRACT END */
 
 #ifdef notdef
 static	int	intrupt;
@@ -815,7 +790,6 @@ turn_on_logging(void)
 }
 
 
-/* ONC_PLUS EXTRACT START */
 /*
  * login_conv():
  *	This is the conv (conversation) function called from
@@ -981,7 +955,6 @@ verify_passwd(void)
 
 	return (error);
 }
-/* ONC_PLUS EXTRACT END */
 
 /*
  * quotec		- Called by getargs
@@ -1788,7 +1761,6 @@ chdir_to_dir_user(void)
 }
 
 
-/* ONC_PLUS EXTRACT START */
 /*
  * login_authenticate	- Performs the main authentication work
  *			  1. Prints the login prompt
@@ -1967,7 +1939,6 @@ setup_credentials(void)
 	 */
 	audit_success(get_audit_id(), pwd, zone_name);
 }
-/* ONC_PLUS EXTRACT END */
 
 static uint_t
 get_audit_id(void)
@@ -2027,7 +1998,6 @@ adjust_nice(void)
 	}
 }
 
-/* ONC_PLUS EXTRACT START */
 /*
  * update_utmpx_entry	- Searchs for the correct utmpx entry, making an
  *			  entry there if it finds one, otherwise exits.
@@ -2064,7 +2034,6 @@ update_utmpx_entry(int sublogin)
 		audit_error = ADT_FAIL_PAM + err;
 		login_exit(1);
 	}
-/* ONC_PLUS EXTRACT END */
 
 	(void) memset((void *)&utmpx, 0, sizeof (utmpx));
 	(void) time(&utmpx.ut_tv.tv_sec);
@@ -2132,7 +2101,6 @@ update_utmpx_entry(int sublogin)
 		/* the wtmp file exists.				   */
 		updwtmpx(WTMPX_FILE, &utmpx);
 	}
-/* ONC_PLUS EXTRACT START */
 }
 
 
@@ -2166,7 +2134,6 @@ process_chroot_logins(void)
 		 * Set the environment flag <!sublogin> so that the next login
 		 * knows that it is a sublogin.
 		 */
-/* ONC_PLUS EXTRACT END */
 		envinit[0] = SUBLOGIN;
 		envinit[1] = (char *)NULL;
 		(void) printf("Subsystem root: %s\n", pwd->pw_dir);
@@ -2180,7 +2147,6 @@ process_chroot_logins(void)
 		login_exit(1);
 	}
 	return (OK);
-/* ONC_PLUS EXTRACT START */
 }
 
 /*
@@ -2228,7 +2194,6 @@ establish_user_environment(char **renvp)
 		}
 	}
 	(void) memcpy(&envinit[basicenv], newenv, sizeof (newenv));
-/* ONC_PLUS EXTRACT END */
 
 	/* Set up environment */
 	if (rflag) {

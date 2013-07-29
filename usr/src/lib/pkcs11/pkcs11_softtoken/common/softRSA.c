@@ -45,8 +45,6 @@ soft_rsa_encrypt(soft_object_t *key, CK_BYTE_PTR in, uint32_t in_len,
 
 	CK_RV rv = CKR_OK;
 
-/* EXPORT DELETE START */
-
 	uchar_t expo[MAX_KEY_ATTR_BUFLEN];
 	uchar_t modulus[MAX_KEY_ATTR_BUFLEN];
 	uint32_t expo_len = sizeof (expo);
@@ -82,8 +80,6 @@ soft_rsa_encrypt(soft_object_t *key, CK_BYTE_PTR in, uint32_t in_len,
 
 clean1:
 
-/* EXPORT DELETE END */
-
 	return (rv);
 }
 
@@ -94,8 +90,6 @@ soft_rsa_decrypt(soft_object_t *key, CK_BYTE_PTR in, uint32_t in_len,
 {
 
 	CK_RV rv = CKR_OK;
-
-/* EXPORT DELETE START */
 
 	uchar_t modulus[MAX_KEY_ATTR_BUFLEN];
 	uchar_t prime1[MAX_KEY_ATTR_BUFLEN];
@@ -183,8 +177,6 @@ soft_rsa_decrypt(soft_object_t *key, CK_BYTE_PTR in, uint32_t in_len,
 	rv = rsa_decrypt(&k, in, in_len, out);
 
 clean1:
-
-/* EXPORT DELETE END */
 
 	return (rv);
 }

@@ -83,8 +83,6 @@ gss_buffer_t			input_message_buffer;
 int *				conf_state;
 gss_buffer_t			output_message_buffer;
 {
-/* EXPORT DELETE START */
-
 	OM_uint32		status;
 	gss_union_ctx_id_t	ctx;
 	gss_mechanism		mech;
@@ -122,7 +120,6 @@ gss_buffer_t			output_message_buffer;
 
 		return (status);
 	}
-/* EXPORT DELETE END */
 
 	return (GSS_S_BAD_MECH);
 }

@@ -40,7 +40,6 @@ mit_des_cbc_encrypt(context, in, out, length, key, ivec, encrypt)
 	int encrypt;
 {
     krb5_error_code ret = KRB5_PROG_ETYPE_NOSUPP;
-/* EXPORT DELETE START */
     KRB5_MECH_TO_PKCS algos;
     CK_MECHANISM mechanism;
     CK_RV rv;
@@ -102,7 +101,6 @@ final_cleanup:
     if (ret)
         (void) memset(out, 0, length);
 
-/* EXPORT DELETE END */
     KRB5_LOG(KRB5_INFO, "mit_des_cbc_encrypt() end retval=%d", ret);
 
     return(ret);
@@ -137,7 +135,6 @@ mit_des_cbc_encrypt(krb5_context context,
 	mit_des_cblock ivec, int encrypt)
 {
 	int ret = KRB5_PROG_ETYPE_NOSUPP;
-/* EXPORT DELETE START */
 	krb5_data ivdata;
 	ret = 0;
 
@@ -149,7 +146,6 @@ mit_des_cbc_encrypt(krb5_context context,
 	ret = k5_ef_crypto((const char *)in,
 			(char *)out, length, key, &ivdata, encrypt);
 
-/* EXPORT DELETE END */
 	KRB5_LOG(KRB5_INFO, "mit_des_cbc_encrypt() end retval=%d", ret);
 	return(ret);
 }

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "dh_gssapi.h"
 #include <stdlib.h>
 
@@ -41,9 +39,7 @@ static struct gss_config dh_mechanism = {
 	__dh_gss_release_cred,
 	__dh_gss_init_sec_context,
 	__dh_gss_accept_sec_context,
-/* EXPORT DELETE START */ /* CRYPT DELETE START */
 	__dh_gss_unseal,
-/* EXPORT DELETE END */ /* CRYPT DELETE END */
 	__dh_gss_process_context_token,
 	__dh_gss_delete_sec_context,
 	__dh_gss_context_time,
@@ -55,9 +51,7 @@ static struct gss_config dh_mechanism = {
 	__dh_gss_release_name,
 	__dh_gss_inquire_cred,
 	NULL, /* Back ends don't implement this */
-/* EXPORT DELETE START */ /* CRYPT DELETE START */
 	__dh_gss_seal,
-/* EXPORT DELETE END */ /* CRYPT DELETE END */
 	__dh_gss_export_sec_context,
 	__dh_gss_import_sec_context,
 	__dh_gss_inquire_cred_by_mech,
@@ -68,27 +62,6 @@ static struct gss_config dh_mechanism = {
 	__dh_pname_to_uid,
 	NULL,  /* __gss_userok */
 	__dh_gss_export_name,
-/* EXPORT DELETE START */
-/* CRYPT DELETE START */
-/*
- * This block comment is Sun Proprietary: Need-To-Know.
- * What we are doing is leaving the seal and unseal entry points
- * in an obvious place before sign and unsign for the Domestic customer
- * of the Solaris Source Product. The Domestic customer of the Solaris Source
- * Product will have to deal with the problem of creating exportable libgss
- * binaries.
- * In the binary product that Sun builds, these entry points are elsewhere,
- * and bracketed with special comments so that the CRYPT_SRC and EXPORT_SRC
- * targets delete them.
- */
-#if 0
-/* CRYPT DELETE END */
-	__dh_gss_seal,
-	__dh_gss_unseal,
-/* CRYPT DELETE START */
-#endif /* 0 */
-/* CRYPT DELETE END */
-/* EXPORT DELETE END */
 	__dh_gss_sign,
 	__dh_gss_verify,
 	NULL, /* gss_store_cred() -- DH lacks this for now */

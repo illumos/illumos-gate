@@ -1646,10 +1646,7 @@ K5_KRB= kfree.o copy_key.o \
 K5_OS=  timeofday.o toffset.o \
 	init_os_ctx.o c_ustime.o
 
-SEAL=
-# EXPORT DELETE START
 SEAL=	seal.o unseal.o
-# EXPORT DELETE END
 
 MECH=	delete_sec_context.o \
 	import_sec_context.o \

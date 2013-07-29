@@ -27,14 +27,10 @@
 #ifndef	_SYS_WANBOOT_IMPL_H
 #define	_SYS_WANBOOT_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
-/* EXPORT DELETE START */
 #include <aes.h>
 #include <des3.h>
 #include <hmac_sha1.h>
-/* EXPORT DELETE END */
 
 #ifdef	__cplusplus
 extern "C" {
@@ -55,29 +51,23 @@ extern "C" {
 
 #define	WANBOOT_MAXKEYLEN	1024    /* sized for RSA */
 
-/* EXPORT DELETE START */
 #define	WANBOOT_MAXBLOCKLEN	AES_BLOCK_SIZE
 #define	WANBOOT_HMAC_KEY_SIZE	20	/* size of key we use for HMAC SHA-1 */
-/* EXPORT DELETE END */
 
 struct wankeyio {
 	char	wk_keyname[WANBOOT_MAXKEYNAMELEN];
 	uint_t	wk_keysize;
 	union {
-/* EXPORT DELETE START */
 		char	hmac_sha1_key[WANBOOT_HMAC_KEY_SIZE];
 		char	des3key[DES3_KEY_SIZE];
 		char	aeskey[AES_128_KEY_SIZE];
-/* EXPORT DELETE END */
 		char	key[WANBOOT_MAXKEYLEN];
 	} wk_u;
 };
 
-/* EXPORT DELETE START */
 #define	wk_hmac_sha1_key	wk_u.hmac_sha1_key
 #define	wk_3des_key		wk_u.3des_key
 #define	wk_aes_key		wk_u.aeskey
-/* EXPORT DELETE END */
 
 #define	WANBOOT_SETKEY		(('W' << 24) | ('A' << 16) | ('N' << 8) | 0)
 

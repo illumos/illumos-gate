@@ -242,9 +242,7 @@ static struct gss_config spnego_mechanism =
 #else
 	NULL,				
 #endif  /* LEAN_CLIENT */
-/* EXPORT DELETE START */ /* CRYPT DELETE START */
 	NULL,  /* unseal */
-/* EXPORT DELETE END */ /* CRYPT DELETE END */
 	NULL,				/* gss_process_context_token */
 	glue_spnego_gss_delete_sec_context,	/* gss_delete_sec_context */
 	glue_spnego_gss_context_time,
@@ -256,9 +254,7 @@ static struct gss_config spnego_mechanism =
 	glue_spnego_gss_release_name,
 	NULL,				/* gss_inquire_cred */
 	NULL,				/* gss_add_cred */
-/* EXPORT DELETE START */ /* CRYPT DELETE START */
 	NULL, /* seal */
-/* EXPORT DELETE END */ /* CRYPT DELETE END */
 #ifndef LEAN_CLIENT
 	glue_spnego_gss_export_sec_context,	/* gss_export_sec_context */
 	glue_spnego_gss_import_sec_context,	/* gss_import_sec_context */
@@ -274,16 +270,6 @@ static struct gss_config spnego_mechanism =
 	NULL, /* pname */
 	NULL, /* userok */
 	NULL, /* gss_export_name */
-/* EXPORT DELETE START */
-/* CRYPT DELETE START */
-#if 0
-/* CRYPT DELETE END */
-	NULL, /* seal */
-	NULL, /* unseal */
-/* CRYPT DELETE START */
-#endif
-/* CRYPT DELETE END */
-/* EXPORT DELETE END */
 	NULL, /* sign */
 	NULL, /* verify */
 	NULL, /* gss_store_cred */

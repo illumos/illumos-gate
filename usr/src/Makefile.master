@@ -1165,13 +1165,6 @@ CPPFORPO=$(COMPILE.cpp:\"$(TEXT_DOMAIN)\"=TEXT_DOMAIN)
 	$(MANIFEST_CHECK)
 
 #
-# Rules to process ONC+ Source partial files
-#
-%_onc_plus:	%
-	@$(ECHO) "extracting code from $< ... "
-	sed -n -e '/ONC_PLUS EXTRACT START/,/ONC_PLUS EXTRACT END/p' $<  > $@
-
-#
 # Include rules to render automated sccs get rules "safe".
 # 
 include $(SRC)/Makefile.noget

@@ -70,14 +70,12 @@ static OM_uint32 kgss_sign_wrapped(void *, OM_uint32 *, gss_ctx_id_t, int,
 static OM_uint32 kgss_verify_wrapped(void *, OM_uint32 *, gss_ctx_id_t,
 	gss_buffer_t, gss_buffer_t, int *qop_state, OM_uint32);
 
-/* EXPORT DELETE START */
 static OM_uint32 kgss_seal_wrapped(void *, OM_uint32 *, gss_ctx_id_t,
 	int, int, gss_buffer_t, int *, gss_buffer_t,  OM_uint32);
 
 static OM_uint32 kgss_unseal_wrapped(void *, OM_uint32 *, gss_ctx_id_t,
 	gss_buffer_t, gss_buffer_t, int *conf_state, int *qop_state,
 	OM_uint32);
-/* EXPORT DELETE END */
 
 static OM_uint32 kgss_delete_sec_context_wrapped(void *, OM_uint32 *,
 	gssd_ctx_id_t *, gss_buffer_t, OM_uint32);
@@ -821,24 +819,10 @@ static struct gss_config default_gc = {
 	NULL,
 	NULL,
 	0,
-/* EXPORT DELETE START */ /* CRYPT DELETE START */
 	kgss_unseal_wrapped,
-/* EXPORT DELETE END */ /* CRYPT DELETE END */
 	NULL,		/* kgss_delete_sec_context_wrapped */
-/* EXPORT DELETE START */ /* CRYPT DELETE START */
 	kgss_seal_wrapped,
-/* EXPORT DELETE END */ /* CRYPT DELETE END */
 	NULL,		/* kgss_import_sec_context */
-/* EXPORT DELETE START */
-/* CRYPT DELETE START */
-#if 0
-/* CRYPT DELETE END */
-	kgss_seal_wrapped,
-	kgss_unseal_wrapped,
-/* CRYPT DELETE START */
-#endif
-/* CRYPT DELETE END */
-/* EXPORT DELETE END */
 	kgss_sign_wrapped,
 	kgss_verify_wrapped
 };
@@ -1789,8 +1773,6 @@ kgss_verify(OM_uint32 *minor_status,
 	    message_buffer, token_buffer, qop_state));
 }
 
-/* EXPORT DELETE START */
-
 /*ARGSUSED*/
 static OM_uint32
 kgss_seal_wrapped(void *private,
@@ -2020,8 +2002,6 @@ kgss_unseal(OM_uint32 *minor_status,
 	return (KGSS_UNSEAL(minor_status, context_handle, input_message_buffer,
 	    output_message_buffer, conf_state, qop_state));
 }
-
-/* EXPORT DELETE END */
 
 OM_uint32
 kgss_display_status(minor_status,

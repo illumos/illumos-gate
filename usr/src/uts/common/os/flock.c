@@ -18,7 +18,6 @@
  *
  * CDDL HEADER END
  */
-/* ONC_PLUS EXTRACT START */
 
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
@@ -27,8 +26,6 @@
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
 /*	All Rights Reserved */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/flock_impl.h>
 #include <sys/vfs.h>
@@ -609,7 +606,6 @@ flk_add_callback(flk_callback_t *newcb,
 	cblist->cb_prev->cb_next = newcb;
 	cblist->cb_prev = newcb;
 }
-/* ONC_PLUS EXTRACT END */
 
 /*
  * Initialize the flk_edge_cache data structure and create the
@@ -984,7 +980,6 @@ block:
 	}
 }
 
-/* ONC_PLUS EXTRACT START */
 /*
  * The actual execution of the request in the simple case is only to
  * insert the 'request' in the list of active locks if it is not an
@@ -1043,7 +1038,6 @@ flk_execute_request(lock_descriptor_t *request)
 
 	return (0);
 }
-/* ONC_PLUS EXTRACT END */
 
 /*
  * 'request' is blocked by some one therefore we put it into sleep queue.
@@ -2243,7 +2237,6 @@ done:
 	return (result);
 }
 
-/* ONC_PLUS EXTRACT START */
 /*
  * Determine whether there are any locks for the given vnode with a remote
  * sysid.  Returns zero if not, non-zero if there are.
@@ -2614,7 +2607,6 @@ cleanlocks(vnode_t *vp, pid_t pid, int sysid)
 	CHECK_OWNER_LOCKS(gp, pid, sysid, vp);
 	mutex_exit(&gp->gp_mutex);
 }
-/* ONC_PLUS EXTRACT END */
 
 
 /*
@@ -2653,7 +2645,6 @@ chklock(
 	return (error);
 }
 
-/* ONC_PLUS EXTRACT START */
 /*
  * convoff - converts the given data (start, whence) to the
  * given whence.
@@ -2706,7 +2697,6 @@ convoff(vp, lckdat, whence, offset)
 	lckdat->l_whence = (short)whence;
 	return (0);
 }
-/* ONC_PLUS EXTRACT END */
 
 
 /* 	proc_graph function definitions */
@@ -3070,7 +3060,6 @@ add:
 	mutex_exit(&flock_lock);
 }
 
-/* ONC_PLUS EXTRACT START */
 /*
  * Set the control status for lock manager requests.
  *
@@ -3692,7 +3681,6 @@ unlock_lockmgr_granted(struct flock_globals *fg)
 		mutex_exit(&gp->gp_mutex);
 	}
 }
-/* ONC_PLUS EXTRACT END */
 
 
 /*
@@ -3715,7 +3703,6 @@ wait_for_lock(lock_descriptor_t *request)
 	}
 }
 
-/* ONC_PLUS EXTRACT START */
 /*
  * Create an flock structure from the existing lock information
  *
@@ -3870,7 +3857,6 @@ report_blocker(lock_descriptor_t *blocker, lock_descriptor_t *request)
 		}
 	}
 }
-/* ONC_PLUS EXTRACT END */
 
 /*
  * PSARC case 1997/292

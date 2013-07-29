@@ -87,8 +87,6 @@
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* EXPORT DELETE START */
-
 #if defined(sun4u)
 /* External assembly functions: */
 extern void aes_encrypt_impl(const uint32_t rk[], int Nr, const uint32_t pt[4],
@@ -1556,7 +1554,6 @@ rijndael_decrypt(const uint32_t rk[], int Nr, const uint32_t ct[4],
 	pt[3] = s3;
 }
 #endif	/* sun4u, __amd64 */
-/* EXPORT DELETE END */
 
 
 /*
@@ -1571,7 +1568,6 @@ rijndael_decrypt(const uint32_t rk[], int Nr, const uint32_t ct[4],
 void
 aes_init_keysched(const uint8_t *cipherKey, uint_t keyBits, void *keysched)
 {
-/* EXPORT DELETE START */
 	aes_key_t	*newbie = keysched;
 	uint_t		keysize, i, j;
 	union {
@@ -1624,7 +1620,6 @@ aes_init_keysched(const uint8_t *cipherKey, uint_t keyBits, void *keysched)
 #endif
 
 	aes_setupkeys(newbie, keyarr.ka32, keyBits);
-/* EXPORT DELETE END */
 }
 
 
@@ -1640,7 +1635,6 @@ aes_init_keysched(const uint8_t *cipherKey, uint_t keyBits, void *keysched)
 int
 aes_encrypt_block(const void *ks, const uint8_t *pt, uint8_t *ct)
 {
-/* EXPORT DELETE START */
 	aes_key_t	*ksch = (aes_key_t *)ks;
 
 #ifndef	AES_BYTE_SWAP
@@ -1678,7 +1672,6 @@ aes_encrypt_block(const void *ks, const uint8_t *pt, uint8_t *ct)
 		*(uint32_t *)(void *)&ct[8] = htonl(buffer[2]);
 		*(uint32_t *)(void *)&ct[12] = htonl(buffer[3]);
 #endif
-/* EXPORT DELETE END */
 	return (CRYPTO_SUCCESS);
 }
 
@@ -1695,7 +1688,6 @@ aes_encrypt_block(const void *ks, const uint8_t *pt, uint8_t *ct)
 int
 aes_decrypt_block(const void *ks, const uint8_t *ct, uint8_t *pt)
 {
-/* EXPORT DELETE START */
 	aes_key_t	*ksch = (aes_key_t *)ks;
 
 #ifndef	AES_BYTE_SWAP
@@ -1734,7 +1726,6 @@ aes_decrypt_block(const void *ks, const uint8_t *ct, uint8_t *pt)
 	*(uint32_t *)(void *)&pt[12] = htonl(buffer[3]);
 #endif
 
-/* EXPORT DELETE END */
 	return (CRYPTO_SUCCESS);
 }
 
@@ -1753,7 +1744,6 @@ aes_decrypt_block(const void *ks, const uint8_t *ct, uint8_t *pt)
 void *
 aes_alloc_keysched(size_t *size, int kmflag)
 {
-/* EXPORT DELETE START */
 	aes_key_t *keysched;
 
 #ifdef	_KERNEL
@@ -1766,7 +1756,6 @@ aes_alloc_keysched(size_t *size, int kmflag)
 		*size = sizeof (aes_key_t);
 		return (keysched);
 	}
-/* EXPORT DELETE END */
 	return (NULL);
 }
 

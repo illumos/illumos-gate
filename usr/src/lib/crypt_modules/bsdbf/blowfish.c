@@ -9,8 +9,6 @@
  * been made.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* $OpenBSD: blowfish.c,v 1.16 2002/02/19 19:39:36 millert Exp $ */
 /*
  * Blowfish block cipher for OpenBSD
@@ -82,7 +80,6 @@ Blowfish_encipher(c, xl, xr)
 	uint32_t *xl;
 	uint32_t *xr;
 {
-/* CRYPT DELETE START */
 	uint32_t Xl;
 	uint32_t Xr;
 	uint32_t *s = c->S[0];
@@ -103,7 +100,6 @@ Blowfish_encipher(c, xl, xr)
 
 	*xl = Xr ^ p[17];
 	*xr = Xl;
-/* CRYPT DELETE END */
 }
 
 void
@@ -112,7 +108,6 @@ Blowfish_decipher(c, xl, xr)
 	uint32_t *xl;
 	uint32_t *xr;
 {
-/* CRYPT DELETE START */
 	uint32_t Xl;
 	uint32_t Xr;
 	uint32_t *s = c->S[0];
@@ -133,15 +128,12 @@ Blowfish_decipher(c, xl, xr)
 
 	*xl = Xr ^ p[0];
 	*xr = Xl;
-/* CRYPT DELETE END */
 }
 
 void
 Blowfish_initstate(c)
 	blf_ctx *c;
 {
-/* CRYPT DELETE START */
-
 /* P-box and S-box tables initialized with digits of Pi */
 
 	const blf_ctx initstate =
@@ -417,8 +409,6 @@ Blowfish_initstate(c)
 	} };
 
 	*c = initstate;
-
-/* CRYPT DELETE END */
 }
 
 uint32_t
@@ -429,7 +419,6 @@ Blowfish_stream2word(const uint8_t *data, uint16_t databytes, uint16_t *current)
 	uint32_t temp;
 
 	temp = 0x00000000;
-/* CRYPT DELETE START */
 	j = *current;
 
 	for (i = 0; i < 4; i++, j++) {
@@ -439,14 +428,12 @@ Blowfish_stream2word(const uint8_t *data, uint16_t databytes, uint16_t *current)
 	}
 
 	*current = j;
-/* CRYPT DELETE END */
 	return temp;
 }
 
 void
 Blowfish_expand0state(blf_ctx *c, const uint8_t *key, uint16_t keybytes)
 {
-/* CRYPT DELETE START */
 	uint16_t i;
 	uint16_t j;
 	uint16_t k;
@@ -479,7 +466,6 @@ Blowfish_expand0state(blf_ctx *c, const uint8_t *key, uint16_t keybytes)
 			c->S[i][k + 1] = datar;
 		}
 	}
-/* CRYPT DELETE END */
 }
 
 
@@ -487,7 +473,6 @@ void
 Blowfish_expandstate(blf_ctx *c, const uint8_t *data, uint16_t databytes,
 		     const uint8_t *key, uint16_t keybytes)
 {
-/* CRYPT DELETE START */
 	uint16_t i;
 	uint16_t j;
 	uint16_t k;
@@ -524,26 +509,21 @@ Blowfish_expandstate(blf_ctx *c, const uint8_t *data, uint16_t databytes,
 			c->S[i][k + 1] = datar;
 		}
 	}
-
-/* CRYPT DELETE END */
 }
 
 void
 blf_key(blf_ctx *c, const uint8_t *k, uint16_t len)
 {
-/* CRYPT DELETE START */
 	/* Initialize S-boxes and subkeys with Pi */
 	Blowfish_initstate(c);
 
 	/* Transform S-boxes and subkeys with key */
 	Blowfish_expand0state(c, k, len);
-/* CRYPT DELETE END */
 }
 
 void
 blf_enc(blf_ctx *c, uint32_t *data, uint16_t blocks)
 {
-/* CRYPT DELETE START */
 	uint32_t *d;
 	uint16_t i;
 
@@ -552,13 +532,11 @@ blf_enc(blf_ctx *c, uint32_t *data, uint16_t blocks)
 		Blowfish_encipher(c, d, d + 1);
 		d += 2;
 	}
-/* CRYPT DELETE END */
 }
 
 void
 blf_dec(blf_ctx *c, uint32_t *data, uint16_t blocks)
 {
-/* CRYPT DELETE START */
 	uint32_t *d;
 	uint16_t i;
 
@@ -567,13 +545,11 @@ blf_dec(blf_ctx *c, uint32_t *data, uint16_t blocks)
 		Blowfish_decipher(c, d, d + 1);
 		d += 2;
 	}
-/* CRYPT DELETE END */
 }
 
 void
 blf_ecb_encrypt(blf_ctx *c, uint8_t *data, uint32_t len)
 {
-/* CRYPT DELETE START */
 	uint32_t l, r;
 	uint32_t i;
 
@@ -591,13 +567,11 @@ blf_ecb_encrypt(blf_ctx *c, uint8_t *data, uint32_t len)
 		data[7] = r & 0xff;
 		data += 8;
 	}
-/* CRYPT DELETE END */
 }
 
 void
 blf_ecb_decrypt(blf_ctx *c, uint8_t *data, uint32_t len)
 {
-/* CRYPT DELETE START */
 	uint32_t l, r;
 	uint32_t i;
 
@@ -615,13 +589,11 @@ blf_ecb_decrypt(blf_ctx *c, uint8_t *data, uint32_t len)
 		data[7] = r & 0xff;
 		data += 8;
 	}
-/* CRYPT DELETE END */
 }
 
 void
 blf_cbc_encrypt(blf_ctx *c, uint8_t *iv, uint8_t *data, uint32_t len)
 {
-/* CRYPT DELETE START */
 	uint32_t l, r;
 	uint32_t i, j;
 
@@ -642,13 +614,11 @@ blf_cbc_encrypt(blf_ctx *c, uint8_t *iv, uint8_t *data, uint32_t len)
 		iv = data;
 		data += 8;
 	}
-/* CRYPT DELETE END */
 }
 
 void
 blf_cbc_decrypt(blf_ctx *c, uint8_t *iva, uint8_t *data, uint32_t len)
 {
-/* CRYPT DELETE START */
 	uint32_t l, r;
 	uint8_t *iv;
 	uint32_t i, j;
@@ -685,10 +655,8 @@ blf_cbc_decrypt(blf_ctx *c, uint8_t *iva, uint8_t *data, uint32_t len)
 	data[7] = r & 0xff;
 	for (j = 0; j < 8; j++)
 		data[j] ^= iva[j];
-/* CRYPT DELETE END */
 }
 
-/* CRYPT DELETE START */
 #if 0
 void
 report(uint32_t data[], uint16_t len)
@@ -732,4 +700,3 @@ main(void)
 	report(data2, 2);
 }
 #endif
-/* CRYPT DELETE END */

@@ -1382,16 +1382,3 @@ clobber:	clean
 check:	$(CHECKHDRS)
 
 FRC:
-
-# EXPORT DELETE START
-EXPORT_SRC:
-	$(RM) wanboot_impl.h+ Makefile+
-	sed -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
-		< wanboot_impl.h > wanboot_impl.h+
-	$(MV) wanboot_impl.h+ wanboot_impl.h
-	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-		< Makefile > Makefile+
-	$(RM) Makefile
-	$(MV) Makefile+ Makefile
-	$(CHMOD) 444 Makefile wanboot_impl.h
-# EXPORT DELETE END

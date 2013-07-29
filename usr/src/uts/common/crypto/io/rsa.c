@@ -315,12 +315,8 @@ static int rsa_verify_common(rsa_mech_type_t, crypto_key_t *,
     crypto_data_t *, crypto_data_t *);
 static int compare_data(crypto_data_t *, uchar_t *);
 
-/* EXPORT DELETE START */
-
 static int core_rsa_encrypt(crypto_key_t *, uchar_t *, int, uchar_t *, int);
 static int core_rsa_decrypt(crypto_key_t *, uchar_t *, int, uchar_t *);
-
-/* EXPORT DELETE END */
 
 static crypto_kcf_provider_handle_t rsa_prov_handle = NULL;
 
@@ -373,8 +369,6 @@ check_mech_and_key(crypto_mechanism_t *mechanism, crypto_key_t *key)
 {
 	int rv = CRYPTO_FAILED;
 
-/* EXPORT DELETE START */
-
 	uchar_t *modulus;
 	ssize_t modulus_len; /* In bytes */
 
@@ -396,8 +390,6 @@ check_mech_and_key(crypto_mechanism_t *mechanism, crypto_key_t *key)
 	if (modulus_len < MIN_RSA_KEYLENGTH_IN_BYTES ||
 	    modulus_len > MAX_RSA_KEYLENGTH_IN_BYTES)
 		return (CRYPTO_KEY_SIZE_RANGE);
-
-/* EXPORT DELETE END */
 
 	return (rv);
 }
@@ -598,8 +590,6 @@ rsa_encrypt_common(rsa_mech_type_t mech_type, crypto_key_t *key,
 {
 	int rv = CRYPTO_FAILED;
 
-/* EXPORT DELETE START */
-
 	int plen;
 	uchar_t *ptptr;
 	uchar_t *modulus;
@@ -656,12 +646,8 @@ rsa_encrypt_common(rsa_mech_type_t mech_type, crypto_key_t *key,
 		ciphertext->cd_length = modulus_len;
 	}
 
-/* EXPORT DELETE END */
-
 	return (rv);
 }
-
-/* EXPORT DELETE START */
 
 static int
 core_rsa_encrypt(crypto_key_t *key, uchar_t *in,
@@ -703,8 +689,6 @@ core_rsa_encrypt(crypto_key_t *key, uchar_t *in,
 
 	return (rv);
 }
-
-/* EXPORT DELETE END */
 
 /* ARGSUSED */
 static int
@@ -751,8 +735,6 @@ rsa_decrypt_common(rsa_mech_type_t mech_type, crypto_key_t *key,
     crypto_data_t *ciphertext, crypto_data_t *plaintext)
 {
 	int rv = CRYPTO_FAILED;
-
-/* EXPORT DELETE START */
 
 	size_t plain_len;
 	uchar_t *ctptr;
@@ -802,12 +784,8 @@ rsa_decrypt_common(rsa_mech_type_t mech_type, crypto_key_t *key,
 		plaintext->cd_length = plain_len;
 	}
 
-/* EXPORT DELETE END */
-
 	return (rv);
 }
-
-/* EXPORT DELETE START */
 
 static int
 core_rsa_decrypt(crypto_key_t *key, uchar_t *in, int in_len, uchar_t *out)
@@ -862,8 +840,6 @@ core_rsa_decrypt(crypto_key_t *key, uchar_t *in, int in_len, uchar_t *out)
 
 	return (rv);
 }
-
-/* EXPORT DELETE END */
 
 /* ARGSUSED */
 static int
@@ -960,8 +936,6 @@ rsa_digest_svrfy_common(digest_rsa_ctx_t *ctxp, crypto_data_t *data,
     crypto_data_t *signature, uchar_t flag)
 {
 	int rv = CRYPTO_FAILED;
-
-/* EXPORT DELETE START */
 
 	uchar_t digest[SHA512_DIGEST_LENGTH];
 	/* The der_data size is enough for MD5 also */
@@ -1068,8 +1042,6 @@ rsa_digest_svrfy_common(digest_rsa_ctx_t *ctxp, crypto_data_t *data,
 		rv = rsa_verify_common(mech_type, ctxp->key, &der_cd,
 		    signature);
 
-/* EXPORT DELETE END */
-
 	return (rv);
 }
 
@@ -1078,8 +1050,6 @@ rsa_sign_common(rsa_mech_type_t mech_type, crypto_key_t *key,
     crypto_data_t *data, crypto_data_t *signature)
 {
 	int rv = CRYPTO_FAILED;
-
-/* EXPORT DELETE START */
 
 	int dlen;
 	uchar_t *dataptr, *modulus;
@@ -1148,8 +1118,6 @@ rsa_sign_common(rsa_mech_type_t mech_type, crypto_key_t *key,
 
 		signature->cd_length = modulus_len;
 	}
-
-/* EXPORT DELETE END */
 
 	return (rv);
 }
@@ -1297,8 +1265,6 @@ rsa_verify_common(rsa_mech_type_t mech_type, crypto_key_t *key,
 {
 	int rv = CRYPTO_FAILED;
 
-/* EXPORT DELETE START */
-
 	uchar_t *sigptr, *modulus;
 	ssize_t modulus_len;
 	uchar_t plain_data[MAX_RSA_KEYLENGTH_IN_BYTES];
@@ -1345,8 +1311,6 @@ rsa_verify_common(rsa_mech_type_t mech_type, crypto_key_t *key,
 		    - data_len)) != 0)
 			rv = CRYPTO_SIGNATURE_INVALID;
 	}
-
-/* EXPORT DELETE END */
 
 	return (rv);
 }
@@ -1503,8 +1467,6 @@ rsa_verify_recover_common(rsa_mech_type_t mech_type, crypto_key_t *key,
 {
 	int rv = CRYPTO_FAILED;
 
-/* EXPORT DELETE START */
-
 	size_t data_len;
 	uchar_t *sigptr, *modulus;
 	ssize_t modulus_len;
@@ -1550,8 +1512,6 @@ rsa_verify_recover_common(rsa_mech_type_t mech_type, crypto_key_t *key,
 	    data, data_len)) != CRYPTO_SUCCESS)
 		return (rv);
 	data->cd_length = data_len;
-
-/* EXPORT DELETE END */
 
 	return (rv);
 }

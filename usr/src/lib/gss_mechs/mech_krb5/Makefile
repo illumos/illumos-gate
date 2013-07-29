@@ -22,8 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 # This make file will build mech_krb5.so.1. This shared object
@@ -89,66 +87,6 @@ $(ROOTLIBDIR):
 
 $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
-
-# EXPORT DELETE START
-# Special target to clean up the source tree for export distribution
-# Warning: This target changes the source tree
-EXPORT_SRC:
-	$(RM) Makefile+ Makefile.mech_krb5+\
-		crypto/des/afsstring2key.c+ \
-		crypto/des/string2key.c+ \
-		mech/krb5_gss_glue.c+
-
-	$(SED) -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
-		< crypto/des/afsstring2key.c > crypto/des/afsstring2key.c+
-	$(MV) crypto/des/afsstring2key.c+ crypto/des/afsstring2key.c
-
-	$(SED) -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
-		< crypto/des/string2key.c > crypto/des/string2key.c+
-	$(MV) crypto/des/string2key.c+ crypto/des/string2key.c
-
-	$(SED) -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
-		< mech/krb5_gss_glue.c > mech/krb5_gss_glue.c+
-	$(MV) mech/krb5_gss_glue.c+ mech/krb5_gss_glue.c
-
-	$(SED) -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-		< Makefile.mech_krb5 > Makefile.mech_krb5+
-	$(MV) Makefile.mech_krb5+ Makefile.mech_krb5
-
-	$(SED) -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-		< Makefile > Makefile+
-	$(MV) Makefile+ Makefile
-
-	$(CHMOD) 444 Makefile Makefile.mech_krb5 \
-		crypto/des/afsstring2key.c \
-		crypto/des/string2key.c \
-		mech/krb5_gss_glue.c
-
-
-# CRYPT DELETE START
-# Special target to clean up the source tree for domestic distribution
-# Warning: This target changes the source tree
-CRYPT_SRC:
-	$(RM) Makefile+ mech/krb5_gss_glue.c+
-
-	$(SED) -e "/CRYPT DELETE START/,/CRYPT DELETE END/d" \
-		> mech/krb5_gss_glue.c+ < mech/krb5_gss_glue.c
-	$(MV) mech/krb5_gss_glue.c+ mech/krb5_gss_glue.c
-
-	$(SED) -e "/^# CRYPT DELETE START/,/^# CRYPT DELETE END/d"	\
-			< Makefile 				\
-	   | $(SED) -e "/EXPORT DELETE/d"				\
-			> Makefile+
-	$(MV) Makefile+ Makefile
-
-	$(CHMOD) 444 mech/krb5_gss_glue.c Makefile
-
-# CRYPT DELETE END
-# EXPORT DELETE END
-
-
 
 FRC:
 

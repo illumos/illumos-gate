@@ -23,9 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-/* EXPORT DELETE START */
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/salib.h>
@@ -49,11 +46,8 @@
 #include <netdb.h>
 #include <wanboot_conf.h>
 #include <bootinfo.h>
-/* EXPORT DELETE END */
 
 #include "wbcli.h"
-
-/* EXPORT DELETE START */
 
 #define	skipspace(p)	while (isspace(*(p))) ++p
 
@@ -1305,11 +1299,9 @@ setup_interface()
 	}
 }
 
-/* EXPORT DELETE END */
 boolean_t
 wanboot_init_interface(char *boot_arguments)
 {
-/* EXPORT DELETE START */
 	boolean_t	interactive;
 	int		which;
 
@@ -1405,14 +1397,12 @@ wanboot_init_interface(char *boot_arguments)
 	 */
 	if (strcmp(net_config_strategy(), "manual") == 0)
 		setup_interface();
-/* EXPORT DELETE END */
 	return (B_TRUE);
 }
 
 boolean_t
 wanboot_verify_config(void)
 {
-/* EXPORT DELETE START */
 	/*
 	 * Check that the wanboot.conf file defines a valid root_server
 	 * URL, and check that, if given, the boot_logger URL is valid.
@@ -1422,6 +1412,5 @@ wanboot_verify_config(void)
 		    "incomplete boot configuration");
 		return (B_FALSE);
 	}
-/* EXPORT DELETE END */
 	return (B_TRUE);
 }

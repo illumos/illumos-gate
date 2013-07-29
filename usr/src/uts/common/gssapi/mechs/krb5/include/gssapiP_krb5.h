@@ -428,7 +428,6 @@ OM_uint32 krb5_gss_verify
 #endif
            );
 
-/* EXPORT DELETE START */
 OM_uint32 krb5_gss_seal
 (OM_uint32*,       /* minor_status */
             gss_ctx_id_t,     /* context_handle */
@@ -453,7 +452,6 @@ OM_uint32 krb5_gss_unseal
             /* */, OM_uint32	/* context verifier */
 #endif
            );
-/* EXPORT DELETE END */
 
 OM_uint32 krb5_gss_display_status
 (OM_uint32*,       /* minor_status */

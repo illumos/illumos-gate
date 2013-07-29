@@ -45,7 +45,6 @@ int *			conf_state;
 int *			qop_state;
 
 {
-/* EXPORT DELETE START */
 	OM_uint32		status;
 	gss_union_ctx_id_t	ctx;
 	gss_mechanism		mech;
@@ -96,8 +95,6 @@ int *			qop_state;
 
 		return (status);
 	}
-
-/* EXPORT DELETE END */
 
 	return (GSS_S_BAD_MECH);
 }

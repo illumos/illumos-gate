@@ -87,13 +87,3 @@ clean:
 clobber:	clean
 
 modlist:
-
-EXPORT_SRC:
-	$(RM) Makefile+ 
-	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-		< Makefile > Makefile+
-	$(MV) Makefile+ Makefile
-	$(CHMOD) 444 Makefile
-# EXPORT DELETE END
-
-#

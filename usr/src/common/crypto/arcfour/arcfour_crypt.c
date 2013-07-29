@@ -58,8 +58,6 @@
 void
 arcfour_key_init(ARCFour_key *key, uchar_t *keyval, int keyvallen)
 {
-/* EXPORT DELETE START */
-
 	uchar_t ext_keyval[256];
 	uchar_t tmp;
 	int i, j;
@@ -83,8 +81,6 @@ arcfour_key_init(ARCFour_key *key, uchar_t *keyval, int keyvallen)
 	}
 	key->i = 0;
 	key->j = 0;
-
-/* EXPORT DELETE END */
 }
 #endif	/* !__amd64 */
 
@@ -106,7 +102,6 @@ arcfour_key_init(ARCFour_key *key, uchar_t *keyval, int keyvallen)
 void
 arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 {
-/* EXPORT DELETE START */
 #ifdef	__amd64
 	if (key->flag == ARCFOUR_ON_AMD64) {
 		arcfour_crypt_asm(key, in, out, len);
@@ -227,8 +222,6 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 #ifdef	__amd64
 	}
 #endif	/* amd64 */
-
-/* EXPORT DELETE END */
 }
 
 

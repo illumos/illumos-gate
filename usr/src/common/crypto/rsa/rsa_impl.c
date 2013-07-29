@@ -109,8 +109,6 @@ RSA_key_init(RSAkey *key, int psize, int qsize)
 {
 	BIG_ERR_CODE err = BIG_OK;
 
-/* EXPORT DELETE START */
-
 	int plen, qlen, nlen;
 
 	plen = BITLEN2BIGNUMLEN(psize);
@@ -163,17 +161,12 @@ ret2:
 ret1:
 	big_finish(&(key->p));
 
-/* EXPORT DELETE END */
-
 	return (err);
 }
 
 static void
 RSA_key_finish(RSAkey *key)
 {
-
-/* EXPORT DELETE START */
-
 	big_finish(&(key->n_rr));
 	big_finish(&(key->q_rr));
 	big_finish(&(key->p_rr));
@@ -185,9 +178,6 @@ RSA_key_finish(RSAkey *key)
 	big_finish(&(key->n));
 	big_finish(&(key->q));
 	big_finish(&(key->p));
-
-/* EXPORT DELETE END */
-
 }
 
 /*
@@ -198,8 +188,6 @@ generate_rsa_key(RSAkey *key, int psize, int qsize, BIGNUM *pubexp,
     int (*rfunc)(void *, size_t))
 {
 	CK_RV		rv = CKR_OK;
-
-/* EXPORT DELETE START */
 
 	int		(*rf)(void *, size_t);
 	BIGNUM		a, b, c, d, e, f, g, h;
@@ -379,8 +367,6 @@ ret1:
 	big_finish(&b);
 	big_finish(&a);
 
-/* EXPORT DELETE END */
-
 	return (rv);
 }
 
@@ -411,8 +397,6 @@ rsa_genkey_pair(RSAbytekey *bkey)
 	 * make the reader aware of the switcheroo.
 	 */
 	CK_RV	rv = CKR_OK;
-
-/* EXPORT DELETE START */
 
 	BIGNUM	public_exponent = {0};
 	RSAkey	rsakey;
@@ -495,8 +479,6 @@ rsa_genkey_pair(RSAbytekey *bkey)
 clean1:
 	RSA_key_finish(&rsakey);
 
-/* EXPORT DELETE END */
-
 	return (rv);
 }
 
@@ -507,8 +489,6 @@ CK_RV
 rsa_encrypt(RSAbytekey *bkey, uchar_t *in, uint32_t in_len, uchar_t *out)
 {
 	CK_RV rv = CKR_OK;
-
-/* EXPORT DELETE START */
 
 	BIGNUM msg;
 	RSAkey rsakey;
@@ -566,8 +546,6 @@ clean3:
 clean2:
 	RSA_key_finish(&rsakey);
 
-/* EXPORT DELETE END */
-
 	return (rv);
 }
 
@@ -578,8 +556,6 @@ CK_RV
 rsa_decrypt(RSAbytekey *bkey, uchar_t *in, uint32_t in_len, uchar_t *out)
 {
 	CK_RV rv = CKR_OK;
-
-/* EXPORT DELETE START */
 
 	BIGNUM msg;
 	RSAkey rsakey;
@@ -654,8 +630,6 @@ clean4:
 	big_finish(&msg);
 clean3:
 	RSA_key_finish(&rsakey);
-
-/* EXPORT DELETE END */
 
 	return (rv);
 }
