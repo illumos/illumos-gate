@@ -24,6 +24,7 @@
  * Use is subject to license terms.
  */
 /*
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
  */
 
@@ -228,7 +229,7 @@ mdb_amd64_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 
 	uintptr_t fp = gsp->kregs[KREG_RBP];
 	uintptr_t pc = gsp->kregs[KREG_RIP];
-	uintptr_t lastfp, curpc;
+	uintptr_t lastfp;
 
 	ssize_t size;
 	ssize_t insnsize;
@@ -249,8 +250,6 @@ mdb_amd64_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 
 	while (fp != 0) {
 		int args_style = 0;
-
-		curpc = pc;
 
 		if (!fp_is_aligned(fp, xpv_panic))
 			return (set_errno(EMDB_STKALIGN));
@@ -376,13 +375,10 @@ mdb_amd64_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 		if (xpv_panic)
 			if ((fp != 0) && (fp < lastfp) &&
 			    ((lastfp ^ ~fp) < 0xfff))
-			fp = ~fp;
+				fp = ~fp;
 
 		kregs[KREG_RBP] = fp;
 		kregs[KREG_RIP] = pc = fr.fr_savpc;
-
-		if (curpc == pc)
-			break;
 
 		got_pc = (pc != 0);
 	}

@@ -534,7 +534,6 @@ dmu_objset_refresh_ownership(objset_t *os, void *tag)
 	dsl_pool_t *dp;
 	dsl_dataset_t *ds, *newds;
 	char name[MAXNAMELEN];
-	int err;
 
 	ds = os->os_dsl_dataset;
 	VERIFY3P(ds, !=, NULL);

@@ -22,8 +22,9 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #include <mdb/mdb_modapi.h>
 #include <sys/list.h>
@@ -66,13 +67,19 @@ list_walk_init_range(mdb_walk_state_t *wsp, uintptr_t begin, uintptr_t end,
 	if (element_name == NULL)
 		element_name = "list element";
 
-	lwd = mdb_alloc(sizeof (list_walk_data_t), UM_SLEEP);
 	if (mdb_vread(&list, sizeof (list_t), wsp->walk_addr) == -1) {
 		mdb_warn("failed to read %s at %#lx", list_name,
 		    wsp->walk_addr);
-		mdb_free(lwd, sizeof (list_walk_data_t));
 		return (WALK_ERR);
 	}
+
+	if (list.list_size < list.list_offset + sizeof (list_node_t)) {
+		mdb_warn("invalid or uninitialized %s at %#lx\n", list_name,
+		    wsp->walk_addr);
+		return (WALK_ERR);
+	}
+
+	lwd = mdb_alloc(sizeof (list_walk_data_t), UM_SLEEP);
 
 	lwd->lw_size = list.list_size;
 	lwd->lw_offset = list.list_offset;
