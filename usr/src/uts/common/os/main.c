@@ -26,6 +26,10 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+/*
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ */
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/sysmacros.h>
@@ -53,7 +57,7 @@
 #include <sys/modctl.h>
 #include <sys/vm.h>
 #include <sys/callb.h>
-#include <sys/ddi_timer.h>
+#include <sys/ddi_periodic.h>
 #include <sys/kmem.h>
 #include <sys/vmem.h>
 #include <sys/cpuvar.h>
@@ -415,7 +419,7 @@ main(void)
 	segkmem_gc();
 	callb_init();
 	cbe_init_pre();	/* x86 must initialize gethrtimef before timer_init */
-	timer_init();	/* timer must be initialized before cyclic starts */
+	ddi_periodic_init();
 	cbe_init();
 	callout_init();	/* callout table MUST be init'd after cyclics */
 	clock_tick_init_pre();

@@ -118,7 +118,7 @@
 #include <sys/smbios.h>
 #include <sys/debug_info.h>
 #include <sys/bootinfo.h>
-#include <sys/ddi_timer.h>
+#include <sys/ddi_periodic.h>
 #include <sys/systeminfo.h>
 #include <sys/multiboot.h>
 
@@ -2245,14 +2245,13 @@ startup_end(void)
 	    "softlevel1", NULL, NULL); /* XXX to be moved later */
 
 	/*
-	 * Register these software interrupts for ddi timer.
+	 * Register software interrupt handlers for ddi_periodic_add(9F).
 	 * Software interrupts up to the level 10 are supported.
 	 */
 	for (i = DDI_IPL_1; i <= DDI_IPL_10; i++) {
-		char name[sizeof ("timer_softintr") + 2];
-		(void) sprintf(name, "timer_softintr%02d", i);
 		(void) add_avsoftintr((void *)&softlevel_hdl[i-1], i,
-		    (avfunc)timer_softintr, name, (caddr_t)(uintptr_t)i, NULL);
+		    (avfunc)ddi_periodic_softintr, "ddi_periodic",
+		    (caddr_t)(uintptr_t)i, NULL);
 	}
 
 #if !defined(__xpv)

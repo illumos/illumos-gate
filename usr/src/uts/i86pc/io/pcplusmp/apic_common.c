@@ -22,6 +22,9 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ */
 
 /*
  * PSMI 1.1 extensions are supported only in 2.6 and later versions.
@@ -1351,7 +1354,7 @@ restart_sitka_bmc:
 
 }
 
-ddi_periodic_t apic_periodic_id;
+cyclic_id_t apic_cyclic_id;
 
 /*
  * The following functions are in the platform specific file so that they
