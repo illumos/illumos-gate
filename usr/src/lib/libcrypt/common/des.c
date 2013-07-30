@@ -32,8 +32,6 @@
  * under license from the Regents of the University of California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * DES encryption library routines
  */
@@ -99,15 +97,12 @@ int
 cbc_crypt(char *key, char *buf, size_t len, unsigned int mode, char *ivec)
 {
 	int err = 0;
-
-/* EXPORT DELETE START */
 	struct desparams dp;
 
 	dp.des_mode = CBC;
 	COPY8(ivec, dp.des_ivec);
 	err = common_crypt(key, buf, len, mode, &dp);
 	COPY8(dp.des_ivec, ivec);
-/* EXPORT DELETE END */
 	return (err);
 }
 
@@ -119,18 +114,14 @@ int
 ecb_crypt(char *key, char *buf, size_t len, unsigned int mode)
 {
 	int ret = 0;
-
-/* EXPORT DELETE START */
 	struct desparams dp;
 
 	dp.des_mode = ECB;
 	ret = common_crypt(key, buf, len, mode, &dp);
-/* EXPORT DELETE END */
 	return (ret);
 }
 
 
-/* EXPORT DELETE START */
 /*
  * Common code to cbc_crypt() & ecb_crypt()
  */
@@ -182,4 +173,3 @@ software:
 	}
 	return (desdev == DES_SW ? DESERR_NONE : DESERR_NOHWDEVICE);
 }
-/* EXPORT DELETE END */

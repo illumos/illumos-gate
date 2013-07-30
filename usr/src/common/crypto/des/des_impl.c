@@ -42,8 +42,6 @@
 #define	UNALIGNED_POINTERS_PERMITTED
 #endif
 
-/* EXPORT DELETE START */
-
 typedef struct keysched_s {
 	uint64_t ksch_encrypt[16];
 	uint64_t ksch_decrypt[16];
@@ -501,13 +499,10 @@ des_crypt_impl(uint64_t *ks, uint64_t block, int one_or_three)
 }
 #endif /* !sun4u */
 
-/* EXPORT DELETE END */
-
 int
 des3_crunch_block(const void *cookie, const uint8_t block[DES_BLOCK_LEN],
     uint8_t out_block[DES_BLOCK_LEN], boolean_t decrypt)
 {
-/* EXPORT DELETE START */
 	keysched3_t *ksch = (keysched3_t *)cookie;
 
 	/*
@@ -560,7 +555,6 @@ des3_crunch_block(const void *cookie, const uint8_t block[DES_BLOCK_LEN],
 		out_block[7] = (uint8_t)tmp;
 #endif	/* UNALIGNED_POINTERS_PERMITTED */
 	}
-/* EXPORT DELETE END */
 	return (CRYPTO_SUCCESS);
 }
 
@@ -568,7 +562,6 @@ int
 des_crunch_block(const void *cookie, const uint8_t block[DES_BLOCK_LEN],
     uint8_t out_block[DES_BLOCK_LEN], boolean_t decrypt)
 {
-/* EXPORT DELETE START */
 	keysched_t *ksch = (keysched_t *)cookie;
 
 	/*
@@ -623,14 +616,12 @@ des_crunch_block(const void *cookie, const uint8_t block[DES_BLOCK_LEN],
 		out_block[7] = (uint8_t)tmp;
 #endif	/* UNALIGNED_POINTERS_PERMITTED */
 	}
-/* EXPORT DELETE END */
 	return (CRYPTO_SUCCESS);
 }
 
 static boolean_t
 keycheck(uint8_t *key, uint8_t *corrected_key)
 {
-/* EXPORT DELETE START */
 	uint64_t key_so_far;
 	uint_t i;
 	/*
@@ -716,14 +707,12 @@ keycheck(uint8_t *key, uint8_t *corrected_key)
 		corrected_key[7] = (uint8_t)key_so_far;
 #endif	/* UNALIGNED_POINTERS_PERMITTED */
 	}
-/* EXPORT DELETE END */
 	return (B_TRUE);
 }
 
 static boolean_t
 des23_keycheck(uint8_t *key, uint8_t *corrected_key, boolean_t des3)
 {
-/* EXPORT DELETE START */
 	uint64_t aligned_key[DES3_KEYSIZE / sizeof (uint64_t)];
 	uint64_t key_so_far, scratch, *currentkey;
 	uint_t j, num_weakkeys = 0;
@@ -781,7 +770,6 @@ des23_keycheck(uint8_t *key, uint8_t *corrected_key, boolean_t des3)
 		bcopy(currentkey, corrected_key, keysize);
 	}
 
-/* EXPORT DELETE END */
 	return (B_TRUE);
 }
 
@@ -802,7 +790,6 @@ des_keycheck(uint8_t *key, des_strength_t strength, uint8_t *corrected_key)
 void
 des_parity_fix(uint8_t *key, des_strength_t strength, uint8_t *corrected_key)
 {
-/* EXPORT DELETE START */
 	uint64_t aligned_key[DES3_KEYSIZE / sizeof (uint64_t)];
 	uint8_t *paritied_key;
 	uint64_t key_so_far;
@@ -848,7 +835,6 @@ des_parity_fix(uint8_t *key, des_strength_t strength, uint8_t *corrected_key)
 	}
 
 	bcopy(paritied_key, corrected_key, DES_KEYSIZE * strength);
-/* EXPORT DELETE END */
 }
 
 
@@ -858,7 +844,6 @@ des_parity_fix(uint8_t *key, des_strength_t strength, uint8_t *corrected_key)
 void
 des_init_keysched(uint8_t *cipherKey, des_strength_t strength, void *ks)
 {
-/* EXPORT DELETE START */
 	uint64_t *encryption_ks;
 	uint64_t *decryption_ks;
 	uint64_t keysched[48];
@@ -947,7 +932,6 @@ des_init_keysched(uint8_t *cipherKey, des_strength_t strength, void *ks)
 
 	/* save the decryption keyschedule */
 	bcopy(keysched, decryption_ks, keysize * 16);
-/* EXPORT DELETE END */
 }
 
 /*
@@ -958,8 +942,6 @@ void *
 des_alloc_keysched(size_t *keysched_size, des_strength_t strength, int kmflag)
 {
 	void *keysched;
-
-/* EXPORT DELETE START */
 
 	size_t size;
 
@@ -984,8 +966,6 @@ des_alloc_keysched(size_t *keysched_size, des_strength_t strength, int kmflag)
 	if (keysched_size != NULL)
 		*keysched_size = size;
 
-/* EXPORT DELETE END */
-
 	return (keysched);
 }
 
@@ -997,14 +977,12 @@ des_alloc_keysched(size_t *keysched_size, des_strength_t strength, int kmflag)
 static void
 fix_des_parity(uint64_t *keyp)
 {
-/* EXPORT DELETE START */
 	uint64_t k = *keyp;
 	k ^= k >> 1;
 	k ^= k >> 2;
 	k ^= k >> 4;
 	*keyp ^= (k & 0x0101010101010101ULL);
 	*keyp ^= 0x0101010101010101ULL;
-/* EXPORT DELETE END */
 }
 
 void

@@ -77,8 +77,8 @@ DOMAINS= \
 MSGDDIRS=       $(DOMAINS:%=$(MSGROOT)/%)
 MSGDIRS=        $(MSGROOT) $(MSGDDIRS) $(MSGROOT)/LC_TIME
 
-all all_xmod :=		TARGET= all
-install install_xmod :=	TARGET= install
+all :=			TARGET= all
+install :=		TARGET= install
 install1 :=		TARGET= install
 install2 :=		TARGET= install
 install_h :=		TARGET= install_h
@@ -205,19 +205,6 @@ cmdheaders: FRC
 	@cd cmd/fm; pwd; $(MAKE) install_h
 	@cd cmd/mdb; pwd; $(MAKE) install_h
 
-# each xmod target depends on a corresponding MACH-specific pseudotarget
-# before doing common xmod work
-#
-all_xmod install_xmod: $$@_$(MACH)
-	@cd uts/common/sys; pwd; $(MAKE) svvs_h
-
-all_xmod_sparc install_xmod_sparc: FRC
-	@cd uts/sparc; pwd; \
-	  $(MAKE) TARGET=$(TARGET) svvs pm wsdrv
-
-all_xmod_i386 install_xmod_i386: FRC
-	@cd uts/i86; pwd; $(MAKE) TARGET=$(TARGET) svvs
-
 check:	$(CHKHDRSUBDIRS) $(CHKMFSTSUBDIRS)
 
 #
@@ -225,7 +212,7 @@ check:	$(CHKHDRSUBDIRS) $(CHKMFSTSUBDIRS)
 # don't contain actual source code.
 #
 $(CLOSED_BUILD)XRDIRS += ../closed
-XRPRUNE = pkg prototypes xmod
+XRPRUNE = pkg prototypes
 XRINCDIRS = uts/common head ucbhead
 $(CLOSED_BUILD)XRINCDIRS = uts/common ../closed/uts/common head ucbhead
 
@@ -233,110 +220,6 @@ cscope.out tags: FRC
 	$(XREF) -f -x $@
 
 FRC:
-
-# EXPORT DELETE START
-
-XMOD_DELETE_FILES:sh = cat xmod/xmod_files
-
-EXPORT_SRC:
-	@cd $(CLOSED)/cmd/cmd-inet/usr.lib/in.iked;  pwd; $(MAKE) EXPORT_SRC
-	@cd $(CLOSED)/cmd/cmd-inet/usr.lib/ike-certutils;  pwd; \
-	    $(MAKE) EXPORT_SRC
-	@cd cmd/cmd-inet/usr.sbin; pwd; $(MAKE) EXPORT_SRC
-	@cd $(CLOSED)/cmd/cmd-crypto/etc; pwd; $(MAKE) EXPORT_SRC
-	@cd cmd/crypt;	  pwd; $(MAKE) EXPORT_SRC
-	@cd cmd/gss/gssd;         pwd; $(MAKE) EXPORT_SRC
-	@cd cmd/krb5/kadmin;  pwd; $(MAKE) EXPORT_SRC
-	@cd cmd/sendmail/src; pwd; $(MAKE) EXPORT_SRC
-	@cd common/crypto/aes;	  pwd; $(MAKE) EXPORT_SRC
-	@cd common/crypto/arcfour; pwd; $(MAKE) EXPORT_SRC
-	@cd common/crypto/blowfish;	  pwd; $(MAKE) EXPORT_SRC
-	@cd common/crypto/des;	  pwd; $(MAKE) EXPORT_SRC
-	@cd common/crypto/rsa;	  pwd; $(MAKE) EXPORT_SRC
-	@cd lib/crypt_modules/bsdbf; pwd ; $(MAKE) EXPORT_SRC
-	@cd lib/gss_mechs/mech_dummy;   pwd; $(MAKE) EXPORT_SRC
-	@cd lib/gss_mechs/mech_dh/backend;	pwd; $(MAKE) EXPORT_SRC
-	@cd lib/gss_mechs/mech_krb5;		pwd; $(MAKE) EXPORT_SRC
-	@cd lib/gss_mechs/mech_spnego;		pwd; $(MAKE) EXPORT_SRC
-	@cd lib/libcrypt; pwd; $(MAKE) EXPORT_SRC
-	@cd lib/libgss;   pwd; $(MAKE) EXPORT_SRC
-	@cd $(CLOSED)/lib/libike;   pwd; $(MAKE) EXPORT_SRC
-	@cd lib/libnsl;	  pwd; $(MAKE) EXPORT_SRC
-	@cd lib/pkcs11/pkcs11_softtoken/common;  pwd; $(MAKE) EXPORT_SRC
-	@cd lib/libsldap; pwd; $(MAKE) EXPORT_SRC
-	@cd lib/libsasl; pwd; $(MAKE) EXPORT_SRC
-	@cd lib/sasl_plugins; pwd; $(MAKE) EXPORT_SRC
-	@cd lib/pam_modules/krb5;   pwd; $(MAKE) EXPORT_SRC
-	@cd psm/stand/boot; pwd; $(MAKE) EXPORT_SRC
-	@cd uts/common/crypto/io; pwd; $(MAKE) EXPORT_SRC
-	@cd uts/common/des; pwd; $(MAKE) EXPORT_SRC
-	@cd uts/common/rpc; pwd; $(MAKE) EXPORT_SRC
-	@cd uts/common/sys; pwd; $(MAKE) EXPORT_SRC
-	@cd uts/common/gssapi/include;		pwd; $(MAKE) EXPORT_SRC
-	@cd uts/common/gssapi;			pwd; $(MAKE) EXPORT_SRC
-	@cd uts/common/gssapi/mechs/dummy;	pwd; $(MAKE) EXPORT_SRC
-	@cd uts/common/gssapi/mechs/krb5;	pwd; $(MAKE) EXPORT_SRC
-	@cd uts/common; pwd; $(MAKE) EXPORT_SRC
-	@cd uts/sparc; pwd; $(MAKE) EXPORT_SRC
-	@cd $(CLOSED)/uts/sun4u/forthdebug; pwd; $(MAKE) EXPORT_SRC
-	@cd $(CLOSED)/uts/sun4v/forthdebug; pwd; $(MAKE) EXPORT_SRC
-	@cd uts/intel; pwd; $(MAKE) EXPORT_SRC
-	@cd uts/sun4u; pwd; $(MAKE) EXPORT_SRC
-	@cd $(CLOSED)/uts/sun4v/io/ncp;	pwd;	$(MAKE) EXPORT_SRC
-	@cd $(CLOSED)/uts/sun4v/io/n2cp; pwd;	$(MAKE) EXPORT_SRC
-	@cd pkg; pwd;	$(MAKE) EXPORT_SRC
-	$(RM) -r $(XMOD_DELETE_FILES)
-	$(RM) Targetdirs+
-	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-			< Targetdirs > Targetdirs+
-	$(MV) Targetdirs+ Targetdirs
-	$(CHMOD) 444 Targetdirs
-	$(RM) Makefile+
-	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-			< Makefile > Makefile+
-	$(MV) Makefile+ Makefile
-	$(CHMOD) 444 Makefile
-	$(RM) Makefile.master+
-	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-			< Makefile.master > Makefile.master+
-	$(MV) Makefile.master+ Makefile.master
-	$(CHMOD) 444 Makefile.master
-
-CRYPT_SRC:
-	@cd $(CLOSED)/cmd/cmd-crypto/etc;  pwd; $(MAKE) CRYPT_SRC
-	@cd $(CLOSED)/cmd/cmd-inet/usr.lib/in.iked;  pwd; $(MAKE) CRYPT_SRC
-	@cd $(CLOSED)/cmd/cmd-inet/usr.lib/ike-certutils;  pwd; \
-	    $(MAKE) CRYPT_SRC
-	@cd lib/crypt_modules/bsdbf; pwd ; $(MAKE) CRYPT_SRC
-	@cd lib/gss_mechs/mech_dummy;   pwd; $(MAKE) CRYPT_SRC
-	@cd lib/gss_mechs/mech_dh/backend; pwd; $(MAKE) CRYPT_SRC
-	@cd lib/gss_mechs/mech_krb5; pwd; $(MAKE) CRYPT_SRC
-	@cd lib/gss_mechs/mech_spnego; pwd; $(MAKE) CRYPT_SRC
-	@cd $(CLOSED)/lib/libike;   pwd; $(MAKE) CRYPT_SRC
-	@cd lib/libnsl;	 pwd; $(MAKE) CRYPT_SRC
-	@cd lib/libsasl;	 pwd; $(MAKE) CRYPT_SRC
-	@cd lib/sasl_plugins; pwd; $(MAKE) CRYPT_SRC
-	@cd lib/pam_modules/krb5;   pwd; $(MAKE) CRYPT_SRC
-	@cd uts/common/gssapi;    pwd; $(MAKE) CRYPT_SRC
-	@cd uts/common/gssapi/include;    pwd; $(MAKE) CRYPT_SRC
-	@cd uts/common/gssapi/mechs/dummy;        pwd; $(MAKE) CRYPT_SRC
-	@cd uts/common/gssapi/mechs/krb5; pwd; $(MAKE) CRYPT_SRC
-	$(RM) Makefile+
-	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-			< Makefile > Makefile+
-	$(MV) Makefile+ Makefile
-	$(CHMOD) 444 Makefile
-	$(RM) Makefile.master+
-	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-			< Makefile.master > Makefile.master+
-	$(MV) Makefile.master+ Makefile.master
-	$(CHMOD) 444 Makefile.master
-
-# EXPORT DELETE END
-
-ONC_PLUS:
-	@cd cmd/login; pwd; $(MAKE) ONC_PLUS
-	@cd uts; pwd; $(MAKE) ONC_PLUS
 
 #
 # Targets for reporting compiler versions; nightly uses these.

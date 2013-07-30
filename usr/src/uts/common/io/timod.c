@@ -18,7 +18,6 @@
  *
  * CDDL HEADER END
  */
-/* ONC_PLUS EXTRACT START */
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -31,7 +30,6 @@
  * Transport Interface Library cooperating module - issue 2
  */
 
-/* ONC_PLUS EXTRACT END */
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/stream.h>
@@ -195,9 +193,7 @@ struct tim_tim {
 #define	LOCORDREL	0x0020	/* local end has orderly released	*/
 #define	REMORDREL	0x0040	/* remote end had orderly released	*/
 #define	NAMEPROC	0x0080	/* processing a NAME ioctl		*/
-/* ONC_PLUS EXTRACT START */
 #define	DO_MYNAME	0x0100	/* timod handles TI_GETMYNAME		*/
-/* ONC_PLUS EXTRACT END */
 #define	DO_PEERNAME	0x0200	/* timod handles TI_GETPEERNAME		*/
 #define	TI_CAP_RECVD	0x0400	/* TI_CAPABILITY received		*/
 #define	CAP_WANTS_INFO	0x0800	/* TI_CAPABILITY has TC1_INFO set	*/
@@ -313,20 +309,14 @@ int dotilog = 0;
 
 #define	TIMOD_ID	3
 
-/* ONC_PLUS EXTRACT START */
 static int timodopen(queue_t *, dev_t *, int, int, cred_t *);
-/* ONC_PLUS EXTRACT END */
 static int timodclose(queue_t *, int, cred_t *);
 static void timodwput(queue_t *, mblk_t *);
 static void timodrput(queue_t *, mblk_t *);
-/* ONC_PLUS EXTRACT START */
 static void timodrsrv(queue_t *);
-/* ONC_PLUS EXTRACT END */
 static void timodwsrv(queue_t *);
-/* ONC_PLUS EXTRACT START */
 static int timodrproc(queue_t *, mblk_t *);
 static int timodwproc(queue_t *, mblk_t *);
-/* ONC_PLUS EXTRACT END */
 
 /* stream data structure definitions */
 
@@ -352,7 +342,6 @@ static struct qinit timodwinit = {
 };
 static struct streamtab timinfo = { &timodrinit, &timodwinit, NULL, NULL };
 
-/* ONC_PLUS EXTRACT START */
 /*
  * timodopen -	open routine gets called when the module gets pushed
  *		onto the stream.
@@ -488,7 +477,6 @@ tim_buffer(void *arg)
 	enableok(q);
 	qenable(q);
 }
-/* ONC_PLUS EXTRACT END */
 
 /*
  * timodclose - This routine gets called when the module gets popped
@@ -637,7 +625,6 @@ timodrput(queue_t *q, mblk_t *mp)
 	}
 }
 
-/* ONC_PLUS EXTRACT START */
 /*
  * timodrsrv -	Module read queue service procedure.  This is called when
  *		messages are placed on an empty queue, when high priority
@@ -652,7 +639,6 @@ timodrput(queue_t *q, mblk_t *mp)
 static void
 timodrsrv(queue_t *q)
 {
-/* ONC_PLUS EXTRACT END */
 	mblk_t *mp;
 	struct tim_tim *tp;
 
@@ -671,7 +657,6 @@ timodrsrv(queue_t *q)
 			return;
 		}
 	}
-/* ONC_PLUS EXTRACT START */
 }
 
 /*
@@ -701,11 +686,9 @@ timodrproc(queue_t *q, mblk_t *mp)
 	struct iocblk *iocbp;
 	mblk_t *nbp;
 	size_t blen;
-/* ONC_PLUS EXTRACT END */
 
 	tp = (struct tim_tim *)q->q_ptr;
 
-/* ONC_PLUS EXTRACT START */
 	switch (mp->b_datap->db_type) {
 	default:
 		putnext(q, mp);
@@ -786,14 +769,11 @@ timodrproc(queue_t *q, mblk_t *mp)
 		pptr = (union T_primitives *)mp->b_rptr;
 		switch (pptr->type) {
 		default:
-/* ONC_PLUS EXTRACT END */
 
 			if (auditing)
 				audit_sock(T_UNITDATA_IND, q, mp, TIMOD_ID);
-/* ONC_PLUS EXTRACT START */
 			putnext(q, mp);
 			break;
-/* ONC_PLUS EXTRACT END */
 
 		case T_ERROR_ACK:
 			/* Restore db_type - recover() might have changed it */
@@ -903,7 +883,6 @@ timodrproc(queue_t *q, mblk_t *mp)
 			tim_send_reply(q, mp, tp, pptr->ok_ack.CORRECT_prim);
 			break;
 
-/* ONC_PLUS EXTRACT START */
 		case T_BIND_ACK: {
 			struct T_bind_ack *ackp =
 			    (struct T_bind_ack *)mp->b_rptr;
@@ -967,7 +946,6 @@ timodrproc(queue_t *q, mblk_t *mp)
 			break;
 		}
 
-/* ONC_PLUS EXTRACT END */
 		case T_OPTMGMT_ACK:
 
 			tilog("timodrproc: Got T_OPTMGMT_ACK\n", 0);
@@ -1200,7 +1178,6 @@ timodrproc(queue_t *q, mblk_t *mp)
 		tim_send_reply(q, mp, tp, T_ADDR_REQ);
 		break;
 
-/* ONC_PLUS EXTRACT START */
 		case T_CONN_IND: {
 			struct T_conn_ind *tcip =
 			    (struct T_conn_ind *)mp->b_rptr;
@@ -1219,15 +1196,12 @@ timodrproc(queue_t *q, mblk_t *mp)
 					return (1);
 				}
 			}
-/* ONC_PLUS EXTRACT END */
 			if (auditing)
 				audit_sock(T_CONN_IND, q, mp, TIMOD_ID);
-/* ONC_PLUS EXTRACT START */
 			putnext(q, mp);
 			break;
 		}
 
-/* ONC_PLUS EXTRACT END */
 	    case T_CONN_CON:
 		mutex_enter(&tp->tim_mutex);
 		if (tp->tim_peercred != NULL)
@@ -1340,7 +1314,6 @@ timodrproc(queue_t *q, mblk_t *mp)
 	    }
 	    break;
 
-/* ONC_PLUS EXTRACT START */
 	case M_FLUSH:
 
 		tilog("timodrproc: Got M_FLUSH\n", 0);
@@ -1353,7 +1326,6 @@ timodrproc(queue_t *q, mblk_t *mp)
 		}
 		putnext(q, mp);
 		break;
-/* ONC_PLUS EXTRACT END */
 
 	case M_IOCACK:
 	    iocbp = (struct iocblk *)mp->b_rptr;
@@ -1429,7 +1401,6 @@ timodrproc(queue_t *q, mblk_t *mp)
 	    putnext(q, mp);
 	    break;
 
-/* ONC_PLUS EXTRACT START */
 	case M_IOCNAK:
 
 		tilog("timodrproc: Got M_IOCNAK\n", 0);
@@ -1462,13 +1433,11 @@ timodrproc(queue_t *q, mblk_t *mp)
 		}
 		putnext(q, mp);
 		break;
-/* ONC_PLUS EXTRACT END */
 	}
 
 	return (0);
 }
 
-/* ONC_PLUS EXTRACT START */
 /*
  * timodwput -	Module write put procedure.  This is called from
  *		the module, driver, or stream head upstream/downstream.
@@ -1490,7 +1459,6 @@ timodwput(queue_t *q, mblk_t *mp)
 	 * enqueue those M_IOCTLs which will result in an
 	 * M_PCPROTO (ie, high priority) message being created.
 	 */
-/* ONC_PLUS EXTRACT END */
 	if (q->q_first != 0 && mp->b_datap->db_type < QPCTL) {
 		if (mp->b_datap->db_type == M_IOCTL) {
 			iocbp = (struct iocblk *)mp->b_rptr;
@@ -1509,7 +1477,6 @@ timodwput(queue_t *q, mblk_t *mp)
 			return;
 		}
 	}
-/* ONC_PLUS EXTRACT START */
 	/*
 	 * Inline processing of data (to avoid additional procedure call).
 	 * Rest is handled in timodwproc.
@@ -1538,7 +1505,6 @@ timodwput(queue_t *q, mblk_t *mp)
 	case M_PCPROTO:
 		pptr = (union T_primitives *)mp->b_rptr;
 		switch (pptr->type) {
-/* ONC_PLUS EXTRACT END */
 		case T_UNITDATA_REQ:
 			tp = (struct tim_tim *)q->q_ptr;
 			ASSERT(tp);
@@ -1571,7 +1537,6 @@ timodwput(queue_t *q, mblk_t *mp)
 			break;
 		}
 		break;
-/* ONC_PLUS EXTRACT START */
 	default:
 		(void) timodwproc(q, mp);
 		break;
@@ -1627,7 +1592,6 @@ timodwproc(queue_t *q, mblk_t *mp)
 	default:
 		putnext(q, mp);
 		break;
-/* ONC_PLUS EXTRACT END */
 
 	case M_DATA:
 		if (tp->tim_flags & CLTS) {
@@ -1644,7 +1608,6 @@ timodwproc(queue_t *q, mblk_t *mp)
 		putnext(q, mp);
 		break;
 
-/* ONC_PLUS EXTRACT START */
 	case M_IOCTL:
 
 		iocbp = (struct iocblk *)mp->b_rptr;
@@ -1669,7 +1632,6 @@ timodwproc(queue_t *q, mblk_t *mp)
 				tim_ioctl_retry(q);
 			return (1);
 		}
-/* ONC_PLUS EXTRACT END */
 
 		switch (iocbp->ioc_cmd) {
 		default:
@@ -1919,7 +1881,6 @@ timodwproc(queue_t *q, mblk_t *mp)
 		}
 		break;
 
-/* ONC_PLUS EXTRACT START */
 		case TI_GETMYNAME:
 
 			tilog("timodwproc: Got TI_GETMYNAME\n", 0);
@@ -1989,7 +1950,6 @@ getname:
 		}
 		putnext(q, mp);
 		break;
-/* ONC_PLUS EXTRACT END */
 
 		case T_UNITDATA_REQ:
 			if (tp->tim_flags & CLTS) {
@@ -2009,7 +1969,6 @@ getname:
 			putnext(q, mp);
 			break;
 
-/* ONC_PLUS EXTRACT START */
 		case T_CONN_REQ: {
 			struct T_conn_req *reqp = (struct T_conn_req *)
 			    mp->b_rptr;
@@ -2055,10 +2014,8 @@ getname:
 			}
 			if (tp->tim_flags & COTS)
 				tp->tim_flags |= CONNWAIT;
-/* ONC_PLUS EXTRACT END */
 			if (auditing)
 				audit_sock(T_CONN_REQ, q, mp, TIMOD_ID);
-/* ONC_PLUS EXTRACT START */
 		putnext(q, mp);
 		break;
 		}
@@ -2119,7 +2076,6 @@ getname:
 			break;
 		}
 
-/* ONC_PLUS EXTRACT END */
 		case T_DISCON_REQ: {
 			struct T_discon_req *disp;
 			struct T_conn_ind *conp;
@@ -2175,7 +2131,6 @@ getname:
 			 */
 			putnext(q, mp);
 			break;
-/* ONC_PLUS EXTRACT START */
 		}
 		break;
 	case M_FLUSH:
@@ -2446,7 +2401,6 @@ ti_doname(
 	return (ret);
 }
 
-/* ONC_PLUS EXTRACT END */
 
 /*
  * Fill in the address of a connectionless data packet if a connect
@@ -2580,7 +2534,6 @@ tim_findlink(t_uscalar_t id)
 	return (tp);
 }
 
-/* ONC_PLUS EXTRACT START */
 static void
 tim_recover(queue_t *q, mblk_t *mp, t_scalar_t size)
 {
@@ -2691,7 +2644,6 @@ ti_expind_on_rdqueues(queue_t *rq)
 	return (0);		/* no expdata on read queues */
 }
 
-/* ONC_PLUS EXTRACT END */
 static void
 tim_tcap_timer(void *q_ptr)
 {

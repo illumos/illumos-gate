@@ -2,7 +2,6 @@
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* SASL server API implementation
  * Rob Siemborski
@@ -198,11 +197,7 @@ int _sasl_client_add_plugin(void *ctx,
   cmech_list_t *cmechlist;
 #ifdef _INTEGRATED_SOLARIS_
   _sasl_global_context_t *gctx = ctx == NULL ? _sasl_gbl_ctx() : ctx;
-  /* EXPORT DELETE START */
-  /* CRYPT DELETE START */
   int sun_reg;
-  /* CRYPT DELETE END */
-  /* EXPORT DELETE END */
 #endif /* _INTEGRATED_SOLARIS_ */
   int i;
   cmechanism_t *m;
@@ -239,13 +234,9 @@ int _sasl_client_add_plugin(void *ctx,
   result = entry_point(cmechlist->utils, SASL_CLIENT_PLUG_VERSION, &version,
 		       &pluglist, &plugcount);
 
-  /* EXPORT DELETE START */
-  /* CRYPT DELETE START */
 #ifdef _INTEGRATED_SOLARIS_
   sun_reg = _is_sun_reg(pluglist);
 #endif /* _INTEGRATED_SOLARIS_ */
-  /* CRYPT DELETE END */
-  /* EXPORT DELETE END */
   if (result != SASL_OK)
   {
 #ifdef _SUN_SDK_
@@ -309,13 +300,9 @@ int _sasl_client_add_plugin(void *ctx,
 	sasl_FREE(mech);
 	return SASL_NOMEM;
       }
-      /* EXPORT DELETE START */
-      /* CRYPT DELETE START */
 #ifdef _INTEGRATED_SOLARIS_
       mech->sun_reg = sun_reg;
 #endif /* _INTEGRATED_SOLARIS_ */
-     /* CRYPT DELETE END */
-     /* EXPORT DELETE END */
       mech->version = version;
       mech->next = cmechlist->mech_list;
       cmechlist->mech_list = mech;
@@ -843,15 +830,11 @@ int sasl_client_start(sasl_conn_t *conn,
 	    if (minssf > m->plug->max_ssf)
 		break;
 
-	    /* EXPORT DELETE START */
-	    /* CRYPT DELETE START */
 #ifdef _INTEGRATED_SOLARIS_
 	    /* If not SUN supplied mech, it has no strength */
 	    if (minssf > 0 && !m->sun_reg)
 		break;
 #endif /* _INTEGRATED_SOLARIS_ */
-	    /* CRYPT DELETE END */
-	    /* EXPORT DELETE END */
 
 	    /* Does it meet our security properties? */
 	    myflags = conn->props.security_flags;
@@ -879,43 +862,26 @@ int sasl_client_start(sasl_conn_t *conn,
 	    }
 	    
 #ifdef PREFER_MECH
-	    /* EXPORT DELETE START */
-	    /* CRYPT DELETE START */
 #ifdef _INTEGRATED_SOLARIS_
 	    if (strcasecmp(m->plug->mech_name, PREFER_MECH) &&
 		bestm && (m->sun_reg && m->plug->max_ssf <= bestssf) ||
 		(m->plug->max_ssf == 0)) {
 #else
-	    /* CRYPT DELETE END */
-	    /* EXPORT DELETE END */
 	    if (strcasecmp(m->plug->mech_name, PREFER_MECH) &&
 		bestm && m->plug->max_ssf <= bestssf) {
-
-		/* EXPORT DELETE START */
-		/* CRYPT DELETE START */
 #endif /* _INTEGRATED_SOLARIS_ */
-		/* CRYPT DELETE END */
-		/* EXPORT DELETE END */
 
 		/* this mechanism isn't our favorite, and it's no better
 		   than what we already have! */
 		break;
 	    }
 #else
-	    /* EXPORT DELETE START */
-	    /* CRYPT DELETE START */
 #ifdef _INTEGRATED_SOLARIS_
 	    if (bestm && m->sun_reg && m->plug->max_ssf <= bestssf) {
 #else
-	    /* CRYPT DELETE END */
-	    /* EXPORT DELETE END */
 
 	    if (bestm && m->plug->max_ssf <= bestssf) {
-	    /* EXPORT DELETE START */
-	    /* CRYPT DELETE START */
 #endif /* _INTEGRATED_SOLARIS_ */
-	    /* CRYPT DELETE END */
-	    /* EXPORT DELETE END */
 
 		/* this mechanism is no better than what we already have! */
 		break;
@@ -949,19 +915,11 @@ int sasl_client_start(sasl_conn_t *conn,
 	    if (mech) {
 		*mech = m->plug->mech_name;
 	    }
-	    /* EXPORT DELETE START */
-	    /* CRYPT DELETE START */
 #ifdef _INTEGRATED_SOLARIS_
 	    bestssf = m->sun_reg ? m->plug->max_ssf : 0;
 #else
-	    /* CRYPT DELETE END */
-	    /* EXPORT DELETE END */
 	    bestssf = m->plug->max_ssf;
-	    /* EXPORT DELETE START */
-	    /* CRYPT DELETE START */
 #endif /* _INTEGRATED_SOLARIS_ */
-	    /* CRYPT DELETE END */
-	    /* EXPORT DELETE END */
 	    bestm = m;
 	    break;
 	}
@@ -989,8 +947,6 @@ int sasl_client_start(sasl_conn_t *conn,
 
     c_conn->cparams->external_ssf = conn->external.ssf;
     c_conn->cparams->props = conn->props;
-    /* EXPORT DELETE START */
-    /* CRYPT DELETE START */
 #ifdef _INTEGRATED_SOLARIS_
     if (!bestm->sun_reg) {
 	c_conn->cparams->props.min_ssf = 0;
@@ -998,8 +954,6 @@ int sasl_client_start(sasl_conn_t *conn,
     }
     c_conn->base.sun_reg = bestm->sun_reg;
 #endif /* _INTEGRATED_SOLARIS_ */
-    /* CRYPT DELETE END */
-    /* EXPORT DELETE END */
     c_conn->mech = bestm;
 
     /* init that plugin */
@@ -1221,15 +1175,11 @@ int _sasl_client_listmech(sasl_conn_t *conn,
 	    if (minssf > m->plug->max_ssf)
 		continue;
 
-	    /* EXPORT DELETE START */
-	    /* CRYPT DELETE START */
 #ifdef _INTEGRATED_SOLARIS_
 	    /* If not SUN supplied mech, it has no strength */
 	    if (minssf > 0 && !m->sun_reg)
 		continue;
 #endif /* _INTEGRATED_SOLARIS_ */
-	    /* CRYPT DELETE END */
-	    /* EXPORT DELETE END */
 
 	    /* does it meet our security properties? */
 	    if (((conn->props.security_flags ^ m->plug->security_flags)

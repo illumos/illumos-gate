@@ -2227,7 +2227,6 @@ sigcheck(proc_t *p, kthread_t *t)
 #endif
 }
 
-/* ONC_PLUS EXTRACT START */
 void
 sigintr(k_sigset_t *smask, int intable)
 {
@@ -2304,7 +2303,6 @@ sigintr(k_sigset_t *smask, int intable)
 	lwp->lwp_nostop++;
 
 }
-/* ONC_PLUS EXTRACT END */
 
 void
 sigunintr(k_sigset_t *smask)

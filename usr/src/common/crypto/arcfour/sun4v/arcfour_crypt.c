@@ -29,8 +29,6 @@
 void
 arcfour_key_init(ARCFour_key *key, uchar_t *keyval, int keyvallen)
 {
-/* EXPORT DELETE START */
-
 	uchar_t ext_keyval[256];
 	uchar_t tmp;
 	int i, j;
@@ -53,8 +51,6 @@ arcfour_key_init(ARCFour_key *key, uchar_t *keyval, int keyvallen)
 	}
 	key->i = 0;
 	key->j = 0;
-
-/* EXPORT DELETE END */
 }
 
 
@@ -70,8 +66,6 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 	uchar_t i, j, *base, jj, *base1, tmp;
 	unsigned int tmp0, tmp1, i_accum, shift = 0, i1;
 
-
-/* EXPORT DELETE START */
 	int index;
 
 	base = key->arr;
@@ -599,6 +593,4 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 		key->j = j;
 	}
 #endif /* sun4v */
-
-/* EXPORT DELETE END */
 }

@@ -18,11 +18,9 @@
  *
  * CDDL HEADER END
  */
-/* ONC_PLUS EXTRACT START */
 /*
  * Copyright (c) 1982, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-/* ONC_PLUS EXTRACT END */
 
 /*
  * Configure root, swap and dump devices.
@@ -326,7 +324,6 @@ preload_module(struct sysparam *sysp, void *p)
 	return (0);
 }
 
-/* ONC_PLUS EXTRACT START */
 /*
  * We want to load all the modules needed to mount the root filesystem,
  * so that when we start the ball rolling in 'getrootdev', every module
@@ -340,7 +337,6 @@ loadrootmodules(void)
 	char		*this;
 	char		*name;
 	int		err;
-/* ONC_PLUS EXTRACT END */
 	int		i, proplen;
 	extern char	*impl_module_list[];
 	extern char	*platform_module_list[];
@@ -483,7 +479,6 @@ loop:
 	BMDPRINTF(("loadrootmodules: preload_module\n"));
 	(void) mod_sysctl_type(MOD_FORCELOAD, preload_module, NULL);
 
-/* ONC_PLUS EXTRACT START */
 	/*
 	 * If we booted otw then load in the plumbing
 	 * routine now while we still can. If we didn't
@@ -582,7 +577,6 @@ out:
 
 	return (err);
 }
-/* ONC_PLUS EXTRACT END */
 
 static int
 get_bootpath_prop(char *bootpath)

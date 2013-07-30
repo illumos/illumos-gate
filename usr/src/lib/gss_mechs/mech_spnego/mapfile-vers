@@ -40,6 +40,7 @@ $mapfile_version 2
 
 SYMBOL_VERSION SUNWprivate {
     global:
+	gss_mech_initialize;
 	spnego_gss_accept_sec_context;
 	spnego_gss_acquire_cred;
 	spnego_gss_delete_sec_context;

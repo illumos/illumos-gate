@@ -33,8 +33,6 @@
  * under license from the Regents of the University of California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * DES encryption library routines
  */
@@ -44,7 +42,6 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <rpc/des_crypt.h>
-/* EXPORT DELETE START */
 #ifdef sun
 #include <sys/ioctl.h>
 #include <sys/des.h>
@@ -52,9 +49,7 @@
 #else
 #include <des/des.h>
 #endif
-/* EXPORT DELETE END */
 #include <rpc/rpc.h>
-/* EXPORT DELETE START */
 
 extern int __des_crypt(char *, unsigned, struct desparams *);
 
@@ -89,7 +84,6 @@ static int g_desfd = UNOPENED;
 		*a++ = *b++; *a++ = *b++; *a++ = *b++; *a++ = *b++; \
 	} \
 }
-/* EXPORT DELETE END */
 
 /*
  * CBC mode encryption
@@ -97,7 +91,6 @@ static int g_desfd = UNOPENED;
 int
 cbc_crypt(char *key, char *buf, size_t len, unsigned int mode, char *ivec)
 {
-/* EXPORT DELETE START */
 	int err;
 	struct desparams dp;
 
@@ -106,12 +99,6 @@ cbc_crypt(char *key, char *buf, size_t len, unsigned int mode, char *ivec)
 	err = common_crypt(key, buf, len, mode, &dp);
 	COPY8(dp.des_ivec, ivec);
 	return (err);
-#if 0
-/* EXPORT DELETE END */
-	return (DESERR_HWERROR);
-/* EXPORT DELETE START */
-#endif
-/* EXPORT DELETE END */
 }
 
 
@@ -121,21 +108,13 @@ cbc_crypt(char *key, char *buf, size_t len, unsigned int mode, char *ivec)
 int
 ecb_crypt(char *key, char *buf, size_t len, unsigned int mode)
 {
-/* EXPORT DELETE START */
 	struct desparams dp;
 
 	dp.des_mode = ECB;
 	return (common_crypt(key, buf, len, mode, &dp));
-#if 0
-/* EXPORT DELETE END */
-	return (DESERR_HWERROR);
-/* EXPORT DELETE START */
-#endif
-/* EXPORT DELETE END */
 }
 
 
-/* EXPORT DELETE START */
 
 /*
  * Common code to cbc_crypt() & ecb_crypt()
@@ -185,9 +164,7 @@ software:
 		return (DESERR_HWERROR);
 	return (desdev == DES_SW ? DESERR_NONE : DESERR_NOHWDEVICE);
 }
-/* EXPORT DELETE END */
 
-/* EXPORT DELETE START */
 static int
 desN_crypt(des_block keys[], int keynum, char *buf, unsigned int len,
 		unsigned int mode, char *ivec)
@@ -223,7 +200,6 @@ desN_crypt(des_block keys[], int keynum, char *buf, unsigned int len,
 
 	return (stat);
 }
-/* EXPORT DELETE END */
 
 
 
@@ -231,12 +207,5 @@ int
 __cbc_triple_crypt(des_block keys[], char *buf,  uint_t len,
 			uint_t mode, char *ivec)
 {
-/* EXPORT DELETE START */
 	return (desN_crypt(keys, 3, buf, len, mode, ivec));
-#if 0
-/* EXPORT DELETE END */
-	return (DESERR_HWERROR);
-/* EXPORT DELETE START */
-#endif
-/* EXPORT DELETE END */
 }

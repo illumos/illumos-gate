@@ -31,8 +31,6 @@
  * under license from the Regents of the University of California.
  */
 
-#ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Warning!  Things are arranged very carefully in this file to
  * allow read-only data to be moved to the text segment.  The
@@ -60,10 +58,8 @@ static void des_setkey(u_char userkey[8], struct deskeydata *kd,
     unsigned int dir);
 static void des_encrypt(u_char *data, struct deskeydata *kd);
 
-/* EXPORT DELETE START */
 #define	btst(k, b)	(k[b >> 3] & (0x80 >> (b & 07)))
 #define	BIT28	(1<<28)
-/* EXPORT DELETE END */
 
 /*
  * Software encrypt or decrypt a block of data (multiple of 8 bytes)
@@ -73,7 +69,6 @@ static void des_encrypt(u_char *data, struct deskeydata *kd);
 int
 _des_crypt(char *buf, size_t len, struct desparams *desp)
 {
-/* EXPORT DELETE START */
 	short i;
 	uint_t mode;
 	uint_t dir;
@@ -112,7 +107,6 @@ _des_crypt(char *buf, size_t len, struct desparams *desp)
 		buf += 8;
 		len -= 8;
 	}
-/* EXPORT DELETE END */
 	return (1);
 }
 
@@ -125,7 +119,6 @@ _des_crypt(char *buf, size_t len, struct desparams *desp)
 static void
 des_setkey(u_char userkey[8], struct deskeydata *kd, unsigned int dir)
 {
-/* EXPORT DELETE START */
 	int32_t C, D;
 	short i;
 
@@ -206,7 +199,6 @@ des_setkey(u_char userkey[8], struct deskeydata *kd, unsigned int dir)
 			bbit >>= 8;
 		}
 	}
-/* EXPORT DELETE END */
 }
 
 
@@ -222,7 +214,6 @@ des_setkey(u_char userkey[8], struct deskeydata *kd, unsigned int dir)
 static void
 des_encrypt(u_char *data, struct deskeydata *kd)
 {
-/* EXPORT DELETE START */
 	chunk_t work1, work2;
 
 	/*
@@ -400,5 +391,4 @@ des_encrypt(u_char *data, struct deskeydata *kd)
 	data[5] = work2.byte5;
 	data[6] = work2.byte6;
 	data[7] = work2.byte7;
-/* EXPORT DELETE END */
 }

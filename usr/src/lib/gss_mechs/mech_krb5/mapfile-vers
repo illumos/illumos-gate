@@ -222,6 +222,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	gsskrb5_extract_authz_data_from_sec_context;
 	gss_krb5_ccache_name;
 	gss_krb5_copy_ccache;
+	gss_mech_initialize;
 	gss_mech_krb5;
 	gss_mech_krb5_old;
 	gss_mech_krb5_wrong;
@@ -748,9 +749,11 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	kwarn_add_warning;
 	kwarn_del_warning;
 	kv5m_error_table;
+	mit_afs_string_to_key;
 	mit_des_check_key_parity;
 	mit_des_fixup_key_parity;
 	mit_des_is_weak_key;
+	mit_des_string_to_key_int;
 	ovk_error_table;
 	ovku_error_table;
 	prof_error_table;

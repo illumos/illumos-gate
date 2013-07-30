@@ -26,9 +26,7 @@
 #include <sys/param.h>
 #include <sys/promif.h>
 #include <sys/salib.h>
-/* EXPORT DELETE START */
 #include <bootlog.h>
-/* EXPORT DELETE END */
 #include "ramdisk.h"
 
 #include <sys/param.h>

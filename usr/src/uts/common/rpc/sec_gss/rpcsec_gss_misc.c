@@ -145,9 +145,7 @@ __rpc_gss_wrap_data(service, qop, context, seq_num, out_xdrs,
 	gss_buffer_desc		in_buf, out_buf;
 	XDR			temp_xdrs;
 	char			*temp_data;
-/* EXPORT DELETE START */
 	bool_t			conf_state;
-/* EXPORT DELETE END */
 	bool_t			ret = FALSE;
 	int			size;
 
@@ -185,7 +183,6 @@ __rpc_gss_wrap_data(service, qop, context, seq_num, out_xdrs,
 	switch (service) {
 	case rpc_gss_svc_privacy:
 
-/* EXPORT DELETE START */
 		if ((major = kgss_seal(&minor, context, TRUE, qop, &in_buf,
 				&conf_state, &out_buf)) != GSS_S_COMPLETE) {
 			RPCGSS_LOG1(1, "rpc_gss_wrap: kgss_seal failed."
@@ -194,11 +191,8 @@ __rpc_gss_wrap_data(service, qop, context, seq_num, out_xdrs,
 		}
 		in_buf.length = 0;	/* in_buf not needed */
 		if (!conf_state)
-/* EXPORT DELETE END */
 			goto fail;
-/* EXPORT DELETE START */
 		break;
-/* EXPORT DELETE END */
 	case rpc_gss_svc_integrity:
 		if ((major = kgss_sign(&minor, context, qop, &in_buf,
 				&out_buf)) != GSS_S_COMPLETE) {
@@ -264,10 +258,8 @@ __rpc_gss_unwrap_data(service, context, seq_num, qop_check, in_xdrs,
 
 	if (service == rpc_gss_svc_privacy) {
 		major = GSS_S_FAILURE;
-/* EXPORT DELETE START */
 		major = kgss_unseal(&minor, context, &in_buf, &out_buf, &conf,
 					&qop);
-/* EXPORT DELETE END */
 		kmem_free(in_buf.value, in_buf.length);
 		if (major != GSS_S_COMPLETE) {
 			RPCGSS_LOG1(1, "rpc_gss_unwrap: kgss_unseal failed."

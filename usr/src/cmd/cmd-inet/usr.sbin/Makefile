@@ -26,14 +26,10 @@
 SYNCPROG=	syncinit syncloop syncstat
 DHCPPROG=	dhcpconfig dhtadm pntadm
 
-# EXPORT DELETE START
-XMODPROG=	wanbootutil
-# EXPORT DELETE END
-
 PROG=		6to4relay arp gettable if_mpadm \
 		in.comsat in.fingerd in.rarpd in.rexecd in.rlogind \
 		in.rshd in.rwhod in.telnetd in.tftpd ipaddrsel \
-		ndd $(SYNCPROG) $(DHCPPROG) $(XMODPROG)
+		ndd $(SYNCPROG) $(DHCPPROG) wanbootutil
 
 MANIFEST=	rarp.xml telnet.xml comsat.xml finger.xml \
 		login.xml shell.xml rexec.xml socket-filter-kssl.xml
@@ -272,13 +268,3 @@ lint: $(LINTSUBDIRS)
 	    -lsocket -lnsl
 	$(LINT.c) in.tftpd.c ../usr.bin/tftp/tftpsubs.c $(LDLIBS) \
 	    -lsocket -lnsl
-
-# EXPORT DELETE START
-EXPORT_SRC:
-	$(RM) Makefile+
-	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-		< Makefile > Makefile+
-	$(RM) Makefile
-	$(MV) Makefile+ Makefile
-	$(CHMOD) 444 Makefile
-# EXPORT DELETE END

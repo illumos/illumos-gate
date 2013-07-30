@@ -201,9 +201,6 @@ rc4_common_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
     crypto_key_t *key, crypto_spi_ctx_template_t template,
     crypto_req_handle_t req)
 {
-
-/* EXPORT DELETE START */
-
 	ARCFour_key *keystream;
 
 	if ((mechanism)->cm_type != RC4_MECH_INFO_TYPE)
@@ -229,8 +226,6 @@ rc4_common_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 
 	ctx->cc_provider_private = keystream;
 
-/* EXPORT DELETE END */
-
 	return (CRYPTO_SUCCESS);
 }
 
@@ -254,8 +249,6 @@ rc4_crypt_update(crypto_ctx_t *ctx, crypto_data_t *input, crypto_data_t *output,
     crypto_req_handle_t req)
 {
 	int ret = CRYPTO_SUCCESS;
-
-/* EXPORT DELETE START */
 
 	ARCFour_key *key;
 	off_t saveoffset;
@@ -484,8 +477,6 @@ rc4_crypt_update(crypto_ctx_t *ctx, crypto_data_t *input, crypto_data_t *output,
 	output->cd_offset = saveoffset;
 	output->cd_length = input->cd_length;
 
-/* EXPORT DELETE END */
-
 	return (ret);
 }
 
@@ -527,9 +518,6 @@ rc4_crypt_atomic(crypto_provider_handle_t handle, crypto_session_id_t session,
 static int
 rc4_free_context(crypto_ctx_t *ctx)
 {
-
-/* EXPORT DELETE START */
-
 	ARCFour_key *keystream = ctx->cc_provider_private;
 
 	if (keystream != NULL) {
@@ -537,8 +525,6 @@ rc4_free_context(crypto_ctx_t *ctx)
 		kmem_free(keystream, sizeof (ARCFour_key));
 		ctx->cc_provider_private = NULL;
 	}
-
-/* EXPORT DELETE END */
 
 	return (CRYPTO_SUCCESS);
 }

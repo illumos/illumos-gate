@@ -19,7 +19,6 @@
  * CDDL HEADER END
  */
 
-/* ONC_PLUS EXTRACT START */
 /*
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
@@ -34,8 +33,6 @@
  */
 
 
-/* ONC_PLUS EXTRACT END */
-
 #include <sys/param.h>
 #include <sys/isa_defs.h>
 #include <sys/types.h>
@@ -43,9 +40,7 @@
 #include <sys/systm.h>
 #include <sys/errno.h>
 #include <sys/fcntl.h>
-/* ONC_PLUS EXTRACT START */
 #include <sys/flock.h>
-/* ONC_PLUS EXTRACT END */
 #include <sys/vnode.h>
 #include <sys/file.h>
 #include <sys/mode.h>
@@ -58,7 +53,6 @@
 
 #include <sys/cmn_err.h>
 
-/* ONC_PLUS EXTRACT START */
 static int flock_check(vnode_t *, flock64_t *, offset_t, offset_t);
 static int flock_get_start(vnode_t *, flock64_t *, offset_t, u_offset_t *);
 static void fd_too_big(proc_t *);
@@ -150,8 +144,6 @@ fcntl(int fdes, int cmd, intptr_t arg)
 	iarg = (int)arg;
 
 	switch (cmd) {
-/* ONC_PLUS EXTRACT END */
-
 	case F_DUPFD:
 	case F_DUPFD_CLOEXEC:
 		p = curproc;
@@ -275,7 +267,6 @@ fcntl(int fdes, int cmd, intptr_t arg)
 	offset = fp->f_offset;
 
 	switch (cmd) {
-/* ONC_PLUS EXTRACT START */
 	/*
 	 * The file system and vnode layers understand and implement
 	 * locking with flock64 structures. So here once we pass through
@@ -450,7 +441,6 @@ fcntl(int fdes, int cmd, intptr_t arg)
 #endif
 		}
 		break;
-/* ONC_PLUS EXTRACT END */
 
 	case F_CHKFL:
 		/*
@@ -597,7 +587,6 @@ fcntl(int fdes, int cmd, intptr_t arg)
 		break;
 
 #if !defined(_LP64) || defined(_SYSCALL32_IMPL)
-/* ONC_PLUS EXTRACT START */
 	case F_GETLK64:
 	case F_SETLK64:
 	case F_SETLKW64:
@@ -680,10 +669,8 @@ fcntl(int fdes, int cmd, intptr_t arg)
 				error = EFAULT;
 		}
 		break;
-/* ONC_PLUS EXTRACT END */
 #endif /* !defined(_LP64) || defined(_SYSCALL32_IMPL) */
 
-/* ONC_PLUS EXTRACT START */
 	case F_SHARE:
 	case F_SHARE_NBMAND:
 	case F_UNSHARE:
@@ -708,7 +695,6 @@ fcntl(int fdes, int cmd, intptr_t arg)
 		shr.s_own_len = sizeof (shr_own);
 		shr.s_owner = (caddr_t)&shr_own;
 		error = VOP_SHRLOCK(vp, cmd, &shr, flag, fp->f_cred, NULL);
-/* ONC_PLUS EXTRACT END */
 		break;
 
 	default:
@@ -727,7 +713,6 @@ out:
 	return (retval);
 }
 
-/* ONC_PLUS EXTRACT START */
 int
 flock_check(vnode_t *vp, flock64_t *flp, offset_t offset, offset_t max)
 {
@@ -839,4 +824,3 @@ fd_too_big(proc_t *p)
 	    p->p_rctls, p, RCA_SAFE);
 	mutex_exit(&p->p_lock);
 }
-/* ONC_PLUS EXTRACT END */

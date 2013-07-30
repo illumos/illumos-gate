@@ -1434,8 +1434,6 @@ kgss_verify(OM_uint32 *minor_status,
 }
 
 
-/* EXPORT DELETE START */
-
 OM_uint32
 kgss_seal_wrapped(
 	minor_status,
@@ -1657,8 +1655,6 @@ kgss_unseal(OM_uint32 *minor_status,
 		    input_message_buffer, output_message_buffer,
 		    conf_state, qop_state));
 }
-
-/* EXPORT DELETE END */
 
 OM_uint32
 kgss_display_status(minor_status,

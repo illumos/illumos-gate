@@ -22,8 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include			../Makefile.lib
 
@@ -76,16 +74,3 @@ $(POFILES):
 	$(RM) messages.po
 
 FRC:
-
-# EXPORT DELETE START
-EXPORT_SRC:
-	$(RM) -f common/ns_crypt.c+ Makefile+
-	sed -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" < \
-		common/ns_crypt.c > common/ns_crypt.c+
-	$(MV) common/ns_crypt.c+ common/ns_crypt.c
-	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-		< Makefile > Makefile+
-	$(MV) Makefile+ Makefile
-	$(CHMOD) 444 Makefile common/ns_crypt.c
-
-# EXPORT DELETE END

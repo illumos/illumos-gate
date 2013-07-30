@@ -115,7 +115,6 @@ static OM_uint32 k5glue_verify
             int*              /* qop_state */
            );
 
-/* EXPORT DELETE START */
 static OM_uint32 k5glue_seal
 (void *, OM_uint32*,       /* minor_status */
             gss_ctx_id_t,     /* context_handle */
@@ -134,7 +133,6 @@ static OM_uint32 k5glue_unseal
             int*,             /* conf_state */
             int*              /* qop_state */
            );
-/* EXPORT DELETE END */
 
 static OM_uint32 k5glue_display_status
 (void *, OM_uint32*,       /* minor_status */
@@ -409,9 +407,7 @@ static struct gss_config krb5_mechanism = {
     k5glue_release_cred,
     k5glue_init_sec_context,
     k5glue_accept_sec_context,
-/* EXPORT DELETE START */ /* CRYPT DELETE START */
     k5glue_unseal,
-/* EXPORT DELETE END */ /* CRYPT DELETE END */
     k5glue_process_context_token,
     k5glue_delete_sec_context,
     k5glue_context_time,
@@ -423,9 +419,7 @@ static struct gss_config krb5_mechanism = {
     k5glue_release_name,
     k5glue_inquire_cred,
     k5glue_add_cred,
-/* EXPORT DELETE START */ /* CRYPT DELETE START */
     k5glue_seal,
-/* EXPORT DELETE END */ /* CRYPT DELETE END */
     k5glue_export_sec_context,
     k5glue_import_sec_context,
     k5glue_inquire_cred_by_mech,
@@ -436,16 +430,6 @@ static struct gss_config krb5_mechanism = {
     k5glue_pname_to_uid,
     k5glue_userok,
     k5glue_export_name,
-/* EXPORT DELETE START */
-/* CRYPT DELETE START */
-#if 0
-/* CRYPT DELETE END */
-    k5glue_seal,
-    k5glue_unseal,
-/* CRYPT DELETE START */
-#endif
-/* CRYPT DELETE END */
-/* EXPORT DELETE END */
     k5glue_sign,
     k5glue_verify,
     k5glue_store_cred,
@@ -462,9 +446,7 @@ static struct gss_config krb5_mechanism_old = {
     k5glue_release_cred,
     k5glue_init_sec_context,
     k5glue_accept_sec_context,
-/* EXPORT DELETE START */ /* CRYPT DELETE START */
     k5glue_unseal,
-/* EXPORT DELETE END */ /* CRYPT DELETE END */
     k5glue_process_context_token,
     k5glue_delete_sec_context,
     k5glue_context_time,
@@ -476,9 +458,7 @@ static struct gss_config krb5_mechanism_old = {
     k5glue_release_name,
     k5glue_inquire_cred,
     k5glue_add_cred,
-/* EXPORT DELETE START */ /* CRYPT DELETE START */
     k5glue_seal,
-/* EXPORT DELETE END */ /* CRYPT DELETE END */
     k5glue_export_sec_context,
     k5glue_import_sec_context,
     k5glue_inquire_cred_by_mech,
@@ -489,16 +469,6 @@ static struct gss_config krb5_mechanism_old = {
     k5glue_pname_to_uid,
     k5glue_userok,
     k5glue_export_name,
-/* EXPORT DELETE START */
-/* CRYPT DELETE START */
-#if 0
-/* CRYPT DELETE END */
-    k5glue_seal,
-    k5glue_unseal,
-/* CRYPT DELETE START */
-#endif
-/* CRYPT DELETE END */
-/* EXPORT DELETE END */
     k5glue_sign,
     k5glue_verify,
     k5glue_store_cred,
@@ -515,9 +485,7 @@ static struct gss_config krb5_mechanism_wrong = {
     k5glue_release_cred,
     k5glue_init_sec_context,
     k5glue_accept_sec_context,
-/* EXPORT DELETE START */ /* CRYPT DELETE START */
     k5glue_unseal,
-/* EXPORT DELETE END */ /* CRYPT DELETE END */
     k5glue_process_context_token,
     k5glue_delete_sec_context,
     k5glue_context_time,
@@ -529,9 +497,7 @@ static struct gss_config krb5_mechanism_wrong = {
     k5glue_release_name,
     k5glue_inquire_cred,
     k5glue_add_cred,
-/* EXPORT DELETE START */ /* CRYPT DELETE START */
     k5glue_seal,
-/* EXPORT DELETE END */ /* CRYPT DELETE END */
     k5glue_export_sec_context,
     k5glue_import_sec_context,
     k5glue_inquire_cred_by_mech,
@@ -542,16 +508,6 @@ static struct gss_config krb5_mechanism_wrong = {
     k5glue_pname_to_uid,
     k5glue_userok,
     k5glue_export_name,
-/* EXPORT DELETE START */
-/* CRYPT DELETE START */
-#if 0
-/* CRYPT DELETE END */
-    k5glue_seal,
-    k5glue_unseal,
-/* CRYPT DELETE START */
-#endif
-/* CRYPT DELETE END */
-/* EXPORT DELETE END */
     k5glue_sign,
     k5glue_verify,
     k5glue_store_cred,
@@ -993,7 +949,6 @@ k5glue_release_oid_set(ctx, minor_status, set)
 }
 #endif
 
-/* EXPORT DELETE START */
 /* V1 only */
 static OM_uint32
 k5glue_seal(ctx, minor_status, context_handle, conf_req_flag, qop_req,
@@ -1011,7 +966,6 @@ k5glue_seal(ctx, minor_status, context_handle, conf_req_flag, qop_req,
 			conf_req_flag, qop_req, input_message_buffer,
 			conf_state, output_message_buffer));
 }
-/* EXPORT DELETE END */
 
 static OM_uint32
 k5glue_sign(ctx, minor_status, context_handle,
@@ -1087,7 +1041,6 @@ k5glue_test_oid_set_member(ctx, minor_status, member, set, present)
 }
 #endif
 
-/* EXPORT DELETE START */
 /* V1 only */
 static OM_uint32
 k5glue_unseal(ctx, minor_status, context_handle, input_message_buffer,
@@ -1104,7 +1057,6 @@ k5glue_unseal(ctx, minor_status, context_handle, input_message_buffer,
 			  input_message_buffer, output_message_buffer,
 			  conf_state, qop_state));
 }
-/* EXPORT DELETE END */
 
 #if 0
 /* V2 */

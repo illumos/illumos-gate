@@ -33,8 +33,6 @@
  * under license from the Regents of the University of California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Hex encryption/decryption and utility routines
  */
@@ -60,7 +58,6 @@ static char hexval();
 int passwd2des(char *, char *);
 static int weak_DES_key(des_block);
 
-/* EXPORT DELETE START */
 /*
  * For export control reasons, we want to limit the maximum size of
  * data that can be encrypted or decrypted.  We limit this to 1024
@@ -73,7 +70,6 @@ static int weak_DES_key(des_block);
  * and we have reason to believe this is ok for export.
  */
 #define	MAX_KEY_CRYPT_LEN	144
-/* EXPORT DELETE END */
 
 /*
  * Encrypt a secret key given passwd
@@ -85,7 +81,6 @@ xencrypt(secret, passwd)
 	char *secret;
 	char *passwd;
 {
-/* EXPORT DELETE START */
 	char key[8];
 	char ivec[8];
 	char *buf;
@@ -108,12 +103,6 @@ xencrypt(secret, passwd)
 	(void) bin2hex(len, (unsigned char *) buf, secret);
 	free(buf);
 	return (1);
-#if 0
-/* EXPORT DELETE END */
-	return (0);
-/* EXPORT DELETE START */
-#endif
-/* EXPORT DELETE END */
 }
 
 /*
@@ -126,7 +115,6 @@ xdecrypt(secret, passwd)
 	char *secret;
 	char *passwd;
 {
-/* EXPORT DELETE START */
 	char key[8];
 	char ivec[8];
 	char *buf;
@@ -150,12 +138,6 @@ xdecrypt(secret, passwd)
 	(void) bin2hex(len, (unsigned char *) buf, secret);
 	free(buf);
 	return (1);
-#if 0
-/* EXPORT DELETE END */
-	return (0);
-/* EXPORT DELETE START */
-#endif
-/* EXPORT DELETE END */
 }
 
 /*
@@ -264,7 +246,6 @@ xencrypt_g(
 	char **encrypted_secret,	/* out */
 	bool_t do_chksum)		/* in  */
 {
-/* EXPORT DELETE START */
 	des_block key;
 	char ivec[8];
 	char *binkeybuf;
@@ -342,12 +323,6 @@ xencrypt_g(
 	free(binkeybuf);
 	*encrypted_secret = hexkeybuf;
 	return (1);
-#if 0
-/* EXPORT DELETE END */
-	return (0);
-/* EXPORT DELETE START */
-#endif
-/* EXPORT DELETE END */
 }
 
 /*
@@ -375,7 +350,6 @@ xdecrypt_g(
 	const char netname[],	/* in  */
 	bool_t do_chksum)	/* in  */
 {
-/* EXPORT DELETE START */
 	des_block key;
 	char ivec[8];
 	char *buf;
@@ -443,12 +417,6 @@ xdecrypt_g(
 	secret[hexkeybytes] = '\0';
 
 	return (1);
-#if 0
-/* EXPORT DELETE END */
-	return (0);
-/* EXPORT DELETE START */
-#endif
-/* EXPORT DELETE END */
 }
 
 

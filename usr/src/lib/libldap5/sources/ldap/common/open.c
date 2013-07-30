@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 /*
  * The contents of this file are subject to the Netscape Public
@@ -401,11 +399,7 @@ ldap_version( LDAPVersion *ver )
 
 		ver->security_level = LDAP_SECURITY_NONE;
 #if defined(LINK_SSL)
-#if defined(NS_DOMESTIC)
 		ver->security_level = 128;
-#elif defined(NSS_EXPORT)
-		ver->security_level = 40;
-#endif
 #endif
 
 	}

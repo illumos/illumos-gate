@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* DIGEST-MD5 SASL plugin
  * Rob Siemborski
  * Tim Martin
@@ -63,7 +61,6 @@
 #include <fcntl.h>
 #include <ctype.h>
 
-/* EXPORT DELETE START */
 /* DES support */
 #ifdef WITH_DES
 # ifdef WITH_SSL_DES
@@ -72,7 +69,6 @@
 #  include <des.h>
 # endif
 #endif /* WITH_DES */
-/* EXPORT DELETE END */
 
 #ifdef WIN32
 # include <winsock.h>
@@ -721,7 +717,6 @@ static void get_pair(char **in, char **name, char **value)
     *in = endpair;
 }
 
-/* EXPORT DELETE START */
 #ifdef WITH_DES
 struct des_context_s {
     des_key_schedule keysched;  /* key schedule for des initialization */
@@ -1189,11 +1184,9 @@ static int enc_rc4(context_t *text,
 }
 
 #endif /* WITH_RC4 */
-/* EXPORT DELETE END */
 
 struct digest_cipher available_ciphers[] =
 {
-    /* EXPORT DELETE START */
 #ifdef WITH_RC4
     { "rc4-40", 40, 5, 0x01, &enc_rc4, &dec_rc4, &init_rc4, &free_rc4 },
     { "rc4-56", 56, 7, 0x02, &enc_rc4, &dec_rc4, &init_rc4, &free_rc4 },
@@ -1203,7 +1196,6 @@ struct digest_cipher available_ciphers[] =
     { "des", 55, 16, 0x08, &enc_des, &dec_des, &init_des, &free_des },
     { "3des", 112, 16, 0x10, &enc_3des, &dec_3des, &init_3des, &free_des },
 #endif
-    /* EXPORT DELETE END */
     { NULL, 0, 0, 0, NULL, NULL, NULL, NULL }
 };
 
@@ -3688,17 +3680,13 @@ static sasl_server_plug_t digestmd5_server_plugins[] =
 {
     {
 	"DIGEST-MD5",			/* mech_name */
-	/* EXPORT DELETE START */
 #ifdef WITH_RC4
 	128,				/* max_ssf */
 #elif WITH_DES
 	112,
 #else 
-	/* EXPORT DELETE END */
 	0,
-	/* EXPORT DELETE START */
 #endif
-	/* EXPORT DELETE END */
 	SASL_SEC_NOPLAINTEXT
 	| SASL_SEC_NOANONYMOUS
 	| SASL_SEC_MUTUAL_AUTH,		/* security_flags */
@@ -3779,8 +3767,6 @@ int digestmd5_server_plug_init(sasl_utils_t *utils,
 #endif /* USE_UEF_CLIENT */
 #endif /* _SUN_SDK_ */
 
-    /* EXPORT DELETE START */
-    /* CRYPT DELETE START */
 #ifdef _INTEGRATED_SOLARIS_
     /*
      * Let libsasl know that we are a "Sun" plugin so that privacy
@@ -3788,8 +3774,6 @@ int digestmd5_server_plug_init(sasl_utils_t *utils,
      */
     REG_PLUG("DIGEST-MD5", digestmd5_server_plugins);
 #endif /* _INTEGRATED_SOLARIS_ */
-    /* CRYPT DELETE END */
-    /* EXPORT DELETE END */
 
     *out_version = SASL_SERVER_PLUG_VERSION;
     *pluglist = digestmd5_server_plugins;
@@ -5178,17 +5162,13 @@ static sasl_client_plug_t digestmd5_client_plugins[] =
 {
     {
 	"DIGEST-MD5",
-	/* EXPORT DELETE START */
 #ifdef WITH_RC4				/* mech_name */
 	128,				/* max ssf */
 #elif WITH_DES
 	112,
 #else
-	/* EXPORT DELETE END */
 	0,
-	/* EXPORT DELETE START */
 #endif
-	/* EXPORT DELETE END */
 	SASL_SEC_NOPLAINTEXT
 	| SASL_SEC_NOANONYMOUS
 	| SASL_SEC_MUTUAL_AUTH,		/* security_flags */
@@ -5251,8 +5231,6 @@ int digestmd5_client_plug_init(sasl_utils_t *utils,
 #endif /* USE_UEF_CLIENT */
 #endif /* _SUN_SDK_ */
 
-    /* EXPORT DELETE START */
-    /* CRYPT DELETE START */
 #ifdef _INTEGRATED_SOLARIS_
     /*
      * Let libsasl know that we are a "Sun" plugin so that privacy
@@ -5260,8 +5238,6 @@ int digestmd5_client_plug_init(sasl_utils_t *utils,
      */
     REG_PLUG("DIGEST-MD5", digestmd5_client_plugins);
 #endif /* _INTEGRATED_SOLARIS_ */
-    /* CRYPT DELETE END */
-    /* EXPORT DELETE END */
 
     *out_version = SASL_CLIENT_PLUG_VERSION;
     *pluglist = digestmd5_client_plugins;

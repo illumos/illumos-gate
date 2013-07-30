@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* GSSAPI SASL plugin
  * Leif Johansson
  * Rob Siemborski (SASL v2 Conversion)
@@ -1486,8 +1484,6 @@ int gssapiv2_server_plug_init(
 #endif
 #endif /* !_SUN_SDK_ */
     
-    /* EXPORT DELETE START */
-    /* CRYPT DELETE START */
 #ifdef _INTEGRATED_SOLARIS_
     /*
      * Let libsasl know that we are a "Sun" plugin so that privacy
@@ -1495,8 +1491,6 @@ int gssapiv2_server_plug_init(
      */
     REG_PLUG("GSSAPI", gssapi_server_plugins);
 #endif /* _INTEGRATED_SOLARIS_ */
-    /* CRYPT DELETE END */
-    /* EXPORT DELETE END */
 
     *out_version = SASL_SERVER_PLUG_VERSION;
     *pluglist = gssapi_server_plugins;
@@ -2186,8 +2180,6 @@ int gssapiv2_client_plug_init(const sasl_utils_t *utils __attribute__((unused)),
 	return SASL_BADVERS;
     }
     
-    /* EXPORT DELETE START */
-    /* CRYPT DELETE START */
 #ifdef _INTEGRATED_SOLARIS_
     /*
      * Let libsasl know that we are a "Sun" plugin so that privacy
@@ -2195,8 +2187,6 @@ int gssapiv2_client_plug_init(const sasl_utils_t *utils __attribute__((unused)),
      */
     REG_PLUG("GSSAPI", gssapi_client_plugins);
 #endif /* _INTEGRATED_SOLARIS_ */
-    /* CRYPT DELETE END */
-    /* EXPORT DELETE END */
 
     *out_version = SASL_CLIENT_PLUG_VERSION;
     *pluglist = gssapi_client_plugins;

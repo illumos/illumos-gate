@@ -78,8 +78,6 @@ void aes_decrypt_impl(const uint32_t rk[], int Nr, const uint32_t ct[4],
 	.section	".text",#alloc
 	.align	8192
 
-/* EXPORT DELETE START */
-
 !
 ! CONSTANT POOL
 !
@@ -5866,8 +5864,6 @@ rcon:
 	.word	905969664
 	.type	rcon,#object
 	.size	rcon,40
-
-/* EXPORT DELETE END */
 
 ! Begin Disassembling Stabs
 	.xstabs	".stab.index","Xa ; O ; P ; V=3.1 ; R=WorkShop Compilers 5.0 99/02/25 C 5.0 patch 107289-01",60,0,0,0	! (/tmp/acompAAA5jaWsZ:1)

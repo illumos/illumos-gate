@@ -71,33 +71,3 @@ cscope.out tags: FRC
 	$(XREF) -x $@
 
 FRC:
-
-# EXPORT DELETE START
-EXPORT_SRC:
-	$(RM) sparc/common/wanboot.c+
-	sed -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
-		< sparc/common/wanboot.c > sparc/common/wanboot.c+
-	$(MV) sparc/common/wanboot.c+ sparc/common/wanboot.c
-	$(CHMOD) 444 sparc/common/wanboot.c
-	$(RM) sparc/common/wbcli.c+
-	sed -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
-		< sparc/common/wbcli.c > sparc/common/wbcli.c+
-	$(MV) sparc/common/wbcli.c+ sparc/common/wbcli.c
-	$(CHMOD) 444 sparc/common/wbcli.c
-	$(RM) sparc/common/ramdisk.c+
-	sed -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
-		< sparc/common/ramdisk.c > sparc/common/ramdisk.c+
-	$(MV) sparc/common/ramdisk.c+ sparc/common/ramdisk.c
-	$(CHMOD) 444 sparc/common/ramdisk.c
-	$(RM) sparcv9/Makefile.com+
-	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-		< sparcv9/sun4/Makefile > sparcv9/sun4/Makefile+
-	$(MV) sparcv9/sun4/Makefile+ sparcv9/sun4/Makefile
-	$(CHMOD) 444 sparcv9/sun4/Makefile
-	$(RM) Makefile+
-	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-		< Makefile > Makefile+
-	$(RM) Makefile
-	$(MV) Makefile+ Makefile
-	$(CHMOD) 444 Makefile
-# EXPORT DELETE END

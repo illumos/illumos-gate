@@ -2,7 +2,6 @@
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* Generic SASL plugin utility functions
  * Rob Siemborski
@@ -204,8 +203,6 @@ int _plug_parseuser(const sasl_utils_t *utils,
 		    const char *serverFQDN, const char *input);
 
 #ifdef _INTEGRATED_SOLARIS_
-/* EXPORT DELETE START */
-/* CRYPT DELETE START */
 typedef void reg_sun_t(void *);
 
 #define REG_PLUG( X, Y ) { \
@@ -216,8 +213,6 @@ typedef void reg_sun_t(void *);
 	if (func != NULL && l == 0) \
 		(*func)(Y); \
 }
-/* CRYPT DELETE END */
-/* EXPORT DELETE END */
 
 int use_locale(const char *lang_list, int is_client);
 const char *convert_prompt(const sasl_utils_t *utils, void **h, const char *s);

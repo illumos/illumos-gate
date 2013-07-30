@@ -72,46 +72,6 @@ mech/dhmech_prot.h: mech/dhmech_prot.x
 # include library targets
 include ../../../Makefile.targ
 
-# EXPORT DELETE START
-# Special target to clean up the source tree for export distribution
-# Warning: This target changes the source tree
-EXPORT_SRC:
-	$(RM) Makefile+ Makefile.com+ mech/crypto.c+ mech/dhmech.c+
-	$(SED) -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d"	\
-			< Makefile > Makefile+
-	$(MV) Makefile+ Makefile
-	$(SED) -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d"	\
-			< Makefile.com > Makefile.com+
-	$(MV) Makefile.com+ Makefile.com
-	$(SED) -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
-		< mech/crypto.c > mech/crypto.c+
-	$(MV) mech/crypto.c+ mech/crypto.c
-	$(SED) -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
-		< mech/dhmech.c > mech/dhmech.c+
-	$(MV) mech/dhmech.c+ mech/dhmech.c
-	$(CHMOD) 444 Makefile Makefile.com mech/crypto.c mech/dhmech.c
-
-# CRYPT DELETE START
-CRYPT_SRC:
-	$(RM) Makefile+ Makefile.com+ mech/dhmech.c+
-	$(SED) -e "/^# CRYPT DELETE START/,/^# CRYPT DELETE END/d"	\
-			< Makefile				\
-	   | $(SED) -e "/EXPORT DELETE/d"				\
-			> Makefile+
-	$(MV) Makefile+ Makefile
-	$(SED) -e "/^# CRYPT DELETE START/,/^# CRYPT DELETE END/d"	\
-			< Makefile.com				\
-	   | $(SED) -e "/EXPORT DELETE/d"				\
-			> Makefile.com+
-	$(MV) Makefile.com+ Makefile.com
-	$(SED) -e "/CRYPT DELETE START/,/CRYPT DELETE END/d" \
-			< mech/dhmech.c > mech/dhmech.c+
-	$(MV) mech/dhmech.c+ mech/dhmech.c
-	$(CHMOD) 444 Makefile Makefile.com mech/dhmech.c
-
-# CRYPT DELETE END
-# EXPORT DELETE END
-
 _msg: $(MSGDOMAIN) $(POFILE)
 	$(RM) $(MSGDOMAIN)/$(POFILE)
 	$(CP) $(POFILE) $(MSGDOMAIN)

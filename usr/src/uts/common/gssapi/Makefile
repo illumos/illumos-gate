@@ -88,36 +88,3 @@ check:	$(CHECKHDRS)
 
 clean:
 	$(RM) $(DERIVED_FILES)
-
-# EXPORT DELETE START
-# Special target to clean up the source tree for export distribution
-# Warning: This target changes the source tree
-EXPORT_SRC:
-	$(RM) Makefile+ gssd.x+ gssd_clnt_stubs.c+
-	sed -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
-		< gssd.x > gssd.x+
-	$(MV) gssd.x+ gssd.x
-	sed -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
-		< gssd_clnt_stubs.c > gssd_clnt_stubs.c+
-	$(MV) gssd_clnt_stubs.c+ gssd_clnt_stubs.c
-	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-		< Makefile > Makefile+
-	$(MV) Makefile+ Makefile
-	$(CHMOD) 444 Makefile gssd.x gssd_clnt_stubs.c
-
-# CRYPT DELETE START
-# Special target to clean up the source tree for domestic distribution
-# Warning: This target changes the source tree
-
-CRYPT_SRC:
-	$(RM) Makefile+ gssd_clnt_stubs.c+
-	sed  -e "/^# CRYPT DELETE START/,/^# CRYPT DELETE END/d" \
-		< Makefile > Makefile+
-	$(MV) Makefile+ Makefile
-	sed -e "/CRYPT DELETE START/,/CRYPT DELETE END/d" \
-		< gssd_clnt_stubs.c > gssd_clnt_stubs.c+
-	$(MV) gssd_clnt_stubs.c+ gssd_clnt_stubs.c 
-	$(CHMOD) 444 Makefile gssd_clnt_stubs.c
-
-# CRYPT DELETE END
-# EXPORT DELETE END

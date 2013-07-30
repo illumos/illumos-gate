@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -43,17 +41,3 @@ clean:
 lint:	lint_PROG
 
 include ../Makefile.targ
-
-# EXPORT DELETE START
-EXPORT_SRC:
-	$(RM) $(PROG).c+ Makefile+
-	sed -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
-		< $(PROG).c > $(PROG).c+
-	$(MV) $(PROG).c+ $(PROG).c
-	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-		< Makefile > Makefile+
-	$(RM) Makefile
-	$(MV) Makefile+ Makefile
-	$(CHMOD) 444 Makefile $(PROG).c
-
-# EXPORT DELETE END
