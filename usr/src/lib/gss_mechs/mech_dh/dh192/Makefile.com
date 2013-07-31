@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 # This make file will build dh192.so.1. This shared object
@@ -60,8 +58,6 @@ LIBS = $(DYNLIB)
 LIBNAME = $(LIBRARY:%.a=%)
 
 MAPFILES =	../mapfile-vers
-$(EXPORT_RELEASE_BUILD)MAPFILES = \
-	$(CLOSED)/lib/gss_mechs/mech_dh/dh192/mapfile-vers-export
 
 LDLIBS += -lnsl -lmp -lc
 

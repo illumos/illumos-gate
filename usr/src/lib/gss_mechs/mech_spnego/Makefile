@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 # This make file will build mech_spnego.so.1. This shared object
@@ -53,32 +51,3 @@ $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
-
-# EXPORT DELETE START
-# Special target to clean up the source tree for export distribution
-# Warning: This target changes the source tree
-EXPORT_SRC:
-	$(RM) Makefile+ mech/spnego_mech.c+
-	sed -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
-		< mech/spnego_mech.c > mech/spnego_mech.c+ 
-	$(MV) mech/spnego_mech.c+ mech/spnego_mech.c
-	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-		< Makefile > Makefile+
-	$(MV) Makefile+ Makefile
-	$(CHMOD) 444 Makefile mech/spnego_mech.c
-
-# CRYPT DELETE START
-# Special target to clean up the source tree for domestic distribution
-# Warning: This target changes the source tree
-CRYPT_SRC:
-	$(RM) Makefile+ mech/spnego_mech.c+
-	sed -e "/CRYPT DELETE START/,/CRYPT DELETE END/d" \
-		< mech/spnego_mech.c > mech/spnego_mech.c+ 
-	$(MV) mech/spnego_mech.c+ mech/spnego_mech.c
-	sed -e "/^# CRYPT DELETE START/,/^# CRYPT DELETE END/d" \
-		< Makefile > Makefile+
-	$(MV) Makefile+ Makefile
-	$(CHMOD) 444 Makefile mech/spnego_mech.c
-
-# CRYPT DELETE END
-# EXPORT DELETE END

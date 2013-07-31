@@ -532,20 +532,6 @@ corresponding variable for Mercurial or Subversion, which are assumed
 to be installed in the default path.
 .RE
 .LP
-.B EXPORT_SRC
-.RS 5
-The source product has no SCCS history, and is modified to remove source
-that cannot be shipped. EXPORT_SRC is where the clear files are copied, then
-modified with 'make EXPORT_SRC'.
-.RE
-.LP
-.B CRYPT_SRC
-.RS 5
-CRYPT_SRC is similar to EXPORT_SRC, but after 'make CRYPT_SRC' the files in
-xmod/cry_files are saved. They are dropped on the exportable source to create
-the domestic build.
-.LP
-.RE
 .B OPEN_SRCDIR
 .RS 5
 The open source tree is copied to this directory when simulating an

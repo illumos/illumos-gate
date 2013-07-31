@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * AES implementation taken from public domain. The S-boxes
  * used by this implmentation are defined by NIST.
@@ -51,7 +49,6 @@
 #define	PUTU32(ct, st)  *((uint32_t *)(ct)) = BSWAP_L(st)
 
 
-/* EXPORT DELETE START */
 /*
  * Te0[x] = S [x].[02, 01, 01, 03];
  * Te1[x] = S [x].[03, 02, 01, 01];
@@ -739,9 +736,6 @@ typedef struct keysched_s {
 	uint32_t rk_e[60]; /* max round key size */
 	uint32_t rk_d[60]; /* max round key size */
 } keysched_t;
-/* EXPORT DELETE END */
-
-/* EXPORT DELETE START */
 
 int
 aes_init(void **cookie)
@@ -1404,5 +1398,3 @@ finish_keysched:
 			Td3[Te4[(rk_d[3]) & 0xff] & 0xff];
 	}
 }
-
-/* EXPORT DELETE END */

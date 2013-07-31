@@ -156,8 +156,8 @@
  * sub	rax,[ebx+ecx*4-20h]	sub	-0x20(%ebx,%ecx,4),%rax
  *
  * 5. Added OpenSolaris ENTRY_NP/SET_SIZE macros from
- * /usr/include/sys/asm_linkage.h, lint(1B) guards, EXPORT DELETE START
- * and EXPORT DELETE END markers, and dummy C function definitions for lint.
+ * /usr/include/sys/asm_linkage.h, lint(1B) guards, and dummy C function
+ * definitions for lint.
  *
  * 6. Renamed functions and reordered parameters to match OpenSolaris:
  * Original Gladman interface:
@@ -327,7 +327,6 @@ aes_decrypt_amd64(const uint32_t rk[], int Nr, const uint32_t ct[4],
 #define	tab_f(x)	1(tptr,x,8)
 #define	tab_i(x)	7(tptr,x,8)
 
-	/* EXPORT DELETE START */
 #define	ff_rnd(p1, p2, p3, p4, round)	/* normal forward round */ \
 	mov	fk_ref(round,0), p1; \
 	mov	fk_ref(round,1), p2; \
@@ -683,7 +682,6 @@ aes_decrypt_amd64(const uint32_t rk[], int Nr, const uint32_t ct[4],
 	xor	%edi, p3
 
 #endif	/* LAST_ROUND_TABLES */
-	/* EXPORT DELETE END */
 
 /*
  * OpenSolaris OS:
@@ -704,7 +702,6 @@ enc_tab:
 
 
 	ENTRY_NP(aes_encrypt_amd64)
-	/* EXPORT DELETE START */
 #ifdef	GLADMAN_INTERFACE
 	/ Original interface
 	sub	$[4*8], %rsp	/ gnu/linux/opensolaris binary interface
@@ -786,7 +783,6 @@ enc_tab:
 	mov	2*8(%rsp), %rbp
 	mov	3*8(%rsp), %r12
 	add	$[4*8], %rsp
-	/* EXPORT DELETE END */
 	ret
 
 	SET_SIZE(aes_encrypt_amd64)
@@ -810,7 +806,6 @@ dec_tab:
 
 
 	ENTRY_NP(aes_decrypt_amd64)
-	/* EXPORT DELETE START */
 #ifdef	GLADMAN_INTERFACE
 	/ Original interface
 	sub	$[4*8], %rsp	/ gnu/linux/opensolaris binary interface
@@ -898,7 +893,6 @@ dec_tab:
 	mov	2*8(%rsp), %rbp
 	mov	3*8(%rsp), %r12
 	add	$[4*8], %rsp
-	/* EXPORT DELETE END */
 	ret
 
 	SET_SIZE(aes_decrypt_amd64)

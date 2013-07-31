@@ -27,8 +27,6 @@
  *
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/note.h>
 #include "dh_gssapi.h"
 #include "crypto.h"
@@ -80,8 +78,6 @@ cipher_pad(cipher_t c, unsigned int len)
 	return (((len + pad - 1)/pad)*pad);
 }
 
-
-/* EXPORT DELETE START */
 
 /*
  * Des [en/de]crypt buffer, buf of length, len for each key provided using
@@ -148,8 +144,6 @@ __desN_crypt(des_block keys[], int keynum, char *buf, unsigned int len,
 	return (stat);
 }
 
-/* EXPORT DELETE END */
-
 
 /*
  * DesN crypt packaged for use as a cipher entry
@@ -158,7 +152,6 @@ static OM_uint32
 __dh_desN_crypt(gss_buffer_t buf, dh_key_set_t keys, cipher_mode_t cipher_mode)
 {
 	int stat = DESERR_BADPARAM;
-/* EXPORT DELETE START */
 	int encrypt_flag = (cipher_mode == ENCIPHER);
 	unsigned mode = (encrypt_flag ? DES_ENCRYPT : DES_DECRYPT) | DES_HW;
 	des_block ivec;
@@ -179,7 +172,6 @@ __dh_desN_crypt(gss_buffer_t buf, dh_key_set_t keys, cipher_mode_t cipher_mode)
 	/* Do the encryption/decryption */
 	stat = __desN_crypt(keys->dh_key_set_val, keys->dh_key_set_len,
 			    (char *)buf->value, buf->length, mode, ivec.c);
-/* EXPORT DELETE END */
 
 	if (DES_FAILED(stat))
 		return (DH_CIPHER_FAILURE);
@@ -194,7 +186,6 @@ static OM_uint32
 __dh_des_crypt(gss_buffer_t buf, dh_key_set_t keys, cipher_mode_t cipher_mode)
 {
 	int stat = DESERR_BADPARAM;
-/* EXPORT DELETE START */
 	int encrypt_flag = (cipher_mode == ENCIPHER);
 	unsigned mode = (encrypt_flag ? DES_ENCRYPT : DES_DECRYPT) | DES_HW;
 	des_block ivec;
@@ -206,7 +197,6 @@ __dh_des_crypt(gss_buffer_t buf, dh_key_set_t keys, cipher_mode_t cipher_mode)
 	memset(&ivec, 0, sizeof (ivec));
 	stat = cbc_crypt(keys->dh_key_set_val[0].c, (char *)buf->value,
 			buf->length, mode, ivec.c);
-/* EXPORT DELETE END */
 
 	if (DES_FAILED(stat))
 		return (DH_CIPHER_FAILURE);

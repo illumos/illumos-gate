@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* common.c - Functions that are common to server and clinet
  * Rob Siemborski
  * Tim Martin
@@ -307,7 +305,6 @@ int sasl_encodev(sasl_conn_t *conn,
     unsigned i;
     size_t total_size = 0;
 
-    /* EXPORT DELETE START */
     if (!conn) return SASL_BADPARAM;
     if (! invec || ! output || ! outputlen || numiov < 1)
 	PARAMERROR(conn);
@@ -348,17 +345,14 @@ int sasl_encodev(sasl_conn_t *conn,
 	*output = conn->encode_buf->data;
 	*outputlen = conn->encode_buf->curlen;
 
-    /* CRYPT DELETE START */
 #ifdef _INTEGRATED_SOLARIS_
     } else if (!conn->sun_reg) {
 	    INTERROR(conn, SASL_FAIL);
 #endif /* _INTEGRATED_SOLARIS_ */
-    /* CRYPT DELETE END */
     } else {
 	result = conn->oparams.encode(conn->context, invec, numiov,
 				      output, outputlen);
     }
-    /* EXPORT DELETE END */
 
     RETURN(conn, result);
 }
@@ -369,7 +363,6 @@ int sasl_decode(sasl_conn_t *conn,
 		const char **output, unsigned *outputlen)
 {
     int result;
-    /* EXPORT DELETE START */
 #ifdef _SUN_SDK_
     const _sasl_global_context_t *gctx;
 #endif /* _SUN_SDK_ */
@@ -423,12 +416,10 @@ int sasl_decode(sasl_conn_t *conn,
 	*outputlen = inputlen;
 	
         return SASL_OK;
-    /* CRYPT DELETE START */
 #ifdef _INTEGRATED_SOLARIS_
     } else if (!conn->sun_reg) {
 	    INTERROR(conn, SASL_FAIL);
 #endif /* _INTEGRATED_SOLARIS_ */
-    /* CRYPT DELETE END */
     } else {
         result = conn->oparams.decode(conn->context, input, inputlen,
                                       output, outputlen);
@@ -439,7 +430,6 @@ int sasl_decode(sasl_conn_t *conn,
         RETURN(conn, result);
     }
 
-    /* EXPORT DELETE END */
 #ifdef _SUN_SDK_
     return SASL_FAIL;
 #else
@@ -747,14 +737,10 @@ int sasl_getprop(sasl_conn_t *conn, int propnum, const void **pvalue)
   switch(propnum)
   {
   case SASL_SSF:
-    /* EXPORT DELETE START */
-    /* CRYPT DELETE START */
 #ifdef _INTEGRATED_SOLARIS_
       if (!conn->sun_reg)
 	conn->oparams.mech_ssf = 0;
 #endif /* _INTEGRATED_SOLARIS_ */
-    /* CRYPT DELETE END */
-    /* EXPORT DELETE END */
       *(sasl_ssf_t **)pvalue= &conn->oparams.mech_ssf;
       break;      
   case SASL_MAXOUTBUF:
@@ -1304,8 +1290,6 @@ const char *sasl_errdetail(sasl_conn_t *conn)
     return conn->errdetail_buf;
 }
 
-/* EXPORT DELETE START */
-/* CRYPT DELETE START */
 #ifdef _INTEGRATED_SOLARIS_
 DEFINE_STATIC_MUTEX(reg_mutex);
 typedef struct reg_list {
@@ -1353,8 +1337,6 @@ _register_plugin(void *arg)
 	}
 }
 #endif /* _INTEGRATED_SOLARIS_ */
-/* CRYPT DELETE END */
-/* EXPORT DELETE END */
 
 /* Note that this needs the global callbacks, so if you don't give getcallbacks
  * a sasl_conn_t, you're going to need to pass it yourself (or else we couldn't
@@ -1374,8 +1356,6 @@ static int _sasl_global_getopt(void *context,
   global_callbacks = (const sasl_global_callbacks_t *) context;
 
 #ifdef _SUN_SDK_
-  /* EXPORT DELETE START */
-  /* CRYPT DELETE START */
 #ifdef _INTEGRATED_SOLARIS_
   if (strcmp("reg_sun_plug", option) == 0) {
         *result = (const char *)_register_plugin;
@@ -1383,8 +1363,6 @@ static int _sasl_global_getopt(void *context,
         return (SASL_OK);
   }
 #endif /* _INTEGRATED_SOLARIS_ */
-  /* CRYPT DELETE END */
-  /* EXPORT DELETE END */
 
   if (global_callbacks)
     gctx = global_callbacks->gctx;
@@ -2696,8 +2674,6 @@ _sasl_getconf(void *context __attribute__((unused)), const char **conf)
     return SASL_OK;
 }
 
-/* EXPORT DELETE START */
-/* CRYPT DELETE START */
 #ifdef _INTEGRATED_SOLARIS_
 #pragma fini(sasl_fini)
 int 
@@ -2713,8 +2689,6 @@ sasl_fini(void)
     return (0);
 } 
 #endif /* _INTEGRATED_SOLARIS_ */
-/* CRYPT DELETE END */
-/* EXPORT DELETE END */
 
 #endif /* _SUN_SDK_ */
 

@@ -222,7 +222,6 @@ typedef struct gss_config {
 		    OM_uint32 *,			/* time_rec */
 		    gss_cred_id_t *		/* delegated_cred_handle */
 	/* */);
-/* EXPORT DELETE START */ /* CRYPT DELETE START */
 #endif	/* ! _KERNEL */
 
 /*
@@ -242,7 +241,6 @@ typedef struct gss_config {
 #endif
 	/* */);
 #ifndef	_KERNEL
-/* EXPORT DELETE END */ /* CRYPT DELETE END */
 	OM_uint32	    (*gss_process_context_token)
 	(
 		    void *,		/* context */
@@ -340,7 +338,6 @@ typedef struct gss_config {
 		    OM_uint32 *,	/* initiator_time_rec */
 		    OM_uint32 *		/* acceptor_time_rec */
 	/* */);
-/* EXPORT DELETE START */ /* CRYPT DELETE START */
 #endif	/* ! _KERNEL */
 /*
  * Note: there are two gss_seal's in here. Make any changes to both.
@@ -360,7 +357,6 @@ typedef struct gss_config {
 #endif
 	/* */);
 #ifndef	_KERNEL
-/* EXPORT DELETE END */ /* CRYPT DELETE END */
 	OM_uint32	    (*gss_export_sec_context)
 	(
 		    void *,		/* context */
@@ -447,52 +443,6 @@ typedef struct gss_config {
 		gss_buffer_t		/* exported_name */
 	/* */);
 #endif	/* ! _KERNEL */
-/* EXPORT DELETE START */
-/* CRYPT DELETE START */
-/*
- * This block comment is Sun Proprietary: Need-To-Know.
- * What we are doing is leaving the seal and unseal entry points
- * in an obvious place before sign and unsign for the Domestic customer
- * of the Solaris Source Product. The Domestic customer of the Solaris Source
- * Product will have to deal with the problem of creating exportable libgss
- * binaries.
- * In the binary product that Sun builds, these entry points are elsewhere,
- * and bracketed with special comments so that the CRYPT_SRC and EXPORT_SRC
- * targets delete them.
- */
-#if 0
-/* CRYPT DELETE END */
-	OM_uint32	    (*gss_seal)
-	(
-		    void *,		/* context */
-		    OM_uint32 *,	/* minor_status */
-		    const gss_ctx_id_t,	/* context_handle */
-		    int,		/* conf_req_flag */
-		    int,		/* qop_req */
-		    const gss_buffer_t,	/* input_message_buffer */
-		    int *,		/* conf_state */
-		    gss_buffer_t	/* output_message_buffer */
-#ifdef	 _KERNEL
-	/* */, OM_uint32
-#endif
-	/* */);
-	OM_uint32	    (*gss_unseal)
-	(
-		    void *,		/* context */
-		    OM_uint32 *,	/* minor_status */
-		    const gss_ctx_id_t,	/* context_handle */
-		    const gss_buffer_t,	/* input_message_buffer */
-		    gss_buffer_t,	/* output_message_buffer */
-		    int *,		/* conf_state */
-		    int *		/* qop_state */
-#ifdef	 _KERNEL
-	/* */, OM_uint32
-#endif
-	/* */);
-/* CRYPT DELETE START */
-#endif /* 0 */
-/* CRYPT DELETE END */
-/* EXPORT DELETE END */
 	OM_uint32	(*gss_sign)
 	(
 		    void *,		/* context */
@@ -801,7 +751,6 @@ struct	kgss_ctx {
 	(*(KCTX_TO_MECH(ctx)->gss_import_sec_context))(KCTX_TO_PRIVATE(ctx),\
 		minor_st, tkn, int_ctx_id)
 
-/* EXPORT DELETE START */
 #define	KGSS_SEAL(minor_st, ctx, conf_req, qop, msg, conf_state, tkn) \
 	(*(KCTX_TO_MECH(ctx)->gss_seal))(KCTX_TO_PRIVATE(ctx), minor_st, \
 		KCTX_TO_CTX(ctx), conf_req, qop, msg, conf_state, tkn,\
@@ -811,8 +760,6 @@ struct	kgss_ctx {
 	(*(KCTX_TO_MECH(ctx)->gss_unseal))(KCTX_TO_PRIVATE(ctx), minor_st,\
 		KCTX_TO_CTX(ctx), msg, tkn, conf, qop, \
 		KCTX_TO_CTXV(ctx))
-
-/* EXPORT DELETE END */
 
 #define KGSS_INIT_CONTEXT(ctx) krb5_init_context(ctx)
 #define KGSS_RELEASE_OID(minor_st, oid) krb5_gss_release_oid(minor_st, oid)

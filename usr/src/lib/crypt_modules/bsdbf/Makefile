@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include $(SRC)/lib/Makefile.lib
 
@@ -50,17 +48,3 @@ $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
-
-# EXPORT DELETE START
-CRYPT_SRC: EXPORT_SRC
-EXPORT_SRC: 
-	$(RM) Makefile+ blowfish.c+
-	sed -e "/CRYPT DELETE START/,/CRYPT DELETE END/d" \
-		< blowfish.c > blowfish.c+
-	$(MV) blowfish.c+ blowfish.c
-	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-		< Makefile > Makefile+
-	$(MV) Makefile+ Makefile
-	$(CHMOD) 444 Makefile blowfish.c
-
-# EXPORT DELETE END

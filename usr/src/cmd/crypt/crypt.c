@@ -33,7 +33,6 @@
  *	but considerably trivialized.
  */
 
-/* EXPORT DELETE START */
 #define	ECHO 010
 #include <stdio.h>
 #include <stdlib.h>
@@ -96,12 +95,10 @@ char *pw;
 	for (i = 0; i < ROTORSZ; i++)
 		t2[t1[i]&MASK] = i;
 }
-/* EXPORT DELETE END */
 
 int
 main(int argc, char **argv)
 {
-/* EXPORT DELETE START */
 	extern int optind;
 	char *p1;
 	int i, n1, n2, nchar;
@@ -199,5 +196,4 @@ main(int argc, char **argv)
 		}
 	}
 	return (0);
-/* EXPORT DELETE END */
 }

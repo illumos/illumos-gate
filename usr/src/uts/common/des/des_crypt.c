@@ -51,7 +51,6 @@
 #define	_DES_IMPL
 #include <des/des_impl.h>
 
-/* EXPORT DELETE START */
 #include <sys/types.h>
 #include <rpc/des_crypt.h>
 #include <des/des.h>
@@ -72,8 +71,6 @@ static int common_crypt(char *key, char *buf, size_t len,
     unsigned int mode, struct desparams *desp);
 
 extern int _des_crypt(char *buf, size_t len, struct desparams *desp);
-
-/* EXPORT DELETE END */
 
 extern struct mod_ops mod_cryptoops;
 
@@ -97,14 +94,10 @@ static struct modlinkage modlinkage = {
 	NULL
 };
 
-/* EXPORT DELETE START */
-
 #define	DES_MIN_KEY_LEN		DES_MINBYTES
 #define	DES_MAX_KEY_LEN		DES_MAXBYTES
 #define	DES3_MIN_KEY_LEN	DES3_MAXBYTES	/* no CKK_DES2 support */
 #define	DES3_MAX_KEY_LEN	DES3_MAXBYTES
-
-/* EXPORT DELETE END */
 
 #ifndef DES_MIN_KEY_LEN
 #define	DES_MIN_KEY_LEN		0
@@ -311,14 +304,12 @@ int
 cbc_crypt(char *key, char *buf, size_t len, unsigned int mode, char *ivec)
 {
 	int err = 0;
-/* EXPORT DELETE START */
 	struct desparams dp;
 
 	dp.des_mode = CBC;
 	COPY8(ivec, dp.des_ivec);
 	err = common_crypt(key, buf, len, mode, &dp);
 	COPY8(dp.des_ivec, ivec);
-/* EXPORT DELETE END */
 	return (err);
 }
 
@@ -331,18 +322,15 @@ int
 ecb_crypt(char *key, char *buf, size_t len, unsigned int mode)
 {
 	int err = 0;
-/* EXPORT DELETE START */
 	struct desparams dp;
 
 	dp.des_mode = ECB;
 	err = common_crypt(key, buf, len, mode, &dp);
-/* EXPORT DELETE END */
 	return (err);
 }
 
 
 
-/* EXPORT DELETE START */
 /*
  * Common code to cbc_crypt() & ecb_crypt()
  */
@@ -428,8 +416,6 @@ init_keysched(crypto_key_t *key, void *newbie, des_strength_t strength)
 	return (CRYPTO_SUCCESS);
 }
 
-/* EXPORT DELETE END */
-
 /*
  * KCF software provider control entry points.
  */
@@ -448,8 +434,6 @@ des_common_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
     crypto_key_t *key, crypto_spi_ctx_template_t template,
     crypto_req_handle_t req)
 {
-
-/* EXPORT DELETE START */
 
 	des_strength_t strength;
 	des_ctx_t *des_ctx = NULL;
@@ -504,8 +488,6 @@ des_common_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 
 	ctx->cc_provider_private = des_ctx;
 
-/* EXPORT DELETE END */
-
 	return (CRYPTO_SUCCESS);
 }
 
@@ -549,7 +531,6 @@ des_encrypt(crypto_ctx_t *ctx, crypto_data_t *plaintext,
 {
 	int ret;
 
-/* EXPORT DELETE START */
 	des_ctx_t *des_ctx;
 
 	/*
@@ -581,8 +562,6 @@ des_encrypt(crypto_ctx_t *ctx, crypto_data_t *plaintext,
 	ASSERT(des_ctx->dc_remainder_len == 0);
 	(void) des_free_context(ctx);
 
-/* EXPORT DELETE END */
-
 	/* LINTED */
 	return (ret);
 }
@@ -594,7 +573,6 @@ des_decrypt(crypto_ctx_t *ctx, crypto_data_t *ciphertext,
 {
 	int ret;
 
-/* EXPORT DELETE START */
 	des_ctx_t *des_ctx;
 
 	/*
@@ -626,8 +604,6 @@ des_decrypt(crypto_ctx_t *ctx, crypto_data_t *ciphertext,
 	ASSERT(des_ctx->dc_remainder_len == 0);
 	(void) des_free_context(ctx);
 
-/* EXPORT DELETE END */
-
 	/* LINTED */
 	return (ret);
 }
@@ -640,8 +616,6 @@ des_encrypt_update(crypto_ctx_t *ctx, crypto_data_t *plaintext,
 	off_t saved_offset;
 	size_t saved_length, out_len;
 	int ret = CRYPTO_SUCCESS;
-
-/* EXPORT DELETE START */
 
 	ASSERT(ctx->cc_provider_private != NULL);
 
@@ -693,8 +667,6 @@ des_encrypt_update(crypto_ctx_t *ctx, crypto_data_t *plaintext,
 	}
 	ciphertext->cd_offset = saved_offset;
 
-/* EXPORT DELETE END */
-
 	return (ret);
 }
 
@@ -706,8 +678,6 @@ des_decrypt_update(crypto_ctx_t *ctx, crypto_data_t *ciphertext,
 	off_t saved_offset;
 	size_t saved_length, out_len;
 	int ret = CRYPTO_SUCCESS;
-
-/* EXPORT DELETE START */
 
 	ASSERT(ctx->cc_provider_private != NULL);
 
@@ -759,8 +729,6 @@ des_decrypt_update(crypto_ctx_t *ctx, crypto_data_t *ciphertext,
 	}
 	plaintext->cd_offset = saved_offset;
 
-/* EXPORT DELETE END */
-
 	return (ret);
 }
 
@@ -769,9 +737,6 @@ static int
 des_encrypt_final(crypto_ctx_t *ctx, crypto_data_t *ciphertext,
     crypto_req_handle_t req)
 {
-
-/* EXPORT DELETE START */
-
 	des_ctx_t *des_ctx;
 
 	ASSERT(ctx->cc_provider_private != NULL);
@@ -788,8 +753,6 @@ des_encrypt_final(crypto_ctx_t *ctx, crypto_data_t *ciphertext,
 	(void) des_free_context(ctx);
 	ciphertext->cd_length = 0;
 
-/* EXPORT DELETE END */
-
 	return (CRYPTO_SUCCESS);
 }
 
@@ -798,9 +761,6 @@ static int
 des_decrypt_final(crypto_ctx_t *ctx, crypto_data_t *plaintext,
     crypto_req_handle_t req)
 {
-
-/* EXPORT DELETE START */
-
 	des_ctx_t *des_ctx;
 
 	ASSERT(ctx->cc_provider_private != NULL);
@@ -817,8 +777,6 @@ des_decrypt_final(crypto_ctx_t *ctx, crypto_data_t *plaintext,
 	(void) des_free_context(ctx);
 	plaintext->cd_length = 0;
 
-/* EXPORT DELETE END */
-
 	return (CRYPTO_SUCCESS);
 }
 
@@ -830,8 +788,6 @@ des_encrypt_atomic(crypto_provider_handle_t provider,
     crypto_spi_ctx_template_t template, crypto_req_handle_t req)
 {
 	int ret;
-
-/* EXPORT DELETE START */
 
 	des_ctx_t des_ctx;		/* on the stack */
 	des_strength_t strength;
@@ -923,8 +879,6 @@ des_encrypt_atomic(crypto_provider_handle_t provider,
 	}
 	ciphertext->cd_offset = saved_offset;
 
-/* EXPORT DELETE END */
-
 	/* LINTED */
 	return (ret);
 }
@@ -937,8 +891,6 @@ des_decrypt_atomic(crypto_provider_handle_t provider,
     crypto_spi_ctx_template_t template, crypto_req_handle_t req)
 {
 	int ret;
-
-/* EXPORT DELETE START */
 
 	des_ctx_t des_ctx;	/* on the stack */
 	des_strength_t strength;
@@ -1030,8 +982,6 @@ des_decrypt_atomic(crypto_provider_handle_t provider,
 	}
 	plaintext->cd_offset = saved_offset;
 
-/* EXPORT DELETE END */
-
 	/* LINTED */
 	return (ret);
 }
@@ -1045,8 +995,6 @@ des_create_ctx_template(crypto_provider_handle_t provider,
     crypto_mechanism_t *mechanism, crypto_key_t *key,
     crypto_spi_ctx_template_t *tmpl, size_t *tmpl_size, crypto_req_handle_t req)
 {
-
-/* EXPORT DELETE START */
 
 	des_strength_t strength;
 	void *keysched;
@@ -1088,8 +1036,6 @@ des_create_ctx_template(crypto_provider_handle_t provider,
 	*tmpl = keysched;
 	*tmpl_size = size;
 
-/* EXPORT DELETE END */
-
 	return (CRYPTO_SUCCESS);
 }
 
@@ -1097,9 +1043,6 @@ des_create_ctx_template(crypto_provider_handle_t provider,
 static int
 des_free_context(crypto_ctx_t *ctx)
 {
-
-/* EXPORT DELETE START */
-
 	des_ctx_t *des_ctx = ctx->cc_provider_private;
 
 	if (des_ctx != NULL) {
@@ -1113,8 +1056,6 @@ des_free_context(crypto_ctx_t *ctx)
 		ctx->cc_provider_private = NULL;
 	}
 
-/* EXPORT DELETE END */
-
 	return (CRYPTO_SUCCESS);
 }
 
@@ -1127,9 +1068,6 @@ static int
 des_key_check(crypto_provider_handle_t pd, crypto_mechanism_t *mech,
     crypto_key_t *key)
 {
-
-/* EXPORT DELETE START */
-
 	int expectedkeylen;
 	des_strength_t strength;
 	uint8_t keydata[DES3_MAX_KEY_LEN];
@@ -1163,8 +1101,6 @@ des_key_check(crypto_provider_handle_t pd, crypto_mechanism_t *mech,
 	if (des_keycheck(keydata, strength, key->ck_data) == B_FALSE)
 		return (CRYPTO_WEAK_KEY);
 
-/* EXPORT DELETE END */
-
 	return (CRYPTO_SUCCESS);
 }
 
@@ -1175,8 +1111,6 @@ des_common_init_ctx(des_ctx_t *des_ctx, crypto_spi_ctx_template_t *template,
     int kmflag)
 {
 	int rv = CRYPTO_SUCCESS;
-
-/* EXPORT DELETE START */
 
 	void *keysched;
 	size_t size;
@@ -1221,8 +1155,6 @@ des_common_init_ctx(des_ctx_t *des_ctx, crypto_spi_ctx_template_t *template,
 			kmem_free(keysched, size);
 		}
 	}
-
-/* EXPORT DELETE END */
 
 	return (rv);
 }

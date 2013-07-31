@@ -151,8 +151,6 @@ arcfour_key_init(ARCFour_key *key, uchar_t *keyval, int keyvallen)
 #include <sys/asm_linkage.h>
 
 ENTRY_NP(arcfour_crypt_asm)
-	/* EXPORT DELETE START */
-
 	or	$len,$len # If (len == 0) return
 	jne	.Lentry
 	ret
@@ -243,7 +241,6 @@ $code.=<<___;
 	jnz	.Lloop1
 	jmp	.Lexit
 
-	/* EXPORT DELETE END */
 	ret
 SET_SIZE(arcfour_crypt_asm)
 ___
@@ -274,8 +271,6 @@ $code.=<<___;
 .extern	arcfour_crypt_on_intel
 
 ENTRY_NP(arcfour_key_init)
-	/* EXPORT DELETE START */
-
 	/ Find out if we're running on Intel or something else (e.g., AMD64).
 	/ This sets %eax to 1 for Intel, otherwise 0.
 	push	%rdi		/ Save arg1
@@ -330,7 +325,6 @@ ENTRY_NP(arcfour_key_init)
 	mov	%eax,-8($dat)
 	mov	%eax,-4($dat)
 
-	/* EXPORT DELETE END */
 	ret
 SET_SIZE(arcfour_key_init)
 .asciz	"RC4 for x86_64, CRYPTOGAMS by <appro\@openssl.org>"

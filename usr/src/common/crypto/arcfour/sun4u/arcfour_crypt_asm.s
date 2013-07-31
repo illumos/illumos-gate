@@ -59,8 +59,6 @@ arcfour_crypt_aligned(ARCFour_key *key, size_t len, uchar_t *in, uchar_t *out)
 
 
 arcfour_crypt_aligned:
-
-/* EXPORT DELETE START */
 	save	%sp,-144,%sp
 
 	srl	%i1, 3, %l7
@@ -518,7 +516,6 @@ arcfour_crypt_aligned:
 	ba	.L8B
 	and	%g2, 255, %g2
 
-/* EXPORT DELETE END */
 	.type	arcfour_crypt_aligned,2
 	.size	arcfour_crypt_aligned,(. - arcfour_crypt_aligned)
 

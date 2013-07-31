@@ -18,7 +18,6 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
@@ -30,7 +29,6 @@
  * specified through dummy_mech.conf located in /etc.
  *
  */
-/* EXPORT DELETE START */ /* CRYPT DELETE START */
 #ifndef	lint
 #define	dummy_gss_accept_sec_context \
 		dummy_867227349
@@ -87,7 +85,6 @@
 #define	dummy_pname_to_uid \
 		dummy_345475423
 #endif
-/* EXPORT DELETE END */ /* CRYPT DELETE END */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -129,9 +126,7 @@ static struct gss_config dummy_mechanism =
 	dummy_gss_release_cred,
 	dummy_gss_init_sec_context,
 	dummy_gss_accept_sec_context,
-/* EXPORT DELETE START */ /* CRYPT DELETE START */
 	dummy_gss_unseal,
-/* EXPORT DELETE END */ /* CRYPT DELETE END */
 	dummy_gss_process_context_token,
 	dummy_gss_delete_sec_context,
 	dummy_gss_context_time,
@@ -143,9 +138,7 @@ static struct gss_config dummy_mechanism =
 	dummy_gss_release_name,
 	dummy_gss_inquire_cred,
 	dummy_gss_add_cred,
-/* EXPORT DELETE START */ /* CRYPT DELETE START */
 	dummy_gss_seal,
-/* EXPORT DELETE END */ /* CRYPT DELETE END */
 	dummy_gss_export_sec_context,
 	dummy_gss_import_sec_context,
 	dummy_gss_inquire_cred_by_mech,
@@ -156,16 +149,6 @@ static struct gss_config dummy_mechanism =
 	dummy_pname_to_uid,
 	NULL,	/* __gss_userok */
 	NULL,	/* _export name */
-/* EXPORT DELETE START */
-/* CRYPT DELETE START */
-#if 0
-/* CRYPT DELETE END */
-	dummy_gss_seal,
-	dummy_gss_unseal,
-/* CRYPT DELETE START */
-#endif
-/* CRYPT DELETE END */
-/* EXPORT DELETE END */
 	dummy_gss_sign,
 	dummy_gss_verify,
 	NULL,	/* _store_cred */

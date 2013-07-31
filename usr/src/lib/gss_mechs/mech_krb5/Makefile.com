@@ -261,12 +261,7 @@ CERRWARN +=	-_gcc=-Wno-unused-value
 CERRWARN +=	-_gcc=-Wno-empty-body
 CERRWARN +=	-_gcc=-Wno-address
 
-MAPFILE_EXPORT = ../mapfile-vers-clean
-$(EXPORT_RELEASE_BUILD)MAPFILE_EXPORT = \
-		$(CLOSED)/lib/gss_mechs/mech_krb5/mapfile-vers-export
-MAPFILES =	../mapfile-vers $(MAPFILE_EXPORT)
-
-$(EXPORT_RELEASE_BUILD)include $(CLOSED)/lib/gss_mechs/mech_krb5/Makefile.export
+MAPFILES =	../mapfile-vers
 
 #CPPFLAGS += 	-D_REENTRANT
 $(PICS) :=	CFLAGS += $(XFFLAG)

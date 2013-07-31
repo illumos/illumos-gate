@@ -24,7 +24,6 @@
  */
 
 #include <sys/types.h>
-/* EXPORT DELETE START */
 #include <sys/promif.h>
 #include <sys/obpdefs.h>
 #include <sys/bootvfs.h>
@@ -1587,12 +1586,10 @@ error:
  *   ramdisk.  The bootfs filesystem is unmounted, and the rootfs filesystem
  *   is booted.
  */
-/* EXPORT DELETE END */
 /*ARGSUSED*/
 int
 bootprog(char *bpath, char *bargs, boolean_t user_specified_filename)
 {
-/* EXPORT DELETE START */
 	char		*miniroot_path;
 	url_t		server_url;
 	int		ret;
@@ -1677,6 +1674,5 @@ bootprog(char *bpath, char *bargs, boolean_t user_specified_filename)
 
 	boot_ramdisk(RD_ROOTFS);
 
-/* EXPORT DELETE END */
 	return (0);
 }

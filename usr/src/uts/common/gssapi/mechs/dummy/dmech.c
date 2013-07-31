@@ -89,24 +89,10 @@ static struct gss_config dummy_mechanism =
 	NULL,	/* context */
 	NULL,	/* next */
 	TRUE,	/* uses_kmod */
-/* EXPORT DELETE START */ /* CRYPT DELETE START */
 	dummy_gss_unseal,
-/* EXPORT DELETE END */ /* CRYPT DELETE END */
 	dummy_gss_delete_sec_context,
-/* EXPORT DELETE START */ /* CRYPT DELETE START */
 	dummy_gss_seal,
-/* EXPORT DELETE END */ /* CRYPT DELETE END */
 	dummy_gss_import_sec_context,
-/* EXPORT DELETE START */
-/* CRYPT DELETE START */
-#if 0
-/* CRYPT DELETE END */
-	dummy_gss_seal,
-	dummy_gss_unseal,
-/* CRYPT DELETE START */
-#endif
-/* CRYPT DELETE END */
-/* EXPORT DELETE END */
 	dummy_gss_sign,
 	dummy_gss_verify
 };
@@ -275,7 +261,6 @@ static OM_uint32
 	return (GSS_S_COMPLETE);
 }
 
-/* EXPORT DELETE START */
 /*ARGSUSED*/
 static OM_uint32
 dummy_gss_seal(context, minor_status, context_handle, conf_req_flag,
@@ -362,8 +347,6 @@ dummy_gss_unseal(context, minor_status, context_handle,
 	dprintf("Leaving gss_unseal\n");
 	return (GSS_S_COMPLETE);
 }
-
-/* EXPORT DELETE END */
 
 /*ARGSUSED*/
 OM_uint32

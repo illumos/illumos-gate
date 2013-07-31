@@ -158,24 +158,10 @@
 #
 # Ignore files that get used during a EXPORT_SRC or CRYPT_SRC build only.
 #
-./usr/src/common/crypto/aes/Makefile
-./usr/src/common/crypto/arcfour/Makefile
-./usr/src/common/crypto/blowfish/Makefile
-./usr/src/common/crypto/des/Makefile
-./usr/src/common/crypto/rsa/Makefile
 ./usr/src/lib/gss_mechs/mech_dh/backend/mapfile-vers
 ./usr/src/lib/gss_mechs/mech_dh/dh1024/mapfile-vers
 ./usr/src/lib/gss_mechs/mech_dh/dh192/mapfile-vers
 ./usr/src/lib/gss_mechs/mech_dh/dh640/mapfile-vers
-./usr/src/lib/gss_mechs/mech_krb5/mapfile-vers-clean
-./usr/src/lib/gss_mechs/mech_spnego/mapfile-vers-clean
-./usr/src/lib/pkcs11/pkcs11_softtoken/common/Makefile
-./usr/src/uts/common/Makefile
-./usr/src/uts/common/crypto/io/Makefile
-./usr/src/uts/common/gssapi/include/Makefile
-./usr/src/uts/common/gssapi/mechs/dummy/Makefile
-./usr/src/uts/common/gssapi/mechs/krb5/Makefile
-./usr/src/xmod
 
 #
 # Ignore Makefiles which are used by developers but not used by nightly

@@ -2,7 +2,6 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* SASL server API implementation
  * Rob Siemborski
@@ -386,13 +385,9 @@ int _sasl_server_add_plugin(void *ctx,
     _sasl_global_context_t *gctx = ctx == NULL ? _sasl_gbl_ctx() : ctx;
     mech_list_t *mechlist = gctx->mechlist;
 
-    /* EXPORT DELETE START */
-    /* CRYPT DELETE START */
 #ifdef _INTEGRATED_SOLARIS_
     int sun_reg;
 #endif /* _INTEGRATED_SOLARIS_ */
-    /* CRYPT DELETE END */
-    /* EXPORT DELETE END */
 #else
 {
 #endif /* _SUN_SDK_ */
@@ -429,13 +424,9 @@ int _sasl_server_add_plugin(void *ctx,
     result = entry_point(mechlist->utils, SASL_SERVER_PLUG_VERSION, &version,
 			 &pluglist, &plugcount);
 
-    /* EXPORT DELETE START */
-    /* CRYPT DELETE START */
 #ifdef _INTEGRATED_SOLARIS_
     sun_reg = _is_sun_reg(pluglist);
 #endif /* _INTEGRATED_SOLARIS_ */
-    /* CRYPT DELETE END */
-    /* EXPORT DELETE END */
 
 #ifdef _SUN_SDK_
     if (result != SASL_OK) {
@@ -513,13 +504,9 @@ int _sasl_server_add_plugin(void *ctx,
 	}
 	mech->version = version;
 #ifdef _SUN_SDK_
-	/* EXPORT DELETE START */
-	/* CRYPT DELETE START */
 #ifdef _INTEGRATED_SOLARIS_
 	mech->sun_reg = sun_reg;
 #endif /* _INTEGRATED_SOLARIS_ */
-	/* CRYPT DELETE END */
-	/* EXPORT DELETE END */
 
 	/* whether this mech actually has any users in it's db */
 	mech->condition = SASL_OK;
@@ -1491,8 +1478,6 @@ static int mech_permitted(sasl_conn_t *conn,
 	}
     }
     
-    /* EXPORT DELETE START */
-    /* CRYPT DELETE START */
 #ifdef _INTEGRATED_SOLARIS_
     if (!mech->sun_reg) {
 	s_conn->sparams->props.min_ssf = 0;
@@ -1500,8 +1485,6 @@ static int mech_permitted(sasl_conn_t *conn,
     }
     s_conn->base.sun_reg = mech->sun_reg;
 #endif /* _INTEGRATED_SOLARIS_ */
-    /* CRYPT DELETE END */
-    /* EXPORT DELETE END */
     if (conn->props.min_ssf < conn->external.ssf) {
 	minssf = 0;
     } else {
@@ -1509,20 +1492,12 @@ static int mech_permitted(sasl_conn_t *conn,
     }
     
     /* Generic mechanism */
-    /* EXPORT DELETE START */
-    /* CRYPT DELETE START */
 #ifdef _INTEGRATED_SOLARIS_
     /* If not SUN supplied mech, it has no strength */
     if (plug->max_ssf < minssf || (minssf > 0 && !mech->sun_reg)) {
 #else
-    /* CRYPT DELETE END */
-    /* EXPORT DELETE END */
     if (plug->max_ssf < minssf) {
-    /* EXPORT DELETE START */
-    /* CRYPT DELETE START */
 #endif /* _INTEGRATED_SOLARIS_ */
-    /* CRYPT DELETE END */
-    /* EXPORT DELETE END */
 #ifdef _INTEGRATED_SOLARIS_
 	sasl_seterror(conn, SASL_NOLOG,
 		      gettext("mech %s is too weak"), plug->mech_name);
@@ -1576,20 +1551,12 @@ static int mech_permitted(sasl_conn_t *conn,
     }
     
     /* Generic mechanism */
-    /* EXPORT DELETE START */
-    /* CRYPT DELETE START */
 #ifdef _INTEGRATED_SOLARIS_
     /* If not SUN supplied mech, it has no strength */
     if (plug->max_ssf < minssf || (minssf > 0 && !mech->sun_reg)) {
 #else
-    /* CRYPT DELETE END */
-    /* EXPORT DELETE END */
     if (plug->max_ssf < minssf) {
-    /* EXPORT DELETE START */
-    /* CRYPT DELETE START */
 #endif /* _INTEGRATED_SOLARIS_ */
-    /* CRYPT DELETE END */
-    /* EXPORT DELETE END */
 #ifdef _INTEGRATED_SOLARIS_
 	sasl_seterror(conn, SASL_NOLOG, gettext("too weak"));
 #else

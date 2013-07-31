@@ -148,30 +148,6 @@ check:	$(CHKMANIFEST)
 
 include ../../Makefile.targ
 
-# EXPORT DELETE START
-# Special targets to clean up the source tree for export distribution
-# The WS target modifies the SCCS files as well, so a working workspace
-# can be shipped.
-# Warning: These targets change the source tree, the first only at the
-#		plain source level, but the second changes the guts!
-EXPORT_SRC:
-	$(RM) Makefile+ gssd_clnt_stubs.c+ gssd_proc.c+ gssdtest.c+
-	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-		< Makefile > Makefile+
-	$(MV) Makefile+ Makefile
-	sed -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
-		< gssd_clnt_stubs.c > gssd_clnt_stubs.c+
-	$(MV) gssd_clnt_stubs.c+ gssd_clnt_stubs.c
-	sed -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
-		< gssd_proc.c > gssd_proc.c+
-	$(MV) gssd_proc.c+ gssd_proc.c
-	sed -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
-		< gssdtest.c > gssdtest.c+
-	$(MV) gssdtest.c+ gssdtest.c
-	$(CHMOD) 444  Makefile gssd_clnt_stubs.c gssd_proc.c gssdtest.c
-
-# EXPORT DELETE END
-
 $(POFILE): $(DERIVED_FILES) .WAIT $(POFILES)
 	$(RM) $@
 	$(CAT) $(POFILES) > $@

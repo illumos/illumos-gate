@@ -116,17 +116,6 @@ if [ -r $SRC/tools/findunref/exception_list ]; then
 	validate_paths -k ISUSED -r -e '^\*' $SRC/tools/findunref/exception_list
 fi
 
-# These are straightforward.
-if [ -d $SRC/xmod ]; then
-	# If the closed source is not present, then don't validate it.
-	if [ "$CLOSED_IS_PRESENT" = no ]; then
-		excl_cry="-e ^usr/closed"
-		excl_xmod="-e ^../closed"
-	fi
-	validate_paths $excl_cry $SRC/xmod/cry_files
-	validate_paths $excl_xmod -b $SRC $SRC/xmod/xmod_files
-fi
-
 if [ -f $SRC/tools/opensolaris/license-list ]; then
 	excl=
 	if [ "$CLOSED_IS_PRESENT" = no ]; then

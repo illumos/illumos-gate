@@ -198,16 +198,6 @@ clobber: $(EXTRA_CLOBBER_TARGETS)
 
 clean.lint modlist: $($(MACH)_ARCHITECTURES)
 
-ONC_FILES=	common/io/timod.c \
-		common/os/sig.c \
-		common/os/flock.c \
-		common/os/sysent.c \
-		common/os/swapgeneric.c \
-		common/syscall/fcntl.c 
-
-# edit onc plus source files. 
-ONC_PLUS:	$(ONC_FILES:%=%_onc_plus) 
-
 #
 # Cross-reference customization: build a cross-reference over all of
 # the supported architectures.  Although there's no correct way to set

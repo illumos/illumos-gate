@@ -96,20 +96,12 @@ XRPRUNE =	i86pc i386
 #
 # Libraries used to build wanboot
 #
-# EXPORT DELETE START
-LIBWANBOOT =	libwanboot.a
-LIBSCRYPT =	libscrypt.a
-LIBSSL =	libssl.a
-LIBCRYPTO =	libcrypto.a
-# EXPORT DELETE END
-
 LIBWAN_LIBS     = \
-		$(LIBWANBOOT) \
+		libwanboot.a \
 		libnvpair.a libufs.a libhsfs.a libnfs.a \
 		libxdr.a libnames.a libsock.a libinet.a libtcp.a \
-		$(LIBSCRYPT) $(LIBSSL) $(LIBCRYPTO) \
-		libmd5.a libsa.a libprom.a \
-		$(LIBSSL) \
+		libscrypt.a libssl.a libcrypto.a \
+		libmd5.a libsa.a libprom.a libssl.a \
 		$(LIBPLAT_LIBS)
 WAN_LIBS        = $(LIBWAN_LIBS:lib%.a=-l%)
 WAN_DIRS        = $(LIBNAME_DIR:%=-L%) $(LIBSYS_DIR:%=-L%)

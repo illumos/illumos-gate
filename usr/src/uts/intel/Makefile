@@ -36,7 +36,6 @@ LINT_LIBS	= $(LINT_LIB) $(GEN_LINT_LIB) \
 		  $(LINT_KMODLIBS:%=$(LINT_LIB_DIR)/llib-l%.ln) \
 		  $(CLOSED_LINT_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln) 
 
-# EXPORT DELETE START
 $(CLOSED_BUILD)LINT_LIBS	+= $(SVVS_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln)
 $(CLOSED_BUILD)LINT_CLOSED_XMOD4	= $(CLOSED_XMODS:bnx=)
 $(CLOSED_BUILD)LINT_CLOSED_XMOD3	= $(LINT_CLOSED_XMOD4:bnxe=)
@@ -48,8 +47,6 @@ $(CLOSED_BUILD)LINT_LIBS	+= $(LINT_XMODLIBS:%=$(LINT_LIB_DIR)/llib-l%.ln)
 # dprov is delivered in the SUNWcryptoint package.
 #
 DRV_KMODS	+= dprov
-
-# EXPORT DELETE END
 
 #
 #
@@ -181,16 +178,5 @@ globallint:
 	@-$(LINT) $(LINTFLAGS) $(LINT_LIBS) 2>&1 | $(LGREP.intel) | $(LGREP.2)
 
 lint:	modlintlib .WAIT $(LINT_DEPS)
-
-# EXPORT DELETE START
-
-EXPORT_SRC:
-	$(RM) Makefile+
-	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-	    < Makefile > Makefile+
-	$(MV) Makefile+ Makefile
-	$(CHMOD) 444 Makefile
-
-# EXPORT DELETE END
 
 include ../Makefile.targ

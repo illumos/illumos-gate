@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #pragma weak _des_crypt = des_crypt
 #pragma weak _des_encrypt = des_encrypt
 #pragma weak _des_setkey = des_setkey
@@ -42,7 +40,6 @@
 #include <pthread.h>
 #include <sys/types.h>
 
-/* EXPORT DELETE START */
 /*
  * This program implements the
  * Proposed Federal Information Processing
@@ -154,13 +151,9 @@ static char e2[] = {
 
 static mutex_t lock = DEFAULTMUTEX;
 
-/* EXPORT DELETE END */
-
-
 static void
 des_setkey_nolock(const char *key)
 {
-/* EXPORT DELETE START */
 	int i, j, k;
 	char t;
 
@@ -204,20 +197,16 @@ des_setkey_nolock(const char *key)
 
 	for (i = 0; i < 48; i++)
 		E[i] = e2[i];
-/* EXPORT DELETE END */
 }
 
 void
 des_setkey(const char *key)
 {
-/* EXPORT DELETE START */
 	(void) mutex_lock(&lock);
 	des_setkey_nolock(key);
 	(void) mutex_unlock(&lock);
-/* EXPORT DELETE END */
 }
 
-/* EXPORT DELETE START */
 /*
  * The 8 selection functions.
  * For some reason, they give a 0-origin
@@ -295,31 +284,24 @@ static char preS[48];
 /*
  * The payoff: encrypt a block.
  */
-/* EXPORT DELETE END */
 
 static void
 des_encrypt_nolock(char *block, int edflag)
 {
-/* EXPORT DELETE START */
-
 	if (edflag)
 		(void) _des_decrypt1(block, L, IP, &L[32],
 		    preS, E, KS, S, f, tempL, P, FP);
 	else
 		(void) des_encrypt1(block, L, IP, &L[32],
 		    preS, E, KS, S, f, tempL, P, FP);
-
-/* EXPORT DELETE END */
 }
 
 void
 des_encrypt(char *block, int edflag)
 {
-/* EXPORT DELETE START */
 	(void) mutex_lock(&lock);
 	des_encrypt_nolock(block, edflag);
 	(void) mutex_unlock(&lock);
-/* EXPORT DELETE END */
 }
 
 
@@ -347,7 +329,6 @@ _get_iobuf(thread_key_t *keyp, unsigned size)
 char *
 des_crypt(const char *pw, const char *salt)
 {
-/* EXPORT DELETE START */
 	int	i, j;
 	char	c, temp;
 	char block[66];
@@ -406,10 +387,4 @@ des_crypt(const char *pw, const char *salt)
 		iobuf[1] = iobuf[0];
 	(void) mutex_unlock(&lock);
 	return (iobuf);
-#if 0
-/* EXPORT DELETE END */
-	return (0);
-/* EXPORT DELETE START */
-#endif
-/* EXPORT DELETE END */
 }

@@ -240,7 +240,6 @@ _info(struct modinfo *modinfop)
 static int
 init_keysched(crypto_key_t *key, void *keysched)
 {
-/* EXPORT DELETE START */
 	/*
 	 * Only keys by value are supported by this module.
 	 */
@@ -256,7 +255,6 @@ init_keysched(crypto_key_t *key, void *keysched)
 	}
 
 	blowfish_init_keysched(key->ck_data, key->ck_length, keysched);
-/* EXPORT DELETE END */
 	return (CRYPTO_SUCCESS);
 }
 
@@ -278,9 +276,6 @@ blowfish_common_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
     crypto_key_t *key, crypto_spi_ctx_template_t template,
     crypto_req_handle_t req)
 {
-
-/* EXPORT DELETE START */
-
 	blowfish_ctx_t *blowfish_ctx;
 	int rv;
 	int kmflag;
@@ -320,8 +315,6 @@ blowfish_common_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 
 	ctx->cc_provider_private = blowfish_ctx;
 
-/* EXPORT DELETE END */
-
 	return (CRYPTO_SUCCESS);
 }
 
@@ -344,8 +337,6 @@ blowfish_encrypt(crypto_ctx_t *ctx, crypto_data_t *plaintext,
     crypto_data_t *ciphertext, crypto_req_handle_t req)
 {
 	int ret;
-
-/* EXPORT DELETE START */
 
 	blowfish_ctx_t *blowfish_ctx;
 
@@ -378,8 +369,6 @@ blowfish_encrypt(crypto_ctx_t *ctx, crypto_data_t *plaintext,
 	ASSERT(blowfish_ctx->bc_remainder_len  == 0);
 	(void) blowfish_free_context(ctx);
 
-/* EXPORT DELETE END */
-
 	/* LINTED */
 	return (ret);
 }
@@ -390,8 +379,6 @@ blowfish_decrypt(crypto_ctx_t *ctx, crypto_data_t *ciphertext,
     crypto_data_t *plaintext, crypto_req_handle_t req)
 {
 	int ret;
-
-/* EXPORT DELETE START */
 
 	blowfish_ctx_t *blowfish_ctx;
 
@@ -423,8 +410,6 @@ blowfish_decrypt(crypto_ctx_t *ctx, crypto_data_t *ciphertext,
 	ret = blowfish_decrypt_update(ctx, ciphertext, plaintext, req);
 	ASSERT(blowfish_ctx->bc_remainder_len == 0);
 	(void) blowfish_free_context(ctx);
-
-/* EXPORT DELETE END */
 
 	/* LINTED */
 	return (ret);
@@ -561,9 +546,6 @@ static int
 blowfish_encrypt_final(crypto_ctx_t *ctx, crypto_data_t *data,
     crypto_req_handle_t req)
 {
-
-/* EXPORT DELETE START */
-
 	blowfish_ctx_t *blowfish_ctx;
 
 	ASSERT(ctx->cc_provider_private != NULL);
@@ -580,8 +562,6 @@ blowfish_encrypt_final(crypto_ctx_t *ctx, crypto_data_t *data,
 	(void) blowfish_free_context(ctx);
 	data->cd_length = 0;
 
-/* EXPORT DELETE END */
-
 	return (CRYPTO_SUCCESS);
 }
 
@@ -590,9 +570,6 @@ static int
 blowfish_decrypt_final(crypto_ctx_t *ctx, crypto_data_t *data,
     crypto_req_handle_t req)
 {
-
-/* EXPORT DELETE START */
-
 	blowfish_ctx_t *blowfish_ctx;
 
 	ASSERT(ctx->cc_provider_private != NULL);
@@ -608,8 +585,6 @@ blowfish_decrypt_final(crypto_ctx_t *ctx, crypto_data_t *data,
 
 	(void) blowfish_free_context(ctx);
 	data->cd_length = 0;
-
-/* EXPORT DELETE END */
 
 	return (CRYPTO_SUCCESS);
 }
@@ -797,9 +772,6 @@ blowfish_create_ctx_template(crypto_provider_handle_t provider,
     crypto_mechanism_t *mechanism, crypto_key_t *key,
     crypto_spi_ctx_template_t *tmpl, size_t *tmpl_size, crypto_req_handle_t req)
 {
-
-/* EXPORT DELETE START */
-
 	void *keysched;
 	size_t size;
 	int rv;
@@ -824,8 +796,6 @@ blowfish_create_ctx_template(crypto_provider_handle_t provider,
 
 	*tmpl = keysched;
 	*tmpl_size = size;
-
-/* EXPORT DELETE END */
 
 	return (CRYPTO_SUCCESS);
 }
@@ -858,8 +828,6 @@ blowfish_common_init_ctx(blowfish_ctx_t *blowfish_ctx,
     crypto_key_t *key, int kmflag)
 {
 	int rv = CRYPTO_SUCCESS;
-
-/* EXPORT DELETE START */
 
 	void *keysched;
 	size_t size;
@@ -897,8 +865,6 @@ blowfish_common_init_ctx(blowfish_ctx_t *blowfish_ctx,
 			kmem_free(keysched, size);
 		}
 	}
-
-/* EXPORT DELETE END */
 
 	return (rv);
 }
