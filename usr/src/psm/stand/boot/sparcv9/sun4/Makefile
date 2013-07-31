@@ -101,7 +101,7 @@ LIBWAN_LIBS     = \
 		libnvpair.a libufs.a libhsfs.a libnfs.a \
 		libxdr.a libnames.a libsock.a libinet.a libtcp.a \
 		libscrypt.a libssl.a libcrypto.a \
-		libmd5.a libsa.a libprom.a \
+		libmd5.a libsa.a libprom.a libssl.a \
 		$(LIBPLAT_LIBS)
 WAN_LIBS        = $(LIBWAN_LIBS:lib%.a=-l%)
 WAN_DIRS        = $(LIBNAME_DIR:%=-L%) $(LIBSYS_DIR:%=-L%)
