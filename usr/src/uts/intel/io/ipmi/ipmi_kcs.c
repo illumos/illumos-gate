@@ -28,6 +28,7 @@
 
 /*
  * Copyright 2013, Joyent, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>

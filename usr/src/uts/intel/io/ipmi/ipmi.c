@@ -28,7 +28,7 @@
 
 /*
  * Copyright 2012, Joyent, Inc.  All rights reserved.
- * Copyright 2013, Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/devops.h>
@@ -48,9 +48,6 @@
 #include <sys/smbios_impl.h>
 #include <sys/ipmi.h>
 #include "ipmivars.h"
-
-static kmutex_t		slpmutex;
-static kcondvar_t	slplock;
 
 /*
  * Request management.
@@ -78,6 +75,10 @@ ipmi_alloc_request(struct ipmi_device *dev, long msgid, uint8_t addr,
 		req->ir_reply = (uchar_t *)&req[1] + requestlen;
 		req->ir_replybuflen = replylen;
 	}
+
+	cv_init(&req->ir_cv, NULL, CV_DEFAULT, NULL);
+	req->ir_status = IRS_ALLOCATED;
+
 	return (req);
 }
 
@@ -85,6 +86,11 @@ ipmi_alloc_request(struct ipmi_device *dev, long msgid, uint8_t addr,
 void
 ipmi_free_request(struct ipmi_request *req)
 {
+	if (req == NULL)
+		return;
+
+	cv_destroy(&req->ir_cv);
+
 	kmem_free(req, req->ir_sz);
 }
 
@@ -101,11 +107,15 @@ ipmi_complete_request(struct ipmi_softc *sc, struct ipmi_request *req)
 	 * Anonymous requests (from inside the driver) always have a
 	 * waiter that we awaken.
 	 */
-	if (req->ir_owner == NULL) {
-		mutex_enter(&slpmutex);
-		cv_signal(&slplock);
-		mutex_exit(&slpmutex);
-	} else {
+	if (req->ir_status == IRS_CANCELED) {
+		ASSERT(req->ir_owner == NULL);
+		ipmi_free_request(req);
+		return;
+	}
+	req->ir_status = IRS_COMPLETED;
+	cv_signal(&req->ir_cv);
+
+	if (req->ir_owner != NULL) {
 		dev = req->ir_owner;
 		TAILQ_INSERT_TAIL(&dev->ipmi_completed_requests, req, ir_link);
 		pollwakeup(dev->ipmi_pollhead, POLLIN | POLLRDNORM);
@@ -116,28 +126,46 @@ ipmi_complete_request(struct ipmi_softc *sc, struct ipmi_request *req)
  * Enqueue an internal driver request and wait until it is completed.
  */
 static int
-ipmi_submit_driver_request(struct ipmi_softc *sc, struct ipmi_request *req,
+ipmi_submit_driver_request(struct ipmi_softc *sc, struct ipmi_request **preq,
     int timo)
 {
 	int error;
+	struct ipmi_request *req = *preq;
+
+	ASSERT(req->ir_owner == NULL);
 
 	IPMI_LOCK(sc);
 	error = sc->ipmi_enqueue_request(sc, req);
-	if (error == 0) {
-		/* Wait for result - see ipmi_complete_request */
+
+	if (error != 0) {
 		IPMI_UNLOCK(sc);
-		mutex_enter(&slpmutex);
+		return (error);
+	}
+
+	while (req->ir_status != IRS_COMPLETED && error >= 0)
 		if (timo == 0)
-			cv_wait(&slplock, &slpmutex);
+			cv_wait(&req->ir_cv, &sc->ipmi_lock);
 		else
-			error = cv_timedwait(&slplock, &slpmutex,
+			error = cv_timedwait(&req->ir_cv, &sc->ipmi_lock,
 			    ddi_get_lbolt() + timo);
-		mutex_exit(&slpmutex);
-		IPMI_LOCK(sc);
-		if (error == -1)
+
+	switch (req->ir_status) {
+		case IRS_QUEUED:
+			TAILQ_REMOVE(&sc->ipmi_pending_requests, req, ir_link);
+			req->ir_status = IRS_CANCELED;
 			error = EWOULDBLOCK;
-		else
+			break;
+		case IRS_PROCESSED:
+			req->ir_status = IRS_CANCELED;
+			error = EWOULDBLOCK;
+			*preq = NULL;
+			break;
+		case IRS_COMPLETED:
 			error = req->ir_error;
+			break;
+		default:
+			panic("IPMI: Invalid request status");
+			break;
 	}
 	IPMI_UNLOCK(sc);
 
@@ -164,6 +192,7 @@ ipmi_dequeue_request(struct ipmi_softc *sc)
 
 	req = TAILQ_FIRST(&sc->ipmi_pending_requests);
 	TAILQ_REMOVE(&sc->ipmi_pending_requests, req, ir_link);
+	req->ir_status = IRS_PROCESSED;
 	return (req);
 }
 
@@ -174,6 +203,7 @@ ipmi_polled_enqueue_request(struct ipmi_softc *sc, struct ipmi_request *req)
 	IPMI_LOCK_ASSERT(sc);
 
 	TAILQ_INSERT_TAIL(&sc->ipmi_pending_requests, req, ir_link);
+	req->ir_status = IRS_QUEUED;
 	cv_signal(&sc->ipmi_request_added);
 	return (0);
 }
@@ -185,9 +215,6 @@ ipmi_shutdown(struct ipmi_softc *sc)
 
 	cv_destroy(&sc->ipmi_request_added);
 	mutex_destroy(&sc->ipmi_lock);
-
-	cv_destroy(&slplock);
-	mutex_destroy(&slpmutex);
 }
 
 boolean_t
@@ -195,9 +222,6 @@ ipmi_startup(struct ipmi_softc *sc)
 {
 	struct ipmi_request *req;
 	int error, i;
-
-	mutex_init(&slpmutex, NULL, MUTEX_DEFAULT, NULL);
-	cv_init(&slplock, NULL, CV_DEFAULT, NULL);
 
 	/* Initialize interface-independent state. */
 	mutex_init(&sc->ipmi_lock, NULL, MUTEX_DEFAULT, NULL);
@@ -215,7 +239,7 @@ ipmi_startup(struct ipmi_softc *sc)
 	req = ipmi_alloc_driver_request(IPMI_ADDR(IPMI_APP_REQUEST, 0),
 	    IPMI_GET_DEVICE_ID, 0, 15);
 
-	error = ipmi_submit_driver_request(sc, req, MAX_TIMEOUT);
+	error = ipmi_submit_driver_request(sc, &req, MAX_TIMEOUT);
 	if (error == EWOULDBLOCK) {
 		cmn_err(CE_WARN, "Timed out waiting for GET_DEVICE_ID");
 		ipmi_free_request(req);
@@ -248,7 +272,7 @@ ipmi_startup(struct ipmi_softc *sc)
 	req = ipmi_alloc_driver_request(IPMI_ADDR(IPMI_APP_REQUEST, 0),
 	    IPMI_CLEAR_FLAGS, 1, 0);
 
-	if ((error = ipmi_submit_driver_request(sc, req, 0)) != 0) {
+	if ((error = ipmi_submit_driver_request(sc, &req, 0)) != 0) {
 		cmn_err(CE_WARN, "Failed to clear IPMI flags: %d\n", error);
 		ipmi_free_request(req);
 		return (B_FALSE);
@@ -268,7 +292,7 @@ ipmi_startup(struct ipmi_softc *sc)
 		    IPMI_GET_CHANNEL_INFO, 1, 0);
 		req->ir_request[0] = (uchar_t)i;
 
-		if (ipmi_submit_driver_request(sc, req, 0) != 0) {
+		if (ipmi_submit_driver_request(sc, &req, 0) != 0) {
 			ipmi_free_request(req);
 			break;
 		}
@@ -285,7 +309,7 @@ ipmi_startup(struct ipmi_softc *sc)
 	req = ipmi_alloc_driver_request(IPMI_ADDR(IPMI_APP_REQUEST, 0),
 	    IPMI_GET_WDOG, 0, 0);
 
-	if ((error = ipmi_submit_driver_request(sc, req, 0)) != 0) {
+	if ((error = ipmi_submit_driver_request(sc, &req, 0)) != 0) {
 		cmn_err(CE_WARN, "Failed to check IPMI watchdog: %d\n", error);
 		ipmi_free_request(req);
 		return (B_FALSE);
