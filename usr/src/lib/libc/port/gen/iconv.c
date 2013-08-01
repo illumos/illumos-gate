@@ -435,7 +435,7 @@ iconv(iconv_t cd, const char **inbuf, size_t *inbytesleft,
 	char **outbuf, size_t *outbytesleft)
 {
 	/* check if cd is valid */
-	if (cd == NULL) {
+	if (cd == NULL || cd == (iconv_t)-1) {
 		errno = EBADF;
 		return ((size_t)-1);
 	}
