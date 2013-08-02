@@ -56,8 +56,8 @@
  * config/id_cache_timeout = count: seconds
  * config/name_cache_timeout = count: seconds
  */
-#define	ID_CACHE_TMO_DEFAULT	600
-#define	NAME_CACHE_TMO_DEFAULT	3600
+#define	ID_CACHE_TMO_DEFAULT	86400
+#define	NAME_CACHE_TMO_DEFAULT	604800
 
 enum event_type {
 	EVENT_NOTHING,	/* Woke up for no good reason */
