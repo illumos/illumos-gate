@@ -23,6 +23,9 @@
  * Copyright (c) 2001 by Sun Microsystems, Inc.
  * All rights reserved.
  */
+/*
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ */
 
 /*
  * These crt*.o modules are provided as the bare minimum required
@@ -40,6 +43,7 @@
  */
 	.section	.init,"ax"
 
+	addl	$4, %esp	/ Undo stack alignment from crti.s
 	popl	%ebx
 	leave
 	ret
@@ -49,6 +53,7 @@
  */
 	.section	.fini,"ax"
 
+	addl	$4, %esp	/ Undo stack alignment from crti.s
 	popl	%ebx
 	leave
 	ret
