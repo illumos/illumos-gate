@@ -960,6 +960,9 @@ get_default_bootfsobj(dnode_phys_t *mosmdn, uint64_t *obj, char *stack)
  * List of pool features that the grub implementation of ZFS supports for
  * read. Note that features that are only required for write do not need
  * to be listed here since grub opens pools in read-only mode.
+ *
+ * When this list is updated the version number in usr/src/grub/capability
+ * must be incremented to ensure the new grub gets installed.
  */
 static const char *spa_feature_names[] = {
 	"org.illumos:lz4_compress",
