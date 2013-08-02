@@ -1,5 +1,6 @@
 '\" te
 .\" Copyright (c) 2012, Joyent, Inc. All Rights Reserved
+.\" Copyright (c) 2013 by Delphix. All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
@@ -1080,10 +1081,18 @@ The IPv6 hoplimit.
 Largest ephemeral port (SCTP, TCP or UDP)
 .RE
 
-\fBrecv_maxbuf\fR
+\fBmax_buf\fR
 .ad
 .RS 4n
-Receive buffer size (ICMP, SCTP, TCP or UDP)
+Maximum receive or send buffer size (ICMP, SCTP, TCP, or UDP).  This also
+sets the upper limit for the \fBrecv_buf\fB and \fBsend_buf\fB properties.
+.RE
+
+\fBrecv_buf\fR
+.ad
+.RS 4n
+Default receive buffer size (ICMP, SCTP, TCP, or UDP).  The maximum value for
+this property is controlled by the \fBmax_buf\fR property.
 .RE
 
 \fBsack\fR
@@ -1093,10 +1102,11 @@ Selective acknowledgement (TCP).
 Can be "active", "passive" or "never".
 .RE
 
-\fBsend_maxbuf\fR
+\fBsend_buf\fR
 .ad
 .RS 4n
-Send buffer size (ICMP, SCTP, TCP or UDP)
+Default send buffer size (ICMP, SCTP, TCP, or UDP).  The maximum value for
+this property is controlled by the \fBmax_buf\fR property.
 .RE
 
 \fBsmallest_anon_port\fR

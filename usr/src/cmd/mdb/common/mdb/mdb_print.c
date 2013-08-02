@@ -26,7 +26,7 @@
  */
 
 /*
- * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright (c) 2012 Joyent, Inc. All rights reserved.
  */
 
@@ -709,9 +709,10 @@ cmd_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (argv->a_type != MDB_TYPE_STRING) {
 		/*
 		 * We are being given a raw offset in lieu of a type and
-		 * member; confirm the arguments.
+		 * member; confirm the number of arguments and argument
+		 * type.
 		 */
-		if (argv->a_type != MDB_TYPE_IMMEDIATE)
+		if (argc != 1 || argv->a_type != MDB_TYPE_IMMEDIATE)
 			return (DCMD_USAGE);
 
 		offset = argv->a_un.a_val;
@@ -727,6 +728,13 @@ cmd_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		const char *member;
 		char buf[MDB_SYM_NAMLEN];
 		int ret;
+
+		/*
+		 * Check that we were provided 2 arguments: a type name
+		 * and a member of that type.
+		 */
+		if (argc != 2)
+			return (DCMD_USAGE);
 
 		ret = args_to_typename(&argc, &argv, buf, sizeof (buf));
 		if (ret != 0)

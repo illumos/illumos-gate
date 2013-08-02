@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 1990 Mentat Inc.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 #ifndef _INET_TUNABLES_H
@@ -88,10 +89,10 @@ typedef struct mod_ioc_prop_s {
 typedef struct mod_prop_info_s mod_prop_info_t;
 
 /* set/get property callback functions */
-typedef int	mod_prop_setf_t(void *, cred_t *, mod_prop_info_t *,
+typedef int	mod_prop_setf_t(netstack_t *, cred_t *, mod_prop_info_t *,
 		    const char *, const void *, uint_t);
-typedef int	mod_prop_getf_t(void *, mod_prop_info_t *, const char *,
-		    void *val, uint_t, uint_t);
+typedef int	mod_prop_getf_t(netstack_t *, mod_prop_info_t *, const char *,
+		    void *, uint_t, uint_t);
 
 typedef struct mod_propval_uint32_s {
 	uint32_t	mod_propval_umin;
@@ -149,6 +150,8 @@ struct mod_prop_info_s {
 #define	ULP_DEF_EPRIV_PORT1	2049
 #define	ULP_DEF_EPRIV_PORT2	4045
 
+#define	ULP_MAX_BUF	(1<<30) /* Largest possible send/receive buffer */
+
 /* generic function to set/get global module properties */
 extern mod_prop_setf_t	mod_set_boolean, mod_set_uint32,
 			mod_set_aligned, mod_set_extra_privports;
@@ -156,8 +159,14 @@ extern mod_prop_setf_t	mod_set_boolean, mod_set_uint32,
 extern mod_prop_getf_t	mod_get_boolean, mod_get_uint32,
 			mod_get_allprop, mod_get_extra_privports;
 
-extern int mod_uint32_value(const void *, mod_prop_info_t *, uint_t,
-    unsigned long *);
+extern int		mod_uint32_value(const void *, mod_prop_info_t *,
+    uint_t, unsigned long *);
+extern mod_prop_info_t	*mod_prop_lookup(mod_prop_info_t[], const char *,
+    uint_t);
+extern int		mod_set_buf_prop(mod_prop_info_t[], netstack_t *,
+    cred_t *cr, mod_prop_info_t *, const char *, const void *, uint_t);
+extern int		mod_get_buf_prop(mod_prop_info_t[], netstack_t *,
+    mod_prop_info_t *, const char *, void *, uint_t, uint_t);
 
 #endif	/* _KERNEL */
 

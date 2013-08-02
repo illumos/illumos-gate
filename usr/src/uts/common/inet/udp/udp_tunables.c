@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -29,17 +30,33 @@
 #include <inet/udp_impl.h>
 #include <sys/sunddi.h>
 
+static int
+udp_set_buf_prop(netstack_t *stack, cred_t *cr, mod_prop_info_t *pinfo,
+    const char *ifname, const void *pval, uint_t flags)
+{
+	return (mod_set_buf_prop(stack->netstack_udp->us_propinfo_tbl, stack,
+	    cr, pinfo, ifname, pval, flags));
+}
+
+static int
+udp_get_buf_prop(netstack_t *stack, mod_prop_info_t *pinfo, const char *ifname,
+    void *val, uint_t psize, uint_t flags)
+{
+	return (mod_get_buf_prop(stack->netstack_udp->us_propinfo_tbl, stack,
+	    pinfo, ifname, val, psize, flags));
+}
+
 /*
  * Special checkers for smallest/largest anonymous port so they don't
  * ever happen to be (largest < smallest).
  */
 /* ARGSUSED */
 static int
-udp_smallest_anon_set(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
+udp_smallest_anon_set(netstack_t *stack, cred_t *cr, mod_prop_info_t *pinfo,
     const char *ifname, const void *pval, uint_t flags)
 {
 	unsigned long new_value;
-	udp_stack_t *us = (udp_stack_t *)cbarg;
+	udp_stack_t *us = stack->netstack_udp;
 	int err;
 
 	if ((err = mod_uint32_value(pval, pinfo, flags, &new_value)) != 0)
@@ -53,11 +70,11 @@ udp_smallest_anon_set(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
 
 /* ARGSUSED */
 static int
-udp_largest_anon_set(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
+udp_largest_anon_set(netstack_t *stack, cred_t *cr, mod_prop_info_t *pinfo,
     const char *ifname, const void *pval, uint_t flags)
 {
 	unsigned long new_value;
-	udp_stack_t *us = (udp_stack_t *)cbarg;
+	udp_stack_t *us = stack->netstack_udp;
 	int err;
 
 	if ((err = mod_uint32_value(pval, pinfo, flags, &new_value)) != 0)
@@ -105,25 +122,25 @@ mod_prop_info_t udp_propinfo_tbl[] = {
 	    udp_largest_anon_set, mod_get_uint32,
 	    {1024, ULP_MAX_PORT, ULP_MAX_PORT}, {ULP_MAX_PORT} },
 
-	{ "send_maxbuf", MOD_PROTO_UDP,
-	    mod_set_uint32, mod_get_uint32,
-	    {UDP_XMIT_LOWATER, (1<<30), UDP_XMIT_HIWATER},
+	{ "send_buf", MOD_PROTO_UDP,
+	    udp_set_buf_prop, udp_get_buf_prop,
+	    {UDP_XMIT_LOWATER, ULP_MAX_BUF, UDP_XMIT_HIWATER},
 	    {UDP_XMIT_HIWATER} },
 
 	{ "_xmit_lowat", MOD_PROTO_UDP,
 	    mod_set_uint32, mod_get_uint32,
-	    {0, (1<<30), UDP_XMIT_LOWATER},
+	    {0, ULP_MAX_BUF, UDP_XMIT_LOWATER},
 	    {UDP_XMIT_LOWATER} },
 
-	{ "recv_maxbuf", MOD_PROTO_UDP,
-	    mod_set_uint32, mod_get_uint32,
-	    {UDP_RECV_LOWATER, (1<<30), UDP_RECV_HIWATER},
+	{ "recv_buf", MOD_PROTO_UDP,
+	    udp_set_buf_prop, udp_get_buf_prop,
+	    {UDP_RECV_LOWATER, ULP_MAX_BUF, UDP_RECV_HIWATER},
 	    {UDP_RECV_HIWATER} },
 
 	/* tunable - 10 */
-	{ "_max_buf", MOD_PROTO_UDP,
+	{ "max_buf", MOD_PROTO_UDP,
 	    mod_set_uint32, mod_get_uint32,
-	    {65536, (1<<30), 2*1024*1024}, {2*1024*1024} },
+	    {65536, ULP_MAX_BUF, 2*1024*1024}, {2*1024*1024} },
 
 	{ "_pmtu_discovery", MOD_PROTO_UDP,
 	    mod_set_boolean, mod_get_boolean,

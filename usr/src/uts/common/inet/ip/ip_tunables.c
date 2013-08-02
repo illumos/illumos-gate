@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -45,15 +46,15 @@
  */
 /* ARGSUSED */
 static int
-ip_set_forwarding(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
+ip_set_forwarding(netstack_t *stack, cred_t *cr, mod_prop_info_t *pinfo,
     const char *ifname, const void* pval, uint_t flags)
 {
 	char			*end;
 	unsigned long		new_value;
-	boolean_t 		per_ill, isv6;
-	ill_walk_context_t 	ctx;
-	ill_t 			*ill;
-	ip_stack_t 		*ipst = (ip_stack_t *)cbarg;
+	boolean_t		per_ill, isv6;
+	ill_walk_context_t	ctx;
+	ill_t			*ill;
+	ip_stack_t		*ipst = stack->netstack_ip;
 
 	if (flags & MOD_PROP_DEFAULT) {
 		new_value = pinfo->prop_def_bval;
@@ -95,13 +96,13 @@ ip_set_forwarding(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
 }
 
 static int
-ip_get_forwarding(void *cbarg, mod_prop_info_t *pinfo, const char *ifname,
+ip_get_forwarding(netstack_t *stack, mod_prop_info_t *pinfo, const char *ifname,
     void *pval, uint_t pr_size, uint_t flags)
 {
-	boolean_t 		value;
-	ill_walk_context_t 	ctx;
-	ill_t 			*ill;
-	ip_stack_t 		*ipst =  (ip_stack_t *)cbarg;
+	boolean_t		value;
+	ill_walk_context_t	ctx;
+	ill_t			*ill;
+	ip_stack_t		*ipst = stack->netstack_ip;
 	boolean_t		get_def = (flags & MOD_PROP_DEFAULT);
 	boolean_t		get_perm = (flags & MOD_PROP_PERM);
 	boolean_t		isv6;
@@ -157,10 +158,10 @@ ret:
  */
 /* ARGSUSED */
 int
-ip_set_debug(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
+ip_set_debug(netstack_t *stack, cred_t *cr, mod_prop_info_t *pinfo,
     const char *ifname, const void* pval, uint_t flags)
 {
-	unsigned long 	new_value;
+	unsigned long	new_value;
 	int		err;
 
 	if (cr != NULL && secpolicy_net_config(cr, B_FALSE) != 0)
@@ -179,7 +180,7 @@ ip_set_debug(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
  */
 /* ARGSUSED */
 int
-ip_get_debug(void *cbarg, mod_prop_info_t *pinfo, const char *ifname,
+ip_get_debug(netstack_t *stack, mod_prop_info_t *pinfo, const char *ifname,
     void *pval, uint_t psize, uint_t flags)
 {
 	boolean_t	get_def = (flags & MOD_PROP_DEFAULT);
@@ -209,11 +210,11 @@ ip_get_debug(void *cbarg, mod_prop_info_t *pinfo, const char *ifname,
  */
 /* ARGSUSED */
 static int
-ip_set_cgtp_filter(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
+ip_set_cgtp_filter(netstack_t *stack, cred_t *cr, mod_prop_info_t *pinfo,
     const char *ifname, const void* pval, uint_t flags)
 {
 	unsigned long	new_value;
-	ip_stack_t	*ipst = (ip_stack_t *)cbarg;
+	ip_stack_t	*ipst = stack->netstack_ip;
 	char		*end;
 
 	if (flags & MOD_PROP_DEFAULT) {
@@ -266,12 +267,12 @@ ip_set_cgtp_filter(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
  *     (IPV6_MIN_MTU/IP_MIN_MTU) and ill_max_frag.
  */
 int
-ip_get_mtu(void *cbarg, mod_prop_info_t *pinfo, const char *ifname,
+ip_get_mtu(netstack_t *stack, mod_prop_info_t *pinfo, const char *ifname,
     void *pval, uint_t psize, uint_t flags)
 {
-	ill_walk_context_t 	ctx;
-	ill_t 			*ill;
-	ip_stack_t 		*ipst =  (ip_stack_t *)cbarg;
+	ill_walk_context_t	ctx;
+	ill_t			*ill;
+	ip_stack_t		*ipst = stack->netstack_ip;
 	boolean_t		isv6;
 	uint32_t		max_mtu, def_mtu;
 	size_t			nbytes = 0;
@@ -353,12 +354,12 @@ ip_set_src_multihoming_common(ulong_t new_value, ulong_t old_value,
 
 /* ARGSUSED */
 static int
-ip_set_src_multihoming(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
+ip_set_src_multihoming(netstack_t *stack, cred_t *cr, mod_prop_info_t *pinfo,
     const char *ifname, const void* pval, uint_t flags)
 {
-	unsigned long 	new_value, old_value;
+	unsigned long	new_value, old_value;
 	boolean_t	isv6;
-	ip_stack_t	*ipst = (ip_stack_t *)cbarg;
+	ip_stack_t	*ipst = stack->netstack_ip;
 	int		err;
 
 	old_value = pinfo->prop_cur_uval;
@@ -374,11 +375,11 @@ ip_set_src_multihoming(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
 
 /* ARGSUSED */
 static int
-ip_set_hostmodel(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
+ip_set_hostmodel(netstack_t *stack, cred_t *cr, mod_prop_info_t *pinfo,
     const char *ifname, const void* pval, uint_t flags)
 {
 	ip_hostmodel_t	new_value, old_value;
-	ip_stack_t	*ipst = (ip_stack_t *)cbarg;
+	ip_stack_t	*ipst = stack->netstack_ip;
 	uint32_t	old_src_multihoming;
 	int		err;
 	ulong_t		tmp;
@@ -447,11 +448,11 @@ ip_set_hostmodel(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
 
 /* ARGSUSED */
 int
-ip_get_hostmodel(void *cbarg, mod_prop_info_t *pinfo, const char *ifname,
+ip_get_hostmodel(netstack_t *stack, mod_prop_info_t *pinfo, const char *ifname,
     void *pval, uint_t psize, uint_t flags)
 {
 	boolean_t	isv6 = (pinfo->mpi_proto == MOD_PROTO_IPV6);
-	ip_stack_t	*ipst = cbarg;
+	ip_stack_t	*ipst = stack->netstack_ip;
 	ip_hostmodel_t	hostmodel;
 
 	if (psize < sizeof (hostmodel))
