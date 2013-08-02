@@ -22,6 +22,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011, Joyent Inc. All rights reserved.
  * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 #ifndef	_INET_TCP_IMPL_H
@@ -52,6 +53,17 @@ extern struct qinit	tcp_sock_winit;
 extern struct qinit	tcp_winit;
 
 extern sock_downcalls_t sock_tcp_downcalls;
+
+/*
+ * Note that by default, the _snd_lowat_fraction tunable controls the value of
+ * the transmit low water mark.  TCP_XMIT_LOWATER (and thus the _xmit_lowat
+ * property) is only used if the administrator has disabled _snd_lowat_fraction
+ * by setting it to 0.
+ */
+#define	TCP_XMIT_LOWATER	4096
+#define	TCP_XMIT_HIWATER	49152
+#define	TCP_RECV_LOWATER	2048
+#define	TCP_RECV_HIWATER	128000
 
 /*
  * Bind hash list size and has function.  It has to be a power of 2 for

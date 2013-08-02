@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 #include <inet/ip.h>
@@ -42,10 +43,10 @@
  */
 /* ARGSUSED */
 static int
-sctp_listener_conf_get(void *cbarg, mod_prop_info_t *pinfo, const char *ifname,
-    void *val, uint_t psize, uint_t flags)
+sctp_listener_conf_get(netstack_t *stack, mod_prop_info_t *pinfo,
+    const char *ifname, void *val, uint_t psize, uint_t flags)
 {
-	sctp_stack_t	*sctps = (sctp_stack_t *)cbarg;
+	sctp_stack_t	*sctps = stack->netstack_sctp;
 	sctp_listener_t	*sl;
 	char		*pval = val;
 	size_t		nbytes = 0, tbytes = 0;
@@ -86,7 +87,7 @@ sctp_listener_conf_get(void *cbarg, mod_prop_info_t *pinfo, const char *ifname,
  */
 /* ARGSUSED */
 static int
-sctp_listener_conf_add(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
+sctp_listener_conf_add(netstack_t *stack, cred_t *cr, mod_prop_info_t *pinfo,
     const char *ifname, const void* pval, uint_t flags)
 {
 	sctp_listener_t	*new_sl;
@@ -94,7 +95,7 @@ sctp_listener_conf_add(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
 	long		lport;
 	long		ratio;
 	char		*colon;
-	sctp_stack_t	*sctps = (sctp_stack_t *)cbarg;
+	sctp_stack_t	*sctps = stack->netstack_sctp;
 
 	if (flags & MOD_PROP_DEFAULT)
 		return (ENOTSUP);
@@ -135,12 +136,12 @@ sctp_listener_conf_add(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
  */
 /* ARGSUSED */
 static int
-sctp_listener_conf_del(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
+sctp_listener_conf_del(netstack_t *stack, cred_t *cr, mod_prop_info_t *pinfo,
     const char *ifname, const void* pval, uint_t flags)
 {
 	sctp_listener_t	*sl;
 	long		lport;
-	sctp_stack_t	*sctps = (sctp_stack_t *)cbarg;
+	sctp_stack_t	*sctps = stack->netstack_sctp;
 
 	if (flags & MOD_PROP_DEFAULT)
 		return (ENOTSUP);
@@ -161,6 +162,22 @@ sctp_listener_conf_del(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
 	}
 	mutex_exit(&sctps->sctps_listener_conf_lock);
 	return (ESRCH);
+}
+
+static int
+sctp_set_buf_prop(netstack_t *stack, cred_t *cr, mod_prop_info_t *pinfo,
+    const char *ifname, const void *pval, uint_t flags)
+{
+	return (mod_set_buf_prop(stack->netstack_sctp->sctps_propinfo_tbl,
+	    stack, cr, pinfo, ifname, pval, flags));
+}
+
+static int
+sctp_get_buf_prop(netstack_t *stack, mod_prop_info_t *pinfo, const char *ifname,
+    void *val, uint_t psize, uint_t flags)
+{
+	return (mod_get_buf_prop(stack->netstack_sctp->sctps_propinfo_tbl,
+	    stack, pinfo, ifname, val, psize, flags));
 }
 
 /*
@@ -184,7 +201,7 @@ mod_prop_info_t sctp_propinfo_tbl[] = {
 
 	{ "_cwnd_max", MOD_PROTO_SCTP,
 	    mod_set_uint32, mod_get_uint32,
-	    {128, (1<<30), 1024*1024}, {1024*1024} },
+	    {128, ULP_MAX_BUF, 1024*1024}, {1024*1024} },
 
 	{ "smallest_nonpriv_port", MOD_PROTO_SCTP,
 	    mod_set_uint32, mod_get_uint32,
@@ -235,24 +252,24 @@ mod_prop_info_t sctp_propinfo_tbl[] = {
 	    mod_set_uint32, mod_get_uint32,
 	    {1024, ULP_MAX_PORT, ULP_MAX_PORT}, {ULP_MAX_PORT} },
 
-	{ "send_maxbuf", MOD_PROTO_SCTP,
-	    mod_set_uint32, mod_get_uint32,
-	    {SCTP_XMIT_LOWATER,  (1<<30),  SCTP_XMIT_HIWATER},
+	{ "send_buf", MOD_PROTO_SCTP,
+	    sctp_set_buf_prop, sctp_get_buf_prop,
+	    {SCTP_XMIT_LOWATER,  ULP_MAX_BUF,  SCTP_XMIT_HIWATER},
 	    {SCTP_XMIT_HIWATER} },
 
 	{ "_xmit_lowat", MOD_PROTO_SCTP,
 	    mod_set_uint32, mod_get_uint32,
-	    {SCTP_XMIT_LOWATER,  (1<<30),  SCTP_XMIT_LOWATER},
+	    {SCTP_XMIT_LOWATER,  ULP_MAX_BUF,  SCTP_XMIT_LOWATER},
 	    {SCTP_XMIT_LOWATER} },
 
-	{ "recv_maxbuf", MOD_PROTO_SCTP,
-	    mod_set_uint32, mod_get_uint32,
-	    {SCTP_RECV_LOWATER,  (1<<30),  SCTP_RECV_HIWATER},
+	{ "recv_buf", MOD_PROTO_SCTP,
+	    sctp_set_buf_prop, sctp_get_buf_prop,
+	    {SCTP_RECV_LOWATER,  ULP_MAX_BUF,  SCTP_RECV_HIWATER},
 	    {SCTP_RECV_HIWATER} },
 
-	{ "_max_buf", MOD_PROTO_SCTP,
+	{ "max_buf", MOD_PROTO_SCTP,
 	    mod_set_uint32, mod_get_uint32,
-	    {8192, (1<<30), 1024*1024}, {1024*1024} },
+	    {8192, ULP_MAX_BUF, 1024*1024}, {1024*1024} },
 
 	/* tunable - 20 */
 	{ "_rtt_updates", MOD_PROTO_SCTP,

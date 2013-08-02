@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 1990 Mentat Inc.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 #include <inet/tunables.h>
@@ -38,6 +39,24 @@
 #include <inet/sctp/sctp_impl.h>
 #include <inet/tunables.h>
 
+mod_prop_info_t *
+mod_prop_lookup(mod_prop_info_t ptbl[], const char *prop_name, uint_t proto)
+{
+	mod_prop_info_t *pinfo;
+
+	/*
+	 * Walk the ptbl array looking for a property that has the requested
+	 * name and protocol number.  Note that we assume that all protocol
+	 * tables are terminated by an entry with a NULL property name.
+	 */
+	for (pinfo = ptbl; pinfo->mpi_name != NULL; pinfo++) {
+		if (strcmp(pinfo->mpi_name, prop_name) == 0 &&
+		    pinfo->mpi_proto == proto)
+			return (pinfo);
+	}
+	return (NULL);
+}
+
 static int
 prop_perm2const(mod_prop_info_t *pinfo)
 {
@@ -54,11 +73,11 @@ prop_perm2const(mod_prop_info_t *pinfo)
  */
 /* ARGSUSED */
 int
-mod_set_boolean(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
+mod_set_boolean(netstack_t *stack, cred_t *cr, mod_prop_info_t *pinfo,
     const char *ifname, const void* pval, uint_t flags)
 {
-	char 		*end;
-	unsigned long 	new_value;
+	char		*end;
+	unsigned long	new_value;
 
 	if (flags & MOD_PROP_DEFAULT) {
 		pinfo->prop_cur_bval = pinfo->prop_def_bval;
@@ -79,7 +98,7 @@ mod_set_boolean(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
  */
 /* ARGSUSED */
 int
-mod_get_boolean(void *cbarg, mod_prop_info_t *pinfo, const char *ifname,
+mod_get_boolean(netstack_t *stack, mod_prop_info_t *pinfo, const char *ifname,
     void *pval, uint_t psize, uint_t flags)
 {
 	boolean_t	get_def = (flags & MOD_PROP_DEFAULT);
@@ -128,7 +147,7 @@ mod_uint32_value(const void *pval, mod_prop_info_t *pinfo, uint_t flags,
  */
 /* ARGSUSED */
 int
-mod_set_uint32(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
+mod_set_uint32(netstack_t *stack, cred_t *cr, mod_prop_info_t *pinfo,
     const char *ifname, const void *pval, uint_t flags)
 {
 	unsigned long	new_value;
@@ -145,12 +164,12 @@ mod_set_uint32(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
  */
 /* ARGSUSED */
 int
-mod_set_aligned(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
+mod_set_aligned(netstack_t *stack, cred_t *cr, mod_prop_info_t *pinfo,
     const char *ifname, const void* pval, uint_t flags)
 {
 	int	err;
 
-	if ((err = mod_set_uint32(cbarg, cr, pinfo, ifname, pval, flags)) != 0)
+	if ((err = mod_set_uint32(stack, cr, pinfo, ifname, pval, flags)) != 0)
 		return (err);
 
 	/* if required, align the value to multiple of 8 */
@@ -168,7 +187,7 @@ mod_set_aligned(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
  */
 /* ARGSUSED */
 int
-mod_get_uint32(void *cbarg, mod_prop_info_t *pinfo, const char *ifname,
+mod_get_uint32(netstack_t *stack, mod_prop_info_t *pinfo, const char *ifname,
     void *pval, uint_t psize, uint_t flags)
 {
 	boolean_t	get_def = (flags & MOD_PROP_DEFAULT);
@@ -192,21 +211,86 @@ mod_get_uint32(void *cbarg, mod_prop_info_t *pinfo, const char *ifname,
 }
 
 /*
+ * The range of the buffer size properties has a static lower bound configured
+ * in the property info structure of the property itself, and a dynamic upper
+ * bound.  The upper bound is the current value of the "max_buf" property
+ * in the appropriate protocol property table.
+ */
+static void
+mod_get_buf_prop_range(mod_prop_info_t ptbl[], mod_prop_info_t *pinfo,
+    uint32_t *min, uint32_t *max)
+{
+	mod_prop_info_t *maxbuf_pinfo = mod_prop_lookup(ptbl, "max_buf",
+	    pinfo->mpi_proto);
+
+	*min = pinfo->prop_min_uval;
+	*max = maxbuf_pinfo->prop_cur_uval;
+}
+
+/*
+ * Modifies the value of the buffer size property to its default value or to
+ * the value specified by the user.  This is similar to mod_set_uint32() except
+ * that the value has a dynamically bounded range (see mod_get_buf_prop_range()
+ * for details).
+ */
+/* ARGSUSED */
+int
+mod_set_buf_prop(mod_prop_info_t ptbl[], netstack_t *stack, cred_t *cr,
+    mod_prop_info_t *pinfo, const char *ifname, const void *pval, uint_t flags)
+{
+	unsigned long	new_value;
+	char		*end;
+	uint32_t	min, max;
+
+	if (flags & MOD_PROP_DEFAULT) {
+		pinfo->prop_cur_uval = pinfo->prop_def_uval;
+		return (0);
+	}
+
+	if (ddi_strtoul(pval, &end, 10, &new_value) != 0 || *end != '\0')
+		return (EINVAL);
+
+	mod_get_buf_prop_range(ptbl, pinfo, &min, &max);
+	if (new_value < min || new_value > max)
+		return (ERANGE);
+
+	pinfo->prop_cur_uval = new_value;
+	return (0);
+}
+
+/*
+ * Retrieves property permissions, default value, current value, or possible
+ * values for buffer size properties.  While these properties have integer
+ * values, they have a dynamic range (see mod_get_buf_prop_range() for
+ * details).  As such, they need to be handled differently.
+ */
+int
+mod_get_buf_prop(mod_prop_info_t ptbl[], netstack_t *stack,
+    mod_prop_info_t *pinfo, const char *ifname, void *pval, uint_t psize,
+    uint_t flags)
+{
+	size_t nbytes;
+	uint32_t min, max;
+
+	if (flags & MOD_PROP_POSSIBLE) {
+		mod_get_buf_prop_range(ptbl, pinfo, &min, &max);
+		nbytes = snprintf(pval, psize, "%u-%u", min, max);
+		return (nbytes < psize ? 0 : ENOBUFS);
+	}
+	return (mod_get_uint32(stack, pinfo, ifname, pval, psize, flags));
+}
+
+/*
  * Implements /sbin/ndd -get /dev/ip ?, for all the modules. Needed for
  * backward compatibility with /sbin/ndd.
  */
 /* ARGSUSED */
 int
-mod_get_allprop(void *cbarg, mod_prop_info_t *pinfo, const char *ifname,
+mod_get_allprop(netstack_t *stack, mod_prop_info_t *pinfo, const char *ifname,
     void *val, uint_t psize, uint_t flags)
 {
 	char		*pval = val;
 	mod_prop_info_t	*ptbl, *prop;
-	ip_stack_t	*ipst;
-	tcp_stack_t	*tcps;
-	sctp_stack_t	*sctps;
-	udp_stack_t	*us;
-	icmp_stack_t	*is;
 	uint_t		size;
 	size_t		nbytes = 0, tbytes = 0;
 
@@ -217,24 +301,19 @@ mod_get_allprop(void *cbarg, mod_prop_info_t *pinfo, const char *ifname,
 	case MOD_PROTO_IP:
 	case MOD_PROTO_IPV4:
 	case MOD_PROTO_IPV6:
-		ipst = (ip_stack_t *)cbarg;
-		ptbl = ipst->ips_propinfo_tbl;
+		ptbl = stack->netstack_ip->ips_propinfo_tbl;
 		break;
 	case MOD_PROTO_RAWIP:
-		is = (icmp_stack_t *)cbarg;
-		ptbl = is->is_propinfo_tbl;
+		ptbl = stack->netstack_icmp->is_propinfo_tbl;
 		break;
 	case MOD_PROTO_TCP:
-		tcps = (tcp_stack_t *)cbarg;
-		ptbl = tcps->tcps_propinfo_tbl;
+		ptbl = stack->netstack_tcp->tcps_propinfo_tbl;
 		break;
 	case MOD_PROTO_UDP:
-		us = (udp_stack_t *)cbarg;
-		ptbl = us->us_propinfo_tbl;
+		ptbl = stack->netstack_udp->us_propinfo_tbl;
 		break;
 	case MOD_PROTO_SCTP:
-		sctps = (sctp_stack_t *)cbarg;
-		ptbl = sctps->sctps_propinfo_tbl;
+		ptbl = stack->netstack_sctp->sctps_propinfo_tbl;
 		break;
 	default:
 		return (EINVAL);
@@ -264,7 +343,7 @@ mod_get_allprop(void *cbarg, mod_prop_info_t *pinfo, const char *ifname,
  */
 /* ARGSUSED */
 int
-mod_set_extra_privports(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
+mod_set_extra_privports(netstack_t *stack, cred_t *cr, mod_prop_info_t *pinfo,
     const char *ifname, const void* val, uint_t flags)
 {
 	uint_t		proto = pinfo->mpi_proto;
@@ -293,19 +372,19 @@ mod_set_extra_privports(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
 
 	switch (proto) {
 	case MOD_PROTO_TCP:
-		tcps = (tcp_stack_t *)cbarg;
+		tcps = stack->netstack_tcp;
 		lock = &tcps->tcps_epriv_port_lock;
 		ports = tcps->tcps_g_epriv_ports;
 		nports = tcps->tcps_g_num_epriv_ports;
 		break;
 	case MOD_PROTO_UDP:
-		us = (udp_stack_t *)cbarg;
+		us = stack->netstack_udp;
 		lock = &us->us_epriv_port_lock;
 		ports = us->us_epriv_ports;
 		nports = us->us_num_epriv_ports;
 		break;
 	case MOD_PROTO_SCTP:
-		sctps = (sctp_stack_t *)cbarg;
+		sctps = stack->netstack_sctp;
 		lock = &sctps->sctps_epriv_port_lock;
 		ports = sctps->sctps_g_epriv_ports;
 		nports = sctps->sctps_g_num_epriv_ports;
@@ -382,8 +461,8 @@ mod_set_extra_privports(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
  */
 /* ARGSUSED */
 int
-mod_get_extra_privports(void *cbarg, mod_prop_info_t *pinfo, const char *ifname,
-    void *val, uint_t psize, uint_t flags)
+mod_get_extra_privports(netstack_t *stack, mod_prop_info_t *pinfo,
+    const char *ifname, void *val, uint_t psize, uint_t flags)
 {
 	uint_t		proto = pinfo->mpi_proto;
 	tcp_stack_t	*tcps;
@@ -411,17 +490,17 @@ mod_get_extra_privports(void *cbarg, mod_prop_info_t *pinfo, const char *ifname,
 
 	switch (proto) {
 	case MOD_PROTO_TCP:
-		tcps = (tcp_stack_t *)cbarg;
+		tcps = stack->netstack_tcp;
 		ports = tcps->tcps_g_epriv_ports;
 		nports = tcps->tcps_g_num_epriv_ports;
 		break;
 	case MOD_PROTO_UDP:
-		us = (udp_stack_t *)cbarg;
+		us = stack->netstack_udp;
 		ports = us->us_epriv_ports;
 		nports = us->us_num_epriv_ports;
 		break;
 	case MOD_PROTO_SCTP:
-		sctps = (sctp_stack_t *)cbarg;
+		sctps = stack->netstack_sctp;
 		ports = sctps->sctps_g_epriv_ports;
 		nports = sctps->sctps_g_num_epriv_ports;
 		break;
