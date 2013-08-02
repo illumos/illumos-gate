@@ -42,11 +42,11 @@
 /*
  * Note that when _init and _fini are called we have 16-byte alignment per the
  * ABI. We need to make sure that our asm leaves it such that subsequent calls
- * will be aligned. Between the two pushls we do ourselves, that leaves us
- * having pushed 8 bytes onto the stack. The call that will follow this prologue
- * which have us push eip onto the stack. To make sure that when that function
- * is called it is 16-byte aligned we must subtract another four bytes from the
- * stack.
+ * will be aligned. gcc expects stack alignment before the call instruction is
+ * executed. Specifically if we call function foo(), the stack pointer will be
+ * 0xc aligned after executing the call instruction and before executing foo's
+ * prologue. Note that because 16-byte alignment also ensures 4-byte alignment
+ * we will not be breaking compatibility with older applications.
  */
 
 /*
@@ -59,11 +59,12 @@
 _init:
 	pushl	%ebp
 	movl	%esp, %ebp
+	andl	$-16,%esp
+	subl	$12,%esp
 	pushl	%ebx
 	call	.L1
 .L1:	popl	%ebx
 	addl	$_GLOBAL_OFFSET_TABLE_+[.-.L1], %ebx
-	subl	$4, %esp	/ See above comments on alignment
 
 /*
  * _fini function prologue
@@ -75,8 +76,9 @@ _init:
 _fini:
 	pushl	%ebp
 	movl	%esp, %ebp
+	andl	$-16,%esp
+	subl	$12,%esp
 	pushl	%ebx
 	call	.L2
 .L2:	popl	%ebx
 	addl	$_GLOBAL_OFFSET_TABLE_+[.-.L2], %ebx
-	subl	$4, %esp	/ See above comments on alignment
