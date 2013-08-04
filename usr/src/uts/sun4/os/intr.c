@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ */
 
 #include <sys/sysmacros.h>
 #include <sys/stack.h>
@@ -43,7 +46,7 @@
 #include <sys/debug.h>
 #include <sys/cyclic.h>
 #include <sys/kdi_impl.h>
-#include <sys/ddi_timer.h>
+#include <sys/ddi_periodic.h>
 
 #include <sys/cpu_sgnblk_defs.h>
 
@@ -119,7 +122,8 @@ intr_init(cpu_t *cp)
 	 * Software interrupts up to the level 10 are supported.
 	 */
 	for (i = DDI_IPL_1; i <= DDI_IPL_10; i++) {
-		siron_inum[i-1] = add_softintr(i, (softintrfunc)timer_softintr,
+		siron_inum[i - 1] = add_softintr(i,
+		    (softintrfunc)ddi_periodic_softintr,
 		    (caddr_t)(uintptr_t)(i), SOFTINT_ST);
 	}
 

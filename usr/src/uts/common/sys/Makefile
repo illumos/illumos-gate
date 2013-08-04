@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2013, Joyent, Inc. All rights reserved.
 #
 
 include $(SRC)/uts/Makefile.uts
@@ -156,7 +157,7 @@ CHKHDRS=			\
 	ddi_impldefs.h		\
 	ddi_implfuncs.h		\
 	ddi_obsolete.h		\
-	ddi_timer.h		\
+	ddi_periodic.h		\
 	ddidevmap.h		\
 	ddidmareq.h		\
 	ddimapreq.h		\

@@ -58,7 +58,7 @@
 #include <sys/conf.h>
 #include <sys/ddi_impldefs.h>	/* include implementation structure defs */
 #include <sys/ndi_impldefs.h>	/* include prototypes */
-#include <sys/ddi_timer.h>
+#include <sys/ddi_periodic.h>
 #include <sys/hwconf.h>
 #include <sys/pathname.h>
 #include <sys/modctl.h>

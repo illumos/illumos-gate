@@ -34,7 +34,7 @@
 #include <sys/sunndi.h>
 #include <sys/kstat.h>
 #include <sys/conf.h>
-#include <sys/ddi_timer.h>
+#include <sys/ddi_periodic.h>
 #include <sys/devctl.h>
 #include <sys/callb.h>
 #include <sys/sysevent.h>
