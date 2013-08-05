@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, Joyent, Inc.  All rights reserved.
 #
 
 #
@@ -60,6 +61,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	kvm_aread;
 	kvm_awrite;
+	kvm_namelist;
 	kvm_physaddr;
 	kvm_pread;
 	kvm_pwrite;

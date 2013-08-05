@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 /*
@@ -88,63 +89,63 @@ static int protocols[] = { MOD_PROTO_IP, MOD_PROTO_RAWIP,
  * Supported IP protocol properties.
  */
 static ipadm_prop_desc_t ipadm_ip_prop_table[] = {
-	{ "arp", IPADMPROP_CLASS_IF, MOD_PROTO_IPV4, 0,
+	{ "arp", NULL, IPADMPROP_CLASS_IF, MOD_PROTO_IPV4, 0,
 	    i_ipadm_set_ifprop_flags, i_ipadm_get_onoff,
 	    i_ipadm_get_ifprop_flags },
 
-	{ "forwarding", IPADMPROP_CLASS_MODIF, MOD_PROTO_IPV4, 0,
+	{ "forwarding", NULL, IPADMPROP_CLASS_MODIF, MOD_PROTO_IPV4, 0,
 	    i_ipadm_set_forwarding, i_ipadm_get_onoff,
 	    i_ipadm_get_forwarding },
 
-	{ "metric", IPADMPROP_CLASS_IF, MOD_PROTO_IPV4, 0,
+	{ "metric", NULL, IPADMPROP_CLASS_IF, MOD_PROTO_IPV4, 0,
 	    i_ipadm_set_metric, NULL, i_ipadm_get_metric },
 
-	{ "mtu", IPADMPROP_CLASS_IF, MOD_PROTO_IPV4, 0,
+	{ "mtu", NULL, IPADMPROP_CLASS_IF, MOD_PROTO_IPV4, 0,
 	    i_ipadm_set_mtu, i_ipadm_get_mtu, i_ipadm_get_mtu },
 
-	{ "exchange_routes", IPADMPROP_CLASS_IF, MOD_PROTO_IPV4, 0,
+	{ "exchange_routes", NULL, IPADMPROP_CLASS_IF, MOD_PROTO_IPV4, 0,
 	    i_ipadm_set_ifprop_flags, i_ipadm_get_onoff,
 	    i_ipadm_get_ifprop_flags },
 
-	{ "usesrc", IPADMPROP_CLASS_IF, MOD_PROTO_IPV4, 0,
+	{ "usesrc", NULL, IPADMPROP_CLASS_IF, MOD_PROTO_IPV4, 0,
 	    i_ipadm_set_usesrc, NULL, i_ipadm_get_usesrc },
 
-	{ "ttl", IPADMPROP_CLASS_MODULE, MOD_PROTO_IPV4, 0,
+	{ "ttl", NULL, IPADMPROP_CLASS_MODULE, MOD_PROTO_IPV4, 0,
 	    i_ipadm_set_prop, i_ipadm_get_prop, i_ipadm_get_prop },
 
-	{ "forwarding", IPADMPROP_CLASS_MODIF, MOD_PROTO_IPV6, 0,
+	{ "forwarding", NULL, IPADMPROP_CLASS_MODIF, MOD_PROTO_IPV6, 0,
 	    i_ipadm_set_forwarding, i_ipadm_get_onoff,
 	    i_ipadm_get_forwarding },
 
-	{ "hoplimit", IPADMPROP_CLASS_MODULE, MOD_PROTO_IPV6, 0,
+	{ "hoplimit", NULL, IPADMPROP_CLASS_MODULE, MOD_PROTO_IPV6, 0,
 	    i_ipadm_set_prop, i_ipadm_get_prop, i_ipadm_get_prop },
 
-	{ "metric", IPADMPROP_CLASS_IF, MOD_PROTO_IPV6, 0,
+	{ "metric", NULL, IPADMPROP_CLASS_IF, MOD_PROTO_IPV6, 0,
 	    i_ipadm_set_metric, NULL, i_ipadm_get_metric },
 
-	{ "mtu", IPADMPROP_CLASS_IF, MOD_PROTO_IPV6, 0,
+	{ "mtu", NULL, IPADMPROP_CLASS_IF, MOD_PROTO_IPV6, 0,
 	    i_ipadm_set_mtu, i_ipadm_get_mtu, i_ipadm_get_mtu },
 
-	{ "nud", IPADMPROP_CLASS_IF, MOD_PROTO_IPV6, 0,
+	{ "nud", NULL, IPADMPROP_CLASS_IF, MOD_PROTO_IPV6, 0,
 	    i_ipadm_set_ifprop_flags, i_ipadm_get_onoff,
 	    i_ipadm_get_ifprop_flags },
 
-	{ "exchange_routes", IPADMPROP_CLASS_IF, MOD_PROTO_IPV6, 0,
+	{ "exchange_routes", NULL, IPADMPROP_CLASS_IF, MOD_PROTO_IPV6, 0,
 	    i_ipadm_set_ifprop_flags, i_ipadm_get_onoff,
 	    i_ipadm_get_ifprop_flags },
 
-	{ "usesrc", IPADMPROP_CLASS_IF, MOD_PROTO_IPV6, 0,
+	{ "usesrc", NULL, IPADMPROP_CLASS_IF, MOD_PROTO_IPV6, 0,
 	    i_ipadm_set_usesrc, NULL, i_ipadm_get_usesrc },
 
-	{ "hostmodel", IPADMPROP_CLASS_MODULE, MOD_PROTO_IPV6, 0,
+	{ "hostmodel", NULL, IPADMPROP_CLASS_MODULE, MOD_PROTO_IPV6, 0,
 	    i_ipadm_set_hostmodel, i_ipadm_get_hostmodel,
 	    i_ipadm_get_hostmodel },
 
-	{ "hostmodel", IPADMPROP_CLASS_MODULE, MOD_PROTO_IPV4, 0,
+	{ "hostmodel", NULL, IPADMPROP_CLASS_MODULE, MOD_PROTO_IPV4, 0,
 	    i_ipadm_set_hostmodel, i_ipadm_get_hostmodel,
 	    i_ipadm_get_hostmodel },
 
-	{ NULL, 0, 0, 0, NULL, NULL, NULL }
+	{ NULL, NULL, 0, 0, 0, NULL, NULL, NULL }
 };
 
 /* possible values for TCP properties `ecn' and `sack' */
@@ -152,99 +153,111 @@ static const char *ecn_sack_vals[] = {"never", "passive", "active", NULL};
 
 /* Supported TCP protocol properties */
 static ipadm_prop_desc_t ipadm_tcp_prop_table[] = {
-	{ "ecn", IPADMPROP_CLASS_MODULE, MOD_PROTO_TCP, 0,
+	{ "ecn", NULL, IPADMPROP_CLASS_MODULE, MOD_PROTO_TCP, 0,
 	    i_ipadm_set_ecnsack, i_ipadm_get_ecnsack, i_ipadm_get_ecnsack },
 
-	{ "extra_priv_ports", IPADMPROP_CLASS_MODULE, MOD_PROTO_TCP,
+	{ "extra_priv_ports", NULL, IPADMPROP_CLASS_MODULE, MOD_PROTO_TCP,
 	    IPADMPROP_MULVAL, i_ipadm_set_eprivport, i_ipadm_get_prop,
 	    i_ipadm_get_prop },
 
-	{ "largest_anon_port", IPADMPROP_CLASS_MODULE, MOD_PROTO_TCP, 0,
+	{ "largest_anon_port", NULL, IPADMPROP_CLASS_MODULE, MOD_PROTO_TCP, 0,
 	    i_ipadm_set_prop, i_ipadm_get_prop, i_ipadm_get_prop },
 
-	{ "recv_maxbuf", IPADMPROP_CLASS_MODULE, MOD_PROTO_TCP, 0,
+	{ "max_buf", "_max_buf", IPADMPROP_CLASS_MODULE, MOD_PROTO_TCP, 0,
 	    i_ipadm_set_prop, i_ipadm_get_prop, i_ipadm_get_prop },
 
-	{ "sack", IPADMPROP_CLASS_MODULE, MOD_PROTO_TCP, 0,
+	{ "recv_buf", "recv_maxbuf", IPADMPROP_CLASS_MODULE, MOD_PROTO_TCP, 0,
+	    i_ipadm_set_prop, i_ipadm_get_prop, i_ipadm_get_prop },
+
+	{ "sack", NULL, IPADMPROP_CLASS_MODULE, MOD_PROTO_TCP, 0,
 	    i_ipadm_set_ecnsack, i_ipadm_get_ecnsack, i_ipadm_get_ecnsack },
 
-	{ "send_maxbuf", IPADMPROP_CLASS_MODULE, MOD_PROTO_TCP, 0,
+	{ "send_buf", "send_maxbuf", IPADMPROP_CLASS_MODULE, MOD_PROTO_TCP, 0,
 	    i_ipadm_set_prop, i_ipadm_get_prop, i_ipadm_get_prop },
 
-	{ "smallest_anon_port", IPADMPROP_CLASS_MODULE, MOD_PROTO_TCP, 0,
+	{ "smallest_anon_port", NULL, IPADMPROP_CLASS_MODULE, MOD_PROTO_TCP, 0,
 	    i_ipadm_set_prop, i_ipadm_get_prop, i_ipadm_get_prop },
 
-	{ "smallest_nonpriv_port", IPADMPROP_CLASS_MODULE, MOD_PROTO_TCP, 0,
-	    i_ipadm_set_prop, i_ipadm_get_prop, i_ipadm_get_prop },
+	{ "smallest_nonpriv_port", NULL, IPADMPROP_CLASS_MODULE, MOD_PROTO_TCP,
+	    0, i_ipadm_set_prop, i_ipadm_get_prop, i_ipadm_get_prop },
 
-	{ NULL, 0, 0, 0, NULL, NULL, NULL }
+	{ NULL, NULL, 0, 0, 0, NULL, NULL, NULL }
 };
 
 /* Supported UDP protocol properties */
 static ipadm_prop_desc_t ipadm_udp_prop_table[] = {
-	{ "extra_priv_ports", IPADMPROP_CLASS_MODULE, MOD_PROTO_UDP,
+	{ "extra_priv_ports", NULL, IPADMPROP_CLASS_MODULE, MOD_PROTO_UDP,
 	    IPADMPROP_MULVAL, i_ipadm_set_eprivport, i_ipadm_get_prop,
 	    i_ipadm_get_prop },
 
-	{ "largest_anon_port", IPADMPROP_CLASS_MODULE, MOD_PROTO_UDP, 0,
+	{ "largest_anon_port", NULL, IPADMPROP_CLASS_MODULE, MOD_PROTO_UDP, 0,
 	    i_ipadm_set_prop, i_ipadm_get_prop, i_ipadm_get_prop },
 
-	{ "recv_maxbuf", IPADMPROP_CLASS_MODULE, MOD_PROTO_UDP, 0,
+	{ "max_buf", "_max_buf", IPADMPROP_CLASS_MODULE, MOD_PROTO_UDP, 0,
 	    i_ipadm_set_prop, i_ipadm_get_prop, i_ipadm_get_prop },
 
-	{ "send_maxbuf", IPADMPROP_CLASS_MODULE, MOD_PROTO_UDP, 0,
+	{ "recv_buf", "recv_maxbuf", IPADMPROP_CLASS_MODULE, MOD_PROTO_UDP, 0,
 	    i_ipadm_set_prop, i_ipadm_get_prop, i_ipadm_get_prop },
 
-	{ "smallest_anon_port", IPADMPROP_CLASS_MODULE, MOD_PROTO_UDP, 0,
+	{ "send_buf", "send_maxbuf", IPADMPROP_CLASS_MODULE, MOD_PROTO_UDP, 0,
 	    i_ipadm_set_prop, i_ipadm_get_prop, i_ipadm_get_prop },
 
-	{ "smallest_nonpriv_port", IPADMPROP_CLASS_MODULE, MOD_PROTO_UDP, 0,
+	{ "smallest_anon_port", NULL, IPADMPROP_CLASS_MODULE, MOD_PROTO_UDP, 0,
 	    i_ipadm_set_prop, i_ipadm_get_prop, i_ipadm_get_prop },
 
-	{ NULL, 0, 0, 0, NULL, NULL, NULL }
+	{ "smallest_nonpriv_port", NULL, IPADMPROP_CLASS_MODULE, MOD_PROTO_UDP,
+	    0, i_ipadm_set_prop, i_ipadm_get_prop, i_ipadm_get_prop },
+
+	{ NULL, NULL, 0, 0, 0, NULL, NULL, NULL }
 };
 
 /* Supported SCTP protocol properties */
 static ipadm_prop_desc_t ipadm_sctp_prop_table[] = {
-	{ "extra_priv_ports", IPADMPROP_CLASS_MODULE, MOD_PROTO_SCTP,
+	{ "extra_priv_ports", NULL, IPADMPROP_CLASS_MODULE, MOD_PROTO_SCTP,
 	    IPADMPROP_MULVAL, i_ipadm_set_eprivport, i_ipadm_get_prop,
 	    i_ipadm_get_prop },
 
-	{ "largest_anon_port", IPADMPROP_CLASS_MODULE, MOD_PROTO_SCTP, 0,
+	{ "largest_anon_port", NULL, IPADMPROP_CLASS_MODULE, MOD_PROTO_SCTP, 0,
 	    i_ipadm_set_prop, i_ipadm_get_prop, i_ipadm_get_prop },
 
-	{ "recv_maxbuf", IPADMPROP_CLASS_MODULE, MOD_PROTO_SCTP, 0,
+	{ "max_buf", "_max_buf", IPADMPROP_CLASS_MODULE, MOD_PROTO_SCTP, 0,
 	    i_ipadm_set_prop, i_ipadm_get_prop, i_ipadm_get_prop },
 
-	{ "send_maxbuf", IPADMPROP_CLASS_MODULE, MOD_PROTO_SCTP, 0,
+	{ "recv_buf", "recv_maxbuf", IPADMPROP_CLASS_MODULE, MOD_PROTO_SCTP, 0,
 	    i_ipadm_set_prop, i_ipadm_get_prop, i_ipadm_get_prop },
 
-	{ "smallest_anon_port", IPADMPROP_CLASS_MODULE, MOD_PROTO_SCTP, 0,
+	{ "send_buf", "send_maxbuf", IPADMPROP_CLASS_MODULE, MOD_PROTO_SCTP, 0,
 	    i_ipadm_set_prop, i_ipadm_get_prop, i_ipadm_get_prop },
 
-	{ "smallest_nonpriv_port", IPADMPROP_CLASS_MODULE, MOD_PROTO_SCTP, 0,
+	{ "smallest_anon_port", NULL, IPADMPROP_CLASS_MODULE, MOD_PROTO_SCTP, 0,
 	    i_ipadm_set_prop, i_ipadm_get_prop, i_ipadm_get_prop },
 
-	{ NULL, 0, 0, 0, NULL, NULL, NULL }
+	{ "smallest_nonpriv_port", NULL, IPADMPROP_CLASS_MODULE, MOD_PROTO_SCTP,
+	    0, i_ipadm_set_prop, i_ipadm_get_prop, i_ipadm_get_prop },
+
+	{ NULL, NULL, 0, 0, 0, NULL, NULL, NULL }
 };
 
 /* Supported ICMP protocol properties */
 static ipadm_prop_desc_t ipadm_icmp_prop_table[] = {
-	{ "recv_maxbuf", IPADMPROP_CLASS_MODULE, MOD_PROTO_RAWIP, 0,
+	{ "max_buf", "_max_buf", IPADMPROP_CLASS_MODULE, MOD_PROTO_RAWIP, 0,
 	    i_ipadm_set_prop, i_ipadm_get_prop, i_ipadm_get_prop },
 
-	{ "send_maxbuf", IPADMPROP_CLASS_MODULE, MOD_PROTO_RAWIP, 0,
+	{ "recv_buf", "recv_maxbuf", IPADMPROP_CLASS_MODULE, MOD_PROTO_RAWIP, 0,
 	    i_ipadm_set_prop, i_ipadm_get_prop, i_ipadm_get_prop },
 
-	{ NULL, 0, 0, 0, NULL, NULL, NULL }
+	{ "send_buf", "send_maxbuf", IPADMPROP_CLASS_MODULE, MOD_PROTO_RAWIP, 0,
+	    i_ipadm_set_prop, i_ipadm_get_prop, i_ipadm_get_prop },
+
+	{ NULL, NULL, 0, 0, 0, NULL, NULL, NULL }
 };
 
 /*
  * A dummy private property structure, used while handling private
  * protocol properties (properties not yet supported by libipadm).
  */
-static ipadm_prop_desc_t	ipadm_privprop =\
-	{ NULL, IPADMPROP_CLASS_MODULE, MOD_PROTO_NONE, 0,
+static ipadm_prop_desc_t ipadm_privprop =
+	{ NULL, NULL, IPADMPROP_CLASS_MODULE, MOD_PROTO_NONE, 0,
 	    i_ipadm_set_prop, i_ipadm_get_prop, i_ipadm_get_prop };
 
 /*
@@ -282,13 +295,17 @@ i_ipadm_get_prop_desc(const char *pname, uint_t proto, int *errp)
 		err = EINVAL;
 		goto ret;
 	}
+
 	for (ipdp = ipdtbl; ipdp->ipd_name != NULL; ipdp++) {
-		if (strcmp(pname, ipdp->ipd_name) == 0) {
+		if (strcmp(pname, ipdp->ipd_name) == 0 ||
+		    (ipdp->ipd_old_name != NULL &&
+		    strcmp(pname, ipdp->ipd_old_name) == 0)) {
 			matched_name = B_TRUE;
 			if (ipdp->ipd_proto == proto)
 				break;
 		}
 	}
+
 	if (ipdp->ipd_name == NULL) {
 		err = ENOENT;
 		/* if we matched name, but failed protocol check */

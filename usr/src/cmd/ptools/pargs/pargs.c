@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -1201,7 +1201,7 @@ print_cmdline(pargs_data_t *datap)
 	 * an error message and bail.
 	 */
 	for (i = 0; i < datap->pd_argc; i++) {
-		if (datap->pd_argv[i] == NULL ||
+		if (datap->pd_argv == NULL || datap->pd_argv[i] == NULL ||
 		    datap->pd_argv_strs[i] == NULL) {
 			(void) fprintf(stderr, "%s: target has corrupted "
 			    "argument list\n", command);

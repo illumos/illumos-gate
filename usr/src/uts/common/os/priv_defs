@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013, Joyent, Inc. All rights reserved.
  *
 INSERT COMMENT
  */
@@ -303,9 +304,13 @@ privilege PRIV_PROC_OWNER
 	effective uid is 0.
 	Allows a process to bind arbitrary processes to CPUs.
 
-privilege PRIV_PROC_PRIOCNTL
+privilege PRIV_PROC_PRIOUP
 
 	Allows a process to elevate its priority above its current level.
+
+privilege PRIV_PROC_PRIOCNTL
+
+	Allows all that PRIV_PROC_PRIOUP allows.
 	Allows a process to change its scheduling class to any scheduling class,
 	including the RT class.
 

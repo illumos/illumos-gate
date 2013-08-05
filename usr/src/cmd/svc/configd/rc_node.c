@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -6534,7 +6535,15 @@ rc_iter_next(rc_node_iter_t *iter, rc_node_ptr_t *out, uint32_t type)
 			}
 
 			if (pg == NULL) {
+				(void) pthread_mutex_unlock(&np->rn_lock);
 				rc_node_rele(res);
+				(void) pthread_mutex_lock(&np->rn_lock);
+				if (!rc_node_wait_flag(np, RC_NODE_DYING)) {
+					(void) pthread_mutex_unlock(&np->
+					    rn_lock);
+					rc_node_clear(out, 1);
+					return (REP_PROTOCOL_FAIL_DELETED);
+				}
 			} else {
 				rc_node_t *cpg;
 
@@ -6557,9 +6566,21 @@ rc_iter_next(rc_node_iter_t *iter, rc_node_ptr_t *out, uint32_t type)
 
 				case REP_PROTOCOL_FAIL_TYPE_MISMATCH:
 					/* Nevermind. */
+					(void) pthread_mutex_unlock(&np->
+					    rn_lock);
 					rc_node_destroy(cpg);
 					rc_node_rele(pg);
 					rc_node_rele(res);
+					(void) pthread_mutex_lock(&np->
+					    rn_lock);
+					if (!rc_node_wait_flag(np,
+					    RC_NODE_DYING)) {
+						(void) pthread_mutex_unlock(&
+						    np->rn_lock);
+						rc_node_clear(out, 1);
+						return
+						    (REP_PROTOCOL_FAIL_DELETED);
+					}
 					break;
 
 				case REP_PROTOCOL_FAIL_NO_RESOURCES:

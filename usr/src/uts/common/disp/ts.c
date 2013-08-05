@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013, Joyent, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -1197,7 +1198,7 @@ ts_parmsset(kthread_t *tx, void *parmsp, id_t reqpcid, cred_t *reqpcredp)
 	 */
 	if (reqpcredp != NULL &&
 	    reqtsuprilim > tspp->ts_uprilim &&
-	    secpolicy_setpriority(reqpcredp) != 0)
+	    secpolicy_raisepriority(reqpcredp) != 0)
 		return (EPERM);
 
 	/*
@@ -1250,7 +1251,7 @@ ia_parmsset(kthread_t *tx, void *parmsp, id_t reqpcid, cred_t *reqpcredp)
 	 */
 
 	if (reqpcredp != NULL && !groupmember(IA_gid, reqpcredp) &&
-	    secpolicy_setpriority(reqpcredp) != 0) {
+	    secpolicy_raisepriority(reqpcredp) != 0) {
 		/*
 		 * Silently fail in case this is just a priocntl
 		 * call with upri and uprilim set to IA_NOCHANGE.
@@ -2097,7 +2098,7 @@ ts_donice(kthread_t *t, cred_t *cr, int incr, int *retvalp)
 	}
 
 	if ((incr < 0 || incr > 2 * NZERO) &&
-	    secpolicy_setpriority(cr) != 0)
+	    secpolicy_raisepriority(cr) != 0)
 		return (EPERM);
 
 	/*

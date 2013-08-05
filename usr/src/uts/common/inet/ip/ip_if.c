@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 1990 Mentat Inc.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 /*
@@ -8854,14 +8855,9 @@ ip_sioctl_getsetprop(queue_t *q, mblk_t *mp)
 	mod_ioc_prop_t	*pioc;
 	mod_prop_info_t *ptbl = NULL, *pinfo = NULL;
 	ip_stack_t	*ipst;
-	icmp_stack_t	*is;
-	tcp_stack_t	*tcps;
-	sctp_stack_t	*sctps;
-	udp_stack_t	*us;
 	netstack_t	*stack;
-	void		*cbarg;
 	cred_t		*cr;
-	boolean_t 	set;
+	boolean_t	set;
 	int		err;
 
 	ASSERT(q->q_next == NULL);
@@ -8880,40 +8876,26 @@ ip_sioctl_getsetprop(queue_t *q, mblk_t *mp)
 	case MOD_PROTO_IPV4:
 	case MOD_PROTO_IPV6:
 		ptbl = ipst->ips_propinfo_tbl;
-		cbarg = ipst;
 		break;
 	case MOD_PROTO_RAWIP:
-		is = stack->netstack_icmp;
-		ptbl = is->is_propinfo_tbl;
-		cbarg = is;
+		ptbl = stack->netstack_icmp->is_propinfo_tbl;
 		break;
 	case MOD_PROTO_TCP:
-		tcps = stack->netstack_tcp;
-		ptbl = tcps->tcps_propinfo_tbl;
-		cbarg = tcps;
+		ptbl = stack->netstack_tcp->tcps_propinfo_tbl;
 		break;
 	case MOD_PROTO_UDP:
-		us = stack->netstack_udp;
-		ptbl = us->us_propinfo_tbl;
-		cbarg = us;
+		ptbl = stack->netstack_udp->us_propinfo_tbl;
 		break;
 	case MOD_PROTO_SCTP:
-		sctps = stack->netstack_sctp;
-		ptbl = sctps->sctps_propinfo_tbl;
-		cbarg = sctps;
+		ptbl = stack->netstack_sctp->sctps_propinfo_tbl;
 		break;
 	default:
 		miocnak(q, mp, 0, EINVAL);
 		return;
 	}
 
-	/* search for given property in respective protocol propinfo table */
-	for (pinfo = ptbl; pinfo->mpi_name != NULL; pinfo++) {
-		if (strcmp(pinfo->mpi_name, pioc->mpr_name) == 0 &&
-		    pinfo->mpi_proto == pioc->mpr_proto)
-			break;
-	}
-	if (pinfo->mpi_name == NULL) {
+	pinfo = mod_prop_lookup(ptbl, pioc->mpr_name, pioc->mpr_proto);
+	if (pinfo == NULL) {
 		miocnak(q, mp, 0, ENOENT);
 		return;
 	}
@@ -8923,10 +8905,10 @@ ip_sioctl_getsetprop(queue_t *q, mblk_t *mp)
 		cr = msg_getcred(mp, NULL);
 		if (cr == NULL)
 			cr = iocp->ioc_cr;
-		err = pinfo->mpi_setf(cbarg, cr, pinfo, pioc->mpr_ifname,
+		err = pinfo->mpi_setf(stack, cr, pinfo, pioc->mpr_ifname,
 		    pioc->mpr_val, pioc->mpr_flags);
 	} else if (!set && pinfo->mpi_getf != NULL) {
-		err = pinfo->mpi_getf(cbarg, pinfo, pioc->mpr_ifname,
+		err = pinfo->mpi_getf(stack, pinfo, pioc->mpr_ifname,
 		    pioc->mpr_val, pioc->mpr_valsize, pioc->mpr_flags);
 	} else {
 		err = EPERM;
@@ -8955,7 +8937,7 @@ ip_process_legacy_nddprop(queue_t *q, mblk_t *mp)
 	mblk_t		*mp1 = mp->b_cont;
 	char		*pname, *pval, *buf;
 	uint_t		bufsize, proto;
-	mod_prop_info_t *ptbl = NULL, *pinfo = NULL;
+	mod_prop_info_t *pinfo = NULL;
 	ip_stack_t	*ipst;
 	int		err = 0;
 
@@ -8982,19 +8964,12 @@ ip_process_legacy_nddprop(queue_t *q, mblk_t *mp)
 		return;
 	}
 
-	ptbl = ipst->ips_propinfo_tbl;
-	for (pinfo = ptbl; pinfo->mpi_name != NULL; pinfo++) {
-		if (strcmp(pinfo->mpi_name, pname) == 0 &&
-		    pinfo->mpi_proto == proto)
-			break;
-	}
-
-	ASSERT(pinfo->mpi_name != NULL);
+	pinfo = mod_prop_lookup(ipst->ips_propinfo_tbl, pname, proto);
 
 	switch (iocp->ioc_cmd) {
 	case ND_GET:
-		if ((err = pinfo->mpi_getf(ipst, pinfo, NULL, buf, bufsize,
-		    0)) == 0) {
+		if ((err = pinfo->mpi_getf(ipst->ips_netstack, pinfo, NULL, buf,
+		    bufsize, 0)) == 0) {
 			miocack(q, mp, iocp->ioc_count, 0);
 			return;
 		}
@@ -9010,8 +8985,8 @@ ip_process_legacy_nddprop(queue_t *q, mblk_t *mp)
 
 		if (!*pval || pval >= (char *)mp1->b_wptr) {
 			err = EINVAL;
-		} else if ((err = pinfo->mpi_setf(ipst, NULL, pinfo, NULL,
-		    pval, 0)) == 0) {
+		} else if ((err = pinfo->mpi_setf(ipst->ips_netstack, NULL,
+		    pinfo, NULL, pval, 0)) == 0) {
 			miocack(q, mp, 0, 0);
 			return;
 		}

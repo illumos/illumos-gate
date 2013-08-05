@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 #ifndef _LIBIPADM_IMPL_H
@@ -118,7 +119,8 @@ typedef ipadm_status_t	ipadm_pd_getf_t(ipadm_handle_t, const void *,
 
 struct ipadm_prop_desc {
 	char		*ipd_name;	/* property name */
-	uint_t		ipd_class; 	/* prop. class - global/perif/both */
+	char		*ipd_old_name;	/* for backward compatibility */
+	uint_t		ipd_class;	/* prop. class - global/perif/both */
 	uint_t		ipd_proto;	/* protocol to which property belongs */
 	uint_t		ipd_flags;	/* see below */
 	ipadm_pd_setf_t	*ipd_set;	/* set callback function */

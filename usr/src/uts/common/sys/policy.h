@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013, Joyent, Inc. All rights reserved.
  */
 
 #ifndef	_SYS_POLICY_H
@@ -136,6 +137,7 @@ int secpolicy_resource(const cred_t *);
 int secpolicy_resource_anon_mem(const cred_t *);
 int secpolicy_rpcmod_open(const cred_t *);
 int secpolicy_rsm_access(const cred_t *, uid_t, mode_t);
+int secpolicy_raisepriority(const cred_t *);
 int secpolicy_setpriority(const cred_t *);
 int secpolicy_settime(const cred_t *);
 int secpolicy_smb(const cred_t *);

@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -92,7 +93,6 @@
  * it is possible to I_PUSH "icmp", but that results in pushing a passthrough
  * dummy module.
  */
-
 static void	icmp_addr_req(queue_t *q, mblk_t *mp);
 static void	icmp_tpi_bind(queue_t *q, mblk_t *mp);
 static void	icmp_bind_proto(icmp_t *icmp);
@@ -213,6 +213,22 @@ static struct T_info_ack icmp_g_t_info_ack = {
 	(XPG4_1|SENDZERO) /* PROVIDER_flag */
 };
 
+static int
+icmp_set_buf_prop(netstack_t *stack, cred_t *cr, mod_prop_info_t *pinfo,
+    const char *ifname, const void *pval, uint_t flags)
+{
+	return (mod_set_buf_prop(stack->netstack_icmp->is_propinfo_tbl,
+	    stack, cr, pinfo, ifname, pval, flags));
+}
+
+static int
+icmp_get_buf_prop(netstack_t *stack, mod_prop_info_t *pinfo, const char *ifname,
+    void *val, uint_t psize, uint_t flags)
+{
+	return (mod_get_buf_prop(stack->netstack_icmp->is_propinfo_tbl, stack,
+	    pinfo, ifname, val, psize, flags));
+}
+
 /*
  * All of these are alterable, within the min/max values given, at run time.
  *
@@ -238,21 +254,21 @@ static mod_prop_info_t icmp_propinfo_tbl[] = {
 	    mod_set_boolean, mod_get_boolean,
 	    {B_TRUE}, {B_TRUE} },
 
-	{ "send_maxbuf", MOD_PROTO_RAWIP,
-	    mod_set_uint32, mod_get_uint32,
+	{ "send_buf", MOD_PROTO_RAWIP,
+	    icmp_set_buf_prop, icmp_get_buf_prop,
 	    {4096, 65536, 8192}, {8192} },
 
 	{ "_xmit_lowat", MOD_PROTO_RAWIP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 65536, 1024}, {1024} },
 
-	{ "recv_maxbuf", MOD_PROTO_RAWIP,
-	    mod_set_uint32, mod_get_uint32,
+	{ "recv_buf", MOD_PROTO_RAWIP,
+	    icmp_set_buf_prop, icmp_get_buf_prop,
 	    {4096, 65536, 8192}, {8192} },
 
-	{ "_max_buf", MOD_PROTO_RAWIP,
+	{ "max_buf", MOD_PROTO_RAWIP,
 	    mod_set_uint32, mod_get_uint32,
-	    {65536, 1024*1024*1024, 256*1024}, {256 * 1024} },
+	    {65536, ULP_MAX_BUF, 256*1024}, {256*1024} },
 
 	{ "_pmtu_discovery", MOD_PROTO_RAWIP,
 	    mod_set_boolean, mod_get_boolean,

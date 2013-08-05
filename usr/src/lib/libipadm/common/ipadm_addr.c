@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 /*
@@ -96,30 +97,30 @@ static ipadm_pd_setf_t	i_ipadm_set_prefixlen, i_ipadm_set_addr_flag,
 
 /* address properties description table */
 ipadm_prop_desc_t ipadm_addrprop_table[] = {
-	{ "broadcast", IPADMPROP_CLASS_ADDR, MOD_PROTO_NONE, 0,
+	{ "broadcast", NULL, IPADMPROP_CLASS_ADDR, MOD_PROTO_NONE, 0,
 	    NULL, NULL, i_ipadm_get_broadcast },
 
-	{ "deprecated", IPADMPROP_CLASS_ADDR, MOD_PROTO_NONE, 0,
+	{ "deprecated", NULL, IPADMPROP_CLASS_ADDR, MOD_PROTO_NONE, 0,
 	    i_ipadm_set_addr_flag, i_ipadm_get_onoff,
 	    i_ipadm_get_addr_flag },
 
-	{ "prefixlen", IPADMPROP_CLASS_ADDR, MOD_PROTO_NONE, 0,
+	{ "prefixlen", NULL, IPADMPROP_CLASS_ADDR, MOD_PROTO_NONE, 0,
 	    i_ipadm_set_prefixlen, i_ipadm_get_prefixlen,
 	    i_ipadm_get_prefixlen },
 
-	{ "private", IPADMPROP_CLASS_ADDR, MOD_PROTO_NONE, 0,
+	{ "private", NULL, IPADMPROP_CLASS_ADDR, MOD_PROTO_NONE, 0,
 	    i_ipadm_set_addr_flag, i_ipadm_get_onoff, i_ipadm_get_addr_flag },
 
-	{ "transmit", IPADMPROP_CLASS_ADDR, MOD_PROTO_NONE, 0,
+	{ "transmit", NULL, IPADMPROP_CLASS_ADDR, MOD_PROTO_NONE, 0,
 	    i_ipadm_set_addr_flag, i_ipadm_get_onoff, i_ipadm_get_addr_flag },
 
-	{ "zone", IPADMPROP_CLASS_ADDR, MOD_PROTO_NONE, 0,
+	{ "zone", NULL, IPADMPROP_CLASS_ADDR, MOD_PROTO_NONE, 0,
 	    i_ipadm_set_zone, NULL, i_ipadm_get_zone },
 
-	{ NULL, 0, 0, 0, NULL, NULL, NULL }
+	{ NULL, NULL, 0, 0, 0, NULL, NULL, NULL }
 };
 
-static ipadm_prop_desc_t up_addrprop = { "up", IPADMPROP_CLASS_ADDR,
+static ipadm_prop_desc_t up_addrprop = { "up", NULL, IPADMPROP_CLASS_ADDR,
 					MOD_PROTO_NONE, 0, NULL, NULL, NULL };
 
 /*
@@ -1376,7 +1377,9 @@ i_ipadm_get_addrprop_desc(const char *pname)
 	int i;
 
 	for (i = 0; ipadm_addrprop_table[i].ipd_name != NULL; i++) {
-		if (strcmp(pname, ipadm_addrprop_table[i].ipd_name) == 0)
+		if (strcmp(pname, ipadm_addrprop_table[i].ipd_name) == 0 ||
+		    (ipadm_addrprop_table[i].ipd_old_name != NULL &&
+		    strcmp(pname, ipadm_addrprop_table[i].ipd_old_name) == 0))
 			return (&ipadm_addrprop_table[i]);
 	}
 	return (NULL);

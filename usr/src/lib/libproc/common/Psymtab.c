@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 #include <assert.h>
@@ -1733,6 +1734,21 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 			(void) elf_end(elf);
 			elf = newelf;
 			dprintf("switched to faked up ELF file\n");
+
+			/*
+			 * Check to see if the file that we just discovered
+			 * to be an imposter matches the execname that was
+			 * determined by Pfindexec().  If it does, we (clearly)
+			 * don't have the right binary, and we zero out
+			 * execname before anyone gets hurt.
+			 */
+			if (fptr->file_rname != NULL && P->execname != NULL &&
+			    strcmp(fptr->file_rname, P->execname) == 0) {
+				dprintf("file/in-core image mismatch was "
+				    "on P->execname; discarding\n");
+				free(P->execname);
+				P->execname = NULL;
+			}
 		}
 	}
 

@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1708,7 +1709,7 @@ fss_parmsset(kthread_t *t, void *parmsp, id_t reqpcid, cred_t *reqpcredp)
 	 */
 	if ((reqpcredp != NULL) &&
 	    (reqfssuprilim > fssproc->fss_uprilim) &&
-	    secpolicy_setpriority(reqpcredp) != 0)
+	    secpolicy_raisepriority(reqpcredp) != 0)
 		return (EPERM);
 
 	/*
@@ -2355,7 +2356,7 @@ fss_donice(kthread_t *t, cred_t *cr, int incr, int *retvalp)
 		return (0);
 	}
 
-	if ((incr < 0 || incr > 2 * NZERO) && secpolicy_setpriority(cr) != 0)
+	if ((incr < 0 || incr > 2 * NZERO) && secpolicy_raisepriority(cr) != 0)
 		return (EPERM);
 
 	/*
