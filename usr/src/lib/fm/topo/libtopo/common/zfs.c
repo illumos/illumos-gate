@@ -22,6 +22,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <stdio.h>
@@ -41,6 +42,7 @@
 #include <topo_subr.h>
 #include <libzfs.h>
 #include <zfs.h>
+#include <pthread.h>
 
 static int zfs_enum(topo_mod_t *, tnode_t *, const char *, topo_instance_t,
     topo_instance_t, void *, void *);
@@ -59,7 +61,9 @@ static const topo_modops_t zfs_ops =
 static const topo_modinfo_t zfs_info =
 	{ ZFS, FM_FMRI_SCHEME_ZFS, ZFS_VERSION, &zfs_ops };
 
-static libzfs_handle_t *g_zfs;
+static libzfs_handle_t *g_zfs = NULL;
+static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
+static int g_refcount = 0;
 
 int
 zfs_init(topo_mod_t *mod, topo_version_t version)
@@ -80,8 +84,18 @@ zfs_init(topo_mod_t *mod, topo_version_t version)
 		    "%s\n", topo_mod_errmsg(mod));
 		return (-1); /* mod errno already set */
 	}
-	if (!g_zfs)
-		g_zfs = libzfs_init();
+
+	(void) pthread_mutex_lock(&g_lock);
+	if (g_refcount == 0) {
+		if ((g_zfs = libzfs_init()) == NULL) {
+			(void) pthread_mutex_unlock(&g_lock);
+			topo_mod_dprintf(mod, "libzfs_init() failed");
+			topo_mod_unregister(mod);
+			return (topo_mod_seterrno(mod, EMOD_UNKNOWN));
+		}
+	}
+	g_refcount++;
+	(void) pthread_mutex_unlock(&g_lock);
 
 	return (0);
 }
@@ -89,10 +103,13 @@ zfs_init(topo_mod_t *mod, topo_version_t version)
 void
 zfs_fini(topo_mod_t *mod)
 {
-	if (g_zfs) {
+	(void) pthread_mutex_lock(&g_lock);
+	g_refcount--;
+	if (g_refcount == 0) {
 		libzfs_fini(g_zfs);
 		g_zfs = NULL;
 	}
+	(void) pthread_mutex_unlock(&g_lock);
 	topo_mod_unregister(mod);
 }
 
@@ -155,7 +172,7 @@ fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 	cb.cb_guid = pool_guid;
 	cb.cb_pool = NULL;
 
-	if (g_zfs != NULL && zpool_iter(g_zfs, find_pool, &cb) == 1) {
+	if (zpool_iter(g_zfs, find_pool, &cb) == 1) {
 		name = zpool_get_name(cb.cb_pool);
 	} else {
 		(void) snprintf(guidbuf, sizeof (guidbuf), "%llx", pool_guid);
