@@ -364,7 +364,7 @@ CCNOAUTOINLINE= -_gcc=-fno-inline-small-functions \
 # Since we do some of this (foo might be referenced in common kernel code
 # but provided only for some cpu modules or platforms), we disable this
 # optimization.
-# 
+#
 sparc_CCUNBOUND	= -Wd,-xsafe=unboundsym
 i386_CCUNBOUND	=
 CCUNBOUND	= $($(MACH)_CCUNBOUND)
@@ -411,7 +411,7 @@ ILDOFF=			-xildoff
 XDEPEND=		-xdepend
 XFFLAG=			-xF=%all
 XESS=			-xs
-XSTRCONST=		-xstrconst 
+XSTRCONST=		-xstrconst
 
 #
 # turn warnings into errors (C)
@@ -557,19 +557,46 @@ amd64_XREGSFLAG		=
 XREGSFLAG		= $($(MACH)_XREGSFLAG)
 XREGSFLAG64		= $($(MACH64)_XREGSFLAG)
 
+# dmake SOURCEDEBUG=yes ... enables source-level debugging information, and
+# avoids stripping it.
+SOURCEDEBUG	= $(POUND_SIGN)
+SRCDBGBLD	= $(SOURCEDEBUG:yes=)
+
+#
+# These variables are intended ONLY for use by developers to safely pass extra
+# flags to the compilers without unintentionally overriding Makefile-set
+# flags.  They should NEVER be set to any value in a Makefile.
+#
+# They come last in the associated FLAGS variable such that they can
+# explicitly override things if necessary, there are gaps in this, but it's
+# the best we can manage.
+#
+CUSERFLAGS		=
+CUSERFLAGS64		= $(CUSERFLAGS)
+CCUSERFLAGS		=
+CCUSERFLAGS64		= $(CCUSERFLAGS)
+
+CSOURCEDEBUGFLAGS	=
+CCSOURCEDEBUGFLAGS	=
+$(SRCDBGBLD)CSOURCEDEBUGFLAGS	= -g -xs
+$(SRCDBGBLD)CCSOURCEDEBUGFLAGS	= -g -xs
+
 CFLAGS=         $(COPTFLAG) $($(MACH)_CFLAGS) $(SPACEFLAG) $(CCMODE) \
 		$(ILDOFF) $(CERRWARN) $(C99MODE) $(CCUNBOUND) $(IROPTFLAG) \
-		$(CGLOBALSTATIC) $(CCNOAUTOINLINE)
+		$(CGLOBALSTATIC) $(CCNOAUTOINLINE) $(CSOURCEDEBUGFLAGS) \
+		$(CUSERFLAGS)
 CFLAGS64=       $(COPTFLAG64) $($(MACH64)_CFLAGS) $(SPACEFLAG64) $(CCMODE64) \
 		$(ILDOFF) $(CERRWARN) $(C99MODE) $(CCUNBOUND) $(IROPTFLAG64) \
-		$(CGLOBALSTATIC) $(CCNOAUTOINLINE)
+		$(CGLOBALSTATIC) $(CCNOAUTOINLINE) $(CSOURCEDEBUGFLAGS) \
+		$(CUSERFLAGS64)
 #
 # Flags that are used to build parts of the code that are subsequently
 # run on the build machine (also known as the NATIVE_BUILD).
 #
 NATIVE_CFLAGS=	$(COPTFLAG) $($(NATIVE_MACH)_CFLAGS) $(CCMODE) \
 		$(ILDOFF) $(CERRWARN) $(C99MODE) $($(NATIVE_MACH)_CCUNBOUND) \
-		$(IROPTFLAG) $(CGLOBALSTATIC) $(CCNOAUTOINLINE)
+		$(IROPTFLAG) $(CGLOBALSTATIC) $(CCNOAUTOINLINE) \
+		$(CSOURCEDEBUGFLAGS) $(CUSERFLAGS)
 
 DTEXTDOM=-DTEXT_DOMAIN=\"$(TEXT_DOMAIN)\"	# For messaging.
 DTS_ERRNO=-D_TS_ERRNO
@@ -589,7 +616,7 @@ JAVAFLAGS=	-deprecation
 MSGROOT= $(ROOT)/catalog
 MSGDOMAIN= $(MSGROOT)/$(TEXT_DOMAIN)
 MSGDOMAINPOFILE = $(MSGDOMAIN)/$(POFILE)
-DCMSGDOMAIN= $(MSGROOT)/LC_TIME/$(TEXT_DOMAIN) 
+DCMSGDOMAIN= $(MSGROOT)/LC_TIME/$(TEXT_DOMAIN)
 DCMSGDOMAINPOFILE = $(DCMSGDOMAIN)/$(DCFILE:.dc=.po)
 
 CLOBBERFILES += $(POFILE) $(POFILES)
@@ -633,13 +660,15 @@ amd64_CCOPTFLAG=	-O
 
 CCOPTFLAG=	$($(MACH)_CCOPTFLAG)
 CCOPTFLAG64=	$($(MACH64)_CCOPTFLAG)
-CCFLAGS=	$(CCOPTFLAG) $($(MACH)_CCFLAGS)
-CCFLAGS64=	$(CCOPTFLAG64) $($(MACH64)_CCFLAGS)
+CCFLAGS=	$(CCOPTFLAG) $($(MACH)_CCFLAGS) $(CCSOURCEDEBUGFLAGS) \
+		$(CCUSERFLAGS)
+CCFLAGS64=	$(CCOPTFLAG64) $($(MACH64)_CCFLAGS) $(CCSOURCEDEBUGFLAGS) \
+		$(CCUSERFLAGS64)
 
 #
 #
 #
-ELFWRAP_FLAGS	=	
+ELFWRAP_FLAGS	=
 ELFWRAP_FLAGS64	=	-64
 
 #
@@ -678,7 +707,7 @@ MAPFILE.NGB =		$(MAPFILE.NGB_$(MACH))
 #
 MAPFILE.INT =		mapfile-intf
 
-# 
+#
 # LDLIBS32 can be set in the environment to override the following assignment.
 # LDLIBS64 can be set to override the assignment made in Makefile.master.64.
 # These environment settings make sure that no libraries are searched outside
@@ -912,12 +941,16 @@ AS_BIGPICFLAGS=		$(C_BIGPICFLAGS)
 # Default label for CTF sections
 #
 CTFCVTFLAGS=		-i -L VERSION
+$(SRCDBGBLD)CTFCVTFLAGS 	+= -g
 
 #
-# Override to pass module-specific flags to ctfmerge.  Currently used
-# only by krtld to turn on fuzzy matching.
+# Override to pass module-specific flags to ctfmerge.  Currently used only by
+# krtld to turn on fuzzy matching, and source-level debugging to inhibit
+# stripping.
 #
 CTFMRGFLAGS=
+$(SRCDBGBLD)CTFMRGFLAGS 	+= -g
+
 
 CTFCONVERT_O		= $(CTFCONVERT) $(CTFCVTFLAGS) $@
 
@@ -1000,6 +1033,7 @@ $(RELEASE_BUILD)PROCESS_COMMENT=   @?${MCS} -d -a $(RELEASE_CM)
 
 STRIP_STABS=			   :
 $(RELEASE_BUILD)STRIP_STABS=	   $(STRIP) -x $@
+$(SRCDBGBLD)STRIP_STABS=	   :
 
 POST_PROCESS_O=		$(PROCESS_COMMENT) $@
 POST_PROCESS_A=
@@ -1159,7 +1193,7 @@ CPPFORPO=$(COMPILE.cpp:\"$(TEXT_DOMAIN)\"=TEXT_DOMAIN)
 .y.i:
 	$(YACC) -d $<
 	$(CPPFORPO) y.tab.c  > $@
-	$(RM) y.tab.c 
+	$(RM) y.tab.c
 
 .l.i:
 	$(LEX) $<
@@ -1174,7 +1208,7 @@ CPPFORPO=$(COMPILE.cpp:\"$(TEXT_DOMAIN)\"=TEXT_DOMAIN)
 	$(YACC) -d $<
 	$(CPPFORPO) y.tab.c  > $<.i
 	$(BUILD.po)
-	$(RM) y.tab.c 
+	$(RM) y.tab.c
 
 .l.po:
 	$(LEX) $<
@@ -1198,5 +1232,5 @@ CPPFORPO=$(COMPILE.cpp:\"$(TEXT_DOMAIN)\"=TEXT_DOMAIN)
 
 #
 # Include rules to render automated sccs get rules "safe".
-# 
+#
 include $(SRC)/Makefile.noget

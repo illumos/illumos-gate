@@ -23,7 +23,7 @@
 # Use is subject to license terms.
 #
 
-POST_PROCESS += ; $(CTFMERGE) -L VERSION -o $@ $(OBJS)
+POST_PROCESS += ; $(CTFMERGE) $(CTFMRGFLAGS) -L VERSION -o $@ $(OBJS)
 POST_PROCESS_O += ; $(CTFCONVERT_O)
 
 CFLAGS += $(CTF_FLAGS)

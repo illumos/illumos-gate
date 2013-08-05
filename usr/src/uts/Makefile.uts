@@ -237,6 +237,8 @@ CFLAGS_uts		+= $(CERRWARN)
 CFLAGS_uts		+= $(CCNOAUTOINLINE)
 CFLAGS_uts		+= $(CGLOBALSTATIC)
 CFLAGS_uts		+= $(EXTRA_CFLAGS)
+CFLAGS_uts		+= $(CSOURCEDEBUGFLAGS)
+CFLAGS_uts		+= $(CUSERFLAGS)
 
 #
 #	Declare that $(OBJECTS) and $(LINTS) can be compiled in parallel.
