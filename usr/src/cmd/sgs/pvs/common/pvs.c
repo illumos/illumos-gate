@@ -1090,6 +1090,7 @@ main(int argc, char **argv, char **envp)
 	for (; optind < argc; optind++) {
 		int		derror = 0, nerror = 0,	err;
 		const char	*file = argv[optind];
+		size_t		shnum = 0;
 
 		if ((var = open(file, O_RDONLY)) == -1) {
 			err = errno;
@@ -1154,7 +1155,13 @@ main(int argc, char **argv, char **envp)
 		 * as elf_begin has already gone through all the overhead we
 		 * might as well set up the cache for every section.
 		 */
-		if ((cache = calloc(ehdr.e_shnum, sizeof (Cache))) == NULL) {
+		if (elf_getshdrnum(elf, &shnum) == -1) {
+			(void) fprintf(stderr, MSG_ORIG(MSG_ELF_GETSHDRNUM),
+			    cname, file, elf_errmsg(elf_errno()));
+			exit(1);
+		}
+
+		if ((cache = calloc(shnum, sizeof (Cache))) == NULL) {
 			int err = errno;
 			(void) fprintf(stderr, MSG_INTL(MSG_SYS_MALLOC), cname,
 			    file, strerror(err));

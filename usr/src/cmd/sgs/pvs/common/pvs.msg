@@ -77,6 +77,7 @@
 @ MSG_ELF_GETSCN	"%s: %s: elf_getscn: %s\n"
 @ MSG_ELF_GETSHDR	"%s: %s: elf_getshdr: %s\n"
 @ MSG_ELF_GETDATA	"%s: %s: elf_getdata: %s\n"
+@ MSG_ELF_GETSHDRNUM	"%s: %s: elf_getshdrnum: %s\n"
 
 @ MSG_STR_EMPTY		""
 @ MSG_STR_OPTIONS	"CdI:lnorsvN:"
