@@ -282,7 +282,6 @@ mptsas_start_config_page_access(mptsas_t *mpt, mptsas_cmd_t *cmd)
 	request_desc_low = (cmd->cmd_slot << 16) +
 	    MPI2_REQ_DESCRIPT_FLAGS_DEFAULT_TYPE;
 	cmd->cmd_rfm = NULL;
-	mpt->m_active->m_slot[cmd->cmd_slot] = cmd;
 	MPTSAS_START_CMD(mpt, request_desc_low, 0);
 	if ((mptsas_check_dma_handle(mpt->m_dma_req_frame_hdl) !=
 	    DDI_SUCCESS) ||
@@ -1324,7 +1323,6 @@ mptsas_update_flash(mptsas_t *mpt, caddr_t ptrbuffer, uint32_t size,
 	request_desc_low = (cmd->cmd_slot << 16) +
 	    MPI2_REQ_DESCRIPT_FLAGS_DEFAULT_TYPE;
 	cmd->cmd_rfm = NULL;
-	mpt->m_active->m_slot[cmd->cmd_slot] = cmd;
 	MPTSAS_START_CMD(mpt, request_desc_low, 0);
 
 	rvalue = 0;
