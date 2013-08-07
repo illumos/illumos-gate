@@ -29,6 +29,7 @@
 #include <sys/strsun.h>
 #include <sys/zone.h>
 #include <sys/ddi.h>
+#include <sys/disp.h>
 #include <sys/sunddi.h>
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
