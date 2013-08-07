@@ -87,7 +87,7 @@ enum Command
 	F_GROUPACL, F_USER, F_USERACL, FOLLOW, FSTYPE, INAME, INUM, IPATH,
 	IREGEX,	LINKS, LOCAL, LPAREN, LS, MAXDEPTH, MINDEPTH, MMIN, MOUNT,
 	MTIME, NAME, NCPIO, NEWER, NOGRP, NOT, NOUSER, OK, OR, PATH, PERM,
-	PRINT0, PRUNE, REGEX, RPAREN, SIZE, TYPE, VARARGS, XATTR
+	PRINT0, PRUNE, REGEX, RPAREN, SIZE, TYPE, VARARGS, XATTR, DELETE
 };
 
 enum Type
@@ -119,6 +119,7 @@ static struct Args commands[] =
 	"-cpio",	CPIO,		Cpio,
 	"-ctime",	CTIME,		Num,
 	"-depth",	DEPTH,		Unary,
+	"-delete",	DELETE,		Unary,
 	"-exec",	EXEC,		Exec,
 	"-follow",	FOLLOW,		Unary,
 	"-fstype",	FSTYPE,		Str,
@@ -204,6 +205,7 @@ struct Arglist
 static int		compile();
 static int		execute();
 static int		doexec(char *, char **, int *);
+static int		dodelete(char *, struct stat *, struct FTW *);
 static struct Args	*lookup();
 static int		ok();
 static void		usage(void)	__NORETURN;
@@ -528,6 +530,11 @@ int *actionp;
 			break;
 		case DEPTH:
 			walkflags |= FTW_DEPTH;
+			break;
+		case DELETE:
+			walkflags |= (FTW_DEPTH | FTW_PHYS);
+			walkflags &= ~FTW_CHDIR;
+			(*actionp)++;
 			break;
 
 		case LOCAL:
@@ -967,6 +974,9 @@ struct FTW *state;
 		case EXEC:
 			val = doexec(name, np->first.ap, NULL);
 			break;
+		case DELETE:
+			val = dodelete(name, statb, state);
+			break;
 
 		case VARARGS: {
 			struct Arglist *ap = np->first.vp;
@@ -1318,6 +1328,49 @@ doexec(char *name, char *argv[], int *exitcode)
 	return (!r);
 }
 
+static int
+dodelete(char *name, struct stat *statb, struct FTW *state)
+{
+	char *fn;
+	int rc = 0;
+
+	/* restrict symlinks */
+	if ((walkflags & FTW_PHYS) == 0) {
+		(void) fprintf(stderr,
+		    gettext("-delete is not allowed when symlinks are "
+		    "followed.\n"));
+		return (1);
+	}
+
+	fn = name + state->base;
+	if (strcmp(fn, ".") == 0) {
+		/* nothing to do */
+		return (1);
+	}
+
+	if (strchr(fn, '/') != NULL) {
+		(void) fprintf(stderr,
+		    gettext("-delete with relative path is unsafe."));
+		return (1);
+	}
+
+	if (S_ISDIR(statb->st_mode)) {
+		/* delete directory */
+		rc = rmdir(name);
+	} else {
+		/* delete file */
+		rc = unlink(name);
+	}
+
+	if (rc < 0) {
+		/* operation failed */
+		(void) fprintf(stderr, gettext("delete failed %s: %s\n"),
+		    name, strerror(errno));
+		return (1);
+	}
+
+	return (1);
+}
 
 /*
  *  Table lookup routine
