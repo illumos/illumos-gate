@@ -209,14 +209,6 @@ typedef	struct mptsas_target {
 		uint16_t		m_slot_num;
 		uint32_t		m_tgt_unconfigured;
 
-		/*
-		 * For the common case, the elements in this structure are
-		 * protected by the per hba instance mutex. In order to make
-		 * the key code path in ISR lockless, a separate mutex is
-		 * introdeced to protect those shown in ISR.
-		 */
-		kmutex_t		m_tgt_intr_mutex;
-
 } mptsas_target_t;
 
 typedef struct mptsas_smp {
@@ -601,32 +593,6 @@ typedef struct mptsas_tgt_private {
 		mpt->m_max_requests))
 #define	MPTSAS_TM_SLOT(mpt)	(mpt->m_max_requests - 1)
 
-typedef struct mptsas_slot_free_e {
-	processorid_t		cpuid;
-	int			slot;
-	list_node_t		node;
-} mptsas_slot_free_e_t;
-
-/*
- * each of the allocq and releaseq in all CPU groups resides in separate
- * cacheline(64 bytes). Multiple mutex in the same cacheline is not good
- * for performance.
- */
-typedef union mptsas_slot_freeq {
-	struct {
-		kmutex_t	m_fq_mutex;
-		list_t		m_fq_list;
-		int		m_fq_n;
-		int		m_fq_n_init;
-	} s;
-	char pad[64];
-} mptsas_slot_freeq_t;
-
-typedef struct mptsas_slot_freeq_pair {
-	mptsas_slot_freeq_t	m_slot_allocq;
-	mptsas_slot_freeq_t	m_slot_releq;
-} mptsas_slot_freeq_pair_t;
-
 /*
  * Macro for phy_flags
  */
@@ -692,7 +658,9 @@ typedef struct mptsas {
 	scsi_hba_tran_t		*m_tran;
 	smp_hba_tran_t		*m_smptran;
 	kmutex_t		m_mutex;
+	kmutex_t		m_passthru_mutex;
 	kcondvar_t		m_cv;
+	kcondvar_t		m_passthru_cv;
 	kcondvar_t		m_fw_cv;
 	kcondvar_t		m_config_cv;
 	kcondvar_t		m_fw_diag_cv;
@@ -708,11 +676,14 @@ typedef struct mptsas {
 	mptsas_cmd_t	*m_waitq;	/* cmd queue for active request */
 	mptsas_cmd_t	**m_waitqtail;	/* wait queue tail ptr */
 
+	kmutex_t	m_tx_waitq_mutex;
+	mptsas_cmd_t	*m_tx_waitq;	/* TX cmd queue for active request */
+	mptsas_cmd_t	**m_tx_waitqtail;	/* tx_wait queue tail ptr */
+	int		m_tx_draining;	/* TX queue draining flag */
+
 	mptsas_cmd_t	*m_doneq;	/* queue of completed commands */
 	mptsas_cmd_t	**m_donetail;	/* queue tail ptr */
 
-	kmutex_t		m_passthru_mutex;
-	kcondvar_t		m_passthru_cv;
 	/*
 	 * variables for helper threads (fan-out interrupts)
 	 */
@@ -749,13 +720,6 @@ typedef struct mptsas {
 	ddi_acc_handle_t m_acc_free_queue_hdl;
 	ddi_dma_handle_t m_dma_post_queue_hdl;
 	ddi_acc_handle_t m_acc_post_queue_hdl;
-
-	/*
-	 * Try the best to make the key code path in the ISR lockless.
-	 * so avoid to use the per instance mutex m_mutex in the ISR. Introduce
-	 * a separate mutex to protect the elements shown in ISR.
-	 */
-	kmutex_t	m_intr_mutex;
 
 	/*
 	 * list of reset notification requests
@@ -849,11 +813,8 @@ typedef struct mptsas {
 	 * MPI handshake protocol. only one handshake cmd can run at a time.
 	 */
 	ddi_dma_handle_t	m_hshk_dma_hdl;
-
 	ddi_acc_handle_t	m_hshk_acc_hdl;
-
 	caddr_t			m_hshk_memp;
-
 	size_t			m_hshk_dma_size;
 
 	/* Firmware version on the card at boot time */
@@ -922,15 +883,6 @@ typedef struct mptsas {
 	 * IR Capable flag
 	 */
 	uint8_t			m_ir_capable;
-
-	/*
-	 * release and alloc queue for slot
-	 */
-	int			m_slot_freeq_pair_n;
-	mptsas_slot_freeq_pair_t	*m_slot_freeq_pairp;
-	mptsas_slot_free_e_t	*m_slot_free_ae;
-#define	MPI_ADDRESS_COALSCE_MAX	128
-	pMpi2ReplyDescriptorsUnion_t	m_reply;
 
 	/*
 	 * Is HBA processing a diag reset?
