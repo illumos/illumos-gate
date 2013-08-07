@@ -205,6 +205,7 @@ recover_padding(Elf *elf, ARFILE *file)
 {
 	size_t		extent;
 	size_t		padding;
+	size_t		shnum;
 	GElf_Ehdr	ehdr;
 
 
@@ -222,8 +223,11 @@ recover_padding(Elf *elf, ARFILE *file)
 	 * we've found the end, and the difference is padding (We assume
 	 * that no ELF section can fit into PADSZ bytes).
 	 */
+	if (elf_getshdrnum(elf, &shnum) == -1)
+		return;
+
 	extent = gelf_getehdr(elf, &ehdr)
-	    ? (ehdr.e_shoff + (ehdr.e_shnum * ehdr.e_shentsize)) : 0;
+	    ? (ehdr.e_shoff + (shnum * ehdr.e_shentsize)) : 0;
 
 	/*
 	 * If the extent exceeds the end of the archive member
@@ -552,11 +556,33 @@ mksymtab(const char *arname, ARFILEP **symlist, int *found_obj)
 			exit(1);
 		}
 		if (gelf_getehdr(elf, &ehdr) != 0) {
+			size_t shstrndx = 0;
 			if ((class = gelf_getclass(elf)) == ELFCLASS64) {
 				fptr->ar_flag |= F_CLASS64;
 			} else if (class == ELFCLASS32)
 				fptr->ar_flag |= F_CLASS32;
-			scn = elf_getscn(elf, ehdr.e_shstrndx);
+
+			if (elf_getshdrstrndx(elf, &shstrndx) == -1) {
+				if (fptr->ar_pathname != NULL) {
+					(void) fprintf(stderr,
+					    MSG_INTL(MSG_ELF_GETSHSTRNDX_FILE),
+					    fptr->ar_pathname, elf_errmsg(-1));
+				} else {
+					(void) fprintf(stderr,
+					    MSG_INTL(MSG_ELF_GETSHSTRNDX_AR),
+					    arname, fptr->ar_longname,
+					    elf_errmsg(-1));
+				}
+				num_errs++;
+				if (newfd) {
+					(void) close(newfd);
+					newfd = 0;
+				}
+				(void) elf_end(elf);
+				continue;
+			}
+
+			scn = elf_getscn(elf, shstrndx);
 			if (scn == NULL) {
 				if (fptr->ar_pathname != NULL)
 					(void) fprintf(stderr,
@@ -640,7 +666,7 @@ mksymtab(const char *arname, ARFILEP **symlist, int *found_obj)
 					continue;
 				}
 				*found_obj = 1;
-				if (shdr.sh_type == SHT_SYMTAB)
+				if (shdr.sh_type == SHT_SYMTAB) {
 					if (search_sym_tab(arname, fptr, elf,
 					    scn, &nsyms, symlist,
 					    &num_errs) == -1) {
@@ -650,6 +676,7 @@ mksymtab(const char *arname, ARFILEP **symlist, int *found_obj)
 						}
 						continue;
 					}
+				}
 			}
 		}
 		mem_offset += sizeof (struct ar_hdr) + fptr->ar_size;
