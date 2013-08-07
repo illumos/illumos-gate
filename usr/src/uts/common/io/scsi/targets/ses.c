@@ -24,6 +24,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/modctl.h>
@@ -1103,7 +1104,10 @@ ses_get_pkt(struct buf *bp, int (*func)())
 	if (pkt == (struct scsi_pkt *)NULL)
 		return;
 	bcopy(scmd->uscsi_cdb, pkt->pkt_cdbp, (size_t)scmd->uscsi_cdblen);
-	pkt->pkt_time = scmd->uscsi_timeout;
+
+	/* Set an upper bound timeout of ses_io_time if zero is passed in */
+	pkt->pkt_time = (scmd->uscsi_timeout == 0) ?
+	    ses_io_time : scmd->uscsi_timeout;
 
 	pkt->pkt_comp = ses_callback;
 	pkt->pkt_private = (opaque_t)ssc;
