@@ -64,3 +64,4 @@
 extern uint64_t metaslab_gang_bang;
 extern uint64_t metaslab_df_alloc_threshold;
 extern boolean_t zfeature_checks_disable;
+extern uint64_t zfs_deadman_synctime;

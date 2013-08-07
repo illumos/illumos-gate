@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
  */
 
 #include <mdb/mdb_modapi.h>
@@ -340,6 +341,8 @@ stacks_cleanup(int force)
 			mdb_free(stacks_array,
 			    stacks_array_size * sizeof (*stacks_array));
 
+		mdb_free(stacks_hash, STACKS_HSIZE * sizeof (*stacks_hash));
+
 	} else if (stacks_array != NULL) {
 		for (idx = 0; idx < stacks_array_size; idx++) {
 			if ((cur = stacks_array[idx]) != NULL) {
@@ -360,6 +363,8 @@ stacks_cleanup(int force)
 
 	stacks_array_size = 0;
 	stacks_state = STACKS_STATE_CLEAN;
+	stacks_hash = NULL;
+	stacks_array = NULL;
 }
 
 /*ARGSUSED*/
