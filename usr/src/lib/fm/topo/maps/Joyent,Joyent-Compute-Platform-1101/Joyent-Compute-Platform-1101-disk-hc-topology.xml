@@ -1,0 +1,246 @@
+<?xml version="1.0"?>
+<!DOCTYPE topology SYSTEM "/usr/share/lib/xml/dtd/topology.dtd.1">
+<topology name='disk' scheme='hc'>
+  <range name='bay' min='0' max='15'>
+    <facility name='fail' type='indicator' provider='fac_prov_mptsas' >
+      <propgroup name='facility' version='1' name-stability='Private'
+        data-stability='Private' >
+        <propval name='type' type='uint32' value='0' />
+        <propmethod name='mptsas_led_mode' version='0' propname='mode'
+          proptype='uint32' mutable='1'>
+        </propmethod>
+      </propgroup>
+    </facility>
+    <facility name='ident' type='indicator' provider='fac_prov_mptsas' >
+      <propgroup name='facility' version='1' name-stability='Private'
+        data-stability='Private' >
+        <propval name='type' type='uint32' value='1' />
+        <propmethod name='mptsas_led_mode' version='0' propname='mode'
+          proptype='uint32' mutable='1'>
+        </propmethod>
+      </propgroup>
+    </facility>
+    <facility name='ok2rm' type='indicator' provider='fac_prov_mptsas' >
+      <propgroup name='facility' version='1' name-stability='Private'
+        data-stability='Private' >
+        <propval name='type' type='uint32' value='2' />
+        <propmethod name='mptsas_led_mode' version='0' propname='mode'
+          proptype='uint32' mutable='1'>
+        </propmethod>
+      </propgroup>
+    </facility>
+    <node instance='0'>
+      <propgroup name='protocol' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='label' type='string' value='Front Disk 0' />
+      </propgroup>
+      <propgroup name='binding' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='driver' type='string' value='mpt_sas' />
+        <propval name='devctl' type='string' value='/devices/pci@0,0/pci8086,3c02@1/pci15d9,691@0:devctl' />
+        <propval name='enclosure' type='uint32' value='1' />
+        <propval name='slot' type='uint32' value='0' />
+      </propgroup>
+    </node>
+    <node instance='1'>
+      <propgroup name='protocol' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='label' type='string' value='Front Disk 1' />
+      </propgroup>
+      <propgroup name='binding' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='driver' type='string' value='mpt_sas' />
+        <propval name='devctl' type='string' value='/devices/pci@0,0/pci8086,3c02@1/pci15d9,691@0:devctl' />
+        <propval name='enclosure' type='uint32' value='1' />
+        <propval name='slot' type='uint32' value='1' />
+      </propgroup>
+    </node>
+    <node instance='2'>
+      <propgroup name='protocol' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='label' type='string' value='Front Disk 2' />
+      </propgroup>
+      <propgroup name='binding' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='driver' type='string' value='mpt_sas' />
+        <propval name='devctl' type='string' value='/devices/pci@0,0/pci8086,3c02@1/pci15d9,691@0:devctl' />
+        <propval name='enclosure' type='uint32' value='1' />
+        <propval name='slot' type='uint32' value='2' />
+      </propgroup>
+    </node>
+    <node instance='3'>
+      <propgroup name='protocol' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='label' type='string' value='Front Disk 3' />
+      </propgroup>
+      <propgroup name='binding' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='driver' type='string' value='mpt_sas' />
+        <propval name='devctl' type='string' value='/devices/pci@0,0/pci8086,3c02@1/pci15d9,691@0:devctl' />
+        <propval name='enclosure' type='uint32' value='1' />
+        <propval name='slot' type='uint32' value='3' />
+      </propgroup>
+    </node>
+    <node instance='4'>
+      <propgroup name='protocol' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='label' type='string' value='Front Disk 4' />
+      </propgroup>
+      <propgroup name='binding' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='driver' type='string' value='mpt_sas' />
+        <propval name='devctl' type='string' value='/devices/pci@0,0/pci8086,3c02@1/pci15d9,691@0:devctl' />
+        <propval name='enclosure' type='uint32' value='1' />
+        <propval name='slot' type='uint32' value='4' />
+      </propgroup>
+    </node>
+    <node instance='5'>
+      <propgroup name='protocol' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='label' type='string' value='Front Disk 5' />
+      </propgroup>
+      <propgroup name='binding' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='driver' type='string' value='mpt_sas' />
+        <propval name='devctl' type='string' value='/devices/pci@0,0/pci8086,3c02@1/pci15d9,691@0:devctl' />
+        <propval name='enclosure' type='uint32' value='1' />
+        <propval name='slot' type='uint32' value='5' />
+      </propgroup>
+    </node>
+    <node instance='6'>
+      <propgroup name='protocol' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='label' type='string' value='Front Disk 6' />
+      </propgroup>
+      <propgroup name='binding' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='driver' type='string' value='mpt_sas' />
+        <propval name='devctl' type='string' value='/devices/pci@0,0/pci8086,3c02@1/pci15d9,691@0:devctl' />
+        <propval name='enclosure' type='uint32' value='1' />
+        <propval name='slot' type='uint32' value='6' />
+      </propgroup>
+    </node>
+    <node instance='7'>
+      <propgroup name='protocol' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='label' type='string' value='Front Disk 7' />
+      </propgroup>
+      <propgroup name='binding' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='driver' type='string' value='mpt_sas' />
+        <propval name='devctl' type='string' value='/devices/pci@0,0/pci8086,3c02@1/pci15d9,691@0:devctl' />
+        <propval name='enclosure' type='uint32' value='1' />
+        <propval name='slot' type='uint32' value='7' />
+      </propgroup>
+    </node>
+    <node instance='8'>
+      <propgroup name='protocol' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='label' type='string' value='Front Disk 8' />
+      </propgroup>
+      <propgroup name='binding' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='driver' type='string' value='mpt_sas' />
+        <propval name='devctl' type='string' value='/devices/pci@0,0/pci8086,3c06@2,2/pci15d9,691@0:devctl' />
+        <propval name='enclosure' type='uint32' value='1' />
+        <propval name='slot' type='uint32' value='0' />
+      </propgroup>
+    </node>
+    <node instance='9'>
+      <propgroup name='protocol' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='label' type='string' value='Front Disk 9' />
+      </propgroup>
+      <propgroup name='binding' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='driver' type='string' value='mpt_sas' />
+        <propval name='devctl' type='string' value='/devices/pci@0,0/pci8086,3c06@2,2/pci15d9,691@0:devctl' />
+        <propval name='enclosure' type='uint32' value='1' />
+        <propval name='slot' type='uint32' value='1' />
+      </propgroup>
+    </node>
+    <node instance='10'>
+      <propgroup name='protocol' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='label' type='string' value='Front Disk 10' />
+      </propgroup>
+      <propgroup name='binding' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='driver' type='string' value='mpt_sas' />
+        <propval name='devctl' type='string' value='/devices/pci@0,0/pci8086,3c06@2,2/pci15d9,691@0:devctl' />
+        <propval name='enclosure' type='uint32' value='1' />
+        <propval name='slot' type='uint32' value='2' />
+      </propgroup>
+    </node>
+    <node instance='11'>
+      <propgroup name='protocol' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='label' type='string' value='Front Disk 11' />
+      </propgroup>
+      <propgroup name='binding' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='driver' type='string' value='mpt_sas' />
+        <propval name='devctl' type='string' value='/devices/pci@0,0/pci8086,3c06@2,2/pci15d9,691@0:devctl' />
+        <propval name='enclosure' type='uint32' value='1' />
+        <propval name='slot' type='uint32' value='3' />
+      </propgroup>
+    </node>
+    <node instance='12'>
+      <propgroup name='protocol' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='label' type='string' value='Front Disk 12' />
+      </propgroup>
+      <propgroup name='binding' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='driver' type='string' value='mpt_sas' />
+        <propval name='devctl' type='string' value='/devices/pci@0,0/pci8086,3c06@2,2/pci15d9,691@0:devctl' />
+        <propval name='enclosure' type='uint32' value='1' />
+        <propval name='slot' type='uint32' value='4' />
+      </propgroup>
+    </node>
+    <node instance='13'>
+      <propgroup name='protocol' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='label' type='string' value='Front Disk 13' />
+      </propgroup>
+      <propgroup name='binding' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='driver' type='string' value='mpt_sas' />
+        <propval name='devctl' type='string' value='/devices/pci@0,0/pci8086,3c06@2,2/pci15d9,691@0:devctl' />
+        <propval name='enclosure' type='uint32' value='1' />
+        <propval name='slot' type='uint32' value='5' />
+      </propgroup>
+    </node>
+    <node instance='14'>
+      <propgroup name='protocol' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='label' type='string' value='Front Disk 14' />
+      </propgroup>
+      <propgroup name='binding' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='driver' type='string' value='mpt_sas' />
+        <propval name='devctl' type='string' value='/devices/pci@0,0/pci8086,3c06@2,2/pci15d9,691@0:devctl' />
+        <propval name='enclosure' type='uint32' value='1' />
+        <propval name='slot' type='uint32' value='6' />
+      </propgroup>
+    </node>
+    <node instance='15'>
+      <propgroup name='protocol' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='label' type='string' value='Front Disk 15' />
+      </propgroup>
+      <propgroup name='binding' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='driver' type='string' value='mpt_sas' />
+        <propval name='devctl' type='string' value='/devices/pci@0,0/pci8086,3c06@2,2/pci15d9,691@0:devctl' />
+        <propval name='enclosure' type='uint32' value='1' />
+        <propval name='slot' type='uint32' value='7' />
+      </propgroup>
+    </node>
+    <dependents grouping='children'>
+      <range name='disk' min='0' max='0'>
+        <enum-method name='disk' version='1' />
+      </range>
+    </dependents>
+  </range>
+</topology>

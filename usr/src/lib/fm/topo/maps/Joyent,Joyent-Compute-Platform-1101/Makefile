@@ -18,26 +18,24 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+# Copyright (c) 2013, Joyent, Inc. All rights reserved.
 #
 
-SUBDIRS = cpumem-retire \
-	disk-lights	\
-	disk-monitor	\
-	disk-transport	\
-	eversholt 	\
-	ext-event-transport \
-	fabric-xlate \
-	fdd-msg \
-	io-retire	\
-	ip-transport	\
-	sensor-transport \
-	ses-log-transport \
-	sw-diag-response \
-	sp-monitor	\
-	syslog-msgs	\
-	zfs-diagnosis	\
-	zfs-retire
+# NOTE: The name of the xml file we are building is 'platform'
+# specific, but its build is structured as 'arch' specific since
+# 'uname -i' on all x86 platforms returns i86pc.
 
-include ../../Makefile.subdirs
+ARCH = i86pc
+CLASS = arch
+DTDFILE = topology.dtd.1
+TOPOFILE = Joyent-Compute-Platform-1101-disk-hc-topology.xml
+SRCDIR = ../Joyent,Joyent-Compute-Platform-1101
+
+PLATFORM = Joyent-Compute-Platform-1101
+TOPOBASE = ../i86pc/i86pc-hc-topology.xml
+
+include ../Makefile.map

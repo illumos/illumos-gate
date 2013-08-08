@@ -2,6 +2,7 @@
 <!DOCTYPE topology SYSTEM "/usr/share/lib/xml/dtd/topology.dtd.1">
 <!--
 Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+Copyright (c) 2013, Joyent, Inc. All rights reserved.
 
  CDDL HEADER START
 
@@ -148,6 +149,18 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
        </range>
        <range name='bay' min='0' max='3'>
           <propmap name='Sun-Fire-X4600-M2-disk' />
+       </range>
+    </set>
+
+    <set type='product' setlist='Joyent-Compute-Platform-1101|Joyent-Compute-Platform-1102'>
+       <range name='psu' min='0' max='1'>
+          <enum-method name='ipmi' version='1' />
+       </range>
+       <range name='fan' min='0' max='100'>
+          <enum-method name='ipmi' version='1' />
+       </range>
+       <range name='bay' min='0' max='15'>
+          <propmap name='Joyent-Compute-Platform-1101-disk' />
        </range>
     </set>
 
