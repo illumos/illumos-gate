@@ -77,7 +77,8 @@ static int Rflag = 0;
 
 static int get_adj(char *, struct timeval *);
 static int setdate(struct tm *, char *);
-static char *fmt_extensions(const char *, const struct timespec *);
+static void fmt_extensions(char *, size_t,
+    const char *, const struct timespec *);
 
 int
 main(int argc, char **argv)
@@ -85,7 +86,7 @@ main(int argc, char **argv)
 	struct tm *tp, tm;
 	struct timeval tv;
 	char *fmt;
-	char *fmtbuf;
+	char fmtbuf[BUFSIZ];
 	int c, aflag = 0, illflag = 0;
 	struct timespec ts;
 
@@ -132,7 +133,7 @@ main(int argc, char **argv)
 	}
 
 	if (clock_gettime(CLOCK_REALTIME, &ts) != 0) {
-		perror(gettext("data: Failed to obtain system time"));
+		perror(gettext("date: Failed to obtain system time"));
 		exit(1);
 	}
 	clock_val = ts.tv_sec;
@@ -160,7 +161,7 @@ main(int argc, char **argv)
 	} else
 		fmt = nl_langinfo(_DATE_FMT);
 
-	fmtbuf = fmt_extensions(fmt, &ts);
+	fmt_extensions(fmtbuf, sizeof (fmtbuf), fmt, &ts);
 
 	if (uflag) {
 		(void) putenv("TZ=GMT0");
@@ -367,60 +368,28 @@ get_adj(char *cp, struct timeval *tp)
 /*
  * Extensions that cannot be interpreted by strftime are interpreted here.
  */
-char *
-fmt_extensions(const char *fmt, const struct timespec *tsp)
+void
+fmt_extensions(char *fmtbuf, size_t len,
+    const char *fmt, const struct timespec *tsp)
 {
-	size_t len;
-	char *fmt_buf;
 	const char *p;
 	char *q;
 
-	if (strstr(fmt, "%N") == NULL)
-		return ((char *)fmt);
-
-	len = strlen(fmt) + 1;
-
-	for (p = fmt; *p != '\0';) {
+	for (p = fmt, q = fmtbuf; *p != '\0' && q < fmtbuf + len; ++p) {
 		if (*p == '%') {
 			switch (*(p + 1)) {
 			case 'N':
-				len += 7;	/* 9 digits minus the %N */
-				break;
-			default:
-				break;
-			}
-
-			p += 2;
-			continue;
-		}
-		++p;
-	}
-
-	fmt_buf = malloc(len);
-	if (fmt_buf == NULL) {
-		perror(gettext("date: failed to allocate memory"));
-		exit(1);
-	}
-
-	for (p = fmt, q = fmt_buf; *p != '\0';) {
-		if (*p == '%') {
-			switch (*(p + 1)) {
-			case 'N':
-				q += snprintf(q, len - (q - fmt_buf),
+				++p;
+				q += snprintf(q, len - (q - fmtbuf),
 				    "%09lu", tsp->tv_nsec);
-				break;
-			default:
-				*q = *p;
-				*(q + 1) = *(p + 1);
-				q += 2;
-				break;
+				continue;
 			}
-			p += 2;
-		} else {
-			*q++ = *p++;
 		}
+		*q++ = *p;
 	}
-	*q = '\0';
 
-	return (fmt_buf);
+	if (q < fmtbuf + len)
+		*q = '\0';
+	else
+		fmtbuf[len - 1] = '\0';
 }
