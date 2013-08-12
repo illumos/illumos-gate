@@ -27,8 +27,6 @@
 #ifndef	_MDB_TARGET_H
 #define	_MDB_TARGET_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/utsname.h>
 #include <sys/types.h>
 #include <gelf.h>
@@ -232,7 +230,11 @@ typedef int mdb_tgt_sym_f(void *, const GElf_Sym *, const char *,
 
 /*
  * Values for selecting symbols of interest by binding and type.  These flags
- * can be used to construct a bitmask to pass to mdb_tgt_symbol_iter():
+ * can be used to construct a bitmask to pass to mdb_tgt_symbol_iter().  The
+ * module API has its own slightly different names for these values.  If you are
+ * adding a new flag here, you should consider exposing it in the module API.
+ * If you are changing these flags and their meanings, you will need to update
+ * the module API implementation to account for those changes.
  */
 #define	MDB_TGT_BIND_LOCAL	0x0001	/* Local (static-scope) symbols */
 #define	MDB_TGT_BIND_GLOBAL	0x0002	/* Global symbols */

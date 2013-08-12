@@ -1153,7 +1153,7 @@ stop_instance(scf_handle_t *local_handle, restarter_inst_t *inst,
 			if (method_rate_critical(inst)) {
 				log_instance(inst, B_TRUE, "Failing too "
 				    "quickly, throttling.");
-				sleep(WT_SVC_ERR_THROTTLE);
+				(void) sleep(WT_SVC_ERR_THROTTLE);
 			}
 		} else {
 			(void) update_fault_count(inst, FAULT_COUNT_RESET);
