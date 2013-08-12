@@ -199,12 +199,6 @@ clock_get_milli_uptime()
 	return (TICK_TO_MSEC(ddi_get_lbolt()));
 }
 
-int /*ARGSUSED*/
-smb_noop(void *p, size_t size, int foo)
-{
-	return (0);
-}
-
 /*
  * smb_idpool_increment
  *

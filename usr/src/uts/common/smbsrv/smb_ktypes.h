@@ -1724,6 +1724,10 @@ typedef struct smb_xa {
 
 	char			*xa_pipe_name;
 
+	/*
+	 * These are the param and data count received so far,
+	 * used to decide if the whole trans is here yet.
+	 */
 	int			req_disp_param;
 	int			req_disp_data;
 
