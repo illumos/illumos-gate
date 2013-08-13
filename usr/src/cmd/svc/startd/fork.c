@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ */
+
+/*
  * fork.c - safe forking for svc.startd
  *
  * fork_configd() and fork_sulogin() are related, special cases that handle the
@@ -72,6 +76,7 @@ startd_fork1(int *forkerr)
 	 * prefork stack
 	 */
 	wait_prefork();
+	utmpx_prefork();
 
 	p = fork1();
 
@@ -81,6 +86,7 @@ startd_fork1(int *forkerr)
 	/*
 	 * postfork stack
 	 */
+	utmpx_postfork();
 	wait_postfork(p);
 
 	return (p);
@@ -169,6 +175,8 @@ fork_common(const char *name, const char *svc_fmri, int retries, ctid_t *ctidp,
 		/* NOTREACHED */
 	}
 
+	utmpx_prefork();
+
 	/*
 	 * Attempt to fork "retries" times.
 	 */
@@ -181,12 +189,15 @@ fork_common(const char *name, const char *svc_fmri, int retries, ctid_t *ctidp,
 			err = errno;
 			(void) ct_tmpl_clear(ctfd);
 			(void) close(ctfd);
+			utmpx_postfork();
 			fork_sulogin(B_TRUE, "Could not fork to start %s: %s\n",
 			    name, strerror(err));
 			/* NOTREACHED */
 		}
 		(void) sleep(tries);
 	}
+
+	utmpx_postfork();
 
 	/*
 	 * Clean up, return pid and ctid.

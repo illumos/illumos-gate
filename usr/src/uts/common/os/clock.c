@@ -23,6 +23,7 @@
 
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -63,7 +64,7 @@
 #include <sys/rctl.h>
 #include <sys/task.h>
 #include <sys/sdt.h>
-#include <sys/ddi_timer.h>
+#include <sys/ddi_periodic.h>
 #include <sys/random.h>
 #include <sys/modctl.h>
 
@@ -314,7 +315,6 @@ static int tod_broken = 0;	/* clock chip doesn't work */
 time_t	boot_time = 0;		/* Boot time in seconds since 1970 */
 cyclic_id_t clock_cyclic;	/* clock()'s cyclic_id */
 cyclic_id_t deadman_cyclic;	/* deadman()'s cyclic_id */
-cyclic_id_t ddi_timer_cyclic;	/* cyclic_timer()'s cyclic_id */
 
 extern void	clock_tick_schedule(int);
 
@@ -945,7 +945,7 @@ clock(void)
 void
 clock_init(void)
 {
-	cyc_handler_t clk_hdlr, timer_hdlr, lbolt_hdlr;
+	cyc_handler_t clk_hdlr, lbolt_hdlr;
 	cyc_time_t clk_when, lbolt_when;
 	int i, sz;
 	intptr_t buf;
@@ -959,14 +959,6 @@ clock_init(void)
 
 	clk_when.cyt_when = 0;
 	clk_when.cyt_interval = nsec_per_tick;
-
-	/*
-	 * cyclic_timer is dedicated to the ddi interface, which
-	 * uses the same clock resolution as the system one.
-	 */
-	timer_hdlr.cyh_func = (cyc_func_t)cyclic_timer;
-	timer_hdlr.cyh_level = CY_LOCK_LEVEL;
-	timer_hdlr.cyh_arg = NULL;
 
 	/*
 	 * The lbolt cyclic will be reprogramed to fire at a nsec_per_tick
@@ -1043,7 +1035,6 @@ clock_init(void)
 	mutex_enter(&cpu_lock);
 
 	clock_cyclic = cyclic_add(&clk_hdlr, &clk_when);
-	ddi_timer_cyclic = cyclic_add(&timer_hdlr, &clk_when);
 	lb_info->id.lbi_cyclic_id = cyclic_add(&lbolt_hdlr, &lbolt_when);
 
 	mutex_exit(&cpu_lock);

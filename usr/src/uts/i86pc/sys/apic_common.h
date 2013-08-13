@@ -21,6 +21,9 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ */
 
 #ifndef _SYS_APIC_COMMON_H
 #define	_SYS_APIC_COMMON_H
@@ -29,6 +32,7 @@
 #include <sys/avintr.h>
 #include <sys/privregs.h>
 #include <sys/pci.h>
+#include <sys/cyclic.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -159,7 +163,7 @@ extern int	apic_stretch_interrupts;
 extern int	apic_stretch_ISR;	/* IPL of 3 matches nothing now */
 #endif
 
-extern ddi_periodic_t apic_periodic_id;
+extern cyclic_id_t apic_cyclic_id;
 
 extern void apic_nmi_intr(caddr_t arg, struct regs *rp);
 extern int	apic_clkinit();

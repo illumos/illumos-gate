@@ -23,6 +23,9 @@
  * Copyright (c) 2001 by Sun Microsystems, Inc.
  * All rights reserved.
  */
+/*
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ */
 
 /*
  * These crt*.o modules are provided as the bare minimum required
@@ -34,8 +37,17 @@
  * For further details - see bug#4433015
  */
 
-	.ident	"%Z%%M%	%I%	%E% SMI"
 	.file	"crti.s"
+
+/*
+ * Note that when _init and _fini are called we have 16-byte alignment per the
+ * ABI. We need to make sure that our asm leaves it such that subsequent calls
+ * will be aligned. gcc expects stack alignment before the call instruction is
+ * executed. Specifically if we call function foo(), the stack pointer will be
+ * 0xc aligned after executing the call instruction and before executing foo's
+ * prologue. Note that because 16-byte alignment also ensures 4-byte alignment
+ * we will not be breaking compatibility with older applications.
+ */
 
 /*
  * _init function prologue
@@ -47,6 +59,8 @@
 _init:
 	pushl	%ebp
 	movl	%esp, %ebp
+	andl	$-16,%esp
+	subl	$12,%esp
 	pushl	%ebx
 	call	.L1
 .L1:	popl	%ebx
@@ -62,6 +76,8 @@ _init:
 _fini:
 	pushl	%ebp
 	movl	%esp, %ebp
+	andl	$-16,%esp
+	subl	$12,%esp
 	pushl	%ebx
 	call	.L2
 .L2:	popl	%ebx

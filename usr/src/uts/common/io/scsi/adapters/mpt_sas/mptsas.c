@@ -67,7 +67,6 @@
 #include <sys/scsi/scsi.h>
 #include <sys/pci.h>
 #include <sys/file.h>
-#include <sys/cpuvar.h>
 #include <sys/policy.h>
 #include <sys/sysevent.h>
 #include <sys/sysevent/eventdefs.h>
@@ -95,7 +94,6 @@
 #include <sys/scsi/adapters/mpt_sas/mptsas_var.h>
 #include <sys/scsi/adapters/mpt_sas/mptsas_ioctl.h>
 #include <sys/scsi/adapters/mpt_sas/mptsas_smhba.h>
-
 #include <sys/raidioctl.h>
 
 #include <sys/fs/dv_node.h>	/* devfs_clean */
@@ -107,21 +105,6 @@
 #include <sys/fm/protocol.h>
 #include <sys/fm/util.h>
 #include <sys/fm/io/ddi.h>
-
-/*
- * For anyone who would modify the code in mptsas_driver, it must be awared
- * that from snv_145 where CR6910752(mpt_sas driver performance can be
- * improved) is integrated, the per_instance mutex m_mutex is not hold
- * in the key IO code path, including mptsas_scsi_start(), mptsas_intr()
- * and all of the recursive functions called in them, so don't
- * make it for granted that all operations are sync/exclude correctly. Before
- * doing any modification in key code path, and even other code path such as
- * DR, watchsubr, ioctl, passthrough etc, make sure the elements modified have
- * no releationship to elements shown in the fastpath
- * (function mptsas_handle_io_fastpath()) in ISR and its recursive functions.
- * otherwise, you have to use the new introduced mutex to protect them.
- * As to how to do correctly, refer to the comments in mptsas_intr().
- */
 
 /*
  * autoconfiguration data and routines.
@@ -216,6 +199,8 @@ static void mptsas_ncmds_checkdrain(void *arg);
 
 static int mptsas_prepare_pkt(mptsas_cmd_t *cmd);
 static int mptsas_accept_pkt(mptsas_t *mpt, mptsas_cmd_t *sp);
+static int mptsas_accept_txwq_and_pkt(mptsas_t *mpt, mptsas_cmd_t *sp);
+static void mptsas_accept_tx_waitq(mptsas_t *mpt);
 
 static int mptsas_do_detach(dev_info_t *dev);
 static int mptsas_do_scsi_reset(mptsas_t *mpt, uint16_t devhdl);
@@ -241,7 +226,6 @@ static void mptsas_set_pkt_reason(mptsas_t *mpt, mptsas_cmd_t *cmd,
 static uint_t mptsas_intr(caddr_t arg1, caddr_t arg2);
 static void mptsas_process_intr(mptsas_t *mpt,
     pMpi2ReplyDescriptorsUnion_t reply_desc_union);
-static int mptsas_handle_io_fastpath(mptsas_t *mpt, uint16_t SMID);
 static void mptsas_handle_scsi_io_success(mptsas_t *mpt,
     pMpi2ReplyDescriptorsUnion_t reply_desc);
 static void mptsas_handle_address_reply(mptsas_t *mpt,
@@ -308,13 +292,12 @@ static int mptsas_send_scsi_cmd(mptsas_t *mpt, struct scsi_address *ap,
 static int mptsas_alloc_active_slots(mptsas_t *mpt, int flag);
 static void mptsas_free_active_slots(mptsas_t *mpt);
 static int mptsas_start_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd);
-static int mptsas_start_cmd0(mptsas_t *mpt, mptsas_cmd_t *cmd);
 
 static void mptsas_restart_hba(mptsas_t *mpt);
+static void mptsas_restart_waitq(mptsas_t *mpt);
 
 static void mptsas_deliver_doneq_thread(mptsas_t *mpt);
 static void mptsas_doneq_add(mptsas_t *mpt, mptsas_cmd_t *cmd);
-static inline void mptsas_doneq_add0(mptsas_t *mpt, mptsas_cmd_t *cmd);
 static void mptsas_doneq_mv(mptsas_t *mpt, uint64_t t);
 
 static mptsas_cmd_t *mptsas_doneq_thread_rm(mptsas_t *mpt, uint64_t t);
@@ -323,13 +306,15 @@ static void mptsas_doneq_thread(mptsas_doneq_thread_arg_t *arg);
 
 static mptsas_cmd_t *mptsas_waitq_rm(mptsas_t *mpt);
 static void mptsas_waitq_delete(mptsas_t *mpt, mptsas_cmd_t *cmd);
+static mptsas_cmd_t *mptsas_tx_waitq_rm(mptsas_t *mpt);
+static void mptsas_tx_waitq_delete(mptsas_t *mpt, mptsas_cmd_t *cmd);
+
 
 static void mptsas_start_watch_reset_delay();
 static void mptsas_setup_bus_reset_delay(mptsas_t *mpt);
 static void mptsas_watch_reset_delay(void *arg);
 static int mptsas_watch_reset_delay_subr(mptsas_t *mpt);
 
-static int mptsas_outstanding_cmds_n(mptsas_t *mpt);
 /*
  * helper functions
  */
@@ -361,7 +346,6 @@ static int mptsas_inquiry(mptsas_t *mpt, mptsas_target_t *ptgt, int lun,
 static int mptsas_get_target_device_info(mptsas_t *mpt, uint32_t page_address,
     uint16_t *handle, mptsas_target_t **pptgt);
 static void mptsas_update_phymask(mptsas_t *mpt);
-static inline void mptsas_remove_cmd0(mptsas_t *mpt, mptsas_cmd_t *cmd);
 
 static int mptsas_send_sep(mptsas_t *mpt, mptsas_target_t *ptgt,
     uint32_t *status, uint8_t cmd);
@@ -431,7 +415,7 @@ static void * mptsas_hash_search(mptsas_hash_table_t *hashtab, uint64_t key1,
 static void * mptsas_hash_traverse(mptsas_hash_table_t *hashtab, int pos);
 
 mptsas_target_t *mptsas_tgt_alloc(mptsas_hash_table_t *, uint16_t, uint64_t,
-    uint32_t, mptsas_phymask_t, uint8_t, mptsas_t *);
+    uint32_t, mptsas_phymask_t, uint8_t);
 static mptsas_smp_t *mptsas_smp_alloc(mptsas_hash_table_t *hashtab,
     mptsas_smp_t *data);
 static void mptsas_smp_free(mptsas_hash_table_t *hashtab, uint64_t wwid,
@@ -1197,7 +1181,7 @@ mptsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	mutex_init(&mpt->m_mutex, NULL, MUTEX_DRIVER,
 	    DDI_INTR_PRI(mpt->m_intr_pri));
 	mutex_init(&mpt->m_passthru_mutex, NULL, MUTEX_DRIVER, NULL);
-	mutex_init(&mpt->m_intr_mutex, NULL, MUTEX_DRIVER,
+	mutex_init(&mpt->m_tx_waitq_mutex, NULL, MUTEX_DRIVER,
 	    DDI_INTR_PRI(mpt->m_intr_pri));
 	for (i = 0; i < MPTSAS_MAX_PHYS; i++) {
 		mutex_init(&mpt->m_phy_info[i].smhba_info.phy_mutex,
@@ -1300,6 +1284,8 @@ mptsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	mpt->m_donetail = &mpt->m_doneq;
 	mpt->m_waitqtail = &mpt->m_waitq;
+	mpt->m_tx_waitqtail = &mpt->m_tx_waitq;
+	mpt->m_tx_draining = 0;
 
 	/*
 	 * ioc cmd queue initialize
@@ -1459,7 +1445,7 @@ fail:
 			ddi_taskq_destroy(mpt->m_dr_taskq);
 		}
 		if (mutex_init_done) {
-			mutex_destroy(&mpt->m_intr_mutex);
+			mutex_destroy(&mpt->m_tx_waitq_mutex);
 			mutex_destroy(&mpt->m_passthru_mutex);
 			mutex_destroy(&mpt->m_mutex);
 			for (i = 0; i < MPTSAS_MAX_PHYS; i++) {
@@ -1877,7 +1863,7 @@ mptsas_do_detach(dev_info_t *dip)
 			    mpt->m_instance);
 	}
 
-	mutex_destroy(&mpt->m_intr_mutex);
+	mutex_destroy(&mpt->m_tx_waitq_mutex);
 	mutex_destroy(&mpt->m_passthru_mutex);
 	mutex_destroy(&mpt->m_mutex);
 	for (i = 0; i < MPTSAS_MAX_PHYS; i++) {
@@ -2241,9 +2227,7 @@ mptsas_power(dev_info_t *dip, int component, int level)
 				return (DDI_FAILURE);
 			}
 		}
-		mutex_enter(&mpt->m_intr_mutex);
 		mpt->m_power_level = PM_LEVEL_D0;
-		mutex_exit(&mpt->m_intr_mutex);
 		break;
 	case PM_LEVEL_D3:
 		NDBG11(("mptsas%d: turning power OFF.", mpt->m_instance));
@@ -2999,29 +2983,147 @@ mptsas_scsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	 * and which scsi_pkt is the currently-running command so the
 	 * interrupt handler can refer to the pkt to set completion
 	 * status, call the target driver back through pkt_comp, etc.
+	 *
+	 * If the instance lock is held by other thread, don't spin to wait
+	 * for it. Instead, queue the cmd and next time when the instance lock
+	 * is not held, accept all the queued cmd. A extra tx_waitq is
+	 * introduced to protect the queue.
+	 *
+	 * The polled cmd will not be queud and accepted as usual.
+	 *
+	 * Under the tx_waitq mutex, record whether a thread is draining
+	 * the tx_waitq.  An IO requesting thread that finds the instance
+	 * mutex contended appends to the tx_waitq and while holding the
+	 * tx_wait mutex, if the draining flag is not set, sets it and then
+	 * proceeds to spin for the instance mutex. This scheme ensures that
+	 * the last cmd in a burst be processed.
+	 *
+	 * we enable this feature only when the helper threads are enabled,
+	 * at which we think the loads are heavy.
+	 *
+	 * per instance mutex m_tx_waitq_mutex is introduced to protect the
+	 * m_tx_waitqtail, m_tx_waitq, m_tx_draining.
 	 */
 
-	mutex_enter(&ptgt->m_tgt_intr_mutex);
+	if (mpt->m_doneq_thread_n) {
+		if (mutex_tryenter(&mpt->m_mutex) != 0) {
+			rval = mptsas_accept_txwq_and_pkt(mpt, cmd);
+			mutex_exit(&mpt->m_mutex);
+		} else if (cmd->cmd_pkt_flags & FLAG_NOINTR) {
+			mutex_enter(&mpt->m_mutex);
+			rval = mptsas_accept_txwq_and_pkt(mpt, cmd);
+			mutex_exit(&mpt->m_mutex);
+		} else {
+			mutex_enter(&mpt->m_tx_waitq_mutex);
+			/*
+			 * ptgt->m_dr_flag is protected by m_mutex or
+			 * m_tx_waitq_mutex. In this case, m_tx_waitq_mutex
+			 * is acquired.
+			 */
+			if (ptgt->m_dr_flag == MPTSAS_DR_INTRANSITION) {
+				if (cmd->cmd_pkt_flags & FLAG_NOQUEUE) {
+					/*
+					 * The command should be allowed to
+					 * retry by returning TRAN_BUSY to
+					 * to stall the I/O's which come from
+					 * scsi_vhci since the device/path is
+					 * in unstable state now.
+					 */
+					mutex_exit(&mpt->m_tx_waitq_mutex);
+					return (TRAN_BUSY);
+				} else {
+					/*
+					 * The device is offline, just fail the
+					 * command by returning
+					 * TRAN_FATAL_ERROR.
+					 */
+					mutex_exit(&mpt->m_tx_waitq_mutex);
+					return (TRAN_FATAL_ERROR);
+				}
+			}
+			if (mpt->m_tx_draining) {
+				cmd->cmd_flags |= CFLAG_TXQ;
+				*mpt->m_tx_waitqtail = cmd;
+				mpt->m_tx_waitqtail = &cmd->cmd_linkp;
+				mutex_exit(&mpt->m_tx_waitq_mutex);
+			} else { /* drain the queue */
+				mpt->m_tx_draining = 1;
+				mutex_exit(&mpt->m_tx_waitq_mutex);
+				mutex_enter(&mpt->m_mutex);
+				rval = mptsas_accept_txwq_and_pkt(mpt, cmd);
+				mutex_exit(&mpt->m_mutex);
+			}
+		}
+	} else {
+		mutex_enter(&mpt->m_mutex);
+		/*
+		 * ptgt->m_dr_flag is protected by m_mutex or m_tx_waitq_mutex
+		 * in this case, m_mutex is acquired.
+		 */
+		if (ptgt->m_dr_flag == MPTSAS_DR_INTRANSITION) {
+			if (cmd->cmd_pkt_flags & FLAG_NOQUEUE) {
+				/*
+				 * commands should be allowed to retry by
+				 * returning TRAN_BUSY to stall the I/O's
+				 * which come from scsi_vhci since the device/
+				 * path is in unstable state now.
+				 */
+				mutex_exit(&mpt->m_mutex);
+				return (TRAN_BUSY);
+			} else {
+				/*
+				 * The device is offline, just fail the
+				 * command by returning TRAN_FATAL_ERROR.
+				 */
+				mutex_exit(&mpt->m_mutex);
+				return (TRAN_FATAL_ERROR);
+			}
+		}
+		rval = mptsas_accept_pkt(mpt, cmd);
+		mutex_exit(&mpt->m_mutex);
+	}
+
+	return (rval);
+}
+
+/*
+ * Accept all the queued cmds(if any) before accept the current one.
+ */
+static int
+mptsas_accept_txwq_and_pkt(mptsas_t *mpt, mptsas_cmd_t *cmd)
+{
+	int rval;
+	mptsas_target_t	*ptgt = cmd->cmd_tgt_addr;
+
+	ASSERT(mutex_owned(&mpt->m_mutex));
+	/*
+	 * The call to mptsas_accept_tx_waitq() must always be performed
+	 * because that is where mpt->m_tx_draining is cleared.
+	 */
+	mutex_enter(&mpt->m_tx_waitq_mutex);
+	mptsas_accept_tx_waitq(mpt);
+	mutex_exit(&mpt->m_tx_waitq_mutex);
+	/*
+	 * ptgt->m_dr_flag is protected by m_mutex or m_tx_waitq_mutex
+	 * in this case, m_mutex is acquired.
+	 */
 	if (ptgt->m_dr_flag == MPTSAS_DR_INTRANSITION) {
 		if (cmd->cmd_pkt_flags & FLAG_NOQUEUE) {
 			/*
-			 * commands should be allowed to retry by
-			 * returning TRAN_BUSY to stall the I/O's
-			 * which come from scsi_vhci since the device/
-			 * path is in unstable state now.
+			 * The command should be allowed to retry by returning
+			 * TRAN_BUSY to stall the I/O's which come from
+			 * scsi_vhci since the device/path is in unstable state
+			 * now.
 			 */
-			mutex_exit(&ptgt->m_tgt_intr_mutex);
 			return (TRAN_BUSY);
 		} else {
 			/*
-			 * The device is offline, just fail the
-			 * command by returning TRAN_FATAL_ERROR.
+			 * The device is offline, just fail the command by
+			 * return TRAN_FATAL_ERROR.
 			 */
-			mutex_exit(&ptgt->m_tgt_intr_mutex);
 			return (TRAN_FATAL_ERROR);
 		}
 	}
-	mutex_exit(&ptgt->m_tgt_intr_mutex);
 	rval = mptsas_accept_pkt(mpt, cmd);
 
 	return (rval);
@@ -3035,6 +3137,8 @@ mptsas_accept_pkt(mptsas_t *mpt, mptsas_cmd_t *cmd)
 
 	NDBG1(("mptsas_accept_pkt: cmd=0x%p", (void *)cmd));
 
+	ASSERT(mutex_owned(&mpt->m_mutex));
+
 	if ((cmd->cmd_flags & CFLAG_PREPARED) == 0) {
 		rval = mptsas_prepare_pkt(cmd);
 		if (rval != TRAN_ACCEPT) {
@@ -3046,12 +3150,29 @@ mptsas_accept_pkt(mptsas_t *mpt, mptsas_cmd_t *cmd)
 	/*
 	 * reset the throttle if we were draining
 	 */
-	mutex_enter(&ptgt->m_tgt_intr_mutex);
 	if ((ptgt->m_t_ncmds == 0) &&
 	    (ptgt->m_t_throttle == DRAIN_THROTTLE)) {
 		NDBG23(("reset throttle"));
 		ASSERT(ptgt->m_reset_delay == 0);
 		mptsas_set_throttle(mpt, ptgt, MAX_THROTTLE);
+	}
+
+	/*
+	 * If HBA is being reset, the DevHandles are being re-initialized,
+	 * which means that they could be invalid even if the target is still
+	 * attached.  Check if being reset and if DevHandle is being
+	 * re-initialized.  If this is the case, return BUSY so the I/O can be
+	 * retried later.
+	 */
+	if ((ptgt->m_devhdl == MPTSAS_INVALID_DEVHDL) && mpt->m_in_reset) {
+		mptsas_set_pkt_reason(mpt, cmd, CMD_RESET, STAT_BUS_RESET);
+		if (cmd->cmd_flags & CFLAG_TXQ) {
+			mptsas_doneq_add(mpt, cmd);
+			mptsas_doneq_empty(mpt);
+			return (rval);
+		} else {
+			return (TRAN_BUSY);
+		}
 	}
 
 	/*
@@ -3064,66 +3185,36 @@ mptsas_accept_pkt(mptsas_t *mpt, mptsas_cmd_t *cmd)
 	if (ptgt->m_devhdl == MPTSAS_INVALID_DEVHDL) {
 		NDBG20(("rejecting command, it might because invalid devhdl "
 		    "request."));
-		mutex_exit(&ptgt->m_tgt_intr_mutex);
-		mutex_enter(&mpt->m_mutex);
-		/*
-		 * If HBA is being reset, the DevHandles are being
-		 * re-initialized, which means that they could be invalid
-		 * even if the target is still attached. Check if being reset
-		 * and if DevHandle is being re-initialized. If this is the
-		 * case, return BUSY so the I/O can be retried later.
-		 */
-		if (mpt->m_in_reset) {
-			mptsas_set_pkt_reason(mpt, cmd, CMD_RESET,
-			    STAT_BUS_RESET);
-			if (cmd->cmd_flags & CFLAG_TXQ) {
-				mptsas_doneq_add(mpt, cmd);
-				mptsas_doneq_empty(mpt);
-				mutex_exit(&mpt->m_mutex);
-				return (rval);
-			} else {
-				mutex_exit(&mpt->m_mutex);
-				return (TRAN_BUSY);
-			}
-		}
 		mptsas_set_pkt_reason(mpt, cmd, CMD_DEV_GONE, STAT_TERMINATED);
 		if (cmd->cmd_flags & CFLAG_TXQ) {
 			mptsas_doneq_add(mpt, cmd);
 			mptsas_doneq_empty(mpt);
-			mutex_exit(&mpt->m_mutex);
 			return (rval);
 		} else {
-			mutex_exit(&mpt->m_mutex);
 			return (TRAN_FATAL_ERROR);
 		}
 	}
-	mutex_exit(&ptgt->m_tgt_intr_mutex);
 	/*
 	 * The first case is the normal case.  mpt gets a command from the
 	 * target driver and starts it.
 	 * Since SMID 0 is reserved and the TM slot is reserved, the actual max
 	 * commands is m_max_requests - 2.
 	 */
-	mutex_enter(&ptgt->m_tgt_intr_mutex);
-	if ((ptgt->m_t_throttle > HOLD_THROTTLE) &&
+	if ((mpt->m_ncmds <= (mpt->m_max_requests - 2)) &&
+	    (ptgt->m_t_throttle > HOLD_THROTTLE) &&
 	    (ptgt->m_t_ncmds < ptgt->m_t_throttle) &&
 	    (ptgt->m_reset_delay == 0) &&
 	    (ptgt->m_t_nwait == 0) &&
 	    ((cmd->cmd_pkt_flags & FLAG_NOINTR) == 0)) {
-		mutex_exit(&ptgt->m_tgt_intr_mutex);
 		if (mptsas_save_cmd(mpt, cmd) == TRUE) {
-			(void) mptsas_start_cmd0(mpt, cmd);
+			(void) mptsas_start_cmd(mpt, cmd);
 		} else {
-			mutex_enter(&mpt->m_mutex);
 			mptsas_waitq_add(mpt, cmd);
-			mutex_exit(&mpt->m_mutex);
 		}
 	} else {
 		/*
 		 * Add this pkt to the work queue
 		 */
-		mutex_exit(&ptgt->m_tgt_intr_mutex);
-		mutex_enter(&mpt->m_mutex);
 		mptsas_waitq_add(mpt, cmd);
 
 		if (cmd->cmd_pkt_flags & FLAG_NOINTR) {
@@ -3138,7 +3229,6 @@ mptsas_accept_pkt(mptsas_t *mpt, mptsas_cmd_t *cmd)
 				mptsas_doneq_empty(mpt);
 			}
 		}
-		mutex_exit(&mpt->m_mutex);
 	}
 	return (rval);
 }
@@ -3149,9 +3239,8 @@ mptsas_save_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd)
 	mptsas_slots_t	*slots;
 	int		slot;
 	mptsas_target_t	*ptgt = cmd->cmd_tgt_addr;
-	mptsas_slot_free_e_t	*pe;
-	int		qn, qn_first;
 
+	ASSERT(mutex_owned(&mpt->m_mutex));
 	slots = mpt->m_active;
 
 	/*
@@ -3159,100 +3248,67 @@ mptsas_save_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd)
 	 */
 	ASSERT(slots->m_n_slots == (mpt->m_max_requests - 2));
 
-	qn = qn_first = CPU->cpu_seqid & (mpt->m_slot_freeq_pair_n - 1);
+	/*
+	 * m_tags is equivalent to the SMID when sending requests.  Since the
+	 * SMID cannot be 0, start out at one if rolling over past the size
+	 * of the request queue depth.  Also, don't use the last SMID, which is
+	 * reserved for TM requests.
+	 */
+	slot = (slots->m_tags)++;
+	if (slots->m_tags > slots->m_n_slots) {
+		slots->m_tags = 1;
+	}
 
-qpair_retry:
-	ASSERT(qn < mpt->m_slot_freeq_pair_n);
-	mutex_enter(&mpt->m_slot_freeq_pairp[qn].m_slot_allocq.s.m_fq_mutex);
-	pe = list_head(&mpt->m_slot_freeq_pairp[qn].m_slot_allocq.
-	    s.m_fq_list);
-	if (!pe) { /* switch the allocq and releq */
-		mutex_enter(&mpt->m_slot_freeq_pairp[qn].m_slot_releq.
-		    s.m_fq_mutex);
-		if (mpt->m_slot_freeq_pairp[qn].m_slot_releq.s.m_fq_n) {
-			mpt->m_slot_freeq_pairp[qn].
-			    m_slot_allocq.s.m_fq_n =
-			    mpt->m_slot_freeq_pairp[qn].
-			    m_slot_releq.s.m_fq_n;
-			mpt->m_slot_freeq_pairp[qn].
-			    m_slot_allocq.s.m_fq_list.list_head.list_next =
-			    mpt->m_slot_freeq_pairp[qn].
-			    m_slot_releq.s.m_fq_list.list_head.list_next;
-			mpt->m_slot_freeq_pairp[qn].
-			    m_slot_allocq.s.m_fq_list.list_head.list_prev =
-			    mpt->m_slot_freeq_pairp[qn].
-			    m_slot_releq.s.m_fq_list.list_head.list_prev;
-			mpt->m_slot_freeq_pairp[qn].
-			    m_slot_releq.s.m_fq_list.list_head.list_prev->
-			    list_next =
-			    &mpt->m_slot_freeq_pairp[qn].
-			    m_slot_allocq.s.m_fq_list.list_head;
-			mpt->m_slot_freeq_pairp[qn].
-			    m_slot_releq.s.m_fq_list.list_head.list_next->
-			    list_prev =
-			    &mpt->m_slot_freeq_pairp[qn].
-			    m_slot_allocq.s.m_fq_list.list_head;
+alloc_tag:
+	/* Validate tag, should never fail. */
+	if (slots->m_slot[slot] == NULL) {
+		/*
+		 * Make sure SMID is not using reserved value of 0
+		 * and the TM request slot.
+		 */
+		ASSERT((slot > 0) && (slot <= slots->m_n_slots));
+		cmd->cmd_slot = slot;
+		slots->m_slot[slot] = cmd;
+		mpt->m_ncmds++;
 
-			mpt->m_slot_freeq_pairp[qn].
-			    m_slot_releq.s.m_fq_list.list_head.list_next =
-			    mpt->m_slot_freeq_pairp[qn].
-			    m_slot_releq.s.m_fq_list.list_head.list_prev =
-			    &mpt->m_slot_freeq_pairp[qn].
-			    m_slot_releq.s.m_fq_list.list_head;
-			mpt->m_slot_freeq_pairp[qn].
-			    m_slot_releq.s.m_fq_n = 0;
-		} else {
-			mutex_exit(&mpt->m_slot_freeq_pairp[qn].
-			    m_slot_releq.s.m_fq_mutex);
-			mutex_exit(&mpt->m_slot_freeq_pairp[qn].
-			    m_slot_allocq.s.m_fq_mutex);
-			qn = (qn + 1) & (mpt->m_slot_freeq_pair_n - 1);
-			if (qn == qn_first)
-				return (FALSE);
-			else
-				goto qpair_retry;
+		/*
+		 * only increment per target ncmds if this is not a
+		 * command that has no target associated with it (i.e. a
+		 * event acknoledgment)
+		 */
+		if ((cmd->cmd_flags & CFLAG_CMDIOC) == 0) {
+			ptgt->m_t_ncmds++;
 		}
-		mutex_exit(&mpt->m_slot_freeq_pairp[qn].
-		    m_slot_releq.s.m_fq_mutex);
-		pe = list_head(&mpt->m_slot_freeq_pairp[qn].
-		    m_slot_allocq.s.m_fq_list);
-		ASSERT(pe);
-	}
-	list_remove(&mpt->m_slot_freeq_pairp[qn].
-	    m_slot_allocq.s.m_fq_list, pe);
-	slot = pe->slot;
-	/*
-	 * Make sure SMID is not using reserved value of 0
-	 * and the TM request slot.
-	 */
-	ASSERT((slot > 0) && (slot <= slots->m_n_slots) &&
-	    mpt->m_slot_freeq_pairp[qn].m_slot_allocq.s.m_fq_n > 0);
-	cmd->cmd_slot = slot;
-	mpt->m_slot_freeq_pairp[qn].m_slot_allocq.s.m_fq_n--;
-	ASSERT(mpt->m_slot_freeq_pairp[qn].m_slot_allocq.s.m_fq_n >= 0);
+		cmd->cmd_active_timeout = cmd->cmd_pkt->pkt_time;
 
-	mutex_exit(&mpt->m_slot_freeq_pairp[qn].m_slot_allocq.s.m_fq_mutex);
-	/*
-	 * only increment per target ncmds if this is not a
-	 * command that has no target associated with it (i.e. a
-	 * event acknoledgment)
-	 */
-	if ((cmd->cmd_flags & CFLAG_CMDIOC) == 0) {
-		mutex_enter(&ptgt->m_tgt_intr_mutex);
-		ptgt->m_t_ncmds++;
-		mutex_exit(&ptgt->m_tgt_intr_mutex);
-	}
-	cmd->cmd_active_timeout = cmd->cmd_pkt->pkt_time;
+		/*
+		 * If initial timout is less than or equal to one tick, bump
+		 * the timeout by a tick so that command doesn't timeout before
+		 * its allotted time.
+		 */
+		if (cmd->cmd_active_timeout <= mptsas_scsi_watchdog_tick) {
+			cmd->cmd_active_timeout += mptsas_scsi_watchdog_tick;
+		}
+		return (TRUE);
+	} else {
+		int i;
 
-	/*
-	 * If initial timout is less than or equal to one tick, bump
-	 * the timeout by a tick so that command doesn't timeout before
-	 * its allotted time.
-	 */
-	if (cmd->cmd_active_timeout <= mptsas_scsi_watchdog_tick) {
-		cmd->cmd_active_timeout += mptsas_scsi_watchdog_tick;
+		/*
+		 * If slot in use, scan until a free one is found. Don't use 0
+		 * or final slot, which is reserved for TM requests.
+		 */
+		for (i = 0; i < slots->m_n_slots; i++) {
+			slot = slots->m_tags;
+			if (++(slots->m_tags) > slots->m_n_slots) {
+				slots->m_tags = 1;
+			}
+			if (slots->m_slot[slot] == NULL) {
+				NDBG22(("found free slot %d", slot));
+				goto alloc_tag;
+			}
+		}
 	}
-	return (TRUE);
+	return (FALSE);
 }
 
 /*
@@ -3320,9 +3376,7 @@ mptsas_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 	mptsas_cmd_t		*cmd, *new_cmd;
 	mptsas_t		*mpt = ADDR2MPT(ap);
 	int			failure = 1;
-#ifndef	__sparc
 	uint_t			oldcookiec;
-#endif	/* __sparc */
 	mptsas_target_t		*ptgt = NULL;
 	int			rval;
 	mptsas_tgt_private_t	*tgt_private;
@@ -3360,9 +3414,6 @@ mptsas_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 		ddi_dma_handle_t	save_arq_dma_handle;
 		struct buf		*save_arq_bp;
 		ddi_dma_cookie_t	save_arqcookie;
-#ifdef	__sparc
-		mptti_t			*save_sg;
-#endif	/* __sparc */
 
 		cmd = kmem_cache_alloc(mpt->m_kmem_cache, kf);
 
@@ -3371,17 +3422,12 @@ mptsas_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 			save_arq_dma_handle = cmd->cmd_arqhandle;
 			save_arq_bp = cmd->cmd_arq_buf;
 			save_arqcookie = cmd->cmd_arqcookie;
-#ifdef	__sparc
-			save_sg = cmd->cmd_sg;
-#endif	/* __sparc */
 			bzero(cmd, sizeof (*cmd) + scsi_pkt_size());
 			cmd->cmd_dmahandle = save_dma_handle;
 			cmd->cmd_arqhandle = save_arq_dma_handle;
 			cmd->cmd_arq_buf = save_arq_bp;
 			cmd->cmd_arqcookie = save_arqcookie;
-#ifdef	__sparc
-			cmd->cmd_sg = save_sg;
-#endif	/* __sparc */
+
 			pkt = (void *)((uchar_t *)cmd +
 			    sizeof (struct mptsas_cmd));
 			pkt->pkt_ha_private = (opaque_t)cmd;
@@ -3424,11 +3470,9 @@ mptsas_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 	}
 
 
-#ifndef	__sparc
 	/* grab cmd->cmd_cookiec here as oldcookiec */
 
 	oldcookiec = cmd->cmd_cookiec;
-#endif	/* __sparc */
 
 	/*
 	 * If the dma was broken up into PARTIAL transfers cmd_nwin will be
@@ -3578,7 +3622,7 @@ get_dma_cookies:
 		 * We check cmd->cmd_cookiec against oldcookiec so
 		 * the scatter-gather list is correctly allocated
 		 */
-#ifndef	__sparc
+
 		if (oldcookiec != cmd->cmd_cookiec) {
 			if (cmd->cmd_sg != (mptti_t *)NULL) {
 				kmem_free(cmd->cmd_sg, sizeof (mptti_t) *
@@ -3607,7 +3651,7 @@ get_dma_cookies:
 				return ((struct scsi_pkt *)NULL);
 			}
 		}
-#endif	/* __sparc */
+
 		dmap = cmd->cmd_sg;
 
 		ASSERT(cmd->cmd_cookie.dmac_size != 0);
@@ -3687,12 +3731,12 @@ mptsas_scsi_destroy_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
 		(void) ddi_dma_unbind_handle(cmd->cmd_dmahandle);
 		cmd->cmd_flags &= ~CFLAG_DMAVALID;
 	}
-#ifndef	__sparc
+
 	if (cmd->cmd_sg) {
 		kmem_free(cmd->cmd_sg, sizeof (mptti_t) * cmd->cmd_cookiec);
 		cmd->cmd_sg = NULL;
 	}
-#endif	/* __sparc */
+
 	mptsas_free_extra_sgl_frame(mpt, cmd);
 
 	if ((cmd->cmd_flags &
@@ -3770,16 +3814,6 @@ mptsas_kmem_cache_constructor(void *buf, void *cdrarg, int kmflags)
 		cmd->cmd_arq_buf = NULL;
 		return (-1);
 	}
-	/*
-	 * In sparc, the sgl length in most of the cases would be 1, so we
-	 * pre-allocate it in cache. On x86, the max number would be 256,
-	 * pre-allocate a maximum would waste a lot of memory especially
-	 * when many cmds are put onto waitq.
-	 */
-#ifdef	__sparc
-	cmd->cmd_sg = kmem_alloc((size_t)(sizeof (mptti_t)*
-	    MPTSAS_MAX_CMD_SEGS), KM_SLEEP);
-#endif	/* __sparc */
 
 	return (0);
 }
@@ -3807,12 +3841,6 @@ mptsas_kmem_cache_destructor(void *buf, void *cdrarg)
 		ddi_dma_free_handle(&cmd->cmd_dmahandle);
 		cmd->cmd_dmahandle = NULL;
 	}
-#ifdef	__sparc
-	if (cmd->cmd_sg) {
-		kmem_free(cmd->cmd_sg, sizeof (mptti_t)* MPTSAS_MAX_CMD_SEGS);
-		cmd->cmd_sg = NULL;
-	}
-#endif	/* __sparc */
 }
 
 static int
@@ -4474,24 +4502,6 @@ mptsas_poll(mptsas_t *mpt, mptsas_cmd_t *poll_cmd, int polltime)
 
 	NDBG5(("mptsas_poll: cmd=0x%p", (void *)poll_cmd));
 
-	/*
-	 * In order to avoid using m_mutex in ISR(a new separate mutex
-	 * m_intr_mutex is introduced) and keep the same lock logic,
-	 * the m_intr_mutex should be used to protect the getting and
-	 * setting of the ReplyDescriptorIndex.
-	 *
-	 * Since the m_intr_mutex would be released during processing the poll
-	 * cmd, so we should set the poll flag earlier here to make sure the
-	 * polled cmd be handled in this thread/context. A side effect is other
-	 * cmds during the period between the flag set and reset are also
-	 * handled in this thread and not the ISR. Since the poll cmd is not
-	 * so common, so the performance degradation in this case is not a big
-	 * issue.
-	 */
-	mutex_enter(&mpt->m_intr_mutex);
-	mpt->m_polled_intr = 1;
-	mutex_exit(&mpt->m_intr_mutex);
-
 	if ((poll_cmd->cmd_flags & CFLAG_TM_CMD) == 0) {
 		mptsas_restart_hba(mpt);
 	}
@@ -4517,10 +4527,6 @@ mptsas_poll(mptsas_t *mpt, mptsas_cmd_t *poll_cmd, int polltime)
 			break;
 		}
 	}
-
-	mutex_enter(&mpt->m_intr_mutex);
-	mpt->m_polled_intr = 0;
-	mutex_exit(&mpt->m_intr_mutex);
 
 	if (rval == FALSE) {
 
@@ -4558,12 +4564,11 @@ mptsas_wait_intr(mptsas_t *mpt, int polltime)
 {
 	int				cnt;
 	pMpi2ReplyDescriptorsUnion_t	reply_desc_union;
-	Mpi2ReplyDescriptorsUnion_t	reply_desc_union_v;
 	uint32_t			int_mask;
-	uint8_t	reply_type;
 
 	NDBG5(("mptsas_wait_intr"));
 
+	mpt->m_polled_intr = 1;
 
 	/*
 	 * Get the current interrupt mask and disable interrupts.  When
@@ -4576,7 +4581,6 @@ mptsas_wait_intr(mptsas_t *mpt, int polltime)
 	 * Keep polling for at least (polltime * 1000) seconds
 	 */
 	for (cnt = 0; cnt < polltime; cnt++) {
-		mutex_enter(&mpt->m_intr_mutex);
 		(void) ddi_dma_sync(mpt->m_dma_post_queue_hdl, 0, 0,
 		    DDI_DMA_SYNC_FORCPU);
 
@@ -4587,37 +4591,15 @@ mptsas_wait_intr(mptsas_t *mpt, int polltime)
 		    &reply_desc_union->Words.Low) == 0xFFFFFFFF ||
 		    ddi_get32(mpt->m_acc_post_queue_hdl,
 		    &reply_desc_union->Words.High) == 0xFFFFFFFF) {
-			mutex_exit(&mpt->m_intr_mutex);
 			drv_usecwait(1000);
 			continue;
 		}
 
-		reply_type = ddi_get8(mpt->m_acc_post_queue_hdl,
-		    &reply_desc_union->Default.ReplyFlags);
-		reply_type &= MPI2_RPY_DESCRIPT_FLAGS_TYPE_MASK;
-		reply_desc_union_v.Default.ReplyFlags = reply_type;
-		if (reply_type == MPI2_RPY_DESCRIPT_FLAGS_SCSI_IO_SUCCESS) {
-			reply_desc_union_v.SCSIIOSuccess.SMID =
-			    ddi_get16(mpt->m_acc_post_queue_hdl,
-			    &reply_desc_union->SCSIIOSuccess.SMID);
-		} else if (reply_type ==
-		    MPI2_RPY_DESCRIPT_FLAGS_ADDRESS_REPLY) {
-			reply_desc_union_v.AddressReply.ReplyFrameAddress =
-			    ddi_get32(mpt->m_acc_post_queue_hdl,
-			    &reply_desc_union->AddressReply.ReplyFrameAddress);
-			reply_desc_union_v.AddressReply.SMID =
-			    ddi_get16(mpt->m_acc_post_queue_hdl,
-			    &reply_desc_union->AddressReply.SMID);
-		}
 		/*
-		 * Clear the reply descriptor for re-use and increment
-		 * index.
+		 * The reply is valid, process it according to its
+		 * type.
 		 */
-		ddi_put64(mpt->m_acc_post_queue_hdl,
-		    &((uint64_t *)(void *)mpt->m_post_queue)[mpt->m_post_index],
-		    0xFFFFFFFFFFFFFFFF);
-		(void) ddi_dma_sync(mpt->m_dma_post_queue_hdl, 0, 0,
-		    DDI_DMA_SYNC_FORDEV);
+		mptsas_process_intr(mpt, reply_desc_union);
 
 		if (++mpt->m_post_index == mpt->m_post_queue_depth) {
 			mpt->m_post_index = 0;
@@ -4628,14 +4610,7 @@ mptsas_wait_intr(mptsas_t *mpt, int polltime)
 		 */
 		ddi_put32(mpt->m_datap,
 		    &mpt->m_reg->ReplyPostHostIndex, mpt->m_post_index);
-		mutex_exit(&mpt->m_intr_mutex);
-
-		/*
-		 * The reply is valid, process it according to its
-		 * type.
-		 */
-		mptsas_process_intr(mpt, &reply_desc_union_v);
-
+		mpt->m_polled_intr = 0;
 
 		/*
 		 * Re-enable interrupts and quit.
@@ -4649,119 +4624,9 @@ mptsas_wait_intr(mptsas_t *mpt, int polltime)
 	/*
 	 * Clear polling flag, re-enable interrupts and quit.
 	 */
+	mpt->m_polled_intr = 0;
 	ddi_put32(mpt->m_datap, &mpt->m_reg->HostInterruptMask, int_mask);
 	return (FALSE);
-}
-
-/*
- * For fastpath, the m_intr_mutex should be held from the begining to the end,
- * so we only treat those cmds that need not release m_intr_mutex(even just for
- * a moment) as candidate for fast processing. otherwise, we don't handle them
- * and just return, then in ISR, those cmds would be handled later with m_mutex
- * held and m_intr_mutex not held.
- */
-static int
-mptsas_handle_io_fastpath(mptsas_t *mpt,
-    uint16_t SMID)
-{
-	mptsas_slots_t				*slots = mpt->m_active;
-	mptsas_cmd_t				*cmd = NULL;
-	struct scsi_pkt				*pkt;
-
-	/*
-	 * This is a success reply so just complete the IO.  First, do a sanity
-	 * check on the SMID.  The final slot is used for TM requests, which
-	 * would not come into this reply handler.
-	 */
-	if ((SMID == 0) || (SMID > slots->m_n_slots)) {
-		mptsas_log(mpt, CE_WARN, "?Received invalid SMID of %d\n",
-		    SMID);
-		ddi_fm_service_impact(mpt->m_dip, DDI_SERVICE_UNAFFECTED);
-		return (TRUE);
-	}
-
-	cmd = slots->m_slot[SMID];
-
-	/*
-	 * print warning and return if the slot is empty
-	 */
-	if (cmd == NULL) {
-		mptsas_log(mpt, CE_WARN, "?NULL command for successful SCSI IO "
-		    "in slot %d", SMID);
-		return (TRUE);
-	}
-
-	pkt = CMD2PKT(cmd);
-	pkt->pkt_state |= (STATE_GOT_BUS | STATE_GOT_TARGET | STATE_SENT_CMD |
-	    STATE_GOT_STATUS);
-	if (cmd->cmd_flags & CFLAG_DMAVALID) {
-		pkt->pkt_state |= STATE_XFERRED_DATA;
-	}
-	pkt->pkt_resid = 0;
-
-	/*
-	 * If the cmd is a IOC, or a passthrough, then we don't process it in
-	 * fastpath, and later it would be handled by mptsas_process_intr()
-	 * with m_mutex protected.
-	 */
-	if (cmd->cmd_flags & (CFLAG_PASSTHRU | CFLAG_CMDIOC)) {
-		return (FALSE);
-	} else {
-		mptsas_remove_cmd0(mpt, cmd);
-	}
-
-	if (cmd->cmd_flags & CFLAG_RETRY) {
-		/*
-		 * The target returned QFULL or busy, do not add tihs
-		 * pkt to the doneq since the hba will retry
-		 * this cmd.
-		 *
-		 * The pkt has already been resubmitted in
-		 * mptsas_handle_qfull() or in mptsas_check_scsi_io_error().
-		 * Remove this cmd_flag here.
-		 */
-		cmd->cmd_flags &= ~CFLAG_RETRY;
-	} else {
-		mptsas_doneq_add0(mpt, cmd);
-	}
-
-	/*
-	 * In fastpath, the cmd should only be a context reply, so just check
-	 * the post queue of the reply descriptor and the dmahandle of the cmd
-	 * is enough. No sense data in this case and no need to check the dma
-	 * handle where sense data dma info is saved, the dma handle of the
-	 * reply frame, and the dma handle of the reply free queue.
-	 * For the dma handle of the request queue. Check fma here since we
-	 * are sure the request must have already been sent/DMAed correctly.
-	 * otherwise checking in mptsas_scsi_start() is not correct since
-	 * at that time the dma may not start.
-	 */
-	if ((mptsas_check_dma_handle(mpt->m_dma_req_frame_hdl) !=
-	    DDI_SUCCESS) ||
-	    (mptsas_check_dma_handle(mpt->m_dma_post_queue_hdl) !=
-	    DDI_SUCCESS)) {
-		ddi_fm_service_impact(mpt->m_dip,
-		    DDI_SERVICE_UNAFFECTED);
-		pkt->pkt_reason = CMD_TRAN_ERR;
-		pkt->pkt_statistics = 0;
-	}
-	if (cmd->cmd_dmahandle &&
-	    (mptsas_check_dma_handle(cmd->cmd_dmahandle) != DDI_SUCCESS)) {
-		ddi_fm_service_impact(mpt->m_dip, DDI_SERVICE_UNAFFECTED);
-		pkt->pkt_reason = CMD_TRAN_ERR;
-		pkt->pkt_statistics = 0;
-	}
-	if ((cmd->cmd_extra_frames &&
-	    ((mptsas_check_dma_handle(cmd->cmd_extra_frames->m_dma_hdl) !=
-	    DDI_SUCCESS) ||
-	    (mptsas_check_acc_handle(cmd->cmd_extra_frames->m_acc_hdl) !=
-	    DDI_SUCCESS)))) {
-		ddi_fm_service_impact(mpt->m_dip, DDI_SERVICE_UNAFFECTED);
-		pkt->pkt_reason = CMD_TRAN_ERR;
-		pkt->pkt_statistics = 0;
-	}
-
-	return (TRUE);
 }
 
 static void
@@ -4774,8 +4639,10 @@ mptsas_handle_scsi_io_success(mptsas_t *mpt,
 	mptsas_cmd_t				*cmd = NULL;
 	struct scsi_pkt				*pkt;
 
+	ASSERT(mutex_owned(&mpt->m_mutex));
+
 	scsi_io_success = (pMpi2SCSIIOSuccessReplyDescriptor_t)reply_desc;
-	SMID = scsi_io_success->SMID;
+	SMID = ddi_get16(mpt->m_acc_post_queue_hdl, &scsi_io_success->SMID);
 
 	/*
 	 * This is a success reply so just complete the IO.  First, do a sanity
@@ -4850,9 +4717,10 @@ mptsas_handle_address_reply(mptsas_t *mpt,
 	ASSERT(mutex_owned(&mpt->m_mutex));
 
 	address_reply = (pMpi2AddressReplyDescriptor_t)reply_desc;
+	reply_addr = ddi_get32(mpt->m_acc_post_queue_hdl,
+	    &address_reply->ReplyFrameAddress);
+	SMID = ddi_get16(mpt->m_acc_post_queue_hdl, &address_reply->SMID);
 
-	reply_addr = address_reply->ReplyFrameAddress;
-	SMID = address_reply->SMID;
 	/*
 	 * If reply frame is not in the proper range we should ignore this
 	 * message and exit the interrupt handler.
@@ -5112,12 +4980,10 @@ mptsas_check_scsi_io_error(mptsas_t *mpt, pMpi2SCSIIOReply_t reply,
 	    MPI2_IOCSTATUS_SCSI_DEVICE_NOT_THERE)) {
 		pkt->pkt_reason = CMD_INCOMPLETE;
 		pkt->pkt_state |= STATE_GOT_BUS;
-		mutex_enter(&ptgt->m_tgt_intr_mutex);
 		if (ptgt->m_reset_delay == 0) {
 			mptsas_set_throttle(mpt, ptgt,
 			    DRAIN_THROTTLE);
 		}
-		mutex_exit(&ptgt->m_tgt_intr_mutex);
 		return;
 	}
 
@@ -5217,11 +5083,9 @@ mptsas_check_scsi_io_error(mptsas_t *mpt, pMpi2SCSIIOReply_t reply,
 		case MPI2_IOCSTATUS_SCSI_DEVICE_NOT_THERE:
 			pkt->pkt_reason = CMD_DEV_GONE;
 			pkt->pkt_state |= STATE_GOT_BUS;
-			mutex_enter(&ptgt->m_tgt_intr_mutex);
 			if (ptgt->m_reset_delay == 0) {
 				mptsas_set_throttle(mpt, ptgt, DRAIN_THROTTLE);
 			}
-			mutex_exit(&ptgt->m_tgt_intr_mutex);
 			NDBG31(("lost disk for target%d, command:%x",
 			    Tgt(cmd), pkt->pkt_cdbp[0]));
 			break;
@@ -5268,9 +5132,7 @@ mptsas_check_scsi_io_error(mptsas_t *mpt, pMpi2SCSIIOReply_t reply,
 			ptgt = (mptsas_target_t *)mptsas_hash_traverse(
 			    &mpt->m_active->m_tgttbl, MPTSAS_HASH_FIRST);
 			while (ptgt != NULL) {
-				mutex_enter(&ptgt->m_tgt_intr_mutex);
 				mptsas_set_throttle(mpt, ptgt, DRAIN_THROTTLE);
-				mutex_exit(&ptgt->m_tgt_intr_mutex);
 
 				ptgt = (mptsas_target_t *)mptsas_hash_traverse(
 				    &mpt->m_active->m_tgttbl, MPTSAS_HASH_NEXT);
@@ -5282,9 +5144,7 @@ mptsas_check_scsi_io_error(mptsas_t *mpt, pMpi2SCSIIOReply_t reply,
 			cmd->cmd_flags |= CFLAG_RETRY;
 			cmd->cmd_pkt_flags |= FLAG_HEAD;
 
-			mutex_exit(&mpt->m_mutex);
 			(void) mptsas_accept_pkt(mpt, cmd);
-			mutex_enter(&mpt->m_mutex);
 			break;
 		default:
 			mptsas_log(mpt, CE_WARN,
@@ -5399,6 +5259,7 @@ mptsas_doneq_thread(mptsas_doneq_thread_arg_t *arg)
 	mutex_exit(&mpt->m_doneq_mutex);
 }
 
+
 /*
  * mpt interrupt handler.
  */
@@ -5408,189 +5269,10 @@ mptsas_intr(caddr_t arg1, caddr_t arg2)
 	mptsas_t			*mpt = (void *)arg1;
 	pMpi2ReplyDescriptorsUnion_t	reply_desc_union;
 	uchar_t				did_reply = FALSE;
-	int				i = 0, j;
-	uint8_t				reply_type;
-	uint16_t			SMID;
 
 	NDBG1(("mptsas_intr: arg1 0x%p arg2 0x%p", (void *)arg1, (void *)arg2));
 
-	/*
-	 * 1.
-	 * To avoid using m_mutex in the ISR(ISR referes not only mptsas_intr,
-	 * but all of the recursive called functions in it. the same below),
-	 * separate mutexs are introduced to protect the elements shown in ISR.
-	 * 3 type of mutex are involved here:
-	 *	a)per instance mutex m_intr_mutex.
-	 *	b)per target mutex m_tgt_intr_mutex.
-	 *	c)mutex that protect the free slot.
-	 *
-	 * a)per instance mutex m_intr_mutex:
-	 * used to protect m_options, m_power, m_waitq, etc that would be
-	 * checked/modified in ISR; protect the getting and setting the reply
-	 * descriptor index; protect the m_slots[];
-	 *
-	 * b)per target mutex m_tgt_intr_mutex:
-	 * used to protect per target element which has relationship to ISR.
-	 * contention for the new per target mutex is just as high as it in
-	 * sd(7d) driver.
-	 *
-	 * c)mutexs that protect the free slots:
-	 * those mutexs are introduced to minimize the mutex contentions
-	 * between the IO request threads where free slots are allocated
-	 * for sending cmds and ISR where slots holding outstanding cmds
-	 * are returned to the free pool.
-	 * the idea is like this:
-	 * 1) Partition all of the free slot into NCPU groups. For example,
-	 * In system where we have 15 slots, and 4 CPU, then slot s1,s5,s9,s13
-	 * are marked belonging to CPU1, s2,s6,s10,s14 to CPU2, s3,s7,s11,s15
-	 * to CPU3, and s4,s8,s12 to CPU4.
-	 * 2) In each of the group, an alloc/release queue pair is created,
-	 * and both the allocq and the releaseq have a dedicated mutex.
-	 * 3) When init, all of the slots in a CPU group are inserted into the
-	 * allocq of its CPU's pair.
-	 * 4) When doing IO,
-	 * mptsas_scsi_start()
-	 * {
-	 *	cpuid = the cpu NO of the cpu where this thread is running on
-	 * retry:
-	 *	mutex_enter(&allocq[cpuid]);
-	 *	if (get free slot = success) {
-	 *		remove the slot from the allocq
-	 *		mutex_exit(&allocq[cpuid]);
-	 *		return(success);
-	 *	} else { // exchange allocq and releaseq and try again
-	 *		mutex_enter(&releq[cpuid]);
-	 *		exchange the allocq and releaseq of this pair;
-	 *		mutex_exit(&releq[cpuid]);
-	 *		if (try to get free slot again = success) {
-	 *			remove the slot from the allocq
-	 *			mutex_exit(&allocq[cpuid]);
-	 *			return(success);
-	 *		} else {
-	 *			MOD(cpuid)++;
-	 *			goto retry;
-	 *			if (all CPU groups tried)
-	 *				mutex_exit(&allocq[cpuid]);
-	 *				return(failure);
-	 *		}
-	 *	}
-	 * }
-	 * ISR()
-	 * {
-	 *		cpuid = the CPU group id where the slot sending the
-	 * 		cmd belongs;
-	 *		mutex_enter(&releq[cpuid]);
-	 *		remove the slot from the releaseq
-	 *		mutex_exit(&releq[cpuid]);
-	 * }
-	 * This way, only when the queue pair doing exchange have mutex
-	 * contentions.
-	 *
-	 * For mutex m_intr_mutex and m_tgt_intr_mutex, there are 2 scenarios:
-	 *
-	 * a)If the elements are only checked but not modified in the ISR, then
-	 * only the places where those elements are modifed(outside of ISR)
-	 * need to be protected by the new introduced mutex.
-	 * For example, data A is only read/checked in ISR, then we need do
-	 * like this:
-	 * In ISR:
-	 * {
-	 *	mutex_enter(&new_mutex);
-	 * 	read(A);
-	 *	mutex_exit(&new_mutex);
-	 *	//the new_mutex here is either the m_tgt_intr_mutex or
-	 *	//the m_intr_mutex.
-	 * }
-	 * In non-ISR
-	 * {
-	 *	mutex_enter(&m_mutex); //the stock driver already did this
-	 *	mutex_enter(&new_mutex);
-	 * 	write(A);
-	 *	mutex_exit(&new_mutex);
-	 *	mutex_exit(&m_mutex); //the stock driver already did this
-	 *
-	 *	read(A);
-	 *	// read(A) in non-ISR is not required to be protected by new
-	 *	// mutex since 'A' has already been protected by m_mutex
-	 *	// outside of the ISR
-	 * }
-	 *
-	 * Those fields in mptsas_target_t/ptgt which are only read in ISR
-	 * fall into this catergory. So they, together with the fields which
-	 * are never read in ISR, are not necessary to be protected by
-	 * m_tgt_intr_mutex, don't bother.
-	 * checking of m_waitq also falls into this catergory. so all of the
-	 * place outside of ISR where the m_waitq is modified, such as in
-	 * mptsas_waitq_add(), mptsas_waitq_delete(), mptsas_waitq_rm(),
-	 * m_intr_mutex should be used.
-	 *
-	 * b)If the elements are modified in the ISR, then each place where
-	 * those elements are referred(outside of ISR) need to be protected
-	 * by the new introduced mutex. Of course, if those elements only
-	 * appear in the non-key code path, that is, they don't affect
-	 * performance, then the m_mutex can still be used as before.
-	 * For example, data B is modified in key code path in ISR, and data C
-	 * is modified in non-key code path in ISR, then we can do like this:
-	 * In ISR:
-	 * {
-	 *	mutex_enter(&new_mutex);
-	 * 	wirte(B);
-	 *	mutex_exit(&new_mutex);
-	 *	if (seldom happen) {
-	 *		mutex_enter(&m_mutex);
-	 *		write(C);
-	 *		mutex_exit(&m_mutex);
-	 *	}
-	 *	//the new_mutex here is either the m_tgt_intr_mutex or
-	 *	//the m_intr_mutex.
-	 * }
-	 * In non-ISR
-	 * {
-	 *	mutex_enter(&new_mutex);
-	 * 	write(B);
-	 *	mutex_exit(&new_mutex);
-	 *
-	 *	mutex_enter(&new_mutex);
-	 *	read(B);
-	 *	mutex_exit(&new_mutex);
-	 *	// both write(B) and read(B) in non-ISR is required to be
-	 *	// protected by new mutex outside of the ISR
-	 *
-	 *	mutex_enter(&m_mutex); //the stock driver already did this
-	 *	read(C);
-	 *	write(C);
-	 *	mutex_exit(&m_mutex); //the stock driver already did this
-	 *	// both write(C) and read(C) in non-ISR have been already
-	 *	// been protected by m_mutex outside of the ISR
-	 * }
-	 *
-	 * For example, ptgt->m_t_ncmds fall into 'B' of this catergory, and
-	 * elements shown in address reply, restart_hba, passthrough, IOC
-	 * fall into 'C' of  this catergory.
-	 *
-	 * In any case where mutexs are nested, make sure in the following
-	 * order:
-	 *	m_mutex -> m_intr_mutex -> m_tgt_intr_mutex
-	 *	m_intr_mutex -> m_tgt_intr_mutex
-	 *	m_mutex -> m_intr_mutex
-	 *	m_mutex -> m_tgt_intr_mutex
-	 *
-	 * 2.
-	 * Make sure at any time, getting the ReplyDescriptor by m_post_index
-	 * and setting m_post_index to the ReplyDescriptorIndex register are
-	 * atomic. Since m_mutex is not used for this purpose in ISR, the new
-	 * mutex m_intr_mutex must play this role. So mptsas_poll(), where this
-	 * kind of getting/setting is also performed, must use m_intr_mutex.
-	 * Note, since context reply in ISR/process_intr is the only code path
-	 * which affect performance, a fast path is introduced to only handle
-	 * the read/write IO having context reply. For other IOs such as
-	 * passthrough and IOC with context reply and all address reply, we
-	 * use the as-is process_intr() to handle them. In order to keep the
-	 * same semantics in process_intr(), make sure any new mutex is not held
-	 * before enterring it.
-	 */
-
-	mutex_enter(&mpt->m_intr_mutex);
+	mutex_enter(&mpt->m_mutex);
 
 	/*
 	 * If interrupts are shared by two channels then check whether this
@@ -5599,7 +5281,7 @@ mptsas_intr(caddr_t arg1, caddr_t arg2)
 	 */
 	if ((mpt->m_options & MPTSAS_OPT_PM) &&
 	    (mpt->m_power_level != PM_LEVEL_D0)) {
-		mutex_exit(&mpt->m_intr_mutex);
+		mutex_exit(&mpt->m_mutex);
 		return (DDI_INTR_UNCLAIMED);
 	}
 
@@ -5610,7 +5292,7 @@ mptsas_intr(caddr_t arg1, caddr_t arg2)
 	 * return with interrupt unclaimed.
 	 */
 	if (mpt->m_polled_intr) {
-		mutex_exit(&mpt->m_intr_mutex);
+		mutex_exit(&mpt->m_mutex);
 		mptsas_log(mpt, CE_WARN, "mpt_sas: Unclaimed interrupt");
 		return (DDI_INTR_UNCLAIMED);
 	}
@@ -5645,40 +5327,7 @@ mptsas_intr(caddr_t arg1, caddr_t arg2)
 			 */
 			did_reply = TRUE;
 
-			reply_type = ddi_get8(mpt->m_acc_post_queue_hdl,
-			    &reply_desc_union->Default.ReplyFlags);
-			reply_type &= MPI2_RPY_DESCRIPT_FLAGS_TYPE_MASK;
-			mpt->m_reply[i].Default.ReplyFlags = reply_type;
-			if (reply_type ==
-			    MPI2_RPY_DESCRIPT_FLAGS_SCSI_IO_SUCCESS) {
-				SMID = ddi_get16(mpt->m_acc_post_queue_hdl,
-				    &reply_desc_union->SCSIIOSuccess.SMID);
-				if (mptsas_handle_io_fastpath(mpt, SMID) !=
-				    TRUE) {
-					mpt->m_reply[i].SCSIIOSuccess.SMID =
-					    SMID;
-					i++;
-				}
-			} else if (reply_type ==
-			    MPI2_RPY_DESCRIPT_FLAGS_ADDRESS_REPLY) {
-				mpt->m_reply[i].AddressReply.ReplyFrameAddress =
-				    ddi_get32(mpt->m_acc_post_queue_hdl,
-				    &reply_desc_union->AddressReply.
-				    ReplyFrameAddress);
-				mpt->m_reply[i].AddressReply.SMID =
-				    ddi_get16(mpt->m_acc_post_queue_hdl,
-				    &reply_desc_union->AddressReply.SMID);
-				i++;
-			}
-			/*
-			 * Clear the reply descriptor for re-use and increment
-			 * index.
-			 */
-			ddi_put64(mpt->m_acc_post_queue_hdl,
-			    &((uint64_t *)(void *)mpt->m_post_queue)
-			    [mpt->m_post_index], 0xFFFFFFFFFFFFFFFF);
-			(void) ddi_dma_sync(mpt->m_dma_post_queue_hdl, 0, 0,
-			    DDI_DMA_SYNC_FORDEV);
+			mptsas_process_intr(mpt, reply_desc_union);
 
 			/*
 			 * Increment post index and roll over if needed.
@@ -5686,8 +5335,6 @@ mptsas_intr(caddr_t arg1, caddr_t arg2)
 			if (++mpt->m_post_index == mpt->m_post_queue_depth) {
 				mpt->m_post_index = 0;
 			}
-			if (i >= MPI_ADDRESS_COALSCE_MAX)
-				break;
 		}
 
 		/*
@@ -5697,43 +5344,12 @@ mptsas_intr(caddr_t arg1, caddr_t arg2)
 		if (did_reply) {
 			ddi_put32(mpt->m_datap,
 			    &mpt->m_reg->ReplyPostHostIndex, mpt->m_post_index);
-
-			/*
-			 * For fma, only check the PIO is required and enough
-			 * here. Those cases where fastpath is not hit, the
-			 * mptsas_fma_check() check all of the types of
-			 * fma. That is not necessary and sometimes not
-			 * correct. fma check should only be done after
-			 * the PIO and/or dma is performed.
-			 */
-			if ((mptsas_check_acc_handle(mpt->m_datap) !=
-			    DDI_SUCCESS)) {
-				ddi_fm_service_impact(mpt->m_dip,
-				    DDI_SERVICE_UNAFFECTED);
-			}
-
 		}
 	} else {
-		mutex_exit(&mpt->m_intr_mutex);
+		mutex_exit(&mpt->m_mutex);
 		return (DDI_INTR_UNCLAIMED);
 	}
 	NDBG1(("mptsas_intr complete"));
-	mutex_exit(&mpt->m_intr_mutex);
-
-	/*
-	 * Since most of the cmds(read and write IO with success return.)
-	 * have already been processed in fast path in which the m_mutex
-	 * is not held, handling here the address reply and other context reply
-	 * such as passthrough and IOC cmd with m_mutex held should be a big
-	 * issue for performance.
-	 * If holding m_mutex to process these cmds was still an obvious issue,
-	 * we can process them in a taskq.
-	 */
-	for (j = 0; j < i; j++) {
-		mutex_enter(&mpt->m_mutex);
-		mptsas_process_intr(mpt, &mpt->m_reply[j]);
-		mutex_exit(&mpt->m_mutex);
-	}
 
 	/*
 	 * If no helper threads are created, process the doneq in ISR. If
@@ -5743,55 +5359,40 @@ mptsas_intr(caddr_t arg1, caddr_t arg2)
 	 * This measurement has some limitations, although it is simple and
 	 * straightforward and works well for most of the cases at present.
 	 */
-	if (!mpt->m_doneq_thread_n) {
+	if (!mpt->m_doneq_thread_n ||
+	    (mpt->m_doneq_len <= mpt->m_doneq_length_threshold)) {
 		mptsas_doneq_empty(mpt);
 	} else {
-		int helper = 1;
-		mutex_enter(&mpt->m_intr_mutex);
-		if (mpt->m_doneq_len <= mpt->m_doneq_length_threshold)
-			helper = 0;
-		mutex_exit(&mpt->m_intr_mutex);
-		if (helper) {
-			mptsas_deliver_doneq_thread(mpt);
-		} else {
-			mptsas_doneq_empty(mpt);
-		}
+		mptsas_deliver_doneq_thread(mpt);
 	}
 
 	/*
 	 * If there are queued cmd, start them now.
 	 */
-	mutex_enter(&mpt->m_intr_mutex);
 	if (mpt->m_waitq != NULL) {
-		mutex_exit(&mpt->m_intr_mutex);
-		mutex_enter(&mpt->m_mutex);
-		mptsas_restart_hba(mpt);
-		mutex_exit(&mpt->m_mutex);
-		return (DDI_INTR_CLAIMED);
+		mptsas_restart_waitq(mpt);
 	}
-	mutex_exit(&mpt->m_intr_mutex);
+
+	mutex_exit(&mpt->m_mutex);
 	return (DDI_INTR_CLAIMED);
 }
 
-/*
- * In ISR, the successfully completed read and write IO are processed in a
- * fast path. This function is only used to handle non-fastpath IO, including
- * all of the address reply, and the context reply for IOC cmd, passthrough,
- * etc.
- * This function is also used to process polled cmd.
- */
 static void
 mptsas_process_intr(mptsas_t *mpt,
     pMpi2ReplyDescriptorsUnion_t reply_desc_union)
 {
 	uint8_t	reply_type;
 
+	ASSERT(mutex_owned(&mpt->m_mutex));
+
 	/*
 	 * The reply is valid, process it according to its
 	 * type.  Also, set a flag for updated the reply index
 	 * after they've all been processed.
 	 */
-	reply_type = reply_desc_union->Default.ReplyFlags;
+	reply_type = ddi_get8(mpt->m_acc_post_queue_hdl,
+	    &reply_desc_union->Default.ReplyFlags);
+	reply_type &= MPI2_RPY_DESCRIPT_FLAGS_TYPE_MASK;
 	if (reply_type == MPI2_RPY_DESCRIPT_FLAGS_SCSI_IO_SUCCESS) {
 		mptsas_handle_scsi_io_success(mpt, reply_desc_union);
 	} else if (reply_type == MPI2_RPY_DESCRIPT_FLAGS_ADDRESS_REPLY) {
@@ -5800,6 +5401,16 @@ mptsas_process_intr(mptsas_t *mpt,
 		mptsas_log(mpt, CE_WARN, "?Bad reply type %x", reply_type);
 		ddi_fm_service_impact(mpt->m_dip, DDI_SERVICE_UNAFFECTED);
 	}
+
+	/*
+	 * Clear the reply descriptor for re-use and increment
+	 * index.
+	 */
+	ddi_put64(mpt->m_acc_post_queue_hdl,
+	    &((uint64_t *)(void *)mpt->m_post_queue)[mpt->m_post_index],
+	    0xFFFFFFFFFFFFFFFF);
+	(void) ddi_dma_sync(mpt->m_dma_post_queue_hdl, 0, 0,
+	    DDI_DMA_SYNC_FORDEV);
 }
 
 /*
@@ -5821,24 +5432,18 @@ mptsas_handle_qfull(mptsas_t *mpt, mptsas_cmd_t *cmd)
 		 * to kick in. We do this by having pkt_reason
 		 * as CMD_CMPLT and pkt_scbp as STATUS_QFULL.
 		 */
-		mutex_enter(&ptgt->m_tgt_intr_mutex);
 		mptsas_set_throttle(mpt, ptgt, DRAIN_THROTTLE);
-		mutex_exit(&ptgt->m_tgt_intr_mutex);
 	} else {
-		mutex_enter(&ptgt->m_tgt_intr_mutex);
 		if (ptgt->m_reset_delay == 0) {
 			ptgt->m_t_throttle =
 			    max((ptgt->m_t_ncmds - 2), 0);
 		}
-		mutex_exit(&ptgt->m_tgt_intr_mutex);
 
 		cmd->cmd_pkt_flags |= FLAG_HEAD;
 		cmd->cmd_flags &= ~(CFLAG_TRANFLAG);
 		cmd->cmd_flags |= CFLAG_RETRY;
 
-		mutex_exit(&mpt->m_mutex);
 		(void) mptsas_accept_pkt(mpt, cmd);
-		mutex_enter(&mpt->m_mutex);
 
 		/*
 		 * when target gives queue full status with no commands
@@ -5847,7 +5452,6 @@ mptsas_handle_qfull(mptsas_t *mpt, mptsas_cmd_t *cmd)
 		 * (see psarc/1994/313); if there are commands outstanding,
 		 * throttle is set to (m_t_ncmds - 2)
 		 */
-		mutex_enter(&ptgt->m_tgt_intr_mutex);
 		if (ptgt->m_t_throttle == HOLD_THROTTLE) {
 			/*
 			 * By setting throttle to QFULL_THROTTLE, we
@@ -5862,7 +5466,6 @@ mptsas_handle_qfull(mptsas_t *mpt, mptsas_cmd_t *cmd)
 				    ptgt->m_qfull_retry_interval);
 			}
 		}
-		mutex_exit(&ptgt->m_tgt_intr_mutex);
 	}
 }
 
@@ -6465,11 +6068,11 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 			 * PHCI driver since failover finished.
 			 * Invalidate the devhdl
 			 */
-			mutex_enter(&ptgt->m_tgt_intr_mutex);
 			ptgt->m_devhdl = MPTSAS_INVALID_DEVHDL;
 			ptgt->m_tgt_unconfigured = 0;
+			mutex_enter(&mpt->m_tx_waitq_mutex);
 			ptgt->m_dr_flag = MPTSAS_DR_INACTIVE;
-			mutex_exit(&ptgt->m_tgt_intr_mutex);
+			mutex_exit(&mpt->m_tx_waitq_mutex);
 		}
 
 		/*
@@ -7015,14 +6618,15 @@ mptsas_handle_event_sync(void *args)
 				/*
 				 * Update DR flag immediately avoid I/O failure
 				 * before failover finish. Pay attention to the
-				 * mutex protect, we need grab the per target
-				 * mutex during set m_dr_flag because the
-				 * m_mutex would not be held all the time in
-				 * mptsas_scsi_start().
+				 * mutex protect, we need grab m_tx_waitq_mutex
+				 * during set m_dr_flag because we won't add
+				 * the following command into waitq, instead,
+				 * we need return TRAN_BUSY in the tran_start
+				 * context.
 				 */
-				mutex_enter(&ptgt->m_tgt_intr_mutex);
+				mutex_enter(&mpt->m_tx_waitq_mutex);
 				ptgt->m_dr_flag = MPTSAS_DR_INTRANSITION;
-				mutex_exit(&ptgt->m_tgt_intr_mutex);
+				mutex_exit(&mpt->m_tx_waitq_mutex);
 
 				topo_node = kmem_zalloc(
 				    sizeof (mptsas_topo_change_list_t),
@@ -7255,9 +6859,9 @@ mptsas_handle_event_sync(void *args)
 				/*
 				 * Update DR flag immediately avoid I/O failure
 				 */
-				mutex_enter(&ptgt->m_tgt_intr_mutex);
+				mutex_enter(&mpt->m_tx_waitq_mutex);
 				ptgt->m_dr_flag = MPTSAS_DR_INTRANSITION;
-				mutex_exit(&ptgt->m_tgt_intr_mutex);
+				mutex_exit(&mpt->m_tx_waitq_mutex);
 
 				topo_node = kmem_zalloc(
 				    sizeof (mptsas_topo_change_list_t),
@@ -7289,9 +6893,9 @@ mptsas_handle_event_sync(void *args)
 				/*
 				 * Update DR flag immediately avoid I/O failure
 				 */
-				mutex_enter(&ptgt->m_tgt_intr_mutex);
+				mutex_enter(&mpt->m_tx_waitq_mutex);
 				ptgt->m_dr_flag = MPTSAS_DR_INTRANSITION;
-				mutex_exit(&ptgt->m_tgt_intr_mutex);
+				mutex_exit(&mpt->m_tx_waitq_mutex);
 
 				topo_node = kmem_zalloc(
 				    sizeof (mptsas_topo_change_list_t),
@@ -7946,14 +7550,12 @@ mptsas_restart_cmd(void *arg)
 	ptgt = (mptsas_target_t *)mptsas_hash_traverse(&mpt->m_active->m_tgttbl,
 	    MPTSAS_HASH_FIRST);
 	while (ptgt != NULL) {
-		mutex_enter(&ptgt->m_tgt_intr_mutex);
 		if (ptgt->m_reset_delay == 0) {
 			if (ptgt->m_t_throttle == QFULL_THROTTLE) {
 				mptsas_set_throttle(mpt, ptgt,
 				    MAX_THROTTLE);
 			}
 		}
-		mutex_exit(&ptgt->m_tgt_intr_mutex);
 
 		ptgt = (mptsas_target_t *)mptsas_hash_traverse(
 		    &mpt->m_active->m_tgttbl, MPTSAS_HASH_NEXT);
@@ -7962,40 +7564,13 @@ mptsas_restart_cmd(void *arg)
 	mutex_exit(&mpt->m_mutex);
 }
 
-/*
- * mptsas_remove_cmd0 is similar to mptsas_remove_cmd except that it is called
- * where m_intr_mutex has already been held.
- */
 void
 mptsas_remove_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd)
-{
-	ASSERT(mutex_owned(&mpt->m_mutex));
-
-	/*
-	 * With new fine-grained lock mechanism, the outstanding cmd is only
-	 * linked to m_active before the dma is triggerred(MPTSAS_START_CMD)
-	 * to send it. that is, mptsas_save_cmd() doesn't link the outstanding
-	 * cmd now. So when mptsas_remove_cmd is called, a mptsas_save_cmd must
-	 * have been called, but the cmd may have not been linked.
-	 * For mptsas_remove_cmd0, the cmd must have been linked.
-	 * In order to keep the same semantic, we link the cmd to the
-	 * outstanding cmd list.
-	 */
-	mpt->m_active->m_slot[cmd->cmd_slot] = cmd;
-
-	mutex_enter(&mpt->m_intr_mutex);
-	mptsas_remove_cmd0(mpt, cmd);
-	mutex_exit(&mpt->m_intr_mutex);
-}
-
-static inline void
-mptsas_remove_cmd0(mptsas_t *mpt, mptsas_cmd_t *cmd)
 {
 	int		slot;
 	mptsas_slots_t	*slots = mpt->m_active;
 	int		t;
 	mptsas_target_t	*ptgt = cmd->cmd_tgt_addr;
-	mptsas_slot_free_e_t	*pe;
 
 	ASSERT(cmd != NULL);
 	ASSERT(cmd->cmd_queued == FALSE);
@@ -8010,52 +7585,37 @@ mptsas_remove_cmd0(mptsas_t *mpt, mptsas_cmd_t *cmd)
 
 	t = Tgt(cmd);
 	slot = cmd->cmd_slot;
-	pe = mpt->m_slot_free_ae + slot - 1;
-	ASSERT(cmd == slots->m_slot[slot]);
-	ASSERT((slot > 0) && slot < (mpt->m_max_requests - 1));
 
 	/*
 	 * remove the cmd.
 	 */
-	mutex_enter(&mpt->m_slot_freeq_pairp[pe->cpuid].
-	    m_slot_releq.s.m_fq_mutex);
-	NDBG31(("mptsas_remove_cmd0: removing cmd=0x%p", (void *)cmd));
-	slots->m_slot[slot] = NULL;
-	ASSERT(pe->slot == slot);
-	list_insert_tail(&mpt->m_slot_freeq_pairp[pe->cpuid].
-	    m_slot_releq.s.m_fq_list, pe);
-	mpt->m_slot_freeq_pairp[pe->cpuid].m_slot_releq.s.m_fq_n++;
-	ASSERT(mpt->m_slot_freeq_pairp[pe->cpuid].
-	    m_slot_releq.s.m_fq_n <= mpt->m_max_requests - 2);
-	mutex_exit(&mpt->m_slot_freeq_pairp[pe->cpuid].
-	    m_slot_releq.s.m_fq_mutex);
+	if (cmd == slots->m_slot[slot]) {
+		NDBG31(("mptsas_remove_cmd: removing cmd=0x%p", (void *)cmd));
+		slots->m_slot[slot] = NULL;
+		mpt->m_ncmds--;
 
-	/*
-	 * only decrement per target ncmds if command
-	 * has a target associated with it.
-	 */
-	if ((cmd->cmd_flags & CFLAG_CMDIOC) == 0) {
-		mutex_enter(&ptgt->m_tgt_intr_mutex);
-		ptgt->m_t_ncmds--;
 		/*
-		 * reset throttle if we just ran an untagged command
-		 * to a tagged target
+		 * only decrement per target ncmds if command
+		 * has a target associated with it.
 		 */
-		if ((ptgt->m_t_ncmds == 0) &&
-		    ((cmd->cmd_pkt_flags & FLAG_TAGMASK) == 0)) {
-			mptsas_set_throttle(mpt, ptgt, MAX_THROTTLE);
+		if ((cmd->cmd_flags & CFLAG_CMDIOC) == 0) {
+			ptgt->m_t_ncmds--;
+			/*
+			 * reset throttle if we just ran an untagged command
+			 * to a tagged target
+			 */
+			if ((ptgt->m_t_ncmds == 0) &&
+			    ((cmd->cmd_pkt_flags & FLAG_TAGMASK) == 0)) {
+				mptsas_set_throttle(mpt, ptgt, MAX_THROTTLE);
+			}
 		}
-		mutex_exit(&ptgt->m_tgt_intr_mutex);
+
 	}
 
 	/*
 	 * This is all we need to do for ioc commands.
-	 * The ioc cmds would never be handled in fastpath in ISR, so we make
-	 * sure the mptsas_return_to_pool() would always be called with
-	 * m_mutex protected.
 	 */
 	if (cmd->cmd_flags & CFLAG_CMDIOC) {
-		ASSERT(mutex_owned(&mpt->m_mutex));
 		mptsas_return_to_pool(mpt, cmd);
 		return;
 	}
@@ -8072,7 +7632,6 @@ mptsas_remove_cmd0(mptsas_t *mpt, mptsas_cmd_t *cmd)
 	 * going to take a while...
 	 * Add 1 to m_n_slots to account for TM request.
 	 */
-	mutex_enter(&ptgt->m_tgt_intr_mutex);
 	if (cmd->cmd_pkt->pkt_time == ptgt->m_timebase) {
 		if (--(ptgt->m_dups) == 0) {
 			if (ptgt->m_t_ncmds) {
@@ -8106,19 +7665,40 @@ mptsas_remove_cmd0(mptsas_t *mpt, mptsas_cmd_t *cmd)
 	ptgt->m_timeout = ptgt->m_timebase;
 
 	ASSERT(cmd != slots->m_slot[cmd->cmd_slot]);
-	mutex_exit(&ptgt->m_tgt_intr_mutex);
 }
 
 /*
+ * accept all cmds on the tx_waitq if any and then
  * start a fresh request from the top of the device queue.
+ *
+ * since there are always cmds queued on the tx_waitq, and rare cmds on
+ * the instance waitq, so this function should not be invoked in the ISR,
+ * the mptsas_restart_waitq() is invoked in the ISR instead. otherwise, the
+ * burden belongs to the IO dispatch CPUs is moved the interrupt CPU.
  */
 static void
 mptsas_restart_hba(mptsas_t *mpt)
 {
+	ASSERT(mutex_owned(&mpt->m_mutex));
+
+	mutex_enter(&mpt->m_tx_waitq_mutex);
+	if (mpt->m_tx_waitq) {
+		mptsas_accept_tx_waitq(mpt);
+	}
+	mutex_exit(&mpt->m_tx_waitq_mutex);
+	mptsas_restart_waitq(mpt);
+}
+
+/*
+ * start a fresh request from the top of the device queue
+ */
+static void
+mptsas_restart_waitq(mptsas_t *mpt)
+{
 	mptsas_cmd_t	*cmd, *next_cmd;
 	mptsas_target_t *ptgt = NULL;
 
-	NDBG1(("mptsas_restart_hba: mpt=0x%p", (void *)mpt));
+	NDBG1(("mptsas_restart_waitq: mpt=0x%p", (void *)mpt));
 
 	ASSERT(mutex_owned(&mpt->m_mutex));
 
@@ -8173,244 +7753,65 @@ mptsas_restart_hba(mptsas_t *mpt)
 		}
 
 		ptgt = cmd->cmd_tgt_addr;
-		if (ptgt) {
-			mutex_enter(&mpt->m_intr_mutex);
-			mutex_enter(&ptgt->m_tgt_intr_mutex);
-			if ((ptgt->m_t_throttle == DRAIN_THROTTLE) &&
-			    (ptgt->m_t_ncmds == 0)) {
-				mptsas_set_throttle(mpt, ptgt, MAX_THROTTLE);
-			}
-			if ((ptgt->m_reset_delay == 0) &&
-			    (ptgt->m_t_ncmds < ptgt->m_t_throttle)) {
-				mutex_exit(&ptgt->m_tgt_intr_mutex);
-				mutex_exit(&mpt->m_intr_mutex);
-				if (mptsas_save_cmd(mpt, cmd) == TRUE) {
-					mptsas_waitq_delete(mpt, cmd);
-					(void) mptsas_start_cmd(mpt, cmd);
-				}
-				goto out;
-			}
-			mutex_exit(&ptgt->m_tgt_intr_mutex);
-			mutex_exit(&mpt->m_intr_mutex);
+		if (ptgt && (ptgt->m_t_throttle == DRAIN_THROTTLE) &&
+		    (ptgt->m_t_ncmds == 0)) {
+			mptsas_set_throttle(mpt, ptgt, MAX_THROTTLE);
 		}
-out:
+		if ((mpt->m_ncmds <= (mpt->m_max_requests - 2)) &&
+		    (ptgt && (ptgt->m_reset_delay == 0)) &&
+		    (ptgt && (ptgt->m_t_ncmds <
+		    ptgt->m_t_throttle))) {
+			if (mptsas_save_cmd(mpt, cmd) == TRUE) {
+				mptsas_waitq_delete(mpt, cmd);
+				(void) mptsas_start_cmd(mpt, cmd);
+			}
+		}
 		cmd = next_cmd;
 	}
 }
+/*
+ * Cmds are queued if tran_start() doesn't get the m_mutexlock(no wait).
+ * Accept all those queued cmds before new cmd is accept so that the
+ * cmds are sent in order.
+ */
+static void
+mptsas_accept_tx_waitq(mptsas_t *mpt)
+{
+	mptsas_cmd_t *cmd;
+
+	ASSERT(mutex_owned(&mpt->m_mutex));
+	ASSERT(mutex_owned(&mpt->m_tx_waitq_mutex));
+
+	/*
+	 * A Bus Reset could occur at any time and flush the tx_waitq,
+	 * so we cannot count on the tx_waitq to contain even one cmd.
+	 * And when the m_tx_waitq_mutex is released and run
+	 * mptsas_accept_pkt(), the tx_waitq may be flushed.
+	 */
+	cmd = mpt->m_tx_waitq;
+	for (;;) {
+		if ((cmd = mpt->m_tx_waitq) == NULL) {
+			mpt->m_tx_draining = 0;
+			break;
+		}
+		if ((mpt->m_tx_waitq = cmd->cmd_linkp) == NULL) {
+			mpt->m_tx_waitqtail = &mpt->m_tx_waitq;
+		}
+		cmd->cmd_linkp = NULL;
+		mutex_exit(&mpt->m_tx_waitq_mutex);
+		if (mptsas_accept_pkt(mpt, cmd) != TRAN_ACCEPT)
+			cmn_err(CE_WARN, "mpt: mptsas_accept_tx_waitq: failed "
+			    "to accept cmd on queue\n");
+		mutex_enter(&mpt->m_tx_waitq_mutex);
+	}
+}
+
 
 /*
  * mpt tag type lookup
  */
 static char mptsas_tag_lookup[] =
 	{0, MSG_HEAD_QTAG, MSG_ORDERED_QTAG, 0, MSG_SIMPLE_QTAG};
-
-/*
- * mptsas_start_cmd0 is similar to mptsas_start_cmd, except that, it is called
- * without ANY mutex protected, while, mptsas_start_cmd is called with m_mutex
- * protected.
- *
- * the relevant field in ptgt should be protected by m_tgt_intr_mutex in both
- * functions.
- *
- * before the cmds are linked on the slot for monitor as outstanding cmds, they
- * are accessed as slab objects, so slab framework ensures the exclusive access,
- * and no other mutex is requireed. Linking for monitor and the trigger of dma
- * must be done exclusively.
- */
-static int
-mptsas_start_cmd0(mptsas_t *mpt, mptsas_cmd_t *cmd)
-{
-	struct scsi_pkt		*pkt = CMD2PKT(cmd);
-	uint32_t		control = 0;
-	int			n;
-	caddr_t			mem;
-	pMpi2SCSIIORequest_t	io_request;
-	ddi_dma_handle_t	dma_hdl = mpt->m_dma_req_frame_hdl;
-	ddi_acc_handle_t	acc_hdl = mpt->m_acc_req_frame_hdl;
-	mptsas_target_t		*ptgt = cmd->cmd_tgt_addr;
-	uint16_t		SMID, io_flags = 0;
-	uint32_t		request_desc_low, request_desc_high;
-
-	NDBG1(("mptsas_start_cmd0: cmd=0x%p", (void *)cmd));
-
-	/*
-	 * Set SMID and increment index.  Rollover to 1 instead of 0 if index
-	 * is at the max.  0 is an invalid SMID, so we call the first index 1.
-	 */
-	SMID = cmd->cmd_slot;
-
-	/*
-	 * It is possible for back to back device reset to
-	 * happen before the reset delay has expired.  That's
-	 * ok, just let the device reset go out on the bus.
-	 */
-	if ((cmd->cmd_pkt_flags & FLAG_NOINTR) == 0) {
-		ASSERT(ptgt->m_reset_delay == 0);
-	}
-
-	/*
-	 * if a non-tagged cmd is submitted to an active tagged target
-	 * then drain before submitting this cmd; SCSI-2 allows RQSENSE
-	 * to be untagged
-	 */
-	mutex_enter(&ptgt->m_tgt_intr_mutex);
-	if (((cmd->cmd_pkt_flags & FLAG_TAGMASK) == 0) &&
-	    (ptgt->m_t_ncmds > 1) &&
-	    ((cmd->cmd_flags & CFLAG_TM_CMD) == 0) &&
-	    (*(cmd->cmd_pkt->pkt_cdbp) != SCMD_REQUEST_SENSE)) {
-		if ((cmd->cmd_pkt_flags & FLAG_NOINTR) == 0) {
-			NDBG23(("target=%d, untagged cmd, start draining\n",
-			    ptgt->m_devhdl));
-
-			if (ptgt->m_reset_delay == 0) {
-				mptsas_set_throttle(mpt, ptgt, DRAIN_THROTTLE);
-			}
-			mutex_exit(&ptgt->m_tgt_intr_mutex);
-
-			mutex_enter(&mpt->m_mutex);
-			mptsas_remove_cmd(mpt, cmd);
-			cmd->cmd_pkt_flags |= FLAG_HEAD;
-			mptsas_waitq_add(mpt, cmd);
-			mutex_exit(&mpt->m_mutex);
-			return (DDI_FAILURE);
-		}
-		mutex_exit(&ptgt->m_tgt_intr_mutex);
-		return (DDI_FAILURE);
-	}
-	mutex_exit(&ptgt->m_tgt_intr_mutex);
-
-	/*
-	 * Set correct tag bits.
-	 */
-	if (cmd->cmd_pkt_flags & FLAG_TAGMASK) {
-		switch (mptsas_tag_lookup[((cmd->cmd_pkt_flags &
-		    FLAG_TAGMASK) >> 12)]) {
-		case MSG_SIMPLE_QTAG:
-			control |= MPI2_SCSIIO_CONTROL_SIMPLEQ;
-			break;
-		case MSG_HEAD_QTAG:
-			control |= MPI2_SCSIIO_CONTROL_HEADOFQ;
-			break;
-		case MSG_ORDERED_QTAG:
-			control |= MPI2_SCSIIO_CONTROL_ORDEREDQ;
-			break;
-		default:
-			mptsas_log(mpt, CE_WARN, "mpt: Invalid tag type\n");
-			break;
-		}
-	} else {
-		if (*(cmd->cmd_pkt->pkt_cdbp) != SCMD_REQUEST_SENSE) {
-				ptgt->m_t_throttle = 1;
-		}
-		control |= MPI2_SCSIIO_CONTROL_SIMPLEQ;
-	}
-
-	if (cmd->cmd_pkt_flags & FLAG_TLR) {
-		control |= MPI2_SCSIIO_CONTROL_TLR_ON;
-	}
-
-	mem = mpt->m_req_frame + (mpt->m_req_frame_size * SMID);
-	io_request = (pMpi2SCSIIORequest_t)mem;
-
-	bzero(io_request, sizeof (Mpi2SCSIIORequest_t));
-	ddi_put8(acc_hdl, &io_request->SGLOffset0, offsetof
-	    (MPI2_SCSI_IO_REQUEST, SGL) / 4);
-	mptsas_init_std_hdr(acc_hdl, io_request, ptgt->m_devhdl, Lun(cmd), 0,
-	    MPI2_FUNCTION_SCSI_IO_REQUEST);
-
-	(void) ddi_rep_put8(acc_hdl, (uint8_t *)pkt->pkt_cdbp,
-	    io_request->CDB.CDB32, cmd->cmd_cdblen, DDI_DEV_AUTOINCR);
-
-	io_flags = cmd->cmd_cdblen;
-	ddi_put16(acc_hdl, &io_request->IoFlags, io_flags);
-	/*
-	 * setup the Scatter/Gather DMA list for this request
-	 */
-	if (cmd->cmd_cookiec > 0) {
-		mptsas_sge_setup(mpt, cmd, &control, io_request, acc_hdl);
-	} else {
-		ddi_put32(acc_hdl, &io_request->SGL.MpiSimple.FlagsLength,
-		    ((uint32_t)MPI2_SGE_FLAGS_LAST_ELEMENT |
-		    MPI2_SGE_FLAGS_END_OF_BUFFER |
-		    MPI2_SGE_FLAGS_SIMPLE_ELEMENT |
-		    MPI2_SGE_FLAGS_END_OF_LIST) << MPI2_SGE_FLAGS_SHIFT);
-	}
-
-	/*
-	 * save ARQ information
-	 */
-	ddi_put8(acc_hdl, &io_request->SenseBufferLength, cmd->cmd_rqslen);
-	if ((cmd->cmd_flags & (CFLAG_SCBEXTERN | CFLAG_EXTARQBUFVALID)) ==
-	    (CFLAG_SCBEXTERN | CFLAG_EXTARQBUFVALID)) {
-		ddi_put32(acc_hdl, &io_request->SenseBufferLowAddress,
-		    cmd->cmd_ext_arqcookie.dmac_address);
-	} else {
-		ddi_put32(acc_hdl, &io_request->SenseBufferLowAddress,
-		    cmd->cmd_arqcookie.dmac_address);
-	}
-
-	ddi_put32(acc_hdl, &io_request->Control, control);
-
-	NDBG31(("starting message=0x%p, with cmd=0x%p",
-	    (void *)(uintptr_t)mpt->m_req_frame_dma_addr, (void *)cmd));
-
-	(void) ddi_dma_sync(dma_hdl, 0, 0, DDI_DMA_SYNC_FORDEV);
-
-	/*
-	 * Build request descriptor and write it to the request desc post reg.
-	 */
-	request_desc_low = (SMID << 16) + MPI2_REQ_DESCRIPT_FLAGS_SCSI_IO;
-	request_desc_high = ptgt->m_devhdl << 16;
-
-	mutex_enter(&mpt->m_mutex);
-	mpt->m_active->m_slot[cmd->cmd_slot] = cmd;
-	MPTSAS_START_CMD(mpt, request_desc_low, request_desc_high);
-	mutex_exit(&mpt->m_mutex);
-
-	/*
-	 * Start timeout.
-	 */
-	mutex_enter(&ptgt->m_tgt_intr_mutex);
-#ifdef MPTSAS_TEST
-	/*
-	 * Temporarily set timebase = 0;  needed for
-	 * timeout torture test.
-	 */
-	if (mptsas_test_timeouts) {
-		ptgt->m_timebase = 0;
-	}
-#endif
-	n = pkt->pkt_time - ptgt->m_timebase;
-
-	if (n == 0) {
-		(ptgt->m_dups)++;
-		ptgt->m_timeout = ptgt->m_timebase;
-	} else if (n > 0) {
-		ptgt->m_timeout =
-		    ptgt->m_timebase = pkt->pkt_time;
-		ptgt->m_dups = 1;
-	} else if (n < 0) {
-		ptgt->m_timeout = ptgt->m_timebase;
-	}
-#ifdef MPTSAS_TEST
-	/*
-	 * Set back to a number higher than
-	 * mptsas_scsi_watchdog_tick
-	 * so timeouts will happen in mptsas_watchsubr
-	 */
-	if (mptsas_test_timeouts) {
-		ptgt->m_timebase = 60;
-	}
-#endif
-	mutex_exit(&ptgt->m_tgt_intr_mutex);
-
-	if ((mptsas_check_dma_handle(dma_hdl) != DDI_SUCCESS) ||
-	    (mptsas_check_acc_handle(acc_hdl) != DDI_SUCCESS)) {
-		ddi_fm_service_impact(mpt->m_dip, DDI_SERVICE_UNAFFECTED);
-		return (DDI_FAILURE);
-	}
-	return (DDI_SUCCESS);
-}
 
 static int
 mptsas_start_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd)
@@ -8448,7 +7849,6 @@ mptsas_start_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd)
 	 * then drain before submitting this cmd; SCSI-2 allows RQSENSE
 	 * to be untagged
 	 */
-	mutex_enter(&ptgt->m_tgt_intr_mutex);
 	if (((cmd->cmd_pkt_flags & FLAG_TAGMASK) == 0) &&
 	    (ptgt->m_t_ncmds > 1) &&
 	    ((cmd->cmd_flags & CFLAG_TM_CMD) == 0) &&
@@ -8460,17 +7860,13 @@ mptsas_start_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd)
 			if (ptgt->m_reset_delay == 0) {
 				mptsas_set_throttle(mpt, ptgt, DRAIN_THROTTLE);
 			}
-			mutex_exit(&ptgt->m_tgt_intr_mutex);
 
 			mptsas_remove_cmd(mpt, cmd);
 			cmd->cmd_pkt_flags |= FLAG_HEAD;
 			mptsas_waitq_add(mpt, cmd);
-			return (DDI_FAILURE);
 		}
-		mutex_exit(&ptgt->m_tgt_intr_mutex);
 		return (DDI_FAILURE);
 	}
-	mutex_exit(&ptgt->m_tgt_intr_mutex);
 
 	/*
 	 * Set correct tag bits.
@@ -8554,14 +7950,11 @@ mptsas_start_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd)
 	 */
 	request_desc_low = (SMID << 16) + MPI2_REQ_DESCRIPT_FLAGS_SCSI_IO;
 	request_desc_high = ptgt->m_devhdl << 16;
-
-	mpt->m_active->m_slot[cmd->cmd_slot] = cmd;
 	MPTSAS_START_CMD(mpt, request_desc_low, request_desc_high);
 
 	/*
 	 * Start timeout.
 	 */
-	mutex_enter(&ptgt->m_tgt_intr_mutex);
 #ifdef MPTSAS_TEST
 	/*
 	 * Temporarily set timebase = 0;  needed for
@@ -8593,7 +7986,6 @@ mptsas_start_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd)
 		ptgt->m_timebase = 60;
 	}
 #endif
-	mutex_exit(&ptgt->m_tgt_intr_mutex);
 
 	if ((mptsas_check_dma_handle(dma_hdl) != DDI_SUCCESS) ||
 	    (mptsas_check_acc_handle(acc_hdl) != DDI_SUCCESS)) {
@@ -8640,7 +8032,7 @@ mptsas_deliver_doneq_thread(mptsas_t *mpt)
 }
 
 /*
- * move the current global doneq to the doneq of thread[t]
+ * move the current global doneq to the doneq of thead[t]
  */
 static void
 mptsas_doneq_mv(mptsas_t *mpt, uint64_t t)
@@ -8649,7 +8041,6 @@ mptsas_doneq_mv(mptsas_t *mpt, uint64_t t)
 	mptsas_doneq_thread_list_t	*item = &mpt->m_doneq_thread_id[t];
 
 	ASSERT(mutex_owned(&item->mutex));
-	mutex_enter(&mpt->m_intr_mutex);
 	while ((cmd = mpt->m_doneq) != NULL) {
 		if ((mpt->m_doneq = cmd->cmd_linkp) == NULL) {
 			mpt->m_donetail = &mpt->m_doneq;
@@ -8660,7 +8051,6 @@ mptsas_doneq_mv(mptsas_t *mpt, uint64_t t)
 		mpt->m_doneq_len--;
 		item->len++;
 	}
-	mutex_exit(&mpt->m_intr_mutex);
 }
 
 void
@@ -8735,33 +8125,6 @@ mptsas_fma_check(mptsas_t *mpt, mptsas_cmd_t *cmd)
 }
 
 /*
- * mptsas_doneq_add0 is similar to mptsas_doneq_add except that it is called
- * where m_intr_mutex has already been held.
- */
-static inline void
-mptsas_doneq_add0(mptsas_t *mpt, mptsas_cmd_t *cmd)
-{
-	struct scsi_pkt	*pkt = CMD2PKT(cmd);
-
-	NDBG31(("mptsas_doneq_add0: cmd=0x%p", (void *)cmd));
-
-	ASSERT((cmd->cmd_flags & CFLAG_COMPLETED) == 0);
-	cmd->cmd_linkp = NULL;
-	cmd->cmd_flags |= CFLAG_FINISHED;
-	cmd->cmd_flags &= ~CFLAG_IN_TRANSPORT;
-
-	/*
-	 * only add scsi pkts that have completion routines to
-	 * the doneq.  no intr cmds do not have callbacks.
-	 */
-	if (pkt && (pkt->pkt_comp)) {
-		*mpt->m_donetail = cmd;
-		mpt->m_donetail = &cmd->cmd_linkp;
-		mpt->m_doneq_len++;
-	}
-}
-
-/*
  * These routines manipulate the queue of commands that
  * are waiting for their completion routines to be called.
  * The queue is usually in FIFO order but on an MP system
@@ -8773,13 +8136,26 @@ mptsas_doneq_add0(mptsas_t *mpt, mptsas_cmd_t *cmd)
 static void
 mptsas_doneq_add(mptsas_t *mpt, mptsas_cmd_t *cmd)
 {
-	ASSERT(mutex_owned(&mpt->m_mutex));
+	struct scsi_pkt	*pkt = CMD2PKT(cmd);
+
+	NDBG31(("mptsas_doneq_add: cmd=0x%p", (void *)cmd));
+
+	ASSERT((cmd->cmd_flags & CFLAG_COMPLETED) == 0);
+	cmd->cmd_linkp = NULL;
+	cmd->cmd_flags |= CFLAG_FINISHED;
+	cmd->cmd_flags &= ~CFLAG_IN_TRANSPORT;
 
 	mptsas_fma_check(mpt, cmd);
 
-	mutex_enter(&mpt->m_intr_mutex);
-	mptsas_doneq_add0(mpt, cmd);
-	mutex_exit(&mpt->m_intr_mutex);
+	/*
+	 * only add scsi pkts that have completion routines to
+	 * the doneq.  no intr cmds do not have callbacks.
+	 */
+	if (pkt && (pkt->pkt_comp)) {
+		*mpt->m_donetail = cmd;
+		mpt->m_donetail = &cmd->cmd_linkp;
+		mpt->m_doneq_len++;
+	}
 }
 
 static mptsas_cmd_t *
@@ -8804,7 +8180,6 @@ mptsas_doneq_thread_rm(mptsas_t *mpt, uint64_t t)
 static void
 mptsas_doneq_empty(mptsas_t *mpt)
 {
-	mutex_enter(&mpt->m_intr_mutex);
 	if (mpt->m_doneq && !mpt->m_in_callback) {
 		mptsas_cmd_t	*cmd, *next;
 		struct scsi_pkt *pkt;
@@ -8815,14 +8190,7 @@ mptsas_doneq_empty(mptsas_t *mpt)
 		mpt->m_donetail = &mpt->m_doneq;
 		mpt->m_doneq_len = 0;
 
-		mutex_exit(&mpt->m_intr_mutex);
-
-		/*
-		 * ONLY in ISR, is it called without m_mutex held, otherwise,
-		 * it is always called with m_mutex held.
-		 */
-		if ((curthread->t_flag & T_INTR_THREAD) == 0)
-			mutex_exit(&mpt->m_mutex);
+		mutex_exit(&mpt->m_mutex);
 		/*
 		 * run the completion routines of all the
 		 * completed commands
@@ -8836,12 +8204,9 @@ mptsas_doneq_empty(mptsas_t *mpt)
 			mptsas_pkt_comp(pkt, cmd);
 			cmd = next;
 		}
-		if ((curthread->t_flag & T_INTR_THREAD) == 0)
-			mutex_enter(&mpt->m_mutex);
+		mutex_enter(&mpt->m_mutex);
 		mpt->m_in_callback = 0;
-		return;
 	}
-	mutex_exit(&mpt->m_intr_mutex);
 }
 
 /*
@@ -8856,12 +8221,10 @@ mptsas_waitq_add(mptsas_t *mpt, mptsas_cmd_t *cmd)
 	if (ptgt)
 		ptgt->m_t_nwait++;
 	if (cmd->cmd_pkt_flags & FLAG_HEAD) {
-		mutex_enter(&mpt->m_intr_mutex);
 		if ((cmd->cmd_linkp = mpt->m_waitq) == NULL) {
 			mpt->m_waitqtail = &cmd->cmd_linkp;
 		}
 		mpt->m_waitq = cmd;
-		mutex_exit(&mpt->m_intr_mutex);
 	} else {
 		cmd->cmd_linkp = NULL;
 		*(mpt->m_waitqtail) = cmd;
@@ -8876,9 +8239,7 @@ mptsas_waitq_rm(mptsas_t *mpt)
 	mptsas_target_t *ptgt;
 	NDBG7(("mptsas_waitq_rm"));
 
-	mutex_enter(&mpt->m_intr_mutex);
 	MPTSAS_WAITQ_RM(mpt, cmd);
-	mutex_exit(&mpt->m_intr_mutex);
 
 	NDBG7(("mptsas_waitq_rm: cmd=0x%p", (void *)cmd));
 	if (cmd) {
@@ -8908,10 +8269,8 @@ mptsas_waitq_delete(mptsas_t *mpt, mptsas_cmd_t *cmd)
 	}
 
 	if (prevp == cmd) {
-		mutex_enter(&mpt->m_intr_mutex);
 		if ((mpt->m_waitq = cmd->cmd_linkp) == NULL)
 			mpt->m_waitqtail = &mpt->m_waitq;
-		mutex_exit(&mpt->m_intr_mutex);
 
 		cmd->cmd_linkp = NULL;
 		cmd->cmd_queued = FALSE;
@@ -8934,6 +8293,57 @@ mptsas_waitq_delete(mptsas_t *mpt, mptsas_cmd_t *cmd)
 		prevp = prevp->cmd_linkp;
 	}
 	cmn_err(CE_PANIC, "mpt: mptsas_waitq_delete: queue botch");
+}
+
+static mptsas_cmd_t *
+mptsas_tx_waitq_rm(mptsas_t *mpt)
+{
+	mptsas_cmd_t *cmd;
+	NDBG7(("mptsas_tx_waitq_rm"));
+
+	MPTSAS_TX_WAITQ_RM(mpt, cmd);
+
+	NDBG7(("mptsas_tx_waitq_rm: cmd=0x%p", (void *)cmd));
+
+	return (cmd);
+}
+
+/*
+ * remove specified cmd from the middle of the tx_waitq.
+ */
+static void
+mptsas_tx_waitq_delete(mptsas_t *mpt, mptsas_cmd_t *cmd)
+{
+	mptsas_cmd_t *prevp = mpt->m_tx_waitq;
+
+	NDBG7(("mptsas_tx_waitq_delete: mpt=0x%p cmd=0x%p",
+	    (void *)mpt, (void *)cmd));
+
+	if (prevp == cmd) {
+		if ((mpt->m_tx_waitq = cmd->cmd_linkp) == NULL)
+			mpt->m_tx_waitqtail = &mpt->m_tx_waitq;
+
+		cmd->cmd_linkp = NULL;
+		cmd->cmd_queued = FALSE;
+		NDBG7(("mptsas_tx_waitq_delete: mpt=0x%p cmd=0x%p",
+		    (void *)mpt, (void *)cmd));
+		return;
+	}
+
+	while (prevp != NULL) {
+		if (prevp->cmd_linkp == cmd) {
+			if ((prevp->cmd_linkp = cmd->cmd_linkp) == NULL)
+				mpt->m_tx_waitqtail = &prevp->cmd_linkp;
+
+			cmd->cmd_linkp = NULL;
+			cmd->cmd_queued = FALSE;
+			NDBG7(("mptsas_tx_waitq_delete: mpt=0x%p cmd=0x%p",
+			    (void *)mpt, (void *)cmd));
+			return;
+		}
+		prevp = prevp->cmd_linkp;
+	}
+	cmn_err(CE_PANIC, "mpt: mptsas_tx_waitq_delete: queue botch");
 }
 
 /*
@@ -9099,11 +8509,9 @@ mptsas_flush_target(mptsas_t *mpt, ushort_t target, int lun, uint8_t tasktype)
 	 * and target/lun for abort task set.
 	 * Account for TM requests, which use the last SMID.
 	 */
-	mutex_enter(&mpt->m_intr_mutex);
 	for (slot = 0; slot <= mpt->m_active->m_n_slots; slot++) {
-		if ((cmd = slots->m_slot[slot]) == NULL) {
+		if ((cmd = slots->m_slot[slot]) == NULL)
 			continue;
-		}
 		reason = CMD_RESET;
 		stat = STAT_DEV_RESET;
 		switch (tasktype) {
@@ -9113,9 +8521,9 @@ mptsas_flush_target(mptsas_t *mpt, ushort_t target, int lun, uint8_t tasktype)
 				    "NULL cmd in slot %d, tasktype 0x%x", slot,
 				    tasktype));
 				mptsas_dump_cmd(mpt, cmd);
-				mptsas_remove_cmd0(mpt, cmd);
+				mptsas_remove_cmd(mpt, cmd);
 				mptsas_set_pkt_reason(mpt, cmd, reason, stat);
-				mptsas_doneq_add0(mpt, cmd);
+				mptsas_doneq_add(mpt, cmd);
 			}
 			break;
 		case MPI2_SCSITASKMGMT_TASKTYPE_ABRT_TASK_SET:
@@ -9129,20 +8537,19 @@ mptsas_flush_target(mptsas_t *mpt, ushort_t target, int lun, uint8_t tasktype)
 				    "NULL cmd in slot %d, tasktype 0x%x", slot,
 				    tasktype));
 				mptsas_dump_cmd(mpt, cmd);
-				mptsas_remove_cmd0(mpt, cmd);
+				mptsas_remove_cmd(mpt, cmd);
 				mptsas_set_pkt_reason(mpt, cmd, reason,
 				    stat);
-				mptsas_doneq_add0(mpt, cmd);
+				mptsas_doneq_add(mpt, cmd);
 			}
 			break;
 		default:
 			break;
 		}
 	}
-	mutex_exit(&mpt->m_intr_mutex);
 
 	/*
-	 * Flush the waitq of this target's cmds
+	 * Flush the waitq and tx_waitq of this target's cmds
 	 */
 	cmd = mpt->m_waitq;
 
@@ -9161,6 +8568,21 @@ mptsas_flush_target(mptsas_t *mpt, ushort_t target, int lun, uint8_t tasktype)
 			}
 			cmd = next_cmd;
 		}
+		mutex_enter(&mpt->m_tx_waitq_mutex);
+		cmd = mpt->m_tx_waitq;
+		while (cmd != NULL) {
+			next_cmd = cmd->cmd_linkp;
+			if (Tgt(cmd) == target) {
+				mptsas_tx_waitq_delete(mpt, cmd);
+				mutex_exit(&mpt->m_tx_waitq_mutex);
+				mptsas_set_pkt_reason(mpt, cmd,
+				    reason, stat);
+				mptsas_doneq_add(mpt, cmd);
+				mutex_enter(&mpt->m_tx_waitq_mutex);
+			}
+			cmd = next_cmd;
+		}
+		mutex_exit(&mpt->m_tx_waitq_mutex);
 		break;
 	case MPI2_SCSITASKMGMT_TASKTYPE_ABRT_TASK_SET:
 		reason = CMD_ABORTED;
@@ -9177,6 +8599,21 @@ mptsas_flush_target(mptsas_t *mpt, ushort_t target, int lun, uint8_t tasktype)
 			}
 			cmd = next_cmd;
 		}
+		mutex_enter(&mpt->m_tx_waitq_mutex);
+		cmd = mpt->m_tx_waitq;
+		while (cmd != NULL) {
+			next_cmd = cmd->cmd_linkp;
+			if ((Tgt(cmd) == target) && (Lun(cmd) == lun)) {
+				mptsas_tx_waitq_delete(mpt, cmd);
+				mutex_exit(&mpt->m_tx_waitq_mutex);
+				mptsas_set_pkt_reason(mpt, cmd,
+				    reason, stat);
+				mptsas_doneq_add(mpt, cmd);
+				mutex_enter(&mpt->m_tx_waitq_mutex);
+			}
+			cmd = next_cmd;
+		}
+		mutex_exit(&mpt->m_tx_waitq_mutex);
 		break;
 	default:
 		mptsas_log(mpt, CE_WARN, "Unknown task management type %d.",
@@ -9204,11 +8641,9 @@ mptsas_flush_hba(mptsas_t *mpt)
 	 * sure all commands have been flushed.
 	 * Account for TM request, which use the last SMID.
 	 */
-	mutex_enter(&mpt->m_intr_mutex);
 	for (slot = 0; slot <= mpt->m_active->m_n_slots; slot++) {
-		if ((cmd = slots->m_slot[slot]) == NULL) {
+		if ((cmd = slots->m_slot[slot]) == NULL)
 			continue;
-		}
 
 		if (cmd->cmd_flags & CFLAG_CMDIOC) {
 			/*
@@ -9236,11 +8671,10 @@ mptsas_flush_hba(mptsas_t *mpt)
 		    slot));
 		mptsas_dump_cmd(mpt, cmd);
 
-		mptsas_remove_cmd0(mpt, cmd);
+		mptsas_remove_cmd(mpt, cmd);
 		mptsas_set_pkt_reason(mpt, cmd, CMD_RESET, STAT_BUS_RESET);
-		mptsas_doneq_add0(mpt, cmd);
+		mptsas_doneq_add(mpt, cmd);
 	}
-	mutex_exit(&mpt->m_intr_mutex);
 
 	/*
 	 * Flush the waitq.
@@ -9258,6 +8692,18 @@ mptsas_flush_hba(mptsas_t *mpt)
 			mptsas_doneq_add(mpt, cmd);
 		}
 	}
+
+	/*
+	 * Flush the tx_waitq
+	 */
+	mutex_enter(&mpt->m_tx_waitq_mutex);
+	while ((cmd = mptsas_tx_waitq_rm(mpt)) != NULL) {
+		mutex_exit(&mpt->m_tx_waitq_mutex);
+		mptsas_set_pkt_reason(mpt, cmd, CMD_RESET, STAT_BUS_RESET);
+		mptsas_doneq_add(mpt, cmd);
+		mutex_enter(&mpt->m_tx_waitq_mutex);
+	}
+	mutex_exit(&mpt->m_tx_waitq_mutex);
 }
 
 /*
@@ -9306,10 +8752,8 @@ mptsas_setup_bus_reset_delay(mptsas_t *mpt)
 	ptgt = (mptsas_target_t *)mptsas_hash_traverse(&mpt->m_active->m_tgttbl,
 	    MPTSAS_HASH_FIRST);
 	while (ptgt != NULL) {
-		mutex_enter(&ptgt->m_tgt_intr_mutex);
 		mptsas_set_throttle(mpt, ptgt, HOLD_THROTTLE);
 		ptgt->m_reset_delay = mpt->m_scsi_reset_delay;
-		mutex_exit(&ptgt->m_tgt_intr_mutex);
 
 		ptgt = (mptsas_target_t *)mptsas_hash_traverse(
 		    &mpt->m_active->m_tgttbl, MPTSAS_HASH_NEXT);
@@ -9367,7 +8811,6 @@ mptsas_watch_reset_delay_subr(mptsas_t *mpt)
 	ptgt = (mptsas_target_t *)mptsas_hash_traverse(&mpt->m_active->m_tgttbl,
 	    MPTSAS_HASH_FIRST);
 	while (ptgt != NULL) {
-		mutex_enter(&ptgt->m_tgt_intr_mutex);
 		if (ptgt->m_reset_delay != 0) {
 			ptgt->m_reset_delay -=
 			    MPTSAS_WATCH_RESET_DELAY_TICK;
@@ -9380,7 +8823,6 @@ mptsas_watch_reset_delay_subr(mptsas_t *mpt)
 				done = -1;
 			}
 		}
-		mutex_exit(&ptgt->m_tgt_intr_mutex);
 
 		ptgt = (mptsas_target_t *)mptsas_hash_traverse(
 		    &mpt->m_active->m_tgttbl, MPTSAS_HASH_NEXT);
@@ -9476,9 +8918,8 @@ mptsas_do_scsi_abort(mptsas_t *mpt, int target, int lun, struct scsi_pkt *pkt)
 		/*
 		 * Have mpt firmware abort this command
 		 */
-		mutex_enter(&mpt->m_intr_mutex);
+
 		if (slots->m_slot[sp->cmd_slot] != NULL) {
-			mutex_exit(&mpt->m_intr_mutex);
 			rval = mptsas_ioc_task_management(mpt,
 			    MPI2_SCSITASKMGMT_TASKTYPE_ABORT_TASK, target,
 			    lun, NULL, 0, 0);
@@ -9492,7 +8933,6 @@ mptsas_do_scsi_abort(mptsas_t *mpt, int target, int lun, struct scsi_pkt *pkt)
 				rval = FALSE;
 			goto done;
 		}
-		mutex_exit(&mpt->m_intr_mutex);
 	}
 
 	/*
@@ -9604,7 +9044,6 @@ mptsas_scsi_setcap(struct scsi_address *ap, char *cap, int value, int tgtonly)
 	mptsas_t	*mpt = ADDR2MPT(ap);
 	int		ckey;
 	int		rval = FALSE;
-	mptsas_target_t *ptgt;
 
 	NDBG24(("mptsas_scsi_setcap: target=%d, cap=%s value=%x tgtonly=%x",
 	    ap->a_target, cap, value, tgtonly));
@@ -9644,11 +9083,9 @@ mptsas_scsi_setcap(struct scsi_address *ap, char *cap, int value, int tgtonly)
 		}
 		break;
 	case SCSI_CAP_TAGGED_QING:
-		ptgt = ((mptsas_tgt_private_t *)
-		    (ap->a_hba_tran->tran_tgt_private))->t_private;
-		mutex_enter(&ptgt->m_tgt_intr_mutex);
-		mptsas_set_throttle(mpt, ptgt, MAX_THROTTLE);
-		mutex_exit(&ptgt->m_tgt_intr_mutex);
+		mptsas_set_throttle(mpt, ((mptsas_tgt_private_t *)
+		    (ap->a_hba_tran->tran_tgt_private))->t_private,
+		    MAX_THROTTLE);
 		rval = TRUE;
 		break;
 	case SCSI_CAP_QFULL_RETRIES:
@@ -9692,13 +9129,13 @@ mptsas_alloc_active_slots(mptsas_t *mpt, int flag)
 	mptsas_slots_t	*old_active = mpt->m_active;
 	mptsas_slots_t	*new_active;
 	size_t		size;
-	int		rval = -1, nslot, i;
-	mptsas_slot_free_e_t	*pe;
+	int		rval = -1, i;
 
-	if (mptsas_outstanding_cmds_n(mpt)) {
-		NDBG9(("cannot change size of active slots array"));
-		return (rval);
-	}
+	/*
+	 * if there are active commands, then we cannot
+	 * change size of active slots array.
+	 */
+	ASSERT(mpt->m_ncmds == 0);
 
 	size = MPTSAS_SLOTS_SIZE(mpt);
 	new_active = kmem_zalloc(size, flag);
@@ -9711,10 +9148,9 @@ mptsas_alloc_active_slots(mptsas_t *mpt, int flag)
 	 * number of slots that can be used at any one time is
 	 * m_max_requests - 2.
 	 */
-	new_active->m_n_slots = nslot = (mpt->m_max_requests - 2);
+	new_active->m_n_slots = (mpt->m_max_requests - 2);
 	new_active->m_size = size;
 	new_active->m_tags = 1;
-
 	if (old_active) {
 		new_active->m_tgttbl = old_active->m_tgttbl;
 		new_active->m_smptbl = old_active->m_smptbl;
@@ -9726,62 +9162,6 @@ mptsas_alloc_active_slots(mptsas_t *mpt, int flag)
 		}
 		mptsas_free_active_slots(mpt);
 	}
-
-	if (max_ncpus & (max_ncpus - 1)) {
-		mpt->m_slot_freeq_pair_n = (1 << highbit(max_ncpus));
-	} else {
-		mpt->m_slot_freeq_pair_n = max_ncpus;
-	}
-	mpt->m_slot_freeq_pairp = kmem_zalloc(
-	    mpt->m_slot_freeq_pair_n *
-	    sizeof (mptsas_slot_freeq_pair_t), KM_SLEEP);
-	for (i = 0; i < mpt->m_slot_freeq_pair_n; i++) {
-		list_create(&mpt->m_slot_freeq_pairp[i].
-		    m_slot_allocq.s.m_fq_list,
-		    sizeof (mptsas_slot_free_e_t),
-		    offsetof(mptsas_slot_free_e_t, node));
-		list_create(&mpt->m_slot_freeq_pairp[i].
-		    m_slot_releq.s.m_fq_list,
-		    sizeof (mptsas_slot_free_e_t),
-		    offsetof(mptsas_slot_free_e_t, node));
-		mpt->m_slot_freeq_pairp[i].m_slot_allocq.s.m_fq_n = 0;
-		mpt->m_slot_freeq_pairp[i].m_slot_releq.s.m_fq_n = 0;
-		mutex_init(&mpt->m_slot_freeq_pairp[i].
-		    m_slot_allocq.s.m_fq_mutex, NULL, MUTEX_DRIVER,
-		    DDI_INTR_PRI(mpt->m_intr_pri));
-		mutex_init(&mpt->m_slot_freeq_pairp[i].
-		    m_slot_releq.s.m_fq_mutex, NULL, MUTEX_DRIVER,
-		    DDI_INTR_PRI(mpt->m_intr_pri));
-	}
-	pe = mpt->m_slot_free_ae = kmem_zalloc(nslot *
-	    sizeof (mptsas_slot_free_e_t), KM_SLEEP);
-	/*
-	 * An array of Mpi2ReplyDescriptorsUnion_t is defined here.
-	 * We are trying to eliminate the m_mutex in the context
-	 * reply code path in the ISR. Since the read of the
-	 * ReplyDescriptor and update/write of the ReplyIndex must
-	 * be atomic (since the poll thread may also update them at
-	 * the same time) so we first read out of the ReplyDescriptor
-	 * into this array and update the ReplyIndex register with a
-	 * separate mutex m_intr_mutex protected, and then release the
-	 * mutex and process all of them. the length of the array is
-	 * defined as max as 128(128*64=8k), which is
-	 * assumed as the maxmium depth of the interrupt coalese.
-	 */
-	mpt->m_reply = kmem_zalloc(MPI_ADDRESS_COALSCE_MAX *
-	    sizeof (Mpi2ReplyDescriptorsUnion_t), KM_SLEEP);
-	for (i = 0; i < nslot; i++, pe++) {
-		pe->slot = i + 1; /* SMID 0 is reserved */
-		pe->cpuid = i % mpt->m_slot_freeq_pair_n;
-		list_insert_tail(&mpt->m_slot_freeq_pairp
-		    [i % mpt->m_slot_freeq_pair_n]
-		    .m_slot_allocq.s.m_fq_list, pe);
-		mpt->m_slot_freeq_pairp[i % mpt->m_slot_freeq_pair_n]
-		    .m_slot_allocq.s.m_fq_n++;
-		mpt->m_slot_freeq_pairp[i % mpt->m_slot_freeq_pair_n]
-		    .m_slot_allocq.s.m_fq_n_init++;
-	}
-
 	mpt->m_active = new_active;
 	rval = 0;
 
@@ -9793,44 +9173,9 @@ mptsas_free_active_slots(mptsas_t *mpt)
 {
 	mptsas_slots_t	*active = mpt->m_active;
 	size_t		size;
-	mptsas_slot_free_e_t	*pe;
-	int	i;
 
 	if (active == NULL)
 		return;
-
-	if (mpt->m_slot_freeq_pairp) {
-		for (i = 0; i < mpt->m_slot_freeq_pair_n; i++) {
-			while ((pe = list_head(&mpt->m_slot_freeq_pairp
-			    [i].m_slot_allocq.s.m_fq_list)) != NULL) {
-				list_remove(&mpt->m_slot_freeq_pairp[i]
-				    .m_slot_allocq.s.m_fq_list, pe);
-			}
-			list_destroy(&mpt->m_slot_freeq_pairp
-			    [i].m_slot_allocq.s.m_fq_list);
-			while ((pe = list_head(&mpt->m_slot_freeq_pairp
-			    [i].m_slot_releq.s.m_fq_list)) != NULL) {
-				list_remove(&mpt->m_slot_freeq_pairp[i]
-				    .m_slot_releq.s.m_fq_list, pe);
-			}
-			list_destroy(&mpt->m_slot_freeq_pairp
-			    [i].m_slot_releq.s.m_fq_list);
-			mutex_destroy(&mpt->m_slot_freeq_pairp
-			    [i].m_slot_allocq.s.m_fq_mutex);
-			mutex_destroy(&mpt->m_slot_freeq_pairp
-			    [i].m_slot_releq.s.m_fq_mutex);
-		}
-		kmem_free(mpt->m_slot_freeq_pairp, mpt->m_slot_freeq_pair_n *
-		    sizeof (mptsas_slot_freeq_pair_t));
-	}
-	if (mpt->m_slot_free_ae)
-		kmem_free(mpt->m_slot_free_ae, mpt->m_active->m_n_slots *
-		    sizeof (mptsas_slot_free_e_t));
-
-	if (mpt->m_reply)
-		kmem_free(mpt->m_reply, MPI_ADDRESS_COALSCE_MAX *
-		    sizeof (Mpi2ReplyDescriptorsUnion_t));
-
 	size = active->m_size;
 	kmem_free(active, size);
 	mpt->m_active = NULL;
@@ -9977,7 +9322,6 @@ mptsas_watchsubr(mptsas_t *mpt)
 	 * Check for commands stuck in active slot
 	 * Account for TM requests, which use the last SMID.
 	 */
-	mutex_enter(&mpt->m_intr_mutex);
 	for (i = 0; i <= mpt->m_active->m_n_slots; i++) {
 		if ((cmd = mpt->m_active->m_slot[i]) != NULL) {
 			if ((cmd->cmd_flags & CFLAG_CMDIOC) == 0) {
@@ -9988,11 +9332,9 @@ mptsas_watchsubr(mptsas_t *mpt)
 					 * There seems to be a command stuck
 					 * in the active slot.  Drain throttle.
 					 */
-					ptgt = cmd->cmd_tgt_addr;
-					mutex_enter(&ptgt->m_tgt_intr_mutex);
-					mptsas_set_throttle(mpt, ptgt,
+					mptsas_set_throttle(mpt,
+					    cmd->cmd_tgt_addr,
 					    DRAIN_THROTTLE);
-					mutex_exit(&ptgt->m_tgt_intr_mutex);
 				}
 			}
 			if ((cmd->cmd_flags & CFLAG_PASSTHRU) ||
@@ -10013,18 +9355,10 @@ mptsas_watchsubr(mptsas_t *mpt)
 			}
 		}
 	}
-	mutex_exit(&mpt->m_intr_mutex);
 
 	ptgt = (mptsas_target_t *)mptsas_hash_traverse(&mpt->m_active->m_tgttbl,
 	    MPTSAS_HASH_FIRST);
 	while (ptgt != NULL) {
-		/*
-		 * In order to avoid using m_mutex in the key code path in ISR,
-		 * separate mutexs are introduced to protect those elements
-		 * shown in ISR.
-		 */
-		mutex_enter(&ptgt->m_tgt_intr_mutex);
-
 		/*
 		 * If we were draining due to a qfull condition,
 		 * go back to full throttle.
@@ -10043,7 +9377,6 @@ mptsas_watchsubr(mptsas_t *mpt)
 			    mptsas_scsi_watchdog_tick) {
 				ptgt->m_timebase +=
 				    mptsas_scsi_watchdog_tick;
-				mutex_exit(&ptgt->m_tgt_intr_mutex);
 				ptgt = (mptsas_target_t *)mptsas_hash_traverse(
 				    &mpt->m_active->m_tgttbl, MPTSAS_HASH_NEXT);
 				continue;
@@ -10052,7 +9385,6 @@ mptsas_watchsubr(mptsas_t *mpt)
 			ptgt->m_timeout -= mptsas_scsi_watchdog_tick;
 
 			if (ptgt->m_timeout < 0) {
-				mutex_exit(&ptgt->m_tgt_intr_mutex);
 				mptsas_cmd_timeout(mpt, ptgt->m_devhdl);
 				ptgt = (mptsas_target_t *)mptsas_hash_traverse(
 				    &mpt->m_active->m_tgttbl, MPTSAS_HASH_NEXT);
@@ -10066,7 +9398,7 @@ mptsas_watchsubr(mptsas_t *mpt)
 				    DRAIN_THROTTLE);
 			}
 		}
-		mutex_exit(&ptgt->m_tgt_intr_mutex);
+
 		ptgt = (mptsas_target_t *)mptsas_hash_traverse(
 		    &mpt->m_active->m_tgttbl, MPTSAS_HASH_NEXT);
 	}
@@ -10135,18 +9467,14 @@ mptsas_quiesce_bus(mptsas_t *mpt)
 	ptgt = (mptsas_target_t *)mptsas_hash_traverse(&mpt->m_active->m_tgttbl,
 	    MPTSAS_HASH_FIRST);
 	while (ptgt != NULL) {
-		mutex_enter(&ptgt->m_tgt_intr_mutex);
 		mptsas_set_throttle(mpt, ptgt, HOLD_THROTTLE);
-		mutex_exit(&ptgt->m_tgt_intr_mutex);
 
 		ptgt = (mptsas_target_t *)mptsas_hash_traverse(
 		    &mpt->m_active->m_tgttbl, MPTSAS_HASH_NEXT);
 	}
 
 	/* If there are any outstanding commands in the queue */
-	mutex_enter(&mpt->m_intr_mutex);
-	if (mptsas_outstanding_cmds_n(mpt)) {
-		mutex_exit(&mpt->m_intr_mutex);
+	if (mpt->m_ncmds) {
 		mpt->m_softstate |= MPTSAS_SS_DRAINING;
 		mpt->m_quiesce_timeid = timeout(mptsas_ncmds_checkdrain,
 		    mpt, (MPTSAS_QUIESCE_TIMEOUT * drv_usectohz(1000000)));
@@ -10158,9 +9486,7 @@ mptsas_quiesce_bus(mptsas_t *mpt)
 			ptgt = (mptsas_target_t *)mptsas_hash_traverse(
 			    &mpt->m_active->m_tgttbl, MPTSAS_HASH_FIRST);
 			while (ptgt != NULL) {
-				mutex_enter(&ptgt->m_tgt_intr_mutex);
 				mptsas_set_throttle(mpt, ptgt, MAX_THROTTLE);
-				mutex_exit(&ptgt->m_tgt_intr_mutex);
 
 				ptgt = (mptsas_target_t *)mptsas_hash_traverse(
 				    &mpt->m_active->m_tgttbl, MPTSAS_HASH_NEXT);
@@ -10184,7 +9510,6 @@ mptsas_quiesce_bus(mptsas_t *mpt)
 			return (0);
 		}
 	}
-	mutex_exit(&mpt->m_intr_mutex);
 	/* Bus was not busy - QUIESCED */
 	mutex_exit(&mpt->m_mutex);
 
@@ -10202,9 +9527,7 @@ mptsas_unquiesce_bus(mptsas_t *mpt)
 	ptgt = (mptsas_target_t *)mptsas_hash_traverse(&mpt->m_active->m_tgttbl,
 	    MPTSAS_HASH_FIRST);
 	while (ptgt != NULL) {
-		mutex_enter(&ptgt->m_tgt_intr_mutex);
 		mptsas_set_throttle(mpt, ptgt, MAX_THROTTLE);
-		mutex_exit(&ptgt->m_tgt_intr_mutex);
 
 		ptgt = (mptsas_target_t *)mptsas_hash_traverse(
 		    &mpt->m_active->m_tgttbl, MPTSAS_HASH_NEXT);
@@ -10223,9 +9546,10 @@ mptsas_ncmds_checkdrain(void *arg)
 	mutex_enter(&mpt->m_mutex);
 	if (mpt->m_softstate & MPTSAS_SS_DRAINING) {
 		mpt->m_quiesce_timeid = 0;
-		mutex_enter(&mpt->m_intr_mutex);
-		if (mptsas_outstanding_cmds_n(mpt)) {
-			mutex_exit(&mpt->m_intr_mutex);
+		if (mpt->m_ncmds == 0) {
+			/* Command queue has been drained */
+			cv_signal(&mpt->m_cv);
+		} else {
 			/*
 			 * The throttle may have been reset because
 			 * of a SCSI bus reset
@@ -10233,9 +9557,7 @@ mptsas_ncmds_checkdrain(void *arg)
 			ptgt = (mptsas_target_t *)mptsas_hash_traverse(
 			    &mpt->m_active->m_tgttbl, MPTSAS_HASH_FIRST);
 			while (ptgt != NULL) {
-				mutex_enter(&ptgt->m_tgt_intr_mutex);
 				mptsas_set_throttle(mpt, ptgt, HOLD_THROTTLE);
-				mutex_exit(&ptgt->m_tgt_intr_mutex);
 
 				ptgt = (mptsas_target_t *)mptsas_hash_traverse(
 				    &mpt->m_active->m_tgttbl, MPTSAS_HASH_NEXT);
@@ -10244,10 +9566,6 @@ mptsas_ncmds_checkdrain(void *arg)
 			mpt->m_quiesce_timeid = timeout(mptsas_ncmds_checkdrain,
 			    mpt, (MPTSAS_QUIESCE_TIMEOUT *
 			    drv_usectohz(1000000)));
-		} else {
-			mutex_exit(&mpt->m_intr_mutex);
-			/* Command queue has been drained */
-			cv_signal(&mpt->m_cv);
 		}
 	}
 	mutex_exit(&mpt->m_mutex);
@@ -10411,7 +9729,6 @@ mptsas_start_passthru(mptsas_t *mpt, mptsas_cmd_t *cmd)
 	(void) ddi_dma_sync(dma_hdl, 0, 0, DDI_DMA_SYNC_FORDEV);
 	request_desc_low = (cmd->cmd_slot << 16) + desc_type;
 	cmd->cmd_rfm = NULL;
-	mpt->m_active->m_slot[cmd->cmd_slot] = cmd;
 	MPTSAS_START_CMD(mpt, request_desc_low, request_desc_high);
 	if ((mptsas_check_dma_handle(dma_hdl) != DDI_SUCCESS) ||
 	    (mptsas_check_acc_handle(acc_hdl) != DDI_SUCCESS)) {
@@ -10842,7 +10159,6 @@ mptsas_start_diag(mptsas_t *mpt, mptsas_cmd_t *cmd)
 	request_desc_low = (cmd->cmd_slot << 16) +
 	    MPI2_REQ_DESCRIPT_FLAGS_DEFAULT_TYPE;
 	cmd->cmd_rfm = NULL;
-	mpt->m_active->m_slot[cmd->cmd_slot] = cmd;
 	MPTSAS_START_CMD(mpt, request_desc_low, 0);
 	if ((mptsas_check_dma_handle(mpt->m_dma_req_frame_hdl) !=
 	    DDI_SUCCESS) ||
@@ -12225,8 +11541,6 @@ mptsas_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *credp,
 	}
 
 out:
-	if (mpt->m_options & MPTSAS_OPT_PM)
-		(void) pm_idle_component(mpt->m_dip, 0);
 	return (status);
 }
 
@@ -12253,9 +11567,7 @@ mptsas_restart_ioc(mptsas_t *mpt)
 	ptgt = (mptsas_target_t *)mptsas_hash_traverse(&mpt->m_active->m_tgttbl,
 	    MPTSAS_HASH_FIRST);
 	while (ptgt != NULL) {
-		mutex_enter(&ptgt->m_tgt_intr_mutex);
 		mptsas_set_throttle(mpt, ptgt, HOLD_THROTTLE);
-		mutex_exit(&ptgt->m_tgt_intr_mutex);
 
 		ptgt = (mptsas_target_t *)mptsas_hash_traverse(
 		    &mpt->m_active->m_tgttbl, MPTSAS_HASH_NEXT);
@@ -12267,7 +11579,8 @@ mptsas_restart_ioc(mptsas_t *mpt)
 	MPTSAS_DISABLE_INTR(mpt);
 
 	/*
-	 * Abort all commands: outstanding commands, commands in waitq
+	 * Abort all commands: outstanding commands, commands in waitq and
+	 * tx_waitq.
 	 */
 	mptsas_flush_hba(mpt);
 
@@ -12296,9 +11609,7 @@ mptsas_restart_ioc(mptsas_t *mpt)
 	ptgt = (mptsas_target_t *)mptsas_hash_traverse(&mpt->m_active->m_tgttbl,
 	    MPTSAS_HASH_FIRST);
 	while (ptgt != NULL) {
-		mutex_enter(&ptgt->m_tgt_intr_mutex);
 		mptsas_set_throttle(mpt, ptgt, MAX_THROTTLE);
-		mutex_exit(&ptgt->m_tgt_intr_mutex);
 
 		ptgt = (mptsas_target_t *)mptsas_hash_traverse(
 		    &mpt->m_active->m_tgttbl, MPTSAS_HASH_NEXT);
@@ -12608,9 +11919,7 @@ mptsas_init_pm(mptsas_t *mpt)
 	pmc[0] = pmc_name;
 	if (ddi_prop_update_string_array(DDI_DEV_T_NONE, mpt->m_dip,
 	    "pm-components", pmc, 3) != DDI_PROP_SUCCESS) {
-		mutex_enter(&mpt->m_intr_mutex);
 		mpt->m_options &= ~MPTSAS_OPT_PM;
-		mutex_exit(&mpt->m_intr_mutex);
 		mptsas_log(mpt, CE_WARN,
 		    "mptsas%d: pm-component property creation failed.",
 		    mpt->m_instance);
@@ -12633,9 +11942,7 @@ mptsas_init_pm(mptsas_t *mpt)
 		mptsas_log(mpt, CE_WARN, "pm_power_has_changed failed");
 		return (DDI_FAILURE);
 	}
-	mutex_enter(&mpt->m_intr_mutex);
 	mpt->m_power_level = PM_LEVEL_D0;
-	mutex_exit(&mpt->m_intr_mutex);
 	/*
 	 * Set pm idle delay.
 	 */
@@ -13076,7 +12383,7 @@ mptsas_get_target_device_info(mptsas_t *mpt, uint32_t page_address,
 
 	phymask = mptsas_physport_to_phymask(mpt, physport);
 	*pptgt = mptsas_tgt_alloc(&slots->m_tgttbl, *dev_handle, sas_wwn,
-	    dev_info, phymask, phynum, mpt);
+	    dev_info, phymask, phynum);
 	if (*pptgt == NULL) {
 		mptsas_log(mpt, CE_WARN, "Failed to allocated target"
 		    "structure!");
@@ -15784,7 +15091,7 @@ mptsas_search_by_devhdl(mptsas_hash_table_t *hashtab, uint16_t devhdl)
 
 mptsas_target_t *
 mptsas_tgt_alloc(mptsas_hash_table_t *hashtab, uint16_t devhdl, uint64_t wwid,
-    uint32_t devinfo, mptsas_phymask_t phymask, uint8_t phynum, mptsas_t *mpt)
+    uint32_t devinfo, mptsas_phymask_t phymask, uint8_t phynum)
 {
 	mptsas_target_t *tmp_tgt = NULL;
 
@@ -15810,8 +15117,6 @@ mptsas_tgt_alloc(mptsas_hash_table_t *hashtab, uint16_t devhdl, uint64_t wwid,
 	tmp_tgt->m_qfull_retry_interval =
 	    drv_usectohz(QFULL_RETRY_INTERVAL * 1000);
 	tmp_tgt->m_t_throttle = MAX_THROTTLE;
-	mutex_init(&tmp_tgt->m_tgt_intr_mutex, NULL, MUTEX_DRIVER,
-	    DDI_INTR_PRI(mpt->m_intr_pri));
 
 	mptsas_hash_add(hashtab, tmp_tgt);
 
@@ -15827,7 +15132,6 @@ mptsas_tgt_free(mptsas_hash_table_t *hashtab, uint64_t wwid,
 	if (tmp_tgt == NULL) {
 		cmn_err(CE_WARN, "Tgt not found, nothing to free");
 	} else {
-		mutex_destroy(&tmp_tgt->m_tgt_intr_mutex);
 		kmem_free(tmp_tgt, sizeof (struct mptsas_target));
 	}
 }
@@ -16174,26 +15478,4 @@ mptsas_dma_addr_destroy(ddi_dma_handle_t *dma_hdp, ddi_acc_handle_t *acc_hdp)
 	(void) ddi_dma_mem_free(acc_hdp);
 	ddi_dma_free_handle(dma_hdp);
 	dma_hdp = NULL;
-}
-
-static int
-mptsas_outstanding_cmds_n(mptsas_t *mpt)
-{
-	int n = 0, i;
-	for (i = 0; i < mpt->m_slot_freeq_pair_n; i++) {
-		mutex_enter(&mpt->m_slot_freeq_pairp[i].
-		    m_slot_allocq.s.m_fq_mutex);
-		mutex_enter(&mpt->m_slot_freeq_pairp[i].
-		    m_slot_releq.s.m_fq_mutex);
-		n += (mpt->m_slot_freeq_pairp[i].m_slot_allocq.s.m_fq_n_init -
-		    mpt->m_slot_freeq_pairp[i].m_slot_allocq.s.m_fq_n -
-		    mpt->m_slot_freeq_pairp[i].m_slot_releq.s.m_fq_n);
-		mutex_exit(&mpt->m_slot_freeq_pairp[i].
-		    m_slot_releq.s.m_fq_mutex);
-		mutex_exit(&mpt->m_slot_freeq_pairp[i].
-		    m_slot_allocq.s.m_fq_mutex);
-	}
-	if (mpt->m_max_requests - 2 < n)
-		panic("mptsas: free slot allocq and releq crazy");
-	return (n);
 }

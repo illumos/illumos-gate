@@ -1140,7 +1140,7 @@ do_print_vdev(uintptr_t addr, int flags, int depth, int stats,
 	}
 
 	if (flags & DCMD_PIPE_OUT) {
-		mdb_printf("%#lr", addr);
+		mdb_printf("%#lr\n", addr);
 	} else {
 		if (vdev.vdev_path != NULL) {
 			if (mdb_readstr(desc, sizeof (desc),

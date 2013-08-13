@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1983, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 /*
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
@@ -1506,7 +1507,14 @@ getbounds(const char *f)
 	long b = -1;
 	const char *p = strrchr(f, '/');
 
-	(void) sscanf(p ? p + 1 : f, "vmdump.%ld", &b);
+	if (p == NULL || strncmp(p, "vmdump", 6) != 0)
+		p = strstr(f, "vmdump");
+
+	if (p != NULL && *p == '/')
+		p++;
+
+	(void) sscanf(p ? p : f, "vmdump.%ld", &b);
+
 	return (b);
 }
 
@@ -1640,6 +1648,7 @@ main(int argc, char *argv[])
 	struct rlimit rl;
 	long filebounds = -1;
 	char namelist[30], corefile[30], boundstr[30];
+	dumpfile = NULL;
 
 	startts = gethrtime();
 
@@ -1680,7 +1689,11 @@ main(int argc, char *argv[])
 		}
 	}
 
-	if (geteuid() != 0 && filebounds < 0) {
+	/*
+	 * If doing something other than extracting an existing dump (i.e.
+	 * dumpfile has been provided as an option), the user must be root.
+	 */
+	if (geteuid() != 0 && dumpfile == NULL) {
 		(void) fprintf(stderr, "%s: %s %s\n", progname,
 		    gettext("you must be root to use"), progname);
 		exit(1);

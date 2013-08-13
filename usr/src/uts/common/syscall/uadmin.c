@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2013 Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -47,6 +48,7 @@
 #include <sys/cmn_err.h>
 #include <sys/panic.h>
 #include <sys/ddi.h>
+#include <sys/ddi_periodic.h>
 #include <sys/sunddi.h>
 #include <sys/policy.h>
 #include <sys/zone.h>
@@ -283,6 +285,12 @@ kadmin(int cmd, int fcn, void *mdep, cred_t *credp)
 		vfs_unmountall();
 		(void) VFS_MOUNTROOT(rootvfs, ROOT_UNMOUNT);
 		vfs_syncall();
+
+		/*
+		 * Check for (and unregister) any DDI periodic handlers that
+		 * still exist, as they most likely constitute resource leaks:
+		 */
+		ddi_periodic_fini();
 
 		dump_ereports();
 		dump_messages();

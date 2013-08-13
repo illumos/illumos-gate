@@ -148,6 +148,7 @@ SYMBOL_SCOPE {
 		mdb_set_pipe			{ FLAGS = EXTERN };
 		mdb_snprintf			{ FLAGS = EXTERN };
 		mdb_strtoull			{ FLAGS = EXTERN };
+		mdb_symbol_iter			{ FLAGS = EXTERN };
 		mdb_tgt_notsup			{ FLAGS = EXTERN };
 		mdb_vnode2path			{ FLAGS = EXTERN };
 		mdb_vread			{ FLAGS = EXTERN };

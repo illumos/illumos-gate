@@ -1,6 +1,6 @@
 '\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
-.\" Copyright 2011, Joyent Inc
+.\" Copyright 2012, Joyent, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
@@ -488,7 +488,9 @@ conditions occurs.
 "\fBWait\fR" model services are restarted whenever the child process associated
 with the service exits. A child process that exits is not considered an error
 for "\fBwait\fR" model services, and repeated failures do not lead to a
-transition to maintenance state.
+transition to maintenance state. However, a wait service which is repeatedly
+exiting with an error that exceeds the default rate (5 failures/second) will be
+throttled back so that the service only restarts once per second.
 .SS "LEGACY SERVICES"
 .sp
 .LP

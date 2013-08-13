@@ -1,18 +1,19 @@
 '\" te
+.\" Copyright 2013, Joyent, Inc. All Rights Reserved.
 .\"  Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_PERIODIC_DELETE 9F "May 6, 2009"
+.TH DDI_PERIODIC_DELETE 9F "Jul 23, 2013"
 .SH NAME
-ddi_periodic_delete \- cancel nanosecond periodic timeout requests
+ddi_periodic_delete \- cancel periodic function invocation requests
 .SH SYNOPSIS
 .LP
 .nf
 #include <sys/dditypes.h>
 #include <sys/sunddi.h>
 
-\fBvoid\fR \fBddi_periodic_delete\fR(\fBddi_periodic_t\fR \fIreq\fR\fB);\fR
+\fBvoid\fR \fBddi_periodic_delete\fR(\fBddi_periodic_t\fR \fIrequest\fR\fB);\fR
 .fi
 
 .SH INTERFACE LEVEL
@@ -23,7 +24,7 @@ Solaris DDI specific (Solaris DDI)
 .sp
 .ne 2
 .na
-\fB\fIreq\fR\fR
+\fB\fIrequest\fR\fR
 .ad
 .RS 7n
 \fBddi_periodic_t\fR opaque value returned by \fBddi_periodic_add\fR(9F)
@@ -32,15 +33,20 @@ Solaris DDI specific (Solaris DDI)
 .SH DESCRIPTION
 .sp
 .LP
-The \fBddi_periodic_delete()\fR function cancels the \fBddi_periodic_add\fR(9F)
-request that was previously issued.
+The \fBddi_periodic_delete()\fR function cancels a periodic invocation request
+previously established with \fBddi_periodic_add\fR(9F).
 .sp
 .LP
-As with \fBuntimeout\fR(9F), calling \fBddi_periodic_delete()\fR against a
-periodic \fItimeout\fR request which is either running on another CPU, or has
-already been canceled causes no problems. Unlike \fBuntimeout\fR(9F), there are
-no restrictions on the lock which might be held across the call to
-\fBddi_periodic_delete()\fR.
+It is not possible to cancel a periodic invocation request from within the
+periodic callback itself; to do so is a programming error that will panic the
+system.  Instead, requests must be cancelled from some other user or kernel
+context routine, such as the \fBdetach\fR(9E) entry point of a module.
+.sp
+.LP
+If the callback function is already executing (for instance, on another CPU)
+when the request is cancelled, \fBddi_periodic_delete()\fR will block until
+it finishes executing and is completely unregistered.  The callback will not
+be invoked again after the call to \fBddi_periodic_delete()\fR returns.
 .SH CONTEXT
 .sp
 .LP
@@ -48,56 +54,54 @@ The \fBddi_periodic_delete()\fR function may be called from user or kernel
 context.
 .SH EXAMPLES
 .LP
-\fBExample 1 \fRCancelling a timeout request
+\fBExample 1 \fRCancelling a periodic invocation request
 .sp
 .LP
-In the following example, the device driver cancels the \fItimeout\fR request
-by calling \fBddi_periodic_delete()\fR against the request that was previously
-issued.
+In the following example, the device driver cancels the request
+by calling \fBddi_periodic_delete()\fR and passing the opaque \fIrequest\fR
+identifier returned by a previous call to \fBddi_periodic_add\fR(9F).
 
 .sp
 .in +2
 .nf
 /*
-* Stop the periodic timer
-*/
+ * Stop the periodic timer.
+ */
 static void
 stop_periodic_timer(struct my_state *statep)
 {
-         ddi_periodic_delete(statep->periodic_id);
-         delay(1); /* wait for one tick */
-         mutex_destory(&statep->lock);
+        ddi_periodic_delete(statep->periodic_id);
+        mutex_destroy(&statep->lock);
 }
 
 static void
 start_periodic_timer(struct my_state *statep)
 {
-         hrtime_t interval = CHECK_INTERVAL;
+        hrtime_t interval = CHECK_INTERVAL;
 
-         mutex_init(&statep->lock, NULL, MUTEX_DRIVER,
-             (void *)DDI_IPL_0);
+        mutex_init(&statep->lock, NULL, MUTEX_DRIVER, DDI_IPL_0);
 
-         /*
-          * Register my_callback which is invoked periodically
-          * in CHECK_INTERVAL in kernel context.
-          */
-         statep->periodic_id = ddi_periodic_add(my_periodic_func,
-             statep, interval, DDI_IPL_0);
+        /*
+         * Register my_callback which is invoked periodically
+         * in CHECK_INTERVAL in kernel context.
+         */
+        statep->periodic_id = ddi_periodic_add(my_periodic_func,
+            statep, interval, DDI_IPL_0);
 }
 
 static void
 my_periodic_func(void *arg)
 {
-           /*
-            * This handler is invoked periodically.
-            */
-           struct my_state *statep = (struct my_state *)arg;
+        /*
+         * This handler is invoked periodically.
+         */
+        struct my_state *statep = (struct my_state *)arg;
 
-           mutex_enter(&statep->lock);
-           if (load_unbalanced(statep)) {
-               balance_tasks(statep);
-           }
-           mutex_exit(&statep->lock);
+        mutex_enter(&statep->lock);
+        if (load_unbalanced(statep)) {
+                balance_tasks(statep);
+        }
+        mutex_exit(&statep->lock);
 }
 .fi
 .in -2
@@ -106,12 +110,11 @@ my_periodic_func(void *arg)
 .sp
 .LP
 \fBcv_timedwait\fR(9F), \fBddi_intr_get_pri\fR(9F), \fBddi_periodic_add\fR(9F),
-\fBdelay\fR(9F), \fBdrv_usectohz\fR(9F), \fBqtimeout\fR(9F),
-\fBquntimeout\fR(9F), \fBtimeout\fR(9F), \fBuntimeout\fR(9F)
+\fBqtimeout\fR(9F), \fBquntimeout\fR(9F), \fBtimeout\fR(9F), \fBuntimeout\fR(9F)
 .SH NOTES
 .sp
 .LP
-There might be a race between a callback invocation and
-\fBddi_periodic_delete()\fR. A device driver should take a responsibility for
-this avoidance if needed by using the kernel synchronization such as a mutex
-lock or calling \fBdelay\fR(9F) as in the example above.
+Historically this interface was advertised as safe for use from within the
+periodic callback function.  In order to ensure the correct operation of the
+system, and as reflected in the documentation above, this unlikely (and
+unsafe) usage pattern is no longer allowed.

@@ -180,6 +180,14 @@ typedef struct mdb_object {
 	uintptr_t obj_size;		/* in memory size of object in bytes */
 } mdb_object_t;
 
+typedef struct mdb_symbol {
+	const char *sym_name;		/* name of symbol */
+	const char *sym_object;		/* name of containing object */
+	const GElf_Sym *sym_sym;	/* ELF symbol information */
+	uint_t sym_table;		/* symbol table id */
+	uint_t sym_id;			/* symbol identifier */
+} mdb_symbol_t;
+
 extern int mdb_pwalk(const char *, mdb_walk_cb_t, void *, uintptr_t);
 extern int mdb_walk(const char *, mdb_walk_cb_t, void *);
 
@@ -295,6 +303,28 @@ extern ssize_t mdb_get_xdata(const char *, void *, size_t);
 
 typedef int (*mdb_object_cb_t)(mdb_object_t *, void *);
 extern int mdb_object_iter(mdb_object_cb_t, void *);
+
+#define	MDB_SYMTAB		1	/* Normal symbol table (.symtab) */
+#define	MDB_DYNSYM		2	/* Dynamic symbol table (.dynsym) */
+
+#define	MDB_BIND_LOCAL		0x0001	/* Local (static-scope) symbols */
+#define	MDB_BIND_GLOBAL		0x0002	/* Global symbols */
+#define	MDB_BIND_WEAK		0x0004	/* Weak binding symbols */
+#define	MDB_BIND_ANY		0x0007	/* Any of the above */
+
+#define	MDB_TYPE_NOTYPE		0x0100	/* Symbol has no type */
+#define	MDB_TYPE_OBJECT		0x0200	/* Symbol refers to data */
+#define	MDB_TYPE_FUNC		0x0400	/* Symbol refers to text */
+#define	MDB_TYPE_SECT		0x0800	/* Symbol refers to a section */
+#define	MDB_TYPE_FILE		0x1000	/* Symbol refers to a source file */
+#define	MDB_TYPE_COMMON		0x2000	/* Symbol refers to a common block */
+#define	MDB_TYPE_TLS		0x4000	/* Symbol refers to TLS */
+
+#define	MDB_TYPE_ANY		0x7f00	/* Any of the above */
+
+typedef int (*mdb_symbol_cb_t)(mdb_symbol_t *, void *);
+extern int mdb_symbol_iter(const char *, uint_t, uint_t, mdb_symbol_cb_t,
+    void *);
 
 #define	MDB_STATE_IDLE		0	/* Target is idle (not running yet) */
 #define	MDB_STATE_RUNNING	1	/* Target is currently executing */

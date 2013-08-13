@@ -23,8 +23,9 @@
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ */
 
 #include <stdio.h>
 
@@ -32,24 +33,24 @@ int
 main(int argc, char **argv)
 {
 	if (argc <= 1) {
-		for (;;) {
-			(void) putchar('y');
-			(void) putchar('\n');
-		}
+		while (puts("y") != EOF)
+			continue;
 	} else {
 		for (;;) {
 			int i;
 
 			for (i = 1; i < argc; i++) {
 				if (i > 1)
-					(void) putchar(' ');
-				(void) fputs(argv[i], stdout);
+					if (putchar(' ') == EOF)
+						goto err;
+				if (fputs(argv[i], stdout) == EOF)
+					goto err;
 			}
-			(void) putchar('\n');
+			if (putchar('\n') == EOF)
+				goto err;
 		}
 	}
-#if defined(lint)
-	/*NOTREACHED*/
-	return (0);
-#endif
+
+err:
+	return (1);
 }

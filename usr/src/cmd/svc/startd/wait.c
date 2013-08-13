@@ -21,9 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012, Joyent, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * wait.c - asynchronous monitoring of "wait registered" start methods
@@ -90,6 +89,7 @@ static void
 wait_remove(wait_info_t *wi, int direct)
 {
 	int status;
+	stop_cause_t cause = RSTOP_EXIT;
 
 	if (waitpid(wi->wi_pid, &status, 0) == -1) {
 		if (wi->wi_parent)
@@ -101,6 +101,10 @@ wait_remove(wait_info_t *wi, int direct)
 			log_framework(LOG_NOTICE,
 			    "instance %s exited with status %d\n", wi->wi_fmri,
 			    WEXITSTATUS(status));
+			if (WEXITSTATUS(status) == SMF_EXIT_ERR_CONFIG)
+				cause = RSTOP_ERR_CFG;
+			else
+				cause = RSTOP_ERR_EXIT;
 		}
 	}
 
@@ -137,7 +141,7 @@ wait_remove(wait_info_t *wi, int direct)
 
 		log_framework(LOG_DEBUG,
 		    "wait_remove requesting stop of %s\n", wi->wi_fmri);
-		(void) stop_instance_fmri(wait_hndl, wi->wi_fmri, RSTOP_EXIT);
+		(void) stop_instance_fmri(wait_hndl, wi->wi_fmri, cause);
 	}
 
 	uu_list_node_fini(wi, &wi->wi_link, wait_info_pool);

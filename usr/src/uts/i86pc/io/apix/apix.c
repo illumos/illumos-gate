@@ -27,7 +27,7 @@
  * All rights reserved.
  */
 /*
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -75,6 +75,7 @@
 #include <sys/pci_intr_lib.h>
 #include <sys/spl.h>
 #include <sys/clock.h>
+#include <sys/cyclic.h>
 #include <sys/dditypes.h>
 #include <sys/sunddi.h>
 #include <sys/x_call.h>
@@ -1072,6 +1073,9 @@ apix_post_cyclic_setup(void *arg)
 {
 	UNREFERENCED_1PARAMETER(arg);
 
+	cyc_handler_t cyh;
+	cyc_time_t cyt;
+
 	/* cpu_lock is held */
 	/* set up a periodic handler for intr redistribution */
 
@@ -1084,12 +1088,19 @@ apix_post_cyclic_setup(void *arg)
 
 	/*
 	 * Register a periodical handler for the redistribution processing.
-	 * On X86, CY_LOW_LEVEL is mapped to the level 2 interrupt, so
-	 * DDI_IPL_2 should be passed to ddi_periodic_add() here.
+	 * Though we would generally prefer to use the DDI interface for
+	 * periodic handler invocation, ddi_periodic_add(9F), we are
+	 * unfortunately already holding cpu_lock, which ddi_periodic_add will
+	 * attempt to take for us.  Thus, we add our own cyclic directly:
 	 */
-	apic_periodic_id = ddi_periodic_add(
-	    (void (*)(void *))apix_redistribute_compute, NULL,
-	    apic_redistribute_sample_interval, DDI_IPL_2);
+	cyh.cyh_func = (void (*)(void *))apix_redistribute_compute;
+	cyh.cyh_arg = NULL;
+	cyh.cyh_level = CY_LOW_LEVEL;
+
+	cyt.cyt_when = 0;
+	cyt.cyt_interval = apic_redistribute_sample_interval;
+
+	apic_cyclic_id = cyclic_add(&cyh, &cyt);
 }
 
 /*
