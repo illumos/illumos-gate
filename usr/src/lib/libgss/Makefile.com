@@ -111,8 +111,6 @@ CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-empty-body
 
-$(EXPORT_RELEASE_BUILD)include $(CLOSED)/lib/libgss/Makefile.export
-
 .KEEP_STATE:
 
 all: $(LIBS)

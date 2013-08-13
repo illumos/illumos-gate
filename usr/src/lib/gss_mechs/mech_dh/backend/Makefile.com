@@ -44,10 +44,6 @@ OBJECTS= $(MECH) $(CRYPTO) $(DERIVED_OBJS)
 # include library definitions
 include ../../../../Makefile.lib
 
-MAKEFILE_EXPORT = $(CLOSED)/lib/gss_mechs/mech_dh/backend/Makefile.export
-$(EXPORT_RELEASE_BUILD)include $(MAKEFILE_EXPORT)
-
-
 CPPFLAGS += -I../mech -I../crypto -I$(SRC)/uts/common/gssapi/include
 
 CERRWARN +=	-_gcc=-Wno-parentheses
