@@ -43,9 +43,6 @@ CPPFLAGS +=	-I../../libgss -I$(SRC)/uts/common/gssapi/include \
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-uninitialized
 
-MAKEFILE_EXPORT = $(CLOSED)/lib/gss_mechs/mech_dummy/Makefile.export
-$(EXPORT_RELEASE_BUILD)include $(MAKEFILE_EXPORT)
-
 SRCDIR =	../mech
 LIBS =		$(DYNLIB)
 LDLIBS +=	-lgss -lc

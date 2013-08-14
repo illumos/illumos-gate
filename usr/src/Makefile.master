@@ -48,11 +48,6 @@ NATIVE_ADJUNCT=	/usr
 # identification strings. Enabling RELEASE_BUILD automatically enables
 # INTERNAL_RELEASE_BUILD.
 #
-# EXPORT_RELEASE_BUILD controls whether binaries are built in a form that
-# can be released for export under a binary license.  It is orthogonal to
-# the other *RELEASE_BUILD settings.  ("#" means do an export release
-# build, "" means do a normal build.)
-#
 # CLOSED_BUILD controls whether we try to build files under
 # usr/closed.  ("" means to build closed code, "#" means don't try to
 # build it.)  Skipping the closed code implies doing an export release
@@ -89,9 +84,6 @@ PATCH_BUILD=				$(POUND_SIGN)
 # If CLOSED_IS_PRESENT is not set, assume the closed tree is present.
 CLOSED_BUILD_1=	$(CLOSED_IS_PRESENT:yes=)
 CLOSED_BUILD=	$(CLOSED_BUILD_1:no=$(POUND_SIGN))
-
-EXPORT_RELEASE_BUILD=			$(POUND_SIGN)
-$(CLOSED_BUILD)EXPORT_RELEASE_BUILD=
 
 # SPARC_BLD is '#' for an Intel build.
 # INTEL_BLD is '#' for a Sparc build.
@@ -957,23 +949,6 @@ CTFCONVERT_O		= $(CTFCONVERT) $(CTFCVTFLAGS) $@
 ELFSIGN_O=	$(TRUE)
 ELFSIGN_CRYPTO=	$(ELFSIGN_O)
 ELFSIGN_OBJECT=	$(ELFSIGN_O)
-$(EXPORT_RELEASE_BUILD)ELFSIGN_O =	$(ELFSIGN)
-$(EXPORT_RELEASE_BUILD)ELFSIGN_CFNAME =	SUNWosnetCF
-$(EXPORT_RELEASE_BUILD)ELFSIGN_KEY =	\
-			$(CLOSED)/cmd/cmd-crypto/etc/keys/$(ELFSIGN_CFNAME)
-$(EXPORT_RELEASE_BUILD)ELFSIGN_CERT=	\
-			$(CLOSED)/cmd/cmd-crypto/etc/certs/$(ELFSIGN_CFNAME)
-$(EXPORT_RELEASE_BUILD)ELFSIGN_SENAME =	SUNWosnetSE
-$(EXPORT_RELEASE_BUILD)ELFSIGN_SEKEY =	\
-			$(CLOSED)/cmd/cmd-crypto/etc/keys/$(ELFSIGN_SENAME)
-$(EXPORT_RELEASE_BUILD)ELFSIGN_SECERT=	\
-			$(CLOSED)/cmd/cmd-crypto/etc/certs/$(ELFSIGN_SENAME)
-$(EXPORT_RELEASE_BUILD)ELFSIGN_CRYPTO=	$(ELFSIGN_O) sign \
-			$(ELFSIGN_FORMAT_OPTION) \
-			-k $(ELFSIGN_KEY) -c $(ELFSIGN_CERT) -e $@
-$(EXPORT_RELEASE_BUILD)ELFSIGN_OBJECT=	$(ELFSIGN_O) sign \
-			$(ELFSIGN_FORMAT_OPTION) \
-			-k $(ELFSIGN_SEKEY) -c $(ELFSIGN_SECERT) -e $@
 
 # Rules (normally from make.rules) and macros which are used for post
 # processing files. Normally, these do stripping of the comment section

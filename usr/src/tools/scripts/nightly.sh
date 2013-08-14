@@ -2627,7 +2627,6 @@ if is_source_build && [ $build_ok = y ] ; then
 		fi
 	fi
 
-	export EXPORT_RELEASE_BUILD ; EXPORT_RELEASE_BUILD=#
 	normal_build
 fi
 
