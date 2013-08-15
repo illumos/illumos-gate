@@ -1022,7 +1022,7 @@ sdev_direnter(struct sdev_node *ddv, struct sdev_node *dv)
 static void
 decr_link(struct sdev_node *dv)
 {
-	ASSERT(RW_WRITE_HELD(&dv->sdev_contents));
+	VERIFY(RW_WRITE_HELD(&dv->sdev_contents));
 	if (dv->sdev_state != SDEV_INIT) {
 		VERIFY(dv->sdev_nlink >= 1);
 		dv->sdev_nlink--;
