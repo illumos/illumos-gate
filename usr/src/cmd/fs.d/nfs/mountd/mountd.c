@@ -2020,7 +2020,7 @@ getclientsflavors_new(share_t *sh, SVCXPRT *transp, struct netbuf **nb,
 	char *lasts;
 	char *f;
 	boolean_t access_ok;
-	int count, c, perm;
+	int count, c;
 	boolean_t reject = B_FALSE;
 
 	opts = strdup(sh->sh_opts);
@@ -2030,7 +2030,7 @@ getclientsflavors_new(share_t *sh, SVCXPRT *transp, struct netbuf **nb,
 	}
 
 	p = opts;
-	perm = count = c = 0;
+	count = c = 0;
 	/* default access is rw */
 	access_ok = B_TRUE;
 

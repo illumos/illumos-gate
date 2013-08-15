@@ -104,12 +104,12 @@ int
 fs_smf_set_prop(smf_fstype_t fstype, char *prop_name, char *valbuf,
     char *instance, scf_type_t sctype, char *fmri)
 {
-	fs_smfhandle_t *phandle;
+	fs_smfhandle_t *phandle = NULL;
 	scf_handle_t *handle;
 	scf_propertygroup_t *pg;
 	scf_property_t *prop;
-	scf_transaction_t *tran;
-	scf_transaction_entry_t *entry;
+	scf_transaction_t *tran = NULL;
+	scf_transaction_entry_t *entry = NULL;
 	scf_instance_t *inst;
 	scf_value_t *val;
 	int valint;
@@ -238,7 +238,7 @@ int
 fs_smf_get_prop(smf_fstype_t fstype, char *prop_name, char *cbuf,
     char *instance, scf_type_t sctype, char *fmri, int *bufsz)
 {
-	fs_smfhandle_t *phandle;
+	fs_smfhandle_t *phandle = NULL;
 	scf_handle_t *handle;
 	scf_propertygroup_t *pg;
 	scf_property_t *prop;
