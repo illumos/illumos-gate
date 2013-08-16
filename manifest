@@ -1525,6 +1525,7 @@ f lib/svc/manifest/network/routing/ripng.xml 0444 root sys
 f lib/svc/manifest/network/routing/route.xml 0444 root sys
 d lib/svc/manifest/network/rpc 0755 root sys
 f lib/svc/manifest/network/rpc/bind.xml 0444 root sys
+f lib/svc/manifest/network/rpc/gss.xml 0444 root sys 
 d lib/svc/manifest/network/security 0755 root sys
 f lib/svc/manifest/network/sendmail-client.xml 0444 root sys
 d lib/svc/manifest/network/shares 0755 root sys
