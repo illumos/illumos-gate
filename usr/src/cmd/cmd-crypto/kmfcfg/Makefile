@@ -47,7 +47,7 @@ POFILES		= $(OBJS:%.o=%.po)
 POFILE		= $(PROG)_msg.po
 MSGFILES	= $(SRCS:%.c=%.i)
 
-CPPFLAGS	+= -I$(ADJUNCT_PROTO)//usr/include/libxml2 \
+CPPFLAGS	+= -I$(ADJUNCT_PROTO)/usr/include/libxml2 \
 		-I$(KMFDIR)/include -I.
 LDLIBS		+= -L$(ROOT)/usr/lib -lkmf -lcryptoutil
 XMLLIB		= -lxml2

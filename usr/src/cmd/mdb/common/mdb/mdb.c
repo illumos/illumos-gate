@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ */
+/*
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright (c) 2012 Joyent, Inc. All rights reserved.
  */
@@ -952,9 +954,8 @@ mdb_call(uintmax_t addr, uintmax_t count, uint_t flags)
 
 		} else {
 			mdb_intr_enable();
-			status = mdb_call_idcmd(cp->c_dcmd, addr, count, flags,
-			    &cp->c_argv, &cp->c_addrv, cp->c_vcbs);
-			mdb.m_lastret = status;
+			mdb.m_lastret = mdb_call_idcmd(cp->c_dcmd, addr, count,
+			    flags, &cp->c_argv, &cp->c_addrv, cp->c_vcbs);
 			mdb_intr_disable();
 		}
 

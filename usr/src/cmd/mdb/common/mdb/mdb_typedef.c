@@ -1,25 +1,48 @@
 /*
- * CDDL HEADER START
+ * This file and its contents are supplied under the terms of the
+ * Common Development and Distribution License ("CDDL"), version 1.0.
+ * You may only use this file in accordance with the terms of version
+ * 1.0 of the CDDL.
  *
- * The contents of this file are subject to the terms of the
- * Common Development and Distribution License (the "License").
- * You may not use this file except in compliance with the License.
- *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
- * See the License for the specific language governing permissions
- * and limitations under the License.
- *
- * When distributing Covered Code, include this CDDL HEADER in each
- * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
- * If applicable, add the following below this CDDL HEADER, with the
- * fields enclosed by brackets "[]" replaced with your own identifying
- * information: Portions Copyright [yyyy] [name of copyright owner]
- *
- * CDDL HEADER END
+ * A full copy of the text of the CDDL should have accompanied this
+ * source.  A copy of the CDDL is also available via the Internet at
+ * http://www.illumos.org/license/CDDL.
  */
+
 /*
  * Copyright (c) 2013 Joyent, Inc. All rights reserved.
+ */
+
+/*
+ * ::typedef exists to allow a user to create and import auxiliary CTF
+ * information for the currently running target. ::typedef is similar to the C
+ * typedef keyword. However, ::typedef has no illusions of grandeur. It is not a
+ * standards complaint version of C's typedef. For specifics on what it does and
+ * does not support, please see the help message for ::typedef later on in this
+ * file.
+ *
+ * In addition to allowing the user to create types, it has a notion of a
+ * built-in set of types that a compiler might provide. Currently ::typedef
+ * supports both the standard illumos 32-bit and 64-bit environments, mainly
+ * LP32 and LP64. These are not present by default; it is up to the user to
+ * request that they be inserted.
+ *
+ * To facilitate this, ::typedef adds all of its type information to an
+ * auxiliary CTF container that is a part of the global mdb state. This is
+ * abstracted away from ::typedef by the mdb_ctf_* apis. This container is
+ * referred to as the synthetic container, as it holds these synthetic types.
+ * The synthetic container does not have a parent CTF container. This is rather
+ * important to its operation, as a user can end up referencing types that come
+ * from many different such containers (eg. different kernel modules). As such,
+ * whenever a type is referenced that we do not know about, we search all of the
+ * CTF containers that mdb knows about it. If we find it, then that type is
+ * imported (along with all of its dependent types) into the synthetic
+ * container.
+ *
+ * Finally, ::typedef can source CTF information from external files with the -r
+ * option. This will copy in every type from their container into the synthetic
+ * container, because of this the parent and child relationship between
+ * containers with parents cannot be maintained.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -64,16 +87,16 @@ typedef_valid_identifier(const char *str)
 		return (1);
 
 	if (*str != '_' &&
-	    (*str < 0x41 || *str > 0x5a) &&
-	    (*str < 0x61 || *str > 0x7a))
+	    (*str < 'A' || *str > 'Z') &&
+	    (*str < 'a' || *str > 'z'))
 		return (1);
 	str++;
 
 	while (*str != '\0') {
 		if (*str != '_' &&
-		    (*str < 0x30 || *str > 0x39) &&
-		    (*str < 0x41 || *str > 0x5a) &&
-		    (*str < 0x61 || *str > 0x7a))
+		    (*str < '0' || *str > '9') &&
+		    (*str < 'A' || *str > 'Z') &&
+		    (*str < 'a' || *str > 'z'))
 			return (1);
 		str++;
 	}
@@ -132,7 +155,6 @@ typedef_join_strings(int nstr, const mdb_arg_t *args, int flags)
 static int
 typedef_list(void)
 {
-
 	(void) mdb_ctf_type_iter(MDB_CTF_SYNTHETIC_ITER, typedef_list_cb,
 	    NULL);
 	return (DCMD_OK);

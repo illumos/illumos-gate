@@ -1716,7 +1716,7 @@ mdb_ctf_synthetics_create_base(int kind)
 
 	if (mdb.m_synth == NULL) {
 		mdb_printf("synthetic types disabled: ctf create failed\n");
-		return (DCMD_ERR);
+		return (1);
 	}
 
 	switch (kind) {
@@ -1747,14 +1747,12 @@ mdb_ctf_synthetics_create_base(int kind)
 		if (err == CTF_ERR) {
 			mdb_dprintf(MDB_DBG_CTF, "couldn't add synthetic "
 			    "type: %s\n", synp->syn_name);
-			err = set_errno(ctf_to_errno(ctf_errno(cp)));
 			goto discard;
 		}
 	}
 
 	if (ctf_update(cp) == CTF_ERR) {
 		mdb_dprintf(MDB_DBG_CTF, "failed to update synthetic types\n");
-		err = set_errno(ctf_to_errno(ctf_errno(cp)));
 		goto discard;
 	}
 
@@ -1763,7 +1761,6 @@ mdb_ctf_synthetics_create_base(int kind)
 		if (id == CTF_ERR) {
 			mdb_dprintf(MDB_DBG_CTF, "cailed to lookup %s: %s\n",
 			    sytp->syt_src, ctf_errmsg(ctf_errno(cp)));
-			err = set_errno(ctf_to_errno(ctf_errno(cp)));
 			goto discard;
 		}
 		if (ctf_add_typedef(cp, CTF_ADD_ROOT, sytp->syt_targ, id) ==
@@ -1771,14 +1768,12 @@ mdb_ctf_synthetics_create_base(int kind)
 			mdb_dprintf(MDB_DBG_CTF, "couldn't add typedef %s "
 			    "%s: %s\n", sytp->syt_targ, sytp->syt_src,
 			    ctf_errmsg(ctf_errno(cp)));
-			err = set_errno(ctf_to_errno(ctf_errno(cp)));
 			goto discard;
 		}
 	}
 
 	if (ctf_update(cp) == CTF_ERR) {
 		mdb_dprintf(MDB_DBG_CTF, "failed to update synthetic types\n");
-		err = set_errno(ctf_to_errno(ctf_errno(cp)));
 		goto discard;
 	}
 
@@ -1805,7 +1800,7 @@ mdb_ctf_add_typedef(const char *name, const mdb_ctf_id_t *p, mdb_ctf_id_t *new)
 
 	if (mdb.m_synth == NULL) {
 		mdb_printf("synthetic types disabled: ctf create failed\n");
-		return (DCMD_ERR);
+		return (1);
 	}
 
 	if (mdb_ctf_lookup_by_name(name, &tid) == 0) {
@@ -1847,7 +1842,7 @@ mdb_ctf_add_struct(const char *name, mdb_ctf_id_t *rid)
 
 	if (mdb.m_synth == NULL) {
 		mdb_printf("synthetic types disabled: ctf create failed\n");
-		return (DCMD_ERR);
+		return (1);
 	}
 
 	if (name != NULL && mdb_ctf_lookup_by_name(name, &tid) == 0) {
@@ -1883,7 +1878,7 @@ mdb_ctf_add_union(const char *name, mdb_ctf_id_t *rid)
 
 	if (mdb.m_synth == NULL) {
 		mdb_printf("synthetic types disabled: ctf create failed\n");
-		return (DCMD_ERR);
+		return (1);
 	}
 
 	if (name != NULL && mdb_ctf_lookup_by_name(name, &tid) == 0) {
@@ -1971,7 +1966,7 @@ mdb_ctf_add_array(const mdb_ctf_arinfo_t *marp, mdb_ctf_id_t *rid)
 
 	if (mdb.m_synth == NULL) {
 		mdb_printf("synthetic types disabled: ctf create failed\n");
-		return (DCMD_ERR);
+		return (1);
 	}
 
 	car.ctr_nelems = marp->mta_nelems;
@@ -2027,7 +2022,7 @@ mdb_ctf_add_pointer(const mdb_ctf_id_t *p, mdb_ctf_id_t *rid)
 
 	if (mdb.m_synth == NULL) {
 		mdb_printf("synthetic types disabled: ctf create failed\n");
-		return (DCMD_ERR);
+		return (1);
 	}
 
 	id = ctf_add_type(mdb.m_synth, mcip->mci_fp, mcip->mci_id);
@@ -2073,7 +2068,7 @@ mdb_ctf_type_delete(const mdb_ctf_id_t *id)
 
 	if (mcip->mci_fp != mdb.m_synth) {
 		mdb_warn("bad ctf_file_t, expected synth container\n");
-		return (DCMD_ERR);
+		return (1);
 	}
 
 	ret = ctf_delete_type(mcip->mci_fp, mcip->mci_id);
@@ -2116,12 +2111,12 @@ mdb_ctf_synthetics_from_file(const char *file)
 
 	if (syn == NULL) {
 		mdb_warn("synthetic types disabled: ctf create failed\n");
-		return (DCMD_ERR);
+		return (1);
 	}
 
 	if ((fp = mdb_ctf_open(file, &ret)) == NULL) {
 		mdb_warn("failed to parse ctf data in %s", file);
-		return (DCMD_ERR);
+		return (1);
 	}
 
 	ret = DCMD_OK;
@@ -2141,7 +2136,7 @@ mdb_ctf_synthetics_from_file(const char *file)
 
 cleanup:
 	ctf_close(fp);
-	if (ret != DCMD_OK)
+	if (ret != 0)
 		(void) ctf_discard(syn);
 	return (ret);
 }
