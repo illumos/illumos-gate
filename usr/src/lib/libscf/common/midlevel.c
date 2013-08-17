@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include "libscf_impl.h"
@@ -1842,11 +1843,14 @@ scf_simple_app_props_get(scf_handle_t *hin, const char *inst_fmri)
 	    (pgiter = scf_iter_create(h)) == NULL ||
 	    (propiter = scf_iter_create(h)) == NULL ||
 	    (pg = scf_pg_create(h)) == NULL ||
-	    (prop = scf_property_create(h)) == NULL)
+	    (prop = scf_property_create(h)) == NULL) {
+		free(sys_fmri);
 		goto error2;
+	}
 
 	if (scf_handle_decode_fmri(h, sys_fmri, NULL, svc, inst, NULL, NULL,
 	    SCF_DECODE_FMRI_REQUIRE_INSTANCE) == -1) {
+		free(sys_fmri);
 		if (scf_error() == SCF_ERROR_CONSTRAINT_VIOLATED)
 			(void) scf_set_error(SCF_ERROR_INVALID_ARGUMENT);
 		goto error2;
@@ -1858,6 +1862,7 @@ scf_simple_app_props_get(scf_handle_t *hin, const char *inst_fmri)
 	    (pgname = malloc(namelen)) == NULL) {
 		free(thispg);
 		free(ret);
+		free(sys_fmri);
 		(void) scf_set_error(SCF_ERROR_NO_MEMORY);
 		goto error2;
 	}
@@ -2088,6 +2093,9 @@ scf_simple_app_props_get(scf_handle_t *hin, const char *inst_fmri)
 		goto error1;
 	}
 
+	if (ret->ap_pglist->pg_name == NULL)
+		goto error1;
+
 	scf_iter_destroy(pgiter);
 	scf_iter_destroy(propiter);
 	scf_pg_destroy(pg);
@@ -2098,9 +2106,6 @@ scf_simple_app_props_get(scf_handle_t *hin, const char *inst_fmri)
 	free(pgname);
 	if (local_h)
 		scf_handle_destroy(h);
-
-	if (ret->ap_pglist->pg_name == NULL)
-		return (NULL);
 
 	return (ret);
 
