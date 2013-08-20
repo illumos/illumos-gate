@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/strsun.h>
@@ -1533,9 +1533,20 @@ ipnospoof_check_v4(mac_client_impl_t *mcip, mac_protect_t *protect,
 	for (i = 0; i < protect->mp_ipaddrcnt; i++) {
 		mac_ipaddr_t	*v4addr = &protect->mp_ipaddrs[i];
 
-		if (v4addr->ip_version == IPV4_VERSION &&
-		    V4_PART_OF_V6(v4addr->ip_addr) == *addr)
-			return (B_TRUE);
+		if (v4addr->ip_version == IPV4_VERSION) {
+			if (v4addr->ip_v4netmask != 0) {
+				/*
+				 * Since we have a netmask we know this entry
+				 * signifies the entire subnet. Check if the
+				 * given address is on the subnet.
+				 */
+				if (htonl(V4_PART_OF_V6(v4addr->ip_addr)) ==
+				    (htonl(*addr) & v4addr->ip_v4netmask))
+					return (B_TRUE);
+			} else if (V4_PART_OF_V6(v4addr->ip_addr) == *addr) {
+				return (B_TRUE);
+			}
+		}
 	}
 	return (protect->mp_ipaddrcnt == 0 ?
 	    check_dhcpv4_dyn_ip(mcip, *addr) : B_FALSE);
