@@ -2053,7 +2053,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 				shndx = symshndx[ndx];
 			} else if ((shndx = sym->st_shndx) >= SHN_LORESERVE) {
 				sdflags |= FLG_SY_SPECSEC;
-			} else if (shndx > ifl->ifl_ehdr->e_shnum) {
+			} else if (shndx > ifl->ifl_shnum) {
 				/* We need the name before we can issue error */
 				shndx_bad = 1;
 			}
@@ -2368,7 +2368,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			shndx = symshndx[ndx];
 		} else if ((shndx = nsym->st_shndx) >= SHN_LORESERVE) {
 			sdflags |= FLG_SY_SPECSEC;
-		} else if (shndx > ifl->ifl_ehdr->e_shnum) {
+		} else if (shndx > ifl->ifl_shnum) {
 			/* We need the name before we can issue error */
 			shndx_bad = 1;
 		}

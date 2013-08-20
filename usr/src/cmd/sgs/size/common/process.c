@@ -22,7 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-   
+
 /*	Copyright (c) 1988 AT&T	*/
 /*	Copyright (c) 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
@@ -68,9 +68,9 @@ void
 process(Elf * elf)
 {
 	/* EXTERNAL VARIABLES USED */
-	extern int	fflag, /* full format for sections */
-			Fflag, /* full format for segments */
-			nflag; /* include non-loadable segments or sections */
+	extern int	fflag; /* full format for sections */
+	extern int	Fflag; /* full format for segments */
+	extern int	nflag; /* include non-loadable segments or sections */
 	extern int	numbase; /* hex, octal, or decimal */
 	extern char	*fname;
 	extern char	*archive;
@@ -78,23 +78,24 @@ process(Elf * elf)
 	extern int	oneflag;
 
 	/* LOCAL VARIABLES */
-	GElf_Xword	size, /* total size in non-default case for sections */
-			/*
-			 * size of first, second, third number and total size
-			 * in default case for sections.
-			 */
-			first,
-			second,
-			third,
-			totsize;
+	GElf_Xword	size; /* total size in non-default case for sections */
+	/*
+	 * size of first, second, third number and total size
+	 * in default case for sections.
+	 */
+	GElf_Xword	first;
+	GElf_Xword	second;
+	GElf_Xword	third;
+	GElf_Xword	totsize;
 	GElf_Ehdr	ehdr;
 	GElf_Shdr	shdr;
 	Elf_Scn		*scn;
-	unsigned	ndx = 0;
+	size_t		ndx = 0, shnum = 0;
 	int		numsect = 0;
 	int		notfirst = 0;
 	int		i;
 	char		*name = 0;
+
 
 /*
  * If there is a program header and the -f flag requesting section infor-
@@ -124,14 +125,19 @@ process(Elf * elf)
 	} else if (!oneflag && !is_archive) {
 		(void) printf("%s: ", fname);
 	}
-	ndx = ehdr.e_shstrndx;
+	if (elf_getshdrstrndx(elf, &ndx) == -1)
+		error(fname, "no string table");
 	scn = 0;
 	size = 0;
 	first = second = third = totsize = 0;
-	if (ehdr.e_shnum == 0) {
+
+	if (elf_getshdrnum(elf, &shnum) == -1)
+		error(fname, "can't get number of sections");
+
+	if (shnum == 0)
 		error(fname, "no section data");
-	}
-	numsect = ehdr.e_shnum;
+
+	numsect = shnum;
 	for (i = 0; i < numsect; i++) {
 		if ((scn = elf_nextscn(elf, scn)) == 0) {
 			break;
@@ -144,23 +150,23 @@ process(Elf * elf)
 			error(fname, "no segment data");
 			return;
 		} else if ((!(shdr.sh_flags & SHF_ALLOC)) &&
-			fflag && !(nflag)) {
+		    fflag && !(nflag)) {
 			continue;
 		} else if ((!(shdr.sh_flags & SHF_ALLOC)) && !(nflag)) {
 			continue;
 		} else if ((shdr.sh_flags & SHF_ALLOC) &&
-			(!(shdr.sh_flags & SHF_WRITE)) &&
-			(!(shdr.sh_type == SHT_NOBITS)) &&
-			!(fflag) && !(nflag)) {
+		    (!(shdr.sh_flags & SHF_WRITE)) &&
+		    (!(shdr.sh_type == SHT_NOBITS)) &&
+		    !(fflag) && !(nflag)) {
 			first += shdr.sh_size;
 		} else if ((shdr.sh_flags & SHF_ALLOC) &&
-			(shdr.sh_flags & SHF_WRITE) &&
-			(!(shdr.sh_type == SHT_NOBITS)) &&
-			!(fflag) && !(nflag)) {
+		    (shdr.sh_flags & SHF_WRITE) &&
+		    (!(shdr.sh_type == SHT_NOBITS)) &&
+		    !(fflag) && !(nflag)) {
 			second += shdr.sh_size;
 		} else if ((shdr.sh_flags & SHF_WRITE) &&
-			(shdr.sh_type == SHT_NOBITS) &&
-			!(fflag) && !(nflag)) {
+		    (shdr.sh_type == SHT_NOBITS) &&
+		    !(fflag) && !(nflag)) {
 			third += shdr.sh_size;
 		}
 		name = elf_strptr(elf, ndx, (size_t)shdr.sh_name);
@@ -182,7 +188,7 @@ process(Elf * elf)
 	if (!fflag && !nflag) {
 		totsize = first + second + third;
 		(void) printf(format[numbase],
-			first, second, third, totsize);
+		    first, second, third, totsize);
 	}
 
 	if (Fflag) {
@@ -215,19 +221,19 @@ process_phdr(Elf * elf, GElf_Half num)
 	int		i;
 	int		notfirst = 0;
 	GElf_Phdr	p;
-	GElf_Xword	memsize,
-			total,
-			First,
-			Second,
-			Third,
-			Totsize;
-		extern int Fflag;
-		extern int nflag;
-		extern int numbase;
-		extern char *fname;
-		extern char *archive;
-		extern int is_archive;
-		extern int oneflag;
+	GElf_Xword	memsize;
+	GElf_Xword	total;
+	GElf_Xword	First;
+	GElf_Xword	Second;
+	GElf_Xword	Third;
+	GElf_Xword	Totsize;
+	extern int Fflag;
+	extern int nflag;
+	extern int numbase;
+	extern char *fname;
+	extern char *archive;
+	extern int is_archive;
+	extern int oneflag;
 
 	memsize = total = 0;
 	First = Second = Third = Totsize = 0;
@@ -301,6 +307,6 @@ process_phdr(Elf * elf, GElf_Half num)
 	if (!Fflag && !nflag) {
 		Totsize = First + Second + (Third - Second);
 		(void) printf(format[numbase],
-			First, Second, Third - Second, Totsize);
+		    First, Second, Third - Second, Totsize);
 	}
 }

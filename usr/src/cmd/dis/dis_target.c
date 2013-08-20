@@ -446,6 +446,7 @@ dis_tgt_create(const char *file)
 	current = tgt;
 	cmd = ELF_C_READ;
 	while ((elf = elf_begin(tgt->dt_fd, cmd, tgt->dt_elf_root)) != NULL) {
+		size_t shnum = 0;
 
 		if (elf_kind(tgt->dt_elf_root) == ELF_K_AR &&
 		    (arhdr = elf_getarhdr(elf)) == NULL) {
@@ -501,9 +502,16 @@ dis_tgt_create(const char *file)
 			return (NULL);
 		}
 
+		if (elf_getshdrnum(elf, &shnum) == -1) {
+			warn("%s: failed to get number of sections in file",
+			    file);
+			dis_tgt_destroy(tgt);
+			return (NULL);
+		}
+
 		current->dt_shnmap = safe_malloc(sizeof (dis_shnmap_t) *
-		    ehdr.e_shnum);
-		current->dt_shncount = ehdr.e_shnum;
+		    shnum);
+		current->dt_shncount = shnum;
 
 		idx = 0;
 		dis_tgt_section_iter(current, tgt_scn_init, &idx);

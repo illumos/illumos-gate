@@ -25,7 +25,6 @@
  *
  * dldump(3c) creates a new file image from the specified input file.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<sys/param.h>
 #include	<sys/procfs.h>
@@ -158,7 +157,7 @@ rt_dldump(Rt_map *lmp, const char *opath, int flags, Addr addr)
 	Elf_Data	*data;
 	Half		endx = 1;
 	int		fd = 0, err, num;
-	size_t		shstr_size = 1;
+	size_t		shstr_size = 1, shndx;
 	Addr		edata;
 	char		*shstr, *_shstr, *ipath = NAME(lmp);
 	prstatus_t	*status = 0, _status;
@@ -309,7 +308,13 @@ rt_dldump(Rt_map *lmp, const char *opath, int flags, Addr addr)
 	/*
 	 * Obtain the input files section header string table.
 	 */
-	if ((scn = elf_getscn(ielf, iehdr->e_shstrndx)) == NULL) {
+
+	if (elf_getshdrstrndx(ielf, &shndx) == -1) {
+		eprintf(lml, ERR_ELF, MSG_ORIG(MSG_ELF_GETSHDRSTRNDX), ipath);
+		cleanup(ielf, oelf, melf, icache, mcache, fd, opath);
+		return (1);
+	}
+	if ((scn = elf_getscn(ielf, shndx)) == NULL) {
 		eprintf(lml, ERR_ELF, MSG_ORIG(MSG_ELF_GETSCN), ipath);
 		cleanup(ielf, oelf, melf, icache, mcache, fd, opath);
 		return (1);
@@ -327,10 +332,18 @@ rt_dldump(Rt_map *lmp, const char *opath, int flags, Addr addr)
 	 * add an additional entry (marked FLG_C_END) to make the processing of
 	 * this cache easier.
 	 */
-	num = iehdr->e_shnum;
+
+	if (elf_getshdrnum(ielf, &shndx) == -1) {
+		eprintf(lml, ERR_ELF, MSG_ORIG(MSG_ELF_GETSHDRNUM), opath);
+		cleanup(ielf, oelf, melf, icache, mcache, fd, opath);
+		return (1);
+	}
+
+	num = shndx;
+
 	if (status)
 		num++;
-	if ((icache = malloc((num + 1) * sizeof (Cache))) == 0) {
+	if ((icache = calloc(num + 1, sizeof (Cache))) == 0) {
 		cleanup(ielf, oelf, melf, icache, mcache, fd, opath);
 		return (1);
 	}
@@ -420,7 +433,7 @@ rt_dldump(Rt_map *lmp, const char *opath, int flags, Addr addr)
 			if (status) {
 				_icache++;
 				_icache->c_name =
-					(char *)MSG_ORIG(MSG_SCN_HEAP);
+				    (char *)MSG_ORIG(MSG_SCN_HEAP);
 				_icache->c_flags = FLG_C_HEAP;
 
 				_icache->c_scn = 0;
@@ -624,7 +637,27 @@ rt_dldump(Rt_map *lmp, const char *opath, int flags, Addr addr)
 			_icache->c_info = shstr;
 
 			/* LINTED */
-			oehdr->e_shstrndx = (Half)elf_ndxscn(scn);
+			if (elf_ndxscn(scn) >= SHN_LORESERVE) {
+				Elf_Scn	*_scn;
+				Shdr	*shdr0;
+
+				/*
+				 * libelf deals with e_shnum for us, but we
+				 * need to deal with e_shstrndx ourselves.
+				 */
+				oehdr->e_shstrndx = SHN_XINDEX;
+				if ((_scn = elf_getscn(oelf, 0)) == NULL) {
+					eprintf(lml, ERR_ELF,
+					    MSG_ORIG(MSG_ELF_GETSCN), opath);
+					cleanup(ielf, oelf, melf, icache,
+					    mcache, fd, opath);
+					return (1);
+				}
+				shdr0 = elf_getshdr(_scn);
+				shdr0->sh_link = elf_ndxscn(scn);
+			} else {
+				oehdr->e_shstrndx = (Half)elf_ndxscn(scn);
+			}
 
 		} else if (_icache->c_flags == FLG_C_HEAP) {
 			/*
@@ -727,10 +760,16 @@ rt_dldump(Rt_map *lmp, const char *opath, int flags, Addr addr)
 		return (1);
 	}
 
+	if (elf_getshdrnum(melf, &shndx) == -1) {
+		eprintf(lml, ERR_ELF, MSG_ORIG(MSG_ELF_GETSHDRNUM), opath);
+		cleanup(ielf, oelf, melf, icache, mcache, fd, opath);
+		return (1);
+	}
+
 	/*
 	 * Construct a cache to maintain the memory files section information.
 	 */
-	if ((mcache = malloc(mehdr->e_shnum * sizeof (Cache))) == 0) {
+	if ((mcache = calloc(shndx, sizeof (Cache))) == 0) {
 		cleanup(ielf, oelf, melf, icache, mcache, fd, opath);
 		return (1);
 	}
