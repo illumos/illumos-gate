@@ -26,6 +26,7 @@
  * Portions Copyright 2007 Chad Mynhier
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 /*
@@ -127,6 +128,7 @@ extern	int	_libproc_incore_elf;	/* only use in-core elf data */
 #define	PGRAB_FORCE	0x02	/* Open the process w/o O_EXCL */
 #define	PGRAB_RDONLY	0x04	/* Open the process or core w/ O_RDONLY */
 #define	PGRAB_NOSTOP	0x08	/* Open the process but do not stop it */
+#define	PGRAB_INCORE	0x10	/* Use in-core data to build symbol tables */
 
 /* Error codes from Pcreate() */
 #define	C_STRANGE	-1	/* Unanticipated error, errno is meaningful */
@@ -188,6 +190,55 @@ typedef	struct {	/* argument descriptor for system call (Psyscall) */
 #define	MAXARGL		(4*1024)
 
 /*
+ * Ops vector definition for the Pgrab_ops().
+ */
+typedef ssize_t (*pop_pread_t)(struct ps_prochandle *, void *, size_t,
+    uintptr_t, void *);
+typedef ssize_t (*pop_pwrite_t)(struct ps_prochandle *, const void *, size_t,
+    uintptr_t, void *);
+typedef int (*pop_read_maps_t)(struct ps_prochandle *, prmap_t **, ssize_t *,
+    void *);
+typedef void (*pop_read_aux_t)(struct ps_prochandle *, auxv_t **, int *,
+    void *);
+typedef int (*pop_cred_t)(struct ps_prochandle *, prcred_t *, int,
+    void *);
+typedef int (*pop_priv_t)(struct ps_prochandle *, prpriv_t **, void *);
+typedef const psinfo_t *(*pop_psinfo_t)(struct ps_prochandle *, psinfo_t *,
+    void *);
+typedef void (*pop_status_t)(struct ps_prochandle *, pstatus_t *, void *);
+typedef prheader_t *(*pop_lstatus_t)(struct ps_prochandle *, void *);
+typedef prheader_t *(*pop_lpsinfo_t)(struct ps_prochandle *, void *);
+typedef void (*pop_fini_t)(struct ps_prochandle *, void *);
+typedef char *(*pop_platform_t)(struct ps_prochandle *, char *, size_t, void *);
+typedef int (*pop_uname_t)(struct ps_prochandle *, struct utsname *, void *);
+typedef char *(*pop_zonename_t)(struct ps_prochandle *, char *, size_t, void *);
+typedef char *(*pop_execname_t)(struct ps_prochandle *, char *, size_t, void *);
+#if defined(__i386) || defined(__amd64)
+typedef int (*pop_ldt_t)(struct ps_prochandle *, struct ssd *, int, void *);
+#endif
+
+typedef struct ps_ops {
+	pop_pread_t		pop_pread;
+	pop_pwrite_t		pop_pwrite;
+	pop_read_maps_t		pop_read_maps;
+	pop_read_aux_t		pop_read_aux;
+	pop_cred_t		pop_cred;
+	pop_priv_t		pop_priv;
+	pop_psinfo_t		pop_psinfo;
+	pop_status_t		pop_status;
+	pop_lstatus_t		pop_lstatus;
+	pop_lpsinfo_t		pop_lpsinfo;
+	pop_fini_t		pop_fini;
+	pop_platform_t		pop_platform;
+	pop_uname_t		pop_uname;
+	pop_zonename_t		pop_zonename;
+	pop_execname_t		pop_execname;
+#if defined(__i386) || defined(__amd64)
+	pop_ldt_t		pop_ldt;
+#endif
+} ps_ops_t;
+
+/*
  * Function prototypes for routines in the process control package.
  */
 extern struct ps_prochandle *Pcreate(const char *, char *const *,
@@ -201,6 +252,7 @@ extern struct ps_prochandle *Pgrab(pid_t, int, int *);
 extern struct ps_prochandle *Pgrab_core(const char *, const char *, int, int *);
 extern struct ps_prochandle *Pfgrab_core(int, const char *, int *);
 extern struct ps_prochandle *Pgrab_file(const char *, int *);
+extern struct ps_prochandle *Pgrab_ops(pid_t, void *, const ps_ops_t *, int);
 extern const char *Pgrab_error(int);
 
 extern	int	Preopen(struct ps_prochandle *);
@@ -221,7 +273,7 @@ extern	const psinfo_t *Ppsinfo(struct ps_prochandle *);
 extern	const pstatus_t *Pstatus(struct ps_prochandle *);
 extern	int	Pcred(struct ps_prochandle *, prcred_t *, int);
 extern	int	Psetcred(struct ps_prochandle *, const prcred_t *);
-extern	ssize_t	Ppriv(struct ps_prochandle *, prpriv_t *, size_t);
+extern	int	Ppriv(struct ps_prochandle *, prpriv_t **);
 extern	int	Psetpriv(struct ps_prochandle *, prpriv_t *);
 extern	void   *Pprivinfo(struct ps_prochandle *);
 extern	int	Psetzoneid(struct ps_prochandle *, zoneid_t);

@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright (c) 2012 Joyent, Inc. All rights reserved.
  */
 
@@ -206,6 +206,9 @@ extern int mdb_remove_walker(const char *);
 
 extern ssize_t mdb_vread(void *, size_t, uintptr_t);
 extern ssize_t mdb_vwrite(const void *, size_t, uintptr_t);
+
+extern ssize_t mdb_aread(void *, size_t, uintptr_t, void *);
+extern ssize_t mdb_awrite(const void *, size_t, uintptr_t, void *);
 
 extern ssize_t mdb_fread(void *, size_t, uintptr_t);
 extern ssize_t mdb_fwrite(const void *, size_t, uintptr_t);

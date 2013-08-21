@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 #include <assert.h>
@@ -41,7 +42,6 @@
 #include <libgen.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/systeminfo.h>
 #include <sys/sysmacros.h>
 
 #include "libproc.h"
@@ -434,6 +434,12 @@ load_static_maps(struct ps_prochandle *P)
 		map_set(P, mptr, "ld.so.1");
 }
 
+int
+Preadmaps(struct ps_prochandle *P, prmap_t **Pmapp, ssize_t *nmapp)
+{
+	return (P->ops.pop_read_maps(P, Pmapp, nmapp, P->data));
+}
+
 /*
  * Go through all the address space mappings, validating or updating
  * the information already gathered, or gathering new information.
@@ -444,9 +450,6 @@ load_static_maps(struct ps_prochandle *P)
 void
 Pupdate_maps(struct ps_prochandle *P)
 {
-	char mapfile[PATH_MAX];
-	int mapfd;
-	struct stat statb;
 	prmap_t *Pmap = NULL;
 	prmap_t *pmap;
 	ssize_t nmap;
@@ -460,22 +463,8 @@ Pupdate_maps(struct ps_prochandle *P)
 
 	Preadauxvec(P);
 
-	(void) snprintf(mapfile, sizeof (mapfile), "%s/%d/map",
-	    procfs_path, (int)P->pid);
-	if ((mapfd = open(mapfile, O_RDONLY)) < 0 ||
-	    fstat(mapfd, &statb) != 0 ||
-	    statb.st_size < sizeof (prmap_t) ||
-	    (Pmap = malloc(statb.st_size)) == NULL ||
-	    (nmap = pread(mapfd, Pmap, statb.st_size, 0L)) <= 0 ||
-	    (nmap /= sizeof (prmap_t)) == 0) {
-		if (Pmap != NULL)
-			free(Pmap);
-		if (mapfd >= 0)
-			(void) close(mapfd);
-		Preset_maps(P);	/* utter failure; destroy tables */
+	if (Preadmaps(P, &Pmap, &nmap) != 0)
 		return;
-	}
-	(void) close(mapfd);
 
 	if ((newmap = calloc(1, nmap * sizeof (map_info_t))) == NULL)
 		return;
@@ -848,51 +837,16 @@ Pname_to_ctf(struct ps_prochandle *P, const char *name)
 	return (Plmid_to_ctf(P, PR_LMID_EVERY, name));
 }
 
-/*
- * If we're not a core file, re-read the /proc/<pid>/auxv file and store
- * its contents in P->auxv.  In the case of a core file, we either
- * initialized P->auxv in Pcore() from the NT_AUXV, or we don't have an
- * auxv because the note was missing.
- */
 void
 Preadauxvec(struct ps_prochandle *P)
 {
-	char auxfile[64];
-	struct stat statb;
-	ssize_t naux;
-	int fd;
-
-	if (P->state == PS_DEAD)
-		return; /* Already read during Pgrab_core() */
-	if (P->state == PS_IDLE)
-		return; /* No aux vec for Pgrab_file() */
-
 	if (P->auxv != NULL) {
 		free(P->auxv);
 		P->auxv = NULL;
 		P->nauxv = 0;
 	}
 
-	(void) snprintf(auxfile, sizeof (auxfile), "%s/%d/auxv",
-	    procfs_path, (int)P->pid);
-	if ((fd = open(auxfile, O_RDONLY)) < 0)
-		return;
-
-	if (fstat(fd, &statb) == 0 &&
-	    statb.st_size >= sizeof (auxv_t) &&
-	    (P->auxv = malloc(statb.st_size + sizeof (auxv_t))) != NULL) {
-		if ((naux = read(fd, P->auxv, statb.st_size)) < 0 ||
-		    (naux /= sizeof (auxv_t)) < 1) {
-			free(P->auxv);
-			P->auxv = NULL;
-		} else {
-			P->auxv[naux].a_type = AT_NULL;
-			P->auxv[naux].a_un.a_val = 0L;
-			P->nauxv = (int)naux;
-		}
-	}
-
-	(void) close(fd);
+	P->ops.pop_read_aux(P, &P->auxv, &P->nauxv, P->data);
 }
 
 /*
@@ -1683,7 +1637,7 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 	 * the in-core elf image.
 	 */
 
-	if (_libproc_incore_elf) {
+	if (_libproc_incore_elf || (P->flags & INCORE)) {
 		dprintf("Pbuild_file_symtab: using in-core data for: %s\n",
 		    fptr->file_pname);
 
@@ -2969,52 +2923,21 @@ Psymbol_iter_by_name(struct ps_prochandle *P,
 }
 
 /*
- * Get the platform string from the core file if we have it;
- * just perform the system call for the caller if this is a live process.
+ * Get the platform string.
  */
 char *
 Pplatform(struct ps_prochandle *P, char *s, size_t n)
 {
-	if (P->state == PS_IDLE) {
-		errno = ENODATA;
-		return (NULL);
-	}
-
-	if (P->state == PS_DEAD) {
-		if (P->core->core_platform == NULL) {
-			errno = ENODATA;
-			return (NULL);
-		}
-		(void) strncpy(s, P->core->core_platform, n - 1);
-		s[n - 1] = '\0';
-
-	} else if (sysinfo(SI_PLATFORM, s, n) == -1)
-		return (NULL);
-
-	return (s);
+	return (P->ops.pop_platform(P, s, n, P->data));
 }
 
 /*
- * Get the uname(2) information from the core file if we have it;
- * just perform the system call for the caller if this is a live process.
+ * Get the uname(2) information.
  */
 int
 Puname(struct ps_prochandle *P, struct utsname *u)
 {
-	if (P->state == PS_IDLE) {
-		errno = ENODATA;
-		return (-1);
-	}
-
-	if (P->state == PS_DEAD) {
-		if (P->core->core_uts == NULL) {
-			errno = ENODATA;
-			return (-1);
-		}
-		(void) memcpy(u, P->core->core_uts, sizeof (struct utsname));
-		return (0);
-	}
-	return (uname(u));
+	return (P->ops.pop_uname(P, u, P->data));
 }
 
 /*

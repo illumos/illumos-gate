@@ -25,6 +25,7 @@
 
 /*
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -50,10 +51,11 @@
 static lwp_info_t *
 getlwpcore(struct ps_prochandle *P, lwpid_t lwpid)
 {
-	lwp_info_t *lwp = list_next(&P->core->core_lwp_head);
+	core_info_t *core = P->data;
+	lwp_info_t *lwp = list_next(&core->core_lwp_head);
 	uint_t i;
 
-	for (i = 0; i < P->core->core_nlwp; i++, lwp = list_next(lwp)) {
+	for (i = 0; i < core->core_nlwp; i++, lwp = list_next(lwp)) {
 		if (lwp->lwp_id == lwpid)
 			return (lwp);
 	}
@@ -118,7 +120,7 @@ getlwpstatus(struct ps_prochandle *P, lwpid_t lwpid, lwpstatus_t *lps)
 	 * If this is a core file, we need to iterate through our list of
 	 * cached lwp information and then copy out the status.
 	 */
-	if (P->core != NULL && (lwp = getlwpcore(P, lwpid)) != NULL) {
+	if (P->data != NULL && (lwp = getlwpcore(P, lwpid)) != NULL) {
 		(void) memcpy(lps, &lwp->lwp_status, sizeof (lwpstatus_t));
 		return (0);
 	}

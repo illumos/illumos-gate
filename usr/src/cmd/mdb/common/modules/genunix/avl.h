@@ -22,11 +22,12 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2013 by Delphix. All rights reserved.
+ */
 
 #ifndef	_MDB_AVL_H
 #define	_MDB_AVL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -47,6 +48,7 @@ extern int avl_walk_init_range(mdb_walk_state_t *wsp, uintptr_t, uintptr_t,
     int (*)(void *, uintptr_t, void *), void *);
 extern int avl_walk_step(mdb_walk_state_t *);
 extern void avl_walk_fini(mdb_walk_state_t *wsp);
+extern int avl_walk_mdb(uintptr_t, mdb_walk_cb_t, void *);
 
 #ifdef	__cplusplus
 }

@@ -25,6 +25,7 @@
  */
 /*
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 #include <assert.h>
@@ -231,23 +232,7 @@ Pbrandname(struct ps_prochandle *P, char *buf, size_t buflen)
 char *
 Pzonename(struct ps_prochandle *P, char *s, size_t n)
 {
-	if (P->state == PS_IDLE) {
-		errno = ENODATA;
-		return (NULL);
-	}
-
-	if (P->state == PS_DEAD) {
-		if (P->core->core_zonename == NULL) {
-			errno = ENODATA;
-			return (NULL);
-		}
-		(void) strlcpy(s, P->core->core_zonename, n);
-	} else {
-		if (getzonenamebyid(P->status.pr_zoneid, s, n) < 0)
-			return (NULL);
-		s[n - 1] = '\0';
-	}
-	return (s);
+	return (P->ops.pop_zonename(P, s, n, P->data));
 }
 
 char *

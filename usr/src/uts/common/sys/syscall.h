@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -498,12 +499,12 @@ typedef struct {		/* syscall set type */
 	unsigned int	word[16];
 } sysset_t;
 
-#if !defined(_KERNEL)
-
 typedef struct {	/* return values from system call */
 	long	sys_rval1;	/* primary return value from system call */
 	long	sys_rval2;	/* second return value from system call */
 } sysret_t;
+
+#if !defined(_KERNEL)
 
 #if defined(__STDC__)
 extern int	syscall(int, ...);

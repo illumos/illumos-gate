@@ -20,7 +20,11 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- *
+ */
+/*
+ * Copyright (c) 2013 by Delphix. All rights reserved.
+ */
+/*
  * Program to examine or set process privileges.
  */
 
@@ -158,9 +162,6 @@ main(int argc, char **argv)
 static int
 look(char *arg)
 {
-	static size_t pprivsz = sizeof (prpriv_t);
-	static prpriv_t *ppriv;
-
 	struct ps_prochandle *Pr;
 	int gcode;
 	size_t sz;
@@ -168,6 +169,7 @@ look(char *arg)
 	char *x;
 	int i;
 	boolean_t nodata;
+	prpriv_t *ppriv;
 
 	procname = arg;		/* for perr() */
 
@@ -179,15 +181,11 @@ look(char *arg)
 		return (1);
 	}
 
-	if (ppriv == NULL)
-		ppriv = malloc(pprivsz);
-
-	if (Ppriv(Pr, ppriv, pprivsz) == -1) {
+	if (Ppriv(Pr, &ppriv) == -1) {
 		perr(command);
 		Prelease(Pr, 0);
 		return (1);
 	}
-
 	sz = PRIV_PRPRIV_SIZE(ppriv);
 
 	/*
@@ -202,18 +200,8 @@ look(char *arg)
 		    "%s: %s: bad PRNOTES section, size = %lx\n",
 		    command, arg, (long)sz);
 		Prelease(Pr, 0);
+		free(ppriv);
 		return (1);
-	}
-
-	if (sz > pprivsz) {
-		ppriv = realloc(ppriv, sz);
-
-		if (ppriv == NULL || Ppriv(Pr, ppriv, sz) != sz) {
-			perr(command);
-			Prelease(Pr, 0);
-			return (1);
-		}
-		pprivsz = sz;
 	}
 
 	if (set) {
@@ -221,9 +209,11 @@ look(char *arg)
 		if (Psetpriv(Pr, ppriv) != 0) {
 			perr(command);
 			Prelease(Pr, 0);
+			free(ppriv);
 			return (1);
 		}
 		Prelease(Pr, 0);
+		free(ppriv);
 		return (0);
 	}
 
@@ -298,6 +288,7 @@ look(char *arg)
 		}
 	}
 	Prelease(Pr, 0);
+	free(ppriv);
 	return (0);
 }
 
