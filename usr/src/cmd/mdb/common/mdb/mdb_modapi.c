@@ -71,6 +71,23 @@ mdb_vwrite(const void *buf, size_t nbytes, uintptr_t addr)
 }
 
 ssize_t
+mdb_aread(void *buf, size_t nbytes, uintptr_t addr, void *as)
+{
+	ssize_t rbytes = mdb_tgt_aread(mdb.m_target, as, buf, nbytes, addr);
+
+	if (rbytes > 0 && rbytes < nbytes)
+		return (set_errbytes(rbytes, nbytes));
+
+	return (rbytes);
+}
+
+ssize_t
+mdb_awrite(const void *buf, size_t nbytes, uintptr_t addr, void *as)
+{
+	return (mdb_tgt_awrite(mdb.m_target, as, buf, nbytes, addr));
+}
+
+ssize_t
 mdb_fread(void *buf, size_t nbytes, uintptr_t addr)
 {
 	ssize_t rbytes = mdb_tgt_fread(mdb.m_target, buf, nbytes, addr);

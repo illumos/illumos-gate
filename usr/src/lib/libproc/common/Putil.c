@@ -23,8 +23,9 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2013 by Delphix. All rights reserved.
+ */
 
 #include <limits.h>
 #include <string.h>
@@ -149,4 +150,97 @@ void
 Perror_printf(struct ps_prochandle *P, const char *format, ...)
 {
 	/* nothing to do here */
+}
+
+/*
+ * Default operations.
+ */
+static ssize_t
+Pdefault_ssizet()
+{
+	return (-1);
+}
+
+static int
+Pdefault_int()
+{
+	return (-1);
+}
+
+static void
+Pdefault_void()
+{
+}
+
+static void *
+Pdefault_voidp()
+{
+	return (NULL);
+}
+
+static const ps_ops_t P_default_ops = {
+	.pop_pread	= (pop_pread_t)Pdefault_ssizet,
+	.pop_pwrite	= (pop_pwrite_t)Pdefault_ssizet,
+	.pop_read_maps	= (pop_read_maps_t)Pdefault_int,
+	.pop_read_aux	= (pop_read_aux_t)Pdefault_void,
+	.pop_cred	= (pop_cred_t)Pdefault_int,
+	.pop_priv	= (pop_priv_t)Pdefault_int,
+	.pop_psinfo	= (pop_psinfo_t)Pdefault_voidp,
+	.pop_status	= (pop_status_t)Pdefault_void,
+	.pop_lstatus	= (pop_lstatus_t)Pdefault_voidp,
+	.pop_lpsinfo	= (pop_lpsinfo_t)Pdefault_voidp,
+	.pop_fini	= (pop_fini_t)Pdefault_void,
+	.pop_platform	= (pop_platform_t)Pdefault_voidp,
+	.pop_uname	= (pop_uname_t)Pdefault_int,
+	.pop_zonename	= (pop_zonename_t)Pdefault_voidp,
+	.pop_execname	= (pop_execname_t)Pdefault_voidp,
+#if defined(__i386) || defined(__amd64)
+	.pop_ldt	= (pop_ldt_t)Pdefault_int
+#endif
+};
+
+/*
+ * Initialize the destination ops vector with functions from the source.
+ * Functions which are NULL in the source ops vector are set to corresponding
+ * default function in the destination vector.
+ */
+void
+Pinit_ops(ps_ops_t *dst, const ps_ops_t *src)
+{
+	*dst = P_default_ops;
+
+	if (src->pop_pread != NULL)
+		dst->pop_pread = src->pop_pread;
+	if (src->pop_pwrite != NULL)
+		dst->pop_pwrite = src->pop_pwrite;
+	if (src->pop_read_maps != NULL)
+		dst->pop_read_maps = src->pop_read_maps;
+	if (src->pop_read_aux != NULL)
+		dst->pop_read_aux = src->pop_read_aux;
+	if (src->pop_cred != NULL)
+		dst->pop_cred = src->pop_cred;
+	if (src->pop_priv != NULL)
+		dst->pop_priv = src->pop_priv;
+	if (src->pop_psinfo != NULL)
+		dst->pop_psinfo = src->pop_psinfo;
+	if (src->pop_status != NULL)
+		dst->pop_status = src->pop_status;
+	if (src->pop_lstatus != NULL)
+		dst->pop_lstatus = src->pop_lstatus;
+	if (src->pop_lpsinfo != NULL)
+		dst->pop_lpsinfo = src->pop_lpsinfo;
+	if (src->pop_fini != NULL)
+		dst->pop_fini = src->pop_fini;
+	if (src->pop_platform != NULL)
+		dst->pop_platform = src->pop_platform;
+	if (src->pop_uname != NULL)
+		dst->pop_uname = src->pop_uname;
+	if (src->pop_zonename != NULL)
+		dst->pop_zonename = src->pop_zonename;
+	if (src->pop_execname != NULL)
+		dst->pop_execname = src->pop_execname;
+#if defined(__i386) || defined(__amd64)
+	if (src->pop_ldt != NULL)
+		dst->pop_ldt = src->pop_ldt;
+#endif
 }

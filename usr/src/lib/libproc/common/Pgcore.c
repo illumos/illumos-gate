@@ -26,6 +26,7 @@
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 #define	_STRUCTURED_PROC	1
@@ -1357,11 +1358,11 @@ Pfgcore(struct ps_prochandle *P, int fd, core_content_t content)
 	}
 
 	{
-		prpriv_t *ppriv;
+		prpriv_t *ppriv = NULL;
 		const priv_impl_info_t *pinfo;
 		size_t pprivsz, pinfosz;
 
-		if ((ppriv = proc_get_priv(P->pid)) == NULL)
+		if (Ppriv(P, &ppriv) == -1)
 			goto err;
 		pprivsz = PRIV_PRPRIV_SIZE(ppriv);
 

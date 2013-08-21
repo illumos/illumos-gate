@@ -22,6 +22,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2013 by Delphix. All rights reserved.
+#
 
 .KEEP_STATE:
 .SUFFIXES:
@@ -92,6 +94,8 @@ LINTFILES		= $(LINTFILES_$(MDBTGT))
 
 kvm_TGTFLAGS		= -D_KERNEL
 proc_TGTFLAGS		= -D_USER
+
+C99MODE			= $(C99_ENABLE)
 
 CFLAGS			+= $(CCVERBOSE)
 CFLAGS64		+= $(CCVERBOSE)

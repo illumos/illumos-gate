@@ -1,6 +1,6 @@
 #
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2013 by Delphix. All rights reserved.
 #
 # CDDL HEADER START
 #
@@ -45,13 +45,16 @@ SYMBOL_SCOPE {
 #		Pmapping_iter			{ FLAGS = EXTERN };
 
 		_mdb_ks_ncpu			{ FLAGS = EXTERN };
+		_mdb_ks_pagemask		{ FLAGS = EXTERN };
+		_mdb_ks_pageoffset		{ FLAGS = EXTERN };
 		_mdb_ks_pageshift		{ FLAGS = EXTERN };
 		_mdb_ks_pagesize		{ FLAGS = EXTERN };
-		_mdb_ks_pageoffset		{ FLAGS = EXTERN };
 
 		mdb				{ FLAGS = EXTERN };
 		mdb_add_walker			{ FLAGS = EXTERN };
 		mdb_alloc			{ FLAGS = EXTERN };
+		mdb_aread			{ FLAGS = EXTERN };
+		mdb_awrite			{ FLAGS = EXTERN };
 		mdb_call_dcmd			{ FLAGS = EXTERN };
 		mdb_callback_add		{ FLAGS = EXTERN };
 		mdb_callback_remove		{ FLAGS = EXTERN };
