@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013, Joyent, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -149,6 +150,7 @@ cfork(int isvfork, int isfork1, int flags)
 	 */
 	if ((flags & ~(FORK_NOSIGCHLD | FORK_WAITPID)) != 0) {
 		error = EINVAL;
+		atomic_add_32(&curproc->p_zone->zone_ffmisc, 1);
 		goto forkerr;
 	}
 
@@ -157,11 +159,14 @@ cfork(int isvfork, int isfork1, int flags)
 	 */
 	if (curthread == p->p_agenttp) {
 		error = ENOTSUP;
+		atomic_add_32(&curproc->p_zone->zone_ffmisc, 1);
 		goto forkerr;
 	}
 
-	if ((error = secpolicy_basic_fork(CRED())) != 0)
+	if ((error = secpolicy_basic_fork(CRED())) != 0) {
+		atomic_add_32(&p->p_zone->zone_ffmisc, 1);
 		goto forkerr;
+	}
 
 	/*
 	 * If the calling lwp is doing a fork1() then the
@@ -175,6 +180,7 @@ cfork(int isvfork, int isfork1, int flags)
 	if (!holdlwps(isfork1 ? SHOLDFORK1 : SHOLDFORK)) {
 		aston(curthread);
 		error = EINTR;
+		atomic_add_32(&p->p_zone->zone_ffmisc, 1);
 		goto forkerr;
 	}
 
@@ -290,6 +296,7 @@ cfork(int isvfork, int isfork1, int flags)
 			 * map all others to EAGAIN.
 			 */
 			error = (error == ENOMEM) ? ENOMEM : EAGAIN;
+			atomic_add_32(&p->p_zone->zone_ffnomem, 1);
 			goto forkerr;
 		}
 
@@ -424,8 +431,10 @@ cfork(int isvfork, int isfork1, int flags)
 	 * fork event (if requested) to whatever contract the child is
 	 * a member of.  Fails if the parent has been SIGKILLed.
 	 */
-	if (contract_process_fork(NULL, cp, p, B_TRUE) == NULL)
+	if (contract_process_fork(NULL, cp, p, B_TRUE) == NULL) {
+		atomic_add_32(&p->p_zone->zone_ffmisc, 1);
 		goto forklwperr;
+	}
 
 	/*
 	 * No fork failures occur beyond this point.
@@ -962,6 +971,7 @@ getproc(proc_t **cpp, pid_t pid, uint_t flags)
 		if (rctlfail) {
 			mutex_exit(&zone->zone_nlwps_lock);
 			mutex_exit(&pp->p_lock);
+			atomic_add_32(&zone->zone_ffcap, 1);
 			goto punish;
 		}
 	}
@@ -1235,6 +1245,7 @@ bad:
 	proj->kpj_nprocs--;
 	zone->zone_nprocs--;
 	mutex_exit(&zone->zone_nlwps_lock);
+	atomic_add_32(&zone->zone_ffnoproc, 1);
 
 punish:
 	/*

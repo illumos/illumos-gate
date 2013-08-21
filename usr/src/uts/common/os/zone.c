@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, 2012, Joyent Inc. All rights reserved.
+ * Copyright 2013, Joyent Inc. All rights reserved.
  */
 
 /*
@@ -2225,6 +2225,11 @@ zone_misc_kstat_update(kstat_t *ksp, int rw)
 	zmp->zm_avenrun5.value.ui32 = zone->zone_avenrun[1];
 	zmp->zm_avenrun15.value.ui32 = zone->zone_avenrun[2];
 
+	zmp->zm_ffcap.value.ui32 = zone->zone_ffcap;
+	zmp->zm_ffnoproc.value.ui32 = zone->zone_ffnoproc;
+	zmp->zm_ffnomem.value.ui32 = zone->zone_ffnomem;
+	zmp->zm_ffmisc.value.ui32 = zone->zone_ffmisc;
+
 	return (0);
 }
 
@@ -2258,6 +2263,11 @@ zone_misc_kstat_create(zone_t *zone)
 	kstat_named_init(&zmp->zm_avenrun5, "avenrun_5min", KSTAT_DATA_UINT32);
 	kstat_named_init(&zmp->zm_avenrun15, "avenrun_15min",
 	    KSTAT_DATA_UINT32);
+	kstat_named_init(&zmp->zm_ffcap, "forkfail_cap", KSTAT_DATA_UINT32);
+	kstat_named_init(&zmp->zm_ffnoproc, "forkfail_noproc",
+	    KSTAT_DATA_UINT32);
+	kstat_named_init(&zmp->zm_ffnomem, "forkfail_nomem", KSTAT_DATA_UINT32);
+	kstat_named_init(&zmp->zm_ffmisc, "forkfail_misc", KSTAT_DATA_UINT32);
 
 	ksp->ks_update = zone_misc_kstat_update;
 	ksp->ks_private = zone;

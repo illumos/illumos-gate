@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2013, Joyent, Inc. All rights reserved.
  */
 
 #ifndef _SYS_ZONE_H
@@ -451,6 +451,10 @@ typedef struct {
 	kstat_named_t	zm_fss_shr_pct;
 	kstat_named_t	zm_fss_pri_hi;
 	kstat_named_t	zm_fss_pri_avg;
+	kstat_named_t	zm_ffcap;
+	kstat_named_t	zm_ffnoproc;
+	kstat_named_t	zm_ffnomem;
+	kstat_named_t	zm_ffmisc;
 } zone_misc_kstat_t;
 
 typedef struct zone {
@@ -685,6 +689,11 @@ typedef struct zone {
 	uint64_t	zone_stime;		/* total system time */
 	uint64_t	zone_utime;		/* total user time */
 	uint64_t	zone_wtime;		/* total time waiting in runq */
+	/* fork-fail kstat tracking */
+	uint32_t	zone_ffcap;		/* hit an rctl cap */
+	uint32_t	zone_ffnoproc;		/* get proc/lwp error */
+	uint32_t	zone_ffnomem;		/* as_dup/memory error */
+	uint32_t	zone_ffmisc;		/* misc. other error */
 
 	struct loadavg_s zone_loadavg;		/* loadavg for this zone */
 	uint64_t	zone_hp_avenrun[3];	/* high-precision avenrun */
