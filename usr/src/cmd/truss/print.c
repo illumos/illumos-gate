@@ -734,7 +734,7 @@ mmap_type(private_t *pri, long arg)
 	arg &= ~(_MAP_NEW|MAP_TYPE);
 
 	if (arg & ~(MAP_FIXED|MAP_RENAME|MAP_NORESERVE|MAP_ANON|MAP_ALIGN|
-	    MAP_TEXT|MAP_INITDATA))
+	    MAP_TEXT|MAP_INITDATA|MAP_32BIT))
 		(void) snprintf(str + used, sizeof (pri->code_buf) - used,
 		    "|0x%lX", arg);
 	else {
@@ -752,6 +752,8 @@ mmap_type(private_t *pri, long arg)
 			(void) strlcat(str, "|MAP_TEXT", CBSIZE);
 		if (arg & MAP_INITDATA)
 			(void) strlcat(str, "|MAP_INITDATA", CBSIZE);
+		if (arg & MAP_32BIT)
+			(void) strlcat(str, "|MAP_32BIT", CBSIZE);
 	}
 
 	return ((const char *)str);
