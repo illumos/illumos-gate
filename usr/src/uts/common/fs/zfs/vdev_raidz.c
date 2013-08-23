@@ -1554,15 +1554,15 @@ vdev_raidz_close(vdev_t *vd)
  *         |        |        |        |        |
  *   8 KB parity    ------8 KB data blocks------
  *
- * However, when writing to the dump device, the layout is different:
+ * However, when writing to the dump device, the behavior is different:
  *
  *     vdev_raidz_physio(data, size: 32 KB, offset: 64 KB)
  *
  * Unlike the normal RAID-Z case in which the block is allocated based on the
- * I/O size, reads and writes here always use a 128 KB logical I/O size.  is
- * less than 128 KB, only the actual portions of data are written.  In this
- * example the data is written to the third data vdev since that vdev contains
- * the offset [64 KB, 96 KB).
+ * I/O size, reads and writes here always use a 128 KB logical I/O size. If the
+ * I/O size is less than 128 KB, only the actual portions of data are written.
+ * In this example the data is written to the third data vdev since that vdev
+ * contains the offset [64 KB, 96 KB).
  *
  *       parity    data     data     data     data
  *     |        |        |        |   XX   |        |
