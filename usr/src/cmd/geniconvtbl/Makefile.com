@@ -79,7 +79,7 @@ OBJS	= $(SRCSC1:%.c=%.o) $(YTABC:.c=.o) $(LEXYY:.c=.o)
 
 CHECKHDRS = $(HDRS%.h=%.check)
 
-CLOBBERFILES=	$(ITM)
+CLOBBERFILES=	$(ITM) $(SRCYC)
 CLEANFILES = 	$(OBJS) $(YTABC) $(YTABH) $(LEXYY) $(YOUT) \
 		$(POFILES) $(POFILE)
 

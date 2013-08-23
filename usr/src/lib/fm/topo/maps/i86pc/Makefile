@@ -34,4 +34,6 @@ SRCDIR = ../i86pc
 PLATFORM = unused
 TOPOBASE = i86pc-hc-topology.xml
 
+CLOBBERFILES = fan-hc-topology.xml
+
 include ../Makefile.map

@@ -23,7 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/fs.d/cachefs/cfsd
 #
@@ -45,7 +44,7 @@ include		../Makefile.cachefs
 MDBUGLIB=	../mdbug/libdbug.a
 CPPFLAGS +=	-I.. -D_REENTRANT
 RPCGENFLAGS=	-M -C -T
-CLOBBERFILES +=	$(LIBPROG_C)
+CLOBBERFILES +=	$(LIBPROG_C) cachefsd_tbl.i
 
 all : $(LIBPROG_C)
 

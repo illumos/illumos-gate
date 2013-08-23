@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 1989-2002 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -56,7 +54,7 @@ $(PROG) : 	$(OBJS)
 install :	all $(ROOTLIBLPPOSTPROG)
 
 clean :
-		$(RM) $(OBJS) core *~ *#
+		$(RM) $(OBJS)
 
 strip :
 		$(STRIP) $(PROG)

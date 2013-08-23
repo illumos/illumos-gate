@@ -68,6 +68,9 @@ LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 LINTTAGS	+= -erroff=E_STATIC_UNUSED
 
+CLEANFILES	+= $(WARLOCK_OUT) $(WARLOCK_OK)
+CLOBBERFILES	+= $(BINSRC)/$(MODULE)
+
 #
 #	Default build targets.
 #
@@ -78,10 +81,8 @@ def:		$(DEF_DEPS) $(FWOBJ)
 all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 

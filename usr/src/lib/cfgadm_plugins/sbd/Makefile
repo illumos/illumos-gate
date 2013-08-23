@@ -49,7 +49,9 @@ GREP=	grep
 
 .KEEP_STATE:
 
-all clean clobber delete install lint package: $(SUBDIRS)
+all clean delete install lint package: $(SUBDIRS)
+clobber: $(SUBDIRS)
+	$(RM) $(POFILE) $(POFILES)
 
 $(MACH) $(MACH64):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

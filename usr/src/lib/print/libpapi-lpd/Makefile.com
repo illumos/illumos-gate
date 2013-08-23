@@ -55,6 +55,8 @@ MAPFILES =	$(SRCDIR)/mapfile
 
 LDLIBS +=	-lc
 
+CLOBBERFILES += $(PROG)
+
 .KEEP_STATE:
 
 all:	$(LIBS) $(PROG)

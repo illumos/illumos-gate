@@ -124,7 +124,7 @@ lint:
 	$(LINT) $(LINT_FLAGS) $(CPPFLAGS) $(LINT_SRCS)
 
 clean:
-	$(RM) $(PROG) $(OBJS) $(LINT_FILES) $(POFILES) $(POFILE) core 
+	$(RM) $(PROG) $(OBJS) $(LINT_FILES)
 
 $(POFILE): $(POFILES)
 	$(RM) $(POFILE)

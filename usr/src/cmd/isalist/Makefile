@@ -29,6 +29,8 @@ OBJS= isalist.o
 
 include ../Makefile.cmd
 
+CLOBBERFILES += $(SHFILES)
+
 FILEMODE= 0555
 
 .KEEP_STATE:

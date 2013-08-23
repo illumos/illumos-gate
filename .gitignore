@@ -1,0 +1,20 @@
+# .gitignore for illumos checkouts.
+# Note: this does not try to ignore all files in a fully built workspace.
+# Rather, you are expected to "make clobber" before running "git status".
+.make.state*
+/log
+/packages
+/proto
+/webrev
+/usr/src/.build.tstamp
+/usr/src/ELF-data.*
+/usr/src/check-*.out
+/usr/src/clobber-*.out
+/usr/src/install-*.out
+/usr/src/lint-*.out
+/usr/src/lint-noise-*.out
+/usr/src/lint-noise-*.ref
+/usr/src/noise-*.out
+/usr/src/noise-*.ref
+/usr/src/tools/clobber-*.out
+/usr/src/tools/install-*.out

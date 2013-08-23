@@ -22,45 +22,39 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/ipf/tools/Makefile
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
+
+# Path to the base of the uts directory tree (usually /usr/src/uts).
+UTSBASE	= ../../../..
+
 #
+#	Include common rules.
+#
+include $(SRC)/Makefile.master
 
-LICENCE= IPFILTER.LICENCE
+MD_XDR_CSRC	=	$(UTSBASE)/common/io/lvm/md
+MD_XDR_XSRC	=	$(UTSBASE)/common/sys/lvm
+RPCGENFLAGS	+=	-C -M -D_KERNEL -DSYSV
 
-include ../../Makefile.cmd
+DERIVED_FILES	=	meta_basic_xdr.c metamed_xdr.c
 
-$(64ONLY)SUBDIRS= $(MACH)
-$(BUILD64)SUBDIRS += $(MACH64)
+all_h install_h : $(DERIVED_FILES)
 
-USRLIBIPF=		$(ROOTLIB)/ipf
-USRLIBIPFLICENCE=	$(LICENCE:%=$(USRLIBIPF)/%) 
+check:
 
-FILEMODE= 0755
+clean:
+	$(RM) $(DERIVED_FILES)
 
-$(USRLIBIPFLICENCE):=FILEMODE= 0644
+clobber: clean
 
-all:=           TARGET= all
-install:=       TARGET= install
-clean:=         TARGET= clean
-clobber:=       TARGET= clobber
-lint:=          TARGET= lint
-
-$(USRLIBIPF):
-	$(INS.dir)
-
-$(USRLIBIPF)/% : %
-	$(INS.file)
+%_xdr.c:	$(MD_XDR_XSRC)/%.x
+	$(RPCGEN) $(RPCGENFLAGS) -c -i 100 $(MD_XDR_XSRC)/$*.x | \
+$(NAWK) '/^#include/ {\
+    sub(/(\.\.\/)*common\//,"");\
+    sub(/meta_basic.h/, "md_basic.h");\
+    sub(/metamed.h/, "mdmed.h");\
+}\
+{   print $0; }' > $@
 
 .KEEP_STATE:
-
-all clean clobber lint: $(SUBDIRS)
-
-install: all $(SUBDIRS) install_local
-
-install_local: $(USRLIBIPF) $(USRLIBIPFLICENCE)
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
-
-FRC:

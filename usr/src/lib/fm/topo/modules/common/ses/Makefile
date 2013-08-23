@@ -35,3 +35,5 @@ CPPFLAGS += -I../disk
 
 LDLIBS += -L$(ROOTLIBDIR)/scsi -R/usr/lib/scsi -lses
 LDLIBS += -ldevinfo -ldevid -ldiskstatus -lcontract -lsysevent
+
+CLOBBERFILES += disk_common.ln

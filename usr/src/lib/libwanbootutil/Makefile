@@ -94,6 +94,8 @@ common/key_xdr.c:	common/key_xdr.x
 common/key_xdr.h:	common/key_xdr.x
 		cd common; $(RPCGEN) -h -o key_xdr.h key_xdr.x; cd ..
 
+CLOBBERFILES += common/key_xdr.c common/key_xdr.h
+
 include $(SRC)/Makefile.msg.targ
 include $(SRC)/lib/Makefile.targ
 

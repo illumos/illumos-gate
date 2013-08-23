@@ -42,7 +42,9 @@ CLEANFILES	+= \
 		8859-11.cm 8859-13.cm 8859-14.cm 8859-15.cm \
 		8859-16.cm \
 		KOI8-R.cm
-CLOBBERFILES	= $(PROG) $(POFILE) $(DATA:%=locale/%)
+CLOBBERFILES	= $(PROG) $(POFILE) \
+		GB18030.cm UTF-8.cm
+
 PIFILES		= $(OBJS:%.o=%.i)
 POFILE		= localedef_cmd.po
 
@@ -248,6 +250,10 @@ clean:
 	$(RM) $(CLEANFILES)
 	$(RM) $(STAMPFILES)
 
+clobber: clean
+	$(RM) $(CLOBBERFILES)
+	$(RM) -r $(LOCDIRS)
+
 $(POFILE):	$(PIFILES)
 	$(RM) $@
 	$(RM) messages.po
@@ -258,7 +264,8 @@ $(POFILE):	$(PIFILES)
 locale $(ROOTLOCDIRS) $(ROOTCATDIRS):
 	$(INS.dir)
 
-include ../Makefile.targ
+$(ROOTBIN)/%: $(ROOTBIN) %
+	$(INS.file)
 
 # Strip LC_CTYPE contents for UTF-8 locales and replace them
 # with UTF-8.ct we compiled

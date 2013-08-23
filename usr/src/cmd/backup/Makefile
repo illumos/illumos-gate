@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 1993,1998,2002 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -58,6 +56,9 @@ $(UFSINSDIRS):
 	$(INS.dir)
 
 $(COMMONPRODSUBDIRS) $(UFSPRODSUBDIRS): $(LIBSUBDIRS) FRC
+	$(DO_SUBDIR)
+
+$(LIBSUBDIRS): FRC
 	$(DO_SUBDIR)
 
 FRC:

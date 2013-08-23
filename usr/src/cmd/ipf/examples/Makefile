@@ -38,6 +38,8 @@ SHSRCS= $(SHPROG:%=%.sh)
 
 include ../../Makefile.cmd
 
+CLOBBERFILES =	$(SHPROG)
+
 SHAREIPF= $(ROOT)/usr/share/ipfilter
 SHAREIPFX= $(SHAREIPF)/examples
 
@@ -62,8 +64,6 @@ $(SHAREIPFX):
 all:		$(SHPROG)
 
 clean:
-
-clobber:
 
 install:	all $(SHAREIPF) $(SHAREIPFX)  \
 		$(IPFEXAMPLES) $(IPFEXSHPROG)

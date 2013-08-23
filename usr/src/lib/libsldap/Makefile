@@ -46,7 +46,9 @@ POFILES=	generic.po
 
 .KEEP_STATE:
 
-all clean clobber delete install lint catalog package: $(SUBDIRS)
+all clean delete install lint catalog package: $(SUBDIRS)
+clobber: $(SUBDIRS)
+	$(RM) $(POFILE) $(POFILES)
 
 # install rule for install_h target
 $(ROOTHDRDIR)/%: %

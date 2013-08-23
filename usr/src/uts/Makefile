@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 # include global definitions
 include ../Makefile.master
@@ -74,6 +75,7 @@ install		:=	TARGET= install
 install_h	:=	TARGET= install_h
 clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
+clobber_h	:=	TARGET= clobber
 lint		:=	TARGET= lint
 clean.lint	:=	TARGET= clean.lint
 check		:=	TARGET= check
@@ -142,6 +144,8 @@ COMMON_HDRDIRS= common/avs \
 		common/inet/nca \
 		common/inet/sockmods/netpacket \
 		common/io/bpf/net \
+		common/io/fibre-channel/fca/qlc \
+		common/io/lvm/md \
 		common/ipp \
 		common/net \
 		common/netinet \
@@ -166,8 +170,13 @@ $(CLOSED_BUILD)COMMON_HDRDIRS += $(CLOSED)/uts/common/sys
 # Other directories should be included here, but do not yet have the
 # necessary Makefile support (make clean).  See 6414855.
 #
-DYNHDRDIRS =	common/idmap \
+DYNHDRDIRS =	common/avs \
+		common/gssapi \
+		common/idmap \
+		common/io/fibre-channel/fca/qlc \
+		common/io/lvm/md \
 		common/klm \
+		common/rpc \
 		common/rpcsvc \
 		common/sys
 
@@ -197,9 +206,8 @@ clean clobber: $($(MACH)_ARCHITECTURES) $(DYNHDRDIRS)
 		$(RM) $(PMTMO_FILE) ; \
 	fi
 
-EXTRA_CLOBBER_TARGETS= common/avs/ns/rdc
-clobber: $(EXTRA_CLOBBER_TARGETS)
-
+# testing convenience
+clobber_h: $(DYNHDRDIRS)
 
 clean.lint modlist: $($(MACH)_ARCHITECTURES)
 

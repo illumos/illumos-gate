@@ -54,6 +54,7 @@ INCS += -I../../../common/zfs
 INCS += -I../../../common
 
 CLEANFILES += ../common/zfs.h
+CLEANFILES += $(EXTPICS)
 
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
 $(LINTLIB): ../common/zfs.h

@@ -22,7 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Makefile for logical volume management
 #
@@ -59,10 +58,9 @@ $(POFILE): $(POFILES)
 	$(RM) $@
 	cat $(POFILES) > $(POFILE)
 
-clean:	$(SUBDIRS)
-	$(RM) metad_svc.c *.po
+CLOBBERFILES += metad_svc.c
 
-lint:     $(SUBDIRS)
+clean clobber lint:	$(SUBDIRS)
 
 install:        $(SUBDIRS) $(ROOTMANIFEST)
 

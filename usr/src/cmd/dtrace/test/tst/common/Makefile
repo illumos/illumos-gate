@@ -40,6 +40,7 @@ RPCSVCDIR = $(SRC)/head/rpcsvc
 RPCSVCOBJS = nfs_prot.o
 RPCSVCSRCS = ${RPCSVCOBJS:%o=%c}
 CLOBBERFILES += nfs/$(RPCSVCOBJS) $(RPCSVCDIR)/$(RPCSVCSRCS)
+CLOBBERFILES += usdt/forker.h usdt/lazyprobe.h
 
 fasttrap/tst.fasttrap.exe := LDLIBS += -ldtrace
 fasttrap/tst.stack.exe := LDLIBS += -ldtrace

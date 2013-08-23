@@ -78,6 +78,8 @@ $(ROOTDOCDIRBASE)/%.html: misc/%.docbook
 	$(INS) -s -m $(FILEMODE) -f "$(@D)" "$(@F)"
 	$(RM) "$(@F)"
 
+CLOBBERFILES += xsltproc.log
+
 # Generic documentation rules
 DOCFILESRCDIR=         common
 ROOTDOCFILES=  $(DOCFILES:%=$(ROOTDOCDIRBASE)/%)

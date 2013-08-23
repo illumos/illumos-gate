@@ -205,7 +205,8 @@ PKGDEP_INCORP= \
 # All packaging build products should go into $(PDIR), so they don't
 # need to be included separately in CLOBBERFILES.
 #
-CLOBBERFILES= $(PDIR) proto_list_$(PKGMACH)
+CLOBBERFILES= $(PDIR) proto_list_$(PKGMACH) install-$(PKGMACH).out \
+	license-list
 
 #
 # By default, PKGS will list all manifests.  To build and/or publish a

@@ -64,6 +64,9 @@ all: $(MSGDIRFILES)
 
 install: all _msg
 
+clobber:
+	$(RM) $(MSGDIRFILES_REMOTE)
+
 #
 # The _msg target gathers the output of the top-level _msg target into
 # text-domain-specific message files under the ROOTMSGDIR for packaging.

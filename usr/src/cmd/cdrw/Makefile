@@ -63,6 +63,7 @@ $(POFILE) : $(SRCS)
 	$(RM) $@
 	$(COMPILE.cpp) $(SRCS) | $(XGETTEXT) $(XGETFLAGS) -
 	$(SED) -e '/^domain/d' messages.po > $@
+	$(RM) messages.po
 
 sb: $(SRCS)
 	$(COMPILE.c) -xsbfast $(SRCS)

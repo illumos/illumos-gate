@@ -35,7 +35,7 @@ HEADERS=	../../../head/protocols/dumprestore.h \
 	../include/byteorder.h ../include/memutils.h \
 	../include/rmt.h restore.h
 
-CLOBBERFILES=	$(PRODUCT) $(DEBUGPRODUCTS) *.ln $(POFILES)
+CLOBBERFILES +=	$(PRODUCT) $(DEBUGPRODUCTS)
 
 LOCAL=		.
 GENERAL=	../include

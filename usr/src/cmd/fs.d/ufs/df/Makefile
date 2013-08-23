@@ -53,4 +53,7 @@ $(LIBPROG):	$(OBJS)
 		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 		$(POST_PROCESS)
 
+clean:
+		$(RM) $(LIBPROG).o
+
 lint:		lint_SRCS

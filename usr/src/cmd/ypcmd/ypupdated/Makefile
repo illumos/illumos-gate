@@ -55,6 +55,8 @@ SRCS =			$(OBJS:%.o=%.c)
 CERRWARN +=		-_gcc=-Wno-implicit-function-declaration
 CERRWARN +=		-_gcc=-Wno-unused-variable
 
+CLOBBERFILES += ypupdated_prot.h
+
 #conditional assignments
 $(INETSVC)   := FILEMODE=555
 

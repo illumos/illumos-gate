@@ -100,8 +100,13 @@ $(ROOTJAVA) :=	FILEMODE = 444
 all:	$(PROG) $(JAVA_SUBDIRS) $(JARFILE) \
 		    .WAIT $(SUBDIRS)
 
-clean :	$(JAVA_SUBDIRS) $(SUBDIRS)
-	-$(RM) $(OBJS) $(POFILES)
+clean :	$(JAVA_SUBDIRS) $(SUBDIRS) clean_local
+clean_local:
+	$(RM) $(OBJS)
+
+clobber : $(JAVA_SUBDIRS) $(SUBDIRS) clobber_local
+clobber_local: clean_local
+	$(RM) $(CLOBBERFILES)
 
 lint: $(SUBDIRS)
 

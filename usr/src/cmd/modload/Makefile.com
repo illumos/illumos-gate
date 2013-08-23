@@ -105,7 +105,7 @@ modinfo:	modinfo.o $(MODCOMMONOBJ)
 	$(POST_PROCESS)
 
 clean:
-	$(RM) $(OBJECTS) core
+	$(RM) $(OBJECTS)
 
 lint_%.c:
 	$(LINT.c) $(@:lint_%.c=../%.c) $(COMMONSRC) $(LDLIBS)

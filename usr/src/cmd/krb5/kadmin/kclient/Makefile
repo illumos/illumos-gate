@@ -32,7 +32,7 @@ SHFILES=	kclient
 SECFILES=	pam_krb5_first \
 		pam_krb5_only \
 		pam_krb5_optional
-CLOBBERFILES=	$(SHFILES)
+CLOBBERFILES +=	$(SHFILES)
 
 KRB5SBINSHFILES=$(SHFILES:%=$(KRB5SBIN)/%)
 
@@ -103,7 +103,7 @@ $(USRLIBSEC)/%: %
 	$(INS.file)
 
 clean:
-	$(RM) $(PROG) $(SHFILES)
+	$(RM) $(OBJS)
 
 lint:	lint_SRCS
 

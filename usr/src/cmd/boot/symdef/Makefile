@@ -22,8 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-# 
 
 BOOTPROG= symdef
 
@@ -39,6 +37,8 @@ LDLIBS +=	-lelf
 # Writing into string literals is incorrect.  We need to match gcc's
 # behavior, which causes us to take SIGSEGV on such a write.
 CFLAGS +=	$(XSTRCONST)
+
+CLOBBERFILES= $(BOOTPROG)
 
 all: $(BOOTPROG)
 

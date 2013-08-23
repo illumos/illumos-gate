@@ -62,8 +62,6 @@ WARLOCKFILES=	$(OBJECTS:%.o=wlocks/%.ll)
 
 MAPFILES =	../common/mapfile-vers
 
-CLOBBERFILES +=
-
 DYNFLAGS +=	$(VERSREF)
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) -lc
 

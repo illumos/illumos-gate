@@ -69,7 +69,7 @@ xpg4_%.o:	$(SRC)/common/util/%.c
 	$(POST_PROCESS_O)
 
 clean:
-	$(RM) $(FINDOBJS)
+	$(RM) $(FINDOBJS) $(XPG4FINDOBJS)
 
 lint:	lint_SRCS
 

@@ -96,6 +96,7 @@ clean:
 	$(RM) $(COBJS) $(CCOBJS)
 
 clobber: clean
+	$(RM) $(libaudio)
 
 lint:
 	$(LINT.c) $(LIBCSRCS) $(LDLIBS)

@@ -70,6 +70,8 @@ LINTFLAGS= 	-hb
 LDLIBS +=	-lmail
 LDFLAGS +=	$(MAPFILE.NGB:%=-M%)
 
+CLOBBERFILES += $(MAILXHELP)
+
 # install rules
 $(ROOTMAILXD)/% : %
 	$(INS.file)

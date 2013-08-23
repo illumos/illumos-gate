@@ -21,6 +21,8 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
 COBJS =		brand_util.o
 ASOBJS =	crt.o handler.o runexe.o
@@ -57,14 +59,18 @@ ASFLAGS =	-P $(ASFLAGS_$(CURTYPE)) -D_ASM -I. -I../sys
 # build the offset header before trying to compile any files.  (it's included
 # by brand_misc.h, so it's needed for all objects, not just assembly ones.)
 #
-all: $(OFFSETS_H) pics .WAIT $(PICS)
+# Note we have to build assym.h via its dependency on pics/% so that the
+# target dependent assignment of CTF_FLAGS will be there, otherwise make
+# will see two different commands to build it (endless rebuilds).
+#
+all: pics .WAIT $$(PICS)
 
 lint: lintcheck
 
 $(OBJECTS:%=pics/%): $(OFFSETS_H)
 
 $(OFFSETS_H): $(OFFSETS_SRC)
-	$(OFFSETS_CREATE) $(CTF_FLAGS) < $(OFFSETS_SRC) >$@
+	$(OFFSETS_CREATE) < $(OFFSETS_SRC) >$@
 
 pics/%.o: $(ISASRCDIR)/%.s
 	$(COMPILE.s) -o $@ $<
