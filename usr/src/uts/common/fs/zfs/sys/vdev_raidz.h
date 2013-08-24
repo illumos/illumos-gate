@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2013 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 #ifndef _SYS_VDEV_RAIDZ_H

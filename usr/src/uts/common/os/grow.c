@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 
+/* Copyright 2013 OmniTI Computer Consulting, Inc. All rights reserved. */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -814,9 +816,7 @@ smmap64(caddr_t addr, size_t len, int prot, int flags, int fd, off_t pos)
 	struct file *fp;
 	int error;
 
-	if (flags & _MAP_LOW32)
-		error = EINVAL;
-	else if (fd == -1 && (flags & MAP_ANON) != 0)
+	if (fd == -1 && (flags & MAP_ANON) != 0)
 		error = smmap_common(&addr, len, prot, flags,
 		    NULL, (offset_t)pos);
 	else if ((fp = getf(fd)) != NULL) {

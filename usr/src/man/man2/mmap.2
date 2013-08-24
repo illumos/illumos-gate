@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2013 OmniTI Computer Consulting, Inc. All Rights Reserved.
 .\" Copyright 1989 AT&T.  Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved.  Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
@@ -203,6 +204,15 @@ Map initialized data segment.
 .RE
 
 .sp
+.ne 2
+.na
+\fB\fBMAP_32BIT\fR\fR
+.ad
+.RS 17n
+Map to the lower 32 bits of address space.
+.RE
+
+.sp
 .LP
 The \fBMAP_SHARED\fR and \fBMAP_PRIVATE\fR options describe the disposition of
 write references to the underlying object. If \fBMAP_SHARED\fR is specified,
@@ -286,6 +296,13 @@ initialized data segment of an executable or shared object. When the
 the system can choose a mapping size larger than the page size returned by
 \fBsysconf()\fR. The \fBMAP_INITDATA\fR option should be used only by the
 dynamic linker for mapping initialized data of shared objects.
+.sp
+.LP
+The \fBMAP_32BIT\fR option informs the system that the search space for
+mapping assignment should be limited to the first 32 bits (4 Gbytes) of the
+caller's address space.  This flag is accepted in both 32-bit and 64-bit
+process models, but does not alter the mapping strategy when used in a
+32-bit process model.
 .sp
 .LP
 The \fIoff\fR argument is constrained to be aligned and sized according to the

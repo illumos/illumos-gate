@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -1559,7 +1559,7 @@ vdev_raidz_close(vdev_t *vd)
  *     vdev_raidz_physio(data, size: 32 KB, offset: 64 KB)
  *
  * Unlike the normal RAID-Z case in which the block is allocated based on the
- * I/O size, reads and writes here always use a 128 KB logical I/O size. If the
+ * I/O size, reads and writes here always use a 128 KB logical I/O size.  If the
  * I/O size is less than 128 KB, only the actual portions of data are written.
  * In this example the data is written to the third data vdev since that vdev
  * contains the offset [64 KB, 96 KB).

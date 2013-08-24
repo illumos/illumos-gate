@@ -1130,7 +1130,7 @@ zvol_dumpio_vdev(vdev_t *vd, void *addr, uint64_t offset, uint64_t origoffset,
 	}
 
 	if (!vd->vdev_ops->vdev_op_leaf && vd->vdev_ops != &vdev_raidz_ops)
-		return (numerrors < vd->vdev_children ? 0 : SET_ERROR(EIO));
+		return (numerrors < vd->vdev_children ? 0 : EIO);
 
 	if (doread && !vdev_readable(vd))
 		return (SET_ERROR(EIO));
@@ -1155,7 +1155,6 @@ zvol_dumpio_vdev(vdev_t *vd, void *addr, uint64_t offset, uint64_t origoffset,
 	} else {
 		dvd = vd->vdev_tsd;
 		ASSERT3P(dvd, !=, NULL);
-
 		return (vdev_disk_ldi_physio(dvd->vd_lh, addr, size,
 		    offset, doread ? B_READ : B_WRITE));
 	}
