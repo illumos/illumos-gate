@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 /* LINTLIBRARY */
@@ -64,4 +64,4 @@
 extern uint64_t metaslab_gang_bang;
 extern uint64_t metaslab_df_alloc_threshold;
 extern boolean_t zfeature_checks_disable;
-extern uint64_t zfs_deadman_synctime;
+extern uint64_t zfs_deadman_synctime_ms;
