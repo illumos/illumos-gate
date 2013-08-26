@@ -23,11 +23,12 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2013 by Delphix. All rights reserved.
+ */
 
 #ifndef	_SYS_LWP_H
 #define	_SYS_LWP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/synch.h>
 #include <sys/ucontext.h>
@@ -64,6 +65,8 @@ struct lwpinfo32 {
 
 #endif	/* _SYSCALL32 */
 
+typedef uint_t lwpid_t;
+
 #define	_LWP_FSBASE	0
 #define	_LWP_GSBASE	1
 
@@ -71,8 +74,6 @@ struct lwpinfo32 {
 #define	_LWP_GETPRIVATE	1
 
 #ifndef _KERNEL
-
-typedef uint_t lwpid_t;
 
 int		_lwp_kill(lwpid_t, int);
 int		_lwp_info(struct lwpinfo *);

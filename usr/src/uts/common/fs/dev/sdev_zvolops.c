@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2013 Joyent, Inc.  All rights reserved.
  */
 
 /* vnode ops for the /dev/zvol directory */
@@ -47,6 +48,7 @@ static ldi_ident_t devzvol_li;
 static ldi_handle_t devzvol_lh;
 static kmutex_t devzvol_mtx;
 static boolean_t devzvol_isopen;
+static major_t devzvol_major;
 
 /*
  * we need to use ddi_mod* since fs/dev gets loaded early on in
@@ -61,12 +63,16 @@ int (*szn2m)(char *, minor_t *);
 int
 sdev_zvol_create_minor(char *dsname)
 {
+	if (szcm == NULL)
+		return (-1);
 	return ((*szcm)(dsname));
 }
 
 int
 sdev_zvol_name2minor(char *dsname, minor_t *minor)
 {
+	if (szn2m == NULL)
+		return (-1);
 	return ((*szn2m)(dsname, minor));
 }
 
@@ -74,6 +80,7 @@ int
 devzvol_open_zfs()
 {
 	int rc;
+	dev_t dv;
 
 	devzvol_li = ldi_ident_from_anon();
 	if (ldi_open_by_name("/dev/zfs", FREAD | FWRITE, kcred,
@@ -94,6 +101,9 @@ devzvol_open_zfs()
 		cmn_err(CE_WARN, "couldn't resolve zvol_name2minor");
 		return (rc);
 	}
+	if (ldi_get_dev(devzvol_lh, &dv))
+		return (-1);
+	devzvol_major = getmajor(dv);
 	return (0);
 }
 
@@ -270,6 +280,8 @@ devzvol_validate(struct sdev_node *dv)
 	sdcmn_err13(("  v_type %d do_type %d",
 	    SDEVTOV(dv)->v_type, do_type));
 	if ((SDEVTOV(dv)->v_type == VLNK && do_type != DMU_OST_ZVOL) ||
+	    ((SDEVTOV(dv)->v_type == VBLK || SDEVTOV(dv)->v_type == VCHR) &&
+	    do_type != DMU_OST_ZVOL) ||
 	    (SDEVTOV(dv)->v_type == VDIR && do_type == DMU_OST_ZVOL)) {
 		kmem_free(dsname, strlen(dsname) + 1);
 		return (SDEV_VTOR_STALE);
@@ -452,12 +464,6 @@ devzvol_prunedir(struct sdev_node *ddv)
 	dv = SDEV_FIRST_ENTRY(ddv);
 	while (dv) {
 		sdcmn_err13(("sdev_name '%s'", dv->sdev_name));
-		/* skip stale nodes */
-		if (dv->sdev_flags & SDEV_STALE) {
-			sdcmn_err13(("  stale"));
-			dv = SDEV_NEXT_ENTRY(ddv, dv);
-			continue;
-		}
 
 		switch (devzvol_validate(dv)) {
 		case SDEV_VTOR_VALID:
@@ -477,13 +483,88 @@ devzvol_prunedir(struct sdev_node *ddv)
 		}
 		SDEV_HOLD(dv);
 		/* remove the cache node */
-		if (sdev_cache_update(ddv, &dv, dv->sdev_name,
-		    SDEV_CACHE_DELETE) == 0)
-			dv = SDEV_FIRST_ENTRY(ddv);
-		else
-			dv = SDEV_NEXT_ENTRY(ddv, dv);
+		sdev_cache_update(ddv, &dv, dv->sdev_name,
+		    SDEV_CACHE_DELETE);
+		SDEV_RELE(dv);
+		dv = SDEV_FIRST_ENTRY(ddv);
 	}
 	rw_downgrade(&ddv->sdev_contents);
+}
+
+/*
+ * This function is used to create a dir or dev inside a zone's /dev when the
+ * zone has a zvol that is dynamically created within the zone (i.e. inside
+ * of a delegated dataset.  Since there is no /devices tree within a zone,
+ * we create the chr/blk devices directly inside the zone's /dev instead of
+ * making symlinks.
+ */
+static int
+devzvol_mk_ngz_node(struct sdev_node *parent, char *nm)
+{
+	struct vattr vattr;
+	timestruc_t now;
+	enum vtype expected_type = VDIR;
+	dmu_objset_type_t do_type;
+	struct sdev_node *dv = NULL;
+	int res;
+	char *dsname;
+
+	bzero(&vattr, sizeof (vattr));
+	gethrestime(&now);
+	vattr.va_mask = AT_TYPE|AT_MODE|AT_UID|AT_GID;
+	vattr.va_uid = SDEV_UID_DEFAULT;
+	vattr.va_gid = SDEV_GID_DEFAULT;
+	vattr.va_type = VNON;
+	vattr.va_atime = now;
+	vattr.va_mtime = now;
+	vattr.va_ctime = now;
+
+	if ((dsname = devzvol_make_dsname(parent->sdev_path, nm)) == NULL)
+		return (ENOENT);
+
+	if (devzvol_objset_check(dsname, &do_type) != 0) {
+		kmem_free(dsname, strlen(dsname) + 1);
+		return (ENOENT);
+	}
+	if (do_type == DMU_OST_ZVOL)
+		expected_type = VBLK;
+
+	if (expected_type == VDIR) {
+		vattr.va_type = VDIR;
+		vattr.va_mode = SDEV_DIRMODE_DEFAULT;
+	} else {
+		minor_t minor;
+		dev_t devnum;
+		int rc;
+
+		rc = sdev_zvol_create_minor(dsname);
+		if ((rc != 0 && rc != EEXIST && rc != EBUSY) ||
+		    sdev_zvol_name2minor(dsname, &minor)) {
+			kmem_free(dsname, strlen(dsname) + 1);
+			return (ENOENT);
+		}
+
+		devnum = makedevice(devzvol_major, minor);
+		vattr.va_rdev = devnum;
+
+		if (strstr(parent->sdev_path, "/rdsk/") != NULL)
+			vattr.va_type = VCHR;
+		else
+			vattr.va_type = VBLK;
+		vattr.va_mode = SDEV_DEVMODE_DEFAULT;
+	}
+	kmem_free(dsname, strlen(dsname) + 1);
+
+	rw_enter(&parent->sdev_contents, RW_WRITER);
+
+	res = sdev_mknode(parent, nm, &dv, &vattr,
+	    NULL, NULL, kcred, SDEV_READY);
+	rw_exit(&parent->sdev_contents);
+	if (res != 0)
+		return (ENOENT);
+
+	SDEV_RELE(dv);
+	return (0);
 }
 
 /*ARGSUSED*/
@@ -505,9 +586,52 @@ devzvol_lookup(struct vnode *dvp, char *nm, struct vnode **vpp,
 		return (error);
 
 	rw_enter(&parent->sdev_contents, RW_READER);
-	if (!SDEV_IS_GLOBAL(parent)) {
+	if (SDEV_IS_GLOBAL(parent)) {
+		/*
+		 * During iter_datasets, don't create GZ dev when running in
+		 * NGZ.  We can't return ENOENT here since that could
+		 * incorrectly trigger the creation of the dev from the
+		 * recursive call through prof_filldir during iter_datasets.
+		 */
+		if (getzoneid() != GLOBAL_ZONEID) {
+			rw_exit(&parent->sdev_contents);
+			return (EPERM);
+		}
+	} else {
+		int res;
+
 		rw_exit(&parent->sdev_contents);
-		return (prof_lookup(dvp, nm, vpp, cred));
+
+		/*
+		 * If we're in the global zone and reach down into a non-global
+		 * zone's /dev/zvol then this action could trigger the creation
+		 * of all of the zvol devices for every zone into the non-global
+		 * zone's /dev tree. This could be a big security hole. To
+		 * prevent this, disallow the global zone from looking inside
+		 * a non-global zones /dev/zvol. This behavior is similar to
+		 * delegated datasets, which cannot be used by the global zone.
+		 */
+		if (getzoneid() == GLOBAL_ZONEID)
+			return (EPERM);
+
+		res = prof_lookup(dvp, nm, vpp, cred);
+
+		/*
+		 * We won't find a zvol that was dynamically created inside
+		 * a NGZ, within a delegated dataset, in the zone's dev profile
+		 * but prof_lookup will also find it via sdev_cache_lookup.
+		 */
+		if (res == ENOENT) {
+			/*
+			 * We have to create the sdev node for the dymamically
+			 * created zvol.
+			 */
+			if (devzvol_mk_ngz_node(parent, nm) != 0)
+				return (ENOENT);
+			res = prof_lookup(dvp, nm, vpp, cred);
+		}
+
+		return (res);
 	}
 
 	dsname = devzvol_make_dsname(parent->sdev_path, nm);
@@ -613,8 +737,10 @@ sdev_iter_datasets(struct vnode *dvp, int arg, char *name)
 		} else if (rc == ENOENT) {
 			goto skip;
 		} else {
-			/* EBUSY == problem with zvols's dmu holds? */
-			ASSERT(0);
+			/*
+			 * EBUSY == problem with zvols's dmu holds?
+			 * EPERM when in a NGZ and traversing up and out.
+			 */
 			goto skip;
 		}
 		if (arg == ZFS_IOC_DATASET_LIST_NEXT &&

@@ -161,7 +161,7 @@ prof_mknode(struct sdev_node *dir, char *name, struct sdev_node **newdv,
 		return (rv);
 	}
 
-	rv = sdev_cache_update(dir, &dv, name, SDEV_CACHE_ADD);
+	sdev_cache_update(dir, &dv, name, SDEV_CACHE_ADD);
 	*newdv = dv;
 
 	/* put it in ready state */
@@ -173,6 +173,9 @@ prof_mknode(struct sdev_node *dir, char *name, struct sdev_node **newdv,
 			sdcmn_err10(("sdev_origin for %s set to 0x%p\n",
 			    name, arg));
 		apply_glob_pattern(dir, *newdv);
+	} else {
+		sdev_cache_update(dir, &dv, name, SDEV_CACHE_DELETE);
+		SDEV_RELE(dv);
 	}
 	return (rv);
 }
@@ -198,8 +201,8 @@ prof_make_dir(char *name, struct sdev_node **gdirp, struct sdev_node **dirp)
 	if (newdv = sdev_cache_lookup(dir, name)) {
 		*dirp = newdv;
 		*gdirp = newdv->sdev_origin;
-		SDEV_RELE(dir);
 		rw_exit(&dir->sdev_contents);
+		SDEV_RELE(dir);
 		return (0);
 	}
 	rw_exit(&dir->sdev_contents);
@@ -675,6 +678,10 @@ check_build:
 	    (gdir == NULL || ddv->sdev_ldir_gen
 	    == gdir->sdev_gdir_gen))
 		return;		/* already up to date */
+
+	/* We may have become a zombie (across a try) */
+	if (ddv->sdev_state == SDEV_ZOMBIE)
+		return;
 
 	if (firsttime && rw_tryupgrade(&ddv->sdev_contents) == 0) {
 		rw_exit(&ddv->sdev_contents);

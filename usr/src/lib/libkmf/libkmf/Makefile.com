@@ -63,7 +63,8 @@ LDLIBS6	+=	$(BERDERLIB64) $(CRYPTOUTILLIB64) -lmd -lpkcs11 -lnsl -lsocket -lc
 $(DYNLIB) :=    LDLIBS += -lxml2
 $(DYNLIB64) :=  LDLIBS64 += -lxml2
 
-CPPFLAGS	+=	-I$(INCDIR) -I/usr/include/libxml2 -I../../ber_der/inc -I$(SRCDIR)
+CPPFLAGS	+=	-I$(INCDIR) -I$(ADJUNCT_PROTO)/usr/include/libxml2 \
+			-I../../ber_der/inc -I$(SRCDIR)
 
 CERRWARN	+=	-_gcc=-Wno-parentheses
 CERRWARN	+=	-_gcc=-Wno-switch

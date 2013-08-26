@@ -1648,3 +1648,5 @@ Bugid   Risk Synopsis
 3709	need sloppy relocation for GNU .debug_macro
 3722	link-editor is over restrictive of R_AMD64_32 addends
 3926	multiple extern map file definitions corrupt symbol table entry
+3999	libld extended section handling is broken
+4003	dldump() can't deal with extended sections

@@ -21,6 +21,9 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ */
 
 /*
  * vnode ops for the /dev filesystem
@@ -30,6 +33,248 @@
  *    the global zone, e.g. devname and devfsadm communication
  * - other file types are unusual in this namespace and
  *    not supported for now
+ */
+
+/*
+ * sdev has a few basic goals:
+ *   o Provide /dev for the global zone as well as various non-global zones.
+ *   o Provide the basic functionality that devfsadm might need (mknod,
+ *     symlinks, etc.)
+ *   o Allow persistent permissions on files in /dev.
+ *   o Allow for dynamic directories and nodes for use by various services (pts,
+ *     zvol, net, etc.)
+ *
+ * The sdev file system is primarily made up of sdev_node_t's which is sdev's
+ * counterpart to the vnode_t. There are two different classes of sdev_node_t's
+ * that we generally care about, dynamic and otherwise.
+ *
+ * Persisting Information
+ * ----------------------
+ *
+ * When sdev is mounted, it keeps track of the underlying file system it is
+ * mounted over. In certain situations, sdev will go and create entries in that
+ * underlying file system. These underlying 'back end' nodes are used as proxies
+ * for various changes in permissions. While specific sets of nodes, such as
+ * dynamic ones, are exempt, this process stores permission changes against
+ * these back end nodes. The point of all of this is to allow for these settings
+ * to persist across host and zone reboots. As an example, consider the entry
+ * /dev/dsk/c0t0d0 which is a character device and that / is in UFS. Upon
+ * changing the permissions on c0t0d0 you'd have the following logical
+ * relationships:
+ *
+ *    +------------------+   sdev_vnode     +--------------+
+ *    | sdev_node_t      |<---------------->| vnode_t      |
+ *    | /dev/dsk/c0t0d0  |<---------------->| for sdev     |
+ *    +------------------+                  +--------------+
+ *           |
+ *           | sdev_attrvp
+ *           |
+ *           |    +---------------------+
+ *           +--->| vnode_t for UFS|ZFS |
+ *                | /dev/dsk/c0t0d0     |
+ *                +---------------------+
+ *
+ * sdev is generally in memory. Therefore when a lookup happens and there is no
+ * entry already inside of a directory cache, it will next check the backing
+ * store. If the backing store exists, we will reconstitute the sdev_node based
+ * on the information that we persisted. When we create the backing store node,
+ * we use the struct vattr information that we already have in sdev_node_t.
+ * Because of this, we already know if the entry was previously a symlink,
+ * directory, or some other kind of type. Note that not all types of nodes are
+ * supported. Currently only VDIR, VCHR, VBLK, VREG, VDOOR, and VLNK are
+ * eligible to be persisted.
+ *
+ * When the sdev_node is created and the lookup is done, we grab a hold on the
+ * underlying vnode as part of the call to VOP_LOOKUP. That reference is held
+ * until the sdev_node becomes inactive. Once its reference count reaches one
+ * and the VOP_INACTIVE callback fires leading to the destruction of the node,
+ * the reference on the underlying vnode will be released.
+ *
+ * The backing store node will be deleted only when the node itself is deleted
+ * through the means of a VOP_REMOVE, VOP_RMDIR, or similar call.
+ *
+ * Not everything can be persisted, see The Rules section for more details.
+ *
+ * Dynamic Nodes
+ * -------------
+ *
+ * Dynamic nodes allow for specific interactions with various kernel subsystems
+ * when looking up directory entries. This allows the lookup and readdir
+ * functions to check against the kernel subsystem's for validity. eg. does a
+ * zvol or nic still exist.
+ *
+ * More specifically, when we create various directories we check if the
+ * directory name matches that of one of the names in the vtab[] (sdev_subr.c).
+ * If it does, we swap out the vnode operations into a new set which combine the
+ * normal sdev vnode operations with the dynamic set here.
+ *
+ * In addition, various dynamic nodes implement a verification entry point. This
+ * verification entry is used as a part of lookup and readdir. The goal for
+ * these dynamic nodes is to allow them to check with the underlying subsystems
+ * to ensure that these devices are still present, or if they have gone away, to
+ * remove them from the results. This is indicated by using the SDEV_VTOR flag
+ * in vtab[].
+ *
+ * Dynamic nodes have additional restrictions placed upon them. They may only
+ * appear at the top level directory of the file system. In addition, users
+ * cannot create dirents below any leve of a dynamic node aside from its special
+ * vnops.
+ *
+ * Profiles
+ * --------
+ *
+ * Profiles exist for the purpose of non-global zones. They work with the zone
+ * brands and zoneadmd to set up a filter of allowed devices that can appear in
+ * a non-global zone's /dev. These are sent to sdev by means of libdevinfo and a
+ * modctl system call. Specifically it allows one to add patterns of device
+ * paths to include and exclude. It allows for a collection of symlinks to be
+ * added and it allows for remapping names.
+ *
+ * When operating in a non-global zone, several of the sdev vnops are redirected
+ * to the profile versions. These impose additional restrictions such as
+ * enforcing that a non-global zone's /dev is read only.
+ *
+ * sdev_node_t States
+ * ------------------
+ *
+ * A given sdev_node_t has a field called the sdev_state which describes where
+ * in the sdev life cycle it is. There are three primary states: SDEV_INIT,
+ * SDEV_READY, and SDEV_ZOMBIE.
+ *
+ *	SDEV_INIT: When a new /dev file is first looked up, a sdev_node
+ *		   is allocated, initialized and added to the directory's
+ *		   sdev_node cache. A node at this state will also
+ *		   have the SDEV_LOOKUP flag set.
+ *
+ *		   Other threads that are trying to look up a node at
+ *		   this state will be blocked until the SDEV_LOOKUP flag
+ *		   is cleared.
+ *
+ *		   When the SDEV_LOOKUP flag is cleared, the node may
+ *		   transition into the SDEV_READY state for a successful
+ *		   lookup or the node is removed from the directory cache
+ *		   and destroyed if the named node can not be found.
+ *		   An ENOENT error is returned for the second case.
+ *
+ *	SDEV_READY: A /dev file has been successfully looked up and
+ *		    associated with a vnode. The /dev file is available
+ *		    for the supported /dev file system operations.
+ *
+ *	SDEV_ZOMBIE: Deletion of a /dev file has been explicitly issued
+ *		    to an SDEV_READY node. The node is transitioned into
+ *		    the SDEV_ZOMBIE state if the vnode reference count
+ *		    is still held. A SDEV_ZOMBIE node does not support
+ *		    any of the /dev file system operations. A SDEV_ZOMBIE
+ *		    node is immediately removed from the directory cache
+ *		    and destroyed once the reference count reaches zero.
+ *
+ * Historically nodes that were marked SDEV_ZOMBIE were not removed from the
+ * underlying directory caches. This has been the source of numerous bugs and
+ * thus to better mimic what happens on a real file system, it is no longer the
+ * case.
+ *
+ * The following state machine describes the life cycle of a given node and its
+ * associated states:
+ *
+ * node is . . . . .
+ * allocated via   .     +-------------+         . . . . . . . vnode_t refcount
+ * sdev_nodeinit() .     | Unallocated |         .             reaches zero and
+ *        +--------*-----|   Memory    |<--------*---+         sdev_inactive is
+ *        |              +-------------+             |         called.
+ *        |       +------------^                     |         called.
+ *        v       |                                  |
+ *  +-----------+ * . . sdev_nodeready()      +-------------+
+ *  | SDEV_INIT | |     or related setup      | SDEV_ZOMBIE |
+ *  +-----------+ |     failure               +-------------+
+ *        |       |                                  ^
+ *        |       |      +------------+              |
+ *        +-*----------->| SDEV_READY |--------*-----+
+ *          .            +------------+        .          The node is no longer
+ *          . . node successfully              . . . . .  valid or we've been
+ *              inserted into the                         asked to remove it.
+ *              directory cache                           This happens via
+ *              and sdev_nodready()                       sdev_dirdelete().
+ *              call successful.
+ *
+ * Adding and Removing Dirents, Zombie Nodes
+ * -----------------------------------------
+ *
+ * As part of doing a lookup, readdir, or an explicit creation operation like
+ * mkdir or create, nodes may be created. Every directory has an avl tree which
+ * contains its children, the sdev_entries tree. This is only used if the type
+ * is VDIR. Access to this is controlled by the sdev_node_t's contents_lock and
+ * it is managed through sdev_cache_update().
+ *
+ * Every sdev_node_t has a field sdev_state, which describes the current state
+ * of the node. A node is generally speaking in the SDEV_READY state. When it is
+ * there, it can be looked up, accessed, and operations performed on it. When a
+ * node is going to be removed from the directory cache it is marked as a
+ * zombie. Once a node becomes a zombie, no other file system operations will
+ * succeed and it will continue to exist as a node until the vnode count on the
+ * node reaches zero. At that point, the node will be freed.  However, once a
+ * node has been marked as a zombie, it will be removed immediately from the
+ * directory cache such that no one else may find it again.  This means that
+ * someone else can insert a new entry into that directory with the same name
+ * and without a problem.
+ *
+ * To remove a node, see the section on that in The Rules.
+ *
+ * The Rules
+ * ---------
+ * These are the rules to live by when working in sdev. These are not
+ * exhaustive.
+ *
+ * - Set 1: Working with Backing Nodes
+ *   o If there is a SDEV_READY sdev_node_t, it knows about its backing node.
+ *   o If we find a backing node when looking up an sdev_node_t for the first
+ *     time, we use its attributes to build our sdev_node_t.
+ *   o If there is a found backing node, or we create a backing node, that's
+ *     when we grab the hold on its vnode.
+ *   o If we mark an sdev_node_t a ZOMBIE, we must remove its backing node from
+ *     the underlying file system. It must not be searchable or findable.
+ *   o We release our hold on the backing node vnode when we destroy the
+ *     sdev_node_t.
+ *
+ * - Set 2: Locking rules for sdev (not exhaustive)
+ *   o The majority of nodes contain an sdev_contents rw lock. You must hold it
+ *     for read or write if manipulating its contents appropriately.
+ *   o You must lock your parent before yourself.
+ *   o If you need your vnode's v_lock and the sdev_contents rw lock, you must
+ *     grab the v_lock before the sdev_contents rw_lock.
+ *   o If you release a lock on the node as a part of upgrading it, you must
+ *     verify that the node has not become a zombie as a part of this process.
+ *
+ * - Set 3: Zombie Status and What it Means
+ *   o If you encounter a node that is a ZOMBIE, that means that it has been
+ *     unlinked from the backing store.
+ *   o If you release your contents lock and acquire it again (say as part of
+ *     trying to grab a write lock) you must check that the node has not become
+ *     a zombie.
+ *   o You should VERIFY that a looked up node is not a zombie. This follows
+ *     from the following logic. To mark something as a zombie means that it is
+ *     removed from the parents directory cache. To do that, you must have a
+ *     write lock on the parent's sdev_contents. To lookup through that
+ *     directory you must have a read lock. This then becomes a simple ordering
+ *     problem. If you've been granted the lock then the other operation cannot
+ *     be in progress or must have already succeeded.
+ *
+ * - Set 4: Removing Directory Entries (aka making nodes Zombies)
+ *   o Write lock must be held on the directory
+ *   o Write lock must be held on the node
+ *   o Remove the sdev_node_t from its parent cache
+ *   o Remove the corresponding backing store node, if it exists, eg. use
+ *     VOP_REMOVE or VOP_RMDIR.
+ *   o You must NOT make any change in the vnode reference count! Nodes should
+ *     only be cleaned up through VOP_INACTIVE callbacks.
+ *   o VOP_INACTIVE is the only one responsible for doing the final vn_rele of
+ *     the backing store vnode that was grabbed during lookup.
+ *
+ * - Set 5: What Nodes may be Persisted
+ *   o The root, /dev is always persisted
+ *   o Any node in vtab which is marked SDEV_DYNAMIC, may not be persisted
+ *     unless it is also marked SDEV_PERSIST
+ *   o Anything whose parent directory is marked SDEV_PERSIST will pass that
+ *     along to the child as long as it does not contradict the above rules
  */
 
 #include <sys/types.h>
@@ -559,6 +804,12 @@ sdev_remove(struct vnode *dvp, char *nm, struct cred *cred,
 	if (!rw_tryupgrade(&parent->sdev_contents)) {
 		rw_exit(&parent->sdev_contents);
 		rw_enter(&parent->sdev_contents, RW_WRITER);
+		/* Make sure we didn't become a zombie */
+		if (parent->sdev_state == SDEV_ZOMBIE) {
+			rw_exit(&parent->sdev_contents);
+			VN_RELE(vp);
+			return (ENOENT);
+		}
 	}
 
 	/* we do not support unlinking a non-empty directory */
@@ -574,39 +825,28 @@ sdev_remove(struct vnode *dvp, char *nm, struct cred *cred,
 	 *  - destroying the sdev_node
 	 *  - releasing the hold on attrvp
 	 */
-	error = sdev_cache_update(parent, &dv, nm, SDEV_CACHE_DELETE);
+	sdev_cache_update(parent, &dv, nm, SDEV_CACHE_DELETE);
+	VN_RELE(vp);
 	rw_exit(&parent->sdev_contents);
 
-	sdcmn_err2(("sdev_remove: cache_update error %d\n", error));
-	if (error && (error != EBUSY)) {
-		/* report errors other than EBUSY */
-		VN_RELE(vp);
-	} else {
-		sdcmn_err2(("sdev_remove: cleaning node %s from cache "
-		    " with error %d\n", nm, error));
-
+	/*
+	 * best efforts clean up the backing store
+	 */
+	if (bkstore) {
+		ASSERT(parent->sdev_attrvp);
+		error = VOP_REMOVE(parent->sdev_attrvp, nm, cred,
+		    ct, flags);
 		/*
-		 * best efforts clean up the backing store
+		 * do not report BUSY error
+		 * because the backing store ref count is released
+		 * when the last ref count on the sdev_node is
+		 * released.
 		 */
-		if (bkstore) {
-			ASSERT(parent->sdev_attrvp);
-			error = VOP_REMOVE(parent->sdev_attrvp, nm, cred,
-			    ct, flags);
-			/*
-			 * do not report BUSY error
-			 * because the backing store ref count is released
-			 * when the last ref count on the sdev_node is
-			 * released.
-			 */
-			if (error == EBUSY) {
-				sdcmn_err2(("sdev_remove: device %s is still on"
-				    "disk %s\n", nm, parent->sdev_path));
-				error = 0;
-			}
-		}
-
-		if (error == EBUSY)
+		if (error == EBUSY) {
+			sdcmn_err2(("sdev_remove: device %s is still on"
+			    "disk %s\n", nm, parent->sdev_path));
 			error = 0;
+		}
 	}
 
 	return (error);
@@ -716,6 +956,8 @@ sdev_rename(struct vnode *odvp, char *onm, struct vnode *ndvp, char *nnm,
 		if (error = VOP_GETATTR(odvp, &vattr, 0, cred, ct)) {
 			mutex_exit(&sdev_lock);
 			VN_RELE(ovp);
+			if (nvp != NULL)
+				VN_RELE(nvp);
 			return (error);
 		}
 		fsid = vattr.va_fsid;
@@ -723,11 +965,15 @@ sdev_rename(struct vnode *odvp, char *onm, struct vnode *ndvp, char *nnm,
 		if (error = VOP_GETATTR(ndvp, &vattr, 0, cred, ct)) {
 			mutex_exit(&sdev_lock);
 			VN_RELE(ovp);
+			if (nvp != NULL)
+				VN_RELE(nvp);
 			return (error);
 		}
 		if (fsid != vattr.va_fsid) {
 			mutex_exit(&sdev_lock);
 			VN_RELE(ovp);
+			if (nvp != NULL)
+				VN_RELE(nvp);
 			return (EXDEV);
 		}
 	}
@@ -737,6 +983,8 @@ sdev_rename(struct vnode *odvp, char *onm, struct vnode *ndvp, char *nnm,
 	if (error) {
 		mutex_exit(&sdev_lock);
 		VN_RELE(ovp);
+		if (nvp != NULL)
+			VN_RELE(nvp);
 		return (error);
 	}
 
@@ -747,6 +995,8 @@ sdev_rename(struct vnode *odvp, char *onm, struct vnode *ndvp, char *nnm,
 		if (error) {
 			mutex_exit(&sdev_lock);
 			VN_RELE(ovp);
+			if (nvp != NULL)
+				VN_RELE(nvp);
 			return (error);
 		}
 	}
@@ -755,21 +1005,31 @@ sdev_rename(struct vnode *odvp, char *onm, struct vnode *ndvp, char *nnm,
 	ASSERT(fromdv);
 
 	/* destination file exists */
-	if (nvp) {
+	if (nvp != NULL) {
 		todv = VTOSDEV(nvp);
 		ASSERT(todv);
 	}
 
+	if ((fromdv->sdev_flags & SDEV_DYNAMIC) != 0 ||
+	    (todv != NULL && (todv->sdev_flags & SDEV_DYNAMIC) != 0)) {
+		mutex_exit(&sdev_lock);
+		if (nvp != NULL)
+			VN_RELE(nvp);
+		VN_RELE(ovp);
+		return (EACCES);
+	}
+
 	/*
-	 * link source to new target in the memory
+	 * link source to new target in the memory. Regardless of failure, we
+	 * must rele our hold on nvp.
 	 */
 	error = sdev_rnmnode(fromparent, fromdv, toparent, &todv, nnm, cred);
+	if (nvp != NULL)
+		VN_RELE(nvp);
 	if (error) {
 		sdcmn_err2(("sdev_rename: renaming %s to %s failed "
 		    " with error %d\n", onm, nnm, error));
 		mutex_exit(&sdev_lock);
-		if (nvp)
-			VN_RELE(nvp);
 		VN_RELE(ovp);
 		return (error);
 	}
@@ -782,6 +1042,7 @@ sdev_rename(struct vnode *odvp, char *onm, struct vnode *ndvp, char *nnm,
 	if (fromdv == NULL) {
 		rw_exit(&fromparent->sdev_contents);
 		mutex_exit(&sdev_lock);
+		VN_RELE(ovp);
 		sdcmn_err2(("sdev_rename: the source is deleted already\n"));
 		return (0);
 	}
@@ -790,6 +1051,7 @@ sdev_rename(struct vnode *odvp, char *onm, struct vnode *ndvp, char *nnm,
 		rw_exit(&fromparent->sdev_contents);
 		mutex_exit(&sdev_lock);
 		VN_RELE(SDEVTOV(fromdv));
+		VN_RELE(ovp);
 		sdcmn_err2(("sdev_rename: the source is being deleted\n"));
 		return (0);
 	}
@@ -809,8 +1071,9 @@ sdev_rename(struct vnode *odvp, char *onm, struct vnode *ndvp, char *nnm,
 
 	rw_enter(&fromparent->sdev_contents, RW_WRITER);
 	bkstore = SDEV_IS_PERSIST(fromdv) ? 1 : 0;
-	error = sdev_cache_update(fromparent, &fromdv, onm,
+	sdev_cache_update(fromparent, &fromdv, onm,
 	    SDEV_CACHE_DELETE);
+	VN_RELE(SDEVTOV(fromdv));
 
 	/* best effforts clean up the backing store */
 	if (bkstore) {
@@ -1078,27 +1341,23 @@ sdev_rmdir(struct vnode *dvp, char *nm, struct vnode *cdir, struct cred *cred,
 	rw_exit(&self->sdev_contents);
 
 	/* unlink it from the directory cache */
-	error = sdev_cache_update(parent, &self, nm, SDEV_CACHE_DELETE);
+	sdev_cache_update(parent, &self, nm, SDEV_CACHE_DELETE);
 	rw_exit(&parent->sdev_contents);
 	vn_vfsunlock(vp);
+	VN_RELE(vp);
 
-	if (error && (error != EBUSY)) {
-		VN_RELE(vp);
-	} else {
-		sdcmn_err2(("sdev_rmdir: cleaning node %s from directory "
-		    " cache with error %d\n", nm, error));
+	/* best effort to clean up the backing store */
+	if (SDEV_IS_PERSIST(parent)) {
+		ASSERT(parent->sdev_attrvp);
+		error = VOP_RMDIR(parent->sdev_attrvp, nm,
+		    parent->sdev_attrvp, kcred, ct, flags);
 
-		/* best effort to clean up the backing store */
-		if (SDEV_IS_PERSIST(parent)) {
-			ASSERT(parent->sdev_attrvp);
-			error = VOP_RMDIR(parent->sdev_attrvp, nm,
-			    parent->sdev_attrvp, kcred, ct, flags);
+		if (error)
 			sdcmn_err2(("sdev_rmdir: cleaning device %s is on"
 			    " disk error %d\n", parent->sdev_path, error));
-		}
-
 		if (error == EBUSY)
 			error = 0;
+
 	}
 
 	return (error);
@@ -1142,9 +1401,21 @@ sdev_readdir(struct vnode *dvp, struct uio *uiop, struct cred *cred, int *eofp,
 	struct sdev_node *parent = VTOSDEV(dvp);
 	int error;
 
-	/* execute access is required to search the directory */
-	if ((error = VOP_ACCESS(dvp, VEXEC, 0, cred, ct)) != 0)
-		return (error);
+	/*
+	 * We must check that we have execute access to search the directory --
+	 * but because our sdev_contents lock is already held as a reader (the
+	 * caller must have done a VOP_RWLOCK()), we call directly into the
+	 * underlying access routine if sdev_attr is non-NULL.
+	 */
+	if (parent->sdev_attr != NULL) {
+		VERIFY(RW_READ_HELD(&parent->sdev_contents));
+
+		if (sdev_unlocked_access(parent, VEXEC, cred) != 0)
+			return (EACCES);
+	} else {
+		if ((error = VOP_ACCESS(dvp, VEXEC, 0, cred, ct)) != 0)
+			return (error);
+	}
 
 	ASSERT(parent);
 	if (!SDEV_IS_GLOBAL(parent))

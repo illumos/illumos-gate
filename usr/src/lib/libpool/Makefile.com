@@ -48,7 +48,8 @@ SRCDIR =	../common
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS +=	-D_REENTRANT -D_FILE_OFFSET_BITS=64 -I/usr/include/libxml2
+CPPFLAGS +=	-D_REENTRANT -D_FILE_OFFSET_BITS=64 \
+		-I$(ADJUNCT_PROTO)/usr/include/libxml2
 
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-switch

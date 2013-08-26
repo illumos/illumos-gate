@@ -34,19 +34,21 @@ include	$(SRC)/lib/Makefile.lib
 
 MPSDIR=		/usr/lib/mps
 KMFINC=		-I../../../include -I../../../ber_der/inc
-NSSINC=		-I/usr/include/mps
+NSSINC=		-I$(ADJUNCT_PROTO)/usr/include/mps
 BERLIB=		-lkmf -lkmfberder
 BERLIB64=	$(BERLIB)
 
-NSSLIBS=	$(BERLIB) -L$(MPSDIR) -R$(MPSDIR) -lnss3 -lnspr4 -lsmime3 -lc
-NSSLIBS64=	$(BERLIB64) -L$(MPSDIR)/$(MACH64) -R$(MPSDIR)/$(MACH64) -lnss3 -lnspr4 -lsmime3 -lc
+NSSLIBS=	$(BERLIB) -L$(ADJUNCT_PROTO)$(MPSDIR) -R$(MPSDIR) \
+		-lnss3 -lnspr4 -lsmime3 -lc
+NSSLIBS64=	$(BERLIB64) -L$(ADJUNCT_PROTO)$(MPSDIR)/$(MACH64) \
+		-R$(MPSDIR)/$(MACH64) -lnss3 -lnspr4 -lsmime3 -lc
 
 SRCDIR=		../common
 INCDIR=		../../include
 
 CFLAGS		+=	$(CCVERBOSE) 
 CPPFLAGS	+=	-D_REENTRANT $(KMFINC) $(NSSINC)  \
-		-I$(SFWDIR)/include -I$(INCDIR) -I/usr/include/libxml2
+		-I$(INCDIR) -I$(ADJUNCT_PROTO)/usr/include/libxml2
 
 PICS=	$(OBJECTS:%=pics/%)
 

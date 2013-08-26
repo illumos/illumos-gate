@@ -23,8 +23,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG=		availdevs
 
@@ -32,7 +30,7 @@ include ../Makefile.cmd
 
 ROOTCMDDIR=	$(ROOTLIB)/zfs
 
-INCS += -I/usr/include/libxml2
+INCS += -I$(ADJUNCT_PROTO)/usr/include/libxml2
 
 #
 # There is no lint library for libxml2, so we need to avoid linking against

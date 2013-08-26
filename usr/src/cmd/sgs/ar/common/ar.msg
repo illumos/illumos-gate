@@ -70,6 +70,8 @@
 @ MSG_ELF_GETSCN_FILE	"ar: %s has no section header or bad elf format: %s\n"
 @ MSG_ELF_GETSCN_AR	"ar: %s(%s) has no section header or bad elf \
 			 format: %s\n"
+@ MSG_ELF_GETSHSTRNDX_FILE "ar: %s has no string table index: %s\n"
+@ MSG_ELF_GETSHSTRNDX_AR "ar: %s(%s) has no string table index: %s\n"
 @ MSG_ELF_MALARCHIVE	"ar: %s: offset %lld: malformed archive: %s\n"
 @ MSG_ELF_RAWFILE	"ar: elf_rawfile() failed: %s\n"
 @ MSG_ELF_VERSION	"ar: libelf.a out of date: %s\n"

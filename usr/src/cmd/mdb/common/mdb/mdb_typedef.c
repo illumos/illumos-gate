@@ -1,25 +1,48 @@
 /*
- * CDDL HEADER START
+ * This file and its contents are supplied under the terms of the
+ * Common Development and Distribution License ("CDDL"), version 1.0.
+ * You may only use this file in accordance with the terms of version
+ * 1.0 of the CDDL.
  *
- * The contents of this file are subject to the terms of the
- * Common Development and Distribution License (the "License").
- * You may not use this file except in compliance with the License.
- *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
- * See the License for the specific language governing permissions
- * and limitations under the License.
- *
- * When distributing Covered Code, include this CDDL HEADER in each
- * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
- * If applicable, add the following below this CDDL HEADER, with the
- * fields enclosed by brackets "[]" replaced with your own identifying
- * information: Portions Copyright [yyyy] [name of copyright owner]
- *
- * CDDL HEADER END
+ * A full copy of the text of the CDDL should have accompanied this
+ * source.  A copy of the CDDL is also available via the Internet at
+ * http://www.illumos.org/license/CDDL.
  */
+
 /*
- * Copyright (c) 2012 Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013 Joyent, Inc. All rights reserved.
+ */
+
+/*
+ * ::typedef exists to allow a user to create and import auxiliary CTF
+ * information for the currently running target. ::typedef is similar to the C
+ * typedef keyword. However, ::typedef has no illusions of grandeur. It is not a
+ * standards complaint version of C's typedef. For specifics on what it does and
+ * does not support, please see the help message for ::typedef later on in this
+ * file.
+ *
+ * In addition to allowing the user to create types, it has a notion of a
+ * built-in set of types that a compiler might provide. Currently ::typedef
+ * supports both the standard illumos 32-bit and 64-bit environments, mainly
+ * LP32 and LP64. These are not present by default; it is up to the user to
+ * request that they be inserted.
+ *
+ * To facilitate this, ::typedef adds all of its type information to an
+ * auxiliary CTF container that is a part of the global mdb state. This is
+ * abstracted away from ::typedef by the mdb_ctf_* apis. This container is
+ * referred to as the synthetic container, as it holds these synthetic types.
+ * The synthetic container does not have a parent CTF container. This is rather
+ * important to its operation, as a user can end up referencing types that come
+ * from many different such containers (eg. different kernel modules). As such,
+ * whenever a type is referenced that we do not know about, we search all of the
+ * CTF containers that mdb knows about it. If we find it, then that type is
+ * imported (along with all of its dependent types) into the synthetic
+ * container.
+ *
+ * Finally, ::typedef can source CTF information from external files with the -r
+ * option. This will copy in every type from their container into the synthetic
+ * container, because of this the parent and child relationship between
+ * containers with parents cannot be maintained.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -64,16 +87,16 @@ typedef_valid_identifier(const char *str)
 		return (1);
 
 	if (*str != '_' &&
-	    (*str < 0x41 || *str > 0x5a) &&
-	    (*str < 0x61 || *str > 0x7a))
+	    (*str < 'A' || *str > 'Z') &&
+	    (*str < 'a' || *str > 'z'))
 		return (1);
 	str++;
 
 	while (*str != '\0') {
 		if (*str != '_' &&
-		    (*str < 0x30 || *str > 0x39) &&
-		    (*str < 0x41 || *str > 0x5a) &&
-		    (*str < 0x61 || *str > 0x7a))
+		    (*str < '0' || *str > '9') &&
+		    (*str < 'A' || *str > 'Z') &&
+		    (*str < 'a' || *str > 'z'))
 			return (1);
 		str++;
 	}
@@ -87,8 +110,20 @@ typedef_list_cb(mdb_ctf_id_t id, void *arg)
 {
 	char buf[MDB_SYM_NAMLEN];
 
+	/*
+	 * The user may have created an anonymous structure or union as part of
+	 * running ::typedef. If this is the case, we passed a NULL pointer for
+	 * the name into the ctf routines. When we go back and ask for the name
+	 * of that, ctf goes through and loops through all the declarations.
+	 * This, however correctly, gives us back something undesirable to the
+	 * user, eg. the name is simply 'struct' and 'union'. Because a typedef
+	 * will always have a non-anonymous name for that, we instead opt to
+	 * not include these anonymous names. ctf usefully includes a space as
+	 * part of that name.
+	 */
 	(void) mdb_ctf_type_name(id, buf, sizeof (buf));
-	mdb_printf("%s\n", buf);
+	if (strcmp("struct ", buf) != 0 && strcmp("union ", buf) != 0)
+		mdb_printf("%s\n", buf);
 	return (0);
 }
 
@@ -120,7 +155,6 @@ typedef_join_strings(int nstr, const mdb_arg_t *args, int flags)
 static int
 typedef_list(void)
 {
-
 	(void) mdb_ctf_type_iter(MDB_CTF_SYNTHETIC_ITER, typedef_list_cb,
 	    NULL);
 	return (DCMD_OK);
@@ -432,7 +466,7 @@ static int
 typedef_add(parse_root_t *pr)
 {
 	parse_node_t *pn;
-	mdb_ctf_id_t id, aid, tid;
+	mdb_ctf_id_t id, aid, tid, pid;
 	mdb_ctf_arinfo_t ar;
 	int ii;
 
@@ -466,12 +500,13 @@ typedef_add(parse_root_t *pr)
 		if (pn->pn_flags & PN_F_POINTER) {
 			for (ii = 0; ii < pn->pn_nptrs; ii++) {
 				if (mdb_ctf_add_pointer(&tid,
-				    &tid) != 0) {
+				    &pid) != 0) {
 					mdb_printf("failed to add a pointer "
 					    "type as part of member: %s\n",
 					    pn->pn_name);
 					goto destroy;
 				}
+				tid = pid;
 			}
 		}
 
@@ -514,6 +549,17 @@ destroy:
 	return (mdb_ctf_type_delete(&id));
 }
 
+static int
+typedef_readfile(const char *file)
+{
+	int ret;
+
+	ret = mdb_ctf_synthetics_from_file(file);
+	if (ret != DCMD_OK)
+		mdb_warn("failed to create synthetics from file\n");
+	return (ret);
+}
+
 /* ARGSUSED */
 int
 cmd_typedef(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
@@ -521,7 +567,7 @@ cmd_typedef(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_ctf_id_t id;
 	int i;
 	int destroy = 0, list = 0;
-	const char *cmode = NULL;
+	const char *cmode = NULL, *rfile = NULL;
 	const char *dst, *src;
 	char *dup;
 	parse_root_t *pr;
@@ -532,7 +578,8 @@ cmd_typedef(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	i = mdb_getopts(argc, argv,
 	    'd', MDB_OPT_SETBITS, TRUE, &destroy,
 	    'l', MDB_OPT_SETBITS, TRUE, &list,
-	    'c', MDB_OPT_STR, &cmode, NULL);
+	    'c', MDB_OPT_STR, &cmode,
+	    'r', MDB_OPT_STR, &rfile, NULL);
 
 	argc -= i;
 	argv += i;
@@ -540,12 +587,19 @@ cmd_typedef(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	/*
 	 * All our options are mutually exclusive currently.
 	 */
-	if ((destroy && (cmode != NULL || list)) ||
-	    (cmode != NULL && (list || destroy)) ||
-	    (list && (destroy || cmode != NULL)))
+	i = 0;
+	if (destroy)
+		i++;
+	if (cmode != NULL)
+		i++;
+	if (list)
+		i++;
+	if (rfile != NULL)
+		i++;
+	if (i > 1)
 		return (DCMD_USAGE);
 
-	if ((destroy || cmode != NULL || list) && argc != 0)
+	if ((destroy || cmode != NULL || list || rfile != NULL) && argc != 0)
 		return (DCMD_USAGE);
 
 	if (destroy)
@@ -556,6 +610,9 @@ cmd_typedef(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (list)
 		return (typedef_list());
+
+	if (rfile)
+		return (typedef_readfile(rfile));
 
 	if (argc < 2)
 		return (DCMD_USAGE);
@@ -616,7 +673,6 @@ static char typedef_desc[] =
 "::typedef operates like the C typedef keyword and creates a synthetic type\n"
 "that is usable across mdb just like a type that is embedded in CTF data.\n"
 "This includes familiar dcmds like ::print as well as mdb's tab completion\n"
-
 "engine. The \"type\" argument can either be a named structure or union\n"
 "declaration, like \"struct proc { int p_id; }\" declartion, an anonymous\n"
 "structure or union declaration, like \"struct { int count; }\", or simply\n"
@@ -644,6 +700,12 @@ static char typedef_desc[] =
 "  o function pointers (use a void * instead)\n"
 "  o bitfields (use an integer of the appropriate size instead)\n"
 "  o packed structures (all structures currently use their natural alignment)\n"
+"\n"
+"::typedef also allows you to read type definitions from a file. Definitions\n"
+"can be read from any ELF file that has a CTF section that libctf can parse.\n"
+"You can check if a file has such a section with elfdump(1). If a binary or\n"
+"core dump does not have any type information, but you do have it elsewhere,\n"
+"then you can use ::typedef -r to read in that type information.\n"
 "\n";
 
 static char typedef_opts[] =
@@ -655,6 +717,7 @@ static char typedef_opts[] =
 "                 o ILP32 - An alternate name for LP32.\n"
 "  -d         delete all synthetic types\n"
 "  -l         list all synthetic types\n"
+"  -r file    import type definitions (CTF) from another ELF file\n"
 "\n";
 
 static char typedef_examps[] =
@@ -665,6 +728,7 @@ static char typedef_examps[] =
 "  ::typedef \"struct { uintptr_t stone[7]; void **white; }\" gift_t\n"
 "  ::typedef \"struct list { struct list *l_next; struct list *l_prev; }\" "
 "list_t\n"
+"  ::typedef -r /var/tmp/qemu-system-x86_64\n"
 "\n";
 
 static char typedef_intrins[] =

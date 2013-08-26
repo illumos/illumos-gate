@@ -22,6 +22,9 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2013 by Delphix. All rights reserved.
+ */
 
 #define	__EXTENSIONS__
 #include <string.h>
@@ -236,23 +239,7 @@ found:
 }
 
 /*
- * Callback function for Pfindexec().  We return a match if we can stat the
- * suggested pathname and confirm its device and inode number match our
- * previous information about the /proc/<pid>/object/a.out file.
- */
-static int
-stat_exec(const char *path, struct stat64 *stp)
-{
-	struct stat64 st;
-
-	return (stat64(path, &st) == 0 && S_ISREG(st.st_mode) &&
-	    stp->st_dev == st.st_dev && stp->st_ino == st.st_ino);
-}
-
-/*
- * Return the full pathname for the executable file.  If the process handle is
- * a core file, we've already tried our best to get the executable name.
- * Otherwise, we make an attempt using Pfindexec().
+ * Return the full pathname for the executable file.
  */
 char *
 Pexecname(struct ps_prochandle *P, char *buf, size_t buflen)
@@ -262,48 +249,5 @@ Pexecname(struct ps_prochandle *P, char *buf, size_t buflen)
 		return (buf);
 	}
 
-	if (P->state != PS_DEAD && P->state != PS_IDLE) {
-		char exec_name[PATH_MAX];
-		char cwd[PATH_MAX];
-		char proc_cwd[64];
-		struct stat64 st;
-		int ret;
-
-		/*
-		 * Try to get the path information first.
-		 */
-		(void) snprintf(exec_name, sizeof (exec_name),
-		    "%s/%d/path/a.out", procfs_path, (int)P->pid);
-		if ((ret = readlink(exec_name, buf, buflen - 1)) > 0) {
-			buf[ret] = '\0';
-			(void) Pfindobj(P, buf, buf, buflen);
-			return (buf);
-		}
-
-		/*
-		 * Stat the executable file so we can compare Pfindexec's
-		 * suggestions to the actual device and inode number.
-		 */
-		(void) snprintf(exec_name, sizeof (exec_name),
-		    "%s/%d/object/a.out", procfs_path, (int)P->pid);
-
-		if (stat64(exec_name, &st) != 0 || !S_ISREG(st.st_mode))
-			return (NULL);
-
-		/*
-		 * Attempt to figure out the current working directory of the
-		 * target process.  This only works if the target process has
-		 * not changed its current directory since it was exec'd.
-		 */
-		(void) snprintf(proc_cwd, sizeof (proc_cwd),
-		    "%s/%d/path/cwd", procfs_path, (int)P->pid);
-
-		if ((ret = readlink(proc_cwd, cwd, PATH_MAX - 1)) > 0)
-			cwd[ret] = '\0';
-
-		(void) Pfindexec(P, ret > 0 ? cwd : NULL,
-		    (int (*)(const char *, void *))stat_exec, &st);
-	}
-
-	return (NULL);
+	return (P->ops.pop_execname(P, buf, buflen, P->data));
 }

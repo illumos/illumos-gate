@@ -248,7 +248,7 @@ extern char *ulltostr(unsigned long long, char *);
 
 #else /* not __STDC__ */
 
-#if defined(__EXTENSIONS__) || !defined(_XOPEN_OR_POSIX) || \
+#if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || \
 	(_POSIX_C_SOURCE - 0 >= 199506L) || defined(_REENTRANT)
 extern int rand_r();
 #endif	/* defined(__EXTENSIONS__) || defined(_REENTRANT) ... */

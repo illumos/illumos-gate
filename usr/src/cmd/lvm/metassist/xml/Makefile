@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 METASSIST_TOPLEVEL = ..
 
@@ -35,7 +33,7 @@ MSGFILES = $(SRCS:%.c=%.i)
 include $(METASSIST_TOPLEVEL)/../../Makefile.cmd
 include $(METASSIST_TOPLEVEL)/Makefile.env
 
-INCLUDES += -I /usr/include/libxml2 -I../common
+INCLUDES += -I$(ADJUNCT_PROTO)/usr/include/libxml2 -I../common
 CFLAGS   += $(INCLUDES)
 
 POFILE = xmlp.po

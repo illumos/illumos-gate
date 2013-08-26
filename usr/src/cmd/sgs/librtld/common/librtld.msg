@@ -22,8 +22,6 @@
 #
 # CDDL HEADER END
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-
 
 @ _START_
 
@@ -70,6 +68,8 @@
 @ MSG_ELF_GETPHDR	"%s: elf_getphdr"
 @ MSG_ELF_GETSCN	"%s: elf_getscn"
 @ MSG_ELF_GETSHDR	"%s: elf_getshdr"
+@ MSG_ELF_GETSHDRNUM	"%s: elf_getshdrnum"
+@ MSG_ELF_GETSHDRSTRNDX	"%s: elf_getshdrstrndx"
 @ MSG_ELF_NEWDATA	"%s: elf_newdata"
 @ MSG_ELF_NEWEHDR	"%s: elf_newehdr"
 @ MSG_ELF_NEWPHDR	"%s: elf_newphdr"

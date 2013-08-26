@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -369,7 +370,8 @@ sdev_nodeinit(struct sdev_node *ddv, char *nm, struct sdev_node **newdv,
 }
 
 /*
- * transition a sdev_node into SDEV_READY state
+ * Transition a sdev_node into SDEV_READY state. If this fails, it is up to the
+ * caller to transition the node to the SDEV_ZOMBIE state.
  */
 int
 sdev_nodeready(struct sdev_node *dv, struct vattr *vap, struct vnode *avp,
@@ -432,23 +434,9 @@ sdev_nodeready(struct sdev_node *dv, struct vattr *vap, struct vnode *avp,
 		/* transition to READY state */
 		sdev_set_nodestate(dv, SDEV_READY);
 		sdev_nc_node_exists(dv);
-	} else {
-		sdev_set_nodestate(dv, SDEV_ZOMBIE);
 	}
 	rw_exit(&dv->sdev_contents);
 	return (error);
-}
-
-/*
- * setting ZOMBIE state
- */
-static int
-sdev_nodezombied(struct sdev_node *dv)
-{
-	rw_enter(&dv->sdev_contents, RW_WRITER);
-	sdev_set_nodestate(dv, SDEV_ZOMBIE);
-	rw_exit(&dv->sdev_contents);
-	return (0);
 }
 
 /*
@@ -537,7 +525,7 @@ static struct sdev_vop_table vtab[] =
 	SDEV_DYNAMIC | SDEV_VTOR },
 
 	{ "zvol", devzvol_vnodeops_tbl, NULL, &devzvol_vnodeops,
-	devzvol_validate, SDEV_DYNAMIC | SDEV_VTOR | SDEV_SUBDIR },
+	devzvol_validate, SDEV_ZONED | SDEV_DYNAMIC | SDEV_VTOR | SDEV_SUBDIR },
 
 	{ "zcons", NULL, NULL, NULL, NULL, SDEV_NO_NCACHE },
 
@@ -567,23 +555,31 @@ static struct sdev_vop_table vtab[] =
 	{ NULL, NULL, NULL, NULL, NULL, 0}
 };
 
+/*
+ * We need to match off of the sdev_path, not the sdev_name. We are only allowed
+ * to exist directly under /dev.
+ */
 struct sdev_vop_table *
 sdev_match(struct sdev_node *dv)
 {
 	int vlen;
 	int i;
+	const char *path;
+
+	if (strlen(dv->sdev_path) <= 5)
+		return (NULL);
+
+	if (strncmp(dv->sdev_path, "/dev/", 5) != 0)
+		return (NULL);
+	path = dv->sdev_path + 5;
 
 	for (i = 0; vtab[i].vt_name; i++) {
-		if (strcmp(vtab[i].vt_name, dv->sdev_name) == 0)
+		if (strcmp(vtab[i].vt_name, path) == 0)
 			return (&vtab[i]);
 		if (vtab[i].vt_flags & SDEV_SUBDIR) {
-			char *ptr;
-
-			ASSERT(strlen(dv->sdev_path) > 5);
-			ptr = dv->sdev_path + 5;
 			vlen = strlen(vtab[i].vt_name);
-			if ((strncmp(vtab[i].vt_name, ptr,
-			    vlen - 1) == 0) && ptr[vlen] == '/')
+			if ((strncmp(vtab[i].vt_name, path,
+			    vlen - 1) == 0) && path[vlen] == '/')
 				return (&vtab[i]);
 		}
 
@@ -609,10 +605,14 @@ sdev_get_vop(struct sdev_node *dv)
 	/* gets the vtab entry it matches */
 	if ((vtp = sdev_match(dv)) != NULL) {
 		dv->sdev_flags |= vtp->vt_flags;
+		if (SDEV_IS_PERSIST(dv->sdev_dotdot) &&
+		    (SDEV_IS_PERSIST(dv) || !SDEV_IS_DYNAMIC(dv)))
+			dv->sdev_flags |= SDEV_PERSIST;
 
 		if (vtp->vt_vops) {
 			if (vtp->vt_global_vops)
 				*(vtp->vt_global_vops) = vtp->vt_vops;
+
 			return (vtp->vt_vops);
 		}
 
@@ -630,8 +630,10 @@ sdev_get_vop(struct sdev_node *dv)
 				*(vtp->vt_global_vops) = vtp->vt_vops;
 			}
 			sdev_free_vtab(templ);
+
 			return (vtp->vt_vops);
 		}
+
 		return (sdev_vnodeops);
 	}
 
@@ -742,7 +744,6 @@ sdev_follow_link(struct sdev_node *dv)
 	ASSERT(linkvp->v_type == VLNK);
 	err = sdev_getlink(linkvp, &link);
 	if (err) {
-		(void) sdev_nodezombied(dv);
 		dv->sdev_symlink = NULL;
 		return (ENOENT);
 	}
@@ -838,12 +839,7 @@ sdev_mknode(struct sdev_node *ddv, char *nm, struct sdev_node **newdv,
 		ASSERT(dv);
 
 		/* insert into the directory cache */
-		error = sdev_cache_update(ddv, &dv, nm, SDEV_CACHE_ADD);
-		if (error) {
-			sdcmn_err9(("sdev_mknode: node %s can not"
-			    " be added into directory cache\n", nm));
-			return (ENOENT);
-		}
+		sdev_cache_update(ddv, &dv, nm, SDEV_CACHE_ADD);
 	}
 
 	ASSERT(dv);
@@ -877,7 +873,13 @@ sdev_mknode(struct sdev_node *ddv, char *nm, struct sdev_node **newdv,
 		*newdv = dv;
 		ASSERT((*newdv)->sdev_state != SDEV_ZOMBIE);
 	} else {
-		SDEV_SIMPLE_RELE(dv);
+		sdev_cache_update(ddv, &dv, nm, SDEV_CACHE_DELETE);
+		/*
+		 * We created this node, it wasn't passed into us. Therefore it
+		 * is up to us to delete it.
+		 */
+		if (*newdv == NULL)
+			SDEV_SIMPLE_RELE(dv);
 		*newdv = NULL;
 	}
 
@@ -985,6 +987,7 @@ sdev_findbyname(struct sdev_node *ddv, char *nm)
 	if (dv) {
 		ASSERT(dv->sdev_dotdot == ddv);
 		ASSERT(strcmp(dv->sdev_name, nm) == 0);
+		ASSERT(dv->sdev_state != SDEV_ZOMBIE);
 		SDEV_HOLD(dv);
 		return (dv);
 	}
@@ -1003,6 +1006,7 @@ sdev_direnter(struct sdev_node *ddv, struct sdev_node *dv)
 	ASSERT(SDEVTOV(ddv)->v_type == VDIR);
 	ASSERT(ddv->sdev_nlink >= 2);
 	ASSERT(dv->sdev_nlink == 0);
+	ASSERT(dv->sdev_state != SDEV_ZOMBIE);
 
 	dv->sdev_dotdot = ddv;
 	VERIFY(avl_find(&ddv->sdev_entries, dv, &where) == NULL);
@@ -1018,60 +1022,55 @@ sdev_direnter(struct sdev_node *ddv, struct sdev_node *dv)
 static void
 decr_link(struct sdev_node *dv)
 {
-	if (dv->sdev_state != SDEV_INIT)
+	VERIFY(RW_WRITE_HELD(&dv->sdev_contents));
+	if (dv->sdev_state != SDEV_INIT) {
+		VERIFY(dv->sdev_nlink >= 1);
 		dv->sdev_nlink--;
-	else
-		ASSERT(dv->sdev_nlink == 0);
+	} else {
+		VERIFY(dv->sdev_nlink == 0);
+	}
 }
 
 /*
  * Delete an existing dv from directory cache
  *
- * In the case of a node is still held by non-zero reference count,
- *     the node is put into ZOMBIE state. Once the reference count
- *     reaches "0", the node is unlinked and destroyed,
- *     in sdev_inactive().
+ * In the case of a node is still held by non-zero reference count, the node is
+ * put into ZOMBIE state. The node is always unlinked from its parent, but it is
+ * not destroyed via sdev_inactive until its reference count reaches "0".
  */
-static int
+static void
 sdev_dirdelete(struct sdev_node *ddv, struct sdev_node *dv)
 {
 	struct vnode *vp;
+	sdev_node_state_t os;
 
 	ASSERT(RW_WRITE_HELD(&ddv->sdev_contents));
 
 	vp = SDEVTOV(dv);
 	mutex_enter(&vp->v_lock);
+	rw_enter(&dv->sdev_contents, RW_WRITER);
+	os = dv->sdev_state;
+	ASSERT(os != SDEV_ZOMBIE);
+	dv->sdev_state = SDEV_ZOMBIE;
 
-	/* dv is held still */
-	if (vp->v_count > 1) {
-		rw_enter(&dv->sdev_contents, RW_WRITER);
-		if (dv->sdev_state == SDEV_READY) {
-			sdcmn_err9((
-			    "sdev_dirdelete: node %s busy with count %d\n",
-			    dv->sdev_name, vp->v_count));
-			dv->sdev_state = SDEV_ZOMBIE;
-		}
-		rw_exit(&dv->sdev_contents);
-		--vp->v_count;
-		mutex_exit(&vp->v_lock);
-		return (EBUSY);
-	}
-	ASSERT(vp->v_count == 1);
-
-	/* unlink from the memory cache */
-	ddv->sdev_nlink--;	/* .. to above */
-	if (vp->v_type == VDIR) {
-		decr_link(dv);		/* . to self */
-	}
-
+	/*
+	 * unlink ourselves from the parent directory now to take care of the ..
+	 * link. However, if we're a directory, we don't remove our reference to
+	 * ourself eg. '.' until we are torn down in the inactive callback.
+	 */
+	decr_link(ddv);
 	avl_remove(&ddv->sdev_entries, dv);
-	decr_link(dv);	/* name, back to zero */
-	vp->v_count--;
+	/*
+	 * sdev_inactive expects nodes to have a link to themselves when we're
+	 * tearing them down. If we're transitioning from the initial state to
+	 * zombie and not via ready, then we're not going to have this link that
+	 * comes from the node being ready. As a result, we need to increment
+	 * our link count by one to account for this.
+	 */
+	if (os == SDEV_INIT && dv->sdev_nlink == 0)
+		dv->sdev_nlink++;
+	rw_exit(&dv->sdev_contents);
 	mutex_exit(&vp->v_lock);
-
-	/* destroy the node */
-	sdev_nodedestroy(dv, 0);
-	return (0);
 }
 
 /*
@@ -1168,6 +1167,35 @@ sdev_rnmnode(struct sdev_node *oddv, struct sdev_node *odv,
 			goto err_out;
 	}
 
+	/* fix the source for a symlink */
+	if (vattr.va_type == VLNK) {
+		if (odv->sdev_symlink == NULL) {
+			error = sdev_follow_link(odv);
+			if (error) {
+				/*
+				 * The underlying symlink doesn't exist. This
+				 * node probably shouldn't even exist. While
+				 * it's a bit jarring to consumers, we're going
+				 * to remove the node from /dev.
+				 */
+				if (SDEV_IS_PERSIST((*ndvp)))
+					bkstore = 1;
+				sdev_dirdelete(oddv, odv);
+				if (bkstore) {
+					ASSERT(nddv->sdev_attrvp);
+					error = VOP_REMOVE(nddv->sdev_attrvp,
+					    nnm, cred, NULL, 0);
+					if (error)
+						goto err_out;
+				}
+				error = ENOENT;
+				goto err_out;
+			}
+		}
+		ASSERT(odv->sdev_symlink);
+		link = i_ddi_strdup(odv->sdev_symlink, KM_SLEEP);
+	}
+
 	/* destination existing */
 	if (*ndvp) {
 		nvp = SDEVTOV(*ndvp);
@@ -1204,7 +1232,12 @@ sdev_rnmnode(struct sdev_node *oddv, struct sdev_node *odv,
 			}
 			vn_vfsunlock(nvp);
 
-			(void) sdev_dirdelete(nddv, *ndvp);
+			/*
+			 * We did not place the hold on *ndvp, so even though
+			 * we're deleting the node, we should not get rid of our
+			 * reference.
+			 */
+			sdev_dirdelete(nddv, *ndvp);
 			*ndvp = NULL;
 			ASSERT(nddv->sdev_attrvp);
 			error = VOP_RMDIR(nddv->sdev_attrvp, nnm,
@@ -1222,11 +1255,11 @@ sdev_rnmnode(struct sdev_node *oddv, struct sdev_node *odv,
 			}
 
 			/*
-			 * get rid of the node from the directory cache
-			 * note, in case EBUSY is returned, the ZOMBIE
-			 * node is taken care in sdev_mknode.
+			 * Get rid of the node from the directory cache note.
+			 * Don't forget that it's not up to us to remove the vn
+			 * ref on the sdev node, as we did not place it.
 			 */
-			(void) sdev_dirdelete(nddv, *ndvp);
+			sdev_dirdelete(nddv, *ndvp);
 			*ndvp = NULL;
 			if (bkstore) {
 				ASSERT(nddv->sdev_attrvp);
@@ -1238,19 +1271,6 @@ sdev_rnmnode(struct sdev_node *oddv, struct sdev_node *odv,
 		}
 	}
 
-	/* fix the source for a symlink */
-	if (vattr.va_type == VLNK) {
-		if (odv->sdev_symlink == NULL) {
-			error = sdev_follow_link(odv);
-			if (error) {
-				error = ENOENT;
-				goto err_out;
-			}
-		}
-		ASSERT(odv->sdev_symlink);
-		link = i_ddi_strdup(odv->sdev_symlink, KM_SLEEP);
-	}
-
 	/*
 	 * make a fresh node from the source attrs
 	 */
@@ -1258,8 +1278,10 @@ sdev_rnmnode(struct sdev_node *oddv, struct sdev_node *odv,
 	error = sdev_mknode(nddv, nnm, ndvp, &vattr,
 	    NULL, (void *)link, cred, SDEV_READY);
 
-	if (link)
+	if (link != NULL) {
 		kmem_free(link, strlen(link) + 1);
+		link = NULL;
+	}
 
 	if (error)
 		goto err_out;
@@ -1270,9 +1292,11 @@ sdev_rnmnode(struct sdev_node *oddv, struct sdev_node *odv,
 	if (doingdir) {
 		for (idv = SDEV_FIRST_ENTRY(odv); idv;
 		    idv = SDEV_NEXT_ENTRY(odv, idv)) {
+			SDEV_HOLD(idv);
 			error = sdev_rnmnode(odv, idv,
 			    (struct sdev_node *)(*ndvp), &ndv,
 			    idv->sdev_name, cred);
+			SDEV_RELE(idv);
 			if (error)
 				goto err_out;
 			ndv = NULL;
@@ -1306,6 +1330,11 @@ sdev_rnmnode(struct sdev_node *oddv, struct sdev_node *odv,
 	return (error);
 
 err_out:
+	if (link != NULL) {
+		kmem_free(link, strlen(link) + 1);
+		link = NULL;
+	}
+
 	rw_exit(&nddv->sdev_contents);
 	if (!samedir)
 		rw_exit(&oddv->sdev_contents);
@@ -1464,18 +1493,8 @@ sdev_filldir_from_store(struct sdev_node *ddv, int dlen, struct cred *cred)
 			vp = NULLVP;
 			dv = sdev_cache_lookup(ddv, nm);
 			if (dv) {
-				if (dv->sdev_state != SDEV_ZOMBIE) {
-					SDEV_SIMPLE_RELE(dv);
-				} else {
-					/*
-					 * A ZOMBIE node may not have been
-					 * cleaned up from the backing store,
-					 * bypass this entry in this case,
-					 * and clean it up from the directory
-					 * cache if this is the last call.
-					 */
-					(void) sdev_dirdelete(ddv, dv);
-				}
+				VERIFY(dv->sdev_state != SDEV_ZOMBIE);
+				SDEV_SIMPLE_RELE(dv);
 				continue;
 			}
 
@@ -1546,11 +1565,16 @@ sdev_filldir_dynamic(struct sdev_node *ddv)
 	vap->va_ctime = vap->va_atime;
 	for (i = 0; vtab[i].vt_name != NULL; i++) {
 		/*
-		 * This early, we may be in a read-only /dev
-		 * environment: leave the creation of any nodes we'd
-		 * attempt to persist to devfsadm.
+		 * This early, we may be in a read-only /dev environment: leave
+		 * the creation of any nodes we'd attempt to persist to
+		 * devfsadm. Because /dev itself is normally persistent, any
+		 * node which is not marked dynamic will end up being marked
+		 * persistent. However, some nodes are both dynamic and
+		 * persistent, mostly lofi and rlofi, so we need to be careful
+		 * in our check.
 		 */
-		if (vtab[i].vt_flags & SDEV_PERSIST)
+		if ((vtab[i].vt_flags & SDEV_PERSIST) ||
+		    !(vtab[i].vt_flags & SDEV_DYNAMIC))
 			continue;
 		nm = vtab[i].vt_name;
 		ASSERT(RW_WRITE_HELD(&ddv->sdev_contents));
@@ -1613,6 +1637,8 @@ lookup:
 		error = VOP_MKDIR(rdvp, nm, vap, rvp, cred, NULL, 0, NULL);
 		sdcmn_err9(("sdev_shadow_node: mkdir vp %p error %d\n",
 		    (void *)(*rvp), error));
+		if (!error)
+			VN_RELE(*rvp);
 		break;
 	case VCHR:
 	case VBLK:
@@ -1646,74 +1672,49 @@ lookup:
 	return (error);
 }
 
-static int
+static void
 sdev_cache_add(struct sdev_node *ddv, struct sdev_node **dv, char *nm)
 {
-	int error = 0;
 	struct sdev_node *dup = NULL;
 
 	ASSERT(RW_WRITE_HELD(&ddv->sdev_contents));
 	if ((dup = sdev_findbyname(ddv, nm)) == NULL) {
 		sdev_direnter(ddv, *dv);
 	} else {
-		if (dup->sdev_state == SDEV_ZOMBIE) {
-			error = sdev_dirdelete(ddv, dup);
-			/*
-			 * The ZOMBIE node is still hanging
-			 * around with more than one reference counts.
-			 * Fail the new node creation so that
-			 * the directory cache won't have
-			 * duplicate entries for the same named node
-			 */
-			if (error == EBUSY) {
-				SDEV_SIMPLE_RELE(*dv);
-				sdev_nodedestroy(*dv, 0);
-				*dv = NULL;
-				return (error);
-			}
-			sdev_direnter(ddv, *dv);
-		} else {
-			ASSERT((*dv)->sdev_state != SDEV_ZOMBIE);
-			SDEV_SIMPLE_RELE(*dv);
-			sdev_nodedestroy(*dv, 0);
-			*dv = dup;
-		}
+		VERIFY(dup->sdev_state != SDEV_ZOMBIE);
+		SDEV_SIMPLE_RELE(*dv);
+		sdev_nodedestroy(*dv, 0);
+		*dv = dup;
 	}
-
-	return (0);
 }
 
-static int
+static void
 sdev_cache_delete(struct sdev_node *ddv, struct sdev_node **dv)
 {
 	ASSERT(RW_WRITE_HELD(&ddv->sdev_contents));
-	return (sdev_dirdelete(ddv, *dv));
+	sdev_dirdelete(ddv, *dv);
 }
 
 /*
  * update the in-core directory cache
  */
-int
+void
 sdev_cache_update(struct sdev_node *ddv, struct sdev_node **dv, char *nm,
     sdev_cache_ops_t ops)
 {
-	int error = 0;
-
 	ASSERT((SDEV_HELD(*dv)));
 
 	ASSERT(RW_WRITE_HELD(&ddv->sdev_contents));
 	switch (ops) {
 	case SDEV_CACHE_ADD:
-		error = sdev_cache_add(ddv, dv, nm);
+		sdev_cache_add(ddv, dv, nm);
 		break;
 	case SDEV_CACHE_DELETE:
-		error = sdev_cache_delete(ddv, dv);
+		sdev_cache_delete(ddv, dv);
 		break;
 	default:
 		break;
 	}
-
-	return (error);
 }
 
 /*
@@ -2156,7 +2157,6 @@ lookup_create_node:
 	}
 
 found:
-	ASSERT(!(dv->sdev_flags & SDEV_STALE));
 	ASSERT(dv->sdev_state == SDEV_READY);
 	if (vtor) {
 		/*
@@ -2175,13 +2175,11 @@ found:
 				rw_exit(&ddv->sdev_contents);
 				rw_enter(&ddv->sdev_contents, RW_WRITER);
 			}
-			error = sdev_cache_update(ddv, &dv, nm,
-			    SDEV_CACHE_DELETE);
+			sdev_cache_update(ddv, &dv, nm, SDEV_CACHE_DELETE);
 			rw_downgrade(&ddv->sdev_contents);
-			if (error == 0) {
-				dv = NULL;
-				goto lookup_create_node;
-			}
+			SDEV_RELE(dv);
+			dv = NULL;
+			goto lookup_create_node;
 			/* FALLTHRU */
 		case SDEV_VTOR_INVALID:
 			SD_TRACE_FAILED_LOOKUP(ddv, nm, retried);
@@ -2228,9 +2226,10 @@ nolock_notfound:
 		 * changes. Re-check.
 		 */
 		if (dv->sdev_state == SDEV_INIT) {
-			(void) sdev_dirdelete(ddv, dv);
+			sdev_dirdelete(ddv, dv);
 			rw_exit(&ddv->sdev_contents);
 			sdev_lookup_failed(ddv, nm, failed_flags);
+			SDEV_RELE(dv);
 			*vpp = NULL;
 			return (ENOENT);
 		}
@@ -2262,15 +2261,14 @@ sdev_stale(struct sdev_node *ddv)
 	ASSERT(SDEVTOV(ddv)->v_type == VDIR);
 
 	rw_enter(&ddv->sdev_contents, RW_WRITER);
-	for (dv = SDEV_FIRST_ENTRY(ddv); dv; dv = SDEV_NEXT_ENTRY(ddv, dv)) {
+	while ((dv = SDEV_FIRST_ENTRY(ddv)) != NULL) {
 		vp = SDEVTOV(dv);
+		SDEV_HOLD(dv);
 		if (vp->v_type == VDIR)
 			sdev_stale(dv);
 
-		sdcmn_err9(("sdev_stale: setting stale %s\n",
-		    dv->sdev_path));
-		dv->sdev_flags |= SDEV_STALE;
-		avl_remove(&ddv->sdev_entries, dv);
+		sdev_dirdelete(ddv, dv);
+		SDEV_RELE(dv);
 	}
 	ddv->sdev_flags |= SDEV_BUILD;
 	rw_exit(&ddv->sdev_contents);
@@ -2288,7 +2286,7 @@ sdev_cleandir(struct sdev_node *ddv, char *expr, uint_t flags)
 	int error = 0;
 	int busy = 0;
 	struct vnode *vp;
-	struct sdev_node *dv, *next = NULL;
+	struct sdev_node *dv;
 	int bkstore = 0;
 	int len = 0;
 	char *bks_name = NULL;
@@ -2299,8 +2297,7 @@ sdev_cleandir(struct sdev_node *ddv, char *expr, uint_t flags)
 	 * We try our best to destroy all unused sdev_node's
 	 */
 	rw_enter(&ddv->sdev_contents, RW_WRITER);
-	for (dv = SDEV_FIRST_ENTRY(ddv); dv; dv = next) {
-		next = SDEV_NEXT_ENTRY(ddv, dv);
+	while ((dv = SDEV_FIRST_ENTRY(ddv)) != NULL) {
 		vp = SDEVTOV(dv);
 
 		if (expr && gmatch(dv->sdev_name, expr) == 0)
@@ -2337,15 +2334,10 @@ sdev_cleandir(struct sdev_node *ddv, char *expr, uint_t flags)
 			bcopy(dv->sdev_name, bks_name, len);
 		}
 
-		error = sdev_dirdelete(ddv, dv);
-
-		if (error == EBUSY) {
-			sdcmn_err9(("sdev_cleandir: dir busy\n"));
-			busy++;
-		}
+		sdev_dirdelete(ddv, dv);
 
 		/* take care the backing store clean up */
-		if (bkstore && (error == 0)) {
+		if (bkstore) {
 			ASSERT(bks_name);
 			ASSERT(ddv->sdev_attrvp);
 
@@ -2369,6 +2361,9 @@ sdev_cleandir(struct sdev_node *ddv, char *expr, uint_t flags)
 			bks_name = NULL;
 			len = 0;
 		}
+
+		ddv->sdev_flags |= SDEV_BUILD;
+		SDEV_RELE(dv);
 	}
 
 	ddv->sdev_flags |= SDEV_BUILD;
@@ -3113,42 +3108,41 @@ devname_inactive_func(struct vnode *vp, struct cred *cred,
 {
 	int clean;
 	struct sdev_node *dv = VTOSDEV(vp);
-	struct sdev_node *ddv = dv->sdev_dotdot;
 	int state;
-
-	rw_enter(&ddv->sdev_contents, RW_WRITER);
-	state = dv->sdev_state;
 
 	mutex_enter(&vp->v_lock);
 	ASSERT(vp->v_count >= 1);
 
+
 	if (vp->v_count == 1 && callback != NULL)
 		callback(vp);
+
+	rw_enter(&dv->sdev_contents, RW_WRITER);
+	state = dv->sdev_state;
 
 	clean = (vp->v_count == 1) && (state == SDEV_ZOMBIE);
 
 	/*
-	 * last ref count on the ZOMBIE node is released.
-	 * clean up the sdev_node, and
-	 * release the hold on the backing store node so that
-	 * the ZOMBIE backing stores also cleaned out.
+	 * sdev is a rather bad public citizen. It violates the general
+	 * agreement that in memory nodes should always have a valid reference
+	 * count on their vnode. But that's not the case here. This means that
+	 * we do actually have to distinguish between getting inactive callbacks
+	 * for zombies and otherwise. This should probably be fixed.
 	 */
 	if (clean) {
-		ASSERT(ddv);
-
-		ddv->sdev_nlink--;
+		/* Remove the . entry to ourselves */
 		if (vp->v_type == VDIR) {
-			dv->sdev_nlink--;
+			decr_link(dv);
 		}
-		if ((dv->sdev_flags & SDEV_STALE) == 0)
-			avl_remove(&ddv->sdev_entries, dv);
-		dv->sdev_nlink--;
+		VERIFY(dv->sdev_nlink == 1);
+		decr_link(dv);
 		--vp->v_count;
+		rw_exit(&dv->sdev_contents);
 		mutex_exit(&vp->v_lock);
 		sdev_nodedestroy(dv, 0);
 	} else {
 		--vp->v_count;
+		rw_exit(&dv->sdev_contents);
 		mutex_exit(&vp->v_lock);
 	}
-	rw_exit(&ddv->sdev_contents);
 }

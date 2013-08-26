@@ -22,7 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 LIBRARY=	libbrand.a
 VERS=		.1
@@ -34,7 +33,7 @@ include ../../Makefile.lib
 LIBS=		$(DYNLIB) $(LINTLIB)
 LDLIBS +=	-lc
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
-CPPFLAGS +=	-I/usr/include/libxml2 -I$(SRCDIR) -D_REENTRANT
+CPPFLAGS +=	-I$(ADJUNCT_PROTO)/usr/include/libxml2 -I$(SRCDIR) -D_REENTRANT
 $(DYNLIB) :=	LDLIBS += -lxml2
 
 SRCDIR=		../common

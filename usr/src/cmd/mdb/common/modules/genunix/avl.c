@@ -22,8 +22,9 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2013 by Delphix. All rights reserved.
+ */
 
 #include <sys/avl.h>
 
@@ -282,4 +283,26 @@ avl_walk_fini(mdb_walk_state_t *wsp)
 		mdb_free(aw->aw_buff, aw->aw_tree.avl_size);
 
 	mdb_free(aw, sizeof (struct aw_info));
+}
+
+/*
+ * This function is named avl_walk_mdb to avoid a naming conflict with the
+ * existing avl_walk function.
+ */
+int
+avl_walk_mdb(uintptr_t addr, mdb_walk_cb_t callback, void *cbdata)
+{
+	mdb_walk_state_t ws;
+	int ret;
+
+	ws.walk_addr = addr;
+	ws.walk_callback = callback;
+	ws.walk_cbdata = cbdata;
+
+	avl_walk_init(&ws);
+	while ((ret = avl_walk_step(&ws)) == WALK_NEXT)
+		continue;
+	avl_walk_fini(&ws);
+
+	return (ret);
 }

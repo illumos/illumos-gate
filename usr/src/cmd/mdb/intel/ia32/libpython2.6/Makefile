@@ -34,6 +34,8 @@ include ../../../../Makefile.cmd
 include ../../Makefile.ia32
 include ../../../Makefile.module
 
+%.o := CPPFLAGS +=	-_gcc=-isystem -_gcc=$(ADJUNCT_PROTO)/usr/include
+
 dmod/$(MODULE) := LDLIBS += -lproc
 
 %.o: $(MODSRCS_DIR)/%.c

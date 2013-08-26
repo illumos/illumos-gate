@@ -47,7 +47,7 @@ SRCDIR =	../common
 CFLAGS +=	$(CCVERBOSE)
 LOCFLAGS +=	-D_REENTRANT -DSUNW_OPTIONS
 CPPFLAGS +=	-I../common -I$(SRC)/lib/libldap5/include/ldap \
-		-I/usr/include/mps $(LOCFLAGS)
+		-I$(ADJUNCT_PROTO)/usr/include/mps $(LOCFLAGS)
 LINTFLAGS +=	-erroff=E_BAD_PTR_CAST_ALIGN
 LINTFLAGS64 +=	-erroff=E_BAD_PTR_CAST_ALIGN
 

@@ -8,25 +8,22 @@
  * source.  A copy of the CDDL is also available via the Internet at
  * http://www.illumos.org/license/CDDL.
  */
-
 /*
- * Copyright (c) 2012 Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
-#ifndef	_MDB_TYPEDEF_H
-#define	_MDB_TYPEDEF_H
+#ifndef	_MDB_GCORE_H
+#define	_MDB_GCORE_H
 
-#include <mdb/mdb_modapi.h>
-
-#ifdef	__cplusplus
+#ifdef __cplusplus
 extern "C" {
 #endif
 
-int cmd_typedef(uintptr_t, uint_t, int, const mdb_arg_t *);
-void cmd_typedef_help(void);
+extern void gcore_init(void);
+extern int gcore_dcmd(uintptr_t, uint_t, int, const mdb_arg_t *);
 
-#ifdef	__cplusplus
+#ifdef __cplusplus
 }
 #endif
 
-#endif	/* _MDB_TYPEDEF_H */
+#endif /* _MDB_GCORE_H */

@@ -22,15 +22,16 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Definitions common for PolicyKit
 #
 
 POLICYKIT_VERSION = 0.2
 
-POLICYKIT_DBUS_CPPFLAGS =	-DDBUS_API_SUBJECT_TO_CHANGE -I/usr/include/dbus-1.0 -I/usr/lib/dbus-1.0/include
-POLICYKIT_GLIB_CPPFLAGS = 	-I/usr/include/glib-2.0 -I/usr/lib/glib-2.0/include
+POLICYKIT_DBUS_CPPFLAGS =	-DDBUS_API_SUBJECT_TO_CHANGE \
+				-I$(ADJUNCT_PROTO)/usr/include/dbus-1.0 \
+				-I$(ADJUNCT_PROTO)/usr/lib/dbus-1.0/include
+POLICYKIT_GLIB_CPPFLAGS = 	-I$(ADJUNCT_PROTO)/usr/include/glib-2.0 \
+				-I$(ADJUNCT_PROTO)/usr/lib/glib-2.0/include
 
 POLICYKIT_DBUS_LDLIBS =	-ldbus-1
 POLICYKIT_GLIB_LDLIBS =	-lglib-2.0

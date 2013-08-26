@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY=      	libsvm.a 
 VERS=          	.1 
@@ -46,7 +44,7 @@ LDLIBS +=	-lmeta -ldevid -lc
 # XXX There isn't a lint library for libspmicommon.  For now, we work
 # around this by only using the library when we build (as opposed to lint).
 #
-all debug install := LDLIBS += -L/usr/snadm/lib -lspmicommon
+all debug install := LDLIBS += -L$(ADJUNCT_PROTO)/usr/snadm/lib -lspmicommon
 
 DYNFLAGS +=	-R/usr/snadm/lib
 CPPFLAGS +=	-D_FILE_OFFSET_BITS=64

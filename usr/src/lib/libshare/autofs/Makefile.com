@@ -49,8 +49,9 @@ CFLAGS +=	$(CCVERBOSE)
 CERRWARN +=	-_gcc=-Wno-switch
 CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-uninitialized
-CPPFLAGS +=	-D_REENTRANT -I$(AUTOFSSMFLIB_DIR) -I/usr/include/libxml2 \
-			-I$(SRCDIR)../common
+CPPFLAGS +=	-D_REENTRANT -I$(AUTOFSSMFLIB_DIR) \
+			-I$(ADJUNCT_PROTO)/usr/include/libxml2 \
+  			-I$(SRCDIR)../common
 
 .KEEP_STATE:
 

@@ -40,9 +40,6 @@ OBJECTS= $(DH640)
 # include library definitions
 include ../../../../Makefile.lib
 
-MAKEFILE_EXPORT = $(CLOSED)/lib/gss_mechs/mech_dh/dh640/Makefile.export
-$(EXPORT_RELEASE_BUILD)include $(MAKEFILE_EXPORT)
-
 CPPFLAGS += -I../../backend/mech -I../../backend/crypto
 CPPFLAGS += -I$(SRC)/lib/libnsl/include
 CPPFLAGS += -I$(SRC)/uts/common/gssapi/include

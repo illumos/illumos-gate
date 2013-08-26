@@ -22,8 +22,9 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2013 by Delphix. All rights reserved.
+ */
 
 #include <stdarg.h>
 #include <string.h>
@@ -56,7 +57,7 @@ ps_pdmodel(struct ps_prochandle *P, int *modelp)
 ps_err_e
 ps_pread(struct ps_prochandle *P, psaddr_t addr, void *buf, size_t size)
 {
-	if (P->ops->p_pread(P, buf, size, addr) != size)
+	if (P->ops.pop_pread(P, buf, size, addr, P->data) != size)
 		return (PS_BADADDR);
 	return (PS_OK);
 }
@@ -64,7 +65,7 @@ ps_pread(struct ps_prochandle *P, psaddr_t addr, void *buf, size_t size)
 ps_err_e
 ps_pwrite(struct ps_prochandle *P, psaddr_t addr, const void *buf, size_t size)
 {
-	if (P->ops->p_pwrite(P, buf, size, addr) != size)
+	if (P->ops.pop_pwrite(P, buf, size, addr, P->data) != size)
 		return (PS_BADADDR);
 	return (PS_OK);
 }

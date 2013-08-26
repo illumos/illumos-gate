@@ -161,6 +161,14 @@ devipnet_filldir(struct sdev_node *ddv)
 	if (rw_tryupgrade(&ddv->sdev_contents) == NULL) {
 		rw_exit(&ddv->sdev_contents);
 		rw_enter(&ddv->sdev_contents, RW_WRITER);
+		/*
+		 * We've been made a zombie while we weren't looking. We'll bail
+		 * if that's the case.
+		 */
+		if (ddv->sdev_state == SDEV_ZOMBIE) {
+			rw_exit(&ddv->sdev_contents);
+			return;
+		}
 	}
 
 	for (dv = SDEV_FIRST_ENTRY(ddv); dv; dv = next) {
@@ -186,6 +194,7 @@ devipnet_filldir(struct sdev_node *ddv)
 		/* remove the cache node */
 		(void) sdev_cache_update(ddv, &dv, dv->sdev_name,
 		    SDEV_CACHE_DELETE);
+		SDEV_RELE(dv);
 	}
 
 	ipnet_walk_if(devipnet_filldir_entry, ddv, getzoneid());

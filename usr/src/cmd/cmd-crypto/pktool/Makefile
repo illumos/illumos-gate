@@ -48,7 +48,7 @@ POFILES = $(OBJS:%.o=%.po)
 POFILE = $(PROG)_msg.po
 MSGFILES=$(SRCS:%.c=%.i)
 
-CPPFLAGS += -I. -I$(KMFDIR)/include -I/usr/include/libxml2 \
+CPPFLAGS += -I. -I$(KMFDIR)/include -I$(ADJUNCT_PROTO)/usr/include/libxml2 \
 	-I$(KMFDIR)/ber_der/inc
 
 CFLAGS += $(CCVERBOSE) -DDEBUG

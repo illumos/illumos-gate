@@ -446,6 +446,7 @@ dis_tgt_create(const char *file)
 	current = tgt;
 	cmd = ELF_C_READ;
 	while ((elf = elf_begin(tgt->dt_fd, cmd, tgt->dt_elf_root)) != NULL) {
+		size_t shnum = 0;
 
 		if (elf_kind(tgt->dt_elf_root) == ELF_K_AR &&
 		    (arhdr = elf_getarhdr(elf)) == NULL) {
@@ -501,9 +502,16 @@ dis_tgt_create(const char *file)
 			return (NULL);
 		}
 
+		if (elf_getshdrnum(elf, &shnum) == -1) {
+			warn("%s: failed to get number of sections in file",
+			    file);
+			dis_tgt_destroy(tgt);
+			return (NULL);
+		}
+
 		current->dt_shnmap = safe_malloc(sizeof (dis_shnmap_t) *
-		    ehdr.e_shnum);
-		current->dt_shncount = ehdr.e_shnum;
+		    shnum);
+		current->dt_shncount = shnum;
 
 		idx = 0;
 		dis_tgt_section_iter(current, tgt_scn_init, &idx);
@@ -639,13 +647,22 @@ dis_tgt_lookup(dis_tgt_t *tgt, uint64_t addr, off_t *offset, int cache_result,
 	sym_entry_t *sym, *osym, *match;
 	int found;
 
+	*offset = 0;
+	*size = 0;
+	if (isfunc != NULL)
+		*isfunc = 0;
+
 	if (tgt->dt_symcache != NULL &&
 	    addr >= tgt->dt_symcache->se_sym.st_value &&
 	    addr < tgt->dt_symcache->se_sym.st_value +
 	    tgt->dt_symcache->se_sym.st_size) {
-		*offset = addr - tgt->dt_symcache->se_sym.st_value;
-		*size = tgt->dt_symcache->se_sym.st_size;
-		return (tgt->dt_symcache->se_name);
+		sym = tgt->dt_symcache;
+		*offset = addr - sym->se_sym.st_value;
+		*size = sym->se_sym.st_size;
+		if (isfunc != NULL)
+			*isfunc = (GELF_ST_TYPE(sym->se_sym.st_info) ==
+			    STT_FUNC);
+		return (sym->se_name);
 	}
 
 	lo = 0;
@@ -719,11 +736,12 @@ dis_tgt_next_symbol(dis_tgt_t *tgt, uint64_t addr)
 {
 	sym_entry_t *sym;
 
-	for (sym = tgt->dt_symcache;
-	    sym != tgt->dt_symtab + tgt->dt_symcount;
-	    sym++) {
+	sym = (tgt->dt_symcache != NULL) ? tgt->dt_symcache : tgt->dt_symtab;
+
+	while (sym != (tgt->dt_symtab + tgt->dt_symcount)) {
 		if (sym->se_sym.st_value >= addr)
 			return (sym->se_sym.st_value - addr);
+		sym++;
 	}
 
 	return (0);

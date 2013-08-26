@@ -25,6 +25,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2013 by Delphix. All rights reserved.
+ */
 #include "libproc.h"
 
 /*
@@ -46,7 +49,7 @@ int	Pctlfd(struct ps_prochandle *Pr);
 const psinfo_t *Ppsinfo(struct ps_prochandle *Pr);
 const pstatus_t *Pstatus(struct ps_prochandle *Pr);
 int	Pcred(struct ps_prochandle *Pr, prcred_t *pcrp, int ngroups);
-ssize_t	Ppriv(struct ps_prochandle *Pr, prpriv_t *pprivp, size_t);
+int	Ppriv(struct ps_prochandle *Pr, prpriv_t **pprivp);
 void	Psync(struct ps_prochandle *Pr);
 int	Pcreate_agent(struct ps_prochandle *Pr);
 void	Pdestroy_agent(struct ps_prochandle *Pr);
